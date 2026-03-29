@@ -1,5 +1,41 @@
-__pycache__/ 
-build/ 
-ffmpeg.exe 
-desktop.ini 
-*.skill 
+# Build
+dist/
+build/
+*.spec
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Modelos de IA (pesados demais para o GitHub)
+modelos_ia/
+*.pt
+*.onnx
+
+# Binários de terceiros
+ffmpeg.exe
+rclone.exe
+
+# HuggingFace cache
+huggingface/
+dist/huggingface/
+
+# Arquivos temporários
+*.tmp
+*.log
+_rclone_tmp.zip
+canivete_update_*.exe
+canivete_patch_*.bat
+
+# Windows
+desktop.ini
+Thumbs.db
+
+# Skills
+*.skill
+
+# IDE
+.vscode/
+.idea/

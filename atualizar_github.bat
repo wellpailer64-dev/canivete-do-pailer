@@ -10,26 +10,48 @@ echo  =========================================
 echo.
 
 :: Le versao atual do version.txt
-set VERSAO=desconhecida
-if exist version.txt (
-    set /p VERSAO=<version.txt
+if not exist version.txt echo 1.0.0> version.txt
+
+set /p VERSAO_ATUAL=<version.txt
+set VERSAO_ATUAL=%VERSAO_ATUAL: =%
+
+:: Separa major.minor.patch
+for /f "tokens=1,2,3 delims=." %%a in ("%VERSAO_ATUAL%") do (
+    set MAJOR=%%a
+    set MINOR=%%b
+    set PATCH=%%c
 )
-echo  Versao atual: %VERSAO%
+
+:: Incrementa patch
+set /a PATCH_NOVO=%PATCH%+1
+set VERSAO_NOVA=%MAJOR%.%MINOR%.%PATCH_NOVO%
+
+echo  Versao atual:  %VERSAO_ATUAL%
+echo  Nova versao:   %VERSAO_NOVA%
 echo.
 
-:: Pergunta a mensagem do commit
+:: Pergunta descricao
 echo  O que voce melhorou nessa versao?
 echo  Exemplo: Adicionei Compressor de Video
 echo.
 set /p MENSAGEM=" Descricao: "
-
-if "%MENSAGEM%"=="" set MENSAGEM=atualizacao v%VERSAO%
+if "%MENSAGEM%"=="" set MENSAGEM=atualizacao v%VERSAO_NOVA%
 
 echo.
-echo  Subindo para o GitHub...
+echo  Atualizando arquivos e subindo para o GitHub...
 echo.
 
-:: Remove arquivos desnecessarios do rastreamento
+:: Atualiza version.txt
+echo %VERSAO_NOVA%> version.txt
+echo  [OK] version.txt -> %VERSAO_NOVA%
+
+:: Atualiza VERSAO_LOCAL no atualizador.py
+if exist atualizador.py (
+    powershell -NoProfile -Command "(Get-Content atualizador.py) -replace 'VERSAO_LOCAL\s*=\s*"[^"]*"', 'VERSAO_LOCAL   = "%VERSAO_NOVA%"' | Set-Content atualizador.py"
+    echo  [OK] atualizador.py -> v%VERSAO_NOVA%
+)
+
+:: Remove arquivos desnecessarios
 git rm -r --cached dist/ >nul 2>&1
 git rm -r --cached build/ >nul 2>&1
 git rm -r --cached modelos_ia/ >nul 2>&1
@@ -39,7 +61,7 @@ git rm -r --cached whisper/ >nul 2>&1
 git rm --cached ffmpeg.exe >nul 2>&1
 git rm --cached rclone.exe >nul 2>&1
 
-:: Adiciona so o que interessa
+:: Adiciona apenas o necessario
 git add *.py
 git add *.bat
 git add *.txt
@@ -61,23 +83,18 @@ if %errorlevel% == 0 (
 )
 
 :: Commit e push
-git commit -m "v%VERSAO% - %MENSAGEM%"
-
+git commit -m "v%VERSAO_NOVA% - %MENSAGEM%"
 if errorlevel 1 (
     color 0C
-    echo.
     echo  ERRO: Falha ao criar commit.
     pause
     exit /b 1
 )
 
 git push origin main
-
 if errorlevel 1 (
     color 0C
-    echo.
     echo  ERRO: Falha ao enviar para o GitHub.
-    echo  Verifique sua conexao ou o token de acesso.
     pause
     exit /b 1
 )
@@ -87,10 +104,11 @@ color 0A
 echo.
 echo  =========================================
 echo   Codigo enviado com sucesso!
+echo   Versao: %VERSAO_NOVA%
 echo.
 echo   Proximos passos:
 echo   1. Rode o build.bat para gerar o .exe
-echo   2. Crie nova Release no GitHub
+echo   2. Crie nova Release no GitHub com o .exe
 echo  =========================================
 echo.
 pause
