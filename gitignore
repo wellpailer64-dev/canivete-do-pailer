@@ -1,0 +1,30 @@
+# Build
+dist/
+build/
+*.spec
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Modelos de IA (pesados demais para o GitHub)
+modelos_ia/
+*.pt
+*.onnx
+
+# Binários de terceiros
+ffmpeg.exe
+rclone.exe
+
+# Arquivos temporários
+*.tmp
+*.log
+_rclone_tmp.zip
+canivete_update_*.exe
+canivete_patch_*.bat
+
+# IDE
+.vscode/
+.idea/
