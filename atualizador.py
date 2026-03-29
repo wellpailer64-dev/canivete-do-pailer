@@ -18,7 +18,7 @@ import tempfile
 from packaging.version import Version
 
 # ── CONFIGURAÇÕES — ajuste para o seu repositório ────────────
-GITHUB_USER    = "seuusuario"           # ← seu usuário do GitHub
+GITHUB_USER    = "wellpailer64-dev"      # ← seu usuário do GitHub
 GITHUB_REPO    = "canivete-do-pailer"   # ← nome do repositório
 VERSION_URL    = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/main/version.txt"
 RELEASE_URL    = f"https://github.com/{GITHUB_USER}/{GITHUB_REPO}/releases/latest/download/Canivete.do.Pailer.exe"

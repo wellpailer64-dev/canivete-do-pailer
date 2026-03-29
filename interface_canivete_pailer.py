@@ -17,6 +17,8 @@ from snapshot_logger import restaurar_backup, aplicar_nextup
 from gdrive_dumper import (extract_folder_id, verificar_rclone, verificar_gdrive_configurado,
                            calcular_tamanho_pasta, dump_pasta)
 from atualizador import verificar_em_background, baixar_e_aplicar, get_versao_local
+from compressor_video import (listar_videos, comprimir_lista, get_info_video,
+                              EXTENSOES_VIDEO, QUALIDADE_PADRAO, _fmt_tamanho)
 from removerfundo import remover_fundo_pasta, remover_fundo_arquivos
 from setup_modelos import verificar_modelos, tudo_instalado
 
@@ -379,6 +381,7 @@ def abrir_hub():
         ("✂️", "Remover Fundo",            lambda: [hub.withdraw(), abrir_remover_fundo_janela(hub)],     "#2A2A2A", "#F97316"),
         ("🎬", "Logger Brabo",              lambda: [hub.withdraw(), abrir_org_videos_janela(hub)],        "#2A2A2A", "#F97316"),
         ("☁️", "GDrive Dumper",            lambda: [hub.withdraw(), abrir_gdrive_dumper_janela(hub)],     "#2A2A2A", "#F97316"),
+        ("🗜️", "Compressor de Vídeo",      lambda: [hub.withdraw(), abrir_compressor_video_janela(hub)], "#2A2A2A", "#F97316"),
     ]
 
     for i, (emoji, texto, cmd, bg, fg) in enumerate(ferramentas):
@@ -2545,6 +2548,369 @@ def abrir_gdrive_dumper_janela(hub):
     botao_dump.config(
         command=lambda: threading.Thread(target=rodar_dump, daemon=True).start())
     botao_cancelar.config(command=cancelar)
+
+
+
+# =========================
+# 🗜️ COMPRESSOR DE VÍDEO
+# =========================
+def abrir_compressor_video_janela(hub):
+    import tkinter as tk
+    from tkinter import filedialog
+    from tkinter.ttk import Progressbar, Style
+
+    win = Toplevel()
+    win.title("🗜️ Compressor de Vídeo — Canivete do Pailer")
+    try:
+        win.iconbitmap(resource_path("icone.ico"))
+    except Exception:
+        pass
+
+    largura, altura = 640, 720
+    x = (win.winfo_screenwidth()  // 2) - (largura // 2)
+    y = (win.winfo_screenheight() // 2) - (altura  // 2)
+    win.geometry(f"{largura}x{altura}+{x}+{y}")
+    win.minsize(560, 640)
+    win.resizable(True, True)
+    win.configure(bg="#1C1C1C")
+    win.protocol("WM_DELETE_WINDOW", lambda: [win.destroy(), hub.deiconify()])
+
+    style = Style()
+    style.theme_use("clam")
+    style.configure("Laranja.Horizontal.TProgressbar",
+                    troughcolor="#2A2A2A", background="#F97316",
+                    bordercolor="#1C1C1C", lightcolor="#F97316", darkcolor="#F97316")
+    style.configure("Verde.Horizontal.TProgressbar",
+                    troughcolor="#2A2A2A", background="#4CAF50",
+                    bordercolor="#1C1C1C", lightcolor="#4CAF50", darkcolor="#4CAF50")
+
+    # ── Header ────────────────────────────────────────────────
+    frame_header = Frame(win, bg="#F97316", pady=10)
+    frame_header.pack(fill="x")
+    try:
+        img = Image.open(resource_path("splash.png")).resize((38, 38), Image.LANCZOS)
+        photo = ImageTk.PhotoImage(img)
+        lbl = Label(frame_header, image=photo, bg="#F97316", bd=0)
+        lbl.image = photo
+        lbl.pack(side="left", padx=(14, 8))
+    except Exception:
+        pass
+    Label(frame_header, text="Compressor de Vídeo",
+          font=("Segoe UI", 12, "bold"), bg="#F97316", fg="#0F0F0F").pack(side="left")
+    Label(frame_header, text="H.265 • Qualidade original • Menos peso",
+          font=("Segoe UI", 9), bg="#F97316", fg="#0F0F0F").pack(side="right", padx=14)
+
+    # ── Seleção de arquivo ou pasta ───────────────────────────
+    Frame(win, bg="#333333", height=1).pack(fill="x", padx=20, pady=(14, 0))
+
+    sel_frame = Frame(win, bg="#1C1C1C")
+    sel_frame.pack(fill="x", padx=20, pady=(10, 0))
+
+    lbl_sel = Label(sel_frame, text="Nenhum arquivo ou pasta selecionado",
+                    font=("Segoe UI", 9), bg="#1C1C1C", fg="#888888",
+                    anchor="w", wraplength=500)
+    lbl_sel.pack(fill="x", pady=(0, 8))
+
+    btn_s = dict(font=("Segoe UI", 9, "bold"), bd=0, relief="flat",
+                 cursor="hand2", padx=14, pady=7)
+
+    btn_row = Frame(win, bg="#1C1C1C")
+    btn_row.pack(fill="x", padx=20)
+
+    win._arquivos   = []
+    win._pasta_base = ""
+
+    def selecionar_arquivos():
+        exts = " ".join(f"*{e}" for e in sorted(EXTENSOES_VIDEO))
+        arquivos = filedialog.askopenfilenames(
+            parent=win,
+            title="Selecionar vídeos",
+            filetypes=[("Vídeos", exts), ("Todos", "*.*")]
+        )
+        if arquivos:
+            win._arquivos   = list(arquivos)
+            win._pasta_base = os.path.dirname(arquivos[0])
+            n = len(arquivos)
+            lbl_sel.config(
+                text=f"📄 {n} arquivo(s) selecionado(s)",
+                fg="#CCCCCC")
+            _atualizar_info_selecao()
+            botao_comprimir.config(state="normal")
+
+    def selecionar_pasta():
+        pasta = filedialog.askdirectory(parent=win, title="Selecionar pasta com vídeos")
+        if pasta:
+            videos = listar_videos(pasta)
+            if not videos:
+                lbl_sel.config(text="⚠️  Nenhum vídeo encontrado nessa pasta.", fg="#f59e0b")
+                return
+            win._arquivos   = videos
+            win._pasta_base = pasta
+            lbl_sel.config(
+                text=f"📂 {pasta}  •  {len(videos)} vídeo(s) encontrado(s)",
+                fg="#CCCCCC")
+            _atualizar_info_selecao()
+            botao_comprimir.config(state="normal")
+
+    Button(btn_row, text="📄  Arquivo(s)", bg="#F97316", fg="#0F0F0F",
+           activebackground="#e06510", command=selecionar_arquivos, **btn_s).pack(side="left", padx=(0,8))
+    Button(btn_row, text="📂  Pasta inteira", bg="#2A2A2A", fg="#F97316",
+           activebackground="#3a3a3a", command=selecionar_pasta, **btn_s).pack(side="left")
+
+    # ── Info dos arquivos selecionados ────────────────────────
+    info_card = Frame(win, bg="#242424")
+    info_card.pack(fill="x", padx=20, pady=(12, 0))
+
+    info_row = Frame(info_card, bg="#242424")
+    info_row.pack(fill="x", padx=14, pady=10)
+
+    lbl_qtd   = _mini_stat(info_row, "Arquivos", "—")
+    lbl_total = _mini_stat(info_row, "Tamanho total", "—")
+    lbl_codec = _mini_stat(info_row, "Codec", "—")
+    lbl_res   = _mini_stat(info_row, "Resolução", "—")
+
+    def _atualizar_info_selecao():
+        arquivos = win._arquivos
+        if not arquivos:
+            return
+        lbl_qtd[1].config(text=str(len(arquivos)))
+        total_mb = sum(os.path.getsize(f) / 1024 / 1024 for f in arquivos if os.path.exists(f))
+        lbl_total[1].config(text=_fmt_tamanho(total_mb))
+        # Pega info do primeiro arquivo
+        info = get_info_video(arquivos[0])
+        if info:
+            lbl_codec[1].config(text=info.get("codec_video", "—").upper())
+            w, h = info.get("largura", 0), info.get("altura", 0)
+            lbl_res[1].config(text=f"{w}x{h}" if w else "—")
+
+    # ── Qualidade ─────────────────────────────────────────────
+    Frame(win, bg="#333333", height=1).pack(fill="x", padx=20, pady=12)
+    Label(win, text="Qualidade da compressão:",
+          font=("Segoe UI", 9, "bold"), bg="#1C1C1C", fg="#CCCCCC").pack(anchor="w", padx=20)
+
+    qual_frame = Frame(win, bg="#1C1C1C")
+    qual_frame.pack(fill="x", padx=20, pady=(6, 0))
+
+    qual_var = tk.IntVar(value=QUALIDADE_PADRAO)
+    qualidades = [
+        (18, "🌟 Máxima",   "Quase sem perda — arquivo maior"),
+        (23, "✅ Ótima",    "Padrão recomendado — melhor equilíbrio"),
+        (28, "📦 Compacta", "Menor arquivo — leve perda em cenas rápidas"),
+    ]
+    for crf, nome, desc in qualidades:
+        f = Frame(qual_frame, bg="#1C1C1C")
+        f.pack(fill="x", pady=2)
+        tk.Radiobutton(f, text=nome, variable=qual_var, value=crf,
+                       font=("Segoe UI", 9, "bold"), bg="#1C1C1C", fg="#CCCCCC",
+                       selectcolor="#2A2A2A", activebackground="#1C1C1C",
+                       activeforeground="#F97316").pack(side="left")
+        Label(f, text=f"  {desc}", font=("Segoe UI", 8),
+              bg="#1C1C1C", fg="#666666").pack(side="left")
+
+    # ── O que fazer com o original ────────────────────────────
+    Frame(win, bg="#333333", height=1).pack(fill="x", padx=20, pady=12)
+    Label(win, text="Após comprimir:",
+          font=("Segoe UI", 9, "bold"), bg="#1C1C1C", fg="#CCCCCC").pack(anchor="w", padx=20)
+
+    orig_var = tk.IntVar(value=1)  # 1=manter cópia, 0=substituir
+    orig_frame = Frame(win, bg="#1C1C1C")
+    orig_frame.pack(fill="x", padx=20, pady=(6, 0))
+
+    opcoes_orig = [
+        (1, "📋 Manter original",   "Salva comprimido em pasta separada, original intacto"),
+        (0, "🔄 Substituir original", "Apaga original após comprimir — economiza espaço"),
+    ]
+    for val, nome, desc in opcoes_orig:
+        f = Frame(orig_frame, bg="#1C1C1C")
+        f.pack(fill="x", pady=2)
+        tk.Radiobutton(f, text=nome, variable=orig_var, value=val,
+                       font=("Segoe UI", 9, "bold"), bg="#1C1C1C", fg="#CCCCCC",
+                       selectcolor="#2A2A2A", activebackground="#1C1C1C",
+                       activeforeground="#F97316").pack(side="left")
+        Label(f, text=f"  {desc}", font=("Segoe UI", 8),
+              bg="#1C1C1C", fg="#666666").pack(side="left")
+
+    # ── Botão comprimir ───────────────────────────────────────
+    Frame(win, bg="#333333", height=1).pack(fill="x", padx=20, pady=12)
+    botao_comprimir = Button(win, text="🗜️  Comprimir Vídeo(s)",
+                             bg="#F97316", fg="#0F0F0F", activebackground="#e06510",
+                             font=("Segoe UI", 12, "bold"),
+                             bd=0, relief="flat", cursor="hand2", pady=12,
+                             state="disabled")
+    botao_comprimir.pack(fill="x", padx=20)
+
+    botao_cancelar = Button(win, text="✕  Cancelar",
+                            bg="#2A2A2A", fg="#f44336", activebackground="#3a3a3a",
+                            font=("Segoe UI", 10, "bold"),
+                            bd=0, relief="flat", cursor="hand2", pady=8,
+                            state="disabled")
+    botao_cancelar.pack(fill="x", padx=20, pady=(4, 0))
+
+    # ── Painel de progresso ───────────────────────────────────
+    Frame(win, bg="#333333", height=1).pack(fill="x", padx=20, pady=10)
+    prog_card = Frame(win, bg="#242424")
+    prog_card.pack(fill="x", padx=20)
+
+    # Arquivo atual
+    arq_row = Frame(prog_card, bg="#242424")
+    arq_row.pack(fill="x", padx=14, pady=(10, 2))
+    lbl_arq_titulo = Label(arq_row, text="Aguardando…",
+                           font=("Segoe UI", 8), bg="#242424", fg="#666666")
+    lbl_arq_titulo.pack(anchor="w")
+    lbl_arq_nome = Label(arq_row, text="",
+                         font=("Segoe UI", 10, "bold"), bg="#242424", fg="#CCCCCC",
+                         anchor="w", wraplength=560)
+    lbl_arq_nome.pack(fill="x")
+
+    # Barra + %
+    bar_row = Frame(prog_card, bg="#242424")
+    bar_row.pack(fill="x", padx=14, pady=(6, 2))
+    progress = Progressbar(bar_row, mode="determinate",
+                           style="Laranja.Horizontal.TProgressbar")
+    progress.pack(side="left", fill="x", expand=True)
+    lbl_pct = Label(bar_row, text="0%", font=("Segoe UI", 10, "bold"),
+                    bg="#242424", fg="#F97316", width=5)
+    lbl_pct.pack(side="left", padx=(8, 0))
+
+    # Stats: arquivo atual / total, tamanho original → final, economia
+    stats_row = Frame(prog_card, bg="#242424")
+    stats_row.pack(fill="x", padx=14, pady=(4, 12))
+
+    lbl_stat_arqs  = _mini_stat(stats_row, "Arquivo",      "—")
+    lbl_stat_orig  = _mini_stat(stats_row, "Original",     "—")
+    lbl_stat_final = _mini_stat(stats_row, "Comprimido",   "—")
+    lbl_stat_econ  = _mini_stat(stats_row, "Economia",     "—")
+
+    lbl_log = Label(win, text="", font=("Consolas", 8),
+                    bg="#1C1C1C", fg="#555555", anchor="w",
+                    wraplength=580, justify="left")
+    lbl_log.pack(fill="x", padx=20, pady=(4, 10))
+
+    def _on_resize(event):
+        lbl_arq_nome.config(wraplength=max(200, win.winfo_width() - 60))
+        lbl_log.config(wraplength=max(200, win.winfo_width() - 60))
+    win.bind("<Configure>", _on_resize)
+
+    # ── Estado interno ────────────────────────────────────────
+    stop_event       = threading.Event()
+    win._total_orig  = 0.0
+    win._total_final = 0.0
+
+    def _log(msg):
+        win.after(0, lambda: lbl_log.config(text=msg, fg="#888888"))
+
+    def _prog(pct, texto):
+        def _up():
+            if pct < 0:
+                if progress["mode"] != "indeterminate":
+                    progress.config(mode="indeterminate")
+                    progress.start(12)
+            else:
+                if progress["mode"] == "indeterminate":
+                    progress.stop()
+                    progress.config(mode="determinate")
+                progress["value"] = pct
+                lbl_pct.config(text=f"{pct}%",
+                               fg="#F97316" if pct < 100 else "#4CAF50")
+            lbl_log.config(text=texto, fg="#888888")
+        win.after(0, _up)
+
+    def _on_arquivo(idx, total, nome):
+        win.after(0, lambda: lbl_arq_titulo.config(
+            text=f"Comprimindo arquivo {idx} de {total}:", fg="#F97316"))
+        win.after(0, lambda: lbl_arq_nome.config(text=nome, fg="#CCCCCC"))
+        win.after(0, lambda: lbl_stat_arqs[1].config(text=f"{idx} / {total}"))
+        win.after(0, lambda: progress.__setitem__("value", 0))
+        win.after(0, lambda: lbl_pct.config(text="0%", fg="#F97316"))
+
+    def rodar():
+        stop_event.clear()
+        win.after(0, lambda: botao_comprimir.config(state="disabled", text="Comprimindo…"))
+        win.after(0, lambda: botao_cancelar.config(state="normal"))
+        win.after(0, lambda: progress.config(
+            mode="indeterminate", style="Laranja.Horizontal.TProgressbar"))
+        win.after(0, progress.start)
+        win.after(0, lambda: lbl_arq_titulo.config(text="Iniciando…", fg="#888888"))
+
+        arquivos      = win._arquivos
+        manter_orig   = bool(orig_var.get())
+        crf           = qual_var.get()
+
+        # Pasta de saída
+        if manter_orig:
+            pasta_saida = os.path.join(win._pasta_base, "comprimidos_h265")
+        else:
+            pasta_saida = win._pasta_base  # só temporário, será substituído
+
+        resultado = comprimir_lista(
+            arquivos,
+            pasta_saida,
+            qualidade_crf=crf,
+            manter_original=manter_orig,
+            callback_progresso=_prog,
+            callback_log=_log,
+            callback_arquivo=_on_arquivo,
+            stop_event=stop_event,
+        )
+
+        # Finalização
+        win.after(0, lambda: botao_comprimir.config(state="normal", text="🗜️  Comprimir Vídeo(s)"))
+        win.after(0, lambda: botao_cancelar.config(state="disabled"))
+
+        ok    = resultado["ok"]
+        erros = resultado["erros"]
+        orig  = resultado["total_orig_mb"]
+        final = resultado["total_final_mb"]
+        econ  = resultado["reducao_pct"]
+
+        win.after(0, lambda: lbl_stat_orig[1].config(text=_fmt_tamanho(orig)))
+        win.after(0, lambda: lbl_stat_final[1].config(text=_fmt_tamanho(final)))
+        win.after(0, lambda: lbl_stat_econ[1].config(
+            text=f"-{econ:.0f}%", fg="#4CAF50" if econ > 0 else "#888888"))
+
+        if ok > 0:
+            win.after(0, lambda: progress.config(
+                mode="determinate", style="Verde.Horizontal.TProgressbar"))
+            win.after(0, lambda: progress.__setitem__("value", 100))
+            win.after(0, lambda: lbl_pct.config(text="100%", fg="#4CAF50"))
+            win.after(0, lambda: lbl_arq_titulo.config(
+                text=f"✅ {ok} vídeo(s) comprimido(s) com sucesso!", fg="#4CAF50"))
+            win.after(0, lambda: lbl_arq_nome.config(
+                text=f"{_fmt_tamanho(orig)} → {_fmt_tamanho(final)}  (-{econ:.0f}% de peso)",
+                fg="#4CAF50"))
+            win.after(0, lambda: tocar("concluido.wav"))
+            if manter_orig:
+                win.after(500, lambda: abrir_pasta(pasta_saida))
+            else:
+                win.after(500, lambda: abrir_pasta(win._pasta_base))
+        else:
+            win.after(0, lambda: lbl_arq_titulo.config(
+                text="⚠️  Nenhum vídeo foi comprimido.", fg="#f59e0b"))
+
+        if erros > 0:
+            win.after(0, lambda: _log(f"⚠️  {erros} arquivo(s) com erro."))
+
+    def cancelar():
+        stop_event.set()
+        win.after(0, lambda: botao_cancelar.config(state="disabled"))
+        win.after(0, lambda: lbl_log.config(
+            text="⛔ Cancelando… aguarde o arquivo atual terminar.", fg="#888888"))
+
+    botao_comprimir.config(
+        command=lambda: threading.Thread(target=rodar, daemon=True).start())
+    botao_cancelar.config(command=cancelar)
+
+
+def _mini_stat(parent, titulo, valor_inicial):
+    """Cria um bloco de estatística com título e valor. Retorna (frame, lbl_valor)."""
+    f = Frame(parent, bg=parent.cget("bg"))
+    f.pack(side="left", padx=(0, 24))
+    Label(f, text=titulo, font=("Segoe UI", 8),
+          bg=parent.cget("bg"), fg="#666666").pack(anchor="w")
+    lbl = Label(f, text=valor_inicial, font=("Segoe UI", 11, "bold"),
+                bg=parent.cget("bg"), fg="#CCCCCC")
+    lbl.pack(anchor="w")
+    return f, lbl
 
 
 # =========================
