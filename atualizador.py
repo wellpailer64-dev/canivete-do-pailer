@@ -124,11 +124,19 @@ def baixar_e_aplicar(versao_nova, callback_progresso=None, callback_log=None):
         exe_dir = os.path.dirname(exe_atual)
         version_file = os.path.join(exe_dir, "version.txt")
 
+        pid_atual = os.getpid()
+
         with open(bat, "w") as f:
             f.write(f"""@echo off
+:: Aguarda o processo atual encerrar
 timeout /t 2 /nobreak >nul
+taskkill /PID {pid_atual} /F >nul 2>&1
+timeout /t 1 /nobreak >nul
+:: Substitui o exe
 move /y "{tmp}" "{exe_atual}"
+:: Atualiza version.txt
 echo {versao_nova}> "{version_file}"
+:: Inicia a nova versao
 start "" "{exe_atual}"
 del "%~f0"
 """)

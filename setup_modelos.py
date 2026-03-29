@@ -108,12 +108,26 @@ def checar_whisper_medium():
 def checar_rembg():
     return os.path.exists(os.path.join(_rembg_dir, "u2net.onnx"))
 
+def _get_clip_dir():
+    """Retorna o diretório onde o modelo CLIP deve ser salvo."""
+    base = get_base_dir()
+    clip_dir = os.path.join(base, "modelos_ia", "clip")
+    os.makedirs(clip_dir, exist_ok=True)
+    return clip_dir
+
 def checar_clip():
-    """Verifica se o modelo CLIP já foi baixado no cache do HuggingFace."""
+    """Verifica se o modelo CLIP já foi baixado na pasta do app."""
     try:
+        clip_dir = _get_clip_dir()
+        # Verifica se existe pelo menos um arquivo de modelo baixado
+        for root, dirs, files in os.walk(clip_dir):
+            for f in files:
+                if f.endswith((".bin", ".safetensors", ".json")):
+                    if "clip" in root.lower() or "clip" in f.lower() or "model" in f.lower():
+                        return True
+        # Fallback: verifica cache do HuggingFace também
         cache_hf = os.path.join(os.path.expanduser("~"),
                                 ".cache", "huggingface", "hub")
-        # Procura qualquer pasta com clip-vit-base
         if os.path.exists(cache_hf):
             for item in os.listdir(cache_hf):
                 if "clip-vit-base" in item.lower():
@@ -124,20 +138,30 @@ def checar_clip():
 
 
 def instalar_clip(callback_log=None, callback_progresso=None):
-    """Baixa o modelo CLIP via transformers."""
+    """Baixa o modelo CLIP via transformers — salva ao lado do .exe."""
     import io as _io
 
     if callback_log:
         callback_log("📥 Baixando modelo CLIP (clip-vit-base-patch32)...")
         callback_log("   Isso pode demorar alguns minutos (~350MB)...")
 
+    clip_dir = _get_clip_dir()
+    # Configura HuggingFace para salvar na pasta do app
+    os.environ["HF_HOME"]            = clip_dir
+    os.environ["HUGGINGFACE_HUB_CACHE"] = clip_dir
+    os.environ["TRANSFORMERS_CACHE"] = clip_dir
+
     def _tentar():
         _out, _err = sys.stdout, sys.stderr
         sys.stdout = sys.stderr = _io.StringIO()
         try:
             from transformers import CLIPProcessor, CLIPModel
-            CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-            CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+            CLIPModel.from_pretrained(
+                "openai/clip-vit-base-patch32",
+                cache_dir=clip_dir)
+            CLIPProcessor.from_pretrained(
+                "openai/clip-vit-base-patch32",
+                cache_dir=clip_dir)
             return True, None
         except Exception as e:
             return False, str(e)

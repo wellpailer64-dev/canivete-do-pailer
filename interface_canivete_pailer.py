@@ -267,7 +267,33 @@ def _mostrar_popup_update(hub, versao_nova):
           font=("Segoe UI", 10), bg="#1C1C1C", fg="#CCCCCC").pack(pady=(4, 0))
     Label(popup, text="O app será atualizado e reiniciado automaticamente.",
           font=("Segoe UI", 9), bg="#1C1C1C", fg="#888888",
-          wraplength=360).pack(pady=(4, 14))
+          wraplength=360).pack(pady=(4, 0))
+
+    # Busca notas de melhoria do GitHub
+    def _buscar_notas():
+        try:
+            import urllib.request as _ur
+            url = (f"https://api.github.com/repos/wellpailer64-dev/"
+                   f"canivete-do-pailer/releases/latest")
+            req = _ur.Request(url, headers={"User-Agent": "CaniveteUpdater"})
+            with _ur.urlopen(req, timeout=6) as r:
+                import json as _json
+                data = _json.loads(r.read())
+                notas = data.get("body", "").strip()
+                if notas:
+                    # Limita a 3 linhas
+                    linhas = [l for l in notas.split("\n") if l.strip()][:4]
+                    texto  = "\n".join(linhas)
+                    popup.after(0, lambda: lbl_notas.config(
+                        text=texto, fg="#AAAAAA"))
+        except Exception:
+            pass
+
+    lbl_notas = Label(popup, text="Buscando novidades…",
+                      font=("Segoe UI", 8), bg="#1C1C1C", fg="#555555",
+                      wraplength=380, justify="left")
+    lbl_notas.pack(padx=20, pady=(6, 10))
+    threading.Thread(target=_buscar_notas, daemon=True).start()
 
     # Progressbar (aparece só durante o download)
     style = Style()
@@ -312,8 +338,18 @@ def _mostrar_popup_update(hub, versao_nova):
                 callback_log=_log)
             if sucesso:
                 popup.after(0, lambda: lbl_status.config(
-                    text="✅ Reiniciando…", fg="#4CAF50"))
-                popup.after(1500, lambda: hub.quit())
+                    text="✅ Pronto! Reiniciando em 2 segundos…", fg="#4CAF50"))
+                # Fecha popup e hub antes do bat matar o processo
+                def _fechar_tudo():
+                    try:
+                        popup.destroy()
+                    except Exception:
+                        pass
+                    try:
+                        hub.destroy()
+                    except Exception:
+                        pass
+                popup.after(1800, _fechar_tudo)
             else:
                 popup.after(0, lambda: btn_pular.config(state="normal"))
                 popup.after(0, lambda: btn_update.config(
