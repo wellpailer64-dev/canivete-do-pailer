@@ -29,8 +29,12 @@ if exist ffmpeg.exe (
       --hidden-import "onnxruntime" ^
       --hidden-import "gdrive_dumper" ^
       --hidden-import "atualizador" ^
+      --hidden-import "compressor_video" ^
+      --hidden-import "setup_modelos" ^
       --add-data "gdrive_dumper.py;." ^
       --add-data "atualizador.py;." ^
+      --add-data "compressor_video.py;." ^
+      --add-data "setup_modelos.py;." ^
       --add-data "version.txt;." ^
       interface_canivete_pailer.py
 ) else (
@@ -48,8 +52,12 @@ if exist ffmpeg.exe (
       --hidden-import "onnxruntime" ^
       --hidden-import "gdrive_dumper" ^
       --hidden-import "atualizador" ^
+      --hidden-import "compressor_video" ^
+      --hidden-import "setup_modelos" ^
       --add-data "gdrive_dumper.py;." ^
       --add-data "atualizador.py;." ^
+      --add-data "compressor_video.py;." ^
+      --add-data "setup_modelos.py;." ^
       --add-data "version.txt;." ^
       interface_canivete_pailer.py
 )
