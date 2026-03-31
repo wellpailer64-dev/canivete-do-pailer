@@ -1,14 +1,19 @@
 import threading
 import sys
 import os
-from tkinter import Tk, Toplevel, Button, Label, filedialog, Text, END, Frame
+import ctypes
+from tkinter import Tk, Toplevel, Button, Label, filedialog, Text, END, Frame, font as tkFont
 from tkinter.ttk import Progressbar, Style
 from PIL import Image, ImageTk
 from organizador_de_imagens import limpar_pasta
-from convertermp3 import converter_pasta, converter_arquivos
+from convertermp3 import converter_pasta, converter_arquivos, FORMATOS_SAIDA as FORMATOS_AUDIO_SAIDA
 from converterimagem import (converter_pasta as img_converter_pasta,
                               converter_arquivos as img_converter_arquivos,
                               FORMATOS_SAIDA)
+from videoconverter import (converter_arquivo as video_converter_arquivo,
+                            detectar_tipo_arquivo,
+                            FORMATOS_SAIDA_VIDEO_PARA_GIF,
+                            FORMATOS_SAIDA_GIF_PARA_VIDEO)
 from transcreveraudio import (transcrever_pasta, transcrever_audios, MODELOS)
 from faviconconverter import gerar_favicon
 from organizador_de_videos import organizar_videos
@@ -18,7 +23,10 @@ from gdrive_dumper import (extract_folder_id, verificar_rclone, verificar_gdrive
                            calcular_tamanho_pasta, dump_pasta)
 from atualizador import verificar_em_background, baixar_e_aplicar, get_versao_local
 from compressor_video import (listar_videos, comprimir_lista, get_info_video,
-                              EXTENSOES_VIDEO, QUALIDADE_PADRAO, _fmt_tamanho)
+                              EXTENSOES_VIDEO, QUALIDADE_PADRAO, _fmt_tamanho,
+                              detectar_encoders_disponiveis)
+from compressor_imagem import (listar_arquivos as listar_arquivos_img,
+                               comprimir_lista as comprimir_lista_img)
 from removerfundo import remover_fundo_pasta, remover_fundo_arquivos
 from setup_modelos import verificar_modelos, tudo_instalado
 
@@ -31,20 +39,71 @@ try:
 except ImportError:
     PLAYSOUND_OK = False
 
-
 # =========================
-# 🔍 HELPER
+# 🔍 HELPERS (Devem vir primeiro)
 # =========================
 def resource_path(filename):
+    """Acessa arquivos embutidos no .exe pelo PyInstaller."""
     if hasattr(sys, "_MEIPASS"):
         return os.path.join(sys._MEIPASS, filename)
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
 
 
+def get_base_dir():
+    """Pasta ao lado do .exe (onde ficam modelos, rclone, exiftool)."""
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+_CLICK_SOM_ATIVO = False
+_FONTE_MAIN = "Segoe UI"  # Fallback
+
+def carregar_fonte_customizada():
+    """Carrega a fonte CreateFutureRegular para a sessao do Windows."""
+    global _FONTE_MAIN
+    try:
+        font_path = os.path.abspath(resource_path("CreateFutureRegular-m2Mw2.otf"))
+        if os.path.exists(font_path):
+            # Carrega a fonte no Windows (apenas para este processo)
+            # FR_PRIVATE = 0x10
+            res = ctypes.windll.gdi32.AddFontResourceExW(font_path, 0x10, 0)
+            if res > 0:
+                _FONTE_MAIN = "Create Future"
+                # Notifica o sistema
+                ctypes.windll.user32.PostMessageW(0xFFFF, 0x001D, 0, 0)
+                print(f"Fonte carregada: {_FONTE_MAIN}")
+            else:
+                print(f"Falha ao registrar fonte {font_path}")
+        else:
+            print(f"Arquivo de fonte nao encontrado: {font_path}")
+    except Exception as e:
+        print(f"Erro ao carregar fonte: {e}")
+
+# Inicializa a fonte apos definir resource_path
+# Tentativa 1: Global
+carregar_fonte_customizada()
+
+
+# =========================
+# 🎵 AUDIO PLAYER
+# =========================
 def tocar(arquivo):
     def _play():
         try:
-            path = resource_path(arquivo)
+            candidatos = [arquivo]
+            if os.path.basename(arquivo) == arquivo:
+                candidatos.insert(0, os.path.join("sound", arquivo))
+
+            path = None
+            for item in candidatos:
+                p = resource_path(item)
+                if os.path.exists(p):
+                    path = p
+                    break
+
+            if not path:
+                return
             # Tenta winsound primeiro (Windows nativo, sem problemas de path)
             try:
                 import winsound
@@ -68,50 +127,135 @@ def abrir_pasta(path):
         pass
 
 
+def configurar_janela_responsiva(win, largura=900, altura=680, min_w=640, min_h=520):
+    """Configura janela com tamanho inicial centralizado e redimensionamento livre."""
+    try:
+        sw = win.winfo_screenwidth()
+        sh = win.winfo_screenheight()
+        largura = min(int(largura), max(640, sw - 60))
+        altura = min(int(altura), max(520, sh - 80))
+        x = max((sw // 2) - (largura // 2), 0)
+        y = max((sh // 2) - (altura // 2), 0)
+        win.geometry(f"{largura}x{altura}+{x}+{y}")
+        win.minsize(min_w, min_h)
+        win.resizable(True, True)
+    except Exception:
+        pass
+
+
+def ativar_som_click_global(widget):
+    """Reproduz click.wav ao clicar em botoes/check/radio no app."""
+    global _CLICK_SOM_ATIVO
+    if _CLICK_SOM_ATIVO:
+        return
+
+    def _on_click(event):
+        try:
+            w = event.widget
+            try:
+                if str(w.cget("state")).lower() == "disabled":
+                    return
+            except Exception:
+                pass
+            tocar("click.wav")
+        except Exception:
+            pass
+
+    try:
+        for classe in ["Button", "TButton", "Checkbutton", "TCheckbutton", "Radiobutton", "TRadiobutton"]:
+            widget.bind_class(classe, "<ButtonRelease-1>", _on_click, add="+")
+        _CLICK_SOM_ATIVO = True
+    except Exception:
+        pass
+
+
 # =========================
 # 🎨 SPLASH SCREEN
 # =========================
 def mostrar_splash(depois):
-    # Pré-carrega imagem e som ANTES de montar a janela
-    splash_img   = None
-    splash_photo = None
-    try:
-        splash_img   = Image.open(resource_path("splash.png")).resize((220, 220), Image.LANCZOS)
-    except Exception:
-        pass
-
+    """Exibe splash screen com GIF animado (splash.gif) ou PNG estatico."""
     splash = Tk()
     splash.overrideredirect(True)
     largura, altura = 360, 420
-    x = (splash.winfo_screenwidth()  // 2) - (largura // 2)
-    y = (splash.winfo_screenheight() // 2) - (altura  // 2)
+    sw = splash.winfo_screenwidth()
+    sh = splash.winfo_screenheight()
+    x = (sw // 2) - (largura // 2)
+    y = (sh // 2) - (altura // 2)
     splash.geometry(f"{largura}x{altura}+{x}+{y}")
-    splash.configure(bg="#F97316")
+    # Layout Cyberpunk: Fundo Preto
+    splash.configure(bg="#0A0A0A")
 
-    # Exibe imagem pré-carregada
-    if splash_img:
+    frames = []
+    # 1. Tenta carregar o GIF animado
+    try:
+        gif_path = resource_path("splash.gif")
+        if os.path.exists(gif_path):
+            img_gif = Image.open(gif_path)
+            try:
+                rs = Image.Resampling.LANCZOS
+            except AttributeError:
+                rs = Image.LANCZOS
+
+            total_frames = getattr(img_gif, "n_frames", 1)
+            for i in range(total_frames):
+                img_gif.seek(i)
+                # Mantém fundo preto na conversão se houver transparência
+                frame_data = img_gif.copy().convert("RGBA").resize((220, 220), rs)
+                frames.append(ImageTk.PhotoImage(frame_data, master=splash))
+    except Exception:
+        frames = []
+
+    # 2. Fallback para PNG
+    splash_photo = None
+    if not frames:
         try:
-            splash_photo = ImageTk.PhotoImage(splash_img)
-            lbl = Label(splash, image=splash_photo, bg="#F97316", bd=0)
-            lbl.image = splash_photo  # mantém referência
-            lbl.pack(pady=(40, 10))
+            png_path = resource_path("splash.png")
+            if os.path.exists(png_path):
+                img_png = Image.open(png_path).resize((220, 220), Image.LANCZOS)
+                splash_photo = ImageTk.PhotoImage(img_png, master=splash)
         except Exception:
-            Label(splash, text="🔧", font=("Segoe UI", 60), bg="#F97316").pack(pady=(40, 10))
-    else:
-        Label(splash, text="🔧", font=("Segoe UI", 60), bg="#F97316").pack(pady=(40, 10))
+            pass
 
-    Label(splash, text="Canivete do Pailer",
-          font=("Segoe UI", 16, "bold"), bg="#F97316", fg="#0F0F0F").pack()
-    Label(splash, text="Ferramentas para o dia a dia",
-          font=("Segoe UI", 10), bg="#F97316", fg="#1C1C1C").pack(pady=(4, 0))
-    Label(splash, text="Carregando...",
-          font=("Segoe UI", 9), bg="#F97316", fg="#1C1C1C").pack(pady=(18, 0))
+    # Widget da Imagem com borda sutil neon
+    lbl = Label(splash, bg="#0A0A0A", bd=0)
+    lbl.pack(pady=(45, 15))
+    
+    if frames:
+        lbl._frames = frames
+    elif splash_photo:
+        lbl._photo = splash_photo
 
-    # Força renderização da janela antes de tocar o som
+    # Loop de animação: 100ms para execução mais lenta e natural
+    def animar(idx=0):
+        try:
+            if frames:
+                lbl.config(image=frames[idx])
+                splash.after(100, lambda: animar((idx + 1) % len(frames)))
+            elif splash_photo:
+                lbl.config(image=splash_photo)
+            else:
+                lbl.config(text="⚙️", font=("Segoe UI", 60), fg="#F97316", bg="#0A0A0A")
+        except Exception:
+            pass
+
+    # Tipografia Cyberpunk (Preto + Laranja Neon)
+    # Tenta usar a fonte carregada; se falhar, o Tkinter usa fallback
+    Label(splash, text="CANIVETE DO PAILER",
+          font=(_FONTE_MAIN, 20), bg="#0A0A0A", fg="#F97316").pack()
+    
+    Label(splash, text="System tools for digital creators",
+          font=("Segoe UI", 9), bg="#0A0A0A", fg="#444444").pack(pady=(2, 0))
+    
+    # Barra de progresso fake / Carregando
+    Label(splash, text="INITIALIZING SYSTEM...",
+          font=("Consolas", 8), bg="#0A0A0A", fg="#F97316").pack(pady=(25, 0))
+
+    animar()
     splash.update()
     tocar("splash.wav")
 
-    splash.after(2800, lambda: [splash.destroy(), depois()])
+    # Mantém o splash por 3.5s para apreciar o GIF lento
+    splash.after(3500, lambda: [splash.destroy(), depois()])
     splash.mainloop()
 
 
@@ -371,38 +515,55 @@ def _mostrar_popup_update(hub, versao_nova):
 def abrir_hub():
     hub = Tk()
     hub.title("Canivete do Pailer")
+    ativar_som_click_global(hub)
     try:
         hub.iconbitmap(resource_path("icone.ico"))
     except Exception:
         pass
 
-    largura, altura = 560, 420
-    x = (hub.winfo_screenwidth()  // 2) - (largura // 2)
-    y = (hub.winfo_screenheight() // 2) - (altura  // 2)
-    hub.geometry(f"{largura}x{altura}+{x}+{y}")
-    hub.minsize(480, 360)
+    configurar_janela_responsiva(hub, largura=980, altura=720, min_w=760, min_h=560)
     hub.configure(bg="#1C1C1C")
 
-    # Header
-    frame_header = Frame(hub, bg="#F97316", pady=10)
-    frame_header.pack(fill="x")
-    try:
-        img = Image.open(resource_path("splash.png")).resize((38, 38), Image.LANCZOS)
-        photo = ImageTk.PhotoImage(img)
-        lbl = Label(frame_header, image=photo, bg="#F97316", bd=0)
-        lbl.image = photo
-        lbl.pack(side="left", padx=(14, 8))
-    except Exception:
-        pass
-    Label(frame_header, text="Canivete do Pailer",
-          font=("Segoe UI", 13, "bold"), bg="#F97316", fg="#0F0F0F").pack(side="left")
+    # ── HERO HEADER ───────────────────────────────────────────
+    hero_frame = Frame(hub, bg="#1C1C1C")
+    hero_frame.pack(fill="x", side="top")
+    
+    lbl_hero = Label(hero_frame, bg="#1C1C1C", bd=0)
+    lbl_hero.pack(fill="x")
 
-    Label(hub, text="Selecione uma ferramenta para começar",
-          font=("Segoe UI", 10), bg="#1C1C1C", fg="#AAAAAA").pack(pady=(18, 10))
+    def _atualizar_hero(_event=None):
+        try:
+            largura_w = hub.winfo_width()
+            if largura_w < 100: largura_w = 980
+            
+            # Carrega e redimensiona a imagem Hero
+            img_path = resource_path("hero.webp")
+            if os.path.exists(img_path):
+                img = Image.open(img_path)
+                # Calcula altura proporcional para largura total ou limitada
+                img_w, img_h = img.size
+                nova_w = largura_w
+                nova_h = int((nova_w / img_w) * img_h)
+                
+                # Limita altura máxima do hero para não comer a tela toda
+                if nova_h > 280:
+                    nova_h = 280
+                    nova_w = int((nova_h / img_h) * img_w)
+
+                img_res = img.resize((nova_w, nova_h), Image.LANCZOS)
+                photo = ImageTk.PhotoImage(img_res)
+                lbl_hero.config(image=photo)
+                lbl_hero.image = photo # Referência
+        except Exception as e:
+            print(f"Erro no Hero: {e}")
+
+    lbl_intro = Label(hub, text="Selecione uma ferramenta para começar",
+                      font=("Segoe UI", 10), bg="#1C1C1C", fg="#AAAAAA")
+    lbl_intro.pack(pady=(18, 10))
 
     # Grade de botões 3 colunas
     frame_grid = Frame(hub, bg="#1C1C1C")
-    frame_grid.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+    frame_grid.pack(fill="both", expand=True, padx=24, pady=(0, 12))
 
     # Configura colunas com peso igual para expandir
     for col in range(3):
@@ -410,7 +571,7 @@ def abrir_hub():
 
     ferramentas = [
         ("🗂️", "Organizador de Imagens",  lambda: [hub.withdraw(), abrir_organizador_janela(hub)],      "#F97316", "#0F0F0F"),
-        ("🎵", "Converter para MP3",       lambda: [hub.withdraw(), abrir_conversor_janela(hub)],         "#2A2A2A", "#F97316"),
+        ("🎵", "Converter Áudios",         lambda: [hub.withdraw(), abrir_conversor_janela(hub)],         "#2A2A2A", "#F97316"),
         ("🖼️", "Converter Imagens",        lambda: [hub.withdraw(), abrir_conversor_imagem_janela(hub)],  "#2A2A2A", "#F97316"),
         ("🎙️", "Transcrever Audios",       lambda: [hub.withdraw(), abrir_transcricao_janela(hub)],       "#2A2A2A", "#F97316"),
         ("🌐", "Favicon Generator",        lambda: [hub.withdraw(), abrir_favicon_janela(hub)],           "#2A2A2A", "#F97316"),
@@ -418,6 +579,8 @@ def abrir_hub():
         ("🎬", "Logger Brabo",              lambda: [hub.withdraw(), abrir_org_videos_janela(hub)],        "#2A2A2A", "#F97316"),
         ("☁️", "GDrive Dumper",            lambda: [hub.withdraw(), abrir_gdrive_dumper_janela(hub)],     "#2A2A2A", "#F97316"),
         ("🗜️", "Compressor de Vídeo",      lambda: [hub.withdraw(), abrir_compressor_video_janela(hub)], "#2A2A2A", "#F97316"),
+        ("🎞️", "Video Converter",         lambda: [hub.withdraw(), abrir_video_converter_janela(hub)],   "#2A2A2A", "#F97316"),
+        ("🖼️", "Compressor de Imagem",    lambda: [hub.withdraw(), abrir_compressor_imagem_janela(hub)], "#2A2A2A", "#F97316"),
     ]
 
     for i, (emoji, texto, cmd, bg, fg) in enumerate(ferramentas):
@@ -448,6 +611,19 @@ def abrir_hub():
     Label(hub, text=f"Canivete do Pailer © 2025  •  v{versao_local}",
           font=("Segoe UI", 8), bg="#1C1C1C", fg="#444444").pack(side="bottom", pady=6)
 
+    def _ajustar_respiro_hub(event=None):
+        try:
+            _atualizar_hero() # Atualiza imagem hero no redimensionamento
+            largura_atual = hub.winfo_width()
+            pad = max(24, (largura_atual - 980) // 2)
+            frame_grid.pack_configure(padx=pad)
+            lbl_intro.pack_configure(padx=pad)
+        except Exception:
+            pass
+
+    hub.bind("<Configure>", _ajustar_respiro_hub)
+    hub.after(150, _ajustar_respiro_hub)
+
     # Verifica atualização em background — não bloqueia o hub
     def _quando_tiver_update(versao_nova):
         hub.after(0, lambda: _mostrar_popup_update(hub, versao_nova))
@@ -468,11 +644,7 @@ def abrir_organizador_janela(hub):
     except Exception:
         pass
 
-    largura, altura = 560, 580
-    x = (win.winfo_screenwidth()  // 2) - (largura // 2)
-    y = (win.winfo_screenheight() // 2) - (altura  // 2)
-    win.geometry(f"{largura}x{altura}+{x}+{y}")
-    win.resizable(False, False)
+    configurar_janela_responsiva(win, largura=760, altura=700, min_w=640, min_h=560)
     win.configure(bg="#1C1C1C")
     win.protocol("WM_DELETE_WINDOW", lambda: [win.destroy(), hub.deiconify()])
 
@@ -650,6 +822,98 @@ def abrir_organizador_janela(hub):
 
     botao_backup.config(command=rodar_backup_thread)
 
+    def rodar_desagrupar_thread():
+        """Seleciona pasta organizada e extrai todos os arquivos para uma pasta plana."""
+        pasta_src = filedialog.askdirectory(
+            parent=win,
+            title="Selecionar pasta para desagrupar"
+        )
+        if not pasta_src:
+            return
+
+        # Pede o nome da pasta de saída
+        import tkinter.simpledialog as _sd
+        nome_saida = _sd.askstring(
+            "Nome da pasta de saída",
+            "Digite o nome da pasta onde os arquivos serão colocados:",
+            initialvalue="BRUTOS_DESAGRUPADOS",
+            parent=win
+        )
+        if not nome_saida:
+            return
+        nome_saida = nome_saida.strip() or "BRUTOS_DESAGRUPADOS"
+
+        botao_desagrupar.config(state="disabled", text="Desagrupando…")
+        log_box.delete("1.0", END)
+        progress["value"] = 0
+        status_label.config(text="Desagrupando arquivos...")
+
+        def _rodar():
+            try:
+                import re as _re
+                import shutil as _sh
+
+                # Pasta de saída ao lado da pasta selecionada
+                pasta_pai = os.path.dirname(os.path.abspath(pasta_src))
+                pasta_dest = os.path.join(pasta_pai, nome_saida)
+                os.makedirs(pasta_dest, exist_ok=True)
+
+                log(f"📂 Origem:  {pasta_src}")
+                log(f"📂 Destino: {pasta_dest}")
+
+                # Coleta todos os arquivos recursivamente
+                arquivos = []
+                for root, dirs, files in os.walk(pasta_src):
+                    for f in files:
+                        if not f.startswith('.'):
+                            arquivos.append(os.path.join(root, f))
+
+                total = len(arquivos)
+                log(f"📥 {total} arquivo(s) encontrado(s)")
+
+                movidos = 0
+                erros   = 0
+                for i, src_path in enumerate(arquivos):
+                    nome = os.path.basename(src_path)
+                    dest = os.path.join(pasta_dest, nome)
+                    # Evita colisão de nomes
+                    base, ext = os.path.splitext(nome)
+                    n = 1
+                    while os.path.exists(dest):
+                        dest = os.path.join(pasta_dest, f"{base}_{n}{ext}")
+                        n += 1
+                    try:
+                        _sh.move(src_path, dest)
+                        movidos += 1
+                    except Exception as e:
+                        log(f"   ⚠️  {nome}: {e}")
+                        erros += 1
+
+                    if total > 0:
+                        win.after(0, lambda v=int((i+1)/total*100):
+                                  progress.__setitem__("value", v))
+                        win.after(0, lambda t=f"Copiando... {i+1}/{total}":
+                                  status_label.config(text=t))
+
+                log(f"\n✅ {movidos} arquivo(s) copiados")
+                if erros:
+                    log(f"⚠️  {erros} erro(s)")
+                win.after(0, lambda: status_label.config(
+                    text=f"✅ Desagrupamento concluído! {movidos} arquivos"))
+                win.after(0, lambda: tocar("concluido.wav"))
+                win.after(500, lambda: abrir_pasta(pasta_dest))
+
+            except Exception as e:
+                log(f"❌ ERRO: {e}")
+                win.after(0, lambda: status_label.config(text="❌ Erro ao desagrupar"))
+            finally:
+                win.after(0, lambda: botao_desagrupar.config(
+                    state="normal", text="📂  Desagrupar Pasta"))
+
+        threading.Thread(target=_rodar, daemon=True).start()
+
+    botao_desagrupar.config(command=rodar_desagrupar_thread)
+
     def rodar_nextup_thread():
         path_nu = filedialog.askopenfilename(
             parent=win,
@@ -711,17 +975,13 @@ def abrir_organizador_janela(hub):
 # =========================
 def abrir_conversor_janela(hub):
     win = Toplevel()
-    win.title("🎵 Converter para MP3 — Canivete do Pailer")
+    win.title("🎵 Converter Áudios — Canivete do Pailer")
     try:
         win.iconbitmap(resource_path("icone.ico"))
     except Exception:
         pass
 
-    largura, altura = 560, 500
-    x = (win.winfo_screenwidth()  // 2) - (largura // 2)
-    y = (win.winfo_screenheight() // 2) - (altura  // 2)
-    win.geometry(f"{largura}x{altura}+{x}+{y}")
-    win.resizable(False, False)
+    configurar_janela_responsiva(win, largura=760, altura=640, min_w=640, min_h=520)
     win.configure(bg="#1C1C1C")
     win.protocol("WM_DELETE_WINDOW", lambda: [win.destroy(), hub.deiconify()])
 
@@ -742,10 +1002,27 @@ def abrir_conversor_janela(hub):
         lbl.pack(side="left", padx=(14, 8))
     except Exception:
         pass
-    Label(frame_header, text="Converter para MP3",
+    Label(frame_header, text="Converter Áudios",
           font=("Segoe UI", 12, "bold"), bg="#F97316", fg="#0F0F0F").pack(side="left")
 
-    Label(win, text="Selecione uma pasta ou arquivos para converter",
+    import tkinter as tk
+    formatos_audio = list(FORMATOS_AUDIO_SAIDA.keys())
+    formato_saida_var = tk.StringVar(value="MP3")
+
+    Label(win, text="Formato de saída:",
+          font=("Segoe UI", 10, "bold"), bg="#1C1C1C", fg="#CCCCCC").pack(pady=(14, 2))
+
+    frame_formatos = Frame(win, bg="#1C1C1C")
+    frame_formatos.pack()
+    for fmt in formatos_audio:
+        tk.Radiobutton(
+            frame_formatos, text=fmt, variable=formato_saida_var, value=fmt,
+            bg="#1C1C1C", fg="#F97316", selectcolor="#2A2A2A",
+            activebackground="#1C1C1C", activeforeground="#F97316",
+            font=("Segoe UI", 9, "bold"), cursor="hand2"
+        ).pack(side="left", padx=6)
+
+    Label(win, text="Selecione uma pasta ou arquivos de áudio para converter",
           font=("Segoe UI", 10), bg="#1C1C1C", fg="#CCCCCC").pack(pady=(14, 4))
 
     btn_s = {"font": ("Segoe UI", 10, "bold"), "width": 20,
@@ -773,7 +1050,7 @@ def abrir_conversor_janela(hub):
         arquivos = filedialog.askopenfilenames(
             parent=win,
             title="Selecionar arquivos",
-            filetypes=[("Áudio/Vídeo", "*.wav *.ogg *.flac *.aac *.mp4 *.m4a *.m4v *.webm *.mkv *.avi *.mov")]
+            filetypes=[("Áudios", "*.mp3 *.wav *.ogg *.flac *.aac *.m4a *.wma *.opus *.aiff *.aif *.amr *.ac3 *.webm *.mka *.caf")]
         )
         if arquivos:
             win.modo    = "arquivos"
@@ -841,15 +1118,18 @@ def abrir_conversor_janela(hub):
         progress['value'] = 0
         for lbl in contadores.values():
             lbl.config(text="—")
-        status_label.config(text="Convertendo...")
+        formato_saida = formato_saida_var.get().strip().lower()
+        status_label.config(text=f"Convertendo para {formato_saida.upper()}...")
 
         try:
             if win.modo == "pasta":
                 resultado = converter_pasta(win.selecao,
+                                            formato_saida=formato_saida,
                                             callback_progresso=atualizar_progresso,
                                             callback_log=log)
             else:
                 resultado = converter_arquivos(win.selecao,
+                                               formato_saida=formato_saida,
                                                callback_progresso=atualizar_progresso,
                                                callback_log=log)
 
@@ -859,13 +1139,14 @@ def abrir_conversor_janela(hub):
             log(f"  Total      : {resultado['total']}")
             log(f"  Convertidos: {resultado['convertidos']}")
             log(f"  Falhas     : {resultado['falhas']}")
+            log(f"  Saída      : {formato_saida.upper()}")
 
             contadores['total'].config(text=str(resultado['total']))
             contadores['convertidos'].config(text=str(resultado['convertidos']))
             contadores['falhas'].config(text=str(resultado['falhas']))
-            status_label.config(text="✅ Conversão concluída!")
+            status_label.config(text=f"✅ Conversão para {formato_saida.upper()} concluída!")
             tocar("concluido.wav")
-            abrir_pasta(os.path.dirname(win.selecao) if win.modo == "arquivos" else win.selecao)
+            abrir_pasta(os.path.dirname(win.selecao[0]) if win.modo == "arquivos" else win.selecao)
 
         except Exception as e:
             log(f"❌ ERRO: {e}")
@@ -875,6 +1156,445 @@ def abrir_conversor_janela(hub):
 
     botao_converter.config(command=lambda: threading.Thread(
         target=rodar_em_thread, daemon=True).start())
+
+
+# =========================
+# 🎞️ VIDEO CONVERTER
+# =========================
+def abrir_video_converter_janela(hub):
+    win = Toplevel()
+    win.title("🎞️ Video Converter — Canivete do Pailer")
+    try:
+        win.iconbitmap(resource_path("icone.ico"))
+    except Exception:
+        pass
+
+    configurar_janela_responsiva(win, largura=780, altura=700, min_w=650, min_h=560)
+    win.configure(bg="#1C1C1C")
+    win.protocol("WM_DELETE_WINDOW", lambda: [win.destroy(), hub.deiconify()])
+
+    style = Style()
+    style.theme_use("clam")
+    style.configure("Laranja.Horizontal.TProgressbar",
+                    troughcolor="#2A2A2A", background="#F97316",
+                    bordercolor="#1C1C1C", lightcolor="#F97316", darkcolor="#F97316")
+
+    frame_header = Frame(win, bg="#F97316", pady=10)
+    frame_header.pack(fill="x")
+    try:
+        img = Image.open(resource_path("splash.png")).resize((38, 38), Image.LANCZOS)
+        photo = ImageTk.PhotoImage(img)
+        lbl = Label(frame_header, image=photo, bg="#F97316", bd=0)
+        lbl.image = photo
+        lbl.pack(side="left", padx=(14, 8))
+    except Exception:
+        pass
+    Label(frame_header, text="Video Converter",
+          font=("Segoe UI", 12, "bold"), bg="#F97316", fg="#0F0F0F").pack(side="left")
+
+    Label(win, text="Converta vídeo para GIF leve ou GIF para vídeo.",
+          font=("Segoe UI", 10), bg="#1C1C1C", fg="#CCCCCC").pack(pady=(14, 4))
+
+    frame_sel = Frame(win, bg="#1C1C1C")
+    frame_sel.pack(fill="x", padx=28)
+
+    status_sel = Label(frame_sel, text="Nenhum arquivo selecionado.",
+                       font=("Segoe UI", 9), bg="#1C1C1C", fg="#AAAAAA",
+                       anchor="w", wraplength=640, justify="left")
+    status_sel.pack(fill="x", pady=(0, 8))
+
+    frame_info = Frame(win, bg="#242424")
+    frame_info.pack(fill="x", padx=28, pady=(2, 10))
+
+    lbl_tipo = Label(frame_info, text="Entrada: —", font=("Segoe UI", 9, "bold"),
+                     bg="#242424", fg="#CCCCCC")
+    lbl_tipo.pack(anchor="w", padx=12, pady=(8, 2))
+    lbl_saida_hint = Label(frame_info, text="Saída disponível: —", font=("Segoe UI", 9),
+                           bg="#242424", fg="#888888")
+    lbl_saida_hint.pack(anchor="w", padx=12, pady=(0, 8))
+
+    import tkinter as tk
+    formato_var = tk.StringVar(value="GIF")
+    loop_var = tk.IntVar(value=1)
+
+    frame_formatos = Frame(win, bg="#1C1C1C")
+    frame_formatos.pack(fill="x", padx=28)
+
+    Label(frame_formatos, text="Formato de saída:",
+          font=("Segoe UI", 9, "bold"), bg="#1C1C1C", fg="#CCCCCC").pack(anchor="w")
+
+    frame_radios = Frame(frame_formatos, bg="#1C1C1C")
+    frame_radios.pack(fill="x", pady=(4, 2))
+
+    rb_1 = tk.Radiobutton(frame_radios, variable=formato_var, value="GIF",
+                          text="GIF", bg="#1C1C1C", fg="#F97316", selectcolor="#2A2A2A",
+                          activebackground="#1C1C1C", activeforeground="#F97316",
+                          font=("Segoe UI", 9, "bold"), state="disabled")
+    rb_2 = tk.Radiobutton(frame_radios, variable=formato_var, value="MP4",
+                          text="MP4", bg="#1C1C1C", fg="#F97316", selectcolor="#2A2A2A",
+                          activebackground="#1C1C1C", activeforeground="#F97316",
+                          font=("Segoe UI", 9, "bold"), state="disabled")
+    rb_3 = tk.Radiobutton(frame_radios, variable=formato_var, value="MOV",
+                          text="MOV", bg="#1C1C1C", fg="#F97316", selectcolor="#2A2A2A",
+                          activebackground="#1C1C1C", activeforeground="#F97316",
+                          font=("Segoe UI", 9, "bold"), state="disabled")
+    rb_4 = tk.Radiobutton(frame_radios, variable=formato_var, value="WEBM",
+                          text="WEBM", bg="#1C1C1C", fg="#F97316", selectcolor="#2A2A2A",
+                          activebackground="#1C1C1C", activeforeground="#F97316",
+                          font=("Segoe UI", 9, "bold"), state="disabled")
+    rb_1.pack(side="left", padx=(0, 8))
+    rb_2.pack(side="left", padx=(0, 8))
+    rb_3.pack(side="left", padx=(0, 8))
+    rb_4.pack(side="left", padx=(0, 8))
+
+    chk_loop = tk.Checkbutton(frame_formatos, text="Loop infinito no GIF",
+                              variable=loop_var, bg="#1C1C1C", fg="#CCCCCC",
+                              selectcolor="#2A2A2A", activebackground="#1C1C1C",
+                              activeforeground="#F97316", font=("Segoe UI", 9, "bold"),
+                              state="disabled")
+    chk_loop.pack(anchor="w", pady=(4, 0))
+
+    progress = Progressbar(win, length=500, mode='determinate',
+                           style="Laranja.Horizontal.TProgressbar")
+    progress.pack(pady=(16, 2), padx=28, fill="x")
+
+    status_label = Label(win, text="Aguardando...",
+                         font=("Segoe UI", 9), bg="#1C1C1C", fg="#888888")
+    status_label.pack()
+
+    log_box = Text(win, height=10, width=66, font=("Consolas", 8),
+                   bg="#111111", fg="#CCCCCC", insertbackground="#F97316",
+                   relief="flat", bd=0)
+    log_box.pack(pady=(6, 8), padx=28, fill="both", expand=True)
+
+    frame_btn = Frame(win, bg="#1C1C1C")
+    frame_btn.pack(pady=(0, 12))
+
+    botao_sel = Button(frame_btn, text="📁  Selecionar Arquivo",
+                       bg="#2A2A2A", fg="#F97316", activebackground="#3a3a3a",
+                       font=("Segoe UI", 10, "bold"), width=20,
+                       bd=0, cursor="hand2", relief="flat", pady=6)
+    botao_sel.pack(side="left", padx=6)
+
+    botao_conv = Button(frame_btn, text="▶  Converter",
+                        bg="#2A2A2A", fg="#F97316", activebackground="#3a3a3a",
+                        state="disabled", font=("Segoe UI", 10, "bold"), width=16,
+                        bd=0, cursor="hand2", relief="flat", pady=6)
+    botao_conv.pack(side="left", padx=6)
+
+    win.arquivo = None
+    win.tipo_entrada = None
+
+    def _set_radios(tipo):
+        for rb in [rb_1, rb_2, rb_3, rb_4]:
+            rb.config(state="disabled")
+        chk_loop.config(state="disabled")
+
+        if tipo == "video":
+            rb_1.config(state="normal")
+            formato_var.set("GIF")
+            chk_loop.config(state="normal")
+            lbl_saida_hint.config(text="Saída disponível: GIF")
+        elif tipo == "gif":
+            rb_2.config(state="normal")
+            rb_3.config(state="normal")
+            rb_4.config(state="normal")
+            formato_var.set("MP4")
+            lbl_saida_hint.config(text="Saída disponível: MP4, MOV, WEBM")
+        else:
+            formato_var.set("GIF")
+            lbl_saida_hint.config(text="Saída disponível: —")
+
+    def _log(msg):
+        log_box.insert(END, msg + "\n")
+        log_box.see(END)
+        win.update_idletasks()
+
+    def _prog(val, txt):
+        progress["value"] = val
+        status_label.config(text=txt)
+        win.update_idletasks()
+
+    def selecionar_arquivo():
+        path = filedialog.askopenfilename(
+            parent=win,
+            title="Selecionar vídeo ou GIF",
+            filetypes=[
+                ("Vídeo e GIF", "*.gif *.mp4 *.mov *.avi *.mkv *.webm *.m4v *.wmv *.flv *.mpeg *.mpg"),
+                ("Todos", "*.*"),
+            ],
+        )
+        if not path:
+            return
+
+        tipo = detectar_tipo_arquivo(path)
+        if tipo == "invalido":
+            status_sel.config(text="❌ Formato não suportado.")
+            botao_conv.config(state="disabled")
+            lbl_tipo.config(text="Entrada: inválida")
+            _set_radios("invalido")
+            return
+
+        win.arquivo = path
+        win.tipo_entrada = tipo
+        status_sel.config(text=f"📄  {path}")
+        lbl_tipo.config(text=f"Entrada: {'GIF' if tipo == 'gif' else 'VÍDEO'}")
+        _set_radios(tipo)
+        botao_conv.config(state="normal")
+
+    def rodar():
+        if not win.arquivo:
+            return
+        botao_conv.config(state="disabled")
+        botao_sel.config(state="disabled")
+        progress["value"] = 0
+        log_box.delete("1.0", END)
+        _prog(10, "Iniciando...")
+
+        try:
+            resultado = video_converter_arquivo(
+                win.arquivo,
+                formato_var.get(),
+                loop_gif=bool(loop_var.get()),
+                callback_progresso=_prog,
+                callback_log=_log,
+            )
+
+            if resultado.get("sucesso"):
+                saida = resultado.get("saida")
+                _log("✅ Conversão concluída")
+                _log(f"📦 Saída: {os.path.basename(saida)}")
+                status_label.config(text="✅ Conversão concluída!")
+                tocar("concluido.wav")
+                abrir_pasta(os.path.dirname(saida))
+            else:
+                _log(f"❌ Erro: {resultado.get('erro', 'Falha na conversão')}")
+                status_label.config(text="❌ Erro durante conversão")
+        except Exception as e:
+            _log(f"❌ Erro inesperado: {e}")
+            status_label.config(text="❌ Erro durante conversão")
+        finally:
+            botao_conv.config(state="normal")
+            botao_sel.config(state="normal")
+
+    botao_sel.config(command=selecionar_arquivo)
+    botao_conv.config(command=lambda: threading.Thread(target=rodar, daemon=True).start())
+
+
+# =========================
+# 🖼️ COMPRESSOR DE IMAGEM
+# =========================
+def abrir_compressor_imagem_janela(hub):
+    win = Toplevel()
+    win.title("🖼️ Compressor de Imagem — Canivete do Pailer")
+    try:
+        win.iconbitmap(resource_path("icone.ico"))
+    except Exception:
+        pass
+
+    configurar_janela_responsiva(win, largura=860, altura=760, min_w=700, min_h=580)
+    win.configure(bg="#1C1C1C")
+    win.protocol("WM_DELETE_WINDOW", lambda: [win.destroy(), hub.deiconify()])
+
+    style = Style()
+    style.theme_use("clam")
+    style.configure("Laranja.Horizontal.TProgressbar",
+                    troughcolor="#2A2A2A", background="#F97316",
+                    bordercolor="#1C1C1C", lightcolor="#F97316", darkcolor="#F97316")
+    style.configure("Verde.Horizontal.TProgressbar",
+                    troughcolor="#2A2A2A", background="#4CAF50",
+                    bordercolor="#1C1C1C", lightcolor="#4CAF50", darkcolor="#4CAF50")
+
+    frame_header = Frame(win, bg="#F97316", pady=10)
+    frame_header.pack(fill="x")
+    try:
+        img = Image.open(resource_path("splash.png")).resize((38, 38), Image.LANCZOS)
+        photo = ImageTk.PhotoImage(img)
+        lbl = Label(frame_header, image=photo, bg="#F97316", bd=0)
+        lbl.image = photo
+        lbl.pack(side="left", padx=(14, 8))
+    except Exception:
+        pass
+    Label(frame_header, text="Compressor de Imagem",
+          font=("Segoe UI", 12, "bold"), bg="#F97316", fg="#0F0F0F").pack(side="left")
+
+    Label(win, text="Comprime imagens, GIF e PDF mantendo no mesmo projeto.",
+          font=("Segoe UI", 10), bg="#1C1C1C", fg="#CCCCCC").pack(pady=(14, 4))
+
+    frame_sel = Frame(win, bg="#1C1C1C")
+    frame_sel.pack(fill="x", padx=20)
+
+    lbl_sel = Label(frame_sel, text="Nenhuma seleção.", font=("Segoe UI", 9),
+                    bg="#1C1C1C", fg="#AAAAAA", anchor="w", justify="left", wraplength=760)
+    lbl_sel.pack(fill="x", pady=(0, 8))
+
+    btn_row = Frame(win, bg="#1C1C1C")
+    btn_row.pack(fill="x", padx=20)
+
+    btn_s = {"font": ("Segoe UI", 10, "bold"), "bd": 0, "cursor": "hand2", "relief": "flat", "pady": 8}
+
+    botao_pasta = Button(btn_row, text="📂 Pasta inteira",
+                         bg="#F97316", fg="#0F0F0F", activebackground="#e06510",
+                         **btn_s)
+    botao_pasta.pack(side="left", fill="x", expand=True, padx=(0, 6))
+
+    botao_arquivos = Button(btn_row, text="🖼️ Arquivos avulsos",
+                            bg="#2A2A2A", fg="#F97316", activebackground="#3a3a3a",
+                            **btn_s)
+    botao_arquivos.pack(side="left", fill="x", expand=True)
+
+    Frame(win, bg="#333333", height=1).pack(fill="x", padx=20, pady=12)
+
+    import tkinter as tk
+    qual_var = tk.IntVar(value=75)
+    Label(win, text="Nível de compressão:", font=("Segoe UI", 9, "bold"),
+          bg="#1C1C1C", fg="#CCCCCC").pack(anchor="w", padx=20)
+
+    qual_frame = Frame(win, bg="#1C1C1C")
+    qual_frame.pack(fill="x", padx=20, pady=(6, 0))
+    for q, nome, desc in [
+        (88, "🌟 Alta", "Mais qualidade, menor compressão"),
+        (75, "✅ Equilibrada", "Boa qualidade com ganho de tamanho"),
+        (60, "📦 Compacta", "Arquivo menor, com mais perda"),
+    ]:
+        f = Frame(qual_frame, bg="#1C1C1C")
+        f.pack(fill="x", pady=2)
+        tk.Radiobutton(f, text=nome, variable=qual_var, value=q,
+                       font=("Segoe UI", 9, "bold"), bg="#1C1C1C", fg="#CCCCCC",
+                       selectcolor="#2A2A2A", activebackground="#1C1C1C",
+                       activeforeground="#F97316").pack(side="left")
+        Label(f, text=f"  {desc}", font=("Segoe UI", 8), bg="#1C1C1C", fg="#666666").pack(side="left")
+
+    Frame(win, bg="#333333", height=1).pack(fill="x", padx=20, pady=12)
+    Label(win, text="Após comprimir:", font=("Segoe UI", 9, "bold"),
+          bg="#1C1C1C", fg="#CCCCCC").pack(anchor="w", padx=20)
+
+    orig_var = tk.IntVar(value=1)
+    orig_frame = Frame(win, bg="#1C1C1C")
+    orig_frame.pack(fill="x", padx=20, pady=(6, 0))
+    tk.Radiobutton(orig_frame, text="📋 Manter original (pasta separada)", variable=orig_var, value=1,
+                   font=("Segoe UI", 9, "bold"), bg="#1C1C1C", fg="#CCCCCC",
+                   selectcolor="#2A2A2A", activebackground="#1C1C1C",
+                   activeforeground="#F97316").pack(anchor="w")
+    tk.Radiobutton(orig_frame, text="🔄 Substituir original", variable=orig_var, value=0,
+                   font=("Segoe UI", 9, "bold"), bg="#1C1C1C", fg="#CCCCCC",
+                   selectcolor="#2A2A2A", activebackground="#1C1C1C",
+                   activeforeground="#F97316").pack(anchor="w", pady=(2, 0))
+
+    Frame(win, bg="#333333", height=1).pack(fill="x", padx=20, pady=12)
+
+    botao_comprimir = Button(win, text="🗜️  Comprimir Imagem(ns)",
+                             bg="#2A2A2A", fg="#F97316", activebackground="#3a3a3a",
+                             font=("Segoe UI", 10, "bold"), bd=0, cursor="hand2",
+                             relief="flat", pady=9, state="disabled")
+    botao_comprimir.pack(fill="x", padx=20)
+
+    progress = Progressbar(win, mode="determinate", style="Laranja.Horizontal.TProgressbar")
+    progress.pack(fill="x", padx=20, pady=(10, 2))
+    lbl_pct = Label(win, text="0%", font=("Segoe UI", 9, "bold"), bg="#1C1C1C", fg="#F97316")
+    lbl_pct.pack()
+
+    stats = Frame(win, bg="#242424")
+    stats.pack(fill="x", padx=20, pady=(8, 6))
+    lbl_orig = _mini_stat(stats, "Original", "—")
+    lbl_comp = _mini_stat(stats, "Comprimido", "—")
+    lbl_econ = _mini_stat(stats, "Economia", "—")
+
+    lbl_log = Label(win, text="", font=("Consolas", 8), bg="#1C1C1C", fg="#888888",
+                    anchor="w", justify="left", wraplength=760)
+    lbl_log.pack(fill="x", padx=20, pady=(0, 10))
+
+    stop_event = threading.Event()
+    win._arquivos = []
+    win._pasta_base = None
+
+    def _log(msg):
+        win.after(0, lambda: lbl_log.config(text=msg))
+
+    def _prog(pct, txt):
+        def _up():
+            progress["value"] = pct
+            lbl_pct.config(text=f"{pct}%", fg="#F97316" if pct < 100 else "#4CAF50")
+            lbl_log.config(text=txt)
+        win.after(0, _up)
+
+    def _on_arq(i, total, nome):
+        win.after(0, lambda: lbl_log.config(text=f"Comprimindo {i}/{total}: {nome}"))
+
+    def selecionar_pasta():
+        pasta = filedialog.askdirectory(parent=win)
+        if not pasta:
+            return
+        arqs = listar_arquivos_img(pasta)
+        if not arqs:
+            lbl_sel.config(text="⚠️ Nenhum arquivo suportado encontrado na pasta.", fg="#f59e0b")
+            return
+        win._arquivos = arqs
+        win._pasta_base = pasta
+        lbl_sel.config(text=f"📂 {len(arqs)} arquivo(s) encontrados em: {pasta}", fg="#AAAAAA")
+        botao_comprimir.config(state="normal")
+
+    def selecionar_arquivos():
+        arqs = filedialog.askopenfilenames(
+            parent=win,
+            title="Selecionar imagens/GIF/PDF",
+            filetypes=[("Arquivos", "*.jpg *.jpeg *.png *.webp *.bmp *.tif *.tiff *.gif *.heic *.heif *.pdf")],
+        )
+        if not arqs:
+            return
+        win._arquivos = list(arqs)
+        win._pasta_base = os.path.dirname(win._arquivos[0])
+        lbl_sel.config(text=f"🖼️ {len(arqs)} arquivo(s) selecionado(s)", fg="#AAAAAA")
+        botao_comprimir.config(state="normal")
+
+    def rodar():
+        botao_comprimir.config(state="disabled", text="Comprimindo...")
+        progress["value"] = 0
+        lbl_pct.config(text="0%", fg="#F97316")
+
+        try:
+            manter = bool(orig_var.get())
+            qualidade = int(qual_var.get())
+            if manter:
+                pasta_saida = os.path.join(win._pasta_base, "comprimidos_img")
+            else:
+                pasta_saida = os.path.join(win._pasta_base, "_tmp_comp_img")
+
+            resultado = comprimir_lista_img(
+                win._arquivos,
+                pasta_saida,
+                qualidade=qualidade,
+                manter_original=manter,
+                callback_progresso=_prog,
+                callback_log=_log,
+                callback_arquivo=_on_arq,
+                stop_event=stop_event,
+            )
+
+            orig = resultado["total_orig_mb"]
+            comp = resultado["total_final_mb"]
+            econ = resultado["reducao_pct"]
+            lbl_orig[1].config(text=_fmt_tamanho(orig))
+            lbl_comp[1].config(text=_fmt_tamanho(comp))
+            lbl_econ[1].config(text=f"-{econ:.0f}%", fg="#4CAF50" if econ > 0 else "#888888")
+
+            if resultado["ok"] > 0:
+                progress.config(style="Verde.Horizontal.TProgressbar")
+                progress["value"] = 100
+                lbl_pct.config(text="100%", fg="#4CAF50")
+                lbl_log.config(text=f"✅ {resultado['ok']} arquivo(s) comprimido(s).")
+                tocar("concluido.wav")
+                abrir_pasta(os.path.join(win._pasta_base, "comprimidos_img") if manter else win._pasta_base)
+            else:
+                lbl_log.config(text="⚠️ Nenhum arquivo foi comprimido.", fg="#f59e0b")
+        except Exception as e:
+            lbl_log.config(text=f"❌ Erro: {e}", fg="#f44336")
+        finally:
+            botao_comprimir.config(state="normal", text="🗜️  Comprimir Imagem(ns)")
+
+    botao_pasta.config(command=selecionar_pasta)
+    botao_arquivos.config(command=selecionar_arquivos)
+    botao_comprimir.config(command=lambda: threading.Thread(target=rodar, daemon=True).start())
 
 
 # =========================
@@ -888,11 +1608,7 @@ def abrir_conversor_imagem_janela(hub):
     except Exception:
         pass
 
-    largura, altura = 560, 520
-    x = (win.winfo_screenwidth()  // 2) - (largura // 2)
-    y = (win.winfo_screenheight() // 2) - (altura  // 2)
-    win.geometry(f"{largura}x{altura}+{x}+{y}")
-    win.resizable(False, False)
+    configurar_janela_responsiva(win, largura=780, altura=680, min_w=650, min_h=540)
     win.configure(bg="#1C1C1C")
     win.protocol("WM_DELETE_WINDOW", lambda: [win.destroy(), hub.deiconify()])
 
@@ -1079,11 +1795,7 @@ def abrir_transcricao_janela(hub):
     except Exception:
         pass
 
-    largura, altura = 560, 560
-    x = (win.winfo_screenwidth()  // 2) - (largura // 2)
-    y = (win.winfo_screenheight() // 2) - (altura  // 2)
-    win.geometry(f"{largura}x{altura}+{x}+{y}")
-    win.resizable(False, False)
+    configurar_janela_responsiva(win, largura=800, altura=700, min_w=660, min_h=560)
     win.configure(bg="#1C1C1C")
     win.protocol("WM_DELETE_WINDOW", lambda: [win.destroy(), hub.deiconify()])
 
@@ -1302,11 +2014,7 @@ def abrir_favicon_janela(hub):
     except Exception:
         pass
 
-    largura, altura = 560, 520
-    x = (win.winfo_screenwidth()  // 2) - (largura // 2)
-    y = (win.winfo_screenheight() // 2) - (altura  // 2)
-    win.geometry(f"{largura}x{altura}+{x}+{y}")
-    win.resizable(False, False)
+    configurar_janela_responsiva(win, largura=780, altura=680, min_w=650, min_h=540)
     win.configure(bg="#1C1C1C")
     win.protocol("WM_DELETE_WINDOW", lambda: [win.destroy(), hub.deiconify()])
 
@@ -1449,11 +2157,7 @@ def abrir_remover_fundo_janela(hub):
     except Exception:
         pass
 
-    largura, altura = 560, 580
-    x = (win.winfo_screenwidth()  // 2) - (largura // 2)
-    y = (win.winfo_screenheight() // 2) - (altura  // 2)
-    win.geometry(f"{largura}x{altura}+{x}+{y}")
-    win.resizable(False, False)
+    configurar_janela_responsiva(win, largura=780, altura=700, min_w=650, min_h=560)
     win.configure(bg="#1C1C1C")
     win.protocol("WM_DELETE_WINDOW", lambda: [win.destroy(), hub.deiconify()])
 
@@ -1662,11 +2366,7 @@ def abrir_org_videos_janela(hub):
     except Exception:
         pass
 
-    largura, altura = 560, 820
-    x = (win.winfo_screenwidth()  // 2) - (largura // 2)
-    y = (win.winfo_screenheight() // 2) - (altura  // 2)
-    win.geometry(f"{largura}x{altura}+{x}+{y}")
-    win.resizable(False, True)
+    configurar_janela_responsiva(win, largura=900, altura=840, min_w=720, min_h=620)
     win.configure(bg="#1C1C1C")
     win.protocol("WM_DELETE_WINDOW", lambda: [win.destroy(), hub.deiconify()])
 
@@ -1789,6 +2489,20 @@ def abrir_org_videos_janela(hub):
                           **btn_s2)
     botao_nextup.pack(side="left", padx=6)
 
+    # Separador + botão Desagrupar
+    Frame(win, bg="#2A2A2A", height=1).pack(fill="x", padx=28, pady=(8, 4))
+    Label(win, text="Ferramentas extras:",
+          font=("Segoe UI", 8), bg="#1C1C1C", fg="#888888").pack()
+
+    frame_extra = Frame(win, bg="#1C1C1C")
+    frame_extra.pack(pady=(4, 6))
+
+    botao_desagrupar = Button(frame_extra, text="📂  Desagrupar Pasta",
+                              bg="#2A2A2A", fg="#F97316", activebackground="#3a3a3a",
+                              font=("Segoe UI", 9, "bold"), width=21,
+                              bd=0, cursor="hand2", relief="flat", pady=6)
+    botao_desagrupar.pack(side="left", padx=6)
+
     def atualizar_progresso(valor, texto):
         progress["value"] = valor
         status_label.config(text=texto)
@@ -1906,6 +2620,98 @@ def abrir_org_videos_janela(hub):
         threading.Thread(target=_rodar, daemon=True).start()
 
     botao_backup.config(command=rodar_backup_thread)
+
+    def rodar_desagrupar_thread():
+        """Seleciona pasta organizada e extrai todos os arquivos para uma pasta plana."""
+        pasta_src = filedialog.askdirectory(
+            parent=win,
+            title="Selecionar pasta para desagrupar"
+        )
+        if not pasta_src:
+            return
+
+        # Pede o nome da pasta de saída
+        import tkinter.simpledialog as _sd
+        nome_saida = _sd.askstring(
+            "Nome da pasta de saída",
+            "Digite o nome da pasta onde os arquivos serão colocados:",
+            initialvalue="BRUTOS_DESAGRUPADOS",
+            parent=win
+        )
+        if not nome_saida:
+            return
+        nome_saida = nome_saida.strip() or "BRUTOS_DESAGRUPADOS"
+
+        botao_desagrupar.config(state="disabled", text="Desagrupando…")
+        log_box.delete("1.0", END)
+        progress["value"] = 0
+        status_label.config(text="Desagrupando arquivos...")
+
+        def _rodar():
+            try:
+                import re as _re
+                import shutil as _sh
+
+                # Pasta de saída ao lado da pasta selecionada
+                pasta_pai = os.path.dirname(os.path.abspath(pasta_src))
+                pasta_dest = os.path.join(pasta_pai, nome_saida)
+                os.makedirs(pasta_dest, exist_ok=True)
+
+                log(f"📂 Origem:  {pasta_src}")
+                log(f"📂 Destino: {pasta_dest}")
+
+                # Coleta todos os arquivos recursivamente
+                arquivos = []
+                for root, dirs, files in os.walk(pasta_src):
+                    for f in files:
+                        if not f.startswith('.'):
+                            arquivos.append(os.path.join(root, f))
+
+                total = len(arquivos)
+                log(f"📥 {total} arquivo(s) encontrado(s)")
+
+                movidos = 0
+                erros   = 0
+                for i, src_path in enumerate(arquivos):
+                    nome = os.path.basename(src_path)
+                    dest = os.path.join(pasta_dest, nome)
+                    # Evita colisão de nomes
+                    base, ext = os.path.splitext(nome)
+                    n = 1
+                    while os.path.exists(dest):
+                        dest = os.path.join(pasta_dest, f"{base}_{n}{ext}")
+                        n += 1
+                    try:
+                        _sh.move(src_path, dest)
+                        movidos += 1
+                    except Exception as e:
+                        log(f"   ⚠️  {nome}: {e}")
+                        erros += 1
+
+                    if total > 0:
+                        win.after(0, lambda v=int((i+1)/total*100):
+                                  progress.__setitem__("value", v))
+                        win.after(0, lambda t=f"Copiando... {i+1}/{total}":
+                                  status_label.config(text=t))
+
+                log(f"\n✅ {movidos} arquivo(s) copiados")
+                if erros:
+                    log(f"⚠️  {erros} erro(s)")
+                win.after(0, lambda: status_label.config(
+                    text=f"✅ Desagrupamento concluído! {movidos} arquivos"))
+                win.after(0, lambda: tocar("concluido.wav"))
+                win.after(500, lambda: abrir_pasta(pasta_dest))
+
+            except Exception as e:
+                log(f"❌ ERRO: {e}")
+                win.after(0, lambda: status_label.config(text="❌ Erro ao desagrupar"))
+            finally:
+                win.after(0, lambda: botao_desagrupar.config(
+                    state="normal", text="📂  Desagrupar Pasta"))
+
+        threading.Thread(target=_rodar, daemon=True).start()
+
+    botao_desagrupar.config(command=rodar_desagrupar_thread)
 
     def rodar_nextup_thread():
         path_nu = filedialog.askopenfilename(
@@ -2705,6 +3511,8 @@ def abrir_compressor_video_janela(hub):
     lbl_codec = _mini_stat(info_row, "Codec", "—")
     lbl_res   = _mini_stat(info_row, "Resolução", "—")
 
+    fullhd_var = tk.IntVar(value=0)
+
     def _atualizar_info_selecao():
         arquivos = win._arquivos
         if not arquivos:
@@ -2713,11 +3521,38 @@ def abrir_compressor_video_janela(hub):
         total_mb = sum(os.path.getsize(f) / 1024 / 1024 for f in arquivos if os.path.exists(f))
         lbl_total[1].config(text=_fmt_tamanho(total_mb))
         # Pega info do primeiro arquivo
-        info = get_info_video(arquivos[0])
+        info = get_info_video(arquivos[0], timeout_sec=12)
         if info:
             lbl_codec[1].config(text=info.get("codec_video", "—").upper())
             w, h = info.get("largura", 0), info.get("altura", 0)
             lbl_res[1].config(text=f"{w}x{h}" if w else "—")
+            if w <= 0 or h <= 0:
+                fullhd_var.set(0)
+                chk_fullhd.config(state="disabled")
+                lbl_fullhd_hint.config(
+                    text="Não foi possível ler resolução para liberar Full HD.",
+                    fg="#f59e0b"
+                )
+            elif w > 1920 or h > 1080:
+                chk_fullhd.config(state="normal")
+                lbl_fullhd_hint.config(
+                    text="Ativo para esta seleção: resolução acima de Full HD detectada.",
+                    fg="#4CAF50"
+                )
+            else:
+                fullhd_var.set(0)
+                chk_fullhd.config(state="disabled")
+                lbl_fullhd_hint.config(
+                    text="Disponível apenas para arquivos acima de 1920x1080.",
+                    fg="#666666"
+                )
+        else:
+            fullhd_var.set(0)
+            chk_fullhd.config(state="disabled")
+            lbl_fullhd_hint.config(
+                text="Não foi possível ler resolução para liberar Full HD.",
+                fg="#f59e0b"
+            )
 
     # ── Qualidade ─────────────────────────────────────────────
     Frame(win, bg="#333333", height=1).pack(fill="x", padx=20, pady=12)
@@ -2743,6 +3578,76 @@ def abrir_compressor_video_janela(hub):
         Label(f, text=f"  {desc}", font=("Segoe UI", 8),
               bg="#1C1C1C", fg="#666666").pack(side="left")
 
+    # ── Modo de codificação (CPU/GPU) ─────────────────────────
+    Frame(win, bg="#333333", height=1).pack(fill="x", padx=20, pady=12)
+    Label(win, text="Modo de codificação:",
+          font=("Segoe UI", 9, "bold"), bg="#1C1C1C", fg="#CCCCCC").pack(anchor="w", padx=20)
+
+    enc = detectar_encoders_disponiveis()
+    gpus = []
+    if enc.get("hevc_nvenc"):
+        gpus.append("NVIDIA")
+    if enc.get("hevc_qsv"):
+        gpus.append("Intel")
+    if enc.get("hevc_amf"):
+        gpus.append("AMD")
+    gpu_disponivel = len(gpus) > 0
+
+    modo_var = tk.IntVar(value=1 if gpu_disponivel else 0)  # 0=CPU, 1=GPU auto
+    modo_frame = Frame(win, bg="#1C1C1C")
+    modo_frame.pack(fill="x", padx=20, pady=(6, 0))
+
+    tk.Radiobutton(modo_frame, text="🧠 CPU (melhor compressão)", variable=modo_var, value=0,
+                   font=("Segoe UI", 9, "bold"), bg="#1C1C1C", fg="#CCCCCC",
+                   selectcolor="#2A2A2A", activebackground="#1C1C1C",
+                   activeforeground="#F97316").pack(anchor="w")
+
+    rb_gpu = tk.Radiobutton(modo_frame, text="⚡ GPU (mais rápido)", variable=modo_var, value=1,
+                            font=("Segoe UI", 9, "bold"), bg="#1C1C1C", fg="#CCCCCC",
+                            selectcolor="#2A2A2A", activebackground="#1C1C1C",
+                            activeforeground="#F97316")
+    rb_gpu.pack(anchor="w", pady=(2, 0))
+
+    if gpu_disponivel:
+        Label(modo_frame, text=f"  Detectado: {', '.join(gpus)}",
+              font=("Segoe UI", 8), bg="#1C1C1C", fg="#666666").pack(anchor="w", pady=(0, 4))
+    else:
+        rb_gpu.config(state="disabled")
+        Label(modo_frame, text="  GPU HEVC não detectada no ffmpeg. Usando CPU.",
+              font=("Segoe UI", 8), bg="#1C1C1C", fg="#f59e0b").pack(anchor="w", pady=(0, 4))
+
+    # ── Resolução de saída ────────────────────────────────────
+    Frame(win, bg="#333333", height=1).pack(fill="x", padx=20, pady=12)
+    Label(win, text="Resolução de saída:",
+          font=("Segoe UI", 9, "bold"), bg="#1C1C1C", fg="#CCCCCC").pack(anchor="w", padx=20)
+
+    res_frame = Frame(win, bg="#1C1C1C")
+    res_frame.pack(fill="x", padx=20, pady=(6, 0))
+
+    chk_fullhd = tk.Checkbutton(
+        res_frame,
+        text="📺 Forçar Full HD (máx. 1920x1080)",
+        variable=fullhd_var,
+        font=("Segoe UI", 9, "bold"),
+        bg="#1C1C1C",
+        fg="#CCCCCC",
+        selectcolor="#2A2A2A",
+        activebackground="#1C1C1C",
+        activeforeground="#F97316",
+        disabledforeground="#666666",
+        state="disabled",
+    )
+    chk_fullhd.pack(anchor="w")
+
+    lbl_fullhd_hint = Label(
+        res_frame,
+        text="Disponível apenas para arquivos acima de 1920x1080.",
+        font=("Segoe UI", 8),
+        bg="#1C1C1C",
+        fg="#666666",
+    )
+    lbl_fullhd_hint.pack(anchor="w", pady=(0, 4))
+
     # ── O que fazer com o original ────────────────────────────
     Frame(win, bg="#333333", height=1).pack(fill="x", padx=20, pady=12)
     Label(win, text="Após comprimir:",
@@ -2766,21 +3671,32 @@ def abrir_compressor_video_janela(hub):
         Label(f, text=f"  {desc}", font=("Segoe UI", 8),
               bg="#1C1C1C", fg="#666666").pack(side="left")
 
-    # ── Botão comprimir ───────────────────────────────────────
+    # ── Botões ────────────────────────────────────────────────
     Frame(win, bg="#333333", height=1).pack(fill="x", padx=20, pady=12)
-    botao_comprimir = Button(win, text="🗜️  Comprimir Vídeo(s)",
+
+    # Linha de botões principais
+    frame_btns_top = Frame(win, bg="#1C1C1C")
+    frame_btns_top.pack(fill="x", padx=20, pady=(0, 4))
+
+    botao_comprimir = Button(frame_btns_top, text="🗜️  Comprimir Vídeo(s)",
                              bg="#F97316", fg="#0F0F0F", activebackground="#e06510",
-                             font=("Segoe UI", 12, "bold"),
-                             bd=0, relief="flat", cursor="hand2", pady=12,
+                             font=("Segoe UI", 11, "bold"),
+                             bd=0, relief="flat", cursor="hand2", pady=11,
                              state="disabled")
-    botao_comprimir.pack(fill="x", padx=20)
+    botao_comprimir.pack(side="left", fill="x", expand=True, padx=(0, 6))
+
+    botao_sugestao = Button(frame_btns_top, text="💡 Sugestão Inteligente",
+                            bg="#2A2A2A", fg="#F97316", activebackground="#3a3a3a",
+                            font=("Segoe UI", 11, "bold"),
+                            bd=0, relief="flat", cursor="hand2", pady=11)
+    botao_sugestao.pack(side="left", fill="x", expand=True)
 
     botao_cancelar = Button(win, text="✕  Cancelar",
                             bg="#2A2A2A", fg="#f44336", activebackground="#3a3a3a",
                             font=("Segoe UI", 10, "bold"),
                             bd=0, relief="flat", cursor="hand2", pady=8,
                             state="disabled")
-    botao_cancelar.pack(fill="x", padx=20, pady=(4, 0))
+    botao_cancelar.pack(fill="x", padx=20, pady=(0, 0))
 
     # ── Painel de progresso ───────────────────────────────────
     Frame(win, bg="#333333", height=1).pack(fill="x", padx=20, pady=10)
@@ -2841,13 +3757,16 @@ def abrir_compressor_video_janela(hub):
                 if progress["mode"] != "indeterminate":
                     progress.config(mode="indeterminate")
                     progress.start(12)
+                lbl_pct.config(text="...", fg="#F97316")
             else:
                 if progress["mode"] == "indeterminate":
                     progress.stop()
                     progress.config(mode="determinate")
-                progress["value"] = pct
-                lbl_pct.config(text=f"{pct}%",
-                               fg="#F97316" if pct < 100 else "#4CAF50")
+                pct_val = float(pct)
+                progress["value"] = pct_val
+                pct_txt = f"{pct_val:.1f}%" if abs(pct_val - int(pct_val)) > 0.001 else f"{int(pct_val)}%"
+                lbl_pct.config(text=pct_txt,
+                               fg="#F97316" if pct_val < 100 else "#4CAF50")
             lbl_log.config(text=texto, fg="#888888")
         win.after(0, _up)
 
@@ -2868,63 +3787,75 @@ def abrir_compressor_video_janela(hub):
         win.after(0, progress.start)
         win.after(0, lambda: lbl_arq_titulo.config(text="Iniciando…", fg="#888888"))
 
-        arquivos      = win._arquivos
-        manter_orig   = bool(orig_var.get())
-        crf           = qual_var.get()
+        try:
+            arquivos    = win._arquivos
+            manter_orig = bool(orig_var.get())
+            crf         = qual_var.get()
+            usar_gpu    = bool(modo_var.get())
+            forcar_fhd  = bool(fullhd_var.get())
 
-        # Pasta de saída
-        if manter_orig:
-            pasta_saida = os.path.join(win._pasta_base, "comprimidos_h265")
-        else:
-            pasta_saida = win._pasta_base  # só temporário, será substituído
-
-        resultado = comprimir_lista(
-            arquivos,
-            pasta_saida,
-            qualidade_crf=crf,
-            manter_original=manter_orig,
-            callback_progresso=_prog,
-            callback_log=_log,
-            callback_arquivo=_on_arquivo,
-            stop_event=stop_event,
-        )
-
-        # Finalização
-        win.after(0, lambda: botao_comprimir.config(state="normal", text="🗜️  Comprimir Vídeo(s)"))
-        win.after(0, lambda: botao_cancelar.config(state="disabled"))
-
-        ok    = resultado["ok"]
-        erros = resultado["erros"]
-        orig  = resultado["total_orig_mb"]
-        final = resultado["total_final_mb"]
-        econ  = resultado["reducao_pct"]
-
-        win.after(0, lambda: lbl_stat_orig[1].config(text=_fmt_tamanho(orig)))
-        win.after(0, lambda: lbl_stat_final[1].config(text=_fmt_tamanho(final)))
-        win.after(0, lambda: lbl_stat_econ[1].config(
-            text=f"-{econ:.0f}%", fg="#4CAF50" if econ > 0 else "#888888"))
-
-        if ok > 0:
-            win.after(0, lambda: progress.config(
-                mode="determinate", style="Verde.Horizontal.TProgressbar"))
-            win.after(0, lambda: progress.__setitem__("value", 100))
-            win.after(0, lambda: lbl_pct.config(text="100%", fg="#4CAF50"))
-            win.after(0, lambda: lbl_arq_titulo.config(
-                text=f"✅ {ok} vídeo(s) comprimido(s) com sucesso!", fg="#4CAF50"))
-            win.after(0, lambda: lbl_arq_nome.config(
-                text=f"{_fmt_tamanho(orig)} → {_fmt_tamanho(final)}  (-{econ:.0f}% de peso)",
-                fg="#4CAF50"))
-            win.after(0, lambda: tocar("concluido.wav"))
+            # Pasta de saída
             if manter_orig:
-                win.after(500, lambda: abrir_pasta(pasta_saida))
+                pasta_saida = os.path.join(win._pasta_base, "comprimidos_h265")
             else:
-                win.after(500, lambda: abrir_pasta(win._pasta_base))
-        else:
-            win.after(0, lambda: lbl_arq_titulo.config(
-                text="⚠️  Nenhum vídeo foi comprimido.", fg="#f59e0b"))
+                pasta_saida = win._pasta_base  # só temporário, será substituído
 
-        if erros > 0:
-            win.after(0, lambda: _log(f"⚠️  {erros} arquivo(s) com erro."))
+            resultado = comprimir_lista(
+                arquivos,
+                pasta_saida,
+                qualidade_crf=crf,
+                usar_gpu=usar_gpu,
+                forcar_fullhd=forcar_fhd,
+                manter_original=manter_orig,
+                callback_progresso=_prog,
+                callback_log=_log,
+                callback_arquivo=_on_arquivo,
+                stop_event=stop_event,
+            )
+
+            ok    = resultado["ok"]
+            erros = resultado["erros"]
+            orig  = resultado["total_orig_mb"]
+            final = resultado["total_final_mb"]
+            econ  = resultado["reducao_pct"]
+
+            win.after(0, lambda: lbl_stat_orig[1].config(text=_fmt_tamanho(orig)))
+            win.after(0, lambda: lbl_stat_final[1].config(text=_fmt_tamanho(final)))
+            win.after(0, lambda: lbl_stat_econ[1].config(
+                text=f"-{econ:.0f}%", fg="#4CAF50" if econ > 0 else "#888888"))
+
+            if ok > 0:
+                win.after(0, lambda: progress.config(
+                    mode="determinate", style="Verde.Horizontal.TProgressbar"))
+                win.after(0, lambda: progress.__setitem__("value", 100))
+                win.after(0, lambda: lbl_pct.config(text="100%", fg="#4CAF50"))
+                win.after(0, lambda: lbl_arq_titulo.config(
+                    text=f"✅ {ok} vídeo(s) comprimido(s) com sucesso!", fg="#4CAF50"))
+                win.after(0, lambda: lbl_arq_nome.config(
+                    text=f"{_fmt_tamanho(orig)} → {_fmt_tamanho(final)}  (-{econ:.0f}% de peso)",
+                    fg="#4CAF50"))
+                win.after(0, lambda: tocar("concluido.wav"))
+                if manter_orig:
+                    win.after(500, lambda: abrir_pasta(pasta_saida))
+                else:
+                    win.after(500, lambda: abrir_pasta(win._pasta_base))
+            else:
+                win.after(0, lambda: lbl_arq_titulo.config(
+                    text="⚠️  Nenhum vídeo foi comprimido.", fg="#f59e0b"))
+
+            if erros > 0:
+                win.after(0, lambda: _log(f"⚠️  {erros} arquivo(s) com erro."))
+        except Exception as e:
+            win.after(0, lambda: progress.stop())
+            win.after(0, lambda: progress.config(mode="determinate"))
+            win.after(0, lambda: lbl_arq_titulo.config(
+                text="❌ Erro ao iniciar compressão.", fg="#f44336"))
+            win.after(0, lambda: lbl_log.config(
+                text=f"Erro interno: {e}", fg="#f44336"))
+        finally:
+            win.after(0, lambda: progress.stop())
+            win.after(0, lambda: botao_comprimir.config(state="normal", text="🗜️  Comprimir Vídeo(s)"))
+            win.after(0, lambda: botao_cancelar.config(state="disabled"))
 
     def cancelar():
         stop_event.set()
@@ -2935,6 +3866,317 @@ def abrir_compressor_video_janela(hub):
     botao_comprimir.config(
         command=lambda: threading.Thread(target=rodar, daemon=True).start())
     botao_cancelar.config(command=cancelar)
+
+    # ── Sugestão Inteligente ──────────────────────────────────
+    LIMITE_GB = 19.0  # arquivos acima de 19 GB
+
+    def sugestao_inteligente():
+        """Varre uma pasta buscando vídeos grandes e sugere compressão."""
+        pasta_scan = filedialog.askdirectory(
+            parent=win,
+            title="Selecionar pasta para varrer arquivos grandes"
+        )
+        if not pasta_scan:
+            return
+
+        # Janela de sugestão
+        popup = Toplevel(win)
+        popup.title("💡 Sugestão Inteligente — Arquivos Grandes")
+        popup.configure(bg="#1C1C1C")
+        popup.resizable(True, True)
+        try:
+            popup.iconbitmap(resource_path("icone.ico"))
+        except Exception:
+            pass
+
+        larg, alt = 680, 560
+        x = win.winfo_rootx() + (win.winfo_width() // 2) - (larg // 2)
+        y = win.winfo_rooty() + (win.winfo_height() // 2) - (alt // 2)
+        popup.geometry(f"{larg}x{alt}+{x}+{y}")
+        popup.minsize(500, 400)
+        popup.grab_set()
+
+        # Header
+        Frame(popup, bg="#F97316", height=3).pack(fill="x")
+        hdr = Frame(popup, bg="#1C1C1C")
+        hdr.pack(fill="x", padx=20, pady=(14, 0))
+        Label(hdr, text="💡", font=("Segoe UI", 20), bg="#1C1C1C").pack(side="left")
+        Label(hdr, text="  Sugestão Inteligente",
+              font=("Segoe UI", 13, "bold"), bg="#1C1C1C", fg="#F97316").pack(side="left")
+
+        lbl_scan = Label(popup, text="🔍 Varrendo pasta...",
+                         font=("Segoe UI", 9), bg="#1C1C1C", fg="#888888")
+        lbl_scan.pack(anchor="w", padx=20, pady=(8, 2))
+
+        # Lista de arquivos encontrados
+        frame_lista = Frame(popup, bg="#242424")
+        frame_lista.pack(fill="both", expand=True, padx=20, pady=(4, 0))
+
+        # Cabeçalho da lista
+        hdr_row = Frame(frame_lista, bg="#2A2A2A")
+        hdr_row.pack(fill="x")
+        Label(hdr_row, text="  ✓", font=("Segoe UI", 9, "bold"),
+              bg="#2A2A2A", fg="#888888", width=3).pack(side="left")
+        Label(hdr_row, text="Arquivo", font=("Segoe UI", 9, "bold"),
+              bg="#2A2A2A", fg="#888888", anchor="w").pack(side="left", fill="x", expand=True)
+        Label(hdr_row, text="Tamanho", font=("Segoe UI", 9, "bold"),
+              bg="#2A2A2A", fg="#888888", width=10).pack(side="left")
+        Label(hdr_row, text="Duração", font=("Segoe UI", 9, "bold"),
+              bg="#2A2A2A", fg="#888888", width=10).pack(side="left", padx=(0, 4))
+
+        # Scroll
+        import tkinter as _tk2
+        scroll_frame = Frame(frame_lista, bg="#242424")
+        scroll_frame.pack(fill="both", expand=True)
+        canvas = _tk2.Canvas(scroll_frame, bg="#242424", bd=0, highlightthickness=0)
+        scrollbar = _tk2.Scrollbar(scroll_frame, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        inner = Frame(canvas, bg="#242424")
+        canvas_win = canvas.create_window((0, 0), window=inner, anchor="nw")
+
+        def _on_inner_resize(e):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.itemconfig(canvas_win, width=canvas.winfo_width())
+        inner.bind("<Configure>", _on_inner_resize)
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(
+            canvas_win, width=e.width))
+
+        # Resumo e botões
+        Frame(popup, bg="#333333", height=1).pack(fill="x", padx=20, pady=8)
+        lbl_resumo = Label(popup, text="",
+                           font=("Segoe UI", 9), bg="#1C1C1C", fg="#CCCCCC")
+        lbl_resumo.pack(anchor="w", padx=20)
+
+        frame_popup_btns = Frame(popup, bg="#1C1C1C")
+        frame_popup_btns.pack(fill="x", padx=20, pady=10)
+
+        btn_s_p = dict(font=("Segoe UI", 10, "bold"), bd=0, relief="flat",
+                       cursor="hand2", padx=14, pady=8)
+
+        btn_comprimir_sel = Button(frame_popup_btns,
+                                   text="🗜️  Comprimir Selecionados",
+                                   bg="#F97316", fg="#0F0F0F",
+                                   activebackground="#e06510",
+                                   state="disabled", **btn_s_p)
+        btn_comprimir_sel.pack(side="left", padx=(0, 8))
+
+        btn_sel_todos = Button(frame_popup_btns, text="☑  Selecionar Todos",
+                               bg="#2A2A2A", fg="#F97316",
+                               activebackground="#3a3a3a", **btn_s_p)
+        btn_sel_todos.pack(side="left", padx=(0, 8))
+
+        btn_fechar = Button(frame_popup_btns, text="Fechar",
+                            bg="#2A2A2A", fg="#888888",
+                            activebackground="#3a3a3a",
+                            command=popup.destroy, **btn_s_p)
+        btn_fechar.pack(side="right")
+
+        # Estado dos checkboxes
+        checks    = []   # lista de (var, arquivo_info)
+        arquivos_encontrados = []
+
+        def _atualizar_resumo():
+            selecionados = [a for v, a in checks if v.get()]
+            total_gb = sum(a["tam"] for a in selecionados) / 1024**3
+            if selecionados:
+                lbl_resumo.config(
+                    text=f"✅ {len(selecionados)} arquivo(s) selecionado(s) — "
+                         f"{total_gb:.1f} GB para comprimir",
+                    fg="#F97316")
+                btn_comprimir_sel.config(state="normal")
+            else:
+                lbl_resumo.config(text="Nenhum arquivo selecionado.", fg="#888888")
+                btn_comprimir_sel.config(state="disabled")
+
+        def _sel_todos():
+            for v, _ in checks:
+                v.set(True)
+            _atualizar_resumo()
+
+        btn_sel_todos.config(command=_sel_todos)
+
+        def _comprimir_selecionados():
+            selecionados = [a["path"] for v, a in checks if v.get()]
+            if not selecionados:
+                return
+
+            # Pergunta: cópia ou substituir
+            popup_op = Toplevel(popup)
+            popup_op.title("O que fazer com o original?")
+            popup_op.configure(bg="#1C1C1C")
+            popup_op.resizable(False, False)
+            popup_op.grab_set()
+            pw, ph = 400, 200
+            px = popup.winfo_rootx() + popup.winfo_width()//2 - pw//2
+            py = popup.winfo_rooty() + popup.winfo_height()//2 - ph//2
+            popup_op.geometry(f"{pw}x{ph}+{px}+{py}")
+
+            Label(popup_op, text="O que fazer com o arquivo original\napós a compressão?",
+                  font=("Segoe UI", 10), bg="#1C1C1C", fg="#CCCCCC",
+                  justify="center").pack(pady=(20, 14))
+
+            op_var = tk.IntVar(value=1)
+            frame_op = Frame(popup_op, bg="#1C1C1C")
+            frame_op.pack()
+            tk.Radiobutton(frame_op, text="📋  Manter original (criar cópia comprimida)",
+                           variable=op_var, value=1,
+                           font=("Segoe UI", 9), bg="#1C1C1C", fg="#CCCCCC",
+                           selectcolor="#2A2A2A", activebackground="#1C1C1C"
+                           ).pack(anchor="w", pady=2)
+            tk.Radiobutton(frame_op, text="🔄  Substituir original (apagar após comprimir)",
+                           variable=op_var, value=0,
+                           font=("Segoe UI", 9), bg="#1C1C1C", fg="#CCCCCC",
+                           selectcolor="#2A2A2A", activebackground="#1C1C1C"
+                           ).pack(anchor="w", pady=2)
+
+            def _confirmar():
+                manter = bool(op_var.get())
+                popup_op.destroy()
+                popup.destroy()
+
+                # Injeta arquivos no compressor e dispara
+                win._arquivos   = selecionados
+                win._pasta_base = os.path.dirname(selecionados[0])
+                lbl_sel.config(
+                    text=f"💡 {len(selecionados)} arquivo(s) da Sugestão Inteligente",
+                    fg="#F97316")
+                _atualizar_info_selecao()
+                botao_comprimir.config(state="normal")
+                orig_var.set(1 if manter else 0)
+
+                # Dispara compressão automaticamente
+                threading.Thread(
+                    target=rodar, daemon=True).start()
+
+            Button(popup_op, text="Confirmar →",
+                   bg="#F97316", fg="#0F0F0F", activebackground="#e06510",
+                   font=("Segoe UI", 10, "bold"), bd=0, relief="flat",
+                   cursor="hand2", padx=16, pady=8,
+                   command=_confirmar).pack(pady=12)
+
+        btn_comprimir_sel.config(command=_comprimir_selecionados)
+
+        # Varre a pasta em thread
+        def _varrer():
+            encontrados = []
+            try:
+                todos = []
+                for root, dirs, files in os.walk(pasta_scan):
+                    dirs[:] = [d for d in dirs if not d.startswith('.')]
+                    for f in files:
+                        ext = os.path.splitext(f)[1].lower()
+                        if ext in {".mp4",".mov",".avi",".mkv",".mxf",
+                                   ".mts",".m2ts",".r3d",".braw",".wmv"}:
+                            todos.append(os.path.join(root, f))
+
+                total = len(todos)
+                popup.after(0, lambda: lbl_scan.config(
+                    text=f"🔍 Varrendo {total} vídeo(s)..."))
+
+                from compressor_video import get_info_video, _fmt_tamanho
+                for i, path in enumerate(todos):
+                    tam = os.path.getsize(path)
+                    if tam >= LIMITE_GB * 1024**3:
+                        info = get_info_video(path) or {}
+                        dur  = info.get("duracao", 0)
+                        h    = int(dur // 3600)
+                        m    = int((dur % 3600) // 60)
+                        s    = int(dur % 60)
+                        dur_str = f"{h:02d}:{m:02d}:{s:02d}" if dur > 0 else "—"
+                        encontrados.append({
+                            "path":    path,
+                            "nome":    os.path.basename(path),
+                            "tam":     tam,
+                            "tam_str": _fmt_tamanho(tam / 1024 / 1024),
+                            "dur_str": dur_str,
+                        })
+
+                    popup.after(0, lambda v=int((i+1)/max(total,1)*100),
+                                t=f"🔍 Varrendo... {i+1}/{total}":
+                                lbl_scan.config(text=t))
+
+            except Exception as e:
+                popup.after(0, lambda: lbl_scan.config(
+                    text=f"❌ Erro: {e}", fg="#f44336"))
+                return
+
+            # Popula a lista na UI
+            def _popular():
+                if not encontrados:
+                    lbl_scan.config(
+                        text=f"✅ Nenhum vídeo acima de {LIMITE_GB:.0f} GB encontrado.",
+                        fg="#4CAF50")
+                    lbl_resumo.config(
+                        text="Seus vídeos estão dentro do limite de tamanho! 🎉",
+                        fg="#4CAF50")
+                    return
+
+                lbl_scan.config(
+                    text=f"✅ {len(encontrados)} vídeo(s) acima de "
+                         f"{LIMITE_GB:.0f} GB encontrado(s):",
+                    fg="#F97316")
+
+                import tkinter as _tk3
+                for arq in encontrados:
+                    var = _tk3.BooleanVar(value=True)
+                    checks.append((var, arq))
+
+                    row = Frame(inner, bg="#242424")
+                    row.pack(fill="x", pady=1)
+
+                    cb = _tk3.Checkbutton(row, variable=var,
+                                          bg="#242424", selectcolor="#2A2A2A",
+                                          activebackground="#242424",
+                                          command=_atualizar_resumo)
+                    cb.pack(side="left", padx=4)
+
+                    Label(row, text=arq["nome"],
+                          font=("Segoe UI", 9), bg="#242424", fg="#CCCCCC",
+                          anchor="w").pack(side="left", fill="x", expand=True)
+                    Label(row, text=arq["tam_str"],
+                          font=("Segoe UI", 9, "bold"), bg="#242424",
+                          fg="#f59e0b", width=10).pack(side="left")
+                    Label(row, text=arq["dur_str"],
+                          font=("Segoe UI", 9), bg="#242424",
+                          fg="#888888", width=10).pack(side="left", padx=(0, 4))
+
+                _atualizar_resumo()
+
+            popup.after(0, _popular)
+
+        threading.Thread(target=_varrer, daemon=True).start()
+
+    botao_sugestao.config(command=sugestao_inteligente)
+
+    def _ajustar_layout_responsivo():
+        """Ajusta tamanho inicial da janela para caber no conteúdo e na tela."""
+        try:
+            win.update_idletasks()
+            screen_w = win.winfo_screenwidth()
+            screen_h = win.winfo_screenheight()
+
+            req_w = max(640, win.winfo_reqwidth() + 16)
+            req_h = max(720, win.winfo_reqheight() + 16)
+
+            max_w = max(640, screen_w - 60)
+            max_h = max(640, screen_h - 80)
+
+            final_w = min(req_w, max_w)
+            final_h = min(req_h, max_h)
+
+            x = max((screen_w - final_w) // 2, 0)
+            y = max((screen_h - final_h) // 2, 0)
+            win.geometry(f"{int(final_w)}x{int(final_h)}+{int(x)}+{int(y)}")
+
+            min_w = min(640, int(final_w))
+            min_h = min(640, int(final_h))
+            win.minsize(min_w, min_h)
+        except Exception:
+            pass
+
+    win.after(120, _ajustar_layout_responsivo)
 
 
 def _mini_stat(parent, titulo, valor_inicial):
@@ -2971,16 +4213,13 @@ def abrir_setup(depois):
 
     win = Tk()
     win.title("Canivete do Pailer — Configuração Inicial")
+    ativar_som_click_global(win)
     try:
         win.iconbitmap(resource_path("icone.ico"))
     except Exception:
         pass
 
-    largura, altura = 520, 480
-    x = (win.winfo_screenwidth()  // 2) - (largura // 2)
-    y = (win.winfo_screenheight() // 2) - (altura  // 2)
-    win.geometry(f"{largura}x{altura}+{x}+{y}")
-    win.resizable(False, False)
+    configurar_janela_responsiva(win, largura=760, altura=640, min_w=640, min_h=520)
     win.configure(bg="#1C1C1C")
     win.protocol("WM_DELETE_WINDOW", lambda: os.sys.exit(0))
 

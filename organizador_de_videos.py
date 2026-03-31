@@ -3,102 +3,582 @@ organizador_de_videos.py
 ========================
 Organiza pastas de LOG de vídeos e fotos para edição audiovisual.
 
-O que faz:
-  - Lê metadados EXIF (fotos) e ffprobe (vídeos) para obter data/hora real de criação
-  - Ordena todos os arquivos cronologicamente
-  - Move para estrutura organizada por data → tipo → sequência numérica
-  - Detecta duplicatas de vídeo por tamanho + duração + nome base
-  - Gera relatório .txt com resumo completo
-
-Estrutura gerada:
-  /organizado/
-    /2025-03-26/
-      /fotos/   001_14h00m32s_original.jpg
-      /videos/  001_14h00m45s_original.mp4
-    /duplicatas/
-    /outros/
-  relatorio.txt
-
-Dependências:
-  pip install pillow       (metadados EXIF de fotos)
-  ffprobe embutido via ffmpeg.exe (metadados de vídeo)
+Estrutura PAI/FILHO:
+  NomeDoProjeto/
+    Sony/          videos/   fotos/   audios/
+    Canon/         videos/   fotos/
+    iPhone/        videos/   fotos/
+    Android/       videos/   fotos/
+    DJI_GoPro_ActionCam/  videos/  fotos/
+    Blackmagic/    videos/
+    RED/           videos/
+    ARRI/          videos/
+    Fuji/          videos/   fotos/
+    Lumix/         videos/   fotos/
+    Leica/         videos/   fotos/
+    Nikon/         videos/   fotos/
+    Olympus/       videos/   fotos/
+    Sigma/         videos/
+    Desconhecido/  videos/   fotos/   audios/
+    duplicatas/
+    outros/
+  relatorio.txt  BACKUP.json  NEXTUP.json
 """
 
-import os
-import sys
-import re
-import shutil
-import json
-import subprocess
-import hashlib
+import os, sys, re, shutil, json, subprocess
+import concurrent.futures as cf
 from datetime import datetime
-from pathlib import Path
 from snapshot_logger import gerar_backup, gerar_nextup
 
-# =========================
-# 📋 EXTENSÕES POR TIPO
-# =========================
 EXTENSOES_VIDEO = {
-    ".mp4", ".mov", ".avi", ".mkv", ".mts", ".m2ts", ".mxf",
-    ".wmv", ".flv", ".webm", ".m4v", ".3gp", ".ts", ".vob",
-    ".mpg", ".mpeg", ".dv", ".r3d", ".braw"
+    ".mp4",".mov",".avi",".mkv",".mts",".m2ts",".mxf",
+    ".wmv",".flv",".webm",".m4v",".3gp",".ts",".vob",
+    ".mpg",".mpeg",".dv",".r3d",".braw",".prproj"
 }
-
 EXTENSOES_FOTO = {
-    ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".raw", ".arw",
-    ".cr2", ".cr3", ".nef", ".dng", ".heic", ".heif", ".webp",
-    ".bmp", ".gif"
+    ".jpg",".jpeg",".png",".tiff",".tif",".raw",".arw",
+    ".cr2",".cr3",".nef",".dng",".heic",".heif",".webp",
+    ".bmp",".orf",".rw2",".pef",".srw",".raf"
 }
-
 EXTENSOES_AUDIO = {
-    ".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a", ".wma", ".aiff"
+    ".mp3",".wav",".aac",".flac",".ogg",".m4a",".wma",
+    ".aiff",".aif",".opus"
 }
 
+_NAO_PROFISSIONAL = {
+    "BRUTOS","BRUTO","RAW","FOOTAGE","VIDEOS","VIDEO","FOTOS",
+    "PHOTOS","PHOTO","AUDIO","AUDIOS","OUTROS","BACKUP","EXPORTS",
+    "EXPORT","IMPORT","LOG","LOGS","CARD","SD","SSD","HDD","USB",
+    "CAMERA","CAM","DRONE","GOPRO","IPHONE","SAMSUNG","SONY","CANON",
+    "NIKON","DJI","MAVIC","ACTION","CLIP","CLIPS","PROJETO","PROJECT",
+    "EDIT","EDITS","MEDIA","MISC","VARIOUS","MIX","MULTI","MULTICAM",
+    "PRIVATE","100CANON","100ANDRO","XDROOT","DCIM","STREAM","AVCHD",
+    "BDMV","CERTIFICATE","BDAV","BACKUP","NEXTUP","ORGANIZADO",
+}
 
-# =========================
-# 🔍 LOCALIZA FFPROBE
-# =========================
-def _get_ffprobe():
-    """Retorna caminho do ffprobe/ffmpeg para extrair metadados de vídeo."""
+_INVALIDO_METADADO = [
+    "lavf","libav","ffmpeg","encoder","handler","video","audio",
+    "track","stream","mp4","h264","h265","avc","hevc","codec",
+    "quicktime","generic","unknown","mediatek","qualcomm",
+]
+
+# Mapa marca → pasta PAI (ordem importa: mais específico primeiro)
+_MAPA_PAI = [
+    # iPhone/iPad
+    ("iphone","iPhone"), ("ipad","iPhone"), ("apple","iPhone"),
+    # Android
+    ("samsung","Android"),("galaxy","Android"),("pixel","Android"),
+    ("xiaomi","Android"),("redmi","Android"),("huawei","Android"),
+    ("oneplus","Android"),("motorola","Android"),("oppo","Android"),
+    ("vivo","Android"),("realme","Android"),("nokia","Android"),
+    ("zte","Android"),("sm-","Android"),("android","Android"),
+    # DJI / GoPro / Action
+    ("dji","DJI_GoPro_ActionCam"),("mavic","DJI_GoPro_ActionCam"),
+    ("osmo","DJI_GoPro_ActionCam"),("phantom","DJI_GoPro_ActionCam"),
+    ("gopro","DJI_GoPro_ActionCam"),("insta360","DJI_GoPro_ActionCam"),
+    ("action cam","DJI_GoPro_ActionCam"),
+    # Sony
+    ("sony","Sony"),("ilce-","Sony"),("ilca-","Sony"),("zv-e","Sony"),
+    ("fx3","Sony"),("fx6","Sony"),("fx9","Sony"),("pxw-","Sony"),
+    ("xdcam","Sony"),("venice","Sony"),
+    # Canon
+    ("canon","Canon"),("eos","Canon"),("c70","Canon"),
+    ("c300","Canon"),("c500","Canon"),("c200","Canon"),
+    # Nikon
+    ("nikon","Nikon"),("nikkor","Nikon"),
+    # Blackmagic
+    ("blackmagic","Blackmagic"),("bmpcc","Blackmagic"),
+    ("ursa","Blackmagic"),("pocket cinema","Blackmagic"),
+    # RED
+    ("komodo","RED"),("monstro","RED"),("helium","RED"),
+    ("dragon","RED"),("raven","RED"),(" red ","RED"),
+    # ARRI
+    ("arri","ARRI"),("alexa","ARRI"),("amira","ARRI"),
+    # Fuji
+    ("fujifilm","Fuji"),("fuji","Fuji"),("x-h2","Fuji"),
+    ("x-t","Fuji"),("x-s","Fuji"),("gfx","Fuji"),
+    # Lumix / Panasonic
+    ("panasonic","Lumix"),("lumix","Lumix"),("gh5","Lumix"),
+    ("gh6","Lumix"),("gh7","Lumix"),("ag-","Lumix"),
+    # Leica
+    ("leica","Leica"),("sl2","Leica"),("m11","Leica"),
+    # Olympus / OM System
+    ("olympus","Olympus"),("om system","Olympus"),
+    ("om-d","Olympus"),("om-1","Olympus"),
+    # Sigma
+    ("sigma","Sigma"),
+]
+
+# Extensões exclusivas de câmeras específicas
+_EXT_PAI = {
+    ".r3d":  "RED",
+    ".braw": "Blackmagic",
+    ".ari":  "ARRI",
+    # .mts e .mxf são formatos Sony/profissional — fallback Sony se metadado não identificar
+    # (não adicionamos aqui pois queremos tentar metadados primeiro — aplicamos no fallback)
+}
+# Extensões que têm fallback específico se metadados não identificarem
+_EXT_FALLBACK = {
+    ".mts":  "Sony",   # AVCHD — Sony, Panasonic
+    ".m2ts": "Sony",   # AVCHD — Sony, Panasonic
+    ".mxf":  "Sony",   # Professional — Sony, Canon, Panasonic
+}
+
+# Prefixos de nome de arquivo típicos
+_PREFIXO_PAI = {
+    "IMG_": "iPhone",    # iPhone/iPad — IMG_XXXX.MOV ou IMG_XXXX(1).MOV
+    "MOV_": "Android",
+    "VID_": "Android",
+    "DSCF": "Fuji",
+    "GOPR": "DJI_GoPro_ActionCam",
+    "GX": "DJI_GoPro_ActionCam",
+    "DJI_": "DJI_GoPro_ActionCam",
+    "DJIM": "DJI_GoPro_ActionCam",
+    "MVI_": "Canon",
+}
+
+# Padrões regex para nomes de arquivo (mais flexíveis que prefixo simples)
+import re as _re_mod
+_REGEX_PAI = [
+    # DJI usa nomes como DJI_0001.MOV, DJIM0001.MOV — deve vir ANTES do iPhone
+    # iPhone: IMG_XXXX.MOV — mas NÃO se o nome começar com DJI
+    (_re_mod.compile(r'^IMG_\d{4}(?!.*DJI)', _re_mod.IGNORECASE), "iPhone"),
+    # iPhone fotos: _MG_XXXX.JPG (Canon também usa, mas com extensão RAW diferente)
+    (_re_mod.compile(r'^_MG_\d{4}', _re_mod.IGNORECASE), "Canon"),
+    # DJI: DJI_XXXX, DJIM_XXXX
+    (_re_mod.compile(r'^DJI[_M]?\d{4}', _re_mod.IGNORECASE), "DJI_GoPro_ActionCam"),
+    # GoPro: GOPRXXXX, GXXXXXYYY, GPXXXXYYY
+    (_re_mod.compile(r'^(GOPR|GX\d{2}|GP\d{3})\d{4}', _re_mod.IGNORECASE), "DJI_GoPro_ActionCam"),
+    # Sony: DSC_XXXX, DSCF_XXXX
+    (_re_mod.compile(r'^DSC[FN_]?\d{4}', _re_mod.IGNORECASE), "Sony"),
+    # Canon vídeo: MVI_XXXX
+    (_re_mod.compile(r'^MVI_\d{4}', _re_mod.IGNORECASE), "Canon"),
+    # Android: VID_YYYYMMDD, MOV_YYYYMMDD
+    (_re_mod.compile(r'^(VID|MOV)_\d{8}', _re_mod.IGNORECASE), "Android"),
+]
+
+
+def _get_base_dir():
     if hasattr(sys, "_MEIPASS"):
-        base = sys._MEIPASS
-        exe  = os.path.dirname(sys.executable)
-    else:
-        base = os.path.dirname(os.path.abspath(__file__))
-        exe  = base
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
 
+
+def _carregar_camera_map(callback_log=None):
+    """
+    Carrega regras locais de classificação de câmera/dispositivo.
+
+    Formato esperado (camera_map.json):
+    {
+      "contains": {"ilce-7m4": "Sony", "iphone 15": "iPhone"},
+      "prefix": {"A0": "Canon"},
+      "ext": {".mxf": "Canon"},
+      "folder_contains": {"/drone/": "DJI_GoPro_ActionCam"},
+      "regex": [{"pattern": "^C\\d{4}", "pai": "Canon"}]
+    }
+    """
+    path = os.path.join(_get_base_dir(), "camera_map.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return None
+
+        norm = {
+            "contains": {},
+            "prefix": {},
+            "ext": {},
+            "folder_contains": {},
+            "regex": [],
+            "_path": path,
+        }
+
+        for k in ["contains", "prefix", "ext", "folder_contains"]:
+            bloco = data.get(k, {})
+            if isinstance(bloco, dict):
+                for chave, pai in bloco.items():
+                    if isinstance(chave, str) and isinstance(pai, str) and chave.strip() and pai.strip():
+                        norm[k][chave.strip().lower()] = pai.strip()
+
+        bloco_regex = data.get("regex", [])
+        if isinstance(bloco_regex, list):
+            for item in bloco_regex:
+                if not isinstance(item, dict):
+                    continue
+                padrao = str(item.get("pattern", "")).strip()
+                pai = str(item.get("pai", "")).strip()
+                if not padrao or not pai:
+                    continue
+                try:
+                    norm["regex"].append((re.compile(padrao, re.IGNORECASE), pai))
+                except Exception:
+                    pass
+
+        if callback_log:
+            q = (len(norm["contains"]) + len(norm["prefix"]) + len(norm["ext"]) +
+                 len(norm["folder_contains"]) + len(norm["regex"]))
+            callback_log(f"🧠 camera_map: {q} regra(s) carregada(s)")
+        return norm
+    except Exception as e:
+        if callback_log:
+            callback_log(f"⚠️ camera_map inválido: {e}")
+        return None
+
+
+def _coletar_hints_metadado(path, ffprobe_bin=None, exiftool_bin=None):
+    """Coleta pistas de metadado para diagnóstico e regras customizadas."""
+    hints = []
+    fontes = {}
+
+    if exiftool_bin:
+        try:
+            cmd = [
+                exiftool_bin,
+                "-Make", "-Model", "-CameraModelName",
+                "-DeviceManufacturer", "-DeviceModelName",
+                "-DroneModel", "-VehicleModel",
+                "-HandlerVendorID", "-CompressorName",
+                "-j", "-q", path,
+            ]
+            r = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=20,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            )
+            if r.returncode == 0 and r.stdout.strip():
+                data = json.loads(r.stdout)
+                if data:
+                    tags = data[0]
+                    campos = [
+                        "Make", "Model", "CameraModelName",
+                        "DeviceManufacturer", "DeviceModelName",
+                        "DroneModel", "VehicleModel",
+                        "HandlerVendorID", "CompressorName",
+                    ]
+                    exif_vals = []
+                    for c in campos:
+                        v = str(tags.get(c, "")).strip()
+                        if v and len(v) <= 80:
+                            exif_vals.append(v)
+                            hints.append(v)
+                    if exif_vals:
+                        fontes["exiftool"] = exif_vals
+        except Exception:
+            pass
+
+    if ffprobe_bin:
+        try:
+            cmd = [ffprobe_bin, "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", path]
+            r = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=20,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            )
+            if r.returncode == 0 and r.stdout.strip():
+                data = json.loads(r.stdout)
+                tags = (data.get("format") or {}).get("tags") or {}
+                streams = data.get("streams") or []
+                probe_vals = []
+                for chave in [
+                    "com.apple.quicktime.model", "com.apple.quicktime.make",
+                    "com.android.manufacturer", "com.android.model",
+                    "make", "model", "Make", "Model",
+                ]:
+                    v = tags.get(chave) or tags.get(chave.lower()) or tags.get(chave.upper())
+                    if v:
+                        vs = str(v).strip()
+                        if vs and len(vs) <= 80:
+                            probe_vals.append(vs)
+                            hints.append(vs)
+                for stream in streams:
+                    st = stream.get("tags", {})
+                    for chave in ["handler_name", "vendor_id", "encoder"]:
+                        v = st.get(chave, "")
+                        if v:
+                            vs = str(v).strip()
+                            if vs and len(vs) <= 80:
+                                probe_vals.append(vs)
+                                hints.append(vs)
+                if probe_vals:
+                    fontes["ffprobe"] = probe_vals
+        except Exception:
+            pass
+
+    return {
+        "texto": " ".join(hints).strip(),
+        "fontes": fontes,
+    }
+
+
+def _aplicar_camera_map(path, mapa_custom, hints_texto=""):
+    if not mapa_custom:
+        return None
+
+    ext = os.path.splitext(path)[1].lower()
+    nome = os.path.basename(path)
+    nome_low = nome.lower()
+    pasta_low = os.path.dirname(path).replace("\\", "/").lower()
+    alvo_texto = f"{nome_low} {pasta_low} {hints_texto.lower()}".strip()
+
+    if ext in mapa_custom.get("ext", {}):
+        return mapa_custom["ext"][ext]
+
+    for pref, pai in mapa_custom.get("prefix", {}).items():
+        if nome_low.startswith(pref):
+            return pai
+
+    for trecho, pai in mapa_custom.get("folder_contains", {}).items():
+        if trecho and trecho in pasta_low:
+            return pai
+
+    for trecho, pai in mapa_custom.get("contains", {}).items():
+        if trecho and trecho in alvo_texto:
+            return pai
+
+    for rx, pai in mapa_custom.get("regex", []):
+        try:
+            if rx.search(nome):
+                return pai
+        except Exception:
+            pass
+
+    return None
+
+
+def _get_ffprobe():
+    base = sys._MEIPASS if hasattr(sys, "_MEIPASS") else os.path.dirname(os.path.abspath(__file__))
+    exe  = os.path.dirname(sys.executable) if hasattr(sys, "_MEIPASS") else base
     for pasta in [base, exe]:
         for nome in ["ffprobe.exe", "ffmpeg.exe"]:
             path = os.path.join(pasta, nome)
             if os.path.exists(path):
                 return path, nome == "ffmpeg.exe"
-
-    # Tenta no PATH do sistema
     for nome in ["ffprobe", "ffmpeg"]:
         try:
-            subprocess.run([nome, "-version"],
-                           capture_output=True, timeout=3)
+            subprocess.run([nome, "-version"], capture_output=True, timeout=3)
             return nome, nome == "ffmpeg"
         except Exception:
             pass
-
     return None, False
 
 
-# =========================
-# 📅 EXTRAIR DATA DE CRIAÇÃO
-# =========================
-def extrair_data(path, ffprobe_bin=None, usa_ffmpeg=False):
+def _get_exiftool():
     """
-    Tenta extrair a data/hora real de criação do arquivo.
-    Ordem de prioridade:
-      1. EXIF (fotos)
-      2. Metadados de vídeo via ffprobe
-      3. Data de modificação do arquivo (fallback)
+    Retorna o caminho do exiftool.exe ou None se não disponível.
+    1. _MEIPASS (embutido no .exe pelo PyInstaller)
+    2. Pasta ao lado do executável
+    3. PATH do sistema
     """
-    ext = os.path.splitext(path)[1].lower()
+    # 1. Embutido no .exe
+    if hasattr(sys, "_MEIPASS"):
+        meipass_exe = os.path.join(sys._MEIPASS, "exiftool.exe")
+        if os.path.exists(meipass_exe):
+            return meipass_exe
 
-    # --- EXIF para fotos ---
+    # 2. Ao lado do executável
+    base = os.path.dirname(sys.executable) if hasattr(sys, "_MEIPASS") \
+           else os.path.dirname(os.path.abspath(__file__))
+    local = os.path.join(base, "exiftool.exe")
+    if os.path.exists(local):
+        return local
+
+    # 3. PATH do sistema
+    try:
+        r = subprocess.run(["exiftool", "-ver"], capture_output=True, timeout=3)
+        if r.returncode == 0:
+            return "exiftool"
+    except Exception:
+        pass
+    return None
+
+
+def _exiftool_pai(path, exiftool_bin):
+    """
+    Usa ExifTool para extrair Make/Model/etc e identificar o PAI.
+    ExifTool conhece campos proprietários de Sony, Canon, DJI, GoPro, etc.
+    Retorna string do PAI ou None.
+    """
+    try:
+        cmd = [
+            exiftool_bin,
+            "-Make", "-Model", "-CameraModelName",
+            "-DeviceManufacturer", "-DeviceModelName",
+            "-DroneModel", "-VehicleModel",
+            "-HandlerVendorID", "-CompressorName",
+            "-j",          # output JSON
+            "-q",          # quiet
+            path
+        ]
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           timeout=15,
+                           creationflags=subprocess.CREATE_NO_WINDOW
+                           if sys.platform == "win32" else 0)
+        if r.returncode != 0 or not r.stdout.strip():
+            return None
+
+        data = json.loads(r.stdout)
+        if not data:
+            return None
+
+        tags = data[0]  # ExifTool retorna lista com um item por arquivo
+
+        # Campos em ordem de confiança
+        campos = [
+            "Make", "Model", "CameraModelName",
+            "DeviceManufacturer", "DeviceModelName",
+            "DroneModel", "VehicleModel",
+            "HandlerVendorID", "CompressorName",
+        ]
+
+        valores = []
+        for campo in campos:
+            v = tags.get(campo, "")
+            if v and isinstance(v, str) and len(v) <= 60:
+                v_lower = v.lower()
+                # Filtra valores claramente inválidos
+                if not any(p in v_lower for p in _INVALIDO_METADADO):
+                    valores.append(v)
+
+        if not valores:
+            return None
+
+        texto = " ".join(valores)
+        return _texto_para_pai(texto)
+
+    except Exception:
+        return None
+
+
+def _texto_para_pai(texto):
+    t = texto.lower().strip()
+    for chave, pai in _MAPA_PAI:
+        if chave in t:
+            return pai
+    return None
+
+
+def identificar_pai(path, ffprobe_bin=None, exiftool_bin=None, mapa_custom=None):
+    ext      = os.path.splitext(path)[1].lower()
+    nome_arq = os.path.basename(path)
+    nome_up  = nome_arq.upper()
+
+    # 0. Regras por nome (forçadas)
+    # Lightroom Mobile exportado no celular durante o evento
+    if ext in EXTENSOES_FOTO and "COMPARTILHADA DO LIGHTROOM MOBILE" in nome_up:
+        return "Lightroom photos"
+    # DJI/GoPro/Insta360 no nome devem ter prioridade sobre qualquer outro indício
+    if any(k in nome_up for k in ["DJI", "GOPR", "INSTA360"]):
+        return "DJI_GoPro_ActionCam"
+
+    # 1. Extensão exclusiva de câmera
+    if ext in _EXT_PAI:
+        return _EXT_PAI[ext]
+
+    # 2. ExifTool — padrão ouro, conhece campos proprietários de todas as câmeras
+    if exiftool_bin:
+        pai = _exiftool_pai(path, exiftool_bin)
+        if pai:
+            return pai
+
+    # 3. EXIF via Pillow para fotos (fallback rápido sem ExifTool)
+    if ext in EXTENSOES_FOTO:
+        try:
+            from PIL import Image as _I
+            from PIL.ExifTags import TAGS
+            img  = _I.open(path)
+            exif = img._getexif()
+            if exif:
+                make = model = ""
+                for tid, v in exif.items():
+                    tag = TAGS.get(tid, "")
+                    if tag == "Make":  make  = str(v).strip()
+                    if tag == "Model": model = str(v).strip()
+                pai = _texto_para_pai(f"{make} {model}")
+                if pai:
+                    return pai
+        except Exception:
+            pass
+
+    # 4. ffprobe para vídeos/áudios
+    if ext in EXTENSOES_VIDEO | EXTENSOES_AUDIO and ffprobe_bin:
+        try:
+            cmd = [ffprobe_bin, "-v", "quiet", "-print_format", "json",
+                   "-show_format", "-show_streams", path]
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+            if r.returncode == 0:
+                data    = json.loads(r.stdout)
+                tags    = data.get("format", {}).get("tags", {})
+                streams = data.get("streams", [])
+                valores = []
+                for chave in ["com.apple.quicktime.model",
+                              "com.apple.quicktime.make",
+                              "com.android.manufacturer",
+                              "com.android.model",
+                              "make", "model", "Make", "Model"]:
+                    v = tags.get(chave) or tags.get(chave.lower()) or tags.get(chave.upper())
+                    if v:
+                        vs = str(v).strip()
+                        if len(vs) <= 50 and not any(p in vs.lower() for p in _INVALIDO_METADADO):
+                            valores.append(vs)
+                # Handler de streams (GoPro, DJI gravam aqui)
+                for stream in streams:
+                    st = stream.get("tags", {})
+                    for chave in ["handler_name", "vendor_id"]:
+                        v = st.get(chave, "")
+                        if v and len(v) <= 30:
+                            if any(m in v.lower() for m in
+                                   ["gopro","dji","apple","insta360",
+                                    "sony","canon","nikon","blackmagic"]):
+                                valores.append(v)
+                if valores:
+                    pai = _texto_para_pai(" ".join(valores))
+                    if pai:
+                        return pai
+        except Exception:
+            pass
+
+    # 5. Prefixo simples do nome do arquivo
+    #    DJI tem prioridade sobre iPhone no prefixo IMG_
+    if nome_up.startswith("DJI") or nome_up.startswith("DJIM"):
+        return "DJI_GoPro_ActionCam"
+    for prefixo, pai in _PREFIXO_PAI.items():
+        if nome_up.startswith(prefixo):
+            return pai
+
+    # 6. Regex mais flexível (cobre IMG_XXXX(1).MOV e variantes)
+    nome_sem_ext = os.path.splitext(nome_arq)[0]
+    for padrao, pai in _REGEX_PAI:
+        if padrao.match(nome_sem_ext):
+            return pai
+
+    # 7. Regras customizadas locais (camera_map.json)
+    if mapa_custom:
+        pai_custom = _aplicar_camera_map(path, mapa_custom)
+        if pai_custom:
+            return pai_custom
+
+    # 8. Fallback por extensão profissional (.mts, .m2ts, .mxf → Sony)
+    if ext in _EXT_FALLBACK:
+        return _EXT_FALLBACK[ext]
+
+    # 9. Vídeo com nome IMG_ não identificado → Smartphone
+    #    (pode ser iPhone sem metadado ou Android)
+    nome_up = nome_arq.upper()
+    if ext in EXTENSOES_VIDEO and nome_up.startswith("IMG"):
+        # Verifica se já existe pai iPhone para agrupar junto
+        return "iPhone"
+
+    return "Desconhecido"
+
+
+def extrair_data(path, ffprobe_bin=None):
+    ext = os.path.splitext(path)[1].lower()
     if ext in EXTENSOES_FOTO:
         try:
             from PIL import Image
@@ -106,216 +586,241 @@ def extrair_data(path, ffprobe_bin=None, usa_ffmpeg=False):
             img  = Image.open(path)
             exif = img._getexif()
             if exif:
-                for tag_id, value in exif.items():
-                    tag = TAGS.get(tag_id, tag_id)
-                    if tag in ("DateTimeOriginal", "DateTime", "DateTimeDigitized"):
+                for tid, v in exif.items():
+                    tag = TAGS.get(tid, tid)
+                    if tag in ("DateTimeOriginal","DateTime","DateTimeDigitized"):
                         try:
-                            return datetime.strptime(str(value), "%Y:%m:%d %H:%M:%S")
+                            return datetime.strptime(str(v), "%Y:%m:%d %H:%M:%S")
                         except Exception:
                             pass
         except Exception:
             pass
-
-    # --- ffprobe para vídeos e áudios ---
     if ext in EXTENSOES_VIDEO | EXTENSOES_AUDIO and ffprobe_bin:
         try:
-            if usa_ffmpeg:
-                # ffmpeg pode extrair metadados também
-                cmd = [ffprobe_bin, "-v", "quiet", "-print_format", "json",
-                       "-show_format", path]
-            else:
-                cmd = [ffprobe_bin, "-v", "quiet", "-print_format", "json",
-                       "-show_format", path]
-
-            resultado = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=15
-            )
-            if resultado.returncode == 0:
-                data = json.loads(resultado.stdout)
-                tags = data.get("format", {}).get("tags", {})
-
-                for chave in ["creation_time", "date", "com.apple.quicktime.creationdate"]:
+            cmd = [ffprobe_bin, "-v", "quiet", "-print_format", "json", "-show_format", path]
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            if r.returncode == 0:
+                tags = json.loads(r.stdout).get("format", {}).get("tags", {})
+                for chave in ["creation_time","date","com.apple.quicktime.creationdate"]:
                     valor = tags.get(chave) or tags.get(chave.upper())
                     if valor:
-                        for fmt in ["%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ",
-                                    "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"]:
+                        for fmt in ["%Y-%m-%dT%H:%M:%S.%fZ","%Y-%m-%dT%H:%M:%SZ",
+                                    "%Y-%m-%d %H:%M:%S","%Y-%m-%dT%H:%M:%S"]:
                             try:
                                 return datetime.strptime(valor[:19], fmt[:len(valor[:19])])
                             except Exception:
                                 pass
         except Exception:
             pass
-
-    # --- Fallback: data de modificação ---
     try:
-        ts = os.path.getmtime(path)
-        return datetime.fromtimestamp(ts)
+        return datetime.fromtimestamp(os.path.getmtime(path))
     except Exception:
         return datetime.now()
 
 
-# =========================
-# 📷 EXTRAIR MODELO DA CÂMERA
-# =========================
-def extrair_camera(path, ffprobe_bin=None):
-    """
-    Tenta identificar o modelo da câmera/celular/drone.
-    Retorna string limpa ex: "Sony", "iPhone", "DJI" ou None.
-    """
-    ext = os.path.splitext(path)[1].lower()
-
-    # --- EXIF para fotos ---
-    if ext in EXTENSOES_FOTO:
-        try:
-            from PIL import Image as _Img
-            from PIL.ExifTags import TAGS
-            img  = _Img.open(path)
-            exif = img._getexif()
-            if exif:
-                make  = None
-                model = None
-                for tag_id, value in exif.items():
-                    tag = TAGS.get(tag_id, "")
-                    if tag == "Make":  make  = str(value).strip()
-                    if tag == "Model": model = str(value).strip()
-                if model:
-                    # Remove make do model se repetido (ex: "Apple iPhone 14" → "iPhone14")
-                    if make and model.startswith(make):
-                        model = model[len(make):].strip()
-                    return _limpar_nome_camera(model or make)
-                if make:
-                    return _limpar_nome_camera(make)
-        except Exception:
-            pass
-
-    # --- ffprobe para vídeos ---
-    if ext in EXTENSOES_VIDEO and ffprobe_bin:
-        try:
-            cmd = [ffprobe_bin, "-v", "quiet", "-print_format", "json",
-                   "-show_format", path]
-            resultado = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-            if resultado.returncode == 0:
-                data = json.loads(resultado.stdout)
-                tags = data.get("format", {}).get("tags", {})
-                for chave in ["com.apple.quicktime.model", "model", "Make",
-                               "com.android.model", "encoder", "handler_name"]:
-                    valor = tags.get(chave) or tags.get(chave.lower()) or tags.get(chave.upper())
-                    if valor and len(str(valor)) < 40:
-                        limpo = _limpar_nome_camera(str(valor))
-                        if limpo:
-                            return limpo
-        except Exception:
-            pass
-
-    return None
-
-
-def _limpar_nome_camera(nome):
-    """Limpa e abrevia o nome da câmera para usar no filename."""
-    if not nome:
-        return None
-    # Remove caracteres inválidos em nomes de arquivo
-    nome = re.sub(r'[\/:*?"<>|]', '', nome)
-    nome = nome.strip()
-    # Abreviações conhecidas
-    abreviacoes = {
-        "apple":    "Apple",
-        "iphone":   "iPhone",
-        "ipad":     "iPad",
-        "samsung":  "Samsung",
-        "sony":     "Sony",
-        "canon":    "Canon",
-        "nikon":    "Nikon",
-        "gopro":    "GoPro",
-        "dji":      "DJI",
-        "fujifilm": "Fuji",
-        "panasonic":"Panasonic",
-        "olympus":  "Olympus",
-        "blackmagic":"BMPCC",
-        "red":      "RED",
-        "arri":     "ARRI",
-        "insta360": "Insta360",
-        "xiaomi":   "Xiaomi",
-        "huawei":   "Huawei",
-        "google":   "Google",
-    }
-    nome_lower = nome.lower()
-    for chave, abrev in abreviacoes.items():
-        if chave in nome_lower:
-            return abrev
-    # Retorna primeiras 12 chars sem espaços se não reconhecido
-    return nome[:12].replace(" ", "")
-
-
-# =========================
-# ⏱️ EXTRAIR DURAÇÃO DO VÍDEO
-# =========================
 def extrair_duracao(path, ffprobe_bin=None):
-    """Retorna duração em segundos ou 0 se não conseguir."""
     if not ffprobe_bin:
         return 0
     try:
-        cmd = [ffprobe_bin, "-v", "quiet", "-print_format", "json",
-               "-show_format", path]
-        resultado = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-        if resultado.returncode == 0:
-            data = json.loads(resultado.stdout)
-            dur  = data.get("format", {}).get("duration")
-            if dur:
-                return float(dur)
+        bin_low = os.path.basename(str(ffprobe_bin)).lower()
+
+        # Caminho rápido via ffprobe (mais leve que -show_streams completo)
+        if "ffprobe" in bin_low:
+            cmd = [
+                ffprobe_bin, "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                path,
+            ]
+            r = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            )
+            if r.returncode == 0:
+                txt = (r.stdout or "").strip().splitlines()
+                if txt:
+                    try:
+                        v = float(txt[0])
+                        if v > 0:
+                            return v
+                    except Exception:
+                        pass
+
+            # Fallback: duração por stream
+            cmd = [
+                ffprobe_bin, "-v", "error",
+                "-show_entries", "stream=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                path,
+            ]
+            r = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=12,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            )
+            if r.returncode == 0:
+                for linha in (r.stdout or "").splitlines():
+                    try:
+                        v = float(str(linha).strip())
+                        if v > 0:
+                            return v
+                    except Exception:
+                        pass
+
+        # Fallback quando só existe ffmpeg: parse de "Duration: HH:MM:SS.xx" no stderr
+        cmd = [ffprobe_bin, "-i", path]
+        r = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=12,
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        )
+        info = (r.stderr or "") + "\n" + (r.stdout or "")
+        m = re.search(r"Duration:\s+(\d+):(\d+):([\d.]+)", info)
+        if m:
+            h, mn, s = int(m.group(1)), int(m.group(2)), float(m.group(3))
+            v = h * 3600 + mn * 60 + s
+            if v > 0:
+                return v
     except Exception:
         pass
     return 0
 
 
-# =========================
-# 🔁 DETECTAR DUPLICATAS
-# =========================
+def _detectar_profissional(path, pasta_raiz):
+    try:
+        rel    = os.path.relpath(path, pasta_raiz)
+        partes = rel.replace("\\", "/").split("/")
+        for parte in partes[:-1]:
+            pc = parte.strip()
+            pu = re.sub(r'\d+', '', pc).upper().strip()
+            if (2 <= len(pc) <= 20
+                    and not re.search(r'[0-9]{4}', pc)
+                    and re.search(r'[a-zA-Z]', pc)
+                    and pu not in _NAO_PROFISSIONAL
+                    and not pc.startswith(".")):
+                return pc.capitalize()
+    except Exception:
+        pass
+    return None
+
+
+def _tem_sufixo_copia(nome_sem_ext):
+    """
+    Retorna True APENAS se o nome claramente indica uma cópia do SO.
+    MUITO conservador — só padrões que o sistema operacional cria automaticamente.
+    NÃO inclui _1, _2 — câmeras Canon/Sony usam isso para clipes sequenciais.
+    """
+    n = nome_sem_ext.strip()
+    if re.search(r'\(\d+\)$', n):           # IMG_1234(1) — macOS/iOS
+        return True
+    if re.search(r'\s+\(\d+\)$', n):        # IMG_1234 (2) — Windows
+        return True
+    if re.search(r'[-_\s]+(c[oó]pia|copy|copia|dup|duplicate|backup)\s*(\d*)$',
+                 n, re.IGNORECASE):          # arquivo - Copia, arquivo - Copy
+        return True
+    return False
+
+
+def _nome_base_canonico(nome_sem_ext):
+    """
+    Remove sufixos de cópia do SO para obter o nome base.
+    NÃO remove _1, _2 — esses são sequências de câmera.
+    Retorna (nome_base, tinha_sufixo_copia).
+    """
+    n = nome_sem_ext.strip()
+    orig = n
+    n = re.sub(r'\s*\(\d+\)\s*$', '', n)
+    n = re.sub(r'\s+\(\d+\)\s*$', '', n)
+    n = re.sub(r'[-_\s]+(c[oó]pia|copy|copia|dup|duplicate|backup)\s*\d*$',
+               '', n, flags=re.IGNORECASE)
+    tinha = n.lower() != orig.lower()
+    return n.lower().strip(), tinha
+
+
 def detectar_duplicatas(arquivos_info):
     """
-    Detecta duplicatas de vídeo por: tamanho + duração arredondada + nome base.
-    Retorna set de paths que são duplicatas (mantém o primeiro de cada grupo).
+    Detecta duplicatas de forma CONSERVADORA.
+
+    Um arquivo é duplicata SOMENTE se:
+    1. Tem exatamente o mesmo tamanho E mesma duração E
+       ao menos um dos dois tem sufixo de cópia do SO: (1), (2), - Copia, - Copy
+    OU
+    2. Tem exatamente o mesmo tamanho E mesma duração E
+       nome base idêntico (sem sufixos de cópia) — ex: IMG_1234.MOV e IMG_1234(1).MOV
+
+    NÃO marca como duplicata:
+    - Arquivos com mesmo tamanho mas nomes não relacionados
+      (Canon grava muitos clipes com durações iguais por acidente)
+    - Arquivos com _1, _2 no nome (são sequências de câmera, não cópias)
     """
-    grupos = {}
-    duplicatas = set()
+    dups = set()
 
+    # Agrupa por tamanho + duração exatos
+    grupos = {}  # (tam, dur) → lista de infos
     for info in arquivos_info:
-        if info["tipo"] != "video":
+        if info["tipo"] not in ("video", "foto", "audio"):
             continue
-
-        tamanho  = info["tamanho"]
-        duracao  = round(info.get("duracao", 0))
-        nome_b   = re.sub(r'[-_\s]\d+$', '', os.path.splitext(
-                          os.path.basename(info["path"]))[0].lower())
-
-        chave = (tamanho, duracao)
-
-        if chave in grupos:
-            duplicatas.add(info["path"])
-        else:
-            grupos[chave] = info["path"]
-
-    # Também detecta pelo nome base + tamanho similar (±5%)
-    by_nome = {}
-    for info in arquivos_info:
-        if info["tipo"] != "video" or info["path"] in duplicatas:
+        tam = info["tamanho"]
+        if tam == 0:
             continue
-        nome_b = re.sub(r'[-_\s]\d+$', '',
-                        os.path.splitext(os.path.basename(info["path"]))[0].lower())
-        if nome_b in by_nome:
-            tam_a = by_nome[nome_b]["tamanho"]
-            tam_b = info["tamanho"]
-            if tam_a > 0 and abs(tam_a - tam_b) / tam_a < 0.05:
-                duplicatas.add(info["path"])
-        else:
-            by_nome[nome_b] = info
+        dur   = round(info.get("duracao", 0))
+        chave = (tam, dur)
+        if chave not in grupos:
+            grupos[chave] = []
+        grupos[chave].append(info)
 
-    return duplicatas
+    # Analisa cada grupo de arquivos com mesmo tamanho+duração
+    for chave, grupo in grupos.items():
+        if len(grupo) <= 1:
+            continue  # único com esse tamanho — não é duplicata
+
+        # Dentro do grupo, compara pares
+        for i, info_a in enumerate(grupo):
+            if info_a["path"] in dups:
+                continue
+            for info_b in grupo[i+1:]:
+                if info_b["path"] in dups:
+                    continue
+
+                nome_a = os.path.splitext(os.path.basename(info_a["path"]))[0]
+                nome_b = os.path.splitext(os.path.basename(info_b["path"]))[0]
+
+                base_a, copia_a = _nome_base_canonico(nome_a)
+                base_b, copia_b = _nome_base_canonico(nome_b)
+
+                # Caso 1: nomes base idênticos (um tem sufixo de cópia)
+                if base_a == base_b and (copia_a or copia_b):
+                    if copia_b and not copia_a:
+                        dups.add(info_b["path"])
+                    elif copia_a and not copia_b:
+                        dups.add(info_a["path"])
+                    else:
+                        # Ambos têm sufixo — mantém o de nome "menor" (mais original)
+                        if nome_a <= nome_b:
+                            dups.add(info_b["path"])
+                        else:
+                            dups.add(info_a["path"])
+                    continue
+
+                # Caso 2: nomes completamente idênticos (mesmo nome, mesmo tamanho)
+                if nome_a.lower() == nome_b.lower():
+                    # Mantém o primeiro encontrado
+                    dups.add(info_b["path"])
+
+                # Caso 3: nomes diferentes, tamanho igual, duração igual
+                # → NÃO marca como duplicata (pode ser coincidência)
+                # Câmeras Canon/Sony gravam muitos clipes curtos com mesma duração
+
+    return dups
 
 
-# =========================
-# 🗂️ NOME SEGURO SEM COLISÃO
-# =========================
 def nome_seguro(pasta, nome):
     base, ext = os.path.splitext(nome)
     dest = os.path.join(pasta, nome)
@@ -326,410 +831,403 @@ def nome_seguro(pasta, nome):
     return dest
 
 
-# =========================
-# 🚀 FUNÇÃO PRINCIPAL
-# =========================
-def _detectar_profissional(path, pasta_raiz):
-    """
-    Verifica se alguma subpasta entre o arquivo e a raiz
-    parece ser nome de profissional (ex: MAYCOM, FERNANDO, FEIJAO).
-    Retorna o nome em uppercase ou None.
-    """
-    try:
-        rel = os.path.relpath(path, pasta_raiz)
-        partes = rel.replace("\\", "/").split("/")
-        # Ignora o nome do arquivo (última parte)
-        # e verifica as pastas intermediárias
-        for parte in partes[:-1]:
-            parte_clean = parte.strip()
-            # Considera nome de profissional se:
-            # - entre 2 e 20 caracteres
-            # - não parece data (não tem números de 4 dígitos)
-            # - não é uma extensão conhecida
-            # - tem pelo menos uma letra
-            if (2 <= len(parte_clean) <= 20
-                    and not re.search(r'[0-9]{4}', parte_clean)
-                    and re.search(r'[a-zA-Z]', parte_clean)
-                    and parte_clean.upper() not in {
-                        "BRUTOS", "BRUTO", "RAW", "FOOTAGE", "VIDEOS",
-                        "FOTOS", "PHOTOS", "AUDIO", "OUTROS", "BACKUP",
-                        "EXPORTS", "IMPORT", "LOG", "CARD", "SD", "SSD",
-                        "CAMERA", "CAM", "DRONE", "GOPRO"
-                    }):
-                return parte_clean.upper()
-    except Exception:
-        pass
-    return None
+def _coletar_info_arquivo(path, pasta_raiz, ffprobe_bin, exiftool_bin, mapa_custom):
+    """Lê metadados de um único arquivo (usado em paralelo)."""
+    ext = os.path.splitext(path)[1].lower()
+    tam = os.path.getsize(path)
+
+    if ext in EXTENSOES_VIDEO:
+        tipo, dur = "video", extrair_duracao(path, ffprobe_bin)
+    elif ext in EXTENSOES_FOTO:
+        tipo, dur = "foto", 0
+    elif ext in EXTENSOES_AUDIO:
+        tipo, dur = "audio", extrair_duracao(path, ffprobe_bin)
+    else:
+        tipo, dur = "outro", 0
+
+    pai = identificar_pai(path, ffprobe_bin, exiftool_bin, mapa_custom=mapa_custom) if tipo != "outro" else None
+    if pai == "Desconhecido":
+        pai = None
+
+    hints = None
+    if tipo != "outro" and not pai:
+        hints = _coletar_hints_metadado(path, ffprobe_bin=ffprobe_bin, exiftool_bin=exiftool_bin)
+        pai = _aplicar_camera_map(path, mapa_custom, hints_texto=hints.get("texto", "")) if mapa_custom else None
+
+    data = extrair_data(path, ffprobe_bin)
+    prof = _detectar_profissional(path, pasta_raiz)
+
+    info = {
+        "path": path, "tipo": tipo, "pai": pai,
+        "data": data, "tamanho": tam, "duracao": dur,
+        "ext": ext, "profissional": prof,
+    }
+
+    dbg = None
+    if tipo in ("video", "foto", "audio") and not pai:
+        dbg = {
+            "path": path,
+            "tipo": tipo,
+            "ext": ext,
+            "tamanho": tam,
+            "duracao": round(float(dur or 0), 2),
+            "hints": (hints or {"texto": "", "fontes": {}}),
+        }
+
+    return info, dbg
 
 
-def organizar_videos(pasta, nome_projeto=None, callback_progresso=None, callback_log=None):
-    """
-    Organiza todos os arquivos de mídia de uma pasta recursivamente.
-    nome_projeto: nome para a pasta raiz de saída (ex: "Casamento_Joao_Maria")
-    """
-    nome_pasta   = nome_projeto if nome_projeto else "organizado"
-    # Remove caracteres inválidos do nome da pasta
-    nome_pasta   = re.sub(r'[\\/:*?"<>|]', '_', nome_pasta).strip()
-    pasta_org    = os.path.join(pasta, nome_pasta)
+def organizar_videos(pasta, nome_projeto=None, callback_progresso=None, callback_log=None, metadata_workers=None):
+
+    nome_pasta = re.sub(r'[\\/:*?"<>|]', '_', nome_projeto or "organizado").strip()
+
+    # Saída FORA da pasta selecionada (ao lado)
+    pasta_pai_dir = os.path.dirname(os.path.abspath(pasta))
+    pasta_org     = os.path.join(pasta_pai_dir, nome_pasta)
+    if os.path.exists(pasta_org):
+        n = 1
+        while os.path.exists(f"{pasta_org}_{n}"):
+            n += 1
+        pasta_org = f"{pasta_org}_{n}"
+
     pasta_dup    = os.path.join(pasta_org, "duplicatas")
+    pasta_dup_vid = os.path.join(pasta_dup, "videos")
+    pasta_dup_fot = os.path.join(pasta_dup, "fotos")
+    pasta_dup_aud = os.path.join(pasta_dup, "audios")
+    pasta_dup_out = os.path.join(pasta_dup, "outros")
     pasta_outros = os.path.join(pasta_org, "outros")
-
     os.makedirs(pasta_org,    exist_ok=True)
-    os.makedirs(pasta_dup,    exist_ok=True)
     os.makedirs(pasta_outros, exist_ok=True)
 
-    ffprobe_bin, usa_ffmpeg = _get_ffprobe()
+    # Marcos de progresso (0-100)
+    P_SCAN = 5
+    P_META_INI = 5
+    P_META_FIM = 55
+    P_DUP_FIM = 60
+    P_BACKUP_FIM = 68
+    P_MOVE_INI = 68
+    P_MOVE_FIM = 96
+    P_NEXTUP_FIM = 98
 
+    ffprobe_bin, _ = _get_ffprobe()
+    exiftool_bin   = _get_exiftool()
+    mapa_custom    = _carregar_camera_map(callback_log=callback_log)
     if callback_log:
-        if ffprobe_bin:
-            callback_log(f"✅ ffprobe/ffmpeg encontrado: {os.path.basename(ffprobe_bin)}")
+        callback_log(f"📂 Saída: {pasta_org}")
+        callback_log(f"{'✅' if ffprobe_bin else '⚠️ '} ffprobe:  "
+                     f"{os.path.basename(ffprobe_bin) if ffprobe_bin else 'não encontrado'}")
+        callback_log(f"{'✅' if exiftool_bin else '⚠️ '} exiftool: "
+                     f"{os.path.basename(exiftool_bin) if exiftool_bin else 'não encontrado — leitura básica'}")
+        if mapa_custom:
+            callback_log(f"✅ camera_map: {os.path.basename(mapa_custom.get('_path', 'camera_map.json'))}")
         else:
-            callback_log("⚠️  ffprobe não encontrado — metadados de vídeo limitados")
+            callback_log("ℹ️ camera_map: não encontrado (opcional)")
 
-    # --- Coleta todos os arquivos (ignora pasta organizado) ---
-    IGNORAR = {"organizado"}
+    # Coleta arquivos
+    IGNORAR = {os.path.basename(pasta_org), nome_pasta, "organizado"}
     arquivos_raw = []
-
     for root, dirs, files in os.walk(pasta):
-        dirs[:] = [d for d in dirs if d not in IGNORAR]
+        dirs[:] = [d for d in dirs if d not in IGNORAR and not d.startswith('.')]
         for f in files:
-            path = os.path.join(root, f)
-            arquivos_raw.append(path)
+            if not f.startswith('.'):
+                arquivos_raw.append(os.path.join(root, f))
 
     total = len(arquivos_raw)
     if callback_log:
         callback_log(f"📥 {total} arquivo(s) encontrado(s)")
-
+    if callback_progresso:
+        callback_progresso(P_SCAN, f"Arquivos encontrados: {total}")
     if total == 0:
         if callback_progresso:
             callback_progresso(100, "Nenhum arquivo encontrado")
-        return {"total": 0, "videos": 0, "fotos": 0, "audio": 0,
-                "outros": 0, "duplicatas": 0, "movidos": 0}
+        return {"total":0,"videos":0,"fotos":0,"audio":0,
+                "outros":0,"duplicatas":0,"movidos":0,"pasta_org":pasta_org}
 
-    # --- Extrai metadados de todos ---
+    # Lê metadados
     if callback_log:
-        callback_log("🔍 Lendo metadados...")
-
+        callback_log("🔍 Identificando câmeras pelos metadados...")
     arquivos_info = []
-    for i, path in enumerate(arquivos_raw):
-        ext  = os.path.splitext(path)[1].lower()
-        tam  = os.path.getsize(path)
+    desconhecidos_debug = []
+    if metadata_workers is None:
+        metadata_workers = min(6, max(2, (os.cpu_count() or 4) // 2))
+    metadata_workers = max(1, int(metadata_workers))
+    metadata_workers = min(metadata_workers, max(1, total))
 
-        if ext in EXTENSOES_VIDEO:
-            tipo  = "video"
-            dur   = extrair_duracao(path, ffprobe_bin)
-        elif ext in EXTENSOES_FOTO:
-            tipo  = "foto"
-            dur   = 0
-        elif ext in EXTENSOES_AUDIO:
-            tipo  = "audio"
-            dur   = extrair_duracao(path, ffprobe_bin)
-        else:
-            tipo  = "outro"
-            dur   = 0
+    if callback_log:
+        modo = "paralelo" if metadata_workers > 1 else "sequencial"
+        callback_log(f"   ⚙️ Leitura de metadados: {modo} ({metadata_workers} worker(s))")
 
-        data   = extrair_data(path, ffprobe_bin, usa_ffmpeg)
-        camera = extrair_camera(path, ffprobe_bin) if tipo in ("video", "foto") else None
+    if metadata_workers == 1:
+        for i, path in enumerate(arquivos_raw):
+            try:
+                info, dbg = _coletar_info_arquivo(path, pasta, ffprobe_bin, exiftool_bin, mapa_custom)
+            except Exception as e:
+                if callback_log:
+                    callback_log(f"   ⚠️ Falha em metadados ({os.path.basename(path)}): {e}")
+                info = {
+                    "path": path, "tipo": "outro", "pai": None,
+                    "data": datetime.now(), "tamanho": os.path.getsize(path), "duracao": 0,
+                    "ext": os.path.splitext(path)[1].lower(), "profissional": None,
+                }
+                dbg = None
 
-        # Detecta nome do profissional nas subpastas de origem
-        # Ex: "...BRUTOS/MAYCOM/arquivo.mp4" → profissional = "MAYCOM"
-        profissional = _detectar_profissional(path, pasta)
+            arquivos_info.append(info)
+            if dbg:
+                desconhecidos_debug.append(dbg)
+            if callback_progresso and total > 0:
+                pct = P_META_INI + int((i+1)/total * (P_META_FIM - P_META_INI))
+                callback_progresso(pct, f"Lendo metadados... {i+1}/{total}")
+    else:
+        concluidos = 0
+        with cf.ThreadPoolExecutor(max_workers=metadata_workers) as ex:
+            fut_map = {
+                ex.submit(_coletar_info_arquivo, path, pasta, ffprobe_bin, exiftool_bin, mapa_custom): path
+                for path in arquivos_raw
+            }
+            for fut in cf.as_completed(fut_map):
+                path = fut_map[fut]
+                try:
+                    info, dbg = fut.result()
+                except Exception as e:
+                    if callback_log:
+                        callback_log(f"   ⚠️ Falha em metadados ({os.path.basename(path)}): {e}")
+                    info = {
+                        "path": path, "tipo": "outro", "pai": None,
+                        "data": datetime.now(), "tamanho": os.path.getsize(path), "duracao": 0,
+                        "ext": os.path.splitext(path)[1].lower(), "profissional": None,
+                    }
+                    dbg = None
 
-        arquivos_info.append({
-            "path":        path,
-            "tipo":        tipo,
-            "data":        data,
-            "tamanho":     tam,
-            "duracao":     dur,
-            "ext":         ext,
-            "camera":      camera,
-            "profissional": profissional,
-        })
+                arquivos_info.append(info)
+                if dbg:
+                    desconhecidos_debug.append(dbg)
 
-        if callback_progresso and total > 0:
-            callback_progresso(int((i + 1) / total * 30), f"Lendo metadados... {i+1}/{total}")
+                concluidos += 1
+                if callback_progresso and total > 0:
+                    pct = P_META_INI + int(concluidos/total * (P_META_FIM - P_META_INI))
+                    callback_progresso(pct, f"Lendo metadados... {concluidos}/{total}")
 
-    # --- Detecta duplicatas ---
+    # Detecta duplicatas
     if callback_log:
         callback_log("🔁 Detectando duplicatas...")
+    dup_paths = detectar_duplicatas(arquivos_info)
+    if callback_log and dup_paths:
+        callback_log(f"   {len(dup_paths)} duplicata(s)")
+    if callback_progresso:
+        callback_progresso(P_DUP_FIM, f"Duplicatas detectadas: {len(dup_paths)}")
 
-    duplicatas_paths = detectar_duplicatas(arquivos_info)
-    if callback_log and duplicatas_paths:
-        callback_log(f"   {len(duplicatas_paths)} duplicata(s) detectada(s)")
+    nao_dup = [a for a in arquivos_info if a["path"] not in dup_paths]
+    nao_dup.sort(key=lambda x: x["data"])
 
-    # --- Ordena por data de criação ---
-    nao_duplicatas = [a for a in arquivos_info if a["path"] not in duplicatas_paths]
-    nao_duplicatas.sort(key=lambda x: x["data"])
-
-    # --- Mapeia dias únicos → número do dia de gravação ---
-    # Ex: dia 02/07, 05/07, 08/07 → DIA-01, DIA-02, DIA-03
-    dias_unicos = sorted({a["data"].date() for a in nao_duplicatas
-                          if a["tipo"] in ("video", "foto", "audio")})
-    mapa_dia = {dia: i+1 for i, dia in enumerate(dias_unicos)}
-
-    # --- Gera sequência numérica por tipo por pasta ---
-    contadores_seq = {}  # (pasta_nome, tipo) → contador
-
-    # --- Monta mapa completo ANTES de mover (para BACKUP) ---
-    # Primeiro pass: calcula todos os destinos sem mover nada
+    # Mapa de destinos para BACKUP
+    seq_map      = {}
     mapa_backup  = []
-    mapa_movidos = []  # lista completa para NEXTUP
+    mapa_movidos = []
 
-    for info in nao_duplicatas:
-        data         = info["data"]
-        tipo         = info["tipo"]
-        ext          = info["ext"]
-        nome_ori     = os.path.basename(info["path"])
-        base_ori     = os.path.splitext(nome_ori)[0]
-        MESES_PT_MAP = {1:"JAN",2:"FEV",3:"MAR",4:"ABR",5:"MAI",6:"JUN",
-                        7:"JUL",8:"AGO",9:"SET",10:"OUT",11:"NOV",12:"DEZ"}
-        mes_m        = MESES_PT_MAP[data.month]
-        data_fmt_m   = f"{data.day:02d}-{mes_m}-{data.year}"
-        camera_m     = info.get("camera")
-        prof_m       = info.get("profissional")
-        num_dia_m    = mapa_dia.get(data.date(), 1)
-        pasta_dia_m  = f"DIA-{num_dia_m:02d}_{data_fmt_m}"
-        partes_m     = []
-        if prof_m:  partes_m.append(prof_m)
-        if camera_m: partes_m.append(camera_m)
-        partes_m.append(data_fmt_m)
-        pasta_sub_m  = "_".join(partes_m)
-        chave_m      = f"{pasta_dia_m}/{pasta_sub_m}"
-        seq_m        = contadores_seq.get((chave_m, tipo), 0) + 1
-        hora_str_m   = data.strftime("%Hh%Mm%Ss")
-        novo_nome_m  = f"{seq_m:03d}_{camera_m}_{hora_str_m}_{base_ori}{ext}" if camera_m                        else f"{seq_m:03d}_{hora_str_m}_{base_ori}{ext}"
+    for info in nao_dup:
+        tipo, ext  = info["tipo"], info["ext"]
+        base_ori   = os.path.splitext(os.path.basename(info["path"]))[0]
+        pai        = info.get("pai") or "Desconhecido"
+        prof       = info.get("profissional")
 
-        if tipo != "outro":
-            dest_dir = os.path.join(pasta_org, pasta_dia_m, pasta_sub_m, tipo + "s")
-            dest_m   = os.path.join(dest_dir, novo_nome_m)
+        if tipo == "outro":
+            dest_plan = os.path.join(pasta_outros, os.path.basename(info["path"]))
         else:
-            dest_m   = os.path.join(pasta_outros, nome_ori)
+            tipo_plural = tipo + "s"
+            filho       = f"{tipo_plural}_{prof}" if prof else tipo_plural
+            pasta_filho = os.path.join(pasta_org, pai, filho)
+            chave_seq   = (pai, filho)
+            seq         = seq_map.get(chave_seq, 0) + 1
+            seq_map[chave_seq] = seq
+            dest_plan = os.path.join(pasta_filho, f"{seq:03d}_{base_ori}{ext}")
 
         mapa_backup.append({
-            "path":             info["path"],
-            "destino_planejado": dest_m,
-            "tamanho":          info["tamanho"],
-            "tipo":             tipo,
+            "path": info["path"], "destino_planejado": dest_plan,
+            "tamanho": info["tamanho"], "tipo": tipo,
         })
         mapa_movidos.append({
-            **info,
-            "path_original":  info["path"],
-            "destino_final":  dest_m,
-            "pasta_org":      pasta_org,
+            **info, "path_original": info["path"],
+            "destino_final": dest_plan, "pasta_org": pasta_org,
         })
 
-    # Salva BACKUP antes de mover qualquer coisa
+    # Salva BACKUP
     if callback_log:
         callback_log("💾 Salvando BACKUP...")
     gerar_backup(pasta, mapa_backup, pasta_org, callback_log=callback_log)
+    if callback_progresso:
+        callback_progresso(P_BACKUP_FIM, "BACKUP salvo")
 
-    # --- Move arquivos ---
+    # Move arquivos
     if callback_log:
         callback_log("📦 Organizando arquivos...")
 
-    movidos    = 0
-    ct_video   = 0
-    ct_foto    = 0
-    ct_audio   = 0
-    ct_outros  = 0
-    ct_dup     = 0
+    movidos = ct_video = ct_foto = ct_audio = ct_outros = ct_dup = 0
+    seq_mov = {}
 
-    total_mover = len(arquivos_info)
-
-    # Move duplicatas primeiro
-    for i, info in enumerate(arquivos_info):
-        if info["path"] not in duplicatas_paths:
+    # Move duplicatas
+    for info in arquivos_info:
+        if info["path"] not in dup_paths:
             continue
+        if info.get("tipo") == "video":
+            pasta_dest_dup = pasta_dup_vid
+        elif info.get("tipo") == "foto":
+            pasta_dest_dup = pasta_dup_fot
+        elif info.get("tipo") == "audio":
+            pasta_dest_dup = pasta_dup_aud
+        else:
+            pasta_dest_dup = pasta_dup_out
 
-        dest = nome_seguro(pasta_dup, os.path.basename(info["path"]))
+        os.makedirs(pasta_dest_dup, exist_ok=True)
+        dest = nome_seguro(pasta_dest_dup, os.path.basename(info["path"]))
         try:
             shutil.move(info["path"], dest)
-            ct_dup += 1
-            movidos += 1
+            ct_dup += 1; movidos += 1
             if callback_log:
-                callback_log(f"   🔁 Duplicata: {os.path.basename(info['path'])}")
+                callback_log(f"   🔁 {os.path.basename(info['path'])}")
         except Exception as e:
             if callback_log:
-                callback_log(f"   ⚠️  Erro ao mover {os.path.basename(info['path'])}: {e}")
+                callback_log(f"   ⚠️  {os.path.basename(info['path'])}: {e}")
 
-    # Move arquivos organizados
-    for i, info in enumerate(nao_duplicatas):
-        data     = info["data"]
-        tipo     = info["tipo"]
-        ext      = info["ext"]
-        nome_ori = os.path.basename(info["path"])
-        base_ori = os.path.splitext(nome_ori)[0]
-
-        MESES_PT = {
-            1:"JAN",2:"FEV",3:"MAR",4:"ABR",5:"MAI",6:"JUN",
-            7:"JUL",8:"AGO",9:"SET",10:"OUT",11:"NOV",12:"DEZ"
-        }
-        mes_abrev    = MESES_PT[data.month]
-        data_str     = data.strftime("%Y-%m-%d")
-        camera       = info.get("camera")
-        profissional = info.get("profissional")
-        num_dia      = mapa_dia.get(data.date(), 1)
-
-        # Estrutura:
-        # DIA-01_22-NOV-2025/
-        #   MAYCOM_Sony_22-NOV-2025/videos/
-        #   FERNANDO_iPhone_22-NOV-2025/fotos/
-        data_fmt   = f"{data.day:02d}-{mes_abrev}-{data.year}"
-        pasta_dia  = f"DIA-{num_dia:02d}_{data_fmt}"
-
-        # Subpasta do profissional/câmera dentro do dia
-        partes_sub = []
-        if profissional:
-            partes_sub.append(profissional)
-        if camera:
-            partes_sub.append(camera)
-        partes_sub.append(data_fmt)
-        pasta_sub  = "_".join(partes_sub)
-
-        # Chave para agrupamento de sequência
-        pasta_nome = f"{pasta_dia}/{pasta_sub}"
+    # Move organizados
+    total_mover = len(nao_dup)
+    for i, info in enumerate(nao_dup):
+        tipo, ext  = info["tipo"], info["ext"]
+        nome_ori   = os.path.basename(info["path"])
+        base_ori   = os.path.splitext(nome_ori)[0]
+        pai        = info.get("pai") or "Desconhecido"
+        prof       = info.get("profissional")
 
         if tipo == "outro":
-            pasta_dest = pasta_outros
+            dest = nome_seguro(pasta_outros, nome_ori)
             ct_outros += 1
         else:
-            pasta_dest = os.path.join(pasta_org, pasta_dia, pasta_sub, tipo + "s")
-            os.makedirs(pasta_dest, exist_ok=True)
-
-        # Sequência por (pasta_nome, tipo)
-        chave_seq = (pasta_nome, tipo)
-        contadores_seq[chave_seq] = contadores_seq.get(chave_seq, 0) + 1
-        seq = contadores_seq[chave_seq]
-
-        # Novo nome: 001_Sony_14h00m32s_original.mp4
-        hora_str  = data.strftime("%Hh%Mm%Ss")
-        camera    = info.get("camera")
-        if camera:
-            novo_nome = f"{seq:03d}_{camera}_{hora_str}_{base_ori}{ext}"
-        else:
-            novo_nome = f"{seq:03d}_{hora_str}_{base_ori}{ext}"
-        dest      = nome_seguro(pasta_dest, novo_nome)
+            tipo_plural = tipo + "s"
+            filho       = f"{tipo_plural}_{prof}" if prof else tipo_plural
+            pasta_filho = os.path.join(pasta_org, pai, filho)
+            os.makedirs(pasta_filho, exist_ok=True)
+            chave_seq   = (pai, filho)
+            seq         = seq_mov.get(chave_seq, 0) + 1
+            seq_mov[chave_seq] = seq
+            dest = nome_seguro(pasta_filho, f"{seq:03d}_{base_ori}{ext}")
+            if tipo == "video":  ct_video += 1
+            elif tipo == "foto": ct_foto  += 1
+            elif tipo == "audio":ct_audio += 1
 
         try:
             shutil.move(info["path"], dest)
             movidos += 1
-
-            if tipo == "video":   ct_video += 1
-            elif tipo == "foto":  ct_foto  += 1
-            elif tipo == "audio": ct_audio += 1
-
             if callback_log:
-                callback_log(f"   ✅ {novo_nome}")
-
+                prof_txt = f" [{prof}]" if prof else ""
+                callback_log(f"   ✅ [{pai}]{prof_txt} {os.path.basename(dest)}")
         except Exception as e:
             if callback_log:
-                callback_log(f"   ⚠️  Erro: {os.path.basename(info['path'])}: {e}")
+                callback_log(f"   ⚠️  {nome_ori}: {e}")
 
-        if callback_progresso:
-            callback_progresso(
-                30 + int((i + 1) / len(nao_duplicatas) * 60),
-                f"Movendo... {i+1}/{len(nao_duplicatas)}"
-            )
+        if callback_progresso and total_mover > 0:
+            callback_progresso(P_MOVE_INI + int((i+1)/total_mover*(P_MOVE_FIM-P_MOVE_INI)),
+                               f"Movendo... {i+1}/{total_mover}")
 
-    # --- Gera NEXTUP ---
+    # NEXTUP
     if callback_log:
         callback_log("📤 Gerando NEXTUP...")
     gerar_nextup(pasta, mapa_movidos, nome_pasta, callback_log=callback_log)
+    if callback_progresso:
+        callback_progresso(P_NEXTUP_FIM, "NEXTUP gerado")
 
-    # --- Gera relatório ---
-    if callback_log:
-        callback_log("📄 Gerando relatório...")
+    # Relatório
+    dur_total = sum(a["duracao"] for a in arquivos_info if a["tipo"] in ("video","audio"))
+    h, m, s = int(dur_total//3600), int((dur_total%3600)//60), int(dur_total%60)
 
-    # Duração total: vídeos pela duração real, fotos contam 1s cada
-    duracao_total = sum(
-        a["duracao"] if a["tipo"] in ("video", "audio") else 1.0
-        for a in arquivos_info
-        if a["tipo"] in ("video", "audio", "foto")
-    )
-    h  = int(duracao_total // 3600)
-    m  = int((duracao_total % 3600) // 60)
-    s  = int(duracao_total % 60)
+    pais_stats = {}
+    for info in nao_dup:
+        pai  = info.get("pai") or "Desconhecido"
+        tipo = info["tipo"]
+        if tipo == "outro":
+            continue
+        if pai not in pais_stats:
+            pais_stats[pai] = {"video":0,"foto":0,"audio":0,"dur":0.0}
+        pais_stats[pai][tipo] = pais_stats[pai].get(tipo,0) + 1
+        if tipo in ("video","audio"):
+            pais_stats[pai]["dur"] += info.get("duracao",0)
 
-    linhas_rel = [
+    linhas = [
         "RELATÓRIO DE ORGANIZAÇÃO — Canivete do Pailer",
         f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
-        f"Pasta: {pasta}",
-        "=" * 60,
-        "",
-        f"  Total de arquivos : {total}",
-        f"  🎬 Vídeos         : {ct_video}",
-        f"  📷 Fotos          : {ct_foto}",
-        f"  🎵 Áudios         : {ct_audio}",
-        f"  📁 Outros         : {ct_outros}",
-        f"  🔁 Duplicatas     : {ct_dup}",
-        f"  ⏱️  Duração total  : {h}h {m}m {s}s",
-        "",
-        "=" * 60,
-        "ARQUIVOS POR DIA:",
-        "",
+        f"Origem: {pasta}",
+        f"Saída:  {pasta_org}",
+        "="*60, "",
+        f"  Total      : {total}",
+        f"  🎬 Vídeos  : {ct_video}",
+        f"  📷 Fotos   : {ct_foto}",
+        f"  🎵 Áudios  : {ct_audio}",
+        f"  📁 Outros  : {ct_outros}",
+        f"  🔁 Duplic. : {ct_dup}",
+        f"  ⏱️  Duração : {h}h {m}m {s}s",
+        "", "="*60, "POR CÂMERA/DISPOSITIVO:", "",
     ]
+    for pai, sts in sorted(pais_stats.items()):
+        dv = sts["dur"]
+        hv,mv,sv = int(dv//3600), int((dv%3600)//60), int(dv%60)
+        dur_s = f" ({hv}h{mv:02d}m{sv:02d}s)" if dv > 0 else ""
+        linhas.append(f"  {pai}: {sts['video']} vídeos, {sts['foto']} fotos, {sts['audio']} áudios{dur_s}")
 
-    MESES_PT_REL = {
-        1:"JAN",2:"FEV",3:"MAR",4:"ABR",5:"MAI",6:"JUN",
-        7:"JUL",8:"AGO",9:"SET",10:"OUT",11:"NOV",12:"DEZ"
-    }
-    dias = {}
-    for info in nao_duplicatas:
-        cam = info.get("camera")
-        mes = MESES_PT_REL[info["data"].month]
-        chave_dia = f"{cam}_{info['data'].day:02d}-{mes}-{info['data'].year}" if cam                     else f"{info['data'].day:02d}-{mes}-{info['data'].year}"
-        if chave_dia not in dias:
-            dias[chave_dia] = {"video": 0, "foto": 0, "audio": 0, "outro": 0,
-                               "dur_video": 0.0, "_data": info["data"]}
-        dias[chave_dia][info["tipo"]] = dias[chave_dia].get(info["tipo"], 0) + 1
-        if info["tipo"] == "video":
-            dias[chave_dia]["dur_video"] += info.get("duracao", 0)
+    qtd_desconhecidos = sum(1 for a in nao_dup if (a.get("pai") or "Desconhecido") == "Desconhecido" and a["tipo"] != "outro")
+    linhas.extend([
+        "",
+        "="*60,
+        "DESCONHECIDOS:",
+        f"  Total não identificados: {qtd_desconhecidos}",
+        "  Dica: crie/ajuste camera_map.json para ensinar modelos específicos.",
+    ])
 
-    # Ordena por data real
-    for pasta_d, cts in sorted(dias.items(), key=lambda x: x[1]["_data"]):
-        dv = cts["dur_video"]
-        hv, mv, sv = int(dv//3600), int((dv%3600)//60), int(dv%60)
-        dur_str = f" ({hv}h{mv:02d}m{sv:02d}s de vídeo)" if dv > 0 else ""
-        linhas_rel.append(f"  {pasta_d}: {cts['video']} vídeos, {cts['foto']} fotos, "
-                          f"{cts['audio']} áudios, {cts['outro']} outros{dur_str}")
+    if desconhecidos_debug:
+        linhas.append("")
+        linhas.append("  Amostra (até 20 arquivos):")
+        for item in desconhecidos_debug[:20]:
+            nome = os.path.basename(item["path"])
+            htxt = (item.get("hints", {}).get("texto") or "").strip()
+            if len(htxt) > 120:
+                htxt = htxt[:120] + "..."
+            linhas.append(f"   - {nome} [{item['ext']}] -> hints: {htxt or 'sem metadado útil'}")
 
     relatorio_path = os.path.join(pasta_org, "relatorio.txt")
     with open(relatorio_path, "w", encoding="utf-8") as f:
-        f.write("\n".join(linhas_rel))
+        f.write("\n".join(linhas))
+
+    diagnostico_path = os.path.join(pasta_org, "desconhecidos_diagnostico.json")
+    try:
+        with open(diagnostico_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "gerado_em": datetime.now().isoformat(),
+                "origem": pasta,
+                "saida": pasta_org,
+                "total_desconhecidos": qtd_desconhecidos,
+                "camera_map_path": (mapa_custom or {}).get("_path"),
+                "items": desconhecidos_debug,
+            }, f, ensure_ascii=False, indent=2)
+    except Exception:
+        diagnostico_path = None
 
     if callback_progresso:
-        callback_progresso(100, "Finalizado")
-
+        callback_progresso(100, "Finalizado!")
     if callback_log:
-        callback_log(f"\n📄 Relatório salvo em: {relatorio_path}")
+        callback_log(f"\n📄 Relatório: {relatorio_path}")
+        if diagnostico_path:
+            callback_log(f"🧪 Diagnóstico desconhecidos: {diagnostico_path}")
+        callback_log(f"📂 Saída: {pasta_org}")
 
     return {
-        "total":      total,
-        "videos":     ct_video,
-        "fotos":      ct_foto,
-        "audio":      ct_audio,
-        "outros":     ct_outros,
-        "duplicatas": ct_dup,
-        "movidos":    movidos,
-        "relatorio":  relatorio_path,
-        "pasta_org":  pasta_org,
+        "total": total, "videos": ct_video, "fotos": ct_foto,
+        "audio": ct_audio, "outros": ct_outros, "duplicatas": ct_dup,
+        "movidos": movidos, "relatorio": relatorio_path, "pasta_org": pasta_org,
+        "desconhecidos": qtd_desconhecidos, "diagnostico": diagnostico_path,
     }
 
 
-# =========================
-# 🖥️ CLI
-# =========================
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Uso: python organizador_de_videos.py <pasta>")
         sys.exit(1)
-
     r = organizar_videos(sys.argv[1], callback_log=print)
-
-    print("\n🔥 FINALIZADO")
-    print(f"  Total     : {r['total']}")
-    print(f"  Vídeos    : {r['videos']}")
-    print(f"  Fotos     : {r['fotos']}")
-    print(f"  Áudios    : {r['audio']}")
-    print(f"  Outros    : {r['outros']}")
-    print(f"  Duplicatas: {r['duplicatas']}")
+    print(f"\n🔥 Total:{r['total']} Vídeos:{r['videos']} Fotos:{r['fotos']} "
+          f"Áudios:{r['audio']} Outros:{r['outros']} Dups:{r['duplicatas']}")

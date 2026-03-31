@@ -86,6 +86,14 @@ def get_modelos():
             "instalar":  instalar_rclone,
         },
         {
+            "nome":      "ExifTool",
+            "descricao": "Leitura avançada de metadados — Logger Brabo",
+            "tamanho":   "~5MB",
+            "tamanho_mb": 5,
+            "check":     checar_exiftool,
+            "instalar":  instalar_exiftool,
+        },
+        {
             "nome":      "Google Drive — Login",
             "descricao": "Autorização para o GDrive Dumper acessar seu Drive",
             "tamanho":   "login",
@@ -383,6 +391,153 @@ def configurar_gdrive(callback_log=None, callback_progresso=None):
         return False
 
 
+
+# =========================
+# 🔬 EXIFTOOL
+# =========================
+def checar_exiftool():
+    """
+    Verifica se exiftool.exe está disponível.
+    Procura em 3 lugares:
+    1. Dentro do _MEIPASS (embutido no .exe pelo PyInstaller)
+    2. Ao lado do executável (pasta do app)
+    3. No PATH do sistema
+    """
+    # 1. Embutido no .exe (PyInstaller — _MEIPASS)
+    if hasattr(sys, "_MEIPASS"):
+        if os.path.exists(os.path.join(sys._MEIPASS, "exiftool.exe")):
+            return True
+
+    # 2. Ao lado do executável
+    base = get_base_dir()
+    if os.path.exists(os.path.join(base, "exiftool.exe")):
+        return True
+
+    # 3. PATH do sistema
+    try:
+        r = subprocess.run(["exiftool", "-ver"],
+                           capture_output=True, timeout=5)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def instalar_exiftool(callback_log=None, callback_progresso=None):
+    """Baixa exiftool.exe standalone para a pasta do executável."""
+    if callback_log:
+        callback_log("📥 Baixando ExifTool v13.53...")
+        callback_log("   Leitura avançada de metadados de câmeras, drones e celulares")
+
+    base     = get_base_dir()
+    dest_exe = os.path.join(base, "exiftool.exe")
+    dest_zip = os.path.join(base, "_exiftool_tmp.zip")
+    dest_files = os.path.join(base, "exiftool_files")
+
+    # SourceForge redireciona — precisa seguir o redirect manualmente
+    # URLs diretas dos mirrors do SourceForge
+    urls = [
+        # Mirror direto (sem redirect do SourceForge)
+        "https://downloads.sourceforge.net/project/exiftool/exiftool-13.53_64.zip",
+        "https://downloads.sourceforge.net/project/exiftool/exiftool-13.52_64.zip",
+        "https://downloads.sourceforge.net/project/exiftool/exiftool-13.51_64.zip",
+    ]
+
+    if callback_log:
+        callback_log("   Conectando ao servidor...")
+
+    import urllib.request as _ur
+    ok = False
+    for url in urls:
+        try:
+            if callback_log:
+                callback_log(f"   Tentando: {url.split('/')[-1]}")
+            req = _ur.Request(url, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "Accept": "application/zip, application/octet-stream, */*",
+                "Referer": "https://exiftool.org/",
+            })
+            with _ur.urlopen(req, timeout=60) as resp:
+                content_type = resp.headers.get("Content-Type", "")
+                total = int(resp.headers.get("Content-Length", 0))
+                baixado = 0
+                chunk = 1024 * 64
+                with open(dest_zip, "wb") as f_out:
+                    while True:
+                        buf = resp.read(chunk)
+                        if not buf:
+                            break
+                        f_out.write(buf)
+                        baixado += len(buf)
+                        if total > 0 and callback_progresso:
+                            pct = int(baixado / total * 100)
+                            mb_b = baixado / 1024 / 1024
+                            mb_t = total / 1024 / 1024
+                            callback_progresso(pct, f"{mb_b:.1f} MB / {mb_t:.1f} MB ({pct}%)")
+
+            # Verifica se é realmente um zip
+            import zipfile
+            if zipfile.is_zipfile(dest_zip):
+                ok = True
+                break
+            else:
+                if callback_log:
+                    callback_log("   Arquivo inválido, tentando próximo...")
+                os.remove(dest_zip)
+        except Exception as e:
+            if callback_log:
+                callback_log(f"   Erro: {e}")
+            if os.path.exists(dest_zip):
+                os.remove(dest_zip)
+
+    if not ok:
+        if callback_log:
+            callback_log("❌ Falha no download do ExifTool.")
+        return False
+
+    # Extrai o .exe e a pasta exiftool_files (necessária para funcionar)
+    try:
+        import zipfile
+        with zipfile.ZipFile(dest_zip, 'r') as z:
+            nomes = z.namelist()
+            for name in nomes:
+                name_lower = name.lower()
+                # Extrai o executável (exiftool(-k).exe → exiftool.exe)
+                if name_lower.endswith(".exe") and "exiftool" in name_lower:
+                    with z.open(name) as src, open(dest_exe, "wb") as dst:
+                        dst.write(src.read())
+                # Extrai a pasta exiftool_files (obrigatória)
+                elif "exiftool_files" in name_lower and not name.endswith("/"):
+                    # Reconstrói o path relativo dentro da pasta base
+                    partes = name.replace("\\", "/").split("/")
+                    idx = next((i for i, p in enumerate(partes)
+                                if "exiftool_files" in p.lower()), None)
+                    if idx is not None:
+                        rel = os.path.join(*partes[idx:])
+                        dest_f = os.path.join(base, rel)
+                        os.makedirs(os.path.dirname(dest_f), exist_ok=True)
+                        with z.open(name) as src, open(dest_f, "wb") as dst:
+                            dst.write(src.read())
+
+        os.remove(dest_zip)
+    except Exception as e:
+        if callback_log:
+            callback_log(f"❌ Erro ao extrair ExifTool: {e}")
+        if os.path.exists(dest_zip):
+            os.remove(dest_zip)
+        return False
+
+    if checar_exiftool():
+        if callback_log:
+            callback_log("✅ ExifTool instalado com sucesso!")
+        if callback_progresso:
+            callback_progresso(100, "ExifTool pronto!")
+        return True
+
+    if callback_log:
+        callback_log("❌ Não foi possível instalar o ExifTool.")
+    return False
+
+
 def verificar_modelos():
     faltando = []
     for m in get_modelos():
@@ -397,7 +552,8 @@ def tudo_instalado():
     """Considera instalado mesmo se só o login do Drive estiver faltando."""
     faltando = verificar_modelos()
     # Login do Drive é opcional — não bloqueia o app
-    obrigatorios = [m for m in faltando if m.get("nome") != "Google Drive — Login"]
+    opcionais = {"Google Drive — Login"}
+    obrigatorios = [m for m in faltando if m.get("nome") not in opcionais]
     return len(obrigatorios) == 0
 
 

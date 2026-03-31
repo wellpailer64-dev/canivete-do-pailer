@@ -35,6 +35,7 @@ Thumbs.db
 
 # Skills
 *.skill
+Skills/
 
 # IDE
 .vscode/

@@ -1,0 +1,25 @@
+{
+  "contains": {
+    "ilce-7m4": "Sony",
+    "iphone 15": "iPhone",
+    "sm-s928": "Android",
+    "hero12": "DJI_GoPro_ActionCam"
+  },
+  "prefix": {
+    "mvi_": "Canon",
+    "dji_": "DJI_GoPro_ActionCam"
+  },
+  "ext": {
+    ".mxf": "Sony"
+  },
+  "folder_contains": {
+    "/drone/": "DJI_GoPro_ActionCam",
+    "/iphone/": "iPhone"
+  },
+  "regex": [
+    {
+      "pattern": "^A\\d{4}",
+      "pai": "Canon"
+    }
+  ]
+}

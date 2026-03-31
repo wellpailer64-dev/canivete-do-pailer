@@ -68,6 +68,10 @@ git add *.txt
 git add *.md
 git add *.ico
 git add *.png
+git add *.gif
+git add *.webp
+git add *.otf
+git add *.json
 git add *.wav
 git add .gitignore
 git add LICENSE 2>nul
