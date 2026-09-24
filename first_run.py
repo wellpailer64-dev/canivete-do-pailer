@@ -19,6 +19,7 @@ else:
     BASE_DIR = os.getcwd()
 
 INSTALLED_MARKER = os.path.join(BASE_DIR, "models", ".installed")
+MARKER_VERSION = "v2-ffprobe"
 
 # ── Lista de downloads ──────────────────────────────────────────────────────
 DOWNLOADS = [
@@ -63,7 +64,7 @@ DOWNLOADS = [
         "asset_pattern": "*win64-gpl.zip",
         "asset_exclude": ["*shared*", "*7.1.zip", "*8.1.zip"],
         "dest": "modelos_ia/ffmpeg.zip",
-        "extract": "modelos_ia/ffmpeg.exe",
+        "extract": ["modelos_ia/ffmpeg.exe", "modelos_ia/ffprobe.exe"],
     },
     {
         "label": "Baixando Rclone",
@@ -105,7 +106,8 @@ def _item_existe(item: dict) -> bool:
     elif tipo == "url":
         if "extract" in item:
             # O que importa é o arquivo extraído, não o zip intermediário
-            return os.path.exists(_abs(item["extract"]))
+            alvos = item["extract"] if isinstance(item["extract"], list) else [item["extract"]]
+            return all(os.path.exists(_abs(a)) for a in alvos)
         else:
             return os.path.exists(_abs(item["dest"]))
 
@@ -125,8 +127,14 @@ def precisa_instalar() -> bool:
     Se o marcador existir, retorna False imediatamente.
     Se todos os artefatos já existirem no disco, cria o marcador e retorna False.
     """
-    if os.path.exists(INSTALLED_MARKER):
-        return False
+    # Marcador de versão: quando a lista de downloads ganha itens novos (ex. ffprobe),
+    # instalações antigas re-verificam e baixam só o que falta.
+    try:
+        with open(INSTALLED_MARKER, encoding="utf-8") as f:
+            if f.read().strip() == MARKER_VERSION:
+                return False
+    except OSError:
+        pass
 
     # Verifica se todos os itens já estão presentes (instalação anterior sem marcador)
     if all(_item_existe(item) for item in DOWNLOADS):
@@ -138,8 +146,8 @@ def precisa_instalar() -> bool:
 
 def _marcar_instalado():
     os.makedirs(os.path.dirname(INSTALLED_MARKER), exist_ok=True)
-    with open(INSTALLED_MARKER, "w") as f:
-        f.write("ok")
+    with open(INSTALLED_MARKER, "w", encoding="utf-8") as f:
+        f.write(MARKER_VERSION)
 
 
 # ── Download de URL com progresso ───────────────────────────────────────────
@@ -281,9 +289,10 @@ def _run_item(item: dict, on_progress=None, on_label=None,
         _download_url(url, zip_path, on_progress=on_progress)
 
         if "extract" in item:
-            extract_dest = _abs(item["extract"])
-            extract_name = os.path.basename(extract_dest)
-            _extract_from_zip(zip_path, extract_dest, extract_name)
+            alvos = item["extract"] if isinstance(item["extract"], list) else [item["extract"]]
+            for alvo in alvos:
+                extract_dest = _abs(alvo)
+                _extract_from_zip(zip_path, extract_dest, os.path.basename(extract_dest))
             try:
                 os.remove(zip_path)
             except Exception:

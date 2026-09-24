@@ -212,51 +212,94 @@ def audio_cutter_export(file_path, cuts, output_format="mp3", tracks=None, main_
 # ========================================
 # Tools: cortar video
 # ========================================
+_ve_prepare_stop = None
+_ve_export_stop = None
+
+
+def _ve_emit(fn, data):
+    if _window:
+        try:
+            _window.evaluate_js(f"{fn}({json.dumps(data, ensure_ascii=False)})")
+        except Exception:
+            pass
+
+
 def video_cutter_prepare(file_path):
-    from Functions.video_cutter import preparar_preview
-    return preparar_preview(file_path)
-
-
-def video_cutter_export(file_path, cuts, output_format="mp4", qualidade="medium"):
-    from Functions.video_cutter import exportar_video
-    import json
-
-    def emit(data):
-        if _window:
-            try:
-                _window.evaluate_js(f"updateVideoCutterProgress({json.dumps(data, ensure_ascii=False)})")
-            except Exception:
-                pass
+    """Prepara o vídeo em background; eventos chegam em veOnPrepare(evento)."""
+    from Functions.video_cutter import preparar
+    global _ve_prepare_stop
+    if _ve_prepare_stop is not None:
+        _ve_prepare_stop.set()
+    stop = threading.Event()
+    _ve_prepare_stop = stop
 
     def run():
-        def log(msg):
-            emit({"log": msg})
-
         try:
-            resultado = exportar_video(file_path, cuts, output_format, qualidade, callback_log=log)
-            if resultado.get("success"):
-                emit({
-                    "complete": True,
-                    "output_path": resultado.get("output_path"),
-                    "output_folder": resultado.get("output_folder"),
-                })
-                try:
-                    os.startfile(resultado.get("output_folder") or os.path.dirname(file_path) or os.getcwd())
-                except Exception:
-                    pass
-            else:
-                emit({"error": resultado.get("error", "Erro ao exportar vídeo.")})
+            preparar(file_path, lambda ev: None if stop.is_set() else _ve_emit("veOnPrepare", ev), stop)
         except Exception as e:
-            emit({"error": str(e)})
+            _ve_emit("veOnPrepare", {"stage": "error", "error": str(e)})
 
     threading.Thread(target=run, daemon=True).start()
     return {"success": True}
 
 
+def video_cutter_export(file_path, segments, output_format="mp4", qualidade="medium",
+                        resolucao="original", usar_gpu=True, pasta_saida=None, sem_audio=False):
+    """Exporta os trechos mantidos; progresso em veOnExport(evento)."""
+    from Functions.video_cutter import exportar_video
+    global _ve_export_stop
+    stop = threading.Event()
+    _ve_export_stop = stop
+
+    def run():
+        try:
+            r = exportar_video(
+                file_path, segments, output_format, qualidade, resolucao, bool(usar_gpu),
+                pasta_saida or None,
+                on_progress=lambda p, m: _ve_emit("veOnExport", {"pct": p, "message": m}),
+                stop_event=stop,
+                sem_audio=bool(sem_audio),
+            )
+            _ve_emit("veOnExport", {"done": True, **r})
+        except Exception as e:
+            _ve_emit("veOnExport", {"done": True, "success": False, "error": str(e)})
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
+def video_cutter_cancel_export():
+    from Functions.video_cutter import cancelar_exportacao
+    if _ve_export_stop is not None:
+        _ve_export_stop.set()
+    cancelar_exportacao()
+    return {"success": True}
+
+
+def reveal_file(path):
+    """Abre o Explorer com o arquivo selecionado."""
+    try:
+        if path and os.path.exists(path):
+            import subprocess as _sp
+            _sp.Popen(["explorer", "/select,", os.path.normpath(path)])
+            return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    return {"success": False}
+
+
+def open_file(path):
+    try:
+        os.startfile(path)
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def select_video_file(tool):
     if _window:
         file_types = (
-            "Vídeos (*.mp4;*.mov;*.mkv;*.avi;*.webm;*.flv;*.wmv;*.m4v;*.ts;*.mts)",
+            "Vídeos (*.mp4;*.mov;*.mkv;*.avi;*.webm;*.flv;*.wmv;*.m4v;*.ts;*.mts;*.m2ts;*.3gp;*.mpg;*.mpeg)",
             "Todos os arquivos (*.*)",
         )
         result = _window.create_file_dialog(
@@ -2112,8 +2155,19 @@ class ApiBridge:
     def video_cutter_prepare(self, file_path):
         return video_cutter_prepare(file_path)
 
-    def video_cutter_export(self, file_path, cuts, output_format="mp4", qualidade="medium"):
-        return video_cutter_export(file_path, cuts, output_format, qualidade)
+    def video_cutter_export(self, file_path, segments, output_format="mp4", qualidade="medium",
+                            resolucao="original", usar_gpu=True, pasta_saida=None, sem_audio=False):
+        return video_cutter_export(file_path, segments, output_format, qualidade, resolucao, usar_gpu,
+                                   pasta_saida, sem_audio)
+
+    def video_cutter_cancel_export(self):
+        return video_cutter_cancel_export()
+
+    def reveal_file(self, path):
+        return reveal_file(path)
+
+    def open_file(self, path):
+        return open_file(path)
 
     def select_video_file(self, tool):
         return select_video_file(tool)
@@ -2343,6 +2397,27 @@ def main():
         gdrive_cancel()
 
     window.events.closed += _on_window_closed
+
+    def _bind_drop():
+        """Arrastar arquivo de vídeo para o editor (pywebview entrega o caminho real)."""
+        try:
+            from webview.dom import DOMEventHandler
+
+            def _on_drop(e):
+                files = (e.get("dataTransfer") or {}).get("files") or []
+                for f in files:
+                    p = f.get("pywebviewFullPath")
+                    if p and os.path.splitext(p)[1].lower() in (
+                            ".mp4", ".mov", ".mkv", ".avi", ".webm", ".flv", ".wmv", ".m4v",
+                            ".ts", ".mts", ".m2ts", ".3gp", ".ogv", ".mpg", ".mpeg"):
+                        window.evaluate_js(f"veOpenPath({json.dumps(p)})")
+                        break
+
+            window.dom.document.events.drop += DOMEventHandler(_on_drop, True, True)
+        except Exception as e:
+            print("[drop] indisponível:", e)
+
+    window.events.loaded += _bind_drop
     atexit.register(gdrive_cancel)
 
     def _splash_sound():

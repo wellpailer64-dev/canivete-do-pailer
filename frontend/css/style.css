@@ -605,23 +605,6 @@ body {
     margin-bottom: 14px;
 }
 
-/* Video Cutter */
-.video-editor {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-}
-
-.video-cutter-player {
-    width: 100%;
-    max-height: 280px;
-    background: #000;
-    display: block;
-    border-radius: var(--radius-sm);
-    margin-bottom: 12px;
-    outline: none;
-}
-
 .waveform-wrap {
     position: relative;
     background: #151515;

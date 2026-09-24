@@ -7,6 +7,7 @@ import subprocess
 import sys
 import uuid
 
+from Functions import media_server
 from Functions.convertermp3 import FORMATOS_ENTRADA, FORMATOS_SAIDA, _normalizar_saida, ffmpeg_path
 
 
@@ -17,7 +18,10 @@ def _project_root():
 
 
 def _preview_dir():
-    return os.path.join(_project_root(), "frontend", "_audio_preview")
+    # Pasta temporária do sistema: a pasta do app pode ser somente-leitura e, no .exe,
+    # a interface não enxerga frontend/ ao lado do executável. Servido via media_server.
+    import tempfile
+    return os.path.join(tempfile.gettempdir(), "canivete_audio_preview")
 
 
 def _creationflags():
@@ -221,8 +225,8 @@ def preparar_preview(path):
         "duration": duration,
         "peaks": gerar_peaks(path),
         "preview_path": preview_path,
-        "preview_url": f"_audio_preview/{preview_name}",
-        "preview_fallback_url": f"_audio_preview/{wav_preview_name}" if os.path.exists(wav_preview_path) else "",
+        "preview_url": media_server.register(preview_path),
+        "preview_fallback_url": media_server.register(wav_preview_path) if os.path.exists(wav_preview_path) else "",
     }
 
 

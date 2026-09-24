@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Canivete do Pailer</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/editor.css">
     <link rel="icon" href="identidade/icone.ico">
 </head>
 <body>
@@ -38,8 +39,8 @@
                     <span class="label">Cortar Audio</span>
                 </button>
                 <button class="menu-item" data-tool="video-cutter" onclick="switchTool('video-cutter')">
-                    <span class="icon">✂</span>
-                    <span class="label">Cortar Vídeo</span>
+                    <span class="icon">🎬</span>
+                    <span class="label">Editor de Vídeo</span>
                 </button>
                 <button class="menu-item" data-tool="converter-imagem" onclick="switchTool('converter-imagem')">
                     <span class="icon">🖼️</span>
@@ -478,93 +479,186 @@
                     </div>
                 </div>
 
-                <!-- Cortar Vídeo -->
-                <div class="tool-page" id="page-video-cutter">
-                    <h2>Cortar Vídeo</h2>
-                    <div class="tool-container audio-cutter-container">
-                        <div class="input-section">
-                            <div class="selection-buttons">
-                                <button class="btn-primary" onclick="selectVideoCutterFile()">
-                                    Selecionar Vídeo
-                                </button>
-                            </div>
-                            <div id="video-cutter-selected" class="selected-info"></div>
+                <!-- Pocket Editor (editor de vídeo) -->
+                <div class="tool-page ve-page" id="page-video-cutter">
+                    <div class="ve" id="ve">
+                        <header class="ve-top">
+                            <div class="ve-brand"><span class="ve-brand-mark">▶</span> Pocket Editor</div>
+                            <button class="ve-btn" onclick="veOpenFile()" title="Abrir vídeo (Ctrl+O)">📂 Abrir</button>
+                            <div class="ve-meta" id="ve-meta">Nenhum vídeo aberto</div>
+                            <div class="ve-top-spacer"></div>
+                            <button class="ve-icon-btn" id="ve-undo" onclick="veUndo()" title="Desfazer (Ctrl+Z)" disabled>↶</button>
+                            <button class="ve-icon-btn" id="ve-redo" onclick="veRedo()" title="Refazer (Ctrl+Shift+Z)" disabled>↷</button>
+                            <button class="ve-btn ve-btn-primary" id="ve-export-btn" onclick="veOpenExport()" disabled title="Exportar (Ctrl+E)">⬇ Exportar</button>
+                        </header>
 
-                            <div class="video-editor" id="video-editor" style="display:none;">
-                                <video id="video-cutter-player" class="video-cutter-player" controls preload="metadata"></video>
-
-                                <div class="audio-editing-shell">
-                                    <div class="audio-tool-rail">
-                                        <button class="rail-tool active" id="vbtn-tool-select" onclick="setVideoTimelineTool('select')" title="V - Selecionar">V</button>
-                                        <button class="rail-tool" id="vbtn-tool-hand" onclick="setVideoTimelineTool('hand')" title="M - Navegar">M</button>
-                                        <button class="rail-tool" onclick="bladeVideoAtPlayhead()" title="E - Corte na agulha">E</button>
-                                        <button class="rail-tool" onclick="rippleDeleteVideoLeft()" title="Q - Remover até a agulha">Q</button>
-                                        <button class="rail-tool" onclick="rippleDeleteVideoRight()" title="W - Remover após a agulha">W</button>
-                                        <button class="rail-tool" onclick="undoVideoEdit()" title="Desfazer">↶</button>
-                                        <button class="rail-tool" onclick="toggleVideoEditsPopover()" title="Ver cortes">☰</button>
-                                        <button class="rail-tool" onclick="clearVideoCuts()" title="Limpar cortes">×</button>
+                        <div class="ve-main">
+                            <section class="ve-monitor">
+                                <div class="ve-screen" id="ve-screen">
+                                    <video id="ve-video" preload="auto" playsinline></video>
+                                    <div class="ve-badge" id="ve-proxy-badge" hidden title="Este formato não toca direto no app: você vê uma cópia leve. A exportação usa o arquivo original, em qualidade máxima.">PRÉVIA LEVE</div>
+                                    <div class="ve-empty" id="ve-empty">
+                                        <div class="ve-empty-icon">🎬</div>
+                                        <div class="ve-empty-title">Arraste um vídeo aqui</div>
+                                        <div class="ve-empty-sub">ou</div>
+                                        <button class="ve-btn ve-btn-primary ve-btn-lg" onclick="veOpenFile()">Abrir vídeo</button>
+                                        <div class="ve-empty-hint">MP4 · MOV · MKV · AVI · WEBM · HEVC/iPhone e mais</div>
                                     </div>
+                                    <div class="ve-loading" id="ve-loading" hidden>
+                                        <div class="ve-spinner"></div>
+                                        <div id="ve-loading-text">Analisando vídeo...</div>
+                                        <div class="ve-loading-bar"><div id="ve-loading-fill"></div></div>
+                                    </div>
+                                </div>
+                                <div class="ve-transport">
+                                    <div class="ve-tc" id="ve-tc" title="Posição atual">00:00:00:00</div>
+                                    <div class="ve-transport-btns">
+                                        <button class="ve-tbtn" onclick="veSeek(0)" title="Início (Home)">⏮</button>
+                                        <button class="ve-tbtn" onclick="veJumpEdit(-1)" title="Corte anterior (↑)">⇤</button>
+                                        <button class="ve-tbtn" onclick="veStepFrames(-1)" title="Voltar 1 frame (←)">◀︎|</button>
+                                        <button class="ve-tbtn ve-play" id="ve-play" onclick="veTogglePlay()" title="Reproduzir / Pausar (Espaço)">▶</button>
+                                        <button class="ve-tbtn" onclick="veStepFrames(1)" title="Avançar 1 frame (→)">|▶︎</button>
+                                        <button class="ve-tbtn" onclick="veJumpEdit(1)" title="Próximo corte (↓)">⇥</button>
+                                        <button class="ve-tbtn" onclick="veSeek(1e9)" title="Fim (End)">⏭</button>
+                                    </div>
+                                    <div class="ve-transport-right">
+                                        <button class="ve-chip" onclick="veMarkIn()" title="Marcar entrada (I)">{ In</button>
+                                        <button class="ve-chip" onclick="veMarkOut()" title="Marcar saída (O)">Out }</button>
+                                        <span class="ve-rate" id="ve-rate" hidden>1x</span>
+                                        <button class="ve-tbtn ve-vol" id="ve-mute" onclick="veToggleMute()" title="Som da prévia (M)">🔊</button>
+                                        <div class="ve-tc ve-tc-dim" id="ve-tc-total" title="Duração final do vídeo editado">00:00:00:00</div>
+                                    </div>
+                                </div>
+                            </section>
 
-                                    <div class="waveform-wrap audio-tracks-timeline" id="video-tracks-timeline">
-                                        <div class="audio-track-row active" data-layer-id="main">
-                                            <canvas id="video-waveform" class="track-waveform" data-layer-id="main" width="1200" height="120"></canvas>
+                            <aside class="ve-side">
+                                <div class="ve-tabs">
+                                    <button class="ve-tab active" data-tab="clips" onclick="veTab('clips')">Clipes</button>
+                                    <button class="ve-tab" data-tab="keys" onclick="veTab('keys')">Atalhos</button>
+                                </div>
+                                <div class="ve-tabpane" id="ve-pane-clips">
+                                    <div class="ve-summary">
+                                        <div><span>Original</span><b id="ve-sum-orig">—</b></div>
+                                        <div><span>Final</span><b id="ve-sum-final" class="ve-accent">—</b></div>
+                                        <div><span>Removido</span><b id="ve-sum-cut">—</b></div>
+                                    </div>
+                                    <div class="ve-clips" id="ve-clips">
+                                        <div class="ve-clips-empty">Abra um vídeo e use <b>S</b> (ou a lâmina <b>C</b>) para dividir. Selecione um clipe e aperte <b>Delete</b> para removê-lo.</div>
+                                    </div>
+                                </div>
+                                <div class="ve-tabpane" id="ve-pane-keys" hidden>
+                                    <div class="ve-keys">
+                                        <h4>Reprodução</h4>
+                                        <div><kbd>Espaço</kbd> Play / Pausa</div>
+                                        <div><kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> Voltar 5s · Pausar · Acelerar</div>
+                                        <div><kbd>←</kbd> <kbd>→</kbd> 1 frame · <kbd>Shift</kbd> 1 segundo</div>
+                                        <div><kbd>↑</kbd> <kbd>↓</kbd> Corte anterior / próximo</div>
+                                        <div><kbd>Home</kbd> <kbd>End</kbd> Início / Fim</div>
+                                        <h4>Edição</h4>
+                                        <div><kbd>S</kbd> ou <kbd>Ctrl</kbd>+<kbd>K</kbd> Dividir na agulha</div>
+                                        <div><kbd>Delete</kbd> Remover clipe selecionado</div>
+                                        <div><kbd>I</kbd> <kbd>O</kbd> Marcar entrada / saída</div>
+                                        <div><kbd>X</kbd> Remover trecho entre In e Out</div>
+                                        <div><kbd>Q</kbd> / <kbd>W</kbd> Remover antes / depois da agulha</div>
+                                        <div>Duplo clique no clipe: remover / restaurar</div>
+                                        <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> Desfazer · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> Refazer</div>
+                                        <h4>Ferramentas e visão</h4>
+                                        <div><kbd>V</kbd> Seleção · <kbd>C</kbd> Lâmina · <kbd>H</kbd> Mão</div>
+                                        <div><kbd>+</kbd> <kbd>-</kbd> Zoom · <kbd>\</kbd> Ajustar à tela</div>
+                                        <div><kbd>Ctrl</kbd>+Roda: zoom · Roda: rolar</div>
+                                        <div><kbd>N</kbd> Ímã (encaixe) liga/desliga</div>
+                                        <div><kbd>Ctrl</kbd>+<kbd>E</kbd> Exportar · <kbd>Ctrl</kbd>+<kbd>O</kbd> Abrir</div>
+                                    </div>
+                                </div>
+                            </aside>
+                        </div>
+
+                        <section class="ve-timeline">
+                            <div class="ve-tl-toolbar">
+                                <div class="ve-seg" role="group" aria-label="Ferramentas">
+                                    <button class="ve-seg-btn active" id="ve-tool-select" onclick="veSetTool('select')" title="Seleção (V)">➤</button>
+                                    <button class="ve-seg-btn" id="ve-tool-razor" onclick="veSetTool('razor')" title="Lâmina (C): clique para dividir">✂</button>
+                                    <button class="ve-seg-btn" id="ve-tool-hand" onclick="veSetTool('hand')" title="Mão (H): arraste para navegar">✋</button>
+                                </div>
+                                <div class="ve-divider"></div>
+                                <button class="ve-btn ve-btn-sm" onclick="veSplitAtPlayhead()" title="Dividir na agulha (S)">⎮ Dividir</button>
+                                <button class="ve-btn ve-btn-sm" onclick="veDeleteSelected()" title="Remover clipe selecionado (Delete)">🗑 Remover</button>
+                                <button class="ve-btn ve-btn-sm" onclick="veExtractInOut()" title="Remover trecho In→Out (X)">✂ In→Out</button>
+                                <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="veResetEdits()" title="Voltar ao vídeo original">↺ Restaurar tudo</button>
+                                <div class="ve-top-spacer"></div>
+                                <button class="ve-seg-btn ve-snap active" id="ve-snap" onclick="veToggleSnap()" title="Ímã: encaixar na agulha e nos cortes (N)">🧲</button>
+                                <div class="ve-zoom">
+                                    <button class="ve-icon-btn" onclick="veZoomBy(1/1.5)" title="Menos zoom (-)">−</button>
+                                    <input type="range" id="ve-zoom" min="0" max="1000" value="0" oninput="veZoomSlider(this.value)">
+                                    <button class="ve-icon-btn" onclick="veZoomBy(1.5)" title="Mais zoom (+)">+</button>
+                                    <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="veZoomFit()" title="Ajustar à tela (\)">Ajustar</button>
+                                </div>
+                            </div>
+                            <div class="ve-tl-body">
+                                <div class="ve-tl-heads">
+                                    <div class="ve-head-ruler"></div>
+                                    <div class="ve-head ve-head-v"><b>V1</b><span>Vídeo</span></div>
+                                    <div class="ve-head ve-head-a"><b>A1</b><span>Áudio</span></div>
+                                </div>
+                                <div class="ve-tl-wrap" id="ve-tl-wrap">
+                                    <canvas id="ve-tl"></canvas>
+                                </div>
+                            </div>
+                            <div class="ve-scrollbar" id="ve-scrollbar"><div class="ve-scroll-thumb" id="ve-scroll-thumb"></div></div>
+                        </section>
+
+                        <!-- Modal de exportação -->
+                        <div class="ve-modal" id="ve-export" hidden>
+                            <div class="ve-modal-box">
+                                <div class="ve-modal-head">
+                                    <span>Exportar vídeo</span>
+                                    <button class="ve-icon-btn" onclick="veCloseExport()" title="Fechar">✕</button>
+                                </div>
+                                <div class="ve-modal-body" id="ve-export-form">
+                                    <div class="ve-field">
+                                        <label>Formato</label>
+                                        <div class="ve-pills" data-name="format">
+                                            <button class="ve-pill active" data-v="mp4">MP4</button>
+                                            <button class="ve-pill" data-v="mov">MOV</button>
+                                            <button class="ve-pill" data-v="mkv">MKV</button>
+                                            <button class="ve-pill" data-v="webm">WebM</button>
+                                            <button class="ve-pill" data-v="avi">AVI</button>
                                         </div>
-                                        <div class="waveform-playhead" id="video-playhead-label">00:00.00</div>
                                     </div>
-
-                                    <div class="audio-edits-popover" id="video-edits-popover" style="display:none;">
-                                        <h3>Cortes aplicados</h3>
-                                        <div id="video-cuts-list" class="audio-cuts-list"></div>
+                                    <div class="ve-field">
+                                        <label>Qualidade</label>
+                                        <div class="ve-pills" data-name="quality">
+                                            <button class="ve-pill" data-v="high">Máxima</button>
+                                            <button class="ve-pill active" data-v="medium">Alta</button>
+                                            <button class="ve-pill" data-v="fast">Boa</button>
+                                            <button class="ve-pill" data-v="low">Leve</button>
+                                        </div>
                                     </div>
-                                </div>
-
-                                <div class="audio-transport">
-                                    <div class="audio-time-readout" id="video-timeline-readout">00:00.00 / 00:00.00</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="output-section">
-                            <button class="btn-success" id="btn-video-cutter" onclick="openVideoExportModal()" disabled>
-                                Exportar Vídeo
-                            </button>
-                        </div>
-
-                        <div class="audio-export-modal" id="video-export-modal" style="display:none;">
-                            <div class="audio-export-box">
-                                <div class="audio-export-header">
-                                    <span>Exportar Vídeo</span>
-                                    <button type="button" onclick="closeVideoExportModal()">×</button>
-                                </div>
-                                <div class="formats-grid">
-                                    <label>Formato de saída:</label>
-                                    <div class="format-options">
-                                        <label class="format-option"><input type="radio" name="video-cutter-format" value="mp4" checked> MP4</label>
-                                        <label class="format-option"><input type="radio" name="video-cutter-format" value="mov"> MOV</label>
-                                        <label class="format-option"><input type="radio" name="video-cutter-format" value="mkv"> MKV</label>
-                                        <label class="format-option"><input type="radio" name="video-cutter-format" value="webm"> WebM</label>
-                                        <label class="format-option"><input type="radio" name="video-cutter-format" value="avi"> AVI</label>
+                                    <div class="ve-field">
+                                        <label>Resolução</label>
+                                        <select id="ve-res" class="ve-select"></select>
                                     </div>
-                                </div>
-                                <div class="formats-grid">
-                                    <label>Qualidade:</label>
-                                    <div class="format-options">
-                                        <label class="format-option"><input type="radio" name="video-cutter-quality" value="high"> Alta</label>
-                                        <label class="format-option"><input type="radio" name="video-cutter-quality" value="medium" checked> Média</label>
-                                        <label class="format-option"><input type="radio" name="video-cutter-quality" value="fast"> Rápida</label>
-                                        <label class="format-option"><input type="radio" name="video-cutter-quality" value="low"> Baixa</label>
+                                    <div class="ve-field ve-field-row">
+                                        <label class="ve-check"><input type="checkbox" id="ve-gpu" checked> Usar placa de vídeo (mais rápido)</label>
+                                        <label class="ve-check"><input type="checkbox" id="ve-noaudio"> Exportar sem áudio</label>
                                     </div>
-                                </div>
-                                <div class="progress-section" id="progress-video-cutter" style="display: none;">
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" id="progress-fill-video-cutter"></div>
+                                    <div class="ve-field">
+                                        <label>Salvar em</label>
+                                        <div class="ve-dest">
+                                            <span id="ve-dest-label">Mesma pasta do vídeo original</span>
+                                            <button class="ve-btn ve-btn-sm" onclick="veChooseDest()">Escolher...</button>
+                                        </div>
                                     </div>
-                                    <span class="progress-text" id="progress-text-video-cutter">Processando...</span>
+                                    <div class="ve-export-summary" id="ve-export-summary"></div>
                                 </div>
-                                <div class="log-section" id="log-video-cutter"></div>
-                                <div class="audio-export-actions">
-                                    <button class="btn-secondary" onclick="closeVideoExportModal()">Cancelar</button>
-                                    <button class="btn-success" onclick="exportVideoCuts()">Exportar</button>
+                                <div class="ve-modal-body" id="ve-export-progress" hidden>
+                                    <div class="ve-progress-big"><div id="ve-exp-fill"></div></div>
+                                    <div class="ve-exp-row"><span id="ve-exp-msg">Preparando...</span><b id="ve-exp-pct">0%</b></div>
+                                    <div class="ve-exp-result" id="ve-exp-result" hidden></div>
+                                </div>
+                                <div class="ve-modal-foot" id="ve-export-foot">
+                                    <button class="ve-btn ve-btn-ghost" onclick="veCloseExport()">Cancelar</button>
+                                    <button class="ve-btn ve-btn-primary" onclick="veStartExport()">⬇ Exportar</button>
                                 </div>
                             </div>
                         </div>
@@ -1242,6 +1336,7 @@
     </div>
 
     <script src="js/app.js"></script>
+    <script src="js/editor.js"></script>
     <script>
         console.log('HTML loaded, checking switchTool:', typeof switchTool);
     </script>
