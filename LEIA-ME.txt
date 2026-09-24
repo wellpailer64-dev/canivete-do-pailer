@@ -1,0 +1,26 @@
+CANIVETE DO PAILER - LEIA-ME
+
+Obrigado por usar o Canivete do Pailer.
+
+Este aplicativo foi criado de forma autonoma e artesanal, usando Python e ferramentas de codigo aberto. Ele nao esta publicado na Microsoft Store e tambem nao possui assinatura paga de distribuidor, porque manter esse tipo de cadastro/certificacao no ecossistema da Microsoft tem custo em dolar.
+
+Por isso, na primeira vez que voce abrir o aplicativo no Windows, pode aparecer uma tela azul do Windows SmartScreen dizendo que o aplicativo pode nao ser seguro.
+
+Isso nao significa que o app tem virus. E apenas um aviso padrao do Windows para programas independentes que ainda nao foram reconhecidos ou assinados pela Microsoft.
+
+Para abrir:
+
+1. Clique em "Mais informacoes".
+2. Clique em "Executar mesmo assim".
+
+Normalmente esse aviso aparece so na primeira abertura.
+
+IMPORTANTE SOBRE O GDRIVE DUMPER
+
+O GDrive Dumper usa o rclone para baixar pastas inteiras do Google Drive.
+
+No primeiro uso dessa ferramenta, o aplicativo pode abrir uma janela do Chrome pedindo login na sua conta Google. Isso e esperado e serve apenas para autorizar o rclone a acessar os arquivos do Drive que voce escolher baixar.
+
+Depois dessa autorizacao inicial, o GDrive Dumper fica configurado para baixar arquivos em massa do Google Drive sem precisar gerar zip manualmente.
+
+Se aparecerem esses avisos no primeiro uso, pode seguir normalmente.

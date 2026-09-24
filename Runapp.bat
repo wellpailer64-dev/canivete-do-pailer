@@ -4,11 +4,11 @@ cd /d "%~dp0"
 
 where python >nul 2>nul
 if %errorlevel%==0 (
-    python "interface_canivete_pailer.py"
+    python "main.py"
 ) else (
     where py >nul 2>nul
     if %errorlevel%==0 (
-        py "interface_canivete_pailer.py"
+        py "main.py"
     ) else (
         echo Python nao encontrado no PATH.
         echo Instale o Python ou adicione ao PATH para executar o app.

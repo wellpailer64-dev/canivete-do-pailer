@@ -21,7 +21,7 @@ O **Canivete do Pailer** é um app desktop Windows que reúne 8 ferramentas úte
 |---|-----------|-----------|
 | 🗂️ | **Organizador de Imagens** | Detecta e remove duplicatas, classifica por tipo |
 | 🎵 | **Converter para MP3** | Converte qualquer áudio para MP3 via ffmpeg |
-| 🖼️ | **Converter Imagens** | Converte entre JPG, PNG, WebP, AVIF e mais |
+| 🖼️ | **Converter Imagens** | Converte HEIC/HEIF, JPG, PNG, WebP, AVIF e mais |
 | 🎙️ | **Transcrever Áudios** | Transcrição automática via Whisper (IA) |
 | 🌐 | **Favicon Generator** | Gera favicons para sites em todos os tamanhos |
 | ✂️ | **Remover Fundo** | Remove fundo de imagens com IA (rembg) |
@@ -32,45 +32,48 @@ O **Canivete do Pailer** é um app desktop Windows que reúne 8 ferramentas úte
 
 ## ⬇️ Download
 
-> **Não precisa instalar Python nem nada. Só baixar e abrir.**
+> **Não precisa instalar Python nem nada. Só baixar, extrair e abrir.**
 
-### [📥 Baixar Canivete do Pailer v1.0.0](../../releases/latest/download/Canivete.do.Pailer.exe)
+### [📥 Baixar a versão mais recente](../../releases/latest/download/CaniveteDoPailer-win64.zip)
+
+1. Extraia o `.zip` numa pasta (ex.: `C:\CaniveteDoPailer`)
+2. Rode `CaniveteDoPailer.exe`
 
 **Requisitos:**
 - Windows 10 ou 11 (64-bit)
 - ~1.5 GB de espaço livre (para os modelos de IA)
 - Conexão com internet na primeira abertura
 
-**Na primeira abertura**, o app baixa automaticamente os modelos de IA necessários (~1.2 GB no total). Isso acontece **uma única vez**.
+**Na primeira abertura**, o app baixa automaticamente os modelos de IA necessários. Isso acontece **uma única vez**.
+
+### 🔄 Atualizações automáticas
+
+Ao abrir, o app consulta a última Release deste repositório. Se houver versão nova, aparece um aviso **"Atualizar agora"**: o app baixa, fecha, instala por cima (mantendo modelos de IA, cérebros e configurações) e reabre sozinho.
 
 ---
 
 ## 🚀 Como rodar o código-fonte
 
-Se quiser rodar direto pelo Python:
-
 ```bash
-# 1. Clone o repositório
-git clone https://github.com/seuusuario/canivete-do-pailer.git
+git clone https://github.com/wellpailer64-dev/canivete-do-pailer.git
 cd canivete-do-pailer
-
-# 2. Instale as dependências
-pip install pillow imagehash numpy opencv-python openai-whisper rembg onnxruntime transformers torch torchvision playsound packaging
-
-# 3. Rode
-python interface_canivete_pailer.py
+pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+python main.py
 ```
 
 ---
 
-## 🔨 Como fazer o build
+## 🔨 Build e Releases
 
+**Automático:** cada `git push` na `main` dispara o GitHub Actions (`.github/workflows/release.yml`), que builda o `.exe` no Windows e publica uma Release `vX.Y.N` (N = número do build). Os apps instalados detectam e se atualizam. Pushes que só mexem em `.md`/`Instructions/` não geram build.
+
+Para mudar a versão "grande", edite `version.txt` (ex.: `1.2.0` → releases `1.2.N`).
+
+**Manual (local):**
 ```bash
-# Na pasta do projeto
 build.bat
 ```
-
-O executável será gerado em `dist/Canivete do Pailer.exe`.
+Gera `dist/CaniveteDoPailer/`. ⚠️ O build apaga `dist/` — não guarde modelos lá.
 
 ---
 

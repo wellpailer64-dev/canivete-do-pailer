@@ -1,111 +1,96 @@
 @echo off
-echo Limpando cache anterior...
-if exist build rmdir /s /q build
-if exist "Canivete do Pailer.spec" del /q "Canivete do Pailer.spec"
+:: Uso: build.bat          (local, pausa no final)
+::      build.bat --ci     (GitHub Actions, sem pausa)
+set CI_MODE=
+if /i "%~1"=="--ci" set CI_MODE=1
+echo Iniciando build do Canivete do Pailer...
+if not exist version.txt echo 1.1.0> version.txt
 
-echo Instalando dependencias...
-python -m pip install playsound pillow imagehash numpy opencv-python openai-whisper rembg onnxruntime transformers torch torchvision packaging pymupdf
-
-echo.
-echo Localizando assets do Whisper...
+:: Localiza os assets internos do whisper (mel_filters.npz, etc.)
 for /f "delims=" %%i in ('python -c "import whisper, os; print(os.path.join(os.path.dirname(whisper.__file__), 'assets'))"') do set WHISPER_ASSETS=%%i
-echo Whisper assets em: %WHISPER_ASSETS%
+echo Assets do Whisper: %WHISPER_ASSETS%
 
-echo.
-echo Verificando ExifTool...
-if exist exiftool.exe (
-    echo ExifTool encontrado - sera incluido no build
-    set EXIFTOOL_ARGS=--add-data "exiftool.exe;." --add-data "exiftool_files;exiftool_files"
-) else (
-    echo AVISO: exiftool.exe nao encontrado - leitura de metadados sera limitada
-    echo Baixe em: https://sourceforge.net/projects/exiftool/files/exiftool-13.53_64.zip/download
-    set EXIFTOOL_ARGS=
+:: Garante suporte a HEIC/HEIF antes de empacotar o executavel
+python -c "import pillow_heif" 2>nul
+if errorlevel 1 (
+ echo Instalando pillow-heif...
+ python -m pip install pillow-heif
+ if errorlevel 1 (
+  echo ERRO: nao foi possivel instalar pillow-heif.
+  if not defined CI_MODE pause
+  exit /b 1
+ )
 )
 
-echo.
-echo Verificando FFprobe...
-if exist ffprobe.exe (
-    echo FFprobe encontrado - sera incluido no build
-    set FFPROBE_ARGS=--add-data "ffprobe.exe;."
-    set FFPROBE_INCLUDED=1
-) else (
-    echo AVISO: ffprobe.exe nao encontrado - leitura de resolucao pode ficar limitada no .exe
-    set FFPROBE_ARGS=
-    set FFPROBE_INCLUDED=0
+:: Garante o motor de download de video
+python -c "import yt_dlp" 2>nul
+if errorlevel 1 (
+ echo Instalando yt-dlp...
+ python -m pip install yt-dlp
+ if errorlevel 1 (
+  echo ERRO: nao foi possivel instalar yt-dlp.
+  if not defined CI_MODE pause
+  exit /b 1
+ )
 )
 
-echo.
-echo Gerando executavel...
+:: Limpa builds anteriores
+if exist dist rmdir /s /q dist
+if exist build rmdir /s /q build
 
-if exist ffmpeg.exe (
-    python -m PyInstaller --onefile --windowed --name "Canivete do Pailer" ^
-      --icon="icone.ico" ^
-      --add-data "splash.png;." ^
-      --add-data "splash.gif;." ^
-      --add-data "hero.webp;." ^
-      --add-data "CreateFutureRegular-m2Mw2.otf;." ^
-      --add-data "sound\\splash.wav;sound" ^
-      --add-data "sound\\concluido.wav;sound" ^
-      --add-data "sound\\click.wav;sound" ^
-      --add-data "icone.ico;." ^
-      --add-data "ffmpeg.exe;." ^
-      --add-data "%WHISPER_ASSETS%;whisper/assets" ^
-      %EXIFTOOL_ARGS% ^
-      %FFPROBE_ARGS% ^
-      --hidden-import "transformers" ^
-      --hidden-import "transformers.models.clip" ^
-      --hidden-import "PIL" ^
-      --hidden-import "onnxruntime" ^
-      --hidden-import "gdrive_dumper" ^
-      --hidden-import "atualizador" ^
-      --hidden-import "compressor_video" ^
-      --hidden-import "compressor_imagem" ^
-      --hidden-import "videoconverter" ^
-      --hidden-import "setup_modelos" ^
-      --add-data "gdrive_dumper.py;." ^
-      --add-data "atualizador.py;." ^
-      --add-data "compressor_video.py;." ^
-      --add-data "compressor_imagem.py;." ^
-      --add-data "videoconverter.py;." ^
-      --add-data "setup_modelos.py;." ^
-      --add-data "version.txt;." ^
-      interface_canivete_pailer.py
-) else (
-    echo AVISO: ffmpeg.exe nao encontrado
-    if not exist exiftool.exe echo AVISO: exiftool.exe nao encontrado
-    python -m PyInstaller --onefile --windowed --name "Canivete do Pailer" ^
-      --icon="icone.ico" ^
-      --add-data "splash.png;." ^
-      --add-data "splash.gif;." ^
-      --add-data "hero.webp;." ^
-      --add-data "CreateFutureRegular-m2Mw2.otf;." ^
-      --add-data "sound\\splash.wav;sound" ^
-      --add-data "sound\\concluido.wav;sound" ^
-      --add-data "sound\\click.wav;sound" ^
-      --add-data "icone.ico;." ^
-      --add-data "%WHISPER_ASSETS%;whisper/assets" ^
-      %EXIFTOOL_ARGS% ^
-      %FFPROBE_ARGS% ^
-      --hidden-import "transformers" ^
-      --hidden-import "transformers.models.clip" ^
-      --hidden-import "PIL" ^
-      --hidden-import "onnxruntime" ^
-      --hidden-import "gdrive_dumper" ^
-      --hidden-import "atualizador" ^
-      --hidden-import "compressor_video" ^
-      --hidden-import "compressor_imagem" ^
-      --hidden-import "videoconverter" ^
-      --hidden-import "setup_modelos" ^
-      --add-data "gdrive_dumper.py;." ^
-      --add-data "atualizador.py;." ^
-      --add-data "compressor_video.py;." ^
-      --add-data "compressor_imagem.py;." ^
-      --add-data "videoconverter.py;." ^
-      --add-data "setup_modelos.py;." ^
-      --add-data "version.txt;." ^
-      interface_canivete_pailer.py
+:: Comando de Build (usando --onedir para startup rápido — sem extração temp a cada launch)
+:: Modelos e executáveis são baixados no primeiro uso via first_run.py
+python -m PyInstaller --noconfirm --onedir --windowed ^
+ --name "CaniveteDoPailer" ^
+ --icon "identidade/icone.ico" ^
+ --add-data "frontend;frontend" ^
+ --add-data "identidade;identidade" ^
+ --add-data "Functions;Functions" ^
+ --add-data "version.txt;." ^
+ --add-data "%WHISPER_ASSETS%;whisper/assets" ^
+ --hidden-import "PIL" ^
+ --hidden-import "pillow_heif" ^
+ --hidden-import "yt_dlp" ^
+ --hidden-import "webview" ^
+ --hidden-import "webview.platforms.winforms" ^
+ --hidden-import "webview.platforms.edgechromium" ^
+ --hidden-import "clr" ^
+ --hidden-import "pythonnet" ^
+ --hidden-import "clr_loader" ^
+ --hidden-import "requests" ^
+ --hidden-import "Functions.updater" ^
+ --hidden-import "huggingface_hub" ^
+ --hidden-import "whisper" ^
+ --collect-all "webview" ^
+ --collect-all "pythonnet" ^
+ --collect-all "clr_loader" ^
+ --copy-metadata "pywebview" ^
+ --copy-metadata "pythonnet" ^
+ --copy-metadata "clr_loader" ^
+ "main.py"
+
+if exist "dist\CaniveteDoPailer" (
+ if exist "LEIA-ME.txt" copy /Y "LEIA-ME.txt" "dist\CaniveteDoPailer\LEIA-ME.txt" >nul
+ if not exist "dist\CaniveteDoPailer\cerebros_md" mkdir "dist\CaniveteDoPailer\cerebros_md"
+ if exist "dist\CaniveteDoPailer\modelos_ia" rmdir /S /Q "dist\CaniveteDoPailer\modelos_ia"
+ if exist "dist\CaniveteDoPailer\models" rmdir /S /Q "dist\CaniveteDoPailer\models"
+ if exist "dist\CaniveteDoPailer\frontend\_audio_preview" rmdir /S /Q "dist\CaniveteDoPailer\frontend\_audio_preview"
+ if exist "dist\CaniveteDoPailer\frontend\_cv_progress.json" del /Q "dist\CaniveteDoPailer\frontend\_cv_progress.json"
+ if exist "dist\CaniveteDoPailer\_internal\frontend\_audio_preview" rmdir /S /Q "dist\CaniveteDoPailer\_internal\frontend\_audio_preview"
+ if exist "dist\CaniveteDoPailer\_internal\frontend\_cv_progress.json" del /Q "dist\CaniveteDoPailer\_internal\frontend\_cv_progress.json"
+ if exist "dist\CaniveteDoPailer\_internal\Functions\__pycache__" rmdir /S /Q "dist\CaniveteDoPailer\_internal\Functions\__pycache__"
 )
 
+
+if not exist "dist\CaniveteDoPailer\CaniveteDoPailer.exe" (
+ echo ERRO: build falhou.
+ if not defined CI_MODE pause
+ exit /b 1
+)
+if exist "version.txt" copy /Y "version.txt" "dist\CaniveteDoPailer\version.txt" >nul
+
 echo.
-echo Concluido! O exe esta em: dist\Canivete do Pailer.exe
-pause
+echo Build concluido com sucesso!
+echo O executavel esta na pasta 'dist'.
+if not defined CI_MODE pause
+exit /b 0

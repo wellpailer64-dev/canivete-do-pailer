@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canivete do Pailer</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" href="identidade/icone.ico">
+</head>
+<body>
+
+    <!-- Splash Screen -->
+    <div id="splash-overlay">
+        <img src="identidade/splash.png" alt="">
+        <div class="splash-title">Canivete do Pailer</div>
+        <div class="splash-sub">Carregando...</div>
+    </div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">🔧</div>
+                <span>Canivete</span>
+            </div>
+            
+            <nav class="menu">
+                <button class="menu-item active" data-tool="home" onclick="switchTool('home')">
+                    <span class="icon">🏠</span>
+                    <span class="label">Início</span>
+                </button>
+                <button class="menu-item" data-tool="converter-audio" onclick="switchTool('converter-audio')">
+                    <span class="icon">🎵</span>
+                    <span class="label">Converter Áudio</span>
+                </button>
+                <button class="menu-item" data-tool="audio-cutter" onclick="switchTool('audio-cutter')">
+                    <span class="icon">A</span>
+                    <span class="label">Cortar Audio</span>
+                </button>
+                <button class="menu-item" data-tool="video-cutter" onclick="switchTool('video-cutter')">
+                    <span class="icon">✂</span>
+                    <span class="label">Cortar Vídeo</span>
+                </button>
+                <button class="menu-item" data-tool="converter-imagem" onclick="switchTool('converter-imagem')">
+                    <span class="icon">🖼️</span>
+                    <span class="label">Converter Imagem</span>
+                </button>
+                <button class="menu-item" data-tool="compressor-imagem" onclick="switchTool('compressor-imagem')">
+                    <span class="icon">📸</span>
+                    <span class="label">Comprimir Imagem</span>
+                </button>
+                <button class="menu-item" data-tool="compressor-video" onclick="switchTool('compressor-video')">
+                    <span class="icon">🎬</span>
+                    <span class="label">Comprimir Vídeo</span>
+                </button>
+                <button class="menu-item" data-tool="favicon" onclick="switchTool('favicon')">
+                    <span class="icon">🌐</span>
+                    <span class="label">Favicon Generator</span>
+                </button>
+                <button class="menu-item" data-tool="video-converter" onclick="switchTool('video-converter')">
+                    <span class="icon">🔄</span>
+                    <span class="label">Video Converter</span>
+                </button>
+                <button class="menu-item" data-tool="video-downloader" onclick="switchTool('video-downloader')">
+                    <span class="icon">📥</span>
+                    <span class="label">Video Downloader</span>
+                </button>
+                <button class="menu-item" data-tool="web-scraper" onclick="switchTool('web-scraper')">
+                    <span class="icon">🕷️</span>
+                    <span class="label">Web Scraper</span>
+                </button>
+                <button class="menu-item" data-tool="transcrever-audio" onclick="switchTool('transcrever-audio')">
+                    <span class="icon">📝</span>
+                    <span class="label">Transcrever Áudio</span>
+                </button>
+                <button class="menu-item" data-tool="remover-fundo" onclick="switchTool('remover-fundo')">
+                    <span class="icon">✂️</span>
+                    <span class="label">Remover Fundo</span>
+                </button>
+                <button class="menu-item" data-tool="organizador-imagens" onclick="switchTool('organizador-imagens')">
+                    <span class="icon">🗂️</span>
+                    <span class="label">Organizador Imagens</span>
+                </button>
+                <button class="menu-item" data-tool="organizador-videos" onclick="switchTool('organizador-videos')">
+                    <span class="icon">🎥</span>
+                    <span class="label">Logger Pro</span>
+                </button>
+                <button class="menu-item" data-tool="gdrive-dumper" onclick="switchTool('gdrive-dumper')">
+                    <span class="icon">☁️</span>
+                    <span class="label">GDrive Dumper</span>
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <img src="img/hero.webp" alt="Canivete do Pailer" class="header-hero">
+            </header>
+
+            <!-- Tool Content Area -->
+            <div class="content-area" id="content-area">
+                <!-- Home Page -->
+                <div class="tool-page active" id="page-home">
+                    <div class="welcome-card">
+                        <div class="welcome-header">
+                            <h1>🔧 Canivete do Pailer</h1>
+                            <p class="welcome-subtitle">Seu kit de ferramentas tudo-em-um para edição de mídia</p>
+                        </div>
+                        
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <span class="stat-icon">📦</span>
+                                <span class="stat-value">17</span>
+                                <span class="stat-label">Ferramentas</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-icon">🎬</span>
+                                <span class="stat-value">Video</span>
+                                <span class="stat-label">Edição</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-icon">🖼️</span>
+                                <span class="stat-value">Imagem</span>
+                                <span class="stat-label">Processamento</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-icon">☁️</span>
+                                <span class="stat-value">Cloud</span>
+                                <span class="stat-label">Integração</span>
+                            </div>
+                        </div>
+                        
+                        <div class="quick-start">
+                            <h3>🚀 Quick Start</h3>
+                            <p>Selecione uma ferramenta no menu lateral para começar. Cada ferramenta tem instruções específicas abaixo.</p>
+                        </div>
+                        
+                        <!-- FAQ Accordion -->
+                        <div class="faq-section">
+                            <h3>❓ Perguntas Frequentes</h3>
+                            
+                            <div class="faq-item" onclick="toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>🎵 Converter Áudio</span>
+                                    <span class="faq-toggle">+</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <p>Converte arquivos de áudio entre formatos (MP3, WAV, FLAC, AAC).</p>
+                                    <ul>
+                                        <li>Selecione uma pasta ou arquivo único</li>
+                                        <li>Escolha o formato de saída</li>
+                                        <li>Clique em Converter</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="faq-item" onclick="toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>🖼️ Converter Imagem</span>
+                                    <span class="faq-toggle">+</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <p>Converte imagens entre formatos (HEIC/HEIF, PNG, JPG, WEBP, BMP, ICO).</p>
+                                    <ul>
+                                        <li>Selecione pasta ou arquivo</li>
+                                        <li>Escolha o formato de saída</li>
+                                        <li>Clique em Converter</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="faq-item" onclick="toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>📸 Comprimir Imagem</span>
+                                    <span class="faq-toggle">+</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <p>Comprime imagens JPEG/PNG para reduzir tamanho mantendo qualidade.</p>
+                                    <ul>
+                                        <li>Selecione pasta com imagens</li>
+                                        <li>Imagens comprimidas ficam em pasta "comprimidas"</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="faq-item" onclick="toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>🎬 Comprimir Vídeo</span>
+                                    <span class="faq-toggle">+</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <p>Comprime vídeos usando FFmpeg. Suporta CPU ou GPU (mais rápido).</p>
+                                    <ul>
+                                        <li>Selecione vídeos para comprimir</li>
+                                        <li>Escolha CPU ou GPU</li>
+                                        <li>Vídeos comprimidos em pasta "comprimidos"</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="faq-item" onclick="toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>🌐 Favicon Generator</span>
+                                    <span class="faq-toggle">+</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <p>Gera favicons e manifest para sites.</p>
+                                    <ul>
+                                        <li>Selecione uma imagem</li>
+                                        <li>Defina nome do site e cor</li>
+                                        <li>Gerado automáticamente</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="faq-item" onclick="toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>🔄 Video Converter</span>
+                                    <span class="faq-toggle">+</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <p>Converte vídeos entre formatos ou cria GIF.</p>
+                                    <ul>
+                                        <li>Selecione vídeos</li>
+                                        <li>Escolha formato de saída (MP4, AVI, MKV, GIF, etc)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="faq-item" onclick="toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>📥 Video Downloader</span>
+                                    <span class="faq-toggle">+</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <p>Baixa vídeos do YouTube e outros sites.</p>
+                                    <ul>
+                                        <li>Cole a URL do vídeo</li>
+                                        <li>Clique em Verificar</li>
+                                        <li>Escolha pasta e baixe</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="faq-item" onclick="toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>🕷️ Web Scraper</span>
+                                    <span class="faq-toggle">+</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <p>Baixa imagens/vídeos de sites. Suporta regras .md (Cérebro).</p>
+                                    <ul>
+                                        <li>Digite a URL do site</li>
+                                        <li>Analise para ver o que tem</li>
+                                        <li>Baixe o que precisar</li>
+                                        <li>Use Cérebro para renomear arquivos</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="faq-item" onclick="toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>📝 Transcrever Áudio</span>
+                                    <span class="faq-toggle">+</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <p>Transcreve áudio usando Whisper AI.</p>
+                                    <ul>
+                                        <li>Selecione arquivos de áudio</li>
+                                        <li>Escolha modelo (Small rápido, Medium preciso)</li>
+                                        <li>Selecione idioma ou auto-detectar</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="faq-item" onclick="toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>✂️ Remover Fundo</span>
+                                    <span class="faq-toggle">+</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <p>Remove fundo de imagens usando IA.</p>
+                                    <ul>
+                                        <li>Selecione imagens</li>
+                                        <li>Fundo removido automaticamente</li>
+                                        <li>Salvo em pasta "sem_fundo"</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="faq-item" onclick="toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>🗂️ Organizador Imagens</span>
+                                    <span class="faq-toggle">+</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <p>Organiza imagens por data de criação.</p>
+                                    <ul>
+                                        <li>Selecione pasta com imagens</li>
+                                        <li>Organizado por ano/mês</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="faq-item" onclick="toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>🎥 Logger Pro</span>
+                                    <span class="faq-toggle">+</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <p>Organiza vídeos por metadados (data, duração).</p>
+                                    <ul>
+                                        <li>Selecione pasta com vídeos</li>
+                                        <li>Cria CSV com informações</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="faq-item" onclick="toggleFaq(this)">
+                                <div class="faq-question">
+                                    <span>☁️ GDrive Dumper</span>
+                                    <span class="faq-toggle">+</span>
+                                </div>
+                                <div class="faq-answer">
+                                    <p>Baixa pastas inteiras do Google Drive.</p>
+                                    <ul>
+                                        <li>Cole o link da pasta</li>
+                                        <li>Selecione destino</li>
+                                        <li>Baixe tudo</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Converter Audio -->
+                <div class="tool-page" id="page-converter-audio">
+                    <h2>🎵 Conversor de Áudio</h2>
+                    <div class="tool-container">
+                        <div class="input-section">
+                            <div class="selection-buttons">
+                                <button class="btn-primary" onclick="selectFolder('converter-audio')">
+                                    📁 Selecionar Pasta
+                                </button>
+                                <button class="btn-secondary" onclick="selectFile('converter-audio')">
+                                    📄 Selecionar Arquivo
+                                </button>
+                            </div>
+                            <div id="converter-audio-selected" class="selected-info"></div>
+                            <div class="formats-grid">
+                                <label>Formato de saída:</label>
+                                <div class="format-options">
+                                    <label class="format-option">
+                                        <input type="radio" name="audio-format" value="mp3" checked> MP3
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="audio-format" value="wav"> WAV
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="audio-format" value="flac"> FLAC
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="audio-format" value="aac"> AAC
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="output-section">
+                            <button class="btn-success" id="btn-converter-audio" onclick="runConverterAudio()">
+                                ▶ Converter
+                            </button>
+                        </div>
+                        <div class="progress-section" id="progress-converter-audio" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill-converter-audio"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text-converter-audio">0%</span>
+                        </div>
+                        <div class="log-section" id="log-converter-audio"></div>
+                    </div>
+                </div>
+
+                <!-- Cortar Audio -->
+                <div class="tool-page" id="page-audio-cutter">
+                    <h2>Cortar Audio</h2>
+                    <div class="tool-container audio-cutter-container">
+                        <div class="input-section">
+                            <div class="selection-buttons">
+                                <button class="btn-primary" onclick="selectAudioCutterFile()">
+                                    Selecionar Audio
+                                </button>
+                            </div>
+                            <div id="audio-cutter-selected" class="selected-info"></div>
+
+                            <div class="audio-editor" id="audio-editor" style="display:none;">
+                                <audio id="audio-cutter-player"></audio>
+
+                                <div class="audio-editing-shell">
+                                    <div class="audio-tool-rail">
+                                        <button class="rail-tool active" id="btn-tool-select" onclick="setAudioTimelineTool('select')" title="V - Selecionar/mover faixa">V</button>
+                                        <button class="rail-tool" id="btn-tool-hand" onclick="setAudioTimelineTool('hand')" title="M - Mao/navegar timeline">M</button>
+                                        <button class="rail-tool" onclick="bladeAudioAtPlayhead()" title="E - Lamina/corte">E</button>
+                                        <button class="rail-tool" onclick="rippleDeleteAudioLeft()" title="Q - Remover ate a agulha">Q</button>
+                                        <button class="rail-tool" onclick="rippleDeleteAudioRight()" title="W - Remover depois da agulha">W</button>
+                                        <button class="rail-tool" onclick="undoAudioEdit()" title="Desfazer ultima edicao">↶</button>
+                                        <button class="rail-tool" onclick="addAudioLayer()" title="Adicionar faixa de audio">+</button>
+                                        <button class="rail-tool" onclick="toggleAudioEditsPopover()" title="Edicoes aplicadas">☰</button>
+                                        <button class="rail-tool" onclick="clearAudioCuts()" title="Limpar cortes">×</button>
+                                    </div>
+
+                                    <div class="waveform-wrap audio-tracks-timeline" id="audio-tracks-timeline">
+                                        <div class="audio-track-row active" data-layer-id="main">
+                                            <div class="audio-track-panel">
+                                                <div class="audio-track-name">Principal</div>
+                                                <div class="audio-track-meta">0 dB | Livre</div>
+                                                <button type="button" onclick="selectAudioLayer('main')">Editar</button>
+                                                <button type="button" onclick="toggleAudioLayerLock('main')">Lock</button>
+                                            </div>
+                                            <canvas id="audio-waveform" class="track-waveform" data-layer-id="main" width="1200" height="180"></canvas>
+                                        </div>
+                                        <div class="waveform-playhead" id="audio-playhead-label">00:00.00</div>
+                                    </div>
+
+                                    <div class="audio-edits-popover" id="audio-edits-popover" style="display:none;">
+                                        <h3>Edicoes aplicadas</h3>
+                                        <div id="audio-cuts-list" class="audio-cuts-list"></div>
+                                    </div>
+                                </div>
+
+                                <div class="audio-transport">
+                                    <button class="btn-primary" id="btn-audio-play" onclick="toggleAudioTimelinePlayback()">Play</button>
+                                    <div class="audio-time-readout" id="audio-timeline-readout">00:00.00 / 00:00.00</div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <div class="output-section">
+                            <button class="btn-success" id="btn-audio-cutter" onclick="openAudioExportPopup()" disabled>
+                                Exportar Audio
+                            </button>
+                        </div>
+
+                        <div class="audio-export-modal" id="audio-export-modal" style="display:none;">
+                            <div class="audio-export-box">
+                                <div class="audio-export-header">
+                                    <span>Exportar Audio</span>
+                                    <button type="button" onclick="closeAudioExportPopup()">×</button>
+                                </div>
+                                <div class="formats-grid">
+                                    <label>Formato de saida:</label>
+                                    <div class="format-options">
+                                        <label class="format-option"><input type="radio" name="audio-cutter-format" value="mp3" checked> MP3</label>
+                                        <label class="format-option"><input type="radio" name="audio-cutter-format" value="wav"> WAV</label>
+                                        <label class="format-option"><input type="radio" name="audio-cutter-format" value="m4a"> M4A</label>
+                                        <label class="format-option"><input type="radio" name="audio-cutter-format" value="aac"> AAC</label>
+                                        <label class="format-option"><input type="radio" name="audio-cutter-format" value="flac"> FLAC</label>
+                                        <label class="format-option"><input type="radio" name="audio-cutter-format" value="ogg"> OGG</label>
+                                        <label class="format-option"><input type="radio" name="audio-cutter-format" value="opus"> OPUS</label>
+                                    </div>
+                                </div>
+                                <div class="progress-section" id="progress-audio-cutter" style="display: none;">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="progress-fill-audio-cutter"></div>
+                                    </div>
+                                    <span class="progress-text" id="progress-text-audio-cutter">Processando...</span>
+                                </div>
+                                <div class="log-section" id="log-audio-cutter"></div>
+                                <div class="audio-export-actions">
+                                    <button class="btn-secondary" onclick="closeAudioExportPopup()">Cancelar</button>
+                                    <button class="btn-success" onclick="exportAudioCuts()">Exportar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cortar Vídeo -->
+                <div class="tool-page" id="page-video-cutter">
+                    <h2>Cortar Vídeo</h2>
+                    <div class="tool-container audio-cutter-container">
+                        <div class="input-section">
+                            <div class="selection-buttons">
+                                <button class="btn-primary" onclick="selectVideoCutterFile()">
+                                    Selecionar Vídeo
+                                </button>
+                            </div>
+                            <div id="video-cutter-selected" class="selected-info"></div>
+
+                            <div class="video-editor" id="video-editor" style="display:none;">
+                                <video id="video-cutter-player" class="video-cutter-player" controls preload="metadata"></video>
+
+                                <div class="audio-editing-shell">
+                                    <div class="audio-tool-rail">
+                                        <button class="rail-tool active" id="vbtn-tool-select" onclick="setVideoTimelineTool('select')" title="V - Selecionar">V</button>
+                                        <button class="rail-tool" id="vbtn-tool-hand" onclick="setVideoTimelineTool('hand')" title="M - Navegar">M</button>
+                                        <button class="rail-tool" onclick="bladeVideoAtPlayhead()" title="E - Corte na agulha">E</button>
+                                        <button class="rail-tool" onclick="rippleDeleteVideoLeft()" title="Q - Remover até a agulha">Q</button>
+                                        <button class="rail-tool" onclick="rippleDeleteVideoRight()" title="W - Remover após a agulha">W</button>
+                                        <button class="rail-tool" onclick="undoVideoEdit()" title="Desfazer">↶</button>
+                                        <button class="rail-tool" onclick="toggleVideoEditsPopover()" title="Ver cortes">☰</button>
+                                        <button class="rail-tool" onclick="clearVideoCuts()" title="Limpar cortes">×</button>
+                                    </div>
+
+                                    <div class="waveform-wrap audio-tracks-timeline" id="video-tracks-timeline">
+                                        <div class="audio-track-row active" data-layer-id="main">
+                                            <canvas id="video-waveform" class="track-waveform" data-layer-id="main" width="1200" height="120"></canvas>
+                                        </div>
+                                        <div class="waveform-playhead" id="video-playhead-label">00:00.00</div>
+                                    </div>
+
+                                    <div class="audio-edits-popover" id="video-edits-popover" style="display:none;">
+                                        <h3>Cortes aplicados</h3>
+                                        <div id="video-cuts-list" class="audio-cuts-list"></div>
+                                    </div>
+                                </div>
+
+                                <div class="audio-transport">
+                                    <div class="audio-time-readout" id="video-timeline-readout">00:00.00 / 00:00.00</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="output-section">
+                            <button class="btn-success" id="btn-video-cutter" onclick="openVideoExportModal()" disabled>
+                                Exportar Vídeo
+                            </button>
+                        </div>
+
+                        <div class="audio-export-modal" id="video-export-modal" style="display:none;">
+                            <div class="audio-export-box">
+                                <div class="audio-export-header">
+                                    <span>Exportar Vídeo</span>
+                                    <button type="button" onclick="closeVideoExportModal()">×</button>
+                                </div>
+                                <div class="formats-grid">
+                                    <label>Formato de saída:</label>
+                                    <div class="format-options">
+                                        <label class="format-option"><input type="radio" name="video-cutter-format" value="mp4" checked> MP4</label>
+                                        <label class="format-option"><input type="radio" name="video-cutter-format" value="mov"> MOV</label>
+                                        <label class="format-option"><input type="radio" name="video-cutter-format" value="mkv"> MKV</label>
+                                        <label class="format-option"><input type="radio" name="video-cutter-format" value="webm"> WebM</label>
+                                        <label class="format-option"><input type="radio" name="video-cutter-format" value="avi"> AVI</label>
+                                    </div>
+                                </div>
+                                <div class="formats-grid">
+                                    <label>Qualidade:</label>
+                                    <div class="format-options">
+                                        <label class="format-option"><input type="radio" name="video-cutter-quality" value="high"> Alta</label>
+                                        <label class="format-option"><input type="radio" name="video-cutter-quality" value="medium" checked> Média</label>
+                                        <label class="format-option"><input type="radio" name="video-cutter-quality" value="fast"> Rápida</label>
+                                        <label class="format-option"><input type="radio" name="video-cutter-quality" value="low"> Baixa</label>
+                                    </div>
+                                </div>
+                                <div class="progress-section" id="progress-video-cutter" style="display: none;">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="progress-fill-video-cutter"></div>
+                                    </div>
+                                    <span class="progress-text" id="progress-text-video-cutter">Processando...</span>
+                                </div>
+                                <div class="log-section" id="log-video-cutter"></div>
+                                <div class="audio-export-actions">
+                                    <button class="btn-secondary" onclick="closeVideoExportModal()">Cancelar</button>
+                                    <button class="btn-success" onclick="exportVideoCuts()">Exportar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Converter Imagem -->
+                <div class="tool-page" id="page-converter-imagem">
+                    <h2>🖼️ Conversor de Imagem</h2>
+                    <div class="tool-container">
+                        <div class="input-section">
+                            <div class="selection-buttons">
+                                <button class="btn-primary" onclick="selectFolder('converter-imagem')">
+                                    📁 Selecionar Pasta
+                                </button>
+                                <button class="btn-secondary" onclick="selectFile('converter-imagem')">
+                                    📄 Selecionar Arquivo
+                                </button>
+                            </div>
+                            <div id="converter-imagem-selected" class="selected-info"></div>
+                            <div class="formats-grid">
+                                <label>Formato de saída:</label>
+                                <div class="format-options">
+                                    <label class="format-option">
+                                        <input type="radio" name="img-format" value="png" checked> PNG
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="img-format" value="jpg"> JPG
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="img-format" value="webp"> WEBP
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="img-format" value="bmp"> BMP
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="img-format" value="ico"> ICO
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="output-section">
+                            <button class="btn-success" onclick="runConverterImagem()">
+                                ▶ Converter
+                            </button>
+                        </div>
+                        <div class="progress-section" id="progress-converter-imagem" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill-converter-imagem"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text-converter-imagem">0%</span>
+                        </div>
+                        <div class="log-section" id="log-converter-imagem"></div>
+                    </div>
+                </div>
+
+                <!-- Favicon Generator -->
+                <div class="tool-page" id="page-favicon">
+                    <h2>🌐 Gerador de Favicon</h2>
+                    <div class="tool-container">
+                        <div class="input-section">
+                            <label>Nome do site (webmanifest):</label>
+                            <input type="text" id="favicon-site-name" placeholder="Meu Site">
+                            <label>Cor do tema:</label>
+                            <input type="color" id="favicon-theme-color" value="#ffffff">
+                            <button class="btn-primary" onclick="selectImage('favicon')">
+                                🖼️ Selecionar Imagem
+                            </button>
+                            <p id="favicon-selected-file">Nenhuma imagem selecionada</p>
+                        </div>
+                        <div class="output-section">
+                            <button class="btn-success" onclick="runFaviconGenerator()">
+                                ▶ Gerar Favicons
+                            </button>
+                        </div>
+                        <div class="progress-section" id="progress-favicon" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill-favicon"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text-favicon">0%</span>
+                        </div>
+                        <div class="log-section" id="log-favicon"></div>
+                    </div>
+                </div>
+
+                <!-- Compressor de Imagem -->
+                <div class="tool-page" id="page-compressor-imagem">
+                    <h2>📸 Compressor de Imagem</h2>
+                    <div class="tool-container">
+                        <div class="input-section">
+                            <div class="selection-buttons">
+                                <button class="btn-primary" onclick="selectFolder('compressor-imagem')">
+                                    📁 Selecionar Pasta
+                                </button>
+                                <button class="btn-secondary" onclick="selectFile('compressor-imagem')">
+                                    📄 Selecionar Arquivo
+                                </button>
+                            </div>
+                            <div id="compressor-imagem-selected" class="selected-info"></div>
+                            <label class="format-option" style="margin-top: 12px;">
+                                <input type="checkbox" id="compressor-img-fullhd">
+                                Forçar Full HD
+                            </label>
+                        </div>
+                        <div class="output-section">
+                            <button class="btn-success" onclick="runCompressorImagem()">
+                                ▶ Comprimir
+                            </button>
+                        </div>
+                        <div class="progress-section" id="progress-compressor-imagem" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill-compressor-imagem"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text-compressor-imagem">0%</span>
+                        </div>
+                        <div class="log-section" id="log-compressor-imagem"></div>
+                    </div>
+                </div>
+
+                <!-- Compressor de Vídeo -->
+                <div class="tool-page" id="page-compressor-video">
+                    <h2>🎬 Compressor de Vídeo</h2>
+                    <div class="tool-container">
+                        <div class="input-section">
+                            <div class="selection-buttons">
+                                <button class="btn-primary" onclick="selectFolder('compressor-video')">
+                                    📁 Selecionar Pasta
+                                </button>
+                                <button class="btn-secondary" onclick="selectFile('compressor-video')">
+                                    📄 Selecionar Arquivo
+                                </button>
+                            </div>
+                            <div id="compressor-video-selected" class="selected-info"></div>
+                            <div class="formats-grid">
+                                <label>Encode:</label>
+                                <div class="format-options">
+                                    <label class="format-option">
+                                        <input type="radio" name="video-gpu" value="cpu" checked> CPU
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="video-gpu" value="gpu"> GPU (rápido)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="formats-grid">
+                                <label>Modo de saída:</label>
+                                <div class="format-options">
+                                    <label class="format-option">
+                                        <input type="radio" name="video-mode" value="copy" checked> Manter original
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="video-mode" value="overwrite"> Sobrescrever
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="output-section">
+                            <button class="btn-success" onclick="runCompressorVideo()">
+                                ▶ Comprimir
+                            </button>
+                        </div>
+                        <div class="progress-section" id="progress-compressor-video" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill-compressor-video"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text-compressor-video">0%</span>
+                        </div>
+                        <div class="log-section" id="log-compressor-video"></div>
+                    </div>
+                </div>
+
+                <!-- Video Converter -->
+                <div class="tool-page" id="page-video-converter">
+                    <h2>🔄 Video Converter</h2>
+                    <div class="tool-container">
+                        <div class="input-section">
+                            <div class="selection-buttons">
+                                <button class="btn-primary" onclick="selectFolder('video-converter')">
+                                    📁 Selecionar Pasta
+                                </button>
+                                <button class="btn-secondary" onclick="selectFile('video-converter')">
+                                    📄 Selecionar Arquivo
+                                </button>
+                            </div>
+                            <div id="video-converter-selected" class="selected-info"></div>
+                            <div class="formats-grid">
+                                <label>Formato de saída:</label>
+                                <div class="format-options">
+                                    <label class="format-option">
+                                        <input type="radio" name="video-format" value="mp4" checked> MP4
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="video-format" value="avi"> AVI
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="video-format" value="mkv"> MKV
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="video-format" value="mov"> MOV
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="video-format" value="webm"> WEBM
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="video-format" value="gif" checked> GIF
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="video-format" value="mp3"> MP3
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="output-section">
+                            <button class="btn-success" onclick="runVideoConverter()">
+                                ▶ Converter
+                            </button>
+                        </div>
+                        <div class="progress-section" id="progress-video-converter" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill-video-converter"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text-video-converter">0%</span>
+                        </div>
+                        <div class="log-section" id="log-video-converter"></div>
+                    </div>
+                </div>
+
+                <!-- Video Downloader -->
+                <div class="tool-page" id="page-video-downloader">
+                    <h2>📥 Video Downloader</h2>
+                    <div class="tool-container">
+
+                        <!-- URL + Verificar -->
+                        <div class="vd-url-row">
+                            <input type="text" id="video-url" placeholder="Cole a URL do vídeo (YouTube, Instagram, TikTok...)" onkeydown="if(event.key==='Enter')getVideoInfo()">
+                            <button class="btn-primary" onclick="getVideoInfo()">🔍 Verificar</button>
+                        </div>
+
+                        <!-- Card de info (oculto até verificar) -->
+                        <div id="video-info" class="vd-info-card" style="display:none;">
+                            <img id="video-thumbnail" class="vd-thumb" alt="">
+                            <div class="vd-details">
+                                <div class="vd-title" id="video-title"></div>
+                                <div class="vd-meta">
+                                    <span id="video-duration"></span>
+                                    <span class="vd-meta-sep">·</span>
+                                    <span id="video-provider"></span>
+                                    <span class="vd-meta-sep">·</span>
+                                    <span id="video-size"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Formato + Destino -->
+                        <div class="vd-options-row">
+                            <div class="vd-option-block">
+                                <label class="vd-label">Formato</label>
+                                <div class="vd-format-pills">
+                                    <label class="vd-pill">
+                                        <input type="radio" name="vd-format" value="mp4" checked>
+                                        <span>🎬 MP4</span>
+                                    </label>
+                                    <label class="vd-pill">
+                                        <input type="radio" name="vd-format" value="mp3">
+                                        <span>🎵 MP3</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="vd-option-block vd-dest">
+                                <label class="vd-label">Pasta de destino</label>
+                                <div class="folder-select">
+                                    <button class="btn-secondary" onclick="selectFolder('video-downloader')">📁 Selecionar</button>
+                                    <span id="video-downloader-selected" class="selected-path">Nenhuma pasta selecionada</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="output-section">
+                            <button class="btn-success" id="btn-download-video" onclick="runVideoDownloader()">⬇️ Baixar</button>
+                        </div>
+                        <div class="progress-section" id="progress-video-downloader" style="display:none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill-video-downloader"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text-video-downloader">0%</span>
+                        </div>
+                        <div class="log-section" id="log-video-downloader"></div>
+                    </div>
+                </div>
+
+                <!-- Web Scraper -->
+                <div class="tool-page" id="page-web-scraper">
+                    <h2>🕷️ Web Scraper</h2>
+                    <div class="tool-container">
+                        <div class="input-section">
+                            <label>URL do site:</label>
+                            <input type="text" id="scraper-url" placeholder="https://...">
+                            <label>Pasta de destino:</label>
+                            <div class="folder-select">
+                                <input type="text" id="scraper-destino" placeholder="Selecionar pasta..." readonly>
+                                <button class="btn-secondary" onclick="selectScraperDestino()">
+                                    📁 Selecionar
+                                </button>
+                            </div>
+                        </div>
+                        <div class="output-section">
+                            <button class="btn-primary" onclick="runWebScraperAnalyze()">
+                                🔎 Analisar
+                            </button>
+                        </div>
+                        <div class="input-section" id="scraper-result-box" style="display: none;">
+                            <label>Resultado da análise:</label>
+                            <div class="format-options" style="margin-bottom: 10px;">
+                                <span id="scraper-count-images">Imagens: 0</span>
+                                <span id="scraper-count-videos">Vídeos: 0</span>
+                            </div>
+                            <label>O que baixar:</label>
+                            <div class="format-options">
+                                <label class="format-option">
+                                    <input type="radio" name="scraper-download-mode" value="images" checked> Só imagens
+                                </label>
+                                <label class="format-option">
+                                    <input type="radio" name="scraper-download-mode" value="images_videos"> Imagens + vídeos
+                                </label>
+                                <label class="format-option">
+                                    <input type="radio" name="scraper-download-mode" value="videos"> Só vídeos
+                                </label>
+                            </div>
+                        </div>
+                        <div class="output-section">
+                            <button class="btn-success" onclick="runWebScraperDownload()">
+                                ⬇️ Baixar
+                            </button>
+                        </div>
+                        <div class="progress-section" id="progress-web-scraper" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill-web-scraper"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text-web-scraper">0%</span>
+                        </div>
+                        <div class="log-section" id="log-web-scraper"></div>
+                        
+                        <!-- Cérebro integrado ao Web Scraper -->
+                        <div class="cerebro-section">
+                            <h3>🧠 Cérebro (Regras .md)</h3>
+                            <p id="cerebro-status" class="cerebro-status">Nenhum .md carregado</p>
+                            <div class="cerebro-actions">
+                                <button class="btn-primary" onclick="loadCerebro()">
+                                    📂 Carregar .md
+                                </button>
+                                <button class="btn-primary" onclick="removeCerebro()">
+                                    🗑️ Remover
+                                </button>
+                            </div>
+                            <div class="cerebro-preview" id="cerebro-preview" style="display: none;">
+                                <h4>Preview do Cérebro:</h4>
+                                <pre id="cerebro-content-preview"></pre>
+                            </div>
+                            <div class="output-section">
+                                <button class="btn-success" id="btn-generate-csv" onclick="generateCSV()">
+                                    📊 Gerar CSV com Cérebro
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transcrever Áudio -->
+                <div class="tool-page" id="page-transcrever-audio">
+                    <h2>📝 Transcrever Áudio</h2>
+                    <div class="tool-container">
+                        <div class="input-section">
+                            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                                <button class="btn-primary" onclick="selectFolder('transcrever-audio')">
+                                    📁 Selecionar Pasta
+                                </button>
+                                <button class="btn-secondary" onclick="selectFile('transcrever-audio')">
+                                    📄 Selecionar Arquivo
+                                </button>
+                            </div>
+                            <div id="transcrever-audio-selected" class="selected-path"></div>
+                            <div class="formats-grid">
+                                <label>Modelo:</label>
+                                <div class="format-options">
+                                    <label class="format-option">
+                                        <input type="radio" name="whisper-model" value="Rápido (small)" checked> Small (Rápido)
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="whisper-model" value="Preciso (medium)"> Medium (Preciso)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="formats-grid">
+                                <label>Idioma:</label>
+                                <select id="whisper-language" style="width: 100%; padding: 10px; background: #333; color: white; border: 1px solid #444; border-radius: 8px;">
+                                    <option value="pt">Português</option>
+                                    <option value="en">Inglês</option>
+                                    <option value="es">Espanhol</option>
+                                    <option value="auto">Auto-detectar</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="output-section">
+                            <button class="btn-success" onclick="runTranscreverAudio()">
+                                ▶ Transcrever
+                            </button>
+                        </div>
+                        <div class="progress-section" id="progress-transcrever-audio" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill-transcrever-audio"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text-transcrever-audio">0%</span>
+                        </div>
+                        <div class="log-section" id="log-transcrever-audio"></div>
+                    </div>
+                </div>
+
+                <!-- Remover Fundo -->
+                <div class="tool-page" id="page-remover-fundo">
+                    <h2>✂️ Remover Fundo</h2>
+                    <div class="tool-container">
+                        <div class="input-section">
+                            <div class="selection-buttons">
+                                <button class="btn-primary" onclick="selectFolder('remover-fundo')">
+                                    📁 Selecionar Pasta
+                                </button>
+                                <button class="btn-secondary" onclick="selectFile('remover-fundo')">
+                                    📄 Selecionar Arquivo
+                                </button>
+                            </div>
+                            <div id="remover-fundo-selected" class="selected-info"></div>
+                        </div>
+                        <div class="output-section">
+                            <button class="btn-success" onclick="runRemoverFundo()">
+                                ▶ Processar
+                            </button>
+                        </div>
+                        <div class="progress-section" id="progress-remover-fundo" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill-remover-fundo"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text-remover-fundo">0%</span>
+                        </div>
+                        <div class="log-section" id="log-remover-fundo"></div>
+                    </div>
+                </div>
+
+                <!-- Organizador de Imagens -->
+                <div class="tool-page" id="page-organizador-imagens">
+                    <h2>🗂️ Organizador de Imagens</h2>
+                    <div class="tool-container">
+                        <div class="input-section">
+                            <button class="btn-primary" onclick="selectFolder('organizador-imagens')">
+                                📁 Selecionar Pasta
+                            </button>
+                            <div id="organizador-imagens-selected" class="selected-path"></div>
+                            <div class="formats-grid" style="margin-top: 14px;">
+                                <label>O que fazer?</label>
+                                <div class="format-options">
+                                    <label class="format-option">
+                                        <input type="radio" name="organizador-imagens-modo" value="completa" checked>
+                                        Organização completa
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="organizador-imagens-modo" value="duplicadas">
+                                        Identificar duplicadas
+                                    </label>
+                                    <label class="format-option">
+                                        <input type="radio" name="organizador-imagens-modo" value="thumbs">
+                                        Identificar thumbs
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="output-section">
+                            <button class="btn-success" onclick="runOrganizadorImagens()">
+                                ▶ Organizar
+                            </button>
+                        </div>
+                        <div class="progress-section" id="progress-organizador-imagens" style="display: none;">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill-organizador-imagens"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text-organizador-imagens">0%</span>
+                        </div>
+                        <div class="log-section" id="log-organizador-imagens"></div>
+                    </div>
+                </div>
+
+                <!-- Organizador de Vídeos -->
+                <div class="tool-page" id="page-organizador-videos">
+                    <h2>🎥 Logger Pro</h2>
+                    <div class="tool-container">
+                        <div class="input-section">
+                            <button class="btn-primary" onclick="selectFolder('organizador-videos')">
+                                📁 Selecionar Pasta
+                            </button>
+                            <div id="organizador-videos-selected" class="selected-path"></div>
+                        </div>
+                        <div class="output-section" id="btn-organizar-organizador-videos-wrap" style="display:none;">
+                            <button class="btn-success" onclick="runOrganizadorVideosScan()">
+                                🔍 Analisar
+                            </button>
+                        </div>
+                        <div class="progress-section" id="progress-organizador-videos" style="display: none;">
+                            <div class="progress-info">
+                                <div class="progress-file" id="organizador-videos-fase">—</div>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill-organizador-videos"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text-organizador-videos">0%</span>
+                            <div id="log-organizador-videos" style="margin-top:8px; font-size:12px; color:#666; font-family:monospace; min-height:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GDrive Dumper -->
+                <div class="tool-page" id="page-gdrive-dumper">
+                    <h2>☁️ GDrive Dumper</h2>
+                    <div class="tool-container">
+                        <div class="input-section">
+                            <label>Link da pasta Google Drive:</label>
+                            <input type="text" id="gdrive-url" placeholder="https://drive.google.com/...">
+                            <div id="gdrive-status" style="margin-top:6px; font-size:13px; min-height:18px;"></div>
+                        </div>
+                        <div class="input-section">
+                            <label>Pasta de destino:</label>
+                            <div class="folder-select">
+                                <input type="text" id="gdrive-destino" placeholder="Selecione a pasta de destino..." readonly>
+                                <button class="btn-secondary" onclick="selectGdriveDestino()">
+                                    📁 Selecionar
+                                </button>
+                            </div>
+                        </div>
+                        <div class="input-section">
+                            <label>Velocidade da sua internet:</label>
+                            <select id="gdrive-perfil" style="width: 100%; padding: 10px; background: #333; color: white; border: 1px solid #444; border-radius: 8px;">
+                                <option value="rapida" selected>🚀 Rápida (recomendado) — 8 arquivos em paralelo</option>
+                                <option value="normal">⚖️ Normal — 4 arquivos em paralelo</option>
+                                <option value="lenta">🐢 Lenta / instável — 2 arquivos, mais tolerante a quedas</option>
+                            </select>
+                        </div>
+                        <div class="analyze-section" id="gdrive-analyze-info" style="display: none;">
+                            <div class="analyze-result">
+                                <div class="analyze-item">
+                                    <span class="analyze-label">📁 Pasta:</span>
+                                    <span class="analyze-value" id="gdrive-pasta-nome">-</span>
+                                </div>
+                                <div class="analyze-item">
+                                    <span class="analyze-label">📊 Tamanho:</span>
+                                    <span class="analyze-value" id="gdrive-tamanho">-</span>
+                                </div>
+                                <div class="analyze-item">
+                                    <span class="analyze-label">📄 Arquivos:</span>
+                                    <span class="analyze-value" id="gdrive-arquivos">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="gdrive-action-buttons" style="display: flex; gap: 10px;">
+                            <button class="btn-primary" onclick="analyzeGdrive()" style="flex: 1;">
+                                🔍 Verificar
+                            </button>
+                            <button class="btn-success" id="btn-gdrive-baixar" onclick="runGdriveDump()" style="flex: 1;" disabled>
+                                ⬇️ Baixar Pasta
+                            </button>
+                        </div>
+                        <div class="progress-section" id="progress-gdrive" style="display: none;">
+                            <div class="progress-info">
+                                <div class="progress-file" id="gdrive-arquivo-atual">-</div>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill-gdrive"></div>
+                            </div>
+                            <span class="progress-text" id="progress-text-gdrive">0%</span>
+                            <div id="gdrive-msg" style="margin-top:8px; font-size:13px; color:#9ca3af; font-family:monospace; min-height:18px;"></div>
+                            <div style="display:flex; gap:10px; margin-top:10px;">
+                                <button id="btn-gdrive-pause" onclick="toggleGdrivePause()" style="flex:1; padding:8px 0; background:#D97706; color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer;">
+                                    ⏸ Pausar
+                                </button>
+                                <button id="btn-gdrive-cancel" onclick="cancelGdriveDump()" style="flex:1; padding:8px 0; background:#DC2626; color:#fff; border:none; border-radius:6px; font-size:14px; font-weight:600; cursor:pointer;">
+                                    ✖ Cancelar Download
+                                </button>
+                            </div>
+                        </div>
+                        <div id="gdrive-stats-panel" style="display:none; background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:14px 18px; margin-bottom:10px; font-family:monospace; font-size:13px;">
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 24px;">
+                                <div>
+                                    <span style="color:#6b7280; font-size:11px; text-transform:uppercase; letter-spacing:.06em;">📦 Transferido</span>
+                                    <div id="gdrive-stat-transferido" style="color:#10B981; font-size:15px; font-weight:600; margin-top:2px;">—</div>
+                                </div>
+                                <div>
+                                    <span style="color:#6b7280; font-size:11px; text-transform:uppercase; letter-spacing:.06em;">⚡ Velocidade</span>
+                                    <div id="gdrive-stat-velocidade" style="color:#38BDF8; font-size:15px; font-weight:600; margin-top:2px;">—</div>
+                                </div>
+                                <div>
+                                    <span style="color:#6b7280; font-size:11px; text-transform:uppercase; letter-spacing:.06em;">⏱ Tempo restante</span>
+                                    <div id="gdrive-stat-eta" style="color:#FBBF24; font-size:15px; font-weight:600; margin-top:2px;">—</div>
+                                </div>
+                                <div>
+                                    <span style="color:#6b7280; font-size:11px; text-transform:uppercase; letter-spacing:.06em;">📄 Arquivos</span>
+                                    <div id="gdrive-stat-arquivos" style="color:#A78BFA; font-size:15px; font-weight:600; margin-top:2px;">—</div>
+                                </div>
+                            </div>
+                            <div id="gdrive-stat-extra" style="color:#6b7280; font-size:11px; margin-top:10px;"></div>
+                            <div id="gdrive-transferring" style="margin-top:8px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Placeholder for other tools -->
+                <div class="tool-page" id="page-placeholder">
+                    <div class="placeholder-content">
+                        <span class="placeholder-icon">🔧</span>
+                        <h2>Em Desenvolvimento</h2>
+                        <p>Esta ferramenta está sendo migrada para a nova interface.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Sons -->
+        <audio id="audio-click" src="audio/click.wav"></audio>
+        <audio id="audio-concluido" src="audio/concluido.wav"></audio>
+        <audio id="audio-execute" src="audio/execute.wav"></audio>
+    </div>
+
+    <!-- Modal: Remover Fundo -->
+    <div id="modal-remover-fundo" class="rf-modal-overlay" style="display:none;" onclick="fecharModalRF(event)">
+        <div class="rf-modal">
+            <div class="rf-modal-header">
+                <span>✂️ Resultado — Remover Fundo</span>
+                <button class="rf-modal-close" onclick="fecharModalRF()">✕</button>
+            </div>
+            <div class="rf-viewer">
+                <div class="rf-side">
+                    <div class="rf-side-label">Original</div>
+                    <div class="rf-img-wrap">
+                        <img id="rf-img-original" src="" alt="original" />
+                    </div>
+                </div>
+                <div class="rf-divider"></div>
+                <div class="rf-side">
+                    <div class="rf-side-label">Sem Fundo</div>
+                    <div class="rf-img-wrap rf-checkerboard">
+                        <img id="rf-img-resultado" src="" alt="sem fundo" />
+                    </div>
+                </div>
+            </div>
+            <div class="rf-thumbs-strip" id="rf-thumbs-strip"></div>
+            <div class="rf-modal-footer">
+                <span class="rf-counter" id="rf-counter"></span>
+                <div style="display:flex;gap:10px;">
+                    <button class="btn-secondary" id="rf-btn-copiar" onclick="copiarRFAtual()">📋 Copiar</button>
+                    <button class="btn-secondary" onclick="salvarRFAtual()">💾 Salvar Esta</button>
+                    <button class="btn-success" id="rf-btn-salvar-todas" onclick="salvarRFTodas()">💾 Salvar Todas</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Resultado da Transcrição -->
+    <div id="modal-transcricao" class="transcricao-modal-overlay" style="display:none;" onclick="fecharModalTranscricao(event)">
+        <div class="transcricao-modal">
+            <div class="transcricao-modal-header">
+                <span>📝 Resultado da Transcrição</span>
+                <button class="transcricao-modal-close" onclick="fecharModalTranscricao()">✕</button>
+            </div>
+            <textarea id="transcricao-modal-texto" class="transcricao-modal-textarea" spellcheck="false"></textarea>
+            <div class="transcricao-modal-footer">
+                <button class="btn-secondary" onclick="copiarTranscricao()">📋 Copiar</button>
+                <button class="btn-success" onclick="salvarTranscricaoTxt()">💾 Salvar TXT</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        console.log('HTML loaded, checking switchTool:', typeof switchTool);
+    </script>
+
+    <!-- Modal: Câmeras Identificadas -->
+    <div id="modal-cameras" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+            <h3>📷 Câmeras Identificadas</h3>
+
+            <div class="modal-field">
+                <label class="modal-label">🎬 Nome do Projeto</label>
+                <input type="text" id="input-nome-projeto" class="modal-input"
+                       placeholder="Ex: Casamento João e Maria">
+            </div>
+
+            <div class="modal-divider"></div>
+
+            <p>Câmeras ordenadas pela gravação mais antiga. Operador é opcional:</p>
+            <div id="cameras-list" class="cameras-list"></div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="fecharModalCameras()">Cancelar</button>
+                <button class="btn-success" onclick="confirmarOrganizacaoVideos()">▶ Confirmar e Organizar</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -40,3 +40,24 @@ Skills/
 # IDE
 .vscode/
 .idea/
+
+# Dados locais / do usuário (não publicar)
+logs/
+_dist_preserve/
+build_log.txt
+window_state.json
+compressor_video_debug.log
+videos_baixados/
+scraper_output/
+teste_cr2_saida/
+*.CR2
+TESTE_ESCRITA.txt
+VERSÃO ANTIGA QUE FUNCIONAVA BEM/
+models/
+whisper/
+exiftool.exe
+exiftool_files/
+frontend/_audio_preview/
+frontend/_video_preview/
+frontend/_cv_progress.json
+*.pek
