@@ -90,6 +90,28 @@ def _alta_prioridade():
     return getattr(subprocess, "ABOVE_NORMAL_PRIORITY_CLASS", 0) if sys.platform == "win32" else 0
 
 
+def _sistema_arquivos(caminho):
+    """Retorna o sistema de arquivos do volume (ex. 'NTFS', 'exFAT', 'FAT32') ou '' se desconhecido."""
+    if sys.platform != "win32":
+        return ""
+    try:
+        import ctypes
+        raiz = os.path.splitdrive(os.path.abspath(caminho))[0] + "\\"
+        buf = ctypes.create_unicode_buffer(64)
+        ok = ctypes.windll.kernel32.GetVolumeInformationW(
+            ctypes.c_wchar_p(raiz), None, 0, None, None, None, buf, len(buf))
+        return buf.value if ok else ""
+    except Exception:
+        return ""
+
+
+def _suporta_sparse(caminho):
+    """Sem sparse (exFAT/FAT32), o download multi-thread força o Windows a preencher o
+    arquivo com zeros a cada gravação fora de ordem — derruba a velocidade para KB/s."""
+    fs = _sistema_arquivos(caminho).upper()
+    return fs in ("", "NTFS", "REFS")
+
+
 def _logs_dir():
     base = os.path.dirname(sys.executable) if hasattr(sys, "_MEIPASS") else \
         os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -122,6 +144,77 @@ def verificar_gdrive_configurado():
         return "gdrive:" in r.stdout
     except Exception:
         return False
+
+
+# Credencial OAuth própria (projeto "canivete-do-pailer" no Google Cloud). O client_id padrão
+# do rclone é compartilhado por todos os usuários do mundo e vive estourando o limite do Google.
+# Em apps desktop o secret não é confidencial; fica fatiado só para não disparar scanners.
+CLIENT_ID = "1080880442408-4n2ncnfnrl80qrcu4tps2mk1qkjji936.apps.googleusercontent.com"
+OAUTH_TIMEOUT = 600      # tempo para o usuário autorizar no navegador
+
+# O secret não fica no repositório público: vem de Functions/_credenciais.py (fora do git;
+# no build, o GitHub Actions gera esse arquivo a partir do secret GDRIVE_CLIENT_SECRET).
+try:
+    from Functions._credenciais import CLIENT_SECRET
+except Exception:  # ausente ou com defeito: nunca derruba o app
+    CLIENT_SECRET = os.environ.get("GDRIVE_CLIENT_SECRET", "")
+
+
+def _config_gdrive():
+    """Retorna o dict de config do remote 'gdrive' (ou None se não existir)."""
+    try:
+        r = subprocess.run([_rclone_exe(), "config", "dump"], capture_output=True, text=True,
+                           timeout=10, encoding="utf-8", errors="replace", creationflags=_no_window())
+        return json.loads(r.stdout or "{}").get("gdrive")
+    except Exception:
+        return None
+
+
+def usa_client_proprio():
+    cfg = _config_gdrive()
+    return bool(cfg) and cfg.get("client_id") == CLIENT_ID and bool(cfg.get("token"))
+
+
+def garantir_conexao(callback_log=None):
+    """
+    Garante o remote 'gdrive' com a credencial própria. Cria ou migra se preciso —
+    o rclone abre o navegador e espera o usuário clicar em "Permitir".
+    Retorna (ok, erro).
+    """
+    log = callback_log or (lambda m: None)
+    cfg = _config_gdrive()
+    if cfg and cfg.get("client_id") == CLIENT_ID and cfg.get("token"):
+        return True, None
+    if not CLIENT_SECRET:
+        # Build sem a credencial própria: segue com o remote que existir (credencial padrão do rclone)
+        if cfg and cfg.get("token"):
+            return True, None
+        return False, "Google Drive não configurado e esta versão está sem a credencial do app."
+
+    if cfg:
+        log("Atualizando a conexão com o Google Drive (só desta vez)...")
+        cmd = [_rclone_exe(), "config", "update", "gdrive",
+               "client_id", CLIENT_ID, "client_secret", CLIENT_SECRET, "config_refresh_token", "true"]
+    else:
+        log("Conectando ao Google Drive pela primeira vez...")
+        cmd = [_rclone_exe(), "config", "create", "gdrive", "drive", "scope", "drive",
+               "client_id", CLIENT_ID, "client_secret", CLIENT_SECRET]
+    log("🌐 Uma página do Google vai abrir. Escolha sua conta e clique em Permitir. "
+        "Se aparecer 'O Google não verificou este app', clique em Avançado → Acessar Canivete do Pailer.")
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=OAUTH_TIMEOUT,
+                           stdin=subprocess.DEVNULL, encoding="utf-8", errors="replace",
+                           creationflags=_no_window())
+    except subprocess.TimeoutExpired:
+        return False, "Tempo esgotado esperando a autorização no navegador. Tente de novo."
+    except FileNotFoundError:
+        return False, "rclone não encontrado. Rode o setup inicial do app para baixá-lo."
+
+    if usa_client_proprio():
+        log("✅ Google Drive conectado!")
+        return True, None
+    erro = (r.stderr or r.stdout or "").strip()
+    return False, f"Não foi possível conectar ao Google Drive. {erro[-300:]}"
 
 
 def get_folder_name(folder_id, callback_log=None, tipo="folder"):
@@ -260,12 +353,14 @@ def _stats_to_ui(st):
 
 def _montar_cmd(tipo, remote_args, destino, perfil, use_shared):
     cfg = PERFIS.get(perfil, PERFIS["normal"])
+    sparse = _suporta_sparse(destino)
     comum = [
         # ── Performance ──
         f"--transfers={cfg['transfers']}",
         f"--checkers={max(4, cfg['transfers'] * 2)}",
         f"--buffer-size={cfg['buffer']}",
-        f"--multi-thread-streams={cfg['streams']}",
+        # Sem sparse: 1 stream por arquivo (gravação sequencial, sem preenchimento com zeros)
+        f"--multi-thread-streams={cfg['streams'] if sparse else 0}",
         "--multi-thread-cutoff=64M",
         # ── Resiliência ──
         "--retries=10",
@@ -281,6 +376,8 @@ def _montar_cmd(tipo, remote_args, destino, perfil, use_shared):
         "--stats=1s",
         "--stats-log-level=NOTICE",
     ]
+    if not sparse:
+        comum.append("--local-no-sparse")
     if use_shared:
         comum.append("--drive-shared-with-me")
     if tipo == "file":
@@ -308,6 +405,11 @@ def dump_pasta(remote_args, destino, perfil="rapida",
     global _current_proc
     log = callback_log or (lambda m: None)
     os.makedirs(destino, exist_ok=True)
+    if not _suporta_sparse(destino):
+        fs = _sistema_arquivos(destino)
+        log(f"Disco de destino em {fs}: usando gravação sequencial (mais rápida nesse formato).")
+        if fs.upper() == "FAT32":
+            log("⚠ FAT32 não aceita arquivos acima de 4 GB. Prefira um disco NTFS/exFAT.")
 
     trace = collections.deque(maxlen=3000)   # últimas linhas p/ depuração (memória limitada)
     use_shared = False

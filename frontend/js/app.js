@@ -8,6 +8,211 @@ const selectedTypes = {};   // 'file' ou 'folder' por ferramenta
 let scraperLogBuffer = [];
 let scraperLastAnalyzedUrl = null;
 
+// ─────────────────────────── UI genérica das ferramentas ───────────────────────────
+
+const _rodando = {};  // ferramenta -> true enquanto processa
+
+function _el(id) { return document.getElementById(id); }
+
+function toast(msg, tipo = 'info', ms = 4500) {
+    const box = _el('toasts');
+    if (!box) return;
+    const t = document.createElement('div');
+    t.className = `toast ${tipo}`;
+    const icone = tipo === 'ok' ? '✅' : tipo === 'erro' ? '⚠️' : 'ℹ️';
+    t.innerHTML = `<span>${icone}</span><span>${_escHtml(msg)}</span>`;
+    box.appendChild(t);
+    setTimeout(() => { t.classList.add('saindo'); setTimeout(() => t.remove(), 300); }, ms);
+}
+
+function _nomeCurto(caminho) {
+    return String(caminho || '').split(/[\\/]/).filter(Boolean).pop() || caminho;
+}
+
+function setSelecao(tool, caminho, tipo) {
+    selectedPaths[tool] = caminho;
+    selectedTypes[tool] = tipo;
+    const el = _el(`${tool}-selected`);
+    if (!el) return;
+    if (!caminho) { el.innerHTML = ''; return; }
+    const icone = tipo === 'folder' ? '📁' : '📄';
+    el.title = caminho;
+    el.innerHTML = `<span>${icone}</span><span class="sel-nome">${_escHtml(caminho)}</span>` +
+        `<button class="sel-x" title="Limpar" onclick="setSelecao('${tool}', null)">✕</button>`;
+    const wrap = _el(`btn-organizar-${tool}-wrap`);
+    if (wrap) wrap.style.display = 'block';
+}
+
+function uiIniciar(tool, status = 'Preparando...') {
+    _rodando[tool] = true;
+    const card = _el(`progress-${tool}`);
+    if (card) {
+        card.hidden = false;
+        card.classList.remove('ok', 'erro', 'indeterminado');
+    }
+    if (_el(`progress-fill-${tool}`)) _el(`progress-fill-${tool}`).style.width = '0%';
+    if (_el(`progress-text-${tool}`)) _el(`progress-text-${tool}`).textContent = '0%';
+    if (_el(`status-${tool}`)) _el(`status-${tool}`).textContent = status;
+    if (_el(`result-${tool}`)) _el(`result-${tool}`).hidden = true;
+    if (_el(`log-${tool}`)) _el(`log-${tool}`).textContent = '';
+    const btn = _el(`btn-${tool}`);
+    if (btn) {
+        btn.dataset.label = btn.dataset.label || btn.innerHTML;
+        btn.disabled = true;
+        btn.classList.add('rodando');
+        btn.innerHTML = '⏳ Processando...';
+    }
+    document.querySelector(`.menu-item[data-tool="${tool}"]`)?.classList.add('rodando');
+    playExecute();
+}
+
+function _logLinha(tool, msg) {
+    const log = _el(`log-${tool}`);
+    if (!log) return;
+    log.textContent += msg + '\n';
+    if (log.textContent.length > 60000) log.textContent = log.textContent.slice(-40000);
+    log.scrollTop = log.scrollHeight;
+}
+
+function uiAtualizar(tool, data) {
+    const card = _el(`progress-${tool}`);
+    if (data.percent !== undefined && data.percent !== null) {
+        const p = Number(data.percent);
+        if (card) card.classList.toggle('indeterminado', p < 0);
+        if (p >= 0) {
+            const v = Math.min(100, p);
+            _el(`progress-fill-${tool}`).style.width = v + '%';
+            _el(`progress-text-${tool}`).textContent = Math.round(v) + '%';
+        } else if (_el(`progress-text-${tool}`)) {
+            _el(`progress-text-${tool}`).textContent = '';
+        }
+    }
+    if (data.status && _el(`status-${tool}`)) _el(`status-${tool}`).textContent = data.status;
+    if (data.log) {
+        _logLinha(tool, data.log);
+        if (!data.status && _el(`status-${tool}`)) _el(`status-${tool}`).textContent = String(data.log).trim();
+    }
+    if (data.complete) uiConcluir(tool, data);
+}
+
+function uiConcluir(tool, data) {
+    _rodando[tool] = false;
+    const card = _el(`progress-${tool}`);
+    const erro = data.error;
+    if (card) {
+        card.classList.remove('indeterminado');
+        card.classList.add(erro ? 'erro' : 'ok');
+    }
+    if (!erro && _el(`progress-fill-${tool}`)) {
+        _el(`progress-fill-${tool}`).style.width = '100%';
+        _el(`progress-text-${tool}`).textContent = '100%';
+    }
+    if (_el(`status-${tool}`)) _el(`status-${tool}`).textContent = erro ? 'Falhou' : 'Concluído';
+    const btn = _el(`btn-${tool}`);
+    if (btn) {
+        btn.disabled = false;
+        btn.classList.remove('rodando');
+        if (btn.dataset.label) btn.innerHTML = btn.dataset.label;
+    }
+    document.querySelector(`.menu-item[data-tool="${tool}"]`)?.classList.remove('rodando');
+
+    const texto = erro || data.resumo || 'Concluído!';
+    const rb = _el(`result-${tool}`);
+    if (rb) {
+        rb.className = `result-banner ${erro ? 'erro' : 'ok'}`;
+        rb.innerHTML = `<span class="rb-icon">${erro ? '⚠️' : '✅'}</span><span class="rb-text">${_escHtml(texto)}</span>`;
+        rb.hidden = false;
+    }
+    if (erro) {
+        _logLinha(tool, '❌ ' + erro);
+        const det = _el(`logwrap-${tool}`);
+        if (det) det.open = true;
+    } else {
+        playConcluido();
+    }
+    // Só avisa por toast se o usuário está em outra ferramenta
+    if (!_el(`page-${tool}`)?.classList.contains('active')) {
+        const nome = document.querySelector(`.menu-item[data-tool="${tool}"] .label`)?.textContent || tool;
+        toast(`${nome}: ${texto}`, erro ? 'erro' : 'ok', 7000);
+    }
+}
+
+function _exigirSelecao(tool, msg = 'Escolha uma pasta ou arquivo primeiro (ou arraste aqui).') {
+    if (_rodando[tool]) return null;
+    const p = selectedPaths[tool];
+    if (!p) {
+        toast(msg, 'erro');
+        const dz = document.querySelector(`.dropzone[data-tool="${tool}"]`);
+        if (dz) { dz.classList.add('drag-over'); setTimeout(() => dz.classList.remove('drag-over'), 700); }
+        return null;
+    }
+    return p;
+}
+
+// ── Busca no menu ──
+function filtrarMenu(q) {
+    const termo = String(q || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    let grupo = null, visiveisNoGrupo = 0;
+    const fecharGrupo = () => { if (grupo) grupo.classList.toggle('oculto', visiveisNoGrupo === 0); };
+    document.querySelectorAll('.menu > *').forEach(el => {
+        if (el.classList.contains('menu-group')) {
+            fecharGrupo();
+            grupo = el; visiveisNoGrupo = 0;
+            return;
+        }
+        const txt = el.textContent.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+        const ok = !termo || txt.includes(termo);
+        el.classList.toggle('oculto', !ok);
+        if (ok && grupo) visiveisNoGrupo++;
+    });
+    fecharGrupo();
+}
+
+// ── Arrastar e soltar (o Python entrega os caminhos reais em onArquivosSoltos) ──
+const EXT_VIDEO = /\.(mp4|mov|mkv|avi|webm|flv|wmv|m4v|ts|mts|m2ts|3gp|ogv|mpg|mpeg|mxf)$/i;
+
+function onArquivosSoltos(itens) {
+    document.body.classList.remove('arrastando');
+    const pagina = document.querySelector('.tool-page.active');
+    const tool = pagina?.id.replace('page-', '');
+    if (!tool || !itens?.length) return;
+    const item = itens[0];
+
+    if (tool === 'video-cutter') {
+        const v = itens.find(i => !i.pasta && EXT_VIDEO.test(i.path));
+        if (v) veOpenPath(v.path); else toast('Solte um arquivo de vídeo.', 'erro');
+        return;
+    }
+    if (tool === 'audio-cutter') {
+        if (item.pasta) return toast('Solte um arquivo de áudio.', 'erro');
+        return loadAudioCutterPath(item.path);
+    }
+    const aceita = pagina.dataset.drop;  // 'ambos' | 'arquivo' | 'pasta'
+    if (!aceita) return toast('Esta ferramenta não recebe arquivos arrastados.', 'info');
+    if (aceita === 'pasta' && !item.pasta) return toast('Aqui é preciso soltar uma pasta.', 'erro');
+    if (aceita === 'arquivo' && item.pasta) return toast('Aqui é preciso soltar um arquivo.', 'erro');
+    if (itens.length > 1 && !item.pasta) toast('Vários arquivos soltos: usando o primeiro. Para vários, solte a pasta.', 'info');
+    setSelecao(tool, item.path, item.pasta ? 'folder' : 'file');
+}
+
+(function _instalarArrastar() {
+    let profundidade = 0;
+    document.addEventListener('dragenter', e => {
+        if (e.dataTransfer?.types?.includes('Files')) { profundidade++; document.body.classList.add('arrastando'); }
+    });
+    document.addEventListener('dragleave', () => {
+        if (--profundidade <= 0) { profundidade = 0; document.body.classList.remove('arrastando'); }
+    });
+    // Sem isso o navegador interno tenta abrir o arquivo em vez de disparar o drop
+    document.addEventListener('dragover', e => e.preventDefault());
+    document.addEventListener('drop', e => { e.preventDefault(); profundidade = 0; document.body.classList.remove('arrastando'); });
+})();
+
+function atualizarOpcoesDownloader() {
+    const mp3 = document.querySelector('input[name="vd-format"]:checked').value === 'mp3';
+    _el('vd-qualidade-row').style.display = mp3 ? 'none' : '';
+}
+
 // Helper para tocar som
 function playClick() {
     const audio = document.getElementById('audio-click');
@@ -92,98 +297,48 @@ function switchTool(toolId) {
 // Selecionar pasta
 function selectFolder(tool) {
     window.pywebview.api.select_folder(tool).then(result => {
-        if (result.success) {
+        if (!result.success) return;
+        if (tool === 'video-downloader') {
             selectedPaths[tool] = result.path;
-            selectedTypes[tool] = 'folder';
-            const infoEl = document.getElementById(`${tool}-selected`);
-            if (infoEl) {
-                infoEl.textContent = `📁 Pasta: ${result.path}`;
-                infoEl.style.color = '#10B981';
-            }
-            showMessage(tool, `Pasta selecionada: ${result.path}`, 'success');
-
-            // Revela botão de ação se existir wrap escondido
-            const wrap = document.getElementById(`btn-organizar-${tool}-wrap`);
-            if (wrap) wrap.style.display = 'block';
-        } else {
-            showMessage(tool, result.error || 'Erro ao selecionar pasta', 'error');
+            _el('video-downloader-selected').textContent = result.path;
+            return;
         }
+        setSelecao(tool, result.path, 'folder');
     });
 }
 
 // Selecionar arquivo
 function selectFile(tool) {
     window.pywebview.api.select_file(tool).then(result => {
-        if (result.success) {
-            selectedPaths[tool] = result.path;
-            selectedTypes[tool] = 'file';
-            const infoEl = document.getElementById(`${tool}-selected`);
-            if (infoEl) {
-                infoEl.textContent = `📄 Arquivo: ${result.path}`;
-                infoEl.style.color = '#10B981';
-            }
-            showMessage(tool, `Arquivo selecionado: ${result.path}`, 'success');
-        } else {
-            showMessage(tool, result.error || 'Erro ao selecionar arquivo', 'error');
-        }
+        if (result.success) setSelecao(tool, result.path, 'file');
     });
 }
 
 // Selecionar imagem
 function selectImage(tool) {
     window.pywebview.api.select_image(tool).then(result => {
-        if (result.success) {
-            selectedPaths[tool] = result.path;
-            const fileName = result.path.split(/[/\\]/).pop();
-            document.getElementById(`${tool}-selected-file`).textContent = `🖼️ ${fileName}`;
-        } else {
-            showMessage(tool, result.error || 'Erro ao selecionar imagem', 'error');
-        }
+        if (result.success) setSelecao(tool, result.path, 'file');
     });
 }
+
 
 // =========================
 // Converter Áudio
 // =========================
 
 function runConverterAudio() {
+    const path = _exigirSelecao('converter-audio');
+    if (!path) return;
     const format = document.querySelector('input[name="audio-format"]:checked').value;
-    const path = selectedPaths['converter-audio'];
-    const type = selectedTypes['converter-audio'];
-
-    if (!path) {
-        showMessage('converter-audio', 'Selecione uma pasta ou arquivo primeiro!', 'error');
-        return;
-    }
-    
-    playExecute();
-
-    document.getElementById('progress-converter-audio').style.display = 'flex';
-    document.getElementById('progress-fill-converter-audio').style.width = '0%';
-    document.getElementById('progress-text-converter-audio').textContent = '0%';
-    document.getElementById('log-converter-audio').textContent = '';
-
-    if (type === 'file') {
-        window.pywebview.api.converter_audio_file(path, format);
-    } else {
-        window.pywebview.api.converter_audio(path, format);
-    }
+    uiIniciar('converter-audio');
+    window.pywebview.api.converter_audio(path, format);
 }
 
 // Callback para atualizar progresso do conversor de áudio
 function updateConverterAudioProgress(data) {
-    if (data.percent !== undefined) {
-        document.getElementById('progress-fill-converter-audio').style.width = data.percent + '%';
-        document.getElementById('progress-text-converter-audio').textContent = data.percent + '%';
-    }
-    if (data.log) {
-        document.getElementById('log-converter-audio').textContent += data.log + '\n';
-    }
-    if (data.complete) {
-        playConcluido();
-        showMessage('converter-audio', 'Conversão concluída!', 'success');
-    }
+    uiAtualizar('converter-audio', data);
 }
+
 
 // =========================
 // Cortar Audio
@@ -686,11 +841,13 @@ async function loadAudioWaveform(url) {
 
 function selectAudioCutterFile() {
     window.pywebview.api.select_file('audio-cutter').then(result => {
-        if (!result.success) {
-            showMessage('audio-cutter', result.error || 'Erro ao selecionar arquivo', 'error');
-            return;
-        }
+        if (result.success) loadAudioCutterPath(result.path);
+    });
+}
 
+function loadAudioCutterPath(path) {
+    const result = { path };
+    {
         playExecute();
         const selected = document.getElementById('audio-cutter-selected');
         if (selected) {
@@ -753,9 +910,9 @@ function selectAudioCutterFile() {
             if (!audioCutterState.peaks.length) {
                 loadAudioWaveform(preview.preview_url);
             }
-            showMessage('audio-cutter', 'Audio carregado. Use a agulha para editar a timeline.', 'success');
+            showMessage('audio-cutter', 'Áudio carregado. Use a agulha para editar a timeline.', 'success');
         });
-    });
+    }
 }
 
 function addAudioLayer() {
@@ -1380,321 +1537,146 @@ document.addEventListener('DOMContentLoaded', () => {
 // =========================
 
 function runConverterImagem() {
+    const path = _exigirSelecao('converter-imagem');
+    if (!path) return;
     const format = document.querySelector('input[name="img-format"]:checked').value;
-    const path = selectedPaths['converter-imagem'];
-    const type = selectedTypes['converter-imagem'];
-
-    if (!path) {
-        showMessage('converter-imagem', 'Selecione uma pasta ou arquivo primeiro!', 'error');
-        return;
-    }
-    
-    playExecute();
-
-    document.getElementById('progress-converter-imagem').style.display = 'flex';
-    document.getElementById('progress-fill-converter-imagem').style.width = '0%';
-    document.getElementById('progress-text-converter-imagem').textContent = '0%';
-    document.getElementById('log-converter-imagem').textContent = '';
-
-    if (type === 'file') {
-        window.pywebview.api.converter_imagem_file(path, format);
-    } else {
-        window.pywebview.api.converter_imagem(path, format);
-    }
+    uiIniciar('converter-imagem');
+    window.pywebview.api.converter_imagem(path, format);
 }
 
 // Callback para atualizar progresso do conversor de imagem
 function updateConverterImagemProgress(data) {
-    if (data.percent !== undefined) {
-        document.getElementById('progress-fill-converter-imagem').style.width = data.percent + '%';
-        document.getElementById('progress-text-converter-imagem').textContent = data.percent + '%';
-    }
-    if (data.log) {
-        document.getElementById('log-converter-imagem').textContent += data.log + '\n';
-    }
-    if (data.complete) {
-        playConcluido();
-        showMessage('converter-imagem', 'Conversão concluída!', 'success');
-    }
+    uiAtualizar('converter-imagem', data);
 }
+
 
 // =========================
 // Favicon Generator
 // =========================
 
 function runFaviconGenerator() {
-    const siteName = document.getElementById('favicon-site-name').value;
-    const themeColor = document.getElementById('favicon-theme-color').value;
-    const imagePath = selectedPaths['favicon'];
-
-    if (!imagePath) {
-        showMessage('favicon', 'Selecione uma imagem primeiro!', 'error');
-        return;
-    }
-    
-    playExecute();
-    document.getElementById('progress-favicon').style.display = 'flex';
-    document.getElementById('progress-fill-favicon').style.width = '0%';
-    document.getElementById('progress-text-favicon').textContent = '0%';
-    document.getElementById('log-favicon').textContent = '';
-
-    window.pywebview.api.favicon_generator(imagePath, siteName, themeColor);
+    const imagePath = _exigirSelecao('favicon', 'Escolha a imagem do logo primeiro.');
+    if (!imagePath) return;
+    uiIniciar('favicon');
+    window.pywebview.api.favicon_generator(imagePath, _el('favicon-site-name').value, _el('favicon-theme-color').value);
 }
+
 
 function updateFaviconProgress(data) {
-    if (data.percent !== undefined) {
-        document.getElementById('progress-fill-favicon').style.width = data.percent + '%';
-        document.getElementById('progress-text-favicon').textContent = data.percent + '%';
-    }
-    if (data.log) {
-        document.getElementById('log-favicon').textContent += data.log + '\n';
-    }
-    if (data.complete) {
-        playConcluido();
-        showMessage('favicon', 'Favicons gerados com sucesso!', 'success');
-    }
+    uiAtualizar('favicon', data);
 }
+
 
 // =========================
 // Compressor de Imagem
 // =========================
 
-document.getElementById('compressor-img-quality')?.addEventListener('input', function() {
-    document.getElementById('compressor-img-quality-val').textContent = this.value + '%';
-});
 
 function runCompressorImagem() {
-    const path = selectedPaths['compressor-imagem'];
-    const type = selectedTypes['compressor-imagem'];
-    const forceFullhd = document.getElementById('compressor-img-fullhd')?.checked || false;
-
-    if (!path) {
-        showMessage('compressor-imagem', 'Selecione uma pasta ou arquivo primeiro!', 'error');
-        return;
-    }
-    
-    playExecute();
-    document.getElementById('progress-compressor-imagem').style.display = 'flex';
-    document.getElementById('progress-fill-compressor-imagem').style.width = '0%';
-    document.getElementById('progress-text-compressor-imagem').textContent = '0%';
-    document.getElementById('log-compressor-imagem').textContent = '';
-
-    if (type === 'file') {
-        window.pywebview.api.compressor_imagem_file(path, forceFullhd);
-    } else {
-        window.pywebview.api.compressor_imagem(path, forceFullhd);
-    }
+    const path = _exigirSelecao('compressor-imagem');
+    if (!path) return;
+    uiIniciar('compressor-imagem');
+    window.pywebview.api.compressor_imagem(path, _el('compressor-img-fullhd')?.checked || false);
 }
+
 
 function updateCompressorImagemProgress(data) {
-    if (data.percent !== undefined) {
-        document.getElementById('progress-fill-compressor-imagem').style.width = data.percent + '%';
-        document.getElementById('progress-text-compressor-imagem').textContent = data.percent + '%';
-    }
-    if (data.log) {
-        const logEl = document.getElementById('log-compressor-imagem');
-        logEl.textContent += data.log + '\n';
-        logEl.scrollTop = logEl.scrollHeight;
-    }
-    if (data.complete) {
-        playConcluido();
-        showMessage('compressor-imagem', 'Compressão concluída!', 'success');
-    }
+    uiAtualizar('compressor-imagem', data);
 }
+
 
 // =========================
 // Compressor de Vídeo
 // =========================
 
 function updateCompressorVideoProgress(data) {
-    if (data.percent !== undefined) {
-        document.getElementById('progress-fill-compressor-video').style.width = data.percent + '%';
-        document.getElementById('progress-text-compressor-video').textContent = data.percent + '%';
-    }
-    if (data.status) {
-        document.getElementById('progress-text-compressor-video').textContent = data.status;
-    }
-    if (data.log) {
-        document.getElementById('log-compressor-video').textContent += data.log + '\n';
-        const logSection = document.getElementById('log-compressor-video');
-        logSection.scrollTop = logSection.scrollHeight;
-    }
-    if (data.complete) {
-        playConcluido();
-        showMessage('compressor-video', 'Compressão concluída!', 'success');
-    }
+    uiAtualizar('compressor-video', data);
 }
+
 
 function runCompressorVideo() {
-    try {
-        const gpu  = document.querySelector('input[name="video-gpu"]:checked').value;
-        const mode = document.querySelector('input[name="video-mode"]:checked').value;
-        const path = selectedPaths['compressor-video'];
-        const type = selectedTypes['compressor-video'];
-
-        if (!path) {
-            showMessage('compressor-video', 'Selecione uma pasta ou arquivo primeiro!', 'error');
-            return;
-        }
-        
-        playExecute();
-        document.getElementById('progress-compressor-video').style.display = 'flex';
-        document.getElementById('progress-fill-compressor-video').style.width = '0%';
-        document.getElementById('progress-text-compressor-video').textContent = '0%';
-        document.getElementById('log-compressor-video').textContent = 'Iniciando...\n';
-
-        if (type === 'file') {
-            window.pywebview.api.compressor_video_file(path, mode, gpu);
-        } else {
-            window.pywebview.api.compressor_video(path, mode, gpu);
-        }
-    } catch(e) {
-        showMessage('compressor-video', 'Erro: ' + e, 'error');
-    }
+    const path = _exigirSelecao('compressor-video');
+    if (!path) return;
+    const gpu = document.querySelector('input[name="video-gpu"]:checked').value;
+    const mode = document.querySelector('input[name="video-mode"]:checked').value;
+    const qualidade = document.querySelector('input[name="video-qualidade"]:checked').value;
+    uiIniciar('compressor-video', 'Analisando vídeo(s)...');
+    window.pywebview.api.compressor_video(path, mode, gpu, qualidade);
 }
+
 
 // =========================
 // Video Converter
 // =========================
 
 function runVideoConverter() {
+    const path = _exigirSelecao('video-converter');
+    if (!path) return;
     const format = document.querySelector('input[name="video-format"]:checked').value;
-    const path = selectedPaths['video-converter'];
-    const type = selectedTypes['video-converter'];
-
-    if (!path) {
-        showMessage('video-converter', 'Selecione uma pasta ou arquivo primeiro!', 'error');
-        return;
-    }
-    
-    playExecute();
-    document.getElementById('progress-video-converter').style.display = 'flex';
-    document.getElementById('progress-fill-video-converter').style.width = '0%';
-    document.getElementById('progress-text-video-converter').textContent = '0%';
-    document.getElementById('log-video-converter').textContent = '';
-
-    if (type === 'file') {
-        window.pywebview.api.video_converter_file(path, format);
-    } else {
-        window.pywebview.api.video_converter(path, format);
-    }
+    uiIniciar('video-converter');
+    window.pywebview.api.video_converter(path, format);
 }
+
 
 function updateVideoConverterProgress(data) {
-    if (data.percent !== undefined) {
-        document.getElementById('progress-fill-video-converter').style.width = data.percent + '%';
-        document.getElementById('progress-text-video-converter').textContent = data.percent + '%';
-    }
-    if (data.log) {
-        document.getElementById('log-video-converter').textContent += data.log + '\n';
-    }
-    if (data.complete) {
-        playConcluido();
-        showMessage('video-converter', 'Conversão concluída!', 'success');
-    }
+    uiAtualizar('video-converter', data);
 }
+
 
 // =========================
 // Video Downloader
 // =========================
 
 function getVideoInfo() {
-    const url = document.getElementById('video-url').value;
-    if (!url) {
-        showMessage('video-downloader', 'Digite uma URL primeiro!', 'error');
-        return;
-    }
-    
-    playExecute();
-    showMessage('video-downloader', 'Verificando vídeo...', 'info');
-    
+    const url = _el('video-url').value.trim();
+    if (!url) return toast('Cole o link do vídeo primeiro.', 'erro');
+    const card = _el('video-info');
+    card.style.display = 'flex';
+    _el('video-title').textContent = 'Verificando...';
+    _el('video-thumbnail').style.display = 'none';
+    ['video-duration', 'video-provider', 'video-size'].forEach(id => _el(id).textContent = '');
+
     window.pywebview.api.video_downloader_info(url).then(result => {
-        if (result.success) {
-            const thumbEl = document.getElementById('video-thumbnail');
-            document.getElementById('video-info').style.display = 'flex';
-            document.getElementById('video-title').textContent = result.info.title || 'Sem título';
-            
-            // Preferir thumbnail local, senão usar URL
-            const localThumb = result.info.thumbnail || '';
-            const remoteThumb = result.info.thumbnail_url || '';
-            
-            thumbEl.style.display = 'block';
-            thumbEl.src = localThumb;
-            
-            // Se falhar o local (bloqueio de browser), tenta a URL original
-            thumbEl.onerror = function() {
-                if (this.src !== remoteThumb && remoteThumb) {
-                    this.src = remoteThumb;
-                } else {
-                    this.style.display = 'none';
-                }
-            };
-            
-            document.getElementById('video-provider').textContent = 'Provider: ' + (result.info.provider || 'Desconhecido');
-            
-            // Format duration
-            const duration = result.info.duration || 0;
-            const minutes = Math.floor(duration / 60);
-            const seconds = duration % 60;
-            document.getElementById('video-duration').textContent = `Duração: ${minutes}:${seconds.toString().padStart(2, '0')}`;
-            
-            const sizeText = result.info.filesize_mb > 0 ? `Tamanho: ~${result.info.filesize_mb} MB` : 'Tamanho não disponível';
-            document.getElementById('video-size').textContent = sizeText;
-            
-            showMessage('video-downloader', 'Vídeo encontrado!', 'success');
-        } else {
-            showMessage('video-downloader', result.error || 'Erro ao obter info', 'error');
-            document.getElementById('video-info').style.display = 'none';
+        if (!result.success) {
+            card.style.display = 'none';
+            return toast(result.error || 'Não foi possível ler o link.', 'erro', 8000);
         }
+        const info = result.info;
+        const thumbEl = _el('video-thumbnail');
+        _el('video-title').textContent = info.title || 'Sem título';
+        thumbEl.style.display = 'block';
+        thumbEl.onerror = function () {
+            if (info.thumbnail_url && this.src !== info.thumbnail_url) this.src = info.thumbnail_url;
+            else this.style.display = 'none';
+        };
+        thumbEl.src = info.thumbnail || info.thumbnail_url || '';
+        const d = Number(info.duration) || 0;
+        const h = Math.floor(d / 3600), m = Math.floor(d % 3600 / 60), s = d % 60;
+        _el('video-duration').textContent = d ? (h ? `${h}:${String(m).padStart(2, '0')}` : m) + `:${String(s).padStart(2, '0')}` : '';
+        _el('video-provider').textContent = info.provider || '';
+        _el('video-size').textContent = info.filesize_mb > 0 ? `~${info.filesize_mb} MB` : '';
     }).catch(err => {
-        showMessage('video-downloader', 'Erro: ' + err, 'error');
-        document.getElementById('video-info').style.display = 'none';
+        card.style.display = 'none';
+        toast('Erro: ' + err, 'erro');
     });
 }
 
+
 function runVideoDownloader() {
-    const url = document.getElementById('video-url').value.trim();
-    const destino = selectedPaths['video-downloader'] || '';
+    if (_rodando['video-downloader']) return;
+    const url = _el('video-url').value.trim();
+    if (!url) return toast('Cole o link do vídeo primeiro.', 'erro');
     const formato = document.querySelector('input[name="vd-format"]:checked').value;
-
-    if (!url) {
-        showMessage('video-downloader', 'Digite uma URL primeiro!', 'error');
-        return;
-    }
-    if (!destino) {
-        showMessage('video-downloader', 'Selecione a pasta de destino antes de baixar!', 'error');
-        return;
-    }
-    
-    playExecute();
-    document.getElementById('progress-video-downloader').style.display = 'flex';
-    document.getElementById('progress-fill-video-downloader').style.width = '0%';
-    document.getElementById('progress-text-video-downloader').textContent = '0%';
-    document.getElementById('log-video-downloader').textContent = '';
-
-    window.pywebview.api.video_downloader(url, destino, formato);
+    const qualidade = document.querySelector('input[name="vd-qualidade"]:checked').value;
+    uiIniciar('video-downloader', 'Conectando...');
+    window.pywebview.api.video_downloader(url, selectedPaths['video-downloader'] || '', formato, qualidade);
 }
+
 
 function updateVideoDownloaderProgress(data) {
-    if (data.percent !== undefined) {
-        const pct = Math.min(100, Math.max(0, data.percent));
-        document.getElementById('progress-fill-video-downloader').style.width = pct + '%';
-        document.getElementById('progress-text-video-downloader').textContent = Math.round(pct) + '%';
-    }
-    if (data.log) {
-        const logEl = document.getElementById('log-video-downloader');
-        logEl.textContent += data.log + '\n';
-        logEl.scrollTop = logEl.scrollHeight;
-    }
-    if (data.complete) {
-        if (data.error) {
-            showMessage('video-downloader', 'Erro no download. Veja o log.', 'error');
-        } else {
-            playConcluido();
-            showMessage('video-downloader', 'Download concluído!', 'success');
-        }
-    }
+    uiAtualizar('video-downloader', data);
 }
+
 
 // =========================
 // Web Scraper
@@ -1709,162 +1691,63 @@ function selectScraperDestino() {
 }
 
 function runWebScraperAnalyze() {
-    const url = document.getElementById('scraper-url').value;
-
-    if (!url) {
-        showMessage('web-scraper', 'Digite uma URL primeiro!', 'error');
-        return;
-    }
-    
-    playExecute();
-    document.getElementById('progress-web-scraper').style.display = 'flex';
-    document.getElementById('progress-fill-web-scraper').style.width = '0%';
-    document.getElementById('log-web-scraper').textContent = '';
-    document.getElementById('progress-text-web-scraper').textContent = 'Analisando...';
-    scraperLogBuffer = [];
-
+    const url = _el('scraper-url').value.trim();
+    if (!url) return toast('Digite o endereço da página.', 'erro');
+    _el('scraper-result-box').style.display = 'none';
+    toast('Analisando a página...', 'info', 2500);
     window.pywebview.api.web_scraper_analyze(url).then(result => {
         if (!result || !result.success) {
-            showMessage('web-scraper', (result && result.error) || 'Falha ao analisar a página', 'error');
-            return;
+            return toast((result && result.error) || 'Falha ao analisar a página', 'erro', 8000);
         }
-
         scraperLastAnalyzedUrl = url;
-        document.getElementById('scraper-result-box').style.display = 'block';
-        document.getElementById('scraper-count-images').textContent = `Imagens: ${result.qtd_imagens || 0}`;
-        document.getElementById('scraper-count-videos').textContent = `Vídeos: ${result.qtd_videos || 0}`;
-        document.getElementById('progress-fill-web-scraper').style.width = '100%';
-        document.getElementById('progress-text-web-scraper').textContent = 'Análise concluída';
-        playConcluido();
-        showMessage('web-scraper', 'Análise concluída! Agora escolha o que deseja baixar.', 'success');
-    }).catch(err => {
-        showMessage('web-scraper', 'Erro ao analisar: ' + err, 'error');
-    });
+        _el('scraper-result-box').style.display = 'flex';
+        _el('scraper-count-images').textContent = `🖼️ ${result.qtd_imagens || 0} imagens`;
+        _el('scraper-count-videos').textContent = `🎬 ${result.qtd_videos || 0} vídeos`;
+    }).catch(err => toast('Erro ao analisar: ' + err, 'erro'));
 }
 
+
 function runWebScraperDownload() {
-    const url = document.getElementById('scraper-url').value;
-    const destino = document.getElementById('scraper-destino').value || '';
+    if (_rodando['web-scraper']) return;
+    const url = _el('scraper-url').value.trim();
+    const destino = _el('scraper-destino').value || '';
     const mode = document.querySelector('input[name="scraper-download-mode"]:checked').value;
-
-    if (!url) {
-        showMessage('web-scraper', 'Digite uma URL primeiro!', 'error');
-        return;
-    }
-    if (!destino) {
-        showMessage('web-scraper', 'Selecione uma pasta de destino para o download.', 'error');
-        return;
-    }
-    
-    if (!scraperLastAnalyzedUrl || scraperLastAnalyzedUrl !== url) {
-        showMessage('web-scraper', 'Analise a URL antes de baixar.', 'error');
-        return;
-    }
-    
-    playExecute();
-    document.getElementById('progress-web-scraper').style.display = 'flex';
-    document.getElementById('progress-fill-web-scraper').style.width = '0%';
-    document.getElementById('progress-text-web-scraper').textContent = 'Baixando...';
-    document.getElementById('log-web-scraper').textContent = '';
-    scraperLogBuffer = [];
-
+    if (!url) return toast('Digite o endereço da página.', 'erro');
+    if (!scraperLastAnalyzedUrl || scraperLastAnalyzedUrl !== url) return toast('Clique em Analisar antes de baixar.', 'erro');
+    if (!destino) return toast('Escolha a pasta onde salvar.', 'erro');
+    uiIniciar('web-scraper', 'Baixando...');
     window.pywebview.api.web_scraper_download(url, mode, destino);
 }
 
+
 function updateWebScraperProgress(data) {
-    const progressText = document.getElementById('progress-text-web-scraper');
-    const progressFill = document.getElementById('progress-fill-web-scraper');
-    let currentPct = null;
-
-    if (data.percent !== undefined) {
-        currentPct = Math.max(0, Math.min(100, Number(data.percent) || 0));
-        progressFill.style.width = currentPct + '%';
-        progressText.textContent = Math.round(currentPct) + '%';
-    }
-    if (data.status) {
-        if (currentPct !== null) {
-            progressText.textContent = `${Math.round(currentPct)}% • ${data.status}`;
-        } else {
-            progressText.textContent = data.status;
-        }
-    }
-    if (data.log) {
-        const msg = String(data.log || '').trim();
-        if (msg) {
-            const isStatusLike =
-                msg.startsWith('Baixando vídeo ') ||
-                msg.startsWith('Extraindo ZIP') ||
-                msg.startsWith('Organizando imagens') ||
-                msg.startsWith('Analisando') ||
-                msg.startsWith('Baixando imagens');
-
-            if (isStatusLike) {
-                document.getElementById('progress-text-web-scraper').textContent = msg;
-            } else {
-                const last = scraperLogBuffer[scraperLogBuffer.length - 1];
-                if (last !== msg) {
-                    scraperLogBuffer.push(msg);
-                    if (scraperLogBuffer.length > 6) {
-                        scraperLogBuffer = scraperLogBuffer.slice(-6);
-                    }
-                }
-                document.getElementById('log-web-scraper').textContent = scraperLogBuffer.join('\n');
-            }
-        }
-    }
-    if (data.complete) {
-        playConcluido();
-        showMessage('web-scraper', 'Download concluído!', 'success');
-    }
+    uiAtualizar('web-scraper', data);
 }
+
 
 // =========================
 // Transcrever Áudio
 // =========================
 
 function runTranscreverAudio() {
-    const path = selectedPaths['transcrever-audio'];
-    const type = selectedTypes['transcrever-audio'];
+    const path = _exigirSelecao('transcrever-audio');
+    if (!path) return;
     const model = document.querySelector('input[name="whisper-model"]:checked').value;
-    const language = document.getElementById('whisper-language').value;
-
-    if (!path) {
-        showMessage('transcrever-audio', 'Selecione uma pasta ou arquivo primeiro!', 'error');
-        return;
-    }
-    
-    playExecute();
-    document.getElementById('progress-transcrever-audio').style.display = 'flex';
-    document.getElementById('progress-fill-transcrever-audio').style.width = '0%';
-    document.getElementById('log-transcrever-audio').textContent = '';
-
-    if (type === 'file') {
-        window.pywebview.api.transcrever_audio_file(path, model, language);
-    } else {
-        window.pywebview.api.transcrever_audio(path, model, language);
-    }
+    uiIniciar('transcrever-audio', 'Carregando modelo...');
+    window.pywebview.api.transcrever_audio(path, model, _el('whisper-language').value);
 }
+
 
 let _transcricaoPastaOrigem = '';
 
 function updateTranscreverAudioProgress(data) {
-    if (data.percent !== undefined) {
-        document.getElementById('progress-fill-transcrever-audio').style.width = data.percent + '%';
-        document.getElementById('progress-text-transcrever-audio').textContent = data.percent + '%';
-    }
-    if (data.log) {
-        document.getElementById('log-transcrever-audio').textContent += data.log + '\n';
-    }
-    if (data.complete) {
-        playConcluido();
-        if (data.texto && data.texto.trim()) {
-            _transcricaoPastaOrigem = data.pasta_origem || '';
-            abrirModalTranscricao(data.texto);
-        } else {
-            showMessage('transcrever-audio', 'Transcrição concluída!', 'success');
-        }
+    uiAtualizar('transcrever-audio', data);
+    if (data.complete && !data.error && data.texto && data.texto.trim()) {
+        _transcricaoPastaOrigem = data.pasta_origem || '';
+        abrirModalTranscricao(data.texto);
     }
 }
+
 
 function abrirModalTranscricao(texto) {
     document.getElementById('transcricao-modal-texto').value = texto;
@@ -1896,43 +1779,20 @@ function salvarTranscricaoTxt() {
 // =========================
 
 function runRemoverFundo() {
-    const path = selectedPaths['remover-fundo'];
-    const type = selectedTypes['remover-fundo'];
-
-    if (!path) {
-        showMessage('remover-fundo', 'Selecione uma pasta ou arquivo primeiro!', 'error');
-        return;
-    }
-    
-    playExecute();
-    document.getElementById('progress-remover-fundo').style.display = 'flex';
-    document.getElementById('progress-fill-remover-fundo').style.width = '0%';
-    document.getElementById('log-remover-fundo').textContent = '';
-
-    if (type === 'file') {
-        window.pywebview.api.remover_fundo_file(path);
-    } else {
-        window.pywebview.api.remover_fundo(path);
-    }
+    const path = _exigirSelecao('remover-fundo');
+    if (!path) return;
+    uiIniciar('remover-fundo', 'Carregando modelo de IA...');
+    window.pywebview.api.remover_fundo(path);
 }
+
 
 function updateRemoverFundoProgress(data) {
-    if (data.percent !== undefined) {
-        document.getElementById('progress-fill-remover-fundo').style.width = data.percent + '%';
-        document.getElementById('progress-text-remover-fundo').textContent = data.percent + '%';
-    }
-    if (data.log) {
-        document.getElementById('log-remover-fundo').textContent += data.log + '\n';
-    }
-    if (data.complete) {
-        if (data.resultados && data.resultados.length > 0) {
-            abrirModalRF(data.resultados);
-        } else {
-            playConcluido();
-            showMessage('remover-fundo', 'Processamento concluído!', 'success');
-        }
+    uiAtualizar('remover-fundo', data);
+    if (data.complete && !data.error && data.resultados && data.resultados.length) {
+        abrirModalRF(data.resultados);
     }
 }
+
 
 // =========================
 // Modal Remover Fundo
@@ -2002,50 +1862,36 @@ async function copiarRFAtual() {
 async function salvarRFAtual() {
     const result = await window.pywebview.api.select_folder('remover-fundo-save');
     if (!result || !result.success) return;
-    window.pywebview.api.remover_fundo_salvar([_rfIndexAtual], result.path);
+    const r = await window.pywebview.api.remover_fundo_salvar([_rfIndexAtual], result.path);
+    toast(r && r.success ? 'Imagem salva.' : ('Erro ao salvar: ' + (r && r.error)), r && r.success ? 'ok' : 'erro');
 }
+
 
 async function salvarRFTodas() {
     const result = await window.pywebview.api.select_folder('remover-fundo-save');
     if (!result || !result.success) return;
-    const indices = _rfResultados.map((_, i) => i);
-    window.pywebview.api.remover_fundo_salvar(indices, result.path);
+    const r = await window.pywebview.api.remover_fundo_salvar(_rfResultados.map((_, i) => i), result.path);
+    toast(r && r.success ? `${r.saved} imagem(ns) salvas.` : ('Erro ao salvar: ' + (r && r.error)), r && r.success ? 'ok' : 'erro');
 }
+
 
 // =========================
 // Organizador de Imagens
 // =========================
 
 function runOrganizadorImagens() {
-    const folderPath = selectedPaths['organizador-imagens'];
+    const folderPath = _exigirSelecao('organizador-imagens', 'Escolha (ou arraste) a pasta primeiro.');
+    if (!folderPath) return;
     const modo = document.querySelector('input[name="organizador-imagens-modo"]:checked')?.value || 'completa';
-
-    if (!folderPath) {
-        showMessage('organizador-imagens', 'Selecione uma pasta primeiro!', 'error');
-        return;
-    }
-    
-    playExecute();
-    document.getElementById('progress-organizador-imagens').style.display = 'flex';
-    document.getElementById('progress-fill-organizador-imagens').style.width = '0%';
-    document.getElementById('log-organizador-imagens').textContent = '';
-
+    uiIniciar('organizador-imagens');
     window.pywebview.api.organizador_imagens(folderPath, modo);
 }
 
+
 function updateOrganizadorImagensProgress(data) {
-    if (data.percent !== undefined) {
-        document.getElementById('progress-fill-organizador-imagens').style.width = data.percent + '%';
-        document.getElementById('progress-text-organizador-imagens').textContent = data.percent + '%';
-    }
-    if (data.log) {
-        document.getElementById('log-organizador-imagens').textContent += data.log + '\n';
-    }
-    if (data.complete) {
-        playConcluido();
-        showMessage('organizador-imagens', 'Organização concluída!', 'success');
-    }
+    uiAtualizar('organizador-imagens', data);
 }
+
 
 // =========================
 // Organizador de Vídeos
@@ -2054,52 +1900,51 @@ function updateOrganizadorImagensProgress(data) {
 let _pastaOrganizadorVideos = null;
 
 function _resetOrganizadorVideosProgress() {
-    document.getElementById('progress-organizador-videos').style.display = 'flex';
-    document.getElementById('progress-fill-organizador-videos').style.width = '0%';
-    document.getElementById('progress-text-organizador-videos').textContent = '0%';
-    document.getElementById('organizador-videos-fase').textContent = '—';
-    document.getElementById('log-organizador-videos').textContent = '';
+    const card = _el('progress-organizador-videos');
+    card.hidden = false;
+    card.classList.remove('ok', 'erro');
+    _el('progress-fill-organizador-videos').style.width = '0%';
+    _el('progress-text-organizador-videos').textContent = '0%';
+    _el('organizador-videos-fase').textContent = 'Analisando...';
+    _el('log-organizador-videos').textContent = '';
 }
 
+
 function runOrganizadorVideosScan() {
-    const folderPath = selectedPaths['organizador-videos'];
-    if (!folderPath) {
-        showMessage('organizador-videos', 'Selecione uma pasta primeiro!', 'error');
-        return;
-    }
+    const folderPath = _exigirSelecao('organizador-videos', 'Escolha (ou arraste) a pasta do job primeiro.');
+    if (!folderPath) return;
     _pastaOrganizadorVideos = folderPath;
     playExecute();
     _resetOrganizadorVideosProgress();
     window.pywebview.api.escanear_cameras_videos(folderPath);
 }
 
+
 function showCameraPopup(cameras) {
-    const lista = document.getElementById('cameras-list');
+    const lista = _el('cameras-list');
     lista.innerHTML = '';
-
     if (!cameras || cameras.length === 0) {
-        showMessage('organizador-videos', 'Nenhuma câmera identificada na pasta.', 'error');
-        return;
+        _el('organizador-videos-fase').textContent = 'Nenhuma câmera identificada';
+        return toast('Nenhuma câmera identificada na pasta.', 'erro');
     }
-
+    _el('organizador-videos-fase').textContent = `${cameras.length} câmera(s) encontrada(s)`;
     cameras.forEach(cam => {
         const row = document.createElement('div');
         row.className = 'camera-row';
         row.innerHTML = `
             <div class="camera-info">
-                <span class="camera-ordem">${String(cam.ordem).padStart(2,'0')}</span>
-                <span class="camera-nome">${cam.pai}</span>
+                <span class="camera-ordem">${String(cam.ordem).padStart(2, '0')}</span>
+                <span class="camera-nome">${_escHtml(cam.pai)}</span>
                 <span class="camera-stats">${cam.videos}v ${cam.fotos}f ${cam.audios}a</span>
-                <span class="camera-data">📅 ${cam.data_mais_antiga}</span>
+                <span class="camera-data">📅 ${_escHtml(cam.data_mais_antiga)}</span>
             </div>
-            <input type="text" class="camera-operador" placeholder="Operador (opcional)"
-                   data-pai="${cam.pai}">
-        `;
+            <input type="text" class="camera-operador" placeholder="Operador (opcional)">`;
+        row.querySelector('.camera-operador').dataset.pai = cam.pai;
         lista.appendChild(row);
     });
-
-    document.getElementById('modal-cameras').style.display = 'flex';
+    _el('modal-cameras').style.display = 'flex';
 }
+
 
 function fecharModalCameras() {
     document.getElementById('modal-cameras').style.display = 'none';
@@ -2123,20 +1968,18 @@ function confirmarOrganizacaoVideos() {
 
 function updateOrganizadorVideosProgress(data) {
     if (data.percent !== undefined) {
-        document.getElementById('progress-fill-organizador-videos').style.width = data.percent + '%';
-        document.getElementById('progress-text-organizador-videos').textContent = data.percent + '%';
+        _el('progress-fill-organizador-videos').style.width = data.percent + '%';
+        _el('progress-text-organizador-videos').textContent = Math.round(data.percent) + '%';
     }
-    if (data.status) {
-        document.getElementById('organizador-videos-fase').textContent = data.status;
-    }
-    if (data.log) {
-        document.getElementById('log-organizador-videos').textContent = data.log;
-    }
+    if (data.status) _el('organizador-videos-fase').textContent = data.status;
+    if (data.log) _el('log-organizador-videos').textContent = data.log;
     if (data.complete) {
+        _el('progress-organizador-videos').classList.add('ok');
         playConcluido();
-        showMessage('organizador-videos', 'Organização concluída!', 'success');
+        toast('Logger Pro: organização concluída!', 'ok');
     }
 }
+
 
 // =========================
 // GDrive
@@ -2144,19 +1987,12 @@ function updateOrganizadorVideosProgress(data) {
 
 function checkCerebroStatus() {
     window.pywebview.api.cerebro_exists().then(result => {
-        const statusEl = document.getElementById('cerebro-status');
-        const btnGen = document.getElementById('btn-generate-csv');
+        const statusEl = _el('cerebro-status');
+        const btnGen = _el('btn-generate-csv');
         if (!statusEl || !btnGen) return;
-
-        if (result.exists) {
-            statusEl.textContent = '✅ Cérebro carregado: ' + result.path;
-            statusEl.style.color = '#10B981';
-            btnGen.disabled = false;
-        } else {
-            statusEl.textContent = 'Nenhum .md carregado';
-            statusEl.style.color = '#888888';
-            btnGen.disabled = true;
-        }
+        statusEl.textContent = result.exists ? '✅ Regras carregadas: ' + result.path : 'Nenhum arquivo de regras (.md) carregado';
+        statusEl.style.color = result.exists ? 'var(--ok)' : '';
+        btnGen.disabled = !result.exists;
     });
 }
 
@@ -2169,35 +2005,25 @@ if (window.pywebview) {
 
 function loadCerebro() {
     window.pywebview.api.cerebro_select_file().then(result => {
-        if (result.success) {
-            checkCerebroStatus();
-            showMessage('web-scraper', 'Cérebro carregado!', 'success');
-        } else {
-            showMessage('web-scraper', result.error || 'Erro ao carregar', 'error');
-        }
+        if (result.success) { checkCerebroStatus(); toast('Regras carregadas!', 'ok'); }
+        else if (result.error) toast(result.error, 'erro');
     });
 }
+
 
 function removeCerebro() {
-    window.pywebview.api.cerebro_remove().then(result => {
-        checkCerebroStatus();
-        showMessage('web-scraper', 'Cérebro removido', 'success');
-    });
+    window.pywebview.api.cerebro_remove().then(() => { checkCerebroStatus(); toast('Regras removidas.', 'info'); });
 }
+
 
 function generateCSV() {
-    const url = document.getElementById('scraper-url').value;
-    if (!url) {
-        showMessage('web-scraper', 'Digite uma URL primeiro!', 'error');
-        return;
-    }
-    
-    playExecute();
-    document.getElementById('progress-web-scraper').style.display = 'flex';
-    document.getElementById('log-web-scraper').textContent = '';
-
+    if (_rodando['web-scraper']) return;
+    const url = _el('scraper-url').value.trim();
+    if (!url) return toast('Digite o endereço da página.', 'erro');
+    uiIniciar('web-scraper', 'Gerando CSV com IA local...');
     window.pywebview.api.web_scraper_csv(url);
 }
+
 
 // =========================
 // Google Drive
@@ -2212,7 +2038,7 @@ function checkGdriveConfig() {
         if (result.success) {
             statusDiv.innerHTML = result.configured 
                 ? '<span style="color: #10B981;">✅ Configurado</span>' 
-                : '<span style="color: #EF4444;">❌ Não configurado. Execute "rclone config" no terminal.</span>';
+                : '<span style="color: #F59E0B;">🔑 Ao analisar o primeiro link, o Google vai pedir sua autorização no navegador.</span>';
         } else {
             statusDiv.innerHTML = '<span style="color: #EF4444;">❌ Erro: ' + result.error + '</span>';
         }
@@ -2276,12 +2102,12 @@ function runGdriveDump() {
 
     if (!url) {
         document.getElementById('gdrive-msg').textContent = '❌ Digite uma URL primeiro!';
-        document.getElementById('progress-gdrive').style.display = 'flex';
+        document.getElementById('progress-gdrive').style.display = 'block';
         return;
     }
     if (!destino) {
         document.getElementById('gdrive-msg').textContent = '❌ Selecione a pasta de destino!';
-        document.getElementById('progress-gdrive').style.display = 'flex';
+        document.getElementById('progress-gdrive').style.display = 'block';
         return;
     }
     
@@ -2293,7 +2119,7 @@ function runGdriveDump() {
     document.getElementById('gdrive-action-buttons').style.display = 'none';
 
     // Mostra seção de progresso
-    document.getElementById('progress-gdrive').style.display = 'flex';
+    document.getElementById('progress-gdrive').style.display = 'block';
 
     // Chama API e trata retorno
     const perfil = (document.getElementById('gdrive-perfil') || {}).value || 'rapida';
@@ -2316,7 +2142,7 @@ function runGdriveDump() {
     document.getElementById('gdrive-transferring').innerHTML = '';
     _gdriveStatus('');
     const pauseBtn = document.getElementById('btn-gdrive-pause');
-    if (pauseBtn) { pauseBtn.textContent = '⏸ Pausar'; pauseBtn.style.background = '#D97706'; }
+    if (pauseBtn) pauseBtn.textContent = '⏸ Pausar';
 
     // Reseta painel de stats
     document.getElementById('gdrive-stats-panel').style.display = 'none';
@@ -2329,25 +2155,24 @@ function runGdriveDump() {
 let _gdrivePaused = false;
 
 function toggleGdrivePause() {
-    const btn = document.getElementById('btn-gdrive-pause');
+    const btn = _el('btn-gdrive-pause');
     _gdrivePaused = !_gdrivePaused;
     if (_gdrivePaused) {
         window.pywebview.api.gdrive_pause();
         btn.textContent = '▶ Retomar';
-        btn.style.background = '#059669';
     } else {
         window.pywebview.api.gdrive_resume();
         btn.textContent = '⏸ Pausar';
-        btn.style.background = '#D97706';
     }
 }
+
 
 function cancelGdriveDump() {
     const btn = document.getElementById('btn-gdrive-cancel');
     if (btn) { btn.disabled = true; btn.textContent = 'Cancelando...'; }
     // A UI é finalizada quando o backend emitir complete=true
     window.pywebview.api.gdrive_cancel().catch(() => {
-        if (btn) { btn.disabled = false; btn.textContent = '✖ Cancelar Download'; }
+        if (btn) { btn.disabled = false; btn.textContent = '✖ Cancelar'; }
     });
 }
 
@@ -2401,7 +2226,7 @@ function updateGdriveProgress(data) {
         el('btn-gdrive-baixar').disabled = false;
         el('gdrive-transferring').innerHTML = '';
         const cancelBtn = el('btn-gdrive-cancel');
-        if (cancelBtn) { cancelBtn.disabled = false; cancelBtn.textContent = '✖ Cancelar Download'; }
+        if (cancelBtn) { cancelBtn.disabled = false; cancelBtn.textContent = '✖ Cancelar'; }
         // Mantém a última mensagem visível fora da seção de progresso
         const final = data.log || el('gdrive-msg').textContent;
         _gdriveStatus('<span style="color:' + (data.success ? '#10B981' : '#EF4444') + ';">' + _escHtml(final) + '</span>');
@@ -2424,13 +2249,8 @@ function copyLog(tool) {
 // =========================
 
 function showMessage(tool, message, type) {
-    const logId = `log-${tool}`;
-    const logEl = document.getElementById(logId);
-    if (logEl) {
-        const prefix = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
-        logEl.textContent += `${prefix} ${message}\n`;
-        logEl.scrollTop = logEl.scrollHeight;
-    }
+    _logLinha(tool, `${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'} ${message}`);
+    if (type === 'error') toast(message, 'erro');
 }
 
 // Função para abrir pasta no Explorer
@@ -2527,7 +2347,11 @@ window.updateAppUpdateProgress = updateAppUpdateProgress;
 window.addEventListener('pywebviewready', () => {
     setTimeout(() => {
         window.pywebview.api.check_update().then(info => {
+            if (info && info.current && _el('app-version')) _el('app-version').textContent = 'do Pailer • v' + info.current;
             if (info && info.available) _showUpdateBanner(info);
         }).catch(() => {});
     }, 4000);
 });
+
+window.onArquivosSoltos = onArquivosSoltos;
+window.setSelecao = setSelecao;

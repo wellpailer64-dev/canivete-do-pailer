@@ -19,7 +19,7 @@ else:
     BASE_DIR = os.getcwd()
 
 INSTALLED_MARKER = os.path.join(BASE_DIR, "models", ".installed")
-MARKER_VERSION = "v2-ffprobe"
+MARKER_VERSION = "v3-isnet-deno"
 
 # ── Lista de downloads ──────────────────────────────────────────────────────
 DOWNLOADS = [
@@ -50,6 +50,20 @@ DOWNLOADS = [
         "type": "url",
         "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx",
         "dest": "modelos_ia/u2net/u2net.onnx",
+    },
+    {
+        "label": "Baixando modelo de recorte preciso (ISNet)",
+        "type": "url",
+        "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx",
+        "dest": "modelos_ia/u2net/isnet-general-use.onnx",
+    },
+    {
+        "label": "Baixando motor JavaScript para o YouTube (Deno)",
+        "type": "url",
+        "github_latest": "https://api.github.com/repos/denoland/deno/releases/latest",
+        "asset_pattern": "deno-x86_64-pc-windows-msvc.zip",
+        "dest": "modelos_ia/deno.zip",
+        "extract": "modelos_ia/deno.exe",
     },
     {
         "label": "Baixando modelo inteligente (Flan-T5)",
@@ -164,13 +178,20 @@ def _download_url(url: str, dest_path: str, on_progress=None):
     total = int(resp.headers.get("content-length", 0))
     baixado = 0
 
-    with open(dest_path, "wb") as f:
+    # Baixa em .part e só renomeia no fim: um download interrompido não deixa
+    # um arquivo quebrado que depois seria tomado como "já instalado".
+    parcial = dest_path + ".part"
+    with open(parcial, "wb") as f:
         for chunk in resp.iter_content(chunk_size=65536):
             if chunk:
                 f.write(chunk)
                 baixado += len(chunk)
                 if total and on_progress:
                     on_progress(int(baixado * 100 / total))
+    if total and baixado < total:
+        os.remove(parcial)
+        raise IOError(f"Download incompleto ({baixado} de {total} bytes)")
+    os.replace(parcial, dest_path)
 
     if on_progress:
         on_progress(100)
@@ -353,18 +374,6 @@ def _run_item(item: dict, on_progress=None, on_label=None,
 
 # ── Configuração do rclone ──────────────────────────────────────────────────
 
-def _ja_configurado():
-    """Verifica se o rclone já tem o Google Drive configurado."""
-    rclone = _abs("modelos_ia/rclone.exe")
-    try:
-        result = subprocess.run(
-            [rclone, "listremotes"],
-            capture_output=True, text=True, timeout=10,
-        )
-        return "gdrive:" in result.stdout
-    except Exception:
-        return False
-
 def _configurar_rclone(on_label=None, on_progress=None):
     """Configura o rclone para Google Drive automaticamente."""
     rclone = _abs("modelos_ia/rclone.exe")
@@ -376,42 +385,10 @@ def _configurar_rclone(on_label=None, on_progress=None):
     if on_progress:
         on_progress(0)
 
-    # Verifica se já está configurado
-    if _ja_configurado():
-        if on_label:
-            on_label("✓ Google Drive já configurado!")
-        if on_progress:
-            on_progress(100)
-        return
-
-    # Não está configurado - criar automaticamente e abrir navegador
+    # A conexão com o Google (login no navegador) acontece no primeiro uso do
+    # GDrive Dumper — quem não usa o Drive nunca vê a tela de login.
     if on_label:
-        on_label("Criando configuração do Google Drive...")
-    if on_progress:
-        on_progress(30)
-
-    # Criar config do zero automaticamente (scope drive = full access)
-    try:
-        subprocess.run(
-            [rclone, "config", "create", "gdrive", "drive", "scope", "drive"],
-            capture_output=True, text=True, timeout=15,
-        )
-    except Exception:
-        pass
-
-    if on_progress:
-        on_progress(50)
-
-    # Abrir navegador para OAuth (login no Google)
-    # Isso abre a página do Google para usuário permitir acesso
-    if on_label:
-        on_label("Fazendo login no Google...")
-
-    subprocess.Popen(
-        ["cmd.exe", "/c", "start", "cmd", "/k", rclone, "authorize", "drive"],
-        shell=False,
-    )
-
+        on_label("✓ Google Drive: conecta no primeiro uso do GDrive Dumper")
     if on_progress:
         on_progress(100)
 
@@ -507,6 +484,7 @@ def executar_instalacao():
     # ── Thread de instalação ──────────────────────────────────────────────────
     def instalar():
         try:
+            falhas = []
             for i, item in enumerate(DOWNLOADS):
                 set_geral(i)
                 if _item_existe(item):
@@ -515,8 +493,15 @@ def executar_instalacao():
                     set_label(f"✓ Já instalado: {nome_curto}")
                     set_progress(100)
                 else:
-                    _run_item(item, on_progress=set_progress, on_label=set_label,
-                              on_spinner_start=spinner_start, on_spinner_stop=spinner_stop)
+                    # Um item com problema (rede, GitHub fora) não impede os demais;
+                    # ele é tentado de novo na próxima abertura.
+                    try:
+                        _run_item(item, on_progress=set_progress, on_label=set_label,
+                                  on_spinner_start=spinner_start, on_spinner_stop=spinner_stop)
+                    except Exception as e:
+                        spinner_stop()
+                        falhas.append(item["label"])
+                        set_label(f"⚠ Falhou: {item['label']} ({e})")
                 set_geral(i + 1)
 
             # Etapa final: configurar rclone
@@ -524,8 +509,11 @@ def executar_instalacao():
             _configurar_rclone(on_label=set_label, on_progress=set_progress)
             set_geral(total_items)
 
-            _marcar_instalado()
-            set_label("✅ Instalação concluída! Abrindo o app...")
+            if falhas:
+                set_label(f"⚠ {len(falhas)} item(ns) não baixaram — tento de novo na próxima abertura.")
+            else:
+                _marcar_instalado()
+                set_label("✅ Instalação concluída! Abrindo o app...")
             set_progress(100)
 
         except Exception as e:

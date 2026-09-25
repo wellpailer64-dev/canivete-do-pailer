@@ -12,8 +12,28 @@ import threading
 
 _POPEN_PATCH_LOCK = threading.Lock()
 
+_ultimo_erro = [""]
+
+
 def _internal_log(msg):
-    pass
+    _ultimo_erro[0] = str(msg)
+
+
+def explicar_erro(e):
+    """Traduz os erros mais comuns do yt-dlp para o usuário."""
+    t = str(e)
+    tl = t.lower()
+    if "sign in to confirm" in tl or "not a bot" in tl:
+        return "O YouTube pediu verificação anti-robô. Tente de novo em alguns minutos ou use outra rede."
+    if "private video" in tl or "login required" in tl or "requires authentication" in tl:
+        return "Vídeo privado ou que exige login."
+    if "unsupported url" in tl:
+        return "Site ou link não suportado."
+    if "unavailable" in tl or "not available" in tl:
+        return "Vídeo indisponível (removido ou bloqueado na sua região)."
+    if "http error 403" in tl:
+        return "O site bloqueou o download (403). Tente novamente — se persistir, o app precisa ser atualizado."
+    return re.sub(r"^ERROR:\s*", "", t)[:300]
 
 class _QuietYtdlpLogger:
     def debug(self, msg):
@@ -24,6 +44,47 @@ class _QuietYtdlpLogger:
 
     def error(self, msg):
         _internal_log(msg)
+
+def _deno_path():
+    """deno.exe baixado pelo setup (o YouTube exige um runtime JS para liberar os formatos)."""
+    try:
+        from Functions.midia import modelo_path
+        p = modelo_path("deno.exe")
+        if os.path.exists(p):
+            return p
+    except Exception:
+        pass
+    return shutil.which("deno") or ""
+
+
+def _opts_base(**extra):
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "noprogress": True,
+        "logger": _QuietYtdlpLogger(),
+        "noplaylist": True,
+        "retries": 10,
+        "fragment_retries": 10,
+        "concurrent_fragment_downloads": 4,
+        # Scripts do desafio do YouTube: pacote yt-dlp-ejs ou, se faltar, baixados do GitHub
+        "remote_components": ["ejs:github"],
+    }
+    deno = _deno_path()
+    if deno:
+        opts["js_runtimes"] = {"deno": {"path": deno}}
+    opts.update(extra)
+    return opts
+
+
+# Seletores de formato
+# compativel: H.264 + AAC (abre em qualquer editor/celular), até 1080p no YouTube
+# maxima: melhor imagem disponível (4K/8K em VP9/AV1), juntado em MP4
+FORMATO_COMPATIVEL = (
+    "bv*[vcodec^=avc1]+ba[acodec^=mp4a]/bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b"
+)
+FORMATO_MAXIMO = "bv*+ba/b"
+
 
 def _default_download_dir():
     return os.path.join(os.path.expanduser("~"), "Downloads")
@@ -104,14 +165,7 @@ def extrair_info_video(url: str):
         _internal_log(f"ERRO NO IMPORT: {e}")
         raise
 
-    ydl_opts = {
-        "quiet": True,
-        "no_warnings": True,
-        "noprogress": True,
-        "logger": _QuietYtdlpLogger(),
-        "noplaylist": True,
-        "skip_download": True,
-    }
+    ydl_opts = _opts_base(skip_download=True)
 
     with _yt_dlp_no_console():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -158,21 +212,26 @@ def extrair_info_video(url: str):
         "webpage_url": info.get("webpage_url") or url,
     }
 
-def _make_hook(callback):
-    """Retorna hook yt-dlp que chama callback(pct_float, msg_str)."""
+def _make_hook(callback, partes=1):
+    """Hook yt-dlp → callback(pct 0..97, msg). Vídeo e áudio separados viram uma barra só."""
+    estado = {"fase": 0}
+
     def _hook(d):
         if not callback:
             return
         if d.get("status") == "downloading":
-            pct_raw = re.sub(r'\x1b\[[0-9;]*m', '', d.get("_percent_str", "0%").strip())
-            spd_raw = re.sub(r'\x1b\[[0-9;]*m', '', d.get("_speed_str", "").strip())
-            try:
-                pct = float(pct_raw.replace('%', '').strip())
-            except Exception:
-                pct = 0.0
-            callback(pct, f"Baixando {pct_raw} | {spd_raw}")
+            total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+            frac = (d.get("downloaded_bytes") or 0) / total if total else 0.0
+            geral = min(97.0, (estado["fase"] + frac) / partes * 97)
+            vel = d.get("speed") or 0
+            vel_txt = f"{vel / 1048576:.1f} MB/s" if vel else ""
+            eta = d.get("eta")
+            eta_txt = f" • falta {int(eta) // 60}:{int(eta) % 60:02d}" if eta else ""
+            callback(geral, f"Baixando {geral:.0f}% • {vel_txt}{eta_txt}")
         elif d.get("status") == "finished":
-            callback(98.0, "Download concluido. Juntando audio e video...")
+            estado["fase"] = min(partes, estado["fase"] + 1)
+            if estado["fase"] >= partes:
+                callback(98.0, "Download concluído. Finalizando arquivo...")
     return _hook
 
 
@@ -194,26 +253,21 @@ def _make_postprocessor_hook(callback):
     return _hook
 
 
-def baixar_video_mp4(url: str, destino_dir: str = "", callback=None):
-    """callback(pct: float, msg: str)"""
+def baixar_video_mp4(url: str, destino_dir: str = "", callback=None, qualidade="compativel"):
+    """callback(pct: float, msg: str). qualidade: 'compativel' (H.264) ou 'maxima' (até 4K)."""
     import yt_dlp
     destino = os.path.abspath(destino_dir.strip()) if destino_dir.strip() else _default_download_dir()
     os.makedirs(destino, exist_ok=True)
     temp_dir = tempfile.mkdtemp(prefix=".canivete_video_", dir=destino)
 
-    ydl_opts = {
-        "format": "bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a][acodec^=mp4a]/bestvideo[ext=mp4][vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]",
-        "merge_output_format": "mp4",
-        "outtmpl": os.path.join(temp_dir, "%(title)s [%(id)s].%(ext)s"),
-        "noplaylist": True,
-        "quiet": True,
-        "no_warnings": True,
-        "noprogress": True,
-        "logger": _QuietYtdlpLogger(),
-        "keepvideo": False,
-        "progress_hooks": [_make_hook(callback)],
-        "postprocessor_hooks": [_make_postprocessor_hook(callback)],
-    }
+    ydl_opts = _opts_base(
+        format=FORMATO_MAXIMO if qualidade == "maxima" else FORMATO_COMPATIVEL,
+        merge_output_format="mp4",
+        outtmpl=os.path.join(temp_dir, "%(title).150B [%(id)s].%(ext)s"),
+        keepvideo=False,
+        progress_hooks=[_make_hook(callback, partes=2)],
+        postprocessor_hooks=[_make_postprocessor_hook(callback)],
+    )
 
     ffmpeg_exe = _resolver_ffmpeg_exe()
     if ffmpeg_exe:
@@ -256,22 +310,17 @@ def baixar_audio_mp3(url: str, destino_dir: str = "", callback=None):
 
     ffmpeg_exe = _resolver_ffmpeg_exe()
 
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "outtmpl": os.path.join(temp_dir, "%(title)s [%(id)s].%(ext)s"),
-        "noplaylist": True,
-        "quiet": True,
-        "no_warnings": True,
-        "noprogress": True,
-        "logger": _QuietYtdlpLogger(),
-        "progress_hooks": [_make_hook(callback)],
-        "postprocessor_hooks": [_make_postprocessor_hook(callback)],
-        "postprocessors": [{
+    ydl_opts = _opts_base(
+        format="bestaudio/best",
+        outtmpl=os.path.join(temp_dir, "%(title).150B [%(id)s].%(ext)s"),
+        progress_hooks=[_make_hook(callback)],
+        postprocessor_hooks=[_make_postprocessor_hook(callback)],
+        postprocessors=[{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
-            "preferredquality": "192",
+            "preferredquality": "320",
         }],
-    }
+    )
 
     if ffmpeg_exe:
         ydl_opts["ffmpeg_location"] = ffmpeg_exe

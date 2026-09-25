@@ -378,7 +378,8 @@ def comprimir_video(
     if callback_log:
         callback_log(f"   Codec: {codec_video}  •  {perfil_codec}")
 
-    _debug_log = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "compressor_video_debug.log")
+    from Functions.midia import logs_dir
+    _debug_log = os.path.join(logs_dir(), "compressor_video_debug.log")
 
     cmd = [
         ffmpeg, "-y",
@@ -408,8 +409,17 @@ def comprimir_video(
     if aplicar_fullhd:
         cmd += ["-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease"]
 
+    if codec_video.startswith("hevc") or codec_video == "libx265":
+        cmd += ["-tag:v", "hvc1"]  # sem isso, HEVC em MP4 não abre no QuickTime/Premiere Mac
+
+    # PCM (câmeras) e outros codecs não cabem em MP4: nesses casos recodifica para AAC.
+    codec_audio = (info or {}).get("codec_audio", "")
+    if codec_audio in ("aac", "mp3", "ac3", "eac3", "alac", "opus"):
+        cmd += ["-c:a", "copy"]
+    elif codec_audio or not info:
+        cmd += ["-c:a", "aac", "-b:a", "192k"]
+
     cmd += [
-        "-c:a", "copy",
         "-map_metadata", "0",
         "-movflags", "+faststart",
         "-progress", "pipe:1",
@@ -526,6 +536,16 @@ def comprimir_video(
             tamanho_final = os.path.getsize(saida) / 1024 / 1024
             reducao = (1 - tamanho_final / tamanho_original) * 100
 
+            if tamanho_final >= tamanho_original * 0.97:
+                # Já estava bem comprimido: guardar o "comprimido" só pioraria.
+                os.remove(saida)
+                if callback_log:
+                    callback_log(f"   = Já estava otimizado ({_fmt_tamanho(tamanho_original)} → "
+                                 f"{_fmt_tamanho(tamanho_final)}). Original mantido.")
+                if callback_progresso:
+                    callback_progresso(100, "100%  •  original já estava otimizado")
+                return None, tamanho_original, tamanho_original
+
             if callback_log:
                 callback_log(
                     f"   ✅ {_fmt_tamanho(tamanho_original)} → "
@@ -595,6 +615,7 @@ def comprimir_lista(
     total        = len(arquivos)
     ok           = 0
     erros        = 0
+    mantidos     = 0
     total_orig   = 0.0
     total_final  = 0.0
 
@@ -627,7 +648,11 @@ def comprimir_lista(
             stop_event=stop_event
         )
 
-        if sucesso:
+        if sucesso is None:  # original já otimizado — mantido
+            mantidos += 1
+            total_orig += orig
+            total_final += orig
+        elif sucesso:
             ok += 1
             total_orig  += orig
             total_final += final
@@ -656,6 +681,7 @@ def comprimir_lista(
         "total":         total,
         "ok":            ok,
         "erros":         erros,
+        "mantidos":      mantidos,
         "total_orig_mb": total_orig,
         "total_final_mb": total_final,
         "reducao_pct":   reducao_total,

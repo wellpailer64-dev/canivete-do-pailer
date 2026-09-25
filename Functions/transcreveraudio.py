@@ -20,12 +20,10 @@ import os
 import sys
 import datetime
 import re
-import threading
-import time
 
 FORMATOS_SUPORTADOS = {
-    ".ogg", ".opus", ".mp3", ".wav",
-    ".m4a", ".mp4", ".webm", ".flac"
+    ".ogg", ".opus", ".mp3", ".wav", ".m4a", ".aac", ".wma", ".flac",
+    ".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v",
 }
 
 MODELOS = {
@@ -150,32 +148,22 @@ def transcrever_audios(lista_paths, modelo_key="Rápido (small)", idioma="pt",
             callback_log(f"🎙️  Transcrevendo ({i+1}/{total}): {nome}")
         
         try:
-            def fake_progress_loop(stop_event):
-                current_sub_pct = 0
-                while not stop_event.is_set():
-                    time.sleep(2)
-                    if current_sub_pct < 0.95:
-                        current_sub_pct += 0.05
-                        pg = 5 + int(((i + current_sub_pct) / total) * 90)
-                        if callback_progresso:
-                            callback_progresso(pg, f"🎙️ Transcrevendo {nome}...")
+            def _on_frac(frac, i=i, nome=nome):
+                if callback_progresso:
+                    callback_progresso(5 + int((i + frac) / total * 90), f"🎙️ Transcrevendo {nome}... {int(frac * 100)}%")
 
-            stop_evt = threading.Event()
-            t_prog = threading.Thread(target=fake_progress_loop, args=(stop_evt,))
-            t_prog.start()
-
-            try:
-                # transcribe() do whisper
+            with _progresso_whisper(_on_frac):
                 resultado = modelo.transcribe(
                     path,
                     language=idioma if idioma != "auto" else None,
                     task="transcribe",
                     fp16=False,
-                    verbose=False
+                    verbose=False,
                 )
-            finally:
-                stop_evt.set()
-                t_prog.join()
+
+            srt = _salvar_srt(path, resultado.get("segments") or [])
+            if srt and callback_log:
+                callback_log(f"   💬 Legenda: transcricoes/{os.path.basename(srt)}")
 
             if callback_progresso:
                 pct_geral = 5 + int(((i + 1) / total) * 90)
@@ -213,6 +201,67 @@ def transcrever_audios(lista_paths, modelo_key="Rápido (small)", idioma="pt",
         "texto_completo": texto_limpo,
         "pasta_origem": os.path.dirname(lista_paths[0]) if lista_paths else "",
     }
+
+
+class _progresso_whisper:
+    """Troca o tqdm interno do Whisper por um que reporta a fração processada (0..1)."""
+
+    def __init__(self, on_frac):
+        self.on_frac = on_frac
+
+    def __enter__(self):
+        import importlib
+        self.mod = importlib.import_module("whisper.transcribe")
+        self.original = self.mod.tqdm
+        on_frac = self.on_frac
+
+        class _Barra:
+            def __init__(self, total=None, **_k):
+                self.total, self.n = total or 1, 0
+
+            def update(self, n=1):
+                self.n += n
+                on_frac(min(1.0, self.n / self.total))
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        class _Tqdm:
+            tqdm = _Barra
+
+        self.mod.tqdm = _Tqdm
+        return self
+
+    def __exit__(self, *a):
+        self.mod.tqdm = self.original
+        return False
+
+
+def _tempo_srt(seg):
+    ms = int(round(seg * 1000))
+    h, ms = divmod(ms, 3_600_000)
+    m, ms = divmod(ms, 60_000)
+    s, ms = divmod(ms, 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def _salvar_srt(audio_path, segmentos):
+    """Legenda .srt em /transcricoes ao lado do áudio (abre direto no Premiere/CapCut)."""
+    if not segmentos:
+        return None
+    try:
+        pasta = os.path.join(os.path.dirname(audio_path), "transcricoes")
+        os.makedirs(pasta, exist_ok=True)
+        destino = os.path.join(pasta, os.path.splitext(os.path.basename(audio_path))[0] + ".srt")
+        with open(destino, "w", encoding="utf-8") as f:
+            for n, seg in enumerate(segmentos, 1):
+                f.write(f"{n}\n{_tempo_srt(seg['start'])} --> {_tempo_srt(seg['end'])}\n{seg['text'].strip()}\n\n")
+        return destino
+    except OSError:
+        return None
 
 
 def _montar_texto_limpo(lista_paths, linhas_resultado):

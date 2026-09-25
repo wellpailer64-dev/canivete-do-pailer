@@ -48,6 +48,68 @@ def _file_dialog_kind(name, fallback):
         return fallback
 
 
+def _js(fn, data):
+    """Chama fn(data) no frontend com JSON seguro (aspas, barras e quebras de linha)."""
+    if _window:
+        try:
+            _window.evaluate_js(f"{fn}({json.dumps(data, ensure_ascii=False)})")
+        except Exception:
+            pass
+
+
+def _abrir_pasta(caminho):
+    try:
+        if caminho and os.path.exists(caminho):
+            os.startfile(caminho if os.path.isdir(caminho) else os.path.dirname(caminho))
+    except Exception:
+        pass
+
+
+def _registrar_erro(nome, exc):
+    """Grava o traceback em logs/erros.log para diagnóstico."""
+    import traceback
+    from datetime import datetime
+    try:
+        from Functions.midia import logs_dir
+        with open(os.path.join(logs_dir(), "erros.log"), "a", encoding="utf-8") as f:
+            f.write(f"\n[{datetime.now():%Y-%m-%d %H:%M:%S}] {nome}: {exc}\n{traceback.format_exc()}")
+    except Exception:
+        pass
+
+
+def _tarefa(fn_js, trabalho):
+    """
+    Roda trabalho(log, progresso) numa thread. A UI SEMPRE recebe complete=true no fim,
+    com error quando algo falha — a tela nunca fica travada em "processando".
+    trabalho pode retornar {"resumo": str, "abrir": caminho, ...extras para o frontend}.
+    """
+    def log(msg):
+        _js(fn_js, {"log": str(msg)})
+
+    def progresso(pct, status=None):
+        dados = {"percent": round(float(pct), 1)}
+        if status:
+            dados["status"] = str(status)
+        _js(fn_js, dados)
+
+    def run():
+        try:
+            r = trabalho(log, progresso) or {}
+            abrir = r.pop("abrir", None)
+            _js(fn_js, {"percent": 100, "complete": True, **r})
+            _abrir_pasta(abrir)
+        except Exception as e:
+            _registrar_erro(fn_js, e)
+            _js(fn_js, {"complete": True, "error": str(e) or type(e).__name__})
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
+def _is_file(caminho):
+    return bool(caminho) and os.path.isfile(caminho)
+
+
 # ========================================
 # Limpeza de thumbs temporárias
 # ========================================
@@ -120,47 +182,23 @@ def open_folder(path):
 # ========================================
 # Tools: converter audio
 # ========================================
-def converter_audio(folder_path, output_format):
-    from Functions.convertermp3 import converter_pasta as converter_audio_pasta
-    
-    def run():
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateConverterAudioProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
-        
-        converter_audio_pasta(folder_path, output_format, callback_log=log)
-        
-        if _window:
-            _window.evaluate_js("updateConverterAudioProgress({complete: true})")
-            os.startfile(folder_path)
-    
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+def converter_audio(caminho, output_format):
+    from Functions.convertermp3 import converter_pasta, converter_arquivos
+
+    def trabalho(log, progresso):
+        if _is_file(caminho):
+            r = converter_arquivos([caminho], output_format, progresso, log)
+        else:
+            r = converter_pasta(caminho, output_format, progresso, log)
+        falhas = f" • {r['falhas']} falha(s)" if r["falhas"] else ""
+        return {"resumo": f"{r['convertidos']} de {r['total']} convertido(s){falhas}",
+                "abrir": caminho if r["convertidos"] else None}
+
+    return _tarefa("updateConverterAudioProgress", trabalho)
 
 
 def converter_audio_file(file_path, output_format):
-    """Converte um único arquivo de áudio usando a mesma rotina do módulo."""
-    from Functions.convertermp3 import converter_arquivo as converter_audio_arquivo
-
-    def run():
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateConverterAudioProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
-
-        converter_audio_arquivo(file_path, output_format, callback_log=log)
-
-        if _window:
-            _window.evaluate_js("updateConverterAudioProgress({complete: true})")
-            os.startfile(os.path.dirname(file_path) or os.getcwd())
-
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+    return converter_audio(file_path, output_format)
 
 
 # ========================================
@@ -314,30 +352,23 @@ def select_video_file(tool):
 # ========================================
 # Tools: converter imagem
 # ========================================
-def converter_imagem(folder_path, output_format):
-    from Functions.converterimagem import converter_pasta as converter_imagem_pasta
-    
-    def run():
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateConverterImagemProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
-        
-        converter_imagem_pasta(folder_path, output_format, callback_log=log)
-        
-        if _window:
-            _window.evaluate_js("updateConverterImagemProgress({complete: true})")
-            os.startfile(folder_path)
-    
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+def converter_imagem(caminho, output_format):
+    from Functions.converterimagem import converter_pasta, converter_arquivos
+
+    def trabalho(log, progresso):
+        if _is_file(caminho):
+            r = converter_arquivos([caminho], output_format, progresso, log)
+        else:
+            r = converter_pasta(caminho, output_format, progresso, log)
+        falhas = f" • {r['falhas']} falha(s)" if r["falhas"] else ""
+        return {"resumo": f"{r['convertidos']} de {r['total']} convertida(s){falhas}",
+                "abrir": r.get("pasta_saida") if r["convertidos"] else None}
+
+    return _tarefa("updateConverterImagemProgress", trabalho)
 
 
 def converter_imagem_file(file_path, output_format):
-    """Converte um único arquivo de imagem (fallback para a pasta do arquivo)."""
-    return converter_imagem(os.path.dirname(file_path) or os.getcwd(), output_format)
+    return converter_imagem(file_path, output_format)
 
 
 # ========================================
@@ -345,384 +376,137 @@ def converter_imagem_file(file_path, output_format):
 # ========================================
 def favicon_generator(image_path, site_name, theme_color):
     from Functions.faviconconverter import gerar_favicon
-    
-    def run():
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateFaviconProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
-        
-        def progress(pct, status):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateFaviconProgress({{percent: {int(pct)}, log: '{_safe_msg(status)}'}})")
-                except:
-                    pass
-        
-        try:
-            resultado = gerar_favicon(image_path, nome_site=site_name, cor_tema=theme_color, callback_log=log, callback_progresso=progress)
-            
-            if _window:
-                # Chama o JS indicando completo para tocar o som
-                _window.evaluate_js("updateFaviconProgress({complete: true})")
-                if resultado.get("sucesso"):
-                    if resultado.get("pasta"):
-                        os.startfile(resultado["pasta"])
-        except Exception as e:
-            import traceback
-            err_msg = str(e)
-            full_error = traceback.format_exc()
-            log(f"Erro ao gerar favicon: {err_msg}")
-            # Log de emergência
-            try:
-                with open(os.path.join(os.getcwd(), "erro_favicon.txt"), "w") as f:
-                    f.write(full_error)
-            except: pass
-    
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+
+    def trabalho(log, progresso):
+        r = gerar_favicon(image_path, nome_site=site_name, cor_tema=theme_color,
+                          callback_log=log, callback_progresso=progresso)
+        if not r.get("sucesso"):
+            raise RuntimeError("Nenhum arquivo foi gerado. Veja o log.")
+        return {"resumo": f"{len(r['arquivos'])} arquivos em favicon_gerados", "abrir": r.get("pasta")}
+
+    return _tarefa("updateFaviconProgress", trabalho)
 
 
 # ========================================
 # Tools: compressor imagem
 # ========================================
-def compressor_imagem(folder_path, force_fullhd=False):
-    from Functions.compressor_imagem import listar_arquivos, comprimir_lista as comprimir_imagem_lista
-    
-    def run():
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateCompressorImagemProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
-        
-        arquivos = listar_arquivos(folder_path)
+def compressor_imagem(caminho, force_fullhd=False):
+    from Functions.compressor_imagem import listar_arquivos, comprimir_lista
+
+    def trabalho(log, progresso):
+        if _is_file(caminho):
+            arquivos, base = [caminho], os.path.dirname(caminho)
+        else:
+            arquivos, base = listar_arquivos(caminho), caminho
         if not arquivos:
-            log("Nenhum arquivo de imagem/PDF encontrado.")
-            if _window:
-                _window.evaluate_js("updateCompressorImagemProgress({complete: true})")
-            return
+            raise RuntimeError("Nenhuma imagem ou PDF encontrado.")
+        pasta_saida = os.path.join(base, "comprimidas")
+        r = comprimir_lista(arquivos, pasta_saida, manter_original=True, callback_log=log,
+                            callback_progresso=progresso, force_fullhd=bool(force_fullhd))
+        economia = r["total_orig_mb"] - r["total_final_mb"]
+        return {"resumo": f"{r['ok']} comprimida(s) • {r['mantidos']} já otimizada(s) • "
+                          f"-{r['reducao_pct']:.0f}% ({economia:.1f} MB economizados)",
+                "abrir": pasta_saida if r["ok"] else None}
 
-        def progresso(pct, status):
-            if _window:
-                try:
-                    _window.evaluate_js(
-                        f"updateCompressorImagemProgress({{percent: {pct}, log: '{_safe_msg(status)}'}})"
-                    )
-                except Exception:
-                    pass
-
-        pasta_saida = os.path.join(folder_path, "comprimidas")
-        
-        try:
-            resultado = comprimir_imagem_lista(
-                arquivos,
-                pasta_saida,
-                manter_original=True,
-                callback_log=log,
-                callback_progresso=progresso,
-                force_fullhd=bool(force_fullhd),
-            )
-            log(
-                f"Concluido: {resultado.get('ok', 0)}/{resultado.get('total', 0)} comprimidos | "
-                f"{resultado.get('mantidos', 0)} mantidos | "
-                f"{resultado.get('redimensionados', 0)} FullHD | "
-                f"Reducao: {resultado.get('reducao_pct', 0):.1f}%"
-            )
-        except Exception as e:
-            log(f"Erro: {e}")
-        
-        if _window:
-            _window.evaluate_js("updateCompressorImagemProgress({complete: true})")
-            if os.path.exists(pasta_saida):
-                os.startfile(pasta_saida)
-            else:
-                os.startfile(folder_path)
-    
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+    return _tarefa("updateCompressorImagemProgress", trabalho)
 
 
 def compressor_imagem_file(file_path, force_fullhd=False):
-    from Functions.compressor_imagem import comprimir_lista as comprimir_imagem_lista
-
-    def run():
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateCompressorImagemProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
-
-        def progresso(pct, status):
-            if _window:
-                try:
-                    _window.evaluate_js(
-                        f"updateCompressorImagemProgress({{percent: {pct}, log: '{_safe_msg(status)}'}})"
-                    )
-                except Exception:
-                    pass
-
-        pasta_base = os.path.dirname(file_path) or os.getcwd()
-        pasta_saida = os.path.join(pasta_base, "comprimidas")
-        
-        try:
-            resultado = comprimir_imagem_lista(
-                [file_path],
-                pasta_saida,
-                manter_original=True,
-                callback_log=log,
-                callback_progresso=progresso,
-                force_fullhd=bool(force_fullhd),
-            )
-            log(
-                f"Concluido: {resultado.get('ok', 0)}/{resultado.get('total', 0)} comprimidos | "
-                f"{resultado.get('mantidos', 0)} mantidos | "
-                f"{resultado.get('redimensionados', 0)} FullHD | "
-                f"Reducao: {resultado.get('reducao_pct', 0):.1f}%"
-            )
-        except Exception as e:
-            log(f"Erro: {e}")
-
-        if _window:
-            _window.evaluate_js("updateCompressorImagemProgress({complete: true})")
-            if os.path.exists(pasta_saida):
-                os.startfile(pasta_saida)
-            else:
-                os.startfile(pasta_base)
-
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+    return compressor_imagem(file_path, force_fullhd)
 
 
 # ========================================
 # Tools: compressor video
 # ========================================
-def compressor_video(folder_path, mode="copy", gpu="cpu"):
-    from Functions.compressor_video import comprimir_lista as comprimir_video_lista, listar_videos
-    
-    def run():
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateCompressorVideoProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
-        
-        def progress(pct, status):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateCompressorVideoProgress({{percent: {int(pct)}, status: '{_safe_msg(status)}'}})")
-                except:
-                    pass
+def compressor_video(caminho, mode="copy", gpu="cpu", qualidade="equilibrada"):
+    from Functions.compressor_video import comprimir_lista, listar_videos
 
-        if os.path.isfile(folder_path):
-            arquivos = [folder_path]
-            pasta_base = os.path.dirname(folder_path) or os.getcwd()
+    crf = {"alta": 23, "equilibrada": 26, "maxima": 30}.get(str(qualidade), 26)
+    sobrescrever = str(mode).lower() == "overwrite"
+
+    def trabalho(log, progresso):
+        if _is_file(caminho):
+            arquivos, base = [caminho], os.path.dirname(caminho)
         else:
-            pasta_base = folder_path
-            arquivos = listar_videos(folder_path)
-            
+            arquivos, base = listar_videos(caminho), caminho
         if not arquivos:
-            log("Nenhum vídeo encontrado.")
-            if _window:
-                _window.evaluate_js("updateCompressorVideoProgress({complete: true})")
-            return
+            raise RuntimeError("Nenhum vídeo encontrado.")
+        pasta_saida = base if sobrescrever else os.path.join(base, "comprimidos")
+        total = len(arquivos)
+        atual = {"i": 0}
 
-        pasta_saida = os.path.join(pasta_base, "comprimidos") if str(mode).lower() != "overwrite" else pasta_base
-        
-        try:
-            resultado = comprimir_video_lista(
-                arquivos,
-                pasta_saida,
-                qualidade_crf=28,
-                usar_gpu=str(gpu).lower() != "cpu",
-                forcar_fullhd=False,
-                manter_original=str(mode).lower() != "overwrite",
-                callback_log=log,
-                callback_progresso=progress,
-            )
-            log(f"Concluído: {resultado.get('ok', 0)}/{resultado.get('total', 0)} | Redução: {resultado.get('reducao_pct', 0):.1f}%")
-            
-            if _window:
-                _window.evaluate_js("updateCompressorVideoProgress({complete: true})")
-                os.startfile(pasta_saida if os.path.exists(pasta_saida) else pasta_base)
-        except Exception as e:
-            log(f"Erro: {e}")
-            if _window:
-                _window.evaluate_js("updateCompressorVideoProgress({complete: true})")
+        def por_arquivo(i, _total, nome):
+            atual["i"] = i - 1
 
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+        def prog(pct, status):
+            if pct is None or pct < 0:
+                progresso(-1, status)
+            else:
+                progresso((atual["i"] + pct / 100) / total * 100, f"{atual['i'] + 1}/{total} • {status}")
+
+        r = comprimir_lista(arquivos, pasta_saida, qualidade_crf=crf,
+                            usar_gpu=str(gpu).lower() != "cpu", manter_original=not sobrescrever,
+                            callback_log=log, callback_progresso=prog, callback_arquivo=por_arquivo)
+        mantidos = f" • {r['mantidos']} já otimizado(s)" if r.get("mantidos") else ""
+        erros = f" • {r['erros']} erro(s)" if r["erros"] else ""
+        return {"resumo": f"{r['ok']} de {r['total']} comprimido(s){mantidos}{erros} • -{r['reducao_pct']:.0f}%",
+                "abrir": pasta_saida if r["ok"] else None}
+
+    return _tarefa("updateCompressorVideoProgress", trabalho)
 
 
-def compressor_video_file(file_path, mode="copy", gpu="cpu"):
-    return compressor_video(file_path, mode, gpu)
+def compressor_video_file(file_path, mode="copy", gpu="cpu", qualidade="equilibrada"):
+    return compressor_video(file_path, mode, gpu, qualidade)
 
 
 
 # ========================================
 # Tools: video converter
 # ========================================
-def video_converter(folder_path, output_format):
-    from Functions.videoconverter import converter_pasta, detectar_tipo_arquivo
-    
-    def run():
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateVideoConverterProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
-        
-        def progresso(pct, status):
-            if _window:
-                try:
-                    _window.evaluate_js(
-                        f"updateVideoConverterProgress({{percent: {pct}, status: '{_safe_msg(status)}'}})"
-                    )
-                except:
-                    pass
-        
-        tipo = detectar_tipo_arquivo(folder_path)
-        if tipo == "invalido":
-            log("Caminho inválido ou não suportado")
-            if _window:
-                _window.evaluate_js("updateVideoConverterProgress({complete: true})")
-            return
-        
-        resultado = converter_pasta(folder_path, output_format, loop_gif=True, callback_progresso=progresso, callback_log=log)
-        
-        if resultado.get("sucesso"):
-            log(f"Processamento concluído: {resultado.get('sucessos', 0)}/{resultado.get('total', 0)} arquivos.")
-            if os.path.exists(folder_path):
-                os.startfile(folder_path)
+def video_converter(caminho, output_format):
+    from Functions.videoconverter import converter_pasta, converter_lista
+
+    def trabalho(log, progresso):
+        if _is_file(caminho):
+            r = converter_lista([caminho], output_format, callback_progresso=progresso, callback_log=log)
         else:
-            log(f"Erro: {resultado.get('erro', 'Nenhum arquivo processado')}")
-        
-        if _window:
-            _window.evaluate_js("updateVideoConverterProgress({complete: true})")
-    
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
-    
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+            r = converter_pasta(caminho, output_format, callback_progresso=progresso, callback_log=log)
+        if not r.get("sucesso"):
+            raise RuntimeError(r.get("erro") or "Nenhum arquivo foi convertido. Veja o log.")
+        return {"resumo": f"{r['sucessos']} de {r['total']} convertido(s)", "abrir": r["saidas"][0]}
+
+    return _tarefa("updateVideoConverterProgress", trabalho)
 
 
 def video_converter_file(file_path, output_format):
-    """Converte um único vídeo usando a rotina de arquivo do módulo."""
-    from Functions.videoconverter import converter_arquivo as video_converter_arquivo, detectar_tipo_arquivo
-
-    def run():
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateVideoConverterProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
-
-        def progresso(pct, status):
-            if _window:
-                try:
-                    _window.evaluate_js(
-                        f"updateVideoConverterProgress({{percent: {pct}, status: '{_safe_msg(status)}'}})"
-                    )
-                except:
-                    pass
-
-        tipo = detectar_tipo_arquivo(file_path)
-        if tipo == "invalido":
-            log("Formato não suportado")
-            if _window:
-                _window.evaluate_js("updateVideoConverterProgress({complete: true})")
-            return
-
-        pasta_base = os.path.dirname(file_path) or os.getcwd()
-        resultado = video_converter_arquivo(file_path, output_format, loop_gif=True, callback_progresso=progresso, callback_log=log)
-
-        if resultado.get("sucesso"):
-            log(f"Convertido: {resultado.get('saida', '')}")
-            pasta_saida = os.path.dirname(resultado.get("saida", "")) or pasta_base
-            if os.path.exists(pasta_saida):
-                os.startfile(pasta_saida)
-        else:
-            log(f"Erro: {resultado.get('erro', 'Desconhecido')}")
-
-        if _window:
-            _window.evaluate_js("updateVideoConverterProgress({complete: true})")
-
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+    return video_converter(file_path, output_format)
 
 
 def video_downloader_info(url):
-    # Tenta descobrir a pasta raiz de forma absoluta e segura
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    log_path = os.path.join(base_path, "erro_video_info.txt")
-    
-    # Sinal de vida: tenta criar o arquivo vazio só pra ver se tem permissão
+    from Functions.videodownloader import extrair_info_video, explicar_erro
     try:
-        with open(os.path.join(base_path, "TESTE_ESCRITA.txt"), "w") as f:
-            f.write("Python consegue escrever aqui")
-    except:
-        pass
-
-    try:
-        from Functions.videodownloader import extrair_info_video
-        info = extrair_info_video(url)
-        return {"success": True, "info": info}
+        return {"success": True, "info": extrair_info_video(url)}
     except Exception as e:
-        import traceback
-        err_msg = str(e)
-        full_error = traceback.format_exc()
-        
+        _registrar_erro("video_downloader_info", e)
+        return {"success": False, "error": explicar_erro(e)}
+
+
+def video_downloader(url, destino="", formato="mp4", qualidade="compativel"):
+    from Functions.videodownloader import baixar_audio_mp3, baixar_video_mp4, explicar_erro
+
+    def trabalho(log, progresso):
+        output_dir = (destino or "").strip() or os.path.join(os.path.expanduser("~"), "Downloads")
+        os.makedirs(output_dir, exist_ok=True)
         try:
-            with open(log_path, "w", encoding="utf-8") as f:
-                f.write(f"--- ERRO DE ANALISE ---\nURL: {url}\nERRO: {err_msg}\n\n{full_error}")
-        except:
-            pass
-            
-        return {"success": False, "error": f"Erro: {err_msg}. Log: {log_path}"}
-
-
-def video_downloader(url, destino="", formato="mp4"):
-    def run():
-        def progresso(pct, msg):
-            if _window:
-                try:
-                    _window.evaluate_js(
-                        f"updateVideoDownloaderProgress({{percent: {pct}, log: '{_safe_msg(msg)}'}})"
-                    )
-                except:
-                    pass
-
-        try:
-            output_dir = destino.strip() if destino else os.path.join(os.getcwd(), "videos_baixados")
-            os.makedirs(output_dir, exist_ok=True)
-
             if str(formato).lower() == "mp3":
-                from Functions.videodownloader import baixar_audio_mp3
-                final_path = baixar_audio_mp3(url, output_dir, callback=progresso)
+                final = baixar_audio_mp3(url, output_dir, callback=progresso)
             else:
-                from Functions.videodownloader import baixar_video_mp4
-                final_path = baixar_video_mp4(url, output_dir, callback=progresso)
-
-            if _window:
-                _window.evaluate_js("updateVideoDownloaderProgress({percent: 100, complete: true})")
-                if final_path and os.path.exists(final_path):
-                    os.startfile(os.path.dirname(final_path))
+                final = baixar_video_mp4(url, output_dir, callback=progresso, qualidade=qualidade)
         except Exception as e:
-            if _window:
-                _window.evaluate_js(
-                    f"updateVideoDownloaderProgress({{log: 'Erro: {_safe_msg(str(e))}', error: true, complete: true}})"
-                )
+            raise RuntimeError(explicar_erro(e))
+        return {"resumo": os.path.basename(final), "abrir": final}
 
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+    return _tarefa("updateVideoDownloaderProgress", trabalho)
 
 
 # ========================================
@@ -771,8 +555,7 @@ def web_scraper_download(url, mode, destino):
         try:
             pasta_destino = (destino or "").strip()
             if not pasta_destino:
-                if _window:
-                    _window.evaluate_js("updateWebScraperProgress({log: 'Selecione uma pasta de destino para o download.', complete: true})")
+                _js("updateWebScraperProgress", {"complete": True, "error": "Selecione uma pasta de destino para o download."})
                 return
 
             os.makedirs(pasta_destino, exist_ok=True)
@@ -1050,15 +833,12 @@ def web_scraper_download(url, mode, destino):
                 else:
                     log("Nenhum vídeo para baixar.")
 
-            if _window:
-                emit(percent=100, status="100% Concluído", complete=True)
-                try:
-                    os.startfile(pasta_final_para_abrir)
-                except:
-                    pass
+            _js("updateWebScraperProgress", {"percent": 100, "complete": True,
+                                             "resumo": f"Salvo em {os.path.basename(pasta_final_para_abrir)}"})
+            _abrir_pasta(pasta_final_para_abrir)
         except Exception as e:
-            if _window:
-                _window.evaluate_js(f"updateWebScraperProgress({{log: 'Erro: {_safe_msg(str(e))}', complete: true}})")
+            _registrar_erro("web_scraper_download", e)
+            _js("updateWebScraperProgress", {"complete": True, "error": str(e)})
 
     threading.Thread(target=run, daemon=True).start()
     return {"success": True}
@@ -1095,13 +875,13 @@ def web_scraper_csv(url):
         try:
             cerebro_path = get_cerebro_md_path()
             if not cerebro_path or not os.path.exists(cerebro_path):
-                emit("Carregue um arquivo .md primeiro!")
+                _js("updateWebScraperProgress", {"complete": True, "error": "Carregue um arquivo de regras (.md) primeiro."})
                 return
             
             with open(cerebro_path, "r", encoding="utf-8") as f:
                 cerebro_md = f.read().strip()
             if not cerebro_md:
-                emit("Cérebro vazio!")
+                _js("updateWebScraperProgress", {"complete": True, "error": "O arquivo de regras está vazio."})
                 return
 
             emit(log_msg="Analisando página...", percent=10)
@@ -1127,13 +907,11 @@ def web_scraper_csv(url):
                 cerebro_md=cerebro_md,
                 callback_log=emit
             )
-            emit(log_msg=f"CSV gerado: {nome_csv}.csv", percent=100)
-            if _window:
-                _window.evaluate_js("updateWebScraperProgress({complete: true})")
-                os.startfile(os.path.dirname(csv_path))
+            _js("updateWebScraperProgress", {"percent": 100, "complete": True, "resumo": f"CSV gerado: {nome_csv}.csv"})
+            _abrir_pasta(csv_path)
         except Exception as e:
-            if _window:
-                _window.evaluate_js(f"updateWebScraperProgress({{log: 'Erro: {_safe_msg(str(e))}', complete: true}})")
+            _registrar_erro("web_scraper_csv", e)
+            _js("updateWebScraperProgress", {"complete": True, "error": str(e)})
 
     threading.Thread(target=run, daemon=True).start()
     return {"success": True}
@@ -1142,67 +920,25 @@ def web_scraper_csv(url):
 # ========================================
 # Tools: transcrever audio
 # ========================================
-def transcrever_audio(folder_path, model, language):
-    from Functions.transcreveraudio import transcrever_pasta as transcrever_audio_pasta
-    import json
+def transcrever_audio(caminho, model, language):
+    from Functions.transcreveraudio import transcrever_pasta, transcrever_arquivo
 
-    def run():
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateTranscreverAudioProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
+    def trabalho(log, progresso):
+        fn = transcrever_arquivo if _is_file(caminho) else transcrever_pasta
+        r = fn(caminho, modelo_key=model, idioma=language, callback_log=log, callback_progresso=progresso)
+        if not r.get("total"):
+            raise RuntimeError("Nenhum áudio ou vídeo encontrado.")
+        if not r.get("transcritos"):
+            raise RuntimeError("Nenhum arquivo foi transcrito. Veja o log.")
+        return {"resumo": f"{r['transcritos']} de {r['total']} transcrito(s) • legendas .srt em /transcricoes",
+                "texto": r.get("texto_completo", ""),
+                "pasta_origem": r.get("pasta_origem") or (os.path.dirname(caminho) if _is_file(caminho) else caminho)}
 
-        def progress(pct, status):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateTranscreverAudioProgress({{percent: {int(pct)}, status: '{_safe_msg(status)}'}})")
-                except:
-                    pass
-
-        resultado = transcrever_audio_pasta(folder_path, modelo_key=model, idioma=language, callback_log=log, callback_progresso=progress)
-
-        if _window:
-            texto = resultado.get("texto_completo", "")
-            pasta = resultado.get("pasta_origem", folder_path)
-            payload = json.dumps({"complete": True, "texto": texto, "pasta_origem": pasta})
-            _window.evaluate_js(f"updateTranscreverAudioProgress({payload})")
-
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+    return _tarefa("updateTranscreverAudioProgress", trabalho)
 
 
 def transcrever_audio_file(file_path, model, language):
-    from Functions.transcreveraudio import transcrever_arquivo as transcrever_audio_arquivo
-    import json
-
-    def run():
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateTranscreverAudioProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
-
-        def progress(pct, status):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateTranscreverAudioProgress({{percent: {int(pct)}, status: '{_safe_msg(status)}'}})")
-                except:
-                    pass
-
-        pasta_base = os.path.dirname(file_path) or os.getcwd()
-        resultado = transcrever_audio_arquivo(file_path, modelo_key=model, idioma=language, callback_log=log, callback_progresso=progress)
-
-        if _window:
-            texto = resultado.get("texto_completo", "")
-            pasta = resultado.get("pasta_origem", pasta_base)
-            payload = json.dumps({"complete": True, "texto": texto, "pasta_origem": pasta})
-            _window.evaluate_js(f"updateTranscreverAudioProgress({payload})")
-
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+    return transcrever_audio(file_path, model, language)
 
 
 def transcrever_salvar_txt(texto, pasta_origem):
@@ -1220,100 +956,35 @@ def transcrever_salvar_txt(texto, pasta_origem):
         return {"success": False, "error": str(e)}
 
 
-def remover_fundo(folder_path):
+def remover_fundo(caminho):
     from Functions.removerfundo import processar_imagem_preview, FORMATOS_SUPORTADOS
-    import json
     global _rf_cache
     _rf_cache = []
 
-    def run():
-        global _rf_cache
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateRemoverFundoProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
-
-        def progress(pct, status):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateRemoverFundoProgress({{percent: {int(pct)}, status: '{_safe_msg(status)}'}})")
-                except:
-                    pass
-
-        arquivos = sorted([
-            os.path.join(folder_path, f) for f in os.listdir(folder_path)
-            if os.path.isfile(os.path.join(folder_path, f))
-            and os.path.splitext(f)[1].lower() in FORMATOS_SUPORTADOS
-        ])
-
+    def trabalho(log, progresso):
+        if _is_file(caminho):
+            arquivos = [caminho]
+        else:
+            arquivos = sorted(os.path.join(caminho, f) for f in os.listdir(caminho)
+                              if os.path.splitext(f)[1].lower() in FORMATOS_SUPORTADOS)
         if not arquivos:
-            log("Nenhuma imagem encontrada.")
-            if _window:
-                _window.evaluate_js("updateRemoverFundoProgress({complete: true})")
-            return
-
-        total = len(arquivos)
-        resultados_js = []
+            raise RuntimeError("Nenhuma imagem encontrada.")
+        resultados = []
         for i, path in enumerate(arquivos):
+            progresso(i / len(arquivos) * 100, f"{i + 1}/{len(arquivos)} • {os.path.basename(path)}")
             r = processar_imagem_preview(path, callback_log=log)
             if r:
                 _rf_cache.append({"nome": r["nome"], "resultado_pil": r["resultado_pil"]})
-                resultados_js.append({
-                    "nome": r["nome"],
-                    "original_b64": r["original_b64"],
-                    "resultado_b64": r["resultado_b64"],
-                })
-            progress(int((i + 1) / total * 100), f"{i+1}/{total}")
+                resultados.append({k: r[k] for k in ("nome", "original_b64", "resultado_b64")})
+        if not resultados:
+            raise RuntimeError("Nenhuma imagem pôde ser processada. Veja o log.")
+        return {"resumo": f"{len(resultados)} imagem(ns) prontas para revisar", "resultados": resultados}
 
-        if _window:
-            if resultados_js:
-                playConcluido_js = "if(typeof playConcluido==='function')playConcluido();"
-                payload = json.dumps({"complete": True, "resultados": resultados_js})
-                _window.evaluate_js(f"{playConcluido_js}updateRemoverFundoProgress({payload})")
-            else:
-                _window.evaluate_js("updateRemoverFundoProgress({complete: true})")
-
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+    return _tarefa("updateRemoverFundoProgress", trabalho)
 
 
 def remover_fundo_file(file_path):
-    from Functions.removerfundo import processar_imagem_preview
-    import json
-    global _rf_cache
-    _rf_cache = []
-
-    def run():
-        global _rf_cache
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateRemoverFundoProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
-
-        if _window:
-            _window.evaluate_js("updateRemoverFundoProgress({percent: 10, status: 'Processando...'})")
-
-        r = processar_imagem_preview(file_path, callback_log=log)
-
-        if _window:
-            if r:
-                _rf_cache.append({"nome": r["nome"], "resultado_pil": r["resultado_pil"]})
-                playConcluido_js = "if(typeof playConcluido==='function')playConcluido();"
-                payload = json.dumps({"complete": True, "resultados": [{
-                    "nome": r["nome"],
-                    "original_b64": r["original_b64"],
-                    "resultado_b64": r["resultado_b64"],
-                }]})
-                _window.evaluate_js(f"{playConcluido_js}updateRemoverFundoProgress({payload})")
-            else:
-                _window.evaluate_js("updateRemoverFundoProgress({complete: true})")
-
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+    return remover_fundo(file_path)
 
 
 def remover_fundo_salvar(indices, pasta_destino):
@@ -1336,71 +1007,29 @@ def remover_fundo_salvar(indices, pasta_destino):
 
 
 def organizador_imagens(folder_path, modo="completa"):
-    from Functions.organizador_de_imagens import (
-        identificar_duplicadas,
-        identificar_thumbs,
-        limpar_pasta as organizar_imagens,
-    )
-    
-    def run():
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateOrganizadorImagensProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
-        
-        def emit_p(p, status):
-            if _window:
-                _window.evaluate_js(f"updateOrganizadorImagensProgress({{percent: {p}}})")
+    from Functions.organizador_de_imagens import identificar_duplicadas, identificar_thumbs, limpar_pasta
 
+    def trabalho(log, progresso):
         modo_norm = str(modo or "completa").lower()
         if modo_norm == "duplicadas":
-            log("Identificando duplicadas...")
-            identificar_duplicadas(folder_path, callback_log=log, callback_progresso=emit_p)
-            emit_p(100, "Concluido")
-            if _window:
-                _window.evaluate_js("updateOrganizadorImagensProgress({complete: true})")
-                os.startfile(folder_path)
-            return
-
+            identificar_duplicadas(folder_path, callback_log=log, callback_progresso=progresso)
+            return {"resumo": "Duplicadas identificadas", "abrir": folder_path}
         if modo_norm == "thumbs":
-            log("Identificando thumbs...")
-            identificar_thumbs(folder_path, callback_log=log, callback_progresso=emit_p)
-            emit_p(100, "Concluido")
-            if _window:
-                _window.evaluate_js("updateOrganizadorImagensProgress({complete: true})")
-                os.startfile(folder_path)
-            return
+            identificar_thumbs(folder_path, callback_log=log, callback_progresso=progresso)
+            return {"resumo": "Thumbs identificadas", "abrir": folder_path}
 
-        # 1. Limpeza básica (0-70%)
-        log("Iniciando organização...")
-        def progress1(p, status):
-            scaled = int(p * 0.70)
-            emit_p(scaled, status)
-            
-        organizar_imagens(folder_path, callback_log=log, callback_progresso=progress1)
-        
-        # 2. Mover gráficos escapados (70-85%)
-        log("Checando gráficos...")
-        emit_p(75, "Checando gráficos...")
+        limpar_pasta(folder_path, callback_log=log, callback_progresso=lambda p, s=None: progresso(p * 0.7, s))
+        progresso(75, "Checando gráficos...")
         _mover_graficos_de_imagens_em_alta(folder_path, callback_log=log)
-        
-        # 3. Renomear por contexto CLIP (85-100%)
         pasta_alta = os.path.join(folder_path, "imagens_em_alta")
-        if os.path.exists(pasta_alta):
-            log("Renomeando imagens por contexto...")
-            # Como renomear não tem progresso nativo, vamos apenas saltar
-            emit_p(90, "Renomeando...")
-            _renomear_imagens_por_contexto(pasta_alta, callback_log=log)
-        
-        emit_p(100, "Concluído")
-        if _window:
-            _window.evaluate_js("updateOrganizadorImagensProgress({complete: true})")
-            os.startfile(folder_path)
-    
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+        if os.path.isdir(pasta_alta):
+            progresso(85, "Renomeando por contexto...")
+            _renomear_imagens_por_contexto(
+                pasta_alta, callback_log=log,
+                callback_status=lambda i, t: progresso(85 + i / max(t, 1) * 15, f"Renomeando {i}/{t}"))
+        return {"resumo": "Pasta organizada", "abrir": folder_path}
+
+    return _tarefa("updateOrganizadorImagensProgress", trabalho)
 
 
 def escanear_cameras_videos(folder_path):
@@ -1473,23 +1102,12 @@ def organizador_videos(folder_path, operadores=None, nome_projeto_premiere=None)
 
 def transcrever_cena(folder_path):
     from Functions.transcrever_cena import analisar_e_renomear_pasta
-    
-    def run():
-        def log(msg):
-            if _window:
-                try:
-                    _window.evaluate_js(f"updateTranscreverCenaProgress({{log: '{_safe_msg(msg)}'}})")
-                except:
-                    pass
-        
+
+    def trabalho(log, progresso):
         analisar_e_renomear_pasta(folder_path, callback_log=log)
-        
-        if _window:
-            _window.evaluate_js("updateTranscreverCenaProgress({complete: true})")
-            os.startfile(folder_path)
-    
-    threading.Thread(target=run, daemon=True).start()
-    return {"success": True}
+        return {"resumo": "Cenas analisadas", "abrir": folder_path}
+
+    return _tarefa("updateTranscreverCenaProgress", trabalho)
 
 
 # ========================================
@@ -1551,16 +1169,16 @@ def cerebro_select_file():
 
 
 def gdrive_check():
-    from Functions.gdrive_dumper import verificar_gdrive_configurado
+    from Functions.gdrive_dumper import usa_client_proprio
     try:
-        ok = verificar_gdrive_configurado()
+        ok = usa_client_proprio()
         return {"success": True, "configured": ok}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
 
 def gdrive_analyze(url):
-    from Functions.gdrive_dumper import parse_link, calcular_tamanho_pasta, get_folder_name, verificar_gdrive_configurado
+    from Functions.gdrive_dumper import parse_link, calcular_tamanho_pasta, get_folder_name, garantir_conexao
     import threading
 
     def run():
@@ -1576,8 +1194,9 @@ def gdrive_analyze(url):
             if not item_id:
                 send(error="URL inválida! Não encontrei o ID da pasta/arquivo.")
                 return
-            if not verificar_gdrive_configurado():
-                send(error="Google Drive não configurado no rclone. Execute 'rclone config' e crie o remote 'gdrive'.")
+            ok, erro = garantir_conexao(callback_log=log)
+            if not ok:
+                send(error=erro)
                 return
 
             log("Obtendo informações...")
@@ -2191,18 +1810,18 @@ class ApiBridge:
     def compressor_imagem_file(self, file_path, force_fullhd=False):
         return compressor_imagem_file(file_path, force_fullhd)
 
-    def compressor_video(self, folder_path, mode="copy", gpu="cpu"):
-        compressor_video(folder_path, mode, gpu)
+    def compressor_video(self, folder_path, mode="copy", gpu="cpu", qualidade="equilibrada"):
+        return compressor_video(folder_path, mode, gpu, qualidade)
 
-    def compressor_video_file(self, file_path, mode="copy", gpu="cpu"):
-        compressor_video_file(file_path, mode, gpu)
+    def compressor_video_file(self, file_path, mode="copy", gpu="cpu", qualidade="equilibrada"):
+        return compressor_video_file(file_path, mode, gpu, qualidade)
 
     # media tools
     def video_downloader_info(self, url):
         return video_downloader_info(url)
 
-    def video_downloader(self, url, destino="", formato="mp4"):
-        return video_downloader(url, destino, formato)
+    def video_downloader(self, url, destino="", formato="mp4", qualidade="compativel"):
+        return video_downloader(url, destino, formato, qualidade)
 
     def favicon_generator(self, image_path, site_name, theme_color):
         return favicon_generator(image_path, site_name, theme_color)
@@ -2323,14 +1942,6 @@ def main():
     if precisa_instalar():
         executar_instalacao()
 
-    # Inicializa modelos em background para não atrasar a abertura da janela
-    def _setup_modelos():
-        from Functions.setup_app import verificar_e_instalar_modelos
-        verificar_e_instalar_modelos()
-    threading.Thread(target=_setup_modelos, daemon=True).start()
-
-    # Cria API com métodos explícitos
-
     # Cria API com métodos explícitos
     api = ApiBridge()
     
@@ -2399,19 +2010,16 @@ def main():
     window.events.closed += _on_window_closed
 
     def _bind_drop():
-        """Arrastar arquivo de vídeo para o editor (pywebview entrega o caminho real)."""
+        """Arrastar arquivos/pastas para qualquer ferramenta (pywebview entrega o caminho real)."""
         try:
             from webview.dom import DOMEventHandler
 
             def _on_drop(e):
                 files = (e.get("dataTransfer") or {}).get("files") or []
-                for f in files:
-                    p = f.get("pywebviewFullPath")
-                    if p and os.path.splitext(p)[1].lower() in (
-                            ".mp4", ".mov", ".mkv", ".avi", ".webm", ".flv", ".wmv", ".m4v",
-                            ".ts", ".mts", ".m2ts", ".3gp", ".ogv", ".mpg", ".mpeg"):
-                        window.evaluate_js(f"veOpenPath({json.dumps(p)})")
-                        break
+                caminhos = [{"path": p, "pasta": os.path.isdir(p)}
+                            for p in (f.get("pywebviewFullPath") for f in files) if p]
+                if caminhos:
+                    window.evaluate_js(f"onArquivosSoltos({json.dumps(caminhos)})")
 
             window.dom.document.events.drop += DOMEventHandler(_on_drop, True, True)
         except Exception as e:

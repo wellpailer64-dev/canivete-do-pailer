@@ -28,13 +28,32 @@ from PIL import Image
 ARQUIVOS = [
     {"nome": "favicon-16x16.png",          "size": (16,  16),  "formato": "PNG"},
     {"nome": "favicon-32x32.png",          "size": (32,  32),  "formato": "PNG"},
+    {"nome": "favicon-48x48.png",          "size": (48,  48),  "formato": "PNG"},
     {"nome": "favicon-128x128.png",        "size": (128, 128), "formato": "PNG"},
-    {"nome": "favicon-48x48.ico",          "size": (48,  48),  "formato": "ICO"},
-    {"nome": "favicon-180x180.ico",        "size": (180, 180), "formato": "ICO"},
-    {"nome": "apple-touch-icon.png",       "size": (180, 180), "formato": "PNG"},
+    # iOS não aceita transparência no ícone: recebe fundo (cor do tema)
+    {"nome": "apple-touch-icon.png",       "size": (180, 180), "formato": "PNG", "opaco": True},
     {"nome": "android-chrome-192x192.png", "size": (192, 192), "formato": "PNG"},
     {"nome": "android-chrome-512x512.png", "size": (512, 512), "formato": "PNG"},
 ]
+
+
+SNIPPET_HTML = """<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="{cor}">
+"""
+
+
+def _cor_rgba(hex_cor):
+    h = str(hex_cor or "#ffffff").lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    try:
+        return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), 255)
+    except ValueError:
+        return (255, 255, 255, 255)
 
 
 # =========================
@@ -62,7 +81,7 @@ def gerar_favicon(path_imagem, nome_site="", cor_tema="#ffffff",
         callback_log(f"📁 Salvando em: {pasta_saida}")
         callback_log("")
 
-    total    = len(ARQUIVOS) + 2  # +2 para .ico e .webmanifest
+    total    = len(ARQUIVOS) + 3  # + .ico, .webmanifest e snippet
     gerados  = []
     etapa    = 0
 
@@ -71,18 +90,13 @@ def gerar_favicon(path_imagem, nome_site="", cor_tema="#ffffff",
         w, h = img_original.size
 
         if w != h:
+            # Centraliza num quadrado transparente: nada da imagem é cortado
+            size = max(w, h)
+            quadrado = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+            quadrado.paste(img_original, ((size - w) // 2, (size - h) // 2))
+            img_original = quadrado
             if callback_log:
-                callback_log(f"⚙️  Ajustando imagem ({w}x{h}) para 1:1...")
-
-            size = min(w, h)
-            left = (w - size) // 2
-            top = (h - size) // 2
-            right = left + size
-            bottom = top + size
-            img_original = img_original.crop((left, top, right, bottom))
-
-            if callback_log:
-                callback_log(f"✅ Imagem cropada para {size}x{size}")
+                callback_log(f"⚙️  Imagem {w}x{h} centralizada em {size}x{size} (sem cortes)")
     except Exception as e:
         if callback_log:
             callback_log(f"❌ Erro ao abrir imagem: {e}")
@@ -94,9 +108,8 @@ def gerar_favicon(path_imagem, nome_site="", cor_tema="#ffffff",
         try:
             img_redim = img_original.resize(arq["size"], Image.LANCZOS)
 
-            # Preencher com fundo branco se tiver transparência (para ícones de pasta Windows)
-            if img_redim.mode == "RGBA":
-                background = Image.new("RGBA", arq["size"], (255, 255, 255, 255))
+            if arq.get("opaco"):
+                background = Image.new("RGBA", arq["size"], _cor_rgba(cor_tema))
                 background.paste(img_redim, (0, 0), img_redim)
                 img_redim = background
 
@@ -113,19 +126,13 @@ def gerar_favicon(path_imagem, nome_site="", cor_tema="#ffffff",
         if callback_progresso:
             callback_progresso(int(etapa / total * 90), f"Gerando {arq['nome']}...")
 
-    # --- ICO multi-tamanho (sem transparência para compatibilidade Windows) ---
+    # --- ICO multi-tamanho (PNG com transparência dentro do ICO) ---
     etapa += 1
     try:
         ico_sizes  = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
         ico_frames = []
         for s in ico_sizes:
-            img_resized = img_original.resize(s, Image.LANCZOS)
-            if img_resized.mode == "RGBA":
-                background = Image.new("RGBA", s, (255, 255, 255, 255))
-                background.paste(img_resized, (0, 0), img_resized)
-                ico_frames.append(background)
-            else:
-                ico_frames.append(img_resized.convert("RGBA"))
+            ico_frames.append(img_original.resize(s, Image.LANCZOS).convert("RGBA"))
         
         path_ico = os.path.join(pasta_saida, "favicon.ico")
         
@@ -202,6 +209,16 @@ def gerar_favicon(path_imagem, nome_site="", cor_tema="#ffffff",
     except Exception as e:
         if callback_log:
             callback_log(f"❌ Erro ao gerar site.webmanifest: {e}")
+
+    try:
+        with open(os.path.join(pasta_saida, "COLE-NO-HEAD.html"), "w", encoding="utf-8") as f:
+            f.write(SNIPPET_HTML.format(cor=cor_tema))
+        gerados.append("COLE-NO-HEAD.html")
+        if callback_log:
+            callback_log("✅ COLE-NO-HEAD.html (tags prontas para o <head> do site)")
+    except Exception as e:
+        if callback_log:
+            callback_log(f"❌ Erro ao gerar COLE-NO-HEAD.html: {e}")
 
     if callback_progresso:
         callback_progresso(100, "Finalizado")

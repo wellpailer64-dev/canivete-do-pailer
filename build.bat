@@ -22,11 +22,11 @@ if errorlevel 1 (
  )
 )
 
-:: Garante o motor de download de video
-python -c "import yt_dlp" 2>nul
+:: Garante o motor de download de video (com os scripts EJS do YouTube)
+python -c "import yt_dlp, yt_dlp_ejs" 2>nul
 if errorlevel 1 (
  echo Instalando yt-dlp...
- python -m pip install yt-dlp
+ python -m pip install "yt-dlp[default]"
  if errorlevel 1 (
   echo ERRO: nao foi possivel instalar yt-dlp.
   if not defined CI_MODE pause
@@ -61,6 +61,7 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "Functions.updater" ^
  --hidden-import "huggingface_hub" ^
  --hidden-import "whisper" ^
+ --collect-all "yt_dlp_ejs" ^
  --collect-all "webview" ^
  --collect-all "pythonnet" ^
  --collect-all "clr_loader" ^

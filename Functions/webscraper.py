@@ -394,27 +394,40 @@ def baixar_imagens_zip(imagens, destino_zip, callback=None, referer_url=""):
     puladas = 0
     nomes_usados = set()
 
-    with zipfile.ZipFile(destino_zip, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for i, img_url in enumerate(imagens, start=1):
-            try:
-                data, ct = _baixar_com_headers(img_url, timeout=30, referer=referer_url)
-                nome = _nome_arquivo_da_url(img_url, i)
-                ext_ct = _ext_por_content_type(ct)
-                stem, ext = os.path.splitext(nome)
-                if ext_ct and ext.lower() in {"", ".bin"}:
-                    nome = stem + ext_ct
-                if nome in nomes_usados:
-                    stem, ext = os.path.splitext(nome)
-                    nome = f"{stem}_{i:04d}{ext}"
-                nomes_usados.add(nome)
-                zf.writestr(nome, data)
-                baixadas += 1
-                if callback:
-                    callback(i, len(imagens), img_url, True)
-            except Exception:
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def _baixar(i_url):
+        i, img_url = i_url
+        try:
+            return i, img_url, _baixar_com_headers(img_url, timeout=30, referer=referer_url)
+        except Exception:
+            return i, img_url, None
+
+    # Download em paralelo; a escrita no zip fica numa thread só (zipfile não é thread-safe)
+    feitos = 0
+    with zipfile.ZipFile(destino_zip, "w", compression=zipfile.ZIP_STORED) as zf,             ThreadPoolExecutor(max_workers=8) as ex:
+        for fut in as_completed([ex.submit(_baixar, par) for par in enumerate(imagens, start=1)]):
+            i, img_url, res = fut.result()
+            feitos += 1
+            if res is None:
                 puladas += 1
                 if callback:
-                    callback(i, len(imagens), img_url, False)
+                    callback(feitos, len(imagens), img_url, False)
+                continue
+            data, ct = res
+            nome = _nome_arquivo_da_url(img_url, i)
+            ext_ct = _ext_por_content_type(ct)
+            stem, ext = os.path.splitext(nome)
+            if ext_ct and ext.lower() in {"", ".bin"}:
+                nome = stem + ext_ct
+            if nome in nomes_usados:
+                stem, ext = os.path.splitext(nome)
+                nome = f"{stem}_{i:04d}{ext}"
+            nomes_usados.add(nome)
+            zf.writestr(nome, data)
+            baixadas += 1
+            if callback:
+                callback(feitos, len(imagens), img_url, True)
 
     return {
         "zip_path": destino_zip,
@@ -437,5 +450,5 @@ def salvar_texto_txt(titulo: str, url: str, texto: str, destino_txt: str):
 
 
 def baixar_video_mp4(video_url: str, destino_dir: str, callback=None):
-    from videodownloader import baixar_video_mp4 as _baixar_video_mp4_unificado
+    from Functions.videodownloader import baixar_video_mp4 as _baixar_video_mp4_unificado
     return _baixar_video_mp4_unificado(video_url, destino_dir, callback=callback)

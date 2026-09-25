@@ -11,22 +11,29 @@
 
 ## ✨ O que é?
 
-O **Canivete do Pailer** é um app desktop Windows que reúne 8 ferramentas úteis para o dia a dia de editores de vídeo, criadores de conteúdo e profissionais criativos — tudo em uma interface simples, rápida e bonita.
+O **Canivete do Pailer** é um app desktop Windows que reúne 15 ferramentas para editores de vídeo, criadores de conteúdo e profissionais criativos. Tudo roda no seu PC, sem enviar arquivos para a nuvem. Dá para arrastar arquivos e pastas direto para qualquer ferramenta.
 
 ---
 
-## 🛠️ Ferramentas disponíveis
+## 🛠️ Ferramentas
 
-| # | Ferramenta | O que faz |
-|---|-----------|-----------|
-| 🗂️ | **Organizador de Imagens** | Detecta e remove duplicatas, classifica por tipo |
-| 🎵 | **Converter para MP3** | Converte qualquer áudio para MP3 via ffmpeg |
-| 🖼️ | **Converter Imagens** | Converte HEIC/HEIF, JPG, PNG, WebP, AVIF e mais |
-| 🎙️ | **Transcrever Áudios** | Transcrição automática via Whisper (IA) |
-| 🌐 | **Favicon Generator** | Gera favicons para sites em todos os tamanhos |
-| ✂️ | **Remover Fundo** | Remove fundo de imagens com IA (rembg) |
-| 🎬 | **Logger Brabo** | Organiza e renomeia vídeos automaticamente |
-| ☁️ | **GDrive Dumper** | Baixa pastas inteiras do Google Drive sem zip |
+| Área | Ferramenta | O que faz |
+|---|---|---|
+| 🎬 Vídeo | **Editor de Vídeo** | Corta, divide e exporta com atalhos estilo Premiere |
+| | **Comprimir Vídeo** | H.265 com GPU (NVIDIA/Intel/AMD); mantém o original se já estiver otimizado |
+| | **Converter Vídeo** | MP4, MOV, MKV, WEBM, AVI, GIF e MP3; troca o formato sem recodificar quando dá |
+| | **Baixar Vídeo** | YouTube, Instagram, TikTok e mais, até 4K (yt-dlp) |
+| | **Logger Pro** | Organiza cartões de câmera e monta o projeto do Premiere |
+| 🎵 Áudio | **Converter Áudio** | MP3, WAV, FLAC, M4A, OGG, Opus; extrai o áudio de vídeos |
+| | **Cortar Áudio** | Linha do tempo com várias faixas |
+| | **Transcrever** | Texto e legenda `.srt` com Whisper |
+| 🖼️ Imagem | **Converter Imagem** | HEIC, RAW, WEBP, AVIF, PNG, JPG, TIFF (mantém EXIF e perfil de cor) |
+| | **Comprimir Imagem** | Fotos e PDFs mais leves, em paralelo |
+| | **Remover Fundo** | Recorte com IA (ISNet) e revisão antes de salvar |
+| | **Organizar Imagens** | Duplicadas, thumbs, gráficos e renomeação por contexto (CLIP) |
+| | **Gerar Favicon** | Todos os ícones do site + manifest + código para o `<head>` |
+| ☁️ Web | **GDrive Dumper** | Baixa pastas inteiras do Google Drive (rclone) com retomada |
+| | **Web Scraper** | Imagens e vídeos de uma página, já organizados |
 
 ---
 
@@ -81,26 +88,16 @@ Gera `dist/CaniveteDoPailer/`. ⚠️ O build apaga `dist/` — não guarde mode
 
 ```
 canivete-do-pailer/
-├── interface_canivete_pailer.py   ← Hub principal
-├── gdrive_dumper.py               ← Módulo GDrive Dumper
-├── atualizador.py                 ← Auto-update
-├── organizador_de_imagens.py
-├── convertermp3.py
-├── converterimagem.py
-├── transcreveraudio.py
-├── removerfundo.py
-├── faviconconverter.py
-├── organizador_de_videos.py
-├── transcrever_cena.py
-├── snapshot_logger.py
-├── setup_modelos.py
-├── build.bat
-├── version.txt
-├── icone.ico
-├── splash.png
-├── splash.wav
-└── concluido.wav
+├── main.py              ← janela (pywebview) + ponte com o frontend
+├── first_run.py         ← setup do primeiro uso (baixa modelos, ffmpeg, rclone, deno)
+├── Functions/           ← uma ferramenta por módulo (midia.py = ffmpeg/caminhos comuns)
+├── frontend/            ← index.html, css/ (style, ui, editor), js/ (app, editor)
+├── modelos_ia/          ← baixado no primeiro uso (não versionado)
+├── build.bat            ← build PyInstaller
+└── version.txt
 ```
+
+Erros ficam registrados em `logs/erros.log`.
 
 ---
 

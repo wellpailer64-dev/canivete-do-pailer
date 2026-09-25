@@ -1,31 +1,51 @@
-import os
-import sys
-import subprocess
+"""
+videoconverter.py — converte vídeos entre formatos, vídeo→GIF/MP3 e GIF→vídeo.
 
+Quando os codecs já servem no formato de destino (ex.: MKV H.264 → MP4), só troca o
+"envelope" (remux, -c copy): leva segundos e não perde qualidade.
+"""
+import os
+
+from Functions.midia import probe, rodar_ffmpeg
 
 ENTRADA_VIDEO = {
-    ".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v", ".wmv", ".flv", ".mpeg", ".mpg"
+    ".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v", ".wmv", ".flv", ".mpeg", ".mpg",
+    ".mts", ".m2ts", ".ts", ".3gp", ".mxf",
 }
 
 FORMATOS_SAIDA_VIDEO = ["GIF", "MP3", "MP4", "AVI", "MKV", "MOV", "WEBM"]
 FORMATOS_SAIDA_GIF_PARA_VIDEO = ["MP4", "MOV", "WEBM"]
 
+EXT = {"MP4": ".mp4", "AVI": ".avi", "MKV": ".mkv", "MOV": ".mov", "WEBM": ".webm", "GIF": ".gif", "MP3": ".mp3"}
 
-def ffmpeg_path():
-    candidatos = []
-    try:
-        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        exe_dir = os.path.dirname(sys.executable) if hasattr(sys, "_MEIPASS") else base
-        candidatos.append(os.path.join(exe_dir, "modelos_ia", "ffmpeg.exe"))
-        candidatos.append(os.path.join(base, "modelos_ia", "ffmpeg.exe"))
-    except:
-        pass
+# Codecs que cada container aceita sem recodificar
+REMUX_OK = {
+    "MP4": ({"h264", "hevc", "av1", "mpeg4"}, {"aac", "mp3", "ac3", "eac3", "alac", "opus", ""}),
+    "MOV": ({"h264", "hevc", "prores", "mpeg4", "mjpeg"}, {"aac", "mp3", "pcm_s16le", "pcm_s24le", "alac", ""}),
+    "MKV": (None, None),  # MKV aceita praticamente tudo
+    "WEBM": ({"vp8", "vp9", "av1"}, {"opus", "vorbis", ""}),
+    "AVI": ({"h264", "mpeg4", "mjpeg"}, {"mp3", "ac3", "pcm_s16le", ""}),
+}
 
-    for p in candidatos:
-        if p and os.path.exists(p):
-            return os.path.abspath(p)
-
-    return "ffmpeg"
+# Recodificação quando precisa (compatível com Premiere / celulares / web)
+X264 = ["-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p"]
+VENC = {
+    "MP4": X264 + ["-movflags", "+faststart"],
+    "MOV": X264 + ["-movflags", "+faststart"],
+    "MKV": X264,
+    "AVI": X264,
+    "WEBM": ["-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-row-mt", "1", "-deadline", "good",
+             "-cpu-used", "4", "-pix_fmt", "yuv420p"],
+}
+AENC = {
+    "MP4": ["-c:a", "aac", "-b:a", "192k"],
+    "MOV": ["-c:a", "aac", "-b:a", "192k"],
+    "MKV": ["-c:a", "aac", "-b:a", "192k"],
+    "AVI": ["-c:a", "libmp3lame", "-b:a", "192k"],
+    "WEBM": ["-c:a", "libopus", "-b:a", "128k"],
+}
+# Dimensões pares (exigência do H.264/VP9 em 4:2:0)
+PAR = "scale=trunc(iw/2)*2:trunc(ih/2)*2"
 
 
 def detectar_tipo_arquivo(path):
@@ -44,142 +64,99 @@ def detectar_tipo_arquivo(path):
 def _nome_saida(path, ext_saida):
     base = os.path.splitext(path)[0]
     destino = f"{base}_convertido{ext_saida}"
-    if not os.path.exists(destino):
-        return destino
     n = 1
-    while True:
+    while os.path.exists(destino):
         destino = f"{base}_convertido_{n}{ext_saida}"
-        if not os.path.exists(destino):
-            return destino
         n += 1
+    return destino
 
 
-def converter_arquivo(path, formato_saida, loop_gif=True, callback_progresso=None, callback_log=None):
+def _pode_remux(info, fmt):
+    vcodecs, acodecs = REMUX_OK.get(fmt, (set(), set()))
+    if vcodecs is None:
+        return bool(info.get("codec_video"))
+    return info.get("codec_video") in vcodecs and info.get("codec_audio", "") in acodecs
+
+
+def converter_arquivo(path, formato_saida, loop_gif=True, callback_progresso=None, callback_log=None,
+                      on_progress=None):
+    """Converte um arquivo. Retorna {sucesso, saida | erro}."""
+    log = callback_log or (lambda m: None)
     tipo = detectar_tipo_arquivo(path)
-    if tipo == "invalido":
-        return {"sucesso": False, "erro": "Formato de entrada nao suportado"}
-    if tipo == "pasta":
-        return {"sucesso": False, "erro": "Caminho e uma pasta"}
+    if tipo in ("invalido", "pasta"):
+        return {"sucesso": False, "erro": "Formato de entrada não suportado"}
 
-    ffmpeg = ffmpeg_path()
-    saida = None
+    fmt = str(formato_saida or "").strip().upper()
+    if fmt not in EXT:
+        return {"sucesso": False, "erro": f"Formato {fmt} não suportado"}
+    if tipo == "gif" and fmt not in FORMATOS_SAIDA_GIF_PARA_VIDEO:
+        return {"sucesso": False, "erro": "GIF só converte para MP4, MOV ou WEBM"}
 
-    try:
-        fmt = str(formato_saida or "").strip().upper()
+    info = probe(path)
+    saida = _nome_saida(path, EXT[fmt])
+    nome = os.path.basename(path)
 
-        if tipo == "video":
-            if fmt == "GIF":
-                saida = _nome_saida(path, ".gif")
-                loop_val = "0" if loop_gif else "-1"
-                filtro = (
-                    "fps=12,scale='min(720,iw)':-2:flags=lanczos,"
-                    "split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer"
-                )
-                cmd = [
-                    ffmpeg, "-y", "-i", path,
-                    "-filter_complex", filtro,
-                    "-loop", loop_val,
-                    saida,
-                ]
-            elif fmt == "MP3":
-                saida = _nome_saida(path, ".mp3")
-                cmd = [
-                    ffmpeg, "-y", "-i", path,
-                    "-vn", "-acodec", "libmp3lame", "-ab", "192k",
-                    saida,
-                ]
-            else:
-                # Outros formatos de vídeo (transcoding simples)
-                ext_map = {"MP4": ".mp4", "AVI": ".avi", "MKV": ".mkv", "MOV": ".mov", "WEBM": ".webm"}
-                ext = ext_map.get(fmt)
-                if not ext:
-                    return {"sucesso": False, "erro": f"Formato {fmt} nao suportado para video"}
-                
-                saida = _nome_saida(path, ext)
-                cmd = [
-                    ffmpeg, "-y", "-i", path,
-                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-                    "-c:a", "aac",
-                    saida,
-                ]
+    if fmt == "GIF":
+        filtro = ("fps=15,scale='min(720,iw)':-2:flags=lanczos,split[s0][s1];"
+                  "[s0]palettegen=max_colors=192:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2_4a")
+        args = ["-i", path, "-filter_complex", filtro, "-loop", "0" if loop_gif else "-1", saida]
+        acao = "gerando GIF"
+    elif fmt == "MP3":
+        if info and not info.get("audio"):
+            return {"sucesso": False, "erro": "O vídeo não tem áudio"}
+        args = ["-i", path, "-vn", "-c:a", "libmp3lame", "-b:a", "320k", saida]
+        acao = "extraindo áudio"
+    elif tipo == "gif":
+        args = ["-i", path, "-vf", PAR, "-an"] + VENC[fmt] + [saida]
+        acao = "convertendo GIF"
+    elif info and _pode_remux(info, fmt):
+        args = ["-i", path, "-map", "0:v:0", "-map", "0:a?", "-c", "copy"]
+        if fmt in ("MP4", "MOV"):
+            args += ["-movflags", "+faststart"]
+            if info.get("codec_video") == "hevc":
+                args += ["-tag:v", "hvc1"]
+        args.append(saida)
+        acao = "trocando formato sem recodificar"
+    else:
+        args = ["-i", path, "-map", "0:v:0", "-map", "0:a:0?", "-vf", PAR] + VENC[fmt] + AENC[fmt] + [saida]
+        acao = "recodificando"
 
-        else:  # gif -> video
-            ext_map = {"MP4": ".mp4", "MOV": ".mov", "WEBM": ".webm"}
-            if fmt not in ext_map:
-                return {"sucesso": False, "erro": "Saida invalida para GIF (use MP4, MOV ou WEBM)"}
-
-            saida = _nome_saida(path, ext_map[fmt])
-
-            if fmt in ("MP4", "MOV"):
-                cmd = [
-                    ffmpeg, "-y", "-stream_loop", "-1", "-i", path,
-                    "-t", "15",
-                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-                    saida,
-                ]
-            else:  # WEBM
-                cmd = [
-                    ffmpeg, "-y", "-stream_loop", "-1", "-i", path,
-                    "-t", "15",
-                    "-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p",
-                    saida,
-                ]
-
-        if callback_log:
-            callback_log(f"Processando: {os.path.basename(path)}")
-
-        proc = subprocess.run(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=3600,
-            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
-        )
-
-        if proc.returncode == 0 and saida and os.path.exists(saida):
-            return {
-                "sucesso": True,
-                "saida": saida,
-                "tipo_entrada": tipo,
-                "formato_saida": fmt,
-            }
-
-        return {"sucesso": False, "erro": f"FFmpeg erro ({proc.returncode})"}
-
-    except Exception as e:
-        return {"sucesso": False, "erro": str(e)}
+    log(f"🎬 {nome}: {acao}...")
+    ok, erro = rodar_ffmpeg(args, duracao=info.get("duracao", 0), on_progress=on_progress)
+    if ok and os.path.exists(saida):
+        return {"sucesso": True, "saida": saida, "tipo_entrada": tipo, "formato_saida": fmt}
+    if os.path.exists(saida):
+        os.remove(saida)
+    return {"sucesso": False, "erro": (erro.splitlines() or ["erro do FFmpeg"])[-1]}
 
 
 def converter_pasta(pasta, formato_saida, loop_gif=True, callback_progresso=None, callback_log=None):
     if not os.path.isdir(pasta):
-        return {"sucesso": False, "erro": "Nao e uma pasta"}
+        return {"sucesso": False, "erro": "Não é uma pasta"}
+    arquivos = sorted(os.path.join(pasta, f) for f in os.listdir(pasta)
+                      if detectar_tipo_arquivo(os.path.join(pasta, f)) in ("video", "gif"))
+    return converter_lista(arquivos, formato_saida, loop_gif, callback_progresso, callback_log)
 
-    arquivos = []
-    for f in os.listdir(pasta):
-        p = os.path.join(pasta, f)
-        if os.path.isfile(p):
-            t = detectar_tipo_arquivo(p)
-            if t != "invalido":
-                arquivos.append(p)
 
-    if not arquivos:
-        return {"sucesso": False, "erro": "Nenhum arquivo conversivel encontrado"}
-
+def converter_lista(arquivos, formato_saida, loop_gif=True, callback_progresso=None, callback_log=None):
+    log = callback_log or (lambda m: None)
     total = len(arquivos)
+    if not total:
+        return {"sucesso": False, "erro": "Nenhum arquivo conversível encontrado"}
+    log(f"📥 {total} arquivo(s) para converter para {str(formato_saida).upper()}")
     sucessos = 0
-    
-    if callback_log:
-        callback_log(f"Encontrados {total} arquivos para conversao.")
-
+    saidas = []
     for i, path in enumerate(arquivos):
-        if callback_progresso:
-            callback_progresso(int(i / total * 100), f"Convertendo {i+1}/{total}...")
-        
-        res = converter_arquivo(path, formato_saida, loop_gif, callback_log=callback_log)
+        def on_p(p, i=i):
+            if callback_progresso:
+                callback_progresso(int((i + p / 100) / total * 100), f"{i + 1}/{total} • {os.path.basename(path)}")
+        res = converter_arquivo(path, formato_saida, loop_gif, callback_log=log, on_progress=on_p)
         if res.get("sucesso"):
             sucessos += 1
-
+            saidas.append(res["saida"])
+            log(f"✅ {os.path.basename(res['saida'])}")
+        else:
+            log(f"❌ {os.path.basename(path)}: {res.get('erro')}")
     if callback_progresso:
-        callback_progresso(100, "Concluido")
-
-    return {"sucesso": sucessos > 0, "total": total, "sucessos": sucessos}
+        callback_progresso(100, "Concluído")
+    return {"sucesso": sucessos > 0, "total": total, "sucessos": sucessos, "saidas": saidas}

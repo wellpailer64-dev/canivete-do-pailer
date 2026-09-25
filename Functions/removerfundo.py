@@ -1,7 +1,7 @@
 """
 removerfundo.py
 ===============
-Remove o fundo de imagens usando onnxruntime + modelo u2net diretamente.
+Remove o fundo de imagens usando onnxruntime + modelo ISNet (ou U2Net) diretamente.
 Não depende do import do rembg em tempo de execução — mais robusto no .exe
 
 Resultado: PNG com fundo transparente salvo em /sem_fundo
@@ -10,21 +10,55 @@ Resultado: PNG com fundo transparente salvo em /sem_fundo
 import os
 import sys
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
-FORMATOS_SUPORTADOS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif"}
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except Exception:
+    pass
+
+FORMATOS_SUPORTADOS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".heic", ".heif", ".avif"}
+
+
+def _abrir(path):
+    """Abre já na orientação certa (fotos de celular guardam a rotação no EXIF)."""
+    img = Image.open(path)
+    return (ImageOps.exif_transpose(img) or img).convert("RGBA")
 
 
 # =========================
 # 📁 PASTA DO MODELO
 # =========================
+# Modelos em ordem de preferência: (arquivo, lado da entrada, média, desvio)
+# ISNet recorta cabelo e bordas bem melhor que o U2Net, com custo parecido.
+MODELOS = [
+    ("isnet-general-use.onnx", 1024, (0.5, 0.5, 0.5), (1.0, 1.0, 1.0)),
+    ("u2net.onnx", 320, (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+]
+_sessao = {"path": None, "sess": None}
+
+
+def _get_modelo():
+    from Functions.midia import modelo_path
+    for arquivo, lado, mean, std in MODELOS:
+        p = modelo_path("u2net", arquivo)
+        if os.path.exists(p):
+            return p, lado, mean, std
+    return modelo_path("u2net", MODELOS[-1][0]), *MODELOS[-1][1:]
+
+
 def _get_modelo_path():
-    if hasattr(sys, "_MEIPASS"):
-        exe_dir = sys._MEIPASS
-    else:
-        # Se este arquivo está em Functions/, a raiz é um nível acima
-        exe_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(exe_dir, "modelos_ia", "u2net", "u2net.onnx")
+    return _get_modelo()[0]
+
+
+def _get_sessao(modelo_path):
+    """Carregar o modelo leva segundos: a sessão é criada uma vez e reaproveitada."""
+    if _sessao["path"] != modelo_path:
+        import onnxruntime as ort
+        _sessao["sess"] = ort.InferenceSession(modelo_path, providers=["CPUExecutionProvider"])
+        _sessao["path"] = modelo_path
+    return _sessao["sess"]
 
 
 # =========================
@@ -35,22 +69,17 @@ def _remover_fundo_onnx(img_pil, modelo_path):
     Remove o fundo usando onnxruntime diretamente.
     Retorna imagem PIL RGBA com fundo transparente.
     """
-    import onnxruntime as ort
+    lado, mean, std = next((m[1:] for m in MODELOS if m[0] == os.path.basename(modelo_path)), MODELOS[-1][1:])
 
-    # Prepara a imagem (u2net usa 320x320)
-    img = img_pil.convert("RGB").resize((320, 320), Image.LANCZOS)
-    img_np = np.array(img, dtype=np.float32) / 255.0
-
-    # Normalização padrão do u2net
-    mean = np.array([0.485, 0.456, 0.406])
-    std  = np.array([0.229, 0.224, 0.225])
-    img_np = (img_np - mean) / std
+    img = img_pil.convert("RGB").resize((lado, lado), Image.LANCZOS)
+    img_np = np.array(img, dtype=np.float32)
+    img_np = img_np / max(float(img_np.max()), 1e-6)
+    img_np = (img_np - np.array(mean)) / np.array(std)
 
     # HWC → CHW → NCHW
     img_np = img_np.transpose(2, 0, 1)[np.newaxis, :].astype(np.float32)
 
-    # Inferência
-    sess    = ort.InferenceSession(modelo_path, providers=["CPUExecutionProvider"])
+    sess    = _get_sessao(modelo_path)
     input_n = sess.get_inputs()[0].name
     output  = sess.run(None, {input_n: img_np})[0]
 
@@ -96,7 +125,7 @@ def remover_fundo_arquivo(path, pasta_saida, callback_log=None):
         if callback_log:
             callback_log(f"🔄 Processando: {os.path.basename(path)}...")
 
-        img_pil   = Image.open(path).convert("RGBA")
+        img_pil   = _abrir(path)
         resultado = _remover_fundo_onnx(img_pil, modelo_path)
         resultado.save(path_saida, format="PNG")
 
@@ -212,7 +241,7 @@ def processar_imagem_preview(path, callback_log=None):
     try:
         if callback_log:
             callback_log(f"🔄 Processando: {os.path.basename(path)}...")
-        img_original = Image.open(path).convert("RGBA")
+        img_original = _abrir(path)
         img_resultado = _remover_fundo_onnx(img_original, modelo_path)
         if callback_log:
             callback_log(f"✅ Pronto: {os.path.basename(path)}")

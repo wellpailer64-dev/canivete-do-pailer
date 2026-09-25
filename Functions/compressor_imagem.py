@@ -196,6 +196,21 @@ def _jpeg_save_kwargs(quality):
     }
 
 
+def _metadados(img):
+    """EXIF (data, câmera, GPS) e perfil de cor ICC para manter na imagem comprimida."""
+    meta = {}
+    icc = img.info.get("icc_profile")
+    if icc:
+        meta["icc_profile"] = icc
+    try:
+        exif = img.getexif()
+        if exif:
+            meta["exif"] = exif.tobytes()
+    except Exception:
+        pass
+    return meta
+
+
 def _tem_alpha(img):
     return img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
 
@@ -317,6 +332,7 @@ def _comprimir_imagem_multicandidatos(entrada, saida, force_fullhd=False):
 
         img = ImageOps.exif_transpose(_abrir_imagem(entrada))
         img.load()
+        meta = _metadados(img)
         if force_fullhd:
             img, _ = _aplicar_fullhd(img)
         modo = img.mode
@@ -326,7 +342,7 @@ def _comprimir_imagem_multicandidatos(entrada, saida, force_fullhd=False):
             img.close()
             for idx, quality in enumerate((72, 62, 52), 1):
                 tmp = _candidate_path(saida, idx)
-                rgb.save(tmp, format="JPEG", **_jpeg_save_kwargs(quality))
+                rgb.save(tmp, format="JPEG", **_jpeg_save_kwargs(quality), **meta)
                 candidatos.append(tmp)
                 if _bom_o_suficiente(tmp, tamanho_original, 0.70):
                     return _finalizar_candidato(tmp, saida, candidatos)
@@ -370,7 +386,7 @@ def _comprimir_imagem_multicandidatos(entrada, saida, force_fullhd=False):
         if ext == ".webp":
             for idx, quality in enumerate((72, 62, 52), 1):
                 tmp = _candidate_path(saida, idx)
-                img.save(tmp, format="WEBP", quality=quality, method=6)
+                img.save(tmp, format="WEBP", quality=quality, method=6, **meta)
                 candidatos.append(tmp)
                 if _bom_o_suficiente(tmp, tamanho_original, 0.70):
                     img.close()
@@ -384,7 +400,7 @@ def _comprimir_imagem_multicandidatos(entrada, saida, force_fullhd=False):
             img.close()
             for idx, quality in enumerate((72, 62, 52), 1):
                 tmp = _candidate_path(saida, idx)
-                rgb.save(tmp, format="JPEG", **_jpeg_save_kwargs(quality))
+                rgb.save(tmp, format="JPEG", **_jpeg_save_kwargs(quality), **meta)
                 candidatos.append(tmp)
                 if _bom_o_suficiente(tmp, tamanho_original, 0.70):
                     return _finalizar_candidato(tmp, saida, candidatos)
@@ -421,126 +437,94 @@ def comprimir_lista(
     stop_event=None,
     force_fullhd=False,
 ):
+    """Comprime vários arquivos em paralelo. Retorna estatísticas."""
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    from Functions.midia import workers
+
     os.makedirs(pasta_saida, exist_ok=True)
-
+    log = callback_log or (lambda m: None)
     total = len(arquivos)
-    ok = 0
-    erros = 0
-    total_orig = 0.0
-    total_final = 0.0
-    mantidos = 0
-    redimensionados = 0
+    lock = threading.Lock()
+    est = {"ok": 0, "erros": 0, "mantidos": 0, "redimensionados": 0,
+           "orig": 0.0, "final": 0.0, "feitos": 0}
 
-    for i, entrada in enumerate(arquivos, 1):
+    def _reservar(caminho):
+        # Reserva o nome sob lock para duas threads não escreverem no mesmo arquivo
+        with lock:
+            destino = _nome_seguro(caminho)
+            open(destino, "wb").close()
+            return destino
+
+    def _um(i, entrada):
         if stop_event and stop_event.is_set():
-            break
-
+            return
         if callback_arquivo:
             callback_arquivo(i, total, os.path.basename(entrada))
-
-        if not os.path.exists(entrada):
-            erros += 1
-            continue
-
         ext = os.path.splitext(entrada)[1].lower()
-        if ext not in EXTENSOES_SUPORTADAS:
-            erros += 1
-            continue
+        if not os.path.exists(entrada) or ext not in EXTENSOES_SUPORTADAS:
+            return "erro", 0, 0, False
 
-        acima_fullhd = False
-        tamanho_original_px = None
+        acima_fullhd, px = (False, None)
         if force_fullhd and ext in EXTENSOES_IMAGEM:
-            acima_fullhd, tamanho_original_px = _arquivo_acima_fullhd(entrada)
-            if acima_fullhd:
-                redimensionados += 1
+            acima_fullhd, px = _arquivo_acima_fullhd(entrada)
 
-        tam_orig_bytes = os.path.getsize(entrada)
-        tam_orig_mb = tam_orig_bytes / 1024 / 1024
-        total_orig += tam_orig_mb
-
+        tam_orig = os.path.getsize(entrada) / 1024 / 1024
         nome = os.path.basename(entrada)
         if ext in {".bmp", ".tif", ".tiff", ".heic", ".heif", ".cr2"}:
             nome = os.path.splitext(nome)[0] + ".jpg"
-
-        if manter_original:
-            destino = _nome_seguro(os.path.join(pasta_saida, nome))
-            trabalho = destino
-        else:
-            destino = entrada
-            trabalho = _nome_seguro(os.path.join(pasta_saida, f"__tmp_comp_{i}_{nome}"))
+        trabalho = _reservar(os.path.join(pasta_saida, nome if manter_original else f"__tmp_comp_{i}_{nome}"))
 
         sucesso, erro = comprimir_arquivo(entrada, trabalho, force_fullhd=force_fullhd)
-        if not sucesso:
-            if callback_log:
-                callback_log(f"✗ {os.path.basename(entrada)}: {erro}")
-            erros += 1
-            if callback_progresso:
-                callback_progresso(int(i / max(total, 1) * 100), f"Processando {i}/{total}")
-            continue
+        if not sucesso or not os.path.exists(trabalho) or os.path.getsize(trabalho) <= 0:
+            _cleanup_paths([trabalho])
+            log(f"✗ {os.path.basename(entrada)}: {erro or 'arquivo comprimido não foi gerado'}")
+            return "erro", tam_orig, tam_orig, acima_fullhd
 
-        if not os.path.exists(trabalho) or os.path.getsize(trabalho) <= 0:
-            if callback_log:
-                callback_log(f"✗ {os.path.basename(entrada)}: arquivo comprimido nao foi gerado")
-            erros += 1
-            if callback_progresso:
-                callback_progresso(int(i / max(total, 1) * 100), f"Processando {i}/{total}")
-            continue
+        tam_novo = os.path.getsize(trabalho) / 1024 / 1024
+        if tam_novo >= tam_orig:
+            _cleanup_paths([trabalho])
+            log(f"= {os.path.basename(entrada)}: original mantido ({_fmt_tamanho(tam_orig)}; "
+                f"tentativa gerou {_fmt_tamanho(tam_novo)})")
+            return "mantido", tam_orig, tam_orig, acima_fullhd
 
-        tam_trabalho_bytes = os.path.getsize(trabalho)
-        if tam_trabalho_bytes >= tam_orig_bytes:
+        if not manter_original:
             try:
-                if os.path.abspath(trabalho) != os.path.abspath(entrada):
-                    os.remove(trabalho)
-            except Exception:
-                pass
+                os.replace(trabalho, entrada)
+            except Exception as e:
+                _cleanup_paths([trabalho])
+                log(f"✗ Falha ao substituir {os.path.basename(entrada)}: {e}")
+                return "erro", tam_orig, tam_orig, acima_fullhd
 
-            mantidos += 1
-            total_final += tam_orig_mb
+        reducao = (1.0 - tam_novo / tam_orig) * 100 if tam_orig > 0 else 0
+        extra = f" | FullHD {px[0]}x{px[1]}" if acima_fullhd and px else ""
+        log(f"✓ {os.path.basename(entrada)}: {_fmt_tamanho(tam_orig)} -> {_fmt_tamanho(tam_novo)} (-{reducao:.0f}%){extra}")
+        return "ok", tam_orig, tam_novo, acima_fullhd
 
-            if callback_log:
-                tam_trabalho_mb = tam_trabalho_bytes / 1024 / 1024
-                callback_log(
-                    f"= {os.path.basename(entrada)}: original mantido "
-                    f"({_fmt_tamanho(tam_orig_mb)}; tentativa gerou {_fmt_tamanho(tam_trabalho_mb)})"
-                )
-
+    def _tarefa(args):
+        r = _um(*args)
+        with lock:
+            est["feitos"] += 1
+            if r:
+                status, o, f, redim = r
+                est["erros" if status == "erro" else "mantidos" if status == "mantido" else "ok"] += 1
+                est["orig"] += o
+                est["final"] += f
+                est["redimensionados"] += int(bool(redim))
             if callback_progresso:
-                callback_progresso(int(i / max(total, 1) * 100), f"Processando {i}/{total}")
-            continue
+                callback_progresso(int(est["feitos"] / max(total, 1) * 100), f"Processando {est['feitos']}/{total}")
 
-        try:
-            if not manter_original:
-                os.replace(trabalho, destino)
-        except Exception as e:
-            if callback_log:
-                callback_log(f"? Falha ao substituir: {e}")
-            erros += 1
-            continue
+    with ThreadPoolExecutor(max_workers=workers(6)) as ex:
+        list(ex.map(_tarefa, enumerate(arquivos, 1)))
 
-        tam_final_mb = os.path.getsize(destino if not manter_original else trabalho) / 1024 / 1024
-        total_final += tam_final_mb
-        ok += 1
-
-        if callback_log:
-            reducao = (1.0 - (tam_final_mb / tam_orig_mb)) * 100 if tam_orig_mb > 0 else 0
-            extra = ""
-            if acima_fullhd and tamanho_original_px:
-                extra = f" | FullHD {tamanho_original_px[0]}x{tamanho_original_px[1]}"
-            callback_log(
-                f"✓ {os.path.basename(entrada)}: {_fmt_tamanho(tam_orig_mb)} -> {_fmt_tamanho(tam_final_mb)} (-{reducao:.0f}%){extra}"
-            )
-
-        if callback_progresso:
-            callback_progresso(int(i / max(total, 1) * 100), f"Processando {i}/{total}")
-
-    reducao_pct = (1.0 - (total_final / total_orig)) * 100 if total_orig > 0 else 0.0
+    reducao_pct = (1.0 - est["final"] / est["orig"]) * 100 if est["orig"] > 0 else 0.0
     return {
         "total": total,
-        "ok": ok,
-        "erros": erros,
-        "mantidos": mantidos,
-        "redimensionados": redimensionados,
-        "total_orig_mb": total_orig,
-        "total_final_mb": total_final,
+        "ok": est["ok"],
+        "erros": est["erros"],
+        "mantidos": est["mantidos"],
+        "redimensionados": est["redimensionados"],
+        "total_orig_mb": est["orig"],
+        "total_final_mb": est["final"],
         "reducao_pct": reducao_pct,
     }

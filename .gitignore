@@ -61,3 +61,6 @@ frontend/_audio_preview/
 frontend/_video_preview/
 frontend/_cv_progress.json
 *.pek
+
+# Credencial do Google (gerada no build a partir do secret do GitHub)
+Functions/_credenciais.py
