@@ -152,7 +152,7 @@ function veRestore(snap) {
     VE.clips = d.clips; VE.inPt = d.inPt; VE.outPt = d.outPt;
     VE.sel = -1;
     veRelayout();
-    veAfterEdit(d.playhead);
+    veAfterEdit(VE.playhead);   // como no Premiere, desfazer não mexe na agulha
 }
 
 function veUndo() {
@@ -247,6 +247,37 @@ function veDeleteClip(i) {
     if (i < 0 || i >= VE.clips.length) return;
     const l = VE.lay[i];
     veRippleRemove(l.ts, l.te, 'Clipe apagado');
+}
+
+// Arrastar clipe: onde ele entra se o início for solto em `start` (tempo da sequência).
+// Retorna o índice de inserção na lista sem o clipe (encaixa no corte mais próximo).
+function veMoveTarget(i, start) {
+    let t = 0, best = 0, bd = Infinity, k = 0;
+    const pts = [0];
+    VE.clips.forEach((c, j) => { if (j !== i) { t += c.e - c.s; pts.push(t); } });
+    for (k = 0; k < pts.length; k++) {
+        const d = Math.abs(pts[k] - start);
+        if (d < bd) { bd = d; best = k; }
+    }
+    return best;
+}
+
+// Ordem de exibição durante o arraste (prévia do resultado)
+function veMoveOrder(i, k) {
+    const idx = VE.clips.map((_, j) => j).filter(j => j !== i);
+    idx.splice(k, 0, i);
+    return idx;
+}
+
+function veMoveClip(i, k) {
+    const order = veMoveOrder(i, k);
+    if (order.every((j, pos) => j === pos)) { veDraw(); return; }   // soltou no mesmo lugar
+    vePushHistory();
+    VE.clips = order.map(j => VE.clips[j]);
+    VE.sel = order.indexOf(i);
+    veRelayout();
+    veAfterEdit(VE.playhead);
+    veToast(`Clipe movido para a posição ${VE.sel + 1}`);
 }
 
 // Q: apaga do início do clipe sob a agulha até a agulha (ripple trim, como no Premiere)
@@ -609,13 +640,22 @@ function veRender() {
     ctx.save();
     ctx.beginPath(); ctx.rect(0, VE_RULER, W, H - VE_RULER); ctx.clip();
     const n = VE.peaks.length;
-    VE.clips.forEach((c, i) => {
-        const { ts, te } = VE.lay[i];
+    // Lista a desenhar: normalmente a sequência; ao arrastar um clipe, a prévia com ele na nova posição
+    const mv = VE.drag && VE.drag.mode === 'move' && VE.drag.active ? VE.drag : null;
+    const order = mv ? veMoveOrder(mv.i, mv.k) : VE.clips.map((_, j) => j);
+    let acc = 0;
+    const items = order.map((j, pos) => {
+        const c = VE.clips[j], it = { c, i: j, pos, ts: acc, te: acc + (c.e - c.s), ghost: mv && j === mv.i };
+        acc = it.te;
+        return it;
+    });
+    items.forEach(({ c, i, pos, ts, te, ghost }) => {
         const x1 = X(ts), x2 = X(te);
         if (x2 < -2 || x1 > W + 2) return;
         const cx = Math.max(x1, -4) + 1, cw = Math.min(x2, W + 4) - Math.max(x1, -4) - 2;
         if (cw <= 0) return;
         const srcAt = x => c.s + (VE.view + x / VE.pps - ts);   // x do canvas -> tempo da fonte
+        ctx.globalAlpha = ghost ? 0.7 : 1;
 
         // ---- vídeo
         const vy = rV.y + 3, vh = rV.h - 6;
@@ -641,7 +681,7 @@ function veRender() {
         if (cw > 50 && vh >= 14) {
             ctx.fillStyle = '#eef0ff';
             ctx.font = '600 10.5px Segoe UI';
-            ctx.fillText(`Clipe ${i + 1}` + (cw > 150 ? '  ·  ' + veShort(te - ts) : ''), cx + 6, vy + 10.5);
+            ctx.fillText(`Clipe ${pos + 1}` + (cw > 150 ? '  ·  ' + veShort(te - ts) : ''), cx + 6, vy + 10.5);
         }
         ctx.restore();
 
@@ -671,14 +711,27 @@ function veRender() {
         }
         ctx.restore();
 
-        // seleção
-        if (i === VE.sel) {
+        ctx.globalAlpha = 1;
+
+        // seleção (o clipe sendo arrastado ganha contorno tracejado)
+        if (i === VE.sel || ghost) {
             ctx.strokeStyle = '#F97316';
             ctx.lineWidth = 2;
+            if (ghost) ctx.setLineDash([5, 3]);
             veRoundRect(ctx, cx, vy, cw, vh, 4); ctx.stroke();
             veRoundRect(ctx, cx, ay, cw, ah, 4); ctx.stroke();
+            ctx.setLineDash([]);
         }
     });
+    // marcador de inserção (onde o clipe arrastado entra)
+    if (mv) {
+        const g = items.find(it => it.ghost);
+        const gx = Math.round(X(g.ts)) + 0.5;
+        ctx.fillStyle = '#F97316';
+        ctx.fillRect(gx - 1, rV.y, 2, rA.y + rA.h - rV.y);
+        ctx.beginPath(); ctx.moveTo(gx - 6, rV.y); ctx.lineTo(gx + 6, rV.y); ctx.lineTo(gx, rV.y + 7); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(gx - 6, rA.y + rA.h); ctx.lineTo(gx + 6, rA.y + rA.h); ctx.lineTo(gx, rA.y + rA.h - 7); ctx.closePath(); ctx.fill();
+    }
     ctx.restore();
 
     // guia da lâmina
@@ -1228,13 +1281,14 @@ function veInitEvents() {
             veSplitAt(veSnapTime(t, true));
             return;
         }
-        // seleção: clicar num clipe (V1/A1) seleciona; clicar numa trilha vazia desmarca
+        // seleção: clicar num clipe só seleciona (a agulha fica onde está — ela anda pela régua).
+        // Segurar e arrastar move o clipe na sequência; clicar em área vazia desmarca.
         const row = veRowAt(y);
-        VE.sel = row && row.main ? veClipAt(veClamp(t)) : -1;
-        if (VE.playing) v.pause();
-        VE.drag = { mode: 'scrub' };
-        veSeek(veSnapTime(t));
+        const i = row && row.main && t >= 0 && t <= VE.dur ? veClipAt(t) : -1;
+        VE.sel = i;
+        if (i >= 0) VE.drag = { mode: 'move', i, x0: e.clientX, y0: e.clientY, grab: t - VE.lay[i].ts, active: false, k: i };
         veRenderClips();
+        veDraw();
     });
 
     wrap.addEventListener('pointermove', e => {
@@ -1242,6 +1296,22 @@ function veInitEvents() {
         VE.hoverX = x;
         if (!VE.drag) {
             if (VE.tool === 'razor') veDraw();
+            return;
+        }
+        if (VE.drag.mode === 'move') {
+            const d = VE.drag;
+            if (!d.active) {
+                if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 5) return;   // ainda é um clique
+                d.active = true;
+                if (VE.playing) v.pause();
+                wrap.classList.add('moving');
+            }
+            // auto-rolagem nas bordas
+            const w = veCanvasWidth();
+            if (x > w - 24) { VE.view += 14 / VE.pps; veClampView(); }
+            if (x < 24) { VE.view -= 14 / VE.pps; veClampView(); }
+            d.k = veMoveTarget(d.i, veTimeFromEvent(e).t - d.grab);
+            veDraw();
             return;
         }
         if (VE.drag.mode === 'pan') {
@@ -1259,8 +1329,11 @@ function veInitEvents() {
     });
 
     const endDrag = () => {
+        const d = VE.drag;
         VE.drag = null;
-        wrap.classList.remove('dragging', 'scrub');
+        wrap.classList.remove('dragging', 'scrub', 'moving');
+        if (d && d.mode === 'move' && d.active) veMoveClip(d.i, d.k);
+        else veDraw();
     };
     wrap.addEventListener('pointerup', endDrag);
     wrap.addEventListener('pointercancel', endDrag);

@@ -584,3 +584,4 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-mz-btn.active { color: var(--ve-accent); }
 .ve-mz-val { min-width: 42px; padding: 0 6px; text-align: right; font: 600 11px var(--ve-mono); color: var(--ve-text); }
 .ve-screen:has(.ve-empty:not([hidden])) .ve-mzoom { display: none; }
+.ve-tl-wrap.moving, .ve-tl-wrap.moving * { cursor: grabbing; }

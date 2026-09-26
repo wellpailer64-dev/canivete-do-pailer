@@ -435,11 +435,11 @@ def _normalizar_segmentos(segmentos, duracao):
             continue
         if b - a >= 0.04:
             sane.append([a, b])
-    sane.sort()
+    # A ordem é a da timeline (o usuário pode reordenar clipes); só junta vizinhos colados
     merged = []
     for a, b in sane:
-        if merged and a <= merged[-1][1] + 0.001:
-            merged[-1][1] = max(merged[-1][1], b)
+        if merged and abs(a - merged[-1][1]) <= 0.001:
+            merged[-1][1] = b
         else:
             merged.append([a, b])
     return [(a, b) for a, b in merged]
@@ -478,7 +478,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     saida = _nome_saida(path, cfg["ext"], pasta_saida)
     has_audio = info["has_audio"] and not sem_audio
 
-    usar_inputs = len(segs) <= 150
+    em_ordem = all(segs[k][0] >= segs[k - 1][1] - 0.001 for k in range(1, len(segs)))
+    # select/aselect só funciona com trechos em ordem crescente; reordenados sempre vão por concat
+    usar_inputs = len(segs) <= 150 or not em_ordem
     cmd = [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1"]
     filtros = []
     if usar_inputs:
