@@ -40,7 +40,7 @@ const VE = {
 };
 
 const VE_RULER = 28;
-const VE_MAX_PPS = 600;
+const VE_MAX_PPS = 3000;   // zoom máximo: ~100 px por quadro a 30 fps
 const VE_TRACK_MIN = 22, VE_TRACK_MAX = 220;
 const $ve = id => document.getElementById(id);
 
@@ -608,7 +608,9 @@ function veRender() {
 
     // ticks
     const major = veNiceStep(90 / VE.pps);
-    const minor = major / (major >= 1 ? 5 : 2);
+    // divisões menores: em zoom alto, sempre em quadros inteiros
+    const fr = Math.round(major * (VE.fps || 30));
+    const minor = major >= 0.5 ? major / 5 : ({ 1: 1, 2: 1, 5: 1, 10: 2 }[fr] || 1) / (VE.fps || 30);
     ctx.fillStyle = '#333';
     for (let t = Math.floor(t0 / minor) * minor; t <= t1; t += minor) {
         const x = Math.round(X(t)) + 0.5;
@@ -1349,7 +1351,9 @@ function veInitEvents() {
         }
         if (!VE.ready) return;
         if (e.ctrlKey || e.altKey) {
-            const f = e.deltaY < 0 ? 1.2 : 1 / 1.2;
+            // Alt/Ctrl+roda: zoom na timeline mantendo fixo o instante sob o cursor.
+            // Proporcional ao giro (roda comum ≈ 25% por passo; touchpad fica suave).
+            const f = Math.exp(-Math.max(-300, Math.min(300, e.deltaY)) * 0.0022);
             veSetPps(VE.pps * f, VE.view + x / VE.pps, x);
         } else {
             const d = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY);
@@ -1426,6 +1430,7 @@ function veInitEvents() {
     veInitResizers();
     veInitMonitorZoom();
     document.addEventListener('keydown', veOnKey);
+    document.addEventListener('keyup', e => { if (e.key === 'Alt' && veIsActive()) e.preventDefault(); });
     // Botões não ficam com foco (senão o Espaço "clica" neles em vez de dar play)
     $ve('ve').addEventListener('mouseup', e => {
         const b = e.target.closest('button');
@@ -1435,6 +1440,8 @@ function veInitEvents() {
 
 function veOnKey(e) {
     if (!veIsActive()) return;
+    // Alt sozinho ativaria o menu da janela no Windows e roubaria o foco do Alt+roda
+    if (e.key === 'Alt') { e.preventDefault(); return; }
     const tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' && e.target.type !== 'range' && e.target.type !== 'checkbox') return;
     if (tag === 'textarea' || tag === 'select') return;
