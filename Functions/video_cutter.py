@@ -472,10 +472,41 @@ def cancelar_exportacao():
                 pass
 
 
+def _normalizar_camadas(camadas, path_video):
+    """Camadas por cima da base, de baixo para cima: imagens e clipes de vídeo transformados."""
+    out = []
+    for c in camadas or []:
+        try:
+            tipo = c.get("tipo")
+            st = max(0.0, float(c["st"]))
+            s, e = float(c.get("s", 0)), float(c.get("e", 0))
+            if e - s < 0.04:
+                continue
+            item = {
+                "tipo": "imagem" if tipo == "imagem" else "video",
+                "path": c.get("path") if tipo == "imagem" else path_video,
+                "st": st, "s": max(0.0, s), "dur": e - s,
+                "sc": max(0.5, min(2000.0, float(c.get("sc", 100)))) / 100.0,
+                "x": float(c.get("x", 0)), "y": float(c.get("y", 0)),
+                "rot": float(c.get("rot", 0)) % 360,
+                "op": max(0.0, min(100.0, float(c.get("op", 100)))) / 100.0,
+            }
+        except Exception:
+            continue
+        if item["tipo"] == "imagem" and not (item["path"] and os.path.isfile(item["path"])):
+            continue
+        out.append(item)
+    return out
+
+
 def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", resolucao="original",
-                   usar_gpu=True, pasta_saida=None, on_progress=None, stop_event=None, sem_audio=False):
+                   usar_gpu=True, pasta_saida=None, on_progress=None, stop_event=None, sem_audio=False,
+                   camadas=None, audio_segmentos=None, duracao=None):
     """
-    Exporta apenas os `segmentos` mantidos ([{start, end}] em segundos do original).
+    Exporta a timeline do editor.
+    segmentos       = base de vídeo em ordem ([{start, end, gain}] do original ou {gap: s})
+    audio_segmentos = trilha de áudio (mesmo formato); se None, usa os segmentos da base
+    camadas         = imagens/clipes transformados por cima da base (de baixo para cima)
     on_progress(pct, mensagem)
     """
     global _export_proc
@@ -489,59 +520,117 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     alvo_h = _RESOLUCOES.get(str(resolucao), 0)
 
     info = probe(path)
+    W, H = info["width"] or 1920, info["height"] or 1080
+    W, H = W + (W % 2), H + (H % 2)
+    fps = f'{info["fps"]:.3f}'
+
     pecas = _normalizar_segmentos(segmentos, info["duration"])
+    pecas_a = pecas if audio_segmentos is None else _normalizar_segmentos(audio_segmentos, info["duration"])
+    lay = _normalizar_camadas(camadas, path)
     segs = [p for p in pecas if p[0] != "gap"]
-    tem_ganho = any(p[2] for p in segs)
-    if not segs:
+    if not segs and not lay and not any(p[0] != "gap" for p in pecas_a):
         return {"success": False, "error": "Nada para exportar: todos os trechos foram removidos."}
-    total = sum(_dur_peca(p) for p in pecas)
+
+    # duração final: a maior entre base, áudio, camadas e a informada pela timeline
+    total = max([sum(_dur_peca(p) for p in pecas), sum(_dur_peca(p) for p in pecas_a)]
+                + [c["st"] + c["dur"] for c in lay] + [float(duracao or 0)])
+    if total < 0.04:
+        return {"success": False, "error": "Nada para exportar."}
+
+    def _completar(lista):
+        falta = total - sum(_dur_peca(p) for p in lista)
+        return list(lista) + ([("gap", falta)] if falta > 0.02 else [])
+
+    simples = not lay and audio_segmentos is None
+    if not simples:
+        pecas, pecas_a = _completar(pecas), _completar(pecas_a)
     saida = _nome_saida(path, cfg["ext"], pasta_saida)
     has_audio = info["has_audio"] and not sem_audio
+    audio_junto = pecas_a == pecas   # mesmas peças: o áudio sai das mesmas entradas do vídeo
 
+    tem_ganho = any(p[2] for p in segs)
     tem_vazio = len(segs) != len(pecas)
     em_ordem = all(segs[k][0] >= segs[k - 1][1] - 0.001 for k in range(1, len(segs)))
-    # select/aselect só serve para trechos em ordem crescente, sem vazios e sem ganho; o resto vai por concat
-    usar_inputs = len(pecas) <= 150 or not em_ordem or tem_vazio or (tem_ganho and has_audio)
+    # select/aselect só serve para o caso simples: em ordem, sem vazios, sem ganho e sem camadas
+    usar_inputs = not simples or len(pecas) <= 150 or not em_ordem or tem_vazio or (tem_ganho and has_audio)
     cmd = [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1"]
     filtros = []
+    entrada = 0
+
+    def _entrada_peca(p, video):
+        """Adiciona a entrada de uma peça (trecho ou vazio) e devolve o índice."""
+        nonlocal entrada
+        if p[0] == "gap":
+            src = f"color=c=black:s={W}x{H}:r={fps}" if video else "anullsrc=r=48000:cl=stereo"
+            cmd.extend(["-f", "lavfi", "-t", f"{p[1]:.3f}", "-i", src])
+        else:
+            cmd.extend(["-ss", f"{p[0]:.3f}", "-t", f"{p[1] - p[0]:.3f}", "-i", path])
+        entrada += 1
+        return entrada - 1
+
+    def _filtro_audio(idx, p, rotulo):
+        vol = f",volume={p[2]:.2f}dB" if p[0] != "gap" and p[2] else ""
+        filtros.append(f"[{idx}:a:0]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo{vol}[{rotulo}]")
+
     if usar_inputs:
         # Uma entrada por trecho com seek preciso → só decodifica o que fica no vídeo.
         # Espaços vazios viram quadro preto + silêncio. Tudo é padronizado antes do concat.
-        W, H = info["width"] or 1920, info["height"] or 1080
-        W, H = W + (W % 2), H + (H % 2)
-        fps = f'{info["fps"]:.3f}'
-        entrada = 0
+        junto = has_audio and audio_junto
         pares = ""
         for k, p in enumerate(pecas):
-            if p[0] == "gap":
-                cmd += ["-f", "lavfi", "-t", f"{p[1]:.3f}", "-i", f"color=c=black:s={W}x{H}:r={fps}"]
-                vi = entrada; entrada += 1
-                if has_audio:
-                    cmd += ["-f", "lavfi", "-t", f"{p[1]:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
-                    ai = entrada; entrada += 1
-            else:
-                a, b = p[0], p[1]
-                cmd += ["-ss", f"{a:.3f}", "-t", f"{b - a:.3f}", "-i", path]
-                vi = ai = entrada; entrada += 1
+            vi = _entrada_peca(p, True)
             filtros.append(f"[{vi}:v:0]scale={W}:{H}:force_original_aspect_ratio=decrease,"
                            f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},format=yuv420p[v{k}]")
             pares += f"[v{k}]"
-            if has_audio:
-                vol = f",volume={p[2]:.2f}dB" if p[0] != "gap" and p[2] else ""
-                filtros.append(f"[{ai}:a:0]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo{vol}[a{k}]")
+            if junto:
+                ai = _entrada_peca(p, False) if p[0] == "gap" else vi
+                _filtro_audio(ai, p, f"a{k}")
                 pares += f"[a{k}]"
-        filtros.append(f"{pares}concat=n={len(pecas)}:v=1:a={1 if has_audio else 0}[vc]" + ("[ac]" if has_audio else ""))
+        filtros.append(f"{pares}concat=n={len(pecas)}:v=1:a={1 if junto else 0}[vc]" + ("[ac]" if junto else ""))
+        if has_audio and not audio_junto:
+            pares_a = ""
+            for k, p in enumerate(pecas_a):
+                _filtro_audio(_entrada_peca(p, False), p, f"ax{k}")
+                pares_a += f"[ax{k}]"
+            filtros.append(f"{pares_a}concat=n={len(pecas_a)}:v=0:a=1[ac]")
     else:
         # Muitos trechos: um único select (baixa memória)
         cond = "+".join(f"between(t,{p[0]:.3f},{p[1]:.3f})" for p in segs)
         cmd += ["-i", path]
+        entrada += 1
         filtros.append(f"[0:v:0]select='{cond}',setpts=N/FRAME_RATE/TB[vc]")
         if has_audio:
             filtros.append(f"[0:a:0]aselect='{cond}',asetpts=N/SR/TB[ac]")
 
+    # Camadas por cima (imagens e clipes com escala/posição/rotação/opacidade), de baixo para cima
     vf = "[vc]"
+    for n, c in enumerate(lay):
+        if c["tipo"] == "imagem":
+            cmd += ["-loop", "1", "-framerate", fps, "-t", f"{c['dur']:.3f}", "-i", c["path"]]
+        else:
+            cmd += ["-ss", f"{c['s']:.3f}", "-t", f"{c['dur']:.3f}", "-i", path]
+        idx = entrada
+        entrada += 1
+        k = c["sc"]
+        cadeia = (f"[{idx}:v:0]fps={fps},format=rgba,"
+                  f"scale='max(2,trunc(iw*{k:.5f}))':'max(2,trunc(ih*{k:.5f}))':flags=bicubic")
+        if c["rot"]:
+            rad = c["rot"] * 3.141592653589793 / 180
+            cadeia += f",rotate={rad:.6f}:c=none:ow='rotw({rad:.6f})':oh='roth({rad:.6f})'"
+        if c["op"] < 0.999:
+            cadeia += f",colorchannelmixer=aa={c['op']:.4f}"
+        cadeia += f",setpts=PTS-STARTPTS+{c['st']:.3f}/TB[l{n}]"
+        filtros.append(cadeia)
+        fim = c["st"] + c["dur"]
+        filtros.append(f"{vf}[l{n}]overlay=x='{c['x']:.2f}-w/2':y='{c['y']:.2f}-h/2'"
+                       f":enable='between(t,{c['st']:.3f},{fim:.3f})':eof_action=pass:format=auto[o{n}]")
+        vf = f"[o{n}]"
+    if lay:
+        filtros.append(f"{vf}format=yuv420p[vlay]")
+        vf = "[vlay]"
+
     if alvo_h and info["height"] > alvo_h:
-        filtros.append(f"[vc]scale=-2:{alvo_h}:flags=lanczos[vs]")
+        filtros.append(f"{vf}scale=-2:{alvo_h}:flags=lanczos[vs]")
         vf = "[vs]"
 
     script = os.path.join(_work_dir(), f"filtro_{uuid.uuid4().hex[:8]}.txt")

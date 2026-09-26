@@ -281,9 +281,22 @@ def video_cutter_prepare(file_path):
     return {"success": True}
 
 
+def video_cutter_add_media(path):
+    """Registra uma imagem para usar como camada no editor (a URL é servida pelo media_server)."""
+    from Functions import media_server
+    ext = os.path.splitext(path or "")[1].lower()
+    if ext not in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".avif"):
+        return {"success": False, "error": "Formato de imagem não suportado no editor (use PNG, JPG, WEBP, GIF ou BMP)."}
+    if not os.path.isfile(path):
+        return {"success": False, "error": "Arquivo não encontrado."}
+    return {"success": True, "kind": "image", "path": path, "url": media_server.register(path),
+            "name": os.path.basename(path)}
+
+
 def video_cutter_export(file_path, segments, output_format="mp4", qualidade="medium",
-                        resolucao="original", usar_gpu=True, pasta_saida=None, sem_audio=False):
-    """Exporta os trechos mantidos; progresso em veOnExport(evento)."""
+                        resolucao="original", usar_gpu=True, pasta_saida=None, sem_audio=False,
+                        camadas=None, audio_segments=None, duracao=None):
+    """Exporta a timeline (base + camadas por cima); progresso em veOnExport(evento)."""
     from Functions.video_cutter import exportar_video
     global _ve_export_stop
     stop = threading.Event()
@@ -297,6 +310,9 @@ def video_cutter_export(file_path, segments, output_format="mp4", qualidade="med
                 on_progress=lambda p, m: _ve_emit("veOnExport", {"pct": p, "message": m}),
                 stop_event=stop,
                 sem_audio=bool(sem_audio),
+                camadas=camadas or [],
+                audio_segmentos=audio_segments,
+                duracao=duracao,
             )
             _ve_emit("veOnExport", {"done": True, **r})
         except Exception as e:
@@ -1775,9 +1791,13 @@ class ApiBridge:
         return video_cutter_prepare(file_path)
 
     def video_cutter_export(self, file_path, segments, output_format="mp4", qualidade="medium",
-                            resolucao="original", usar_gpu=True, pasta_saida=None, sem_audio=False):
+                            resolucao="original", usar_gpu=True, pasta_saida=None, sem_audio=False,
+                            camadas=None, audio_segments=None, duracao=None):
         return video_cutter_export(file_path, segments, output_format, qualidade, resolucao, usar_gpu,
-                                   pasta_saida, sem_audio)
+                                   pasta_saida, sem_audio, camadas, audio_segments, duracao)
+
+    def video_cutter_add_media(self, path):
+        return video_cutter_add_media(path)
 
     def video_cutter_cancel_export(self):
         return video_cutter_cancel_export()
@@ -1918,6 +1938,21 @@ class ApiBridge:
         return {"success": True}
 
 
+def _porta_agente():
+    """Porta do modo agente (None = desligado). Aceita --agente, --agente=PORTA ou CANIVETE_AGENTE_PORTA."""
+    valor = os.environ.get("CANIVETE_AGENTE_PORTA")
+    for arg in sys.argv[1:]:
+        if arg == "--agente":
+            valor = valor or "9222"
+        elif arg.startswith("--agente="):
+            valor = arg.split("=", 1)[1]
+    try:
+        porta = int(valor) if valor else None
+    except ValueError:
+        return None
+    return porta if porta and 1024 <= porta <= 65535 else None
+
+
 def main():
     global webview
 
@@ -2042,6 +2077,15 @@ def main():
                 winsound.PlaySound(sound_path, winsound.SND_FILENAME | winsound.SND_ASYNC)
         except Exception:
             pass
+
+    # Modo agente (opcional): abre a porta de depuração do WebView2 (Chrome DevTools Protocol) só em
+    # 127.0.0.1, para um agente de IA/automação ver e usar o painel (ex.: Playwright connect_over_cdp).
+    # Liga com:  CaniveteDoPailer.exe --agente   (porta 9222)  ou  --agente=9333
+    # ou com a variável de ambiente CANIVETE_AGENTE_PORTA=9222. Desligado por padrão.
+    porta_agente = _porta_agente()
+    if porta_agente:
+        webview.settings["REMOTE_DEBUGGING_PORT"] = porta_agente
+        print(f"[agente] depuração remota em http://127.0.0.1:{porta_agente}")
 
     webview.start(_splash_sound, debug=False)
     

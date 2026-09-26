@@ -359,6 +359,7 @@
                         <header class="ve-top">
                             <div class="ve-brand"><span class="ve-brand-mark"><svg class="i"><use href="#i-play"/></svg></span> Pocket Editor</div>
                             <button class="ve-btn" onclick="veOpenFile()" title="Abrir vídeo (Ctrl+O)"><svg class="i"><use href="#i-folder"/></svg> Abrir</button>
+                            <button class="ve-btn" id="ve-add-image" onclick="vePickImage()" disabled title="Adicionar imagem na timeline (ou arraste a imagem para a timeline)"><svg class="i"><use href="#i-image"/></svg> Imagem</button>
                             <div class="ve-meta" id="ve-meta">Nenhum vídeo aberto</div>
                             <div class="ve-top-spacer"></div>
                             <button class="ve-icon-btn" id="ve-undo" onclick="veUndo()" title="Desfazer (Ctrl+Z)" disabled>↶</button>
@@ -370,6 +371,7 @@
                             <section class="ve-monitor">
                                 <div class="ve-screen" id="ve-screen">
                                     <video id="ve-video" preload="auto" playsinline></video>
+                                    <canvas id="ve-canvas" width="1280" height="720"></canvas>
                                     <div class="ve-mzoom" id="ve-mzoom" title="Ctrl+roda do mouse no vídeo: zoom · arraste para mover quando ampliado">
                                         <button class="ve-mz-btn active" id="ve-mz-fit" onclick="veMonitorFit()">Fit</button>
                                         <button class="ve-mz-btn" onclick="veMonitorZoomTo(1)">100%</button>
@@ -413,6 +415,7 @@
                             <aside class="ve-side">
                                 <div class="ve-tabs">
                                     <button class="ve-tab active" data-tab="clips" onclick="veTab('clips')">Clipes</button>
+                                    <button class="ve-tab" data-tab="props" onclick="veTab('props')">Propriedades</button>
                                     <button class="ve-tab" data-tab="keys" onclick="veTab('keys')">Atalhos</button>
                                 </div>
                                 <div class="ve-tabpane" id="ve-pane-clips">
@@ -423,6 +426,41 @@
                                     </div>
                                     <div class="ve-clips" id="ve-clips">
                                         <div class="ve-clips-empty">Abra um vídeo e use <b>'</b> (ou a lâmina <b>C</b>) para cortar. Selecione um clipe e aperte <b>D</b> para apagá-lo.</div>
+                                    </div>
+                                </div>
+                                <div class="ve-tabpane" id="ve-pane-props" hidden>
+                                    <div class="ve-clips-empty" id="ve-props-empty">Selecione um clipe ou imagem na timeline para ajustar escala, posição, rotação e opacidade.<br><br>Dica: com o clipe selecionado, arraste a imagem direto no monitor para mover.</div>
+                                    <div class="ve-props" id="ve-props" hidden>
+                                        <div class="ve-props-title" id="ve-props-title"></div>
+                                        <div class="ve-prop">
+                                            <label>Escala</label>
+                                            <input type="range" min="1" max="400" step="0.5" data-prop="sc">
+                                            <span class="ve-prop-num"><input type="number" step="0.5" data-prop="sc"><i>%</i></span>
+                                        </div>
+                                        <div class="ve-prop">
+                                            <label>Posição X</label>
+                                            <input type="range" data-prop="x" data-range="x">
+                                            <span class="ve-prop-num"><input type="number" step="1" data-prop="x"><i>px</i></span>
+                                        </div>
+                                        <div class="ve-prop">
+                                            <label>Posição Y</label>
+                                            <input type="range" data-prop="y" data-range="y">
+                                            <span class="ve-prop-num"><input type="number" step="1" data-prop="y"><i>px</i></span>
+                                        </div>
+                                        <div class="ve-prop">
+                                            <label>Rotação</label>
+                                            <input type="range" min="-180" max="180" step="0.5" data-prop="rot">
+                                            <span class="ve-prop-num"><input type="number" step="0.5" data-prop="rot"><i>°</i></span>
+                                        </div>
+                                        <div class="ve-prop">
+                                            <label>Opacidade</label>
+                                            <input type="range" min="0" max="100" step="1" data-prop="op">
+                                            <span class="ve-prop-num"><input type="number" min="0" max="100" step="1" data-prop="op"><i>%</i></span>
+                                        </div>
+                                        <div class="ve-props-actions">
+                                            <button class="ve-btn ve-btn-sm" onclick="vePropsCenter()">Centralizar</button>
+                                            <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="vePropsReset()">↺ Restaurar</button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="ve-tabpane" id="ve-pane-keys" hidden>
@@ -441,6 +479,8 @@
                                         <div>Arraste um clipe para frente/trás ou para outra trilha (V1–V4)</div>
                                         <div>A agulha anda pela régua; clicar no clipe só seleciona</div>
                                         <div><kbd>G</kbd> Ganho do clipe selecionado (ex.: 10 ou -10 dB)</div>
+                                        <div>Arraste uma imagem do Windows para a timeline para usá-la por cima do vídeo</div>
+                                        <div>Arraste a borda de um clipe para encurtar ou alongar</div>
                                         <div><kbd>I</kbd> <kbd>O</kbd> Marcar entrada / saída</div>
                                         <div><kbd>X</kbd> Apagar trecho entre In e Out</div>
                                         <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> Desfazer · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> Refazer</div>

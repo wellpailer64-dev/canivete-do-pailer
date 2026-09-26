@@ -319,8 +319,7 @@ function _entregarItens(tool, itens) {
     const item = itens[0];
 
     if (tool === 'video-cutter') {
-        const v = itens.find(i => !i.pasta && EXT_VIDEO.test(i.path));
-        if (v) veOpenPath(v.path); else toast('Solte um arquivo de vídeo.', 'erro');
+        veDropFiles(itens);   // vídeo abre o projeto; imagens viram camadas na timeline
         return;
     }
     if (tool === 'audio-cutter') {

@@ -592,3 +592,42 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-gain-cur { margin-top: 10px; font-size: 12px; color: var(--ve-dim); text-align: center; }
 .ve-clip-tr { font: 600 10px var(--ve-mono); color: var(--ve-faint); margin-left: 4px; }
 .ve-clip-db { font: 600 10px var(--ve-mono); color: #fbbf24; margin-left: 2px; }
+
+/* ---------- Monitor em canvas (compõe vídeo + imagens) ---------- */
+.ve-screen video { opacity: 0; pointer-events: none; }
+.ve-screen canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    transform-origin: center center;
+}
+.ve-screen.layer-move { cursor: move; }
+
+/* ---------- Propriedades ---------- */
+.ve-props { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.ve-props[hidden] { display: none; }
+.ve-props-title { font-weight: 600; font-size: 12.5px; }
+.ve-props-title span { color: var(--ve-faint); font-weight: 500; margin-left: 4px; }
+.ve-prop { display: grid; grid-template-columns: 68px minmax(0, 1fr) 78px; align-items: center; gap: 8px; }
+.ve-prop label { font-size: 11.5px; color: var(--ve-dim); }
+.ve-prop input[type=range] { width: 100%; accent-color: var(--ve-accent); }
+.ve-prop-num { position: relative; display: flex; align-items: center; }
+.ve-prop-num input {
+    width: 100%;
+    padding: 4px 22px 4px 6px;
+    border-radius: 6px;
+    border: 1px solid var(--ve-line-2);
+    background: var(--ve-bg);
+    color: var(--ve-text);
+    font: 600 11.5px var(--ve-mono);
+    text-align: right;
+    outline: none;
+}
+.ve-prop-num input:focus { border-color: var(--ve-accent); }
+.ve-prop-num input::-webkit-inner-spin-button { opacity: .4; }
+.ve-prop-num i { position: absolute; right: 6px; font: normal 10px var(--ve-mono); color: var(--ve-faint); pointer-events: none; }
+.ve-props-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.ve-tl-wrap.trim-hover, .ve-tl-wrap.trimming, .ve-tl-wrap.trimming * { cursor: ew-resize; }
