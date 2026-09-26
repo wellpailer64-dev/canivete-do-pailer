@@ -15,6 +15,7 @@ import json
 import tempfile
 import zipfile
 import subprocess
+import time
 import urllib.request
 
 GITHUB_REPO = "wellpailer64-dev/canivete-do-pailer"
@@ -148,39 +149,73 @@ def apply_update(info, callback_progresso=None):
     xd_int = f'"{os.path.join(app_dir, "_internal", "modelos_ia")}"'
     xf = " ".join(f'"{a}"' for a in PRESERVAR_ARQS)
     log = os.path.join(tmp, "update_log.txt")
+    lista_pid = os.path.join(tmp, "pid.txt")
+    pid = os.getpid()
 
+    # Regras do .bat (aprendidas na marra):
+    # - nada de "tasklist | find": sem console, o find trava para sempre esperando entrada;
+    # - nada de "timeout": falha sem console; "ping" serve de pausa em qualquer situação;
+    # - espera limitada: se o app não fechar em ~60s, instala assim mesmo (robocopy tenta de novo);
+    # - tudo vai para o log desde a primeira linha, para diagnóstico.
     bat = os.path.join(tmp, "aplicar_update.bat")
     with open(bat, "w", encoding="utf-8") as f:
         f.write(f"""@echo off
 chcp 65001 >nul
 title Atualizando Canivete do Pailer...
+echo [%time%] instalador iniciado > "{log}"
 echo Aguardando o Canivete do Pailer fechar...
+set /a tentativas=0
 :espera
-tasklist /FI "PID eq {os.getpid()}" 2>nul | find "{os.getpid()}" >nul
-if not errorlevel 1 (
-  timeout /t 1 /nobreak >nul
-  goto espera
-)
+tasklist /FI "PID eq {pid}" /FO CSV /NH > "{lista_pid}" 2>nul
+findstr /C:"\\"{pid}\\"" "{lista_pid}" >nul 2>&1
+if errorlevel 1 goto instalar
+set /a tentativas+=1
+if %tentativas% geq 60 goto instalar
+ping -n 2 127.0.0.1 >nul
+goto espera
+:instalar
+echo [%time%] app fechado (esperas: %tentativas%), copiando arquivos >> "{log}"
 echo Instalando nova versao...
-rem _internal é espelhado (remove bibliotecas antigas), preservando dados do usuario
-robocopy "{origem}\\_internal" "{app_dir}\\_internal" /MIR /R:5 /W:2 /NFL /NDL /NP /XD {xd_int} /XF {xf} > "{log}"
+rem _internal espelhado (remove bibliotecas antigas), preservando dados do usuario
+robocopy "{origem}\\_internal" "{app_dir}\\_internal" /MIR /R:10 /W:2 /NFL /NDL /NP /XD {xd_int} /XF {xf} >> "{log}"
+set erro1=%errorlevel%
 rem Raiz: copia sem apagar nada do usuario
-robocopy "{origem}" "{app_dir}" /E /R:5 /W:2 /NFL /NDL /NP /XD "{origem}\\_internal" {xd_raiz} /XF {xf} >> "{log}"
-if errorlevel 8 (
-  echo ERRO ao copiar arquivos. Veja {log}
-  pause
-)
+robocopy "{origem}" "{app_dir}" /E /R:10 /W:2 /NFL /NDL /NP /XD "{origem}\\_internal" {xd_raiz} /XF {xf} >> "{log}"
+set erro2=%errorlevel%
+echo [%time%] robocopy: %erro1% / %erro2% >> "{log}"
+if %erro1% geq 8 goto falhou
+if %erro2% geq 8 goto falhou
+echo [%time%] reabrindo o app >> "{log}"
 start "" "{exe}"
 rmdir /s /q "{extr}" >nul 2>&1
+exit /b 0
+:falhou
+echo.
+echo ERRO ao copiar os arquivos da atualizacao.
+echo Detalhes: {log}
+pause
+start "" "{exe}"
 """)
 
-    try:
-        subprocess.Popen(
-            ["cmd", "/c", bat],
-            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
-            | subprocess.CREATE_NEW_PROCESS_GROUP,
-            close_fds=True,
-        )
-    except Exception as e:
-        return False, f"Falha ao iniciar instalador: {e}"
-    return True, "Atualização pronta. O app vai fechar e reabrir sozinho."
+    # O app reaberto não pode herdar as variáveis internas do PyInstaller deste processo
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("_PYI_", "_MEI"))}
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+
+    # Console próprio: com DETACHED_PROCESS o .bat trava. A janela mostra o andamento ao usuário.
+    base_flags = subprocess.CREATE_NEW_CONSOLE | subprocess.CREATE_NEW_PROCESS_GROUP
+    ultimo_erro = None
+    for flags in (base_flags | subprocess.CREATE_BREAKAWAY_FROM_JOB, base_flags):
+        try:
+            subprocess.Popen(["cmd", "/c", bat], creationflags=flags, close_fds=True, env=env, cwd=tmp)
+            break
+        except OSError as e:  # sair do job pode ser negado; tenta sem
+            ultimo_erro = e
+    else:
+        return False, f"Falha ao iniciar instalador: {ultimo_erro}"
+
+    # Só manda fechar o app depois de confirmar que o instalador está vivo
+    for _ in range(50):
+        if os.path.exists(log):
+            return True, "Atualização pronta. O app vai fechar e reabrir sozinho."
+        time.sleep(0.2)
+    return False, f"O instalador não iniciou. Baixe a versão nova manualmente em github.com/{GITHUB_REPO}/releases"
