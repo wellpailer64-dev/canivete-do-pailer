@@ -1912,6 +1912,11 @@ class ApiBridge:
     def gdrive_cancel(self):
         return gdrive_cancel()
 
+    def toggle_fullscreen(self):
+        if _window:
+            _window.toggle_fullscreen()
+        return {"success": True}
+
 
 def main():
     global webview
@@ -1994,6 +1999,7 @@ def main():
         width=_w,
         height=_h,
         min_size=(1000, 600),
+        maximized=True,   # abre ocupando a tela; F11 alterna tela cheia
     )
     if _x is not None and _y is not None:
         _create_kwargs["x"] = _x

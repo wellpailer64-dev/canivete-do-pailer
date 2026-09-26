@@ -137,6 +137,9 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
     overflow: hidden;
 }
 .ve-screen video {
+    /* absoluto: sem isso o vídeo cresce pela proporção e o excesso era cortado */
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: contain;
@@ -362,23 +365,37 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
 .ve-zoom { display: flex; align-items: center; gap: 4px; }
 .ve-zoom input[type=range] { width: 130px; accent-color: var(--ve-accent); }
 
-.ve-tl-body { display: grid; grid-template-columns: 72px minmax(0, 1fr); height: 176px; }
-.ve-tl-heads { background: var(--ve-panel-2); border-right: 1px solid var(--ve-line); display: flex; flex-direction: column; }
-.ve-head-ruler { height: 28px; border-bottom: 1px solid var(--ve-line); }
+.ve-tl-body { display: grid; grid-template-columns: 72px minmax(0, 1fr); height: var(--ve-tl-h, 312px); }
+.ve-tl-heads { background: var(--ve-panel-2); border-right: 1px solid var(--ve-line); display: flex; flex-direction: column; min-height: 0; }
+.ve-head-ruler { height: 28px; flex-shrink: 0; border-bottom: 1px solid var(--ve-line); }
+.ve-heads-clip { flex: 1; min-height: 0; overflow: hidden; }
 .ve-head {
+    position: relative;
     display: flex;
     flex-direction: column;
     justify-content: center;
     padding: 0 10px;
     border-bottom: 1px solid var(--ve-line);
     gap: 1px;
+    overflow: hidden;
+    user-select: none;
 }
-.ve-head b { font: 700 12px var(--ve-mono); }
+.ve-head b { font: 700 11.5px var(--ve-mono); color: var(--ve-faint); }
 .ve-head span { font-size: 10px; color: var(--ve-faint); }
-.ve-head-v { height: 82px; }
-.ve-head-v b { color: #97a4ff; }
-.ve-head-a { flex: 1; }
-.ve-head-a b { color: #5fd4a2; }
+.ve-head.main { background: rgba(255, 255, 255, .025); }
+.ve-head-v.main b { color: #97a4ff; }
+.ve-head-a.main b { color: #5fd4a2; }
+.ve-head-a.main { border-top: 1px solid #2c2c2c; }
+/* alça para mudar a altura da trilha (borda inferior do cabeçalho) */
+.ve-head-grip { position: absolute; left: 0; right: 0; bottom: -1px; height: 6px; cursor: ns-resize; z-index: 1; }
+.ve-head-grip:hover { background: var(--ve-accent); opacity: .5; }
+
+/* alça para mudar a altura da timeline inteira (borda superior do painel) */
+.ve-timeline { position: relative; }
+.ve-tl-resize { position: absolute; left: 0; right: 0; top: -4px; height: 8px; cursor: ns-resize; z-index: 5; }
+.ve-tl-resize::after { content: ""; position: absolute; left: 0; right: 0; top: 3px; height: 2px; background: transparent; transition: background .15s; }
+.ve-tl-resize:hover::after { background: var(--ve-accent); }
+body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-select: none; }
 
 .ve-tl-wrap { position: relative; min-width: 0; overflow: hidden; cursor: default; }
 .ve-tl-wrap.tool-razor { cursor: crosshair; }
@@ -515,8 +532,7 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
     .ve-btn-sm { padding: 0 7px; }
 }
 @media (max-height: 700px) {
-    .ve-tl-body { height: 150px; }
-    .ve-head-v { height: 68px; }
+    .ve-tl-body { height: var(--ve-tl-h, 220px); }
 }
 
 /* ---------- Ícones SVG dentro do editor ---------- */
@@ -531,3 +547,40 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
 .ve-empty-icon .i { stroke-width: 1.25; }
 .ve-snap.active { color: var(--ve-accent); }
 .ve-clip-act { display: inline-grid; place-items: center; }
+.ve-exp-sub { color: var(--ve-dim); }
+
+/* ---------- Zoom do monitor (Fit / 100% / Ctrl+roda) ---------- */
+.ve-screen video { transform-origin: center center; will-change: transform; }
+.ve-screen.zoomed { cursor: grab; }
+.ve-screen.panning { cursor: grabbing; }
+.ve-mzoom {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 7px;
+    background: rgba(0, 0, 0, .55);
+    border: 1px solid var(--ve-line-2);
+    backdrop-filter: blur(6px);
+    opacity: .55;
+    transition: opacity .15s;
+}
+.ve-screen:hover .ve-mzoom, .ve-screen.zoomed .ve-mzoom { opacity: 1; }
+.ve-mz-btn {
+    height: 22px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--ve-dim);
+    font: 600 11px var(--ve-ui);
+    cursor: pointer;
+}
+.ve-mz-btn:hover { color: var(--ve-text); background: rgba(255, 255, 255, .08); }
+.ve-mz-btn.active { color: var(--ve-accent); }
+.ve-mz-val { min-width: 42px; padding: 0 6px; text-align: right; font: 600 11px var(--ve-mono); color: var(--ve-text); }
+.ve-screen:has(.ve-empty:not([hidden])) .ve-mzoom { display: none; }

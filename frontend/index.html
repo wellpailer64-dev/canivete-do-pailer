@@ -370,6 +370,11 @@
                             <section class="ve-monitor">
                                 <div class="ve-screen" id="ve-screen">
                                     <video id="ve-video" preload="auto" playsinline></video>
+                                    <div class="ve-mzoom" id="ve-mzoom" title="Ctrl+roda do mouse no vídeo: zoom · arraste para mover quando ampliado">
+                                        <button class="ve-mz-btn active" id="ve-mz-fit" onclick="veMonitorFit()">Fit</button>
+                                        <button class="ve-mz-btn" onclick="veMonitorZoomTo(1)">100%</button>
+                                        <span class="ve-mz-val" id="ve-mz-val">Fit</span>
+                                    </div>
                                     <div class="ve-badge" id="ve-proxy-badge" hidden title="Este formato não toca direto no app: você vê uma cópia leve. A exportação usa o arquivo original, em qualidade máxima.">PRÉVIA LEVE</div>
                                     <div class="ve-empty" id="ve-empty">
                                         <div class="ve-empty-icon"><svg class="i"><use href="#i-film"/></svg></div>
@@ -417,7 +422,7 @@
                                         <div><span>Removido</span><b id="ve-sum-cut">—</b></div>
                                     </div>
                                     <div class="ve-clips" id="ve-clips">
-                                        <div class="ve-clips-empty">Abra um vídeo e use <b>S</b> (ou a lâmina <b>C</b>) para dividir. Selecione um clipe e aperte <b>Delete</b> para removê-lo.</div>
+                                        <div class="ve-clips-empty">Abra um vídeo e use <b>'</b> (ou a lâmina <b>C</b>) para cortar. Selecione um clipe e aperte <b>D</b> para apagá-lo.</div>
                                     </div>
                                 </div>
                                 <div class="ve-tabpane" id="ve-pane-keys" hidden>
@@ -429,17 +434,19 @@
                                         <div><kbd>↑</kbd> <kbd>↓</kbd> Corte anterior / próximo</div>
                                         <div><kbd>Home</kbd> <kbd>End</kbd> Início / Fim</div>
                                         <h4>Edição</h4>
-                                        <div><kbd>S</kbd> ou <kbd>Ctrl</kbd>+<kbd>K</kbd> Dividir na agulha</div>
-                                        <div><kbd>Delete</kbd> Remover clipe selecionado</div>
+                                        <div><kbd>'</kbd> <kbd>S</kbd> ou <kbd>Ctrl</kbd>+<kbd>K</kbd> Cortar todas as trilhas na agulha</div>
+                                        <div><kbd>D</kbd> ou <kbd>Delete</kbd> Apagar clipe selecionado (fecha o espaço)</div>
+                                        <div><kbd>Q</kbd> Apagar do corte anterior até a agulha</div>
+                                        <div><kbd>W</kbd> Apagar da agulha até o próximo corte</div>
                                         <div><kbd>I</kbd> <kbd>O</kbd> Marcar entrada / saída</div>
-                                        <div><kbd>X</kbd> Remover trecho entre In e Out</div>
-                                        <div><kbd>Q</kbd> / <kbd>W</kbd> Remover antes / depois da agulha</div>
-                                        <div>Duplo clique no clipe: remover / restaurar</div>
+                                        <div><kbd>X</kbd> Apagar trecho entre In e Out</div>
                                         <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> Desfazer · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> Refazer</div>
                                         <h4>Ferramentas e visão</h4>
                                         <div><kbd>V</kbd> Seleção · <kbd>C</kbd> Lâmina · <kbd>H</kbd> Mão</div>
                                         <div><kbd>+</kbd> <kbd>-</kbd> Zoom · <kbd>\</kbd> Ajustar à tela</div>
-                                        <div><kbd>Ctrl</kbd>+Roda: zoom · Roda: rolar</div>
+                                        <div><kbd>Ctrl</kbd>+Roda: zoom · Roda: rolar · <kbd>Shift</kbd>+Roda: trilhas</div>
+                                        <div>Arraste a borda de V1/A1 para mudar a altura da trilha</div>
+                                        <div>Arraste o topo da timeline para aumentá-la</div>
                                         <div><kbd>N</kbd> Ímã (encaixe) liga/desliga</div>
                                         <div><kbd>Ctrl</kbd>+<kbd>E</kbd> Exportar · <kbd>Ctrl</kbd>+<kbd>O</kbd> Abrir</div>
                                     </div>
@@ -448,6 +455,7 @@
                         </div>
 
                         <section class="ve-timeline">
+                            <div class="ve-tl-resize" id="ve-tl-resize" title="Arraste para aumentar ou diminuir a timeline (duplo clique: tamanho padrão)"></div>
                             <div class="ve-tl-toolbar">
                                 <div class="ve-seg" role="group" aria-label="Ferramentas">
                                     <button class="ve-seg-btn active" id="ve-tool-select" onclick="veSetTool('select')" title="Seleção (V)"><svg class="i"><use href="#i-pointer"/></svg></button>
@@ -455,8 +463,8 @@
                                     <button class="ve-seg-btn" id="ve-tool-hand" onclick="veSetTool('hand')" title="Mão (H): arraste para navegar"><svg class="i"><use href="#i-hand"/></svg></button>
                                 </div>
                                 <div class="ve-divider"></div>
-                                <button class="ve-btn ve-btn-sm" onclick="veSplitAtPlayhead()" title="Dividir na agulha (S)">⎮ Dividir</button>
-                                <button class="ve-btn ve-btn-sm" onclick="veDeleteSelected()" title="Remover clipe selecionado (Delete)"><svg class="i"><use href="#i-trash"/></svg> Remover</button>
+                                <button class="ve-btn ve-btn-sm" onclick="veSplitAtPlayhead()" title="Cortar todas as trilhas na agulha (' ou S)">⎮ Cortar</button>
+                                <button class="ve-btn ve-btn-sm" onclick="veDeleteSelected()" title="Apagar clipe selecionado (D)"><svg class="i"><use href="#i-trash"/></svg> Apagar</button>
                                 <button class="ve-btn ve-btn-sm" onclick="veExtractInOut()" title="Remover trecho In→Out (X)">✂ In→Out</button>
                                 <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="veResetEdits()" title="Voltar ao vídeo original">↺ Restaurar tudo</button>
                                 <div class="ve-top-spacer"></div>
@@ -468,11 +476,10 @@
                                     <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="veZoomFit()" title="Ajustar à tela (\)">Ajustar</button>
                                 </div>
                             </div>
-                            <div class="ve-tl-body">
+                            <div class="ve-tl-body" id="ve-tl-body">
                                 <div class="ve-tl-heads">
                                     <div class="ve-head-ruler"></div>
-                                    <div class="ve-head ve-head-v"><b>V1</b><span>Vídeo</span></div>
-                                    <div class="ve-head ve-head-a"><b>A1</b><span>Áudio</span></div>
+                                    <div class="ve-heads-clip"><div class="ve-heads-rows" id="ve-heads-rows"></div></div>
                                 </div>
                                 <div class="ve-tl-wrap" id="ve-tl-wrap">
                                     <canvas id="ve-tl"></canvas>

@@ -207,6 +207,13 @@ document.addEventListener('DOMContentLoaded', () => {
     renderRecentes();
 });
 
+// F11: tela cheia (sem barra de título)
+document.addEventListener('keydown', e => {
+    if (e.key !== 'F11') return;
+    e.preventDefault();
+    window.pywebview?.api?.toggle_fullscreen?.();
+});
+
 // Ctrl+K: buscar ferramenta (no editor de vídeo o Ctrl+K é "dividir")
 document.addEventListener('keydown', e => {
     if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'k') return;
