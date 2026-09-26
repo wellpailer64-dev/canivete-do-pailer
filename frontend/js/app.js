@@ -225,7 +225,7 @@ document.addEventListener('keydown', e => {
 
 // ── Recentes ──
 function _recentes() {
-    try { return JSON.parse(_lsGet('recentes') || '[]').filter(t => _el(`page-${t}`)); } catch (e) { return []; }
+    try { return JSON.parse(_lsGet('recentes') || '[]').filter(t => _el(`page-${t}`) && document.querySelector(`.menu-item[data-tool="${t}"]`)); } catch (e) { return []; }
 }
 function _registrarRecente(tool) {
     if (!tool || tool === 'home') return;
@@ -252,7 +252,7 @@ const EXT_AUDIO = /\.(mp3|wav|flac|m4a|aac|ogg|opus|wma|aiff?)$/i;
 const EXT_IMAGEM = /\.(jpe?g|png|webp|gif|heic|heif|avif|tiff?|bmp|ico|cr2|cr3|nef|arw|dng|raw|orf|rw2)$/i;
 const HOME_SUGESTOES = {
     video: ['video-cutter', 'compressor-video', 'video-converter', 'converter-audio', 'transcrever-audio'],
-    audio: ['converter-audio', 'audio-cutter', 'transcrever-audio'],
+    audio: ['video-cutter', 'converter-audio', 'transcrever-audio'],
     imagem: ['converter-imagem', 'compressor-imagem', 'remover-fundo', 'favicon'],
     pdf: ['compressor-imagem'],
     pasta: ['compressor-video', 'video-converter', 'converter-imagem', 'compressor-imagem', 'remover-fundo',
@@ -300,6 +300,113 @@ function homeEscolher(tipo) {
     pedido.then(r => { if (r?.success) homeSugerir([{ path: r.path, pasta: tipo === 'folder' }]); });
 }
 
+
+// ── Abas no topo: cada ferramenta aberta vira uma aba; o ponto laranja mostra processo em andamento ──
+const appTabs = [];
+
+function _abaRodando(tool) {
+    return !!document.querySelector(`.menu-item[data-tool="${tool}"].rodando`);
+}
+
+function renderTabs() {
+    const bar = _el('tabbar');
+    if (!bar) return;
+    const ativa = document.querySelector('.tool-page.active')?.id.replace('page-', '') || 'home';
+    const home = `<button class="tab tab-home${ativa === 'home' ? ' active' : ''}" role="tab" title="Início" onclick="switchTool('home')">` +
+        `<span class="tab-ico">${ico('home')}</span></button>`;
+    bar.innerHTML = home + appTabs.map(t => {
+        const { icone, nome } = _menuInfo(t);
+        let extra = '';
+        if (t === 'video-cutter' && typeof VE !== 'undefined' && VE.ready) {
+            const proj = VE.projectPath ? VE.projectPath.split(/[\\/]/).pop().replace(/\.vcnvt$/i, '') : '';
+            extra = (proj ? ` · ${_escHtml(proj)}` : '') + (VE.dirty ? ' •' : '');
+        }
+        const rodando = _abaRodando(t);
+        return `<div class="tab${t === ativa ? ' active' : ''}${rodando ? ' rodando' : ''}" role="tab" data-tab="${t}" ` +
+            `title="${_escHtml(nome)}${rodando ? ' — em andamento' : ''}" onclick="switchTool('${t}')" onauxclick="if(event.button===1)fecharAba('${t}',event)">` +
+            `<span class="tab-ico">${icone}</span><span class="tab-nome">${_escHtml(nome)}${extra ? `<span class="tab-extra">${extra}</span>` : ''}</span>` +
+            (rodando ? '<span class="tab-dot"></span>' : '') +
+            `<button class="tab-x" title="Fechar aba" onclick="fecharAba('${t}', event)">${ico('x')}</button></div>`;
+    }).join('');
+    bar.querySelector('.tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+function _abrirAba(tool) {
+    if (tool && tool !== 'home' && !appTabs.includes(tool) && _el(`page-${tool}`)) appTabs.push(tool);
+    renderTabs();
+}
+
+// Confirmação dentro do app. botoes: [{rotulo, valor, tipo: 'primario'|'perigo'|'secundario'}]
+function appConfirm({ titulo, texto, botoes }) {
+    return new Promise(resolve => {
+        const box = _el('app-confirm');
+        _el('app-confirm-titulo').textContent = titulo;
+        _el('app-confirm-texto').textContent = texto || '';
+        const area = _el('app-confirm-botoes');
+        area.innerHTML = '';
+        const fechar = v => { box.hidden = true; document.removeEventListener('keydown', tecla, true); resolve(v); };
+        botoes.forEach(b => {
+            const el = document.createElement('button');
+            el.className = b.tipo === 'primario' ? 'btn-primary' : b.tipo === 'perigo' ? 'btn-perigo' : 'btn-secondary';
+            el.textContent = b.rotulo;
+            el.onclick = () => fechar(b.valor);
+            area.appendChild(el);
+        });
+        const tecla = e => {
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fechar(null); }
+            if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); area.lastElementChild?.click(); }
+        };
+        document.addEventListener('keydown', tecla, true);
+        box.hidden = false;
+        area.lastElementChild?.focus();
+    });
+}
+
+async function fecharAba(tool, ev) {
+    ev?.stopPropagation();
+    const { nome } = _menuInfo(tool);
+    const rodando = _abaRodando(tool);
+    if (tool === 'video-cutter' && typeof VE !== 'undefined' && VE.ready) {
+        if (VE.exportRunning) {
+            await appConfirm({ titulo: 'Exportação em andamento', texto: 'Aguarde a exportação terminar (ou cancele-a) antes de fechar o editor.', botoes: [{ rotulo: 'Ok', valor: 1, tipo: 'primario' }] });
+            return;
+        }
+        if (VE.dirty) {
+            const r = await appConfirm({
+                titulo: 'Salvar o projeto antes de fechar?',
+                texto: 'Há alterações no editor de vídeo que ainda não foram salvas.',
+                botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Não salvar', valor: 'descartar', tipo: 'perigo' }, { rotulo: 'Salvar', valor: 'salvar', tipo: 'primario' }],
+            });
+            if (!r) return;
+            if (r === 'salvar' && !(await veSaveProject())) return;
+        } else {
+            const r = await appConfirm({ titulo: 'Fechar o editor de vídeo?', texto: 'O projeto aberto será fechado.', botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Fechar', valor: 1, tipo: 'primario' }] });
+            if (!r) return;
+        }
+        veCloseProject();
+    } else {
+        const r = await appConfirm({
+            titulo: `Fechar ${nome}?`,
+            texto: rodando ? 'Há um processo em andamento nesta ferramenta. Ele continua rodando mesmo com a aba fechada; reabra pelo menu para acompanhar.'
+                           : 'Você pode reabrir pelo menu quando quiser.',
+            botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Fechar', valor: 1, tipo: 'primario' }],
+        });
+        if (!r) return;
+    }
+    const i = appTabs.indexOf(tool);
+    if (i >= 0) appTabs.splice(i, 1);
+    const ativa = document.querySelector('.tool-page.active')?.id === `page-${tool}`;
+    if (ativa) switchTool(appTabs[i] || appTabs[i - 1] || 'home');
+    else renderTabs();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    renderTabs();
+    // processos que começam/terminam (bolinha no menu) atualizam as abas
+    const menu = document.querySelector('.menu');
+    if (menu) new MutationObserver(renderTabs).observe(menu, { subtree: true, attributes: true, attributeFilter: ['class'] });
+});
+
 // ── Arrastar e soltar (o Python entrega os caminhos reais em onArquivosSoltos) ──
 const EXT_VIDEO = /\.(mp4|mov|mkv|avi|webm|flv|wmv|m4v|ts|mts|m2ts|3gp|ogv|mpg|mpeg|mxf)$/i;
 
@@ -308,6 +415,8 @@ function onArquivosSoltos(itens) {
     const pagina = document.querySelector('.tool-page.active');
     const tool = pagina?.id.replace('page-', '');
     if (!tool || !itens?.length) return;
+    const proj = itens.find(i => !i.pasta && /\.vcnvt$/i.test(i.path));
+    if (proj && tool !== 'video-cutter') { switchTool('video-cutter'); setTimeout(() => veOpenProject(proj.path), 60); return; }
     if (tool === 'home') return homeSugerir(itens);
     _entregarItens(tool, itens);
 }
@@ -419,6 +528,7 @@ function switchTool(toolId) {
     }
 
     _registrarRecente(toolId);
+    _abrirAba(toolId);
     if (toolId === 'home') renderRecentes();
 
     // Refresh states specific to tools

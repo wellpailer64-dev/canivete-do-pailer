@@ -24,7 +24,11 @@ from Functions import media_server
 FORMATOS_ENTRADA = {
     ".mp4", ".mov", ".mkv", ".avi", ".webm", ".flv", ".wmv",
     ".m4v", ".ts", ".mts", ".m2ts", ".3gp", ".ogv", ".mpg", ".mpeg",
+    # só áudio: o editor também corta/ajusta áudio e exporta em MP3/WAV
+    ".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".wma", ".aiff", ".aif",
 }
+# áudio que o player do app toca direto (o resto ganha uma prévia .m4a)
+_NAVEGADOR_AUDIO = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus"}
 
 FORMATOS_SAIDA = {
     "mp4":  {"ext": ".mp4",  "vcodec": "h264", "acodec": "aac",     "extra": ["-movflags", "+faststart"]},
@@ -32,6 +36,9 @@ FORMATOS_SAIDA = {
     "mkv":  {"ext": ".mkv",  "vcodec": "h264", "acodec": "aac",     "extra": []},
     "webm": {"ext": ".webm", "vcodec": "vp9",  "acodec": "libopus", "extra": []},
     "avi":  {"ext": ".avi",  "vcodec": "mpeg4", "acodec": "mp3",    "extra": []},
+    # só áudio
+    "mp3":  {"ext": ".mp3",  "vcodec": None, "acodec": "libmp3lame", "extra": [], "audio_only": True},
+    "wav":  {"ext": ".wav",  "vcodec": None, "acodec": "pcm_s16le",  "extra": [], "audio_only": True},
 }
 
 # crf x264 | cq GPU | crf vp9 | bitrate áudio | preset x264
@@ -310,6 +317,31 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None):
     return rc == 0 and os.path.exists(out), err
 
 
+def _preparar_audio(path, info, work, emit, stop_event):
+    """Arquivo só de áudio: timeline com forma de onda, monitor preto; quadro padrão 1280x720."""
+    info = {**info, "width": 1280, "height": 720, "fps": 30.0, "audio_only": True}
+    ext = os.path.splitext(path)[1].lower()
+    direto = ext in _NAVEGADOR_AUDIO
+    emit({"stage": "info", "path": path, "file_name": os.path.basename(path), "needs_proxy": not direto, **info})
+    t = threading.Thread(target=lambda: emit({"stage": "peaks", "peaks": gerar_peaks(path, info["duration"])}), daemon=True)
+    t.start()
+    if direto:
+        emit({"stage": "video", "url": media_server.register(path), "proxy": False})
+    else:
+        prev = os.path.join(work, "previa.m4a")
+        cmd = [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-i", path,
+               "-vn", "-c:a", "aac", "-b:a", "160k", "-ac", "2", prev]
+        rc, err = _run_progress(cmd, info["duration"], lambda p: emit({"stage": "proxy", "pct": p}), stop_event)
+        if stop_event is not None and stop_event.is_set():
+            return
+        if rc != 0 or not os.path.exists(prev):
+            emit({"stage": "error", "error": "Falha ao preparar o áudio: " + (err.splitlines()[-1] if err else "?")})
+            return
+        emit({"stage": "video", "url": media_server.register(prev), "proxy": True})
+    t.join()
+    emit({"stage": "done"})
+
+
 def preparar(path, emit, stop_event=None):
     """
     Prepara o vídeo para o editor, emitindo eventos progressivos:
@@ -332,13 +364,17 @@ def preparar(path, emit, stop_event=None):
     except Exception as e:
         emit({"stage": "error", "error": f"Não foi possível analisar o vídeo: {e}"})
         return
-    if not info["has_video"] or info["duration"] <= 0:
-        emit({"stage": "error", "error": "Arquivo sem vídeo ou duração inválida."})
+    if info["duration"] <= 0 or not (info["has_video"] or info["has_audio"]):
+        emit({"stage": "error", "error": "Arquivo sem vídeo/áudio ou com duração inválida."})
         return
 
     limpar_previews()
     work = os.path.join(_work_dir(), uuid.uuid4().hex[:10])
     os.makedirs(work, exist_ok=True)
+
+    if not info["has_video"]:
+        _preparar_audio(path, info, work, emit, stop_event)
+        return
 
     direto = _navegador_toca(path, info)
     emit({"stage": "info", "path": path, "file_name": os.path.basename(path),
@@ -520,6 +556,14 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     alvo_h = _RESOLUCOES.get(str(resolucao), 0)
 
     info = probe(path)
+    audio_only = bool(cfg.get("audio_only")) or not info["has_video"]
+    if audio_only and not info["has_audio"]:
+        return {"success": False, "error": "Este arquivo não tem som para exportar em áudio."}
+    if audio_only and not cfg.get("audio_only"):
+        cfg = FORMATOS_SAIDA["mp3"]   # fonte só de áudio sempre sai como áudio
+    if audio_only:
+        camadas = None
+        sem_audio = False
     W, H = info["width"] or 1920, info["height"] or 1080
     W, H = W + (W % 2), H + (H % 2)
     fps = f'{info["fps"]:.3f}'
@@ -553,6 +597,10 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     em_ordem = all(segs[k][0] >= segs[k - 1][1] - 0.001 for k in range(1, len(segs)))
     # select/aselect só serve para o caso simples: em ordem, sem vazios, sem ganho e sem camadas
     usar_inputs = not simples or len(pecas) <= 150 or not em_ordem or tem_vazio or (tem_ganho and has_audio)
+    if audio_only:
+        # só o áudio: nenhuma cadeia de vídeo no grafo
+        usar_inputs, audio_junto = True, False
+        pecas = pecas_a = _completar(pecas_a)
     cmd = [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1"]
     filtros = []
     entrada = 0
@@ -577,7 +625,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         # Espaços vazios viram quadro preto + silêncio. Tudo é padronizado antes do concat.
         junto = has_audio and audio_junto
         pares = ""
-        for k, p in enumerate(pecas):
+        for k, p in enumerate([] if audio_only else pecas):
             vi = _entrada_peca(p, True)
             filtros.append(f"[{vi}:v:0]scale={W}:{H}:force_original_aspect_ratio=decrease,"
                            f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},format=yuv420p[v{k}]")
@@ -586,7 +634,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 ai = _entrada_peca(p, False) if p[0] == "gap" else vi
                 _filtro_audio(ai, p, f"a{k}")
                 pares += f"[a{k}]"
-        filtros.append(f"{pares}concat=n={len(pecas)}:v=1:a={1 if junto else 0}[vc]" + ("[ac]" if junto else ""))
+        if not audio_only:
+            filtros.append(f"{pares}concat=n={len(pecas)}:v=1:a={1 if junto else 0}[vc]" + ("[ac]" if junto else ""))
         if has_audio and not audio_junto:
             pares_a = ""
             for k, p in enumerate(pecas_a):
@@ -637,13 +686,16 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     with open(script, "w", encoding="utf-8") as f:
         f.write(";\n".join(filtros))
 
-    base_cmd = cmd + ["-filter_complex_script", script, "-map", vf]
+    base_cmd = cmd + ["-filter_complex_script", script] + ([] if audio_only else ["-map", vf])
     if has_audio:
-        base_cmd += ["-map", "[ac]", "-c:a", cfg["acodec"], "-b:a", q["ab"]]
+        base_cmd += ["-map", "[ac]", "-c:a", cfg["acodec"]]
+        if cfg["acodec"] != "pcm_s16le":
+            base_cmd += ["-b:a", "320k" if audio_only and q["ab"] == "256k" else q["ab"]]
 
     def _tentar(gpu):
         global _export_proc
-        full = base_cmd + _args_video(cfg, q, gpu) + cfg["extra"] + [saida]
+        video_args = ["-vn"] if audio_only else _args_video(cfg, q, gpu)
+        full = base_cmd + video_args + cfg["extra"] + [saida]
 
         def _hold(p):
             global _export_proc
@@ -656,7 +708,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         return rc, err
 
     try:
-        enc = _detectar_hw_encoder() if (usar_gpu and cfg["vcodec"] == "h264") else None
+        enc = _detectar_hw_encoder() if (usar_gpu and not audio_only and cfg["vcodec"] == "h264") else None
         prog(0, "Iniciando exportação" + (f" (GPU: {enc.split('_')[1].upper()})" if enc else "") + "...")
         rc, err = _tentar(usar_gpu)
         if stop_event is not None and stop_event.is_set():

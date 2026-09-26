@@ -631,3 +631,12 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-prop-num i { position: absolute; right: 6px; font: normal 10px var(--ve-mono); color: var(--ve-faint); pointer-events: none; }
 .ve-props-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .ve-tl-wrap.trim-hover, .ve-tl-wrap.trimming, .ve-tl-wrap.trimming * { cursor: ew-resize; }
+
+/* ---------- Nome do projeto na barra do editor ---------- */
+.ve-proj { font-weight: 600; font-size: 12px; color: var(--ve-accent); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.ve-proj[hidden] { display: none; }
+
+/* exportação em áudio: esconde o que só vale para vídeo */
+#ve-export.audio .ve-only-video { display: none; }
+.ve-pill-audio { border-style: dashed; }
+.ve-pill.disabled { opacity: .35; pointer-events: none; }

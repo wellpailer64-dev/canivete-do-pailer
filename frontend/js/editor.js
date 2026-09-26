@@ -19,6 +19,8 @@ const VE = {
     playhead: 0,        // tempo da sequência
     cur: -1,            // clipe que o player está mostrando (-1 = espaço vazio)
     media: [],          // [0] = vídeo aberto; imagens adicionadas depois
+    projectPath: null,  // .vcnvt salvo/aberto
+    dirty: false,       // alterações desde o último salvar
     seqW: 1920, seqH: 1080,   // tamanho do quadro da sequência (o do vídeo)
     pps: 50,            // pixels por segundo
     view: 0,            // tempo na borda esquerda
@@ -147,6 +149,7 @@ function veEditPoints(excluir) {
 function veSnapshot() { return JSON.stringify({ clips: VE.clips, inPt: VE.inPt, outPt: VE.outPt }); }
 
 function vePushHistory() {
+    if (!VE.dirty) { VE.dirty = true; veUpdateTitle(); }
     VE.history.push(veSnapshot());
     if (VE.history.length > 200) VE.history.shift();
     VE.future = [];
@@ -569,11 +572,13 @@ function vePickImage() {
 // Arquivos soltos no editor: sem projeto abre o vídeo; com projeto, imagens viram camadas
 const VE_EXT_IMG = /\.(png|jpe?g|webp|gif|bmp|avif)$/i;
 function veDropFiles(itens) {
-    const videos = itens.filter(i => !i.pasta && EXT_VIDEO.test(i.path));
+    const proj = itens.find(i => !i.pasta && /\.vcnvt$/i.test(i.path));
+    if (proj) { veOpenProject(proj.path); return; }
+    const videos = itens.filter(i => !i.pasta && (EXT_VIDEO.test(i.path) || EXT_AUDIO.test(i.path)));
     const imgs = itens.filter(i => !i.pasta && VE_EXT_IMG.test(i.path));
     if (!VE.ready) {
         if (videos.length) veOpenPath(videos[0].path);
-        else veToast(imgs.length ? 'Abra um vídeo primeiro; depois arraste as imagens para a timeline' : 'Solte um arquivo de vídeo');
+        else veToast(imgs.length ? 'Abra um vídeo primeiro; depois arraste as imagens para a timeline' : 'Solte um arquivo de vídeo ou áudio');
         return;
     }
     if (imgs.length) {
@@ -842,6 +847,148 @@ function veMoveSnap(t, excluir) {
         if (Math.abs(p - t) < bd) { bd = Math.abs(p - t); best = p; }
     }
     return best != null ? best : veSnapFrame(t);
+}
+
+// ─────────────────────────── projeto (.vcnvt) ───────────────────────────
+// Ctrl+S salva, Ctrl+Shift+S salva como, Ctrl+O abre (vídeo ou projeto). O arquivo guarda a timeline
+// e os caminhos das mídias (nada é copiado). Duplo clique num .vcnvt abre o app direto aqui.
+
+function veUpdateTitle() {
+    const el = $ve('ve-proj');
+    if (!el) return;
+    const nome = VE.projectPath ? VE.projectPath.split(/[\\/]/).pop().replace(/\.vcnvt$/i, '') : '';
+    el.textContent = nome ? nome + (VE.dirty ? ' •' : '') : (VE.ready && VE.dirty ? 'Não salvo •' : '');
+    el.title = VE.projectPath || (VE.dirty ? 'Projeto ainda não salvo (Ctrl+S)' : '');
+    el.hidden = !el.textContent;
+    if (typeof renderTabs === 'function') renderTabs();
+}
+
+// Alterações não salvas: a primeira tentativa avisa; repetir em até 5 s confirma e descarta
+function veConfirmDiscard() {
+    if (!VE.ready || !VE.dirty) return true;
+    if (VE._discardAt && Date.now() - VE._discardAt < 5000) { VE._discardAt = 0; return true; }
+    VE._discardAt = Date.now();
+    veToast('Há alterações não salvas. Salve com Ctrl+S ou repita para descartar.');
+    return false;
+}
+
+function veProjectData() {
+    return {
+        app: 'Canivete do Pailer',
+        video: VE.path,
+        media: VE.media.filter(m => m.kind === 'image')
+            .map(m => ({ id: m.id, kind: 'image', path: m.path, name: m.name, w: m.w, h: m.h })),
+        clips: VE.clips,
+        inPt: VE.inPt,
+        outPt: VE.outPt,
+        playhead: VE.playhead,
+        view: { pps: VE.pps, x: VE.view },
+        salvo_em: new Date().toISOString(),
+    };
+}
+
+function veSaveProject(comoNovo) {
+    if (!VE.ready) { veToast('Abra um vídeo antes de salvar'); return Promise.resolve(false); }
+    return window.pywebview.api.ve_project_save(VE.projectPath, JSON.stringify(veProjectData()), !!comoNovo).then(r => {
+        if (!r || !r.success) { if (r && r.error) veToast('Não foi possível salvar: ' + r.error); return false; }
+        VE.projectPath = r.path;
+        VE.dirty = false;
+        veUpdateTitle();
+        veToast('Projeto salvo: ' + r.name);
+        return true;
+    });
+}
+
+// Fecha o projeto (aba do editor fechada): volta à tela "arraste um vídeo"
+function veCloseProject() {
+    veStop();
+    const v = veVideo();
+    v.pause();
+    v.removeAttribute('src');
+    v.load();
+    Object.assign(VE, {
+        path: null, info: null, dur: 0, srcDur: 0, clips: [], sel: -1, inPt: null, outPt: null, playhead: 0,
+        cur: -1, history: [], future: [], thumbs: [], peaks: [], ready: false, dest: null, view: 0, media: [],
+        projectPath: null, dirty: false, _pendingProject: null,
+    });
+    veUpdateUndo();
+    $ve('ve-empty').hidden = false;
+    $ve('ve-loading').hidden = true;
+    $ve('ve-proxy-badge').hidden = true;
+    ['ve-export-btn', 've-add-image', 've-save'].forEach(id => { $ve(id).disabled = true; });
+    $ve('ve-meta').textContent = 'Nenhum vídeo aberto';
+    $ve('ve-clips').innerHTML = '<div class="ve-clips-empty">Abra um vídeo ou áudio para começar.</div>';
+    ['ve-sum-orig', 've-sum-final', 've-sum-cut'].forEach(id => { $ve(id).textContent = '—'; });
+    veUpdateReadouts();
+    veRenderProps();
+    veUpdateTitle();
+    veDrawMonitor();
+    veDraw();
+}
+
+function veOpenProject(path) {
+    if (VE.exportRunning || !veConfirmDiscard()) return;
+    window.pywebview.api.ve_project_open(path || null).then(r => {
+        if (!r || !r.success) { if (r && r.error) veToast(r.error); return; }
+        const d = r.data;
+        if (!d.video || r.missing.includes(d.video)) {
+            veToast('O vídeo deste projeto não foi encontrado: ' + (d.video || '?'));
+            return;
+        }
+        VE._pendingProject = { data: d, path: r.path, name: r.name, missing: r.missing || [] };
+        VE.dirty = false;
+        veOpenPath(d.video);
+    });
+}
+
+// Chamado pelo Python quando o app abre por duplo clique num .vcnvt
+function veOpenProjectExternal(path) {
+    if (typeof switchTool === 'function') switchTool('video-cutter');
+    setTimeout(() => veOpenProject(path), 60);
+}
+
+// Depois que o vídeo do projeto carregou: recoloca imagens, clipes, marcas e visão
+function veApplyProject() {
+    const { data: d, path, name, missing } = VE._pendingProject;
+    VE._pendingProject = null;
+    VE.projectPath = path;
+    const ids = { 0: 0 };
+    (d.media || []).forEach(m => {
+        if (!m.path || missing.includes(m.path)) return;
+        const nm = { id: VE.media.length, kind: 'image', path: m.path, name: m.name, img: new Image(), w: m.w || 0, h: m.h || 0 };
+        VE.media.push(nm);
+        ids[m.id] = nm.id;
+        window.pywebview.api.video_cutter_add_media(m.path).then(r => {
+            if (!r || !r.success) return;
+            nm.url = r.url;
+            nm.img.crossOrigin = 'anonymous';
+            nm.img.onload = () => { nm.w = nm.img.naturalWidth; nm.h = nm.img.naturalHeight; veDraw(); veDrawMonitor(); };
+            nm.img.src = r.url;
+        });
+    });
+    const clips = (d.clips || [])
+        .filter(c => !c.m || ids[c.m] != null)
+        .map(c => {
+            const n = { ...c };
+            if (c.m) n.m = ids[c.m]; else { delete n.m; n.e = Math.min(n.e, VE.srcDur); }
+            return n;
+        })
+        .filter(c => c.e - c.s > 1e-3);
+    if (clips.length) VE.clips = clips;
+    VE.inPt = d.inPt ?? null;
+    VE.outPt = d.outPt ?? null;
+    VE.sel = -1;
+    VE.history = [];
+    VE.future = [];
+    veUpdateUndo();
+    veRelayout();
+    if (d.view && d.view.pps > 0) { VE.pps = d.view.pps; VE.view = d.view.x || 0; }
+    veAfterEdit(d.playhead || 0);
+    VE.dirty = false;
+    veUpdateTitle();
+    const faltam = missing.filter(p => p !== d.video).length;
+    veToast(faltam ? `Projeto aberto — ${faltam} imagem(ns) não encontrada(s); os clipes delas ficaram de fora`
+                   : 'Projeto aberto: ' + name.replace(/\.vcnvt$/i, ''));
 }
 
 // ─────────────────────────── visão / zoom ───────────────────────────
@@ -1322,12 +1469,15 @@ function veSnapTime(t, forRazor) {
 function veOpenFile() {
     if (VE.exportRunning) return;
     window.pywebview.api.select_video_file('video-cutter').then(r => {
-        if (r && r.success) veOpenPath(r.path);
+        if (!r || !r.success) return;
+        if (/\.vcnvt$/i.test(r.path)) veOpenProject(r.path);
+        else if (veConfirmDiscard()) veOpenPath(r.path);
     });
 }
 
 function veOpenPath(path) {
     if (!path || VE.exportRunning || !veIsActive()) return;
+    if (!VE._pendingProject) { VE.projectPath = null; VE.dirty = false; }
     veStop();
     const v = veVideo();
     v.pause();
@@ -1343,6 +1493,8 @@ function veOpenPath(path) {
     veLoading('Analisando vídeo...', 5);
     $ve('ve-export-btn').disabled = true;
     $ve('ve-add-image').disabled = true;
+    $ve('ve-save').disabled = true;
+    veUpdateTitle();
     $ve('ve-meta').textContent = path.split(/[\\/]/).pop();
     if (typeof playExecute === 'function') playExecute();
     window.pywebview.api.video_cutter_prepare(path);
@@ -1378,6 +1530,9 @@ function veOnPrepare(ev) {
             $ve('ve-meta').innerHTML = `<b>${veEsc(ev.file_name)}</b> · ${res} · ${(+ev.fps).toFixed(2).replace(/\.00$/, '')} fps · ${veHuman(ev.duration)}${ev.has_audio ? '' : ' · sem áudio'}`;
             veLoading(ev.needs_proxy ? 'Preparando prévia leve (formato não toca direto no app)...' : 'Carregando vídeo...', ev.needs_proxy ? 0 : 60);
             veRefresh();
+            if (VE._pendingProject) veApplyProject();
+            $ve('ve-save').disabled = false;
+            veUpdateTitle();
             break;
         }
         case 'proxy':
@@ -1437,6 +1592,16 @@ function veOpenExport() {
         .forEach(([r, l]) => { if (h > r) opts.push([String(r), l]); });
     sel.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
     $ve('ve-noaudio').disabled = !VE.info.has_audio;
+    const soAudio = !!VE.info.audio_only;
+    document.querySelectorAll('#ve-export .ve-pills[data-name="format"] .ve-pill').forEach(b => {
+        const audio = b.classList.contains('ve-pill-audio');
+        b.classList.toggle('disabled', (soAudio && !audio) || (!VE.info.has_audio && audio));
+    });
+    const atual = document.querySelector('#ve-export .ve-pills[data-name="format"] .ve-pill.active');
+    if (atual && atual.classList.contains('disabled')) {
+        atual.classList.remove('active');
+        document.querySelector(`#ve-export .ve-pill[data-v="${soAudio ? 'mp3' : 'mp4'}"]`).classList.add('active');
+    }
     $ve('ve-export-form').hidden = false;
     $ve('ve-export-progress').hidden = true;
     $ve('ve-exp-result').hidden = true;
@@ -1447,6 +1612,13 @@ function veOpenExport() {
 
 function veUpdateExportSummary() {
     const fmt = vePill('format') || 'mp4';
+    const audio = fmt === 'mp3' || fmt === 'wav';
+    $ve('ve-export').classList.toggle('audio', audio);
+    if (audio) {
+        $ve('ve-export-summary').innerHTML =
+            `Duração final: <b>${veTC(VE.dur)}</b> (${veHuman(VE.dur)})<br>Só o áudio da timeline · <b>${fmt.toUpperCase()}</b>`;
+        return;
+    }
     const res = $ve('ve-res').value;
     const h = res === 'original' ? VE.info.height : +res;
     const w = res === 'original' ? VE.info.width : Math.round(VE.info.width * h / VE.info.height / 2) * 2;
@@ -1485,6 +1657,7 @@ function veStartExport() {
     // base (vídeo sem transformação, trilha de cima vence, vazio = preto) + áudio + camadas por cima
     const plano = veExportPlan();
     VE.exportRunning = true;
+    document.querySelector('.menu-item[data-tool="video-cutter"]')?.classList.add('rodando');
     $ve('ve-export-form').hidden = true;
     $ve('ve-export-progress').hidden = false;
     $ve('ve-exp-result').hidden = true;
@@ -1521,6 +1694,7 @@ function veOnExport(ev) {
         return;
     }
     VE.exportRunning = false;
+    document.querySelector('.menu-item[data-tool="video-cutter"]')?.classList.remove('rodando');
     const box = $ve('ve-exp-result');
     box.hidden = false;
     if (ev.success) {
@@ -1982,6 +2156,7 @@ function veOnKey(e) {
     const ctrl = e.ctrlKey || e.metaKey;
 
     if (ctrl && k === 'o') { e.preventDefault(); veOpenFile(); return; }
+    if (ctrl && k === 's') { e.preventDefault(); veSaveProject(e.shiftKey); return; }
     if (!VE.ready) return;
     if (ctrl && k === 'z' && !e.shiftKey) { e.preventDefault(); veUndo(); return; }
     if (ctrl && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); veRedo(); return; }

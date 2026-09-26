@@ -342,6 +342,50 @@ def reveal_file(path):
     return {"success": False}
 
 
+def ve_project_save(path, dados, salvar_como=False):
+    """Salva o projeto .vcnvt. Sem caminho (ou 'salvar como'), pergunta onde salvar."""
+    from Functions import projeto
+    try:
+        if not path or salvar_como:
+            if not _window:
+                return {"success": False}
+            sugestao = os.path.basename(path) if path else "Meu projeto.vcnvt"
+            pasta = os.path.dirname(path) if path else ""
+            r = _window.create_file_dialog(
+                _file_dialog_kind("SAVE", webview.SAVE_DIALOG),
+                directory=pasta, save_filename=sugestao,
+                file_types=("Projeto do Canivete (*.vcnvt)",),
+            )
+            if not r:
+                return {"success": False, "cancelled": True}
+            path = r[0] if isinstance(r, (list, tuple)) else r
+        final = projeto.salvar(path, dados)
+        return {"success": True, "path": final, "name": os.path.basename(final)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def ve_project_open(path=None):
+    """Abre um .vcnvt (pergunta qual, se não vier o caminho) e avisa o que estiver faltando."""
+    from Functions import projeto
+    try:
+        if not path:
+            if not _window:
+                return {"success": False}
+            r = _window.create_file_dialog(
+                _file_dialog_kind("OPEN", webview.OPEN_DIALOG),
+                file_types=("Projeto do Canivete (*.vcnvt)", "Todos os arquivos (*.*)"),
+            )
+            if not r:
+                return {"success": False, "cancelled": True}
+            path = r[0] if isinstance(r, (list, tuple)) else r
+        dados, faltando = projeto.abrir(path)
+        return {"success": True, "path": os.path.abspath(path), "name": os.path.basename(path),
+                "data": dados, "missing": faltando}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def open_file(path):
     try:
         os.startfile(path)
@@ -353,7 +397,8 @@ def open_file(path):
 def select_video_file(tool):
     if _window:
         file_types = (
-            "Vídeos (*.mp4;*.mov;*.mkv;*.avi;*.webm;*.flv;*.wmv;*.m4v;*.ts;*.mts;*.m2ts;*.3gp;*.mpg;*.mpeg)",
+            "Vídeos, áudios e projetos (*.mp4;*.mov;*.mkv;*.avi;*.webm;*.flv;*.wmv;*.m4v;*.ts;*.mts;*.m2ts;*.3gp;*.mpg;*.mpeg;*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.wma;*.vcnvt)",
+            "Projeto do Canivete (*.vcnvt)",
             "Todos os arquivos (*.*)",
         )
         result = _window.create_file_dialog(
@@ -1811,6 +1856,12 @@ class ApiBridge:
     def select_video_file(self, tool):
         return select_video_file(tool)
 
+    def ve_project_save(self, path, dados, salvar_como=False):
+        return ve_project_save(path, dados, salvar_como)
+
+    def ve_project_open(self, path=None):
+        return ve_project_open(path)
+
     def converter_imagem(self, folder_path, output_format):
         return converter_imagem(folder_path, output_format)
 
@@ -2067,6 +2118,18 @@ def main():
             print("[drop] indisponível:", e)
 
     window.events.loaded += _bind_drop
+
+    # Projeto .vcnvt aberto por duplo clique: vai direto para o editor com ele carregado
+    from Functions import projeto as _projeto
+    _projeto.registrar_associacao()
+    _proj_arg = _projeto.projeto_na_linha_de_comando()
+    if _proj_arg:
+        def _abrir_projeto_arg():
+            try:
+                window.evaluate_js(f"veOpenProjectExternal({json.dumps(_proj_arg)})")
+            except Exception as e:
+                print("[projeto] não abriu:", e)
+        window.events.loaded += _abrir_projeto_arg
     atexit.register(gdrive_cancel)
 
     def _splash_sound():

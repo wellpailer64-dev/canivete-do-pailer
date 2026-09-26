@@ -1217,3 +1217,76 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 }
 .home-recent { margin-top: 10px; }
 .home-suggest .dz-sub { text-align: left; }
+
+/* =========================================================
+   Abas no topo (ferramentas abertas + processos em andamento)
+   ========================================================= */
+.tabbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 40px;
+    padding: 6px 10px 0;
+    background: var(--bg-1);
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-shrink: 0;
+    scrollbar-width: none;
+}
+.tabbar::-webkit-scrollbar { display: none; }
+.tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    max-width: 220px;
+    padding: 0 8px 0 12px;
+    border: 1px solid transparent;
+    border-bottom: 0;
+    border-radius: 9px 9px 0 0;
+    background: transparent;
+    color: var(--text-2);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background .12s, color .12s;
+    flex-shrink: 0;
+}
+.tab:hover { background: rgba(255, 255, 255, .04); color: var(--text); }
+.tab.active { background: var(--bg-0); border-color: var(--line); color: var(--text); }
+.tab.active::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--bg-0); }
+.tab.active::before { content: ""; position: absolute; left: 10px; right: 10px; top: -1px; height: 2px; border-radius: 0 0 2px 2px; background: var(--primary); }
+.tab .tab-ico { display: grid; font-size: 14px; color: var(--text-3); }
+.tab.active .tab-ico { color: var(--primary); }
+.tab .tab-nome { overflow: hidden; text-overflow: ellipsis; }
+.tab .tab-extra { font-size: 11px; color: var(--primary); font-weight: 600; }
+.tab-home { padding: 0 11px; }
+.tab-x {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--text-3);
+    font-size: 11px;
+    opacity: 0;
+    transition: opacity .12s, background .12s, color .12s;
+}
+.tab:hover .tab-x, .tab.active .tab-x { opacity: 1; }
+.tab-x:hover { background: rgba(255, 255, 255, .1); color: var(--text); }
+.tab.rodando .tab-ico { color: var(--primary); }
+.tab.rodando .tab-ico .i { animation: spin 1.4s linear infinite; }
+.tab .tab-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); animation: pulse 1.2s infinite; }
+
+/* Confirmação */
+.app-confirm[hidden] { display: none; }
+.app-confirm { z-index: 20000; }
+.app-confirm-box { width: min(440px, 92vw); gap: 10px; }
+.app-confirm-box .modal-actions { margin-top: 8px; }
+.btn-perigo { padding: 8px 14px; border: 1px solid rgba(239, 68, 68, .45); background: transparent; color: #fca5a5; border-radius: var(--r-md); font-size: 13px; font-weight: 600; }
+.btn-perigo:hover { background: rgba(239, 68, 68, .12); }
