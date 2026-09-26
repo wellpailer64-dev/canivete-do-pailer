@@ -426,23 +426,41 @@ def _nome_saida(path, ext, pasta=None):
 
 
 def _normalizar_segmentos(segmentos, duracao):
-    sane = []
+    """
+    Peças da timeline, na ordem: (a, b, ganho_db) = trecho do original; ("gap", d) = espaço vazio
+    (preto/silêncio). A ordem é a da timeline (clipes podem ser reordenados); só junta trechos
+    colados com o mesmo ganho e vazios seguidos.
+    """
+    pecas = []
     for s in segmentos or []:
         try:
+            if s.get("gap") is not None:
+                d = float(s["gap"])
+                if d >= 0.02:
+                    if pecas and pecas[-1][0] == "gap":
+                        pecas[-1][1] += d
+                    else:
+                        pecas.append(["gap", d])
+                continue
             a = max(0.0, float(s.get("start", 0)))
             b = min(float(s.get("end", 0)), duracao)
+            g = max(-60.0, min(30.0, float(s.get("gain") or 0)))
         except Exception:
             continue
-        if b - a >= 0.04:
-            sane.append([a, b])
-    # A ordem é a da timeline (o usuário pode reordenar clipes); só junta vizinhos colados
-    merged = []
-    for a, b in sane:
-        if merged and abs(a - merged[-1][1]) <= 0.001:
-            merged[-1][1] = b
+        if b - a < 0.04:
+            continue
+        if pecas and pecas[-1][0] != "gap" and abs(a - pecas[-1][1]) <= 0.001 and pecas[-1][2] == g:
+            pecas[-1][1] = b
         else:
-            merged.append([a, b])
-    return [(a, b) for a, b in merged]
+            pecas.append([a, b, g])
+    # espaço vazio no fim não entra no vídeo
+    while pecas and pecas[-1][0] == "gap":
+        pecas.pop()
+    return [tuple(p) for p in pecas]
+
+
+def _dur_peca(p):
+    return p[1] if p[0] == "gap" else p[1] - p[0]
 
 
 def cancelar_exportacao():
@@ -471,27 +489,51 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     alvo_h = _RESOLUCOES.get(str(resolucao), 0)
 
     info = probe(path)
-    segs = _normalizar_segmentos(segmentos, info["duration"])
+    pecas = _normalizar_segmentos(segmentos, info["duration"])
+    segs = [p for p in pecas if p[0] != "gap"]
+    tem_ganho = any(p[2] for p in segs)
     if not segs:
         return {"success": False, "error": "Nada para exportar: todos os trechos foram removidos."}
-    total = sum(b - a for a, b in segs)
+    total = sum(_dur_peca(p) for p in pecas)
     saida = _nome_saida(path, cfg["ext"], pasta_saida)
     has_audio = info["has_audio"] and not sem_audio
 
+    tem_vazio = len(segs) != len(pecas)
     em_ordem = all(segs[k][0] >= segs[k - 1][1] - 0.001 for k in range(1, len(segs)))
-    # select/aselect só funciona com trechos em ordem crescente; reordenados sempre vão por concat
-    usar_inputs = len(segs) <= 150 or not em_ordem
+    # select/aselect só serve para trechos em ordem crescente, sem vazios e sem ganho; o resto vai por concat
+    usar_inputs = len(pecas) <= 150 or not em_ordem or tem_vazio or (tem_ganho and has_audio)
     cmd = [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1"]
     filtros = []
     if usar_inputs:
-        # Uma entrada por trecho com seek preciso → só decodifica o que fica no vídeo
-        for a, b in segs:
-            cmd += ["-ss", f"{a:.3f}", "-t", f"{b - a:.3f}", "-i", path]
-        pares = "".join(f"[{i}:v:0]" + (f"[{i}:a:0]" if has_audio else "") for i in range(len(segs)))
-        filtros.append(f"{pares}concat=n={len(segs)}:v=1:a={1 if has_audio else 0}[vc]" + ("[ac]" if has_audio else ""))
+        # Uma entrada por trecho com seek preciso → só decodifica o que fica no vídeo.
+        # Espaços vazios viram quadro preto + silêncio. Tudo é padronizado antes do concat.
+        W, H = info["width"] or 1920, info["height"] or 1080
+        W, H = W + (W % 2), H + (H % 2)
+        fps = f'{info["fps"]:.3f}'
+        entrada = 0
+        pares = ""
+        for k, p in enumerate(pecas):
+            if p[0] == "gap":
+                cmd += ["-f", "lavfi", "-t", f"{p[1]:.3f}", "-i", f"color=c=black:s={W}x{H}:r={fps}"]
+                vi = entrada; entrada += 1
+                if has_audio:
+                    cmd += ["-f", "lavfi", "-t", f"{p[1]:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
+                    ai = entrada; entrada += 1
+            else:
+                a, b = p[0], p[1]
+                cmd += ["-ss", f"{a:.3f}", "-t", f"{b - a:.3f}", "-i", path]
+                vi = ai = entrada; entrada += 1
+            filtros.append(f"[{vi}:v:0]scale={W}:{H}:force_original_aspect_ratio=decrease,"
+                           f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},format=yuv420p[v{k}]")
+            pares += f"[v{k}]"
+            if has_audio:
+                vol = f",volume={p[2]:.2f}dB" if p[0] != "gap" and p[2] else ""
+                filtros.append(f"[{ai}:a:0]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo{vol}[a{k}]")
+                pares += f"[a{k}]"
+        filtros.append(f"{pares}concat=n={len(pecas)}:v=1:a={1 if has_audio else 0}[vc]" + ("[ac]" if has_audio else ""))
     else:
         # Muitos trechos: um único select (baixa memória)
-        cond = "+".join(f"between(t,{a:.3f},{b:.3f})" for a, b in segs)
+        cond = "+".join(f"between(t,{p[0]:.3f},{p[1]:.3f})" for p in segs)
         cmd += ["-i", path]
         filtros.append(f"[0:v:0]select='{cond}',setpts=N/FRAME_RATE/TB[vc]")
         if has_audio:

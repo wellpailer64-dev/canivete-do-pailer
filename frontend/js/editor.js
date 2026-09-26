@@ -12,13 +12,12 @@ const VE = {
     srcDur: 0,          // duração do arquivo original
     dur: 0,             // duração da sequência (soma dos clipes)
     fps: 30,
-    clips: [],          // [{s, e}] em tempo da fonte, na ordem da sequência
-    lay: [],            // [{ts, te}] posição de cada clipe na sequência (derivado)
+    clips: [],          // [{tr, st, s, e, g}] trilha, início na timeline, trecho da fonte, ganho dB
     sel: -1,            // índice do clipe selecionado
     inPt: null,
     outPt: null,
     playhead: 0,        // tempo da sequência
-    playIdx: 0,         // clipe tocando agora
+    cur: -1,            // clipe que o player está mostrando (-1 = espaço vazio)
     pps: 50,            // pixels por segundo
     view: 0,            // tempo na borda esquerda
     vs: 0,              // rolagem vertical das trilhas (px)
@@ -106,39 +105,44 @@ function veIsActive() {
 function veLsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function veLsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
-// ─────────────────────────── modelo (sequência) ───────────────────────────
+// ─────────────────────────── modelo (timeline) ───────────────────────────
+// Clipe: {tr, st, s, e} — tr = trilha 0..3 (V1..V4, com o áudio vinculado em A1..A4),
+// st = início na timeline, [s, e] = trecho do arquivo original. Pode haver espaço vazio.
+// Onde clipes se sobrepõem, a trilha mais alta é a que aparece (e a que se ouve).
+
+const veLen = c => c.e - c.s;
+const veEnd = c => c.st + c.e - c.s;
+const VE_EPS = 1e-6;
 
 function veRelayout() {
-    let t = 0;
-    VE.lay = VE.clips.map(c => { const o = { ts: t, te: t + (c.e - c.s) }; t = o.te; return o; });
-    VE.dur = t;
-    if (VE.sel >= VE.clips.length) VE.sel = -1;
+    const selC = VE.clips[VE.sel];
+    VE.clips.sort((a, b) => a.st - b.st || a.tr - b.tr);
+    VE.sel = selC ? VE.clips.indexOf(selC) : -1;
+    VE.dur = VE.clips.reduce((m, c) => Math.max(m, veEnd(c)), 0);
     VE.playhead = Math.min(VE.playhead, VE.dur);
 }
 
-function veClipAt(t) {
-    const n = VE.lay.length;
-    for (let i = 0; i < n; i++) {
-        const l = VE.lay[i];
-        if (t >= l.ts && (t < l.te || (i === n - 1 && t <= l.te))) return i;
-    }
-    return n ? n - 1 : -1;
+// Clipe visível no instante t (o da trilha mais alta), ou -1 se for espaço vazio
+function veTopAt(t) {
+    let best = -1;
+    VE.clips.forEach((c, i) => {
+        if (t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS && (best < 0 || c.tr > VE.clips[best].tr)) best = i;
+    });
+    return best;
 }
 
-// tempo da sequência -> {i, src}
-function veSrcAt(t) {
-    const i = veClipAt(t);
-    if (i < 0) return { i: -1, src: 0 };
-    return { i, src: VE.clips[i].s + (t - VE.lay[i].ts) };
+// Clipe sob o ponto (t, trilha) — para clique/seleção
+function veClipAtTrack(t, tr) {
+    return VE.clips.findIndex(c => c.tr === tr && t >= c.st - VE_EPS && t <= veEnd(c) + VE_EPS);
 }
 
-function veEditPoints() {
+function veEditPoints(excluir) {
     const pts = new Set([0, VE.dur]);
-    VE.lay.forEach(l => { pts.add(l.ts); pts.add(l.te); });
+    VE.clips.forEach((c, i) => { if (i !== excluir) { pts.add(c.st); pts.add(veEnd(c)); } });
     return [...pts].sort((a, b) => a - b);
 }
 
-function veSnapshot() { return JSON.stringify({ clips: VE.clips, inPt: VE.inPt, outPt: VE.outPt, playhead: VE.playhead }); }
+function veSnapshot() { return JSON.stringify({ clips: VE.clips, inPt: VE.inPt, outPt: VE.outPt }); }
 
 function vePushHistory() {
     VE.history.push(veSnapshot());
@@ -179,28 +183,31 @@ function veUpdateUndo() {
 // Depois de qualquer edição: reencaixa zoom/visão, reposiciona a agulha e redesenha
 function veAfterEdit(playhead) {
     const fit = veFitPps();
-    if (VE.pps < fit) VE.pps = fit;
+    if (VE.pps < fit * 0.5) VE.pps = fit;
     veClampView();
     veSyncZoomSlider();
     veSeek(playhead != null ? playhead : VE.playhead);
     veRefresh();
 }
 
-// Fatia todas as trilhas no ponto (cortar = dividir, nunca apagar)
+// Corta TODAS as trilhas no ponto (cortar = fatiar, nunca apagar)
 function veSplitAt(t, quiet) {
     if (!VE.ready) return false;
     t = veSnapFrame(veClamp(t));
-    const i = veClipAt(t);
-    if (i < 0) return false;
-    const c = VE.clips[i], l = VE.lay[i];
-    if (t - l.ts < veFrame() * 0.99 || l.te - t < veFrame() * 0.99) {
-        if (!quiet) veToast('Já existe um corte aqui');
+    const f = veFrame() * 0.99;
+    const alvo = VE.clips.filter(c => t - c.st >= f && veEnd(c) - t >= f);
+    if (!alvo.length) {
+        if (!quiet) veToast(veTopAt(t) < 0 ? 'Não há clipe na agulha' : 'Já existe um corte aqui');
         return false;
     }
     vePushHistory();
-    const src = c.s + (t - l.ts);
-    VE.clips.splice(i, 1, { s: c.s, e: src }, { s: src, e: c.e });
-    if (VE.sel > i) VE.sel++;
+    const selC = VE.clips[VE.sel];
+    alvo.forEach(c => {
+        const src = c.s + (t - c.st);
+        VE.clips.push({ ...c, st: t, s: src, e: c.e });
+        c.e = src;
+    });
+    VE.sel = selC ? VE.clips.indexOf(selC) : -1;
     veRelayout();
     veRefresh();
     return true;
@@ -210,25 +217,26 @@ function veSplitAtPlayhead() {
     if (veSplitAt(VE.playhead)) veToast('Cortado em ' + veShort(VE.playhead));
 }
 
-// Remove um trecho da sequência e fecha o buraco (ripple). A agulha vai para o ponto do corte.
+// Remove o intervalo [a, b] de todas as trilhas e puxa o que vem depois (ripple)
 function veRippleRemove(a, b, label) {
     if (!VE.ready) return false;
     a = veSnapFrame(veClamp(Math.min(a, b)));
     b = veSnapFrame(veClamp(Math.max(a, b)));
-    if (b - a < veFrame() * 0.5) return false;
-    if (VE.dur - (b - a) < veFrame()) { veToast('Isso removeria o vídeo inteiro'); return false; }
-    vePushHistory();
+    const d = b - a;
+    if (d < veFrame() * 0.5) return false;
     const tiny = veFrame() * 0.5;
     const out = [];
-    VE.clips.forEach((c, i) => {
-        const { ts, te } = VE.lay[i];
-        if (te <= a || ts >= b) { out.push({ ...c }); return; }
-        if (ts < a && a - ts > tiny) out.push({ s: c.s, e: c.s + (a - ts) });
-        if (te > b && te - b > tiny) out.push({ s: c.s + (b - ts), e: c.e });
+    VE.clips.forEach(c => {
+        const en = veEnd(c);
+        if (en <= a + VE_EPS) { out.push({ ...c }); return; }
+        if (c.st >= b - VE_EPS) { out.push({ ...c, st: c.st - d }); return; }
+        if (c.st < a && a - c.st > tiny) out.push({ ...c, e: c.s + (a - c.st) });
+        if (en > b && en - b > tiny) out.push({ ...c, st: a, s: c.s + (b - c.st) });
     });
+    if (!out.length) { veToast('Isso apagaria tudo da timeline'); return false; }
+    vePushHistory();
     VE.clips = out;
     VE.sel = -1;
-    // marcas In/Out que caíam no trecho removido deixam de valer
     VE.inPt = VE.outPt = null;
     veRelayout();
     veAfterEdit(a);
@@ -236,67 +244,79 @@ function veRippleRemove(a, b, label) {
     return true;
 }
 
-// D / Delete: apaga o clipe selecionado e fecha o buraco
-function veDeleteSelected() {
-    if (VE.sel < 0) { veToast('Selecione um clipe na timeline'); return; }
-    const l = VE.lay[VE.sel];
-    veRippleRemove(l.ts, l.te, 'Clipe apagado');
-}
-
+// D / Delete: apaga o clipe selecionado. Se o espaço que ele deixa ficar vazio em todas as
+// trilhas, a timeline fecha o buraco (como o ripple delete do Premiere); senão fica o espaço.
 function veDeleteClip(i) {
     if (i < 0 || i >= VE.clips.length) return;
-    const l = VE.lay[i];
-    veRippleRemove(l.ts, l.te, 'Clipe apagado');
-}
-
-// Arrastar clipe: onde ele entra se o início for solto em `start` (tempo da sequência).
-// Retorna o índice de inserção na lista sem o clipe (encaixa no corte mais próximo).
-function veMoveTarget(i, start) {
-    let t = 0, best = 0, bd = Infinity, k = 0;
-    const pts = [0];
-    VE.clips.forEach((c, j) => { if (j !== i) { t += c.e - c.s; pts.push(t); } });
-    for (k = 0; k < pts.length; k++) {
-        const d = Math.abs(pts[k] - start);
-        if (d < bd) { bd = d; best = k; }
-    }
-    return best;
-}
-
-// Ordem de exibição durante o arraste (prévia do resultado)
-function veMoveOrder(i, k) {
-    const idx = VE.clips.map((_, j) => j).filter(j => j !== i);
-    idx.splice(k, 0, i);
-    return idx;
-}
-
-function veMoveClip(i, k) {
-    const order = veMoveOrder(i, k);
-    if (order.every((j, pos) => j === pos)) { veDraw(); return; }   // soltou no mesmo lugar
+    if (VE.clips.length === 1) { veToast('Não dá para apagar o último clipe'); return; }
     vePushHistory();
-    VE.clips = order.map(j => VE.clips[j]);
-    VE.sel = order.indexOf(i);
+    const c = VE.clips[i], a = c.st, b = veEnd(c), d = b - a;
+    VE.clips.splice(i, 1);
+    const ocupado = VE.clips.some(o => o.st < b - VE_EPS && veEnd(o) > a + VE_EPS);
+    if (!ocupado) VE.clips.forEach(o => { if (o.st >= b - VE_EPS) o.st -= d; });
+    VE.sel = -1;
+    veRelayout();
+    veAfterEdit(VE.playhead > b && !ocupado ? VE.playhead - d : Math.min(VE.playhead, VE.dur));
+    veToast(ocupado ? 'Clipe apagado (o espaço ficou porque há clipes em outras trilhas)' : 'Clipe apagado');
+}
+
+function veDeleteSelected() {
+    if (VE.sel < 0) { veToast('Selecione um clipe na timeline'); return; }
+    veDeleteClip(VE.sel);
+}
+
+// ── Mover clipe (arrastar) ──
+// Onde o clipe cairia: início com ímã nos cortes/agulha, sem ficar antes do zero.
+function veMoveTarget(i, start) {
+    const c = VE.clips[i], len = veLen(c);
+    start = Math.max(0, start);
+    if (VE.snap) {
+        const lim = 8 / VE.pps;
+        const cands = veEditPoints(i).concat([VE.playhead]);
+        let best = null, bd = lim;
+        for (const p of cands) {
+            if (Math.abs(p - start) < bd) { bd = Math.abs(p - start); best = p; }
+            if (Math.abs(p - (start + len)) < bd) { bd = Math.abs(p - (start + len)); best = p - len; }
+        }
+        if (best != null) start = Math.max(0, best);
+    }
+    return veSnapFrame(start);
+}
+
+// Solta o clipe na trilha/posição: o que estiver embaixo na trilha de destino é sobrescrito
+function veMoveClip(i, tr, st) {
+    const c = VE.clips[i];
+    if (tr === c.tr && Math.abs(st - c.st) < veFrame() / 2) { veDraw(); return; }
+    vePushHistory();
+    const moved = { ...c, tr, st };
+    const a = st, b = st + veLen(c), tiny = veFrame() * 0.5;
+    const out = [];
+    VE.clips.forEach((o, j) => {
+        if (j === i) return;
+        const en = veEnd(o);
+        if (o.tr !== tr || en <= a + VE_EPS || o.st >= b - VE_EPS) { out.push(o); return; }
+        if (o.st < a && a - o.st > tiny) out.push({ ...o, e: o.s + (a - o.st) });
+        if (en > b && en - b > tiny) out.push({ ...o, st: b, s: o.s + (b - o.st) });
+    });
+    out.push(moved);
+    VE.clips = out;
+    VE.sel = out.indexOf(moved);
     veRelayout();
     veAfterEdit(VE.playhead);
-    veToast(`Clipe movido para a posição ${VE.sel + 1}`);
 }
 
-// Q: apaga do início do clipe sob a agulha até a agulha (ripple trim, como no Premiere)
+// Q: apaga do corte anterior (qualquer trilha) até a agulha; W: da agulha até o próximo corte
 function veRippleTrimStart() {
     const t = veSnapFrame(VE.playhead);
-    const i = veClipAt(t);
-    if (i < 0) return;
-    const p = VE.lay[i].ts;
-    if (t - p < veFrame() * 0.5) { veToast('A agulha já está no início do clipe'); return; }
+    const p = [...veEditPoints()].reverse().find(x => x < t - veFrame() * 0.5);
+    if (p == null) { veToast('Nada antes da agulha'); return; }
     veRippleRemove(p, t, 'Removido até a agulha');
 }
 
-// W: apaga da agulha até o fim do clipe sob a agulha
 function veRippleTrimEnd() {
     const t = veSnapFrame(VE.playhead);
-    const i = veClipAt(t);
-    if (i < 0) return;
-    const n = VE.lay[i].te;
-    if (n - t < veFrame() * 0.5) { veToast('A agulha já está no fim do clipe'); return; }
+    const n = veEditPoints().find(x => x > t + veFrame() * 0.5);
+    if (n == null) { veToast('Nada depois da agulha'); return; }
     veRippleRemove(t, n, 'Removido depois da agulha');
 }
 
@@ -308,12 +328,27 @@ function veExtractInOut() {
 function veResetEdits() {
     if (!VE.ready) return;
     vePushHistory();
-    VE.clips = [{ s: 0, e: VE.srcDur }];
+    VE.clips = [{ tr: 0, st: 0, s: 0, e: VE.srcDur }];
     VE.sel = -1;
     VE.inPt = VE.outPt = null;
     veRelayout();
     veAfterEdit(0);
     veToast('Vídeo restaurado ao original');
+}
+
+// O que vai para a exportação: a timeline "achatada" (trilha mais alta vence; vazio = preto)
+function veFlatten() {
+    const pts = veEditPoints();
+    const out = [];
+    for (let k = 0; k < pts.length - 1; k++) {
+        const p = pts[k], q = pts[k + 1];
+        if (q - p < 1e-4) continue;
+        const i = veTopAt((p + q) / 2);
+        if (i < 0) { out.push({ gap: q - p }); continue; }
+        const c = VE.clips[i];
+        out.push({ start: c.s + (p - c.st), end: c.s + (q - c.st), gain: c.g || 0 });
+    }
+    return out;
 }
 
 function veMarkIn() {
@@ -333,25 +368,45 @@ function veMarkOut() {
 }
 
 // ─────────────────────────── reprodução ───────────────────────────
+// Relógio próprio: dentro de um clipe o <video> dita o tempo; no espaço vazio a agulha anda
+// sozinha com a tela preta. Troca de clipe quando muda o que está visível na agulha.
 
 function veVideo() { return $ve('ve-video'); }
 
-function veSeek(t, fromPlayer) {
+// Ajusta o player ao que está visível na agulha (quadro do clipe, ou preto no vazio)
+function veSyncPlayer(forcar) {
+    const v = veVideo();
+    const i = veTopAt(VE.playhead);
+    if (i < 0) {
+        VE.cur = -1;
+        if (!v.paused) v.pause();
+        v.style.visibility = 'hidden';
+        return;
+    }
+    const c = VE.clips[i];
+    const src = c.s + (VE.playhead - c.st);
+    if (forcar || i !== VE.cur || Math.abs(v.currentTime - src) > 0.25) {
+        if (v.src && Math.abs(v.currentTime - src) > 0.02) {
+            try { v.currentTime = src; } catch (e) { /* ainda carregando */ }
+        }
+    }
+    VE.cur = i;
+    v.style.visibility = '';
+    veApplyAudioGain();
+    if (VE.playing && v.paused && v.src) { v.playbackRate = VE.rate; v.play().catch(() => {}); }
+}
+
+function veSeek(t) {
     if (!VE.ready) return;
     VE.playhead = veClamp(t);
-    const { i, src } = veSrcAt(VE.playhead);
-    VE.playIdx = Math.max(0, i);
-    const v = veVideo();
-    if (!fromPlayer && v && v.src && Math.abs(v.currentTime - src) > 0.001) {
-        try { v.currentTime = src; } catch (e) { /* ainda carregando */ }
-    }
+    veSyncPlayer(true);
     veFollowPlayhead(false);
     veUpdateReadouts();
     veDraw();
 }
 
 function veStepFrames(n) {
-    if (VE.playing) veVideo().pause();
+    if (VE.playing) veStop();
     veSeek(veSnapFrame(VE.playhead) + n * veFrame());
 }
 
@@ -362,19 +417,26 @@ function veJumpEdit(dir) {
     if (t != null) veSeek(t);
 }
 
-function veTogglePlay() {
-    if (!VE.ready) return;
-    const v = veVideo();
-    if (!v.src) return;
-    if (v.paused) {
-        if (VE.playhead >= VE.dur - veFrame()) veSeek(0);
-        else veSeek(VE.playhead);
-        v.playbackRate = VE.rate;
-        v.play().catch(() => {});
-    } else {
-        v.pause();
-    }
+function vePlay() {
+    if (!VE.ready || !veVideo().src || VE.playing) return;
+    if (VE.playhead >= VE.dur - veFrame()) VE.playhead = 0;
+    VE.playing = true;
+    VE._last = performance.now();
+    $ve('ve-play').textContent = '❚❚';
+    veSyncPlayer(true);
+    requestAnimationFrame(vePlaybackLoop);
 }
+
+function veStop() {
+    if (!VE.playing) return;
+    VE.playing = false;
+    veVideo().pause();
+    $ve('ve-play').textContent = '▶';
+    veUpdateReadouts();
+    veDraw();
+}
+
+function veTogglePlay() { VE.playing ? veStop() : vePlay(); }
 
 function veSetRate(r) {
     VE.rate = r;
@@ -390,31 +452,92 @@ function veToggleMute() {
     $ve('ve-mute').innerHTML = `<svg class="i"><use href="#i-${VE.muted ? 'volume-x' : 'volume'}"/></svg>`;
 }
 
-// Posição na sequência a partir do tempo atual do player (dentro do clipe que está tocando)
-function veSeqFromPlayer() {
-    const c = VE.clips[VE.playIdx], l = VE.lay[VE.playIdx];
-    if (!c) return VE.playhead;
-    const ct = Math.min(Math.max(veVideo().currentTime, c.s), c.e);
-    return l.ts + (ct - c.s);
-}
-
-function vePlaybackLoop() {
+function vePlaybackLoop(now) {
     if (!VE.playing) return;
+    now = now || performance.now();
+    const dt = Math.min(0.25, (now - VE._last) / 1000);
+    VE._last = now;
     const v = veVideo();
-    let c = VE.clips[VE.playIdx];
-    if (c && v.currentTime >= c.e - 0.004) {
-        // fim do clipe: pula para o próximo (os trechos removidos nunca aparecem)
-        const next = VE.clips[VE.playIdx + 1];
-        if (!next) { v.pause(); veSeek(VE.dur); return; }
-        VE.playIdx++;
-        if (Math.abs(next.s - c.e) > 0.004) v.currentTime = next.s;
-        c = next;
+    const c = VE.clips[VE.cur];
+    if (c && !v.paused && !v.seeking) {
+        // dentro de um clipe o vídeo manda (fica em sincronia com o áudio)
+        VE.playhead = c.st + (Math.min(v.currentTime, c.e) - c.s);
+        if (v.currentTime >= c.e - 0.004) VE.playhead = veEnd(c);
+    } else {
+        VE.playhead += dt * VE.rate;
     }
-    VE.playhead = veClamp(veSeqFromPlayer());
+    if (VE.playhead >= VE.dur - 1e-3) {
+        VE.playhead = VE.dur;
+        veStop();
+        veSyncPlayer(true);
+        return;
+    }
+    if (veTopAt(VE.playhead) !== VE.cur) veSyncPlayer(false);
     veFollowPlayhead(true);
     veUpdateReadouts();
     veDraw();
     requestAnimationFrame(vePlaybackLoop);
+}
+
+// ─────────────────────────── ganho de áudio (G) ───────────────────────────
+// Cada clipe guarda seu ganho em dB (c.g). G abre a caixa "ajustar ganho em": o valor é somado.
+
+const VE_GAIN_MIN = -60, VE_GAIN_MAX = 30;
+function veDb(g) { return Math.pow(10, (g || 0) / 20); }
+function veFmtDb(g) { g = Math.round((g || 0) * 10) / 10; return (g > 0 ? '+' : '') + g + ' dB'; }
+
+function veOpenGain() {
+    if (VE.sel < 0) { veToast('Selecione um clipe para ajustar o ganho'); return; }
+    if (!VE.info || !VE.info.has_audio) { veToast('Este vídeo não tem som'); return; }
+    if (VE.playing) veStop();
+    $ve('ve-gain-cur').textContent = 'Ganho atual do clipe: ' + veFmtDb(VE.clips[VE.sel].g);
+    const inp = $ve('ve-gain-input');
+    inp.value = '';
+    $ve('ve-gain').hidden = false;
+    inp.focus();   // foco imediato: dá para digitar logo depois do G
+}
+
+function veCloseGain() {
+    $ve('ve-gain').hidden = true;
+    $ve('ve-gain-input').blur();   // devolve o teclado para o editor (senão G/Enter iriam para o campo escondido)
+}
+
+function veApplyGain() {
+    const raw = String($ve('ve-gain-input').value).replace(',', '.').trim();
+    const d = parseFloat(raw);
+    if (!raw || !isFinite(d)) { veCloseGain(); return; }
+    const c = VE.clips[VE.sel];
+    if (!c) { veCloseGain(); return; }
+    const novo = Math.min(Math.max(Math.round(((c.g || 0) + d) * 10) / 10, VE_GAIN_MIN), VE_GAIN_MAX);
+    veCloseGain();
+    if (novo === (c.g || 0)) return;
+    vePushHistory();
+    c.g = novo;
+    veApplyAudioGain();
+    veRefresh();
+    veToast(`Ganho do clipe: ${veFmtDb(novo)}`);
+}
+
+// Prévia: Web Audio permite aumentar acima de 100%; sem ele, só dá para abaixar (volume do player)
+const VEA = { ctx: null, gain: null, falhou: false };
+function veApplyAudioGain() {
+    const v = veVideo();
+    const c = VE.clips[VE.cur];
+    const lin = veDb(c ? c.g : 0);
+    if (!VEA.ctx && !VEA.falhou && lin > 1) {
+        try {
+            VEA.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            VEA.gain = VEA.ctx.createGain();
+            VEA.ctx.createMediaElementSource(v).connect(VEA.gain).connect(VEA.ctx.destination);
+        } catch (e) { VEA.falhou = true; VEA.ctx = null; }
+    }
+    if (VEA.ctx) {
+        if (VEA.ctx.state === 'suspended') VEA.ctx.resume().catch(() => {});
+        VEA.gain.gain.value = lin;
+        v.volume = 1;
+    } else {
+        v.volume = Math.min(1, lin);
+    }
 }
 
 // ─────────────────────────── visão / zoom ───────────────────────────
@@ -425,7 +548,8 @@ function veFitPps() { return VE.dur > 0 ? (veCanvasWidth() - 16) / VE.dur : 50; 
 function veVisibleDur() { return veCanvasWidth() / VE.pps; }
 
 function veClampView() {
-    const maxView = Math.max(0, VE.dur - veVisibleDur() + 8 / VE.pps);
+    // deixa meia tela livre depois do fim, para dar para arrastar clipes para lá
+    const maxView = Math.max(0, VE.dur - veVisibleDur() * 0.5);
     VE.view = Math.min(Math.max(VE.view, 0), maxView);
 }
 
@@ -512,6 +636,9 @@ function veTrackRows() {
     let y = VE_RULER - VE.vs;
     return VE_TRACKS.map(tr => { const r = { ...tr, y, h: tr.h }; y += tr.h; return r; });
 }
+
+// V1/A1 -> 0, V2/A2 -> 1 ...
+function veTrackIndex(row) { return (+row.id.slice(1) || 1) - 1; }
 
 function veRowAt(y) {
     if (y <= VE_RULER) return null;
@@ -638,29 +765,27 @@ function veRender() {
         if (VE.outPt != null) { ctx.fillRect(X(VE.outPt) - 2, 0, 2, H); }
     }
 
-    // clipes (V1 + A1 vinculados)
+    // clipes: cada um na sua trilha de vídeo (Vn) com o áudio vinculado em An
     ctx.save();
     ctx.beginPath(); ctx.rect(0, VE_RULER, W, H - VE_RULER); ctx.clip();
     const n = VE.peaks.length;
-    // Lista a desenhar: normalmente a sequência; ao arrastar um clipe, a prévia com ele na nova posição
+    const rowOf = id => rows.find(r => r.id === id);
+    // ao arrastar: o original fica apagadinho e um "fantasma" mostra onde ele vai cair
     const mv = VE.drag && VE.drag.mode === 'move' && VE.drag.active ? VE.drag : null;
-    const order = mv ? veMoveOrder(mv.i, mv.k) : VE.clips.map((_, j) => j);
-    let acc = 0;
-    const items = order.map((j, pos) => {
-        const c = VE.clips[j], it = { c, i: j, pos, ts: acc, te: acc + (c.e - c.s), ghost: mv && j === mv.i };
-        acc = it.te;
-        return it;
-    });
-    items.forEach(({ c, i, pos, ts, te, ghost }) => {
-        const x1 = X(ts), x2 = X(te);
+    const items = VE.clips.map((c, i) => ({ c, i, st: c.st, tr: c.tr, dim: mv && mv.i === i }));
+    if (mv) items.push({ c: VE.clips[mv.i], i: mv.i, st: mv.st, tr: mv.tr, ghost: true });
+    items.forEach(({ c, i, st, tr, dim, ghost }) => {
+        const len = veLen(c);
+        const x1 = X(st), x2 = X(st + len);
         if (x2 < -2 || x1 > W + 2) return;
         const cx = Math.max(x1, -4) + 1, cw = Math.min(x2, W + 4) - Math.max(x1, -4) - 2;
         if (cw <= 0) return;
-        const srcAt = x => c.s + (VE.view + x / VE.pps - ts);   // x do canvas -> tempo da fonte
-        ctx.globalAlpha = ghost ? 0.7 : 1;
+        const srcAt = x => c.s + (VE.view + x / VE.pps - st);   // x do canvas -> tempo da fonte
+        const vr = rowOf('V' + (tr + 1)), ar = rowOf('A' + (tr + 1));
+        ctx.globalAlpha = dim ? 0.28 : ghost ? 0.8 : 1;
 
         // ---- vídeo
-        const vy = rV.y + 3, vh = rV.h - 6;
+        const vy = vr.y + 3, vh = vr.h - 6;
         ctx.save();
         veRoundRect(ctx, cx, vy, cw, vh, 4);
         ctx.clip();
@@ -680,31 +805,40 @@ function veRender() {
         ctx.fillRect(cx, vy, cw, vh);
         ctx.fillStyle = '#5b6ee1';
         ctx.fillRect(cx, vy, cw, Math.min(14, vh));
-        if (cw > 50 && vh >= 14) {
+        if (cw > 50 && vh >= 12) {
             ctx.fillStyle = '#eef0ff';
             ctx.font = '600 10.5px Segoe UI';
-            ctx.fillText(`Clipe ${pos + 1}` + (cw > 150 ? '  ·  ' + veShort(te - ts) : ''), cx + 6, vy + 10.5);
+            ctx.fillText(`Clipe ${i + 1}` + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, vy + 10.5);
         }
         ctx.restore();
 
-        // ---- áudio
-        const ay = rA.y + 3, ah = rA.h - 6;
+        // ---- áudio (a altura da onda acompanha o ganho do clipe)
+        const ay = ar.y + 3, ah = ar.h - 6;
         ctx.save();
         veRoundRect(ctx, cx, ay, cw, ah, 4);
         ctx.clip();
         ctx.fillStyle = '#163a2b';
         ctx.fillRect(cx, ay, cw, ah);
         if (n && VE.info && VE.info.has_audio) {
-            const mid = ay + ah / 2, amp = ah / 2 - 3;
-            ctx.fillStyle = '#43c58f';
+            const mid = ay + ah / 2, amp = ah / 2 - 3, gl = veDb(c.g);
             const xa = Math.max(cx, 0), xb = Math.min(cx + cw, W);
             for (let x = xa; x < xb; x += 2) {
                 const sa = srcAt(x), sb = srcAt(x + 2);
                 const ia = Math.floor(sa / VE.srcDur * n), ib = Math.max(ia + 1, Math.ceil(sb / VE.srcDur * n));
                 let pk = 0;
                 for (let k = Math.max(0, ia); k < Math.min(n, ib); k++) pk = Math.max(pk, VE.peaks[k]);
-                const h = Math.max(1, pk * amp);
+                pk *= gl;
+                ctx.fillStyle = pk > 1 ? '#f87171' : '#43c58f';     // vermelho = estourando
+                const h = Math.max(1, Math.min(1, pk) * amp);
                 ctx.fillRect(x, mid - h, 1.4, h * 2);
+            }
+            if (c.g && cw > 60 && ah >= 14) {
+                ctx.font = '600 10px Cascadia Mono, Consolas, monospace';
+                const txt = veFmtDb(c.g), tw = ctx.measureText(txt).width + 8;
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(cx + cw - tw - 4, ay + 3, tw, 14);
+                ctx.fillStyle = c.g > 0 ? '#fbbf24' : '#93c5fd';
+                ctx.fillText(txt, cx + cw - tw, ay + 13.5);
             }
         } else if (VE.info && !VE.info.has_audio) {
             ctx.fillStyle = '#4a4a4a';
@@ -712,11 +846,10 @@ function veRender() {
             if (cw > 80) ctx.fillText('sem áudio', cx + 8, ay + ah / 2 + 4);
         }
         ctx.restore();
-
         ctx.globalAlpha = 1;
 
-        // seleção (o clipe sendo arrastado ganha contorno tracejado)
-        if (i === VE.sel || ghost) {
+        // seleção (o fantasma do arraste ganha contorno tracejado)
+        if ((i === VE.sel && !dim) || ghost) {
             ctx.strokeStyle = '#F97316';
             ctx.lineWidth = 2;
             if (ghost) ctx.setLineDash([5, 3]);
@@ -724,16 +857,15 @@ function veRender() {
             veRoundRect(ctx, cx, ay, cw, ah, 4); ctx.stroke();
             ctx.setLineDash([]);
         }
+        if (ghost) {
+            ctx.font = '600 10px Cascadia Mono, Consolas, monospace';
+            const txt = `V${tr + 1} · ${veShort(st)}`;
+            ctx.fillStyle = 'rgba(0,0,0,0.75)';
+            ctx.fillRect(Math.max(2, x1), vy - 17, ctx.measureText(txt).width + 10, 15);
+            ctx.fillStyle = '#F97316';
+            ctx.fillText(txt, Math.max(2, x1) + 5, vy - 6);
+        }
     });
-    // marcador de inserção (onde o clipe arrastado entra)
-    if (mv) {
-        const g = items.find(it => it.ghost);
-        const gx = Math.round(X(g.ts)) + 0.5;
-        ctx.fillStyle = '#F97316';
-        ctx.fillRect(gx - 1, rV.y, 2, rA.y + rA.h - rV.y);
-        ctx.beginPath(); ctx.moveTo(gx - 6, rV.y); ctx.lineTo(gx + 6, rV.y); ctx.lineTo(gx, rV.y + 7); ctx.closePath(); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(gx - 6, rA.y + rA.h); ctx.lineTo(gx + 6, rA.y + rA.h); ctx.lineTo(gx, rA.y + rA.h - 7); ctx.closePath(); ctx.fill();
-    }
     ctx.restore();
 
     // guia da lâmina
@@ -805,7 +937,8 @@ function veRenderClips() {
     $ve('ve-sum-final').textContent = veHuman(VE.dur);
     $ve('ve-sum-cut').textContent = veHuman(Math.max(0, VE.srcDur - VE.dur));
 
-    if (VE.clips.length === 1 && VE.clips[0].s < 1e-3 && Math.abs(VE.clips[0].e - VE.srcDur) < 1e-3) {
+    const c0 = VE.clips[0];
+    if (VE.clips.length === 1 && c0.st < 1e-3 && c0.tr === 0 && !c0.g && c0.s < 1e-3 && Math.abs(c0.e - VE.srcDur) < 1e-3) {
         box.innerHTML = '<div class="ve-clips-empty">Nenhum corte ainda.<br>Aperte <b>\'</b> (ou <b>S</b>) para cortar na agulha. <b>Q</b> / <b>W</b> apagam antes / depois da agulha até o corte mais próximo.<br>Selecione um clipe e aperte <b>D</b> para apagá-lo.</div>';
         return;
     }
@@ -813,8 +946,8 @@ function veRenderClips() {
         <div class="ve-clip${i === VE.sel ? ' sel' : ''}" data-i="${i}">
             <div class="ve-clip-bar"></div>
             <div>
-                <div class="ve-clip-name">Clipe ${i + 1}</div>
-                <div class="ve-clip-time">${veShort(VE.lay[i].ts)} → ${veShort(VE.lay[i].te)} · ${veShort(c.e - c.s)}</div>
+                <div class="ve-clip-name">Clipe ${i + 1} <span class="ve-clip-tr">V${c.tr + 1}</span>${c.g ? ` <span class="ve-clip-db">${veFmtDb(c.g)}</span>` : ''}</div>
+                <div class="ve-clip-time">${veShort(c.st)} → ${veShort(veEnd(c))} · ${veShort(veLen(c))}</div>
             </div>
             <button class="ve-clip-act" data-act="${i}" title="Apagar clipe (D)"><svg class="i"><use href="#i-trash"/></svg></button>
         </div>`).join('');
@@ -873,13 +1006,14 @@ function veOpenFile() {
 
 function veOpenPath(path) {
     if (!path || VE.exportRunning || !veIsActive()) return;
+    veStop();
     const v = veVideo();
     v.pause();
     v.removeAttribute('src');
     v.load();
     Object.assign(VE, {
-        path, info: null, dur: 0, srcDur: 0, clips: [], lay: [], sel: -1, inPt: null, outPt: null, playhead: 0,
-        playIdx: 0, history: [], future: [], thumbs: [], peaks: [], ready: false, dest: null, view: 0,
+        path, info: null, dur: 0, srcDur: 0, clips: [], sel: -1, inPt: null, outPt: null, playhead: 0,
+        cur: -1, history: [], future: [], thumbs: [], peaks: [], ready: false, dest: null, view: 0,
     });
     veUpdateUndo();
     $ve('ve-empty').hidden = true;
@@ -908,7 +1042,7 @@ function veOnPrepare(ev) {
             VE.info = ev;
             VE.srcDur = ev.duration;
             VE.fps = ev.fps || 30;
-            VE.clips = [{ s: 0, e: VE.srcDur }];
+            VE.clips = [{ tr: 0, st: 0, s: 0, e: VE.srcDur }];
             veRelayout();
             VE.ready = true;
             VE.pps = veFitPps();
@@ -925,6 +1059,7 @@ function veOnPrepare(ev) {
             break;
         case 'video': {
             const v = veVideo();
+            v.crossOrigin = 'anonymous';   // permite o ganho acima de 100% na prévia (Web Audio)
             v.src = ev.url;
             v.muted = VE.muted;
             v.load();
@@ -967,7 +1102,7 @@ function vePill(name) {
 
 function veOpenExport() {
     if (!VE.ready) return;
-    if (VE.playing) veVideo().pause();
+    veStop();
     const sel = $ve('ve-res');
     const h = VE.info.height || 0;
     const opts = [['original', `Original (${VE.info.width}×${h})`]];
@@ -1020,8 +1155,8 @@ function veChooseDest() {
 }
 
 function veStartExport() {
-    // Os clipes da sequência já estão na ordem do vídeo; trechos colados são unidos no Python
-    const segs = VE.clips.map(c => ({ start: c.s, end: c.e }));
+    // A timeline achatada: trilha mais alta vence, vazio vira preto; trechos colados são unidos no Python
+    const segs = veFlatten();
     if (!segs.length) return;
     VE.exportRunning = true;
     $ve('ve-export-form').hidden = true;
@@ -1243,19 +1378,7 @@ function veInitEvents() {
     const wrap = $ve('ve-tl-wrap');
     const v = veVideo();
 
-    v.addEventListener('play', () => {
-        VE.playing = true;
-        $ve('ve-play').textContent = '❚❚';
-        requestAnimationFrame(vePlaybackLoop);
-    });
-    v.addEventListener('pause', () => {
-        VE.playing = false;
-        $ve('ve-play').textContent = '▶';
-        if (VE.ready) VE.playhead = veClamp(veSeqFromPlayer());
-        veUpdateReadouts();
-        veDraw();
-    });
-    v.addEventListener('ended', () => { VE.playing = false; $ve('ve-play').textContent = '▶'; });
+    // o estado de reprodução é do editor (relógio próprio), não do <video>
     v.addEventListener('click', () => { if (!VEM.panned) veTogglePlay(); });
     v.addEventListener('error', () => {
         if (!v.getAttribute('src')) return;
@@ -1273,7 +1396,7 @@ function veInitEvents() {
             return;
         }
         if (y <= VE_RULER || veOnPlayheadHandle(x, y)) {
-            if (VE.playing) v.pause();
+            if (VE.playing) veStop();
             VE.drag = { mode: 'scrub' };
             wrap.classList.add('scrub');
             veSeek(e.shiftKey ? veSnapFrame(t) : veSnapTime(t));
@@ -1284,11 +1407,14 @@ function veInitEvents() {
             return;
         }
         // seleção: clicar num clipe só seleciona (a agulha fica onde está — ela anda pela régua).
-        // Segurar e arrastar move o clipe na sequência; clicar em área vazia desmarca.
+        // Segurar e arrastar move o clipe no tempo e entre trilhas; clicar em área vazia desmarca.
         const row = veRowAt(y);
-        const i = row && row.main && t >= 0 && t <= VE.dur ? veClipAt(t) : -1;
+        const i = row ? veClipAtTrack(t, veTrackIndex(row)) : -1;
         VE.sel = i;
-        if (i >= 0) VE.drag = { mode: 'move', i, x0: e.clientX, y0: e.clientY, grab: t - VE.lay[i].ts, active: false, k: i };
+        if (i >= 0) {
+            const c = VE.clips[i];
+            VE.drag = { mode: 'move', i, x0: e.clientX, y0: e.clientY, grab: t - c.st, active: false, st: c.st, tr: c.tr, kind: row.kind };
+        }
         veRenderClips();
         veDraw();
     });
@@ -1305,14 +1431,18 @@ function veInitEvents() {
             if (!d.active) {
                 if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 5) return;   // ainda é um clique
                 d.active = true;
-                if (VE.playing) v.pause();
+                if (VE.playing) veStop();
                 wrap.classList.add('moving');
             }
             // auto-rolagem nas bordas
             const w = veCanvasWidth();
             if (x > w - 24) { VE.view += 14 / VE.pps; veClampView(); }
             if (x < 24) { VE.view -= 14 / VE.pps; veClampView(); }
-            d.k = veMoveTarget(d.i, veTimeFromEvent(e).t - d.grab);
+            const p = veTimeFromEvent(e);
+            d.st = veMoveTarget(d.i, p.t - d.grab);
+            // trilha sob o mouse (arrastando pelo vídeo ou pelo áudio, o par vinculado vai junto)
+            const r = veRowAt(p.y);
+            if (r) d.tr = veTrackIndex(r);
             veDraw();
             return;
         }
@@ -1334,7 +1464,7 @@ function veInitEvents() {
         const d = VE.drag;
         VE.drag = null;
         wrap.classList.remove('dragging', 'scrub', 'moving');
-        if (d && d.mode === 'move' && d.active) veMoveClip(d.i, d.k);
+        if (d && d.mode === 'move' && d.active) veMoveClip(d.i, d.tr, d.st);
         else veDraw();
     };
     wrap.addEventListener('pointerup', endDrag);
@@ -1394,7 +1524,7 @@ function veInitEvents() {
         if (row) {
             const i = +row.dataset.i;
             VE.sel = i;
-            veSeek(VE.lay[i].ts);
+            veSeek(VE.clips[i].st);
             veRenderClips();
         }
     });
@@ -1428,6 +1558,12 @@ function veInitEvents() {
     }).observe(wrap);
 
     veInitResizers();
+    // caixa de ganho: Enter aplica, Esc cancela
+    $ve('ve-gain-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); veApplyGain(); }
+        else if (e.key === 'Escape') { e.preventDefault(); veCloseGain(); }
+        e.stopPropagation();
+    });
     veInitMonitorZoom();
     document.addEventListener('keydown', veOnKey);
     document.addEventListener('keyup', e => { if (e.key === 'Alt' && veIsActive()) e.preventDefault(); });
@@ -1449,6 +1585,7 @@ function veOnKey(e) {
         if (e.key === 'Escape') veCloseExport();
         return;
     }
+    if (!$ve('ve-gain').hidden) return;   // a caixa de ganho trata as próprias teclas
     const k = e.key.toLowerCase();
     const ctrl = e.ctrlKey || e.metaKey;
 
@@ -1457,7 +1594,7 @@ function veOnKey(e) {
     if (ctrl && k === 'z' && !e.shiftKey) { e.preventDefault(); veUndo(); return; }
     if (ctrl && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); veRedo(); return; }
     if (ctrl && k === 'k') { e.preventDefault(); veSplitAtPlayhead(); return; }
-    if (ctrl && k === 'e') { e.preventDefault(); veOpenExport(); return; }
+    if (ctrl && (k === 'm' || k === 'e')) { e.preventDefault(); veOpenExport(); return; }
     if (ctrl) return;
 
     // ' corta todas as trilhas na agulha. No teclado ABNT2 a tecla pode chegar como "Dead"
@@ -1466,11 +1603,12 @@ function veOnKey(e) {
 
     const map = {
         ' ': () => veTogglePlay(),
-        'k': () => { veVideo().pause(); veSetRate(1); },
+        'k': () => { veStop(); veSetRate(1); },
+        // L: 1º toque dá play em 1,5x; depois 2x, 3x e volta ao normal (1x)
         'l': () => {
-            const v = veVideo();
-            if (v.paused) { veSetRate(1); veTogglePlay(); }
-            else veSetRate({ 1: 1.5, 1.5: 2, 2: 4, 4: 4 }[VE.rate] || 1);
+            if (!VE.playing) { veSetRate(1.5); vePlay(); }
+            else veSetRate({ 1: 1.5, 1.5: 2, 2: 3, 3: 1 }[VE.rate] || 1);
+            veToast(VE.rate === 1 ? 'Velocidade normal' : `Velocidade ${String(VE.rate).replace('.', ',')}x`);
         },
         'j': () => veSeek(VE.playhead - 5),
         'arrowleft': () => e.shiftKey ? veSeek(VE.playhead - 1) : veStepFrames(-1),
@@ -1481,6 +1619,7 @@ function veOnKey(e) {
         'end': () => veSeek(VE.dur),
         's': () => veSplitAtPlayhead(),
         'd': () => veDeleteSelected(),
+        'g': () => veOpenGain(),
         'delete': () => veDeleteSelected(),
         'backspace': () => veDeleteSelected(),
         'i': () => veMarkIn(),
@@ -1508,7 +1647,7 @@ function veOnKey(e) {
     const orig = window.switchTool;
     if (typeof orig !== 'function') return;
     window.switchTool = function (toolId) {
-        if (VE.playing && toolId !== 'video-cutter') veVideo().pause();
+        if (VE.playing && toolId !== 'video-cutter') veStop();
         orig(toolId);
         document.body.classList.toggle('ve-focus', toolId === 'video-cutter');
         if (toolId === 'video-cutter') setTimeout(() => { if (VE.ready) veSyncZoomSlider(); veDraw(); }, 30);

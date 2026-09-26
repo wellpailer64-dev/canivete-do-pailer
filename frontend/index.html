@@ -363,7 +363,7 @@
                             <div class="ve-top-spacer"></div>
                             <button class="ve-icon-btn" id="ve-undo" onclick="veUndo()" title="Desfazer (Ctrl+Z)" disabled>↶</button>
                             <button class="ve-icon-btn" id="ve-redo" onclick="veRedo()" title="Refazer (Ctrl+Shift+Z)" disabled>↷</button>
-                            <button class="ve-btn ve-btn-primary" id="ve-export-btn" onclick="veOpenExport()" disabled title="Exportar (Ctrl+E)"><svg class="i"><use href="#i-download"/></svg> Exportar</button>
+                            <button class="ve-btn ve-btn-primary" id="ve-export-btn" onclick="veOpenExport()" disabled title="Exportar (Ctrl+M)"><svg class="i"><use href="#i-download"/></svg> Exportar</button>
                         </header>
 
                         <div class="ve-main">
@@ -429,7 +429,7 @@
                                     <div class="ve-keys">
                                         <h4>Reprodução</h4>
                                         <div><kbd>Espaço</kbd> Play / Pausa</div>
-                                        <div><kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> Voltar 5s · Pausar · Acelerar</div>
+                                        <div><kbd>J</kbd> Voltar 5s · <kbd>K</kbd> Pausar · <kbd>L</kbd> Play 1,5x → 2x → 3x → normal</div>
                                         <div><kbd>←</kbd> <kbd>→</kbd> 1 frame · <kbd>Shift</kbd> 1 segundo</div>
                                         <div><kbd>↑</kbd> <kbd>↓</kbd> Corte anterior / próximo</div>
                                         <div><kbd>Home</kbd> <kbd>End</kbd> Início / Fim</div>
@@ -438,7 +438,9 @@
                                         <div><kbd>D</kbd> ou <kbd>Delete</kbd> Apagar clipe selecionado (fecha o espaço)</div>
                                         <div><kbd>Q</kbd> Apagar do corte anterior até a agulha</div>
                                         <div><kbd>W</kbd> Apagar da agulha até o próximo corte</div>
-                                        <div>Arraste um clipe para mudar a ordem (a agulha só anda pela régua)</div>
+                                        <div>Arraste um clipe para frente/trás ou para outra trilha (V1–V4)</div>
+                                        <div>A agulha anda pela régua; clicar no clipe só seleciona</div>
+                                        <div><kbd>G</kbd> Ganho do clipe selecionado (ex.: 10 ou -10 dB)</div>
                                         <div><kbd>I</kbd> <kbd>O</kbd> Marcar entrada / saída</div>
                                         <div><kbd>X</kbd> Apagar trecho entre In e Out</div>
                                         <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> Desfazer · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> Refazer</div>
@@ -449,7 +451,7 @@
                                         <div>Arraste a borda de V1/A1 para mudar a altura da trilha</div>
                                         <div>Arraste o topo da timeline para aumentá-la</div>
                                         <div><kbd>N</kbd> Ímã (encaixe) liga/desliga</div>
-                                        <div><kbd>Ctrl</kbd>+<kbd>E</kbd> Exportar · <kbd>Ctrl</kbd>+<kbd>O</kbd> Abrir</div>
+                                        <div><kbd>Ctrl</kbd>+<kbd>M</kbd> Exportar · <kbd>Ctrl</kbd>+<kbd>O</kbd> Abrir</div>
                                     </div>
                                 </div>
                             </aside>
@@ -488,6 +490,27 @@
                             </div>
                             <div class="ve-scrollbar" id="ve-scrollbar"><div class="ve-scroll-thumb" id="ve-scroll-thumb"></div></div>
                         </section>
+
+                        <!-- Ganho de áudio (G) -->
+                        <div class="ve-modal" id="ve-gain" hidden>
+                            <div class="ve-modal-box ve-gain-box">
+                                <div class="ve-modal-head">
+                                    <span>Ganho de áudio</span>
+                                    <button class="ve-icon-btn" onclick="veCloseGain()" title="Fechar (Esc)"><svg class="i"><use href="#i-x"/></svg></button>
+                                </div>
+                                <div class="ve-modal-body">
+                                    <div class="ve-field">
+                                        <label for="ve-gain-input">Ajustar ganho em (dB)</label>
+                                        <input type="text" inputmode="decimal" id="ve-gain-input" class="ve-select ve-gain-input" placeholder="ex.: 10 ou -10" autocomplete="off">
+                                    </div>
+                                    <div class="ve-gain-cur" id="ve-gain-cur"></div>
+                                </div>
+                                <div class="ve-modal-foot">
+                                    <button class="ve-btn ve-btn-ghost" onclick="veCloseGain()">Cancelar</button>
+                                    <button class="ve-btn ve-btn-primary" onclick="veApplyGain()">Aplicar</button>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- Modal de exportação -->
                         <div class="ve-modal" id="ve-export" hidden>

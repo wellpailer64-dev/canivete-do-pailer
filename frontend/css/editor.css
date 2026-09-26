@@ -585,3 +585,10 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-mz-val { min-width: 42px; padding: 0 6px; text-align: right; font: 600 11px var(--ve-mono); color: var(--ve-text); }
 .ve-screen:has(.ve-empty:not([hidden])) .ve-mzoom { display: none; }
 .ve-tl-wrap.moving, .ve-tl-wrap.moving * { cursor: grabbing; }
+
+/* ---------- Ganho (G) e lista de clipes ---------- */
+.ve-gain-box { width: min(360px, 92vw); }
+.ve-gain-input { width: 100%; font: 600 16px var(--ve-mono); text-align: center; }
+.ve-gain-cur { margin-top: 10px; font-size: 12px; color: var(--ve-dim); text-align: center; }
+.ve-clip-tr { font: 600 10px var(--ve-mono); color: var(--ve-faint); margin-left: 4px; }
+.ve-clip-db { font: 600 10px var(--ve-mono); color: #fbbf24; margin-left: 2px; }
