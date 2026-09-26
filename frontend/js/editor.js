@@ -193,7 +193,7 @@ function veDeleteSelected() {
     if (VE.sel < 0) { veToast('Selecione um clipe na timeline'); return; }
     const c = VE.clips[VE.sel];
     veSetOff(VE.sel, !c.off);
-    veToast(c.off ? '🗑 Clipe removido' : '↺ Clipe restaurado');
+    veToast(c.off ? 'Clipe removido' : '↺ Clipe restaurado');
 }
 
 function veRemoveRange(a, b, label) {
@@ -319,7 +319,7 @@ function veSetRate(r) {
 function veToggleMute() {
     VE.muted = !VE.muted;
     veVideo().muted = VE.muted;
-    $ve('ve-mute').textContent = VE.muted ? '🔇' : '🔊';
+    $ve('ve-mute').innerHTML = `<svg class="i"><use href="#i-${VE.muted ? 'volume-x' : 'volume'}"/></svg>`;
 }
 
 function vePlaybackLoop() {
@@ -682,7 +682,7 @@ function veRenderClips() {
                 <div class="ve-clip-name">${c.off ? 'Trecho removido' : 'Clipe ' + veKeptIndex(i)}</div>
                 <div class="ve-clip-time">${veShort(c.s)} → ${veShort(c.e)} · ${veShort(c.e - c.s)}</div>
             </div>
-            <button class="ve-clip-act" data-act="${i}" title="${c.off ? 'Restaurar' : 'Remover'}">${c.off ? '↺' : '🗑'}</button>
+            <button class="ve-clip-act" data-act="${i}" title="${c.off ? 'Restaurar' : 'Remover'}">${c.off ? '↺' : '<svg class="i"><use href="#i-trash"/></svg>'}</button>
         </div>`).join('');
 }
 
@@ -710,7 +710,7 @@ function veSetTool(tool) {
 function veToggleSnap() {
     VE.snap = !VE.snap;
     $ve('ve-snap').classList.toggle('active', VE.snap);
-    veToast(VE.snap ? '🧲 Ímã ligado' : 'Ímã desligado');
+    veToast(VE.snap ? 'Ímã ligado' : 'Ímã desligado');
 }
 
 function veSnapTime(t, forRazor) {
@@ -863,9 +863,9 @@ function veExportFoot(mode) {
     const foot = $ve('ve-export-foot');
     if (mode === 'form') {
         foot.innerHTML = '<button class="ve-btn ve-btn-ghost" onclick="veCloseExport()">Cancelar</button>' +
-            '<button class="ve-btn ve-btn-primary" onclick="veStartExport()">⬇ Exportar</button>';
+            '<button class="ve-btn ve-btn-primary" onclick="veStartExport()"><svg class="i"><use href="#i-download"/></svg> Exportar</button>';
     } else if (mode === 'running') {
-        foot.innerHTML = '<button class="ve-btn" onclick="veCancelExport()">✕ Cancelar exportação</button>';
+        foot.innerHTML = '<button class="ve-btn" onclick="veCancelExport()"><svg class="i"><use href="#i-x"/></svg> Cancelar exportação</button>';
     } else {
         foot.innerHTML = '<button class="ve-btn" onclick="veCloseExport()">Fechar</button>';
     }
@@ -933,11 +933,11 @@ function veOnExport(ev) {
         $ve('ve-exp-msg').textContent = 'Concluído em ' + veHuman((Date.now() - VE._expStart) / 1000);
         box.className = 've-exp-result ok';
         const mb = ev.size ? (ev.size / 1048576).toFixed(1) + ' MB' : '';
-        box.innerHTML = `✅ <b>${veEsc(ev.output_path.split(/[\\/]/).pop())}</b><br>` +
+        box.innerHTML = `<b>${veEsc(ev.output_path.split(/[\\/]/).pop())}</b><br>` +
             `<span style="color:#9a9aa6">${veHuman(ev.duration)} · ${mb}</span>` +
             '<div class="ve-exp-actions">' +
             '<button class="ve-btn ve-btn-primary ve-btn-sm" onclick="window.pywebview.api.open_file(VE.lastOutput)">▶ Assistir</button>' +
-            '<button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.reveal_file(VE.lastOutput)">📂 Mostrar na pasta</button></div>';
+            '<button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.reveal_file(VE.lastOutput)"><svg class="i"><use href="#i-folder"/></svg> Mostrar na pasta</button></div>';
         if (typeof playConcluido === 'function') playConcluido();
     } else {
         box.className = 've-exp-result err';
@@ -1048,7 +1048,7 @@ function veInitEvents() {
         if (i >= 0) {
             const off = !VE.clips[i].off;
             veSetOff(i, off);
-            veToast(off ? '🗑 Clipe removido' : '↺ Clipe restaurado');
+            veToast(off ? 'Clipe removido' : '↺ Clipe restaurado');
         }
     });
 

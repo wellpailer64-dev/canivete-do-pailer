@@ -14,13 +14,16 @@ const _rodando = {};  // ferramenta -> true enquanto processa
 
 function _el(id) { return document.getElementById(id); }
 
+// Ícone do sprite SVG do index.html
+function ico(nome, extra = '') { return `<svg class="i ${extra}"><use href="#i-${nome}"/></svg>`; }
+
 function toast(msg, tipo = 'info', ms = 4500) {
     const box = _el('toasts');
     if (!box) return;
     const t = document.createElement('div');
     t.className = `toast ${tipo}`;
-    const icone = tipo === 'ok' ? '✅' : tipo === 'erro' ? '⚠️' : 'ℹ️';
-    t.innerHTML = `<span>${icone}</span><span>${_escHtml(msg)}</span>`;
+    const icone = ico(tipo === 'ok' ? 'check' : tipo === 'erro' ? 'alert' : 'info');
+    t.innerHTML = `${icone}<span>${_escHtml(msg)}</span>`;
     box.appendChild(t);
     setTimeout(() => { t.classList.add('saindo'); setTimeout(() => t.remove(), 300); }, ms);
 }
@@ -35,10 +38,9 @@ function setSelecao(tool, caminho, tipo) {
     const el = _el(`${tool}-selected`);
     if (!el) return;
     if (!caminho) { el.innerHTML = ''; return; }
-    const icone = tipo === 'folder' ? '📁' : '📄';
     el.title = caminho;
-    el.innerHTML = `<span>${icone}</span><span class="sel-nome">${_escHtml(caminho)}</span>` +
-        `<button class="sel-x" title="Limpar" onclick="setSelecao('${tool}', null)">✕</button>`;
+    el.innerHTML = ico(tipo === 'folder' ? 'folder' : 'file') + `<span class="sel-nome">${_escHtml(caminho)}</span>` +
+        `<button class="sel-x" title="Limpar" onclick="setSelecao('${tool}', null)">${ico('x')}</button>`;
     const wrap = _el(`btn-organizar-${tool}-wrap`);
     if (wrap) wrap.style.display = 'block';
 }
@@ -60,7 +62,8 @@ function uiIniciar(tool, status = 'Preparando...') {
         btn.dataset.label = btn.dataset.label || btn.innerHTML;
         btn.disabled = true;
         btn.classList.add('rodando');
-        btn.innerHTML = '⏳ Processando...';
+        btn.style.setProperty('--p', '0%');
+        btn.innerHTML = ico('loader', 'spin') + '<span>Processando…</span>';
     }
     document.querySelector(`.menu-item[data-tool="${tool}"]`)?.classList.add('rodando');
     playExecute();
@@ -83,6 +86,12 @@ function uiAtualizar(tool, data) {
             const v = Math.min(100, p);
             _el(`progress-fill-${tool}`).style.width = v + '%';
             _el(`progress-text-${tool}`).textContent = Math.round(v) + '%';
+            const btn = _el(`btn-${tool}`);
+            if (btn) {
+                btn.style.setProperty('--p', v + '%');
+                const span = btn.querySelector('span');
+                if (span && btn.classList.contains('rodando')) span.textContent = `Processando… ${Math.round(v)}%`;
+            }
         } else if (_el(`progress-text-${tool}`)) {
             _el(`progress-text-${tool}`).textContent = '';
         }
@@ -112,6 +121,7 @@ function uiConcluir(tool, data) {
     if (btn) {
         btn.disabled = false;
         btn.classList.remove('rodando');
+        btn.style.removeProperty('--p');
         if (btn.dataset.label) btn.innerHTML = btn.dataset.label;
     }
     document.querySelector(`.menu-item[data-tool="${tool}"]`)?.classList.remove('rodando');
@@ -120,7 +130,7 @@ function uiConcluir(tool, data) {
     const rb = _el(`result-${tool}`);
     if (rb) {
         rb.className = `result-banner ${erro ? 'erro' : 'ok'}`;
-        rb.innerHTML = `<span class="rb-icon">${erro ? '⚠️' : '✅'}</span><span class="rb-text">${_escHtml(texto)}</span>`;
+        rb.innerHTML = `<span class="rb-icon">${ico(erro ? 'alert' : 'check')}</span><span class="rb-text">${_escHtml(texto)}</span>`;
         rb.hidden = false;
     }
     if (erro) {
@@ -168,6 +178,121 @@ function filtrarMenu(q) {
     fecharGrupo();
 }
 
+function menuBuscaTecla(e) {
+    if (e.key === 'Escape') { e.target.value = ''; filtrarMenu(''); e.target.blur(); }
+    if (e.key === 'Enter') {
+        const primeiro = document.querySelector('.menu-item:not(.oculto)');
+        if (primeiro) { switchTool(primeiro.dataset.tool); e.target.value = ''; filtrarMenu(''); e.target.blur(); }
+    }
+}
+
+// ── Menu recolhível (lembra a escolha) ──
+function _lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function _lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+function toggleNav(forcar) {
+    const mini = typeof forcar === 'boolean' ? forcar : !document.body.classList.contains('nav-mini');
+    document.body.classList.toggle('nav-mini', mini);
+    _lsSet('navMini', mini ? '1' : '0');
+    const t = document.querySelector('.nav-toggle');
+    if (t) t.title = mini ? 'Expandir menu' : 'Recolher menu';
+    // o editor de vídeo recalcula a timeline quando a largura muda
+    if (typeof veDraw === 'function') setTimeout(() => { try { veDraw(); } catch (e) {} }, 240);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (_lsGet('navMini') === '1') toggleNav(true);
+    // No modo compacto o nome aparece como dica
+    document.querySelectorAll('.menu-item').forEach(b => { b.title = b.querySelector('.label')?.textContent || ''; });
+    renderRecentes();
+});
+
+// Ctrl+K: buscar ferramenta (no editor de vídeo o Ctrl+K é "dividir")
+document.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'k') return;
+    if (_el('page-video-cutter')?.classList.contains('active')) return;
+    e.preventDefault();
+    if (document.body.classList.contains('nav-mini')) toggleNav(false);
+    _el('menu-search')?.focus();
+});
+
+// ── Recentes ──
+function _recentes() {
+    try { return JSON.parse(_lsGet('recentes') || '[]').filter(t => _el(`page-${t}`)); } catch (e) { return []; }
+}
+function _registrarRecente(tool) {
+    if (!tool || tool === 'home') return;
+    const lista = [tool, ..._recentes().filter(t => t !== tool)].slice(0, 5);
+    _lsSet('recentes', JSON.stringify(lista));
+}
+function _menuInfo(tool) {
+    const m = document.querySelector(`.menu-item[data-tool="${tool}"]`);
+    return { icone: m?.querySelector('.icon')?.innerHTML || '', nome: m?.querySelector('.label')?.textContent || tool };
+}
+function renderRecentes() {
+    const box = _el('home-recent'), wrap = _el('home-recent-wrap');
+    if (!box || !wrap) return;
+    const lista = _recentes();
+    wrap.hidden = !lista.length;
+    box.innerHTML = lista.map(t => {
+        const { icone, nome } = _menuInfo(t);
+        return `<button class="recent-btn" onclick="switchTool('${t}')">${icone}${_escHtml(nome)}</button>`;
+    }).join('');
+}
+
+// ── Home: solta qualquer coisa e sugere a ferramenta certa ──
+const EXT_AUDIO = /\.(mp3|wav|flac|m4a|aac|ogg|opus|wma|aiff?)$/i;
+const EXT_IMAGEM = /\.(jpe?g|png|webp|gif|heic|heif|avif|tiff?|bmp|ico|cr2|cr3|nef|arw|dng|raw|orf|rw2)$/i;
+const HOME_SUGESTOES = {
+    video: ['video-cutter', 'compressor-video', 'video-converter', 'converter-audio', 'transcrever-audio'],
+    audio: ['converter-audio', 'audio-cutter', 'transcrever-audio'],
+    imagem: ['converter-imagem', 'compressor-imagem', 'remover-fundo', 'favicon'],
+    pdf: ['compressor-imagem'],
+    pasta: ['compressor-video', 'video-converter', 'converter-imagem', 'compressor-imagem', 'remover-fundo',
+            'organizador-imagens', 'organizador-videos', 'converter-audio', 'transcrever-audio'],
+};
+let _homeItens = null;
+
+function _tipoItem(item) {
+    if (item.pasta) return 'pasta';
+    if (EXT_VIDEO.test(item.path)) return 'video';
+    if (EXT_AUDIO.test(item.path)) return 'audio';
+    if (EXT_IMAGEM.test(item.path)) return 'imagem';
+    if (/\.pdf$/i.test(item.path)) return 'pdf';
+    return null;
+}
+
+function homeSugerir(itens) {
+    const box = _el('home-suggest');
+    if (!box || !itens?.length) return;
+    const tipo = _tipoItem(itens[0]);
+    const ferramentas = HOME_SUGESTOES[tipo] || [];
+    _homeItens = itens;
+    const nome = _nomeCurto(itens[0].path) + (itens.length > 1 ? ` +${itens.length - 1}` : '');
+    box.innerHTML =
+        `<div class="home-suggest-title">${ico(itens[0].pasta ? 'folder' : 'file')}<b>${_escHtml(nome)}</b></div>` +
+        (ferramentas.length
+            ? '<div class="home-suggest-list">' + ferramentas.map(t => {
+                const { icone, nome } = _menuInfo(t);
+                return `<button class="suggest-btn" onclick="homeUsar('${t}')">${icone}${_escHtml(nome)}</button>`;
+            }).join('') + '</div>'
+            : '<div class="dz-sub">Nenhuma ferramenta abre este tipo de arquivo.</div>');
+    box.hidden = false;
+}
+
+function homeUsar(tool) {
+    const itens = _homeItens;
+    switchTool(tool);
+    if (itens) _entregarItens(tool, itens);
+}
+
+function homeEscolher(tipo) {
+    const api = window.pywebview?.api;
+    if (!api) return;
+    const pedido = tipo === 'folder' ? api.select_folder('home') : api.select_file('home');
+    pedido.then(r => { if (r?.success) homeSugerir([{ path: r.path, pasta: tipo === 'folder' }]); });
+}
+
 // ── Arrastar e soltar (o Python entrega os caminhos reais em onArquivosSoltos) ──
 const EXT_VIDEO = /\.(mp4|mov|mkv|avi|webm|flv|wmv|m4v|ts|mts|m2ts|3gp|ogv|mpg|mpeg|mxf)$/i;
 
@@ -176,6 +301,14 @@ function onArquivosSoltos(itens) {
     const pagina = document.querySelector('.tool-page.active');
     const tool = pagina?.id.replace('page-', '');
     if (!tool || !itens?.length) return;
+    if (tool === 'home') return homeSugerir(itens);
+    _entregarItens(tool, itens);
+}
+
+// Entrega arquivos/pastas (arrastados ou escolhidos na Home) para uma ferramenta
+function _entregarItens(tool, itens) {
+    const pagina = _el(`page-${tool}`);
+    if (!pagina) return;
     const item = itens[0];
 
     if (tool === 'video-cutter') {
@@ -278,6 +411,9 @@ function switchTool(toolId) {
         const label = menuItem.querySelector('.label');
         if (label) toolTitle.textContent = label.textContent;
     }
+
+    _registrarRecente(toolId);
+    if (toolId === 'home') renderRecentes();
 
     // Refresh states specific to tools
     if (toolId === 'web-scraper') {
@@ -1701,8 +1837,8 @@ function runWebScraperAnalyze() {
         }
         scraperLastAnalyzedUrl = url;
         _el('scraper-result-box').style.display = 'flex';
-        _el('scraper-count-images').textContent = `🖼️ ${result.qtd_imagens || 0} imagens`;
-        _el('scraper-count-videos').textContent = `🎬 ${result.qtd_videos || 0} vídeos`;
+        _el('scraper-count-images').innerHTML = `${ico('image')}<b>${result.qtd_imagens || 0}</b> imagens`;
+        _el('scraper-count-videos').innerHTML = `${ico('film')}<b>${result.qtd_videos || 0}</b> vídeos`;
     }).catch(err => toast('Erro ao analisar: ' + err, 'erro'));
 }
 
@@ -1763,9 +1899,9 @@ function copiarTranscricao() {
     const texto = document.getElementById('transcricao-modal-texto').value;
     navigator.clipboard.writeText(texto).then(() => {
         const btn = document.querySelector('.transcricao-modal-footer .btn-secondary');
-        const orig = btn.textContent;
-        btn.textContent = '✅ Copiado!';
-        setTimeout(() => { btn.textContent = orig; }, 1500);
+        const orig = btn.innerHTML;
+        btn.innerHTML = ico('check') + 'Copiado';
+        setTimeout(() => { btn.innerHTML = orig; }, 1500);
     });
 }
 
@@ -1851,9 +1987,9 @@ async function copiarRFAtual() {
     try {
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
         const btn = document.getElementById('rf-btn-copiar');
-        const orig = btn.textContent;
-        btn.textContent = '✅ Copiado!';
-        setTimeout(() => { btn.textContent = orig; }, 1500);
+        const orig = btn.innerHTML;
+        btn.innerHTML = ico('check') + 'Copiado';
+        setTimeout(() => { btn.innerHTML = orig; }, 1500);
     } catch (e) {
         console.error('Erro ao copiar imagem:', e);
     }
@@ -1936,7 +2072,7 @@ function showCameraPopup(cameras) {
                 <span class="camera-ordem">${String(cam.ordem).padStart(2, '0')}</span>
                 <span class="camera-nome">${_escHtml(cam.pai)}</span>
                 <span class="camera-stats">${cam.videos}v ${cam.fotos}f ${cam.audios}a</span>
-                <span class="camera-data">📅 ${_escHtml(cam.data_mais_antiga)}</span>
+                <span class="camera-data">${_escHtml(cam.data_mais_antiga)}</span>
             </div>
             <input type="text" class="camera-operador" placeholder="Operador (opcional)">`;
         row.querySelector('.camera-operador').dataset.pai = cam.pai;
@@ -1990,7 +2126,7 @@ function checkCerebroStatus() {
         const statusEl = _el('cerebro-status');
         const btnGen = _el('btn-generate-csv');
         if (!statusEl || !btnGen) return;
-        statusEl.textContent = result.exists ? '✅ Regras carregadas: ' + result.path : 'Nenhum arquivo de regras (.md) carregado';
+        statusEl.textContent = result.exists ? 'Regras carregadas: ' + result.path : 'Nenhum arquivo de regras (.md) carregado';
         statusEl.style.color = result.exists ? 'var(--ok)' : '';
         btnGen.disabled = !result.exists;
     });
@@ -2037,10 +2173,10 @@ function checkGdriveConfig() {
         const statusDiv = document.getElementById('gdrive-status');
         if (result.success) {
             statusDiv.innerHTML = result.configured 
-                ? '<span style="color: #10B981;">✅ Configurado</span>' 
-                : '<span style="color: #F59E0B;">🔑 Ao analisar o primeiro link, o Google vai pedir sua autorização no navegador.</span>';
+                ? '<span class="txt-ok">Configurado</span>'
+                : '<span>Ao analisar o primeiro link, o Google vai pedir sua autorização no navegador.</span>';
         } else {
-            statusDiv.innerHTML = '<span style="color: #EF4444;">❌ Erro: ' + result.error + '</span>';
+            statusDiv.innerHTML = '<span class="txt-err">Erro: ' + _escHtml(result.error) + '</span>';
         }
     });
 }
@@ -2057,24 +2193,24 @@ function _escHtml(t) {
 function analyzeGdrive() {
     const url = document.getElementById('gdrive-url').value.trim();
     if (!url) {
-        _gdriveStatus('<span style="color:#EF4444;">❌ Digite uma URL primeiro!</span>');
+        _gdriveStatus('<span class="txt-err">Cole o link do Google Drive primeiro.</span>');
         return;
     }
 
     playExecute();
     document.getElementById('gdrive-analyze-info').style.display = 'none';
     document.getElementById('btn-gdrive-baixar').disabled = true;
-    _gdriveStatus('<span style="color:#9ca3af;">🔍 Verificando...</span>');
+    _gdriveStatus(ico('loader', 'spin') + ' Verificando…');
 
     window.pywebview.api.gdrive_analyze(url);
 }
 
 function updateGdriveAnalyze(data) {
     if (data.log) {
-        _gdriveStatus('<span style="color:#9ca3af;">🔍 ' + _escHtml(data.log) + '</span>');
+        _gdriveStatus(ico('loader', 'spin') + ' ' + _escHtml(data.log));
     }
     if (data.error) {
-        _gdriveStatus('<span style="color:#EF4444;">❌ ' + _escHtml(data.error) + '</span>');
+        _gdriveStatus('<span class="txt-err">' + _escHtml(data.error) + '</span>');
         if (data.allowDownload) document.getElementById('btn-gdrive-baixar').disabled = false;
     }
     if (data.complete) {
@@ -2083,7 +2219,7 @@ function updateGdriveAnalyze(data) {
         document.getElementById('gdrive-arquivos').textContent = data.totalFiles;
         document.getElementById('gdrive-analyze-info').style.display = 'block';
         document.getElementById('btn-gdrive-baixar').disabled = false;
-        _gdriveStatus('<span style="color:#10B981;">✅ Pronto para baixar</span>');
+        _gdriveStatus('<span class="txt-ok">' + ico('check') + ' Pronto para baixar</span>');
         playConcluido();
     }
 }
@@ -2101,12 +2237,12 @@ function runGdriveDump() {
     const destino = document.getElementById('gdrive-destino').value;
 
     if (!url) {
-        document.getElementById('gdrive-msg').textContent = '❌ Digite uma URL primeiro!';
+        document.getElementById('gdrive-msg').textContent = 'Cole o link do Google Drive primeiro.';
         document.getElementById('progress-gdrive').style.display = 'block';
         return;
     }
     if (!destino) {
-        document.getElementById('gdrive-msg').textContent = '❌ Selecione a pasta de destino!';
+        document.getElementById('gdrive-msg').textContent = 'Escolha a pasta de destino.';
         document.getElementById('progress-gdrive').style.display = 'block';
         return;
     }
@@ -2126,11 +2262,11 @@ function runGdriveDump() {
     window.pywebview.api.gdrive_dump(url, destino, perfil).then(result => {
         console.log('[GDrive] gdrive_dump returned:', result);
         if (!result || !result.success) {
-            document.getElementById('gdrive-msg').textContent = '❌ Erro ao iniciar: ' + (result?.error || 'desconhecido');
+            document.getElementById('gdrive-msg').textContent = 'Erro ao iniciar: ' + (result?.error || 'desconhecido');
         }
     }).catch(err => {
         console.error('[GDrive] Erro na chamada:', err);
-        document.getElementById('gdrive-msg').textContent = '❌ Erro: ' + err;
+        document.getElementById('gdrive-msg').textContent = 'Erro: ' + err;
     });
     document.getElementById('progress-fill-gdrive').style.width = '0%';
     document.getElementById('gdrive-arquivo-atual').textContent = '-';
@@ -2142,7 +2278,7 @@ function runGdriveDump() {
     document.getElementById('gdrive-transferring').innerHTML = '';
     _gdriveStatus('');
     const pauseBtn = document.getElementById('btn-gdrive-pause');
-    if (pauseBtn) pauseBtn.textContent = '⏸ Pausar';
+    if (pauseBtn) pauseBtn.innerHTML = ico('pause') + 'Pausar';
 
     // Reseta painel de stats
     document.getElementById('gdrive-stats-panel').style.display = 'none';
@@ -2159,10 +2295,10 @@ function toggleGdrivePause() {
     _gdrivePaused = !_gdrivePaused;
     if (_gdrivePaused) {
         window.pywebview.api.gdrive_pause();
-        btn.textContent = '▶ Retomar';
+        btn.innerHTML = ico('play') + 'Retomar';
     } else {
         window.pywebview.api.gdrive_resume();
-        btn.textContent = '⏸ Pausar';
+        btn.innerHTML = ico('pause') + 'Pausar';
     }
 }
 
@@ -2172,7 +2308,7 @@ function cancelGdriveDump() {
     if (btn) { btn.disabled = true; btn.textContent = 'Cancelando...'; }
     // A UI é finalizada quando o backend emitir complete=true
     window.pywebview.api.gdrive_cancel().catch(() => {
-        if (btn) { btn.disabled = false; btn.textContent = '✖ Cancelar'; }
+        if (btn) { btn.disabled = false; btn.innerHTML = ico('x') + 'Cancelar'; }
     });
 }
 
@@ -2197,17 +2333,17 @@ function updateGdriveProgress(data) {
         el('gdrive-stat-velocidade').textContent = data.speed;
         el('gdrive-stat-eta').textContent = data.eta;
         const extras = [];
-        if (data.elapsed) extras.push('⏲ Decorrido: ' + data.elapsed);
-        if (data.checks > 0) extras.push('✔ Já existentes/verificados: ' + data.checks);
-        if (data.errors > 0) extras.push('⚠ Erros (serão re-tentados): ' + data.errors);
+        if (data.elapsed) extras.push('Decorrido: ' + data.elapsed);
+        if (data.checks > 0) extras.push('Já existentes/verificados: ' + data.checks);
+        if (data.errors > 0) extras.push('Erros (serão re-tentados): ' + data.errors);
         el('gdrive-stat-extra').textContent = extras.join('   •   ');
     }
     if (Array.isArray(data.transferring)) {
         el('gdrive-transferring').innerHTML = data.transferring.map(f =>
-            '<div style="display:flex; align-items:center; gap:8px; margin-top:4px; font-size:12px;">' +
-                '<span style="flex:1; min-width:0; color:#d1d5db; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + _escHtml(f.name) + '">' + _escHtml(f.name) + '</span>' +
-                '<span style="width:90px; height:6px; background:#30363d; border-radius:3px; overflow:hidden;"><span style="display:block; height:100%; width:' + (f.pct | 0) + '%; background:#38BDF8;"></span></span>' +
-                '<span style="width:140px; text-align:right; color:#9ca3af;">' + (f.pct | 0) + '% de ' + _escHtml(f.size) + '</span>' +
+            '<div class="xfer-row">' +
+                '<span class="xfer-name" title="' + _escHtml(f.name) + '">' + _escHtml(f.name) + '</span>' +
+                '<span class="xfer-bar"><span style="width:' + (f.pct | 0) + '%"></span></span>' +
+                '<span class="xfer-pct">' + (f.pct | 0) + '% de ' + _escHtml(f.size) + '</span>' +
             '</div>').join('');
     }
     if (data.message) {
@@ -2226,10 +2362,10 @@ function updateGdriveProgress(data) {
         el('btn-gdrive-baixar').disabled = false;
         el('gdrive-transferring').innerHTML = '';
         const cancelBtn = el('btn-gdrive-cancel');
-        if (cancelBtn) { cancelBtn.disabled = false; cancelBtn.textContent = '✖ Cancelar'; }
+        if (cancelBtn) { cancelBtn.disabled = false; cancelBtn.innerHTML = ico('x') + 'Cancelar'; }
         // Mantém a última mensagem visível fora da seção de progresso
         const final = data.log || el('gdrive-msg').textContent;
-        _gdriveStatus('<span style="color:' + (data.success ? '#10B981' : '#EF4444') + ';">' + _escHtml(final) + '</span>');
+        _gdriveStatus('<span class="' + (data.success ? 'txt-ok' : 'txt-err') + '">' + _escHtml(final) + '</span>');
         if (data.success) playConcluido();
     }
 }
@@ -2312,14 +2448,13 @@ function _showUpdateBanner(info) {
     if (document.getElementById('app-update-banner')) return;
     const bar = document.createElement('div');
     bar.id = 'app-update-banner';
-    bar.style.cssText = 'position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:9999; ' +
-        'background:#111827; border:1px solid #10B981; color:#e5e7eb; border-radius:10px; padding:12px 16px; ' +
-        'display:flex; align-items:center; gap:12px; box-shadow:0 8px 24px rgba(0,0,0,.45); font-size:14px; max-width:calc(100% - 32px);';
+    bar.className = 'update-banner';
     bar.innerHTML =
-        '<span>🚀 Nova versão <b>' + _escHtml(info.latest) + '</b> disponível (você tem ' + _escHtml(info.current) + ')</span>' +
-        '<span id="app-update-status" style="color:#9ca3af; font-size:12px;"></span>' +
-        '<button id="app-update-btn" style="background:#10B981; color:#fff; border:none; border-radius:6px; padding:6px 14px; font-weight:600; cursor:pointer;">Atualizar agora</button>' +
-        '<button id="app-update-close" title="Depois" style="background:none; border:none; color:#9ca3af; font-size:18px; cursor:pointer;">✕</button>';
+        ico('arrow-up') +
+        '<span>Nova versão <b>' + _escHtml(info.latest) + '</b> disponível · você tem ' + _escHtml(info.current) + '</span>' +
+        '<span id="app-update-status" class="ub-status"></span>' +
+        '<button id="app-update-btn" class="btn-primary">Atualizar agora</button>' +
+        '<button id="app-update-close" class="ub-close" title="Depois">' + ico('x') + '</button>';
     document.body.appendChild(bar);
     document.getElementById('app-update-close').onclick = () => bar.remove();
     document.getElementById('app-update-btn').onclick = () => {
@@ -2347,7 +2482,7 @@ window.updateAppUpdateProgress = updateAppUpdateProgress;
 window.addEventListener('pywebviewready', () => {
     setTimeout(() => {
         window.pywebview.api.check_update().then(info => {
-            if (info && info.current && _el('app-version')) _el('app-version').textContent = 'do Pailer • v' + info.current;
+            if (info && info.current && _el('app-version')) _el('app-version').textContent = 'v' + info.current + ' · local e offline';
             if (info && info.available) _showUpdateBanner(info);
         }).catch(() => {});
     }, 4000);

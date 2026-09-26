@@ -4,93 +4,147 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Canivete do Pailer</title>
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/ui.css">
+    <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/editor.css">
     <link rel="icon" href="identidade/icone.ico">
 </head>
 <body>
 
-    <!-- Splash Screen -->
+    <!-- Ícones (traço fino, 24x24). Uso: <svg class="i"><use href="#i-nome"/></svg> -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+        <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></symbol>
+        <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v18M17 3v18M3 7.5h4M3 12h18M3 16.5h4M17 7.5h4M17 16.5h4"/></symbol>
+        <symbol id="i-shrink" viewBox="0 0 24 24"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></symbol>
+        <symbol id="i-convert" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5M3 21v-5h5"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></symbol>
+        <symbol id="i-camera" viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3.5v11L16 14"/></symbol>
+        <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+        <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></symbol>
+        <symbol id="i-captions" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15h5M14 15h4M6 11h3M12 11h6"/></symbol>
+        <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></symbol>
+        <symbol id="i-feather" viewBox="0 0 24 24"><path d="M20.2 12.2a6 6 0 0 0-8.5-8.5L5 10.5V19h8.5z"/><path d="M16 8 2 22M17.5 15H9"/></symbol>
+        <symbol id="i-wand" viewBox="0 0 24 24"><path d="m3 21 12-12M13 7l4 4M18 2v4M16 4h4M8 2v2M7 3h2M20 13v3M18.5 14.5h3"/></symbol>
+        <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+        <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+        <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A7 7 0 1 0 4 15.3"/><path d="M12 12v9M8.5 17.5 12 21l3.5-3.5"/></symbol>
+        <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="11.5" cy="11.5" r="3.5"/><path d="m16 16-2-2"/></symbol>
+        <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+        <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></symbol>
+        <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5 12 14l4.5-4.5"/><path d="M3 14v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/></symbol>
+        <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor" stroke="none"/></symbol>
+        <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+        <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16h.01"/></symbol>
+        <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+        <symbol id="i-loader" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9"/></symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+        <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h11l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8M7 21v-7h10v7"/></symbol>
+        <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9z"/><path d="M19 15v5M16.5 17.5h5"/></symbol>
+        <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16"/></symbol>
+        <symbol id="i-sidebar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 10l-2 2 2 2"/></symbol>
+        <symbol id="i-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 4-4 4 4M12 16V8"/></symbol>
+        <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+        <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+        <symbol id="i-hdd" viewBox="0 0 24 24"><path d="M22 12H2M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/><path d="M6 16h.01M10 16h.01"/></symbol>
+        <symbol id="i-volume" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></symbol>
+        <symbol id="i-volume-x" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 6 6M22 9l-6 6"/></symbol>
+        <symbol id="i-magnet" viewBox="0 0 24 24"><path d="M6 3v8a6 6 0 0 0 12 0V3"/><path d="M6 7h4M14 7h4M10 3v8a2 2 0 0 0 4 0V3"/></symbol>
+        <symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.4l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/></symbol>
+        <symbol id="i-pointer" viewBox="0 0 24 24"><path d="m4 4 7 17 2.5-7.5L21 11z"/></symbol>
+    </svg>
+
+    <!-- Splash -->
     <div id="splash-overlay">
         <img src="identidade/splash.png" alt="">
-        <div class="splash-title">Canivete do Pailer</div>
-        <div class="splash-sub">Carregando...</div>
+        <div class="splash-title">Canivete <em>do Pailer</em></div>
+        <div class="splash-bar"></div>
     </div>
 
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
-            <div class="brand" onclick="switchTool('home')" title="Início">
-                <img src="identidade/splash.png" alt="" class="brand-logo">
-                <div class="brand-text">
-                    <b>Canivete</b>
-                    <span id="app-version">do Pailer</span>
-                </div>
+            <div class="brand">
+                <button class="brand-home" onclick="switchTool('home')" title="Início">
+                    <img src="identidade/splash.png" alt="" class="brand-logo">
+                    <div class="brand-text">
+                        <b>Canivete</b>
+                        <span>do Pailer</span>
+                    </div>
+                </button>
+                <button class="nav-toggle" onclick="toggleNav()" title="Recolher menu"><svg class="i"><use href="#i-sidebar"/></svg></button>
             </div>
 
             <div class="menu-search">
-                <input type="search" id="menu-search" placeholder="Buscar ferramenta..." oninput="filtrarMenu(this.value)" autocomplete="off">
+                <svg class="i"><use href="#i-search"/></svg>
+                <input type="search" id="menu-search" placeholder="Buscar" oninput="filtrarMenu(this.value)" onkeydown="menuBuscaTecla(event)" autocomplete="off">
+                <kbd>Ctrl K</kbd>
             </div>
 
             <nav class="menu">
                 <button class="menu-item active" data-tool="home" onclick="switchTool('home')">
-                    <span class="icon">🏠</span><span class="label">Início</span>
+                    <span class="icon"><svg class="i"><use href="#i-home"/></svg></span><span class="label">Início</span>
                 </button>
 
                 <div class="menu-group">Vídeo</div>
                 <button class="menu-item" data-tool="video-cutter" onclick="switchTool('video-cutter')">
-                    <span class="icon">🎬</span><span class="label">Editor de Vídeo</span>
+                    <span class="icon"><svg class="i"><use href="#i-film"/></svg></span><span class="label">Editor de Vídeo</span>
                 </button>
                 <button class="menu-item" data-tool="compressor-video" onclick="switchTool('compressor-video')">
-                    <span class="icon">🗜️</span><span class="label">Comprimir Vídeo</span>
+                    <span class="icon"><svg class="i"><use href="#i-shrink"/></svg></span><span class="label">Comprimir Vídeo</span>
                 </button>
                 <button class="menu-item" data-tool="video-converter" onclick="switchTool('video-converter')">
-                    <span class="icon">🔄</span><span class="label">Converter Vídeo</span>
+                    <span class="icon"><svg class="i"><use href="#i-convert"/></svg></span><span class="label">Converter Vídeo</span>
                 </button>
                 <button class="menu-item" data-tool="video-downloader" onclick="switchTool('video-downloader')">
-                    <span class="icon">📥</span><span class="label">Baixar Vídeo</span>
+                    <span class="icon"><svg class="i"><use href="#i-download"/></svg></span><span class="label">Baixar Vídeo</span>
                 </button>
                 <button class="menu-item" data-tool="organizador-videos" onclick="switchTool('organizador-videos')">
-                    <span class="icon">🎥</span><span class="label">Logger Pro</span>
+                    <span class="icon"><svg class="i"><use href="#i-camera"/></svg></span><span class="label">Logger Pro</span>
                 </button>
 
                 <div class="menu-group">Áudio</div>
                 <button class="menu-item" data-tool="converter-audio" onclick="switchTool('converter-audio')">
-                    <span class="icon">🎵</span><span class="label">Converter Áudio</span>
+                    <span class="icon"><svg class="i"><use href="#i-music"/></svg></span><span class="label">Converter Áudio</span>
                 </button>
                 <button class="menu-item" data-tool="audio-cutter" onclick="switchTool('audio-cutter')">
-                    <span class="icon">✂️</span><span class="label">Cortar Áudio</span>
+                    <span class="icon"><svg class="i"><use href="#i-scissors"/></svg></span><span class="label">Cortar Áudio</span>
                 </button>
                 <button class="menu-item" data-tool="transcrever-audio" onclick="switchTool('transcrever-audio')">
-                    <span class="icon">📝</span><span class="label">Transcrever</span>
+                    <span class="icon"><svg class="i"><use href="#i-captions"/></svg></span><span class="label">Transcrever</span>
                 </button>
 
                 <div class="menu-group">Imagem</div>
                 <button class="menu-item" data-tool="converter-imagem" onclick="switchTool('converter-imagem')">
-                    <span class="icon">🖼️</span><span class="label">Converter Imagem</span>
+                    <span class="icon"><svg class="i"><use href="#i-image"/></svg></span><span class="label">Converter Imagem</span>
                 </button>
                 <button class="menu-item" data-tool="compressor-imagem" onclick="switchTool('compressor-imagem')">
-                    <span class="icon">📸</span><span class="label">Comprimir Imagem</span>
+                    <span class="icon"><svg class="i"><use href="#i-feather"/></svg></span><span class="label">Comprimir Imagem</span>
                 </button>
                 <button class="menu-item" data-tool="remover-fundo" onclick="switchTool('remover-fundo')">
-                    <span class="icon">🪄</span><span class="label">Remover Fundo</span>
+                    <span class="icon"><svg class="i"><use href="#i-wand"/></svg></span><span class="label">Remover Fundo</span>
                 </button>
                 <button class="menu-item" data-tool="organizador-imagens" onclick="switchTool('organizador-imagens')">
-                    <span class="icon">🗂️</span><span class="label">Organizar Imagens</span>
+                    <span class="icon"><svg class="i"><use href="#i-grid"/></svg></span><span class="label">Organizar Imagens</span>
                 </button>
                 <button class="menu-item" data-tool="favicon" onclick="switchTool('favicon')">
-                    <span class="icon">🌐</span><span class="label">Gerar Favicon</span>
+                    <span class="icon"><svg class="i"><use href="#i-globe"/></svg></span><span class="label">Gerar Favicon</span>
                 </button>
 
                 <div class="menu-group">Web</div>
                 <button class="menu-item" data-tool="gdrive-dumper" onclick="switchTool('gdrive-dumper')">
-                    <span class="icon">☁️</span><span class="label">GDrive Dumper</span>
+                    <span class="icon"><svg class="i"><use href="#i-cloud"/></svg></span><span class="label">GDrive Dumper</span>
                 </button>
                 <button class="menu-item" data-tool="web-scraper" onclick="switchTool('web-scraper')">
-                    <span class="icon">🕷️</span><span class="label">Web Scraper</span>
+                    <span class="icon"><svg class="i"><use href="#i-scan"/></svg></span><span class="label">Web Scraper</span>
                 </button>
             </nav>
+
+            <div class="sidebar-foot" title="Tudo roda neste computador">
+                <span class="dot"></span><span id="app-version">Local · offline</span>
+            </div>
         </aside>
 
         <!-- Main Content -->
@@ -98,57 +152,76 @@
             <div class="content-area" id="content-area">
 
                 <!-- Início -->
-                <div class="tool-page active" id="page-home">
-                    <section class="home-hero">
-                        <img src="img/hero.webp" alt="Canivete do Pailer">
+                <div class="tool-page active" id="page-home" data-drop="home">
+                    <header class="home-top">
+                        <div>
+                            <h1 class="home-title">O que vamos fazer <em>hoje?</em></h1>
+                            <p class="home-sub">Vídeo, áudio e imagem direto no seu PC. Solte um arquivo abaixo e o Canivete sugere a ferramenta certa.</p>
+                        </div>
+                        <span class="home-badge"><svg class="i"><use href="#i-shield"/></svg>Nada vai para a nuvem</span>
+                    </header>
+
+                    <div class="dropzone home-drop" data-tool="home">
+                        <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
+                        <div class="dz-title">Solte qualquer arquivo ou pasta</div>
+                        <div class="dz-sub">Vídeo, áudio, imagem, PDF ou uma pasta inteira</div>
+                        <div class="dz-actions">
+                            <button class="btn-secondary" onclick="homeEscolher('file')"><svg class="i"><use href="#i-file"/></svg>Escolher arquivo</button>
+                            <button class="btn-secondary" onclick="homeEscolher('folder')"><svg class="i"><use href="#i-folder"/></svg>Escolher pasta</button>
+                        </div>
+                        <div class="home-suggest" id="home-suggest" hidden></div>
+                    </div>
+
+                    <section id="home-recent-wrap" hidden>
+                        <h3 class="home-group">Recentes</h3>
+                        <div class="home-recent" id="home-recent"></div>
                     </section>
-                    <p class="home-sub">Tudo o que você precisa para vídeo, áudio e imagem — rodando no seu PC, sem enviar nada para a nuvem. <b>Dica:</b> arraste arquivos direto para qualquer ferramenta.</p>
 
-                    <h3 class="home-group">Vídeo</h3>
-                    <div class="home-grid">
-                        <button class="home-card" onclick="switchTool('video-cutter')"><span>🎬</span><b>Editor de Vídeo</b><small>Corte, divida e exporte com atalhos estilo Premiere</small></button>
-                        <button class="home-card" onclick="switchTool('compressor-video')"><span>🗜️</span><b>Comprimir Vídeo</b><small>H.265 com GPU: até 70% menor mantendo a qualidade</small></button>
-                        <button class="home-card" onclick="switchTool('video-converter')"><span>🔄</span><b>Converter Vídeo</b><small>MP4, MOV, MKV, WEBM, GIF e MP3</small></button>
-                        <button class="home-card" onclick="switchTool('video-downloader')"><span>📥</span><b>Baixar Vídeo</b><small>YouTube, Instagram, TikTok e mais — até 4K</small></button>
-                        <button class="home-card" onclick="switchTool('organizador-videos')"><span>🎥</span><b>Logger Pro</b><small>Organiza cartões de câmera e cria o projeto Premiere</small></button>
-                    </div>
-
-                    <h3 class="home-group">Áudio</h3>
-                    <div class="home-grid">
-                        <button class="home-card" onclick="switchTool('converter-audio')"><span>🎵</span><b>Converter Áudio</b><small>MP3, WAV, FLAC, M4A, Opus — e extrai áudio de vídeos</small></button>
-                        <button class="home-card" onclick="switchTool('audio-cutter')"><span>✂️</span><b>Cortar Áudio</b><small>Linha do tempo com várias faixas</small></button>
-                        <button class="home-card" onclick="switchTool('transcrever-audio')"><span>📝</span><b>Transcrever</b><small>Texto e legenda .srt com Whisper</small></button>
-                    </div>
-
-                    <h3 class="home-group">Imagem</h3>
-                    <div class="home-grid">
-                        <button class="home-card" onclick="switchTool('converter-imagem')"><span>🖼️</span><b>Converter Imagem</b><small>HEIC, RAW, WEBP, AVIF, PNG, JPG e mais</small></button>
-                        <button class="home-card" onclick="switchTool('compressor-imagem')"><span>📸</span><b>Comprimir Imagem</b><small>Fotos e PDFs mais leves, com EXIF preservado</small></button>
-                        <button class="home-card" onclick="switchTool('remover-fundo')"><span>🪄</span><b>Remover Fundo</b><small>Recorte automático com IA</small></button>
-                        <button class="home-card" onclick="switchTool('organizador-imagens')"><span>🗂️</span><b>Organizar Imagens</b><small>Duplicadas, thumbs, gráficos e nomes por contexto</small></button>
-                        <button class="home-card" onclick="switchTool('favicon')"><span>🌐</span><b>Gerar Favicon</b><small>Todos os ícones do site + código pronto</small></button>
-                    </div>
-
-                    <h3 class="home-group">Web</h3>
-                    <div class="home-grid">
-                        <button class="home-card" onclick="switchTool('gdrive-dumper')"><span>☁️</span><b>GDrive Dumper</b><small>Baixa pastas inteiras do Google Drive, sem zip</small></button>
-                        <button class="home-card" onclick="switchTool('web-scraper')"><span>🕷️</span><b>Web Scraper</b><small>Imagens e vídeos de um site, já organizados</small></button>
+                    <h3 class="home-group">Ferramentas</h3>
+                    <div class="home-cols">
+                        <div class="home-cat">
+                            <h4>Vídeo</h4>
+                            <button class="home-card" onclick="switchTool('video-cutter')"><span class="hc-ico"><svg class="i"><use href="#i-film"/></svg></span><b>Editor de Vídeo</b><small>Corte, divida e exporte com atalhos estilo Premiere</small></button>
+                            <button class="home-card" onclick="switchTool('compressor-video')"><span class="hc-ico"><svg class="i"><use href="#i-shrink"/></svg></span><b>Comprimir Vídeo</b><small>H.265 com GPU: até 70% menor mantendo a qualidade</small></button>
+                            <button class="home-card" onclick="switchTool('video-converter')"><span class="hc-ico"><svg class="i"><use href="#i-convert"/></svg></span><b>Converter Vídeo</b><small>MP4, MOV, MKV, WEBM, GIF e MP3</small></button>
+                            <button class="home-card" onclick="switchTool('video-downloader')"><span class="hc-ico"><svg class="i"><use href="#i-download"/></svg></span><b>Baixar Vídeo</b><small>YouTube, Instagram, TikTok e mais — até 4K</small></button>
+                            <button class="home-card" onclick="switchTool('organizador-videos')"><span class="hc-ico"><svg class="i"><use href="#i-camera"/></svg></span><b>Logger Pro</b><small>Organiza cartões de câmera e cria o projeto Premiere</small></button>
+                        </div>
+                        <div class="home-cat">
+                            <h4>Imagem</h4>
+                            <button class="home-card" onclick="switchTool('converter-imagem')"><span class="hc-ico"><svg class="i"><use href="#i-image"/></svg></span><b>Converter Imagem</b><small>HEIC, RAW, WEBP, AVIF, PNG, JPG e mais</small></button>
+                            <button class="home-card" onclick="switchTool('compressor-imagem')"><span class="hc-ico"><svg class="i"><use href="#i-feather"/></svg></span><b>Comprimir Imagem</b><small>Fotos e PDFs mais leves, com EXIF preservado</small></button>
+                            <button class="home-card" onclick="switchTool('remover-fundo')"><span class="hc-ico"><svg class="i"><use href="#i-wand"/></svg></span><b>Remover Fundo</b><small>Recorte automático com IA</small></button>
+                            <button class="home-card" onclick="switchTool('organizador-imagens')"><span class="hc-ico"><svg class="i"><use href="#i-grid"/></svg></span><b>Organizar Imagens</b><small>Duplicadas, thumbs, gráficos e nomes por contexto</small></button>
+                            <button class="home-card" onclick="switchTool('favicon')"><span class="hc-ico"><svg class="i"><use href="#i-globe"/></svg></span><b>Gerar Favicon</b><small>Todos os ícones do site + código pronto</small></button>
+                        </div>
+                        <div class="home-cat">
+                            <h4>Áudio</h4>
+                            <button class="home-card" onclick="switchTool('converter-audio')"><span class="hc-ico"><svg class="i"><use href="#i-music"/></svg></span><b>Converter Áudio</b><small>MP3, WAV, FLAC, M4A, Opus — e extrai de vídeos</small></button>
+                            <button class="home-card" onclick="switchTool('audio-cutter')"><span class="hc-ico"><svg class="i"><use href="#i-scissors"/></svg></span><b>Cortar Áudio</b><small>Linha do tempo com várias faixas</small></button>
+                            <button class="home-card" onclick="switchTool('transcrever-audio')"><span class="hc-ico"><svg class="i"><use href="#i-captions"/></svg></span><b>Transcrever</b><small>Texto e legenda .srt com Whisper</small></button>
+                        </div>
+                        <div class="home-cat">
+                            <h4>Web</h4>
+                            <button class="home-card" onclick="switchTool('gdrive-dumper')"><span class="hc-ico"><svg class="i"><use href="#i-cloud"/></svg></span><b>GDrive Dumper</b><small>Baixa pastas inteiras do Google Drive, sem zip</small></button>
+                            <button class="home-card" onclick="switchTool('web-scraper')"><span class="hc-ico"><svg class="i"><use href="#i-scan"/></svg></span><b>Web Scraper</b><small>Imagens e vídeos de um site, já organizados</small></button>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Converter Áudio -->
                 <div class="tool-page" id="page-converter-audio" data-drop="ambos">
                     <div class="tool-head">
-                        <div class="tool-icon">🎵</div>
+                        <div class="tool-icon"><svg class="i"><use href="#i-music"/></svg></div>
                         <div><h2>Converter Áudio</h2><p>Converte entre formatos e extrai o áudio de vídeos. O original é mantido.</p></div>
                     </div>
                     <div class="dropzone" data-tool="converter-audio">
-                        <div class="dz-icon">⤓</div>
+                        <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
                         <div class="dz-title">Arraste arquivos ou uma pasta aqui</div>
                         <div class="dz-sub">MP3, WAV, FLAC, M4A, OGG, WMA… e vídeos (MP4, MOV, MKV)</div>
                         <div class="dz-actions">
-                            <button class="btn-secondary" onclick="selectFolder('converter-audio')">📁 Escolher pasta</button>
-                            <button class="btn-secondary" onclick="selectFile('converter-audio')">📄 Escolher arquivo</button>
+                            <button class="btn-secondary" onclick="selectFolder('converter-audio')"><svg class="i"><use href="#i-folder"/></svg>Escolher pasta</button>
+                            <button class="btn-secondary" onclick="selectFile('converter-audio')"><svg class="i"><use href="#i-file"/></svg>Escolher arquivo</button>
                         </div>
                         <div id="converter-audio-selected" class="selected-info"></div>
                     </div>
@@ -166,7 +239,7 @@
                         </div>
                     </div>
                     <div class="run-row">
-                        <button class="btn-run" id="btn-converter-audio" onclick="runConverterAudio()">▶ Converter</button>
+                        <button class="btn-run" id="btn-converter-audio" onclick="runConverterAudio()"><svg class="i"><use href="#i-play"/></svg>Converter</button>
                     </div>
                     <div class="progress-card" id="progress-converter-audio" hidden>
                         <div class="progress-top">
@@ -185,14 +258,14 @@
                 <!-- Cortar Audio -->
                 <div class="tool-page" id="page-audio-cutter" data-drop="arquivo">
                     <div class="tool-head">
-                        <div class="tool-icon">✂️</div>
+                        <div class="tool-icon"><svg class="i"><use href="#i-scissors"/></svg></div>
                         <div><h2>Cortar Áudio</h2><p>Linha do tempo com várias faixas: corte com a lâmina (E), remova trechos (Q/W) e exporte.</p></div>
                     </div>
                     <div class="tool-container audio-cutter-container">
                         <div class="input-section">
                             <div class="selection-buttons">
                                 <button class="btn-primary" onclick="selectAudioCutterFile()">
-                                    🎵 Escolher áudio
+                                    <svg class="i"><use href="#i-music"/></svg>Escolher áudio
                                 </button>
                             </div>
                             <div id="audio-cutter-selected" class="selected-info"></div>
@@ -203,13 +276,13 @@
                                 <div class="audio-editing-shell">
                                     <div class="audio-tool-rail">
                                         <button class="rail-tool active" id="btn-tool-select" onclick="setAudioTimelineTool('select')" title="V - Selecionar/mover faixa">V</button>
-                                        <button class="rail-tool" id="btn-tool-hand" onclick="setAudioTimelineTool('hand')" title="M - Mao/navegar timeline">M</button>
-                                        <button class="rail-tool" onclick="bladeAudioAtPlayhead()" title="E - Lamina/corte">E</button>
-                                        <button class="rail-tool" onclick="rippleDeleteAudioLeft()" title="Q - Remover ate a agulha">Q</button>
+                                        <button class="rail-tool" id="btn-tool-hand" onclick="setAudioTimelineTool('hand')" title="M - Mão/navegar timeline">M</button>
+                                        <button class="rail-tool" onclick="bladeAudioAtPlayhead()" title="E - Lâmina/corte">E</button>
+                                        <button class="rail-tool" onclick="rippleDeleteAudioLeft()" title="Q - Remover até a agulha">Q</button>
                                         <button class="rail-tool" onclick="rippleDeleteAudioRight()" title="W - Remover depois da agulha">W</button>
-                                        <button class="rail-tool" onclick="undoAudioEdit()" title="Desfazer ultima edicao">↶</button>
-                                        <button class="rail-tool" onclick="addAudioLayer()" title="Adicionar faixa de audio">+</button>
-                                        <button class="rail-tool" onclick="toggleAudioEditsPopover()" title="Edicoes aplicadas">☰</button>
+                                        <button class="rail-tool" onclick="undoAudioEdit()" title="Desfazer última edição">↶</button>
+                                        <button class="rail-tool" onclick="addAudioLayer()" title="Adicionar faixa de áudio">+</button>
+                                        <button class="rail-tool" onclick="toggleAudioEditsPopover()" title="Edições aplicadas">☰</button>
                                         <button class="rail-tool" onclick="clearAudioCuts()" title="Limpar cortes">×</button>
                                     </div>
 
@@ -227,13 +300,13 @@
                                     </div>
 
                                     <div class="audio-edits-popover" id="audio-edits-popover" style="display:none;">
-                                        <h3>Edicoes aplicadas</h3>
+                                        <h3>Edições aplicadas</h3>
                                         <div id="audio-cuts-list" class="audio-cuts-list"></div>
                                     </div>
                                 </div>
 
                                 <div class="audio-transport">
-                                    <button class="btn-primary" id="btn-audio-play" onclick="toggleAudioTimelinePlayback()">Play</button>
+                                    <button class="btn-secondary" id="btn-audio-play" onclick="toggleAudioTimelinePlayback()">Play</button>
                                     <div class="audio-time-readout" id="audio-timeline-readout">00:00.00 / 00:00.00</div>
                                 </div>
 
@@ -242,15 +315,15 @@
 
                         <div class="output-section">
                             <button class="btn-success" id="btn-audio-cutter" onclick="openAudioExportPopup()" disabled>
-                                ⬇ Exportar áudio
+                                <svg class="i"><use href="#i-download"/></svg>Exportar áudio
                             </button>
                         </div>
 
                         <div class="audio-export-modal" id="audio-export-modal" style="display:none;">
                             <div class="audio-export-box">
                                 <div class="audio-export-header">
-                                    <span>⬇ Exportar áudio</span>
-                                    <button type="button" onclick="closeAudioExportPopup()">×</button>
+                                    <span><svg class="i"><use href="#i-download"/></svg>Exportar áudio</span>
+                                    <button type="button" onclick="closeAudioExportPopup()" title="Fechar"><svg class="i"><use href="#i-x"/></svg></button>
                                 </div>
                                 <div class="formats-grid">
                                     <label>Formato de saída:</label>
@@ -284,13 +357,13 @@
                 <div class="tool-page ve-page" id="page-video-cutter">
                     <div class="ve" id="ve">
                         <header class="ve-top">
-                            <div class="ve-brand"><span class="ve-brand-mark">▶</span> Pocket Editor</div>
-                            <button class="ve-btn" onclick="veOpenFile()" title="Abrir vídeo (Ctrl+O)">📂 Abrir</button>
+                            <div class="ve-brand"><span class="ve-brand-mark"><svg class="i"><use href="#i-play"/></svg></span> Pocket Editor</div>
+                            <button class="ve-btn" onclick="veOpenFile()" title="Abrir vídeo (Ctrl+O)"><svg class="i"><use href="#i-folder"/></svg> Abrir</button>
                             <div class="ve-meta" id="ve-meta">Nenhum vídeo aberto</div>
                             <div class="ve-top-spacer"></div>
                             <button class="ve-icon-btn" id="ve-undo" onclick="veUndo()" title="Desfazer (Ctrl+Z)" disabled>↶</button>
                             <button class="ve-icon-btn" id="ve-redo" onclick="veRedo()" title="Refazer (Ctrl+Shift+Z)" disabled>↷</button>
-                            <button class="ve-btn ve-btn-primary" id="ve-export-btn" onclick="veOpenExport()" disabled title="Exportar (Ctrl+E)">⬇ Exportar</button>
+                            <button class="ve-btn ve-btn-primary" id="ve-export-btn" onclick="veOpenExport()" disabled title="Exportar (Ctrl+E)"><svg class="i"><use href="#i-download"/></svg> Exportar</button>
                         </header>
 
                         <div class="ve-main">
@@ -299,7 +372,7 @@
                                     <video id="ve-video" preload="auto" playsinline></video>
                                     <div class="ve-badge" id="ve-proxy-badge" hidden title="Este formato não toca direto no app: você vê uma cópia leve. A exportação usa o arquivo original, em qualidade máxima.">PRÉVIA LEVE</div>
                                     <div class="ve-empty" id="ve-empty">
-                                        <div class="ve-empty-icon">🎬</div>
+                                        <div class="ve-empty-icon"><svg class="i"><use href="#i-film"/></svg></div>
                                         <div class="ve-empty-title">Arraste um vídeo aqui</div>
                                         <div class="ve-empty-sub">ou</div>
                                         <button class="ve-btn ve-btn-primary ve-btn-lg" onclick="veOpenFile()">Abrir vídeo</button>
@@ -326,7 +399,7 @@
                                         <button class="ve-chip" onclick="veMarkIn()" title="Marcar entrada (I)">{ In</button>
                                         <button class="ve-chip" onclick="veMarkOut()" title="Marcar saída (O)">Out }</button>
                                         <span class="ve-rate" id="ve-rate" hidden>1x</span>
-                                        <button class="ve-tbtn ve-vol" id="ve-mute" onclick="veToggleMute()" title="Som da prévia (M)">🔊</button>
+                                        <button class="ve-tbtn ve-vol" id="ve-mute" onclick="veToggleMute()" title="Som da prévia (M)"><svg class="i"><use href="#i-volume"/></svg></button>
                                         <div class="ve-tc ve-tc-dim" id="ve-tc-total" title="Duração final do vídeo editado">00:00:00:00</div>
                                     </div>
                                 </div>
@@ -377,17 +450,17 @@
                         <section class="ve-timeline">
                             <div class="ve-tl-toolbar">
                                 <div class="ve-seg" role="group" aria-label="Ferramentas">
-                                    <button class="ve-seg-btn active" id="ve-tool-select" onclick="veSetTool('select')" title="Seleção (V)">➤</button>
-                                    <button class="ve-seg-btn" id="ve-tool-razor" onclick="veSetTool('razor')" title="Lâmina (C): clique para dividir">✂</button>
-                                    <button class="ve-seg-btn" id="ve-tool-hand" onclick="veSetTool('hand')" title="Mão (H): arraste para navegar">✋</button>
+                                    <button class="ve-seg-btn active" id="ve-tool-select" onclick="veSetTool('select')" title="Seleção (V)"><svg class="i"><use href="#i-pointer"/></svg></button>
+                                    <button class="ve-seg-btn" id="ve-tool-razor" onclick="veSetTool('razor')" title="Lâmina (C): clique para dividir"><svg class="i"><use href="#i-scissors"/></svg></button>
+                                    <button class="ve-seg-btn" id="ve-tool-hand" onclick="veSetTool('hand')" title="Mão (H): arraste para navegar"><svg class="i"><use href="#i-hand"/></svg></button>
                                 </div>
                                 <div class="ve-divider"></div>
                                 <button class="ve-btn ve-btn-sm" onclick="veSplitAtPlayhead()" title="Dividir na agulha (S)">⎮ Dividir</button>
-                                <button class="ve-btn ve-btn-sm" onclick="veDeleteSelected()" title="Remover clipe selecionado (Delete)">🗑 Remover</button>
+                                <button class="ve-btn ve-btn-sm" onclick="veDeleteSelected()" title="Remover clipe selecionado (Delete)"><svg class="i"><use href="#i-trash"/></svg> Remover</button>
                                 <button class="ve-btn ve-btn-sm" onclick="veExtractInOut()" title="Remover trecho In→Out (X)">✂ In→Out</button>
                                 <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="veResetEdits()" title="Voltar ao vídeo original">↺ Restaurar tudo</button>
                                 <div class="ve-top-spacer"></div>
-                                <button class="ve-seg-btn ve-snap active" id="ve-snap" onclick="veToggleSnap()" title="Ímã: encaixar na agulha e nos cortes (N)">🧲</button>
+                                <button class="ve-seg-btn ve-snap active" id="ve-snap" onclick="veToggleSnap()" title="Ímã: encaixar na agulha e nos cortes (N)"><svg class="i"><use href="#i-magnet"/></svg></button>
                                 <div class="ve-zoom">
                                     <button class="ve-icon-btn" onclick="veZoomBy(1/1.5)" title="Menos zoom (-)">−</button>
                                     <input type="range" id="ve-zoom" min="0" max="1000" value="0" oninput="veZoomSlider(this.value)">
@@ -413,7 +486,7 @@
                             <div class="ve-modal-box">
                                 <div class="ve-modal-head">
                                     <span>Exportar vídeo</span>
-                                    <button class="ve-icon-btn" onclick="veCloseExport()" title="Fechar">✕</button>
+                                    <button class="ve-icon-btn" onclick="veCloseExport()" title="Fechar"><svg class="i"><use href="#i-x"/></svg></button>
                                 </div>
                                 <div class="ve-modal-body" id="ve-export-form">
                                     <div class="ve-field">
@@ -459,7 +532,7 @@
                                 </div>
                                 <div class="ve-modal-foot" id="ve-export-foot">
                                     <button class="ve-btn ve-btn-ghost" onclick="veCloseExport()">Cancelar</button>
-                                    <button class="ve-btn ve-btn-primary" onclick="veStartExport()">⬇ Exportar</button>
+                                    <button class="ve-btn ve-btn-primary" onclick="veStartExport()"><svg class="i"><use href="#i-download"/></svg> Exportar</button>
                                 </div>
                             </div>
                         </div>
@@ -469,16 +542,16 @@
                 <!-- Converter Imagem -->
                 <div class="tool-page" id="page-converter-imagem" data-drop="ambos">
                     <div class="tool-head">
-                        <div class="tool-icon">🖼️</div>
+                        <div class="tool-icon"><svg class="i"><use href="#i-image"/></svg></div>
                         <div><h2>Converter Imagem</h2><p>Os convertidos vão para a pasta <b>convertidas</b>. Perfil de cor e EXIF são mantidos.</p></div>
                     </div>
                     <div class="dropzone" data-tool="converter-imagem">
-                        <div class="dz-icon">⤓</div>
+                        <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
                         <div class="dz-title">Arraste imagens ou uma pasta aqui</div>
                         <div class="dz-sub">HEIC (iPhone), RAW (CR2, NEF, ARW, DNG), WEBP, AVIF, PNG, JPG, TIFF…</div>
                         <div class="dz-actions">
-                            <button class="btn-secondary" onclick="selectFolder('converter-imagem')">📁 Escolher pasta</button>
-                            <button class="btn-secondary" onclick="selectFile('converter-imagem')">📄 Escolher arquivo</button>
+                            <button class="btn-secondary" onclick="selectFolder('converter-imagem')"><svg class="i"><use href="#i-folder"/></svg>Escolher pasta</button>
+                            <button class="btn-secondary" onclick="selectFile('converter-imagem')"><svg class="i"><use href="#i-file"/></svg>Escolher arquivo</button>
                         </div>
                         <div id="converter-imagem-selected" class="selected-info"></div>
                     </div>
@@ -497,7 +570,7 @@
                         </div>
                     </div>
                     <div class="run-row">
-                        <button class="btn-run" id="btn-converter-imagem" onclick="runConverterImagem()">▶ Converter</button>
+                        <button class="btn-run" id="btn-converter-imagem" onclick="runConverterImagem()"><svg class="i"><use href="#i-play"/></svg>Converter</button>
                     </div>
                     <div class="progress-card" id="progress-converter-imagem" hidden>
                         <div class="progress-top">
@@ -516,15 +589,15 @@
                 <!-- Favicon -->
                 <div class="tool-page" id="page-favicon" data-drop="arquivo">
                     <div class="tool-head">
-                        <div class="tool-icon">🌐</div>
+                        <div class="tool-icon"><svg class="i"><use href="#i-globe"/></svg></div>
                         <div><h2>Gerar Favicon</h2><p>Gera todos os ícones do site, o manifest e o código para colar no &lt;head&gt;.</p></div>
                     </div>
                     <div class="dropzone" data-tool="favicon">
-                        <div class="dz-icon">⤓</div>
+                        <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
                         <div class="dz-title">Arraste o logo aqui</div>
                         <div class="dz-sub">De preferência PNG quadrado com fundo transparente, 512px ou mais</div>
                         <div class="dz-actions">
-                            <button class="btn-secondary" onclick="selectImage('favicon')">🖼️ Escolher imagem</button>
+                            <button class="btn-secondary" onclick="selectImage('favicon')"><svg class="i"><use href="#i-image"/></svg>Escolher imagem</button>
                         </div>
                         <div id="favicon-selected" class="selected-info"></div>
                     </div>
@@ -539,7 +612,7 @@
                         </div>
                     </div>
                     <div class="run-row">
-                        <button class="btn-run" id="btn-favicon" onclick="runFaviconGenerator()">▶ Gerar favicons</button>
+                        <button class="btn-run" id="btn-favicon" onclick="runFaviconGenerator()"><svg class="i"><use href="#i-play"/></svg>Gerar favicons</button>
                     </div>
                     <div class="progress-card" id="progress-favicon" hidden>
                         <div class="progress-top">
@@ -558,16 +631,16 @@
                 <!-- Comprimir Imagem -->
                 <div class="tool-page" id="page-compressor-imagem" data-drop="ambos">
                     <div class="tool-head">
-                        <div class="tool-icon">📸</div>
+                        <div class="tool-icon"><svg class="i"><use href="#i-feather"/></svg></div>
                         <div><h2>Comprimir Imagem</h2><p>Deixa fotos e PDFs mais leves na pasta <b>comprimidas</b>. Se não der para reduzir, o original fica como está.</p></div>
                     </div>
                     <div class="dropzone" data-tool="compressor-imagem">
-                        <div class="dz-icon">⤓</div>
+                        <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
                         <div class="dz-title">Arraste imagens, PDFs ou uma pasta aqui</div>
                         <div class="dz-sub">JPG, PNG, WEBP, GIF, HEIC, TIFF, CR2 e PDF • inclui subpastas</div>
                         <div class="dz-actions">
-                            <button class="btn-secondary" onclick="selectFolder('compressor-imagem')">📁 Escolher pasta</button>
-                            <button class="btn-secondary" onclick="selectFile('compressor-imagem')">📄 Escolher arquivo</button>
+                            <button class="btn-secondary" onclick="selectFolder('compressor-imagem')"><svg class="i"><use href="#i-folder"/></svg>Escolher pasta</button>
+                            <button class="btn-secondary" onclick="selectFile('compressor-imagem')"><svg class="i"><use href="#i-file"/></svg>Escolher arquivo</button>
                         </div>
                         <div id="compressor-imagem-selected" class="selected-info"></div>
                     </div>
@@ -579,7 +652,7 @@
                         </label>
                     </div>
                     <div class="run-row">
-                        <button class="btn-run" id="btn-compressor-imagem" onclick="runCompressorImagem()">▶ Comprimir</button>
+                        <button class="btn-run" id="btn-compressor-imagem" onclick="runCompressorImagem()"><svg class="i"><use href="#i-play"/></svg>Comprimir</button>
                     </div>
                     <div class="progress-card" id="progress-compressor-imagem" hidden>
                         <div class="progress-top">
@@ -598,16 +671,16 @@
                 <!-- Comprimir Vídeo -->
                 <div class="tool-page" id="page-compressor-video" data-drop="ambos">
                     <div class="tool-head">
-                        <div class="tool-icon">🗜️</div>
+                        <div class="tool-icon"><svg class="i"><use href="#i-shrink"/></svg></div>
                         <div><h2>Comprimir Vídeo</h2><p>Recomprime em H.265 mantendo resolução e áudio. Se o vídeo já estiver otimizado, o original é mantido.</p></div>
                     </div>
                     <div class="dropzone" data-tool="compressor-video">
-                        <div class="dz-icon">⤓</div>
+                        <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
                         <div class="dz-title">Arraste vídeos ou uma pasta aqui</div>
                         <div class="dz-sub">MP4, MOV, MKV, MXF, AVI, MTS…</div>
                         <div class="dz-actions">
-                            <button class="btn-secondary" onclick="selectFolder('compressor-video')">📁 Escolher pasta</button>
-                            <button class="btn-secondary" onclick="selectFile('compressor-video')">📄 Escolher arquivo</button>
+                            <button class="btn-secondary" onclick="selectFolder('compressor-video')"><svg class="i"><use href="#i-folder"/></svg>Escolher pasta</button>
+                            <button class="btn-secondary" onclick="selectFile('compressor-video')"><svg class="i"><use href="#i-file"/></svg>Escolher arquivo</button>
                         </div>
                         <div id="compressor-video-selected" class="selected-info"></div>
                     </div>
@@ -636,7 +709,7 @@
                         </div>
                     </div>
                     <div class="run-row">
-                        <button class="btn-run" id="btn-compressor-video" onclick="runCompressorVideo()">▶ Comprimir</button>
+                        <button class="btn-run" id="btn-compressor-video" onclick="runCompressorVideo()"><svg class="i"><use href="#i-play"/></svg>Comprimir</button>
                     </div>
                     <div class="progress-card" id="progress-compressor-video" hidden>
                         <div class="progress-top">
@@ -655,16 +728,16 @@
                 <!-- Converter Vídeo -->
                 <div class="tool-page" id="page-video-converter" data-drop="ambos">
                     <div class="tool-head">
-                        <div class="tool-icon">🔄</div>
+                        <div class="tool-icon"><svg class="i"><use href="#i-convert"/></svg></div>
                         <div><h2>Converter Vídeo</h2><p>Quando dá, só troca o formato sem recodificar — leva segundos e não perde qualidade.</p></div>
                     </div>
                     <div class="dropzone" data-tool="video-converter">
-                        <div class="dz-icon">⤓</div>
+                        <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
                         <div class="dz-title">Arraste vídeos, GIFs ou uma pasta aqui</div>
                         <div class="dz-sub">MP4, MOV, MKV, AVI, WEBM, MTS, GIF…</div>
                         <div class="dz-actions">
-                            <button class="btn-secondary" onclick="selectFolder('video-converter')">📁 Escolher pasta</button>
-                            <button class="btn-secondary" onclick="selectFile('video-converter')">📄 Escolher arquivo</button>
+                            <button class="btn-secondary" onclick="selectFolder('video-converter')"><svg class="i"><use href="#i-folder"/></svg>Escolher pasta</button>
+                            <button class="btn-secondary" onclick="selectFile('video-converter')"><svg class="i"><use href="#i-file"/></svg>Escolher arquivo</button>
                         </div>
                         <div id="video-converter-selected" class="selected-info"></div>
                     </div>
@@ -683,7 +756,7 @@
                         </div>
                     </div>
                     <div class="run-row">
-                        <button class="btn-run" id="btn-video-converter" onclick="runVideoConverter()">▶ Converter</button>
+                        <button class="btn-run" id="btn-video-converter" onclick="runVideoConverter()"><svg class="i"><use href="#i-play"/></svg>Converter</button>
                     </div>
                     <div class="progress-card" id="progress-video-converter" hidden>
                         <div class="progress-top">
@@ -702,12 +775,12 @@
                 <!-- Baixar Vídeo -->
                 <div class="tool-page" id="page-video-downloader">
                     <div class="tool-head">
-                        <div class="tool-icon">📥</div>
+                        <div class="tool-icon"><svg class="i"><use href="#i-download"/></svg></div>
                         <div><h2>Baixar Vídeo</h2><p>YouTube, Instagram, TikTok, X, Vimeo, Facebook e centenas de outros sites.</p></div>
                     </div>
                     <div class="url-row">
                         <input type="text" id="video-url" class="field" placeholder="Cole o link do vídeo..." onkeydown="if(event.key==='Enter')getVideoInfo()">
-                        <button class="btn-primary" onclick="getVideoInfo()">🔍 Verificar</button>
+                        <button class="btn-secondary" onclick="getVideoInfo()"><svg class="i"><use href="#i-search"/></svg>Verificar</button>
                     </div>
                     <div id="video-info" class="vd-info-card" style="display:none;">
                         <img id="video-thumbnail" class="vd-thumb" alt="">
@@ -724,8 +797,8 @@
                         <div class="opt-row">
                             <span class="opt-label">Formato</span>
                             <div class="pills">
-                                <label class="pill"><input type="radio" name="vd-format" value="mp4" checked onchange="atualizarOpcoesDownloader()"><span>🎬 Vídeo MP4</span></label>
-                                <label class="pill"><input type="radio" name="vd-format" value="mp3" onchange="atualizarOpcoesDownloader()"><span>🎵 Só áudio MP3</span></label>
+                                <label class="pill"><input type="radio" name="vd-format" value="mp4" checked onchange="atualizarOpcoesDownloader()"><span>Vídeo MP4</span></label>
+                                <label class="pill"><input type="radio" name="vd-format" value="mp3" onchange="atualizarOpcoesDownloader()"><span>Só áudio MP3</span></label>
                             </div>
                         </div>
                         <div class="opt-row" id="vd-qualidade-row">
@@ -739,12 +812,12 @@
                             <span class="opt-label">Salvar em</span>
                             <div class="path-pick">
                                 <span id="video-downloader-selected" class="path-text">Downloads</span>
-                                <button class="btn-secondary" onclick="selectFolder('video-downloader')">📁 Alterar</button>
+                                <button class="btn-secondary" onclick="selectFolder('video-downloader')"><svg class="i"><use href="#i-folder"/></svg>Alterar</button>
                             </div>
                         </div>
                     </div>
                     <div class="run-row">
-                        <button class="btn-run" id="btn-video-downloader" onclick="runVideoDownloader()">⬇ Baixar</button>
+                        <button class="btn-run" id="btn-video-downloader" onclick="runVideoDownloader()"><svg class="i"><use href="#i-download"/></svg>Baixar</button>
                     </div>
                     <div class="progress-card" id="progress-video-downloader" hidden>
                         <div class="progress-top">
@@ -763,12 +836,12 @@
                 <!-- Web Scraper -->
                 <div class="tool-page" id="page-web-scraper">
                     <div class="tool-head">
-                        <div class="tool-icon">🕷️</div>
+                        <div class="tool-icon"><svg class="i"><use href="#i-scan"/></svg></div>
                         <div><h2>Web Scraper</h2><p>Baixa as imagens e vídeos de uma página e já organiza: converte para WEBP, separa logos, thumbs e plantas, e renomeia por contexto.</p></div>
                     </div>
                     <div class="url-row">
                         <input type="text" id="scraper-url" class="field" placeholder="https://site.com/pagina" onkeydown="if(event.key==='Enter')runWebScraperAnalyze()">
-                        <button class="btn-primary" onclick="runWebScraperAnalyze()">🔎 Analisar</button>
+                        <button class="btn-secondary" onclick="runWebScraperAnalyze()"><svg class="i"><use href="#i-search"/></svg>Analisar</button>
                     </div>
                     <div class="options-card" id="scraper-result-box" style="display:none;">
                         <div class="stat-chips">
@@ -787,12 +860,12 @@
                             <span class="opt-label">Salvar em</span>
                             <div class="path-pick">
                                 <input type="text" id="scraper-destino" class="path-text" placeholder="Escolha a pasta..." readonly>
-                                <button class="btn-secondary" onclick="selectScraperDestino()">📁 Escolher</button>
+                                <button class="btn-secondary" onclick="selectScraperDestino()"><svg class="i"><use href="#i-folder"/></svg>Escolher</button>
                             </div>
                         </div>
                     </div>
                     <div class="run-row">
-                        <button class="btn-run" id="btn-web-scraper" onclick="runWebScraperDownload()">⬇ Baixar</button>
+                        <button class="btn-run" id="btn-web-scraper" onclick="runWebScraperDownload()"><svg class="i"><use href="#i-download"/></svg>Baixar</button>
                     </div>
                     <div class="progress-card" id="progress-web-scraper" hidden>
                         <div class="progress-top">
@@ -808,12 +881,12 @@
                     </details>
 
                     <details class="options-card cerebro-section">
-                        <summary>🧠 Cérebro — extrair dados da página para CSV com IA local</summary>
+                        <summary><svg class="i"><use href="#i-sparkles"/></svg>Cérebro — extrair dados da página para CSV com IA local</summary>
                         <p id="cerebro-status" class="cerebro-status">Nenhum .md carregado</p>
                         <div class="dz-actions">
-                            <button class="btn-secondary" onclick="loadCerebro()">📂 Carregar regras (.md)</button>
-                            <button class="btn-secondary" onclick="removeCerebro()">🗑️ Remover</button>
-                            <button class="btn-primary" id="btn-generate-csv" onclick="generateCSV()">📊 Gerar CSV</button>
+                            <button class="btn-secondary" onclick="loadCerebro()"><svg class="i"><use href="#i-file"/></svg>Carregar regras (.md)</button>
+                            <button class="btn-secondary" onclick="removeCerebro()"><svg class="i"><use href="#i-trash"/></svg>Remover</button>
+                            <button class="btn-primary" id="btn-generate-csv" onclick="generateCSV()"><svg class="i"><use href="#i-table"/></svg>Gerar CSV</button>
                         </div>
                         <div class="cerebro-preview" id="cerebro-preview" style="display: none;">
                             <pre id="cerebro-content-preview"></pre>
@@ -824,16 +897,16 @@
                 <!-- Transcrever -->
                 <div class="tool-page" id="page-transcrever-audio" data-drop="ambos">
                     <div class="tool-head">
-                        <div class="tool-icon">📝</div>
+                        <div class="tool-icon"><svg class="i"><use href="#i-captions"/></svg></div>
                         <div><h2>Transcrever</h2><p>Transforma fala em texto com o Whisper, direto no seu PC. Também gera legenda <b>.srt</b> para Premiere e CapCut.</p></div>
                     </div>
                     <div class="dropzone" data-tool="transcrever-audio">
-                        <div class="dz-icon">⤓</div>
+                        <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
                         <div class="dz-title">Arraste áudios, vídeos ou uma pasta aqui</div>
                         <div class="dz-sub">MP3, WAV, M4A, OGG/Opus (WhatsApp), MP4, MOV…</div>
                         <div class="dz-actions">
-                            <button class="btn-secondary" onclick="selectFolder('transcrever-audio')">📁 Escolher pasta</button>
-                            <button class="btn-secondary" onclick="selectFile('transcrever-audio')">📄 Escolher arquivo</button>
+                            <button class="btn-secondary" onclick="selectFolder('transcrever-audio')"><svg class="i"><use href="#i-folder"/></svg>Escolher pasta</button>
+                            <button class="btn-secondary" onclick="selectFile('transcrever-audio')"><svg class="i"><use href="#i-file"/></svg>Escolher arquivo</button>
                         </div>
                         <div id="transcrever-audio-selected" class="selected-info"></div>
                     </div>
@@ -856,7 +929,7 @@
                         </div>
                     </div>
                     <div class="run-row">
-                        <button class="btn-run" id="btn-transcrever-audio" onclick="runTranscreverAudio()">▶ Transcrever</button>
+                        <button class="btn-run" id="btn-transcrever-audio" onclick="runTranscreverAudio()"><svg class="i"><use href="#i-play"/></svg>Transcrever</button>
                     </div>
                     <div class="progress-card" id="progress-transcrever-audio" hidden>
                         <div class="progress-top">
@@ -875,21 +948,21 @@
                 <!-- Remover Fundo -->
                 <div class="tool-page" id="page-remover-fundo" data-drop="ambos">
                     <div class="tool-head">
-                        <div class="tool-icon">🪄</div>
+                        <div class="tool-icon"><svg class="i"><use href="#i-wand"/></svg></div>
                         <div><h2>Remover Fundo</h2><p>Recorte automático com IA. Você revisa o resultado antes de salvar.</p></div>
                     </div>
                     <div class="dropzone" data-tool="remover-fundo">
-                        <div class="dz-icon">⤓</div>
+                        <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
                         <div class="dz-title">Arraste imagens ou uma pasta aqui</div>
                         <div class="dz-sub">JPG, PNG, WEBP, HEIC, AVIF</div>
                         <div class="dz-actions">
-                            <button class="btn-secondary" onclick="selectFolder('remover-fundo')">📁 Escolher pasta</button>
-                            <button class="btn-secondary" onclick="selectFile('remover-fundo')">📄 Escolher arquivo</button>
+                            <button class="btn-secondary" onclick="selectFolder('remover-fundo')"><svg class="i"><use href="#i-folder"/></svg>Escolher pasta</button>
+                            <button class="btn-secondary" onclick="selectFile('remover-fundo')"><svg class="i"><use href="#i-file"/></svg>Escolher arquivo</button>
                         </div>
                         <div id="remover-fundo-selected" class="selected-info"></div>
                     </div>
                     <div class="run-row">
-                        <button class="btn-run" id="btn-remover-fundo" onclick="runRemoverFundo()">▶ Remover fundo</button>
+                        <button class="btn-run" id="btn-remover-fundo" onclick="runRemoverFundo()"><svg class="i"><use href="#i-play"/></svg>Remover fundo</button>
                     </div>
                     <div class="progress-card" id="progress-remover-fundo" hidden>
                         <div class="progress-top">
@@ -908,14 +981,14 @@
                 <!-- Organizar Imagens -->
                 <div class="tool-page" id="page-organizador-imagens" data-drop="pasta">
                     <div class="tool-head">
-                        <div class="tool-icon">🗂️</div>
+                        <div class="tool-icon"><svg class="i"><use href="#i-grid"/></svg></div>
                         <div><h2>Organizar Imagens</h2><p>Separa duplicadas, thumbs, logos e plantas, e renomeia as fotos pelo que aparece nelas.</p></div>
                     </div>
                     <div class="dropzone" data-tool="organizador-imagens">
-                        <div class="dz-icon">⤓</div>
+                        <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
                         <div class="dz-title">Arraste uma pasta aqui</div>
                         <div class="dz-actions">
-                            <button class="btn-secondary" onclick="selectFolder('organizador-imagens')">📁 Escolher pasta</button>
+                            <button class="btn-secondary" onclick="selectFolder('organizador-imagens')"><svg class="i"><use href="#i-folder"/></svg>Escolher pasta</button>
                         </div>
                         <div id="organizador-imagens-selected" class="selected-info"></div>
                     </div>
@@ -930,7 +1003,7 @@
                         </div>
                     </div>
                     <div class="run-row">
-                        <button class="btn-run" id="btn-organizador-imagens" onclick="runOrganizadorImagens()">▶ Organizar</button>
+                        <button class="btn-run" id="btn-organizador-imagens" onclick="runOrganizadorImagens()"><svg class="i"><use href="#i-play"/></svg>Organizar</button>
                     </div>
                     <div class="progress-card" id="progress-organizador-imagens" hidden>
                         <div class="progress-top">
@@ -949,15 +1022,15 @@
                 <!-- Logger Pro -->
                 <div class="tool-page" id="page-organizador-videos" data-drop="pasta">
                     <div class="tool-head">
-                        <div class="tool-icon">🎥</div>
+                        <div class="tool-icon"><svg class="i"><use href="#i-camera"/></svg></div>
                         <div><h2>Logger Pro</h2><p>Organiza os cartões das câmeras por ordem de gravação, identifica operadores e monta o projeto do Premiere.</p></div>
                     </div>
                     <div class="dropzone" data-tool="organizador-videos">
-                        <div class="dz-icon">⤓</div>
+                        <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
                         <div class="dz-title">Arraste a pasta do job aqui</div>
                         <div class="dz-sub">Uma subpasta por câmera/cartão</div>
                         <div class="dz-actions">
-                            <button class="btn-secondary" onclick="selectFolder('organizador-videos')">📁 Escolher pasta</button>
+                            <button class="btn-secondary" onclick="selectFolder('organizador-videos')"><svg class="i"><use href="#i-folder"/></svg>Escolher pasta</button>
                         </div>
                         <div id="organizador-videos-selected" class="selected-info"></div>
                     </div>
@@ -970,26 +1043,26 @@
                         <div class="progress-sub" id="log-organizador-videos"></div>
                     </div>
                     <div class="run-row">
-                        <button class="btn-run" id="btn-organizador-videos" onclick="runOrganizadorVideosScan()">🔍 Analisar câmeras</button>
+                        <button class="btn-run" id="btn-organizador-videos" onclick="runOrganizadorVideosScan()"><svg class="i"><use href="#i-search"/></svg>Analisar câmeras</button>
                     </div>
                 </div>
 
                 <!-- GDrive Dumper -->
                 <div class="tool-page" id="page-gdrive-dumper">
                     <div class="tool-head">
-                        <div class="tool-icon">☁️</div>
+                        <div class="tool-icon"><svg class="i"><use href="#i-cloud"/></svg></div>
                         <div><h2>GDrive Dumper</h2><p>Baixa pastas inteiras do Google Drive com retomada automática — sem os zips quebrados do navegador.</p></div>
                     </div>
                     <div class="url-row">
                         <input type="text" id="gdrive-url" class="field" placeholder="Cole o link da pasta ou arquivo do Google Drive..." onkeydown="if(event.key==='Enter')analyzeGdrive()">
-                        <button class="btn-primary" onclick="analyzeGdrive()">🔍 Verificar</button>
+                        <button class="btn-secondary" onclick="analyzeGdrive()"><svg class="i"><use href="#i-search"/></svg>Verificar</button>
                     </div>
                     <div id="gdrive-status" class="status-line"></div>
                     <div class="analyze-section options-card" id="gdrive-analyze-info" style="display:none;">
                         <div class="stat-chips">
-                            <span class="chip">📁 <b id="gdrive-pasta-nome">-</b></span>
-                            <span class="chip">📊 <b id="gdrive-tamanho">-</b></span>
-                            <span class="chip">📄 <b id="gdrive-arquivos">-</b> arquivos</span>
+                            <span class="chip"><svg class="i"><use href="#i-folder"/></svg><b id="gdrive-pasta-nome">-</b></span>
+                            <span class="chip"><svg class="i"><use href="#i-hdd"/></svg><b id="gdrive-tamanho">-</b></span>
+                            <span class="chip"><svg class="i"><use href="#i-file"/></svg><b id="gdrive-arquivos">-</b> arquivos</span>
                         </div>
                     </div>
                     <div class="options-card">
@@ -997,20 +1070,20 @@
                             <span class="opt-label">Salvar em</span>
                             <div class="path-pick">
                                 <input type="text" id="gdrive-destino" class="path-text" placeholder="Escolha a pasta de destino..." readonly>
-                                <button class="btn-secondary" onclick="selectGdriveDestino()">📁 Escolher</button>
+                                <button class="btn-secondary" onclick="selectGdriveDestino()"><svg class="i"><use href="#i-folder"/></svg>Escolher</button>
                             </div>
                         </div>
                         <div class="opt-row">
                             <span class="opt-label">Sua internet</span>
                             <select id="gdrive-perfil" class="field field-select">
-                                <option value="rapida" selected>🚀 Rápida (recomendado) — 8 arquivos em paralelo</option>
-                                <option value="normal">⚖️ Normal — 4 arquivos em paralelo</option>
-                                <option value="lenta">🐢 Lenta / instável — 2 arquivos, mais tolerante a quedas</option>
+                                <option value="rapida" selected>Rápida (recomendado) — 8 arquivos em paralelo</option>
+                                <option value="normal">Normal — 4 arquivos em paralelo</option>
+                                <option value="lenta">Lenta / instável — 2 arquivos, mais tolerante a quedas</option>
                             </select>
                         </div>
                     </div>
                     <div id="gdrive-action-buttons" class="run-row">
-                        <button class="btn-run" id="btn-gdrive-baixar" onclick="runGdriveDump()" disabled>⬇ Baixar</button>
+                        <button class="btn-run" id="btn-gdrive-baixar" onclick="runGdriveDump()" disabled><svg class="i"><use href="#i-download"/></svg>Baixar</button>
                     </div>
                     <div class="progress-card" id="progress-gdrive" style="display: none;">
                         <div class="progress-top">
@@ -1020,8 +1093,8 @@
                         <div class="progress-bar"><div class="progress-fill" id="progress-fill-gdrive"></div></div>
                         <div class="progress-sub" id="gdrive-msg"></div>
                         <div class="run-row">
-                            <button class="btn-secondary" id="btn-gdrive-pause" onclick="toggleGdrivePause()">⏸ Pausar</button>
-                            <button class="btn-danger" id="btn-gdrive-cancel" onclick="cancelGdriveDump()">✖ Cancelar</button>
+                            <button class="btn-secondary" id="btn-gdrive-pause" onclick="toggleGdrivePause()"><svg class="i"><use href="#i-pause"/></svg>Pausar</button>
+                            <button class="btn-danger" id="btn-gdrive-cancel" onclick="cancelGdriveDump()"><svg class="i"><use href="#i-x"/></svg>Cancelar</button>
                         </div>
                     </div>
                     <div id="gdrive-stats-panel" class="stats-panel" style="display:none;">
@@ -1050,8 +1123,8 @@
     <div id="modal-remover-fundo" class="rf-modal-overlay" style="display:none;" onclick="fecharModalRF(event)">
         <div class="rf-modal">
             <div class="rf-modal-header">
-                <span>✂️ Resultado — Remover Fundo</span>
-                <button class="rf-modal-close" onclick="fecharModalRF()">✕</button>
+                <span><svg class="i"><use href="#i-wand"/></svg>Resultado — Remover Fundo</span>
+                <button class="rf-modal-close" onclick="fecharModalRF()" title="Fechar"><svg class="i"><use href="#i-x"/></svg></button>
             </div>
             <div class="rf-viewer">
                 <div class="rf-side">
@@ -1071,10 +1144,10 @@
             <div class="rf-thumbs-strip" id="rf-thumbs-strip"></div>
             <div class="rf-modal-footer">
                 <span class="rf-counter" id="rf-counter"></span>
-                <div style="display:flex;gap:10px;">
-                    <button class="btn-secondary" id="rf-btn-copiar" onclick="copiarRFAtual()">📋 Copiar</button>
-                    <button class="btn-secondary" onclick="salvarRFAtual()">💾 Salvar Esta</button>
-                    <button class="btn-success" id="rf-btn-salvar-todas" onclick="salvarRFTodas()">💾 Salvar Todas</button>
+                <div class="rf-actions">
+                    <button class="btn-secondary" id="rf-btn-copiar" onclick="copiarRFAtual()"><svg class="i"><use href="#i-copy"/></svg>Copiar</button>
+                    <button class="btn-secondary" onclick="salvarRFAtual()"><svg class="i"><use href="#i-save"/></svg>Salvar esta</button>
+                    <button class="btn-success" id="rf-btn-salvar-todas" onclick="salvarRFTodas()"><svg class="i"><use href="#i-save"/></svg>Salvar todas</button>
                 </div>
             </div>
         </div>
@@ -1084,13 +1157,13 @@
     <div id="modal-transcricao" class="transcricao-modal-overlay" style="display:none;" onclick="fecharModalTranscricao(event)">
         <div class="transcricao-modal">
             <div class="transcricao-modal-header">
-                <span>📝 Resultado da Transcrição</span>
-                <button class="transcricao-modal-close" onclick="fecharModalTranscricao()">✕</button>
+                <span><svg class="i"><use href="#i-captions"/></svg>Resultado da transcrição</span>
+                <button class="transcricao-modal-close" onclick="fecharModalTranscricao()" title="Fechar"><svg class="i"><use href="#i-x"/></svg></button>
             </div>
             <textarea id="transcricao-modal-texto" class="transcricao-modal-textarea" spellcheck="false"></textarea>
             <div class="transcricao-modal-footer">
-                <button class="btn-secondary" onclick="copiarTranscricao()">📋 Copiar</button>
-                <button class="btn-success" onclick="salvarTranscricaoTxt()">💾 Salvar TXT</button>
+                <button class="btn-secondary" onclick="copiarTranscricao()"><svg class="i"><use href="#i-copy"/></svg>Copiar</button>
+                <button class="btn-success" onclick="salvarTranscricaoTxt()"><svg class="i"><use href="#i-save"/></svg>Salvar TXT</button>
             </div>
         </div>
     </div>
@@ -1098,10 +1171,10 @@
     <!-- Modal: Câmeras Identificadas -->
     <div id="modal-cameras" class="modal-overlay" style="display:none;">
         <div class="modal-box">
-            <h3>📷 Câmeras Identificadas</h3>
+            <h3><svg class="i"><use href="#i-camera"/></svg>Câmeras identificadas</h3>
 
             <div class="modal-field">
-                <label class="modal-label">🎬 Nome do Projeto</label>
+                <label class="modal-label">Nome do projeto</label>
                 <input type="text" id="input-nome-projeto" class="modal-input"
                        placeholder="Ex: Casamento João e Maria">
             </div>
@@ -1112,7 +1185,7 @@
             <div id="cameras-list" class="cameras-list"></div>
             <div class="modal-actions">
                 <button class="btn-secondary" onclick="fecharModalCameras()">Cancelar</button>
-                <button class="btn-success" onclick="confirmarOrganizacaoVideos()">▶ Confirmar e Organizar</button>
+                <button class="btn-success" onclick="confirmarOrganizacaoVideos()">Confirmar e organizar</button>
             </div>
         </div>
     </div>
