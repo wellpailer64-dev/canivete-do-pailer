@@ -8,7 +8,7 @@
 // =========================================================
 
 const VE_LEG_PADRAO = { max: 42, linhas: 2, minDur: 3, gap: 0 };                 // "Criar legendas" do Premiere
-const VE_LEG_ESTILO = { tam: 5.5, cor: '#ffffff', fundo: 'caixa', pos: 'baixo', maiusc: false, negrito: true };
+const VE_LEG_ESTILO = { fonte: 'Arial', tam: 5.5, cor: '#ffffff', fundo: 'caixa', pos: 'baixo', maiusc: false, negrito: true };
 
 const VETX = {
     palavras: [], idioma: 'pt', chave: '', rodando: false, aba: 'trans', legSel: -1, ativa: -1,
@@ -200,23 +200,38 @@ function veTxLegendaEm(t) {
     return -1;
 }
 
+// Altura da linha e topo das letras da fonte (em "em"): o libass usa o Fontsize do .ass como a altura da linha
+// (ascendente + descendente), então a prévia mede a fonte escolhida e a exportação recebe a proporção
+const VE_LEG_MET = new Map();
+function veTxMetricas(e) {
+    const k = e.fonte + '|' + !!e.negrito;
+    if (!VE_LEG_MET.has(k)) {
+        const ctx = document.createElement('canvas').getContext('2d');
+        ctx.font = `${e.negrito ? 'bold ' : ''}100px "${e.fonte}", Arial`;
+        const m = ctx.measureText('Hg');
+        const asc = (m.fontBoundingBoxAscent || 90.5) / 100, desc = (m.fontBoundingBoxDescent || 21.2) / 100;
+        VE_LEG_MET.set(k, { asc, razao: asc + desc });
+    }
+    return VE_LEG_MET.get(k);
+}
+
 // Desenha a legenda da agulha no monitor (coordenadas do quadro; mesma conta do .ass da exportação)
 function veTxDesenhar(ctx) {
     const i = veTxLegendaEm(VE.playhead);
     if (i < 0) return;
-    const e = veTxEstilo(), H = VE.seqH, W = VE.seqW;
-    const em = Math.max(8, e.tam / 100 * H), alt = em * 1.117, folga = em * 0.22, margem = Math.round(0.06 * H);
+    const e = veTxEstilo(), H = VE.seqH, W = VE.seqW, met = veTxMetricas(e);
+    const em = Math.max(8, e.tam / 100 * H), alt = em * met.razao, folga = em * 0.22, margem = Math.round(0.06 * H);
     let linhas = String(VE.legendas[i].texto || '').split('\n').filter(l => l.trim());
     if (e.maiusc) linhas = linhas.map(l => l.toUpperCase());
     if (!linhas.length) return;
     ctx.save();
-    ctx.font = `${e.negrito ? 'bold ' : ''}${em}px Arial`;
+    ctx.font = `${e.negrito ? 'bold ' : ''}${em}px "${e.fonte}", Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     const bloco = linhas.length * alt;
     let topo = e.pos === 'cima' ? margem : e.pos === 'meio' ? (H - bloco) / 2 : H - margem - bloco;
     linhas.forEach((l, k) => {
-        const y = topo + k * alt, base = y + em * 0.905 + (alt - em * 1.117) / 2;
+        const y = topo + k * alt, base = y + em * met.asc;
         const w = ctx.measureText(l).width;
         if (e.fundo === 'caixa') {
             ctx.fillStyle = 'rgba(0,0,0,0.64)';
@@ -252,7 +267,9 @@ function veTxSalvarSrt() {
 
 // Para a exportação: legendas gravadas no vídeo (se ligado)
 function veTxExport() {
-    return VE.legGravar !== false && (VE.legendas || []).length ? { itens: VE.legendas, estilo: veTxEstilo() } : null;
+    if (VE.legGravar === false || !(VE.legendas || []).length) return null;
+    const e = veTxEstilo();
+    return { itens: VE.legendas, estilo: { ...e, razao: veTxMetricas(e).razao } };
 }
 
 // ─────────────────────────── painel ───────────────────────────
@@ -305,14 +322,8 @@ function veTxConstruir() {
             </div>
             <div class="ve-tx-sec">
                 <b>Estilo</b>
-                <div class="ve-tx-grade">
-                    <label>Tamanho<input type="range" data-est="tam" min="3" max="10" step="0.1"></label>
-                    <label>Cor do texto<input type="color" data-est="cor"></label>
-                    <label>Fundo<select data-est="fundo"><option value="caixa">Caixa</option><option value="sombra">Contorno e sombra</option><option value="nenhum">Nenhum</option></select></label>
-                    <label>Posição<select data-est="pos"><option value="baixo">Embaixo</option><option value="meio">No meio</option><option value="cima">Em cima</option></select></label>
-                    <label class="ve-tx-chk"><input type="checkbox" data-est="negrito"> Negrito</label>
-                    <label class="ve-tx-chk"><input type="checkbox" data-est="maiusc"> CAIXA ALTA</label>
-                </div>
+                <p class="ve-tx-nota">Fonte, tamanho, cor, fundo e posição das legendas ficam no painel Propriedades (selecione uma legenda).</p>
+                <button class="ve-btn ve-btn-sm" data-txacao="estilo">Editar estilo em Propriedades</button>
             </div>
             <div class="ve-tx-sec ve-tx-saida">
                 <label class="ve-tx-chk"><input type="checkbox" id="ve-leg-gravar"> Gravar as legendas no vídeo ao exportar</label>
@@ -389,6 +400,13 @@ function veTxInit() {
             else if (a === 'cancelar') veTxCancelar();
             else if (a === 'criar') { if (!(VE.legendas || []).length || veConfirmarTroca()) veTxCriarLegendas(); }
             else if (a === 'srt') veTxSalvarSrt();
+            else if (a === 'estilo') {
+                if (!(VE.legendas || []).length) { veToast('Crie as legendas primeiro'); return; }
+                if (VETX.legSel < 0) VETX.legSel = Math.max(0, veTxLegendaEm(VE.playhead));
+                VE.sel = -1;
+                vedShow('pp');
+                veRefresh();
+            }
             return;
         }
         const w = e.target.closest('[data-w]'), ir = e.target.closest('[data-ir]');

@@ -33,7 +33,7 @@ function vedDefault() {
             { t: 's', d: 'row', z: [0.77, 0.23], c: [
                 { t: 'g', p: ['monitor'], a: 'monitor' },
                 { t: 's', d: 'col', z: [0.6, 0.4], c: [
-                    { t: 'g', p: ['props', 'lc', 'texto', 'clips'], a: 'props' },
+                    { t: 'g', p: ['pp', 'props', 'lc', 'texto', 'clips'], a: 'pp' },
                     { t: 'g', p: ['fx', 'keys'], a: 'fx' },
                 ] },
             ] },
@@ -170,7 +170,7 @@ function vedApply(d) {
     vedMain().max = null;
     st.floats.forEach(f => VED.hosts.push(vedNewHost(f.root, f.b)));
     VED.home = st.home;
-    st.novos.forEach(vedAddTab);
+    st.novos.forEach(id => vedAddTab(id, true));
     vedRender();
     if (VED.editor) vedOpenFloats();
 }
@@ -303,11 +303,14 @@ function vedBuild(n, h, doc) {
 }
 
 // ── abrir / fechar / mostrar ──
-function vedAddTab(id) {
+// novo = painel que surgiu numa versão nova do app (layout salvo não o conhece): vai para o grupo de
+// Controles de efeito, na frente, e não para o painel com foco (que poderia ser a timeline)
+function vedAddTab(id, novo) {
     const m = vedMain();
-    const alvo = vedGroups(m.root).find(g => g.p.includes(VED.focus)) || vedGroups(m.root).find(g => g.p.includes('props')) || vedGroups(m.root)[0];
+    const gs = vedGroups(m.root), comProps = gs.find(g => g.p.includes('props'));
+    const alvo = (novo ? comProps : gs.find(g => g.p.includes(VED.focus)) || comProps) || gs[0];
     if (!alvo) { m.root = m.root ? { t: 's', d: 'row', c: [m.root, { t: 'g', p: [id], a: id }], z: [0.75, 0.25] } : { t: 'g', p: [id], a: id }; return; }
-    alvo.p.push(id);
+    if (novo) alvo.p.unshift(id); else alvo.p.push(id);
     alvo.a = id;
 }
 

@@ -320,6 +320,64 @@ def ve_transcrever_cancelar():
     return {"success": True}
 
 
+def ve_fontes():
+    """Famílias de fonte instaladas no Windows (texto e legendas do editor), pelos nomes que o GDI conhece —
+    os mesmos que o navegador e o libass (legendas gravadas) encontram."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class LOGFONTW(ctypes.Structure):
+            _fields_ = [("lfHeight", wintypes.LONG), ("lfWidth", wintypes.LONG), ("lfEscapement", wintypes.LONG),
+                        ("lfOrientation", wintypes.LONG), ("lfWeight", wintypes.LONG), ("lfItalic", wintypes.BYTE),
+                        ("lfUnderline", wintypes.BYTE), ("lfStrikeOut", wintypes.BYTE), ("lfCharSet", wintypes.BYTE),
+                        ("lfOutPrecision", wintypes.BYTE), ("lfClipPrecision", wintypes.BYTE),
+                        ("lfQuality", wintypes.BYTE), ("lfPitchAndFamily", wintypes.BYTE),
+                        ("lfFaceName", wintypes.WCHAR * 32)]
+
+        proc_t = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.POINTER(LOGFONTW), ctypes.c_void_p, wintypes.DWORD,
+                                    wintypes.LPARAM)
+        gdi32, user32 = ctypes.WinDLL("gdi32"), ctypes.WinDLL("user32")
+        user32.GetDC.restype = wintypes.HDC
+        user32.GetDC.argtypes = [wintypes.HWND]
+        user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
+        gdi32.EnumFontFamiliesExW.argtypes = [wintypes.HDC, ctypes.POINTER(LOGFONTW), proc_t, wintypes.LPARAM,
+                                              wintypes.DWORD]
+        nomes = set()
+
+        def _cb(lf, _tm, _tipo, _lp):
+            n = lf.contents.lfFaceName
+            # "@" = variante vertical (CJK); tipo 1 = fonte bitmap antiga (não escala)
+            if n and not n.startswith("@") and not (_tipo & 1):
+                nomes.add(n)
+            return 1
+
+        cb = proc_t(_cb)
+        hdc = user32.GetDC(None)
+        lf = LOGFONTW()
+        lf.lfCharSet = 1   # DEFAULT_CHARSET: todas
+        gdi32.EnumFontFamiliesExW(hdc, ctypes.byref(lf), cb, 0, 0)
+        user32.ReleaseDC(None, hdc)
+        return {"success": True, "fontes": sorted(nomes, key=str.lower)}
+    except Exception as e:
+        return {"success": False, "error": str(e), "fontes": []}
+
+
+def ve_salvar_png(dados):
+    """PNG (data URL) de um texto do editor → arquivo na pasta de trabalho, para a exportação usar como imagem."""
+    try:
+        import base64
+        import uuid
+        from Functions import video_cutter as vc
+        b = base64.b64decode(str(dados).split(",", 1)[-1])
+        path = os.path.join(vc._work_dir(), f"texto_{uuid.uuid4().hex[:10]}.png")
+        with open(path, "wb") as f:
+            f.write(b)
+        return {"success": True, "path": path}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def ve_salvar_srt(conteudo, sugestao="legendas.srt", pasta=""):
     """Pergunta onde salvar e grava o .srt (UTF-8)."""
     try:
@@ -2183,6 +2241,12 @@ class ApiBridge:
 
     def ve_salvar_srt(self, conteudo, sugestao="legendas.srt", pasta=""):
         return ve_salvar_srt(conteudo, sugestao, pasta)
+
+    def ve_fontes(self):
+        return ve_fontes()
+
+    def ve_salvar_png(self, dados):
+        return ve_salvar_png(dados)
 
     def video_cutter_audio_fonte(self):
         return video_cutter_audio_fonte()

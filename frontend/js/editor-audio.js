@@ -143,10 +143,11 @@ function veAudioBloco(F, k) {
 function veAudioPrever(t) {
     const esperas = [];
     const a = t, b = t + VE_AU_PREVER * VEAU.taxa;
-    (VEAU.clipes.length ? VEAU.clipes : veAudioClipes()).forEach(([st, s0, e0, , id]) => {
-        const F = VEAU.fontes.get(id), fimC = st + (e0 - s0);
+    (VEAU.clipes.length ? VEAU.clipes : veAudioClipes()).forEach(([st, s0, e0, , id, v]) => {
+        const F = VEAU.fontes.get(id), fimC = st + (e0 - s0) / v;
         if (!F || fimC <= a || st >= b) return;
-        const i0 = s0 + Math.max(0, a - st), i1 = s0 + Math.min(fimC, b) - st;
+        // (com folga de um grão: a mudança de velocidade lê um pouco além do ponto)
+        const i0 = Math.max(0, s0 + Math.max(0, a - st) * v - 0.05), i1 = s0 + (Math.min(fimC, b) - st) * v + 0.05;
         for (let k = Math.floor(i0 * VE_AU_SR / VE_AU_BLOCO); k <= Math.floor(i1 * VE_AU_SR / VE_AU_BLOCO); k++) {
             if (!F.blocos.has(k)) { veAudioBloco(F, k); if (F.pedidos.has(k)) esperas.push(F.pedidos.get(k)); }
         }
@@ -154,29 +155,66 @@ function veAudioPrever(t) {
     return esperas;
 }
 
-// Clipes com som, prontos para o mixer: [início, entrada, saída, ganho linear, id da fonte]
+// Clipes com som, prontos para o mixer: [início, entrada, saída, ganho linear, id da fonte, velocidade, manter tom]
 function veAudioClipes() {
-    return veMixClipes().map(([st, s0, e0, g, id]) => [st, s0, e0, Math.pow(10, g / 20), id]);
+    return veMixClipes().map(([st, s0, e0, g, id, v, tom]) => [st, s0, e0, Math.pow(10, g / 20), id, v || 1, tom !== 0]);
 }
+
+// Amostra (esquerda, direita) da fonte F no quadro fracionário f, ou null se o bloco ainda não chegou
+function veAudioAmostra(F, f) {
+    const q = Math.floor(f), fr = f - q;
+    const k = Math.floor(q / VE_AU_BLOCO), b = F.blocos.get(k);
+    if (!b || q < 0) return null;
+    const j = (q - k * VE_AU_BLOCO) * 2;
+    let l = b[j], r = b[j + 1];
+    if (fr > 0 && j + 3 < b.length) { l += (b[j + 2] - l) * fr; r += (b[j + 3] - r) * fr; }
+    return [l, r];
+}
+
+// Velocidade mantendo o tom na prévia: grãos de 40 ms tocados na velocidade normal, cada um começando no ponto
+// da fonte que corresponde ao seu instante, somados com janela Hann (50% de sobreposição soma 1). Não guarda
+// estado: a amostra de qualquer instante sai só da conta — como o mixer, que refaz trechos ao editar.
+// A exportação usa o atempo do ffmpeg (mesma ideia, com busca de encaixe da onda).
+const VE_AU_GRAO = 960;   // meio grão (20 ms): distância entre grãos na saída
+const VE_AU_HANN = (() => {
+    const w = new Float32Array(VE_AU_GRAO * 2);
+    for (let i = 0; i < w.length; i++) w[i] = 0.5 - 0.5 * Math.cos(Math.PI * i / VE_AU_GRAO);
+    return w;
+})();
 
 // ── mixagem ──
 // Mixa n quadros de saída a partir do instante t da timeline (avançando `taxa` s da timeline por s de som)
 function veAudioMixar(t, n) {
     const L = new Float32Array(n), R = new Float32Array(n), passo = VEAU.taxa / VE_AU_SR;
-    for (const [st, s0, e0, g, id] of VEAU.clipes) {
-        const F = VEAU.fontes.get(id), fimC = st + (e0 - s0), tFim = t + n * passo;
+    for (const [st, s0, e0, g, id, v, tom] of VEAU.clipes) {
+        const F = VEAU.fontes.get(id), fimC = st + (e0 - s0) / v, tFim = t + n * passo;
         if (!F || fimC <= t || st >= tFim) continue;
         const i0 = Math.max(0, Math.ceil((st - t) / passo)), i1 = Math.min(n, Math.ceil((fimC - t) / passo));
+        const k = g / 32768, a0 = s0 * VE_AU_SR;
+        if (v === 1 || !tom) {
+            // normal, ou velocidade que muda o tom junto (como fita mais rápida)
+            for (let i = i0; i < i1; i++) {
+                const x = veAudioAmostra(F, a0 + (t + i * passo - st) * v * VE_AU_SR);
+                if (!x) continue;                                   // bloco ainda não lido: silêncio (raro, há previsão)
+                L[i] += x[0] * k;
+                R[i] += x[1] * k;
+            }
+            continue;
+        }
         for (let i = i0; i < i1; i++) {
-            const f = (s0 + (t + i * passo - st)) * VE_AU_SR;   // quadro da fonte (fracionário)
-            const q = Math.floor(f), fr = f - q;
-            const k = Math.floor(q / VE_AU_BLOCO), b = F.blocos.get(k);
-            if (!b) continue;                                   // bloco ainda não lido: silêncio (raro, há previsão)
-            const j = (q - k * VE_AU_BLOCO) * 2;
-            let l = b[j], r = b[j + 1];
-            if (fr > 0 && j + 3 < b.length) { l += (b[j + 2] - l) * fr; r += (b[j + 3] - r) * fr; }
-            L[i] += l * g / 32768;
-            R[i] += r * g / 32768;
+            const u = (t + i * passo - st) * VE_AU_SR;           // quadros desde o início do clipe (na saída)
+            const g1 = Math.floor(u / VE_AU_GRAO);
+            let l = 0, r = 0;
+            for (let gi = g1 - 1; gi <= g1; gi++) {
+                if (gi < 0) continue;                            // no começo do clipe: entra suave (meio grão)
+                const ug = gi * VE_AU_GRAO, o = u - ug;
+                const x = veAudioAmostra(F, a0 + ug * v + o);
+                if (!x) continue;
+                const w = VE_AU_HANN[Math.min(VE_AU_HANN.length - 1, Math.floor(o))];
+                l += x[0] * w; r += x[1] * w;
+            }
+            L[i] += l * k;
+            R[i] += r * k;
         }
     }
     return { l: L, r: R };

@@ -998,3 +998,65 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-leg-cab button:hover { background: var(--ve-panel-2); color: var(--ve-text); }
 .ve-leg textarea { resize: vertical; line-height: 1.4; }
 .ve-head-l b { color: #facc15; }
+
+/* ── painel Propriedades (como no Premiere 25): controles do que está selecionado ── */
+.ve-pp { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; height: 100%; }
+.ve-pp-cab { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-bottom: 1px solid var(--ve-line); }
+.ve-pp-cab b { font-size: 12.5px; }
+.ve-pp-cab span { font-size: 11px; color: var(--ve-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-pp-sec { border-bottom: 1px solid var(--ve-line); }
+.ve-pp-sec > summary {
+    list-style: none; cursor: pointer; padding: 9px 12px; font: 600 11.5px var(--ve-ui); color: var(--ve-text);
+    display: flex; align-items: center; gap: 6px; user-select: none;
+}
+.ve-pp-sec > summary::-webkit-details-marker { display: none; }
+.ve-pp-sec > summary::before { content: '▸'; color: var(--ve-faint); font-size: 10px; transition: transform .15s; }
+.ve-pp-sec[open] > summary::before { transform: rotate(90deg); }
+.ve-pp-sec > summary:hover { background: var(--ve-panel-2); }
+.ve-pp-corpo { display: flex; flex-direction: column; gap: 8px; padding: 2px 12px 12px; }
+.ve-pp-l { display: grid; grid-template-columns: 78px minmax(0, 1fr) 70px; align-items: center; gap: 8px; }
+.ve-pp-l > label { font-size: 11px; color: var(--ve-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ve-pp-l input[type=range] { width: 100%; accent-color: var(--ve-accent); }
+.ve-pp-l > select { grid-column: 2 / -1; }
+.ve-pp select, .ve-pp-texto {
+    min-width: 0; padding: 5px 7px; border-radius: 6px; border: 1px solid var(--ve-line-2); background: var(--ve-bg);
+    color: var(--ve-text); font: 12px var(--ve-ui); outline: none;
+}
+.ve-pp select:focus, .ve-pp-texto:focus { border-color: var(--ve-accent); }
+.ve-pp-texto { resize: vertical; line-height: 1.4; min-height: 44px; }
+.ve-pp-botoes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.ve-pp-sep { width: 1px; height: 18px; background: var(--ve-line-2); margin: 0 4px; }
+.ve-pp-tog {
+    min-width: 30px; height: 26px; padding: 0 7px; border-radius: 6px; border: 1px solid var(--ve-line-2);
+    background: var(--ve-bg); color: var(--ve-dim); font: 12px var(--ve-ui); cursor: pointer;
+}
+.ve-pp-tog:hover { color: var(--ve-text); background: var(--ve-panel-2); }
+.ve-pp-tog.on { background: var(--ve-accent); border-color: var(--ve-accent); color: #1a0d02; }
+.ve-pp-cores { display: flex; gap: 10px; }
+.ve-pp-cor { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--ve-dim); }
+.ve-pp input[type=color] { width: 34px; height: 24px; padding: 0; border: 1px solid var(--ve-line-2); border-radius: 5px; background: var(--ve-bg); cursor: pointer; }
+.ve-pp-grupo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 4px; }
+.ve-pp-grupo > .ve-pp-chk { flex: 1; }
+.ve-pp-sub { flex-basis: 100%; display: flex; flex-direction: column; gap: 8px; padding-left: 10px; border-left: 2px solid var(--ve-line-2); }
+.ve-pp-sub[hidden] { display: none; }
+.ve-pp-chk { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ve-dim); cursor: pointer; }
+.ve-pp-chk input { accent-color: var(--ve-accent); }
+.ve-pp-dica { display: block; padding: 0 12px; font-size: 10.5px; color: var(--ve-faint); line-height: 1.45; }
+.ve-pp-corpo .ve-pp-dica { padding: 0; }
+.ve-pp > .ve-pp-dica { padding: 10px 12px 0; }
+.ve-pp-links { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px 14px; }
+.ve-pp-seq { padding: 0 14px; font: 600 11px var(--ve-mono); color: var(--ve-faint); }
+.ve-tx-nota { margin: 0; font-size: 11px; color: var(--ve-dim); line-height: 1.5; }
+
+/* ferramenta Texto: caixa transparente sobre o texto do monitor (o desenho de verdade fica por baixo) */
+.ve-screen.tool-texto, .ve-screen.tool-texto canvas { cursor: text; }
+.ve-tx-edit {
+    position: absolute; z-index: 6; margin: 0; border: 1px dashed rgba(249,115,22,.9); border-radius: 2px;
+    background: transparent; color: transparent; caret-color: #F97316; resize: none; overflow: hidden;
+    white-space: pre; outline: none; box-sizing: border-box; padding-bottom: 0; transform-origin: 50% 50%;
+}
+.ve-tx-edit::selection { background: rgba(249,115,22,.35); color: transparent; }
+
+/* ferramenta Velocidade (R) */
+.ve-tl-wrap.tool-rate { cursor: default; }
+.ve-tl-wrap.tool-rate.trim-hover, .ve-tl-wrap.tool-rate.trimming { cursor: col-resize; }

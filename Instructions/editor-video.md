@@ -194,3 +194,25 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
 - **Gravar no vídeo**: arquivo .ass + filtro `subtitles` depois das camadas e antes da redução de resolução. As mesmas contas da prévia
   (Arial, Fontsize = em × 1,117, caixa = BorderStyle 3, margem 6% da altura).
 - O projeto salva a transcrição, as legendas e o estilo.
+- A fonte das legendas (Propriedades) vale para a prévia e para o .ass. A prévia mede a fonte (ascendente + descendente)
+  e manda `razao` para o Fontsize ficar igual no libass.
+
+## Painel Propriedades (como no Premiere 25) · ferramentas Texto (T) e Velocidade (R)
+- Código: `frontend/js/editor-props.js`. Os **Controles de efeito** continuam com os quadros-chave e todos os efeitos;
+  **Propriedades** mostra só o essencial do que está selecionado e muda sozinho com a seleção:
+  - texto: conteúdo, fonte, N/I, alinhamento, tamanho, espaçamento, entrelinha, preenchimento, contorno, fundo, sombra;
+  - vídeo e imagem: alinhar/ajustar/preencher o quadro, posição, escala, rotação, opacidade;
+  - velocidade/duração e volume;
+  - legenda: o texto dela e o estilo de todas.
+  As fontes vêm do Windows (`ve_fontes`, via GDI).
+- **Velocidade** (`c.v`, 10–1000%):
+  - [s, e] continua sendo o trecho da fonte, e na timeline o clipe dura (e − s)/v. Use `veSrcAt`/`veTlAt`.
+  - Os quadros-chave ficam em tempo da fonte.
+  - Prévia: o player toca com `playbackRate = L × v`. O mixer mantém o tom com grãos de 40 ms (Hann, sem estado);
+    com `c.tom === false`, o tom muda junto.
+  - Exportação: o clipe vira camada com `setpts=(PTS-STARTPTS)/v`, e o som usa `atempo` (ou `asetrate` sem manter o tom).
+  - R arrasta a borda (Rate Stretch). O painel tem "Empurrar os clipes seguintes" (ripple).
+- **Texto** (media kind `texto`, estilo em `c.tx`): é um clipe de imagem desenhado em canvas.
+  - T + clique no monitor cria o texto na trilha livre acima (V2+), começando no ponto do clique.
+  - A digitação acontece numa textarea transparente por cima do desenho; duplo clique edita.
+  - Na exportação, cada texto vira PNG (`ve_salvar_png`) na maior escala dele, então sai idêntico à prévia com qualquer fonte.

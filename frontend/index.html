@@ -58,6 +58,8 @@
         <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
         <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></symbol>
         <symbol id="i-sliders" viewBox="0 0 24 24"><line x1="21" y1="4" x2="14" y2="4"/><line x1="10" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="12" y2="12"/><line x1="8" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="16" y1="18" x2="16" y2="22"/></symbol>
+        <symbol id="i-type" viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></symbol>
+        <symbol id="i-rate" viewBox="0 0 24 24"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4M10 5v14M14 5v14"/></symbol>
         <symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.4l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/></symbol>
         <symbol id="i-pointer" viewBox="0 0 24 24"><path d="m4 4 7 17 2.5-7.5L21 11z"/></symbol>
     </svg>
@@ -487,6 +489,9 @@
                                         <div class="ve-clips-empty">Abra um vídeo e use <b>'</b> (ou a lâmina <b>C</b>) para cortar. Selecione um clipe e aperte <b>D</b> para apagá-lo.</div>
                                     </div>
                                 </div>
+                                <div class="ve-panel ve-tabpane" id="ve-pane-pp" data-panel="pp" data-title="Propriedades">
+                                    <div class="ve-pp" id="ve-pp"></div>
+                                </div>
                                 <div class="ve-panel ve-tabpane" id="ve-pane-props" data-panel="props" data-title="Controles de efeito">
                                     <div class="ve-clips-empty" id="ve-props-empty">Selecione um clipe ou imagem na timeline para ajustar escala, posição, rotação e opacidade.<br><br>Dica: com o clipe selecionado, arraste a imagem direto no monitor para mover. Clique no ⏱ de uma propriedade para animá-la com quadros-chave.</div>
                                     <div class="ve-props" id="ve-props" hidden>
@@ -565,6 +570,8 @@
                                         <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> Desfazer · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> Refazer</div>
                                         <h4>Ferramentas e visão</h4>
                                         <div><kbd>V</kbd> Seleção · <kbd>C</kbd> Lâmina · <kbd>H</kbd> Mão</div>
+                                        <div><kbd>R</kbd> Velocidade: arraste a borda do clipe (mais curto = mais rápido)</div>
+                                        <div><kbd>T</kbd> Texto: clique no monitor e digite · duplo clique num texto edita · <kbd>Esc</kbd> termina</div>
                                         <div><kbd>+</kbd> <kbd>-</kbd> Zoom · <kbd>\</kbd> Ajustar à tela</div>
                                         <div><kbd>Alt</kbd> ou <kbd>Ctrl</kbd>+Roda: zoom até o quadro · Roda: rolar · <kbd>Shift</kbd>+Roda: trilhas</div>
                                         <div>Arraste a borda de V1/A1 para mudar a altura da trilha</div>
@@ -591,6 +598,8 @@
                                 <div class="ve-seg" role="group" aria-label="Ferramentas">
                                     <button class="ve-seg-btn active" id="ve-tool-select" onclick="veSetTool('select')" title="Seleção (V)"><svg class="i"><use href="#i-pointer"/></svg></button>
                                     <button class="ve-seg-btn" id="ve-tool-razor" onclick="veSetTool('razor')" title="Lâmina (C): clique para dividir"><svg class="i"><use href="#i-scissors"/></svg></button>
+                                    <button class="ve-seg-btn" id="ve-tool-rate" onclick="veSetTool('rate')" title="Velocidade (R): arraste a borda de um clipe para acelerar ou desacelerar"><svg class="i"><use href="#i-rate"/></svg></button>
+                                    <button class="ve-seg-btn" id="ve-tool-texto" onclick="veSetTool('texto')" title="Texto (T): clique no monitor para escrever"><svg class="i"><use href="#i-type"/></svg></button>
                                     <button class="ve-seg-btn" id="ve-tool-hand" onclick="veSetTool('hand')" title="Mão (H): arraste para navegar"><svg class="i"><use href="#i-hand"/></svg></button>
                                 </div>
                                 <div class="ve-divider"></div>
@@ -1385,6 +1394,7 @@
     <script src="js/editor-lc.js"></script>
     <script src="js/editor-audio.js"></script>
     <script src="js/editor-texto.js"></script>
+    <script src="js/editor-props.js"></script>
     <script src="js/editor-dock.js"></script>
 </body>
 </html>

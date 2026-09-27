@@ -681,14 +681,17 @@ def _opacidade_animada(pts, dur, fps, nome, inicio=0.0):
 # conformado): soma com o ganho em dB, posições em amostras de 48 kHz.
 
 def _normalizar_mix(clipes, dur_fonte):
-    """[[st, s, e, ganho_db, arquivo?], ...] da timeline → tuplas (st, s, e, ganho, arquivo). arquivo None = o
-    vídeo aberto (limitado à duração dele); senão um áudio extra solto na timeline."""
+    """[[st, s, e, ganho_db, arquivo?, velocidade?, manter_tom?], ...] da timeline → tuplas
+    (st, s, e, ganho, arquivo, velocidade, manter_tom). arquivo None = o vídeo aberto (limitado à duração dele);
+    senão um áudio extra solto na timeline. Na timeline o clipe dura (e - s) / velocidade."""
     out = []
     for c in clipes or []:
         try:
             st, s0, e0 = float(c[0]), float(c[1]), float(c[2])
             g = float(c[3]) if len(c) > 3 and c[3] else 0.0
             arq = c[4] if len(c) > 4 and c[4] else None
+            vel = max(0.05, min(20.0, float(c[5]))) if len(c) > 5 and c[5] else 1.0
+            tom = not (len(c) > 6 and c[6] in (0, False))
         except Exception:
             continue
         if arq is not None and not os.path.isfile(str(arq)):
@@ -697,8 +700,28 @@ def _normalizar_mix(clipes, dur_fonte):
         if arq is None and dur_fonte:
             e0 = min(float(dur_fonte), e0)
         if st >= 0 and e0 - s0 > 0.005:
-            out.append((st, s0, e0, max(-60.0, min(30.0, g)), arq))
+            out.append((st, s0, e0, max(-60.0, min(30.0, g)), arq, vel, tom))
     return out
+
+
+def _fim_mix(c):
+    """Fim do clipe de som na timeline."""
+    return c[0] + (c[2] - c[1]) / c[5]
+
+
+def _filtro_velocidade(vel, tom):
+    """Velocidade do som: atempo (mantém o tom; cada estágio aceita 0,5 a 100) ou, sem manter o tom,
+    reamostragem (como fita mais rápida)."""
+    if abs(vel - 1) < 1e-4:
+        return ""
+    if not tom:
+        return f",asetrate={48000 * vel:.3f},aresample=48000"
+    partes, v = [], vel
+    while v < 0.5:
+        partes.append("atempo=0.5")
+        v /= 0.5
+    partes.append(f"atempo={v:.6f}")
+    return "," + ",".join(partes)
 
 
 def _grafo_mix(clipes, total, entradas, rotulo):
@@ -717,9 +740,10 @@ def _grafo_mix(clipes, total, entradas, rotulo):
             nomes[k] = f"{rotulo}s{k}"
         f.append(f"{ent}aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,asplit={len(ks)}"
                  + "".join(f"[{nomes[k]}]" for k in ks))
-    for k, (st, s0, e0, g, _) in enumerate(clipes):
+    for k, (st, s0, e0, g, _, vel, tom) in enumerate(clipes):
         vol = f",volume={g:.2f}dB" if g else ""
-        f.append(f"[{nomes[k]}]atrim=start={s0:.5f}:end={e0:.5f},asetpts=PTS-STARTPTS{vol},"
+        f.append(f"[{nomes[k]}]atrim=start={s0:.5f}:end={e0:.5f},asetpts=PTS-STARTPTS"
+                 f"{_filtro_velocidade(vel, tom)}{vol},"
                  f"adelay={int(round(st * 48000))}S:all=1[{rotulo}m{k}]")
     n = len(clipes)
     f.append("".join(f"[{rotulo}m{k}]" for k in range(n))
@@ -793,8 +817,9 @@ def audio_conformado(espera=600):
 
 
 # ─────────────────────────── legendas gravadas no vídeo ───────────────────────────
-# O editor desenha a legenda na prévia com as mesmas contas (editor-texto.js: veTxDesenhar). Arial; o
-# "Fontsize" do ASS é a altura da linha (ascent+descent = 1,117 em no Arial), por isso tam_em * 1,117.
+# O editor desenha a legenda na prévia com as mesmas contas (editor-texto.js: veTxDesenhar). O "Fontsize" do
+# ASS é a altura da linha (ascendente + descendente da fonte; 1,117 em no Arial): a prévia mede a fonte
+# escolhida e manda a proporção em estilo["razao"].
 
 def _ass_tempo(t):
     t = max(0.0, float(t))
@@ -815,6 +840,8 @@ def _ass_cor(hexcor, alfa=0):
 
 def _gerar_ass(itens, estilo, W, H):
     em = max(8.0, float(estilo.get("tam", 5.5)) / 100.0 * H)
+    razao = _num(estilo.get("razao"), 0.6, 2.5, 1.117)
+    fonte = "".join(ch for ch in str(estilo.get("fonte") or "Arial") if ch not in ",{}\\\n\r").strip() or "Arial"
     fundo = estilo.get("fundo", "caixa")
     pos = estilo.get("pos", "baixo")
     alinhamento = {"baixo": 2, "meio": 5, "cima": 8}.get(pos, 2)
@@ -835,7 +862,7 @@ def _gerar_ass(itens, estilo, W, H):
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
         "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, "
         "MarginR, MarginV, Encoding",
-        f"Style: Leg,Arial,{em * 1.117:.1f},{cor},{cor},{fundo_cor if borda == 3 else _ass_cor('#000000')},{fundo_cor},"
+        f"Style: Leg,{fonte},{em * razao:.1f},{cor},{cor},{fundo_cor if borda == 3 else _ass_cor('#000000')},{fundo_cor},"
         f"{negrito},0,0,0,100,100,0,0,{borda},{contorno},{sombra},{alinhamento},{margem},{margem},{margem},1",
         "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ]
@@ -957,12 +984,13 @@ def _normalizar_camadas(camadas, path_video):
             tipo = c.get("tipo")
             st = max(0.0, float(c["st"]))
             s, e = float(c.get("s", 0)), float(c.get("e", 0))
+            vel = max(0.05, min(20.0, float(c.get("v") or 1)))
             if e - s < 0.04:
                 continue
             item = {
                 "tipo": tipo if tipo in ("imagem", "ajuste") else "video",
                 "path": c.get("path") if tipo == "imagem" else None if tipo == "ajuste" else path_video,
-                "st": st, "s": max(0.0, s), "dur": e - s,
+                "st": st, "s": max(0.0, s), "dur": (e - s) / vel, "fonte": e - s, "v": vel,
                 "sc": max(0.5, min(2000.0, float(c.get("sc", 100)))) / 100.0,
                 "x": float(c.get("x", 0)), "y": float(c.get("y", 0)),
                 "rot": float(c.get("rot", 0)) % 360,
@@ -1043,9 +1071,10 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         return {"success": False, "error": "Nada para exportar: todos os trechos foram removidos."}
 
     # duração final: a maior entre base, áudio, camadas e a informada pela timeline
-    total = max([sum(_dur_peca(p) for p in pecas), sum(_dur_peca(p) for p in pecas_a)]
+    # (com o mix, os trechos de áudio antigos não valem: medem a fonte, não a timeline, se houver velocidade)
+    total = max([sum(_dur_peca(p) for p in pecas)] + ([] if mix is not None else [sum(_dur_peca(p) for p in pecas_a)])
                 + [c["st"] + c["dur"] for c in lay] + [float(duracao or 0)]
-                + [c[0] + c[2] - c[1] for c in (mix or [])])
+                + [_fim_mix(c) for c in (mix or [])])
     if total < 0.04:
         return {"success": False, "error": "Nada para exportar."}
 
@@ -1155,7 +1184,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         if c["tipo"] == "imagem":
             cmd += ["-loop", "1", "-framerate", fps, "-t", f"{c['dur']:.3f}", "-i", c["path"]]
         else:
-            cmd += ["-ss", f"{c['s']:.3f}", "-t", f"{c['dur']:.3f}", "-i", path]
+            cmd += ["-ss", f"{c['s']:.3f}", "-t", f"{c['fonte']:.3f}", "-i", path]
         idx = entrada
         entrada += 1
         kf = c["kf"]
@@ -1186,7 +1215,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         # escala animada vai por último (tamanho muda a cada quadro; o resto trabalha em tamanho fixo)
         ordem = [giro, opac, escala] if "sc" in kf else [escala, giro, opac]
         efeitos = _filtros_fx(c["fx"], c["mw"], c["mh"], f"l{n}")
-        cadeia = f"[{idx}:v:0]fps={fps},format=rgba," + ",".join(efeitos + [f for f in ordem if f])
+        # velocidade do clipe (como no Premiere): o tempo da fonte é comprimido/esticado antes de tudo
+        vel = f"setpts=(PTS-STARTPTS)/{c['v']:.6f}," if abs(c["v"] - 1) > 1e-4 else ""
+        cadeia = f"[{idx}:v:0]{vel}fps={fps},format=rgba," + ",".join(efeitos + [f for f in ordem if f])
         cadeia += f",setpts=PTS-STARTPTS+{c['st']:.3f}/TB[l{n}]"
         filtros.append(cadeia)
         fim = c["st"] + c["dur"]
