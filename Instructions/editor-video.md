@@ -19,8 +19,14 @@ aleatório e servido com suporte a Range (seek). Só escuta em 127.0.0.1. O Cort
 
 ## Prévia
 - Toca o original se o WebView suportar (MP4/MOV/WEBM com H.264 8-bit, VP8/9, AV1 e áudio AAC/MP3/Opus).
-- Senão (HEVC do iPhone, MKV, AVI, H.264 10-bit, PCM...) gera um **proxy** 720p H.264 `ultrafast` com keyframe
-  a cada ~0,5s (scrub preciso). Aparece o selo "PRÉVIA LEVE". A exportação sempre usa o original.
+- Senão (HEVC do iPhone/Samsung, MKV, AVI, H.264 10-bit, PCM...) gera um **proxy** H.264 com o lado CURTO até 1080 px
+  (4K em pé → 1080x1920) e keyframe a cada ~0,5s (scrub preciso). As miniaturas saem na MESMA passada do ffmpeg
+  (decodificar o 4K várias vezes em paralelo era o que mais atrasava). Com placa NVIDIA tudo roda na GPU
+  (cuda + scale_cuda + nvenc: 4K60 HEVC de 20 s em ~3,6 s); senão, pelo processador. Selo "PRÉVIA LEVE".
+  A exportação sempre usa o original.
+- Cortes sem piscar: perto do fim de um trecho, um player de reserva (`VEPRE`) já para no primeiro quadro do
+  seguinte; enquanto o player principal busca, o monitor mostra esse quadro. Sem quadro nenhum, o monitor mantém
+  o último quadro (até 600 ms) em vez de desenhar preto.
 - Arquivos temporários em `%TEMP%\canivete_editor` (limpos ao abrir outro vídeo).
 
 ### Desempenho da prévia

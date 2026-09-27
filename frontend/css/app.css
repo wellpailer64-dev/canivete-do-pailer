@@ -255,23 +255,36 @@ button { cursor: pointer; }
 }
 .sidebar-foot .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); flex-shrink: 0; }
 
-/* Sidebar compacta (só ícones) */
-body.nav-mini .sidebar { width: 64px; }
-body.nav-mini .brand { padding: 18px 0 14px; flex-direction: column; gap: 12px; }
-body.nav-mini .brand-home { flex: 0; }
-body.nav-mini .brand-text,
-body.nav-mini .menu-item .label,
-body.nav-mini .menu-search,
-body.nav-mini .sidebar-foot span:not(.dot) { display: none; }
-body.nav-mini .menu-group { font-size: 0; padding: 10px 0 6px; }
-body.nav-mini .menu-group::after { content: ""; display: block; height: 1px; margin: 0 12px; background: var(--line); }
-body.nav-mini .menu-item { justify-content: center; padding: 9px 0; }
-body.nav-mini .menu-item.rodando::after { position: absolute; top: 6px; right: 8px; }
-body.nav-mini .sidebar-foot { justify-content: center; }
-body.nav-mini .nav-toggle { transform: scaleX(-1); }
+/* Sidebar compacta (só ícones): fixa pelo botão (nav-mini) ou automática numa ferramenta (nav-auto) */
+body.nav-mini .sidebar, body.nav-auto:not(.nav-peek) .sidebar { width: 64px; }
+body.nav-mini .brand, body.nav-auto:not(.nav-peek) .brand { padding: 18px 0 14px; flex-direction: column; gap: 12px; }
+body.nav-mini .brand-home, body.nav-auto:not(.nav-peek) .brand-home { flex: 0; }
+body.nav-mini .brand-text, body.nav-auto:not(.nav-peek) .brand-text,
+body.nav-mini .menu-item .label, body.nav-auto:not(.nav-peek) .menu-item .label,
+body.nav-mini .menu-search, body.nav-auto:not(.nav-peek) .menu-search,
+body.nav-mini .sidebar-foot span:not(.dot), body.nav-auto:not(.nav-peek) .sidebar-foot span:not(.dot) { display: none; }
+body.nav-mini .menu-group, body.nav-auto:not(.nav-peek) .menu-group { font-size: 0; padding: 10px 0 6px; }
+body.nav-mini .menu-group::after, body.nav-auto:not(.nav-peek) .menu-group::after { content: ""; display: block; height: 1px; margin: 0 12px; background: var(--line); }
+body.nav-mini .menu-item, body.nav-auto:not(.nav-peek) .menu-item { justify-content: center; padding: 9px 0; }
+body.nav-mini .menu-item.rodando::after, body.nav-auto:not(.nav-peek) .menu-item.rodando::after { position: absolute; top: 6px; right: 8px; }
+body.nav-mini .sidebar-foot, body.nav-auto:not(.nav-peek) .sidebar-foot { justify-content: center; }
+body.nav-mini .nav-toggle, body.nav-auto:not(.nav-peek) .nav-toggle { transform: scaleX(-1); }
+
+/* Automática: passar o mouse abre o menu POR CIMA do conteúdo (a tela não se reorganiza a cada passada).
+   A margem negativa mantém só 64 px no fluxo enquanto a barra tem 228 px. */
+body.nav-auto .sidebar { width: 64px; position: relative; z-index: 60; transition: width .2s var(--ease), margin-right .2s var(--ease), box-shadow .2s; }
+body.nav-auto.nav-peek .sidebar { width: 228px; margin-right: -164px; box-shadow: 8px 0 24px rgba(0, 0, 0, .45); }
 
 /* ---------- Área principal ---------- */
-.main-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-0); }
+.main-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-0); position: relative; }
+/* Fundo animado do Início (frontend/video/home-bg.webm). O desfoque já está gravado no vídeo: um blur()
+   em CSS custaria à placa de vídeo desfocar a tela inteira a cada quadro. Só aparece e toca no Início. */
+.home-bg {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    opacity: 0; pointer-events: none; transition: opacity .8s var(--ease);
+}
+.main-content:has(#page-home.active) .home-bg.pronto { opacity: .35; }
+.main-content > .tabbar, .main-content > .content-area { position: relative; }
 .content-area { flex: 1; overflow-y: auto; padding: 36px 44px 0; }
 .tool-page { display: none; animation: page-in .28s var(--ease); }
 .tool-page:not(.ve-page) { max-width: 780px; margin: 0 auto; padding-bottom: 40px; }
@@ -796,40 +809,42 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .recent-btn:hover { border-color: var(--line-3); background: var(--bg-3); }
 .recent-btn:hover .i { color: var(--primary); }
 
-.home-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 28px; margin-top: 4px; }
-.home-cat h4 { font-size: 12px; font-weight: 600; color: var(--text-2); margin: 8px 10px 4px; }
+.home-tools { display: flex; flex-direction: column; gap: 26px; margin-top: 6px; }
+.home-cat h4 { font-size: 12px; font-weight: 600; color: var(--text-2); letter-spacing: .02em; margin: 0 0 12px; }
+.home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 26px 20px; }
+
+/* Card da ferramenta: imagem em paisagem com cantos suaves, nome e descrição embaixo */
 .home-card {
-    display: grid;
-    grid-template-columns: 32px 1fr;
-    grid-template-rows: auto auto;
-    column-gap: 12px;
-    align-items: center;
-    width: 100%;
-    padding: 9px 10px;
-    text-align: left;
-    border: 1px solid transparent;
-    border-radius: var(--r-md);
-    background: transparent;
-    color: var(--text);
-    transition: background .12s, border-color .12s;
+    display: flex; flex-direction: column; align-items: stretch; gap: 0;
+    width: 100%; padding: 0; text-align: left; border: 0; background: transparent; color: var(--text);
 }
-.home-card > .hc-ico {
-    grid-row: 1 / 3;
-    width: 32px;
-    height: 32px;
-    display: grid;
-    place-items: center;
-    border-radius: 9px;
-    background: var(--bg-2);
-    border: 1px solid var(--line);
-    color: var(--text-2);
-    font-size: 16px;
-    transition: color .12s, border-color .12s;
+.hc-media {
+    position: relative; display: block; aspect-ratio: 3 / 2; margin-bottom: 11px;
+    border-radius: 14px; overflow: hidden; background: var(--bg-2);
+    box-shadow: 0 0 0 1px var(--line), 0 6px 18px rgba(0, 0, 0, .28);
+    transition: box-shadow .25s var(--ease), transform .25s var(--ease);
 }
-.home-card b { font-size: 13.5px; font-weight: 600; }
-.home-card small { font-size: 12px; color: var(--text-3); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.home-card:hover { background: var(--bg-2); border-color: var(--line); }
-.home-card:hover > .hc-ico { color: var(--primary); border-color: var(--primary-line); }
+.hc-media img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .5s var(--ease), filter .3s; filter: saturate(.92); }
+/* leve véu embaixo: o ícone fica legível sobre qualquer foto */
+.hc-media::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0, 0, 0, .45)); pointer-events: none; }
+.hc-media > .hc-ico {
+    position: absolute; left: 10px; bottom: 10px; z-index: 1;
+    width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px;
+    background: rgba(12, 12, 14, .55); backdrop-filter: blur(6px); border: 1px solid rgba(255, 255, 255, .12);
+    color: #f1f1f1; font-size: 14px; transition: color .2s, border-color .2s;
+}
+.home-card b { font-size: 14px; font-weight: 600; padding: 0 2px; }
+.home-card small {
+    font-size: 12.5px; color: var(--text-3); line-height: 1.45; margin-top: 4px; padding: 0 2px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.home-card:hover .hc-media { transform: translateY(-2px); box-shadow: 0 0 0 1px var(--primary-line), 0 12px 28px rgba(0, 0, 0, .4); }
+.home-card:hover .hc-media img { transform: scale(1.04); filter: saturate(1.05); }
+.home-card:hover .hc-ico { color: var(--primary); border-color: var(--primary-line); }
+.home-card:hover b { color: #fff; }
+.home-card:focus-visible { outline: none; }
+.home-card:focus-visible .hc-media { box-shadow: 0 0 0 2px var(--primary); }
+#page-home.tool-page { max-width: 1080px; }
 
 /* =========================================================
    Páginas específicas
@@ -1214,7 +1229,6 @@ button:disabled { opacity: .4; cursor: not-allowed; }
     .stats-grid4 > div:nth-child(3) { border-left: 0; padding-left: 0; }
 }
 @media (max-width: 900px) {
-    .home-cols { grid-template-columns: 1fr; }
     .home-top { flex-direction: column; align-items: flex-start; }
     .audio-track-row { grid-template-columns: 92px minmax(0, 1fr); }
     .audio-editing-shell { grid-template-columns: 40px minmax(0, 1fr); }

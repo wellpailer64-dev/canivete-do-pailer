@@ -196,12 +196,52 @@ function toggleNav(forcar) {
     _lsSet('navMini', mini ? '1' : '0');
     const t = document.querySelector('.nav-toggle');
     if (t) t.title = mini ? 'Expandir menu' : 'Recolher menu';
-    // o editor de vídeo recalcula a timeline quando a largura muda
+    navAutoAgendar();
+    navLarguraMudou();
+}
+
+// o editor de vídeo recalcula a timeline quando a largura muda
+function navLarguraMudou() {
     if (typeof veDraw === 'function') setTimeout(() => { try { veDraw(); } catch (e) {} }, 240);
+}
+
+// ── Menu automático: dentro de uma ferramenta (fora do Início) o menu recolhe para só ícones depois de
+// 4 s sem o mouse em cima; passar o mouse abre por cima do conteúdo (nav-peek), sem reorganizar a tela.
+// Com o menu recolhido pelo botão (nav-mini) fica como o usuário deixou.
+const NAV_AUTO_MS = 4000;
+let _navT = 0;
+function _navNaFerramenta() { return !_el('page-home')?.classList.contains('active'); }
+function _navEmUso() {
+    const sb = document.querySelector('.sidebar');
+    return !!sb && (sb.matches(':hover') || sb.contains(document.activeElement) && document.activeElement.matches('input'));
+}
+function navAutoAgendar() {
+    clearTimeout(_navT);
+    const b = document.body;
+    if (b.classList.contains('nav-mini') || !_navNaFerramenta()) {
+        if (b.classList.contains('nav-auto')) { b.classList.remove('nav-auto', 'nav-peek'); navLarguraMudou(); }
+        return;
+    }
+    const espera = b.classList.contains('nav-auto') ? 500 : NAV_AUTO_MS;   // já recolhido: fecha logo ao sair
+    _navT = setTimeout(() => {
+        if (_navEmUso() || b.classList.contains('nav-mini') || !_navNaFerramenta()) return;
+        const antes = b.classList.contains('nav-auto');
+        b.classList.add('nav-auto');
+        b.classList.remove('nav-peek');
+        if (!antes) navLarguraMudou();
+    }, espera);
+}
+function navAutoAbrir() {
+    clearTimeout(_navT);
+    if (document.body.classList.contains('nav-auto')) document.body.classList.add('nav-peek');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     if (_lsGet('navMini') === '1') toggleNav(true);
+    const sb = document.querySelector('.sidebar');
+    sb.addEventListener('mouseenter', navAutoAbrir);
+    sb.addEventListener('mouseleave', navAutoAgendar);
+    sb.addEventListener('focusout', () => setTimeout(navAutoAgendar, 0));
     // No modo compacto o nome aparece como dica
     document.querySelectorAll('.menu-item').forEach(b => { b.title = b.querySelector('.label')?.textContent || ''; });
     renderRecentes();
@@ -220,7 +260,26 @@ document.addEventListener('keydown', e => {
     if (_el('page-video-cutter')?.classList.contains('active')) return;
     e.preventDefault();
     if (document.body.classList.contains('nav-mini')) toggleNav(false);
+    navAutoAbrir();
     _el('menu-search')?.focus();
+});
+
+// ── Fundo animado do Início: só toca com o Início na tela e a janela visível (não gasta nada fora dele) ──
+function homeBgSync() {
+    const v = _el('home-bg');
+    if (!v) return;
+    const tocar = _el('page-home')?.classList.contains('active') && !document.hidden
+        && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (tocar) v.play().catch(() => {}); else v.pause();
+}
+document.addEventListener('visibilitychange', homeBgSync);
+document.addEventListener('DOMContentLoaded', () => {
+    const v = _el('home-bg');
+    if (!v) return;
+    v.addEventListener('playing', () => v.classList.add('pronto'), { once: true });   // entra suave, sem piscar preto
+    // sem animação (acessibilidade do Windows): fica o primeiro quadro parado
+    v.addEventListener('loadeddata', () => { if (matchMedia('(prefers-reduced-motion: reduce)').matches) v.classList.add('pronto'); }, { once: true });
+    homeBgSync();
 });
 
 // ── Recentes ──
@@ -529,6 +588,8 @@ function switchTool(toolId) {
 
     _registrarRecente(toolId);
     _abrirAba(toolId);
+    navAutoAgendar();
+    homeBgSync();
     if (toolId === 'home') renderRecentes();
 
     // Refresh states specific to tools

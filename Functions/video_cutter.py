@@ -309,16 +309,54 @@ def gerar_peaks(path, duration):
         return []
 
 
-def gerar_proxy(path, info, out, on_pct, stop_event=None):
+# Prévia leve: lado CURTO até 1080 px (vídeo em pé 2160x3840 → 1080x1920; deitado 4K → 1920x1080).
+# Antes limitava a ALTURA a 720: um 4K vertical virava 405x720 e a prévia ficava borrada.
+_PROXY_ESCALA = "'if(gte(iw,ih),-2,min(1080,iw))':'if(gte(iw,ih),min(1080,ih),-2)'"
+
+
+def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumbs_n=0):
+    """Gera a prévia leve e, na MESMA passada, as miniaturas da timeline (decodificar um 4K HEVC
+    várias vezes em paralelo era o que mais atrasava a abertura). Com placa NVIDIA tudo roda na GPU
+    (decodifica, reduz e codifica); se falhar, refaz pelo processador. Retorna (ok, err, thumbs)."""
     fps_gop = max(1, int(round(info["fps"] / 2)))  # keyframe a cada ~0,5s → scrub preciso
-    cmd = [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-i", path,
-           "-map", "0:v:0", "-map", "0:a:0?",
-           "-vf", "scale=-2:'min(720,ih)':flags=fast_bilinear,format=yuv420p",
-           "-c:v", "libx264", "-preset", "ultrafast", "-tune", "fastdecode", "-crf", "27",
-           "-g", str(fps_gop), "-c:a", "aac", "-b:a", "128k", "-ac", "2",
-           "-movflags", "+faststart", out]
-    rc, err = _run_progress(cmd, info["duration"], on_pct, stop_event)
-    return rc == 0 and os.path.exists(out), err
+    dur = max(0.1, info["duration"])
+    passo = dur / thumbs_n if thumbs_n else 0
+    th_saida = []
+    if thumbs_n and thumbs_dir:
+        # um quadro a cada `passo`, começando no meio do primeiro intervalo (mesmos tempos de gerar_thumbs)
+        th_saida = ["-map", "[t]", "-q:v", "6", "-fps_mode", "passthrough", os.path.join(thumbs_dir, "th_%04d.jpg")]
+    th_filtro = f";[b]fps=fps={1 / passo:.6f}:start_time={passo / 2:.4f},scale=-2:96[t]" if th_saida else ""
+    comum = ["-map", "0:a:0?", "-g", str(fps_gop), "-c:a", "aac", "-b:a", "128k", "-ac", "2",
+             "-movflags", "+faststart", out] + th_saida
+
+    def _cpu():
+        return [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-i", path,
+                "-filter_complex", f"[0:v:0]scale={_PROXY_ESCALA}:flags=fast_bilinear,format=yuv420p"
+                + (",split[p][b]" + th_filtro if th_saida else "[p]"),
+                "-map", "[p]", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "fastdecode", "-crf", "25"] + comum
+
+    def _cuda():
+        return [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1",
+                "-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-i", path,
+                "-filter_complex", f"[0:v:0]scale_cuda={_PROXY_ESCALA}:format=yuv420p,hwdownload,format=yuv420p"
+                + (",split[p][b]" + th_filtro if th_saida else "[p]"),
+                "-map", "[p]", "-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "24", "-b:v", "0",
+                "-bf", "0"] + comum
+
+    tentativas = ([_cuda] if _detectar_hw_encoder() == "h264_nvenc" else []) + [_cpu]
+    rc, err = 1, ""
+    for fazer in tentativas:
+        rc, err = _run_progress(fazer(), dur, on_pct, stop_event)
+        if rc == 0 or (stop_event is not None and stop_event.is_set()):
+            break
+    ok = rc == 0 and os.path.exists(out)
+    thumbs = []
+    if ok and th_saida:
+        for i in range(thumbs_n):
+            arq = os.path.join(thumbs_dir, f"th_{i + 1:04d}.jpg")
+            if os.path.exists(arq):
+                thumbs.append({"t": round(min(dur - 0.05, passo * i + passo / 2), 3), "url": media_server.register(arq)})
+    return ok, err, thumbs
 
 
 def _preparar_audio(path, info, work, emit, stop_event):
@@ -384,16 +422,19 @@ def preparar(path, emit, stop_event=None):
     emit({"stage": "info", "path": path, "file_name": os.path.basename(path),
           "needs_proxy": not direto, **info})
 
-    # Miniaturas e forma de onda em paralelo com o proxy
+    # Forma de onda em paralelo; miniaturas em paralelo (toca direto) ou junto com a prévia leve
+    count = int(min(180, max(24, info["duration"] / 2)))
+
     def _thumbs():
-        count = int(min(180, max(24, info["duration"] / 2)))
         emit({"stage": "thumbs", "thumbs": gerar_thumbs(path, info["duration"], work, count)})
 
     def _peaks():
         if info["has_audio"]:
             emit({"stage": "peaks", "peaks": gerar_peaks(path, info["duration"])})
 
-    threads = [threading.Thread(target=_thumbs, daemon=True), threading.Thread(target=_peaks, daemon=True)]
+    threads = [threading.Thread(target=_peaks, daemon=True)]
+    if direto:
+        threads.append(threading.Thread(target=_thumbs, daemon=True))
     for t in threads:
         t.start()
 
@@ -401,11 +442,13 @@ def preparar(path, emit, stop_event=None):
         emit({"stage": "video", "url": media_server.register(path), "proxy": False})
     else:
         proxy = os.path.join(work, "proxy.mp4")
-        ok, err = gerar_proxy(path, info, proxy, lambda p: emit({"stage": "proxy", "pct": p}), stop_event)
+        ok, err, thumbs = gerar_proxy(path, info, proxy, lambda p: emit({"stage": "proxy", "pct": p}), stop_event,
+                                      thumbs_dir=work, thumbs_n=count)
         if stop_event is not None and stop_event.is_set():
             return
         if ok:
             emit({"stage": "video", "url": media_server.register(proxy), "proxy": True})
+            emit({"stage": "thumbs", "thumbs": thumbs or gerar_thumbs(proxy, info["duration"], work, count)})
         else:
             emit({"stage": "error", "error": "Falha ao gerar pré-visualização: " + (err.splitlines()[-1] if err else "?")})
             return

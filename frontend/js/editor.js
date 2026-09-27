@@ -471,7 +471,8 @@ function vePlaybackLoop(now) {
         return;
     }
     if (veTopAt(VE.playhead) !== VE.cur) veSyncPlayer(false);
-    else if (veMonitorDue()) veDrawMonitor();
+    else if (veMonitorDue() || v.seeking) veDrawMonitor();
+    vePreloadNext();
     veFollowPlayhead(true);
     veUpdateReadouts();
     veDraw();
@@ -894,12 +895,55 @@ function veSyncExtra(x, srcT) {
     }
 }
 
+// ── cortes sem piscar: o trecho seguinte já espera num player de reserva ──
+// No corte o player principal busca outro ponto do vídeo e fica 100–300 ms sem quadro. Perto do fim do
+// trecho, um player mudo já para no primeiro quadro do seguinte; no corte o monitor mostra esse quadro
+// até o principal terminar a busca.
+const VEPRE = { x: null, i: -1, t: -1 };
+
+function vePrePlayer() {
+    if (!VEPRE.x) {
+        const x = document.createElement('video');
+        x.muted = true;
+        x.preload = 'auto';
+        x.crossOrigin = 'anonymous';
+        VEPRE.x = x;
+    }
+    const base = veVideo().src, x = VEPRE.x;
+    if (x._base !== base) {
+        x._base = base;
+        x.src = base.startsWith('blob:') ? base : base + (base.includes('?') ? '&' : '?') + 'camada=reserva';
+        x.load();
+        VEPRE.i = -1;
+    }
+    return x;
+}
+
+function vePreloadNext() {
+    const c = VE.clips[VE.cur];
+    if (!c || !veVideo().src) return;
+    const fim = veEnd(c);
+    if (fim - VE.playhead > 1.5) return;
+    const j = veTopAt(fim + 0.01);
+    if (j < 0 || j === VE.cur) return;
+    const n = VE.clips[j], alvo = n.s + (fim - n.st);
+    if (Math.abs(alvo - c.e) < 0.03) return;   // continua do mesmo ponto: não há busca
+    if (VEPRE.i === j && Math.abs(VEPRE.t - alvo) < 0.02) return;
+    const x = vePrePlayer();
+    if (!x.paused) x.pause();
+    try { x.currentTime = alvo; } catch (e) { return; }
+    VEPRE.i = j;
+    VEPRE.t = alvo;
+}
+
 // Pausa os players que não estão em uso (a partir do índice n); n = 0 com `limpar` solta o arquivo
 function veParkExtras(n, limpar) {
     VEX.slice(n).forEach(x => {
         if (!x.paused) x.pause();
         if (limpar && x.getAttribute('src')) { x.removeAttribute('src'); x._base = null; x.load(); }
     });
+    const r = VEPRE.x;
+    if (limpar && r && r.getAttribute('src')) { r.pause(); r.removeAttribute('src'); r._base = null; r.load(); VEPRE.i = -1; }
 }
 
 // ── monitor: desenha as camadas visíveis na agulha, de baixo para cima ──
@@ -928,15 +972,6 @@ function veDrawMonitor() {
     if (!cv) return;
     const ctx = cv.getContext('2d');
     if (!VE.ready) { ctx.clearRect(0, 0, cv.width, cv.height); return; }
-    // desenha em coordenadas do quadro
-    const pv = veMonitorScale();
-    const cw = Math.round(VE.seqW * pv), ch = Math.round(VE.seqH * pv);
-    if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; }
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, cw, ch);
-    ctx.setTransform(pv, 0, 0, pv, 0, 0);
-    ctx.imageSmoothingQuality = 'high';
     const t = VE.playhead, v = veVideo();
     let vis = VE.clips
         .map((c, i) => ({ c, i }))
@@ -945,20 +980,46 @@ function veDrawMonitor() {
     // o que está abaixo de um vídeo que cobre o quadro inteiro não aparece: nem decodifica
     const cobre = vis.map(({ c }) => !veIsImage(c) && veIsPlain(c)).lastIndexOf(true);
     if (cobre > 0) vis = vis.slice(cobre);
-    let extra = 0;
-    vis.forEach(({ c, i }) => {
-            let src = null;
-            if (veIsImage(c)) {
-                const m = veMediaOf(c);
-                if (m.img && m.img.complete && m.w) src = m.img;
-            } else if (i === VE.cur) {
-                if (v.readyState >= 2) src = v;   // o player principal (dá o som e o relógio)
-            } else if (v.src) {
-                // vídeo de camada de baixo (transparência/dupla exposição): player extra sem som
-                const x = veExtraPlayer(extra++);
-                veSyncExtra(x, c.s + (t - c.st));
-                if (x.readyState >= 2) src = x;
-            }
+    let extra = 0, falta = false;
+    const itens = vis.map(({ c, i }) => {
+        let src = null;
+        if (veIsImage(c)) {
+            const m = veMediaOf(c);
+            if (m.img && m.img.complete && m.w) src = m.img;
+        } else if (i === VE.cur) {
+            // o player principal (dá o som e o relógio); buscando outro ponto (corte), vale o quadro
+            // que o player de reserva deixou esperando (vePreloadNext)
+            if (v.readyState >= 2 && !v.seeking) src = v;
+            else if (VEPRE.i === i && VEPRE.x && VEPRE.x.readyState >= 2 && !VEPRE.x.seeking) src = VEPRE.x;
+            else falta = true;
+        } else if (v.src) {
+            // vídeo de camada de baixo (transparência/dupla exposição): player extra sem som
+            const x = veExtraPlayer(extra++);
+            veSyncExtra(x, c.s + (t - c.st));
+            if (x.readyState >= 2) src = x;
+        }
+        return { c, i, src };
+    });
+    veParkExtras(extra);
+    // desenha em coordenadas do quadro
+    const pv = veMonitorScale();
+    const cw = Math.round(VE.seqW * pv), ch = Math.round(VE.seqH * pv);
+    const novo = cv.width !== cw || cv.height !== ch;
+    // sem quadro do vídeo principal (buscando): mantém o último quadro na tela em vez de piscar preto
+    // (no máximo 600 ms, para um vídeo com erro não congelar o monitor)
+    if (falta && !novo) {
+        const agora = performance.now();
+        if (!VE._monHold) VE._monHold = agora;
+        if (agora - VE._monHold < 600) return;
+    }
+    VE._monHold = 0;
+    if (novo) { cv.width = cw; cv.height = ch; }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.setTransform(pv, 0, 0, pv, 0, 0);
+    ctx.imageSmoothingQuality = 'high';
+    itens.forEach(({ c, src }) => {
             if (!src) return;
             const p = veProps(c), sz = veMediaSize(c);
             src = veFxRender(c, src, sz, pv * p.sc / 100);   // efeitos rodam antes do movimento (como no Premiere)
@@ -971,7 +1032,6 @@ function veDrawMonitor() {
             ctx.drawImage(src, -sz.w / 2, -sz.h / 2, sz.w, sz.h);
             ctx.restore();
         });
-    veParkExtras(extra);
     // contorno do clipe selecionado visível (ajuda a posicionar)
     const cs = VE.clips[VE.sel];
     if (cs && t >= cs.st - VE_EPS && t < veEnd(cs) - VE_EPS && (veIsImage(cs) || !veIsDefaultProps(cs))) {

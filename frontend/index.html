@@ -151,6 +151,8 @@
 
         <!-- Main Content -->
         <main class="main-content">
+            <!-- fundo animado do Início: já vem desfocado no próprio vídeo (loop de 20 s, 58 KB) -->
+            <video class="home-bg" id="home-bg" src="video/home-bg.webm" muted loop playsinline preload="auto" aria-hidden="true" tabindex="-1"></video>
             <div class="tabbar" id="tabbar" role="tablist"></div>
             <div class="content-area" id="content-area">
 
@@ -181,33 +183,83 @@
                     </section>
 
                     <h3 class="home-group">Ferramentas</h3>
-                    <div class="home-cols">
-                        <div class="home-cat">
+                    <div class="home-tools">
+                        <section class="home-cat">
                             <h4>Vídeo</h4>
-                            <button class="home-card" onclick="switchTool('video-cutter')"><span class="hc-ico"><svg class="i"><use href="#i-film"/></svg></span><b>Editor de Vídeo</b><small>Vídeo e áudio: cortes, camadas e exportação (MP4, MP3...)</small></button>
-                            <button class="home-card" onclick="switchTool('compressor-video')"><span class="hc-ico"><svg class="i"><use href="#i-shrink"/></svg></span><b>Comprimir Vídeo</b><small>H.265 com GPU: até 70% menor mantendo a qualidade</small></button>
-                            <button class="home-card" onclick="switchTool('video-converter')"><span class="hc-ico"><svg class="i"><use href="#i-convert"/></svg></span><b>Converter Vídeo</b><small>MP4, MOV, MKV, WEBM, GIF e MP3</small></button>
-                            <button class="home-card" onclick="switchTool('video-downloader')"><span class="hc-ico"><svg class="i"><use href="#i-download"/></svg></span><b>Baixar Vídeo</b><small>YouTube, Instagram, TikTok e mais — até 4K</small></button>
-                            <button class="home-card" onclick="switchTool('organizador-videos')"><span class="hc-ico"><svg class="i"><use href="#i-camera"/></svg></span><b>Logger Pro</b><small>Organiza cartões de câmera e cria o projeto Premiere</small></button>
-                        </div>
-                        <div class="home-cat">
+                            <div class="home-grid">
+                                <button class="home-card" onclick="switchTool('video-cutter')">
+                                    <span class="hc-media"><img src="img/tools/video-cutter.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-film"/></svg></span></span>
+                                    <b>Editor de Vídeo</b><small>Vídeo e áudio: cortes, camadas e exportação (MP4, MP3...)</small>
+                                </button>
+                                <button class="home-card" onclick="switchTool('compressor-video')">
+                                    <span class="hc-media"><img src="img/tools/compressor-video.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-shrink"/></svg></span></span>
+                                    <b>Comprimir Vídeo</b><small>H.265 com GPU: até 70% menor mantendo a qualidade</small>
+                                </button>
+                                <button class="home-card" onclick="switchTool('video-converter')">
+                                    <span class="hc-media"><img src="img/tools/video-converter.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-convert"/></svg></span></span>
+                                    <b>Converter Vídeo</b><small>MP4, MOV, MKV, WEBM, GIF e MP3</small>
+                                </button>
+                                <button class="home-card" onclick="switchTool('video-downloader')">
+                                    <span class="hc-media"><img src="img/tools/video-downloader.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-download"/></svg></span></span>
+                                    <b>Baixar Vídeo</b><small>YouTube, Instagram, TikTok e mais — até 4K</small>
+                                </button>
+                                <button class="home-card" onclick="switchTool('organizador-videos')">
+                                    <span class="hc-media"><img src="img/tools/organizador-videos.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-camera"/></svg></span></span>
+                                    <b>Logger Pro</b><small>Organiza cartões de câmera e cria o projeto Premiere</small>
+                                </button>
+                            </div>
+                        </section>
+                        <section class="home-cat">
                             <h4>Imagem</h4>
-                            <button class="home-card" onclick="switchTool('converter-imagem')"><span class="hc-ico"><svg class="i"><use href="#i-image"/></svg></span><b>Converter Imagem</b><small>HEIC, RAW, WEBP, AVIF, PNG, JPG e mais</small></button>
-                            <button class="home-card" onclick="switchTool('compressor-imagem')"><span class="hc-ico"><svg class="i"><use href="#i-feather"/></svg></span><b>Comprimir Imagem</b><small>Fotos e PDFs mais leves, com EXIF preservado</small></button>
-                            <button class="home-card" onclick="switchTool('remover-fundo')"><span class="hc-ico"><svg class="i"><use href="#i-wand"/></svg></span><b>Remover Fundo</b><small>Recorte automático com IA</small></button>
-                            <button class="home-card" onclick="switchTool('organizador-imagens')"><span class="hc-ico"><svg class="i"><use href="#i-grid"/></svg></span><b>Organizar Imagens</b><small>Duplicadas, thumbs, gráficos e nomes por contexto</small></button>
-                            <button class="home-card" onclick="switchTool('favicon')"><span class="hc-ico"><svg class="i"><use href="#i-globe"/></svg></span><b>Gerar Favicon</b><small>Todos os ícones do site + código pronto</small></button>
-                        </div>
-                        <div class="home-cat">
+                            <div class="home-grid">
+                                <button class="home-card" onclick="switchTool('converter-imagem')">
+                                    <span class="hc-media"><img src="img/tools/converter-imagem.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-image"/></svg></span></span>
+                                    <b>Converter Imagem</b><small>HEIC, RAW, WEBP, AVIF, PNG, JPG e mais</small>
+                                </button>
+                                <button class="home-card" onclick="switchTool('compressor-imagem')">
+                                    <span class="hc-media"><img src="img/tools/compressor-imagem.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-feather"/></svg></span></span>
+                                    <b>Comprimir Imagem</b><small>Fotos e PDFs mais leves, com EXIF preservado</small>
+                                </button>
+                                <button class="home-card" onclick="switchTool('remover-fundo')">
+                                    <span class="hc-media"><img src="img/tools/remover-fundo.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-wand"/></svg></span></span>
+                                    <b>Remover Fundo</b><small>Recorte automático com IA</small>
+                                </button>
+                                <button class="home-card" onclick="switchTool('organizador-imagens')">
+                                    <span class="hc-media"><img src="img/tools/organizador-imagens.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-grid"/></svg></span></span>
+                                    <b>Organizar Imagens</b><small>Duplicadas, thumbs, gráficos e nomes por contexto</small>
+                                </button>
+                                <button class="home-card" onclick="switchTool('favicon')">
+                                    <span class="hc-media"><img src="img/tools/favicon.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-globe"/></svg></span></span>
+                                    <b>Gerar Favicon</b><small>Todos os ícones do site + código pronto</small>
+                                </button>
+                            </div>
+                        </section>
+                        <section class="home-cat">
                             <h4>Áudio</h4>
-                            <button class="home-card" onclick="switchTool('converter-audio')"><span class="hc-ico"><svg class="i"><use href="#i-music"/></svg></span><b>Converter Áudio</b><small>MP3, WAV, FLAC, M4A, Opus — e extrai de vídeos</small></button>
-                            <button class="home-card" onclick="switchTool('transcrever-audio')"><span class="hc-ico"><svg class="i"><use href="#i-captions"/></svg></span><b>Transcrever</b><small>Texto e legenda .srt com Whisper</small></button>
-                        </div>
-                        <div class="home-cat">
+                            <div class="home-grid">
+                                <button class="home-card" onclick="switchTool('converter-audio')">
+                                    <span class="hc-media"><img src="img/tools/converter-audio.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-music"/></svg></span></span>
+                                    <b>Converter Áudio</b><small>MP3, WAV, FLAC, M4A, Opus — e extrai de vídeos</small>
+                                </button>
+                                <button class="home-card" onclick="switchTool('transcrever-audio')">
+                                    <span class="hc-media"><img src="img/tools/transcrever-audio.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-captions"/></svg></span></span>
+                                    <b>Transcrever</b><small>Texto e legenda .srt com Whisper</small>
+                                </button>
+                            </div>
+                        </section>
+                        <section class="home-cat">
                             <h4>Web</h4>
-                            <button class="home-card" onclick="switchTool('gdrive-dumper')"><span class="hc-ico"><svg class="i"><use href="#i-cloud"/></svg></span><b>GDrive Dumper</b><small>Baixa pastas inteiras do Google Drive, sem zip</small></button>
-                            <button class="home-card" onclick="switchTool('web-scraper')"><span class="hc-ico"><svg class="i"><use href="#i-scan"/></svg></span><b>Web Scraper</b><small>Imagens e vídeos de um site, já organizados</small></button>
-                        </div>
+                            <div class="home-grid">
+                                <button class="home-card" onclick="switchTool('gdrive-dumper')">
+                                    <span class="hc-media"><img src="img/tools/gdrive-dumper.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-cloud"/></svg></span></span>
+                                    <b>GDrive Dumper</b><small>Baixa pastas inteiras do Google Drive, sem zip</small>
+                                </button>
+                                <button class="home-card" onclick="switchTool('web-scraper')">
+                                    <span class="hc-media"><img src="img/tools/web-scraper.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-scan"/></svg></span></span>
+                                    <b>Web Scraper</b><small>Imagens e vídeos de um site, já organizados</small>
+                                </button>
+                            </div>
+                        </section>
                     </div>
                 </div>
 
