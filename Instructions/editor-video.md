@@ -5,6 +5,8 @@ Editor de cortes estilo Premiere, versão de bolso. Menu: **Editor de Vídeo**.
 ## Arquivos
 - `frontend/js/editor.js` — interface: timeline em canvas, ferramentas, atalhos, reprodução, exportação
 - `frontend/css/editor.css` — visual (prefixo `.ve-`)
+- `frontend/js/editor-dock.js` — painéis encaixáveis (docking estilo Premiere)
+- `frontend/js/editor-fx.js` — efeitos (painel Efeitos + Controles de efeito)
 - `Functions/video_cutter.py` — análise, prévia (proxy), miniaturas, forma de onda, exportação
 - `Functions/media_server.py` — servidor HTTP local (127.0.0.1) que entrega vídeo/miniaturas/prévias à interface
 - `main.py` — API: `video_cutter_prepare`, `video_cutter_export`, `video_cutter_cancel_export`, `reveal_file`, `open_file`; arrastar-e-soltar via `window.dom` do pywebview
@@ -37,3 +39,51 @@ Validado: corte em 0:20→0:35 resulta em frame #599 seguido de #1050 do origina
 Espaço play · J/K/L · ←/→ frame (Shift = 1s) · ↑/↓ corte anterior/próximo · S ou Ctrl+K dividir ·
 Delete remover · I/O entrada/saída · X remover In→Out · Q/W remover antes/depois · V/C/H ferramentas ·
 +/- zoom · \ ajustar · N ímã · M mudo · Ctrl+Z/Ctrl+Shift+Z · Ctrl+E exportar · Ctrl+O abrir
+
+## Painéis (docking como no Premiere)
+Layout em árvore (`VED.root`: divisões `{t:'s', d, c, z}` e grupos de abas `{t:'g', p, a}`), salvo em
+`%APPDATA%\CaniveteDoPailer\editor_workspaces.json` (`ve_layout_load/save`, main.py). O localStorage NÃO serve:
+o WebView roda em modo privado e numa porta nova a cada abertura (só segura um recarregar da página). Arrastar a aba: centro do painel = vira aba; borda = divide ao lado/acima/abaixo;
+faixa de 12 px na borda da área = ocupa a lateral inteira. Duplo clique na aba maximiza. **Janela ▾** mostra/oculta
+painéis e restaura o padrão. Os `.ve-panel[data-panel]` só são movidos no DOM (não recriados).
+Painel novo: crie um `.ve-panel` com `data-panel`/`data-title` no HTML; quem tinha layout salvo recebe como aba.
+
+### Janelas soltas (outro monitor)
+Cada janela solta é um quadro completo (abas + divisões), como as flutuantes do Premiere: `VED.hosts[0]` é a
+área do editor e os demais são as janelas, cada um com seu `root`. A aba pode ser arrastada de qualquer janela
+para qualquer janela: o alvo é achado por coordenada de TELA (`vedHitScreen`/`vedOrigin`), porque o arraste
+não atravessa documentos. Janela que fica vazia fecha. As soltas ficam sempre acima da principal
+(`ve_win_prepare`: a principal vira "dona" no Windows).
+⧉ na aba, Ctrl ao soltar ou soltar fora de todas as janelas.
+- A janela é nossa (`_janela_solta_propria`, main.py): um Form do WinForms com WebView2 no mesmo ambiente,
+  entregue ao window.open via `NewWindow` — sem a barra "about:blank" e o "[InPrivate]" do pop-up padrão
+  (que fica só de reserva se a nossa falhar). Fechar o Form pode não disparar `pagehide`: o JS também
+  percebe por `w.closed`.
+- Arrastar a janela pela barra de título do Windows (a página não recebe eventos): `vedWatchMoves` percebe a
+  janela andando, o Python informa cursor/botão e a janela sob ele (`ve_win_hit`, só janelas deste processo),
+  e aparece uma bússola (centro + 4 lados, e as bordas da área). Soltar num quadradinho encaixa a janela
+  inteira; fora deles só move. Durante o arraste a janela fica semitransparente (`ve_win_alpha`). `window.open('')` abre uma janela nativa do WebView2
+(liberada em `_liberar_janelas_flutuantes`, main.py — o pywebview mandaria para o navegador) e o MESMO
+elemento do painel é movido para ela, com os estilos e o sprite de ícones copiados. Por isso:
+- `$ve(id)` procura também nas janelas soltas (`vedFind`); não use `document.querySelector` para
+  coisas de dentro de um painel — use `$ve('...').querySelector`, `el.ownerDocument`, `ownerDocument.defaultView`.
+- O relógio da reprodução usa sempre `performance.now()` da janela principal (o rAF de outra janela tem outra origem).
+- Fechar a janela devolve o painel ao lugar de onde saiu (`VED.home`). Fechar o app ou sair do Editor de Vídeo
+  fecha as janelas sem tirar do layout; elas reabrem ao entrar no editor de novo.
+- Posição: o Chromium prende o window.open no monitor do app. Por isso quem posiciona e lê a janela é o Python
+  (`ve_win_place` / `ve_win_rect`, Win32 em pixels reais, qualquer monitor). A janela é achada pelo título,
+  que termina com espaços invisíveis (`vedWinTitle`) para ser único; o WebView2 acrescenta " — [InPrivate]".
+
+### Workspaces (Janela ▾)
+"Salvar estilo de workspace…" pede um nome e guarda painéis + janelas soltas (monitor, posição, tamanho,
+maximizada). Com um workspace ativo (●), o editor sempre abre como ele foi salvo; mexer no layout marca
+"(modificado)" e o menu oferece salvar as alterações ou voltar ao salvo. Salvar com um nome existente atualiza.
+
+## Efeitos
+`c.fx = [{id, t, on, v}]`, aplicados de cima para baixo no tamanho original da mídia, antes de
+escala/posição/rotação/opacidade. Clipe com efeito ativo vira camada na exportação (`veIsPlain`).
+- Desfoque gaussiano: 100% = sigma de 5% do lado menor; bordas repetidas (canvas `blur()` / ffmpeg `gblur`)
+- Brilho e contraste: igual a `brightness()`+`contrast()` do navegador (ffmpeg `lutrgb`)
+- Cortar: área cortada fica transparente (ffmpeg `drawbox ... replace=1`)
+Efeito novo: `VE_FX` em editor-fx.js (parâmetros + `draw`) e `_filtros_fx` em video_cutter.py (mesma conta).
+Parâmetros de efeito ainda não têm quadros-chave.

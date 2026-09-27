@@ -21,7 +21,7 @@
     --ve-ui: var(--font-ui);
 
     display: grid;
-    grid-template-rows: 46px minmax(0, 1fr) auto;
+    grid-template-rows: 46px minmax(0, 1fr);
     height: 100%;
     background: var(--ve-bg);
     color: var(--ve-text);
@@ -115,18 +115,12 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
 .ve-icon-btn:hover:not(:disabled) { background: var(--ve-panel-2); color: var(--ve-text); }
 .ve-icon-btn:disabled { opacity: .3; cursor: not-allowed; }
 
-/* ---------- Área principal ---------- */
-.ve-main {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 272px;
-    min-height: 0;
-}
+/* ---------- Monitor ---------- */
 .ve-monitor {
     display: grid;
     grid-template-rows: minmax(0, 1fr) 52px;
     min-width: 0;
     min-height: 0;
-    border-right: 1px solid var(--ve-line);
 }
 .ve-screen {
     position: relative;
@@ -249,22 +243,8 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
 .ve-rate { font: 700 11px var(--ve-mono); color: var(--ve-accent-2); }
 .ve-rate[hidden] { display: none; }
 
-/* ---------- Painel lateral ---------- */
-.ve-side { display: flex; flex-direction: column; min-height: 0; background: var(--ve-panel); }
-.ve-tabs { display: flex; border-bottom: 1px solid var(--ve-line); }
-.ve-tab {
-    flex: 1;
-    height: 36px;
-    border: none;
-    background: transparent;
-    color: var(--ve-dim);
-    font: 600 12px var(--ve-ui);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-}
-.ve-tab.active { color: var(--ve-text); border-bottom-color: var(--ve-accent); }
-.ve-tabpane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.ve-tabpane[hidden] { display: none; }
+/* ---------- Painéis (lista de clipes, controles, efeitos, atalhos) ---------- */
+.ve-tabpane { min-height: 0; display: flex; flex-direction: column; background: var(--ve-panel); overflow-y: auto; }
 
 .ve-summary {
     display: grid;
@@ -336,7 +316,7 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
 }
 
 /* ---------- Timeline ---------- */
-.ve-timeline { background: var(--ve-panel); border-top: 1px solid var(--ve-line); display: flex; flex-direction: column; }
+.ve-timeline { background: var(--ve-panel); display: flex; flex-direction: column; min-height: 0; }
 .ve-tl-toolbar {
     display: flex;
     align-items: center;
@@ -365,7 +345,7 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
 .ve-zoom { display: flex; align-items: center; gap: 4px; }
 .ve-zoom input[type=range] { width: 130px; accent-color: var(--ve-accent); }
 
-.ve-tl-body { display: grid; grid-template-columns: 72px minmax(0, 1fr); height: var(--ve-tl-h, 312px); }
+.ve-tl-body { display: grid; grid-template-columns: 72px minmax(0, 1fr); flex: 1; min-height: 0; }
 .ve-tl-heads { background: var(--ve-panel-2); border-right: 1px solid var(--ve-line); display: flex; flex-direction: column; min-height: 0; }
 .ve-head-ruler { height: 28px; flex-shrink: 0; border-bottom: 1px solid var(--ve-line); }
 .ve-heads-clip { flex: 1; min-height: 0; overflow: hidden; }
@@ -390,11 +370,6 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
 .ve-head-grip { position: absolute; left: 0; right: 0; bottom: -1px; height: 6px; cursor: ns-resize; z-index: 1; }
 .ve-head-grip:hover { background: var(--ve-accent); opacity: .5; }
 
-/* alça para mudar a altura da timeline inteira (borda superior do painel) */
-.ve-timeline { position: relative; }
-.ve-tl-resize { position: absolute; left: 0; right: 0; top: -4px; height: 8px; cursor: ns-resize; z-index: 5; }
-.ve-tl-resize::after { content: ""; position: absolute; left: 0; right: 0; top: 3px; height: 2px; background: transparent; transition: background .15s; }
-.ve-tl-resize:hover::after { background: var(--ve-accent); }
 body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-select: none; }
 
 .ve-tl-wrap { position: relative; min-width: 0; overflow: hidden; cursor: default; }
@@ -520,7 +495,6 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 
 /* ---------- Telas menores ---------- */
 @media (max-width: 1180px) {
-    .ve-main { grid-template-columns: minmax(0, 1fr) 220px; }
     .ve-summary { gap: 4px; padding: 8px; }
     .ve-summary > div { padding: 5px 6px; }
     .ve-summary b { font-size: 11px; }
@@ -530,9 +504,6 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
     .ve-tbtn { min-width: 28px; }
     .ve-zoom input[type=range] { width: 80px; }
     .ve-btn-sm { padding: 0 7px; }
-}
-@media (max-height: 700px) {
-    .ve-tl-body { height: var(--ve-tl-h, 220px); }
 }
 
 /* ---------- Ícones SVG dentro do editor ---------- */
@@ -592,6 +563,7 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-gain-cur { margin-top: 10px; font-size: 12px; color: var(--ve-dim); text-align: center; }
 .ve-clip-tr { font: 600 10px var(--ve-mono); color: var(--ve-faint); margin-left: 4px; }
 .ve-clip-db { font: 600 10px var(--ve-mono); color: #fbbf24; margin-left: 2px; }
+.ve-clip-fx { font: 700 9px var(--ve-mono); color: #1a0d02; background: var(--ve-accent); border-radius: 3px; padding: 0 3px; margin-left: 2px; }
 
 /* ---------- Monitor em canvas (compõe vídeo + imagens) ---------- */
 .ve-screen video { opacity: 0; pointer-events: none; }
@@ -671,3 +643,174 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 #ve-export.audio .ve-only-video { display: none; }
 .ve-pill-audio { border-style: dashed; }
 .ve-pill.disabled { opacity: .35; pointer-events: none; }
+
+/* =========================================================
+   Painéis encaixáveis (docking como no Premiere)
+   ========================================================= */
+.ve-dock-store { display: none; }
+.ve-dock { display: flex; min-height: 0; min-width: 0; padding: 4px; background: var(--ve-bg); }
+.ve-dsplit { display: flex; min-width: 0; min-height: 0; }
+.ve-dsplit.row { flex-direction: row; }
+.ve-dsplit.col { flex-direction: column; }
+.ve-dgroup {
+    display: flex; flex-direction: column; min-width: 140px; min-height: 90px;
+    background: var(--ve-panel); border: 1px solid var(--ve-line); border-radius: 7px; overflow: hidden;
+}
+.ve-dgroup.has-timeline { min-height: 150px; min-width: 320px; }
+.ve-dgroup.has-monitor { min-width: 240px; min-height: 160px; }
+.ve-dtabs {
+    display: flex; align-items: stretch; height: 30px; flex-shrink: 0; background: var(--ve-bg);
+    border-bottom: 1px solid var(--ve-line); overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+}
+.ve-dtabs::-webkit-scrollbar { display: none; }
+.ve-dtab {
+    display: flex; align-items: center; gap: 6px; padding: 0 6px 0 11px; white-space: nowrap;
+    color: var(--ve-faint); font: 600 11.5px var(--ve-ui); cursor: grab; border-right: 1px solid var(--ve-line);
+    position: relative;
+}
+.ve-dtab:hover { color: var(--ve-text); }
+.ve-dtab.active { color: var(--ve-text); background: var(--ve-panel); }
+.ve-dtab.active::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #555; }
+.ve-dgroup.focus .ve-dtab.active::before { background: var(--ve-accent); }
+.ve-dtab-x {
+    display: grid; place-items: center; width: 16px; height: 16px; border: 0; border-radius: 4px; padding: 0;
+    background: transparent; color: var(--ve-faint); cursor: pointer; font-size: 13px; line-height: 1; opacity: 0;
+}
+.ve-dtab:hover .ve-dtab-x { opacity: .7; }
+.ve-dtab-x:hover { opacity: 1 !important; background: var(--ve-panel-2); color: var(--ve-text); }
+.ve-dbody { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.ve-dbody > .ve-panel { flex: 1; min-height: 0; min-width: 0; }
+.ve-sash { flex: 0 0 4px; position: relative; z-index: 2; }
+.ve-dsplit.row > .ve-sash { cursor: ew-resize; }
+.ve-dsplit.col > .ve-sash { cursor: ns-resize; }
+.ve-sash::after { content: ""; position: absolute; inset: 0; border-radius: 2px; transition: background .15s; }
+.ve-sash:hover::after, .ve-sash.on::after { background: var(--ve-accent); }
+body.ve-resizing-x, body.ve-resizing-x * { cursor: ew-resize !important; user-select: none; }
+/* painel maximizado (duplo clique na aba) */
+.ve-dock.maxed .ve-dgroup:not(.maxed), .ve-dock.maxed .ve-sash { display: none; }
+.ve-dock.maxed .ve-dsplit:not(:has(.ve-dgroup.maxed)) { display: none; }
+.ve-dock.maxed .ve-dgroup.maxed, .ve-dock.maxed .ve-dsplit:has(.ve-dgroup.maxed) { flex: 1 1 0 !important; }
+/* arrastando um painel: fantasma + zona de encaixe */
+body.ve-docking, body.ve-docking * { cursor: grabbing !important; user-select: none; }
+.ve-dghost {
+    position: fixed; z-index: 1000; pointer-events: none; padding: 5px 10px; border-radius: 6px;
+    background: #222; border: 1px solid var(--ve-accent); color: var(--ve-text); font: 600 11.5px var(--ve-ui);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+}
+.ve-ddrop {
+    position: fixed; z-index: 999; pointer-events: none; border-radius: 6px;
+    background: rgba(249, 115, 22, .2); border: 2px solid var(--ve-accent);
+    transition: left .08s, top .08s, width .08s, height .08s;
+}
+.ve-ddrop[hidden], .ve-dzones[hidden] { display: none; }
+/* painel-alvo com as 5 zonas (centro + 4 bordas), como o Premiere mostra ao arrastar */
+.ve-dzones { position: fixed; z-index: 998; pointer-events: none; }
+.ve-dzones svg { width: 100%; height: 100%; display: block; }
+.ve-dzones path { fill: rgba(255, 255, 255, .03); stroke: rgba(255, 255, 255, .22); stroke-width: 1; vector-effect: non-scaling-stroke; }
+/* menu Janela */
+.ve-win-btn { margin-right: 4px; }
+.ve-menu {
+    position: fixed; z-index: 1001; min-width: 230px; padding: 5px; border-radius: 9px;
+    background: var(--ve-panel, #0e0e0e); border: 1px solid var(--ve-line-2, rgba(255, 255, 255, .12));
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .55); color: var(--ve-text, #f5f5f5);
+}
+.ve-menu button {
+    display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 10px; border: 0; border-radius: 6px;
+    background: transparent; color: var(--ve-text); font: 500 12px var(--ve-ui); text-align: left; cursor: pointer;
+}
+.ve-menu button:hover { background: var(--ve-panel-2); }
+.ve-menu button b { width: 14px; color: var(--ve-accent); font-weight: 700; }
+.ve-menu hr { border: 0; border-top: 1px solid var(--ve-line); margin: 4px 2px; }
+
+/* =========================================================
+   Efeitos
+   ========================================================= */
+.ve-fx-search { display: flex; align-items: center; gap: 6px; margin: 8px; padding: 0 8px; height: 28px; flex-shrink: 0; border-radius: 7px; border: 1px solid var(--ve-line-2); background: var(--ve-bg); color: var(--ve-faint); }
+.ve-fx-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ve-text); font: 12px var(--ve-ui); }
+.ve-fx-list { flex: 1; overflow-y: auto; padding: 0 6px 6px; }
+.ve-fx-cat { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ve-faint); padding: 8px 6px 4px; }
+.ve-fx-item {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: grab;
+    font-size: 12px; color: var(--ve-text); border: 1px solid transparent;
+}
+.ve-fx-item:hover { background: var(--ve-panel-2); border-color: var(--ve-line-2); }
+.ve-fx-item i { font: 700 9.5px var(--ve-mono); font-style: normal; color: #1a0d02; background: var(--ve-accent); border-radius: 3px; padding: 1px 4px; }
+.ve-fx-item span { flex: 1; }
+.ve-fx-item small { color: var(--ve-faint); font-size: 10.5px; }
+.ve-fx-hint { padding: 8px 12px 12px; font-size: 11px; line-height: 1.5; color: var(--ve-faint); border-top: 1px solid var(--ve-line); }
+.ve-tl-wrap.fx-drop { outline: 2px dashed var(--ve-accent); outline-offset: -3px; }
+body.ve-fx-dragging, body.ve-fx-dragging * { cursor: grabbing !important; user-select: none; }
+/* efeitos aplicados no clipe (dentro de Controles de efeito) */
+.ve-fxc:empty { display: none; }
+.ve-fxc { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--ve-line); padding-top: 10px; }
+.ve-fxc-title { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ve-faint); }
+.ve-fxe { border: 1px solid var(--ve-line-2); border-radius: 8px; background: var(--ve-bg); }
+.ve-fxe-head { display: flex; align-items: center; gap: 4px; padding: 5px 5px 5px 8px; }
+.ve-fxe-head b { flex: 1; font-size: 12px; font-weight: 600; cursor: pointer; }
+.ve-fxe.off .ve-fxe-head b { color: var(--ve-faint); text-decoration: line-through; }
+.ve-fxe-head button {
+    display: grid; place-items: center; min-width: 22px; height: 20px; padding: 0 4px; border: 0; border-radius: 4px;
+    background: transparent; color: var(--ve-faint); font: 700 10px var(--ve-mono); cursor: pointer;
+}
+.ve-fxe-head button:hover:not(:disabled) { background: var(--ve-panel-2); color: var(--ve-text); }
+.ve-fxe-head button:disabled { opacity: .25; cursor: default; }
+.ve-fxe-head .ve-fxe-on { color: var(--ve-accent); box-shadow: inset 0 0 0 1px currentColor; }
+.ve-fxe.off .ve-fxe-head .ve-fxe-on { color: var(--ve-faint); }
+.ve-fxe-body { display: flex; flex-direction: column; gap: 8px; padding: 2px 8px 10px; }
+.ve-fxe.collapsed .ve-fxe-body { display: none; }
+.ve-fxe.off .ve-fxe-body { opacity: .5; }
+.ve-fxe-body .ve-prop label { grid-column: 1 / -1; }
+
+/* ---------- Janela solta (painel numa janela própria do Windows) ---------- */
+html.ve-float-html body { background: var(--bg-0); }
+.ve.ve-float { height: 100vh; border: 0; border-radius: 0; grid-template-rows: 30px minmax(0, 1fr); }
+.ve-float-bar {
+    display: flex; align-items: center; gap: 8px; padding: 0 4px 0 12px; background: var(--ve-bg);
+    border-bottom: 1px solid var(--ve-line); font: 600 11.5px var(--ve-ui); color: var(--ve-text);
+}
+.ve-float-bar span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-float-bar .ve-btn { height: 22px; }
+.ve-float .ve-dock { min-height: 0; }
+.ve-float-bar span { color: var(--ve-faint); font-weight: 500; }
+.ve-float .ve-toast { bottom: 24px; }
+.ve-dghost.solta { border-style: dashed; background: #2a1a0e; }
+.ve-dtab-x[data-float] { font-size: 11px; }
+.ve-menu small { color: var(--ve-faint); margin-left: 4px; }
+
+/* ---------- Workspaces (menu Janela) ---------- */
+.ve-menu { max-height: calc(100vh - 80px); overflow-y: auto; }
+.ve-menu-h { padding: 6px 10px 3px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ve-faint); }
+.ve-menu-empty { padding: 4px 10px 6px 32px; font-size: 11.5px; color: var(--ve-faint); }
+.ve-menu-row { display: flex; align-items: center; }
+.ve-menu-row > button:first-child { flex: 1; min-width: 0; }
+.ve-menu .ve-menu-del { width: auto; flex: 0 0 auto; padding: 4px 8px; color: var(--ve-faint); }
+.ve-menu .ve-menu-del:hover { color: var(--ve-text); }
+.ve-menu .ve-menu-del.confirm { color: #fff; background: var(--ve-danger); }
+.ve-menu-form { display: flex; flex-direction: column; gap: 8px; padding: 8px; width: 280px; }
+.ve-menu-form label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ve-faint); }
+.ve-menu-form input {
+    height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--ve-accent); outline: 0;
+    background: var(--ve-bg); color: var(--ve-text); font: 12.5px var(--ve-ui);
+}
+.ve-menu-form small { font-size: 11px; line-height: 1.5; color: var(--ve-faint); }
+.ve-menu-form div { display: flex; justify-content: flex-end; gap: 6px; }
+.ve-menu .ve-menu-form button { width: auto; }
+/* menu, fantasma e guias de encaixe ficam no <body>, fora do .ve: precisam das cores do editor */
+.ve-menu, .ve-dghost, .ve-ddrop, .ve-dzones {
+    --ve-bg: var(--bg-0); --ve-panel: var(--bg-1); --ve-panel-2: var(--bg-3);
+    --ve-line: var(--line); --ve-line-2: var(--line-2); --ve-text: var(--text); --ve-dim: var(--text-2);
+    --ve-faint: var(--text-3); --ve-accent: #F97316; --ve-accent-2: var(--primary-hover);
+    --ve-danger: #ef4444; --ve-ui: var(--font-ui); --ve-mono: var(--mono);
+}
+
+/* bússola de encaixe ao mover uma janela solta pela barra de título */
+.ve-dcompass { position: fixed; inset: 0; z-index: 998; pointer-events: none; }
+.ve-dcompass[hidden] { display: none; }
+.ve-dcompass i {
+    position: absolute; display: grid; place-items: center; border-radius: 7px; font: 700 13px/1 Segoe UI, sans-serif;
+    font-style: normal; color: #F97316; background: rgba(18, 18, 18, .94); border: 1px solid rgba(249, 115, 22, .75);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .55);
+}
+.ve-dcompass i.root { border-style: dashed; }
+.ve-dcompass i.on { background: #F97316; color: #111; }
+.ve-float-bar .ve-btn { flex-shrink: 0; }

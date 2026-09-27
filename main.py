@@ -342,6 +342,237 @@ def reveal_file(path):
     return {"success": False}
 
 
+def _ve_layout_path():
+    """Layout dos painéis do editor e workspaces salvos. Fica em %APPDATA% (o localStorage do WebView
+    não sobrevive: modo privado e porta nova a cada abertura; e a pasta do app é trocada ao atualizar)."""
+    base = os.environ.get("APPDATA") or os.path.expanduser("~")
+    pasta = os.path.join(base, "CaniveteDoPailer")
+    os.makedirs(pasta, exist_ok=True)
+    return os.path.join(pasta, "editor_workspaces.json")
+
+
+def ve_layout_load():
+    try:
+        with open(_ve_layout_path(), "r", encoding="utf-8") as f:
+            return {"success": True, "data": json.load(f)}
+    except FileNotFoundError:
+        return {"success": True, "data": None}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def ve_layout_save(dados):
+    """Grava o JSON (texto) de uma vez: arquivo temporário + troca, para não corromper se o app fechar."""
+    try:
+        json.loads(dados)
+        final = _ve_layout_path()
+        tmp = final + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(dados)
+        os.replace(tmp, final)
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def _janela_por_titulo(titulo):
+    """Janela nativa (solta do editor) pelo título exato; None se não achar. Só Windows."""
+    if os.name != "nt" or not titulo:
+        return None
+    import ctypes
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    titulo = str(titulo)
+    meus, outros = [], []
+    # as janelas soltas são deste processo; a de reserva (pop-up padrão do WebView2) acrescenta
+    # " — [InPrivate]" ao título e pertence ao processo do WebView2
+    def _cada(h, _):
+        n = u.GetWindowTextLengthW(h)
+        if n and u.IsWindowVisible(h):
+            b = ctypes.create_unicode_buffer(n + 1)
+            u.GetWindowTextW(h, b, n + 1)
+            if b.value == titulo or b.value.startswith(titulo + " "):
+                (meus if _do_app(h) else outros).append(h)
+        return True
+    u.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)(_cada), 0)
+    return (meus or outros or [None])[0]
+
+
+def _do_app(hwnd):
+    """A janela é deste processo (e não de outra cópia do app aberta ao mesmo tempo)?"""
+    import ctypes
+    from ctypes import wintypes
+    d = wintypes.DWORD()
+    ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(d))
+    return d.value == os.getpid()
+
+
+class _DpiReal:
+    """Coordenadas em pixels reais do monitor (sem a escala do Windows), iguais em qualquer monitor."""
+    def __enter__(self):
+        import ctypes
+        try:
+            self._antes = ctypes.windll.user32.SetThreadDpiAwarenessContext(ctypes.c_void_p(-4))  # per-monitor v2
+        except Exception:
+            self._antes = None
+        return self
+
+    def __exit__(self, *a):
+        import ctypes
+        if self._antes:
+            try:
+                ctypes.windll.user32.SetThreadDpiAwarenessContext(ctypes.c_void_p(self._antes))
+            except Exception:
+                pass
+
+
+def ve_win_rect(titulo):
+    """Posição/tamanho de uma janela solta do editor (px reais) e se está maximizada."""
+    import ctypes
+    from ctypes import wintypes
+    hwnd = _janela_por_titulo(titulo)
+    if not hwnd:
+        return None
+    u = ctypes.windll.user32
+    with _DpiReal():
+        wp = (ctypes.c_uint * 11)()   # WINDOWPLACEMENT: posição "normal" mesmo se maximizada
+        wp[0] = ctypes.sizeof(wp)
+        if not u.GetWindowPlacement(hwnd, ctypes.byref(wp)):
+            r = wintypes.RECT()
+            u.GetWindowRect(hwnd, ctypes.byref(r))
+            return {"x": r.left, "y": r.top, "w": r.right - r.left, "h": r.bottom - r.top, "max": False}
+        if u.IsZoomed(hwnd):
+            x0, y0, x1, y1 = (ctypes.c_int(v).value for v in wp[7:11])
+            return {"x": x0, "y": y0, "w": x1 - x0, "h": y1 - y0, "max": True}
+        r = wintypes.RECT()
+        u.GetWindowRect(hwnd, ctypes.byref(r))
+        return {"x": r.left, "y": r.top, "w": r.right - r.left, "h": r.bottom - r.top, "max": False}
+
+
+def _janela_principal():
+    """Janela principal deste app (processo atual)."""
+    import ctypes
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    pid, achou = os.getpid(), []
+    def _cada(h, _):
+        dono = wintypes.DWORD()
+        u.GetWindowThreadProcessId(h, ctypes.byref(dono))
+        if dono.value == pid and u.IsWindowVisible(h) and u.GetWindowTextLengthW(h):
+            achou.append(h)
+            return False
+        return True
+    u.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)(_cada), 0)
+    return achou[0] if achou else None
+
+
+def ve_win_prepare(titulo):
+    """Janela solta fica sempre acima da principal (como as flutuantes do Premiere), sem ficar acima de
+    outros programas: a principal vira "dona" dela. Devolve False se a janela ainda não existe."""
+    if os.name != "nt":
+        return True
+    import ctypes
+    hwnd = _janela_por_titulo(titulo)
+    if not hwnd:
+        return False
+    dono = _janela_principal()
+    if dono:
+        ctypes.windll.user32.SetWindowLongPtrW(hwnd, -8, dono)   # GWLP_HWNDPARENT = dona
+    return True
+
+
+def ve_win_hit(titulos, excluir=None):
+    """Arrastar uma janela solta pela barra de título do Windows: a página não recebe eventos nisso.
+    Diz qual das janelas do editor (`titulos`) está sob o cursor — a de cima, ignorando a que está sendo
+    movida (`excluir`) — e onde o cursor está na área da página dela (px reais), além do botão esquerdo."""
+    if os.name != "nt":
+        return {"titulo": None, "down": False}
+    import ctypes
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    with _DpiReal():
+        pt = wintypes.POINT()
+        u.GetCursorPos(ctypes.byref(pt))
+        down = bool(u.GetAsyncKeyState(0x01) & 0x8000)
+        alvo = {}
+        ignorar = _janela_por_titulo(excluir) if excluir else None
+        def _titulo(h):
+            n = u.GetWindowTextLengthW(h)
+            b = ctypes.create_unicode_buffer(n + 1)
+            u.GetWindowTextW(h, b, n + 1)
+            return b.value
+        def _dentro(h):
+            r = wintypes.RECT()
+            u.GetWindowRect(h, ctypes.byref(r))
+            return r.left <= pt.x < r.right and r.top <= pt.y < r.bottom
+        # janelas de cima para baixo: a primeira sob o cursor (fora a que se move) decide
+        def _cada(h, _):
+            if h == ignorar or not u.IsWindowVisible(h) or u.IsIconic(h) or not _dentro(h):
+                return True
+            t = _titulo(h)
+            for cand in titulos or []:
+                if (t == cand and _do_app(h)) or t.startswith(cand + " "):
+                    alvo["h"], alvo["t"] = h, cand
+            return False
+        u.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)(_cada), 0)
+        if not alvo:
+            return {"titulo": None, "down": down}
+        # área da página = janela interna do Chromium
+        area = []
+        def _filho(h, _):
+            b = ctypes.create_unicode_buffer(64)
+            u.GetClassNameW(h, b, 64)
+            if b.value == "Chrome_RenderWidgetHostHWND" and u.IsWindowVisible(h):
+                area.append(h)
+                return False
+            return True
+        u.EnumChildWindows(alvo["h"], ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)(_filho), 0)
+        r = wintypes.RECT()
+        u.GetWindowRect(area[0] if area else alvo["h"], ctypes.byref(r))
+        return {"titulo": alvo["t"], "x": pt.x - r.left, "y": pt.y - r.top, "down": down}
+
+
+def ve_win_alpha(titulo, opacidade=1.0):
+    """Janela solta semitransparente enquanto é arrastada, para ver a bússola de encaixe embaixo dela."""
+    if os.name != "nt":
+        return False
+    import ctypes
+    hwnd = _janela_por_titulo(titulo)
+    if not hwnd:
+        return False
+    u = ctypes.windll.user32
+    ex = u.GetWindowLongW(hwnd, -20)                     # GWL_EXSTYLE
+    if not ex & 0x80000:
+        u.SetWindowLongW(hwnd, -20, ex | 0x80000)        # WS_EX_LAYERED
+    a = max(40, min(255, int(float(opacidade) * 255)))
+    u.SetLayeredWindowAttributes(hwnd, 0, a, 2)          # LWA_ALPHA
+    return True
+
+
+def ve_win_place(titulo, x, y, w, h, maximizada=False):
+    """Coloca a janela solta no lugar salvo (qualquer monitor). O WebView sozinho prende a janela
+    no monitor do app; pelo Windows ela vai para onde estava."""
+    import ctypes
+    hwnd = _janela_por_titulo(titulo)
+    if not hwnd:
+        return False
+    u = ctypes.windll.user32
+    x, y, w, h = int(x), int(y), max(200, int(w)), max(150, int(h))
+    # só aceita se o canto da barra de título cair num monitor que existe (monitor desligado = fica onde abriu)
+    class POINT(ctypes.Structure):
+        _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+    ve_win_prepare(titulo)
+    with _DpiReal():
+        if not u.MonitorFromPoint(POINT(x + 40, y + 12), 0):   # MONITOR_DEFAULTTONULL
+            return True   # monitor desligado: fica onde abriu (no monitor do app)
+        u.ShowWindow(hwnd, 9)   # SW_RESTORE
+        for _ in range(2):      # 2x: ao trocar de monitor com outra escala o Windows reajusta o tamanho
+            u.SetWindowPos(hwnd, 0, x, y, w, h, 0x0014)   # SWP_NOZORDER | SWP_NOACTIVATE
+        if maximizada:
+            u.ShowWindow(hwnd, 3)   # SW_MAXIMIZE
+    return True
+
+
 def ve_project_save(path, dados, salvar_como=False):
     """Salva o projeto .vcnvt. Sem caminho (ou 'salvar como'), pergunta onde salvar."""
     from Functions import projeto
@@ -1856,6 +2087,27 @@ class ApiBridge:
     def select_video_file(self, tool):
         return select_video_file(tool)
 
+    def ve_win_rect(self, titulo):
+        return ve_win_rect(titulo)
+
+    def ve_win_hit(self, titulos, excluir=None):
+        return ve_win_hit(titulos, excluir)
+
+    def ve_win_alpha(self, titulo, opacidade=1.0):
+        return ve_win_alpha(titulo, opacidade)
+
+    def ve_win_prepare(self, titulo):
+        return ve_win_prepare(titulo)
+
+    def ve_win_place(self, titulo, x, y, w, h, maximizada=False):
+        return ve_win_place(titulo, x, y, w, h, maximizada)
+
+    def ve_layout_load(self):
+        return ve_layout_load()
+
+    def ve_layout_save(self, dados):
+        return ve_layout_save(dados)
+
     def ve_project_save(self, path, dados, salvar_como=False):
         return ve_project_save(path, dados, salvar_como)
 
@@ -1987,6 +2239,76 @@ class ApiBridge:
         if _window:
             _window.toggle_fullscreen()
         return {"success": True}
+
+
+def _liberar_janelas_flutuantes():
+    """Painéis soltos do editor de vídeo: window.open('') vira uma janela nossa (Form do Windows com um
+    WebView2 no mesmo ambiente do app), ligada à página principal — o painel é movido para lá e dá para
+    levar a outro monitor. A janela padrão de pop-up do WebView2 mostraria a barra "about:blank" e o
+    título "[InPrivate]"; se a nossa falhar, ela fica de reserva. Outros window.open seguem para o navegador."""
+    try:
+        from webview.platforms import edgechromium
+    except Exception:
+        return
+    original = edgechromium.EdgeChrome.on_new_window_request
+
+    def on_new_window_request(self, sender, args):
+        if str(args.get_Uri()) != "about:blank":
+            original(self, sender, args)
+            return
+        try:
+            _janela_solta_propria(self, sender, args)
+        except Exception as e:
+            print(f"[janela solta] usando a janela padrão do WebView2: {e}")
+
+    edgechromium.EdgeChrome.on_new_window_request = on_new_window_request
+
+
+def _janela_solta_propria(chrome, sender, args):
+    from webview.platforms import edgechromium as ec
+    WinForms = ec.WinForms
+    from System.Drawing import Color, Point, Size
+
+    adiado = args.GetDeferral()
+    form = WinForms.Form()
+    form.Text = "Pocket Editor"
+    form.BackColor = Color.FromArgb(255, 8, 8, 8)
+    try:
+        form.Icon = chrome.form.Icon
+    except Exception:
+        pass
+    form.Owner = chrome.form            # sempre acima da principal (como as flutuantes do Premiere)
+    form.ShowInTaskbar = False
+    feats = args.WindowFeatures
+    if feats.HasPosition:
+        form.StartPosition = WinForms.FormStartPosition.Manual
+        form.Location = Point(int(feats.Left), int(feats.Top))
+    if feats.HasSize:
+        form.ClientSize = Size(int(feats.Width), int(feats.Height))
+
+    wv = ec.WebView2()
+    wv.CreationProperties = chrome.webview.CreationProperties   # mesma pasta de dados e modo privado
+    wv.DefaultBackgroundColor = Color.FromArgb(255, 8, 8, 8)
+    wv.Dock = WinForms.DockStyle.Fill
+    form.Controls.Add(wv)
+
+    def pronto(s, e):
+        try:
+            if e.IsSuccess:
+                core = wv.CoreWebView2
+                args.NewWindow = core
+                core.DocumentTitleChanged += lambda c, _: setattr(form, "Text", str(c.DocumentTitle))
+                core.WindowCloseRequested += lambda c, _: form.Close()
+                st = core.Settings
+                st.AreDefaultContextMenusEnabled = False
+                st.AreBrowserAcceleratorKeysEnabled = False
+                st.IsStatusBarEnabled = False
+        finally:
+            adiado.Complete()
+
+    wv.CoreWebView2InitializationCompleted += pronto
+    form.Show()
+    wv.EnsureCoreWebView2Async(sender.Environment)
 
 
 def _porta_agente():
@@ -2150,6 +2472,7 @@ def main():
         webview.settings["REMOTE_DEBUGGING_PORT"] = porta_agente
         print(f"[agente] depuração remota em http://127.0.0.1:{porta_agente}")
 
+    _liberar_janelas_flutuantes()
     webview.start(_splash_sound, debug=False)
     
     # Ao fechar

@@ -38,6 +38,7 @@ const VE = {
     dest: null,
     hoverX: null,
     drag: null,
+    fxHover: -1,        // clipe sob um efeito sendo arrastado do painel Efeitos
     exportRunning: false,
     lastOutput: null,
 };
@@ -45,7 +46,8 @@ const VE = {
 const VE_RULER = 28;
 const VE_MAX_PPS = 3000;   // zoom máximo: ~100 px por quadro a 30 fps
 const VE_TRACK_MIN = 22, VE_TRACK_MAX = 220;
-const $ve = id => document.getElementById(id);
+// procura na janela principal e, se o painel estiver numa janela solta (editor-dock.js), nela
+const $ve = id => document.getElementById(id) || (typeof vedFind === 'function' ? vedFind(id) : null);
 
 // Trilhas como no Premiere: V4..V1 em cima, A1..A4 embaixo. O conteúdo fica em V1/A1 (vinculados).
 const VE_TRACKS = [
@@ -90,11 +92,15 @@ function veClamp(t) { return Math.min(Math.max(t, 0), VE.dur); }
 function veSnapFrame(t) { return Math.round(t * VE.fps) / VE.fps; }
 
 function veToast(msg) {
-    let el = document.querySelector('.ve-toast');
+    // aparece na janela em uso (a principal ou uma janela solta)
+    const w = (typeof vedFloats === 'function' ? vedFloats() : []).map(h => h.win).filter(Boolean)
+        .find(x => { try { return x.document.hasFocus(); } catch (e) { return false; } });
+    const root = (w && w.document.querySelector('.ve-float')) || $ve('ve');
+    let el = root.querySelector(':scope > .ve-toast');
     if (!el) {
-        el = document.createElement('div');
+        el = root.ownerDocument.createElement('div');
         el.className = 've-toast';
-        $ve('ve').appendChild(el);
+        root.appendChild(el);
     }
     el.textContent = msg;
     el.classList.add('show');
@@ -414,7 +420,7 @@ function vePlay() {
     VE._last = performance.now();
     $ve('ve-play').textContent = '❚❚';
     veSyncPlayer(true);
-    requestAnimationFrame(vePlaybackLoop);
+    veRaf($ve('ve-canvas'), vePlaybackLoop);
 }
 
 function veStop() {
@@ -445,8 +451,9 @@ function veToggleMute() {
 
 function vePlaybackLoop(now) {
     if (!VE.playing) return;
-    now = now || performance.now();
-    const dt = Math.min(0.25, (now - VE._last) / 1000);
+    // relógio sempre da janela principal: o rAF de uma janela solta tem outra origem de tempo
+    now = performance.now();
+    const dt = Math.max(0, Math.min(0.25, (now - VE._last) / 1000));
     VE._last = now;
     const v = veVideo();
     const c = VE.clips[VE.cur];
@@ -468,7 +475,7 @@ function vePlaybackLoop(now) {
     veFollowPlayhead(true);
     veUpdateReadouts();
     veDraw();
-    requestAnimationFrame(vePlaybackLoop);
+    veRaf($ve('ve-canvas'), vePlaybackLoop);
 }
 
 // ─────────────────────────── ganho de áudio (G) ───────────────────────────
@@ -869,7 +876,7 @@ function veDrawMonitor() {
         .filter(({ c }) => t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS)
         .sort((a, b) => a.c.tr - b.c.tr);
     // o que está abaixo de um vídeo que cobre o quadro inteiro não aparece: nem decodifica
-    const cobre = vis.map(({ c }) => !veIsImage(c) && veIsDefaultProps(c)).lastIndexOf(true);
+    const cobre = vis.map(({ c }) => !veIsImage(c) && veIsPlain(c)).lastIndexOf(true);
     if (cobre > 0) vis = vis.slice(cobre);
     let extra = 0;
     vis.forEach(({ c, i }) => {
@@ -887,6 +894,7 @@ function veDrawMonitor() {
             }
             if (!src) return;
             const p = veProps(c), sz = veMediaSize(c);
+            src = veFxRender(c, src, sz);   // efeitos rodam antes do movimento (como no Premiere)
             ctx.save();
             ctx.globalAlpha = Math.max(0, Math.min(1, p.op / 100));
             ctx.translate(p.x, p.y);
@@ -917,21 +925,21 @@ function veRenderProps() {
     const c = VE.clips[VE.sel];
     $ve('ve-props-empty').hidden = !!c;
     $ve('ve-props').hidden = !c;
-    if (!c) return;
+    if (!c) { VEFX.key = ''; return; }
     const m = veMediaOf(c);
     $ve('ve-props-title').innerHTML = `Clipe ${VE.sel + 1}<span>${veIsImage(c) ? 'Imagem · ' + veEsc(m.name || '') : 'Vídeo'} · V${c.tr + 1}</span>`;
     const p = veProps(c);
-    document.querySelectorAll('#ve-props [data-prop]').forEach(el => {
+    $ve('ve-props').querySelectorAll('[data-prop]').forEach(el => {
         const k = el.dataset.prop;
         if (el.dataset.range === 'x') { el.min = -VE.seqW; el.max = VE.seqW * 2; el.step = 1; }
         if (el.dataset.range === 'y') { el.min = -VE.seqH; el.max = VE.seqH * 2; el.step = 1; }
-        if (document.activeElement !== el) el.value = veRound(p[k], k === 'x' || k === 'y' ? 0 : 1);
+        if (el.ownerDocument.activeElement !== el) el.value = veRound(p[k], k === 'x' || k === 'y' ? 0 : 1);
     });
     // cronômetro / ◆ de cada propriedade
     const dentro = veInClip(c), tl = veKfTime(c);
     let naAgulha = null;
     VE_KF_PROPS.forEach(k => {
-        const head = document.querySelector(`#ve-props .ve-prop-head[data-kf="${k}"]`);
+        const head = $ve('ve-props').querySelector(`.ve-prop-head[data-kf="${k}"]`);
         if (!head) return;
         const on = veKfOn(c, k), j = on && dentro ? veKfIndex(c.k[k], tl) : -1;
         head.classList.toggle('anim', on);
@@ -941,6 +949,7 @@ function veRenderProps() {
     const box = $ve('ve-kf-interp');
     box.hidden = !naAgulha;
     if (naAgulha) box.querySelectorAll('[data-i]').forEach(b => b.classList.toggle('active', b.dataset.i === naAgulha));
+    veRenderFxControls();
 }
 
 function veSetProp(k, val) {
@@ -1049,12 +1058,12 @@ function veFlattenWith(pred) {
 
 function veExportPlan() {
     const isVid = c => !veIsImage(c);
-    const base = veFlattenWith(c => isVid(c) && veIsDefaultProps(c));
+    const base = veFlattenWith(c => isVid(c) && veIsPlain(c));
     const audio = veFlattenWith(isVid);
     // camadas: imagens e vídeos transformados; um vídeo "normal" acima de alguma camada também
     // precisa entrar (senão a camada apareceria por cima dele)
-    const overlays = VE.clips.filter(c => veIsImage(c) || !veIsDefaultProps(c));
-    const cobre = c => isVid(c) && veIsDefaultProps(c) &&
+    const overlays = VE.clips.filter(c => veIsImage(c) || !veIsPlain(c));
+    const cobre = c => isVid(c) && veIsPlain(c) &&
         overlays.some(o => o.tr < c.tr && o.st < veEnd(c) - VE_EPS && veEnd(o) > c.st + VE_EPS);
     const camadas = VE.clips
         .filter(c => overlays.includes(c) || cobre(c))
@@ -1066,7 +1075,8 @@ function veExportPlan() {
             VE_KF_PROPS.forEach(k => { if (veKfOn(c, k)) kf[k] = c.k[k].map(q => [q.t - c.s, q.v, q.i || 'lin']); });
             return { tipo: veIsImage(c) ? 'imagem' : 'video', path: veIsImage(c) ? m.path : null,
                      st: c.st, s: veIsImage(c) ? 0 : c.s, e: veIsImage(c) ? veLen(c) : c.e,
-                     sc: p.sc, x: p.x, y: p.y, rot: p.rot, op: p.op, kf };
+                     sc: p.sc, x: p.x, y: p.y, rot: p.rot, op: p.op, kf,
+                     fx: veFxExport(c), mw: veMediaSize(c).w, mh: veMediaSize(c).h };
         });
     return { base, audio, camadas };
 }
@@ -1331,8 +1341,6 @@ function veLoadLayout() {
             hs.forEach((h, i) => { VE_TRACKS[i].h = Math.min(Math.max(+h || VE_TRACKS[i].h, VE_TRACK_MIN), VE_TRACK_MAX); });
         }
     } catch (e) {}
-    const tlh = +veLsGet('ve-tl-h');
-    if (tlh) veSetTimelineHeight(tlh, true);
 }
 
 function veBuildHeads() {
@@ -1364,22 +1372,33 @@ function veRowAt(y) {
     return veTrackRows().find(r => y >= r.y && y < r.y + r.h) || null;
 }
 
-function veSetTimelineHeight(h, silent) {
-    const ve = $ve('ve');
-    if (!ve) return;
-    const max = Math.max(160, ve.clientHeight - 46 - 180);
-    h = Math.min(Math.max(h, 120), max || 900);
-    ve.style.setProperty('--ve-tl-h', h + 'px');
-    if (!silent) veLsSet('ve-tl-h', String(Math.round(h)));
-}
-
 // ─────────────────────────── desenho ───────────────────────────
 
 let veDrawQueued = false;
 function veDraw() {
     if (veDrawQueued) return;
     veDrawQueued = true;
-    requestAnimationFrame(() => { veDrawQueued = false; veRender(); });
+    veRaf($ve('ve-tl'), () => { veDrawQueued = false; veRender(); });
+}
+
+// requestAnimationFrame da janela onde o elemento está (painel solto: a janela dele segue desenhando
+// mesmo com a principal escondida atrás de outra); janela minimizada cai na principal
+function veRaf(el, cb) {
+    const w = el && el.ownerDocument.defaultView;
+    return (w && !w.document.hidden ? w : window).requestAnimationFrame(cb);
+}
+
+// Painel mudou de tamanho ou de lugar (docking / janela solta): reajusta zoom e redesenha
+function veLayoutChanged() {
+    if (VE.ready) {
+        const fit = veFitPps();
+        if (VE.pps < fit) VE.pps = fit;
+        veClampView();
+        veSyncZoomSlider();
+    }
+    if ($ve('ve-screen')) veApplyMonitor();
+    veDraw();
+    veDrawMonitor();
 }
 
 function veNiceStep(minSec) {
@@ -1403,7 +1422,7 @@ function veRender() {
     const canvas = $ve('ve-tl');
     const wrap = $ve('ve-tl-wrap');
     if (!canvas || !wrap) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = canvas.ownerDocument.defaultView.devicePixelRatio || 1;   // o painel pode estar em outro monitor
     const W = wrap.clientWidth, H = wrap.clientHeight;
     if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {
         canvas.width = Math.round(W * dpr);
@@ -1534,7 +1553,26 @@ function veRender() {
             const nome = img ? (med.name || 'Imagem') : `Clipe ${i + 1}`;
             ctx.fillText(nome + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, vy + 10.5);
         }
+        if (veHasFx(c) && cw > 34 && vh >= 12) {
+            // selo fx (como no Premiere): laranja = efeitos ligados; cinza = todos desligados/neutros
+            ctx.fillStyle = veFxActive(c).length ? '#F97316' : '#666';
+            ctx.fillRect(cx + cw - 20, vy + 2, 17, 10);
+            ctx.fillStyle = '#1a0d02';
+            ctx.font = '700 8.5px Cascadia Mono, Consolas, monospace';
+            ctx.fillText('fx', cx + cw - 16.5, vy + 10);
+        }
         ctx.restore();
+        if (!ghost && i === VE.fxHover) {
+            ctx.save();
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = 'rgba(249,115,22,0.18)';
+            ctx.fillRect(cx, vy, cw, vh);
+            ctx.strokeStyle = '#F97316';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 3]);
+            veRoundRect(ctx, cx, vy, cw, vh, 4); ctx.stroke();
+            ctx.restore();
+        }
         if (!ghost && veHasKf(c)) veDrawKfMarks(ctx, c, i, st, veKfMarkY(vr));
         if (img) {
             ctx.globalAlpha = 1;
@@ -1698,7 +1736,7 @@ function veUpdateReadouts() {
     $ve('ve-tc').textContent = veTC(VE.playhead);
     $ve('ve-tc-total').textContent = veTC(VE.dur);
     // valores animados e ◆ do painel acompanham a agulha
-    if (veHasKf(VE.clips[VE.sel]) && !$ve('ve-pane-props').hidden) veRenderProps();
+    if (veHasKf(VE.clips[VE.sel]) && vedVisible('props')) veRenderProps();
 }
 
 function veRenderClips() {
@@ -1709,7 +1747,7 @@ function veRenderClips() {
     $ve('ve-sum-cut').textContent = veHuman(Math.max(0, VE.srcDur - VE.dur));
 
     const c0 = VE.clips[0];
-    if (VE.clips.length === 1 && c0.st < 1e-3 && c0.tr === 0 && !c0.g && !c0.p && !c0.k && c0.s < 1e-3 && Math.abs(c0.e - VE.srcDur) < 1e-3) {
+    if (VE.clips.length === 1 && c0.st < 1e-3 && c0.tr === 0 && !c0.g && !c0.p && !c0.k && !c0.fx && c0.s < 1e-3 && Math.abs(c0.e - VE.srcDur) < 1e-3) {
         box.innerHTML = '<div class="ve-clips-empty">Nenhum corte ainda.<br>Aperte <b>\'</b> (ou <b>S</b>) para cortar na agulha. <b>Q</b> / <b>W</b> apagam antes / depois da agulha até o corte mais próximo.<br>Selecione um clipe e aperte <b>D</b> para apagá-lo.</div>';
         return;
     }
@@ -1717,7 +1755,7 @@ function veRenderClips() {
         <div class="ve-clip${i === VE.sel ? ' sel' : ''}" data-i="${i}">
             <div class="ve-clip-bar"></div>
             <div>
-                <div class="ve-clip-name">${veIsImage(c) ? 'Imagem' : 'Clipe'} ${i + 1} <span class="ve-clip-tr">V${c.tr + 1}</span>${c.g ? ` <span class="ve-clip-db">${veFmtDb(c.g)}</span>` : ''}</div>
+                <div class="ve-clip-name">${veIsImage(c) ? 'Imagem' : 'Clipe'} ${i + 1} <span class="ve-clip-tr">V${c.tr + 1}</span>${c.g ? ` <span class="ve-clip-db">${veFmtDb(c.g)}</span>` : ''}${veHasFx(c) ? ` <span class="ve-clip-fx" title="${veEsc(c.fx.map(f => VE_FX[f.t]?.nome).join(', '))}">fx</span>` : ''}</div>
                 <div class="ve-clip-time">${veShort(c.st)} → ${veShort(veEnd(c))} · ${veShort(veLen(c))}</div>
             </div>
             <button class="ve-clip-act" data-act="${i}" title="Apagar clipe (D)"><svg class="i"><use href="#i-trash"/></svg></button>
@@ -1732,9 +1770,9 @@ function veRefresh() {
     veDraw();
 }
 
+// Mostra um painel (aba) do editor — os painéis ficam em editor-dock.js
 function veTab(name) {
-    document.querySelectorAll('.ve-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
-    ['clips', 'props', 'keys'].forEach(n => { $ve('ve-pane-' + n).hidden = n !== name; });
+    vedShow(name);
     if (name === 'props') veRenderProps();
 }
 
@@ -2150,25 +2188,7 @@ function veOnPlayheadHandle(x, y) {
 }
 
 function veInitResizers() {
-    // Altura da timeline: arrastar a borda superior do painel (como no Premiere)
-    const grip = $ve('ve-tl-resize');
-    grip.addEventListener('pointerdown', e => {
-        e.preventDefault();
-        grip.setPointerCapture(e.pointerId);
-        const y0 = e.clientY, h0 = $ve('ve-tl-body').getBoundingClientRect().height;
-        document.body.classList.add('ve-resizing-y');
-        const move = ev => { veSetTimelineHeight(h0 - (ev.clientY - y0), true); veDraw(); };
-        const up = () => {
-            grip.removeEventListener('pointermove', move);
-            grip.removeEventListener('pointerup', up);
-            document.body.classList.remove('ve-resizing-y');
-            veSetTimelineHeight($ve('ve-tl-body').getBoundingClientRect().height);
-        };
-        grip.addEventListener('pointermove', move);
-        grip.addEventListener('pointerup', up);
-    });
-    grip.addEventListener('dblclick', () => { $ve('ve').style.removeProperty('--ve-tl-h'); veLsSet('ve-tl-h', ''); veDraw(); });
-
+    // (a altura da timeline agora é a divisa entre os painéis: editor-dock.js)
     // Altura de cada trilha: arrastar a borda inferior do cabeçalho (V1, A1...)
     $ve('ve-heads-rows').addEventListener('pointerdown', e => {
         const g = e.target.closest('[data-grip]');
@@ -2176,22 +2196,22 @@ function veInitResizers() {
         e.preventDefault();
         const i = +g.dataset.grip, tr = VE_TRACKS[i];
         g.setPointerCapture(e.pointerId);
-        const y0 = e.clientY, h0 = tr.h;
-        document.body.classList.add('ve-resizing-y');
+        const y0 = e.clientY, h0 = tr.h, win = g.ownerDocument.defaultView;   // timeline pode estar numa janela solta
+        win.document.body.classList.add('ve-resizing-y');
         const move = ev => {
             tr.h = Math.round(Math.min(Math.max(h0 + (ev.clientY - y0), VE_TRACK_MIN), VE_TRACK_MAX));
             veBuildHeads();
             veDraw();
         };
         const up = () => {
-            window.removeEventListener('pointermove', move);
-            window.removeEventListener('pointerup', up);
-            document.body.classList.remove('ve-resizing-y');
+            win.removeEventListener('pointermove', move);
+            win.removeEventListener('pointerup', up);
+            win.document.body.classList.remove('ve-resizing-y');
             veLsSet('ve-track-h', JSON.stringify(VE_TRACKS.map(t => t.h)));
         };
         // o cabeçalho é recriado durante o arraste, então os eventos ficam na janela
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', up);
+        win.addEventListener('pointermove', move);
+        win.addEventListener('pointerup', up);
     });
     // Duplo clique no cabeçalho: alterna trilha compacta / expandida
     $ve('ve-heads-rows').addEventListener('dblclick', e => {
@@ -2551,6 +2571,7 @@ function veOnKey(e) {
         if (VE.playing && toolId !== 'video-cutter') veStop();
         orig(toolId);
         document.body.classList.toggle('ve-focus', toolId === 'video-cutter');
+        if (typeof vedEditorVisible === 'function') vedEditorVisible(toolId === 'video-cutter');
         if (toolId === 'video-cutter') setTimeout(() => { if (VE.ready) veSyncZoomSlider(); veDraw(); }, 30);
     };
     switchTool = window.switchTool;

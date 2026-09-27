@@ -361,13 +361,16 @@
                             <span class="ve-proj" id="ve-proj" hidden></span>
                             <div class="ve-meta" id="ve-meta">Nenhum vídeo aberto</div>
                             <div class="ve-top-spacer"></div>
+                            <button class="ve-btn ve-btn-sm ve-btn-ghost ve-win-btn" id="ve-win-btn" onclick="veDockMenu(event)" title="Painéis: mostrar/ocultar e restaurar o layout padrão">Janela ▾</button>
                             <button class="ve-icon-btn" id="ve-undo" onclick="veUndo()" title="Desfazer (Ctrl+Z)" disabled>↶</button>
                             <button class="ve-icon-btn" id="ve-redo" onclick="veRedo()" title="Refazer (Ctrl+Shift+Z)" disabled>↷</button>
                             <button class="ve-btn ve-btn-primary" id="ve-export-btn" onclick="veOpenExport()" disabled title="Exportar (Ctrl+M)"><svg class="i"><use href="#i-download"/></svg> Exportar</button>
                         </header>
 
-                        <div class="ve-main">
-                            <section class="ve-monitor">
+                        <!-- Painéis encaixáveis (como no Premiere): arraste a aba de um painel para outro lugar -->
+                        <div class="ve-dock" id="ve-dock"></div>
+                        <div class="ve-dock-store" id="ve-dock-store">
+                            <section class="ve-panel ve-monitor" data-panel="monitor" data-title="Programa">
                                 <div class="ve-screen" id="ve-screen">
                                     <video id="ve-video" preload="auto" playsinline></video>
                                     <canvas id="ve-canvas" width="1280" height="720"></canvas>
@@ -411,13 +414,7 @@
                                 </div>
                             </section>
 
-                            <aside class="ve-side">
-                                <div class="ve-tabs">
-                                    <button class="ve-tab active" data-tab="clips" onclick="veTab('clips')">Clipes</button>
-                                    <button class="ve-tab" data-tab="props" onclick="veTab('props')">Propriedades</button>
-                                    <button class="ve-tab" data-tab="keys" onclick="veTab('keys')">Atalhos</button>
-                                </div>
-                                <div class="ve-tabpane" id="ve-pane-clips">
+                            <div class="ve-panel ve-tabpane" id="ve-pane-clips" data-panel="clips" data-title="Clipes">
                                     <div class="ve-summary">
                                         <div><span>Original</span><b id="ve-sum-orig">—</b></div>
                                         <div><span>Final</span><b id="ve-sum-final" class="ve-accent">—</b></div>
@@ -427,7 +424,7 @@
                                         <div class="ve-clips-empty">Abra um vídeo e use <b>'</b> (ou a lâmina <b>C</b>) para cortar. Selecione um clipe e aperte <b>D</b> para apagá-lo.</div>
                                     </div>
                                 </div>
-                                <div class="ve-tabpane" id="ve-pane-props" hidden>
+                                <div class="ve-panel ve-tabpane" id="ve-pane-props" data-panel="props" data-title="Controles de efeito">
                                     <div class="ve-clips-empty" id="ve-props-empty">Selecione um clipe ou imagem na timeline para ajustar escala, posição, rotação e opacidade.<br><br>Dica: com o clipe selecionado, arraste a imagem direto no monitor para mover. Clique no ⏱ de uma propriedade para animá-la com quadros-chave.</div>
                                     <div class="ve-props" id="ve-props" hidden>
                                         <div class="ve-props-title" id="ve-props-title"></div>
@@ -460,9 +457,15 @@
                                             <button class="ve-btn ve-btn-sm" onclick="vePropsCenter()">Centralizar</button>
                                             <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="vePropsReset()">↺ Restaurar</button>
                                         </div>
+                                        <div class="ve-fxc" id="ve-fxc"></div>
                                     </div>
                                 </div>
-                                <div class="ve-tabpane" id="ve-pane-keys" hidden>
+                                <div class="ve-panel ve-tabpane" id="ve-pane-fx" data-panel="fx" data-title="Efeitos">
+                                    <div class="ve-fx-search"><svg class="i"><use href="#i-search"/></svg><input type="text" id="ve-fx-q" placeholder="Buscar efeito" autocomplete="off"></div>
+                                    <div class="ve-fx-list" id="ve-fx-list"></div>
+                                    <div class="ve-fx-hint">Arraste um efeito até um clipe na timeline, ou selecione o clipe e dê duplo clique no efeito.</div>
+                                </div>
+                                <div class="ve-panel ve-tabpane" id="ve-pane-keys" data-panel="keys" data-title="Atalhos">
                                     <div class="ve-keys">
                                         <h4>Reprodução</h4>
                                         <div><kbd>Espaço</kbd> Play / Pausa</div>
@@ -488,11 +491,16 @@
                                         <div><kbd>+</kbd> <kbd>-</kbd> Zoom · <kbd>\</kbd> Ajustar à tela</div>
                                         <div><kbd>Alt</kbd> ou <kbd>Ctrl</kbd>+Roda: zoom até o quadro · Roda: rolar · <kbd>Shift</kbd>+Roda: trilhas</div>
                                         <div>Arraste a borda de V1/A1 para mudar a altura da trilha</div>
-                                        <div>Arraste o topo da timeline para aumentá-la</div>
+                                        <div>Arraste a divisa entre dois painéis para redimensionar</div>
+                                        <h4>Painéis (como no Premiere)</h4>
+                                        <div>Arraste a aba de um painel: solte no centro de outro para virar aba; nas bordas, ele se encaixa ao lado / acima / abaixo</div>
+                                        <div>Soltar bem na borda da janela encaixa o painel ocupando a lateral inteira</div>
+                                        <div>Duplo clique na aba maximiza o painel (de novo para voltar) · <b>Janela ▾</b> restaura o layout</div>
+                                        <div><b>⧉</b> na aba, <kbd>Ctrl</kbd> ao soltar, ou soltar fora dos painéis: o painel vira uma janela própria (dá para levar a outro monitor). Fechar a janela devolve o painel ao lugar de antes</div>
                                         <div><kbd>N</kbd> Ímã (encaixe) liga/desliga</div>
                                         <div><kbd>Ctrl</kbd>+<kbd>M</kbd> Exportar · <kbd>Ctrl</kbd>+<kbd>O</kbd> Abrir vídeo ou projeto</div>
                                         <div><kbd>Ctrl</kbd>+<kbd>S</kbd> Salvar projeto (.vcnvt) · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> Salvar como</div>
-                                        <h4>Quadros-chave (Propriedades)</h4>
+                                        <h4>Quadros-chave (Controles de efeito)</h4>
                                         <div>⏱ liga a animação da propriedade e marca o 1º quadro-chave na agulha</div>
                                         <div>Com ⏱ ligado, mova a agulha e mude o valor (ou arraste no monitor): o quadro-chave é criado sozinho</div>
                                         <div>‹ ◆ › Anterior · adicionar/remover na agulha · próximo</div>
@@ -500,11 +508,8 @@
                                         <div>Na timeline: clique no ◆ para ir até ele · arraste para mudar o tempo</div>
                                     </div>
                                 </div>
-                            </aside>
-                        </div>
 
-                        <section class="ve-timeline">
-                            <div class="ve-tl-resize" id="ve-tl-resize" title="Arraste para aumentar ou diminuir a timeline (duplo clique: tamanho padrão)"></div>
+                        <section class="ve-panel ve-timeline" data-panel="timeline" data-title="Timeline">
                             <div class="ve-tl-toolbar">
                                 <div class="ve-seg" role="group" aria-label="Ferramentas">
                                     <button class="ve-seg-btn active" id="ve-tool-select" onclick="veSetTool('select')" title="Seleção (V)"><svg class="i"><use href="#i-pointer"/></svg></button>
@@ -536,6 +541,7 @@
                             </div>
                             <div class="ve-scrollbar" id="ve-scrollbar"><div class="ve-scroll-thumb" id="ve-scroll-thumb"></div></div>
                         </section>
+                        </div>
 
                         <!-- Ganho de áudio (G) -->
                         <div class="ve-modal" id="ve-gain" hidden>
@@ -1280,5 +1286,7 @@
 
     <script src="js/app.js"></script>
     <script src="js/editor.js"></script>
+    <script src="js/editor-fx.js"></script>
+    <script src="js/editor-dock.js"></script>
 </body>
 </html>

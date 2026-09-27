@@ -551,6 +551,46 @@ def _expr_kf(pts, tv):
     return f"if(lt({tv},{pts[0][0]:.4f}),{f(pts[0][1])},{expr})"
 
 
+def _num(v, lo, hi, padrao=0.0):
+    try:
+        return max(lo, min(hi, float(v)))
+    except Exception:
+        return padrao
+
+
+def _filtros_fx(fx, mw, mh):
+    """Efeitos do clipe (mesma ordem e mesmas contas da prévia do editor, em frontend/js/editor-fx.js).
+    Rodam no tamanho original da mídia, antes de escala/posição/rotação/opacidade (como no Premiere)."""
+    out = []
+    for f in fx or []:
+        t, v = str(f.get("t")), f.get("v") or {}
+        if t == "blur":
+            # desfoque em % do lado menor da mídia: 100% = sigma de 5% do lado menor
+            sigma = _num(v.get("amt"), 0, 100) * max(2, min(mw, mh)) / 2000.0
+            if sigma >= 0.05:
+                out.append(f"gblur=sigma={min(sigma, 1000):.3f}:steps=3")
+        elif t == "bc":
+            b = 1 + _num(v.get("br"), -100, 100) / 100.0
+            c = 1 + _num(v.get("ct"), -100, 100) / 100.0
+            if abs(b - 1) > 1e-4 or abs(c - 1) > 1e-4:
+                # igual ao filtro brightness()+contrast() do navegador
+                e = f"clip((clip(val*{b:.4f},0,255)-127.5)*{c:.4f}+127.5,0,255)"
+                out.append(f"lutrgb=r='{e}':g='{e}':b='{e}'")
+        elif t == "crop":
+            l, tp, r, bt = (_num(v.get(k), 0, 100) / 100.0 for k in ("l", "t", "r", "b"))
+            # a área cortada fica transparente (a camada de baixo aparece), sem mudar o tamanho
+            caixa = "drawbox=x={x}:y={y}:w={w}:h={h}:color=black@0:t=fill:replace=1"
+            if l > 0:
+                out.append(caixa.format(x=0, y=0, w=f"'max(1,trunc(iw*{l:.5f}))'", h="ih"))
+            if r > 0:
+                out.append(caixa.format(x=f"'iw-max(1,trunc(iw*{r:.5f}))'", y=0, w=f"'max(1,trunc(iw*{r:.5f}))'", h="ih"))
+            if tp > 0:
+                out.append(caixa.format(x=0, y=0, w="iw", h=f"'max(1,trunc(ih*{tp:.5f}))'"))
+            if bt > 0:
+                out.append(caixa.format(x=0, y=f"'ih-max(1,trunc(ih*{bt:.5f}))'", w="iw", h=f"'max(1,trunc(ih*{bt:.5f}))'"))
+    return out
+
+
 def _normalizar_camadas(camadas, path_video):
     """Camadas por cima da base, de baixo para cima: imagens e clipes de vídeo transformados."""
     out = []
@@ -570,6 +610,8 @@ def _normalizar_camadas(camadas, path_video):
                 "rot": float(c.get("rot", 0)) % 360,
                 "op": max(0.0, min(100.0, float(c.get("op", 100)))) / 100.0,
                 "kf": _normalizar_kf(c.get("kf")),
+                "fx": [f for f in (c.get("fx") or []) if isinstance(f, dict)],
+                "mw": _num(c.get("mw"), 2, 20000, 1920), "mh": _num(c.get("mh"), 2, 20000, 1080),
             }
         except Exception:
             continue
@@ -750,7 +792,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             opac = None
         # escala animada vai por último (tamanho muda a cada quadro; o resto trabalha em tamanho fixo)
         ordem = [giro, opac, escala] if "sc" in kf else [escala, giro, opac]
-        cadeia = f"[{idx}:v:0]fps={fps},format=rgba," + ",".join(f for f in ordem if f)
+        efeitos = _filtros_fx(c["fx"], c["mw"], c["mh"])
+        cadeia = f"[{idx}:v:0]fps={fps},format=rgba," + ",".join(efeitos + [f for f in ordem if f])
         cadeia += f",setpts=PTS-STARTPTS+{c['st']:.3f}/TB[l{n}]"
         filtros.append(cadeia)
         fim = c["st"] + c["dur"]
