@@ -508,6 +508,49 @@ def cancelar_exportacao():
                 pass
 
 
+# Quadros-chave: mesma conversão das propriedades fixas (escala e opacidade viram fração)
+_KF_CONV = {
+    "sc": lambda v: max(0.5, min(2000.0, v)) / 100.0,
+    "x": lambda v: v,
+    "y": lambda v: v,
+    "rot": lambda v: v,
+    "op": lambda v: max(0.0, min(100.0, v)) / 100.0,
+}
+
+
+def _normalizar_kf(kf):
+    """{prop: [[t, v, interp], ...]} (t = segundos desde o início da camada) → listas ordenadas."""
+    out = {}
+    for k, conv in _KF_CONV.items():
+        pts = []
+        for q in (kf or {}).get(k) or []:
+            try:
+                pts.append((float(q[0]), conv(float(q[1])), str(q[2]) if len(q) > 2 else "lin"))
+            except Exception:
+                continue
+        if pts:
+            out[k] = sorted(pts)
+    return out
+
+
+def _expr_kf(pts, tv):
+    """Expressão do ffmpeg que interpola os quadros-chave no tempo `tv` (igual à prévia do editor):
+    antes do 1º e depois do último o valor fica parado; 'ease' = smoothstep, 'hold' = degrau."""
+    f = lambda v: f"{v:.6f}"
+    expr = f(pts[-1][1])
+    for j in range(len(pts) - 2, -1, -1):
+        (ta, va, ia), (tb, vb, _) = pts[j], pts[j + 1]
+        d = tb - ta
+        if d < 1e-6 or ia == "hold" or abs(vb - va) < 1e-9:
+            seg = f(va)
+        else:
+            u = f"clip(({tv}-{ta:.4f})/{d:.4f},0,1)"
+            curva = f"{u}*{u}*(3-2*{u})" if ia == "ease" else u
+            seg = f"({f(va)}+{f(vb - va)}*{curva})"
+        expr = f"if(lt({tv},{tb:.4f}),{seg},{expr})"
+    return f"if(lt({tv},{pts[0][0]:.4f}),{f(pts[0][1])},{expr})"
+
+
 def _normalizar_camadas(camadas, path_video):
     """Camadas por cima da base, de baixo para cima: imagens e clipes de vídeo transformados."""
     out = []
@@ -526,6 +569,7 @@ def _normalizar_camadas(camadas, path_video):
                 "x": float(c.get("x", 0)), "y": float(c.get("y", 0)),
                 "rot": float(c.get("rot", 0)) % 360,
                 "op": max(0.0, min(100.0, float(c.get("op", 100)))) / 100.0,
+                "kf": _normalizar_kf(c.get("kf")),
             }
         except Exception:
             continue
@@ -679,18 +723,41 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             cmd += ["-ss", f"{c['s']:.3f}", "-t", f"{c['dur']:.3f}", "-i", path]
         idx = entrada
         entrada += 1
-        k = c["sc"]
-        cadeia = (f"[{idx}:v:0]fps={fps},format=rgba,"
-                  f"scale='max(2,trunc(iw*{k:.5f}))':'max(2,trunc(ih*{k:.5f}))':flags=bicubic")
-        if c["rot"]:
+        kf = c["kf"]
+        # Dentro da cadeia da camada o tempo começa em 0 (t / T); no overlay é o tempo do vídeo final.
+        # Propriedade animada vira expressão avaliada a cada quadro.
+        if "sc" in kf:
+            e = _expr_kf(kf["sc"], "t")
+            escala = (f"scale=w='max(2,trunc(iw*({e})))':h='max(2,trunc(ih*({e})))'"
+                      f":eval=frame:flags=bicubic")
+        else:
+            k = c["sc"]
+            escala = f"scale='max(2,trunc(iw*{k:.5f}))':'max(2,trunc(ih*{k:.5f}))':flags=bicubic"
+        giro = None
+        if "rot" in kf:
+            # quadro fixo do tamanho da diagonal: cabe em qualquer ângulo
+            e = _expr_kf(kf["rot"], "t")
+            giro = f"rotate=a='({e})*PI/180':c=black@0:ow='hypot(iw,ih)':oh='hypot(iw,ih)'"
+        elif c["rot"]:
             rad = c["rot"] * 3.141592653589793 / 180
-            cadeia += f",rotate={rad:.6f}:c=none:ow='rotw({rad:.6f})':oh='roth({rad:.6f})'"
-        if c["op"] < 0.999:
-            cadeia += f",colorchannelmixer=aa={c['op']:.4f}"
+            giro = f"rotate={rad:.6f}:c=black@0:ow='rotw({rad:.6f})':oh='roth({rad:.6f})'"
+        if "op" in kf:
+            e = _expr_kf(kf["op"], "T")
+            opac = f"geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*({e})'"
+        elif c["op"] < 0.999:
+            opac = f"colorchannelmixer=aa={c['op']:.4f}"
+        else:
+            opac = None
+        # escala animada vai por último (tamanho muda a cada quadro; o resto trabalha em tamanho fixo)
+        ordem = [giro, opac, escala] if "sc" in kf else [escala, giro, opac]
+        cadeia = f"[{idx}:v:0]fps={fps},format=rgba," + ",".join(f for f in ordem if f)
         cadeia += f",setpts=PTS-STARTPTS+{c['st']:.3f}/TB[l{n}]"
         filtros.append(cadeia)
         fim = c["st"] + c["dur"]
-        filtros.append(f"{vf}[l{n}]overlay=x='{c['x']:.2f}-w/2':y='{c['y']:.2f}-h/2'"
+        tl = f"(t-{c['st']:.4f})"
+        px = _expr_kf(kf["x"], tl) if "x" in kf else f"{c['x']:.2f}"
+        py = _expr_kf(kf["y"], tl) if "y" in kf else f"{c['y']:.2f}"
+        filtros.append(f"{vf}[l{n}]overlay=x='{px}-w/2':y='{py}-h/2'"
                        f":enable='between(t,{c['st']:.3f},{fim:.3f})':eof_action=pass:format=auto[o{n}]")
         vf = f"[o{n}]"
     if lay:

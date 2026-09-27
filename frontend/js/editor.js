@@ -550,9 +550,161 @@ function veDefProps(c) {
     if (m && m.kind === 'image' && m.w) sc = veRound(Math.min(100, 100 * Math.min(VE.seqW / m.w, VE.seqH / m.h)));
     return { sc, x: VE.seqW / 2, y: VE.seqH / 2, rot: 0, op: 100 };
 }
-function veProps(c) { return Object.assign(veDefProps(c), c.p || {}); }
+function veStaticProps(c) { return Object.assign(veDefProps(c), c.p || {}); }
+
+// Valor das propriedades no instante T da sequência (quadros-chave, se houver, mandam)
+function veProps(c, T = VE.playhead) {
+    const p = veStaticProps(c);
+    if (c.k) {
+        const tl = c.s + (T - c.st);
+        VE_KF_PROPS.forEach(k => { const ks = c.k[k]; if (ks && ks.length) p[k] = veKfValue(ks, tl); });
+    }
+    return p;
+}
+
+// ── quadros-chave (como no Premiere/After Effects) ──
+// c.k = { sc|x|y|rot|op: [{t, v, i}] } em ordem de t. t é tempo da FONTE do clipe (acompanha o clipe
+// ao mover, cortar e aparar). i = interpolação até o próximo quadro: 'lin', 'ease' (suave) ou 'hold'.
+const VE_KF_PROPS = ['sc', 'x', 'y', 'rot', 'op'];
+const VE_KF_NAMES = { sc: 'Escala', x: 'Posição X', y: 'Posição Y', rot: 'Rotação', op: 'Opacidade' };
+const VE_KF_INTERP = { lin: 'Linear', ease: 'Suave', hold: 'Parar' };
+
+function veKfEase(i, u) { return i === 'hold' ? 0 : i === 'ease' ? u * u * (3 - 2 * u) : u; }
+
+function veKfValue(ks, t) {
+    if (t <= ks[0].t) return ks[0].v;
+    const n = ks.length - 1;
+    if (t >= ks[n].t) return ks[n].v;
+    let j = 0;
+    while (j < n - 1 && t >= ks[j + 1].t) j++;
+    const a = ks[j], b = ks[j + 1];
+    return a.v + (b.v - a.v) * veKfEase(a.i, (t - a.t) / (b.t - a.t));
+}
+
+function veKfOn(c, k) { return !!(c && c.k && c.k[k] && c.k[k].length); }
+function veHasKf(c) { return !!c && VE_KF_PROPS.some(k => veKfOn(c, k)); }
+
+// Tempo da fonte na agulha, preso ao trecho do clipe
+function veKfTime(c) {
+    const t = c.s + (veSnapFrame(VE.playhead) - c.st);
+    return Math.round(Math.min(Math.max(t, c.s), c.e) * 1e4) / 1e4;
+}
+
+function veKfIndex(ks, t) { return ks ? ks.findIndex(q => Math.abs(q.t - t) < veFrame() * 0.5) : -1; }
+
+// Aplica valores na agulha: propriedade animada ganha/atualiza quadro-chave; as outras mudam fixo
+function veApplyProps(c, vals) {
+    const tl = veKfTime(c);
+    const fixos = {};
+    Object.entries(vals).forEach(([k, v]) => {
+        if (!veKfOn(c, k)) { fixos[k] = v; return; }
+        const ks = c.k[k].map(q => ({ ...q }));
+        const j = veKfIndex(ks, tl);
+        if (j >= 0) ks[j].v = v;
+        else { ks.push({ t: tl, v, i: 'lin' }); ks.sort((a, b) => a.t - b.t); }
+        c.k = { ...c.k, [k]: ks };
+    });
+    if (Object.keys(fixos).length) c.p = { ...veStaticProps(c), ...fixos };
+}
+
+// Cronômetro: liga a animação (1º quadro-chave na agulha) ou desliga (fica o valor atual)
+function veKfToggle(k) {
+    const c = VE.clips[VE.sel];
+    if (!c) return;
+    vePushHistory();
+    const v = veProps(c)[k];
+    if (veKfOn(c, k)) {
+        const k2 = { ...c.k };
+        delete k2[k];
+        c.k = k2;
+        if (!veHasKf(c)) delete c.k;
+        c.p = { ...veStaticProps(c), [k]: v };
+        veToast(`Animação de ${VE_KF_NAMES[k]} desligada`);
+    } else {
+        c.k = { ...(c.k || {}), [k]: [{ t: veKfTime(c), v, i: 'lin' }] };
+        veToast(`Animação de ${VE_KF_NAMES[k]} ligada: mude o valor em outro ponto para criar movimento`);
+    }
+    veRefresh();
+}
+
+// ◆: adiciona quadro-chave na agulha ou remove o que já está nela
+function veKfAddRemove(k) {
+    const c = VE.clips[VE.sel];
+    if (!c) return;
+    if (!veInClip(c)) { veToast('Leve a agulha para dentro do clipe'); return; }
+    const tl = veKfTime(c), v = veProps(c)[k];
+    vePushHistory();
+    const ks = veKfOn(c, k) ? c.k[k].map(q => ({ ...q })) : [];
+    const j = veKfIndex(ks, tl);
+    if (j >= 0) {
+        ks.splice(j, 1);
+        const k2 = { ...c.k };
+        if (ks.length) k2[k] = ks; else delete k2[k];
+        c.k = k2;
+        if (!ks.length) c.p = { ...veStaticProps(c), [k]: v };
+        if (!veHasKf(c)) delete c.k;
+    } else {
+        ks.push({ t: tl, v, i: 'lin' });
+        ks.sort((a, b) => a.t - b.t);
+        c.k = { ...(c.k || {}), [k]: ks };
+    }
+    veRefresh();
+}
+
+// Tempos (da sequência) dos quadros-chave do clipe dentro do trecho visível; k = uma propriedade ou todas
+function veKfSeqTimes(c, k) {
+    const set = new Set();
+    (k ? [k] : VE_KF_PROPS).forEach(p => {
+        if (veKfOn(c, p)) c.k[p].forEach(q => { if (q.t >= c.s - 1e-4 && q.t <= c.e + 1e-4) set.add(Math.round((c.st + q.t - c.s) * 1e4) / 1e4); });
+    });
+    return [...set].sort((a, b) => a - b);
+}
+
+function veKfJump(k, dir) {
+    const c = VE.clips[VE.sel];
+    if (!c) return;
+    const eps = veFrame() / 2;
+    const ts = veKfSeqTimes(c, k);
+    const t = dir > 0 ? ts.find(x => x > VE.playhead + eps) : [...ts].reverse().find(x => x < VE.playhead - eps);
+    if (t == null) { veToast(dir > 0 ? 'Não há quadro-chave depois' : 'Não há quadro-chave antes'); return; }
+    if (VE.playing) veStop();
+    veSeek(t);
+}
+
+// Interpolação de todos os quadros-chave que estão na agulha
+function veKfSetInterp(i) {
+    const c = VE.clips[VE.sel];
+    if (!c || !c.k) return;
+    const tl = veKfTime(c);
+    vePushHistory();
+    const k2 = { ...c.k };
+    VE_KF_PROPS.forEach(k => {
+        const j = veKfIndex(k2[k], tl);
+        if (j >= 0) { k2[k] = k2[k].map(q => ({ ...q })); k2[k][j].i = i; }
+    });
+    c.k = k2;
+    veRefresh();
+    veToast('Interpolação: ' + VE_KF_INTERP[i]);
+}
+
+// Move os quadros-chave do instante t0 (fonte) para t1 (arrastar o ◆ na timeline)
+function veKfMove(c, t0, t1) {
+    const k2 = { ...c.k };
+    VE_KF_PROPS.forEach(k => {
+        const ks = k2[k];
+        const j = veKfIndex(ks, t0);
+        if (j < 0) return;
+        const q = { ...ks[j], t: t1 };
+        const resto = ks.filter((x, n) => n !== j && Math.abs(x.t - t1) >= veFrame() * 0.5);
+        k2[k] = [...resto, q].sort((a, b) => a.t - b.t);
+    });
+    c.k = k2;
+}
+
+function veInClip(c) { return VE.playhead >= c.st - VE_EPS && VE.playhead <= veEnd(c) + VE_EPS; }
 
 function veIsDefaultProps(c) {
+    if (veHasKf(c)) return false;
     const p = veProps(c), near = (a, b) => Math.abs(a - b) < 0.05;
     return near(p.sc, 100) && near(p.x, VE.seqW / 2) && near(p.y, VE.seqH / 2) && near(p.rot % 360, 0) && p.op >= 99.95;
 }
@@ -719,6 +871,20 @@ function veRenderProps() {
         if (el.dataset.range === 'y') { el.min = -VE.seqH; el.max = VE.seqH * 2; el.step = 1; }
         if (document.activeElement !== el) el.value = veRound(p[k], k === 'x' || k === 'y' ? 0 : 1);
     });
+    // cronômetro / ◆ de cada propriedade
+    const dentro = veInClip(c), tl = veKfTime(c);
+    let naAgulha = null;
+    VE_KF_PROPS.forEach(k => {
+        const head = document.querySelector(`#ve-props .ve-prop-head[data-kf="${k}"]`);
+        if (!head) return;
+        const on = veKfOn(c, k), j = on && dentro ? veKfIndex(c.k[k], tl) : -1;
+        head.classList.toggle('anim', on);
+        head.querySelector('.ve-kf-add').classList.toggle('on', j >= 0);
+        if (j >= 0 && !naAgulha) naAgulha = c.k[k][j].i || 'lin';
+    });
+    const box = $ve('ve-kf-interp');
+    box.hidden = !naAgulha;
+    if (naAgulha) box.querySelectorAll('[data-i]').forEach(b => b.classList.toggle('active', b.dataset.i === naAgulha));
 }
 
 function veSetProp(k, val) {
@@ -726,9 +892,11 @@ function veSetProp(k, val) {
     if (!c || !isFinite(val)) return;
     if (k === 'sc') val = Math.max(0.5, Math.min(2000, val));
     if (k === 'op') val = Math.max(0, Math.min(100, val));
-    c.p = { ...veProps(c), [k]: val };
+    if (veKfOn(c, k) && !veInClip(c)) { veToast('Leve a agulha para dentro do clipe para criar o quadro-chave'); return; }
+    veApplyProps(c, { [k]: val });
     veRenderProps();
     veDrawMonitor();
+    if (veKfOn(c, k)) veDraw();
 }
 
 function vePropsReset() {
@@ -737,20 +905,60 @@ function vePropsReset() {
     vePushHistory();
     c.p = veIsImage(c) ? veDefProps(c) : undefined;
     if (!c.p) delete c.p;
-    veRenderProps();
-    veDrawMonitor();
+    delete c.k;
+    veRefresh();
 }
 
 function vePropsCenter() {
     const c = VE.clips[VE.sel];
     if (!c) return;
     vePushHistory();
-    c.p = { ...veProps(c), x: VE.seqW / 2, y: VE.seqH / 2 };
-    veRenderProps();
-    veDrawMonitor();
+    veApplyProps(c, { x: VE.seqW / 2, y: VE.seqH / 2 });
+    veRefresh();
+}
+
+// Cabeçalho de cada propriedade: ⏱ nome ……… ◀ ◆ ▶ (montado aqui para não repetir no HTML)
+function veBuildKfHeads() {
+    document.querySelectorAll('#ve-props .ve-prop').forEach(row => {
+        const k = row.querySelector('input[type=range]')?.dataset.prop;
+        const label = row.querySelector(':scope > label');
+        if (!k || !label) return;
+        const head = document.createElement('div');
+        head.className = 've-prop-head';
+        head.dataset.kf = k;
+        head.innerHTML =
+            `<button class="ve-kf-sw" data-kfa="toggle" title="Animar ${VE_KF_NAMES[k]} (liga/desliga os quadros-chave)">` +
+            '<svg viewBox="0 0 16 16"><circle cx="8" cy="9.2" r="5.3"/><path d="M8 9.2V6.2M6.3 1.8h3.4M12.2 4.4l1-1"/></svg></button>' +
+            `<label>${label.textContent}</label>` +
+            '<span class="ve-kf-nav">' +
+            '<button data-kfa="prev" title="Quadro-chave anterior">‹</button>' +
+            '<button class="ve-kf-add" data-kfa="add" title="Adicionar/remover quadro-chave na agulha"><i></i></button>' +
+            '<button data-kfa="next" title="Próximo quadro-chave">›</button></span>';
+        label.replaceWith(head);
+    });
+    const actions = document.querySelector('#ve-props .ve-props-actions');
+    const interp = document.createElement('div');
+    interp.className = 've-kf-interp';
+    interp.id = 've-kf-interp';
+    interp.hidden = true;
+    interp.innerHTML = '<span>Quadro-chave na agulha</span><div>' +
+        Object.entries(VE_KF_INTERP).map(([i, n]) => `<button data-i="${i}">${n}</button>`).join('') + '</div>';
+    actions.before(interp);
+    $ve('ve-props').addEventListener('click', e => {
+        const b = e.target.closest('[data-kfa]');
+        if (b) {
+            const k = b.closest('.ve-prop-head').dataset.kf;
+            ({ toggle: () => veKfToggle(k), add: () => veKfAddRemove(k),
+               prev: () => veKfJump(k, -1), next: () => veKfJump(k, 1) })[b.dataset.kfa]();
+            return;
+        }
+        const it = e.target.closest('#ve-kf-interp [data-i]');
+        if (it) veKfSetInterp(it.dataset.i);
+    });
 }
 
 function veInitProps() {
+    veBuildKfHeads();
     const box = $ve('ve-props');
     // um passo no histórico por gesto (arrastar o slider inteiro = um Ctrl+Z)
     box.addEventListener('input', e => {
@@ -796,10 +1004,13 @@ function veExportPlan() {
         .filter(c => overlays.includes(c) || cobre(c))
         .sort((a, b) => a.tr - b.tr || a.st - b.st)
         .map(c => {
-            const p = veProps(c), m = veMediaOf(c);
+            const p = veStaticProps(c), m = veMediaOf(c);
+            // quadros-chave em tempo da camada (0 = início do clipe na timeline)
+            const kf = {};
+            VE_KF_PROPS.forEach(k => { if (veKfOn(c, k)) kf[k] = c.k[k].map(q => [q.t - c.s, q.v, q.i || 'lin']); });
             return { tipo: veIsImage(c) ? 'imagem' : 'video', path: veIsImage(c) ? m.path : null,
                      st: c.st, s: veIsImage(c) ? 0 : c.s, e: veIsImage(c) ? veLen(c) : c.e,
-                     sc: p.sc, x: p.x, y: p.y, rot: p.rot, op: p.op };
+                     sc: p.sc, x: p.x, y: p.y, rot: p.rot, op: p.op, kf };
         });
     return { base, audio, camadas };
 }
@@ -1267,6 +1478,7 @@ function veRender() {
             ctx.fillText(nome + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, vy + 10.5);
         }
         ctx.restore();
+        if (!ghost && veHasKf(c) && vh >= 20) veDrawKfMarks(ctx, c, i, st, vy + vh - 7);
         if (img) {
             ctx.globalAlpha = 1;
             if ((i === VE.sel && !dim) || ghost) {
@@ -1362,6 +1574,34 @@ function veRender() {
     veUpdateScrollbar();
 }
 
+// ◆ dos quadros-chave na faixa de baixo do clipe (no selecionado ficam maiores e dá para arrastar)
+function veDrawKfMarks(ctx, c, i, st, y) {
+    const sel = i === VE.sel;
+    const d = VE.drag && VE.drag.mode === 'kf' && VE.drag.i === i ? VE.drag : null;
+    const r = sel ? 4.5 : 3;
+    veKfSeqTimes(c).forEach(t => {
+        let x = (t - c.st + st - VE.view) * VE.pps;
+        if (d && Math.abs(t - d.t0) < 1e-3) x = (d.t1 - VE.view) * VE.pps;
+        const naAgulha = sel && Math.abs(t - VE.playhead) < veFrame() / 2;
+        ctx.fillStyle = naAgulha ? '#fbbf24' : sel ? '#F97316' : 'rgba(255,255,255,0.7)';
+        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+    });
+}
+
+// ◆ do clipe selecionado sob o ponteiro (tempo da sequência) ou null
+function veKfMarkAt(x, y, row) {
+    const c = VE.clips[VE.sel];
+    if (!c || !row || row.kind !== 'v' || veTrackIndex(row) !== c.tr || !veHasKf(c)) return null;
+    const my = row.y + row.h - 3 - 7;
+    if (Math.abs(y - my) > 8) return null;
+    return veKfSeqTimes(c).find(t => Math.abs((t - VE.view) * VE.pps - x) <= 6) ?? null;
+}
+
 function veThumbFor(t) {
     if (!VE.thumbs.length) return null;
     let best = null, bd = Infinity;
@@ -1395,6 +1635,8 @@ function veUpdateScrollbar() {
 function veUpdateReadouts() {
     $ve('ve-tc').textContent = veTC(VE.playhead);
     $ve('ve-tc-total').textContent = veTC(VE.dur);
+    // valores animados e ◆ do painel acompanham a agulha
+    if (veHasKf(VE.clips[VE.sel]) && !$ve('ve-pane-props').hidden) veRenderProps();
 }
 
 function veRenderClips() {
@@ -1405,7 +1647,7 @@ function veRenderClips() {
     $ve('ve-sum-cut').textContent = veHuman(Math.max(0, VE.srcDur - VE.dur));
 
     const c0 = VE.clips[0];
-    if (VE.clips.length === 1 && c0.st < 1e-3 && c0.tr === 0 && !c0.g && !c0.p && c0.s < 1e-3 && Math.abs(c0.e - VE.srcDur) < 1e-3) {
+    if (VE.clips.length === 1 && c0.st < 1e-3 && c0.tr === 0 && !c0.g && !c0.p && !c0.k && c0.s < 1e-3 && Math.abs(c0.e - VE.srcDur) < 1e-3) {
         box.innerHTML = '<div class="ve-clips-empty">Nenhum corte ainda.<br>Aperte <b>\'</b> (ou <b>S</b>) para cortar na agulha. <b>Q</b> / <b>W</b> apagam antes / depois da agulha até o corte mais próximo.<br>Selecione um clipe e aperte <b>D</b> para apagá-lo.</div>';
         return;
     }
@@ -1809,9 +2051,10 @@ function veInitMonitorZoom() {
             if (!c) return;
             if (!VEM.pan.hist) { vePushHistory(); VEM.pan.hist = true; }
             const k = veFitScale() * VEM.mz;   // px de tela por px do quadro
-            c.p = { ...veProps(c), x: Math.round(VEM.pan.px + dx / k), y: Math.round(VEM.pan.py + dy / k) };
+            veApplyProps(c, { x: Math.round(VEM.pan.px + dx / k), y: Math.round(VEM.pan.py + dy / k) });
             veRenderProps();
             veDrawMonitor();
+            if (veHasKf(c)) veDraw();
             return;
         }
         VEM.mx = VEM.pan.mx0 + dx;
@@ -1941,6 +2184,13 @@ function veInitEvents() {
         // Segurar e arrastar move o clipe no tempo e entre trilhas; clicar em área vazia desmarca.
         // Pela borda do clipe, arrastar encurta/alonga (imagens: define a duração).
         const row = veRowAt(y);
+        // ◆ do clipe selecionado: clicar leva a agulha até ele; arrastar muda o tempo do quadro-chave
+        const kft = veKfMarkAt(x, y, row);
+        if (kft != null) {
+            if (VE.playing) veStop();
+            VE.drag = { mode: 'kf', i: VE.sel, t0: kft, t1: kft, x0: e.clientX, active: false };
+            return;
+        }
         const borda = veEdgeAt(x, row);
         if (borda) {
             VE.sel = borda.i;
@@ -1970,8 +2220,19 @@ function veInitEvents() {
             if (VE.tool === 'razor') veDraw();
             else if (VE.ready && VE.tool === 'select') {
                 const { y } = veTimeFromEvent(e);
-                wrap.classList.toggle('trim-hover', !!veEdgeAt(x, veRowAt(y)));
+                const row = veRowAt(y);
+                wrap.classList.toggle('kf-hover', veKfMarkAt(x, y, row) != null);
+                wrap.classList.toggle('trim-hover', !wrap.classList.contains('kf-hover') && !!veEdgeAt(x, row));
             }
+            return;
+        }
+        if (VE.drag.mode === 'kf') {
+            const d = VE.drag, c = VE.clips[d.i];
+            if (!d.active && Math.abs(e.clientX - d.x0) < 4) return;   // ainda é um clique
+            d.active = true;
+            d.t1 = Math.min(Math.max(veSnapFrame(t), c.st), veEnd(c));
+            VE.hoverX = null;
+            veDraw();
             return;
         }
         if (VE.drag.mode === 'trim') {
@@ -2023,6 +2284,16 @@ function veInitEvents() {
         VE.drag = null;
         wrap.classList.remove('dragging', 'scrub', 'moving', 'trimming');
         if (d && d.mode === 'trim' && d.started) { veRelayout(); veAfterEdit(VE.playhead); return; }
+        if (d && d.mode === 'kf') {
+            const c = VE.clips[d.i];
+            if (d.active && Math.abs(d.t1 - d.t0) >= veFrame() / 2) {
+                vePushHistory();
+                veKfMove(c, c.s + d.t0 - c.st, Math.round((c.s + d.t1 - c.st) * 1e4) / 1e4);
+            }
+            veSeek(d.active ? d.t1 : d.t0);
+            veRefresh();
+            return;
+        }
         if (d && d.mode === 'move' && d.active) veMoveClip(d.i, d.tr, d.st);
         else veDraw();
     };

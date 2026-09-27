@@ -611,8 +611,39 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-props[hidden] { display: none; }
 .ve-props-title { font-weight: 600; font-size: 12.5px; }
 .ve-props-title span { color: var(--ve-faint); font-weight: 500; margin-left: 4px; }
-.ve-prop { display: grid; grid-template-columns: 68px minmax(0, 1fr) 78px; align-items: center; gap: 8px; }
+.ve-prop { display: grid; grid-template-columns: minmax(0, 1fr) 78px; align-items: center; gap: 4px 8px; }
 .ve-prop label { font-size: 11.5px; color: var(--ve-dim); }
+
+/* ---------- Quadros-chave: ⏱ nome ……… ‹ ◆ › ---------- */
+.ve-prop-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; }
+.ve-prop-head label { flex: 1; }
+.ve-prop-head button {
+    display: grid; place-items: center; width: 20px; height: 20px; padding: 0;
+    border: 0; border-radius: 4px; background: transparent; color: var(--ve-faint); cursor: pointer;
+    font: 600 14px/1 var(--ve-ui);
+}
+.ve-prop-head button:hover { background: var(--ve-panel-2); color: var(--ve-text); }
+.ve-kf-sw svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+.ve-prop-head.anim .ve-kf-sw { color: var(--ve-accent); }
+.ve-prop-head.anim label { color: var(--ve-text); }
+.ve-kf-nav { display: flex; align-items: center; gap: 1px; opacity: .45; }
+.ve-prop-head.anim .ve-kf-nav { opacity: 1; }
+.ve-kf-add i {
+    width: 8px; height: 8px; transform: rotate(45deg);
+    border: 1.5px solid currentColor; border-radius: 1px;
+}
+.ve-kf-add.on { color: var(--ve-accent); }
+.ve-kf-add.on i { background: currentColor; }
+.ve-kf-interp { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--ve-dim); }
+.ve-kf-interp[hidden] { display: none; }
+.ve-kf-interp div { display: flex; border: 1px solid var(--ve-line-2); border-radius: 6px; overflow: hidden; }
+.ve-kf-interp button {
+    padding: 3px 8px; border: 0; background: transparent; color: var(--ve-dim);
+    font: 600 11px var(--ve-ui); cursor: pointer;
+}
+.ve-kf-interp button + button { border-left: 1px solid var(--ve-line-2); }
+.ve-kf-interp button.active { background: var(--ve-accent); color: #fff; }
+.ve-tl-wrap.kf-hover { cursor: pointer; }
 .ve-prop input[type=range] { width: 100%; accent-color: var(--ve-accent); }
 .ve-prop-num { position: relative; display: flex; align-items: center; }
 .ve-prop-num input {
