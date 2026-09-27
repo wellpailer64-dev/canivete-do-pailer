@@ -184,7 +184,23 @@ def garantir_conexao(callback_log=None):
     log = callback_log or (lambda m: None)
     cfg = _config_gdrive()
     if cfg and cfg.get("client_id") == CLIENT_ID and cfg.get("token"):
-        return True, None
+        # Secret salvo diferente do embutido (ex.: secret rotacionado): só atualiza, sem novo login
+        if CLIENT_SECRET and cfg.get("client_secret") != CLIENT_SECRET:
+            log("Atualizando a credencial do Google Drive...")
+            try:
+                subprocess.run([_rclone_exe(), "config", "update", "gdrive", "client_secret", CLIENT_SECRET,
+                                "--non-interactive"], capture_output=True, text=True, timeout=30,
+                               stdin=subprocess.DEVNULL, creationflags=_no_window())
+            except Exception:
+                pass
+        erro_auth = _testar_auth()
+        if not erro_auth:
+            return True, None
+        log("⚠ Login do Google recusado. Refazendo a conexão...")
+        if not CLIENT_SECRET:
+            # Sem a credencial própria: volta para a credencial padrão do rclone
+            return _reconectar([_rclone_exe(), "config", "update", "gdrive", "client_id", "",
+                                "client_secret", "", "config_refresh_token", "true"], log)
     if not CLIENT_SECRET:
         # Build sem a credencial própria: segue com o remote que existir (credencial padrão do rclone)
         if cfg and cfg.get("token"):
@@ -199,8 +215,13 @@ def garantir_conexao(callback_log=None):
         log("Conectando ao Google Drive pela primeira vez...")
         cmd = [_rclone_exe(), "config", "create", "gdrive", "drive", "scope", "drive",
                "client_id", CLIENT_ID, "client_secret", CLIENT_SECRET]
+    return _reconectar(cmd, log, proprio=True)
+
+
+def _reconectar(cmd, log, proprio=False):
+    """Roda o 'rclone config' que abre o navegador para o usuário autorizar. Retorna (ok, erro)."""
     log("🌐 Uma página do Google vai abrir. Escolha sua conta e clique em Permitir. "
-        "Se aparecer 'O Google não verificou este app', clique em Avançado → Acessar Canivete do Pailer.")
+        "Se aparecer 'O Google não verificou este app', clique em Avançado → Acessar.")
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=OAUTH_TIMEOUT,
                            stdin=subprocess.DEVNULL, encoding="utf-8", errors="replace",
@@ -210,11 +231,24 @@ def garantir_conexao(callback_log=None):
     except FileNotFoundError:
         return False, "rclone não encontrado. Rode o setup inicial do app para baixá-lo."
 
-    if usa_client_proprio():
+    if (usa_client_proprio() or not proprio) and not _testar_auth():
         log("✅ Google Drive conectado!")
         return True, None
     erro = (r.stderr or r.stdout or "").strip()
     return False, f"Não foi possível conectar ao Google Drive. {erro[-300:]}"
+
+
+def _testar_auth():
+    """Renova/valida o token com uma chamada leve. Retorna o erro de autenticação ou None."""
+    try:
+        r = subprocess.run([_rclone_exe(), "about", "gdrive:", "--json"], capture_output=True, text=True,
+                           timeout=30, encoding="utf-8", errors="replace", creationflags=_no_window())
+    except Exception:
+        return None   # rede lenta/instável: não bloqueia, o download trata depois
+    if r.returncode == 0:
+        return None
+    t = (r.stderr or r.stdout or "").lower()
+    return t if ("invalid_client" in t or "invalid_grant" in t or "unauthorized_client" in t) else None
 
 
 def get_folder_name(folder_id, callback_log=None, tipo="folder"):
@@ -254,6 +288,8 @@ def _explicar_erro(texto):
         return "Sem espaço em disco no destino."
     if "notfound" in t or "directory not found" in t or "404" in t:
         return "Pasta/arquivo não encontrado (link errado ou sem acesso)."
+    if "invalid_client" in t or "unauthorized_client" in t:
+        return "Credencial do app recusada pelo Google (client secret inválido). Atualize o app."
     if "invalid_grant" in t or "token" in t and "expired" in t:
         return "Login do Google expirado. Rode 'rclone config reconnect gdrive:'."
     return None
@@ -550,9 +586,10 @@ def dump_pasta(remote_args, destino, perfil="rapida",
                     or "no space left" in texto_erros or "not enough space" in texto_erros:
                 log("❌ " + (_explicar_erro(texto_erros) or "Erro fatal."))
                 return False
-            if "invalid_grant" in texto_erros:
-                log("❌ " + _explicar_erro("invalid_grant"))
-                return False
+            for chave in ("invalid_client", "unauthorized_client", "invalid_grant"):
+                if chave in texto_erros:
+                    log("❌ " + _explicar_erro(chave))
+                    return False
 
             log(f"rclone saiu com código {rc}. Retentando em 5s...")
             time.sleep(5)
