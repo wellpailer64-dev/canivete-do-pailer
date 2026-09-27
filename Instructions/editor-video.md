@@ -115,6 +115,29 @@ escala/posição/rotação/opacidade. Clipe com efeito ativo vira camada na expo
 Efeito novo: `VE_FX` em editor-fx.js (parâmetros + `draw`) e `_filtros_fx` em video_cutter.py (mesma conta).
 Parâmetros de efeito ainda não têm quadros-chave.
 
+## Áudio: todas as trilhas somadas, mixadas em tempo real (como Premiere/DaVinci Resolve)
+A1..A4 tocam juntas. Mesmo modelo dos dois: áudio **conformado** em disco + **mixer em tempo real** por blocos.
+- Conformar (como os .cfa do Premiere): ao abrir, o som da fonte vira PCM s16le 48 kHz estéreo sem cabeçalho
+  (`_conformar_audio`; registrado ANTES do `info`, senão a interface pegava o da abertura anterior).
+  `video_cutter_audio_fonte` devolve a URL (media_server, com Range).
+- Mixer (editor-audio.js, como o Fairlight): um AudioWorklet toca uma fila de pedaços de 1024 quadros; o editor
+  mixa ~0,3 s à frente (`VE_AU_ADIANTE`) lendo blocos de 1 s do PCM por HTTP Range (cache LRU, previsão de 3 s).
+  Soma com ganho (dB→linear) e interpolação linear (velocidades J/K/L). A placa de som é o RELÓGIO
+  (`veAudioPos` desconta `outputLatency`); os players de vídeo tocam mudos e seguem (`veSeguirAudio`).
+- Editar tocando: `veAudioEditou` corta a fila (mantém 50 ms) e remixa dali — vale em ~85 ms, sem parar o som.
+- Exportação: a mesma conta no ffmpeg (`_grafo_mix`: asplit, atrim, volume dB, adelay em amostras, amix normalize=0).
+- Medido: soma exata (2 trilhas = 2,0x; −6 dB = 1,5x); fila nunca vazia; play→som 13–40 ms (inclusive no minuto 8
+  de 10); imagem dentro de ±1 quadro do som. Vídeo sem som usa o esquema antigo (som do player de vídeo).
+
+## Trilhas: olho, cadeado e mudo (cabeçalho V1/A1...) · cor do rótulo
+Estado em `VE_TRK` (`v[k]`/`a[k]`: `hide`, `lock`, `mute`), salvo no projeto (`trilhas`), fora do desfazer.
+- Olho (V): a trilha some da prévia (`veDrawMonitor`, `veTopAt`) e da exportação (`veExportPlan`).
+- Cadeado: clipe da trilha (`veLocked`) não é selecionado, movido, aparado, cortado, apagado, nem recebe efeito
+  ou ganho; nada é solto/inserido por cima dele; exclusões em cascata (Q/W/X, D) não o deslocam.
+- M (A): silencia a trilha (o clipe sai do mix de áudio).
+- Botão direito no clipe (`veClipMenu`): cor do rótulo (`c.cor`, paleta `VE_CORES`, entra no desfazer),
+  ganho, efeitos, apagar.
+
 ## Camada de ajuste (como no Premiere)
 Botão **Ajuste** (ao lado de Imagem): cria um clipe de 5 s na primeira trilha livre acima do vídeo. É uma mídia
 `kind: 'ajuste'` (sem arquivo): `veIsImage` vale para ela (sem som, duração livre) e `veIsAdj` a distingue.

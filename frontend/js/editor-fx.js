@@ -162,6 +162,7 @@ function veFxNewId() { return 'f' + Date.now().toString(36) + Math.random().toSt
 function veFxAdd(i, t) {
     const c = VE.clips[i];
     if (!c || !VE_FX[t]) return;
+    if (veLocked(c)) { veAvisoBloqueio(); return; }
     if (VE.info && VE.info.audio_only) { veToast('Efeitos de vídeo precisam de um vídeo ou imagem'); return; }
     const painel = VE_FX[t].painel;
     if (painel && c.fx && c.fx.some(f => f.t === t)) {   // um só por clipe: abre o painel dele

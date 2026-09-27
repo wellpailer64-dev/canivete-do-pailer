@@ -281,6 +281,12 @@ def video_cutter_prepare(file_path):
     return {"success": True}
 
 
+def video_cutter_audio_fonte():
+    """Áudio conformado (PCM) da fonte aberta, para o mixer em tempo real do editor."""
+    from Functions.video_cutter import audio_conformado
+    return audio_conformado()
+
+
 def video_cutter_add_media(path):
     """Registra uma imagem para usar como camada no editor (a URL é servida pelo media_server)."""
     from Functions import media_server
@@ -295,7 +301,7 @@ def video_cutter_add_media(path):
 
 def video_cutter_export(file_path, segments, output_format="mp4", qualidade="medium",
                         resolucao="original", usar_gpu=True, pasta_saida=None, sem_audio=False,
-                        camadas=None, audio_segments=None, duracao=None):
+                        camadas=None, audio_segments=None, duracao=None, audio_clipes=None):
     """Exporta a timeline (base + camadas por cima); progresso em veOnExport(evento)."""
     from Functions.video_cutter import exportar_video
     global _ve_export_stop
@@ -313,6 +319,7 @@ def video_cutter_export(file_path, segments, output_format="mp4", qualidade="med
                 camadas=camadas or [],
                 audio_segmentos=audio_segments,
                 duracao=duracao,
+                audio_clipes=audio_clipes,
             )
             _ve_emit("veOnExport", {"done": True, **r})
         except Exception as e:
@@ -2096,9 +2103,12 @@ class ApiBridge:
 
     def video_cutter_export(self, file_path, segments, output_format="mp4", qualidade="medium",
                             resolucao="original", usar_gpu=True, pasta_saida=None, sem_audio=False,
-                            camadas=None, audio_segments=None, duracao=None):
+                            camadas=None, audio_segments=None, duracao=None, audio_clipes=None):
         return video_cutter_export(file_path, segments, output_format, qualidade, resolucao, usar_gpu,
-                                   pasta_saida, sem_audio, camadas, audio_segments, duracao)
+                                   pasta_saida, sem_audio, camadas, audio_segments, duracao, audio_clipes)
+
+    def video_cutter_audio_fonte(self):
+        return video_cutter_audio_fonte()
 
     def video_cutter_add_media(self, path):
         return video_cutter_add_media(path)

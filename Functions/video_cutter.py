@@ -362,6 +362,7 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
 def _preparar_audio(path, info, work, emit, stop_event):
     """Arquivo só de áudio: timeline com forma de onda, monitor preto; quadro padrão 1280x720."""
     info = {**info, "width": 1280, "height": 720, "fps": 30.0, "audio_only": True}
+    _conformar_audio(path, work)
     ext = os.path.splitext(path)[1].lower()
     direto = ext in _NAVEGADOR_AUDIO
     emit({"stage": "info", "path": path, "file_name": os.path.basename(path), "needs_proxy": not direto, **info})
@@ -419,6 +420,8 @@ def preparar(path, emit, stop_event=None):
         return
 
     direto = _navegador_toca(path, info)
+    if info["has_audio"]:
+        _conformar_audio(path, work)
     emit({"stage": "info", "path": path, "file_name": os.path.basename(path),
           "needs_proxy": not direto, **info})
 
@@ -672,6 +675,82 @@ def _opacidade_animada(pts, dur, fps, nome, inicio=0.0):
     return f"sendcmd=f={_caminho_filtro(arq)},{nome}=aa={_valor_kf(pts, 0):.5f}"
 
 
+# ─────────────────────────── mixagem das trilhas de áudio ───────────────────────────
+# Todas as trilhas tocam juntas (soma, como no Premiere): cada clipe com som entra com o próprio ganho no
+# instante dele. A prévia do editor faz a MESMA conta em tempo real (mixer de editor-audio.js, sobre o áudio
+# conformado): soma com o ganho em dB, posições em amostras de 48 kHz.
+
+def _normalizar_mix(clipes, dur_fonte):
+    """[[st, s, e, ganho_db], ...] da timeline → lista limpa de tuplas (só trechos válidos da fonte)."""
+    out = []
+    for c in clipes or []:
+        try:
+            st, s0, e0 = float(c[0]), float(c[1]), float(c[2])
+            g = float(c[3]) if len(c) > 3 and c[3] else 0.0
+        except Exception:
+            continue
+        s0, e0 = max(0.0, s0), min(float(dur_fonte or e0), e0)
+        if st >= 0 and e0 - s0 > 0.005:
+            out.append((st, s0, e0, max(-60.0, min(30.0, g))))
+    return out
+
+
+def _grafo_mix(clipes, total, entrada, rotulo):
+    """Filtros que somam os clipes (st, s, e, ganho) lidos de `entrada` (o áudio da fonte) e terminam em
+    [rotulo], com a duração exata `total`. Um decodificador só (asplit), atraso em amostras (preciso)."""
+    if not clipes:
+        return [f"anullsrc=r=48000:cl=stereo,atrim=0:{total:.4f}[{rotulo}]"]
+    n = len(clipes)
+    f = [f"{entrada}aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,asplit={n}"
+         + "".join(f"[{rotulo}s{k}]" for k in range(n))]
+    for k, (st, s0, e0, g) in enumerate(clipes):
+        vol = f",volume={g:.2f}dB" if g else ""
+        f.append(f"[{rotulo}s{k}]atrim=start={s0:.5f}:end={e0:.5f},asetpts=PTS-STARTPTS{vol},"
+                 f"adelay={int(round(st * 48000))}S:all=1[{rotulo}m{k}]")
+    f.append("".join(f"[{rotulo}m{k}]" for k in range(n))
+             + f"amix=inputs={n}:normalize=0:duration=longest:dropout_transition=0,"
+             + f"apad=whole_dur={total:.4f},atrim=0:{total:.4f}[{rotulo}]")
+    return f
+
+
+# Áudio "conformado" (como os .cfa do Premiere): ao abrir, o som da fonte vira PCM puro em disco
+# (48 kHz, estéreo, 16 bits, sem cabeçalho). O mixer em tempo real do editor (editor-audio.js) lê trechos dele
+# por HTTP Range e soma as trilhas a cada bloco — nada é renderizado de novo quando a timeline muda.
+AUDIO_SR = 48000
+_conf = {"fonte": None, "pcm": None, "evento": None}
+
+
+def _conformar_audio(path, work):
+    """Conforma o áudio da fonte (uma vez por abertura). Registra o pedido ANTES de voltar — a interface pede
+    o áudio logo que recebe o 'info' e não pode pegar o da abertura anterior — e converte em segundo plano."""
+    pcm = os.path.join(work, "fonte_audio.pcm")
+    ev = threading.Event()
+    _conf.update(fonte=path, pcm=pcm, evento=ev)
+    threading.Thread(target=_mix_fonte_pronta, args=(path, pcm, ev), daemon=True).start()
+
+
+def _mix_fonte_pronta(path, pcm, ev):
+    try:
+        subprocess.run([ffmpeg_path(), "-y", "-v", "error", "-i", path, "-map", "0:a:0", "-vn", "-ac", "2",
+                        "-ar", str(AUDIO_SR), "-f", "s16le", "-c:a", "pcm_s16le", pcm],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3600, creationflags=_creationflags())
+    except Exception:
+        pass
+    ev.set()
+
+
+def audio_conformado(espera=600):
+    """{url, sr, canais, quadros} do PCM conformado da fonte aberta (espera a conversão terminar)."""
+    ev, pcm = _conf["evento"], _conf["pcm"]
+    if ev is None or not pcm:
+        return {"success": False, "error": "sem áudio"}
+    ev.wait(espera)
+    if _conf["pcm"] != pcm or not os.path.isfile(pcm) or os.path.getsize(pcm) < 4:
+        return {"success": False, "error": "falha ao preparar o áudio"}
+    return {"success": True, "url": media_server.register(pcm), "sr": AUDIO_SR, "canais": 2,
+            "quadros": os.path.getsize(pcm) // 4}
+
+
 def _num(v, lo, hi, padrao=0.0):
     try:
         return max(lo, min(hi, float(v)))
@@ -811,12 +890,14 @@ def _opcao_filtro_script():
 
 def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", resolucao="original",
                    usar_gpu=True, pasta_saida=None, on_progress=None, stop_event=None, sem_audio=False,
-                   camadas=None, audio_segmentos=None, duracao=None):
+                   camadas=None, audio_segmentos=None, duracao=None, audio_clipes=None):
     """
     Exporta a timeline do editor.
     segmentos       = base de vídeo em ordem ([{start, end, gain}] do original ou {gap: s})
     audio_segmentos = trilha de áudio (mesmo formato); se None, usa os segmentos da base
     camadas         = imagens/clipes transformados por cima da base (de baixo para cima)
+    audio_clipes    = [[st, s, e, ganho_db]] de TODOS os clipes com som: as trilhas são somadas (_grafo_mix).
+                      Com ele, audio_segmentos é ignorado.
     on_progress(pct, mensagem)
     """
     global _export_proc
@@ -845,13 +926,15 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     pecas = _normalizar_segmentos(segmentos, info["duration"])
     pecas_a = pecas if audio_segmentos is None else _normalizar_segmentos(audio_segmentos, info["duration"])
     lay = _normalizar_camadas(camadas, path)
+    mix = _normalizar_mix(audio_clipes, info["duration"]) if audio_clipes is not None else None
     segs = [p for p in pecas if p[0] != "gap"]
-    if not segs and not lay and not any(p[0] != "gap" for p in pecas_a):
+    if not segs and not lay and not any(p[0] != "gap" for p in pecas_a) and not mix:
         return {"success": False, "error": "Nada para exportar: todos os trechos foram removidos."}
 
     # duração final: a maior entre base, áudio, camadas e a informada pela timeline
     total = max([sum(_dur_peca(p) for p in pecas), sum(_dur_peca(p) for p in pecas_a)]
-                + [c["st"] + c["dur"] for c in lay] + [float(duracao or 0)])
+                + [c["st"] + c["dur"] for c in lay] + [float(duracao or 0)]
+                + [c[0] + c[2] - c[1] for c in (mix or [])])
     if total < 0.04:
         return {"success": False, "error": "Nada para exportar."}
 
@@ -859,12 +942,12 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         falta = total - sum(_dur_peca(p) for p in lista)
         return list(lista) + ([("gap", falta)] if falta > 0.02 else [])
 
-    simples = not lay and audio_segmentos is None
+    simples = not lay and audio_segmentos is None and mix is None
     if not simples:
         pecas, pecas_a = _completar(pecas), _completar(pecas_a)
     saida = _nome_saida(path, cfg["ext"], pasta_saida)
     has_audio = info["has_audio"] and not sem_audio
-    audio_junto = pecas_a == pecas   # mesmas peças: o áudio sai das mesmas entradas do vídeo
+    audio_junto = pecas_a == pecas and mix is None   # mesmas peças: o áudio sai das mesmas entradas do vídeo
 
     tem_ganho = any(p[2] for p in segs)
     tem_vazio = len(segs) != len(pecas)
@@ -910,7 +993,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 pares += f"[a{k}]"
         if not audio_only:
             filtros.append(f"{pares}concat=n={len(pecas)}:v=1:a={1 if junto else 0}[vc]" + ("[ac]" if junto else ""))
-        if has_audio and not audio_junto:
+        if has_audio and not audio_junto and mix is None:
             pares_a = ""
             for k, p in enumerate(pecas_a):
                 _filtro_audio(_entrada_peca(p, False), p, f"ax{k}")
@@ -922,8 +1005,13 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         cmd += ["-i", path]
         entrada += 1
         filtros.append(f"[0:v:0]select='{cond}',setpts=N/FRAME_RATE/TB[vc]")
-        if has_audio:
+        if has_audio and mix is None:
             filtros.append(f"[0:a:0]aselect='{cond}',asetpts=N/SR/TB[ac]")
+    if has_audio and mix is not None:
+        # todas as trilhas de áudio somadas (o mesmo grafo que a prévia do editor toca)
+        cmd += ["-i", path]
+        entrada += 1
+        filtros.extend(_grafo_mix(mix, total, f"[{entrada - 1}:a:0]", "ac"))
 
     # Camadas por cima (imagens e clipes com escala/posição/rotação/opacidade), de baixo para cima
     vf = "[vc]"

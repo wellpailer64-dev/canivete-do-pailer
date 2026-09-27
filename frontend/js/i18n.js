@@ -253,6 +253,16 @@ const I18N_EN = {
     'Temperatura': 'Temperature', 'Matiz': 'Tint', 'Exposição': 'Exposure', 'Gama': 'Gamma', 'Vinheta': 'Vignette', 'Espelhar': 'Mirror',
     'Horizontal': 'Horizontal', 'Vertical': 'Vertical', 'Raio': 'Radius', 'Intensidade': 'Intensity', 'Cor': 'Color', 'Estilizar': 'Stylize',
     'Preto e branco': 'Black and white', 'Sépia': 'Sepia', 'Inverter': 'Invert', 'Ruído': 'Noise', 'Granulação': 'Grain',
+    // Trilhas (cabeçalho) e menu do clipe
+    'Bloquear trilha (os clipes não podem ser editados)': 'Lock track (clips cannot be edited)', 'Desbloquear trilha': 'Unlock track',
+    'Ocultar trilha (não aparece na prévia nem na exportação)': 'Hide track (not shown in preview or export)', 'Mostrar trilha': 'Show track',
+    'Silenciar trilha': 'Mute track', 'Ativar som da trilha': 'Unmute track',
+    'Trilha bloqueada: clique no cadeado para desbloquear': 'Track locked: click the lock to unlock',
+    'Cor do rótulo': 'Label color', 'Padrão': 'Default', 'Ganho de áudio…': 'Audio gain…',
+    'Efeitos e propriedades': 'Effects and properties', 'Apagar clipe': 'Delete clip',
+    'Violeta': 'Violet', 'Íris': 'Iris', 'Azul': 'Blue', 'Cerúleo': 'Cerulean', 'Caribe': 'Caribbean', 'Verde-azulado': 'Teal',
+    'Floresta': 'Forest', 'Verde': 'Green', 'Amarelo': 'Yellow', 'Manga': 'Mango', 'Laranja': 'Orange', 'Rosa': 'Rose',
+    'Magenta': 'Magenta', 'Lavanda': 'Lavender', 'Bege': 'Tan', 'Marrom': 'Brown',
     // Camada de ajuste
     'Ajuste': 'Adjustment', 'Camada de ajuste': 'Adjustment layer', 'Camada de ajuste precisa de um vídeo': 'An adjustment layer needs a video',
     'Camada de ajuste: os efeitos dela valem para tudo o que está nas trilhas de baixo': 'Adjustment layer: its effects apply to everything on the tracks below',
@@ -296,6 +306,8 @@ const I18N_EN = {
 
 // Frases com partes variáveis (números, nomes, caminhos)
 const I18N_RE = [
+    [/^([VA]\d) (bloqueada|desbloqueada|oculta|visível|sem som|com som)$/, (m, t, e) =>
+        `${t} ${{ bloqueada: 'locked', desbloqueada: 'unlocked', oculta: 'hidden', 'visível': 'visible', 'sem som': 'muted', 'com som': 'unmuted' }[e]}`],
     [/^Ajuste (\d+)(.*)$/, 'Adjustment $1$2'],
     [/^Camada de ajuste adicionada em V(\d+)$/, 'Adjustment layer added to V$1'],
     [/^Clipe (\d+)$/, 'Clip $1'],
