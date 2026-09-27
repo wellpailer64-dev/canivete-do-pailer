@@ -681,32 +681,47 @@ def _opacidade_animada(pts, dur, fps, nome, inicio=0.0):
 # conformado): soma com o ganho em dB, posições em amostras de 48 kHz.
 
 def _normalizar_mix(clipes, dur_fonte):
-    """[[st, s, e, ganho_db], ...] da timeline → lista limpa de tuplas (só trechos válidos da fonte)."""
+    """[[st, s, e, ganho_db, arquivo?], ...] da timeline → tuplas (st, s, e, ganho, arquivo). arquivo None = o
+    vídeo aberto (limitado à duração dele); senão um áudio extra solto na timeline."""
     out = []
     for c in clipes or []:
         try:
             st, s0, e0 = float(c[0]), float(c[1]), float(c[2])
             g = float(c[3]) if len(c) > 3 and c[3] else 0.0
+            arq = c[4] if len(c) > 4 and c[4] else None
         except Exception:
             continue
-        s0, e0 = max(0.0, s0), min(float(dur_fonte or e0), e0)
+        if arq is not None and not os.path.isfile(str(arq)):
+            continue
+        s0 = max(0.0, s0)
+        if arq is None and dur_fonte:
+            e0 = min(float(dur_fonte), e0)
         if st >= 0 and e0 - s0 > 0.005:
-            out.append((st, s0, e0, max(-60.0, min(30.0, g))))
+            out.append((st, s0, e0, max(-60.0, min(30.0, g)), arq))
     return out
 
 
-def _grafo_mix(clipes, total, entrada, rotulo):
-    """Filtros que somam os clipes (st, s, e, ganho) lidos de `entrada` (o áudio da fonte) e terminam em
-    [rotulo], com a duração exata `total`. Um decodificador só (asplit), atraso em amostras (preciso)."""
+def _grafo_mix(clipes, total, entradas, rotulo):
+    """Filtros que somam os clipes (st, s, e, ganho, arquivo) e terminam em [rotulo] com a duração exata `total`.
+    entradas = {arquivo: "[i:a:0]"} (arquivo None = vídeo aberto). Um decodificador por arquivo (asplit),
+    atraso em amostras (preciso), soma pura (amix normalize=0)."""
+    clipes = [c for c in clipes if c[4] in entradas]
     if not clipes:
         return [f"anullsrc=r=48000:cl=stereo,atrim=0:{total:.4f}[{rotulo}]"]
-    n = len(clipes)
-    f = [f"{entrada}aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,asplit={n}"
-         + "".join(f"[{rotulo}s{k}]" for k in range(n))]
-    for k, (st, s0, e0, g) in enumerate(clipes):
+    f, nomes = [], {}
+    for j, (arq, ent) in enumerate(entradas.items()):
+        ks = [k for k, c in enumerate(clipes) if c[4] == arq]
+        if not ks:
+            continue
+        for k in ks:
+            nomes[k] = f"{rotulo}s{k}"
+        f.append(f"{ent}aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,asplit={len(ks)}"
+                 + "".join(f"[{nomes[k]}]" for k in ks))
+    for k, (st, s0, e0, g, _) in enumerate(clipes):
         vol = f",volume={g:.2f}dB" if g else ""
-        f.append(f"[{rotulo}s{k}]atrim=start={s0:.5f}:end={e0:.5f},asetpts=PTS-STARTPTS{vol},"
+        f.append(f"[{nomes[k]}]atrim=start={s0:.5f}:end={e0:.5f},asetpts=PTS-STARTPTS{vol},"
                  f"adelay={int(round(st * 48000))}S:all=1[{rotulo}m{k}]")
+    n = len(clipes)
     f.append("".join(f"[{rotulo}m{k}]" for k in range(n))
              + f"amix=inputs={n}:normalize=0:duration=longest:dropout_transition=0,"
              + f"apad=whole_dur={total:.4f},atrim=0:{total:.4f}[{rotulo}]")
@@ -739,6 +754,32 @@ def _mix_fonte_pronta(path, pcm, ev):
     ev.set()
 
 
+def adicionar_audio(path):
+    """Áudio solto na timeline (MP3, WAV...): conforma em PCM (para o mixer em tempo real), gera a forma de onda
+    e devolve a duração. Um arquivo só é convertido uma vez por sessão."""
+    if not os.path.isfile(path):
+        return {"success": False, "error": "Arquivo não encontrado."}
+    try:
+        info = probe(path)
+    except Exception as e:
+        return {"success": False, "error": f"Não foi possível analisar o áudio: {e}"}
+    if not info["has_audio"] or info["duration"] <= 0:
+        return {"success": False, "error": "Este arquivo não tem som."}
+    chave = hashlib.md5(f"{os.path.abspath(path)}|{os.path.getmtime(path)}".encode()).hexdigest()[:14]
+    pcm = os.path.join(_work_dir(), f"aud_{chave}.pcm")
+    if not os.path.isfile(pcm):
+        r = subprocess.run([ffmpeg_path(), "-y", "-v", "error", "-i", path, "-map", "0:a:0", "-vn", "-ac", "2",
+                            "-ar", str(AUDIO_SR), "-f", "s16le", "-c:a", "pcm_s16le", pcm + ".tmp"],
+                           capture_output=True, text=True, timeout=3600, creationflags=_creationflags())
+        if r.returncode != 0 or not os.path.isfile(pcm + ".tmp"):
+            _apagar(pcm + ".tmp")
+            return {"success": False, "error": "Não foi possível ler o áudio."}
+        os.replace(pcm + ".tmp", pcm)
+    quadros = os.path.getsize(pcm) // 4
+    return {"success": True, "path": path, "name": os.path.basename(path), "dur": quadros / AUDIO_SR,
+            "url": media_server.register(pcm), "quadros": quadros, "peaks": gerar_peaks(path, quadros / AUDIO_SR)}
+
+
 def audio_conformado(espera=600):
     """{url, sr, canais, quadros} do PCM conformado da fonte aberta (espera a conversão terminar)."""
     ev, pcm = _conf["evento"], _conf["pcm"]
@@ -749,6 +790,75 @@ def audio_conformado(espera=600):
         return {"success": False, "error": "falha ao preparar o áudio"}
     return {"success": True, "url": media_server.register(pcm), "sr": AUDIO_SR, "canais": 2,
             "quadros": os.path.getsize(pcm) // 4}
+
+
+# ─────────────────────────── legendas gravadas no vídeo ───────────────────────────
+# O editor desenha a legenda na prévia com as mesmas contas (editor-texto.js: veTxDesenhar). Arial; o
+# "Fontsize" do ASS é a altura da linha (ascent+descent = 1,117 em no Arial), por isso tam_em * 1,117.
+
+def _ass_tempo(t):
+    t = max(0.0, float(t))
+    h, r = divmod(t, 3600)
+    m, s = divmod(r, 60)
+    return f"{int(h)}:{int(m):02d}:{s:05.2f}"
+
+
+def _ass_cor(hexcor, alfa=0):
+    """#RRGGBB + transparência (0 = opaco, 255 = invisível) → &HAABBGGRR do ASS."""
+    try:
+        hx = str(hexcor).lstrip("#")
+        rr, gg, bb = int(hx[0:2], 16), int(hx[2:4], 16), int(hx[4:6], 16)
+    except Exception:
+        rr = gg = bb = 255
+    return f"&H{int(alfa):02X}{bb:02X}{gg:02X}{rr:02X}"
+
+
+def _gerar_ass(itens, estilo, W, H):
+    em = max(8.0, float(estilo.get("tam", 5.5)) / 100.0 * H)
+    fundo = estilo.get("fundo", "caixa")
+    pos = estilo.get("pos", "baixo")
+    alinhamento = {"baixo": 2, "meio": 5, "cima": 8}.get(pos, 2)
+    margem = int(round(0.06 * H))
+    negrito = -1 if estilo.get("negrito", True) else 0
+    cor = _ass_cor(estilo.get("cor", "#ffffff"))
+    if fundo == "caixa":
+        # BorderStyle 3: caixa opaca atrás de cada linha; o Outline vira a folga da caixa
+        borda, contorno, sombra, fundo_cor = 3, round(em * 0.22, 1), 0, _ass_cor(estilo.get("caixa", "#000000"), 0x5C)
+    elif fundo == "sombra":
+        borda, contorno, sombra, fundo_cor = 1, round(em * 0.06, 1), round(em * 0.07, 1), _ass_cor("#000000", 0x40)
+    else:
+        borda, contorno, sombra, fundo_cor = 1, 0, 0, _ass_cor("#000000", 0xFF)
+    linhas = [
+        "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {W}", f"PlayResY: {H}", "WrapStyle: 2",
+        "ScaledBorderAndShadow: yes", "",
+        "[V4+ Styles]",
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
+        "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, "
+        "MarginR, MarginV, Encoding",
+        f"Style: Leg,Arial,{em * 1.117:.1f},{cor},{cor},{fundo_cor if borda == 3 else _ass_cor('#000000')},{fundo_cor},"
+        f"{negrito},0,0,0,100,100,0,0,{borda},{contorno},{sombra},{alinhamento},{margem},{margem},{margem},1",
+        "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+    ]
+    n = 0
+    for it in itens:
+        try:
+            st, en = float(it["st"]), float(it["en"])
+        except Exception:
+            continue
+        txt = str(it.get("texto", "")).strip()
+        if en - st < 0.02 or not txt:
+            continue
+        if estilo.get("maiusc"):
+            txt = txt.upper()
+        txt = txt.replace("\\", "\\\\").replace("{", "(").replace("}", ")").replace("\r", "").replace("\n", "\\N")
+        linhas.append(f"Dialogue: 0,{_ass_tempo(st)},{_ass_tempo(en)},Leg,,0,0,0,,{txt}")
+        n += 1
+    if not n:
+        return None
+    arq = os.path.join(_work_dir(), f"legendas_{uuid.uuid4().hex[:8]}.ass")
+    with open(arq, "w", encoding="utf-8") as f:
+        f.write("\n".join(linhas) + "\n")
+    return arq
 
 
 def _num(v, lo, hi, padrao=0.0):
@@ -890,13 +1000,14 @@ def _opcao_filtro_script():
 
 def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", resolucao="original",
                    usar_gpu=True, pasta_saida=None, on_progress=None, stop_event=None, sem_audio=False,
-                   camadas=None, audio_segmentos=None, duracao=None, audio_clipes=None):
+                   camadas=None, audio_segmentos=None, duracao=None, audio_clipes=None, legendas=None):
     """
     Exporta a timeline do editor.
     segmentos       = base de vídeo em ordem ([{start, end, gain}] do original ou {gap: s})
     audio_segmentos = trilha de áudio (mesmo formato); se None, usa os segmentos da base
     camadas         = imagens/clipes transformados por cima da base (de baixo para cima)
     audio_clipes    = [[st, s, e, ganho_db]] de TODOS os clipes com som: as trilhas são somadas (_grafo_mix).
+    legendas        = {itens: [{st, en, texto}], estilo: {...}}: gravadas no vídeo (arquivo .ass + subtitles)
                       Com ele, audio_segmentos é ignorado.
     on_progress(pct, mensagem)
     """
@@ -946,7 +1057,11 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     if not simples:
         pecas, pecas_a = _completar(pecas), _completar(pecas_a)
     saida = _nome_saida(path, cfg["ext"], pasta_saida)
-    has_audio = info["has_audio"] and not sem_audio
+    # áudios soltos na timeline dão som ao vídeo mesmo que o vídeo aberto não tenha
+    extras = sorted({c[4] for c in (mix or []) if c[4]})
+    if mix is not None and not info["has_audio"]:
+        mix = [c for c in mix if c[4]]
+    has_audio = (info["has_audio"] or bool(extras)) and not sem_audio
     audio_junto = pecas_a == pecas and mix is None   # mesmas peças: o áudio sai das mesmas entradas do vídeo
 
     tem_ganho = any(p[2] for p in segs)
@@ -1008,10 +1123,13 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         if has_audio and mix is None:
             filtros.append(f"[0:a:0]aselect='{cond}',asetpts=N/SR/TB[ac]")
     if has_audio and mix is not None:
-        # todas as trilhas de áudio somadas (o mesmo grafo que a prévia do editor toca)
-        cmd += ["-i", path]
-        entrada += 1
-        filtros.extend(_grafo_mix(mix, total, f"[{entrada - 1}:a:0]", "ac"))
+        # todas as trilhas de áudio somadas (a mesma conta que o mixer em tempo real da prévia faz)
+        entradas = {}
+        for arq in ([None] if info["has_audio"] else []) + extras:
+            cmd += ["-i", path if arq is None else arq]
+            entradas[arq] = f"[{entrada}:a:0]"
+            entrada += 1
+        filtros.extend(_grafo_mix(mix, total, entradas, "ac"))
 
     # Camadas por cima (imagens e clipes com escala/posição/rotação/opacidade), de baixo para cima
     vf = "[vc]"
@@ -1082,6 +1200,14 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         filtros.append(f"{vf}format=yuv420p[vlay]")
         vf = "[vlay]"
 
+    # legendas gravadas no vídeo (mesmo estilo da prévia do editor), antes de reduzir a resolução
+    ass = None
+    if legendas and legendas.get("itens") and not audio_only:
+        ass = _gerar_ass(legendas["itens"], legendas.get("estilo") or {}, W, H)
+        if ass:
+            filtros.append(f"{vf}subtitles=filename={_caminho_filtro(ass)}[vsub]")
+            vf = "[vsub]"
+
     if alvo_h and info["height"] > alvo_h:
         filtros.append(f"{vf}scale=-2:{alvo_h}:flags=lanczos[vs]")
         vf = "[vs]"
@@ -1133,6 +1259,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             os.remove(script)
         except Exception:
             pass
+        if ass:
+            _apagar(ass)
 
     prog(100, "Concluído!")
     return {

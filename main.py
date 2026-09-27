@@ -281,6 +281,70 @@ def video_cutter_prepare(file_path):
     return {"success": True}
 
 
+# ── painel Texto do editor: transcrever a timeline / legendas ──
+_ve_texto_stop = None
+
+
+def ve_texto_modelos():
+    from Functions import legendas
+    return legendas.modelos_estado()
+
+
+def ve_transcrever(clipes, total, idioma="pt"):
+    """Transcreve a timeline em background; eventos em veOnTexto({stage, pct, msg} | {stage:'pronto', ...})."""
+    from Functions import legendas
+    global _ve_texto_stop
+    if _ve_texto_stop is not None:
+        _ve_texto_stop.set()
+    stop = threading.Event()
+    _ve_texto_stop = stop
+
+    def run():
+        try:
+            r = legendas.transcrever(clipes, total, idioma,
+                                     lambda p, msg: _ve_emit("veOnTexto", {"stage": "prog", "pct": p, "msg": msg}), stop)
+            if not stop.is_set() or r.get("cancelled"):
+                _ve_emit("veOnTexto", {"stage": "pronto", **r})
+        except InterruptedError:
+            _ve_emit("veOnTexto", {"stage": "pronto", "success": False, "cancelled": True})
+        except Exception as e:
+            _ve_emit("veOnTexto", {"stage": "pronto", "success": False, "error": str(e)})
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
+def ve_transcrever_cancelar():
+    if _ve_texto_stop is not None:
+        _ve_texto_stop.set()
+    return {"success": True}
+
+
+def ve_salvar_srt(conteudo, sugestao="legendas.srt", pasta=""):
+    """Pergunta onde salvar e grava o .srt (UTF-8)."""
+    try:
+        if not _window:
+            return {"success": False}
+        r = _window.create_file_dialog(_file_dialog_kind("SAVE", webview.SAVE_DIALOG), directory=pasta or "",
+                                       save_filename=sugestao, file_types=("Legendas SubRip (*.srt)",))
+        if not r:
+            return {"success": False, "cancelled": True}
+        path = r[0] if isinstance(r, (list, tuple)) else r
+        if not path.lower().endswith(".srt"):
+            path += ".srt"
+        with open(path, "w", encoding="utf-8-sig", newline="\r\n") as f:
+            f.write(conteudo)
+        return {"success": True, "path": path, "name": os.path.basename(path)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def video_cutter_add_audio(path):
+    """Áudio solto na timeline (arrastado): conforma, forma de onda e duração."""
+    from Functions.video_cutter import adicionar_audio
+    return adicionar_audio(path)
+
+
 def video_cutter_audio_fonte():
     """Áudio conformado (PCM) da fonte aberta, para o mixer em tempo real do editor."""
     from Functions.video_cutter import audio_conformado
@@ -301,7 +365,7 @@ def video_cutter_add_media(path):
 
 def video_cutter_export(file_path, segments, output_format="mp4", qualidade="medium",
                         resolucao="original", usar_gpu=True, pasta_saida=None, sem_audio=False,
-                        camadas=None, audio_segments=None, duracao=None, audio_clipes=None):
+                        camadas=None, audio_segments=None, duracao=None, audio_clipes=None, legendas=None):
     """Exporta a timeline (base + camadas por cima); progresso em veOnExport(evento)."""
     from Functions.video_cutter import exportar_video
     global _ve_export_stop
@@ -320,6 +384,7 @@ def video_cutter_export(file_path, segments, output_format="mp4", qualidade="med
                 audio_segmentos=audio_segments,
                 duracao=duracao,
                 audio_clipes=audio_clipes,
+                legendas=legendas,
             )
             _ve_emit("veOnExport", {"done": True, **r})
         except Exception as e:
@@ -2103,12 +2168,27 @@ class ApiBridge:
 
     def video_cutter_export(self, file_path, segments, output_format="mp4", qualidade="medium",
                             resolucao="original", usar_gpu=True, pasta_saida=None, sem_audio=False,
-                            camadas=None, audio_segments=None, duracao=None, audio_clipes=None):
+                            camadas=None, audio_segments=None, duracao=None, audio_clipes=None, legendas=None):
         return video_cutter_export(file_path, segments, output_format, qualidade, resolucao, usar_gpu,
-                                   pasta_saida, sem_audio, camadas, audio_segments, duracao, audio_clipes)
+                                   pasta_saida, sem_audio, camadas, audio_segments, duracao, audio_clipes, legendas)
+
+    def ve_texto_modelos(self):
+        return ve_texto_modelos()
+
+    def ve_transcrever(self, clipes, total, idioma="pt"):
+        return ve_transcrever(clipes, total, idioma)
+
+    def ve_transcrever_cancelar(self):
+        return ve_transcrever_cancelar()
+
+    def ve_salvar_srt(self, conteudo, sugestao="legendas.srt", pasta=""):
+        return ve_salvar_srt(conteudo, sugestao, pasta)
 
     def video_cutter_audio_fonte(self):
         return video_cutter_audio_fonte()
+
+    def video_cutter_add_audio(self, path):
+        return video_cutter_add_audio(path)
 
     def video_cutter_add_media(self, path):
         return video_cutter_add_media(path)

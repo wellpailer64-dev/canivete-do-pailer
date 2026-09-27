@@ -33,7 +33,7 @@ function vedDefault() {
             { t: 's', d: 'row', z: [0.77, 0.23], c: [
                 { t: 'g', p: ['monitor'], a: 'monitor' },
                 { t: 's', d: 'col', z: [0.6, 0.4], c: [
-                    { t: 'g', p: ['props', 'lc', 'clips'], a: 'props' },
+                    { t: 'g', p: ['props', 'lc', 'texto', 'clips'], a: 'props' },
                     { t: 'g', p: ['fx', 'keys'], a: 'fx' },
                 ] },
             ] },

@@ -16,7 +16,7 @@ const VE_AU_MANTER = 0.05;          // ao editar tocando, o que já está na fil
 
 const VEAU = {
     ctx: null, node: null, ganho: null, falhou: false,
-    url: null, quadros: 0, blocos: new Map(), pedidos: new Map(),
+    fontes: new Map(),   // id da mídia → { url, quadros, blocos, pedidos } (0 = vídeo aberto; demais = áudios soltos)
     tocando: false, esperando: false, base: 0, taxa: 1, escritos: 0, lidos: 0, lidosCt: 0,
     wt: 0, clipes: [], chave: '', timer: 0, fila: 0,
 };
@@ -92,86 +92,85 @@ function veAudioMsg(m) {
     }
 }
 
+// Registra uma fonte de som (áudio conformado) no mixer: id 0 = vídeo aberto; demais = áudios soltos
+function veAudioRegistrar(id, url, quadros) {
+    VEAU.fontes.set(id, { url, quadros, blocos: new Map(), pedidos: new Map() });
+    VEAU.chave = '';
+    return veAudioIniciar().then(ok => { if (ok) { veApplyAudioGain(); veAudioPrever(VE.playhead); veAudioEditou(); } return ok; });
+}
+
 // Fonte aberta: pede o áudio conformado ao Python
 function veAudioFonte() {
-    veAudioReset();
     if (!window.pywebview || !window.pywebview.api.video_cutter_audio_fonte) return;
     const pedido = VE.path;
     window.pywebview.api.video_cutter_audio_fonte().then(r => {
         if (!r || !r.success || VE.path !== pedido) return;
-        VEAU.url = r.url;
-        VEAU.quadros = r.quadros;
-        veAudioIniciar().then(ok => { if (ok) { veApplyAudioGain(); veAudioPrever(VE.playhead); } });
+        veAudioRegistrar(0, r.url, r.quadros);
     });
 }
 
 function veAudioReset() {
     veAudioParar();
-    VEAU.url = null;
-    VEAU.quadros = 0;
-    VEAU.blocos.clear();
-    VEAU.pedidos.clear();
+    VEAU.fontes.clear();
+    VEAU.clipes = [];
     VEAU.chave = '';
 }
 
-// O mixer em tempo real manda no som (conformado pronto e processador de áudio funcionando)
-function veAudioPronto() { return !!(VEAU.url && VEAU.ctx); }
+// O mixer em tempo real manda no som (alguma fonte conformada e processador de áudio funcionando)
+function veAudioPronto() { return !!(VEAU.fontes.size && VEAU.ctx); }
 
-// ── leitura do áudio conformado em blocos de 1 s (com cache) ──
-function veAudioBloco(k) {
-    if (k < 0 || k * VE_AU_BLOCO >= VEAU.quadros) return null;
-    const b = VEAU.blocos.get(k);
-    if (b) { VEAU.blocos.delete(k); VEAU.blocos.set(k, b); return b; }   // LRU
-    if (!VEAU.pedidos.has(k)) {
-        const ini = k * VE_AU_BLOCO * 4, fim = Math.min(VEAU.quadros, (k + 1) * VE_AU_BLOCO) * 4 - 1;
-        const url = VEAU.url;
-        const p = fetch(url, { headers: { Range: `bytes=${ini}-${fim}` } })
+// ── leitura do áudio conformado em blocos de 1 s (com cache por fonte) ──
+function veAudioBloco(F, k) {
+    if (k < 0 || k * VE_AU_BLOCO >= F.quadros) return null;
+    const b = F.blocos.get(k);
+    if (b) { F.blocos.delete(k); F.blocos.set(k, b); return b; }   // LRU
+    if (!F.pedidos.has(k)) {
+        const ini = k * VE_AU_BLOCO * 4, fim = Math.min(F.quadros, (k + 1) * VE_AU_BLOCO) * 4 - 1;
+        const p = fetch(F.url, { headers: { Range: `bytes=${ini}-${fim}` } })
             .then(r => r.arrayBuffer())
             .then(buf => {
-                if (VEAU.url !== url) return;
-                VEAU.blocos.set(k, new Int16Array(buf));
-                if (VEAU.blocos.size > 240) VEAU.blocos.delete(VEAU.blocos.keys().next().value);
+                F.blocos.set(k, new Int16Array(buf));
+                if (F.blocos.size > 160) F.blocos.delete(F.blocos.keys().next().value);
             })
             .catch(() => {})
-            .finally(() => VEAU.pedidos.delete(k));
-        VEAU.pedidos.set(k, p);
+            .finally(() => F.pedidos.delete(k));
+        F.pedidos.set(k, p);
     }
     return null;
 }
 
 // Pede ao disco os blocos que a timeline vai precisar entre t e t + VE_AU_PREVER
 function veAudioPrever(t) {
-    if (!VEAU.url) return [];
     const esperas = [];
     const a = t, b = t + VE_AU_PREVER * VEAU.taxa;
-    (VEAU.clipes.length ? VEAU.clipes : veAudioClipes()).forEach(([st, s0, e0]) => {
-        const fimC = st + (e0 - s0);
-        if (fimC <= a || st >= b) return;
+    (VEAU.clipes.length ? VEAU.clipes : veAudioClipes()).forEach(([st, s0, e0, , id]) => {
+        const F = VEAU.fontes.get(id), fimC = st + (e0 - s0);
+        if (!F || fimC <= a || st >= b) return;
         const i0 = s0 + Math.max(0, a - st), i1 = s0 + Math.min(fimC, b) - st;
         for (let k = Math.floor(i0 * VE_AU_SR / VE_AU_BLOCO); k <= Math.floor(i1 * VE_AU_SR / VE_AU_BLOCO); k++) {
-            if (!VEAU.blocos.has(k)) { veAudioBloco(k); if (VEAU.pedidos.has(k)) esperas.push(VEAU.pedidos.get(k)); }
+            if (!F.blocos.has(k)) { veAudioBloco(F, k); if (F.pedidos.has(k)) esperas.push(F.pedidos.get(k)); }
         }
     });
     return esperas;
 }
 
-// Clipes com som, prontos para o mixer: [início, entrada, saída, ganho linear]
+// Clipes com som, prontos para o mixer: [início, entrada, saída, ganho linear, id da fonte]
 function veAudioClipes() {
-    return veMixClipes().map(([st, s0, e0, g]) => [st, s0, e0, Math.pow(10, g / 20)]);
+    return veMixClipes().map(([st, s0, e0, g, id]) => [st, s0, e0, Math.pow(10, g / 20), id]);
 }
 
 // ── mixagem ──
 // Mixa n quadros de saída a partir do instante t da timeline (avançando `taxa` s da timeline por s de som)
 function veAudioMixar(t, n) {
     const L = new Float32Array(n), R = new Float32Array(n), passo = VEAU.taxa / VE_AU_SR;
-    for (const [st, s0, e0, g] of VEAU.clipes) {
-        const fimC = st + (e0 - s0), tFim = t + n * passo;
-        if (fimC <= t || st >= tFim) continue;
+    for (const [st, s0, e0, g, id] of VEAU.clipes) {
+        const F = VEAU.fontes.get(id), fimC = st + (e0 - s0), tFim = t + n * passo;
+        if (!F || fimC <= t || st >= tFim) continue;
         const i0 = Math.max(0, Math.ceil((st - t) / passo)), i1 = Math.min(n, Math.ceil((fimC - t) / passo));
         for (let i = i0; i < i1; i++) {
             const f = (s0 + (t + i * passo - st)) * VE_AU_SR;   // quadro da fonte (fracionário)
             const q = Math.floor(f), fr = f - q;
-            const k = Math.floor(q / VE_AU_BLOCO), b = VEAU.blocos.get(k);
+            const k = Math.floor(q / VE_AU_BLOCO), b = F.blocos.get(k);
             if (!b) continue;                                   // bloco ainda não lido: silêncio (raro, há previsão)
             const j = (q - k * VE_AU_BLOCO) * 2;
             let l = b[j], r = b[j + 1];

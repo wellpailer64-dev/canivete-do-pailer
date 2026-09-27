@@ -14,6 +14,9 @@ sentencepiece==0.2.1
 tokenizers==0.22.2
 huggingface_hub==1.8.0
 onnxruntime==1.24.4
+# painel Texto do editor (transcrição com Parakeet ONNX; onnx = comprimir o modelo PT-BR para int8)
+onnx-asr==0.12.0
+onnx==1.22.0
 rembg==2.0.74
 opencv-python==4.13.0.92
 numpy==2.4.3

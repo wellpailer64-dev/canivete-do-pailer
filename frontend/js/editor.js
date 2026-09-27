@@ -51,6 +51,7 @@ const $ve = id => document.getElementById(id) || (typeof vedFind === 'function' 
 
 // Trilhas como no Premiere: V4..V1 em cima, A1..A4 embaixo. O conteúdo fica em V1/A1 (vinculados).
 const VE_TRACKS = [
+    { id: 'LEG', kind: 'l', h: 26 },   // legendas (painel Texto), como a trilha de legendas do Premiere
     { id: 'V4', kind: 'v', h: 24 }, { id: 'V3', kind: 'v', h: 24 }, { id: 'V2', kind: 'v', h: 24 },
     { id: 'V1', kind: 'v', h: 76, main: true },
     { id: 'A1', kind: 'a', h: 60, main: true },
@@ -64,8 +65,8 @@ const VE_TRACKS = [
 // Clipes com som: [início na timeline, entrada, saída, ganho dB] — trilha muda (M) fica de fora
 function veMixClipes() {
     return VE.clips
-        .filter(c => !veIsImage(c) && !veTrkMuted(c.tr) && c.e - c.s > 0.005)
-        .map(c => [+c.st.toFixed(5), +c.s.toFixed(5), +c.e.toFixed(5), +(c.g || 0).toFixed(2)])
+        .filter(c => !veIsImage(c) && !veTrkMuted(c.tr) && c.e - c.s > 0.005 && (veIsAudio(c) || (VE.info && VE.info.has_audio)))
+        .map(c => [+c.st.toFixed(5), +c.s.toFixed(5), +c.e.toFixed(5), +(c.g || 0).toFixed(2), veIsAudio(c) ? c.m : 0])
         .sort((a, b) => a[0] - b[0]);
 }
 function veMixAtivo() { return veAudioPronto(); }
@@ -175,14 +176,16 @@ function veRelayout() {
 function veTopAt(t) {
     let best = -1;
     VE.clips.forEach((c, i) => {
-        if (!veIsImage(c) && !veTrkHidden(c.tr) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS && (best < 0 || c.tr > VE.clips[best].tr)) best = i;
+        if (!veIsImage(c) && !veIsAudio(c) && !veTrkHidden(c.tr) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS && (best < 0 || c.tr > VE.clips[best].tr)) best = i;
     });
     return best;
 }
 
 // Clipe sob o ponto (t, trilha) — para clique/seleção
-function veClipAtTrack(t, tr) {
-    return VE.clips.findIndex(c => c.tr === tr && t >= c.st - VE_EPS && t <= veEnd(c) + VE_EPS);
+function veClipAtTrack(t, tr, kind) {
+    if (kind === 'l') return -1;
+    return VE.clips.findIndex(c => c.tr === tr && t >= c.st - VE_EPS && t <= veEnd(c) + VE_EPS &&
+        (kind === 'v' ? veOcupaV(c) : kind === 'a' ? veOcupaA(c) : true));
 }
 
 function veEditPoints(excluir) {
@@ -191,7 +194,7 @@ function veEditPoints(excluir) {
     return [...pts].sort((a, b) => a - b);
 }
 
-function veSnapshot() { return JSON.stringify({ clips: VE.clips, inPt: VE.inPt, outPt: VE.outPt }); }
+function veSnapshot() { return JSON.stringify({ clips: VE.clips, inPt: VE.inPt, outPt: VE.outPt, legendas: VE.legendas || [] }); }
 
 function vePushHistory() {
     if (!VE.dirty) { VE.dirty = true; veUpdateTitle(); }
@@ -204,7 +207,9 @@ function vePushHistory() {
 function veRestore(snap) {
     const d = JSON.parse(snap);
     VE.clips = d.clips; VE.inPt = d.inPt; VE.outPt = d.outPt;
+    VE.legendas = d.legendas || [];
     VE.sel = -1;
+    VETX.legSel = -1;
     veRelayout();
     veAfterEdit(VE.playhead);   // como no Premiere, desfazer não mexe na agulha
 }
@@ -313,6 +318,14 @@ function veDeleteClip(i) {
 }
 
 function veDeleteSelected() {
+    if (VE.sel < 0 && VETX.legSel >= 0 && VE.legendas[VETX.legSel]) {
+        vePushHistory();
+        VE.legendas = VE.legendas.filter((_, k) => k !== VETX.legSel);
+        VETX.legSel = -1;
+        veRefresh();
+        veToast('Legenda apagada');
+        return;
+    }
     if (VE.sel < 0) { veToast('Selecione um clipe na timeline'); return; }
     veDeleteClip(VE.sel);
 }
@@ -347,7 +360,7 @@ function veMoveClip(i, tr, st) {
     VE.clips.forEach((o, j) => {
         if (j === i) return;
         const en = veEnd(o);
-        if (o.tr !== tr || en <= a + VE_EPS || o.st >= b - VE_EPS) { out.push(o); return; }
+        if (o.tr !== tr || en <= a + VE_EPS || o.st >= b - VE_EPS || !veConflita(o, c)) { out.push(o); return; }
         if (o.st < a && a - o.st > tiny) out.push({ ...o, e: o.s + (a - o.st) });
         if (en > b && en - b > tiny) out.push({ ...o, st: b, s: o.s + (b - o.st) });
     });
@@ -735,7 +748,14 @@ function veIsImage(c) { const m = veMediaOf(c); return !!m && (m.kind === 'image
 // Camada de ajuste (como no Premiere): clipe transparente cujos efeitos valem para tudo o que está nas trilhas de
 // baixo durante o trecho dele; a opacidade dosa a força do efeito. Sem escala/posição/rotação.
 function veIsAdj(c) { const m = veMediaOf(c); return !!m && m.kind === 'ajuste'; }
-function veNomeClipe(c) { return veIsAdj(c) ? 'Ajuste' : veIsImage(c) ? 'Imagem' : 'Clipe'; }
+function veNomeClipe(c) { return veIsAudio(c) ? 'Áudio' : veIsAdj(c) ? 'Ajuste' : veIsImage(c) ? 'Imagem' : 'Clipe'; }
+// Áudio solto na timeline (MP3, WAV...): só a linha A da trilha, sem imagem
+function veIsAudio(c) { const m = veMediaOf(c); return !!m && m.kind === 'audio'; }
+// O que cada clipe ocupa: vídeo = V e A (vinculados); imagem/ajuste = só V; áudio solto = só A.
+// Sobrescrever, aparar e mover só esbarram em clipes que dividem a mesma linha.
+const veOcupaV = c => !veIsAudio(c);
+const veOcupaA = c => !veIsImage(c);
+const veConflita = (a, b) => (veOcupaV(a) && veOcupaV(b)) || (veOcupaA(a) && veOcupaA(b));
 
 function veDefProps(c) {
     const m = veMediaOf(c);
@@ -965,6 +985,12 @@ function veDropFiles(itens) {
         imgs.forEach((it, k) => veAddImage(it.path, k * VE_IMG_DUR));
         return;
     }
+    const audios = videos.filter(i => EXT_AUDIO.test(i.path) && !EXT_VIDEO.test(i.path));
+    if (audios.length) {
+        // um por vez: cada um escolhe a trilha livre depois de o anterior ter entrado
+        audios.reduce((p, it) => p.then(() => veAddAudio(it.path)), Promise.resolve());
+        return;
+    }
     if (videos.length) veToast('Por enquanto o editor usa um vídeo por projeto. Para trocar, use Abrir (Ctrl+O).');
     else veToast('Arraste imagens (PNG, JPG, WEBP, GIF) para usar por cima do vídeo');
 }
@@ -986,21 +1012,52 @@ function veAddImage(path, deslocamento = 0) {
     });
 }
 
+// ── áudio solto (MP3, WAV...): entra na agulha, na trilha logo abaixo da última trilha de áudio usada,
+// sem sobrescrever nada; o som entra no mixer em tempo real ──
+function veAddAudio(path) {
+    if (!VE.ready) return Promise.resolve();
+    veToast('Preparando o áudio...');
+    return window.pywebview.api.video_cutter_add_audio(path).then(r => {
+        if (!r || !r.success) { veToast((r && r.error) || 'Não foi possível abrir o áudio'); return; }
+        let m = VE.media.find(x => x.kind === 'audio' && x.path === r.path);
+        if (!m) { m = { id: VE.media.length, kind: 'audio', path: r.path, name: r.name }; VE.media.push(m); }
+        Object.assign(m, { dur: r.dur, peaks: r.peaks || [], url: r.url, quadros: r.quadros });
+        const st = veSnapFrame(VE.playhead), b = st + r.dur, novo = { m: m.id };
+        const usadas = VE.clips.filter(veOcupaA).map(c => c.tr);
+        const ultima = usadas.length ? Math.max(...usadas) : -1;
+        const livre = k => !veTrkLocked(k) && veTrackFree(k, st, b, novo);
+        let tr = [0, 1, 2, 3].find(k => k > ultima && livre(k));
+        if (tr == null) tr = [0, 1, 2, 3].find(livre);
+        if (tr == null) { veToast('Não há trilha de áudio livre a partir da agulha (A1 a A4)'); return; }
+        vePushHistory();
+        const clip = { tr, st, s: 0, e: r.dur, m: m.id };
+        VE.clips.push(clip);
+        VE.sel = VE.clips.indexOf(clip);
+        veRelayout();
+        veAfterEdit(VE.playhead);
+        veAudioRegistrar(m.id, r.url, r.quadros);
+        // trilha compacta abre para a forma de onda aparecer
+        const linha = VE_TRACKS.find(x => x.id === 'A' + (tr + 1));
+        if (linha && linha.h < 40) { linha.h = 48; veBuildHeads(); veLsSet('ve-track-h', JSON.stringify(VE_TRACKS.map(t => t.h))); veDraw(); }
+        veToast(`Áudio adicionado em A${tr + 1}`);
+    });
+}
+
 // Tira da trilha `tr` tudo que estiver entre a e b (sobrescrever), exceto o índice `exceto`
-function veCarve(clips, tr, a, b, exceto) {
+function veCarve(clips, tr, a, b, exceto, novo) {
     const out = [], tiny = veFrame() * 0.5;
     clips.forEach((o, j) => {
         if (j === exceto) return;
         const en = veEnd(o);
-        if (o.tr !== tr || en <= a + VE_EPS || o.st >= b - VE_EPS) { out.push(o); return; }
+        if (o.tr !== tr || en <= a + VE_EPS || o.st >= b - VE_EPS || (novo && !veConflita(o, novo))) { out.push(o); return; }
         if (o.st < a && a - o.st > tiny) out.push({ ...o, e: o.s + (a - o.st) });
         if (en > b && en - b > tiny) out.push({ ...o, st: b, s: o.s + (b - o.st) });
     });
     return out;
 }
 
-function veTrackFree(tr, a, b) {
-    return !VE.clips.some(o => o.tr === tr && o.st < b - VE_EPS && veEnd(o) > a + VE_EPS);
+function veTrackFree(tr, a, b, novo) {
+    return !VE.clips.some(o => o.tr === tr && o.st < b - VE_EPS && veEnd(o) > a + VE_EPS && (!novo || veConflita(o, novo)));
 }
 
 function veInsertImageClip(m, drop, deslocamento, rotulo = 'Imagem adicionada') {
@@ -1009,13 +1066,13 @@ function veInsertImageClip(m, drop, deslocamento, rotulo = 'Imagem adicionada') 
     if (drop && drop.x >= wrap.left && drop.x <= wrap.right && drop.y >= wrap.top + VE_RULER && drop.y <= wrap.bottom) {
         st = Math.max(0, VE.view + (drop.x - wrap.left) / VE.pps);
         const row = veRowAt(drop.y - wrap.top);
-        if (row) tr = veTrackIndex(row);
+        if (row && row.kind !== 'l') tr = veTrackIndex(row);
     }
     st = veSnapFrame(st + deslocamento);
     const b = st + VE_IMG_DUR;
     if (tr < 0) {
         // primeira trilha livre acima do vídeo (V2, V3, V4); se todas ocupadas, V4 sobrescreve
-        tr = [1, 2, 3].find(k => !veTrkLocked(k) && veTrackFree(k, st, b));
+        tr = [1, 2, 3].find(k => !veTrkLocked(k) && veTrackFree(k, st, b, { m: m.id }));
         if (tr == null) tr = [3, 2, 1].find(k => !veTrkLocked(k));
         if (tr == null) { veAvisoBloqueio(); return; }
     }
@@ -1023,7 +1080,7 @@ function veInsertImageClip(m, drop, deslocamento, rotulo = 'Imagem adicionada') 
     vePushHistory();
     const clip = { tr, st, s: 0, e: VE_IMG_DUR, m: m.id };
     clip.p = veDefProps(clip);
-    VE.clips = veCarve(VE.clips, tr, st, b, -1);
+    VE.clips = veCarve(VE.clips, tr, st, b, -1, clip);
     VE.clips.push(clip);
     VE.sel = VE.clips.indexOf(clip);
     veRelayout();
@@ -1227,7 +1284,7 @@ function veDrawMonitor() {
     const t = VE.playhead, v = veVideo();
     let vis = VE.clips
         .map((c, i) => ({ c, i }))
-        .filter(({ c }) => !veTrkHidden(c.tr) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS)
+        .filter(({ c }) => !veIsAudio(c) && !veTrkHidden(c.tr) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS)
         .sort((a, b) => a.c.tr - b.c.tr);
     // o que está abaixo de um vídeo que cobre o quadro inteiro não aparece: nem decodifica
     const cobre = vis.map(({ c }) => !veIsImage(c) && veIsPlain(c)).lastIndexOf(true);
@@ -1288,6 +1345,7 @@ function veDrawMonitor() {
             ctx.drawImage(src, -sz.w / 2, -sz.h / 2, sz.w, sz.h);
             ctx.restore();
         });
+    veTxDesenhar(ctx);
     // contorno do clipe selecionado visível (ajuda a posicionar)
     const cs = VE.clips[VE.sel];
     if (cs && !veIsAdj(cs) && t >= cs.st - VE_EPS && t < veEnd(cs) - VE_EPS && (veIsImage(cs) || !veIsDefaultProps(cs))) {
@@ -1310,14 +1368,17 @@ function veRenderProps() {
     $ve('ve-props').hidden = !c;
     if (!c) { VEFX.key = ''; veLcRender(); return; }
     const m = veMediaOf(c);
-    $ve('ve-props-title').innerHTML = `Clipe ${VE.sel + 1}<span>${veIsAdj(c) ? 'Camada de ajuste' : veIsImage(c) ? 'Imagem · ' + veEsc(m.name || '') : 'Vídeo'} · V${c.tr + 1}</span>`;
-    // camada de ajuste: só opacidade (dosa o efeito); escala/posição/rotação não se aplicam
+    const aud = veIsAudio(c);
+    $ve('ve-props-title').innerHTML = aud
+        ? `Clipe ${VE.sel + 1}<span>Áudio · ${veEsc(m.name || '')} · A${c.tr + 1}</span><small class="ve-props-nota">Clipe só de som: ajuste o volume com G (ganho) ou pelo botão direito.</small>`
+        : `Clipe ${VE.sel + 1}<span>${veIsAdj(c) ? 'Camada de ajuste' : veIsImage(c) ? 'Imagem · ' + veEsc(m.name || '') : 'Vídeo'} · V${c.tr + 1}</span>`;
+    // camada de ajuste: só opacidade (dosa o efeito); escala/posição/rotação não se aplicam. Áudio: nada.
     const adj = veIsAdj(c);
     $ve('ve-props').querySelectorAll('[data-prop]').forEach(el => {
         const row = el.closest('.ve-prop');
-        if (row) row.hidden = adj && el.dataset.prop !== 'op';
+        if (row) row.hidden = aud || (adj && el.dataset.prop !== 'op');
     });
-    $ve('ve-props').querySelectorAll('.ve-props-actions').forEach(el => { el.hidden = adj; });
+    $ve('ve-props').querySelectorAll('.ve-props-actions').forEach(el => { el.hidden = adj || aud; });
     const p = veProps(c);
     $ve('ve-props').querySelectorAll('[data-prop]').forEach(el => {
         const k = el.dataset.prop;
@@ -1581,12 +1642,12 @@ function veFlattenWith(pred, silencio) {
 
 function veExportPlan() {
     // trilha oculta (olho) não entra; o som é o do clipe de vídeo de cima (como na prévia), mudo = silêncio
-    const isVid = c => !veIsImage(c) && !veTrkHidden(c.tr);
+    const isVid = c => !veIsImage(c) && !veIsAudio(c) && !veTrkHidden(c.tr);
     const base = veFlattenWith(c => isVid(c) && veIsPlain(c));
     const audio = veFlattenWith(isVid, c => veTrkMuted(c.tr));
     // camadas: imagens e vídeos transformados; um vídeo "normal" acima de alguma camada também
     // precisa entrar (senão a camada apareceria por cima dele)
-    const overlays = VE.clips.filter(c => !veTrkHidden(c.tr) && (veIsImage(c) || !veIsPlain(c)));
+    const overlays = VE.clips.filter(c => !veIsAudio(c) && !veTrkHidden(c.tr) && (veIsImage(c) || !veIsPlain(c)));
     const cobre = c => isVid(c) && veIsPlain(c) &&
         overlays.some(o => o.tr < c.tr && o.st < veEnd(c) - VE_EPS && veEnd(o) > c.st + VE_EPS);
     const camadas = VE.clips
@@ -1602,16 +1663,57 @@ function veExportPlan() {
                      sc: p.sc, x: p.x, y: p.y, rot: p.rot, op: p.op, kf,
                      fx: veFxExport(c), mw: veMediaSize(c).w, mh: veMediaSize(c).h };
         });
-    return { base, audio, camadas, mix: veMixClipes() };
+    // o arquivo de cada clipe com som (null = o vídeo aberto)
+    const mix = veMixClipes().map(([st, s0, e0, g, id]) => [st, s0, e0, g, id ? VE.media[id].path : null]);
+    return { base, audio, camadas, mix };
+}
+
+// ── legendas na timeline: clicar seleciona; arrastar move; pelas bordas, apara ──
+function veLegPointer(e, x, t) {
+    const L = VE.legendas || [];
+    let i = -1, lado = null;
+    for (let k = 0; k < L.length; k++) {
+        const xl = (L[k].st - VE.view) * VE.pps, xr = (L[k].en - VE.view) * VE.pps;
+        if (xr - xl >= 14 && Math.abs(x - xl) <= 5) { i = k; lado = 'l'; break; }
+        if (xr - xl >= 14 && Math.abs(x - xr) <= 5) { i = k; lado = 'r'; break; }
+        if (t >= L[k].st && t <= L[k].en) { i = k; }
+    }
+    VETX.legSel = i;
+    VE.sel = -1;
+    if (i >= 0 && e.button === 0) {
+        VE.drag = { mode: 'leg', i, lado, x0: e.clientX, t0: t, c0: { ...L[i] }, active: false };
+        VETX.aba = 'leg';
+        if (VED.el && VED.el.texto) vedShow('texto');
+    }
+    veRefresh();
+}
+
+function veLegArrastar(e, t) {
+    const d = VE.drag, L = VE.legendas;
+    if (!d.active) {
+        if (Math.abs(e.clientX - d.x0) < 4) return;   // ainda é um clique
+        d.active = true;
+        vePushHistory();
+    }
+    const c0 = d.c0, dt = veSnapFrame(t) - veSnapFrame(d.t0), len = c0.en - c0.st;
+    const ant = L.filter((_, k) => k !== d.i && L[k].en <= c0.st + 1e-3).reduce((m, c) => Math.max(m, c.en), 0);
+    const prox = L.filter((_, k) => k !== d.i && L[k].st >= c0.en - 1e-3).reduce((m, c) => Math.min(m, c.st), Infinity);
+    let st = c0.st, en = c0.en;
+    if (d.lado === 'l') st = Math.min(Math.max(c0.st + dt, ant), c0.en - 0.2);
+    else if (d.lado === 'r') en = Math.max(Math.min(c0.en + dt, prox), c0.st + 0.2);
+    else { st = Math.min(Math.max(c0.st + dt, ant), prox - len); en = st + len; }
+    L[d.i] = { ...L[d.i], st: +st.toFixed(3), en: +en.toFixed(3) };
+    veDraw();
+    veDrawMonitorSoon();
 }
 
 // ── ajuste de duração pelas bordas do clipe ──
 function veEdgeAt(x, row) {
-    if (!row) return null;
+    if (!row || row.kind === 'l') return null;
     const tr = veTrackIndex(row);
     for (let i = 0; i < VE.clips.length; i++) {
         const c = VE.clips[i];
-        if (c.tr !== tr || (row.kind === 'a' && veIsImage(c))) continue;
+        if (c.tr !== tr || (row.kind === 'a' ? !veOcupaA(c) : !veOcupaV(c))) continue;
         const xl = (c.st - VE.view) * VE.pps, xr = (veEnd(c) - VE.view) * VE.pps;
         if (xr - xl < 14) continue;
         if (Math.abs(x - xl) <= 6) return { i, side: 'l' };
@@ -1622,8 +1724,8 @@ function veEdgeAt(x, row) {
 
 function veTrimTo(d, t) {
     const c = VE.clips[d.i], c0 = d.c0, en0 = c0.st + c0.e - c0.s;
-    const vizinhos = VE.clips.filter((o, j) => j !== d.i && o.tr === c0.tr);
-    const img = veIsImage(c);
+    const vizinhos = VE.clips.filter((o, j) => j !== d.i && o.tr === c0.tr && veConflita(o, c0));
+    const img = veIsImage(c), limite = veIsAudio(c) ? veMediaOf(c).dur : VE.srcDur;
     t = veMoveSnap(t, d.i);
     if (d.side === 'l') {
         const prevEnd = Math.max(0, ...vizinhos.filter(o => veEnd(o) <= c0.st + VE_EPS).map(veEnd));
@@ -1633,7 +1735,7 @@ function veTrimTo(d, t) {
         c.s = c0.s + (st - c0.st);
     } else {
         const nextSt = Math.min(Infinity, ...vizinhos.filter(o => o.st >= en0 - VE_EPS).map(o => o.st));
-        const maxEn = img ? nextSt : Math.min(nextSt, c0.st + (VE.srcDur - c0.s));
+        const maxEn = img ? nextSt : Math.min(nextSt, c0.st + (limite - c0.s));
         const en = Math.max(Math.min(t, maxEn), c0.st + veFrame());
         c.e = c0.s + (en - c0.st);
     }
@@ -1677,11 +1779,14 @@ function veProjectData() {
     return {
         app: 'Canivete do Pailer',
         video: VE.path,
-        media: VE.media.filter(m => m.kind === 'image' || m.kind === 'ajuste')
+        media: VE.media.filter(m => m.kind === 'image' || m.kind === 'ajuste' || m.kind === 'audio')
             .map(m => m.kind === 'ajuste' ? { id: m.id, kind: 'ajuste', name: m.name }
+                : m.kind === 'audio' ? { id: m.id, kind: 'audio', path: m.path, name: m.name, dur: m.dur }
                 : { id: m.id, kind: 'image', path: m.path, name: m.name, w: m.w, h: m.h }),
         clips: VE.clips,
         trilhas: VE_TRK,
+        texto: { palavras: VETX.palavras, idioma: VETX.idioma, chave: VETX.chave },
+        legendas: VE.legendas || [], legEstilo: VE.legEstilo || null, legGravar: VE.legGravar !== false,
         inPt: VE.inPt,
         outPt: VE.outPt,
         playhead: VE.playhead,
@@ -1709,6 +1814,10 @@ function veCloseProject() {
     veAudioReset();
     VE_TRK = veTrkNovo();
     veBuildHeads();
+    VE.legendas = [];
+    VE.legEstilo = null;
+    VE.legGravar = true;
+    veTxReset();
     const v = veVideo();
     v.pause();
     v.removeAttribute('src');
@@ -1768,6 +1877,19 @@ function veApplyProject() {
             ids[m.id] = nm.id;
             return;
         }
+        if (m.kind === 'audio') {
+            if (!m.path || missing.includes(m.path)) return;
+            const nm = { id: VE.media.length, kind: 'audio', path: m.path, name: m.name, dur: m.dur || 0, peaks: [] };
+            VE.media.push(nm);
+            ids[m.id] = nm.id;
+            window.pywebview.api.video_cutter_add_audio(m.path).then(r => {
+                if (!r || !r.success) return;
+                Object.assign(nm, { dur: r.dur, peaks: r.peaks || [], url: r.url, quadros: r.quadros });
+                veAudioRegistrar(nm.id, r.url, r.quadros);
+                veDraw();
+            });
+            return;
+        }
         if (!m.path || missing.includes(m.path)) return;
         const nm = { id: VE.media.length, kind: 'image', path: m.path, name: m.name, img: new Image(), w: m.w || 0, h: m.h || 0 };
         VE.media.push(nm);
@@ -1789,6 +1911,15 @@ function veApplyProject() {
         })
         .filter(c => c.e - c.s > 1e-3);
     if (clips.length) VE.clips = clips;
+    VE.legendas = Array.isArray(d.legendas) ? d.legendas : [];
+    VE.legEstilo = d.legEstilo || null;
+    VE.legGravar = d.legGravar !== false;
+    if (d.texto && Array.isArray(d.texto.palavras)) {
+        VETX.palavras = d.texto.palavras;
+        VETX.idioma = d.texto.idioma || 'pt';
+        VETX.chave = d.texto.chave || '';
+        VETX.construidoTexto = false;
+    }
     if (d.trilhas && Array.isArray(d.trilhas.v) && Array.isArray(d.trilhas.a)) {
         VE_TRK = veTrkNovo();
         [0, 1, 2, 3].forEach(k => { Object.assign(VE_TRK.v[k], d.trilhas.v[k] || {}); Object.assign(VE_TRK.a[k], d.trilhas.a[k] || {}); });
@@ -1888,6 +2019,11 @@ function veBuildHeads() {
     const box = $ve('ve-heads-rows');
     if (!box) return;
     box.innerHTML = VE_TRACKS.map((tr, i) => {
+        if (tr.kind === 'l') return `
+        <div class="ve-head ve-head-l" data-tr="${i}" style="height:${tr.h}px" title="Legendas (painel Texto)">
+            <div class="ve-head-row"><b>LEG</b></div>
+            <i class="ve-head-grip" data-grip="${i}" title="Arraste para aumentar ou diminuir a trilha"></i>
+        </div>`;
         const k = veTrackIndex(tr), st = (tr.kind === 'v' ? VE_TRK.v : VE_TRK.a)[k] || {};
         const bt = (act, on, titulo, conteudo) =>
             `<button class="ve-hb${on ? ' on' : ''}" data-hact="${act}" data-hk="${k}" data-hkind="${tr.kind}" title="${titulo}">${conteudo}</button>`;
@@ -2089,15 +2225,17 @@ function veRender() {
         if (cw <= 0) return;
         const srcAt = x => c.s + (VE.view + x / VE.pps - st);   // x do canvas -> tempo da fonte
         const vr = rowOf('V' + (tr + 1)), ar = rowOf('A' + (tr + 1));
-        const img = veIsImage(c), adj = veIsAdj(c), med = veMediaOf(c);
+        const img = veIsImage(c), adj = veIsAdj(c), aud = veIsAudio(c), med = veMediaOf(c);
         ctx.globalAlpha = dim ? 0.28 : ghost ? 0.8 : 1;
+        const cor = veCor(c);
 
-        // ---- vídeo
+        // ---- vídeo (áudio solto não tem)
         const vy = vr.y + 3, vh = vr.h - 6;
+        if (!aud) {
         ctx.save();
         veRoundRect(ctx, cx, vy, cw, vh, 4);
         ctx.clip();
-        const cor = veCor(c), apagado = veTrkHidden(c.tr);
+        const apagado = veTrkHidden(c.tr);
         if (apagado && !dim && !ghost) ctx.globalAlpha = 0.35;
         ctx.fillStyle = cor ? veRgba(cor, 0.28) : adj ? '#123a36' : img ? '#3b2358' : '#27305f';
         ctx.fillRect(cx, vy, cw, vh);
@@ -2157,6 +2295,7 @@ function veRender() {
             }
             return;   // imagem não tem trilha de áudio
         }
+        }
 
         // ---- áudio (a altura da onda acompanha o ganho do clipe)
         const ay = ar.y + 3, ah = ar.h - 6;
@@ -2167,14 +2306,16 @@ function veRender() {
         ctx.fillStyle = cor ? veRgba(cor, 0.22) : '#163a2b';
         ctx.fillRect(cx, ay, cw, ah);
         if (veLocked(c)) veListras(ctx, cx, ay, cw, ah);
-        if (n && VE.info && VE.info.has_audio) {
+        // forma de onda: a do vídeo aberto, ou a do próprio arquivo (áudio solto)
+        const picos = aud ? (med.peaks || []) : VE.peaks, np = picos.length, durP = aud ? med.dur : VE.srcDur;
+        if (np && (aud || (VE.info && VE.info.has_audio))) {
             const mid = ay + ah / 2, amp = ah / 2 - 3, gl = veDb(c.g);
             const xa = Math.max(cx, 0), xb = Math.min(cx + cw, W);
             for (let x = xa; x < xb; x += 2) {
                 const sa = srcAt(x), sb = srcAt(x + 2);
-                const ia = Math.floor(sa / VE.srcDur * n), ib = Math.max(ia + 1, Math.ceil(sb / VE.srcDur * n));
+                const ia = Math.floor(sa / durP * np), ib = Math.max(ia + 1, Math.ceil(sb / durP * np));
                 let pk = 0;
-                for (let k = Math.max(0, ia); k < Math.min(n, ib); k++) pk = Math.max(pk, VE.peaks[k]);
+                for (let k = Math.max(0, ia); k < Math.min(np, ib); k++) pk = Math.max(pk, picos[k]);
                 pk *= gl;
                 ctx.fillStyle = pk > 1 ? '#f87171' : '#43c58f';     // vermelho = estourando
                 const h = Math.max(1, Math.min(1, pk) * amp);
@@ -2188,10 +2329,19 @@ function veRender() {
                 ctx.fillStyle = c.g > 0 ? '#fbbf24' : '#93c5fd';
                 ctx.fillText(txt, cx + cw - tw, ay + 13.5);
             }
-        } else if (VE.info && !VE.info.has_audio) {
+        } else if (!aud && VE.info && !VE.info.has_audio) {
             ctx.fillStyle = '#4a4a4a';
             ctx.font = '11px Segoe UI';
             if (cw > 80) ctx.fillText(veT('sem áudio'), cx + 8, ay + ah / 2 + 4);
+        }
+        // áudio solto: nome do arquivo no alto do clipe
+        if (aud && cw > 50 && ah >= 12) {
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = cor || '#2fa877';
+            ctx.fillRect(cx, ay, cw, Math.min(13, ah));
+            ctx.fillStyle = '#04150d';
+            ctx.font = '600 10px Segoe UI';
+            ctx.fillText((med.name || veT('Áudio')) + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, ay + 10);
         }
         ctx.restore();
         ctx.globalAlpha = 1;
@@ -2201,20 +2351,46 @@ function veRender() {
             ctx.strokeStyle = '#F97316';
             ctx.lineWidth = 2;
             if (ghost) ctx.setLineDash([5, 3]);
-            veRoundRect(ctx, cx, vy, cw, vh, 4); ctx.stroke();
+            if (!aud) { veRoundRect(ctx, cx, vy, cw, vh, 4); ctx.stroke(); }
             veRoundRect(ctx, cx, ay, cw, ah, 4); ctx.stroke();
             ctx.setLineDash([]);
         }
         if (ghost) {
             ctx.font = '600 10px Cascadia Mono, Consolas, monospace';
-            const txt = `V${tr + 1} · ${veShort(st)}`;
+            const txt = `${aud ? 'A' : 'V'}${tr + 1} · ${veShort(st)}`, ty = aud ? ay : vy;
             ctx.fillStyle = 'rgba(0,0,0,0.75)';
-            ctx.fillRect(Math.max(2, x1), vy - 17, ctx.measureText(txt).width + 10, 15);
+            ctx.fillRect(Math.max(2, x1), ty - 17, ctx.measureText(txt).width + 10, 15);
             ctx.fillStyle = '#F97316';
-            ctx.fillText(txt, Math.max(2, x1) + 5, vy - 6);
+            ctx.fillText(txt, Math.max(2, x1) + 5, ty - 6);
         }
     });
     ctx.restore();
+
+    // legendas (linha LEG)
+    const rl = rows.find(r => r.kind === 'l');
+    if (rl && (VE.legendas || []).length) {
+        ctx.save();
+        ctx.beginPath(); ctx.rect(0, Math.max(VE_RULER, rl.y), W, rl.h); ctx.clip();
+        VE.legendas.forEach((c, i) => {
+            const x1 = X(c.st), x2 = X(c.en);
+            if (x2 < -2 || x1 > W + 2) return;
+            const y = rl.y + 3, h = rl.h - 6, w = Math.max(2, x2 - x1 - 1);
+            ctx.fillStyle = i === VETX.legSel ? 'rgba(250,204,21,0.42)' : 'rgba(250,204,21,0.22)';
+            ctx.fillRect(x1, y, w, h);
+            ctx.fillStyle = '#facc15';
+            ctx.fillRect(x1, y, 2, h);
+            if (w > 30 && h >= 12) {
+                ctx.save();
+                ctx.beginPath(); ctx.rect(x1, y, w - 2, h); ctx.clip();
+                ctx.fillStyle = '#fff7d1';
+                ctx.font = '600 10px Segoe UI';
+                ctx.fillText(c.texto.replace(/\n/g, ' '), x1 + 6, y + h / 2 + 3.5);
+                ctx.restore();
+            }
+            if (i === VETX.legSel) { ctx.strokeStyle = '#F97316'; ctx.lineWidth = 2; ctx.strokeRect(x1 + 1, y + 1, w - 2, h - 2); }
+        });
+        ctx.restore();
+    }
 
     // guia da lâmina
     if (VE.tool === 'razor' && VE.hoverX != null) {
@@ -2317,6 +2493,7 @@ function veUpdateScrollbar() {
 // ─────────────────────────── UI (listas / leituras) ───────────────────────────
 
 function veUpdateReadouts() {
+    veTxSeguir();
     $ve('ve-tc').textContent = veTC(VE.playhead);
     $ve('ve-tc-total').textContent = veTC(VE.dur);
     // valores animados e ◆ do painel acompanham a agulha
@@ -2347,6 +2524,7 @@ function veRenderClips() {
 }
 
 function veRefresh() {
+    veTxRender();
     if (veMixAtivo()) veAudioEditou();
     veUpdateReadouts();
     veRenderClips();
@@ -2410,6 +2588,10 @@ function veOpenPath(path) {
     veAudioReset();
     VE_TRK = veTrkNovo();
     veBuildHeads();
+    VE.legendas = [];
+    VE.legEstilo = null;
+    VE.legGravar = true;
+    veTxReset();
     const v = veVideo();
     v.pause();
     v.removeAttribute('src');
@@ -2605,7 +2787,7 @@ function veStartExport() {
     window.pywebview.api.video_cutter_export(
         VE.path, plano.base, vePill('format') || 'mp4', vePill('quality') || 'medium',
         $ve('ve-res').value, $ve('ve-gpu').checked, VE.dest, noAudio,
-        plano.camadas, plano.audio, VE.dur, plano.mix
+        plano.camadas, plano.audio, VE.dur, plano.mix, veTxExport()
     );
 }
 
@@ -2866,6 +3048,7 @@ function veInitEvents() {
         // Segurar e arrastar move o clipe no tempo e entre trilhas; clicar em área vazia desmarca.
         // Pela borda do clipe, arrastar encurta/alonga (imagens: define a duração).
         const row = veRowAt(y);
+        if (row && row.kind === 'l') { veLegPointer(e, x, t); return; }
         // ◆ do clipe selecionado: clicar leva a agulha até ele; arrastar muda o tempo do quadro-chave
         const kft = e.button === 0 && !veLocked(VE.clips[VE.sel]) ? veKfMarkAt(x, y, row) : null;
         if (kft != null) {
@@ -2883,8 +3066,7 @@ function veInitEvents() {
             veRenderClips(); veRenderProps(); veDraw();
             return;
         }
-        let i = row ? veClipAtTrack(t, veTrackIndex(row)) : -1;
-        if (i >= 0 && row.kind === 'a' && veIsImage(VE.clips[i])) i = -1;
+        let i = row ? veClipAtTrack(t, veTrackIndex(row), row.kind) : -1;
         if (i >= 0 && veLocked(VE.clips[i])) { i = -1; if (e.button === 0) veAvisoBloqueio(); }
         VE.sel = i;
         if (i >= 0 && e.button === 0) {
@@ -2910,6 +3092,7 @@ function veInitEvents() {
             }
             return;
         }
+        if (VE.drag.mode === 'leg') { veLegArrastar(e, t); return; }
         if (VE.drag.mode === 'kf') {
             const d = VE.drag, c = VE.clips[d.i];
             if (!d.active && Math.abs(e.clientX - d.x0) < 4) return;   // ainda é um clique
@@ -2945,7 +3128,7 @@ function veInitEvents() {
             d.st = veMoveTarget(d.i, p.t - d.grab);
             // trilha sob o mouse (arrastando pelo vídeo ou pelo áudio, o par vinculado vai junto)
             const r = veRowAt(p.y);
-            if (r) d.tr = veTrackIndex(r);
+            if (r && r.kind !== 'l') d.tr = veTrackIndex(r);
             veDraw();
             return;
         }
@@ -2967,6 +3150,7 @@ function veInitEvents() {
         const d = VE.drag;
         VE.drag = null;
         wrap.classList.remove('dragging', 'scrub', 'moving', 'trimming');
+        if (d && d.mode === 'leg') { veRefresh(); return; }
         if (d && d.mode === 'trim' && d.started) { veRelayout(); veAfterEdit(VE.playhead); return; }
         if (d && d.mode === 'kf') {
             const c = VE.clips[d.i];
@@ -2987,8 +3171,7 @@ function veInitEvents() {
         if (!VE.ready) return;
         const { t, y } = veTimeFromEvent(e);
         const row = veRowAt(y);
-        let i = row ? veClipAtTrack(t, veTrackIndex(row)) : -1;
-        if (i >= 0 && row.kind === 'a' && veIsImage(VE.clips[i])) i = -1;
+        const i = row ? veClipAtTrack(t, veTrackIndex(row), row.kind) : -1;
         if (i < 0) return;
         if (veLocked(VE.clips[i])) { veAvisoBloqueio(); return; }
         VE.sel = i;

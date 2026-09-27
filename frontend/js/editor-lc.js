@@ -315,7 +315,7 @@ const veLcVigAngle = v => v.vig / 100 * Math.PI / 2;       // angle do vignette
 // ── painel ──
 function veLcClip() {
     const c = VE.clips[VE.sel];
-    return c && !(VE.info && VE.info.audio_only) ? c : null;
+    return c && !(VE.info && VE.info.audio_only) && !veIsAudio(c) ? c : null;
 }
 function veLcFx(c) { return c && c.fx ? c.fx.find(f => f.t === 'lc') : null; }
 

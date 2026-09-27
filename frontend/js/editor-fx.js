@@ -163,6 +163,7 @@ function veFxAdd(i, t) {
     const c = VE.clips[i];
     if (!c || !VE_FX[t]) return;
     if (veLocked(c)) { veAvisoBloqueio(); return; }
+    if (veIsAudio(c)) { veToast('Efeitos de vídeo não se aplicam a um clipe de áudio'); return; }
     if (VE.info && VE.info.audio_only) { veToast('Efeitos de vídeo precisam de um vídeo ou imagem'); return; }
     const painel = VE_FX[t].painel;
     if (painel && c.fx && c.fx.some(f => f.t === t)) {   // um só por clipe: abre o painel dele
@@ -291,8 +292,8 @@ function veClipAtClient(x, y, doc) {
     if (!VE.ready || wrap.ownerDocument !== doc || !wrap.offsetParent || x < r.left || x > r.right || y < r.top || y > r.bottom) return -1;
     const row = veRowAt(y - r.top);
     if (!row) return -1;
-    const i = veClipAtTrack(VE.view + (x - r.left) / VE.pps, veTrackIndex(row));
-    return i >= 0 && row.kind === 'a' && veIsImage(VE.clips[i]) ? -1 : i;
+    const i = veClipAtTrack(VE.view + (x - r.left) / VE.pps, veTrackIndex(row), row.kind);
+    return i;
 }
 
 function veFxInit() {

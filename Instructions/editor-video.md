@@ -129,6 +129,16 @@ A1..A4 tocam juntas. Mesmo modelo dos dois: áudio **conformado** em disco + **m
 - Medido: soma exata (2 trilhas = 2,0x; −6 dB = 1,5x); fila nunca vazia; play→som 13–40 ms (inclusive no minuto 8
   de 10); imagem dentro de ±1 quadro do som. Vídeo sem som usa o esquema antigo (som do player de vídeo).
 
+## Áudios soltos na timeline (MP3, WAV, M4A...)
+Arrastar um arquivo de áudio para o editor aberto cria uma mídia `kind: 'audio'` (`veAddAudio` →
+`video_cutter_add_audio`: conforma em PCM, forma de onda, duração). O clipe entra na agulha, na trilha logo
+abaixo da última trilha de áudio usada (A1..A4), sem sobrescrever nada; a trilha compacta abre sozinha.
+- Ocupação por linha (`veOcupaV/veOcupaA/veConflita`): vídeo = V+A, imagem/ajuste = só V, áudio = só A.
+  Sobrescrever (`veCarve`), mover, aparar e cliques só esbarram em clipes da mesma linha.
+- Mixer: cada mídia é uma fonte (`VEAU.fontes`, id 0 = vídeo aberto). Exportação: `audio_clipes` traz o arquivo
+  de cada clipe; `_grafo_mix` abre uma entrada por arquivo. Vídeo sem som + áudio solto também exporta com som.
+- Projeto salva o caminho e reabre (conformando de novo). Efeitos de vídeo/Luz e Cor não se aplicam a áudio.
+
 ## Trilhas: olho, cadeado e mudo (cabeçalho V1/A1...) · cor do rótulo
 Estado em `VE_TRK` (`v[k]`/`a[k]`: `hide`, `lock`, `mute`), salvo no projeto (`trilhas`), fora do desfazer.
 - Olho (V): a trilha some da prévia (`veDrawMonitor`, `veTopAt`) e da exportação (`veExportPlan`).
@@ -159,3 +169,28 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
 - Nitidez = `unsharp` 5×5 na luma (núcleo binomial, igual no shader); vinheta = `vignette` do ffmpeg
   (cos⁴, raio até o canto), com o alfa preservado por split/alphamerge.
 - Validado: prévia × exportação diferem ~4/255 em média (menos que a diferença YUV→RGB que já existia sem efeito).
+
+## Painel Texto: Transcrever e Criar legendas (como no Premiere)
+- Código: `Functions/legendas.py` (motor), `frontend/js/editor-texto.js` (painel, legendas, prévia), `_gerar_ass` em `video_cutter.py` (gravação).
+- **Motor**: onnx-asr + NVIDIA Parakeet TDT 0.6B em ONNX (usa o onnxruntime que o app já tem, sem PyTorch), com Silero VAD
+  (silêncio mín. 0,6 s, folga 0,15 s, trecho máx. 20 s). Medido só no processador:
+
+  | Motor | Velocidade | Erro PT | Erro EN |
+  |---|---|---|---|
+  | TAGARELA (Parakeet ajustado PT-BR, int8) | ~10x tempo real | 0,9–1,9% | falha |
+  | Parakeet v3 multilíngue int8 | ~10x | 3,8% | 0% |
+  | Whisper large-v3-turbo int8 | 1–2x | 0–12% | 0% |
+
+  PT-BR usa o TAGARELA; inglês e outras 24 línguas europeias usam o v3.
+- **Modelos** em `modelos_ia/asr/` ao lado do exe (fora do git). Baixados do Hugging Face no primeiro uso. O TAGARELA vem
+  em fp32 (2,4 GB) e é comprimido aqui para int8 (640 MB, `quantize_dynamic`), uma vez só.
+  No build, `onnxruntime/transformers` e `onnxruntime/tools` vão como `--add-data`, porque a quantização importa arquivos soltos.
+- **Entrada**: a mesma mixagem da exportação (`_grafo_mix`), com áudios soltos e trilhas mudas → WAV 16 kHz mono.
+  **Saída**: palavras `[início, fim, texto]` no tempo da timeline. Clicar numa palavra leva a agulha até ela, duplo clique corrige a palavra, há busca e a palavra falada fica destacada.
+- **Legendas** (padrões do Premiere): 42 caracteres por linha, 2 linhas, duração mínima de 3 s, intervalo de 0 quadros.
+  A quebra respeita o fim da frase; se não couber, quebra na vírgula e as duas linhas ficam equilibradas.
+  As legendas ficam na trilha LEG: clicar seleciona, arrastar move e arrastar a borda apara. Delete apaga, Ctrl+Z desfaz.
+  Também dá para exportar um `.srt` (UTF-8).
+- **Gravar no vídeo**: arquivo .ass + filtro `subtitles` depois das camadas e antes da redução de resolução. As mesmas contas da prévia
+  (Arial, Fontsize = em × 1,117, caixa = BorderStyle 3, margem 6% da altura).
+- O projeto salva a transcrição, as legendas e o estilo.

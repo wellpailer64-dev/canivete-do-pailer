@@ -9,6 +9,7 @@ if not exist version.txt echo 1.1.0> version.txt
 :: Localiza os assets internos do whisper (mel_filters.npz, etc.)
 for /f "delims=" %%i in ('python -c "import whisper, os; print(os.path.join(os.path.dirname(whisper.__file__), 'assets'))"') do set WHISPER_ASSETS=%%i
 echo Assets do Whisper: %WHISPER_ASSETS%
+for /f "delims=" %%i in ('python -c "import onnxruntime, os; print(os.path.dirname(onnxruntime.__file__))"') do set ORT_DIR=%%i
 
 :: Garante suporte a HEIC/HEIF antes de empacotar o executavel
 python -c "import pillow_heif" 2>nul
@@ -65,6 +66,11 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --collect-all "webview" ^
  --collect-all "pythonnet" ^
  --collect-all "clr_loader" ^
+ --collect-all "onnx_asr" ^
+ --hidden-import "onnxruntime.quantization" ^
+ --add-data "%ORT_DIR%\transformers;onnxruntime/transformers" ^
+ --add-data "%ORT_DIR%\tools;onnxruntime/tools" ^
+ --hidden-import "Functions.legendas" ^
  --copy-metadata "pywebview" ^
  --copy-metadata "pythonnet" ^
  --copy-metadata "clr_loader" ^
