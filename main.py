@@ -320,6 +320,72 @@ def ve_transcrever_cancelar():
     return {"success": True}
 
 
+# ── painel Projeto do editor: importar arquivos e pastas, ler .srt ──
+_VE_EXT_PROJETO = (".mp4", ".mov", ".mkv", ".avi", ".webm", ".flv", ".wmv", ".m4v", ".ts", ".mts", ".m2ts", ".3gp",
+                   ".ogv", ".mpg", ".mpeg", ".mxf", ".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wma",
+                   ".aif", ".aiff", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".avif", ".srt")
+
+
+def ve_importar_dialogo():
+    """Janela "Importar" (vários arquivos) do painel Projeto."""
+    if not _window:
+        return {"success": False}
+    tipos = ("Mídia (*.mp4;*.mov;*.mkv;*.avi;*.webm;*.m4v;*.mts;*.mp3;*.wav;*.flac;*.m4a;*.aac;*.ogg;*.png;*.jpg;*.jpeg;"
+             "*.webp;*.gif;*.bmp;*.srt)", "Todos os arquivos (*.*)")
+    r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), allow_multiple=True, file_types=tipos)
+    if not r:
+        return {"success": False, "cancelled": True}
+    return {"success": True, "paths": list(r) if isinstance(r, (list, tuple)) else [r]}
+
+
+def ve_listar_pasta(path, _nivel=0):
+    """Pasta arrastada para o painel Projeto → árvore {nome, arquivos, pastas} só com o que o editor usa."""
+    try:
+        nomes = sorted(os.listdir(path), key=str.lower)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    arquivos, pastas = [], []
+    for n in nomes:
+        c = os.path.join(path, n)
+        if os.path.isdir(c):
+            if _nivel < 8:
+                sub = ve_listar_pasta(c, _nivel + 1)
+                if sub.get("success") and (sub["arquivos"] or sub["pastas"]):
+                    pastas.append(sub)
+        elif n.lower().endswith(_VE_EXT_PROJETO):
+            arquivos.append(c)
+    return {"success": True, "nome": os.path.basename(os.path.normpath(path)), "arquivos": arquivos, "pastas": pastas}
+
+
+def ve_ler_srt(path):
+    """Legendas .srt → [{st, en, texto}] (segundos)."""
+    import re
+    try:
+        bruto = open(path, "rb").read()
+        for enc in ("utf-8-sig", "cp1252", "latin-1"):
+            try:
+                txt = bruto.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        tempo = r"(\d+):(\d+):(\d+)[,.](\d+)"
+        seg = lambda m, k: int(m[k]) * 3600 + int(m[k + 1]) * 60 + int(m[k + 2]) + int(m[k + 3].ljust(3, "0")[:3]) / 1000
+        itens = []
+        for bloco in re.split(r"\r?\n\s*\r?\n", txt.strip()):
+            linhas = [l for l in bloco.strip().splitlines()]
+            for k, l in enumerate(linhas):
+                m = re.match(tempo + r"\s*-->\s*" + tempo, l.strip())
+                if m:
+                    g = m.groups()
+                    texto = "\n".join(re.sub(r"<[^>]+>", "", x).strip() for x in linhas[k + 1:] if x.strip())
+                    if texto:
+                        itens.append({"st": round(seg(g, 0), 3), "en": round(seg(g, 4), 3), "texto": texto})
+                    break
+        return {"success": True, "itens": itens, "nome": os.path.basename(path)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def ve_fontes():
     """Famílias de fonte instaladas e os estilos de cada uma (Functions/fontes.py). Sem conseguir ler os
     arquivos, cai na lista simples de famílias do GDI."""
@@ -2251,6 +2317,15 @@ class ApiBridge:
 
     def ve_fontes(self):
         return ve_fontes()
+
+    def ve_importar_dialogo(self):
+        return ve_importar_dialogo()
+
+    def ve_listar_pasta(self, path):
+        return ve_listar_pasta(path)
+
+    def ve_ler_srt(self, path):
+        return ve_ler_srt(path)
 
     def ve_salvar_png(self, dados):
         return ve_salvar_png(dados)

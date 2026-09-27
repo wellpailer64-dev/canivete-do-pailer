@@ -33,7 +33,7 @@ function vedDefault() {
             { t: 's', d: 'row', z: [0.77, 0.23], c: [
                 { t: 'g', p: ['monitor'], a: 'monitor' },
                 { t: 's', d: 'col', z: [0.6, 0.4], c: [
-                    { t: 'g', p: ['pp', 'props', 'lc', 'texto', 'clips'], a: 'pp' },
+                    { t: 'g', p: ['pp', 'props', 'lc', 'texto', 'projeto'], a: 'pp' },
                     { t: 'g', p: ['fx', 'keys'], a: 'fx' },
                 ] },
             ] },
@@ -170,6 +170,15 @@ function vedApply(d) {
     vedMain().max = null;
     st.floats.forEach(f => VED.hosts.push(vedNewHost(f.root, f.b)));
     VED.home = st.home;
+    // o painel Projeto substitui o Clipes (como no Premiere): num layout salvo, ele entra no lugar do outro
+    if (st.novos.includes('projeto')) {
+        const g = vedGroups(st.root).find(g => g.p.includes('clips'));
+        if (g) {
+            g.p[g.p.indexOf('clips')] = 'projeto';
+            if (g.a === 'clips') g.a = 'projeto';
+            st.novos = st.novos.filter(id => id !== 'projeto');
+        }
+    }
     st.novos.forEach(id => vedAddTab(id, true));
     vedRender();
     if (VED.editor) vedOpenFloats();

@@ -1078,6 +1078,14 @@ const VE_EXT_IMG = /\.(png|jpe?g|webp|gif|bmp|avif)$/i;
 function veDropFiles(itens) {
     const proj = itens.find(i => !i.pasta && /\.vcnvt$/i.test(i.path));
     if (proj) { veOpenProject(proj.path); return; }
+    const drop = VE._drop && Date.now() - VE._drop.at < 5000 ? VE._drop : null;
+    const noPainel = VE.ready ? vePjSoltouAqui(drop) : null;
+    if (noPainel) { vePjImportar(itens, noPainel.pasta); return; }
+    if (VE.ready) {
+        // pastas, legendas e outros vídeos não vão direto para a timeline: entram no painel Projeto
+        const soProjeto = itens.filter(i => i.pasta || VE_EXT_SRT.test(i.path) || (EXT_VIDEO.test(i.path) && i.path !== VE.path));
+        if (soProjeto.length) { vePjImportar(soProjeto, null); itens = itens.filter(i => !soProjeto.includes(i)); if (!itens.length) return; }
+    }
     const videos = itens.filter(i => !i.pasta && (EXT_VIDEO.test(i.path) || EXT_AUDIO.test(i.path)));
     const imgs = itens.filter(i => !i.pasta && VE_EXT_IMG.test(i.path));
     if (!VE.ready) {
@@ -1164,7 +1172,7 @@ function veTrackFree(tr, a, b, novo) {
     return !VE.clips.some(o => o.tr === tr && o.st < b - VE_EPS && veEnd(o) > a + VE_EPS && (!novo || veConflita(o, novo)));
 }
 
-function veInsertImageClip(m, drop, deslocamento, rotulo = 'Imagem adicionada') {
+function veInsertImageClip(m, drop, deslocamento, rotulo = 'Imagem adicionada', abrirPainel = true) {
     let st = VE.playhead, tr = -1;
     const wrap = $ve('ve-tl-wrap').getBoundingClientRect();
     if (drop && drop.x >= wrap.left && drop.x <= wrap.right && drop.y >= wrap.top + VE_RULER && drop.y <= wrap.bottom) {
@@ -1189,7 +1197,7 @@ function veInsertImageClip(m, drop, deslocamento, rotulo = 'Imagem adicionada') 
     VE.sel = VE.clips.indexOf(clip);
     veRelayout();
     veAfterEdit(VE.playhead);
-    veTab('props');
+    if (abrirPainel) veTab('props');
     veToast(`${rotulo} em V${tr + 1}`);
 }
 
@@ -1884,10 +1892,18 @@ function veProjectData() {
     return {
         app: 'Canivete do Pailer',
         video: VE.path,
-        media: VE.media.filter(m => m.kind === 'image' || m.kind === 'ajuste' || m.kind === 'audio' || m.kind === 'texto')
-            .map(m => m.kind === 'ajuste' || m.kind === 'texto' ? { id: m.id, kind: m.kind, name: m.name }
-                : m.kind === 'audio' ? { id: m.id, kind: 'audio', path: m.path, name: m.name, dur: m.dur }
-                : { id: m.id, kind: 'image', path: m.path, name: m.name, w: m.w, h: m.h }),
+        media: VE.media.filter(m => m.id && !m.removido && ['image', 'ajuste', 'audio', 'texto', 'legenda', 'video2'].includes(m.kind))
+            .map(m => {
+                const o = { id: m.id, kind: m.kind, name: m.name, pasta: m.pasta || null, cor: m.cor, nome: m.nome };
+                if (m.kind === 'audio') Object.assign(o, { path: m.path, dur: m.dur });
+                if (m.kind === 'image') Object.assign(o, { path: m.path, w: m.w, h: m.h });
+                if (m.kind === 'legenda') Object.assign(o, { path: m.path, itens: m.itens });
+                if (m.kind === 'video2') o.path = m.path;
+                return o;
+            }),
+        // painel Projeto: pastas e a organização do vídeo principal
+        bins: VE.bins || [],
+        m0: VE.media[0] ? { pasta: VE.media[0].pasta || null, cor: VE.media[0].cor, nome: VE.media[0].nome } : null,
         clips: VE.clips,
         trilhas: VE_TRK,
         texto: { palavras: VETX.palavras, idioma: VETX.idioma, chave: VETX.chave },
@@ -1931,8 +1947,9 @@ function veCloseProject() {
     Object.assign(VE, {
         path: null, info: null, dur: 0, srcDur: 0, clips: [], sel: -1, inPt: null, outPt: null, playhead: 0,
         cur: -1, history: [], future: [], thumbs: [], peaks: [], ready: false, dest: null, view: 0, media: [],
-        projectPath: null, dirty: false, _pendingProject: null,
+        projectPath: null, dirty: false, _pendingProject: null, bins: [],
     });
+    VEPJ.sel.clear();
     veUpdateUndo();
     $ve('ve-empty').hidden = false;
     $ve('ve-loading').hidden = true;
@@ -1976,15 +1993,22 @@ function veApplyProject() {
     VE.projectPath = path;
     const ids = { 0: 0 };
     (d.media || []).forEach(m => {
+        const org = { pasta: m.pasta || null, cor: m.cor, nome: m.nome };
+        if (m.kind === 'legenda' || m.kind === 'video2') {
+            const nm = { id: VE.media.length, kind: m.kind, name: m.name, path: m.path, itens: m.itens, ...org };
+            VE.media.push(nm);
+            ids[m.id] = nm.id;
+            return;
+        }
         if (m.kind === 'ajuste' || m.kind === 'texto') {
-            const nm = { id: VE.media.length, kind: m.kind, name: m.name || (m.kind === 'texto' ? 'Texto' : 'Camada de ajuste') };
+            const nm = { id: VE.media.length, kind: m.kind, name: m.name || (m.kind === 'texto' ? 'Texto' : 'Camada de ajuste'), ...org };
             VE.media.push(nm);
             ids[m.id] = nm.id;
             return;
         }
         if (m.kind === 'audio') {
             if (!m.path || missing.includes(m.path)) return;
-            const nm = { id: VE.media.length, kind: 'audio', path: m.path, name: m.name, dur: m.dur || 0, peaks: [] };
+            const nm = { id: VE.media.length, kind: 'audio', path: m.path, name: m.name, dur: m.dur || 0, peaks: [], ...org };
             VE.media.push(nm);
             ids[m.id] = nm.id;
             window.pywebview.api.video_cutter_add_audio(m.path).then(r => {
@@ -1996,7 +2020,7 @@ function veApplyProject() {
             return;
         }
         if (!m.path || missing.includes(m.path)) return;
-        const nm = { id: VE.media.length, kind: 'image', path: m.path, name: m.name, img: new Image(), w: m.w || 0, h: m.h || 0 };
+        const nm = { id: VE.media.length, kind: 'image', path: m.path, name: m.name, img: new Image(), w: m.w || 0, h: m.h || 0, ...org };
         VE.media.push(nm);
         ids[m.id] = nm.id;
         window.pywebview.api.video_cutter_add_media(m.path).then(r => {
@@ -2016,6 +2040,8 @@ function veApplyProject() {
         })
         .filter(c => c.e - c.s > 1e-3);
     if (clips.length) VE.clips = clips;
+    VE.bins = Array.isArray(d.bins) ? d.bins : [];
+    if (d.m0 && VE.media[0]) Object.assign(VE.media[0], d.m0);
     VE.legendas = Array.isArray(d.legendas) ? d.legendas : [];
     VE.legEstilo = d.legEstilo || null;
     VE.legGravar = d.legGravar !== false;
@@ -2366,7 +2392,7 @@ function veRender() {
         if (cw > 50 && vh >= 12) {
             ctx.fillStyle = '#eef0ff';
             ctx.font = '600 10.5px Segoe UI';
-            const nome = adj ? veT('Camada de ajuste') : txt ? 'T  ' + veNomeTexto(c) : img ? (med.name || veT('Imagem')) : veT(`Clipe ${i + 1}`);
+            const nome = adj ? veT('Camada de ajuste') : txt ? 'T  ' + veNomeTexto(c) : img ? (med.nome || med.name || veT('Imagem')) : veT(`Clipe ${i + 1}`);
             ctx.fillText(nome + velTxt + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, vy + 10.5);
         }
         if (veHasFx(c) && cw > 34 && vh >= 12) {
@@ -2447,7 +2473,7 @@ function veRender() {
             ctx.fillRect(cx, ay, cw, Math.min(13, ah));
             ctx.fillStyle = '#04150d';
             ctx.font = '600 10px Segoe UI';
-            ctx.fillText((med.name || veT('Áudio')) + velTxt + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, ay + 10);
+            ctx.fillText((med.nome || med.name || veT('Áudio')) + velTxt + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, ay + 10);
         }
         ctx.restore();
         ctx.globalAlpha = 1;
@@ -2631,6 +2657,7 @@ function veRenderClips() {
 
 function veRefresh() {
     veTxRender();
+    vePjRender();
     if (veMixAtivo()) veAudioEditou();
     veUpdateReadouts();
     veRenderClips();
@@ -2742,6 +2769,8 @@ function veOnPrepare(ev) {
             VE.srcDur = ev.duration;
             VE.fps = ev.fps || 30;
             VE.media = [{ id: 0, kind: 'video', path: VE.path, name: ev.file_name }];
+            VE.bins = [];
+            VEPJ.sel.clear();
             VE.seqW = ev.width || 1920;
             VE.seqH = ev.height || 1080;
             VE.clips = [{ tr: 0, st: 0, s: 0, e: VE.srcDur }];

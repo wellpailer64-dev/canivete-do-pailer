@@ -248,3 +248,26 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
   - Cada estilo guarda o nome "de sistema" (nome 1) + negrito/itálico.
 - O desenho (canvas) e o libass usam esse nome de sistema, por isso acham exatamente o mesmo estilo:
   prévia = vídeo gravado, testado com Segoe UI Semibold Italic e Arial Narrow Bold.
+
+## Painel Projeto (como o Project do Premiere; substitui o painel Clipes)
+- Código: `frontend/js/editor-projeto.js`. Guarda os materiais do projeto: o vídeo aberto, imagens, áudios, camadas de ajuste,
+  legendas (.srt) e outros vídeos (estes ainda não entram na timeline: o editor usa um vídeo por projeto).
+  Tudo isso organizado em pastas (`VE.bins`).
+- Na mídia: `pasta`, `cor` e `nome` (renomeado). O id é o índice em `VE.media`, então apagar marca `removido`.
+- **Entrada:**
+  - Arquivos e pastas do Windows soltos em cima do painel entram na pasta sob o cursor.
+  - Uma pasta vira pasta do projeto, com as subpastas (`ve_listar_pasta`).
+  - Pastas, `.srt` e outros vídeos soltos na timeline também vão para o painel.
+  - Botão Importar (Ctrl+I) e `.srt` via `ve_ler_srt`.
+- **Organizar:**
+  - Ctrl+B cria pasta; F2 ou duplo clique no nome renomeia.
+  - Ctrl+C/X/V (cola na pasta selecionada), Ctrl+D duplica, Delete apaga.
+  - Apagar material em uso pede uma segunda confirmação e tira os clipes dele da timeline.
+  - Arrastar para dentro de uma pasta, cor do rótulo, menu do botão direito, busca e ordenar pelas colunas.
+- **Para a sequência:** arrastar para a timeline põe o item no ponto e na trilha do soltar; soltar no monitor põe na agulha.
+  - Vídeo: o clipe inteiro.
+  - Imagem ou ajuste: 5 s.
+  - Áudio: na linha A do soltar, se estiver livre.
+  - `.srt`: substitui as legendas (LEG), deslocadas para o ponto do soltar.
+  - A cor do rótulo passa para o clipe, e o nome dado no Projeto aparece na timeline.
+- O arquivo do projeto (.vcnvt) guarda `bins`, `m0` (organização do vídeo principal) e os itens que ainda não estão na timeline.
