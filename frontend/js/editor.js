@@ -421,6 +421,7 @@ function veStop() {
     if (!VE.playing) return;
     VE.playing = false;
     veVideo().pause();
+    veParkExtras(0);
     $ve('ve-play').textContent = '▶';
     veUpdateReadouts();
     veDraw();
@@ -802,6 +803,45 @@ function veInsertImageClip(m, drop, deslocamento) {
     veToast(`Imagem adicionada em V${tr + 1}`);
 }
 
+// ── players extras: vídeos das camadas de baixo aparecendo por trás de camadas transparentes ──
+// O projeto tem um vídeo só; cada clipe visível ao mesmo tempo precisa de um player no seu instante.
+const VEX = [];
+
+function veExtraPlayer(n) {
+    while (VEX.length <= n) {
+        const x = document.createElement('video');
+        x.muted = true;
+        x.preload = 'auto';
+        x.crossOrigin = 'anonymous';
+        x.addEventListener('seeked', () => { if (!VE.playing) veDrawMonitor(); });
+        x.addEventListener('loadeddata', () => veDrawMonitor());
+        VEX.push(x);
+    }
+    const x = VEX[n], src = veVideo().src;
+    if (x.src !== src) { x.src = src; x.load(); }
+    return x;
+}
+
+function veSyncExtra(x, srcT) {
+    if (x.readyState < 1) return;
+    if (VE.playing) {
+        if (x.playbackRate !== VE.rate) x.playbackRate = VE.rate;
+        if (x.paused) x.play().catch(() => {});
+        if (!x.seeking && Math.abs(x.currentTime - srcT) > 0.2) x.currentTime = srcT;
+    } else {
+        if (!x.paused) x.pause();
+        if (!x.seeking && Math.abs(x.currentTime - srcT) > 0.02) x.currentTime = srcT;
+    }
+}
+
+// Pausa os players que não estão em uso (a partir do índice n); n = 0 com `limpar` solta o arquivo
+function veParkExtras(n, limpar) {
+    VEX.slice(n).forEach(x => {
+        if (!x.paused) x.pause();
+        if (limpar && x.getAttribute('src')) { x.removeAttribute('src'); x.load(); }
+    });
+}
+
 // ── monitor: desenha as camadas visíveis na agulha, de baixo para cima ──
 function veDrawMonitor() {
     const cv = $ve('ve-canvas');
@@ -818,17 +858,26 @@ function veDrawMonitor() {
     ctx.setTransform(pv, 0, 0, pv, 0, 0);
     ctx.imageSmoothingQuality = 'high';
     const t = VE.playhead, v = veVideo();
-    VE.clips
+    let vis = VE.clips
         .map((c, i) => ({ c, i }))
         .filter(({ c }) => t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS)
-        .sort((a, b) => a.c.tr - b.c.tr)
-        .forEach(({ c, i }) => {
+        .sort((a, b) => a.c.tr - b.c.tr);
+    // o que está abaixo de um vídeo que cobre o quadro inteiro não aparece: nem decodifica
+    const cobre = vis.map(({ c }) => !veIsImage(c) && veIsDefaultProps(c)).lastIndexOf(true);
+    if (cobre > 0) vis = vis.slice(cobre);
+    let extra = 0;
+    vis.forEach(({ c, i }) => {
             let src = null;
             if (veIsImage(c)) {
                 const m = veMediaOf(c);
                 if (m.img && m.img.complete && m.w) src = m.img;
-            } else if (i === VE.cur && v.readyState >= 2) {
-                src = v;   // um único player: só o clipe de vídeo de cima aparece
+            } else if (i === VE.cur) {
+                if (v.readyState >= 2) src = v;   // o player principal (dá o som e o relógio)
+            } else if (v.src) {
+                // vídeo de camada de baixo (transparência/dupla exposição): player extra sem som
+                const x = veExtraPlayer(extra++);
+                veSyncExtra(x, c.s + (t - c.st));
+                if (x.readyState >= 2) src = x;
             }
             if (!src) return;
             const p = veProps(c), sz = veMediaSize(c);
@@ -841,6 +890,7 @@ function veDrawMonitor() {
             ctx.drawImage(src, -sz.w / 2, -sz.h / 2, sz.w, sz.h);
             ctx.restore();
         });
+    veParkExtras(extra);
     // contorno do clipe selecionado visível (ajuda a posicionar)
     const cs = VE.clips[VE.sel];
     if (cs && t >= cs.st - VE_EPS && t < veEnd(cs) - VE_EPS && (veIsImage(cs) || !veIsDefaultProps(cs))) {
@@ -941,7 +991,7 @@ function veBuildKfHeads() {
     interp.className = 've-kf-interp';
     interp.id = 've-kf-interp';
     interp.hidden = true;
-    interp.innerHTML = '<span>Quadro-chave na agulha</span><div>' +
+    interp.innerHTML = '<span>Interpolação</span><div>' +
         Object.entries(VE_KF_INTERP).map(([i, n]) => `<button data-i="${i}">${n}</button>`).join('') + '</div>';
     actions.before(interp);
     $ve('ve-props').addEventListener('click', e => {
@@ -1117,6 +1167,7 @@ function veCloseProject() {
     v.pause();
     v.removeAttribute('src');
     v.load();
+    veParkExtras(0, true);
     Object.assign(VE, {
         path: null, info: null, dur: 0, srcDur: 0, clips: [], sel: -1, inPt: null, outPt: null, playhead: 0,
         cur: -1, history: [], future: [], thumbs: [], peaks: [], ready: false, dest: null, view: 0, media: [],
@@ -1478,7 +1529,7 @@ function veRender() {
             ctx.fillText(nome + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, vy + 10.5);
         }
         ctx.restore();
-        if (!ghost && veHasKf(c) && vh >= 20) veDrawKfMarks(ctx, c, i, st, vy + vh - 7);
+        if (!ghost && veHasKf(c)) veDrawKfMarks(ctx, c, i, st, veKfMarkY(vr));
         if (img) {
             ctx.globalAlpha = 1;
             if ((i === VE.sel && !dim) || ghost) {
@@ -1593,12 +1644,17 @@ function veDrawKfMarks(ctx, c, i, st, y) {
     });
 }
 
+// Altura dos ◆: faixa de baixo do clipe; em trilha compacta, no meio dele
+function veKfMarkY(row) {
+    const vy = row.y + 3, vh = row.h - 6;
+    return vh >= 28 ? vy + vh - 7 : vy + vh / 2;
+}
+
 // ◆ do clipe selecionado sob o ponteiro (tempo da sequência) ou null
 function veKfMarkAt(x, y, row) {
     const c = VE.clips[VE.sel];
     if (!c || !row || row.kind !== 'v' || veTrackIndex(row) !== c.tr || !veHasKf(c)) return null;
-    const my = row.y + row.h - 3 - 7;
-    if (Math.abs(y - my) > 8) return null;
+    if (Math.abs(y - veKfMarkY(row)) > 8) return null;
     return veKfSeqTimes(c).find(t => Math.abs((t - VE.view) * VE.pps - x) <= 6) ?? null;
 }
 
@@ -1725,6 +1781,7 @@ function veOpenPath(path) {
     v.pause();
     v.removeAttribute('src');
     v.load();
+    veParkExtras(0, true);
     Object.assign(VE, {
         path, info: null, dur: 0, srcDur: 0, clips: [], sel: -1, inPt: null, outPt: null, playhead: 0,
         cur: -1, history: [], future: [], thumbs: [], peaks: [], ready: false, dest: null, view: 0, media: [],

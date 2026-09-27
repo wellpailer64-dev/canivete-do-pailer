@@ -638,7 +638,7 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-kf-interp[hidden] { display: none; }
 .ve-kf-interp div { display: flex; border: 1px solid var(--ve-line-2); border-radius: 6px; overflow: hidden; }
 .ve-kf-interp button {
-    padding: 3px 8px; border: 0; background: transparent; color: var(--ve-dim);
+    padding: 3px 7px; border: 0; background: transparent; color: var(--ve-dim); white-space: nowrap;
     font: 600 11px var(--ve-ui); cursor: pointer;
 }
 .ve-kf-interp button + button { border-left: 1px solid var(--ve-line-2); }
