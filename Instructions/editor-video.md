@@ -216,3 +216,14 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
   - T + clique no monitor cria o texto na trilha livre acima (V2+), começando no ponto do clique.
   - A digitação acontece numa textarea transparente por cima do desenho; duplo clique edita.
   - Na exportação, cada texto vira PNG (`ve_salvar_png`) na maior escala dele, então sai idêntico à prévia com qualquer fonte.
+
+## Apagar, duplicar, copiar e colar (como no Premiere)
+- **D / Delete:** apaga e deixa o espaço (Lift). **Shift+D / Shift+Delete:** apaga e fecha o espaço (Ripple Delete).
+  O espaço só fecha se nenhuma outra trilha tiver clipe ali.
+- **Ctrl+C / Ctrl+X / Ctrl+V:** cola na agulha, na mesma trilha de onde o clipe saiu, sobrescrevendo o que estiver lá.
+  A agulha vai para o fim do colado. A cópia só vale para o mesmo vídeo aberto.
+- **Alt+arrastar:**
+  - Na timeline, solta uma cópia e o original fica. O fantasma mostra "+".
+  - No monitor, com a camada selecionada, a cópia nasce na primeira trilha livre acima, no mesmo tempo, e é ela que se move.
+- **Alt+↑ / Alt+↓:** muda o clipe de trilha sem mudar o tempo (sobrescreve).
+- Código: `vePlaceClip`, `veDuplicarEm`, `veDuplicarAcima`, `veCopiar`/`veColar` e `veTrocarTrilha` em `editor.js`.

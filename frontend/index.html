@@ -557,7 +557,9 @@
                                         <div><kbd>Home</kbd> <kbd>End</kbd> Início / Fim</div>
                                         <h4>Edição</h4>
                                         <div><kbd>'</kbd> <kbd>S</kbd> ou <kbd>Ctrl</kbd>+<kbd>K</kbd> Cortar todas as trilhas na agulha</div>
-                                        <div><kbd>D</kbd> ou <kbd>Delete</kbd> Apagar clipe selecionado (fecha o espaço)</div>
+                                        <div><kbd>D</kbd> ou <kbd>Delete</kbd> Apagar clipe selecionado (o espaço fica) · <kbd>Shift</kbd>+<kbd>D</kbd> apaga e fecha o espaço</div>
+                                        <div><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>X</kbd> copiar / recortar · <kbd>Ctrl</kbd>+<kbd>V</kbd> cola na agulha, na mesma trilha</div>
+                                        <div><kbd>Alt</kbd>+arrastar um clipe (na timeline ou no monitor) duplica · <kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>↓</kbd> muda o clipe de trilha</div>
                                         <div><kbd>Q</kbd> Apagar do corte anterior até a agulha</div>
                                         <div><kbd>W</kbd> Apagar da agulha até o próximo corte</div>
                                         <div>Arraste um clipe para frente/trás ou para outra trilha (V1–V4)</div>
@@ -604,7 +606,7 @@
                                 </div>
                                 <div class="ve-divider"></div>
                                 <button class="ve-btn ve-btn-sm" onclick="veSplitAtPlayhead()" title="Cortar todas as trilhas na agulha (' ou S)">⎮ Cortar</button>
-                                <button class="ve-btn ve-btn-sm" onclick="veDeleteSelected()" title="Apagar clipe selecionado (D)"><svg class="i"><use href="#i-trash"/></svg> Apagar</button>
+                                <button class="ve-btn ve-btn-sm" onclick="veDeleteSelected()" title="Apagar clipe selecionado (D: o espaço fica · Shift+D: fecha o espaço)"><svg class="i"><use href="#i-trash"/></svg> Apagar</button>
                                 <button class="ve-btn ve-btn-sm" onclick="veExtractInOut()" title="Remover trecho In→Out (X)">✂ In→Out</button>
                                 <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="veResetEdits()" title="Voltar ao vídeo original">↺ Restaurar tudo</button>
                                 <div class="ve-top-spacer"></div>

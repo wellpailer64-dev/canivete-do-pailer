@@ -312,13 +312,21 @@ function veRippleRemove(a, b, label) {
 
 // D / Delete: apaga o clipe selecionado. Se o espaço que ele deixa ficar vazio em todas as
 // trilhas, a timeline fecha o buraco (como o ripple delete do Premiere); senão fica o espaço.
-function veDeleteClip(i) {
+// ripple = fecha o espaço (Shift+D, como Shift+Delete no Premiere); sem ripple o espaço vazio fica (D / Delete)
+function veDeleteClip(i, ripple) {
     if (i < 0 || i >= VE.clips.length) return;
     if (veLocked(VE.clips[i])) { veAvisoBloqueio(); return; }
     if (VE.clips.length === 1) { veToast('Não dá para apagar o último clipe'); return; }
     vePushHistory();
     const c = VE.clips[i], a = c.st, b = veEnd(c), d = b - a;
     VE.clips.splice(i, 1);
+    if (!ripple) {
+        VE.sel = -1;
+        veRelayout();
+        veAfterEdit(Math.min(VE.playhead, VE.dur));
+        veToast('Clipe apagado (Shift+D apaga e fecha o espaço)');
+        return;
+    }
     const ocupado = VE.clips.some(o => o.st < b - VE_EPS && veEnd(o) > a + VE_EPS);
     if (!ocupado) VE.clips.forEach(o => { if (o.st >= b - VE_EPS && !veLocked(o)) o.st -= d; });
     VE.sel = -1;
@@ -327,7 +335,7 @@ function veDeleteClip(i) {
     veToast(ocupado ? 'Clipe apagado (o espaço ficou porque há clipes em outras trilhas)' : 'Clipe apagado');
 }
 
-function veDeleteSelected() {
+function veDeleteSelected(ripple) {
     if (VE.sel < 0 && VETX.legSel >= 0 && VE.legendas[VETX.legSel]) {
         vePushHistory();
         VE.legendas = VE.legendas.filter((_, k) => k !== VETX.legSel);
@@ -337,7 +345,85 @@ function veDeleteSelected() {
         return;
     }
     if (VE.sel < 0) { veToast('Selecione um clipe na timeline'); return; }
-    veDeleteClip(VE.sel);
+    veDeleteClip(VE.sel, ripple);
+}
+
+// ── duplicar / copiar e colar / mudar de trilha ──
+// Põe `novo` na trilha dele sobrescrevendo o que estiver embaixo (como soltar um clipe); `exceto` = índice que sai
+function vePlaceClip(novo, exceto = -1) {
+    const a = novo.st, b = veEnd(novo), tiny = veFrame() * 0.5, out = [];
+    VE.clips.forEach((o, j) => {
+        if (j === exceto) return;
+        const en = veEnd(o);
+        if (o.tr !== novo.tr || en <= a + VE_EPS || o.st >= b - VE_EPS || !veConflita(o, novo)) { out.push(o); return; }
+        if (o.st < a && a - o.st > tiny) out.push({ ...o, e: veSrcAt(o, a) });
+        if (en > b && en - b > tiny) out.push({ ...o, st: b, s: veSrcAt(o, b) });
+    });
+    out.push(novo);
+    VE.clips = out;
+    VE.sel = out.indexOf(novo);
+    veRelayout();
+}
+
+const veCopiaClipe = c => JSON.parse(JSON.stringify(c));
+
+// Alt+arrastar: uma cópia igual cai onde o clipe foi solto; o original fica
+function veDuplicarEm(i, tr, st) {
+    const c = VE.clips[i];
+    if (!c) return;
+    if (veTrkLocked(tr)) { veAvisoBloqueio(); veDraw(); return; }
+    vePushHistory();
+    vePlaceClip({ ...veCopiaClipe(c), tr, st });
+    veAfterEdit(VE.playhead);
+    veToast(`${veNomeClipe(c)} duplicado em ${veIsAudio(c) ? 'A' : 'V'}${tr + 1}`);
+}
+
+// Ctrl+C / Ctrl+X / Ctrl+V: cola na agulha, na mesma trilha de onde saiu (a agulha vai para o fim do colado)
+function veCopiar(recortar) {
+    const c = VE.clips[VE.sel];
+    if (!c) { veToast('Selecione um clipe para copiar'); return; }
+    VE.clipboard = { c: veCopiaClipe(c), path: VE.path };
+    if (recortar) { veDeleteClip(VE.sel, false); veToast('Clipe recortado: Ctrl+V cola na agulha'); }
+    else veToast('Clipe copiado: Ctrl+V cola na agulha');
+}
+
+function veColar() {
+    const cb = VE.clipboard;
+    if (!cb || cb.path !== VE.path) { veToast('Nada copiado (Ctrl+C num clipe primeiro)'); return; }
+    if (cb.c.m && !VE.media[cb.c.m]) { veToast('A mídia desse clipe não está mais no projeto'); return; }
+    if (veTrkLocked(cb.c.tr)) { veAvisoBloqueio(); return; }
+    vePushHistory();
+    const novo = { ...veCopiaClipe(cb.c), st: veSnapFrame(VE.playhead) };
+    vePlaceClip(novo);
+    veAfterEdit(veEnd(novo));
+    veToast(`Colado em ${veIsAudio(novo) ? 'A' : 'V'}${novo.tr + 1}`);
+}
+
+// Alt+arrastar no monitor: a cópia nasce na primeira trilha livre acima, no mesmo tempo, e é ela que se move
+// (sem trilha livre, sobrescreve a de cima). Devolve false se não houver trilha acima.
+function veDuplicarAcima() {
+    const c = VE.clips[VE.sel];
+    if (!c) return false;
+    const a = c.st, b = veEnd(c);
+    let tr = [1, 2, 3].map(k => c.tr + k).find(k => k <= 3 && !veTrkLocked(k) && veTrackFree(k, a, b, c));
+    if (tr == null && c.tr < 3 && !veTrkLocked(c.tr + 1)) tr = c.tr + 1;
+    if (tr == null) { veToast('Não há trilha acima para a cópia (V4 é a última)'); return false; }
+    vePushHistory();
+    vePlaceClip({ ...veCopiaClipe(c), tr });
+    veRefresh();
+    veToast(`${veNomeClipe(c)} duplicado em V${tr + 1}`);
+    return true;
+}
+
+// Alt+↑ / Alt+↓: leva o clipe para a trilha de cima/baixo, no mesmo tempo (sobrescreve o que estiver lá)
+function veTrocarTrilha(dir) {
+    const c = VE.clips[VE.sel];
+    if (!c) { veToast('Selecione um clipe na timeline'); return; }
+    if (veLocked(c)) { veAvisoBloqueio(); return; }
+    // no vídeo "cima" é V2, V3...; no áudio solto, "cima" é em direção ao A1 (como aparece na tela)
+    const tr = c.tr + (veIsAudio(c) ? -dir : dir);
+    if (tr < 0 || tr > 3) return;
+    veMoveClip(VE.sel, tr, c.st);
 }
 
 // ── Mover clipe (arrastar) ──
@@ -2242,7 +2328,7 @@ function veRender() {
     const rowOf = id => rows.find(r => r.id === id);
     // ao arrastar: o original fica apagadinho e um "fantasma" mostra onde ele vai cair
     const mv = VE.drag && VE.drag.mode === 'move' && VE.drag.active ? VE.drag : null;
-    const items = VE.clips.map((c, i) => ({ c, i, st: c.st, tr: c.tr, dim: mv && mv.i === i }));
+    const items = VE.clips.map((c, i) => ({ c, i, st: c.st, tr: c.tr, dim: mv && !mv.alt && mv.i === i }));
     if (mv) items.push({ c: VE.clips[mv.i], i: mv.i, st: mv.st, tr: mv.tr, ghost: true });
     items.forEach(({ c, i, st, tr, dim, ghost }) => {
         const len = veLen(c);
@@ -2385,7 +2471,7 @@ function veRender() {
         }
         if (ghost) {
             ctx.font = '600 10px Cascadia Mono, Consolas, monospace';
-            const txt = `${aud ? 'A' : 'V'}${tr + 1} · ${veShort(st)}`, ty = aud ? ay : vy;
+            const txt = `${mv && mv.alt ? '+ ' : ''}${aud ? 'A' : 'V'}${tr + 1} · ${veShort(st)}`, ty = aud ? ay : vy;
             ctx.fillStyle = 'rgba(0,0,0,0.75)';
             ctx.fillRect(Math.max(2, x1), ty - 17, ctx.measureText(txt).width + 10, 15);
             ctx.fillStyle = '#F97316';
@@ -2941,7 +3027,7 @@ function veInitMonitorZoom() {
         const visivel = c && !veIsAdj(c) && VE.playhead >= c.st - VE_EPS && VE.playhead < veEnd(c) - VE_EPS;
         if (visivel) {
             const p = veProps(c);
-            VEM.pan = { layer: true, x0: e.clientX, y0: e.clientY, px: p.x, py: p.y, id: e.pointerId, hist: false };
+            VEM.pan = { layer: true, x0: e.clientX, y0: e.clientY, px: p.x, py: p.y, id: e.pointerId, hist: false, clonar: e.altKey && !veLocked(c) };
         } else if (VEM.mz > 1.001) {
             VEM.pan = { x0: e.clientX, y0: e.clientY, mx0: VEM.mx, my0: VEM.my, id: e.pointerId };
         } else return;
@@ -2953,6 +3039,8 @@ function veInitMonitorZoom() {
         if (!VEM.panned && Math.hypot(dx, dy) < 4) return;
         if (!VEM.panned) {
             VEM.panned = true;
+            if (VEM.pan.clonar && !veDuplicarAcima()) { VEM.pan = null; return; }
+            if (VEM.pan.clonar) VEM.pan.hist = true;
             scr.setPointerCapture(VEM.pan.id);
             scr.classList.add(VEM.pan.layer ? 'layer-move' : 'panning');
             if (VE.playing) veStop();
@@ -3169,6 +3257,7 @@ function veInitEvents() {
             if (x < 24) { VE.view -= 14 / VE.pps; veClampView(); }
             const p = veTimeFromEvent(e);
             d.st = veMoveTarget(d.i, p.t - d.grab);
+            d.alt = e.altKey;   // Alt (antes ou durante o arraste): solta uma cópia e o original fica
             // trilha sob o mouse (arrastando pelo vídeo ou pelo áudio, o par vinculado vai junto)
             const r = veRowAt(p.y);
             if (r && r.kind !== 'l') d.tr = veTrackIndex(r);
@@ -3206,8 +3295,9 @@ function veInitEvents() {
             veRefresh();
             return;
         }
-        if (d && d.mode === 'move' && d.active) veMoveClip(d.i, d.tr, d.st);
-        else veDraw();
+        if (d && d.mode === 'move' && d.active) {
+            if (d.alt) veDuplicarEm(d.i, d.tr, d.st); else veMoveClip(d.i, d.tr, d.st);
+        } else veDraw();
     };
     wrap.addEventListener('pointerup', endDrag);
     wrap.addEventListener('contextmenu', e => {
@@ -3356,6 +3446,10 @@ function veOnKey(e) {
     if (ctrl && k === 'z' && !e.shiftKey) { e.preventDefault(); veUndo(); return; }
     if (ctrl && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); veRedo(); return; }
     if (ctrl && k === 'k') { e.preventDefault(); veSplitAtPlayhead(); return; }
+    if (ctrl && k === 'c' && !e.shiftKey) { e.preventDefault(); veCopiar(false); return; }
+    if (ctrl && k === 'x' && !e.shiftKey) { e.preventDefault(); veCopiar(true); return; }
+    if (ctrl && k === 'v' && !e.shiftKey) { e.preventDefault(); veColar(); return; }
+    if (e.altKey && (k === 'arrowup' || k === 'arrowdown')) { e.preventDefault(); veTrocarTrilha(k === 'arrowup' ? 1 : -1); return; }
     if (ctrl && (k === 'm' || k === 'e')) { e.preventDefault(); veOpenExport(); return; }
     if (ctrl) return;
 
@@ -3380,10 +3474,10 @@ function veOnKey(e) {
         'home': () => veSeek(0),
         'end': () => veSeek(VE.dur),
         's': () => veSplitAtPlayhead(),
-        'd': () => veDeleteSelected(),
+        'd': () => veDeleteSelected(e.shiftKey),
         'g': () => veOpenGain(),
-        'delete': () => veDeleteSelected(),
-        'backspace': () => veDeleteSelected(),
+        'delete': () => veDeleteSelected(e.shiftKey),
+        'backspace': () => veDeleteSelected(e.shiftKey),
         'i': () => veMarkIn(),
         'o': () => veMarkOut(),
         'x': () => veExtractInOut(),
