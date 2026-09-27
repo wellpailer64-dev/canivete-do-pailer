@@ -370,7 +370,7 @@ function veLcRender() {
     const key = VE.sel + '|' + (f ? f.id + (f.on !== false) : '') + '|' + JSON.stringify(v) + VELC.ch;
     if (key === VELC.key) return;
     VELC.key = key;
-    $ve('ve-lc-title').innerHTML = `${veIsImage(c) ? 'Imagem' : 'Clipe'} ${VE.sel + 1}<span>${f ? (f.on === false ? 'desligado' : 'Luz e Cor aplicado') : 'sem ajustes'}</span>`;
+    $ve('ve-lc-title').innerHTML = `${veNomeClipe(c)} ${VE.sel + 1}<span>${f ? (f.on === false ? 'desligado' : 'Luz e Cor aplicado') : 'sem ajustes'}</span>`;
     const on = $ve('ve-lc-on');
     on.classList.toggle('off', !!f && f.on === false);
     on.disabled = !f;

@@ -253,6 +253,10 @@ const I18N_EN = {
     'Temperatura': 'Temperature', 'Matiz': 'Tint', 'Exposição': 'Exposure', 'Gama': 'Gamma', 'Vinheta': 'Vignette', 'Espelhar': 'Mirror',
     'Horizontal': 'Horizontal', 'Vertical': 'Vertical', 'Raio': 'Radius', 'Intensidade': 'Intensity', 'Cor': 'Color', 'Estilizar': 'Stylize',
     'Preto e branco': 'Black and white', 'Sépia': 'Sepia', 'Inverter': 'Invert', 'Ruído': 'Noise', 'Granulação': 'Grain',
+    // Camada de ajuste
+    'Ajuste': 'Adjustment', 'Camada de ajuste': 'Adjustment layer', 'Camada de ajuste precisa de um vídeo': 'An adjustment layer needs a video',
+    'Camada de ajuste: os efeitos dela valem para tudo o que está nas trilhas de baixo': 'Adjustment layer: its effects apply to everything on the tracks below',
+    'Camada de ajuste criada: arraste efeitos (ou use Luz e Cor) nela para afetar tudo o que está abaixo': 'Adjustment layer created: drag effects onto it (or use Light & Color) to affect everything below',
     // Luz e Cor
     'Luz e Cor': 'Light & Color', 'Luz e Cor aplicado': 'Light & Color applied', 'sem ajustes': 'no adjustments', 'desligado': 'off',
     'Correção básica': 'Basic correction', 'Balanço de branco': 'White balance', 'Tom': 'Tone', 'Realces': 'Highlights',
@@ -292,6 +296,8 @@ const I18N_EN = {
 
 // Frases com partes variáveis (números, nomes, caminhos)
 const I18N_RE = [
+    [/^Ajuste (\d+)(.*)$/, 'Adjustment $1$2'],
+    [/^Camada de ajuste adicionada em V(\d+)$/, 'Adjustment layer added to V$1'],
     [/^Clipe (\d+)$/, 'Clip $1'],
     [/^Clipe (\d+)(.*)$/, 'Clip $1$2'],
     [/^Imagem adicionada em V(\d+)$/, 'Image added to V$1'],

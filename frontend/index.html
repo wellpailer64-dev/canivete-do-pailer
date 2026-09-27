@@ -53,6 +53,7 @@
         <symbol id="i-volume" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></symbol>
         <symbol id="i-volume-x" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 6 6M22 9l-6 6"/></symbol>
         <symbol id="i-magnet" viewBox="0 0 24 24"><path d="M6 3v8a6 6 0 0 0 12 0V3"/><path d="M6 7h4M14 7h4M10 3v8a2 2 0 0 0 4 0V3"/></symbol>
+        <symbol id="i-sliders" viewBox="0 0 24 24"><line x1="21" y1="4" x2="14" y2="4"/><line x1="10" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="12" y2="12"/><line x1="8" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="16" y1="18" x2="16" y2="22"/></symbol>
         <symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.4l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/></symbol>
         <symbol id="i-pointer" viewBox="0 0 24 24"><path d="m4 4 7 17 2.5-7.5L21 11z"/></symbol>
     </svg>
@@ -415,6 +416,7 @@
                             <button class="ve-btn" onclick="veOpenFile()" title="Abrir vídeo (Ctrl+O)"><svg class="i"><use href="#i-folder"/></svg> Abrir</button>
                             <button class="ve-btn" id="ve-save" onclick="veSaveProject()" disabled title="Salvar projeto .vcnvt (Ctrl+S) · Salvar como: Ctrl+Shift+S"><svg class="i"><use href="#i-save"/></svg> Salvar</button>
                             <button class="ve-btn" id="ve-add-image" onclick="vePickImage()" disabled title="Adicionar imagem na timeline (ou arraste a imagem para a timeline)"><svg class="i"><use href="#i-image"/></svg> Imagem</button>
+                            <button class="ve-btn" id="ve-add-adjust" onclick="veAddAdjust()" disabled title="Camada de ajuste: os efeitos dela valem para tudo o que está nas trilhas de baixo"><svg class="i"><use href="#i-sliders"/></svg> Ajuste</button>
                             <span class="ve-proj" id="ve-proj" hidden></span>
                             <div class="ve-meta" id="ve-meta">Nenhum vídeo aberto</div>
                             <div class="ve-top-spacer"></div>

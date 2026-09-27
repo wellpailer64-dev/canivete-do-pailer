@@ -367,7 +367,64 @@ function veMarkOut() {
 // Relógio próprio: dentro de um clipe o <video> dita o tempo; no espaço vazio a agulha anda
 // sozinha com a tela preta. Troca de clipe quando muda o que está visível na agulha.
 
-function veVideo() { return $ve('ve-video'); }
+// Dois players que se revezam (deck A = #ve-video, deck B = criado aqui): o que está tocando dá a imagem, o
+// som e o relógio; o outro espera parado no primeiro quadro do trecho seguinte. No corte ele começa a tocar e
+// o anterior pausa — sem busca, sem congelar e sem buraco no som (vePreloadNext / veSyncPlayer).
+const VEDK = { b: null, ativo: 0, i: -1, t: -1 };   // i/t: trecho e instante em que a reserva está esperando
+function veDeckA() { return $ve('ve-video'); }
+function veVideo() { return VEDK.ativo && VEDK.b ? VEDK.b : veDeckA(); }
+function veReserva() { return VEDK.ativo ? veDeckA() : veDeckB(); }
+// A reserva só se já existir (não cria o deck B nem carrega o vídeo nele à toa)
+function veReservaExiste() { return VEDK.ativo ? veDeckA() : VEDK.b; }
+
+function veDeckB() {
+    if (!VEDK.b) {
+        const x = document.createElement('video');
+        x.preload = 'auto';
+        x.crossOrigin = 'anonymous';
+        x.playsInline = true;
+        x.setAttribute('aria-hidden', 'true');
+        x.addEventListener('seeked', () => veDrawMonitor());
+        x.addEventListener('loadeddata', () => veDrawMonitor());
+        VEDK.b = x;
+    }
+    // na página, ao lado do A (invisível como ele): fora da página o navegador não atualiza a imagem
+    // de um vídeo que está tocando, e o corte mostraria um quadro velho
+    const a = veDeckA();
+    if (VEDK.b.parentNode !== a.parentNode) a.parentNode.insertBefore(VEDK.b, a.nextSibling);
+    // mesmo arquivo em URL própria (com a mesma URL o WebView divide o carregamento entre os players)
+    const base = a.getAttribute('src') ? a.src : '', x = VEDK.b;
+    if (x._base !== base) {
+        x._base = base;
+        x.muted = true;
+        if (base) x.src = base.startsWith('blob:') ? base : base + (base.includes('?') ? '&' : '?') + 'camada=b';
+        else x.removeAttribute('src');
+        x.load();
+        VEDK.i = -1;
+    }
+    return x;
+}
+
+// Volta ao deck A e solta o B (abrir/fechar vídeo)
+function veDeckReset() {
+    const b = VEDK.b;
+    if (VEDK.ativo) { veDeckA().muted = VE.muted; }
+    VEDK.ativo = 0;
+    VEDK.i = -1;
+    if (b && b.getAttribute('src')) { b.pause(); b.removeAttribute('src'); b._base = null; b.load(); }
+}
+
+// Troca de deck no corte: a reserva (já no quadro certo) passa a tocar com som; a anterior pausa e vira reserva
+function veDeckSwap() {
+    const velho = veVideo(), novo = veReserva();
+    VEDK.ativo = VEDK.ativo ? 0 : 1;
+    VEDK.i = -1;
+    novo.muted = VE.muted;
+    novo.playbackRate = VE.rate;
+    velho.muted = true;
+    if (VE.playing && novo.paused) novo.play().catch(() => {});
+    velho.pause();
+}
 
 // Ajusta o player ao que está visível na agulha (quadro do clipe, ou preto no vazio)
 function veSyncPlayer(forcar) {
@@ -381,6 +438,26 @@ function veSyncPlayer(forcar) {
     }
     const c = VE.clips[i];
     const src = c.s + (VE.playhead - c.st);
+    // corte na reprodução com a reserva esperando neste trecho: troca de player em vez de buscar
+    if (!forcar && VE.playing && i !== VE.cur && VEDK.i === i) {
+        const r = veReserva();
+        if (r.readyState >= 2 && !r.seeking) {
+            const d = r.currentTime - src;
+            // já no ponto de entrada (a imagem do player anda ~meio quadro atrás do tempo dele; até ~2 quadros
+            // depois): troca. Antes disso mostraria um quadro de antes do ponto de entrada.
+            if (d >= 0.012 && d < 0.1) {
+                VE._trocaErro = d;   // diagnóstico (modo agente)
+                veDeckSwap();
+                VE.cur = i;
+                veApplyAudioGain();
+                veDrawMonitor();
+                return;
+            }
+            // chegando (pré-rolando, poucos ms atrás): espera no último quadro do trecho, sem buscar
+            if (d < 0.012 && d > -0.15 && !r.paused) return;
+        }
+    }
+    if (forcar) veReservaParar();
     if (forcar || i !== VE.cur || Math.abs(v.currentTime - src) > 0.25) {
         if (v.src && Math.abs(v.currentTime - src) > 0.02) {
             try { v.currentTime = src; } catch (e) { /* ainda carregando */ }
@@ -427,6 +504,7 @@ function veStop() {
     if (!VE.playing) return;
     VE.playing = false;
     veVideo().pause();
+    veReservaParar();
     veParkExtras(0);
     $ve('ve-play').textContent = '▶';
     veUpdateReadouts();
@@ -459,7 +537,8 @@ function vePlaybackLoop(now) {
     const c = VE.clips[VE.cur];
     if (c && !v.paused && !v.seeking) {
         // dentro de um clipe o vídeo manda (fica em sincronia com o áudio)
-        VE.playhead = c.st + (Math.min(v.currentTime, c.e) - c.s);
+        // nunca antes do início do trecho (o player recém-trocado pode estar a 1 quadro do ponto de entrada)
+        VE.playhead = c.st + Math.max(0, Math.min(v.currentTime, c.e) - c.s);
         if (v.currentTime >= c.e - 0.004) VE.playhead = veEnd(c);
     } else {
         VE.playhead += dt * VE.rate;
@@ -539,8 +618,12 @@ function veApplyAudioGain() {
         try {
             VEA.ctx = new (window.AudioContext || window.webkitAudioContext)();
             VEA.gain = VEA.ctx.createGain();
-            VEA.ctx.createMediaElementSource(v).connect(VEA.gain).connect(VEA.ctx.destination);
+            VEA.gain.connect(VEA.ctx.destination);
         } catch (e) { VEA.falhou = true; VEA.ctx = null; }
+    }
+    // cada deck entra no ganho quando for o ativo (um elemento só pode ser ligado uma vez)
+    if (VEA.ctx && !v._veaSrc) {
+        try { v._veaSrc = VEA.ctx.createMediaElementSource(v); v._veaSrc.connect(VEA.gain); } catch (e) { /* já ligado */ }
     }
     if (VEA.ctx) {
         if (VEA.ctx.state === 'suspended') VEA.ctx.resume().catch(() => {});
@@ -563,7 +646,12 @@ const VE_IMG_DUR = 5;
 const veRound = (v, n = 1) => Math.round(v * Math.pow(10, n)) / Math.pow(10, n);
 
 function veMediaOf(c) { return VE.media[c.m || 0]; }
-function veIsImage(c) { const m = veMediaOf(c); return !!m && m.kind === 'image'; }
+// Clipe sem vídeo da fonte (sem som, duração livre): imagem ou camada de ajuste
+function veIsImage(c) { const m = veMediaOf(c); return !!m && (m.kind === 'image' || m.kind === 'ajuste'); }
+// Camada de ajuste (como no Premiere): clipe transparente cujos efeitos valem para tudo o que está nas trilhas de
+// baixo durante o trecho dele; a opacidade dosa a força do efeito. Sem escala/posição/rotação.
+function veIsAdj(c) { const m = veMediaOf(c); return !!m && m.kind === 'ajuste'; }
+function veNomeClipe(c) { return veIsAdj(c) ? 'Ajuste' : veIsImage(c) ? 'Imagem' : 'Clipe'; }
 
 function veDefProps(c) {
     const m = veMediaOf(c);
@@ -831,7 +919,7 @@ function veTrackFree(tr, a, b) {
     return !VE.clips.some(o => o.tr === tr && o.st < b - VE_EPS && veEnd(o) > a + VE_EPS);
 }
 
-function veInsertImageClip(m, drop, deslocamento) {
+function veInsertImageClip(m, drop, deslocamento, rotulo = 'Imagem adicionada') {
     let st = VE.playhead, tr = -1;
     const wrap = $ve('ve-tl-wrap').getBoundingClientRect();
     if (drop && drop.x >= wrap.left && drop.x <= wrap.right && drop.y >= wrap.top + VE_RULER && drop.y <= wrap.bottom) {
@@ -855,7 +943,29 @@ function veInsertImageClip(m, drop, deslocamento) {
     veRelayout();
     veAfterEdit(VE.playhead);
     veTab('props');
-    veToast(`Imagem adicionada em V${tr + 1}`);
+    veToast(`${rotulo} em V${tr + 1}`);
+}
+
+// ── camada de ajuste ──
+function veAddAdjust() {
+    if (!VE.ready) return;
+    if (VE.info && VE.info.audio_only) { veToast('Camada de ajuste precisa de um vídeo'); return; }
+    let m = VE.media.find(x => x.kind === 'ajuste');
+    if (!m) { m = { id: VE.media.length, kind: 'ajuste', name: 'Camada de ajuste' }; VE.media.push(m); }
+    veInsertImageClip(m, null, 0, 'Camada de ajuste adicionada');
+    veToast('Camada de ajuste criada: arraste efeitos (ou use Luz e Cor) nela para afetar tudo o que está abaixo');
+}
+
+// Aplica os efeitos da camada de ajuste sobre o que já foi desenhado no monitor (as trilhas de baixo)
+function veAdjDraw(ctx, cv, c, pv) {
+    const op = Math.max(0, Math.min(1, veProps(c).op / 100));
+    if (op <= 0 || !veFxActive(c).length) return;
+    const res = veFxRender(c, cv, { w: VE.seqW, h: VE.seqH }, pv);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = op;
+    ctx.drawImage(res, 0, 0, cv.width, cv.height);
+    ctx.restore();
 }
 
 // ── players extras: vídeos das camadas de baixo aparecendo por trás de camadas transparentes ──
@@ -874,7 +984,7 @@ function veExtraPlayer(n) {
     }
     // URL própria por player: com a mesma URL o WebView divide o carregamento e o player
     // principal pode travar buscando o quadro
-    const base = veVideo().src, x = VEX[n];
+    const base = veDeckA().src, x = VEX[n];
     if (x._base !== base) {
         x._base = base;
         x.src = base.startsWith('blob:') ? base : base + (base.includes('?') ? '&' : '?') + 'camada=' + (n + 1);
@@ -895,45 +1005,56 @@ function veSyncExtra(x, srcT) {
     }
 }
 
-// ── cortes sem piscar: o trecho seguinte já espera num player de reserva ──
-// No corte o player principal busca outro ponto do vídeo e fica 100–300 ms sem quadro. Perto do fim do
-// trecho, um player mudo já para no primeiro quadro do seguinte; no corte o monitor mostra esse quadro
-// até o principal terminar a busca.
-const VEPRE = { x: null, i: -1, t: -1 };
-
-function vePrePlayer() {
-    if (!VEPRE.x) {
-        const x = document.createElement('video');
-        x.muted = true;
-        x.preload = 'auto';
-        x.crossOrigin = 'anonymous';
-        VEPRE.x = x;
-    }
-    const base = veVideo().src, x = VEPRE.x;
-    if (x._base !== base) {
-        x._base = base;
-        x.src = base.startsWith('blob:') ? base : base + (base.includes('?') ? '&' : '?') + 'camada=reserva';
-        x.load();
-        VEPRE.i = -1;
-    }
-    return x;
-}
+// Perto do fim do trecho a reserva se prepara para o seguinte (quando ele começa em outro ponto do vídeo):
+// busca um pouco ANTES do ponto de entrada e, nos últimos VE_PREROLL s, já toca sem som, acertando a própria
+// velocidade a cada quadro para chegar ao ponto de entrada junto com o corte. Player parado leva ~2 quadros
+// para voltar a andar; assim, na troca, ele já está rodando e o corte sai seco.
+const VE_PREROLL = 0.6;
 
 function vePreloadNext() {
     const c = VE.clips[VE.cur];
     if (!c || !veVideo().src) return;
-    const fim = veEnd(c);
-    if (fim - VE.playhead > 1.5) return;
+    const fim = veEnd(c), falta = fim - VE.playhead;
+    if (falta > 1.5) return;
     const j = veTopAt(fim + 0.01);
     if (j < 0 || j === VE.cur) return;
     const n = VE.clips[j], alvo = n.s + (fim - n.st);
-    if (Math.abs(alvo - c.e) < 0.03) return;   // continua do mesmo ponto: não há busca
-    if (VEPRE.i === j && Math.abs(VEPRE.t - alvo) < 0.02) return;
-    const x = vePrePlayer();
-    if (!x.paused) x.pause();
-    try { x.currentTime = alvo; } catch (e) { return; }
-    VEPRE.i = j;
-    VEPRE.t = alvo;
+    if (Math.abs(alvo - c.e) < 0.03) return;   // continua do mesmo ponto: o player atual segue sozinho
+    const r = veReserva();
+    if (VEDK.i !== j || Math.abs(VEDK.t - alvo) > 0.02) {
+        if (r === VEDK.b) veDeckB();   // garante o arquivo certo no deck B
+        if (!r.paused) r.pause();
+        r.muted = true;
+        const ini = Math.max(0, alvo - VE_PREROLL);
+        try { r.currentTime = ini; } catch (e) { return; }
+        VEDK.i = j;
+        VEDK.t = alvo;
+        VEDK.ini = ini;
+        return;
+    }
+    // pré-rolagem: começa a tocar quando faltar o mesmo tanto que separa o ponto de busca do ponto de entrada,
+    // mais o tempo que um player parado leva para arrancar (VE_ARRANQUE). Sem mexer na velocidade: trocar o
+    // playbackRate a cada quadro reinicia o player e ele engasga.
+    if (!VE.playing || r.seeking || r.readyState < 2) return;
+    if (!r.paused) { veReservaToque(r); return; }
+    if (falta / VE.rate > (alvo - VEDK.ini) / VE.rate + VE_ARRANQUE) return;
+    r.playbackRate = VE.rate;
+    r.play().catch(() => {});
+}
+
+// Um vídeo invisível que ninguém desenha não atualiza a imagem no navegador, mesmo tocando: na troca o
+// primeiro desenho pegaria um quadro velho. Desenhar a reserva num canvas de 2x2 a cada quadro a mantém em dia.
+function veReservaToque(r) {
+    if (!VEDK.toque) { const c = document.createElement('canvas'); c.width = c.height = 2; VEDK.toque = c.getContext('2d'); }
+    try { VEDK.toque.drawImage(r, 0, 0, 2, 2); } catch (e) { /* ainda sem quadro */ }
+}
+const VE_ARRANQUE = 0.08;
+
+// Para a reserva (parou a reprodução ou pulou para outro ponto: a preparação recomeça)
+function veReservaParar() {
+    const r = veReservaExiste();
+    if (r && !r.paused) r.pause();
+    VEDK.i = -1;
 }
 
 // Pausa os players que não estão em uso (a partir do índice n); n = 0 com `limpar` solta o arquivo
@@ -942,8 +1063,6 @@ function veParkExtras(n, limpar) {
         if (!x.paused) x.pause();
         if (limpar && x.getAttribute('src')) { x.removeAttribute('src'); x._base = null; x.load(); }
     });
-    const r = VEPRE.x;
-    if (limpar && r && r.getAttribute('src')) { r.pause(); r.removeAttribute('src'); r._base = null; r.load(); VEPRE.i = -1; }
 }
 
 // ── monitor: desenha as camadas visíveis na agulha, de baixo para cima ──
@@ -983,14 +1102,17 @@ function veDrawMonitor() {
     let extra = 0, falta = false;
     const itens = vis.map(({ c, i }) => {
         let src = null;
-        if (veIsImage(c)) {
+        if (veIsAdj(c)) {
+            src = 'ajuste';
+        } else if (veIsImage(c)) {
             const m = veMediaOf(c);
             if (m.img && m.img.complete && m.w) src = m.img;
         } else if (i === VE.cur) {
-            // o player principal (dá o som e o relógio); buscando outro ponto (corte), vale o quadro
-            // que o player de reserva deixou esperando (vePreloadNext)
+            // o player ativo (dá o som e o relógio); se ele estiver buscando, vale o quadro que a reserva
+            // deixou esperando (vePreloadNext)
+            const r = veReservaExiste();
             if (v.readyState >= 2 && !v.seeking) src = v;
-            else if (VEPRE.i === i && VEPRE.x && VEPRE.x.readyState >= 2 && !VEPRE.x.seeking) src = VEPRE.x;
+            else if (r && VEDK.i === i && r.readyState >= 2 && !r.seeking) src = r;
             else falta = true;
         } else if (v.src) {
             // vídeo de camada de baixo (transparência/dupla exposição): player extra sem som
@@ -1021,6 +1143,7 @@ function veDrawMonitor() {
     ctx.imageSmoothingQuality = 'high';
     itens.forEach(({ c, src }) => {
             if (!src) return;
+            if (src === 'ajuste') { veAdjDraw(ctx, cv, c, pv); return; }
             const p = veProps(c), sz = veMediaSize(c);
             src = veFxRender(c, src, sz, pv * p.sc / 100);   // efeitos rodam antes do movimento (como no Premiere)
             ctx.save();
@@ -1034,7 +1157,7 @@ function veDrawMonitor() {
         });
     // contorno do clipe selecionado visível (ajuda a posicionar)
     const cs = VE.clips[VE.sel];
-    if (cs && t >= cs.st - VE_EPS && t < veEnd(cs) - VE_EPS && (veIsImage(cs) || !veIsDefaultProps(cs))) {
+    if (cs && !veIsAdj(cs) && t >= cs.st - VE_EPS && t < veEnd(cs) - VE_EPS && (veIsImage(cs) || !veIsDefaultProps(cs))) {
         const p = veProps(cs), sz = veMediaSize(cs), k = p.sc / 100;
         ctx.save();
         ctx.translate(p.x, p.y);
@@ -1054,7 +1177,14 @@ function veRenderProps() {
     $ve('ve-props').hidden = !c;
     if (!c) { VEFX.key = ''; veLcRender(); return; }
     const m = veMediaOf(c);
-    $ve('ve-props-title').innerHTML = `Clipe ${VE.sel + 1}<span>${veIsImage(c) ? 'Imagem · ' + veEsc(m.name || '') : 'Vídeo'} · V${c.tr + 1}</span>`;
+    $ve('ve-props-title').innerHTML = `Clipe ${VE.sel + 1}<span>${veIsAdj(c) ? 'Camada de ajuste' : veIsImage(c) ? 'Imagem · ' + veEsc(m.name || '') : 'Vídeo'} · V${c.tr + 1}</span>`;
+    // camada de ajuste: só opacidade (dosa o efeito); escala/posição/rotação não se aplicam
+    const adj = veIsAdj(c);
+    $ve('ve-props').querySelectorAll('[data-prop]').forEach(el => {
+        const row = el.closest('.ve-prop');
+        if (row) row.hidden = adj && el.dataset.prop !== 'op';
+    });
+    $ve('ve-props').querySelectorAll('.ve-props-actions').forEach(el => { el.hidden = adj; });
     const p = veProps(c);
     $ve('ve-props').querySelectorAll('[data-prop]').forEach(el => {
         const k = el.dataset.prop;
@@ -1332,7 +1462,7 @@ function veExportPlan() {
             // quadros-chave em tempo da camada (0 = início do clipe na timeline)
             const kf = {};
             VE_KF_PROPS.forEach(k => { if (veKfOn(c, k)) kf[k] = c.k[k].map(q => [q.t - c.s, q.v, q.i || 'lin', veKfCurve(q)]); });
-            return { tipo: veIsImage(c) ? 'imagem' : 'video', path: veIsImage(c) ? m.path : null,
+            return { tipo: veIsAdj(c) ? 'ajuste' : veIsImage(c) ? 'imagem' : 'video', path: veIsImage(c) ? m.path || null : null,
                      st: c.st, s: veIsImage(c) ? 0 : c.s, e: veIsImage(c) ? veLen(c) : c.e,
                      sc: p.sc, x: p.x, y: p.y, rot: p.rot, op: p.op, kf,
                      fx: veFxExport(c), mw: veMediaSize(c).w, mh: veMediaSize(c).h };
@@ -1412,8 +1542,9 @@ function veProjectData() {
     return {
         app: 'Canivete do Pailer',
         video: VE.path,
-        media: VE.media.filter(m => m.kind === 'image')
-            .map(m => ({ id: m.id, kind: 'image', path: m.path, name: m.name, w: m.w, h: m.h })),
+        media: VE.media.filter(m => m.kind === 'image' || m.kind === 'ajuste')
+            .map(m => m.kind === 'ajuste' ? { id: m.id, kind: 'ajuste', name: m.name }
+                : { id: m.id, kind: 'image', path: m.path, name: m.name, w: m.w, h: m.h }),
         clips: VE.clips,
         inPt: VE.inPt,
         outPt: VE.outPt,
@@ -1438,6 +1569,7 @@ function veSaveProject(comoNovo) {
 // Fecha o projeto (aba do editor fechada): volta à tela "arraste um vídeo"
 function veCloseProject() {
     veStop();
+    veDeckReset();
     const v = veVideo();
     v.pause();
     v.removeAttribute('src');
@@ -1452,7 +1584,7 @@ function veCloseProject() {
     $ve('ve-empty').hidden = false;
     $ve('ve-loading').hidden = true;
     $ve('ve-proxy-badge').hidden = true;
-    ['ve-export-btn', 've-add-image', 've-save'].forEach(id => { $ve(id).disabled = true; });
+    ['ve-export-btn', 've-add-image', 've-add-adjust', 've-save'].forEach(id => { $ve(id).disabled = true; });
     $ve('ve-meta').textContent = 'Nenhum vídeo aberto';
     $ve('ve-clips').innerHTML = '<div class="ve-clips-empty">Abra um vídeo ou áudio para começar.</div>';
     ['ve-sum-orig', 've-sum-final', 've-sum-cut'].forEach(id => { $ve(id).textContent = '—'; });
@@ -1491,6 +1623,12 @@ function veApplyProject() {
     VE.projectPath = path;
     const ids = { 0: 0 };
     (d.media || []).forEach(m => {
+        if (m.kind === 'ajuste') {
+            const nm = { id: VE.media.length, kind: 'ajuste', name: m.name || 'Camada de ajuste' };
+            VE.media.push(nm);
+            ids[m.id] = nm.id;
+            return;
+        }
         if (!m.path || missing.includes(m.path)) return;
         const nm = { id: VE.media.length, kind: 'image', path: m.path, name: m.name, img: new Image(), w: m.w || 0, h: m.h || 0 };
         VE.media.push(nm);
@@ -1779,7 +1917,7 @@ function veRender() {
         if (cw <= 0) return;
         const srcAt = x => c.s + (VE.view + x / VE.pps - st);   // x do canvas -> tempo da fonte
         const vr = rowOf('V' + (tr + 1)), ar = rowOf('A' + (tr + 1));
-        const img = veIsImage(c), med = veMediaOf(c);
+        const img = veIsImage(c), adj = veIsAdj(c), med = veMediaOf(c);
         ctx.globalAlpha = dim ? 0.28 : ghost ? 0.8 : 1;
 
         // ---- vídeo
@@ -1787,7 +1925,7 @@ function veRender() {
         ctx.save();
         veRoundRect(ctx, cx, vy, cw, vh, 4);
         ctx.clip();
-        ctx.fillStyle = img ? '#3b2358' : '#27305f';
+        ctx.fillStyle = adj ? '#123a36' : img ? '#3b2358' : '#27305f';
         ctx.fillRect(cx, vy, cw, vh);
         const th = vh - 16;
         const img0 = VE.thumbs.find(tb => tb.img && tb.img.complete && tb.img.naturalWidth);
@@ -1802,14 +1940,14 @@ function veRender() {
                 if (tb) ctx.drawImage(tb.img, x, vy + 14, tw, th);
             }
         }
-        ctx.fillStyle = img ? 'rgba(168,85,247,0.15)' : 'rgba(91,110,225,0.18)';
+        ctx.fillStyle = adj ? 'rgba(20,184,166,0.12)' : img ? 'rgba(168,85,247,0.15)' : 'rgba(91,110,225,0.18)';
         ctx.fillRect(cx, vy, cw, vh);
-        ctx.fillStyle = img ? '#a855f7' : '#5b6ee1';
+        ctx.fillStyle = adj ? '#14b8a6' : img ? '#a855f7' : '#5b6ee1';
         ctx.fillRect(cx, vy, cw, Math.min(14, vh));
         if (cw > 50 && vh >= 12) {
             ctx.fillStyle = '#eef0ff';
             ctx.font = '600 10.5px Segoe UI';
-            const nome = img ? (med.name || veT('Imagem')) : veT(`Clipe ${i + 1}`);
+            const nome = adj ? veT('Camada de ajuste') : img ? (med.name || veT('Imagem')) : veT(`Clipe ${i + 1}`);
             ctx.fillText(nome + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, vy + 10.5);
         }
         if (veHasFx(c) && cw > 34 && vh >= 12) {
@@ -2014,7 +2152,7 @@ function veRenderClips() {
         <div class="ve-clip${i === VE.sel ? ' sel' : ''}" data-i="${i}">
             <div class="ve-clip-bar"></div>
             <div>
-                <div class="ve-clip-name">${veIsImage(c) ? 'Imagem' : 'Clipe'} ${i + 1} <span class="ve-clip-tr">V${c.tr + 1}</span>${c.g ? ` <span class="ve-clip-db">${veFmtDb(c.g)}</span>` : ''}${veHasFx(c) ? ` <span class="ve-clip-fx" title="${veEsc(c.fx.map(f => VE_FX[f.t]?.nome).join(', '))}">fx</span>` : ''}</div>
+                <div class="ve-clip-name">${veNomeClipe(c)} ${i + 1} <span class="ve-clip-tr">V${c.tr + 1}</span>${c.g ? ` <span class="ve-clip-db">${veFmtDb(c.g)}</span>` : ''}${veHasFx(c) ? ` <span class="ve-clip-fx" title="${veEsc(c.fx.map(f => VE_FX[f.t]?.nome).join(', '))}">fx</span>` : ''}</div>
                 <div class="ve-clip-time">${veShort(c.st)} → ${veShort(veEnd(c))} · ${veShort(veLen(c))}</div>
             </div>
             <button class="ve-clip-act" data-act="${i}" title="Apagar clipe (D)"><svg class="i"><use href="#i-trash"/></svg></button>
@@ -2080,6 +2218,7 @@ function veOpenPath(path) {
     if (!path || VE.exportRunning || !veIsActive()) return;
     if (!VE._pendingProject) { VE.projectPath = null; VE.dirty = false; }
     veStop();
+    veDeckReset();
     const v = veVideo();
     v.pause();
     v.removeAttribute('src');
@@ -2095,6 +2234,7 @@ function veOpenPath(path) {
     veLoading('Analisando vídeo...', 5);
     $ve('ve-export-btn').disabled = true;
     $ve('ve-add-image').disabled = true;
+    $ve('ve-add-adjust').disabled = true;
     $ve('ve-save').disabled = true;
     veUpdateTitle();
     $ve('ve-meta').textContent = path.split(/[\\/]/).pop();
@@ -2151,6 +2291,7 @@ function veOnPrepare(ev) {
                 veLoading(null);
                 $ve('ve-export-btn').disabled = false;
                 $ve('ve-add-image').disabled = false;
+                $ve('ve-add-adjust').disabled = !!(VE.info && VE.info.audio_only);
                 veSeek(0);
             }, { once: true });
             break;
@@ -2389,7 +2530,7 @@ function veInitMonitorZoom() {
     scr.addEventListener('pointerdown', e => {
         if (e.button !== 0 || e.target.closest('button')) return;
         const c = VE.clips[VE.sel];
-        const visivel = c && VE.playhead >= c.st - VE_EPS && VE.playhead < veEnd(c) - VE_EPS;
+        const visivel = c && !veIsAdj(c) && VE.playhead >= c.st - VE_EPS && VE.playhead < veEnd(c) - VE_EPS;
         if (visivel) {
             const p = veProps(c);
             VEM.pan = { layer: true, x0: e.clientX, y0: e.clientY, px: p.x, py: p.y, id: e.pointerId, hist: false };

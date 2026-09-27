@@ -177,7 +177,7 @@ function veFxAdd(i, t) {
     VE.sel = i;
     vedShow(painel || 'props');
     veRefresh();
-    veToast(`${VE_FX[t].nome} aplicado em ${veIsImage(c) ? 'Imagem' : 'Clipe'} ${i + 1}`);
+    veToast(`${VE_FX[t].nome} aplicado em ${veNomeClipe(c)} ${i + 1}`);
 }
 
 // Troca o efeito `id` do clipe selecionado sem mexer no array antigo (clipes cortados compartilham)

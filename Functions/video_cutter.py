@@ -658,7 +658,7 @@ def _valor_kf(pts, t):
     return pts[-1][1]
 
 
-def _opacidade_animada(pts, dur, fps, nome):
+def _opacidade_animada(pts, dur, fps, nome, inicio=0.0):
     """Opacidade com quadros-chave: um valor por quadro mandado por sendcmd ao colorchannelmixer.
     (O geq fazia a mesma conta pixel a pixel e deixava a exportação ~3x mais lenta.)"""
     fps = float(fps)
@@ -666,7 +666,7 @@ def _opacidade_animada(pts, dur, fps, nome):
     linhas = []
     for i in range(int(dur * fps) + 2):
         # meio quadro antes: o comando já vale no quadro i (evita cair um quadro depois por arredondamento)
-        linhas.append(f"{max(0.0, (i - 0.5) / fps):.5f} {nome} aa {_valor_kf(pts, i / fps):.5f};")
+        linhas.append(f"{max(0.0, inicio + (i - 0.5) / fps):.5f} {nome} aa {_valor_kf(pts, i / fps):.5f};")
     with open(arq, "w", encoding="ascii") as f:
         f.write("\n".join(linhas) + "\n")
     return f"sendcmd=f={_caminho_filtro(arq)},{nome}=aa={_valor_kf(pts, 0):.5f}"
@@ -771,8 +771,8 @@ def _normalizar_camadas(camadas, path_video):
             if e - s < 0.04:
                 continue
             item = {
-                "tipo": "imagem" if tipo == "imagem" else "video",
-                "path": c.get("path") if tipo == "imagem" else path_video,
+                "tipo": tipo if tipo in ("imagem", "ajuste") else "video",
+                "path": c.get("path") if tipo == "imagem" else None if tipo == "ajuste" else path_video,
                 "st": st, "s": max(0.0, s), "dur": e - s,
                 "sc": max(0.5, min(2000.0, float(c.get("sc", 100)))) / 100.0,
                 "x": float(c.get("x", 0)), "y": float(c.get("y", 0)),
@@ -928,6 +928,24 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     # Camadas por cima (imagens e clipes com escala/posição/rotação/opacidade), de baixo para cima
     vf = "[vc]"
     for n, c in enumerate(lay):
+        if c["tipo"] == "ajuste":
+            # Camada de ajuste: os efeitos valem para o que já foi composto (as trilhas de baixo) no trecho dela.
+            # Um ramo do vídeo composto passa pelos efeitos (só no trecho) e volta por cima com a opacidade da camada.
+            efeitos = _filtros_fx(c["fx"], W, H, f"a{n}")
+            if not efeitos or (c["op"] <= 0.001 and "op" not in c["kf"]):
+                continue
+            fim = c["st"] + c["dur"]
+            if "op" in c["kf"]:
+                opac = [_opacidade_animada(c["kf"]["op"], c["dur"], fps, f"colorchannelmixer@op{n}", c["st"])]
+            else:
+                opac = [f"colorchannelmixer=aa={c['op']:.4f}"] if c["op"] < 0.999 else []
+            filtros.append(f"{vf}split[aj{n}a][aj{n}b]")
+            filtros.append(f"[aj{n}b]trim=start={c['st']:.4f}:end={fim:.4f},format=rgba,"
+                           + ",".join(efeitos + opac) + f"[aj{n}c]")
+            filtros.append(f"[aj{n}a][aj{n}c]overlay=0:0:enable='between(t,{c['st']:.3f},{fim:.3f})'"
+                           f":eof_action=pass:format=auto[o{n}]")
+            vf = f"[o{n}]"
+            continue
         if c["tipo"] == "imagem":
             cmd += ["-loop", "1", "-framerate", fps, "-t", f"{c['dur']:.3f}", "-i", c["path"]]
         else:

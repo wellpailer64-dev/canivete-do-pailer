@@ -24,10 +24,17 @@ aleatório e servido com suporte a Range (seek). Só escuta em 127.0.0.1. O Cort
   (decodificar o 4K várias vezes em paralelo era o que mais atrasava). Com placa NVIDIA tudo roda na GPU
   (cuda + scale_cuda + nvenc: 4K60 HEVC de 20 s em ~3,6 s); senão, pelo processador. Selo "PRÉVIA LEVE".
   A exportação sempre usa o original.
-- Cortes sem piscar: perto do fim de um trecho, um player de reserva (`VEPRE`) já para no primeiro quadro do
-  seguinte; enquanto o player principal busca, o monitor mostra esse quadro. Sem quadro nenhum, o monitor mantém
-  o último quadro (até 600 ms) em vez de desenhar preto.
-- Arquivos temporários em `%TEMP%\canivete_editor` (limpos ao abrir outro vídeo).
+- Cortes secos na prévia (dois players que se revezam, `VEDK`): `veVideo()` é o deck ativo (A = `#ve-video` ou B,
+  criado só quando há corte). Perto do fim do trecho a reserva busca `VE_PREROLL` (0,6 s) antes do ponto de entrada
+  e começa a tocar sem som no momento certo (+`VE_ARRANQUE`, o tempo que um player parado leva para andar). No corte
+  ela assume imagem e som e a outra pausa: sem busca, sem preto, sem congelar. Regras aprendidas medindo quadro a quadro:
+  - a reserva precisa estar NA PÁGINA e ser desenhada (canvas 2x2, `veReservaToque`) enquanto pré-rola: vídeo
+    invisível que ninguém desenha não atualiza a imagem, e a troca mostraria um quadro velho;
+  - não mudar `playbackRate` a cada quadro (o player engasga);
+  - só trocar com a reserva ≥ meio quadro à frente do ponto de entrada; se estiver chegando, espera no último quadro
+    (a agulha nunca volta para antes do trecho — isso disparava buscas em cadeia).
+  Sem quadro nenhum (busca comum), o monitor mantém o último quadro (até 600 ms) em vez de desenhar preto.
+  A exportação não usa players: é exata quadro a quadro (validado: 540/540 quadros corretos num 4K com 2 cortes).
 
 ### Desempenho da prévia
 - O monitor tem a resolução em que aparece na tela (zoom × densidade da tela), até 1920 px (`veMonitorScale`,
@@ -107,6 +114,17 @@ escala/posição/rotação/opacidade. Clipe com efeito ativo vira camada na expo
 - Cortar: área cortada fica transparente (ffmpeg `drawbox ... replace=1`)
 Efeito novo: `VE_FX` em editor-fx.js (parâmetros + `draw`) e `_filtros_fx` em video_cutter.py (mesma conta).
 Parâmetros de efeito ainda não têm quadros-chave.
+
+## Camada de ajuste (como no Premiere)
+Botão **Ajuste** (ao lado de Imagem): cria um clipe de 5 s na primeira trilha livre acima do vídeo. É uma mídia
+`kind: 'ajuste'` (sem arquivo): `veIsImage` vale para ela (sem som, duração livre) e `veIsAdj` a distingue.
+- Os efeitos dela (`c.fx`, inclusive Luz e Cor) valem para tudo o que já foi composto nas trilhas de baixo, só no
+  trecho dela. Opacidade (com quadros-chave) dosa a força: resultado = original × (1−op) + com efeito × op.
+  Escala/posição/rotação não se aplicam (o painel mostra só Opacidade).
+- Prévia: `veAdjDraw` aplica `veFxRender` no próprio canvas do monitor e desenha por cima com a opacidade.
+- Exportação (`tipo: 'ajuste'`): `split` do vídeo composto → ramo com `trim` no trecho + efeitos + opacidade →
+  `overlay` de volta. Opacidade animada: `_opacidade_animada(..., inicio=st)` (o ramo mantém o tempo absoluto).
+- Projeto .vcnvt salva a mídia `ajuste` (sem path) e recria ao abrir.
 
 ## Luz e Cor (estilo Lumetri)
 Painel `lc` que edita o efeito `lc` do clipe selecionado (criado no primeiro ajuste; um por clipe). Seções:
