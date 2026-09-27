@@ -465,6 +465,17 @@
                                         <div class="ve-fxc" id="ve-fxc"></div>
                                     </div>
                                 </div>
+                                <div class="ve-panel ve-tabpane" id="ve-pane-lc" data-panel="lc" data-title="Luz e Cor">
+                                    <div class="ve-clips-empty" id="ve-lc-empty">Selecione um clipe ou imagem na timeline para corrigir luz e cor: exposição, contraste, realces, sombras, balanço de branco, saturação, curvas e mais.</div>
+                                    <div class="ve-lc" id="ve-lc" hidden>
+                                        <div class="ve-lc-top">
+                                            <button class="ve-lc-on" id="ve-lc-on" data-la="on" title="Ligar/desligar Luz e Cor">fx</button>
+                                            <div class="ve-props-title" id="ve-lc-title"></div>
+                                            <button class="ve-btn ve-btn-sm ve-btn-ghost" data-la="reset" title="Restaurar todos os ajustes">↺ Restaurar</button>
+                                        </div>
+                                        <div id="ve-lc-body"></div>
+                                    </div>
+                                </div>
                                 <div class="ve-panel ve-tabpane" id="ve-pane-fx" data-panel="fx" data-title="Efeitos">
                                     <div class="ve-fx-search"><svg class="i"><use href="#i-search"/></svg><input type="text" id="ve-fx-q" placeholder="Buscar efeito" autocomplete="off"></div>
                                     <div class="ve-fx-list" id="ve-fx-list"></div>
@@ -1310,6 +1321,7 @@
     <script src="js/app.js"></script>
     <script src="js/editor.js"></script>
     <script src="js/editor-fx.js"></script>
+    <script src="js/editor-lc.js"></script>
     <script src="js/editor-dock.js"></script>
 </body>
 </html>

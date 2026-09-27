@@ -253,6 +253,17 @@ const I18N_EN = {
     'Temperatura': 'Temperature', 'Matiz': 'Tint', 'Exposição': 'Exposure', 'Gama': 'Gamma', 'Vinheta': 'Vignette', 'Espelhar': 'Mirror',
     'Horizontal': 'Horizontal', 'Vertical': 'Vertical', 'Raio': 'Radius', 'Intensidade': 'Intensity', 'Cor': 'Color', 'Estilizar': 'Stylize',
     'Preto e branco': 'Black and white', 'Sépia': 'Sepia', 'Inverter': 'Invert', 'Ruído': 'Noise', 'Granulação': 'Grain',
+    // Luz e Cor
+    'Luz e Cor': 'Light & Color', 'Luz e Cor aplicado': 'Light & Color applied', 'sem ajustes': 'no adjustments', 'desligado': 'off',
+    'Correção básica': 'Basic correction', 'Balanço de branco': 'White balance', 'Tom': 'Tone', 'Realces': 'Highlights',
+    'Sombras': 'Shadows', 'Brancos': 'Whites', 'Pretos': 'Blacks', 'Criativo': 'Creative', 'Filme desbotado': 'Faded film',
+    'Vibração': 'Vibrance', 'Curvas': 'Curves', 'Restaurar esta seção': 'Reset this section', 'Duplo clique restaura': 'Double-click to reset',
+    'Ligar/desligar Luz e Cor': 'Turn Light & Color on/off', 'Restaurar todos os ajustes': 'Reset all adjustments',
+    'Curva RGB (todas as cores)': 'RGB curve (all colors)', 'Curva só do vermelho': 'Red only curve', 'Curva só do verde': 'Green only curve',
+    'Curva só do azul': 'Blue only curve', 'Editar no painel Luz e Cor': 'Edit in the Light & Color panel',
+    'Máximo de 16 pontos por curva': 'Up to 16 points per curve',
+    'Clique para criar um ponto e arraste · duplo clique (ou Ctrl+clique) no ponto remove': 'Click to add a point and drag · double-click (or Ctrl+click) a point to remove it',
+    'Selecione um clipe ou imagem na timeline para corrigir luz e cor: exposição, contraste, realces, sombras, balanço de branco, saturação, curvas e mais.': 'Select a clip or image on the timeline to correct light and color: exposure, contrast, highlights, shadows, white balance, saturation, curves and more.',
     // painéis / workspaces
     'Janela ▾': 'Window ▾', 'Painéis': 'Panels', 'Painéis (como no Premiere)': 'Panels (like in Premiere)',
     'Painéis: mostrar/ocultar e restaurar o layout padrão': 'Panels: show/hide and restore the default layout',

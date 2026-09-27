@@ -9,10 +9,14 @@ video_cutter.py — Motor do Pocket Editor (editor de vídeo do Canivete do Pail
   (-ss/-t) e tudo é concatenado — rápido (pula os trechos removidos) e sem estourar memória
 - Progresso real, cancelamento e aceleração por GPU (NVENC/QSV/AMF) com fallback
 """
+import array
+import base64
+import hashlib
 import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import uuid
@@ -590,6 +594,41 @@ def _expr_kf(pts, tv):
     return f"if(lt({tv},{pts[0][0]:.4f}),{f(pts[0][1])},{expr})"
 
 
+def _valor_kf(pts, t):
+    """Valor que a expressão de _expr_kf dá no tempo t (mesmas regras, calculado aqui)."""
+    if t < pts[0][0]:
+        return pts[0][1]
+    for j in range(len(pts) - 1):
+        (ta, va, ia, bz), (tb, vb, _, _) = pts[j], pts[j + 1]
+        if t >= tb:
+            continue
+        d = tb - ta
+        if d < 1e-6 or ia == "hold" or abs(vb - va) < 1e-9:
+            return va
+        u = min(1.0, max(0.0, (t - ta) / d))
+        if ia in ("lin", "ease") or bz is None:
+            return va + (vb - va) * (u * u * (3 - 2 * u) if ia == "ease" else u)
+        n = _KF_AMOSTRAS
+        i = min(n - 1, int(u * n))
+        y0, y1 = _bez_y(bz, i / n), _bez_y(bz, (i + 1) / n)
+        return va + (vb - va) * (y0 + (y1 - y0) * (u * n - i))
+    return pts[-1][1]
+
+
+def _opacidade_animada(pts, dur, fps, nome):
+    """Opacidade com quadros-chave: um valor por quadro mandado por sendcmd ao colorchannelmixer.
+    (O geq fazia a mesma conta pixel a pixel e deixava a exportação ~3x mais lenta.)"""
+    fps = float(fps)
+    arq = os.path.join(_work_dir(), f"op_{uuid.uuid4().hex[:8]}.txt")
+    linhas = []
+    for i in range(int(dur * fps) + 2):
+        # meio quadro antes: o comando já vale no quadro i (evita cair um quadro depois por arredondamento)
+        linhas.append(f"{max(0.0, (i - 0.5) / fps):.5f} {nome} aa {_valor_kf(pts, i / fps):.5f};")
+    with open(arq, "w", encoding="ascii") as f:
+        f.write("\n".join(linhas) + "\n")
+    return f"sendcmd=f={_caminho_filtro(arq)},{nome}=aa={_valor_kf(pts, 0):.5f}"
+
+
 def _num(v, lo, hi, padrao=0.0):
     try:
         return max(lo, min(hi, float(v)))
@@ -597,11 +636,40 @@ def _num(v, lo, hi, padrao=0.0):
         return padrao
 
 
-def _filtros_fx(fx, mw, mh):
+def _lut_cube(n, b64):
+    """LUT 3D do Luz e Cor (calculada na interface, editor-lc.js: Uint16 little-endian, r mais rápido)
+    gravada como .cube. Mesmo conteúdo = mesmo arquivo (clipes cortados compartilham a LUT)."""
+    n = int(n)
+    if not 2 <= n <= 65:
+        return None
+    raw = base64.b64decode(b64)
+    if len(raw) != n * n * n * 3 * 2:
+        return None
+    nome = os.path.join(_work_dir(), f"lc_{hashlib.md5(raw).hexdigest()[:16]}.cube")
+    if not os.path.isfile(nome):
+        v = array.array("H")
+        v.frombytes(raw)
+        if sys.byteorder != "little":
+            v.byteswap()
+        linhas = [f"LUT_3D_SIZE {n}"]
+        for i in range(0, len(v), 3):
+            linhas.append(f"{v[i] / 65535:.6f} {v[i + 1] / 65535:.6f} {v[i + 2] / 65535:.6f}")
+        with open(nome, "w", encoding="ascii") as f:
+            f.write("\n".join(linhas) + "\n")
+    return nome
+
+
+def _caminho_filtro(p):
+    """Caminho de arquivo como valor de opção no grafo de filtros (Windows: 'C\\:/...')."""
+    return "'" + p.replace("\\", "/").replace(":", "\\:").replace("'", "'\\''") + "'"
+
+
+def _filtros_fx(fx, mw, mh, tag="x"):
     """Efeitos do clipe (mesma ordem e mesmas contas da prévia do editor, em frontend/js/editor-fx.js).
-    Rodam no tamanho original da mídia, antes de escala/posição/rotação/opacidade (como no Premiere)."""
+    Rodam no tamanho original da mídia, antes de escala/posição/rotação/opacidade (como no Premiere).
+    tag = prefixo único para rótulos internos do grafo."""
     out = []
-    for f in fx or []:
+    for j, f in enumerate(fx or []):
         t, v = str(f.get("t")), f.get("v") or {}
         if t == "blur":
             # desfoque em % do lado menor da mídia: 100% = sigma de 5% do lado menor
@@ -627,6 +695,25 @@ def _filtros_fx(fx, mw, mh):
                 out.append(caixa.format(x=0, y=0, w="iw", h=f"'max(1,trunc(ih*{tp:.5f}))'"))
             if bt > 0:
                 out.append(caixa.format(x=0, y=f"'ih-max(1,trunc(ih*{bt:.5f}))'", w="iw", h=f"'max(1,trunc(ih*{bt:.5f}))'"))
+        elif t == "lc":
+            # Luz e Cor: cor pela LUT (trilinear, igual à textura 3D da prévia), depois nitidez e vinheta
+            if v.get("lut"):
+                try:
+                    cube = _lut_cube(v.get("n"), v["lut"])
+                except Exception:
+                    cube = None
+                if cube:
+                    out.append(f"lut3d=file={_caminho_filtro(cube)}:interp=trilinear")
+            nit = _num(v.get("sharp"), 0, 5)
+            if nit > 0.001:
+                # unsharp 5×5 só na luma (a prévia usa o mesmo núcleo binomial)
+                out.append(f"unsharp=5:5:{nit:.4f}:5:5:0,format=rgba")
+            ang = _num(v.get("vig"), 0, 1.5708)
+            if ang > 0.001:
+                # vignette não trabalha com alfa: escurece o RGB e devolve o alfa original
+                r = f"{tag}f{j}"
+                out.append(f"format=rgba,split[{r}a][{r}b];[{r}a]format=gbrp,vignette=angle={ang:.5f}:dither=0[{r}c];"
+                           f"[{r}b]alphaextract[{r}m];[{r}c][{r}m]alphamerge,format=rgba")
     return out
 
 
@@ -809,7 +896,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         # Propriedade animada vira expressão avaliada a cada quadro.
         if "sc" in kf:
             e = _expr_kf(kf["sc"], "t")
-            escala = (f"scale=w='max(2,trunc(iw*({e})))':h='max(2,trunc(ih*({e})))'"
+            # tamanho sempre par: com metade inteira o centro não "treme" meio pixel a cada quadro do zoom
+            escala = (f"scale=w='max(2,2*trunc(iw*({e})/2))':h='max(2,2*trunc(ih*({e})/2))'"
                       f":eval=frame:flags=bicubic")
         else:
             k = c["sc"]
@@ -823,15 +911,14 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             rad = c["rot"] * 3.141592653589793 / 180
             giro = f"rotate={rad:.6f}:c=black@0:ow='rotw({rad:.6f})':oh='roth({rad:.6f})'"
         if "op" in kf:
-            e = _expr_kf(kf["op"], "T")
-            opac = f"geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*({e})'"
+            opac = _opacidade_animada(kf["op"], c["dur"], fps, f"colorchannelmixer@op{n}")
         elif c["op"] < 0.999:
             opac = f"colorchannelmixer=aa={c['op']:.4f}"
         else:
             opac = None
         # escala animada vai por último (tamanho muda a cada quadro; o resto trabalha em tamanho fixo)
         ordem = [giro, opac, escala] if "sc" in kf else [escala, giro, opac]
-        efeitos = _filtros_fx(c["fx"], c["mw"], c["mh"])
+        efeitos = _filtros_fx(c["fx"], c["mw"], c["mh"], f"l{n}")
         cadeia = f"[{idx}:v:0]fps={fps},format=rgba," + ",".join(efeitos + [f for f in ordem if f])
         cadeia += f",setpts=PTS-STARTPTS+{c['st']:.3f}/TB[l{n}]"
         filtros.append(cadeia)

@@ -51,6 +51,33 @@ const VE_FX = {
             return b;
         },
     },
+    // Luz e Cor: editado no painel próprio (editor-lc.js); a parte de cor vai para a exportação como LUT 3D
+    lc: {
+        nome: 'Luz e Cor', cat: 'Correção de cor', tag: 'Lumetri', painel: 'lc',
+        params: [
+            { k: 'temp', nome: 'Temperatura', min: -100, max: 100, step: 1, def: 0, un: '' },
+            { k: 'tint', nome: 'Matiz', min: -100, max: 100, step: 1, def: 0, un: '' },
+            { k: 'exp', nome: 'Exposição', min: -4, max: 4, step: 0.05, def: 0, un: 'EV' },
+            { k: 'ct', nome: 'Contraste', min: -100, max: 100, step: 1, def: 0, un: '' },
+            { k: 'hi', nome: 'Realces', min: -100, max: 100, step: 1, def: 0, un: '' },
+            { k: 'sh', nome: 'Sombras', min: -100, max: 100, step: 1, def: 0, un: '' },
+            { k: 'wh', nome: 'Brancos', min: -100, max: 100, step: 1, def: 0, un: '' },
+            { k: 'bl', nome: 'Pretos', min: -100, max: 100, step: 1, def: 0, un: '' },
+            { k: 'sat', nome: 'Saturação', min: 0, max: 200, step: 1, def: 100, un: '' },
+            { k: 'fade', nome: 'Filme desbotado', min: 0, max: 100, step: 1, def: 0, un: '' },
+            { k: 'sharp', nome: 'Nitidez', min: 0, max: 100, step: 1, def: 0, un: '' },
+            { k: 'vib', nome: 'Vibração', min: -100, max: 100, step: 1, def: 0, un: '' },
+            { k: 'vig', nome: 'Quantidade', min: 0, max: 100, step: 1, def: 0, un: '' },
+        ],
+        extra: ['cv'],
+        neutro: v => veLcColorNeutral(v) && !(v.sharp > 0) && !(v.vig > 0),
+        draw: (a, v, env) => veLcDraw(a, v, env),
+        exportar: v => {
+            const o = { sharp: veLcSharpAmt(v), vig: veLcVigAngle(v) };
+            if (!veLcColorNeutral(v)) { o.n = VE_LC_N; o.lut = veLcLutB64(v); }
+            return o;
+        },
+    },
     crop: {
         nome: 'Cortar', cat: 'Transformar', tag: 'Crop',
         params: [
@@ -91,6 +118,7 @@ function veFxOther(a, w, h) { return veFxCanvas(a === VEFX.pool[0] ? 1 : 0, w, h
 function veFxValues(f) {
     const d = VE_FX[f.t], v = {};
     d.params.forEach(p => { v[p.k] = f.v && isFinite(f.v[p.k]) ? +f.v[p.k] : p.def; });
+    (d.extra || []).forEach(k => { v[k] = f.v && f.v[k] != null ? f.v[k] : {}; });
     return v;
 }
 
@@ -103,11 +131,14 @@ function veHasFx(c) { return !!(c && c.fx && c.fx.length); }
 // Clipe de vídeo "puro": ocupa o quadro todo, sem efeitos (vai direto na base da exportação)
 function veIsPlain(c) { return veIsDefaultProps(c) && !veFxActive(c).length; }
 
-// Prévia: aplica os efeitos na mídia e devolve o que desenhar no lugar dela
-function veFxRender(c, src, sz) {
+// Prévia: aplica os efeitos na mídia e devolve o que desenhar no lugar dela.
+// alvo = pixels do monitor por pixel da mídia: os efeitos rodam só na resolução em que a mídia aparece
+// (em degraus de 1/8, para não recriar os canvases a cada quadro de uma escala animada)
+function veFxRender(c, src, sz, alvo) {
     const fx = veFxActive(c);
     if (!fx.length) return src;
-    const q = Math.min(1, 1920 / Math.max(sz.w, sz.h));
+    let q = Math.min(1, 1920 / Math.max(sz.w, sz.h));
+    if (alvo > 0) q = Math.min(q, Math.max(0.125, Math.ceil(alvo * 8) / 8));
     const w = Math.max(1, Math.round(sz.w * q)), h = Math.max(1, Math.round(sz.h * q));
     let a = veFxCanvas(0, w, h);
     a.ctx.clearRect(0, 0, w, h);
@@ -118,7 +149,12 @@ function veFxRender(c, src, sz) {
 }
 
 // Para a exportação: [{t, v}] só dos efeitos ativos
-function veFxExport(c) { return veFxActive(c).map(f => ({ t: f.t, v: veFxValues(f) })); }
+function veFxExport(c) {
+    return veFxActive(c).map(f => {
+        const d = VE_FX[f.t], v = veFxValues(f);
+        return { t: f.t, v: d.exportar ? d.exportar(v) : v };
+    });
+}
 
 // ── aplicar / editar ──
 function veFxNewId() { return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -127,12 +163,19 @@ function veFxAdd(i, t) {
     const c = VE.clips[i];
     if (!c || !VE_FX[t]) return;
     if (VE.info && VE.info.audio_only) { veToast('Efeitos de vídeo precisam de um vídeo ou imagem'); return; }
+    const painel = VE_FX[t].painel;
+    if (painel && c.fx && c.fx.some(f => f.t === t)) {   // um só por clipe: abre o painel dele
+        VE.sel = i;
+        vedShow(painel);
+        veRefresh();
+        return;
+    }
     vePushHistory();
     const v = {};
     VE_FX[t].params.forEach(p => { v[p.k] = p.def; });
     c.fx = [...(c.fx || []), { id: veFxNewId(), t, on: true, v }];
     VE.sel = i;
-    vedShow('props');
+    vedShow(painel || 'props');
     veRefresh();
     veToast(`${VE_FX[t].nome} aplicado em ${veIsImage(c) ? 'Imagem' : 'Clipe'} ${i + 1}`);
 }
@@ -150,6 +193,7 @@ function veFxAction(id, act) {
     if (!c || !c.fx) return;
     const j = c.fx.findIndex(f => f.id === id);
     if (j < 0) return;
+    if (act === 'open') { vedShow(VE_FX[c.fx[j].t].painel); return; }
     if (act === 'fold') {
         VEFX.collapsed.has(id) ? VEFX.collapsed.delete(id) : VEFX.collapsed.add(id);
         VEFX.key = '';
@@ -158,7 +202,7 @@ function veFxAction(id, act) {
     }
     vePushHistory();
     if (act === 'on') veFxEdit(id, f => ({ ...f, on: f.on === false }));
-    else if (act === 'reset') veFxEdit(id, f => { VE_FX[f.t].params.forEach(p => { f.v[p.k] = p.def; }); return f; });
+    else if (act === 'reset') veFxEdit(id, f => { VE_FX[f.t].params.forEach(p => { f.v[p.k] = p.def; }); (VE_FX[f.t].extra || []).forEach(k => delete f.v[k]); return f; });
     else if (act === 'del') { c.fx = c.fx.filter(f => f.id !== id); if (!c.fx.length) delete c.fx; }
     else if (act === 'up' || act === 'down') {
         const k = act === 'up' ? j - 1 : j + 1;
@@ -194,7 +238,8 @@ function veRenderFxControls() {
                     <button data-fa="reset" title="Restaurar valores">↺</button>
                     <button data-fa="del" title="Remover efeito">✕</button>
                 </div>
-                <div class="ve-fxe-body">${d.params.map(p => `
+                <div class="ve-fxe-body">${d.painel ? `
+                    <button class="ve-btn ve-btn-sm ve-fxe-open" data-fa="open">Editar no painel ${d.nome}</button>` : d.params.map(p => `
                     <div class="ve-prop">
                         <label>${p.nome}</label>
                         <input type="range" min="${p.min}" max="${p.max}" step="${p.step}" data-fk="${p.k}">
@@ -221,7 +266,7 @@ function veFxSetParam(id, k, val) {
     val = Math.min(Math.max(val, p.min), p.max);
     veFxEdit(id, x => { x.v[k] = val; return x; });
     veRenderFxControls();
-    veDrawMonitor();
+    veDrawMonitorSoon();
 }
 
 // ── painel Efeitos: lista, busca, arrastar até um clipe ──

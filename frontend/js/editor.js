@@ -471,11 +471,21 @@ function vePlaybackLoop(now) {
         return;
     }
     if (veTopAt(VE.playhead) !== VE.cur) veSyncPlayer(false);
-    else veDrawMonitor();
+    else if (veMonitorDue()) veDrawMonitor();
     veFollowPlayhead(true);
     veUpdateReadouts();
     veDraw();
     veRaf($ve('ve-canvas'), vePlaybackLoop);
+}
+
+// Na reprodução o monitor só redesenha quando a agulha entra em outro quadro da sequência (e na volta
+// seguinte, caso o decodificador entregue o quadro um pouco depois). Numa tela de 144 Hz com vídeo de 30 fps,
+// corta mais da metade dos desenhos (e dos efeitos). requestVideoFrameCallback seria o sinal exato, mas no
+// WebView2 ele fez o player descartar quadros.
+function veMonitorDue() {
+    const f = Math.floor(VE.playhead * (VE.fps || 30) + 1e-6);
+    if (f !== VE._monF) { VE._monF = f; VE._monLeft = 2; }
+    return VE._monLeft-- > 0;
 }
 
 // ─────────────────────────── ganho de áudio (G) ───────────────────────────
@@ -893,13 +903,33 @@ function veParkExtras(n, limpar) {
 }
 
 // ── monitor: desenha as camadas visíveis na agulha, de baixo para cima ──
+// Redesenho pedido por slider/arraste: no máximo um por quadro da tela (vários eventos viram um desenho)
+let veMonQueued = false;
+function veDrawMonitorSoon() {
+    if (veMonQueued) return;
+    veMonQueued = true;
+    veRaf($ve('ve-canvas'), () => { veMonQueued = false; veDrawMonitor(); });
+}
+
+// Pixels da prévia por pixel do quadro: o tamanho em que o monitor aparece na tela (com o zoom e a
+// densidade da tela), até 1920 px no lado maior. Monitor pequeno = menos pixels para compor e para os efeitos,
+// sem perda visível. Em degraus de 1/8 para não recriar o canvas a cada pixel de redimensionamento.
+function veMonitorScale() {
+    const cap = Math.min(1, 1920 / Math.max(VE.seqW, VE.seqH));
+    const scr = $ve('ve-screen');
+    if (!scr || !scr.clientWidth) return cap;
+    const dpr = scr.ownerDocument.defaultView.devicePixelRatio || 1;
+    const tela = veFitScale() * VEM.mz * dpr;
+    return Math.min(cap, Math.max(0.125, Math.ceil(tela * 8) / 8));
+}
+
 function veDrawMonitor() {
     const cv = $ve('ve-canvas');
     if (!cv) return;
     const ctx = cv.getContext('2d');
     if (!VE.ready) { ctx.clearRect(0, 0, cv.width, cv.height); return; }
-    // prévia até 1920 px no lado maior (4K fica leve); desenha em coordenadas do quadro
-    const pv = Math.min(1, 1920 / Math.max(VE.seqW, VE.seqH));
+    // desenha em coordenadas do quadro
+    const pv = veMonitorScale();
     const cw = Math.round(VE.seqW * pv), ch = Math.round(VE.seqH * pv);
     if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -931,7 +961,7 @@ function veDrawMonitor() {
             }
             if (!src) return;
             const p = veProps(c), sz = veMediaSize(c);
-            src = veFxRender(c, src, sz);   // efeitos rodam antes do movimento (como no Premiere)
+            src = veFxRender(c, src, sz, pv * p.sc / 100);   // efeitos rodam antes do movimento (como no Premiere)
             ctx.save();
             ctx.globalAlpha = Math.max(0, Math.min(1, p.op / 100));
             ctx.translate(p.x, p.y);
@@ -962,7 +992,7 @@ function veRenderProps() {
     const c = VE.clips[VE.sel];
     $ve('ve-props-empty').hidden = !!c;
     $ve('ve-props').hidden = !c;
-    if (!c) { VEFX.key = ''; return; }
+    if (!c) { VEFX.key = ''; veLcRender(); return; }
     const m = veMediaOf(c);
     $ve('ve-props-title').innerHTML = `Clipe ${VE.sel + 1}<span>${veIsImage(c) ? 'Imagem · ' + veEsc(m.name || '') : 'Vídeo'} · V${c.tr + 1}</span>`;
     const p = veProps(c);
@@ -991,6 +1021,7 @@ function veRenderProps() {
         veKfGraphDraw(naAgulha);
     }
     veRenderFxControls();
+    veLcRender();
 }
 
 function veSetProp(k, val) {
@@ -1001,7 +1032,7 @@ function veSetProp(k, val) {
     if (veKfOn(c, k) && !veInClip(c)) { veToast('Leve a agulha para dentro do clipe para criar o quadro-chave'); return; }
     veApplyProps(c, { [k]: val });
     veRenderProps();
-    veDrawMonitor();
+    veDrawMonitorSoon();
     if (veKfOn(c, k)) veDraw();
 }
 
@@ -2261,6 +2292,8 @@ function veApplyMonitor() {
     $ve('ve-mz-val').textContent = fit ? 'Fit' : Math.round(veFitScale() * VEM.mz * 100) + '%';
     $ve('ve-mz-fit').classList.toggle('active', fit);
     $ve('ve-screen').classList.toggle('zoomed', VEM.mz > 1.001);
+    // zoom pede outra resolução da prévia
+    if (VE.ready && Math.round(VE.seqW * veMonitorScale()) !== v.width) veDrawMonitorSoon();
 }
 
 function veMonitorFit() { VEM.mz = 1; VEM.mx = VEM.my = 0; veApplyMonitor(); }
@@ -2322,7 +2355,7 @@ function veInitMonitorZoom() {
             const k = veFitScale() * VEM.mz;   // px de tela por px do quadro
             veApplyProps(c, { x: Math.round(VEM.pan.px + dx / k), y: Math.round(VEM.pan.py + dy / k) });
             veRenderProps();
-            veDrawMonitor();
+            veDrawMonitorSoon();
             if (veHasKf(c)) veDraw();
             return;
         }

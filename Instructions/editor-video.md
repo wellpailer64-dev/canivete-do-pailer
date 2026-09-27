@@ -7,6 +7,7 @@ Editor de cortes estilo Premiere, versão de bolso. Menu: **Editor de Vídeo**.
 - `frontend/css/editor.css` — visual (prefixo `.ve-`)
 - `frontend/js/editor-dock.js` — painéis encaixáveis (docking estilo Premiere)
 - `frontend/js/editor-fx.js` — efeitos (painel Efeitos + Controles de efeito)
+- `frontend/js/editor-lc.js` — painel Luz e Cor (correção de cor estilo Lumetri)
 - `Functions/video_cutter.py` — análise, prévia (proxy), miniaturas, forma de onda, exportação
 - `Functions/media_server.py` — servidor HTTP local (127.0.0.1) que entrega vídeo/miniaturas/prévias à interface
 - `main.py` — API: `video_cutter_prepare`, `video_cutter_export`, `video_cutter_cancel_export`, `reveal_file`, `open_file`; arrastar-e-soltar via `window.dom` do pywebview
@@ -21,6 +22,14 @@ aleatório e servido com suporte a Range (seek). Só escuta em 127.0.0.1. O Cort
 - Senão (HEVC do iPhone, MKV, AVI, H.264 10-bit, PCM...) gera um **proxy** 720p H.264 `ultrafast` com keyframe
   a cada ~0,5s (scrub preciso). Aparece o selo "PRÉVIA LEVE". A exportação sempre usa o original.
 - Arquivos temporários em `%TEMP%\canivete_editor` (limpos ao abrir outro vídeo).
+
+### Desempenho da prévia
+- O monitor tem a resolução em que aparece na tela (zoom × densidade da tela), até 1920 px (`veMonitorScale`,
+  degraus de 1/8). Os efeitos rodam na resolução em que a mídia aparece (`veFxRender(..., alvo)`).
+- Na reprodução o monitor só redesenha quando a agulha entra em outro quadro da sequência (`veMonitorDue`):
+  em tela de 144 Hz não repinta 144 vezes um vídeo de 30 fps. `requestVideoFrameCallback` foi testado e
+  fazia o WebView2 descartar quadros — não usar.
+- Sliders e arraste no monitor pedem `veDrawMonitorSoon()` (um desenho por quadro da tela, não por evento).
 
 ## Modelo de edição
 `VE.clips = [{s, e, off}]` cobre o vídeo inteiro de forma contígua. Dividir = partir um clipe em dois.
@@ -79,6 +88,11 @@ elemento do painel é movido para ela, com os estilos e o sprite de ícones copi
 maximizada). Com um workspace ativo (●), o editor sempre abre como ele foi salvo; mexer no layout marca
 "(modificado)" e o menu oferece salvar as alterações ou voltar ao salvo. Salvar com um nome existente atualiza.
 
+### Movimento na exportação
+- Escala animada usa tamanhos pares (`2*trunc(.../2)`): com tamanho ímpar o centro "tremia" 0,5 px por quadro.
+- Opacidade animada: um valor por quadro via `sendcmd` → `colorchannelmixer@opN` (`_opacidade_animada`).
+  O `geq` antigo fazia a conta por pixel e deixava a exportação ~2–3× mais lenta. Mesmo resultado (validado).
+
 ## Efeitos
 `c.fx = [{id, t, on, v}]`, aplicados de cima para baixo no tamanho original da mídia, antes de
 escala/posição/rotação/opacidade. Clipe com efeito ativo vira camada na exportação (`veIsPlain`).
@@ -87,3 +101,14 @@ escala/posição/rotação/opacidade. Clipe com efeito ativo vira camada na expo
 - Cortar: área cortada fica transparente (ffmpeg `drawbox ... replace=1`)
 Efeito novo: `VE_FX` em editor-fx.js (parâmetros + `draw`) e `_filtros_fx` em video_cutter.py (mesma conta).
 Parâmetros de efeito ainda não têm quadros-chave.
+
+## Luz e Cor (estilo Lumetri)
+Painel `lc` que edita o efeito `lc` do clipe selecionado (criado no primeiro ajuste; um por clipe). Seções:
+Correção básica (temperatura, matiz, exposição, contraste, realces, sombras, brancos, pretos, saturação),
+Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, até 16 pontos) e Vinheta.
+- Toda a cor vira uma LUT 3D 33³ calculada em JS (`veLcBuildLut`). A prévia aplica por WebGL2 (textura 3D,
+  trilinear); a exportação recebe a mesma LUT em base64 (Uint16) e grava um `.cube` para o `lut3d` (trilinear).
+  Mudar a conta da cor = mexer só em `veLcBuildLut`.
+- Nitidez = `unsharp` 5×5 na luma (núcleo binomial, igual no shader); vinheta = `vignette` do ffmpeg
+  (cos⁴, raio até o canto), com o alfa preservado por split/alphamerge.
+- Validado: prévia × exportação diferem ~4/255 em média (menos que a diferença YUV→RGB que já existia sem efeito).
