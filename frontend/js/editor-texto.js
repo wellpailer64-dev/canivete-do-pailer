@@ -8,7 +8,7 @@
 // =========================================================
 
 const VE_LEG_PADRAO = { max: 42, linhas: 2, minDur: 3, gap: 0 };                 // "Criar legendas" do Premiere
-const VE_LEG_ESTILO = { fonte: 'Arial', tam: 5.5, cor: '#ffffff', fundo: 'caixa', pos: 'baixo', maiusc: false, negrito: true };
+const VE_LEG_ESTILO = { fonte: 'Arial', tam: 5.5, cor: '#ffffff', fundo: 'caixa', pos: 'baixo', maiusc: false, negrito: true, ita: false };
 
 const VETX = {
     palavras: [], idioma: 'pt', chave: '', rodando: false, aba: 'trans', legSel: -1, ativa: -1,
@@ -204,10 +204,10 @@ function veTxLegendaEm(t) {
 // (ascendente + descendente), então a prévia mede a fonte escolhida e a exportação recebe a proporção
 const VE_LEG_MET = new Map();
 function veTxMetricas(e) {
-    const k = e.fonte + '|' + !!e.negrito;
+    const k = e.fonte + '|' + !!e.negrito + '|' + !!e.ita;
     if (!VE_LEG_MET.has(k)) {
         const ctx = document.createElement('canvas').getContext('2d');
-        ctx.font = `${e.negrito ? 'bold ' : ''}100px "${e.fonte}", Arial`;
+        ctx.font = `${e.ita ? 'italic ' : ''}${e.negrito ? 'bold ' : ''}100px "${e.fonte}", Arial`;
         const m = ctx.measureText('Hg');
         const asc = (m.fontBoundingBoxAscent || 90.5) / 100, desc = (m.fontBoundingBoxDescent || 21.2) / 100;
         VE_LEG_MET.set(k, { asc, razao: asc + desc });
@@ -225,7 +225,7 @@ function veTxDesenhar(ctx) {
     if (e.maiusc) linhas = linhas.map(l => l.toUpperCase());
     if (!linhas.length) return;
     ctx.save();
-    ctx.font = `${e.negrito ? 'bold ' : ''}${em}px "${e.fonte}", Arial`;
+    ctx.font = `${e.ita ? 'italic ' : ''}${e.negrito ? 'bold ' : ''}${em}px "${e.fonte}", Arial`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     const bloco = linhas.length * alt;

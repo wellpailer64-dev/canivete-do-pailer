@@ -18,7 +18,30 @@ const VE_TX_PADRAO = {
 };
 const VE_TX_DUR = 5;
 
-const VEPP = { chave: '', fontes: null, ripple: true, edit: null, cache: new Map() };
+const VEPP = { chave: '', fontes: null, estilos: null, ripple: true, edit: null, cache: new Map() };
+
+// ── família e estilo (Light, Regular, Semibold, Bold, Italic...) ──
+// Desenho (prévia e .ass) usa o nome "de sistema" da fonte + negrito/itálico: é como o Windows, o navegador e o
+// libass acham cada estilo (Arial Narrow, Segoe UI Semibold...). fam/estilo são só para o seletor.
+function veFonteFamilia(o) {
+    if (o.fam && (!VEPP.estilos || VEPP.estilos[o.fam])) return o.fam;
+    if (VEPP.estilos) for (const [f, lista] of Object.entries(VEPP.estilos)) if (lista.some(e => e.gdi === o.fonte)) return f;
+    return o.fonte;
+}
+function veFonteEstiloAtual(o, neg, ita) {
+    const lista = VEPP.estilos && VEPP.estilos[veFonteFamilia(o)];
+    const e = lista && lista.find(e => e.gdi === o.fonte && e.gdi_negrito === !!neg && e.gdi_italico === !!ita);
+    return e ? e.estilo : '';
+}
+// Estilo "Regular" da família (ou o mais perto de 400, sem itálico)
+function veFontePadrao(fam) {
+    const lista = (VEPP.estilos && VEPP.estilos[fam]) || [];
+    return lista.find(e => /^(regular|normal|book|roman)$/i.test(e.estilo)) ||
+        [...lista].filter(e => !e.italico).sort((a, b) => Math.abs(a.peso - 400) - Math.abs(b.peso - 400))[0] || lista[0];
+}
+function veFonteEstilos(k) {
+    return `<select data-pp="${k}" class="ve-pp-estilo" title="Estilo da fonte"></select>`;
+}
 
 function veIsTexto(c) { const m = c && veMediaOf(c); return !!m && m.kind === 'texto'; }
 function veTxt(c) { return Object.assign({}, VE_TX_PADRAO, (c && c.tx) || {}); }
@@ -148,17 +171,7 @@ function veTxPontoQuadro(e) {
 
 // Clipe de texto visível sob o ponto (o da trilha mais alta)
 function veTxClipeEm(pt) {
-    const t = VE.playhead;
-    const vis = VE.clips.map((c, i) => ({ c, i }))
-        .filter(({ c }) => veIsTexto(c) && !veTrkHidden(c.tr) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS)
-        .sort((a, b) => b.c.tr - a.c.tr);
-    for (const { c, i } of vis) {
-        const p = veProps(c), sz = veTxTamanho(c), a = -p.rot * Math.PI / 180, k = p.sc / 100;
-        const dx = pt.x - p.x, dy = pt.y - p.y;
-        const lx = (dx * Math.cos(a) - dy * Math.sin(a)) / k, ly = (dx * Math.sin(a) + dy * Math.cos(a)) / k;
-        if (Math.abs(lx) <= sz.w / 2 && Math.abs(ly) <= sz.h / 2) return i;
-    }
-    return -1;
+    return veTfClipeEm(pt, veIsTexto);
 }
 
 function veTxNovo(pt) {
@@ -235,7 +248,8 @@ function veTxEditarPos() {
     const q = veTxQuadroTela(), rs = $ve('ve-screen').getBoundingClientRect();
     const k = q.s * p.sc / 100;
     const s = ed.ta.style;
-    const cx = q.x0 - rs.left + p.x * q.s, cy = q.y0 - rs.top + p.y * q.s;
+    const ctr = veTfQuadro(c, p, L.w / 2, L.h / 2, { w: L.w, h: L.h });   // centro do texto no quadro (com a âncora)
+    const cx = q.x0 - rs.left + ctr.x * q.s, cy = q.y0 - rs.top + ctr.y * q.s;
     s.width = (L.w * k) + 'px';
     s.height = (L.h * k) + 'px';
     s.left = (cx - L.w * k / 2) + 'px';
@@ -359,7 +373,16 @@ function vePpHtml(a) {
         ${vePpNum('p.y', 'Posição Y', -VE.seqH, VE.seqH * 2, 1, 'px')}
         ${vePpNum('p.sc', 'Escala', 1, 400, 0.5, '%')}
         ${vePpNum('p.rot', 'Rotação', -180, 180, 0.5, '°')}
-        ${vePpNum('p.op', 'Opacidade', 0, 100, 1, '%')}`);
+        ${vePpNum('p.op', 'Opacidade', 0, 100, 1, '%')}
+        <div class="ve-pp-anc">
+            <div class="ve-pp-grade" title="Ponto de ancoragem: clique para escolher (o objeto não sai do lugar)">
+                ${[0, 0.5, 1].map(v => [0, 0.5, 1].map(u => `<button data-ppanc="${u},${v}"></button>`).join('')).join('')}
+            </div>
+            <div class="ve-pp-anc-num"><label>Ponto de ancoragem</label>
+                <span class="ve-prop-num"><input type="number" data-pp="p.ax" step="1"><i>X</i></span>
+                <span class="ve-prop-num"><input type="number" data-pp="p.ay" step="1"><i>Y</i></span></div>
+        </div>
+        <small class="ve-pp-dica">No monitor: arraste as alças para escalar, por fora dos cantos para girar e a mira ⊕ para mudar o ponto de ancoragem.</small>`);
     const velocidade = () => vePpSec('Velocidade', `
         ${vePpNum('vel', 'Velocidade', 10, 400, 1, '%')}
         <div class="ve-pp-l"><label>Duração</label><span></span><span class="ve-prop-num"><input type="number" data-pp="dur" min="0.04" step="0.01"><i>s</i></span></div>
@@ -379,9 +402,11 @@ function vePpHtml(a) {
         return cab('Legenda', `${VETX.legSel + 1} de ${VE.legendas.length} · trilha LEG`) +
             vePpSec('Texto da legenda', `<textarea class="ve-pp-texto" data-pp="leg.texto" rows="3"></textarea>`) +
             vePpSec('Estilo das legendas (todas)', `
-                <div class="ve-pp-l"><label>Fonte</label>${vePpFontes('le.fonte')}</div>
+                <div class="ve-pp-l"><label>Fonte</label>${vePpFontes('le.fam')}</div>
+                <div class="ve-pp-l"><label>Estilo</label>${veFonteEstilos('le.estilo')}</div>
                 <div class="ve-pp-botoes">
                     <button class="ve-pp-tog" data-pptog="le.negrito" title="Negrito"><b>N</b></button>
+                    <button class="ve-pp-tog" data-pptog="le.ita" title="Itálico"><i>I</i></button>
                     <button class="ve-pp-tog" data-pptog="le.maiusc" title="CAIXA ALTA">AA</button></div>
                 ${vePpNum('le.tam', 'Tamanho', 3, 10, 0.1, '%')}
                 <div class="ve-pp-cores">${vePpCor('le.cor', 'Cor do texto')}</div>
@@ -395,7 +420,8 @@ function vePpHtml(a) {
         return cab(nome, `Texto · V${c.tr + 1}`) +
             vePpSec('Texto', `
                 <textarea class="ve-pp-texto" data-pp="tx.t" rows="2" placeholder="Digite o texto"></textarea>
-                <div class="ve-pp-l"><label>Fonte</label>${vePpFontes('tx.fonte')}</div>
+                <div class="ve-pp-l"><label>Fonte</label>${vePpFontes('tx.fam')}</div>
+                <div class="ve-pp-l"><label>Estilo</label>${veFonteEstilos('tx.estilo')}</div>
                 <div class="ve-pp-botoes">
                     <button class="ve-pp-tog" data-pptog="tx.neg" title="Negrito"><b>N</b></button>
                     <button class="ve-pp-tog" data-pptog="tx.ita" title="Itálico"><i>I</i></button>
@@ -442,7 +468,12 @@ function vePpHtml(a) {
 // Valor atual de cada controle
 function vePpGet(k) {
     const c = VE.clips[VE.sel];
+    if (k === 'tx.fam') return veFonteFamilia(veTxt(c));
+    if (k === 'tx.estilo') { const x = veTxt(c); return veFonteEstiloAtual(x, x.neg, x.ita); }
+    if (k === 'le.fam') return veFonteFamilia(veTxEstilo());
+    if (k === 'le.estilo') { const e = veTxEstilo(); return veFonteEstiloAtual(e, e.negrito, e.ita); }
     if (k.startsWith('tx.')) return veTxt(c)[k.slice(3)];
+    if (k === 'p.ax' || k === 'p.ay') return veAnc(c)[k === 'p.ax' ? 0 : 1];
     if (k.startsWith('p.')) return veProps(c)[k.slice(2)];
     if (k.startsWith('le.')) return veTxEstilo()[k.slice(3)];
     if (k === 'leg.texto') return (VE.legendas[VETX.legSel] || {}).texto || '';
@@ -457,6 +488,19 @@ function vePpGet(k) {
 
 function vePpSet(k, v) {
     const c = VE.clips[VE.sel];
+    if (k === 'tx.fam' || k === 'tx.estilo' || k === 'le.fam' || k === 'le.estilo') {
+        const leg = k.startsWith('le.'), atual = leg ? veTxEstilo() : veTxt(c);
+        const fam = k.endsWith('.fam') ? v : veFonteFamilia(atual);
+        const lista = (VEPP.estilos && VEPP.estilos[fam]) || [];
+        const e = k.endsWith('.fam') ? veFontePadrao(fam) : lista.find(x => x.estilo === v);
+        const novo = e ? { fam, fonte: e.gdi } : { fam, fonte: fam };
+        if (leg) VE.legEstilo = { ...atual, ...novo, negrito: e ? e.gdi_negrito : atual.negrito, ita: e ? e.gdi_italico : atual.ita };
+        else {
+            c.tx = { ...atual, ...novo, neg: e ? e.gdi_negrito : atual.neg, ita: e ? e.gdi_italico : atual.ita };
+            if (VEPP.edit && VEPP.edit.c === c) veTxEditarPos();
+        }
+        return 'monitor';
+    }
     if (k.startsWith('tx.')) {
         const n = k.slice(3);
         c.tx = { ...veTxt(c), [n]: v };
@@ -468,6 +512,7 @@ function vePpSet(k, v) {
         if (!isFinite(v)) return;
         if (n === 'sc') v = Math.max(0.5, Math.min(2000, v));
         if (n === 'op') v = Math.max(0, Math.min(100, v));
+        if (n === 'ax' || n === 'ay') { c.p = { ...veStaticProps(c), [n]: v }; return 'props'; }   // como no Premiere: o objeto anda
         if (veKfOn(c, n) && !veInClip(c)) { veToast('Leve a agulha para dentro do clipe para criar o quadro-chave'); return; }
         veApplyProps(c, { [n]: v });
         if (VEPP.edit) veTxEditarPos();
@@ -505,6 +550,19 @@ function vePpRender() {
         VEPP.chave = chave;
     }
     const ativo = box.ownerDocument.activeElement;
+    box.querySelectorAll('select.ve-pp-estilo').forEach(sel => {
+        const leg = sel.dataset.pp.startsWith('le.');
+        const o = leg ? veTxEstilo() : a.c && veTxt(a.c);
+        if (!o) return;
+        const fam = veFonteFamilia(o), lista = (VEPP.estilos && VEPP.estilos[fam]) || [];
+        const chave = fam + '|' + lista.length;
+        if (sel._chave === chave) return;
+        sel._chave = chave;
+        // estilo que não existe na família (N/I sem a variação de verdade): o navegador simula
+        sel.innerHTML = lista.map(e => `<option value="${veTxEsc(e.estilo)}">${veTxEsc(e.estilo)}</option>`).join('') +
+            '<option value="">(simulado)</option>';
+        sel.disabled = !lista.length;
+    });
     box.querySelectorAll('[data-pp]').forEach(el => {
         if (el === ativo) return;
         const v = vePpGet(el.dataset.pp);
@@ -518,6 +576,13 @@ function vePpRender() {
     box.querySelectorAll('[data-pptog]').forEach(b => b.classList.toggle('on', !!vePpGet(b.dataset.pptog)));
     box.querySelectorAll('[data-ppalin]').forEach(b => b.classList.toggle('on', a.c && veTxt(a.c).alin === b.dataset.ppalin));
     box.querySelectorAll('[data-ppse]').forEach(el => { el.hidden = !vePpGet(el.dataset.ppse); });
+    if (a.c) {
+        const sz = veMediaSize(a.c), [ax, ay] = veAnc(a.c);
+        box.querySelectorAll('[data-ppanc]').forEach(b => {
+            const [u, v] = b.dataset.ppanc.split(',').map(Number);
+            b.classList.toggle('on', Math.abs(ax - u * sz.w) < 0.6 && Math.abs(ay - v * sz.h) < 0.6);
+        });
+    }
 }
 
 // Depois de mudar um valor: redesenha só o que precisa
@@ -553,6 +618,8 @@ function vePpInit() {
         vePpDepois('tudo', true);
     });
     box.addEventListener('click', e => {
+        const anc = e.target.closest('[data-ppanc]');
+        if (anc && VE.ready) { const [u, v] = anc.dataset.ppanc.split(',').map(Number); veTfAncoraEm(u, v); return; }
         const tog = e.target.closest('[data-pptog]'), alin = e.target.closest('[data-ppalin]');
         const ac = e.target.closest('[data-ppacao]'), ir = e.target.closest('[data-ppir]');
         if (ir) { vedShow(ir.dataset.ppir); if (ir.dataset.ppir === 'props') veRenderProps(); return; }
@@ -564,14 +631,16 @@ function vePpInit() {
             if (!c) return;
             const sz = veMediaSize(c), p = veProps(c);
             vePushHistory();
-            if (ac.dataset.ppacao === 'alin-h') veApplyProps(c, { x: VE.seqW / 2 });
-            else if (ac.dataset.ppacao === 'alin-v') veApplyProps(c, { y: VE.seqH / 2 });
+            const centro = vePosParaCentro(c, p, VE.seqW / 2, VE.seqH / 2);
+            if (ac.dataset.ppacao === 'alin-h') veApplyProps(c, { x: centro.x });
+            else if (ac.dataset.ppacao === 'alin-v') veApplyProps(c, { y: centro.y });
             else {
                 const aj = ac.dataset.ppacao === 'ajustar' ? Math.min : Math.max;
                 // gira 90°/270°: a largura vira altura
                 const deitado = Math.abs(Math.round(p.rot / 90)) % 2 === 1;
                 const w = deitado ? sz.h : sz.w, h = deitado ? sz.w : sz.h;
-                veApplyProps(c, { sc: veRound(100 * aj(VE.seqW / w, VE.seqH / h), 2), x: VE.seqW / 2, y: VE.seqH / 2 });
+                const sc = veRound(100 * aj(VE.seqW / w, VE.seqH / h), 2);
+                veApplyProps(c, { sc, ...vePosParaCentro(c, { ...p, sc }, VE.seqW / 2, VE.seqH / 2) });
             }
             veRefresh();
         }
@@ -585,7 +654,7 @@ function vePpInit() {
         if (e.target.dataset && e.target.dataset.pp === 'leg.texto' && VE.legendas[VETX.legSel]) veSeek(VE.legendas[VETX.legSel].st);
     });
     const carregar = () => window.pywebview.api.ve_fontes().then(r => {
-        if (r && r.success && r.fontes.length) { VEPP.fontes = r.fontes; vePpRender(); }
+        if (r && r.success && r.fontes.length) { VEPP.fontes = r.fontes; VEPP.estilos = r.estilos || null; VEPP.chave = ''; vePpRender(); }
     });
     if (window.pywebview && window.pywebview.api && window.pywebview.api.ve_fontes) carregar();
     else window.addEventListener('pywebviewready', carregar, { once: true });

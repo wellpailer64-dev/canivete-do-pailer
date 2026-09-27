@@ -1060,3 +1060,12 @@ html.ve-float-html body { background: var(--bg-0); }
 /* ferramenta Velocidade (R) */
 .ve-tl-wrap.tool-rate { cursor: default; }
 .ve-tl-wrap.tool-rate.trim-hover, .ve-tl-wrap.tool-rate.trimming { cursor: col-resize; }
+
+/* ponto de ancoragem: grade 3×3 de referência (como no Photoshop) + X/Y (como no Premiere) */
+.ve-pp-anc { display: flex; align-items: center; gap: 12px; }
+.ve-pp-grade { display: grid; grid-template-columns: repeat(3, 14px); gap: 4px; padding: 5px; border: 1px solid var(--ve-line-2); border-radius: 6px; background: var(--ve-bg); }
+.ve-pp-grade button { width: 14px; height: 14px; padding: 0; border-radius: 3px; border: 1px solid var(--ve-line-2); background: var(--ve-panel-2); cursor: pointer; }
+.ve-pp-grade button:hover { border-color: var(--ve-accent); }
+.ve-pp-grade button.on { background: var(--ve-accent); border-color: var(--ve-accent); }
+.ve-pp-anc-num { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ve-pp-anc-num label { grid-column: 1 / -1; font-size: 11px; color: var(--ve-dim); }

@@ -1055,8 +1055,9 @@ function veInClip(c) { return VE.playhead >= c.st - VE_EPS && VE.playhead <= veE
 
 function veIsDefaultProps(c) {
     if (veHasKf(c)) return false;
-    const p = veProps(c), near = (a, b) => Math.abs(a - b) < 0.05;
-    return near(p.sc, 100) && near(p.x, VE.seqW / 2) && near(p.y, VE.seqH / 2) && near(p.rot % 360, 0) && p.op >= 99.95;
+    const p = veProps(c), near = (a, b) => Math.abs(a - b) < 0.05, sz = veMediaSize(c);
+    return near(p.sc, 100) && near(p.x, VE.seqW / 2) && near(p.y, VE.seqH / 2) && near(p.rot % 360, 0) && p.op >= 99.95 &&
+        (p.ax == null || near(p.ax, sz.w / 2)) && (p.ay == null || near(p.ay, sz.h / 2));
 }
 
 function veMediaSize(c) {
@@ -1449,23 +1450,13 @@ function veDrawMonitor() {
             ctx.rotate(p.rot * Math.PI / 180);
             const k = p.sc / 100;
             ctx.scale(k, k);
-            ctx.drawImage(src, -sz.w / 2, -sz.h / 2, sz.w, sz.h);
+            const [ax, ay] = veAnc(c, p, sz);   // a Posição é onde fica o ponto de ancoragem
+            ctx.drawImage(src, -ax, -ay, sz.w, sz.h);
             ctx.restore();
         });
     veTxDesenhar(ctx);
-    // contorno do clipe selecionado visível (ajuda a posicionar)
-    const cs = VE.clips[VE.sel];
-    if (cs && !veIsAdj(cs) && t >= cs.st - VE_EPS && t < veEnd(cs) - VE_EPS && (veIsImage(cs) || !veIsDefaultProps(cs))) {
-        const p = veProps(cs), sz = veMediaSize(cs), k = p.sc / 100;
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rot * Math.PI / 180);
-        ctx.strokeStyle = 'rgba(249,115,22,0.9)';
-        ctx.lineWidth = 2 / pv;
-        ctx.setLineDash([8 / pv, 5 / pv]);
-        ctx.strokeRect(-sz.w * k / 2, -sz.h * k / 2, sz.w * k, sz.h * k);
-        ctx.restore();
-    }
+    // caixa com alças e ponto de ancoragem do selecionado (editor-transform.js)
+    veTfDesenhar(ctx, cv, pv);
 }
 
 // ── painel de propriedades ──
@@ -1542,7 +1533,7 @@ function vePropsCenter() {
     const c = VE.clips[VE.sel];
     if (!c) return;
     vePushHistory();
-    veApplyProps(c, { x: VE.seqW / 2, y: VE.seqH / 2 });
+    veApplyProps(c, vePosParaCentro(c, veProps(c), VE.seqW / 2, VE.seqH / 2));
     veRefresh();
 }
 
@@ -1774,7 +1765,8 @@ function veExportPlan() {
             return { tipo: veIsAdj(c) ? 'ajuste' : veIsImage(c) ? 'imagem' : 'video', path: png ? png.path : veIsImage(c) ? m.path || null : null,
                      st: c.st, s: veIsImage(c) ? 0 : c.s, e: veIsImage(c) ? veLen(c) : c.e,
                      sc: p.sc / f, x: p.x, y: p.y, rot: p.rot, op: p.op, kf,
-                     fx: veFxExport(c), mw: sz.w, mh: sz.h, v: veVel(c) };
+                     fx: veFxExport(c), mw: sz.w, mh: sz.h, v: veVel(c),
+                     ox: (veMediaSize(c).w / 2 - veAnc(c, p)[0]) * f, oy: (veMediaSize(c).h / 2 - veAnc(c, p)[1]) * f };
         });
     // o arquivo de cada clipe com som (null = o vídeo aberto)
     const mix = veMixClipes().map(([st, s0, e0, g, id, v, tom]) => [st, s0, e0, g, id ? VE.media[id].path : null, v, tom]);
@@ -3065,7 +3057,6 @@ function veInitMonitorZoom() {
         scr.classList.remove('panning', 'layer-move');
         setTimeout(() => { VEM.panned = false; }, 0);
     };
-    $ve('ve-canvas').addEventListener('click', () => { if (!VEM.panned) veTogglePlay(); });
     scr.addEventListener('pointerup', end);
     scr.addEventListener('pointercancel', end);
     new ResizeObserver(() => veApplyMonitor()).observe(scr);
@@ -3139,7 +3130,6 @@ function veInitEvents() {
     const v = veVideo();
 
     // o estado de reprodução é do editor (relógio próprio), não do <video>
-    v.addEventListener('click', () => { if (!VEM.panned) veTogglePlay(); });
     v.addEventListener('error', () => {
         if (!v.getAttribute('src')) return;
         veLoading(null);

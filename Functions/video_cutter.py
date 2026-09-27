@@ -13,6 +13,7 @@ import array
 import base64
 import hashlib
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -847,6 +848,7 @@ def _gerar_ass(itens, estilo, W, H):
     alinhamento = {"baixo": 2, "meio": 5, "cima": 8}.get(pos, 2)
     margem = int(round(0.06 * H))
     negrito = -1 if estilo.get("negrito", True) else 0
+    italico = -1 if estilo.get("ita") else 0
     cor = _ass_cor(estilo.get("cor", "#ffffff"))
     if fundo == "caixa":
         # BorderStyle 3: caixa opaca atrás de cada linha; o Outline vira a folga da caixa
@@ -863,7 +865,7 @@ def _gerar_ass(itens, estilo, W, H):
         "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, "
         "MarginR, MarginV, Encoding",
         f"Style: Leg,{fonte},{em * razao:.1f},{cor},{cor},{fundo_cor if borda == 3 else _ass_cor('#000000')},{fundo_cor},"
-        f"{negrito},0,0,0,100,100,0,0,{borda},{contorno},{sombra},{alinhamento},{margem},{margem},{margem},1",
+        f"{negrito},{italico},0,0,100,100,0,0,{borda},{contorno},{sombra},{alinhamento},{margem},{margem},{margem},1",
         "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ]
     n = 0
@@ -998,6 +1000,8 @@ def _normalizar_camadas(camadas, path_video):
                 "kf": _normalizar_kf(c.get("kf")),
                 "fx": [f for f in (c.get("fx") or []) if isinstance(f, dict)],
                 "mw": _num(c.get("mw"), 2, 20000, 1920), "mh": _num(c.get("mh"), 2, 20000, 1080),
+                # ponto de ancoragem: do ponto até o centro da mídia, em px da mídia (0 = âncora no centro)
+                "ox": _num(c.get("ox"), -1e5, 1e5, 0), "oy": _num(c.get("oy"), -1e5, 1e5, 0),
             }
         except Exception:
             continue
@@ -1224,6 +1228,18 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         tl = f"(t-{c['st']:.4f})"
         px = _expr_kf(kf["x"], tl) if "x" in kf else f"{c['x']:.2f}"
         py = _expr_kf(kf["y"], tl) if "y" in kf else f"{c['y']:.2f}"
+        if abs(c["ox"]) > 0.01 or abs(c["oy"]) > 0.01:
+            # Posição = onde fica o ponto de ancoragem; o centro da camada gira/escala em volta dele
+            if "sc" in kf or "rot" in kf:
+                k = _expr_kf(kf["sc"], tl) if "sc" in kf else f"{c['sc']:.6f}"
+                a = f"(({_expr_kf(kf['rot'], tl)})*PI/180)" if "rot" in kf else f"{c['rot'] * 3.141592653589793 / 180:.6f}"
+                px = f"({px})+({k})*({c['ox']:.3f}*cos({a})-{c['oy']:.3f}*sin({a}))"
+                py = f"({py})+({k})*({c['ox']:.3f}*sin({a})+{c['oy']:.3f}*cos({a}))"
+            else:
+                a = c["rot"] * 3.141592653589793 / 180
+                dx = c["sc"] * (c["ox"] * math.cos(a) - c["oy"] * math.sin(a))
+                dy = c["sc"] * (c["ox"] * math.sin(a) + c["oy"] * math.cos(a))
+                px, py = f"({px})+{dx:.3f}", f"({py})+{dy:.3f}"
         filtros.append(f"{vf}[l{n}]overlay=x='{px}-w/2':y='{py}-h/2'"
                        f":enable='between(t,{c['st']:.3f},{fim:.3f})':eof_action=pass:format=auto[o{n}]")
         vf = f"[o{n}]"

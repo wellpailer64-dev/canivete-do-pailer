@@ -227,3 +227,24 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
   - No monitor, com a camada selecionada, a cópia nasce na primeira trilha livre acima, no mesmo tempo, e é ela que se move.
 - **Alt+↑ / Alt+↓:** muda o clipe de trilha sem mudar o tempo (sobrescreve).
 - Código: `vePlaceClip`, `veDuplicarEm`, `veDuplicarAcima`, `veCopiar`/`veColar` e `veTrocarTrilha` em `editor.js`.
+
+## Monitor: selecionar e transformar (como Premiere/Photoshop) · ponto de ancoragem
+- Código: `frontend/js/editor-transform.js`.
+- Com a ferramenta Seleção, o clique seleciona o objeto de cima sob o cursor, e clicar no vazio desmarca.
+  Play/pausa fica só no Espaço, como no Premiere.
+- O selecionado mostra uma caixa com 8 alças:
+  - arrastar uma alça escala de modo uniforme a partir da âncora;
+  - arrastar por fora de um canto gira (Shift: de 15° em 15°);
+  - Alt+arrastar duplica.
+- **Ponto de ancoragem** (`c.p.ax`/`c.p.ay`, em px da mídia; sem valor = centro): é o ponto que fica na Posição.
+  Escala e rotação acontecem em volta dele: quadro = Posição + R·S·(m − âncora).
+  - Arrastar a mira ⊕ e a grade 3×3 de Propriedades mudam a âncora sem mover o objeto.
+  - Os campos X/Y mudam a âncora sem compensar a Posição, então o objeto anda (como no Premiere).
+  - Na exportação vai `ox/oy` (âncora → centro), e o Python soma na posição do overlay (com expressão, se escala/rotação forem animadas).
+
+## Fontes: família + estilo
+- `Functions/fontes.py` lê as tabelas name/OS2 dos arquivos de fonte (sem dependência).
+  - A família tipográfica (nome 16) agrupa os estilos (nome 17: Light, Semibold, Narrow Bold...).
+  - Cada estilo guarda o nome "de sistema" (nome 1) + negrito/itálico.
+- O desenho (canvas) e o libass usam esse nome de sistema, por isso acham exatamente o mesmo estilo:
+  prévia = vídeo gravado, testado com Segoe UI Semibold Italic e Arial Narrow Bold.

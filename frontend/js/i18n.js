@@ -264,6 +264,9 @@ const I18N_EN = {
     'Floresta': 'Forest', 'Verde': 'Green', 'Amarelo': 'Yellow', 'Manga': 'Mango', 'Laranja': 'Orange', 'Rosa': 'Rose',
     'Magenta': 'Magenta', 'Lavanda': 'Lavender', 'Bege': 'Tan', 'Marrom': 'Brown',
     // Painel Propriedades, ferramenta Texto (T) e Velocidade (R)
+    'Estilo da fonte': 'Font style', '(simulado)': '(simulated)',
+    'Ponto de ancoragem': 'Anchor point', 'Ponto de ancoragem: clique para escolher (o objeto não sai do lugar)': 'Anchor point: click to choose (the object stays in place)',
+    'No monitor: arraste as alças para escalar, por fora dos cantos para girar e a mira ⊕ para mudar o ponto de ancoragem.': 'On the monitor: drag the handles to scale, outside the corners to rotate and the ⊕ crosshair to move the anchor point.',
     'Clipe apagado (Shift+D apaga e fecha o espaço)': 'Clip deleted (Shift+D deletes and closes the gap)',
     'Apagar clipe selecionado (o espaço fica) ·': 'Delete selected clip (the gap stays) ·', 'apaga e fecha o espaço': 'deletes and closes the gap',
     'Apagar clipe selecionado (D: o espaço fica · Shift+D: fecha o espaço)': 'Delete selected clip (D: the gap stays · Shift+D: closes the gap)',

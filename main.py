@@ -321,8 +321,15 @@ def ve_transcrever_cancelar():
 
 
 def ve_fontes():
-    """Famílias de fonte instaladas no Windows (texto e legendas do editor), pelos nomes que o GDI conhece —
-    os mesmos que o navegador e o libass (legendas gravadas) encontram."""
+    """Famílias de fonte instaladas e os estilos de cada uma (Functions/fontes.py). Sem conseguir ler os
+    arquivos, cai na lista simples de famílias do GDI."""
+    try:
+        from Functions import fontes
+        est = fontes.listar()
+        if est:
+            return {"success": True, "fontes": list(est.keys()), "estilos": est}
+    except Exception:
+        pass
     try:
         import ctypes
         from ctypes import wintypes
