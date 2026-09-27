@@ -545,6 +545,9 @@ function veApplyAudioGain() {
 // Propriedades de cada clipe (c.p): sc = escala % do tamanho original, x/y = centro em px do quadro,
 // rot = graus, op = opacidade %. Sem c.p o clipe usa o padrão (vídeo ocupando o quadro todo).
 
+// texto desenhado em canvas passa pelo idioma escolhido (Preferências)
+const veT = s => (window.i18nT ? window.i18nT(s) : s);
+
 const VE_IMG_DUR = 5;
 const veRound = (v, n = 1) => Math.round(v * Math.pow(10, n)) / Math.pow(10, n);
 
@@ -572,12 +575,42 @@ function veProps(c, T = VE.playhead) {
 
 // ── quadros-chave (como no Premiere/After Effects) ──
 // c.k = { sc|x|y|rot|op: [{t, v, i}] } em ordem de t. t é tempo da FONTE do clipe (acompanha o clipe
-// ao mover, cortar e aparar). i = interpolação até o próximo quadro: 'lin', 'ease' (suave) ou 'hold'.
+// ao mover, cortar e aparar). i = interpolação até o próximo quadro: 'lin', 'hold' (degrau) ou uma curva
+// de Bézier (como o gráfico de velocidade do Premiere/AE): 'ease', 'in', 'out' (prontas) ou 'bez' com
+// b = [x1, y1, x2, y2] (as duas alças; x = tempo, y = valor, de 0 a 1 no trecho).
 const VE_KF_PROPS = ['sc', 'x', 'y', 'rot', 'op'];
 const VE_KF_NAMES = { sc: 'Escala', x: 'Posição X', y: 'Posição Y', rot: 'Rotação', op: 'Opacidade' };
-const VE_KF_INTERP = { lin: 'Linear', ease: 'Suave', hold: 'Parar' };
+const VE_KF_INTERP = { lin: 'Linear', ease: 'Suave', in: 'Acelerar', out: 'Frear', hold: 'Parar' };
+// 'ease' = smoothstep (compatível com projetos antigos): é exatamente a Bézier (1/3, 0, 2/3, 1)
+const VE_KF_BEZ = { lin: [1 / 3, 1 / 3, 2 / 3, 2 / 3], ease: [1 / 3, 0, 2 / 3, 1], in: [0.42, 0, 1, 1], out: [0, 0, 0.58, 1] };
 
-function veKfEase(i, u) { return i === 'hold' ? 0 : i === 'ease' ? u * u * (3 - 2 * u) : u; }
+function veKfCurve(q) { return q.i === 'bez' && Array.isArray(q.b) ? q.b : VE_KF_BEZ[q.i] || null; }
+
+// Ponto da Bézier (0,0)-(x1,y1)-(x2,y2)-(1,1) no parâmetro s
+function veBez(a, b, s) { const r = 1 - s; return 3 * r * r * s * a + 3 * r * s * s * b + s * s * s; }
+
+// y da curva no tempo u (0..1): acha s com x(s) = u (Newton, com bisseção de reserva)
+function veBezY(bz, u) {
+    const [x1, y1, x2, y2] = bz;
+    let s = u;
+    for (let n = 0; n < 6; n++) {
+        const r = 1 - s, dx = 3 * r * r * x1 + 6 * r * s * (x2 - x1) + 3 * s * s * (1 - x2);
+        if (Math.abs(dx) < 1e-6) break;
+        s = Math.min(1, Math.max(0, s - (veBez(x1, x2, s) - u) / dx));
+    }
+    if (Math.abs(veBez(x1, x2, s) - u) > 1e-4) {
+        let lo = 0, hi = 1;
+        for (let n = 0; n < 30; n++) { s = (lo + hi) / 2; if (veBez(x1, x2, s) < u) lo = s; else hi = s; }
+    }
+    return veBez(y1, y2, s);
+}
+
+function veKfEase(q, u) {
+    if (q.i === 'hold') return 0;
+    if (!q.i || q.i === 'lin') return u;
+    const bz = veKfCurve(q);
+    return bz ? veBezY(bz, u) : u;
+}
 
 function veKfValue(ks, t) {
     if (t <= ks[0].t) return ks[0].v;
@@ -586,7 +619,7 @@ function veKfValue(ks, t) {
     let j = 0;
     while (j < n - 1 && t >= ks[j + 1].t) j++;
     const a = ks[j], b = ks[j + 1];
-    return a.v + (b.v - a.v) * veKfEase(a.i, (t - a.t) / (b.t - a.t));
+    return a.v + (b.v - a.v) * veKfEase(a, (t - a.t) / (b.t - a.t));
 }
 
 function veKfOn(c, k) { return !!(c && c.k && c.k[k] && c.k[k].length); }
@@ -679,20 +712,24 @@ function veKfJump(k, dir) {
     veSeek(t);
 }
 
-// Interpolação de todos os quadros-chave que estão na agulha
-function veKfSetInterp(i) {
+// Interpolação de todos os quadros-chave que estão na agulha; bz = alças da curva ('bez')
+function veKfSetInterp(i, bz, silencioso) {
     const c = VE.clips[VE.sel];
     if (!c || !c.k) return;
     const tl = veKfTime(c);
-    vePushHistory();
+    if (!silencioso) vePushHistory();
     const k2 = { ...c.k };
     VE_KF_PROPS.forEach(k => {
         const j = veKfIndex(k2[k], tl);
-        if (j >= 0) { k2[k] = k2[k].map(q => ({ ...q })); k2[k][j].i = i; }
+        if (j < 0) return;
+        k2[k] = k2[k].map(q => ({ ...q }));
+        k2[k][j].i = i;
+        if (i === 'bez') k2[k][j].b = bz.map(v => Math.round(v * 1e4) / 1e4); else delete k2[k][j].b;
     });
     c.k = k2;
+    if (silencioso) { veRenderProps(); veDrawMonitor(); veDraw(); return; }
     veRefresh();
-    veToast('Interpolação: ' + VE_KF_INTERP[i]);
+    veToast('Interpolação: ' + (VE_KF_INTERP[i] || 'Curva'));
 }
 
 // Move os quadros-chave do instante t0 (fonte) para t1 (arrastar o ◆ na timeline)
@@ -944,11 +981,15 @@ function veRenderProps() {
         const on = veKfOn(c, k), j = on && dentro ? veKfIndex(c.k[k], tl) : -1;
         head.classList.toggle('anim', on);
         head.querySelector('.ve-kf-add').classList.toggle('on', j >= 0);
-        if (j >= 0 && !naAgulha) naAgulha = c.k[k][j].i || 'lin';
+        if (j >= 0 && !naAgulha) naAgulha = c.k[k][j];
     });
     const box = $ve('ve-kf-interp');
     box.hidden = !naAgulha;
-    if (naAgulha) box.querySelectorAll('[data-i]').forEach(b => b.classList.toggle('active', b.dataset.i === naAgulha));
+    if (naAgulha) {
+        const i = naAgulha.i || 'lin';
+        box.querySelectorAll('[data-i]').forEach(b => b.classList.toggle('active', b.dataset.i === i));
+        veKfGraphDraw(naAgulha);
+    }
     veRenderFxControls();
 }
 
@@ -1006,9 +1047,12 @@ function veBuildKfHeads() {
     interp.className = 've-kf-interp';
     interp.id = 've-kf-interp';
     interp.hidden = true;
-    interp.innerHTML = '<span>Interpolação</span><div>' +
-        Object.entries(VE_KF_INTERP).map(([i, n]) => `<button data-i="${i}">${n}</button>`).join('') + '</div>';
+    interp.innerHTML = '<span>Interpolação</span><div class="ve-kf-btns">' +
+        Object.entries(VE_KF_INTERP).map(([i, n]) => `<button data-i="${i}">${n}</button>`).join('') + '</div>' +
+        '<div class="ve-kf-graph"><canvas id="ve-kf-graph" title="Arraste as alças para mudar a curva (duplo clique volta ao linear)"></canvas>' +
+        '<div class="ve-kf-graph-leg"><span class="val">Valor</span><span class="vel">Velocidade</span></div></div>';
     actions.before(interp);
+    veKfGraphInit($ve('ve-kf-graph'));
     $ve('ve-props').addEventListener('click', e => {
         const b = e.target.closest('[data-kfa]');
         if (b) {
@@ -1020,6 +1064,130 @@ function veBuildKfHeads() {
         const it = e.target.closest('#ve-kf-interp [data-i]');
         if (it) veKfSetInterp(it.dataset.i);
     });
+}
+
+// ── gráfico da curva (como o editor de gráficos do Premiere/AE) ──
+// Mostra o trecho que sai do quadro-chave na agulha: curva de valor (com as duas alças) e, por baixo,
+// a curva de velocidade (derivada). Arrastar uma alça muda a curva de todos os quadros-chave na agulha.
+const VE_KG = { y0: -0.35, y1: 1.35, pad: 10, q: null, drag: -1 };
+
+function veKgMap(cv) {
+    const w = cv.clientWidth, h = cv.clientHeight, p = VE_KG.pad;
+    return {
+        w, h,
+        X: x => p + x * (w - 2 * p),
+        Y: y => h - p - (y - VE_KG.y0) / (VE_KG.y1 - VE_KG.y0) * (h - 2 * p),
+        ix: px => (px - p) / (w - 2 * p),
+        iy: py => VE_KG.y0 + (h - p - py) / (h - 2 * p) * (VE_KG.y1 - VE_KG.y0),
+    };
+}
+
+function veKfGraphDraw(q) {
+    const cv = $ve('ve-kf-graph');
+    if (!cv) return;
+    if (q) VE_KG.q = q;
+    q = VE_KG.q;
+    const dpr = window.devicePixelRatio || 1;
+    const W = cv.clientWidth, H = cv.clientHeight;
+    if (!W || !H) return;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const m = veKgMap(cv);
+    // grade: 0 e 1 do valor, 1/4 do tempo
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let n = 0; n <= 4; n++) { const x = Math.round(m.X(n / 4)) + 0.5; ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+    [0, 1].forEach(v => { const y = Math.round(m.Y(v)) + 0.5; ctx.moveTo(0, y); ctx.lineTo(W, y); });
+    ctx.stroke();
+    if (!q) return;
+    const hold = q.i === 'hold';
+    const bz = hold ? null : (veKfCurve(q) || VE_KF_BEZ.lin);
+    const N = 80, ys = [];
+    for (let n = 0; n <= N; n++) ys.push(hold ? (n === N ? 1 : 0) : veBezY(bz, n / N));
+    // velocidade (derivada), normalizada para caber na faixa de 0 a 1
+    const vs = [];
+    for (let n = 0; n <= N; n++) {
+        const a = ys[Math.max(0, n - 1)], b = ys[Math.min(N, n + 1)];
+        vs.push(hold ? 0 : (b - a) / ((Math.min(N, n + 1) - Math.max(0, n - 1)) / N));
+    }
+    const vmax = Math.max(1.5, ...vs.map(Math.abs));
+    ctx.beginPath();
+    ctx.moveTo(m.X(0), m.Y(0));
+    vs.forEach((v, n) => ctx.lineTo(m.X(n / N), m.Y(Math.max(0, v) / vmax)));
+    ctx.lineTo(m.X(1), m.Y(0));
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(56,189,248,0.13)';
+    ctx.fill();
+    ctx.beginPath();
+    vs.forEach((v, n) => ctx[n ? 'lineTo' : 'moveTo'](m.X(n / N), m.Y(Math.max(0, v) / vmax)));
+    ctx.strokeStyle = 'rgba(56,189,248,0.75)';
+    ctx.lineWidth = 1.25;
+    ctx.stroke();
+    // curva de valor
+    ctx.beginPath();
+    if (hold) { ctx.moveTo(m.X(0), m.Y(0)); ctx.lineTo(m.X(1), m.Y(0)); ctx.lineTo(m.X(1), m.Y(1)); }
+    else ys.forEach((y, n) => ctx[n ? 'lineTo' : 'moveTo'](m.X(n / N), m.Y(y)));
+    ctx.strokeStyle = '#F97316';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    if (hold) return;
+    // alças
+    const [x1, y1, x2, y2] = bz;
+    [[0, 0, x1, y1], [1, 1, x2, y2]].forEach(([ax, ay, hx, hy], n) => {
+        ctx.beginPath();
+        ctx.moveTo(m.X(ax), m.Y(ay));
+        ctx.lineTo(m.X(hx), m.Y(hy));
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(m.X(hx), m.Y(hy), VE_KG.drag === n ? 5.5 : 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = VE_KG.drag === n ? '#fbbf24' : '#fff';
+        ctx.fill();
+    });
+    [[0, 0], [1, 1]].forEach(([x, y]) => { ctx.fillStyle = '#F97316'; ctx.fillRect(m.X(x) - 3, m.Y(y) - 3, 6, 6); });
+}
+
+function veKfGraphInit(cv) {
+    const alcaEm = e => {
+        const q = VE_KG.q;
+        if (!q || q.i === 'hold') return -1;
+        const bz = veKfCurve(q) || VE_KF_BEZ.lin, m = veKgMap(cv), r = cv.getBoundingClientRect();
+        const px = e.clientX - r.left, py = e.clientY - r.top;
+        let best = -1, dmin = 12;
+        [[bz[0], bz[1]], [bz[2], bz[3]]].forEach(([x, y], n) => {
+            const d = Math.hypot(m.X(x) - px, m.Y(y) - py);
+            if (d < dmin) { dmin = d; best = n; }
+        });
+        return best;
+    };
+    cv.addEventListener('pointerdown', e => {
+        const n = alcaEm(e);
+        if (n < 0) return;
+        e.preventDefault();
+        cv.setPointerCapture(e.pointerId);
+        vePushHistory();
+        VE_KG.drag = n;
+        veKfGraphDraw();
+    });
+    cv.addEventListener('pointermove', e => {
+        if (VE_KG.drag < 0) { cv.style.cursor = alcaEm(e) >= 0 ? 'grab' : ''; return; }
+        const m = veKgMap(cv), r = cv.getBoundingClientRect();
+        const x = Math.min(1, Math.max(0, m.ix(e.clientX - r.left)));
+        const y = Math.min(VE_KG.y1, Math.max(VE_KG.y0, m.iy(e.clientY - r.top)));
+        const bz = [...(veKfCurve(VE_KG.q) || VE_KF_BEZ.lin)];
+        bz[VE_KG.drag * 2] = x;
+        bz[VE_KG.drag * 2 + 1] = y;
+        veKfSetInterp('bez', bz, true);
+    });
+    const fim = () => { if (VE_KG.drag < 0) return; VE_KG.drag = -1; veKfGraphDraw(); };
+    cv.addEventListener('pointerup', fim);
+    cv.addEventListener('pointercancel', fim);
+    cv.addEventListener('dblclick', () => { if (VE_KG.q) veKfSetInterp('lin'); });
+    if (window.ResizeObserver) new ResizeObserver(() => veKfGraphDraw()).observe(cv);
 }
 
 function veInitProps() {
@@ -1072,7 +1240,7 @@ function veExportPlan() {
             const p = veStaticProps(c), m = veMediaOf(c);
             // quadros-chave em tempo da camada (0 = início do clipe na timeline)
             const kf = {};
-            VE_KF_PROPS.forEach(k => { if (veKfOn(c, k)) kf[k] = c.k[k].map(q => [q.t - c.s, q.v, q.i || 'lin']); });
+            VE_KF_PROPS.forEach(k => { if (veKfOn(c, k)) kf[k] = c.k[k].map(q => [q.t - c.s, q.v, q.i || 'lin', veKfCurve(q)]); });
             return { tipo: veIsImage(c) ? 'imagem' : 'video', path: veIsImage(c) ? m.path : null,
                      st: c.st, s: veIsImage(c) ? 0 : c.s, e: veIsImage(c) ? veLen(c) : c.e,
                      sc: p.sc, x: p.x, y: p.y, rot: p.rot, op: p.op, kf,
@@ -1462,7 +1630,7 @@ function veRender() {
         ctx.fillStyle = '#4a4a4a';
         ctx.font = '12px Segoe UI';
         ctx.textAlign = 'center';
-        ctx.fillText('A timeline aparece aqui quando você abrir um vídeo', W / 2, rV.y + rV.h / 2 + 4);
+        ctx.fillText(veT('A timeline aparece aqui quando você abrir um vídeo'), W / 2, rV.y + rV.h / 2 + 4);
         ctx.textAlign = 'left';
         veUpdateScrollbar();
         return;
@@ -1550,7 +1718,7 @@ function veRender() {
         if (cw > 50 && vh >= 12) {
             ctx.fillStyle = '#eef0ff';
             ctx.font = '600 10.5px Segoe UI';
-            const nome = img ? (med.name || 'Imagem') : `Clipe ${i + 1}`;
+            const nome = img ? (med.name || veT('Imagem')) : veT(`Clipe ${i + 1}`);
             ctx.fillText(nome + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, vy + 10.5);
         }
         if (veHasFx(c) && cw > 34 && vh >= 12) {
@@ -1617,7 +1785,7 @@ function veRender() {
         } else if (VE.info && !VE.info.has_audio) {
             ctx.fillStyle = '#4a4a4a';
             ctx.font = '11px Segoe UI';
-            if (cw > 80) ctx.fillText('sem áudio', cx + 8, ay + ah / 2 + 4);
+            if (cw > 80) ctx.fillText(veT('sem áudio'), cx + 8, ay + ah / 2 + 4);
         }
         ctx.restore();
         ctx.globalAlpha = 1;

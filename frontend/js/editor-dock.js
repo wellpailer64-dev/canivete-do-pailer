@@ -389,6 +389,7 @@ function vedOpenWin(h) {
     h.win = w;
     w._desde = Date.now();
     vedBuildFloatDoc(h);
+    if (window.i18nWatch) i18nWatch(w.document);
     vedWatchFloat(h);
     const api = vedApi();
     if (api.ve_win_place) {

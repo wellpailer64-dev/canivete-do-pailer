@@ -518,35 +518,74 @@ _KF_CONV = {
 }
 
 
+def _curva_kf(q):
+    """Alças [x1, y1, x2, y2] da curva de Bézier do quadro-chave (4º item), ou None."""
+    try:
+        b = [float(v) for v in q[3]]
+        if len(b) == 4:
+            return (min(1.0, max(0.0, b[0])), b[1], min(1.0, max(0.0, b[2])), b[3])
+    except Exception:
+        pass
+    return None
+
+
 def _normalizar_kf(kf):
-    """{prop: [[t, v, interp], ...]} (t = segundos desde o início da camada) → listas ordenadas."""
+    """{prop: [[t, v, interp, bezier?], ...]} (t = segundos desde o início da camada) → listas ordenadas."""
     out = {}
     for k, conv in _KF_CONV.items():
         pts = []
         for q in (kf or {}).get(k) or []:
             try:
-                pts.append((float(q[0]), conv(float(q[1])), str(q[2]) if len(q) > 2 else "lin"))
+                pts.append((float(q[0]), conv(float(q[1])), str(q[2]) if len(q) > 2 else "lin",
+                            _curva_kf(q) if len(q) > 3 else None))
             except Exception:
                 continue
         if pts:
-            out[k] = sorted(pts)
+            out[k] = sorted(pts, key=lambda p: p[0])
     return out
+
+
+def _bez_y(bz, u):
+    """y da Bézier (0,0)-(x1,y1)-(x2,y2)-(1,1) no tempo u — igual a veBezY da prévia."""
+    x1, y1, x2, y2 = bz
+    b = lambda a, c, s: 3 * (1 - s) ** 2 * s * a + 3 * (1 - s) * s * s * c + s ** 3
+    lo, hi, s = 0.0, 1.0, u
+    for _ in range(40):
+        s = (lo + hi) / 2
+        if b(x1, x2, s) < u:
+            lo = s
+        else:
+            hi = s
+    return b(y1, y2, s)
+
+
+_KF_AMOSTRAS = 24   # curva vira trechos retos no ffmpeg (a expressão não tem laço para resolver a Bézier)
 
 
 def _expr_kf(pts, tv):
     """Expressão do ffmpeg que interpola os quadros-chave no tempo `tv` (igual à prévia do editor):
-    antes do 1º e depois do último o valor fica parado; 'ease' = smoothstep, 'hold' = degrau."""
+    antes do 1º e depois do último o valor fica parado; 'ease' = smoothstep, 'hold' = degrau,
+    curva de Bézier = trechos retos (_KF_AMOSTRAS por segmento)."""
     f = lambda v: f"{v:.6f}"
     expr = f(pts[-1][1])
     for j in range(len(pts) - 2, -1, -1):
-        (ta, va, ia), (tb, vb, _) = pts[j], pts[j + 1]
+        (ta, va, ia, bz), (tb, vb, _, _) = pts[j], pts[j + 1]
         d = tb - ta
         if d < 1e-6 or ia == "hold" or abs(vb - va) < 1e-9:
             seg = f(va)
-        else:
+        elif ia in ("lin", "ease") or bz is None:
             u = f"clip(({tv}-{ta:.4f})/{d:.4f},0,1)"
             curva = f"{u}*{u}*(3-2*{u})" if ia == "ease" else u
             seg = f"({f(va)}+{f(vb - va)}*{curva})"
+        else:
+            n = _KF_AMOSTRAS
+            ys = [_bez_y(bz, i / n) for i in range(n + 1)]
+            seg = f(vb)
+            for i in range(n - 1, -1, -1):
+                t0, t1 = ta + d * i / n, ta + d * (i + 1) / n
+                v0, v1 = va + (vb - va) * ys[i], va + (vb - va) * ys[i + 1]
+                reta = f"({f(v0)}+{f(v1 - v0)}*({tv}-{t0:.5f})/{t1 - t0:.5f})"
+                seg = f"if(lt({tv},{t1:.5f}),{reta},{seg})"
         expr = f"if(lt({tv},{tb:.4f}),{seg},{expr})"
     return f"if(lt({tv},{pts[0][0]:.4f}),{f(pts[0][1])},{expr})"
 

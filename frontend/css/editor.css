@@ -606,9 +606,18 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 }
 .ve-kf-add.on { color: var(--ve-accent); }
 .ve-kf-add.on i { background: currentColor; }
-.ve-kf-interp { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--ve-dim); }
+.ve-kf-interp { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; font-size: 11px; color: var(--ve-dim); }
+.ve-kf-graph { flex: 1 0 100%; position: relative; }
+.ve-kf-graph canvas {
+    display: block; width: 100%; height: 150px; border-radius: 6px;
+    border: 1px solid var(--ve-line-2); background: var(--ve-bg); touch-action: none;
+}
+.ve-kf-graph-leg { display: flex; gap: 12px; margin-top: 4px; font-size: 10.5px; color: var(--ve-faint); }
+.ve-kf-graph-leg span::before { content: ''; display: inline-block; width: 10px; height: 2px; margin-right: 5px; vertical-align: middle; }
+.ve-kf-graph-leg .val::before { background: var(--ve-accent); }
+.ve-kf-graph-leg .vel::before { background: var(--ve-inout); }
 .ve-kf-interp[hidden] { display: none; }
-.ve-kf-interp div { display: flex; border: 1px solid var(--ve-line-2); border-radius: 6px; overflow: hidden; }
+.ve-kf-interp .ve-kf-btns { display: flex; border: 1px solid var(--ve-line-2); border-radius: 6px; overflow: hidden; }
 .ve-kf-interp button {
     padding: 3px 7px; border: 0; background: transparent; color: var(--ve-dim); white-space: nowrap;
     font: 600 11px var(--ve-ui); cursor: pointer;

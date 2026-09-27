@@ -1101,6 +1101,15 @@ button:disabled { opacity: .4; cursor: not-allowed; }
     flex-direction: column;
     gap: 16px;
 }
+.prefs-box { width: min(420px, 90vw); }
+.pref-lang { display: flex; gap: 8px; }
+.pref-lang button {
+    flex: 1; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line-2);
+    background: transparent; color: var(--text-2); font: 600 13px var(--font-ui); cursor: pointer;
+}
+.pref-lang button:hover { color: var(--text); border-color: var(--text-3); }
+.pref-lang button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.menu-prefs { margin: 0 12px 6px; width: calc(100% - 24px); }
 .modal-box h3 { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; }
 .modal-box h3 .i { color: var(--primary); }
 .modal-box p { font-size: 13px; color: var(--text-2); line-height: 1.5; }

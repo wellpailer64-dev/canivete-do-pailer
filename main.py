@@ -375,6 +375,34 @@ def ve_layout_save(dados):
         return {"success": False, "error": str(e)}
 
 
+def _prefs_path():
+    """Preferências do app (idioma...). Mesma pasta do layout do editor (%APPDATA%/CaniveteDoPailer)."""
+    return os.path.join(os.path.dirname(_ve_layout_path()), "preferencias.json")
+
+
+def prefs_load():
+    try:
+        with open(_prefs_path(), "r", encoding="utf-8") as f:
+            return {"success": True, "data": json.load(f)}
+    except FileNotFoundError:
+        return {"success": True, "data": None}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def prefs_save(dados):
+    try:
+        json.loads(dados)
+        final = _prefs_path()
+        tmp = final + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(dados)
+        os.replace(tmp, final)
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def _janela_por_titulo(titulo):
     """Janela nativa (solta do editor) pelo título exato; None se não achar. Só Windows."""
     if os.name != "nt" or not titulo:
@@ -2107,6 +2135,12 @@ class ApiBridge:
 
     def ve_layout_save(self, dados):
         return ve_layout_save(dados)
+
+    def prefs_load(self):
+        return prefs_load()
+
+    def prefs_save(self, dados):
+        return prefs_save(dados)
 
     def ve_project_save(self, path, dados, salvar_como=False):
         return ve_project_save(path, dados, salvar_como)
