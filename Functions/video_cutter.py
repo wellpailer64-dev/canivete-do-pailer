@@ -535,6 +535,25 @@ def _normalizar_camadas(camadas, path_video):
     return out
 
 
+_opcao_script = None
+
+
+def _opcao_filtro_script():
+    """ffmpeg 7+ lê o grafo de arquivo com '-/filter_complex'; o '-filter_complex_script'
+    antigo foi removido nas versões novas. Detecta uma vez qual o ffmpeg instalado aceita."""
+    global _opcao_script
+    if _opcao_script is None:
+        try:
+            r = subprocess.run([ffmpeg_path(), "-hide_banner", "-f", "lavfi", "-i", "nullsrc=d=0.04",
+                                "-/filter_complex", os.devnull, "-f", "null", "-"],
+                               capture_output=True, text=True, timeout=15, creationflags=_creationflags())
+            antigo = "unrecognized option" in (r.stderr or "").lower()
+        except Exception:
+            antigo = False
+        _opcao_script = "-filter_complex_script" if antigo else "-/filter_complex"
+    return _opcao_script
+
+
 def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", resolucao="original",
                    usar_gpu=True, pasta_saida=None, on_progress=None, stop_event=None, sem_audio=False,
                    camadas=None, audio_segmentos=None, duracao=None):
@@ -686,7 +705,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     with open(script, "w", encoding="utf-8") as f:
         f.write(";\n".join(filtros))
 
-    base_cmd = cmd + ["-filter_complex_script", script] + ([] if audio_only else ["-map", vf])
+    base_cmd = cmd + [_opcao_filtro_script(), script] + ([] if audio_only else ["-map", vf])
     if has_audio:
         base_cmd += ["-map", "[ac]", "-c:a", cfg["acodec"]]
         if cfg["acodec"] != "pcm_s16le":
