@@ -817,8 +817,14 @@ function veExtraPlayer(n) {
         x.addEventListener('loadeddata', () => veDrawMonitor());
         VEX.push(x);
     }
-    const x = VEX[n], src = veVideo().src;
-    if (x.src !== src) { x.src = src; x.load(); }
+    // URL própria por player: com a mesma URL o WebView divide o carregamento e o player
+    // principal pode travar buscando o quadro
+    const base = veVideo().src, x = VEX[n];
+    if (x._base !== base) {
+        x._base = base;
+        x.src = base.startsWith('blob:') ? base : base + (base.includes('?') ? '&' : '?') + 'camada=' + (n + 1);
+        x.load();
+    }
     return x;
 }
 
@@ -838,7 +844,7 @@ function veSyncExtra(x, srcT) {
 function veParkExtras(n, limpar) {
     VEX.slice(n).forEach(x => {
         if (!x.paused) x.pause();
-        if (limpar && x.getAttribute('src')) { x.removeAttribute('src'); x.load(); }
+        if (limpar && x.getAttribute('src')) { x.removeAttribute('src'); x._base = null; x.load(); }
     });
 }
 
