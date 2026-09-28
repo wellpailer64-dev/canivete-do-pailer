@@ -63,11 +63,16 @@ const VE_TRACKS = [
 // Com o mixer ativo o áudio é o relógio da reprodução e os players de vídeo tocam mudos.
 
 // Clipes com som: [início na timeline, entrada, saída, ganho dB] — trilha muda (M) fica de fora
+// + fade de entrada / saída em s (transições de áudio: editor-trans.js); no crossfade, início e trecho já estendidos
 function veMixClipes() {
+    const fd = veAudFades();
     return VE.clips
         .filter(c => !veIsImage(c) && !veTrkMuted(c.tr) && c.e - c.s > 0.005 && veTemSom(c))
-        .map(c => [+c.st.toFixed(5), +c.s.toFixed(5), +c.e.toFixed(5), +(c.g || 0).toFixed(2), veMid(c),
-                   +veVel(c).toFixed(4), c.tom === false ? 0 : 1])
+        .map(c => {
+            const f = fd.get(c) || c;
+            return [+f.st.toFixed(5), +f.s.toFixed(5), +f.e.toFixed(5), +(c.g || 0).toFixed(2), veMid(c),
+                    +veVel(c).toFixed(4), c.tom === false ? 0 : 1, +(f.fi || 0).toFixed(4), +(f.fo || 0).toFixed(4)];
+        })
         .sort((a, b) => a[0] - b[0]);
 }
 function veMixAtivo() { return veAudioPronto(); }
@@ -273,7 +278,7 @@ function veSplitAt(t, quiet, so) {
         const src = veSrcAt(c, t);
         VE.clips.push(veSemTin(lk({ ...c, st: t, s: src, e: c.e })));
         c.e = src;
-        delete c.tout;
+        delete c.tout; delete c.atout;
     });
     VE.sel = selC ? VE.clips.indexOf(selC) : -1;
     veRelayout();
@@ -380,8 +385,8 @@ const veVinculados = c => c.lk ? VE.clips.filter(o => o.lk === c.lk) : [c];
 let veLkN = 0;
 const veNovoLk = () => Date.now().toString(36) + (veLkN++).toString(36);
 // Pedaços de um clipe cortado: a transição de entrada (c.tin) fica no da esquerda e a de saída no da direita
-const veSemTin = c => { delete c.tin; return c; };
-const veSemTout = c => { delete c.tout; return c; };
+const veSemTin = c => { delete c.tin; delete c.atin; return c; };
+const veSemTout = c => { delete c.tout; delete c.atout; return c; };
 // Um corte gera um par novo: os pedaços da direita ganham um vínculo próprio (o mesmo para imagem e som)
 function veLkMapa() {
     const m = {};
@@ -1044,6 +1049,7 @@ function veProps(c, T = VE.playhead) {
     if (c.k) {
         const tl = veSrcAt(c, T);
         VE_KF_PROPS.forEach(k => { const ks = c.k[k]; if (ks && ks.length) p[k] = veKfValue(ks, tl); });
+        if (c.k.sx && c.k.sx.length) p.sx = veKfValue(c.k.sx, tl);   // escala só na horizontal (transição Dobrar)
     }
     return p;
 }
@@ -1665,7 +1671,7 @@ function veDrawMonitor() {
             ctx.translate(p.x, p.y);
             ctx.rotate(p.rot * Math.PI / 180);
             const k = p.sc / 100;
-            ctx.scale(k, k);
+            ctx.scale(k * (p.sx == null ? 1 : p.sx), k);
             const [ax, ay] = veAnc(c, p, sz);   // a Posição é onde fica o ponto de ancoragem
             ctx.drawImage(src, -ax, -ay, sz.w, sz.h);
             ctx.restore();
@@ -2004,6 +2010,7 @@ function veExportPlanClips() {
             // quadros-chave em tempo da camada (0 = início do clipe na timeline)
             const kf = {};
             VE_KF_PROPS.forEach(k => { if (veKfOn(c, k)) kf[k] = c.k[k].map(q => [(q.t - c.s) / veVel(c), k === 'sc' ? q.v / f : q.v, q.i || 'lin', veKfCurve(q)]); });
+            if (veKfOn(c, 'sx')) kf.sx = c.k.sx.map(q => [(q.t - c.s) / veVel(c), q.v, q.i || 'lin', veKfCurve(q)]);
             const sz = png ? { w: png.w, h: png.h } : veMediaSize(c);
             return { tipo: veIsAdj(c) ? 'ajuste' : veIsImage(c) ? 'imagem' : 'video', path: png ? png.path : veIsImage(c) || veMid(c) ? m.path || null : null,
                      st: c.st, s: veIsImage(c) ? 0 : c.s, e: veIsImage(c) ? veLen(c) : c.e,
@@ -2012,7 +2019,7 @@ function veExportPlanClips() {
                      ox: (veMediaSize(c).w / 2 - veAnc(c, p)[0]) * f, oy: (veMediaSize(c).h / 2 - veAnc(c, p)[1]) * f };
         });
     // o arquivo de cada clipe com som (null = o vídeo aberto)
-    const mix = veMixClipes().map(([st, s0, e0, g, id, v, tom]) => [st, s0, e0, g, id ? VE.media[id].path : null, v, tom]);
+    const mix = veMixClipes().map(([st, s0, e0, g, id, v, tom, fi, fo]) => [st, s0, e0, g, id ? VE.media[id].path : null, v, tom, fi, fo]);
     return { base, audio, camadas, mix };
 }
 
@@ -3469,9 +3476,10 @@ function veInitEvents() {
         if (row && row.kind === 'l') { veLegPointer(e, x, t); return; }
         if (VE.tool === 'rate' && e.button === 0) { veRatePointer(e, x, row); return; }
         // bloco de transição: clicar seleciona; pela borda, arrastar muda a duração
-        const th = e.button === 0 && row && row.kind === 'v' ? veTransAt(x, y) : null;
+        const th = e.button === 0 && row && row.kind !== 'l' ? veTransAt(x, y) : null;
         if (th) { if (VE.playing) veStop(); veTransPointer(th, t); return; }
         VE.trSel = null;
+        VE.bordaSel = null;
         // ◆ do clipe selecionado: clicar leva a agulha até ele; arrastar muda o tempo do quadro-chave
         const kft = e.button === 0 && !veLocked(VE.clips[VE.sel]) ? veKfMarkAt(x, y, row) : null;
         if (kft != null) {
@@ -3489,6 +3497,7 @@ function veInitEvents() {
             const par = parte.filter(o => o !== cb && !veLocked(o) && Math.abs((borda.side === 'l' ? o.st : veEnd(o)) - ed) < 1e-4)
                 .map(o => ({ i: VE.clips.indexOf(o), side: borda.side, c0: { ...o } }));
             VE.drag = { mode: 'trim', i: bi, side: borda.side, c0: { ...cb }, par, started: false };
+            VE.bordaSel = { c: cb, lado: borda.side === 'l' ? 'in' : 'out' };   // ponta selecionada (Ctrl+D / Ctrl+Shift+D)
             if (VE.playing) veStop();
             wrap.classList.add('trimming');
             veRenderClips(); veRenderProps(); veDraw();
@@ -3792,6 +3801,9 @@ function veOnKey(e) {
     if (ctrl && k === 'v' && !e.shiftKey) { e.preventDefault(); veColar(); return; }
     if (e.altKey && (k === 'arrowup' || k === 'arrowdown')) { e.preventDefault(); veTrocarTrilha(k === 'arrowup' ? 1 : -1); return; }
     if (ctrl && (k === 'm' || k === 'e')) { e.preventDefault(); veOpenExport(); return; }
+    // transição padrão (como no Premiere): Ctrl+D vídeo; Ctrl+Shift+D (ou Ctrl+Shift+9) áudio — Potência constante
+    if (ctrl && e.shiftKey && (k === 'd' || e.code === 'Digit9')) { e.preventDefault(); veTransPadrao(true); return; }
+    if (ctrl && !e.shiftKey && k === 'd') { e.preventDefault(); veTransPadrao(false); return; }
     if (ctrl) return;
 
     // ' corta todas as trilhas na agulha. No teclado ABNT2 a tecla pode chegar como "Dead"
@@ -3837,7 +3849,7 @@ function veOnKey(e) {
         '=': () => veZoomBy(1.5),
         '-': () => veZoomBy(1 / 1.5),
         '\\': () => veZoomFit(),
-        'escape': () => { VE.sel = -1; VE.trSel = null; veRenderClips(); veDraw(); },
+        'escape': () => { VE.sel = -1; VE.trSel = null; VE.bordaSel = null; veRenderClips(); veDraw(); },
     };
     const fn = map[k];
     if (fn) { e.preventDefault(); fn(); }

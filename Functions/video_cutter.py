@@ -653,6 +653,7 @@ def cancelar_exportacao():
 # Quadros-chave: mesma conversão das propriedades fixas (escala e opacidade viram fração)
 _KF_CONV = {
     "sc": lambda v: max(0.5, min(2000.0, v)) / 100.0,
+    "sx": lambda v: max(0.0005, min(20.0, v)),   # escala só na horizontal (multiplica a largura; transição Dobrar)
     "x": lambda v: v,
     "y": lambda v: v,
     "rot": lambda v: v,
@@ -784,6 +785,8 @@ def _normalizar_mix(clipes, dur_fonte):
             arq = c[4] if len(c) > 4 and c[4] else None
             vel = max(0.05, min(20.0, float(c[5]))) if len(c) > 5 and c[5] else 1.0
             tom = not (len(c) > 6 and c[6] in (0, False))
+            fi = max(0.0, float(c[7])) if len(c) > 7 and c[7] else 0.0   # fades (Potência constante), em s da timeline
+            fo = max(0.0, float(c[8])) if len(c) > 8 and c[8] else 0.0
         except Exception:
             continue
         if arq is not None and not os.path.isfile(str(arq)):
@@ -792,7 +795,7 @@ def _normalizar_mix(clipes, dur_fonte):
         if arq is None and dur_fonte:
             e0 = min(float(dur_fonte), e0)
         if st >= 0 and e0 - s0 > 0.005:
-            out.append((st, s0, e0, max(-60.0, min(30.0, g)), arq, vel, tom))
+            out.append((st, s0, e0, max(-60.0, min(30.0, g)), arq, vel, tom, fi, fo))
     return out
 
 
@@ -832,8 +835,15 @@ def _grafo_mix(clipes, total, entradas, rotulo):
             nomes[k] = f"{rotulo}s{k}"
         f.append(f"{ent}aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,asplit={len(ks)}"
                  + "".join(f"[{nomes[k]}]" for k in ks))
-    for k, (st, s0, e0, g, _, vel, tom) in enumerate(clipes):
+    for k, (st, s0, e0, g, _, vel, tom, *fd) in enumerate(clipes):
         vol = f",volume={g:.2f}dB" if g else ""
+        # fades de Potência constante (seno/cosseno = curve=qsin), no tempo da timeline (depois da velocidade)
+        fi, fo = (fd + [0.0, 0.0])[:2]
+        dur = (e0 - s0) / vel
+        if fi > 0.001:
+            vol += f",afade=t=in:st=0:d={min(fi, dur):.4f}:curve=qsin"
+        if fo > 0.001:
+            vol += f",afade=t=out:st={max(0.0, dur - fo):.4f}:d={min(fo, dur):.4f}:curve=qsin"
         f.append(f"[{nomes[k]}]atrim=start={s0:.5f}:end={e0:.5f},asetpts=PTS-STARTPTS"
                  f"{_filtro_velocidade(vel, tom)}{vol},"
                  f"adelay={int(round(st * 48000))}S:all=1[{rotulo}m{k}]")
@@ -1314,10 +1324,12 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         kf = c["kf"]
         # Dentro da cadeia da camada o tempo começa em 0 (t / T); no overlay é o tempo do vídeo final.
         # Propriedade animada vira expressão avaliada a cada quadro.
-        if "sc" in kf:
-            e = _expr_kf(kf["sc"], "t")
+        sx = _expr_kf(kf["sx"], "t") if "sx" in kf else None
+        if "sc" in kf or sx:
+            e = _expr_kf(kf["sc"], "t") if "sc" in kf else f"{c['sc']:.5f}"
+            ew = f"({e})*({sx})" if sx else e
             # tamanho sempre par: com metade inteira o centro não "treme" meio pixel a cada quadro do zoom
-            escala = (f"scale=w='max(2,2*trunc(iw*({e})/2))':h='max(2,2*trunc(ih*({e})/2))'"
+            escala = (f"scale=w='max(2,2*trunc(iw*({ew})/2))':h='max(2,2*trunc(ih*({e})/2))'"
                       f":eval=frame:flags=bicubic")
         else:
             k = c["sc"]
@@ -1337,7 +1349,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         else:
             opac = None
         # escala animada vai por último (tamanho muda a cada quadro; o resto trabalha em tamanho fixo)
-        ordem = [giro, opac, escala] if "sc" in kf else [escala, giro, opac]
+        ordem = [giro, opac, escala] if ("sc" in kf or sx) else [escala, giro, opac]
         efeitos = _filtros_fx(c["fx"], c["mw"], c["mh"], f"l{n}")
         # velocidade do clipe (como no Premiere): o tempo da fonte é comprimido/esticado antes de tudo
         vel = f"setpts=(PTS-STARTPTS)/{c['v']:.6f}," if abs(c["v"] - 1) > 1e-4 else ""

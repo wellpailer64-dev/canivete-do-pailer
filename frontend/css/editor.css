@@ -752,6 +752,9 @@ body.ve-docking, body.ve-docking * { cursor: grabbing !important; user-select: n
 .ve-tr-card:hover { background: var(--ve-panel-2); border-color: var(--ve-line-2); }
 .ve-tr-card canvas { width: 100%; aspect-ratio: 16 / 9; border-radius: 4px; background: #0b0b0b; border: 1px solid #8b5cf655; }
 .ve-tr-card:hover canvas { border-color: #8b5cf6; }
+/* a transição do Ctrl+D (clique no cartão) */
+.ve-tr-card.escolhida { border-color: var(--ve-accent, #F97316); box-shadow: 0 0 0 1px var(--ve-accent, #F97316), 0 0 10px #f9731655; }
+.ve-tr-card.escolhida canvas { border-color: var(--ve-accent, #F97316); }
 .ve-tr-card span { font-size: 11.5px; color: var(--ve-text, #ddd); }
 .ve-tr-card small { font-size: 10px; color: var(--ve-faint); margin-top: -3px; }
 /* Chroma Key: cor da tela + conta-gotas, e opção liga/desliga */

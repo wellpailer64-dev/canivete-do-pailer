@@ -1,11 +1,13 @@
 // =========================================================
-// Pocket Editor — transições de vídeo (como as do Premiere / Film Impact)
+// Pocket Editor — transições de vídeo (como as do Premiere / Film Impact) e de áudio (Potência constante)
 // Ficam presas ao clipe: c.tin = {t, d} na entrada (no corte com o clipe de antes na mesma trilha, ou do nada
 // se não houver), c.tout = {t, d} na saída de um clipe sem vizinho depois. d = duração em segundos.
+// No áudio, o mesmo com c.atin / c.atout (Potência constante: o crossfade padrão do Premiere, Ctrl+Shift+D).
 // No corte a transição fica centrada (como no Premiere) e usa a mídia que sobra além dos pontos de corte;
 // sem sobra suficiente ela se desloca/encurta (veTransJanela).
 // Prévia e exportação usam a mesma conta: veTransVirtuais() devolve os clipes com os dois lados estendidos
 // e a animação convertida em quadros-chave (posição, escala, opacidade) — o resto do editor não muda.
+// O áudio vira fades no mix (veAudFades → veMixClipes): mixer em tempo real e afade do ffmpeg.
 // =========================================================
 
 const VE_TR_DUR = 1;   // duração padrão (s), como no Premiere
@@ -14,8 +16,8 @@ const veEaseOut = u => 1 - Math.pow(1 - u, 3);
 const veEaseBack = u => 1 + 2.70158 * Math.pow(u - 1, 3) + 1.70158 * Math.pow(u - 1, 2);   // passa do ponto e volta
 
 // pausa = instante mostrado no cartão parado do painel (padrão: o meio).
-// fn(u) → {a, b}: o que muda no clipe que sai (a) e no que entra (b). dx/dy em quadros, s = escala, op = 0..1.
-// O que entra fica por cima do que sai.
+// fn(u) → {a, b}: o que muda no clipe que sai (a) e no que entra (b). dx/dy em quadros, s = escala,
+// sx = escala só na horizontal, op = 0..1. O que entra fica por cima do que sai.
 const VE_TR = {
     dissolve: { nome: 'Dissolução cruzada', tag: 'Cross Dissolve', fn: u => ({ a: {}, b: { op: u } }) },
     push: { nome: 'Empurrar', tag: 'Push', fn: u => { const e = veEaseIO(u); return { a: { dx: -e }, b: { dx: 1 - e } }; } },
@@ -25,40 +27,81 @@ const VE_TR = {
         fn: u => ({ a: { s: 1 + 0.35 * veEaseIO(u) }, b: { s: 1 + 1.4 * (1 - veEaseOut(u)), op: Math.min(1, u * 2.5) } }),
     },
     pop: { nome: 'Pop', tag: 'Pop', pausa: 0.3, fn: u => ({ a: {}, b: { s: 0.15 + 0.85 * veEaseBack(u), op: Math.min(1, u * 4) } }) },
+    // como o Impact Fold: o quadro que sai dobra para a esquerda (escurecendo) e o que entra desdobra da direita
+    fold: {
+        nome: 'Dobrar', tag: 'Fold', pausa: 0.3,
+        fn: u => {
+            if (u < 0.5) {
+                const e = veEaseIO(u * 2), sx = Math.max(0.001, 1 - e);
+                return { a: { sx, dx: (sx - 1) / 2, op: 1 - 0.45 * e }, b: { op: 0 } };
+            }
+            const e = veEaseIO((u - 0.5) * 2), sx = Math.max(0.001, e);
+            return { a: { op: 0 }, b: { sx, dx: (1 - sx) / 2, op: 0.55 + 0.45 * e } };
+        },
+    },
 };
+// Transição de áudio (a do Ctrl+Shift+D): ganho seno/cosseno — soma de potência constante no crossfade
+const VE_TR_AUD = { cp: { nome: 'Potência constante', tag: 'Constant Power' } };
 
-// Clipes de imagem que dão para transição (áudio e camada de ajuste não)
+// Clipes de imagem que dão para transição (áudio e camada de ajuste não); de áudio: os que têm som
 const veTransPode = c => !!c && !veIsAudio(c) && !veIsAdj(c);
-const veVizAntes = c => VE.clips.find(o => o !== c && o.tr === c.tr && veTransPode(o) && Math.abs(veEnd(o) - c.st) < 1e-3);
-const veVizDepois = c => VE.clips.find(o => o !== c && o.tr === c.tr && veTransPode(o) && Math.abs(o.st - veEnd(c)) < 1e-3);
+const veAudPode = c => !!c && veOcupaA(c) && veTemSom(c);
+const veVizAntes = (c, aud) => VE.clips.find(o => o !== c && o.tr === c.tr && (aud ? veAudPode : veTransPode)(o) && Math.abs(veEnd(o) - c.st) < 1e-3);
+const veVizDepois = (c, aud) => VE.clips.find(o => o !== c && o.tr === c.tr && (aud ? veAudPode : veTransPode)(o) && Math.abs(o.st - veEnd(c)) < 1e-3);
 // Mídia que sobra (em tempo da timeline) antes do início / depois do fim do clipe. Imagem e texto: à vontade.
 const veSobra = (c, lado) => veIsImage(c) ? Infinity : lado === 'ini' ? c.s / veVel(c) : Math.max(0, veDurMidia(c) - c.e) / veVel(c);
+// Campo do clipe que guarda a transição
+const veTrCampo = (lado, aud) => aud ? (lado === 'in' ? 'atin' : 'atout') : (lado === 'in' ? 'tin' : 'tout');
 
-// Trecho da timeline que a transição ocupa: {t, A, B, ws, we, c, lado} ou null
-function veTransJanela(c, lado) {
-    const tr = c && (lado === 'in' ? c.tin : c.tout);
-    if (!tr || !VE_TR[tr.t] || !veTransPode(c)) return null;
+// Trecho da timeline que a transição ocupa: {t, A, B, ws, we, c, lado, aud} ou null
+function veTransJanela(c, lado, aud) {
+    const tr = c && c[veTrCampo(lado, aud)];
+    if (!tr || !(aud ? VE_TR_AUD : VE_TR)[tr.t] || !(aud ? veAudPode : veTransPode)(c)) return null;
     let d = Math.max(veFrame(), Math.min(tr.d || VE_TR_DUR, veLen(c)));
-    if (lado === 'out') return { t: tr.t, A: c, B: null, ws: veEnd(c) - d, we: veEnd(c), c, lado };
-    const A = veVizAntes(c);
-    if (!A) return { t: tr.t, A: null, B: c, ws: c.st, we: c.st + d, c, lado };
+    if (lado === 'out') return { t: tr.t, A: c, B: null, ws: veEnd(c) - d, we: veEnd(c), c, lado, aud };
+    const A = veVizAntes(c, aud);
+    if (!A) return { t: tr.t, A: null, B: c, ws: c.st, we: c.st + d, c, lado, aud };
     const cut = c.st, hA = veSobra(A, 'fim'), hB = veSobra(c, 'ini');
     d = Math.min(d, veLen(A), hA + hB);
     if (d < veFrame() * 0.99) return null;
     const lo = Math.max(cut - hB, cut - d), hi = Math.min(cut, cut + hA - d);
     const ws = Math.min(Math.max(cut - d / 2, lo), hi);
-    return { t: tr.t, A, B: c, ws, we: ws + d, c, lado };
+    return { t: tr.t, A, B: c, ws, we: ws + d, c, lado, aud };
 }
 
-function veTransLista() {
+// Transições de vídeo (comAudio: também as de áudio, para desenhar e clicar na timeline)
+function veTransLista(comAudio) {
     const out = [];
     VE.clips.forEach(c => {
         if (c.tin) { const j = veTransJanela(c, 'in'); if (j) out.push(j); }
         if (c.tout) { const j = veTransJanela(c, 'out'); if (j) out.push(j); }
+        if (comAudio && c.atin) { const j = veTransJanela(c, 'in', true); if (j) out.push(j); }
+        if (comAudio && c.atout) { const j = veTransJanela(c, 'out', true); if (j) out.push(j); }
     });
     return out;
 }
 const veTransAtiva = t => VE.clips.some(c => c.tin || c.tout) && veTransLista().some(j => t >= j.ws - VE_EPS && t <= j.we + VE_EPS);
+
+// Fades de áudio de cada clipe: Map(clipe → {st, s, e, fi, fo}) — no crossfade os dois lados se estendem pela sobra
+function veAudFades() {
+    const m = new Map();
+    if (!VE.clips.some(c => c.atin || c.atout)) return m;
+    const pega = c => { if (!m.has(c)) m.set(c, { st: c.st, s: c.s, e: c.e, fi: 0, fo: 0 }); return m.get(c); };
+    veTransLista(true).filter(j => j.aud).forEach(j => {
+        const d = j.we - j.ws;
+        if (j.B) {
+            const f = pega(j.B);
+            if (j.ws < f.st) { f.s -= (f.st - j.ws) * veVel(j.B); f.st = j.ws; }
+            f.fi = d;
+        }
+        if (j.A) {
+            const f = pega(j.A), fim = f.st + (f.e - f.s) / veVel(j.A);
+            if (j.we > fim) f.e += (j.we - fim) * veVel(j.A);
+            f.fo = d;
+        }
+    });
+    return m;
+}
 
 // Efeito da transição no instante T para o papel ('a' sai / 'b' entra)
 function veTransFx(j, papel, T) {
@@ -105,22 +148,27 @@ function veTransVirtuais() {
         VE_KF_PROPS.forEach(k => { if (veKfOn(base, k)) base.k[k].forEach(q => ts.add(+veTlAt(base, q.t).toFixed(4))); });
         const tempos = [...ts].sort((a, b) => a - b);
         const k = {};
-        ['sc', 'x', 'y', 'op'].forEach(p => { k[p] = []; });
+        let usaSx = false;
+        ['sc', 'x', 'y', 'op', 'sx'].forEach(p => { k[p] = []; });
         tempos.forEach(T => {
             const p = veProps(base, T);
-            let x = p.x, y = p.y, sc = p.sc, op = p.op;
+            let x = p.x, y = p.y, sc = p.sc, op = p.op, sx = p.sx == null ? 1 : p.sx;
             v._tr.forEach(([j, papel]) => {
                 if (T < j.ws - VE_EPS || T > j.we + VE_EPS) return;
-                const f = veTransFx(j, papel, T), s = f.s == null ? 1 : f.s;
-                x = W / 2 + (f.dx || 0) * W + s * (x - W / 2);
+                const f = veTransFx(j, papel, T), s = f.s == null ? 1 : f.s, fx = f.sx == null ? 1 : f.sx;
+                if (f.sx != null) usaSx = true;
+                x = W / 2 + (f.dx || 0) * W + s * fx * (x - W / 2);
                 y = H / 2 + (f.dy || 0) * H + s * (y - H / 2);
                 sc *= s;
+                sx *= fx;
                 op *= f.op == null ? 1 : f.op;
             });
             const t = Math.round(veSrcAt(v, T) * 1e4) / 1e4;
             k.sc.push({ t, v: sc, i: 'lin' }); k.x.push({ t, v: x, i: 'lin' });
             k.y.push({ t, v: y, i: 'lin' }); k.op.push({ t, v: op, i: 'lin' });
+            k.sx.push({ t, v: sx, i: 'lin' });
         });
+        if (!usaSx) delete k.sx;
         v.k = Object.assign({}, v.k || {}, k);
         delete v._base;
     });
@@ -130,27 +178,63 @@ function veTransVirtuais() {
 }
 
 // ── adicionar / remover / duração ──
-function veTransAdd(c, lado, t) {
-    if (!veTransPode(c)) { veToast('Transições de vídeo não se aplicam a áudio nem a camada de ajuste'); return; }
+function veTransAdd(c, lado, t, aud) {
+    if (!(aud ? veAudPode : veTransPode)(c)) {
+        veToast(aud ? 'Esse clipe não tem som' : 'Transições de vídeo não se aplicam a áudio nem a camada de ajuste');
+        return;
+    }
     if (veLocked(c)) { veAvisoBloqueio(); return; }
     vePushHistory();
-    c[lado === 'in' ? 'tin' : 'tout'] = { t, d: VE_TR_DUR };
-    const j = veTransJanela(c, lado);
+    c[veTrCampo(lado, aud)] = { t, d: VE_TR_DUR };
+    const j = veTransJanela(c, lado, aud);
     if (!j) {
         veUndo();
         veToast('Sem mídia sobrando nos dois lados do corte para a transição');
         return;
     }
-    VE.trSel = { c, lado };
+    VE.trSel = { c, lado, aud };
     VE.sel = -1;
     veRefresh();
     const d = j.we - j.ws;
-    veToast(`${VE_TR[t].nome} (${veShort(d)})` + (d < VE_TR_DUR - 0.01 ? ' · encurtada: pouca mídia sobrando' : ''));
+    veToast(`${(aud ? VE_TR_AUD : VE_TR)[t].nome} (${veShort(d)})` + (d < VE_TR_DUR - 0.01 ? ' · encurtada: pouca mídia sobrando' : ''));
+}
+
+// Ctrl+D (vídeo: a transição marcada no painel Transições) / Ctrl+Shift+D ou Ctrl+Shift+9 (áudio: Potência
+// constante), como no Premiere: na ponta selecionada ou nas duas pontas dos clipes selecionados.
+// Ponta final com clipe colado depois = o corte entre os dois.
+function veTransPadrao(aud) {
+    const t = aud ? 'cp' : (VE_TR[VE.trEscolhida] ? VE.trEscolhida : 'dissolve');
+    const pode = aud ? veAudPode : veTransPode;
+    const ponta = (c, lado) => {
+        if (lado === 'out') { const n = veVizDepois(c, aud); if (n) return { c: n, lado: 'in' }; }
+        return { c, lado };
+    };
+    const b = veBordaSel();
+    let alvos = [];
+    if (b) { if (pode(b.c)) alvos.push(ponta(b.c, b.lado)); }
+    else veSelLista().filter(pode).forEach(c => alvos.push(ponta(c, 'in'), ponta(c, 'out')));
+    alvos = alvos.filter((a, k) => !veLocked(a.c) && alvos.findIndex(o => o.c === a.c && o.lado === a.lado) === k);
+    if (!alvos.length) {
+        veToast(aud ? 'Selecione a ponta de um clipe com som (ou o clipe) e aperte Ctrl+Shift+D'
+                    : 'Selecione a ponta de um clipe (ou o clipe) e aperte Ctrl+D');
+        return;
+    }
+    vePushHistory();
+    let ok = 0;
+    alvos.forEach(a => {
+        const campo = veTrCampo(a.lado, aud), antes = a.c[campo];
+        a.c[campo] = { t, d: antes ? antes.d : VE_TR_DUR };
+        if (veTransJanela(a.c, a.lado, aud)) ok++;
+        else if (antes) a.c[campo] = antes; else delete a.c[campo];
+    });
+    if (!ok) { VE.history.pop(); veUpdateUndo(); veToast('Sem mídia sobrando para a transição'); return; }
+    veRefresh();
+    veToast(`${(aud ? VE_TR_AUD : VE_TR)[t].nome}: ${ok} ${ok > 1 ? 'transições aplicadas' : 'transição aplicada'}`);
 }
 
 function veTransSelecionada() {
     const s = VE.trSel;
-    return s && VE.clips.includes(s.c) && s.c[s.lado === 'in' ? 'tin' : 'tout'] ? s : null;
+    return s && VE.clips.includes(s.c) && s.c[veTrCampo(s.lado, s.aud)] ? s : null;
 }
 
 function veTransApagar() {
@@ -158,82 +242,112 @@ function veTransApagar() {
     if (!s) return false;
     if (veLocked(s.c)) { veAvisoBloqueio(); return true; }
     vePushHistory();
-    delete s.c[s.lado === 'in' ? 'tin' : 'tout'];
+    delete s.c[veTrCampo(s.lado, s.aud)];
     VE.trSel = null;
     veRefresh();
     veToast('Transição apagada');
     return true;
 }
 
+// ── ponta selecionada (clique na borda do clipe, como a seleção de ponto de edição do Premiere) ──
+function veBordaSel() {
+    const b = VE.bordaSel;
+    return b && VE.clips.includes(b.c) ? b : null;
+}
+
+function veBordaDesenhar(ctx, rows) {
+    const b = veBordaSel();
+    if (!b) return;
+    const c = b.c, x = ((b.lado === 'in' ? c.st : veEnd(c)) - VE.view) * VE.pps;
+    const ids = [];
+    if (veOcupaV(c)) ids.push('V' + (c.tr + 1));
+    if (veOcupaA(c)) ids.push('A' + (c.tr + 1));
+    ctx.save();
+    ctx.strokeStyle = '#F97316';
+    ctx.lineWidth = 3;
+    ids.forEach(id => {
+        const r = rows.find(r => r.id === id);
+        if (!r) return;
+        const y0 = r.y + 3, y1 = r.y + r.h - 3, dx = b.lado === 'in' ? 6 : -6;
+        ctx.beginPath();   // colchete [ na entrada, ] na saída
+        ctx.moveTo(x + dx, y0); ctx.lineTo(x, y0); ctx.lineTo(x, y1); ctx.lineTo(x + dx, y1);
+        ctx.stroke();
+    });
+    ctx.restore();
+}
+
 // ── timeline: desenho, clique e arrastar a borda (duração) ──
 function veTransRetangulo(j, rows) {
-    const r = rows.find(r => r.id === 'V' + (j.c.tr + 1));
+    const r = rows.find(r => r.id === (j.aud ? 'A' : 'V') + (j.c.tr + 1));
     if (!r) return null;
     const x1 = (j.ws - VE.view) * VE.pps, x2 = (j.we - VE.view) * VE.pps;
     const w = Math.max(8, x2 - x1), x = x2 - x1 < 8 ? (x1 + x2) / 2 - 4 : x1;
-    return { x, w, y: r.y + r.h - Math.min(22, r.h - 8) - 3, h: Math.min(22, r.h - 8) };
+    const h = Math.max(8, Math.min(22, r.h - 8));
+    return { x, w, y: r.y + r.h - h - 3, h };
 }
 
 function veTransDesenhar(ctx, rows) {
-    const sel = veTransSelecionada(), lista = veTransLista();
+    const sel = veTransSelecionada(), lista = veTransLista(true);
     const hov = VE.trHover && VE.trHover.prev;
     if (hov) lista.push(Object.assign(hov, { _prev: true }));
     lista.forEach(j => {
         const b = veTransRetangulo(j, rows);
         if (!b || b.x > ctx.canvas.width || b.x + b.w < 0) return;
-        const on = sel && sel.c === j.c && sel.lado === j.lado;
+        const on = sel && sel.c === j.c && sel.lado === j.lado && !!sel.aud === !!j.aud;
+        const cor = j.aud ? ['rgba(10,40,34,0.9)', 'rgba(110,231,183,0.55)', '#10b981', '#d1fae5'] : ['rgba(30,24,60,0.88)', 'rgba(196,181,253,0.55)', '#8b5cf6', '#ede9fe'];
         ctx.save();
         ctx.globalAlpha = j._prev ? 0.7 : 1;
-        ctx.fillStyle = 'rgba(30,24,60,0.88)';
+        ctx.fillStyle = cor[0];
         veRoundRect(ctx, b.x, b.y, b.w, b.h, 3); ctx.fill();
         // diagonal, como o bloco de transição do Premiere
-        ctx.strokeStyle = 'rgba(196,181,253,0.55)';
+        ctx.strokeStyle = cor[1];
         ctx.lineWidth = 1;
         ctx.beginPath();
         if (!j.A) { ctx.moveTo(b.x, b.y + b.h); ctx.lineTo(b.x + b.w, b.y); }
         else if (!j.B) { ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + b.w, b.y + b.h); }
         else { ctx.moveTo(b.x, b.y + b.h); ctx.lineTo(b.x + b.w, b.y); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + b.w, b.y + b.h); }
         ctx.stroke();
-        ctx.strokeStyle = on ? '#F97316' : j._prev ? '#c4b5fd' : '#8b5cf6';
+        ctx.strokeStyle = on ? '#F97316' : j._prev ? '#c4b5fd' : cor[2];
         ctx.lineWidth = on ? 2 : 1;
         if (j._prev) ctx.setLineDash([4, 3]);
         veRoundRect(ctx, b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1, 3); ctx.stroke();
-        if (b.w > 46) {
+        if (b.w > 46 && b.h >= 12) {
             ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip();
-            ctx.fillStyle = '#ede9fe';
             ctx.font = '600 10px Segoe UI';
-            const txt = veT(VE_TR[j.t].nome), tw = ctx.measureText(txt).width;
-            ctx.fillStyle = 'rgba(30,24,60,0.9)';
+            const txt = veT((j.aud ? VE_TR_AUD : VE_TR)[j.t].nome), tw = ctx.measureText(txt).width;
+            ctx.fillStyle = cor[0];
             ctx.fillRect(b.x + b.w / 2 - tw / 2 - 4, b.y + b.h / 2 - 7, tw + 8, 13);
-            ctx.fillStyle = '#ede9fe';
+            ctx.fillStyle = cor[3];
             ctx.fillText(txt, b.x + b.w / 2 - tw / 2, b.y + b.h / 2 + 3.5);
         }
         ctx.restore();
     });
+    veBordaDesenhar(ctx, rows);
 }
 
-// Transição sob o ponto (x, y do canvas): {c, lado, j, borda: 'l'|'r'|null}
+// Transição sob o ponto (x, y do canvas): {c, lado, aud, j, borda: 'l'|'r'|null}
 function veTransAt(x, y) {
     const rows = veTrackRows();
-    for (const j of veTransLista()) {
+    for (const j of veTransLista(true)) {
         const b = veTransRetangulo(j, rows);
         if (!b || y < b.y || y > b.y + b.h || x < b.x - 3 || x > b.x + b.w + 3) continue;
         const borda = b.w >= 14 && Math.abs(x - b.x) <= 4 ? 'l' : b.w >= 14 && Math.abs(x - b.x - b.w) <= 4 ? 'r' : null;
-        return { c: j.c, lado: j.lado, j, borda };
+        return { c: j.c, lado: j.lado, aud: !!j.aud, j, borda };
     }
     return null;
 }
 
 // Clique numa transição: seleciona; pela borda, arrastar muda a duração
 function veTransPointer(hit, t) {
-    VE.trSel = { c: hit.c, lado: hit.lado };
+    VE.trSel = { c: hit.c, lado: hit.lado, aud: hit.aud };
     VE.sel = -1;
+    VE.bordaSel = null;
     VETX.legSel = -1;
     if (hit.borda && !veLocked(hit.c)) {
         const j = hit.j;
         // ponto fixo: no corte fica o centro; do nada / para o nada, a borda do clipe
         const fixo = !j.A ? j.ws : !j.B ? j.we : (j.ws + j.we) / 2;
-        VE.drag = { mode: 'trdur', c: hit.c, lado: hit.lado, fixo, meio: !!(j.A && j.B), started: false };
+        VE.drag = { mode: 'trdur', c: hit.c, lado: hit.lado, aud: hit.aud, fixo, meio: !!(j.A && j.B), started: false };
     }
     veRefresh();
 }
@@ -242,12 +356,13 @@ function veTransArrastar(t) {
     const d = VE.drag;
     if (!d.started) { vePushHistory(); d.started = true; }
     const dur = Math.min(10, Math.max(veFrame(), Math.abs(veSnapFrame(t) - d.fixo) * (d.meio ? 2 : 1)));
-    d.c[d.lado === 'in' ? 'tin' : 'tout'].d = Math.round(dur * 1000) / 1000;
+    d.c[veTrCampo(d.lado, d.aud)].d = Math.round(dur * 1000) / 1000;
     veDraw();
     veDrawMonitorSoon();
+    if (d.aud && typeof veAudioEditou === 'function') veAudioEditou();
 }
 
-// ── arrastar do painel Efeitos: onde a transição cairia ──
+// ── arrastar do painel: onde a transição cairia ──
 // Metade inicial do clipe = entrada dele; metade final = entrada do próximo (ou saída, se não houver próximo)
 function veTransAlvo(x, y, doc) {
     const i = veClipAtClient(x, y, doc);
@@ -264,7 +379,7 @@ function veTransHover(alvo, t) {
     const velho = VE.trHover;
     if (!alvo) { VE.trHover = null; if (velho) veDraw(); return; }
     if (velho && velho.c === alvo.c && velho.lado === alvo.lado) return;
-    const campo = alvo.lado === 'in' ? 'tin' : 'tout', antes = alvo.c[campo];
+    const campo = veTrCampo(alvo.lado), antes = alvo.c[campo];
     alvo.c[campo] = { t, d: VE_TR_DUR };
     alvo.prev = veTransJanela(alvo.c, alvo.lado);
     if (antes) alvo.c[campo] = antes; else delete alvo.c[campo];
@@ -362,7 +477,7 @@ function veTrvDesenhar(cv, t, u) {
         x.save();
         x.globalAlpha = Math.max(0, Math.min(1, f.op == null ? 1 : f.op));
         x.translate(W / 2 + (f.dx || 0) * W, H / 2 + (f.dy || 0) * H);
-        x.scale(s, s);
+        x.scale(s * (f.sx == null ? 1 : f.sx), s);
         x.drawImage(src, -W / 2, -H / 2, W, H);
         x.restore();
     });
@@ -402,7 +517,7 @@ function veRenderTrList() {
     [...VETRV.anim.keys()].forEach(veTrvParar);
     const lista = Object.entries(VE_TR).filter(([t, d]) => !q || (veT(d.nome) + ' ' + d.nome + ' ' + d.tag).toLowerCase()
         .normalize('NFD').replace(/[̀-ͯ]/g, '').includes(q));
-    box.innerHTML = lista.map(([t, d]) => `<div class="ve-tr-card" data-trt="${t}" title="Arraste até o corte entre dois clipes (ou o início/fim de um clipe) · duplo clique põe na entrada do clipe selecionado">
+    box.innerHTML = lista.map(([t, d]) => `<div class="ve-tr-card${t === VE.trEscolhida ? ' escolhida' : ''}" data-trt="${t}" title="Clique marca como a do Ctrl+D · arraste até o corte entre dois clipes (ou o início/fim de um clipe) · duplo clique põe na entrada do clipe selecionado">
         <canvas width="${VE_TRV_W}" height="${VE_TRV_H}"></canvas><span>${d.nome}</span><small>${d.tag}</small></div>`).join('')
         || '<div class="ve-clips-empty">Nenhuma transição encontrada.</div>';
     veTrvPrep();
@@ -421,6 +536,7 @@ function veTrAlvoEvento(ev, doc) {
 function veTrInit() {
     const box = $ve('ve-tr-list');
     if (!box) return;
+    VE.trEscolhida = VE_TR[veLsGet('ve-tr-escolhida')] ? veLsGet('ve-tr-escolhida') : 'dissolve';
     veRenderTrList();
     $ve('ve-tr-q').addEventListener('input', veRenderTrList);
     $ve('ve-tr-q').addEventListener('keydown', e => { if (e.key === 'Escape') { e.target.value = ''; veRenderTrList(); e.target.blur(); } e.stopPropagation(); });
@@ -428,6 +544,14 @@ function veTrInit() {
     box.addEventListener('pointerout', e => {
         const el = e.target.closest('[data-trt]');
         if (el && !el.contains(e.relatedTarget)) veTrvParar(el);
+    });
+    // clique marca a transição do Ctrl+D (contorno laranja), como a "transição padrão" do Premiere
+    box.addEventListener('click', e => {
+        const el = e.target.closest('[data-trt]');
+        if (!el) return;
+        VE.trEscolhida = el.dataset.trt;
+        veLsSet('ve-tr-escolhida', VE.trEscolhida);
+        box.querySelectorAll('[data-trt]').forEach(x => x.classList.toggle('escolhida', x === el));
     });
     box.addEventListener('dblclick', e => {
         const el = e.target.closest('[data-trt]');

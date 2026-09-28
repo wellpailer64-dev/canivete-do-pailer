@@ -343,3 +343,14 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
   recortes) → `despill` → [`format=gbrap`, `erosion`/`dilation` só no alfa × n, `gblur planes=8`] → `format=rgba`.
   Os coeficientes saem prontos do JS (`exportar`); a prévia faz as mesmas contas.
 - Não vale em camada de ajuste (`soClipe`).
+
+## Transição padrão (Ctrl+D / Ctrl+Shift+D) e fade de áudio (Potência constante)
+- Clicar na borda de um clipe seleciona a ponta (colchete laranja, `VE.bordaSel`), como a seleção de ponto de edição do Premiere.
+- **Ctrl+D:** aplica a transição de vídeo marcada no painel Transições (clique no cartão = contorno laranja,
+  `VE.trEscolhida`, salva no navegador; padrão Dissolução cruzada). **Ctrl+Shift+D** (ou **Ctrl+Shift+9**): áudio,
+  Potência constante. Na ponta selecionada ou nas duas pontas dos clipes selecionados; ponta final colada em outro clipe = o corte.
+- Áudio: `c.atin` / `c.atout` (mesma janela das de vídeo: centrada no corte, usando a sobra). `veAudFades` estende os
+  dois lados e passa `fi`/`fo` em `veMixClipes` (itens 8 e 9). Mixer: ganho seno/cosseno (`veAudioFade`);
+  exportação: `afade curve=qsin` em `_grafo_mix`. Bloco verde na linha A; clique seleciona, D apaga, borda muda a duração.
+- **Dobrar (Fold):** usa escala só na horizontal (`sx` nos quadros-chave dos clipes virtuais; prévia `ctx.scale(k*sx, k)`,
+  exportação multiplica a largura no `scale`).

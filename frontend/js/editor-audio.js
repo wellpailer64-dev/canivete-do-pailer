@@ -155,9 +155,19 @@ function veAudioPrever(t) {
     return esperas;
 }
 
-// Clipes com som, prontos para o mixer: [início, entrada, saída, ganho linear, id da fonte, velocidade, manter tom]
+// Clipes com som, prontos para o mixer: [início, entrada, saída, ganho linear, id da fonte, velocidade, manter tom,
+// fade de entrada (s), fade de saída (s)]
 function veAudioClipes() {
-    return veMixClipes().map(([st, s0, e0, g, id, v, tom]) => [st, s0, e0, Math.pow(10, g / 20), id, v || 1, tom !== 0]);
+    return veMixClipes().map(([st, s0, e0, g, id, v, tom, fi, fo]) => [st, s0, e0, Math.pow(10, g / 20), id, v || 1, tom !== 0, fi || 0, fo || 0]);
+}
+
+// Ganho do fade no instante u (s desde o início do clipe na timeline): Potência constante = seno / cosseno
+// (o mesmo do afade curve=qsin do ffmpeg na exportação)
+function veAudioFade(u, dur, fi, fo) {
+    let g = 1;
+    if (fi > 0 && u < fi) g *= Math.sin(Math.PI / 2 * Math.max(0, u) / fi);
+    if (fo > 0 && u > dur - fo) g *= Math.sin(Math.PI / 2 * Math.max(0, dur - u) / fo);
+    return g;
 }
 
 // Amostra (esquerda, direita) da fonte F no quadro fracionário f, ou null se o bloco ainda não chegou
@@ -186,16 +196,17 @@ const VE_AU_HANN = (() => {
 // Mixa n quadros de saída a partir do instante t da timeline (avançando `taxa` s da timeline por s de som)
 function veAudioMixar(t, n) {
     const L = new Float32Array(n), R = new Float32Array(n), passo = VEAU.taxa / VE_AU_SR;
-    for (const [st, s0, e0, g, id, v, tom] of VEAU.clipes) {
+    for (const [st, s0, e0, g, id, v, tom, fi, fo] of VEAU.clipes) {
         const F = VEAU.fontes.get(id), fimC = st + (e0 - s0) / v, tFim = t + n * passo;
         if (!F || fimC <= t || st >= tFim) continue;
         const i0 = Math.max(0, Math.ceil((st - t) / passo)), i1 = Math.min(n, Math.ceil((fimC - t) / passo));
-        const k = g / 32768, a0 = s0 * VE_AU_SR;
+        const k0 = g / 32768, a0 = s0 * VE_AU_SR, durC = fimC - st, fade = fi > 0 || fo > 0;
         if (v === 1 || !tom) {
             // normal, ou velocidade que muda o tom junto (como fita mais rápida)
             for (let i = i0; i < i1; i++) {
                 const x = veAudioAmostra(F, a0 + (t + i * passo - st) * v * VE_AU_SR);
                 if (!x) continue;                                   // bloco ainda não lido: silêncio (raro, há previsão)
+                const k = fade ? k0 * veAudioFade(t + i * passo - st, durC, fi, fo) : k0;
                 L[i] += x[0] * k;
                 R[i] += x[1] * k;
             }
@@ -213,6 +224,7 @@ function veAudioMixar(t, n) {
                 const w = VE_AU_HANN[Math.min(VE_AU_HANN.length - 1, Math.floor(o))];
                 l += x[0] * w; r += x[1] * w;
             }
+            const k = fade ? k0 * veAudioFade(t + i * passo - st, durC, fi, fo) : k0;
             L[i] += l * k;
             R[i] += r * k;
         }

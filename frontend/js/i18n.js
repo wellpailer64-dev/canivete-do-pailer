@@ -308,6 +308,14 @@ const I18N_EN = {
     'Nenhum clipe selecionado passa pela agulha': 'No selected clip is under the playhead',
     'Não dá para apagar todos os clipes': "Can't delete every clip",
     'Transições de vídeo': 'Video transitions',
+    'Dobrar': 'Fold', 'Potência constante': 'Constant Power', 'Esse clipe não tem som': "This clip has no sound",
+    'Selecione a ponta de um clipe com som (ou o clipe) e aperte Ctrl+Shift+D': 'Select the edge of a clip with sound (or the clip) and press Ctrl+Shift+D',
+    'Selecione a ponta de um clipe (ou o clipe) e aperte Ctrl+D': 'Select the edge of a clip (or the clip) and press Ctrl+D',
+    'Sem mídia sobrando para a transição': 'Not enough extra media for the transition',
+    'Clique marca como a do Ctrl+D · arraste até o corte entre dois clipes (ou o início/fim de um clipe) · duplo clique põe na entrada do clipe selecionado':
+        'Click to set it as the Ctrl+D transition · drag onto the cut between two clips (or the start/end of a clip) · double-click adds it to the start of the selected clip',
+    'Clique numa transição para usá-la no Ctrl+D; clique na ponta de um clipe e aperte Ctrl+D (vídeo) ou Ctrl+Shift+D / Ctrl+Shift+9 (áudio: Potência constante)':
+        'Click a transition to use it with Ctrl+D; click a clip edge and press Ctrl+D (video) or Ctrl+Shift+D / Ctrl+Shift+9 (audio: Constant Power)',
     'Chaveamento': 'Keying', 'Cor da tela': 'Screen color', 'Ganho da tela': 'Screen gain', 'Equilíbrio': 'Screen balance',
     'Recorte do preto': 'Clip black', 'Recorte do branco': 'Clip white', 'Encolher / expandir': 'Choke / expand',
     'Suavizar borda': 'Soften edge', 'Remover reflexo': 'Despill', 'Mostrar matte (só na prévia)': 'Show matte (preview only)',
@@ -450,6 +458,7 @@ const I18N_RE = [
     [/^Colado em ([VA]\d)$/, 'Pasted to $1'],
     [/^Selecionados cortados em (.+)$/, 'Selected clips cut at $1'],
     [/^Cor da tela: (#[0-9a-f]{6})$/i, 'Screen color: $1'],
+    [/^(.+): (\d+) transiç(?:ões aplicadas|ão aplicada)$/, (m, n, k) => `${i18nT(n)}: ${k} transition${k > 1 ? 's' : ''} applied`],
     [/^(.+) não se aplica a uma camada de ajuste$/, (m, n) => `${i18nT(n)} doesn't apply to an adjustment layer`],
     [/^(Dissolução cruzada|Empurrar|Deslizar|Puxar \(zoom\)|Pop) \(([^)]+)\)( · encurtada: pouca mídia sobrando)?$/,
         (m, n, d, e) => `${i18nT(n)} (${d})` + (e ? ' · shortened: little extra media' : '')],
