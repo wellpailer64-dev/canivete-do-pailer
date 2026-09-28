@@ -281,6 +281,20 @@ def video_cutter_prepare(file_path):
     return {"success": True}
 
 
+def ve_preparar_midia(path, mid):
+    """Outro vídeo do projeto (painel Projeto → timeline): prepara em background; eventos em veOnMidia({id, ...})."""
+    from Functions.video_cutter import preparar_midia
+
+    def run():
+        try:
+            preparar_midia(path, lambda ev: _ve_emit("veOnMidia", {"id": mid, **ev}))
+        except Exception as e:
+            _ve_emit("veOnMidia", {"id": mid, "stage": "error", "error": str(e)})
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
 # ── painel Texto do editor: transcrever a timeline / legendas ──
 _ve_texto_stop = None
 
@@ -2317,6 +2331,9 @@ class ApiBridge:
 
     def ve_fontes(self):
         return ve_fontes()
+
+    def ve_preparar_midia(self, path, mid):
+        return ve_preparar_midia(path, mid)
 
     def ve_importar_dialogo(self):
         return ve_importar_dialogo()

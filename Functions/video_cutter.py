@@ -462,6 +462,59 @@ def preparar(path, emit, stop_event=None):
     emit({"stage": "done"})
 
 
+def preparar_midia(path, emit, stop_event=None):
+    """
+    Outro vídeo do projeto (além do aberto): mesma preparação, sem limpar a sessão nem mexer no áudio da fonte
+    principal. Cada vídeo tem o seu áudio conformado (como os .cfa do Premiere; adicionar_audio) e a sua prévia.
+      {stage:'info', ...} → {stage:'audio', url, quadros, peaks} → {stage:'video', url, proxy} → {stage:'thumbs'}
+      → {stage:'done'} | {stage:'error', error}
+    """
+    if not os.path.isfile(path):
+        emit({"stage": "error", "error": "Arquivo não encontrado."})
+        return
+    try:
+        info = probe(path)
+    except Exception as e:
+        emit({"stage": "error", "error": f"Não foi possível analisar o vídeo: {e}"})
+        return
+    if info["duration"] <= 0 or not info["has_video"]:
+        emit({"stage": "error", "error": "Arquivo sem vídeo ou com duração inválida."})
+        return
+    work = os.path.join(_work_dir(), "m_" + hashlib.md5(f"{os.path.abspath(path)}|{os.path.getmtime(path)}".encode()).hexdigest()[:12])
+    os.makedirs(work, exist_ok=True)
+    direto = _navegador_toca(path, info)
+    emit({"stage": "info", "needs_proxy": not direto, **info})
+    count = int(min(180, max(24, info["duration"] / 2)))
+
+    def _audio():
+        if info["has_audio"]:
+            r = adicionar_audio(path)
+            if r.get("success"):
+                emit({"stage": "audio", "url": r["url"], "quadros": r["quadros"], "peaks": r["peaks"]})
+
+    ta = threading.Thread(target=_audio, daemon=True)
+    ta.start()
+    if direto:
+        emit({"stage": "video", "url": media_server.register(path), "proxy": False})
+        emit({"stage": "thumbs", "thumbs": gerar_thumbs(path, info["duration"], work, count)})
+    else:
+        proxy = os.path.join(work, "proxy.mp4")
+        if os.path.isfile(proxy):
+            ok, err, thumbs = True, "", None
+        else:
+            ok, err, thumbs = gerar_proxy(path, info, proxy, lambda p: emit({"stage": "proxy", "pct": p}), stop_event,
+                                          thumbs_dir=work, thumbs_n=count)
+        if stop_event is not None and stop_event.is_set():
+            return
+        if not ok:
+            emit({"stage": "error", "error": "Falha ao gerar pré-visualização: " + (err.splitlines()[-1] if err else "?")})
+            return
+        emit({"stage": "video", "url": media_server.register(proxy), "proxy": True})
+        emit({"stage": "thumbs", "thumbs": thumbs or gerar_thumbs(proxy, info["duration"], work, count)})
+    ta.join()
+    emit({"stage": "done"})
+
+
 # ─────────────────────────── exportação ───────────────────────────
 
 def _detectar_hw_encoder():
@@ -991,7 +1044,7 @@ def _normalizar_camadas(camadas, path_video):
                 continue
             item = {
                 "tipo": tipo if tipo in ("imagem", "ajuste") else "video",
-                "path": c.get("path") if tipo == "imagem" else None if tipo == "ajuste" else path_video,
+                "path": c.get("path") if tipo == "imagem" else None if tipo == "ajuste" else (c.get("path") or path_video),
                 "st": st, "s": max(0.0, s), "dur": (e - s) / vel, "fonte": e - s, "v": vel,
                 "sc": max(0.5, min(2000.0, float(c.get("sc", 100)))) / 100.0,
                 "x": float(c.get("x", 0)), "y": float(c.get("y", 0)),
@@ -1005,7 +1058,7 @@ def _normalizar_camadas(camadas, path_video):
             }
         except Exception:
             continue
-        if item["tipo"] == "imagem" and not (item["path"] and os.path.isfile(item["path"])):
+        if item["tipo"] in ("imagem", "video") and not (item["path"] and os.path.isfile(item["path"])):
             continue
         out.append(item)
     return out
@@ -1188,7 +1241,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         if c["tipo"] == "imagem":
             cmd += ["-loop", "1", "-framerate", fps, "-t", f"{c['dur']:.3f}", "-i", c["path"]]
         else:
-            cmd += ["-ss", f"{c['s']:.3f}", "-t", f"{c['fonte']:.3f}", "-i", path]
+            cmd += ["-ss", f"{c['s']:.3f}", "-t", f"{c['fonte']:.3f}", "-i", c["path"] or path]   # o arquivo do clipe
         idx = entrada
         entrada += 1
         kf = c["kf"]

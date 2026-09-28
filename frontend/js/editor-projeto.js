@@ -11,7 +11,7 @@
 const VEPJ = { sel: new Set(), foco: null, busca: '', clip: null, ordem: { col: 'nome', dir: 1 }, conf: 0, nBin: 0 };
 
 const VE_PJ_TIPOS = {
-    video: ['i-film', 'Vídeo'], video2: ['i-film', 'Vídeo'], image: ['i-image', 'Imagem'], audio: ['i-music', 'Áudio'],
+    video: ['i-film', 'Vídeo'], image: ['i-image', 'Imagem'], audio: ['i-music', 'Áudio'],
     ajuste: ['i-sliders', 'Camada de ajuste'], legenda: ['i-captions', 'Legendas'],
 };
 const VE_EXT_SRT = /\.srt$/i;
@@ -38,11 +38,16 @@ function vePjAlterou() { if (!VE.dirty) { VE.dirty = true; veUpdateTitle(); } ve
 
 // Duração e informações de cada item (colunas)
 function vePjInfo(m) {
-    if (m.kind === 'video' && VE.info) return { dur: VE.srcDur, info: `${VE.info.width}×${VE.info.height} · ${String(+(VE.fps || 30).toFixed(2)).replace('.', ',')} qps` };
+    if (m.kind === 'video') {
+        const inf = m.id === 0 ? VE.info : m.info, fps = inf && (m.id === 0 ? VE.fps : inf.fps);
+        if (m.erro) return { dur: null, info: veT('erro: ') + m.erro };
+        if (!inf) return { dur: null, info: veT('preparando...') };
+        const estado = m.id && !m.url ? ` · ${veT('prévia')} ${m.pct || 0}%` : '';
+        return { dur: m.id === 0 ? VE.srcDur : inf.duration, info: `${inf.width}×${inf.height} · ${String(+(fps || 30).toFixed(2)).replace('.', ',')} qps${estado}` };
+    }
     if (m.kind === 'image') return { dur: null, info: m.w ? `${m.w}×${m.h}` : '' };
     if (m.kind === 'audio') return { dur: m.dur || null, info: '48 kHz' };
     if (m.kind === 'legenda') return { dur: m.itens && m.itens.length ? m.itens[m.itens.length - 1].en : null, info: `${(m.itens || []).length} legendas` };
-    if (m.kind === 'video2') return { dur: null, info: 'ainda não entra na timeline' };
     return { dur: null, info: '' };
 }
 
@@ -60,7 +65,7 @@ function vePjFilhos(pai) {
 function vePjLinhaMidia(m, nivel) {
     const k = 'm:' + m.id, [ic, tipo] = VE_PJ_TIPOS[m.kind], inf = vePjInfo(m), uso = vePjUso(m);
     const cor = m.cor ? veCor({ cor: m.cor }) : null;
-    return `<div class="ve-pj-row${VEPJ.sel.has(k) ? ' sel' : ''}${m.kind === 'video2' ? ' fraco' : ''}" data-k="${k}" draggable="true" style="--n:${nivel}">
+    return `<div class="ve-pj-row${VEPJ.sel.has(k) ? ' sel' : ''}${m.kind === 'video' && m.id && !m.url ? ' fraco' : ''}" data-k="${k}" draggable="true" style="--n:${nivel}">
         <span class="ve-pj-cor"${cor ? ` style="background:${cor}"` : ''}></span><span class="ve-pj-seta"></span>
         <svg class="i"><use href="#${ic}"/></svg><span class="ve-pj-nome" title="${veEsc(m.path || vePjNome(m))}">${veEsc(vePjNome(m))}</span>
         <span class="ve-pj-c">${veT(tipo)}</span><span class="ve-pj-c mono">${inf.dur ? veTC(inf.dur).slice(0, 11) : ''}</span>
@@ -131,7 +136,7 @@ async function vePjImportarArquivo(path, pasta) {
     }
     if (EXT_VIDEO.test(path)) {
         if (path === VE.path) return false;
-        vePjAddMidia({ kind: 'video2', path, name: nome }, pasta);
+        veMidiaPreparar(vePjAddMidia({ kind: 'video', path, name: nome }, pasta));
         return true;
     }
     return false;
@@ -227,7 +232,12 @@ function vePjCopiaMidia(m, pasta) {
     const n = vePjAddMidia({ ...m, nome: `${vePjNome(m)} ${veT('cópia')}`, itens: m.itens ? m.itens.map(x => ({ ...x })) : undefined }, pasta);
     delete n.removido;
     if (n.kind === 'audio' && n.url) veAudioRegistrar(n.id, n.url, n.quadros);
-    if (n.kind === 'video2' || n.kind === 'video') n.kind = n.kind === 'video' ? 'video2' : n.kind;   // o vídeo aberto é um só
+    if (n.kind === 'video') {
+        // outro item do mesmo arquivo: prévia e áudio próprios (preparados de novo; o que já existe em disco é reaproveitado)
+        ['url', 'info', 'thumbs', 'peaks', 'dur', 'pct', 'erro'].forEach(k => delete n[k]);
+        n.path = n.path || VE.path;
+        veMidiaPreparar(n);
+    }
     return n;
 }
 
@@ -336,14 +346,17 @@ function vePjColocar(ids, drop) {
             if (c && m.cor) c.cor = m.cor;
             t = st + VE_IMG_DUR; colocados++;
         } else if (m.kind === 'video') {
+            const dur = m.id === 0 ? VE.srcDur : m.info && m.info.duration;
+            if (!dur) { veToast(m.erro ? 'Esse vídeo não pôde ser preparado: ' + m.erro : 'Esse vídeo ainda está sendo preparado'); return; }
             const tr = row && row.kind !== 'l' ? veTrackIndex(row) : 0;
             if (veTrkLocked(tr)) { veAvisoBloqueio(); return; }
             vePushHistory();
-            const clip = { tr, st, s: 0, e: VE.srcDur };
+            const clip = { tr, st, s: 0, e: dur };
+            if (m.id) clip.m = m.id;
             if (m.cor) clip.cor = m.cor;
             vePlaceClip(clip);
             veAfterEdit(VE.playhead);
-            t = st + VE.srcDur; colocados++;
+            t = st + dur; colocados++;
         } else if (m.kind === 'audio') {
             const trA = row && row.kind === 'a' ? veTrackIndex(row) : -1;
             if (vePjAudioEm(m, st, trA)) { t = st + m.dur; colocados++; }
@@ -355,8 +368,6 @@ function vePjColocar(ids, drop) {
             veRefresh();
             veToast(`${m.itens.length} legendas na trilha LEG`);
             colocados++;
-        } else if (m.kind === 'video2') {
-            veToast('Por enquanto só o vídeo principal entra na timeline (vários vídeos por projeto vem em breve)');
         }
     });
     if (colocados) vePjRender();
@@ -532,6 +543,58 @@ function vePjInit() {
     alvo($ve('ve-screen'));
     vePjRender();
 }
+
+// ─────────────────────────── preparar outros vídeos (um por vez) ───────────────────────────
+const VEPJF = { fila: [], rodando: null };
+function veMidiaPreparar(m) {
+    if (!m || m.kind !== 'video' || !m.id || !m.path) return;
+    m.pct = 0;
+    delete m.erro;
+    VEPJF.fila.push(m.id);
+    veMidiaProxima();
+}
+function veMidiaProxima() {
+    if (VEPJF.rodando != null || !VEPJF.fila.length) return;
+    const id = VEPJF.fila.shift(), m = VE.media[id];
+    if (!m || m.removido) { veMidiaProxima(); return; }
+    VEPJF.rodando = id;
+    window.pywebview.api.ve_preparar_midia(m.path, id);
+}
+
+// Eventos da preparação de um vídeo do projeto (Functions/video_cutter.py: preparar_midia)
+function veOnMidia(ev) {
+    const m = VE.media[ev.id];
+    if (!m || m.kind !== 'video') { if (ev.stage === 'done' || ev.stage === 'error') { VEPJF.rodando = null; veMidiaProxima(); } return; }
+    if (ev.stage === 'info') {
+        m.info = ev;
+        m.dur = ev.duration;
+    } else if (ev.stage === 'proxy') {
+        m.pct = ev.pct;
+    } else if (ev.stage === 'audio') {
+        m.peaks = ev.peaks || [];
+        veAudioRegistrar(m.id, ev.url, ev.quadros);
+    } else if (ev.stage === 'video') {
+        m.url = ev.url;
+        m.proxy = ev.proxy;
+        m.pct = 100;
+        if (VE.clips.some(c => veMid(c) === m.id)) veSyncPlayer(true);
+    } else if (ev.stage === 'thumbs') {
+        m.thumbs = (ev.thumbs || []).sort((a, b) => a.t - b.t).map(tb => {
+            const img = new Image();
+            img.onload = veDraw;
+            img.src = tb.url;
+            return { t: tb.t, url: tb.url, img };
+        });
+    } else if (ev.stage === 'error') {
+        m.erro = ev.error || 'erro';
+        veToast(`${vePjNome(m)}: ${m.erro}`);
+    }
+    if (ev.stage === 'done' || ev.stage === 'error') { VEPJF.rodando = null; veMidiaProxima(); }
+    vePjRender();
+    veDraw();
+    veDrawMonitorSoon();
+}
+window.veOnMidia = veOnMidia;
 
 // Arquivos do Windows soltos em cima do painel: vão para o projeto (na pasta sob o cursor), não para a timeline
 function vePjSoltouAqui(drop) {

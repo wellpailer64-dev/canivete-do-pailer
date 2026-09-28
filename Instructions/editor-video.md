@@ -271,3 +271,19 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
   - `.srt`: substitui as legendas (LEG), deslocadas para o ponto do soltar.
   - A cor do rótulo passa para o clipe, e o nome dado no Projeto aparece na timeline.
 - O arquivo do projeto (.vcnvt) guarda `bins`, `m0` (organização do vídeo principal) e os itens que ainda não estão na timeline.
+
+## Vários vídeos por projeto (como no Premiere)
+- O vídeo aberto (`VE.media[0]`) define a sequência: tamanho, qps e duração de fonte. Outros vídeos entram pelo painel Projeto.
+- Cada vídeo do projeto é preparado em fila (`veMidiaPreparar` → `ve_preparar_midia` → `preparar_midia` em video_cutter.py) e fica com:
+  - análise (`m.info`);
+  - prévia (`m.url`), com proxy quando o navegador não toca o formato;
+  - miniaturas (`m.thumbs`);
+  - áudio conformado próprio (`adicionar_audio`), registrado no mixer com o id da mídia, mais a forma de onda (`m.peaks`).
+- Clipe de outro vídeo: `c.m = id` (`veMid(c)`).
+  - Entra ajustado ao quadro ("Definir para o tamanho do quadro"): escala padrão = min(seqW/w, seqH/h).
+  - Na prévia, cada player carrega o arquivo da mídia do clipe (`veDeckCarregar`, uma URL marcada por player).
+    A reserva já carrega o próximo arquivo antes do corte, então a troca entre vídeos diferentes sai seca.
+  - Aparar respeita a duração da mídia (`veDurMidia`).
+- Exportação:
+  - Só o vídeo aberto vai na base (concat); os outros vão como camada, com o arquivo deles (`c.path`).
+  - O som de cada um entra no `_grafo_mix` pelo próprio arquivo.
