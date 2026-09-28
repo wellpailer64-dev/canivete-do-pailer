@@ -1107,3 +1107,26 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-pj-c.mono { font-family: var(--ve-mono); }
 .ve-pj-fim { height: 40px; }
 .ve-pj-rodape { display: flex; align-items: center; gap: 2px; padding: 4px 8px; border-top: 1px solid var(--ve-line); }
+
+/* ── painel Ferramentas (como o Tools do Premiere): vertical ou horizontal conforme o formato ── */
+.ve-dgroup.has-ferramentas { min-width: 40px; min-height: 40px; }
+.ve-dgroup.has-ferramentas .ve-dtabs { height: 12px; }
+.ve-dgroup.has-ferramentas .ve-dtab { padding: 0; flex: 1; justify-content: center; }
+.ve-dgroup.has-ferramentas .ve-dtab > span, .ve-dgroup.has-ferramentas .ve-dtab-x { display: none; }
+.ve-dgroup.has-ferramentas .ve-dtab::after { content: "⋯"; font-size: 10px; line-height: 1; color: var(--ve-faint); }
+.ve-tools { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 4px; height: 100%; overflow: hidden; }
+.ve-tools.horizontal { flex-direction: row; justify-content: flex-start; padding: 4px 6px; }
+.ve-tool {
+    position: relative; flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 30px; padding: 0;
+    border: 0; border-radius: 6px; background: transparent; color: var(--ve-dim); cursor: pointer;
+}
+.ve-tool .i { font-size: 17px; }
+.ve-tool:hover { background: var(--ve-panel-2); color: var(--ve-text); }
+.ve-tool.active { background: #2563eb; color: #fff; }
+.ve-tool.grupo::after {
+    content: ""; position: absolute; right: 3px; bottom: 3px; border-style: solid; border-width: 0 0 5px 5px;
+    border-color: transparent transparent currentColor transparent; opacity: .75;
+}
+.ve-tool-menu .ve-ctx-item { display: flex; align-items: center; gap: 8px; }
+.ve-tool-menu .ve-ctx-item.on { color: var(--ve-accent); }
+.ve-tl-wrap.tool-zoom { cursor: zoom-in; }

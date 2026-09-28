@@ -2674,11 +2674,12 @@ function veTab(name) {
 
 function veSetTool(tool) {
     VE.tool = tool;
-    ['select', 'razor', 'hand', 'rate', 'texto'].forEach(t => $ve('ve-tool-' + t).classList.toggle('active', t === tool));
+    veFerrRender();
     const wrap = $ve('ve-tl-wrap');
     wrap.classList.toggle('tool-razor', tool === 'razor');
     wrap.classList.toggle('tool-hand', tool === 'hand');
     wrap.classList.toggle('tool-rate', tool === 'rate');
+    wrap.classList.toggle('tool-zoom', tool === 'zoom');
     $ve('ve-screen').classList.toggle('tool-texto', tool === 'texto');
     if (tool !== 'texto') veTxEditarFim();
     veDraw();
@@ -3181,6 +3182,10 @@ function veInitEvents() {
             veSeek(e.shiftKey ? veSnapFrame(t) : veSnapTime(t));
             return;
         }
+        if (VE.tool === 'zoom' && e.button === 0) {
+            veSetPps(VE.pps * (e.altKey ? 0.5 : 2), t, x);
+            return;
+        }
         if (VE.tool === 'razor' && e.button === 0) {
             veSplitAt(veSnapTime(t, true));
             return;
@@ -3505,6 +3510,7 @@ function veOnKey(e) {
         'v': () => veSetTool('select'),
         'c': () => veSetTool('razor'),
         'h': () => veSetTool('hand'),
+        'z': () => veSetTool('zoom'),
         'r': () => { veSetTool('rate'); veToast('Velocidade (R): arraste a borda de um clipe'); },
         't': () => { veSetTool('texto'); veToast('Texto (T): clique no monitor para escrever'); },
         'n': () => veToggleSnap(),

@@ -263,6 +263,9 @@ const I18N_EN = {
     'Violeta': 'Violet', 'Íris': 'Iris', 'Azul': 'Blue', 'Cerúleo': 'Cerulean', 'Caribe': 'Caribbean', 'Verde-azulado': 'Teal',
     'Floresta': 'Forest', 'Verde': 'Green', 'Amarelo': 'Yellow', 'Manga': 'Mango', 'Laranja': 'Orange', 'Rosa': 'Rose',
     'Magenta': 'Magenta', 'Lavanda': 'Lavender', 'Bege': 'Tan', 'Marrom': 'Brown',
+    // Painel Ferramentas
+    'Ferramentas': 'Tools', 'Seleção': 'Selection', 'Velocidade (Rate Stretch)': 'Rate Stretch', 'Lâmina': 'Razor', 'Mão': 'Hand', 'Zoom': 'Zoom',
+    'Z': 'Z', 'Zoom (clique aproxima,': 'Zoom (click zooms in,', '+clique afasta)': '+click zooms out)',
     // Painel Projeto
     'Projeto': 'Project', 'Buscar no projeto': 'Search project', 'Nome': 'Name', 'Tipo': 'Type', 'Informações': 'Info', 'Uso': 'Usage',
     'Clipes na timeline': 'Clips in the timeline', 'Pasta': 'Bin', 'item': 'item', 'itens': 'items', 'Legendas': 'Captions', 'Projeto não salvo': 'Unsaved project',
@@ -402,6 +405,7 @@ const I18N_RE = [
     [/^Clipe (\d+)$/, 'Clip $1'],
     [/^(Texto|Imagem|Áudio|Ajuste) (\d+)$/, (m, n, i) => `${{ Texto: 'Text', Imagem: 'Image', 'Áudio': 'Audio', Ajuste: 'Adjustment' }[n]} ${i}`],
     [/^Texto · (.+)$/, 'Text · $1'],
+    [/^(Seleção|Lâmina|Mão|Zoom|Texto|Velocidade \(Rate Stretch\)) \((\w)\)( · segure para ver as outras)?$/, (m, n, k, g) => `${i18nT(n)} (${k})${g ? ' · hold to see the others' : ''}`],
     [/^(\d+) de (\d+) selecionado\(s\)$/, '$1 of $2 selected'],
     [/^(\d+) (item|itens)$/, (m, n) => `${n} ${n === '1' ? 'item' : 'items'}`],
     [/^(\d+) (item importado|itens importados) para o projeto$/, (m, n) => `${n} item(s) imported into the project`],

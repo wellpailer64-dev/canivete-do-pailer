@@ -37,7 +37,10 @@ function vedDefault() {
                     { t: 'g', p: ['fx', 'keys'], a: 'fx' },
                 ] },
             ] },
-            { t: 'g', p: ['timeline'], a: 'timeline' },
+            { t: 's', d: 'row', z: [0.028, 0.972], c: [
+                { t: 'g', p: ['ferramentas'], a: 'ferramentas' },
+                { t: 'g', p: ['timeline'], a: 'timeline' },
+            ] },
         ],
     };
 }
@@ -178,6 +181,18 @@ function vedApply(d) {
             if (g.a === 'clips') g.a = 'projeto';
             st.novos = st.novos.filter(id => id !== 'projeto');
         }
+    }
+    if (st.novos.includes('ferramentas')) {
+        const troca = (n, pai) => {
+            if (n.t === 'g') {
+                if (!n.p.includes('timeline')) return false;
+                const sp = { t: 's', d: 'row', z: [0.028, 0.972], c: [{ t: 'g', p: ['ferramentas'], a: 'ferramentas' }, n] };
+                if (pai) pai.c[pai.c.indexOf(n)] = sp; else st.root = sp;
+                return true;
+            }
+            return n.c.some(ch => troca(ch, n));
+        };
+        if (troca(st.root, null)) st.novos = st.novos.filter(id => id !== 'ferramentas');
     }
     st.novos.forEach(id => vedAddTab(id, true));
     vedRender();
@@ -1032,7 +1047,7 @@ function vedSashDrag(e, sash) {
     const sa = row ? ra.width : ra.height, sb = row ? rb.width : rb.height;
     const tot = sa + sb, ftot = n.z[i - 1] + n.z[i];
     const minOf = el => parseFloat(doc.defaultView.getComputedStyle(el)[row ? 'minWidth' : 'minHeight']) || 80;
-    const ma = Math.max(60, minOf(a)), mb = Math.max(60, minOf(b));
+    const ma = Math.max(30, minOf(a)), mb = Math.max(30, minOf(b));
     const p0 = row ? e.clientX : e.clientY;
     sash.setPointerCapture(e.pointerId);
     sash.classList.add('on');
