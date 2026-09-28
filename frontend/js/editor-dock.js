@@ -34,7 +34,7 @@ function vedDefault() {
                 { t: 'g', p: ['monitor'], a: 'monitor' },
                 { t: 's', d: 'col', z: [0.6, 0.4], c: [
                     { t: 'g', p: ['pp', 'props', 'lc', 'texto', 'projeto'], a: 'pp' },
-                    { t: 'g', p: ['fx', 'keys'], a: 'fx' },
+                    { t: 'g', p: ['fx', 'trans', 'keys'], a: 'fx' },
                 ] },
             ] },
             { t: 's', d: 'row', z: [0.028, 0.972], c: [
@@ -193,6 +193,14 @@ function vedApply(d) {
             return n.c.some(ch => troca(ch, n));
         };
         if (troca(st.root, null)) st.novos = st.novos.filter(id => id !== 'ferramentas');
+    }
+    // o painel Transições entra como aba ao lado do Efeitos (esteja ele onde estiver)
+    if (st.novos.includes('trans')) {
+        const g = [st.root, ...st.floats.map(f => f.root)].flatMap(r => vedGroups(r)).find(g => g.p.includes('fx'));
+        if (g) {
+            g.p.splice(g.p.indexOf('fx') + 1, 0, 'trans');
+            st.novos = st.novos.filter(id => id !== 'trans');
+        }
     }
     st.novos.forEach(id => vedAddTab(id, true));
     vedRender();

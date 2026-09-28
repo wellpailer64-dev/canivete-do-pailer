@@ -873,7 +873,7 @@ def open_file(path):
 def select_video_file(tool):
     if _window:
         file_types = (
-            "Vídeos, áudios e projetos (*.mp4;*.mov;*.mkv;*.avi;*.webm;*.flv;*.wmv;*.m4v;*.ts;*.mts;*.m2ts;*.3gp;*.mpg;*.mpeg;*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.wma;*.vcnvt)",
+            "Vídeos, áudios, imagens e projetos (*.mp4;*.mov;*.mkv;*.avi;*.webm;*.flv;*.wmv;*.m4v;*.ts;*.mts;*.m2ts;*.3gp;*.mpg;*.mpeg;*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.wma;*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.avif;*.vcnvt)",
             "Projeto do Canivete (*.vcnvt)",
             "Todos os arquivos (*.*)",
         )

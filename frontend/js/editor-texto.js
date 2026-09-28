@@ -266,10 +266,13 @@ function veTxSalvarSrt() {
 }
 
 // Para a exportação: legendas gravadas no vídeo (se ligado)
-function veTxExport() {
+// faixa {a, b}: exportando só o trecho In→Out, as legendas vão recortadas e trazidas para o zero
+function veTxExport(faixa) {
     if (VE.legGravar === false || !(VE.legendas || []).length) return null;
     const e = veTxEstilo();
-    return { itens: VE.legendas, estilo: { ...e, razao: veTxMetricas(e).razao } };
+    const itens = !faixa ? VE.legendas : VE.legendas.filter(l => l.st < faixa.b && l.en > faixa.a)
+        .map(l => ({ ...l, st: Math.max(l.st, faixa.a) - faixa.a, en: Math.min(l.en, faixa.b) - faixa.a }));
+    return itens.length ? { itens, estilo: { ...e, razao: veTxMetricas(e).razao } } : null;
 }
 
 // ─────────────────────────── painel ───────────────────────────

@@ -448,10 +448,10 @@
                                     <div class="ve-badge" id="ve-proxy-badge" hidden title="Este formato não toca direto no app: você vê uma cópia leve. A exportação usa o arquivo original, em qualidade máxima.">PRÉVIA LEVE</div>
                                     <div class="ve-empty" id="ve-empty">
                                         <div class="ve-empty-icon"><svg class="i"><use href="#i-film"/></svg></div>
-                                        <div class="ve-empty-title">Arraste um vídeo aqui</div>
+                                        <div class="ve-empty-title">Arraste um vídeo ou imagem aqui</div>
                                         <div class="ve-empty-sub">ou</div>
                                         <button class="ve-btn ve-btn-primary ve-btn-lg" onclick="veOpenFile()">Abrir vídeo</button>
-                                        <div class="ve-empty-hint">MP4 · MOV · MKV · AVI · WEBM · HEVC/iPhone e mais</div>
+                                        <div class="ve-empty-hint">MP4 · MOV · MKV · AVI · WEBM · HEVC/iPhone · PNG · JPG e mais</div>
                                     </div>
                                     <div class="ve-loading" id="ve-loading" hidden>
                                         <div class="ve-spinner"></div>
@@ -568,6 +568,11 @@
                                     <div class="ve-fx-list" id="ve-fx-list"></div>
                                     <div class="ve-fx-hint">Arraste um efeito até um clipe na timeline, ou selecione o clipe e dê duplo clique no efeito.</div>
                                 </div>
+                                <div class="ve-panel ve-tabpane" id="ve-pane-trans" data-panel="trans" data-title="Transições">
+                                    <div class="ve-fx-search"><svg class="i"><use href="#i-search"/></svg><input type="text" id="ve-tr-q" placeholder="Buscar transição" autocomplete="off"></div>
+                                    <div class="ve-tr-grid" id="ve-tr-list"></div>
+                                    <div class="ve-fx-hint">Passe o mouse para ver o exemplo. Arraste até o corte entre dois clipes (ou o início/fim de um clipe); a borda do bloco na timeline muda a duração.</div>
+                                </div>
                                 <div class="ve-panel ve-tabpane" id="ve-pane-keys" data-panel="keys" data-title="Atalhos">
                                     <div class="ve-keys">
                                         <h4>Reprodução</h4>
@@ -578,6 +583,10 @@
                                         <div><kbd>Home</kbd> <kbd>End</kbd> Início / Fim</div>
                                         <h4>Edição</h4>
                                         <div><kbd>'</kbd> <kbd>S</kbd> ou <kbd>Ctrl</kbd>+<kbd>K</kbd> Cortar todas as trilhas na agulha</div>
+                                        <div><kbd>E</kbd> Cortar só os clipes selecionados na agulha</div>
+                                        <div>Arraste uma transição do painel Transições até o corte · arraste a borda do bloco para mudar a duração</div>
+                                        <div>Arrastar na área vazia da timeline seleciona vários clipes · <kbd>Shift</kbd>+clique soma / tira da seleção</div>
+                                        <div>Botão do elo (timeline): seleção vinculada — desligada, clicar no vídeo ou no áudio pega só aquela parte</div>
                                         <div><kbd>D</kbd> ou <kbd>Delete</kbd> Apagar clipe selecionado (o espaço fica) · <kbd>Shift</kbd>+<kbd>D</kbd> apaga e fecha o espaço</div>
                                         <div><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>X</kbd> copiar / recortar · <kbd>Ctrl</kbd>+<kbd>V</kbd> cola na agulha, na mesma trilha</div>
                                         <div><kbd>Alt</kbd>+arrastar um clipe (na timeline ou no monitor) duplica · <kbd>Alt</kbd>+<kbd>↑</kbd> <kbd>↓</kbd> muda o clipe de trilha</div>
@@ -624,6 +633,7 @@
                                 <button class="ve-btn ve-btn-sm" onclick="veExtractInOut()" title="Remover trecho In→Out (X)">✂ In→Out</button>
                                 <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="veResetEdits()" title="Voltar ao vídeo original">↺ Restaurar tudo</button>
                                 <div class="ve-top-spacer"></div>
+                                <button class="ve-seg-btn ve-snap active" id="ve-vinculo" onclick="veToggleVinculo()" title="Seleção vinculada: ligada, clicar no vídeo ou no áudio seleciona os dois; desligada, só a parte clicada"><svg class="i"><use href="#i-link"/></svg></button>
                                 <button class="ve-seg-btn ve-snap active" id="ve-snap" onclick="veToggleSnap()" title="Ímã: encaixar na agulha e nos cortes (N)"><svg class="i"><use href="#i-magnet"/></svg></button>
                                 <div class="ve-zoom">
                                     <button class="ve-icon-btn" onclick="veZoomBy(1/1.5)" title="Menos zoom (-)">−</button>
@@ -1407,6 +1417,7 @@
     <script src="js/app.js"></script>
     <script src="js/editor.js"></script>
     <script src="js/editor-fx.js"></script>
+    <script src="js/editor-trans.js"></script>
     <script src="js/editor-lc.js"></script>
     <script src="js/editor-audio.js"></script>
     <script src="js/editor-texto.js"></script>

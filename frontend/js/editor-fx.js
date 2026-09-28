@@ -6,6 +6,8 @@
 // A prévia e a exportação precisam fazer a mesma conta.
 // =========================================================
 
+const VE_KEY_PADRAO = '#00b140';   // verde de chroma key (Chroma Key, mais abaixo)
+
 const VE_FX = {
     blur: {
         nome: 'Desfoque gaussiano', cat: 'Desfoque e nitidez', tag: 'Blur',
@@ -78,6 +80,29 @@ const VE_FX = {
             return o;
         },
     },
+    key: {
+        nome: 'Chroma Key', cat: 'Chaveamento', tag: 'Keylight', soClipe: true,
+        params: [
+            { k: 'cor', nome: 'Cor da tela', tipo: 'cor', def: VE_KEY_PADRAO },
+            { k: 'ganho', nome: 'Ganho da tela', min: 0, max: 200, step: 1, def: 100, un: '%' },
+            { k: 'bal', nome: 'Equilíbrio', min: 0, max: 100, step: 1, def: 50, un: '%' },
+            { k: 'preto', nome: 'Recorte do preto', min: 0, max: 99, step: 0.5, def: 0, un: '%' },
+            { k: 'branco', nome: 'Recorte do branco', min: 1, max: 100, step: 0.5, def: 100, un: '%' },
+            { k: 'encolher', nome: 'Encolher / expandir', min: -10, max: 10, step: 1, def: 0, un: 'px' },
+            { k: 'suave', nome: 'Suavizar borda', min: 0, max: 20, step: 0.5, def: 0, un: 'px' },
+            { k: 'spill', nome: 'Remover reflexo', min: 0, max: 100, step: 1, def: 100, un: '%' },
+            { k: 'matte', nome: 'Mostrar matte (só na prévia)', tipo: 'bool', def: 0 },
+        ],
+        neutro: () => false,
+        draw: (a, v, env) => veKeyDraw(a, v, env),
+        exportar: v => {
+            const k = veKeyCalc(v), e = k.eq, c = 1 - e;
+            // coeficientes do colorchannelmixer para o alfa (aa = 0,5 com o alfa de entrada 255 = constante)
+            const mix = k.azul ? { ar: 0.5 * e, ag: 0.5 * c, ab: -0.5 } : { ar: 0.5 * e, ag: -0.5, ab: 0.5 * c };
+            return { azul: k.azul ? 1 : 0, ...mix, dk: k.dk, ganho: k.ganho, cb: k.cb, cw: k.cw, eq: e,
+                     spill: k.spill, choke: k.choke, suave: k.suave };
+        },
+    },
     crop: {
         nome: 'Cortar', cat: 'Transformar', tag: 'Crop',
         params: [
@@ -101,6 +126,101 @@ const VE_FX = {
     },
 };
 
+// ── Chroma Key (como Keylight / Ultra Key) ──
+// Matte por DIFERENÇA DE COR (o núcleo do Keylight e do IBK do Nuke), não por distância de cor: a transparência vem
+// de quanto o canal da tela (G ou B) passa dos outros dois, medido em relação à cor da tela. Preserva cabelo, desfoque
+// de movimento e semitransparência melhor que "chave por tolerância". Passos (iguais aos do ffmpeg, _filtros_fx):
+//   1. bruto = 0,5 + 0,5·(eq·R − G + (1−eq)·B) (tela azul: troca G↔B)   → colorchannelmixer (alfa, 8 bits)
+//   2. d = 1 − 2·bruto; alfa = 1 − ganho·d/dk; recorte preto/branco      → lutrgb no alfa
+//   3. reflexo: s = max(G − (R·eq + B·(1−eq)), 0); G −= quant·s          → despill
+//   4. encolher/expandir (mínimo/máximo 3×3, n vezes) e suavizar (gaussiano) só no alfa → erosion/dilation, gblur
+function veKeyCalc(v) {
+    const hx = /^#[0-9a-f]{6}$/i.test(v.cor) ? v.cor : VE_KEY_PADRAO;
+    const kr = parseInt(hx.slice(1, 3), 16) / 255, kg = parseInt(hx.slice(3, 5), 16) / 255, kb = parseInt(hx.slice(5, 7), 16) / 255;
+    const azul = kb > kg, eq = v.bal / 100;
+    // canal da tela S e os outros dois (o1 pesa eq, o2 pesa 1−eq)
+    const dk = Math.max(0.05, azul ? kb - (eq * kr + (1 - eq) * kg) : kg - (eq * kr + (1 - eq) * kb));
+    const cb = Math.min(v.preto, v.branco - 1) / 100, cw = Math.max(v.branco, v.preto + 1) / 100;
+    const ganho = v.ganho / 100;
+    const lut = new Uint8ClampedArray(256);
+    for (let i = 0; i < 256; i++) {
+        const a = 1 - ganho * (1 - 2 * i / 255) / dk;
+        lut[i] = Math.round(Math.min(1, Math.max(0, (a - cb) / (cw - cb))) * 255);
+    }
+    return { azul, eq, dk, cb, cw, ganho, lut, spill: v.spill / 100, choke: Math.round(v.encolher), suave: v.suave };
+}
+const VEKEY = { a: null, b: null, m: null, m2: null };
+function veKeyCv(k, w, h) {
+    if (!VEKEY[k]) { const cv = document.createElement('canvas'); VEKEY[k] = { cv, ctx: cv.getContext('2d', { willReadFrequently: true }) }; }
+    const o = VEKEY[k];
+    if (o.cv.width !== w || o.cv.height !== h) { o.cv.width = w; o.cv.height = h; }
+    return o;
+}
+// n passes de mínimo (encolher, n > 0) ou máximo (expandir, n < 0) 3×3 no alfa (separável)
+function veKeyMorf(al, w, h, n) {
+    const tmp = new Uint8ClampedArray(al.length), f = n > 0 ? Math.min : Math.max;
+    for (let p = 0; p < Math.abs(n); p++) {
+        for (let y = 0; y < h; y++) {
+            const o = y * w;
+            for (let x = 0; x < w; x++) tmp[o + x] = f(al[o + Math.max(0, x - 1)], al[o + x], al[o + Math.min(w - 1, x + 1)]);
+        }
+        for (let y = 0; y < h; y++) {
+            const a = Math.max(0, y - 1) * w, o = y * w, b = Math.min(h - 1, y + 1) * w;
+            for (let x = 0; x < w; x++) al[o + x] = f(tmp[a + x], tmp[o + x], tmp[b + x]);
+        }
+    }
+}
+function veKeyDraw(a, v, env) {
+    const k = veKeyCalc(v), { w, h } = env;
+    const A = veKeyCv('a', w, h);
+    A.ctx.clearRect(0, 0, w, h);
+    A.ctx.drawImage(a.cv, 0, 0);
+    const img = A.ctx.getImageData(0, 0, w, h), d = img.data, n = w * h, al = new Uint8ClampedArray(n);
+    const eq = k.eq, ceq = 1 - eq, amt = k.spill, lut = k.lut;
+    for (let i = 0, j = 0; i < n; i++, j += 4) {
+        const r = d[j], g = d[j + 1], b = d[j + 2];
+        const bruto = k.azul ? 0.5 * eq * r + 0.5 * ceq * g - 0.5 * b + 127.5 : 0.5 * eq * r - 0.5 * g + 0.5 * ceq * b + 127.5;
+        const src = d[j + 3];
+        al[i] = src === 0 ? 0 : Math.round(lut[Math.max(0, Math.min(255, Math.round(bruto)))] * src / 255);
+        if (amt > 0) {
+            if (k.azul) { const s = b - (r * eq + g * ceq); if (s > 0) d[j + 2] = b - amt * s; }
+            else { const s = g - (r * eq + b * ceq); if (s > 0) d[j + 1] = g - amt * s; }
+        }
+        d[j + 3] = 255;
+    }
+    const ch = Math.round(k.choke * env.q);
+    if (ch) veKeyMorf(al, w, h, ch);
+    // máscara (branco com o alfa): serve para suavizar e para "Mostrar matte"
+    const M = veKeyCv('m', w, h), mi = M.ctx.createImageData(w, h), md = mi.data;
+    for (let i = 0, j = 0; i < n; i++, j += 4) { md[j] = md[j + 1] = md[j + 2] = 255; md[j + 3] = al[i]; }
+    M.ctx.putImageData(mi, 0, 0);
+    let mask = M.cv;
+    const sp = k.suave * env.q;
+    if (sp >= 0.05) {
+        const M2 = veKeyCv('m2', w, h);
+        M2.ctx.clearRect(0, 0, w, h);
+        M2.ctx.filter = `blur(${sp}px)`;
+        M2.ctx.drawImage(M.cv, 0, 0);
+        M2.ctx.filter = 'none';
+        mask = M2.cv;
+    }
+    const out = veFxOther(a, w, h);
+    out.ctx.globalCompositeOperation = 'source-over';
+    if (v.matte) {
+        out.ctx.fillStyle = '#000';
+        out.ctx.fillRect(0, 0, w, h);
+        out.ctx.drawImage(mask, 0, 0);
+        return out;
+    }
+    A.ctx.putImageData(img, 0, 0);   // RGB sem o reflexo, opaco
+    out.ctx.clearRect(0, 0, w, h);
+    out.ctx.drawImage(A.cv, 0, 0);
+    out.ctx.globalCompositeOperation = 'destination-in';
+    out.ctx.drawImage(mask, 0, 0);
+    out.ctx.globalCompositeOperation = 'source-over';
+    return out;
+}
+
 const VEFX = { pool: [], collapsed: new Set(), key: '', drag: null };
 
 // Canvases reaproveitados (0 e 1 alternam entre os passos; 2 = área com borda do desfoque)
@@ -117,7 +237,10 @@ function veFxOther(a, w, h) { return veFxCanvas(a === VEFX.pool[0] ? 1 : 0, w, h
 
 function veFxValues(f) {
     const d = VE_FX[f.t], v = {};
-    d.params.forEach(p => { v[p.k] = f.v && isFinite(f.v[p.k]) ? +f.v[p.k] : p.def; });
+    d.params.forEach(p => {
+        if (p.tipo === 'cor') v[p.k] = f.v && /^#[0-9a-f]{6}$/i.test(f.v[p.k]) ? f.v[p.k] : p.def;
+        else v[p.k] = f.v && isFinite(f.v[p.k]) ? +f.v[p.k] : p.def;
+    });
     (d.extra || []).forEach(k => { v[k] = f.v && f.v[k] != null ? f.v[k] : {}; });
     return v;
 }
@@ -164,6 +287,7 @@ function veFxAdd(i, t) {
     if (!c || !VE_FX[t]) return;
     if (veLocked(c)) { veAvisoBloqueio(); return; }
     if (veIsAudio(c)) { veToast('Efeitos de vídeo não se aplicam a um clipe de áudio'); return; }
+    if (VE_FX[t].soClipe && veIsAdj(c)) { veToast(`${VE_FX[t].nome} não se aplica a uma camada de ajuste`); return; }
     if (VE.info && VE.info.audio_only) { veToast('Efeitos de vídeo precisam de um vídeo ou imagem'); return; }
     const painel = VE_FX[t].painel;
     if (painel && c.fx && c.fx.some(f => f.t === t)) {   // um só por clipe: abre o painel dele
@@ -196,6 +320,7 @@ function veFxAction(id, act) {
     const j = c.fx.findIndex(f => f.id === id);
     if (j < 0) return;
     if (act === 'open') { vedShow(VE_FX[c.fx[j].t].painel); return; }
+    if (act === 'gotas') { veKeyGotas(id); return; }
     if (act === 'fold') {
         VEFX.collapsed.has(id) ? VEFX.collapsed.delete(id) : VEFX.collapsed.add(id);
         VEFX.key = '';
@@ -241,7 +366,13 @@ function veRenderFxControls() {
                     <button data-fa="del" title="Remover efeito">✕</button>
                 </div>
                 <div class="ve-fxe-body">${d.painel ? `
-                    <button class="ve-btn ve-btn-sm ve-fxe-open" data-fa="open">Editar no painel ${d.nome}</button>` : d.params.map(p => `
+                    <button class="ve-btn ve-btn-sm ve-fxe-open" data-fa="open">Editar no painel ${d.nome}</button>` : d.params.map(p => p.tipo === 'cor' ? `
+                    <div class="ve-prop ve-prop-cor">
+                        <label>${p.nome}</label>
+                        <input type="color" data-fk="${p.k}">
+                        <button class="ve-btn ve-btn-sm" data-fa="gotas" title="Conta-gotas: clique na tela verde/azul no monitor">⌖ Conta-gotas</button>
+                    </div>` : p.tipo === 'bool' ? `
+                    <label class="ve-prop-bool"><input type="checkbox" data-fk="${p.k}"> ${p.nome}</label>` : `
                     <div class="ve-prop">
                         <label>${p.nome}</label>
                         <input type="range" min="${p.min}" max="${p.max}" step="${p.step}" data-fk="${p.k}">
@@ -255,7 +386,9 @@ function veRenderFxControls() {
         if (!d || !el) return;
         const v = veFxValues(f);
         d.params.forEach(p => el.querySelectorAll(`[data-fk="${p.k}"]`).forEach(inp => {
-            if (inp.ownerDocument.activeElement !== inp) inp.value = veFxFmt(p, v[p.k]);
+            if (p.tipo === 'bool') inp.checked = !!v[p.k];
+            else if (p.tipo === 'cor') { if (inp.ownerDocument.activeElement !== inp) inp.value = v[p.k]; }
+            else if (inp.ownerDocument.activeElement !== inp) inp.value = veFxFmt(p, v[p.k]);
         }));
     });
 }
@@ -264,8 +397,10 @@ function veFxSetParam(id, k, val) {
     const c = VE.clips[VE.sel];
     const f = c && c.fx && c.fx.find(x => x.id === id);
     const p = f && VE_FX[f.t] && VE_FX[f.t].params.find(x => x.k === k);
-    if (!p || !isFinite(val)) return;
-    val = Math.min(Math.max(val, p.min), p.max);
+    if (!p) return;
+    if (p.tipo === 'cor') { if (!/^#[0-9a-f]{6}$/i.test(val)) return; }
+    else if (p.tipo === 'bool') val = val ? 1 : 0;
+    else { if (!isFinite(val)) return; val = Math.min(Math.max(val, p.min), p.max); }
     veFxEdit(id, x => { x.v[k] = val; return x; });
     veRenderFxControls();
     veDrawMonitorSoon();
@@ -361,9 +496,49 @@ function veFxInit() {
         const el = e.target.closest('[data-fk]');
         if (!el) return;
         if (!VE._fxEdit) { vePushHistory(); VE._fxEdit = true; }
-        veFxSetParam(el.closest('[data-fx]').dataset.fx, el.dataset.fk, parseFloat(String(el.value).replace(',', '.')));
+        const val = el.type === 'checkbox' ? el.checked : el.type === 'color' ? el.value : parseFloat(String(el.value).replace(',', '.'));
+        veFxSetParam(el.closest('[data-fx]').dataset.fx, el.dataset.fk, val);
+        if (el.type === 'checkbox') { VE._fxEdit = false; veDrawMonitor(); }
     });
     box.addEventListener('change', () => { VE._fxEdit = false; veRenderClips(); veDraw(); });
 }
 
+// Conta-gotas do Chroma Key: o próximo clique no monitor pega a cor (média 5×5) com o efeito desligado
+function veKeyGotas(id) {
+    VEFX.gotas = { id, sel: VE.sel };
+    $ve('ve-screen').classList.add('ve-gotas');
+    veToast('Clique na tela verde/azul no monitor (Esc cancela)');
+}
+function veKeyGotasFim() {
+    VEFX.gotas = null;
+    $ve('ve-screen')?.classList.remove('ve-gotas');
+}
+function veKeyGotasInit() {
+    const scr = $ve('ve-screen');
+    if (!scr) return;
+    scr.addEventListener('pointerdown', e => {
+        const g = VEFX.gotas;
+        if (!g) return;
+        e.stopImmediatePropagation(); e.preventDefault();   // o clique não move a camada nem dá play
+        veKeyGotasFim();
+        if (e.button !== 0 || VE.sel !== g.sel) return;
+        const cv = $ve('ve-canvas'), r = cv.getBoundingClientRect();
+        const x = Math.round((e.clientX - r.left) / r.width * cv.width), y = Math.round((e.clientY - r.top) / r.height * cv.height);
+        if (x < 0 || y < 0 || x >= cv.width || y >= cv.height) return;
+        veFxEdit(g.id, f => ({ ...f, on: false }));
+        veDrawMonitor();
+        const px = cv.getContext('2d').getImageData(Math.max(0, x - 2), Math.max(0, y - 2), 5, 5).data;
+        veFxEdit(g.id, f => ({ ...f, on: true }));
+        let s = [0, 0, 0], n = 0;
+        for (let i = 0; i < px.length; i += 4) { s[0] += px[i]; s[1] += px[i + 1]; s[2] += px[i + 2]; n++; }
+        const hx = '#' + s.map(c => Math.round(c / n).toString(16).padStart(2, '0')).join('');
+        vePushHistory();
+        veFxSetParam(g.id, 'cor', hx);
+        veRefresh();
+        veToast('Cor da tela: ' + hx);
+    }, true);
+    scr.ownerDocument.addEventListener('keydown', e => { if (e.key === 'Escape' && VEFX.gotas) veKeyGotasFim(); }, true);
+}
+
 document.addEventListener('DOMContentLoaded', veFxInit);
+document.addEventListener('DOMContentLoaded', veKeyGotasInit);

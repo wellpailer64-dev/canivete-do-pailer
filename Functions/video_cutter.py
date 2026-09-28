@@ -32,6 +32,8 @@ FORMATOS_ENTRADA = {
     # só áudio: o editor também corta/ajusta áudio e exporta em MP3/WAV
     ".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".wma", ".aiff", ".aif",
 }
+# imagem também abre o editor: a sequência nasce com o tamanho dela (_base_imagem)
+FORMATOS_IMAGEM = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".avif", ".tif", ".tiff"}
 # áudio que o player do app toca direto (o resto ganha uma prévia .m4a)
 _NAVEGADOR_AUDIO = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus"}
 
@@ -71,6 +73,35 @@ def _work_dir():
     d = os.path.join(tempfile.gettempdir(), "canivete_editor")
     os.makedirs(d, exist_ok=True)
     return d
+
+
+def _eh_imagem(path):
+    return os.path.splitext(str(path))[1].lower() in FORMATOS_IMAGEM
+
+
+def _base_imagem(path):
+    """
+    Timeline começando por uma imagem: o editor precisa de um vídeo base (tamanho, qps, fundo da exportação).
+    Gera um vídeo preto mudo de 1 s no tamanho da imagem (par), guardado fora da pasta de prévias (que é limpa a
+    cada abertura) e reaproveitado por tamanho. A imagem em si entra na timeline como clipe comum.
+    """
+    info = probe(path)
+    w, h = info.get("width") or 1920, info.get("height") or 1080
+    w, h = w + (w % 2), h + (h % 2)
+    pasta = os.path.join(tempfile.gettempdir(), "canivete_editor_bases")
+    os.makedirs(pasta, exist_ok=True)
+    saida = os.path.join(pasta, f"base_{w}x{h}.mp4")
+    if not os.path.isfile(saida):
+        tmp = saida + ".tmp.mp4"
+        r = subprocess.run([ffmpeg_path(), "-y", "-hide_banner", "-loglevel", "error",
+                            "-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=30:d=1",
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", tmp],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           timeout=60, creationflags=_creationflags())
+        if r.returncode != 0 or not os.path.isfile(tmp):
+            raise RuntimeError((r.stderr or "falha ao gerar a base").strip().splitlines()[-1])
+        os.replace(tmp, saida)
+    return saida
 
 
 def limpar_previews():
@@ -399,6 +430,13 @@ def preparar(path, emit, stop_event=None):
     if not os.path.isfile(path):
         emit({"stage": "error", "error": "Arquivo não encontrado."})
         return
+    aberto = path   # o que o usuário abriu (numa imagem, a mídia de verdade é a base preta)
+    if _eh_imagem(path):
+        try:
+            path = _base_imagem(path)
+        except Exception as e:
+            emit({"stage": "error", "error": f"Não foi possível abrir a imagem: {e}"})
+            return
     ext = os.path.splitext(path)[1].lower()
     if ext not in FORMATOS_ENTRADA:
         emit({"stage": "error", "error": f"Formato não suportado: {ext or 'sem extensão'}"})
@@ -423,8 +461,8 @@ def preparar(path, emit, stop_event=None):
     direto = _navegador_toca(path, info)
     if info["has_audio"]:
         _conformar_audio(path, work)
-    emit({"stage": "info", "path": path, "file_name": os.path.basename(path),
-          "needs_proxy": not direto, **info})
+    emit({"stage": "info", "path": aberto, "file_name": os.path.basename(aberto),
+          "needs_proxy": not direto, **info, "base_imagem": aberto != path})
 
     # Forma de onda em paralelo; miniaturas em paralelo (toca direto) ou junto com a prévia leve
     count = int(min(180, max(24, info["duration"] / 2)))
@@ -997,6 +1035,32 @@ def _filtros_fx(fx, mw, mh, tag="x"):
                 # igual ao filtro brightness()+contrast() do navegador
                 e = f"clip((clip(val*{b:.4f},0,255)-127.5)*{c:.4f}+127.5,0,255)"
                 out.append(f"lutrgb=r='{e}':g='{e}':b='{e}'")
+        elif t == "key":
+            # Chroma Key por diferença de cor (mesmas contas da prévia: veKeyDraw em editor-fx.js)
+            if tag.startswith("a"):
+                continue   # não vale em camada de ajuste
+            ar, ag, ab = (_num(v.get(k), -2, 2) for k in ("ar", "ag", "ab"))
+            dk, ganho = _num(v.get("dk"), 0.05, 1, 0.5), _num(v.get("ganho"), 0, 2, 1)
+            cb, cw = _num(v.get("cb"), 0, 0.99), _num(v.get("cw"), 0.01, 1, 1)
+            cw = max(cw, cb + 0.01)
+            eq, spill = _num(v.get("eq"), 0, 1, 0.5), _num(v.get("spill"), 0, 1, 1)
+            choke, suave = int(round(_num(v.get("choke"), -10, 10))), _num(v.get("suave"), 0, 20)
+            a = f"clip(((1-{ganho:.5f}*(1-2*val/255)/{dk:.5f})-{cb:.5f})/{cw - cb:.5f},0,1)*255"
+            cadeia = [f"colorchannelmixer=ar={ar:.5f}:ag={ag:.5f}:ab={ab:.5f}:aa=0.5",
+                      # o alfa bruto sai do vídeo opaco; a imagem com transparência própria multiplica depois
+                      f"lutrgb=a='{a}'"]
+            if spill > 0.001:
+                azul = 1 if v.get("azul") else 0
+                cadeia.append(f"despill=type={azul}:mix={eq:.5f}:expand=0:red=0:green={-spill if not azul else 0:.4f}"
+                              f":blue={-spill if azul else 0:.4f}:brightness=0:alpha=0")
+            if choke or suave >= 0.05:
+                cadeia.append("format=gbrap")
+                morf = "erosion" if choke > 0 else "dilation"
+                cadeia += [f"{morf}=threshold0=0:threshold1=0:threshold2=0"] * abs(choke)
+                if suave >= 0.05:
+                    cadeia.append(f"gblur=sigma={suave:.3f}:planes=8")
+                cadeia.append("format=rgba")
+            out.append(",".join(cadeia))
         elif t == "crop":
             l, tp, r, bt = (_num(v.get(k), 0, 100) / 100.0 for k in ("l", "t", "r", "b"))
             # a área cortada fica transparente (a camada de baixo aparece), sem mudar o tamanho
@@ -1100,6 +1164,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     prog = on_progress or (lambda p, m: None)
     if not os.path.isfile(path):
         return {"success": False, "error": "Arquivo não encontrado."}
+    aberto = path   # nome e pasta da saída vêm do que o usuário abriu
+    if _eh_imagem(path):
+        path = _base_imagem(path)   # timeline que começou por uma imagem: fundo preto no tamanho dela
 
     formato_saida = str(formato_saida).lower()
     cfg = FORMATOS_SAIDA.get(formato_saida, FORMATOS_SAIDA["mp4"])
@@ -1142,7 +1209,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     simples = not lay and audio_segmentos is None and mix is None
     if not simples:
         pecas, pecas_a = _completar(pecas), _completar(pecas_a)
-    saida = _nome_saida(path, cfg["ext"], pasta_saida)
+    saida = _nome_saida(aberto, cfg["ext"], pasta_saida)
     # áudios soltos na timeline dão som ao vídeo mesmo que o vídeo aberto não tenha
     extras = sorted({c[4] for c in (mix or []) if c[4]})
     if mix is not None and not info["has_audio"]:

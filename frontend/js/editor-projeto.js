@@ -16,7 +16,7 @@ const VE_PJ_TIPOS = {
 };
 const VE_EXT_SRT = /\.srt$/i;
 
-const vePjMidia = () => VE.media.filter(m => m && !m.removido && VE_PJ_TIPOS[m.kind]);
+const vePjMidia = () => VE.media.filter(m => m && !m.removido && !m.base && VE_PJ_TIPOS[m.kind]);
 const vePjNome = m => m.nome || m.name || VE_PJ_TIPOS[m.kind][1];
 const vePjBin = id => (VE.bins || []).find(b => b.id === id);
 const vePjUso = m => VE.clips.filter(c => (c.m || 0) === m.id).length;

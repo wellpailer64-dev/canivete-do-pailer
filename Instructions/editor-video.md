@@ -287,3 +287,59 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
 - Exportação:
   - Só o vídeo aberto vai na base (concat); os outros vão como camada, com o arquivo deles (`c.path`).
   - O som de cada um entra no `_grafo_mix` pelo próprio arquivo.
+
+## Seleção múltipla, seleção vinculada e E (como no Premiere)
+- **Retângulo:** arrastar na área vazia da timeline seleciona tudo o que ele tocar. **Shift** soma à seleção.
+- **Shift+clique:** põe ou tira um clipe da seleção. Clicar num clipe que já está na seleção mantém o grupo.
+- Com vários selecionados: arrastar move todos juntos (Alt = cópias), D/Delete apaga todos (Shift+D fecha os espaços vazios).
+- **E:** corta na agulha só os selecionados. `'` / S continuam cortando todas as trilhas.
+- **Seleção vinculada** (botão do elo na barra da timeline, fica salvo no navegador):
+  - Ligada: clicar no vídeo ou no áudio pega os dois; aparar a borda mexe no par.
+  - Desligada: pega só a parte clicada. O clipe se separa em dois (`c.x = 'v'` imagem sem som, `c.x = 'a'` só o som),
+    vinculados por `c.lk`. Separar não muda a prévia nem a exportação.
+- Cortes dão um `lk` novo aos pedaços da direita (`veLkMapa`); cópias não herdam o `lk` (`veCopiaClipe`).
+- Código: `veSelLista`/`veSelDefinir`, `vePegar`, `veSeparar`, `veMoverGrupo`, `veApagarVarios`, `veMarqueeFim` e
+  `veCortarSelecionados` em `editor.js`. `VE.sel` segue sendo o principal; `VE.selx` só vale enquanto `prim` for ele.
+
+## Transições de vídeo (MVP, no estilo Film Impact) — `editor-trans.js`
+- Tipos (`VE_TR`): Dissolução cruzada, Empurrar (Push), Deslizar (Slide), Puxar/zoom (Pull) e Pop.
+  Cada um é `fn(u) → {a, b}` (quem sai / quem entra): `dx`/`dy` em quadros, `s` escala, `op` 0..1. Quem entra fica por cima.
+- Ficam no painel próprio **Transições** (aba ao lado de Efeitos): cartões com o exemplo animado (ícone do Canivete,
+  `identidade/splash.png`) ao passar o mouse; parado mostra o meio da transição. Arrastar até a timeline: metade inicial do clipe = entrada dele;
+  metade final = corte com o próximo (ou saída para o nada se não houver próximo). Duplo clique = entrada do selecionado.
+- Guardadas no clipe: `c.tin = {t, d}` (entrada) e `c.tout = {t, d}` (saída sem vizinho). Duração padrão 1 s.
+  Cortar um clipe: a entrada fica no pedaço da esquerda e a saída no da direita (`veSemTin`/`veSemTout`).
+- No corte a transição fica centrada e usa a mídia que sobra além dos pontos de corte; sem sobra ela se desloca e,
+  se preciso, encurta (`veTransJanela`). Imagem/texto: sobra infinita.
+- Timeline: bloco roxo sobre o clipe; clique seleciona, D/Delete apaga, arrastar a borda muda a duração (no corte, simétrica).
+- Prévia e exportação usam `veTransVirtuais()`: cópias dos clipes estendidas pela sobra e com a animação virando
+  quadros-chave lineares por quadro (sc, x, y, op) compostos com os do clipe. O som fica numa cópia à parte, no trecho
+  original. `veExportPlan` troca `VE.clips` pelos virtuais só durante o plano; clipes com `_tr` vão como camadas.
+- Tipo novo: acrescente em `VE_TR` (nada muda no Python: tudo vira quadro-chave de camada).
+- Prévia sem piscar: cada clipe da transição usa um player fixo (`VEX[VE_TR_PL0+n]`, `veTransPlayers`), preparado
+  `VE_TR_PRE` s antes (o que entra espera parado no 1º quadro). Sem quadro pronto, o monitor segura o último desenho.
+
+## Exportar só In→Out
+- Com entrada (I) e/ou saída (O) marcadas, a exportação leva só esse trecho (`veExportFaixa`, `veRecortarClips`);
+  legendas recortadas e trazidas para o zero. O resumo da exportação mostra o trecho. A transcrição usa a timeline inteira
+  (`veExportPlan()` sem `emFaixa`).
+
+## Começar a timeline por uma imagem
+- Abrir (ou soltar) uma imagem sem nada aberto: a sequência nasce com o tamanho dela e a imagem entra em V1 com 5 s
+  (`veIniciarComImagem`). Várias imagens soltas juntas entram em sequência.
+- O editor precisa de um vídeo base (mídia 0): o Python gera um vídeo preto mudo de 1 s no tamanho da imagem
+  (`_base_imagem`, em `%TEMP%\canivete_editor_bases`, reaproveitado por tamanho). `VE.path` continua sendo a imagem;
+  `preparar` e `exportar_video` trocam pela base. A mídia 0 fica com `base: true` e não aparece no painel Projeto.
+- Saída da exportação: nome e pasta da imagem.
+
+## Chroma Key (efeito, categoria Chaveamento) — como Keylight / Ultra Key
+- Método: **diferença de cor** (núcleo do Keylight e do IBK do Nuke), não distância de cor (`chromakey`/`colorkey` do
+  ffmpeg): transparência = quanto o canal da tela (G ou B, escolhido pela cor) passa dos outros dois, medido em relação
+  à cor da tela. Preserva cabelo, desfoque e semitransparência.
+- Controles: Cor da tela (conta-gotas no monitor, média 5×5 com o efeito desligado), Ganho, Equilíbrio (peso R×B),
+  Recorte do preto/branco, Encolher/expandir (px), Suavizar borda (px), Remover reflexo (%), Mostrar matte (só prévia).
+- Prévia: `veKeyDraw` (editor-fx.js), pixel a pixel no tamanho em que a mídia aparece (~19 ms em 1280×720).
+- Exportação (`_filtros_fx`, t == "key"): `colorchannelmixer` (alfa bruto, 8 bits) → `lutrgb` no alfa (ganho e
+  recortes) → `despill` → [`format=gbrap`, `erosion`/`dilation` só no alfa × n, `gblur planes=8`] → `format=rgba`.
+  Os coeficientes saem prontos do JS (`exportar`); a prévia faz as mesmas contas.
+- Não vale em camada de ajuste (`soClipe`).
