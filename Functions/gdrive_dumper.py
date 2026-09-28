@@ -158,6 +158,36 @@ try:
     from Functions._credenciais import CLIENT_SECRET
 except Exception:  # ausente ou com defeito: nunca derruba o app
     CLIENT_SECRET = os.environ.get("GDRIVE_CLIENT_SECRET", "")
+CLIENT_SECRET = (CLIENT_SECRET or "").strip()
+
+
+def _marca_recusa():
+    return os.path.join(_logs_dir(), "gdrive_credencial_recusada.txt")
+
+
+def _assinatura_secret():
+    import hashlib
+    return hashlib.sha256(CLIENT_SECRET.encode()).hexdigest()[:16]
+
+
+def _credencial_propria_ativa():
+    """Falso se não há secret ou se o Google já recusou ESTE secret (invalid_client).
+    Um build com secret novo tem outra assinatura e volta a tentar a credencial própria."""
+    if not CLIENT_SECRET:
+        return False
+    try:
+        with open(_marca_recusa(), encoding="utf-8") as f:
+            return f.read().strip() != _assinatura_secret()
+    except Exception:
+        return True
+
+
+def _marcar_recusa():
+    try:
+        with open(_marca_recusa(), "w", encoding="utf-8") as f:
+            f.write(_assinatura_secret())
+    except Exception:
+        pass
 
 
 def _config_gdrive():
@@ -171,21 +201,30 @@ def _config_gdrive():
 
 
 def usa_client_proprio():
+    """Remote pronto: com a credencial própria ou, se ela foi recusada, com a padrão do rclone."""
     cfg = _config_gdrive()
-    return bool(cfg) and cfg.get("client_id") == CLIENT_ID and bool(cfg.get("token"))
+    if not cfg or not cfg.get("token"):
+        return False
+    if _credencial_propria_ativa():
+        return cfg.get("client_id") == CLIENT_ID
+    return cfg.get("client_id") != CLIENT_ID
 
 
 def garantir_conexao(callback_log=None):
     """
     Garante o remote 'gdrive' com a credencial própria. Cria ou migra se preciso —
     o rclone abre o navegador e espera o usuário clicar em "Permitir".
+    Se o Google recusar o secret do app (invalid_client), cai para a credencial padrão do rclone.
     Retorna (ok, erro).
     """
     log = callback_log or (lambda m: None)
     cfg = _config_gdrive()
+    if not _credencial_propria_ativa():
+        return _conexao_padrao(cfg, log)
+
     if cfg and cfg.get("client_id") == CLIENT_ID and cfg.get("token"):
         # Secret salvo diferente do embutido (ex.: secret rotacionado): só atualiza, sem novo login
-        if CLIENT_SECRET and cfg.get("client_secret") != CLIENT_SECRET:
+        if cfg.get("client_secret") != CLIENT_SECRET:
             log("Atualizando a credencial do Google Drive...")
             try:
                 subprocess.run([_rclone_exe(), "config", "update", "gdrive", "client_secret", CLIENT_SECRET,
@@ -193,19 +232,9 @@ def garantir_conexao(callback_log=None):
                                stdin=subprocess.DEVNULL, creationflags=_no_window())
             except Exception:
                 pass
-        erro_auth = _testar_auth()
-        if not erro_auth:
+        if not _testar_auth():
             return True, None
         log("⚠ Login do Google recusado. Refazendo a conexão...")
-        if not CLIENT_SECRET:
-            # Sem a credencial própria: volta para a credencial padrão do rclone
-            return _reconectar([_rclone_exe(), "config", "update", "gdrive", "client_id", "",
-                                "client_secret", "", "config_refresh_token", "true"], log)
-    if not CLIENT_SECRET:
-        # Build sem a credencial própria: segue com o remote que existir (credencial padrão do rclone)
-        if cfg and cfg.get("token"):
-            return True, None
-        return False, "Google Drive não configurado e esta versão está sem a credencial do app."
 
     if cfg:
         log("Atualizando a conexão com o Google Drive (só desta vez)...")
@@ -215,7 +244,25 @@ def garantir_conexao(callback_log=None):
         log("Conectando ao Google Drive pela primeira vez...")
         cmd = [_rclone_exe(), "config", "create", "gdrive", "drive", "scope", "drive",
                "client_id", CLIENT_ID, "client_secret", CLIENT_SECRET]
-    return _reconectar(cmd, log, proprio=True)
+    ok, erro = _reconectar(cmd, log, proprio=True)
+    if ok or "invalid_client" not in (erro or "").lower():
+        return ok, erro
+    _marcar_recusa()
+    log("⚠ O Google recusou a credencial do app. Conectando pela credencial padrão do rclone — "
+        "autorize mais uma vez no navegador.")
+    return _conexao_padrao(_config_gdrive(), log)
+
+
+def _conexao_padrao(cfg, log):
+    """Remote 'gdrive' com o client_id padrão do rclone (sem a credencial própria)."""
+    if cfg and cfg.get("token") and cfg.get("client_id") != CLIENT_ID and not _testar_auth():
+        return True, None
+    if cfg:
+        cmd = [_rclone_exe(), "config", "update", "gdrive", "client_id", "", "client_secret", "",
+               "config_refresh_token", "true"]
+    else:
+        cmd = [_rclone_exe(), "config", "create", "gdrive", "drive", "scope", "drive"]
+    return _reconectar(cmd, log)
 
 
 def _reconectar(cmd, log, proprio=False):
@@ -231,10 +278,14 @@ def _reconectar(cmd, log, proprio=False):
     except FileNotFoundError:
         return False, "rclone não encontrado. Rode o setup inicial do app para baixá-lo."
 
-    if (usa_client_proprio() or not proprio) and not _testar_auth():
+    cfg = _config_gdrive() or {}
+    if bool(cfg.get("token")) and (cfg.get("client_id") == CLIENT_ID) == proprio and not _testar_auth():
         log("✅ Google Drive conectado!")
         return True, None
-    erro = (r.stderr or r.stdout or "").strip()
+    saida = (r.stderr or r.stdout or "").strip()
+    # O rclone despeja o "Usage/help" junto; mostra só as linhas de erro
+    linhas = [l for l in saida.splitlines() if re.search(r"error|failed|NOTICE", l, re.I)]
+    erro = " ".join(linhas[-2:]) if linhas else saida[-300:]
     return False, f"Não foi possível conectar ao Google Drive. {erro[-300:]}"
 
 

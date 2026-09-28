@@ -56,7 +56,7 @@ jobs:
           GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
         run: |
           if (-not $env:GDRIVE_CLIENT_SECRET) { Write-Error "Configure o secret GDRIVE_CLIENT_SECRET no repositório."; exit 1 }
-          Set-Content -Path Functions/_credenciais.py -Value "CLIENT_SECRET = `"$env:GDRIVE_CLIENT_SECRET`"" -Encoding utf8
+          Set-Content -Path Functions/_credenciais.py -Value "CLIENT_SECRET = `"$($env:GDRIVE_CLIENT_SECRET.Trim())`"" -Encoding utf8
 
       - name: Build (PyInstaller)
         shell: cmd
