@@ -79,6 +79,34 @@ def _work_dir():
     return d
 
 
+def _linhas_ffmpeg(err, n=8):
+    linhas = [l.strip() for l in (err or "").splitlines() if l.strip()]
+    if not linhas:
+        return []
+    return linhas[-n:]
+
+
+def _salvar_falha_export(cmd, script, err, saida):
+    try:
+        arq = os.path.join(_work_dir(), f"export_fail_{uuid.uuid4().hex[:8]}.log")
+        with open(arq, "w", encoding="utf-8") as f:
+            f.write("Saida:\n")
+            f.write(str(saida or "") + "\n\n")
+            f.write("Comando:\n")
+            f.write(json.dumps(cmd or [], ensure_ascii=False, indent=2) + "\n\n")
+            if script and os.path.isfile(script):
+                f.write("Filtro:\n")
+                with open(script, "r", encoding="utf-8", errors="replace") as sf:
+                    f.write(sf.read())
+                f.write("\n\n")
+            f.write("FFmpeg stderr:\n")
+            f.write(err or "")
+            f.write("\n")
+        return arq
+    except Exception:
+        return None
+
+
 def _eh_imagem(path):
     return os.path.splitext(str(path))[1].lower() in FORMATOS_IMAGEM
 
@@ -628,6 +656,10 @@ def _nome_saida(path, ext, pasta=None):
     return destino
 
 
+def _tempo_ffmpeg(t):
+    return f"{max(0.0, float(t)):.6f}"
+
+
 def _normalizar_segmentos(segmentos, duracao):
     """
     Peças da timeline, na ordem: (a, b, ganho_db) = trecho do original; ("gap", d) = espaço vazio
@@ -1047,12 +1079,20 @@ def _gerar_ass(itens, estilo, W, H):
     negrito = -1 if estilo.get("negrito", True) else 0
     italico = -1 if estilo.get("ita") else 0
     cor = _ass_cor(estilo.get("cor", "#ffffff"))
-    if fundo == "caixa":
+    folga = em * 0.22
+    caixa_alfa = round((1 - _num(estilo.get("caixaOp"), 0, 100, 64) / 100) * 255)
+    caixa_cor = _ass_cor(estilo.get("caixaCor", "#000000"), caixa_alfa)
+    raio = _num(estilo.get("caixaRaio"), 0, 100, 0) if fundo == "caixa" else 0
+    cont_cor = _ass_cor(estilo.get("cCor", "#000000"))
+    if fundo == "caixa" and not raio:
         # BorderStyle 3: caixa opaca atrás de cada linha; o Outline vira a folga da caixa
-        borda, contorno, sombra, fundo_cor = 3, round(em * 0.22, 1), 0, _ass_cor(estilo.get("caixa", "#000000"), 0x5C)
+        borda, contorno, sombra, fundo_cor = 3, round(folga, 1), 0, caixa_cor
     elif fundo == "sombra":
-        borda, contorno, sombra, fundo_cor = 1, round(em * 0.06, 1), round(em * 0.07, 1), _ass_cor("#000000", 0x40)
+        # o traço da prévia fica metade dentro da letra; o Outline do ASS é só para fora
+        largura = _num(estilo.get("cLarg"), 0, 40, 12) / 200
+        borda, contorno, sombra, fundo_cor = 1, round(em * largura, 1), round(em * 0.07, 1), _ass_cor("#000000", 0x40)
     else:
+        # sem fundo, ou caixa de cantos arredondados (desenhada à parte, numa camada de baixo)
         borda, contorno, sombra, fundo_cor = 1, 0, 0, _ass_cor("#000000", 0xFF)
     # Sombra projetada (mesma prévia do editor-texto.js): com caixa, a sombra é da própria caixa (Shadow do estilo);
     # sem caixa, uma cópia da legenda na cor da sombra numa camada de baixo, deslocada e com \blur
@@ -1068,12 +1108,17 @@ def _gerar_ass(itens, estilo, W, H):
         fundo_cor_sombra = fundo_cor
     if camada_sombra:
         sombra = 0
+    if raio:
+        camada_sombra = False   # a sombra é da caixa desenhada (\shad do desenho)
     # Entrada rápida de cada legenda (VE_LEG_ENTRADA): Fade 0,12 s; Pop 80% → 106% → 100% em 0,18 s
     entrada = {
         "fade": r"\fad(120,0)",
         "pop": r"\fscx80\fscy80\t(0,117,\fscx106\fscy106)\t(117,180,\fscx100\fscy100)\fad(60,0)",
     }.get(estilo.get("entrada"), "")
-    ancora_y = {"baixo": H - margem, "meio": H / 2, "cima": margem}.get(pos, H - margem)
+    # deslocamento arrastado no monitor (% do quadro; py positivo sobe)
+    cx = W / 2 + _num(estilo.get("px"), -100, 100, 0) / 100 * W
+    ancora_y = ({"baixo": H - margem, "meio": H / 2, "cima": margem}.get(pos, H - margem)
+                - _num(estilo.get("py"), -100, 100, 0) / 100 * H)
     linhas = [
         "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {W}", f"PlayResY: {H}", "WrapStyle: 2",
         "ScaledBorderAndShadow: yes", "",
@@ -1081,14 +1126,20 @@ def _gerar_ass(itens, estilo, W, H):
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
         "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, "
         "MarginR, MarginV, Encoding",
-        f"Style: Leg,{fonte},{em * razao:.1f},{cor},{cor},{fundo_cor if borda == 3 else _ass_cor('#000000')},{fundo_cor_sombra},"
+        f"Style: Leg,{fonte},{em * razao:.1f},{cor},{cor},{fundo_cor if borda == 3 else cont_cor},{fundo_cor_sombra},"
         f"{negrito},{italico},0,0,100,100,0,0,{borda},{contorno},{sombra},{alinhamento},{margem},{margem},{margem},1",
         f"Style: LegS,{fonte},{em * razao:.1f},{s_cor},{s_cor},{s_cor},{s_cor},"
         f"{negrito},{italico},0,0,100,100,0,0,1,0,0,{alinhamento},{margem},{margem},{margem},1",
         "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ]
-    tag_sombra = f"{{\\an{alinhamento}\\pos({W / 2 + s_d:.1f},{ancora_y + s_d:.1f})\\blur{s_blur:.1f}{entrada}}}"
-    tag_texto = f"{{{entrada}}}" if entrada else ""
+    tag_sombra = f"{{\\an{alinhamento}\\pos({cx + s_d:.1f},{ancora_y + s_d:.1f})\\blur{s_blur:.1f}{entrada}}}"
+    tag_texto = f"{{\\an{alinhamento}\\pos({cx:.1f},{ancora_y:.1f}){entrada}}}"
+    # caixa arredondada: a forma inteira é um desenho ancorado como o texto, na borda de fora da caixa
+    alt = em * razao
+    caixa_y = ancora_y + {"baixo": folga, "cima": -folga}.get(pos, 0)
+    caixa_sombra = f"\\shad{s_d:.1f}\\4c&H{s_cor[4:]}&\\4a&H{s_alfa:02X}&" if s_on else "\\shad0"
+    tag_caixa = (f"{{\\an{alinhamento}\\pos({cx:.1f},{caixa_y:.1f})\\bord0{caixa_sombra}"
+                 f"\\1c&H{caixa_cor[4:]}&\\1a&H{caixa_alfa:02X}&{entrada}\\p1}}")
     n = 0
     for it in itens:
         try:
@@ -1103,6 +1154,10 @@ def _gerar_ass(itens, estilo, W, H):
         txt = txt.replace("\\", "\\\\").replace("{", "(").replace("}", ")").replace("\r", "").replace("\n", "\\N")
         if camada_sombra:
             linhas.append(f"Dialogue: 0,{_ass_tempo(st)},{_ass_tempo(en)},LegS,,0,0,0,,{tag_sombra}{txt}")
+        if raio:
+            forma = _ass_caixa_redonda(it.get("larg"), txt.count("\\N") + 1, alt, folga, raio)
+            if forma:
+                linhas.append(f"Dialogue: 0,{_ass_tempo(st)},{_ass_tempo(en)},Leg,,0,0,0,,{tag_caixa}{forma}")
         linhas.append(f"Dialogue: 1,{_ass_tempo(st)},{_ass_tempo(en)},Leg,,0,0,0,,{tag_texto}{txt}")
         n += 1
     if not n:
@@ -1111,6 +1166,36 @@ def _gerar_ass(itens, estilo, W, H):
     with open(arq, "w", encoding="utf-8") as f:
         f.write("\n".join(linhas) + "\n")
     return arq
+
+
+def _ass_caixa_redonda(larg, n, alt, folga, raio):
+    """Desenho ASS (\\p1) da caixa de cantos arredondados: um retângulo por linha, centralizados, que se
+    sobrepõem na folga e viram uma forma só (a mesma da prévia, veTxCaixa). Começa em (0, 0)."""
+    try:
+        larg = [max(0.0, float(w)) for w in larg][:n]
+    except Exception:
+        return ""
+    if not larg:
+        return ""
+    k = 1 - 0.5523   # quarto de círculo por Bézier
+    h = alt + folga * 2
+    w_max = max(larg) + folga * 2
+
+    def f(*v):
+        return " ".join(f"{a:.1f}" for a in v)
+    partes = []
+    for i, w in enumerate(larg):
+        w += folga * 2
+        x0, y0 = (w_max - w) / 2, i * alt
+        x1, y1 = x0 + w, y0 + h
+        r = min(h, w) / 2 * raio / 100
+        c = r * k
+        partes.append(
+            f"m {f(x0 + r, y0)} l {f(x1 - r, y0)} b {f(x1 - c, y0, x1, y0 + c, x1, y0 + r)} "
+            f"l {f(x1, y1 - r)} b {f(x1, y1 - c, x1 - c, y1, x1 - r, y1)} "
+            f"l {f(x0 + r, y1)} b {f(x0 + c, y1, x0, y1 - c, x0, y1 - r)} "
+            f"l {f(x0, y0 + r)} b {f(x0, y0 + c, x0 + c, y0, x0 + r, y0)}")
+    return " ".join(partes)
 
 
 def _num(v, lo, hi, padrao=0.0):
@@ -1325,6 +1410,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         pass
     W, H = W + (W % 2), H + (H % 2)
     fps = f'{info["fps"]:.3f}'
+    frame_dur = 1.0 / max(float(info["fps"] or 30), 1.0)
 
     pecas = _normalizar_segmentos(segmentos, info["duration"])
     pecas_a = pecas if audio_segmentos is None else _normalizar_segmentos(audio_segmentos, info["duration"])
@@ -1378,29 +1464,46 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         nonlocal entrada
         if p[0] == "gap":
             src = f"color=c=black:s={W}x{H}:r={fps}" if video else "anullsrc=r=48000:cl=stereo"
-            cmd.extend(["-f", "lavfi", "-t", f"{p[1]:.3f}", "-i", src])
+            cmd.extend(["-f", "lavfi", "-t", _tempo_ffmpeg(p[1]), "-i", src])
         else:
-            cmd.extend(["-ss", f"{p[0]:.3f}", "-t", f"{p[1] - p[0]:.3f}", "-i", path])
+            cmd.extend(["-ss", _tempo_ffmpeg(p[0]), "-t", _tempo_ffmpeg(p[1] - p[0]), "-i", path])
         entrada += 1
         return entrada - 1
 
     def _filtro_audio(idx, p, rotulo):
         vol = f",volume={p[2]:.2f}dB" if p[0] != "gap" and p[2] else ""
-        filtros.append(f"[{idx}:a:0]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo{vol}[{rotulo}]")
+        filtros.append(f"[{idx}:a:0]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+                       f"asetpts=PTS-STARTPTS{vol}[{rotulo}]")
 
     if usar_inputs:
-        # Uma entrada por trecho com seek preciso → só decodifica o que fica no vídeo.
-        # Espaços vazios viram quadro preto + silêncio. Tudo é padronizado antes do concat.
+        # Uma única leitura da fonte + trim por trecho evita frames pretos/danificados no começo de cortes
+        # em vídeos long-GOP/VFR (comuns em arquivos de celular/WhatsApp). Espaços vazios ainda viram preto.
         junto = has_audio and audio_junto
         pares = ""
+        fonte_base = None
+        if not audio_only and any(p[0] != "gap" for p in pecas):
+            cmd += ["-i", path]
+            fonte_base = entrada
+            entrada += 1
         for k, p in enumerate([] if audio_only else pecas):
-            vi = _entrada_peca(p, True)
-            filtros.append(f"[{vi}:v:0]scale={W}:{H}:force_original_aspect_ratio=decrease,"
-                           f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},format=yuv420p[v{k}]")
+            if p[0] == "gap":
+                filtros.append(f"color=c=black:s={W}x{H}:r={fps}:d={_tempo_ffmpeg(p[1])},"
+                               f"format=yuv420p[v{k}]")
+            else:
+                filtros.append(f"[{fonte_base}:v:0]trim=start={_tempo_ffmpeg(p[0])}:end={_tempo_ffmpeg(p[1])},"
+                               f"setpts=PTS-STARTPTS,scale={W}:{H}:force_original_aspect_ratio=decrease,"
+                               f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
+                               f"fps=fps={fps}:start_time=0,format=yuv420p[v{k}]")
             pares += f"[v{k}]"
             if junto:
-                ai = _entrada_peca(p, False) if p[0] == "gap" else vi
-                _filtro_audio(ai, p, f"a{k}")
+                if p[0] == "gap":
+                    filtros.append(f"anullsrc=r=48000:cl=stereo,atrim=0:{_tempo_ffmpeg(p[1])},"
+                                   f"asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp:channel_layouts=stereo[a{k}]")
+                else:
+                    vol = f",volume={p[2]:.2f}dB" if p[2] else ""
+                    filtros.append(f"[{fonte_base}:a:0]atrim=start={_tempo_ffmpeg(p[0])}:end={_tempo_ffmpeg(p[1])},"
+                                   f"asetpts=PTS-STARTPTS,aresample=48000,"
+                                   f"aformat=sample_fmts=fltp:channel_layouts=stereo{vol}[a{k}]")
                 pares += f"[a{k}]"
         if not audio_only:
             filtros.append(f"{pares}concat=n={len(pecas)}:v=1:a={1 if junto else 0}[vc]" + ("[ac]" if junto else ""))
@@ -1449,9 +1552,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             vf = f"[o{n}]"
             continue
         if c["tipo"] == "imagem":
-            cmd += ["-loop", "1", "-framerate", fps, "-t", f"{c['dur']:.3f}", "-i", c["path"]]
+            cmd += ["-loop", "1", "-framerate", fps, "-t", _tempo_ffmpeg(c["dur"]), "-i", c["path"]]
         else:
-            cmd += ["-ss", f"{c['s']:.3f}", "-t", f"{c['fonte']:.3f}", "-i", c["path"] or path]   # o arquivo do clipe
+            cmd += ["-i", c["path"] or path]   # o arquivo do clipe; trim no grafo evita flash preto em cortes
         idx = entrada
         entrada += 1
         kf = c["kf"]
@@ -1485,9 +1588,18 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         ordem = [giro, opac, escala] if ("sc" in kf or sx) else [escala, giro, opac]
         efeitos = _filtros_fx(c["fx"], c["mw"], c["mh"], f"l{n}")
         # velocidade do clipe (como no Premiere): o tempo da fonte é comprimido/esticado antes de tudo
-        vel = f"setpts=(PTS-STARTPTS)/{c['v']:.6f}," if abs(c["v"] - 1) > 1e-4 else ""
-        cadeia = f"[{idx}:v:0]{vel}fps={fps},format=rgba," + ",".join(efeitos + [f for f in ordem if f])
-        cadeia += f",setpts=PTS-STARTPTS+{c['st']:.3f}/TB[l{n}]"
+        if c["tipo"] == "imagem":
+            src = f"[{idx}:v:0]"
+            vel = ""
+        else:
+            src = (f"[{idx}:v:0]trim=start={_tempo_ffmpeg(c['s'])}:"
+                   f"end={_tempo_ffmpeg(c['s'] + c['fonte'])},")
+            vel = f"setpts=(PTS-STARTPTS)/{c['v']:.6f},"
+        filtros_clip = efeitos + [f for f in ordem if f]
+        if c["tipo"] != "imagem":
+            filtros_clip.append(f"tpad=stop_mode=clone:stop_duration={_tempo_ffmpeg(frame_dur)}")
+        cadeia = f"{src}{vel}fps=fps={fps}:start_time=0,format=rgba," + ",".join(filtros_clip)
+        cadeia += f",setpts=PTS-STARTPTS+{_tempo_ffmpeg(c['st'])}/TB[l{n}]"
         filtros.append(cadeia)
         fim = c["st"] + c["dur"]
         tl = f"(t-{c['st']:.4f})"
@@ -1506,7 +1618,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 dy = c["sc"] * (c["ox"] * math.sin(a) + c["oy"] * math.cos(a))
                 px, py = f"({px})+{dx:.3f}", f"({py})+{dy:.3f}"
         filtros.append(f"{vf}[l{n}]overlay=x='{px}-w/2':y='{py}-h/2'"
-                       f":enable='between(t,{c['st']:.3f},{fim:.3f})':eof_action=pass:format=auto[o{n}]")
+                       f":enable='between(t,{_tempo_ffmpeg(c['st'])},{_tempo_ffmpeg(fim)})'"
+                       f":eof_action=pass:format=auto[o{n}]")
         vf = f"[o{n}]"
     if lay:
         filtros.append(f"{vf}format=yuv420p[vlay]")
@@ -1536,10 +1649,14 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         if cfg["acodec"] != "pcm_s16le":
             base_cmd += ["-b:a", "320k" if audio_only and q["ab"] == "256k" else q["ab"]]
 
+    ultimo_cmd = None
+
     def _tentar(gpu):
+        nonlocal ultimo_cmd
         global _export_proc
         video_args = ["-vn"] if audio_only else _args_video(cfg, q, gpu)
         full = base_cmd + video_args + cfg["extra"] + [saida]
+        ultimo_cmd = full
 
         def _hold(p):
             global _export_proc
@@ -1564,8 +1681,12 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             rc, err = _tentar(False)
         if rc != 0 or not os.path.exists(saida):
             _apagar(saida)
-            linhas = [l for l in (err or "").splitlines() if l.strip()]
-            return {"success": False, "error": "Falha ao exportar: " + (linhas[-1] if linhas else f"código {rc}")}
+            linhas = _linhas_ffmpeg(err)
+            detalhe = "\n".join(linhas) if linhas else f"código {rc}"
+            log = _salvar_falha_export(ultimo_cmd, script, err, saida)
+            if log:
+                detalhe += f"\nLog: {log}"
+            return {"success": False, "error": "Falha ao exportar: " + detalhe}
     except FileNotFoundError:
         return {"success": False, "error": "ffmpeg não encontrado."}
     finally:

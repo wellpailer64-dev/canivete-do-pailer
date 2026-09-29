@@ -493,10 +493,11 @@ function vePjAudioEm(m, st, trPedida) {
     let tr = trPedida >= 0 && livre(trPedida) ? trPedida : -1;
     if (tr < 0) {
         const usadas = VE.clips.filter(veOcupaA).map(c => c.tr), ultima = usadas.length ? Math.max(...usadas) : -1;
-        tr = [0, 1, 2, 3].find(k => k > ultima && livre(k));
-        if (tr == null) tr = [0, 1, 2, 3].find(livre);
+        tr = veTrackIndexes().find(k => k > ultima && livre(k));
+        if (tr == null) tr = veTrackIndexes().find(livre);
+        if (tr == null) { tr = Math.max(0, ultima + 1, veTrackCount()); veEnsureTrackIndex(tr); }
     }
-    if (tr == null || tr < 0) { veToast('Não há trilha de áudio livre nesse ponto (A1 a A4)'); return false; }
+    if (tr == null || tr < 0 || !livre(tr)) { veToast('Não há trilha de áudio livre nesse ponto'); return false; }
     vePushHistory();
     const clip = { tr, st, s: 0, e: m.dur, m: m.id };
     if (m.cor) clip.cor = m.cor;

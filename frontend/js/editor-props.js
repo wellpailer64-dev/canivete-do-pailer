@@ -180,9 +180,9 @@ function veTxNovo(pt) {
     if (VE.playing) veStop();
     const m = veTxMidia();
     const st = veSnapFrame(VE.playhead), b = st + VE_TX_DUR, novo = { m: m.id };
-    let tr = [1, 2, 3].find(k => !veTrkLocked(k) && veTrackFree(k, st, b, novo));
-    if (tr == null) tr = [0].find(k => !veTrkLocked(k) && veTrackFree(k, st, b, novo));
-    if (tr == null) { veToast('Não há trilha de vídeo livre na agulha para o texto (V1 a V4)'); return; }
+    let tr = veTrackIndexes().filter(k => k > 0).find(k => !veTrkLocked(k) && veTrackFree(k, st, b, novo));
+    if (tr == null) { tr = Math.max(1, veTrackCount()); veEnsureTrackIndex(tr); }
+    if (veTrkLocked(tr) || !veTrackFree(tr, st, b, novo)) { veToast('Não há trilha de vídeo livre na agulha para o texto'); return; }
     vePushHistory();
     // como no Premiere: o texto novo começa no ponto clicado (alinhado à esquerda) e cresce para a direita
     const clip = { tr, st, s: 0, e: VE_TX_DUR, m: m.id, tx: { ...VE_TX_PADRAO, alin: 'left' }, p: { sc: 100, x: Math.round(pt.x), y: Math.round(pt.y), rot: 0, op: 100 } };
@@ -411,9 +411,15 @@ function vePpHtml(a) {
                 ${vePpNum('le.tam', 'Tamanho', 3, 10, 0.1, '%')}
                 <div class="ve-pp-cores">${vePpCor('le.cor', 'Cor do texto')}</div>
                 <div class="ve-pp-l"><label>Fundo</label><select data-pp="le.fundo"><option value="caixa">Caixa</option><option value="sombra">Contorno e sombra</option><option value="nenhum">Nenhum</option></select></div>
+                <div class="ve-pp-sub" data-ppse="le.eCaixa"><div class="ve-pp-cores">${vePpCor('le.caixaCor', 'Cor da caixa')}</div>${vePpNum('le.caixaOp', 'Opacidade', 0, 100, 1, '%')}${vePpNum('le.caixaRaio', 'Cantos', 0, 100, 1, '%')}</div>
+                <div class="ve-pp-sub" data-ppse="le.eContorno"><div class="ve-pp-cores">${vePpCor('le.cCor', 'Cor do contorno')}</div>${vePpNum('le.cLarg', 'Largura', 0, 40, 0.5, '%')}</div>
                 <div class="ve-pp-grupo">${vePpChk('le.sOn', 'Sombra projetada')}${vePpCor('le.sCor', '')}
                     <div class="ve-pp-sub" data-ppse="le.sOn">${vePpNum('le.sOp', 'Opacidade', 0, 100, 1, '%')}${vePpNum('le.sDist', 'Distância', 0, 60, 0.5, 'px')}${vePpNum('le.sBlur', 'Desfoque', 0, 80, 0.5, 'px')}</div></div>
                 <div class="ve-pp-l"><label>Posição</label><select data-pp="le.pos"><option value="baixo">Embaixo</option><option value="meio">No meio</option><option value="cima">Em cima</option></select></div>
+                ${vePpNum('le.px', 'Horizontal', -50, 50, 0.1, '%')}
+                ${vePpNum('le.py', 'Vertical', -50, 50, 0.1, '%')}
+                <div class="ve-pp-botoes"><button class="ve-btn ve-btn-sm ve-btn-ghost" data-ppleg="centro" title="Volta a legenda para a posição escolhida acima">Zerar deslocamento</button></div>
+                <small class="ve-pp-dica">Arraste a legenda no monitor para mover (Shift: sem grudar no centro).</small>
                 <div class="ve-pp-l"><label>Entrada</label><select data-pp="le.entrada" title="Efeito rápido quando cada legenda aparece"><option value="nenhum">Seca (sem efeito)</option><option value="pop">Pop</option><option value="fade">Fade</option></select></div>
                 ${vePpChk('legGravar', 'Gravar as legendas no vídeo ao exportar')}`) +
             links([['texto', 'Painel Texto']]);
@@ -478,6 +484,8 @@ function vePpGet(k) {
     if (k.startsWith('tx.')) return veTxt(c)[k.slice(3)];
     if (k === 'p.ax' || k === 'p.ay') return veAnc(c)[k === 'p.ax' ? 0 : 1];
     if (k.startsWith('p.')) return veProps(c)[k.slice(2)];
+    if (k === 'le.eCaixa') return veTxEstilo().fundo === 'caixa';
+    if (k === 'le.eContorno') return veTxEstilo().fundo === 'sombra';
     if (k.startsWith('le.')) return veTxEstilo()[k.slice(3)];
     if (k === 'leg.texto') return (VE.legendas[VETX.legSel] || {}).texto || '';
     if (k === 'legGravar') return VE.legGravar !== false;
@@ -629,6 +637,7 @@ function vePpInit() {
         if (!VE.ready) return;
         if (tog) { vePushHistory(); vePpSet(tog.dataset.pptog, !vePpGet(tog.dataset.pptog)); vePpDepois('monitor', true); return; }
         if (alin) { vePushHistory(); vePpSet('tx.alin', alin.dataset.ppalin); vePpDepois('monitor', true); return; }
+        if (e.target.closest('[data-ppleg="centro"]')) { vePushHistory(); VE.legEstilo = { ...veTxEstilo(), px: 0, py: 0 }; vePpDepois('monitor', true); return; }
         if (ac) {
             const c = VE.clips[VE.sel];
             if (!c) return;

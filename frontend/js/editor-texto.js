@@ -9,8 +9,11 @@
 
 const VE_LEG_PADRAO = { max: 42, linhas: 2, minDur: 3, gap: 0 };                 // "Criar legendas" do Premiere
 // s* = sombra projetada (px do quadro, como a dos textos); entrada = 'nenhum' | 'pop' | 'fade'
+// px/py = deslocamento a partir da posição (% do quadro; py positivo sobe); caixa* = cor, opacidade (%) e cantos
+// (0 = retos, 100 = pílula); cCor/cLarg = contorno do "Contorno e sombra" (largura em % da fonte)
 const VE_LEG_ESTILO = { fonte: 'Arial', tam: 5.5, cor: '#ffffff', fundo: 'caixa', pos: 'baixo', maiusc: false, negrito: true, ita: false,
-    sOn: false, sCor: '#000000', sOp: 75, sDist: 6, sBlur: 8, entrada: 'nenhum' };
+    sOn: false, sCor: '#000000', sOp: 75, sDist: 6, sBlur: 8, entrada: 'nenhum', px: 0, py: 0,
+    caixaCor: '#000000', caixaOp: 64, caixaRaio: 0, cCor: '#000000', cLarg: 12 };
 const VE_LEG_ENTRADA = { fade: 0.12, pop: 0.18 };   // segundos: rápido, para não atrapalhar a leitura
 
 const VETX = {
@@ -243,8 +246,32 @@ function veTxLegLayout(texto, e = veTxEstilo()) {
     const m = VE_LEG_MEDIDA || (VE_LEG_MEDIDA = document.createElement('canvas').getContext('2d'));
     m.font = fonte;
     const larg = linhas.map(l => m.measureText(l).width), bloco = linhas.length * alt;
-    const topo = e.pos === 'cima' ? margem : e.pos === 'meio' ? (H - bloco) / 2 : H - margem - bloco;
-    return { W, H, em, alt, folga, margem, linhas, fonte, larg, bloco, topo, asc: met.asc, wMax: Math.max(0, ...larg) };
+    const topo = (e.pos === 'cima' ? margem : e.pos === 'meio' ? (H - bloco) / 2 : H - margem - bloco) - (+e.py || 0) / 100 * H;
+    const cx = W / 2 + (+e.px || 0) / 100 * W;
+    return { W, H, cx, em, alt, folga, margem, linhas, fonte, larg, bloco, topo, asc: met.asc, wMax: Math.max(0, ...larg) };
+}
+
+// Cor #rrggbb + opacidade (%) → rgba()
+function veTxRgba(hex, op) {
+    const n = parseInt(String(hex || '#000000').slice(1), 16) || 0;
+    return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${Math.max(0, Math.min(100, +op)) / 100})`;
+}
+
+// Caixa da legenda: um retângulo por linha; com cantos arredondados, as linhas viram uma forma só
+// (a exportação desenha a mesma forma no .ass, _gerar_ass)
+function veTxCaixa(ctx, L, e, d = 0) {
+    const raio = Math.max(0, Math.min(100, +e.caixaRaio || 0));
+    const h = L.alt + L.folga * 2;
+    if (!raio) {
+        L.linhas.forEach((l, k) => ctx.fillRect(L.cx - L.larg[k] / 2 - L.folga + d, L.topo + k * L.alt - L.folga + d, L.larg[k] + L.folga * 2, h));
+        return;
+    }
+    ctx.beginPath();
+    L.linhas.forEach((l, k) => {
+        const w = L.larg[k] + L.folga * 2;
+        ctx.roundRect(L.cx - w / 2 + d, L.topo + k * L.alt - L.folga + d, w, h, Math.min(h, w) / 2 * raio / 100);
+    });
+    ctx.fill();
 }
 
 // Pop: 80% → 106% → 100% (linear, como os \t do .ass); cresce a partir da borda da posição (embaixo/em cima/meio)
@@ -256,9 +283,9 @@ function veTxEntrada(ctx, e, L, t, i) {
     if (e.entrada === 'fade') { ctx.globalAlpha *= p; return; }
     const s = veTxPopEscala(p), oy = e.pos === 'cima' ? L.topo : e.pos === 'meio' ? L.topo + L.bloco / 2 : L.topo + L.bloco;
     ctx.globalAlpha *= Math.min(1, p * 3);
-    ctx.translate(L.W / 2, oy);
+    ctx.translate(L.cx, oy);
     ctx.scale(s, s);
-    ctx.translate(-L.W / 2, -oy);
+    ctx.translate(-L.cx, -oy);
 }
 
 // Sombra projetada do texto: o texto na cor da sombra, deslocado e desfocado, num quadro à parte
@@ -274,7 +301,7 @@ function veTxSombraQuadro(L, e) {
     o.textAlign = 'center';
     o.textBaseline = 'alphabetic';
     o.fillStyle = e.sCor;
-    L.linhas.forEach((l, k) => o.fillText(l, L.W / 2 + d, L.topo + k * L.alt + L.em * L.asc + d));
+    L.linhas.forEach((l, k) => o.fillText(l, L.cx + d, L.topo + k * L.alt + L.em * L.asc + d));
     o.restore();
     return c;
 }
@@ -285,7 +312,7 @@ function veTxDesenhar(ctx) {
     if (i < 0) return;
     const e = veTxEstilo(), L = veTxLegLayout(VE.legendas[i].texto, e);
     if (!L.linhas.length) return;
-    const { W, em, alt, folga, linhas, larg, topo } = L;
+    const { cx, em, alt, linhas, topo } = L;
     ctx.save();
     veTxEntrada(ctx, e, L, VE.playhead - VE.legendas[i].st, i);
     if (e.sOn) {
@@ -293,31 +320,34 @@ function veTxDesenhar(ctx) {
         ctx.globalAlpha *= e.sOp / 100;
         if (e.fundo === 'caixa') {
             // com caixa, a sombra é da caixa (sem desfoque, como o libass faz)
-            const d = e.sDist * Math.SQRT1_2;
             ctx.fillStyle = e.sCor;
-            linhas.forEach((l, k) => ctx.fillRect(W / 2 - larg[k] / 2 - folga + d, topo + k * alt - folga + d, larg[k] + folga * 2, alt + folga * 2));
+            veTxCaixa(ctx, L, e, e.sDist * Math.SQRT1_2);
         } else ctx.drawImage(veTxSombraQuadro(L, e), 0, 0);
         ctx.restore();
     }
     ctx.font = L.fonte;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
+    if (e.fundo === 'caixa') {
+        ctx.fillStyle = veTxRgba(e.caixaCor, e.caixaOp);
+        veTxCaixa(ctx, L, e);
+    }
     linhas.forEach((l, k) => {
-        const y = topo + k * alt, base = y + em * L.asc, w = larg[k];
-        if (e.fundo === 'caixa') {
-            ctx.fillStyle = 'rgba(0,0,0,0.64)';
-            ctx.fillRect(W / 2 - w / 2 - folga, y - folga, w + folga * 2, alt + folga * 2);
-        } else if (e.fundo === 'sombra') {
+        const base = topo + k * alt + em * L.asc;
+        if (e.fundo === 'sombra') {
             if (!e.sOn) {   // a sombra fixa do "Contorno e sombra" dá lugar à sombra projetada quando ela está ligada
                 ctx.fillStyle = 'rgba(0,0,0,0.75)';
-                ctx.fillText(l, W / 2 + em * 0.07, base + em * 0.07);
+                ctx.fillText(l, cx + em * 0.07, base + em * 0.07);
             }
-            ctx.lineWidth = em * 0.12;
-            ctx.strokeStyle = '#000';
-            ctx.strokeText(l, W / 2, base);
+            if (+e.cLarg > 0) {
+                ctx.lineWidth = em * e.cLarg / 100;
+                ctx.lineJoin = 'round';
+                ctx.strokeStyle = e.cCor;
+                ctx.strokeText(l, cx, base);
+            }
         }
         ctx.fillStyle = e.cor;
-        ctx.fillText(l, W / 2, base);
+        ctx.fillText(l, cx, base);
     });
     ctx.restore();
 }
@@ -328,7 +358,7 @@ function veTxLegendaNoPonto(pt) {
     const i = veTxLegendaEm(VE.playhead);
     if (i < 0) return -1;
     const L = veTxLegLayout(VE.legendas[i].texto), f = L.folga * 2;
-    const dentro = pt.x >= L.W / 2 - L.wMax / 2 - f && pt.x <= L.W / 2 + L.wMax / 2 + f && pt.y >= L.topo - f && pt.y <= L.topo + L.bloco + f;
+    const dentro = pt.x >= L.cx - L.wMax / 2 - f && pt.x <= L.cx + L.wMax / 2 + f && pt.y >= L.topo - f && pt.y <= L.topo + L.bloco + f;
     return dentro ? i : -1;
 }
 
@@ -372,8 +402,8 @@ function veTxLegEditarPos() {
     const e = veTxEstilo(), L = veTxLegLayout(VE.legendas[ed.i].texto || ' ', e);
     const q = veTxQuadroTela(), rs = $ve('ve-screen').getBoundingClientRect(), s = ed.ta.style;
     const w = Math.max(L.wMax, L.em * 3) + L.folga * 2, linhas = Math.max(1, String(VE.legendas[ed.i].texto).split('\n').length);
-    const topo = e.pos === 'baixo' ? L.topo + L.bloco - linhas * L.alt : e.pos === 'meio' ? (L.H - linhas * L.alt) / 2 : L.topo;
-    s.left = (q.x0 - rs.left + (L.W / 2 - w / 2) * q.s) + 'px';
+    const topo = e.pos === 'baixo' ? L.topo + L.bloco - linhas * L.alt : e.pos === 'meio' ? L.topo + (L.bloco - linhas * L.alt) / 2 : L.topo;
+    s.left = (q.x0 - rs.left + (L.cx - w / 2) * q.s) + 'px';
     s.top = (q.y0 - rs.top + topo * q.s) + 'px';
     s.width = (w * q.s) + 'px';
     s.height = (linhas * L.alt * q.s) + 'px';
@@ -424,8 +454,10 @@ function veTxExportar(origem) {
 function veTxExport(faixa) {
     if (VE.legGravar === false || !(VE.legendas || []).length) return null;
     const e = veTxEstilo();
-    const itens = !faixa ? VE.legendas : VE.legendas.filter(l => l.st < faixa.b && l.en > faixa.a)
+    let itens = !faixa ? VE.legendas : VE.legendas.filter(l => l.st < faixa.b && l.en > faixa.a)
         .map(l => ({ ...l, st: Math.max(l.st, faixa.a) - faixa.a, en: Math.min(l.en, faixa.b) - faixa.a }));
+    // caixa de cantos arredondados: o .ass desenha a forma, então vai a largura de cada linha (px do quadro)
+    if (e.fundo === 'caixa' && +e.caixaRaio > 0) itens = itens.map(l => ({ ...l, larg: veTxLegLayout(l.texto, e).larg.map(w => Math.round(w * 10) / 10) }));
     return itens.length ? { itens, estilo: { ...e, razao: veTxMetricas(e).razao } } : null;
 }
 

@@ -125,6 +125,19 @@ function veTfIniciar() {
         if (VE.tool !== 'select' || e.button !== 0 || !VE.ready || e.target.closest('button, textarea, .ve-mzoom')) return;
         const q = veTxQuadroTela(), pt = { x: (e.clientX - q.x0) / q.s, y: (e.clientY - q.y0) / q.s };
         let alvo = veTfAlvo(pt, q), i = VE.sel;
+        // legenda (desenhada por cima de tudo): arrastar muda a posição de todas
+        const lg = alvo ? -1 : veTxLegendaNoPonto(pt);
+        if (lg >= 0) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            VEM.panned = true;
+            if (VE.playing) veStop();
+            if (VE.sel !== -1 || VETX.legSel !== lg) { VE.sel = -1; VETX.legSel = lg; veRefresh(); }
+            const est = veTxEstilo();
+            VETF.drag = { tipo: 'leg', x0: e.clientX, y0: e.clientY, pt0: pt, px0: +est.px || 0, py0: +est.py || 0, hist: false, ativo: false, id: e.pointerId };
+            scr.setPointerCapture(e.pointerId);
+            return;
+        }
         if (!alvo) {
             i = veTfClipeEm(pt, c => !veLocked(c));
             if (i < 0) {
@@ -152,7 +165,7 @@ function veTfIniciar() {
             if (VE.tool !== 'select' || !VE.ready || VEM.pan) return;
             const q = veTxQuadroTela(), pt = { x: (e.clientX - q.x0) / q.s, y: (e.clientY - q.y0) / q.s };
             const alvo = veTfAlvo(pt, q);
-            const cur = alvo ? veTfCursor(alvo, VE.clips[VE.sel]) : veTfClipeEm(pt, c => !veLocked(c)) >= 0 ? 'move' : '';
+            const cur = alvo ? veTfCursor(alvo, VE.clips[VE.sel]) : veTxLegendaNoPonto(pt) >= 0 || veTfClipeEm(pt, c => !veLocked(c)) >= 0 ? 'move' : '';
             if (scr.style.cursor !== cur) scr.style.cursor = cur;
             return;
         }
@@ -166,6 +179,17 @@ function veTfIniciar() {
                 d.i = VE.sel;
                 d.hist = true;
             }
+        }
+        if (d.tipo === 'leg') {
+            if (!d.hist) { vePushHistory(); d.hist = true; }
+            const q = veTxQuadroTela(), pt = { x: (e.clientX - q.x0) / q.s, y: (e.clientY - q.y0) / q.s };
+            let px = Math.round((d.px0 + (pt.x - d.pt0.x) / VE.seqW * 100) * 10) / 10;
+            const py = Math.round((d.py0 - (pt.y - d.pt0.y) / VE.seqH * 100) * 10) / 10;
+            if (Math.abs(px) < 1 && !e.shiftKey) px = 0;   // gruda no centro
+            VE.legEstilo = { ...veTxEstilo(), px, py };
+            vePpRender();
+            veDrawMonitorSoon();
+            return;
         }
         const c = VE.clips[d.i];
         if (!c) return;
