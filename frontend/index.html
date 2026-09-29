@@ -466,6 +466,7 @@
                                 <div class="ve-screen" id="ve-screen">
                                     <video id="ve-video" preload="auto" playsinline></video>
                                     <canvas id="ve-canvas" width="1280" height="720"></canvas>
+                                    <canvas class="ve-rulers" id="ve-rulers" width="800" height="450" aria-hidden="true"></canvas>
                                     <div class="ve-mzoom" id="ve-mzoom" title="Ctrl+roda do mouse no vídeo: zoom · arraste para mover quando ampliado">
                                         <button class="ve-mz-btn active" id="ve-mz-fit" onclick="veMonitorFit()">Fit</button>
                                         <button class="ve-mz-btn" onclick="veMonitorZoomTo(1)">100%</button>
@@ -500,7 +501,7 @@
                                         <button class="ve-chip" onclick="veMarkIn()" title="Marcar entrada (I)">{ In</button>
                                         <button class="ve-chip" onclick="veMarkOut()" title="Marcar saída (O)">Out }</button>
                                         <span class="ve-rate" id="ve-rate" hidden>1x</span>
-                                        <button class="ve-tbtn ve-vol" id="ve-mute" onclick="veToggleMute()" title="Som da prévia (M)"><svg class="i"><use href="#i-volume"/></svg></button>
+                                        <button class="ve-tbtn ve-vol" id="ve-mute" onclick="veToggleMute()" title="Som da prévia (Ctrl+Alt+M)"><svg class="i"><use href="#i-volume"/></svg></button>
                                         <div class="ve-tc ve-tc-dim" id="ve-tc-total" title="Duração final do vídeo editado">00:00:00:00</div>
                                     </div>
                                 </div>
@@ -653,6 +654,7 @@
                                         <div>Arraste uma imagem do Windows para a timeline para usá-la por cima do vídeo</div>
                                         <div>Arraste a borda de um clipe para encurtar ou alongar</div>
                                         <div><kbd>I</kbd> <kbd>O</kbd> Marcar entrada / saída</div>
+                                        <div><kbd>M</kbd> Marcador na agulha · <kbd>Shift</kbd>+<kbd>M</kbd> próximo · <kbd>Alt</kbd>+<kbd>M</kbd> apagar na agulha</div>
                                         <div><kbd>X</kbd> Apagar trecho entre In e Out</div>
                                         <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> Desfazer · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> Refazer</div>
                                         <h4>Ferramentas e visão</h4>

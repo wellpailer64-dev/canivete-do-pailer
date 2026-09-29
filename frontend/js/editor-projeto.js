@@ -51,6 +51,7 @@ function vePjInfo(m) {
         const dur = m.sequenceId === VE.activeSequence ? VE.dur : veSeqDur(seq);
         return { dur, info: m.sequenceId === VE.activeSequence ? veT('aberta agora') : `${(seq && (seq.clips || []).length) || 0} clipes` };
     }
+    if (veMediaOffline(m)) return { dur: m.dur || (m.info && m.info.duration) || null, info: veT('Mídia offline · relinque ou apague') };
     if (m.kind === 'video') {
         const inf = m.id === 0 ? VE.info : m.info, fps = inf && (m.id === 0 ? VE.fps : inf.fps);
         if (m.erro) return { dur: null, info: veT('erro: ') + m.erro };
@@ -79,7 +80,8 @@ function vePjLinhaMidia(m, nivel) {
     const k = 'm:' + m.id, [ic, tipo] = VE_PJ_TIPOS[m.kind], inf = vePjInfo(m), uso = vePjUso(m);
     const cor = m.cor ? veCor({ cor: m.cor }) : null;
     const ativa = m.kind === 'timeline' && m.sequenceId === VE.activeSequence;
-    return `<div class="ve-pj-row${VEPJ.sel.has(k) ? ' sel' : ''}${ativa ? ' atual' : ''}${m.kind === 'video' && m.id && !m.url ? ' fraco' : ''}" data-k="${k}" data-kind="${m.kind}" draggable="true" style="--n:${nivel}">
+    const lost = veMediaOffline(m);
+    return `<div class="ve-pj-row${VEPJ.sel.has(k) ? ' sel' : ''}${ativa ? ' atual' : ''}${m.kind === 'video' && m.id && !m.url ? ' fraco' : ''}${lost ? ' lost' : ''}" data-k="${k}" data-kind="${m.kind}" draggable="true" style="--n:${nivel}">
         <span class="ve-pj-cor"${cor ? ` style="background:${cor}"` : ''}></span><span class="ve-pj-seta"></span>
         <svg class="i"><use href="#${ic}"/></svg><span class="ve-pj-nome" title="${veEsc(m.path || vePjNome(m))}">${veEsc(vePjNome(m))}</span>
         <span class="ve-pj-c">${veT(tipo)}</span><span class="ve-pj-c mono">${inf.dur ? veTC(inf.dur).slice(0, 11) : ''}</span>
@@ -104,6 +106,7 @@ function vePjArvore(pai, nivel) {
 // ─────────────────────────── grade (cards com prévia, como o modo ícones do Premiere) ───────────────────────────
 // capa do card: a imagem, ou a miniatura do vídeo no ponto f (0..1) — passar o mouse percorre o vídeo
 function vePjCapa(m, f = 0.35) {
+    if (veMediaOffline(m)) return '';
     if (m.kind === 'image') return m.url || '';
     const th = m.kind === 'video' ? (m.id === 0 ? VE.thumbs : m.thumbs) || [] : [];
     return th.length ? th[Math.min(th.length - 1, Math.floor(f * th.length))].url : '';
@@ -113,8 +116,9 @@ function vePjCardMidia(m) {
     const k = 'm:' + m.id, [ic, tipo] = VE_PJ_TIPOS[m.kind], inf = vePjInfo(m), capa = vePjCapa(m);
     const cor = m.cor ? veCor({ cor: m.cor }) : null;
     const ativa = m.kind === 'timeline' && m.sequenceId === VE.activeSequence;
-    return `<div class="ve-pj-card${VEPJ.sel.has(k) ? ' sel' : ''}${ativa ? ' atual' : ''}${m.kind === 'video' && m.id && !m.url ? ' fraco' : ''}" data-k="${k}" data-kind="${m.kind}" draggable="true" title="${veEsc((m.path || vePjNome(m)) + (inf.info ? '\n' + inf.info : ''))}">
-        <div class="ve-pj-capa">${capa ? `<img src="${veEsc(capa)}" alt="" draggable="false">` : `<svg class="i"><use href="#${ic}"/></svg>`}
+    const lost = veMediaOffline(m);
+    return `<div class="ve-pj-card${VEPJ.sel.has(k) ? ' sel' : ''}${ativa ? ' atual' : ''}${m.kind === 'video' && m.id && !m.url ? ' fraco' : ''}${lost ? ' lost' : ''}" data-k="${k}" data-kind="${m.kind}" draggable="true" title="${veEsc((m.path || vePjNome(m)) + (inf.info ? '\n' + inf.info : ''))}">
+        <div class="ve-pj-capa">${lost ? `<div class="ve-pj-lost">${veT('MÍDIA OFFLINE')}</div>` : capa ? `<img src="${veEsc(capa)}" alt="" draggable="false">` : `<svg class="i"><use href="#${ic}"/></svg>`}
             ${inf.dur ? `<span class="ve-pj-dur">${veTC(inf.dur).slice(0, 11)}</span>` : ''}</div>
         <div class="ve-pj-rotulo"><span class="ve-pj-cor"${cor ? ` style="background:${cor}"` : ''}></span><svg class="i"><use href="#${ic}"/></svg><span class="ve-pj-nome">${veEsc(vePjNome(m))}</span></div>
         <div class="ve-pj-sub">${veT(tipo)}${inf.info ? ' · ' + veEsc(inf.info) : ''}</div></div>`;
@@ -409,8 +413,10 @@ function vePjApagar(keys = [...VEPJ.sel]) {
         }
     });
     if (!midias.size && !bins.size) { VEPJ.sel.clear(); vePjRender(); return; }
-    if (midias.has(0)) { veToast('O vídeo principal do projeto não pode ser apagado'); midias.delete(0); if (!midias.size && !bins.size) return; }
-    const usados = VE.clips.filter(c => midias.has(c.m || 0)).length;
+    if (midias.has(0) && !veMediaOffline(VE.media[0])) { veToast('O vídeo principal do projeto não pode ser apagado'); midias.delete(0); if (!midias.size && !bins.size) return; }
+    if (typeof veSeqSalvarAtiva === 'function') veSeqSalvarAtiva();
+    const seqs = VE.sequences && VE.sequences.length ? VE.sequences : [{ id: VE.activeSequence, clips: VE.clips }];
+    const usados = seqs.reduce((n, s) => n + (s.clips || []).filter(c => midias.has(c.m || 0)).length, 0);
     // em uso na timeline: pede confirmação (clicar/apertar de novo), como o aviso do Premiere
     if (usados && !(VEPJ.conf && Date.now() - VEPJ.conf < 5000)) {
         VEPJ.conf = Date.now();
@@ -420,12 +426,25 @@ function vePjApagar(keys = [...VEPJ.sel]) {
     VEPJ.conf = 0;
     if (usados) {
         vePushHistory();
-        VE.clips = VE.clips.filter(c => !midias.has(c.m || 0));
+        seqs.forEach(s => { s.clips = (s.clips || []).filter(c => !midias.has(c.m || 0)); });
+        const ativa = seqs.find(s => s.id === VE.activeSequence);
+        VE.clips = ativa ? ativa.clips : VE.clips.filter(c => !midias.has(c.m || 0));
         VE.sel = -1;
         veRelayout();
         veAfterEdit(Math.min(VE.playhead, VE.dur));
     }
-    midias.forEach(id => { VE.media[id].removido = true; });
+    midias.forEach(id => {
+        VE.media[id].removido = true;
+        if (id === 0) {
+            VE.path = null;
+            VE.info = { duration: 0, fps: VE.fps || 30, width: VE.seqW, height: VE.seqH, has_audio: false, offline: true };
+            VE.srcDur = 0;
+            VE.thumbs = [];
+            VE.peaks = [];
+            $ve('ve-export-btn').disabled = true;
+            $ve('ve-meta').textContent = 'Mídia principal removida';
+        }
+    });
     VE.bins = (VE.bins || []).filter(b => !bins.has(b.id));
     VEPJ.sel.clear();
     vePjAlterou();
@@ -440,6 +459,60 @@ function vePjCor(keys, cor) {
     vePjAlterou();
 }
 
+function vePjRelink(id) {
+    const m = VE.media[id];
+    if (!m || m.removido || !['video', 'audio', 'image'].includes(m.kind)) return;
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.select_file) { veToast('A ponte com o app ainda não está pronta'); return; }
+    api.select_file('video-cutter').then(r => {
+        if (!r || !r.success || !r.path) return;
+        const path = r.path, nome = vePathNome(path);
+        if (m.kind === 'image' && !VE_EXT_IMG.test(path)) { veToast('Escolha um arquivo de imagem para relincar'); return; }
+        if (m.kind === 'audio' && (!EXT_AUDIO.test(path) || EXT_VIDEO.test(path))) { veToast('Escolha um arquivo de áudio para relincar'); return; }
+        if (m.kind === 'video' && !EXT_VIDEO.test(path) && !EXT_AUDIO.test(path)) { veToast('Escolha um vídeo ou áudio para relincar'); return; }
+        Object.assign(m, { path, name: m.nome ? m.name || nome : nome });
+        delete m.offline; delete m.missing; delete m.lost; delete m.erro;
+        if (m.kind === 'image') {
+            api.video_cutter_add_media(path).then(rr => {
+                if (!rr || !rr.success) { m.offline = true; m.erro = (rr && rr.error) || 'erro'; vePjRender(); return; }
+                Object.assign(m, { path: rr.path, url: rr.url, name: m.nome ? m.name : rr.name, img: new Image(), w: 0, h: 0 });
+                m.img.crossOrigin = 'anonymous';
+                m.img.onload = () => { m.w = m.img.naturalWidth; m.h = m.img.naturalHeight; veRelinkDone(m); };
+                m.img.onerror = () => { m.offline = true; m.erro = 'erro'; vePjRender(); };
+                m.img.src = rr.url;
+            });
+        } else if (m.kind === 'audio') {
+            api.video_cutter_add_audio(path).then(rr => {
+                if (!rr || !rr.success) { m.offline = true; m.erro = (rr && rr.error) || 'erro'; vePjRender(); return; }
+                Object.assign(m, { path: rr.path, name: m.nome ? m.name : rr.name, dur: rr.dur, peaks: rr.peaks || [], url: rr.url, quadros: rr.quadros });
+                veAudioRegistrar(m.id, rr.url, rr.quadros);
+                veRelinkDone(m);
+            });
+        } else if (m.id === 0) {
+            VE.path = path;
+            VE.info = null;
+            VE.thumbs = [];
+            VE.peaks = [];
+            m.dur = m.dur || VE.srcDur || 1;
+            veLoading('Relincando mídia...', 10);
+            api.ve_preparar_midia(path, 0);
+            veRelinkDone(m, true);
+        } else {
+            delete m.info; delete m.url; delete m.thumbs; delete m.peaks;
+            veMidiaPreparar(m);
+            veRelinkDone(m, true);
+        }
+    });
+}
+
+function veRelinkDone(m, preparando) {
+    if (!VE.dirty) { VE.dirty = true; veUpdateTitle(); }
+    vePjRender();
+    veDraw();
+    veDrawMonitorSoon();
+    veToast(preparando ? 'Relincando mídia...' : `${vePjNome(m)} relincada`);
+}
+
 // ─────────────────────────── para a timeline ───────────────────────────
 // ids arrastados do painel e soltos em (x, y) da tela: cada item entra no ponto/trilha do soltar (os seguintes, em fila)
 function vePjColocar(ids, drop) {
@@ -452,6 +525,7 @@ function vePjColocar(ids, drop) {
     let colocados = 0;
     ids.map(id => VE.media[id]).filter(m => m && !m.removido).forEach(m => {
         if (m.kind === 'timeline') { veOpenTimeline(m.sequenceId); return; }
+        if (veMediaOffline(m)) { veToast('Relinque a mídia offline antes de colocar na timeline'); return; }
         const st = veSnapFrame(t);
         if (m.kind === 'image' || m.kind === 'ajuste') {
             veInsertImageClip(m, naTl ? { x: wrap.left + (st - VE.view) * VE.pps, y: drop.y, at: Date.now() } : null, 0,
@@ -518,6 +592,8 @@ function vePjAudioEm(m, st, trPedida) {
 function vePjMenu(x, y, doc) {
     veClipMenuFechar();
     const keys = [...VEPJ.sel], um = keys.length === 1;
+    const midiaUm = um && keys[0].startsWith('m:') ? VE.media[+keys[0].slice(2)] : null;
+    const podeRelink = midiaUm && ['video', 'audio', 'image'].includes(midiaUm.kind);
     const m = doc.createElement('div');
     m.className = 've-ctx';
     m.innerHTML = `
@@ -527,6 +603,7 @@ function vePjMenu(x, y, doc) {
             ${VE_CORES.map(([k, nome, hex]) => `<button class="ve-ctx-cor" data-cor="${k}" title="${nome}" style="--c:${hex}"></button>`).join('')}
         </div><div class="ve-ctx-sep"></div>` : ''}
         ${um ? '<button class="ve-ctx-item" data-pj="ren">Renomear<kbd>F2</kbd></button>' : ''}
+        ${podeRelink ? `<button class="ve-ctx-item${veMediaOffline(midiaUm) ? ' offline' : ''}" data-pj="rel">Relincar mídia...</button>` : ''}
         ${keys.length ? `<button class="ve-ctx-item" data-pj="dup">Duplicar<kbd>Ctrl+D</kbd></button>
         <button class="ve-ctx-item" data-pj="cut">Recortar<kbd>Ctrl+X</kbd></button>
         <button class="ve-ctx-item" data-pj="copy">Copiar<kbd>Ctrl+C</kbd></button>` : ''}
@@ -546,7 +623,7 @@ function vePjMenu(x, y, doc) {
         if (cor) vePjCor(keys, cor.dataset.cor);
         else if (it) ({ ren: () => vePjRenomear(keys[0]), dup: () => vePjDuplicar(keys), cut: () => vePjCopiar('recortar'),
             copy: () => vePjCopiar('copiar'), paste: vePjColar, bin: vePjNovaPasta, aj: vePjNovoAjuste, imp: vePjImportarDialogo,
-            tl: () => veCreateTimeline(), del: () => vePjApagar(keys) })[it.dataset.pj]();
+            tl: () => veCreateTimeline(), rel: () => vePjRelink(+keys[0].slice(2)), del: () => vePjApagar(keys) })[it.dataset.pj]();
         else return;
         veClipMenuFechar();
     });
@@ -584,6 +661,7 @@ function vePjInit() {
         if (k.startsWith('m:')) {
             const m = VE.media[+k.slice(2)];
             if (m && m.kind === 'timeline') { veOpenTimeline(m.sequenceId); return; }
+            if (m && veMediaOffline(m)) { vePjRelink(m.id); return; }
             if (m && m.kind === 'video') { veSrcOpen(m.id); return; }
         }
         if (e.target.closest('.ve-pj-nome')) { vePjRenomear(k); return; }
@@ -715,10 +793,20 @@ function veMidiaProxima() {
 // Eventos da preparação de um vídeo do projeto (Functions/video_cutter.py: preparar_midia)
 function veOnMidia(ev) {
     const m = VE.media[ev.id];
-    if (!m || m.kind !== 'video') { if (ev.stage === 'done' || ev.stage === 'error') { VEPJF.rodando = null; veMidiaProxima(); } return; }
+    if (!m || m.kind !== 'video') { if ((ev.stage === 'done' || ev.stage === 'error') && VEPJF.rodando === ev.id) { VEPJF.rodando = null; veMidiaProxima(); } return; }
     if (ev.stage === 'info') {
         m.info = ev;
         m.dur = ev.duration;
+        if (m.id === 0) {
+            VE.info = ev;
+            VE.srcDur = ev.duration;
+            VE.fps = ev.fps || VE.fps || 30;
+            m.name = m.nome || ev.file_name || m.name;
+            delete m.offline; delete m.missing; delete m.lost; delete m.erro;
+            const res = ev.width && ev.height ? `${ev.width}×${ev.height}` : '';
+            $ve('ve-meta').innerHTML = `<b>${veEsc(ev.file_name || vePjNome(m))}</b> · ${res} · ${(+ev.fps || VE.fps).toFixed(2).replace(/\.00$/, '')} fps · ${veHuman(ev.duration)}${ev.has_audio ? '' : ' · sem áudio'}`;
+            if (ev.has_audio) veAudioFonte();
+        }
         if (m._insertQueue) veVideoQueueTick(m._insertQueue);
         if (m._insertPending) {
             const drop = m._insertDrop || null;
@@ -731,10 +819,16 @@ function veOnMidia(ev) {
     } else if (ev.stage === 'audio') {
         m.peaks = ev.peaks || [];
         veAudioRegistrar(m.id, ev.url, ev.quadros);
+        if (m.id === 0) VE.peaks = m.peaks;
     } else if (ev.stage === 'video') {
         m.url = ev.url;
         m.proxy = ev.proxy;
         m.pct = 100;
+        if (m.id === 0) {
+            veLoading(null);
+            $ve('ve-export-btn').disabled = false;
+            $ve('ve-proxy-badge').hidden = !ev.proxy;
+        }
         if (typeof VESRC !== 'undefined' && VESRC.id === m.id) veSrcLoad();
         if (VE.clips.some(c => veMid(c) === m.id)) veSyncPlayer(true);
     } else if (ev.stage === 'thumbs') {
@@ -744,8 +838,10 @@ function veOnMidia(ev) {
             img.src = tb.url;
             return { t: tb.t, url: tb.url, img };
         });
+        if (m.id === 0) VE.thumbs = m.thumbs;
     } else if (ev.stage === 'error') {
         m.erro = ev.error || 'erro';
+        if (m.id === 0) { m.offline = true; veLoading(null); $ve('ve-export-btn').disabled = true; }
         if (m._insertQueue) {
             const q = m._insertQueue;
             q.ids = q.ids.filter(id => id !== m.id);
@@ -754,7 +850,7 @@ function veOnMidia(ev) {
         }
         veToast(`${vePjNome(m)}: ${m.erro}`);
     }
-    if (ev.stage === 'done' || ev.stage === 'error') { VEPJF.rodando = null; veMidiaProxima(); }
+    if ((ev.stage === 'done' || ev.stage === 'error') && VEPJF.rodando === ev.id) { VEPJF.rodando = null; veMidiaProxima(); }
     vePjRender();
     veDraw();
     veDrawMonitorSoon();
@@ -767,6 +863,7 @@ const VESRC = { id: null, video: null, inPt: null, outPt: null };
 function veSrcOpen(id) {
     const m = VE.media[id];
     if (!m || m.kind !== 'video') return;
+    if (veMediaOffline(m)) { vePjRelink(id); return; }
     let md = $ve('ve-source');
     if (!md) {
         md = document.createElement('div');

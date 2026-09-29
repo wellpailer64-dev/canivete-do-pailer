@@ -16,6 +16,7 @@ const VE = {
     sel: -1,            // índice do clipe selecionado
     inPt: null,
     outPt: null,
+    markers: [],        // marcadores da timeline ativa [{t, cor, nome}]
     playhead: 0,        // tempo da sequência
     cur: -1,            // clipe que o player está mostrando (-1 = espaço vazio)
     media: [],          // [0] = vídeo aberto; imagens adicionadas depois
@@ -218,6 +219,7 @@ function veCache() {
             on: veLsGet('ve-cache-on') !== '0',
             rev: 0,
             frames: new Map(),
+            pending: new Set(),
             bytes: 0,
             maxBytes: VE_CACHE_MAX_BYTES,
         };
@@ -247,16 +249,16 @@ function veCacheRelease(item) {
 
 function veCacheClear(silencioso) {
     const c = veCache();
+    c.rev++;
     c.frames.forEach(veCacheRelease);
     c.frames.clear();
+    c.pending.clear();
     c.bytes = 0;
     veCacheUpdateUi();
     if (!silencioso) veToast('Cache RAM limpo');
 }
 
 function veCacheInvalidate() {
-    const c = veCache();
-    c.rev++;
     veCacheClear(true);
 }
 
@@ -334,7 +336,28 @@ function veCacheStore(cv, cw, ch, pv, itens, trans, falta) {
     const c = veCache();
     if (!c.on || !veCacheValeGuardar(itens, trans, falta) || !cw || !ch) return;
     const f = veCacheFrame(), key = veCacheKey(f);
-    if (c.frames.has(key)) return;
+    if (c.frames.has(key) || c.pending.has(key)) return;
+    if (typeof createImageBitmap === 'function') {
+        if (c.pending.size >= 4) return;
+        const seq = VE.activeSequence || '', rev = c.rev, fps = VE.fps || 30;
+        c.pending.add(key);
+        createImageBitmap(cv).then(bmp => {
+            c.pending.delete(key);
+            if (!c.on || c.rev !== rev || c.frames.has(key)) { if (bmp.close) bmp.close(); return; }
+            const bytes = bmp.width * bmp.height * 4;
+            c.frames.set(key, { bmp, bytes, f, rev, seq, fps, pv, w: bmp.width, h: bmp.height });
+            c.bytes += bytes;
+            veCacheEvict();
+            veCacheUpdateUi();
+            const agora = performance.now();
+            if (!VE.playing || agora - (c.uiAt || 0) > 180) {
+                c.uiAt = agora;
+                veDraw();
+            }
+        }).catch(() => { c.pending.delete(key); });
+        return;
+    }
+    if (VE.playing) return;
     const cp = document.createElement('canvas');
     cp.width = cw;
     cp.height = ch;
@@ -376,6 +399,89 @@ function veCacheDraw(ctx, X, W) {
         const x1 = X(r.a), x2 = X(r.b);
         if (x2 < 0 || x1 > W) return;
         ctx.fillRect(Math.max(0, x1), 0, Math.max(1, Math.min(W, x2) - Math.max(0, x1)), 5);
+    });
+    ctx.restore();
+}
+
+// ─────────────────────────── marcadores da timeline ───────────────────────────
+const VE_MARKER_COLORS = ['#22c55e', '#f59e0b', '#38bdf8', '#a855f7', '#ef4444', '#eab308'];
+
+function veMarkerColor(i) { return VE_MARKER_COLORS[Math.abs(i || 0) % VE_MARKER_COLORS.length]; }
+function veMarkerList() { return (VE.markers || []).filter(m => Number.isFinite(+m.t)).sort((a, b) => a.t - b.t); }
+
+function veMarkerIndexAt(t = VE.playhead) {
+    const eps = veFrame() / 2 + 1e-6;
+    return (VE.markers || []).findIndex(m => Math.abs((+m.t || 0) - t) <= eps);
+}
+
+function veAddMarker() {
+    if (!VE.ready) return;
+    const t = veSnapFrame(veClamp(VE.playhead));
+    VE.markers = VE.markers || [];
+    const i = veMarkerIndexAt(t);
+    vePushHistory();
+    if (i >= 0) {
+        const atual = VE.markers[i].cor || veMarkerColor(i);
+        const n = (VE_MARKER_COLORS.indexOf(atual) + 1) || 1;
+        VE.markers[i].cor = veMarkerColor(n);
+        veToast('Cor do marcador atualizada');
+    } else {
+        VE.markers.push({ t, cor: veMarkerColor(VE.markers.length), nome: '' });
+        veToast('Marcador adicionado em ' + veShort(t));
+    }
+    VE.markers.sort((a, b) => a.t - b.t);
+    veDraw();
+}
+
+function veRemoveMarkerAtPlayhead() {
+    if (!VE.ready || !(VE.markers || []).length) return;
+    const i = veMarkerIndexAt(veSnapFrame(VE.playhead));
+    if (i < 0) { veToast('Nenhum marcador na agulha'); return; }
+    vePushHistory();
+    VE.markers.splice(i, 1);
+    veDraw();
+    veToast('Marcador apagado');
+}
+
+function veJumpMarker(dir) {
+    const ms = veMarkerList();
+    if (!ms.length) return;
+    const eps = veFrame() / 2;
+    const t = dir > 0 ? (ms.find(m => m.t > VE.playhead + eps) || ms[0]).t
+        : ([...ms].reverse().find(m => m.t < VE.playhead - eps) || ms[ms.length - 1]).t;
+    veSeek(t);
+}
+
+function veDrawMarkers(ctx, X, W, H) {
+    if (!VE.ready || !(VE.markers || []).length) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    ctx.clip();
+    veMarkerList().forEach((m, i) => {
+        const x = Math.round(X(+m.t || 0)) + 0.5;
+        if (x < -12 || x > W + 12) return;
+        const cor = m.cor || veMarkerColor(i);
+        ctx.strokeStyle = veRgba(cor, 0.28);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, VE_RULER);
+        ctx.lineTo(x, H);
+        ctx.stroke();
+        ctx.fillStyle = cor;
+        ctx.beginPath();
+        ctx.moveTo(x - 5, 4);
+        ctx.lineTo(x + 5, 4);
+        ctx.lineTo(x + 5, 13);
+        ctx.lineTo(x, 20);
+        ctx.lineTo(x - 5, 13);
+        ctx.closePath();
+        ctx.fill();
+        if (m.nome && x < W - 60) {
+            ctx.font = '600 10px Segoe UI';
+            ctx.fillStyle = veRgba(cor, 0.88);
+            ctx.fillText(m.nome, x + 7, 14);
+        }
     });
     ctx.restore();
 }
@@ -429,7 +535,9 @@ function veEditPoints(excluir) {
     return [...pts].sort((a, b) => a - b);
 }
 
-function veSnapshot() { return JSON.stringify({ clips: VE.clips, inPt: VE.inPt, outPt: VE.outPt, legendas: VE.legendas || [] }); }
+function veSnapshot() {
+    return JSON.stringify({ clips: VE.clips, inPt: VE.inPt, outPt: VE.outPt, markers: VE.markers || [], legendas: VE.legendas || [] });
+}
 
 function vePushHistory() {
     if (!VE.dirty) { VE.dirty = true; veUpdateTitle(); }
@@ -443,6 +551,7 @@ function vePushHistory() {
 function veRestore(snap) {
     const d = JSON.parse(snap);
     VE.clips = d.clips; VE.inPt = d.inPt; VE.outPt = d.outPt;
+    VE.markers = d.markers || [];
     VE.legendas = d.legendas || [];
     VE.sel = -1;
     VETX.legSel = -1;
@@ -526,6 +635,7 @@ function veSeqCapturar() {
         legGravar: VE.legGravar !== false,
         inPt: VE.inPt ?? null,
         outPt: VE.outPt ?? null,
+        markers: vePlain(VE.markers || [], []),
         playhead: VE.playhead || 0,
         view: { pps: VE.pps, x: VE.view || 0 },
         w: VE.seqW, h: VE.seqH,   // Configurações da sequência (quadro)
@@ -551,6 +661,7 @@ function veSeqAplicar(seq, opts = {}) {
     veBuildHeads();
     VE.inPt = seq.inPt ?? null;
     VE.outPt = seq.outPt ?? null;
+    VE.markers = vePlain(seq.markers || [], []);
     VE.legendas = vePlain(seq.legendas || [], []);
     VE.legEstilo = vePlain(seq.legEstilo || null, null);
     VE.legGravar = seq.legGravar !== false;
@@ -599,7 +710,7 @@ function veCreateTimeline(opts = {}) {
     const id = veSeqId();
     const seq = origem ? vePlain(origem, {}) : {
         clips: [], trilhas: veTrkNovo(), texto: { palavras: [], idioma: 'pt', chave: '' },
-        legendas: [], legEstilo: null, legGravar: true, inPt: null, outPt: null, playhead: 0, view: { pps: 0, x: 0 },
+        legendas: [], legEstilo: null, legGravar: true, inPt: null, outPt: null, markers: [], playhead: 0, view: { pps: 0, x: 0 },
         w: VE.seqW, h: VE.seqH,   // nova timeline nasce com o quadro da atual
     };
     seq.id = id;
@@ -1264,6 +1375,12 @@ function veSyncPlayer(forcar) {
         return;
     }
     const c = VE.clips[i];
+    if (veMediaOffline(veMediaOf(c))) {
+        VE.cur = i;
+        if (!v.paused) v.pause();
+        veDrawMonitor();
+        return;
+    }
     const src = veSrcAt(c, VE.playhead);
     // corte na reprodução com a reserva esperando neste trecho: troca de player em vez de buscar
     if (!forcar && VE.playing && i !== VE.cur && VEDK.i === i) {
@@ -1335,10 +1452,11 @@ function veJumpEdit(dir) {
 }
 
 function vePlay() {
-    if (!VE.ready || !veVideo().src || VE.playing) return;
+    if (!VE.ready || VE.playing) return;
     if (VE.playhead >= VE.dur - veFrame()) VE.playhead = 0;
     VE.playing = true;
     VE._last = performance.now();
+    VE._tlPlayKey = null;
     $ve('ve-play').textContent = '❚❚';
     if (veMixAtivo()) veAudioTocar(VE.playhead);
     veSyncPlayer(true);
@@ -1405,9 +1523,9 @@ function vePlaybackLoop(now) {
     else if (veMonitorDue() || v.seeking) veDrawMonitor();
     vePreloadNext();
     veSeguirAudio();
-    veFollowPlayhead(true);
+    const viewMudou = veFollowPlayhead(true);
     veUpdateReadouts();
-    veDraw();
+    if (viewMudou || vePlaybackTimelineDue()) veDraw();
     veRaf($ve('ve-canvas'), vePlaybackLoop);
 }
 
@@ -1523,6 +1641,29 @@ const VE_IMG_DUR = 5;
 const veRound = (v, n = 1) => Math.round(v * Math.pow(10, n)) / Math.pow(10, n);
 
 function veMediaOf(c) { return VE.media[c.m || 0]; }
+function vePathNome(path, fallback = 'Mídia offline') {
+    return path ? String(path).split(/[\\/]/).pop() : fallback;
+}
+function veMediaOffline(m) { return !!(m && (m.offline || m.missing || m.lost)); }
+function veOfflineMedias() { return (VE.media || []).filter(m => m && !m.removido && veMediaOffline(m)); }
+function veProjetoSeqs(d) {
+    return Array.isArray(d && d.sequences) && d.sequences.length ? d.sequences : [{
+        clips: (d && d.clips) || [],
+        w: d && d.w,
+        h: d && d.h,
+        playhead: d && d.playhead,
+        view: d && d.view,
+    }];
+}
+function veProjetoMidiaDur(d, mid = 0) {
+    return veProjetoSeqs(d).reduce((dur, s) => Math.max(dur, ...((s.clips || [])
+        .filter(c => (c.m || 0) === mid)
+        .map(c => +c.e || 0))), 0);
+}
+function veProjetoQuadro(d) {
+    const seq = veProjetoSeqs(d).find(s => s && s.w > 0 && s.h > 0) || {};
+    return { w: seq.w || 1920, h: seq.h || 1080 };
+}
 
 // ── vários vídeos por projeto (como no Premiere): cada clipe aponta para a mídia dele (c.m; 0 = o vídeo aberto,
 // que também define o tamanho e o qps da sequência). Cada vídeo tem prévia, miniaturas, forma de onda e áudio
@@ -1537,7 +1678,7 @@ function veTemSom(c) {
     if (c.x === 'v') return false;              // vídeo cujo áudio foi separado
     if (veIsAudio(c) && !c.x) return true;
     const m = veMediaOf(c);
-    if (!m || m.kind !== 'video') return false;
+    if (!m || m.kind !== 'video' || veMediaOffline(m)) return false;
     return m.id === 0 ? !!(VE.info && VE.info.has_audio) : !!(m.info && m.info.has_audio);
 }
 // Põe no player o vídeo da mídia. Cada player usa a URL com uma marca própria (tag): com a mesma URL o WebView
@@ -2225,21 +2366,119 @@ function veMonitorScale() {
     return Math.min(cap, Math.max(0.125, Math.ceil(tela * 8) / 8));
 }
 
+function veRulerNiceStep(minPx) {
+    const min = Math.max(1, minPx || 1);
+    const pow = Math.pow(10, Math.floor(Math.log10(min)));
+    return [1, 2, 5, 10].map(n => n * pow).find(n => n >= min) || 10 * pow;
+}
+
+function veRulersDraw() {
+    const ov = $ve('ve-rulers'), scr = $ve('ve-screen');
+    if (!ov || !scr) return;
+    const w = scr.clientWidth || 0, h = scr.clientHeight || 0;
+    const dpr = scr.ownerDocument.defaultView.devicePixelRatio || 1;
+    const bw = Math.max(1, Math.round(w * dpr)), bh = Math.max(1, Math.round(h * dpr));
+    if (ov.width !== bw || ov.height !== bh) { ov.width = bw; ov.height = bh; }
+    const ctx = ov.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    if (!VE.ready || !VE.seqW || !VE.seqH || !w || !h) return;
+
+    const k = veFitScale() * VEM.mz;
+    const fw = VE.seqW * k, fh = VE.seqH * k;
+    const x0 = (w - fw) / 2 + VEM.mx, y0 = (h - fh) / 2 + VEM.my;
+    const topH = 20, leftW = 28;
+    const rx = Math.max(0, Math.min(w - leftW, x0 - leftW));
+    const ry = Math.max(0, Math.min(h - topH, y0 - topH));
+    const x1 = Math.max(0, x0), x2 = Math.min(w, x0 + fw);
+    const y1 = Math.max(0, y0), y2 = Math.min(h, y0 + fh);
+    if (x2 <= x1 || y2 <= y1) return;
+
+    ctx.save();
+    ctx.font = '10px Cascadia Mono, Consolas, monospace';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = 'rgba(12,12,12,0.78)';
+    ctx.fillRect(x1, ry, x2 - x1, topH);
+    ctx.fillRect(rx, y1, leftW, y2 - y1);
+    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+    ctx.fillRect(x1, ry + topH - 1, x2 - x1, 1);
+    ctx.fillRect(rx + leftW - 1, y1, 1, y2 - y1);
+
+    const majorX = veRulerNiceStep(90 / k), minorX = Math.max(1, majorX / 5);
+    const majorY = veRulerNiceStep(70 / k), minorY = Math.max(1, majorY / 5);
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.fillStyle = 'rgba(230,230,230,0.78)';
+    ctx.beginPath();
+    for (let px = Math.ceil(Math.max(0, (x1 - x0) / k) / minorX) * minorX; px <= Math.min(VE.seqW, (x2 - x0) / k); px += minorX) {
+        const x = Math.round(x0 + px * k) + 0.5;
+        const big = Math.abs(px / majorX - Math.round(px / majorX)) < 1e-4;
+        ctx.moveTo(x, ry + topH);
+        ctx.lineTo(x, ry + (big ? 4 : 12));
+    }
+    for (let py = Math.ceil(Math.max(0, (y1 - y0) / k) / minorY) * minorY; py <= Math.min(VE.seqH, (y2 - y0) / k); py += minorY) {
+        const y = Math.round(y0 + py * k) + 0.5;
+        const big = Math.abs(py / majorY - Math.round(py / majorY)) < 1e-4;
+        ctx.moveTo(rx + leftW, y);
+        ctx.lineTo(rx + (big ? 5 : 15), y);
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(235,235,235,0.78)';
+    for (let px = Math.ceil(Math.max(0, (x1 - x0) / k) / majorX) * majorX; px <= Math.min(VE.seqW, (x2 - x0) / k); px += majorX) {
+        const x = Math.round(x0 + px * k);
+        if (x > x1 + 2 && x < x2 - 26) ctx.fillText(String(Math.round(px)), x + 3, ry + 3);
+    }
+    ctx.textAlign = 'right';
+    for (let py = Math.ceil(Math.max(0, (y1 - y0) / k) / majorY) * majorY; py <= Math.min(VE.seqH, (y2 - y0) / k); py += majorY) {
+        const y = Math.round(y0 + py * k);
+        if (y > y1 + 2 && y < y2 - 12) ctx.fillText(String(Math.round(py)), rx + leftW - 4, y + 2);
+    }
+    ctx.restore();
+}
+
+function veDrawOfflineMedia(ctx, w, h, nome) {
+    ctx.save();
+    ctx.fillStyle = '#120809';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(248,113,113,0.55)';
+    ctx.lineWidth = Math.max(2, Math.min(w, h) * 0.004);
+    ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, Math.max(1, w - ctx.lineWidth), Math.max(1, h - ctx.lineWidth));
+    ctx.strokeStyle = 'rgba(248,113,113,0.22)';
+    ctx.lineWidth = Math.max(1, Math.min(w, h) * 0.002);
+    for (let x = -h; x < w + h; x += Math.max(36, Math.min(w, h) * 0.08)) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + h, h);
+        ctx.stroke();
+    }
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fecaca';
+    ctx.font = `800 ${Math.max(18, Math.min(64, w / 13))}px Segoe UI`;
+    ctx.fillText(veT('MÍDIA OFFLINE'), w / 2, h / 2 - Math.max(12, h * 0.035), w * 0.82);
+    ctx.fillStyle = 'rgba(254,202,202,0.76)';
+    ctx.font = `600 ${Math.max(10, Math.min(24, w / 32))}px Segoe UI`;
+    ctx.fillText(nome || veT('Relinque ou apague no painel Projeto'), w / 2, h / 2 + Math.max(16, h * 0.055), w * 0.82);
+    ctx.restore();
+}
+
 function veDrawMonitor() {
     const cv = $ve('ve-canvas');
     if (!cv) return;
     const ctx = cv.getContext('2d');
-    if (!VE.ready) { ctx.clearRect(0, 0, cv.width, cv.height); return; }
+    if (!VE.ready) { ctx.clearRect(0, 0, cv.width, cv.height); veRulersDraw(); return; }
     const pv = veMonitorScale();
     const cw = Math.round(VE.seqW * pv), ch = Math.round(VE.seqH * pv);
     const cached = veCacheGet(cw, ch, pv);
-    if (cached && cached.cv) {
+    const cachedSrc = cached && (cached.bmp || cached.cv);
+    if (cachedSrc) {
         if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; }
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, cw, ch);
-        ctx.drawImage(cached.cv, 0, 0, cw, ch);
+        ctx.drawImage(cachedSrc, 0, 0, cw, ch);
         ctx.setTransform(pv, 0, 0, pv, 0, 0);
         veTfDesenhar(ctx, cv, pv);
+        veRulersDraw();
         return;
     }
     const t = VE.playhead, v = veVideo();
@@ -2258,7 +2497,10 @@ function veDrawMonitor() {
     let extra = 0, falta = false;
     const itens = vis.map(({ c, i }) => {
         let src = null;
-        if (veIsAdj(c)) {
+        const med = veMediaOf(c);
+        if (veMediaOffline(med)) {
+            src = 'offline';
+        } else if (veIsAdj(c)) {
             src = 'ajuste';
         } else if (veIsTexto(c)) {
             src = veTxCanvas(c, pv * veProps(c).sc / 100).cv;   // desenhado na resolução em que aparece
@@ -2292,7 +2534,7 @@ function veDrawMonitor() {
     if (falta && !novo) {
         const agora = performance.now();
         if (!VE._monHold) VE._monHold = agora;
-        if (agora - VE._monHold < 600) return;
+        if (agora - VE._monHold < 600) { veRulersDraw(); return; }
     }
     VE._monHold = 0;
     if (novo) { cv.width = cw; cv.height = ch; }
@@ -2305,7 +2547,7 @@ function veDrawMonitor() {
             if (!src) return;
             if (src === 'ajuste') { veAdjDraw(ctx, cv, c, pv); return; }
             const p = veProps(c), sz = veMediaSize(c);
-            src = veFxRender(c, src, sz, pv * p.sc / 100);   // efeitos rodam antes do movimento (como no Premiere)
+            if (src !== 'offline') src = veFxRender(c, src, sz, pv * p.sc / 100);   // efeitos rodam antes do movimento (como no Premiere)
             ctx.save();
             ctx.globalAlpha = Math.max(0, Math.min(1, p.op / 100));
             ctx.translate(p.x, p.y);
@@ -2313,13 +2555,17 @@ function veDrawMonitor() {
             const k = p.sc / 100;
             ctx.scale(k * (p.sx == null ? 1 : p.sx), k * (p.sy == null ? 1 : p.sy));
             const [ax, ay] = veAnc(c, p, sz);   // a Posição é onde fica o ponto de ancoragem
-            ctx.drawImage(src, -ax, -ay, sz.w, sz.h);
+            if (src === 'offline') {
+                ctx.translate(-ax, -ay);
+                veDrawOfflineMedia(ctx, sz.w, sz.h, vePjNome(veMediaOf(c)));
+            } else ctx.drawImage(src, -ax, -ay, sz.w, sz.h);
             ctx.restore();
         });
     veTxDesenhar(ctx);
     veCacheStore(cv, cw, ch, pv, itens, trans, falta);
     // caixa com alças e ponto de ancoragem do selecionado (editor-transform.js)
     veTfDesenhar(ctx, cv, pv);
+    veRulersDraw();
 }
 
 // ── painel de propriedades ──
@@ -2908,6 +3154,7 @@ function veProjectData() {
         legendas: VE.legendas || [], legEstilo: VE.legEstilo || null, legGravar: VE.legGravar !== false,
         inPt: VE.inPt,
         outPt: VE.outPt,
+        markers: VE.markers || [],
         playhead: VE.playhead,
         view: { pps: VE.pps, x: VE.view },
         salvo_em: new Date().toISOString(),
@@ -2945,7 +3192,7 @@ function veCloseProject() {
     veParkExtras(0, true);
     veCacheClear(true);
     Object.assign(VE, {
-        path: null, info: null, dur: 0, srcDur: 0, clips: [], sel: -1, inPt: null, outPt: null, playhead: 0,
+        path: null, info: null, dur: 0, srcDur: 0, clips: [], sel: -1, inPt: null, outPt: null, markers: [], playhead: 0,
         cur: -1, history: [], future: [], thumbs: [], peaks: [], ready: false, dest: null, view: 0, media: [],
         sequences: [], activeSequence: null, openSequences: [], _seqN: 0, projectPath: null, dirty: false, quickEdit: false, _pendingProject: null, bins: [],
     });
@@ -2973,14 +3220,58 @@ function veOpenProject(path) {
     window.pywebview.api.ve_project_open(path || null).then(r => {
         if (!r || !r.success) { if (r && r.error) veToast(r.error); return; }
         const d = r.data;
-        if (!d.video || r.missing.includes(d.video)) {
-            veToast('O vídeo deste projeto não foi encontrado: ' + (d.video || '?'));
-            return;
-        }
         VE._pendingProject = { data: d, path: r.path, name: r.name, missing: r.missing || [] };
         VE.dirty = false;
-        veOpenPath(d.video);
+        const faltaBase = !d.video || (r.missing || []).includes(d.video);
+        if (faltaBase) veOpenLostProject();
+        else veOpenPath(d.video);
     });
+}
+
+function veOpenLostProject() {
+    const pend = VE._pendingProject;
+    if (!pend) return;
+    const { data: d, missing } = pend;
+    veStop();
+    veDeckReset();
+    veAudioReset();
+    VE_TRK = veTrkNovo();
+    VE.legendas = [];
+    VE.legEstilo = null;
+    VE.legGravar = true;
+    veTxReset();
+    const v = veVideo();
+    v.pause();
+    v.removeAttribute('src');
+    v.load();
+    veParkExtras(0, true);
+    veCacheClear(true);
+    const q = veProjetoQuadro(d), dur = Math.max(veProjetoMidiaDur(d, 0), veSeqDur((veProjetoSeqs(d)[0] || {})), 1);
+    const basePath = d.video || '';
+    const baseName = vePathNome(basePath, 'Mídia principal offline');
+    Object.assign(VE, {
+        path: basePath || null,
+        info: { duration: dur, fps: 30, width: q.w, height: q.h, has_audio: false, file_name: baseName, offline: true },
+        dur: 0, srcDur: dur, fps: 30, clips: [], sel: -1, inPt: null, outPt: null, markers: [], playhead: 0,
+        cur: -1, history: [], future: [], thumbs: [], peaks: [], ready: true, dest: null, view: 0, media: [],
+        sequences: [], activeSequence: null, openSequences: [], _seqN: 0,
+    });
+    VE.seqW = q.w;
+    VE.seqH = q.h;
+    VE.media = [{
+        id: 0, kind: 'video', path: basePath, name: baseName, offline: !!basePath, missing: !!basePath,
+        info: VE.info, dur, removido: !basePath,
+    }];
+    VEPJ.sel.clear();
+    VEPJF.fila = [];
+    veBuildHeads();
+    veUpdateUndo();
+    $ve('ve-empty').hidden = true;
+    $ve('ve-loading').hidden = true;
+    $ve('ve-proxy-badge').hidden = true;
+    $ve('ve-export-btn').disabled = true;
+    $ve('ve-meta').innerHTML = `<b>${veEsc(baseName)}</b> · ${veT('MÍDIA OFFLINE')}`;
+    veApplyProject();
 }
 
 // Chamado pelo Python quando o app abre por duplo clique num .vcnvt
@@ -2996,6 +3287,14 @@ function veApplyProject() {
     VE.projectPath = path;
     VE.quickEdit = false;
     const ids = { 0: 0 };
+    const missingSet = new Set(missing || []);
+    const mediaDur = new Map();
+    veProjetoSeqs(d).forEach(s => (s.clips || []).forEach(c => {
+        const mid = c.m || 0;
+        mediaDur.set(mid, Math.max(mediaDur.get(mid) || 0, +c.e || 0));
+    }));
+    const estaFaltando = p => !p || missingSet.has(p);
+    const q = veProjetoQuadro(d);
     (d.media || []).forEach(m => {
         const org = { pasta: m.pasta || null, cor: m.cor, nome: m.nome };
         if (m.kind === 'timeline') {
@@ -3011,11 +3310,17 @@ function veApplyProject() {
             return;
         }
         if (m.kind === 'video' || m.kind === 'video2') {
-            if (!m.path || missing.includes(m.path)) return;
             const nm = { id: VE.media.length, kind: 'video', name: m.name, path: m.path, ...org };
             VE.media.push(nm);
             ids[m.id] = nm.id;
-            veMidiaPreparar(nm);
+            if (estaFaltando(m.path)) {
+                const dur = mediaDur.get(m.id) || m.dur || 1;
+                Object.assign(nm, {
+                    offline: true, missing: true, dur,
+                    info: { duration: dur, width: q.w, height: q.h, fps: VE.fps || 30, has_audio: false, offline: true },
+                    name: m.name || vePathNome(m.path),
+                });
+            } else veMidiaPreparar(nm);
             return;
         }
         if (m.kind === 'ajuste' || m.kind === 'texto') {
@@ -3025,10 +3330,13 @@ function veApplyProject() {
             return;
         }
         if (m.kind === 'audio') {
-            if (!m.path || missing.includes(m.path)) return;
             const nm = { id: VE.media.length, kind: 'audio', path: m.path, name: m.name, dur: m.dur || 0, peaks: [], ...org };
             VE.media.push(nm);
             ids[m.id] = nm.id;
+            if (estaFaltando(m.path)) {
+                Object.assign(nm, { offline: true, missing: true, erro: 'Mídia offline' });
+                return;
+            }
             window.pywebview.api.video_cutter_add_audio(m.path).then(r => {
                 if (!r || !r.success) return;
                 Object.assign(nm, { dur: r.dur, peaks: r.peaks || [], url: r.url, quadros: r.quadros });
@@ -3037,10 +3345,13 @@ function veApplyProject() {
             });
             return;
         }
-        if (!m.path || missing.includes(m.path)) return;
         const nm = { id: VE.media.length, kind: 'image', path: m.path, name: m.name, img: new Image(), w: m.w || 0, h: m.h || 0, ...org };
         VE.media.push(nm);
         ids[m.id] = nm.id;
+        if (estaFaltando(m.path)) {
+            Object.assign(nm, { offline: true, missing: true, erro: 'Mídia offline' });
+            return;
+        }
         window.pywebview.api.video_cutter_add_media(m.path).then(r => {
             if (!r || !r.success) return;
             nm.url = r.url;
@@ -3071,6 +3382,7 @@ function veApplyProject() {
         legGravar: d.legGravar,
         inPt: d.inPt,
         outPt: d.outPt,
+        markers: d.markers || [],
         playhead: d.playhead,
         view: d.view,
     }]).map((s, i) => {
@@ -3086,6 +3398,7 @@ function veApplyProject() {
             legGravar: s.legGravar !== false,
             inPt: s.inPt ?? null,
             outPt: s.outPt ?? null,
+            markers: Array.isArray(s.markers) ? s.markers : [],
             playhead: s.playhead || 0,
             view: s.view || { pps: 0, x: 0 },
             w: s.w, h: s.h,
@@ -3103,8 +3416,8 @@ function veApplyProject() {
     VE.dirty = false;
     veUpdateTitle();
     veRegistrarProjetoRecente(path, d);
-    const faltam = missing.filter(p => p !== d.video).length;
-    veToast(faltam ? `Projeto aberto — ${faltam} imagem(ns) não encontrada(s); os clipes delas ficaram de fora`
+    const faltam = (missing || []).length;
+    veToast(faltam ? `Projeto aberto — ${faltam} mídia(s) offline`
                    : 'Projeto aberto: ' + name.replace(/\.vcnvt$/i, ''));
 }
 
@@ -3163,12 +3476,14 @@ function veSyncZoomSlider() {
 function veFollowPlayhead(playing) {
     const w = veCanvasWidth();
     const x = (VE.playhead - VE.view) * VE.pps;
+    const antes = VE.view;
     if (playing) {
         if (x > w * 0.92 || x < 0) { VE.view = VE.playhead - w * 0.1 / VE.pps; veClampView(); }
     } else if (x < 0 || x > w) {
         VE.view = VE.playhead - w / 2 / VE.pps;
         veClampView();
     }
+    return Math.abs(VE.view - antes) > 1e-6;
 }
 
 // ─────────────────────────── trilhas (cabeçalhos e tamanhos) ───────────────────────────
@@ -3253,6 +3568,19 @@ function veDraw() {
     if (veDrawQueued) return;
     veDrawQueued = true;
     veRaf($ve('ve-tl'), () => { veDrawQueued = false; veRender(); });
+}
+
+function vePlaybackTimelineDue() {
+    const key = [
+        Math.round((VE.playhead - VE.view) * VE.pps * 2),
+        Math.round(VE.view * VE.pps),
+        Math.round(VE.vs),
+        VE.sel,
+        VE.tool
+    ].join('|');
+    if (VE._tlPlayKey === key) return false;
+    VE._tlPlayKey = key;
+    return true;
 }
 
 // requestAnimationFrame da janela onde o elemento está (painel solto: a janela dele segue desenhando
@@ -3598,6 +3926,8 @@ function veRender() {
         ctx.fillText(veShort(t), Math.min(x + 4, W - 60), VE_RULER + 12);
     }
 
+    veDrawMarkers(ctx, X, W, H);
+
     // agulha
     const px = Math.round(X(VE.playhead)) + 0.5;
     if (px >= -8 && px <= W + 8) {
@@ -3772,6 +4102,7 @@ function veSnapTime(t, forRazor) {
         if (forRazor) cands.push(VE.playhead);
         if (VE.inPt != null) cands.push(VE.inPt);
         if (VE.outPt != null) cands.push(VE.outPt);
+        (VE.markers || []).forEach(m => cands.push(+m.t || 0));
         let best = null, bd = lim;
         for (const c of cands) { const d = Math.abs(c - t); if (d < bd) { bd = d; best = c; } }
         if (best != null) return best;
@@ -3831,7 +4162,7 @@ function veOpenPath(path) {
     veParkExtras(0, true);
     veCacheClear(true);
     Object.assign(VE, {
-        path, info: null, dur: 0, srcDur: 0, clips: [], sel: -1, inPt: null, outPt: null, playhead: 0,
+        path, info: null, dur: 0, srcDur: 0, clips: [], sel: -1, inPt: null, outPt: null, markers: [], playhead: 0,
         cur: -1, history: [], future: [], thumbs: [], peaks: [], ready: false, dest: null, view: 0, media: [],
         sequences: [], activeSequence: null, openSequences: [], _seqN: 0,
     });
@@ -3941,6 +4272,7 @@ function vePill(name) {
 
 function veOpenExport() {
     if (!VE.ready) return;
+    if (veOfflineMedias().length) { veToast('Relinque ou apague as mídias offline antes de exportar'); return; }
     veStop();
     const sel = $ve('ve-res');
     const W = VE.seqW || VE.info.width || 0, H = VE.seqH || VE.info.height || 0;
@@ -4119,6 +4451,7 @@ function veApplyMonitor() {
     $ve('ve-mz-val').textContent = fit ? 'Fit' : Math.round(veFitScale() * VEM.mz * 100) + '%';
     $ve('ve-mz-fit').classList.toggle('active', fit);
     $ve('ve-screen').classList.toggle('zoomed', VEM.mz > 1.001);
+    veRulersDraw();
     // zoom pede outra resolução da prévia
     if (VE.ready && Math.round(VE.seqW * veMonitorScale()) !== v.width) veDrawMonitorSoon();
 }

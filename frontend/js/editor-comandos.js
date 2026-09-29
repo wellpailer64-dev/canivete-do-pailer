@@ -59,6 +59,10 @@ const VE_CMDS = [
     // ── Marcadores ──
     { id: 'marcar-in', grupo: 'marcadores', nome: 'Marcar entrada', teclas: ['I'], fn: () => veMarkIn() },
     { id: 'marcar-out', grupo: 'marcadores', nome: 'Marcar saída', teclas: ['O'], fn: () => veMarkOut() },
+    { id: 'marcador-add', grupo: 'marcadores', nome: 'Adicionar marcador', teclas: ['M'], sep: true, fn: () => veAddMarker() },
+    { id: 'marcador-prox', grupo: 'marcadores', nome: 'Ir para o próximo marcador', teclas: ['Shift+M'], fn: () => veJumpMarker(1), pode: () => (VE.markers || []).length > 0 },
+    { id: 'marcador-ant', grupo: 'marcadores', nome: 'Ir para o marcador anterior', teclas: ['Ctrl+Shift+M'], fn: () => veJumpMarker(-1), pode: () => (VE.markers || []).length > 0 },
+    { id: 'marcador-apagar', grupo: 'marcadores', nome: 'Apagar marcador na agulha', teclas: ['Alt+M'], fn: () => veRemoveMarkerAtPlayhead(), pode: () => (VE.markers || []).length > 0 },
     { id: 'ir-in', grupo: 'marcadores', nome: 'Ir para a entrada', teclas: ['Shift+I'], sep: true, fn: () => veSeek(VE.inPt), pode: () => VE.inPt != null },
     { id: 'ir-out', grupo: 'marcadores', nome: 'Ir para a saída', teclas: ['Shift+O'], fn: () => veSeek(VE.outPt), pode: () => VE.outPt != null },
     { id: 'limpar-in', grupo: 'marcadores', nome: 'Limpar entrada', teclas: ['Ctrl+Shift+I'], sep: true, fn: () => veLimparInOut(true, false), pode: () => VE.inPt != null },
@@ -68,7 +72,7 @@ const VE_CMDS = [
     // ── Exibir ──
     { id: 'play', grupo: 'exibir', nome: 'Reproduzir / Pausar', teclas: ['Space'], fn: () => veTogglePlay() },
     { id: 'tela-cheia', grupo: 'exibir', nome: 'Reproduzir em tela cheia', teclas: ['Alt+Enter'], fn: () => veTelaCheia() },
-    { id: 'mudo', grupo: 'exibir', nome: 'Som da prévia', teclas: ['M'], fn: () => veToggleMute(), marcado: () => !VE.muted },
+    { id: 'mudo', grupo: 'exibir', nome: 'Som da prévia', teclas: ['Ctrl+Alt+M'], fn: () => veToggleMute(), marcado: () => !VE.muted },
     { id: 'zoom-mais', grupo: 'exibir', nome: 'Mais zoom na timeline', teclas: ['+', '='], sep: true, fn: () => veZoomBy(1.5) },
     { id: 'zoom-menos', grupo: 'exibir', nome: 'Menos zoom na timeline', teclas: ['-'], fn: () => veZoomBy(1 / 1.5) },
     { id: 'zoom-ajustar', grupo: 'exibir', nome: 'Ajustar a timeline à tela', teclas: ['\\'], fn: () => veZoomFit() },
