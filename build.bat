@@ -80,6 +80,7 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --add-data "%ORT_DIR%\tools;onnxruntime/tools" ^
  --hidden-import "Functions.legendas" ^
  --hidden-import "Functions.fontes" ^
+ --hidden-import "Functions.render_cache" ^
  --copy-metadata "pywebview" ^
  --copy-metadata "pythonnet" ^
  --copy-metadata "clr_loader" ^

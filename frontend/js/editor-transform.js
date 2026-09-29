@@ -125,7 +125,7 @@ function veTfIniciar() {
         if (VE.tool !== 'select' || e.button !== 0 || !VE.ready || e.target.closest('button, textarea, .ve-mzoom')) return;
         const q = veTxQuadroTela(), pt = { x: (e.clientX - q.x0) / q.s, y: (e.clientY - q.y0) / q.s };
         let alvo = veTfAlvo(pt, q), i = VE.sel;
-        // legenda (desenhada por cima de tudo): arrastar muda a posição de todas
+        // legenda (desenhada por cima de tudo): arrastar muda a posição da legenda selecionada
         const lg = alvo ? -1 : veTxLegendaNoPonto(pt);
         if (lg >= 0) {
             e.stopImmediatePropagation();
@@ -133,7 +133,7 @@ function veTfIniciar() {
             VEM.panned = true;
             if (VE.playing) veStop();
             if (VE.sel !== -1 || VETX.legSel !== lg) { VE.sel = -1; VETX.legSel = lg; veRefresh(); }
-            const est = veTxEstilo();
+            const est = veTxEstiloLegenda(lg);
             VETF.drag = { tipo: 'leg', x0: e.clientX, y0: e.clientY, pt0: pt, px0: +est.px || 0, py0: +est.py || 0, hist: false, ativo: false, id: e.pointerId };
             scr.setPointerCapture(e.pointerId);
             return;
@@ -142,7 +142,7 @@ function veTfIniciar() {
             i = veTfClipeEm(pt, c => !veLocked(c));
             if (i < 0) {
                 // vazio: desmarca (com zoom, o arraste move a visão — fica com o monitor)
-                if (VE.sel >= 0) { VE.sel = -1; veRefresh(); }
+                if (VE.sel >= 0 || VETX.legSel >= 0) { VE.sel = -1; VETX.legSel = -1; veRefresh(); }
                 return;
             }
             alvo = { tipo: 'mover' };
@@ -151,7 +151,7 @@ function veTfIniciar() {
         e.preventDefault();
         VEM.panned = true;
         if (VE.playing) veStop();
-        if (i !== VE.sel) { VE.sel = i; veRefresh(); }
+        if (i !== VE.sel || VETX.legSel >= 0) { VE.sel = i; VETX.legSel = -1; veRefresh(); }
         const c = VE.clips[i], p = veProps(c);
         VETF.drag = { ...alvo, i, x0: e.clientX, y0: e.clientY, pt0: pt, p0: { ...p }, hist: false, ativo: false,
                       clonar: e.altKey && alvo.tipo === 'mover', id: e.pointerId };
@@ -186,7 +186,7 @@ function veTfIniciar() {
             let px = Math.round((d.px0 + (pt.x - d.pt0.x) / VE.seqW * 100) * 10) / 10;
             const py = Math.round((d.py0 - (pt.y - d.pt0.y) / VE.seqH * 100) * 10) / 10;
             if (Math.abs(px) < 1 && !e.shiftKey) px = 0;   // gruda no centro
-            VE.legEstilo = { ...veTxEstilo(), px, py };
+            veTxSetEstiloLegenda(VETX.legSel, { px, py });
             vePpRender();
             veDrawMonitorSoon();
             return;
@@ -197,7 +197,10 @@ function veTfIniciar() {
         const q = veTxQuadroTela(), pt = { x: (e.clientX - q.x0) / q.s, y: (e.clientY - q.y0) / q.s };
         const p0 = d.p0, sz = veMediaSize(c);
         if (d.tipo === 'mover') {
-            veApplyProps(c, { x: Math.round(p0.x + pt.x - d.pt0.x), y: Math.round(p0.y + pt.y - d.pt0.y) });
+            // encaixa nas guias e nas bordas/centro do quadro (editor-guias.js); Ctrl segurado: livre
+            const s = veGuiasEncaixarCamada(c, p0, Math.round(p0.x + pt.x - d.pt0.x), Math.round(p0.y + pt.y - d.pt0.y), q.s, e.ctrlKey);
+            veApplyProps(c, s);
+            veGuiasRedesenhar();
         } else if (d.tipo === 'alca') {
             // escala uniforme a partir da âncora: projeção do ponteiro na direção da alça
             const [ax, ay] = veAnc(c, p0, sz);
@@ -228,6 +231,7 @@ function veTfIniciar() {
         const d = VETF.drag;
         if (!d) return;
         VETF.drag = null;
+        veGuiasEncaixeFim();
         e.stopImmediatePropagation();
         setTimeout(() => { VEM.panned = false; }, 0);
         if (d.ativo) veRefresh();

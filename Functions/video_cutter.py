@@ -1085,79 +1085,91 @@ def _ass_cor(hexcor, alfa=0):
 
 
 def _gerar_ass(itens, estilo, W, H):
-    em = max(8.0, float(estilo.get("tam", 5.5)) / 100.0 * H)
-    razao = _num(estilo.get("razao"), 0.6, 2.5, 1.117)
-    fonte = "".join(ch for ch in str(estilo.get("fonte") or "Arial") if ch not in ",{}\\\n\r").strip() or "Arial"
-    fundo = estilo.get("fundo", "caixa")
-    pos = estilo.get("pos", "baixo")
-    alinhamento = {"baixo": 2, "meio": 5, "cima": 8}.get(pos, 2)
-    margem = int(round(0.06 * H))
-    negrito = -1 if estilo.get("negrito", True) else 0
-    italico = -1 if estilo.get("ita") else 0
-    cor = _ass_cor(estilo.get("cor", "#ffffff"))
-    folga = em * 0.22
-    caixa_alfa = round((1 - _num(estilo.get("caixaOp"), 0, 100, 64) / 100) * 255)
-    caixa_cor = _ass_cor(estilo.get("caixaCor", "#000000"), caixa_alfa)
-    raio = _num(estilo.get("caixaRaio"), 0, 100, 0) if fundo == "caixa" else 0
-    cont_cor = _ass_cor(estilo.get("cCor", "#000000"))
-    if fundo == "caixa" and not raio:
-        # BorderStyle 3: caixa opaca atrás de cada linha; o Outline vira a folga da caixa
-        borda, contorno, sombra, fundo_cor = 3, round(folga, 1), 0, caixa_cor
-    elif fundo == "sombra":
-        # o traço da prévia fica metade dentro da letra; o Outline do ASS é só para fora
-        largura = _num(estilo.get("cLarg"), 0, 40, 12) / 200
-        borda, contorno, sombra, fundo_cor = 1, round(em * largura, 1), round(em * 0.07, 1), _ass_cor("#000000", 0x40)
-    else:
-        # sem fundo, ou caixa de cantos arredondados (desenhada à parte, numa camada de baixo)
-        borda, contorno, sombra, fundo_cor = 1, 0, 0, _ass_cor("#000000", 0xFF)
-    # Sombra projetada (mesma prévia do editor-texto.js): com caixa, a sombra é da própria caixa (Shadow do estilo);
-    # sem caixa, uma cópia da legenda na cor da sombra numa camada de baixo, deslocada e com \blur
-    s_on = bool(estilo.get("sOn"))
-    s_alfa = round((1 - _num(estilo.get("sOp"), 0, 100, 75) / 100) * 255)
-    s_cor = _ass_cor(estilo.get("sCor", "#000000"), s_alfa)
-    s_d = _num(estilo.get("sDist"), 0, 200, 6) * 0.7071   # deslocamento em x e em y (distância na diagonal)
-    s_blur = _num(estilo.get("sBlur"), 0, 200, 8) / 2
-    camada_sombra = s_on and borda != 3
-    if s_on and borda == 3:
-        sombra, fundo_cor_sombra = round(s_d, 1), s_cor
-    else:
-        fundo_cor_sombra = fundo_cor
-    if camada_sombra:
-        sombra = 0
-    if raio:
-        camada_sombra = False   # a sombra é da caixa desenhada (\shad do desenho)
-    # Entrada rápida de cada legenda (VE_LEG_ENTRADA): Fade 0,12 s; Pop 80% → 106% → 100% em 0,18 s
-    entrada = {
-        "fade": r"\fad(120,0)",
-        "pop": r"\fscx80\fscy80\t(0,117,\fscx106\fscy106)\t(117,180,\fscx100\fscy100)\fad(60,0)",
-    }.get(estilo.get("entrada"), "")
-    # deslocamento arrastado no monitor (% do quadro; py positivo sobe)
-    cx = W / 2 + _num(estilo.get("px"), -100, 100, 0) / 100 * W
-    ancora_y = ({"baixo": H - margem, "meio": H / 2, "cima": margem}.get(pos, H - margem)
-                - _num(estilo.get("py"), -100, 100, 0) / 100 * H)
-    linhas = [
-        "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {W}", f"PlayResY: {H}", "WrapStyle: 2",
-        "ScaledBorderAndShadow: yes", "",
-        "[V4+ Styles]",
-        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
-        "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, "
-        "MarginR, MarginV, Encoding",
-        f"Style: Leg,{fonte},{em * razao:.1f},{cor},{cor},{fundo_cor if borda == 3 else cont_cor},{fundo_cor_sombra},"
-        f"{negrito},{italico},0,0,100,100,0,0,{borda},{contorno},{sombra},{alinhamento},{margem},{margem},{margem},1",
-        f"Style: LegS,{fonte},{em * razao:.1f},{s_cor},{s_cor},{s_cor},{s_cor},"
-        f"{negrito},{italico},0,0,100,100,0,0,1,0,0,{alinhamento},{margem},{margem},{margem},1",
-        "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-    ]
-    tag_sombra = f"{{\\an{alinhamento}\\pos({cx + s_d:.1f},{ancora_y + s_d:.1f})\\blur{s_blur:.1f}{entrada}}}"
-    tag_texto = f"{{\\an{alinhamento}\\pos({cx:.1f},{ancora_y:.1f}){entrada}}}"
-    # caixa arredondada: a forma inteira é um desenho ancorado como o texto, na borda de fora da caixa
-    alt = em * razao
-    caixa_y = ancora_y + {"baixo": folga, "cima": -folga}.get(pos, 0)
-    caixa_sombra = f"\\shad{s_d:.1f}\\4c&H{s_cor[4:]}&\\4a&H{s_alfa:02X}&" if s_on else "\\shad0"
-    tag_caixa = (f"{{\\an{alinhamento}\\pos({cx:.1f},{caixa_y:.1f})\\bord0{caixa_sombra}"
-                 f"\\1c&H{caixa_cor[4:]}&\\1a&H{caixa_alfa:02X}&{entrada}\\p1}}")
+    estilo = estilo or {}
+    estilos, eventos, cache = [], [], {}
+
+    def montar(est, leg, legs):
+        em = max(8.0, float(est.get("tam", 5.5)) / 100.0 * H)
+        razao = _num(est.get("razao"), 0.6, 2.5, 1.117)
+        fonte = "".join(ch for ch in str(est.get("fonte") or "Arial") if ch not in ",{}\\\n\r").strip() or "Arial"
+        fundo = est.get("fundo", "caixa")
+        pos = est.get("pos", "baixo")
+        alinhamento = {"baixo": 2, "meio": 5, "cima": 8}.get(pos, 2)
+        margem = int(round(0.06 * H))
+        negrito = -1 if est.get("negrito", True) else 0
+        italico = -1 if est.get("ita") else 0
+        cor = _ass_cor(est.get("cor", "#ffffff"))
+        folga = em * 0.22
+        caixa_alfa = round((1 - _num(est.get("caixaOp"), 0, 100, 64) / 100) * 255)
+        caixa_cor = _ass_cor(est.get("caixaCor", "#000000"), caixa_alfa)
+        raio = _num(est.get("caixaRaio"), 0, 100, 0) if fundo == "caixa" else 0
+        cont_cor = _ass_cor(est.get("cCor", "#000000"))
+        if fundo == "caixa" and not raio:
+            borda, contorno, sombra, fundo_cor = 3, round(folga, 1), 0, caixa_cor
+        elif fundo == "sombra":
+            largura = _num(est.get("cLarg"), 0, 40, 12) / 200
+            borda, contorno, sombra, fundo_cor = 1, round(em * largura, 1), round(em * 0.07, 1), _ass_cor("#000000", 0x40)
+        else:
+            borda, contorno, sombra, fundo_cor = 1, 0, 0, _ass_cor("#000000", 0xFF)
+        s_on = bool(est.get("sOn"))
+        s_alfa = round((1 - _num(est.get("sOp"), 0, 100, 75) / 100) * 255)
+        s_cor = _ass_cor(est.get("sCor", "#000000"), s_alfa)
+        s_d = _num(est.get("sDist"), 0, 200, 6) * 0.7071
+        s_blur = _num(est.get("sBlur"), 0, 200, 8) / 2
+        camada_sombra = s_on and borda != 3
+        if s_on and borda == 3:
+            sombra, fundo_cor_sombra = round(s_d, 1), s_cor
+        else:
+            fundo_cor_sombra = fundo_cor
+        if camada_sombra:
+            sombra = 0
+        if raio:
+            camada_sombra = False
+        entrada = {
+            "fade": r"\fad(120,0)",
+            "pop": r"\fscx80\fscy80\t(0,117,\fscx106\fscy106)\t(117,180,\fscx100\fscy100)\fad(60,0)",
+        }.get(est.get("entrada"), "")
+        cx = W / 2 + _num(est.get("px"), -100, 100, 0) / 100 * W
+        ancora_y = ({"baixo": H - margem, "meio": H / 2, "cima": margem}.get(pos, H - margem)
+                    - _num(est.get("py"), -100, 100, 0) / 100 * H)
+        alt = em * razao
+        caixa_y = ancora_y + {"baixo": folga, "cima": -folga}.get(pos, 0)
+        caixa_sombra = f"\\shad{s_d:.1f}\\4c&H{s_cor[4:]}&\\4a&H{s_alfa:02X}&" if s_on else "\\shad0"
+        return {
+            "style": f"Style: {leg},{fonte},{em * razao:.1f},{cor},{cor},{fundo_cor if borda == 3 else cont_cor},{fundo_cor_sombra},"
+                     f"{negrito},{italico},0,0,100,100,0,0,{borda},{contorno},{sombra},{alinhamento},{margem},{margem},{margem},1",
+            "style_s": f"Style: {legs},{fonte},{em * razao:.1f},{s_cor},{s_cor},{s_cor},{s_cor},"
+                       f"{negrito},{italico},0,0,100,100,0,0,1,0,0,{alinhamento},{margem},{margem},{margem},1",
+            "leg": leg,
+            "legs": legs,
+            "tag_sombra": f"{{\\an{alinhamento}\\pos({cx + s_d:.1f},{ancora_y + s_d:.1f})\\blur{s_blur:.1f}{entrada}}}",
+            "tag_texto": f"{{\\an{alinhamento}\\pos({cx:.1f},{ancora_y:.1f}){entrada}}}",
+            "tag_caixa": (f"{{\\an{alinhamento}\\pos({cx:.1f},{caixa_y:.1f})\\bord0{caixa_sombra}"
+                          f"\\1c&H{caixa_cor[4:]}&\\1a&H{caixa_alfa:02X}&{entrada}\\p1}}"),
+            "camada_sombra": camada_sombra,
+            "raio": raio,
+            "alt": alt,
+            "folga": folga,
+            "maiusc": bool(est.get("maiusc")),
+        }
+
+    def info_estilo(item):
+        est = dict(estilo)
+        if isinstance(item.get("estilo"), dict):
+            est.update(item["estilo"])
+        chave = json.dumps(est, sort_keys=True, ensure_ascii=False, default=str)
+        if chave in cache:
+            return cache[chave]
+        sufixo = "" if not cache else str(len(cache))
+        info = montar(est, f"Leg{sufixo}", f"LegS{sufixo}")
+        estilos.extend([info["style"], info["style_s"]])
+        cache[chave] = info
+        return info
+
     n = 0
     for it in itens:
+        if not isinstance(it, dict):
+            continue
         try:
             st, en = float(it["st"]), float(it["en"])
         except Exception:
@@ -1165,19 +1177,31 @@ def _gerar_ass(itens, estilo, W, H):
         txt = str(it.get("texto", "")).strip()
         if en - st < 0.02 or not txt:
             continue
-        if estilo.get("maiusc"):
+        info = info_estilo(it)
+        if info["maiusc"]:
             txt = txt.upper()
         txt = txt.replace("\\", "\\\\").replace("{", "(").replace("}", ")").replace("\r", "").replace("\n", "\\N")
-        if camada_sombra:
-            linhas.append(f"Dialogue: 0,{_ass_tempo(st)},{_ass_tempo(en)},LegS,,0,0,0,,{tag_sombra}{txt}")
-        if raio:
-            forma = _ass_caixa_redonda(it.get("larg"), txt.count("\\N") + 1, alt, folga, raio)
+        if info["camada_sombra"]:
+            eventos.append(f"Dialogue: 0,{_ass_tempo(st)},{_ass_tempo(en)},{info['legs']},,0,0,0,,{info['tag_sombra']}{txt}")
+        if info["raio"]:
+            forma = _ass_caixa_redonda(it.get("larg"), txt.count("\\N") + 1, info["alt"], info["folga"], info["raio"])
             if forma:
-                linhas.append(f"Dialogue: 0,{_ass_tempo(st)},{_ass_tempo(en)},Leg,,0,0,0,,{tag_caixa}{forma}")
-        linhas.append(f"Dialogue: 1,{_ass_tempo(st)},{_ass_tempo(en)},Leg,,0,0,0,,{tag_texto}{txt}")
+                eventos.append(f"Dialogue: 0,{_ass_tempo(st)},{_ass_tempo(en)},{info['leg']},,0,0,0,,{info['tag_caixa']}{forma}")
+        eventos.append(f"Dialogue: 1,{_ass_tempo(st)},{_ass_tempo(en)},{info['leg']},,0,0,0,,{info['tag_texto']}{txt}")
         n += 1
     if not n:
         return None
+    linhas = [
+        "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {W}", f"PlayResY: {H}", "WrapStyle: 2",
+        "ScaledBorderAndShadow: yes", "",
+        "[V4+ Styles]",
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
+        "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, "
+        "MarginR, MarginV, Encoding",
+        *estilos,
+        "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+        *eventos,
+    ]
     arq = os.path.join(_work_dir(), f"legendas_{uuid.uuid4().hex[:8]}.ass")
     with open(arq, "w", encoding="utf-8") as f:
         f.write("\n".join(linhas) + "\n")
@@ -1382,9 +1406,12 @@ def _opcao_filtro_script():
 
 def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", resolucao="original",
                    usar_gpu=True, pasta_saida=None, on_progress=None, stop_event=None, sem_audio=False,
-                   camadas=None, audio_segmentos=None, duracao=None, audio_clipes=None, legendas=None, quadro=None):
+                   camadas=None, audio_segmentos=None, duracao=None, audio_clipes=None, legendas=None, quadro=None,
+                   saida=None, previa_h=0, proc_holder=None):
     """
     Exporta a timeline do editor.
+    saida/previa_h  = prévia renderizada (render_cache.py): arquivo fixo, sem som, H.264 leve de decodificar
+                      (GOP curto: buscar é rápido), lado menor até previa_h px; proc_holder guarda o processo
     quadro          = [largura, altura] da sequência (Configurações da sequência); sem ele, o tamanho do vídeo aberto
     segmentos       = base de vídeo em ordem ([{start, end, gain}] do original ou {gap: s})
     audio_segmentos = trilha de áudio (mesmo formato); se None, usa os segmentos da base
@@ -1406,6 +1433,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     cfg = FORMATOS_SAIDA.get(formato_saida, FORMATOS_SAIDA["mp4"])
     q = _QUALIDADE.get(str(qualidade).lower(), _QUALIDADE["medium"])
     alvo_h = _RESOLUCOES.get(str(resolucao), 0)
+    previa = bool(saida and previa_h)
+    if previa:
+        cfg, alvo_h, sem_audio, usar_gpu = FORMATOS_SAIDA["mp4"], int(previa_h), True, False
 
     info = probe(path)
     audio_only = bool(cfg.get("audio_only")) or not info["has_video"]
@@ -1451,7 +1481,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     simples = not lay and audio_segmentos is None and mix is None
     if not simples:
         pecas, pecas_a = _completar(pecas), _completar(pecas_a)
-    saida = _nome_saida(aberto, cfg["ext"], pasta_saida)
+    saida = saida or _nome_saida(aberto, cfg["ext"], pasta_saida)
     # áudios soltos na timeline dão som ao vídeo mesmo que o vídeo aberto não tenha
     extras = sorted({c[4] for c in (mix or []) if c[4]})
     if mix is not None and not info["has_audio"]:
@@ -1672,18 +1702,28 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     def _tentar(gpu):
         nonlocal ultimo_cmd
         global _export_proc
-        video_args = ["-vn"] if audio_only else _args_video(cfg, q, gpu)
+        if previa:
+            video_args = ["-c:v", "libx264", "-preset", "ultrafast", "-tune", "fastdecode", "-crf", "20",
+                          "-g", "10", "-pix_fmt", "yuv420p"]
+        else:
+            video_args = ["-vn"] if audio_only else _args_video(cfg, q, gpu)
         full = base_cmd + video_args + cfg["extra"] + [saida]
         ultimo_cmd = full
 
         def _hold(p):
             global _export_proc
+            if proc_holder is not None:
+                proc_holder(p)
+                return
             with _export_lock:
                 _export_proc = p
 
         rc, err = _run_progress(full, total, lambda p: prog(p, f"Exportando... {p}%"), stop_event, _hold)
-        with _export_lock:
-            _export_proc = None
+        if proc_holder is not None:
+            proc_holder(None)
+        else:
+            with _export_lock:
+                _export_proc = None
         return rc, err
 
     try:

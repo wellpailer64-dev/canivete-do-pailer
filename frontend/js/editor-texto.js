@@ -2,7 +2,7 @@
 // Pocket Editor — painel Texto: Transcrever e Criar legendas (como no Premiere)
 // Transcrição: Functions/legendas.py (Parakeet via onnx-asr, local) sobre a MESMA mixagem da exportação;
 // devolve palavras [início, fim, texto] em segundos da timeline (VETX.palavras).
-// Legendas: VE.legendas = [{st, en, texto}] (entram no desfazer), estilo em VE.legEstilo; aparecem numa trilha
+// Legendas: VE.legendas = [{st, en, texto, estilo?}] (entram no desfazer), estilo padrão em VE.legEstilo; aparecem numa trilha
 // própria no alto da timeline (linha "LEG"), no monitor (veTxDesenhar) e, ao exportar, gravadas no vídeo com o
 // mesmo estilo (_gerar_ass em video_cutter.py) ou num arquivo (SRT, VTT, ASS, SSA, SBV ou TXT).
 // =========================================================
@@ -213,6 +213,16 @@ function veTxCriarLegendas() {
 }
 
 function veTxEstilo() { return Object.assign({}, VE_LEG_ESTILO, VE.legEstilo || {}); }
+function veTxEstiloLegenda(i = VETX.legSel) {
+    const l = (VE.legendas || [])[i];
+    return Object.assign({}, veTxEstilo(), l && l.estilo || {});
+}
+function veTxSetEstiloLegenda(i, patch) {
+    const l = (VE.legendas || [])[i];
+    if (!l) return false;
+    VE.legendas[i] = { ...l, estilo: { ...(l.estilo || {}), ...patch } };
+    return true;
+}
 
 function veTxLegendaEm(t) {
     const L = VE.legendas || [];
@@ -310,7 +320,7 @@ function veTxSombraQuadro(L, e) {
 function veTxDesenhar(ctx) {
     const i = veTxLegendaEm(VE.playhead);
     if (i < 0) return;
-    const e = veTxEstilo(), L = veTxLegLayout(VE.legendas[i].texto, e);
+    const e = veTxEstiloLegenda(i), L = veTxLegLayout(VE.legendas[i].texto, e);
     if (!L.linhas.length) return;
     const { cx, em, alt, linhas, topo } = L;
     ctx.save();
@@ -357,7 +367,7 @@ function veTxDesenhar(ctx) {
 function veTxLegendaNoPonto(pt) {
     const i = veTxLegendaEm(VE.playhead);
     if (i < 0) return -1;
-    const L = veTxLegLayout(VE.legendas[i].texto), f = L.folga * 2;
+    const L = veTxLegLayout(VE.legendas[i].texto, veTxEstiloLegenda(i)), f = L.folga * 2;
     const dentro = pt.x >= L.cx - L.wMax / 2 - f && pt.x <= L.cx + L.wMax / 2 + f && pt.y >= L.topo - f && pt.y <= L.topo + L.bloco + f;
     return dentro ? i : -1;
 }
@@ -373,6 +383,7 @@ function veTxLegEditar(i) {
     scr.appendChild(ta);
     VETX.editando = i;
     VETX.legSel = i;
+    VE.sel = -1;
     VETX.edit = { i, ta, hist: false };
     veTxLegEditarPos();
     ta.focus();
@@ -399,7 +410,7 @@ function veTxLegEditar(i) {
 function veTxLegEditarPos() {
     const ed = VETX.edit;
     if (!ed) return;
-    const e = veTxEstilo(), L = veTxLegLayout(VE.legendas[ed.i].texto || ' ', e);
+    const e = veTxEstiloLegenda(ed.i), L = veTxLegLayout(VE.legendas[ed.i].texto || ' ', e);
     const q = veTxQuadroTela(), rs = $ve('ve-screen').getBoundingClientRect(), s = ed.ta.style;
     const w = Math.max(L.wMax, L.em * 3) + L.folga * 2, linhas = Math.max(1, String(VE.legendas[ed.i].texto).split('\n').length);
     const topo = e.pos === 'baixo' ? L.topo + L.bloco - linhas * L.alt : e.pos === 'meio' ? L.topo + (L.bloco - linhas * L.alt) / 2 : L.topo;
@@ -453,12 +464,18 @@ function veTxExportar(origem) {
 // faixa {a, b}: exportando só o trecho In→Out, as legendas vão recortadas e trazidas para o zero
 function veTxExport(faixa) {
     if (VE.legGravar === false || !(VE.legendas || []).length) return null;
-    const e = veTxEstilo();
-    let itens = !faixa ? VE.legendas : VE.legendas.filter(l => l.st < faixa.b && l.en > faixa.a)
-        .map(l => ({ ...l, st: Math.max(l.st, faixa.a) - faixa.a, en: Math.min(l.en, faixa.b) - faixa.a }));
-    // caixa de cantos arredondados: o .ass desenha a forma, então vai a largura de cada linha (px do quadro)
-    if (e.fundo === 'caixa' && +e.caixaRaio > 0) itens = itens.map(l => ({ ...l, larg: veTxLegLayout(l.texto, e).larg.map(w => Math.round(w * 10) / 10) }));
-    return itens.length ? { itens, estilo: { ...e, razao: veTxMetricas(e).razao } } : null;
+    const base = veTxEstilo();
+    let itens = !faixa ? VE.legendas.map((l, i) => ({ l, i })) : VE.legendas
+        .map((l, i) => ({ l, i }))
+        .filter(x => x.l.st < faixa.b && x.l.en > faixa.a)
+        .map(x => ({ ...x, l: { ...x.l, st: Math.max(x.l.st, faixa.a) - faixa.a, en: Math.min(x.l.en, faixa.b) - faixa.a } }));
+    itens = itens.map(({ l, i }) => {
+        const e = veTxEstiloLegenda(i);
+        const item = { ...l, estilo: { ...e, razao: veTxMetricas(e).razao } };
+        if (e.fundo === 'caixa' && +e.caixaRaio > 0) item.larg = veTxLegLayout(l.texto, e).larg.map(w => Math.round(w * 10) / 10);
+        return item;
+    });
+    return itens.length ? { itens, estilo: { ...base, razao: veTxMetricas(base).razao } } : null;
 }
 
 // ─────────────────────────── painel ───────────────────────────
@@ -605,7 +622,7 @@ function veTxInit() {
         const lg = e.target.closest('[data-legacao]');
         if (lg) {
             const i = +lg.closest('[data-leg]').dataset.leg;
-            if (lg.dataset.legacao === 'ir') { VETX.legSel = i; veSeek(VE.legendas[i].st); veRefresh(); }
+            if (lg.dataset.legacao === 'ir') { VETX.legSel = i; VE.sel = -1; veSeek(VE.legendas[i].st); veRefresh(); }
             else { vePushHistory(); VE.legendas = VE.legendas.filter((_, k) => k !== i); VETX.legSel = -1; veRefresh(); }
         }
     });
@@ -655,7 +672,7 @@ function veTxInit() {
     });
     box.addEventListener('focusin', e => {
         const i = e.target.dataset && e.target.dataset.legtxt;
-        if (i != null) { VETX.legSel = +i; veSeek(VE.legendas[+i].st); veDraw(); }
+        if (i != null) { VETX.legSel = +i; VE.sel = -1; veSeek(VE.legendas[+i].st); veDraw(); vePpRender(); }
     });
     if (window.pywebview && window.pywebview.api && window.pywebview.api.ve_texto_modelos) {
         window.pywebview.api.ve_texto_modelos().then(m => { VETX.modelos = m; veTxRender(); });

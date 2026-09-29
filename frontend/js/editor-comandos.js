@@ -6,7 +6,8 @@
 // Teclas no formato "Ctrl+Alt+Shift+Tecla"; letras e números pela posição física (e.code), símbolos pelo caractere.
 // =========================================================
 
-const veSel = () => VE.sel >= 0 || (typeof veSelLista === 'function' && veSelLista().length > 0);
+const veSel = () => VE.sel >= 0 || (typeof veSelLista === 'function' && veSelLista().length > 0) ||
+    (typeof VETX !== 'undefined' && VETX.legSel >= 0 && (VE.legendas || [])[VETX.legSel]);
 
 // grupo = menu onde aparece (sem menu: só atalho). sempre = funciona sem projeto aberto.
 // pode() = habilitado; marcado() = ✓ no menu. sep = linha antes do item no menu.
@@ -34,7 +35,7 @@ const VE_CMDS = [
     { id: 'colar', grupo: 'editar', nome: 'Colar', teclas: ['Ctrl+V'], fn: () => veColar() },
     { id: 'apagar', grupo: 'editar', nome: 'Apagar', teclas: ['Delete', 'Backspace', 'D'], fn: () => veDeleteSelected(false), pode: veSel },
     { id: 'apagar-ripple', grupo: 'editar', nome: 'Apagar e fechar o espaço', teclas: ['Shift+Delete', 'Shift+Backspace', 'Shift+D'], fn: () => veDeleteSelected(true), pode: veSel },
-    { id: 'desselecionar', grupo: 'editar', nome: 'Desmarcar tudo', teclas: ['Esc'], fn: () => { VE.sel = -1; VE.trSel = null; VE.bordaSel = null; veRenderClips(); veDraw(); } },
+    { id: 'desselecionar', grupo: 'editar', nome: 'Desmarcar tudo', teclas: ['Esc'], fn: () => { VE.sel = -1; VETX.legSel = -1; VE.selx = null; VE.trSel = null; VE.bordaSel = null; veRenderClips(); veDraw(); } },
     { id: 'atalhos', grupo: 'editar', nome: 'Atalhos do teclado...', teclas: ['Ctrl+Alt+K'], sempre: true, sep: true, fn: () => veAtalhosAbrir() },
     { id: 'preferencias', grupo: 'editar', nome: 'Preferências...', teclas: [], sempre: true, fn: () => prefsOpen() },
 
@@ -54,6 +55,9 @@ const VE_CMDS = [
     { id: 'trans-video', grupo: 'sequencia', nome: 'Aplicar transição de vídeo padrão', teclas: ['Ctrl+D'], sep: true, fn: () => veTransPadrao(false) },
     { id: 'trans-audio', grupo: 'sequencia', nome: 'Aplicar transição de áudio padrão', teclas: ['Ctrl+Shift+D', 'Ctrl+Shift+9'], fn: () => veTransPadrao(true) },
     { id: 'ima', grupo: 'sequencia', nome: 'Ímã (encaixar)', teclas: ['N'], sep: true, fn: () => veToggleSnap(), marcado: () => VE.snap },
+    { id: 'render-inout', grupo: 'sequencia', sep: true, nome: 'Renderizar prévia (In a Out)', teclas: ['Enter'], fn: () => vePrRenderizar() },
+    { id: 'render-cancelar', grupo: 'sequencia', nome: 'Cancelar render da prévia', teclas: [], fn: () => vePrCancelar(), pode: () => !!(VEPR.atual || VEPR.fila.length) },
+    { id: 'render-apagar', grupo: 'sequencia', nome: 'Apagar arquivos de render do projeto', teclas: [], fn: () => vePrApagarProjeto(), pode: () => VEPR.files.size > 0 },
     { id: 'restaurar', grupo: 'sequencia', nome: 'Voltar ao vídeo original', teclas: [], sep: true, fn: () => veResetEdits() },
 
     // ── Marcadores ──
@@ -78,6 +82,13 @@ const VE_CMDS = [
     { id: 'zoom-ajustar', grupo: 'exibir', nome: 'Ajustar a timeline à tela', teclas: ['\\'], fn: () => veZoomFit() },
     { id: 'monitor-fit', grupo: 'exibir', nome: 'Monitor: ajustar à tela', teclas: [], sep: true, fn: () => veMonitorFit() },
     { id: 'monitor-100', grupo: 'exibir', nome: 'Monitor: 100%', teclas: [], fn: () => veMonitorZoomTo(1) },
+    { id: 'reguas', grupo: 'exibir', nome: 'Réguas', teclas: ['Ctrl+R'], sep: true, sempre: true, fn: () => veToggleRulers(), marcado: () => VEM.rulers },
+    { id: 'guias-mostrar', grupo: 'exibir', nome: 'Mostrar guias', teclas: ['Ctrl+;'], sempre: true, fn: () => veGuiasMostrar(), marcado: () => VEG.show },
+    { id: 'guias-travar', grupo: 'exibir', nome: 'Travar guias', teclas: ['Ctrl+Alt+;'], sempre: true, fn: () => veGuiasTravar(), marcado: () => VEG.lock },
+    { id: 'guias-encaixe', grupo: 'exibir', nome: 'Encaixar nas guias', teclas: [], sempre: true, fn: () => veGuiasEncaixe(), marcado: () => VEG.snap },
+    { id: 'guias-limpar', grupo: 'exibir', nome: 'Limpar guias', teclas: [], fn: () => veGuiasLimpar(), pode: () => veGuias().length > 0 },
+    { id: 'res-full', grupo: 'exibir', nome: 'Resolução da prévia: Full', teclas: [], sep: true, fn: () => veSetPreviewRes(1), marcado: () => VEM.res === 1 },
+    { id: 'res-half', grupo: 'exibir', nome: 'Resolução da prévia: 1/2', teclas: [], fn: () => veSetPreviewRes(0.5), marcado: () => VEM.res !== 1 },
 
     // ── só atalho: reprodução e navegação ──
     { id: 'parar', grupo: 'reproducao', nome: 'Parar', teclas: ['K'], fn: () => { veStop(); veSetRate(1); } },

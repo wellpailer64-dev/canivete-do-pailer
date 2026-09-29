@@ -135,9 +135,9 @@ function veTxCanvas(c, alvo) {
 function veTxTamanho(c) { const L = veTxLayout(veTxt(c)); return { w: L.w, h: L.h }; }
 
 // Exportação: cada clipe de texto vira um PNG no tamanho em que ele aparece (a maior escala dele)
-async function veTxPngs() {
+async function veTxPngs(filtro) {
     const mapa = new Map();
-    for (const c of VE.clips.filter(veIsTexto)) {
+    for (const c of VE.clips.filter(c => veIsTexto(c) && (!filtro || filtro(c)))) {
         const p = veStaticProps(c);
         const escalas = [p.sc].concat(veKfOn(c, 'sc') ? c.k.sc.map(q => q.v) : []);
         const f = Math.min(4, Math.max(1, Math.max(...escalas) / 100));
@@ -353,6 +353,11 @@ const vePpNum = (k, rot, min, max, passo, un) => `
 const vePpCor = (k, rot) => `<label class="ve-pp-cor">${rot}<input type="color" data-pp="${k}"></label>`;
 const vePpChk = (k, rot) => `<label class="ve-pp-chk"><input type="checkbox" data-pp="${k}"> ${rot}</label>`;
 const vePpSec = (tit, corpo, fechada) => `<details class="ve-pp-sec"${fechada ? '' : ' open'}><summary>${tit}</summary><div class="ve-pp-corpo">${corpo}</div></details>`;
+const vePpLegEstilo = () => typeof veTxEstiloLegenda === 'function' ? veTxEstiloLegenda(VETX.legSel) : veTxEstilo();
+const vePpSetLegEstilo = patch => {
+    if (typeof veTxSetEstiloLegenda === 'function' && VETX.legSel >= 0) veTxSetEstiloLegenda(VETX.legSel, patch);
+    else VE.legEstilo = { ...veTxEstilo(), ...patch };
+};
 
 function vePpFontes(k) {
     const lista = VEPP.fontes || ['Arial', 'Segoe UI', 'Times New Roman', 'Verdana', 'Impact'];
@@ -401,7 +406,7 @@ function vePpHtml(a) {
     if (a.tipo === 'legenda') {
         return cab('Legenda', `${VETX.legSel + 1} de ${VE.legendas.length} · trilha LEG`) +
             vePpSec('Texto da legenda', `<textarea class="ve-pp-texto" data-pp="leg.texto" rows="3"></textarea>`) +
-            vePpSec('Estilo das legendas (todas)', `
+            vePpSec('Estilo desta legenda', `
                 <div class="ve-pp-l"><label>Fonte</label>${vePpFontes('le.fam')}</div>
                 <div class="ve-pp-l"><label>Estilo</label>${veFonteEstilos('le.estilo')}</div>
                 <div class="ve-pp-botoes">
@@ -421,7 +426,8 @@ function vePpHtml(a) {
                 <div class="ve-pp-botoes"><button class="ve-btn ve-btn-sm ve-btn-ghost" data-ppleg="centro" title="Volta a legenda para a posição escolhida acima">Zerar deslocamento</button></div>
                 <small class="ve-pp-dica">Arraste a legenda no monitor para mover (Shift: sem grudar no centro).</small>
                 <div class="ve-pp-l"><label>Entrada</label><select data-pp="le.entrada" title="Efeito rápido quando cada legenda aparece"><option value="nenhum">Seca (sem efeito)</option><option value="pop">Pop</option><option value="fade">Fade</option></select></div>
-                ${vePpChk('legGravar', 'Gravar as legendas no vídeo ao exportar')}`) +
+                `) +
+            vePpSec('Exportação', `${vePpChk('legGravar', 'Gravar as legendas no vídeo ao exportar')}`) +
             links([['texto', 'Painel Texto']]);
     }
     const nome = `${veNomeClipe(c)} ${VE.sel + 1}`;
@@ -479,14 +485,14 @@ function vePpGet(k) {
     const c = VE.clips[VE.sel];
     if (k === 'tx.fam') return veFonteFamilia(veTxt(c));
     if (k === 'tx.estilo') { const x = veTxt(c); return veFonteEstiloAtual(x, x.neg, x.ita); }
-    if (k === 'le.fam') return veFonteFamilia(veTxEstilo());
-    if (k === 'le.estilo') { const e = veTxEstilo(); return veFonteEstiloAtual(e, e.negrito, e.ita); }
+    if (k === 'le.fam') return veFonteFamilia(vePpLegEstilo());
+    if (k === 'le.estilo') { const e = vePpLegEstilo(); return veFonteEstiloAtual(e, e.negrito, e.ita); }
     if (k.startsWith('tx.')) return veTxt(c)[k.slice(3)];
     if (k === 'p.ax' || k === 'p.ay') return veAnc(c)[k === 'p.ax' ? 0 : 1];
     if (k.startsWith('p.')) return veProps(c)[k.slice(2)];
-    if (k === 'le.eCaixa') return veTxEstilo().fundo === 'caixa';
-    if (k === 'le.eContorno') return veTxEstilo().fundo === 'sombra';
-    if (k.startsWith('le.')) return veTxEstilo()[k.slice(3)];
+    if (k === 'le.eCaixa') return vePpLegEstilo().fundo === 'caixa';
+    if (k === 'le.eContorno') return vePpLegEstilo().fundo === 'sombra';
+    if (k.startsWith('le.')) return vePpLegEstilo()[k.slice(3)];
     if (k === 'leg.texto') return (VE.legendas[VETX.legSel] || {}).texto || '';
     if (k === 'legGravar') return VE.legGravar !== false;
     if (k === 'vel') return veVel(c) * 100;
@@ -500,12 +506,12 @@ function vePpGet(k) {
 function vePpSet(k, v) {
     const c = VE.clips[VE.sel];
     if (k === 'tx.fam' || k === 'tx.estilo' || k === 'le.fam' || k === 'le.estilo') {
-        const leg = k.startsWith('le.'), atual = leg ? veTxEstilo() : veTxt(c);
+        const leg = k.startsWith('le.'), atual = leg ? vePpLegEstilo() : veTxt(c);
         const fam = k.endsWith('.fam') ? v : veFonteFamilia(atual);
         const lista = (VEPP.estilos && VEPP.estilos[fam]) || [];
         const e = k.endsWith('.fam') ? veFontePadrao(fam) : lista.find(x => x.estilo === v);
         const novo = e ? { fam, fonte: e.gdi } : { fam, fonte: fam };
-        if (leg) VE.legEstilo = { ...atual, ...novo, negrito: e ? e.gdi_negrito : atual.negrito, ita: e ? e.gdi_italico : atual.ita };
+        if (leg) vePpSetLegEstilo({ ...novo, negrito: e ? e.gdi_negrito : atual.negrito, ita: e ? e.gdi_italico : atual.ita });
         else {
             c.tx = { ...atual, ...novo, neg: e ? e.gdi_negrito : atual.neg, ita: e ? e.gdi_italico : atual.ita };
             if (VEPP.edit && VEPP.edit.c === c) veTxEditarPos();
@@ -529,7 +535,7 @@ function vePpSet(k, v) {
         if (VEPP.edit) veTxEditarPos();
         return 'props';
     }
-    if (k.startsWith('le.')) { VE.legEstilo = { ...veTxEstilo(), [k.slice(3)]: v }; return 'monitor'; }
+    if (k.startsWith('le.')) { vePpSetLegEstilo({ [k.slice(3)]: v }); return 'monitor'; }
     if (k === 'leg.texto') { VE.legendas[VETX.legSel] = { ...VE.legendas[VETX.legSel], texto: v }; return 'monitor'; }
     if (k === 'legGravar') { VE.legGravar = !!v; return; }
     if (k === 'vel') { if (isFinite(v) && v > 0) veMudarVelocidade(c, v / 100); return 'tudo'; }
@@ -563,7 +569,7 @@ function vePpRender() {
     const ativo = box.ownerDocument.activeElement;
     box.querySelectorAll('select.ve-pp-estilo').forEach(sel => {
         const leg = sel.dataset.pp.startsWith('le.');
-        const o = leg ? veTxEstilo() : a.c && veTxt(a.c);
+        const o = leg ? vePpLegEstilo() : a.c && veTxt(a.c);
         if (!o) return;
         const fam = veFonteFamilia(o), lista = (VEPP.estilos && VEPP.estilos[fam]) || [];
         const chave = fam + '|' + lista.length;
@@ -637,7 +643,7 @@ function vePpInit() {
         if (!VE.ready) return;
         if (tog) { vePushHistory(); vePpSet(tog.dataset.pptog, !vePpGet(tog.dataset.pptog)); vePpDepois('monitor', true); return; }
         if (alin) { vePushHistory(); vePpSet('tx.alin', alin.dataset.ppalin); vePpDepois('monitor', true); return; }
-        if (e.target.closest('[data-ppleg="centro"]')) { vePushHistory(); VE.legEstilo = { ...veTxEstilo(), px: 0, py: 0 }; vePpDepois('monitor', true); return; }
+        if (e.target.closest('[data-ppleg="centro"]')) { vePushHistory(); vePpSetLegEstilo({ px: 0, py: 0 }); vePpDepois('monitor', true); return; }
         if (ac) {
             const c = VE.clips[VE.sel];
             if (!c) return;

@@ -220,7 +220,9 @@ const I18N_EN = {
     'Escolha um arquivo de áudio para relincar': 'Choose an audio file to relink',
     'Escolha um vídeo ou áudio para relincar': 'Choose a video or audio file to relink',
     'Duração final do vídeo editado': 'Final duration of the edited video', 'Duração final:': 'Final duration:',
-    'Este vídeo não tem som': 'This video has no sound', 'Imagem não tem som': 'Images have no sound', 'sem áudio': 'no audio',
+    'Este vídeo não tem som': 'This video has no sound', 'Este clipe não tem som': 'This clip has no sound',
+    'Mídia offline: relinque antes de ajustar o ganho': 'Media offline: relink before adjusting gain',
+    'Imagem não tem som': 'Images have no sound', 'sem áudio': 'no audio',
     'Ganho de áudio': 'Audio gain', 'Ajustar ganho em (dB)': 'Adjust gain by (dB)', 'Ganho do clipe selecionado (ex.: 10 ou -10 dB)': 'Selected clip gain (e.g. 10 or -10 dB)',
     'ex.: 10 ou -10': 'e.g. 10 or -10', 'Selecione um clipe para ajustar o ganho': 'Select a clip to adjust the gain', 'Ganho atual do clipe: ': 'Current clip gain: ',
     '0 dB | Livre': '0 dB | Free', 'Livre': 'Free', 'Clipe': 'Clip', 'Clipes:': 'Clips:',
@@ -302,6 +304,9 @@ const I18N_EN = {
     'Ímã (encaixar)': 'Snap', 'Voltar ao vídeo original': 'Revert to Original Video', 'Marcar entrada': 'Mark In', 'Marcar saída': 'Mark Out',
     'Ir para a entrada': 'Go to In', 'Ir para a saída': 'Go to Out', 'Limpar entrada': 'Clear In', 'Limpar saída': 'Clear Out', 'Limpar entrada e saída': 'Clear In and Out',
     'Reproduzir / Pausar': 'Play / Pause', 'Reproduzir em tela cheia': 'Play Full Screen', 'Som da prévia': 'Preview Audio',
+    'Réguas': 'Rulers',
+    "Geral": "General", "Cache e Disco": "Cache & Disk", "Pasta do cache em disco (prévias renderizadas)": "Disk cache folder (rendered previews)", "Padrão (pasta do app)": "Default (app folder)", "Escolher disco/pasta...": "Choose disk/folder...", "Usar padrão": "Use default", "Abrir pasta": "Open folder", "Cada projeto ganha a própria pasta aqui dentro. Prefira um SSD com espaço livre. Ao trocar de pasta, as prévias antigas ficam na pasta anterior (limpe-as antes, se quiser).": "Each project gets its own folder in here. Prefer an SSD with free space. When you change folders, old previews stay in the previous one (clear them first if you want).", "Qualidade das prévias": "Preview quality", "1080p (máxima)": "1080p (best)", "720p (mais leve)": "720p (lighter)", "540p (a mais leve)": "540p (lightest)", "Tamanho máximo do cache em disco (GB)": "Maximum disk cache size (GB)", "Apagar prévias não usadas há mais de": "Delete previews unused for more than", "7 dias": "7 days", "15 dias": "15 days", "30 dias": "30 days", "60 dias": "60 days", "90 dias": "90 days", "Cache de quadros na RAM (máximo)": "RAM frame cache (maximum)", "A limpeza é automática: ao abrir o app e depois de cada render, o que passou da idade é apagado; se o total passar do máximo, saem primeiro as prévias usadas há mais tempo.": "Cleanup is automatic: when the app opens and after each render, anything past the age limit is deleted; if the total exceeds the maximum, the least recently used previews go first.", "Limpar deste projeto": "Clear this project", "Limpar todo o cache em disco": "Clear all disk cache", "Limpar cache RAM": "Clear RAM cache", "Renderizar prévia (In a Out)": "Render Preview (In to Out)", "Cancelar render da prévia": "Cancel Preview Render", "Apagar arquivos de render do projeto": "Delete Project Render Files", "Renderizando a prévia em disco": "Rendering preview to disk", "Cancelar render": "Cancel render", "Render cancelado": "Render cancelled", "Arquivos de render apagados": "Render files deleted", "Cache em disco limpo": "Disk cache cleared", "Já está renderizando": "Already rendering", "Nada para renderizar: os trechos já estão prontos (ou são leves)": "Nothing to render: sections are already done (or light)", "Espere a exportação terminar": "Wait for the export to finish", 'Mostrar guias': 'Show Guides', 'Travar guias': 'Lock Guides', 'Encaixar nas guias': 'Snap to Guides', 'Limpar guias': 'Clear Guides', 'Guias visíveis': 'Guides visible', 'Guias ocultas': 'Guides hidden', 'Guias travadas': 'Guides locked', 'Guias destravadas': 'Guides unlocked', 'Encaixe nas guias ligado': 'Snap to guides on', 'Encaixe nas guias desligado': 'Snap to guides off', 'Guias apagadas': 'Guides cleared', 'Arraste para criar uma guia horizontal': 'Drag to create a horizontal guide', 'Arraste para criar uma guia vertical': 'Drag to create a vertical guide', 'Réguas (Ctrl+R)': 'Rulers (Ctrl+R)', 'Resolução da prévia: Full': 'Playback Resolution: Full', 'Resolução da prévia: 1/2': 'Playback Resolution: 1/2',
+    'Resolução da reprodução: Half alivia o processamento na prévia (a exportação sai sempre em qualidade máxima)': 'Playback resolution: 1/2 lightens preview processing (export is always full quality)',
     'Mais zoom na timeline': 'Zoom In Timeline', 'Menos zoom na timeline': 'Zoom Out Timeline', 'Ajustar a timeline à tela': 'Fit Timeline to Screen',
     'Monitor: ajustar à tela': 'Monitor: Fit', 'Parar': 'Stop', 'Reproduzir mais rápido (1,5x · 2x · 3x)': 'Play Faster (1.5x · 2x · 3x)',
     'Voltar 5 segundos': 'Back 5 Seconds', 'Voltar 1 quadro': 'Step Back 1 Frame', 'Avançar 1 quadro': 'Step Forward 1 Frame', 'Voltar 1 segundo': 'Back 1 Second',
@@ -404,7 +409,7 @@ const I18N_EN = {
     'Abra um vídeo para começar.': 'Open a video to start.',
     'Os efeitos da camada valem para tudo o que está abaixo dela.': 'The layer’s effects apply to everything below it.',
     'Duplo clique no texto do monitor para editar ali mesmo. Quadros-chave: Controles de efeito.': 'Double-click the text on the monitor to edit it there. Keyframes: Effect Controls.',
-    'Legenda': 'Caption', 'Texto da legenda': 'Caption text', 'Estilo das legendas (todas)': 'Caption style (all)', 'Painel Texto ›': 'Text panel ›',
+    'Legenda': 'Caption', 'Texto da legenda': 'Caption text', 'Estilo das legendas (todas)': 'Caption style (all)', 'Estilo desta legenda': 'This caption style', 'Exportação': 'Export', 'Painel Texto ›': 'Text panel ›',
     'Controles de efeito ›': 'Effect Controls ›', 'Luz e Cor ›': 'Light & Color ›',
     'Fonte, tamanho, cor, fundo e posição das legendas ficam no painel Propriedades (selecione uma legenda).': 'Caption font, size, color, background and position are in the Properties panel (select a caption).',
     'Editar estilo em Propriedades': 'Edit style in Properties', 'Propriedades (velocidade, volume)': 'Properties (speed, volume)',
@@ -430,6 +435,14 @@ const I18N_EN = {
     'Clique em "Criar legendas" para gerar a partir da transcrição.': 'Click "Create captions" to generate them from the transcript.',
     'Primeiro transcreva a sequência na aba Transcrição.': 'First transcribe the sequence in the Transcript tab.',
     'Ir para a legenda': 'Go to caption', 'Apagar legenda': 'Delete caption', 'Legenda apagada': 'Caption deleted',
+    'A legenda selecionada não passa pela agulha': 'The selected caption is not under the playhead',
+    'Não há legenda na agulha': 'No caption under the playhead', 'Não há clipe ou legenda na agulha': 'No clip or caption under the playhead',
+    "Selecione um clipe ou legenda (E corta só os selecionados; ' corta todas as trilhas)": "Select a clip or caption (E cuts only selected items; ' cuts all tracks)",
+    'Legenda recortada: Ctrl+V cola na agulha': 'Caption cut: Ctrl+V pastes at the playhead',
+    'Legenda copiada: Ctrl+V cola na agulha': 'Caption copied: Ctrl+V pastes at the playhead',
+    'Selecione um clipe ou legenda para copiar': 'Select a clip or caption to copy',
+    'Nada copiado (Ctrl+C num clipe ou legenda primeiro)': 'Nothing copied (Ctrl+C a clip or caption first)',
+    'Legenda colada na trilha LEG': 'Caption pasted to the LEG track',
     'Não há som na timeline para transcrever': 'There is no sound in the timeline to transcribe', 'Nenhuma fala encontrada na timeline': 'No speech found in the timeline',
     'Transcreva a sequência primeiro': 'Transcribe the sequence first', 'Crie as legendas primeiro': 'Create the captions first',
     'Isso substitui as legendas atuais. Clique de novo para confirmar (dá para desfazer com Ctrl+Z).': 'This replaces the current captions. Click again to confirm (Ctrl+Z undoes it).',
@@ -513,6 +526,7 @@ const I18N_RE = [
     [/^(.+) duplicado em ([VA]\d)$/, (m, n, t) => `${i18nT(n)} duplicated to ${t}`],
     [/^Colado em ([VA]\d)$/, 'Pasted to $1'],
     [/^Selecionados cortados em (.+)$/, 'Selected clips cut at $1'],
+    [/^Legenda cortada em (.+)$/, 'Caption cut at $1'],
     [/^Cor da tela: (#[0-9a-f]{6})$/i, 'Screen color: $1'],
     [/^(.+): (\d+) transiç(?:ões aplicadas|ão aplicada)$/, (m, n, k) => `${i18nT(n)}: ${k} transition${k > 1 ? 's' : ''} applied`],
     [/^(.+) não se aplica a uma camada de ajuste$/, (m, n) => `${i18nT(n)} doesn't apply to an adjustment layer`],
@@ -706,6 +720,7 @@ function prefsOpen() {
     const m = document.getElementById('modal-prefs');
     if (!m) return;
     i18nApply(I18N.lang);
+    if (typeof prefsAba === 'function') prefsAba('geral');
     m.style.display = 'flex';
 }
 
@@ -721,6 +736,7 @@ function prefsLoad() {
     api.prefs_load().then(r => {
         if (r && r.success && r.data) Object.assign(PREFS, r.data);
         if (PREFS.lang !== I18N.lang) i18nApply(PREFS.lang);
+        window.dispatchEvent(new Event('prefs-carregadas'));   // cache em disco/RAM (editor-render.js)
         if (typeof vePjRender === 'function') vePjRender();   // modo lista/grade do painel Projeto
     }).catch(() => {});
 }

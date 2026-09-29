@@ -63,6 +63,7 @@
         <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8M10.5 7.5v6M7.5 10.5h6"/></symbol>
         <symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.4l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/></symbol>
         <symbol id="i-pointer" viewBox="0 0 24 24"><path d="m4 4 7 17 2.5-7.5L21 11z"/></symbol>
+        <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M3 3h18v5H8v13H3z"/><path d="M7 3v2.5M11 3v2.5M15 3v2.5M19 3v2.5M3 12h2.5M3 16h2.5"/></symbol>
     </svg>
 
     <!-- Splash -->
@@ -463,10 +464,13 @@
                         <div class="ve-dock" id="ve-dock"></div>
                         <div class="ve-dock-store" id="ve-dock-store">
                             <section class="ve-panel ve-monitor" data-panel="monitor" data-title="Programa">
+                                <div class="ve-stage" id="ve-stage">
+                                <canvas class="ve-rulers" id="ve-rulers" width="800" height="450" aria-hidden="true"></canvas>
+                                <div class="ve-ruler-hit ve-ruler-hit-h" data-o="h" title="Arraste para criar uma guia horizontal"></div>
+                                <div class="ve-ruler-hit ve-ruler-hit-v" data-o="v" title="Arraste para criar uma guia vertical"></div>
                                 <div class="ve-screen" id="ve-screen">
                                     <video id="ve-video" preload="auto" playsinline></video>
                                     <canvas id="ve-canvas" width="1280" height="720"></canvas>
-                                    <canvas class="ve-rulers" id="ve-rulers" width="800" height="450" aria-hidden="true"></canvas>
                                     <div class="ve-mzoom" id="ve-mzoom" title="Ctrl+roda do mouse no vídeo: zoom · arraste para mover quando ampliado">
                                         <button class="ve-mz-btn active" id="ve-mz-fit" onclick="veMonitorFit()">Fit</button>
                                         <button class="ve-mz-btn" onclick="veMonitorZoomTo(1)">100%</button>
@@ -486,8 +490,16 @@
                                         <div class="ve-loading-bar"><div id="ve-loading-fill"></div></div>
                                     </div>
                                 </div>
+                                </div>
                                 <div class="ve-transport">
-                                    <div class="ve-tc" id="ve-tc" title="Posição atual">00:00:00:00</div>
+                                    <div class="ve-transport-left">
+                                        <div class="ve-tc" id="ve-tc" title="Posição atual">00:00:00:00</div>
+                                        <button class="ve-tbtn ve-ruler-btn" id="ve-ruler-btn" onclick="veToggleRulers()" title="Réguas (Ctrl+R)"><svg class="i"><use href="#i-ruler"/></svg></button>
+                                        <select class="ve-res-sel" id="ve-res-sel" onchange="veSetPreviewRes(this.value)" title="Resolução da reprodução: Half alivia o processamento na prévia (a exportação sai sempre em qualidade máxima)">
+                                            <option value="1">Full</option>
+                                            <option value="0.5">1/2</option>
+                                        </select>
+                                    </div>
                                     <div class="ve-transport-btns">
                                         <button class="ve-tbtn" onclick="veSeek(0)" title="Início (Home)">⏮</button>
                                         <button class="ve-tbtn" onclick="veJumpEdit(-1)" title="Corte anterior (↑)">⇤</button>
@@ -694,6 +706,10 @@
                                 <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="veLimparInOut(true, true)" title="Limpar entrada e saída da timeline">Limpar In/Out</button>
                                 <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="veResetEdits()" title="Voltar ao vídeo original">↺ Restaurar tudo</button>
                                 <div class="ve-top-spacer"></div>
+                                <div class="ve-render-status" id="ve-render-status" hidden title="Renderizando a prévia em disco">
+                                    <span class="ve-render-dot"></span><span id="ve-render-txt">Render</span>
+                                    <button onclick="vePrCancelar()" title="Cancelar render"><svg class="i"><use href="#i-x"/></svg></button>
+                                </div>
                                 <button class="ve-seg-btn ve-snap active ve-cache-btn" id="ve-cache" onclick="veCacheToggle(event)" title="Cache inteligente RAM">RAM</button>
                                 <button class="ve-seg-btn ve-snap active" id="ve-vinculo" onclick="veToggleVinculo()" title="Seleção vinculada: ligada, clicar no vídeo ou no áudio seleciona os dois; desligada, só a parte clicada"><svg class="i"><use href="#i-link"/></svg></button>
                                 <button class="ve-seg-btn ve-snap active" id="ve-snap" onclick="veToggleSnap()" title="Ímã: encaixar na agulha e nos cortes (N)"><svg class="i"><use href="#i-magnet"/></svg></button>
@@ -1575,13 +1591,64 @@
     <div id="modal-prefs" class="modal-overlay" style="display:none;" onclick="prefsClose(event)">
         <div class="modal-box prefs-box">
             <h3><svg class="i"><use href="#i-gear"/></svg>Preferências</h3>
-            <div class="modal-field">
-                <label class="modal-label">Idioma da interface</label>
-                <div class="pref-lang">
-                    <button data-lang="pt" onclick="prefsSetLang('pt')">Português</button>
-                    <button data-lang="en" onclick="prefsSetLang('en')">English</button>
+            <div class="prefs-abas">
+                <button class="active" data-prefs-aba="geral" onclick="prefsAba('geral')">Geral</button>
+                <button data-prefs-aba="cache" onclick="prefsAba('cache')">Cache e Disco</button>
+            </div>
+            <div class="prefs-painel" data-prefs-painel="geral">
+                <div class="modal-field">
+                    <label class="modal-label">Idioma da interface</label>
+                    <div class="pref-lang">
+                        <button data-lang="pt" onclick="prefsSetLang('pt')">Português</button>
+                        <button data-lang="en" onclick="prefsSetLang('en')">English</button>
+                    </div>
+                    <p>A troca vale na hora e fica salva para as próximas vezes.</p>
                 </div>
-                <p>A troca vale na hora e fica salva para as próximas vezes.</p>
+            </div>
+            <div class="prefs-painel" data-prefs-painel="cache" hidden>
+                <div class="modal-field">
+                    <label class="modal-label">Pasta do cache em disco (prévias renderizadas)</label>
+                    <div class="pref-cache-dir" id="pref-cache-dir">Padrão (pasta do app)</div>
+                    <div class="pref-cache-btns">
+                        <button class="btn-secondary" onclick="vePrefsCacheEscolher()"><svg class="i"><use href="#i-folder"/></svg>Escolher disco/pasta...</button>
+                        <button class="btn-secondary" onclick="vePrefsCachePadrao()">Usar padrão</button>
+                        <button class="btn-secondary" onclick="vePrefsCacheAbrir()">Abrir pasta</button>
+                    </div>
+                    <p>Cada projeto ganha a própria pasta aqui dentro. Prefira um SSD com espaço livre. Ao trocar de pasta, as prévias antigas ficam na pasta anterior (limpe-as antes, se quiser).</p>
+                </div>
+                <div class="pref-cache-grid">
+                    <label class="modal-label" for="pref-cache-alt">Qualidade das prévias</label>
+                    <select id="pref-cache-alt" class="modal-input" onchange="vePrefsCacheCampo('altura', this.value)">
+                        <option value="1080">1080p (máxima)</option>
+                        <option value="720">720p (mais leve)</option>
+                        <option value="540">540p (a mais leve)</option>
+                    </select>
+                    <label class="modal-label" for="pref-cache-max">Tamanho máximo do cache em disco (GB)</label>
+                    <input id="pref-cache-max" class="modal-input" type="number" min="1" max="4096" step="1" onchange="vePrefsCacheCampo('maxGB', this.value)">
+                    <label class="modal-label" for="pref-cache-dias">Apagar prévias não usadas há mais de</label>
+                    <select id="pref-cache-dias" class="modal-input" onchange="vePrefsCacheCampo('dias', this.value)">
+                        <option value="7">7 dias</option>
+                        <option value="15">15 dias</option>
+                        <option value="30">30 dias</option>
+                        <option value="60">60 dias</option>
+                        <option value="90">90 dias</option>
+                    </select>
+                    <label class="modal-label" for="pref-cache-ram">Cache de quadros na RAM (máximo)</label>
+                    <select id="pref-cache-ram" class="modal-input" onchange="vePrefsCacheCampo('ramGB', this.value)">
+                        <option value="0.5">512 MB</option>
+                        <option value="1">1 GB</option>
+                        <option value="1.5">1,5 GB</option>
+                        <option value="2">2 GB</option>
+                        <option value="3">3 GB</option>
+                    </select>
+                </div>
+                <p>A limpeza é automática: ao abrir o app e depois de cada render, o que passou da idade é apagado; se o total passar do máximo, saem primeiro as prévias usadas há mais tempo.</p>
+                <div class="pref-cache-uso" id="pref-cache-uso"></div>
+                <div class="pref-cache-btns">
+                    <button class="btn-secondary" onclick="vePrefsCacheLimpar(false)"><svg class="i"><use href="#i-trash"/></svg>Limpar deste projeto</button>
+                    <button class="btn-secondary" onclick="vePrefsCacheLimpar(true)"><svg class="i"><use href="#i-trash"/></svg>Limpar todo o cache em disco</button>
+                    <button class="btn-secondary" onclick="veCacheClear(false)">Limpar cache RAM</button>
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn-primary" onclick="prefsClose()">Pronto</button>
@@ -1620,6 +1687,8 @@
     <script src="js/editor-texto.js"></script>
     <script src="js/editor-props.js"></script>
     <script src="js/editor-transform.js"></script>
+    <script src="js/editor-guias.js"></script>
+    <script src="js/editor-render.js"></script>
     <script src="js/editor-projeto.js"></script>
     <script src="js/editor-ferramentas.js"></script>
     <script src="js/editor-dock.js"></script>

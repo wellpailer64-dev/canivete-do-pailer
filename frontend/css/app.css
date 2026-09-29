@@ -1316,7 +1316,25 @@ button:disabled { opacity: .4; cursor: not-allowed; }
     flex-direction: column;
     gap: 16px;
 }
-.prefs-box { width: min(420px, 90vw); }
+.prefs-box { width: min(560px, 92vw); }
+.prefs-abas { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-top: -4px; }
+.prefs-abas button {
+    padding: 8px 14px; border: 0; border-bottom: 2px solid transparent; background: transparent;
+    color: var(--text-2); font: 600 13px var(--font-ui); cursor: pointer; margin-bottom: -1px;
+}
+.prefs-abas button:hover { color: var(--text); }
+.prefs-abas button.active { color: var(--text); border-bottom-color: var(--primary); }
+.prefs-painel { display: flex; flex-direction: column; gap: 16px; }
+.prefs-painel[hidden] { display: none; }
+.pref-cache-dir {
+    padding: 8px 12px; border-radius: var(--r-sm); background: var(--bg-input); border: 1px solid var(--line-2);
+    font: 12px var(--mono); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pref-cache-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.pref-cache-btns .btn-secondary { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 7px 12px; }
+.pref-cache-grid { display: grid; grid-template-columns: 1fr minmax(140px, 180px); align-items: center; gap: 10px 14px; }
+.pref-cache-grid .modal-input { padding: 7px 10px; }
+.pref-cache-uso { font: 12px var(--mono); color: var(--text-2); }
 .pref-lang { display: flex; gap: 8px; }
 .pref-lang button {
     flex: 1; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line-2);

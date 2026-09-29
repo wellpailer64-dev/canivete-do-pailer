@@ -528,6 +528,69 @@ def video_cutter_export(file_path, segments, output_format="mp4", qualidade="med
     return {"success": True}
 
 
+# ── cache de render em disco (Functions/render_cache.py) ──
+def ve_render_listar(base, chave):
+    from Functions import render_cache
+    try:
+        return render_cache.listar(base, chave)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def ve_render_trecho(base, chave, h, job):
+    """Renderiza um trecho em background; progresso e fim chegam em veOnRender(evento)."""
+    from Functions import render_cache
+
+    def run():
+        try:
+            r = render_cache.renderizar(base, chave, h, job, lambda p: _ve_emit("veOnRender", {"hash": h, "pct": p}))
+            _ve_emit("veOnRender", {"hash": h, "done": True, **r})
+        except Exception as e:
+            _ve_emit("veOnRender", {"hash": h, "done": True, "success": False, "error": str(e)})
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
+def ve_render_cancelar():
+    from Functions import render_cache
+    return render_cache.cancelar()
+
+
+def ve_render_tocar(base, chave, hashes):
+    from Functions import render_cache
+    return render_cache.tocar(base, chave, hashes)
+
+
+def ve_render_mover(base, chave_antiga, chave_nova):
+    from Functions import render_cache
+    return render_cache.mover_projeto(base, chave_antiga, chave_nova)
+
+
+def ve_render_limpar(base, chave=None):
+    from Functions import render_cache
+    try:
+        return render_cache.limpar(base, chave or None)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def ve_render_manutencao(base, max_gb=20, dias=30):
+    from Functions import render_cache
+    try:
+        return render_cache.manutencao(base, max_gb, dias)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def ve_render_info(base, chave=None):
+    from Functions import render_cache
+    try:
+        return render_cache.info(base, chave or None)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def video_cutter_cancel_export():
     from Functions.video_cutter import cancelar_exportacao
     if _ve_export_stop is not None:
@@ -2459,6 +2522,30 @@ class ApiBridge:
 
     def video_cutter_add_media(self, path):
         return video_cutter_add_media(path)
+
+    def ve_render_listar(self, base, chave):
+        return ve_render_listar(base, chave)
+
+    def ve_render_trecho(self, base, chave, h, job):
+        return ve_render_trecho(base, chave, h, job)
+
+    def ve_render_cancelar(self):
+        return ve_render_cancelar()
+
+    def ve_render_tocar(self, base, chave, hashes):
+        return ve_render_tocar(base, chave, hashes)
+
+    def ve_render_mover(self, base, chave_antiga, chave_nova):
+        return ve_render_mover(base, chave_antiga, chave_nova)
+
+    def ve_render_limpar(self, base, chave=None):
+        return ve_render_limpar(base, chave)
+
+    def ve_render_manutencao(self, base, max_gb=20, dias=30):
+        return ve_render_manutencao(base, max_gb, dias)
+
+    def ve_render_info(self, base, chave=None):
+        return ve_render_info(base, chave)
 
     def video_cutter_cancel_export(self):
         return video_cutter_cancel_export()
