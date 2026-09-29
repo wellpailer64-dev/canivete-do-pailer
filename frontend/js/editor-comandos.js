@@ -48,7 +48,8 @@ const VE_CMDS = [
     { id: 'vinculo', grupo: 'clipe', nome: 'Seleção vinculada', teclas: [], sep: true, fn: () => veToggleVinculo(), marcado: () => VE.vinculo },
 
     // ── Sequência ──
-    { id: 'cortar-tudo', grupo: 'sequencia', nome: 'Cortar todas as trilhas na agulha', teclas: ['Ctrl+K', 'S', "'"], fn: () => veSplitAtPlayhead() },
+    { id: 'seq-config', grupo: 'sequencia', nome: 'Configurações da sequência...', teclas: [], fn: () => veSeqConfigAbrir() },
+    { id: 'cortar-tudo', grupo: 'sequencia', sep: true, nome: 'Cortar todas as trilhas na agulha', teclas: ['Ctrl+K', 'S', "'"], fn: () => veSplitAtPlayhead() },
     { id: 'extrair', grupo: 'sequencia', nome: 'Remover trecho In→Out', teclas: ['X'], fn: () => veExtractInOut(), pode: () => VE.inPt != null && VE.outPt != null },
     { id: 'trans-video', grupo: 'sequencia', nome: 'Aplicar transição de vídeo padrão', teclas: ['Ctrl+D'], sep: true, fn: () => veTransPadrao(false) },
     { id: 'trans-audio', grupo: 'sequencia', nome: 'Aplicar transição de áudio padrão', teclas: ['Ctrl+Shift+D', 'Ctrl+Shift+9'], fn: () => veTransPadrao(true) },

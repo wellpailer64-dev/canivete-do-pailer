@@ -124,7 +124,8 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
 }
 .ve-screen {
     position: relative;
-    background: #000;
+    /* "mesa" em volta do quadro (como no Premiere): o quadro da sequência é preto, o que sobra é cinza */
+    background: #1f1f1f;
     min-height: 0;
     display: grid;
     place-items: center;
@@ -1115,7 +1116,21 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-pp-corpo .ve-pp-dica { padding: 0; }
 .ve-pp > .ve-pp-dica { padding: 10px 12px 0; }
 .ve-pp-links { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px 14px; }
-.ve-pp-seq { padding: 0 14px; font: 600 11px var(--ve-mono); color: var(--ve-faint); }
+.ve-pp-seq { margin: 0 8px; padding: 4px 6px; border: 0; border-radius: 5px; background: none; font: 600 11px var(--ve-mono); color: var(--ve-faint); cursor: pointer; text-align: left; }
+.ve-pp-seq:hover { background: var(--ve-panel-2); color: var(--ve-text); }
+
+/* Configurações da sequência */
+.ve-seqcfg-box { width: min(440px, calc(100% - 32px)); }
+.ve-seqcfg-nome { font-size: 13px; color: var(--ve-text); }
+.ve-seqcfg-tam { display: flex; align-items: flex-end; gap: 8px; }
+.ve-seqcfg-dim { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--ve-dim); }
+.ve-seqcfg-dim input { width: 100%; font-family: var(--ve-mono); }
+.ve-seqcfg-tam .ve-icon-btn { margin-bottom: 4px; }
+.ve-seqcfg-nome small { color: var(--ve-faint); font-size: 11.5px; }
+.ve-seqcfg-prev { display: flex; align-items: center; gap: 12px; margin-top: 10px; min-height: 66px; }
+.ve-seqcfg-prev > div { flex: none; border: 1px solid var(--ve-accent); background: rgba(249,115,22,.12); border-radius: 2px; transition: width .15s, height .15s; }
+.ve-seqcfg-prev span { font-size: 11.5px; color: var(--ve-dim); }
+.ve-seqcfg-dica { font-size: 11px; line-height: 1.5; color: var(--ve-faint); }
 .ve-tx-nota { margin: 0; font-size: 11px; color: var(--ve-dim); line-height: 1.5; }
 
 /* ferramenta Texto: caixa transparente sobre o texto do monitor (o desenho de verdade fica por baixo) */

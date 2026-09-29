@@ -306,6 +306,7 @@ function veSeqCapturar() {
         outPt: VE.outPt ?? null,
         playhead: VE.playhead || 0,
         view: { pps: VE.pps, x: VE.view || 0 },
+        w: VE.seqW, h: VE.seqH,   // Configurações da sequência (quadro)
     };
 }
 
@@ -320,6 +321,7 @@ function veSeqAplicar(seq, opts = {}) {
     if (!seq) return;
     veStop();
     VE.activeSequence = seq.id;
+    if (seq.w > 0 && seq.h > 0) veSeqQuadro(seq.w, seq.h);
     VE.clips = vePlain(seq.clips, []);
     VE_TRK = veSeqTracks(seq.trilhas);
     veBuildHeads();
@@ -372,6 +374,7 @@ function veCreateTimeline(opts = {}) {
     const seq = origem ? vePlain(origem, {}) : {
         clips: [], trilhas: veTrkNovo(), texto: { palavras: [], idioma: 'pt', chave: '' },
         legendas: [], legEstilo: null, legGravar: true, inPt: null, outPt: null, playhead: 0, view: { pps: 0, x: 0 },
+        w: VE.seqW, h: VE.seqH,   // nova timeline nasce com o quadro da atual
     };
     seq.id = id;
     seq.name = opts.name || veSeqNomeDisponivel(nomeBase);
@@ -415,6 +418,108 @@ function veDeleteTimeline(seqId) {
     vePjRender();
     veToast('Timeline apagada');
     return true;
+}
+
+// ─────────────────────────── Configurações da sequência (tamanho do quadro) ───────────────────────────
+// Muda o quadro da timeline ativa. Clipes sem Movimento mexido (sem c.p) se reencaixam sozinhos no quadro novo
+// (veDefProps); os mexidos ficam onde estão, como no Premiere.
+function veSeqQuadro(w, h) {
+    VE.seqW = Math.max(16, Math.min(8192, Math.round(w / 2) * 2));
+    VE.seqH = Math.max(16, Math.min(8192, Math.round(h / 2) * 2));
+    if (typeof veApplyMonitor === 'function' && $ve('ve-canvas')) veApplyMonitor();
+}
+
+const VE_SEQ_PRESETS = [
+    ['1920x1080', '1920 × 1080 · Full HD 16:9'], ['1280x720', '1280 × 720 · HD 16:9'], ['3840x2160', '3840 × 2160 · 4K UHD 16:9'],
+    ['1080x1920', '1080 × 1920 · Vertical 9:16 (Reels, TikTok, Shorts)'], ['1080x1350', '1080 × 1350 · Retrato 4:5 (Instagram)'],
+    ['1080x1080', '1080 × 1080 · Quadrado 1:1'], ['2560x1080', '2560 × 1080 · Ultrawide 21:9'],
+];
+
+function veSeqConfigAbrir() {
+    if (!VE.ready) { veToast('Abra um projeto primeiro'); return; }
+    let md = $ve('ve-seqcfg');
+    if (!md) {
+        md = document.createElement('div');
+        md.className = 've-modal';
+        md.id = 've-seqcfg';
+        md.innerHTML = `<div class="ve-modal-box ve-seqcfg-box">
+            <div class="ve-modal-head"><span>Configurações da sequência</span><button class="ve-icon-btn" data-sq="fechar" title="Fechar (Esc)"><svg class="i"><use href="#i-x"/></svg></button></div>
+            <div class="ve-modal-body">
+                <div class="ve-field"><label>Timeline</label><div class="ve-seqcfg-nome" id="ve-sq-nome"></div></div>
+                <div class="ve-field"><label for="ve-sq-preset">Predefinição</label><select class="ve-select" id="ve-sq-preset"></select></div>
+                <div class="ve-field"><label>Tamanho do quadro</label>
+                    <div class="ve-seqcfg-tam">
+                        <label class="ve-seqcfg-dim"><span>Largura</span><input type="number" class="ve-select" id="ve-sq-w" min="16" max="8192" step="2"></label>
+                        <button class="ve-icon-btn" data-sq="girar" title="Trocar largura e altura (horizontal ↔ vertical)">⇄</button>
+                        <label class="ve-seqcfg-dim"><span>Altura</span><input type="number" class="ve-select" id="ve-sq-h" min="16" max="8192" step="2"></label>
+                    </div>
+                    <div class="ve-seqcfg-prev"><div id="ve-sq-caixa"></div><span id="ve-sq-info"></span></div>
+                </div>
+                <div class="ve-field"><label>Taxa de quadros</label><div class="ve-seqcfg-nome" id="ve-sq-fps"></div></div>
+                <small class="ve-seqcfg-dica">Clipes sem posição/escala mexidas se encaixam sozinhos no quadro novo. A exportação sai neste tamanho.</small>
+            </div>
+            <div class="ve-modal-foot"><button class="ve-btn ve-btn-ghost" data-sq="fechar">Cancelar</button><button class="ve-btn ve-btn-primary" data-sq="ok">Aplicar</button></div>
+        </div>`;
+        $ve('ve').appendChild(md);
+        const w = md.querySelector('#ve-sq-w'), h = md.querySelector('#ve-sq-h'), pre = md.querySelector('#ve-sq-preset');
+        const sync = () => veSeqConfigPrevia();
+        pre.addEventListener('change', () => {
+            if (pre.value === 'video') { w.value = VE.info.width; h.value = VE.info.height; }
+            else if (pre.value !== 'custom') { const [a, b] = pre.value.split('x'); w.value = a; h.value = b; }
+            sync();
+        });
+        [w, h].forEach(el => el.addEventListener('input', sync));
+        md.addEventListener('click', e => {
+            const b = e.target.closest('[data-sq]');
+            if (!b) { if (e.target === md) md.hidden = true; return; }
+            if (b.dataset.sq === 'girar') { [w.value, h.value] = [h.value, w.value]; sync(); }
+            else if (b.dataset.sq === 'fechar') md.hidden = true;
+            else if (b.dataset.sq === 'ok') veSeqConfigAplicar();
+        });
+        md.addEventListener('keydown', e => {
+            e.stopPropagation();
+            if (e.key === 'Escape') md.hidden = true;
+            else if (e.key === 'Enter' && e.target.tagName !== 'SELECT') veSeqConfigAplicar();
+        });
+    }
+    const m = veSeqMedia(VE.activeSequence);
+    md.querySelector('#ve-sq-nome').textContent = (m && (m.nome || m.name)) || 'Timeline';
+    const v = VE.info && VE.info.width && !VE.info.audio_only ? `${VE.info.width}x${VE.info.height}` : null;
+    md.querySelector('#ve-sq-preset').innerHTML = VE_SEQ_PRESETS.map(([k, n]) => `<option value="${k}">${n}</option>`).join('') +
+        (v ? `<option value="video">Igual ao vídeo (${v.replace('x', ' × ')})</option>` : '') + '<option value="custom">Personalizado</option>';
+    md.querySelector('#ve-sq-w').value = VE.seqW;
+    md.querySelector('#ve-sq-h').value = VE.seqH;
+    md.querySelector('#ve-sq-fps').innerHTML = `${String(+(VE.fps || 30).toFixed(3)).replace('.', ',')} qps <small>(a do vídeo)</small>`;
+    md.hidden = false;
+    veSeqConfigPrevia();
+    md.querySelector('#ve-sq-preset').focus();
+}
+
+// Caixa com a proporção escolhida + a descrição (e a predefinição que bate com os números)
+function veSeqConfigPrevia() {
+    const md = $ve('ve-seqcfg'), w = +md.querySelector('#ve-sq-w').value || 0, h = +md.querySelector('#ve-sq-h').value || 0;
+    const pre = md.querySelector('#ve-sq-preset'), k = `${w}x${h}`;
+    const v = VE.info && VE.info.width ? `${VE.info.width}x${VE.info.height}` : '';
+    pre.value = VE_SEQ_PRESETS.some(([p]) => p === k) ? k : k === v ? 'video' : 'custom';
+    const caixa = md.querySelector('#ve-sq-caixa'), lado = 64, r = w && h ? w / h : 16 / 9;
+    caixa.style.width = (r >= 1 ? lado : lado * r) + 'px';
+    caixa.style.height = (r >= 1 ? lado / r : lado) + 'px';
+    const mdc = (a, b) => (b ? mdc(b, a % b) : a), g = w && h ? mdc(w, h) : 1;
+    md.querySelector('#ve-sq-info').textContent = w && h ? `${w} × ${h} px · ${w / g}:${h / g} · ${w > h ? 'horizontal' : w < h ? 'vertical' : 'quadrado'}` : '';
+}
+
+function veSeqConfigAplicar() {
+    const md = $ve('ve-seqcfg'), w = +md.querySelector('#ve-sq-w').value, h = +md.querySelector('#ve-sq-h').value;
+    if (!(w >= 16 && h >= 16 && w <= 8192 && h <= 8192)) { veToast('Use de 16 a 8192 px na largura e na altura'); return; }
+    md.hidden = true;
+    if (Math.round(w / 2) * 2 === VE.seqW && Math.round(h / 2) * 2 === VE.seqH) return;
+    veSeqQuadro(w, h);
+    veSeqSalvarAtiva();
+    VE.dirty = true;
+    veUpdateTitle();
+    veMonitorFit();
+    veRefresh();
+    veToast(`Quadro da sequência: ${VE.seqW} × ${VE.seqH}`);
 }
 
 // Depois de qualquer edição: reencaixa zoom/visão, reposiciona a agulha e redesenha
@@ -1204,8 +1309,9 @@ function veDefProps(c) {
     let sc = 100;
     // imagem maior que o quadro entra ajustada para caber (como "ajustar ao quadro" do Premiere)
     if (m && m.kind === 'image' && m.w) sc = veRound(Math.min(100, 100 * Math.min(VE.seqW / m.w, VE.seqH / m.h)));
-    // outro vídeo com outro tamanho: ajustado ao quadro (como "Definir para o tamanho do quadro" do Premiere)
-    if (m && m.kind === 'video' && m.id && m.info && m.info.width) sc = veRound(100 * Math.min(VE.seqW / m.info.width, VE.seqH / m.info.height), 2);
+    // vídeo com outro tamanho que o quadro (outro vídeo, ou a sequência mudada nas Configurações da sequência):
+    // ajustado ao quadro (como "Definir para o tamanho do quadro" do Premiere)
+    if (m && m.kind === 'video') { const sz = veMediaSize(c); sc = veRound(100 * Math.min(VE.seqW / sz.w, VE.seqH / sz.h), 2); }
     return { sc, x: VE.seqW / 2, y: VE.seqH / 2, rot: 0, op: 100 };
 }
 function veStaticProps(c) { return Object.assign(veDefProps(c), c.p || {}); }
@@ -1408,6 +1514,8 @@ function veMediaSize(c) {
     if (m && m.kind === 'image') return { w: m.w || 1, h: m.h || 1 };
     if (m && m.kind === 'texto') return veTxTamanho(c);
     if (m && m.kind === 'video' && m.id && m.info && m.info.width) return { w: m.info.width, h: m.info.height };
+    // o vídeo aberto: o tamanho dele (a sequência pode ter outro, nas Configurações da sequência)
+    if (m && m.kind === 'video' && !m.id && VE.info && VE.info.width && !VE.info.audio_only) return { w: VE.info.width, h: VE.info.height };
     return { w: VE.seqW, h: VE.seqH };
 }
 
@@ -2525,6 +2633,7 @@ function veApplyProject() {
         outPt: s.outPt ?? null,
         playhead: s.playhead || 0,
         view: s.view || { pps: 0, x: 0 },
+        w: s.w, h: s.h,
     }));
     VE.sequences.forEach(seq => {
         let m = veSeqMedia(seq.id);
@@ -3388,9 +3497,10 @@ function veUpdateExportSummary() {
             `Duração final: <b>${veTC(dur)}</b> (${veHuman(dur)})<br>Só o áudio da timeline · <b>${fmt.toUpperCase()}</b>` + faixa;
         return;
     }
-    const res = $ve('ve-res').value;
-    const h = res === 'original' ? VE.info.height : +res;
-    const w = res === 'original' ? VE.info.width : Math.round(VE.info.width * h / VE.info.height / 2) * 2;
+    // o quadro da sequência; a resolução escolhida vale para o lado menor (1080p vertical = 1080×1920)
+    const res = $ve('ve-res').value, W = VE.seqW, H = VE.seqH, lado = Math.min(W, H);
+    const k = res === 'original' || +res >= lado ? 1 : +res / lado;
+    const w = Math.round(W * k / 2) * 2, h = Math.round(H * k / 2) * 2;
     $ve('ve-export-summary').innerHTML =
         `Duração final: <b>${veTC(dur)}</b> (${veHuman(dur)})<br>` +
         `Clipes: <b>${VE.clips.length}</b> · Resolução: <b>${w}×${h}</b> · <b>${fmt.toUpperCase()}</b>` + faixa;
@@ -3442,7 +3552,7 @@ async function veStartExport() {
     window.pywebview.api.video_cutter_export(
         VE.path, plano.base, vePill('format') || 'mp4', vePill('quality') || 'medium',
         $ve('ve-res').value, $ve('ve-gpu').checked, VE.dest, noAudio,
-        plano.camadas, plano.audio, plano.dur, plano.mix, veTxExport(plano.faixa)
+        plano.camadas, plano.audio, plano.dur, plano.mix, veTxExport(plano.faixa), [VE.seqW, VE.seqH]
     );
 }
 

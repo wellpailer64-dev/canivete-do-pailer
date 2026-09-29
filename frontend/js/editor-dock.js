@@ -518,7 +518,7 @@ function vedBuildFloatDoc(h) {
         'veOpenFile', 'veImportTimelineFile', 'veSplitAtPlayhead', 'veDeleteSelected', 'veExtractInOut',
         'veResetEdits', 'veToggleVinculo', 'veToggleSnap', 'veZoomBy', 'veZoomSlider',
         'vePjImportarDialogo', 'veCreateTimeline', 'vePjNovaPasta', 'vePjNovoAjuste', 'vePjApagar',
-        'veUndo', 'veRedo', 'veSaveProject', 'veOpenExport',
+        'veUndo', 'veRedo', 'veSaveProject', 'veOpenExport', 'veSeqConfigAbrir',
     ].forEach(fn => { w[fn] = (...args) => window[fn] && window[fn](...args); });
     root.querySelector('[data-dock]').addEventListener('click', () => { try { w.close(); } catch (e) {} });
     vedBindDock(d.getElementById('ve-dock-solta'), h);

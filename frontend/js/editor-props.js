@@ -396,7 +396,7 @@ function vePpHtml(a) {
         return `<div class="ve-clips-empty">${VE.ready
             ? 'Selecione um clipe, texto ou legenda para ver as propriedades dele aqui.<br><br>Dica: <b>T</b> e clique no monitor cria um texto · <b>R</b> e arraste a borda de um clipe muda a velocidade.'
             : 'Abra um vídeo para começar.'}</div>
-            ${VE.ready ? `<div class="ve-pp-seq">${VE.seqW}×${VE.seqH} · ${String(+(VE.fps || 30).toFixed(3)).replace('.', ',')} qps · ${veShort(VE.dur)}</div>` : ''}`;
+            ${VE.ready ? `<button class="ve-pp-seq" onclick="veSeqConfigAbrir()" title="Configurações da sequência: mudar o tamanho do quadro">${VE.seqW}×${VE.seqH} · ${String(+(VE.fps || 30).toFixed(3)).replace('.', ',')} qps · ${veShort(VE.dur)} ✎</button>` : ''}`;
     }
     if (a.tipo === 'legenda') {
         return cab('Legenda', `${VETX.legSel + 1} de ${VE.legendas.length} · trilha LEG`) +

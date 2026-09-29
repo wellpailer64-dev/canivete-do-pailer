@@ -261,6 +261,13 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
 - Alt+Enter: `veTelaCheia` (monitor em tela cheia, toca da agulha; ao sair pausa). O main.py (`_ligar_tela_cheia`)
   deixa a janela sem borda e maximizada enquanto o WebView2 tem elemento em tela cheia.
 
+## Configurações da sequência (quadro)
+- Sequência › Configurações da sequência (ou o tamanho no rodapé de Propriedades): predefinições (16:9, vertical 9:16,
+  4:5, 1:1, 4K...) ou personalizado. `veSeqQuadro` muda `VE.seqW/seqH`; cada timeline guarda o seu (`seq.w/h`, salvo no projeto).
+- O vídeo aberto tem o tamanho dele (`veMediaSize`) e entra ajustado ao quadro como os outros vídeos; clipes sem `c.p`
+  se reencaixam sozinhos. A exportação recebe `quadro=[w, h]` e a resolução escolhida vale para o lado menor.
+- Monitor: fora do quadro é cinza (`.ve-screen`), o quadro é preto.
+
 ## Painel Projeto (como o Project do Premiere; substitui o painel Clipes)
 - Código: `frontend/js/editor-projeto.js`. Guarda os materiais do projeto: o vídeo aberto, imagens, áudios, camadas de ajuste,
   legendas (.srt) e outros vídeos (estes ainda não entram na timeline: o editor usa um vídeo por projeto).

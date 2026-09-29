@@ -496,8 +496,8 @@ def video_cutter_add_media(path):
 
 def video_cutter_export(file_path, segments, output_format="mp4", qualidade="medium",
                         resolucao="original", usar_gpu=True, pasta_saida=None, sem_audio=False,
-                        camadas=None, audio_segments=None, duracao=None, audio_clipes=None, legendas=None):
-    """Exporta a timeline (base + camadas por cima); progresso em veOnExport(evento)."""
+                        camadas=None, audio_segments=None, duracao=None, audio_clipes=None, legendas=None, quadro=None):
+    """Exporta a timeline (base + camadas por cima); progresso em veOnExport(evento). quadro = [w, h] da sequência."""
     from Functions.video_cutter import exportar_video
     global _ve_export_stop
     stop = threading.Event()
@@ -516,6 +516,7 @@ def video_cutter_export(file_path, segments, output_format="mp4", qualidade="med
                 duracao=duracao,
                 audio_clipes=audio_clipes,
                 legendas=legendas,
+                quadro=quadro,
             )
             _ve_emit("veOnExport", {"done": True, **r})
         except Exception as e:
@@ -2392,9 +2393,9 @@ class ApiBridge:
 
     def video_cutter_export(self, file_path, segments, output_format="mp4", qualidade="medium",
                             resolucao="original", usar_gpu=True, pasta_saida=None, sem_audio=False,
-                            camadas=None, audio_segments=None, duracao=None, audio_clipes=None, legendas=None):
+                            camadas=None, audio_segments=None, duracao=None, audio_clipes=None, legendas=None, quadro=None):
         return video_cutter_export(file_path, segments, output_format, qualidade, resolucao, usar_gpu,
-                                   pasta_saida, sem_audio, camadas, audio_segments, duracao, audio_clipes, legendas)
+                                   pasta_saida, sem_audio, camadas, audio_segments, duracao, audio_clipes, legendas, quadro)
 
     def ve_texto_modelos(self):
         return ve_texto_modelos()

@@ -1210,9 +1210,10 @@ def _opcao_filtro_script():
 
 def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", resolucao="original",
                    usar_gpu=True, pasta_saida=None, on_progress=None, stop_event=None, sem_audio=False,
-                   camadas=None, audio_segmentos=None, duracao=None, audio_clipes=None, legendas=None):
+                   camadas=None, audio_segmentos=None, duracao=None, audio_clipes=None, legendas=None, quadro=None):
     """
     Exporta a timeline do editor.
+    quadro          = [largura, altura] da sequência (Configurações da sequência); sem ele, o tamanho do vídeo aberto
     segmentos       = base de vídeo em ordem ([{start, end, gain}] do original ou {gap: s})
     audio_segmentos = trilha de áudio (mesmo formato); se None, usa os segmentos da base
     camadas         = imagens/clipes transformados por cima da base (de baixo para cima)
@@ -1243,7 +1244,14 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     if audio_only:
         camadas = None
         sem_audio = False
-    W, H = info["width"] or 1920, info["height"] or 1080
+    W0, H0 = info["width"] or 1920, info["height"] or 1080
+    W0, H0 = W0 + (W0 % 2), H0 + (H0 % 2)
+    W, H = W0, H0
+    try:
+        if quadro:
+            W, H = max(16, min(8192, int(quadro[0]))), max(16, min(8192, int(quadro[1])))
+    except (TypeError, ValueError, IndexError):
+        pass
     W, H = W + (W % 2), H + (H % 2)
     fps = f'{info["fps"]:.3f}'
 
@@ -1282,7 +1290,10 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     tem_vazio = len(segs) != len(pecas)
     em_ordem = all(segs[k][0] >= segs[k - 1][1] - 0.001 for k in range(1, len(segs)))
     # select/aselect só serve para o caso simples: em ordem, sem vazios, sem ganho e sem camadas
-    usar_inputs = not simples or len(pecas) <= 150 or not em_ordem or tem_vazio or (tem_ganho and has_audio)
+    # quadro da sequência diferente do vídeo: cada trecho precisa ser encaixado (o select não redimensiona)
+    outro_quadro = (W, H) != (W0, H0)
+    usar_inputs = (not simples or len(pecas) <= 150 or not em_ordem or tem_vazio or (tem_ganho and has_audio)
+                   or outro_quadro)
     if audio_only:
         # só o áudio: nenhuma cadeia de vídeo no grafo
         usar_inputs, audio_junto = True, False
@@ -1438,8 +1449,10 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             filtros.append(f"{vf}subtitles=filename={_caminho_filtro(ass)}[vsub]")
             vf = "[vsub]"
 
-    if alvo_h and info["height"] > alvo_h:
-        filtros.append(f"{vf}scale=-2:{alvo_h}:flags=lanczos[vs]")
+    # resolução pelo lado menor do quadro: "1080p" vertical = 1080×1920
+    if alvo_h and not audio_only and min(W, H) > alvo_h:
+        escala = f"{alvo_h}:-2" if W < H else f"-2:{alvo_h}"
+        filtros.append(f"{vf}scale={escala}:flags=lanczos[vs]")
         vf = "[vs]"
 
     script = os.path.join(_work_dir(), f"filtro_{uuid.uuid4().hex[:8]}.txt")
