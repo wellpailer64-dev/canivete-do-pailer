@@ -155,6 +155,14 @@ def _fps(txt):
             return 0.0
 
 
+def _rotaciona_lados(rot):
+    return abs(int(rot or 0)) % 180 == 90
+
+
+def _tem_rotacao(info):
+    return int((info or {}).get("rotation") or 0) % 360 != 0
+
+
 def _probe_ffmpeg(path):
     """Plano B sem ffprobe: interpreta a saída de 'ffmpeg -i'."""
     import re
@@ -185,8 +193,11 @@ def _probe_ffmpeg(path):
     if ma:
         info.update(has_audio=True, acodec=ma.group(1))
     mr = re.search(r"rotation of (-?[\d.]+)", txt)
-    if mr and abs(int(float(mr.group(1)))) in (90, 270):
-        info["width"], info["height"] = info["height"], info["width"]
+    if mr:
+        rot = int(float(mr.group(1)))
+        info["rotation"] = rot
+        if _rotaciona_lados(rot):
+            info["width"], info["height"] = info["height"], info["width"]
     return info
 
 
@@ -233,7 +244,7 @@ def _probe_ffprobe(path):
                 except Exception:
                     pass
     w, h = (v or {}).get("width", 0), (v or {}).get("height", 0)
-    if abs(rot) in (90, 270):
+    if _rotaciona_lados(rot):
         w, h = h, w
 
     fps = _fps((v or {}).get("avg_frame_rate")) or _fps((v or {}).get("r_frame_rate")) or 30.0
@@ -278,6 +289,8 @@ def _duration_by_counting_frames(path, fps):
 def _navegador_toca(path, info):
     ext = os.path.splitext(path)[1].lower()
     if ext not in _NAVEGADOR_CONTAINERS:
+        return False
+    if _tem_rotacao(info):
         return False
     if info["vcodec"] not in _NAVEGADOR_VCODECS:
         return False
@@ -405,6 +418,7 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
     (decodifica, reduz e codifica); se falhar, refaz pelo processador. Retorna (ok, err, thumbs)."""
     fps_gop = max(1, int(round(info["fps"] / 2)))  # keyframe a cada ~0,5s → scrub preciso
     dur = max(0.1, info["duration"])
+    rotacionado = _tem_rotacao(info)
     passo = dur / thumbs_n if thumbs_n else 0
     th_saida = []
     if thumbs_n and thumbs_dir:
@@ -412,6 +426,7 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
         th_saida = ["-map", "[t]", "-q:v", "6", "-fps_mode", "passthrough", os.path.join(thumbs_dir, "th_%04d.jpg")]
     th_filtro = f";[b]fps=fps={1 / passo:.6f}:start_time={passo / 2:.4f},scale=-2:96[t]" if th_saida else ""
     comum = ["-map", "0:a:0?", "-g", str(fps_gop), "-c:a", "aac", "-b:a", "128k", "-ac", "2",
+             "-metadata:s:v:0", "rotate=0",
              "-movflags", "+faststart", out] + th_saida
 
     def _cpu():
@@ -428,7 +443,7 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
                 "-map", "[p]", "-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "24", "-b:v", "0",
                 "-bf", "0"] + comum
 
-    tentativas = ([_cuda] if _detectar_hw_encoder() == "h264_nvenc" else []) + [_cpu]
+    tentativas = [_cpu] if rotacionado else ([_cuda] if _detectar_hw_encoder() == "h264_nvenc" else []) + [_cpu]
     rc, err = 1, ""
     for fazer in tentativas:
         rc, err = _run_progress(fazer(), dur, on_pct, stop_event)
@@ -536,7 +551,7 @@ def preparar(path, emit, stop_event=None):
     if direto:
         emit({"stage": "video", "url": media_server.register(path), "proxy": False})
     else:
-        proxy = os.path.join(work, "proxy.mp4")
+        proxy = os.path.join(work, "proxy_v2.mp4")
         ok, err, thumbs = gerar_proxy(path, info, proxy, lambda p: emit({"stage": "proxy", "pct": p}), stop_event,
                                       thumbs_dir=work, thumbs_n=count)
         if stop_event is not None and stop_event.is_set():
@@ -589,7 +604,7 @@ def preparar_midia(path, emit, stop_event=None):
         emit({"stage": "video", "url": media_server.register(path), "proxy": False})
         emit({"stage": "thumbs", "thumbs": gerar_thumbs(path, info["duration"], work, count)})
     else:
-        proxy = os.path.join(work, "proxy.mp4")
+        proxy = os.path.join(work, "proxy_v2.mp4")
         if os.path.isfile(proxy):
             ok, err, thumbs = True, "", None
         else:
@@ -711,6 +726,7 @@ def cancelar_exportacao():
 _KF_CONV = {
     "sc": lambda v: max(0.5, min(2000.0, v)) / 100.0,
     "sx": lambda v: max(0.0005, min(20.0, v)),   # escala só na horizontal (multiplica a largura; transição Dobrar)
+    "sy": lambda v: max(0.0005, min(20.0, v)),   # escala só na vertical (multiplica a altura; transição Dobrar)
     "x": lambda v: v,
     "y": lambda v: v,
     "rot": lambda v: v,
@@ -1561,11 +1577,13 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         # Dentro da cadeia da camada o tempo começa em 0 (t / T); no overlay é o tempo do vídeo final.
         # Propriedade animada vira expressão avaliada a cada quadro.
         sx = _expr_kf(kf["sx"], "t") if "sx" in kf else None
-        if "sc" in kf or sx:
+        sy = _expr_kf(kf["sy"], "t") if "sy" in kf else None
+        if "sc" in kf or sx or sy:
             e = _expr_kf(kf["sc"], "t") if "sc" in kf else f"{c['sc']:.5f}"
             ew = f"({e})*({sx})" if sx else e
+            eh = f"({e})*({sy})" if sy else e
             # tamanho sempre par: com metade inteira o centro não "treme" meio pixel a cada quadro do zoom
-            escala = (f"scale=w='max(2,2*trunc(iw*({ew})/2))':h='max(2,2*trunc(ih*({e})/2))'"
+            escala = (f"scale=w='max(2,2*trunc(iw*({ew})/2))':h='max(2,2*trunc(ih*({eh})/2))'"
                       f":eval=frame:flags=bicubic")
         else:
             k = c["sc"]
@@ -1585,7 +1603,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         else:
             opac = None
         # escala animada vai por último (tamanho muda a cada quadro; o resto trabalha em tamanho fixo)
-        ordem = [giro, opac, escala] if ("sc" in kf or sx) else [escala, giro, opac]
+        ordem = [giro, opac, escala] if ("sc" in kf or sx or sy) else [escala, giro, opac]
         efeitos = _filtros_fx(c["fx"], c["mw"], c["mh"], f"l{n}")
         # velocidade do clipe (como no Premiere): o tempo da fonte é comprimido/esticado antes de tudo
         if c["tipo"] == "imagem":

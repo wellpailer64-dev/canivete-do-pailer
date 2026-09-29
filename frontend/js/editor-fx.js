@@ -668,6 +668,7 @@ function veKeyGotasInit() {
         const cv = $ve('ve-canvas'), r = cv.getBoundingClientRect();
         const x = Math.round((e.clientX - r.left) / r.width * cv.width), y = Math.round((e.clientY - r.top) / r.height * cv.height);
         if (x < 0 || y < 0 || x >= cv.width || y >= cv.height) return;
+        if (typeof veCacheInvalidate === 'function') veCacheInvalidate();
         veFxEdit(g.id, f => ({ ...f, on: false }));
         veDrawMonitor();
         const px = cv.getContext('2d').getImageData(Math.max(0, x - 2), Math.max(0, y - 2), 5, 5).data;

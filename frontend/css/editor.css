@@ -39,6 +39,49 @@ body.ve-focus .header { display: none; }
 body.ve-focus .content-area { padding: 10px; overflow: hidden; }
 .ve-page.active { display: block; height: 100%; animation: none; }
 
+.ve-start {
+    grid-row: 2; grid-column: 1; position: relative; z-index: 6; min-height: 0;
+    display: grid; place-items: center; padding: 28px; overflow: auto;
+    background: var(--ve-bg);
+}
+.ve-start[hidden] { display: none; }
+.ve-start-inner { width: min(1100px, 100%); display: flex; flex-direction: column; gap: 18px; }
+.ve-start-hero {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end;
+    padding: 22px 24px; border: 1px solid var(--ve-line); border-radius: 8px; background: var(--ve-panel);
+}
+.ve-start-kicker { color: var(--ve-accent); font: 700 11px var(--ve-ui); text-transform: uppercase; letter-spacing: 0; }
+.ve-start h2 { margin: 4px 0 8px; font-size: 28px; line-height: 1.05; letter-spacing: 0; }
+.ve-start p { margin: 0; max-width: 620px; color: var(--ve-dim); font-size: 13px; line-height: 1.55; }
+.ve-start-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.ve-start-actions .ve-btn { display: inline-flex; align-items: center; gap: 8px; }
+.ve-start-section { border: 1px solid var(--ve-line); border-radius: 8px; background: var(--ve-panel); overflow: hidden; }
+.ve-start-head { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--ve-line); }
+.ve-start-head h3 { margin: 0; flex: 1; font-size: 13px; letter-spacing: 0; }
+.ve-start-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; padding: 12px; }
+.ve-start-empty { color: var(--ve-faint); font-size: 12px; line-height: 1.5; padding: 10px 2px; }
+.ve-start-card {
+    display: grid; grid-template-rows: 104px auto; min-width: 0; padding: 0; overflow: hidden;
+    border: 1px solid var(--ve-line-2); border-radius: 7px; background: var(--ve-bg); color: var(--ve-text);
+    text-align: left; cursor: pointer;
+}
+.ve-start-card:hover { border-color: var(--ve-accent); background: var(--ve-panel-2); }
+.ve-start-thumb {
+    display: grid; place-items: center; min-width: 0; background: #111; color: var(--ve-faint);
+    border-bottom: 1px solid var(--ve-line); overflow: hidden;
+}
+.ve-start-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ve-start-thumb .i { width: 34px; height: 34px; opacity: .75; }
+.ve-start-info { min-width: 0; padding: 9px 10px 10px; }
+.ve-start-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 700; }
+.ve-start-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ve-faint); font-size: 10.5px; margin-top: 3px; }
+.ve-start-date { color: var(--ve-dim); font-size: 10.5px; margin-top: 7px; }
+@media (max-width: 760px) {
+    .ve-start { padding: 16px; }
+    .ve-start-hero { grid-template-columns: 1fr; align-items: start; }
+    .ve-start-actions { justify-content: flex-start; }
+}
+
 /* ---------- Barra superior ---------- */
 .ve-top {
     display: flex;
@@ -327,6 +370,21 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
     min-width: 0;
     overflow: hidden;
 }
+.ve-seq-tabs { display: flex; align-items: stretch; gap: 2px; min-width: 120px; max-width: 38%; overflow-x: auto; scrollbar-width: none; }
+.ve-seq-tabs::-webkit-scrollbar { display: none; }
+.ve-seq-tab {
+    display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 170px; height: 26px;
+    padding: 0 5px 0 9px; border: 1px solid var(--ve-line); border-radius: 5px;
+    background: var(--ve-bg); color: var(--ve-dim); font: 600 11.5px var(--ve-ui); cursor: pointer;
+}
+.ve-seq-tab:hover { color: var(--ve-text); border-color: var(--ve-line-2); }
+.ve-seq-tab.active { color: var(--ve-text); border-color: var(--ve-accent); background: #f9731612; }
+.ve-seq-tab span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-seq-tab button {
+    display: grid; place-items: center; flex: none; width: 15px; height: 15px; padding: 0; border: 0;
+    border-radius: 3px; background: transparent; color: var(--ve-faint); cursor: pointer; line-height: 1;
+}
+.ve-seq-tab button:hover { background: var(--ve-panel-2); color: var(--ve-text); }
 .ve-divider { width: 1px; height: 20px; background: var(--ve-line-2); margin: 0 4px; }
 .ve-seg { display: flex; background: var(--ve-bg); border: 1px solid var(--ve-line-2); border-radius: 8px; padding: 2px; gap: 2px; }
 .ve-seg-btn {
@@ -341,6 +399,8 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
 }
 .ve-seg-btn:hover { color: var(--ve-text); }
 .ve-seg-btn.active { background: var(--ve-panel-2); color: var(--ve-accent); box-shadow: inset 0 0 0 1px var(--ve-line-2); }
+.ve-cache-btn { width: 38px; font-size: 10px; font-weight: 800; letter-spacing: 0; }
+.ve-cache-btn.active { color: #22c55e; background: rgba(34,197,94,.12); }
 .ve-snap { border: 1px solid var(--ve-line-2); filter: grayscale(1); opacity: .6; }
 .ve-snap.active { filter: none; opacity: 1; }
 .ve-zoom { display: flex; align-items: center; gap: 4px; }
@@ -425,6 +485,33 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-modal-body { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
 .ve-modal-body[hidden] { display: none; }
 .ve-modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--ve-line); }
+.ve-src-box { width: min(920px, calc(100vw - 42px)); max-height: calc(100vh - 42px); }
+.ve-src-body { display: grid; gap: 10px; }
+.ve-src-screen { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; overflow: hidden; }
+.ve-src-screen video { width: 100%; height: 100%; display: block; object-fit: contain; background: #000; }
+.ve-src-wait { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ve-dim); font-size: 12px; background: rgba(0,0,0,.74); }
+.ve-src-wait[hidden] { display: none; }
+.ve-src-range { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; font: 11px var(--ve-mono); color: var(--ve-dim); }
+.ve-src-range input {
+    width: 100%; height: 8px; border-radius: 999px; outline: 0; cursor: pointer;
+    appearance: none; -webkit-appearance: none; background: #3b3b3b;
+}
+.ve-src-range input::-webkit-slider-runnable-track { height: 8px; border-radius: 999px; background: transparent; }
+.ve-src-range input::-webkit-slider-thumb {
+    width: 16px; height: 16px; margin-top: -4px; border: 2px solid #0b0b0b; border-radius: 50%;
+    appearance: none; -webkit-appearance: none; background: var(--ve-accent); box-shadow: 0 0 0 1px rgba(255,255,255,.32);
+}
+.ve-src-range input::-moz-range-track { height: 8px; border-radius: 999px; background: transparent; }
+.ve-src-range input::-moz-range-thumb {
+    width: 14px; height: 14px; border: 2px solid #0b0b0b; border-radius: 50%;
+    background: var(--ve-accent); box-shadow: 0 0 0 1px rgba(255,255,255,.32);
+}
+.ve-src-marks { display: flex; align-items: center; gap: 8px; color: var(--ve-faint); font-size: 11px; min-width: 0; }
+.ve-src-mark { font: 11px var(--ve-mono); color: var(--ve-dim); }
+.ve-src-actions { align-items: center; flex-wrap: wrap; }
+.ve-src-play { min-width: 44px; }
+.ve-src-drag { cursor: grab; }
+.ve-src-drag:active { cursor: grabbing; }
 .ve-field > label:not(.ve-check) { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ve-faint); margin-bottom: 6px; }
 .ve-field-row { display: flex; flex-wrap: wrap; gap: 8px 18px; }
 .ve-pills { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -668,7 +755,7 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
    Painéis encaixáveis (docking como no Premiere)
    ========================================================= */
 .ve-dock-store { display: none; }
-.ve-dock { display: flex; min-height: 0; min-width: 0; padding: 4px; background: var(--ve-bg); }
+.ve-dock { grid-row: 2; grid-column: 1; display: flex; min-height: 0; min-width: 0; padding: 4px; background: var(--ve-bg); }
 .ve-dsplit { display: flex; min-width: 0; min-height: 0; }
 .ve-dsplit.row { flex-direction: row; }
 .ve-dsplit.col { flex-direction: column; }
@@ -817,6 +904,25 @@ body.ve-docking, body.ve-docking * { cursor: grabbing !important; user-select: n
 .ve-tr-card.escolhida canvas { border-color: var(--ve-accent, #F97316); }
 .ve-tr-card span { font-size: 11.5px; color: var(--ve-text, #ddd); }
 .ve-tr-card small { font-size: 10px; color: var(--ve-faint); margin-top: -3px; }
+.ve-tr-controls {
+    flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; padding: 7px 8px;
+    border-top: 1px solid var(--ve-line); background: var(--ve-panel);
+}
+.ve-tr-control-row { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.ve-tr-control-row[hidden] { display: none; }
+.ve-tr-control-row > span {
+    flex: 0 0 68px; font-size: 10px; line-height: 1; color: var(--ve-faint);
+    text-transform: uppercase; letter-spacing: 0;
+}
+.ve-tr-speed-buttons, .ve-tr-dir-buttons { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.ve-tr-control-row button {
+    height: 24px; min-width: 24px; padding: 0 7px; border: 1px solid var(--ve-line-2);
+    border-radius: 5px; background: var(--ve-bg); color: var(--ve-dim);
+    font: 600 10.5px var(--ve-ui); cursor: pointer;
+}
+.ve-tr-dir-buttons button { width: 24px; padding: 0; font-size: 13px; font-family: "Segoe UI Symbol", var(--ve-ui); }
+.ve-tr-control-row button:hover { color: var(--ve-text); border-color: var(--ve-faint); background: var(--ve-panel-2); }
+.ve-tr-control-row button.active { color: var(--ve-accent); border-color: var(--ve-accent); background: #f9731614; }
 /* Chroma Key: cor da tela + conta-gotas, e opção liga/desliga */
 .ve-prop-cor { display: flex; align-items: center; gap: 8px; }
 .ve-prop-cor label { flex: 1; }

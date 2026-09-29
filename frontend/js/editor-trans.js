@@ -15,13 +15,52 @@ const veEaseIO = u => u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
 const veEaseOut = u => 1 - Math.pow(1 - u, 3);
 const veEaseBack = u => 1 + 2.70158 * Math.pow(u - 1, 3) + 1.70158 * Math.pow(u - 1, 2);   // passa do ponto e volta
 
+const VE_TR_SPEED = {
+    fast: { nome: 'Rápida', d: 0.45 },
+    medium: { nome: 'Média', d: 1.0 },
+    slow: { nome: 'Lenta', d: 1.65 },
+};
+const VE_TR_DIRS = {
+    r: ['→', 'Direita', 1, 0], l: ['←', 'Esquerda', -1, 0],
+    u: ['↑', 'Cima', 0, -1], d: ['↓', 'Baixo', 0, 1],
+    ur: ['↗', 'Diagonal cima-direita', 1, -1], ul: ['↖', 'Diagonal cima-esquerda', -1, -1],
+    dr: ['↘', 'Diagonal baixo-direita', 1, 1], dl: ['↙', 'Diagonal baixo-esquerda', -1, 1],
+};
+function veTrDir(dir) {
+    const d = VE_TR_DIRS[dir] || VE_TR_DIRS.r;
+    const n = Math.hypot(d[2], d[3]) || 1;
+    return { x: d[2] / n, y: d[3] / n };
+}
+function veTrCfgBase() { return Object.assign({ speed: 'medium', dir: 'r' }, VE.trCfg || {}); }
+function veTrObj(t, base = veTrCfgBase(), antigo = null) {
+    const speed = VE_TR_SPEED[base.speed] ? base.speed : 'medium';
+    const def = { t, d: VE_TR_SPEED[speed].d, speed };
+    if (VE_TR[t] && VE_TR[t].dir) def.dir = VE_TR_DIRS[base.dir] ? base.dir : 'r';
+    return Object.assign(def, antigo && antigo.t === t ? antigo : {});
+}
+function veTrAnim(t, tr) {
+    return Object.assign({}, veTrCfgBase(), tr || {}, { t });
+}
+
 // pausa = instante mostrado no cartão parado do painel (padrão: o meio).
 // fn(u) → {a, b}: o que muda no clipe que sai (a) e no que entra (b). dx/dy em quadros, s = escala,
-// sx = escala só na horizontal, op = 0..1. O que entra fica por cima do que sai.
+// sx/sy = escala só num eixo, op = 0..1. O que entra fica por cima do que sai.
 const VE_TR = {
     dissolve: { nome: 'Dissolução cruzada', tag: 'Cross Dissolve', fn: u => ({ a: {}, b: { op: u } }) },
-    push: { nome: 'Empurrar', tag: 'Push', fn: u => { const e = veEaseIO(u); return { a: { dx: -e }, b: { dx: 1 - e } }; } },
-    slide: { nome: 'Deslizar', tag: 'Slide', fn: u => ({ a: {}, b: { dx: 1 - veEaseIO(u) } }) },
+    crossfade: { nome: 'Cross fade', tag: 'Opacity Fade', fn: u => ({ a: { op: 1 - u }, b: { op: u } }) },
+    fadeblack: {
+        nome: 'Fade para preto', tag: 'Fade to Black', pausa: 0.35,
+        fn: u => ({ a: { op: u < 0.5 ? 1 - u * 2 : 0 }, b: { op: u < 0.5 ? 0 : (u - 0.5) * 2 } }),
+        solo: u => ({ a: { op: 1 - u }, b: { op: u } }),
+    },
+    push: {
+        nome: 'Empurrar', tag: 'Push', dir: true,
+        fn: (u, tr) => { const e = veEaseIO(u), v = veTrDir(tr.dir); return { a: { dx: -v.x * e, dy: -v.y * e }, b: { dx: v.x * (1 - e), dy: v.y * (1 - e) } }; },
+    },
+    slide: {
+        nome: 'Deslizar', tag: 'Slide', dir: true,
+        fn: (u, tr) => { const e = veEaseIO(u), v = veTrDir(tr.dir); return { a: {}, b: { dx: v.x * (1 - e), dy: v.y * (1 - e) } }; },
+    },
     pull: {
         nome: 'Puxar (zoom)', tag: 'Pull', pausa: 0.3,
         fn: u => ({ a: { s: 1 + 0.35 * veEaseIO(u) }, b: { s: 1 + 1.4 * (1 - veEaseOut(u)), op: Math.min(1, u * 2.5) } }),
@@ -29,14 +68,16 @@ const VE_TR = {
     pop: { nome: 'Pop', tag: 'Pop', pausa: 0.3, fn: u => ({ a: {}, b: { s: 0.15 + 0.85 * veEaseBack(u), op: Math.min(1, u * 4) } }) },
     // como o Impact Fold: o quadro que sai dobra para a esquerda (escurecendo) e o que entra desdobra da direita
     fold: {
-        nome: 'Dobrar', tag: 'Fold', pausa: 0.3,
-        fn: u => {
+        nome: 'Dobrar', tag: 'Fold', pausa: 0.3, dir: true,
+        fn: (u, tr) => {
+            const v = veTrDir(tr.dir), horiz = Math.abs(v.x) >= Math.abs(v.y);
+            const dobra = sx => horiz ? { sx } : { sy: sx };
             if (u < 0.5) {
                 const e = veEaseIO(u * 2), sx = Math.max(0.001, 1 - e);
-                return { a: { sx, dx: (sx - 1) / 2, op: 1 - 0.45 * e }, b: { op: 0 } };
+                return { a: { ...dobra(sx), dx: -v.x * (1 - sx) / 2, dy: -v.y * (1 - sx) / 2, op: 1 - 0.45 * e }, b: { op: 0 } };
             }
             const e = veEaseIO((u - 0.5) * 2), sx = Math.max(0.001, e);
-            return { a: { op: 0 }, b: { sx, dx: (1 - sx) / 2, op: 0.55 + 0.45 * e } };
+            return { a: { op: 0 }, b: { ...dobra(sx), dx: v.x * (1 - sx) / 2, dy: v.y * (1 - sx) / 2, op: 0.55 + 0.45 * e } };
         },
     },
 };
@@ -58,15 +99,15 @@ function veTransJanela(c, lado, aud) {
     const tr = c && c[veTrCampo(lado, aud)];
     if (!tr || !(aud ? VE_TR_AUD : VE_TR)[tr.t] || !(aud ? veAudPode : veTransPode)(c)) return null;
     let d = Math.max(veFrame(), Math.min(tr.d || VE_TR_DUR, veLen(c)));
-    if (lado === 'out') return { t: tr.t, A: c, B: null, ws: veEnd(c) - d, we: veEnd(c), c, lado, aud };
+    if (lado === 'out') return { t: tr.t, tr, A: c, B: null, ws: veEnd(c) - d, we: veEnd(c), c, lado, aud };
     const A = veVizAntes(c, aud);
-    if (!A) return { t: tr.t, A: null, B: c, ws: c.st, we: c.st + d, c, lado, aud };
+    if (!A) return { t: tr.t, tr, A: null, B: c, ws: c.st, we: c.st + d, c, lado, aud };
     const cut = c.st, hA = veSobra(A, 'fim'), hB = veSobra(c, 'ini');
     d = Math.min(d, veLen(A), hA + hB);
     if (d < veFrame() * 0.99) return null;
     const lo = Math.max(cut - hB, cut - d), hi = Math.min(cut, cut + hA - d);
     const ws = Math.min(Math.max(cut - d / 2, lo), hi);
-    return { t: tr.t, A, B: c, ws, we: ws + d, c, lado, aud };
+    return { t: tr.t, tr, A, B: c, ws, we: ws + d, c, lado, aud };
 }
 
 // Transições de vídeo (comAudio: também as de áudio, para desenhar e clicar na timeline)
@@ -105,9 +146,11 @@ function veAudFades() {
 
 // Efeito da transição no instante T para o papel ('a' sai / 'b' entra)
 function veTransFx(j, papel, T) {
-    const u = Math.min(1, Math.max(0, (T - j.ws) / (j.we - j.ws))), fn = VE_TR[j.t].fn;
-    if (papel === 'a' && !j.B) return fn(1 - u).b;   // saída para o nada: o contrário da entrada
-    return fn(u)[papel] || {};
+    const u = Math.min(1, Math.max(0, (T - j.ws) / (j.we - j.ws))), tipo = VE_TR[j.t], fn = tipo.fn;
+    const tr = veTrAnim(j.t, j.tr || (j.c && j.c[veTrCampo(j.lado, j.aud)]) || j);
+    if (papel === 'a' && !j.B) return ((tipo.solo || fn)(1 - u, tr).b || {});   // saída para o nada: o contrário da entrada
+    if (papel === 'b' && !j.A && tipo.solo) return tipo.solo(u, tr).b || {};
+    return fn(u, tr)[papel] || {};
 }
 
 // Clipes com as transições aplicadas: os envolvidos viram cópias (só a imagem; o som fica numa cópia à parte,
@@ -148,27 +191,30 @@ function veTransVirtuais() {
         VE_KF_PROPS.forEach(k => { if (veKfOn(base, k)) base.k[k].forEach(q => ts.add(+veTlAt(base, q.t).toFixed(4))); });
         const tempos = [...ts].sort((a, b) => a - b);
         const k = {};
-        let usaSx = false;
-        ['sc', 'x', 'y', 'op', 'sx'].forEach(p => { k[p] = []; });
+        let usaSx = false, usaSy = false;
+        ['sc', 'x', 'y', 'op', 'sx', 'sy'].forEach(p => { k[p] = []; });
         tempos.forEach(T => {
             const p = veProps(base, T);
-            let x = p.x, y = p.y, sc = p.sc, op = p.op, sx = p.sx == null ? 1 : p.sx;
+            let x = p.x, y = p.y, sc = p.sc, op = p.op, sx = p.sx == null ? 1 : p.sx, sy = p.sy == null ? 1 : p.sy;
             v._tr.forEach(([j, papel]) => {
                 if (T < j.ws - VE_EPS || T > j.we + VE_EPS) return;
-                const f = veTransFx(j, papel, T), s = f.s == null ? 1 : f.s, fx = f.sx == null ? 1 : f.sx;
+                const f = veTransFx(j, papel, T), s = f.s == null ? 1 : f.s, fx = f.sx == null ? 1 : f.sx, fy = f.sy == null ? 1 : f.sy;
                 if (f.sx != null) usaSx = true;
+                if (f.sy != null) usaSy = true;
                 x = W / 2 + (f.dx || 0) * W + s * fx * (x - W / 2);
-                y = H / 2 + (f.dy || 0) * H + s * (y - H / 2);
+                y = H / 2 + (f.dy || 0) * H + s * fy * (y - H / 2);
                 sc *= s;
                 sx *= fx;
+                sy *= fy;
                 op *= f.op == null ? 1 : f.op;
             });
             const t = Math.round(veSrcAt(v, T) * 1e4) / 1e4;
             k.sc.push({ t, v: sc, i: 'lin' }); k.x.push({ t, v: x, i: 'lin' });
             k.y.push({ t, v: y, i: 'lin' }); k.op.push({ t, v: op, i: 'lin' });
-            k.sx.push({ t, v: sx, i: 'lin' });
+            k.sx.push({ t, v: sx, i: 'lin' }); k.sy.push({ t, v: sy, i: 'lin' });
         });
         if (!usaSx) delete k.sx;
+        if (!usaSy) delete k.sy;
         v.k = Object.assign({}, v.k || {}, k);
         delete v._base;
     });
@@ -185,7 +231,8 @@ function veTransAdd(c, lado, t, aud) {
     }
     if (veLocked(c)) { veAvisoBloqueio(); return; }
     vePushHistory();
-    c[veTrCampo(lado, aud)] = { t, d: VE_TR_DUR };
+    const campo = veTrCampo(lado, aud);
+    c[campo] = aud ? { t, d: VE_TR_DUR } : veTrObj(t);
     const j = veTransJanela(c, lado, aud);
     if (!j) {
         veUndo();
@@ -196,7 +243,9 @@ function veTransAdd(c, lado, t, aud) {
     VE.sel = -1;
     veRefresh();
     const d = j.we - j.ws;
-    veToast(`${(aud ? VE_TR_AUD : VE_TR)[t].nome} (${veShort(d)})` + (d < VE_TR_DUR - 0.01 ? ' · encurtada: pouca mídia sobrando' : ''));
+    veTrRenderControls();
+    const durPadrao = aud ? VE_TR_DUR : c[campo].d || VE_TR_DUR;
+    veToast(`${(aud ? VE_TR_AUD : VE_TR)[t].nome} (${veShort(d)})` + (d < durPadrao - 0.01 ? ' · encurtada: pouca mídia sobrando' : ''));
 }
 
 // Ctrl+D (vídeo: a transição marcada no painel Transições) / Ctrl+Shift+D ou Ctrl+Shift+9 (áudio: Potência
@@ -205,36 +254,117 @@ function veTransAdd(c, lado, t, aud) {
 function veTransPadrao(aud) {
     const t = aud ? 'cp' : (VE_TR[VE.trEscolhida] ? VE.trEscolhida : 'dissolve');
     const pode = aud ? veAudPode : veTransPode;
+    const alvoAud = c => {
+        if (veAudPode(c)) return c;
+        const par = typeof veVinculados === 'function' ? veVinculados(c).find(o => o !== c && veAudPode(o)) : null;
+        return par || null;
+    };
     const ponta = (c, lado) => {
         if (lado === 'out') { const n = veVizDepois(c, aud); if (n) return { c: n, lado: 'in' }; }
         return { c, lado };
     };
     const b = veBordaSel();
     let alvos = [];
-    if (b) { if (pode(b.c)) alvos.push(ponta(b.c, b.lado)); }
-    else veSelLista().filter(pode).forEach(c => alvos.push(ponta(c, 'in'), ponta(c, 'out')));
+    if (b) {
+        const c = aud ? alvoAud(b.c) : b.c;
+        if (pode(c)) alvos.push(ponta(c, b.lado));
+    } else veSelLista().map(c => aud ? alvoAud(c) : c).filter(pode).forEach(c => alvos.push(ponta(c, 'in'), ponta(c, 'out')));
     alvos = alvos.filter((a, k) => !veLocked(a.c) && alvos.findIndex(o => o.c === a.c && o.lado === a.lado) === k);
     if (!alvos.length) {
-        veToast(aud ? 'Selecione a ponta de um clipe com som (ou o clipe) e aperte Ctrl+Shift+D'
+        veToast(aud ? 'Selecione a ponta de um clipe com som (ou o clipe) e aperte Ctrl+Shift+D / Ctrl+Shift+9'
                     : 'Selecione a ponta de um clipe (ou o clipe) e aperte Ctrl+D');
         return;
     }
     vePushHistory();
-    let ok = 0;
+    let ok = 0, primeiro = null;
     alvos.forEach(a => {
         const campo = veTrCampo(a.lado, aud), antes = a.c[campo];
-        a.c[campo] = { t, d: antes ? antes.d : VE_TR_DUR };
-        if (veTransJanela(a.c, a.lado, aud)) ok++;
+        a.c[campo] = aud ? { t, d: antes ? antes.d : VE_TR_DUR } : veTrObj(t, veTrCfgBase(), antes);
+        if (veTransJanela(a.c, a.lado, aud)) { ok++; if (!primeiro) primeiro = a; }
         else if (antes) a.c[campo] = antes; else delete a.c[campo];
     });
     if (!ok) { VE.history.pop(); veUpdateUndo(); veToast('Sem mídia sobrando para a transição'); return; }
+    if (primeiro) { VE.trSel = { c: primeiro.c, lado: primeiro.lado, aud }; VE.sel = -1; }
     veRefresh();
+    veTrRenderControls();
     veToast(`${(aud ? VE_TR_AUD : VE_TR)[t].nome}: ${ok} ${ok > 1 ? 'transições aplicadas' : 'transição aplicada'}`);
 }
 
 function veTransSelecionada() {
     const s = VE.trSel;
     return s && VE.clips.includes(s.c) && s.c[veTrCampo(s.lado, s.aud)] ? s : null;
+}
+
+function veTrSalvarCfg() {
+    VE.trCfg = veTrCfgBase();
+    veLsSet('ve-tr-cfg', JSON.stringify(VE.trCfg));
+}
+
+function veTrSelecionadaObj() {
+    const s = veTransSelecionada();
+    return s && !s.aud ? s.c[veTrCampo(s.lado, false)] : null;
+}
+
+function veTrSpeedAtual(tr) {
+    const d = tr && Number.isFinite(+tr.d) ? +tr.d : VE_TR_SPEED[veTrCfgBase().speed].d;
+    if (tr && VE_TR_SPEED[tr.speed] && Math.abs(d - VE_TR_SPEED[tr.speed].d) < 0.05) return tr.speed;
+    let melhor = 'medium', dist = Infinity;
+    Object.entries(VE_TR_SPEED).forEach(([k, v]) => {
+        const n = Math.abs(d - v.d);
+        if (n < dist) { melhor = k; dist = n; }
+    });
+    return melhor;
+}
+
+function veTrRenderControls() {
+    const box = $ve('ve-tr-controls');
+    if (!box) return;
+    const tr = veTrSelecionadaObj(), tipo = tr && VE_TR[tr.t] ? tr.t : (VE_TR[VE.trEscolhida] ? VE.trEscolhida : 'dissolve');
+    const base = tr || veTrObj(tipo, veTrCfgBase());
+    const speed = veTrSpeedAtual(base), dir = VE_TR_DIRS[base.dir] ? base.dir : veTrCfgBase().dir;
+    box.dataset.mode = tr ? 'selecionada' : 'padrao';
+    box.title = veT(tr ? 'Editando a transição selecionada na timeline' : 'Define como as próximas transições do painel serão aplicadas');
+    box.querySelectorAll('[data-tr-speed]').forEach(b => b.classList.toggle('active', b.dataset.trSpeed === speed));
+    const rowDir = box.querySelector('[data-tr-dir-row]');
+    if (rowDir) rowDir.hidden = !(VE_TR[tipo] && VE_TR[tipo].dir);
+    box.querySelectorAll('[data-tr-dir]').forEach(b => b.classList.toggle('active', b.dataset.trDir === dir));
+}
+
+function veTrSetSpeed(speed) {
+    if (!VE_TR_SPEED[speed]) return;
+    const tr = veTrSelecionadaObj(), s = veTransSelecionada();
+    if (tr && s) {
+        if (veLocked(s.c)) { veAvisoBloqueio(); return; }
+        vePushHistory();
+        tr.speed = speed;
+        tr.d = VE_TR_SPEED[speed].d;
+        veRefresh();
+        veTrRenderControls();
+        return;
+    }
+    VE.trCfg = veTrCfgBase();
+    VE.trCfg.speed = speed;
+    veTrSalvarCfg();
+    veTrRenderControls();
+}
+
+function veTrSetDir(dir) {
+    if (!VE_TR_DIRS[dir]) return;
+    const tr = veTrSelecionadaObj(), s = veTransSelecionada();
+    if (tr && s && VE_TR[tr.t] && VE_TR[tr.t].dir) {
+        if (veLocked(s.c)) { veAvisoBloqueio(); return; }
+        vePushHistory();
+        tr.dir = dir;
+        veRefresh();
+        veTrRenderControls();
+        veTrvTodos();
+        return;
+    }
+    VE.trCfg = veTrCfgBase();
+    VE.trCfg.dir = dir;
+    veTrSalvarCfg();
+    veTrRenderControls();
+    veTrvTodos();
 }
 
 function veTransApagar() {
@@ -245,6 +375,7 @@ function veTransApagar() {
     delete s.c[veTrCampo(s.lado, s.aud)];
     VE.trSel = null;
     veRefresh();
+    veTrRenderControls();
     veToast('Transição apagada');
     return true;
 }
@@ -350,13 +481,17 @@ function veTransPointer(hit, t) {
         VE.drag = { mode: 'trdur', c: hit.c, lado: hit.lado, aud: hit.aud, fixo, meio: !!(j.A && j.B), started: false };
     }
     veRefresh();
+    veTrRenderControls();
 }
 
 function veTransArrastar(t) {
     const d = VE.drag;
     if (!d.started) { vePushHistory(); d.started = true; }
     const dur = Math.min(10, Math.max(veFrame(), Math.abs(veSnapFrame(t) - d.fixo) * (d.meio ? 2 : 1)));
-    d.c[veTrCampo(d.lado, d.aud)].d = Math.round(dur * 1000) / 1000;
+    const tr = d.c[veTrCampo(d.lado, d.aud)];
+    tr.d = Math.round(dur * 1000) / 1000;
+    delete tr.speed;
+    veTrRenderControls();
     veDraw();
     veDrawMonitorSoon();
     if (d.aud && typeof veAudioEditou === 'function') veAudioEditou();
@@ -380,7 +515,7 @@ function veTransHover(alvo, t) {
     if (!alvo) { VE.trHover = null; if (velho) veDraw(); return; }
     if (velho && velho.c === alvo.c && velho.lado === alvo.lado) return;
     const campo = veTrCampo(alvo.lado), antes = alvo.c[campo];
-    alvo.c[campo] = { t, d: VE_TR_DUR };
+    alvo.c[campo] = veTrObj(t);
     alvo.prev = veTransJanela(alvo.c, alvo.lado);
     if (antes) alvo.c[campo] = antes; else delete alvo.c[campo];
     VE.trHover = alvo;
@@ -470,14 +605,15 @@ function veTrvDesenhar(cv, t, u) {
     const x = cv.getContext('2d'), W = cv.width, H = cv.height;
     x.fillStyle = '#0b0b0b'; x.fillRect(0, 0, W, H);
     if (!VETRV.B) return;
-    const r = VE_TR[t].fn(u);
+    const sel = veTrSelecionadaObj();
+    const r = VE_TR[t].fn(u, veTrAnim(t, sel && sel.t === t ? sel : null));
     [[VETRV.A, r.a], [VETRV.B, r.b]].forEach(([src, f]) => {
         f = f || {};
-        const s = f.s == null ? 1 : f.s;
+        const s = f.s == null ? 1 : f.s, sx = f.sx == null ? 1 : f.sx, sy = f.sy == null ? 1 : f.sy;
         x.save();
         x.globalAlpha = Math.max(0, Math.min(1, f.op == null ? 1 : f.op));
         x.translate(W / 2 + (f.dx || 0) * W, H / 2 + (f.dy || 0) * H);
-        x.scale(s * (f.sx == null ? 1 : f.sx), s);
+        x.scale(s * sx, s * sy);
         x.drawImage(src, -W / 2, -H / 2, W, H);
         x.restore();
     });
@@ -522,6 +658,7 @@ function veRenderTrList() {
         || '<div class="ve-clips-empty">Nenhuma transição encontrada.</div>';
     veTrvPrep();
     veTrvTodos();
+    veTrRenderControls();
 }
 
 // Ponto do evento (na janela do painel) → alvo na timeline, que pode estar em outra janela
@@ -536,10 +673,21 @@ function veTrAlvoEvento(ev, doc) {
 function veTrInit() {
     const box = $ve('ve-tr-list');
     if (!box) return;
+    let cfg = {};
+    try { cfg = JSON.parse(veLsGet('ve-tr-cfg') || '{}') || {}; } catch (_) { cfg = {}; }
+    VE.trCfg = Object.assign({ speed: 'medium', dir: 'r' }, cfg);
+    if (!VE_TR_SPEED[VE.trCfg.speed]) VE.trCfg.speed = 'medium';
+    if (!VE_TR_DIRS[VE.trCfg.dir]) VE.trCfg.dir = 'r';
     VE.trEscolhida = VE_TR[veLsGet('ve-tr-escolhida')] ? veLsGet('ve-tr-escolhida') : 'dissolve';
     veRenderTrList();
     $ve('ve-tr-q').addEventListener('input', veRenderTrList);
     $ve('ve-tr-q').addEventListener('keydown', e => { if (e.key === 'Escape') { e.target.value = ''; veRenderTrList(); e.target.blur(); } e.stopPropagation(); });
+    const controls = $ve('ve-tr-controls');
+    if (controls) controls.addEventListener('click', e => {
+        const sp = e.target.closest('[data-tr-speed]'), dir = e.target.closest('[data-tr-dir]');
+        if (sp) veTrSetSpeed(sp.dataset.trSpeed);
+        if (dir) veTrSetDir(dir.dataset.trDir);
+    });
     box.addEventListener('pointerover', e => { const el = e.target.closest('[data-trt]'); if (el) veTrvAnimar(el); });
     box.addEventListener('pointerout', e => {
         const el = e.target.closest('[data-trt]');
@@ -552,12 +700,15 @@ function veTrInit() {
         VE.trEscolhida = el.dataset.trt;
         veLsSet('ve-tr-escolhida', VE.trEscolhida);
         box.querySelectorAll('[data-trt]').forEach(x => x.classList.toggle('escolhida', x === el));
+        veTrRenderControls();
+        veTrvTodos();
     });
     box.addEventListener('dblclick', e => {
         const el = e.target.closest('[data-trt]');
         if (!el) return;
         if (VE.sel < 0) { veToast('Selecione um clipe na timeline (ou arraste a transição até o corte)'); return; }
-        veTransAdd(VE.clips[VE.sel], 'in', el.dataset.trt);
+        const c = VE.clips[VE.sel], lado = el.dataset.trt === 'fadeblack' && !veVizDepois(c) ? 'out' : 'in';
+        veTransAdd(c, lado, el.dataset.trt);
     });
     // arrastar até a timeline
     box.addEventListener('pointerdown', e => {

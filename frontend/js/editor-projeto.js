@@ -322,6 +322,7 @@ function vePjRenomear(k) {
                 }
             }
             vePjAlterou();
+            if (!b && m.kind === 'timeline') veSeqTabsRender();
         } else vePjRender();
     };
     inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') fim(true); if (e.key === 'Escape') fim(false); });
@@ -446,8 +447,8 @@ function vePjColocar(ids, drop) {
     const wrapEl = $ve('ve-tl-wrap'), wrap = wrapEl.getBoundingClientRect();
     const mesmoDoc = !drop || !drop.doc || drop.doc === wrapEl.ownerDocument;
     const naTl = mesmoDoc && drop && drop.x >= wrap.left && drop.x <= wrap.right && drop.y >= wrap.top + VE_RULER && drop.y <= wrap.bottom;
-    let t = naTl ? Math.max(0, VE.view + (drop.x - wrap.left) / VE.pps) : VE.playhead;
-    const row = naTl ? veRowAt(drop.y - wrap.top) : null;
+    let t = Number.isFinite(drop && drop.t) ? drop.t : naTl ? Math.max(0, VE.view + (drop.x - wrap.left) / VE.pps) : VE.playhead;
+    const row = Number.isFinite(drop && drop.tr) ? { kind: drop.rowKind || 'v', _tr: drop.tr } : naTl ? veRowAt(drop.y - wrap.top) : null;
     let colocados = 0;
     ids.map(id => VE.media[id]).filter(m => m && !m.removido).forEach(m => {
         if (m.kind === 'timeline') { veOpenTimeline(m.sequenceId); return; }
@@ -461,15 +462,17 @@ function vePjColocar(ids, drop) {
         } else if (m.kind === 'video') {
             const dur = m.id === 0 ? VE.srcDur : m.info && m.info.duration;
             if (!dur) { veToast(m.erro ? 'Esse vídeo não pôde ser preparado: ' + m.erro : 'Esse vídeo ainda está sendo preparado'); return; }
-            const tr = row && row.kind !== 'l' ? veTrackIndex(row) : 0;
+            const tr = Number.isFinite(drop && drop.tr) ? drop.tr : row && row.kind !== 'l' ? veTrackIndex(row) : 0;
             if (veTrkLocked(tr)) { veAvisoBloqueio(); return; }
             vePushHistory();
-            const clip = { tr, st, s: 0, e: dur };
+            const s0 = Number.isFinite(drop && drop.srcIn) ? Math.max(0, Math.min(dur, drop.srcIn)) : 0;
+            const e0 = Number.isFinite(drop && drop.srcOut) ? Math.max(s0 + veFrame(), Math.min(dur, drop.srcOut)) : dur;
+            const clip = { tr, st, s: s0, e: e0 };
             if (m.id) clip.m = m.id;
             if (m.cor) clip.cor = m.cor;
             vePlaceClip(clip);
             veAfterEdit(VE.playhead);
-            t = st + dur; colocados++;
+            t = st + veLen(clip); colocados++;
         } else if (m.kind === 'audio') {
             const trA = row && row.kind === 'a' ? veTrackIndex(row) : -1;
             if (vePjAudioEm(m, st, trA)) { t = st + m.dur; colocados++; }
@@ -578,13 +581,14 @@ function vePjInit() {
         vePjRender();
     });
     const duplo = (e, row, k) => {
+        if (k.startsWith('m:')) {
+            const m = VE.media[+k.slice(2)];
+            if (m && m.kind === 'timeline') { veOpenTimeline(m.sequenceId); return; }
+            if (m && m.kind === 'video') { veSrcOpen(m.id); return; }
+        }
         if (e.target.closest('.ve-pj-nome')) { vePjRenomear(k); return; }
         if (k.startsWith('b:') && row.classList.contains('ve-pj-card')) { vePjAbrirPasta(k.slice(2)); return; }
         if (k.startsWith('b:')) { const b = vePjBin(k.slice(2)); b.aberta = !b.aberta; vePjRender(); }
-        if (k.startsWith('m:')) {
-            const m = VE.media[+k.slice(2)];
-            if (m && m.kind === 'timeline') veOpenTimeline(m.sequenceId);
-        }
     };
     lista.addEventListener('contextmenu', e => {
         e.preventDefault();
@@ -661,8 +665,18 @@ function vePjInit() {
 
     // soltar itens do painel na timeline ou no monitor
     const alvo = el => {
-        el.addEventListener('dragover', e => { if ([...e.dataTransfer.types].includes('text/x-ve-projeto')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; } });
+        el.addEventListener('dragover', e => {
+            const tipos = [...e.dataTransfer.types];
+            if (tipos.includes('text/x-ve-projeto') || tipos.includes('text/x-ve-source')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }
+        });
         el.addEventListener('drop', e => {
+            const src = e.dataTransfer.getData('text/x-ve-source');
+            if (src) {
+                e.preventDefault();
+                e.stopPropagation();
+                veSrcDrop(JSON.parse(src), { x: e.clientX, y: e.clientY, doc: el.ownerDocument });
+                return;
+            }
             const dados = e.dataTransfer.getData('text/x-ve-projeto');
             if (!dados) return;
             e.preventDefault();
@@ -705,6 +719,7 @@ function veOnMidia(ev) {
     if (ev.stage === 'info') {
         m.info = ev;
         m.dur = ev.duration;
+        if (m._insertQueue) veVideoQueueTick(m._insertQueue);
         if (m._insertPending) {
             const drop = m._insertDrop || null;
             delete m._insertPending;
@@ -720,6 +735,7 @@ function veOnMidia(ev) {
         m.url = ev.url;
         m.proxy = ev.proxy;
         m.pct = 100;
+        if (typeof VESRC !== 'undefined' && VESRC.id === m.id) veSrcLoad();
         if (VE.clips.some(c => veMid(c) === m.id)) veSyncPlayer(true);
     } else if (ev.stage === 'thumbs') {
         m.thumbs = (ev.thumbs || []).sort((a, b) => a.t - b.t).map(tb => {
@@ -730,6 +746,12 @@ function veOnMidia(ev) {
         });
     } else if (ev.stage === 'error') {
         m.erro = ev.error || 'erro';
+        if (m._insertQueue) {
+            const q = m._insertQueue;
+            q.ids = q.ids.filter(id => id !== m.id);
+            delete m._insertQueue;
+            setTimeout(() => veVideoQueueTick(q), 0);
+        }
         veToast(`${vePjNome(m)}: ${m.erro}`);
     }
     if (ev.stage === 'done' || ev.stage === 'error') { VEPJF.rodando = null; veMidiaProxima(); }
@@ -738,6 +760,143 @@ function veOnMidia(ev) {
     veDrawMonitorSoon();
 }
 window.veOnMidia = veOnMidia;
+
+// ─────────────────────────── Source monitor (duplo clique no Project) ───────────────────────────
+const VESRC = { id: null, video: null, inPt: null, outPt: null };
+
+function veSrcOpen(id) {
+    const m = VE.media[id];
+    if (!m || m.kind !== 'video') return;
+    let md = $ve('ve-source');
+    if (!md) {
+        md = document.createElement('div');
+        md.className = 've-modal';
+        md.id = 've-source';
+        md.hidden = true;
+        md.innerHTML = `<div class="ve-modal-box ve-src-box" tabindex="0">
+            <div class="ve-modal-head"><span id="ve-src-title">Source</span><button class="ve-icon-btn" data-src="fechar" title="Fechar (Esc)"><svg class="i"><use href="#i-x"/></svg></button></div>
+            <div class="ve-modal-body ve-src-body">
+                <div class="ve-src-screen"><video id="ve-src-video" preload="auto" playsinline></video><div class="ve-src-wait" id="ve-src-wait">Preparando prévia...</div></div>
+                <div class="ve-src-range"><span id="ve-src-cur">0:00.00</span><input type="range" id="ve-src-seek" min="0" max="1000" value="0"><span id="ve-src-dur">0:00.00</span></div>
+                <div class="ve-src-marks"><span>In <b class="ve-src-mark" id="ve-src-in">--:--</b></span><span>Out <b class="ve-src-mark" id="ve-src-out">--:--</b></span><span id="ve-src-len"></span></div>
+            </div>
+            <div class="ve-modal-foot ve-src-actions">
+                <button class="ve-btn ve-btn-sm ve-src-play" data-src="play" id="ve-src-play" title="Reproduzir/Pausar (Espaço)">▶</button>
+                <button class="ve-btn ve-btn-sm" data-src="in">{ In</button>
+                <button class="ve-btn ve-btn-sm" data-src="out">Out }</button>
+                <button class="ve-btn ve-btn-sm ve-btn-ghost" data-src="limpar">Limpar</button>
+                <span class="ve-top-spacer"></span>
+                <button class="ve-btn ve-btn-sm ve-src-drag" draggable="true" id="ve-src-drag" title="Arraste para a timeline">Arrastar para timeline</button>
+                <button class="ve-btn ve-btn-sm ve-btn-primary" data-src="insert">Inserir</button>
+            </div>
+        </div>`;
+        $ve('ve').appendChild(md);
+        VESRC.video = md.querySelector('#ve-src-video');
+        md.addEventListener('click', veSrcClick);
+        md.addEventListener('keydown', veSrcKey);
+        md.querySelector('#ve-src-seek').addEventListener('input', e => {
+            if (VESRC.video.duration) VESRC.video.currentTime = (+e.target.value / 1000) * VESRC.video.duration;
+        });
+        md.querySelector('#ve-src-drag').addEventListener('dragstart', e => {
+            e.dataTransfer.setData('text/x-ve-source', JSON.stringify(veSrcPayload()));
+            e.dataTransfer.effectAllowed = 'copy';
+        });
+        VESRC.video.addEventListener('timeupdate', veSrcRender);
+        VESRC.video.addEventListener('loadedmetadata', veSrcRender);
+        VESRC.video.addEventListener('play', veSrcRender);
+        VESRC.video.addEventListener('pause', veSrcRender);
+        VESRC.video.addEventListener('ended', veSrcRender);
+        VESRC.video.addEventListener('click', veSrcTogglePlay);
+    }
+    VESRC.id = id;
+    VESRC.inPt = m.srcIn ?? null;
+    VESRC.outPt = m.srcOut ?? null;
+    md.querySelector('#ve-src-title').textContent = vePjNome(m);
+    md.hidden = false;
+    veSrcLoad();
+    md.querySelector('.ve-src-box').focus();
+}
+
+function veSrcLoad() {
+    const m = VE.media[VESRC.id], v = VESRC.video, wait = $ve('ve-src-wait');
+    if (!m || !v) return;
+    wait.hidden = !!m.url;
+    if (m.url && v.getAttribute('src') !== m.url) { v.src = m.url; v.load(); }
+    if (!m.url && m.id) veVideoPrepararSePrecisa(m);
+    veSrcRender();
+}
+
+function veSrcClose() {
+    const md = $ve('ve-source');
+    if (!md) return;
+    VESRC.video.pause();
+    md.hidden = true;
+}
+
+function veSrcDur() {
+    const m = VE.media[VESRC.id];
+    return (m && (m.info && m.info.duration || m.dur)) || VESRC.video.duration || 0;
+}
+
+function veSrcPayload() {
+    const dur = veSrcDur(), a = VESRC.inPt ?? 0, b = VESRC.outPt ?? dur;
+    return { id: VESRC.id, srcIn: Math.max(0, Math.min(dur, a)), srcOut: Math.max(0, Math.min(dur, b)) };
+}
+
+function veSrcDrop(p, drop) {
+    const m = VE.media[p.id];
+    if (!m || m.kind !== 'video') return;
+    vePjColocar([m.id], { ...(drop || {}), srcIn: p.srcIn, srcOut: p.srcOut });
+}
+
+function veSrcTogglePlay() {
+    if (!VESRC.video) return;
+    if (VESRC.video.paused) VESRC.video.play().catch(() => {});
+    else VESRC.video.pause();
+    veSrcRender();
+}
+
+function veSrcClick(e) {
+    const b = e.target.closest('[data-src]');
+    if (!b) { if (e.target.id === 've-source') veSrcClose(); return; }
+    const m = VE.media[VESRC.id], t = VESRC.video.currentTime || 0;
+    if (b.dataset.src === 'fechar') veSrcClose();
+    else if (b.dataset.src === 'play') veSrcTogglePlay();
+    else if (b.dataset.src === 'in') { VESRC.inPt = t; if (VESRC.outPt != null && VESRC.outPt <= t) VESRC.outPt = null; }
+    else if (b.dataset.src === 'out') { VESRC.outPt = t; if (VESRC.inPt != null && VESRC.inPt >= t) VESRC.inPt = null; }
+    else if (b.dataset.src === 'limpar') { VESRC.inPt = VESRC.outPt = null; }
+    else if (b.dataset.src === 'insert') veSrcDrop(veSrcPayload(), null);
+    if (m) { m.srcIn = VESRC.inPt; m.srcOut = VESRC.outPt; }
+    veSrcRender();
+}
+
+function veSrcKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); veSrcClose(); return; }
+    if (e.key === ' ') { e.preventDefault(); e.stopPropagation(); veSrcTogglePlay(); return; }
+    if (e.key.toLowerCase() === 'i') { e.preventDefault(); e.stopPropagation(); veSrcClick({ target: { closest: () => ({ dataset: { src: 'in' } }) } }); return; }
+    if (e.key.toLowerCase() === 'o') { e.preventDefault(); e.stopPropagation(); veSrcClick({ target: { closest: () => ({ dataset: { src: 'out' } }) } }); }
+}
+
+function veSrcRender() {
+    const md = $ve('ve-source');
+    if (!md || md.hidden || !VESRC.video) return;
+    const dur = veSrcDur(), cur = VESRC.video.currentTime || 0;
+    const p = veSrcPayload();
+    const pct = v => dur ? Math.max(0, Math.min(100, v / dur * 100)) : 0;
+    md.querySelector('#ve-src-cur').textContent = veShort(cur);
+    md.querySelector('#ve-src-dur').textContent = veShort(dur);
+    const seek = md.querySelector('#ve-src-seek');
+    seek.value = dur ? Math.round(cur / dur * 1000) : 0;
+    const a = pct(p.srcIn), b = pct(p.srcOut);
+    seek.style.background = `linear-gradient(to right, #3b3b3b 0%, #3b3b3b ${a}%, var(--ve-accent) ${a}%, var(--ve-accent) ${b}%, #3b3b3b ${b}%, #3b3b3b 100%)`;
+    md.querySelector('#ve-src-in').textContent = VESRC.inPt == null ? '--:--' : veShort(VESRC.inPt);
+    md.querySelector('#ve-src-out').textContent = VESRC.outPt == null ? '--:--' : veShort(VESRC.outPt);
+    md.querySelector('#ve-src-len').textContent = p.srcOut > p.srcIn ? `Trecho ${veShort(p.srcOut - p.srcIn)}` : '';
+    const play = md.querySelector('#ve-src-play');
+    if (play) play.textContent = VESRC.video.paused ? '▶' : '❚❚';
+    const m = VE.media[VESRC.id], wait = md.querySelector('#ve-src-wait');
+    if (wait) wait.hidden = !!(m && m.url);
+}
 
 // Arquivos do Windows soltos em cima do painel: vão para o projeto (na pasta sob o cursor), não para a timeline
 function vePjSoltouAqui(drop) {

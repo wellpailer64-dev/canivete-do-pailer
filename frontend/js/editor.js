@@ -21,9 +21,11 @@ const VE = {
     media: [],          // [0] = vídeo aberto; imagens adicionadas depois
     sequences: [],      // timelines do projeto (cada uma guarda seus próprios clipes/trilhas/legendas)
     activeSequence: null,
+    openSequences: [],
     _seqN: 0,
     projectPath: null,  // .vcnvt salvo/aberto
     dirty: false,       // alterações desde o último salvar
+    quickEdit: false,   // edição descartável: exporta e fecha sem pedir salvar projeto
     seqW: 1920, seqH: 1080,   // tamanho do quadro da sequência (o do vídeo)
     pps: 50,            // pixels por segundo
     view: 0,            // tempo na borda esquerda
@@ -41,6 +43,7 @@ const VE = {
     dest: null,
     hoverX: null,
     drag: null,
+    cache: null,        // cache RAM dos quadros já compostos do monitor
     fxHover: -1,        // clipe sob um efeito sendo arrastado do painel Efeitos
     exportRunning: false,
     lastOutput: null,
@@ -178,7 +181,8 @@ function veEsc(t) {
 }
 
 function veFrame() { return 1 / (VE.fps || 30); }
-function veClamp(t) { return Math.min(Math.max(t, 0), VE.dur); }
+function veNavDur() { return VE.dur > 0 ? VE.dur : Math.max(VE.srcDur || 0, 60); }
+function veClamp(t) { return Math.min(Math.max(t, 0), veNavDur()); }
 function veSnapFrame(t) { return Math.round(t * VE.fps) / VE.fps; }
 
 function veToast(msg) {
@@ -205,6 +209,177 @@ function veIsActive() {
 function veLsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function veLsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 
+// ─────────────────────────── cache RAM da prévia ───────────────────────────
+const VE_CACHE_MAX_BYTES = 4 * 1024 * 1024 * 1024;
+
+function veCache() {
+    if (!VE.cache) {
+        VE.cache = {
+            on: veLsGet('ve-cache-on') !== '0',
+            rev: 0,
+            frames: new Map(),
+            bytes: 0,
+            maxBytes: VE_CACHE_MAX_BYTES,
+        };
+    }
+    return VE.cache;
+}
+
+function veCacheBytesTxt(n) {
+    if (n >= 1024 * 1024 * 1024) return (n / 1024 / 1024 / 1024).toFixed(n >= 10 * 1024 * 1024 * 1024 ? 0 : 1) + ' GB';
+    return n >= 1024 * 1024 ? Math.round(n / 1024 / 1024) + ' MB' : Math.round(n / 1024) + ' KB';
+}
+
+function veCacheUpdateUi() {
+    const b = $ve('ve-cache');
+    if (!b) return;
+    const c = veCache();
+    b.classList.toggle('active', c.on);
+    b.textContent = 'RAM';
+    b.title = `${c.on ? 'Cache inteligente RAM ligado' : 'Cache inteligente RAM desligado'} · ${veCacheBytesTxt(c.bytes)} / ${veCacheBytesTxt(c.maxBytes)} · Shift+clique limpa`;
+}
+
+function veCacheRelease(item) {
+    if (!item) return;
+    if (item.bmp && item.bmp.close) item.bmp.close();
+    if (item.cv) { item.cv.width = 0; item.cv.height = 0; }
+}
+
+function veCacheClear(silencioso) {
+    const c = veCache();
+    c.frames.forEach(veCacheRelease);
+    c.frames.clear();
+    c.bytes = 0;
+    veCacheUpdateUi();
+    if (!silencioso) veToast('Cache RAM limpo');
+}
+
+function veCacheInvalidate() {
+    const c = veCache();
+    c.rev++;
+    veCacheClear(true);
+}
+
+function veCacheToggle(e) {
+    const c = veCache();
+    if (e && e.shiftKey) {
+        veCacheClear(false);
+        veDraw();
+        return;
+    }
+    c.on = !c.on;
+    veLsSet('ve-cache-on', c.on ? '1' : '0');
+    if (!c.on) veCacheClear(true);
+    veCacheUpdateUi();
+    veDraw();
+    veToast(c.on ? 'Cache RAM ligado' : 'Cache RAM desligado');
+}
+
+function veCacheFrame() { return Math.max(0, Math.floor((VE.playhead || 0) * (VE.fps || 30) + 1e-6)); }
+function veCacheKey(f) {
+    return [VE.activeSequence || 'seq', veCache().rev, Math.round((VE.fps || 30) * 1000), f].join('|');
+}
+
+function veCacheEditando() {
+    const d = VE.drag && VE.drag.mode;
+    return !!(VE._fxEdit || VE._propEdit || VE._ppEdit ||
+        (typeof VEM !== 'undefined' && VEM.pan) ||
+        (typeof VETF !== 'undefined' && VETF.drag) ||
+        (d && ['move', 'trim', 'rate', 'kf', 'leg', 'trdur'].includes(d)));
+}
+
+function veCacheGet(cw, ch, pv) {
+    const c = veCache();
+    if (!c.on || veCacheEditando()) return null;
+    const f = veCacheFrame(), key = veCacheKey(f), item = c.frames.get(key);
+    if (!item) return null;
+    c.frames.delete(key);
+    c.frames.set(key, item);
+    return item;
+}
+
+function veCacheEvict() {
+    const c = veCache();
+    while (c.bytes > c.maxBytes && c.frames.size) {
+        const [key, item] = c.frames.entries().next().value;
+        c.frames.delete(key);
+        c.bytes -= item.bytes || 0;
+        veCacheRelease(item);
+    }
+}
+
+function veCacheClipPesado(c) {
+    if (!c) return false;
+    if (typeof veIsAdj === 'function' && veIsAdj(c)) return true;
+    if (typeof veIsTexto === 'function' && veIsTexto(c)) return true;
+    if (typeof veIsImage === 'function' && veIsImage(c)) return true;
+    if (typeof veFxActive === 'function' && veFxActive(c).length) return true;
+    if (c.k && Object.keys(c.k).length) return true;
+    if (Math.abs(veVel(c) - 1) > 1e-4) return true;
+    if (c.tin || c.tout || c.atin || c.atout) return true;
+    if (typeof veIsDefaultProps === 'function' && !veIsDefaultProps(c)) return true;
+    const m = typeof veMediaOf === 'function' ? veMediaOf(c) : null;
+    const inf = m && (m.id === 0 ? VE.info : m.info);
+    return !!(inf && ((inf.fps || 0) > 60 || (inf.width || 0) * (inf.height || 0) > 1920 * 1080));
+}
+
+function veCacheValeGuardar(itens, trans, falta) {
+    if (falta || veCacheEditando()) return false;
+    if (!itens || !itens.length) return false;
+    if (trans || itens.length > 1) return true;
+    return itens.some(({ c }) => veCacheClipPesado(c));
+}
+
+function veCacheStore(cv, cw, ch, pv, itens, trans, falta) {
+    const c = veCache();
+    if (!c.on || !veCacheValeGuardar(itens, trans, falta) || !cw || !ch) return;
+    const f = veCacheFrame(), key = veCacheKey(f);
+    if (c.frames.has(key)) return;
+    const cp = document.createElement('canvas');
+    cp.width = cw;
+    cp.height = ch;
+    cp.getContext('2d').drawImage(cv, 0, 0);
+    const bytes = cw * ch * 4;
+    c.frames.set(key, { cv: cp, bytes, f, rev: c.rev, seq: VE.activeSequence || '', fps: VE.fps || 30, pv, w: cw, h: ch });
+    c.bytes += bytes;
+    veCacheEvict();
+    veCacheUpdateUi();
+}
+
+function veCacheRanges() {
+    const c = veCache();
+    if (!c.on || !c.frames.size) return [];
+    const seq = VE.activeSequence || '', rev = c.rev, fps = VE.fps || 30;
+    const frames = [...c.frames.values()]
+        .filter(x => x.rev === rev && x.seq === seq && Math.abs((x.fps || fps) - fps) < 1e-3)
+        .map(x => x.f)
+        .sort((a, b) => a - b);
+    const out = [];
+    frames.forEach(f => {
+        const r = out[out.length - 1];
+        if (r && f <= r.b + 1) r.b = Math.max(r.b, f);
+        else out.push({ a: f, b: f });
+    });
+    return out.map(r => ({ a: r.a / fps, b: (r.b + 1) / fps }));
+}
+
+function veCacheDraw(ctx, X, W) {
+    if (!VE.ready) return;
+    const ranges = veCacheRanges();
+    if (!ranges.length) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, VE_RULER);
+    ctx.clip();
+    ctx.fillStyle = 'rgba(34,197,94,0.88)';
+    ranges.forEach(r => {
+        const x1 = X(r.a), x2 = X(r.b);
+        if (x2 < 0 || x1 > W) return;
+        ctx.fillRect(Math.max(0, x1), 0, Math.max(1, Math.min(W, x2) - Math.max(0, x1)), 5);
+    });
+    ctx.restore();
+}
+
 // ─────────────────────────── modelo (timeline) ───────────────────────────
 // Clipe: {tr, st, s, e} — tr = índice da trilha (V1/A1 = 0; novas trilhas crescem sob demanda),
 // st = início na timeline, [s, e] = trecho do arquivo original. Pode haver espaço vazio.
@@ -229,7 +404,7 @@ function veRelayout() {
     VE.clips.sort((a, b) => a.st - b.st || a.tr - b.tr);
     VE.sel = selC ? VE.clips.indexOf(selC) : -1;
     VE.dur = VE.clips.reduce((m, c) => Math.max(m, veEnd(c)), 0);
-    VE.playhead = Math.min(VE.playhead, VE.dur);
+    VE.playhead = Math.min(VE.playhead, veNavDur());
 }
 
 // Clipe visível no instante t (o da trilha mais alta), ou -1 se for espaço vazio
@@ -258,6 +433,7 @@ function veSnapshot() { return JSON.stringify({ clips: VE.clips, inPt: VE.inPt, 
 
 function vePushHistory() {
     if (!VE.dirty) { VE.dirty = true; veUpdateTitle(); }
+    veCacheInvalidate();
     VE.history.push(veSnapshot());
     if (VE.history.length > 200) VE.history.shift();
     VE.future = [];
@@ -367,6 +543,7 @@ function veSeqAplicar(seq, opts = {}) {
     if (!seq) return;
     veStop();
     VE.activeSequence = seq.id;
+    veCacheInvalidate();
     if (seq.w > 0 && seq.h > 0) veSeqQuadro(seq.w, seq.h);
     VE.clips = vePlain(seq.clips, []);
     VE_TRK = veSeqTracks(seq.trilhas, VE.clips);
@@ -393,6 +570,7 @@ function veSeqAplicar(seq, opts = {}) {
     veRelayout();
     if (seq.view && seq.view.pps > 0) { VE.pps = seq.view.pps; VE.view = seq.view.x || 0; }
     else { VE.pps = veFitPps(); VE.view = 0; }
+    veOpenTimelineTab(seq.id);
     veAfterEdit(seq.playhead || 0);
     if (!opts.silent) veToast('Timeline aberta: ' + (seq.name || 'Timeline'));
 }
@@ -410,6 +588,7 @@ function veEnsureSequence() {
     const seq = { ...veSeqCapturar(), id, name };
     VE.sequences = [seq];
     veSeqCriarMidia(seq, null);
+    veOpenTimelineTab(id);
 }
 
 function veCreateTimeline(opts = {}) {
@@ -460,8 +639,10 @@ function veDeleteTimeline(seqId) {
     VE.sequences = seqs.filter(s => s.id !== seqId);
     if (m) m.removido = true;
     if (VE.activeSequence === seqId) veSeqAplicar(VE.sequences[0], { silent: true });
+    VE.openSequences = (VE.openSequences || []).filter(id => id !== seqId);
     VE.dirty = true;
     veUpdateTitle();
+    veSeqTabsRender();
     vePjRender();
     veToast('Timeline apagada');
     return true;
@@ -626,7 +807,6 @@ function veRippleRemove(a, b, label) {
         if (esq) out.push(veSemTout({ ...c, e: veSrcAt(c, a) }));
         if (en > b && en - b > tiny) out.push((esq ? lk : x => x)(veSemTin({ ...c, st: a, s: veSrcAt(c, b) })));
     });
-    if (!out.length) { veToast('Isso apagaria tudo da timeline'); return false; }
     vePushHistory();
     VE.clips = out;
     VE.sel = -1;
@@ -643,14 +823,13 @@ function veRippleRemove(a, b, label) {
 function veDeleteClip(i, ripple) {
     if (i < 0 || i >= VE.clips.length) return;
     if (veLocked(VE.clips[i])) { veAvisoBloqueio(); return; }
-    if (VE.clips.length === 1) { veToast('Não dá para apagar o último clipe'); return; }
     vePushHistory();
     const c = VE.clips[i], a = c.st, b = veEnd(c), d = b - a;
     VE.clips.splice(i, 1);
     if (!ripple) {
         VE.sel = -1;
         veRelayout();
-        veAfterEdit(Math.min(VE.playhead, VE.dur));
+        veAfterEdit(Math.min(VE.playhead, veNavDur()));
         veToast('Clipe apagado (Shift+D apaga e fecha o espaço)');
         return;
     }
@@ -658,7 +837,7 @@ function veDeleteClip(i, ripple) {
     if (!ocupado) VE.clips.forEach(o => { if (o.st >= b - VE_EPS && !veLocked(o)) o.st -= d; });
     VE.sel = -1;
     veRelayout();
-    veAfterEdit(VE.playhead > b && !ocupado ? VE.playhead - d : Math.min(VE.playhead, VE.dur));
+    veAfterEdit(VE.playhead > b && !ocupado ? VE.playhead - d : Math.min(VE.playhead, veNavDur()));
     veToast(ocupado ? 'Clipe apagado (o espaço ficou porque há clipes em outras trilhas)' : 'Clipe apagado');
 }
 
@@ -748,7 +927,6 @@ function veCortarSelecionados() {
 function veApagarVarios(lista, ripple) {
     const livres = lista.filter(c => !veLocked(c));
     if (!livres.length) { veAvisoBloqueio(); return; }
-    if (livres.length >= VE.clips.length) { veToast('Não dá para apagar todos os clipes'); return; }
     vePushHistory();
     VE.clips = VE.clips.filter(c => !livres.includes(c));
     let tira = 0;
@@ -763,7 +941,7 @@ function veApagarVarios(lista, ripple) {
     }
     VE.sel = -1; VE.selx = null;
     veRelayout();
-    veAfterEdit(Math.min(VE.playhead - tira, VE.dur));
+    veAfterEdit(Math.min(VE.playhead - tira, veNavDur()));
     veToast(`${livres.length} clipes apagados` + (livres.length < lista.length ? ' (os de trilhas bloqueadas ficaram)' : ''));
 }
 
@@ -1408,6 +1586,7 @@ function veProps(c, T = VE.playhead) {
         const tl = veSrcAt(c, T);
         VE_KF_PROPS.forEach(k => { const ks = c.k[k]; if (ks && ks.length) p[k] = veKfValue(ks, tl); });
         if (c.k.sx && c.k.sx.length) p.sx = veKfValue(c.k.sx, tl);   // escala só na horizontal (transição Dobrar)
+        if (c.k.sy && c.k.sy.length) p.sy = veKfValue(c.k.sy, tl);   // escala só na vertical (transição Dobrar)
     }
     return p;
 }
@@ -1462,7 +1641,7 @@ function veKfValue(ks, t) {
 }
 
 function veKfOn(c, k) { return !!(c && c.k && c.k[k] && c.k[k].length); }
-function veHasKf(c) { return !!c && VE_KF_PROPS.some(k => veKfOn(c, k)); }
+function veHasKf(c) { return !!c && (VE_KF_PROPS.some(k => veKfOn(c, k)) || veKfOn(c, 'sx') || veKfOn(c, 'sy')); }
 
 // Tempo da fonte na agulha, preso ao trecho do clipe
 function veKfTime(c) {
@@ -1641,7 +1820,7 @@ function veDropFiles(itens) {
     }
     const vids = videos.filter(i => EXT_VIDEO.test(i.path));
     if (vids.length) {
-        vids.forEach(it => veAddVideo(it.path, drop));
+        veAddVideosSequenciais(vids.map(it => it.path), drop);
         return;
     }
     if (imgs.length) {
@@ -1655,6 +1834,70 @@ function veDropFiles(itens) {
         return;
     }
     veToast('Arraste vídeos, áudios ou imagens para a timeline');
+}
+
+function veTimelineDropPoint(drop) {
+    const wrapEl = $ve('ve-tl-wrap'), wrap = wrapEl.getBoundingClientRect();
+    const mesmoDoc = !drop || !drop.doc || drop.doc === wrapEl.ownerDocument;
+    const naTl = mesmoDoc && drop && drop.x >= wrap.left && drop.x <= wrap.right && drop.y >= wrap.top + VE_RULER && drop.y <= wrap.bottom;
+    const t = Number.isFinite(drop && drop.t) ? drop.t : naTl ? Math.max(0, VE.view + (drop.x - wrap.left) / VE.pps) : VE.playhead;
+    const row = Number.isFinite(drop && drop.tr) ? { kind: drop.rowKind || 'v', _tr: drop.tr } : naTl ? veRowAt(drop.y - wrap.top) : null;
+    const tr = Number.isFinite(drop && drop.tr) ? drop.tr : row && row.kind !== 'l' ? veTrackIndex(row) : 0;
+    return { t, tr, row, naTl };
+}
+
+function veVideoMidia(path, pasta) {
+    let m = VE.media.find(x => x.kind === 'video' && x.path === path && !x.removido);
+    if (!m) {
+        const nome = path.split(/[\\/]/).pop();
+        m = vePjAddMidia({ kind: 'video', path, name: nome }, pasta !== undefined ? pasta : (typeof vePjDestino === 'function' ? vePjDestino() : null));
+    }
+    return m;
+}
+
+function veVideoPrepararSePrecisa(m) {
+    if (!m || m.info || m.erro) return;
+    const emFila = typeof VEPJF !== 'undefined' && (VEPJF.rodando === m.id || VEPJF.fila.includes(m.id));
+    if (!emFila) veMidiaPreparar(m);
+}
+
+function veAddVideosSequenciais(paths, drop = veDropAtual()) {
+    if (!VE.ready || !paths || !paths.length) return;
+    const q = { ids: [], drop, nextT: null, tr: null, running: false };
+    paths.forEach(path => {
+        const m = veVideoMidia(path);
+        q.ids.push(m.id);
+        m._insertQueue = q;
+        veVideoPrepararSePrecisa(m);
+    });
+    vePjRender();
+    veVideoQueueTick(q);
+    if (q.ids.length) veToast(q.ids.length === 1 ? 'Preparando vídeo para colocar na timeline...' : `Preparando ${q.ids.length} vídeos para colocar na timeline...`);
+}
+
+function veVideoQueueTick(q) {
+    if (!q || q.running) return;
+    q.running = true;
+    try {
+        while (q.ids.length) {
+            const m = VE.media[q.ids[0]];
+            const dur = m && (m.info && m.info.duration || m.dur);
+            if (!m || m.removido) { q.ids.shift(); continue; }
+            if (!dur) { m._insertQueue = q; break; }
+            q.ids.shift();
+            delete m._insertQueue;
+            if (q.nextT == null) {
+                const p = veTimelineDropPoint(q.drop);
+                q.nextT = p.t;
+                q.tr = p.tr;
+            }
+            const st = veSnapFrame(q.nextT);
+            vePjColocar([m.id], { ...(q.drop || {}), t: st, tr: q.tr, rowKind: 'v' });
+            q.nextT = st + dur;
+        }
+    } finally {
+        q.running = false;
+    }
 }
 
 function veAddImage(path, deslocamento = 0) {
@@ -1679,14 +1922,10 @@ function veAddVideo(path, drop = veDropAtual()) {
     let m = VE.media.find(x => x.kind === 'video' && x.path === path && !x.removido);
     const colocar = () => vePjColocar([m.id], drop);
     if (m && m.info && m.info.duration) { colocar(); return m; }
-    if (!m) {
-        const nome = path.split(/[\\/]/).pop();
-        m = vePjAddMidia({ kind: 'video', path, name: nome }, typeof vePjDestino === 'function' ? vePjDestino() : null);
-    }
+    if (!m) m = veVideoMidia(path);
     m._insertDrop = drop;
     m._insertPending = true;
-    const emFila = typeof VEPJF !== 'undefined' && (VEPJF.rodando === m.id || VEPJF.fila.includes(m.id));
-    if (!emFila && !m.info) veMidiaPreparar(m);
+    veVideoPrepararSePrecisa(m);
     vePjRender();
     veToast('Preparando vídeo para colocar na timeline...');
     return m;
@@ -1991,6 +2230,18 @@ function veDrawMonitor() {
     if (!cv) return;
     const ctx = cv.getContext('2d');
     if (!VE.ready) { ctx.clearRect(0, 0, cv.width, cv.height); return; }
+    const pv = veMonitorScale();
+    const cw = Math.round(VE.seqW * pv), ch = Math.round(VE.seqH * pv);
+    const cached = veCacheGet(cw, ch, pv);
+    if (cached && cached.cv) {
+        if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; }
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, cw, ch);
+        ctx.drawImage(cached.cv, 0, 0, cw, ch);
+        ctx.setTransform(pv, 0, 0, pv, 0, 0);
+        veTfDesenhar(ctx, cv, pv);
+        return;
+    }
     const t = VE.playhead, v = veVideo();
     // transição na agulha (editor-trans.js): os clipes envolvidos vêm estendidos e animados;
     // o que entra fica por cima do que sai (mesma trilha: ordem de início)
@@ -2010,7 +2261,7 @@ function veDrawMonitor() {
         if (veIsAdj(c)) {
             src = 'ajuste';
         } else if (veIsTexto(c)) {
-            src = veTxCanvas(c, veMonitorScale() * veProps(c).sc / 100).cv;   // desenhado na resolução em que aparece
+            src = veTxCanvas(c, pv * veProps(c).sc / 100).cv;   // desenhado na resolução em que aparece
         } else if (veIsImage(c)) {
             const m = veMediaOf(c);
             if (m.img && m.img.complete && m.w) src = m.img;
@@ -2035,8 +2286,6 @@ function veDrawMonitor() {
     });
     veParkExtras(extra, false, true);
     // desenha em coordenadas do quadro
-    const pv = veMonitorScale();
-    const cw = Math.round(VE.seqW * pv), ch = Math.round(VE.seqH * pv);
     const novo = cv.width !== cw || cv.height !== ch;
     // sem quadro do vídeo principal (buscando): mantém o último quadro na tela em vez de piscar preto
     // (no máximo 600 ms, para um vídeo com erro não congelar o monitor)
@@ -2062,12 +2311,13 @@ function veDrawMonitor() {
             ctx.translate(p.x, p.y);
             ctx.rotate(p.rot * Math.PI / 180);
             const k = p.sc / 100;
-            ctx.scale(k * (p.sx == null ? 1 : p.sx), k);
+            ctx.scale(k * (p.sx == null ? 1 : p.sx), k * (p.sy == null ? 1 : p.sy));
             const [ax, ay] = veAnc(c, p, sz);   // a Posição é onde fica o ponto de ancoragem
             ctx.drawImage(src, -ax, -ay, sz.w, sz.h);
             ctx.restore();
         });
     veTxDesenhar(ctx);
+    veCacheStore(cv, cw, ch, pv, itens, trans, falta);
     // caixa com alças e ponto de ancoragem do selecionado (editor-transform.js)
     veTfDesenhar(ctx, cv, pv);
 }
@@ -2402,6 +2652,7 @@ function veExportPlanClips() {
             const kf = {};
             VE_KF_PROPS.forEach(k => { if (veKfOn(c, k)) kf[k] = c.k[k].map(q => [(q.t - c.s) / veVel(c), k === 'sc' ? q.v / f : q.v, q.i || 'lin', veKfCurve(q)]); });
             if (veKfOn(c, 'sx')) kf.sx = c.k.sx.map(q => [(q.t - c.s) / veVel(c), q.v, q.i || 'lin', veKfCurve(q)]);
+            if (veKfOn(c, 'sy')) kf.sy = c.k.sy.map(q => [(q.t - c.s) / veVel(c), q.v, q.i || 'lin', veKfCurve(q)]);
             const sz = png ? { w: png.w, h: png.h } : veMediaSize(c);
             return { tipo: veIsAdj(c) ? 'ajuste' : veIsImage(c) ? 'imagem' : 'video', path: png ? png.path : veIsImage(c) || veMid(c) ? m.path || null : null,
                      st: c.st, s: veIsImage(c) ? 0 : c.s, e: veIsImage(c) ? veLen(c) : c.e,
@@ -2512,13 +2763,123 @@ function veUpdateTitle() {
     if (typeof renderTabs === 'function') renderTabs();
 }
 
+function veSeqName(seqId) {
+    const seq = (VE.sequences || []).find(s => s.id === seqId);
+    const m = typeof veSeqMedia === 'function' ? veSeqMedia(seqId) : null;
+    return (m && (m.nome || m.name)) || (seq && seq.name) || 'Timeline';
+}
+
+function veSeqTabsRender() {
+    const box = $ve('ve-seq-tabs');
+    if (!box) return;
+    if (!VE.ready || !(VE.sequences || []).length) { box.innerHTML = ''; return; }
+    VE.openSequences = (VE.openSequences || []).filter(id => (VE.sequences || []).some(s => s.id === id));
+    if (!VE.openSequences.includes(VE.activeSequence)) VE.openSequences.push(VE.activeSequence);
+    box.innerHTML = VE.openSequences.map(id => `<div class="ve-seq-tab${id === VE.activeSequence ? ' active' : ''}" data-seq="${veEsc(id)}" title="${veEsc(veSeqName(id))}">
+        <span>${veEsc(veSeqName(id))}</span><button data-fechar="${veEsc(id)}" title="Fechar aba">×</button></div>`).join('');
+}
+
+function veSeqTabClick(e) {
+    const fechar = e.target.closest('[data-fechar]');
+    if (fechar) {
+        e.stopPropagation();
+        veCloseTimelineTab(fechar.dataset.fechar);
+        return;
+    }
+    const tab = e.target.closest('[data-seq]');
+    if (tab) veOpenTimeline(tab.dataset.seq);
+}
+
+function veOpenTimelineTab(seqId) {
+    if (!seqId) return;
+    VE.openSequences = (VE.openSequences || []).filter(id => (VE.sequences || []).some(s => s.id === id));
+    if (!VE.openSequences.includes(seqId)) VE.openSequences.push(seqId);
+    veSeqTabsRender();
+}
+
+function veCloseTimelineTab(seqId) {
+    if (!VE.ready || !seqId) return;
+    if ((VE.openSequences || []).length <= 1) { veToast('A timeline ativa precisa ficar aberta'); return; }
+    const i = VE.openSequences.indexOf(seqId);
+    VE.openSequences = VE.openSequences.filter(id => id !== seqId);
+    if (VE.activeSequence === seqId) {
+        const prox = VE.openSequences[Math.min(i, VE.openSequences.length - 1)] || VE.openSequences[0];
+        if (prox) veOpenTimeline(prox);
+    } else veSeqTabsRender();
+}
+
 // Alterações não salvas: a primeira tentativa avisa; repetir em até 5 s confirma e descarta
 function veConfirmDiscard() {
-    if (!VE.ready || !VE.dirty) return true;
+    if (!VE.ready || !VE.dirty || VE.quickEdit) return true;
     if (VE._discardAt && Date.now() - VE._discardAt < 5000) { VE._discardAt = 0; return true; }
     VE._discardAt = Date.now();
     veToast('Há alterações não salvas. Salve com Ctrl+S ou repita para descartar.');
     return false;
+}
+
+const VE_RECENTES_PROJETOS = 've-projetos-recentes';
+function veRecentesProjetos() {
+    try {
+        return JSON.parse(veLsGet(VE_RECENTES_PROJETOS) || '[]').filter(p => p && p.path);
+    } catch (_) {
+        return [];
+    }
+}
+function veSalvarRecentesProjetos(lista) {
+    veLsSet(VE_RECENTES_PROJETOS, JSON.stringify(lista.slice(0, 8)));
+}
+function veRegistrarProjetoRecente(path, dados) {
+    if (!path) return;
+    const nome = path.split(/[\\/]/).pop().replace(/\.vcnvt$/i, '');
+    const atual = { path, nome, video: (dados && dados.video) || VE.path || '', atualizado: Date.now(), thumb: (VE.thumbs && VE.thumbs[0] && VE.thumbs[0].url) || '' };
+    veSalvarRecentesProjetos([atual, ...veRecentesProjetos().filter(p => p.path !== path)]);
+    veOnboardingRender();
+}
+function veRecentesProjetosLimpar() {
+    veSalvarRecentesProjetos([]);
+    veOnboardingRender(true);
+}
+function veFmtRecente(ts) {
+    if (!ts) return '';
+    try { return new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
+    catch (_) { return ''; }
+}
+function veOnboardingRender() {
+    const tela = $ve('ve-start'), box = $ve('ve-start-recentes');
+    if (!tela || !box) return;
+    const mostrar = !VE.ready && !VE.path && !VE.exportRunning;
+    tela.hidden = !mostrar;
+    if (!mostrar) return;
+    const lista = veRecentesProjetos();
+    if (!lista.length) {
+        box.innerHTML = `<div class="ve-start-empty">${veT('Nenhum projeto recente ainda. Crie um projeto ou abra um .vcnvt para ele aparecer aqui.')}</div>`;
+        return;
+    }
+    box.innerHTML = lista.map((p, i) => {
+        const pasta = (p.path || '').split(/[\\/]/).slice(0, -1).join('\\');
+        const capa = p.thumb ? `<img src="${veEsc(p.thumb)}" alt="" onerror="this.remove()">` : '<svg class="i"><use href="#i-film"/></svg>';
+        return `<button class="ve-start-card" data-proj="${i}" title="${veEsc(p.path)}">
+            <span class="ve-start-thumb" data-thumb="${i}">${capa}</span>
+            <span class="ve-start-info"><b class="ve-start-name">${veEsc(p.nome || p.path.split(/[\\/]/).pop())}</b>
+            <span class="ve-start-path">${veEsc(pasta)}</span><span class="ve-start-date">${veEsc(veFmtRecente(p.atualizado))}</span></span>
+        </button>`;
+    }).join('');
+    box.querySelectorAll('[data-proj]').forEach(b => b.addEventListener('click', () => {
+        const p = veRecentesProjetos()[+b.dataset.proj];
+        if (p) veOpenProject(p.path);
+    }));
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.ve_project_thumb) return;
+    lista.forEach((p, i) => {
+        if (p.thumb) return;
+        api.ve_project_thumb(p.path).then(r => {
+            if (!r || !r.success || !r.url) return;
+            const atuais = veRecentesProjetos(), item = atuais.find(x => x.path === p.path);
+            if (item) { item.thumb = r.url; veSalvarRecentesProjetos(atuais); }
+            const alvo = $ve('ve-start-recentes')?.querySelector(`[data-thumb="${i}"]`);
+            if (alvo) alvo.innerHTML = `<img src="${veEsc(r.url)}" alt="">`;
+        }).catch(() => {});
+    });
 }
 
 function veProjectData() {
@@ -2559,6 +2920,8 @@ function veSaveProject(comoNovo) {
         if (!r || !r.success) { if (r && r.error) veToast('Não foi possível salvar: ' + r.error); return false; }
         VE.projectPath = r.path;
         VE.dirty = false;
+        VE.quickEdit = false;
+        veRegistrarProjetoRecente(r.path, { video: VE.path });
         veUpdateTitle();
         veToast('Projeto salvo: ' + r.name);
         return true;
@@ -2580,10 +2943,11 @@ function veCloseProject() {
     v.removeAttribute('src');
     v.load();
     veParkExtras(0, true);
+    veCacheClear(true);
     Object.assign(VE, {
         path: null, info: null, dur: 0, srcDur: 0, clips: [], sel: -1, inPt: null, outPt: null, playhead: 0,
         cur: -1, history: [], future: [], thumbs: [], peaks: [], ready: false, dest: null, view: 0, media: [],
-        sequences: [], activeSequence: null, _seqN: 0, projectPath: null, dirty: false, _pendingProject: null, bins: [],
+        sequences: [], activeSequence: null, openSequences: [], _seqN: 0, projectPath: null, dirty: false, quickEdit: false, _pendingProject: null, bins: [],
     });
     veBuildHeads();
     VEPJ.sel.clear();
@@ -2598,8 +2962,10 @@ function veCloseProject() {
     veUpdateReadouts();
     veRenderProps();
     veUpdateTitle();
+    veSeqTabsRender();
     veDrawMonitor();
     veDraw();
+    veOnboardingRender();
 }
 
 function veOpenProject(path) {
@@ -2628,6 +2994,7 @@ function veApplyProject() {
     const { data: d, path, name, missing } = VE._pendingProject;
     VE._pendingProject = null;
     VE.projectPath = path;
+    VE.quickEdit = false;
     const ids = { 0: 0 };
     (d.media || []).forEach(m => {
         const org = { pasta: m.pasta || null, cor: m.cor, nome: m.nome };
@@ -2731,9 +3098,11 @@ function veApplyProject() {
         if (!m.nome && !m.name) m.name = seq.name;
     });
     VE.activeSequence = d.activeSequence && VE.sequences.find(s => s.id === d.activeSequence) ? d.activeSequence : VE.sequences[0].id;
+    VE.openSequences = [VE.activeSequence];
     veSeqAplicar(VE.sequences.find(s => s.id === VE.activeSequence), { silent: true });
     VE.dirty = false;
     veUpdateTitle();
+    veRegistrarProjetoRecente(path, d);
     const faltam = missing.filter(p => p !== d.video).length;
     veToast(faltam ? `Projeto aberto — ${faltam} imagem(ns) não encontrada(s); os clipes delas ficaram de fora`
                    : 'Projeto aberto: ' + name.replace(/\.vcnvt$/i, ''));
@@ -2743,12 +3112,12 @@ function veApplyProject() {
 
 function veCanvasWidth() { return $ve('ve-tl-wrap').clientWidth || 800; }
 function veCanvasHeight() { return $ve('ve-tl-wrap').clientHeight || 200; }
-function veFitPps() { return VE.dur > 0 ? (veCanvasWidth() - 16) / VE.dur : 50; }
+function veFitPps() { return (veCanvasWidth() - 16) / Math.max(veFrame(), veNavDur()); }
 function veVisibleDur() { return veCanvasWidth() / VE.pps; }
 
 function veClampView() {
     // deixa meia tela livre depois do fim, para dar para arrastar clipes para lá
-    const maxView = Math.max(0, VE.dur - veVisibleDur() * 0.5);
+    const maxView = Math.max(0, veNavDur() - veVisibleDur() * 0.5);
     VE.view = Math.min(Math.max(VE.view, 0), maxView);
 }
 
@@ -2851,6 +3220,7 @@ function veTrackToggle(kind, k, act) {
     veToast({ lock: st.lock ? `${nome} bloqueada` : `${nome} desbloqueada`,
               hide: st.hide ? `${nome} oculta` : `${nome} visível`,
               mute: st.mute ? `${nome} sem som` : `${nome} com som` }[act]);
+    if (act === 'hide') veCacheInvalidate();
     veBuildHeads();
     if (act === 'hide' && VE.ready) veSyncPlayer(true);   // o clipe de baixo pode passar a ser o que toca
     if (act === 'mute') veApplyAudioGain();
@@ -2994,10 +3364,11 @@ function veRender() {
         const label = major < 1 ? veTC(t).slice(3) : veTC(t).slice(0, 8).replace(/^00:/, '');
         ctx.fillText(label, x + 4, 15);
     }
+    veCacheDraw(ctx, X, W);
 
     // In / Out
     if (VE.inPt != null || VE.outPt != null) {
-        const a = VE.inPt ?? 0, b = VE.outPt ?? VE.dur;
+        const a = VE.inPt ?? 0, b = VE.outPt ?? veNavDur();
         ctx.fillStyle = 'rgba(56,189,248,0.10)';
         ctx.fillRect(X(a), VE_RULER, (b - a) * VE.pps, H - VE_RULER);
         ctx.fillStyle = 'rgba(56,189,248,0.55)';
@@ -3305,10 +3676,11 @@ function veThumbFor(t, lista = VE.thumbs) {
 function veUpdateScrollbar() {
     const bar = $ve('ve-scrollbar'), thumb = $ve('ve-scroll-thumb');
     if (!bar || !thumb) return;
-    if (!VE.ready || VE.dur <= 0) { thumb.style.left = '0'; thumb.style.width = '100%'; return; }
-    const frac = Math.min(1, veVisibleDur() / VE.dur);
+    if (!VE.ready) { thumb.style.left = '0'; thumb.style.width = '100%'; return; }
+    const navDur = veNavDur();
+    const frac = Math.min(1, veVisibleDur() / navDur);
     thumb.style.width = Math.max(4, frac * 100) + '%';
-    thumb.style.left = (VE.view / VE.dur * 100) + '%';
+    thumb.style.left = (VE.view / navDur * 100) + '%';
 }
 
 // ─────────────────────────── UI (listas / leituras) ───────────────────────────
@@ -3328,6 +3700,10 @@ function veRenderClips() {
     $ve('ve-sum-final').textContent = veHuman(VE.dur);
     $ve('ve-sum-cut').textContent = veHuman(Math.max(0, VE.srcDur - VE.dur));
 
+    if (!VE.clips.length) {
+        box.innerHTML = '<div class="ve-clips-empty">Timeline vazia.<br>Arraste mídias do painel Projeto para montar a edição.</div>';
+        return;
+    }
     const c0 = VE.clips[0];
     if (VE.clips.length === 1 && c0.st < 1e-3 && c0.tr === 0 && !c0.g && !c0.p && !c0.k && !c0.fx && !c0.afx && c0.s < 1e-3 && Math.abs(c0.e - VE.srcDur) < 1e-3) {
         box.innerHTML = '<div class="ve-clips-empty">Nenhum corte ainda.<br>Aperte <b>\'</b> (ou <b>S</b>) para cortar na agulha. <b>Q</b> / <b>W</b> apagam antes / depois da agulha até o corte mais próximo.<br>Selecione um clipe e aperte <b>D</b> para apagá-lo.</div>';
@@ -3357,6 +3733,8 @@ function veRefresh() {
     veUpdateReadouts();
     veRenderClips();
     veRenderProps();
+    veSeqTabsRender();
+    if (typeof veTrRenderControls === 'function') veTrRenderControls();
     veDrawMonitor();
     veDraw();
 }
@@ -3403,22 +3781,26 @@ function veSnapTime(t, forRazor) {
 
 // ─────────────────────────── abrir vídeo ───────────────────────────
 
-function veOpenFile() {
+function veEscolherArquivoEditor(quickEdit) {
     if (VE.exportRunning) return;
     const api = window.pywebview && window.pywebview.api;
     if (!api || !api.select_file) { veToast('A ponte com o app ainda não está pronta'); return; }
     api.select_file('video-cutter').then(r => {
         if (!r || !r.success) return;
-        veAbrirArquivoEscolhido(r.path, false);
+        veAbrirArquivoEscolhido(r.path, false, !!quickEdit);
     }).catch(e => veToast('Não consegui abrir o seletor: ' + (e && e.message ? e.message : e)));
 }
 
-function veAbrirArquivoEscolhido(path, inserirNaTimeline) {
+function veOpenFile() { veEscolherArquivoEditor(false); }
+function veNovoProjeto() { veEscolherArquivoEditor(false); }
+function veQuickEdit() { veEscolherArquivoEditor(true); }
+
+function veAbrirArquivoEscolhido(path, inserirNaTimeline, quickEdit) {
     if (!path) return;
     if (/\.vcnvt$/i.test(path)) { veOpenProject(path); return; }
     if (inserirNaTimeline && VE.ready) { veDropFiles([{ path, pasta: false }]); return; }
     if (VE.ready && inserirNaTimeline !== false) { veDropFiles([{ path, pasta: false }]); return; }
-    if (veConfirmDiscard()) veOpenPath(path);
+    if (veConfirmDiscard()) { VE.quickEdit = !!quickEdit; veOpenPath(path); }
 }
 
 function veImportTimelineFile() {
@@ -3447,15 +3829,17 @@ function veOpenPath(path) {
     v.removeAttribute('src');
     v.load();
     veParkExtras(0, true);
+    veCacheClear(true);
     Object.assign(VE, {
         path, info: null, dur: 0, srcDur: 0, clips: [], sel: -1, inPt: null, outPt: null, playhead: 0,
         cur: -1, history: [], future: [], thumbs: [], peaks: [], ready: false, dest: null, view: 0, media: [],
-        sequences: [], activeSequence: null, _seqN: 0,
+        sequences: [], activeSequence: null, openSequences: [], _seqN: 0,
     });
     veBuildHeads();
     veUpdateUndo();
     $ve('ve-empty').hidden = true;
     $ve('ve-proxy-badge').hidden = true;
+    veOnboardingRender();
     veLoading('Analisando vídeo...', 5);
     $ve('ve-export-btn').disabled = true;
     veUpdateTitle();
@@ -4141,7 +4525,7 @@ function veInitEvents() {
         thumb.setPointerCapture(e.pointerId);
         const x0 = e.clientX, v0 = VE.view;
         const move = ev => {
-            VE.view = v0 + (ev.clientX - x0) / bar.clientWidth * VE.dur;
+            VE.view = v0 + (ev.clientX - x0) / bar.clientWidth * veNavDur();
             veClampView();
             veDraw();
         };
@@ -4152,7 +4536,7 @@ function veInitEvents() {
     bar.addEventListener('pointerdown', e => {
         if (e.target !== bar || !VE.ready) return;
         const r = bar.getBoundingClientRect();
-        VE.view = (e.clientX - r.left) / r.width * VE.dur - veVisibleDur() / 2;
+        VE.view = (e.clientX - r.left) / r.width * veNavDur() - veVisibleDur() / 2;
         veClampView();
         veDraw();
     });
@@ -4248,15 +4632,18 @@ function veOnKey(e) {
         orig(toolId);
         document.body.classList.toggle('ve-focus', toolId === 'video-cutter');
         if (typeof vedEditorVisible === 'function') vedEditorVisible(toolId === 'video-cutter');
-        if (toolId === 'video-cutter') setTimeout(() => { if (VE.ready) veSyncZoomSlider(); veDraw(); }, 30);
+        if (toolId === 'video-cutter') setTimeout(() => { veOnboardingRender(); if (VE.ready) veSyncZoomSlider(); veDraw(); }, 30);
     };
     switchTool = window.switchTool;
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
     veLoadLayout();
+    veCacheUpdateUi();
+    veOnboardingRender();
     veBuildHeads();
     veInitEvents();
+    $ve('ve-seq-tabs')?.addEventListener('click', veSeqTabClick);
     veSetTool('select');
     veSyncVinculo();
     veDraw();

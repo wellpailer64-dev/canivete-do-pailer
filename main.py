@@ -8,6 +8,8 @@ import sys
 import threading
 import atexit
 import shutil
+import tempfile
+import hashlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # =========================
@@ -845,6 +847,28 @@ def ve_project_open(path=None):
         dados, faltando = projeto.abrir(path)
         return {"success": True, "path": os.path.abspath(path), "name": os.path.basename(path),
                 "data": dados, "missing": faltando}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def ve_project_thumb(path):
+    """Gera uma miniatura leve do vídeo principal de um projeto recente."""
+    from Functions import projeto
+    try:
+        path = os.path.abspath(path or "")
+        if not os.path.isfile(path):
+            return {"success": False, "error": "Projeto não encontrado"}
+        dados, faltando = projeto.abrir(path)
+        video = dados.get("video")
+        if not video or video in faltando or not os.path.isfile(video):
+            return {"success": False, "error": "Vídeo do projeto não encontrado"}
+        from Functions.video_cutter import probe, gerar_thumbs
+        info = probe(video)
+        pasta = os.path.join(tempfile.gettempdir(), "canivete_editor_recentes",
+                             hashlib.sha1(path.encode("utf-8", "ignore")).hexdigest()[:16])
+        os.makedirs(pasta, exist_ok=True)
+        thumbs = gerar_thumbs(video, float(info.get("duration") or dados.get("dur") or 1), pasta, 1)
+        return {"success": True, "url": thumbs[0]["url"] if thumbs else "", "video": video}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2480,6 +2504,9 @@ class ApiBridge:
 
     def ve_project_open(self, path=None):
         return ve_project_open(path)
+
+    def ve_project_thumb(self, path):
+        return ve_project_thumb(path)
 
     def converter_imagem(self, folder_path, output_format):
         return converter_imagem(folder_path, output_format)

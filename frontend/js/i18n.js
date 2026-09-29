@@ -347,6 +347,7 @@ const I18N_EN = {
     'Transições de vídeo': 'Video transitions',
     'Dobrar': 'Fold', 'Potência constante': 'Constant Power', 'Esse clipe não tem som': "This clip has no sound",
     'Selecione a ponta de um clipe com som (ou o clipe) e aperte Ctrl+Shift+D': 'Select the edge of a clip with sound (or the clip) and press Ctrl+Shift+D',
+    'Selecione a ponta de um clipe com som (ou o clipe) e aperte Ctrl+Shift+D / Ctrl+Shift+9': 'Select the edge of a clip with sound (or the clip) and press Ctrl+Shift+D / Ctrl+Shift+9',
     'Selecione a ponta de um clipe (ou o clipe) e aperte Ctrl+D': 'Select the edge of a clip (or the clip) and press Ctrl+D',
     'Sem mídia sobrando para a transição': 'Not enough extra media for the transition',
     'Clique marca como a do Ctrl+D · arraste até o corte entre dois clipes (ou o início/fim de um clipe) · duplo clique põe na entrada do clipe selecionado':
@@ -362,7 +363,13 @@ const I18N_EN = {
     'Passe o mouse para ver o exemplo. Arraste até o corte entre dois clipes (ou o início/fim de um clipe); a borda do bloco na timeline muda a duração.':
         'Hover to see the example. Drag onto the cut between two clips (or the start/end of a clip); the block edge on the timeline changes its duration.',
     'Arraste uma transição do painel Transições até o corte · arraste a borda do bloco para mudar a duração':
-        'Drag a transition from the Transitions panel onto the cut · drag the block edge to change its duration', 'Dissolução cruzada': 'Cross Dissolve', 'Empurrar': 'Push',
+        'Drag a transition from the Transitions panel onto the cut · drag the block edge to change its duration', 'Dissolução cruzada': 'Cross Dissolve',
+    'Cross fade': 'Cross fade', 'Fade para preto': 'Fade to Black', 'Velocidade': 'Speed', 'Direção': 'Direction',
+    'Rápida': 'Fast', 'Média': 'Medium', 'Lenta': 'Slow', 'Esquerda': 'Left', 'Direita': 'Right', 'Cima': 'Up', 'Baixo': 'Down',
+    'Diagonal cima-esquerda': 'Diagonal up-left', 'Diagonal cima-direita': 'Diagonal up-right',
+    'Diagonal baixo-esquerda': 'Diagonal down-left', 'Diagonal baixo-direita': 'Diagonal down-right',
+    'Editando a transição selecionada na timeline': 'Editing the selected transition on the timeline',
+    'Define como as próximas transições do painel serão aplicadas': 'Defines how the next transitions from the panel will be applied', 'Empurrar': 'Push',
     'Deslizar': 'Slide', 'Puxar (zoom)': 'Pull (zoom)', 'Transição apagada': 'Transition deleted',
     'Arraste até o corte entre dois clipes (ou o início/fim de um clipe) · duplo clique põe na entrada do clipe selecionado':
         'Drag onto the cut between two clips (or the start/end of a clip) · double-click adds it to the start of the selected clip',
@@ -497,7 +504,7 @@ const I18N_RE = [
     [/^Cor da tela: (#[0-9a-f]{6})$/i, 'Screen color: $1'],
     [/^(.+): (\d+) transiç(?:ões aplicadas|ão aplicada)$/, (m, n, k) => `${i18nT(n)}: ${k} transition${k > 1 ? 's' : ''} applied`],
     [/^(.+) não se aplica a uma camada de ajuste$/, (m, n) => `${i18nT(n)} doesn't apply to an adjustment layer`],
-    [/^(Dissolução cruzada|Empurrar|Deslizar|Puxar \(zoom\)|Pop) \(([^)]+)\)( · encurtada: pouca mídia sobrando)?$/,
+    [/^(Dissolução cruzada|Cross fade|Fade para preto|Empurrar|Deslizar|Puxar \(zoom\)|Pop|Dobrar) \(([^)]+)\)( · encurtada: pouca mídia sobrando)?$/,
         (m, n, d, e) => `${i18nT(n)} (${d})` + (e ? ' · shortened: little extra media' : '')],
     [/^(\d+) clipes (movidos|duplicados)$/, (m, n, o) => `${n} clips ${o === 'movidos' ? 'moved' : 'duplicated'}`],
     [/^(\d+) clipes apagados( \(os de trilhas bloqueadas ficaram\))?$/, (m, n, b) => `${n} clips deleted` + (b ? ' (the ones on locked tracks stayed)' : '')],

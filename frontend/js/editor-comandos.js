@@ -121,6 +121,8 @@ function veTeclaCombo(e) {
     let simbolo = false;
     if (/^Key[A-Z]$/.test(e.code)) k = e.code.slice(3);
     else if (/^Digit\d$/.test(e.code)) k = e.code.slice(5);
+    else if (/^Numpad\d$/.test(e.code)) k = e.code.slice(6);
+    else if (e.ctrlKey && e.shiftKey && (k === ')' || k === '(')) k = '9';
     else if (k === 'Dead' && e.code === 'Backquote') { k = "'"; simbolo = true; }   // ' no ABNT2 internacional
     else if (VE_TECLA_NOMES[k.toLowerCase()]) k = VE_TECLA_NOMES[k.toLowerCase()];
     else if (/^F\d{1,2}$/.test(k)) { /* F1..F12 */ }
