@@ -1224,7 +1224,7 @@ function veMoverGrupo(lista, dt, dtr, alt) {
 function veMarqueeFim(d) {
     const ta = Math.min(d.ta, d.tb), tb = Math.max(d.ta, d.tb);
     const ya = Math.min(d.ya, d.yb), yb = Math.max(d.ya, d.yb);
-    const rows = veTrackRows().filter(r => r.kind !== 'l' && r.y < yb && r.y + r.h > ya);
+    const rows = veTrackRows().filter(r => r.kind !== 'l' && r.kind !== 'k' && r.y < yb && r.y + r.h > ya);
     const toca = (kind, tr) => rows.some(r => r.kind === kind && veTrackIndex(r) === tr);
     const hits = VE.clips.filter(c => !veLocked(c) && c.st < tb && veEnd(c) > ta)
         .map(c => ({ c, v: veOcupaV(c) && toca('v', c.tr), a: veOcupaA(c) && toca('a', c.tr) }))
@@ -2703,7 +2703,9 @@ function veDrawMonitor() {
         } else if (veIsAdj(c)) {
             src = 'ajuste';
         } else if (veIsTexto(c)) {
-            src = veTxCanvas(c, pv * veProps(c).sc / 100).cv;   // desenhado na resolução em que aparece
+            // desenhado na resolução em que aparece; animação letra a letra (editor-txanim.js) enquanto roda
+            const alvoTx = pv * veProps(c).sc / 100;
+            src = (typeof veTxaCanvas === 'function' && veTxaCanvas(c, alvoTx)) || veTxCanvas(c, alvoTx).cv;
         } else if (veIsImage(c)) {
             const m = veMediaOf(c);
             if (m.img && m.img.complete && m.w) src = m.img;
@@ -2749,7 +2751,9 @@ function veDrawMonitor() {
             if (!src) return;
             if (src === 'ajuste') { veAdjDraw(ctx, cv, c, pv); return; }
             const p = veProps(c), sz = veMediaSize(c);
-            if (src !== 'offline') src = veFxRender(c, src, sz, pv * p.sc / 100);   // efeitos rodam antes do movimento (como no Premiere)
+            // texto animado vem com margem em volta (letras que saem da caixa): desenha maior, mesmo centro
+            const pd = src && src._pad || 0, szd = pd ? { w: sz.w + 2 * pd, h: sz.h + 2 * pd } : sz;
+            if (src !== 'offline') src = veFxRender(c, src, szd, pv * p.sc / 100);   // efeitos rodam antes do movimento (como no Premiere)
             ctx.save();
             ctx.globalAlpha = Math.max(0, Math.min(1, p.op / 100));
             ctx.translate(p.x, p.y);
@@ -2760,7 +2764,7 @@ function veDrawMonitor() {
             if (src === 'offline') {
                 ctx.translate(-ax, -ay);
                 veDrawOfflineMedia(ctx, sz.w, sz.h, vePjNome(veMediaOf(c)));
-            } else ctx.drawImage(src, -ax, -ay, sz.w, sz.h);
+            } else ctx.drawImage(src, -ax - pd, -ay - pd, szd.w, szd.h);
             ctx.restore();
         });
     veTxDesenhar(ctx);
@@ -3103,8 +3107,10 @@ function veExportPlanClips() {
             if (veKfOn(c, 'sx')) kf.sx = c.k.sx.map(q => [(q.t - c.s) / veVel(c), q.v, q.i || 'lin', veKfCurve(q)]);
             if (veKfOn(c, 'sy')) kf.sy = c.k.sy.map(q => [(q.t - c.s) / veVel(c), q.v, q.i || 'lin', veKfCurve(q)]);
             const sz = png ? { w: png.w, h: png.h } : veMediaSize(c);
+            // texto animado: lista de quadros (editor-txanim.js), recortada no trecho exportado
+            const seq = png && png.seq ? png.seq : null, sq = seq ? Math.max(0, c.s - (c._o || c).s) : 0;
             return { tipo: veIsAdj(c) ? 'ajuste' : veIsImage(c) ? 'imagem' : 'video', path: png ? png.path : veIsImage(c) || veMid(c) ? m.path || null : null,
-                     st: c.st, s: veIsImage(c) ? 0 : c.s, e: veIsImage(c) ? veLen(c) : c.e,
+                     seq, st: c.st, s: seq ? sq : veIsImage(c) ? 0 : c.s, e: seq ? sq + veLen(c) : veIsImage(c) ? veLen(c) : c.e,
                      sc: p.sc / f, x: p.x, y: p.y, rot: p.rot, op: p.op, kf,
                      fx: veFxExport(c), mw: sz.w, mh: sz.h, v: veVel(c),
                      ox: (veMediaSize(c).w / 2 - veAnc(c, p)[0]) * f, oy: (veMediaSize(c).h / 2 - veAnc(c, p)[1]) * f };
@@ -3163,7 +3169,7 @@ function veLegArrastar(e, t) {
 
 // ── ajuste de duração pelas bordas do clipe ──
 function veEdgeAt(x, row) {
-    if (!row || row.kind === 'l') return null;
+    if (!row || row.kind === 'l' || row.kind === 'k') return null;
     const tr = veTrackIndex(row);
     for (let i = 0; i < VE.clips.length; i++) {
         const c = VE.clips[i];
@@ -3648,7 +3654,9 @@ function veClampView() {
     VE.view = Math.min(Math.max(VE.view, 0), maxView);
 }
 
-function veTracksHeight() { return VE_TRACKS.reduce((a, tr) => a + tr.h, 0); }
+function veTracksHeight() {
+    return VE_TRACKS.reduce((a, tr) => a + tr.h, 0) + (typeof veKlAltura === 'function' ? veKlAltura() : 0);
+}
 
 function veClampVScroll() {
     const max = Math.max(0, veTracksHeight() - (veCanvasHeight() - VE_RULER));
@@ -3735,7 +3743,7 @@ function veBuildHeads() {
             <div class="ve-head-row">${lock}<b>${tr.id}</b>${extra}</div>
             ${tr.main && tr.h >= 40 ? `<span>${tr.kind === 'v' ? 'Vídeo' : 'Áudio'}</span>` : ''}
             <i class="ve-head-grip" data-grip="${i}" title="Arraste para aumentar ou diminuir a trilha"></i>
-        </div>`;
+        </div>` + (typeof veKlHeadsHtml === 'function' ? veKlHeadsHtml(tr) : '');
     }).join('');
 }
 
@@ -3761,14 +3769,22 @@ function veSyncHeads() {
     if (box) box.style.transform = `translateY(${-VE.vs}px)`;
 }
 
-// Geometria das trilhas no canvas (y já descontada a rolagem vertical)
+// Geometria das trilhas no canvas (y já descontada a rolagem vertical). Faixas de quadros-chave abertas
+// (editor-keyframes.js, kind 'k') entram logo abaixo da trilha de vídeo do clipe selecionado.
 function veTrackRows() {
     let y = VE_RULER - VE.vs;
-    return VE_TRACKS.map(tr => { const r = { ...tr, y, h: tr.h }; y += tr.h; return r; });
+    const c = typeof veKlClip === 'function' ? veKlClip() : null;
+    const out = [];
+    VE_TRACKS.forEach(tr => {
+        out.push({ ...tr, y, h: tr.h });
+        y += tr.h;
+        if (c && tr.kind === 'v' && tr.id === 'V' + (c.tr + 1)) veKlRows(c).forEach(l => { out.push({ ...l, y }); y += l.h; });
+    });
+    return out;
 }
 
-// V1/A1 -> 0, V2/A2 -> 1 ...
-function veTrackIndex(row) { return (+row.id.slice(1) || 1) - 1; }
+// V1/A1 -> 0, V2/A2 -> 1 ... (faixa de quadros-chave: a trilha do clipe dela)
+function veTrackIndex(row) { return row.kind === 'k' ? row.tr : (+row.id.slice(1) || 1) - 1; }
 
 function veRowAt(y) {
     if (y <= VE_RULER) return null;
@@ -3844,6 +3860,7 @@ function veRender() {
         canvas.width = Math.round(W * dpr);
         canvas.height = Math.round(H * dpr);
     }
+    if (typeof veKlSync === 'function') veKlSync();   // faixas de quadros-chave (cabeçalhos e valores)
     veClampVScroll();
     veSyncHeads();
     const ctx = canvas.getContext('2d');
@@ -4090,6 +4107,8 @@ function veRender() {
         }
     });
     veTransDesenhar(ctx, rows);
+    if (typeof veTxaDesenharTl === 'function') veTxaDesenharTl(ctx, rows, X);   // entrada/saída do texto animado
+    if (typeof veKlDesenhar === 'function') veKlDesenhar(ctx, rows, X, W);
     ctx.restore();
 
     // legendas (linha LEG)
@@ -4185,9 +4204,12 @@ function veDrawKfMarks(ctx, c, i, st, y) {
         let x = (t - c.st + st - VE.view) * VE.pps;
         if (d && Math.abs(t - d.t0) < 1e-3) x = (d.t1 - VE.view) * VE.pps;
         const naAgulha = sel && Math.abs(t - VE.playhead) < veFrame() / 2;
+        // ◆ selecionado (editor-keyframes.js: Delete apaga só ele): contorno branco
+        const kSel = sel && typeof veKlTemSel === 'function' && veKlTemSel() &&
+            VEKL.sel.some(s => Math.abs(veTlAt(c, s.t) - t) < veFrame() / 2);
         ctx.fillStyle = naAgulha ? '#fbbf24' : sel ? '#F97316' : 'rgba(255,255,255,0.7)';
-        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = kSel ? '#fff' : 'rgba(0,0,0,0.7)';
+        ctx.lineWidth = kSel ? 2 : 1;
         ctx.beginPath();
         ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y);
         ctx.closePath();
@@ -4290,6 +4312,7 @@ function veRefresh() {
     veRenderProps();
     veSeqTabsRender();
     if (typeof veTrRenderControls === 'function') veTrRenderControls();
+    if (typeof veTxaRenderControls === 'function') veTxaRenderControls();
     veDrawMonitor();
     veDraw();
 }
@@ -5190,6 +5213,8 @@ function veOnKey(e) {
     }
     if (!$ve('ve-gain').hidden) return;   // a caixa de ganho trata as próprias teclas
     if (VEAT.aberto) return;               // janela Atalhos do teclado aberta (ela grava as teclas)
+    // P/S/R/T/U com clipe selecionado, Delete/Ctrl+C/Ctrl+V com quadros-chave selecionados (editor-keyframes.js)
+    if (typeof veKlTecla === 'function' && veKlTecla(e)) return;
     // as teclas de cada ação (padrão ou as do usuário) ficam em editor-comandos.js
     veExecTecla(e);
 }

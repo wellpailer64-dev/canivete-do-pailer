@@ -141,6 +141,9 @@ async function veTxPngs(filtro) {
         const p = veStaticProps(c);
         const escalas = [p.sc].concat(veKfOn(c, 'sc') ? c.k.sc.map(q => q.v) : []);
         const f = Math.min(4, Math.max(1, Math.max(...escalas) / 100));
+        if (typeof veTxaTem === 'function' && veTxaTem(c)) {
+            try { mapa.set(c, await veTxaExportar(c, Math.min(f, 2))); continue; } catch (e) { /* cai no PNG parado */ }
+        }
         const d = veTxDesenho(veTxt(c), f);
         const r = await window.pywebview.api.ve_salvar_png(d.cv.toDataURL('image/png'));
         if (r && r.success) mapa.set(c, { path: r.path, f, w: d.cv.width, h: d.cv.height });

@@ -449,6 +449,29 @@ def ve_salvar_png(dados):
         return {"success": False, "error": str(e)}
 
 
+def ve_txa_lista(entradas):
+    """Texto animado do editor: [[png, duração s], ...] → lista do demuxer concat (a camada do texto na exportação)."""
+    try:
+        import uuid
+        from Functions import video_cutter as vc
+        linhas = ["ffconcat version 1.0"]
+        ultimo = None
+        for arq, dur in entradas or []:
+            if not arq or not os.path.isfile(arq):
+                continue
+            ultimo = arq.replace("\\", "/").replace("'", "'\\''")
+            linhas += [f"file '{ultimo}'", f"duration {max(0.001, float(dur)):.6f}"]
+        if not ultimo:
+            return {"success": False, "error": "sem quadros"}
+        linhas.append(f"file '{ultimo}'")   # o concat ignora a duração do último arquivo: repete ele
+        path = os.path.join(vc._work_dir(), f"texto_{uuid.uuid4().hex[:10]}.ffconcat")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("\n".join(linhas) + "\n")
+        return {"success": True, "path": path}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def ve_salvar_legenda(itens, formato="srt", nome="legendas", pasta=""):
     """Pergunta onde salvar e grava as legendas/transcrição no formato pedido (srt, vtt, ass, ssa, sbv, txt)."""
     from Functions import legendas_formatos as lf
@@ -2513,6 +2536,9 @@ class ApiBridge:
 
     def ve_salvar_png(self, dados):
         return ve_salvar_png(dados)
+
+    def ve_txa_lista(self, entradas):
+        return ve_txa_lista(entradas)
 
     def video_cutter_audio_fonte(self):
         return video_cutter_audio_fonte()

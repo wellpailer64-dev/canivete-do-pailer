@@ -46,6 +46,9 @@ const VE_CMDS = [
     { id: 'aparar-fim', grupo: 'clipe', nome: 'Aparar fim até a agulha', teclas: ['W'], fn: () => veRippleTrimEnd() },
     { id: 'trilha-acima', grupo: 'clipe', nome: 'Mover para a trilha de cima', teclas: ['Alt+Up'], sep: true, fn: () => veTrocarTrilha(1), pode: veSel },
     { id: 'trilha-abaixo', grupo: 'clipe', nome: 'Mover para a trilha de baixo', teclas: ['Alt+Down'], fn: () => veTrocarTrilha(-1), pode: veSel },
+    { id: 'easy-ease', grupo: 'clipe', sep: true, nome: 'Easy Ease (quadros-chave)', teclas: ['F9'], fn: () => veKlEasy('ambos') },
+    { id: 'easy-ease-in', grupo: 'clipe', nome: 'Easy Ease de entrada', teclas: ['Shift+F9'], fn: () => veKlEasy('in') },
+    { id: 'easy-ease-out', grupo: 'clipe', nome: 'Easy Ease de saída', teclas: ['Ctrl+Shift+F9'], fn: () => veKlEasy('out') },
     { id: 'vinculo', grupo: 'clipe', nome: 'Seleção vinculada', teclas: [], sep: true, fn: () => veToggleVinculo(), marcado: () => VE.vinculo },
 
     // ── Sequência ──

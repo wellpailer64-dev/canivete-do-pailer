@@ -1376,6 +1376,8 @@ def _normalizar_camadas(camadas, path_video):
                 "mw": _num(c.get("mw"), 2, 20000, 1920), "mh": _num(c.get("mh"), 2, 20000, 1080),
                 # ponto de ancoragem: do ponto até o centro da mídia, em px da mídia (0 = âncora no centro)
                 "ox": _num(c.get("ox"), -1e5, 1e5, 0), "oy": _num(c.get("oy"), -1e5, 1e5, 0),
+                # texto animado: lista de quadros PNG (demuxer concat) no lugar da imagem parada
+                "seq": c.get("seq") if tipo == "imagem" and c.get("seq") and os.path.isfile(str(c.get("seq"))) else None,
             }
         except Exception:
             continue
@@ -1597,7 +1599,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                            f":eof_action=pass:format=auto[o{n}]")
             vf = f"[o{n}]"
             continue
-        if c["tipo"] == "imagem":
+        if c["tipo"] == "imagem" and c.get("seq"):
+            cmd += ["-f", "concat", "-safe", "0", "-i", c["seq"]]
+        elif c["tipo"] == "imagem":
             cmd += ["-loop", "1", "-framerate", fps, "-t", _tempo_ffmpeg(c["dur"]), "-i", c["path"]]
         else:
             cmd += ["-i", c["path"] or path]   # o arquivo do clipe; trim no grafo evita flash preto em cortes
@@ -1636,7 +1640,12 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         ordem = [giro, opac, escala] if ("sc" in kf or sx or sy) else [escala, giro, opac]
         efeitos = _filtros_fx(c["fx"], c["mw"], c["mh"], f"l{n}")
         # velocidade do clipe (como no Premiere): o tempo da fonte é comprimido/esticado antes de tudo
-        if c["tipo"] == "imagem":
+        if c["tipo"] == "imagem" and c.get("seq"):
+            # quadros do texto animado: o trecho do clipe que entra na exportação
+            src = (f"[{idx}:v:0]trim=start={_tempo_ffmpeg(c['s'])}:end={_tempo_ffmpeg(c['s'] + c['fonte'])},"
+                   f"setpts=PTS-STARTPTS,")
+            vel = ""
+        elif c["tipo"] == "imagem":
             src = f"[{idx}:v:0]"
             vel = ""
         else:

@@ -1451,3 +1451,56 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-render-status button { display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; }
 .ve-render-status button:hover { background: rgba(255, 255, 255, .1); }
 .ve-render-status .i { font-size: 12px; }
+
+/* faixas de quadros-chave na timeline (editor-keyframes.js): cabeçalho largo enquanto abertas */
+.ve-tl-body.kl-aberto { grid-template-columns: 250px minmax(0, 1fr); }
+.ve-head-k { padding: 0 4px 0 12px; background: #0f1117; border-bottom: 1px solid #1b1e27; justify-content: center; }
+.ve-kl-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.ve-kl-sw {
+    display: grid; place-items: center; width: 18px; height: 18px; padding: 0; flex-shrink: 0;
+    border: 0; border-radius: 4px; background: transparent; color: var(--ve-faint); cursor: pointer;
+}
+.ve-kl-sw svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+.ve-kl-sw:hover { background: var(--ve-panel); color: var(--ve-text); }
+.ve-head-k.anim .ve-kl-sw { color: var(--ve-accent); }
+.ve-kl-nome { flex: 1; min-width: 0; font-size: 11px; color: var(--ve-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ve-head-k.anim .ve-kl-nome { color: var(--ve-text); }
+.ve-kl-val {
+    min-width: 38px; padding: 0 2px; text-align: right; font: 600 11px var(--ve-mono); color: #60a5fa;
+    cursor: ew-resize; border-bottom: 1px dotted rgba(96, 165, 250, .5); white-space: nowrap;
+}
+.ve-kl-val:hover { color: #93c5fd; }
+.ve-kl-input { width: 52px; height: 17px; padding: 0 3px; border: 1px solid var(--ve-accent); border-radius: 3px; background: var(--ve-bg); color: var(--ve-text); font: 600 11px var(--ve-mono); outline: none; }
+.ve-kl-nav { display: flex; align-items: center; gap: 0; flex-shrink: 0; }
+.ve-kl-nav button {
+    display: grid; place-items: center; width: 15px; height: 18px; padding: 0; border: 0; border-radius: 3px;
+    background: transparent; color: var(--ve-faint); cursor: pointer; font: 600 13px/1 var(--ve-ui);
+}
+.ve-kl-nav button:hover { background: var(--ve-panel); color: var(--ve-text); }
+.ve-kl-add i { width: 7px; height: 7px; transform: rotate(45deg); border: 1.5px solid currentColor; border-radius: 1px; }
+.ve-kl-add.on { color: var(--ve-accent); }
+.ve-kl-add.on i { background: currentColor; }
+body.ve-kl-scrub, body.ve-kl-scrub * { cursor: ew-resize !important; }
+
+/* painel Transições: seção de animação de texto (editor-txanim.js) */
+.ve-txa-sec { flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; max-height: 58%; }
+.ve-txa-sec[hidden] { display: none; }
+.ve-txa-head { padding: 8px 10px 2px; font: 700 10.5px var(--ve-ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ve-faint); }
+.ve-txa-head small { text-transform: none; letter-spacing: 0; font-weight: 500; margin-left: 4px; }
+.ve-txa-grid { flex: 1 1 auto; min-height: 90px; }
+.ve-txa-card canvas { border-color: #f472b655; }
+.ve-txa-card:hover canvas { border-color: #f472b6; }
+.ve-txa-controls { flex-shrink: 0; margin: 0 8px 4px; padding: 6px 8px; border: 1px solid var(--ve-line-2); border-radius: 7px; background: var(--ve-panel-2); display: flex; flex-direction: column; gap: 6px; }
+.ve-txa-controls:empty { display: none; }
+.ve-txa-dica { font-size: 11px; color: var(--ve-faint); }
+.ve-txa-bloco { display: flex; flex-direction: column; gap: 4px; }
+.ve-txa-bloco + .ve-txa-bloco { border-top: 1px solid var(--ve-line); padding-top: 6px; }
+.ve-txa-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ve-dim); min-width: 0; }
+.ve-txa-row b { width: 52px; flex-shrink: 0; color: var(--ve-text); font-size: 11.5px; }
+.ve-txa-row select, .ve-txa-row input[type=number] {
+    min-width: 0; flex: 1; height: 22px; padding: 0 4px; border-radius: 4px; border: 1px solid var(--ve-line-2);
+    background: var(--ve-bg); color: var(--ve-text); font: 11px var(--ve-ui);
+}
+.ve-txa-row input[type=number] { flex: 0 0 52px; font-family: var(--ve-mono); }
+.ve-txa-row input[type=range] { flex: 1; min-width: 50px; accent-color: #f472b6; }
+.ve-txa-row em { font-style: normal; color: var(--ve-faint); margin-left: -3px; }
