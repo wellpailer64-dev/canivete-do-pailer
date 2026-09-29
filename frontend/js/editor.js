@@ -73,8 +73,9 @@ function veMixClipes() {
         .filter(c => !veIsImage(c) && !veTrkMuted(c.tr) && c.e - c.s > 0.005 && veTemSom(c))
         .map(c => {
             const f = fd.get(c) || c;
+            const afx = typeof veAfxExport === 'function' ? veAfxExport(c) : [];
             return [+f.st.toFixed(5), +f.s.toFixed(5), +f.e.toFixed(5), +(c.g || 0).toFixed(2), veMid(c),
-                    +veVel(c).toFixed(4), c.tom === false ? 0 : 1, +(f.fi || 0).toFixed(4), +(f.fo || 0).toFixed(4)];
+                    +veVel(c).toFixed(4), c.tom === false ? 0 : 1, +(f.fi || 0).toFixed(4), +(f.fo || 0).toFixed(4), afx];
         })
         .sort((a, b) => a[0] - b[0]);
 }
@@ -889,9 +890,35 @@ function veMoveClip(i, tr, st) {
     veAfterEdit(VE.playhead);
 }
 
+function veMesmoPontoDeEdicao(a, b) {
+    return Math.abs(veSnapFrame(a) - veSnapFrame(b)) < veFrame() * 0.5;
+}
+
+function veClipesDireitaDoCorte(t) {
+    const base = VE.clips.filter(c => veMesmoPontoDeEdicao(c.st, t) &&
+        VE.clips.some(o => o !== c && o.tr === c.tr && veConflita(o, c) && veMesmoPontoDeEdicao(veEnd(o), t)));
+    if (!VE.vinculo) return base;
+    const alvos = new Set(base);
+    base.forEach(c => veVinculados(c).forEach(o => { if (veMesmoPontoDeEdicao(o.st, t)) alvos.add(o); }));
+    return [...alvos];
+}
+
+function veRippleTrimStartNoCorte(t) {
+    const alvos = veClipesDireitaDoCorte(t);
+    if (!alvos.length) return null;
+    const bloqueados = alvos.filter(veLocked), livres = alvos.filter(c => !veLocked(c));
+    if (!livres.length || (VE.vinculo && bloqueados.length)) { veAvisoBloqueio(); return true; }
+    const f = veFrame();
+    if (livres.some(c => veLen(c) <= f + VE_EPS)) { veToast('Limite do clipe atingido'); return true; }
+    veRippleRemove(t, t + f, 'Aparado 1 quadro no corte');
+    return true;
+}
+
 // Q: apaga do corte anterior (qualquer trilha) até a agulha; W: da agulha até o próximo corte
 function veRippleTrimStart() {
     const t = veSnapFrame(VE.playhead);
+    const noCorte = veRippleTrimStartNoCorte(t);
+    if (noCorte != null) return;
     const p = [...veEditPoints()].reverse().find(x => x < t - veFrame() * 0.5);
     if (p == null) { veToast('Nada antes da agulha'); return; }
     veRippleRemove(p, t, 'Removido até a agulha');
@@ -1192,11 +1219,11 @@ function veOpenGain() {
     if (veLocked(VE.clips[VE.sel])) { veAvisoBloqueio(); return; }
     if (!VE.info || !VE.info.has_audio) { veToast('Este vídeo não tem som'); return; }
     if (VE.playing) veStop();
-    $ve('ve-gain-cur').textContent = 'Ganho atual do clipe: ' + veFmtDb(VE.clips[VE.sel].g);
+    $ve('ve-gain-cur').innerHTML = `Ganho atual do clipe: <strong>${veFmtDb(VE.clips[VE.sel].g)}</strong>`;
     const inp = $ve('ve-gain-input');
     inp.value = '';
     $ve('ve-gain').hidden = false;
-    inp.focus();   // foco imediato: dá para digitar logo depois do G
+    requestAnimationFrame(() => { inp.focus({ preventScroll: true }); inp.select(); });
 }
 
 function veCloseGain() {
@@ -2324,7 +2351,7 @@ function veExportPlanClips() {
                      ox: (veMediaSize(c).w / 2 - veAnc(c, p)[0]) * f, oy: (veMediaSize(c).h / 2 - veAnc(c, p)[1]) * f };
         });
     // o arquivo de cada clipe com som (null = o vídeo aberto)
-    const mix = veMixClipes().map(([st, s0, e0, g, id, v, tom, fi, fo]) => [st, s0, e0, g, id ? VE.media[id].path : null, v, tom, fi, fo]);
+    const mix = veMixClipes().map(([st, s0, e0, g, id, v, tom, fi, fo, afx]) => [st, s0, e0, g, id ? VE.media[id].path : null, v, tom, fi, fo, afx]);
     return { base, audio, camadas, mix };
 }
 
@@ -3238,19 +3265,25 @@ function veRenderClips() {
     $ve('ve-sum-cut').textContent = veHuman(Math.max(0, VE.srcDur - VE.dur));
 
     const c0 = VE.clips[0];
-    if (VE.clips.length === 1 && c0.st < 1e-3 && c0.tr === 0 && !c0.g && !c0.p && !c0.k && !c0.fx && c0.s < 1e-3 && Math.abs(c0.e - VE.srcDur) < 1e-3) {
+    if (VE.clips.length === 1 && c0.st < 1e-3 && c0.tr === 0 && !c0.g && !c0.p && !c0.k && !c0.fx && !c0.afx && c0.s < 1e-3 && Math.abs(c0.e - VE.srcDur) < 1e-3) {
         box.innerHTML = '<div class="ve-clips-empty">Nenhum corte ainda.<br>Aperte <b>\'</b> (ou <b>S</b>) para cortar na agulha. <b>Q</b> / <b>W</b> apagam antes / depois da agulha até o corte mais próximo.<br>Selecione um clipe e aperte <b>D</b> para apagá-lo.</div>';
         return;
     }
-    box.innerHTML = VE.clips.map((c, i) => `
+    box.innerHTML = VE.clips.map((c, i) => {
+        const vfx = typeof veHasFx === 'function' && veHasFx(c);
+        const afx = typeof veHasAfx === 'function' && veHasAfx(c);
+        const vfxBadge = vfx ? ` <span class="ve-clip-fx" title="${veEsc(c.fx.map(f => VE_FX[f.t]?.nome).join(', '))}">fx</span>` : '';
+        const afxBadge = afx ? ` <span class="ve-clip-fx" title="${veEsc(c.afx.map(f => VE_AFX[f.t]?.nome).join(', '))}">aud</span>` : '';
+        return `
         <div class="ve-clip${i === VE.sel ? ' sel' : ''}" data-i="${i}">
             <div class="ve-clip-bar"${veCor(c) ? ` style="background:${veCor(c)}"` : ''}></div>
             <div>
-                <div class="ve-clip-name">${veNomeClipe(c)} ${i + 1} <span class="ve-clip-tr">V${c.tr + 1}</span>${c.g ? ` <span class="ve-clip-db">${veFmtDb(c.g)}</span>` : ''}${veHasFx(c) ? ` <span class="ve-clip-fx" title="${veEsc(c.fx.map(f => VE_FX[f.t]?.nome).join(', '))}">fx</span>` : ''}</div>
+                <div class="ve-clip-name">${veNomeClipe(c)} ${i + 1} <span class="ve-clip-tr">V${c.tr + 1}</span>${c.g ? ` <span class="ve-clip-db">${veFmtDb(c.g)}</span>` : ''}${vfxBadge}${afxBadge}</div>
                 <div class="ve-clip-time">${veShort(c.st)} → ${veShort(veEnd(c))} · ${veShort(veLen(c))}</div>
             </div>
             <button class="ve-clip-act" data-act="${i}" title="Apagar clipe (D)"><svg class="i"><use href="#i-trash"/></svg></button>
-        </div>`).join('');
+        </div>`;
+    }).join('');
 }
 
 function veRefresh() {

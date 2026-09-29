@@ -561,7 +561,17 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 /* ---------- Ganho (G) e lista de clipes ---------- */
 .ve-gain-box { width: min(360px, 92vw); }
 .ve-gain-input { width: 100%; font: 600 16px var(--ve-mono); text-align: center; }
-.ve-gain-cur { margin-top: 10px; font-size: 12px; color: var(--ve-dim); text-align: center; }
+.ve-gain-cur {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border: 1px solid rgba(251, 191, 36, .35);
+    border-radius: 6px;
+    background: rgba(251, 191, 36, .08);
+    font-size: 12px;
+    color: var(--ve-dim);
+    text-align: center;
+}
+.ve-gain-cur strong { color: #fbbf24; font: 700 14px var(--ve-mono); }
 .ve-clip-tr { font: 600 10px var(--ve-mono); color: var(--ve-faint); margin-left: 4px; }
 .ve-clip-db { font: 600 10px var(--ve-mono); color: #fbbf24; margin-left: 2px; }
 .ve-clip-fx { font: 700 9px var(--ve-mono); color: #1a0d02; background: var(--ve-accent); border-radius: 3px; padding: 0 3px; margin-left: 2px; }

@@ -799,8 +799,8 @@ def _opacidade_animada(pts, dur, fps, nome, inicio=0.0):
 # conformado): soma com o ganho em dB, posições em amostras de 48 kHz.
 
 def _normalizar_mix(clipes, dur_fonte):
-    """[[st, s, e, ganho_db, arquivo?, velocidade?, manter_tom?], ...] da timeline → tuplas
-    (st, s, e, ganho, arquivo, velocidade, manter_tom). arquivo None = o vídeo aberto (limitado à duração dele);
+    """[[st, s, e, ganho_db, arquivo?, velocidade?, manter_tom?, fi?, fo?, efeitos?], ...] da timeline → tuplas
+    (st, s, e, ganho, arquivo, velocidade, manter_tom, fi, fo, efeitos). arquivo None = o vídeo aberto (limitado à duração dele);
     senão um áudio extra solto na timeline. Na timeline o clipe dura (e - s) / velocidade."""
     out = []
     for c in clipes or []:
@@ -812,6 +812,7 @@ def _normalizar_mix(clipes, dur_fonte):
             tom = not (len(c) > 6 and c[6] in (0, False))
             fi = max(0.0, float(c[7])) if len(c) > 7 and c[7] else 0.0   # fades (Potência constante), em s da timeline
             fo = max(0.0, float(c[8])) if len(c) > 8 and c[8] else 0.0
+            afx = _normalizar_afx(c[9] if len(c) > 9 else None)
         except Exception:
             continue
         if arq is not None and not os.path.isfile(str(arq)):
@@ -820,7 +821,7 @@ def _normalizar_mix(clipes, dur_fonte):
         if arq is None and dur_fonte:
             e0 = min(float(dur_fonte), e0)
         if st >= 0 and e0 - s0 > 0.005:
-            out.append((st, s0, e0, max(-60.0, min(30.0, g)), arq, vel, tom, fi, fo))
+            out.append((st, s0, e0, max(-60.0, min(30.0, g)), arq, vel, tom, fi, fo, afx))
     return out
 
 
@@ -844,6 +845,72 @@ def _filtro_velocidade(vel, tom):
     return "," + ",".join(partes)
 
 
+def _afx_num(v, padrao=0.0):
+    try:
+        return float(v)
+    except Exception:
+        return padrao
+
+
+def _afx_lim(v, a, b, padrao=0.0):
+    return max(a, min(b, _afx_num(v, padrao)))
+
+
+def _normalizar_afx(efeitos):
+    out = []
+    for f in efeitos or []:
+        if not isinstance(f, dict):
+            continue
+        t, v = str(f.get("t") or ""), f.get("v") or {}
+        if not isinstance(v, dict):
+            v = {}
+        if t == "denoise":
+            amt = _afx_lim(v.get("amt"), 0.0, 100.0, 35.0)
+            if amt > 0:
+                out.append((t, {"amt": amt, "floor": _afx_lim(v.get("floor"), -75.0, -25.0, -50.0)}))
+        elif t == "limiter":
+            out.append((t, {"ceil": _afx_lim(v.get("ceil"), -12.0, 0.0, -1.0),
+                            "rel": _afx_lim(v.get("rel"), 10.0, 500.0, 80.0)}))
+        elif t == "dereverb":
+            amt = _afx_lim(v.get("amt"), 0.0, 100.0, 40.0)
+            if amt > 0:
+                out.append((t, {"amt": amt}))
+        elif t == "reverb":
+            mix = _afx_lim(v.get("mix"), 0.0, 60.0, 18.0)
+            if mix > 0:
+                out.append((t, {"mix": mix, "size": _afx_lim(v.get("size"), 0.0, 100.0, 45.0)}))
+        elif t == "eq":
+            vals = {k: _afx_lim(v.get(k), -12.0, 12.0, 0.0) for k in ("lo", "mid", "hi")}
+            if any(abs(x) > 0.01 for x in vals.values()):
+                out.append((t, vals))
+    return out
+
+
+def _filtros_afx(efeitos):
+    fs = []
+    for t, v in efeitos or []:
+        if t == "denoise":
+            nr = min(97.0, max(0.01, 4.0 + v["amt"] * 0.25))
+            fs.append(f"afftdn=nr={nr:.3f}:nf={v['floor']:.3f}:tn=1")
+        elif t == "limiter":
+            lim = math.pow(10.0, v["ceil"] / 20.0)
+            fs.append(f"alimiter=limit={lim:.6f}:attack=2:release={v['rel']:.3f}:level=false")
+        elif t == "dereverb":
+            a = v["amt"] / 100.0
+            fs.append(f"dialoguenhance=original={max(0.35, 1.0 - a * 0.45):.4f}:enhance={1.0 + a * 1.6:.4f}:voice={2.0 + a * 20.0:.4f}")
+        elif t == "reverb":
+            wet, size = v["mix"] / 100.0, v["size"] / 100.0
+            atrasos = [30 + size * 50, 70 + size * 90, 120 + size * 150]
+            decays = [wet * 0.55, wet * 0.35, wet * 0.22]
+            fs.append("aecho=0.90:1.0:" + "|".join(f"{d:.1f}" for d in atrasos)
+                      + ":" + "|".join(f"{d:.4f}" for d in decays))
+        elif t == "eq":
+            for freq, width, gain in ((120, 2.0, v["lo"]), (1000, 1.0, v["mid"]), (6500, 2.0, v["hi"])):
+                if abs(gain) > 0.01:
+                    fs.append(f"equalizer=frequency={freq}:width_type=o:width={width:.3f}:gain={gain:.3f}")
+    return fs
+
+
 def _grafo_mix(clipes, total, entradas, rotulo):
     """Filtros que somam os clipes (st, s, e, ganho, arquivo) e terminam em [rotulo] com a duração exata `total`.
     entradas = {arquivo: "[i:a:0]"} (arquivo None = vídeo aberto). Um decodificador por arquivo (asplit),
@@ -861,16 +928,20 @@ def _grafo_mix(clipes, total, entradas, rotulo):
         f.append(f"{ent}aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,asplit={len(ks)}"
                  + "".join(f"[{nomes[k]}]" for k in ks))
     for k, (st, s0, e0, g, _, vel, tom, *fd) in enumerate(clipes):
+        fi, fo, afx = (fd + [0.0, 0.0, []])[:3]
         vol = f",volume={g:.2f}dB" if g else ""
+        audio_fx = _filtros_afx(afx)
+        efeitos = ("," + ",".join(audio_fx)) if audio_fx else ""
         # fades de Potência constante (seno/cosseno = curve=qsin), no tempo da timeline (depois da velocidade)
-        fi, fo = (fd + [0.0, 0.0])[:2]
+        fades = ""
         dur = (e0 - s0) / vel
         if fi > 0.001:
-            vol += f",afade=t=in:st=0:d={min(fi, dur):.4f}:curve=qsin"
+            fades += f",afade=t=in:st=0:d={min(fi, dur):.4f}:curve=qsin"
         if fo > 0.001:
-            vol += f",afade=t=out:st={max(0.0, dur - fo):.4f}:d={min(fo, dur):.4f}:curve=qsin"
+            fades += f",afade=t=out:st={max(0.0, dur - fo):.4f}:d={min(fo, dur):.4f}:curve=qsin"
+        corta = f",atrim=0:{dur:.5f}" if audio_fx else ""
         f.append(f"[{nomes[k]}]atrim=start={s0:.5f}:end={e0:.5f},asetpts=PTS-STARTPTS"
-                 f"{_filtro_velocidade(vel, tom)}{vol},"
+                 f"{_filtro_velocidade(vel, tom)}{vol}{efeitos}{fades}{corta},"
                  f"adelay={int(round(st * 48000))}S:all=1[{rotulo}m{k}]")
     n = len(clipes)
     f.append("".join(f"[{rotulo}m{k}]" for k in range(n))

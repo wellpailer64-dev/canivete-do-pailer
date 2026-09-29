@@ -156,9 +156,9 @@ function veAudioPrever(t) {
 }
 
 // Clipes com som, prontos para o mixer: [início, entrada, saída, ganho linear, id da fonte, velocidade, manter tom,
-// fade de entrada (s), fade de saída (s)]
+// fade de entrada (s), fade de saída (s), efeitos de áudio]
 function veAudioClipes() {
-    return veMixClipes().map(([st, s0, e0, g, id, v, tom, fi, fo]) => [st, s0, e0, Math.pow(10, g / 20), id, v || 1, tom !== 0, fi || 0, fo || 0]);
+    return veMixClipes().map(([st, s0, e0, g, id, v, tom, fi, fo, afx]) => [st, s0, e0, Math.pow(10, g / 20), id, v || 1, tom !== 0, fi || 0, fo || 0, afx || []]);
 }
 
 // Ganho do fade no instante u (s desde o início do clipe na timeline): Potência constante = seno / cosseno
@@ -181,6 +181,66 @@ function veAudioAmostra(F, f) {
     return [l, r];
 }
 
+function veAudioFxDb(db) { return Math.pow(10, db / 20); }
+function veAudioFxTap(F, quadro, k) {
+    const x = veAudioAmostra(F, quadro);
+    return x ? [x[0] * k, x[1] * k] : [0, 0];
+}
+function veAudioFxLimiter(x, lim) {
+    const a = Math.abs(x);
+    return a <= lim ? x : Math.sign(x) * (lim + (a - lim) * 0.08);
+}
+function veAudioFxProcess(l, r, fx, tap) {
+    if (!fx || !fx.length) return [l, r];
+    for (const f of fx) {
+        const v = f.v || {};
+        if (f.t === 'denoise') {
+            const amt = Math.max(0, Math.min(1, (v.amt || 0) / 100));
+            const thr = veAudioFxDb(v.floor || -50);
+            const a = Math.max(Math.abs(l), Math.abs(r));
+            if (amt && a < thr) {
+                const k = Math.max(0.03, 1 - amt * (1 - a / Math.max(1e-6, thr)));
+                l *= k; r *= k;
+            }
+        } else if (f.t === 'dereverb') {
+            const amt = Math.max(0, Math.min(1, (v.amt || 0) / 100));
+            if (!amt) continue;
+            if (tap) {
+                const a = tap(0.045), b = tap(0.095);
+                l = l * (1 + amt * 0.08) - (a[0] * 0.22 + b[0] * 0.12) * amt;
+                r = r * (1 + amt * 0.08) - (a[1] * 0.22 + b[1] * 0.12) * amt;
+            } else {
+                const thr = veAudioFxDb(-34), a = Math.max(Math.abs(l), Math.abs(r));
+                if (a < thr) { const k = 1 - amt * 0.45; l *= k; r *= k; }
+            }
+        } else if (f.t === 'reverb') {
+            const wet = Math.max(0, Math.min(0.8, (v.mix || 0) / 100));
+            if (!wet || !tap) continue;
+            const sz = Math.max(0, Math.min(1, (v.size || 0) / 100));
+            const a = tap(0.030 + sz * 0.050), b = tap(0.070 + sz * 0.090), c = tap(0.120 + sz * 0.150);
+            l = l * (1 - wet * 0.20) + wet * (a[0] * 0.40 + b[0] * 0.25 + c[0] * 0.16);
+            r = r * (1 - wet * 0.20) + wet * (a[1] * 0.40 + b[1] * 0.25 + c[1] * 0.16);
+        } else if (f.t === 'eq') {
+            const gl = veAudioFxDb(v.lo || 0), gm = veAudioFxDb(v.mid || 0), gh = veAudioFxDb(v.hi || 0);
+            if (tap) {
+                const a = tap(0.006), b = tap(0.012), h = tap(0.0008);
+                const lowL = (l + a[0] + b[0]) / 3, lowR = (r + a[1] + b[1]) / 3;
+                const hiL = l - (l + h[0]) / 2, hiR = r - (r + h[1]) / 2;
+                const midL = l - lowL - hiL, midR = r - lowR - hiR;
+                l = lowL * gl + midL * gm + hiL * gh;
+                r = lowR * gl + midR * gm + hiR * gh;
+            } else {
+                l *= gm; r *= gm;
+            }
+        } else if (f.t === 'limiter') {
+            const lim = veAudioFxDb(Math.min(0, v.ceil == null ? -1 : v.ceil));
+            l = veAudioFxLimiter(l, lim);
+            r = veAudioFxLimiter(r, lim);
+        }
+    }
+    return [l, r];
+}
+
 // Velocidade mantendo o tom na prévia: grãos de 40 ms tocados na velocidade normal, cada um começando no ponto
 // da fonte que corresponde ao seu instante, somados com janela Hann (50% de sobreposição soma 1). Não guarda
 // estado: a amostra de qualquer instante sai só da conta — como o mixer, que refaz trechos ao editar.
@@ -196,7 +256,7 @@ const VE_AU_HANN = (() => {
 // Mixa n quadros de saída a partir do instante t da timeline (avançando `taxa` s da timeline por s de som)
 function veAudioMixar(t, n) {
     const L = new Float32Array(n), R = new Float32Array(n), passo = VEAU.taxa / VE_AU_SR;
-    for (const [st, s0, e0, g, id, v, tom, fi, fo] of VEAU.clipes) {
+    for (const [st, s0, e0, g, id, v, tom, fi, fo, fx] of VEAU.clipes) {
         const F = VEAU.fontes.get(id), fimC = st + (e0 - s0) / v, tFim = t + n * passo;
         if (!F || fimC <= t || st >= tFim) continue;
         const i0 = Math.max(0, Math.ceil((st - t) / passo)), i1 = Math.min(n, Math.ceil((fimC - t) / passo));
@@ -204,11 +264,13 @@ function veAudioMixar(t, n) {
         if (v === 1 || !tom) {
             // normal, ou velocidade que muda o tom junto (como fita mais rápida)
             for (let i = i0; i < i1; i++) {
-                const x = veAudioAmostra(F, a0 + (t + i * passo - st) * v * VE_AU_SR);
+                const frame = a0 + (t + i * passo - st) * v * VE_AU_SR;
+                const x = veAudioAmostra(F, frame);
                 if (!x) continue;                                   // bloco ainda não lido: silêncio (raro, há previsão)
                 const k = fade ? k0 * veAudioFade(t + i * passo - st, durC, fi, fo) : k0;
-                L[i] += x[0] * k;
-                R[i] += x[1] * k;
+                const y = veAudioFxProcess(x[0] * k, x[1] * k, fx, d => veAudioFxTap(F, frame - d * v * VE_AU_SR, k));
+                L[i] += y[0];
+                R[i] += y[1];
             }
             continue;
         }
@@ -225,8 +287,9 @@ function veAudioMixar(t, n) {
                 l += x[0] * w; r += x[1] * w;
             }
             const k = fade ? k0 * veAudioFade(t + i * passo - st, durC, fi, fo) : k0;
-            L[i] += l * k;
-            R[i] += r * k;
+            const y = veAudioFxProcess(l * k, r * k, fx, null);
+            L[i] += y[0];
+            R[i] += y[1];
         }
     }
     return { l: L, r: R };

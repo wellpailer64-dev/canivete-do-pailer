@@ -126,6 +126,47 @@ const VE_FX = {
     },
 };
 
+const VE_AFX = {
+    denoise: {
+        nome: 'Limpeza de ruído', cat: 'Áudio · Restauração', tag: 'Noise cleanup',
+        params: [
+            { k: 'amt', nome: 'Redução', min: 0, max: 100, step: 1, def: 35, un: '%' },
+            { k: 'floor', nome: 'Piso do ruído', min: -75, max: -25, step: 1, def: -50, un: 'dB' },
+        ],
+        neutro: v => !(v.amt > 0),
+    },
+    limiter: {
+        nome: 'Limitador de pico', cat: 'Áudio · Dinâmica', tag: 'Limiter',
+        params: [
+            { k: 'ceil', nome: 'Teto', min: -12, max: 0, step: 0.1, def: -1, un: 'dB' },
+            { k: 'rel', nome: 'Soltura', min: 10, max: 500, step: 1, def: 80, un: 'ms' },
+        ],
+        neutro: () => false,
+    },
+    dereverb: {
+        nome: 'Secar ambiente', cat: 'Áudio · Restauração', tag: 'Room dryer',
+        params: [{ k: 'amt', nome: 'Intensidade', min: 0, max: 100, step: 1, def: 40, un: '%' }],
+        neutro: v => !(v.amt > 0),
+    },
+    reverb: {
+        nome: 'Ambiência', cat: 'Áudio · Espaço', tag: 'Reverb',
+        params: [
+            { k: 'mix', nome: 'Mistura', min: 0, max: 60, step: 1, def: 18, un: '%' },
+            { k: 'size', nome: 'Tamanho', min: 0, max: 100, step: 1, def: 45, un: '%' },
+        ],
+        neutro: v => !(v.mix > 0),
+    },
+    eq: {
+        nome: 'Equalizador gráfico', cat: 'Áudio · EQ', tag: 'EQ',
+        params: [
+            { k: 'lo', nome: 'Graves', min: -12, max: 12, step: 0.5, def: 0, un: 'dB' },
+            { k: 'mid', nome: 'Médios', min: -12, max: 12, step: 0.5, def: 0, un: 'dB' },
+            { k: 'hi', nome: 'Agudos', min: -12, max: 12, step: 0.5, def: 0, un: 'dB' },
+        ],
+        neutro: v => !v.lo && !v.mid && !v.hi,
+    },
+};
+
 // ── Chroma Key (como Keylight / Ultra Key) ──
 // Matte por DIFERENÇA DE COR (o núcleo do Keylight e do IBK do Nuke), não por distância de cor: a transparência vem
 // de quanto o canal da tela (G ou B) passa dos outros dois, medido em relação à cor da tela. Preserva cabelo, desfoque
@@ -245,11 +286,24 @@ function veFxValues(f) {
     return v;
 }
 
+function veAfxValues(f) {
+    const d = VE_AFX[f.t], v = {};
+    d.params.forEach(p => {
+        if (p.tipo === 'bool') v[p.k] = f.v && f.v[p.k] ? 1 : 0;
+        else v[p.k] = f.v && isFinite(f.v[p.k]) ? +f.v[p.k] : p.def;
+    });
+    return v;
+}
+
 // Efeitos que mudam a imagem (ligados, conhecidos e fora do valor neutro)
 function veFxActive(c) {
     return ((c && c.fx) || []).filter(f => f.on !== false && VE_FX[f.t] && !VE_FX[f.t].neutro(veFxValues(f)));
 }
 function veHasFx(c) { return !!(c && c.fx && c.fx.length); }
+function veAfxActive(c) {
+    return ((c && c.afx) || []).filter(f => f.on !== false && VE_AFX[f.t] && !VE_AFX[f.t].neutro(veAfxValues(f)));
+}
+function veHasAfx(c) { return !!(c && c.afx && c.afx.length); }
 
 // Clipe de vídeo "puro": ocupa o quadro todo, sem efeitos (vai direto na base da exportação)
 function veIsPlain(c) { return veIsDefaultProps(c) && !veFxActive(c).length; }
@@ -279,6 +333,10 @@ function veFxExport(c) {
     });
 }
 
+function veAfxExport(c) {
+    return veAfxActive(c).map(f => ({ t: f.t, v: veAfxValues(f) }));
+}
+
 // ── aplicar / editar ──
 function veFxNewId() { return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
@@ -306,11 +364,34 @@ function veFxAdd(i, t) {
     veToast(`${VE_FX[t].nome} aplicado em ${veNomeClipe(c)} ${i + 1}`);
 }
 
+function veAfxAdd(i, t) {
+    const c = VE.clips[i];
+    if (!c || !VE_AFX[t]) return;
+    if (veLocked(c)) { veAvisoBloqueio(); return; }
+    if (!veOcupaA(c) || !veTemSom(c)) { veToast('Efeitos de áudio precisam de um clipe com som'); return; }
+    vePushHistory();
+    const v = {};
+    VE_AFX[t].params.forEach(p => { v[p.k] = p.def; });
+    c.afx = [...(c.afx || []), { id: veFxNewId(), t, on: true, v }];
+    VE.sel = i;
+    vedShow('props');
+    veRefresh();
+    if (veMixAtivo()) veAudioEditou();
+    veToast(`${VE_AFX[t].nome} aplicado em ${veNomeClipe(c)} ${i + 1}`);
+}
+
 // Troca o efeito `id` do clipe selecionado sem mexer no array antigo (clipes cortados compartilham)
 function veFxEdit(id, fn) {
     const c = VE.clips[VE.sel];
     if (!c || !c.fx) return null;
     c.fx = c.fx.map(f => f.id === id ? fn({ ...f, v: { ...f.v } }) : f);
+    return c;
+}
+
+function veAfxEdit(id, fn) {
+    const c = VE.clips[VE.sel];
+    if (!c || !c.afx) return null;
+    c.afx = c.afx.map(f => f.id === id ? fn({ ...f, v: { ...f.v } }) : f);
     return c;
 }
 
@@ -341,6 +422,32 @@ function veFxAction(id, act) {
     veRefresh();
 }
 
+function veAfxAction(id, act) {
+    const c = VE.clips[VE.sel];
+    if (!c || !c.afx) return;
+    const j = c.afx.findIndex(f => f.id === id);
+    if (j < 0) return;
+    if (act === 'fold') {
+        VEFX.collapsed.has(id) ? VEFX.collapsed.delete(id) : VEFX.collapsed.add(id);
+        VEFX.key = '';
+        veRenderFxControls();
+        return;
+    }
+    vePushHistory();
+    if (act === 'on') veAfxEdit(id, f => ({ ...f, on: f.on === false }));
+    else if (act === 'reset') veAfxEdit(id, f => { VE_AFX[f.t].params.forEach(p => { f.v[p.k] = p.def; }); return f; });
+    else if (act === 'del') { c.afx = c.afx.filter(f => f.id !== id); if (!c.afx.length) delete c.afx; }
+    else if (act === 'up' || act === 'down') {
+        const k = act === 'up' ? j - 1 : j + 1;
+        if (k < 0 || k >= c.afx.length) return;
+        const a = [...c.afx];
+        [a[j], a[k]] = [a[k], a[j]];
+        c.afx = a;
+    }
+    veRefresh();
+    if (veMixAtivo()) veAudioEditou();
+}
+
 // ── Controles de efeito: lista dos efeitos do clipe selecionado ──
 function veFxFmt(p, v) { return String(veRound(v, p.step < 1 ? 1 : 0)); }
 
@@ -348,20 +455,25 @@ function veRenderFxControls() {
     const box = $ve('ve-fxc');
     if (!box) return;
     const c = VE.clips[VE.sel];
-    const fx = (c && c.fx) || [];
-    const key = VE.sel + '|' + fx.map(f => f.id + f.t + (f.on !== false) + VEFX.collapsed.has(f.id)).join(',');
+    const fx = (c && c.fx) || [], afx = (c && c.afx) || [];
+    const kfx = fx.map(f => 'v' + f.id + f.t + (f.on !== false) + VEFX.collapsed.has(f.id)).join(',');
+    const kafx = afx.map(f => 'a' + f.id + f.t + (f.on !== false) + VEFX.collapsed.has(f.id)).join(',');
+    const key = VE.sel + '|' + kfx + '|' + kafx;
     if (key !== VEFX.key) {
         VEFX.key = key;
-        box.innerHTML = !fx.length ? '' : '<div class="ve-fxc-title">Efeitos</div>' + fx.map((f, j) => {
-            const d = VE_FX[f.t];
+        const render = (lista, defs, tipo, titulo) => !lista.length ? '' :
+            `<div class="ve-fxc-title">${titulo}</div>` + lista.map((f, j) => {
+            const d = defs[f.t];
             if (!d) return '';
             const off = f.on === false;
-            return `<div class="ve-fxe${off ? ' off' : ''}${VEFX.collapsed.has(f.id) ? ' collapsed' : ''}" data-fx="${f.id}">
+            const attr = tipo === 'a' ? 'data-afx' : 'data-fx';
+            const marca = tipo === 'a' ? 'aud' : 'fx';
+            return `<div class="ve-fxe${off ? ' off' : ''}${VEFX.collapsed.has(f.id) ? ' collapsed' : ''}" ${attr}="${f.id}">
                 <div class="ve-fxe-head">
-                    <button class="ve-fxe-on" data-fa="on" title="${off ? 'Ligar' : 'Desligar'} efeito">fx</button>
+                    <button class="ve-fxe-on" data-fa="on" title="${off ? 'Ligar' : 'Desligar'} efeito">${marca}</button>
                     <b data-fa="fold" title="Recolher/expandir">${d.nome}</b>
                     <button data-fa="up" title="Aplicar antes (subir)" ${j ? '' : 'disabled'}>▲</button>
-                    <button data-fa="down" title="Aplicar depois (descer)" ${j < fx.length - 1 ? '' : 'disabled'}>▼</button>
+                    <button data-fa="down" title="Aplicar depois (descer)" ${j < lista.length - 1 ? '' : 'disabled'}>▼</button>
                     <button data-fa="reset" title="Restaurar valores">↺</button>
                     <button data-fa="del" title="Remover efeito">✕</button>
                 </div>
@@ -380,6 +492,7 @@ function veRenderFxControls() {
                     </div>`).join('')}
                 </div></div>`;
         }).join('');
+        box.innerHTML = render(fx, VE_FX, 'v', 'Efeitos de vídeo') + render(afx, VE_AFX, 'a', 'Efeitos de áudio');
     }
     fx.forEach(f => {
         const d = VE_FX[f.t], el = box.querySelector(`[data-fx="${f.id}"]`);
@@ -388,6 +501,15 @@ function veRenderFxControls() {
         d.params.forEach(p => el.querySelectorAll(`[data-fk="${p.k}"]`).forEach(inp => {
             if (p.tipo === 'bool') inp.checked = !!v[p.k];
             else if (p.tipo === 'cor') { if (inp.ownerDocument.activeElement !== inp) inp.value = v[p.k]; }
+            else if (inp.ownerDocument.activeElement !== inp) inp.value = veFxFmt(p, v[p.k]);
+        }));
+    });
+    afx.forEach(f => {
+        const d = VE_AFX[f.t], el = box.querySelector(`[data-afx="${f.id}"]`);
+        if (!d || !el) return;
+        const v = veAfxValues(f);
+        d.params.forEach(p => el.querySelectorAll(`[data-fk="${p.k}"]`).forEach(inp => {
+            if (p.tipo === 'bool') inp.checked = !!v[p.k];
             else if (inp.ownerDocument.activeElement !== inp) inp.value = veFxFmt(p, v[p.k]);
         }));
     });
@@ -406,18 +528,32 @@ function veFxSetParam(id, k, val) {
     veDrawMonitorSoon();
 }
 
+function veAfxSetParam(id, k, val) {
+    const c = VE.clips[VE.sel];
+    const f = c && c.afx && c.afx.find(x => x.id === id);
+    const p = f && VE_AFX[f.t] && VE_AFX[f.t].params.find(x => x.k === k);
+    if (!p) return;
+    if (p.tipo === 'bool') val = val ? 1 : 0;
+    else { if (!isFinite(val)) return; val = Math.min(Math.max(val, p.min), p.max); }
+    veAfxEdit(id, x => { x.v[k] = val; return x; });
+    veRenderFxControls();
+    if (veMixAtivo()) veAudioEditou();
+}
+
 // ── painel Efeitos: lista, busca, arrastar até um clipe ──
 function veRenderFxList() {
     const q = ($ve('ve-fx-q').value || '').trim().toLowerCase()
         .normalize('NFD').replace(/[̀-ͯ]/g, '');
     const cats = {};
-    Object.entries(VE_FX).forEach(([t, d]) => {
+    const add = (t, d, tipo) => {
         const alvo = (d.nome + ' ' + d.tag + ' ' + d.cat).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
         if (q && !alvo.includes(q)) return;
-        (cats[d.cat] = cats[d.cat] || []).push([t, d]);
-    });
+        (cats[d.cat] = cats[d.cat] || []).push([t, d, tipo]);
+    };
+    Object.entries(VE_FX).forEach(([t, d]) => add(t, d, 'v'));
+    Object.entries(VE_AFX).forEach(([t, d]) => add(t, d, 'a'));
     const html = Object.entries(cats).map(([cat, list]) => `<div class="ve-fx-cat">${cat}</div>` +
-        list.map(([t, d]) => `<div class="ve-fx-item" data-fxt="${t}" title="Arraste até um clipe · duplo clique aplica no clipe selecionado"><i>fx</i><span>${d.nome}</span><small>${d.tag}</small></div>`).join('')).join('');
+        list.map(([t, d, tipo]) => `<div class="ve-fx-item" data-${tipo === 'a' ? 'aft' : 'fxt'}="${t}" title="Arraste até um clipe · duplo clique aplica no clipe selecionado"><i>${tipo === 'a' ? 'aud' : 'fx'}</i><span>${d.nome}</span><small>${d.tag}</small></div>`).join('')).join('');
     $ve('ve-fx-list').innerHTML = html || '<div class="ve-clips-empty">Nenhum efeito encontrado.</div>';
 }
 
@@ -437,17 +573,18 @@ function veFxInit() {
     $ve('ve-fx-q').addEventListener('keydown', e => { if (e.key === 'Escape') { e.target.value = ''; veRenderFxList(); e.target.blur(); } e.stopPropagation(); });
     const list = $ve('ve-fx-list');
     list.addEventListener('dblclick', e => {
-        const it = e.target.closest('[data-fxt]');
+        const it = e.target.closest('[data-fxt],[data-aft]');
         if (!it) return;
         if (VE.sel < 0) { veToast('Selecione um clipe na timeline (ou arraste o efeito até ele)'); return; }
-        veFxAdd(VE.sel, it.dataset.fxt);
+        if (it.dataset.aft) veAfxAdd(VE.sel, it.dataset.aft);
+        else veFxAdd(VE.sel, it.dataset.fxt);
     });
     // arrastar o efeito: solta num clipe da timeline ou no Controles de efeito (clipe selecionado)
     list.addEventListener('pointerdown', e => {
-        const it = e.target.closest('[data-fxt]');
+        const it = e.target.closest('[data-fxt],[data-aft]');
         if (!it || e.button !== 0) return;
         const win = list.ownerDocument.defaultView, doc = list.ownerDocument;   // painel pode estar em janela solta
-        VEFX.drag = { t: it.dataset.fxt, x0: e.clientX, y0: e.clientY, on: false, ghost: null };
+        VEFX.drag = { t: it.dataset.aft || it.dataset.fxt, tipo: it.dataset.aft ? 'a' : 'v', x0: e.clientX, y0: e.clientY, on: false, ghost: null };
         const move = ev => {
             const d = VEFX.drag;
             if (!d.on) {
@@ -455,7 +592,7 @@ function veFxInit() {
                 d.on = true;
                 d.ghost = doc.createElement('div');
                 d.ghost.className = 've-dghost';
-                d.ghost.textContent = 'fx  ' + VE_FX[d.t].nome;
+                d.ghost.textContent = (d.tipo === 'a' ? 'aud  ' : 'fx  ') + (d.tipo === 'a' ? VE_AFX[d.t].nome : VE_FX[d.t].nome);
                 doc.body.appendChild(d.ghost);
                 doc.body.classList.add('ve-fx-dragging');
             }
@@ -478,8 +615,9 @@ function veFxInit() {
             veDraw();
             const i = veClipAtClient(ev.clientX, ev.clientY, doc);
             const props = doc.elementFromPoint(ev.clientX, ev.clientY)?.closest('#ve-pane-props');
-            if (i >= 0) veFxAdd(i, d.t);
-            else if (props && VE.sel >= 0) veFxAdd(VE.sel, d.t);
+            const aplica = idx => d.tipo === 'a' ? veAfxAdd(idx, d.t) : veFxAdd(idx, d.t);
+            if (i >= 0) aplica(i);
+            else if (props && VE.sel >= 0) aplica(VE.sel);
             else if (props) veToast('Selecione um clipe na timeline primeiro');
         };
         win.addEventListener('pointermove', move);
@@ -490,17 +628,22 @@ function veFxInit() {
     const box = $ve('ve-fxc');
     box.addEventListener('click', e => {
         const b = e.target.closest('[data-fa]');
-        if (b) veFxAction(b.closest('[data-fx]').dataset.fx, b.dataset.fa);
+        if (!b) return;
+        const a = b.closest('[data-afx]');
+        if (a) veAfxAction(a.dataset.afx, b.dataset.fa);
+        else veFxAction(b.closest('[data-fx]').dataset.fx, b.dataset.fa);
     });
     box.addEventListener('input', e => {
         const el = e.target.closest('[data-fk]');
         if (!el) return;
         if (!VE._fxEdit) { vePushHistory(); VE._fxEdit = true; }
         const val = el.type === 'checkbox' ? el.checked : el.type === 'color' ? el.value : parseFloat(String(el.value).replace(',', '.'));
-        veFxSetParam(el.closest('[data-fx]').dataset.fx, el.dataset.fk, val);
-        if (el.type === 'checkbox') { VE._fxEdit = false; veDrawMonitor(); }
+        const a = el.closest('[data-afx]');
+        if (a) veAfxSetParam(a.dataset.afx, el.dataset.fk, val);
+        else veFxSetParam(el.closest('[data-fx]').dataset.fx, el.dataset.fk, val);
+        if (el.type === 'checkbox') { VE._fxEdit = false; veDrawMonitor(); if (veMixAtivo()) veAudioEditou(); }
     });
-    box.addEventListener('change', () => { VE._fxEdit = false; veRenderClips(); veDraw(); });
+    box.addEventListener('change', () => { VE._fxEdit = false; veRenderClips(); veDraw(); if (veMixAtivo()) veAudioEditou(); });
 }
 
 // Conta-gotas do Chroma Key: o próximo clique no monitor pega a cor (média 5×5) com o efeito desligado
