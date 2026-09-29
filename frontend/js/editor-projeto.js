@@ -8,18 +8,26 @@
 // O id da mídia é o índice em VE.media: apagar do projeto marca removido (não reordena).
 // =========================================================
 
-const VEPJ = { sel: new Set(), foco: null, busca: '', clip: null, ordem: { col: 'nome', dir: 1 }, conf: 0, nBin: 0 };
+// pasta = pasta aberta no modo grade (o modo e o tamanho do card ficam em PREFS: pjModo, pjTam)
+const VEPJ = { sel: new Set(), foco: null, busca: '', clip: null, ordem: { col: 'nome', dir: 1 }, conf: 0, nBin: 0, pasta: null };
+const vePjEmGrade = () => PREFS.pjModo === 'grade';
+const vePjTam = () => Math.max(90, Math.min(260, +PREFS.pjTam || 132));
 
 const VE_PJ_TIPOS = {
     video: ['i-film', 'Vídeo'], image: ['i-image', 'Imagem'], audio: ['i-music', 'Áudio'],
-    ajuste: ['i-sliders', 'Camada de ajuste'], legenda: ['i-captions', 'Legendas'],
+    ajuste: ['i-sliders', 'Camada de ajuste'], legenda: ['i-captions', 'Legendas'], timeline: ['i-film', 'Timeline'],
 };
-const VE_EXT_SRT = /\.srt$/i;
+const VE_EXT_LEG = /\.(srt|vtt|ass|ssa|sbv|txt)$/i;   // legendas (Functions/legendas_formatos.py)
 
 const vePjMidia = () => VE.media.filter(m => m && !m.removido && !m.base && VE_PJ_TIPOS[m.kind]);
 const vePjNome = m => m.nome || m.name || VE_PJ_TIPOS[m.kind][1];
 const vePjBin = id => (VE.bins || []).find(b => b.id === id);
-const vePjUso = m => VE.clips.filter(c => (c.m || 0) === m.id).length;
+function vePjUso(m) {
+    if (m.kind === 'timeline') return m.sequenceId === VE.activeSequence ? 'ativa' : '';
+    if (typeof veSeqSalvarAtiva === 'function') veSeqSalvarAtiva();
+    const seqs = VE.sequences && VE.sequences.length ? VE.sequences : [{ clips: VE.clips }];
+    return seqs.reduce((n, s) => n + (s.clips || []).filter(c => (c.m || 0) === m.id).length, 0);
+}
 // pasta do item (a de uma pasta que não existe mais = raiz)
 const vePjPastaDe = m => (m.pasta && vePjBin(m.pasta) ? m.pasta : null);
 function vePjNovoBin(nome, pai = null) {
@@ -38,6 +46,11 @@ function vePjAlterou() { if (!VE.dirty) { VE.dirty = true; veUpdateTitle(); } ve
 
 // Duração e informações de cada item (colunas)
 function vePjInfo(m) {
+    if (m.kind === 'timeline') {
+        const seq = (VE.sequences || []).find(s => s.id === m.sequenceId);
+        const dur = m.sequenceId === VE.activeSequence ? VE.dur : veSeqDur(seq);
+        return { dur, info: m.sequenceId === VE.activeSequence ? veT('aberta agora') : `${(seq && (seq.clips || []).length) || 0} clipes` };
+    }
     if (m.kind === 'video') {
         const inf = m.id === 0 ? VE.info : m.info, fps = inf && (m.id === 0 ? VE.fps : inf.fps);
         if (m.erro) return { dur: null, info: veT('erro: ') + m.erro };
@@ -65,7 +78,8 @@ function vePjFilhos(pai) {
 function vePjLinhaMidia(m, nivel) {
     const k = 'm:' + m.id, [ic, tipo] = VE_PJ_TIPOS[m.kind], inf = vePjInfo(m), uso = vePjUso(m);
     const cor = m.cor ? veCor({ cor: m.cor }) : null;
-    return `<div class="ve-pj-row${VEPJ.sel.has(k) ? ' sel' : ''}${m.kind === 'video' && m.id && !m.url ? ' fraco' : ''}" data-k="${k}" draggable="true" style="--n:${nivel}">
+    const ativa = m.kind === 'timeline' && m.sequenceId === VE.activeSequence;
+    return `<div class="ve-pj-row${VEPJ.sel.has(k) ? ' sel' : ''}${ativa ? ' atual' : ''}${m.kind === 'video' && m.id && !m.url ? ' fraco' : ''}" data-k="${k}" data-kind="${m.kind}" draggable="true" style="--n:${nivel}">
         <span class="ve-pj-cor"${cor ? ` style="background:${cor}"` : ''}></span><span class="ve-pj-seta"></span>
         <svg class="i"><use href="#${ic}"/></svg><span class="ve-pj-nome" title="${veEsc(m.path || vePjNome(m))}">${veEsc(vePjNome(m))}</span>
         <span class="ve-pj-c">${veT(tipo)}</span><span class="ve-pj-c mono">${inf.dur ? veTC(inf.dur).slice(0, 11) : ''}</span>
@@ -87,20 +101,96 @@ function vePjArvore(pai, nivel) {
         med.map(m => vePjLinhaMidia(m, nivel)).join('');
 }
 
+// ─────────────────────────── grade (cards com prévia, como o modo ícones do Premiere) ───────────────────────────
+// capa do card: a imagem, ou a miniatura do vídeo no ponto f (0..1) — passar o mouse percorre o vídeo
+function vePjCapa(m, f = 0.35) {
+    if (m.kind === 'image') return m.url || '';
+    const th = m.kind === 'video' ? (m.id === 0 ? VE.thumbs : m.thumbs) || [] : [];
+    return th.length ? th[Math.min(th.length - 1, Math.floor(f * th.length))].url : '';
+}
+
+function vePjCardMidia(m) {
+    const k = 'm:' + m.id, [ic, tipo] = VE_PJ_TIPOS[m.kind], inf = vePjInfo(m), capa = vePjCapa(m);
+    const cor = m.cor ? veCor({ cor: m.cor }) : null;
+    const ativa = m.kind === 'timeline' && m.sequenceId === VE.activeSequence;
+    return `<div class="ve-pj-card${VEPJ.sel.has(k) ? ' sel' : ''}${ativa ? ' atual' : ''}${m.kind === 'video' && m.id && !m.url ? ' fraco' : ''}" data-k="${k}" data-kind="${m.kind}" draggable="true" title="${veEsc((m.path || vePjNome(m)) + (inf.info ? '\n' + inf.info : ''))}">
+        <div class="ve-pj-capa">${capa ? `<img src="${veEsc(capa)}" alt="" draggable="false">` : `<svg class="i"><use href="#${ic}"/></svg>`}
+            ${inf.dur ? `<span class="ve-pj-dur">${veTC(inf.dur).slice(0, 11)}</span>` : ''}</div>
+        <div class="ve-pj-rotulo"><span class="ve-pj-cor"${cor ? ` style="background:${cor}"` : ''}></span><svg class="i"><use href="#${ic}"/></svg><span class="ve-pj-nome">${veEsc(vePjNome(m))}</span></div>
+        <div class="ve-pj-sub">${veT(tipo)}${inf.info ? ' · ' + veEsc(inf.info) : ''}</div></div>`;
+}
+
+function vePjCardBin(b) {
+    const k = 'b:' + b.id, cor = b.cor ? veCor({ cor: b.cor }) : null;
+    const n = vePjMidia().filter(m => vePjDescendentes(b.id).has(m.pasta)).length;
+    return `<div class="ve-pj-card bin${VEPJ.sel.has(k) ? ' sel' : ''}" data-k="${k}" draggable="true" title="${veT('Clique duas vezes para abrir a pasta')}">
+        <div class="ve-pj-capa"><svg class="i"><use href="#i-folder"/></svg></div>
+        <div class="ve-pj-rotulo"><span class="ve-pj-cor"${cor ? ` style="background:${cor}"` : ''}></span><svg class="i"><use href="#i-folder"/></svg><span class="ve-pj-nome">${veEsc(b.nome)}</span></div>
+        <div class="ve-pj-sub">${n} ${veT(n === 1 ? 'item' : 'itens')}</div></div>`;
+}
+
+// caminho da pasta aberta na grade (clicar volta para ela)
+function vePjTrilha() {
+    const cad = [];
+    for (let b = vePjBin(VEPJ.pasta); b; b = b.pai ? vePjBin(b.pai) : null) cad.unshift(b);
+    return `<div class="ve-pj-trilha"><button data-ir="" title="${veT('Voltar para a raiz do projeto')}"><svg class="i"><use href="#i-folder"/></svg>${veT('Projeto')}</button>` +
+        cad.map(b => `<span>›</span><button data-ir="${b.id}">${veEsc(b.nome)}</button>`).join('') + '</div>';
+}
+
+function vePjGrade() {
+    if (VEPJ.pasta && !vePjBin(VEPJ.pasta)) VEPJ.pasta = null;
+    const { bins, med } = vePjFilhos(VEPJ.pasta);
+    const cards = bins.map(vePjCardBin).join('') + med.map(vePjCardMidia).join('');
+    return (VEPJ.pasta ? vePjTrilha() : '') +
+        `<div class="ve-pj-grade">${cards || `<div class="ve-clips-empty">${veT('Pasta vazia')}</div>`}</div>`;
+}
+
+// pasta mostrada no painel: a aberta na grade; na lista, a raiz
+const vePjPastaVista = () => (vePjEmGrade() && !VEPJ.busca.trim() && vePjBin(VEPJ.pasta) ? VEPJ.pasta : null);
+
+function vePjAbrirPasta(id) {
+    VEPJ.pasta = id || null;
+    VEPJ.sel.clear();
+    VEPJ.foco = null;
+    vePjRender();
+}
+
+function vePjModo(modo) {
+    PREFS.pjModo = modo === 'grade' ? 'grade' : 'lista';
+    prefsSave();
+    vePjRender();
+}
+
+function vePjTamanho(v) {
+    PREFS.pjTam = +v;
+    const box = $ve('ve-pj');
+    if (box) box.style.setProperty('--pj-card', vePjTam() + 'px');
+    clearTimeout(VEPJ.tamT);
+    VEPJ.tamT = setTimeout(prefsSave, 400);
+}
+
 function vePjRender() {
     const box = $ve('ve-pj-lista');
     if (!box) return;
+    if (VE.ready && typeof veSeqSalvarAtiva === 'function') veSeqSalvarAtiva();
+    const grade = vePjEmGrade(), pj = $ve('ve-pj');
+    pj.classList.toggle('grade', grade);
+    pj.style.setProperty('--pj-card', vePjTam() + 'px');
+    pj.querySelectorAll('[data-pj-modo]').forEach(b => b.classList.toggle('on', (b.dataset.pjModo === 'grade') === grade));
+    const tam = pj.querySelector('.ve-pj-tam');
+    if (tam) tam.value = vePjTam();
     const total = vePjMidia().length + (VE.bins || []).length;
     $ve('ve-pj-conta').textContent = VEPJ.sel.size ? `${VEPJ.sel.size} de ${total} selecionado(s)` : `${total} ${total === 1 ? 'item' : 'itens'}`;
     $ve('ve-pj-proj').textContent = VE.projectPath ? VE.projectPath.split(/[\\/]/).pop() : (VE.ready ? veT('Projeto não salvo') : '');
-    if (!VE.ready) { box.innerHTML = `<div class="ve-clips-empty">${veT('Abra um vídeo para começar. Depois arraste para cá imagens, áudios, legendas (.srt), outros vídeos e pastas inteiras.')}</div>`; return; }
+    if (!VE.ready) { box.innerHTML = `<div class="ve-clips-empty">${veT('Abra um vídeo para começar. Depois arraste para cá imagens, áudios, legendas (.srt, .vtt, .ass, .sbv, .txt), outros vídeos e pastas inteiras.')}</div>`; return; }
     const q = VEPJ.busca.trim().toLowerCase();
     if (q) {
         const achados = vePjMidia().filter(m => vePjNome(m).toLowerCase().includes(q));
-        box.innerHTML = achados.length ? achados.map(m => vePjLinhaMidia(m, 0)).join('') : `<div class="ve-clips-empty">${veT('Nada encontrado')}</div>`;
+        box.innerHTML = !achados.length ? `<div class="ve-clips-empty">${veT('Nada encontrado')}</div>`
+            : grade ? `<div class="ve-pj-grade">${achados.map(vePjCardMidia).join('')}</div>` : achados.map(m => vePjLinhaMidia(m, 0)).join('');
         return;
     }
-    box.innerHTML = vePjArvore(null, 0) + '<div class="ve-pj-fim" data-k="raiz"></div>';
+    box.innerHTML = grade ? vePjGrade() : vePjArvore(null, 0) + '<div class="ve-pj-fim" data-k="raiz"></div>';
 }
 
 // ─────────────────────────── importar ───────────────────────────
@@ -128,9 +218,9 @@ async function vePjImportarArquivo(path, pasta) {
         veAudioRegistrar(m.id, r.url, r.quadros);
         return true;
     }
-    if (VE_EXT_SRT.test(path)) {
-        const r = await api.ve_ler_srt(path);
-        if (!r || !r.success || !r.itens.length) return false;
+    if (VE_EXT_LEG.test(path)) {
+        const r = await api.ve_ler_legenda(path);
+        if (!r || !r.success || !r.itens.length) { veToast(`${nome}: ${(r && r.error) || veT('nenhuma legenda encontrada')}`); return false; }
         vePjAddMidia({ kind: 'legenda', path, name: nome, itens: r.itens }, pasta);
         return true;
     }
@@ -181,7 +271,7 @@ function vePjImportarDialogo() {
 // Pasta onde entram itens novos/colados: a pasta selecionada, ou a pasta do item selecionado
 function vePjDestino() {
     const k = VEPJ.foco || [...VEPJ.sel][0];
-    if (!k) return null;
+    if (!k) return vePjPastaVista();
     if (k.startsWith('b:')) return k.slice(2);
     const m = VE.media[+k.slice(2)];
     return (m && m.pasta) || null;
@@ -222,13 +312,26 @@ function vePjRenomear(k) {
         if (feito) return;
         feito = true;
         const v = inp.value.trim();
-        if (ok && v) { if (b) b.nome = v; else m.nome = v; vePjAlterou(); } else vePjRender();
+        if (ok && v) {
+            if (b) b.nome = v;
+            else {
+                m.nome = v;
+                if (m.kind === 'timeline') {
+                    const seq = (VE.sequences || []).find(s => s.id === m.sequenceId);
+                    if (seq) seq.name = v;
+                }
+            }
+            vePjAlterou();
+        } else vePjRender();
     };
     inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') fim(true); if (e.key === 'Escape') fim(false); });
     inp.addEventListener('blur', () => fim(true));
 }
 
 function vePjCopiaMidia(m, pasta) {
+    if (m.kind === 'timeline') {
+        return typeof veCreateTimeline === 'function' ? veCreateTimeline({ cloneId: m.sequenceId, pasta }) && veSeqMedia(VE.activeSequence) : null;
+    }
     const n = vePjAddMidia({ ...m, nome: `${vePjNome(m)} ${veT('cópia')}`, itens: m.itens ? m.itens.map(x => ({ ...x })) : undefined }, pasta);
     delete n.removido;
     if (n.kind === 'audio' && n.url) veAudioRegistrar(n.id, n.url, n.quadros);
@@ -297,6 +400,14 @@ function vePjApagar(keys = [...VEPJ.sel]) {
     keys.filter(k => k.startsWith('b:')).forEach(k => vePjDescendentes(k.slice(2)).forEach(x => bins.add(x)));
     const midias = new Set(keys.filter(k => k.startsWith('m:')).map(k => +k.slice(2)));
     vePjMidia().forEach(m => { if (bins.has(m.pasta)) midias.add(m.id); });
+    [...midias].forEach(id => {
+        const m = VE.media[id];
+        if (m && m.kind === 'timeline') {
+            veDeleteTimeline(m.sequenceId);
+            midias.delete(id);
+        }
+    });
+    if (!midias.size && !bins.size) { VEPJ.sel.clear(); vePjRender(); return; }
     if (midias.has(0)) { veToast('O vídeo principal do projeto não pode ser apagado'); midias.delete(0); if (!midias.size && !bins.size) return; }
     const usados = VE.clips.filter(c => midias.has(c.m || 0)).length;
     // em uso na timeline: pede confirmação (clicar/apertar de novo), como o aviso do Premiere
@@ -332,12 +443,14 @@ function vePjCor(keys, cor) {
 // ids arrastados do painel e soltos em (x, y) da tela: cada item entra no ponto/trilha do soltar (os seguintes, em fila)
 function vePjColocar(ids, drop) {
     if (!VE.ready) return;
-    const wrap = $ve('ve-tl-wrap').getBoundingClientRect();
-    const naTl = drop && drop.x >= wrap.left && drop.x <= wrap.right && drop.y >= wrap.top + VE_RULER && drop.y <= wrap.bottom;
+    const wrapEl = $ve('ve-tl-wrap'), wrap = wrapEl.getBoundingClientRect();
+    const mesmoDoc = !drop || !drop.doc || drop.doc === wrapEl.ownerDocument;
+    const naTl = mesmoDoc && drop && drop.x >= wrap.left && drop.x <= wrap.right && drop.y >= wrap.top + VE_RULER && drop.y <= wrap.bottom;
     let t = naTl ? Math.max(0, VE.view + (drop.x - wrap.left) / VE.pps) : VE.playhead;
     const row = naTl ? veRowAt(drop.y - wrap.top) : null;
     let colocados = 0;
     ids.map(id => VE.media[id]).filter(m => m && !m.removido).forEach(m => {
+        if (m.kind === 'timeline') { veOpenTimeline(m.sequenceId); return; }
         const st = veSnapFrame(t);
         if (m.kind === 'image' || m.kind === 'ajuste') {
             veInsertImageClip(m, naTl ? { x: wrap.left + (st - VE.view) * VE.pps, y: drop.y, at: Date.now() } : null, 0,
@@ -416,6 +529,7 @@ function vePjMenu(x, y, doc) {
         <button class="ve-ctx-item" data-pj="paste"${VEPJ.clip ? '' : ' disabled'}>Colar<kbd>Ctrl+V</kbd></button>
         <div class="ve-ctx-sep"></div>
         <button class="ve-ctx-item" data-pj="bin">Nova pasta<kbd>Ctrl+B</kbd></button>
+        <button class="ve-ctx-item" data-pj="tl">Nova timeline<kbd>Ctrl+N</kbd></button>
         <button class="ve-ctx-item" data-pj="aj">Nova camada de ajuste</button>
         <button class="ve-ctx-item" data-pj="imp">Importar...<kbd>Ctrl+I</kbd></button>
         ${keys.length ? '<div class="ve-ctx-sep"></div><button class="ve-ctx-item perigo" data-pj="del">Apagar<kbd>Delete</kbd></button>' : ''}`;
@@ -428,7 +542,7 @@ function vePjMenu(x, y, doc) {
         if (cor) vePjCor(keys, cor.dataset.cor);
         else if (it) ({ ren: () => vePjRenomear(keys[0]), dup: () => vePjDuplicar(keys), cut: () => vePjCopiar('recortar'),
             copy: () => vePjCopiar('copiar'), paste: vePjColar, bin: vePjNovaPasta, aj: vePjNovoAjuste, imp: vePjImportarDialogo,
-            del: () => vePjApagar(keys) })[it.dataset.pj]();
+            tl: () => veCreateTimeline(), del: () => vePjApagar(keys) })[it.dataset.pj]();
         else return;
         veClipMenuFechar();
     });
@@ -445,10 +559,14 @@ function vePjInit() {
     const lista = $ve('ve-pj-lista');
     const chaves = () => [...lista.querySelectorAll('[data-k]:not([data-k="raiz"])')].map(r => r.dataset.k);
     lista.addEventListener('click', e => {
+        const ir = e.target.closest('[data-ir]');
+        if (ir) { vePjAbrirPasta(ir.dataset.ir); return; }
         const row = e.target.closest('[data-k]');
         if (e.target.closest('[data-seta]')) { const b = vePjBin(row.dataset.k.slice(2)); b.aberta = !b.aberta; vePjRender(); return; }
         if (!row || row.dataset.k === 'raiz') { VEPJ.sel.clear(); VEPJ.foco = null; vePjRender(); return; }
         const k = row.dataset.k;
+        // duplo clique vem por aqui (e.detail): o 1º clique redesenha o painel e o dblclick se perderia
+        if (e.detail === 2 && !e.shiftKey && !e.ctrlKey && !e.metaKey) { duplo(e, row, k); return; }
         if (e.shiftKey && VEPJ.foco) {
             const ks = chaves(), a = ks.indexOf(VEPJ.foco), b = ks.indexOf(k);
             VEPJ.sel = new Set(ks.slice(Math.min(a, b), Math.max(a, b) + 1));
@@ -458,13 +576,15 @@ function vePjInit() {
         } else { VEPJ.sel = new Set([k]); VEPJ.foco = k; }
         vePjRender();
     });
-    lista.addEventListener('dblclick', e => {
-        const row = e.target.closest('[data-k]');
-        if (!row || row.dataset.k === 'raiz') return;
-        const k = row.dataset.k;
+    const duplo = (e, row, k) => {
         if (e.target.closest('.ve-pj-nome')) { vePjRenomear(k); return; }
+        if (k.startsWith('b:') && row.classList.contains('ve-pj-card')) { vePjAbrirPasta(k.slice(2)); return; }
         if (k.startsWith('b:')) { const b = vePjBin(k.slice(2)); b.aberta = !b.aberta; vePjRender(); }
-    });
+        if (k.startsWith('m:')) {
+            const m = VE.media[+k.slice(2)];
+            if (m && m.kind === 'timeline') veOpenTimeline(m.sequenceId);
+        }
+    };
     lista.addEventListener('contextmenu', e => {
         e.preventDefault();
         const row = e.target.closest('[data-k]');
@@ -496,7 +616,7 @@ function vePjInit() {
         e.preventDefault();
         e.stopPropagation();
         const row = e.target.closest('[data-k]');
-        vePjMover(JSON.parse(dados), row && row.dataset.k.startsWith('b:') ? row.dataset.k.slice(2) : row && row.dataset.k.startsWith('m:') ? VE.media[+row.dataset.k.slice(2)].pasta : null);
+        vePjMover(JSON.parse(dados), row && row.dataset.k.startsWith('b:') ? row.dataset.k.slice(2) : row && row.dataset.k.startsWith('m:') ? VE.media[+row.dataset.k.slice(2)].pasta : vePjPastaVista());
     });
     // atalhos do painel (Ctrl+C/V/X/D, F2, Delete...) não vão para a timeline
     box.addEventListener('keydown', e => {
@@ -505,6 +625,7 @@ function vePjInit() {
         const acoes = {
             'c': ctrl && (() => vePjCopiar('copiar')), 'x': ctrl && (() => vePjCopiar('recortar')), 'v': ctrl && vePjColar,
             'd': ctrl && (() => vePjDuplicar()), 'b': ctrl && vePjNovaPasta, 'i': ctrl && vePjImportarDialogo,
+            'n': ctrl && veCreateTimeline,
             'a': ctrl && (() => { VEPJ.sel = new Set(chaves()); vePjRender(); }),
             'f2': !ctrl && VEPJ.foco && (() => vePjRenomear(VEPJ.foco)),
             'delete': !ctrl && (() => vePjApagar()), 'backspace': !ctrl && (() => vePjApagar()),
@@ -513,6 +634,21 @@ function vePjInit() {
         if (fn) { e.preventDefault(); e.stopPropagation(); fn(); }
         else if (ctrl && k !== 'z' && k !== 'y' && k !== 's') e.stopPropagation();
     });
+    // grade: passar o mouse num card de vídeo percorre as miniaturas (como o Premiere)
+    let scrub = null;
+    lista.addEventListener('mousemove', e => {
+        const card = e.target.closest('.ve-pj-card[data-kind="video"]'), img = card && card.querySelector('.ve-pj-capa img');
+        if (scrub && scrub.card !== card) { scrub.img.src = scrub.orig; scrub.card.style.removeProperty('--pj-f'); scrub = null; }
+        if (!img) return;
+        const r = card.getBoundingClientRect(), f = Math.max(0, Math.min(0.999, (e.clientX - r.left) / r.width));
+        if (!scrub) scrub = { card, img, orig: img.getAttribute('src') };
+        const url = vePjCapa(VE.media[+card.dataset.k.slice(2)], f);
+        if (url && img.getAttribute('src') !== url) img.src = url;
+        card.style.setProperty('--pj-f', f);
+    });
+    lista.addEventListener('mouseleave', () => { if (scrub) { scrub.img.src = scrub.orig; scrub.card.style.removeProperty('--pj-f'); scrub = null; } });
+    box.querySelectorAll('[data-pj-modo]').forEach(b => b.addEventListener('click', () => vePjModo(b.dataset.pjModo)));
+    box.querySelector('.ve-pj-tam').addEventListener('input', e => vePjTamanho(e.target.value));
     $ve('ve-pj-busca').addEventListener('input', e => { VEPJ.busca = e.target.value; vePjRender(); });
     box.querySelector('.ve-pj-cab').addEventListener('click', e => {
         const c = e.target.closest('[data-ord]');
@@ -568,6 +704,12 @@ function veOnMidia(ev) {
     if (ev.stage === 'info') {
         m.info = ev;
         m.dur = ev.duration;
+        if (m._insertPending) {
+            const drop = m._insertDrop || null;
+            delete m._insertPending;
+            delete m._insertDrop;
+            vePjColocar([m.id], drop);
+        }
     } else if (ev.stage === 'proxy') {
         m.pct = ev.pct;
     } else if (ev.stage === 'audio') {
@@ -599,11 +741,12 @@ window.veOnMidia = veOnMidia;
 // Arquivos do Windows soltos em cima do painel: vão para o projeto (na pasta sob o cursor), não para a timeline
 function vePjSoltouAqui(drop) {
     const box = $ve('ve-pj');
-    if (!box || !drop || box.ownerDocument !== document) return null;
+    const doc = drop && drop.doc || document;
+    if (!box || !drop || box.ownerDocument !== doc) return null;
     const r = box.getBoundingClientRect();
     if (!r.width || drop.x < r.left || drop.x > r.right || drop.y < r.top || drop.y > r.bottom) return null;
-    const el = document.elementFromPoint(drop.x, drop.y), row = el && el.closest('[data-k]');
-    return { pasta: row && row.dataset.k.startsWith('b:') ? row.dataset.k.slice(2) : row && row.dataset.k.startsWith('m:') ? (VE.media[+row.dataset.k.slice(2)] || {}).pasta || null : null };
+    const el = doc.elementFromPoint(drop.x, drop.y), row = el && el.closest('[data-k]');
+    return { pasta: row && row.dataset.k.startsWith('b:') ? row.dataset.k.slice(2) : row && row.dataset.k.startsWith('m:') ? (VE.media[+row.dataset.k.slice(2)] || {}).pasta || null : vePjPastaVista() };
 }
 
 document.addEventListener('DOMContentLoaded', vePjInit);

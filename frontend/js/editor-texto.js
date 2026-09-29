@@ -4,11 +4,14 @@
 // devolve palavras [início, fim, texto] em segundos da timeline (VETX.palavras).
 // Legendas: VE.legendas = [{st, en, texto}] (entram no desfazer), estilo em VE.legEstilo; aparecem numa trilha
 // própria no alto da timeline (linha "LEG"), no monitor (veTxDesenhar) e, ao exportar, gravadas no vídeo com o
-// mesmo estilo (_gerar_ass em video_cutter.py) ou num .srt.
+// mesmo estilo (_gerar_ass em video_cutter.py) ou num arquivo (SRT, VTT, ASS, SSA, SBV ou TXT).
 // =========================================================
 
 const VE_LEG_PADRAO = { max: 42, linhas: 2, minDur: 3, gap: 0 };                 // "Criar legendas" do Premiere
-const VE_LEG_ESTILO = { fonte: 'Arial', tam: 5.5, cor: '#ffffff', fundo: 'caixa', pos: 'baixo', maiusc: false, negrito: true, ita: false };
+// s* = sombra projetada (px do quadro, como a dos textos); entrada = 'nenhum' | 'pop' | 'fade'
+const VE_LEG_ESTILO = { fonte: 'Arial', tam: 5.5, cor: '#ffffff', fundo: 'caixa', pos: 'baixo', maiusc: false, negrito: true, ita: false,
+    sOn: false, sCor: '#000000', sOp: 75, sDist: 6, sBlur: 8, entrada: 'nenhum' };
+const VE_LEG_ENTRADA = { fade: 0.12, pop: 0.18 };   // segundos: rápido, para não atrapalhar a leitura
 
 const VETX = {
     palavras: [], idioma: 'pt', chave: '', rodando: false, aba: 'trans', legSel: -1, ativa: -1,
@@ -46,7 +49,7 @@ function veOnTexto(ev) {
     if (ev.stage === 'prog') { veTxProgresso(ev.pct, ev.msg); return; }
     VETX.rodando = false;
     if (ev.success) {
-        VETX.palavras = ev.palavras || [];
+        VETX.palavras = veTxJuntarHifen(ev.palavras || []);
         VETX.chave = VETX.chaveAlvo;
         VETX.construidoTexto = false;
         veMarcarAlterado();
@@ -58,6 +61,18 @@ function veOnTexto(ev) {
 }
 
 function veMarcarAlterado() { if (!VE.dirty) { VE.dirty = true; veUpdateTitle(); } }
+
+// "lembre -se" / "lembre - se" → "lembre-se": o modelo às vezes separa o hífen da ênclise. Legendas.py já junta
+// nas transcrições novas; aqui corrige as que estão salvas em projetos antigos.
+function veTxJuntarHifen(W) {
+    const out = [];
+    W.forEach(w => {
+        const ant = out[out.length - 1], txt = String(w[2]);
+        if (ant && (txt[0] === '-' || (/-$/.test(ant[2]) && /^\p{L}/u.test(txt)))) { ant[1] = w[1]; ant[2] += txt; }
+        else out.push([w[0], w[1], txt]);
+    });
+    return out;
+}
 
 // Parágrafos: quebra em pausas longas ou em fim de frase depois de um trecho grande
 function veTxParagrafos() {
@@ -178,6 +193,8 @@ function veTxMontarLegendas(o) {
 
 function veTxCriarLegendas() {
     if (!VETX.palavras.length) { veToast('Transcreva a sequência primeiro'); return; }
+    const juntas = veTxJuntarHifen(VETX.palavras);
+    if (juntas.length !== VETX.palavras.length) { VETX.palavras = juntas; VETX.construidoTexto = false; }
     const o = {
         max: Math.max(7, Math.min(72, +$ve('ve-leg-max').value || 42)),
         linhas: +$ve('ve-leg-linhas').value || 2,
@@ -215,30 +232,86 @@ function veTxMetricas(e) {
     return VE_LEG_MET.get(k);
 }
 
+// Posição e medidas de uma legenda no quadro (a mesma conta do .ass da exportação): desenho, clique e edição
+let VE_LEG_MEDIDA = null;
+function veTxLegLayout(texto, e = veTxEstilo()) {
+    const H = VE.seqH, W = VE.seqW, met = veTxMetricas(e);
+    const em = Math.max(8, e.tam / 100 * H), alt = em * met.razao, folga = em * 0.22, margem = Math.round(0.06 * H);
+    let linhas = String(texto || '').split('\n').filter(l => l.trim());
+    if (e.maiusc) linhas = linhas.map(l => l.toUpperCase());
+    const fonte = `${e.ita ? 'italic ' : ''}${e.negrito ? 'bold ' : ''}${em}px "${e.fonte}", Arial`;
+    const m = VE_LEG_MEDIDA || (VE_LEG_MEDIDA = document.createElement('canvas').getContext('2d'));
+    m.font = fonte;
+    const larg = linhas.map(l => m.measureText(l).width), bloco = linhas.length * alt;
+    const topo = e.pos === 'cima' ? margem : e.pos === 'meio' ? (H - bloco) / 2 : H - margem - bloco;
+    return { W, H, em, alt, folga, margem, linhas, fonte, larg, bloco, topo, asc: met.asc, wMax: Math.max(0, ...larg) };
+}
+
+// Pop: 80% → 106% → 100% (linear, como os \t do .ass); cresce a partir da borda da posição (embaixo/em cima/meio)
+function veTxPopEscala(p) { return p < 0.65 ? 0.8 + 0.26 * (p / 0.65) : 1.06 - 0.06 * ((p - 0.65) / 0.35); }
+function veTxEntrada(ctx, e, L, t, i) {
+    const dur = VE_LEG_ENTRADA[e.entrada];
+    if (!dur || t < 0 || t >= dur || VETX.editando === i) return;
+    const p = t / dur;
+    if (e.entrada === 'fade') { ctx.globalAlpha *= p; return; }
+    const s = veTxPopEscala(p), oy = e.pos === 'cima' ? L.topo : e.pos === 'meio' ? L.topo + L.bloco / 2 : L.topo + L.bloco;
+    ctx.globalAlpha *= Math.min(1, p * 3);
+    ctx.translate(L.W / 2, oy);
+    ctx.scale(s, s);
+    ctx.translate(-L.W / 2, -oy);
+}
+
+// Sombra projetada do texto: o texto na cor da sombra, deslocado e desfocado, num quadro à parte
+// (a exportação faz igual: uma cópia da legenda numa camada de baixo com \blur)
+function veTxSombraQuadro(L, e) {
+    const c = VETX._sombra || (VETX._sombra = document.createElement('canvas'));
+    if (c.width !== L.W || c.height !== L.H) { c.width = L.W; c.height = L.H; }
+    const o = c.getContext('2d'), d = e.sDist * Math.SQRT1_2;
+    o.clearRect(0, 0, c.width, c.height);
+    o.save();
+    o.filter = e.sBlur > 0 ? `blur(${e.sBlur / 2}px)` : 'none';
+    o.font = L.fonte;
+    o.textAlign = 'center';
+    o.textBaseline = 'alphabetic';
+    o.fillStyle = e.sCor;
+    L.linhas.forEach((l, k) => o.fillText(l, L.W / 2 + d, L.topo + k * L.alt + L.em * L.asc + d));
+    o.restore();
+    return c;
+}
+
 // Desenha a legenda da agulha no monitor (coordenadas do quadro; mesma conta do .ass da exportação)
 function veTxDesenhar(ctx) {
     const i = veTxLegendaEm(VE.playhead);
     if (i < 0) return;
-    const e = veTxEstilo(), H = VE.seqH, W = VE.seqW, met = veTxMetricas(e);
-    const em = Math.max(8, e.tam / 100 * H), alt = em * met.razao, folga = em * 0.22, margem = Math.round(0.06 * H);
-    let linhas = String(VE.legendas[i].texto || '').split('\n').filter(l => l.trim());
-    if (e.maiusc) linhas = linhas.map(l => l.toUpperCase());
-    if (!linhas.length) return;
+    const e = veTxEstilo(), L = veTxLegLayout(VE.legendas[i].texto, e);
+    if (!L.linhas.length) return;
+    const { W, em, alt, folga, linhas, larg, topo } = L;
     ctx.save();
-    ctx.font = `${e.ita ? 'italic ' : ''}${e.negrito ? 'bold ' : ''}${em}px "${e.fonte}", Arial`;
+    veTxEntrada(ctx, e, L, VE.playhead - VE.legendas[i].st, i);
+    if (e.sOn) {
+        ctx.save();
+        ctx.globalAlpha *= e.sOp / 100;
+        if (e.fundo === 'caixa') {
+            // com caixa, a sombra é da caixa (sem desfoque, como o libass faz)
+            const d = e.sDist * Math.SQRT1_2;
+            ctx.fillStyle = e.sCor;
+            linhas.forEach((l, k) => ctx.fillRect(W / 2 - larg[k] / 2 - folga + d, topo + k * alt - folga + d, larg[k] + folga * 2, alt + folga * 2));
+        } else ctx.drawImage(veTxSombraQuadro(L, e), 0, 0);
+        ctx.restore();
+    }
+    ctx.font = L.fonte;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
-    const bloco = linhas.length * alt;
-    let topo = e.pos === 'cima' ? margem : e.pos === 'meio' ? (H - bloco) / 2 : H - margem - bloco;
     linhas.forEach((l, k) => {
-        const y = topo + k * alt, base = y + em * met.asc;
-        const w = ctx.measureText(l).width;
+        const y = topo + k * alt, base = y + em * L.asc, w = larg[k];
         if (e.fundo === 'caixa') {
             ctx.fillStyle = 'rgba(0,0,0,0.64)';
             ctx.fillRect(W / 2 - w / 2 - folga, y - folga, w + folga * 2, alt + folga * 2);
         } else if (e.fundo === 'sombra') {
-            ctx.fillStyle = 'rgba(0,0,0,0.75)';
-            ctx.fillText(l, W / 2 + em * 0.07, base + em * 0.07);
+            if (!e.sOn) {   // a sombra fixa do "Contorno e sombra" dá lugar à sombra projetada quando ela está ligada
+                ctx.fillStyle = 'rgba(0,0,0,0.75)';
+                ctx.fillText(l, W / 2 + em * 0.07, base + em * 0.07);
+            }
             ctx.lineWidth = em * 0.12;
             ctx.strokeStyle = '#000';
             ctx.strokeText(l, W / 2, base);
@@ -249,18 +322,99 @@ function veTxDesenhar(ctx) {
     ctx.restore();
 }
 
-function veTxSrt() {
-    const f = t => { const ms = Math.round(t * 1000); const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
-        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms % 1000).padStart(3, '0')}`; };
-    return (VE.legendas || []).map((c, i) => `${i + 1}\n${f(c.st)} --> ${f(c.en)}\n${c.texto.trim()}\n`).join('\n');
+// ─────────────────────────── editar a legenda no monitor (duplo clique) ───────────────────────────
+// Legenda da agulha sob o ponto (coordenadas do quadro), ou -1
+function veTxLegendaNoPonto(pt) {
+    const i = veTxLegendaEm(VE.playhead);
+    if (i < 0) return -1;
+    const L = veTxLegLayout(VE.legendas[i].texto), f = L.folga * 2;
+    const dentro = pt.x >= L.W / 2 - L.wMax / 2 - f && pt.x <= L.W / 2 + L.wMax / 2 + f && pt.y >= L.topo - f && pt.y <= L.topo + L.bloco + f;
+    return dentro ? i : -1;
 }
 
-function veTxSalvarSrt() {
-    if (!(VE.legendas || []).length) { veToast('Crie as legendas primeiro'); return; }
-    const base = (VE.path || 'legendas').split(/[\\/]/).pop().replace(/\.[^.]+$/, '');
+// Caixa de texto transparente por cima da legenda: o monitor mostra o resultado a cada tecla
+function veTxLegEditar(i) {
+    veTxLegEditarFim();
+    if (VE.playing) veStop();
+    const scr = $ve('ve-screen'), ta = scr.ownerDocument.createElement('textarea');
+    ta.className = 've-tx-edit ve-leg-edit';
+    ta.spellcheck = false;
+    ta.value = VE.legendas[i].texto;
+    scr.appendChild(ta);
+    VETX.editando = i;
+    VETX.legSel = i;
+    VETX.edit = { i, ta, hist: false };
+    veTxLegEditarPos();
+    ta.focus();
+    ta.select();
+    ta.addEventListener('input', () => {
+        const ed = VETX.edit;
+        if (!ed) return;
+        if (!ed.hist) { vePushHistory(); ed.hist = true; }
+        VE.legendas[ed.i] = { ...VE.legendas[ed.i], texto: ta.value };
+        veTxLegEditarPos();
+        veDrawMonitorSoon();
+        veDraw();
+        vePpRender();
+    });
+    ta.addEventListener('keydown', e => {
+        e.stopPropagation();
+        if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) { e.preventDefault(); veTxLegEditarFim(); }
+    });
+    ta.addEventListener('pointerdown', e => e.stopPropagation());
+    ta.addEventListener('blur', () => setTimeout(() => { if (VETX.edit && VETX.edit.ta === ta) veTxLegEditarFim(); }, 0));
+    veRefresh();
+}
+
+function veTxLegEditarPos() {
+    const ed = VETX.edit;
+    if (!ed) return;
+    const e = veTxEstilo(), L = veTxLegLayout(VE.legendas[ed.i].texto || ' ', e);
+    const q = veTxQuadroTela(), rs = $ve('ve-screen').getBoundingClientRect(), s = ed.ta.style;
+    const w = Math.max(L.wMax, L.em * 3) + L.folga * 2, linhas = Math.max(1, String(VE.legendas[ed.i].texto).split('\n').length);
+    const topo = e.pos === 'baixo' ? L.topo + L.bloco - linhas * L.alt : e.pos === 'meio' ? (L.H - linhas * L.alt) / 2 : L.topo;
+    s.left = (q.x0 - rs.left + (L.W / 2 - w / 2) * q.s) + 'px';
+    s.top = (q.y0 - rs.top + topo * q.s) + 'px';
+    s.width = (w * q.s) + 'px';
+    s.height = (linhas * L.alt * q.s) + 'px';
+    s.font = L.fonte.replace(/[\d.]+px/, (L.em * q.s) + 'px');
+    s.lineHeight = (L.alt * q.s) + 'px';
+    s.textAlign = 'center';
+    s.textTransform = e.maiusc ? 'uppercase' : 'none';
+    s.padding = '0';
+    s.transform = 'none';
+}
+
+function veTxLegEditarFim() {
+    const ed = VETX.edit;
+    if (!ed) return;
+    VETX.edit = null;
+    VETX.editando = -1;
+    ed.ta.remove();
+    // legenda apagada por inteiro sai da trilha
+    if (!String(VE.legendas[ed.i] && VE.legendas[ed.i].texto || '').trim()) { VE.legendas.splice(ed.i, 1); VETX.legSel = -1; }
+    veRefresh();
+}
+
+// Exportar em SRT, VTT, ASS, SSA, SBV ou TXT (Functions/legendas_formatos.py)
+// origem 'leg' = as legendas da trilha LEG; 'trans' = a transcrição, um trecho por parágrafo
+const VE_TX_FORMATOS = [['srt', 'SRT (SubRip)'], ['vtt', 'VTT (WebVTT)'], ['ass', 'ASS (Advanced SubStation)'],
+    ['ssa', 'SSA (SubStation)'], ['sbv', 'SBV (YouTube)'], ['txt', 'TXT (texto com tempos)']];
+const veTxOpcoesFormato = () => VE_TX_FORMATOS.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
+
+function veTxItensTranscricao() {
+    const W = VETX.palavras;
+    return veTxParagrafos().map(p => ({ st: W[p.i0][0], en: W[p.i1][1], texto: W.slice(p.i0, p.i1 + 1).map(w => w[2]).join(' ') }));
+}
+
+function veTxExportar(origem) {
+    const itens = origem === 'trans' ? veTxItensTranscricao() : (VE.legendas || []);
+    if (!itens.length) { veToast(origem === 'trans' ? 'Transcreva a sequência primeiro' : 'Crie as legendas primeiro'); return; }
+    const sel = $ve(origem === 'trans' ? 've-tx-fmt-trans' : 've-tx-fmt-leg'), formato = (sel && sel.value) || 'srt';
+    const base = (VE.path || 'legendas').split(/[\\/]/).pop().replace(/\.[^.]+$/, '') + (origem === 'trans' ? ' - transcricao' : '');
     const pasta = (VE.path || '').replace(/[\\/][^\\/]*$/, '');
-    window.pywebview.api.ve_salvar_srt(veTxSrt(), base + '.srt', pasta).then(r => {
-        if (r && r.success) veToast('Legendas salvas: ' + r.name);
+    window.pywebview.api.ve_salvar_legenda(itens, formato, base, pasta).then(r => {
+        if (r && r.success) veToast((origem === 'trans' ? 'Transcrição salva: ' : 'Legendas salvas: ') + r.name);
         else if (r && r.error) veToast('Não foi possível salvar: ' + r.error);
     });
 }
@@ -310,6 +464,7 @@ function veTxConstruir() {
                 <div class="ve-tx-aviso" id="ve-tx-aviso" hidden>A timeline mudou depois da transcrição. <button data-txacao="refazer">Transcrever de novo</button></div>
                 <div class="ve-tx-texto" id="ve-tx-texto"></div>
                 <div class="ve-tx-dica">Clique numa palavra para ir até ela · duplo clique corrige a palavra</div>
+                <div class="ve-tx-exp"><select id="ve-tx-fmt-trans" title="Formato do arquivo">${veTxOpcoesFormato()}</select><button class="ve-btn ve-btn-sm" data-txacao="exp-trans">Exportar transcrição</button></div>
             </div>
         </div>
         <div class="ve-tx-corpo" data-txc="leg" hidden>
@@ -330,7 +485,7 @@ function veTxConstruir() {
             </div>
             <div class="ve-tx-sec ve-tx-saida">
                 <label class="ve-tx-chk"><input type="checkbox" id="ve-leg-gravar"> Gravar as legendas no vídeo ao exportar</label>
-                <button class="ve-btn ve-btn-sm" data-txacao="srt">Salvar .srt</button>
+                <div class="ve-tx-exp"><select id="ve-tx-fmt-leg" title="Formato do arquivo">${veTxOpcoesFormato()}</select><button class="ve-btn ve-btn-sm" data-txacao="exp-leg">Exportar legendas</button></div>
             </div>
             <div class="ve-tx-lista" id="ve-leg-lista"></div>
         </div>`;
@@ -402,7 +557,8 @@ function veTxInit() {
             if (a === 'transcrever' || a === 'refazer') veTxTranscrever();
             else if (a === 'cancelar') veTxCancelar();
             else if (a === 'criar') { if (!(VE.legendas || []).length || veConfirmarTroca()) veTxCriarLegendas(); }
-            else if (a === 'srt') veTxSalvarSrt();
+            else if (a === 'exp-leg') veTxExportar('leg');
+            else if (a === 'exp-trans') veTxExportar('trans');
             else if (a === 'estilo') {
                 if (!(VE.legendas || []).length) { veToast('Crie as legendas primeiro'); return; }
                 if (VETX.legSel < 0) VETX.legSel = Math.max(0, veTxLegendaEm(VE.playhead));

@@ -514,10 +514,37 @@ function vedBuildFloatDoc(h) {
         '<button class="ve-btn ve-btn-sm ve-btn-ghost" data-dock title="Devolver os painéis desta janela ao editor (ou só feche a janela)">⤓ Encaixar no editor</button></div>' +
         '<div class="ve-dock" id="ve-dock-solta"></div>';
     d.body.appendChild(root);
+    [
+        'veOpenFile', 'veImportTimelineFile', 'veSplitAtPlayhead', 'veDeleteSelected', 'veExtractInOut',
+        'veResetEdits', 'veToggleVinculo', 'veToggleSnap', 'veZoomBy', 'veZoomSlider',
+        'vePjImportarDialogo', 'veCreateTimeline', 'vePjNovaPasta', 'vePjNovoAjuste', 'vePjApagar',
+        'veUndo', 'veRedo', 'veSaveProject', 'veOpenExport',
+    ].forEach(fn => { w[fn] = (...args) => window[fn] && window[fn](...args); });
     root.querySelector('[data-dock]').addEventListener('click', () => { try { w.close(); } catch (e) {} });
     vedBindDock(d.getElementById('ve-dock-solta'), h);
     // atalhos do editor funcionam com a janela solta em foco
     d.addEventListener('keydown', e => veOnKey(e));
+    d.addEventListener('dragenter', e => {
+        if (e.dataTransfer?.types?.includes('Files')) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        }
+    }, true);
+    d.addEventListener('dragover', e => {
+        if (e.dataTransfer?.types?.includes('Files')) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        }
+    }, true);
+    // arquivos do Windows: guarda o ponto do soltar e pede o caminho real ao Python (main.py: _janela_solta_propria)
+    d.addEventListener('drop', e => {
+        e.preventDefault();
+        const files = e.dataTransfer && e.dataTransfer.files;
+        if (!files || !files.length) return;
+        veGuardarDrop(e);
+        try { w.chrome.webview.postMessageWithAdditionalObjects('ve-drop', files); }
+        catch (err) { veToast('Não consegui receber o arquivo nesta janela'); }
+    }, true);
     d.addEventListener('keyup', e => { if (e.key === 'Alt') e.preventDefault(); });
     d.addEventListener('mouseup', e => { const bt = e.target.closest('button'); if (bt) setTimeout(() => bt.blur(), 0); });
 }
@@ -618,12 +645,16 @@ function veDockMenu(e) {
     const btn = e.currentTarget;
     document.body.appendChild(m);
     const posiciona = () => {
-        const r = btn.getBoundingClientRect();
-        m.style.top = r.bottom + 4 + 'px';
-        m.style.left = Math.max(8, Math.min(r.right - m.offsetWidth, window.innerWidth - m.offsetWidth - 8)) + 'px';
+        const r = btn.getBoundingClientRect(), naBarra = !!btn.closest('.ve-mbar');   // menu Janela da barra: alinha à esquerda
+        m.style.top = r.bottom + (naBarra ? 2 : 4) + 'px';
+        m.style.left = Math.max(8, Math.min(naBarra ? r.left : r.right - m.offsetWidth, window.innerWidth - m.offsetWidth - 8)) + 'px';
     };
-    const fechar = () => { m.remove(); document.removeEventListener('pointerdown', fora, true); };
-    const fora = ev => { if (!m.contains(ev.target)) fechar(); };
+    const fechar = () => {
+        m.remove();
+        document.removeEventListener('pointerdown', fora, true);
+        if (typeof VEMB !== 'undefined' && VEMB.aberto === 'janela') veMenuFechar();
+    };
+    const fora = ev => { if (!m.contains(ev.target) && !ev.target.closest('.ve-mbar')) fechar(); };   // a barra de menus decide sozinha
     setTimeout(() => document.addEventListener('pointerdown', fora, true), 0);
 
     const lista = () => {

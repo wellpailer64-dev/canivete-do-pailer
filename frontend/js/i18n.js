@@ -270,7 +270,36 @@ const I18N_EN = {
     // Painel Projeto
     'Projeto': 'Project', 'Buscar no projeto': 'Search project', 'Nome': 'Name', 'Tipo': 'Type', 'Informações': 'Info', 'Uso': 'Usage',
     'Clipes na timeline': 'Clips in the timeline', 'Pasta': 'Bin', 'item': 'item', 'itens': 'items', 'Legendas': 'Captions', 'Projeto não salvo': 'Unsaved project',
-    'Abra um vídeo para começar. Depois arraste para cá imagens, áudios, legendas (.srt), outros vídeos e pastas inteiras.': 'Open a video to start. Then drag images, audio, captions (.srt), other videos and whole folders here.',
+    'Abra um vídeo para começar. Depois arraste para cá imagens, áudios, legendas (.srt, .vtt, .ass, .sbv, .txt), outros vídeos e pastas inteiras.': 'Open a video to start. Then drag images, audio, captions (.srt, .vtt, .ass, .sbv, .txt), other videos and whole folders here.',
+    'Visualização em lista': 'List view', 'Visualização em grade (cards com prévia)': 'Icon view (cards with preview)', 'Tamanho dos cards': 'Card size',
+    'Voltar para a raiz do projeto': 'Back to the project root', 'Clique duas vezes para abrir a pasta': 'Double-click to open the bin', 'Pasta vazia': 'Empty bin',
+    'nenhuma legenda encontrada': 'no captions found', 'Exportar legendas': 'Export captions', 'Exportar transcrição': 'Export transcript', 'Formato do arquivo': 'File format',
+    // Barra de menus e comandos (editor-comandos.js)
+    'Arquivo': 'File', 'Editar': 'Edit', 'Clipe': 'Clip', 'Sequência': 'Sequence', 'Marcadores': 'Markers', 'Exibir': 'View', 'Janela': 'Window', 'Ajuda': 'Help',
+    'Reprodução e navegação': 'Playback and navigation', 'Ferramentas': 'Tools',
+    'Novo projeto': 'New Project', 'Nova timeline': 'New Timeline', 'Abrir projeto ou vídeo...': 'Open Project or Video...', 'Fechar projeto': 'Close Project',
+    'Salvar': 'Save', 'Salvar como...': 'Save As...', 'Importar...': 'Import...', 'Importar na timeline...': 'Import into Timeline...',
+    'Adicionar imagem na timeline...': 'Add Image to Timeline...', 'Exportar mídia...': 'Export Media...', 'Exportar legendas...': 'Export Captions...',
+    'Exportar transcrição...': 'Export Transcript...', 'Desfazer': 'Undo', 'Refazer': 'Redo', 'Recortar': 'Cut', 'Copiar': 'Copy', 'Colar': 'Paste',
+    'Apagar': 'Clear', 'Apagar e fechar o espaço': 'Ripple Delete', 'Desmarcar tudo': 'Deselect All', 'Atalhos do teclado...': 'Keyboard Shortcuts...',
+    'Preferências...': 'Preferences...', 'Ganho de áudio...': 'Audio Gain...', 'Cortar selecionados na agulha': 'Cut Selected at Playhead',
+    'Aparar início até a agulha': 'Ripple Trim Start to Playhead', 'Aparar fim até a agulha': 'Ripple Trim End to Playhead',
+    'Mover para a trilha de cima': 'Move to Track Above', 'Mover para a trilha de baixo': 'Move to Track Below', 'Seleção vinculada': 'Linked Selection',
+    'Cortar todas as trilhas na agulha': 'Add Edit to All Tracks', 'Remover trecho In→Out': 'Extract In→Out',
+    'Aplicar transição de vídeo padrão': 'Apply Default Video Transition', 'Aplicar transição de áudio padrão': 'Apply Default Audio Transition',
+    'Ímã (encaixar)': 'Snap', 'Voltar ao vídeo original': 'Revert to Original Video', 'Marcar entrada': 'Mark In', 'Marcar saída': 'Mark Out',
+    'Ir para a entrada': 'Go to In', 'Ir para a saída': 'Go to Out', 'Limpar entrada': 'Clear In', 'Limpar saída': 'Clear Out', 'Limpar entrada e saída': 'Clear In and Out',
+    'Reproduzir / Pausar': 'Play / Pause', 'Reproduzir em tela cheia': 'Play Full Screen', 'Som da prévia': 'Preview Audio',
+    'Mais zoom na timeline': 'Zoom In Timeline', 'Menos zoom na timeline': 'Zoom Out Timeline', 'Ajustar a timeline à tela': 'Fit Timeline to Screen',
+    'Monitor: ajustar à tela': 'Monitor: Fit', 'Parar': 'Stop', 'Reproduzir mais rápido (1,5x · 2x · 3x)': 'Play Faster (1.5x · 2x · 3x)',
+    'Voltar 5 segundos': 'Back 5 Seconds', 'Voltar 1 quadro': 'Step Back 1 Frame', 'Avançar 1 quadro': 'Step Forward 1 Frame', 'Voltar 1 segundo': 'Back 1 Second',
+    'Avançar 1 segundo': 'Forward 1 Second', 'Ir para o corte anterior': 'Go to Previous Edit', 'Ir para o próximo corte': 'Go to Next Edit',
+    'Ir para o início': 'Go to Start', 'Ir para o fim': 'Go to End', 'Ferramenta Seleção': 'Selection Tool', 'Ferramenta Lâmina': 'Razor Tool',
+    'Ferramenta Mão': 'Hand Tool', 'Ferramenta Zoom': 'Zoom Tool', 'Ferramenta Velocidade': 'Rate Stretch Tool', 'Ferramenta Texto': 'Type Tool',
+    'Dicas do editor (painel Atalhos)': 'Editor Tips (Shortcuts panel)', 'Atalhos do teclado': 'Keyboard Shortcuts', 'Buscar comando ou tecla': 'Search command or key',
+    'Restaurar padrões': 'Restore Defaults', 'Fechar': 'Close', 'Remover este atalho': 'Remove this shortcut', 'Adicionar atalho': 'Add shortcut',
+    'Voltar ao padrão': 'Back to default', 'Pressione as teclas... (Esc cancela)': 'Press the keys... (Esc cancels)',
+    'Todos os atalhos voltaram ao padrão.': 'All shortcuts are back to default.',
     'Nada encontrado': 'Nothing found', 'Nova pasta': 'New bin', 'cópia': 'copy', 'Nova camada de ajuste': 'New adjustment layer',
     'Importar...': 'Import...', 'Renomear': 'Rename', 'Duplicar': 'Duplicate', 'Recortar': 'Cut', 'Copiar': 'Copy', 'Colar': 'Paste', 'Apagar': 'Delete',
     'Importar arquivos (Ctrl+I) — ou arraste arquivos e pastas do Windows para cá': 'Import files (Ctrl+I) — or drag files and folders from Windows here',
@@ -664,6 +693,7 @@ function prefsLoad() {
     api.prefs_load().then(r => {
         if (r && r.success && r.data) Object.assign(PREFS, r.data);
         if (PREFS.lang !== I18N.lang) i18nApply(PREFS.lang);
+        if (typeof vePjRender === 'function') vePjRender();   // modo lista/grade do painel Projeto
     }).catch(() => {});
 }
 

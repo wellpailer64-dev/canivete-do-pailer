@@ -29,6 +29,10 @@ from Functions import media_server
 FORMATOS_ENTRADA = {
     ".mp4", ".mov", ".mkv", ".avi", ".webm", ".flv", ".wmv",
     ".m4v", ".ts", ".mts", ".m2ts", ".3gp", ".ogv", ".mpg", ".mpeg",
+    ".mxf", ".asf", ".m2v", ".f4v",
+    # RAW/profissional: passa pela mesma análise/proxy do FFmpeg; alguns codecs proprietários
+    # podem falhar se o decoder não existir na build local.
+    ".r3d", ".braw", ".ari", ".arx",
     # só áudio: o editor também corta/ajusta áudio e exporta em MP3/WAV
     ".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".wma", ".aiff", ".aif",
 }
@@ -205,6 +209,8 @@ def _probe_ffprobe(path):
         w, h = h, w
 
     fps = _fps((v or {}).get("avg_frame_rate")) or _fps((v or {}).get("r_frame_rate")) or 30.0
+    if dur <= 0 and v:
+        dur = _duration_by_counting_frames(path, fps)
     return {
         "duration": dur,
         "has_video": v is not None,
@@ -220,6 +226,25 @@ def _probe_ffprobe(path):
         "bitrate": int(fmt.get("bit_rate") or 0),
         "size": int(fmt.get("size") or 0),
     }
+
+
+def _duration_by_counting_frames(path, fps):
+    """Fallback para streams elementares, como .m2v, que podem nao trazer duração no container."""
+    try:
+        r = subprocess.run(
+            [ffprobe_path(), "-v", "error", "-count_frames", "-select_streams", "v:0",
+             "-show_entries", "stream=nb_read_frames,nb_read_packets", "-of", "json", path],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=300, creationflags=_creationflags(),
+        )
+        data = json.loads(r.stdout or "{}")
+        stream = (data.get("streams") or [{}])[0]
+        frames = int(stream.get("nb_read_frames") or stream.get("nb_read_packets") or 0)
+        if frames > 0 and fps > 0:
+            return frames / fps
+    except Exception:
+        pass
+    return 0.0
 
 
 def _navegador_toca(path, info):
@@ -958,6 +983,26 @@ def _gerar_ass(itens, estilo, W, H):
         borda, contorno, sombra, fundo_cor = 1, round(em * 0.06, 1), round(em * 0.07, 1), _ass_cor("#000000", 0x40)
     else:
         borda, contorno, sombra, fundo_cor = 1, 0, 0, _ass_cor("#000000", 0xFF)
+    # Sombra projetada (mesma prévia do editor-texto.js): com caixa, a sombra é da própria caixa (Shadow do estilo);
+    # sem caixa, uma cópia da legenda na cor da sombra numa camada de baixo, deslocada e com \blur
+    s_on = bool(estilo.get("sOn"))
+    s_alfa = round((1 - _num(estilo.get("sOp"), 0, 100, 75) / 100) * 255)
+    s_cor = _ass_cor(estilo.get("sCor", "#000000"), s_alfa)
+    s_d = _num(estilo.get("sDist"), 0, 200, 6) * 0.7071   # deslocamento em x e em y (distância na diagonal)
+    s_blur = _num(estilo.get("sBlur"), 0, 200, 8) / 2
+    camada_sombra = s_on and borda != 3
+    if s_on and borda == 3:
+        sombra, fundo_cor_sombra = round(s_d, 1), s_cor
+    else:
+        fundo_cor_sombra = fundo_cor
+    if camada_sombra:
+        sombra = 0
+    # Entrada rápida de cada legenda (VE_LEG_ENTRADA): Fade 0,12 s; Pop 80% → 106% → 100% em 0,18 s
+    entrada = {
+        "fade": r"\fad(120,0)",
+        "pop": r"\fscx80\fscy80\t(0,117,\fscx106\fscy106)\t(117,180,\fscx100\fscy100)\fad(60,0)",
+    }.get(estilo.get("entrada"), "")
+    ancora_y = {"baixo": H - margem, "meio": H / 2, "cima": margem}.get(pos, H - margem)
     linhas = [
         "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {W}", f"PlayResY: {H}", "WrapStyle: 2",
         "ScaledBorderAndShadow: yes", "",
@@ -965,10 +1010,14 @@ def _gerar_ass(itens, estilo, W, H):
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, "
         "Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, "
         "MarginR, MarginV, Encoding",
-        f"Style: Leg,{fonte},{em * razao:.1f},{cor},{cor},{fundo_cor if borda == 3 else _ass_cor('#000000')},{fundo_cor},"
+        f"Style: Leg,{fonte},{em * razao:.1f},{cor},{cor},{fundo_cor if borda == 3 else _ass_cor('#000000')},{fundo_cor_sombra},"
         f"{negrito},{italico},0,0,100,100,0,0,{borda},{contorno},{sombra},{alinhamento},{margem},{margem},{margem},1",
+        f"Style: LegS,{fonte},{em * razao:.1f},{s_cor},{s_cor},{s_cor},{s_cor},"
+        f"{negrito},{italico},0,0,100,100,0,0,1,0,0,{alinhamento},{margem},{margem},{margem},1",
         "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ]
+    tag_sombra = f"{{\\an{alinhamento}\\pos({W / 2 + s_d:.1f},{ancora_y + s_d:.1f})\\blur{s_blur:.1f}{entrada}}}"
+    tag_texto = f"{{{entrada}}}" if entrada else ""
     n = 0
     for it in itens:
         try:
@@ -981,7 +1030,9 @@ def _gerar_ass(itens, estilo, W, H):
         if estilo.get("maiusc"):
             txt = txt.upper()
         txt = txt.replace("\\", "\\\\").replace("{", "(").replace("}", ")").replace("\r", "").replace("\n", "\\N")
-        linhas.append(f"Dialogue: 0,{_ass_tempo(st)},{_ass_tempo(en)},Leg,,0,0,0,,{txt}")
+        if camada_sombra:
+            linhas.append(f"Dialogue: 0,{_ass_tempo(st)},{_ass_tempo(en)},LegS,,0,0,0,,{tag_sombra}{txt}")
+        linhas.append(f"Dialogue: 1,{_ass_tempo(st)},{_ass_tempo(en)},Leg,,0,0,0,,{tag_texto}{txt}")
         n += 1
     if not n:
         return None

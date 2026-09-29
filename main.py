@@ -7,6 +7,7 @@ import json
 import sys
 import threading
 import atexit
+import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # =========================
@@ -335,17 +336,21 @@ def ve_transcrever_cancelar():
 
 
 # ── painel Projeto do editor: importar arquivos e pastas, ler .srt ──
-_VE_EXT_PROJETO = (".mp4", ".mov", ".mkv", ".avi", ".webm", ".flv", ".wmv", ".m4v", ".ts", ".mts", ".m2ts", ".3gp",
-                   ".ogv", ".mpg", ".mpeg", ".mxf", ".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wma",
-                   ".aif", ".aiff", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".avif", ".srt")
+_VE_EXT_PROJETO = (".mp4", ".mov", ".mkv", ".avi", ".webm", ".flv", ".f4v", ".wmv", ".asf", ".m4v", ".ts", ".mts",
+                   ".m2ts", ".3gp", ".ogv", ".mpg", ".mpeg", ".m2v", ".mxf", ".r3d", ".braw", ".ari", ".arx",
+                   ".mp3", ".wav", ".flac", ".m4a", ".aac", ".ogg", ".opus", ".wma",
+                   ".aif", ".aiff", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".avif",
+                   ".srt", ".vtt", ".ass", ".ssa", ".sbv")   # .txt só escolhido/arrastado (numa pasta pode ser qualquer coisa)
 
 
 def ve_importar_dialogo():
     """Janela "Importar" (vários arquivos) do painel Projeto."""
     if not _window:
         return {"success": False}
-    tipos = ("Mídia (*.mp4;*.mov;*.mkv;*.avi;*.webm;*.m4v;*.mts;*.mp3;*.wav;*.flac;*.m4a;*.aac;*.ogg;*.png;*.jpg;*.jpeg;"
-             "*.webp;*.gif;*.bmp;*.srt)", "Todos os arquivos (*.*)")
+    tipos = ("Mídia (*.mp4;*.mov;*.mxf;*.mkv;*.avi;*.webm;*.flv;*.f4v;*.wmv;*.asf;*.m4v;*.ts;*.mts;*.m2ts;"
+             "*.mpg;*.mpeg;*.m2v;*.r3d;*.braw;*.ari;*.arx;*.mp3;*.wav;*.flac;*.m4a;*.aac;*.ogg;"
+             "*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp;*.srt;*.vtt;*.ass;*.ssa;*.sbv;*.txt)",
+             "Legendas (*.srt;*.vtt;*.ass;*.ssa;*.sbv;*.txt)", "Todos os arquivos (*.*)")
     r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), allow_multiple=True, file_types=tipos)
     if not r:
         return {"success": False, "cancelled": True}
@@ -371,33 +376,10 @@ def ve_listar_pasta(path, _nivel=0):
     return {"success": True, "nome": os.path.basename(os.path.normpath(path)), "arquivos": arquivos, "pastas": pastas}
 
 
-def ve_ler_srt(path):
-    """Legendas .srt → [{st, en, texto}] (segundos)."""
-    import re
-    try:
-        bruto = open(path, "rb").read()
-        for enc in ("utf-8-sig", "cp1252", "latin-1"):
-            try:
-                txt = bruto.decode(enc)
-                break
-            except UnicodeDecodeError:
-                continue
-        tempo = r"(\d+):(\d+):(\d+)[,.](\d+)"
-        seg = lambda m, k: int(m[k]) * 3600 + int(m[k + 1]) * 60 + int(m[k + 2]) + int(m[k + 3].ljust(3, "0")[:3]) / 1000
-        itens = []
-        for bloco in re.split(r"\r?\n\s*\r?\n", txt.strip()):
-            linhas = [l for l in bloco.strip().splitlines()]
-            for k, l in enumerate(linhas):
-                m = re.match(tempo + r"\s*-->\s*" + tempo, l.strip())
-                if m:
-                    g = m.groups()
-                    texto = "\n".join(re.sub(r"<[^>]+>", "", x).strip() for x in linhas[k + 1:] if x.strip())
-                    if texto:
-                        itens.append({"st": round(seg(g, 0), 3), "en": round(seg(g, 4), 3), "texto": texto})
-                    break
-        return {"success": True, "itens": itens, "nome": os.path.basename(path)}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+def ve_ler_legenda(path):
+    """Legendas (.srt, .vtt, .ass/.ssa, .sbv, .txt) → [{st, en, texto}] (segundos)."""
+    from Functions import legendas_formatos
+    return legendas_formatos.ler(path)
 
 
 def ve_fontes():
@@ -465,18 +447,22 @@ def ve_salvar_png(dados):
         return {"success": False, "error": str(e)}
 
 
-def ve_salvar_srt(conteudo, sugestao="legendas.srt", pasta=""):
-    """Pergunta onde salvar e grava o .srt (UTF-8)."""
+def ve_salvar_legenda(itens, formato="srt", nome="legendas", pasta=""):
+    """Pergunta onde salvar e grava as legendas/transcrição no formato pedido (srt, vtt, ass, ssa, sbv, txt)."""
+    from Functions import legendas_formatos as lf
     try:
         if not _window:
             return {"success": False}
+        formato = formato if formato in lf.FORMATOS else "srt"
+        conteudo = lf.escrever(itens or [], formato)
         r = _window.create_file_dialog(_file_dialog_kind("SAVE", webview.SAVE_DIALOG), directory=pasta or "",
-                                       save_filename=sugestao, file_types=("Legendas SubRip (*.srt)",))
+                                       save_filename=f"{nome}.{formato}",
+                                       file_types=(f"{lf.FORMATOS[formato]} (*.{formato})", "Todos os arquivos (*.*)"))
         if not r:
             return {"success": False, "cancelled": True}
         path = r[0] if isinstance(r, (list, tuple)) else r
-        if not path.lower().endswith(".srt"):
-            path += ".srt"
+        if not path.lower().endswith("." + formato):
+            path += "." + formato
         with open(path, "w", encoding="utf-8-sig", newline="\r\n") as f:
             f.write(conteudo)
         return {"success": True, "path": path, "name": os.path.basename(path)}
@@ -872,14 +858,19 @@ def open_file(path):
 
 def select_video_file(tool):
     if _window:
-        file_types = (
-            "Vídeos, áudios, imagens e projetos (*.mp4;*.mov;*.mkv;*.avi;*.webm;*.flv;*.wmv;*.m4v;*.ts;*.mts;*.m2ts;*.3gp;*.mpg;*.mpeg;*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.wma;*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.avif;*.vcnvt)",
-            "Projeto do Canivete (*.vcnvt)",
-            "Todos os arquivos (*.*)",
-        )
-        result = _window.create_file_dialog(
-            _file_dialog_kind("OPEN", webview.OPEN_DIALOG), file_types=file_types
-        )
+        result = None
+        try:
+            file_types = (
+                "Vídeos, áudios, imagens e projetos (*.mp4;*.mov;*.mxf;*.mkv;*.avi;*.webm;*.flv;*.f4v;*.wmv;*.asf;*.m4v;*.ts;*.mts;*.m2ts;*.3gp;*.mpg;*.mpeg;*.m2v;*.r3d;*.braw;*.ari;*.arx;*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.wma;*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.avif;*.vcnvt)",
+                "Projeto do Canivete (*.vcnvt)",
+                "Todos os arquivos (*.*)",
+            )
+            result = _window.create_file_dialog(
+                _file_dialog_kind("OPEN", webview.OPEN_DIALOG), file_types=file_types
+            )
+        except Exception as e:
+            print("[select_video_file] filtro falhou, usando seletor genérico:", e)
+            result = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG))
         if result:
             file_path = result[0] if isinstance(result, (list, tuple)) else result
             return {"success": True, "path": file_path}
@@ -1490,6 +1481,94 @@ def transcrever_salvar_txt(texto, pasta_origem):
         os.startfile(pasta_saida)
         return {"success": True, "path": path_txt}
     except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+# ========================================
+# Tools: OmniVoice / geração de voz
+# ========================================
+def omnivoice_status():
+    from Functions.omnivoice_tool import status
+    try:
+        return status()
+    except Exception as e:
+        _registrar_erro("omnivoice_status", e)
+        return {"success": False, "error": str(e)}
+
+
+def omnivoice_download():
+    from Functions.omnivoice_tool import download_model
+
+    def trabalho(log, progresso):
+        r = download_model(callback_log=log, callback_progresso=progresso)
+        return {"resumo": "OmniVoice pronto para uso", **r}
+
+    return _tarefa("updateOmniVoiceProgress", trabalho)
+
+
+def omnivoice_create_voice(name, audio_path, ref_text="", options=None):
+    from Functions.omnivoice_tool import create_voice
+
+    def trabalho(log, progresso):
+        r = create_voice(name, audio_path, ref_text, options or {}, callback_log=log, callback_progresso=progresso)
+        voz = (r.get("voice") or {}).get("name") or name
+        return {"resumo": f"Voz salva: {voz}", **r}
+
+    return _tarefa("updateOmniVoiceProgress", trabalho)
+
+
+def omnivoice_update_voice(voice_id, name, ref_text):
+    from Functions.omnivoice_tool import update_voice
+
+    def trabalho(log, progresso):
+        r = update_voice(voice_id, name, ref_text, callback_log=log, callback_progresso=progresso)
+        voz = (r.get("voice") or {}).get("name") or name
+        return {"resumo": f"Voz atualizada: {voz}", **r}
+
+    return _tarefa("updateOmniVoiceProgress", trabalho)
+
+
+def omnivoice_delete_voice(voice_id):
+    from Functions.omnivoice_tool import delete_voice
+    try:
+        return delete_voice(voice_id)
+    except Exception as e:
+        _registrar_erro("omnivoice_delete_voice", e)
+        return {"success": False, "error": str(e)}
+
+
+def omnivoice_synthesize(voice_id, text, options=None):
+    from Functions.omnivoice_tool import synthesize
+
+    def trabalho(log, progresso):
+        return synthesize(voice_id, text, options or {}, callback_log=log, callback_progresso=progresso)
+
+    return _tarefa("updateOmniVoiceProgress", trabalho)
+
+
+def omnivoice_save_output(path):
+    try:
+        if not path or not os.path.isfile(path):
+            return {"success": False, "error": "Audio nao encontrado."}
+        if not _window:
+            return {"success": False}
+        name = os.path.basename(path)
+        folder = os.path.dirname(path)
+        result = _window.create_file_dialog(
+            _file_dialog_kind("SAVE", webview.SAVE_DIALOG),
+            directory=folder,
+            save_filename=name,
+            file_types=("Audio WAV (*.wav)", "Todos os arquivos (*.*)"),
+        )
+        if not result:
+            return {"success": False, "cancelled": True}
+        dest = result[0] if isinstance(result, (list, tuple)) else result
+        if not os.path.splitext(dest)[1]:
+            dest += ".wav"
+        shutil.copy2(path, dest)
+        return {"success": True, "path": dest, "name": os.path.basename(dest)}
+    except Exception as e:
+        _registrar_erro("omnivoice_save_output", e)
         return {"success": False, "error": str(e)}
 
 
@@ -2326,8 +2405,8 @@ class ApiBridge:
     def ve_transcrever_cancelar(self):
         return ve_transcrever_cancelar()
 
-    def ve_salvar_srt(self, conteudo, sugestao="legendas.srt", pasta=""):
-        return ve_salvar_srt(conteudo, sugestao, pasta)
+    def ve_salvar_legenda(self, itens, formato="srt", nome="legendas", pasta=""):
+        return ve_salvar_legenda(itens, formato, nome, pasta)
 
     def ve_fontes(self):
         return ve_fontes()
@@ -2341,8 +2420,8 @@ class ApiBridge:
     def ve_listar_pasta(self, path):
         return ve_listar_pasta(path)
 
-    def ve_ler_srt(self, path):
-        return ve_ler_srt(path)
+    def ve_ler_legenda(self, path):
+        return ve_ler_legenda(path)
 
     def ve_salvar_png(self, dados):
         return ve_salvar_png(dados)
@@ -2467,6 +2546,27 @@ class ApiBridge:
     def transcrever_cena(self, folder_path):
         return transcrever_cena(folder_path)
 
+    def omnivoice_status(self):
+        return omnivoice_status()
+
+    def omnivoice_download(self):
+        return omnivoice_download()
+
+    def omnivoice_create_voice(self, name, audio_path, ref_text="", options=None):
+        return omnivoice_create_voice(name, audio_path, ref_text, options or {})
+
+    def omnivoice_update_voice(self, voice_id, name, ref_text):
+        return omnivoice_update_voice(voice_id, name, ref_text)
+
+    def omnivoice_delete_voice(self, voice_id):
+        return omnivoice_delete_voice(voice_id)
+
+    def omnivoice_synthesize(self, voice_id, text, options=None):
+        return omnivoice_synthesize(voice_id, text, options or {})
+
+    def omnivoice_save_output(self, path):
+        return omnivoice_save_output(path)
+
     # scraper
     def web_scraper_analyze(self, url):
         return web_scraper_analyze(url)
@@ -2538,6 +2638,14 @@ def _liberar_janelas_flutuantes():
     except Exception:
         return
     original = edgechromium.EdgeChrome.on_new_window_request
+    pronto_original = edgechromium.EdgeChrome.on_webview_ready
+
+    def on_webview_ready(self, sender, args):
+        pronto_original(self, sender, args)
+        if args.IsSuccess:
+            _ligar_tela_cheia(self.form, sender.CoreWebView2)
+
+    edgechromium.EdgeChrome.on_webview_ready = on_webview_ready
 
     def on_new_window_request(self, sender, args):
         if str(args.get_Uri()) != "about:blank":
@@ -2549,6 +2657,33 @@ def _liberar_janelas_flutuantes():
             print(f"[janela solta] usando a janela padrão do WebView2: {e}")
 
     edgechromium.EdgeChrome.on_new_window_request = on_new_window_request
+
+
+def _ligar_tela_cheia(form, core):
+    """requestFullscreen() na página (Alt+Enter no editor): sem isso o WebView2 só ocupa a área da janela.
+    Enquanto houver um elemento em tela cheia a janela fica sem borda e maximizada (cobre a barra de tarefas);
+    ao sair, volta como estava."""
+    try:
+        from System.Windows.Forms import FormBorderStyle, FormWindowState
+        sem_borda = getattr(FormBorderStyle, "None")   # "None" é palavra reservada no Python
+        antes = {}
+
+        def mudou(c, _):
+            try:
+                if c.ContainsFullScreenElement:
+                    antes.update(borda=form.FormBorderStyle, estado=form.WindowState)
+                    form.WindowState = FormWindowState.Normal   # maximizar de novo já sem borda
+                    form.FormBorderStyle = sem_borda
+                    form.WindowState = FormWindowState.Maximized
+                elif antes:
+                    form.FormBorderStyle = antes.pop("borda")
+                    form.WindowState = antes.pop("estado")
+            except Exception as exc:
+                print("[tela cheia] erro:", exc)
+
+        core.ContainsFullScreenElementChanged += mudou
+    except Exception as exc:
+        print("[tela cheia] indisponível:", exc)
 
 
 def _janela_solta_propria(chrome, sender, args):
@@ -2579,6 +2714,22 @@ def _janela_solta_propria(chrome, sender, args):
     wv.Dock = WinForms.DockStyle.Fill
     form.Controls.Add(wv)
 
+    # Arquivos do Windows soltos na janela solta: o drop dela (editor-dock.js) manda os File por
+    # postMessageWithAdditionalObjects e o WebView2 entrega o caminho real (como o pywebview faz na principal)
+    def _mensagem(c, e):
+        try:
+            if e.TryGetWebMessageAsString() != "ve-drop":
+                return
+            objs = e.get_AdditionalObjects()
+            caminhos = [{"path": str(f.Path), "pasta": os.path.isdir(str(f.Path))}
+                        for f in list(objs or []) if getattr(f, "Path", None)]
+            if caminhos and _window:
+                # este evento roda na thread da interface; evaluate_js esperaria por ela mesma (trava o app)
+                js = f"onArquivosSoltos({json.dumps(caminhos, ensure_ascii=False)})"
+                threading.Thread(target=_window.evaluate_js, args=(js,), daemon=True).start()
+        except Exception as exc:
+            print("[janela solta drop] erro:", exc)
+
     def pronto(s, e):
         try:
             if e.IsSuccess:
@@ -2586,6 +2737,8 @@ def _janela_solta_propria(chrome, sender, args):
                 args.NewWindow = core
                 core.DocumentTitleChanged += lambda c, _: setattr(form, "Text", str(c.DocumentTitle))
                 core.WindowCloseRequested += lambda c, _: form.Close()
+                core.WebMessageReceived += _mensagem
+                _ligar_tela_cheia(form, core)
                 st = core.Settings
                 st.AreDefaultContextMenusEnabled = False
                 st.AreBrowserAcceleratorKeysEnabled = False
@@ -2758,6 +2911,11 @@ def main():
     if porta_agente:
         webview.settings["REMOTE_DEBUGGING_PORT"] = porta_agente
         print(f"[agente] depuração remota em http://127.0.0.1:{porta_agente}")
+
+    # O servidor local do pywebview aceita só 5 conexões na fila (padrão do Python): ao abrir, a página
+    # pede ~15 arquivos de uma vez e o Windows recusa o resto — um script do editor ficava sem carregar
+    from wsgiref.simple_server import WSGIServer
+    WSGIServer.request_queue_size = 128
 
     _liberar_janelas_flutuantes()
     webview.start(_splash_sound, debug=False)

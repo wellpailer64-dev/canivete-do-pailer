@@ -249,6 +249,18 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
 - O desenho (canvas) e o libass usam esse nome de sistema, por isso acham exatamente o mesmo estilo:
   prévia = vídeo gravado, testado com Segoe UI Semibold Italic e Arial Narrow Bold.
 
+## Comandos, atalhos e barra de menus
+- Código: `frontend/js/editor-comandos.js`. `VE_CMDS` lista cada ação (id, menu, nome, teclas padrão, `fn`,
+  `pode()` = habilitado, `marcado()` = ✓, `sempre` = funciona sem projeto). Ação nova = um item nessa lista:
+  aparece no menu, no teclado e em Editar › Atalhos do teclado (Ctrl+Alt+K).
+- Barra de menus: Arquivo, Editar, Clipe, Sequência, Marcadores, Exibir, Janela, Ajuda. Janela usa o menu de painéis de
+  `editor-dock.js` (`veDockMenu`).
+- `veOnKey` (editor.js) só faz as verificações de foco/modais e chama `veExecTecla`. Teclas no formato
+  `Ctrl+Alt+Shift+Tecla` (letras/números por `e.code`; símbolos pelo caractere, sem o Shift).
+- Teclas trocadas pelo usuário: `PREFS.atalhos` (só as diferentes do padrão; tecla repetida sai do outro comando).
+- Alt+Enter: `veTelaCheia` (monitor em tela cheia, toca da agulha; ao sair pausa). O main.py (`_ligar_tela_cheia`)
+  deixa a janela sem borda e maximizada enquanto o WebView2 tem elemento em tela cheia.
+
 ## Painel Projeto (como o Project do Premiere; substitui o painel Clipes)
 - Código: `frontend/js/editor-projeto.js`. Guarda os materiais do projeto: o vídeo aberto, imagens, áudios, camadas de ajuste,
   legendas (.srt) e outros vídeos (estes ainda não entram na timeline: o editor usa um vídeo por projeto).
@@ -257,8 +269,13 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
 - **Entrada:**
   - Arquivos e pastas do Windows soltos em cima do painel entram na pasta sob o cursor.
   - Uma pasta vira pasta do projeto, com as subpastas (`ve_listar_pasta`).
-  - Pastas, `.srt` e outros vídeos soltos na timeline também vão para o painel.
-  - Botão Importar (Ctrl+I) e `.srt` via `ve_ler_srt`.
+  - Pastas e legendas soltas na timeline também vão para o painel.
+  - Botão Importar (Ctrl+I). Legendas `.srt`, `.vtt`, `.ass`/`.ssa`, `.sbv` e `.txt` via `ve_ler_legenda`
+    (`Functions/legendas_formatos.py`; TXT sem tempos vira uma legenda por parágrafo, em sequência).
+- **Visualização:** lista (colunas) ou grade (cards com miniatura; passar o mouse num vídeo percorre as miniaturas;
+  duplo clique abre a pasta, com a trilha de pastas no alto). O modo e o tamanho do card ficam em `PREFS` (`pjModo`, `pjTam`).
+  Cor do ícone por tipo: pasta amarela, vídeo roxo, imagem azul, áudio verde, timeline verde-água.
+- **Exportar legendas/transcrição** (painel Texto): SRT, VTT, ASS, SSA, SBV ou TXT via `ve_salvar_legenda`.
 - **Organizar:**
   - Ctrl+B cria pasta; F2 ou duplo clique no nome renomeia.
   - Ctrl+C/X/V (cola na pasta selecionada), Ctrl+D duplica, Delete apaga.

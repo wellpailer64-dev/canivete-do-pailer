@@ -19,6 +19,9 @@ const VE = {
     playhead: 0,        // tempo da sequência
     cur: -1,            // clipe que o player está mostrando (-1 = espaço vazio)
     media: [],          // [0] = vídeo aberto; imagens adicionadas depois
+    sequences: [],      // timelines do projeto (cada uma guarda seus próprios clipes/trilhas/legendas)
+    activeSequence: null,
+    _seqN: 0,
     projectPath: null,  // .vcnvt salvo/aberto
     dirty: false,       // alterações desde o último salvar
     seqW: 1920, seqH: 1080,   // tamanho do quadro da sequência (o do vídeo)
@@ -246,8 +249,172 @@ function veRedo() {
 }
 
 function veUpdateUndo() {
-    $ve('ve-undo').disabled = !VE.history.length;
-    $ve('ve-redo').disabled = !VE.future.length;
+    // Desfazer/Refazer ficam no menu Editar, que confere VE.history/VE.future ao abrir
+}
+
+// ─────────────────────────── timelines do projeto ───────────────────────────
+function vePlain(v, fallback) {
+    if (v == null) return fallback;
+    try { return JSON.parse(JSON.stringify(v)); } catch (e) { return fallback; }
+}
+
+function veSeqDur(seq) {
+    return (seq && Array.isArray(seq.clips) ? seq.clips : []).reduce((m, c) => Math.max(m, c.st + (c.e - c.s) / ((c && c.v) || 1)), 0);
+}
+
+function veSeqTracks(trilhas) {
+    const tr = veTrkNovo();
+    if (trilhas && Array.isArray(trilhas.v) && Array.isArray(trilhas.a)) {
+        [0, 1, 2, 3].forEach(k => {
+            Object.assign(tr.v[k], trilhas.v[k] || {});
+            Object.assign(tr.a[k], trilhas.a[k] || {});
+        });
+    }
+    return tr;
+}
+
+function veSeqId() { return 'seq_' + Date.now().toString(36) + '_' + (VE._seqN++); }
+
+function veSeqMedia(seqId) {
+    return VE.media.find(m => m && !m.removido && m.kind === 'timeline' && m.sequenceId === seqId);
+}
+
+function veSeqNomeDisponivel(base = 'Timeline') {
+    const usados = new Set((VE.sequences || []).map(s => s.name).filter(Boolean));
+    VE.media.forEach(m => { if (m && !m.removido && m.kind === 'timeline') usados.add(m.nome || m.name); });
+    let n = 1, nome = `${base} ${n}`;
+    while (usados.has(nome)) nome = `${base} ${++n}`;
+    return nome;
+}
+
+function veSeqAtiva() {
+    return (VE.sequences || []).find(s => s.id === VE.activeSequence) || null;
+}
+
+function veSeqCapturar() {
+    const m = veSeqMedia(VE.activeSequence);
+    return {
+        id: VE.activeSequence || veSeqId(),
+        name: (m && (m.nome || m.name)) || (veSeqAtiva() && veSeqAtiva().name) || veSeqNomeDisponivel(),
+        clips: vePlain(VE.clips, []),
+        trilhas: vePlain(VE_TRK, veTrkNovo()),
+        texto: { palavras: vePlain(VETX.palavras, []), idioma: VETX.idioma || 'pt', chave: VETX.chave || '' },
+        legendas: vePlain(VE.legendas || [], []),
+        legEstilo: vePlain(VE.legEstilo || null, null),
+        legGravar: VE.legGravar !== false,
+        inPt: VE.inPt ?? null,
+        outPt: VE.outPt ?? null,
+        playhead: VE.playhead || 0,
+        view: { pps: VE.pps, x: VE.view || 0 },
+    };
+}
+
+function veSeqSalvarAtiva() {
+    if (!VE.activeSequence) return;
+    const seq = veSeqAtiva();
+    if (!seq) return;
+    Object.assign(seq, veSeqCapturar(), { id: seq.id });
+}
+
+function veSeqAplicar(seq, opts = {}) {
+    if (!seq) return;
+    veStop();
+    VE.activeSequence = seq.id;
+    VE.clips = vePlain(seq.clips, []);
+    VE_TRK = veSeqTracks(seq.trilhas);
+    veBuildHeads();
+    VE.inPt = seq.inPt ?? null;
+    VE.outPt = seq.outPt ?? null;
+    VE.legendas = vePlain(seq.legendas || [], []);
+    VE.legEstilo = vePlain(seq.legEstilo || null, null);
+    VE.legGravar = seq.legGravar !== false;
+    if (typeof VETX !== 'undefined') {
+        VETX.palavras = vePlain(seq.texto && seq.texto.palavras, []);
+        VETX.idioma = (seq.texto && seq.texto.idioma) || 'pt';
+        VETX.chave = (seq.texto && seq.texto.chave) || '';
+        VETX.legSel = -1;
+        VETX.construidoTexto = false;
+    }
+    VE.sel = -1;
+    VE.trSel = null;
+    VE.bordaSel = null;
+    VE.history = [];
+    VE.future = [];
+    veUpdateUndo();
+    veRelayout();
+    if (seq.view && seq.view.pps > 0) { VE.pps = seq.view.pps; VE.view = seq.view.x || 0; }
+    else { VE.pps = veFitPps(); VE.view = 0; }
+    veAfterEdit(seq.playhead || 0);
+    if (!opts.silent) veToast('Timeline aberta: ' + (seq.name || 'Timeline'));
+}
+
+function veSeqCriarMidia(seq, pasta) {
+    const m = { id: VE.media.length, kind: 'timeline', name: seq.name || veSeqNomeDisponivel(), sequenceId: seq.id, pasta: pasta || null };
+    VE.media.push(m);
+    return m;
+}
+
+function veEnsureSequence() {
+    if ((VE.sequences || []).length || !VE.ready) return;
+    const id = veSeqId(), name = veSeqNomeDisponivel();
+    VE.activeSequence = id;
+    const seq = { ...veSeqCapturar(), id, name };
+    VE.sequences = [seq];
+    veSeqCriarMidia(seq, null);
+}
+
+function veCreateTimeline(opts = {}) {
+    if (!VE.ready) { veToast('Abra um projeto antes de criar uma timeline'); return null; }
+    veSeqSalvarAtiva();
+    const origem = opts.cloneId ? (VE.sequences || []).find(s => s.id === opts.cloneId) : null;
+    const nomeBase = origem ? ((origem.name || 'Timeline') + ' cópia') : 'Timeline';
+    const id = veSeqId();
+    const seq = origem ? vePlain(origem, {}) : {
+        clips: [], trilhas: veTrkNovo(), texto: { palavras: [], idioma: 'pt', chave: '' },
+        legendas: [], legEstilo: null, legGravar: true, inPt: null, outPt: null, playhead: 0, view: { pps: 0, x: 0 },
+    };
+    seq.id = id;
+    seq.name = opts.name || veSeqNomeDisponivel(nomeBase);
+    VE.sequences = VE.sequences || [];
+    VE.sequences.push(seq);
+    const srcMidia = origem && veSeqMedia(origem.id);
+    const pasta = opts.pasta !== undefined ? opts.pasta : (srcMidia ? srcMidia.pasta : (typeof vePjDestino === 'function' ? vePjDestino() : null));
+    const m = veSeqCriarMidia(seq, pasta);
+    VE.activeSequence = id;
+    VEPJ.sel = new Set(['m:' + m.id]);
+    VEPJ.foco = 'm:' + m.id;
+    VE.dirty = true;
+    veUpdateTitle();
+    veSeqAplicar(seq, { silent: true });
+    vePjRender();
+    veToast(origem ? 'Timeline duplicada' : 'Nova timeline criada');
+    return seq;
+}
+
+function veOpenTimeline(seqId) {
+    if (!VE.ready || seqId === VE.activeSequence) return;
+    veSeqSalvarAtiva();
+    const seq = (VE.sequences || []).find(s => s.id === seqId);
+    if (!seq) return;
+    veSeqAplicar(seq);
+    const m = veSeqMedia(seq.id);
+    if (m) { VEPJ.sel = new Set(['m:' + m.id]); VEPJ.foco = 'm:' + m.id; vePjRender(); }
+}
+
+function veDeleteTimeline(seqId) {
+    const seqs = VE.sequences || [];
+    const seq = seqs.find(s => s.id === seqId);
+    if (!seq) return false;
+    if (seqs.length <= 1) { veToast('O projeto precisa ter pelo menos uma timeline'); return false; }
+    const m = veSeqMedia(seqId);
+    VE.sequences = seqs.filter(s => s.id !== seqId);
+    if (m) m.removido = true;
+    if (VE.activeSequence === seqId) veSeqAplicar(VE.sequences[0], { silent: true });
+    VE.dirty = true;
+    veUpdateTitle();
+    vePjRender();
+    veToast('Timeline apagada');
+    return true;
 }
 
 // Depois de qualquer edição: reencaixa zoom/visão, reposiciona a agulha e redesenha
@@ -1252,15 +1419,22 @@ function vePickImage() {
 
 // Arquivos soltos no editor: sem projeto abre o vídeo; com projeto, imagens viram camadas
 const VE_EXT_IMG = /\.(png|jpe?g|webp|gif|bmp|avif)$/i;
+function veDropAtual() { return VE._drop && Date.now() - VE._drop.at < 5000 ? VE._drop : null; }
+
+function veGuardarDrop(e) {
+    if (!e) return;
+    VE._drop = { x: e.clientX, y: e.clientY, at: Date.now(), doc: e.target && e.target.ownerDocument || document };
+}
+
 function veDropFiles(itens) {
     const proj = itens.find(i => !i.pasta && /\.vcnvt$/i.test(i.path));
     if (proj) { veOpenProject(proj.path); return; }
-    const drop = VE._drop && Date.now() - VE._drop.at < 5000 ? VE._drop : null;
+    const drop = veDropAtual();
     const noPainel = VE.ready ? vePjSoltouAqui(drop) : null;
     if (noPainel) { vePjImportar(itens, noPainel.pasta); return; }
     if (VE.ready) {
-        // pastas, legendas e outros vídeos não vão direto para a timeline: entram no painel Projeto
-        const soProjeto = itens.filter(i => i.pasta || VE_EXT_SRT.test(i.path) || (EXT_VIDEO.test(i.path) && i.path !== VE.path));
+        // pastas e legendas entram no painel Projeto; vídeos/áudios/imagens soltos entram direto na timeline.
+        const soProjeto = itens.filter(i => i.pasta || VE_EXT_LEG.test(i.path));
         if (soProjeto.length) { vePjImportar(soProjeto, null); itens = itens.filter(i => !soProjeto.includes(i)); if (!itens.length) return; }
     }
     const videos = itens.filter(i => !i.pasta && (EXT_VIDEO.test(i.path) || EXT_AUDIO.test(i.path)));
@@ -1270,6 +1444,11 @@ function veDropFiles(itens) {
         if (videos.length) veOpenPath(videos[0].path);
         else if (imgs.length) { VE._imgsIni = imgs.slice(1).map(i => i.path); veOpenPath(imgs[0].path); }
         else veToast('Solte um arquivo de vídeo, áudio ou imagem');
+        return;
+    }
+    const vids = videos.filter(i => EXT_VIDEO.test(i.path));
+    if (vids.length) {
+        vids.forEach(it => veAddVideo(it.path, drop));
         return;
     }
     if (imgs.length) {
@@ -1282,13 +1461,12 @@ function veDropFiles(itens) {
         audios.reduce((p, it) => p.then(() => veAddAudio(it.path)), Promise.resolve());
         return;
     }
-    if (videos.length) veToast('Por enquanto o editor usa um vídeo por projeto. Para trocar, use Abrir (Ctrl+O).');
-    else veToast('Arraste imagens (PNG, JPG, WEBP, GIF) para usar por cima do vídeo');
+    veToast('Arraste vídeos, áudios ou imagens para a timeline');
 }
 
 function veAddImage(path, deslocamento = 0) {
     if (!VE.ready) return;
-    const drop = VE._drop && Date.now() - VE._drop.at < 5000 ? VE._drop : null;
+    const drop = veDropAtual();
     window.pywebview.api.video_cutter_add_media(path).then(r => {
         if (!r || !r.success) { veToast((r && r.error) || 'Não foi possível abrir a imagem'); return; }
         let m = VE.media.find(x => x.kind === 'image' && x.path === r.path);
@@ -1301,6 +1479,24 @@ function veAddImage(path, deslocamento = 0) {
         m.img.onerror = () => veToast('Não foi possível carregar a imagem');
         m.img.src = r.url;
     });
+}
+
+function veAddVideo(path, drop = veDropAtual()) {
+    if (!VE.ready || !path) return null;
+    let m = VE.media.find(x => x.kind === 'video' && x.path === path && !x.removido);
+    const colocar = () => vePjColocar([m.id], drop);
+    if (m && m.info && m.info.duration) { colocar(); return m; }
+    if (!m) {
+        const nome = path.split(/[\\/]/).pop();
+        m = vePjAddMidia({ kind: 'video', path, name: nome }, typeof vePjDestino === 'function' ? vePjDestino() : null);
+    }
+    m._insertDrop = drop;
+    m._insertPending = true;
+    const emFila = typeof VEPJF !== 'undefined' && (VEPJF.rodando === m.id || VEPJF.fila.includes(m.id));
+    if (!emFila && !m.info) veMidiaPreparar(m);
+    vePjRender();
+    veToast('Preparando vídeo para colocar na timeline...');
+    return m;
 }
 
 // Timeline aberta por uma imagem: ela entra em V1 no zero com 5 s (as outras soltas junto vêm em seguida)
@@ -1381,8 +1577,9 @@ function veTrackFree(tr, a, b, novo) {
 
 function veInsertImageClip(m, drop, deslocamento, rotulo = 'Imagem adicionada', abrirPainel = true) {
     let st = VE.playhead, tr = -1;
-    const wrap = $ve('ve-tl-wrap').getBoundingClientRect();
-    if (drop && drop.x >= wrap.left && drop.x <= wrap.right && drop.y >= wrap.top + VE_RULER && drop.y <= wrap.bottom) {
+    const wrapEl = $ve('ve-tl-wrap'), wrap = wrapEl.getBoundingClientRect();
+    const mesmoDoc = !drop || !drop.doc || drop.doc === wrapEl.ownerDocument;
+    if (drop && mesmoDoc && drop.x >= wrap.left && drop.x <= wrap.right && drop.y >= wrap.top + VE_RULER && drop.y <= wrap.bottom) {
         st = Math.max(0, VE.view + (drop.x - wrap.left) / VE.pps);
         const row = veRowAt(drop.y - wrap.top);
         if (row && row.kind !== 'l') tr = veTrackIndex(row);
@@ -2131,21 +2328,25 @@ function veConfirmDiscard() {
 }
 
 function veProjectData() {
+    veSeqSalvarAtiva();
     return {
         app: 'Canivete do Pailer',
         video: VE.path,
-        media: VE.media.filter(m => m.id && !m.removido && ['image', 'ajuste', 'audio', 'texto', 'legenda', 'video'].includes(m.kind))
+        media: VE.media.filter(m => m.id && !m.removido && ['image', 'ajuste', 'audio', 'texto', 'legenda', 'video', 'timeline'].includes(m.kind))
             .map(m => {
                 const o = { id: m.id, kind: m.kind, name: m.name, pasta: m.pasta || null, cor: m.cor, nome: m.nome };
                 if (m.kind === 'audio') Object.assign(o, { path: m.path, dur: m.dur });
                 if (m.kind === 'image') Object.assign(o, { path: m.path, w: m.w, h: m.h });
                 if (m.kind === 'legenda') Object.assign(o, { path: m.path, itens: m.itens });
                 if (m.kind === 'video') o.path = m.path;
+                if (m.kind === 'timeline') o.sequenceId = m.sequenceId;
                 return o;
             }),
         // painel Projeto: pastas e a organização do vídeo principal
         bins: VE.bins || [],
         m0: VE.media[0] ? { pasta: VE.media[0].pasta || null, cor: VE.media[0].cor, nome: VE.media[0].nome } : null,
+        sequences: vePlain(VE.sequences || [], []),
+        activeSequence: VE.activeSequence,
         clips: VE.clips,
         trilhas: VE_TRK,
         texto: { palavras: VETX.palavras, idioma: VETX.idioma, chave: VETX.chave },
@@ -2189,14 +2390,14 @@ function veCloseProject() {
     Object.assign(VE, {
         path: null, info: null, dur: 0, srcDur: 0, clips: [], sel: -1, inPt: null, outPt: null, playhead: 0,
         cur: -1, history: [], future: [], thumbs: [], peaks: [], ready: false, dest: null, view: 0, media: [],
-        projectPath: null, dirty: false, _pendingProject: null, bins: [],
+        sequences: [], activeSequence: null, _seqN: 0, projectPath: null, dirty: false, _pendingProject: null, bins: [],
     });
     VEPJ.sel.clear();
     veUpdateUndo();
     $ve('ve-empty').hidden = false;
     $ve('ve-loading').hidden = true;
     $ve('ve-proxy-badge').hidden = true;
-    ['ve-export-btn', 've-add-image', 've-add-adjust', 've-save'].forEach(id => { $ve(id).disabled = true; });
+    $ve('ve-export-btn').disabled = true;
     $ve('ve-meta').textContent = 'Nenhum vídeo aberto';
     $ve('ve-clips').innerHTML = '<div class="ve-clips-empty">Abra um vídeo ou áudio para começar.</div>';
     ['ve-sum-orig', 've-sum-final', 've-sum-cut'].forEach(id => { $ve(id).textContent = '—'; });
@@ -2236,6 +2437,12 @@ function veApplyProject() {
     const ids = { 0: 0 };
     (d.media || []).forEach(m => {
         const org = { pasta: m.pasta || null, cor: m.cor, nome: m.nome };
+        if (m.kind === 'timeline') {
+            const nm = { id: VE.media.length, kind: 'timeline', name: m.name || m.nome || 'Timeline', sequenceId: m.sequenceId, ...org };
+            VE.media.push(nm);
+            ids[m.id] = nm.id;
+            return;
+        }
         if (m.kind === 'legenda') {
             const nm = { id: VE.media.length, kind: m.kind, name: m.name, path: m.path, itens: m.itens, ...org };
             VE.media.push(nm);
@@ -2281,7 +2488,7 @@ function veApplyProject() {
             nm.img.src = r.url;
         });
     });
-    const clips = (d.clips || [])
+    const mapClips = lista => (lista || [])
         .filter(c => !c.m || ids[c.m] != null)
         .map(c => {
             const n = { ...c };
@@ -2289,32 +2496,44 @@ function veApplyProject() {
             return n;
         })
         .filter(c => c.e - c.s > 1e-3);
-    if (clips.length) VE.clips = clips;
     VE.bins = Array.isArray(d.bins) ? d.bins : [];
     if (d.m0 && VE.media[0]) Object.assign(VE.media[0], d.m0);
-    VE.legendas = Array.isArray(d.legendas) ? d.legendas : [];
-    VE.legEstilo = d.legEstilo || null;
-    VE.legGravar = d.legGravar !== false;
-    if (d.texto && Array.isArray(d.texto.palavras)) {
-        VETX.palavras = d.texto.palavras;
-        VETX.idioma = d.texto.idioma || 'pt';
-        VETX.chave = d.texto.chave || '';
-        VETX.construidoTexto = false;
-    }
-    if (d.trilhas && Array.isArray(d.trilhas.v) && Array.isArray(d.trilhas.a)) {
-        VE_TRK = veTrkNovo();
-        [0, 1, 2, 3].forEach(k => { Object.assign(VE_TRK.v[k], d.trilhas.v[k] || {}); Object.assign(VE_TRK.a[k], d.trilhas.a[k] || {}); });
-        veBuildHeads();
-    }
-    VE.inPt = d.inPt ?? null;
-    VE.outPt = d.outPt ?? null;
-    VE.sel = -1;
-    VE.history = [];
-    VE.future = [];
-    veUpdateUndo();
-    veRelayout();
-    if (d.view && d.view.pps > 0) { VE.pps = d.view.pps; VE.view = d.view.x || 0; }
-    veAfterEdit(d.playhead || 0);
+    const savedSeqs = Array.isArray(d.sequences) && d.sequences.length ? d.sequences : null;
+    VE.sequences = (savedSeqs || [{
+        id: d.activeSequence || 'seq_legacy',
+        name: 'Timeline 1',
+        clips: d.clips || [],
+        trilhas: d.trilhas,
+        texto: d.texto,
+        legendas: d.legendas,
+        legEstilo: d.legEstilo,
+        legGravar: d.legGravar,
+        inPt: d.inPt,
+        outPt: d.outPt,
+        playhead: d.playhead,
+        view: d.view,
+    }]).map((s, i) => ({
+        id: s.id || veSeqId(),
+        name: s.name || `Timeline ${i + 1}`,
+        clips: mapClips(s.clips),
+        trilhas: veSeqTracks(s.trilhas),
+        texto: s.texto && Array.isArray(s.texto.palavras) ? { palavras: s.texto.palavras, idioma: s.texto.idioma || 'pt', chave: s.texto.chave || '' } : { palavras: [], idioma: 'pt', chave: '' },
+        legendas: Array.isArray(s.legendas) ? s.legendas : [],
+        legEstilo: s.legEstilo || null,
+        legGravar: s.legGravar !== false,
+        inPt: s.inPt ?? null,
+        outPt: s.outPt ?? null,
+        playhead: s.playhead || 0,
+        view: s.view || { pps: 0, x: 0 },
+    }));
+    VE.sequences.forEach(seq => {
+        let m = veSeqMedia(seq.id);
+        if (!m) m = veSeqCriarMidia(seq, null);
+        m.sequenceId = seq.id;
+        if (!m.nome && !m.name) m.name = seq.name;
+    });
+    VE.activeSequence = d.activeSequence && VE.sequences.find(s => s.id === d.activeSequence) ? d.activeSequence : VE.sequences[0].id;
+    veSeqAplicar(VE.sequences.find(s => s.id === VE.activeSequence), { silent: true });
     VE.dirty = false;
     veUpdateTitle();
     const faltam = missing.filter(p => p !== d.video).length;
@@ -2980,11 +3199,30 @@ function veSnapTime(t, forRazor) {
 
 function veOpenFile() {
     if (VE.exportRunning) return;
-    window.pywebview.api.select_video_file('video-cutter').then(r => {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.select_file) { veToast('A ponte com o app ainda não está pronta'); return; }
+    api.select_file('video-cutter').then(r => {
         if (!r || !r.success) return;
-        if (/\.vcnvt$/i.test(r.path)) veOpenProject(r.path);
-        else if (veConfirmDiscard()) veOpenPath(r.path);
-    });
+        veAbrirArquivoEscolhido(r.path, false);
+    }).catch(e => veToast('Não consegui abrir o seletor: ' + (e && e.message ? e.message : e)));
+}
+
+function veAbrirArquivoEscolhido(path, inserirNaTimeline) {
+    if (!path) return;
+    if (/\.vcnvt$/i.test(path)) { veOpenProject(path); return; }
+    if (inserirNaTimeline && VE.ready) { veDropFiles([{ path, pasta: false }]); return; }
+    if (VE.ready && inserirNaTimeline !== false) { veDropFiles([{ path, pasta: false }]); return; }
+    if (veConfirmDiscard()) veOpenPath(path);
+}
+
+function veImportTimelineFile() {
+    if (VE.exportRunning) return;
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.select_file) { veToast('A ponte com o app ainda não está pronta'); return; }
+    api.select_file('video-cutter').then(r => {
+        if (!r || !r.success) return;
+        veAbrirArquivoEscolhido(r.path, true);
+    }).catch(e => veToast('Não consegui abrir o seletor: ' + (e && e.message ? e.message : e)));
 }
 
 function veOpenPath(path) {
@@ -3007,15 +3245,13 @@ function veOpenPath(path) {
     Object.assign(VE, {
         path, info: null, dur: 0, srcDur: 0, clips: [], sel: -1, inPt: null, outPt: null, playhead: 0,
         cur: -1, history: [], future: [], thumbs: [], peaks: [], ready: false, dest: null, view: 0, media: [],
+        sequences: [], activeSequence: null, _seqN: 0,
     });
     veUpdateUndo();
     $ve('ve-empty').hidden = true;
     $ve('ve-proxy-badge').hidden = true;
     veLoading('Analisando vídeo...', 5);
     $ve('ve-export-btn').disabled = true;
-    $ve('ve-add-image').disabled = true;
-    $ve('ve-add-adjust').disabled = true;
-    $ve('ve-save').disabled = true;
     veUpdateTitle();
     $ve('ve-meta').textContent = path.split(/[\\/]/).pop();
     if (typeof playExecute === 'function') playExecute();
@@ -3050,6 +3286,7 @@ function veOnPrepare(ev) {
             VE.clips = ev.base_imagem ? [] : [{ tr: 0, st: 0, s: 0, e: VE.srcDur }];
             veRelayout();
             VE.ready = true;
+            if (!VE._pendingProject) veEnsureSequence();
             VE.pps = veFitPps();
             VE.view = 0;
             veSyncZoomSlider();
@@ -3060,7 +3297,6 @@ function veOnPrepare(ev) {
             if (ev.has_audio) veAudioFonte();   // áudio conformado para o mixer em tempo real
             veRefresh();
             if (VE._pendingProject) veApplyProject();
-            $ve('ve-save').disabled = false;
             veUpdateTitle();
             break;
         }
@@ -3079,8 +3315,6 @@ function veOnPrepare(ev) {
             v.addEventListener('loadeddata', () => {
                 veLoading(null);
                 $ve('ve-export-btn').disabled = false;
-                $ve('ve-add-image').disabled = false;
-                $ve('ve-add-adjust').disabled = !!(VE.info && VE.info.audio_only);
                 veSeek(0);
                 if (VE.info && VE.info.base_imagem && !VE._pendingProject && !VE.clips.length) veIniciarComImagem();
             }, { once: true });
@@ -3742,7 +3976,7 @@ function veInitEvents() {
     document.addEventListener('drop', e => {
         if (!veIsActive()) return;
         e.preventDefault();
-        VE._drop = { x: e.clientX, y: e.clientY, at: Date.now() };
+        veGuardarDrop(e);
     });
 
     new ResizeObserver(() => {
@@ -3787,72 +4021,9 @@ function veOnKey(e) {
         return;
     }
     if (!$ve('ve-gain').hidden) return;   // a caixa de ganho trata as próprias teclas
-    const k = e.key.toLowerCase();
-    const ctrl = e.ctrlKey || e.metaKey;
-
-    if (ctrl && k === 'o') { e.preventDefault(); veOpenFile(); return; }
-    if (ctrl && k === 's') { e.preventDefault(); veSaveProject(e.shiftKey); return; }
-    if (!VE.ready) return;
-    if (ctrl && k === 'z' && !e.shiftKey) { e.preventDefault(); veUndo(); return; }
-    if (ctrl && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); veRedo(); return; }
-    if (ctrl && k === 'k') { e.preventDefault(); veSplitAtPlayhead(); return; }
-    if (ctrl && k === 'c' && !e.shiftKey) { e.preventDefault(); veCopiar(false); return; }
-    if (ctrl && k === 'x' && !e.shiftKey) { e.preventDefault(); veCopiar(true); return; }
-    if (ctrl && k === 'v' && !e.shiftKey) { e.preventDefault(); veColar(); return; }
-    if (e.altKey && (k === 'arrowup' || k === 'arrowdown')) { e.preventDefault(); veTrocarTrilha(k === 'arrowup' ? 1 : -1); return; }
-    if (ctrl && (k === 'm' || k === 'e')) { e.preventDefault(); veOpenExport(); return; }
-    // transição padrão (como no Premiere): Ctrl+D vídeo; Ctrl+Shift+D (ou Ctrl+Shift+9) áudio — Potência constante
-    if (ctrl && e.shiftKey && (k === 'd' || e.code === 'Digit9')) { e.preventDefault(); veTransPadrao(true); return; }
-    if (ctrl && !e.shiftKey && k === 'd') { e.preventDefault(); veTransPadrao(false); return; }
-    if (ctrl) return;
-
-    // ' corta todas as trilhas na agulha. No teclado ABNT2 a tecla pode chegar como "Dead"
-    // (layout internacional); nesse caso vale o código físico da tecla ao lado do 1.
-    if (k === "'" || (k === 'dead' && e.code === 'Backquote')) { e.preventDefault(); veSplitAtPlayhead(); return; }
-
-    const map = {
-        ' ': () => veTogglePlay(),
-        'k': () => { veStop(); veSetRate(1); },
-        // L: 1º toque dá play em 1,5x; depois 2x, 3x e volta ao normal (1x)
-        'l': () => {
-            if (!VE.playing) { veSetRate(1.5); vePlay(); }
-            else veSetRate({ 1: 1.5, 1.5: 2, 2: 3, 3: 1 }[VE.rate] || 1);
-            veToast(VE.rate === 1 ? 'Velocidade normal' : `Velocidade ${String(VE.rate).replace('.', ',')}x`);
-        },
-        'j': () => veSeek(VE.playhead - 5),
-        'arrowleft': () => e.shiftKey ? veSeek(VE.playhead - 1) : veStepFrames(-1),
-        'arrowright': () => e.shiftKey ? veSeek(VE.playhead + 1) : veStepFrames(1),
-        'arrowup': () => veJumpEdit(-1),
-        'arrowdown': () => veJumpEdit(1),
-        'home': () => veSeek(0),
-        'end': () => veSeek(VE.dur),
-        's': () => veSplitAtPlayhead(),
-        'e': () => veCortarSelecionados(),
-        'd': () => veDeleteSelected(e.shiftKey),
-        'g': () => veOpenGain(),
-        'delete': () => veDeleteSelected(e.shiftKey),
-        'backspace': () => veDeleteSelected(e.shiftKey),
-        'i': () => veMarkIn(),
-        'o': () => veMarkOut(),
-        'x': () => veExtractInOut(),
-        'q': () => veRippleTrimStart(),
-        'w': () => veRippleTrimEnd(),
-        'v': () => veSetTool('select'),
-        'c': () => veSetTool('razor'),
-        'h': () => veSetTool('hand'),
-        'z': () => veSetTool('zoom'),
-        'r': () => { veSetTool('rate'); veToast('Velocidade (R): arraste a borda de um clipe'); },
-        't': () => { veSetTool('texto'); veToast('Texto (T): clique no monitor para escrever'); },
-        'n': () => veToggleSnap(),
-        'm': () => veToggleMute(),
-        '+': () => veZoomBy(1.5),
-        '=': () => veZoomBy(1.5),
-        '-': () => veZoomBy(1 / 1.5),
-        '\\': () => veZoomFit(),
-        'escape': () => { VE.sel = -1; VE.trSel = null; VE.bordaSel = null; veRenderClips(); veDraw(); },
-    };
-    const fn = map[k];
-    if (fn) { e.preventDefault(); fn(); }
+    if (VEAT.aberto) return;               // janela Atalhos do teclado aberta (ela grava as teclas)
+    // as teclas de cada ação (padrão ou as do usuário) ficam em editor-comandos.js
+    veExecTecla(e);
 }
 
 // Modo foco: ao entrar no editor, esconde o banner do topo para ganhar espaço
@@ -3881,3 +4052,6 @@ document.addEventListener('DOMContentLoaded', () => {
 window.veOnPrepare = veOnPrepare;
 window.veOnExport = veOnExport;
 window.veOpenPath = veOpenPath;
+window.veGuardarDrop = veGuardarDrop;
+window.veOpenFile = veOpenFile;
+window.veImportTimelineFile = veImportTimelineFile;

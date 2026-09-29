@@ -731,6 +731,55 @@ body.ve-docking, body.ve-docking * { cursor: grabbing !important; user-select: n
 .ve-menu button b { width: 14px; color: var(--ve-accent); font-weight: 700; }
 .ve-menu hr { border: 0; border-top: 1px solid var(--ve-line); margin: 4px 2px; }
 
+/* barra de menus (Arquivo, Editar, Clipe...) como nos apps da Adobe */
+.ve-mbar { display: flex; align-items: center; gap: 1px; margin-left: 4px; }
+.ve-mbar-item {
+    height: 26px; padding: 0 9px; border: 0; border-radius: 5px; background: transparent;
+    color: var(--ve-dim); font: 500 12.5px var(--ve-ui); cursor: default; white-space: nowrap;
+}
+.ve-mbar-item:hover, .ve-mbar-item.on { background: var(--ve-panel-2); color: var(--ve-text); }
+.ve-mbar-menu {
+    position: fixed; z-index: 1001; min-width: 260px; padding: 4px; border-radius: 8px;
+    background: var(--ve-panel); border: 1px solid var(--ve-line-2); box-shadow: 0 16px 40px rgba(0, 0, 0, .55);
+    max-height: calc(100vh - 60px); overflow-y: auto;
+}
+.ve-mbar-menu button {
+    display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 10px 5px 6px; border: 0; border-radius: 5px;
+    background: transparent; color: var(--ve-text); font: 500 12px var(--ve-ui); text-align: left; cursor: default;
+}
+.ve-mbar-menu button:hover:not(:disabled) { background: var(--ve-accent); color: #1a0d02; }
+.ve-mbar-menu button:disabled { color: var(--ve-faint); opacity: .6; }
+.ve-mbar-menu button b { width: 14px; flex: none; text-align: center; font-weight: 700; }
+.ve-mbar-menu button span { flex: 1; }
+.ve-mbar-menu kbd { font: 11px var(--ve-mono); color: var(--ve-faint); padding-left: 24px; }
+.ve-mbar-menu button:hover:not(:disabled) kbd { color: #1a0d02; }
+.ve-mbar-menu hr { border: 0; border-top: 1px solid var(--ve-line); margin: 4px 2px; }
+
+/* janela Atalhos do teclado */
+.ve-at-box { width: min(720px, calc(100% - 32px)); height: min(640px, calc(100% - 32px)); display: flex; flex-direction: column; overflow: hidden; outline: none; }
+.ve-at-topo { padding: 4px 6px 0; }
+.ve-at-lista { flex: 1; min-height: 0; overflow-y: auto; padding: 0 14px 10px; }
+.ve-at-grupo { position: sticky; top: 0; z-index: 1; padding: 12px 0 5px; background: var(--ve-panel); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ve-faint); }
+.ve-at-row { display: flex; align-items: center; gap: 12px; min-height: 32px; padding: 2px 6px; border-radius: 6px; }
+.ve-at-row:hover { background: var(--ve-panel-2); }
+.ve-at-row.gravando { background: rgba(249,115,22,.14); box-shadow: inset 0 0 0 1px rgba(249,115,22,.5); }
+.ve-at-nome { flex: 1; min-width: 0; font-size: 12.5px; color: var(--ve-text); }
+.ve-at-teclas { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 5px; }
+.ve-at-kbd {
+    display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 3px 0 7px; border-radius: 5px;
+    border: 1px solid var(--ve-line-2); border-bottom-width: 2px; background: var(--ve-bg); font: 600 11px var(--ve-mono); color: var(--ve-text);
+}
+.ve-at-kbd button { border: 0; background: none; color: var(--ve-faint); font-size: 13px; line-height: 1; padding: 0 3px; cursor: pointer; }
+.ve-at-kbd button:hover { color: var(--ve-danger); }
+.ve-at-kbd.rec { padding-right: 8px; border-color: var(--ve-accent); color: var(--ve-accent); font-family: var(--ve-ui); }
+.ve-at-add { width: 24px; height: 22px; border: 1px dashed var(--ve-line-2); border-radius: 5px; background: none; color: var(--ve-dim); cursor: pointer; }
+.ve-at-add:hover { border-color: var(--ve-accent); color: var(--ve-accent); }
+.ve-at-aviso { min-height: 18px; padding: 0 14px 6px; font-size: 11.5px; color: #fbbf24; }
+
+/* Alt+Enter: monitor em tela cheia */
+.ve-screen:fullscreen { background: #000; }
+.ve-screen:fullscreen .ve-mzoom, .ve-screen:fullscreen .ve-badge { display: none; }
+
 /* =========================================================
    Efeitos
    ========================================================= */
@@ -822,7 +871,7 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-menu-form div { display: flex; justify-content: flex-end; gap: 6px; }
 .ve-menu .ve-menu-form button { width: auto; }
 /* menu, fantasma e guias de encaixe ficam no <body>, fora do .ve: precisam das cores do editor */
-.ve-menu, .ve-dghost, .ve-ddrop, .ve-dzones {
+.ve-menu, .ve-mbar-menu, .ve-dghost, .ve-ddrop, .ve-dzones {
     --ve-bg: var(--bg-0); --ve-panel: var(--bg-1); --ve-panel-2: var(--bg-3);
     --ve-line: var(--line); --ve-line-2: var(--line-2); --ve-text: var(--text); --ve-dim: var(--text-2);
     --ve-faint: var(--text-3); --ve-accent: #F97316; --ve-accent-2: var(--primary-hover);
@@ -1007,6 +1056,10 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-tx-grade input[type=color] { width: 100%; height: 26px; padding: 0; border: 1px solid var(--ve-line-2); border-radius: 6px; background: var(--ve-bg); }
 .ve-tx-chk { flex-direction: row !important; align-items: center; gap: 6px !important; font-size: 11.5px; color: var(--ve-dim); }
 .ve-tx-saida { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.ve-tx-exp { display: flex; align-items: center; gap: 6px; }
+.ve-tx-exp select { min-width: 0; max-width: 190px; }
+.ve-tx-pronto > .ve-tx-exp { padding: 8px 12px 10px; border-top: 1px solid var(--ve-line); }
+.ve-tx-pronto > .ve-tx-exp select { flex: 1; max-width: none; }
 .ve-tx-lista { display: flex; flex-direction: column; gap: 6px; padding: 10px; }
 .ve-leg { display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 8px; border: 1px solid var(--ve-line-2); background: var(--ve-bg); }
 .ve-leg.sel { border-color: var(--ve-accent); }
@@ -1108,6 +1161,8 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-pj-row { height: 26px; font-size: 12px; color: var(--ve-text); cursor: default; border-radius: 4px; margin: 0 4px; padding-left: 6px; }
 .ve-pj-row:hover { background: var(--ve-panel-2); }
 .ve-pj-row.sel { background: rgba(249,115,22,.18); box-shadow: inset 0 0 0 1px rgba(249,115,22,.45); }
+.ve-pj-row.atual { box-shadow: inset 3px 0 0 var(--ve-accent); }
+.ve-pj-row.atual .ve-pj-nome { color: var(--ve-text); font-weight: 650; }
 .ve-pj-row.alvo { background: rgba(249,115,22,.3); box-shadow: inset 0 0 0 2px var(--ve-accent); }
 .ve-pj-row.fraco > *:not(.ve-pj-cor) { opacity: .6; }
 .ve-pj-row .ve-pj-nome, .ve-pj-row .ve-pj-ren { min-width: 0; }
@@ -1124,6 +1179,53 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-pj-c.mono { font-family: var(--ve-mono); }
 .ve-pj-fim { height: 40px; }
 .ve-pj-rodape { display: flex; align-items: center; gap: 2px; padding: 4px 8px; border-top: 1px solid var(--ve-line); }
+.ve-pj-sep { width: 1px; height: 16px; margin: 0 4px; background: var(--ve-line); }
+.ve-pj-modo.on { background: var(--ve-panel-2); color: var(--ve-accent); }
+.ve-pj-tam { width: 72px; margin-left: 4px; accent-color: var(--ve-accent); display: none; }
+.ve-pj.grade .ve-pj-tam { display: block; }
+
+/* cor de cada tipo de item (ícone da lista e dos cards) */
+.ve-pj { --pj-bin: #e9c46a; --pj-video: #a78bfa; --pj-image: #60a5fa; --pj-audio: #4ade80; --pj-timeline: #2dd4bf; --pj-card: 132px; }
+.ve-pj [data-kind] { --pj-tipo: var(--ve-dim); }
+.ve-pj [data-kind="video"] { --pj-tipo: var(--pj-video); }
+.ve-pj [data-kind="image"] { --pj-tipo: var(--pj-image); }
+.ve-pj [data-kind="audio"] { --pj-tipo: var(--pj-audio); }
+.ve-pj [data-kind="timeline"] { --pj-tipo: var(--pj-timeline); }
+.ve-pj .bin { --pj-tipo: var(--pj-bin); }
+.ve-pj-row[data-kind] > .i, .ve-pj-row.bin > .i { color: var(--pj-tipo); }
+
+/* ── modo grade: cards com prévia (como o modo ícones do Premiere) ── */
+.ve-pj.grade .ve-pj-cab { display: none; }
+.ve-pj-trilha { display: flex; align-items: center; gap: 4px; padding: 6px 10px 2px; font-size: 11.5px; color: var(--ve-faint); min-width: 0; overflow: hidden; }
+.ve-pj-trilha button { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 6px; border: 0; border-radius: 4px; background: none; color: var(--ve-dim); font: inherit; cursor: pointer; white-space: nowrap; }
+.ve-pj-trilha button:hover { background: var(--ve-panel-2); color: var(--ve-text); }
+.ve-pj-trilha button:last-child { color: var(--ve-text); font-weight: 600; }
+.ve-pj-trilha .i { color: var(--pj-bin); }
+.ve-pj-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--pj-card), 1fr)); gap: 10px; padding: 8px 10px 40px; align-content: start; }
+.ve-pj-grade > .ve-clips-empty { grid-column: 1 / -1; }
+.ve-pj-card { min-width: 0; padding: 5px; border-radius: 6px; cursor: default; position: relative; }
+.ve-pj-card:hover { background: var(--ve-panel-2); }
+.ve-pj-card.sel { background: rgba(249,115,22,.18); box-shadow: inset 0 0 0 1px rgba(249,115,22,.55); }
+.ve-pj-card.alvo { background: rgba(249,115,22,.3); box-shadow: inset 0 0 0 2px var(--ve-accent); }
+.ve-pj-card.fraco .ve-pj-capa { opacity: .6; }
+.ve-pj-capa {
+    position: relative; aspect-ratio: 16 / 9; border-radius: 4px; overflow: hidden; display: grid; place-items: center;
+    background: color-mix(in srgb, var(--pj-tipo) 14%, var(--ve-bg)); box-shadow: inset 0 -2px 0 var(--pj-tipo);
+}
+.ve-pj-capa img { width: 100%; height: 100%; object-fit: contain; background: #000; pointer-events: none; }
+.ve-pj-capa > .i { font-size: calc(var(--pj-card) * .24); color: var(--pj-tipo); opacity: .9; }
+.ve-pj-card.bin .ve-pj-capa { background: color-mix(in srgb, var(--pj-bin) 10%, var(--ve-bg)); }
+.ve-pj-card.atual .ve-pj-capa { box-shadow: inset 0 0 0 2px var(--pj-timeline); }
+/* linha que acompanha o mouse ao percorrer o vídeo */
+.ve-pj-card[style*="--pj-f"] .ve-pj-capa::after {
+    content: ""; position: absolute; top: 0; bottom: 0; left: calc(var(--pj-f) * 100%); width: 1px; background: var(--ve-accent);
+}
+.ve-pj-dur { position: absolute; right: 4px; bottom: 5px; padding: 1px 4px; border-radius: 3px; background: rgba(0,0,0,.72); color: #fff; font: 10px var(--ve-mono); }
+.ve-pj-rotulo { display: flex; align-items: center; gap: 5px; margin-top: 5px; min-width: 0; font-size: 12px; color: var(--ve-text); }
+.ve-pj-rotulo .ve-pj-cor { flex: none; width: 8px; height: 10px; border-radius: 2px; background: var(--ve-line-2); }
+.ve-pj-rotulo .i { flex: none; font-size: 12px; color: var(--pj-tipo); }
+.ve-pj-rotulo .ve-pj-nome, .ve-pj-rotulo .ve-pj-ren { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-pj-sub { margin-top: 1px; padding-left: 13px; font-size: 10.5px; color: var(--ve-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── painel Ferramentas (como o Tools do Premiere): vertical ou horizontal conforme o formato ── */
 .ve-dgroup.has-ferramentas { min-width: 40px; min-height: 40px; }

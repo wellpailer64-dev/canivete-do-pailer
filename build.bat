@@ -60,12 +60,20 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "clr_loader" ^
  --hidden-import "requests" ^
  --hidden-import "Functions.updater" ^
+ --hidden-import "Functions.omnivoice_tool" ^
  --hidden-import "huggingface_hub" ^
  --hidden-import "whisper" ^
+ --hidden-import "omnivoice" ^
+ --hidden-import "torchaudio" ^
+ --hidden-import "soundfile" ^
+ --hidden-import "librosa" ^
  --collect-all "yt_dlp_ejs" ^
  --collect-all "webview" ^
  --collect-all "pythonnet" ^
  --collect-all "clr_loader" ^
+ --collect-all "omnivoice" ^
+ --collect-all "torchaudio" ^
+ --collect-all "soundfile" ^
  --collect-all "onnx_asr" ^
  --hidden-import "onnxruntime.quantization" ^
  --add-data "%ORT_DIR%\transformers;onnxruntime/transformers" ^

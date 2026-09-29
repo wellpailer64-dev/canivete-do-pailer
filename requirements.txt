@@ -9,10 +9,17 @@ yt-dlp[default]>=2026.8.19
 requests==2.32.3
 openai-whisper==20250625
 torch==2.11.0
+torchaudio==2.11.0
 transformers==5.4.0
 sentencepiece==0.2.1
 tokenizers==0.22.2
 huggingface_hub==1.8.0
+accelerate>=1.11.0
+soundfile>=0.13.1
+librosa>=0.11.0
+pydub>=0.25.1
+webdataset>=1.0.2
+omnivoice @ git+https://github.com/k2-fsa/OmniVoice.git
 onnxruntime==1.24.4
 # painel Texto do editor (transcrição com Parakeet ONNX; onnx = comprimir o modelo PT-BR para int8)
 onnx-asr==0.12.0

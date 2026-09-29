@@ -310,12 +310,12 @@ function renderRecentes() {
 const EXT_AUDIO = /\.(mp3|wav|flac|m4a|aac|ogg|opus|wma|aiff?)$/i;
 const EXT_IMAGEM = /\.(jpe?g|png|webp|gif|heic|heif|avif|tiff?|bmp|ico|cr2|cr3|nef|arw|dng|raw|orf|rw2)$/i;
 const HOME_SUGESTOES = {
-    video: ['video-cutter', 'compressor-video', 'video-converter', 'converter-audio', 'transcrever-audio'],
-    audio: ['video-cutter', 'converter-audio', 'transcrever-audio'],
+    video: ['video-cutter', 'compressor-video', 'video-converter', 'converter-audio', 'transcrever-audio', 'omnivoice'],
+    audio: ['video-cutter', 'converter-audio', 'transcrever-audio', 'omnivoice'],
     imagem: ['converter-imagem', 'compressor-imagem', 'remover-fundo', 'favicon'],
     pdf: ['compressor-imagem'],
     pasta: ['compressor-video', 'video-converter', 'converter-imagem', 'compressor-imagem', 'remover-fundo',
-            'organizador-imagens', 'organizador-videos', 'converter-audio', 'transcrever-audio'],
+            'organizador-imagens', 'organizador-videos', 'converter-audio', 'transcrever-audio', 'omnivoice'],
 };
 let _homeItens = null;
 
@@ -467,10 +467,31 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── Arrastar e soltar (o Python entrega os caminhos reais em onArquivosSoltos) ──
-const EXT_VIDEO = /\.(mp4|mov|mkv|avi|webm|flv|wmv|m4v|ts|mts|m2ts|3gp|ogv|mpg|mpeg|mxf)$/i;
+const EXT_VIDEO = /\.(mp4|mov|mxf|mkv|avi|webm|flv|f4v|wmv|asf|m4v|ts|mts|m2ts|3gp|ogv|mpg|mpeg|m2v|r3d|braw|ari|arx)$/i;
+let _ultimoDropArquivos = { sig: '', t: 0 };
+
+function _itensDoDropNativo(e) {
+    const files = Array.from(e?.dataTransfer?.files || []);
+    return files.map(f => {
+        const path = f.pywebviewFullPath || f.path || f.mozFullPath || f.webkitRelativePath || '';
+        return path ? { path, pasta: false } : null;
+    }).filter(Boolean);
+}
+
+function receberDropExterno(e) {
+    const itens = _itensDoDropNativo(e);
+    if (!itens.length) return false;
+    if (typeof veGuardarDrop === 'function') veGuardarDrop(e);
+    onArquivosSoltos(itens);
+    return true;
+}
 
 function onArquivosSoltos(itens) {
     document.body.classList.remove('arrastando');
+    const sig = (itens || []).map(i => `${i.pasta ? 'd' : 'f'}:${i.path}`).join('|');
+    const agora = Date.now();
+    if (sig && sig === _ultimoDropArquivos.sig && agora - _ultimoDropArquivos.t < 700) return;
+    _ultimoDropArquivos = { sig, t: agora };
     const pagina = document.querySelector('.tool-page.active');
     const tool = pagina?.id.replace('page-', '');
     if (!tool || !itens?.length) return;
@@ -510,9 +531,17 @@ function _entregarItens(tool, itens) {
     document.addEventListener('dragleave', () => {
         if (--profundidade <= 0) { profundidade = 0; document.body.classList.remove('arrastando'); }
     });
-    // Sem isso o navegador interno tenta abrir o arquivo em vez de disparar o drop
-    document.addEventListener('dragover', e => e.preventDefault());
-    document.addEventListener('drop', e => { e.preventDefault(); profundidade = 0; document.body.classList.remove('arrastando'); });
+    // Sem isso o navegador interno tenta abrir o arquivo. O caminho real vem do backend do pywebview.
+    document.addEventListener('dragover', e => {
+        if (e.dataTransfer?.types?.includes('Files')) e.dataTransfer.dropEffect = 'copy';
+        e.preventDefault();
+    });
+    document.addEventListener('drop', e => {
+        e.preventDefault();
+        profundidade = 0;
+        document.body.classList.remove('arrastando');
+        receberDropExterno(e); // só age quando o WebView expõe caminho real; caso contrário o Python entrega.
+    });
 })();
 
 function atualizarOpcoesDownloader() {
@@ -595,6 +624,10 @@ function switchTool(toolId) {
     // Refresh states specific to tools
     if (toolId === 'web-scraper') {
         if (typeof checkCerebroStatus === 'function') checkCerebroStatus();
+    }
+    if (toolId === 'omnivoice') {
+        loadOmniVoiceStatus(true);
+        syncOmniVoiceLabels();
     }
 }
 
@@ -2088,6 +2121,307 @@ function salvarTranscricaoTxt() {
 }
 
 // =========================
+// OmniVoice / Geração de Voz
+// =========================
+
+let _omnivoiceStatusLoaded = false;
+let _omnivoiceVoices = [];
+let _omnivoiceOutputPath = '';
+let _omnivoiceOutputFolder = '';
+let _omnivoiceHistory = [];
+let _omnivoicePendingRun = null;
+
+function _voiceNameById(id) {
+    return _omnivoiceVoices.find(v => v.id === id)?.name || '';
+}
+
+function _omnivoiceRunLabel(meta) {
+    const options = meta?.options || {};
+    const step = options.num_step ?? _el('omnivoice-num-step')?.value ?? 32;
+    const speed = Number(options.speed ?? _el('omnivoice-speed')?.value ?? 1).toFixed(2);
+    const guidance = Number(options.guidance_scale ?? _el('omnivoice-guidance')?.value ?? 2).toFixed(1);
+    return `Passes ${step} · ${speed}x · Expr. ${guidance}`;
+}
+
+function _omnivoiceTextPreview(text) {
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
+    return clean.length > 82 ? clean.slice(0, 82) + '...' : clean;
+}
+
+function renderOmniVoiceHistory() {
+    const box = _el('omnivoice-history');
+    if (!box) return;
+    if (!_omnivoiceHistory.length) {
+        box.innerHTML = '<div class="ov-empty">As sínteses desta sessão aparecem aqui.</div>';
+        return;
+    }
+    box.innerHTML = _omnivoiceHistory.map(item => `
+        <div class="ov-history-item" data-id="${_escHtml(item.id)}">
+            <div class="ov-history-meta">
+                <b>${_escHtml(item.voice || 'Voz')}</b>
+                <span>${_escHtml(item.time)} · ${_escHtml(item.settings)}</span>
+                <small>${_escHtml(item.preview || item.filename || '')}</small>
+            </div>
+            <audio controls preload="metadata" src="${_escHtml(item.output_url)}"></audio>
+            <div class="ov-history-actions">
+                <button class="btn-secondary" onclick="saveOmniVoiceHistory('${_escHtml(item.id)}')" title="Baixar WAV">${ico('download')}</button>
+                <button class="btn-danger" onclick="removeOmniVoiceHistory('${_escHtml(item.id)}')" title="Excluir do histórico">${ico('trash')}</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function addOmniVoiceHistory(data) {
+    const meta = _omnivoicePendingRun || {};
+    const item = {
+        id: 'ovh-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7),
+        time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        voice: meta.voice || _voiceNameById(_el('omnivoice-voice-select')?.value || ''),
+        settings: _omnivoiceRunLabel(meta),
+        preview: _omnivoiceTextPreview(meta.text || _el('omnivoice-text')?.value || ''),
+        filename: _nomeCurto(data.output_path || ''),
+        output_path: data.output_path || '',
+        output_url: data.output_url || '',
+    };
+    _omnivoiceHistory.unshift(item);
+    _omnivoiceHistory = _omnivoiceHistory.slice(0, 30);
+    renderOmniVoiceHistory();
+}
+
+function removeOmniVoiceHistory(id) {
+    _omnivoiceHistory = _omnivoiceHistory.filter(item => item.id !== id);
+    renderOmniVoiceHistory();
+}
+
+function clearOmniVoiceHistory() {
+    _omnivoiceHistory = [];
+    renderOmniVoiceHistory();
+}
+
+function saveOmniVoiceHistory(id) {
+    const item = _omnivoiceHistory.find(h => h.id === id);
+    if (!item?.output_path) return toast('Não encontrei esse áudio para salvar.', 'erro');
+    window.pywebview.api.omnivoice_save_output(item.output_path).then(result => {
+        if (!result || result.cancelled) return;
+        if (!result.success) return toast(result.error || 'Não consegui salvar o áudio.', 'erro');
+        toast(`Áudio salvo: ${result.name || 'arquivo WAV'}`, 'ok');
+    });
+}
+
+function syncOmniVoiceLabels() {
+    const step = _el('omnivoice-num-step');
+    const speed = _el('omnivoice-speed');
+    const guidance = _el('omnivoice-guidance');
+    if (_el('omnivoice-num-step-label')) _el('omnivoice-num-step-label').textContent = String(step?.value || '32');
+    if (_el('omnivoice-speed-label')) _el('omnivoice-speed-label').textContent = Number(speed?.value || 1).toFixed(2) + 'x';
+    if (_el('omnivoice-guidance-label')) _el('omnivoice-guidance-label').textContent = Number(guidance?.value || 2).toFixed(1);
+}
+
+function renderOmniVoiceStatus(data) {
+    if (!data) return;
+    const engine = data.engine_ready ? 'Motor pronto' : 'Motor ausente';
+    const model = data.model_installed ? 'Baixado' : data.model_available ? 'Detectado fora' : 'Não baixado';
+    if (_el('omnivoice-engine-status')) _el('omnivoice-engine-status').textContent = engine;
+    if (_el('omnivoice-model-status')) _el('omnivoice-model-status').textContent = model;
+    const detail = _el('omnivoice-status-detail');
+    if (detail) {
+        if (!data.engine_ready) {
+            detail.innerHTML = '<span class="txt-err">OmniVoice não está instalado nesta build.</span>';
+        } else if (data.model_installed) {
+            detail.innerHTML = '<span class="txt-ok">Modelo organizado na pasta do Canivete.</span>';
+        } else if (data.external_model_cache) {
+            detail.innerHTML = 'Modelo encontrado em outro projeto. O botão abaixo importa para o Canivete.';
+        } else {
+            detail.innerHTML = 'Baixe o modelo apenas quando for usar esta ferramenta.';
+        }
+    }
+    const btn = _el('btn-omnivoice-download');
+    if (btn) {
+        btn.disabled = _rodando.omnivoice || !data.engine_ready || data.model_installed;
+        btn.innerHTML = data.external_model_cache && !data.model_installed
+            ? ico('download') + 'Importar modelo'
+            : ico('download') + 'Baixar modelo';
+    }
+}
+
+function renderOmniVoiceVoices(voices) {
+    _omnivoiceVoices = Array.isArray(voices) ? voices : [];
+    const select = _el('omnivoice-voice-select');
+    const box = _el('omnivoice-voices');
+    let selectedId = '';
+    if (select) {
+        const current = select.value;
+        select.innerHTML = _omnivoiceVoices.length
+            ? _omnivoiceVoices.map(v => `<option value="${_escHtml(v.id)}">${_escHtml(v.name)}</option>`).join('')
+            : '<option value="">Nenhuma voz salva</option>';
+        if (_omnivoiceVoices.some(v => v.id === current)) select.value = current;
+        selectedId = select.value || '';
+    }
+    if (!box) return;
+    if (!_omnivoiceVoices.length) {
+        box.innerHTML = '<div class="ov-empty">Salve uma voz a partir de um áudio de referência.</div>';
+        return;
+    }
+    box.innerHTML = _omnivoiceVoices.map(v => {
+        const text = v.ref_text || '';
+        const preview = text.length > 120 ? text.slice(0, 120) + '...' : text;
+        const active = v.id === selectedId ? ' ativo' : '';
+        return `<div class="ov-voice${active}" data-id="${_escHtml(v.id)}" onclick="selectOmniVoiceVoice('${_escHtml(v.id)}')">
+            <div class="ov-voice-main">
+                <b>${_escHtml(v.name)}</b>
+                <small>${_escHtml(preview || 'Sem texto de amostra')}</small>
+            </div>
+            <div class="ov-voice-actions">
+                <button class="btn-secondary" onclick="editOmniVoiceVoice('${_escHtml(v.id)}')" title="Editar">${ico('gear')}</button>
+                <button class="btn-danger" onclick="deleteOmniVoiceVoice('${_escHtml(v.id)}')" title="Excluir">${ico('trash')}</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function selectOmniVoiceVoice(id) {
+    const select = _el('omnivoice-voice-select');
+    if (select && id) select.value = id;
+    document.querySelectorAll('.ov-voice').forEach(card => {
+        card.classList.toggle('ativo', card.dataset.id === id);
+    });
+}
+
+function loadOmniVoiceStatus(force = false) {
+    if (_omnivoiceStatusLoaded && !force) return;
+    _omnivoiceStatusLoaded = true;
+    window.pywebview?.api?.omnivoice_status().then(data => {
+        if (!data?.success) return toast(data?.error || 'Não consegui verificar o OmniVoice.', 'erro');
+        renderOmniVoiceStatus(data);
+        renderOmniVoiceVoices(data.voices || []);
+    }).catch(() => toast('Não consegui verificar o OmniVoice.', 'erro'));
+}
+
+function downloadOmniVoiceModel() {
+    if (_rodando.omnivoice) return;
+    uiIniciar('omnivoice', 'Preparando OmniVoice...');
+    window.pywebview.api.omnivoice_download();
+}
+
+function createOmniVoiceVoice() {
+    if (_rodando.omnivoice) return;
+    const path = _exigirSelecao('omnivoice', 'Escolha um áudio de referência primeiro.');
+    if (!path) return;
+    const name = (_el('omnivoice-name')?.value || '').trim();
+    const refText = (_el('omnivoice-ref-text')?.value || '').trim();
+    if (!name) return toast('Dê um nome para a voz.', 'erro');
+    uiIniciar('omnivoice', 'Salvando voz...');
+    window.pywebview.api.omnivoice_create_voice(name, path, refText, {
+        reference_treatment: Boolean(_el('omnivoice-ref-treatment')?.checked),
+    });
+}
+
+function editOmniVoiceVoice(id) {
+    const voice = _omnivoiceVoices.find(v => v.id === id);
+    if (!voice || _rodando.omnivoice) return;
+    _el('omnivoice-edit-id').value = voice.id;
+    _el('omnivoice-edit-name').value = voice.name || '';
+    _el('omnivoice-edit-ref-text').value = voice.ref_text || '';
+    _el('modal-omnivoice-voice').style.display = 'flex';
+    setTimeout(() => _el('omnivoice-edit-name')?.focus(), 30);
+}
+
+function closeOmniVoiceEdit(event) {
+    if (event && event.target !== _el('modal-omnivoice-voice')) return;
+    _el('modal-omnivoice-voice').style.display = 'none';
+}
+
+function saveOmniVoiceEdit() {
+    const id = _el('omnivoice-edit-id')?.value || '';
+    const name = (_el('omnivoice-edit-name')?.value || '').trim();
+    const refText = (_el('omnivoice-edit-ref-text')?.value || '').trim();
+    if (!id) return;
+    if (!name || !refText) return toast('Nome e texto da amostra não podem ficar vazios.', 'erro');
+    closeOmniVoiceEdit();
+    uiIniciar('omnivoice', 'Atualizando voz...');
+    window.pywebview.api.omnivoice_update_voice(id, name, refText);
+}
+
+async function deleteOmniVoiceVoice(id) {
+    const name = _voiceNameById(id) || 'esta voz';
+    const ok = await appConfirm({
+        titulo: `Excluir ${name}?`,
+        texto: 'A voz salva e a amostra de referência serão removidas do Canivete.',
+        botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Excluir', valor: 1, tipo: 'perigo' }],
+    });
+    if (!ok) return;
+    window.pywebview.api.omnivoice_delete_voice(id).then(data => {
+        if (!data?.success) return toast(data?.error || 'Não consegui excluir a voz.', 'erro');
+        renderOmniVoiceVoices(data.voices || []);
+        toast('Voz excluída.', 'ok');
+    });
+}
+
+function _omnivoiceOptions() {
+    return {
+        language: 'pt',
+        num_step: Number(_el('omnivoice-num-step')?.value || 32),
+        speed: Number(_el('omnivoice-speed')?.value || 1),
+        guidance_scale: Number(_el('omnivoice-guidance')?.value || 2),
+        t_shift: 0.1,
+        denoise: Boolean(_el('omnivoice-denoise')?.checked),
+        postprocess_output: true,
+        normalize_text: Boolean(_el('omnivoice-normalize')?.checked),
+        stable_chunks: Boolean(_el('omnivoice-stable')?.checked),
+        max_chunk_chars: 220,
+        pause_seconds: 0.18,
+    };
+}
+
+function runOmniVoiceSynthesis() {
+    if (_rodando.omnivoice) return;
+    const voiceId = _el('omnivoice-voice-select')?.value || '';
+    const text = (_el('omnivoice-text')?.value || '').trim();
+    if (!voiceId) return toast('Salve ou escolha uma voz primeiro.', 'erro');
+    if (!text) return toast('Digite o texto para sintetizar.', 'erro');
+    const options = _omnivoiceOptions();
+    _omnivoicePendingRun = {
+        voice: _voiceNameById(voiceId),
+        text,
+        options,
+    };
+    uiIniciar('omnivoice', 'Carregando voz...');
+    window.pywebview.api.omnivoice_synthesize(voiceId, text, options);
+}
+
+function updateOmniVoiceProgress(data) {
+    uiAtualizar('omnivoice', data);
+    if (data.voices) renderOmniVoiceVoices(data.voices);
+    if (data.complete) {
+        _omnivoiceStatusLoaded = false;
+        loadOmniVoiceStatus(true);
+    }
+    if (data.complete && !data.error && data.output_url) {
+        _omnivoiceOutputPath = data.output_path || '';
+        _omnivoiceOutputFolder = data.output_folder || '';
+        const player = _el('omnivoice-player');
+        if (player) {
+            player.src = data.output_url;
+            player.load();
+        }
+        const out = _el('omnivoice-output');
+        if (out) out.hidden = false;
+        if (_el('omnivoice-output-name')) _el('omnivoice-output-name').textContent = data.output_path || '';
+        addOmniVoiceHistory(data);
+    }
+    if (data.complete) _omnivoicePendingRun = null;
+    if (data.complete && !data.error) {
+        _el('omnivoice-name') && (_el('omnivoice-name').value = '');
+        _el('omnivoice-ref-text') && (_el('omnivoice-ref-text').value = '');
+    }
+}
+
+function openOmniVoiceOutputFolder() {
+    if (!_omnivoiceOutputFolder && !_omnivoiceOutputPath) return;
+    window.pywebview.api.open_folder(_omnivoiceOutputFolder || _omnivoiceOutputPath);
+}
+
+// =========================
 // Remover Fundo
 // =========================
 
@@ -2588,6 +2922,7 @@ window.updateVideoConverterProgress = updateVideoConverterProgress;
 window.updateVideoDownloaderProgress = updateVideoDownloaderProgress;
 window.updateWebScraperProgress = updateWebScraperProgress;
 window.updateTranscreverAudioProgress = updateTranscreverAudioProgress;
+window.updateOmniVoiceProgress = updateOmniVoiceProgress;
 window.updateRemoverFundoProgress = updateRemoverFundoProgress;
 window.updateOrganizadorImagensProgress = updateOrganizadorImagensProgress;
 window.updateOrganizadorVideosProgress = updateOrganizadorVideosProgress;
@@ -2616,6 +2951,19 @@ window.rippleDeleteAudioRight = rippleDeleteAudioRight;
 window.undoAudioEdit = undoAudioEdit;
 window.clearAudioCuts = clearAudioCuts;
 window.exportAudioCuts = exportAudioCuts;
+window.syncOmniVoiceLabels = syncOmniVoiceLabels;
+window.selectOmniVoiceVoice = selectOmniVoiceVoice;
+window.downloadOmniVoiceModel = downloadOmniVoiceModel;
+window.createOmniVoiceVoice = createOmniVoiceVoice;
+window.editOmniVoiceVoice = editOmniVoiceVoice;
+window.closeOmniVoiceEdit = closeOmniVoiceEdit;
+window.saveOmniVoiceEdit = saveOmniVoiceEdit;
+window.deleteOmniVoiceVoice = deleteOmniVoiceVoice;
+window.runOmniVoiceSynthesis = runOmniVoiceSynthesis;
+window.openOmniVoiceOutputFolder = openOmniVoiceOutputFolder;
+window.saveOmniVoiceHistory = saveOmniVoiceHistory;
+window.removeOmniVoiceHistory = removeOmniVoiceHistory;
+window.clearOmniVoiceHistory = clearOmniVoiceHistory;
 
 // =========================
 // Atualização automática (GitHub Releases)

@@ -121,6 +121,9 @@
                 <button class="menu-item" data-tool="transcrever-audio" onclick="switchTool('transcrever-audio')">
                     <span class="icon"><svg class="i"><use href="#i-captions"/></svg></span><span class="label">Transcrever</span>
                 </button>
+                <button class="menu-item" data-tool="omnivoice" onclick="switchTool('omnivoice')">
+                    <span class="icon"><svg class="i"><use href="#i-sparkles"/></svg></span><span class="label">Geração de Voz</span>
+                </button>
 
                 <div class="menu-group">Imagem</div>
                 <button class="menu-item" data-tool="converter-imagem" onclick="switchTool('converter-imagem')">
@@ -252,6 +255,10 @@
                                 <button class="home-card" onclick="switchTool('transcrever-audio')">
                                     <span class="hc-media"><img src="img/tools/transcrever-audio.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-captions"/></svg></span></span>
                                     <b>Transcrever</b><small>Texto e legenda .srt com Whisper</small>
+                                </button>
+                                <button class="home-card" onclick="switchTool('omnivoice')">
+                                    <span class="hc-media"><img src="img/tools/geracao-voz.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-sparkles"/></svg></span></span>
+                                    <b>Geração de Voz</b><small>Salve vozes por referência curta e sintetize textos com OmniVoice</small>
                                 </button>
                             </div>
                         </section>
@@ -420,16 +427,11 @@
                     <div class="ve" id="ve">
                         <header class="ve-top">
                             <div class="ve-brand"><span class="ve-brand-mark"><svg class="i"><use href="#i-play"/></svg></span> Pocket Editor</div>
-                            <button class="ve-btn" onclick="veOpenFile()" title="Abrir vídeo (Ctrl+O)"><svg class="i"><use href="#i-folder"/></svg> Abrir</button>
-                            <button class="ve-btn" id="ve-save" onclick="veSaveProject()" disabled title="Salvar projeto .vcnvt (Ctrl+S) · Salvar como: Ctrl+Shift+S"><svg class="i"><use href="#i-save"/></svg> Salvar</button>
-                            <button class="ve-btn" id="ve-add-image" onclick="vePickImage()" disabled title="Adicionar imagem na timeline (ou arraste a imagem para a timeline)"><svg class="i"><use href="#i-image"/></svg> Imagem</button>
-                            <button class="ve-btn" id="ve-add-adjust" onclick="veAddAdjust()" disabled title="Camada de ajuste: os efeitos dela valem para tudo o que está nas trilhas de baixo"><svg class="i"><use href="#i-sliders"/></svg> Ajuste</button>
+                            <!-- Arquivo · Editar · Clipe · Sequência · Marcadores · Exibir · Janela · Ajuda (editor-comandos.js) -->
+                            <nav class="ve-mbar" id="ve-mbar"></nav>
                             <span class="ve-proj" id="ve-proj" hidden></span>
                             <div class="ve-meta" id="ve-meta">Nenhum vídeo aberto</div>
                             <div class="ve-top-spacer"></div>
-                            <button class="ve-btn ve-btn-sm ve-btn-ghost ve-win-btn" id="ve-win-btn" onclick="veDockMenu(event)" title="Painéis: mostrar/ocultar e restaurar o layout padrão">Janela ▾</button>
-                            <button class="ve-icon-btn" id="ve-undo" onclick="veUndo()" title="Desfazer (Ctrl+Z)" disabled>↶</button>
-                            <button class="ve-icon-btn" id="ve-redo" onclick="veRedo()" title="Refazer (Ctrl+Shift+Z)" disabled>↷</button>
                             <button class="ve-btn ve-btn-primary" id="ve-export-btn" onclick="veOpenExport()" disabled title="Exportar (Ctrl+M)"><svg class="i"><use href="#i-download"/></svg> Exportar</button>
                         </header>
 
@@ -451,7 +453,7 @@
                                         <div class="ve-empty-title">Arraste um vídeo ou imagem aqui</div>
                                         <div class="ve-empty-sub">ou</div>
                                         <button class="ve-btn ve-btn-primary ve-btn-lg" onclick="veOpenFile()">Abrir vídeo</button>
-                                        <div class="ve-empty-hint">MP4 · MOV · MKV · AVI · WEBM · HEVC/iPhone · PNG · JPG e mais</div>
+                                        <div class="ve-empty-hint">MP4 · MOV · MXF · MKV · MTS · WebM · WMV/ASF e mais</div>
                                     </div>
                                     <div class="ve-loading" id="ve-loading" hidden>
                                         <div class="ve-spinner"></div>
@@ -493,8 +495,13 @@
                                     <div class="ve-pj-lista" id="ve-pj-lista"></div>
                                     <div class="ve-pj-rodape">
                                         <button class="ve-icon-btn" onclick="vePjImportarDialogo()" title="Importar arquivos (Ctrl+I) — ou arraste arquivos e pastas do Windows para cá"><svg class="i"><use href="#i-download"/></svg></button>
+                                        <button class="ve-icon-btn" onclick="veCreateTimeline()" title="Nova timeline (Ctrl+N)"><svg class="i"><use href="#i-film"/></svg></button>
                                         <button class="ve-icon-btn" onclick="vePjNovaPasta()" title="Nova pasta (Ctrl+B)"><svg class="i"><use href="#i-folder"/></svg></button>
                                         <button class="ve-icon-btn" onclick="vePjNovoAjuste()" title="Nova camada de ajuste"><svg class="i"><use href="#i-sliders"/></svg></button>
+                                        <span class="ve-pj-sep"></span>
+                                        <button class="ve-icon-btn ve-pj-modo" data-pj-modo="lista" title="Visualização em lista"><svg class="i"><use href="#i-table"/></svg></button>
+                                        <button class="ve-icon-btn ve-pj-modo" data-pj-modo="grade" title="Visualização em grade (cards com prévia)"><svg class="i"><use href="#i-grid"/></svg></button>
+                                        <input type="range" class="ve-pj-tam" min="90" max="260" step="2" value="132" title="Tamanho dos cards">
                                         <span class="ve-top-spacer"></span>
                                         <button class="ve-icon-btn" onclick="vePjApagar()" title="Apagar do projeto (Delete)"><svg class="i"><use href="#i-trash"/></svg></button>
                                     </div>
@@ -612,7 +619,8 @@
                                         <h4>Painéis (como no Premiere)</h4>
                                         <div>Arraste a aba de um painel: solte no centro de outro para virar aba; nas bordas, ele se encaixa ao lado / acima / abaixo</div>
                                         <div>Soltar bem na borda da janela encaixa o painel ocupando a lateral inteira</div>
-                                        <div>Duplo clique na aba maximiza o painel (de novo para voltar) · <b>Janela ▾</b> restaura o layout</div>
+                                        <div>Duplo clique na aba maximiza o painel (de novo para voltar) · o menu <b>Janela</b> restaura o layout</div>
+                                        <div>Todas as teclas podem ser trocadas em <b>Editar › Atalhos do teclado</b> (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>K</kbd>) · <kbd>Alt</kbd>+<kbd>Enter</kbd> reproduz em tela cheia</div>
                                         <div><b>⧉</b> na aba, <kbd>Ctrl</kbd> ao soltar, ou soltar fora dos painéis: o painel vira uma janela própria (dá para levar a outro monitor). Fechar a janela devolve o painel ao lugar de antes</div>
                                         <div><kbd>N</kbd> Ímã (encaixe) liga/desliga</div>
                                         <div><kbd>Ctrl</kbd>+<kbd>M</kbd> Exportar · <kbd>Ctrl</kbd>+<kbd>O</kbd> Abrir vídeo ou projeto</div>
@@ -629,6 +637,7 @@
                         <div class="ve-panel" data-panel="ferramentas" data-title="Ferramentas"><div class="ve-tools" id="ve-tools"></div></div>
                         <section class="ve-panel ve-timeline" data-panel="timeline" data-title="Timeline">
                             <div class="ve-tl-toolbar">
+                                <button class="ve-btn ve-btn-sm ve-btn-primary" onclick="veImportTimelineFile()" title="Importar vídeo, áudio ou imagem na timeline, na posição da agulha"><svg class="i"><use href="#i-download"/></svg> Importar</button>
                                 <button class="ve-btn ve-btn-sm" onclick="veSplitAtPlayhead()" title="Cortar todas as trilhas na agulha (' ou S)">⎮ Cortar</button>
                                 <button class="ve-btn ve-btn-sm" onclick="veDeleteSelected()" title="Apagar clipe selecionado (D: o espaço fica · Shift+D: fecha o espaço)"><svg class="i"><use href="#i-trash"/></svg> Apagar</button>
                                 <button class="ve-btn ve-btn-sm" onclick="veExtractInOut()" title="Remover trecho In→Out (X)">✂ In→Out</button>
@@ -1143,6 +1152,121 @@
                     </details>
                 </div>
 
+                <!-- OmniVoice -->
+                <div class="tool-page" id="page-omnivoice" data-drop="arquivo">
+                    <div class="tool-head">
+                        <div class="tool-icon"><svg class="i"><use href="#i-sparkles"/></svg></div>
+                        <div><h2>Geração de Voz</h2><p>Cria vozes salvas com uma amostra curta e sintetiza texto com o OmniVoice local.</p></div>
+                    </div>
+
+                    <div class="ov-layout">
+                        <section class="ov-col ov-left">
+                            <div class="options-card ov-status-card">
+                                <div class="ov-panel-title">Modelo</div>
+                                <div class="ov-status-main">
+                                    <div class="stat-chips">
+                                        <span class="chip"><svg class="i"><use href="#i-gear"/></svg><b id="omnivoice-engine-status">Verificando...</b></span>
+                                        <span class="chip"><svg class="i"><use href="#i-hdd"/></svg><b id="omnivoice-model-status">Modelo</b></span>
+                                    </div>
+                                    <div class="status-line" id="omnivoice-status-detail"></div>
+                                    <button class="btn-secondary" id="btn-omnivoice-download" onclick="downloadOmniVoiceModel()" disabled><svg class="i"><use href="#i-download"/></svg>Baixar modelo</button>
+                                </div>
+                            </div>
+
+                            <div class="options-card">
+                                <div class="ov-panel-title">Vozes</div>
+                                <select id="omnivoice-voice-select" class="field field-select ov-voice-select" onchange="selectOmniVoiceVoice(this.value)"></select>
+                                <div class="ov-voices" id="omnivoice-voices"></div>
+                            </div>
+
+                            <div class="dropzone ov-drop" data-tool="omnivoice">
+                                <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
+                                <div class="dz-title">Nova voz</div>
+                                <div class="dz-sub">Arraste um áudio. O Canivete usa até 8s úteis da fala.</div>
+                                <div class="dz-actions">
+                                    <button class="btn-secondary" onclick="selectFile('omnivoice')"><svg class="i"><use href="#i-file"/></svg>Escolher áudio</button>
+                                </div>
+                                <div id="omnivoice-selected" class="selected-info"></div>
+                            </div>
+
+                            <div class="options-card">
+                                <div class="opt-row ov-create-row">
+                                    <input type="text" id="omnivoice-name" class="field" placeholder="Nome da voz">
+                                    <button class="btn-secondary" onclick="createOmniVoiceVoice()"><svg class="i"><use href="#i-save"/></svg>Salvar</button>
+                                </div>
+                                <label class="switch-row ov-reference-switch"><input type="checkbox" id="omnivoice-ref-treatment" checked><span class="switch"></span><span><b>Tratar amostra</b><small>Reduz ruído de fundo e nivela a voz antes de salvar</small></span></label>
+                                <textarea id="omnivoice-ref-text" class="field ov-textarea ov-ref-text" rows="2" placeholder="Texto da amostra, opcional. Se deixar vazio, o Canivete transcreve."></textarea>
+                            </div>
+                        </section>
+
+                        <section class="ov-col ov-right">
+                            <div class="options-card ov-script-card">
+                                <div class="ov-panel-title">Síntese</div>
+                                <textarea id="omnivoice-text" class="field ov-textarea ov-script-text" rows="10" placeholder="Digite o texto que a voz selecionada vai falar..."></textarea>
+
+                                <div class="opt-row">
+                                    <span class="opt-label">Passes</span>
+                                    <input type="range" id="omnivoice-num-step" min="1" max="32" step="1" value="32" oninput="syncOmniVoiceLabels()">
+                                    <span class="ov-range-value" id="omnivoice-num-step-label">32</span>
+                                </div>
+                                <div class="opt-row">
+                                    <span class="opt-label">Velocidade</span>
+                                    <input type="range" id="omnivoice-speed" min="0.75" max="1.35" step="0.05" value="1" oninput="syncOmniVoiceLabels()">
+                                    <span class="ov-range-value" id="omnivoice-speed-label">1.00x</span>
+                                </div>
+                                <div class="opt-row">
+                                    <span class="opt-label">Expressividade</span>
+                                    <input type="range" id="omnivoice-guidance" min="1" max="3" step="0.1" value="2" oninput="syncOmniVoiceLabels()">
+                                    <span class="ov-range-value" id="omnivoice-guidance-label">2.0</span>
+                                </div>
+                                <div class="opt-row">
+                                    <span class="opt-label">Ajustes</span>
+                                    <div class="ov-switches">
+                                        <label class="switch-row"><input type="checkbox" id="omnivoice-stable" checked><span class="switch"></span><span><b>Roteiro estável</b><small>Gera em blocos menores para obedecer melhor ao texto</small></span></label>
+                                        <label class="switch-row"><input type="checkbox" id="omnivoice-denoise" checked><span class="switch"></span><span><b>Limpar referência</b><small>Ajuda a manter a voz mais estável</small></span></label>
+                                        <label class="switch-row"><input type="checkbox" id="omnivoice-normalize"><span class="switch"></span><span><b>Normalizar números</b><small>Lê números por extenso quando disponível</small></span></label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="run-row ov-run-row">
+                                <button class="btn-run" id="btn-omnivoice" onclick="runOmniVoiceSynthesis()"><svg class="i"><use href="#i-play"/></svg>Sintetizar</button>
+                            </div>
+                            <div class="progress-card" id="progress-omnivoice" hidden>
+                                <div class="progress-top">
+                                    <span class="progress-status" id="status-omnivoice">Preparando...</span>
+                                    <span class="progress-text" id="progress-text-omnivoice">0%</span>
+                                </div>
+                                <div class="progress-bar"><div class="progress-fill" id="progress-fill-omnivoice"></div></div>
+                            </div>
+                            <div class="result-banner" id="result-omnivoice" hidden></div>
+                            <div class="ov-output" id="omnivoice-output" hidden>
+                                <audio id="omnivoice-player" controls></audio>
+                                <div class="ov-output-actions">
+                                    <button class="btn-secondary" onclick="openOmniVoiceOutputFolder()"><svg class="i"><use href="#i-folder"/></svg>Abrir pasta</button>
+                                    <span id="omnivoice-output-name"></span>
+                                </div>
+                            </div>
+                            <details class="log-wrap" id="logwrap-omnivoice">
+                                <summary>Ver detalhes</summary>
+                                <div class="log-section" id="log-omnivoice"></div>
+                            </details>
+                        </section>
+
+                        <aside class="ov-col ov-history-col">
+                            <div class="options-card ov-history-card">
+                                <div class="ov-history-head">
+                                    <div class="ov-panel-title">Histórico</div>
+                                    <button class="btn-secondary ov-clear-history" onclick="clearOmniVoiceHistory()" title="Limpar histórico"><svg class="i"><use href="#i-trash"/></svg></button>
+                                </div>
+                                <div class="ov-history-list" id="omnivoice-history">
+                                    <div class="ov-empty">As sínteses desta sessão aparecem aqui.</div>
+                                </div>
+                            </div>
+                        </aside>
+                    </div>
+                </div>
+
                 <!-- Remover Fundo -->
                 <div class="tool-page" id="page-remover-fundo" data-drop="ambos">
                     <div class="tool-head">
@@ -1375,6 +1499,26 @@
         </div>
     </div>
 
+    <!-- Modal: Editar Voz -->
+    <div id="modal-omnivoice-voice" class="modal-overlay" style="display:none;" onclick="closeOmniVoiceEdit(event)">
+        <div class="modal-box ov-edit-box">
+            <h3><svg class="i"><use href="#i-sparkles"/></svg>Editar voz</h3>
+            <input type="hidden" id="omnivoice-edit-id">
+            <div class="modal-field">
+                <label class="modal-label">Nome</label>
+                <input type="text" id="omnivoice-edit-name" class="modal-input">
+            </div>
+            <div class="modal-field">
+                <label class="modal-label">Texto da amostra</label>
+                <textarea id="omnivoice-edit-ref-text" class="modal-input ov-edit-text" rows="6"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="closeOmniVoiceEdit()">Cancelar</button>
+                <button class="btn-success" onclick="saveOmniVoiceEdit()"><svg class="i"><use href="#i-save"/></svg>Salvar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Câmeras Identificadas -->
     <div id="modal-prefs" class="modal-overlay" style="display:none;" onclick="prefsClose(event)">
         <div class="modal-box prefs-box">
@@ -1427,5 +1571,6 @@
     <script src="js/editor-projeto.js"></script>
     <script src="js/editor-ferramentas.js"></script>
     <script src="js/editor-dock.js"></script>
+    <script src="js/editor-comandos.js"></script>
 </body>
 </html>

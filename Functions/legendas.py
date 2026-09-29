@@ -156,15 +156,19 @@ def _audio_da_timeline(clipes, total, destino):
 
 def _palavras(seg):
     """Pedaços de palavra (tokens) com tempo → palavras [início, fim, texto] (tempo absoluto no áudio).
-    Token que começa com espaço abre palavra; pontuação e sufixos grudam na anterior."""
+    Token que começa com espaço abre palavra; pontuação e sufixos grudam na anterior.
+    Ênclise/mesóclise ("lembre-se", "dir-se-ia"): o modelo às vezes manda o hífen com espaço ("lembre", " -se"
+    ou "lembre", " -", " se") — o que vem colado a um hífen fica na mesma palavra."""
     out = []
     toks, ts = seg.tokens or [], seg.timestamps or []
     for k, (tok, t) in enumerate(zip(toks, ts)):
         ini = seg.start + t
-        if tok.startswith(" ") or not out:
-            out.append([ini, None, tok.strip()])
+        txt = tok.strip()
+        hifen = out and txt and (txt[0] == "-" or (out[-1][2].endswith("-") and txt[0].isalpha()))
+        if (tok.startswith(" ") and not hifen) or not out:
+            out.append([ini, None, txt])
         else:
-            out[-1][2] += tok
+            out[-1][2] += txt
     for k, w in enumerate(out):
         w[1] = out[k + 1][0] if k + 1 < len(out) else seg.end
         # a palavra não "dura" pela pausa seguinte inteira: no máximo ~0,6 s por sílaba longa

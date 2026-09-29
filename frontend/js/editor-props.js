@@ -411,7 +411,10 @@ function vePpHtml(a) {
                 ${vePpNum('le.tam', 'Tamanho', 3, 10, 0.1, '%')}
                 <div class="ve-pp-cores">${vePpCor('le.cor', 'Cor do texto')}</div>
                 <div class="ve-pp-l"><label>Fundo</label><select data-pp="le.fundo"><option value="caixa">Caixa</option><option value="sombra">Contorno e sombra</option><option value="nenhum">Nenhum</option></select></div>
+                <div class="ve-pp-grupo">${vePpChk('le.sOn', 'Sombra projetada')}${vePpCor('le.sCor', '')}
+                    <div class="ve-pp-sub" data-ppse="le.sOn">${vePpNum('le.sOp', 'Opacidade', 0, 100, 1, '%')}${vePpNum('le.sDist', 'Distância', 0, 60, 0.5, 'px')}${vePpNum('le.sBlur', 'Desfoque', 0, 80, 0.5, 'px')}</div></div>
                 <div class="ve-pp-l"><label>Posição</label><select data-pp="le.pos"><option value="baixo">Embaixo</option><option value="meio">No meio</option><option value="cima">Em cima</option></select></div>
+                <div class="ve-pp-l"><label>Entrada</label><select data-pp="le.entrada" title="Efeito rápido quando cada legenda aparece"><option value="nenhum">Seca (sem efeito)</option><option value="pop">Pop</option><option value="fade">Fade</option></select></div>
                 ${vePpChk('legGravar', 'Gravar as legendas no vídeo ao exportar')}`) +
             links([['texto', 'Painel Texto']]);
     }
@@ -682,15 +685,21 @@ function veTxInitMonitor() {
     }, true);
     scr.addEventListener('dblclick', e => {
         if (!VE.ready || e.target.closest('button, textarea')) return;
-        const i = veTxClipeEm(veTxPontoQuadro(e));
-        if (i < 0 || veLocked(VE.clips[i])) return;
+        const pt = veTxPontoQuadro(e), i = veTxClipeEm(pt);
+        if (i < 0) {
+            // legenda da trilha LEG na agulha: edita o texto ali mesmo
+            const lg = veTxLegendaNoPonto(pt);
+            if (lg >= 0) { VE.sel = -1; vedShow('pp'); veTxLegEditar(lg); }
+            return;
+        }
+        if (veLocked(VE.clips[i])) return;
         if (VE.playing) veStop();
         VE.sel = i;
         veRefresh();
         vedShow('pp');
         veTxEditar(i);
     });
-    new ResizeObserver(() => veTxEditarPos()).observe(scr);
+    new ResizeObserver(() => { veTxEditarPos(); veTxLegEditarPos(); }).observe(scr);
 }
 
 document.addEventListener('DOMContentLoaded', () => { vePpInit(); veTxInitMonitor(); });
