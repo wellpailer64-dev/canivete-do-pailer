@@ -20,6 +20,17 @@ A partir da próxima abertura (exe, atalho ou `python main.py`), o app liga a po
 **9222 a 9231** (uma segunda cópia pega a seguinte). O estado aparece ali mesmo ("Agora: ligado em ...").
 Fica gravado em `%APPDATA%/CaniveteDoPailer/preferencias.json` (`dev` e `agente`).
 
+### Achar a cópia aberta
+Cada cópia com o modo agente ligado se anota em `%APPDATA%/CaniveteDoPailer/agente.json`
+(`{"instancias": [{"porta", "pid", "inicio", "codigo"}]}`) e se tira ao fechar. Confira se o `pid` ainda existe
+(fechada à força, a entrada fica até a próxima abertura limpar).
+
+### Registro e ações do agente (frontend/js/agente.js)
+- `veLogTexto(40)`: os últimos avisos (toasts), erros de JavaScript, `console.error` e resultados de exportação
+  que apareceram na tela (`window.__veLog`, até 300 itens).
+- `veAgente('o que estou fazendo', () => { ... })`: toda ação do agente no app do usuário passa por aqui. Mostra o
+  aviso roxo "✦ Claude: ..." no alto da tela, registra no log e roda a função (o Ctrl+Z desfaz como qualquer edição).
+
 ## Como conectar (exemplo com Playwright)
 
 ```python

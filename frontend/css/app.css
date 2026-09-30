@@ -1361,6 +1361,11 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .pref-dev-corpo[hidden] { display: none; }
 .pref-dev-chk { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
 .pref-dev-estado { font-family: var(--mono, Consolas, monospace); font-size: 11.5px; color: var(--text-2, #aaa); }
+/* aviso das ações do Claude (agente.js: veAgente) */
+.ve-agente-avisos { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 100000; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; }
+.ve-agente-aviso { padding: 6px 12px; border-radius: 999px; background: rgba(76, 29, 149, 0.92); border: 1px solid #a78bfa; color: #f5f3ff; font: 600 12px 'Segoe UI', sans-serif; box-shadow: 0 4px 16px rgba(0,0,0,.4); transition: opacity .5s, transform .5s; }
+.ve-agente-aviso.erro { background: rgba(127, 29, 29, 0.92); border-color: #f87171; }
+.ve-agente-aviso.saindo { opacity: 0; transform: translateY(-6px); }
 .pref-lang button {
     flex: 1; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line-2);
     background: transparent; color: var(--text-2); font: 600 13px var(--font-ui); cursor: pointer;

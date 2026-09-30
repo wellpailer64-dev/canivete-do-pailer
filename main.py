@@ -3163,6 +3163,49 @@ def _agente_nas_preferencias():
     return None
 
 
+def _agente_arquivo():
+    """%APPDATA%/CaniveteDoPailer/agente.json: as cópias abertas com o modo agente ligado ({porta, pid, inicio})."""
+    return os.path.join(os.path.dirname(_prefs_path()), "agente.json")
+
+
+def _pid_vivo(pid):
+    try:
+        import ctypes
+        h = ctypes.windll.kernel32.OpenProcess(0x1000, False, int(pid))   # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return False
+        codigo = ctypes.c_ulong()
+        ctypes.windll.kernel32.GetExitCodeProcess(h, ctypes.byref(codigo))
+        ctypes.windll.kernel32.CloseHandle(h)
+        return codigo.value == 259   # STILL_ACTIVE
+    except Exception:
+        return False
+
+
+def _agente_registrar(porta, sair=False):
+    """Anota (ou tira, ao fechar) esta cópia em agente.json: o agente acha a porta sem varrer 9222–9231.
+    Entradas de cópias que já fecharam saem na hora."""
+    import time
+    arq = _agente_arquivo()
+    try:
+        with open(arq, "r", encoding="utf-8") as f:
+            lista = (json.load(f) or {}).get("instancias") or []
+    except Exception:
+        lista = []
+    lista = [x for x in lista if isinstance(x, dict) and x.get("pid") != os.getpid() and _pid_vivo(x.get("pid", 0))]
+    if not sair:
+        lista.append({"porta": porta, "pid": os.getpid(), "inicio": time.strftime("%Y-%m-%d %H:%M:%S"),
+                      "codigo": not getattr(sys, "frozen", False)})
+    try:
+        os.makedirs(os.path.dirname(arq), exist_ok=True)
+        tmp = arq + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"instancias": lista}, f, ensure_ascii=False, indent=1)
+        os.replace(tmp, arq)
+    except Exception:
+        pass
+
+
 def _abrir_em_outra_copia():
     """App (.exe) já aberto: manda o projeto do duplo clique para ele e esta cópia não abre (senão ficavam dois
     ícones na barra e duas cópias disputando as prévias). Pelo código (python main.py) e no modo agente abre sempre.
@@ -3349,6 +3392,8 @@ def main():
     if porta_agente:
         webview.settings["REMOTE_DEBUGGING_PORT"] = porta_agente
         print(f"[agente] depuração remota em http://127.0.0.1:{porta_agente}")
+        _agente_registrar(porta_agente)   # agente.json: o agente acha esta cópia direto
+        atexit.register(lambda: _agente_registrar(porta_agente, sair=True))
 
     # O servidor local do pywebview aceita só 5 conexões na fila (padrão do Python): ao abrir, a página
     # pede ~15 arquivos de uma vez e o Windows recusa o resto — um script do editor ficava sem carregar
