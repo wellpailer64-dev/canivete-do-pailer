@@ -1544,3 +1544,15 @@ body.ve-kl-scrub, body.ve-kl-scrub * { cursor: ew-resize !important; }
 .ve-mk-acoes { display: flex; gap: 6px; align-items: center; margin-top: 2px; }
 .ve-mk-acoes span { flex: 1; }
 .ve-mk-acoes .perigo { color: #f87171; }
+
+/* exportação: nome do arquivo, codec, 10 bits, taxa de bits */
+.ve-exp-nome { display: flex; align-items: center; height: 32px; border: 1px solid var(--ve-line-2); border-radius: 7px; background: var(--ve-bg); overflow: hidden; }
+.ve-exp-nome:focus-within { border-color: var(--ve-accent); }
+.ve-exp-nome input { flex: 1; min-width: 0; height: 100%; padding: 0 10px; border: 0; outline: 0; background: transparent; color: var(--ve-text); font: 13px var(--ve-ui); }
+.ve-exp-nome span { padding: 0 10px; color: var(--ve-faint); font: 12px var(--ve-mono); }
+.ve-exp-taxa { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ve-exp-mbps { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ve-dim); }
+.ve-exp-mbps[hidden] { display: none; }
+.ve-exp-mbps input { width: 64px; height: 28px; padding: 0 6px; border-radius: 6px; border: 1px solid var(--ve-line-2); background: var(--ve-bg); color: var(--ve-text); font: 12px var(--ve-mono); }
+#ve-export .ve-pill.disabled { opacity: .35; pointer-events: none; }
+#ve-export.audio .ve-only-codec, #ve-export.audio .ve-only-taxa, #ve-export.sem-codec .ve-only-codec, #ve-export.prores .ve-only-taxa { display: none; }

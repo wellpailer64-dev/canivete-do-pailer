@@ -15,6 +15,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -258,6 +259,11 @@ def _probe_ffprobe(path):
         "fps": fps if 1 <= fps <= 240 else 30.0,
         "vcodec": (v or {}).get("codec_name", ""),
         "pix_fmt": (v or {}).get("pix_fmt", ""),
+        # cor da fonte (a saída leva as mesmas marcas; sem elas o player chuta e a cor pode mudar)
+        "color_space": (v or {}).get("color_space", ""),
+        "color_primaries": (v or {}).get("color_primaries", ""),
+        "color_transfer": (v or {}).get("color_transfer", ""),
+        "color_range": (v or {}).get("color_range", ""),
         "rotation": rot,
         "has_audio": a is not None,
         "acodec": (a or {}).get("codec_name", ""),
@@ -623,50 +629,114 @@ def preparar_midia(path, emit, stop_event=None):
 
 # ─────────────────────────── exportação ───────────────────────────
 
-def _detectar_hw_encoder():
-    """Testa encoders de GPU uma vez. Retorna 'h264_nvenc' | 'h264_qsv' | 'h264_amf' | None."""
+def _detectar_hw_encoder(codec="h264", bits=8):
+    """Testa uma vez os encoders de GPU do codec (h264/hevc; hevc 10 bits testa em p010).
+    Retorna 'h264_nvenc' | 'h264_qsv' | 'h264_amf' | 'hevc_*' | None."""
     global _hw_encoder_cache
-    if _hw_encoder_cache is not None:
-        return _hw_encoder_cache or None
-    _hw_encoder_cache = ""
-    for enc in ("h264_nvenc", "h264_qsv", "h264_amf"):
+    if not isinstance(_hw_encoder_cache, dict):
+        _hw_encoder_cache = {}
+    chave = f"{codec}{bits}"
+    if chave in _hw_encoder_cache:
+        return _hw_encoder_cache[chave] or None
+    _hw_encoder_cache[chave] = ""
+    px = ["-pix_fmt", "p010le"] if bits == 10 else []
+    for enc in (f"{codec}_nvenc", f"{codec}_qsv", f"{codec}_amf"):
         try:
             r = subprocess.run(
                 [ffmpeg_path(), "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=0.2",
-                 "-c:v", enc, "-f", "null", "-"],
+                 *px, "-c:v", enc, "-f", "null", "-"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 timeout=15, creationflags=_creationflags(),
             )
             if r.returncode == 0:
-                _hw_encoder_cache = enc
+                _hw_encoder_cache[chave] = enc
                 break
         except Exception:
             pass
-    return _hw_encoder_cache or None
+    return _hw_encoder_cache[chave] or None
 
 
-def _args_video(cfg, q, usar_gpu):
-    if cfg["vcodec"] == "vp9":
+def _args_video(cfg, q, usar_gpu, bits=8, mbps=0):
+    """Argumentos do encoder de vídeo.
+    Qualidade constante (padrão): CRF/CQ pelo preset de qualidade — o tamanho do arquivo acompanha a cena.
+    mbps > 0: taxa de bits alvo (VBR com teto de 1,5x e buffer de 2x) — tamanho previsível.
+    bits = 10: H.265 Main10 / ProRes; H.264 fica em 8 bits (10 bits em H.264 quase nenhum player toca)."""
+    vc = cfg["vcodec"]
+    if vc == "vp9":
         return ["-c:v", "libvpx-vp9", "-crf", str(q["vp9"]), "-b:v", "0", "-row-mt", "1", "-deadline", "good", "-cpu-used", "4"]
-    if cfg["vcodec"] == "mpeg4":
+    if vc == "mpeg4":
         return ["-c:v", "mpeg4", "-q:v", "3"]
-    enc = _detectar_hw_encoder() if usar_gpu else None
-    if enc == "h264_nvenc":
-        return ["-c:v", enc, "-preset", "p5", "-rc", "vbr", "-cq", str(q["cq"]), "-b:v", "0", "-pix_fmt", "yuv420p"]
-    if enc == "h264_qsv":
-        return ["-c:v", enc, "-global_quality", str(q["cq"]), "-pix_fmt", "nv12"]
-    if enc == "h264_amf":
-        return ["-c:v", enc, "-rc", "cqp", "-qp_i", str(q["cq"]), "-qp_p", str(q["cq"] + 2), "-pix_fmt", "yuv420p"]
-    return ["-c:v", "libx264", "-crf", str(q["crf"]), "-preset", q["preset"], "-pix_fmt", "yuv420p"]
+    if vc == "prores":
+        # ProRes 422 HQ (Apple): intermediário de altíssima qualidade para finalizar em outro programa
+        return ["-c:v", "prores_ks", "-profile:v", "3", "-vendor", "apl0", "-bits_per_mb", "8000", "-pix_fmt", "yuv422p10le"]
+    hevc = vc == "hevc"
+    if not hevc:
+        bits = 8
+    taxa = []
+    if mbps and mbps > 0:
+        b = max(0.2, float(mbps))
+        taxa = ["-b:v", f"{b:.2f}M", "-maxrate", f"{b * 1.5:.2f}M", "-bufsize", f"{b * 2:.2f}M"]
+    enc = _detectar_hw_encoder("hevc" if hevc else "h264", bits) if usar_gpu else None
+    tag = ["-tag:v", "hvc1"] if hevc else []   # hvc1: o H.265 toca no QuickTime/iPhone/Premiere
+    if enc and enc.endswith("_nvenc"):
+        # recomendações da NVIDIA para qualidade: AQ espacial/temporal, lookahead, B-frames como referência
+        a = ["-c:v", enc, "-preset", "p6", "-tune", "hq", "-multipass", "qres", "-rc-lookahead", "20",
+             "-spatial-aq", "1", "-temporal-aq", "1", "-bf", "3", "-b_ref_mode", "middle"]
+        a += (["-rc", "vbr"] + taxa) if taxa else ["-rc", "vbr", "-cq", str(q["cq"]), "-b:v", "0"]
+        if hevc:
+            a += ["-profile:v", "main10" if bits == 10 else "main", "-pix_fmt", "p010le" if bits == 10 else "yuv420p"]
+        else:
+            a += ["-profile:v", "high", "-pix_fmt", "yuv420p"]
+        return a + tag
+    if enc and enc.endswith("_qsv"):
+        a = ["-c:v", enc, "-preset", "slow", "-look_ahead", "1"]
+        a += taxa if taxa else ["-global_quality", str(q["cq"])]
+        return a + ["-pix_fmt", "p010le" if bits == 10 else "nv12"] + tag
+    if enc and enc.endswith("_amf"):
+        a = ["-c:v", enc, "-quality", "quality"]
+        a += (["-rc", "vbr_peak"] + taxa) if taxa else ["-rc", "cqp", "-qp_i", str(q["cq"]), "-qp_p", str(q["cq"] + 2)]
+        return a + ["-pix_fmt", "p010le" if bits == 10 else "yuv420p"] + tag
+    if hevc:
+        # x265: CRF ~2-3 acima do x264 dá a mesma qualidade com ~40% menos bits
+        a = ["-c:v", "libx265", "-preset", q["preset"], "-x265-params", "log-level=error"]
+        a += taxa if taxa else ["-crf", str(q["crf"] + 3)]
+        return a + ["-pix_fmt", "yuv420p10le" if bits == 10 else "yuv420p"] + tag
+    a = ["-c:v", "libx264", "-preset", q["preset"], "-profile:v", "high"]
+    a += taxa if taxa else ["-crf", str(q["crf"])]
+    return a + ["-pix_fmt", "yuv420p"]
 
 
-def _nome_saida(path, ext, pasta=None):
-    base = os.path.splitext(os.path.basename(path))[0]
+def _args_cor(info, altura):
+    """Marca de cor da saída: a da fonte (bt709, bt2020...) ou bt709 para HD sem marca (o padrão de vídeo HD)."""
+    ok = lambda v: v and v not in ("unknown", "unspecified", "reserved")
+    cs, cp, ct = info.get("color_space"), info.get("color_primaries"), info.get("color_transfer")
+    if ok(cs) or ok(cp) or ok(ct):
+        a = []
+        if ok(cs):
+            a += ["-colorspace", cs]
+        if ok(cp):
+            a += ["-color_primaries", cp]
+        if ok(ct):
+            a += ["-color_trc", ct]
+        return a + ["-color_range", "pc" if info.get("color_range") == "pc" else "tv"]
+    if altura >= 720:
+        return ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
+    return []
+
+
+def _nome_saida(path, ext, pasta=None, nome=None):
+    """nome = o que o usuário digitou na exportação (sem extensão); sem ele, <vídeo>_editado.
+    Nunca sobrescreve: se já existir, ganha _1, _2..."""
     pasta = pasta or os.path.dirname(path)
-    destino = os.path.join(pasta, f"{base}_editado{ext}")
+    base = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(nome or "")).strip(" .")
+    if base.lower().endswith(ext.lower()):
+        base = base[: -len(ext)].rstrip(" .")
+    if not base:
+        base = os.path.splitext(os.path.basename(path))[0] + "_editado"
+    destino = os.path.join(pasta, f"{base}{ext}")
     n = 1
     while os.path.exists(destino):
-        destino = os.path.join(pasta, f"{base}_editado_{n}{ext}")
+        destino = os.path.join(pasta, f"{base}_{n}{ext}")
         n += 1
     return destino
 
@@ -1409,7 +1479,7 @@ def _opcao_filtro_script():
 def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", resolucao="original",
                    usar_gpu=True, pasta_saida=None, on_progress=None, stop_event=None, sem_audio=False,
                    camadas=None, audio_segmentos=None, duracao=None, audio_clipes=None, legendas=None, quadro=None,
-                   saida=None, previa_h=0, proc_holder=None):
+                   saida=None, previa_h=0, proc_holder=None, opcoes=None):
     """
     Exporta a timeline do editor.
     saida/previa_h  = prévia renderizada (render_cache.py): arquivo fixo, sem som, H.264 leve de decodificar
@@ -1421,6 +1491,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     audio_clipes    = [[st, s, e, ganho_db]] de TODOS os clipes com som: as trilhas são somadas (_grafo_mix).
     legendas        = {itens: [{st, en, texto}], estilo: {...}}: gravadas no vídeo (arquivo .ass + subtitles)
                       Com ele, audio_segmentos é ignorado.
+    opcoes          = {nome, codec: h264|hevc|prores, bits: 8|10, mbps: taxa alvo (0 = qualidade constante)}
     on_progress(pct, mensagem)
     """
     global _export_proc
@@ -1438,6 +1509,19 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     previa = bool(saida and previa_h)
     if previa:
         cfg, alvo_h, sem_audio, usar_gpu = FORMATOS_SAIDA["mp4"], int(previa_h), True, False
+    op = opcoes if isinstance(opcoes, dict) and not previa else {}
+    codec = str(op.get("codec") or "h264").lower()
+    if cfg.get("vcodec") == "h264" and codec == "prores":
+        cfg = dict(FORMATOS_SAIDA["mov"], vcodec="prores", acodec="pcm_s16le")   # ProRes só em .mov, som sem perda
+    elif cfg.get("vcodec") == "h264" and codec == "hevc":
+        cfg = dict(cfg, vcodec="hevc")
+    bits = 10 if str(op.get("bits")) == "10" and cfg.get("vcodec") in ("hevc", "prores") else 8
+    try:
+        mbps = max(0.0, min(500.0, float(op.get("mbps") or 0)))
+    except (TypeError, ValueError):
+        mbps = 0.0
+    # formato de pixel do grafo: 10 bits de ponta a ponta quando a saída é 10 bits (fonte 10 bits não vira 8)
+    pixfmt = "yuv422p10le" if cfg.get("vcodec") == "prores" else "yuv420p10le" if bits == 10 else "yuv420p"
 
     info = probe(path)
     audio_only = bool(cfg.get("audio_only")) or not info["has_video"]
@@ -1483,7 +1567,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     simples = not lay and audio_segmentos is None and mix is None
     if not simples:
         pecas, pecas_a = _completar(pecas), _completar(pecas_a)
-    saida = saida or _nome_saida(aberto, cfg["ext"], pasta_saida)
+    saida = saida or _nome_saida(aberto, cfg["ext"], pasta_saida, op.get("nome"))
     # áudios soltos na timeline dão som ao vídeo mesmo que o vídeo aberto não tenha
     extras = sorted({c[4] for c in (mix or []) if c[4]})
     if mix is not None and not info["has_audio"]:
@@ -1503,208 +1587,276 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         # só o áudio: nenhuma cadeia de vídeo no grafo
         usar_inputs, audio_junto = True, False
         pecas = pecas_a = _completar(pecas_a)
-    cmd = [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1"]
-    filtros = []
-    entrada = 0
+    # Modo turbo: timeline só de cortes (sem camadas, textos, legendas, efeitos) com NVENC → a fonte é decodificada
+    # na placa e fica na memória dela até o encoder (sem descer para a RAM). Mesma velocidade ou mais, com a CPU
+    # quase parada. Fonte girada, 4:2:2/4:4:4 ou quadro com outra proporção ficam no modo normal.
+    tem_legenda = bool(legendas and legendas.get("itens"))
+    enc_gpu = _detectar_hw_encoder(cfg["vcodec"], bits) if (usar_gpu and not audio_only and cfg["vcodec"] in ("h264", "hevc")) else None
+    mesma_proporcao = abs(W / H - W0 / H0) < 0.01
+    turbo = bool(enc_gpu and enc_gpu.endswith("_nvenc") and not previa and usar_inputs and not lay and not tem_legenda
+                 and info.get("vcodec") in ("h264", "hevc", "vp9", "av1", "mpeg2video", "vp8") and not info.get("rotation")
+                 and info.get("pix_fmt", "") in ("yuv420p", "yuvj420p", "yuv420p10le", "nv12", "p010le")
+                 and mesma_proporcao and any(p[0] != "gap" for p in pecas))
+    fmt_cuda = "p010le" if bits == 10 else "nv12"
 
-    def _entrada_peca(p, video):
-        """Adiciona a entrada de uma peça (trecho ou vazio) e devolve o índice."""
-        nonlocal entrada
-        if p[0] == "gap":
-            src = f"color=c=black:s={W}x{H}:r={fps}" if video else "anullsrc=r=48000:cl=stereo"
-            cmd.extend(["-f", "lavfi", "-t", _tempo_ffmpeg(p[1]), "-i", src])
-        else:
-            cmd.extend(["-ss", _tempo_ffmpeg(p[0]), "-t", _tempo_ffmpeg(p[1] - p[0]), "-i", path])
-        entrada += 1
-        return entrada - 1
+    def _montar(turbo):
+        """Comando e grafo de filtros. turbo = tudo na placa de vídeo (NVDEC → scale_cuda → NVENC)."""
+        cmd = [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1"]
+        filtros = []
+        entrada = 0
 
-    def _filtro_audio(idx, p, rotulo):
-        vol = f",volume={p[2]:.2f}dB" if p[0] != "gap" and p[2] else ""
-        filtros.append(f"[{idx}:a:0]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
-                       f"asetpts=PTS-STARTPTS{vol}[{rotulo}]")
-
-    if usar_inputs:
-        # Uma única leitura da fonte + trim por trecho evita frames pretos/danificados no começo de cortes
-        # em vídeos long-GOP/VFR (comuns em arquivos de celular/WhatsApp). Espaços vazios ainda viram preto.
-        junto = has_audio and audio_junto
-        pares = ""
-        fonte_base = None
-        if not audio_only and any(p[0] != "gap" for p in pecas):
-            cmd += ["-i", path]
-            fonte_base = entrada
-            entrada += 1
-        for k, p in enumerate([] if audio_only else pecas):
+        def _entrada_peca(p, video):
+            """Adiciona a entrada de uma peça (trecho ou vazio) e devolve o índice."""
+            nonlocal entrada
             if p[0] == "gap":
-                filtros.append(f"color=c=black:s={W}x{H}:r={fps}:d={_tempo_ffmpeg(p[1])},"
-                               f"format=yuv420p[v{k}]")
+                src = f"color=c=black:s={W}x{H}:r={fps}" if video else "anullsrc=r=48000:cl=stereo"
+                cmd.extend(["-f", "lavfi", "-t", _tempo_ffmpeg(p[1]), "-i", src])
             else:
-                filtros.append(f"[{fonte_base}:v:0]trim=start={_tempo_ffmpeg(p[0])}:end={_tempo_ffmpeg(p[1])},"
-                               f"setpts=PTS-STARTPTS,scale={W}:{H}:force_original_aspect_ratio=decrease,"
-                               f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
-                               f"fps=fps={fps}:start_time=0,format=yuv420p[v{k}]")
-            pares += f"[v{k}]"
-            if junto:
-                if p[0] == "gap":
-                    filtros.append(f"anullsrc=r=48000:cl=stereo,atrim=0:{_tempo_ffmpeg(p[1])},"
-                                   f"asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp:channel_layouts=stereo[a{k}]")
-                else:
-                    vol = f",volume={p[2]:.2f}dB" if p[2] else ""
-                    filtros.append(f"[{fonte_base}:a:0]atrim=start={_tempo_ffmpeg(p[0])}:end={_tempo_ffmpeg(p[1])},"
-                                   f"asetpts=PTS-STARTPTS,aresample=48000,"
-                                   f"aformat=sample_fmts=fltp:channel_layouts=stereo{vol}[a{k}]")
-                pares += f"[a{k}]"
-        if not audio_only:
-            filtros.append(f"{pares}concat=n={len(pecas)}:v=1:a={1 if junto else 0}[vc]" + ("[ac]" if junto else ""))
-        if has_audio and not audio_junto and mix is None:
-            pares_a = ""
-            for k, p in enumerate(pecas_a):
-                _filtro_audio(_entrada_peca(p, False), p, f"ax{k}")
-                pares_a += f"[ax{k}]"
-            filtros.append(f"{pares_a}concat=n={len(pecas_a)}:v=0:a=1[ac]")
-    else:
-        # Muitos trechos: um único select (baixa memória)
-        cond = "+".join(f"between(t,{p[0]:.3f},{p[1]:.3f})" for p in segs)
-        cmd += ["-i", path]
-        entrada += 1
-        filtros.append(f"[0:v:0]select='{cond}',setpts=N/FRAME_RATE/TB[vc]")
-        if has_audio and mix is None:
-            filtros.append(f"[0:a:0]aselect='{cond}',asetpts=N/SR/TB[ac]")
-    if has_audio and mix is not None:
-        # todas as trilhas de áudio somadas (a mesma conta que o mixer em tempo real da prévia faz)
-        entradas = {}
-        for arq in ([None] if info["has_audio"] else []) + extras:
-            cmd += ["-i", path if arq is None else arq]
-            entradas[arq] = f"[{entrada}:a:0]"
+                cmd.extend(["-ss", _tempo_ffmpeg(p[0]), "-t", _tempo_ffmpeg(p[1] - p[0]), "-i", path])
             entrada += 1
-        filtros.extend(_grafo_mix(mix, total, entradas, "ac"))
+            return entrada - 1
 
-    # Camadas por cima (imagens e clipes com escala/posição/rotação/opacidade), de baixo para cima
-    vf = "[vc]"
-    for n, c in enumerate(lay):
-        if c["tipo"] == "ajuste":
-            # Camada de ajuste: os efeitos valem para o que já foi composto (as trilhas de baixo) no trecho dela.
-            # Um ramo do vídeo composto passa pelos efeitos (só no trecho) e volta por cima com a opacidade da camada.
-            efeitos = _filtros_fx(c["fx"], W, H, f"a{n}")
-            if not efeitos or (c["op"] <= 0.001 and "op" not in c["kf"]):
+        def _filtro_audio(idx, p, rotulo):
+            vol = f",volume={p[2]:.2f}dB" if p[0] != "gap" and p[2] else ""
+            filtros.append(f"[{idx}:a:0]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+                           f"asetpts=PTS-STARTPTS{vol}[{rotulo}]")
+
+        if usar_inputs:
+            # Uma única leitura da fonte + trim por trecho evita frames pretos/danificados no começo de cortes
+            # em vídeos long-GOP/VFR (comuns em arquivos de celular/WhatsApp). Espaços vazios ainda viram preto.
+            # Velocidade: cada grupo de trechos próximos (até 20 s entre eles) tem a sua leitura, que começa 3 s antes
+            # do grupo (-ss antes do -i pula direto para lá). Antes a fonte era decodificada desde o começo até o último
+            # corte — num vídeo longo com poucos trechos, quase tudo era jogado fora. O corte exato continua no trim
+            # (os 3 s de folga garantem quadros bons no ponto de corte). Muitos grupos: volta à leitura única.
+            junto = has_audio and audio_junto
+            pares = ""
+            grupos = []   # [índice da entrada, início da leitura, primeiro trecho, fim do último]
+            if not audio_only:
+                for a, b in sorted((p[0], p[1]) for p in pecas if p[0] != "gap"):
+                    if grupos and a <= grupos[-1][3] + 20:
+                        grupos[-1][3] = max(grupos[-1][3], b)
+                    else:
+                        grupos.append([None, max(0.0, a - 3.0), a, b])
+                if len(grupos) > 32:
+                    grupos = [[None, 0.0, min(g[2] for g in grupos), max(g[3] for g in grupos)]]
+                for g in grupos:
+                    # turbo: decodifica na placa (NVDEC) e os quadros ficam na memória dela até o NVENC
+                    cmd += (["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"] if turbo else []) + \
+                           (["-ss", _tempo_ffmpeg(g[1])] if g[1] > 0 else []) + ["-i", path]
+                    g[0] = entrada
+                    entrada += 1
+
+            def _grupo(a):
+                for g in grupos:
+                    if g[2] - 1e-6 <= a <= g[3] + 1e-6:
+                        return g
+                return grupos[0]
+
+            for k, p in enumerate([] if audio_only else pecas):
+                if p[0] == "gap":
+                    filtros.append(f"color=c=black:s={W}x{H}:r={fps}:d={_tempo_ffmpeg(p[1])},"
+                                   + (f"format={fmt_cuda},hwupload_cuda[v{k}]" if turbo else f"format={pixfmt}[v{k}]"))
+                elif turbo:
+                    g = _grupo(p[0])
+                    filtros.append(f"[{g[0]}:v:0]trim=start={_tempo_ffmpeg(p[0] - g[1])}:end={_tempo_ffmpeg(p[1] - g[1])},"
+                                   f"setpts=PTS-STARTPTS,scale_cuda={W}:{H}:format={fmt_cuda},"
+                                   f"fps=fps={fps}:start_time=0[v{k}]")
+                else:
+                    g = _grupo(p[0])
+                    filtros.append(f"[{g[0]}:v:0]trim=start={_tempo_ffmpeg(p[0] - g[1])}:end={_tempo_ffmpeg(p[1] - g[1])},"
+                                   f"setpts=PTS-STARTPTS,scale={W}:{H}:force_original_aspect_ratio=decrease,"
+                                   f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
+                                   f"fps=fps={fps}:start_time=0,format={pixfmt}[v{k}]")
+                pares += f"[v{k}]"
+                if junto:
+                    if p[0] == "gap":
+                        filtros.append(f"anullsrc=r=48000:cl=stereo,atrim=0:{_tempo_ffmpeg(p[1])},"
+                                       f"asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp:channel_layouts=stereo[a{k}]")
+                    else:
+                        vol = f",volume={p[2]:.2f}dB" if p[2] else ""
+                        g = _grupo(p[0])
+                        filtros.append(f"[{g[0]}:a:0]atrim=start={_tempo_ffmpeg(p[0] - g[1])}:end={_tempo_ffmpeg(p[1] - g[1])},"
+                                       f"asetpts=PTS-STARTPTS,aresample=48000,"
+                                       f"aformat=sample_fmts=fltp:channel_layouts=stereo{vol}[a{k}]")
+                    pares += f"[a{k}]"
+            if not audio_only:
+                filtros.append(f"{pares}concat=n={len(pecas)}:v=1:a={1 if junto else 0}[vc]" + ("[ac]" if junto else ""))
+            if has_audio and not audio_junto and mix is None:
+                pares_a = ""
+                for k, p in enumerate(pecas_a):
+                    _filtro_audio(_entrada_peca(p, False), p, f"ax{k}")
+                    pares_a += f"[ax{k}]"
+                filtros.append(f"{pares_a}concat=n={len(pecas_a)}:v=0:a=1[ac]")
+        else:
+            # Muitos trechos: um único select (baixa memória)
+            cond = "+".join(f"between(t,{p[0]:.3f},{p[1]:.3f})" for p in segs)
+            cmd += ["-i", path]
+            entrada += 1
+            filtros.append(f"[0:v:0]select='{cond}',setpts=N/FRAME_RATE/TB[vc]")
+            if has_audio and mix is None:
+                filtros.append(f"[0:a:0]aselect='{cond}',asetpts=N/SR/TB[ac]")
+        if has_audio and mix is not None:
+            # todas as trilhas de áudio somadas (a mesma conta que o mixer em tempo real da prévia faz)
+            entradas = {}
+            for arq in ([None] if info["has_audio"] else []) + extras:
+                cmd += ["-i", path if arq is None else arq]
+                entradas[arq] = f"[{entrada}:a:0]"
+                entrada += 1
+            filtros.extend(_grafo_mix(mix, total, entradas, "ac"))
+
+        # Camadas por cima (imagens e clipes com escala/posição/rotação/opacidade), de baixo para cima
+        vf = "[vc]"
+        for n, c in enumerate(lay):
+            if c["tipo"] == "ajuste":
+                # Camada de ajuste: os efeitos valem para o que já foi composto (as trilhas de baixo) no trecho dela.
+                # Um ramo do vídeo composto passa pelos efeitos (só no trecho) e volta por cima com a opacidade da camada.
+                efeitos = _filtros_fx(c["fx"], W, H, f"a{n}")
+                if not efeitos or (c["op"] <= 0.001 and "op" not in c["kf"]):
+                    continue
+                fim = c["st"] + c["dur"]
+                if "op" in c["kf"]:
+                    opac = [_opacidade_animada(c["kf"]["op"], c["dur"], fps, f"colorchannelmixer@op{n}", c["st"])]
+                else:
+                    opac = [f"colorchannelmixer=aa={c['op']:.4f}"] if c["op"] < 0.999 else []
+                filtros.append(f"{vf}split[aj{n}a][aj{n}b]")
+                filtros.append(f"[aj{n}b]trim=start={c['st']:.4f}:end={fim:.4f},format=rgba,"
+                               + ",".join(efeitos + opac) + f"[aj{n}c]")
+                filtros.append(f"[aj{n}a][aj{n}c]overlay=0:0:enable='between(t,{c['st']:.3f},{fim:.3f})'"
+                               f":eof_action=pass:format=auto[o{n}]")
+                vf = f"[o{n}]"
                 continue
-            fim = c["st"] + c["dur"]
-            if "op" in c["kf"]:
-                opac = [_opacidade_animada(c["kf"]["op"], c["dur"], fps, f"colorchannelmixer@op{n}", c["st"])]
+            if c["tipo"] == "imagem" and c.get("seq"):
+                cmd += ["-f", "concat", "-safe", "0", "-i", c["seq"]]
+            elif c["tipo"] == "imagem":
+                cmd += ["-loop", "1", "-framerate", fps, "-t", _tempo_ffmpeg(c["dur"]), "-i", c["path"]]
             else:
-                opac = [f"colorchannelmixer=aa={c['op']:.4f}"] if c["op"] < 0.999 else []
-            filtros.append(f"{vf}split[aj{n}a][aj{n}b]")
-            filtros.append(f"[aj{n}b]trim=start={c['st']:.4f}:end={fim:.4f},format=rgba,"
-                           + ",".join(efeitos + opac) + f"[aj{n}c]")
-            filtros.append(f"[aj{n}a][aj{n}c]overlay=0:0:enable='between(t,{c['st']:.3f},{fim:.3f})'"
+                # o arquivo do clipe, lido a partir de 3 s antes do trecho (-ss antes do -i: não decodifica o começo
+                # do arquivo à toa); o corte exato fica no trim, o que evita flash preto em cortes
+                c["ss"] = max(0.0, c["s"] - 3.0)
+                cmd += (["-ss", _tempo_ffmpeg(c["ss"])] if c["ss"] > 0 else []) + ["-i", c["path"] or path]
+            idx = entrada
+            entrada += 1
+            kf = c["kf"]
+            # Dentro da cadeia da camada o tempo começa em 0 (t / T); no overlay é o tempo do vídeo final.
+            # Propriedade animada vira expressão avaliada a cada quadro.
+            sx = _expr_kf(kf["sx"], "t") if "sx" in kf else None
+            sy = _expr_kf(kf["sy"], "t") if "sy" in kf else None
+            if "sc" in kf or sx or sy:
+                e = _expr_kf(kf["sc"], "t") if "sc" in kf else f"{c['sc']:.5f}"
+                ew = f"({e})*({sx})" if sx else e
+                eh = f"({e})*({sy})" if sy else e
+                # tamanho sempre par: com metade inteira o centro não "treme" meio pixel a cada quadro do zoom
+                escala = (f"scale=w='max(2,2*trunc(iw*({ew})/2))':h='max(2,2*trunc(ih*({eh})/2))'"
+                          f":eval=frame:flags=bicubic")
+            else:
+                k = c["sc"]
+                escala = f"scale='max(2,trunc(iw*{k:.5f}))':'max(2,trunc(ih*{k:.5f}))':flags=bicubic"
+            giro = None
+            if "rot" in kf:
+                # quadro fixo do tamanho da diagonal: cabe em qualquer ângulo
+                e = _expr_kf(kf["rot"], "t")
+                giro = f"rotate=a='({e})*PI/180':c=black@0:ow='hypot(iw,ih)':oh='hypot(iw,ih)'"
+            elif c["rot"]:
+                rad = c["rot"] * 3.141592653589793 / 180
+                giro = f"rotate={rad:.6f}:c=black@0:ow='rotw({rad:.6f})':oh='roth({rad:.6f})'"
+            if "op" in kf:
+                opac = _opacidade_animada(kf["op"], c["dur"], fps, f"colorchannelmixer@op{n}")
+            elif c["op"] < 0.999:
+                opac = f"colorchannelmixer=aa={c['op']:.4f}"
+            else:
+                opac = None
+            # escala animada vai por último (tamanho muda a cada quadro; o resto trabalha em tamanho fixo)
+            ordem = [giro, opac, escala] if ("sc" in kf or sx or sy) else [escala, giro, opac]
+            efeitos = _filtros_fx(c["fx"], c["mw"], c["mh"], f"l{n}")
+            # velocidade do clipe (como no Premiere): o tempo da fonte é comprimido/esticado antes de tudo
+            if c["tipo"] == "imagem" and c.get("seq"):
+                # quadros do texto animado: o trecho do clipe que entra na exportação
+                src = (f"[{idx}:v:0]trim=start={_tempo_ffmpeg(c['s'])}:end={_tempo_ffmpeg(c['s'] + c['fonte'])},"
+                       f"setpts=PTS-STARTPTS,")
+                vel = ""
+            elif c["tipo"] == "imagem":
+                src = f"[{idx}:v:0]"
+                vel = ""
+            else:
+                ss = c.get("ss", 0.0)
+                src = (f"[{idx}:v:0]trim=start={_tempo_ffmpeg(c['s'] - ss)}:"
+                       f"end={_tempo_ffmpeg(c['s'] - ss + c['fonte'])},")
+                vel = f"setpts=(PTS-STARTPTS)/{c['v']:.6f},"
+            filtros_clip = efeitos + [f for f in ordem if f]
+            if c["tipo"] != "imagem":
+                filtros_clip.append(f"tpad=stop_mode=clone:stop_duration={_tempo_ffmpeg(frame_dur)}")
+            cadeia = f"{src}{vel}fps=fps={fps}:start_time=0,format=rgba," + ",".join(filtros_clip)
+            cadeia += f",setpts=PTS-STARTPTS+{_tempo_ffmpeg(c['st'])}/TB[l{n}]"
+            filtros.append(cadeia)
+            fim = c["st"] + c["dur"]
+            tl = f"(t-{c['st']:.4f})"
+            px = _expr_kf(kf["x"], tl) if "x" in kf else f"{c['x']:.2f}"
+            py = _expr_kf(kf["y"], tl) if "y" in kf else f"{c['y']:.2f}"
+            if abs(c["ox"]) > 0.01 or abs(c["oy"]) > 0.01:
+                # Posição = onde fica o ponto de ancoragem; o centro da camada gira/escala em volta dele
+                if "sc" in kf or "rot" in kf:
+                    k = _expr_kf(kf["sc"], tl) if "sc" in kf else f"{c['sc']:.6f}"
+                    a = f"(({_expr_kf(kf['rot'], tl)})*PI/180)" if "rot" in kf else f"{c['rot'] * 3.141592653589793 / 180:.6f}"
+                    px = f"({px})+({k})*({c['ox']:.3f}*cos({a})-{c['oy']:.3f}*sin({a}))"
+                    py = f"({py})+({k})*({c['ox']:.3f}*sin({a})+{c['oy']:.3f}*cos({a}))"
+                else:
+                    a = c["rot"] * 3.141592653589793 / 180
+                    dx = c["sc"] * (c["ox"] * math.cos(a) - c["oy"] * math.sin(a))
+                    dy = c["sc"] * (c["ox"] * math.sin(a) + c["oy"] * math.cos(a))
+                    px, py = f"({px})+{dx:.3f}", f"({py})+{dy:.3f}"
+            filtros.append(f"{vf}[l{n}]overlay=x='{px}-w/2':y='{py}-h/2'"
+                           f":enable='between(t,{_tempo_ffmpeg(c['st'])},{_tempo_ffmpeg(fim)})'"
                            f":eof_action=pass:format=auto[o{n}]")
             vf = f"[o{n}]"
-            continue
-        if c["tipo"] == "imagem" and c.get("seq"):
-            cmd += ["-f", "concat", "-safe", "0", "-i", c["seq"]]
-        elif c["tipo"] == "imagem":
-            cmd += ["-loop", "1", "-framerate", fps, "-t", _tempo_ffmpeg(c["dur"]), "-i", c["path"]]
-        else:
-            cmd += ["-i", c["path"] or path]   # o arquivo do clipe; trim no grafo evita flash preto em cortes
-        idx = entrada
-        entrada += 1
-        kf = c["kf"]
-        # Dentro da cadeia da camada o tempo começa em 0 (t / T); no overlay é o tempo do vídeo final.
-        # Propriedade animada vira expressão avaliada a cada quadro.
-        sx = _expr_kf(kf["sx"], "t") if "sx" in kf else None
-        sy = _expr_kf(kf["sy"], "t") if "sy" in kf else None
-        if "sc" in kf or sx or sy:
-            e = _expr_kf(kf["sc"], "t") if "sc" in kf else f"{c['sc']:.5f}"
-            ew = f"({e})*({sx})" if sx else e
-            eh = f"({e})*({sy})" if sy else e
-            # tamanho sempre par: com metade inteira o centro não "treme" meio pixel a cada quadro do zoom
-            escala = (f"scale=w='max(2,2*trunc(iw*({ew})/2))':h='max(2,2*trunc(ih*({eh})/2))'"
-                      f":eval=frame:flags=bicubic")
-        else:
-            k = c["sc"]
-            escala = f"scale='max(2,trunc(iw*{k:.5f}))':'max(2,trunc(ih*{k:.5f}))':flags=bicubic"
-        giro = None
-        if "rot" in kf:
-            # quadro fixo do tamanho da diagonal: cabe em qualquer ângulo
-            e = _expr_kf(kf["rot"], "t")
-            giro = f"rotate=a='({e})*PI/180':c=black@0:ow='hypot(iw,ih)':oh='hypot(iw,ih)'"
-        elif c["rot"]:
-            rad = c["rot"] * 3.141592653589793 / 180
-            giro = f"rotate={rad:.6f}:c=black@0:ow='rotw({rad:.6f})':oh='roth({rad:.6f})'"
-        if "op" in kf:
-            opac = _opacidade_animada(kf["op"], c["dur"], fps, f"colorchannelmixer@op{n}")
-        elif c["op"] < 0.999:
-            opac = f"colorchannelmixer=aa={c['op']:.4f}"
-        else:
-            opac = None
-        # escala animada vai por último (tamanho muda a cada quadro; o resto trabalha em tamanho fixo)
-        ordem = [giro, opac, escala] if ("sc" in kf or sx or sy) else [escala, giro, opac]
-        efeitos = _filtros_fx(c["fx"], c["mw"], c["mh"], f"l{n}")
-        # velocidade do clipe (como no Premiere): o tempo da fonte é comprimido/esticado antes de tudo
-        if c["tipo"] == "imagem" and c.get("seq"):
-            # quadros do texto animado: o trecho do clipe que entra na exportação
-            src = (f"[{idx}:v:0]trim=start={_tempo_ffmpeg(c['s'])}:end={_tempo_ffmpeg(c['s'] + c['fonte'])},"
-                   f"setpts=PTS-STARTPTS,")
-            vel = ""
-        elif c["tipo"] == "imagem":
-            src = f"[{idx}:v:0]"
-            vel = ""
-        else:
-            src = (f"[{idx}:v:0]trim=start={_tempo_ffmpeg(c['s'])}:"
-                   f"end={_tempo_ffmpeg(c['s'] + c['fonte'])},")
-            vel = f"setpts=(PTS-STARTPTS)/{c['v']:.6f},"
-        filtros_clip = efeitos + [f for f in ordem if f]
-        if c["tipo"] != "imagem":
-            filtros_clip.append(f"tpad=stop_mode=clone:stop_duration={_tempo_ffmpeg(frame_dur)}")
-        cadeia = f"{src}{vel}fps=fps={fps}:start_time=0,format=rgba," + ",".join(filtros_clip)
-        cadeia += f",setpts=PTS-STARTPTS+{_tempo_ffmpeg(c['st'])}/TB[l{n}]"
-        filtros.append(cadeia)
-        fim = c["st"] + c["dur"]
-        tl = f"(t-{c['st']:.4f})"
-        px = _expr_kf(kf["x"], tl) if "x" in kf else f"{c['x']:.2f}"
-        py = _expr_kf(kf["y"], tl) if "y" in kf else f"{c['y']:.2f}"
-        if abs(c["ox"]) > 0.01 or abs(c["oy"]) > 0.01:
-            # Posição = onde fica o ponto de ancoragem; o centro da camada gira/escala em volta dele
-            if "sc" in kf or "rot" in kf:
-                k = _expr_kf(kf["sc"], tl) if "sc" in kf else f"{c['sc']:.6f}"
-                a = f"(({_expr_kf(kf['rot'], tl)})*PI/180)" if "rot" in kf else f"{c['rot'] * 3.141592653589793 / 180:.6f}"
-                px = f"({px})+({k})*({c['ox']:.3f}*cos({a})-{c['oy']:.3f}*sin({a}))"
-                py = f"({py})+({k})*({c['ox']:.3f}*sin({a})+{c['oy']:.3f}*cos({a}))"
+        if lay:
+            filtros.append(f"{vf}format={pixfmt}[vlay]")
+            vf = "[vlay]"
+
+        # legendas gravadas no vídeo (mesmo estilo da prévia do editor), antes de reduzir a resolução
+        ass = None
+        if legendas and legendas.get("itens") and not audio_only:
+            ass = _gerar_ass(legendas["itens"], legendas.get("estilo") or {}, W, H)
+            if ass:
+                filtros.append(f"{vf}subtitles=filename={_caminho_filtro(ass)}[vsub]")
+                vf = "[vsub]"
+
+        # resolução pelo lado menor do quadro: "1080p" vertical = 1080×1920
+        if alvo_h and not audio_only and min(W, H) > alvo_h:
+            if turbo:
+                k = alvo_h / min(W, H)
+                filtros.append(f"{vf}scale_cuda={int(round(W * k / 2)) * 2}:{int(round(H * k / 2)) * 2}:format={fmt_cuda}[vs]")
             else:
-                a = c["rot"] * 3.141592653589793 / 180
-                dx = c["sc"] * (c["ox"] * math.cos(a) - c["oy"] * math.sin(a))
-                dy = c["sc"] * (c["ox"] * math.sin(a) + c["oy"] * math.cos(a))
-                px, py = f"({px})+{dx:.3f}", f"({py})+{dy:.3f}"
-        filtros.append(f"{vf}[l{n}]overlay=x='{px}-w/2':y='{py}-h/2'"
-                       f":enable='between(t,{_tempo_ffmpeg(c['st'])},{_tempo_ffmpeg(fim)})'"
-                       f":eof_action=pass:format=auto[o{n}]")
-        vf = f"[o{n}]"
-    if lay:
-        filtros.append(f"{vf}format=yuv420p[vlay]")
-        vf = "[vlay]"
+                escala = f"{alvo_h}:-2" if W < H else f"-2:{alvo_h}"
+                filtros.append(f"{vf}scale={escala}:flags=lanczos[vs]")
+            vf = "[vs]"
 
-    # legendas gravadas no vídeo (mesmo estilo da prévia do editor), antes de reduzir a resolução
-    ass = None
-    if legendas and legendas.get("itens") and not audio_only:
-        ass = _gerar_ass(legendas["itens"], legendas.get("estilo") or {}, W, H)
+        # marca de cor nos próprios quadros (o encoder do ffmpeg 7 usa a dos quadros; só a opção de saída não basta)
+        args_cor = [] if audio_only or previa else _args_cor(info, min(W, H) if not alvo_h else min(alvo_h, min(W, H)))
+        if args_cor:
+            m = dict(zip(args_cor[::2], args_cor[1::2]))
+            filtros.append(f"{vf}setparams=range={m.get('-color_range', 'tv')}"
+                           + (f":colorspace={m['-colorspace']}" if "-colorspace" in m else "")
+                           + (f":color_primaries={m['-color_primaries']}" if "-color_primaries" in m else "")
+                           + (f":color_trc={m['-color_trc']}" if "-color_trc" in m else "") + "[vcor]")
+            vf = "[vcor]"
+        return cmd, filtros, vf, ass, args_cor
+
+    prep = {"scripts": [], "ass": []}
+
+    def _preparar(tb):
+        cmd, filtros, vf, ass, args_cor = _montar(tb)
+        script = os.path.join(_work_dir(), f"filtro_{uuid.uuid4().hex[:8]}.txt")
+        with open(script, "w", encoding="utf-8") as f:
+            f.write(";\n".join(filtros))
+        base_cmd = cmd + [_opcao_filtro_script(), script] + ([] if audio_only else ["-map", vf])
+        if has_audio:
+            base_cmd += ["-map", "[ac]", "-c:a", cfg["acodec"]]
+            if not cfg["acodec"].startswith("pcm_"):
+                base_cmd += ["-b:a", "320k" if audio_only and q["ab"] == "256k" else q["ab"]]
+        prep.update(base_cmd=base_cmd, args_cor=args_cor, script=script, turbo=tb)
+        prep["scripts"].append(script)
         if ass:
-            filtros.append(f"{vf}subtitles=filename={_caminho_filtro(ass)}[vsub]")
-            vf = "[vsub]"
-
-    # resolução pelo lado menor do quadro: "1080p" vertical = 1080×1920
-    if alvo_h and not audio_only and min(W, H) > alvo_h:
-        escala = f"{alvo_h}:-2" if W < H else f"-2:{alvo_h}"
-        filtros.append(f"{vf}scale={escala}:flags=lanczos[vs]")
-        vf = "[vs]"
-
-    script = os.path.join(_work_dir(), f"filtro_{uuid.uuid4().hex[:8]}.txt")
-    with open(script, "w", encoding="utf-8") as f:
-        f.write(";\n".join(filtros))
-
-    base_cmd = cmd + [_opcao_filtro_script(), script] + ([] if audio_only else ["-map", vf])
-    if has_audio:
-        base_cmd += ["-map", "[ac]", "-c:a", cfg["acodec"]]
-        if cfg["acodec"] != "pcm_s16le":
-            base_cmd += ["-b:a", "320k" if audio_only and q["ab"] == "256k" else q["ab"]]
+            prep["ass"].append(ass)
 
     ultimo_cmd = None
 
@@ -1715,8 +1867,12 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             video_args = ["-c:v", "libx264", "-preset", "ultrafast", "-tune", "fastdecode", "-crf", "20",
                           "-g", "10", "-pix_fmt", "yuv420p"]
         else:
-            video_args = ["-vn"] if audio_only else _args_video(cfg, q, gpu)
-        full = base_cmd + video_args + cfg["extra"] + [saida]
+            video_args = ["-vn"] if audio_only else _args_video(cfg, q, gpu, bits, mbps) + prep["args_cor"]
+            if prep["turbo"] and "-pix_fmt" in video_args:
+                # quadros já na placa, no formato certo (nv12/p010): converter faria o ffmpeg descer para a RAM
+                i = video_args.index("-pix_fmt")
+                del video_args[i:i + 2]
+        full = prep["base_cmd"] + video_args + cfg["extra"] + [saida]
         ultimo_cmd = full
 
         def _hold(p):
@@ -1727,7 +1883,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             with _export_lock:
                 _export_proc = p
 
-        rc, err = _run_progress(full, total, lambda p: prog(p, f"Exportando... {p}%"), stop_event, _hold)
+        rc, err = _run_progress(full, total, lambda p: prog(p, f"Exportando{' (turbo)' if prep['turbo'] else ''}... {p}%"),
+                                stop_event, _hold)
         if proc_holder is not None:
             proc_holder(None)
         else:
@@ -1736,9 +1893,22 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         return rc, err
 
     try:
-        enc = _detectar_hw_encoder() if (usar_gpu and not audio_only and cfg["vcodec"] == "h264") else None
-        prog(0, "Iniciando exportação" + (f" (GPU: {enc.split('_')[1].upper()})" if enc else "") + "...")
-        rc, err = _tentar(usar_gpu)
+        enc = enc_gpu
+        rc, err = 1, ""
+        if turbo:
+            prog(0, "Iniciando exportação (turbo: tudo na placa de vídeo)...")
+            _preparar(True)
+            rc, err = _tentar(True)
+            if stop_event is not None and stop_event.is_set():
+                _apagar(saida)
+                return {"success": False, "cancelled": True, "error": "Exportação cancelada."}
+            if rc != 0:
+                prog(0, "Turbo não serviu para este arquivo, exportando no modo normal...")
+                _apagar(saida)
+        if not turbo or rc != 0:
+            prog(0, "Iniciando exportação" + (f" (GPU: {enc.split('_')[1].upper()})" if enc else "") + "...")
+            _preparar(False)
+            rc, err = _tentar(usar_gpu)
         if stop_event is not None and stop_event.is_set():
             _apagar(saida)
             return {"success": False, "cancelled": True, "error": "Exportação cancelada."}
@@ -1750,19 +1920,15 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             _apagar(saida)
             linhas = _linhas_ffmpeg(err)
             detalhe = "\n".join(linhas) if linhas else f"código {rc}"
-            log = _salvar_falha_export(ultimo_cmd, script, err, saida)
+            log = _salvar_falha_export(ultimo_cmd, prep.get("script"), err, saida)
             if log:
                 detalhe += f"\nLog: {log}"
             return {"success": False, "error": "Falha ao exportar: " + detalhe}
     except FileNotFoundError:
         return {"success": False, "error": "ffmpeg não encontrado."}
     finally:
-        try:
-            os.remove(script)
-        except Exception:
-            pass
-        if ass:
-            _apagar(ass)
+        for arq in prep["scripts"] + prep["ass"]:
+            _apagar(arq)
 
     prog(100, "Concluído!")
     return {
@@ -1771,6 +1937,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         "output_folder": os.path.dirname(saida),
         "duration": round(total, 2),
         "size": os.path.getsize(saida),
+        "turbo": bool(prep.get("turbo")),
     }
 
 

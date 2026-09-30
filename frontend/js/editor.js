@@ -4512,17 +4512,57 @@ function veOpenExport() {
         atual.classList.remove('active');
         document.querySelector(`#ve-export .ve-pill[data-v="${soAudio ? 'mp3' : 'mp4'}"]`).classList.add('active');
     }
+    // nome do arquivo: o que foi digitado nesta sessão, ou <projeto ou vídeo>_editado
+    const nome = $ve('ve-exp-nome'), base = (VE.projectPath || VE.path || 'video').split(/[\\/]/).pop().replace(/\.[^.]+$/, '');
+    if (!VE._expNome || nome.value === VE._expPadrao) nome.value = VE._expNome || base + '_editado';
+    VE._expPadrao = base + '_editado';
+    // codec, bits e taxa lembrados entre exportações
+    try {
+        const o = JSON.parse(veLsGet('ve-exp-opcoes') || '{}');
+        ['codec', 'bits', 'taxa'].forEach(k => {
+            const b = o[k] && document.querySelector(`#ve-export .ve-pills[data-name="${k}"] .ve-pill[data-v="${o[k]}"]`);
+            if (b) b.parentElement.querySelectorAll('.ve-pill').forEach(x => x.classList.toggle('active', x === b));
+        });
+        if (o.mbps) $ve('ve-exp-mbps').value = o.mbps;
+    } catch (e) { /* padrão */ }
     $ve('ve-export-form').hidden = false;
     $ve('ve-export-progress').hidden = true;
     $ve('ve-exp-result').hidden = true;
     veExportFoot('form');
     veUpdateExportSummary();
     $ve('ve-export').hidden = false;
+    setTimeout(() => { nome.focus(); nome.select(); }, 30);
+}
+
+// Pílula de um grupo: marca uma (e desliga as que não valem)
+function veExpPill(nome, v) {
+    document.querySelectorAll(`#ve-export .ve-pills[data-name="${nome}"] .ve-pill`).forEach(b => b.classList.toggle('active', b.dataset.v === v));
+}
+
+function veExpOpcoes() {
+    const fmt = vePill('format') || 'mp4', codec = ['mp4', 'mov', 'mkv'].includes(fmt) ? vePill('codec') || 'h264' : 'h264';
+    const mbps = vePill('taxa') === 'mbps' ? Math.max(1, Math.min(400, +$ve('ve-exp-mbps').value || 16)) : 0;
+    return { nome: $ve('ve-exp-nome').value.trim(), codec, bits: +(vePill('bits') || 8), mbps };
 }
 
 function veUpdateExportSummary() {
     const fmt = vePill('format') || 'mp4';
     const audio = fmt === 'mp3' || fmt === 'wav';
+    // codec: H.265 e ProRes só em MP4/MOV/MKV; ProRes sai em .mov, sempre 10 bits; H.264 fica em 8 bits
+    const comCodec = ['mp4', 'mov', 'mkv'].includes(fmt), codec = comCodec ? vePill('codec') || 'h264' : 'h264';
+    const ex = $ve('ve-export');
+    ex.classList.toggle('sem-codec', !comCodec);
+    ex.classList.toggle('prores', comCodec && codec === 'prores');
+    const b8 = document.querySelector('#ve-export .ve-pill[data-v="8"]'), b10 = document.querySelector('#ve-export .ve-pill[data-v="10"]');
+    if (b8 && b10) {
+        b10.classList.toggle('disabled', codec === 'h264');
+        b8.classList.toggle('disabled', codec === 'prores');
+        if (codec === 'h264') veExpPill('bits', '8');
+        if (codec === 'prores') veExpPill('bits', '10');
+    }
+    $ve('ve-exp-mbps-box').hidden = vePill('taxa') !== 'mbps';
+    $ve('ve-exp-ext').textContent = codec === 'prores' && comCodec ? '.mov' : '.' + fmt;
+    try { veLsSet('ve-exp-opcoes', JSON.stringify({ codec: vePill('codec'), bits: vePill('bits'), taxa: vePill('taxa'), mbps: $ve('ve-exp-mbps').value })); } catch (e) {}
     const f = veExportFaixa(), dur = f ? f.b - f.a : VE.dur;
     const faixa = f ? `<br>Só o trecho <b>In→Out</b>: ${veShort(f.a)} a ${veShort(f.b)}` : '';
     $ve('ve-export').classList.toggle('audio', audio);
@@ -4535,9 +4575,15 @@ function veUpdateExportSummary() {
     const res = $ve('ve-res').value, W = VE.seqW, H = VE.seqH, lado = Math.min(W, H);
     const k = res === 'original' || +res >= lado ? 1 : +res / lado;
     const w = Math.round(W * k / 2) * 2, h = Math.round(H * k / 2) * 2;
+    const o = veExpOpcoes(), nomes = { h264: 'H.264', hevc: 'H.265', prores: 'ProRes 422 HQ' };
+    // tamanho estimado: com taxa alvo é conta direta; ProRes 422 HQ ≈ 220 Mbps em 1080p30 (escala com os pixels)
+    const px = w * h / (1920 * 1080), fpsK = (VE.fps || 30) / 30;
+    const mbps = o.codec === 'prores' ? 220 * px * fpsK : o.mbps;
+    const tam = mbps ? ` · ~${veCacheBytesTxt((mbps * 1e6 / 8 + 24000) * dur)}` : '';
     $ve('ve-export-summary').innerHTML =
         `Duração final: <b>${veTC(dur)}</b> (${veHuman(dur)})<br>` +
-        `Clipes: <b>${VE.clips.length}</b> · Resolução: <b>${w}×${h}</b> · <b>${fmt.toUpperCase()}</b>` + faixa;
+        `Clipes: <b>${VE.clips.length}</b> · Resolução: <b>${w}×${h}</b> · <b>${fmt.toUpperCase()}</b>` +
+        (comCodec ? ` · <b>${nomes[o.codec]} ${o.bits} bits</b>` : '') + tam + faixa;
 }
 
 function veExportFoot(mode) {
@@ -4587,8 +4633,10 @@ async function veStartExport() {
         await window.pywebview.api.video_cutter_export(
             VE.path, plano.base, vePill('format') || 'mp4', vePill('quality') || 'medium',
             $ve('ve-res').value, $ve('ve-gpu').checked, VE.dest, noAudio,
-            plano.camadas, plano.audio, plano.dur, plano.mix, veTxExport(plano.faixa), [VE.seqW, VE.seqH]
+            plano.camadas, plano.audio, plano.dur, plano.mix, veTxExport(plano.faixa), [VE.seqW, VE.seqH],
+            veExpOpcoes()
         );
+        VE._expNome = $ve('ve-exp-nome').value.trim();
     } catch (e) {
         const msg = e && (e.message || e.error || e);
         veOnExport({ done: true, success: false, error: 'Falha ao exportar: ' + (msg || 'erro ao preparar a exportação') });
@@ -4626,7 +4674,7 @@ function veOnExport(ev) {
         box.className = 've-exp-result ok';
         const mb = ev.size ? (ev.size / 1048576).toFixed(1) + ' MB' : '';
         box.innerHTML = `<b>${veEsc(ev.output_path.split(/[\\/]/).pop())}</b><br>` +
-            `<span class="ve-exp-sub">${veHuman(ev.duration)} · ${mb}</span>` +
+            `<span class="ve-exp-sub">${veHuman(ev.duration)} · ${mb}${ev.turbo ? ' · ⚡ ' + veT('turbo (tudo na placa de vídeo)') : ''}</span>` +
             '<div class="ve-exp-actions">' +
             '<button class="ve-btn ve-btn-primary ve-btn-sm" onclick="window.pywebview.api.open_file(VE.lastOutput)"><svg class="i"><use href="#i-play"/></svg> Assistir</button>' +
             '<button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.reveal_file(VE.lastOutput)"><svg class="i"><use href="#i-folder"/></svg> Mostrar na pasta</button></div>';
@@ -5141,6 +5189,8 @@ function veInitEvents() {
         });
     });
     $ve('ve-res').addEventListener('change', veUpdateExportSummary);
+    $ve('ve-exp-mbps').addEventListener('input', veUpdateExportSummary);
+    $ve('ve-exp-nome').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') veStartExport(); });
 
     // arrastar e soltar (visual; o caminho real chega pelo Python)
     const screen = $ve('ve-screen');

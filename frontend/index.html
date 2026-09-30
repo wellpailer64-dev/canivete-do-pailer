@@ -772,6 +772,10 @@
                                 </div>
                                 <div class="ve-modal-body" id="ve-export-form">
                                     <div class="ve-field">
+                                        <label>Nome do arquivo</label>
+                                        <div class="ve-exp-nome"><input type="text" id="ve-exp-nome" spellcheck="false" autocomplete="off"><span id="ve-exp-ext">.mp4</span></div>
+                                    </div>
+                                    <div class="ve-field">
                                         <label>Formato</label>
                                         <div class="ve-pills" data-name="format">
                                             <button class="ve-pill active" data-v="mp4">MP4</button>
@@ -781,6 +785,31 @@
                                             <button class="ve-pill" data-v="avi">AVI</button>
                                             <button class="ve-pill ve-pill-audio" data-v="mp3">MP3</button>
                                             <button class="ve-pill ve-pill-audio" data-v="wav">WAV</button>
+                                        </div>
+                                    </div>
+                                    <div class="ve-field ve-only-video ve-only-codec">
+                                        <label>Codec</label>
+                                        <div class="ve-pills" data-name="codec">
+                                            <button class="ve-pill active" data-v="h264" title="Toca em qualquer lugar: celular, redes sociais, navegador">H.264</button>
+                                            <button class="ve-pill" data-v="hevc" title="Mesma qualidade com cerca de 40% menos tamanho; aceita 10 bits">H.265 / HEVC</button>
+                                            <button class="ve-pill" data-v="prores" title="ProRes 422 HQ, 10 bits: para finalizar em outro programa (arquivo grande, sai em .mov)">ProRes 422 HQ</button>
+                                        </div>
+                                    </div>
+                                    <div class="ve-field ve-only-video ve-only-codec">
+                                        <label>Profundidade de cor</label>
+                                        <div class="ve-pills" data-name="bits">
+                                            <button class="ve-pill active" data-v="8">8 bits</button>
+                                            <button class="ve-pill" data-v="10" title="Degradês mais suaves (céu, sombras) e mantém fontes 10 bits; precisa de H.265 ou ProRes">10 bits</button>
+                                        </div>
+                                    </div>
+                                    <div class="ve-field ve-only-video ve-only-taxa">
+                                        <label>Taxa de bits</label>
+                                        <div class="ve-exp-taxa">
+                                            <div class="ve-pills" data-name="taxa">
+                                                <button class="ve-pill active" data-v="q" title="Cada cena recebe os bits de que precisa (recomendado)">Qualidade constante</button>
+                                                <button class="ve-pill" data-v="mbps" title="Tamanho previsível: você define os megabits por segundo">Alvo</button>
+                                            </div>
+                                            <span class="ve-exp-mbps" id="ve-exp-mbps-box"><input type="number" id="ve-exp-mbps" min="1" max="400" step="1" value="16"> Mbps</span>
                                         </div>
                                     </div>
                                     <div class="ve-field">
