@@ -435,6 +435,8 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 
 .ve-tl-wrap { position: relative; min-width: 0; overflow: hidden; cursor: default; }
 .ve-tl-wrap.tool-razor { cursor: crosshair; }
+.ve-tl-wrap.tool-fwd { cursor: e-resize; }
+.ve-tl-wrap.tool-bwd { cursor: w-resize; }
 .ve-tl-wrap.tool-hand { cursor: grab; }
 .ve-tl-wrap.tool-hand.dragging { cursor: grabbing; }
 .ve-tl-wrap.scrub { cursor: ew-resize; }

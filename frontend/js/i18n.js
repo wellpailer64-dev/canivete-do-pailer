@@ -369,6 +369,12 @@ const I18N_EN = {
     'Nenhum clipe selecionado passa pela agulha': 'No selected clip is under the playhead',
     'Não dá para apagar todos os clipes': "Can't delete every clip",
     'Transições de vídeo': 'Video transitions',
+    'Selecionar faixa para a frente': 'Track Select Forward', 'Selecionar faixa para trás': 'Track Select Backward',
+    'Faixa para a frente (A): clique para pegar tudo dali em diante · Shift: só a trilha': 'Track Select Forward (A): click to grab everything from there on · Shift: only that track',
+    'Faixa para trás (Shift+A): clique para pegar tudo dali para trás · Shift: só a trilha': 'Track Select Backward (Shift+A): click to grab everything before that point · Shift: only that track',
+    'clipes selecionados': 'clips selected', 'clipe selecionado': 'clip selected', 'Espaço fechado': 'Gap closed',
+    'Não dá para fechar o espaço: há clipes em outras trilhas nesse trecho (trave a trilha com o cadeado para ela não se mexer)':
+        "Can't close the gap: other tracks have clips in it (lock a track with the padlock to keep it still)",
     'Inverter clipe (Reverse Speed)': 'Reverse Clip (Reverse Speed)', 'Clipe invertido': 'Clip reversed', 'Clipe voltou ao normal': 'Clip back to normal',
     'Invertendo o clipe…': 'Reversing the clip…', 'Não foi possível inverter o clipe': "Couldn't reverse the clip", 'invertido': 'reversed',
     'Selecione um clipe de vídeo ou de áudio para inverter': 'Select a video or audio clip to reverse',

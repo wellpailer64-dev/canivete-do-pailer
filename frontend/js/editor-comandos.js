@@ -33,8 +33,8 @@ const VE_CMDS = [
     { id: 'recortar', grupo: 'editar', nome: 'Recortar', teclas: ['Ctrl+X'], sep: true, fn: () => veCopiar(true), pode: veSel },
     { id: 'copiar', grupo: 'editar', nome: 'Copiar', teclas: ['Ctrl+C'], fn: () => veCopiar(false), pode: veSel },
     { id: 'colar', grupo: 'editar', nome: 'Colar', teclas: ['Ctrl+V'], fn: () => veColar() },
-    { id: 'apagar', grupo: 'editar', nome: 'Apagar', teclas: ['Delete', 'Backspace', 'D'], fn: () => veDeleteSelected(false), pode: veSel },
-    { id: 'apagar-ripple', grupo: 'editar', nome: 'Apagar e fechar o espaço', teclas: ['Shift+Delete', 'Shift+Backspace', 'Shift+D'], fn: () => veDeleteSelected(true), pode: veSel },
+    { id: 'apagar', grupo: 'editar', nome: 'Apagar', teclas: ['Delete', 'Backspace', 'D'], fn: () => veDeleteSelected(false), pode: () => veSel() || !!VE.gapSel },
+    { id: 'apagar-ripple', grupo: 'editar', nome: 'Apagar e fechar o espaço', teclas: ['Shift+Delete', 'Shift+Backspace', 'Shift+D'], fn: () => veDeleteSelected(true), pode: () => veSel() || !!VE.gapSel },
     { id: 'desselecionar', grupo: 'editar', nome: 'Desmarcar tudo', teclas: ['Esc'], fn: () => { VE.sel = -1; VETX.legSel = -1; VE.selx = null; VE.trSel = null; VE.bordaSel = null; veRenderClips(); veDraw(); } },
     { id: 'atalhos', grupo: 'editar', nome: 'Atalhos do teclado...', teclas: ['Ctrl+Alt+K'], sempre: true, sep: true, fn: () => veAtalhosAbrir() },
     { id: 'preferencias', grupo: 'editar', nome: 'Preferências...', teclas: [], sempre: true, fn: () => prefsOpen() },
@@ -116,6 +116,8 @@ const VE_CMDS = [
     { id: 'ferr-mao', grupo: 'ferramentas', nome: 'Ferramenta Mão', teclas: ['H'], fn: () => veSetTool('hand') },
     { id: 'ferr-zoom', grupo: 'ferramentas', nome: 'Ferramenta Zoom', teclas: ['Z'], fn: () => veSetTool('zoom') },
     { id: 'ferr-velocidade', grupo: 'ferramentas', nome: 'Ferramenta Velocidade', teclas: ['R'], fn: () => { veSetTool('rate'); veToast('Velocidade (R): arraste a borda de um clipe'); } },
+    { id: 'ferr-frente', grupo: 'ferramentas', nome: 'Selecionar faixa para a frente', teclas: ['A'], fn: () => { veSetTool('fwd'); veToast('Faixa para a frente (A): clique para pegar tudo dali em diante · Shift: só a trilha'); } },
+    { id: 'ferr-tras', grupo: 'ferramentas', nome: 'Selecionar faixa para trás', teclas: ['Shift+A'], fn: () => { veSetTool('bwd'); veToast('Faixa para trás (Shift+A): clique para pegar tudo dali para trás · Shift: só a trilha'); } },
     { id: 'ferr-texto', grupo: 'ferramentas', nome: 'Ferramenta Texto', teclas: ['T'], fn: () => { veSetTool('texto'); veToast('Texto (T): clique no monitor para escrever'); } },
 
     // ── Ajuda ──

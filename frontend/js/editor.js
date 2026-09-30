@@ -1043,6 +1043,7 @@ function veDeleteClip(i, ripple) {
 }
 
 function veDeleteSelected(ripple) {
+    if (VE.sel < 0 && VE.gapSel && veFecharEspaco()) return;   // espaço vazio selecionado (editor-lacunas.js)
     if (VE.sel < 0 && veTransApagar()) return;
     if (veSelLista().length > 1) { veApagarVarios(veSelLista(), ripple); return; }
     if (VE.sel < 0 && VETX.legSel >= 0 && VE.legendas[VETX.legSel]) {
@@ -1074,6 +1075,7 @@ function veSelLista() {
 
 function veSelDefinir(lista, prim) {
     VETX.legSel = -1;
+    VE.gapSel = null;
     lista = [...new Set(lista.filter(Boolean))];
     if (!lista.length) { VE.sel = -1; VE.selx = null; return; }
     if (!prim || !lista.includes(prim)) prim = lista[lista.length - 1];
@@ -1908,7 +1910,15 @@ function veIsAudio(c) { const m = veMediaOf(c); return !!m && (m.kind === 'audio
 // O que cada clipe ocupa: vídeo = V e A (vinculados); imagem/ajuste = só V; áudio solto = só A.
 // Sobrescrever, aparar e mover só esbarram em clipes que dividem a mesma linha.
 const veOcupaV = c => !veIsAudio(c);
-const veOcupaA = c => !veIsImage(c) && c.x !== 'v';
+// Vídeo que sabidamente não tem som (ex.: .mov de animação com transparência): só a linha V, como no Premiere.
+// Sem os dados ainda ou offline, continua ocupando as duas.
+function veSemSom(c) {
+    const m = veMediaOf(c);
+    if (!m || m.kind !== 'video' || veMediaOffline(m)) return false;
+    const info = m.id === 0 ? VE.info : m.info;
+    return !!info && !info.offline && info.has_audio === false;
+}
+const veOcupaA = c => !veIsImage(c) && c.x !== 'v' && !veSemSom(c);
 const veConflita = (a, b) => (veOcupaV(a) && veOcupaV(b)) || (veOcupaA(a) && veOcupaA(b));
 
 function veDefProps(c) {
@@ -4174,7 +4184,7 @@ function veRender() {
             ctx.restore();
         }
         if (!ghost && veHasKf(c)) veDrawKfMarks(ctx, c, i, st, veKfMarkY(vr));
-        if (img || c.x === 'v') {   // imagem (ou vídeo com o som separado) não tem linha de áudio
+        if (img || c.x === 'v' || !veOcupaA(c)) {   // imagem, vídeo com o som separado ou sem som: sem linha de áudio
             ctx.globalAlpha = 1;
             if ((selSet.has(c) && !dim) || ghost) {
                 ctx.strokeStyle = '#F97316';
@@ -4296,6 +4306,8 @@ function veRender() {
         });
         ctx.restore();
     }
+
+    if (VE.gapSel) veGapDesenhar(ctx, rowOf, X);   // espaço vazio selecionado (editor-lacunas.js)
 
     // retângulo de seleção
     if (VE.drag && VE.drag.mode === 'marq') {
@@ -4486,6 +4498,8 @@ function veSetTool(tool) {
     wrap.classList.toggle('tool-hand', tool === 'hand');
     wrap.classList.toggle('tool-rate', tool === 'rate');
     wrap.classList.toggle('tool-zoom', tool === 'zoom');
+    wrap.classList.toggle('tool-fwd', tool === 'fwd');
+    wrap.classList.toggle('tool-bwd', tool === 'bwd');
     $ve('ve-screen').classList.toggle('tool-texto', tool === 'texto');
     if (tool !== 'texto') veTxEditarFim();
     veDraw();
@@ -5120,6 +5134,14 @@ function veInitEvents() {
         if (row && row.kind === 'l') { veLegPointer(e, x, t); return; }
         VETX.legSel = -1;
         if (VE.tool === 'rate' && e.button === 0) { veRatePointer(e, x, row); return; }
+        if ((VE.tool === 'fwd' || VE.tool === 'bwd') && e.button === 0 && row) {
+            // Selecionar faixa para a frente/trás (editor-lacunas.js): pega o grupo e já pode arrastar
+            const c = veFaixaSelecionar(e, t, row), lista = veSelLista();
+            if (c) VE.drag = { mode: 'move', i: VE.clips.indexOf(c), x0: e.clientX, y0: e.clientY, grab: t - c.st, active: false,
+                               st: c.st, tr: c.tr, kind: row.kind, grupo: lista.length > 1 ? lista : null };
+            veRenderClips(); veRenderProps(); veDrawMonitor(); veDraw();
+            return;
+        }
         // bloco de transição: clicar seleciona; pela borda, arrastar muda a duração
         const th = e.button === 0 && row && row.kind !== 'l' ? veTransAt(x, y) : null;
         if (th) { if (VE.playing) veStop(); veTransPointer(th, t); return; }
@@ -5154,6 +5176,8 @@ function veInitEvents() {
             // área vazia: arrastar desenha o retângulo de seleção (Shift soma ao que já está selecionado)
             const base = e.shiftKey ? veSelLista() : [];
             veSelDefinir(base, VE.clips[VE.sel]);
+            // espaço entre dois clipes: fica selecionado (Delete fecha, editor-lacunas.js); arrastar vira retângulo
+            if (e.button === 0 && !e.shiftKey) VE.gapSel = veGapAt(t, row);
             if (e.button === 0) VE.drag = { mode: 'marq', ta: t, tb: t, ya: y, yb: y, base };
         } else {
             const atual = veSelLista(), pega = vePegar(VE.clips[i], row.kind);
@@ -5277,7 +5301,7 @@ function veInitEvents() {
         }
         if (d && d.mode === 'trdur') { veRefresh(); return; }
         if (d && d.mode === 'marq') {
-            if (Math.abs(d.tb - d.ta) * VE.pps > 3 || Math.abs(d.yb - d.ya) > 3) veMarqueeFim(d);
+            if (Math.abs(d.tb - d.ta) * VE.pps > 3 || Math.abs(d.yb - d.ya) > 3) { VE.gapSel = null; veMarqueeFim(d); }
             veRefresh();
             return;
         }
