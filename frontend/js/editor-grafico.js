@@ -139,21 +139,23 @@ async function veGrafPngs(mapa, filtro) {
 }
 
 // ── Cor sólida (painel Projeto) ──
-// seletor de cor do sistema (um input escondido, reaproveitado)
-function veGrEscolherCor(inicial, pronto) {
-    let inp = document.getElementById('ve-gr-cor');
+// seletor de cor do sistema (um input escondido, reaproveitado), criado na janela onde foi o clique: com o painel
+// numa janela solta, o seletor só abre se o input estiver nela
+function veGrEscolherCor(inicial, pronto, doc = document) {
+    let inp = doc.getElementById('ve-gr-cor');
     if (!inp) {
-        inp = document.createElement('input');
+        inp = doc.createElement('input');
         inp.type = 'color';
         inp.id = 've-gr-cor';
         inp.style.cssText = 'position:fixed;left:-100px;top:0;opacity:0;pointer-events:none';
-        document.body.appendChild(inp);
+        doc.body.appendChild(inp);
     }
     inp.value = /^#[0-9a-f]{6}$/i.test(inicial) ? inicial : '#F97316';
     inp.onchange = () => pronto(inp.value);
     inp.click();
 }
 
+const veGrDocProjeto = () => { const el = $ve('ve-pj-lista'); return (el && el.ownerDocument) || document; };
 function vePjNovaCor() {
     if (!VE.ready) return;
     veGrEscolherCor('#F97316', fill => {
@@ -162,7 +164,7 @@ function vePjNovaCor() {
         VEPJ.sel = new Set(['m:' + m.id]);
         vePjAlterou();
         veToast(veT('Cor sólida criada: arraste para a timeline'));
-    });
+    }, veGrDocProjeto());
 }
 
 // Trocar a cor: todos os clipes dela mudam juntos
@@ -173,7 +175,7 @@ function veGrCorEditar(m) {
         m.fill = fill;
         vePjAlterou();
         veRefresh();
-    });
+    }, veGrDocProjeto());
 }
 
 // ── ponto do monitor → ponto dentro do gráfico (desfaz posição, rotação e escala do clipe) ──
@@ -201,6 +203,20 @@ function veGrPointer(e) {
     VEM.panned = true;
     if (VE.playing) veStop();
     const scr = $ve('ve-screen'), doc = scr.ownerDocument, win = doc.defaultView, pt0 = veTxPontoQuadro(e);
+    if (VE.tool === 'pincel' && e.shiftKey) {
+        // Shift+arrastar: muda o tamanho do pincel (direita aumenta, esquerda diminui), sem pintar
+        const q = veTxQuadroTela(), x0 = e.clientX, y0 = e.clientY, tam0 = VEGR.pincel.tam;
+        const move = ev => {
+            VEGR.pincel.tam = Math.round(Math.max(1, Math.min(1200, tam0 + (ev.clientX - x0) / q.s)));
+            veGrCursor(x0, y0);
+            const box = scr.querySelector('.ve-gr-opcoes');
+            if (box) { const r = box.querySelector('[data-gr="p.tam"]'), v = box.querySelector('[data-grv="p.tam"]'); if (r) r.value = VEGR.pincel.tam; if (v) v.textContent = VEGR.pincel.tam; }
+        };
+        const up = () => { win.removeEventListener('pointermove', move); win.removeEventListener('pointerup', up); veGrSalvarOpcoes(); };
+        win.addEventListener('pointermove', move);
+        win.addEventListener('pointerup', up);
+        return;
+    }
     const st = veSnapFrame(VE.playhead), b = st + VE_IMG_DUR;
     let c;
     vePushHistory();
@@ -266,6 +282,7 @@ function veGrOpcoes() {
     const scr = $ve('ve-screen');
     if (!scr) return;
     let box = scr.querySelector('.ve-gr-opcoes');
+    if (VE.tool !== 'pincel') veGrCursor(null);
     if (VE.tool !== 'pincel' && VE.tool !== 'forma') { if (box) box.hidden = true; return; }
     if (!box) {
         box = scr.ownerDocument.createElement('div');
@@ -280,6 +297,9 @@ function veGrOpcoes() {
             const out = box.querySelector(`[data-grv="${el.dataset.gr}"]`);
             if (out) out.textContent = el.value;
             veGrSalvarOpcoes();
+            const cur = scr.querySelector('.ve-gr-cursor');
+            if (cur && !cur.hidden) veGrCursor(parseFloat(cur.style.left) + cur.offsetWidth / 2 + scr.getBoundingClientRect().left,
+                parseFloat(cur.style.top) + cur.offsetHeight / 2 + scr.getBoundingClientRect().top);
         });
         box.addEventListener('click', e => {
             const b = e.target.closest('[data-grt]');
@@ -296,9 +316,10 @@ function veGrOpcoesRender(box) {
     box.innerHTML = VE.tool === 'pincel' ? `
         <span class="ve-gr-tit">${veT('Pincel')}</span>
         <label>${veT('Cor')}<input type="color" data-gr="p.cor" value="${P.cor}"></label>
-        ${faixa('p.tam', 'Tamanho', 1, 400, P.tam, 'px')}
+        ${faixa('p.tam', 'Tamanho', 1, 1200, P.tam, 'px')}
         ${faixa('p.dur', 'Dureza', 0, 100, P.dur, '%')}
         ${faixa('p.op', 'Opacidade', 1, 100, P.op, '%')}
+        <small>${veT('Shift+arrastar: tamanho')}</small>
         <button class="ve-btn ve-btn-sm ve-btn-ghost" data-gracao="nova" title="${veT('O próximo traço começa uma camada de desenho nova')}">${veT('Nova camada')}</button>` : `
         <span class="ve-gr-tit">${veT('Forma')}</span>
         <span class="ve-gr-tipos">${Object.entries(VE_FORMAS).map(([t, n]) => `<button class="${F.t === t ? 'on' : ''}" data-grt="${t}" title="${veT(n)}">${{ ret: '▭', eli: '◯', tri: '△', lin: '╱' }[t]}</button>`).join('')}</span>
@@ -312,4 +333,29 @@ function veGrOpcoesRender(box) {
 document.addEventListener('DOMContentLoaded', () => {
     const scr = $ve('ve-screen');
     if (scr) scr.addEventListener('pointerdown', veGrPointer, true);
+});
+
+// Silhueta do pincel: um círculo do tamanho real do traço (na escala do monitor) que segue o mouse
+function veGrCursor(x, y) {
+    const scr = $ve('ve-screen');
+    if (!scr) return;
+    let el = scr.querySelector('.ve-gr-cursor');
+    if (VE.tool !== 'pincel' || x == null) { if (el) el.hidden = true; return; }
+    if (!el) {
+        el = scr.ownerDocument.createElement('div');
+        el.className = 've-gr-cursor';
+        scr.appendChild(el);
+    }
+    const r = scr.getBoundingClientRect(), q = veTxQuadroTela(), d = Math.max(2, VEGR.pincel.tam * q.s);
+    el.hidden = false;
+    el.style.width = el.style.height = d + 'px';
+    el.style.left = (x - r.left - d / 2) + 'px';
+    el.style.top = (y - r.top - d / 2) + 'px';
+    el.style.borderColor = VEGR.pincel.cor;
+}
+document.addEventListener('DOMContentLoaded', () => {
+    const scr = $ve('ve-screen');
+    if (!scr) return;
+    scr.addEventListener('pointermove', e => { if (VE.tool === 'pincel') veGrCursor(e.clientX, e.clientY); });
+    scr.addEventListener('pointerleave', () => veGrCursor(null));
 });

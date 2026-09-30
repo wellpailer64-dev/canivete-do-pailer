@@ -154,7 +154,7 @@ function veTfIniciar() {
         if (VE.playing) veStop();
         if (i !== VE.sel || VETX.legSel >= 0) { VE.sel = i; VETX.legSel = -1; veRefresh(); }
         const c = VE.clips[i], p = veProps(c);
-        VETF.drag = { ...alvo, i, x0: e.clientX, y0: e.clientY, pt0: pt, p0: { ...p }, hist: false, ativo: false,
+        VETF.drag = { ...alvo, i, x0: e.clientX, y0: e.clientY, pt0: pt, p0: { ...p }, hist: false, ativo: false, fm0: c.fm ? { ...c.fm } : null,
                       clonar: e.altKey && alvo.tipo === 'mover', id: e.pointerId };
         scr.setPointerCapture(e.pointerId);
     }, true);
@@ -202,6 +202,19 @@ function veTfIniciar() {
             const s = veGuiasEncaixarCamada(c, p0, Math.round(p0.x + pt.x - d.pt0.x), Math.round(p0.y + pt.y - d.pt0.y), q.s, e.ctrlKey);
             veApplyProps(c, s);
             veGuiasRedesenhar();
+        } else if (d.tipo === 'alca' && e.shiftKey && d.fm0 && c.fm) {
+            // Forma + Shift: estica só o lado puxado (largura e/ou altura da forma), o lado oposto fica parado
+            const w0 = d.fm0.w, h0 = d.fm0.h, sz0 = { w: w0, h: h0 };
+            const l = veTfLocal(c, p0, pt.x, pt.y, sz0);
+            const w = d.u === 0.5 ? w0 : Math.max(2, Math.round(d.u === 1 ? l.x : w0 - l.x));
+            const h = d.v === 0.5 ? h0 : Math.max(2, Math.round(d.v === 1 ? l.y : h0 - l.y));
+            const esq = d.u === 0 ? w0 - w : 0, topo = d.v === 0 ? h0 - h : 0;   // novo canto sup. esq. (px da forma antiga)
+            const [ax0, ay0] = veAnc(c, p0, sz0), ax = ax0 / w0 * w, ay = ay0 / h0 * h;   // âncora na mesma proporção
+            const m = veTfQuadro(c, p0, esq + ax, topo + ay, sz0);
+            c.fm = { ...c.fm, w, h };
+            if (p0.ax != null || p0.ay != null) c.p = { ...veStaticProps(c), ax, ay };
+            veApplyProps(c, { x: Math.round(m.x * 10) / 10, y: Math.round(m.y * 10) / 10 });
+            VEPP.chave = '';
         } else if (d.tipo === 'alca') {
             // escala uniforme a partir da âncora: projeção do ponteiro na direção da alça
             const [ax, ay] = veAnc(c, p0, sz);

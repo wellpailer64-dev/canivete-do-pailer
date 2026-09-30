@@ -374,6 +374,7 @@ const I18N_EN = {
     'arquivos colados na timeline': 'files pasted into the timeline', 'arquivo colado na timeline': 'file pasted into the timeline',
     'legendas selecionadas': 'captions selected', 'o estilo muda em todas elas': 'style changes apply to all of them',
     'Nas': 'To the', 'selecionadas': 'selected', 'legendas apagadas': 'captions deleted',
+    'Shift+arrastar: tamanho': 'Shift+drag: size',
     'Cor sólida': 'Color Matte', 'Nova cor sólida': 'New color matte', 'Forma': 'Shape', 'Desenho': 'Drawing', 'Pincel': 'Brush',
     'Retângulo': 'Rectangle', 'Elipse': 'Ellipse', 'Triângulo': 'Triangle', 'Linha': 'Line', 'Preenchimento': 'Fill', 'Contorno': 'Stroke',
     'Espessura': 'Width', 'Dureza': 'Hardness', 'Nova camada': 'New layer', 'Traços': 'Strokes', 'Cor': 'Color',
