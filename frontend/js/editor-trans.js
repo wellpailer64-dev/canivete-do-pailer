@@ -31,9 +31,10 @@ function veTrDir(dir) {
     const n = Math.hypot(d[2], d[3]) || 1;
     return { x: d[2] / n, y: d[3] / n };
 }
-function veTrCfgBase() { return Object.assign({ speed: 'medium', dir: 'r' }, VE.trCfg || {}); }
+// padrão: Rápida (0,45 s), o mais usado em cortes dinâmicos
+function veTrCfgBase() { return Object.assign({ speed: 'fast', dir: 'r' }, VE.trCfg || {}); }
 function veTrObj(t, base = veTrCfgBase(), antigo = null) {
-    const speed = VE_TR_SPEED[base.speed] ? base.speed : 'medium';
+    const speed = VE_TR_SPEED[base.speed] ? base.speed : 'fast';
     const def = { t, d: VE_TR_SPEED[speed].d, speed };
     if (VE_TR[t] && VE_TR[t].dir) def.dir = VE_TR_DIRS[base.dir] ? base.dir : 'r';
     return Object.assign(def, antigo && antigo.t === t ? antigo : {});
@@ -675,8 +676,10 @@ function veTrInit() {
     if (!box) return;
     let cfg = {};
     try { cfg = JSON.parse(veLsGet('ve-tr-cfg') || '{}') || {}; } catch (_) { cfg = {}; }
-    VE.trCfg = Object.assign({ speed: 'medium', dir: 'r' }, cfg);
-    if (!VE_TR_SPEED[VE.trCfg.speed]) VE.trCfg.speed = 'medium';
+    // Rápida virou o padrão: quem tinha a Média gravada (o padrão antigo) passa uma vez para Rápida
+    if (veLsGet('ve-tr-fast') !== '1') { cfg.speed = 'fast'; veLsSet('ve-tr-fast', '1'); veLsSet('ve-tr-cfg', JSON.stringify({ ...cfg })); }
+    VE.trCfg = Object.assign({ speed: 'fast', dir: 'r' }, cfg);
+    if (!VE_TR_SPEED[VE.trCfg.speed]) VE.trCfg.speed = 'fast';
     if (!VE_TR_DIRS[VE.trCfg.dir]) VE.trCfg.dir = 'r';
     VE.trEscolhida = VE_TR[veLsGet('ve-tr-escolhida')] ? veLsGet('ve-tr-escolhida') : 'dissolve';
     veRenderTrList();

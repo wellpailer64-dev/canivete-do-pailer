@@ -84,6 +84,7 @@ function veTfCursor(alvo, c) {
 
 // ── desenho: caixa, alças e ponto de ancoragem do selecionado (em px do canvas) ──
 function veTfDesenhar(ctx, cv, pv) {
+    if (typeof veScCaptura === 'function') veScCaptura(cv);   // escopos: o quadro antes das alças
     const c = VE.clips[VE.sel];
     if (!veTfVisivel(c) || (VEPP.edit && VEPP.edit.c === c)) return;
     const p = veProps(c), sz = veMediaSize(c);

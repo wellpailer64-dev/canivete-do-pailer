@@ -3277,12 +3277,44 @@ function veFmtRecente(ts) {
     try { return new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
     catch (_) { return ''; }
 }
+// ── salvamento automático (a cada 3 min com mudanças; cópias em %APPDATA%/CaniveteDoPailer/autosave) ──
+const VE_AUTOSAVE_MS = 3 * 60 * 1000;
+function veAutosave(forcar) {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.ve_autosave || !VE.ready || !VE.dirty || VE.exportRunning || VE._pendingProject) return;
+    if (!forcar && Date.now() - (VE._autoT || 0) < VE_AUTOSAVE_MS) return;
+    let dados;
+    try { dados = veProjectData(); } catch (e) { return; }
+    const snap = JSON.stringify(dados.sequences || []) + JSON.stringify(dados.clips || []);
+    VE._autoT = Date.now();
+    if (snap === VE._autoSnap) return;   // nada mudou desde a última cópia
+    VE._autoSnap = snap;
+    dados._autosave = { origem: VE.projectPath || null, quando: new Date().toISOString() };
+    const nome = (VE.projectPath || VE.path || 'projeto').split(/[\\/]/).pop().replace(/\.[^.]+$/, '');
+    api.ve_autosave(VE.projectPath || VE.path || '', nome, JSON.stringify(dados)).catch(() => {});
+}
+setInterval(() => veAutosave(false), 30 * 1000);
+
+// Tela inicial: cópias automáticas para recuperar
+function veAutosaveRender() {
+    const sec = $ve('ve-start-auto'), box = $ve('ve-start-auto-lista'), api = window.pywebview && window.pywebview.api;
+    if (!sec || !box || !api || !api.ve_autosave_lista) return;
+    api.ve_autosave_lista().then(r => {
+        const itens = (r && r.success && r.itens) || [];
+        sec.hidden = !itens.length;
+        box.innerHTML = itens.map((it, i) => `<button class="ve-start-auto-item" data-auto="${i}" title="${veEsc(it.origem || it.path)}">
+            <svg class="i"><use href="#i-save"/></svg><b>${veEsc(it.nome)}</b><span>${veEsc(veFmtRecente(it.quando))}</span></button>`).join('');
+        box.querySelectorAll('[data-auto]').forEach(b => b.addEventListener('click', () => { const it = itens[+b.dataset.auto]; if (it) veOpenProject(it.path); }));
+    }).catch(() => {});
+}
+
 function veOnboardingRender() {
     const tela = $ve('ve-start'), box = $ve('ve-start-recentes');
     if (!tela || !box) return;
     const mostrar = !VE.ready && !VE.path && !VE.exportRunning;
     tela.hidden = !mostrar;
     if (!mostrar) return;
+    veAutosaveRender();
     const lista = veRecentesProjetos();
     if (!lista.length) {
         box.innerHTML = `<div class="ve-start-empty">${veT('Nenhum projeto recente ainda. Crie um projeto ou abra um .vcnvt para ele aparecer aqui.')}</div>`;
@@ -3474,6 +3506,11 @@ function veApplyProject() {
     const { data: d, path, name, missing } = VE._pendingProject;
     VE._pendingProject = null;
     VE.projectPath = path;
+    // cópia do salvamento automático: Ctrl+S volta a salvar no projeto de origem (ou pergunta, se não havia)
+    if (d._autosave) {
+        VE.projectPath = d._autosave.origem || null;
+        setTimeout(() => { VE.dirty = true; veUpdateTitle(); veToast(veT('Recuperado do salvamento automático: salve (Ctrl+S) para manter')); }, 400);
+    }
     VE.quickEdit = false;
     const ids = { 0: 0 };
     const missingSet = new Set(missing || []);

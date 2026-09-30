@@ -70,8 +70,12 @@ const VE_FX = {
             { k: 'sharp', nome: 'Nitidez', min: 0, max: 100, step: 1, def: 0, un: '' },
             { k: 'vib', nome: 'Vibração', min: -100, max: 100, step: 1, def: 0, un: '' },
             { k: 'vig', nome: 'Quantidade', min: 0, max: 100, step: 1, def: 0, un: '' },
+            // rodas de cor: luminância de sombras / meios-tons / realces (a cor fica em v.cw)
+            { k: 'ls', nome: 'Sombras (luz)', min: -100, max: 100, step: 1, def: 0, un: '' },
+            { k: 'lm', nome: 'Meios-tons (luz)', min: -100, max: 100, step: 1, def: 0, un: '' },
+            { k: 'lh', nome: 'Realces (luz)', min: -100, max: 100, step: 1, def: 0, un: '' },
         ],
-        extra: ['cv'],
+        extra: ['cv', 'cw'],
         neutro: v => veLcColorNeutral(v) && !(v.sharp > 0) && !(v.vig > 0),
         draw: (a, v, env) => veLcDraw(a, v, env),
         exportar: v => {

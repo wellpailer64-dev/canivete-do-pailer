@@ -19,11 +19,12 @@ const VE_LC_SECOES = [
     ] },
     { id: 'creative', nome: 'Criativo', grupos: [{ nome: null, ks: ['fade', 'sharp', 'vib'] }] },
     { id: 'curves', nome: 'Curvas', curvas: true },
+    { id: 'wheels', nome: 'Rodas de cor', rodas: true },
     { id: 'vignette', nome: 'Vinheta', grupos: [{ nome: null, ks: ['vig'] }] },
 ];
 
 const VELC = {
-    open: new Set(['basic', 'creative', 'curves', 'vignette']),
+    open: new Set(['basic', 'creative', 'curves', 'wheels', 'vignette']),
     ch: 'm',            // curva em edição
     key: '', built: false,
     luts: new Map(),    // cache: JSON dos valores → {f32, u16}
@@ -36,6 +37,20 @@ const veLcDec = x => x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.
 const veLcEnc = x => x <= 0.0031308 ? x * 12.92 : 1.055 * Math.pow(x, 1 / 2.4) - 0.055;
 const veLcSmooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const veLcLuma = (r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+// ── rodas de cor (Sombras / Meios-tons / Realces, como no Lumetri) ──
+// Ponto da roda = direção de cor no plano Cb/Cr (BT.709): x → Cb (azul/amarelo), y → Cr (vermelho/ciano) —
+// a mesma orientação do vetorscópio. A cor vira um deslocamento RGB que não mexe na luma (Y = 0).
+const VE_LC_RODAS = [['s', 'Sombras', 'ls'], ['m', 'Meios-tons', 'lm'], ['h', 'Realces', 'lh']];
+function veLcRodaRGB(p) {
+    if (!p || (Math.abs(p[0]) < 1e-4 && Math.abs(p[1]) < 1e-4)) return null;
+    const cb = p[0], cr = p[1];
+    return [1.5748 * cr, -0.1873 * cb - 0.4681 * cr, 1.8556 * cb];
+}
+function veLcRodasNeutras(v) {
+    const cw = v.cw || {};
+    return VE_LC_RODAS.every(([w, , k]) => !veLcRodaRGB(cw[w]) && !(v[k] || 0));
+}
 
 // Curva monótona (Fritsch–Carlson) amostrada em tabela; pontos [x, y] de 0 a 1
 function veLcCurveTable(pts) {
@@ -90,6 +105,13 @@ function veLcBuildLut(v, N) {
     VE_LC_CURVAS.forEach(ch => { if (!veLcCurveId(cv[ch])) tab[ch] = veLcCurveTable(cv[ch]); });
     const tM = tab.m, tR = tab.r, tG = tab.g, tB = tab.b;
     const cl = x => x < 0 ? 0 : x > 1 ? 1 : x;
+    // rodas: lift (soma, mais no escuro), gain (multiplica, mais no claro), gamma (curva o meio), por canal
+    const cw = v.cw || {}, oS = veLcRodaRGB(cw.s), oM = veLcRodaRGB(cw.m), oH = veLcRodaRGB(cw.h);
+    const rodas = !veLcRodasNeutras(v);
+    const lift = [0, 1, 2].map(i => (v.ls || 0) / 100 * 0.25 + (oS ? oS[i] * 0.14 : 0));
+    const gainR = [0, 1, 2].map(i => 1 + (v.lh || 0) / 100 * 0.5 + (oH ? oH[i] * 0.2 : 0));
+    const gama = [0, 1, 2].map(i => Math.pow(2, -((v.lm || 0) / 100 * 0.7 + (oM ? oM[i] * 0.35 : 0))));
+    const roda = (x, i) => { x = cl(x + lift[i] * (1 - x)); x = cl(x * gainR[i]); return Math.pow(x, gama[i]); };
     // 1) balanço de branco e exposição (em luz linear); 2) contraste: curva em S, pivô no meio
     const canal = [0, 1, 2].map(i => {
         const t = new Float64Array(N);
@@ -150,6 +172,8 @@ function veLcBuildLut(v, N) {
         if (tR) r = veLcCurveAt(tR, r);
         if (tG) g = veLcCurveAt(tG, g);
         if (tB) b = veLcCurveAt(tB, b);
+        // 8) rodas de cor (depois das curvas, como no Lumetri)
+        if (rodas) { r = roda(r, 0); g = roda(g, 1); b = roda(b, 2); }
         out[o++] = r; out[o++] = g; out[o++] = b;
     }
     return out;
@@ -161,11 +185,13 @@ function veLcColorKey(v) {
     VE_FX.lc.params.forEach(p => { if (p.k !== 'sharp' && p.k !== 'vig') o[p.k] = v[p.k]; });
     o.cv = {};
     VE_LC_CURVAS.forEach(ch => { if (!veLcCurveId(v.cv && v.cv[ch])) o.cv[ch] = v.cv[ch]; });
+    o.cw = {};
+    VE_LC_RODAS.forEach(([w]) => { if (veLcRodaRGB(v.cw && v.cw[w])) o.cw[w] = v.cw[w]; });
     return JSON.stringify(o);
 }
 function veLcColorNeutral(v) {
-    return VE_FX.lc.params.every(p => p.k === 'sharp' || p.k === 'vig' || v[p.k] === p.def)
-        && VE_LC_CURVAS.every(ch => veLcCurveId(v.cv && v.cv[ch]));
+    return VE_FX.lc.params.every(p => p.k === 'sharp' || p.k === 'vig' || (v[p.k] ?? p.def) === p.def)
+        && VE_LC_CURVAS.every(ch => veLcCurveId(v.cv && v.cv[ch])) && veLcRodasNeutras(v);
 }
 
 // LUT 3D com cache (arrastar um slider volta a valores já vistos)
@@ -351,6 +377,13 @@ function veLcBuild() {
                 <div class="ve-lc-chs">${VE_LC_CURVAS.map(ch => `<button class="ve-lc-ch ch-${ch}" data-la="ch" data-ch="${ch}" title="${ch === 'm' ? 'Curva RGB (todas as cores)' : 'Curva só do ' + { r: 'vermelho', g: 'verde', b: 'azul' }[ch]}">${ch === 'm' ? 'RGB' : ch.toUpperCase()}</button>`).join('')}</div>
                 <canvas class="ve-lc-curve" id="ve-lc-curve"></canvas>
                 <div class="ve-lc-hint">Clique para criar um ponto e arraste · duplo clique (ou Ctrl+clique) no ponto remove</div>`
+                : s.rodas ? `<div class="ve-lc-rodas">${VE_LC_RODAS.map(([w, nome, k]) => `
+                    <div class="ve-lc-roda" data-w="${w}">
+                        <canvas class="ve-lc-roda-cv" data-w="${w}" title="Arraste o ponto para dar cor · duplo clique zera · Shift: ajuste fino"></canvas>
+                        <input type="range" class="ve-lc-range ve-lc-roda-luz" min="-100" max="100" step="1" data-lk="${k}" title="Luz de ${nome.toLowerCase()} · duplo clique zera">
+                        <b>${nome}</b>
+                    </div>`).join('')}</div>
+                <div class="ve-lc-hint">Sombras: cor e luz no escuro · Meios-tons: no meio · Realces: no claro</div>`
                 : s.grupos.map(g => (g.nome ? `<div class="ve-lc-grp">${g.nome}</div>` : '') + g.ks.map(k => row(veLcParam(k))).join('')).join('')}
             </div>
         </div>`).join('');
@@ -376,9 +409,10 @@ function veLcRender() {
     on.disabled = !f;
     pane.classList.toggle('off', !!f && f.on === false);
     pane.querySelectorAll('input[data-lk]').forEach(inp => {
-        const p = veLcParam(inp.dataset.lk);
-        if (inp.ownerDocument.activeElement !== inp) inp.value = veFxFmt(p, v[p.k]);
-        inp.closest('.ve-lc-row').classList.toggle('mod', v[p.k] !== p.def);
+        const p = veLcParam(inp.dataset.lk), val = v[p.k] ?? p.def;
+        if (inp.ownerDocument.activeElement !== inp) inp.value = veFxFmt(p, val);
+        const row = inp.closest('.ve-lc-row');
+        if (row) row.classList.toggle('mod', val !== p.def);
     });
     pane.querySelectorAll('[data-sec]').forEach(s => {
         const sec = VE_LC_SECOES.find(x => x.id === s.dataset.sec);
@@ -389,6 +423,7 @@ function veLcRender() {
         b.classList.toggle('mod', !veLcCurveId(v.cv && v.cv[b.dataset.ch]));
     });
     veLcDrawCurve(v);
+    veLcDrawRodas(v);
 }
 
 function veLcDefaults() {
@@ -398,6 +433,7 @@ function veLcDefaults() {
 }
 function veLcSecNeutral(sec, v) {
     if (sec.curvas) return VE_LC_CURVAS.every(ch => veLcCurveId(v.cv && v.cv[ch]));
+    if (sec.rodas) return veLcRodasNeutras(v);
     return sec.grupos.every(g => g.ks.every(k => v[k] === veLcParam(k).def));
 }
 
@@ -550,6 +586,115 @@ function veLcCurveInit(cv) {
     cv.addEventListener('pointercancel', fim);
 }
 
+// ── rodas: desenho e arraste ──
+const VELCR = { disco: new Map(), drag: null };
+// disco de cor (cache por tamanho): cada ponto é a cor que a roda soma, sobre um cinza médio
+function veLcRodaDisco(px) {
+    let im = VELCR.disco.get(px);
+    if (im) return im;
+    im = document.createElement('canvas');
+    im.width = im.height = px;
+    const g = im.getContext('2d'), d = g.createImageData(px, px), R = px / 2;
+    for (let y = 0; y < px; y++) for (let x = 0; x < px; x++) {
+        const u = (x + 0.5 - R) / R, w = (R - y - 0.5) / R, r = Math.hypot(u, w), i = (y * px + x) * 4;
+        if (r > 1) continue;
+        const o = veLcRodaRGB([u * 0.42, w * 0.42]) || [0, 0, 0];
+        d.data[i] = Math.max(0, Math.min(255, (0.42 + o[0]) * 255));
+        d.data[i + 1] = Math.max(0, Math.min(255, (0.42 + o[1]) * 255));
+        d.data[i + 2] = Math.max(0, Math.min(255, (0.42 + o[2]) * 255));
+        d.data[i + 3] = r > 0.985 ? Math.round((1 - r) / 0.015 * 255) : 255;
+    }
+    g.putImageData(d, 0, 0);
+    VELCR.disco.set(px, im);
+    return im;
+}
+
+function veLcDrawRodas(v) {
+    const pane = $ve('ve-lc');
+    if (pane) pane.querySelectorAll('.ve-lc-roda-cv').forEach(cv => veLcDrawRoda(cv, v));
+}
+function veLcDrawRoda(cv, v) {
+    if (!cv.offsetParent) return;
+    const dpr = cv.ownerDocument.defaultView.devicePixelRatio || 1, S = cv.clientWidth;
+    if (!S) return;
+    const px = Math.round(S * dpr);
+    if (cv.width !== px || cv.height !== px) { cv.width = cv.height = px; }
+    const g = cv.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, px, px);
+    const R = px / 2, ri = R - 3 * dpr;
+    g.drawImage(veLcRodaDisco(Math.round(ri * 2)), R - ri, R - ri);
+    g.strokeStyle = 'rgba(0,0,0,0.35)';
+    g.lineWidth = dpr;
+    g.beginPath(); g.moveTo(R - ri, R); g.lineTo(R + ri, R); g.moveTo(R, R - ri); g.lineTo(R, R + ri); g.stroke();
+    const p = (v.cw && v.cw[cv.dataset.w]) || [0, 0], x = R + p[0] * ri, y = R - p[1] * ri, mod = !!veLcRodaRGB(p);
+    if (mod) { g.strokeStyle = 'rgba(255,255,255,0.8)'; g.beginPath(); g.moveTo(R, R); g.lineTo(x, y); g.stroke(); }
+    g.beginPath();
+    g.arc(x, y, 5 * dpr, 0, Math.PI * 2);
+    g.fillStyle = mod ? '#fff' : 'rgba(255,255,255,0.55)';
+    g.fill();
+    g.strokeStyle = '#000';
+    g.lineWidth = 1.5 * dpr;
+    g.stroke();
+}
+
+function veLcSetRoda(w, p) {
+    veLcChange(f => {
+        const cw = { ...(f.v.cw || {}) };
+        if (!veLcRodaRGB(p)) delete cw[w]; else cw[w] = [+p[0].toFixed(4), +p[1].toFixed(4)];
+        f.v.cw = cw;
+    });
+}
+
+function veLcRodasInit(pane) {
+    const pos = (cv, e) => {
+        const r = cv.getBoundingClientRect(), R = r.width / 2 - 3;
+        let u = (e.clientX - r.left - r.width / 2) / R, w = (r.top + r.height / 2 - e.clientY) / R;
+        const n = Math.hypot(u, w);
+        if (n > 1) { u /= n; w /= n; }
+        return [u, w];
+    };
+    pane.addEventListener('pointerdown', e => {
+        const cv = e.target.closest('.ve-lc-roda-cv');
+        if (!cv || e.button !== 0 || !veLcClip()) return;
+        e.preventDefault();
+        const f = veLcFx(veLcClip()), v = f ? veFxValues(f) : veLcDefaults();
+        const p0 = (v.cw && v.cw[cv.dataset.w]) || [0, 0];
+        VELCR.drag = { cv, w: cv.dataset.w, p0: p0.slice(), a0: pos(cv, e), hist: false };
+        try { cv.setPointerCapture(e.pointerId); } catch (err) { /* solto */ }
+    });
+    pane.addEventListener('pointermove', e => {
+        const d = VELCR.drag;
+        if (!d) return;
+        if (!d.hist) { vePushHistory(); d.hist = true; VE._fxEdit = true; }
+        const a = pos(d.cv, e);
+        // Shift: fino (o ponto anda 1/4 do mouse, a partir de onde estava); sem Shift: vai para onde está o mouse
+        let p = e.shiftKey ? [d.p0[0] + (a[0] - d.a0[0]) * 0.25, d.p0[1] + (a[1] - d.a0[1]) * 0.25] : a;
+        const n = Math.hypot(p[0], p[1]);
+        if (n > 1) p = [p[0] / n, p[1] / n];
+        if (n < 0.03) p = [0, 0];   // encaixa no centro
+        veLcSetRoda(d.w, p);
+    });
+    const fim = () => {
+        if (!VELCR.drag) return;
+        VELCR.drag = null;
+        VE._fxEdit = false;
+        veRenderClips();
+        veDraw();
+    };
+    pane.addEventListener('pointerup', fim);
+    pane.addEventListener('pointercancel', fim);
+    pane.addEventListener('dblclick', e => {
+        const cv = e.target.closest('.ve-lc-roda-cv'), luz = e.target.closest('.ve-lc-roda-luz');
+        if ((!cv && !luz) || !veLcClip()) return;
+        vePushHistory();
+        if (cv) veLcSetRoda(cv.dataset.w, [0, 0]);
+        else veLcSet(luz.dataset.lk, 0);
+        veRenderClips();
+        veDraw();
+    });
+}
+
 function veLcAction(el) {
     const a = el.dataset.la;
     if (a === 'sec') {
@@ -572,6 +717,7 @@ function veLcAction(el) {
         const sec = VE_LC_SECOES.find(x => x.id === el.closest('[data-sec]').dataset.sec);
         veFxEdit(f.id, x => {
             if (sec.curvas) x.v.cv = {};
+            else if (sec.rodas) { x.v.cw = {}; VE_LC_RODAS.forEach(([, , k]) => { x.v[k] = 0; }); }
             else sec.grupos.forEach(g => g.ks.forEach(k => { x.v[k] = veLcParam(k).def; }));
             return x;
         });
@@ -584,6 +730,7 @@ function veLcInit() {
     if (!pane) return;
     veLcBuild();
     veLcCurveInit($ve('ve-lc-curve'));
+    veLcRodasInit(pane);
     pane.addEventListener('click', e => {
         const b = e.target.closest('[data-la]');
         if (!b || (b.dataset.la === 'sec' && e.target.closest('button'))) return;

@@ -1587,6 +1587,13 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         # só o áudio: nenhuma cadeia de vídeo no grafo
         usar_inputs, audio_junto = True, False
         pecas = pecas_a = _completar(pecas_a)
+    # Matriz YUV↔RGB das camadas (clipes com efeito/transformação, imagens, textos). Sem ela o ffmpeg usa BT.601 e
+    # vídeo HD (BT.709, o que a prévia mostra) perdia as cores saturadas na ida para RGB (até ~27 níveis de 255).
+    cs = str(info.get("color_space") or "").lower()
+    mtx = ("bt2020" if cs.startswith("bt2020") else "bt601" if cs in ("bt470bg", "smpte170m")
+           else "bt709" if cs == "bt709" or min(W0, H0) >= 720 else "bt601")
+    para_rgb = f"scale=in_color_matrix={mtx},format=rgba"
+    de_rgb = f"scale=out_color_matrix={mtx}:out_range=tv,format=yuva420p"
     # Modo turbo: timeline só de cortes (sem camadas, textos, legendas, efeitos) com NVENC → a fonte é decodificada
     # na placa e fica na memória dela até o encoder (sem descer para a RAM). Mesma velocidade ou mais, com a CPU
     # quase parada. Fonte girada, 4:2:2/4:4:4 ou quadro com outra proporção ficam no modo normal.
@@ -1719,8 +1726,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 else:
                     opac = [f"colorchannelmixer=aa={c['op']:.4f}"] if c["op"] < 0.999 else []
                 filtros.append(f"{vf}split[aj{n}a][aj{n}b]")
-                filtros.append(f"[aj{n}b]trim=start={c['st']:.4f}:end={fim:.4f},format=rgba,"
-                               + ",".join(efeitos + opac) + f"[aj{n}c]")
+                filtros.append(f"[aj{n}b]trim=start={c['st']:.4f}:end={fim:.4f},{para_rgb},"
+                               + ",".join(efeitos + opac) + f",{de_rgb}[aj{n}c]")
                 filtros.append(f"[aj{n}a][aj{n}c]overlay=0:0:enable='between(t,{c['st']:.3f},{fim:.3f})'"
                                f":eof_action=pass:format=auto[o{n}]")
                 vf = f"[o{n}]"
@@ -1785,8 +1792,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             filtros_clip = efeitos + [f for f in ordem if f]
             if c["tipo"] != "imagem":
                 filtros_clip.append(f"tpad=stop_mode=clone:stop_duration={_tempo_ffmpeg(frame_dur)}")
-            cadeia = f"{src}{vel}fps=fps={fps}:start_time=0,format=rgba," + ",".join(filtros_clip)
-            cadeia += f",setpts=PTS-STARTPTS+{_tempo_ffmpeg(c['st'])}/TB[l{n}]"
+            cadeia = f"{src}{vel}fps=fps={fps}:start_time=0,{para_rgb}," + ",".join(filtros_clip)
+            cadeia += f",{de_rgb},setpts=PTS-STARTPTS+{_tempo_ffmpeg(c['st'])}/TB[l{n}]"
             filtros.append(cadeia)
             fim = c["st"] + c["dur"]
             tl = f"(t-{c['st']:.4f})"

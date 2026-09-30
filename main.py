@@ -940,6 +940,64 @@ def ve_project_open(path=None):
         return {"success": False, "error": str(e)}
 
 
+# ── salvamento automático do editor (como o Auto-Save do Premiere) ──
+def _autosave_dir():
+    pasta = os.path.join(os.path.dirname(_ve_layout_path()), "autosave")
+    os.makedirs(pasta, exist_ok=True)
+    return pasta
+
+
+def ve_autosave(chave, nome, dados):
+    """Cópia de segurança do projeto aberto (nunca sobrescreve o .vcnvt do usuário).
+    Guarda as 5 últimas de cada projeto e no máximo 40 no total."""
+    from Functions import projeto
+    import re
+    import time as _t
+    try:
+        h = hashlib.sha1(str(chave or nome or "sem-projeto").encode("utf-8", "replace")).hexdigest()[:8]
+        base = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(nome or "projeto")).strip(" .")[:40] or "projeto"
+        pasta = _autosave_dir()
+        final = projeto.salvar(os.path.join(pasta, f"{base}-{h}-{_t.strftime('%Y%m%d-%H%M%S')}.vcnvt"), dados)
+        todos = sorted((os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith(".vcnvt")),
+                       key=os.path.getmtime, reverse=True)
+        deste = [f for f in todos if f"-{h}-" in os.path.basename(f)]
+        for f in deste[5:] + [f for f in todos if f not in deste[:5]][40:]:
+            try:
+                os.remove(f)
+            except OSError:
+                pass
+        return {"success": True, "path": final}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def ve_autosave_lista():
+    """Cópias automáticas mais recentes (a mais nova de cada projeto), para a tela inicial."""
+    try:
+        pasta = _autosave_dir()
+        vistos, out = set(), []
+        for f in sorted((os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith(".vcnvt")),
+                        key=os.path.getmtime, reverse=True):
+            partes = os.path.basename(f)[:-6].rsplit("-", 3)
+            h = partes[1] if len(partes) == 4 else f
+            if h in vistos:
+                continue
+            vistos.add(h)
+            try:
+                with open(f, "r", encoding="utf-8") as fh:
+                    dados = json.load(fh)
+            except Exception:
+                continue
+            info = dados.get("_autosave") or {}
+            out.append({"path": f, "nome": partes[0] if len(partes) == 4 else os.path.basename(f),
+                        "quando": os.path.getmtime(f) * 1000, "origem": info.get("origem")})
+            if len(out) >= 6:
+                break
+        return {"success": True, "itens": out}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def ve_project_thumb(path):
     """Gera uma miniatura leve do vídeo principal de um projeto recente."""
     from Functions import projeto
@@ -2622,6 +2680,12 @@ class ApiBridge:
 
     def ve_project_open(self, path=None):
         return ve_project_open(path)
+
+    def ve_autosave(self, chave, nome, dados):
+        return ve_autosave(chave, nome, dados)
+
+    def ve_autosave_lista(self):
+        return ve_autosave_lista()
 
     def ve_project_thumb(self, path):
         return ve_project_thumb(path)

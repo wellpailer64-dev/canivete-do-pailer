@@ -451,6 +451,12 @@
                                         <button class="ve-btn ve-btn-lg ve-btn-ghost" onclick="veOpenProject()"><svg class="i"><use href="#i-folder"/></svg> Abrir projeto</button>
                                     </div>
                                 </div>
+                                <div class="ve-start-section" id="ve-start-auto" hidden>
+                                    <div class="ve-start-head">
+                                        <h3>Recuperar (salvo automaticamente)</h3>
+                                    </div>
+                                    <div class="ve-start-auto-lista" id="ve-start-auto-lista"></div>
+                                </div>
                                 <div class="ve-start-section">
                                     <div class="ve-start-head">
                                         <h3>Projetos recentes</h3>
@@ -594,12 +600,22 @@
                                         <div class="ve-fxc" id="ve-fxc"></div>
                                     </div>
                                 </div>
+                                <div class="ve-panel ve-tabpane ve-sc" id="ve-pane-scopes" data-panel="scopes" data-title="Escopos">
+                                    <div class="ve-sc-modos" id="ve-sc-modos">
+                                        <button data-sc-modo="onda" title="Brilho de cada coluna da imagem (0 = preto, 100 = branco): mostra preto esmagado e estouro">Forma de onda</button>
+                                        <button data-sc-modo="parade" title="Forma de onda de cada canal (R, G, B) lado a lado: mostra dominante de cor">Parade RGB</button>
+                                        <button data-sc-modo="vetor" title="Cor e saturação: ângulo = cor, distância do centro = saturação; a linha amarela é o tom de pele">Vetorscópio</button>
+                                        <button data-sc-modo="histo" title="Quantos pixels há em cada nível de brilho, por canal">Histograma</button>
+                                    </div>
+                                    <canvas class="ve-sc-cv" id="ve-sc-cv"></canvas>
+                                </div>
                                 <div class="ve-panel ve-tabpane" id="ve-pane-lc" data-panel="lc" data-title="Luz e Cor">
                                     <div class="ve-clips-empty" id="ve-lc-empty">Selecione um clipe ou imagem na timeline para corrigir luz e cor: exposição, contraste, realces, sombras, balanço de branco, saturação, curvas e mais.</div>
                                     <div class="ve-lc" id="ve-lc" hidden>
                                         <div class="ve-lc-top">
                                             <button class="ve-lc-on" id="ve-lc-on" data-la="on" title="Ligar/desligar Luz e Cor">fx</button>
                                             <div class="ve-props-title" id="ve-lc-title"></div>
+                                            <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="veScAbrir()" title="Abrir os escopos (forma de onda, vetorscópio...)">Escopos</button>
                                             <button class="ve-btn ve-btn-sm ve-btn-ghost" data-la="reset" title="Restaurar todos os ajustes">↺ Restaurar</button>
                                         </div>
                                         <div id="ve-lc-body"></div>
@@ -656,7 +672,7 @@
                                         <div><kbd>↑</kbd> <kbd>↓</kbd> Corte anterior / próximo</div>
                                         <div><kbd>Home</kbd> <kbd>End</kbd> Início / Fim</div>
                                         <h4>Edição</h4>
-                                        <div><kbd>'</kbd> <kbd>S</kbd> ou <kbd>Ctrl</kbd>+<kbd>K</kbd> Cortar todas as trilhas na agulha</div>
+                                        <div><kbd>'</kbd> ou <kbd>Ctrl</kbd>+<kbd>K</kbd> Cortar todas as trilhas na agulha (<kbd>S</kbd> também, sem clipe selecionado)</div>
                                         <div><kbd>E</kbd> Cortar só os clipes selecionados na agulha</div>
                                         <div>Clique numa transição para usá-la no Ctrl+D; clique na ponta de um clipe e aperte Ctrl+D (vídeo) ou Ctrl+Shift+D / Ctrl+Shift+9 (áudio: Potência constante)</div>
                                         <div>Arraste uma transição do painel Transições até o corte · arraste a borda do bloco para mudar a duração</div>
@@ -674,13 +690,22 @@
                                         <div>Arraste a borda de um clipe para encurtar ou alongar</div>
                                         <div><kbd>I</kbd> <kbd>O</kbd> Marcar entrada / saída</div>
                                         <div><kbd>M</kbd> Marcador na agulha · <kbd>Shift</kbd>+<kbd>M</kbd> próximo · <kbd>Alt</kbd>+<kbd>M</kbd> apagar na agulha</div>
+                                        <div>Duplo clique no marcador: nome, duração, descrição e cor · arraste a ponta para mudar a duração · arraste para mover</div>
+                                        <h4>Quadros-chave (como no After Effects)</h4>
+                                        <div>Com um clipe selecionado: <kbd>P</kbd> Posição · <kbd>S</kbd> Escala · <kbd>R</kbd> Rotação · <kbd>T</kbd> Opacidade · <kbd>U</kbd> tudo o que tem animação · <kbd>Shift</kbd>+tecla soma/tira</div>
+                                        <div>Na faixa: clique seleciona · arrastar move · <kbd>Alt</kbd>+arrastar duplica · <kbd>Delete</kbd> apaga só o quadro-chave · <kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> copia e cola na agulha · botão direito: interpolação</div>
+                                        <div><kbd>F9</kbd> Easy Ease · <kbd>Shift</kbd>+<kbd>F9</kbd> só a chegada · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F9</kbd> só a saída</div>
+                                        <div>Texto animado: arraste um card da seção Texto (painel Transições) até o clipe de texto — começo = entrada, fim = saída</div>
                                         <div><kbd>X</kbd> Apagar trecho entre In e Out</div>
                                         <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> Desfazer · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> Refazer</div>
                                         <h4>Ferramentas e visão</h4>
                                         <div><kbd>V</kbd> Seleção · <kbd>C</kbd> Lâmina · <kbd>H</kbd> Mão · <kbd>Z</kbd> Zoom (clique aproxima, <kbd>Alt</kbd>+clique afasta)</div>
                                         <div><kbd>R</kbd> Velocidade: arraste a borda do clipe (mais curto = mais rápido)</div>
                                         <div><kbd>T</kbd> Texto: clique no monitor e digite · duplo clique num texto edita · <kbd>Esc</kbd> termina</div>
-                                        <div><kbd>+</kbd> <kbd>-</kbd> Zoom · <kbd>\</kbd> Ajustar à tela</div>
+                                        <div><kbd>+</kbd> <kbd>-</kbd> Zoom (dá para afastar além da sequência) · <kbd>\</kbd> Ajustar à tela</div>
+                                        <div><kbd>Alt</kbd>+Roda no cabeçalho (V1, A1…) muda a altura da trilha · <kbd>Alt</kbd>+<kbd>Shift</kbd>: todas do tipo</div>
+                                        <div><kbd>Enter</kbd> Renderizar a prévia dos trechos vermelhos (In a Out) · verde = renderizado</div>
+                                        <div><kbd>Ctrl</kbd>+<kbd>R</kbd> Réguas no Programa · arraste da régua para criar guias · <kbd>Ctrl</kbd>+<kbd>;</kbd> mostrar guias</div>
                                         <div><kbd>Alt</kbd> ou <kbd>Ctrl</kbd>+Roda: zoom até o quadro · Roda: rolar · <kbd>Shift</kbd>+Roda: trilhas</div>
                                         <div>Arraste a borda de V1/A1 para mudar a altura da trilha</div>
                                         <div>Arraste a divisa entre dois painéis para redimensionar</div>
@@ -1730,6 +1755,7 @@
     <script src="js/editor-keyframes.js"></script>
     <script src="js/editor-txanim.js"></script>
     <script src="js/editor-marcadores.js"></script>
+    <script src="js/editor-scopes.js"></script>
     <script src="js/editor-projeto.js"></script>
     <script src="js/editor-ferramentas.js"></script>
     <script src="js/editor-dock.js"></script>
