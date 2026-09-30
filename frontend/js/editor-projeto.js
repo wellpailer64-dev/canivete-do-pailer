@@ -16,6 +16,7 @@ const vePjTam = () => Math.max(90, Math.min(260, +PREFS.pjTam || 132));
 const VE_PJ_TIPOS = {
     video: ['i-film', 'Vídeo'], image: ['i-image', 'Imagem'], audio: ['i-music', 'Áudio'],
     ajuste: ['i-sliders', 'Camada de ajuste'], legenda: ['i-captions', 'Legendas'], timeline: ['i-film', 'Timeline'],
+    cor: ['i-drop', 'Cor sólida'],
 };
 const VE_EXT_LEG = /\.(srt|vtt|ass|ssa|sbv|txt)$/i;   // legendas (Functions/legendas_formatos.py)
 
@@ -60,6 +61,7 @@ function vePjInfo(m) {
         return { dur: m.id === 0 ? VE.srcDur : inf.duration, info: `${inf.width}×${inf.height} · ${String(+(fps || 30).toFixed(2)).replace('.', ',')} qps${estado}` };
     }
     if (m.kind === 'image') return { dur: null, info: m.w ? `${m.w}×${m.h}` : '' };
+    if (m.kind === 'cor') return { dur: null, info: `${String(m.fill || '').toUpperCase()} · ${VE.seqW}×${VE.seqH}` };
     if (m.kind === 'audio') return { dur: m.dur || null, info: '48 kHz' };
     if (m.kind === 'legenda') return { dur: m.itens && m.itens.length ? m.itens[m.itens.length - 1].en : null, info: `${(m.itens || []).length} legendas` };
     return { dur: null, info: '' };
@@ -118,7 +120,7 @@ function vePjCardMidia(m) {
     const ativa = m.kind === 'timeline' && m.sequenceId === VE.activeSequence;
     const lost = veMediaOffline(m);
     return `<div class="ve-pj-card${VEPJ.sel.has(k) ? ' sel' : ''}${ativa ? ' atual' : ''}${m.kind === 'video' && m.id && !m.url ? ' fraco' : ''}${lost ? ' lost' : ''}" data-k="${k}" data-kind="${m.kind}" draggable="true" title="${veEsc((m.path || vePjNome(m)) + (inf.info ? '\n' + inf.info : ''))}">
-        <div class="ve-pj-capa">${lost ? `<div class="ve-pj-lost">${veT('MÍDIA OFFLINE')}</div>` : capa ? `<img src="${veEsc(capa)}" alt="" draggable="false">` : `<svg class="i"><use href="#${ic}"/></svg>`}
+        <div class="ve-pj-capa">${m.kind === 'cor' ? `<div class="ve-pj-swatch" style="background:${veEsc(m.fill || '#000')}"></div>` : lost ? `<div class="ve-pj-lost">${veT('MÍDIA OFFLINE')}</div>` : capa ? `<img src="${veEsc(capa)}" alt="" draggable="false">` : `<svg class="i"><use href="#${ic}"/></svg>`}
             ${inf.dur ? `<span class="ve-pj-dur">${veTC(inf.dur).slice(0, 11)}</span>` : ''}</div>
         <div class="ve-pj-rotulo"><span class="ve-pj-cor"${cor ? ` style="background:${cor}"` : ''}></span><svg class="i"><use href="#${ic}"/></svg><span class="ve-pj-nome">${veEsc(vePjNome(m))}</span></div>
         <div class="ve-pj-sub">${veT(tipo)}${inf.info ? ' · ' + veEsc(inf.info) : ''}</div></div>`;
@@ -527,9 +529,9 @@ function vePjColocar(ids, drop) {
         if (m.kind === 'timeline') { veOpenTimeline(m.sequenceId); return; }
         if (veMediaOffline(m)) { veToast('Relinque a mídia offline antes de colocar na timeline'); return; }
         const st = veSnapFrame(t);
-        if (m.kind === 'image' || m.kind === 'ajuste') {
+        if (m.kind === 'image' || m.kind === 'ajuste' || m.kind === 'cor') {
             veInsertImageClip(m, naTl ? { x: wrap.left + (st - VE.view) * VE.pps, y: drop.y, at: Date.now() } : null, 0,
-                m.kind === 'ajuste' ? 'Camada de ajuste adicionada' : 'Imagem adicionada', false);
+                m.kind === 'ajuste' ? 'Camada de ajuste adicionada' : m.kind === 'cor' ? 'Cor sólida adicionada' : 'Imagem adicionada', false);
             const c = VE.clips[VE.sel];
             if (c && m.cor) c.cor = m.cor;
             t = st + VE_IMG_DUR; colocados++;
@@ -623,6 +625,7 @@ function vePjMenu(x, y, doc) {
         <button class="ve-ctx-item" data-pj="bin">Nova pasta<kbd>Ctrl+B</kbd></button>
         <button class="ve-ctx-item" data-pj="tl">Nova timeline<kbd>Ctrl+N</kbd></button>
         <button class="ve-ctx-item" data-pj="aj">Nova camada de ajuste</button>
+        <button class="ve-ctx-item" data-pj="cor">Nova cor sólida</button>
         <button class="ve-ctx-item" data-pj="imp">Importar...<kbd>Ctrl+I</kbd></button>
         ${keys.length ? '<div class="ve-ctx-sep"></div><button class="ve-ctx-item perigo" data-pj="del">Apagar<kbd>Delete</kbd></button>' : ''}`;
     doc.body.appendChild(m);
@@ -633,7 +636,7 @@ function vePjMenu(x, y, doc) {
         const cor = e.target.closest('[data-cor]'), it = e.target.closest('[data-pj]');
         if (cor) vePjCor(keys, cor.dataset.cor);
         else if (it) ({ ren: () => vePjRenomear(keys[0]), dup: () => vePjDuplicar(keys), cut: () => vePjCopiar('recortar'),
-            copy: () => vePjCopiar('copiar'), paste: vePjColar, bin: vePjNovaPasta, aj: vePjNovoAjuste, imp: vePjImportarDialogo,
+            copy: () => vePjCopiar('copiar'), paste: vePjColar, bin: vePjNovaPasta, aj: vePjNovoAjuste, cor: vePjNovaCor, imp: vePjImportarDialogo,
             tl: () => veCreateTimeline(), rel: () => vePjRelink(+keys[0].slice(2)), del: () => vePjApagar(keys) })[it.dataset.pj]();
         else return;
         veClipMenuFechar();
@@ -672,6 +675,7 @@ function vePjInit() {
         if (k.startsWith('m:')) {
             const m = VE.media[+k.slice(2)];
             if (m && m.kind === 'timeline') { veOpenTimeline(m.sequenceId); return; }
+            if (m && m.kind === 'cor') { veGrCorEditar(m); return; }   // duplo clique troca a cor
             if (m && veMediaOffline(m)) { vePjRelink(m.id); return; }
             if (m && m.kind === 'video') { veSrcOpen(m.id); return; }
         }

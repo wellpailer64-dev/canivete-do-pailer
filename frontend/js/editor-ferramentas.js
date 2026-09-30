@@ -11,6 +11,8 @@ const VE_FERR = [
     [{ id: 'razor', ic: 'i-scissors', nome: 'Lâmina', tecla: 'C' }],
     [{ id: 'hand', ic: 'i-hand', nome: 'Mão', tecla: 'H' }, { id: 'zoom', ic: 'i-zoom', nome: 'Zoom', tecla: 'Z' }],
     [{ id: 'texto', ic: 'i-type', nome: 'Texto', tecla: 'T' }],
+    [{ id: 'forma', ic: 'i-shape', nome: 'Forma (retângulo, elipse, triângulo, linha)', tecla: 'Y' }],
+    [{ id: 'pincel', ic: 'i-brush', nome: 'Pincel', tecla: 'B' }],
     [{ id: 'fwd', ic: 'i-fwd', nome: 'Selecionar faixa para a frente', tecla: 'A' },
      { id: 'bwd', ic: 'i-bwd', nome: 'Selecionar faixa para trás', tecla: 'Shift+A' }],
 ];

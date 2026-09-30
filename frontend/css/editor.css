@@ -436,6 +436,25 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-tl-wrap { position: relative; min-width: 0; overflow: hidden; cursor: default; }
 .ve-tl-wrap.tool-razor { cursor: crosshair; }
 .ve-tl-wrap.tool-fwd { cursor: e-resize; }
+/* Pincel e Forma (editor-grafico.js): cursor no monitor e a caixa de opções no canto dele */
+.ve-screen.tool-pincel, .ve-screen.tool-pincel canvas { cursor: crosshair; }
+.ve-screen.tool-forma, .ve-screen.tool-forma canvas { cursor: crosshair; }
+.ve-gr-opcoes {
+    position: absolute; top: 8px; left: 8px; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+    max-width: calc(100% - 16px); padding: 6px 10px; border-radius: 8px; border: 1px solid var(--ve-line-2);
+    background: rgba(20, 20, 20, 0.92); color: var(--ve-dim); font: 11.5px var(--ve-ui); box-shadow: 0 4px 16px rgba(0,0,0,.45);
+}
+.ve-gr-opcoes[hidden] { display: none; }
+.ve-gr-opcoes label { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.ve-gr-opcoes input[type=range] { width: 90px; accent-color: var(--ve-accent); }
+.ve-gr-opcoes input[type=color] { width: 26px; height: 20px; padding: 0; border: 1px solid var(--ve-line-2); border-radius: 4px; background: none; }
+.ve-gr-opcoes b { min-width: 24px; text-align: right; color: var(--ve-text); font-weight: 600; font-family: var(--ve-mono); }
+.ve-gr-opcoes small { color: var(--ve-faint); }
+.ve-gr-tit { font-weight: 700; color: var(--ve-text); text-transform: uppercase; letter-spacing: .06em; font-size: 10.5px; }
+.ve-gr-tipos { display: flex; gap: 3px; }
+.ve-gr-tipos button { width: 26px; height: 24px; border-radius: 5px; border: 1px solid var(--ve-line-2); background: var(--ve-bg); color: var(--ve-dim); cursor: pointer; font-size: 13px; }
+.ve-gr-tipos button.on { border-color: var(--ve-accent); color: var(--ve-accent); }
+.ve-pj-swatch { width: 100%; height: 100%; border-radius: 4px; }
 .ve-tl-wrap.tool-bwd { cursor: w-resize; }
 .ve-tl-wrap.tool-hand { cursor: grab; }
 .ve-tl-wrap.tool-hand.dragging { cursor: grabbing; }

@@ -48,6 +48,8 @@
         <symbol id="i-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 4-4 4 4M12 16V8"/></symbol>
         <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
         <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+        <symbol id="i-shape" viewBox="0 0 24 24"><rect x="3" y="11" width="10" height="10" rx="1.5"/><circle cx="16" cy="8" r="5"/></symbol>
+        <symbol id="i-brush" viewBox="0 0 24 24"><path d="M9.5 14.5 19 5a2.1 2.1 0 0 1 3 3l-9.5 9.5"/><path d="M7 15c-2 0-3.5 1.5-3.5 3.5 0 1.2-.5 2-1.5 2.5 3 .5 7-.5 7-4 0-1.1-.9-2-2-2z"/></symbol>
         <symbol id="i-fwd" viewBox="0 0 24 24"><path d="M4 5v14"/><path d="M8 12h12"/><path d="M16 8l4 4-4 4"/><path d="M8 7h5M8 17h5"/></symbol>
         <symbol id="i-bwd" viewBox="0 0 24 24"><path d="M20 5v14"/><path d="M16 12H4"/><path d="M8 8l-4 4 4 4"/><path d="M11 7h5M11 17h5"/></symbol>
         <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
@@ -545,6 +547,7 @@
                                         <button class="ve-icon-btn" onclick="veCreateTimeline()" title="Nova timeline (Ctrl+N)"><svg class="i"><use href="#i-film"/></svg></button>
                                         <button class="ve-icon-btn" onclick="vePjNovaPasta()" title="Nova pasta (Ctrl+B)"><svg class="i"><use href="#i-folder"/></svg></button>
                                         <button class="ve-icon-btn" onclick="vePjNovoAjuste()" title="Nova camada de ajuste"><svg class="i"><use href="#i-sliders"/></svg></button>
+                                        <button class="ve-icon-btn" onclick="vePjNovaCor()" title="Nova cor sólida (camada de cor do tamanho do quadro)"><svg class="i"><use href="#i-drop"/></svg></button>
                                         <span class="ve-pj-sep"></span>
                                         <button class="ve-icon-btn ve-pj-modo" data-pj-modo="lista" title="Visualização em lista"><svg class="i"><use href="#i-table"/></svg></button>
                                         <button class="ve-icon-btn ve-pj-modo" data-pj-modo="grade" title="Visualização em grade (cards com prévia)"><svg class="i"><use href="#i-grid"/></svg></button>
@@ -1821,6 +1824,7 @@
     <script src="js/editor-lacunas.js"></script>
     <script src="js/editor-copiar.js"></script>
     <script src="js/editor-colar-externo.js"></script>
+    <script src="js/editor-grafico.js"></script>
     <script src="js/editor-trans.js"></script>
     <script src="js/editor-lc.js"></script>
     <script src="js/editor-audio.js"></script>

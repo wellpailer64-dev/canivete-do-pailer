@@ -120,6 +120,8 @@ const VE_CMDS = [
     { id: 'ferr-velocidade', grupo: 'ferramentas', nome: 'Ferramenta Velocidade', teclas: ['R'], fn: () => { veSetTool('rate'); veToast('Velocidade (R): arraste a borda de um clipe'); } },
     { id: 'ferr-frente', grupo: 'ferramentas', nome: 'Selecionar faixa para a frente', teclas: ['A'], fn: () => { veSetTool('fwd'); veToast('Faixa para a frente (A): clique para pegar tudo dali em diante · Shift: só a trilha'); } },
     { id: 'ferr-tras', grupo: 'ferramentas', nome: 'Selecionar faixa para trás', teclas: ['Shift+A'], fn: () => { veSetTool('bwd'); veToast('Faixa para trás (Shift+A): clique para pegar tudo dali para trás · Shift: só a trilha'); } },
+    { id: 'ferr-forma', grupo: 'ferramentas', nome: 'Ferramenta Forma', teclas: ['Y'], fn: () => { veSetTool('forma'); veToast('Forma (Y): arraste no monitor · Shift: proporção 1:1'); } },
+    { id: 'ferr-pincel', grupo: 'ferramentas', nome: 'Ferramenta Pincel', teclas: ['B'], fn: () => { veSetTool('pincel'); veToast('Pincel (B): pinte no monitor'); } },
     { id: 'ferr-texto', grupo: 'ferramentas', nome: 'Ferramenta Texto', teclas: ['T'], fn: () => { veSetTool('texto'); veToast('Texto (T): clique no monitor para escrever'); } },
 
     // ── Ajuda ──

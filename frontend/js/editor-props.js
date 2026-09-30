@@ -148,6 +148,7 @@ async function veTxPngs(filtro) {
         const r = await window.pywebview.api.ve_salvar_png(d.cv.toDataURL('image/png'));
         if (r && r.success) mapa.set(c, { path: r.path, f, w: d.cv.width, h: d.cv.height });
     }
+    await veGrafPngs(mapa, filtro);   // cor sólida, formas e desenhos (editor-grafico.js)
     VE._txPng = mapa;
 }
 
@@ -344,7 +345,7 @@ function veMudarVelocidade(c, v) {
 // ─────────────────────────── painel Propriedades ───────────────────────────
 function vePpAlvo() {
     const c = VE.clips[VE.sel];
-    if (c) return { tipo: veIsTexto(c) ? 'texto' : veIsAudio(c) ? 'audio' : veIsAdj(c) ? 'ajuste' : veIsImage(c) ? 'imagem' : 'video', c };
+    if (c) return { tipo: veIsTexto(c) ? 'texto' : veIsAudio(c) ? 'audio' : veIsAdj(c) ? 'ajuste' : veEhGrafico(c) ? 'grafico' : veIsImage(c) ? 'imagem' : 'video', c };
     if (VETX.legSel >= 0 && (VE.legendas || [])[VETX.legSel]) return { tipo: 'legenda' };
     return { tipo: 'nada' };
 }
@@ -486,6 +487,26 @@ function vePpHtml(a) {
             vePpSec('Duração', `<div class="ve-pp-l"><label>Duração</label><span></span><span class="ve-prop-num"><input type="number" data-pp="dur" min="0.04" step="0.01"><i>s</i></span></div>`) +
             links([['props', 'Controles de efeito'], ['lc', 'Luz e Cor']]);
     }
+    if (a.tipo === 'grafico') {
+        const k = veMediaOf(c).kind;
+        const sec = k === 'cor' ? vePpSec('Cor sólida', `<div class="ve-pp-cores">${vePpCor('gr.fill', 'Cor')}</div>
+                <small class="ve-pp-dica">Muda todos os clipes desta cor sólida (no painel Projeto: duplo clique também troca).</small>`)
+            : k === 'forma' ? vePpSec('Forma', `
+                <div class="ve-pp-l"><label>Tipo</label><select data-pp="fm.t">${Object.entries(VE_FORMAS).map(([t, n]) => `<option value="${t}">${veT(n)}</option>`).join('')}</select></div>
+                <div class="ve-pp-cores">${vePpCor('fm.cor', 'Preenchimento')}</div>
+                <div class="ve-pp-grupo">${vePpChk('fm.cOn', 'Contorno')}${vePpCor('fm.cCor', '')}
+                    <div class="ve-pp-sub" data-ppse="fm.cOn">${vePpNum('fm.cLarg', 'Espessura', 1, 200, 1, 'px')}</div></div>
+                ${vePpNum('fm.raio', 'Cantos', 0, 100, 1, '%')}
+                ${vePpNum('fm.w', 'Largura', 2, 8000, 1, 'px')}
+                ${vePpNum('fm.h', 'Altura', 2, 8000, 1, 'px')}`)
+            : vePpSec('Desenho', `<div class="ve-pp-l"><label>Traços</label><span>${((c.br && c.br.tracos) || []).length}</span></div>
+                <div class="ve-pp-botoes"><button class="ve-btn ve-btn-sm" data-ppacao="br-desfazer">Apagar o último traço</button>
+                <button class="ve-btn ve-btn-sm ve-btn-ghost" data-ppacao="br-limpar">Limpar desenho</button></div>
+                <small class="ve-pp-dica">Pincel (B): pinte no monitor com esta camada selecionada para continuar nela.</small>`);
+        return cab(nome, `${veT(veNomeClipe(c))} · V${c.tr + 1}`) + sec + transformar(true, false) +
+            vePpSec('Duração', `<div class="ve-pp-l"><label>Duração</label><span></span><span class="ve-prop-num"><input type="number" data-pp="dur" min="0.04" step="0.01"><i>s</i></span></div>`) +
+            links([['props', 'Controles de efeito']]);
+    }
     if (a.tipo === 'imagem') {
         return cab(nome, `Imagem · ${veEsc(veMediaOf(c).name || '')} · V${c.tr + 1}`) + transformar(true, true) +
             vePpSec('Duração', `<div class="ve-pp-l"><label>Duração</label><span></span><span class="ve-prop-num"><input type="number" data-pp="dur" min="0.04" step="0.01"><i>s</i></span></div>`) +
@@ -504,6 +525,8 @@ function vePpGet(k) {
     if (k === 'le.fam') return veFonteFamilia(vePpLegEstilo());
     if (k === 'le.estilo') { const e = vePpLegEstilo(); return veFonteEstiloAtual(e, e.negrito, e.ita); }
     if (k.startsWith('tx.')) return veTxt(c)[k.slice(3)];
+    if (k === 'gr.fill') return veMediaOf(c).fill;
+    if (k.startsWith('fm.')) return (c.fm || {})[k.slice(3)];
     if (k === 'p.ax' || k === 'p.ay') return veAnc(c)[k === 'p.ax' ? 0 : 1];
     if (k.startsWith('p.')) return veProps(c)[k.slice(2)];
     if (k === 'le.tamPx') return vePpLegEstilo().tam / 100 * VE.seqH;   // em px do quadro, como no Premiere
@@ -534,6 +557,13 @@ function vePpSet(k, v) {
             c.tx = { ...atual, ...novo, neg: e ? e.gdi_negrito : atual.neg, ita: e ? e.gdi_italico : atual.ita };
             if (VEPP.edit && VEPP.edit.c === c) veTxEditarPos();
         }
+        return 'monitor';
+    }
+    if (k === 'gr.fill') { veMediaOf(c).fill = v; return 'monitor'; }
+    if (k.startsWith('fm.')) {
+        const n = k.slice(3);
+        if ((n === 'w' || n === 'h' || n === 'cLarg' || n === 'raio') && !isFinite(v)) return;
+        c.fm = { ...c.fm, [n]: n === 'w' || n === 'h' ? Math.max(2, Math.round(v)) : v };
         return 'monitor';
     }
     if (k.startsWith('tx.')) {
@@ -684,6 +714,14 @@ function vePpInit() {
             if (!c) return;
             const sz = veMediaSize(c), p = veProps(c);
             vePushHistory();
+            // desenho do pincel (editor-grafico.js): apagar o último traço / limpar tudo
+            if (ac.dataset.ppacao === 'br-desfazer' || ac.dataset.ppacao === 'br-limpar') {
+                const T = (c.br && c.br.tracos) || [];
+                c.br = { ...c.br, tracos: ac.dataset.ppacao === 'br-limpar' ? [] : T.slice(0, -1) };
+                VEPP.chave = '';
+                veRefresh();
+                return;
+            }
             const centro = vePosParaCentro(c, p, VE.seqW / 2, VE.seqH / 2);
             if (ac.dataset.ppacao === 'alin-h') veApplyProps(c, { x: centro.x });
             else if (ac.dataset.ppacao === 'alin-v') veApplyProps(c, { y: centro.y });

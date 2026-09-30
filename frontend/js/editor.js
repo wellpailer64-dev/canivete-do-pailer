@@ -1929,11 +1929,14 @@ function veDeckCarregar(x, mid, tag) {
 }
 const veDeckTag = x => (x === VEDK.b ? 'b' : null);
 // Clipe sem vídeo da fonte (sem som, duração livre): imagem, texto (editor-props.js) ou camada de ajuste
-function veIsImage(c) { const m = veMediaOf(c); return !!m && (m.kind === 'image' || m.kind === 'ajuste' || m.kind === 'texto'); }
+function veIsImage(c) { const m = veMediaOf(c); return !!m && ['image', 'ajuste', 'texto', 'cor', 'forma', 'pincel'].includes(m.kind); }
 // Camada de ajuste (como no Premiere): clipe transparente cujos efeitos valem para tudo o que está nas trilhas de
 // baixo durante o trecho dele; a opacidade dosa a força do efeito. Sem escala/posição/rotação.
 function veIsAdj(c) { const m = veMediaOf(c); return !!m && m.kind === 'ajuste'; }
-function veNomeClipe(c) { return veIsAudio(c) ? 'Áudio' : veIsAdj(c) ? 'Ajuste' : veIsTexto(c) ? 'Texto' : veIsImage(c) ? 'Imagem' : 'Clipe'; }
+function veNomeClipe(c) {
+    const k = veMediaOf(c) && veMediaOf(c).kind;
+    return veIsAudio(c) ? 'Áudio' : veIsAdj(c) ? 'Ajuste' : veIsTexto(c) ? 'Texto' : k === 'cor' ? 'Cor sólida' : k === 'forma' ? 'Forma' : k === 'pincel' ? 'Desenho' : veIsImage(c) ? 'Imagem' : 'Clipe';
+}
 // Áudio solto na timeline (MP3, WAV...): só a linha A da trilha, sem imagem.
 // c.x = 'a': só o áudio de um vídeo (separado da imagem); c.x = 'v': só a imagem de um vídeo (sem som).
 function veIsAudio(c) { const m = veMediaOf(c); return !!m && (m.kind === 'audio' || c.x === 'a'); }
@@ -2161,6 +2164,7 @@ function veMediaSize(c) {
     const m = veMediaOf(c);
     if (m && m.kind === 'image') return { w: m.w || 1, h: m.h || 1 };
     if (m && m.kind === 'texto') return veTxTamanho(c);
+    if (m && VE_GRAF.has(m.kind)) return veGrafTamanho(c);   // cor sólida, forma, desenho (editor-grafico.js)
     if (m && m.kind === 'video' && m.id && m.info && m.info.width) return { w: m.info.width, h: m.info.height };
     // ainda na fila de preparação: o tamanho que já se sabe (ex.: da análise do AutoFrame), não o da sequência
     if (m && m.kind === 'video' && m.id && m.w && m.h) return { w: m.w, h: m.h };
@@ -2805,6 +2809,8 @@ function veDrawMonitor() {
             // desenhado na resolução em que aparece; animação letra a letra (editor-txanim.js) enquanto roda
             const alvoTx = pv * veProps(c).sc / 100;
             src = (typeof veTxaCanvas === 'function' && veTxaCanvas(c, alvoTx)) || veTxCanvas(c, alvoTx).cv;
+        } else if (veEhGrafico(c)) {
+            src = veGrafDesenho(c);   // cor sólida, forma, desenho do pincel (editor-grafico.js)
         } else if (veIsImage(c)) {
             const m = veMediaOf(c);
             if (m.img && m.img.complete && m.w) src = m.img;
@@ -3223,7 +3229,7 @@ function veExportPlanClips() {
         .map(c => {
             const p = veStaticProps(c), m = veMediaOf(c);
             // texto: PNG desenhado f vezes maior (nítido na maior escala dele); a escala desconta isso
-            const png = veIsTexto(c) ? (VE._txPng && VE._txPng.get(c._o || c)) : null, f = png ? png.f : 1;
+            const png = veIsTexto(c) || veEhGrafico(c) ? (VE._txPng && VE._txPng.get(c._o || c)) : null, f = png ? png.f : 1;
             // quadros-chave em tempo da camada (0 = início do clipe na timeline)
             const kf = {};
             VE_KF_PROPS.forEach(k => { if (veKfOn(c, k)) kf[k] = c.k[k].map(q => [(q.t - c.s) / veVel(c), k === 'sc' ? q.v / f : q.v, q.i || 'lin', veKfCurve(q)]); });
@@ -3570,7 +3576,7 @@ function veProjectData() {
     return {
         app: 'Canivete do Pailer',
         video: VE.path,
-        media: VE.media.filter(m => m.id && !m.removido && ['image', 'ajuste', 'audio', 'texto', 'legenda', 'video', 'timeline'].includes(m.kind))
+        media: VE.media.filter(m => m.id && !m.removido && ['image', 'ajuste', 'audio', 'texto', 'legenda', 'video', 'timeline', 'cor', 'forma', 'pincel'].includes(m.kind))
             .map(m => {
                 const o = { id: m.id, kind: m.kind, name: m.name, pasta: m.pasta || null, cor: m.cor, nome: m.nome };
                 if (m.kind === 'audio') Object.assign(o, { path: m.path, dur: m.dur });
@@ -3578,6 +3584,7 @@ function veProjectData() {
                 if (m.kind === 'legenda') Object.assign(o, { path: m.path, itens: m.itens });
                 if (m.kind === 'video') o.path = m.path;
                 if (m.kind === 'timeline') o.sequenceId = m.sequenceId;
+                if (m.kind === 'cor') o.fill = m.fill;   // cor sólida (m.cor é a do rótulo)
                 if (m.rvDe != null) Object.assign(o, { rvDe: m.rvDe, rvA: m.rvA, rvB: m.rvB });   // cópia invertida (editor-reverse.js)
                 return o;
             }),
@@ -3779,8 +3786,9 @@ function veApplyProject() {
             } else veMidiaPreparar(nm, mediaDur.has(m.id));   // os da timeline primeiro
             return;
         }
-        if (m.kind === 'ajuste' || m.kind === 'texto') {
-            const nm = { id: VE.media.length, kind: m.kind, name: m.name || (m.kind === 'texto' ? 'Texto' : 'Camada de ajuste'), ...org };
+        if (m.kind === 'ajuste' || m.kind === 'texto' || m.kind === 'forma' || m.kind === 'pincel' || m.kind === 'cor') {
+            const nm = { id: VE.media.length, kind: m.kind, name: m.name || { texto: 'Texto', forma: 'Forma', pincel: 'Desenho', cor: 'Cor sólida' }[m.kind] || 'Camada de ajuste', ...org };
+            if (m.kind === 'cor') nm.fill = m.fill || '#000000';
             VE.media.push(nm);
             ids[m.id] = nm.id;
             return;
@@ -4601,6 +4609,9 @@ function veSetTool(tool) {
     wrap.classList.toggle('tool-zoom', tool === 'zoom');
     wrap.classList.toggle('tool-fwd', tool === 'fwd');
     wrap.classList.toggle('tool-bwd', tool === 'bwd');
+    $ve('ve-screen').classList.toggle('tool-pincel', tool === 'pincel');
+    $ve('ve-screen').classList.toggle('tool-forma', tool === 'forma');
+    if (typeof veGrOpcoes === 'function') veGrOpcoes();   // opções do Pincel / Forma no monitor
     $ve('ve-screen').classList.toggle('tool-texto', tool === 'texto');
     if (tool !== 'texto') veTxEditarFim();
     veDraw();
@@ -4946,7 +4957,7 @@ async function veStartExport() {
     // vence, vazio = preto) + áudio + camadas por cima
     VE._txPng = null;
     try {
-        if (VE.clips.some(veIsTexto)) await veTxPngs();
+        if (VE.clips.some(c => veIsTexto(c) || veEhGrafico(c))) await veTxPngs();   // textos e gráficos viram PNG
         const plano = veExportPlan(true);
         await window.pywebview.api.video_cutter_export(
             VE.path, plano.base, vePill('format') || 'mp4', vePill('quality') || 'medium',
