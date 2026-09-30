@@ -2814,6 +2814,10 @@ class ApiBridge:
     def ve_layout_save(self, dados):
         return ve_layout_save(dados)
 
+    def ve_agente_porta(self):
+        """Porta do modo agente desta abertura (Preferências → Modo desenvolvedor)."""
+        return {"porta": _PORTA_AGENTE}
+
     def prefs_load(self):
         return prefs_load()
 
@@ -3133,6 +3137,32 @@ def _porta_agente():
     return porta if porta and 1024 <= porta <= 65535 else None
 
 
+_PORTA_AGENTE = None   # porta do modo agente desta abertura (None = desligado)
+
+
+def _agente_nas_preferencias():
+    """Modo agente ligado nas Preferências (Modo desenvolvedor → "Permitir que o Claude controle a janela"): toda
+    abertura liga a porta, na primeira livre de 9222 a 9231 (uma segunda cópia do app pega a seguinte)."""
+    try:
+        with open(_prefs_path(), "r", encoding="utf-8") as f:
+            d = json.load(f) or {}
+    except Exception:
+        return None
+    if not (d.get("dev") and d.get("agente")):
+        return None
+    import socket
+    for porta in range(9222, 9232):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.bind(("127.0.0.1", porta))
+            return porta
+        except OSError:
+            continue
+        finally:
+            s.close()
+    return None
+
+
 def _abrir_em_outra_copia():
     """App (.exe) já aberto: manda o projeto do duplo clique para ele e esta cópia não abre (senão ficavam dois
     ícones na barra e duas cópias disputando as prévias). Pelo código (python main.py) e no modo agente abre sempre.
@@ -3313,7 +3343,9 @@ def main():
     # 127.0.0.1, para um agente de IA/automação ver e usar o painel (ex.: Playwright connect_over_cdp).
     # Liga com:  CaniveteDoPailer.exe --agente   (porta 9222)  ou  --agente=9333
     # ou com a variável de ambiente CANIVETE_AGENTE_PORTA=9222. Desligado por padrão.
-    porta_agente = _porta_agente()
+    global _PORTA_AGENTE
+    porta_agente = _porta_agente() or _agente_nas_preferencias()
+    _PORTA_AGENTE = porta_agente
     if porta_agente:
         webview.settings["REMOTE_DEBUGGING_PORT"] = porta_agente
         print(f"[agente] depuração remota em http://127.0.0.1:{porta_agente}")

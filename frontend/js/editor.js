@@ -3976,7 +3976,7 @@ function veBuildHeads() {
         <div class="ve-head ve-head-l" data-tr="${i}" style="height:${tr.h}px" title="Legendas (painel Texto)">
             <div class="ve-head-row"><b>LEG</b></div>
             <i class="ve-head-grip" data-grip="${i}" title="Arraste para aumentar ou diminuir a trilha"></i>
-        </div>`;
+        </div><div class="ve-head-folga" id="ve-head-folga" style="height:${veFolgaTopo()}px"></div>`;
         const k = veTrackIndex(tr), st = veTrackState(tr.kind, k);
         const bt = (act, on, titulo, conteudo) =>
             `<button class="ve-hb${on ? ' on' : ''}" data-hact="${act}" data-hk="${k}" data-hkind="${tr.kind}" title="${titulo}">${conteudo}</button>`;
@@ -4015,6 +4015,19 @@ function veTrackToggle(kind, k, act) {
 function veSyncHeads() {
     const box = $ve('ve-heads-rows');
     if (box) box.style.transform = `translateY(${-VE.vs}px)`;
+    const f = $ve('ve-head-folga'), h = veFolgaTopo() + 'px';
+    if (f && f.style.height !== h) f.style.height = h;
+}
+
+// Espaço entre a linha LEG e a trilha de vídeo mais alta (como no Premiere): com poucas trilhas, as de vídeo
+// descem até a divisória vídeo/áudio chegar no meio da timeline, em vez de ficarem coladas em cima e sobrar
+// um vão vazio embaixo. Só usa o que sobra: com trilhas que enchem a timeline, some.
+function veFolgaTopo() {
+    const vis = veCanvasHeight() - VE_RULER, sobra = vis - veTracksHeight();
+    if (sobra <= 0) return 0;
+    const ateDivisa = VE_TRACKS.filter(t => t.kind === 'l' || t.kind === 'v').reduce((a, t) => a + t.h, 0)
+        + (typeof veKlAltura === 'function' ? veKlAltura() : 0);
+    return Math.round(Math.max(0, Math.min(sobra, vis / 2 - ateDivisa)));
 }
 
 // Geometria das trilhas no canvas (y já descontada a rolagem vertical). Faixas de quadros-chave abertas
@@ -4023,9 +4036,11 @@ function veTrackRows() {
     let y = VE_RULER - VE.vs;
     const c = typeof veKlClip === 'function' ? veKlClip() : null;
     const out = [];
+    const folga = veFolgaTopo();
     VE_TRACKS.forEach(tr => {
         out.push({ ...tr, y, h: tr.h });
         y += tr.h;
+        if (tr.kind === 'l') y += folga;   // espaço entre LEG e as trilhas de vídeo (veFolgaTopo)
         if (c && tr.kind === 'v' && tr.id === 'V' + (c.tr + 1)) veKlRows(c).forEach(l => { out.push({ ...l, y }); y += l.h; });
     });
     return out;

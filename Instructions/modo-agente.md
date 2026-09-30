@@ -14,6 +14,12 @@ python main.py --agente                (rodando pelo código)
 Ou defina a variável de ambiente `CANIVETE_AGENTE_PORTA=9222` antes de abrir o app.
 Sem isso o modo fica **desligado** (padrão).
 
+### Ligado sempre (Preferências, escondido)
+Preferências → Geral → clique **5 vezes** em "Modo desenvolvedor" → marque **"Permitir que o Claude controle a janela"**.
+A partir da próxima abertura (exe, atalho ou `python main.py`), o app liga a porta sozinho, na primeira livre de
+**9222 a 9231** (uma segunda cópia pega a seguinte). O estado aparece ali mesmo ("Agora: ligado em ...").
+Fica gravado em `%APPDATA%/CaniveteDoPailer/preferencias.json` (`dev` e `agente`).
+
 ## Como conectar (exemplo com Playwright)
 
 ```python

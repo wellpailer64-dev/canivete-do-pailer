@@ -383,6 +383,13 @@ const I18N_EN = {
     'Selecione um clipe na timeline (ou arraste a animação até ele)': 'Select a clip on the timeline (or drag the animation onto it)',
     'Passe o mouse para ver o exemplo. Transição: arraste até o corte entre dois clipes (a borda do bloco muda a duração). Constante: arraste até o clipe ou dê duplo clique com ele selecionado; os ajustes ficam no Controles de efeito.':
         'Hover to preview. Transition: drag onto the cut between two clips (the block edge changes the duration). Constant: drag onto the clip or double-click with it selected; settings are in Effect Controls.',
+    'Modo desenvolvedor': 'Developer mode', 'Faltam': '', 'cliques para o modo desenvolvedor': 'more clicks to developer mode',
+    'clique para o modo desenvolvedor': 'more click to developer mode', 'Modo desenvolvedor ativado': 'Developer mode enabled',
+    'Permitir que o Claude controle a janela (modo agente)': 'Allow Claude to control the window (agent mode)',
+    'Abre a porta de controle do painel só neste computador (127.0.0.1). Enquanto estiver ligada, qualquer programa do PC pode usar o app. Vale a partir da próxima vez que o app abrir.':
+        'Opens the panel control port on this computer only (127.0.0.1). While on, any program on this PC can use the app. Takes effect the next time the app opens.',
+    'Agora: ligado em': 'Now: on at', 'Agora: desligado': 'Now: off', 'reabra o app para aplicar': 'reopen the app to apply',
+    'Desativar o modo desenvolvedor': 'Turn off developer mode',
     'Copiar efeitos': 'Copy effects', 'Colar efeitos': 'Paste effects', 'Copiar estilo': 'Copy style', 'Colar estilo': 'Paste style',
     'Nesta': 'This one', 'Em todas': 'All', 'Neste clipe': 'This clip', 'Nos': 'To the', 'selecionados': 'selected',
     'Efeitos copiados': 'Effects copied', 'selecione os clipes e clique em Colar efeitos (Ctrl+Alt+V)': 'select the clips and click Paste effects (Ctrl+Alt+V)',
@@ -769,11 +776,57 @@ function prefsSetLang(lang) {
     prefsSave();
 }
 
+// ── Modo desenvolvedor (Preferências → Geral): 5 cliques seguidos no botão liberam o modo agente ──
+let prefsDevN = 0, prefsDevT = 0;
+function prefsDevClique() {
+    if (PREFS.dev) { prefsDevRender(); return; }
+    const agora = Date.now();
+    if (agora - prefsDevT > 2000) prefsDevN = 0;   // cliques seguidos (até 2 s entre um e outro)
+    prefsDevT = agora;
+    prefsDevN++;
+    const falta = 5 - prefsDevN;
+    if (falta > 0) {
+        if (prefsDevN >= 2 && typeof toast === 'function') toast(`${i18nT('Faltam')} ${falta} ${i18nT(falta > 1 ? 'cliques para o modo desenvolvedor' : 'clique para o modo desenvolvedor')}`, 'info', 1500);
+        return;
+    }
+    PREFS.dev = true;
+    prefsSave();
+    prefsDevRender();
+    if (typeof toast === 'function') toast(i18nT('Modo desenvolvedor ativado'), 'success', 2500);
+}
+function prefsDevRender() {
+    const corpo = document.getElementById('pref-dev');
+    if (!corpo) return;
+    corpo.hidden = !PREFS.dev;
+    document.getElementById('pref-dev-btn').classList.toggle('ativo', !!PREFS.dev);
+    document.getElementById('pref-agente').checked = !!PREFS.agente;
+    const estado = document.getElementById('pref-agente-estado'), api = window.pywebview && window.pywebview.api;
+    if (!PREFS.dev || !api || !api.ve_agente_porta) { estado.textContent = ''; return; }
+    api.ve_agente_porta().then(r => {
+        const porta = r && r.porta;
+        estado.textContent = porta ? `${i18nT('Agora: ligado em')} http://127.0.0.1:${porta}` : i18nT('Agora: desligado');
+        if (!!porta !== !!PREFS.agente) estado.textContent += ' · ' + i18nT('reabra o app para aplicar');
+    }).catch(() => {});
+}
+function prefsSetAgente(v) {
+    PREFS.agente = !!v;
+    prefsSave();
+    prefsDevRender();
+}
+function prefsDevDesligar() {
+    PREFS.dev = false;
+    PREFS.agente = false;
+    prefsDevN = 0;
+    prefsSave();
+    prefsDevRender();
+}
+
 function prefsOpen() {
     const m = document.getElementById('modal-prefs');
     if (!m) return;
     i18nApply(I18N.lang);
     if (typeof prefsAba === 'function') prefsAba('geral');
+    prefsDevRender();
     m.style.display = 'flex';
 }
 
