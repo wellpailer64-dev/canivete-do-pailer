@@ -190,7 +190,12 @@ def _base_imagem(path):
     cada abertura) e reaproveitado por tamanho. A imagem em si entra na timeline como clipe comum.
     """
     info = probe(path)
-    w, h = info.get("width") or 1920, info.get("height") or 1080
+    return _base_preta(info.get("width") or 1920, info.get("height") or 1080)
+
+
+def _base_preta(w, h):
+    """Vídeo preto mudo de 1 s w×h (par), reaproveitado por tamanho: fundo da timeline sem vídeo principal."""
+    w, h = max(16, int(w)), max(16, int(h))
     w, h = w + (w % 2), h + (h % 2)
     pasta = os.path.join(tempfile.gettempdir(), "canivete_editor_bases")
     os.makedirs(pasta, exist_ok=True)
@@ -2218,9 +2223,21 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     """
     global _export_proc
     prog = on_progress or (lambda p, m: None)
-    if not os.path.isfile(path):
+    if not path:
+        # projeto sem vídeo principal (tudo veio do painel Projeto): fundo preto no tamanho da sequência;
+        # a saída leva o nome e a pasta do projeto
+        try:
+            w, h = (int(quadro[0]), int(quadro[1])) if quadro else (1920, 1080)
+            path = _base_preta(w, h)
+        except Exception as e:
+            return {"success": False, "error": f"Não foi possível preparar o fundo da exportação: {e}"}
+        projeto = str((opcoes or {}).get("projeto") or "")
+        aberto = (os.path.splitext(projeto)[0] + ".mp4" if projeto
+                  else os.path.join(os.path.expanduser("~"), "Videos", "Pocket Editor.mp4"))
+    elif not os.path.isfile(path):
         return {"success": False, "error": "Arquivo não encontrado."}
-    aberto = path   # nome e pasta da saída vêm do que o usuário abriu
+    else:
+        aberto = path   # nome e pasta da saída vêm do que o usuário abriu
     if _eh_imagem(path):
         path = _base_imagem(path)   # timeline que começou por uma imagem: fundo preto no tamanho dela
 

@@ -4805,10 +4805,19 @@ function veOpenExport() {
         atual.classList.remove('active');
         document.querySelector(`#ve-export .ve-pill[data-v="${soAudio ? 'mp3' : 'mp4'}"]`).classList.add('active');
     }
-    // nome do arquivo: o que foi digitado nesta sessão, ou <projeto ou vídeo>_editado
-    const nome = $ve('ve-exp-nome'), base = (VE.projectPath || VE.path || 'video').split(/[\\/]/).pop().replace(/\.[^.]+$/, '');
-    if (!VE._expNome || nome.value === VE._expPadrao) nome.value = VE._expNome || base + '_editado';
-    VE._expPadrao = base + '_editado';
+    // nome do arquivo: sempre o nome da timeline (o que foi digitado para ela nesta sessão continua valendo);
+    // sem nome de timeline, <projeto ou vídeo>_editado
+    const nome = $ve('ve-exp-nome'), seqM = veSeqMedia(VE.activeSequence);
+    const seqNome = String((seqM && (seqM.nome || seqM.name)) || ((VE.sequences || []).find(s => s.id === VE.activeSequence) || {}).name || '')
+        .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').trim();
+    const base = seqNome || (VE.projectPath || VE.path || 'video').split(/[\\/]/).pop().replace(/\.[^.]+$/, '') + '_editado';
+    VE._expNomes = VE._expNomes || {};
+    nome.value = VE._expNomes[VE.activeSequence] || base;
+    VE._expBase = base;
+    // pasta: sempre a do projeto salvo (o botão escolhe outra só para esta exportação); sem projeto, a do vídeo
+    const pastaProj = VE.projectPath ? VE.projectPath.replace(/[\\/][^\\/]*$/, '') : null;
+    VE.dest = pastaProj;
+    $ve('ve-dest-label').textContent = pastaProj || veT('Mesma pasta do vídeo original');
     // codec, bits e taxa lembrados entre exportações
     try {
         const o = JSON.parse(veLsGet('ve-exp-opcoes') || '{}');
@@ -4835,7 +4844,8 @@ function veExpPill(nome, v) {
 function veExpOpcoes() {
     const fmt = vePill('format') || 'mp4', codec = ['mp4', 'mov', 'mkv'].includes(fmt) ? vePill('codec') || 'h264' : 'h264';
     const mbps = vePill('taxa') === 'mbps' ? Math.max(1, Math.min(400, +$ve('ve-exp-mbps').value || 16)) : 0;
-    return { nome: $ve('ve-exp-nome').value.trim(), codec, bits: +(vePill('bits') || 8), mbps };
+    // projeto: sem vídeo principal, a saída leva o nome e a pasta dele (exportar_video)
+    return { nome: $ve('ve-exp-nome').value.trim(), codec, bits: +(vePill('bits') || 8), mbps, projeto: VE.projectPath || '' };
 }
 
 function veUpdateExportSummary() {
@@ -4930,7 +4940,9 @@ async function veStartExport() {
             veTxExport(plano.faixa), [VE.seqW, VE.seqH],
             veExpOpcoes()
         );
-        VE._expNome = $ve('ve-exp-nome').value.trim();
+        VE._expNomes = VE._expNomes || {};
+        const nm = $ve('ve-exp-nome').value.trim();   // nome digitado para esta timeline (o padrão acompanha o nome dela)
+        if (nm && nm !== VE._expBase) VE._expNomes[VE.activeSequence] = nm; else delete VE._expNomes[VE.activeSequence];
     } catch (e) {
         const msg = e && (e.message || e.error || e);
         veOnExport({ done: true, success: false, error: 'Falha ao exportar: ' + (msg || 'erro ao preparar a exportação') });
