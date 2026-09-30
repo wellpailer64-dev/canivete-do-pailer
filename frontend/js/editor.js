@@ -27,6 +27,8 @@ const VE = {
     projectPath: null,  // .vcnvt salvo/aberto
     dirty: false,       // alterações desde o último salvar
     quickEdit: false,   // edição descartável: exporta e fecha sem pedir salvar projeto
+    quickEditPending: false, // Quick edit aberto sem mídia: o próximo arquivo herda o modo descartável
+    startScreenDismissed: false,
     seqW: 1920, seqH: 1080,   // tamanho do quadro da sequência (o do vídeo)
     pps: 50,            // pixels por segundo
     view: 0,            // tempo na borda esquerda
@@ -2066,6 +2068,8 @@ function veDropFiles(itens) {
     const proj = itens.find(i => !i.pasta && /\.vcnvt$/i.test(i.path));
     if (proj) { veOpenProject(proj.path); return; }
     const drop = veDropAtual();
+    // no painel AutoFrame: pastas/fotos/vídeos/música vão para ele (editor-autoframe.js)
+    if (typeof veAfSoltouAqui === 'function' && veAfSoltouAqui(drop)) { veAfAdicionar(itens); return; }
     const noPainel = VE.ready ? vePjSoltouAqui(drop) : null;
     if (noPainel) { vePjImportar(itens, noPainel.pasta); return; }
     if (VE.ready) {
@@ -3251,27 +3255,59 @@ function veConfirmDiscard() {
 }
 
 const VE_RECENTES_PROJETOS = 've-projetos-recentes';
-function veRecentesProjetos() {
+function veRecentesProjetosLocal() {
     try {
         return JSON.parse(veLsGet(VE_RECENTES_PROJETOS) || '[]').filter(p => p && p.path);
     } catch (_) {
         return [];
     }
 }
+function veRecentesProjetosLimpos(lista) {
+    return (Array.isArray(lista) ? lista : []).filter(p => p && p.path);
+}
+function veRecentesProjetosMesclar(...listas) {
+    const porPath = new Map();
+    listas.flatMap(veRecentesProjetosLimpos).forEach(p => {
+        const chave = String(p.path || '').toLocaleLowerCase();
+        const atual = porPath.get(chave);
+        if (!chave || (atual && (+atual.atualizado || 0) > (+p.atualizado || 0))) return;
+        porPath.set(chave, p);
+    });
+    return [...porPath.values()].sort((a, b) => (+b.atualizado || 0) - (+a.atualizado || 0)).slice(0, 8);
+}
+function veRecentesProjetos() {
+    const prefs = typeof PREFS !== 'undefined' ? PREFS.projetosRecentes : null;
+    return veRecentesProjetosLimpos(Array.isArray(prefs) ? prefs : veRecentesProjetosLocal());
+}
 function veSalvarRecentesProjetos(lista) {
-    veLsSet(VE_RECENTES_PROJETOS, JSON.stringify(lista.slice(0, 8)));
+    const limpos = veRecentesProjetosMesclar(lista);
+    if (typeof PREFS !== 'undefined') PREFS.projetosRecentes = limpos;
+    if (typeof prefsSave === 'function') prefsSave();
+    veLsSet(VE_RECENTES_PROJETOS, JSON.stringify(limpos));
+}
+function veRecentesProjetosSincronizar() {
+    if (typeof PREFS === 'undefined') return;
+    const prefs = veRecentesProjetosLimpos(PREFS.projetosRecentes);
+    const lista = veRecentesProjetosMesclar(prefs, veRecentesProjetosLocal());
+    const mudou = JSON.stringify(lista) !== JSON.stringify(prefs);
+    PREFS.projetosRecentes = lista;
+    veLsSet(VE_RECENTES_PROJETOS, JSON.stringify(lista));
+    if (mudou && typeof prefsSave === 'function') prefsSave();
+    veOnboardingRender();
 }
 function veRegistrarProjetoRecente(path, dados) {
     if (!path) return;
     const nome = path.split(/[\\/]/).pop().replace(/\.vcnvt$/i, '');
     const atual = { path, nome, video: (dados && dados.video) || VE.path || '', atualizado: Date.now(), thumb: (VE.thumbs && VE.thumbs[0] && VE.thumbs[0].url) || '' };
-    veSalvarRecentesProjetos([atual, ...veRecentesProjetos().filter(p => p.path !== path)]);
+    const chave = path.toLocaleLowerCase();
+    veSalvarRecentesProjetos([atual, ...veRecentesProjetos().filter(p => String(p.path || '').toLocaleLowerCase() !== chave)]);
     veOnboardingRender();
 }
 function veRecentesProjetosLimpar() {
     veSalvarRecentesProjetos([]);
     veOnboardingRender(true);
 }
+window.addEventListener('prefs-carregadas', veRecentesProjetosSincronizar);
 function veFmtRecente(ts) {
     if (!ts) return '';
     try { return new Date(ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
@@ -3311,7 +3347,7 @@ function veAutosaveRender() {
 function veOnboardingRender() {
     const tela = $ve('ve-start'), box = $ve('ve-start-recentes');
     if (!tela || !box) return;
-    const mostrar = !VE.ready && !VE.path && !VE.exportRunning;
+    const mostrar = !VE.startScreenDismissed && !VE.ready && !VE.path && !VE.exportRunning;
     tela.hidden = !mostrar;
     if (!mostrar) return;
     veAutosaveRender();
@@ -3396,8 +3432,9 @@ function veSaveProject(comoNovo) {
     });
 }
 
-// Fecha o projeto (aba do editor fechada): volta à tela "arraste um vídeo"
-function veCloseProject() {
+function veResetEditorVazio(opts = {}) {
+    const quickEdit = !!opts.quickEdit;
+    const mostrarInicio = opts.mostrarInicio !== false;
     veStop();
     veDeckReset();
     veAudioReset();
@@ -3415,7 +3452,8 @@ function veCloseProject() {
     Object.assign(VE, {
         path: null, info: null, dur: 0, srcDur: 0, clips: [], sel: -1, inPt: null, outPt: null, markers: [], guias: [], playhead: 0,
         cur: -1, history: [], future: [], thumbs: [], peaks: [], ready: false, dest: null, view: 0, media: [],
-        sequences: [], activeSequence: null, openSequences: [], _seqN: 0, projectPath: null, dirty: false, quickEdit: false, _pendingProject: null, bins: [],
+        sequences: [], activeSequence: null, openSequences: [], _seqN: 0, projectPath: null, dirty: false,
+        quickEdit, quickEditPending: quickEdit, startScreenDismissed: !mostrarInicio, _pendingProject: null, bins: [],
     });
     veBuildHeads();
     VEPJ.sel.clear();
@@ -3436,10 +3474,18 @@ function veCloseProject() {
     veOnboardingRender();
 }
 
+// Fecha o projeto (aba do editor fechada): volta à tela "arraste um vídeo"
+function veCloseProject() {
+    veResetEditorVazio({ mostrarInicio: true });
+}
+
 function veOpenProject(path) {
     if (VE.exportRunning || !veConfirmDiscard()) return;
     window.pywebview.api.ve_project_open(path || null).then(r => {
         if (!r || !r.success) { if (r && r.error) veToast(r.error); return; }
+        VE.quickEdit = false;
+        VE.quickEditPending = false;
+        VE.startScreenDismissed = true;
         const d = r.data;
         VE._pendingProject = { data: d, path: r.path, name: r.name, missing: r.missing || [] };
         VE.dirty = false;
@@ -4375,20 +4421,28 @@ function veEscolherArquivoEditor(quickEdit) {
     if (!api || !api.select_file) { veToast('A ponte com o app ainda não está pronta'); return; }
     api.select_file('video-cutter').then(r => {
         if (!r || !r.success) return;
-        veAbrirArquivoEscolhido(r.path, false, !!quickEdit);
+        veAbrirArquivoEscolhido(r.path, false, !!quickEdit || !!VE.quickEditPending);
     }).catch(e => veToast('Não consegui abrir o seletor: ' + (e && e.message ? e.message : e)));
 }
 
 function veOpenFile() { veEscolherArquivoEditor(false); }
 function veNovoProjeto() { veEscolherArquivoEditor(false); }
-function veQuickEdit() { veEscolherArquivoEditor(true); }
+function veQuickEdit() {
+    if (VE.exportRunning || !veConfirmDiscard()) return;
+    veResetEditorVazio({ quickEdit: true, mostrarInicio: false });
+    veToast('Quick edit pronto: arraste uma mídia ou use Abrir vídeo para começar.');
+}
 
 function veAbrirArquivoEscolhido(path, inserirNaTimeline, quickEdit) {
     if (!path) return;
     if (/\.vcnvt$/i.test(path)) { veOpenProject(path); return; }
     if (inserirNaTimeline && VE.ready) { veDropFiles([{ path, pasta: false }]); return; }
     if (VE.ready && inserirNaTimeline !== false) { veDropFiles([{ path, pasta: false }]); return; }
-    if (veConfirmDiscard()) { VE.quickEdit = !!quickEdit; veOpenPath(path); }
+    if (veConfirmDiscard()) {
+        VE.quickEdit = !!quickEdit;
+        VE.quickEditPending = false;
+        veOpenPath(path);
+    }
 }
 
 function veImportTimelineFile() {
@@ -4404,6 +4458,8 @@ function veImportTimelineFile() {
 function veOpenPath(path) {
     if (!path || VE.exportRunning || !veIsActive()) return;
     if (!VE._pendingProject) { VE.projectPath = null; VE.dirty = false; }
+    if (VE.quickEditPending) { VE.quickEdit = true; VE.quickEditPending = false; }
+    VE.startScreenDismissed = true;
     veStop();
     veDeckReset();
     veAudioReset();
@@ -5305,6 +5361,7 @@ function veOnKey(e) {
 document.addEventListener('DOMContentLoaded', () => {
     veLoadLayout();
     veCacheUpdateUi();
+    if (window.PREFS_CARREGADAS) veRecentesProjetosSincronizar();
     veOnboardingRender();
     veBuildHeads();
     veInitEvents();

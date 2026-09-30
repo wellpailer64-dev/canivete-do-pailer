@@ -264,11 +264,13 @@ document.addEventListener('keydown', e => {
     _el('menu-search')?.focus();
 });
 
-// ── Fundo animado do Início: só toca com o Início na tela e a janela visível (não gasta nada fora dele) ──
+// ── Fundo animado: toca na Home e nas ferramentas comuns; o editor de vídeo fica full-screen limpo. ──
 function homeBgSync() {
     const v = _el('home-bg');
     if (!v) return;
-    const tocar = _el('page-home')?.classList.contains('active') && !document.hidden
+    const ativa = document.querySelector('.tool-page.active');
+    const usarFundo = ativa && !ativa.classList.contains('ve-page');
+    const tocar = usarFundo && !document.hidden
         && !matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (tocar) v.play().catch(() => {}); else v.pause();
 }
@@ -2428,8 +2430,9 @@ function openOmniVoiceOutputFolder() {
 function runRemoverFundo() {
     const path = _exigirSelecao('remover-fundo');
     if (!path) return;
-    uiIniciar('remover-fundo', 'Carregando modelo de IA...');
-    window.pywebview.api.remover_fundo(path);
+    const modelo = document.querySelector('input[name="rf-modelo"]:checked')?.value || 'isnet';
+    uiIniciar('remover-fundo', modelo === 'birefnet-lite' ? 'Preparando BiRefNet Lite...' : 'Carregando modelo de IA...');
+    window.pywebview.api.remover_fundo(path, modelo);
 }
 
 

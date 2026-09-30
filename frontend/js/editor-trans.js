@@ -67,6 +67,20 @@ const VE_TR = {
         fn: u => ({ a: { s: 1 + 0.35 * veEaseIO(u) }, b: { s: 1 + 1.4 * (1 - veEaseOut(u)), op: Math.min(1, u * 2.5) } }),
     },
     pop: { nome: 'Pop', tag: 'Pop', pausa: 0.3, fn: u => ({ a: {}, b: { s: 0.15 + 0.85 * veEaseBack(u), op: Math.min(1, u * 4) } }) },
+    // Chicote (whip pan): os dois quadros correm juntos, quase parados nas pontas e muito rápidos no meio (o meio
+    // cai na batida); a imagem estica na direção do movimento na proporção da velocidade, como o borrão de câmera
+    chicote: {
+        nome: 'Chicote', tag: 'Whip Pan', dir: true, pausa: 0.45,
+        fn: (u, tr) => {
+            const v = veTrDir(tr.dir);
+            const e = u < 0.5 ? 16 * Math.pow(u, 5) : 1 - Math.pow(-2 * u + 2, 5) / 2;   // easeInOutQuint
+            const vel = 30 * u * u * (1 - u) * (1 - u) / 1.875;                          // derivada normalizada (pico 1 no meio)
+            // esticão pequeno: maior que isso, o quadro que entra cobre o que sai e o chicote vira um salto
+            const est = 1 + 0.15 * vel, ax = Math.abs(v.x) >= Math.abs(v.y);
+            const estica = ax ? { sx: est } : { sy: est };
+            return { a: { dx: -v.x * e, dy: -v.y * e, ...estica }, b: { dx: v.x * (1 - e), dy: v.y * (1 - e), ...estica } };
+        },
+    },
     // como o Impact Fold: o quadro que sai dobra para a esquerda (escurecendo) e o que entra desdobra da direita
     fold: {
         nome: 'Dobrar', tag: 'Fold', pausa: 0.3, dir: true,

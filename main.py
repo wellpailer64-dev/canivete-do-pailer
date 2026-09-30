@@ -998,6 +998,99 @@ def ve_autosave_lista():
         return {"success": False, "error": str(e)}
 
 
+# ── AutoFrame (Functions/autoframe.py): vídeos no ritmo da música ──
+_af = {"musica": {}, "midias": {}, "stop": None}
+
+
+def _af_resumo_midia(d):
+    from Functions import media_server
+    r = {k: d.get(k) for k in ("path", "tipo", "nota", "w", "h", "dur", "rostos", "fx", "fy", "data")}
+    r["thumb"] = media_server.register(d["thumb"]) if d.get("thumb") and os.path.isfile(d["thumb"]) else None
+    return r
+
+
+def af_analisar(musica, itens):
+    """Analisa a música e as mídias (pastas/arquivos) em segundo plano; eventos em veOnAF(evento)."""
+    from Functions import autoframe as af
+    if _af["stop"] is not None:
+        _af["stop"].set()
+    stop = threading.Event()
+    _af["stop"] = stop
+
+    def run():
+        try:
+            caminhos = af.listar(itens or [])
+            _ve_emit("veOnAF", {"etapa": "lista", "n": len(caminhos)})
+            resumo_musica = None
+            if musica:
+                _ve_emit("veOnAF", {"etapa": "musica", "pct": 0})
+                dm = af.analisar_musica(musica, lambda p: _ve_emit("veOnAF", {"etapa": "musica", "pct": p}))
+                _af["musica"][musica] = dm
+                resumo_musica = {k: dm.get(k) for k in ("path", "dur", "bpm", "beats", "downbeats", "energia", "secoes", "drop", "refrao")}
+            midias = []
+            for i, pth in enumerate(caminhos):
+                if stop.is_set():
+                    return
+                _ve_emit("veOnAF", {"etapa": "midia", "i": i, "n": len(caminhos), "path": pth})
+                try:
+                    d = af.analisar_midia(pth)
+                except Exception as e:
+                    d = None
+                    print("[autoframe]", pth, e)
+                if d:
+                    _af["midias"][pth] = d
+                    midias.append(_af_resumo_midia(d))
+                    _ve_emit("veOnAF", {"etapa": "midia_ok", "midia": midias[-1]})
+            _ve_emit("veOnAF", {"etapa": "fim", "musica": resumo_musica, "midias": midias})
+        except Exception as e:
+            _ve_emit("veOnAF", {"etapa": "erro", "error": str(e)})
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
+def _af_midias(paths):
+    return [_af["midias"][p] for p in (paths or []) if p in _af["midias"]]
+
+
+def af_recomendar(musica, paths, dur_alvo=None, inicio_modo="inicio", manual=None):
+    from Functions import autoframe as af
+    try:
+        m = _af["musica"].get(musica) or af.analisar_musica(musica)
+        ini = af.melhor_inicio(m, inicio_modo, dur_alvo or None, manual)
+        return {"success": True, "inicio": ini, "modelos": af.recomendar(m, _af_midias(paths), dur_alvo or None, ini)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def af_planejar(musica, paths, modelo, dur_alvo=None, ordem="inteligente", semente=0, inicio_modo="inicio", manual=None):
+    from Functions import autoframe as af
+    try:
+        m = _af["musica"].get(musica) or af.analisar_musica(musica)
+        ini = af.melhor_inicio(m, inicio_modo, dur_alvo or None, manual)
+        return af.planejar(m, _af_midias(paths), modelo, dur_alvo or None, ordem, semente, ini)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def af_escolher(tipo):
+    """tipo: 'pasta' | 'midias' (várias fotos/vídeos) | 'musica'."""
+    if not _window:
+        return {"success": False}
+    if tipo == "pasta":
+        r = _window.create_file_dialog(_file_dialog_kind("FOLDER", webview.FOLDER_DIALOG))
+    elif tipo == "musica":
+        r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), file_types=(
+            "Música (*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.mp4)", "Todos os arquivos (*.*)"))
+    else:
+        r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), allow_multiple=True, file_types=(
+            "Fotos e vídeos (*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.heic;*.tif;*.tiff;*.mp4;*.mov;*.m4v;*.mkv;*.avi;*.webm;*.mts;*.m2ts;*.3gp;*.wmv)",
+            "Todos os arquivos (*.*)"))
+    if not r:
+        return {"success": False, "cancelled": True}
+    return {"success": True, "paths": list(r) if isinstance(r, (list, tuple)) else [r]}
+
+
 def ve_project_thumb(path):
     """Gera uma miniatura leve do vídeo principal de um projeto recente."""
     from Functions import projeto
@@ -1744,12 +1837,15 @@ def omnivoice_save_output(path):
         return {"success": False, "error": str(e)}
 
 
-def remover_fundo(caminho):
-    from Functions.removerfundo import processar_imagem_preview, FORMATOS_SUPORTADOS
+def remover_fundo(caminho, modelo="isnet"):
+    from Functions.removerfundo import processar_imagem_preview, FORMATOS_SUPORTADOS, garantir_modelo
     global _rf_cache
     _rf_cache = []
 
     def trabalho(log, progresso):
+        modelo_id = modelo if modelo in ("isnet", "birefnet-lite") else "isnet"
+        garantir_modelo(modelo_id, callback_log=log,
+                        callback_progresso=lambda p, s=None: progresso(p * 0.25, s))
         if _is_file(caminho):
             arquivos = [caminho]
         else:
@@ -1759,8 +1855,8 @@ def remover_fundo(caminho):
             raise RuntimeError("Nenhuma imagem encontrada.")
         resultados = []
         for i, path in enumerate(arquivos):
-            progresso(i / len(arquivos) * 100, f"{i + 1}/{len(arquivos)} • {os.path.basename(path)}")
-            r = processar_imagem_preview(path, callback_log=log)
+            progresso(25 + i / len(arquivos) * 75, f"{i + 1}/{len(arquivos)} • {os.path.basename(path)}")
+            r = processar_imagem_preview(path, callback_log=log, modelo_id=modelo_id)
             if r:
                 _rf_cache.append({"nome": r["nome"], "resultado_pil": r["resultado_pil"]})
                 resultados.append({k: r[k] for k in ("nome", "original_b64", "resultado_b64")})
@@ -1771,8 +1867,8 @@ def remover_fundo(caminho):
     return _tarefa("updateRemoverFundoProgress", trabalho)
 
 
-def remover_fundo_file(file_path):
-    return remover_fundo(file_path)
+def remover_fundo_file(file_path, modelo="isnet"):
+    return remover_fundo(file_path, modelo)
 
 
 def remover_fundo_salvar(indices, pasta_destino):
@@ -2681,6 +2777,18 @@ class ApiBridge:
     def ve_project_open(self, path=None):
         return ve_project_open(path)
 
+    def af_analisar(self, musica, itens):
+        return af_analisar(musica, itens)
+
+    def af_recomendar(self, musica, paths, dur_alvo=None, inicio_modo="inicio", manual=None):
+        return af_recomendar(musica, paths, dur_alvo, inicio_modo, manual)
+
+    def af_planejar(self, musica, paths, modelo, dur_alvo=None, ordem="inteligente", semente=0, inicio_modo="inicio", manual=None):
+        return af_planejar(musica, paths, modelo, dur_alvo, ordem, semente, inicio_modo, manual)
+
+    def af_escolher(self, tipo):
+        return af_escolher(tipo)
+
     def ve_autosave(self, chave, nome, dados):
         return ve_autosave(chave, nome, dados)
 
@@ -2725,11 +2833,11 @@ class ApiBridge:
     def favicon_generator(self, image_path, site_name, theme_color):
         return favicon_generator(image_path, site_name, theme_color)
 
-    def remover_fundo(self, folder_path):
-        return remover_fundo(folder_path)
+    def remover_fundo(self, folder_path, modelo="isnet"):
+        return remover_fundo(folder_path, modelo)
 
-    def remover_fundo_file(self, file_path):
-        return remover_fundo_file(file_path)
+    def remover_fundo_file(self, file_path, modelo="isnet"):
+        return remover_fundo_file(file_path, modelo)
 
     def remover_fundo_salvar(self, indices, pasta_destino):
         return remover_fundo_salvar(indices, pasta_destino)

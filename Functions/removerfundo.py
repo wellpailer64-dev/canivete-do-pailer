@@ -7,10 +7,12 @@ Não depende do import do rembg em tempo de execução — mais robusto no .exe
 Resultado: PNG com fundo transparente salvo em /sem_fundo
 """
 
+import hashlib
 import os
 import sys
+import urllib.request
 import numpy as np
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageFilter
 
 try:
     from pillow_heif import register_heif_opener
@@ -30,26 +32,119 @@ def _abrir(path):
 # =========================
 # 📁 PASTA DO MODELO
 # =========================
-# Modelos em ordem de preferência: (arquivo, lado da entrada, média, desvio)
-# ISNet recorta cabelo e bordas bem melhor que o U2Net, com custo parecido.
-MODELOS = [
-    ("isnet-general-use.onnx", 1024, (0.5, 0.5, 0.5), (1.0, 1.0, 1.0)),
-    ("u2net.onnx", 320, (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-]
+MODELOS = {
+    # ISNet recorta cabelo e bordas bem melhor que o U2Net, com custo parecido.
+    "isnet": {
+        "nome": "ISNet (rápido)",
+        "arquivo": "isnet-general-use.onnx",
+        "lado": 1024,
+        "mean": (0.5, 0.5, 0.5),
+        "std": (1.0, 1.0, 1.0),
+    },
+    "birefnet-lite": {
+        "nome": "BiRefNet Lite (qualidade máxima)",
+        "arquivo": "birefnet-general-lite.onnx",
+        "lado": 1024,
+        "mean": (0.485, 0.456, 0.406),
+        "std": (0.229, 0.224, 0.225),
+        "sigmoid": True,
+        "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx",
+        "md5": "4fab47adc4ff364be1713e97b7e66334",
+        "tamanho_mb": 214,
+    },
+    # Fallback legado: menor qualidade, mas salva o fluxo se só ele existir.
+    "u2net": {
+        "nome": "U2Net (legado)",
+        "arquivo": "u2net.onnx",
+        "lado": 320,
+        "mean": (0.485, 0.456, 0.406),
+        "std": (0.229, 0.224, 0.225),
+    },
+}
+ORDEM_FALLBACK = ("isnet", "u2net")
 _sessao = {"path": None, "sess": None}
 
 
-def _get_modelo():
+def _modelo_cfg(modelo_id=None):
+    return MODELOS.get(modelo_id or "isnet") or MODELOS["isnet"]
+
+
+def _modelo_path_cfg(modelo_id=None):
     from Functions.midia import modelo_path
-    for arquivo, lado, mean, std in MODELOS:
-        p = modelo_path("u2net", arquivo)
-        if os.path.exists(p):
-            return p, lado, mean, std
-    return modelo_path("u2net", MODELOS[-1][0]), *MODELOS[-1][1:]
+    cfg = _modelo_cfg(modelo_id)
+    return modelo_path("u2net", cfg["arquivo"]), cfg
 
 
-def _get_modelo_path():
-    return _get_modelo()[0]
+def _get_modelo(modelo_id=None):
+    path, cfg = _modelo_path_cfg(modelo_id)
+    if os.path.exists(path):
+        return path, cfg
+    for mid in ORDEM_FALLBACK:
+        path, cfg = _modelo_path_cfg(mid)
+        if os.path.exists(path):
+            return path, cfg
+    return path, cfg
+
+
+def _get_modelo_path(modelo_id=None):
+    return _get_modelo(modelo_id)[0]
+
+
+def _verificar_md5(path, esperado):
+    if not esperado or not os.path.exists(path):
+        return True
+    h = hashlib.md5()
+    with open(path, "rb") as f:
+        for bloco in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(bloco)
+    return h.hexdigest().lower() == esperado.lower()
+
+
+def garantir_modelo(modelo_id="isnet", callback_log=None, callback_progresso=None):
+    """Garante o modelo pedido. Modelos opcionais são baixados na primeira vez."""
+    path, cfg = _modelo_path_cfg(modelo_id)
+    if os.path.exists(path) and _verificar_md5(path, cfg.get("md5")):
+        if callback_log:
+            callback_log(f"Modelo: {cfg['nome']}")
+        return path, cfg
+
+    url = cfg.get("url")
+    if not url:
+        fallback_path, fallback_cfg = _get_modelo(None)
+        if callback_log:
+            callback_log(f"Modelo solicitado não encontrado; usando {fallback_cfg['nome']}.")
+        return fallback_path, fallback_cfg
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".download"
+    total = int(cfg.get("tamanho_mb", 0) * 1024 * 1024)
+    if callback_log:
+        callback_log(f"Baixando {cfg['nome']} (~{cfg.get('tamanho_mb', '?')} MB) na primeira utilização...")
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp, open(tmp, "wb") as out:
+            total = int(resp.headers.get("Content-Length") or total or 0)
+            baixado = 0
+            while True:
+                bloco = resp.read(1024 * 1024)
+                if not bloco:
+                    break
+                out.write(bloco)
+                baixado += len(bloco)
+                if callback_progresso and total:
+                    callback_progresso(min(100, baixado / total * 100), f"Baixando modelo... {baixado / 1048576:.0f}/{total / 1048576:.0f} MB")
+        if not _verificar_md5(tmp, cfg.get("md5")):
+            raise RuntimeError("download do modelo falhou na verificação")
+        os.replace(tmp, path)
+        if callback_log:
+            callback_log("Modelo BiRefNet pronto.")
+        return path, cfg
+    except Exception:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
+        raise
 
 
 def _get_sessao(modelo_path):
@@ -61,15 +156,81 @@ def _get_sessao(modelo_path):
     return _sessao["sess"]
 
 
+def _estimar_cor_fundo(rgb_np, alpha_np):
+    """Estima a cor do fundo original usando áreas que a máscara removeu."""
+    candidatos = alpha_np <= 8
+    if np.count_nonzero(candidatos) < 64:
+        candidatos = alpha_np <= 24
+
+    if np.count_nonzero(candidatos) < 64:
+        h, w = alpha_np.shape
+        borda = max(4, min(h, w) // 40)
+        candidatos = np.zeros_like(alpha_np, dtype=bool)
+        candidatos[:borda, :] = True
+        candidatos[-borda:, :] = True
+        candidatos[:, :borda] = True
+        candidatos[:, -borda:] = True
+
+    pixels = rgb_np[candidatos]
+    if pixels.size == 0:
+        return np.array((255, 255, 255), dtype=np.float32)
+    return np.median(pixels, axis=0).astype(np.float32)
+
+
+def _descontaminar_borda(img_rgb, alpha_np):
+    """Remove a cor do fundo antigo dos pixels semi-transparentes e da franja."""
+    rgb_np = np.array(img_rgb, dtype=np.float32)
+    foreground = alpha_np > 0
+    if not np.any(foreground):
+        return img_rgb
+
+    cor_fundo = _estimar_cor_fundo(rgb_np, alpha_np)
+    alpha = alpha_np.astype(np.float32) / 255.0
+
+    fundo_expandido = Image.fromarray(255 - alpha_np).filter(ImageFilter.MaxFilter(9))
+    perto_do_fundo = np.array(fundo_expandido, dtype=np.float32) / 255.0
+
+    rgb_c = rgb_np - rgb_np.mean(axis=2, keepdims=True)
+    fundo_c = cor_fundo - cor_fundo.mean()
+    fundo_norm = max(float(np.linalg.norm(fundo_c)), 1e-6)
+    rgb_norm = np.maximum(np.linalg.norm(rgb_c, axis=2), 1e-6)
+    cos = np.sum(rgb_c * fundo_c, axis=2) / (rgb_norm * fundo_norm)
+    similaridade_cor = np.clip((cos - 0.45) / 0.55, 0.0, 1.0)
+
+    distancia = np.linalg.norm(rgb_np - cor_fundo, axis=2) / 441.7
+    similaridade_luz = np.clip(1.0 - distancia / 0.85, 0.0, 1.0)
+    similaridade = similaridade_cor * similaridade_luz
+
+    luma = rgb_np[..., 0] * 0.2126 + rgb_np[..., 1] * 0.7152 + rgb_np[..., 2] * 0.0722
+    protecao_pele = np.where((alpha > 0.9) & (luma > 90), 0.35, 1.0)
+
+    vazamento_alpha = (1.0 - alpha) * 0.95
+    vazamento_borda = perto_do_fundo * similaridade * 0.42 * protecao_pele
+    vazamento = np.maximum(vazamento_alpha, vazamento_borda)
+    vazamento = np.clip(vazamento * foreground.astype(np.float32), 0.0, 0.72)
+
+    if not np.any(vazamento > 0.01):
+        return img_rgb
+
+    denominador = np.clip(1.0 - vazamento, 0.12, 1.0)[..., None]
+    rgb_limpo = (rgb_np - vazamento[..., None] * cor_fundo) / denominador
+    rgb_limpo = np.clip(rgb_limpo, 0, 255)
+
+    peso = np.clip(vazamento * 1.35, 0.0, 0.95)[..., None]
+    saida = rgb_np * (1.0 - peso) + rgb_limpo * peso
+    return Image.fromarray(np.clip(saida, 0, 255).astype(np.uint8), "RGB")
+
+
 # =========================
 # 🧠 INFERÊNCIA DIRETA VIA ONNX
 # =========================
-def _remover_fundo_onnx(img_pil, modelo_path):
+def _remover_fundo_onnx(img_pil, modelo_path, cfg=None):
     """
     Remove o fundo usando onnxruntime diretamente.
     Retorna imagem PIL RGBA com fundo transparente.
     """
-    lado, mean, std = next((m[1:] for m in MODELOS if m[0] == os.path.basename(modelo_path)), MODELOS[-1][1:])
+    cfg = cfg or next((m for m in MODELOS.values() if m["arquivo"] == os.path.basename(modelo_path)), MODELOS["u2net"])
+    lado, mean, std = cfg["lado"], cfg["mean"], cfg["std"]
 
     img = img_pil.convert("RGB").resize((lado, lado), Image.LANCZOS)
     img_np = np.array(img, dtype=np.float32)
@@ -85,6 +246,8 @@ def _remover_fundo_onnx(img_pil, modelo_path):
 
     # Máscara → imagem original
     mask = output[0, 0]
+    if cfg.get("sigmoid"):
+        mask = 1 / (1 + np.exp(-mask))
     mask = (mask - mask.min()) / (mask.max() - mask.min() + 1e-8)
 
     # Redimensiona máscara para tamanho original
@@ -92,10 +255,11 @@ def _remover_fundo_onnx(img_pil, modelo_path):
     mask_img = Image.fromarray((mask * 255).astype(np.uint8)).resize((w, h), Image.LANCZOS)
     mask_np  = np.array(mask_img)
 
-    # Aplica máscara como canal alpha
-    img_original = img_pil.convert("RGBA")
-    r, g, b, _   = img_original.split()
-    resultado     = Image.merge("RGBA", (r, g, b, Image.fromarray(mask_np)))
+    # Aplica máscara como canal alpha e limpa halos coloridos na franja.
+    img_original = img_pil.convert("RGB")
+    img_limpa = _descontaminar_borda(img_original, mask_np)
+    r, g, b = img_limpa.split()
+    resultado = Image.merge("RGBA", (r, g, b, Image.fromarray(mask_np)))
 
     return resultado
 
@@ -103,14 +267,14 @@ def _remover_fundo_onnx(img_pil, modelo_path):
 # =========================
 # ✂️ REMOVER FUNDO DE UM ARQUIVO
 # =========================
-def remover_fundo_arquivo(path, pasta_saida, callback_log=None):
+def remover_fundo_arquivo(path, pasta_saida, callback_log=None, modelo_id="isnet"):
     ext = os.path.splitext(path)[1].lower()
     if ext not in FORMATOS_SUPORTADOS:
         if callback_log:
             callback_log(f"Ignorado: {os.path.basename(path)} (formato nao suportado)")
         return False
 
-    modelo_path = _get_modelo_path()
+    modelo_path, modelo_cfg = _get_modelo(modelo_id)
     if not os.path.exists(modelo_path):
         if callback_log:
             callback_log(f"❌ Modelo nao encontrado: {modelo_path}")
@@ -126,7 +290,7 @@ def remover_fundo_arquivo(path, pasta_saida, callback_log=None):
             callback_log(f"🔄 Processando: {os.path.basename(path)}...")
 
         img_pil   = _abrir(path)
-        resultado = _remover_fundo_onnx(img_pil, modelo_path)
+        resultado = _remover_fundo_onnx(img_pil, modelo_path, modelo_cfg)
         resultado.save(path_saida, format="PNG")
 
         if callback_log:
@@ -142,7 +306,7 @@ def remover_fundo_arquivo(path, pasta_saida, callback_log=None):
 # =========================
 # 📁 REMOVER FUNDO DE PASTA
 # =========================
-def remover_fundo_pasta(pasta, callback_progresso=None, callback_log=None):
+def remover_fundo_pasta(pasta, callback_progresso=None, callback_log=None, modelo_id="isnet"):
     pasta_saida = os.path.join(pasta, "sem_fundo")
     
     arquivos = [
@@ -165,7 +329,7 @@ def remover_fundo_pasta(pasta, callback_progresso=None, callback_log=None):
     os.makedirs(pasta_saida, exist_ok=True)
 
     for i, path in enumerate(arquivos):
-        sucesso = remover_fundo_arquivo(path, pasta_saida, callback_log=callback_log)
+        sucesso = remover_fundo_arquivo(path, pasta_saida, callback_log=callback_log, modelo_id=modelo_id)
         if sucesso: processados += 1
         else:       falhas      += 1
 
@@ -181,7 +345,7 @@ def remover_fundo_pasta(pasta, callback_progresso=None, callback_log=None):
 # =========================
 # 📄 REMOVER FUNDO DE LISTA
 # =========================
-def remover_fundo_arquivos(lista_paths, callback_progresso=None, callback_log=None):
+def remover_fundo_arquivos(lista_paths, callback_progresso=None, callback_log=None, modelo_id="isnet"):
     if not lista_paths:
         return {"total": 0, "processados": 0, "falhas": 0}
 
@@ -191,7 +355,7 @@ def remover_fundo_arquivos(lista_paths, callback_progresso=None, callback_log=No
     falhas      = 0
 
     for i, path in enumerate(lista_paths):
-        sucesso = remover_fundo_arquivo(path, pasta_saida, callback_log=callback_log)
+        sucesso = remover_fundo_arquivo(path, pasta_saida, callback_log=callback_log, modelo_id=modelo_id)
         if sucesso: processados += 1
         else:       falhas      += 1
 
@@ -223,7 +387,7 @@ def _img_para_b64(img_pil, max_px=1100, fmt="PNG"):
         return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
 
-def processar_imagem_preview(path, callback_log=None):
+def processar_imagem_preview(path, callback_log=None, modelo_id="isnet"):
     """Processa sem salvar. Retorna dict com previews b64 e resultado PIL full-res."""
     import base64
     ext = os.path.splitext(path)[1].lower()
@@ -232,7 +396,7 @@ def processar_imagem_preview(path, callback_log=None):
             callback_log(f"⏭️ Ignorado: {os.path.basename(path)}")
         return None
 
-    modelo_path = _get_modelo_path()
+    modelo_path, modelo_cfg = _get_modelo(modelo_id)
     if not os.path.exists(modelo_path):
         if callback_log:
             callback_log(f"❌ Modelo não encontrado: {modelo_path}")
@@ -242,7 +406,7 @@ def processar_imagem_preview(path, callback_log=None):
         if callback_log:
             callback_log(f"🔄 Processando: {os.path.basename(path)}...")
         img_original = _abrir(path)
-        img_resultado = _remover_fundo_onnx(img_original, modelo_path)
+        img_resultado = _remover_fundo_onnx(img_original, modelo_path, modelo_cfg)
         if callback_log:
             callback_log(f"✅ Pronto: {os.path.basename(path)}")
         return {

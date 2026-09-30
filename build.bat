@@ -81,6 +81,8 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "Functions.legendas" ^
  --hidden-import "Functions.fontes" ^
  --hidden-import "Functions.render_cache" ^
+ --hidden-import "Functions.autoframe" ^
+ --collect-data "cv2" ^
  --copy-metadata "pywebview" ^
  --copy-metadata "pythonnet" ^
  --copy-metadata "clr_loader" ^

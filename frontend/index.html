@@ -448,6 +448,7 @@
                                     <div class="ve-start-actions">
                                         <button class="ve-btn ve-btn-primary ve-btn-lg" onclick="veNovoProjeto()"><svg class="i"><use href="#i-file"/></svg> Novo projeto</button>
                                         <button class="ve-btn ve-btn-lg" onclick="veQuickEdit()"><svg class="i"><use href="#i-scissors"/></svg> Quick edit</button>
+                                        <button class="ve-btn ve-btn-lg ve-af-start" onclick="veAfAbrir()" title="Vídeo no ritmo da música a partir de uma pasta de fotos e vídeos"><svg class="i"><use href="#i-sparkles"/></svg> AutoFrame</button>
                                         <button class="ve-btn ve-btn-lg ve-btn-ghost" onclick="veOpenProject()"><svg class="i"><use href="#i-folder"/></svg> Abrir projeto</button>
                                     </div>
                                 </div>
@@ -599,6 +600,9 @@
                                         </div>
                                         <div class="ve-fxc" id="ve-fxc"></div>
                                     </div>
+                                </div>
+                                <div class="ve-panel ve-tabpane" id="ve-pane-autoframe" data-panel="autoframe" data-title="AutoFrame">
+                                    <div class="ve-af" id="ve-af"></div>
                                 </div>
                                 <div class="ve-panel ve-tabpane ve-sc" id="ve-pane-scopes" data-panel="scopes" data-title="Escopos">
                                     <div class="ve-sc-modos" id="ve-sc-modos">
@@ -1414,6 +1418,15 @@
                         </div>
                         <div id="remover-fundo-selected" class="selected-info"></div>
                     </div>
+                    <div class="options-card">
+                        <div class="opt-row">
+                            <div class="opt-label">Modelo</div>
+                            <div class="pills">
+                                <label class="pill"><input type="radio" name="rf-modelo" value="isnet" checked><span>Rápido<small>ISNet · bom equilíbrio</small></span></label>
+                                <label class="pill"><input type="radio" name="rf-modelo" value="birefnet-lite"><span>Qualidade máxima<small>BiRefNet Lite · baixa na 1ª vez</small></span></label>
+                            </div>
+                        </div>
+                    </div>
                     <div class="run-row">
                         <button class="btn-run" id="btn-remover-fundo" onclick="runRemoverFundo()"><svg class="i"><use href="#i-play"/></svg>Remover fundo</button>
                     </div>
@@ -1756,6 +1769,7 @@
     <script src="js/editor-txanim.js"></script>
     <script src="js/editor-marcadores.js"></script>
     <script src="js/editor-scopes.js"></script>
+    <script src="js/editor-autoframe.js"></script>
     <script src="js/editor-projeto.js"></script>
     <script src="js/editor-ferramentas.js"></script>
     <script src="js/editor-dock.js"></script>
