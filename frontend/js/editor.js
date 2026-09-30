@@ -16,7 +16,7 @@ const VE = {
     sel: -1,            // índice do clipe selecionado
     inPt: null,
     outPt: null,
-    markers: [],        // marcadores da timeline ativa [{t, cor, nome}]
+    markers: [],        // marcadores da timeline ativa [{t, cor, nome, d?, desc?}] (editor-marcadores.js)
     playhead: 0,        // tempo da sequência
     cur: -1,            // clipe que o player está mostrando (-1 = espaço vazio)
     media: [],          // [0] = vídeo aberto; imagens adicionadas depois
@@ -516,36 +516,7 @@ function veJumpMarker(dir) {
 
 function veDrawMarkers(ctx, X, W, H) {
     if (!VE.ready || !(VE.markers || []).length) return;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, W, H);
-    ctx.clip();
-    veMarkerList().forEach((m, i) => {
-        const x = Math.round(X(+m.t || 0)) + 0.5;
-        if (x < -12 || x > W + 12) return;
-        const cor = m.cor || veMarkerColor(i);
-        ctx.strokeStyle = veRgba(cor, 0.28);
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x, VE_RULER);
-        ctx.lineTo(x, H);
-        ctx.stroke();
-        ctx.fillStyle = cor;
-        ctx.beginPath();
-        ctx.moveTo(x - 5, 4);
-        ctx.lineTo(x + 5, 4);
-        ctx.lineTo(x + 5, 13);
-        ctx.lineTo(x, 20);
-        ctx.lineTo(x - 5, 13);
-        ctx.closePath();
-        ctx.fill();
-        if (m.nome && x < W - 60) {
-            ctx.font = '600 10px Segoe UI';
-            ctx.fillStyle = veRgba(cor, 0.88);
-            ctx.fillText(m.nome, x + 7, 14);
-        }
-    });
-    ctx.restore();
+    veMkDesenhar(ctx, X, W, H);   // editor-marcadores.js (com duração, nome ao longo do corpo)
 }
 
 // ─────────────────────────── modelo (timeline) ───────────────────────────
@@ -928,8 +899,7 @@ function veSeqConfigAplicar() {
 
 // Depois de qualquer edição: reencaixa zoom/visão, reposiciona a agulha e redesenha
 function veAfterEdit(playhead) {
-    const fit = veFitPps();
-    if (VE.pps < fit * 0.5) VE.pps = fit;
+    if (VE.pps < veMinPps()) VE.pps = veMinPps();   // afastado além da sequência continua afastado
     veClampView();
     veSyncZoomSlider();
     veSeek(playhead != null ? playhead : VE.playhead);
@@ -3646,6 +3616,9 @@ function veApplyProject() {
 function veCanvasWidth() { return $ve('ve-tl-wrap').clientWidth || 800; }
 function veCanvasHeight() { return $ve('ve-tl-wrap').clientHeight || 200; }
 function veFitPps() { return (veCanvasWidth() - 16) / Math.max(veFrame(), veNavDur()); }
+// Zoom mínimo: dá para afastar além da sequência (até 4x a duração, no mínimo 5 min na tela), com espaço
+// livre depois do fim para organizar os clipes
+function veMinPps() { return Math.min(veFitPps(), (veCanvasWidth() - 16) / Math.max(veNavDur() * 4, 300)); }
 function veVisibleDur() { return veCanvasWidth() / VE.pps; }
 
 function veClampView() {
@@ -3664,8 +3637,7 @@ function veClampVScroll() {
 }
 
 function veSetPps(pps, anchorT, anchorX) {
-    const fit = veFitPps();
-    VE.pps = Math.min(Math.max(pps, fit), VE_MAX_PPS);
+    VE.pps = Math.min(Math.max(pps, veMinPps()), VE_MAX_PPS);
     if (anchorT != null) VE.view = anchorT - anchorX / VE.pps;
     veClampView();
     veSyncZoomSlider();
@@ -3682,17 +3654,17 @@ function veZoomBy(f) {
 function veZoomFit() { VE.view = 0; veSetPps(veFitPps()); }
 
 function veZoomSlider(v) {
-    const fit = veFitPps();
-    const pps = fit * Math.pow(VE_MAX_PPS / fit, v / 1000);
+    const min = veMinPps();
+    const pps = min * Math.pow(VE_MAX_PPS / min, v / 1000);
     const x = veCanvasWidth() / 2;
     veSetPps(pps, VE.view + x / VE.pps, x);
 }
 
 function veSyncZoomSlider() {
-    const fit = veFitPps();
+    const min = veMinPps();
     const el = $ve('ve-zoom');
-    if (!el || VE_MAX_PPS <= fit) return;
-    el.value = Math.round(1000 * Math.log(VE.pps / fit) / Math.log(VE_MAX_PPS / fit));
+    if (!el || VE_MAX_PPS <= min) return;
+    el.value = Math.round(1000 * Math.log(VE.pps / min) / Math.log(VE_MAX_PPS / min));
 }
 
 function veFollowPlayhead(playing) {
@@ -3823,8 +3795,7 @@ function veRaf(el, cb) {
 // Painel mudou de tamanho ou de lugar (docking / janela solta): reajusta zoom e redesenha
 function veLayoutChanged() {
     if (VE.ready) {
-        const fit = veFitPps();
-        if (VE.pps < fit) VE.pps = fit;
+        if (VE.pps < veMinPps()) VE.pps = veMinPps();
         veClampView();
         veSyncZoomSlider();
     }
@@ -4171,6 +4142,7 @@ function veRender() {
     }
 
     veDrawMarkers(ctx, X, W, H);
+    if (typeof veIoChip === 'function') veIoChip();
 
     // agulha
     const px = Math.round(X(VE.playhead)) + 0.5;
@@ -4841,9 +4813,20 @@ function veInitResizers() {
         veLsSet('ve-track-h', JSON.stringify(VE_TRACKS.map(t => t.h)));
         veDraw();
     });
-    // Rolagem vertical pelos cabeçalhos
+    // Rolagem vertical pelos cabeçalhos. Alt+roda (como no Premiere): altura da trilha sob o ponteiro;
+    // Alt+Shift+roda: todas as trilhas do mesmo tipo (vídeo ou áudio)
     $ve('ve-heads-rows').parentElement.addEventListener('wheel', e => {
         e.preventDefault();
+        const row = e.altKey && e.target.closest('[data-tr]');
+        if (row) {
+            const tr = VE_TRACKS[+row.dataset.tr], passo = (e.deltaY < 0 ? 1 : -1) * Math.max(4, Math.round(tr.h * 0.18));
+            const alvos = e.shiftKey ? VE_TRACKS.filter(t => t.kind === tr.kind) : [tr];
+            alvos.forEach(t => { t.h = Math.round(Math.min(Math.max(t.h + passo, VE_TRACK_MIN), VE_TRACK_MAX)); });
+            veBuildHeads();
+            veLsSet('ve-track-h', JSON.stringify(VE_TRACKS.map(t => t.h)));
+            veDraw();
+            return;
+        }
         VE.vs += e.deltaY;
         veDraw();
     }, { passive: false });
@@ -5172,8 +5155,7 @@ function veInitEvents() {
 
     new ResizeObserver(() => {
         if (VE.ready) {
-            const fit = veFitPps();
-            if (VE.pps < fit) VE.pps = fit;
+            if (VE.pps < veMinPps()) VE.pps = veMinPps();
             veClampView();
             veSyncZoomSlider();
         }

@@ -63,6 +63,7 @@
         <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8M10.5 7.5v6M7.5 10.5h6"/></symbol>
         <symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.4l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/></symbol>
         <symbol id="i-pointer" viewBox="0 0 24 24"><path d="m4 4 7 17 2.5-7.5L21 11z"/></symbol>
+        <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 5v14M20 5v14M8 12h8M11 9l-3 3 3 3M13 9l3 3-3 3"/></symbol>
         <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M3 3h18v5H8v13H3z"/><path d="M7 3v2.5M11 3v2.5M15 3v2.5M19 3v2.5M3 12h2.5M3 16h2.5"/></symbol>
     </svg>
 
@@ -705,25 +706,27 @@
                         <section class="ve-panel ve-timeline" data-panel="timeline" data-title="Timeline">
                             <div class="ve-tl-toolbar">
                                 <div class="ve-seq-tabs" id="ve-seq-tabs"></div>
-                                <button class="ve-btn ve-btn-sm ve-btn-primary" onclick="veImportTimelineFile()" title="Importar vídeo, áudio ou imagem na timeline, na posição da agulha"><svg class="i"><use href="#i-download"/></svg> Importar</button>
-                                <button class="ve-btn ve-btn-sm" onclick="veSplitAtPlayhead()" title="Cortar todas as trilhas na agulha (' ou S)">⎮ Cortar</button>
-                                <button class="ve-btn ve-btn-sm" onclick="veDeleteSelected()" title="Apagar clipe selecionado (D: o espaço fica · Shift+D: fecha o espaço)"><svg class="i"><use href="#i-trash"/></svg> Apagar</button>
-                                <button class="ve-btn ve-btn-sm" onclick="veExtractInOut()" title="Remover trecho In→Out (X)">✂ In→Out</button>
-                                <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="veLimparInOut(true, true)" title="Limpar entrada e saída da timeline">Limpar In/Out</button>
-                                <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="veResetEdits()" title="Voltar ao vídeo original">↺ Restaurar tudo</button>
+                                <button class="ve-icon-btn ve-tb-btn" onclick="veImportTimelineFile()" title="Importar mídia na timeline, na agulha"><svg class="i"><use href="#i-download"/></svg></button>
+                                <button class="ve-icon-btn ve-tb-btn" onclick="veSplitAtPlayhead()" title="Cortar todas as trilhas na agulha (Ctrl+K)"><svg class="i"><use href="#i-scissors"/></svg></button>
+                                <button class="ve-seg-btn ve-snap active" id="ve-vinculo" onclick="veToggleVinculo()" title="Seleção vinculada: ligada, clicar no vídeo ou no áudio seleciona os dois; desligada, só a parte clicada"><svg class="i"><use href="#i-link"/></svg></button>
+                                <button class="ve-seg-btn ve-snap active" id="ve-snap" onclick="veToggleSnap()" title="Ímã: encaixar na agulha e nos cortes (N)"><svg class="i"><use href="#i-magnet"/></svg></button>
+                                <div class="ve-io-chip" id="ve-io-chip" hidden>
+                                    <span class="ve-io-txt" id="ve-io-txt" title="Entrada e saída marcadas (I / O) · clique vai até a entrada"></span>
+                                    <button onclick="veExtractInOut()" title="Remover o trecho In→Out e fechar o espaço (X)">✂</button>
+                                    <button onclick="veLimparInOut(true, true)" title="Limpar entrada e saída (Ctrl+Shift+X)"><svg class="i"><use href="#i-x"/></svg></button>
+                                </div>
                                 <div class="ve-top-spacer"></div>
                                 <div class="ve-render-status" id="ve-render-status" hidden title="Renderizando a prévia em disco">
                                     <span class="ve-render-dot"></span><span id="ve-render-txt">Render</span>
                                     <button onclick="vePrCancelar()" title="Cancelar render"><svg class="i"><use href="#i-x"/></svg></button>
                                 </div>
                                 <button class="ve-seg-btn ve-snap active ve-cache-btn" id="ve-cache" onclick="veCacheToggle(event)" title="Cache inteligente RAM">RAM</button>
-                                <button class="ve-seg-btn ve-snap active" id="ve-vinculo" onclick="veToggleVinculo()" title="Seleção vinculada: ligada, clicar no vídeo ou no áudio seleciona os dois; desligada, só a parte clicada"><svg class="i"><use href="#i-link"/></svg></button>
-                                <button class="ve-seg-btn ve-snap active" id="ve-snap" onclick="veToggleSnap()" title="Ímã: encaixar na agulha e nos cortes (N)"><svg class="i"><use href="#i-magnet"/></svg></button>
+                                <div class="ve-divider"></div>
                                 <div class="ve-zoom">
                                     <button class="ve-icon-btn" onclick="veZoomBy(1/1.5)" title="Menos zoom (-)">−</button>
-                                    <input type="range" id="ve-zoom" min="0" max="1000" value="0" oninput="veZoomSlider(this.value)">
+                                    <input type="range" id="ve-zoom" min="0" max="1000" value="0" oninput="veZoomSlider(this.value)" title="Zoom da timeline">
                                     <button class="ve-icon-btn" onclick="veZoomBy(1.5)" title="Mais zoom (+)">+</button>
-                                    <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="veZoomFit()" title="Ajustar à tela (\)">Ajustar</button>
+                                    <button class="ve-icon-btn" onclick="veZoomFit()" title="Mostrar a timeline inteira (\)"><svg class="i"><use href="#i-fit"/></svg></button>
                                 </div>
                             </div>
                             <div class="ve-tl-body" id="ve-tl-body">
@@ -1697,6 +1700,7 @@
     <script src="js/editor-render.js"></script>
     <script src="js/editor-keyframes.js"></script>
     <script src="js/editor-txanim.js"></script>
+    <script src="js/editor-marcadores.js"></script>
     <script src="js/editor-projeto.js"></script>
     <script src="js/editor-ferramentas.js"></script>
     <script src="js/editor-dock.js"></script>

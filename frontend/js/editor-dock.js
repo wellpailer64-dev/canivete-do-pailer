@@ -514,12 +514,11 @@ function vedBuildFloatDoc(h) {
         '<button class="ve-btn ve-btn-sm ve-btn-ghost" data-dock title="Devolver os painéis desta janela ao editor (ou só feche a janela)">⤓ Encaixar no editor</button></div>' +
         '<div class="ve-dock" id="ve-dock-solta"></div>';
     d.body.appendChild(root);
-    [
-        'veOpenFile', 'veImportTimelineFile', 'veSplitAtPlayhead', 'veDeleteSelected', 'veExtractInOut',
-        'veResetEdits', 'veToggleVinculo', 'veToggleSnap', 'veZoomBy', 'veZoomSlider',
-        'vePjImportarDialogo', 'veCreateTimeline', 'vePjNovaPasta', 'vePjNovoAjuste', 'vePjApagar',
-        'veUndo', 'veRedo', 'veSaveProject', 'veOpenExport', 'veSeqConfigAbrir',
-    ].forEach(fn => { w[fn] = (...args) => window[fn] && window[fn](...args); });
+    // os onclick="..." dos painéis rodam na janela solta: ela recebe todas as funções do editor (ve*, prefs*),
+    // que chamam as da janela principal (uma lista fixa deixava botões mudos, ex.: Limpar In/Out)
+    Object.getOwnPropertyNames(window)
+        .filter(fn => /^(ve|prefs)[A-Z]/.test(fn) && typeof window[fn] === 'function')
+        .forEach(fn => { w[fn] = (...args) => window[fn] && window[fn](...args); });
     root.querySelector('[data-dock]').addEventListener('click', () => { try { w.close(); } catch (e) {} });
     vedBindDock(d.getElementById('ve-dock-solta'), h);
     // atalhos do editor funcionam com a janela solta em foco

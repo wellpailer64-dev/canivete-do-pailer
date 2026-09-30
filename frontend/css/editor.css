@@ -1504,3 +1504,43 @@ body.ve-kl-scrub, body.ve-kl-scrub * { cursor: ew-resize !important; }
 .ve-txa-row input[type=number] { flex: 0 0 52px; font-family: var(--ve-mono); }
 .ve-txa-row input[type=range] { flex: 1; min-width: 50px; accent-color: #f472b6; }
 .ve-txa-row em { font-style: normal; color: var(--ve-faint); margin-left: -3px; }
+
+/* barra da timeline enxuta: ícones + chip de In/Out (só aparece com marcas) */
+.ve-tb-btn { width: 28px; height: 26px; }
+.ve-io-chip {
+    display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 2px 0 8px; border-radius: 6px;
+    border: 1px solid rgba(56, 189, 248, .4); background: rgba(56, 189, 248, .08); color: #7dd3fc; white-space: nowrap;
+}
+.ve-io-chip[hidden] { display: none; }
+.ve-io-txt { font: 600 11px var(--ve-mono); cursor: pointer; margin-right: 4px; }
+.ve-io-chip button {
+    display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px;
+    background: transparent; color: inherit; cursor: pointer; font-size: 12px;
+}
+.ve-io-chip button:hover { background: rgba(56, 189, 248, .18); color: #e0f2fe; }
+.ve-io-chip .i { font-size: 12px; }
+
+/* marcador: diálogo (duplo clique no marcador) */
+.ve-mk-dlg {
+    position: fixed; z-index: 400; width: 300px; padding: 12px; border-radius: 10px;
+    background: var(--ve-panel, #161616); border: 1px solid var(--ve-line-2, #333); box-shadow: 0 12px 32px rgba(0, 0, 0, .65);
+    display: flex; flex-direction: column; gap: 8px; font: 12px var(--ve-ui); color: var(--ve-text);
+}
+.ve-mk-dlg h4 { margin: 0; font-size: 12.5px; display: flex; align-items: center; gap: 8px; }
+.ve-mk-dlg h4 i { width: 10px; height: 10px; border-radius: 2px; background: var(--c); }
+.ve-mk-dlg label { display: flex; flex-direction: column; gap: 3px; color: var(--ve-dim); font-size: 11px; }
+.ve-mk-dlg input, .ve-mk-dlg textarea {
+    height: 26px; padding: 0 8px; border-radius: 5px; border: 1px solid var(--ve-line-2); background: var(--ve-bg);
+    color: var(--ve-text); font: 12px var(--ve-ui); outline: none;
+}
+.ve-mk-dlg textarea { height: auto; padding: 6px 8px; resize: vertical; min-height: 54px; }
+.ve-mk-dlg input:focus, .ve-mk-dlg textarea:focus { border-color: var(--ve-accent); }
+.ve-mk-dlg .ve-mk-tc { font-family: var(--ve-mono); }
+.ve-mk-lin { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ve-mk-lin span { height: 26px; line-height: 26px; font: 12px var(--ve-mono); color: var(--ve-text); }
+.ve-mk-cores { display: flex; gap: 6px; }
+.ve-mk-cores button { width: 18px; height: 18px; padding: 0; border-radius: 4px; border: 2px solid transparent; background: var(--c); cursor: pointer; }
+.ve-mk-cores button.on { border-color: #fff; }
+.ve-mk-acoes { display: flex; gap: 6px; align-items: center; margin-top: 2px; }
+.ve-mk-acoes span { flex: 1; }
+.ve-mk-acoes .perigo { color: #f87171; }
