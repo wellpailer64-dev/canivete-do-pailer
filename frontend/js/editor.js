@@ -2126,9 +2126,11 @@ function veVideoMidia(path, pasta) {
 }
 
 function veVideoPrepararSePrecisa(m) {
-    if (!m || m.info || m.erro) return;
+    if (!m || m.erro) return;
+    if (m.info) { if (!m.url) veMidiaPriorizar(m); return; }
     const emFila = typeof VEPJF !== 'undefined' && (VEPJF.ativos.has(m.id) || VEPJF.fila.includes(m.id));
-    if (!emFila) veMidiaPreparar(m);
+    if (emFila) veMidiaPriorizar(m);
+    else veMidiaPreparar(m, true);
 }
 
 function veAddVideosSequenciais(paths, drop = veDropAtual()) {
@@ -3597,7 +3599,7 @@ function veApplyProject() {
                     info: { duration: dur, width: q.w, height: q.h, fps: VE.fps || 30, has_audio: false, offline: true },
                     name: m.name || vePathNome(m.path),
                 });
-            } else veMidiaPreparar(nm);
+            } else veMidiaPreparar(nm, mediaDur.has(m.id));   // os da timeline primeiro
             return;
         }
         if (m.kind === 'ajuste' || m.kind === 'texto') {

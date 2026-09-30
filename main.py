@@ -284,13 +284,14 @@ def video_cutter_prepare(file_path):
     return {"success": True}
 
 
-def ve_preparar_midia(path, mid):
-    """Outro vídeo do projeto (painel Projeto → timeline): prepara em background; eventos em veOnMidia({id, ...})."""
+def ve_preparar_midia(path, mid, urgente=False):
+    """Outro vídeo do projeto (painel Projeto → timeline): prepara em background; eventos em veOnMidia({id, ...}).
+    urgente = está na timeline: a prévia dele sai antes das dos vídeos que só estão no painel."""
     from Functions.video_cutter import preparar_midia
 
     def run():
         try:
-            preparar_midia(path, lambda ev: _ve_emit("veOnMidia", {"id": mid, **ev}))
+            preparar_midia(path, lambda ev: _ve_emit("veOnMidia", {"id": mid, **ev}), prioridade=0 if urgente else 1)
         except Exception as e:
             _ve_emit("veOnMidia", {"id": mid, "stage": "error", "error": str(e)})
 
@@ -773,7 +774,7 @@ def ve_win_rect(titulo):
 
 
 def _janela_principal():
-    """Janela principal deste app (processo atual)."""
+    """Janela principal deste app (processo atual): a que não tem dona (as soltas do editor têm)."""
     import ctypes
     from ctypes import wintypes
     u = ctypes.windll.user32
@@ -781,7 +782,7 @@ def _janela_principal():
     def _cada(h, _):
         dono = wintypes.DWORD()
         u.GetWindowThreadProcessId(h, ctypes.byref(dono))
-        if dono.value == pid and u.IsWindowVisible(h) and u.GetWindowTextLengthW(h):
+        if dono.value == pid and u.IsWindowVisible(h) and u.GetWindowTextLengthW(h) and not u.GetWindow(h, 4):   # GW_OWNER
             achou.append(h)
             return False
         return True
@@ -2681,8 +2682,13 @@ class ApiBridge:
     def ve_fontes(self):
         return ve_fontes()
 
-    def ve_preparar_midia(self, path, mid):
-        return ve_preparar_midia(path, mid)
+    def ve_preparar_midia(self, path, mid, urgente=False):
+        return ve_preparar_midia(path, mid, urgente)
+
+    def ve_priorizar_midia(self, path):
+        from Functions.video_cutter import priorizar_midia
+        priorizar_midia(path)
+        return {"success": True}
 
     def ve_importar_dialogo(self):
         return ve_importar_dialogo()
@@ -3084,8 +3090,44 @@ def _porta_agente():
     return porta if porta and 1024 <= porta <= 65535 else None
 
 
+def _abrir_em_outra_copia():
+    """App (.exe) já aberto: manda o projeto do duplo clique para ele e esta cópia não abre (senão ficavam dois
+    ícones na barra e duas cópias disputando as prévias). Pelo código (python main.py) e no modo agente abre sempre.
+    Devolve True se entregou o pedido; None se esta é a primeira cópia (e deve escutar as próximas)."""
+    if not getattr(sys, "frozen", False) or _porta_agente():
+        return False
+    try:
+        from Functions import instancia_unica, projeto
+        if not instancia_unica.ja_aberta():
+            return None
+        return instancia_unica.enviar({"projeto": projeto.projeto_na_linha_de_comando()})
+    except Exception as e:
+        print("[instância] seguindo com uma cópia nova:", e)
+        return False
+
+
+def _receber_de_outra_copia(pedido):
+    """Pedido de uma cópia aberta depois: traz a janela para a frente e abre o projeto dela."""
+    if not _window:
+        return
+    if os.name == "nt":
+        import ctypes
+        hwnd = _janela_principal()
+        if hwnd:
+            u = ctypes.windll.user32
+            if u.IsIconic(hwnd):
+                u.ShowWindow(hwnd, 9)   # SW_RESTORE
+            u.SetForegroundWindow(hwnd)
+    if pedido.get("projeto"):
+        _window.evaluate_js(f"veOpenProjectExternal({json.dumps(pedido['projeto'])})")
+
+
 def main():
     global webview
+
+    primeira_copia = _abrir_em_outra_copia()
+    if primeira_copia:
+        return
 
     from startup_diagnostics import (
         format_webview_import_error,
@@ -3211,6 +3253,9 @@ def main():
                 print("[projeto] não abriu:", e)
         window.events.loaded += _abrir_projeto_arg
     atexit.register(gdrive_cancel)
+    if primeira_copia is None:
+        from Functions import instancia_unica
+        instancia_unica.escutar(_receber_de_outra_copia)
 
     def _splash_sound():
         try:

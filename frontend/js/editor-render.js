@@ -163,7 +163,10 @@ function vePrRenderizar() {
     const naFila = new Set(VEPR.fila.map(s => s.sig).concat(VEPR.atual ? [VEPR.atual.sig] : []));
     const add = novos.filter(s => !naFila.has(s.sig)).map(s => ({ a: s.a, b: s.b, sig: s.sig }));
     if (!add.length) {
-        veToast(VEPR.atual ? 'Já está renderizando' : 'Nada para renderizar: os trechos já estão prontos (ou são leves)');
+        // vídeo da timeline ainda sem prévia: o monitor fica preto até ela sair (não é que "não há nada")
+        const esperando = VE.clips.some(c => { const m = VE.media[veMid(c)]; return m && m.id && m.kind === 'video' && !m.url && !m.offline && !m.erro; });
+        veToast(VEPR.atual ? 'Já está renderizando' : esperando ? 'Espere: os vídeos da timeline ainda estão sendo preparados'
+            : 'Nada para renderizar: os trechos já estão prontos (ou são leves)');
         return;
     }
     VEPR.fila.push(...add);

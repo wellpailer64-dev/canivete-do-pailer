@@ -535,7 +535,12 @@ function vePjColocar(ids, drop) {
             t = st + VE_IMG_DUR; colocados++;
         } else if (m.kind === 'video') {
             const dur = m.id === 0 ? VE.srcDur : m.info && m.info.duration;
-            if (!dur) { veToast(m.erro ? 'Esse vídeo não pôde ser preparado: ' + m.erro : 'Esse vídeo ainda está sendo preparado'); return; }
+            if (!dur) {
+                if (!m.erro) veMidiaPriorizar(m);
+                veToast(m.erro ? 'Esse vídeo não pôde ser preparado: ' + m.erro : 'Esse vídeo ainda está sendo preparado');
+                return;
+            }
+            if (!m.url) veMidiaPriorizar(m);
             const tr = Number.isFinite(drop && drop.tr) ? drop.tr : row && row.kind !== 'l' ? veTrackIndex(row) : 0;
             if (veTrkLocked(tr)) { veAvisoBloqueio(); return; }
             vePushHistory();
@@ -777,11 +782,13 @@ function vePjInit() {
 // vídeos em preparação: leitura de 3 em 3 (na ordem da timeline); conversão, miniaturas e áudio
 // têm limite próprio no Python (video_cutter: _SEM_PROXY/_SEM_EXTRAS)
 const VEPJF = { fila: [], ativos: new Set(), max: 3 };
-function veMidiaPreparar(m) {
+// urgente = vídeo na timeline (ou pedido agora): passa na frente dos que só estão no painel, aqui e na fila
+// de conversão do Python — senão, num projeto com 30 vídeos, o da timeline podia ser o último a tocar
+function veMidiaPreparar(m, urgente) {
     if (!m || m.kind !== 'video' || !m.id || !m.path) return;
     m.pct = 0;
     delete m.erro;
-    VEPJF.fila.push(m.id);
+    if (urgente) { m._urgente = true; VEPJF.fila.unshift(m.id); } else VEPJF.fila.push(m.id);
     veMidiaProxima();
 }
 function veMidiaProxima() {
@@ -789,8 +796,16 @@ function veMidiaProxima() {
         const id = VEPJF.fila.shift(), m = VE.media[id];
         if (!m || m.removido) continue;
         VEPJF.ativos.add(id);
-        window.pywebview.api.ve_preparar_midia(m.path, id);
+        window.pywebview.api.ve_preparar_midia(m.path, id, !!m._urgente);
     }
+}
+function veMidiaPriorizar(m) {
+    if (!m || m._urgente) return;
+    m._urgente = true;
+    const i = VEPJF.fila.indexOf(m.id);
+    if (i > 0) { VEPJF.fila.splice(i, 1); VEPJF.fila.unshift(m.id); }
+    const api = window.pywebview && window.pywebview.api;
+    if (i < 0 && m.path && api && api.ve_priorizar_midia) api.ve_priorizar_midia(m.path);
 }
 
 // Eventos da preparação de um vídeo do projeto (Functions/video_cutter.py: preparar_midia)

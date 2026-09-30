@@ -11,6 +11,7 @@ video_cutter.py — Motor do Pocket Editor (editor de vídeo do Canivete do Pail
 """
 import array
 import base64
+import contextlib
 import hashlib
 import json
 import math
@@ -623,13 +624,59 @@ def preparar(path, emit, stop_event=None):
     emit({"stage": "done"})
 
 
-# miniaturas e áudio dos vídeos do projeto: no máximo 2 de cada vez (importar 40 vídeos não trava o PC;
-# o vídeo em si já toca antes disso)
-_SEM_EXTRAS = threading.BoundedSemaphore(2)
-_SEM_PROXY = threading.BoundedSemaphore(2)
+class _Vagas:
+    """Poucas vagas para trabalho pesado, atendidas por PRIORIDADE (0 = urgente) e depois por ordem de chegada.
+    Um semáforo comum acorda quem chegar primeiro por sorte: ao abrir um projeto com 30 vídeos no painel,
+    o único que está na timeline podia ser o último a ganhar prévia (monitor preto por minutos)."""
+
+    def __init__(self, n):
+        self._cv = threading.Condition()
+        self._livres = n
+        self._fila = {}    # chave -> [prioridade, ordem]
+        self._ordem = 0
+
+    def priorizar(self, chave):
+        with self._cv:
+            if chave in self._fila:
+                self._fila[chave][0] = 0
+                self._cv.notify_all()
+
+    @contextlib.contextmanager
+    def vaga(self, chave, prioridade=1):
+        with self._cv:
+            self._ordem += 1
+            eu = [prioridade, self._ordem]
+            while chave in self._fila:   # mesmo arquivo pedido duas vezes: espera o anterior
+                self._cv.wait()
+            self._fila[chave] = eu
+            while self._livres <= 0 or min(self._fila.values()) is not eu:
+                self._cv.wait()
+            del self._fila[chave]
+            self._livres -= 1
+            self._cv.notify_all()
+        try:
+            yield
+        finally:
+            with self._cv:
+                self._livres += 1
+                self._cv.notify_all()
 
 
-def preparar_midia(path, emit, stop_event=None):
+# miniaturas, áudio e prévias dos vídeos do projeto: no máximo 2 de cada vez (importar 40 vídeos não trava o PC),
+# os que estão na timeline primeiro
+_VAGAS_EXTRAS = _Vagas(2)
+_VAGAS_PROXY = _Vagas(2)
+
+
+def priorizar_midia(path):
+    """O vídeo foi para a timeline enquanto esperava na fila: passa na frente dos que só estão no painel."""
+    chave = os.path.abspath(path)
+    _VAGAS_PROXY.priorizar(chave)
+    _VAGAS_EXTRAS.priorizar(chave + "|audio")
+    _VAGAS_EXTRAS.priorizar(chave + "|thumbs")
+
+
+def preparar_midia(path, emit, stop_event=None, prioridade=1):
     """
     Outro vídeo do projeto (além do aberto): mesma preparação, sem limpar a sessão nem mexer no áudio da fonte
     principal. Cada vídeo tem o seu áudio conformado (como os .cfa do Premiere; adicionar_audio) e a sua prévia.
@@ -647,7 +694,8 @@ def preparar_midia(path, emit, stop_event=None):
     if info["duration"] <= 0 or not info["has_video"]:
         emit({"stage": "error", "error": "Arquivo sem vídeo ou com duração inválida."})
         return
-    work = os.path.join(_work_dir(), "m_" + hashlib.md5(f"{os.path.abspath(path)}|{os.path.getmtime(path)}".encode()).hexdigest()[:12])
+    chave = os.path.abspath(path)
+    work = os.path.join(_work_dir(), "m_" + hashlib.md5(f"{chave}|{os.path.getmtime(path)}".encode()).hexdigest()[:12])
     os.makedirs(work, exist_ok=True)
     direto = _navegador_toca(path, info)
     emit({"stage": "info", "needs_proxy": not direto, **info})
@@ -655,7 +703,7 @@ def preparar_midia(path, emit, stop_event=None):
 
     def _audio():
         if info["has_audio"]:
-            with _SEM_EXTRAS:
+            with _VAGAS_EXTRAS.vaga(chave + "|audio", prioridade):
                 r = adicionar_audio(path)
             if r.get("success"):
                 emit({"stage": "audio", "url": r["url"], "quadros": r["quadros"], "peaks": r["peaks"]})
@@ -664,7 +712,7 @@ def preparar_midia(path, emit, stop_event=None):
     ta.start()
     if direto:
         emit({"stage": "video", "url": media_server.register(path), "proxy": False})
-        with _SEM_EXTRAS:
+        with _VAGAS_EXTRAS.vaga(chave + "|thumbs", prioridade):
             th = gerar_thumbs(path, info["duration"], work, count)
         emit({"stage": "thumbs", "thumbs": th})
     else:
@@ -676,7 +724,7 @@ def preparar_midia(path, emit, stop_event=None):
             except OSError:
                 pass
         else:
-            with _SEM_PROXY:   # no máximo 2 conversões ao mesmo tempo (os vídeos que tocam direto não esperam)
+            with _VAGAS_PROXY.vaga(chave, prioridade):   # 2 conversões por vez (os que tocam direto não esperam)
                 ok, err, thumbs = gerar_proxy(path, info, proxy + ".tmp.mp4", lambda p: emit({"stage": "proxy", "pct": p}),
                                               stop_event, thumbs_dir=work, thumbs_n=count)
             if ok:
