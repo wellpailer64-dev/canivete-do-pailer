@@ -1691,17 +1691,28 @@ const VE_GAIN_MIN = -60, VE_GAIN_MAX = 30;
 function veDb(g) { return Math.pow(10, (g || 0) / 20); }
 function veFmtDb(g) { g = Math.round((g || 0) * 10) / 10; return (g > 0 ? '+' : '') + g + ' dB'; }
 
+// G vale para TODOS os clipes selecionados com som (como no Premiere): o ganho soma em cada um (mantém a diferença
+// entre eles) e o Hard Limiter fica igual em todos. Imagens, clipes sem som e travados ficam de fora.
+function veGainAlvos() { return veSelLista().filter(c => !veIsImage(c) && veTemSom(c) && !veLocked(c)); }
+
 function veOpenGain() {
-    const c = VE.clips[VE.sel];
-    if (!c) { veToast('Selecione um clipe para ajustar o ganho'); return; }
-    if (veIsImage(c)) { veToast('Imagem não tem som'); return; }
-    if (veLocked(c)) { veAvisoBloqueio(); return; }
-    if (!veTemSom(c)) {
-        veToast(veMediaOffline(veMediaOf(c)) ? 'Mídia offline: relinque antes de ajustar o ganho' : 'Este clipe não tem som');
+    const p = VE.clips[VE.sel];
+    if (!p) { veToast('Selecione um clipe para ajustar o ganho'); return; }
+    const alvos = veGainAlvos();
+    if (!alvos.length) {
+        if (veIsImage(p)) veToast('Imagem não tem som');
+        else if (veLocked(p)) veAvisoBloqueio();
+        else veToast(veMediaOffline(veMediaOf(p)) ? 'Mídia offline: relinque antes de ajustar o ganho' : 'Este clipe não tem som');
         return;
     }
+    const c = alvos.includes(p) ? p : alvos[0];
+    VE._gainAlvos = alvos;
     if (VE.playing) veStop();
-    $ve('ve-gain-cur').innerHTML = `Ganho atual do clipe: <strong>${veFmtDb(c.g)}</strong>`;
+    const fora = veSelLista().length - alvos.length;
+    $ve('ve-gain-cur').innerHTML = alvos.length > 1
+        ? `<strong>${alvos.length}</strong> ${veT('clipes selecionados')} · ${veT('ganho do principal')}: <strong>${veFmtDb(c.g)}</strong>`
+          + (fora ? `<br><small>${fora} ${veT('sem som ou travados ficam de fora')}</small>` : '')
+        : `Ganho atual do clipe: <strong>${veFmtDb(c.g)}</strong>`;
     const inp = $ve('ve-gain-input');
     inp.value = '';
     veGainLimMontar(c);
@@ -1754,30 +1765,41 @@ function veCloseGain() {
 
 function veApplyGain() {
     const raw = String($ve('ve-gain-input').value).replace(',', '.').trim();
-    const d = parseFloat(raw);
-    const c = VE.clips[VE.sel];
-    if (!c) { veCloseGain(); return; }
-    const novo = raw && isFinite(d) ? Math.min(Math.max(Math.round(((c.g || 0) + d) * 10) / 10, VE_GAIN_MIN), VE_GAIN_MAX) : (c.g || 0);
-    // Hard Limiter: liga/atualiza o efeito do clipe, ou desliga (fica nos Controles de efeito, com os valores)
+    const d = parseFloat(raw), temDelta = !!raw && isFinite(d);
+    const alvos = (VE._gainAlvos || []).filter(c => VE.clips.includes(c));
+    VE._gainAlvos = null;
+    if (!alvos.length) { veCloseGain(); return; }
+    // Hard Limiter: liga/atualiza o efeito em cada clipe, ou desliga (fica nos Controles de efeito, com os valores)
     const limOn = $ve('ve-lim-on').checked, lv = veGainLimLer();
-    const f = (c.afx || []).find(x => x.t === 'limiter');
-    const limMudou = limOn ? (!f || f.on === false || VE_AFX.limiter.params.some(p => veAfxValues(f)[p.k] !== lv[p.k]))
-        : !!(f && f.on !== false);
     veCloseGain();
-    if (novo === (c.g || 0) && !limMudou) return;
+    const plano = alvos.map(c => {
+        const novo = temDelta ? Math.min(Math.max(Math.round(((c.g || 0) + d) * 10) / 10, VE_GAIN_MIN), VE_GAIN_MAX) : (c.g || 0);
+        const f = (c.afx || []).find(x => x.t === 'limiter');
+        const limMudou = limOn ? (!f || f.on === false || VE_AFX.limiter.params.some(p => veAfxValues(f)[p.k] !== lv[p.k]))
+            : !!(f && f.on !== false);
+        return { c, novo, f, limMudou, ganhoMudou: novo !== (c.g || 0) };
+    });
+    if (!plano.some(x => x.ganhoMudou || x.limMudou)) return;
     vePushHistory();
-    c.g = novo;
-    if (limMudou) {
-        if (limOn && f) c.afx = c.afx.map(x => x === f ? { ...x, on: true, v: lv } : x);
-        else if (limOn) c.afx = [...(c.afx || []), { id: veFxNewId(), t: 'limiter', on: true, v: lv }];
+    plano.forEach(({ c, novo, f, limMudou }) => {
+        c.g = novo;
+        if (!limMudou) return;
+        // arrays novos: clipes cortados do mesmo original podem dividir o mesmo array de efeitos
+        if (limOn && f) c.afx = c.afx.map(x => x === f ? { ...x, on: true, v: { ...lv } } : x);
+        else if (limOn) c.afx = [...(c.afx || []), { id: veFxNewId(), t: 'limiter', on: true, v: { ...lv } }];
         else c.afx = c.afx.map(x => x === f ? { ...x, on: false } : x);
-    }
+    });
     veApplyAudioGain();
     veRefresh();
     if (typeof veRenderFxControls === 'function') veRenderFxControls();
     if (veMixAtivo()) veAudioEditou();
-    const partes = [`Ganho do clipe: ${veFmtDb(novo)}`];
-    if (limMudou) partes.push(limOn ? `Hard Limiter em ${veFmtDb(lv.ceil)}` : 'Hard Limiter desligado');
+    const n = alvos.length, partes = [];
+    if (plano.some(x => x.ganhoMudou)) {
+        partes.push(n > 1 ? `${veT('Ganho')} ${d > 0 ? '+' : ''}${veRound(d, 1)} dB ${veT('em')} ${n} ${veT('clipes')}` : `Ganho do clipe: ${veFmtDb(plano[0].novo)}`);
+    }
+    if (plano.some(x => x.limMudou)) {
+        partes.push((limOn ? `Hard Limiter em ${veFmtDb(lv.ceil)}` : 'Hard Limiter desligado') + (n > 1 ? ` (${n} ${veT('clipes')})` : ''));
+    }
     veToast(partes.join(' · '));
 }
 

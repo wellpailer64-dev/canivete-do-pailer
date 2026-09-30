@@ -348,44 +348,71 @@ function veAfxExport(c) {
 // ── aplicar / editar ──
 function veFxNewId() { return 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
+// Aplicar num clipe que faz parte da seleção (arrastar até ele ou duplo clique na lista) vale para TODOS os
+// selecionados, como no Premiere; os que não aceitam o efeito (travados, sem som...) ficam de fora.
+// Os Controles de efeito continuam mostrando o clipe principal.
+function veFxAlvos(c) {
+    const sel = veSelLista();
+    return sel.length > 1 && sel.includes(c) ? sel : [c];
+}
+function veFxMsgVarios(nome, ok, lista) {
+    const fora = lista.length - ok.length;
+    return `${nome} ${veT('aplicado em')} ${ok.length} ${veT('clipes')}` + (fora ? ` (${fora} ${veT('não aceitam o efeito')})` : '');
+}
+
 function veFxAdd(i, t) {
     const c = VE.clips[i];
     if (!c || !VE_FX[t]) return;
-    if (veLocked(c)) { veAvisoBloqueio(); return; }
-    if (veIsAudio(c)) { veToast('Efeitos de vídeo não se aplicam a um clipe de áudio'); return; }
-    if (VE_FX[t].soClipe && veIsAdj(c)) { veToast(`${VE_FX[t].nome} não se aplica a uma camada de ajuste`); return; }
     if (VE.info && VE.info.audio_only) { veToast('Efeitos de vídeo precisam de um vídeo ou imagem'); return; }
-    const painel = VE_FX[t].painel;
-    if (painel && c.fx && c.fx.some(f => f.t === t)) {   // um só por clipe: abre o painel dele
-        VE.sel = i;
-        vedShow(painel);
-        veRefresh();
-        return;
+    const painel = VE_FX[t].painel, lista = veFxAlvos(c);
+    const aceita = x => !veLocked(x) && !veIsAudio(x) && !(VE_FX[t].soClipe && veIsAdj(x));
+    if (lista.length === 1) {
+        if (veLocked(c)) { veAvisoBloqueio(); return; }
+        if (veIsAudio(c)) { veToast('Efeitos de vídeo não se aplicam a um clipe de áudio'); return; }
+        if (VE_FX[t].soClipe && veIsAdj(c)) { veToast(`${VE_FX[t].nome} não se aplica a uma camada de ajuste`); return; }
+        if (painel && c.fx && c.fx.some(f => f.t === t)) {   // um só por clipe: abre o painel dele
+            VE.sel = i;
+            vedShow(painel);
+            veRefresh();
+            return;
+        }
     }
+    // efeito de painel (um só por clipe): entra só nos que ainda não têm
+    const ok = lista.filter(x => aceita(x) && !(painel && x.fx && x.fx.some(f => f.t === t)));
+    if (!ok.length) { veToast(`${VE_FX[t].nome}: ${veT('nenhum clipe selecionado aceita o efeito')}`); return; }
     vePushHistory();
-    const v = {};
-    VE_FX[t].params.forEach(p => { v[p.k] = p.def; });
-    c.fx = [...(c.fx || []), { id: veFxNewId(), t, on: true, v }];
-    VE.sel = i;
+    ok.forEach(x => {
+        const v = {};
+        VE_FX[t].params.forEach(p => { v[p.k] = p.def; });
+        x.fx = [...(x.fx || []), { id: veFxNewId(), t, on: true, v }];
+    });
+    if (lista.length === 1) VE.sel = i;
     vedShow(painel || 'props');
     veRefresh();
-    veToast(`${VE_FX[t].nome} aplicado em ${veNomeClipe(c)} ${i + 1}`);
+    veToast(lista.length > 1 ? veFxMsgVarios(VE_FX[t].nome, ok, lista) : `${VE_FX[t].nome} aplicado em ${veNomeClipe(c)} ${i + 1}`);
 }
 
 function veAfxAdd(i, t) {
     const c = VE.clips[i];
     if (!c || !VE_AFX[t]) return;
-    if (veLocked(c)) { veAvisoBloqueio(); return; }
-    if (!veOcupaA(c) || !veTemSom(c)) { veToast('Efeitos de áudio precisam de um clipe com som'); return; }
+    const lista = veFxAlvos(c);
+    if (lista.length === 1) {
+        if (veLocked(c)) { veAvisoBloqueio(); return; }
+        if (!veOcupaA(c) || !veTemSom(c)) { veToast('Efeitos de áudio precisam de um clipe com som'); return; }
+    }
+    const ok = lista.filter(x => !veLocked(x) && veOcupaA(x) && veTemSom(x));
+    if (!ok.length) { veToast('Efeitos de áudio precisam de um clipe com som'); return; }
     vePushHistory();
-    const v = {};
-    VE_AFX[t].params.forEach(p => { v[p.k] = p.def; });
-    c.afx = [...(c.afx || []), { id: veFxNewId(), t, on: true, v }];
-    VE.sel = i;
+    ok.forEach(x => {
+        const v = {};
+        VE_AFX[t].params.forEach(p => { v[p.k] = p.def; });
+        x.afx = [...(x.afx || []), { id: veFxNewId(), t, on: true, v }];
+    });
+    if (lista.length === 1) VE.sel = i;
     vedShow('props');
     veRefresh();
     if (veMixAtivo()) veAudioEditou();
-    veToast(`${VE_AFX[t].nome} aplicado em ${veNomeClipe(c)} ${i + 1}`);
+    veToast(lista.length > 1 ? veFxMsgVarios(VE_AFX[t].nome, ok, lista) : `${VE_AFX[t].nome} aplicado em ${veNomeClipe(c)} ${i + 1}`);
 }
 
 // Troca o efeito `id` do clipe selecionado sem mexer no array antigo (clipes cortados compartilham)
