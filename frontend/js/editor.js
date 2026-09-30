@@ -676,6 +676,7 @@ function veSeqCapturar() {
         playhead: VE.playhead || 0,
         view: { pps: VE.pps, x: VE.view || 0 },
         w: VE.seqW, h: VE.seqH,   // Configurações da sequência (quadro)
+        master: vePlain(VE.master || null, null),   // Hard Limiter no Master (editor-medidor.js)
     };
 }
 
@@ -703,6 +704,8 @@ function veSeqAplicar(seq, opts = {}) {
     VE.legendas = vePlain(seq.legendas || [], []);
     VE.legEstilo = vePlain(seq.legEstilo || null, null);
     VE.legGravar = seq.legGravar !== false;
+    VE.master = vePlain(seq.master || null, null);
+    if (typeof veMedMasterUi === 'function') veMedMasterUi();
     if (typeof VETX !== 'undefined') {
         VETX.palavras = vePlain(seq.texto && seq.texto.palavras, []);
         VETX.idioma = (seq.texto && seq.texto.idioma) || 'pt';
@@ -1701,8 +1704,47 @@ function veOpenGain() {
     $ve('ve-gain-cur').innerHTML = `Ganho atual do clipe: <strong>${veFmtDb(c.g)}</strong>`;
     const inp = $ve('ve-gain-input');
     inp.value = '';
+    veGainLimMontar(c);
     $ve('ve-gain').hidden = false;
     requestAnimationFrame(() => { inp.focus({ preventScroll: true }); inp.select(); });
+}
+
+// Hard Limiter no painel do G (o mesmo efeito "Hard Limiter" dos Controles de efeito: editor-fx.js / editor-audio.js)
+function veGainLimMontar(c) {
+    veLimMontar($ve('ve-lim-on'), $ve('ve-lim-campos'), (c.afx || []).find(x => x.t === 'limiter') || null);
+}
+
+// Campos do Hard Limiter (painel do G e janela do Master): f = {on, v} ou null (desligado, valores padrão)
+function veLimMontar(on, box, f) {
+    const d = VE_AFX.limiter;
+    const v = f ? veAfxValues(f) : Object.fromEntries(d.params.map(p => [p.k, p.def]));
+    on.checked = !!f && f.on !== false;
+    box.innerHTML = d.params.map(p => p.tipo === 'bool' ? `
+        <label class="ve-lim-bool"><input type="checkbox" data-lk="${p.k}" ${v[p.k] ? 'checked' : ''}> ${veT(p.nome)}</label>` : `
+        <div class="ve-lim-row">
+            <span>${veT(p.nome)}</span>
+            <input type="range" min="${p.min}" max="${p.max}" step="${p.step}" value="${v[p.k]}" data-lk="${p.k}">
+            <span class="ve-prop-num"><input type="number" min="${p.min}" max="${p.max}" step="${p.step}" value="${veFxFmt(p, v[p.k])}" data-lk="${p.k}"><i>${p.un}</i></span>
+        </div>`).join('');
+    box.classList.toggle('off', !on.checked);
+    on.onchange = () => box.classList.toggle('off', !on.checked);
+    // slider e número andam juntos
+    box.oninput = e => {
+        const k = e.target.dataset.lk;
+        if (!k || e.target.type === 'checkbox') return;
+        box.querySelectorAll(`[data-lk="${k}"]`).forEach(x => { if (x !== e.target) x.value = e.target.value; });
+    };
+}
+
+function veGainLimLer() { return veLimLer($ve('ve-lim-campos')); }
+function veLimLer(box) {
+    const v = {};
+    VE_AFX.limiter.params.forEach(p => {
+        const el = box.querySelector(`[data-lk="${p.k}"]`);
+        if (p.tipo === 'bool') v[p.k] = el && el.checked ? 1 : 0;
+        else { const n = parseFloat(String(el && el.value).replace(',', '.')); v[p.k] = isFinite(n) ? Math.min(Math.max(n, p.min), p.max) : p.def; }
+    });
+    return v;
 }
 
 function veCloseGain() {
@@ -1713,17 +1755,30 @@ function veCloseGain() {
 function veApplyGain() {
     const raw = String($ve('ve-gain-input').value).replace(',', '.').trim();
     const d = parseFloat(raw);
-    if (!raw || !isFinite(d)) { veCloseGain(); return; }
     const c = VE.clips[VE.sel];
     if (!c) { veCloseGain(); return; }
-    const novo = Math.min(Math.max(Math.round(((c.g || 0) + d) * 10) / 10, VE_GAIN_MIN), VE_GAIN_MAX);
+    const novo = raw && isFinite(d) ? Math.min(Math.max(Math.round(((c.g || 0) + d) * 10) / 10, VE_GAIN_MIN), VE_GAIN_MAX) : (c.g || 0);
+    // Hard Limiter: liga/atualiza o efeito do clipe, ou desliga (fica nos Controles de efeito, com os valores)
+    const limOn = $ve('ve-lim-on').checked, lv = veGainLimLer();
+    const f = (c.afx || []).find(x => x.t === 'limiter');
+    const limMudou = limOn ? (!f || f.on === false || VE_AFX.limiter.params.some(p => veAfxValues(f)[p.k] !== lv[p.k]))
+        : !!(f && f.on !== false);
     veCloseGain();
-    if (novo === (c.g || 0)) return;
+    if (novo === (c.g || 0) && !limMudou) return;
     vePushHistory();
     c.g = novo;
+    if (limMudou) {
+        if (limOn && f) c.afx = c.afx.map(x => x === f ? { ...x, on: true, v: lv } : x);
+        else if (limOn) c.afx = [...(c.afx || []), { id: veFxNewId(), t: 'limiter', on: true, v: lv }];
+        else c.afx = c.afx.map(x => x === f ? { ...x, on: false } : x);
+    }
     veApplyAudioGain();
     veRefresh();
-    veToast(`Ganho do clipe: ${veFmtDb(novo)}`);
+    if (typeof veRenderFxControls === 'function') veRenderFxControls();
+    if (veMixAtivo()) veAudioEditou();
+    const partes = [`Ganho do clipe: ${veFmtDb(novo)}`];
+    if (limMudou) partes.push(limOn ? `Hard Limiter em ${veFmtDb(lv.ceil)}` : 'Hard Limiter desligado');
+    veToast(partes.join(' · '));
 }
 
 // Prévia: Web Audio permite aumentar acima de 100%; sem ele, só dá para abaixar (volume do player)
@@ -3682,6 +3737,7 @@ function veApplyProject() {
             playhead: s.playhead || 0,
             view: s.view || { pps: 0, x: 0 },
             w: s.w, h: s.h,
+            master: s.master && s.master.lim ? s.master : null,
         };
     });
     VE.sequences.forEach(seq => {
@@ -3884,6 +3940,7 @@ function veRaf(el, cb) {
 
 // Painel mudou de tamanho ou de lugar (docking / janela solta): reajusta zoom e redesenha
 function veLayoutChanged() {
+    if (typeof veMedAgendar === 'function') veMedAgendar();   // medidor de áudio: redesenha no tamanho novo
     if (VE.ready) {
         if (VE.pps < veMinPps()) VE.pps = veMinPps();
         veClampView();
@@ -4734,7 +4791,8 @@ async function veStartExport() {
         await window.pywebview.api.video_cutter_export(
             VE.path, plano.base, vePill('format') || 'mp4', vePill('quality') || 'medium',
             $ve('ve-res').value, $ve('ve-gpu').checked, VE.dest, noAudio,
-            plano.camadas, plano.audio, plano.dur, plano.mix, veTxExport(plano.faixa), [VE.seqW, VE.seqH],
+            plano.camadas, plano.audio, plano.dur, veMasterLim() ? [...plano.mix, { master: veMasterLim() }] : plano.mix,
+            veTxExport(plano.faixa), [VE.seqW, VE.seqH],
             veExpOpcoes()
         );
         VE._expNome = $ve('ve-exp-nome').value.trim();
@@ -5317,13 +5375,19 @@ function veInitEvents() {
     veInitProps();
     v.addEventListener('seeked', () => veDrawMonitor());
     v.addEventListener('loadeddata', () => veDrawMonitor());
-    // caixa de ganho: Enter aplica, Esc cancela
-    $ve('ve-gain-input').addEventListener('keydown', e => {
+    // caixa de ganho (e o Hard Limiter dela): Enter aplica, Esc cancela
+    $ve('ve-gain').addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); veApplyGain(); }
         else if (e.key === 'Escape') { e.preventDefault(); veCloseGain(); }
         e.stopPropagation();
     });
+    $ve('ve-master').addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); veAplicarMaster(); }
+        else if (e.key === 'Escape') { e.preventDefault(); veFecharMaster(); }
+        e.stopPropagation();
+    });
     veInitMonitorZoom();
+    if (typeof veInitMedidor === 'function') veInitMedidor();
     document.addEventListener('keydown', veOnKey);
     document.addEventListener('keyup', e => { if (e.key === 'Alt' && veIsActive()) e.preventDefault(); });
     // Botões não ficam com foco (senão o Espaço "clica" neles em vez de dar play)
@@ -5345,6 +5409,7 @@ function veOnKey(e) {
         return;
     }
     if (!$ve('ve-gain').hidden) return;   // a caixa de ganho trata as próprias teclas
+    if (!$ve('ve-master').hidden) return;
     if (VEAT.aberto) return;               // janela Atalhos do teclado aberta (ela grava as teclas)
     // P/S/R/T/U com clipe selecionado, Delete/Ctrl+C/Ctrl+V com quadros-chave selecionados (editor-keyframes.js)
     if (typeof veKlTecla === 'function' && veKlTecla(e)) return;

@@ -139,11 +139,15 @@ const VE_AFX = {
         ],
         neutro: v => !(v.amt > 0),
     },
+    // Hard Limiter (Premiere/Audition): editor-audio.js (VeLimitador) e video_cutter._hard_limiter fazem a mesma conta
     limiter: {
-        nome: 'Limitador de pico', cat: 'Áudio · Dinâmica', tag: 'Limiter',
+        nome: 'Hard Limiter', cat: 'Áudio · Amplitude e compressão', tag: 'Limitador rígido de picos',
         params: [
-            { k: 'ceil', nome: 'Teto', min: -12, max: 0, step: 0.1, def: -1, un: 'dB' },
-            { k: 'rel', nome: 'Soltura', min: 10, max: 500, step: 1, def: 80, un: 'ms' },
+            { k: 'ceil', nome: 'Amplitude máxima', min: -30, max: 0, step: 0.1, def: -1, un: 'dB' },   // -1: folga para o AAC do mp4
+            { k: 'boost', nome: 'Ganho de entrada', min: -12, max: 30, step: 0.1, def: 0, un: 'dB' },
+            { k: 'look', nome: 'Antecipação', min: 0.1, max: 10, step: 0.1, def: 3, un: 'ms' },
+            { k: 'rel', nome: 'Soltura', min: 10, max: 1000, step: 1, def: 80, un: 'ms' },
+            { k: 'link', nome: 'Vincular canais', tipo: 'bool', def: 1 },
         ],
         neutro: () => false,
     },

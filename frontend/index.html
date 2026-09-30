@@ -732,6 +732,7 @@
                                 </div>
 
                         <div class="ve-panel" data-panel="ferramentas" data-title="Ferramentas"><div class="ve-tools" id="ve-tools"></div></div>
+                        <div class="ve-panel ve-med" data-panel="medidores" data-title="Medidores de áudio"><canvas class="ve-med-cv" id="ve-med-cv" title="Clique para zerar as luzes de pico"></canvas><button class="ve-med-master" id="ve-med-master">LIM</button></div>
                         <section class="ve-panel ve-timeline" data-panel="timeline" data-title="Timeline">
                             <div class="ve-tl-toolbar">
                                 <div class="ve-seq-tabs" id="ve-seq-tabs"></div>
@@ -784,10 +785,36 @@
                                         <input type="text" inputmode="decimal" id="ve-gain-input" class="ve-select ve-gain-input" placeholder="ex.: 10 ou -10" autocomplete="off">
                                     </div>
                                     <div class="ve-gain-cur" id="ve-gain-cur"></div>
+                                    <div class="ve-lim">
+                                        <label class="ve-lim-on"><input type="checkbox" id="ve-lim-on"> <b>Hard Limiter</b> <small>segura os picos no teto</small></label>
+                                        <div class="ve-lim-campos" id="ve-lim-campos"></div>
+                                        <p class="ve-lim-ajuda">Amplitude máxima: nada passa dela. Ganho de entrada: deixa o som mais alto antes de limitar. Antecipação: o ganho começa a descer antes do pico (sem distorcer). Soltura: tempo para voltar 12 dB depois do pico. No mp4 o AAC pode subir o pico ~1 dB: para não estourar, use teto de −1 a −2 dB. Ajuste fino tocando em Controles de efeito.</p>
+                                    </div>
                                 </div>
                                 <div class="ve-modal-foot">
                                     <button class="ve-btn ve-btn-ghost" onclick="veCloseGain()">Cancelar</button>
                                     <button class="ve-btn ve-btn-primary" onclick="veApplyGain()">Aplicar</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Hard Limiter no Master (botão LIM dos Medidores de áudio) -->
+                        <div class="ve-modal" id="ve-master" hidden>
+                            <div class="ve-modal-box ve-gain-box">
+                                <div class="ve-modal-head">
+                                    <span>Master · Hard Limiter</span>
+                                    <button class="ve-icon-btn" onclick="veFecharMaster()" title="Fechar (Esc)"><svg class="i"><use href="#i-x"/></svg></button>
+                                </div>
+                                <div class="ve-modal-body">
+                                    <div class="ve-lim ve-lim-master">
+                                        <label class="ve-lim-on"><input type="checkbox" id="ve-mlim-on"> <b>Hard Limiter no Master</b> <small>a soma de todas as trilhas</small></label>
+                                        <div class="ve-lim-campos" id="ve-mlim-campos"></div>
+                                        <p class="ve-lim-ajuda">Vale para o som final da timeline (o que toca e o que é exportado), depois do ganho e dos efeitos de cada clipe: é o que segura o estouro quando as trilhas somadas passam de 0 dB. A barra laranja no medidor mostra quanto ele está abaixando. No mp4 o AAC pode subir o pico ~1 dB: use teto de −1 a −2 dB.</p>
+                                    </div>
+                                </div>
+                                <div class="ve-modal-foot">
+                                    <button class="ve-btn ve-btn-ghost" onclick="veFecharMaster()">Cancelar</button>
+                                    <button class="ve-btn ve-btn-primary" onclick="veAplicarMaster()">Aplicar</button>
                                 </div>
                             </div>
                         </div>
@@ -1775,6 +1802,7 @@
     <script src="js/editor-txanim.js"></script>
     <script src="js/editor-marcadores.js"></script>
     <script src="js/editor-scopes.js"></script>
+    <script src="js/editor-medidor.js"></script>
     <script src="js/editor-autoframe.js"></script>
     <script src="js/editor-projeto.js"></script>
     <script src="js/editor-ferramentas.js"></script>

@@ -1310,9 +1310,12 @@ def _normalizar_afx(efeitos):
             amt = _afx_lim(v.get("amt"), 0.0, 100.0, 35.0)
             if amt > 0:
                 out.append((t, {"amt": amt, "floor": _afx_lim(v.get("floor"), -75.0, -25.0, -50.0)}))
-        elif t == "limiter":
-            out.append((t, {"ceil": _afx_lim(v.get("ceil"), -12.0, 0.0, -1.0),
-                            "rel": _afx_lim(v.get("rel"), 10.0, 500.0, 80.0)}))
+        elif t == "limiter":   # Hard Limiter (_hard_limiter)
+            out.append((t, {"ceil": _afx_lim(v.get("ceil"), -30.0, 0.0, -1.0),
+                            "boost": _afx_lim(v.get("boost"), -12.0, 30.0, 0.0),
+                            "look": _afx_lim(v.get("look"), 0.1, 10.0, 3.0),
+                            "rel": _afx_lim(v.get("rel"), 10.0, 1000.0, 80.0),
+                            "link": 0 if v.get("link") in (0, False) else 1}))
         elif t == "dereverb":
             amt = _afx_lim(v.get("amt"), 0.0, 100.0, 40.0)
             if amt > 0:
@@ -1334,9 +1337,7 @@ def _filtros_afx(efeitos):
         if t == "denoise":
             nr = min(97.0, max(0.01, 4.0 + v["amt"] * 0.25))
             fs.append(f"afftdn=nr={nr:.3f}:nf={v['floor']:.3f}:tn=1")
-        elif t == "limiter":
-            lim = math.pow(10.0, v["ceil"] / 20.0)
-            fs.append(f"alimiter=limit={lim:.6f}:attack=2:release={v['rel']:.3f}:level=false")
+        # limiter: não é filtro do ffmpeg — o clipe passa pelo _hard_limiter antes do grafo (_pre_limitar)
         elif t == "dereverb":
             a = v["amt"] / 100.0
             fs.append(f"dialoguenhance=original={max(0.35, 1.0 - a * 0.45):.4f}:enhance={1.0 + a * 1.6:.4f}:voice={2.0 + a * 20.0:.4f}")
@@ -1351,6 +1352,123 @@ def _filtros_afx(efeitos):
                 if abs(gain) > 0.01:
                     fs.append(f"equalizer=frequency={freq}:width_type=o:width={width:.3f}:gain={gain:.3f}")
     return fs
+
+
+def _max_janela(a, w):
+    """Máximo de a[i-w+1 .. i] para cada i (antes do início conta 0), em O(n) (van Herk / Gil-Werman)."""
+    import numpy as np
+    if w <= 1:
+        return a.copy()
+    p = np.concatenate([np.zeros(w - 1), a])
+    m = -(-len(p) // w) * w
+    p = np.concatenate([p, np.zeros(m - len(p))]).reshape(-1, w)
+    g = np.maximum.accumulate(p, axis=1).ravel()                   # máximo do começo do bloco até ali
+    h = np.maximum.accumulate(p[:, ::-1], axis=1)[:, ::-1].ravel()  # dali até o fim do bloco
+    k = len(a)
+    return np.maximum(h[:k], g[w - 1:w - 1 + k])
+
+
+def _hard_limiter(x, ceil=-1.0, boost=0.0, look=3.0, rel=80.0, link=1):
+    """Hard Limiter (Premiere/Audition) — a MESMA conta do VeLimitador do editor (editor-audio.js), para a prévia
+    soar igual ao arquivo. x = amostras (n, 2) em float.
+      ganho de entrada → atenuação necessária A = max(0, dB(|x|/teto)) (L e R juntos se vinculados)
+      H = maior A na janela de antecipação [i−L, i]; soltura: R = max(H, R − 12 dB/soltura) (sobe no máximo isso)
+      ganho = média móvel de 10^(−R/20) na janela; saída[m] = x[m] × ganho[m + L] (antecipado, sem atraso final)
+    No pico toda a janela da média tem ganho ≤ o necessário: a saída nunca passa do teto."""
+    import numpy as np
+    x = np.asarray(x, dtype=np.float64) * (10.0 ** (boost / 20.0))
+    teto = 10.0 ** (min(0.0, ceil) / 20.0)
+    L = max(0, int(round(look * AUDIO_SR / 1000.0)))
+    d = 12.0 / max(1.0, rel * AUDIO_SR / 1000.0)
+    n, w = len(x), L + 1
+    if not n:
+        return x.astype(np.float32)
+    xp = np.concatenate([x, np.zeros((L, 2))])   # depois do fim: silêncio (o ganho do fim também antecipa)
+    envs = [np.abs(xp).max(axis=1)] if link else [np.abs(xp[:, 0]), np.abs(xp[:, 1])]
+    ganhos = []
+    for a in envs:
+        A = np.where(a > teto, 20.0 * np.log10(np.maximum(a, 1e-30) / teto), 0.0)
+        H = _max_janela(A, w)
+        passo = np.arange(len(A)) * d
+        R = np.maximum.accumulate(H + passo) - passo   # R[i] = máx(H[j] − (i − j)·d), j ≤ i
+        G = 10.0 ** (-R / 20.0)
+        cs = np.concatenate([[0.0], np.cumsum(np.concatenate([np.ones(L), G]))])   # antes do início: ganho 1
+        Gs = (cs[w:] - cs[:-w]) / w
+        ganhos.append(Gs[L:L + n])
+    y = x * (ganhos[0][:, None] if link else np.stack(ganhos, axis=1))
+    return np.clip(y, -teto, teto).astype(np.float32)
+
+
+def _pre_limitar(mix, path, tem_audio_fonte, work):
+    """Clipes com Hard Limiter: o som do clipe (trecho, velocidade, ganho e efeitos antes do limitador) sai do ffmpeg,
+    passa pelo _hard_limiter e vira um PCM próprio (.f32); no grafo ele só leva os efeitos de depois e os fades."""
+    import numpy as np
+    out = []
+    for c in mix:
+        st, s0, e0, g, arq, vel, tom, fi, fo, afx = c
+        k = next((j for j, (t, _) in enumerate(afx) if t == "limiter"), None)
+        if k is None or (arq is None and not tem_audio_fonte):
+            out.append(c)
+            continue
+        pre, lim = afx[:k], afx[k][1]
+        pos = [f for f in afx[k + 1:] if f[0] != "limiter"]
+        dur = (e0 - s0) / vel
+        fs = ["aresample=48000", "aformat=sample_fmts=fltp:channel_layouts=stereo",
+              f"atrim=start={s0:.5f}:end={e0:.5f}", "asetpts=PTS-STARTPTS"]
+        velf = _filtro_velocidade(vel, tom)
+        if velf:
+            fs.append(velf.lstrip(","))
+        if g:
+            fs.append(f"volume={g:.2f}dB")
+        fs += _filtros_afx(pre)
+        fs.append(f"apad=whole_dur={dur:.5f},atrim=0:{dur:.5f}")
+        r = subprocess.run([ffmpeg_path(), "-v", "error", "-i", path if arq is None else arq, "-map", "0:a:0",
+                            "-af", ",".join(fs), "-f", "f32le", "-ac", "2", "-ar", str(AUDIO_SR), "-"],
+                           capture_output=True, timeout=3600, creationflags=_creationflags())
+        if r.returncode != 0 or not r.stdout:
+            raise RuntimeError("Hard Limiter: não foi possível ler o áudio do clipe: "
+                               + (r.stderr.decode("utf-8", "replace").strip().splitlines() or ["?"])[-1])
+        x = np.frombuffer(r.stdout[:len(r.stdout) // 8 * 8], dtype=np.float32).reshape(-1, 2)
+        y = _hard_limiter(x, **lim)
+        raw = os.path.join(work, f"lim_{uuid.uuid4().hex[:10]}.f32")
+        y.tofile(raw)
+        out.append((st, 0.0, len(y) / AUDIO_SR, 0.0, raw, 1.0, True, fi, fo, pos))
+    return out
+
+
+def _entrada_audio(arq, path):
+    """Opções de entrada do ffmpeg de um arquivo do mix (o PCM cru de um clipe já limitado precisa do formato)."""
+    if arq and str(arq).endswith(".f32"):
+        return ["-f", "f32le", "-ar", str(AUDIO_SR), "-ch_layout", "stereo", "-i", arq]
+    return ["-i", path if arq is None else arq]
+
+
+def _limitar_master(mix, path, tem_audio_fonte, total, lim, work):
+    """Hard Limiter no Master (a soma de todas as trilhas, como no Mixer de trilhas do Premiere): o ffmpeg soma o mix
+    (o mesmo _grafo_mix da exportação), a soma passa pelo _hard_limiter e volta como um PCM só."""
+    import numpy as np
+    if not tem_audio_fonte:
+        mix = [c for c in mix if c[4]]
+    if not mix:
+        return mix
+    arqs = ([None] if tem_audio_fonte else []) + sorted({c[4] for c in mix if c[4]})
+    cmd, entradas = [ffmpeg_path(), "-v", "error"], {}
+    for k, arq in enumerate(arqs):
+        cmd += _entrada_audio(arq, path)
+        entradas[arq] = f"[{k}:a:0]"
+    script = os.path.join(work, f"master_{uuid.uuid4().hex[:8]}.txt")
+    with open(script, "w", encoding="utf-8") as f:
+        f.write(";\n".join(_grafo_mix(mix, total, entradas, "ac")))
+    cmd += [_opcao_filtro_script(), script, "-map", "[ac]", "-f", "f32le", "-ac", "2", "-ar", str(AUDIO_SR), "-"]
+    r = subprocess.run(cmd, capture_output=True, timeout=7200, creationflags=_creationflags())
+    if r.returncode != 0 or not r.stdout:
+        raise RuntimeError("Hard Limiter no Master: não foi possível somar o áudio: "
+                           + (r.stderr.decode("utf-8", "replace").strip().splitlines() or ["?"])[-1])
+    x = np.frombuffer(r.stdout[:len(r.stdout) // 8 * 8], dtype=np.float32).reshape(-1, 2)
+    y = _hard_limiter(x, **lim)
+    raw = os.path.join(work, f"master_{uuid.uuid4().hex[:10]}.f32")
+    y.tofile(raw)
+    return [(0.0, 0.0, len(y) / AUDIO_SR, 0.0, raw, 1.0, True, 0.0, 0.0, [])]
 
 
 def _grafo_mix(clipes, total, entradas, rotulo):
@@ -1877,6 +1995,13 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     pecas = _normalizar_segmentos(segmentos, info["duration"])
     pecas_a = pecas if audio_segmentos is None else _normalizar_segmentos(audio_segmentos, info["duration"])
     lay = _normalizar_camadas(camadas, path)
+    # Hard Limiter no Master: vem no fim da lista do mix como {"master": {...}} (editor.js: veExportar)
+    master_lim = None
+    if audio_clipes is not None:
+        for c in audio_clipes:
+            if isinstance(c, dict) and isinstance(c.get("master"), dict):
+                master_lim = (_normalizar_afx([{"t": "limiter", "v": c["master"]}]) or [(None, None)])[0][1]
+        audio_clipes = [c for c in audio_clipes if not isinstance(c, dict)]
     mix = _normalizar_mix(audio_clipes, info["duration"]) if audio_clipes is not None else None
     segs = [p for p in pecas if p[0] != "gap"]
     if not segs and not lay and not any(p[0] != "gap" for p in pecas_a) and not mix:
@@ -1898,6 +2023,12 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     if not simples:
         pecas, pecas_a = _completar(pecas), _completar(pecas_a)
     saida = saida or _nome_saida(aberto, cfg["ext"], pasta_saida, op.get("nome"))
+    if mix and not sem_audio and any(t == "limiter" for c in mix for t, _ in c[9]):
+        prog(0, "Aplicando Hard Limiter...")
+        mix = _pre_limitar(mix, path, info["has_audio"], _work_dir())
+    if mix and not sem_audio and master_lim:
+        prog(0, "Aplicando Hard Limiter no Master...")
+        mix = _limitar_master(mix, path, info["has_audio"], total, master_lim, _work_dir())
     # áudios soltos na timeline dão som ao vídeo mesmo que o vídeo aberto não tenha
     extras = sorted({c[4] for c in (mix or []) if c[4]})
     if mix is not None and not info["has_audio"]:
@@ -2036,7 +2167,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             # todas as trilhas de áudio somadas (a mesma conta que o mixer em tempo real da prévia faz)
             entradas = {}
             for arq in ([None] if info["has_audio"] else []) + extras:
-                cmd += ["-i", path if arq is None else arq]
+                cmd += _entrada_audio(arq, path)   # clipe/master já limitado (_pre_limitar/_limitar_master): PCM cru
                 entradas[arq] = f"[{entrada}:a:0]"
                 entrada += 1
             filtros.extend(_grafo_mix(mix, total, entradas, "ac"))

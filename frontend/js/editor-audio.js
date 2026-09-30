@@ -18,6 +18,8 @@ const VEAU = {
     ctx: null, node: null, ganho: null, falhou: false,
     fontes: new Map(),   // id da mídia → { url, quadros, blocos, pedidos } (0 = vídeo aberto; demais = áudios soltos)
     tocando: false, esperando: false, base: 0, taxa: 1, escritos: 0, lidos: 0, lidosCt: 0,
+    lims: new Map(),     // Hard Limiter de cada clipe (a memória dele entre um pedaço e outro)
+    mlim: null,          // Hard Limiter do Master (veAudioMixar)
     wt: 0, clipes: [], chave: '', timer: 0, fila: 0,
 };
 
@@ -26,7 +28,7 @@ const VE_AU_WORKLET = `
 class VeMixer extends AudioWorkletProcessor {
     constructor() {
         super();
-        this.q = []; this.off = 0; this.lidos = 0; this.n = 0; this.fila = 0;
+        this.q = []; this.off = 0; this.lidos = 0; this.n = 0; this.fila = 0; this.pl = 0; this.pr = 0;
         this.port.onmessage = e => {
             const m = e.data;
             if (m.t === 'dados') { this.q.push(m); this.fila += m.l.length; }
@@ -48,14 +50,23 @@ class VeMixer extends AudioWorkletProcessor {
     }
     process(inputs, outputs) {
         const L = outputs[0][0], R = outputs[0][1] || outputs[0][0];
+        let pl = this.pl, pr = this.pr;
         for (let i = 0; i < L.length; i++) {
             const c = this.q[0];
             if (!c) { L[i] = 0; R[i] = 0; continue; }
-            L[i] = c.l[this.off]; R[i] = c.r[this.off];
+            const l = c.l[this.off], r = c.r[this.off];
+            L[i] = l; R[i] = r;
+            if (l > pl) pl = l; else if (-l > pl) pl = -l;
+            if (r > pr) pr = r; else if (-r > pr) pr = -r;
             this.off++; this.lidos++; this.fila--;
             if (this.off >= c.l.length) { this.q.shift(); this.off = 0; }
         }
-        if (++this.n % 4 === 0) this.port.postMessage({ t: 'pos', lidos: this.lidos, fila: this.fila, ct: currentTime });
+        this.pl = pl; this.pr = pr;
+        // posição e o pico do que saiu desde a última mensagem (medidor de áudio L/R: editor-medidor.js)
+        if (++this.n % 4 === 0) {
+            this.port.postMessage({ t: 'pos', lidos: this.lidos, fila: this.fila, ct: currentTime, pl, pr });
+            this.pl = this.pr = 0;
+        }
         return true;
     }
 }
@@ -89,7 +100,10 @@ async function veAudioCriar() {
 }
 
 function veAudioMsg(m) {
-    if (m.t === 'pos') { VEAU.lidos = m.lidos; VEAU.lidosCt = m.ct; VEAU.fila = m.fila; }
+    if (m.t === 'pos') {
+        VEAU.lidos = m.lidos; VEAU.lidosCt = m.ct; VEAU.fila = m.fila;
+        if (typeof veMedPico === 'function') veMedPico(m.ct, m.pl, m.pr);
+    }
     else if (m.t === 'cortado') {
         // a fila foi aparada: volta a mixar a partir do fim do que ficou
         VEAU.lidos = m.lidos; VEAU.lidosCt = VEAU.ctx.currentTime;
@@ -194,10 +208,6 @@ function veAudioFxTap(F, quadro, k) {
     const x = veAudioAmostra(F, quadro);
     return x ? [x[0] * k, x[1] * k] : [0, 0];
 }
-function veAudioFxLimiter(x, lim) {
-    const a = Math.abs(x);
-    return a <= lim ? x : Math.sign(x) * (lim + (a - lim) * 0.08);
-}
 function veAudioFxProcess(l, r, fx, tap) {
     if (!fx || !fx.length) return [l, r];
     for (const f of fx) {
@@ -240,11 +250,8 @@ function veAudioFxProcess(l, r, fx, tap) {
             } else {
                 l *= gm; r *= gm;
             }
-        } else if (f.t === 'limiter') {
-            const lim = veAudioFxDb(Math.min(0, v.ceil == null ? -1 : v.ceil));
-            l = veAudioFxLimiter(l, lim);
-            r = veAudioFxLimiter(r, lim);
         }
+        // limiter: não entra aqui (precisa de memória e de antecipação): VeLimitador, no mixer
     }
     return [l, r];
 }
@@ -261,12 +268,38 @@ const VE_AU_HANN = (() => {
 })();
 
 // ── mixagem ──
-// Mixa n quadros de saída a partir do instante t da timeline (avançando `taxa` s da timeline por s de som)
+// Hard Limiter no Master (a soma de todas as trilhas, como no Mixer de trilhas do Premiere): a soma é mixada
+// L amostras à frente e passa pelo mesmo VeLimitador; num salto ele recomeça 0,5 s antes (estado certo no ponto).
+function veMasterLim() {
+    const m = VE.master && VE.master.lim;
+    return m && m.on !== false ? m.v : null;
+}
 function veAudioMixar(t, n) {
+    const mv = veMasterLim();
+    if (!mv) { VEAU.mlim = null; return veAudioMixarBruto(t, n); }
+    const passo = VEAU.taxa / VE_AU_SR, chave = JSON.stringify(mv);
+    let S = VEAU.mlim;
+    if (!S || S.chave !== chave || Math.abs(S.t - t) > passo * 2) {
+        const lim = new VeLimitador(mv), P = Math.round(0.5 / passo);
+        const m = veAudioMixarBruto(t - P * passo, P + lim.L);
+        for (let k = 0; k < m.l.length; k++) lim.passo(m.l[k], m.r[k]);
+        lim.gmin = 1;
+        S = VEAU.mlim = { lim, chave, t };
+    }
+    const m = veAudioMixarBruto(t + S.lim.L * passo, n);
+    for (let k = 0; k < n; k++) { const y = S.lim.passo(m.l[k], m.r[k]); m.l[k] = y[0]; m.r[k] = y[1]; }
+    S.t = t + n * passo;
+    return m;
+}
+
+// Mixa n quadros de saída a partir do instante t da timeline (avançando `taxa` s da timeline por s de som)
+function veAudioMixarBruto(t, n) {
     const L = new Float32Array(n), R = new Float32Array(n), passo = VEAU.taxa / VE_AU_SR;
-    for (const [st, s0, e0, g, id, v, tom, fi, fo, fx] of VEAU.clipes) {
+    for (const cl of VEAU.clipes) {
+        const [st, s0, e0, g, id, v, tom, fi, fo, fx] = cl;
         const F = VEAU.fontes.get(id), fimC = st + (e0 - s0) / v, tFim = t + n * passo;
         if (!F || fimC <= t || st >= tFim) continue;
+        if (fx.some(f => f.t === 'limiter')) { veAudioMixarLim(cl, F, t, n, passo, L, R); continue; }
         const i0 = Math.max(0, Math.ceil((st - t) / passo)), i1 = Math.min(n, Math.ceil((fimC - t) / passo));
         const k0 = g / 32768, a0 = s0 * VE_AU_SR, durC = fimC - st, fade = fi > 0 || fo > 0;
         if (v === 1 || !tom) {
@@ -303,6 +336,127 @@ function veAudioMixar(t, n) {
     return { l: L, r: R };
 }
 
+// ── Hard Limiter (o do Premiere/Audition, de verdade) ──
+// Amplitude máxima (teto): NADA passa dele — é o que segura os picos. Ganho de entrada: aumenta o som antes de
+// limitar (deixa mais alto sem estourar). Antecipação (look-ahead): o som sai atrasado esse tempo e o ganho começa
+// a descer ANTES do pico, numa rampa, em vez de achatar a onda (o que distorceria). Soltura (release): tempo para
+// a atenuação voltar 12 dB depois do pico (curta = mais alto e "bombeando"; longa = mais natural). Canais
+// vinculados: a mesma atenuação em L e R (o estéreo não se desloca quando só um lado tem pico).
+// Conta, amostra a amostra: atenuação necessária A = max(0, dB(|x|/teto)); H = maior A da janela de antecipação;
+// R = max(H, R − passo da soltura); ganho = média móvel de 10^(−R/20) na janela; saída = x de L amostras atrás × ganho.
+// Na hora do pico toda a janela da média já tem ganho ≤ o necessário: a saída nunca passa do teto.
+// A exportação faz a MESMA conta em numpy (video_cutter._hard_limiter): o que se ouve aqui é o que sai no arquivo.
+class VeLimitador {
+    constructor(v) {
+        this.teto = Math.pow(10, Math.min(0, v.ceil ?? -1) / 20);
+        this.boost = Math.pow(10, (v.boost || 0) / 20);
+        this.L = Math.max(0, Math.round((v.look ?? 3) * VE_AU_SR / 1000));
+        this.d = 12 / Math.max(1, (v.rel ?? 80) * VE_AU_SR / 1000);   // dB por amostra
+        this.link = v.link !== 0;
+        const n = this.L + 1;
+        this.n = n;
+        this.xl = new Float64Array(n); this.xr = new Float64Array(n); this.p = 0;   // linha de atraso (anel)
+        this.ch = Array.from({ length: this.link ? 1 : 2 }, () => ({
+            dq: [], dh: 0,                                   // janela deslizante do máximo (fila monotônica)
+            R: 0, g: new Float64Array(n).fill(1), soma: n,   // média móvel do ganho
+        }));
+        this.i = 0;
+        this.gmin = 1;   // menor ganho desde a última leitura (redução no medidor)
+    }
+    _ganho(c, a) {
+        const A = a > this.teto ? 20 * Math.log10(a / this.teto) : 0, i = this.i, dq = c.dq;
+        while (dq.length > c.dh && dq[dq.length - 1][1] <= A) dq.pop();
+        dq.push([i, A]);
+        while (dq[c.dh][0] <= i - this.n) c.dh++;
+        const H = dq[c.dh][1];
+        if (c.dh > 4096) { c.dq = dq.slice(c.dh); c.dh = 0; }
+        c.R = Math.max(H, c.R - this.d);
+        const G = c.R > 0 ? Math.pow(10, -c.R / 20) : 1;
+        c.soma += G - c.g[this.p];
+        c.g[this.p] = G;
+        if ((i & 65535) === 65535) { let s = 0; for (const x of c.g) s += x; c.soma = s; }   // sem erro acumulado
+        return c.soma / this.n;
+    }
+    // Entra uma amostra; sai a de L amostras atrás, limitada
+    passo(l, r) {
+        l *= this.boost; r *= this.boost;
+        const p = this.p;
+        this.xl[p] = l; this.xr[p] = r;
+        let gl, gr;
+        if (this.link) gl = gr = this._ganho(this.ch[0], Math.max(Math.abs(l), Math.abs(r)));
+        else { gl = this._ganho(this.ch[0], Math.abs(l)); gr = this._ganho(this.ch[1], Math.abs(r)); }
+        if (gl < this.gmin) this.gmin = gl;
+        if (gr < this.gmin) this.gmin = gr;
+        const q = (p + 1) % this.n, t = this.teto;
+        const ol = this.xl[q] * gl, or = this.xr[q] * gr;
+        this.p = q;
+        this.i++;
+        return [Math.max(-t, Math.min(t, ol)), Math.max(-t, Math.min(t, or))];
+    }
+}
+
+// Som do clipe no instante u (s desde o início dele na timeline), com o ganho do clipe e sem fade, ou null
+function veAudioFonteEm(F, cl, u) {
+    const [st, s0, e0, g, , v, tom] = cl, k0 = g / 32768, a0 = s0 * VE_AU_SR;
+    if (u < 0 || u >= (e0 - s0) / v) return [0, 0];
+    if (v === 1 || !tom) {
+        const x = veAudioAmostra(F, a0 + u * v * VE_AU_SR);
+        return x ? [x[0] * k0, x[1] * k0] : null;
+    }
+    const uq = u * VE_AU_SR, g1 = Math.floor(uq / VE_AU_GRAO);
+    let l = 0, r = 0;
+    for (let gi = g1 - 1; gi <= g1; gi++) {
+        if (gi < 0) continue;
+        const ug = gi * VE_AU_GRAO, o = uq - ug;
+        const x = veAudioAmostra(F, a0 + ug * v + o);
+        if (!x) continue;
+        const w = VE_AU_HANN[Math.min(VE_AU_HANN.length - 1, Math.floor(o))];
+        l += x[0] * w; r += x[1] * w;
+    }
+    return [l * k0, r * k0];
+}
+
+// Clipe com Hard Limiter: ganho → efeitos antes do limitador → limitador (com memória entre os pedaços) → efeitos
+// depois → fades (a mesma ordem da exportação). O limitador de cada clipe continua de um pedaço para o outro; num
+// salto (play em outro ponto, edição) ele recomeça ~1 s antes, para chegar no ponto já no estado certo.
+function veAudioMixarLim(cl, F, t, n, passo, L, R) {
+    const [st, s0, e0, , , v, , fi, fo, fx] = cl;
+    const k = fx.findIndex(f => f.t === 'limiter'), lv = fx[k].v || {};
+    const pre = fx.slice(0, k), pos = fx.slice(k + 1).filter(f => f.t !== 'limiter');
+    const fimC = st + (e0 - s0) / v, durC = fimC - st, fade = fi > 0 || fo > 0;
+    const i0 = Math.max(0, Math.ceil((st - t) / passo)), i1 = Math.min(n, Math.ceil((fimC - t) / passo));
+    const entrada = tau => {
+        const u = tau - st;
+        const x = veAudioFonteEm(F, cl, u);
+        if (!x) return [0, 0];
+        if (!pre.length || u < 0 || tau >= fimC) return x;
+        const frame = s0 * VE_AU_SR + u * v * VE_AU_SR;
+        return veAudioFxProcess(x[0], x[1], pre, d => veAudioFxTap(F, frame - d * v * VE_AU_SR, cl[3] / 32768));
+    };
+    const tau0 = t + i0 * passo;
+    let S = VEAU.lims.get(cl);
+    if (!S || Math.abs(S.tIn - (tau0 + S.lim.L * passo)) > passo * 2) {
+        const lim = new VeLimitador(lv);
+        const ini = Math.max(st - (lim.L + 1) * passo, tau0 - 1);
+        const nPre = Math.max(0, Math.round((tau0 - ini) / passo));
+        let tIn = tau0 - nPre * passo;
+        const alvo = tau0 + lim.L * passo - passo / 2;
+        while (tIn < alvo) { const x = entrada(tIn); lim.passo(x[0], x[1]); tIn += passo; }
+        S = { lim, tIn: tau0 + lim.L * passo };
+        VEAU.lims.set(cl, S);
+    }
+    for (let i = i0; i < i1; i++) {
+        const x = entrada(S.tIn);
+        let y = S.lim.passo(x[0], x[1]);
+        S.tIn += passo;
+        const u = t + i * passo - st;
+        if (pos.length) y = veAudioFxProcess(y[0], y[1], pos, null);
+        const kf = fade ? veAudioFade(u, durC, fi, fo) : 1;
+        L[i] += y[0] * kf;
+        R[i] += y[1] * kf;
+    }
+}
+
 // Mantém ~VE_AU_ADIANTE s mixados na fila do processador
 function veAudioAlimentar() {
     if (!VEAU.tocando || VEAU.esperando) return;
@@ -312,6 +466,11 @@ function veAudioAlimentar() {
         const m = veAudioMixar(VEAU.wt, VE_AU_CHUNK);
         VEAU.node.port.postMessage({ t: 'dados', l: m.l, r: m.r }, [m.l.buffer, m.r.buffer]);
         VEAU.escritos += VE_AU_CHUNK;
+        // redução do limitador do Master neste pedaço: o medidor mostra quando ele for ouvido (editor-medidor.js)
+        if (VEAU.mlim && typeof veMedReducao === 'function') {
+            veMedReducao(VEAU.escritos, VEAU.mlim.lim.gmin);
+            VEAU.mlim.lim.gmin = 1;
+        }
         VEAU.wt += VE_AU_CHUNK / VE_AU_SR * VEAU.taxa;
     }
     veAudioPrever(VEAU.wt);
@@ -333,6 +492,9 @@ async function veAudioTocar(t) {
     VEAU.taxa = VE.rate;
     VEAU.clipes = veAudioClipes();
     VEAU.chave = JSON.stringify(VEAU.clipes);
+    VEAU.lims.clear();
+    VEAU.mlim = null;
+    if (typeof VEMED !== 'undefined') { VEMED.fila.length = 0; VEMED.gr.length = 0; }   // medidor: fila do som anterior
     VEAU.base = VEAU.wt = t;
     VEAU.escritos = VEAU.lidos = 0;
     VEAU.lidosCt = VEAU.ctx.currentTime;
@@ -361,6 +523,7 @@ function veAudioEditou() {
     if (chave === VEAU.chave) return;
     VEAU.clipes = cl;
     VEAU.chave = chave;
+    VEAU.lims.clear();
     if (!VEAU.tocando) { veAudioPrever(VE.playhead); return; }
     VEAU.esperando = true;
     VEAU.node.port.postMessage({ t: 'cortar', manter: Math.round(VE_AU_MANTER * VE_AU_SR) });

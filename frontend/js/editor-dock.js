@@ -37,9 +37,10 @@ function vedDefault() {
                     { t: 'g', p: ['fx', 'trans', 'keys'], a: 'fx' },
                 ] },
             ] },
-            { t: 's', d: 'row', z: [0.028, 0.972], c: [
+            { t: 's', d: 'row', z: [0.028, 0.94, 0.032], c: [
                 { t: 'g', p: ['ferramentas'], a: 'ferramentas' },
                 { t: 'g', p: ['timeline'], a: 'timeline' },
+                { t: 'g', p: ['medidores'], a: 'medidores' },
             ] },
         ],
     };
@@ -200,6 +201,32 @@ function vedApply(d) {
         if (g) {
             g.p.splice(g.p.indexOf('fx') + 1, 0, 'trans');
             st.novos = st.novos.filter(id => id !== 'trans');
+        }
+    }
+    // Medidores de áudio: à direita da timeline (como no Premiere), esteja ela na área principal ou numa janela solta
+    if (st.novos.includes('medidores')) {
+        const achar = (n, pai) => {
+            if (n.t === 'g') return n.p.includes('timeline') ? [n, pai] : null;
+            for (const ch of n.c) { const r = achar(ch, n); if (r) return r; }
+            return null;
+        };
+        const raizes = [st.root, ...st.floats.map(f => f.root)];
+        for (let ri = 0; ri < raizes.length; ri++) {
+            const a = raizes[ri] && achar(raizes[ri], null);
+            if (!a) continue;
+            const [g, pai] = a, med = { t: 'g', p: ['medidores'], a: 'medidores' };
+            if (pai && pai.d === 'row') {
+                const k = pai.c.indexOf(g), z = pai.z[k];
+                pai.c.splice(k + 1, 0, med);
+                pai.z.splice(k, 1, z - Math.min(z / 2, 0.032), Math.min(z / 2, 0.032));
+            } else {
+                const sp = { t: 's', d: 'row', z: [0.968, 0.032], c: [g, med] };
+                if (pai) pai.c[pai.c.indexOf(g)] = sp;
+                else if (ri === 0) st.root = sp;
+                else st.floats[ri - 1].root = sp;
+            }
+            st.novos = st.novos.filter(id => id !== 'medidores');
+            break;
         }
     }
     st.novos.forEach(id => vedAddTab(id, true));
