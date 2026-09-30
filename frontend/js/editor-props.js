@@ -416,7 +416,7 @@ function vePpHtml(a) {
                     <button class="ve-pp-tog" data-pptog="le.negrito" title="Negrito"><b>N</b></button>
                     <button class="ve-pp-tog" data-pptog="le.ita" title="Itálico"><i>I</i></button>
                     <button class="ve-pp-tog" data-pptog="le.maiusc" title="CAIXA ALTA">AA</button></div>
-                ${vePpNum('le.tam', 'Tamanho', 3, 10, 0.1, '%')}
+                ${vePpNum('le.tamPx', 'Tamanho', 8, 400, 1, 'px')}
                 <div class="ve-pp-cores">${vePpCor('le.cor', 'Cor do texto')}</div>
                 <div class="ve-pp-l"><label>Fundo</label><select data-pp="le.fundo"><option value="caixa">Caixa</option><option value="sombra">Contorno e sombra</option><option value="nenhum">Nenhum</option></select></div>
                 <div class="ve-pp-sub" data-ppse="le.eCaixa"><div class="ve-pp-cores">${vePpCor('le.caixaCor', 'Cor da caixa')}</div>${vePpNum('le.caixaOp', 'Opacidade', 0, 100, 1, '%')}${vePpNum('le.caixaRaio', 'Cantos', 0, 100, 1, '%')}</div>
@@ -430,6 +430,15 @@ function vePpHtml(a) {
                 <small class="ve-pp-dica">Arraste a legenda no monitor para mover (Shift: sem grudar no centro).</small>
                 <div class="ve-pp-l"><label>Entrada</label><select data-pp="le.entrada" title="Efeito rápido quando cada legenda aparece"><option value="nenhum">Seca (sem efeito)</option><option value="pop">Pop</option><option value="fade">Fade</option></select></div>
                 `) +
+            vePpSec('Destaque da palavra falada', `
+                ${vePpChk('ld.dOn', 'Destacar a palavra que está sendo falada')}
+                <div class="ve-pp-sub" data-ppse="ld.dOn">
+                    <div class="ve-pp-cores">${vePpCor('ld.dCor', 'Cor do destaque')}${vePpCor('ld.dTxt', 'Cor da palavra')}</div>
+                    ${vePpNum('ld.dOp', 'Opacidade', 0, 100, 1, '%')}
+                    ${vePpNum('ld.dRaio', 'Cantos', 0, 100, 1, '%')}
+                    ${vePpNum('ld.dPad', 'Margem', 0, 60, 1, '%')}
+                </div>
+                <small class="ve-pp-dica">Um retângulo acompanha palavra por palavra, no tempo da fala. Vale para todas as legendas.</small>`) +
             vePpSec('Exportação', `${vePpChk('legGravar', 'Gravar as legendas no vídeo ao exportar')}`) +
             links([['texto', 'Painel Texto']]);
     }
@@ -493,9 +502,11 @@ function vePpGet(k) {
     if (k.startsWith('tx.')) return veTxt(c)[k.slice(3)];
     if (k === 'p.ax' || k === 'p.ay') return veAnc(c)[k === 'p.ax' ? 0 : 1];
     if (k.startsWith('p.')) return veProps(c)[k.slice(2)];
+    if (k === 'le.tamPx') return vePpLegEstilo().tam / 100 * VE.seqH;   // em px do quadro, como no Premiere
     if (k === 'le.eCaixa') return vePpLegEstilo().fundo === 'caixa';
     if (k === 'le.eContorno') return vePpLegEstilo().fundo === 'sombra';
     if (k.startsWith('le.')) return vePpLegEstilo()[k.slice(3)];
+    if (k.startsWith('ld.')) return veTxEstilo()[k.slice(3)];   // destaque: estilo de todas as legendas
     if (k === 'leg.texto') return (VE.legendas[VETX.legSel] || {}).texto || '';
     if (k === 'legGravar') return VE.legGravar !== false;
     if (k === 'vel') return veVel(c) * 100;
@@ -538,7 +549,20 @@ function vePpSet(k, v) {
         if (VEPP.edit) veTxEditarPos();
         return 'props';
     }
+    if (k === 'le.tamPx') { if (isFinite(v) && v > 0) vePpSetLegEstilo({ tam: Math.max(4, Math.min(1000, v)) / VE.seqH * 100 }); return 'monitor'; }
     if (k.startsWith('le.')) { vePpSetLegEstilo({ [k.slice(3)]: v }); return 'monitor'; }
+    if (k.startsWith('ld.')) {
+        // destaque da palavra: vale para todas (tira o que alguma legenda tinha só para ela)
+        const n = k.slice(3);
+        VE.legEstilo = { ...veTxEstilo(), [n]: v };
+        VE.legendas = (VE.legendas || []).map(l => {
+            if (!l.estilo || !(n in l.estilo)) return l;
+            const est = { ...l.estilo };
+            delete est[n];
+            return { ...l, estilo: est };
+        });
+        return 'monitor';
+    }
     if (k === 'leg.texto') { VE.legendas[VETX.legSel] = { ...VE.legendas[VETX.legSel], texto: v }; return 'monitor'; }
     if (k === 'legGravar') { VE.legGravar = !!v; return; }
     if (k === 'vel') { if (isFinite(v) && v > 0) veMudarVelocidade(c, v / 100); return 'tudo'; }

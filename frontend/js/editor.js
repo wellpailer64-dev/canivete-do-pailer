@@ -2827,6 +2827,8 @@ function veDrawMonitor() {
             if (src !== 'offline') src = veFxRender(c, src, szd, pv * p.sc / 100);   // efeitos rodam antes do movimento (como no Premiere)
             ctx.save();
             ctx.globalAlpha = Math.max(0, Math.min(1, p.op / 100));
+            const gco = src !== 'offline' && veBmGco(c);   // modo de mesclagem (Tela, Multiplicação...)
+            if (gco) ctx.globalCompositeOperation = gco;
             ctx.translate(p.x, p.y);
             ctx.rotate(p.rot * Math.PI / 180);
             const k = p.sc / 100;
@@ -2864,6 +2866,13 @@ function veRenderProps() {
         if (row) row.hidden = aud || (adj && el.dataset.prop !== 'op');
     });
     $ve('ve-props').querySelectorAll('.ve-props-actions').forEach(el => { el.hidden = adj || aud; });
+    const bm = $ve('ve-bm');
+    if (bm) {
+        if (!bm.options.length) bm.innerHTML = VE_BM.map(([k, nome, , grupo]) =>
+            (grupo ? '<option disabled>──────────</option>' : '') + `<option value="${k}">${veT(nome)}</option>`).join('');
+        bm.closest('.ve-prop').hidden = aud || adj;
+        bm.value = veBmAtivo(c) ? c.bm : 'normal';
+    }
     const p = veProps(c);
     $ve('ve-props').querySelectorAll('[data-prop]').forEach(el => {
         const k = el.dataset.prop;
@@ -2891,6 +2900,18 @@ function veRenderProps() {
     }
     veRenderFxControls();
     veLcRender();
+}
+
+// Modo de mesclagem pelo painel: vale para todos os clipes de imagem selecionados (como os efeitos)
+function veBmMudar(v) {
+    const c = VE.clips[VE.sel];
+    if (!c) return;
+    const lista = veFxAlvos(c).filter(x => !veLocked(x) && !veIsAudio(x) && !veIsAdj(x));
+    if (!lista.length) { veAvisoBloqueio(); veRenderProps(); return; }
+    vePushHistory();
+    lista.forEach(x => { if (v && v !== 'normal' && VE_BM_MAPA[v]) x.bm = v; else delete x.bm; });
+    veRefresh();
+    veToast(`${veT('Modo de mesclagem')}: ${veT(VE_BM_MAPA[v] ? VE_BM_MAPA[v][1] : 'Normal')}` + (lista.length > 1 ? ` · ${lista.length} ${veT('clipes')}` : ''));
 }
 
 function veSetProp(k, val) {
@@ -3183,7 +3204,7 @@ function veExportPlanClips() {
             return { tipo: veIsAdj(c) ? 'ajuste' : veIsImage(c) ? 'imagem' : 'video', path: png ? png.path : veIsImage(c) || veMid(c) ? m.path || null : null,
                      seq, st: c.st, s: seq ? sq : veIsImage(c) ? 0 : c.s, e: seq ? sq + veLen(c) : veIsImage(c) ? veLen(c) : c.e,
                      sc: p.sc / f, x: p.x, y: p.y, rot: p.rot, op: p.op, kf,
-                     fx: veFxExport(c), mw: sz.w, mh: sz.h, v: veVel(c),
+                     fx: veFxExport(c), mw: sz.w, mh: sz.h, v: veVel(c), bm: veBmAtivo(c) ? c.bm : null,
                      ox: (veMediaSize(c).w / 2 - veAnc(c, p)[0]) * f, oy: (veMediaSize(c).h / 2 - veAnc(c, p)[1]) * f };
         });
     // o arquivo de cada clipe com som (null = o vídeo aberto)

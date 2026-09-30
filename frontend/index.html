@@ -596,6 +596,10 @@
                                             <input type="range" min="0" max="100" step="1" data-prop="op">
                                             <span class="ve-prop-num"><input type="number" min="0" max="100" step="1" data-prop="op"><i>%</i></span>
                                         </div>
+                                        <div class="ve-prop ve-prop-bm">
+                                            <label>Modo de mesclagem</label>
+                                            <select id="ve-bm" class="ve-select" onchange="veBmMudar(this.value)" title="Como a camada se mistura com o que está embaixo (Tela some com o preto, Multiplicação some com o branco)"></select>
+                                        </div>
                                         <div class="ve-props-actions">
                                             <button class="ve-btn ve-btn-sm" onclick="vePropsCenter()">Centralizar</button>
                                             <button class="ve-btn ve-btn-sm ve-btn-ghost" onclick="vePropsReset()">↺ Restaurar</button>

@@ -792,6 +792,8 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-kf-interp button.active { background: var(--ve-accent); color: #fff; }
 .ve-tl-wrap.kf-hover { cursor: pointer; }
 .ve-prop input[type=range] { width: 100%; accent-color: var(--ve-accent); }
+.ve-prop-bm { grid-template-columns: auto minmax(0, 1fr); margin-top: 2px; }
+.ve-prop-bm select { width: 100%; min-width: 0; }
 .ve-prop-num { position: relative; display: flex; align-items: center; }
 .ve-prop-num input {
     width: 100%;

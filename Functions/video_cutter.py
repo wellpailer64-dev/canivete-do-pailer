@@ -1720,7 +1720,7 @@ def _gerar_ass(itens, estilo, W, H):
     estilos, eventos, cache = [], [], {}
 
     def montar(est, leg, legs):
-        em = max(8.0, float(est.get("tam", 5.5)) / 100.0 * H)
+        em = max(4.0, float(est.get("tam", 5.5)) / 100.0 * H)
         razao = _num(est.get("razao"), 0.6, 2.5, 1.117)
         fonte = "".join(ch for ch in str(est.get("fonte") or "Arial") if ch not in ",{}\\\n\r").strip() or "Arial"
         fundo = est.get("fundo", "caixa")
@@ -1777,6 +1777,14 @@ def _gerar_ass(itens, estilo, W, H):
             "tag_texto": f"{{\\an{alinhamento}\\pos({cx:.1f},{ancora_y:.1f}){entrada}}}",
             "tag_caixa": (f"{{\\an{alinhamento}\\pos({cx:.1f},{caixa_y:.1f})\\bord0{caixa_sombra}"
                           f"\\1c&H{caixa_cor[4:]}&\\1a&H{caixa_alfa:02X}&{entrada}\\p1}}"),
+            "tag_texto_fixo": f"{{\\an{alinhamento}\\pos({cx:.1f},{ancora_y:.1f})}}",
+            # destaque da palavra falada (veTxDesenhar): cor/transparência do retângulo e cor da palavra
+            "d_on": bool(est.get("dOn")),
+            "d_cor": _ass_cor(est.get("dCor", "#22c55e"))[4:],
+            "d_alfa": round((1 - _num(est.get("dOp"), 0, 100, 100) / 100) * 255),
+            "d_txt": _ass_cor(est.get("dTxt") or est.get("cor", "#ffffff"))[4:],
+            "cor": cor[4:],
+            "caixa_reta": fundo == "caixa" and not raio,
             "camada_sombra": camada_sombra,
             "raio": raio,
             "alt": alt,
@@ -1811,14 +1819,24 @@ def _gerar_ass(itens, estilo, W, H):
         info = info_estilo(it)
         if info["maiusc"]:
             txt = txt.upper()
-        txt = txt.replace("\\", "\\\\").replace("{", "(").replace("}", ")").replace("\r", "").replace("\n", "\\N")
+        cru = txt
+        txt = _ass_escapar(txt)
+        # destaque da palavra falada: precisa dos retângulos medidos pela prévia, um por palavra
+        linhas_tk = [re.findall(r"\S+", ln) for ln in cru.replace("\r", "").split("\n") if ln.strip()]
+        pal = it.get("pal") if info["d_on"] else None
+        destaque = isinstance(pal, list) and pal and len(pal) == sum(len(ln) for ln in linhas_tk)
         if info["camada_sombra"]:
             eventos.append(f"Dialogue: 0,{_ass_tempo(st)},{_ass_tempo(en)},{info['legs']},,0,0,0,,{info['tag_sombra']}{txt}")
-        if info["raio"]:
+        # caixa reta com destaque: vira desenho embaixo (a caixa do próprio texto cobriria o retângulo da palavra)
+        if info["raio"] or (destaque and info["caixa_reta"]):
             forma = _ass_caixa_redonda(it.get("larg"), txt.count("\\N") + 1, info["alt"], info["folga"], info["raio"])
             if forma:
-                eventos.append(f"Dialogue: 0,{_ass_tempo(st)},{_ass_tempo(en)},{info['leg']},,0,0,0,,{info['tag_caixa']}{forma}")
-        eventos.append(f"Dialogue: 1,{_ass_tempo(st)},{_ass_tempo(en)},{info['leg']},,0,0,0,,{info['tag_texto']}{txt}")
+                tag = info["tag_caixa"] if info["raio"] else info["tag_caixa"].replace("\\p1}", "\\3a&HFF&\\p1}")
+                eventos.append(f"Dialogue: 0,{_ass_tempo(st)},{_ass_tempo(en)},{info['leg']},,0,0,0,,{tag}{forma}")
+        if destaque:
+            eventos.extend(_ass_destaque(pal, linhas_tk, st, en, info))
+        else:
+            eventos.append(f"Dialogue: 1,{_ass_tempo(st)},{_ass_tempo(en)},{info['leg']},,0,0,0,,{info['tag_texto']}{txt}")
         n += 1
     if not n:
         return None
@@ -1837,6 +1855,54 @@ def _gerar_ass(itens, estilo, W, H):
     with open(arq, "w", encoding="utf-8") as f:
         f.write("\n".join(linhas) + "\n")
     return arq
+
+
+def _ass_escapar(txt):
+    return txt.replace("\\", "\\\\").replace("{", "(").replace("}", ")").replace("\r", "").replace("\n", "\\N")
+
+
+def _ass_retangulo(w, h, r):
+    """Desenho ASS (\\p1) de um retângulo w×h com cantos de raio r, começando em (0, 0)."""
+    r = max(0.0, min(r, w / 2, h / 2))
+    c = r * (1 - 0.5523)
+
+    def f(*v):
+        return " ".join(f"{a:.1f}" for a in v)
+    return (f"m {f(r, 0)} l {f(w - r, 0)} b {f(w - c, 0, w, c, w, r)} l {f(w, h - r)} b {f(w, h - c, w - c, h, w - r, h)} "
+            f"l {f(r, h)} b {f(c, h, 0, h - c, 0, h - r)} l {f(0, r)} b {f(0, c, c, 0, r, 0)}")
+
+
+def _ass_destaque(pal, linhas_tk, st, en, info):
+    """Legenda com a palavra falada destacada (veTxDesenhar): um trecho por palavra, do começo dela até o começo da
+    próxima, com o retângulo atrás dela (camada 1) e o texto por cima com ela na cor de destaque (camada 2).
+    Os retângulos chegam medidos pela prévia, em px do quadro."""
+    ev = []
+    # caixa reta: a do texto some (\3a) — ela foi desenhada à parte, embaixo do retângulo da palavra
+    sem_caixa = "{\\3a&HFF&}" if info["caixa_reta"] else ""
+    for j, p in enumerate(pal):
+        try:
+            a = st if j == 0 else max(st, float(p["a"]))
+            b = en if j == len(pal) - 1 else min(en, max(a, float(pal[j + 1]["a"])))
+            x, y, w, h, r = (float(p[k]) for k in ("x", "y", "w", "h", "r"))
+        except Exception:
+            continue
+        if b - a < 0.01:
+            continue
+        ev.append(f"Dialogue: 1,{_ass_tempo(a)},{_ass_tempo(b)},{info['leg']},,0,0,0,,"
+                  f"{{\\an7\\pos({x:.1f},{y:.1f})\\bord0\\shad0\\1c&H{info['d_cor']}&\\1a&H{info['d_alfa']:02X}&\\p1}}"
+                  f"{_ass_retangulo(w, h, r)}")
+        k, partes = 0, []
+        for ln in linhas_tk:
+            pl = []
+            for tk in ln:
+                t = _ass_escapar(tk)
+                pl.append(f"{{\\1c&H{info['d_txt']}&}}{t}{{\\1c&H{info['cor']}&}}" if k == j else t)
+                k += 1
+            partes.append(" ".join(pl))
+        tag = info["tag_texto"] if j == 0 else info["tag_texto_fixo"]   # a entrada (pop/fade) só no começo
+        texto = "\\N".join(partes)
+        ev.append(f"Dialogue: 2,{_ass_tempo(a)},{_ass_tempo(b)},{info['leg']},,0,0,0,,{tag}{sem_caixa}{texto}")
+    return ev
 
 
 def _ass_caixa_redonda(larg, n, alt, folga, raio):
@@ -1980,6 +2046,21 @@ def _filtros_fx(fx, mw, mh, tag="x"):
                 out.append(caixa.format(x=0, y=0, w="iw", h=f"'max(1,trunc(ih*{tp:.5f}))'"))
             if bt > 0:
                 out.append(caixa.format(x=0, y=f"'ih-max(1,trunc(ih*{bt:.5f}))'", w="iw", h=f"'max(1,trunc(ih*{bt:.5f}))'"))
+        elif t == "luma":
+            # Luma Key (veFx luma): luminância Rec.709 no alfa (colorchannelmixer), rampa Limite→Suavidade (lutrgb)
+            # e multiplicada pelo alfa que a imagem já tinha
+            if tag.startswith("a"):
+                continue   # não vale em camada de ajuste
+            lim = _num(v.get("lim"), 0, 100) / 100.0
+            s = max(1 / 255.0, _num(v.get("suave"), 0, 100) / 100.0)
+            k = f"clip((val/255-{lim:.5f})/{s:.5f},0,1)"
+            if v.get("inv"):
+                k = f"(1-{k})"
+            r = f"{tag}f{j}"
+            out.append(f"format=rgba,split[{r}a][{r}b];"
+                       f"[{r}b]colorchannelmixer=ar=0.2126:ag=0.7152:ab=0.0722:aa=0,lutrgb=a='{k}*255',alphaextract[{r}m];"
+                       f"[{r}a]split[{r}c][{r}d];[{r}d]alphaextract[{r}o];[{r}o][{r}m]blend=all_mode=multiply[{r}k];"
+                       f"[{r}c][{r}k]alphamerge,format=rgba")
         elif t == "rounded":
             # cantos arredondados (veFxRaio): alfa × máscara com borda suavizada de 1 px, como o roundRect da prévia
             R = _num(v.get("raio"), 0, 100) / 100.0 * min(mw, mh) / 2.0
@@ -2024,6 +2105,15 @@ def _filtros_fx(fx, mw, mh, tag="x"):
     return out
 
 
+# Modos de mesclagem (VE_BM em frontend/js/editor-fx.js) → blend do ffmpeg com a CAMADA como 1ª entrada. Medido
+# contra as fórmulas do canvas: o overlay/hardlight do ffmpeg testam a outra entrada, por isso vão trocados.
+_BLEND_FF = {
+    "darken": "darken", "multiply": "multiply", "colorburn": "burn", "lighten": "lighten", "screen": "screen",
+    "colordodge": "dodge", "add": "addition", "overlay": "hardlight", "softlight": "softlight",
+    "hardlight": "overlay", "difference": "difference", "exclusion": "exclusion",
+}
+
+
 def _normalizar_camadas(camadas, path_video):
     """Camadas por cima da base, de baixo para cima: imagens e clipes de vídeo transformados."""
     out = []
@@ -2050,6 +2140,7 @@ def _normalizar_camadas(camadas, path_video):
                 "ox": _num(c.get("ox"), -1e5, 1e5, 0), "oy": _num(c.get("oy"), -1e5, 1e5, 0),
                 # texto animado: lista de quadros PNG (demuxer concat) no lugar da imagem parada
                 "seq": c.get("seq") if tipo == "imagem" and c.get("seq") and os.path.isfile(str(c.get("seq"))) else None,
+                "bm": c.get("bm") if c.get("bm") in _BLEND_FF and tipo != "ajuste" else None,
             }
         except Exception:
             continue
@@ -2426,9 +2517,23 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                     dx = c["sc"] * (c["ox"] * math.cos(a) - c["oy"] * math.sin(a))
                     dy = c["sc"] * (c["ox"] * math.sin(a) + c["oy"] * math.cos(a))
                     px, py = f"({px})+{dx:.3f}", f"({py})+{dy:.3f}"
-            filtros.append(f"{vf}[l{n}]overlay=x='{px}-w/2':y='{py}-h/2'"
-                           f":enable='between(t,{_tempo_ffmpeg(c['st'])},{_tempo_ffmpeg(fim)})'"
-                           f":eof_action=pass:format=auto[o{n}]")
+            ena = f"between(t,{_tempo_ffmpeg(c['st'])},{_tempo_ffmpeg(fim)})"
+            bm = _BLEND_FF.get(c.get("bm") or "")
+            if bm:
+                # Modo de mesclagem: a camada é posicionada num quadro transparente do tamanho do vídeo, misturada
+                # com o fundo (blend) e aplicada pela transparência dela (maskedmerge) — como o canvas da prévia
+                r = f"bm{n}"
+                filtros.append(f"{vf}scale=in_color_matrix={mtx},format=gbrp,split=3[{r}a][{r}b][{r}c]")
+                filtros.append(f"[{r}c]format=rgba,colorchannelmixer=aa=0[{r}z]")
+                filtros.append(f"[{r}z][l{n}]overlay=x='{px}-w/2':y='{py}-h/2':enable='{ena}'"
+                               f":eof_action=pass:format=rgb,split[{r}d][{r}e]")
+                filtros.append(f"[{r}d]format=gbrp[{r}t]")
+                filtros.append(f"[{r}e]alphaextract,format=gbrp[{r}k]")
+                filtros.append(f"[{r}t][{r}a]blend=all_mode={bm}[{r}x]")
+                filtros.append(f"[{r}b][{r}x][{r}k]maskedmerge,{de_rgb}[o{n}]")
+            else:
+                filtros.append(f"{vf}[l{n}]overlay=x='{px}-w/2':y='{py}-h/2'"
+                               f":enable='{ena}':eof_action=pass:format=auto[o{n}]")
             vf = f"[o{n}]"
         if lay:
             filtros.append(f"{vf}format={pixfmt}[vlay]")

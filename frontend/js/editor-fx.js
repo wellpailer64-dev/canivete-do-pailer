@@ -128,6 +128,31 @@ const VE_FX = {
             return a;
         },
     },
+    // Luma Key: some o que é escuro (fundo preto de GC, fogo, partículas). Luminância Rec.709 dos valores RGB;
+    // abaixo do Limite fica transparente e a Suavidade é a faixa até ficar opaco. A exportação faz a mesma conta.
+    luma: {
+        nome: 'Luma Key', cat: 'Chaveamento', tag: 'Luminance key', soClipe: true,
+        params: [
+            { k: 'lim', nome: 'Limite', min: 0, max: 100, step: 0.5, def: 8, un: '%' },
+            { k: 'suave', nome: 'Suavidade', min: 0, max: 100, step: 0.5, def: 12, un: '%' },
+            { k: 'inv', nome: 'Inverter (some o claro)', tipo: 'bool', def: 0 },
+        ],
+        neutro: () => false,
+        draw(a, v, env) {
+            const { w, h } = env, x = a.ctx, lim = v.lim / 100, s = Math.max(1 / 255, v.suave / 100);
+            let d;
+            try { d = x.getImageData(0, 0, w, h); } catch (e) { return a; }   // quadro sem CORS
+            const p = d.data;
+            for (let i = 0; i < p.length; i += 4) {
+                const y = (0.2126 * p[i] + 0.7152 * p[i + 1] + 0.0722 * p[i + 2]) / 255;
+                let k = Math.min(1, Math.max(0, (y - lim) / s));
+                if (v.inv) k = 1 - k;
+                p[i + 3] = Math.round(p[i + 3] * k);
+            }
+            x.putImageData(d, 0, 0);
+            return a;
+        },
+    },
     // Cantos arredondados: 100% = metade do lado menor (vira pílula / círculo). Fora da curva fica transparente.
     rounded: {
         nome: 'Cantos arredondados', cat: 'Transformar', tag: 'Rounded',
@@ -414,8 +439,31 @@ function veAfxActive(c) {
 }
 function veHasAfx(c) { return !!(c && c.afx && c.afx.length); }
 
+// ── Modos de mesclagem (Controles de efeito → Opacidade, como no Premiere): c.bm ──
+// [id, nome, operação do canvas na prévia]. A exportação (_BLEND_FF em video_cutter.py) usa o blend do ffmpeg com
+// a transparência da camada como máscara — a mesma conta do canvas: (1 − α)·fundo + α·mistura(fundo, camada).
+// Só os modos que a prévia e a exportação fazem iguais.
+const VE_BM = [
+    ['normal', 'Normal', 'source-over'],
+    ['darken', 'Escurecer', 'darken', 1],
+    ['multiply', 'Multiplicação', 'multiply'],
+    ['colorburn', 'Superexposição de cores', 'color-burn'],
+    ['lighten', 'Clarear', 'lighten', 1],
+    ['screen', 'Tela', 'screen'],
+    ['colordodge', 'Subexposição de cores', 'color-dodge'],
+    ['add', 'Subexposição linear (Adicionar)', 'lighter'],
+    ['overlay', 'Sobrepor', 'overlay', 1],
+    ['softlight', 'Luz suave', 'soft-light'],
+    ['hardlight', 'Luz direta', 'hard-light'],
+    ['difference', 'Diferença', 'difference', 1],
+    ['exclusion', 'Exclusão', 'exclusion'],
+];   // o 4º campo marca o começo de um grupo (linha no menu)
+const VE_BM_MAPA = Object.fromEntries(VE_BM.map(b => [b[0], b]));
+const veBmAtivo = c => !!(c && c.bm && c.bm !== 'normal' && VE_BM_MAPA[c.bm]);
+const veBmGco = c => (veBmAtivo(c) ? VE_BM_MAPA[c.bm][2] : null);
+
 // Clipe de vídeo "puro": ocupa o quadro todo, sem efeitos (vai direto na base da exportação)
-function veIsPlain(c) { return veIsDefaultProps(c) && !veFxActive(c).length; }
+function veIsPlain(c) { return veIsDefaultProps(c) && !veFxActive(c).length && !veBmAtivo(c); }
 // vídeo com transparência (.mov ProRes 4444/PNG, WebM com alfa): não cobre o que está embaixo
 function veTemAlfa(c) { const m = veMediaOf(c); return !!(m && m.info && m.info.alfa); }
 

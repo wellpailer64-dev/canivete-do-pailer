@@ -369,6 +369,16 @@ const I18N_EN = {
     'Nenhum clipe selecionado passa pela agulha': 'No selected clip is under the playhead',
     'Não dá para apagar todos os clipes': "Can't delete every clip",
     'Transições de vídeo': 'Video transitions',
+    'Destaque da palavra falada': 'Spoken word highlight', 'Destacar a palavra que está sendo falada': 'Highlight the word being spoken',
+    'Cor do destaque': 'Highlight color', 'Cor da palavra': 'Word color', 'Margem': 'Padding',
+    'Um retângulo acompanha palavra por palavra, no tempo da fala. Vale para todas as legendas.':
+        'A box follows each word as it is spoken. Applies to all captions.',
+    'Modo de mesclagem': 'Blend Mode', 'Escurecer': 'Darken', 'Multiplicação': 'Multiply', 'Superexposição de cores': 'Color Burn',
+    'Clarear': 'Lighten', 'Tela': 'Screen', 'Subexposição de cores': 'Color Dodge', 'Subexposição linear (Adicionar)': 'Linear Dodge (Add)',
+    'Sobrepor': 'Overlay', 'Luz suave': 'Soft Light', 'Luz direta': 'Hard Light', 'Diferença': 'Difference', 'Exclusão': 'Exclusion',
+    'Limite': 'Threshold', 'Suavidade': 'Softness', 'Inverter (some o claro)': 'Invert (removes the bright)',
+    'Como a camada se mistura com o que está embaixo (Tela some com o preto, Multiplicação some com o branco)':
+        'How the layer mixes with what is below (Screen removes black, Multiply removes white)',
     'Selecionar faixa para a frente': 'Track Select Forward', 'Selecionar faixa para trás': 'Track Select Backward',
     'Faixa para a frente (A): clique para pegar tudo dali em diante · Shift: só a trilha': 'Track Select Forward (A): click to grab everything from there on · Shift: only that track',
     'Faixa para trás (Shift+A): clique para pegar tudo dali para trás · Shift: só a trilha': 'Track Select Backward (Shift+A): click to grab everything before that point · Shift: only that track',
