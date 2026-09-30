@@ -83,7 +83,12 @@ function veCpLegColar(todas) {
         // vira o estilo de todas: o padrão passa a ser o copiado e as legendas perdem o que tinham só para elas
         VE.legEstilo = veCpClone(VECP.leg);
         VE.legendas = (VE.legendas || []).map(l => { const n = { ...l }; delete n.estilo; return n; });
-    } else if (!veTxSetEstiloLegenda(VETX.legSel, veCpClone(VECP.leg))) { VE.history.pop(); veUpdateUndo(); return; }
+    } else {
+        const idx = veLegSelIdx();   // a selecionada ou todas as selecionadas
+        if (!idx.length) { VE.history.pop(); veUpdateUndo(); return; }
+        idx.forEach(i => veTxSetEstiloLegenda(i, veCpClone(VECP.leg)));
+        if (idx.length > 1) { veRefresh(); veToast(`${veT('Estilo aplicado em')} ${idx.length} ${veT('legendas')}`); return; }
+    }
     veRefresh();
     veToast(todas ? `${veT('Estilo aplicado em')} ${(VE.legendas || []).length} ${veT('legendas')}` : veT('Estilo aplicado nesta legenda'));
 }
@@ -93,6 +98,6 @@ function veCpLegHtml() {
     return `<div class="ve-cp-linha"><span>${veT('Copiar estilo')}</span>
             <button class="ve-cp-btn" data-ppcp="leg-copiar" title="${veT('Copiar o estilo desta legenda')}"><svg class="i"><use href="#i-copy"/></svg></button></div>
         ${VECP.leg ? `<div class="ve-cp-linha"><span>${veT('Colar estilo')}</span>
-            <span class="ve-cp-botoes"><button class="ve-btn ve-btn-sm" data-ppcp="leg-colar">${veT('Nesta')}</button>
+            <span class="ve-cp-botoes"><button class="ve-btn ve-btn-sm" data-ppcp="leg-colar">${veLegSelIdx().length > 1 ? `${veT('Nas')} ${veLegSelIdx().length} ${veT('selecionadas')}` : veT('Nesta')}</button>
             <button class="ve-btn ve-btn-sm" data-ppcp="leg-colar-todas">${veT('Em todas')}</button></span></div>` : ''}`;
 }

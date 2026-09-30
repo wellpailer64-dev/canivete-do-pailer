@@ -949,6 +949,25 @@ function veLegSelecionar(i) {
     VE.bordaSel = null;
 }
 
+// Várias legendas selecionadas (retângulo ou Shift+clique): VETX.legx = {prim, idx, n} com os índices, que só vale
+// enquanto VETX.legSel for `prim` e a lista tiver o mesmo tamanho (igual ao VE.selx dos clipes)
+function veLegSelIdx() {
+    const L = VE.legendas || [], p = VETX.legSel;
+    if (!L[p]) return [];
+    const x = VETX.legx;
+    if (!x || x.prim !== p || x.n !== L.length) return [p];
+    return x.idx.filter(i => L[i]);
+}
+const veLegSelLista = () => veLegSelIdx().map(i => VE.legendas[i]);
+function veLegSelDefinir(idx, prim) {
+    const L = VE.legendas || [];
+    idx = [...new Set(idx)].filter(i => L[i]).sort((a, b) => a - b);
+    if (!idx.length) { veLegSelecionar(-1); VETX.legx = null; return; }
+    if (prim == null || !idx.includes(prim)) prim = idx[0];
+    veLegSelecionar(prim);
+    VETX.legx = idx.length > 1 ? { prim, idx, n: L.length } : null;
+}
+
 function veLegOrdenar(sel) {
     const L = VE.legendas || [];
     L.sort((a, b) => (a.st - b.st) || (a.en - b.en));
@@ -1048,8 +1067,11 @@ function veDeleteSelected(ripple) {
     if (veSelLista().length > 1) { veApagarVarios(veSelLista(), ripple); return; }
     if (VE.sel < 0 && VETX.legSel >= 0 && VE.legendas[VETX.legSel]) {
         vePushHistory();
-        VE.legendas = VE.legendas.filter((_, k) => k !== VETX.legSel);
+        const fora = new Set(veLegSelIdx()), n = fora.size;   // todas as selecionadas
+        VE.legendas = VE.legendas.filter((_, k) => !fora.has(k));
         VETX.legSel = -1;
+        VETX.legx = null;
+        if (n > 1) { veRefresh(); veToast(`${n} ${veT('legendas apagadas')}`); return; }
         veRefresh();
         veToast('Legenda apagada');
         return;
@@ -1208,6 +1230,14 @@ function veMarqueeFim(d) {
         .filter(h => h.v || h.a);
     const pega = [];
     hits.forEach(({ c, v, a }) => pega.push(...(v && a ? veVinculados(c) : vePegar(c, v ? 'v' : 'a'))));
+    // linha LEG no retângulo: pega as legendas do trecho (sem clipe no retângulo, elas viram a seleção)
+    const rl = veTrackRows().find(r => r.kind === 'l');
+    const legs = rl && rl.y < yb && rl.y + rl.h > ya
+        ? (VE.legendas || []).map((l, i) => (l.st < tb && l.en > ta ? i : -1)).filter(i => i >= 0) : [];
+    if (!pega.length && !d.base.length && (legs.length || (d.legBase || []).length)) {
+        veLegSelDefinir((d.legBase || []).concat(legs), legs[0]);
+        return;
+    }
     veSelDefinir(d.base.concat(pega), d.base[0] || pega[0]);
 }
 
@@ -3223,9 +3253,28 @@ function veLegPointer(e, x, t) {
         if (xr - xl >= 14 && Math.abs(x - xr) <= 5) { i = k; lado = 'r'; break; }
         if (t >= L[k].st && t <= L[k].en) { i = k; }
     }
-    veLegSelecionar(i);
+    const atual = veLegSelIdx();
+    if (i < 0) {
+        // espaço vazio da linha LEG: arrastar desenha o retângulo de seleção (Shift soma)
+        veLegSelDefinir(e.shiftKey ? atual : [], VETX.legSel);
+        if (e.button === 0) {
+            const { y } = veTimeFromEvent(e);
+            VE.drag = { mode: 'marq', ta: t, tb: t, ya: y, yb: y, base: [], legBase: e.shiftKey ? atual : [] };
+        }
+        veRefresh();
+        return;
+    }
+    if (e.shiftKey && e.button === 0) {   // Shift+clique: põe ou tira da seleção
+        veLegSelDefinir(atual.includes(i) ? atual.filter(k => k !== i) : atual.concat(i), atual.includes(i) ? null : i);
+        veRefresh();
+        return;
+    }
+    // clicar numa legenda que já faz parte da seleção mantém o grupo (para arrastar todas juntas)
+    const grupo = !lado && atual.length > 1 && atual.includes(i) ? atual : null;
+    if (grupo) veLegSelDefinir(grupo, i); else veLegSelDefinir([i], i);
     if (i >= 0 && e.button === 0) {
-        VE.drag = { mode: 'leg', i, lado, x0: e.clientX, t0: t, c0: veLegClone(L[i]), active: false, alt: e.altKey && !lado, dupe: false };
+        VE.drag = { mode: 'leg', i, lado, x0: e.clientX, t0: t, c0: veLegClone(L[i]), active: false, alt: e.altKey && !lado && !grupo, dupe: false,
+                    grupo: grupo ? grupo.map(k => ({ k, c0: veLegClone(L[k]) })) : null };
         VETX.aba = 'leg';
         if (VED.el && VED.el.pp) vedShow('pp');
     }
@@ -3247,6 +3296,20 @@ function veLegArrastar(e, t) {
             d.c0 = veLegClone(novo);
             veLegSelecionar(d.i);
         }
+    }
+    if (d.grupo) {
+        // várias selecionadas: andam juntas, sem invadir as legendas que ficaram de fora
+        const sel = new Set(d.grupo.map(g => g.k)), fora = L.filter((_, k) => !sel.has(k));
+        let dt = veSnapFrame(t) - veSnapFrame(d.t0), lo = -Infinity, hi = Infinity;
+        d.grupo.forEach(({ c0 }) => {
+            lo = Math.max(lo, -c0.st, ...fora.filter(o => o.en <= c0.st + 1e-3).map(o => o.en - c0.st));
+            hi = Math.min(hi, ...fora.filter(o => o.st >= c0.en - 1e-3).map(o => o.st - c0.en));
+        });
+        dt = Math.min(Math.max(dt, lo), hi);
+        d.grupo.forEach(({ k, c0 }) => { L[k] = { ...L[k], st: +(c0.st + dt).toFixed(3), en: +(c0.en + dt).toFixed(3) }; });
+        veDraw();
+        veDrawMonitorSoon();
+        return;
     }
     const c0 = d.c0, dt = veSnapFrame(t) - veSnapFrame(d.t0), len = c0.en - c0.st;
     const ant = L.filter((_, k) => k !== d.i && L[k].en <= c0.st + 1e-3).reduce((m, c) => Math.max(m, c.en), 0);
@@ -4301,11 +4364,12 @@ function veRender() {
     if (rl && (VE.legendas || []).length) {
         ctx.save();
         ctx.beginPath(); ctx.rect(0, Math.max(VE_RULER, rl.y), W, rl.h); ctx.clip();
+        const legSel = new Set(veLegSelIdx());
         VE.legendas.forEach((c, i) => {
             const x1 = X(c.st), x2 = X(c.en);
             if (x2 < -2 || x1 > W + 2) return;
             const y = rl.y + 3, h = rl.h - 6, w = Math.max(2, x2 - x1 - 1);
-            ctx.fillStyle = i === VETX.legSel ? 'rgba(250,204,21,0.42)' : 'rgba(250,204,21,0.22)';
+            ctx.fillStyle = legSel.has(i) ? 'rgba(250,204,21,0.42)' : 'rgba(250,204,21,0.22)';
             ctx.fillRect(x1, y, w, h);
             ctx.fillStyle = '#facc15';
             ctx.fillRect(x1, y, 2, h);
@@ -4317,7 +4381,7 @@ function veRender() {
                 ctx.fillText(c.texto.replace(/\n/g, ' '), x1 + 6, y + h / 2 + 3.5);
                 ctx.restore();
             }
-            if (i === VETX.legSel) {
+            if (legSel.has(i)) {
                 ctx.strokeStyle = '#F97316';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(x1 + 1, y + 1, w - 2, h - 2);

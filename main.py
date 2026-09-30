@@ -2713,6 +2713,18 @@ class ApiBridge:
     def ve_preparar_midia(self, path, mid, urgente=False, leve=False):
         return ve_preparar_midia(path, mid, urgente, leve)
 
+    def ve_area_transferencia(self, projeto=""):
+        """Ctrl+V na timeline: o que foi copiado no Windows (arquivos, imagem ou texto)."""
+        from Functions import area_transferencia
+        try:
+            return area_transferencia.ler(projeto)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_area_seq(self):
+        from Functions import area_transferencia
+        return {"seq": area_transferencia.sequencia()}
+
     def ve_inverter_midia(self, path, a, b, job):
         return ve_inverter_midia(path, a, b, job)
 

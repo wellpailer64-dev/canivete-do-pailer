@@ -358,7 +358,8 @@ const vePpChk = (k, rot) => `<label class="ve-pp-chk"><input type="checkbox" dat
 const vePpSec = (tit, corpo, fechada) => `<details class="ve-pp-sec"${fechada ? '' : ' open'}><summary>${tit}</summary><div class="ve-pp-corpo">${corpo}</div></details>`;
 const vePpLegEstilo = () => typeof veTxEstiloLegenda === 'function' ? veTxEstiloLegenda(VETX.legSel) : veTxEstilo();
 const vePpSetLegEstilo = patch => {
-    if (typeof veTxSetEstiloLegenda === 'function' && VETX.legSel >= 0) veTxSetEstiloLegenda(VETX.legSel, patch);
+    // várias legendas selecionadas: o ajuste vale para todas elas
+    if (typeof veTxSetEstiloLegenda === 'function' && VETX.legSel >= 0) veLegSelIdx().forEach(i => veTxSetEstiloLegenda(i, patch));
     else VE.legEstilo = { ...veTxEstilo(), ...patch };
 };
 
@@ -407,7 +408,9 @@ function vePpHtml(a) {
             ${VE.ready ? `<button class="ve-pp-seq" onclick="veSeqConfigAbrir()" title="Configurações da sequência: mudar o tamanho do quadro">${VE.seqW}×${VE.seqH} · ${String(+(VE.fps || 30).toFixed(3)).replace('.', ',')} qps · ${veShort(VE.dur)} ✎</button>` : ''}`;
     }
     if (a.tipo === 'legenda') {
-        return cab('Legenda', `${VETX.legSel + 1} de ${VE.legendas.length} · trilha LEG`) +
+        const nSel = veLegSelIdx().length;
+        return cab(nSel > 1 ? `${nSel} ${veT('legendas selecionadas')}` : 'Legenda',
+                   nSel > 1 ? veT('o estilo muda em todas elas') : `${VETX.legSel + 1} de ${VE.legendas.length} · trilha LEG`) +
             vePpSec('Texto da legenda', `<textarea class="ve-pp-texto" data-pp="leg.texto" rows="3"></textarea>`) +
             vePpSec('Estilo desta legenda', `
                 ${veCpLegHtml()}
@@ -585,7 +588,7 @@ function vePpRender() {
     const box = $ve('ve-pp');
     if (!box) return;
     const a = vePpAlvo();
-    const chave = [a.tipo, VE.sel, VETX.legSel, a.c ? a.c.tr : '', VE.seqW, VE.seqH, !!VEPP.fontes, VE.info && VE.info.has_audio, !!VECP.leg].join('|');
+    const chave = [a.tipo, VE.sel, VETX.legSel, a.c ? a.c.tr : '', VE.seqW, VE.seqH, !!VEPP.fontes, VE.info && VE.info.has_audio, !!VECP.leg, typeof veLegSelIdx === 'function' ? veLegSelIdx().length : 0].join('|');
     if (chave !== VEPP.chave) {
         const abertas = [...box.querySelectorAll('details.ve-pp-sec')].map(d => d.open);
         const tipo0 = VEPP.chave.split('|')[0];
