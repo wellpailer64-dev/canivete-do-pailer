@@ -510,8 +510,15 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-src-mark { font: 11px var(--ve-mono); color: var(--ve-dim); }
 .ve-src-actions { align-items: center; flex-wrap: wrap; }
 .ve-src-play { min-width: 44px; }
-.ve-src-drag { cursor: grab; }
-.ve-src-drag:active { cursor: grabbing; }
+.ve-src-arrastes { display: inline-flex; border: 1px solid var(--ve-line-2, rgba(255, 255, 255, .14)); border-radius: 6px; overflow: hidden; }
+.ve-src-drag {
+    display: inline-flex; align-items: center; justify-content: center; gap: 2px; height: 28px; min-width: 34px; padding: 0 8px;
+    border: 0; border-left: 1px solid var(--ve-line-2, rgba(255, 255, 255, .14)); background: transparent; color: var(--ve-dim); cursor: grab;
+}
+.ve-src-drag:first-child { border-left: 0; }
+.ve-src-drag:hover { color: var(--ve-text); background: rgba(255, 255, 255, .06); }
+.ve-src-drag:active { cursor: grabbing; color: var(--ve-accent); }
+.ve-src-drag .i { width: 15px; height: 15px; }
 .ve-field > label:not(.ve-check) { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ve-faint); margin-bottom: 6px; }
 .ve-field-row { display: flex; flex-wrap: wrap; gap: 8px 18px; }
 .ve-pills { display: flex; flex-wrap: wrap; gap: 6px; }

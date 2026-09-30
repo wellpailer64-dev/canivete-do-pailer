@@ -540,7 +540,11 @@ function vePjColocar(ids, drop) {
                 veToast(m.erro ? 'Esse vídeo não pôde ser preparado: ' + m.erro : 'Esse vídeo ainda está sendo preparado');
                 return;
             }
-            if (!m.url) veMidiaPriorizar(m);
+            // só a imagem (x: 'v') ou só o áudio (x: 'a'): o mesmo clipe que o "desvincular" deixa, sem par
+            const parte = drop && (drop.parte === 'v' || drop.parte === 'a') ? drop.parte : null;
+            const temSom = m.id === 0 ? !!(VE.info && VE.info.has_audio) : !!(m.info && m.info.has_audio);
+            if (parte === 'a' && !temSom) { veToast('Esse vídeo não tem som'); return; }
+            if (!m.url && parte !== 'a') veMidiaPriorizar(m);
             const tr = Number.isFinite(drop && drop.tr) ? drop.tr : row && row.kind !== 'l' ? veTrackIndex(row) : 0;
             if (veTrkLocked(tr)) { veAvisoBloqueio(); return; }
             vePushHistory();
@@ -549,7 +553,9 @@ function vePjColocar(ids, drop) {
             const clip = { tr, st, s: s0, e: e0 };
             if (m.id) clip.m = m.id;
             if (m.cor) clip.cor = m.cor;
+            if (parte) clip.x = parte;
             vePlaceClip(clip);
+            if (parte) veToast(parte === 'a' ? `${veT('Só o áudio')} → A${tr + 1}` : `${veT('Só a imagem')} → V${tr + 1}`);
             veAfterEdit(VE.playhead);
             t = st + veLen(clip); colocados++;
         } else if (m.kind === 'audio') {
@@ -926,7 +932,11 @@ function veSrcOpen(id) {
                 <button class="ve-btn ve-btn-sm" data-src="out">Out }</button>
                 <button class="ve-btn ve-btn-sm ve-btn-ghost" data-src="limpar">Limpar</button>
                 <span class="ve-top-spacer"></span>
-                <button class="ve-btn ve-btn-sm ve-src-drag" draggable="true" id="ve-src-drag" title="Arraste para a timeline">Arrastar para timeline</button>
+                <span class="ve-src-arrastes" title="Arraste para a timeline">
+                    <button class="ve-src-drag" draggable="true" data-parte="av" title="Arrastar imagem e áudio"><svg class="i"><use href="#i-film"/></svg><svg class="i"><use href="#i-volume"/></svg></button>
+                    <button class="ve-src-drag" draggable="true" data-parte="v" title="Arrastar só a imagem"><svg class="i"><use href="#i-film"/></svg></button>
+                    <button class="ve-src-drag" draggable="true" data-parte="a" title="Arrastar só o áudio"><svg class="i"><use href="#i-volume"/></svg></button>
+                </span>
                 <button class="ve-btn ve-btn-sm ve-btn-primary" data-src="insert">Inserir</button>
             </div>
         </div>`;
@@ -937,10 +947,11 @@ function veSrcOpen(id) {
         md.querySelector('#ve-src-seek').addEventListener('input', e => {
             if (VESRC.video.duration) VESRC.video.currentTime = (+e.target.value / 1000) * VESRC.video.duration;
         });
-        md.querySelector('#ve-src-drag').addEventListener('dragstart', e => {
-            e.dataTransfer.setData('text/x-ve-source', JSON.stringify(veSrcPayload()));
+        // imagem e áudio / só a imagem / só o áudio (como os ícones embaixo do monitor Source do Premiere)
+        md.querySelectorAll('.ve-src-drag').forEach(b => b.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('text/x-ve-source', JSON.stringify({ ...veSrcPayload(), parte: b.dataset.parte }));
             e.dataTransfer.effectAllowed = 'copy';
-        });
+        }));
         VESRC.video.addEventListener('timeupdate', veSrcRender);
         VESRC.video.addEventListener('loadedmetadata', veSrcRender);
         VESRC.video.addEventListener('play', veSrcRender);
@@ -986,7 +997,9 @@ function veSrcPayload() {
 function veSrcDrop(p, drop) {
     const m = VE.media[p.id];
     if (!m || m.kind !== 'video') return;
-    vePjColocar([m.id], { ...(drop || {}), srcIn: p.srcIn, srcOut: p.srcOut });
+    const antes = VE.clips.length;
+    vePjColocar([m.id], { ...(drop || {}), srcIn: p.srcIn, srcOut: p.srcOut, parte: p.parte });
+    if (VE.clips.length > antes) veSrcClose();   // entrou na timeline: o Source fecha sozinho
 }
 
 function veSrcTogglePlay() {
