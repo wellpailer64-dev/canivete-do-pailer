@@ -1847,7 +1847,7 @@ function vePathNome(path, fallback = 'Mídia offline') {
     return path ? String(path).split(/[\\/]/).pop() : fallback;
 }
 function veMediaOffline(m) { return !!(m && (m.offline || m.missing || m.lost)); }
-function veOfflineMedias() { return (VE.media || []).filter(m => m && !m.removido && veMediaOffline(m)); }
+function veOfflineMedias() { return (VE.media || []).filter(m => m && !m.removido && !m._rvGerando && veMediaOffline(m)); }
 function veProjetoSeqs(d) {
     return Array.isArray(d && d.sequences) && d.sequences.length ? d.sequences : [{
         clips: (d && d.clips) || [],
@@ -1890,6 +1890,7 @@ function veDeckCarregar(x, mid, tag) {
     const m = VE.media[mid], url = m && m.url;
     if (!url) return false;
     x._mid = mid;
+    x.crossOrigin = 'anonymous';   // quadro legível no WebGL (Luz e Cor, Básico 3D) mesmo sem o vídeo principal
     x.src = !tag || url.startsWith('blob:') ? url : url + (url.includes('?') ? '&' : '?') + 'camada=' + tag;
     x.load();
     return true;
@@ -2404,6 +2405,7 @@ function veClipMenu(i, x, y, doc) {
         ${veIsImage(c) ? '' : '<button class="ve-ctx-item" data-ctx="gain">Ganho de áudio…<kbd>G</kbd></button>'}
         <button class="ve-ctx-item" data-ctx="pp">Propriedades${veIsImage(c) ? '' : ' (velocidade, volume)'}</button>
         <button class="ve-ctx-item" data-ctx="fx">Controles de efeito</button>
+        ${veIsImage(c) ? '' : `<button class="ve-ctx-item" data-ctx="inv">${veInvertido(c) ? '✓ ' : ''}Inverter clipe (Reverse Speed)</button>`}
         <button class="ve-ctx-item perigo" data-ctx="del">Apagar clipe<kbd>D</kbd></button>`;
     doc.body.appendChild(m);
     // dentro da janela
@@ -2426,6 +2428,7 @@ function veClipMenu(i, x, y, doc) {
             else if (it.dataset.ctx === 'fx') veTab('props');
             else if (it.dataset.ctx === 'pp') { vedShow('pp'); veRefresh(); }
             else if (it.dataset.ctx === 'del') veDeleteClip(i);
+            else if (it.dataset.ctx === 'inv') veInverterClipes();
         } else return;
         veClipMenuFechar();
     });
@@ -2747,7 +2750,7 @@ function veDrawMonitor() {
         .filter(({ c }) => !veIsAudio(c) && !veTrkHidden(c.tr) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS)
         .sort((a, b) => a.c.tr - b.c.tr || a.c.st - b.c.st);
     // o que está abaixo de um vídeo que cobre o quadro inteiro não aparece: nem decodifica
-    const cobre = vis.map(({ c }) => !veIsImage(c) && veIsPlain(c) && !c._tr).lastIndexOf(true);
+    const cobre = vis.map(({ c }) => !veIsImage(c) && veIsPlain(c) && !c._tr && !veTemAlfa(c)).lastIndexOf(true);
     if (cobre > 0) vis = vis.slice(cobre);
     // parcial: alguma camada sem o quadro certo ainda (carregando/buscando) — desenha, mas não guarda no cache
     let extra = 0, falta = false, parcial = false;
@@ -3144,7 +3147,7 @@ function veExportPlanClips() {
     // trilha oculta (olho) não entra; o som é o do clipe de vídeo de cima (como na prévia), mudo = silêncio
     const isVid = c => !veIsImage(c) && !veIsAudio(c) && !veTrkHidden(c.tr);
     // clipe com velocidade mudada vai como camada (no ffmpeg: setpts)
-    const liso = c => !c._tr && veIsPlain(c) && veVel(c) === 1 && veMid(c) === 0;
+    const liso = c => !c._tr && veIsPlain(c) && veVel(c) === 1 && veMid(c) === 0 && !veTemAlfa(c);
     const base = veFlattenWith(c => isVid(c) && liso(c));
     const audio = veFlattenWith(isVid, c => veTrkMuted(c.tr));
     // camadas: imagens e vídeos transformados; um vídeo "normal" acima de alguma camada também
@@ -3480,6 +3483,7 @@ function veProjectData() {
                 if (m.kind === 'legenda') Object.assign(o, { path: m.path, itens: m.itens });
                 if (m.kind === 'video') o.path = m.path;
                 if (m.kind === 'timeline') o.sequenceId = m.sequenceId;
+                if (m.rvDe != null) Object.assign(o, { rvDe: m.rvDe, rvA: m.rvA, rvB: m.rvB });   // cópia invertida (editor-reverse.js)
                 return o;
             }),
         // painel Projeto: pastas e a organização do vídeo principal
@@ -3667,6 +3671,7 @@ function veApplyProject() {
         }
         if (m.kind === 'video' || m.kind === 'video2') {
             const nm = { id: VE.media.length, kind: 'video', name: m.name, path: m.path, ...org };
+            if (m.rvDe != null) Object.assign(nm, { rvDe: m.rvDe, rvA: m.rvA, rvB: m.rvB });
             VE.media.push(nm);
             ids[m.id] = nm.id;
             if (estaFaltando(m.path)) {
@@ -3687,6 +3692,7 @@ function veApplyProject() {
         }
         if (m.kind === 'audio') {
             const nm = { id: VE.media.length, kind: 'audio', path: m.path, name: m.name, dur: m.dur || 0, peaks: [], ...org };
+            if (m.rvDe != null) Object.assign(nm, { rvDe: m.rvDe, rvA: m.rvA, rvB: m.rvB });
             VE.media.push(nm);
             ids[m.id] = nm.id;
             if (estaFaltando(m.path)) {
@@ -3715,6 +3721,13 @@ function veApplyProject() {
             nm.img.onload = () => { nm.w = nm.img.naturalWidth; nm.h = nm.img.naturalHeight; veDraw(); veDrawMonitor(); };
             nm.img.src = r.url;
         });
+    });
+    // cópias invertidas (editor-reverse.js): aponta para a original com o id novo; apagada do cache → gera de novo
+    VE.media.forEach(nm => {
+        if (!nm || nm.rvDe == null) return;
+        nm.rvDe = ids[nm.rvDe];
+        if (nm.rvDe == null) delete nm.rvDe;
+        else if (nm.missing) veRvRestaurar(nm);
     });
     const mapClips = lista => (lista || [])
         .filter(c => !c.m || ids[c.m] != null)

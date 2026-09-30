@@ -301,6 +301,25 @@ def ve_preparar_midia(path, mid, urgente=False, leve=False):
     return {"success": True}
 
 
+def ve_inverter_midia(path, a, b, job):
+    """Clipe invertido (Reverse Speed): gera a cópia de trás para frente do trecho [a, b] em background;
+    eventos em veOnInverter({job, stage: 'pct'|'done'|'error', ...})."""
+    from Functions.video_cutter import inverter_midia
+
+    def run():
+        try:
+            r = inverter_midia(path, a, b, lambda p: _ve_emit("veOnInverter", {"job": job, "stage": "pct", "pct": p}))
+        except Exception as e:
+            r = {"success": False, "error": str(e)}
+        if r.get("success"):
+            _ve_emit("veOnInverter", {"job": job, "stage": "done", "path": r["path"]})
+        else:
+            _ve_emit("veOnInverter", {"job": job, "stage": "error", "error": r.get("error") or "erro"})
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
 # ── painel Texto do editor: transcrever a timeline / legendas ──
 _ve_texto_stop = None
 
@@ -2693,6 +2712,9 @@ class ApiBridge:
 
     def ve_preparar_midia(self, path, mid, urgente=False, leve=False):
         return ve_preparar_midia(path, mid, urgente, leve)
+
+    def ve_inverter_midia(self, path, a, b, job):
+        return ve_inverter_midia(path, a, b, job)
 
     def ve_priorizar_midia(self, path):
         from Functions.video_cutter import priorizar_midia

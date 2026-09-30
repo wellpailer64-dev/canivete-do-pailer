@@ -19,7 +19,7 @@ const VE_PJ_TIPOS = {
 };
 const VE_EXT_LEG = /\.(srt|vtt|ass|ssa|sbv|txt)$/i;   // legendas (Functions/legendas_formatos.py)
 
-const vePjMidia = () => VE.media.filter(m => m && !m.removido && !m.base && VE_PJ_TIPOS[m.kind]);
+const vePjMidia = () => VE.media.filter(m => m && !m.removido && !m.base && m.rvDe == null && VE_PJ_TIPOS[m.kind]);
 const vePjNome = m => m.nome || m.name || VE_PJ_TIPOS[m.kind][1];
 const vePjBin = id => (VE.bins || []).find(b => b.id === id);
 function vePjUso(m) {

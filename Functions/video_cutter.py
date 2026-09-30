@@ -342,6 +342,14 @@ def _fps(txt):
             return 0.0
 
 
+def _tem_alfa(pix_fmt, tags=None):
+    """Vídeo com transparência (ProRes 4444, PNG/Animation no .mov, VP9 com alfa...)."""
+    p = str(pix_fmt or "").lower()
+    if p.startswith(("yuva", "rgba", "bgra", "argb", "abgr", "gbrap", "ya8", "ya16")):
+        return True
+    return str((tags or {}).get("alpha_mode") or (tags or {}).get("ALPHA_MODE") or "") == "1"   # VP8/VP9 no WebM
+
+
 def _rotaciona_lados(rot):
     return abs(int(rot or 0)) % 180 == 90
 
@@ -370,6 +378,7 @@ def _probe_ffmpeg(path):
         m = re.search(r"\),\s*(\w+)\(|,\s*(yuv\w+|nv12|rgb\w*|gbr\w*|gray\w*)", linha_v)
         if m:
             info["pix_fmt"] = m.group(1) or m.group(2)
+        info["alfa"] = _tem_alfa(info["pix_fmt"]) or "alpha_mode" in linha_v.lower()
         m = re.search(r"\b(\d{2,5})x(\d{2,5})\b", linha_v)
         if m:
             info["width"], info["height"] = int(m.group(1)), int(m.group(2))
@@ -445,6 +454,7 @@ def _probe_ffprobe(path):
         "fps": fps if 1 <= fps <= 240 else 30.0,
         "vcodec": (v or {}).get("codec_name", ""),
         "pix_fmt": (v or {}).get("pix_fmt", ""),
+        "alfa": _tem_alfa((v or {}).get("pix_fmt"), (v or {}).get("tags")),
         # cor da fonte (a saída leva as mesmas marcas; sem elas o player chuta e a cor pode mudar)
         "color_space": (v or {}).get("color_space", ""),
         "color_primaries": (v or {}).get("color_primaries", ""),
@@ -608,7 +618,10 @@ def _proxy_escala(lado=1080):
     return f"'if(gte(iw,ih),-2,min({lado},iw))':'if(gte(iw,ih),min({lado},ih),-2)'"
 
 
-def _nome_proxy(lado):
+def _nome_proxy(lado, alfa=False):
+    # com transparência: WebM VP9 com alfa (o H.264 não tem alfa; o que era transparente ficava preto)
+    if alfa:
+        return "proxy_alfa_v1.webm" if lado == 1080 else f"proxy_alfa_v1_{lado}.webm"
     return "proxy_v2.mp4" if lado == 1080 else f"proxy_v2_{lado}.mp4"
 
 
@@ -658,9 +671,23 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
                 "-map", "[p]", "-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "24", "-b:v", "0",
                 "-bf", "0"] + comum
 
+    def _alfa():
+        # VP9 com alfa (yuva420p) no WebM: o navegador toca com a transparência. Só no processador (o NVENC não
+        # tem alfa); realtime/cpu-used 8 para a conversão não demorar. As miniaturas saem sobre preto.
+        return [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-i", path,
+                "-filter_complex", f"[0:v:0]scale={_PROXY_ESCALA}:flags=fast_bilinear,format=yuva420p"
+                + (",split[p][b]" + th_filtro if th_saida else "[p]"),
+                "-map", "[p]", "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-auto-alt-ref", "0",
+                "-deadline", "realtime", "-cpu-used", "8", "-row-mt", "1", "-crf", "32", "-b:v", "0",
+                "-map", "0:a:0?", "-g", str(fps_gop), "-c:a", "libopus", "-b:a", "128k", "-ac", "2",
+                "-f", "webm", out] + th_saida
+
     gpu = _detectar_hw_encoder() == "h264_nvenc"
-    tentativas = ([_cuda_girado] if rotacionado else [_cuda]) if gpu else []
-    tentativas.append(_cpu)
+    if info.get("alfa"):
+        tentativas = [_alfa]
+    else:
+        tentativas = ([_cuda_girado] if rotacionado else [_cuda]) if gpu else []
+        tentativas.append(_cpu)
     rc, err = 1, ""
     for fazer in tentativas:
         cmd = fazer()
@@ -771,7 +798,7 @@ def preparar(path, emit, stop_event=None):
     if direto:
         emit({"stage": "video", "url": media_server.register(path), "proxy": False})
     else:
-        proxy = os.path.join(work, "proxy_v2.mp4")
+        proxy = os.path.join(work, _nome_proxy(1080, info.get("alfa")))
         ok, err, thumbs = gerar_proxy(path, info, proxy, lambda p: emit({"stage": "proxy", "pct": p}), stop_event,
                                       thumbs_dir=work, thumbs_n=count, lado=_cache_cfg()["lado"])
         if stop_event is not None and stop_event.is_set():
@@ -893,7 +920,7 @@ def preparar_midia(path, emit, stop_event=None, prioridade=1, leve=False):
         pass
     lado = _cache_cfg()["lado"]
     direto = _navegador_toca(path, info)
-    proxy = os.path.join(work, _nome_proxy(lado))
+    proxy = os.path.join(work, _nome_proxy(lado, info.get("alfa")))
     count = int(min(180, max(24, info["duration"] / 2)))
     if leve and not direto and not os.path.isfile(proxy):
         emit({"stage": "info", "needs_proxy": True, "leve": True, **info})
@@ -926,7 +953,7 @@ def preparar_midia(path, emit, stop_event=None, prioridade=1, leve=False):
         if os.path.isfile(proxy):
             ok, err, thumbs = True, "", None
         else:
-            tmp = f"{proxy}.{os.getpid()}.tmp.mp4"   # por cópia do app: duas abrindo o mesmo vídeo não se atropelam
+            tmp = f"{proxy}.{os.getpid()}.tmp{os.path.splitext(proxy)[1]}"   # por cópia do app: duas abrindo o mesmo vídeo não se atropelam
             with _VAGAS_PROXY.vaga(chave, prioridade):   # 2 conversões por vez (os que tocam direto não esperam)
                 ok, err, thumbs = gerar_proxy(path, info, tmp, lambda p: emit({"stage": "proxy", "pct": p}),
                                               stop_event, thumbs_dir=work, thumbs_n=count, lado=lado)
@@ -949,6 +976,92 @@ def preparar_midia(path, emit, stop_event=None, prioridade=1, leve=False):
         emit({"stage": "thumbs", "thumbs": th})
     ta.join()
     emit({"stage": "done"})
+
+
+# ─────────────────────────── clipe invertido (Reverse Speed) ───────────────────────────
+
+def inverter_midia(path, a, b, on_pct=None, stop_event=None):
+    """Cópia do trecho [a, b] da mídia tocando de trás para frente (instante r da cópia = fonte b - r). O navegador
+    não toca vídeo ao contrário: o clipe invertido do editor passa a usar esta cópia como uma mídia comum.
+    O filtro reverse guarda o trecho inteiro na memória: o vídeo é invertido em pedaços de até ~300 MB de quadros
+    (do último para o primeiro) e juntado sem recodificar; o áudio sai inteiro com areverse.
+    Qualidade de exportação (H.264 CRF 16; com transparência, ProRes 4444). Retorna {success, path} ou {error}."""
+    if not os.path.isfile(path):
+        return {"success": False, "error": "Arquivo não encontrado."}
+    info = probe(path)
+    dur = info["duration"]
+    a, b = max(0.0, float(a)), min(dur, float(b)) if dur > 0 else float(b)
+    if b - a < 0.04:
+        return {"success": False, "error": "Trecho curto demais para inverter."}
+    work = _pasta_midia(path)
+    so_audio = not info["has_video"]
+    alfa = bool(info.get("alfa"))
+    ext = ".wav" if so_audio else ".mov" if alfa else ".mp4"
+    out = os.path.join(work, f"rev_{a:.3f}_{b:.3f}{ext}")
+    if os.path.isfile(out):
+        return {"success": True, "path": out}
+    ff = ffmpeg_path()
+    base = [ff, "-y", "-v", "error", "-nostats"]
+    pct = on_pct or (lambda p: None)
+
+    def _rodar(cmd):
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           creationflags=_creationflags())
+        return r.returncode, (r.stderr or "").strip()
+
+    if so_audio:
+        tmp = out + ".tmp.wav"
+        rc, err = _rodar(base + ["-ss", _tempo_ffmpeg(a), "-t", _tempo_ffmpeg(b - a), "-i", path, "-vn",
+                                 "-af", "areverse", "-c:a", "pcm_s16le", tmp])
+        if rc != 0 or not os.path.isfile(tmp):
+            _apagar_item(tmp)
+            return {"success": False, "error": err.splitlines()[-1] if err else "Falha ao inverter o áudio."}
+        os.replace(tmp, out)
+        pct(100)
+        return {"success": True, "path": out}
+
+    fps = info["fps"] or 30.0
+    w, h = max(2, info["width"] or 1920), max(2, info["height"] or 1080)
+    # pedaço com um número inteiro de quadros e no máximo ~300 MB de quadros na memória (4K 30p: ~1 s)
+    quadros = max(4, min(int(fps * 4), int(300e6 / (w * h * (4 if alfa else 1.5)))))
+    passo = quadros / fps
+    pasta = os.path.join(work, f"rev_{uuid.uuid4().hex[:8]}")
+    os.makedirs(pasta, exist_ok=True)
+    gop = str(max(1, int(round(fps / 2))))   # quadro-chave a cada ~0,5 s: busca rápida no editor
+    if alfa:
+        venc = ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le"]
+    else:
+        venc = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-g", gop, "-pix_fmt", "yuv420p"]
+    try:
+        pedacos, n = [], max(1, math.ceil((b - a) / passo - 1e-6))
+        for k in range(n):
+            if stop_event is not None and stop_event.is_set():
+                return {"success": False, "error": "Cancelado."}
+            ini = a + k * passo
+            arq = os.path.join(pasta, f"p{k:05d}{'.mov' if alfa else '.mp4'}")
+            rc, err = _rodar(base + ["-ss", _tempo_ffmpeg(ini), "-t", _tempo_ffmpeg(min(passo, b - ini)), "-i", path,
+                                     "-an", "-vf", f"fps={fps:.6f},reverse", *venc, arq])
+            if rc != 0 or not os.path.isfile(arq):
+                return {"success": False, "error": err.splitlines()[-1] if err else "Falha ao inverter o vídeo."}
+            pedacos.append(arq)
+            pct(int((k + 1) * 90 / n))
+        lista = os.path.join(pasta, "lista.txt")
+        with open(lista, "w", encoding="utf-8") as f:
+            for arq in reversed(pedacos):
+                f.write("file '" + arq.replace("\\", "/").replace("'", r"'\''") + "'\n")
+        tmp = out + ".tmp" + ext
+        aud = (["-ss", _tempo_ffmpeg(a), "-t", _tempo_ffmpeg(b - a), "-i", path, "-map", "1:a:0", "-af", "areverse",
+                *(["-c:a", "pcm_s16le"] if alfa else ["-c:a", "aac", "-b:a", "256k"])] if info["has_audio"] else [])
+        rc, err = _rodar(base + ["-f", "concat", "-safe", "0", "-i", lista, *aud, "-map", "0:v:0", "-c:v", "copy",
+                                 *([] if alfa else ["-movflags", "+faststart"]), *(["-shortest"] if aud else []), tmp])
+        if rc != 0 or not os.path.isfile(tmp):
+            _apagar_item(tmp)
+            return {"success": False, "error": err.splitlines()[-1] if err else "Falha ao juntar o vídeo invertido."}
+        os.replace(tmp, out)
+        pct(100)
+        return {"success": True, "path": out}
+    finally:
+        shutil.rmtree(pasta, ignore_errors=True)
 
 
 # ─────────────────────────── exportação ───────────────────────────
@@ -1791,6 +1904,25 @@ def _caminho_filtro(p):
     return "'" + p.replace("\\", "/").replace(":", "\\:").replace("'", "'\\''") + "'"
 
 
+def _b3d_cantos(v, w, h, folga=0):
+    """Básico 3D: cantos do quadro na tela (sup. esq., sup. dir., inf. esq., inf. dir.) — mesma conta de
+    veB3dCantos (frontend/js/editor-fx.js). None se algum canto ficar atrás da câmera."""
+    f = math.hypot(w, h)
+    gi = _num(v.get("giro"), -180, 180) * math.pi / 180
+    it = _num(v.get("incl"), -180, 180) * math.pi / 180
+    dz = _num(v.get("dist"), -50, 200) / 100.0 * f
+    hw, hh = w / 2 + folga, h / 2 + folga
+    out = []
+    for x, y in ((-hw, -hh), (hw, -hh), (-hw, hh), (hw, hh)):
+        y1, z1 = y * math.cos(it), -y * math.sin(it)
+        x2, z2 = x * math.cos(gi) + z1 * math.sin(gi), -x * math.sin(gi) + z1 * math.cos(gi) + dz
+        p = f + z2
+        if p < f * 0.05:
+            return None
+        out.append((w / 2 + x2 * f / p, h / 2 + y1 * f / p))
+    return out
+
+
 def _filtros_fx(fx, mw, mh, tag="x"):
     """Efeitos do clipe (mesma ordem e mesmas contas da prévia do editor, em frontend/js/editor-fx.js).
     Rodam no tamanho original da mídia, antes de escala/posição/rotação/opacidade (como no Premiere).
@@ -1848,6 +1980,28 @@ def _filtros_fx(fx, mw, mh, tag="x"):
                 out.append(caixa.format(x=0, y=0, w="iw", h=f"'max(1,trunc(ih*{tp:.5f}))'"))
             if bt > 0:
                 out.append(caixa.format(x=0, y=f"'ih-max(1,trunc(ih*{bt:.5f}))'", w="iw", h=f"'max(1,trunc(ih*{bt:.5f}))'"))
+        elif t == "rounded":
+            # cantos arredondados (veFxRaio): alfa × máscara com borda suavizada de 1 px, como o roundRect da prévia
+            R = _num(v.get("raio"), 0, 100) / 100.0 * min(mw, mh) / 2.0
+            if R >= 0.5:
+                r = f"{tag}f{j}"
+                dx = f"max(0,max({R:.3f}-X-0.5,X+0.5-W+{R:.3f}))"
+                dy = f"max(0,max({R:.3f}-Y-0.5,Y+0.5-H+{R:.3f}))"
+                out.append(f"format=rgba,split[{r}a][{r}b];[{r}b]alphaextract,"
+                           f"geq=lum='p(X,Y)*clip({R + 0.5:.3f}-hypot({dx},{dy}),0,1)'[{r}m];"
+                           f"[{r}a][{r}m]alphamerge,format=rgba")
+        elif t == "b3d":
+            # Básico 3D (veB3dCantos/veB3dDraw): os cantos projetados vão para o perspective. Borda transparente de
+            # 2 px antes (o perspective repete a borda: repete transparente) e corte de volta ao tamanho da mídia.
+            folga = 2
+            k = _b3d_cantos(v, mw, mh, folga)
+            if k is None:
+                out.append("format=rgba,colorchannelmixer=aa=0")   # atrás da câmera: não aparece
+            elif any(abs(_num(v.get(n), -1000, 1000)) > 1e-4 for n in ("giro", "incl", "dist")):
+                pts = ":".join(f"{x + folga:.3f}:{y + folga:.3f}" for x, y in k)
+                out.append(f"format=rgba,pad=iw+{2 * folga}:ih+{2 * folga}:{folga}:{folga}:color=black@0,"
+                           f"format=gbrap,perspective={pts}:interpolation=linear:sense=destination,"
+                           f"crop={mw}:{mh}:{folga}:{folga},format=rgba")
         elif t == "lc":
             # Luz e Cor: cor pela LUT (trilinear, igual à textura 3D da prévia), depois nitidez e vinheta
             if v.get("lut"):

@@ -128,6 +128,35 @@ const VE_FX = {
             return a;
         },
     },
+    // Cantos arredondados: 100% = metade do lado menor (vira pílula / círculo). Fora da curva fica transparente.
+    rounded: {
+        nome: 'Cantos arredondados', cat: 'Transformar', tag: 'Rounded',
+        params: [{ k: 'raio', nome: 'Arredondamento', min: 0, max: 100, step: 0.5, def: 15, un: '%' }],
+        neutro: v => !(v.raio > 0),
+        draw(a, v, env) {
+            const { w, h } = env, r = veFxRaio(v, w, h);
+            if (r < 0.5) return a;
+            const x = a.ctx;
+            x.save();
+            x.globalCompositeOperation = 'destination-in';
+            x.beginPath();
+            x.roundRect(0, 0, w, h, r);
+            x.fill();
+            x.restore();
+            return a;
+        },
+    },
+    // Básico 3D (Basic 3D do Premiere): gira o quadro no espaço e projeta com perspectiva, dentro do próprio quadro
+    b3d: {
+        nome: 'Básico 3D', cat: 'Perspectiva', tag: 'Basic 3D',
+        params: [
+            { k: 'giro', nome: 'Girar (eixo Y)', min: -180, max: 180, step: 0.5, def: 0, un: '°' },
+            { k: 'incl', nome: 'Inclinar (eixo X)', min: -180, max: 180, step: 0.5, def: 0, un: '°' },
+            { k: 'dist', nome: 'Distância até a imagem', min: -50, max: 200, step: 0.5, def: 0, un: '' },
+        ],
+        neutro: v => !v.giro && !v.incl && !v.dist,
+        draw: (a, v, env) => veB3dDraw(a, v, env),
+    },
 };
 
 const VE_AFX = {
@@ -174,6 +203,78 @@ const VE_AFX = {
         neutro: v => !v.lo && !v.mid && !v.hi,
     },
 };
+
+// ── Cantos arredondados: raio em px do quadro w×h (a exportação faz a mesma conta: _filtros_fx) ──
+function veFxRaio(v, w, h) { return Math.max(0, Math.min(100, v.raio || 0)) / 100 * Math.min(w, h) / 2; }
+
+// ── Básico 3D ──
+// Quadro centrado na origem, girado primeiro em X (inclinar: o topo afasta com ângulo positivo) e depois em Y
+// (girar), afastado pela distância e projetado por uma câmera a f = diagonal do quadro. Devolve os 4 cantos na tela
+// (sup. esq., sup. dir., inf. esq., inf. dir.) e a profundidade de cada um, ou null se algum ficar atrás da câmera.
+// A exportação (_b3d_cantos em Functions/video_cutter.py) usa a mesma conta.
+function veB3dCantos(v, w, h, folga = 0) {
+    const f = Math.hypot(w, h), gi = (v.giro || 0) * Math.PI / 180, it = (v.incl || 0) * Math.PI / 180;
+    const dz = (v.dist || 0) / 100 * f, hw = w / 2 + folga, hh = h / 2 + folga;
+    const out = [];
+    for (const [x, y] of [[-hw, -hh], [hw, -hh], [-hw, hh], [hw, hh]]) {
+        const y1 = y * Math.cos(it), z1 = -y * Math.sin(it);
+        const x2 = x * Math.cos(gi) + z1 * Math.sin(gi), z2 = -x * Math.sin(gi) + z1 * Math.cos(gi) + dz;
+        const p = f + z2;
+        if (p < f * 0.05) return null;
+        out.push([w / 2 + x2 * f / p, h / 2 + y1 * f / p, p / f]);
+    }
+    return out;
+}
+
+// Prévia: quadrilátero com textura em WebGL (a divisão por w da GPU dá a perspectiva certa, como o ffmpeg perspective)
+const VEB3D = { cv: null, gl: null };
+function veB3dGl() {
+    if (VEB3D.gl) return VEB3D.gl;
+    const cv = document.createElement('canvas'), gl = cv.getContext('webgl', { premultipliedAlpha: true, alpha: true });
+    if (!gl) return null;
+    const sh = (tipo, src) => { const s = gl.createShader(tipo); gl.shaderSource(s, src); gl.compileShader(s); return s; };
+    const pr = gl.createProgram();
+    gl.attachShader(pr, sh(gl.VERTEX_SHADER,
+        'attribute vec4 p; attribute vec2 uv; varying vec2 v; void main() { v = uv; gl_Position = p; }'));
+    gl.attachShader(pr, sh(gl.FRAGMENT_SHADER,
+        'precision mediump float; varying vec2 v; uniform sampler2D t; void main() { gl_FragColor = texture2D(t, v); }'));
+    gl.linkProgram(pr);
+    gl.useProgram(pr);
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T].forEach(k => gl.texParameteri(gl.TEXTURE_2D, k, gl.CLAMP_TO_EDGE));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    const lp = gl.getAttribLocation(pr, 'p'), lu = gl.getAttribLocation(pr, 'uv');
+    gl.enableVertexAttribArray(lp);
+    gl.enableVertexAttribArray(lu);
+    gl.vertexAttribPointer(lp, 4, gl.FLOAT, false, 24, 0);
+    gl.vertexAttribPointer(lu, 2, gl.FLOAT, false, 24, 16);
+    VEB3D.cv = cv;
+    VEB3D.gl = gl;
+    return gl;
+}
+function veB3dDraw(a, v, env) {
+    const { w, h } = env, b = veFxOther(a, w, h);
+    b.ctx.clearRect(0, 0, w, h);
+    const k = veB3dCantos(v, w, h), gl = k && veB3dGl();
+    if (!k || !gl) return b;
+    const cv = VEB3D.cv;
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    gl.viewport(0, 0, w, h);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, a.cv); } catch (e) { return a; }   // quadro sem CORS: sem 3D
+    const uv = [[0, 0], [1, 0], [0, 1], [1, 1]], d = [];
+    k.forEach(([x, y, p], i) => d.push((x / w * 2 - 1) * p, (1 - y / h * 2) * p, 0, p, uv[i][0], uv[i][1]));
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(d), gl.STREAM_DRAW);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    b.ctx.drawImage(cv, 0, 0);
+    return b;
+}
 
 // ── Chroma Key (como Keylight / Ultra Key) ──
 // Matte por DIFERENÇA DE COR (o núcleo do Keylight e do IBK do Nuke), não por distância de cor: a transparência vem
@@ -315,6 +416,8 @@ function veHasAfx(c) { return !!(c && c.afx && c.afx.length); }
 
 // Clipe de vídeo "puro": ocupa o quadro todo, sem efeitos (vai direto na base da exportação)
 function veIsPlain(c) { return veIsDefaultProps(c) && !veFxActive(c).length; }
+// vídeo com transparência (.mov ProRes 4444/PNG, WebM com alfa): não cobre o que está embaixo
+function veTemAlfa(c) { const m = veMediaOf(c); return !!(m && m.info && m.info.alfa); }
 
 // Prévia: aplica os efeitos na mídia e devolve o que desenhar no lugar dela.
 // alvo = pixels do monitor por pixel da mídia: os efeitos rodam só na resolução em que a mídia aparece

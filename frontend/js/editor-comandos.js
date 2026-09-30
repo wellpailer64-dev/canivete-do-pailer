@@ -49,6 +49,7 @@ const VE_CMDS = [
     { id: 'easy-ease', grupo: 'clipe', sep: true, nome: 'Easy Ease (quadros-chave)', teclas: ['F9'], fn: () => veKlEasy('ambos') },
     { id: 'easy-ease-in', grupo: 'clipe', nome: 'Easy Ease de entrada', teclas: ['Shift+F9'], fn: () => veKlEasy('in') },
     { id: 'easy-ease-out', grupo: 'clipe', nome: 'Easy Ease de saída', teclas: ['Ctrl+Shift+F9'], fn: () => veKlEasy('out') },
+    { id: 'inverter', grupo: 'clipe', nome: 'Inverter clipe (Reverse Speed)', teclas: [], sep: true, fn: () => veInverterClipes(), pode: veSel, marcado: () => veInvertido(VE.clips[VE.sel]) },
     { id: 'vinculo', grupo: 'clipe', nome: 'Seleção vinculada', teclas: [], sep: true, fn: () => veToggleVinculo(), marcado: () => VE.vinculo },
 
     // ── Sequência ──
@@ -136,10 +137,11 @@ const VE_TECLA_NOMES = { ' ': 'Space', arrowleft: 'Left', arrowright: 'Right', a
 function veTeclaCombo(e) {
     let k = e.key;
     if (!k || ['Control', 'Shift', 'Alt', 'Meta', 'AltGraph', 'CapsLock'].includes(k)) return null;
-    let simbolo = false;
+    let simbolo = false, shiftNum = false;
     if (/^Key[A-Z]$/.test(e.code)) k = e.code.slice(3);
     else if (/^Digit\d$/.test(e.code)) k = e.code.slice(5);
-    else if (/^Numpad\d$/.test(e.code)) k = e.code.slice(6);
+    // Shift + número do numpad: o Windows solta o Shift e manda PageUp/End...; o Shift estava apertado
+    else if (/^Numpad\d$/.test(e.code)) { k = e.code.slice(6); shiftNum = !/^\d$/.test(e.key) && e.getModifierState('NumLock'); }
     else if (e.ctrlKey && e.shiftKey && (k === ')' || k === '(')) k = '9';
     else if (k === 'Dead' && e.code === 'Backquote') { k = "'"; simbolo = true; }   // ' no ABNT2 internacional
     else if (VE_TECLA_NOMES[k.toLowerCase()]) k = VE_TECLA_NOMES[k.toLowerCase()];
@@ -149,7 +151,7 @@ function veTeclaCombo(e) {
     const mods = [];
     if (e.ctrlKey || e.metaKey) mods.push('Ctrl');
     if (e.altKey) mods.push('Alt');
-    if (e.shiftKey && !simbolo) mods.push('Shift');
+    if ((e.shiftKey || shiftNum) && !simbolo) mods.push('Shift');
     return [...mods, k].join('+');
 }
 

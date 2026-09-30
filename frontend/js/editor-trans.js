@@ -118,11 +118,14 @@ function veTransJanela(c, lado, aud) {
     const A = veVizAntes(c, aud);
     if (!A) return { t: tr.t, tr, A: null, B: c, ws: c.st, we: c.st + d, c, lado, aud };
     const cut = c.st, hA = veSobra(A, 'fim'), hB = veSobra(c, 'ini');
-    d = Math.min(d, veLen(A), hA + hB);
+    // áudio sem mídia sobrando (ex.: duas músicas inteiras coladas): como no Premiere, aplica mesmo assim —
+    // cada lado só se estende pelo que tem (aFim / bIni) e o fade usa o próprio trecho do clipe
+    const semSobra = aud && hA + hB < d;
+    d = Math.min(d, veLen(A), semSobra ? Infinity : hA + hB);
     if (d < veFrame() * 0.99) return null;
     const lo = Math.max(cut - hB, cut - d), hi = Math.min(cut, cut + hA - d);
-    const ws = Math.min(Math.max(cut - d / 2, lo), hi);
-    return { t: tr.t, tr, A, B: c, ws, we: ws + d, c, lado, aud };
+    const ws = semSobra ? cut - d / 2 : Math.min(Math.max(cut - d / 2, lo), hi), we = ws + d;
+    return { t: tr.t, tr, A, B: c, ws, we, aFim: Math.min(we, cut + hA), bIni: Math.max(ws, cut - hB), c, lado, aud };
 }
 
 // Transições de vídeo (comAudio: também as de áudio, para desenhar e clicar na timeline)
@@ -144,16 +147,16 @@ function veAudFades() {
     if (!VE.clips.some(c => c.atin || c.atout)) return m;
     const pega = c => { if (!m.has(c)) m.set(c, { st: c.st, s: c.s, e: c.e, fi: 0, fo: 0 }); return m.get(c); };
     veTransLista(true).filter(j => j.aud).forEach(j => {
-        const d = j.we - j.ws;
+        const d = j.we - j.ws, bIni = j.A ? j.bIni : j.ws, aFim = j.B ? j.aFim : j.we;
         if (j.B) {
             const f = pega(j.B);
-            if (j.ws < f.st) { f.s -= (f.st - j.ws) * veVel(j.B); f.st = j.ws; }
-            f.fi = d;
+            if (bIni < f.st) { f.s -= (f.st - bIni) * veVel(j.B); f.st = bIni; }
+            f.fi = j.A ? j.we - bIni : d;
         }
         if (j.A) {
             const f = pega(j.A), fim = f.st + (f.e - f.s) / veVel(j.A);
-            if (j.we > fim) f.e += (j.we - fim) * veVel(j.A);
-            f.fo = d;
+            if (aFim > fim) f.e += (aFim - fim) * veVel(j.A);
+            f.fo = j.B ? aFim - j.ws : d;
         }
     });
     return m;
