@@ -18,6 +18,7 @@ O JS (editor-autoframe.js) transforma o plano numa timeline normal do editor (cl
 import os
 import json
 import math
+import collections
 import time
 import hashlib
 import subprocess
@@ -452,6 +453,13 @@ def analisar_video(path, on_pct=None):
     """Amostra a 2 quadros/s em 320 px: nitidez, movimento, exposição, cor e rostos a cada instante."""
     d = _cache_ler(path, "video")
     if d and d.get("thumb") and os.path.isfile(d["thumb"]):
+        if d.get("dims") != 2:
+            # análise antiga trocava largura/altura de vídeo girado: conserta só as dimensões (sem reanalisar)
+            info = probe(path)
+            if info.get("width") and info.get("height"):
+                d["w"], d["h"] = int(info["width"]), int(info["height"])
+            d["dims"] = 2
+            _cache_gravar(path, "video", {k: v for k, v in d.items()})
         return d
     import cv2
     info = probe(path)
@@ -486,8 +494,8 @@ def analisar_video(path, on_pct=None):
     proc.wait()
     if not amostras:
         return None
-    rot = int(info.get("rotation") or 0) % 180 != 0
-    d = {"path": path, "tipo": "video", "dur": round(dur, 3), "w": H if rot else W, "h": W if rot else H,
+    # probe() já devolve largura/altura com a rotação aplicada (vídeo em pé do celular/DJI = retrato)
+    d = {"path": path, "tipo": "video", "dur": round(dur, 3), "w": W, "h": H, "dims": 2,
          "fps": info.get("fps"), "tem_audio": bool(info.get("has_audio")), "amostras": amostras,
          "nota": round(float(np.mean([_nota_amostra(a) for a in amostras])), 3),
          "thumb": _miniatura(path, "video", melhor_img) if melhor_img is not None else None}
@@ -738,12 +746,14 @@ def _hamming(a, b):
 
 
 def _candidatos(midias, dur_slot, dur_max):
-    """Fotos (1 cada) e trechos de vídeo (as melhores janelas sem sobreposição, até 4 por vídeo)."""
+    """Fotos (1 cada) e trechos de vídeo (as melhores janelas sem sobreposição). Cada um sabe o seu grupo
+    (mídia; fotos quase iguais, de rajada, contam como o mesmo grupo) e o seu posto dentro dele (0 = o melhor)."""
     cand = []
     for m in midias:
         if m["tipo"] == "foto":
             cand.append({"path": m["path"], "tipo": "foto", "nota": m["nota"], "mov": 0.0, "rostos": m["rostos"],
-                         "fx": m["fx"], "fy": m["fy"], "hash": m["hash"], "w": m["w"], "h": m["h"], "data": m.get("data")})
+                         "fx": m["fx"], "fy": m["fy"], "hash": m["hash"], "w": m["w"], "h": m["h"], "data": m.get("data"),
+                         "posto": 0})
             continue
         am = m["amostras"]
         if not am:
@@ -757,8 +767,8 @@ def _candidatos(midias, dur_slot, dur_max):
         else:
             media = np.array([notas.mean()])
         usados = np.zeros(len(media), dtype=bool)
-        n_max = int(min(4, max(1, m["dur"] // max(dur_slot * 1.5, 0.5))))
-        for _ in range(n_max):
+        n_max = int(min(8, max(1, m["dur"] // max(dur_slot * 1.5, 0.5))))
+        for r in range(n_max):
             livres = np.where(~usados)[0]
             if not len(livres):
                 break
@@ -770,12 +780,198 @@ def _candidatos(midias, dur_slot, dur_max):
             cand.append({"path": m["path"], "tipo": "video", "ini": round(ini, 3), "dur_fonte": m["dur"],
                          "nota": float(media[k]), "mov": float(movs[k:k + janela].mean()),
                          "rostos": meio["rostos"], "fx": meio["fx"], "fy": meio["fy"], "hash": meio["hash"],
-                         "w": m["w"], "h": m["h"], "data": None})
+                         "w": m["w"], "h": m["h"], "data": None, "posto": r})
             usados[max(0, k - janela):k + janela] = True
+    # grupos: mesma mídia, ou fotos quase iguais (rajada) — repetir o grupo é repetir a cena
+    # (vídeo copiado com outro nome, "arquivo(1).mp4": mesma duração e mesmo primeiro quadro)
+    def assinatura(m):
+        if m["tipo"] == "foto":
+            return ("foto", m.get("hash"), 0)
+        am = m.get("amostras") or [{}]
+        return ("video", am[0].get("hash"), m.get("dur", 0))
+
+    def igual(a, b):
+        if a[0] != b[0]:
+            return False
+        if a[0] == "foto":
+            return _hamming(a[1], b[1]) < 8
+        return abs(a[2] - b[2]) < 0.05 and _hamming(a[1], b[1]) < 6
+    reps = []
+    for m in midias:
+        sg = assinatura(m)
+        g = next((i for i, r in enumerate(reps) if igual(r, sg)), None)
+        if g is None:
+            reps.append(sg)
+            g = len(reps) - 1
+        m["_grupo"] = g
+    grupo = {m["path"]: m["_grupo"] for m in midias}
+    for c in cand:
+        c["grupo"] = grupo.get(c["path"], -1)
+    # posto dentro do grupo (duas fotos da mesma rajada: a melhor é a 0)
+    por_g = {}
+    for c in sorted(cand, key=lambda c: (c["posto"], -c["nota"])):
+        c["posto"] = por_g.get(c["grupo"], 0)
+        por_g[c["grupo"]] = c["posto"] + 1
     return cand
 
 
-def planejar(musica, midias, modelo_id, dur_alvo=None, ordem="inteligente", semente=0, inicio=None):
+# ─────────────────────────── telas divididas ───────────────────────────
+# Quadro 9:16 (1080×1920) com fundo preto; as células entram uma por batida (estilo CapCut).
+# "m" = minimalista: margens e respiro; sem "m" = de ponta a ponta com fio preto entre as células.
+def _grade(n_lin, n_col, mx=0, my=None, gap=10, cw=None, ch=None):
+    W, H = 1080, 1920
+    cw = cw or (W - 2 * mx - gap * (n_col - 1)) / n_col
+    ch = ch or ((H - 2 * my - gap * (n_lin - 1)) / n_lin if my is not None else (H - gap * (n_lin - 1)) / n_lin)
+    tw, th = cw * n_col + gap * (n_col - 1), ch * n_lin + gap * (n_lin - 1)
+    x0, y0 = (W - tw) / 2, (H - th) / 2
+    return [{"x": round(x0 + c * (cw + gap), 1), "y": round(y0 + l * (ch + gap), 1), "w": round(cw, 1), "h": round(ch, 1)}
+            for l in range(n_lin) for c in range(n_col)]
+
+
+LAYOUTS = {
+    "pilha3":  {"deitado": True,  "celulas": _grade(3, 1)},                              # 3 faixas 16:9 de ponta a ponta
+    "pilha3m": {"deitado": True,  "celulas": _grade(3, 1, cw=960, ch=540, gap=30)},      # 3 quadros 16:9 com margem
+    "pilha2":  {"deitado": True,  "celulas": _grade(2, 1)},
+    "pilha2m": {"deitado": True,  "celulas": _grade(2, 1, cw=960, ch=540, gap=40)},      # 2 quadros 16:9 no centro
+    "grade4":  {"deitado": False, "celulas": _grade(2, 2)},                              # 4 células 9:16
+    "colunas2": {"deitado": False, "celulas": _grade(1, 2)},
+    "colunas3m": {"deitado": False, "celulas": _grade(1, 3, cw=320, ch=1200, gap=20)},   # 3 colunas no meio
+}
+# por modelo: de quantos em quantos compassos entra uma tela dividida, e quais formas combinam
+_LAYOUT_MODELO = {
+    "batida": {"cada": 12, "passo": 1, "formas": {True: ["pilha3", "pilha2"], False: ["grade4", "colunas2"]}},
+    "drop": {"cada": 12, "passo": 1, "formas": {True: ["pilha3", "pilha3m"], False: ["grade4", "colunas3m"]}},
+    "viagem": {"cada": 8, "passo": 1, "formas": {True: ["pilha3m", "pilha3"], False: ["colunas3m", "grade4"]}},
+    "memorias": {"cada": 12, "passo": 2, "formas": {True: ["pilha2m", "pilha3m"], False: ["colunas3m", "colunas2"]}},
+    "cinematico": {"cada": 16, "passo": 2, "formas": {True: ["pilha2m"], False: ["colunas2"]}},
+}
+
+
+def _layouts(M, sl, musica, cand, rng, sobra=1.0):
+    """Troca alguns trechos por telas divididas. Cada slot vira {..., layout, celulas:[{a, cel}]}.
+    sobra > 1 = mais mídias que cenas: telas divididas mais frequentes (usa mais mídias por compasso)."""
+    cfg = _LAYOUT_MODELO.get(M["id"])
+    beats = musica["beats"]
+    if not cfg or len(sl) < 6 or len(beats) < 8:
+        return sl
+    downs = set(round(t, 3) for t in musica["downbeats"])
+    idx = {round(t, 3): k for k, t in enumerate(beats)}
+    drop = musica.get("drop")
+    per = 60.0 / max(musica["bpm"], 1)
+    cada = max(4, int(round(cfg["cada"] / min(2.0, max(1.0, sobra)))))
+    # orientação que sobra: deitado (paisagem) ou em pé
+    deitados = sum(1 for c in cand if c["posto"] == 0 and c["w"] > c["h"] * 1.1)
+    em_pe = sum(1 for c in cand if c["posto"] == 0 and c["h"] > c["w"] * 1.1)
+    usados, ult, out, i = 0, None, [], 0
+    fim = sl[-1]["b"]
+    while i < len(sl):
+        s = sl[i]
+        k0 = idx.get(round(s["a"], 3))
+        pode = (i >= 2 and k0 is not None and round(s["a"], 3) in downs
+                and (ult is None or s["a"] - ult >= cada * 4 * per - 0.05)
+                and s["a"] - sl[0]["a"] >= 4 * 4 * per - 0.05 and fim - s["a"] >= 3 * 4 * per
+                and not (drop is not None and -2 * per <= s["a"] - drop < 8 * per))   # o drop fica em tela cheia
+        if not pode:
+            out.append(s)
+            i += 1
+            continue
+        deitado = deitados >= em_pe if (deitados + em_pe) else True
+        if deitados and em_pe and rng.uniform() < 0.3:
+            deitado = not deitado   # às vezes a outra orientação, se houver material
+        forma = cfg["formas"][deitado][usados % len(cfg["formas"][deitado])]
+        cels = LAYOUTS[forma]["celulas"]
+        n, passo = len(cels), cfg["passo"]
+        # duração: todas entram, a última ainda fica ~1 batida (fecha em compasso inteiro)
+        tot = int(math.ceil((passo * (n - 1) + max(1, passo)) / 4.0) * 4)
+        if k0 + tot >= len(beats):
+            out.append(s)
+            i += 1
+            continue
+        b = beats[k0 + tot]
+        if b > fim - 0.05:
+            out.append(s)
+            i += 1
+            continue
+        # consome os slots até b; o que atravessa b é aparado
+        j = i
+        while j < len(sl) and sl[j]["b"] <= b + 0.05:
+            j += 1
+        if j < len(sl) and sl[j]["a"] < b - 0.05:
+            if sl[j]["b"] - b < per * 0.95:
+                out.append(s)
+                i += 1
+                continue
+            sl[j] = dict(sl[j], a=round(b, 4), acento=False)
+        out.append({"a": s["a"], "b": round(b, 4), "nivel": s["nivel"], "acento": s["acento"], "layout": forma,
+                    "celulas": [{"a": round(beats[k0 + passo * c], 4), "cel": cel} for c, cel in enumerate(cels)]})
+        usados += 1
+        ult = s["a"]
+        i = j
+    return out
+
+
+def _encaixe_custo(c, s, M, dur, i, n):
+    """Quanto a mídia c combina com o slot s (quanto maior, melhor)."""
+    v = c["nota"]
+    # tipo pedido pelo modelo (Memórias quer foto, Cinemático quer vídeo)
+    v += 0.18 * ((1 if c["tipo"] == "video" else 0) - 0.5) * (M["ideal"] - 0.5) * 2
+    # energia alta pede movimento (vídeo), calma aceita foto
+    v += 0.25 * (c["mov"] if s["nivel"] == 2 else (0.5 - abs(c["mov"] - 0.3)) * 0.4)
+    if c["tipo"] == "foto" and s["nivel"] == 2 and M["ideal"] > 0.5:
+        v -= 0.1
+    if c["tipo"] == "video":
+        if c["dur_fonte"] < dur - 0.05:
+            v -= 5   # curto demais para o slot
+        elif c["ini"] + dur > c["dur_fonte"]:
+            v -= 0.2
+    if s.get("cel"):
+        # célula da tela dividida: orientação da mídia parecida com a da célula (menos corte)
+        ar_c, ar_m = s["cel"]["w"] / s["cel"]["h"], c["w"] / max(1, c["h"])
+        v -= 0.35 * abs(math.log(ar_c / max(ar_m, 1e-3)))
+    elif i == 0 or i == n - 1:
+        v += 0.3 * c["nota"] + 0.1 * min(1, c["rostos"])   # abertura e fecho: as mais fortes
+    return v
+
+
+def _refinar(item, m, dur, nivel, acento, ocupado):
+    """Escolhe o momento exato do vídeo para ESTE slot: bom de ver, com a energia do trecho da música,
+    sem corte de cena no meio e sem repetir o trecho já usado desse vídeo."""
+    am = m.get("amostras") or []
+    if len(am) < 2:
+        return item.get("ini", 0.0)
+    passo = am[1]["t"] - am[0]["t"]
+    jan = max(1, int(round(dur / max(passo, 1e-3))))
+    lim = max(0.0, m["dur"] - dur - 0.05)
+    notas = np.array([_nota_amostra(a) for a in am])
+    movs = np.array([a["mov"] for a in am])
+    rost = np.array([min(1.0, a["rostos"]) for a in am])
+    # corte de cena dentro do próprio arquivo (vídeo já editado / virada brusca): hash muda muito de uma amostra à outra
+    salto = np.array([0.0] + [1.0 if _hamming(am[k - 1]["hash"], am[k]["hash"]) > 22 else 0.0 for k in range(1, len(am))])
+    alvo_mov = {0: 0.2, 1: 0.35, 2: 0.6}.get(nivel, 0.35)
+    melhor, t_melhor = -1e9, item.get("ini", 0.0)
+    for k in range(0, len(am)):
+        t = am[k]["t"]
+        if t > lim + 1e-6:
+            break
+        e = min(len(am), k + jan)
+        v = notas[k:e].mean() + 0.1 * rost[k:e].mean()
+        v -= 0.35 * abs(movs[k:e].mean() - alvo_mov)
+        if acento:
+            v += 0.15 * movs[k:min(e, k + 2)].mean()   # a ação começa junto com o corte
+        v -= 0.4 * salto[k + 1:e].sum()
+        if t < 0.3:
+            v -= 0.08   # começo do arquivo: câmera ainda ajeitando
+        # trecho já usado desse vídeo (ou colado nele) não serve
+        for a, b in ocupado:
+            sobre = min(b, t + dur) - max(a, t)
+            if sobre > -0.3:
+                v -= 1.5 * (0.3 + max(0.0, sobre) / dur)
+        if v > melhor:
+            melhor, t_melhor = v, t
+    return round(min(t_melhor, lim), 3)
+
+
+def planejar(musica, midias, modelo_id, dur_alvo=None, ordem="inteligente", semente=0, inicio=None, telas=True):
     from scipy.optimize import linear_sum_assignment
     M = next((x for x in MODELOS if x["id"] == modelo_id), MODELOS[0])
     sl = _slots(musica, M, dur_alvo, inicio)
@@ -786,75 +982,112 @@ def planejar(musica, midias, modelo_id, dur_alvo=None, ordem="inteligente", seme
     if not cand:
         return {"success": False, "error": "Nenhuma mídia aproveitável"}
     rng = np.random.default_rng(int(semente) or None)
-    # repetidas: cópias das melhores (vídeo em outro trecho), para o húngaro preferir repetir uma boa a usar
-    # uma ruim; e o bastante para cobrir todos os slots
+    n_grupos = len({c["grupo"] for c in cand})
+    if telas:
+        sl = _layouts(M, sl, musica, cand, rng, sobra=n_grupos / max(1, len(sl)))
+    _transicoes(M, sl, musica)
+    # linhas do encaixe: um slot normal = 1 linha; tela dividida = 1 linha por célula
+    linhas = []
+    for si, s in enumerate(sl):
+        if s.get("layout"):
+            for ci, ce in enumerate(s["celulas"]):
+                linhas.append({"slot": si, "cel_i": ci, "a": ce["a"], "b": s["b"], "nivel": s["nivel"], "acento": False, "cel": ce["cel"]})
+        else:
+            linhas.append({"slot": si, "a": s["a"], "b": s["b"], "nivel": s["nivel"], "acento": s["acento"]})
+    n = len(linhas)
+    # cobrir tudo: se as mídias cabem, cada uma entra ao menos uma vez (bônus no melhor trecho de cada);
+    # repetir só quando faltar, e sempre um trecho diferente do mesmo vídeo
+    cobre = n_grupos <= n
     base = sorted(cand, key=lambda x: -x["nota"])
     boas = [c for c in base if c["nota"] >= 0.45] or base
     rodada = 0
-    while len(cand) < len(sl) + sum(1 for c in base if c["nota"] < 0.45) and rodada < 20:
+    while len(cand) < n + sum(1 for c in base if c["nota"] < 0.45) and rodada < 20:
         rodada += 1
         for c in boas:
-            n = dict(c, repetida=rodada)
+            nc = dict(c, repetida=rodada)
             if c["tipo"] == "video":
-                # outro trecho do mesmo vídeo (andando meio slot por rodada), não o mesmo corte de novo
                 passo = max(0.5, float(np.median(dur_slots)) * 0.5)
-                n["ini"] = round((c["ini"] + passo * rodada) % max(0.5, c["dur_fonte"] - max(dur_slots)), 3)
-            cand.append(n)
-    n, k = len(sl), len(cand)
-    C = np.zeros((n, k))
-    for i, s in enumerate(sl):
+                nc["ini"] = round((c["ini"] + passo * rodada) % max(0.5, c["dur_fonte"] - max(dur_slots)), 3)
+            cand.append(nc)
+    # quantas vezes cada vídeo aguenta aparecer sem repetir trecho (vídeo longo aguenta mais)
+    dur_med = float(np.median(dur_slots))
+    n_jan = collections.Counter(c["path"] for c in cand if not c.get("repetida"))
+    C = np.zeros((n, len(cand)))
+    for i, s in enumerate(linhas):
         dur = s["b"] - s["a"]
         for j, c in enumerate(cand):
-            v = c["nota"]
+            v = _encaixe_custo(c, s, M, dur, i, n)
+            # repetir a mesma cena custa caro: 2º trecho do mesmo vídeo, e mais ainda cópias
+            v -= (0.22 if cobre else 0.5) * c["posto"]   # com mídia de sobra, repetir quase nunca compensa
             if c.get("repetida"):
-                v -= 0.25 + 0.1 * c["repetida"]
-            # 4) tipo pedido pelo modelo (Memórias quer foto, Cinemático quer vídeo)
-            v += 0.18 * ((1 if c["tipo"] == "video" else 0) - 0.5) * (M["ideal"] - 0.5) * 2
-            # energia alta pede movimento (vídeo), calma aceita foto; acento gosta de rosto/impacto
-            v += 0.25 * (c["mov"] if s["nivel"] == 2 else (0.5 - abs(c["mov"] - 0.3)) * 0.4)
-            if c["tipo"] == "foto" and s["nivel"] == 2 and M["ideal"] > 0.5:
-                v -= 0.1
-            if c["tipo"] == "video":
-                if c["dur_fonte"] < dur - 0.05:
-                    v -= 5   # curto demais para o slot
-                elif c["ini"] + dur > c["dur_fonte"]:
-                    v -= 0.2
-            if i == 0 or i == n - 1:
-                v += 0.3 * c["nota"] + 0.1 * min(1, c["rostos"])   # abertura e fecho: as mais fortes
+                v -= 0.6 + 0.15 * c["repetida"]
+                uso = c["repetida"] * n_jan[c["path"]] + c["posto"] + 1
+                cap = max(1.0, c["dur_fonte"] / (dur_med * 1.2)) if c["tipo"] == "video" else 1.0
+                v -= 0.3 * max(0.0, uso - cap)
+            if cobre and c["posto"] == 0 and not c.get("repetida") and c["nota"] >= 0.2:
+                v += 0.6
             v += rng.uniform(0, 0.08)   # "gerar outra versão" muda a escolha entre parecidas
             C[i, j] = -v
     lin, col = linear_sum_assignment(C)
     escolha = [cand[j] for j in col[np.argsort(lin)]]
-    # ordem cronológica (data da foto): mantém quem foi escolhido e reordena
-    if ordem == "cronologica":
-        escolha.sort(key=lambda c: (c.get("data") or "", c["path"]))
-    elif ordem == "aleatoria":
-        rng.shuffle(escolha)
-    # troca local: a mesma mídia (ou quase igual) a menos de 4 slots de distância troca com uma de mais longe
+    # a ordem só mexe nos slots de tela cheia (as células já foram escolhidas pela orientação)
+    cheias = [i for i, l in enumerate(linhas) if not l.get("cel")]
+    if ordem in ("cronologica", "aleatoria"):
+        sub = [escolha[i] for i in cheias]
+        if ordem == "cronologica":
+            sub.sort(key=lambda c: (c.get("data") or "", c["path"]))
+        else:
+            rng.shuffle(sub)
+        for i, c in zip(cheias, sub):
+            escolha[i] = c
+
+    # troca local: a mesma cena (ou quase igual) a menos de 4 linhas de distância troca com uma de mais longe
     def perto(i, c):
-        for d in range(1, 4):
-            if i - d >= 0 and (escolha[i - d]["path"] == c["path"] or _hamming(escolha[i - d]["hash"], c["hash"]) < 10):
+        for d in (-3, -2, -1, 1, 2, 3):
+            k = i + d
+            if 0 <= k < n and k != i and linhas[k]["slot"] != linhas[i]["slot"] and (
+                    escolha[k]["grupo"] == c["grupo"] or _hamming(escolha[k]["hash"], c["hash"]) < 10):
                 return True
         return False
     if ordem != "cronologica":
         for _ in range(4):
-            for i in range(1, len(escolha)):
+            for i in cheias:
                 if not perto(i, escolha[i]):
                     continue
-                for j in range(len(escolha) - 1, i, -1):
+                for j in reversed(cheias):
+                    if j == i:
+                        continue
                     a, b = escolha[i], escolha[j]
                     escolha[i], escolha[j] = b, a
                     if not perto(i, b) and not perto(j, a):
                         break
                     escolha[i], escolha[j] = a, b
-    _transicoes(M, sl, musica)
+    # momento exato de cada vídeo, na ordem do vídeo final, sem reaproveitar trecho já usado
+    por_path = {m["path"]: m for m in midias}
+    ocupado = {}
     plano = []
-    for s, c in zip(sl, escolha):
-        item = {"a": s["a"], "b": s["b"], "nivel": s["nivel"], "acento": s["acento"], "path": c["path"], "tipo": c["tipo"],
-                "fx": c["fx"], "fy": c["fy"], "w": c["w"], "h": c["h"], "trans": s["trans"], "flash": s["flash"]}
+    for l, c in zip(linhas, escolha):
+        s = sl[l["slot"]]
+        item = {"a": l["a"], "b": l["b"], "nivel": l["nivel"], "acento": l["acento"], "path": c["path"], "tipo": c["tipo"],
+                "fx": c["fx"], "fy": c["fy"], "w": c["w"], "h": c["h"],
+                "trans": "corte" if l.get("cel") else s["trans"], "flash": False if l.get("cel") else s["flash"]}
+        if l.get("cel"):
+            item.update(layout=s["layout"], cel=l["cel"], cel_i=l["cel_i"], grupo_a=s["a"])
         if c["tipo"] == "video":
-            dur = s["b"] - s["a"]
+            dur = l["b"] - l["a"]
+            m = por_path.get(c["path"])
             item["ini"] = round(min(c["ini"], max(0.0, c["dur_fonte"] - dur - 0.02)), 3)
+            if m:
+                oc = ocupado.setdefault(c["path"], [])
+                item["ini"] = _refinar(item, m, dur, l["nivel"], l["acento"], oc)
+                oc.append((item["ini"], item["ini"] + dur))
+                # foco do momento escolhido
+                am = m.get("amostras") or []
+                if am:
+                    meio = min(am, key=lambda a: abs(a["t"] - (item["ini"] + dur / 2)))
+                    item["fx"], item["fy"] = meio["fx"], meio["fy"]
         plano.append(item)
+    usados = {p["path"] for p in plano}
     return {"success": True, "modelo": {k: M[k] for k in M if k not in ("ritmo",)}, "slots": plano,
-            "inicio": sl[0]["a"], "fim": sl[-1]["b"], "bpm": musica["bpm"]}
+            "inicio": sl[0]["a"], "fim": sl[-1]["b"], "bpm": musica["bpm"],
+            "uso": {"usadas": len(usados), "total": len(midias), "telas": sum(1 for s in sl if s.get("layout"))}}

@@ -774,7 +774,9 @@ function vePjInit() {
 }
 
 // ─────────────────────────── preparar outros vídeos (um por vez) ───────────────────────────
-const VEPJF = { fila: [], rodando: null };
+// vídeos em preparação: leitura de 3 em 3 (na ordem da timeline); conversão, miniaturas e áudio
+// têm limite próprio no Python (video_cutter: _SEM_PROXY/_SEM_EXTRAS)
+const VEPJF = { fila: [], ativos: new Set(), max: 3 };
 function veMidiaPreparar(m) {
     if (!m || m.kind !== 'video' || !m.id || !m.path) return;
     m.pct = 0;
@@ -783,17 +785,21 @@ function veMidiaPreparar(m) {
     veMidiaProxima();
 }
 function veMidiaProxima() {
-    if (VEPJF.rodando != null || !VEPJF.fila.length) return;
-    const id = VEPJF.fila.shift(), m = VE.media[id];
-    if (!m || m.removido) { veMidiaProxima(); return; }
-    VEPJF.rodando = id;
-    window.pywebview.api.ve_preparar_midia(m.path, id);
+    while (VEPJF.ativos.size < VEPJF.max && VEPJF.fila.length) {
+        const id = VEPJF.fila.shift(), m = VE.media[id];
+        if (!m || m.removido) continue;
+        VEPJF.ativos.add(id);
+        window.pywebview.api.ve_preparar_midia(m.path, id);
+    }
 }
 
 // Eventos da preparação de um vídeo do projeto (Functions/video_cutter.py: preparar_midia)
 function veOnMidia(ev) {
     const m = VE.media[ev.id];
-    if (!m || m.kind !== 'video') { if ((ev.stage === 'done' || ev.stage === 'error') && VEPJF.rodando === ev.id) { VEPJF.rodando = null; veMidiaProxima(); } return; }
+    // a vaga libera quando o vídeo já foi lido (info): as conversões pesadas têm fila própria no Python
+    const livre = ev.stage === 'info' || ev.stage === 'video' || ev.stage === 'done' || ev.stage === 'error';
+    if (livre && VEPJF.ativos.delete(ev.id)) veMidiaProxima();
+    if (!m || m.kind !== 'video') return;
     if (ev.stage === 'info') {
         m.info = ev;
         m.dur = ev.duration;
@@ -850,7 +856,6 @@ function veOnMidia(ev) {
         }
         veToast(`${vePjNome(m)}: ${m.erro}`);
     }
-    if ((ev.stage === 'done' || ev.stage === 'error') && VEPJF.rodando === ev.id) { VEPJF.rodando = null; veMidiaProxima(); }
     vePjRender();
     veDraw();
     veDrawMonitorSoon();

@@ -1063,12 +1063,12 @@ def af_recomendar(musica, paths, dur_alvo=None, inicio_modo="inicio", manual=Non
         return {"success": False, "error": str(e)}
 
 
-def af_planejar(musica, paths, modelo, dur_alvo=None, ordem="inteligente", semente=0, inicio_modo="inicio", manual=None):
+def af_planejar(musica, paths, modelo, dur_alvo=None, ordem="inteligente", semente=0, inicio_modo="inicio", manual=None, telas=True):
     from Functions import autoframe as af
     try:
         m = _af["musica"].get(musica) or af.analisar_musica(musica)
         ini = af.melhor_inicio(m, inicio_modo, dur_alvo or None, manual)
-        return af.planejar(m, _af_midias(paths), modelo, dur_alvo or None, ordem, semente, ini)
+        return af.planejar(m, _af_midias(paths), modelo, dur_alvo or None, ordem, semente, ini, bool(telas))
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2783,8 +2783,8 @@ class ApiBridge:
     def af_recomendar(self, musica, paths, dur_alvo=None, inicio_modo="inicio", manual=None):
         return af_recomendar(musica, paths, dur_alvo, inicio_modo, manual)
 
-    def af_planejar(self, musica, paths, modelo, dur_alvo=None, ordem="inteligente", semente=0, inicio_modo="inicio", manual=None):
-        return af_planejar(musica, paths, modelo, dur_alvo, ordem, semente, inicio_modo, manual)
+    def af_planejar(self, musica, paths, modelo, dur_alvo=None, ordem="inteligente", semente=0, inicio_modo="inicio", manual=None, telas=True):
+        return af_planejar(musica, paths, modelo, dur_alvo, ordem, semente, inicio_modo, manual, telas)
 
     def af_escolher(self, tipo):
         return af_escolher(tipo)

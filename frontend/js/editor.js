@@ -2044,6 +2044,8 @@ function veMediaSize(c) {
     if (m && m.kind === 'image') return { w: m.w || 1, h: m.h || 1 };
     if (m && m.kind === 'texto') return veTxTamanho(c);
     if (m && m.kind === 'video' && m.id && m.info && m.info.width) return { w: m.info.width, h: m.info.height };
+    // ainda na fila de preparação: o tamanho que já se sabe (ex.: da análise do AutoFrame), não o da sequência
+    if (m && m.kind === 'video' && m.id && m.w && m.h) return { w: m.w, h: m.h };
     // o vídeo aberto: o tamanho dele (a sequência pode ter outro, nas Configurações da sequência)
     if (m && m.kind === 'video' && !m.id && VE.info && VE.info.width && !VE.info.audio_only) return { w: VE.info.width, h: VE.info.height };
     return { w: VE.seqW, h: VE.seqH };
@@ -2125,7 +2127,7 @@ function veVideoMidia(path, pasta) {
 
 function veVideoPrepararSePrecisa(m) {
     if (!m || m.info || m.erro) return;
-    const emFila = typeof VEPJF !== 'undefined' && (VEPJF.rodando === m.id || VEPJF.fila.includes(m.id));
+    const emFila = typeof VEPJF !== 'undefined' && (VEPJF.ativos.has(m.id) || VEPJF.fila.includes(m.id));
     if (!emFila) veMidiaPreparar(m);
 }
 
@@ -2668,7 +2670,8 @@ function veDrawMonitor() {
     // o que está abaixo de um vídeo que cobre o quadro inteiro não aparece: nem decodifica
     const cobre = vis.map(({ c }) => !veIsImage(c) && veIsPlain(c) && !c._tr).lastIndexOf(true);
     if (cobre > 0) vis = vis.slice(cobre);
-    let extra = 0, falta = false;
+    // parcial: alguma camada sem o quadro certo ainda (carregando/buscando) — desenha, mas não guarda no cache
+    let extra = 0, falta = false, parcial = false;
     const itens = vis.map(({ c, i }) => {
         let src = null;
         const med = veMediaOf(c);
@@ -2699,7 +2702,9 @@ function veDrawMonitor() {
             const x = veExtraPlayer(extra++, veMid(c));
             veSyncExtra(x, veSrcAt(c, t), veTaxa(c));
             if (x.readyState >= 2) src = x;
+            if (x.readyState < 2 || x.seeking) parcial = true;
         }
+        if (!src) parcial = true;
         return { c, i, src };
     });
     veParkExtras(extra, false, true);
@@ -2742,7 +2747,7 @@ function veDrawMonitor() {
             ctx.restore();
         });
     veTxDesenhar(ctx);
-    veCacheStore(cv, cw, ch, pv, itens, trans, falta);
+    veCacheStore(cv, cw, ch, pv, itens, trans, falta || parcial);
     // caixa com alças e ponto de ancoragem do selecionado (editor-transform.js)
     veTfDesenhar(ctx, cv, pv);
     veRulersDraw();

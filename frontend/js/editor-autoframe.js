@@ -16,6 +16,7 @@ const VEAF = {
     modelos: [], modelo: null,
     dur: 0, ordem: 'inteligente', titulo: '', semente: 1,
     inicioModo: 'agitada', manual: null, inicioT: null,   // onde o vídeo começa na música
+    telas: 'sim',           // telas divididas (várias cenas no mesmo quadro, entrando na batida)
     analisando: false, progresso: '', pct: 0,
 };
 const VE_AF_W = 1080, VE_AF_H = 1920;   // 9:16
@@ -156,7 +157,7 @@ async function veAfGerar(outra) {
     VEAF.gerando = true;
     veAfRender();
     try {
-        const plano = await api.af_planejar(VEAF.musicaPath, veAfPaths(), VEAF.modelo, VEAF.dur || null, VEAF.ordem, VEAF.semente, VEAF.inicioModo, VEAF.manual);
+        const plano = await api.af_planejar(VEAF.musicaPath, veAfPaths(), VEAF.modelo, VEAF.dur || null, VEAF.ordem, VEAF.semente, VEAF.inicioModo, VEAF.manual, VEAF.telas !== 'nao');
         if (!plano || !plano.success) throw new Error((plano && plano.error) || 'plano');
         // sem projeto aberto: a primeira mídia do plano abre o projeto
         if (!VE.ready) {
@@ -171,6 +172,11 @@ async function veAfGerar(outra) {
         if (plano.slots.some(s => s.flash)) plano.branco = await veAfBranco(bin && bin.id);
         const falta = precisa.filter(p => !veAfMidiaDe(p));
         if (falta.length) throw new Error(veT('não importou: ') + falta.map(veAfNome).join(', '));
+        // tamanho dos vídeos desde já (a preparação de cada um ainda está na fila): cenas no lugar certo
+        plano.slots.forEach(s => {
+            const m = veAfMidiaDe(s.path);
+            if (m && m.kind === 'video' && !(m.info && m.info.width) && s.w && s.h) { m.w = s.w; m.h = s.h; }
+        });
         // timeline nova 9:16
         const seq = veCreateTimeline({ name: `AutoFrame · ${plano.modelo.nome}`, pasta: bin && bin.id });
         if (!seq) throw new Error('timeline');
@@ -190,7 +196,8 @@ async function veAfGerar(outra) {
         veAfterEdit(0);
         veSeqSalvarAtiva();
         vePjRender();
-        veToast(`AutoFrame: ${plano.slots.length} ${veT('cenas no ritmo')} (${Math.round(plano.bpm)} BPM) · ${veT('tudo editável na timeline')}`);
+        const uso = plano.uso ? ` · ${plano.uso.usadas}/${plano.uso.total} ${veT('mídias usadas')}${plano.uso.telas ? ` · ${plano.uso.telas} ${veT('telas divididas')}` : ''}` : '';
+        veToast(`AutoFrame: ${plano.slots.length} ${veT('cenas no ritmo')} (${Math.round(plano.bpm)} BPM)${uso} · ${veT('tudo editável na timeline')}`);
     } catch (e) {
         veToast(veT('AutoFrame não conseguiu gerar: ') + (e.message || e));
     } finally {
@@ -216,8 +223,22 @@ async function veAfBranco(pasta) {
     return m;
 }
 
+// Célula de tela dividida: a mídia cobre a célula (foco no centro), o resto é cortado (fundo preto)
+function veAfCelula(w, h, fx, fy, cel) {
+    const k = Math.max(cel.w / w, cel.h / h), W = w * k, H = h * k;
+    const cx = cel.x + cel.w / 2, cy = cel.y + cel.h / 2;
+    const x = Math.min(cel.x + W / 2, Math.max(cel.x + cel.w - W / 2, cx + (0.5 - (fx ?? 0.5)) * W));
+    const y = Math.min(cel.y + H / 2, Math.max(cel.y + cel.h - H / 2, cy + (0.5 - (fy ?? 0.5)) * H));
+    const pc = v => Math.max(0, Math.round(v * 1000) / 10);
+    return { sc: Math.round(k * 10000) / 100, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10,
+        crop: { l: pc((cel.x - (x - W / 2)) / W), r: pc((x + W / 2 - cel.x - cel.w) / W), t: pc((cel.y - (y - H / 2)) / H), b: pc((y + H / 2 - cel.y - cel.h) / H) } };
+}
+
 function veAfClipes(plano) {
     const M = plano.modelo, t0 = plano.inicio, out = [], flashes = [];
+    // trilhas: cenas na 0 (células da tela dividida nas 0..n-1); cor, flash e título por cima de todas
+    const NV = Math.max(1, ...plano.slots.map(s => s.cel ? s.cel_i + 1 : 1));
+    const TR_AJ = NV, TR_FL = NV + 1, TR_TX = NV + 2;
     const total = plano.fim - t0, bpm = plano.bpm || 120, batida = 60 / bpm;
     plano.slots.forEach((s, i) => {
         const m = veAfMidiaDe(s.path), st = +(s.a - t0).toFixed(4), len = +(s.b - s.a).toFixed(4);
@@ -227,6 +248,21 @@ function veAfClipes(plano) {
         if (video) c.x = 'v';   // só a imagem: o som é o da música
         // enquadramento 9:16 com folga para a animação
         const folga = M.anim === 'pan' ? 1.1 : M.anim === 'kenburns' ? 1.0 : 1.0;
+        // tamanho real da mídia no projeto, quando já conhecido, manda sobre o da análise (vídeo girado do celular)
+        const real = m.kind === 'image' && m.w ? { w: m.w, h: m.h } : m.info && m.info.width ? { w: m.info.width, h: m.info.height } : null;
+        if (real && (real.w > real.h) !== (s.w > s.h)) { s.w = real.w; s.h = real.h; }
+        if (s.cel) {
+            // tela dividida: cada célula entra na sua batida (sobe um pouco e aparece) e fica até o fim do quadro
+            const q = veAfCelula(s.w, s.h, s.fx, s.fy, s.cel), d = +Math.min(0.25, batida * 0.5, len * 0.5).toFixed(3);
+            c.tr = s.cel_i;
+            c.p = { sc: q.sc, x: q.x, y: q.y, rot: 0, op: 100 };
+            c.fx = [{ id: veFxNewId(), t: 'crop', on: true, v: q.crop }];
+            c.k = { op: [{ t: s0, v: 0, i: 'out' }, { t: +(s0 + d).toFixed(4), v: 100, i: 'lin' }],
+                    y: [{ t: s0, v: +(q.y + 36).toFixed(1), i: 'out' }, { t: +(s0 + d).toFixed(4), v: q.y, i: 'lin' }] };
+            if (M.anim === 'kenburns') c.k.sc = [{ t: s0, v: q.sc, i: 'lin' }, { t: e0, v: +(q.sc * 1.04).toFixed(2), i: 'lin' }];
+            out.push(c);
+            return;
+        }
         const q = veAfEnquadrar(s.w, s.h, s.fx, s.fy, folga);
         c.p = { sc: q.sc, x: q.x, y: q.y, rot: 0, op: 100 };
         // animação (quadros-chave em tempo da fonte)
@@ -237,6 +273,8 @@ function veAfClipes(plano) {
             // zoom-soco na batida: entra 15% maior (22% num acento) e assenta em ~1/2 batida, freando
             const k = s.acento ? 1.22 : 1.15, d = Math.min(len * 0.6, batida * 0.5);
             c.k = { sc: [{ t: s0, v: +(q.sc * k).toFixed(2), i: 'out' }, { t: +(s0 + d).toFixed(4), v: q.sc, i: 'lin' }] };
+            // variedade: cena longa sem acento, de vez em quando, avança devagar depois do soco
+            if (!s.acento && len >= batida * 1.9 && i % 3 === 2) c.k.sc.push({ t: e0, v: +(q.sc * 1.07).toFixed(2), i: 'lin' });
         } else if (M.anim === 'pan') {
             const lx = s.w * q.sc / 100 / 2, xmin = VE_AF_W - lx, xmax = lx, dir = i % 2 ? 1 : -1;
             const a = Math.min(xmax, Math.max(xmin, q.x - dir * 40)), b = Math.min(xmax, Math.max(xmin, q.x + dir * 40));
@@ -251,14 +289,14 @@ function veAfClipes(plano) {
         // flash de impacto: clarão branco que some em ~meia batida, começando no corte
         if (s.flash && plano.branco) {
             const d = +Math.min(0.35, batida * 0.6, len).toFixed(3);
-            flashes.push({ tr: 3, st: Math.max(0, +(st - 0.02).toFixed(4)), s: 0, e: d, m: plano.branco.id,
+            flashes.push({ tr: TR_FL, st: Math.max(0, +(st - 0.02).toFixed(4)), s: 0, e: d, m: plano.branco.id,
                 p: { sc: 100, x: VE_AF_W / 2, y: VE_AF_H / 2, rot: 0, op: 100 },
                 k: { op: [{ t: 0, v: 92, i: 'out' }, { t: d, v: 0, i: 'lin' }] } });
         }
         out.push(c);
     });
     // fim: a última cena escurece até o preto no último compasso (sinaliza que acabou)
-    const ultima = out[out.length - 1];
+    const ultima = out.filter(c => !c.fx || !c.fx.some(f => f.t === 'crop')).pop();
     if (ultima) ultima.tout = { t: 'fadeblack', d: +Math.min(2, batida * 4, (ultima.e - ultima.s) * 0.8).toFixed(3), speed: 'fast' };
     out.push(...flashes);
     // cor: camada de ajuste com Luz e Cor por cima de tudo
@@ -266,12 +304,12 @@ function veAfClipes(plano) {
     if (look && typeof veLcDefaults === 'function') {
         let aj = VE.media.find(x => x.kind === 'ajuste' && !x.removido);
         if (!aj) { aj = { id: VE.media.length, kind: 'ajuste', name: 'Camada de ajuste' }; VE.media.push(aj); }
-        out.push({ tr: 1, st: 0, s: 0, e: +total.toFixed(4), m: aj.id, fx: [{ id: veFxNewId(), t: 'lc', on: true, v: { ...veLcDefaults(), ...look } }] });
+        out.push({ tr: TR_AJ, st: 0, s: 0, e: +total.toFixed(4), m: aj.id, fx: [{ id: veFxNewId(), t: 'lc', on: true, v: { ...veLcDefaults(), ...look } }] });
     }
     // título (opcional): entra subindo, sai com fade
     if (VEAF.titulo.trim() && typeof veTxMidia === 'function') {
         const tm = veTxMidia(), dur = Math.min(total, Math.max(2.5, batida * 8));
-        out.push({ tr: 2, st: 0, s: 0, e: +dur.toFixed(3), m: tm.id,
+        out.push({ tr: TR_TX, st: 0, s: 0, e: +dur.toFixed(3), m: tm.id,
             tx: { ...VE_TX_PADRAO, t: VEAF.titulo.trim(), tam: 120, alin: 'center', sOn: true, sOp: 70, sBlur: 18 },
             p: { sc: 100, x: VE_AF_W / 2, y: VE_AF_H * 0.42, rot: 0, op: 100 },
             txa: typeof veTxaObj === 'function' ? { in: veTxaObj('subir'), out: veTxaObj('fade') } : undefined });
@@ -342,6 +380,7 @@ function veAfRender() {
         <div class="ve-af-sec">
             <div class="ve-af-h"><b>4</b> ${veT('Opções')}</div>
             <div class="ve-af-op"><span>${veT('Duração')}</span>${pill('dur', 0, veT('Música toda'))}${pill('dur', 15, '15 s')}${pill('dur', 30, '30 s')}${pill('dur', 60, '60 s')}</div>
+            <div class="ve-af-op"><span>${veT('Telas divididas')}</span>${pill('telas', 'sim', veT('Sim'))}${pill('telas', 'nao', veT('Não'))}</div>
             <div class="ve-af-op"><span>${veT('Ordem')}</span>${pill('ordem', 'inteligente', veT('Inteligente'))}${pill('ordem', 'cronologica', veT('Cronológica'))}${pill('ordem', 'aleatoria', veT('Aleatória'))}</div>
             <div class="ve-af-op"><span>${veT('Título')}</span><input type="text" id="ve-af-titulo" value="${veEsc(VEAF.titulo)}" placeholder="${veT('opcional: aparece no começo')}"></div>
             <div class="ve-af-gerar">

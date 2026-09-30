@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -137,12 +138,41 @@ def _base_imagem(path):
     return saida
 
 
+_PREVIAS_DIAS = 14          # prévia de vídeo do projeto sem uso há mais que isso é apagada
+_PREVIAS_MAX_GB = 20        # e, passando disso, as menos usadas primeiro
+
+
 def limpar_previews():
-    """Apaga previews de sessões anteriores (chamado ao abrir um vídeo novo)."""
+    """Apaga previews de sessões anteriores (chamado ao abrir um vídeo novo). As prévias dos vídeos do projeto
+    (pastas m_*, uma por arquivo+data) ficam: reabrir o projeto não converte tudo de novo."""
     d = _work_dir()
     media_server.unregister_prefix(d)
+    agora = time.time()
+    guardadas = []
     for nome in os.listdir(d):
-        shutil.rmtree(os.path.join(d, nome), ignore_errors=True)
+        p = os.path.join(d, nome)
+        if nome.startswith("m_") and os.path.isdir(p):
+            try:
+                idade = agora - os.path.getmtime(p)
+                tam = sum(os.path.getsize(os.path.join(p, f)) for f in os.listdir(p))
+            except OSError:
+                idade, tam = 1e12, 0
+            if idade < _PREVIAS_DIAS * 86400:
+                guardadas.append((idade, tam, p))
+                continue
+        if os.path.isdir(p):
+            shutil.rmtree(p, ignore_errors=True)
+        else:
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+    total = sum(t for _, t, _ in guardadas)
+    for idade, tam, p in sorted(guardadas, reverse=True):   # mais antigas primeiro
+        if total <= _PREVIAS_MAX_GB * 1024 ** 3:
+            break
+        shutil.rmtree(p, ignore_errors=True)
+        total -= tam
 
 
 def _fps(txt):
@@ -449,10 +479,29 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
                 "-map", "[p]", "-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "24", "-b:v", "0",
                 "-bf", "0"] + comum
 
-    tentativas = [_cpu] if rotacionado else ([_cuda] if _detectar_hw_encoder() == "h264_nvenc" else []) + [_cpu]
+    def _cuda_girado():
+        # vídeo em pé do celular (rotação nos metadados): a GPU decodifica e reduz o 4K; só o quadro já
+        # pequeno desce para o processador e é girado ali (2,7x mais rápido que tudo no processador)
+        rot = int(info.get("rotation") or 0) % 360
+        giro = {270: "transpose=clock", 90: "transpose=cclock", 180: "hflip,vflip"}.get(rot)
+        if not giro:
+            return None
+        return [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-noautorotate",
+                "-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-i", path,
+                "-filter_complex", f"[0:v:0]scale_cuda={_PROXY_ESCALA}:format=yuv420p,hwdownload,format=yuv420p,{giro}"
+                + (",split[p][b]" + th_filtro if th_saida else "[p]"),
+                "-map", "[p]", "-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "24", "-b:v", "0",
+                "-bf", "0"] + comum
+
+    gpu = _detectar_hw_encoder() == "h264_nvenc"
+    tentativas = ([_cuda_girado] if rotacionado else [_cuda]) if gpu else []
+    tentativas.append(_cpu)
     rc, err = 1, ""
     for fazer in tentativas:
-        rc, err = _run_progress(fazer(), dur, on_pct, stop_event)
+        cmd = fazer()
+        if cmd is None:
+            continue
+        rc, err = _run_progress(cmd, dur, on_pct, stop_event)
         if rc == 0 or (stop_event is not None and stop_event.is_set()):
             break
     ok = rc == 0 and os.path.exists(out)
@@ -574,6 +623,12 @@ def preparar(path, emit, stop_event=None):
     emit({"stage": "done"})
 
 
+# miniaturas e áudio dos vídeos do projeto: no máximo 2 de cada vez (importar 40 vídeos não trava o PC;
+# o vídeo em si já toca antes disso)
+_SEM_EXTRAS = threading.BoundedSemaphore(2)
+_SEM_PROXY = threading.BoundedSemaphore(2)
+
+
 def preparar_midia(path, emit, stop_event=None):
     """
     Outro vídeo do projeto (além do aberto): mesma preparação, sem limpar a sessão nem mexer no áudio da fonte
@@ -600,7 +655,8 @@ def preparar_midia(path, emit, stop_event=None):
 
     def _audio():
         if info["has_audio"]:
-            r = adicionar_audio(path)
+            with _SEM_EXTRAS:
+                r = adicionar_audio(path)
             if r.get("success"):
                 emit({"stage": "audio", "url": r["url"], "quadros": r["quadros"], "peaks": r["peaks"]})
 
@@ -608,14 +664,23 @@ def preparar_midia(path, emit, stop_event=None):
     ta.start()
     if direto:
         emit({"stage": "video", "url": media_server.register(path), "proxy": False})
-        emit({"stage": "thumbs", "thumbs": gerar_thumbs(path, info["duration"], work, count)})
+        with _SEM_EXTRAS:
+            th = gerar_thumbs(path, info["duration"], work, count)
+        emit({"stage": "thumbs", "thumbs": th})
     else:
         proxy = os.path.join(work, "proxy_v2.mp4")
         if os.path.isfile(proxy):
             ok, err, thumbs = True, "", None
+            try:
+                os.utime(work)   # usada agora: não entra na limpeza das antigas
+            except OSError:
+                pass
         else:
-            ok, err, thumbs = gerar_proxy(path, info, proxy, lambda p: emit({"stage": "proxy", "pct": p}), stop_event,
-                                          thumbs_dir=work, thumbs_n=count)
+            with _SEM_PROXY:   # no máximo 2 conversões ao mesmo tempo (os vídeos que tocam direto não esperam)
+                ok, err, thumbs = gerar_proxy(path, info, proxy + ".tmp.mp4", lambda p: emit({"stage": "proxy", "pct": p}),
+                                              stop_event, thumbs_dir=work, thumbs_n=count)
+            if ok:
+                os.replace(proxy + ".tmp.mp4", proxy)   # interrompida no meio não vira prévia "pronta" quebrada
         if stop_event is not None and stop_event.is_set():
             return
         if not ok:
