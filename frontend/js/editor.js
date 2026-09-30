@@ -2899,6 +2899,7 @@ function veRenderProps() {
         veKfGraphDraw(naAgulha);
     }
     veRenderFxControls();
+    veCpBarra();   // copiar/colar efeitos (editor-copiar.js)
     veLcRender();
 }
 

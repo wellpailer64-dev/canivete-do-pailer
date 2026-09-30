@@ -410,6 +410,7 @@ function vePpHtml(a) {
         return cab('Legenda', `${VETX.legSel + 1} de ${VE.legendas.length} · trilha LEG`) +
             vePpSec('Texto da legenda', `<textarea class="ve-pp-texto" data-pp="leg.texto" rows="3"></textarea>`) +
             vePpSec('Estilo desta legenda', `
+                ${veCpLegHtml()}
                 <div class="ve-pp-l"><label>Fonte</label>${vePpFontes('le.fam')}</div>
                 <div class="ve-pp-l"><label>Estilo</label>${veFonteEstilos('le.estilo')}</div>
                 <div class="ve-pp-botoes">
@@ -584,7 +585,7 @@ function vePpRender() {
     const box = $ve('ve-pp');
     if (!box) return;
     const a = vePpAlvo();
-    const chave = [a.tipo, VE.sel, VETX.legSel, a.c ? a.c.tr : '', VE.seqW, VE.seqH, !!VEPP.fontes, VE.info && VE.info.has_audio].join('|');
+    const chave = [a.tipo, VE.sel, VETX.legSel, a.c ? a.c.tr : '', VE.seqW, VE.seqH, !!VEPP.fontes, VE.info && VE.info.has_audio, !!VECP.leg].join('|');
     if (chave !== VEPP.chave) {
         const abertas = [...box.querySelectorAll('details.ve-pp-sec')].map(d => d.open);
         const tipo0 = VEPP.chave.split('|')[0];
@@ -665,7 +666,11 @@ function vePpInit() {
         const anc = e.target.closest('[data-ppanc]');
         if (anc && VE.ready) { const [u, v] = anc.dataset.ppanc.split(',').map(Number); veTfAncoraEm(u, v); return; }
         const tog = e.target.closest('[data-pptog]'), alin = e.target.closest('[data-ppalin]');
-        const ac = e.target.closest('[data-ppacao]'), ir = e.target.closest('[data-ppir]');
+        const ac = e.target.closest('[data-ppacao]'), ir = e.target.closest('[data-ppir]'), cp = e.target.closest('[data-ppcp]');
+        if (cp && VE.ready) {   // copiar/colar estilo de legenda (editor-copiar.js)
+            if (cp.dataset.ppcp === 'leg-copiar') veCpLegCopiar(); else veCpLegColar(cp.dataset.ppcp === 'leg-colar-todas');
+            return;
+        }
         if (ir) { vedShow(ir.dataset.ppir); if (ir.dataset.ppir === 'props') veRenderProps(); return; }
         if (!VE.ready) return;
         if (tog) { vePushHistory(); vePpSet(tog.dataset.pptog, !vePpGet(tog.dataset.pptog)); vePpDepois('monitor', true); return; }

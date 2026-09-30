@@ -49,6 +49,8 @@ const VE_CMDS = [
     { id: 'easy-ease', grupo: 'clipe', sep: true, nome: 'Easy Ease (quadros-chave)', teclas: ['F9'], fn: () => veKlEasy('ambos') },
     { id: 'easy-ease-in', grupo: 'clipe', nome: 'Easy Ease de entrada', teclas: ['Shift+F9'], fn: () => veKlEasy('in') },
     { id: 'easy-ease-out', grupo: 'clipe', nome: 'Easy Ease de saída', teclas: ['Ctrl+Shift+F9'], fn: () => veKlEasy('out') },
+    { id: 'copiar-efeitos', grupo: 'clipe', nome: 'Copiar efeitos', teclas: ['Ctrl+Alt+C'], sep: true, fn: () => veCpEfeitosCopiar(), pode: () => VE.sel >= 0 },
+    { id: 'colar-efeitos', grupo: 'clipe', nome: 'Colar efeitos', teclas: ['Ctrl+Alt+V'], fn: () => veCpEfeitosColar(), pode: () => !!VECP.fx && veSel() },
     { id: 'inverter', grupo: 'clipe', nome: 'Inverter clipe (Reverse Speed)', teclas: [], sep: true, fn: () => veInverterClipes(), pode: veSel, marcado: () => veInvertido(VE.clips[VE.sel]) },
     { id: 'vinculo', grupo: 'clipe', nome: 'Seleção vinculada', teclas: [], sep: true, fn: () => veToggleVinculo(), marcado: () => VE.vinculo },
 
