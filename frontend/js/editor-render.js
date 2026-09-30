@@ -406,6 +406,7 @@ function vePrefsCacheRender() {
     el('pref-cache-dias').value = String(p.dias);
     el('pref-cache-alt').value = String(p.altura);
     el('pref-cache-ram').value = String(p.ramGB);
+    if (el('pref-hevc')) el('pref-hevc').value = PREFS.hevcModo === 'direto' ? 'direto' : 'converter';
     vePrefsCacheInfo();
 }
 
@@ -455,6 +456,7 @@ function vePrefsCacheCampo(campo, valor) {
     if (campo === 'dias') vePrefsCacheSalvar({ dias: n || 30 });
     if (campo === 'altura') { vePrefsCacheSalvar({ altura: n || 1080 }); VEPR.sujo = true; if (VE.ready) veDraw(); }
     if (campo === 'ramGB') vePrefsCacheSalvar({ ramGB: n || 1.5 });
+    if (campo === 'hevc') { PREFS.hevcModo = valor === 'direto' ? 'direto' : 'converter'; prefsSave(); }
     if (campo === 'maxGB' || campo === 'dias') vePrManutencao();
 }
 
@@ -472,5 +474,41 @@ function vePrefsCacheLimpar(tudo) {
     });
 }
 
-window.addEventListener('prefs-carregadas', () => { vePrAplicarRam(); vePrManutencao(); });
+window.addEventListener('prefs-carregadas', () => { vePrAplicarRam(); vePrManutencao(); veHevcTestar(); });
+
+// H.265 toca direto neste PC? (precisa da extensão HEVC do Windows e de decodificador): toca uma amostra pequena,
+// busca um quadro e confere a imagem. O resultado vai para as preferências (hevcDireto), que o Python lê ao preparar
+// um vídeo: se passou e a opção "tocar direto" está ligada, H.265 até a qualidade das prévias não é convertido
+// (video_cutter._hevc_direto; padrão = converter, que corta e busca mais liso).
+// Refeito a cada abertura do app (é rápido): instalar a extensão ou trocar de placa vale na próxima vez.
+function veHevcTestar() {
+    const v = document.createElement('video');
+    let fim = false;
+    const acabar = ok => {
+        if (fim) return;
+        fim = true;
+        clearTimeout(limite);
+        v.removeAttribute('src');
+        v.load();
+        if (PREFS.hevcDireto !== ok) { PREFS.hevcDireto = ok; prefsSave(); }
+    };
+    const limite = setTimeout(() => acabar(false), 5000);
+    v.muted = true;
+    v.preload = 'auto';
+    v.onerror = () => acabar(false);
+    v.onloadeddata = () => { if (!v.videoWidth) acabar(false); else v.currentTime = 0.5; };
+    v.onseeked = () => {
+        try {
+            const cv = document.createElement('canvas');
+            cv.width = 32; cv.height = 24;
+            const cx = cv.getContext('2d');
+            cx.drawImage(v, 0, 0, 32, 24);
+            const px = cx.getImageData(0, 0, 32, 24).data;
+            let soma = 0;
+            for (let i = 0; i < px.length; i += 4) soma += px[i] + px[i + 1] + px[i + 2];
+            acabar(soma > 0);   // quadro preto = decodificou "de mentira"
+        } catch (e) { acabar(false); }
+    };
+    v.src = 'assets/amostra_hevc.mp4';
+}
 window.veOnRender = veOnRender;

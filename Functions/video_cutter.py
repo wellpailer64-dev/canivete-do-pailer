@@ -76,9 +76,78 @@ _export_lock = threading.Lock()
 
 # ─────────────────────────── utilidades ───────────────────────────
 
+_RAIZ_TEMP = os.path.join(tempfile.gettempdir(), "canivete_editor")
+
+
 def _work_dir():
-    d = os.path.join(tempfile.gettempdir(), "canivete_editor")
+    """Arquivos de sessão DESTA cópia do app (cada cópia tem a sua pasta: abrir um vídeo numa não apaga os da outra)."""
+    d = os.path.join(_RAIZ_TEMP, f"s{os.getpid()}")
     os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _pid_vivo(pid):
+    if pid == os.getpid():
+        return True
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+    import ctypes
+    from ctypes import wintypes
+    k = ctypes.windll.kernel32
+    h = k.OpenProcess(0x1000, False, pid)   # PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return False
+    cod = wintypes.DWORD()
+    ok = k.GetExitCodeProcess(h, ctypes.byref(cod))
+    k.CloseHandle(h)
+    return bool(ok) and cod.value == 259   # STILL_ACTIVE
+
+
+# ── preferências (as mesmas do app: Preferências → Cache e Disco), lidas do arquivo e relidas quando ele muda ──
+_prefs_lidas = [None, {}]
+
+
+def _prefs():
+    arq = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "preferencias.json")
+    try:
+        mt = os.path.getmtime(arq)
+        if _prefs_lidas[0] != mt:
+            with open(arq, encoding="utf-8") as f:
+                _prefs_lidas[:] = [mt, json.load(f) or {}]
+    except Exception:
+        pass
+    return _prefs_lidas[1]
+
+
+def _cache_cfg():
+    c = _prefs().get("cache") or {}
+    try:
+        lado = int(c.get("altura") or 1080)
+    except (TypeError, ValueError):
+        lado = 1080
+    try:
+        dias, max_gb = int(c.get("dias") or 30), float(c.get("maxGB") or 20)
+    except (TypeError, ValueError):
+        dias, max_gb = 30, 20.0
+    return {"dir": str(c.get("dir") or "").strip(), "lado": lado if lado in (540, 720, 1080) else 1080,
+            "dias": dias, "max_gb": max_gb}
+
+
+def _midia_dir():
+    """Prévias leves, miniaturas e áudio conformado dos vídeos do projeto: na pasta de cache das Preferências
+    (o %TEMP% é limpo pelo Windows e as prévias tinham de ser refeitas). Uma pasta por arquivo+data."""
+    from Functions import render_cache
+    base = _cache_cfg()["dir"] or render_cache.base_padrao()
+    d = os.path.join(base, "Canivete Media Cache")
+    try:
+        os.makedirs(d, exist_ok=True)
+    except OSError:   # disco escolhido não está conectado: usa a pasta padrão
+        d = os.path.join(render_cache.base_padrao(), "Canivete Media Cache")
+        os.makedirs(d, exist_ok=True)
     return d
 
 
@@ -139,41 +208,127 @@ def _base_imagem(path):
     return saida
 
 
-_PREVIAS_DIAS = 14          # prévia de vídeo do projeto sem uso há mais que isso é apagada
-_PREVIAS_MAX_GB = 20        # e, passando disso, as menos usadas primeiro
+def _apagar_item(p):
+    if os.path.isdir(p):
+        shutil.rmtree(p, ignore_errors=True)
+    else:
+        try:
+            os.remove(p)
+        except OSError:
+            pass
 
 
 def limpar_previews():
-    """Apaga previews de sessões anteriores (chamado ao abrir um vídeo novo). As prévias dos vídeos do projeto
-    (pastas m_*, uma por arquivo+data) ficam: reabrir o projeto não converte tudo de novo."""
+    """Chamado ao abrir um vídeo novo: apaga os arquivos de sessão desta cópia do app, as pastas de cópias que já
+    fecharam e sobras do formato antigo (tudo solto em canivete_editor). As prévias dos vídeos do projeto ficam na
+    pasta de cache (manutencao_midia): reabrir o projeto não converte tudo de novo."""
     d = _work_dir()
     media_server.unregister_prefix(d)
+    for nome in os.listdir(d):
+        _apagar_item(os.path.join(d, nome))
+    manutencao_midia()
+
+
+def _limpar_temp_antigo():
+    """%TEMP%/canivete_editor: pastas de cópias do app que já fecharam e sobras do formato antigo (tudo solto ali;
+    arquivo ainda aberto por outra cópia não sai: o Windows não deixa)."""
+    os.makedirs(_RAIZ_TEMP, exist_ok=True)
+    dias = _cache_cfg()["dias"]
+    agora = time.time()
+    for nome in os.listdir(_RAIZ_TEMP):
+        p = os.path.join(_RAIZ_TEMP, nome)
+        if re.fullmatch(r"s[0-9]+", nome):
+            if not _pid_vivo(int(nome[1:])):
+                _apagar_item(p)
+            continue
+        try:
+            idade = agora - os.path.getmtime(p)
+        except OSError:
+            continue
+        if nome.startswith("m_"):   # prévia do formato antigo: ainda serve (vai para a pasta de cache quando usada)
+            if idade < dias * 86400:
+                continue
+        elif idade < 12 * 3600:     # pode ser de uma cópia da versão anterior ainda aberta
+            continue
+        _apagar_item(p)
+
+
+def _tamanho(p):
+    if not os.path.isdir(p):
+        return os.path.getsize(p)
+    return sum(os.path.getsize(os.path.join(p, f)) for f in os.listdir(p))
+
+
+def manutencao_midia():
+    """Pasta de cache dos vídeos do projeto: sai o que não é usado há mais dias que o das Preferências e, passando
+    do tamanho máximo, os menos usados primeiro (mesmas regras do cache de render)."""
+    try:
+        _limpar_temp_antigo()
+    except Exception:
+        pass
+    cfg = _cache_cfg()
+    raiz = _midia_dir()
     agora = time.time()
     guardadas = []
-    for nome in os.listdir(d):
-        p = os.path.join(d, nome)
-        if nome.startswith("m_") and os.path.isdir(p):
-            try:
-                idade = agora - os.path.getmtime(p)
-                tam = sum(os.path.getsize(os.path.join(p, f)) for f in os.listdir(p))
-            except OSError:
-                idade, tam = 1e12, 0
-            if idade < _PREVIAS_DIAS * 86400:
-                guardadas.append((idade, tam, p))
-                continue
-        if os.path.isdir(p):
-            shutil.rmtree(p, ignore_errors=True)
+    for nome in os.listdir(raiz):
+        p = os.path.join(raiz, nome)
+        try:
+            idade, tam = agora - os.path.getmtime(p), _tamanho(p)
+        except OSError:
+            continue
+        if idade > cfg["dias"] * 86400:
+            _apagar_item(p)
         else:
-            try:
-                os.remove(p)
-            except OSError:
-                pass
+            guardadas.append((idade, tam, p))
     total = sum(t for _, t, _ in guardadas)
     for idade, tam, p in sorted(guardadas, reverse=True):   # mais antigas primeiro
-        if total <= _PREVIAS_MAX_GB * 1024 ** 3:
+        if total <= cfg["max_gb"] * 1024 ** 3:
             break
-        shutil.rmtree(p, ignore_errors=True)
+        _apagar_item(p)
         total -= tam
+    return {"success": True, "total": total}
+
+
+def limpar_midia():
+    """Preferências → "Limpar todo o cache em disco": leva junto as prévias dos vídeos do projeto."""
+    raiz = _midia_dir()
+    liberado = 0
+    for nome in os.listdir(raiz):
+        p = os.path.join(raiz, nome)
+        try:
+            liberado += _tamanho(p)
+        except OSError:
+            pass
+        _apagar_item(p)
+    return liberado
+
+
+def _pasta_midia(path):
+    """Pasta de cache do vídeo (arquivo+data). Uma prévia antiga do %TEMP% vem junto (não converte de novo)."""
+    nome = "m_" + hashlib.md5(f"{os.path.abspath(path)}|{os.path.getmtime(path)}".encode()).hexdigest()[:12]
+    work = os.path.join(_midia_dir(), nome)
+    velha = os.path.join(_RAIZ_TEMP, nome)
+    if not os.path.isdir(work) and os.path.isdir(velha):
+        try:
+            shutil.move(velha, work)
+        except Exception:
+            shutil.rmtree(work, ignore_errors=True)
+    os.makedirs(work, exist_ok=True)
+    return work
+
+
+def _hevc_direto(info):
+    """H.265 toca direto no painel? Só se a opção foi ligada (Preferências; padrão = converter), o teste do app
+    passou neste PC (amostra em frontend/assets; veHevcTestar), é 8 bits 4:2:0 e não é maior que a qualidade das
+    prévias. Padrão desligado: medido no editor, um H.265 exportado (quadro-chave a cada ~4 s) buscou 4x mais e
+    travou 9x mais nos cortes que a prévia leve (quadro-chave a cada 0,5 s)."""
+    pr = _prefs()
+    if pr.get("hevcDireto") is not True or pr.get("hevcModo") != "direto":
+        return False
+    if info.get("pix_fmt") not in ("yuv420p", "yuvj420p"):
+        return False
+    lados = [x for x in (info.get("width"), info.get("height")) if x]
+    return bool(lados) and min(lados) <= _cache_cfg()["lado"]
 
 
 def _fps(txt):
@@ -329,7 +484,10 @@ def _navegador_toca(path, info):
         return False
     if _tem_rotacao(info):
         return False
-    if info["vcodec"] not in _NAVEGADOR_VCODECS:
+    if info["vcodec"] == "hevc":
+        if not _hevc_direto(info):
+            return False
+    elif info["vcodec"] not in _NAVEGADOR_VCODECS:
         return False
     if info["vcodec"] == "h264" and info["pix_fmt"] not in ("yuv420p", "yuvj420p"):
         return False  # H.264 10-bit / 4:2:2 não decodifica no navegador
@@ -409,7 +567,7 @@ def gerar_thumbs(path, duration, outdir, count):
             except Exception:
                 pass
         if os.path.exists(out):
-            return {"t": round(t, 3), "url": media_server.register(out)}
+            return {"t": round(t, 3), "url": media_server.register(out), "arq": out}
         return None
 
     with ThreadPoolExecutor(max_workers=min(8, (os.cpu_count() or 4))) as ex:
@@ -444,18 +602,24 @@ def gerar_peaks(path, duration):
         return []
 
 
-# Prévia leve: lado CURTO até 1080 px (vídeo em pé 2160x3840 → 1080x1920; deitado 4K → 1920x1080).
-# Antes limitava a ALTURA a 720: um 4K vertical virava 405x720 e a prévia ficava borrada.
-_PROXY_ESCALA = "'if(gte(iw,ih),-2,min(1080,iw))':'if(gte(iw,ih),min(1080,ih),-2)'"
+# Prévia leve: lado CURTO até `lado` px (Preferências → Qualidade das prévias: 1080/720/540; vídeo em pé
+# 2160x3840 → 1080x1920; deitado 4K → 1920x1080). Limitar a ALTURA deixava um 4K vertical borrado (405x720).
+def _proxy_escala(lado=1080):
+    return f"'if(gte(iw,ih),-2,min({lado},iw))':'if(gte(iw,ih),min({lado},ih),-2)'"
 
 
-def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumbs_n=0):
+def _nome_proxy(lado):
+    return "proxy_v2.mp4" if lado == 1080 else f"proxy_v2_{lado}.mp4"
+
+
+def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumbs_n=0, lado=1080):
     """Gera a prévia leve e, na MESMA passada, as miniaturas da timeline (decodificar um 4K HEVC
     várias vezes em paralelo era o que mais atrasava a abertura). Com placa NVIDIA tudo roda na GPU
     (decodifica, reduz e codifica); se falhar, refaz pelo processador. Retorna (ok, err, thumbs)."""
     fps_gop = max(1, int(round(info["fps"] / 2)))  # keyframe a cada ~0,5s → scrub preciso
     dur = max(0.1, info["duration"])
     rotacionado = _tem_rotacao(info)
+    _PROXY_ESCALA = _proxy_escala(lado)
     passo = dur / thumbs_n if thumbs_n else 0
     th_saida = []
     if thumbs_n and thumbs_dir:
@@ -511,7 +675,7 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
         for i in range(thumbs_n):
             arq = os.path.join(thumbs_dir, f"th_{i + 1:04d}.jpg")
             if os.path.exists(arq):
-                thumbs.append({"t": round(min(dur - 0.05, passo * i + passo / 2), 3), "url": media_server.register(arq)})
+                thumbs.append({"t": round(min(dur - 0.05, passo * i + passo / 2), 3), "url": media_server.register(arq), "arq": arq})
     return ok, err, thumbs
 
 
@@ -609,7 +773,7 @@ def preparar(path, emit, stop_event=None):
     else:
         proxy = os.path.join(work, "proxy_v2.mp4")
         ok, err, thumbs = gerar_proxy(path, info, proxy, lambda p: emit({"stage": "proxy", "pct": p}), stop_event,
-                                      thumbs_dir=work, thumbs_n=count)
+                                      thumbs_dir=work, thumbs_n=count, lado=_cache_cfg()["lado"])
         if stop_event is not None and stop_event.is_set():
             return
         if ok:
@@ -676,12 +840,39 @@ def priorizar_midia(path):
     _VAGAS_EXTRAS.priorizar(chave + "|thumbs")
 
 
-def preparar_midia(path, emit, stop_event=None, prioridade=1):
+def _thumbs_guardadas(work, tipo):
+    """Miniaturas já feitas deste vídeo (thumbs_<tipo>.json): reabrir o projeto não extrai tudo de novo."""
+    try:
+        with open(os.path.join(work, f"thumbs_{tipo}.json"), encoding="utf-8") as f:
+            itens = json.load(f)
+        arqs = [os.path.join(work, x["arq"]) for x in itens]
+        if itens and all(os.path.isfile(a) for a in arqs):
+            return [{"t": x["t"], "url": media_server.register(a)} for x, a in zip(itens, arqs)]
+    except Exception:
+        pass
+    return None
+
+
+def _guardar_thumbs(work, tipo, thumbs):
+    try:
+        itens = [{"t": x["t"], "arq": os.path.basename(x["arq"])} for x in thumbs if x.get("arq")]
+        if itens:
+            with open(os.path.join(work, f"thumbs_{tipo}.json"), "w", encoding="utf-8") as f:
+                json.dump(itens, f)
+    except Exception:
+        pass
+    return [{"t": x["t"], "url": x["url"]} for x in thumbs]
+
+
+def preparar_midia(path, emit, stop_event=None, prioridade=1, leve=False):
     """
     Outro vídeo do projeto (além do aberto): mesma preparação, sem limpar a sessão nem mexer no áudio da fonte
     principal. Cada vídeo tem o seu áudio conformado (como os .cfa do Premiere; adicionar_audio) e a sua prévia.
       {stage:'info', ...} → {stage:'audio', url, quadros, peaks} → {stage:'video', url, proxy} → {stage:'thumbs'}
       → {stage:'done'} | {stage:'error', error}
+    leve = vídeo só no painel (não está na timeline): se ele precisaria de prévia leve e ela ainda não existe, só
+    lê os dados e faz as miniaturas ({stage:'info', leve: true}); a prévia sai quando ele for usado (a página pede
+    de novo, sem `leve`). Abrir um projeto com 30 vídeos no painel não converte os 30.
     """
     if not os.path.isfile(path):
         emit({"stage": "error", "error": "Arquivo não encontrado."})
@@ -695,11 +886,25 @@ def preparar_midia(path, emit, stop_event=None, prioridade=1):
         emit({"stage": "error", "error": "Arquivo sem vídeo ou com duração inválida."})
         return
     chave = os.path.abspath(path)
-    work = os.path.join(_work_dir(), "m_" + hashlib.md5(f"{chave}|{os.path.getmtime(path)}".encode()).hexdigest()[:12])
-    os.makedirs(work, exist_ok=True)
+    work = _pasta_midia(path)
+    try:
+        os.utime(work)   # usada agora: não entra na limpeza das antigas
+    except OSError:
+        pass
+    lado = _cache_cfg()["lado"]
     direto = _navegador_toca(path, info)
-    emit({"stage": "info", "needs_proxy": not direto, **info})
+    proxy = os.path.join(work, _nome_proxy(lado))
     count = int(min(180, max(24, info["duration"] / 2)))
+    if leve and not direto and not os.path.isfile(proxy):
+        emit({"stage": "info", "needs_proxy": True, "leve": True, **info})
+        th = _thumbs_guardadas(work, "fonte")
+        if th is None:
+            with _VAGAS_EXTRAS.vaga(chave + "|thumbs", prioridade):
+                th = _guardar_thumbs(work, "fonte", gerar_thumbs(path, info["duration"], work, count))
+        emit({"stage": "thumbs", "thumbs": th})
+        emit({"stage": "done", "leve": True})
+        return
+    emit({"stage": "info", "needs_proxy": not direto, **info})
 
     def _audio():
         if info["has_audio"]:
@@ -712,30 +917,36 @@ def preparar_midia(path, emit, stop_event=None, prioridade=1):
     ta.start()
     if direto:
         emit({"stage": "video", "url": media_server.register(path), "proxy": False})
-        with _VAGAS_EXTRAS.vaga(chave + "|thumbs", prioridade):
-            th = gerar_thumbs(path, info["duration"], work, count)
+        th = _thumbs_guardadas(work, "fonte")
+        if th is None:
+            with _VAGAS_EXTRAS.vaga(chave + "|thumbs", prioridade):
+                th = _guardar_thumbs(work, "fonte", gerar_thumbs(path, info["duration"], work, count))
         emit({"stage": "thumbs", "thumbs": th})
     else:
-        proxy = os.path.join(work, "proxy_v2.mp4")
         if os.path.isfile(proxy):
             ok, err, thumbs = True, "", None
-            try:
-                os.utime(work)   # usada agora: não entra na limpeza das antigas
-            except OSError:
-                pass
         else:
+            tmp = f"{proxy}.{os.getpid()}.tmp.mp4"   # por cópia do app: duas abrindo o mesmo vídeo não se atropelam
             with _VAGAS_PROXY.vaga(chave, prioridade):   # 2 conversões por vez (os que tocam direto não esperam)
-                ok, err, thumbs = gerar_proxy(path, info, proxy + ".tmp.mp4", lambda p: emit({"stage": "proxy", "pct": p}),
-                                              stop_event, thumbs_dir=work, thumbs_n=count)
+                ok, err, thumbs = gerar_proxy(path, info, tmp, lambda p: emit({"stage": "proxy", "pct": p}),
+                                              stop_event, thumbs_dir=work, thumbs_n=count, lado=lado)
             if ok:
-                os.replace(proxy + ".tmp.mp4", proxy)   # interrompida no meio não vira prévia "pronta" quebrada
+                os.replace(tmp, proxy)   # interrompida no meio não vira prévia "pronta" quebrada
+            else:
+                _apagar_item(tmp)
         if stop_event is not None and stop_event.is_set():
             return
         if not ok:
             emit({"stage": "error", "error": "Falha ao gerar pré-visualização: " + (err.splitlines()[-1] if err else "?")})
             return
         emit({"stage": "video", "url": media_server.register(proxy), "proxy": True})
-        emit({"stage": "thumbs", "thumbs": thumbs or gerar_thumbs(proxy, info["duration"], work, count)})
+        if thumbs:
+            th = _guardar_thumbs(work, lado, thumbs)
+        else:
+            th = _thumbs_guardadas(work, lado) or _thumbs_guardadas(work, "fonte")
+            if th is None:
+                th = _guardar_thumbs(work, lado, gerar_thumbs(proxy, info["duration"], work, count))
+        emit({"stage": "thumbs", "thumbs": th})
     ta.join()
     emit({"stage": "done"})
 
@@ -1219,15 +1430,21 @@ def adicionar_audio(path):
     if not info["has_audio"] or info["duration"] <= 0:
         return {"success": False, "error": "Este arquivo não tem som."}
     chave = hashlib.md5(f"{os.path.abspath(path)}|{os.path.getmtime(path)}".encode()).hexdigest()[:14]
-    pcm = os.path.join(_work_dir(), f"aud_{chave}.pcm")
+    pcm = os.path.join(_midia_dir(), f"aud_{chave}.pcm")   # guardado com as prévias (não se perde no %TEMP%)
+    tmp = f"{pcm}.{os.getpid()}.{threading.get_ident()}.tmp"   # único: duas leituras juntas não se atropelam
     if not os.path.isfile(pcm):
         r = subprocess.run([ffmpeg_path(), "-y", "-v", "error", "-i", path, "-map", "0:a:0", "-vn", "-ac", "2",
-                            "-ar", str(AUDIO_SR), "-f", "s16le", "-c:a", "pcm_s16le", pcm + ".tmp"],
+                            "-ar", str(AUDIO_SR), "-f", "s16le", "-c:a", "pcm_s16le", tmp],
                            capture_output=True, text=True, timeout=3600, creationflags=_creationflags())
-        if r.returncode != 0 or not os.path.isfile(pcm + ".tmp"):
-            _apagar(pcm + ".tmp")
+        if r.returncode != 0 or not os.path.isfile(tmp):
+            _apagar(tmp)
             return {"success": False, "error": "Não foi possível ler o áudio."}
-        os.replace(pcm + ".tmp", pcm)
+        os.replace(tmp, pcm)
+    else:
+        try:
+            os.utime(pcm)   # usado agora: não entra na limpeza dos antigos
+        except OSError:
+            pass
     quadros = os.path.getsize(pcm) // 4
     return {"success": True, "path": path, "name": os.path.basename(path), "dur": quadros / AUDIO_SR,
             "url": media_server.register(pcm), "quadros": quadros, "peaks": gerar_peaks(path, quadros / AUDIO_SR)}

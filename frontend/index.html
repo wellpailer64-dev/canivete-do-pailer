@@ -1717,7 +1717,13 @@
                         <option value="2">2 GB</option>
                         <option value="3">3 GB</option>
                     </select>
+                    <label class="modal-label" for="pref-hevc">Vídeo H.265 (HEVC)</label>
+                    <select id="pref-hevc" class="modal-input" onchange="vePrefsCacheCampo('hevc', this.value)">
+                        <option value="converter">Sempre converter para prévia leve</option>
+                        <option value="direto">Tocar direto quando o PC suportar</option>
+                    </select>
                 </div>
+                <p>Vale para os próximos vídeos abertos. A qualidade das prévias também define o tamanho da prévia leve de edição. H.265 direto poupa a conversão, mas os cortes buscam mais devagar.</p>
                 <p>A limpeza é automática: ao abrir o app e depois de cada render, o que passou da idade é apagado; se o total passar do máximo, saem primeiro as prévias usadas há mais tempo.</p>
                 <div class="pref-cache-uso" id="pref-cache-uso"></div>
                 <div class="pref-cache-btns">

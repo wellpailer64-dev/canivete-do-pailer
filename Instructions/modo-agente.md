@@ -25,6 +25,17 @@ with sync_playwright() as p:
     pg.screenshot(path="tela.png")
 ```
 
+## Teste de play (Pocket Editor)
+
+```
+python main.py --agente=9333
+python testes/teste_play.py "C:/caminho/projeto.vcnvt" --segundos 20 --inicio 0
+```
+
+Abre o projeto, espera os vídeos da timeline, toca e reprova (código 1) se a agulha voltar para trás, se houver
+buscas/esperas demais nos players, quadros perdidos ou travadas da página. Referência (Portugal, 35 cortes de um
+vídeo, prévia leve 1080p): ~4,5 buscas e ~1 espera a cada 10 s, 0 perdidos.
+
 ## Segurança
 
 - A porta só escuta em `127.0.0.1`: apenas programas **deste computador** conseguem entrar.

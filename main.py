@@ -284,14 +284,16 @@ def video_cutter_prepare(file_path):
     return {"success": True}
 
 
-def ve_preparar_midia(path, mid, urgente=False):
+def ve_preparar_midia(path, mid, urgente=False, leve=False):
     """Outro vídeo do projeto (painel Projeto → timeline): prepara em background; eventos em veOnMidia({id, ...}).
-    urgente = está na timeline: a prévia dele sai antes das dos vídeos que só estão no painel."""
+    urgente = está na timeline: a prévia dele sai antes das dos vídeos que só estão no painel.
+    leve = só no painel: dados e miniaturas; a prévia leve fica para quando ele for usado."""
     from Functions.video_cutter import preparar_midia
 
     def run():
         try:
-            preparar_midia(path, lambda ev: _ve_emit("veOnMidia", {"id": mid, **ev}), prioridade=0 if urgente else 1)
+            preparar_midia(path, lambda ev: _ve_emit("veOnMidia", {"id": mid, **ev}), prioridade=0 if urgente else 1,
+                           leve=bool(leve) and not urgente)
         except Exception as e:
             _ve_emit("veOnMidia", {"id": mid, "stage": "error", "error": str(e)})
 
@@ -597,7 +599,11 @@ def ve_render_mover(base, chave_antiga, chave_nova):
 def ve_render_limpar(base, chave=None):
     from Functions import render_cache
     try:
-        return render_cache.limpar(base, chave or None)
+        r = render_cache.limpar(base, chave or None)
+        if not chave and isinstance(r, dict):   # "limpar todo o cache": prévias dos vídeos do projeto também
+            from Functions.video_cutter import limpar_midia
+            r["liberado"] = (r.get("liberado") or 0) + limpar_midia()
+        return r
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -605,7 +611,10 @@ def ve_render_limpar(base, chave=None):
 def ve_render_manutencao(base, max_gb=20, dias=30):
     from Functions import render_cache
     try:
-        return render_cache.manutencao(base, max_gb, dias)
+        r = render_cache.manutencao(base, max_gb, dias)
+        from Functions.video_cutter import manutencao_midia
+        manutencao_midia()   # prévias dos vídeos do projeto (Canivete Media Cache): mesmas regras
+        return r
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2682,8 +2691,8 @@ class ApiBridge:
     def ve_fontes(self):
         return ve_fontes()
 
-    def ve_preparar_midia(self, path, mid, urgente=False):
-        return ve_preparar_midia(path, mid, urgente)
+    def ve_preparar_midia(self, path, mid, urgente=False, leve=False):
+        return ve_preparar_midia(path, mid, urgente, leve)
 
     def ve_priorizar_midia(self, path):
         from Functions.video_cutter import priorizar_midia

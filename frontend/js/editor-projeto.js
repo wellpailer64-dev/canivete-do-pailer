@@ -56,7 +56,7 @@ function vePjInfo(m) {
         const inf = m.id === 0 ? VE.info : m.info, fps = inf && (m.id === 0 ? VE.fps : inf.fps);
         if (m.erro) return { dur: null, info: veT('erro: ') + m.erro };
         if (!inf) return { dur: null, info: veT('preparando...') };
-        const estado = m.id && !m.url ? ` · ${veT('prévia')} ${m.pct || 0}%` : '';
+        const estado = !m.id || m.url ? '' : m.leve ? ` · ${veT('prévia ao usar')}` : ` · ${veT('prévia')} ${m.pct || 0}%`;
         return { dur: m.id === 0 ? VE.srcDur : inf.duration, info: `${inf.width}×${inf.height} · ${String(+(fps || 30).toFixed(2)).replace('.', ',')} qps${estado}` };
     }
     if (m.kind === 'image') return { dur: null, info: m.w ? `${m.w}×${m.h}` : '' };
@@ -783,24 +783,46 @@ function vePjInit() {
 // têm limite próprio no Python (video_cutter: _SEM_PROXY/_SEM_EXTRAS)
 const VEPJF = { fila: [], ativos: new Set(), max: 3 };
 // urgente = vídeo na timeline (ou pedido agora): passa na frente dos que só estão no painel, aqui e na fila
-// de conversão do Python — senão, num projeto com 30 vídeos, o da timeline podia ser o último a tocar
+// de conversão do Python — senão, num projeto com 30 vídeos, o da timeline podia ser o último a tocar.
+// Os que só estão no painel vão "leves": dados e miniaturas; a prévia leve sai quando forem usados (veMidiaPriorizar)
 function veMidiaPreparar(m, urgente) {
     if (!m || m.kind !== 'video' || !m.id || !m.path) return;
     m.pct = 0;
     delete m.erro;
-    if (urgente) { m._urgente = true; VEPJF.fila.unshift(m.id); } else VEPJF.fila.push(m.id);
+    delete m.leve;
+    if (urgente || veMidiaNaTimeline(m.id)) { m._urgente = true; VEPJF.fila.unshift(m.id); } else VEPJF.fila.push(m.id);
     veMidiaProxima();
+}
+// a mídia tem clipe em alguma sequência (a aberta ou as outras do projeto)?
+function veMidiaNaTimeline(id) {
+    if (VE.clips.some(c => veMid(c) === id)) return true;
+    return (VE.sequences || []).some(s => s.id !== VE.activeSequence && (s.clips || []).some(c => veMid(c) === id));
+}
+// Timeline mudou (veRefresh): vídeo que entrou nela e ainda está só com os dados ganha a prévia leve agora
+function veMidiaUsadasPreparar() {
+    if (typeof VEPJF === 'undefined') return;
+    const vistos = new Set();
+    VE.clips.forEach(c => {
+        const id = veMid(c);
+        if (!id || vistos.has(id)) return;
+        vistos.add(id);
+        const m = VE.media[id];
+        if (m && m.leve && !m.url) veMidiaPriorizar(m);
+    });
 }
 function veMidiaProxima() {
     while (VEPJF.ativos.size < VEPJF.max && VEPJF.fila.length) {
         const id = VEPJF.fila.shift(), m = VE.media[id];
         if (!m || m.removido) continue;
         VEPJF.ativos.add(id);
-        window.pywebview.api.ve_preparar_midia(m.path, id, !!m._urgente);
+        window.pywebview.api.ve_preparar_midia(m.path, id, !!m._urgente, !m._urgente);
     }
 }
 function veMidiaPriorizar(m) {
-    if (!m || m._urgente) return;
+    if (!m) return;
+    // só com os dados (vídeo do painel): agora que vai ser usado, pede a prévia leve na frente da fila
+    if (m.leve && !m.url && !VEPJF.ativos.has(m.id) && !VEPJF.fila.includes(m.id)) { veMidiaPreparar(m, true); return; }
+    if (m._urgente) return;
     m._urgente = true;
     const i = VEPJF.fila.indexOf(m.id);
     if (i > 0) { VEPJF.fila.splice(i, 1); VEPJF.fila.unshift(m.id); }
@@ -818,6 +840,7 @@ function veOnMidia(ev) {
     if (ev.stage === 'info') {
         m.info = ev;
         m.dur = ev.duration;
+        if (ev.leve) m.leve = true; else delete m.leve;
         if (m.id === 0) {
             VE.info = ev;
             VE.srcDur = ev.duration;

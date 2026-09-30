@@ -4366,6 +4366,7 @@ function veRenderClips() {
 }
 
 function veRefresh() {
+    if (typeof veMidiaUsadasPreparar === 'function') veMidiaUsadasPreparar();
     veTxRender();
     vePjRender();
     if (veMixAtivo()) veAudioEditou();

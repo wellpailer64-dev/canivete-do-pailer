@@ -61,8 +61,16 @@ class VeMixer extends AudioWorkletProcessor {
 }
 registerProcessor('ve-mixer', VeMixer);`;
 
-async function veAudioIniciar() {
-    if (VEAU.ctx || VEAU.falhou) return !!VEAU.ctx;
+// Uma vez só, mesmo com vários pedidos juntos (abrir um projeto registra o som de dezenas de vídeos ao mesmo
+// tempo): antes cada pedido criava o seu mixer durante o await, e os que sobravam, vazios, mandavam "posição 0"
+// para o relógio — a agulha pulava para trás e para a frente, o vídeo buscava sem parar e o play engasgava
+function veAudioIniciar() {
+    if (VEAU.ctx || VEAU.falhou) return Promise.resolve(!!VEAU.ctx);
+    if (!VEAU.iniciando) VEAU.iniciando = veAudioCriar().finally(() => { VEAU.iniciando = null; });
+    return VEAU.iniciando;
+}
+
+async function veAudioCriar() {
     try {
         const ctx = new AudioContext({ sampleRate: VE_AU_SR, latencyHint: 'interactive' });
         const url = URL.createObjectURL(new Blob([VE_AU_WORKLET], { type: 'application/javascript' }));
@@ -70,7 +78,7 @@ async function veAudioIniciar() {
         const node = new AudioWorkletNode(ctx, 've-mixer', { numberOfInputs: 0, outputChannelCount: [2] });
         const ganho = ctx.createGain();
         node.connect(ganho).connect(ctx.destination);
-        node.port.onmessage = e => veAudioMsg(e.data);
+        node.port.onmessage = e => { if (VEAU.node === node) veAudioMsg(e.data); };   // só o mixer em uso mexe no relógio
         Object.assign(VEAU, { ctx, node, ganho });
         return true;
     } catch (e) {

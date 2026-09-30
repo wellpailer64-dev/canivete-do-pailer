@@ -12,6 +12,10 @@ Conecte por CDP (ex.: Playwright `connect_over_cdp`), rode JS na página (`veSee
 clique e tire print. Detalhes e segurança em `Instructions/modo-agente.md`.
 Fechar o app aberto do usuário (para trocar o exe ou relançar com `--agente`) exige o ok dele antes.
 
+Play do Pocket Editor: `python testes/teste_play.py "<projeto.vcnvt>" [--segundos 20] [--inicio 0]` (app em
+`--agente=9333`) mede agulha voltando, buscas, esperas, quadros perdidos e travadas; sai com 1 se passar dos limites.
+Rodar antes de release quando mexer em reprodução, áudio ou prévias.
+
 ## Build local
 - `build.bat` apaga `dist/` inteiro, onde ficam os modelos do usuário (`modelos_ia/`, `models/`, ~8 GB).
   Gere em outra pasta (`--distpath dist_novo --workpath build_novo`) e copie só `CaniveteDoPailer.exe`,
