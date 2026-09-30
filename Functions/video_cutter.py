@@ -2114,6 +2114,34 @@ _BLEND_FF = {
 }
 
 
+def _ca_exprs(ca, tv):
+    """Animações constantes do clipe (painel Animação → Constante; veCaAplicar em editor-fx.js faz a mesma conta),
+    no tempo `tv` (segundos desde o início do clipe): multiplica a escala, soma à rotação (graus) e à posição (px)."""
+    sc, rot, dx, dy = [], [], [], []
+
+    def onda(f, r, fase):   # −1..1: balanço suave (r = 0) até tremida nervosa (r = 1), a mesma de veCaOnda
+        a = f"(2*PI*{f:.5f}*{tv})"
+        return (f"((1-{r:.4f})*sin({a}+{fase:.4f})+{r:.4f}*(0.6*sin({a}*2.37+{fase * 1.7 + 1.3:.4f})"
+                f"+0.4*sin({a}*4.11+{fase * 2.3 + 2.9:.4f})))")
+    for f in ca or []:
+        t, v = f.get("t"), f.get("v") or {}
+        if t == "ca_rot":
+            vel = _num(v.get("vel"), 0, 20)
+            if vel > 0:
+                rot.append(f"({-1 if v.get('esq') else 1}*{vel * 360:.5f}*{tv})")
+        elif t == "ca_pul":
+            tam, vel = _num(v.get("tam"), 0, 300) / 100, _num(v.get("vel"), 0, 30)
+            if tam > 0 and vel > 0:
+                sc.append(f"(1+{tam:.5f}*(0.5-0.5*cos(2*PI*{vel:.5f}*{tv})))")
+        elif t == "ca_wig":
+            area, vel, r = _num(v.get("area"), 0, 5000), _num(v.get("vel"), 0, 60), _num(v.get("int"), 0, 100) / 100
+            if area > 0 and vel > 0:
+                dx.append(f"({area:.3f}*{onda(vel, r, 0.3)})")
+                dy.append(f"({area:.3f}*{onda(vel, r, 2.1)})")
+    junta = lambda xs, op: op.join(xs) if xs else None
+    return {"sc": junta(sc, "*"), "rot": junta(rot, "+"), "dx": junta(dx, "+"), "dy": junta(dy, "+")}
+
+
 def _normalizar_camadas(camadas, path_video):
     """Camadas por cima da base, de baixo para cima: imagens e clipes de vídeo transformados."""
     out = []
@@ -2141,6 +2169,7 @@ def _normalizar_camadas(camadas, path_video):
                 # texto animado: lista de quadros PNG (demuxer concat) no lugar da imagem parada
                 "seq": c.get("seq") if tipo == "imagem" and c.get("seq") and os.path.isfile(str(c.get("seq"))) else None,
                 "bm": c.get("bm") if c.get("bm") in _BLEND_FF and tipo != "ajuste" else None,
+                "ca": [f for f in (c.get("ca") or []) if isinstance(f, dict) and tipo != "ajuste"],
             }
         except Exception:
             continue
@@ -2454,8 +2483,11 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             # Propriedade animada vira expressão avaliada a cada quadro.
             sx = _expr_kf(kf["sx"], "t") if "sx" in kf else None
             sy = _expr_kf(kf["sy"], "t") if "sy" in kf else None
-            if "sc" in kf or sx or sy:
+            ca = _ca_exprs(c.get("ca"), "t")   # Rotação / Tremer / Pulsar em loop (tempo da camada)
+            if "sc" in kf or sx or sy or ca["sc"]:
                 e = _expr_kf(kf["sc"], "t") if "sc" in kf else f"{c['sc']:.5f}"
+                if ca["sc"]:
+                    e = f"({e})*{ca['sc']}"
                 ew = f"({e})*({sx})" if sx else e
                 eh = f"({e})*({sy})" if sy else e
                 # tamanho sempre par: com metade inteira o centro não "treme" meio pixel a cada quadro do zoom
@@ -2465,9 +2497,11 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 k = c["sc"]
                 escala = f"scale='max(2,trunc(iw*{k:.5f}))':'max(2,trunc(ih*{k:.5f}))':flags=bicubic"
             giro = None
-            if "rot" in kf:
+            if "rot" in kf or ca["rot"]:
                 # quadro fixo do tamanho da diagonal: cabe em qualquer ângulo
-                e = _expr_kf(kf["rot"], "t")
+                e = _expr_kf(kf["rot"], "t") if "rot" in kf else f"{c['rot']:.5f}"
+                if ca["rot"]:
+                    e = f"({e})+{ca['rot']}"
                 giro = f"rotate=a='({e})*PI/180':c=black@0:ow='hypot(iw,ih)':oh='hypot(iw,ih)'"
             elif c["rot"]:
                 rad = c["rot"] * 3.141592653589793 / 180
@@ -2479,7 +2513,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             else:
                 opac = None
             # escala animada vai por último (tamanho muda a cada quadro; o resto trabalha em tamanho fixo)
-            ordem = [giro, opac, escala] if ("sc" in kf or sx or sy) else [escala, giro, opac]
+            ordem = [giro, opac, escala] if ("sc" in kf or sx or sy or ca["sc"]) else [escala, giro, opac]
             efeitos = _filtros_fx(c["fx"], c["mw"], c["mh"], f"l{n}")
             # velocidade do clipe (como no Premiere): o tempo da fonte é comprimido/esticado antes de tudo
             if c["tipo"] == "imagem" and c.get("seq"):
@@ -2505,11 +2539,17 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             tl = f"(t-{c['st']:.4f})"
             px = _expr_kf(kf["x"], tl) if "x" in kf else f"{c['x']:.2f}"
             py = _expr_kf(kf["y"], tl) if "y" in kf else f"{c['y']:.2f}"
+            ca_tl = _ca_exprs(c.get("ca"), tl)
             if abs(c["ox"]) > 0.01 or abs(c["oy"]) > 0.01:
                 # Posição = onde fica o ponto de ancoragem; o centro da camada gira/escala em volta dele
-                if "sc" in kf or "rot" in kf:
+                if "sc" in kf or "rot" in kf or ca_tl["sc"] or ca_tl["rot"]:
                     k = _expr_kf(kf["sc"], tl) if "sc" in kf else f"{c['sc']:.6f}"
-                    a = f"(({_expr_kf(kf['rot'], tl)})*PI/180)" if "rot" in kf else f"{c['rot'] * 3.141592653589793 / 180:.6f}"
+                    if ca_tl["sc"]:
+                        k = f"({k})*{ca_tl['sc']}"
+                    ag = _expr_kf(kf["rot"], tl) if "rot" in kf else f"{c['rot']:.5f}"
+                    if ca_tl["rot"]:
+                        ag = f"({ag})+{ca_tl['rot']}"
+                    a = f"(({ag})*PI/180)"
                     px = f"({px})+({k})*({c['ox']:.3f}*cos({a})-{c['oy']:.3f}*sin({a}))"
                     py = f"({py})+({k})*({c['ox']:.3f}*sin({a})+{c['oy']:.3f}*cos({a}))"
                 else:
@@ -2517,6 +2557,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                     dx = c["sc"] * (c["ox"] * math.cos(a) - c["oy"] * math.sin(a))
                     dy = c["sc"] * (c["ox"] * math.sin(a) + c["oy"] * math.cos(a))
                     px, py = f"({px})+{dx:.3f}", f"({py})+{dy:.3f}"
+            if ca_tl["dx"]:   # Tremer: desloca a posição
+                px, py = f"({px})+{ca_tl['dx']}", f"({py})+{ca_tl['dy']}"
             ena = f"between(t,{_tempo_ffmpeg(c['st'])},{_tempo_ffmpeg(fim)})"
             bm = _BLEND_FF.get(c.get("bm") or "")
             if bm:

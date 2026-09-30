@@ -171,6 +171,36 @@ const VE_FX = {
             return a;
         },
     },
+    // ── Constante (painel Animação): movimento em loop durante o clipe inteiro. Não mexem nos pixels: somam à
+    // Escala/Rotação/Posição na hora de desenhar (veCaAplicar) e viram fórmulas na exportação (_ca_exprs).
+    ca_rot: {
+        nome: 'Rotação', cat: 'Constante', tag: 'Spin', constante: true, soClipe: true,
+        params: [
+            { k: 'vel', nome: 'Velocidade (voltas por segundo)', min: 0, max: 5, step: 0.05, def: 0.25, un: 'x' },
+            { k: 'esq', nome: 'Girar para a esquerda', tipo: 'bool', def: 0 },
+        ],
+        neutro: v => !(v.vel > 0),
+        draw: a => a,
+    },
+    ca_wig: {
+        nome: 'Tremer', cat: 'Constante', tag: 'Wiggle', constante: true, soClipe: true,
+        params: [
+            { k: 'area', nome: 'Área de deslocamento', min: 0, max: 400, step: 1, def: 30, un: 'px' },
+            { k: 'vel', nome: 'Velocidade (por segundo)', min: 0.2, max: 20, step: 0.1, def: 4, un: 'x' },
+            { k: 'int', nome: 'Intensidade (suave → nervoso)', min: 0, max: 100, step: 1, def: 50, un: '%' },
+        ],
+        neutro: v => !(v.area > 0),
+        draw: a => a,
+    },
+    ca_pul: {
+        nome: 'Pulsar', cat: 'Constante', tag: 'Pulse', constante: true, soClipe: true,
+        params: [
+            { k: 'tam', nome: 'Tamanho do pulso', min: 0, max: 100, step: 0.5, def: 8, un: '%' },
+            { k: 'vel', nome: 'Velocidade (pulsos por segundo)', min: 0.1, max: 10, step: 0.05, def: 1.5, un: 'x' },
+        ],
+        neutro: v => !(v.tam > 0),
+        draw: a => a,
+    },
     // Básico 3D (Basic 3D do Premiere): gira o quadro no espaço e projeta com perspectiva, dentro do próprio quadro
     b3d: {
         nome: 'Básico 3D', cat: 'Perspectiva', tag: 'Basic 3D',
@@ -228,6 +258,33 @@ const VE_AFX = {
         neutro: v => !v.lo && !v.mid && !v.hi,
     },
 };
+
+// ── Constante: Rotação / Tremer / Pulsar (u = segundos desde o início do clipe) ──
+const VE_CA_2PI = Math.PI * 2;
+// −1..1: balanço suave (r = 0) até tremida nervosa (r = 1); a exportação usa a mesma soma de senos (_ca_exprs)
+function veCaOnda(u, f, r, fase) {
+    const a = VE_CA_2PI * f * u;
+    return (1 - r) * Math.sin(a + fase) + r * (0.6 * Math.sin(a * 2.37 + fase * 1.7 + 1.3) + 0.4 * Math.sin(a * 4.11 + fase * 2.3 + 2.9));
+}
+const veCaAtivas = c => veFxActive(c).filter(f => VE_FX[f.t].constante);
+// Propriedades do clipe no instante T com o movimento constante somado (só no desenho: o painel mostra as de base)
+function veCaAplicar(c, p, T) {
+    const L = veCaAtivas(c);
+    if (!L.length) return p;
+    const u = Math.max(0, T - c.st), q = { ...p };
+    L.forEach(f => {
+        const v = veFxValues(f);
+        if (f.t === 'ca_rot') q.rot += (v.esq ? -1 : 1) * v.vel * 360 * u;
+        else if (f.t === 'ca_pul') q.sc *= 1 + v.tam / 100 * (0.5 - 0.5 * Math.cos(VE_CA_2PI * v.vel * u));
+        else if (f.t === 'ca_wig') {
+            const r = v.int / 100;
+            q.x += v.area * veCaOnda(u, v.vel, r, 0.3);
+            q.y += v.area * veCaOnda(u, v.vel, r, 2.1);
+        }
+    });
+    return q;
+}
+const veCaExport = c => veCaAtivas(c).map(f => ({ t: f.t, v: veFxValues(f) }));
 
 // ── Cantos arredondados: raio em px do quadro w×h (a exportação faz a mesma conta: _filtros_fx) ──
 function veFxRaio(v, w, h) { return Math.max(0, Math.min(100, v.raio || 0)) / 100 * Math.min(w, h) / 2; }
@@ -471,7 +528,7 @@ function veTemAlfa(c) { const m = veMediaOf(c); return !!(m && m.info && m.info.
 // alvo = pixels do monitor por pixel da mídia: os efeitos rodam só na resolução em que a mídia aparece
 // (em degraus de 1/8, para não recriar os canvases a cada quadro de uma escala animada)
 function veFxRender(c, src, sz, alvo) {
-    const fx = veFxActive(c);
+    const fx = veFxActive(c).filter(f => !VE_FX[f.t].constante);
     if (!fx.length) return src;
     let q = Math.min(1, 1920 / Math.max(sz.w, sz.h));
     if (alvo > 0) q = Math.min(q, Math.max(0.125, Math.ceil(alvo * 8) / 8));
@@ -486,7 +543,7 @@ function veFxRender(c, src, sz, alvo) {
 
 // Para a exportação: [{t, v}] só dos efeitos ativos
 function veFxExport(c) {
-    return veFxActive(c).map(f => {
+    return veFxActive(c).filter(f => !VE_FX[f.t].constante).map(f => {
         const d = VE_FX[f.t], v = veFxValues(f);
         return { t: f.t, v: d.exportar ? d.exportar(v) : v };
     });
@@ -736,7 +793,7 @@ function veRenderFxList() {
         if (q && !alvo.includes(q)) return;
         (cats[d.cat] = cats[d.cat] || []).push([t, d, tipo]);
     };
-    Object.entries(VE_FX).forEach(([t, d]) => add(t, d, 'v'));
+    Object.entries(VE_FX).forEach(([t, d]) => { if (!d.constante) add(t, d, 'v'); });   // constantes: painel Animação
     Object.entries(VE_AFX).forEach(([t, d]) => add(t, d, 'a'));
     const html = Object.entries(cats).map(([cat, list]) => `<div class="ve-fx-cat">${cat}</div>` +
         list.map(([t, d, tipo]) => `<div class="ve-fx-item" data-${tipo === 'a' ? 'aft' : 'fxt'}="${t}" title="Arraste até um clipe · duplo clique aplica no clipe selecionado"><i>${tipo === 'a' ? 'aud' : 'fx'}</i><span>${d.nome}</span><small>${d.tag}</small></div>`).join('')).join('');

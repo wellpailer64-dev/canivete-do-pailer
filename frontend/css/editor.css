@@ -1535,6 +1535,24 @@ body.ve-kl-scrub, body.ve-kl-scrub * { cursor: ew-resize !important; }
 .ve-txa-controls { flex-shrink: 0; margin: 0 8px 4px; padding: 6px 8px; border: 1px solid var(--ve-line-2); border-radius: 7px; background: var(--ve-panel-2); display: flex; flex-direction: column; gap: 6px; }
 .ve-txa-controls:empty { display: none; }
 .ve-txa-dica { font-size: 11px; color: var(--ve-faint); }
+/* painel Animação: uma rolagem só; cada aba (Texto, Transições, Constante) abre e fecha */
+.ve-an-rolagem { flex: 1; min-height: 0; overflow: auto; }
+.ve-an-rolagem .ve-tr-grid { flex: none; overflow: visible; min-height: 0; }
+.ve-an-sec.ve-txa-sec { display: block; max-height: none; }
+.ve-an-sec[hidden] { display: none; }
+.ve-an-sec > summary {
+    position: sticky; top: 0; z-index: 2; display: flex; align-items: baseline; gap: 6px; cursor: pointer; list-style: none;
+    padding: 8px 10px 6px; background: var(--ve-panel); border-bottom: 1px solid var(--ve-line);
+    font: 700 10.5px var(--ve-ui); text-transform: uppercase; letter-spacing: .08em; color: var(--ve-dim); user-select: none;
+}
+.ve-an-sec > summary::-webkit-details-marker { display: none; }
+.ve-an-sec > summary::before { content: '▸'; font-size: 10px; color: var(--ve-faint); transition: transform .12s; }
+.ve-an-sec[open] > summary::before { transform: rotate(90deg); }
+.ve-an-sec > summary:hover { color: var(--ve-text); }
+.ve-an-sec > summary small { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--ve-faint); }
+.ve-an-sec .ve-tr-controls { border-top: 0; background: none; padding-top: 0; }
+.ve-ca-card canvas { border-color: #22c55e55; }
+.ve-ca-card:hover canvas { border-color: #22c55e; }
 .ve-txa-bloco { display: flex; flex-direction: column; gap: 4px; }
 .ve-txa-bloco + .ve-txa-bloco { border-top: 1px solid var(--ve-line); padding-top: 6px; }
 .ve-txa-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ve-dim); min-width: 0; }

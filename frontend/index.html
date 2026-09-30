@@ -640,14 +640,17 @@
                                     <div class="ve-fx-list" id="ve-fx-list"></div>
                                     <div class="ve-fx-hint">Arraste um efeito até um clipe na timeline, ou selecione o clipe e dê duplo clique no efeito.</div>
                                 </div>
-                                <div class="ve-panel ve-tabpane" id="ve-pane-trans" data-panel="trans" data-title="Transições">
-                                    <div class="ve-fx-search"><svg class="i"><use href="#i-search"/></svg><input type="text" id="ve-tr-q" placeholder="Buscar transição" autocomplete="off"></div>
-                                    <div class="ve-txa-sec" id="ve-txa-sec">
-                                        <div class="ve-txa-head">Texto <small>letra a letra · palavra · linha</small></div>
+                                <div class="ve-panel ve-tabpane" id="ve-pane-trans" data-panel="trans" data-title="Animação">
+                                    <div class="ve-fx-search"><svg class="i"><use href="#i-search"/></svg><input type="text" id="ve-tr-q" placeholder="Buscar animação" autocomplete="off"></div>
+                                    <!-- uma rolagem só; cada aba abre/fecha (editor-trans.js: veAnInit) -->
+                                    <div class="ve-an-rolagem" id="ve-an-rolagem">
+                                    <details class="ve-an-sec ve-txa-sec" id="ve-txa-sec" data-an="texto" open>
+                                        <summary>Texto <small>letra a letra · palavra · linha</small></summary>
                                         <div class="ve-tr-grid ve-txa-grid" id="ve-txa-list"></div>
                                         <div class="ve-txa-controls" id="ve-txa-controls"></div>
-                                        <div class="ve-txa-head">Transições de vídeo</div>
-                                    </div>
+                                    </details>
+                                    <details class="ve-an-sec" id="ve-tr-sec" data-an="trans" open>
+                                    <summary>Transições <small>no corte entre clipes ou no início/fim</small></summary>
                                     <div class="ve-tr-grid" id="ve-tr-list"></div>
                                     <div class="ve-tr-controls" id="ve-tr-controls">
                                         <div class="ve-tr-control-row">
@@ -672,7 +675,13 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="ve-fx-hint">Passe o mouse para ver o exemplo. Arraste até o corte entre dois clipes (ou o início/fim de um clipe); a borda do bloco na timeline muda a duração.</div>
+                                    </details>
+                                    <details class="ve-an-sec" id="ve-ca-sec" data-an="const" open>
+                                        <summary>Constante <small>em loop, no clipe inteiro</small></summary>
+                                        <div class="ve-tr-grid" id="ve-ca-list"></div>
+                                    </details>
+                                    </div>
+                                    <div class="ve-fx-hint">Passe o mouse para ver o exemplo. Transição: arraste até o corte entre dois clipes (a borda do bloco muda a duração). Constante: arraste até o clipe ou dê duplo clique com ele selecionado; os ajustes ficam no Controles de efeito.</div>
                                 </div>
                                 <div class="ve-panel ve-tabpane" id="ve-pane-keys" data-panel="keys" data-title="Atalhos">
                                     <div class="ve-keys">
@@ -686,7 +695,7 @@
                                         <div><kbd>'</kbd> ou <kbd>Ctrl</kbd>+<kbd>K</kbd> Cortar todas as trilhas na agulha (<kbd>S</kbd> também, sem clipe selecionado)</div>
                                         <div><kbd>E</kbd> Cortar só os clipes selecionados na agulha</div>
                                         <div>Clique numa transição para usá-la no Ctrl+D; clique na ponta de um clipe e aperte Ctrl+D (vídeo) ou Ctrl+Shift+D / Ctrl+Shift+9 (áudio: Potência constante)</div>
-                                        <div>Arraste uma transição do painel Transições até o corte · arraste a borda do bloco para mudar a duração</div>
+                                        <div>Arraste uma transição do painel Animação até o corte · arraste a borda do bloco para mudar a duração</div>
                                         <div>Arrastar na área vazia da timeline seleciona vários clipes · <kbd>Shift</kbd>+clique soma / tira da seleção</div>
                                         <div>Botão do elo (timeline): seleção vinculada — desligada, clicar no vídeo ou no áudio pega só aquela parte</div>
                                         <div><kbd>D</kbd> ou <kbd>Delete</kbd> Apagar clipe selecionado (o espaço fica) · <kbd>Shift</kbd>+<kbd>D</kbd> apaga e fecha o espaço</div>
@@ -706,7 +715,7 @@
                                         <div>Com um clipe selecionado: <kbd>P</kbd> Posição · <kbd>S</kbd> Escala · <kbd>R</kbd> Rotação · <kbd>T</kbd> Opacidade · <kbd>U</kbd> tudo o que tem animação · <kbd>Shift</kbd>+tecla soma/tira</div>
                                         <div>Na faixa: clique seleciona · arrastar move · <kbd>Alt</kbd>+arrastar duplica · <kbd>Delete</kbd> apaga só o quadro-chave · <kbd>Ctrl</kbd>+<kbd>C</kbd>/<kbd>V</kbd> copia e cola na agulha · botão direito: interpolação</div>
                                         <div><kbd>F9</kbd> Easy Ease · <kbd>Shift</kbd>+<kbd>F9</kbd> só a chegada · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F9</kbd> só a saída</div>
-                                        <div>Texto animado: arraste um card da seção Texto (painel Transições) até o clipe de texto — começo = entrada, fim = saída</div>
+                                        <div>Texto animado: arraste um card da aba Texto (painel Animação) até o clipe de texto — começo = entrada, fim = saída</div>
                                         <div><kbd>X</kbd> Apagar trecho entre In e Out</div>
                                         <div><kbd>Ctrl</kbd>+<kbd>Z</kbd> Desfazer · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> Refazer</div>
                                         <h4>Ferramentas e visão</h4>

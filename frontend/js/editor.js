@@ -2851,7 +2851,7 @@ function veDrawMonitor() {
     itens.forEach(({ c, src }) => {
             if (!src) return;
             if (src === 'ajuste') { veAdjDraw(ctx, cv, c, pv); return; }
-            const p = veProps(c), sz = veMediaSize(c);
+            const p = veCaAplicar(c, veProps(c), t), sz = veMediaSize(c);   // + Rotação/Tremer/Pulsar em loop
             // texto animado vem com margem em volta (letras que saem da caixa): desenha maior, mesmo centro
             const pd = src && src._pad || 0, szd = pd ? { w: sz.w + 2 * pd, h: sz.h + 2 * pd } : sz;
             if (src !== 'offline') src = veFxRender(c, src, szd, pv * p.sc / 100);   // efeitos rodam antes do movimento (como no Premiere)
@@ -3235,7 +3235,7 @@ function veExportPlanClips() {
             return { tipo: veIsAdj(c) ? 'ajuste' : veIsImage(c) ? 'imagem' : 'video', path: png ? png.path : veIsImage(c) || veMid(c) ? m.path || null : null,
                      seq, st: c.st, s: seq ? sq : veIsImage(c) ? 0 : c.s, e: seq ? sq + veLen(c) : veIsImage(c) ? veLen(c) : c.e,
                      sc: p.sc / f, x: p.x, y: p.y, rot: p.rot, op: p.op, kf,
-                     fx: veFxExport(c), mw: sz.w, mh: sz.h, v: veVel(c), bm: veBmAtivo(c) ? c.bm : null,
+                     fx: veFxExport(c), ca: veCaExport(c), mw: sz.w, mh: sz.h, v: veVel(c), bm: veBmAtivo(c) ? c.bm : null,
                      ox: (veMediaSize(c).w / 2 - veAnc(c, p)[0]) * f, oy: (veMediaSize(c).h / 2 - veAnc(c, p)[1]) * f };
         });
     // o arquivo de cada clipe com som (null = o vídeo aberto)

@@ -592,29 +592,28 @@ function veTransPlayers(t, virt) {
 const VETRV = { A: null, B: null, anim: new Map() };
 const VE_TRV_W = 224, VE_TRV_H = 126;   // canvas 2x (aparece com 112×63)
 
-// Os dois "clipes" do exemplo: o ícone apagado (sai) e o ícone colorido (entra)
+// Os dois "clipes" do exemplo: o logo do Canivete num quadrado de cantos arredondados, no meio do quadro preto
+// (o resto é transparente: dá para ver o quadrado sendo empurrado, girado, apagado...). A = apagado (sai), B = colorido
 function veTrvPrep() {
     if (VETRV.A) return;
     VETRV.A = 'carregando';
     const img = new Image();
     img.onload = () => {
-        const faz = (fundo, filtro) => {
+        const faz = filtro => {
             const cv = document.createElement('canvas');
             cv.width = VE_TRV_W; cv.height = VE_TRV_H;
-            const x = cv.getContext('2d');
-            x.fillStyle = fundo; x.fillRect(0, 0, VE_TRV_W, VE_TRV_H);
+            const x = cv.getContext('2d'), l = VE_TRV_H * 0.6;
+            x.beginPath();
+            x.roundRect((VE_TRV_W - l) / 2, (VE_TRV_H - l) / 2, l, l, l * 0.22);
+            x.clip();
             x.filter = filtro;
-            const h = VE_TRV_H * 0.92;
-            x.drawImage(img, (VE_TRV_W - h) / 2, (VE_TRV_H - h) / 2, h, h);
+            x.drawImage(img, (VE_TRV_W - l) / 2, (VE_TRV_H - l) / 2, l, l);
             return cv;
         };
-        // fundo do colorido = a cor do canto do ícone (emenda sem borda)
-        const px = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
-        px.drawImage(img, 0, 0, 8, 8, 0, 0, 1, 1);
-        const [r, g, b] = px.getImageData(0, 0, 1, 1).data;
-        VETRV.A = faz('#2a2f3a', 'grayscale(1) brightness(0.75)');
-        VETRV.B = faz(`rgb(${r},${g},${b})`, 'none');
+        VETRV.A = faz('grayscale(1) brightness(0.7)');
+        VETRV.B = faz('none');
         veTrvTodos();
+        veCaRender();
     };
     img.src = 'identidade/splash.png';
 }
@@ -677,6 +676,124 @@ function veRenderTrList() {
     veTrvPrep();
     veTrvTodos();
     veTrRenderControls();
+    veCaRender();
+}
+
+// ── aba Constante: cartões de Rotação / Tremer / Pulsar (efeitos com `constante` em editor-fx.js) ──
+const VECA = { anim: new Map() };
+const veCaTipos = () => Object.keys(VE_FX).filter(t => VE_FX[t].constante);
+const veCaNorm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+function veCaDesenhar(cv, t, u) {
+    const x = cv.getContext('2d'), W = cv.width, H = cv.height;
+    x.fillStyle = '#0b0b0b'; x.fillRect(0, 0, W, H);
+    if (!VETRV.B || VETRV.B === 'carregando') return;
+    const v = {};
+    VE_FX[t].params.forEach(p => { v[p.k] = p.def; });
+    const p = veCaAplicar({ st: 0, fx: [{ t, on: true, v }] }, { x: 0, y: 0, sc: 100, rot: 0 }, u), k = W / 540;
+    x.save();
+    x.translate(W / 2 + p.x * k, H / 2 + p.y * k);
+    x.rotate(p.rot * Math.PI / 180);
+    x.scale(p.sc / 100, p.sc / 100);
+    x.drawImage(VETRV.B, -W / 2, -H / 2, W, H);
+    x.restore();
+}
+function veCaRender() {
+    const box = $ve('ve-ca-list');
+    if (!box) return;
+    const q = veCaNorm((($ve('ve-tr-q') || {}).value || '').trim());
+    [...VECA.anim.keys()].forEach(veCaParar);
+    const lista = veCaTipos().filter(t => !q || veCaNorm(veT(VE_FX[t].nome) + ' ' + VE_FX[t].nome + ' ' + VE_FX[t].tag + ' constante constant loop').includes(q));
+    box.innerHTML = lista.map(t => `<div class="ve-tr-card ve-ca-card" data-cat="${t}" title="${veT('Arraste até um clipe · duplo clique aplica no clipe selecionado · os ajustes ficam no Controles de efeito')}">
+        <canvas width="${VE_TRV_W}" height="${VE_TRV_H}"></canvas><span>${veT(VE_FX[t].nome)}</span><small>${VE_FX[t].tag}</small></div>`).join('');
+    const sec = $ve('ve-ca-sec');
+    if (sec) sec.hidden = !lista.length;
+    box.querySelectorAll('[data-cat]').forEach(el => veCaDesenhar(el.querySelector('canvas'), el.dataset.cat, 0.45));
+}
+function veCaAnimar(el) {
+    if (VECA.anim.has(el)) return;
+    const win = el.ownerDocument.defaultView, cv = el.querySelector('canvas'), t0 = performance.now();
+    const passo = () => {
+        if (!VECA.anim.has(el)) return;
+        veCaDesenhar(cv, el.dataset.cat, (performance.now() - t0) / 1000);
+        VECA.anim.set(el, win.requestAnimationFrame(passo));
+    };
+    VECA.anim.set(el, win.requestAnimationFrame(passo));
+}
+function veCaParar(el) {
+    const id = VECA.anim.get(el);
+    if (id == null) return;
+    el.ownerDocument.defaultView.cancelAnimationFrame(id);
+    VECA.anim.delete(el);
+    veCaDesenhar(el.querySelector('canvas'), el.dataset.cat, 0.45);
+}
+// Clipe da timeline sob o ponteiro de um evento do painel (a timeline pode estar em outra janela)
+function veTrAlvoClipe(ev, doc) {
+    const wrap = $ve('ve-tl-wrap'), tdoc = wrap && wrap.ownerDocument;
+    if (!tdoc) return -1;
+    if (tdoc === doc) return veClipAtClient(ev.clientX, ev.clientY, doc);
+    const tw = tdoc.defaultView, borda = (tw.outerWidth - tw.innerWidth) / 2;
+    return veClipAtClient(ev.screenX - tw.screenX - borda, ev.screenY - tw.screenY - (tw.outerHeight - tw.innerHeight - borda), tdoc);
+}
+function veCaInit() {
+    const box = $ve('ve-ca-list');
+    if (!box) return;
+    veCaRender();
+    box.addEventListener('pointerover', e => { const el = e.target.closest('[data-cat]'); if (el) veCaAnimar(el); });
+    box.addEventListener('pointerout', e => { const el = e.target.closest('[data-cat]'); if (el && !el.contains(e.relatedTarget)) veCaParar(el); });
+    box.addEventListener('dblclick', e => {
+        const el = e.target.closest('[data-cat]');
+        if (!el) return;
+        if (VE.sel < 0) { veToast(veT('Selecione um clipe na timeline (ou arraste a animação até ele)')); return; }
+        veFxAdd(VE.sel, el.dataset.cat);
+    });
+    // arrastar até um clipe da timeline ou até o Controles de efeito (clipe selecionado)
+    box.addEventListener('pointerdown', e => {
+        const el = e.target.closest('[data-cat]');
+        if (!el || e.button !== 0) return;
+        const doc = box.ownerDocument, win = doc.defaultView, t = el.dataset.cat, x0 = e.clientX, y0 = e.clientY;
+        let ghost = null;
+        const move = ev => {
+            if (!ghost) {
+                if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 5) return;
+                ghost = doc.createElement('div');
+                ghost.className = 've-dghost';
+                ghost.textContent = '↻  ' + veT(VE_FX[t].nome);
+                doc.body.appendChild(ghost);
+                doc.body.classList.add('ve-fx-dragging');
+            }
+            ghost.style.left = ev.clientX + 12 + 'px';
+            ghost.style.top = ev.clientY + 10 + 'px';
+            const i = veTrAlvoClipe(ev, doc);
+            $ve('ve-tl-wrap').classList.toggle('fx-drop', i >= 0);
+            if (i !== VE.fxHover) { VE.fxHover = i; veDraw(); }
+        };
+        const up = ev => {
+            win.removeEventListener('pointermove', move);
+            win.removeEventListener('pointerup', up);
+            VE.fxHover = -1;
+            $ve('ve-tl-wrap').classList.remove('fx-drop');
+            doc.body.classList.remove('ve-fx-dragging');
+            if (!ghost) return;
+            ghost.remove();
+            veDraw();
+            const i = veTrAlvoClipe(ev, doc);
+            const props = doc.elementFromPoint(ev.clientX, ev.clientY)?.closest('#ve-pane-props');
+            if (i >= 0) veFxAdd(i, t);
+            else if (props && VE.sel >= 0) veFxAdd(VE.sel, t);
+        };
+        win.addEventListener('pointermove', move);
+        win.addEventListener('pointerup', up);
+    });
+}
+
+// Abas do painel Animação: abertas por padrão; a que o usuário fechou continua fechada
+function veAnInit() {
+    const box = $ve('ve-an-rolagem');
+    if (!box) return;
+    box.querySelectorAll('details[data-an]').forEach(d => {
+        if (veLsGet('ve-an-' + d.dataset.an) === '0') d.open = false;
+        d.addEventListener('toggle', () => veLsSet('ve-an-' + d.dataset.an, d.open ? '1' : '0'));
+    });
 }
 
 // Ponto do evento (na janela do painel) → alvo na timeline, que pode estar em outra janela
@@ -700,6 +817,8 @@ function veTrInit() {
     if (!VE_TR_DIRS[VE.trCfg.dir]) VE.trCfg.dir = 'r';
     VE.trEscolhida = VE_TR[veLsGet('ve-tr-escolhida')] ? veLsGet('ve-tr-escolhida') : 'dissolve';
     veRenderTrList();
+    veCaInit();
+    veAnInit();
     $ve('ve-tr-q').addEventListener('input', veRenderTrList);
     $ve('ve-tr-q').addEventListener('keydown', e => { if (e.key === 'Escape') { e.target.value = ''; veRenderTrList(); e.target.blur(); } e.stopPropagation(); });
     const controls = $ve('ve-tr-controls');
