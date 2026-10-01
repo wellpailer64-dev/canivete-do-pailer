@@ -47,7 +47,7 @@ function veFecharEspaco() {
     }
     vePushHistory();
     VE.clips.forEach(c => { if (!veTrkLocked(c.tr) && c.st >= g.b - VE_EPS) c.st = Math.max(0, c.st - d); });
-    (VE.legendas || []).forEach(l => { if (l.st >= g.b - VE_EPS) { l.st = Math.max(0, l.st - d); l.en = Math.max(l.st, l.en - d); } });
+    VE.legendas = (VE.legendas || []).map(l => (l.st >= g.b - VE_EPS ? veLegMover(l, -Math.min(d, l.st)) : l));
     VE.sel = -1; VE.selx = null;
     veRelayout();
     veAfterEdit(VE.playhead >= g.b ? VE.playhead - d : Math.min(VE.playhead, veNavDur()));

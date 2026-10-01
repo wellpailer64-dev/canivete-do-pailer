@@ -941,6 +941,30 @@ function veLegClone(l) {
     return vePlain(l, { st: 0, en: 0, texto: '' });
 }
 
+// Legenda andando d segundos na timeline: o tempo de cada palavra (l.pt, destaque palavra por palavra) anda junto
+function veLegMover(l, d) {
+    const n = { ...l, st: +(l.st + d).toFixed(3), en: +(l.en + d).toFixed(3) };
+    if (Array.isArray(l.pt)) n.pt = l.pt.map(([a, b]) => [+(a + d).toFixed(3), +(b + d).toFixed(3)]);
+    return n;
+}
+
+// Trecho [a, b] tirado de todas as trilhas (ripple): as legendas de depois voltam junto com o vídeo e o áudio;
+// as que estavam inteiras dentro do trecho saem; as que cruzam a borda ficam só com a parte de fora
+function veLegRipple(a, b) {
+    const d = b - a;
+    if (!(d > 0) || !(VE.legendas || []).length) return;
+    VE.legendas = VE.legendas.flatMap(l => {
+        if (l.en <= a + VE_EPS) return [l];
+        if (l.st >= b - VE_EPS) return [veLegMover(l, -d)];
+        if (l.st >= a - VE_EPS && l.en <= b + VE_EPS) return [];
+        const pt = Array.isArray(l.pt) ? l.pt.map(([x, y]) => (x >= b - VE_EPS ? [+(x - d).toFixed(3), +(y - d).toFixed(3)] : [x, y])) : l.pt;
+        if (l.st < a && l.en > b) return [{ ...l, en: +(l.en - d).toFixed(3), pt }];
+        if (l.st < a) return [{ ...l, en: a }];
+        return [{ ...l, st: a, en: +(l.en - d).toFixed(3), pt }];
+    });
+    VETX.legSel = -1;
+}
+
 function veLegSelecionar(i) {
     VETX.legSel = i;
     VE.sel = -1;
@@ -1029,6 +1053,7 @@ function veRippleRemove(a, b, label) {
     });
     vePushHistory();
     VE.clips = out;
+    veLegRipple(a, b);   // legendas acompanham (senão perdem a sincronia com a fala)
     VE.sel = -1;
     VE.inPt = VE.outPt = null;
     veRelayout();
@@ -1054,7 +1079,7 @@ function veDeleteClip(i, ripple) {
         return;
     }
     const ocupado = VE.clips.some(o => o.st < b - VE_EPS && veEnd(o) > a + VE_EPS);
-    if (!ocupado) VE.clips.forEach(o => { if (o.st >= b - VE_EPS && !veLocked(o)) o.st -= d; });
+    if (!ocupado) { VE.clips.forEach(o => { if (o.st >= b - VE_EPS && !veLocked(o)) o.st -= d; }); veLegRipple(a, b); }
     VE.sel = -1;
     veRelayout();
     veAfterEdit(VE.playhead > b && !ocupado ? VE.playhead - d : Math.min(VE.playhead, veNavDur()));
@@ -1169,6 +1194,7 @@ function veApagarVarios(lista, ripple) {
         junto.reverse().forEach(([a, b]) => {
             if (VE.clips.some(o => o.st < b - VE_EPS && veEnd(o) > a + VE_EPS)) return;
             VE.clips.forEach(o => { if (o.st >= b - VE_EPS && !veLocked(o)) o.st -= b - a; });
+            veLegRipple(a, b);
             if (VE.playhead >= b) tira += b - a;
         });
     }
@@ -1298,8 +1324,8 @@ function veColar() {
     const cb = VE.clipboard;
     if (!cb || cb.path !== VE.path) { veToast('Nada copiado (Ctrl+C num clipe ou legenda primeiro)'); return; }
     if (cb.leg) {
-        const novo = veLegClone(cb.leg), len = Math.max(veFrame(), novo.en - novo.st);
-        novo.st = veSnapFrame(VE.playhead);
+        const orig = veLegClone(cb.leg), len = Math.max(veFrame(), orig.en - orig.st);
+        const novo = veLegMover(orig, veSnapFrame(VE.playhead) - orig.st);
         novo.en = +(novo.st + len).toFixed(3);
         vePushHistory();
         VE.legendas = VE.legendas || [];
@@ -3312,7 +3338,7 @@ function veLegArrastar(e, t) {
             hi = Math.min(hi, ...fora.filter(o => o.st >= c0.en - 1e-3).map(o => o.st - c0.en));
         });
         dt = Math.min(Math.max(dt, lo), hi);
-        d.grupo.forEach(({ k, c0 }) => { L[k] = { ...L[k], st: +(c0.st + dt).toFixed(3), en: +(c0.en + dt).toFixed(3) }; });
+        d.grupo.forEach(({ k, c0 }) => { L[k] = { ...veLegMover(c0, dt), texto: L[k].texto, estilo: L[k].estilo }; });
         veDraw();
         veDrawMonitorSoon();
         return;
@@ -3324,7 +3350,9 @@ function veLegArrastar(e, t) {
     if (d.lado === 'l') st = Math.min(Math.max(c0.st + dt, ant), c0.en - 0.2);
     else if (d.lado === 'r') en = Math.max(Math.min(c0.en + dt, prox), c0.st + 0.2);
     else { st = Math.min(Math.max(c0.st + dt, ant), prox - len); en = st + len; }
-    L[d.i] = { ...L[d.i], st: +st.toFixed(3), en: +en.toFixed(3) };
+    // mover inteira: as palavras andam junto; aparar uma borda: as palavras ficam onde estão (a fala não mudou)
+    L[d.i] = d.lado ? { ...L[d.i], st: +st.toFixed(3), en: +en.toFixed(3) }
+        : { ...veLegMover(c0, st - c0.st), texto: L[d.i].texto, estilo: L[d.i].estilo };
     veDraw();
     veDrawMonitorSoon();
 }

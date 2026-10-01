@@ -29,13 +29,18 @@
 - legendas: VE.legendas[{st,en,texto,pt:[[a,b] por palavra],estilo?}] ; estilo base VE.legEstilo ; transcrição VETX.palavras (por timeline)
 - criar timeline: `veCreateTimeline({name})` (vira a ativa) ; depois `veRelayout(); veRefresh();`
 - trilha livre acima de tudo: `veCeTrilhaAcima('v'|'a')`
+- mover legenda: SEMPRE `veLegMover(l, d)` (leva l.pt junto) ; tirar trecho de todas as trilhas: `veLegRipple(a, b)`
 - legendas a partir de palavras: VETX.palavras=[[ini,fim,txt]...] ; `VE.legendas = veTxMontarLegendas({max,linhas,minDur,gap})`
 
 ## 3 RECEITA: REEL A PARTIR DE TIMELINE MODELO
 1. ler a timeline modelo (seção 2) → extrair padrão: ritmo de cortes, trilhas de apoio, gráficos fixos, música, legenda
 2. `analisar` (seção 1) → escolher: falas (transcrição) + takes de apoio (rótulo CLIP ≈ palavra falada)
-3. plano em python (fora do app): trechos [mídia, de, até] por PALAVRAS (w[0] in [a,b)); pausa > 0.30 s = corte seco;
-   folga 0.06 s antes / 0.12 s depois ; aplicar dicionário ; conferir `suspeitas` antes de gerar legenda
+3. plano em python (fora do app): trechos [mídia, de, até] por PALAVRAS (w[0] in [a,b)); corte seco na pausa:
+   > 0.30 s depois de pontuação (.,?!;:), > 0.60 s no meio da frase (respiração curta fica);
+   FIM do corte = quando a VOZ acaba (energia em quadros de 10 ms > limiar; aceita vales < 60 ms; até +0.7 s;
+   nunca até a próxima palavra − 0.04 s) + 0.08 s — o fim de palavra do modelo é estimado e corta sílaba;
+   COMEÇO: volta até 0.21 s enquanto há voz ; cortes contíguos do mesmo vídeo (gap < 0.08 s) = 1 corte só
+   aplicar dicionário ; conferir `suspeitas` antes de gerar legenda ; script modelo: ver histórico (plano_v2b)
 4. apoio: entra em `tempo_da_palavra − 0.1..0.15 s`, dura 1.5–2.5 s, só imagem (x:'v'), tela cheia, trilha acima da fala
 5. gráficos/música: COPIAR os clipes da modelo (JSON.parse(JSON.stringify(c))) e só ajustar st/s/e/tr
 6. montar via veAgente em passos visíveis (1 aviso por etapa) ; no fim: 1 print do monitor num ponto com apoio+legenda
@@ -44,6 +49,7 @@
 ## 4 ESTILO PADRÃO (cliente imobiliário Helo Ribeiro; confirmar lendo a modelo)
 - 1080x1920 30 qps ; fala em V1 voz +2 dB, cortes ~3 s ; apoio V2 1.4–4 s sem som
 - GC "GC HELO RIBEIRO.mov" + Luma Key no início ; logo BRANDBOOK-02 sc≈9 canto sup.dir. + ca_rot ; ajuste Luz e Cor no topo
+- camada PINCEL (kind 'pincel') sob o logo = fundo de apoio de leitura ; logo e pincel vão de 0 até o fim da fala (não na assinatura)
 - assinatura .mov (alfa) no fim ; música −17 dB na fala → −4 dB na assinatura com fade
 - legenda: SF Pro Display ~50 px, 2 linhas ~18 car, sem caixa, sombra, entrada pop, py 8, destaque palavra #385641
 
@@ -61,5 +67,8 @@
 - conhecidos (já no dicionário): Elon→Helo ; Brooklyn→Brooklin (bairro SP) ; lisão→Lisonda (marca da quadra de tênis)
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-09-30 V2 MENOR refeita: pedido = transições em takes de apoio, não cortar antes do fim da frase, legenda certa,
+  manter a camada de PINCEL da V1 (forma no canto sup.dir. atrás do logo = apoio de leitura; copiar junto com o logo,
+  st 0 → fim da fala). feito: chicote + push na batida (2/5 apoios), fim de corte pela energia da voz. aguardando nota.
 - 2026-09-30 V2 MENOR (lazer, 45 s, Portugal): nota 9/10. acertos: apoio no momento certo, música, legenda.
   erros: palavras erradas na legenda (mic ruim). ação: dicionário + suspeitas + guia. pediu: transições em parte dos apoios.

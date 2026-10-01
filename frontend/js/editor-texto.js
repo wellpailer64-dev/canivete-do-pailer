@@ -349,7 +349,11 @@ const veTxTokens = texto => String(texto || '').split(/\s+/).filter(Boolean);
 function veTxLegTempos(l) {
     const n = veTxTokens(l.texto).length;
     if (!n) return [];
-    if (Array.isArray(l.pt) && l.pt.length === n) return l.pt;
+    if (Array.isArray(l.pt) && l.pt.length === n) {
+        // legenda movida antes de as palavras andarem junto: a 1ª palavra fora da legenda → desloca todas
+        const d = l.st - l.pt[0][0];
+        return l.pt[0][0] < l.st - 0.3 || l.pt[0][0] > l.en ? l.pt.map(([a, b]) => [a + d, b + d]) : l.pt;
+    }
     const W = (VETX.palavras || []).filter(w => w[0] >= l.st - 0.05 && w[0] < l.en);
     if (W.length === n) return W.map(w => [w[0], w[1]]);
     const tk = veTxTokens(l.texto), tot = tk.reduce((s, w) => s + w.length + 1, 0), out = [];
