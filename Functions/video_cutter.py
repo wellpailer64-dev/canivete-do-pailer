@@ -2622,7 +2622,14 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 cadeia = f"{src}{vel}" + ",".join([f"fps=fps={fps}:start_time=0"] + filtros_clip
                                                   + ["scale=out_range=tv,format=yuv420p"])
             else:
-                cadeia = f"{src}{vel}" + ",".join([f"fps=fps={fps}:start_time=0", para_rgb] + filtros_clip + [de_rgb])
+                # zoom animado: a volta para YUV vem ANTES dele. Um scale de conversão depois fixa o tamanho de saída
+                # no do 1º quadro e a escala animada (Ken Burns, zoom-soco, pop) ficava parada na exportação
+                if escala_animada and escala in filtros_clip:
+                    k = filtros_clip.index(escala)
+                    fim_cadeia = filtros_clip[:k] + [de_rgb] + filtros_clip[k:]
+                else:
+                    fim_cadeia = filtros_clip + [de_rgb]
+                cadeia = f"{src}{vel}" + ",".join([f"fps=fps={fps}:start_time=0", para_rgb] + fim_cadeia)
             cadeia += f",setpts=PTS-STARTPTS+{_tempo_ffmpeg(c['st'])}/TB[l{n}]"
             filtros.append(cadeia)
             fim = c["st"] + c["dur"]

@@ -82,7 +82,8 @@ function vePrSig(a, b, visuais) {
     });
     const legs = (VE.legendas || []).filter(l => l.st < b && l.en > a)
         .map(l => ({ ...l, st: +(l.st - a).toFixed(4), en: +(l.en - a).toFixed(4) }));
-    const partes = [2, VE.seqW, VE.seqH, VE.fps, vePrPrefs().altura, +(b - a).toFixed(4), VE.path || '', clips,
+    // 3: zoom animado de camada corrigido na exportação (trechos antigos saíram com a escala parada)
+    const partes = [3, VE.seqW, VE.seqH, VE.fps, vePrPrefs().altura, +(b - a).toFixed(4), VE.path || '', clips,
         legs, legs.length ? VE.legEstilo : null];
     return vePrHash(JSON.stringify(partes));
 }

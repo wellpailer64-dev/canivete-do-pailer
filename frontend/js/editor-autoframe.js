@@ -22,6 +22,8 @@ const VEAF = {
     aba: 'quick', cli: null, cliMus: 0,                    // aba e modelo de cliente em uso (Customizado)
 };
 const VE_AF_W = 1080, VE_AF_H = 1920;   // 9:16
+// estilo Dinâmico: transições que se alternam na virada do compasso (nunca a mesma duas vezes seguidas)
+const VE_AF_MISTO = ['push', 'pull', 'slide', 'chicote', 'pop', 'fold'];
 const VE_AF_NOTA_MIN = 0.3;             // abaixo disso a mídia já vem desmarcada
 const VE_AF_LOOKS = {
     vivo: { sat: 115, ct: 12, vib: 15 },
@@ -108,6 +110,7 @@ function veOnAF(ev) {
         VEAF.pct = 100;
         if (ev.musica) VEAF.musica = ev.musica;
         VEAF.midias = ev.midias;
+        VEAF.midias.forEach(m => { if (m.repetida_de) VEAF.fora.add(m.path); });   // repetidas/quase iguais
         VEAF.progresso = '';
         veAfRecomendar();
     } else if (ev.etapa === 'erro') {
@@ -141,6 +144,22 @@ function veAfEnquadrar(w, h, fx, fy, zoom = 1) {
     return { sc: Math.round(k * 10000) / 100, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
 }
 
+// Enquadramento que não corta ninguém: caixa = [x0, y0, x1, y1] (0..1) das cabeças até o peito (autoframe.py).
+// zmax = quanto dá para aproximar (animação) sem a caixa sair do quadro; contem = a foto não cabe em 9:16 sem cortar
+// alguém: entra inteira, sobre um fundo desfocado dela mesma
+function veAfEnquadrarSeguro(w, h, caixa, fx, fy, folga = 1) {
+    if (!caixa) return { ...veAfEnquadrar(w, h, fx, fy, folga), zmax: Infinity };
+    const k = Math.max(VE_AF_W / w, VE_AF_H / h);
+    const bw = Math.max(1, (caixa[2] - caixa[0]) * w), bh = Math.max(1, (caixa[3] - caixa[1]) * h);
+    const zfit = Math.min(VE_AF_W / (k * bw), VE_AF_H / (k * bh));
+    const cx = (caixa[0] + caixa[2]) / 2, cy = (caixa[1] + caixa[3]) / 2;
+    if (zfit < 0.95) {
+        const kc = Math.min(VE_AF_W / w, VE_AF_H / h);
+        return { sc: Math.round(kc * 10000) / 100, x: VE_AF_W / 2, y: VE_AF_H / 2, zmax: 1.04, contem: true, cx, cy };
+    }
+    return { ...veAfEnquadrar(w, h, cx, cy, Math.min(folga, Math.max(1, zfit))), zmax: Math.max(1, zfit) };
+}
+
 const veAfEsperar = (cond, ms = 60000) => new Promise(res => {
     const t0 = Date.now();
     const f = () => (cond() ? res(true) : Date.now() - t0 > ms ? res(false) : setTimeout(f, 150));
@@ -162,7 +181,10 @@ async function veAfGerar(outra) {
     VEAF.gerando = true;
     veAfRender();
     try {
-        const plano = await api.af_planejar(VEAF.musicaPath, veAfPaths(), VEAF.modelo, VEAF.dur || null, VEAF.ordem, VEAF.semente, VEAF.inicioModo, VEAF.manual, VEAF.telas !== 'nao');
+        // modelo de cliente com "usar todas": a duração é a que faz todas as mídias entrarem (+ intro e encerramento)
+        const cobrir = VEAF.cli && VEAF.cli.todas !== false ? veAfcExtraSeg(VEAF.cli, VEAF.musica.bpm) : null;
+        const reserva = VEAF.cli ? veAfcReserva(VEAF.cli, VEAF.musica.bpm) : null;   // intro/encerramento sem cena embaixo
+        const plano = await api.af_planejar(VEAF.musicaPath, veAfPaths(), VEAF.modelo, VEAF.dur || null, VEAF.ordem, VEAF.semente, VEAF.inicioModo, VEAF.manual, VEAF.telas !== 'nao', cobrir, reserva);
         if (!plano || !plano.success) throw new Error((plano && plano.error) || 'plano');
         // sem projeto aberto: a primeira mídia do plano abre o projeto
         if (!VE.ready) {
@@ -246,47 +268,63 @@ function veAfClipes(plano) {
     const M = plano.modelo, t0 = plano.inicio, out = [], flashes = [];
     // trilhas: cenas na 0 (células da tela dividida nas 0..n-1); cor, flash e título por cima de todas
     const NV = Math.max(1, ...plano.slots.map(s => s.cel ? s.cel_i + 1 : 1));
-    const TR_AJ = NV, TR_FL = NV + 1, TR_TX = NV + 2;
+    // a trilha logo acima das cenas recebe a foto inteira quando ela vai sobre fundo desfocado (enquadramento seguro)
+    const TR_FR = NV, TR_AJ = NV + 1, TR_FL = NV + 2, TR_TX = NV + 3;
     const total = plano.fim - t0, bpm = plano.bpm || 120, batida = 60 / bpm;
+    let nMisto = 0;
     plano.slots.forEach((s, i) => {
+        // estilo Dinâmico: o movimento muda a cada cena (soco no acento/energia alta, zoom indo e voltando, pan)
+        const anim = M.anim !== 'misto' ? M.anim : (s.acento || s.nivel === 2) ? 'soco' : ['kenburns', 'pan', 'kenburns', 'soco'][i % 4];
         const m = veAfMidiaDe(s.path), st = +(s.a - t0).toFixed(4), len = +(s.b - s.a).toFixed(4);
         if (!m || len <= 0.04) return;
         const video = s.tipo === 'video', s0 = video ? s.ini : 0, e0 = s0 + len;
         const c = { tr: 0, st, s: s0, e: e0, m: m.id };
         if (video) c.x = 'v';   // só a imagem: o som é o da música
         // enquadramento 9:16 com folga para a animação
-        const folga = M.anim === 'pan' ? 1.1 : M.anim === 'kenburns' ? 1.0 : 1.0;
+        const folga = anim === 'pan' ? 1.1 : 1.0;
         // tamanho real da mídia no projeto, quando já conhecido, manda sobre o da análise (vídeo girado do celular)
         const real = m.kind === 'image' && m.w ? { w: m.w, h: m.h } : m.info && m.info.width ? { w: m.info.width, h: m.info.height } : null;
         if (real && (real.w > real.h) !== (s.w > s.h)) { s.w = real.w; s.h = real.h; }
         if (s.cel) {
             // tela dividida: cada célula entra na sua batida (sobe um pouco e aparece) e fica até o fim do quadro
-            const q = veAfCelula(s.w, s.h, s.fx, s.fy, s.cel), d = +Math.min(0.25, batida * 0.5, len * 0.5).toFixed(3);
+            const cfx = s.caixa ? (s.caixa[0] + s.caixa[2]) / 2 : s.fx, cfy = s.caixa ? (s.caixa[1] + s.caixa[3]) / 2 : s.fy;
+            const q = veAfCelula(s.w, s.h, cfx, cfy, s.cel), d = +Math.min(0.25, batida * 0.5, len * 0.5).toFixed(3);
             c.tr = s.cel_i;
             c.p = { sc: q.sc, x: q.x, y: q.y, rot: 0, op: 100 };
             c.fx = [{ id: veFxNewId(), t: 'crop', on: true, v: q.crop }];
             c.k = { op: [{ t: s0, v: 0, i: 'out' }, { t: +(s0 + d).toFixed(4), v: 100, i: 'lin' }],
                     y: [{ t: s0, v: +(q.y + 36).toFixed(1), i: 'out' }, { t: +(s0 + d).toFixed(4), v: q.y, i: 'lin' }] };
-            if (M.anim === 'kenburns') c.k.sc = [{ t: s0, v: q.sc, i: 'lin' }, { t: e0, v: +(q.sc * 1.04).toFixed(2), i: 'lin' }];
+            if (anim === 'kenburns') c.k.sc = [{ t: s0, v: q.sc, i: 'lin' }, { t: e0, v: +(q.sc * 1.04).toFixed(2), i: 'lin' }];
             out.push(c);
             return;
         }
-        const q = veAfEnquadrar(s.w, s.h, s.fx, s.fy, folga);
-        c.p = { sc: q.sc, x: q.x, y: q.y, rot: 0, op: 100 };
+        const q = veAfEnquadrarSeguro(s.w, s.h, s.caixa, s.fx, s.fy, folga);
+        // a animação nunca aproxima além do que deixa a caixa (cabeças) inteira no quadro
+        const Z = f => Math.max(1, Math.min(f, q.zmax));
+        const alvo = q.contem ? { ...c, tr: TR_FR, p: { sc: q.sc, x: q.x, y: q.y, rot: 0, op: 100 } } : c;
+        if (q.contem) {
+            // foto inteira por cima; a cena (que leva as transições) vira o fundo: a mesma foto cobrindo, desfocada e escura
+            const kf = Math.max(VE_AF_W / s.w, VE_AF_H / s.h) * 110;
+            c.p = { sc: +kf.toFixed(2), x: VE_AF_W / 2, y: VE_AF_H / 2, rot: 0, op: 100 };
+            c.fx = [{ id: veFxNewId(), t: 'blur', on: true, v: { amt: 45 } }, { id: veFxNewId(), t: 'bc', on: true, v: { br: -35, ct: 0 } }];
+            out.push(alvo);
+        } else c.p = { sc: q.sc, x: q.x, y: q.y, rot: 0, op: 100 };
         // animação (quadros-chave em tempo da fonte)
-        if (M.anim === 'kenburns') {
-            const ida = i % 2 === 0, a = q.sc, b = +(q.sc * 1.12).toFixed(2);
-            c.k = { sc: [{ t: s0, v: ida ? a : b, i: 'lin' }, { t: e0, v: ida ? b : a, i: 'lin' }] };
-        } else if (M.anim === 'soco') {
+        if (anim === 'kenburns') {
+            const ida = i % 2 === 0, a = alvo.p.sc, b = +(alvo.p.sc * Z(1.12)).toFixed(2);
+            alvo.k = { sc: [{ t: s0, v: ida ? a : b, i: 'lin' }, { t: e0, v: ida ? b : a, i: 'lin' }] };
+        } else if (anim === 'soco') {
             // zoom-soco na batida: entra 15% maior (22% num acento) e assenta em ~1/2 batida, freando
-            const k = s.acento ? 1.22 : 1.15, d = Math.min(len * 0.6, batida * 0.5);
-            c.k = { sc: [{ t: s0, v: +(q.sc * k).toFixed(2), i: 'out' }, { t: +(s0 + d).toFixed(4), v: q.sc, i: 'lin' }] };
+            const k = Z(s.acento ? 1.22 : 1.15), d = Math.min(len * 0.6, batida * 0.5);
+            alvo.k = { sc: [{ t: s0, v: +(alvo.p.sc * k).toFixed(2), i: 'out' }, { t: +(s0 + d).toFixed(4), v: alvo.p.sc, i: 'lin' }] };
             // variedade: cena longa sem acento, de vez em quando, avança devagar depois do soco
-            if (!s.acento && len >= batida * 1.9 && i % 3 === 2) c.k.sc.push({ t: e0, v: +(q.sc * 1.07).toFixed(2), i: 'lin' });
-        } else if (M.anim === 'pan') {
+            if (!s.acento && len >= batida * 1.9 && i % 3 === 2) alvo.k.sc.push({ t: e0, v: +(alvo.p.sc * Z(1.07)).toFixed(2), i: 'lin' });
+        } else if (anim === 'pan' && !q.contem) {
+            // o deslize também respeita a caixa: com pouca folga, anda menos
+            const amp = q.zmax === Infinity ? 40 : Math.max(0, Math.min(40, (q.zmax - 1) * 400));
             const lx = s.w * q.sc / 100 / 2, xmin = VE_AF_W - lx, xmax = lx, dir = i % 2 ? 1 : -1;
-            const a = Math.min(xmax, Math.max(xmin, q.x - dir * 40)), b = Math.min(xmax, Math.max(xmin, q.x + dir * 40));
-            c.k = { x: [{ t: s0, v: +a.toFixed(1), i: 'ease' }, { t: e0, v: +b.toFixed(1), i: 'lin' }] };
+            const a = Math.min(xmax, Math.max(xmin, q.x - dir * amp)), b = Math.min(xmax, Math.max(xmin, q.x + dir * amp));
+            if (amp > 1) c.k = { x: [{ t: s0, v: +a.toFixed(1), i: 'ease' }, { t: e0, v: +b.toFixed(1), i: 'lin' }] };
         }
         // transição de entrada, escolhida pelo modelo em cada corte (autoframe.py: _transicoes)
         const tr = s.trans, meio = batida / 2;
@@ -294,11 +332,16 @@ function veAfClipes(plano) {
         else if (tr === 'zoom') c.tin = { t: 'pull', d: +Math.min(0.35, meio, len * 0.4).toFixed(3), speed: 'fast' };
         else if (tr === 'chicote') c.tin = { t: 'chicote', d: +Math.min(0.32, meio, len * 0.4).toFixed(3), speed: 'fast', dir: i % 4 < 2 ? 'l' : 'r' };
         else if (tr === 'preto') c.tin = { t: 'fadeblack', d: +Math.min(0.8, len * 0.4).toFixed(3), speed: 'fast' };
+        else if (tr === 'misto') {
+            const t = VE_AF_MISTO[nMisto++ % VE_AF_MISTO.length];
+            c.tin = { t, d: +Math.min(0.4, meio * 1.2, len * 0.45).toFixed(3), speed: 'fast', ...(VE_TR[t] && VE_TR[t].dir ? { dir: ['r', 'l', 'u', 'd'][nMisto % 4] } : {}) };
+        }
         else if (tr && tr.startsWith('tr:') && VE_TR[tr.slice(3)]) {
             // transição escolhida no modelo do cliente (direção alternando)
             const t = tr.slice(3), longa = t === 'dissolve' || t === 'crossfade' || t === 'fadeblack';
             c.tin = { t, d: +Math.min(longa ? 0.6 : 0.4, len * 0.4).toFixed(3), speed: 'fast', ...(VE_TR[t].dir ? { dir: i % 4 < 2 ? 'l' : 'r' } : {}) };
         }
+        if (alvo !== c && c.tin) alvo.tin = { ...c.tin };
         // flash de impacto: clarão branco que some em ~meia batida, começando no corte
         if (s.flash && plano.branco) {
             const d = +Math.min(0.35, batida * 0.6, len).toFixed(3);
@@ -363,10 +406,11 @@ function veAfRender() {
                     <button class="ve-btn ve-btn-sm" data-af="midias"><svg class="i"><use href="#i-image"/></svg> ${veT('Escolher arquivos')}</button>
                     ${n ? `<button class="ve-btn ve-btn-sm ve-btn-ghost" data-af="limpar">${veT('Limpar')}</button>` : ''}
                 </div>
-                <span>${n ? `${usados}/${n} ${veT('em uso')} · ${fotos} ${veT('fotos')}, ${videos} ${veT('vídeos')} · ${veT('clique para tirar ou pôr')}` : veT('ou arraste uma pasta ou arquivos para cá')}</span>
+                <span>${n ? `${usados}/${n} ${veT('em uso')} · ${fotos} ${veT('fotos')}, ${videos} ${veT('vídeos')}${VEAF.midias.some(m => m.repetida_de) ? ` · ${VEAF.midias.filter(m => m.repetida_de).length} ${veT('repetidas fora')}` : ''} · ${veT('clique para tirar ou pôr')}` : veT('ou arraste uma pasta ou arquivos para cá')}</span>
             </div>
             ${n ? `<div class="ve-af-grade">${VEAF.midias.map(m => `
-                <button class="ve-af-mid${VEAF.fora.has(m.path) ? ' fora' : ''}" data-af-mid="${veEsc(m.path)}" title="${veEsc(veAfNome(m.path))} · ${veT('nota')} ${Math.round(m.nota * 100)}">
+                <button class="ve-af-mid${VEAF.fora.has(m.path) ? ' fora' : ''}" data-af-mid="${veEsc(m.path)}" title="${veEsc(veAfNome(m.path))} · ${veT('nota')} ${Math.round(m.nota * 100)}${m.repetida_de ? ` · ${veT('repetida de')} ${veEsc(veAfNome(m.repetida_de))}` : ''}">
+                    ${m.repetida_de ? `<b class="ve-af-rep">${veT('repetida')}</b>` : ''}
                     ${m.thumb ? `<img src="${veEsc(m.thumb)}" alt="" loading="lazy">` : ''}
                     <i class="${m.nota >= 0.6 ? 'boa' : m.nota >= VE_AF_NOTA_MIN ? 'media' : 'ruim'}">${Math.round(m.nota * 100)}</i>
                     ${m.tipo === 'video' ? `<em>${Math.round(m.dur || 0)}s</em>` : ''}

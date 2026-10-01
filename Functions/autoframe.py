@@ -48,7 +48,7 @@ def _pasta_cache():
 def _chave(path, tipo):
     try:
         st = os.stat(path)
-        k = f"{os.path.abspath(path)}|{st.st_size}|{int(st.st_mtime)}|{tipo}|v4"
+        k = f"{os.path.abspath(path)}|{st.st_size}|{int(st.st_mtime)}|{tipo}|v5"   # v5: caixa dos rostos e hash fino
     except OSError:
         k = f"{path}|{tipo}"
     return hashlib.sha1(k.encode("utf-8", "replace")).hexdigest()
@@ -398,8 +398,23 @@ def _notas(img_bgr):
         area_rosto = 0.0
     peq = cv2.resize(gray, (9, 8))
     dh = sum(1 << i for i, v in enumerate((peq[:, 1:] > peq[:, :-1]).flatten()) if v)
+    # caixa que não pode ser cortada no enquadramento: todas as cabeças (com o topo do cabelo) até o peito
+    caixa = None
+    if faces:
+        x0 = min(x - fw * 0.45 for x, y, fw, fh in faces)
+        x1 = max(x + fw * 1.45 for x, y, fw, fh in faces)
+        y0 = min(y - fh * 0.6 for x, y, fw, fh in faces)
+        y1 = max(y + fh * 2.2 for x, y, fw, fh in faces)
+        caixa = [round(max(0.0, x0 / w), 3), round(max(0.0, y0 / h), 3), round(min(1.0, x1 / w), 3), round(min(1.0, y1 / h), 3)]
+    # repetidas: dHash 16x16 (256 bits) + histograma de cor (o de 64 bits confunde fotos diferentes no mesmo cenário)
+    p16 = cv2.resize(gray, (17, 16), interpolation=cv2.INTER_AREA)
+    h256 = np.packbits((p16[:, 1:] > p16[:, :-1]).flatten()).tobytes().hex()
+    hsv = cv2.cvtColor(cv2.resize(img_bgr, (64, 64), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2HSV)
+    hist = cv2.calcHist([hsv], [0, 1], None, [12, 6], [0, 180, 0, 256]).flatten()
+    hist = hist / max(1.0, float(hist.sum()))
     return {"nit": round(nit, 3), "expo": round(expo, 3), "cor": round(cor, 3), "rostos": len(faces),
-            "area_rosto": round(area_rosto, 4), "fx": round(foco[0], 3), "fy": round(foco[1], 3), "hash": str(dh)}
+            "area_rosto": round(area_rosto, 4), "fx": round(foco[0], 3), "fy": round(foco[1], 3), "hash": str(dh),
+            "caixa": caixa, "h256": h256, "hist": [round(float(v), 4) for v in hist]}
 
 
 def _ler_imagem(path, lado=640):
@@ -559,6 +574,8 @@ MODELOS = [
      "ritmo": [4, 4, 2], "anim": "pan", "trans": "push", "ideal": 0.6, "bpm": [80, 150], "cor": "quente"},
     {"id": "cinematico", "nome": "Cinemático", "desc": "Cenas longas, zoom lento, barras de cinema e cor de filme.",
      "ritmo": [8, 8, 8], "anim": "kenburns", "trans": "dissolve", "ideal": 0.85, "bpm": [50, 130], "barras": True, "cor": "filme"},
+    {"id": "dinamico", "nome": "Dinâmico", "desc": "Ritmo de reel: 1 a 2 batidas por cena, movimento variado e transição na virada do compasso.",
+     "ritmo": [4, 2, 1], "anim": "misto", "trans": "misto", "ideal": 0.4, "bpm": [60, 180], "cor": "vivo"},
 ]
 
 
@@ -701,9 +718,59 @@ def _transicoes(M, sl, musica):
                 s["flash"] = True
         elif mid == "cinematico":
             s["trans"] = "preto" if troca else "dissolve"
+        elif mid == "dinamico":
+            # transição na virada do compasso (1 sim, 1 não) e em toda troca de energia; flash no drop e em acentos fortes
+            if (e_drop or (troca and s["nivel"] == 2)) and s["a"] - ult_flash >= 8 * per:
+                s["flash"] = True
+            elif no_1 or troca:
+                s["trans"] = "misto"
         if s["flash"]:
             ult_flash = s["a"]
     return sl
+
+
+def dur_para_cobrir(musica, modelo_id, n, inicio=None, extra=0.0):
+    """Duração (s) para que n mídias entrem ao menos uma vez com o ritmo do modelo, mais `extra` (intro e
+    encerramento). A música inteira se não couber."""
+    M = next((x for x in MODELOS if x["id"] == modelo_id), MODELOS[0])
+    sl = _slots(musica, M, None, inicio)
+    if not sl:
+        return None
+    precisa = max(1, int(n))
+    fim = sl[min(precisa, len(sl)) - 1]["b"]
+    return round(min(musica["dur"] - sl[0]["a"], fim - sl[0]["a"] + extra), 2)
+
+
+def repetidas(midias, max_bits=60, min_cor=0.85):
+    """Fotos repetidas ou quase iguais (rajada, a mesma foto mandada 2 vezes): {path: path da que fica}.
+    Fica a de melhor nota de cada grupo. Calibrado em fotos reais: mesma pose/pessoas dá ≤ 57 bits de 256;
+    pessoas diferentes no mesmo cenário e na mesma pose, ≥ 69."""
+    fotos = [m for m in midias if m.get("tipo") == "foto" and m.get("h256") and m.get("hist")]
+    bits = [np.unpackbits(np.frombuffer(bytes.fromhex(m["h256"]), dtype=np.uint8)) for m in fotos]
+    hist = [np.asarray(m["hist"], dtype=np.float32) for m in fotos]
+    pai = list(range(len(fotos)))
+
+    def raiz(i):
+        while pai[i] != i:
+            pai[i] = pai[pai[i]]
+            i = pai[i]
+        return i
+    for i in range(len(fotos)):
+        for j in range(i + 1, len(fotos)):
+            if int((bits[i] != bits[j]).sum()) <= max_bits and float(np.minimum(hist[i], hist[j]).sum()) >= min_cor:
+                pai[raiz(i)] = raiz(j)
+    grupos = collections.defaultdict(list)
+    for i, m in enumerate(fotos):
+        grupos[raiz(i)].append(m)
+    out = {}
+    for g in grupos.values():
+        if len(g) < 2:
+            continue
+        fica = max(g, key=lambda m: (m["nota"], m.get("rostos") or 0))
+        for m in g:
+            if m is not fica:
+                out[m["path"]] = fica["path"]
+    return out
 
 
 def recomendar(musica, midias, dur_alvo=None, inicio=None):
@@ -753,7 +820,7 @@ def _candidatos(midias, dur_slot, dur_max):
         if m["tipo"] == "foto":
             cand.append({"path": m["path"], "tipo": "foto", "nota": m["nota"], "mov": 0.0, "rostos": m["rostos"],
                          "fx": m["fx"], "fy": m["fy"], "hash": m["hash"], "w": m["w"], "h": m["h"], "data": m.get("data"),
-                         "posto": 0})
+                         "caixa": m.get("caixa"), "posto": 0})
             continue
         am = m["amostras"]
         if not am:
@@ -844,6 +911,7 @@ _LAYOUT_MODELO = {
     "viagem": {"cada": 8, "passo": 1, "formas": {True: ["pilha3m", "pilha3"], False: ["colunas3m", "grade4"]}},
     "memorias": {"cada": 12, "passo": 2, "formas": {True: ["pilha2m", "pilha3m"], False: ["colunas3m", "colunas2"]}},
     "cinematico": {"cada": 16, "passo": 2, "formas": {True: ["pilha2m"], False: ["colunas2"]}},
+    "dinamico": {"cada": 10, "passo": 1, "formas": {True: ["pilha3", "pilha2m"], False: ["grade4", "colunas3m"]}},
 }
 
 
@@ -858,7 +926,11 @@ def _layouts(M, sl, musica, cand, rng, sobra=1.0):
     idx = {round(t, 3): k for k, t in enumerate(beats)}
     drop = musica.get("drop")
     per = 60.0 / max(musica["bpm"], 1)
-    cada = max(4, int(round(cfg["cada"] / min(2.0, max(1.0, sobra)))))
+    # muita mídia para pouca música (ex.: 51 fotos num reel de 30 s): telas divididas bem mais frequentes
+    cada = max(4, int(round(cfg["cada"] / min(2.0, max(1.0, sobra))))) if sobra < 1.25 else \
+        max(4, int(round(cfg["cada"] / min(3.0, sobra * 2))))
+    # margens (em compassos) do começo e do fim sem tela dividida; com mídia sobrando, bem menores
+    m_ini, m_fim = (4, 3) if sobra < 1.25 else (1, 1)
     # orientação que sobra: deitado (paisagem) ou em pé
     deitados = sum(1 for c in cand if c["posto"] == 0 and c["w"] > c["h"] * 1.1)
     em_pe = sum(1 for c in cand if c["posto"] == 0 and c["h"] > c["w"] * 1.1)
@@ -869,7 +941,7 @@ def _layouts(M, sl, musica, cand, rng, sobra=1.0):
         k0 = idx.get(round(s["a"], 3))
         pode = (i >= 2 and k0 is not None and round(s["a"], 3) in downs
                 and (ult is None or s["a"] - ult >= cada * 4 * per - 0.05)
-                and s["a"] - sl[0]["a"] >= 4 * 4 * per - 0.05 and fim - s["a"] >= 3 * 4 * per
+                and s["a"] - sl[0]["a"] >= m_ini * 4 * per - 0.05 and fim - s["a"] >= m_fim * 4 * per
                 and not (drop is not None and -2 * per <= s["a"] - drop < 8 * per))   # o drop fica em tela cheia
         if not pode:
             out.append(s)
@@ -971,12 +1043,27 @@ def _refinar(item, m, dur, nivel, acento, ocupado):
     return round(min(t_melhor, lim), 3)
 
 
-def planejar(musica, midias, modelo_id, dur_alvo=None, ordem="inteligente", semente=0, inicio=None, telas=True):
+def planejar(musica, midias, modelo_id, dur_alvo=None, ordem="inteligente", semente=0, inicio=None, telas=True, reserva=None):
+    """reserva = [s_inicio, s_fim]: segundos no começo/fim do vídeo que ficam sem cena (intro e encerramento do
+    modelo de cliente); as mídias vão todas para o corpo. inicio/fim do plano continuam os da música."""
     from scipy.optimize import linear_sum_assignment
     M = next((x for x in MODELOS if x["id"] == modelo_id), MODELOS[0])
     sl = _slots(musica, M, dur_alvo, inicio)
     if not sl or not midias:
         return {"success": False, "error": "Música sem batidas suficientes ou sem mídias"}
+    ini_musica, fim_musica = sl[0]["a"], sl[-1]["b"]
+
+    def corpo(sl):
+        if not reserva:
+            return sl
+        r0, r1 = float(reserva[0] or 0), float(reserva[1] or 0)
+        c = [s for s in sl if s["a"] >= ini_musica + r0 - 0.05 and s["b"] <= fim_musica - r1 + 0.05]
+        return c if len(c) >= 2 else sl
+    sl = corpo(sl)
+    # muito mais mídia do que cenas (ex.: 42 fotos num reel de 30 s): o ritmo acelera meio passo
+    if len(midias) > len(sl) * 1.3 and max(M["ritmo"]) > 1:
+        M = dict(M, ritmo=[max(1, r // 2) for r in M["ritmo"]])
+        sl = corpo(_slots(musica, M, dur_alvo, inicio))
     dur_slots = [s["b"] - s["a"] for s in sl]
     cand = _candidatos(midias, float(np.median(dur_slots)), max(dur_slots))
     if not cand:
@@ -1069,7 +1156,7 @@ def planejar(musica, midias, modelo_id, dur_alvo=None, ordem="inteligente", seme
     for l, c in zip(linhas, escolha):
         s = sl[l["slot"]]
         item = {"a": l["a"], "b": l["b"], "nivel": l["nivel"], "acento": l["acento"], "path": c["path"], "tipo": c["tipo"],
-                "fx": c["fx"], "fy": c["fy"], "w": c["w"], "h": c["h"],
+                "fx": c["fx"], "fy": c["fy"], "w": c["w"], "h": c["h"], "caixa": c.get("caixa"),
                 "trans": "corte" if l.get("cel") else s["trans"], "flash": False if l.get("cel") else s["flash"]}
         if l.get("cel"):
             item.update(layout=s["layout"], cel=l["cel"], cel_i=l["cel_i"], grupo_a=s["a"])
@@ -1089,5 +1176,5 @@ def planejar(musica, midias, modelo_id, dur_alvo=None, ordem="inteligente", seme
         plano.append(item)
     usados = {p["path"] for p in plano}
     return {"success": True, "modelo": {k: M[k] for k in M if k not in ("ritmo",)}, "slots": plano,
-            "inicio": sl[0]["a"], "fim": sl[-1]["b"], "bpm": musica["bpm"],
+            "inicio": ini_musica, "fim": fim_musica, "bpm": musica["bpm"],
             "uso": {"usadas": len(usados), "total": len(midias), "telas": sum(1 for s in sl if s.get("layout"))}}

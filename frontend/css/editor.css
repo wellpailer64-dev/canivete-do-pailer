@@ -1828,3 +1828,4 @@ body.ve-kl-scrub, body.ve-kl-scrub * { cursor: ew-resize !important; }
     background: linear-gradient(90deg, color-mix(in srgb, var(--cc) 18%, var(--ve-panel-2)), var(--ve-panel-2)); }
 .ve-afc-topo .ve-afc-capa { width: 64px; height: 44px; flex-shrink: 0; }
 .ve-afc-topo .ve-afc-capa img { max-height: 36px; }
+.ve-af-rep { position: absolute; left: 2px; top: 2px; z-index: 1; padding: 0 4px; border-radius: 3px; background: #fbbf24; color: #1a0d02; font: 700 8.5px var(--ve-ui); text-transform: uppercase; }

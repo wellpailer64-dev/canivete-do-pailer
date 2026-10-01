@@ -1033,7 +1033,7 @@ _af = {"musica": {}, "midias": {}, "stop": None}
 
 def _af_resumo_midia(d):
     from Functions import media_server
-    r = {k: d.get(k) for k in ("path", "tipo", "nota", "w", "h", "dur", "rostos", "fx", "fy", "data")}
+    r = {k: d.get(k) for k in ("path", "tipo", "nota", "w", "h", "dur", "rostos", "fx", "fy", "data", "caixa")}
     r["thumb"] = media_server.register(d["thumb"]) if d.get("thumb") and os.path.isfile(d["thumb"]) else None
     return r
 
@@ -1070,6 +1070,11 @@ def af_analisar(musica, itens):
                     _af["midias"][pth] = d
                     midias.append(_af_resumo_midia(d))
                     _ve_emit("veOnAF", {"etapa": "midia_ok", "midia": midias[-1]})
+            # repetidas/quase iguais: vêm marcadas (o JS deixa de fora; um clique devolve)
+            dup = af.repetidas([_af["midias"][m["path"]] for m in midias if m["path"] in _af["midias"]])
+            for m in midias:
+                if m["path"] in dup:
+                    m["repetida_de"] = dup[m["path"]]
             _ve_emit("veOnAF", {"etapa": "fim", "musica": resumo_musica, "midias": midias})
         except Exception as e:
             _ve_emit("veOnAF", {"etapa": "erro", "error": str(e)})
@@ -1092,12 +1097,28 @@ def af_recomendar(musica, paths, dur_alvo=None, inicio_modo="inicio", manual=Non
         return {"success": False, "error": str(e)}
 
 
-def af_planejar(musica, paths, modelo, dur_alvo=None, ordem="inteligente", semente=0, inicio_modo="inicio", manual=None, telas=True):
+def af_planejar(musica, paths, modelo, dur_alvo=None, ordem="inteligente", semente=0, inicio_modo="inicio", manual=None, telas=True,
+                cobrir=None, reserva=None):
+    """cobrir = segundos de intro+encerramento: a duração passa a ser a que faz todas as mídias entrarem."""
     from Functions import autoframe as af
     try:
         m = _af["musica"].get(musica) or af.analisar_musica(musica)
+        if cobrir is not None:
+            ini0 = af.melhor_inicio(m, inicio_modo, None, manual)
+            dur_alvo = af.dur_para_cobrir(m, modelo, len(paths), ini0, float(cobrir)) or dur_alvo
         ini = af.melhor_inicio(m, inicio_modo, dur_alvo or None, manual)
-        return af.planejar(m, _af_midias(paths), modelo, dur_alvo or None, ordem, semente, ini, bool(telas))
+        midias = _af_midias(paths)
+        r = af.planejar(m, midias, modelo, dur_alvo or None, ordem, semente, ini, bool(telas), reserva)
+        # "usar todas": a duração fecha numa frase da música e pode ficar curta; cresce de 4 em 4 compassos até caber
+        if cobrir is not None and dur_alvo:
+            frase = 16 * 60.0 / max(m["bpm"], 1)
+            for _ in range(8):
+                if not r.get("success") or r["uso"]["usadas"] >= r["uso"]["total"] or dur_alvo >= m["dur"]:
+                    break
+                dur_alvo += frase
+                ini = af.melhor_inicio(m, inicio_modo, dur_alvo, manual)
+                r = af.planejar(m, midias, modelo, dur_alvo, ordem, semente, ini, bool(telas), reserva)
+        return r
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -2901,8 +2922,9 @@ class ApiBridge:
     def af_recomendar(self, musica, paths, dur_alvo=None, inicio_modo="inicio", manual=None):
         return af_recomendar(musica, paths, dur_alvo, inicio_modo, manual)
 
-    def af_planejar(self, musica, paths, modelo, dur_alvo=None, ordem="inteligente", semente=0, inicio_modo="inicio", manual=None, telas=True):
-        return af_planejar(musica, paths, modelo, dur_alvo, ordem, semente, inicio_modo, manual, telas)
+    def af_planejar(self, musica, paths, modelo, dur_alvo=None, ordem="inteligente", semente=0, inicio_modo="inicio", manual=None, telas=True,
+                    cobrir=None, reserva=None):
+        return af_planejar(musica, paths, modelo, dur_alvo, ordem, semente, inicio_modo, manual, telas, cobrir, reserva)
 
     def af_escolher(self, tipo):
         return af_escolher(tipo)
