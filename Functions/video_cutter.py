@@ -2520,16 +2520,27 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                     filtros.append(f"[{r}s{j}]trim=end={ini:.4f},setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
                     j += 1
                 trecho = f"[{r}s{j}]trim=start={ini:.4f}:end={fim:.4f}"
+
+                def _com_efeitos(entrada, depois):
+                    """Os efeitos no trecho. Comp (alfa): o alfa é separado antes e volta depois — efeitos de cor
+                    (lut, curvas...) saem opacos e deixavam o fundo transparente da Comp preto."""
+                    if not alfa:
+                        filtros.append(f"{entrada}{para_rgb}," + ",".join(efeitos + depois))
+                        return
+                    filtros.append(f"{entrada}{para_rgb},split[{r}c][{r}m]")
+                    filtros.append(f"[{r}m]alphaextract[{r}k]")
+                    filtros.append(f"[{r}c]" + ",".join(efeitos) + f",format=rgba[{r}f]")
+                    filtros.append(f"[{r}f][{r}k]alphamerge" + "".join("," + d for d in depois))
+
                 if opac:
                     # com opacidade: os efeitos por cima do próprio trecho (o tempo ainda é o da timeline: o sendcmd
                     # da opacidade animada conta a partir do início da camada)
                     filtros.append(f"{trecho},split[{r}x][{r}y]")
-                    filtros.append(f"[{r}y]{para_rgb}," + ",".join(efeitos + opac) + f",{de_rgb}[{r}z]")
+                    _com_efeitos(f"[{r}y]", opac + [f"{de_rgb}[{r}z]"])
                     filtros.append(f"[{r}x][{r}z]overlay=0:0:eof_action=pass:format=auto,"
                                    f"setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
                 else:
-                    filtros.append(f"{trecho},{para_rgb}," + ",".join(efeitos)
-                                   + f",{de_rgb},setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
+                    _com_efeitos(f"{trecho},", [de_rgb, f"setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]"])
                 j += 1
                 if depois:
                     filtros.append(f"[{r}s{j}]trim=start={fim:.4f},setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")

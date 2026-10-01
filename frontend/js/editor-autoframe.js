@@ -239,6 +239,7 @@ async function veAfGerar(outra) {
         veUpdateTitle();
         veAfterEdit(0);
         veSeqSalvarAtiva();
+        if (extra) veAfComps(cli, bin && bin.id);   // intro e encerramento como Comps (editor-autoframe-cliente.js)
         vePjRender();
         const uso = plano.uso ? ` · ${plano.uso.usadas}/${plano.uso.total} ${veT('mídias usadas')}${plano.uso.telas ? ` · ${plano.uso.telas} ${veT('telas divididas')}` : ''}` : '';
         if (cli && !outra) veAfApi().afm_usou(cli.id, VEAF.cliMus).then(r => { if (r && r.success) cli.musicaProx = r.musicaProx; });

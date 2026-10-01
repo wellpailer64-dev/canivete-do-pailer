@@ -1,5 +1,5 @@
 # Plano: Comp (composição estilo After Effects) no Pocket Editor
-Combinado com o usuário em 2026-10-01. Status: **Fases 1 e 2 feitas (2026-10-01)** — próxima: Fase 3 (fluxo e reaproveitamento).
+Combinado com o usuário em 2026-10-01. Status: **Fases 1, 2 e 3 feitas (2026-10-01)** — falta só o opcional (Propriedades essenciais).
 
 ## Por quê
 Projetos com muitas camadas (ex.: intro do AutoFrame com ~15 faixas: foto, Multiplicação, luz, grão, cards, logo...)
@@ -95,12 +95,23 @@ duplicar a Comp no Projeto cria uma Comp independente (timeline copiada).
 - Fica para depois: o som de dentro só muda com o arquivo novo; transições de dentro da Comp não aparecem no
   desenho ao vivo (aparecem no arquivo).
 
-### Fase 3 — fluxo e reaproveitamento
-- **Descompactar comp** (devolve as camadas à mãe, no lugar).
-- Copiar/colar Comp entre projetos; Comp salva no modelo de cliente do AutoFrame.
-- AutoFrame Customizado gera intro e encerramento como Comps ("Intro · <cliente>", "Encerramento · <cliente>")
-  — a timeline gerada fica com ~5 faixas em vez de ~20.
-- (Opcional, como "Propriedades essenciais" do After/Premiere) editar o texto/cor da Comp a partir da mãe.
+### Fase 3 — fluxo e reaproveitamento (feita, menos o opcional)
+- **Descompactar Comp** (botão direito / menu Clipe; `veCompDescompactar`): as camadas voltam no lugar, só o trecho
+  aparado, a partir da trilha do clipe para cima (sobe se não couber). A Comp fica no Projeto. Recusa com
+  velocidade ≠ 100%; efeitos/movimento do clipe da Comp não vão junto (avisa).
+- **Pacote** (`veCompPacote` / `veCompImportar`): timeline da Comp + Comps de dentro + dados das mídias. Ctrl+C numa
+  faixa de Comp guarda o pacote; Ctrl+V em outro projeto importa (reaproveita mídia com o mesmo arquivo; uma vez
+  por projeto) e cola na agulha.
+- **Modelo de cliente**: intro/encerramento tipo "Minha Comp" (`intro.comp` / `fim.comp` = pacote). As mídias com
+  arquivo são copiadas para a pasta do modelo (`autoframe_modelos.py`). Na geração a Comp é recriada e entra pelo
+  caminho do "Meu arquivo de vídeo" (`veAfcPronto`); o som dela vai numa trilha de áudio livre.
+- **AutoFrame gera Comps**: intro e encerramento que cobrem a tela (animada / simples) viram "Intro · <cliente>" e
+  "Encerramento · <cliente>" (`veAfComps`, camadas marcadas com `_grupo` em `veAfcExtras`; sons ficam fora; a
+  transição de entrada passa para a faixa da Comp). Teste: 13 clipes de imagem em 7 trilhas; export = monitor.
+- Corrigido no caminho: **camada de ajuste dentro da Comp deixava o fundo preto/opaco** (exportar_video separa o
+  alfa antes dos efeitos e devolve depois); render espera as imagens de dentro carregarem. `veCompSig` versão 3
+  (Comps antigas renderizam de novo uma vez).
+- Falta (opcional): editar o texto/cor da Comp a partir da mãe ("Propriedades essenciais").
 
 ## Como testar (modo agente)
 - Outra instância: `python main.py --agente=9333` (não usar a do usuário, porta 9222).

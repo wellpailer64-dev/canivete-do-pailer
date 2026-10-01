@@ -55,6 +55,8 @@ const VE_CMDS = [
     { id: 'colar-efeitos', grupo: 'clipe', nome: 'Colar efeitos', teclas: ['Ctrl+Alt+V'], fn: () => veCpEfeitosColar(), pode: () => !!VECP.fx && veSel() },
     { id: 'ativar', grupo: 'clipe', nome: 'Ativar', teclas: ['Ctrl+Shift+E'], sep: true, fn: () => veAlternarAtivo(), pode: veSel, marcado: () => !!VE.clips[VE.sel] && !veClipOff(VE.clips[VE.sel]) },
     { id: 'criar-comp', grupo: 'clipe', nome: 'Criar Comp...', teclas: ['Ctrl+Shift+C'], sep: true, fn: () => veCompDialogo(), pode: veSel },
+    { id: 'descompactar-comp', grupo: 'clipe', nome: 'Descompactar Comp', teclas: [], fn: () => veCompDescompactar(VE.clips[VE.sel]),
+      pode: () => !!VE.clips[VE.sel] && veEhComp(veMediaOf(VE.clips[VE.sel])) },
     { id: 'inverter', grupo: 'clipe', nome: 'Inverter clipe (Reverse Speed)', teclas: [], fn: () => veInverterClipes(), pode: veSel, marcado: () => veInvertido(VE.clips[VE.sel]) },
     { id: 'vinculo', grupo: 'clipe', nome: 'Seleção vinculada', teclas: [], sep: true, fn: () => veToggleVinculo(), marcado: () => VE.vinculo },
 

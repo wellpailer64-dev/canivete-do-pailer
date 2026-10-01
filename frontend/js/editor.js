@@ -1328,12 +1328,17 @@ function veCopiar(recortar) {
     }
     if (!c) { veToast('Selecione um clipe ou legenda para copiar'); return; }
     VE.clipboard = { c: veCopiaClipe(c), path: VE.path };
+    // Comp: leva junto o pacote (timeline e mídias), para colar em outro projeto (editor-comp.js)
+    const mc = veMediaOf(c);
+    if (mc && mc.comp && typeof veCompPacote === 'function') Object.assign(VE.clipboard, { pacote: veCompPacote(mc), compSeq: mc.sequenceId });
     if (recortar) { veDeleteClip(VE.sel, false); veToast('Clipe recortado: Ctrl+V cola na agulha'); }
     else veToast('Clipe copiado: Ctrl+V cola na agulha');
 }
 
 function veColar() {
     const cb = VE.clipboard;
+    // Comp copiada de outro projeto: importa o pacote e cola (a Comp dela não existe aqui)
+    if (cb && cb.pacote && !(VE.sequences || []).some(s => s.id === cb.compSeq)) { veCompColarPacote(cb); return; }
     if (!cb || cb.path !== VE.path) { veToast('Nada copiado (Ctrl+C num clipe ou legenda primeiro)'); return; }
     if (cb.leg) {
         const orig = veLegClone(cb.leg), len = Math.max(veFrame(), orig.en - orig.st);
@@ -2490,7 +2495,7 @@ function veClipMenu(i, x, y, doc) {
         <button class="ve-ctx-item" data-ctx="pp">Propriedades${veIsImage(c) ? '' : ' (velocidade, volume)'}</button>
         <button class="ve-ctx-item" data-ctx="fx">Controles de efeito</button>
         <button class="ve-ctx-item" data-ctx="pj">Mostrar no projeto</button>
-        ${typeof veEhComp === 'function' && veEhComp(veMediaOf(c)) ? '<button class="ve-ctx-item" data-ctx="abrircomp">Abrir Comp<kbd>duplo clique</kbd></button>' : ''}
+        ${typeof veEhComp === 'function' && veEhComp(veMediaOf(c)) ? '<button class="ve-ctx-item" data-ctx="abrircomp">Abrir Comp<kbd>duplo clique</kbd></button><button class="ve-ctx-item" data-ctx="descomp">Descompactar Comp</button>' : ''}
         <button class="ve-ctx-item" data-ctx="comp">Criar Comp…<kbd>Ctrl+Shift+C</kbd></button>
         <button class="ve-ctx-item" data-ctx="off">${veClipOff(c) ? '' : '✓ '}Ativar<kbd>Ctrl+Shift+E</kbd></button>
         ${veIsImage(c) ? '' : `<button class="ve-ctx-item" data-ctx="inv">${veInvertido(c) ? '✓ ' : ''}Inverter clipe (Reverse Speed)</button>`}
@@ -2521,6 +2526,7 @@ function veClipMenu(i, x, y, doc) {
             }
             VE.sel = i;
             if (it.dataset.ctx === 'abrircomp') { veClipMenuFechar(); veCompAbrir(veMediaOf(VE.clips[i])); return; }
+            if (it.dataset.ctx === 'descomp') { veClipMenuFechar(); veCompDescompactar(VE.clips[i]); return; }
             if (it.dataset.ctx === 'gain') veOpenGain();
             else if (it.dataset.ctx === 'fx') veTab('props');
             else if (it.dataset.ctx === 'pp') { vedShow('pp'); veRefresh(); }

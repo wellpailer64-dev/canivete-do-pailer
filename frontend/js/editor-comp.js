@@ -105,6 +105,12 @@ function veCompCriar(nome) {
     if (!VE.ready) return null;
     const sel = veSelLista().filter(c => VE.clips.includes(c));
     if (!sel.length) { veToast('Selecione as camadas que vão para a Comp'); return null; }
+    return veCompDeClipes(sel, nome);
+}
+
+// Os clipes `sel` (da timeline aberta) viram uma Comp. opts.pasta = pasta do Projeto; opts.quieto = sem aviso
+// (AutoFrame). Devolve a mídia da Comp.
+function veCompDeClipes(sel, nome, opts = {}) {
     if (sel.some(veLocked)) { veAvisoBloqueio(); return null; }
     if (VE.playing) veStop();
     veSeqSalvarAtiva();
@@ -133,7 +139,7 @@ function veCompCriar(nome) {
     VE.sequences.push(seq);
     const m = {
         id: VE.media.length, kind: 'video', comp: true, sequenceId: seq.id, name: nome, cor: VE_COMP_COR,
-        pasta: typeof vePjDestino === 'function' ? vePjDestino() : null, path: null, dur, _criada: true,
+        pasta: opts.pasta !== undefined ? opts.pasta : typeof vePjDestino === 'function' ? vePjDestino() : null, path: null, dur, _criada: true,
         // até o render sair: o que já se sabe (duração, quadro, se tem som) — trilha de áudio só se tiver som
         info: { duration: dur, width: VE.seqW, height: VE.seqH, fps: VE.fps || 30, has_audio: temSom, alfa: true, provisoria: true },
     };
@@ -150,9 +156,130 @@ function veCompCriar(nome) {
     veSelDefinir([novo], novo);
     veSeqSalvarAtiva();
     veAfterEdit(VE.playhead);
-    veToast(`${veT('Comp criada')}: ${nome} · ${veT('duplo clique para abrir')}`);
+    if (!opts.quieto) veToast(`${veT('Comp criada')}: ${nome} · ${veT('duplo clique para abrir')}`);
     veCompVerificar();
     return m;
+}
+
+// ─────────────────────────── descompactar (Fase 3) ───────────────────────────
+// As camadas de dentro voltam para a timeline no lugar do clipe da Comp, no mesmo tempo (o trecho aparado dele),
+// a partir da trilha dele para cima. A Comp continua no Projeto. Efeitos/movimento do clipe da Comp não vão junto.
+function veCompDescompactar(c) {
+    const m = veMediaOf(c), seq = veCompSeqDe(m);
+    if (!c || !veEhComp(m) || !seq) return false;
+    if (veLocked(c)) { veAvisoBloqueio(); return false; }
+    if (Math.abs(veVel(c) - 1) > 1e-4) { veToast(veT('Volte a velocidade da Comp para 100% antes de descompactar')); return false; }
+    veSeqSalvarAtiva();
+    if (VE.playing) veStop();
+    // só o trecho que aparece na timeline (clipe aparado), já no tempo de fora
+    const dentro = veRecortarClips(vePlain(seq.clips, []), c.s, c.e).map(n => {
+        const o = {};
+        for (const k in n) if (k[0] !== '_') o[k] = n[k];
+        o.st = +(o.st + c.st).toFixed(6);
+        return o;
+    }).filter(n => n.e - n.s > 1e-3);
+    if (!dentro.length) { veToast(veT('Não há camadas no trecho dessa Comp')); return false; }
+    const perde = (c.fx && c.fx.length) || (c.k && Object.keys(c.k).length) || c.bm || c.tin || c.tout ||
+        (c.p && !veIsDefaultProps(c));
+    const resto = VE.clips.filter(o => o !== c);
+    const trs = [...new Set(dentro.map(n => n.tr))].sort((a, b) => a - b), off = trs[0];
+    const cabe = base => dentro.every(n => {
+        const tr = base + n.tr - off;
+        return !veTrkLocked(tr) && !resto.some(o => o.tr === tr && o.st < veEnd(n) - VE_EPS && veEnd(o) > n.st + VE_EPS && veConflita(o, n));
+    });
+    let base = c.tr;
+    while (!cabe(base)) base++;
+    vePushHistory();
+    dentro.forEach(n => { n.tr = base + n.tr - off; });
+    VE.clips = resto.concat(dentro);
+    veEnsureTracks(Math.max(...dentro.map(n => n.tr)) + 1, { refresh: true });
+    veRelayout();
+    veSelDefinir(dentro, dentro[0]);
+    veAfterEdit(VE.playhead);
+    veToast(`${veT('Comp descompactada')}: ${dentro.length} ${veT(dentro.length === 1 ? 'camada' : 'camadas')}` +
+        (perde ? ` · ${veT('os efeitos e o movimento do clipe da Comp não vão junto')}` : ''));
+    return true;
+}
+
+// ─────────────────────────── pacote: levar a Comp para outro projeto (Fase 3) ───────────────────────────
+// { v, nome, raiz, seqs: [timeline da Comp e das Comps de dentro], midias: [o que as camadas usam] }
+// Copiar (Ctrl+C) uma faixa de Comp guarda o pacote; Colar em outro projeto importa as mídias (as que já
+// existem lá são reaproveitadas) e recria as Comps. Também é o que o modelo de cliente do AutoFrame guarda.
+function veCompMidiaDados(m) {
+    if (!m) return null;
+    const o = { id: m.id, kind: m.kind, name: m.name, nome: m.nome, cor: m.cor };
+    if (m.id === 0) return { ...o, kind: 'video', path: VE.path };
+    if (m.comp) return { ...o, comp: true, sequenceId: m.sequenceId, dur: m.dur, temSom: !!(m.info && m.info.has_audio) };
+    if (['image', 'audio', 'video'].includes(m.kind)) Object.assign(o, { path: m.path, w: m.w, h: m.h, dur: m.dur });
+    if (m.kind === 'cor') o.fill = m.fill;
+    return o;
+}
+
+function veCompPacote(m) {
+    veSeqSalvarAtiva();
+    const seqs = new Map(), midias = new Map();
+    const juntar = mm => {
+        const seq = veCompSeqDe(mm);
+        if (!seq || seqs.has(seq.id)) return;
+        seqs.set(seq.id, vePlain(seq, {}));
+        midias.set(mm.id, veCompMidiaDados(mm));
+        (seq.clips || []).forEach(c => {
+            const mi = VE.media[c.m || 0];
+            if (veEhComp(mi)) juntar(mi);
+            else if (mi && !midias.has(mi.id)) midias.set(mi.id, veCompMidiaDados(mi));
+        });
+    };
+    juntar(m);
+    return { v: 1, nome: vePjNome(m), raiz: m.id, seqs: [...seqs.values()], midias: [...midias.values()].filter(Boolean) };
+}
+
+// Recria no projeto aberto as Comps do pacote; devolve a mídia da Comp de fora. Mídia que não deu para importar
+// (arquivo sumiu) tira as camadas dela, com aviso.
+async function veCompImportar(pac, pasta = null) {
+    const ids = new Map(), falhas = [];
+    const naoRemovida = x => x && !x.removido;
+    for (const d of pac.midias.filter(d => !d.comp)) {
+        let nm = null;
+        if (['image', 'video', 'audio'].includes(d.kind)) {
+            nm = d.path ? veAfMidiaDe(d.path) : null;   // já está no projeto (inclusive o vídeo principal)
+            if (!nm && d.path) { await vePjImportarArquivo(d.path, pasta); nm = veAfMidiaDe(d.path); }
+            if (!nm) { falhas.push(vePathNome(d.path)); continue; }
+        } else if (d.kind === 'texto') nm = veTxMidia();
+        else if (d.kind === 'cor') nm = VE.media.find(x => naoRemovida(x) && x.kind === 'cor' && x.fill === d.fill) ||
+            vePjAddMidia({ kind: 'cor', name: 'Cor sólida', fill: d.fill, nome: d.nome }, pasta);
+        else if (d.kind === 'forma' || d.kind === 'pincel') nm = veGrMidia(d.kind, d.name || (d.kind === 'forma' ? 'Forma' : 'Desenho'));
+        else if (d.kind === 'ajuste') nm = VE.media.find(x => naoRemovida(x) && x.kind === 'ajuste') ||
+            vePjAddMidia({ kind: 'ajuste', name: 'Camada de ajuste' }, pasta);
+        if (nm) ids.set(d.id, nm.id);
+    }
+    const seqIds = new Map(pac.seqs.map(s => [s.id, veSeqId()]));
+    let raiz = null;
+    pac.midias.filter(d => d.comp).forEach(d => {
+        const s = pac.seqs.find(x => x.id === d.sequenceId);
+        if (!s) return;
+        const nm = {
+            id: VE.media.length, kind: 'video', comp: true, sequenceId: seqIds.get(s.id), name: d.name, nome: d.nome,
+            cor: d.cor || VE_COMP_COR, pasta, path: null, dur: d.dur,
+            info: { duration: d.dur, width: s.w || VE.seqW, height: s.h || VE.seqH, fps: VE.fps || 30, has_audio: !!d.temSom, alfa: true, provisoria: true },
+        };
+        VE.media.push(nm);
+        ids.set(d.id, nm.id);
+        if (d.id === pac.raiz) raiz = nm;
+    });
+    pac.seqs.forEach(s => {
+        const clips = (s.clips || []).filter(c => ids.has(c.m || 0)).map(c => {
+            const n = { ...vePlain(c, {}) }, id = ids.get(c.m || 0);
+            if (id) n.m = id; else delete n.m;
+            return n;
+        });
+        VE.sequences.push({ ...vePlain(s, {}), id: seqIds.get(s.id), clips });
+    });
+    if (falhas.length) veToast(`${veT('Comp colada sem')}: ${falhas.join(', ')}`);
+    VE.dirty = true;
+    veUpdateTitle();
+    vePjRender();
+    veCompVerificar();
+    return raiz;
 }
 
 // Duplicar no Projeto: Comp independente (timeline copiada); o arquivo é o mesmo até uma das duas mudar
@@ -176,6 +303,28 @@ function veCompAbrir(m) {
     return true;
 }
 
+// Ctrl+V de uma Comp copiada em outro projeto: importa uma vez por projeto e cola o clipe na agulha
+async function veCompColarPacote(cb) {
+    if (!VE.ready) return;
+    if (VE.playing) veStop();
+    const proj = ((VE.sequences || [])[0] || {}).id;
+    cb.importado = cb.importado || {};
+    let m = VE.media[cb.importado[proj]];
+    if (!veEhComp(m) || m.removido) {
+        veToast(veT('Colando a Comp...'));
+        m = await veCompImportar(cb.pacote, typeof vePjDestino === 'function' ? vePjDestino() : null);
+        if (!m) { veToast(veT('Não foi possível colar a Comp')); return; }
+        cb.importado[proj] = m.id;
+    }
+    const novo = { ...veCopiaClipe(cb.c), m: m.id, st: veSnapFrame(VE.playhead) };
+    veEnsureTrackIndex(novo.tr);
+    if (veTrkLocked(novo.tr)) { veAvisoBloqueio(); return; }
+    vePushHistory();
+    vePlaceClip(novo);
+    veAfterEdit(veEnd(novo));
+    veToast(`${veT('Comp colada')}: ${vePjNome(m)} · V${novo.tr + 1}`);
+}
+
 // ─────────────────────────── render (o arquivo da Comp) ───────────────────────────
 // Tudo o que muda a imagem ou o som da Comp. Os arquivos de dentro entram pelo caminho: Comp de dentro
 // renderizada de novo → caminho novo → a de fora também muda.
@@ -184,10 +333,12 @@ function veCompSig(seq) {
         const o = {};
         for (const k in c) if (k[0] !== '_') o[k] = c[k];
         const m = VE.media[c.m || 0];
-        return [o, m ? [m.kind, m.path || '', m.fill || '', veMediaOffline(m), m.mel && !m.melOff ? m.mel : ''] : null];
+        return [o, m ? [m.kind, m.path || '', m.fill || '', veMediaOffline(m), m.mel && !m.melOff ? m.mel : '', m.kind === 'image' ? [m.w || 0, m.h || 0] : 0] : null];
     });
     const tr = seq.trilhas || {};
-    const partes = [1, seq.w, seq.h, VE.fps, VE.path || '', +seq.dur || 0, clips,
+    // 2: tamanho das imagens (render feito antes de a imagem carregar saía sem ela)
+    // 3: camada de ajuste dentro da Comp deixava o fundo preto (o render corrigido precisa sair de novo)
+    const partes = [3, seq.w, seq.h, VE.fps, VE.path || '', +seq.dur || 0, clips,
         (tr.v || []).map(t => !!(t && t.hide)), (tr.a || []).map(t => !!(t && t.mute)),
         seq.legGravar !== false && (seq.legendas || []).length ? [seq.legendas, seq.legEstilo] : null, seq.master || null];
     return 'comp.' + vePrHash(JSON.stringify(partes));
@@ -234,6 +385,9 @@ function veCompVerificar() {
 }
 
 async function veCompJob(seq) {
+    // imagem recém-importada (colar Comp, AutoFrame) ainda sem tamanho: sairia com 1 px no render
+    const imgs = seq.clips.map(c => VE.media[c.m || 0]).filter(m => m && m.kind === 'image' && !veMediaOffline(m));
+    for (let k = 0; k < 50 && imgs.some(m => !m.w); k++) await new Promise(r => setTimeout(r, 100));
     // textos, formas e cores sólidas viram PNG (o mesmo desenho da prévia), sem mexer no VE._txPng da exportação
     const mapa = seq.clips.some(c => veIsTexto(c) || veEhGrafico(c)) ? await veTxPngs(null, seq.clips, false) : new Map();
     return veCompComo(seq, () => {

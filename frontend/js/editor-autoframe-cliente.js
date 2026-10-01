@@ -9,8 +9,10 @@
 
 const VEAFC = { lista: null, ed: null, apagar: false, quick: null };
 
-const VE_AFC_INTRO = { animada: 'Animada (fotos + logo)', logo_cor: 'Simples (logo na cor)', logo_cena: 'Logo sobre as cenas', video: 'Meu arquivo de vídeo', nenhuma: 'Sem intro' };
-const VE_AFC_FIM = { animada: 'Animado', logo_cor: 'Simples (logo na cor)', video: 'Meu arquivo de vídeo', nenhum: 'Sem encerramento' };
+const VE_AFC_INTRO = { animada: 'Animada (fotos + logo)', logo_cor: 'Simples (logo na cor)', logo_cena: 'Logo sobre as cenas', video: 'Meu arquivo de vídeo', comp: 'Minha Comp', nenhuma: 'Sem intro' };
+const VE_AFC_FIM = { animada: 'Animado', logo_cor: 'Simples (logo na cor)', video: 'Meu arquivo de vídeo', comp: 'Minha Comp', nenhum: 'Sem encerramento' };
+// intro/encerramento que vêm prontos (arquivo de vídeo ou uma Comp guardada no modelo: pacote de editor-comp.js)
+const veAfcPronto = t => t === 'video' || t === 'comp';
 const VE_AFC_ANIM = { pop: 'Pop', fade: 'Fade', zoom: 'Zoom lento' };
 const VE_AFC_ESTILOS = { auto: 'Automático', dinamico: 'Dinâmico', batida: 'Batida', memorias: 'Memórias', drop: 'Drop', viagem: 'Viagem', cinematico: 'Cinemático' };
 const VE_AFC_LOOKS = { estilo: 'Do estilo', vivo: 'Vivo', suave: 'Tons suaves', quente: 'Quente', filme: 'Filme', nenhum: 'Natural' };
@@ -156,6 +158,8 @@ function veAfcForm() {
             ${m.intro.tipo === 'video' ? arq('intro.video', 'video', 'Escolher o arquivo da intro') +
                 `<small class="ve-af-info">${veT('MP4 ou MOV. MOV com transparência pode ficar por cima das cenas.')}</small>` +
                 `<label class="ve-afc-chk"><input type="checkbox" data-afc-chk="intro.transparente"${m.intro.transparente ? ' checked' : ''}> ${veT('Tem fundo transparente (fica por cima das cenas)')}</label>` : ''}
+            ${m.intro.tipo === 'comp' ? veAfcCompCampo(m, 'intro') +
+                `<label class="ve-afc-chk"><input type="checkbox" data-afc-chk="intro.transparente"${m.intro.transparente ? ' checked' : ''}> ${veT('Tem fundo transparente (fica por cima das cenas)')}</label>` : ''}
             ${m.intro.tipo === 'animada' ? `<small class="ve-af-info">${veT('Formas na cor de destaque, as melhores fotos entrando na batida, o logo batendo no compasso e o texto em selo. Com efeitos sonoros do Soundboard.')}</small>` : ''}
             ${['animada', 'logo_cor', 'logo_cena'].includes(m.intro.tipo) ? linha('Duração', pill('intro.compassos', 'auto', 'Automática (~4 s)') + pill('intro.compassos', 1, '1 compasso') + pill('intro.compassos', 2, '2 compassos') + pill('intro.compassos', 4, '4 compassos')) +
                 (m.intro.tipo !== 'animada' ? linha('Animação do logo', pills('intro.anim', VE_AFC_ANIM)) : '') + linha('Texto', txt('intro.texto', 'opcional: slogan ou título padrão')) : ''}
@@ -170,6 +174,7 @@ function veAfcForm() {
             <div class="ve-af-h">${veT('Encerramento')}</div>
             ${linha('Tipo', pills('fim.tipo', VE_AFC_FIM))}
             ${m.fim.tipo === 'video' ? arq('fim.video', 'video', 'Escolher o arquivo do encerramento') : ''}
+            ${m.fim.tipo === 'comp' ? veAfcCompCampo(m, 'fim') : ''}
             ${m.fim.tipo === 'logo_cor' || m.fim.tipo === 'animada' ? linha('Duração', pill('fim.compassos', 'auto', 'Automática (~4 s)') + pill('fim.compassos', 1, '1 compasso') + pill('fim.compassos', 2, '2 compassos') + pill('fim.compassos', 4, '4 compassos')) +
                 linha('Texto', txt('fim.texto', 'opcional: @perfil · telefone · site')) : ''}
         </div>
@@ -243,10 +248,18 @@ function veAfcClick(e) {
     else if (acao === 'voltar') { VEAF.cli = null; veAfcLimparFluxo(); veAfcCarregar(); }
     else if (acao === 'musica') { veAfcTrocarMusica(+b.dataset.i); return true; }
     else if (acao === 'tirar-musica') VEAFC.ed.musicas.splice(+b.dataset.i, 1);
+    else if (acao === 'tirar-comp') VEAFC.ed[b.dataset.campo].comp = null;
     else if (acao === 'tirar') {
         const ch = b.dataset.campo.split('.'), alvo = ch.slice(0, -1).reduce((o, k) => o[k], VEAFC.ed);
         alvo[ch[ch.length - 1]] = null;
         if (VEAFC.ed._arq) delete VEAFC.ed._arq[b.dataset.campo];
+    } else if (acao === 'usar-comp') {
+        // a Comp selecionada no painel Projeto (ou a faixa dela selecionada na timeline) vai para o modelo
+        const k = [...(typeof VEPJ !== 'undefined' ? VEPJ.sel : [])].find(x => x.startsWith('m:') && VE.media[+x.slice(2)] && VE.media[+x.slice(2)].comp);
+        const sel = VE.clips[VE.sel], cm = k ? VE.media[+k.slice(2)] : sel && veMediaOf(sel) && veMediaOf(sel).comp ? veMediaOf(sel) : null;
+        if (!cm) { veToast(veT('Selecione uma Comp no painel Projeto (ou a faixa dela na timeline) e clique de novo')); return true; }
+        VEAFC.ed[b.dataset.campo].comp = veCompPacote(cm);
+        veToast(`${veT('Comp no modelo')}: ${vePjNome(cm)}`);
     } else if (acao === 'arq') {
         api.afm_escolher(b.dataset.tipo).then(r => {
             if (!r || !r.success || !VEAFC.ed) return;
@@ -338,6 +351,9 @@ async function veAfcPreparar(plano, bin) {
     if (mu && info) mu.nome = info.nome;
     if (m.intro.tipo === 'video') x.introV = await imp(veAfcPath(m, 'intro.video'));
     if (m.fim.tipo === 'video') x.fimV = await imp(veAfcPath(m, 'fim.video'));
+    // Comp do modelo: recriada no projeto (mídias copiadas na pasta do modelo); entra como o vídeo pronto
+    if (m.intro.tipo === 'comp' && m.intro.comp) x.introV = await veCompImportar(m.intro.comp, bin && bin.id);
+    if (m.fim.tipo === 'comp' && m.fim.comp) x.fimV = await veCompImportar(m.fim.comp, bin && bin.id);
     for (const v of [x.introV, x.fimV].filter(Boolean)) {
         veMidiaPriorizar(v);
         await veAfEsperar(() => v.info && v.info.duration > 0, 30000);
@@ -358,9 +374,9 @@ async function veAfcPreparar(plano, bin) {
     // intro que cobre a tela: as cenas começam no primeiro corte depois dela
     let di = 0;
     if (veAfcCobre(m.intro.tipo)) di = veAfcCompassos(m.intro.compassos, plano.bpm) * compasso;
-    else if (m.intro.tipo === 'video' && x.introV && !m.intro.transparente) di = x.introV.info.duration;
+    else if (veAfcPronto(m.intro.tipo) && x.introV && !m.intro.transparente) di = x.introV.info.duration;
     if (di > 0) {
-        const corte = m.intro.tipo === 'video'
+        const corte = veAfcPronto(m.intro.tipo)
             ? inicios.filter(t => t - t0 <= di + 0.05 && t > t0).pop() ?? inicios.find(t => t > t0)
             : bordas.find(t => t - t0 >= di - 0.05);
         if (corte != null) { x.introFim = corte - t0; plano.slots = plano.slots.filter(s => (s.cel ? s.grupo_a : s.a) >= corte - 1e-3); }
@@ -368,7 +384,7 @@ async function veAfcPreparar(plano, bin) {
     // encerramento: as cenas acabam no último corte antes dele
     let df = 0;
     if (veAfcCobre(m.fim.tipo)) df = veAfcCompassos(m.fim.compassos, plano.bpm) * compasso;
-    else if (m.fim.tipo === 'video' && x.fimV) df = x.fimV.info.duration;
+    else if (veAfcPronto(m.fim.tipo) && x.fimV) df = x.fimV.info.duration;
     if (df > 0) {
         const corte = bordas.filter(t => plano.fim - t >= df - 0.05 && t > t0 + (x.introFim || 0) + 0.5).pop();
         if (corte != null) { x.fimIni = corte - t0; plano.slots = plano.slots.filter(s => (s.cel ? s.grupo_a : s.a) < corte - 1e-3); }
@@ -523,7 +539,7 @@ function veAfcExtras(out, plano, x) {
     const tin = { t: tAuto, d: 0.4, speed: 'fast', ...(VE_TR[tAuto] && VE_TR[tAuto].dir ? { dir: 'u' } : {}) };
     // efeitos sonoros: trilhas de áudio A2 em diante, sem sobrepor
     const fimA = [];
-    const som = (s, st, g = -6) => {
+    const som = (s, st, g = -6, extra) => {
         if (!s || !s.md) return;
         let ini = 0;
         if (st < 0) { ini = -st; st = 0; }
@@ -532,7 +548,7 @@ function veAfcExtras(out, plano, x) {
         let k = fimA.findIndex(f => f <= st + 1e-3);
         if (k < 0) { fimA.push(0); k = fimA.length - 1; }
         fimA[k] = st + dur;
-        out.push({ tr: k + 1, st: +st.toFixed(4), s: +ini.toFixed(4), e: +(ini + dur).toFixed(4), m: s.md.id, g });
+        out.push({ tr: k + 1, st: +st.toFixed(4), s: +ini.toFixed(4), e: +(ini + dur).toFixed(4), m: s.md.id, g, ...(extra || {}) });
     };
     const sx = x.sfx || {};
     const logoSc = larg => x.logo ? W * larg / x.logo.w * 100 : 100;
@@ -653,10 +669,14 @@ function veAfcExtras(out, plano, x) {
         if (opts.fimSom) som(sx.fim, L + b / 2 - 0.02, -6);
         return L;
     };
+    // intro e encerramento cobrindo a tela viram Comps depois (veAfComps): as camadas do bloco levam _grupo
+    const grupo = (g, n0) => out.slice(n0).forEach(c => { c._grupo = g; });
     // intro
+    const nI = out.length;
     if (m.intro.tipo === 'animada' && x.introFim) {
         out.push({ tr: SC, st: 0, s: 0, e: +x.introFim.toFixed(4), m: corP(), p: { ...cheio } });
         animado(0, x.introFim, { cards: x.cards, texto: VEAF.titulo, riser: true, heroi: x.heroiI });
+        grupo('intro', nI);
         const primeira = out.find(c => c.tr === SC && Math.abs(c.st - x.introFim) < 0.02 && VE.media[c.m] && VE.media[c.m].kind !== 'cor');
         if (primeira) primeira.tin = { ...tin };
         som(sx.whoosh, x.introFim - (sx.whoosh ? sx.whoosh.dur * 0.45 : 0), -6);
@@ -664,6 +684,7 @@ function veAfcExtras(out, plano, x) {
         out.push({ tr: SC, st: 0, s: 0, e: +x.introFim.toFixed(4), m: corP(), p: { ...cheio } });
         logoEm(0, x.introFim, 0.55, H * (VEAF.titulo ? 0.44 : 0.5), m.intro.anim, nova());
         texto(Math.min(b, x.introFim / 3), x.introFim - Math.min(b, x.introFim / 3), VEAF.titulo, H * 0.62, nova());
+        grupo('intro', nI);
         const primeira = out.find(c => c.tr === SC && Math.abs(c.st - x.introFim) < 0.02 && VE.media[c.m] && VE.media[c.m].kind !== 'cor');
         if (primeira) primeira.tin = { ...tin };
         som(sx.boom, 0, -4);
@@ -674,9 +695,11 @@ function veAfcExtras(out, plano, x) {
         texto(Math.min(b, di / 3), di - Math.min(b, di / 3), VEAF.titulo, H * 0.6, nova());
         som(sx.boom, 0, -4);
         x.introFim = di;
-    } else if (m.intro.tipo === 'video' && x.introV) {
+    } else if (veAfcPronto(m.intro.tipo) && x.introV) {
         const dur = m.intro.transparente ? x.introV.info.duration : (x.introFim || x.introV.info.duration);
         out.push({ tr: m.intro.transparente ? nova() : SC, st: 0, s: 0, e: +Math.min(dur, x.introV.info.duration).toFixed(4), m: x.introV.id, x: 'v' });
+        // Comp com som: o som dela numa trilha de áudio livre (a imagem fica no lugar da intro)
+        if (x.introV.comp && x.introV.info.has_audio) som({ md: x.introV, dur: Math.min(dur, x.introV.info.duration) }, 0, 0, { x: 'a' });
         if (m.intro.transparente) x.introFim = 0;
         texto(b, Math.max(1, dur - b), VEAF.titulo, H * 0.62, nova());
     } else texto(0, Math.min(x.total, Math.max(2.5, b * 8)), VEAF.titulo, H * 0.42, nova());
@@ -692,6 +715,7 @@ function veAfcExtras(out, plano, x) {
     if (x.fimIni != null) {
         const df = x.total - x.fimIni;
         if (m.fim.tipo === 'animada' || m.fim.tipo === 'logo_cor') {
+            const nF = out.length;   // do fundo do encerramento em diante (sons ficam de fora em veAfComps)
             out.push({ tr: SC, st: +x.fimIni.toFixed(4), s: 0, e: +df.toFixed(4), m: corP(), p: { ...cheio }, tin: { ...tin } });
             som(sx.whoosh2 || sx.whoosh, x.fimIni - ((sx.whoosh2 || sx.whoosh) ? (sx.whoosh2 || sx.whoosh).dur * 0.45 : 0), -6);
             if (m.fim.tipo === 'animada') animado(x.fimIni, df, { texto: '', larg: 0.6, fimSom: true, heroi: x.heroiF, logoY: H / 2 });
@@ -699,8 +723,10 @@ function veAfcExtras(out, plano, x) {
                 logoEm(x.fimIni, df, 0.5, H * (m.fim.texto ? 0.44 : 0.5), 'fade', nova());
                 texto(x.fimIni + Math.min(b, df / 3), df - Math.min(b, df / 3), m.fim.texto, H * 0.6, nova());
             }
+            grupo('fim', nF);
         } else if (x.fimV) {
             out.push({ tr: SC, st: +x.fimIni.toFixed(4), s: 0, e: +Math.min(df, x.fimV.info.duration).toFixed(4), m: x.fimV.id, x: 'v' });
+            if (x.fimV.comp && x.fimV.info.has_audio) som({ md: x.fimV, dur: Math.min(df, x.fimV.info.duration) }, x.fimIni, 0, { x: 'a' });
         }
     }
     // logo no canto, das cenas até o encerramento
@@ -720,4 +746,35 @@ function veAfcExtras(out, plano, x) {
         p: { ...cheio }, k: { op: veAfK([[0, 0, 'suave'], [fp, 100]]) } });
     if (x.semPack) veToast(veT('Dica: baixe o pack no painel Soundboard para o AutoFrame pôr efeitos sonoros'));
     return out;
+}
+
+// Intro e encerramento (marcados com _grupo em veAfcExtras) viram Comps (editor-comp.js): a timeline gerada fica
+// com poucas faixas, e o bloco abre com duplo clique. Os sons ficam fora (na trilha de áudio da timeline).
+// A transição de entrada do bloco passa do fundo dele para o clipe da Comp.
+function veAfComps(cli, pasta) {
+    if (typeof veCompDeClipes !== 'function') return;
+    [['intro', 'Intro'], ['fim', 'Encerramento']].forEach(([g, rotulo]) => {
+        const sel = VE.clips.filter(c => c._grupo === g && !veIsAudio(c));
+        if (sel.length < 2) return;
+        const fundo = sel.filter(c => c.tin).sort((a, b) => a.tr - b.tr || a.st - b.st)[0], tin = fundo && fundo.tin;
+        if (fundo) delete fundo.tin;
+        const m = veCompDeClipes(sel, `${rotulo} · ${cli.nome}`, { pasta, quieto: true });
+        const c = m && VE.clips.find(x => x.m === m.id);
+        if (c && tin) c.tin = tin;
+    });
+    VE.clips.forEach(c => { delete c._grupo; });
+    // gerar não entra no desfazer (como antes): Ctrl+Z não desmonta as Comps
+    VE.history = [];
+    VE.future = [];
+    VE.media.forEach(m => { if (m && m.comp) delete m._criada; });
+    veRelayout();
+    veSeqSalvarAtiva();
+}
+
+// Formulário: a Comp guardada como intro/encerramento (o pacote fica no modelo)
+function veAfcCompCampo(m, campo) {
+    const pac = m[campo] && m[campo].comp;
+    return `<div class="ve-afc-arq"><button class="ve-btn ve-btn-sm" data-afc="usar-comp" data-campo="${campo}">${veT('Usar a Comp selecionada')}</button>
+        <span>${pac ? veEsc(pac.nome || 'Comp') : veT('nenhuma Comp')}</span>${pac ? `<button class="ve-afc-x" data-afc="tirar-comp" data-campo="${campo}" title="${veT('Tirar')}">×</button>` : ''}</div>
+        <small class="ve-af-info">${veT('Monte a intro numa Comp (Criar Comp), selecione ela no painel Projeto e clique acima. As mídias dela são copiadas para o modelo.')}</small>`;
 }

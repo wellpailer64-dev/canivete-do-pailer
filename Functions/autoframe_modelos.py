@@ -16,6 +16,19 @@ import time
 import uuid
 
 _CAMPOS_ARQ = (("logo",), ("intro", "video"), ("fim", "video"))
+# intro/encerramento "Minha Comp": pacote da Comp (editor-comp.js: veCompPacote) em intro.comp / fim.comp.
+# As mídias com arquivo dele são copiadas para a pasta do modelo ("arq"); o JS recebe o caminho de volta ("path").
+_CAMPOS_COMP = ("intro", "fim")
+
+
+def _comp_midias(m):
+    """Mídias com arquivo dos pacotes de Comp do modelo."""
+    out = []
+    for k in _CAMPOS_COMP:
+        pac = (m.get(k) or {}).get("comp")
+        if isinstance(pac, dict):
+            out += [d for d in pac.get("midias") or [] if isinstance(d, dict) and not d.get("comp")]
+    return out
 
 
 def _base():
@@ -66,6 +79,10 @@ def _com_urls(m):
         p = os.path.join(pasta, nome) if nome else None
         if p and os.path.isfile(p):
             out["_arq"][".".join(chaves)] = {"path": p, "url": media_server.register(p)}
+    for d in _comp_midias(out):
+        if d.get("arq"):
+            p = os.path.join(pasta, d["arq"])
+            d["path"] = p if os.path.isfile(p) else None
     for mu in out.get("musicas") or []:
         p = os.path.join(pasta, mu["arq"])
         mu["path"] = p if os.path.isfile(p) else None
@@ -116,9 +133,17 @@ def salvar(modelo):
             elif mu.get("arq"):
                 musicas.append({"arq": mu["arq"], "nome": mu.get("nome") or mu["arq"]})
         m["musicas"] = musicas
+        for d in _comp_midias(m):
+            p = d.pop("path", None)
+            if d.get("arq") and os.path.isfile(os.path.join(pasta, d["arq"])):
+                continue   # já estava no modelo
+            d.pop("arq", None)
+            if p and os.path.isfile(p):
+                d["arq"] = _copiar(p, pasta, "comp")
         m["atualizado"] = time.time()
         _gravar(m)
-        usados = {_get(m, c) for c in _CAMPOS_ARQ} | {mu["arq"] for mu in musicas} | {"modelo.json"}
+        usados = ({_get(m, c) for c in _CAMPOS_ARQ} | {mu["arq"] for mu in musicas} | {"modelo.json"}
+                  | {d["arq"] for d in _comp_midias(m) if d.get("arq")})
         for a in os.listdir(pasta):
             if a not in usados and not a.endswith(".tmp"):
                 try:
