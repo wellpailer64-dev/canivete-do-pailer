@@ -94,7 +94,7 @@ function vePrSegmentos() {
     VEPR.sujo = false;
     VEPR.segsSeq = VE.activeSequence;
     const eps = veFrame() / 2;
-    const visuais = veTransVirtuais().filter(c => !veIsAudio(c) && !veTrkHidden(c.tr));
+    const visuais = veTransVirtuais().filter(c => !veIsAudio(c) && !veOculto(c));
     const pts = new Set([0, +VE.dur.toFixed(4)]);
     // no primeiro quadro em que o corte já vale (como o monitor decide: quadro em t mostra o clipe se t >= início).
     // Arredondado (14,5333 em vez de 14,53333…, ou um corte fora da grade) o clipe que começa no corte entrava

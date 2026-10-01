@@ -34,7 +34,7 @@ function vePosParaCentro(c, p, cx, cy) {
 }
 
 function veTfVisivel(c, t = VE.playhead) {
-    return c && !veIsAudio(c) && !veIsAdj(c) && !veTrkHidden(c.tr) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS;
+    return c && !veIsAudio(c) && !veIsAdj(c) && !veOculto(c) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS;
 }
 
 // Objeto de cima sob o ponto do quadro (-1 = nenhum); filtro opcional

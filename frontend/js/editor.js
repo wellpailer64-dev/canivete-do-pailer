@@ -77,7 +77,7 @@ const VE_TRACKS = [
 function veMixClipes() {
     const fd = veAudFades();
     return VE.clips
-        .filter(c => !veIsImage(c) && !veTrkMuted(c.tr) && c.e - c.s > 0.005 && veTemSom(c))
+        .filter(c => !veIsImage(c) && !veMudo(c) && c.e - c.s > 0.005 && veTemSom(c))
         .map(c => {
             const f = fd.get(c) || c;
             const afx = typeof veAfxExport === 'function' ? veAfxExport(c) : [];
@@ -134,6 +134,11 @@ function veEnsureTracks(count, opts = {}) {
 function veEnsureTrackIndex(k, opts) { return k >= 0 && veEnsureTracks(k + 1, opts); }
 const veTrkHidden = tr => tr >= 0 && !!(VE_TRK.v[tr] && VE_TRK.v[tr].hide);
 const veTrkMuted = tr => tr >= 0 && !!(VE_TRK.a[tr] && VE_TRK.a[tr].mute);
+// Clipe desativado (Ctrl+Shift+E, como o "Ativar" do Premiere): fica no lugar, apagado na timeline, mas não aparece
+// na prévia nem na exportação e não tem som. Os clipes estendidos das transições levam o original em _o.
+const veClipOff = c => !!(c && (c.off || (c._o && c._o.off)));
+const veOculto = c => veTrkHidden(c.tr) || veClipOff(c);
+const veMudo = c => veTrkMuted(c.tr) || veClipOff(c);
 const veTrkLocked = tr => tr >= 0 && !!((VE_TRK.v[tr] && VE_TRK.v[tr].lock) || (VE_TRK.a[tr] && VE_TRK.a[tr].lock));
 const veLocked = c => !!c && veTrkLocked(c.tr);
 function veAvisoBloqueio() { veToast('Trilha bloqueada: clique no cadeado para desbloquear'); }
@@ -298,7 +303,7 @@ function veCacheSig(f) {
     VE.clips.forEach(c => {
         if (veIsAudio(c) || t < c.st - VE_CACHE_MARGEM || t >= veEnd(c) + VE_CACHE_MARGEM) return;
         const m = veMediaOf(c);
-        partes.push(c, veTrkHidden(c.tr), m && (m.url || m.path || ''), veMediaOffline(m));
+        partes.push(c, veOculto(c), m && (m.url || m.path || ''), veMediaOffline(m));
     });
     const li = typeof veTxLegendaEm === 'function' ? veTxLegendaEm(t) : -1;
     if (li >= 0) partes.push(VE.legendas[li], VE.legEstilo, VE.legGravar);
@@ -552,7 +557,7 @@ function veRelayout() {
 function veTopAt(t) {
     let best = -1;
     VE.clips.forEach((c, i) => {
-        if (!veIsImage(c) && !veIsAudio(c) && !veTrkHidden(c.tr) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS && (best < 0 || c.tr > VE.clips[best].tr)) best = i;
+        if (!veIsImage(c) && !veIsAudio(c) && !veOculto(c) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS && (best < 0 || c.tr > VE.clips[best].tr)) best = i;
     });
     return best;
 }
@@ -1866,7 +1871,7 @@ const VEA = { ctx: null, gain: null, falhou: false };
 function veApplyAudioGain() {
     const v = veVideo();
     const c = VE.clips[VE.cur];
-    v.muted = VE.muted || (!!c && (veTrkMuted(c.tr) || c.x === 'v'));   // M do cabeçalho da trilha de áudio
+    v.muted = VE.muted || (!!c && (veMudo(c) || c.x === 'v'));   // M do cabeçalho da trilha de áudio
     if (veMixAtivo()) { v.muted = true; return; }         // o som vem do mix (ganho incluído)
     const lin = veDb(c ? c.g : 0);
     if (!VEA.ctx && !VEA.falhou && lin > 1) {
@@ -2478,6 +2483,7 @@ function veClipMenu(i, x, y, doc) {
         <button class="ve-ctx-item" data-ctx="pp">Propriedades${veIsImage(c) ? '' : ' (velocidade, volume)'}</button>
         <button class="ve-ctx-item" data-ctx="fx">Controles de efeito</button>
         <button class="ve-ctx-item" data-ctx="pj">Mostrar no projeto</button>
+        <button class="ve-ctx-item" data-ctx="off">${veClipOff(c) ? '' : '✓ '}Ativar<kbd>Ctrl+Shift+E</kbd></button>
         ${veIsImage(c) ? '' : `<button class="ve-ctx-item" data-ctx="inv">${veInvertido(c) ? '✓ ' : ''}Inverter clipe (Reverse Speed)</button>`}
         ${typeof veMelMenuItens === 'function' && veTemSom(c) ? veMelMenuItens(veMediaOf(c), 'data-ctx') : ''}
         <button class="ve-ctx-item perigo" data-ctx="del">Apagar clipe<kbd>D</kbd></button>`;
@@ -2503,6 +2509,7 @@ function veClipMenu(i, x, y, doc) {
             else if (it.dataset.ctx === 'pp') { vedShow('pp'); veRefresh(); }
             else if (it.dataset.ctx === 'del') veDeleteClip(i);
             else if (it.dataset.ctx === 'inv') veInverterClipes();
+            else if (it.dataset.ctx === 'off') veAlternarAtivo();
             else if (it.dataset.ctx === 'pj') veMostrarNoProjeto(VE.clips[i]);
             else if (it.dataset.ctx === 'ma') vePjMelhorarAudio([VE.clips[i].m || 0]);
             else if (it.dataset.ctx === 'mel') veMelAlternar(veMediaOf(VE.clips[i]));
@@ -2580,7 +2587,7 @@ const VECAM = { slot: new Map() };     // clipe → nº do player (abaixo de VE_
 
 // Clipes de vídeo que precisam de player extra no instante t (visíveis, fora o do player principal)
 function veCamVisiveis(t, lista, cur) {
-    let vis = lista.filter(c => !veIsAudio(c) && !veTrkHidden(c.tr) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS)
+    let vis = lista.filter(c => !veIsAudio(c) && !veOculto(c) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS)
         .sort((a, b) => a.tr - b.tr || a.st - b.st);
     const cobre = vis.map(c => !veIsImage(c) && veIsPlain(c) && !c._tr && !veTemAlfa(c)).lastIndexOf(true);
     if (cobre > 0) vis = vis.slice(cobre);
@@ -2888,7 +2895,7 @@ function veDrawMonitor() {
     const trans = temTr && veTransAtiva(t);
     let vis = (trans ? virt : VE.clips)
         .map(c => ({ c, i: VE.clips.indexOf(c._o || c) }))
-        .filter(({ c }) => !veIsAudio(c) && !veTrkHidden(c.tr) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS)
+        .filter(({ c }) => !veIsAudio(c) && !veOculto(c) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS)
         .sort((a, b) => a.c.tr - b.c.tr || a.c.st - b.c.st);
     // o que está abaixo de um vídeo que cobre o quadro inteiro não aparece: nem decodifica
     const cobre = vis.map(({ c }) => !veIsImage(c) && veIsPlain(c) && !c._tr && !veTemAlfa(c)).lastIndexOf(true);
@@ -3310,15 +3317,15 @@ function veExportPlan(emFaixa, faixa) {
 }
 
 function veExportPlanClips() {
-    // trilha oculta (olho) não entra; o som é o do clipe de vídeo de cima (como na prévia), mudo = silêncio
-    const isVid = c => !veIsImage(c) && !veIsAudio(c) && !veTrkHidden(c.tr);
+    // trilha oculta (olho) e clipe desativado não entram; o som é o do clipe de vídeo de cima (como na prévia), mudo = silêncio
+    const isVid = c => !veIsImage(c) && !veIsAudio(c) && !veOculto(c);
     // clipe com velocidade mudada vai como camada (no ffmpeg: setpts)
     const liso = c => !c._tr && veIsPlain(c) && veVel(c) === 1 && veMid(c) === 0 && !veTemAlfa(c);
     const base = veFlattenWith(c => isVid(c) && liso(c));
-    const audio = veFlattenWith(isVid, c => veTrkMuted(c.tr));
+    const audio = veFlattenWith(isVid, c => veMudo(c));
     // camadas: imagens e vídeos transformados; um vídeo "normal" acima de alguma camada também
     // precisa entrar (senão a camada apareceria por cima dele)
-    const overlays = VE.clips.filter(c => !veIsAudio(c) && !veTrkHidden(c.tr) && (veIsImage(c) || !liso(c)));
+    const overlays = VE.clips.filter(c => !veIsAudio(c) && !veOculto(c) && (veIsImage(c) || !liso(c)));
     const cobre = c => isVid(c) && liso(c) &&
         overlays.some(o => o.tr < c.tr && o.st < veEnd(c) - VE_EPS && veEnd(o) > c.st + VE_EPS);
     const camadas = VE.clips
@@ -4107,6 +4114,22 @@ function veBuildHeads() {
     }).join('');
 }
 
+// Ativar/desativar os clipes selecionados (Ctrl+Shift+E). Algum ativo na seleção: desativa todos; senão, ativa
+function veAlternarAtivo() {
+    const alvos = veSelLista().filter(c => !veLocked(c));
+    if (!alvos.length) return;
+    const desativar = alvos.some(c => !c.off);
+    vePushHistory();
+    alvos.forEach(c => { if (desativar) c.off = true; else delete c.off; });
+    veCacheInvalidate();
+    if (typeof vePrInvalidar === 'function') vePrInvalidar();   // já no próximo desenho: senão o monitor tocaria o trecho renderizado antigo
+    if (VE.ready) veSyncPlayer(true);   // o clipe de baixo pode passar a ser o que toca
+    veApplyAudioGain();
+    veRefresh();
+    veToast(desativar ? (alvos.length > 1 ? `${alvos.length} clipes desativados` : 'Clipe desativado')
+        : (alvos.length > 1 ? `${alvos.length} clipes ativados` : 'Clipe ativado'));
+}
+
 // Botões do cabeçalho da trilha (olho, cadeado, mudo)
 function veTrackToggle(kind, k, act) {
     const st = veTrackState(kind, k);
@@ -4345,7 +4368,7 @@ function veRender() {
         ctx.save();
         veRoundRect(ctx, cx, vy, cw, vh, 4);
         ctx.clip();
-        const apagado = veTrkHidden(c.tr);
+        const apagado = veOculto(c);
         if (apagado && !dim && !ghost) ctx.globalAlpha = 0.35;
         ctx.fillStyle = cor ? veRgba(cor, 0.28) : adj ? '#123a36' : txt ? '#4a1936' : img ? '#3b2358' : '#27305f';
         ctx.fillRect(cx, vy, cw, vh);
@@ -4414,7 +4437,7 @@ function veRender() {
         ctx.save();
         veRoundRect(ctx, cx, ay, cw, ah, 4);
         ctx.clip();
-        ctx.globalAlpha = dim ? 0.28 : ghost ? 0.8 : veTrkMuted(c.tr) ? 0.35 : 1;
+        ctx.globalAlpha = dim ? 0.28 : ghost ? 0.8 : veMudo(c) ? 0.35 : 1;
         ctx.fillStyle = cor ? veRgba(cor, 0.30) : '#163a2b';
         ctx.fillRect(cx, ay, cw, ah);
         if (cor) {
