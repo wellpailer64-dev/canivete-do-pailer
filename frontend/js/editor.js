@@ -971,7 +971,6 @@ function veSeqConfigAplicar() {
 function veAfterEdit(playhead) {
     if (VE.pps < veMinPps()) VE.pps = veMinPps();   // afastado além da sequência continua afastado
     veClampView();
-    veSyncZoomSlider();
     veSeek(playhead != null ? playhead : VE.playhead);
     veRefresh();
 }
@@ -1878,7 +1877,20 @@ function veOpenGain() {
     inp.value = '';
     veGainLimMontar(c);
     $ve('ve-gain').hidden = false;
-    requestAnimationFrame(() => { inp.focus({ preventScroll: true }); inp.select(); });
+    requestAnimationFrame(() => veFocarCampo(inp));
+}
+
+// Campo de um diálogo aberto por atalho (G, Ctrl+M): com o atalho apertado numa janela solta (outro monitor),
+// o campo recebe o foco mas o teclado continua na janela solta — ativa a janela do diálogo antes
+function veFocarCampo(el) {
+    if (!el) return;
+    const foca = () => { el.focus({ preventScroll: true }); if (el.select) el.select(); };
+    const w = el.ownerDocument.defaultView;
+    if (!el.ownerDocument.hasFocus()) {
+        if (w === window) { try { window.pywebview.api.janela_ativar().then(foca); } catch (e) { /* sem API */ } }
+        else { try { w.focus(); } catch (e) { /* fechando */ } }
+    }
+    foca();
 }
 
 // Hard Limiter no painel do G (o mesmo efeito "Hard Limiter" dos Controles de efeito: editor-fx.js / editor-audio.js)
@@ -2846,7 +2858,8 @@ function veRulerNiceStep(minPx) {
 // Réguas nas bordas do painel Programa (como no Photoshop): cobrem toda a borda, marcam em pixels do quadro
 // (negativo / além do tamanho = fora do quadro) e destacam o trecho onde o quadro está. O mesmo canvas cobre o
 // palco inteiro e desenha as guias (editor-guias.js). Só redesenha quando algo muda (não a cada quadro do play).
-const VE_RULER_TOP = 18, VE_RULER_LEFT = 26;
+// réguas finas e escuras; o monitor recua exatamente isso (.ve-stage.rulers no CSS): no Fit nunca cobrem o quadro
+const VE_RULER_TOP = 12, VE_RULER_LEFT = 16;
 function veRulersDraw() {
     const ov = $ve('ve-rulers'), scr = $ve('ve-screen'), stage = $ve('ve-stage');
     if (!ov || !scr || !stage) return;
@@ -2868,59 +2881,59 @@ function veRulersDraw() {
     const topH = VE_RULER_TOP, leftW = VE_RULER_LEFT;
 
     ctx.save();
-    ctx.fillStyle = '#161616';
+    ctx.fillStyle = '#0c0c0d';
     ctx.fillRect(0, 0, w, topH);
     ctx.fillRect(0, 0, leftW, h);
     if (g) {
         const { k, x0, y0 } = g;
         const fw = VE.seqW * k, fh = VE.seqH * k;
         // trecho do quadro
-        ctx.fillStyle = '#242424';
+        ctx.fillStyle = '#151517';
         const fx1 = Math.max(leftW, x0), fx2 = Math.min(w, x0 + fw);
         const fy1 = Math.max(topH, y0), fy2 = Math.min(h, y0 + fh);
         if (fx2 > fx1) ctx.fillRect(fx1, 0, fx2 - fx1, topH);
         if (fy2 > fy1) ctx.fillRect(0, fy1, leftW, fy2 - fy1);
 
-        ctx.font = '10px Cascadia Mono, Consolas, monospace';
+        ctx.font = '8px Cascadia Mono, Consolas, monospace';
         ctx.textBaseline = 'top';
         const majorX = veRulerNiceStep(80 / k), minorX = majorX / 5;
         const majorY = veRulerNiceStep(60 / k), minorY = majorY / 5;
         const pxIni = Math.floor((leftW - x0) / k / minorX) * minorX, pxFim = (w - x0) / k;
         const pyIni = Math.floor((topH - y0) / k / minorY) * minorY, pyFim = (h - y0) / k;
         const eMaior = (v, m) => Math.abs(v / m - Math.round(v / m)) < 1e-4;
-        ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.16)';
         ctx.beginPath();
         for (let px = pxIni; px <= pxFim; px += minorX) {
             const x = Math.round(x0 + px * k) + 0.5;
             if (x < leftW) continue;
             ctx.moveTo(x, topH);
-            ctx.lineTo(x, eMaior(px, majorX) ? 2 : topH - 5);
+            ctx.lineTo(x, eMaior(px, majorX) ? 1 : topH - 3);
         }
         for (let py = pyIni; py <= pyFim; py += minorY) {
             const y = Math.round(y0 + py * k) + 0.5;
             if (y < topH) continue;
             ctx.moveTo(leftW, y);
-            ctx.lineTo(eMaior(py, majorY) ? 2 : leftW - 5, y);
+            ctx.lineTo(eMaior(py, majorY) ? 1 : leftW - 3, y);
         }
         ctx.stroke();
-        ctx.fillStyle = 'rgba(235,235,235,0.72)';
+        ctx.fillStyle = 'rgba(235,235,235,0.42)';
         for (let px = Math.ceil(pxIni / majorX) * majorX; px <= pxFim; px += majorX) {
             const x = Math.round(x0 + px * k);
-            if (x >= leftW) ctx.fillText(String(Math.round(px)), x + 3, 3);
+            if (x >= leftW) ctx.fillText(String(Math.round(px)), x + 2, 2);
         }
         ctx.save();
         ctx.rotate(-Math.PI / 2);
         for (let py = Math.ceil(pyIni / majorY) * majorY; py <= pyFim; py += majorY) {
             const y = Math.round(y0 + py * k);
-            if (y >= topH) ctx.fillText(String(Math.round(py)), -y + 3, 3);
+            if (y >= topH) ctx.fillText(String(Math.round(py)), -y + 2, 3);
         }
         ctx.restore();
         veGuiasMarcasReguas(ctx, g, w, h, topH, leftW);
     }
-    ctx.fillStyle = 'rgba(255,255,255,0.10)';
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
     ctx.fillRect(leftW, topH - 1, w - leftW, 1);
     ctx.fillRect(leftW - 1, topH, 1, h - topH);
-    ctx.fillStyle = '#161616';
+    ctx.fillStyle = '#0c0c0d';
     ctx.fillRect(0, 0, leftW, topH);
     ctx.restore();
 }
@@ -4185,7 +4198,6 @@ function veSetPps(pps, anchorT, anchorX) {
     VE.pps = Math.min(Math.max(pps, veMinPps()), VE_MAX_PPS);
     if (anchorT != null) VE.view = anchorT - anchorX / VE.pps;
     veClampView();
-    veSyncZoomSlider();
     veDraw();
 }
 
@@ -4197,20 +4209,6 @@ function veZoomBy(f) {
 }
 
 function veZoomFit() { VE.view = 0; veSetPps(veFitPps()); }
-
-function veZoomSlider(v) {
-    const min = veMinPps();
-    const pps = min * Math.pow(VE_MAX_PPS / min, v / 1000);
-    const x = veCanvasWidth() / 2;
-    veSetPps(pps, VE.view + x / VE.pps, x);
-}
-
-function veSyncZoomSlider() {
-    const min = veMinPps();
-    const el = $ve('ve-zoom');
-    if (!el || VE_MAX_PPS <= min) return;
-    el.value = Math.round(1000 * Math.log(VE.pps / min) / Math.log(VE_MAX_PPS / min));
-}
 
 function veFollowPlayhead(playing) {
     const w = veCanvasWidth();
@@ -4374,7 +4372,6 @@ function veLayoutChanged() {
     if (VE.ready) {
         if (VE.pps < veMinPps()) VE.pps = veMinPps();
         veClampView();
-        veSyncZoomSlider();
     }
     if ($ve('ve-screen')) veApplyMonitor();
     veDraw();
@@ -4833,9 +4830,76 @@ function veUpdateScrollbar() {
 
 // ─────────────────────────── UI (listas / leituras) ───────────────────────────
 
+// ── timecode do monitor: duplo clique para digitar onde ir; botão para copiar ──
+// Aceita (como o Premiere): 00:01:05:12 ou 1:05:12 (alinhado pela direita: quadro, segundo, minuto, hora) ·
+// 130 = 1 s e 30 quadros · 12.5 ou 12,5 = segundos · 2s · relativo à agulha com + ou − (+2s, -10 quadros, +1:00)
+function veTcLer(txt) {
+    let t = String(txt || '').trim().replace(/\s+/g, '');
+    if (!t) return null;
+    let rel = 0;
+    if (t[0] === '+' || t[0] === '-') { rel = t[0] === '+' ? 1 : -1; t = t.slice(1); }
+    const fps = VE.fps || 30;
+    let seg = null, m;
+    if ((m = t.match(/^(\d+(?:[.,]\d+)?)s$/i))) seg = parseFloat(m[1].replace(',', '.'));
+    else if (/^\d+[.,]\d+$/.test(t)) seg = parseFloat(t.replace(',', '.'));
+    else if (/^[\d:;]+$/.test(t) && /[:;]/.test(t)) {
+        const ps = t.split(/[:;]/).map(x => +x || 0).reverse();   // quadros, segundos, minutos, horas
+        seg = ps[0] / fps + (ps[1] || 0) + (ps[2] || 0) * 60 + (ps[3] || 0) * 3600;
+    } else if (/^\d+$/.test(t)) {
+        if (rel) seg = +t / fps;   // +10 = 10 quadros
+        else {
+            const d = t.padStart(8, '0').slice(-8);   // HHMMSSFF, alinhado pela direita
+            seg = +d.slice(6) / fps + +d.slice(4, 6) + +d.slice(2, 4) * 60 + +d.slice(0, 2) * 3600;
+        }
+    }
+    if (seg == null || !isFinite(seg)) return null;
+    return rel ? VE.playhead + rel * seg : seg;
+}
+
+function veTcEditar() {
+    const el = $ve('ve-tc');
+    if (!el || !VE.ready || el.querySelector('input')) return;
+    if (VE.playing) veStop();
+    const atual = veTC(VE.playhead), inp = el.ownerDocument.createElement('input');
+    inp.className = 've-tc-in';
+    inp.value = atual;
+    inp.spellcheck = false;
+    el.textContent = '';
+    el.appendChild(inp);
+    inp.focus();
+    inp.select();
+    let feito = false;
+    const fim = ok => {
+        if (feito) return;
+        feito = true;
+        const txt = inp.value.trim(), t = ok && txt !== atual ? veTcLer(txt) : null;
+        el.textContent = veTC(VE.playhead);
+        if (ok && txt !== atual && t == null) veToast('Timecode inválido · ex.: 00:01:05:12, 1:05:12, 130, 12.5, +2s');
+        if (t != null) veSeek(veSnapFrame(Math.max(0, t)));
+    };
+    inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') fim(true); else if (e.key === 'Escape') fim(false); });
+    inp.addEventListener('blur', () => fim(true));
+}
+
+function veTcCopiar() {
+    if (!VE.ready) return;
+    const tc = veTC(VE.playhead), ok = () => veToast('Timecode copiado: ' + tc);
+    const antigo = () => {
+        const ta = document.createElement('textarea');
+        ta.value = tc;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); ok(); } catch (e) { veToast('Não foi possível copiar'); }
+        ta.remove();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(tc).then(ok, antigo);
+    else antigo();
+}
+
 function veUpdateReadouts() {
     veTxSeguir();
-    $ve('ve-tc').textContent = veTC(VE.playhead);
+    const tc = $ve('ve-tc');
+    if (!tc.querySelector('input')) tc.textContent = veTC(VE.playhead);   // digitando o timecode: não apaga o campo
     $ve('ve-tc-total').textContent = veTC(VE.dur);
     // valores animados e ◆ do painel acompanham a agulha
     if (veHasKf(VE.clips[VE.sel]) && vedVisible('props')) veRenderProps();
@@ -5043,7 +5107,6 @@ function veOnPrepare(ev) {
             if (!VE._pendingProject) veEnsureSequence();
             VE.pps = veFitPps();
             VE.view = 0;
-            veSyncZoomSlider();
             const res = ev.width && ev.height ? `${ev.width}×${ev.height}` : '';
             $ve('ve-meta').innerHTML = ev.base_imagem ? `<b>${veEsc(ev.file_name)}</b> · ${res} · imagem`
                 : `<b>${veEsc(ev.file_name)}</b> · ${res} · ${(+ev.fps).toFixed(2).replace(/\.00$/, '')} fps · ${veHuman(ev.duration)}${ev.has_audio ? '' : ' · sem áudio'}`;
@@ -5154,7 +5217,7 @@ function veOpenExport() {
     veExportFoot('form');
     veUpdateExportSummary();
     $ve('ve-export').hidden = false;
-    setTimeout(() => { nome.focus(); nome.select(); }, 30);
+    setTimeout(() => veFocarCampo(nome), 30);
 }
 
 // Pílula de um grupo: marca uma (e desliga as que não valem)
@@ -5321,7 +5384,7 @@ function veOnExport(ev) {
 
 const VE_MZ_MIN = 0.25, VE_MZ_MAX = 16;
 const VEM = { mz: 1, mx: 0, my: 0, pan: null, panned: false,
-    rulers: veLsGet('ve.rulers') === '1', res: veLsGet('ve.previewRes') === '0.5' ? 0.5 : 1 };
+    rulers: veLsGet('ve.rulers') !== '0', res: veLsGet('ve.previewRes') === '0.5' ? 0.5 : 1 };
 
 // px de tela por px do quadro no modo Fit
 function veFitScale() {
@@ -5880,7 +5943,6 @@ function veInitEvents() {
         if (VE.ready) {
             if (VE.pps < veMinPps()) VE.pps = veMinPps();
             veClampView();
-            veSyncZoomSlider();
         }
         veDraw();
     }).observe(wrap);
@@ -5940,7 +6002,7 @@ function veOnKey(e) {
         orig(toolId);
         document.body.classList.toggle('ve-focus', toolId === 'video-cutter');
         if (typeof vedEditorVisible === 'function') vedEditorVisible(toolId === 'video-cutter');
-        if (toolId === 'video-cutter') setTimeout(() => { veOnboardingRender(); if (VE.ready) veSyncZoomSlider(); veDraw(); }, 30);
+        if (toolId === 'video-cutter') setTimeout(() => { veOnboardingRender(); veDraw(); }, 30);
     };
     switchTool = window.switchTool;
 })();

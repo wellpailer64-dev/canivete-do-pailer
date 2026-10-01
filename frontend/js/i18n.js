@@ -694,6 +694,16 @@ const I18N_EN = {
     'Mídia': 'Media', 'Clipes': 'Clips', 'Timeline': 'Timeline', 'Projeto': 'Project', 'Controles': 'Controls', 'Atalhos': 'Shortcuts',
     'Sons da interface (clique)': 'Interface sounds (click)', 'Sons da interface ligados': 'Interface sounds on',
     'Sons da interface desligados': 'Interface sounds off',
+    'Desempenho': 'Performance', 'Minimizar': 'Minimize', 'Maximizar / restaurar': 'Maximize / restore',
+    'Fechar (os painéis voltam ao editor)': 'Close (the panels go back to the editor)',
+    'Cache inteligente na RAM': 'Smart RAM cache',
+    'Ligado': 'On',
+    'Limpar cache RAM': 'Clear RAM cache',
+    'Guarda na memória os quadros já compostos: o play passa liso por trechos com efeitos e camadas': 'Keeps already composited frames in memory: playback stays smooth through effects and layers',
+    'Copiar o timecode': 'Copy timecode',
+    'Posição atual · duplo clique para digitar onde ir (ex.: 1:05:12, 130, +2s)': 'Current position · double-click to type where to go (e.g. 1:05:12, 130, +2s)',
+    'Timecode inválido · ex.: 00:01:05:12, 1:05:12, 130, 12.5, +2s': 'Invalid timecode · e.g. 00:01:05:12, 1:05:12, 130, 12.5, +2s',
+    'Mostrar a timeline inteira (\\) · zoom: + / − ou Alt+roda do mouse': 'Show the whole timeline (\\) · zoom: + / − or Alt+mouse wheel',
     // ── Comp (editor-comp.js) ──
     'Criar Comp': 'Create Comp',
     'Criar Comp…': 'Create Comp…',
@@ -731,6 +741,7 @@ const I18N_EN = {
 
 // Frases com partes variáveis (números, nomes, caminhos)
 const I18N_RE = [
+    [/^Timecode copiado: (.+)$/, 'Timecode copied: $1'],
     [/^Comp aberta: (.+)$/, 'Comp opened: $1'],
     [/^Comp criada: (.+) · duplo clique para abrir$/, 'Comp created: $1 · double-click to open'],
     [/^Comp descompactada: (\d+) (camada|camadas)(.*)$/, (m, n, c, r) => `Comp unpacked: ${n} ${c === 'camada' ? 'layer' : 'layers'}${r.replace(' · os efeitos e o movimento do clipe da Comp não vão junto', " · the Comp clip's effects and motion are not carried over")}`],

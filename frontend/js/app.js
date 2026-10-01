@@ -617,6 +617,13 @@ window.onerror = function(msg, url, line, col, error) {
 // Menu navigation via onclick in HTML
 
 // Função para trocar de ferramenta
+// Bolinhas da barra de título própria (main.py: janela_cmd)
+function janelaCmd(acao) { try { window.pywebview.api.janela_cmd(acao); } catch (e) { /* sem API */ } }
+// a barra da página só aparece quando a do Windows saiu (se falhar, fica a nativa)
+window.addEventListener('pywebviewready', () => {
+    window.pywebview.api.janela_propria().then(ok => document.documentElement.classList.toggle('barra-propria', !!ok)).catch(() => {});
+});
+
 function switchTool(toolId) {
     console.log("Switching to:", toolId);
     playClick();

@@ -741,7 +741,7 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
     min-height: 0;
     background: #161616;
 }
-.ve-stage.rulers { padding: 18px 0 0 26px; }
+.ve-stage.rulers { padding: 12px 0 0 16px; }   /* = VE_RULER_TOP / VE_RULER_LEFT (editor.js) */
 .ve-stage .ve-rulers {
     position: absolute;
     inset: 0;
@@ -752,8 +752,8 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 }
 .ve-ruler-hit { position: absolute; z-index: 5; display: none; }
 .ve-stage.rulers .ve-ruler-hit { display: block; }
-.ve-ruler-hit-h { top: 0; left: 26px; right: 0; height: 18px; cursor: row-resize; }
-.ve-ruler-hit-v { top: 18px; left: 0; bottom: 0; width: 26px; cursor: col-resize; }
+.ve-ruler-hit-h { top: 0; left: 16px; right: 0; height: 12px; cursor: row-resize; }
+.ve-ruler-hit-v { top: 12px; left: 0; bottom: 0; width: 16px; cursor: col-resize; }
 .ve-transport-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .ve-ruler-btn { min-width: 28px; height: 28px; }
 .ve-ruler-btn.active { color: var(--ve-accent); background: rgba(212, 129, 74, .12); }
@@ -1875,3 +1875,26 @@ body.ve-kl-scrub, body.ve-kl-scrub * { cursor: ew-resize !important; }
 /* capa da timeline no Projeto: o primeiro quadro, com o ícone de filme por cima */
 .ve-pj-capa .ve-pj-capa-ic { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; transform: translate(-50%, -50%);
     padding: 6px; border-radius: 4px; background: rgba(10, 10, 12, .62); color: #e8e9ed; box-sizing: content-box; pointer-events: none; }
+
+/* chip In/Out discreto: só o texto; os botões aparecem ao passar o mouse */
+.ve-io-chip { border: 0; background: none; padding: 0 2px 0 4px; color: #93b8cc; gap: 0; }
+.ve-io-txt { font: 500 10.5px var(--ve-mono); margin-right: 2px; }
+.ve-io-chip button { width: 18px; height: 18px; opacity: 0; transition: opacity .12s; }
+.ve-io-chip:hover button { opacity: .75; }
+.ve-io-chip button:hover { opacity: 1; background: rgba(255, 255, 255, .08); color: var(--ve-text); }
+.ve-io-chip .i { font-size: 11px; }
+
+/* timecode: duplo clique edita; copiar discreto ao lado */
+.ve-tc { cursor: text; user-select: none; }
+.ve-tc-in { width: 11.5ch; padding: 0 4px; font: 600 17px var(--ve-mono); letter-spacing: .02em; color: var(--ve-text);
+    background: var(--ve-bg); border: 1px solid var(--ve-foco, rgba(255,255,255,.34)); border-radius: 3px; outline: none; }
+.ve-tc-copiar { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 3px;
+    background: none; color: var(--ve-faint); opacity: .55; cursor: pointer; }
+.ve-tc-copiar:hover { opacity: 1; color: var(--ve-text); background: rgba(255, 255, 255, .06); }
+.ve-tc-copiar .i { font-size: 12px; }
+
+/* barra da janela solta: arrasta a janela (barra do Windows tirada em main.py) e tem as bolinhas */
+html.barra-propria .ve-float-bar { -webkit-app-region: drag; app-region: drag; user-select: none; padding-right: 10px; }
+html.barra-propria .ve-float-bar .ve-btn { -webkit-app-region: no-drag; app-region: no-drag; }
+.ve-float-bar .tb-bolas { display: none; margin-left: 10px; }
+html.barra-propria .ve-float-bar .tb-bolas { display: flex; }

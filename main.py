@@ -3199,6 +3199,26 @@ class ApiBridge:
             _window.toggle_fullscreen()
         return {"success": True}
 
+    def janela_cmd(self, acao):
+        """Bolinhas da barra de título da página: 'fechar' (o mesmo do X), 'maximizar' (alterna), 'minimizar'."""
+        hwnd = _hwnd_principal()
+        if hwnd:
+            _janela_cmd(hwnd, acao)
+        return {"success": bool(hwnd)}
+
+    def janela_propria(self):
+        """A página mostra a barra de título dela só se a do Windows saiu (_barra_propria)."""
+        return bool(_hwnd_principal())
+
+    def janela_ativar(self):
+        """Traz a janela principal para a frente (G / Ctrl+M apertados numa janela solta: o campo do diálogo
+        recebe o foco, mas o teclado só chega nele com a janela principal ativa)."""
+        hwnd = _hwnd_principal()
+        if hwnd:
+            import ctypes
+            ctypes.windll.user32.SetForegroundWindow(hwnd)
+        return {"success": bool(hwnd)}
+
 
 def _liberar_janelas_flutuantes():
     """Painéis soltos do editor de vídeo: window.open('') vira uma janela nossa (Form do Windows com um
@@ -3216,6 +3236,7 @@ def _liberar_janelas_flutuantes():
         pronto_original(self, sender, args)
         if args.IsSuccess:
             _ligar_tela_cheia(self.form, sender.CoreWebView2)
+            _barra_propria(self.form, sender.CoreWebView2)
 
     edgechromium.EdgeChrome.on_webview_ready = on_webview_ready
 
@@ -3229,6 +3250,71 @@ def _liberar_janelas_flutuantes():
             print(f"[janela solta] usando a janela padrão do WebView2: {e}")
 
     edgechromium.EdgeChrome.on_new_window_request = on_new_window_request
+
+
+_barras = {}            # hwnd -> procedimento de janela (precisa ficar vivo enquanto a janela existir)
+_hwnd_principal_val = [0]
+
+
+def _hwnd_principal():
+    return _hwnd_principal_val[0]
+
+
+def _janela_cmd(hwnd, acao):
+    """Botões da barra da página, como os nativos (WM_CLOSE passa pelos mesmos avisos do X)."""
+    import ctypes
+    u32 = ctypes.windll.user32
+    if acao == "fechar":
+        u32.PostMessageW(hwnd, 0x0010, 0, 0)                                  # WM_CLOSE
+    elif acao == "minimizar":
+        u32.PostMessageW(hwnd, 0x0112, 0xF020, 0)                             # SC_MINIMIZE
+    elif acao == "maximizar":
+        u32.PostMessageW(hwnd, 0x0112, 0xF120 if u32.IsZoomed(hwnd) else 0xF030, 0)   # SC_RESTORE / SC_MAXIMIZE
+
+
+def _barra_propria(form, core, principal=True):
+    """Sem a barra de título do Windows: a página desenha a dela (bolinhas e área de arrastar com CSS
+    app-region: drag). Arrastar, Aero Snap, duplo clique para maximizar, sombra e as bordas de redimensionar
+    continuam nativos: WM_NCCALCSIZE só devolve à área cliente a faixa da legenda. Falhou: fica a barra nativa."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        u32 = ctypes.windll.user32
+        WNDPROC = ctypes.WINFUNCTYPE(ctypes.c_ssize_t, wintypes.HWND, ctypes.c_uint, wintypes.WPARAM, wintypes.LPARAM)
+        u32.SetWindowLongPtrW.restype = ctypes.c_void_p
+        u32.SetWindowLongPtrW.argtypes = (wintypes.HWND, ctypes.c_int, ctypes.c_void_p)
+        u32.CallWindowProcW.restype = ctypes.c_ssize_t
+        u32.CallWindowProcW.argtypes = (ctypes.c_void_p, wintypes.HWND, ctypes.c_uint, wintypes.WPARAM, wintypes.LPARAM)
+        u32.GetWindowLongW.argtypes = (wintypes.HWND, ctypes.c_int)
+
+        core.Settings.IsNonClientRegionSupportEnabled = True
+        hwnd = int(form.Handle.ToInt64())
+        anterior = [0]
+
+        def proc(h, msg, wp, lp):
+            if msg == 0x0083 and wp:                                          # WM_NCCALCSIZE
+                r = ctypes.cast(lp, ctypes.POINTER(wintypes.RECT)).contents
+                topo = r.top
+                res = u32.CallWindowProcW(anterior[0], h, msg, wp, lp)
+                if u32.GetWindowLongW(h, -16) & 0x00C00000:                     # WS_CAPTION (sem borda: tela cheia)
+                    r.top = topo
+                    if u32.IsZoomed(h):                                        # maximizada passa da tela pela borda
+                        dpi = u32.GetDpiForWindow(h)
+                        r.top += u32.GetSystemMetricsForDpi(33, dpi) + u32.GetSystemMetricsForDpi(92, dpi)
+                return res
+            return u32.CallWindowProcW(anterior[0], h, msg, wp, lp)
+
+        cb = WNDPROC(proc)
+        _barras[hwnd] = cb
+        anterior[0] = u32.SetWindowLongPtrW(hwnd, -4, ctypes.cast(cb, ctypes.c_void_p))   # GWLP_WNDPROC
+        u32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0027)   # SWP_FRAMECHANGED|NOMOVE|NOSIZE|NOZORDER
+        form.Disposed += lambda *_: _barras.pop(hwnd, None)
+        if principal:
+            _hwnd_principal_val[0] = hwnd
+        return hwnd
+    except Exception as exc:
+        print("[barra de título] mantendo a nativa:", exc)
+        return 0
 
 
 def _ligar_tela_cheia(form, core):
@@ -3288,9 +3374,16 @@ def _janela_solta_propria(chrome, sender, args):
 
     # Arquivos do Windows soltos na janela solta: o drop dela (editor-dock.js) manda os File por
     # postMessageWithAdditionalObjects e o WebView2 entrega o caminho real (como o pywebview faz na principal)
+    hwnd = [0]
+
     def _mensagem(c, e):
         try:
-            if e.TryGetWebMessageAsString() != "ve-drop":
+            msg = e.TryGetWebMessageAsString()
+            if msg.startswith("ve-janela:"):          # bolinhas da barra da janela solta
+                if hwnd[0]:
+                    _janela_cmd(hwnd[0], msg.split(":", 1)[1])
+                return
+            if msg != "ve-drop":
                 return
             objs = e.get_AdditionalObjects()
             caminhos = [{"path": str(f.Path), "pasta": os.path.isdir(str(f.Path))}
@@ -3310,6 +3403,7 @@ def _janela_solta_propria(chrome, sender, args):
                 core.DocumentTitleChanged += lambda c, _: setattr(form, "Text", str(c.DocumentTitle))
                 core.WindowCloseRequested += lambda c, _: form.Close()
                 core.WebMessageReceived += _mensagem
+                hwnd[0] = _barra_propria(form, core, principal=False)
                 _ligar_tela_cheia(form, core)
                 st = core.Settings
                 st.AreDefaultContextMenusEnabled = False

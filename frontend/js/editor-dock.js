@@ -547,7 +547,10 @@ function vedBuildFloatDoc(h) {
     const root = d.createElement('div');
     root.className = 've ve-float';
     root.innerHTML = '<div class="ve-float-bar"><span title="Arraste uma aba para outro painel, ou arraste esta janela pela barra de título e solte num quadradinho laranja">Encaixar: arraste a aba ou a janela até um quadradinho laranja</span>' +
-        '<button class="ve-btn ve-btn-sm ve-btn-ghost" data-dock title="Devolver os painéis desta janela ao editor (ou só feche a janela)">⤓ Encaixar no editor</button></div>' +
+        '<button class="ve-btn ve-btn-sm ve-btn-ghost" data-dock title="Devolver os painéis desta janela ao editor (ou só feche a janela)">⤓ Encaixar no editor</button>' +
+        '<div class="tb-bolas"><button class="tb-bola tb-min" data-janela="minimizar" title="Minimizar"></button>' +
+        '<button class="tb-bola tb-max" data-janela="maximizar" title="Maximizar / restaurar"></button>' +
+        '<button class="tb-bola tb-fechar" data-janela="fechar" title="Fechar (os painéis voltam ao editor)"></button></div></div>' +
         '<div class="ve-dock" id="ve-dock-solta"></div>';
     d.body.appendChild(root);
     // os onclick="..." dos painéis rodam na janela solta: ela recebe todas as funções do editor (ve*, prefs*),
@@ -556,6 +559,11 @@ function vedBuildFloatDoc(h) {
         .filter(fn => /^(ve|prefs)[A-Z]/.test(fn) && typeof window[fn] === 'function')
         .forEach(fn => { w[fn] = (...args) => window[fn] && window[fn](...args); });
     root.querySelector('[data-dock]').addEventListener('click', () => { try { w.close(); } catch (e) {} });
+    // bolinhas: fechar é o mesmo do X; maximizar/minimizar vão para a janela nativa (main.py: _janela_solta_propria)
+    root.querySelectorAll('[data-janela]').forEach(bt => bt.addEventListener('click', () => {
+        if (bt.dataset.janela === 'fechar') { try { w.close(); } catch (e) {} return; }
+        try { w.chrome.webview.postMessage('ve-janela:' + bt.dataset.janela); } catch (e) {}
+    }));
     vedBindDock(d.getElementById('ve-dock-solta'), h);
     // atalhos do editor funcionam com a janela solta em foco
     d.addEventListener('keydown', e => veOnKey(e));

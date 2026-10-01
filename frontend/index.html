@@ -79,6 +79,16 @@
         <div class="splash-bar"></div>
     </div>
 
+    <!-- Barra de título própria (main.py: _barra_propria tira a do Windows e liga html.barra-propria) -->
+    <div class="titlebar">
+        <span class="titlebar-nome">Canivete do Pailer</span>
+        <div class="tb-bolas">
+            <button class="tb-bola tb-min" onclick="janelaCmd('minimizar')" title="Minimizar"></button>
+            <button class="tb-bola tb-max" onclick="janelaCmd('maximizar')" title="Maximizar / restaurar"></button>
+            <button class="tb-bola tb-fechar" onclick="janelaCmd('fechar')" title="Fechar"></button>
+        </div>
+    </div>
+
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
@@ -570,7 +580,8 @@
                                 </div>
                                 <div class="ve-transport">
                                     <div class="ve-transport-left">
-                                        <div class="ve-tc" id="ve-tc" title="Posição atual">00:00:00:00</div>
+                                        <div class="ve-tc" id="ve-tc" ondblclick="veTcEditar()" title="Posição atual · duplo clique para digitar onde ir (ex.: 1:05:12, 130, +2s)">00:00:00:00</div>
+                                        <button class="ve-tc-copiar" id="ve-tc-copiar" onclick="veTcCopiar()" title="Copiar o timecode"><svg class="i"><use href="#i-copy"/></svg></button>
                                         <button class="ve-tbtn ve-ruler-btn" id="ve-ruler-btn" onclick="veToggleRulers()" title="Réguas (Ctrl+R)"><svg class="i"><use href="#i-ruler"/></svg></button>
                                         <select class="ve-res-sel" id="ve-res-sel" onchange="veSetPreviewRes(this.value)" title="Resolução da reprodução: Half alivia o processamento na prévia (a exportação sai sempre em qualidade máxima)">
                                             <option value="1">Full</option>
@@ -836,12 +847,11 @@
                             <div class="ve-tl-toolbar">
                                 <div class="ve-seq-tabs" id="ve-seq-tabs"></div>
                                 <button class="ve-icon-btn ve-tb-btn" onclick="veImportTimelineFile()" title="Importar mídia na timeline, na agulha"><svg class="i"><use href="#i-download"/></svg></button>
-                                <button class="ve-icon-btn ve-tb-btn" onclick="veSplitAtPlayhead()" title="Cortar todas as trilhas na agulha (Ctrl+K)"><svg class="i"><use href="#i-scissors"/></svg></button>
                                 <button class="ve-seg-btn ve-snap active" id="ve-vinculo" onclick="veToggleVinculo()" title="Seleção vinculada: ligada, clicar no vídeo ou no áudio seleciona os dois; desligada, só a parte clicada"><svg class="i"><use href="#i-link"/></svg></button>
                                 <button class="ve-seg-btn ve-snap active" id="ve-snap" onclick="veToggleSnap()" title="Ímã: encaixar na agulha e nos cortes (N)"><svg class="i"><use href="#i-magnet"/></svg></button>
                                 <div class="ve-io-chip" id="ve-io-chip" hidden>
                                     <span class="ve-io-txt" id="ve-io-txt" title="Entrada e saída marcadas (I / O) · clique vai até a entrada"></span>
-                                    <button onclick="veExtractInOut()" title="Remover o trecho In→Out e fechar o espaço (X)">✂</button>
+                                    <button onclick="veExtractInOut()" title="Remover o trecho In→Out e fechar o espaço (X)"><svg class="i"><use href="#i-scissors"/></svg></button>
                                     <button onclick="veLimparInOut(true, true)" title="Limpar entrada e saída (Ctrl+Shift+X)"><svg class="i"><use href="#i-x"/></svg></button>
                                 </div>
                                 <div class="ve-top-spacer"></div>
@@ -849,14 +859,7 @@
                                     <span class="ve-render-dot"></span><span id="ve-render-txt">Render</span>
                                     <button onclick="vePrCancelar()" title="Cancelar render"><svg class="i"><use href="#i-x"/></svg></button>
                                 </div>
-                                <button class="ve-seg-btn ve-snap active ve-cache-btn" id="ve-cache" onclick="veCacheToggle(event)" title="Cache inteligente RAM">RAM</button>
-                                <div class="ve-divider"></div>
-                                <div class="ve-zoom">
-                                    <button class="ve-icon-btn" onclick="veZoomBy(1/1.5)" title="Menos zoom (-)">−</button>
-                                    <input type="range" id="ve-zoom" min="0" max="1000" value="0" oninput="veZoomSlider(this.value)" title="Zoom da timeline">
-                                    <button class="ve-icon-btn" onclick="veZoomBy(1.5)" title="Mais zoom (+)">+</button>
-                                    <button class="ve-icon-btn" onclick="veZoomFit()" title="Mostrar a timeline inteira (\)"><svg class="i"><use href="#i-fit"/></svg></button>
-                                </div>
+                                <button class="ve-icon-btn ve-tb-btn" onclick="veZoomFit()" title="Mostrar a timeline inteira (\) · zoom: + / − ou Alt+roda do mouse"><svg class="i"><use href="#i-fit"/></svg></button>
                             </div>
                             <div class="ve-tl-body" id="ve-tl-body">
                                 <div class="ve-tl-heads">
@@ -1795,7 +1798,7 @@
             <h3><svg class="i"><use href="#i-gear"/></svg>Preferências</h3>
             <div class="prefs-abas">
                 <button class="active" data-prefs-aba="geral" onclick="prefsAba('geral')">Geral</button>
-                <button data-prefs-aba="cache" onclick="prefsAba('cache')">Cache e Disco</button>
+                <button data-prefs-aba="cache" onclick="prefsAba('cache')">Desempenho</button>
             </div>
             <div class="prefs-painel" data-prefs-painel="geral">
                 <div class="modal-field">
@@ -1852,6 +1855,10 @@
                         <option value="30">Depois de 30 s parado</option>
                         <option value="0">Desligado (só com Enter)</option>
                     </select>
+                    <label class="modal-label" for="pref-ram-on">Cache inteligente na RAM</label>
+                    <div class="pref-ram-linha">
+                        <label class="pref-chk" title="Guarda na memória os quadros já compostos: o play passa liso por trechos com efeitos e camadas"><input type="checkbox" id="pref-ram-on" onchange="vePrefsRamLigar(this.checked)"> Ligado</label>
+                    </div>
                     <label class="modal-label" for="pref-cache-ram">Cache de quadros na RAM (máximo)</label>
                     <select id="pref-cache-ram" class="modal-input" onchange="vePrefsCacheCampo('ramGB', this.value)">
                         <option value="0.5">512 MB</option>

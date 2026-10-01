@@ -1594,3 +1594,31 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .app-confirm-box .modal-actions { margin-top: 8px; }
 .btn-perigo { padding: 8px 14px; border: 1px solid rgba(239, 68, 68, .45); background: transparent; color: #fca5a5; border-radius: var(--r-md); font-size: 13px; font-weight: 600; }
 .btn-perigo:hover { background: rgba(239, 68, 68, .12); }
+
+/* Preferências → Desempenho: cache RAM liga/desliga */
+.pref-ram-linha { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pref-chk { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); cursor: pointer; }
+
+/* ── Barra de título própria (a do Windows sai em main.py: _barra_propria) ── */
+.titlebar { display: none; }
+html.barra-propria .titlebar {
+    display: flex; align-items: center; height: 26px; padding: 0 12px; background: var(--bg-0);
+    -webkit-app-region: drag; app-region: drag; user-select: none;
+}
+html.barra-propria .app-container { height: calc(100vh - 26px); }
+.titlebar-nome { flex: 1; font-size: 11px; color: rgba(255, 255, 255, .32); letter-spacing: .02em; }
+.tb-bolas { display: flex; gap: 16px; -webkit-app-region: no-drag; app-region: no-drag; }
+.tb-bola {
+    width: 9px; height: 9px; padding: 0; border: 0; border-radius: 50%; cursor: default; -webkit-app-region: no-drag; app-region: no-drag;
+    position: relative; transition: filter .12s;
+}
+.tb-fechar { background: #E5534B; }
+.tb-max { background: #D4814A; }
+.tb-min { background: #E8E8E8; }
+.tb-bola:hover { filter: brightness(1.15); }
+/* símbolo só ao passar o mouse, como no Mac */
+.tb-bola::after { position: absolute; inset: 0; display: grid; place-items: center; font: 700 8px/1 var(--font-ui); color: rgba(0, 0, 0, .55); opacity: 0; }
+.tb-bolas:hover .tb-bola::after { opacity: 1; }
+.tb-fechar::after { content: '×'; font-size: 9px; }
+.tb-max::after { content: '+'; }
+.tb-min::after { content: '−'; }

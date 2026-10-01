@@ -475,6 +475,7 @@ function vePrefsCacheRender() {
     el('pref-cache-dias').value = String(p.dias);
     el('pref-cache-alt').value = String(p.altura);
     el('pref-cache-ram').value = String(p.ramGB);
+    if (el('pref-ram-on') && typeof veCache === 'function') el('pref-ram-on').checked = veCache().on;
     if (el('pref-cache-auto')) el('pref-cache-auto').value = String(p.autoSeg);
     if (el('pref-hevc')) el('pref-hevc').value = PREFS.hevcModo === 'direto' ? 'direto' : 'converter';
     vePrefsCacheInfo();
@@ -518,6 +519,12 @@ function vePrefsCacheAbrir() {
     const api = vePrApi();
     if (!api) return;
     api.ve_render_info(vePrPrefs().dir, null).then(r => { if (r && r.success) api.open_folder(r.base); });
+}
+
+// Cache inteligente na RAM (saiu da barra da timeline para Preferências → Desempenho)
+function vePrefsRamLigar(on) {
+    if (typeof veCache !== 'function') return;
+    if (veCache().on !== !!on) veCacheToggle();
 }
 
 function vePrefsCacheCampo(campo, valor) {
