@@ -486,7 +486,10 @@ function veTransAt(x, y) {
     return null;
 }
 
-// Clique numa transição: seleciona; pela borda, arrastar muda a duração
+// A transição da batida (veTransAt) é a selecionada agora?
+const veTransEhSelecionada = h => !!(h && VE.trSel && VE.trSel.c === h.c && VE.trSel.lado === h.lado && !!VE.trSel.aud === !!h.aud);
+
+// Clique numa transição: seleciona; pela borda (só se já estava selecionada: editor.js), arrastar muda a duração
 function veTransPointer(hit, t) {
     VE.trSel = { c: hit.c, lado: hit.lado, aud: hit.aud };
     VE.sel = -1;

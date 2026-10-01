@@ -3487,11 +3487,12 @@ function veEdgeAt(x, row) {
     return null;
 }
 
-function veTrimTo(d, t) {
+// semSnap: as outras camadas de um aparar em grupo (andam a mesma medida da clicada, sem grudar em outro ponto)
+function veTrimTo(d, t, semSnap) {
     const c = VE.clips[d.i], c0 = d.c0, en0 = veEnd(c0), v = veVel(c0);
     const vizinhos = VE.clips.filter((o, j) => j !== d.i && o.tr === c0.tr && veConflita(o, c0));
     const img = veIsImage(c), limite = veDurMidia(c);
-    t = veMoveSnap(t, d.i);
+    t = semSnap ? Math.max(0, t) : veMoveSnap(t, d.i);
     if (d.side === 'l') {
         const prevEnd = Math.max(0, ...vizinhos.filter(o => veEnd(o) <= c0.st + VE_EPS).map(veEnd));
         const minSt = img ? prevEnd : Math.max(prevEnd, c0.st - c0.s / v);
@@ -5454,8 +5455,11 @@ function veInitEvents() {
             return;
         }
         // bloco de transição: clicar seleciona; pela borda, arrastar muda a duração
-        const th = e.button === 0 && row && row.kind !== 'l' ? veTransAt(x, y) : null;
-        if (th) { if (VE.playing) veStop(); veTransPointer(th, t); return; }
+        // bloco de transição: clicar seleciona; só depois de selecionado a borda dele muda a duração. Sem ele
+        // selecionado, clicar e arrastar perto da borda de uma camada apara a camada (não a transição)
+        let th = e.button === 0 && row && row.kind !== 'l' ? veTransAt(x, y) : null;
+        if (th && !veTransEhSelecionada(th) && veEdgeAt(x, row)) th = null;
+        if (th) { if (VE.playing) veStop(); veTransPointer(veTransEhSelecionada(th) ? th : { ...th, borda: null }, t); return; }
         VE.trSel = null;
         VE.bordaSel = null;
         // ◆ do clipe selecionado: clicar leva a agulha até ele; arrastar muda o tempo do quadro-chave
@@ -5469,10 +5473,14 @@ function veInitEvents() {
         if (borda && veLocked(VE.clips[borda.i])) { veAvisoBloqueio(); return; }
         if (borda) {
             // sem vínculo, aparar a borda do vídeo ou do áudio mexe só nele; com vínculo, o par vai junto
-            const c = VE.clips[borda.i], parte = vePegar(c, row.kind);
+            const c = VE.clips[borda.i], parte = vePegar(c, row.kind), atual = veSelLista();
             const cb = parte.includes(c) ? c : parte[0], bi = VE.clips.indexOf(cb), ed = borda.side === 'l' ? cb.st : veEnd(cb);
-            veSelDefinir(parte, cb);
-            const par = parte.filter(o => o !== cb && !veLocked(o) && Math.abs((borda.side === 'l' ? o.st : veEnd(o)) - ed) < 1e-4)
+            // clicou numa camada de uma seleção múltipla: todas as selecionadas aparam junto, do mesmo lado e na mesma
+            // medida (como no Premiere); senão, só ela e o par vinculado com a ponta no mesmo lugar
+            const grupo = atual.length > 1 && parte.some(o => atual.includes(o));
+            if (grupo) veSelDefinir([...new Set(atual.concat(parte))], cb); else veSelDefinir(parte, cb);
+            const par = (grupo ? veSelLista() : parte).filter(o => o !== cb && !veLocked(o) &&
+                    (grupo || Math.abs((borda.side === 'l' ? o.st : veEnd(o)) - ed) < 1e-4))
                 .map(o => ({ i: VE.clips.indexOf(o), side: borda.side, c0: { ...o } }));
             VE.drag = { mode: 'trim', i: bi, side: borda.side, c0: { ...cb }, par, started: false };
             VE.bordaSel = { c: cb, lado: borda.side === 'l' ? 'in' : 'out' };   // ponta selecionada (Ctrl+D / Ctrl+Shift+D)
@@ -5524,7 +5532,8 @@ function veInitEvents() {
                 const row = veRowAt(y);
                 wrap.classList.toggle('kf-hover', veKfMarkAt(x, y, row) != null);
                 const trb = veTransAt(x, y);
-                wrap.classList.toggle('trim-hover', !wrap.classList.contains('kf-hover') && (trb ? !!trb.borda : !!veEdgeAt(x, row)));
+                const trSel = trb && veTransEhSelecionada(trb);
+                wrap.classList.toggle('trim-hover', !wrap.classList.contains('kf-hover') && (trSel ? !!trb.borda : !!veEdgeAt(x, row)));
             }
             return;
         }
@@ -5560,8 +5569,8 @@ function veInitEvents() {
             const d = VE.drag;
             if (!d.started) { vePushHistory(); d.started = true; }
             veTrimTo(d, t);
-            const cc = VE.clips[d.i];
-            (d.par || []).forEach(q => veTrimTo(q, d.side === 'l' ? cc.st : veEnd(cc)));
+            const cc = VE.clips[d.i], dt = d.side === 'l' ? cc.st - d.c0.st : veEnd(cc) - veEnd(d.c0);
+            (d.par || []).forEach(q => veTrimTo(q, (d.side === 'l' ? q.c0.st : veEnd(q.c0)) + dt, true));
             VE.dur = VE.clips.reduce((m, c) => Math.max(m, veEnd(c)), 0);
             veUpdateReadouts();
             veDrawMonitor();
