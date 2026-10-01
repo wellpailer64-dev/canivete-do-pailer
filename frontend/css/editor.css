@@ -1787,3 +1787,44 @@ body.ve-kl-scrub, body.ve-kl-scrub * { cursor: ew-resize !important; }
 .ve-sb-rodape input[type=range] { width: 80px; }
 .ve-sb-hover { display: flex; align-items: center; gap: 4px; cursor: pointer; }
 .ve-sb-som.sel { border-color: var(--ve-accent); border-left-color: var(--cor); box-shadow: inset 0 0 0 1px var(--ve-accent); }
+
+/* AutoFrame: abas Quick / Customizado e modelos de cliente (editor-autoframe-cliente.js) */
+.ve-af-abas { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--ve-bg); border: 1px solid var(--ve-line); flex-shrink: 0; }
+.ve-af-abas button { flex: 1; height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--ve-dim); font: 600 11.5px var(--ve-ui); cursor: pointer; }
+.ve-af-abas button.on { background: var(--ve-panel-2); color: var(--ve-text); box-shadow: inset 0 -2px 0 var(--ve-accent); }
+.ve-afc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.ve-afc-card { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 10px; border: 1px solid var(--ve-line-2);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--cc) 22%, var(--ve-panel-2)), var(--ve-panel-2) 70%); border-top: 3px solid var(--cc); }
+.ve-afc-capa { display: grid; place-items: center; height: 64px; border-radius: 7px; background: color-mix(in srgb, var(--cc) 30%, #000); overflow: hidden; }
+.ve-afc-capa img { max-width: 80%; max-height: 52px; object-fit: contain; }
+.ve-afc-capa b { font: 800 22px var(--ve-ui); color: var(--cc); }
+.ve-afc-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ve-afc-txt b { font-size: 13px; color: var(--ve-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ve-afc-txt small { font-size: 10.5px; color: var(--ve-faint); }
+.ve-afc-acoes { display: flex; gap: 6px; }
+.ve-afc-acoes .ve-btn-primary { flex: 1; justify-content: center; }
+.ve-afc-novo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 150px; border-radius: 10px;
+    border: 1px dashed var(--ve-line-2); background: transparent; color: var(--ve-dim); font: 600 12px var(--ve-ui); cursor: pointer; }
+.ve-afc-novo span { font-size: 26px; line-height: 1; color: var(--ve-accent); }
+.ve-afc-novo:hover { border-color: var(--ve-accent); color: var(--ve-text); }
+.ve-afc-form { display: flex; flex-direction: column; gap: 14px; }
+.ve-afc-form .ve-af-sec { padding: 10px; border-radius: 8px; border: 1px solid var(--ve-line); }
+.ve-afc-in { flex: 1; min-width: 140px; height: 26px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--ve-line-2); background: var(--ve-bg); color: var(--ve-text); font: 12px var(--ve-ui); }
+.ve-afc-cor { display: inline-flex; align-items: center; gap: 5px; margin-right: 8px; cursor: pointer; }
+.ve-afc-cor input[type=color] { flex: none; width: 28px; min-width: 0; height: 22px; padding: 0; border: 1px solid var(--ve-line-2); border-radius: 5px; background: none; cursor: pointer; }
+.ve-afc-logo { display: flex; align-items: center; gap: 10px; }
+.ve-afc-logo-prev { display: grid; place-items: center; width: 96px; height: 64px; flex-shrink: 0; border-radius: 7px; background: var(--bg); border: 1px solid var(--ve-line-2); }
+.ve-afc-logo-prev img { max-width: 86%; max-height: 54px; object-fit: contain; }
+.ve-afc-logo-prev small { color: var(--ve-faint); font-size: 10.5px; mix-blend-mode: difference; }
+.ve-afc-arq { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 11.5px; color: var(--ve-dim); }
+.ve-afc-arq span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ve-afc-arq .i { width: 14px; height: 14px; flex-shrink: 0; color: var(--ve-audio); }
+.ve-afc-x { border: 0; background: none; color: var(--ve-faint); font-size: 15px; cursor: pointer; padding: 0 4px; }
+.ve-afc-x:hover { color: var(--ve-danger); }
+.ve-afc-chk { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ve-dim); cursor: pointer; }
+.ve-afc-form input[type=range] { width: 120px; }
+.ve-afc-apagar { color: var(--ve-danger); }
+.ve-afc-topo { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 10px; border-left: 3px solid var(--cc);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--cc) 18%, var(--ve-panel-2)), var(--ve-panel-2)); }
+.ve-afc-topo .ve-afc-capa { width: 64px; height: 44px; flex-shrink: 0; }
+.ve-afc-topo .ve-afc-capa img { max-height: 36px; }

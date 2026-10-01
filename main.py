@@ -2907,6 +2907,39 @@ class ApiBridge:
     def af_escolher(self, tipo):
         return af_escolher(tipo)
 
+    # AutoFrame Customizado: modelos de cliente (Functions/autoframe_modelos.py)
+    def afm_listar(self):
+        from Functions import autoframe_modelos
+        return autoframe_modelos.listar()
+
+    def afm_salvar(self, modelo):
+        from Functions import autoframe_modelos
+        return autoframe_modelos.salvar(modelo)
+
+    def afm_apagar(self, mid):
+        from Functions import autoframe_modelos
+        return autoframe_modelos.apagar(mid)
+
+    def afm_usou(self, mid, musica_i):
+        from Functions import autoframe_modelos
+        return autoframe_modelos.usou(mid, musica_i)
+
+    def afm_escolher(self, tipo):
+        """tipo: 'logo' (imagem) | 'video' (intro/encerramento) | 'musicas' (várias)."""
+        if not _window:
+            return {"success": False}
+        abrir = _file_dialog_kind("OPEN", webview.OPEN_DIALOG)
+        if tipo == "logo":
+            r = _window.create_file_dialog(abrir, file_types=("Imagens (*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif)", "Todos os arquivos (*.*)"))
+        elif tipo == "video":
+            r = _window.create_file_dialog(abrir, file_types=("Vídeos (*.mp4;*.mov;*.m4v;*.webm;*.mkv)", "Todos os arquivos (*.*)"))
+        else:
+            r = _window.create_file_dialog(abrir, allow_multiple=True, file_types=(
+                "Música (*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus)", "Todos os arquivos (*.*)"))
+        from Functions import media_server
+        paths = list(r or [])
+        return {"success": bool(paths), "itens": [{"path": p, "url": media_server.register(p)} for p in paths]}
+
     def ve_autosave(self, chave, nome, dados):
         return ve_autosave(chave, nome, dados)
 

@@ -5,6 +5,7 @@
 // recomenda modelos e monta o plano (slots × mídia pelo algoritmo húngaro). Aqui o plano vira uma TIMELINE NOVA,
 // normal e editável: clipes 9:16 enquadrados no rosto/ponto de interesse, quadros-chave (Ken Burns, zoom-soco,
 // pan), transições, cor (camada de ajuste com Luz e Cor), título animado e a música com fade.
+// Duas abas: Quick AutoFrame (avulso, aqui) e AutoFrame Customizado (modelos de cliente: editor-autoframe-cliente.js).
 // =========================================================
 
 const VEAF = {
@@ -18,6 +19,7 @@ const VEAF = {
     inicioModo: 'agitada', manual: null, inicioT: null,   // onde o vídeo começa na música
     telas: 'sim',           // telas divididas (várias cenas no mesmo quadro, entrando na batida)
     analisando: false, progresso: '', pct: 0,
+    aba: 'quick', cli: null, cliMus: 0,                    // aba e modelo de cliente em uso (Customizado)
 };
 const VE_AF_W = 1080, VE_AF_H = 1920;   // 9:16
 const VE_AF_NOTA_MIN = 0.3;             // abaixo disso a mídia já vem desmarcada
@@ -62,7 +64,8 @@ function veAfSoltouAqui(drop) {
 }
 
 function veAfAdicionar(itens) {
-    const musica = itens.find(i => !i.pasta && EXT_AUDIO.test(i.path) && !EXT_VIDEO.test(i.path));
+    if (VEAF.aba === 'custom' && !VEAF.cli) { veToast(veT('Clique em Começar num modelo antes de mandar o material')); return; }
+    const musica = VEAF.cli ? null : itens.find(i => !i.pasta && EXT_AUDIO.test(i.path) && !EXT_VIDEO.test(i.path));
     if (musica) { VEAF.musicaPath = musica.path; VEAF.musica = null; }
     const novos = itens.filter(i => i !== musica && !VEAF.itens.some(x => x.path === i.path));
     VEAF.itens.push(...novos);
@@ -122,6 +125,8 @@ function veAfRecomendar() {
         VEAF.modelos = (r && r.success && r.modelos) || [];
         VEAF.inicioT = r && r.success ? r.inicio : null;
         if (!VEAF.modelos.some(m => m.id === VEAF.modelo)) VEAF.modelo = VEAF.modelos[0] ? VEAF.modelos[0].id : null;
+        // modelo de cliente com estilo fixo: ele manda
+        if (VEAF.cli && VEAF.cli.estilo !== 'auto' && VEAF.modelos.some(m => m.id === VEAF.cli.estilo)) VEAF.modelo = VEAF.cli.estilo;
         veAfRender();
     });
 }
@@ -166,10 +171,12 @@ async function veAfGerar(outra) {
         }
         veStop();
         // mídias no projeto (pasta AutoFrame)
-        const bin = typeof vePjNovoBin === 'function' ? vePjNovoBin('AutoFrame · ' + plano.modelo.nome, null) : null;
+        const cli = VEAF.cli, rotulo = cli ? cli.nome : plano.modelo.nome;
+        const bin = typeof vePjNovoBin === 'function' ? vePjNovoBin('AutoFrame · ' + rotulo, null) : null;
         const precisa = [...new Set(plano.slots.map(s => s.path))].concat([VEAF.musicaPath]);
         for (const p of precisa) if (!veAfMidiaDe(p)) await vePjImportarArquivo(p, bin && bin.id);
-        if (plano.slots.some(s => s.flash)) plano.branco = await veAfBranco(bin && bin.id);
+        const extra = cli ? await veAfcPreparar(plano, bin) : null;
+        if (!cli && plano.slots.some(s => s.flash)) plano.branco = await veAfBranco(bin && bin.id);
         const falta = precisa.filter(p => !veAfMidiaDe(p));
         if (falta.length) throw new Error(veT('não importou: ') + falta.map(veAfNome).join(', '));
         // tamanho dos vídeos desde já (a preparação de cada um ainda está na fila): cenas no lugar certo
@@ -178,11 +185,11 @@ async function veAfGerar(outra) {
             if (m && m.kind === 'video' && !(m.info && m.info.width) && s.w && s.h) { m.w = s.w; m.h = s.h; }
         });
         // timeline nova 9:16
-        const seq = veCreateTimeline({ name: `AutoFrame · ${plano.modelo.nome}`, pasta: bin && bin.id });
+        const seq = veCreateTimeline({ name: `AutoFrame · ${rotulo}`, pasta: bin && bin.id });
         if (!seq) throw new Error('timeline');
         veSeqQuadro(VE_AF_W, VE_AF_H);
         seq.w = VE_AF_W; seq.h = VE_AF_H;
-        const clips = veAfClipes(plano);
+        const clips = extra ? veAfcExtras(veAfClipes(plano), plano, extra) : veAfClipes(plano);
         VE.clips = clips;
         VE.markers = veAfMarcadores(plano);
         veEnsureTracks(Math.max(4, ...clips.map(c => c.tr + 1)));
@@ -197,6 +204,7 @@ async function veAfGerar(outra) {
         veSeqSalvarAtiva();
         vePjRender();
         const uso = plano.uso ? ` · ${plano.uso.usadas}/${plano.uso.total} ${veT('mídias usadas')}${plano.uso.telas ? ` · ${plano.uso.telas} ${veT('telas divididas')}` : ''}` : '';
+        if (cli && !outra) veAfApi().afm_usou(cli.id, VEAF.cliMus).then(r => { if (r && r.success) cli.musicaProx = r.musicaProx; });
         veToast(`AutoFrame: ${plano.slots.length} ${veT('cenas no ritmo')} (${Math.round(plano.bpm)} BPM)${uso} · ${veT('tudo editável na timeline')}`);
     } catch (e) {
         veToast(veT('AutoFrame não conseguiu gerar: ') + (e.message || e));
@@ -206,20 +214,20 @@ async function veAfGerar(outra) {
     }
 }
 
-// Quadro branco 9:16 (PNG) para o flash de impacto: criado uma vez por projeto
-async function veAfBranco(pasta) {
-    const ja = (VE.media || []).find(m => m.kind === 'image' && !m.removido && m._afBranco);
+// Quadro 9:16 de uma cor (PNG) para o flash de impacto: branco, ou a cor de destaque do cliente; um por cor
+async function veAfBranco(pasta, cor = '#ffffff') {
+    const ja = (VE.media || []).find(m => m.kind === 'image' && !m.removido && m._afBranco && (m._afCor || '#ffffff') === cor);
     if (ja) return ja;
     const cv = document.createElement('canvas');
     cv.width = VE_AF_W; cv.height = VE_AF_H;
     const g = cv.getContext('2d');
-    g.fillStyle = '#ffffff';
+    g.fillStyle = cor;
     g.fillRect(0, 0, cv.width, cv.height);
     const r = await veAfApi().ve_salvar_png(cv.toDataURL('image/png'));
     if (!r || !r.success) return null;
     await vePjImportarArquivo(r.path, pasta);
     const m = veAfMidiaDe(r.path);
-    if (m) { m._afBranco = true; m.nome = 'Flash (branco)'; m.w = VE_AF_W; m.h = VE_AF_H; }
+    if (m) { m._afBranco = true; m._afCor = cor; m.nome = cor === '#ffffff' ? 'Flash (branco)' : `Flash (${cor})`; m.w = VE_AF_W; m.h = VE_AF_H; }
     return m;
 }
 
@@ -286,6 +294,11 @@ function veAfClipes(plano) {
         else if (tr === 'zoom') c.tin = { t: 'pull', d: +Math.min(0.35, meio, len * 0.4).toFixed(3), speed: 'fast' };
         else if (tr === 'chicote') c.tin = { t: 'chicote', d: +Math.min(0.32, meio, len * 0.4).toFixed(3), speed: 'fast', dir: i % 4 < 2 ? 'l' : 'r' };
         else if (tr === 'preto') c.tin = { t: 'fadeblack', d: +Math.min(0.8, len * 0.4).toFixed(3), speed: 'fast' };
+        else if (tr && tr.startsWith('tr:') && VE_TR[tr.slice(3)]) {
+            // transição escolhida no modelo do cliente (direção alternando)
+            const t = tr.slice(3), longa = t === 'dissolve' || t === 'crossfade' || t === 'fadeblack';
+            c.tin = { t, d: +Math.min(longa ? 0.6 : 0.4, len * 0.4).toFixed(3), speed: 'fast', ...(VE_TR[t].dir ? { dir: i % 4 < 2 ? 'l' : 'r' } : {}) };
+        }
         // flash de impacto: clarão branco que some em ~meia batida, começando no corte
         if (s.flash && plano.branco) {
             const d = +Math.min(0.35, batida * 0.6, len).toFixed(3);
@@ -307,7 +320,7 @@ function veAfClipes(plano) {
         out.push({ tr: TR_AJ, st: 0, s: 0, e: +total.toFixed(4), m: aj.id, fx: [{ id: veFxNewId(), t: 'lc', on: true, v: { ...veLcDefaults(), ...look } }] });
     }
     // título (opcional): entra subindo, sai com fade
-    if (VEAF.titulo.trim() && typeof veTxMidia === 'function') {
+    if (VEAF.titulo.trim() && !VEAF.cli && typeof veTxMidia === 'function') {   // no Customizado o título vai na intro
         const tm = veTxMidia(), dur = Math.min(total, Math.max(2.5, batida * 8));
         out.push({ tr: TR_TX, st: 0, s: 0, e: +dur.toFixed(3), m: tm.id,
             tx: { ...VE_TX_PADRAO, t: VEAF.titulo.trim(), tam: 120, alin: 'center', sOn: true, sOp: 70, sBlur: 18 },
@@ -337,7 +350,11 @@ function veAfRender() {
     const fotos = VEAF.midias.filter(m => m.tipo === 'foto').length, videos = n - fotos;
     const mus = VEAF.musica;
     const pill = (grupo, v, txt) => `<button class="ve-af-pill${VEAF[grupo] === v ? ' on' : ''}" data-af-set="${grupo}" data-v="${v}">${txt}</button>`;
-    box.innerHTML = `
+    const abas = `<div class="ve-af-abas"><button class="${VEAF.aba !== 'custom' ? 'on' : ''}" data-af-aba="quick">Quick AutoFrame</button>` +
+        `<button class="${VEAF.aba === 'custom' ? 'on' : ''}" data-af-aba="custom">${veT('AutoFrame Customizado')}</button></div>`;
+    if (VEAF.aba === 'custom' && !VEAF.cli) { box.innerHTML = abas + veAfcTela(); return; }
+    const cli = VEAF.cli, fixo = cli && cli.estilo !== 'auto';
+    box.innerHTML = abas + (cli ? veAfcCabecalho() : '') + `
         <div class="ve-af-sec">
             <div class="ve-af-h"><b>1</b> ${veT('Fotos e vídeos')}</div>
             <div class="ve-af-drop">
@@ -358,7 +375,7 @@ function veAfRender() {
         <div class="ve-af-sec">
             <div class="ve-af-h"><b>2</b> ${veT('Música')}</div>
             <div class="ve-af-drop">
-                <div class="ve-af-botoes"><button class="ve-btn ve-btn-sm" data-af="musica"><svg class="i"><use href="#i-music"/></svg> ${veT(VEAF.musicaPath ? 'Trocar música' : 'Escolher música')}</button></div>
+                ${cli ? veAfcMusicas() : `<div class="ve-af-botoes"><button class="ve-btn ve-btn-sm" data-af="musica"><svg class="i"><use href="#i-music"/></svg> ${veT(VEAF.musicaPath ? 'Trocar música' : 'Escolher música')}</button></div>`}
                 <span>${VEAF.musicaPath ? `<b>${veEsc(veAfNome(VEAF.musicaPath))}</b>${mus ? ` · ${Math.round(mus.bpm)} BPM · ${veShort(mus.dur)}${mus.drop != null ? ` · drop ${veShort(mus.drop)}` : ''}` : ''}` : veT('MP3, WAV, M4A... (arrastar também funciona)')}</span>
             </div>
             ${mus ? `<div class="ve-af-op"><span>${veT('Começar em')}</span>${pill('inicioModo', 'inicio', veT('Início'))}${pill('inicioModo', 'refrao', veT('Refrão'))}${pill('inicioModo', 'agitada', veT('Mais agitada'))}${pill('inicioModo', 'manual', veT('Manual'))}</div>
@@ -367,8 +384,8 @@ function veAfRender() {
         </div>
         ${VEAF.analisando || VEAF.progresso ? `<div class="ve-af-prog"><div style="width:${VEAF.pct.toFixed(0)}%"></div><span>${veEsc(VEAF.progresso)}</span></div>` : ''}
         <div class="ve-af-sec">
-            <div class="ve-af-h"><b>3</b> ${veT('Modelos recomendados')}</div>
-            ${VEAF.modelos.length ? `<div class="ve-af-modelos">${VEAF.modelos.map(m => `
+            <div class="ve-af-h"><b>3</b> ${veT(fixo ? 'Estilo do modelo' : 'Modelos recomendados')}</div>
+            ${VEAF.modelos.length ? `<div class="ve-af-modelos">${VEAF.modelos.filter(m => !fixo || m.id === VEAF.modelo).map(m => `
                 <button class="ve-af-mod${m.id === VEAF.modelo ? ' on' : ''}" data-af-mod="${m.id}">
                     <div class="ve-af-mod-top"><b>${veT(m.nome)}</b><span class="ve-af-nota" style="--p:${Math.round(m.nota * 100)}%">${Math.round(m.nota * 100)}%</span></div>
                     <p>${veT(m.desc)}</p>
@@ -382,7 +399,7 @@ function veAfRender() {
             <div class="ve-af-op"><span>${veT('Duração')}</span>${pill('dur', 0, veT('Música toda'))}${pill('dur', 15, '15 s')}${pill('dur', 30, '30 s')}${pill('dur', 60, '60 s')}</div>
             <div class="ve-af-op"><span>${veT('Telas divididas')}</span>${pill('telas', 'sim', veT('Sim'))}${pill('telas', 'nao', veT('Não'))}</div>
             <div class="ve-af-op"><span>${veT('Ordem')}</span>${pill('ordem', 'inteligente', veT('Inteligente'))}${pill('ordem', 'cronologica', veT('Cronológica'))}${pill('ordem', 'aleatoria', veT('Aleatória'))}</div>
-            <div class="ve-af-op"><span>${veT('Título')}</span><input type="text" id="ve-af-titulo" value="${veEsc(VEAF.titulo)}" placeholder="${veT('opcional: aparece no começo')}"></div>
+            <div class="ve-af-op"><span>${veT(cli ? 'Texto da intro' : 'Título')}</span><input type="text" id="ve-af-titulo" value="${veEsc(VEAF.titulo)}" placeholder="${veT('opcional: aparece no começo')}"></div>
             <div class="ve-af-gerar">
                 <button class="ve-btn ve-btn-primary" data-af="gerar" ${VEAF.modelo && mus && !VEAF.gerando ? '' : 'disabled'}><svg class="i"><use href="#i-sparkles"/></svg> ${veT(VEAF.gerando ? 'Gerando...' : 'Gerar vídeo')}</button>
                 <button class="ve-btn" data-af="outra" ${VEAF.modelo && mus && !VEAF.gerando ? '' : 'disabled'} title="${veT('Mesma receita, outra escolha entre as mídias parecidas')}">${veT('Outra versão')}</button>
@@ -429,6 +446,7 @@ function veAfInit() {
     const box = $ve('ve-af');
     if (!box) return;
     box.addEventListener('click', e => {
+        if (veAfcClick(e)) return;
         const a = e.target.closest('[data-af]'), mid = e.target.closest('[data-af-mid]'), mod = e.target.closest('[data-af-mod]'), set = e.target.closest('[data-af-set]');
         if (a) {
             const k = a.dataset.af;
@@ -460,7 +478,7 @@ function veAfInit() {
             veAfRecomendar();
         }
     });
-    box.addEventListener('input', e => { if (e.target.id === 've-af-titulo') VEAF.titulo = e.target.value; });
+    box.addEventListener('input', e => { if (veAfcInput(e)) return; if (e.target.id === 've-af-titulo') VEAF.titulo = e.target.value; });
     box.addEventListener('keydown', e => e.stopPropagation());
     // arrastar para o painel (o caminho real chega pelo Python em veDropFiles → veAfSoltouAqui)
     box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('drop'); if (typeof veGuardarDrop === 'function') veGuardarDrop(e); });
