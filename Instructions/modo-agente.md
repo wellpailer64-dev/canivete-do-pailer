@@ -59,3 +59,21 @@ vídeo, prévia leve 1080p): ~4,5 buscas e ~1 espera a cada 10 s, 0 perdidos.
 - Quem conecta tem controle total do app (inclusive das funções de arquivo). Só ligue quando for usar.
 - Para um agente na nuvem acessar, seria preciso um túnel (ex.: SSH/ngrok) — isso expõe o controle
   do app para fora do PC; use apenas com túnel protegido por senha e desligue ao terminar.
+
+## Ferramentas de leitura de mídia (Functions/agente_midia.py)
+Rodam pelo terminal, fora do app (processo próprio, prioridade baixa) — não atrapalham a edição manual.
+Saída em JSON; imagens e resultados ficam em cache em `<cache do editor>/agente`.
+
+```
+python -m Functions.agente_midia midias  "<projeto.vcnvt>" [--nao-usados-em "V1 MAIOR"]
+python -m Functions.agente_midia folha   "<projeto.vcnvt>" --nao-usados-em "V1 MAIOR" --quadros 6 --por-folha 10
+python -m Functions.agente_midia storyboard "<vídeo>" --passo 2 [--inicio 10 --fim 30]
+python -m Functions.agente_midia transcrever "<vídeo ou áudio>"     # frases e palavras com tempo
+python -m Functions.agente_midia batidas "<música>"                 # bpm, batidas e fortes (de 4 em 4)
+```
+- **folha**: 10 vídeos por imagem (nº, id da mídia, nome, duração, 6 quadros com o tempo) — ver o projeto inteiro
+  em 2–3 imagens. ~20 s para 19 vídeos na primeira vez.
+- **storyboard**: escolher o trecho exato de um take (quadros a cada `--passo` s).
+- **transcrever**: o mesmo modelo do painel Texto; ~5x mais rápido que o tempo real.
+- **batidas**: andamento por autocorrelação (prefere 80–160 BPM; `bpm_alternativo` = dobro/metade), batidas
+  ajustadas ao ataque (±10 ms nos testes de clique a 96 e 125 BPM).
