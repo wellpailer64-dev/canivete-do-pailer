@@ -22,6 +22,9 @@ Atualize a seção CALIBRACAO dele a cada feedback do usuário sobre uma ediçã
 Composição, motion, cor e contraste (curvas, tempos, área segura do 9:16, receitas com camadas de ajuste e o plano
 de evolução do AutoFrame): `Instructions/agente/direcao-de-arte.md`.
 
+## Próxima função combinada: Comp (estilo After Effects)
+Plano aprovado e pontos do código em `Instructions/agente/plano-comp.md` — começar pela Fase 1.
+
 ## Build local
 - `build.bat` apaga `dist/` inteiro, onde ficam os modelos do usuário (`modelos_ia/`, `models/`, ~8 GB).
   Gere em outra pasta (`--distpath dist_novo --workpath build_novo`) e copie só `CaniveteDoPailer.exe`,
