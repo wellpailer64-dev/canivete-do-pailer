@@ -151,7 +151,7 @@ def omnivoice_por_cima(x48, frases, device, hf_home, emit, model=None, camadas=2
     ref_txt = ref[2]
 
     @torch.inference_mode()
-    def refaz(tok_src, texto):
+    def refaz(tok_src, texto, passo):
         T = tok_src.shape[1]
         inp = m._prepare_inference_inputs(texto, T, ref_txt, ref_tok, None, None, True)
         ids = inp["input_ids"]
@@ -181,6 +181,7 @@ def omnivoice_por_cima(x48, frases, device, hf_home, emit, model=None, camadas=2
         for s in range(num_step):
             if sched[s] <= 0:
                 continue
+            passo(s / num_step)
             lg = m(input_ids=ids2, audio_mask=am, attention_mask=att).logits.float()
             pred, sc = m._predict_tokens_with_scoring(lg[0:1, :, L - T:L], lg[1:2, :, :T], cfg)
             sc = sc - lid * cfg.layer_penalty_factor
@@ -198,12 +199,13 @@ def omnivoice_por_cima(x48, frases, device, hf_home, emit, model=None, camadas=2
     saida = x.copy()
     fade = int(0.02 * sr)
     for i, (a, b, texto) in enumerate(blocos):
-        emit("progress", f"Reconstruindo a voz (OmniVoice) {i + 1}/{len(blocos)}...", percent=35 + 60 * i / len(blocos))
+        msg = f"Reconstruindo a voz (OmniVoice) {i + 1}/{len(blocos)}..."
         ia = int(a * sr) // hop * hop
         w = x[ia: int(b * sr)]
         if len(w) < hop * 4:
             continue
-        y = refaz(enc(w), texto)
+        # progresso a cada passo (32 por bloco): a barra anda mesmo num bloco longo
+        y = refaz(enc(w), texto, lambda f, i=i, msg=msg: emit("progress", msg, percent=35 + 60 * (i + f) / len(blocos)))
         y = y[: len(w) // hop * hop]
         nb = len(y)
         # cola com uma rampa curta nas bordas (o resto do áudio fica o do Sidon)
@@ -239,6 +241,11 @@ def processar(payload, emit=_emit_stdout, model=None):
         x = resample_poly(x, 48000, sr).astype(np.float32)
     y = sidon(x, payload["sidon_cache"], dev, emit)
     if dev.startswith("cuda"):
+        # o Sidon (w2v-BERT, ~2,5 GB) sai da placa antes do OmniVoice: os dois juntos lotavam uma placa de 8 GB e o
+        # Windows passava a usar a RAM como memória de vídeo — cada passo levava minutos (parecia travado)
+        _MODELOS.pop(("sidon", "cuda"), None)
+        import gc
+        gc.collect()
         torch.cuda.empty_cache()
     frases = [f for f in (payload.get("frases") or []) if f[2].strip()]
     if frases and payload.get("omnivoice", True):
