@@ -165,7 +165,7 @@ function veCompDeClipes(sel, nome, opts = {}) {
 // As camadas de dentro voltam para a timeline no lugar do clipe da Comp, no mesmo tempo (o trecho aparado dele),
 // a partir da trilha dele para cima. A Comp continua no Projeto. Efeitos/movimento do clipe da Comp não vão junto.
 function veCompDescompactar(c) {
-    const m = veMediaOf(c), seq = veCompSeqDe(m);
+    const m = veMediaOf(c), seq = veCompSeqEfetiva(m);   // com as Propriedades essenciais da faixa
     if (!c || !veEhComp(m) || !seq) return false;
     if (veLocked(c)) { veAvisoBloqueio(); return false; }
     if (Math.abs(veVel(c) - 1) > 1e-4) { veToast(veT('Volte a velocidade da Comp para 100% antes de descompactar')); return false; }
@@ -209,7 +209,8 @@ function veCompMidiaDados(m) {
     if (!m) return null;
     const o = { id: m.id, kind: m.kind, name: m.name, nome: m.nome, cor: m.cor };
     if (m.id === 0) return { ...o, kind: 'video', path: VE.path };
-    if (m.comp) return { ...o, comp: true, sequenceId: m.sequenceId, dur: m.dur, temSom: !!(m.info && m.info.has_audio) };
+    if (m.comp) return { ...o, comp: true, sequenceId: m.sequenceId, dur: m.dur, temSom: !!(m.info && m.info.has_audio),
+                         ...(m.ov ? { ov: m.ov, ovDe: m.ovDe } : {}) };   // variação: Propriedades essenciais
     if (['image', 'audio', 'video'].includes(m.kind)) Object.assign(o, { path: m.path, w: m.w, h: m.h, dur: m.dur });
     if (m.kind === 'cor') o.fill = m.fill;
     return o;
@@ -220,9 +221,10 @@ function veCompPacote(m) {
     const seqs = new Map(), midias = new Map();
     const juntar = mm => {
         const seq = veCompSeqDe(mm);
-        if (!seq || seqs.has(seq.id)) return;
+        if (!seq) return;
+        midias.set(mm.id, veCompMidiaDados(mm));   // a Comp e cada variação dela (a timeline vai uma vez só)
+        if (seqs.has(seq.id)) return;
         seqs.set(seq.id, vePlain(seq, {}));
-        midias.set(mm.id, veCompMidiaDados(mm));
         (seq.clips || []).forEach(c => {
             const mi = VE.media[c.m || 0];
             if (veEhComp(mi)) juntar(mi);
@@ -259,13 +261,15 @@ async function veCompImportar(pac, pasta = null) {
         if (!s) return;
         const nm = {
             id: VE.media.length, kind: 'video', comp: true, sequenceId: seqIds.get(s.id), name: d.name, nome: d.nome,
-            cor: d.cor || VE_COMP_COR, pasta, path: null, dur: d.dur,
+            cor: d.cor || VE_COMP_COR, pasta, path: null, dur: d.dur, ...(d.ov ? { ov: vePlain(d.ov, {}) } : {}),
             info: { duration: d.dur, width: s.w || VE.seqW, height: s.h || VE.seqH, fps: VE.fps || 30, has_audio: !!d.temSom, alfa: true, provisoria: true },
         };
         VE.media.push(nm);
         ids.set(d.id, nm.id);
         if (d.id === pac.raiz) raiz = nm;
     });
+    // variação veio com a Comp dela: continua escondida, ligada a ela (sem a Comp, vira um item próprio com os valores)
+    pac.midias.filter(d => d.comp && d.ovDe != null && ids.has(d.ovDe) && ids.has(d.id)).forEach(d => { VE.media[ids.get(d.id)].ovDe = ids.get(d.ovDe); });
     pac.seqs.forEach(s => {
         const clips = (s.clips || []).filter(c => ids.has(c.m || 0)).map(c => {
             const n = { ...vePlain(c, {}) }, id = ids.get(c.m || 0);
@@ -331,7 +335,7 @@ async function veCompColarPacote(cb) {
 function veCompSig(seq) {
     const clips = (seq.clips || []).map(c => {
         const o = {};
-        for (const k in c) if (k[0] !== '_') o[k] = c[k];
+        for (const k in c) if (k[0] !== '_' && k !== 'eid') o[k] = c[k];   // eid: só o nome da propriedade essencial
         const m = VE.media[c.m || 0];
         return [o, m ? [m.kind, m.path || '', m.fill || '', veMediaOffline(m), m.mel && !m.melOff ? m.mel : '', m.kind === 'image' ? [m.w || 0, m.h || 0] : 0] : null];
     });
@@ -344,28 +348,26 @@ function veCompSig(seq) {
     return 'comp.' + vePrHash(JSON.stringify(partes));
 }
 
-// Comp em dia: todas as mídias dela com o arquivo do conteúdo atual
-function veCompEmDia(seq, sig) {
-    return veCompMidias().filter(m => m.sequenceId === seq.id).every(m => m.path && m.compSig === sig);
-}
-
-// Comps que precisam de render, cada uma com "pronta" = as Comps de dentro já estão em dia
+// Comps (e variações com Propriedades essenciais) que precisam de render — uma entrada por mídia, cada uma com
+// "pronta" = as Comps de dentro já estão em dia. Variação que nenhuma faixa usa não renderiza.
 function veCompPendentes() {
-    const seqs = [...new Set(veCompMidias().map(m => m.sequenceId))].map(id => (VE.sequences || []).find(s => s.id === id)).filter(Boolean);
+    const usados = new Set();
+    (VE.sequences || []).forEach(s => (s.clips || []).forEach(c => usados.add(c.m || 0)));
     const estado = new Map();
-    const ver = (seq, pilha = new Set()) => {
-        if (estado.has(seq.id)) return estado.get(seq.id);
-        if (pilha.has(seq.id)) return { ok: true };   // ciclo (não deveria existir): não trava a fila
-        pilha.add(seq.id);
-        const dentro = (seq.clips || []).map(c => VE.media[c.m || 0]).filter(veEhComp).map(veCompSeqDe).filter(Boolean);
-        const pronta = dentro.every(s => ver(s, pilha).ok);
+    const ver = (m, pilha) => {
+        if (estado.has(m.id)) return estado.get(m.id);
+        if (pilha.has(m.id)) return { ok: true };   // ciclo (não deveria existir): não trava a fila
+        pilha.add(m.id);
+        const seq = veCompSeqEfetiva(m);
+        if (!seq) return { ok: true };
+        const pronta = (seq.clips || []).map(c => VE.media[c.m || 0]).filter(veEhComp).every(x => ver(x, pilha).ok);
         const sig = veCompSig(seq);
-        const e = { seq, sig, pronta, ok: pronta && veCompEmDia(seq, sig) };
-        estado.set(seq.id, e);
+        const e = { m, seq, sig, pronta, ok: pronta && !!m.path && m.compSig === sig };
+        estado.set(m.id, e);
         return e;
     };
-    seqs.forEach(s => ver(s));
-    return [...estado.values()].filter(e => !e.ok);
+    veCompMidias().filter(m => m.ovDe == null || usados.has(m.id)).forEach(m => ver(m, new Set()));
+    return [...estado.values()].filter(e => e.m && !e.ok);
 }
 
 // Confere as Comps e renderiza a próxima que mudou (uma por vez; a seguinte quando esta terminar)
@@ -380,7 +382,7 @@ function veCompVerificar() {
     // tocando, o render espera (veCompTick): a Comp segue certa na tela, desenhada ao vivo. A exportação não espera.
     if (VE.playing && !VECOMP.exportando) return;
     const prox = pend.find(e => e.pronta && !VECOMP.falhas.has(e.sig));
-    if (prox) veCompRenderizar(prox.seq, prox.sig);
+    if (prox) veCompRenderizar(prox.m, prox.seq, prox.sig);
     else veCompAvisar();
 }
 
@@ -402,9 +404,9 @@ async function veCompJob(seq) {
     });
 }
 
-async function veCompRenderizar(seq, sig) {
-    const nome = seq.name || 'Comp';
-    VECOMP.atual = { seqId: seq.id, sig, pct: 0, nome };
+async function veCompRenderizar(m, seq, sig) {
+    const nome = vePjNome(m);
+    VECOMP.atual = { mid: m.id, seqId: seq.id, sig, pct: 0, nome };
     veCompUi();
     try {
         const job = await veCompJob(vePlain(seq, {}));
@@ -428,7 +430,8 @@ function veOnComp(ev) {
     if (!ev.done) { a.pct = ev.pct || 0; veCompAvisar(); veCompUi(); return; }
     VECOMP.atual = null;
     if (ev.success) {
-        veCompMidias().filter(m => m.sequenceId === a.seqId).forEach(m => {
+        // a mídia renderizada e as outras com o mesmo conteúdo (variações iguais) passam a usar o arquivo
+        veCompMidias().filter(m => m.id === a.mid || (m.sequenceId === a.seqId && veCompSig(veCompSeqEfetiva(m)) === a.sig)).forEach(m => {
             const trocou = m.path !== ev.path;
             m.path = ev.path;
             m.compSig = a.sig;
@@ -492,7 +495,7 @@ async function veCompProntasLaco(aviso) {
 // Projeto: o que dizer da Comp na coluna de informações
 function veCompInfo(m) {
     const a = VECOMP.atual;
-    if (a && a.seqId === m.sequenceId) return `${veT('renderizando')} ${a.pct || 0}%`;
+    if (a && a.mid === m.id) return `${veT('renderizando')} ${a.pct || 0}%`;
     if (!m.path) return VECOMP.falhas.size ? veT('render falhou') : veT('na fila do render');
     return null;
 }
@@ -510,7 +513,7 @@ function veCompDesenharPendente(ctx, w, h, m) {
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#fdba74';
     ctx.font = `800 ${Math.max(18, Math.min(56, w / 14))}px Segoe UI`;
-    const a = VECOMP.atual && VECOMP.atual.seqId === m.sequenceId ? VECOMP.atual : null;
+    const a = VECOMP.atual && VECOMP.atual.mid === m.id ? VECOMP.atual : null;
     ctx.fillText(`${veT('Renderizando Comp')}${a && a.pct ? ` ${a.pct}%` : '…'}`, w / 2, h / 2, w * 0.86);
     ctx.font = `600 ${Math.max(12, Math.min(28, w / 30))}px Segoe UI`;
     ctx.fillStyle = 'rgba(253,186,116,0.8)';
@@ -544,7 +547,7 @@ function veCompVisiveis(tc) {
 function veCompVideosVivos(t, lista) {
     const out = [];
     const juntar = (c, T, d) => {
-        const m = veMediaOf(c), seq = veCompSeqDe(m);
+        const m = veMediaOf(c), seq = veCompSeqEfetiva(m);
         if (!seq || d > 8) return;
         const tc = veSrcAt(c, T);
         veCompComo(seq, () => veCompVisiveis(tc).forEach(ic => {
@@ -561,7 +564,7 @@ function veCompVideosVivos(t, lista) {
 
 // Quadro da Comp do clipe c no instante T (da timeline de fora); alvo = px do monitor por px da Comp
 function veCompQuadro(c, T, alvo, d = 0, fator = 1) {
-    const m = veMediaOf(c), seq = veCompSeqDe(m);
+    const m = veMediaOf(c), seq = veCompSeqEfetiva(m);
     if (!seq || d > 8) return null;
     const k = Math.min(1, Math.max(0.15, alvo || 1)), W = seq.w || VE.seqW, H = seq.h || VE.seqH;
     const o = c._o || c;
@@ -605,9 +608,8 @@ function veCompSrc(seq, ic, tc, k, fator, d) {
 
 // Comps que precisam de render passam a ser desenhadas ao vivo (o arquivo delas está velho)
 function veCompMarcarVivas(pend) {
-    const ids = new Set(pend.map(e => e.seq.id));
     let mudou = false;
-    veCompMidias().forEach(m => { if (ids.has(m.sequenceId) && !m._aoVivo) { m._aoVivo = true; mudou = true; } });
+    pend.forEach(({ m }) => { if (!m._aoVivo) { m._aoVivo = true; mudou = true; } });
     if (mudou) { veCacheInvalidate(); if (VE.ready) veDrawMonitorSoon(); }
 }
 
@@ -633,6 +635,129 @@ function veCompTick() {
     }
 }
 setInterval(veCompTick, 400);
+
+// ─────────────────────────── Propriedades essenciais (por faixa) ───────────────────────────
+// Como as do After: na timeline de fora, cada faixa de Comp pode trocar o texto e a cor dos textos e a cor das
+// formas de dentro, sem abrir a Comp e sem mudar as outras faixas dela. A lista é automática (todo texto e toda
+// forma). Os valores ficam na faixa (c.ov = {eid: {t, cor}}: entram no desfazer); a faixa aponta para uma variação
+// escondida da Comp com os mesmos valores (mídia {comp, ovDe: id da Comp, ov}) — ela tem o seu render; variações
+// iguais são a mesma mídia. eid = nome fixo da camada de dentro (dado na primeira vez que a lista é montada).
+
+// A timeline da Comp com as Propriedades essenciais de uma variação aplicadas (cópia; sem ov, a própria)
+function veCompSeqEfetiva(m) {
+    const seq = veCompSeqDe(m);
+    if (!seq || !m.ov || !Object.keys(m.ov).length) return seq;
+    return { ...seq, clips: (seq.clips || []).map(c => {
+        const o = c.eid && m.ov[c.eid];
+        if (!o) return c;
+        const n = vePlain(c, {});
+        if (n.tx) { if (o.t != null) n.tx.t = o.t; if (o.cor) n.tx.cor = o.cor; }
+        if (n.fm && o.cor) n.fm.cor = o.cor;
+        return n;
+    }) };
+}
+
+// Textos e formas de dentro da Comp (de cima para baixo), com os valores dela
+function veCompEssenciais(seq) {
+    if (!seq || seq.id === VE.activeSequence) return [];
+    const out = [], vistos = new Set();
+    let nT = 0, nF = 0;
+    [...(seq.clips || [])].sort((a, b) => b.tr - a.tr || a.st - b.st).forEach(c => {
+        const m = VE.media[c.m || 0];
+        const tipo = m && m.kind === 'texto' && c.tx ? 'texto' : m && m.kind === 'forma' && c.fm ? 'forma' : null;
+        if (!tipo) return;
+        if (!c.eid) c.eid = 'e' + Math.random().toString(36).slice(2, 9);
+        if (vistos.has(c.eid)) return;   // cópia de uma camada (Ctrl+V/lâmina dentro da Comp): mesma propriedade
+        vistos.add(c.eid);
+        out.push(tipo === 'texto'
+            ? { eid: c.eid, tipo, nome: `${veT('Texto')} ${++nT}`, t: c.tx.t || '', cor: c.tx.cor || '#ffffff' }
+            : { eid: c.eid, tipo, nome: `${veT('Forma')} ${++nF}`, cor: c.fm.cor || '#ffffff' });
+    });
+    return out;
+}
+
+const veCompBase = m => (m && m.ovDe != null && VE.media[m.ovDe]) || m;
+
+// Variação com estes valores (a mesma mídia para valores iguais); sem valores = a própria Comp
+function veCompVariantePara(base, ov) {
+    if (!ov || !Object.keys(ov).length) return base;
+    const chave = JSON.stringify(ov);
+    let v = VE.media.find(x => x && x.comp && !x.removido && x.ovDe === base.id && JSON.stringify(x.ov || {}) === chave);
+    if (!v) {
+        v = { ...base, id: VE.media.length, ovDe: base.id, ov: vePlain(ov, {}), info: vePlain(base.info, null) };
+        ['_criada', '_aoVivo', '_esperaUrl', 'pasta', 'nome', 'pct', 'erro'].forEach(k => delete v[k]);
+        VE.media.push(v);
+    }
+    return v;
+}
+
+// Muda uma propriedade da faixa c. digitando = a mesma edição continua (não cria uma variação por tecla)
+function veCompEssDefinir(c, eid, campo, valor, digitando) {
+    const m0 = veMediaOf(c), base = veCompBase(m0), item = veCompEssenciais(veCompSeqDe(base)).find(e => e.eid === eid);
+    if (!item || veLocked(c)) return;
+    const ov = vePlain(c.ov || {}, {});
+    ov[eid] = { ...(ov[eid] || {}), [campo]: valor };
+    if (String(item[campo]) === String(valor)) delete ov[eid][campo];   // igual ao da Comp: sem valor próprio
+    if (!Object.keys(ov[eid]).length) delete ov[eid];
+    const ed = VECOMP.ess;
+    if (!(digitando && ed && ed.c === c)) { vePushHistory(); VECOMP.ess = { c }; }
+    // a variação desta edição, usada só por esta faixa, é atualizada no lugar (cada tecla não vira uma mídia)
+    let m;
+    if (ed && ed.c === c && ed.v && m0 === ed.v && Object.keys(ov).length) { m = ed.v; m.ov = vePlain(ov, {}); }
+    else {
+        const n0 = VE.media.length;
+        m = veCompVariantePara(base, ov);
+        VECOMP.ess.v = VE.media.length > n0 ? m : null;   // só a recém-criada (uma que já existia pode ser de outra faixa)
+    }
+    if (Object.keys(ov).length) c.ov = ov; else delete c.ov;
+    c.m = m.id;
+    m._aoVivo = true;   // na tela na hora (ao vivo); o render da variação sai depois
+    veCacheInvalidate();
+    veDrawMonitorSoon();
+    veDraw();
+    clearTimeout(VECOMP.essT);
+    VECOMP.essT = setTimeout(veCompVerificar, 800);
+}
+
+function veCompEssFim() { VECOMP.ess = null; }
+
+// Seção do painel Propriedades para uma faixa de Comp
+function veCompEssHtml(c) {
+    const base = veCompBase(veMediaOf(c)), lista = veCompEssenciais(veCompSeqDe(base)), ov = c.ov || {};
+    const corpo = !lista.length
+        ? `<small class="ve-pp-dica">${veT('Esta Comp não tem texto nem forma para mudar daqui.')}</small>`
+        : lista.map(e => {
+            const o = ov[e.eid] || {}, mudou = Object.keys(o).length > 0;
+            return `<div class="ve-pce${mudou ? ' mudou' : ''}">
+                <div class="ve-pce-cab"><label>${veEsc(e.nome)}</label>
+                    <input type="color" data-pce="${e.eid}" data-campo="cor" value="${veEsc(o.cor || e.cor)}" title="${veT('Cor')}">
+                    ${mudou ? `<button class="ve-pce-volta" data-pce-volta="${e.eid}" title="${veT('Voltar ao valor da Comp')}">↺</button>` : ''}</div>
+                ${e.tipo === 'texto' ? `<textarea class="ve-pp-texto" rows="2" data-pce="${e.eid}" data-campo="t">${veEsc(o.t != null ? o.t : e.t)}</textarea>` : ''}
+            </div>`;
+        }).join('') + `<small class="ve-pp-dica">${veT('Vale só para esta faixa. Para mudar em todas, abra a Comp (duplo clique).')}</small>`;
+    return vePpSec(veT('Propriedades essenciais'), corpo);
+}
+
+// Eventos do painel (editor-props.js chama): digitar/escolher cor, soltar, voltar ao valor da Comp
+function veCompEssEvento(el, tipo) {
+    const c = VE.clips[VE.sel];
+    if (!c || !veEhComp(veMediaOf(c))) return;
+    if (tipo === 'volta') {
+        const ov = vePlain(c.ov || {}, {});
+        delete ov[el.dataset.pceVolta];
+        vePushHistory();
+        veCompEssFim();
+        const base = veCompBase(veMediaOf(c)), m = veCompVariantePara(base, ov);
+        if (Object.keys(ov).length) c.ov = ov; else delete c.ov;
+        c.m = m.id;
+        VEPP.chave = '';
+        veRefresh();
+        veCompVerificar();
+        return;
+    }
+    if (tipo === 'fim') { veCompEssFim(); VEPP.chave = ''; vePpRender(); return; }
+    veCompEssDefinir(c, el.dataset.pce, el.dataset.campo, el.value, true);
+}
 
 // Duplo clique numa faixa de Comp na timeline: abre a Comp
 function veCompDuploClique(e) {

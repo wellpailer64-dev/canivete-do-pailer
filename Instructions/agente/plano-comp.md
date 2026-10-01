@@ -1,5 +1,5 @@
 # Plano: Comp (composição estilo After Effects) no Pocket Editor
-Combinado com o usuário em 2026-10-01. Status: **Fases 1, 2 e 3 feitas (2026-10-01)** — falta só o opcional (Propriedades essenciais).
+Combinado com o usuário em 2026-10-01. Status: **plano completo (2026-10-01)** — Fases 1, 2, 3 e Propriedades essenciais.
 
 ## Por quê
 Projetos com muitas camadas (ex.: intro do AutoFrame com ~15 faixas: foto, Multiplicação, luz, grão, cards, logo...)
@@ -111,7 +111,12 @@ duplicar a Comp no Projeto cria uma Comp independente (timeline copiada).
 - Corrigido no caminho: **camada de ajuste dentro da Comp deixava o fundo preto/opaco** (exportar_video separa o
   alfa antes dos efeitos e devolve depois); render espera as imagens de dentro carregarem. `veCompSig` versão 3
   (Comps antigas renderizam de novo uma vez).
-- Falta (opcional): editar o texto/cor da Comp a partir da mãe ("Propriedades essenciais").
+- **Propriedades essenciais** (decidido com o usuário: por faixa, como no After; lista automática): no painel
+  Propriedades de uma faixa de Comp, cada texto (conteúdo + cor) e cada forma (cor) de dentro. O valor fica na faixa
+  (`c.ov = {eid: {t, cor}}`, entra no desfazer); a faixa aponta para uma variação escondida (mídia `{comp, ovDe, ov}`,
+  `veCompVariantePara`) com render próprio; valores iguais = a mesma variação; digitando, a variação criada na edição
+  é atualizada no lugar. `eid` = nome fixo da camada de dentro (fora do hash). Render/fila agora são por mídia
+  (`veCompPendentes`); variação sem uso não renderiza nem é salva; ↺ volta ao valor da Comp. Textos em inglês no i18n.
 
 ## Como testar (modo agente)
 - Outra instância: `python main.py --agente=9333` (não usar a do usuário, porta 9222).

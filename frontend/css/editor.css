@@ -1316,6 +1316,14 @@ html.ve-float-html body { background: var(--bg-0); }
 }
 .ve-pp select:focus, .ve-pp-texto:focus { border-color: var(--ve-accent); }
 .ve-pp-texto { resize: vertical; line-height: 1.4; min-height: 44px; }
+/* Propriedades essenciais da Comp (editor-comp.js): uma linha por texto/forma de dentro */
+.ve-pce { display: flex; flex-direction: column; gap: 5px; padding-left: 8px; border-left: 2px solid var(--ve-line-2); }
+.ve-pce.mudou { border-left-color: var(--ve-accent); }
+.ve-pce-cab { display: flex; align-items: center; gap: 8px; }
+.ve-pce-cab > label { flex: 1; font-size: 11px; color: var(--ve-dim); }
+.ve-pce-volta { border: 0; background: none; color: var(--ve-faint); font-size: 14px; cursor: pointer; padding: 0 2px; }
+.ve-pce-volta:hover { color: var(--ve-text); }
+.ve-pce .ve-pp-texto { min-height: 34px; }
 .ve-pp-botoes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .ve-pp-sep { width: 1px; height: 18px; background: var(--ve-line-2); margin: 0 4px; }
 .ve-pp-tog {

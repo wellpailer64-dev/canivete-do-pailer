@@ -22,7 +22,8 @@ const VE_PJ_TIPOS = {
 const vePjTipo = m => VE_PJ_TIPOS[m.comp ? 'comp' : m.kind];
 const VE_EXT_LEG = /\.(srt|vtt|ass|ssa|sbv|txt)$/i;   // legendas (Functions/legendas_formatos.py)
 
-const vePjMidia = () => VE.media.filter(m => m && !m.removido && !m.base && m.rvDe == null && VE_PJ_TIPOS[m.kind]);
+// (variações de Comp com Propriedades essenciais — m.ovDe — ficam escondidas: são da faixa, não do Projeto)
+const vePjMidia = () => VE.media.filter(m => m && !m.removido && !m.base && m.rvDe == null && m.ovDe == null && VE_PJ_TIPOS[m.kind]);
 const vePjNome = m => m.nome || m.name || vePjTipo(m)[1];
 const vePjBin = id => (VE.bins || []).find(b => b.id === id);
 function vePjUso(m) {

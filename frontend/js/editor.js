@@ -3720,7 +3720,8 @@ function veProjectData() {
     return {
         app: 'Canivete do Pailer',
         video: VE.path,
-        media: VE.media.filter(m => m.id && !m.removido && ['image', 'ajuste', 'audio', 'texto', 'legenda', 'video', 'timeline', 'cor', 'forma', 'pincel'].includes(m.kind))
+        media: VE.media.filter(m => m.id && !m.removido && ['image', 'ajuste', 'audio', 'texto', 'legenda', 'video', 'timeline', 'cor', 'forma', 'pincel'].includes(m.kind)
+                && (m.ovDe == null || veMidiaNaTimeline(m.id)))   // variação de Comp que nenhuma faixa usa não vai
             .map(m => {
                 const o = { id: m.id, kind: m.kind, name: m.name, pasta: m.pasta || null, cor: m.cor, nome: m.nome };
                 if (m.kind === 'audio') Object.assign(o, { path: m.path, dur: m.dur });
@@ -3729,7 +3730,7 @@ function veProjectData() {
                 if (m.kind === 'video') o.path = m.path;
                 // Comp (editor-comp.js): a timeline dela + o arquivo renderizado e o hash do conteúdo dele
                 if (m.comp) Object.assign(o, { comp: true, sequenceId: m.sequenceId, compSig: m.compSig || null, dur: m.dur,
-                                               temSom: !!(m.info && m.info.has_audio) });
+                                               temSom: !!(m.info && m.info.has_audio), ...(m.ov ? { ov: m.ov, ovDe: m.ovDe } : {}) });
                 if (m.kind === 'timeline') o.sequenceId = m.sequenceId;
                 if (m.kind === 'cor') o.fill = m.fill;   // cor sólida (m.cor é a do rótulo)
                 if (m.rvDe != null) Object.assign(o, { rvDe: m.rvDe, rvA: m.rvA, rvB: m.rvB });   // cópia invertida (editor-reverse.js)
@@ -3930,7 +3931,7 @@ function veApplyProject() {
             if (m.comp) {
                 // Comp: o arquivo pode ter saído do cache (limpeza automática) — renderiza de novo (veCompVerificar)
                 const dur = m.dur || mediaDur.get(m.id) || 1;
-                Object.assign(nm, { comp: true, sequenceId: m.sequenceId, compSig: m.compSig || null, dur });
+                Object.assign(nm, { comp: true, sequenceId: m.sequenceId, compSig: m.compSig || null, dur, ...(m.ov ? { ov: m.ov, ovDe: m.ovDe } : {}) });
                 if (estaFaltando(m.path)) {
                     Object.assign(nm, { path: null, compSig: null,
                         info: { duration: dur, width: q.w, height: q.h, fps: VE.fps || 30, has_audio: !!m.temSom, alfa: true, provisoria: true } });
@@ -3986,6 +3987,8 @@ function veApplyProject() {
             nm.img.src = r.url;
         });
     });
+    // variação de Comp (Propriedades essenciais): aponta para a Comp com o id novo
+    VE.media.forEach(nm => { if (nm && nm.comp && nm.ovDe != null) { nm.ovDe = ids[nm.ovDe]; if (nm.ovDe == null) delete nm.ovDe; } });
     // cópias invertidas (editor-reverse.js): aponta para a original com o id novo; apagada do cache → gera de novo
     VE.media.forEach(nm => {
         if (!nm || nm.rvDe == null) return;

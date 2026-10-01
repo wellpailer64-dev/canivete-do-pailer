@@ -24,7 +24,7 @@ de evolução do AutoFrame): `Instructions/agente/direcao-de-arte.md`.
 
 ## Comp (estilo After Effects)
 Plano, modelo e limitações em `Instructions/agente/plano-comp.md`; código em `frontend/js/editor-comp.js`.
-Fases 1, 2 e 3 feitas; falta só o opcional (Propriedades essenciais: editar texto/cor da Comp pela mãe).
+Plano completo (Fases 1–3 + Propriedades essenciais por faixa).
 
 ## Build local
 - `build.bat` apaga `dist/` inteiro, onde ficam os modelos do usuário (`modelos_ia/`, `models/`, ~8 GB).

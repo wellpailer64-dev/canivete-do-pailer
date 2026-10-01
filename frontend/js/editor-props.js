@@ -514,6 +514,11 @@ function vePpHtml(a) {
             vePpSec('Duração', `<div class="ve-pp-l"><label>Duração</label><span></span><span class="ve-prop-num"><input type="number" data-pp="dur" min="0.04" step="0.01"><i>s</i></span></div>`) +
             links([['props', 'Controles de efeito'], ['lc', 'Luz e Cor']]);
     }
+    // Comp (editor-comp.js): as Propriedades essenciais dela primeiro (textos e formas de dentro, só nesta faixa)
+    if (typeof veEhComp === 'function' && veEhComp(veMediaOf(c))) {
+        return cab(nome, `Comp · ${veEsc(vePjNome(veCompBase(veMediaOf(c))))} · V${c.tr + 1}`) + veCompEssHtml(c) +
+            transformar(true, true) + velocidade() + (veTemSom(c) ? volume() : '') + links([['props', 'Controles de efeito'], ['lc', 'Luz e Cor']]);
+    }
     return cab(nome, `Vídeo · V${c.tr + 1}`) + transformar(true, true) + velocidade() +
         (VE.info && VE.info.has_audio ? volume() : '') +
         links([['props', 'Controles de efeito'], ['lc', 'Luz e Cor']]);
@@ -685,6 +690,8 @@ function vePpInit() {
     const valor = el => el.type === 'checkbox' ? el.checked
         : (el.type === 'number' || el.type === 'range') ? parseFloat(String(el.value).replace(',', '.')) : el.value;
     box.addEventListener('input', e => {
+        const pce = e.target.closest('[data-pce]');   // Propriedades essenciais da Comp (editor-comp.js)
+        if (pce && VE.ready) { veCompEssEvento(pce, 'input'); return; }
         const el = e.target.closest('[data-pp]');
         if (!el || !VE.ready) return;
         if (el.dataset.pp !== 'ripple' && !VE._ppEdit) { vePushHistory(); VE._ppEdit = true; }
@@ -692,12 +699,16 @@ function vePpInit() {
         vePpDepois(o, false);
     });
     box.addEventListener('change', e => {
+        const pce = e.target.closest('[data-pce]');
+        if (pce && VE.ready) { veCompEssEvento(pce, 'fim'); return; }
         const el = e.target.closest('[data-pp]');
         VE._ppEdit = false;
         if (!el) return;
         vePpDepois('tudo', true);
     });
     box.addEventListener('click', e => {
+        const volta = e.target.closest('[data-pce-volta]');
+        if (volta && VE.ready) { veCompEssEvento(volta, 'volta'); return; }
         const anc = e.target.closest('[data-ppanc]');
         if (anc && VE.ready) { const [u, v] = anc.dataset.ppanc.split(',').map(Number); veTfAncoraEm(u, v); return; }
         const tog = e.target.closest('[data-pptog]'), alin = e.target.closest('[data-ppalin]');
