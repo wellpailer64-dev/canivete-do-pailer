@@ -285,6 +285,7 @@ body.nav-auto.nav-peek .sidebar { width: 228px; margin-right: -164px; box-shadow
 }
 .main-content:has(#page-home.active) .home-bg.pronto { opacity: .35; }
 .main-content:has(.tool-page.active:not(#page-home):not(.ve-page)) .home-bg.pronto { opacity: .18; }
+.main-content:has(#page-video-cutter.active #ve-start:not([hidden])) .home-bg.pronto { opacity: .18; }   /* lobby do editor */
 .main-content::before {
     content: "";
     position: absolute;

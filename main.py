@@ -3351,7 +3351,7 @@ def _janela_solta_propria(chrome, sender, args):
 
     adiado = args.GetDeferral()
     form = WinForms.Form()
-    form.Text = "Pocket Editor"
+    form.Text = "Editor de Vídeo"
     form.BackColor = Color.FromArgb(255, 8, 8, 8)
     try:
         form.Icon = chrome.form.Icon

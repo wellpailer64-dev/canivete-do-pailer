@@ -503,11 +503,11 @@
                     </div>
                 </div>
 
-                <!-- Pocket Editor (editor de vídeo) -->
+                <!-- Editor de vídeo -->
                 <div class="tool-page ve-page" id="page-video-cutter">
                     <div class="ve" id="ve">
                         <header class="ve-top">
-                            <div class="ve-brand"><span class="ve-brand-mark"><svg class="i"><use href="#i-play"/></svg></span> Pocket Editor</div>
+                            <div class="ve-brand"><span class="ve-brand-mark"><svg class="i"><use href="#i-play"/></svg></span> Editor de Vídeo</div>
                             <!-- Arquivo · Editar · Clipe · Sequência · Marcadores · Exibir · Janela · Ajuda (editor-comandos.js) -->
                             <nav class="ve-mbar" id="ve-mbar"></nav>
                             <span class="ve-proj" id="ve-proj" hidden></span>
@@ -518,24 +518,21 @@
 
                         <section class="ve-start" id="ve-start" hidden>
                             <div class="ve-start-inner">
+                                <!-- card de entrada: vídeo de fundo bem leve (video/editor-lobby.webm, Pexels 1536322, 10 s em loop) -->
                                 <div class="ve-start-hero">
-                                    <div>
-                                        <div class="ve-start-kicker">Pocket Editor</div>
+                                    <video class="ve-start-hero-bg" id="ve-start-bg" src="video/editor-lobby.webm" muted loop playsinline preload="auto" aria-hidden="true" tabindex="-1"></video>
+                                    <div class="ve-start-hero-txt">
                                         <h2>Comece sua edição</h2>
-                                        <p>Abra um projeto recente, crie uma edição nova ou entre em edição rápida para cortar, exportar e fechar sem salvar projeto.</p>
+                                        <p>Crie um projeto, corte rápido sem salvar ou deixe o AutoFrame montar no ritmo da música.</p>
                                     </div>
                                     <div class="ve-start-actions">
-                                        <button class="ve-btn ve-btn-primary ve-btn-lg" onclick="veNovoProjeto()"><svg class="i"><use href="#i-file"/></svg> Novo projeto</button>
-                                        <button class="ve-btn ve-btn-lg" onclick="veQuickEdit()"><svg class="i"><use href="#i-scissors"/></svg> Quick edit</button>
-                                        <button class="ve-btn ve-btn-lg ve-af-start" onclick="veAfAbrir()" title="Vídeo no ritmo da música a partir de uma pasta de fotos e vídeos"><svg class="i"><use href="#i-sparkles"/></svg> AutoFrame</button>
-                                        <button class="ve-btn ve-btn-lg ve-btn-ghost" onclick="veOpenProject()"><svg class="i"><use href="#i-folder"/></svg> Abrir projeto</button>
+                                        <button class="ve-btn ve-btn-primary ve-btn-lg ve-start-novo" onclick="veNovoProjeto()"><svg class="i"><use href="#i-file"/></svg> Novo projeto</button>
+                                        <div class="ve-start-mais">
+                                            <button class="ve-btn" onclick="veQuickEdit()" title="Cortar, exportar e fechar sem salvar projeto"><svg class="i"><use href="#i-scissors"/></svg> Quick edit</button>
+                                            <button class="ve-btn ve-af-start" onclick="veAfAbrir()" title="Vídeo no ritmo da música a partir de uma pasta de fotos e vídeos"><svg class="i"><use href="#i-sparkles"/></svg> AutoFrame</button>
+                                            <button class="ve-btn" onclick="veOpenProject()"><svg class="i"><use href="#i-folder"/></svg> Abrir</button>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="ve-start-section" id="ve-start-auto" hidden>
-                                    <div class="ve-start-head">
-                                        <h3>Recuperar (salvo automaticamente)</h3>
-                                    </div>
-                                    <div class="ve-start-auto-lista" id="ve-start-auto-lista"></div>
                                 </div>
                                 <div class="ve-start-section">
                                     <div class="ve-start-head">
@@ -544,6 +541,10 @@
                                     </div>
                                     <div class="ve-start-grid" id="ve-start-recentes"></div>
                                 </div>
+                                <details class="ve-start-auto" id="ve-start-auto" hidden>
+                                    <summary><svg class="i"><use href="#i-save"/></svg> Recuperar (salvo automaticamente)</summary>
+                                    <div class="ve-start-auto-lista" id="ve-start-auto-lista"></div>
+                                </details>
                             </div>
                         </section>
 

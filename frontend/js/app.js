@@ -269,10 +269,17 @@ function homeBgSync() {
     const v = _el('home-bg');
     if (!v) return;
     const ativa = document.querySelector('.tool-page.active');
-    const usarFundo = ativa && !ativa.classList.contains('ve-page');
+    const lobby = _el('ve-start'), naLobby = !!lobby && !lobby.hidden;   // lobby do editor usa o mesmo fundo
+    const usarFundo = ativa && (!ativa.classList.contains('ve-page') || naLobby);
     const tocar = usarFundo && !document.hidden
         && !matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (tocar) v.play().catch(() => {}); else v.pause();
+    // vídeo do card de entrada do editor: só toca com o lobby à vista
+    const lv = _el('ve-start-bg');
+    if (lv) {
+        if (!lv._ok) { lv._ok = true; lv.addEventListener('playing', () => lv.classList.add('pronto'), { once: true }); }
+        if (ativa && ativa.id === 'page-video-cutter' && naLobby && !document.hidden) lv.play().catch(() => {}); else lv.pause();
+    }
 }
 document.addEventListener('visibilitychange', homeBgSync);
 document.addEventListener('DOMContentLoaded', () => {
@@ -591,6 +598,62 @@ function playClick() {
     if (audio) { audio.currentTime = 0; audio.play().catch(e => console.log("Audio play blocked", e)); }
 }
 
+// Som etéreo ao abrir uma ferramenta: acorde aberto (Ré com 9ª) que floresce de baixo para cima, sobe um
+// pouquinho de afinação e se abre no filtro, com cauda longa de reverb. Sintetizado aqui (sem arquivo), bem
+// baixo; desliga junto com Exibir → Sons da interface (VECLQ.on, editor.js)
+const ETEREO = { ctx: null, ir: null, ult: 0 };
+function playEtereo() {
+    if (typeof VECLQ !== 'undefined' && !VECLQ.on) return;
+    const agora = performance.now();
+    if (agora - ETEREO.ult < 900) return;   // trocar de ferramenta rápido não empilha
+    ETEREO.ult = agora;
+    try {
+        if (!ETEREO.ctx) ETEREO.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const ac = ETEREO.ctx, t0 = ac.currentTime + 0.02, sr = ac.sampleRate;
+        if (ac.state === 'suspended') ac.resume();
+        if (!ETEREO.ir) {   // reverb: ruído estéreo com queda exponencial (3 s)
+            const n = Math.round(sr * 3), b = ac.createBuffer(2, n, sr);
+            for (let c = 0; c < 2; c++) {
+                const d = b.getChannelData(c);
+                for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3.2);
+            }
+            ETEREO.ir = b;
+        }
+        const mestre = ac.createGain(), seco = ac.createGain(), molhado = ac.createGain(), rev = ac.createConvolver();
+        const lp = ac.createBiquadFilter();
+        mestre.gain.value = 0.075;
+        seco.gain.value = 0.45; molhado.gain.value = 0.9;
+        rev.buffer = ETEREO.ir;
+        lp.type = 'lowpass'; lp.Q.value = 0.4;
+        lp.frequency.setValueAtTime(500, t0);
+        lp.frequency.exponentialRampToValueAtTime(5200, t0 + 0.7);
+        lp.frequency.exponentialRampToValueAtTime(1600, t0 + 2.6);
+        lp.connect(seco).connect(mestre);
+        lp.connect(rev).connect(molhado).connect(mestre);
+        mestre.connect(ac.destination);
+        // Ré, Lá, Dó#, Mi, Fá# (+ Ré grave): cada nota entra um pouco depois da outra
+        [[146.83, 0.5, 0], [293.66, 0.8, 0.02], [440.0, 0.7, 0.07], [554.37, 0.55, 0.12], [659.25, 0.5, 0.17], [739.99, 0.4, 0.23], [1174.66, 0.18, 0.3]]
+            .forEach(([f, v, atraso], k) => {
+                const ini = t0 + atraso, fim = ini + 2.8;
+                const g = ac.createGain(), pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
+                g.gain.setValueAtTime(0.0001, ini);
+                g.gain.exponentialRampToValueAtTime(v * 0.22, ini + 0.45);
+                g.gain.exponentialRampToValueAtTime(0.0001, fim);
+                if (pan) { pan.pan.value = (k % 2 ? 1 : -1) * Math.min(0.6, k * 0.12); g.connect(pan).connect(lp); } else g.connect(lp);
+                [-5, 5].forEach(cents => {   // duas senoides levemente desafinadas: o "coro" que deixa o som largo
+                    const o = ac.createOscillator();
+                    o.type = 'sine';
+                    o.frequency.setValueAtTime(f * Math.pow(2, -40 / 1200), ini);   // sobe 40 cents ao entrar
+                    o.frequency.exponentialRampToValueAtTime(f, ini + 0.5);
+                    o.detune.value = cents;
+                    o.connect(g);
+                    o.start(ini); o.stop(fim + 0.05);
+                });
+            });
+        setTimeout(() => { try { mestre.disconnect(); } catch (e) {} }, 6500);
+    } catch (e) { /* sem áudio: segue em silêncio */ }
+}
+
 function playConcluido() {
     const audio = document.getElementById('audio-concluido');
     if (audio) { audio.currentTime = 0; audio.play().catch(e => console.log("Audio play blocked", e)); }
@@ -626,7 +689,8 @@ window.addEventListener('pywebviewready', () => {
 
 function switchTool(toolId) {
     console.log("Switching to:", toolId);
-    playClick();
+    const ativaAntes = document.querySelector('.menu-item.active')?.dataset.tool;
+    if (toolId !== 'home' && toolId !== ativaAntes) playEtereo();
     
     // Atualiza menu
     document.querySelectorAll('.menu-item').forEach(item => {

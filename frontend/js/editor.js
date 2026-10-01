@@ -3782,6 +3782,7 @@ function veOnboardingRender() {
     if (!tela || !box) return;
     const mostrar = !VE.startScreenDismissed && !VE.ready && !VE.path && !VE.exportRunning;
     tela.hidden = !mostrar;
+    if (typeof homeBgSync === 'function') homeBgSync();   // fundo da Home e vídeo do card só com o lobby à vista
     if (!mostrar) return;
     veAutosaveRender();
     const lista = veRecentesProjetos();

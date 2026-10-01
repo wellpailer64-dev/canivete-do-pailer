@@ -417,7 +417,7 @@ function vedNewHost(root, b) { return { n: VED.proxN++, root, max: null, b, win:
 // Título da janela solta (nomes dos painéis). Os espaços invisíveis no fim deixam o título único:
 // o Python acha a janela por ele para colocá-la no monitor/posição salvos
 function vedWinTitle(h) {
-    return vedPanelsOf(h.root).map(vedTitle).join(' · ') + ' — Pocket Editor' + '​'.repeat(h.n);
+    return vedPanelsOf(h.root).map(vedTitle).join(' · ') + ' — Editor de Vídeo' + '​'.repeat(h.n);
 }
 
 // Tira o painel de onde estiver; se sair da área principal, lembra de onde saiu

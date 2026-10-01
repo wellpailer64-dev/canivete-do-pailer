@@ -2256,7 +2256,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             return {"success": False, "error": f"Não foi possível preparar o fundo da exportação: {e}"}
         projeto = str((opcoes or {}).get("projeto") or "")
         aberto = (os.path.splitext(projeto)[0] + ".mp4" if projeto
-                  else os.path.join(os.path.expanduser("~"), "Videos", "Pocket Editor.mp4"))
+                  else os.path.join(os.path.expanduser("~"), "Videos", "Video editado.mp4"))
     elif not os.path.isfile(path):
         return {"success": False, "error": "Arquivo não encontrado."}
     else:
