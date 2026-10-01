@@ -11,6 +11,8 @@ __pycache__/
 
 # Modelos de IA (pesados demais para o GitHub)
 modelos_ia/
+soundboard/
+_soundboard/
 *.pt
 *.onnx
 

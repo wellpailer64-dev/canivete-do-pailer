@@ -2792,6 +2792,20 @@ class ApiBridge:
     def video_cutter_add_media(self, path):
         return video_cutter_add_media(path)
 
+    # Soundboard do editor (pack baixado no primeiro uso)
+    def ve_sb_estado(self):
+        from Functions import soundboard
+        return soundboard.estado()
+
+    def ve_sb_baixar(self):
+        from Functions import soundboard
+        return soundboard.baixar(lambda d: _ve_emit("veSbProgresso", d))
+
+    def ve_sb_abrir_pasta(self):
+        from Functions import soundboard
+        _abrir_pasta(soundboard.pasta())
+        return {"success": True}
+
     def ve_render_listar(self, base, chave):
         return ve_render_listar(base, chave)
 

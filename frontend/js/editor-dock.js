@@ -34,7 +34,7 @@ function vedDefault() {
                 { t: 'g', p: ['monitor'], a: 'monitor' },
                 { t: 's', d: 'col', z: [0.6, 0.4], c: [
                     { t: 'g', p: ['pp', 'props', 'lc', 'texto', 'projeto'], a: 'pp' },
-                    { t: 'g', p: ['fx', 'trans', 'keys'], a: 'fx' },
+                    { t: 'g', p: ['fx', 'trans', 'sb', 'keys'], a: 'fx' },
                 ] },
             ] },
             { t: 's', d: 'row', z: [0.028, 0.94, 0.032], c: [
@@ -201,6 +201,15 @@ function vedApply(d) {
         if (g) {
             g.p.splice(g.p.indexOf('fx') + 1, 0, 'trans');
             st.novos = st.novos.filter(id => id !== 'trans');
+        }
+    }
+    // o Soundboard entra como aba logo depois do Animação (ou do Efeitos)
+    if (st.novos.includes('sb')) {
+        const gs = [st.root, ...st.floats.map(f => f.root)].flatMap(r => vedGroups(r));
+        const g = gs.find(g => g.p.includes('trans')) || gs.find(g => g.p.includes('fx'));
+        if (g) {
+            g.p.splice(g.p.indexOf(g.p.includes('trans') ? 'trans' : 'fx') + 1, 0, 'sb');
+            st.novos = st.novos.filter(id => id !== 'sb');
         }
     }
     // Medidores de áudio: à direita da timeline (como no Premiere), esteja ela na área principal ou numa janela solta

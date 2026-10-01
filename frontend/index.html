@@ -750,6 +750,21 @@
                                     </div>
                                     <div class="ve-fx-hint">Passe o mouse para ver o exemplo. Transição: arraste até o corte entre dois clipes (a borda do bloco muda a duração). Constante: arraste até o clipe ou dê duplo clique com ele selecionado; os ajustes ficam no Controles de efeito.</div>
                                 </div>
+                                <!-- Soundboard: efeitos sonoros por categoria (editor-soundboard.js; pack baixado no 1º uso) -->
+                                <div class="ve-panel ve-tabpane ve-sb" id="ve-pane-sb" data-panel="sb" data-title="Soundboard">
+                                    <div class="ve-sb-topo">
+                                        <div class="ve-fx-search"><svg class="i"><use href="#i-search"/></svg><input type="text" id="ve-sb-q" placeholder="Buscar som" autocomplete="off"></div>
+                                        <div class="ve-sb-cats" id="ve-sb-cats"></div>
+                                    </div>
+                                    <div class="ve-sb-lista" id="ve-sb-lista"></div>
+                                    <div class="ve-sb-rodape">
+                                        <label class="ve-sb-hover" title="Tocar o som ao passar o mouse por cima"><input type="checkbox" id="ve-sb-hover"> Ouvir ao passar</label>
+                                        <svg class="i"><use href="#i-volume"/></svg>
+                                        <input type="range" id="ve-sb-vol" min="0" max="100" value="70" title="Volume da prévia">
+                                        <span class="ve-top-spacer"></span>
+                                        <button class="ve-icon-btn" id="ve-sb-pasta" title="Abrir a pasta dos sons"><svg class="i"><use href="#i-folder"/></svg></button>
+                                    </div>
+                                </div>
                                 <div class="ve-panel ve-tabpane" id="ve-pane-keys" data-panel="keys" data-title="Atalhos">
                                     <div class="ve-keys">
                                         <h4>Reprodução</h4>
@@ -1912,6 +1927,7 @@
     <script src="js/editor-medidor.js"></script>
     <script src="js/editor-autoframe.js"></script>
     <script src="js/editor-projeto.js"></script>
+    <script src="js/editor-soundboard.js"></script>
     <script src="js/editor-ferramentas.js"></script>
     <script src="js/editor-dock.js"></script>
     <script src="js/editor-comandos.js"></script>

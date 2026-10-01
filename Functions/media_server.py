@@ -22,6 +22,7 @@ _port = 0
 mimetypes.add_type("video/mp4", ".m4v")
 mimetypes.add_type("video/webm", ".webm")
 mimetypes.add_type("audio/mpeg", ".mp3")
+mimetypes.add_type("audio/ogg", ".ogg")
 
 
 class _Handler(BaseHTTPRequestHandler):

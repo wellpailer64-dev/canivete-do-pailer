@@ -26,6 +26,12 @@ Atualize a seção CALIBRACAO dele a cada feedback do usuário sobre uma ediçã
   `_internal/`, `version.txt` e `LEIA-ME.txt` para `dist/CaniveteDoPailer/`.
 - Push na `main` dispara o release automático (GitHub Actions + updater dos amigos).
 
+## Soundboard (pack de sons do editor)
+- Não vai no build: o painel baixa `soundboard-vN.zip` do release `soundboard-vN` (pré-release, para não virar
+  o "latest" do updater) e instala em `<app>/soundboard/`. Só sons CC0 (Kenney, Freesound filtrado por CC0).
+- Gerar: `python tools/montar_soundboard.py <pasta>`; para pack novo, suba `VERSAO` nos dois arquivos
+  (`tools/montar_soundboard.py` e `Functions/soundboard.py`) e publique o zip num release novo.
+
 ## Segredos
 - `Functions/_credenciais.py` (client secret do Google Drive) fica fora do git; no CI vem do secret
   `GDRIVE_CLIENT_SECRET`. Nunca exibir nem commitar o valor.
