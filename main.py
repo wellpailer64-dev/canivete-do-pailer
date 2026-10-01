@@ -3050,6 +3050,13 @@ class ApiBridge:
     def gdrive_cancel(self):
         return gdrive_cancel()
 
+    def sair_app(self):
+        """Ctrl+Q: fecha o app (a página já perguntou sobre o projeto não salvo)."""
+        if _window:
+            # fora da thread da chamada: destroy espera a interface, que está respondendo a esta chamada
+            threading.Thread(target=_window.destroy, daemon=True).start()
+        return {"success": True}
+
     def toggle_fullscreen(self):
         if _window:
             _window.toggle_fullscreen()

@@ -423,6 +423,40 @@ function appConfirm({ titulo, texto, botoes }) {
     });
 }
 
+// Ctrl+Q (Arquivo → Sair no editor): fecha o app. Projeto do editor com alterações: salvar antes, como ao fechar a aba
+let _saindo = false;
+async function appSair() {
+    if (_saindo) return;
+    _saindo = true;
+    try {
+        if (typeof VE !== 'undefined' && VE.ready) {
+            if (VE.exportRunning) {
+                const r = await appConfirm({ titulo: 'Exportação em andamento', texto: 'Sair agora interrompe a exportação.',
+                    botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Sair mesmo assim', valor: 1, tipo: 'perigo' }] });
+                if (!r) return;
+            }
+            if (VE.dirty && !VE.quickEdit) {
+                const r = await appConfirm({
+                    titulo: 'Salvar o projeto antes de sair?',
+                    texto: 'Há alterações no editor de vídeo que ainda não foram salvas.',
+                    botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Não salvar', valor: 'descartar', tipo: 'perigo' }, { rotulo: 'Salvar', valor: 'salvar', tipo: 'primario' }],
+                });
+                if (!r) return;
+                if (r === 'salvar' && !(await veSaveProject())) return;
+            }
+        }
+        window.pywebview.api.sair_app();
+    } finally { _saindo = false; }
+}
+window.appSair = appSair;
+// fora do editor (lá o Ctrl+Q é o comando "Sair", que dá para trocar em Atalhos do teclado)
+document.addEventListener('keydown', e => {
+    if (e.code !== 'KeyQ' || !e.ctrlKey || e.shiftKey || e.altKey || e.repeat) return;
+    if (typeof veIsActive === 'function' && veIsActive()) return;
+    e.preventDefault();
+    appSair();
+}, true);
+
 async function fecharAba(tool, ev) {
     ev?.stopPropagation();
     const { nome } = _menuInfo(tool);

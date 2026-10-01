@@ -26,6 +26,7 @@ const VE_CMDS = [
     { id: 'exportar', grupo: 'arquivo', nome: 'Exportar mídia...', teclas: ['Ctrl+M', 'Ctrl+E'], sep: true, fn: () => veOpenExport() },
     { id: 'exportar-legendas', grupo: 'arquivo', nome: 'Exportar legendas...', teclas: [], fn: () => veAbrirTexto('leg') },
     { id: 'exportar-transcricao', grupo: 'arquivo', nome: 'Exportar transcrição...', teclas: [], fn: () => veAbrirTexto('trans') },
+    { id: 'sair', grupo: 'arquivo', nome: 'Sair', teclas: ['Ctrl+Q'], sempre: true, sep: true, fn: () => appSair() },
 
     // ── Editar ──
     { id: 'desfazer', grupo: 'editar', nome: 'Desfazer', teclas: ['Ctrl+Z'], fn: () => veUndo(), pode: () => VE.history.length > 0 },
