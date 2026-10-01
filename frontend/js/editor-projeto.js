@@ -468,43 +468,66 @@ function vePjRelink(id) {
     if (!api || !api.select_file) { veToast('A ponte com o app ainda não está pronta'); return; }
     api.select_file('video-cutter').then(r => {
         if (!r || !r.success || !r.path) return;
-        const path = r.path, nome = vePathNome(path);
-        if (m.kind === 'image' && !VE_EXT_IMG.test(path)) { veToast('Escolha um arquivo de imagem para relincar'); return; }
-        if (m.kind === 'audio' && (!EXT_AUDIO.test(path) || EXT_VIDEO.test(path))) { veToast('Escolha um arquivo de áudio para relincar'); return; }
-        if (m.kind === 'video' && !EXT_VIDEO.test(path) && !EXT_AUDIO.test(path)) { veToast('Escolha um vídeo ou áudio para relincar'); return; }
-        Object.assign(m, { path, name: m.nome ? m.name || nome : nome });
-        delete m.offline; delete m.missing; delete m.lost; delete m.erro;
-        if (m.kind === 'image') {
-            api.video_cutter_add_media(path).then(rr => {
-                if (!rr || !rr.success) { m.offline = true; m.erro = (rr && rr.error) || 'erro'; vePjRender(); return; }
-                Object.assign(m, { path: rr.path, url: rr.url, name: m.nome ? m.name : rr.name, img: new Image(), w: 0, h: 0 });
-                m.img.crossOrigin = 'anonymous';
-                m.img.onload = () => { m.w = m.img.naturalWidth; m.h = m.img.naturalHeight; veRelinkDone(m); };
-                m.img.onerror = () => { m.offline = true; m.erro = 'erro'; vePjRender(); };
-                m.img.src = rr.url;
-            });
-        } else if (m.kind === 'audio') {
-            api.video_cutter_add_audio(path).then(rr => {
-                if (!rr || !rr.success) { m.offline = true; m.erro = (rr && rr.error) || 'erro'; vePjRender(); return; }
-                Object.assign(m, { path: rr.path, name: m.nome ? m.name : rr.name, dur: rr.dur, peaks: rr.peaks || [], url: rr.url, quadros: rr.quadros });
-                veAudioRegistrar(m.id, rr.url, rr.quadros);
-                veRelinkDone(m);
-            });
-        } else if (m.id === 0) {
-            VE.path = path;
-            VE.info = null;
-            VE.thumbs = [];
-            VE.peaks = [];
-            m.dur = m.dur || VE.srcDur || 1;
-            veLoading('Relincando mídia...', 10);
-            api.ve_preparar_midia(path, 0);
-            veRelinkDone(m, true);
-        } else {
-            delete m.info; delete m.url; delete m.thumbs; delete m.peaks;
-            veMidiaPreparar(m);
-            veRelinkDone(m, true);
-        }
+        veTrocarArquivo(m, r.path);
     });
+}
+
+// O arquivo é do mesmo tipo da mídia? (substituir/relincar)
+function veArquivoServe(m, path) {
+    if (m.kind === 'image') return VE_EXT_IMG.test(path);
+    if (m.kind === 'audio') return EXT_AUDIO.test(path) && !EXT_VIDEO.test(path);
+    return EXT_VIDEO.test(path) || EXT_AUDIO.test(path);
+}
+
+// Substituir mídia (Replace Footage do Premiere) / relincar: a mídia passa a usar outro arquivo e TODOS os clipes
+// dela na timeline (cortes, posições, efeitos) continuam iguais — só a imagem/o som mudam. Ex.: o mesmo vídeo com
+// o som melhorado em outro programa.
+function veTrocarArquivo(m, path, silencioso) {
+    const api = window.pywebview.api, nome = vePathNome(path);
+    if (!veArquivoServe(m, path)) {
+        veToast(m.kind === 'image' ? 'Escolha um arquivo de imagem' : m.kind === 'audio' ? 'Escolha um arquivo de áudio' : 'Escolha um vídeo ou áudio');
+        return false;
+    }
+    const substituindo = !veMediaOffline(m);
+    if (typeof veCacheInvalidate === 'function') veCacheInvalidate();   // o monitor não mostra quadros do arquivo antigo
+    if (typeof vePrInvalidar === 'function') vePrInvalidar();
+    // cópias invertidas (Reverse Speed) da mídia antiga: geradas de novo a partir do arquivo novo
+    const invertidas = VE.media.filter(x => x && !x.removido && x.rvDe === m.id);
+    Object.assign(m, { path, name: m.nome ? m.name || nome : nome });
+    delete m.offline; delete m.missing; delete m.lost; delete m.erro;
+    if (m.kind === 'image') {
+        api.video_cutter_add_media(path).then(rr => {
+            if (!rr || !rr.success) { m.offline = true; m.erro = (rr && rr.error) || 'erro'; vePjRender(); return; }
+            Object.assign(m, { path: rr.path, url: rr.url, name: m.nome ? m.name : rr.name, img: new Image(), w: 0, h: 0 });
+            m.img.crossOrigin = 'anonymous';
+            m.img.onload = () => { m.w = m.img.naturalWidth; m.h = m.img.naturalHeight; veRelinkDone(m); };
+            m.img.onerror = () => { m.offline = true; m.erro = 'erro'; vePjRender(); };
+            m.img.src = rr.url;
+        });
+    } else if (m.kind === 'audio') {
+        api.video_cutter_add_audio(path).then(rr => {
+            if (!rr || !rr.success) { m.offline = true; m.erro = (rr && rr.error) || 'erro'; vePjRender(); return; }
+            Object.assign(m, { path: rr.path, name: m.nome ? m.name : rr.name, dur: rr.dur, peaks: rr.peaks || [], url: rr.url, quadros: rr.quadros });
+            veAudioRegistrar(m.id, rr.url, rr.quadros);
+            veRelinkDone(m);
+        });
+    } else if (m.id === 0) {
+        VE.path = path;
+        VE.info = null;
+        VE.thumbs = [];
+        VE.peaks = [];
+        m.dur = m.dur || VE.srcDur || 1;
+        veLoading('Relincando mídia...', 10);
+        api.ve_preparar_midia(path, 0);
+        veRelinkDone(m, true);
+    } else {
+        delete m.info; delete m.url; delete m.thumbs; delete m.peaks;
+        veMidiaPreparar(m, true);
+        veRelinkDone(m, true);
+    }
+    if (typeof veRvRestaurar === 'function') invertidas.forEach(nm => { nm.missing = true; veRvRestaurar(nm); });
+    if (!silencioso && substituindo) veToast(`${vePjNome(m)}: ${veT('substituída — os clipes da timeline continuam com os mesmos cortes')}`);
+    return true;
 }
 
 function veRelinkDone(m, preparando) {
@@ -512,7 +535,55 @@ function veRelinkDone(m, preparando) {
     vePjRender();
     veDraw();
     veDrawMonitorSoon();
-    veToast(preparando ? 'Relincando mídia...' : `${vePjNome(m)} relincada`);
+    if (!preparando) veToast(`${vePjNome(m)} ${veT('atualizada')}`);
+}
+
+// Substituir várias de uma vez: escolhe a pasta com as versões novas; cada mídia pega o arquivo de mesmo nome
+// (ou o que começa com o nome dela: "IMG_0013_comprimido_melhorado.mp4" serve para "IMG_0013_comprimido.mp4")
+function vePjSubstituirVarios(ids) {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.select_folder) return;
+    const midias = ids.map(id => VE.media[id]).filter(m => m && ['video', 'audio', 'image'].includes(m.kind));
+    api.select_folder('video-cutter').then(r => {
+        if (!r || !r.success || !r.path) return;
+        api.ve_listar_pasta(r.path).then(lst => {
+            const arqs = [];
+            const junta = n => { (n.arquivos || []).forEach(a => arqs.push(a)); (n.pastas || []).forEach(junta); };
+            if (lst && lst.success) junta(lst);
+            const radical = p => vePathNome(p).replace(/\.[^.]+$/, '').toLowerCase();
+            let ok = 0;
+            const faltou = [];
+            midias.forEach(m => {
+                const base = radical(m.path || m.name || '');
+                const servem = arqs.filter(a => veArquivoServe(m, a) && a.toLowerCase() !== String(m.path || '').toLowerCase());
+                const achou = servem.find(a => radical(a) === base) || servem.filter(a => radical(a).startsWith(base)).sort((x, y) => x.length - y.length)[0];
+                if (achou && veTrocarArquivo(m, achou, true)) ok++; else faltou.push(vePjNome(m));
+            });
+            veToast(`${ok} ${veT(ok === 1 ? 'mídia substituída' : 'mídias substituídas')}` + (faltou.length ? ` · ${veT('sem arquivo correspondente')}: ${faltou.slice(0, 4).join(', ')}${faltou.length > 4 ? '…' : ''}` : ''));
+        });
+    });
+}
+
+// ── Mostrar no projeto (botão direito no clipe da timeline, como o Reveal in Project do Premiere) ──
+function veMostrarNoProjeto(c) {
+    let m = c && veMediaOf(c);
+    if (m && m.rvDe != null) m = VE.media[m.rvDe] || m;   // clipe invertido: a mídia original
+    if (!m || !VE_PJ_TIPOS[m.kind] || m.base || m.removido) { veToast('Este clipe não tem um item no painel Projeto'); return; }
+    for (let b = vePjBin(m.pasta); b; b = vePjBin(b.pai)) b.aberta = true;   // abre as pastas até ele
+    if (PREFS.pjModo === 'grade') VEPJ.pasta = m.pasta || null;
+    VEPJ.sel = new Set(['m:' + m.id]);
+    VEPJ.foco = 'm:' + m.id;
+    if (typeof vedShow === 'function') vedShow('projeto');
+    vePjRender();
+    setTimeout(() => {
+        const box = $ve('ve-pj-lista'), el = box && box.querySelector(`[data-k="m:${m.id}"]`);
+        if (!el) return;
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        el.classList.remove('pj-piscar');
+        void el.offsetWidth;
+        el.classList.add('pj-piscar');
+        setTimeout(() => el.classList.remove('pj-piscar'), 1800);
+    }, 60);
 }
 
 // ─────────────────────────── para a timeline ───────────────────────────
@@ -607,6 +678,7 @@ function vePjMenu(x, y, doc) {
     const keys = [...VEPJ.sel], um = keys.length === 1;
     const midiaUm = um && keys[0].startsWith('m:') ? VE.media[+keys[0].slice(2)] : null;
     const podeRelink = midiaUm && ['video', 'audio', 'image'].includes(midiaUm.kind);
+    const varias = keys.length > 1 ? keys.filter(k => k.startsWith('m:')).map(k => +k.slice(2)).filter(id => ['video', 'audio', 'image'].includes((VE.media[id] || {}).kind)) : [];
     const m = doc.createElement('div');
     m.className = 've-ctx';
     m.innerHTML = `
@@ -616,7 +688,8 @@ function vePjMenu(x, y, doc) {
             ${VE_CORES.map(([k, nome, hex]) => `<button class="ve-ctx-cor" data-cor="${k}" title="${nome}" style="--c:${hex}"></button>`).join('')}
         </div><div class="ve-ctx-sep"></div>` : ''}
         ${um ? '<button class="ve-ctx-item" data-pj="ren">Renomear<kbd>F2</kbd></button>' : ''}
-        ${podeRelink ? `<button class="ve-ctx-item${veMediaOffline(midiaUm) ? ' offline' : ''}" data-pj="rel">Relincar mídia...</button>` : ''}
+        ${podeRelink ? `<button class="ve-ctx-item${veMediaOffline(midiaUm) ? ' offline' : ''}" data-pj="rel" title="${veMediaOffline(midiaUm) ? '' : 'Troca o arquivo e mantém os clipes na timeline com os mesmos cortes e posições'}">${veMediaOffline(midiaUm) ? 'Relincar mídia...' : 'Substituir mídia...'}</button>` : ''}
+        ${varias.length > 1 ? `<button class="ve-ctx-item" data-pj="relv" title="Escolha a pasta com as versões novas: cada mídia pega o arquivo de mesmo nome">Substituir ${varias.length} mídias (escolher pasta)...</button>` : ''}
         ${keys.length ? `<button class="ve-ctx-item" data-pj="dup">Duplicar<kbd>Ctrl+D</kbd></button>
         <button class="ve-ctx-item" data-pj="cut">Recortar<kbd>Ctrl+X</kbd></button>
         <button class="ve-ctx-item" data-pj="copy">Copiar<kbd>Ctrl+C</kbd></button>` : ''}
@@ -637,7 +710,7 @@ function vePjMenu(x, y, doc) {
         if (cor) vePjCor(keys, cor.dataset.cor);
         else if (it) ({ ren: () => vePjRenomear(keys[0]), dup: () => vePjDuplicar(keys), cut: () => vePjCopiar('recortar'),
             copy: () => vePjCopiar('copiar'), paste: vePjColar, bin: vePjNovaPasta, aj: vePjNovoAjuste, cor: vePjNovaCor, imp: vePjImportarDialogo,
-            tl: () => veCreateTimeline(), rel: () => vePjRelink(+keys[0].slice(2)), del: () => vePjApagar(keys) })[it.dataset.pj]();
+            tl: () => veCreateTimeline(), rel: () => vePjRelink(+keys[0].slice(2)), relv: () => vePjSubstituirVarios(varias), del: () => vePjApagar(keys) })[it.dataset.pj]();
         else return;
         veClipMenuFechar();
     });

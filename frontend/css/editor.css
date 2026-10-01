@@ -455,6 +455,9 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-gr-tipos button { width: 26px; height: 24px; border-radius: 5px; border: 1px solid var(--ve-line-2); background: var(--ve-bg); color: var(--ve-dim); cursor: pointer; font-size: 13px; }
 .ve-gr-tipos button.on { border-color: var(--ve-accent); color: var(--ve-accent); }
 .ve-pj-swatch { width: 100%; height: 100%; border-radius: 4px; }
+/* Mostrar no projeto: o item pisca para achar com o olho */
+@keyframes vePjPiscar { 0%, 100% { box-shadow: none; } 20%, 60% { box-shadow: 0 0 0 2px var(--ve-accent), 0 0 14px rgba(249,115,22,.55); } 40%, 80% { box-shadow: none; } }
+.pj-piscar { animation: vePjPiscar 1.6s ease-in-out; border-radius: 6px; }
 .ve-screen.tool-pincel, .ve-screen.tool-pincel canvas { cursor: none; }   /* a silhueta do pincel faz de cursor */
 .ve-gr-cursor { position: absolute; z-index: 5; pointer-events: none; border-radius: 50%; border: 1.5px solid #fff;
     box-shadow: 0 0 0 1px rgba(0,0,0,.6), inset 0 0 0 1px rgba(0,0,0,.35); }

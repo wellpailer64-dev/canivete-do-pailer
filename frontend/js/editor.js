@@ -1944,10 +1944,12 @@ function veTemSom(c) {
 // Põe no player o vídeo da mídia. Cada player usa a URL com uma marca própria (tag): com a mesma URL o WebView
 // divide o carregamento entre eles. Devolve true se trocou de arquivo.
 function veDeckCarregar(x, mid, tag) {
-    if (x._mid === mid && x.getAttribute('src')) return false;
     const m = VE.media[mid], url = m && m.url;
+    // mesma mídia E mesmo arquivo: nada a fazer (Substituir mídia troca o arquivo e a URL: o player recarrega)
+    if (x._mid === mid && x._url === url && x.getAttribute('src')) return false;
     if (!url) return false;
     x._mid = mid;
+    x._url = url;
     x.crossOrigin = 'anonymous';   // quadro legível no WebGL (Luz e Cor, Básico 3D) mesmo sem o vídeo principal
     x.src = !tag || url.startsWith('blob:') ? url : url + (url.includes('?') ? '&' : '?') + 'camada=' + tag;
     x.load();
@@ -2475,6 +2477,7 @@ function veClipMenu(i, x, y, doc) {
         ${veIsImage(c) ? '' : '<button class="ve-ctx-item" data-ctx="gain">Ganho de áudio…<kbd>G</kbd></button>'}
         <button class="ve-ctx-item" data-ctx="pp">Propriedades${veIsImage(c) ? '' : ' (velocidade, volume)'}</button>
         <button class="ve-ctx-item" data-ctx="fx">Controles de efeito</button>
+        <button class="ve-ctx-item" data-ctx="pj">Mostrar no projeto</button>
         ${veIsImage(c) ? '' : `<button class="ve-ctx-item" data-ctx="inv">${veInvertido(c) ? '✓ ' : ''}Inverter clipe (Reverse Speed)</button>`}
         <button class="ve-ctx-item perigo" data-ctx="del">Apagar clipe<kbd>D</kbd></button>`;
     doc.body.appendChild(m);
@@ -2499,6 +2502,7 @@ function veClipMenu(i, x, y, doc) {
             else if (it.dataset.ctx === 'pp') { vedShow('pp'); veRefresh(); }
             else if (it.dataset.ctx === 'del') veDeleteClip(i);
             else if (it.dataset.ctx === 'inv') veInverterClipes();
+            else if (it.dataset.ctx === 'pj') veMostrarNoProjeto(VE.clips[i]);
         } else return;
         veClipMenuFechar();
     });
@@ -4796,6 +4800,7 @@ function veOnPrepare(ev) {
             v.crossOrigin = 'anonymous';   // permite o ganho acima de 100% na prévia (Web Audio)
             if (VE.media[0]) VE.media[0].url = ev.url;
             v._mid = 0;
+            v._url = ev.url;
             v.src = ev.url;
             v.muted = VE.muted;
             v.load();

@@ -29,6 +29,7 @@
 - legendas: VE.legendas[{st,en,texto,pt:[[a,b] por palavra],estilo?}] ; estilo base VE.legEstilo ; transcrição VETX.palavras (por timeline)
 - criar timeline: `veCreateTimeline({name})` (vira a ativa) ; depois `veRelayout(); veRefresh();`
 - trilha livre acima de tudo: `veCeTrilhaAcima('v'|'a')`
+- trocar o arquivo de uma mídia mantendo todos os clipes (ex.: versão com som melhorado): `veTrocarArquivo(VE.media[id], path)`
 - mover legenda: SEMPRE `veLegMover(l, d)` (leva l.pt junto) ; tirar trecho de todas as trilhas: `veLegRipple(a, b)`
 - legendas a partir de palavras: VETX.palavras=[[ini,fim,txt]...] ; `VE.legendas = veTxMontarLegendas({max,linhas,minDur,gap})`
 
