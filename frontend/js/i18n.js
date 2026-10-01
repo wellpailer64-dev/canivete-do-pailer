@@ -399,7 +399,7 @@ const I18N_EN = {
     'Muda todos os clipes desta cor sólida (no painel Projeto: duplo clique também troca).': 'Changes every clip of this color matte (double-click it in the Project panel too).',
     'Pincel (B): pinte no monitor com esta camada selecionada para continuar nela.': 'Brush (B): paint on the monitor with this layer selected to keep drawing on it.',
     'Aplicar som do Soundboard na agulha': 'Apply Soundboard sound at the playhead',
-    'Selecione um som no Soundboard (um clique) para aplicar com Ctrl+Shift+1': 'Select a sound in the Soundboard (one click) to apply it with Ctrl+Shift+1',
+    'Selecione um som no Soundboard (um clique) para aplicar com Shift+1': 'Select a sound in the Soundboard (one click) to apply it with Shift+1',
     '1 a cada 3 cortes': 'Every 3rd cut',
     'Adicionar músicas': 'Add music',
     'AutoFrame Customizado': 'Custom AutoFrame',
@@ -691,7 +691,7 @@ const I18N_EN = {
     'Arraste uma aba para outro painel, ou arraste esta janela pela barra de título e solte num quadradinho laranja': 'Drag a tab to another panel, or drag this window by its title bar and drop it on an orange square',
     'Devolver os painéis desta janela ao editor (ou só feche a janela)': 'Return this window’s panels to the editor (or just close the window)',
     'Programa': 'Program', 'Monitor': 'Monitor', 'Linha do tempo': 'Timeline', 'Propriedades': 'Properties', 'Controles de efeito': 'Effect Controls',
-    'Mídia': 'Media', 'Clipes': 'Clips', 'Timeline': 'Timeline', 'Projeto': 'Project', 'Controles': 'Controls', 'Atalhos': 'Shortcuts',
+    'Mídia': 'Media', 'Clipes': 'Clips', 'Timeline': 'Timeline', 'Projeto': 'Project', 'Controles': 'Controls', 'Atalhos': 'Shortcuts',
     // ── Comp (editor-comp.js) ──
     'Criar Comp': 'Create Comp',
     'Criar Comp…': 'Create Comp…',

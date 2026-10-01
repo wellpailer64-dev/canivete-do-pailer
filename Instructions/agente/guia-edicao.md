@@ -87,6 +87,12 @@
 - conferir no fim: `VE.clips.filter(c => VE.media[c.m]?.pasta === (VE.bins||[]).find(b => b.nome==='Soundboard')?.id)`
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-10-01 V3 MÉDIA (Portugal, ~1:25, mistura V1+V2+inédito: saunas IMG_0010): "amei". pedido: versões do mesmo
+  imóvel NÃO podem começar igual (parecia a V1) → abrir de fora (fachada c/ zoom lento → vista da cidade) com a 1ª frase
+  em off (só som, x:'a') e cortar para ela no 2º trecho; GC entra quando ela aparece. final: flores → vista c/ logo
+  PORTUGAL 587 no céu (y≈600; sobre prédios/placas não lê) + voz "Portugal, 587" → placa → frase de fecho + assinatura.
+  vozes de arquivos diferentes: nivelar a ~−20 dB médio (sauna com eco veio +4 dB; "SOM TRATADO" −4 dB).
+  legenda: montar frase a frase por corte (veTxMontarLegendas por segmento, max 22) — inteira emendava cortes.
 - 2026-09-30 correção de diagnóstico: manchas/traços ROSA na imagem vinham das CURVAS do Luz e Cor (vermelho puxado
   para baixo) na camada de ajuste copiada da modelo — NÃO da camada de pincel. ao ver cor estranha: checar fx 'lc'
   (curvas/rodas) das camadas de ajuste antes de culpar outra camada; ao copiar a camada de ajuste, avisar o usuário.

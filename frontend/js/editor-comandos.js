@@ -41,7 +41,7 @@ const VE_CMDS = [
     { id: 'preferencias', grupo: 'editar', nome: 'Preferências...', teclas: [], sempre: true, fn: () => prefsOpen() },
 
     // ── Clipe ──
-    { id: 'sb-aplicar', grupo: 'clipe', nome: 'Aplicar som do Soundboard na agulha', teclas: ['Ctrl+Shift+1'], fn: () => veSbAplicarSelecionado() },
+    { id: 'sb-aplicar', grupo: 'clipe', nome: 'Aplicar som do Soundboard na agulha', teclas: ['Shift+1'], fn: () => veSbAplicarSelecionado() },
     { id: 'ganho', grupo: 'clipe', nome: 'Ganho de áudio...', teclas: ['G'], fn: () => veOpenGain(), pode: veSel },
     { id: 'cortar-selecionados', grupo: 'clipe', nome: 'Cortar selecionados na agulha', teclas: ['E'], fn: () => veCortarSelecionados(), pode: veSel },
     { id: 'aparar-inicio', grupo: 'clipe', nome: 'Aparar início até a agulha', teclas: ['Q'], sep: true, fn: () => veRippleTrimStart() },

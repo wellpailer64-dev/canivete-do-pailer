@@ -4,7 +4,7 @@
 // baixar na primeira vez (Functions/soundboard.py). Passar o mouse num som toca a prévia (ou clique);
 // arrastar até a timeline/monitor ou dar duplo clique (na agulha) coloca o som no projeto (pasta
 // "Soundboard" do painel Projeto) e na timeline, como um áudio importado. Um clique seleciona o som;
-// Ctrl+Shift+1 (comando sb-aplicar) põe o selecionado na agulha, na primeira trilha de áudio livre.
+// Shift+1 (comando sb-aplicar) põe o selecionado na agulha, na primeira trilha de áudio livre.
 // Preferências (PREFS): sbFav (favoritos, por arquivo), sbVol (volume da prévia), sbHover (ouvir ao passar).
 // =========================================================
 
@@ -66,7 +66,7 @@ function veSbRender() {
         total += itens.length;
         html += `<div class="ve-sb-sec">${veEsc(c.nome)} <small>${itens.length}</small></div><div class="ve-sb-grade">` +
             itens.map(([s, si]) => `<div class="ve-sb-som${VESB.sel === s.arq ? ' sel' : ''}" draggable="true" data-k="${ci}:${si}" data-c="${c.id}"
-                title="${veEsc(s.nome)} · ${veSbDur(s.dur)}&#10;Original: ${veEsc(s.orig)}&#10;${veEsc(s.fonte)} · ${veEsc(s.licenca)}&#10;Clique: seleciona · Ctrl+Shift+1 ou duplo clique: aplica na agulha · ou arraste para a timeline">
+                title="${veEsc(s.nome)} · ${veSbDur(s.dur)}&#10;Original: ${veEsc(s.orig)}&#10;${veEsc(s.fonte)} · ${veEsc(s.licenca)}&#10;Clique: seleciona · Shift+1 ou duplo clique: aplica na agulha · ou arraste para a timeline">
                 <i class="ve-sb-prog"></i>
                 <button class="ve-sb-fav${favs.has(s.arq) ? ' on' : ''}" data-fav title="Favorito">★</button>
                 <span>${veEsc(s.nome)}</span><small>${veSbDur(s.dur)}</small></div>`).join('') + '</div>';
@@ -131,12 +131,12 @@ async function veSbInserir(k, drop) {
     vePjAlterou();
 }
 
-// Ctrl+Shift+1: o som selecionado no painel, na agulha
+// Shift+1: o som selecionado no painel, na agulha
 function veSbAplicarSelecionado() {
     const d = VESB.dados;
     let k = null;
     (d && d.categorias || []).forEach((c, ci) => c.sons.forEach((s, si) => { if (s.arq === VESB.sel) k = `${ci}:${si}`; }));
-    if (!k) { veToast('Selecione um som no Soundboard (um clique) para aplicar com Ctrl+Shift+1'); return; }
+    if (!k) { veToast('Selecione um som no Soundboard (um clique) para aplicar com Shift+1'); return; }
     veSbInserir(k);
 }
 
