@@ -294,6 +294,12 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
   - Áudio: na linha A do soltar, se estiver livre.
   - `.srt`: substitui as legendas (LEG), deslocadas para o ponto do soltar.
   - A cor do rótulo passa para o clipe, e o nome dado no Projeto aparece na timeline.
+- **Trocar o arquivo, mantendo os clipes** (`veTrocarArquivo`, botão direito):
+  - **Substituir mídia...** troca uma mídia, como o Replace Footage do Premiere.
+  - **Substituir N mídias** escolhe uma pasta e cada mídia pega o arquivo de mesmo nome ou que começa com o nome dela.
+  - **Melhorar áudio** roda Sidon + OmniVoice no fundo e troca pelo `_melhorado`.
+    Ver `Instructions/melhorar-audio.md`.
+  - No clipe da timeline, **Mostrar no projeto** acha a mídia.
 - O arquivo do projeto (.vcnvt) guarda `bins`, `m0` (organização do vídeo principal) e os itens que ainda não estão na timeline.
 
 ## Vários vídeos por projeto (como no Premiere)

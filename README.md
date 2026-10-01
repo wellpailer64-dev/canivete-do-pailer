@@ -27,6 +27,8 @@ O **Canivete do Pailer** é um app desktop Windows que reúne 15 ferramentas par
 | 🎵 Áudio | **Converter Áudio** | MP3, WAV, FLAC, M4A, OGG, Opus; extrai o áudio de vídeos |
 | | **Cortar Áudio** | Linha do tempo com várias faixas |
 | | **Transcrever** | Texto e legenda `.srt` com Whisper |
+| | **Melhorar Áudio** | Voz com som de estúdio (como o Adobe Podcast) em áudio ou vídeo — Sidon + OmniVoice |
+| | **Geração de Voz** | Clona uma voz por amostra curta e sintetiza textos (OmniVoice) |
 | 🖼️ Imagem | **Converter Imagem** | HEIC, RAW, WEBP, AVIF, PNG, JPG, TIFF (mantém EXIF e perfil de cor) |
 | | **Comprimir Imagem** | Fotos e PDFs mais leves, em paralelo |
 | | **Remover Fundo** | Recorte com IA (ISNet) e revisão antes de salvar |
