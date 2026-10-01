@@ -1632,6 +1632,7 @@ def _grafo_mix(clipes, total, entradas, rotulo):
 # (48 kHz, estéreo, 16 bits, sem cabeçalho). O mixer em tempo real do editor (editor-audio.js) lê trechos dele
 # por HTTP Range e soma as trilhas a cada bloco — nada é renderizado de novo quando a timeline muda.
 AUDIO_SR = 48000
+_THREADS_CLIPE = 4   # threads de decodificação de cada clipe por cima da base (exportar_video)
 _conf = {"fonte": None, "pcm": None, "evento": None}
 
 
@@ -2102,7 +2103,10 @@ def _filtros_fx(fx, mw, mh, tag="x"):
                 # unsharp 5×5 só na luma (a prévia usa o mesmo núcleo binomial)
                 out.append(f"unsharp=5:5:{nit:.4f}:5:5:0,format=rgba")
             ang = _num(v.get("vig"), 0, 1.5708)
-            if ang > 0.001:
+            if ang > 0.001 and tag.startswith("a"):
+                # camada de ajuste: o vídeo embaixo é opaco, não há alfa para guardar (economiza 2 cópias do quadro)
+                out.append(f"format=gbrp,vignette=angle={ang:.5f}:dither=0,format=rgba")
+            elif ang > 0.001:
                 # vignette não trabalha com alfa: escurece o RGB e devolve o alfa original
                 r = f"{tag}f{j}"
                 out.append(f"format=rgba,split[{r}a][{r}b];[{r}a]format=gbrp,vignette=angle={ang:.5f}:dither=0[{r}c];"
@@ -2145,6 +2149,23 @@ def _ca_exprs(ca, tv):
                 dy.append(f"({area:.3f}*{onda(vel, r, 2.1)})")
     junta = lambda xs, op: op.join(xs) if xs else None
     return {"sc": junta(sc, "*"), "rot": junta(rot, "+"), "dx": junta(dx, "+"), "dy": junta(dy, "+")}
+
+
+_alfa_cache = {}
+
+
+def _clipe_tem_alfa(path):
+    """Clipe com transparência (o arquivo é consultado uma vez enquanto não mudar)."""
+    try:
+        chave = (path, os.path.getmtime(path))
+    except OSError:
+        return True
+    if chave not in _alfa_cache:
+        try:
+            _alfa_cache[chave] = bool(probe(path).get("alfa"))
+        except Exception:
+            _alfa_cache[chave] = True   # na dúvida, o caminho em RGBA (mais lento, mas guarda o alfa)
+    return _alfa_cache[chave]
 
 
 def _normalizar_camadas(camadas, path_video):
@@ -2472,27 +2493,56 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 efeitos = _filtros_fx(c["fx"], W, H, f"a{n}")
                 if not efeitos or (c["op"] <= 0.001 and "op" not in c["kf"]):
                     continue
-                fim = c["st"] + c["dur"]
+                ini, fim = max(0.0, c["st"]), min(c["st"] + c["dur"], total)
+                if fim - ini < 1e-3:
+                    continue
                 if "op" in c["kf"]:
                     opac = [_opacidade_animada(c["kf"]["op"], c["dur"], fps, f"colorchannelmixer@op{n}", c["st"])]
                 else:
                     opac = [f"colorchannelmixer=aa={c['op']:.4f}"] if c["op"] < 0.999 else []
-                filtros.append(f"{vf}split[aj{n}a][aj{n}b]")
-                filtros.append(f"[aj{n}b]trim=start={c['st']:.4f}:end={fim:.4f},{para_rgb},"
-                               + ",".join(efeitos + opac) + f",{de_rgb}[aj{n}c]")
-                filtros.append(f"[aj{n}a][aj{n}c]overlay=0:0:enable='between(t,{c['st']:.3f},{fim:.3f})'"
-                               f":eof_action=pass:format=auto[o{n}]")
+                # O vídeo é cortado em antes / trecho / depois e emendado de volta (concat): cada parte é consumida
+                # em sequência. Antes era split + overlay: o ramo de cima só tinha quadro no trecho e o overlay
+                # guardava na RAM todos os quadros de baixo até ele chegar (GBs e a CPU parada esperando).
+                r, partes = f"aj{n}", []
+                antes, depois = ini > 1e-3, fim < total - 1e-3
+                nseg = 1 + antes + depois
+                filtros.append(f"{vf}split={nseg}" + "".join(f"[{r}s{j}]" for j in range(nseg)))
+                j = 0
+                if antes:
+                    filtros.append(f"[{r}s{j}]trim=end={ini:.4f},setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
+                    j += 1
+                trecho = f"[{r}s{j}]trim=start={ini:.4f}:end={fim:.4f}"
+                if opac:
+                    # com opacidade: os efeitos por cima do próprio trecho (o tempo ainda é o da timeline: o sendcmd
+                    # da opacidade animada conta a partir do início da camada)
+                    filtros.append(f"{trecho},split[{r}x][{r}y]")
+                    filtros.append(f"[{r}y]{para_rgb}," + ",".join(efeitos + opac) + f",{de_rgb}[{r}z]")
+                    filtros.append(f"[{r}x][{r}z]overlay=0:0:eof_action=pass:format=auto,"
+                                   f"setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
+                else:
+                    filtros.append(f"{trecho},{para_rgb}," + ",".join(efeitos)
+                                   + f",{de_rgb},setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
+                j += 1
+                if depois:
+                    filtros.append(f"[{r}s{j}]trim=start={fim:.4f},setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
+                    j += 1
+                filtros.append("".join(f"[{r}p{k}]" for k in range(nseg)) + f"concat=n={nseg}:v=1:a=0[o{n}]")
                 vf = f"[o{n}]"
                 continue
             if c["tipo"] == "imagem" and c.get("seq"):
                 cmd += ["-f", "concat", "-safe", "0", "-i", c["seq"]]
             elif c["tipo"] == "imagem":
-                cmd += ["-loop", "1", "-framerate", fps, "-t", _tempo_ffmpeg(c["dur"]), "-i", c["path"]]
+                # um quadro só: decodificado uma vez e repetido no grafo (filtro loop). Com "-loop 1" o PNG era
+                # lido e decodificado de novo a cada quadro do vídeo — caro em PNG grande (textos, logos)
+                cmd += ["-i", c["path"]]
             else:
                 # o arquivo do clipe, lido a partir de 3 s antes do trecho (-ss antes do -i: não decodifica o começo
-                # do arquivo à toa); o corte exato fica no trim, o que evita flash preto em cortes
+                # do arquivo à toa) e só até 1 s depois dele (-t: não decodifica o resto); o corte exato fica no
+                # trim, o que evita flash preto em cortes. Poucas threads por clipe: com 20+ clipes cada
+                # decodificador abria uma por núcleo (1000+ threads, GBs de quadros na RAM) e eles brigavam pela CPU
                 c["ss"] = max(0.0, c["s"] - 3.0)
-                cmd += (["-ss", _tempo_ffmpeg(c["ss"])] if c["ss"] > 0 else []) + ["-i", c["path"] or path]
+                leitura = c["s"] - c["ss"] + c["fonte"] + 1.0
+                cmd += ["-threads", str(_THREADS_CLIPE)] + (["-ss", _tempo_ffmpeg(c["ss"])] if c["ss"] > 0 else [])                     + ["-t", _tempo_ffmpeg(leitura), "-i", c["path"] or path]
             idx = entrada
             entrada += 1
             kf = c["kf"]
@@ -2512,7 +2562,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                           f":eval=frame:flags=bicubic")
             else:
                 k = c["sc"]
-                escala = f"scale='max(2,trunc(iw*{k:.5f}))':'max(2,trunc(ih*{k:.5f}))':flags=bicubic"
+                # tamanho original: sem scale (ele converte o quadro inteiro mesmo com fator 1)
+                escala = (None if abs(k - 1) < 1e-5 else
+                          f"scale='max(2,trunc(iw*{k:.5f}))':'max(2,trunc(ih*{k:.5f}))':flags=bicubic")
             giro = None
             if "rot" in kf or ca["rot"]:
                 # quadro fixo do tamanho da diagonal: cabe em qualquer ângulo
@@ -2530,8 +2582,10 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             else:
                 opac = None
             # escala animada vai por último (tamanho muda a cada quadro; o resto trabalha em tamanho fixo)
-            ordem = [giro, opac, escala] if ("sc" in kf or sx or sy or ca["sc"]) else [escala, giro, opac]
+            escala_animada = "sc" in kf or sx or sy or ca["sc"]
+            ordem = [giro, opac, escala] if escala_animada else [escala, giro, opac]
             efeitos = _filtros_fx(c["fx"], c["mw"], c["mh"], f"l{n}")
+            bm = _BLEND_FF.get(c.get("bm") or "")
             # velocidade do clipe (como no Premiere): o tempo da fonte é comprimido/esticado antes de tudo
             if c["tipo"] == "imagem" and c.get("seq"):
                 # quadros do texto animado: o trecho do clipe que entra na exportação
@@ -2539,7 +2593,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                        f"setpts=PTS-STARTPTS,")
                 vel = ""
             elif c["tipo"] == "imagem":
-                src = f"[{idx}:v:0]"
+                src = f"[{idx}:v:0]"   # montado abaixo: o que é fixo roda uma vez, antes de repetir o quadro
                 vel = ""
             else:
                 ss = c.get("ss", 0.0)
@@ -2547,10 +2601,29 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                        f"end={_tempo_ffmpeg(c['s'] - ss + c['fonte'])},")
                 vel = f"setpts=(PTS-STARTPTS)/{c['v']:.6f},"
             filtros_clip = efeitos + [f for f in ordem if f]
+            if c["tipo"] == "imagem" and not c.get("seq"):
+                # imagem parada: efeitos, escala, giro e opacidade fixos são aplicados uma vez no único quadro
+                # (ex.: LUT num PNG grande antes de reduzir); só o que anima com o tempo roda a cada quadro
+                animados = [f for f, anima in ((escala, escala_animada), (giro, "rot" in kf or ca["rot"]),
+                                                (opac, "op" in kf)) if f and anima]
+                k = 0
+                while k < len(filtros_clip) and filtros_clip[k] not in animados:
+                    k += 1
+                n_q = int(math.ceil(c["dur"] * float(fps))) + 1
+                src += ",".join([para_rgb] + filtros_clip[:k]
+                                + [f"loop=loop={n_q - 1}:size=1:start=0", f"setpts=N/({fps}*TB)"]) + ","
+                filtros_clip = filtros_clip[k:]
             if c["tipo"] != "imagem":
                 filtros_clip.append(f"tpad=stop_mode=clone:stop_duration={_tempo_ffmpeg(frame_dur)}")
-            cadeia = f"{src}{vel}fps=fps={fps}:start_time=0,{para_rgb}," + ",".join(filtros_clip)
-            cadeia += f",{de_rgb},setpts=PTS-STARTPTS+{_tempo_ffmpeg(c['st'])}/TB[l{n}]"
+            if c["tipo"] == "video" and not efeitos and not giro and not opac and not bm and not escala_animada                     and pixfmt == "yuv420p" and not _clipe_tem_alfa(c["path"] or path):
+                # clipe opaco só cortado/redimensionado/posicionado: fica em YUV do começo ao fim. A ida e volta para
+                # RGBA (quadro inteiro, 2 conversões por quadro) não muda nada na imagem e era o mais caro do grafo.
+                # Clipe com transparência (ProRes 4444, Animation/qtrle...) não: em YUV o alfa some e o fundo fica preto
+                cadeia = f"{src}{vel}" + ",".join([f"fps=fps={fps}:start_time=0"] + filtros_clip
+                                                  + ["scale=out_range=tv,format=yuv420p"])
+            else:
+                cadeia = f"{src}{vel}" + ",".join([f"fps=fps={fps}:start_time=0", para_rgb] + filtros_clip + [de_rgb])
+            cadeia += f",setpts=PTS-STARTPTS+{_tempo_ffmpeg(c['st'])}/TB[l{n}]"
             filtros.append(cadeia)
             fim = c["st"] + c["dur"]
             tl = f"(t-{c['st']:.4f})"
@@ -2577,7 +2650,6 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             if ca_tl["dx"]:   # Tremer: desloca a posição
                 px, py = f"({px})+{ca_tl['dx']}", f"({py})+{ca_tl['dy']}"
             ena = f"between(t,{_tempo_ffmpeg(c['st'])},{_tempo_ffmpeg(fim)})"
-            bm = _BLEND_FF.get(c.get("bm") or "")
             if bm:
                 # Modo de mesclagem: a camada é posicionada num quadro transparente do tamanho do vídeo, misturada
                 # com o fundo (blend) e aplicada pela transparência dela (maskedmerge) — como o canvas da prévia
