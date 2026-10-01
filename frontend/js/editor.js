@@ -2571,6 +2571,66 @@ function veSyncExtra(x, srcT, taxa = VE.rate) {
     }
 }
 
+// Cada clipe de camada fica com o MESMO player enquanto aparece, e o do clipe que vai aparecer se prepara antes
+// (carrega o arquivo e espera parado no quadro de entrada), como nas transições. Antes os players eram dados pela
+// ordem das camadas visíveis: quando um clipe entrava ou saía, os outros trocavam de player (arquivo novo + busca)
+// e a camada sumia por alguns quadros — tela preta ou travada no corte.
+const VE_CAM_PRE = 1.2;                // segundos de preparo antes de o clipe aparecer
+const VECAM = { slot: new Map() };     // clipe → nº do player (abaixo de VE_TR_PL0)
+
+// Clipes de vídeo que precisam de player extra no instante t (visíveis, fora o do player principal)
+function veCamVisiveis(t, lista, cur) {
+    let vis = lista.filter(c => !veIsAudio(c) && !veTrkHidden(c.tr) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS)
+        .sort((a, b) => a.tr - b.tr || a.st - b.st);
+    const cobre = vis.map(c => !veIsImage(c) && veIsPlain(c) && !c._tr && !veTemAlfa(c)).lastIndexOf(true);
+    if (cobre > 0) vis = vis.slice(cobre);
+    return vis.filter(c => {
+        const m = veMediaOf(c);
+        return !veIsImage(c) && !c._tr && (c._o || c) !== cur && m && m.url && !veMediaOffline(m);
+    });
+}
+
+// Reserva os players dos clipes visíveis agora e, tocando, dos que aparecem nos próximos VE_CAM_PRE s
+// (esses ficam parados no quadro em que vão entrar). Solta os que não servem mais.
+function veCamPreparar(t, lista, virt) {
+    const precisa = new Map();   // clipe → instante em que aparece (t = já aparece)
+    const cur = VE.clips[VE.cur];
+    veCamVisiveis(t, lista, cur).forEach(c => precisa.set(c._o || c, { c, quando: t }));
+    if (VE.playing) {
+        const ate = t + VE_CAM_PRE * Math.max(1, VE.rate), cortes = new Set();
+        VE.clips.forEach(c => [c.st, veEnd(c)].forEach(b => { if (b > t + VE_EPS && b <= ate) cortes.add(b); }));
+        [...cortes].sort((a, b) => a - b).forEach(b => {
+            // numa transição o desenho usa os clipes estendidos (o de baixo aparece enquanto o de cima entra)
+            const tb = b + 2 * VE_EPS, top = VE.clips[veTopAt(tb)];
+            const lst = virt && virt !== VE.clips && veTransAtiva(tb) ? virt : VE.clips;
+            veCamVisiveis(tb, lst, top).forEach(c => { const o = c._o || c; if (!precisa.has(o)) precisa.set(o, { c, quando: tb }); });
+        });
+    }
+    VECAM.slot.forEach((n, o) => {
+        if (precisa.has(o)) return;
+        VECAM.slot.delete(o);
+        const x = VEX[n];
+        if (x && !x.paused) x.pause();
+    });
+    const usados = new Set(VECAM.slot.values());
+    precisa.forEach(({ c, quando }, o) => {
+        let n = VECAM.slot.get(o);
+        if (n == null) {
+            for (n = 0; usados.has(n); n++);
+            if (n >= VE_TR_PL0) return;
+            usados.add(n);
+            VECAM.slot.set(o, n);
+        }
+        const x = veExtraPlayer(n, veMid(c));
+        if (quando > t) {
+            // ainda não aparece: parado no quadro de entrada
+            if (!x.paused) x.pause();
+            const alvo = veSrcAt(c, quando);
+            if (x.readyState >= 1 && !x.seeking && Math.abs(x.currentTime - alvo) > 0.02) x.currentTime = alvo;
+        }
+    });
+}
+
 // Perto do fim do trecho a reserva se prepara para o seguinte (quando ele começa em outro ponto do vídeo):
 // busca um pouco ANTES do ponto de entrada e, nos últimos VE_PREROLL s, já toca sem som, acertando a própria
 // velocidade a cada quadro para chegar ao ponto de entrada junto com o corte. Player parado leva ~2 quadros
@@ -2580,12 +2640,15 @@ const VE_PREROLL = 0.6;
 function vePreloadNext() {
     const c = VE.clips[VE.cur];
     if (!c || !veVideo().src) return;
-    const fim = veEnd(c), falta = fim - VE.playhead;
+    // a próxima troca: o fim do clipe ou, antes dele, um clipe de trilha de cima começando no meio
+    let fim = veEnd(c);
+    VE.clips.forEach(o => { if (o.st > VE.playhead + VE_EPS && o.st < fim && veTopAt(o.st + 0.01) !== VE.cur) fim = o.st; });
+    const falta = fim - VE.playhead;
     if (falta > 1.5) return;
     const j = veTopAt(fim + 0.01);
     if (j < 0 || j === VE.cur) return;
     const n = VE.clips[j], alvo = veSrcAt(n, fim);
-    if (Math.abs(alvo - c.e) < 0.03 && veMid(n) === veMid(c)) return;   // continua do mesmo ponto: o player atual segue
+    if (Math.abs(alvo - veSrcAt(c, fim)) < 0.03 && veMid(n) === veMid(c)) return;   // continua do mesmo ponto: o player atual segue
     const r = veReserva();
     if (VEDK.i !== j || Math.abs(VEDK.t - alvo) > 0.02) {
         veDeckCarregar(r, veMid(n), veDeckTag(r));   // o arquivo do próximo clipe
@@ -2631,6 +2694,7 @@ function veParkExtras(n, limpar, soCamadas) {
         if (limpar && x.getAttribute('src')) { x.removeAttribute('src'); x._mid = null; x.load(); }
     });
     if (!soCamadas && typeof VETRP !== 'undefined') VETRP.slot.clear();
+    if (limpar) VECAM.slot.clear();
 }
 
 // ── monitor: desenha as camadas visíveis na agulha, de baixo para cima ──
@@ -2830,7 +2894,8 @@ function veDrawMonitor() {
     const cobre = vis.map(({ c }) => !veIsImage(c) && veIsPlain(c) && !c._tr && !veTemAlfa(c)).lastIndexOf(true);
     if (cobre > 0) vis = vis.slice(cobre);
     // parcial: alguma camada sem o quadro certo ainda (carregando/buscando) — desenha, mas não guarda no cache
-    let extra = 0, falta = false, parcial = false;
+    let falta = false, parcial = false;
+    veCamPreparar(t, vis.map(({ c }) => c), virt);
     const itens = vis.map(({ c, i }) => {
         let src = null;
         const med = veMediaOf(c);
@@ -2858,17 +2923,17 @@ function veDrawMonitor() {
             // parte estendida de um clipe da transição: sem o quadro ainda, segura o último desenho (não pisca)
             const x = trPl.get(c._o);
             if (x.readyState >= 2 && !x.seeking) src = x; else falta = true;
-        } else if (veMediaOf(c) && veMediaOf(c).url) {
-            // vídeo de camada de baixo (transparência/dupla exposição): player extra sem som
-            const x = veExtraPlayer(extra++, veMid(c));
+        } else if (VECAM.slot.has(c._o || c)) {
+            // vídeo de camada (transparência/dupla exposição): o player extra sem som reservado para o clipe.
+            // Sem o quadro ainda: segura o último desenho (não pisca preto nem some a camada)
+            const x = VEX[VECAM.slot.get(c._o || c)];
             veSyncExtra(x, veSrcAt(c, t), veTaxa(c));
             if (x.readyState >= 2) src = x;
-            if (x.readyState < 2 || x.seeking) parcial = true;
+            if (x.readyState < 2 || x.seeking) { parcial = true; if (x.readyState < 2) falta = true; }
         }
         if (!src) parcial = true;
         return { c, i, src };
     });
-    veParkExtras(extra, false, true);
     if (pr && vePrDesenhar(pr, ctx, cv, pv, cw, ch)) return;
     if (cachedSrc) { VE._monHold = 0; usarCache(); return; }
     // desenha em coordenadas do quadro
