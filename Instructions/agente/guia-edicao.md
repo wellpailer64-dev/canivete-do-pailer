@@ -67,6 +67,9 @@
 - conhecidos (já no dicionário): Elon→Helo ; Brooklyn→Brooklin (bairro SP) ; lisão→Lisonda (marca da quadra de tênis)
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-09-30 correção de diagnóstico: manchas/traços ROSA na imagem vinham das CURVAS do Luz e Cor (vermelho puxado
+  para baixo) na camada de ajuste copiada da modelo — NÃO da camada de pincel. ao ver cor estranha: checar fx 'lc'
+  (curvas/rodas) das camadas de ajuste antes de culpar outra camada; ao copiar a camada de ajuste, avisar o usuário.
 - 2026-09-30 V2 MENOR refeita: pedido = transições em takes de apoio, não cortar antes do fim da frase, legenda certa,
   manter a camada de PINCEL da V1 (forma no canto sup.dir. atrás do logo = apoio de leitura; copiar junto com o logo,
   st 0 → fim da fala). feito: chicote + push na batida (2/5 apoios), fim de corte pela energia da voz. aguardando nota.
