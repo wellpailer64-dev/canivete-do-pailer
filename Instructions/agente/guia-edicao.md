@@ -1,5 +1,5 @@
 # GUIA-EDICAO :: Pocket Editor (Canivete do Pailer) — para agentes de IA
-# formato: denso, para máquina. calibrar a cada feedback do usuário (seção CALIBRACAO no fim). v1 2026-09-30
+# formato: denso, para máquina. calibrar a cada feedback do usuário (seção CALIBRACAO no fim). v2 2026-10-01 (+ seção 7 efeitos sonoros)
 
 ## 0 ACESSO
 - porta: %APPDATA%/CaniveteDoPailer/agente.json → instancias[].porta (pid vivo?) ; senão varrer 127.0.0.1:9222..9231/json
@@ -67,6 +67,24 @@
 - dicionário de nomes: %APPDATA%/CaniveteDoPailer/dicionario_fala.json {"errado":"certo"} (vale p/ painel Texto e ferramentas)
 - `suspeitas` = nomes próprios duvidosos → corrigir palavra no plano ou perguntar ao usuário ; acrescentar ao dicionário
 - conhecidos (já no dicionário): Elon→Helo ; Brooklyn→Brooklin (bairro SP) ; lisão→Lisonda (marca da quadra de tênis)
+
+## 7 EFEITOS SONOROS (painel Soundboard — editor-soundboard.js)
+- pack instalado? `VESB.dados` (null → `veSbCarregar()` e esperar) ; `.instalado` false → pedir ao usuário para clicar
+  "Baixar sons" no painel (8,7 MB, 1 vez) ou `window.pywebview.api.ve_sb_baixar()` com o ok dele
+- catálogo: `VESB.dados.categorias[ci] = {id, nome, sons[si]: {arq, nome, dur, orig, path, url}}` ; chave do som = `"ci:si"`
+  ids: whoosh riser impacto pop notificacao dinheiro glitch cartoon reacoes objetos jingles vozes
+  escolher por `nome` (pt, ex. "Riser + hit 03") + `orig` (título original em inglês, mais descritivo) + `dur`
+- aplicar: `VE.playhead = t; await veSbInserir(k)` → entra na mídia "Soundboard" do Projeto e na 1ª trilha de áudio
+  livre de cima p/ baixo em [t, t+dur] (nunca sobrescreve; cria trilha se preciso) ; o clipe novo = `VE.clips[VE.sel]`
+- sons nivelados (média ≈ −20 dB, pico −1 dBFS) e já aparados (som começa no 1º quadro) → ajustar só `c.g` (dB)
+- PONTOS DE PARTIDA (calibrar com o usuário):
+  - whoosh/swoosh na transição: começa ~dur/2 antes do corte (pico no corte) ; g −6..−10 sob fala
+  - riser/uplifter: TERMINA no momento-chave (st = alvo − dur) ; boom/riser+hit/bass drop: começa NO momento-chave
+  - pop/clique: entrada de texto, gráfico ou apoio que "pula" na tela ; g −8..−12
+  - dinheiro: preço/valor na tela ou falado ; reações (risada, aplausos, ba dum tss): logo depois da piada/frase de efeito
+  - densidade: 1 efeito a cada ~3–5 s no máximo ; nunca 2 fortes juntos ; nada que mascare palavra importante
+  - preferir a mesma família de whoosh no vídeo inteiro (coerência) ; vozes (inglês) só se pedirem
+- conferir no fim: `VE.clips.filter(c => VE.media[c.m]?.pasta === (VE.bins||[]).find(b => b.nome==='Soundboard')?.id)`
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
 - 2026-09-30 correção de diagnóstico: manchas/traços ROSA na imagem vinham das CURVAS do Luz e Cor (vermelho puxado
