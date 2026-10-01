@@ -16,6 +16,10 @@ Play do Pocket Editor: `python testes/teste_play.py "<projeto.vcnvt>" [--segundo
 `--agente=9333`) mede agulha voltando, buscas, esperas, quadros perdidos e travadas; sai com 1 se passar dos limites.
 Rodar antes de release quando mexer em reprodução, áudio ou prévias.
 
+## Editar vídeo pelo app (agente)
+Guia interno para IAs (acesso, leitura de mídia, receita, estilo do cliente, calibração): `Instructions/agente/guia-edicao.md`.
+Atualize a seção CALIBRACAO dele a cada feedback do usuário sobre uma edição.
+
 ## Build local
 - `build.bat` apaga `dist/` inteiro, onde ficam os modelos do usuário (`modelos_ia/`, `models/`, ~8 GB).
   Gere em outra pasta (`--distpath dist_novo --workpath build_novo`) e copie só `CaniveteDoPailer.exe`,

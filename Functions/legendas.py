@@ -177,6 +177,63 @@ def _palavras(seg):
     return [w for w in out if w[2]]
 
 
+# ── dicionário de correções (nomes que o modelo erra sempre: "Elon" → "Helo") ──
+# %APPDATA%/CaniveteDoPailer/dicionario_fala.json = {"errado": "certo", ...} (sem diferenciar maiúsculas);
+# vale para o painel Texto e para as ferramentas do agente (agente_midia.transcrever).
+def _dicionario_path():
+    return os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "dicionario_fala.json")
+
+
+def dicionario():
+    try:
+        import json
+        with open(_dicionario_path(), "r", encoding="utf-8") as f:
+            return {str(k).lower(): str(v) for k, v in (json.load(f) or {}).items()}
+    except Exception:
+        return {}
+
+
+def corrigir(palavras):
+    """Troca as palavras do dicionário, mantendo a pontuação e a maiúscula do começo."""
+    import re
+    d = dicionario()
+    if not d:
+        return palavras
+    for w in palavras:
+        m = re.match(r"^([\"'(¿¡]*)(.*?)([.,;:!?…\"')]*)$", w[2])
+        if not m:
+            continue
+        novo = d.get(m.group(2).lower())
+        if novo:
+            if m.group(2)[:1].isupper():
+                novo = novo[:1].upper() + novo[1:]
+            w[2] = m.group(1) + novo + m.group(3)
+    return palavras
+
+
+# palavras comuns que abrem frase (com maiúscula mesmo sem pontuação antes): não são nomes para conferir
+_COMUNS = set("""olha olhe uma um umas uns se mas e é o a os as que então aqui ali vem vamos isso isto esse essa este esta
+você vocês eu nós ele ela tem não sim bem agora também quer quero pode com para pra por porque quando onde como
+muito mais tudo todo toda nossa nosso meu minha seu sua aí lá já só ou nem""".split())
+
+
+def suspeitas(palavras):
+    """Palavras para conferir antes das legendas: com maiúscula no meio da frase (nomes próprios que o modelo
+    pode ter ouvido errado) e que não estão no dicionário como forma certa."""
+    certas = {v.lower() for v in dicionario().values()}
+    out, fim_frase, ant_nome, fim_ant = [], True, False, -9.0
+    for w in palavras:
+        nua = w[2].strip("\"'()¿¡.,;:!?…")
+        novo_trecho = fim_frase or w[0] - fim_ant > 0.6   # depois de pausa: frase nova (maiúscula normal)
+        maiuscula = nua[:1].isupper() and len(nua) > 1
+        if maiuscula and not novo_trecho and not ant_nome and nua.lower() not in certas and nua.lower() not in _COMUNS:
+            out.append([w[0], w[2]])
+        # sobrenome/continuação de um nome que já passou ("Helo Ribeiro Imóveis") não entra de novo
+        ant_nome = maiuscula and (nua.lower() in certas or ant_nome or not novo_trecho)
+        fim_frase, fim_ant = w[2][-1:] in ".!?…", w[1]
+    return out
+
+
 def transcrever(clipes, total, idioma="pt", on_prog=None, stop=None):
     """Transcreve a timeline. clipes = [[st, s, e, ganho_db, arquivo|None]] (os mesmos da exportação)."""
     prog = on_prog or (lambda p, m: None)
@@ -198,4 +255,5 @@ def transcrever(clipes, total, idioma="pt", on_prog=None, stop=None):
         palavras.extend(_palavras(seg))
         prog(min(99, 3 + int(seg.end / total * 96)), "Transcrevendo...")
     vc._apagar(wav)
+    palavras = corrigir(palavras)   # dicionário de nomes (dicionario_fala.json)
     return {"success": True, "palavras": palavras, "idioma": idioma, "segundos": round(time.time() - t0, 1)}

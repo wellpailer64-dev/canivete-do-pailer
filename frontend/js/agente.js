@@ -2,6 +2,8 @@
 // Modo agente (Instructions/modo-agente.md): o que o Claude usa para ver e mexer no app aberto
 //   window.__veLog      → os últimos avisos, erros e resultados de exportação que apareceram (veAgLog)
 //   veLogTexto(n)       → as n últimas linhas do registro, em texto
+//   veAgenteMidia(cmd, [args]) → ferramentas de leitura de mídia (Functions/agente_midia.py) num processo à parte:
+//                         'analisar' <projeto> [--nao-usados-em NOME] | 'folha' | 'storyboard' | 'transcrever' | 'batidas'
 //   veAgente(acao, fn)  → ação do Claude: mostra o aviso "✦ Claude: ação", registra e roda fn (o desfazer
 //                         continua valendo, como qualquer edição)
 // =========================================================
@@ -82,4 +84,14 @@ window.veAgente = async function (acao, fn) {
         veAgAviso(`${acao} (falhou)`, true);
         throw e;
     }
+};
+
+// Ferramentas de leitura de mídia (rodam fora do editor, prioridade baixa); devolve o texto/JSON do comando
+window.veAgenteMidia = async function (cmd, args = []) {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.ve_agente_midia) throw new Error('API do agente indisponível');
+    veAgLog('claude', `analisando mídia: ${cmd} ${args.join(' ')}`.slice(0, 300));
+    const r = await api.ve_agente_midia(cmd, args);
+    if (!r || !r.success) throw new Error((r && r.error) || 'falhou');
+    try { return JSON.parse(r.saida); } catch (e) { return r.saida; }
 };

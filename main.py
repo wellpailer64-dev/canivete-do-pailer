@@ -2814,6 +2814,22 @@ class ApiBridge:
     def ve_layout_save(self, dados):
         return ve_layout_save(dados)
 
+    def ve_agente_midia(self, cmd, args=None):
+        """Ferramentas do agente (Functions/agente_midia.py: midias, folha, storyboard, transcrever, batidas,
+        analisar) num processo à parte e de prioridade baixa: o modelo de visão não pesa no editor.
+        args = lista de argumentos da linha de comando. Devolve {success, saida} (JSON ou texto do comando)."""
+        import subprocess
+        base = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, os.path.abspath(__file__)]
+        try:
+            r = subprocess.run(base + ["--agente-midia", str(cmd)] + [str(a) for a in (args or [])],
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3600,
+                               creationflags=0x00004000 | 0x08000000, cwd=os.path.dirname(os.path.abspath(__file__)))
+            if r.returncode != 0:
+                return {"success": False, "error": (r.stderr or "").strip()[-2000:]}
+            return {"success": True, "saida": r.stdout}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def ve_agente_porta(self):
         """Porta do modo agente desta abertura (Preferências → Modo desenvolvedor)."""
         return {"porta": _PORTA_AGENTE}
@@ -3409,4 +3425,9 @@ def main():
 
 
 if __name__ == "__main__":
+    # ferramentas do agente pela linha de comando (também no exe): CaniveteDoPailer.exe --agente-midia analisar ...
+    if len(sys.argv) > 1 and sys.argv[1] == "--agente-midia":
+        from Functions import agente_midia
+        agente_midia.main(sys.argv[2:])
+        sys.exit(0)
     main()

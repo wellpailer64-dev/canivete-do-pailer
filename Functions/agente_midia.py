@@ -214,31 +214,11 @@ def storyboard(path, passo=1.5, inicio=0.0, fim=0.0, colunas=8, altura=200):
 
 # ─────────────────────────── fala ───────────────────────────
 
-def transcrever(path, idioma="pt"):
-    """Palavras [início, fim, texto] do arquivo (o mesmo modelo do painel Texto), com cache."""
-    cache = os.path.join(_pasta(), f"fala_{_chave(_assinatura(path), idioma)}.json")
-    if os.path.isfile(cache):
-        with open(cache, "r", encoding="utf-8") as f:
-            return json.load(f)
-    from Functions import legendas
-    chave = "pt" if idioma == "pt" else "multi"
-    if not legendas.modelo_pronto(chave):
-        legendas.preparar_modelo(chave)
-    wav = os.path.join(_pasta(), f"fala_{os.getpid()}.wav")
-    r = subprocess.run([ffmpeg_path(), "-y", "-v", "error", "-i", path, "-vn", "-ac", "1", "-ar", "16000", wav],
-                       capture_output=True, text=True, timeout=3600, creationflags=_BAIXA)
-    if r.returncode != 0 or not os.path.isfile(wav):
-        return {"erro": (r.stderr or "falha ao ler o áudio").strip().splitlines()[-1] if r.stderr else "sem áudio"}
-    palavras = []
-    try:
-        for seg in legendas._carregar(chave).recognize(wav):
-            palavras.extend(legendas._palavras(seg))
-    finally:
-        try:
-            os.remove(wav)
-        except OSError:
-            pass
-    # frases: palavras juntas até uma pausa de 0,7 s ou fim de frase (fácil de ler e de achar o trecho)
+LIMPEZA = "highpass=f=90,lowpass=f=7500,afftdn=nr=12:nf=-30,dynaudnorm=f=150:g=15"
+
+
+def _frases(palavras):
+    """Palavras juntas até uma pausa de 0,7 s ou fim de frase (fácil de ler e de achar o trecho)."""
     frases, atual = [], []
     for w in palavras:
         if atual and (w[0] - atual[-1][1] > 0.7 or atual[-1][2][-1:] in ".!?"):
@@ -247,10 +227,128 @@ def transcrever(path, idioma="pt"):
         atual.append(w)
     if atual:
         frases.append([atual[0][0], atual[-1][1], " ".join(x[2] for x in atual)])
-    res = {"arquivo": path, "frases": frases, "palavras": palavras}
-    with open(cache, "w", encoding="utf-8") as f:
-        json.dump(res, f, ensure_ascii=False)
-    return res
+    return frases
+
+
+def transcrever(path, idioma="pt", limpo=False):
+    """Frases e palavras [início, fim, texto] do arquivo (o mesmo modelo do painel Texto). O cache guarda a fala
+    crua; o dicionário de nomes (legendas.corrigir) é aplicado a cada leitura e `suspeitas` lista o que conferir.
+    limpo = filtra o ruído antes (medido: ajuda pouco e às vezes atrapalha; só para gravação muito ruim)."""
+    from Functions import legendas
+    cache = os.path.join(_pasta(), f"fala_{_chave(_assinatura(path), idioma, 'limpo' if limpo else '')}.json")
+    palavras = None
+    if os.path.isfile(cache):
+        with open(cache, "r", encoding="utf-8") as f:
+            palavras = json.load(f).get("palavras")
+    if palavras is None:
+        chave = "pt" if idioma == "pt" else "multi"
+        if not legendas.modelo_pronto(chave):
+            legendas.preparar_modelo(chave)
+        wav = os.path.join(_pasta(), f"fala_{os.getpid()}.wav")
+        cmd = [ffmpeg_path(), "-y", "-v", "error", "-i", path, "-vn", "-ac", "1", "-ar", "16000"]
+        r = subprocess.run(cmd + (["-af", LIMPEZA] if limpo else []) + [wav],
+                           capture_output=True, text=True, timeout=3600, creationflags=_BAIXA)
+        if r.returncode != 0 or not os.path.isfile(wav):
+            return {"erro": (r.stderr or "falha ao ler o áudio").strip().splitlines()[-1] if r.stderr else "sem áudio"}
+        palavras = []
+        try:
+            for seg in legendas._carregar(chave).recognize(wav):
+                palavras.extend(legendas._palavras(seg))
+        finally:
+            try:
+                os.remove(wav)
+            except OSError:
+                pass
+        with open(cache, "w", encoding="utf-8") as f:
+            json.dump({"arquivo": path, "palavras": palavras}, f, ensure_ascii=False)
+    palavras = legendas.corrigir([list(w) for w in palavras])
+    return {"arquivo": path, "frases": _frases(palavras), "palavras": palavras, "suspeitas": legendas.suspeitas(palavras)}
+
+
+# ─────────────────────────── cenas (CLIP, local) ───────────────────────────
+# rótulo (como eu leio) → descrição em inglês (o CLIP compara a imagem com o texto em inglês)
+CENAS = [
+    ("piscina", "a swimming pool"), ("academia", "a gym with exercise machines"),
+    ("brinquedoteca", "a children's playroom with toys and a ball pit"), ("quadra", "a tennis court or sports court"),
+    ("salao_festas", "a party room with tables and chairs"), ("sauna_spa", "a sauna or spa room"),
+    ("churrasqueira", "a barbecue grill area"), ("jardim", "a garden with plants and flowers"),
+    ("fachada", "the exterior facade of a residential building"), ("hall", "a building lobby or reception"),
+    ("corredor", "an indoor corridor or hallway"), ("elevador", "an elevator"), ("garagem", "an underground parking garage"),
+    ("vista", "a city skyline view from a high window"), ("varanda", "an apartment balcony with glass railing"),
+    ("sala", "an empty living room"), ("cozinha", "a kitchen"), ("banheiro", "a bathroom with toilet or shower"),
+    ("quarto", "an empty bedroom"), ("area_servico", "a laundry or service area"), ("obra", "an unfinished room with bare concrete"),
+    ("pessoa_falando", "a woman talking to the camera"), ("logo_placa", "a sign, logo or lettering on a wall"),
+]
+_CLIP = {}
+
+
+def _clip():
+    if not _CLIP:
+        from transformers import CLIPModel, CLIPProcessor
+        from transformers.utils import logging as tlog
+        tlog.set_verbosity_error()
+        tlog.disable_progress_bar()
+        base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "modelos_ia", "clip")
+        _CLIP["m"] = CLIPModel.from_pretrained(base, local_files_only=True).eval()
+        _CLIP["p"] = CLIPProcessor.from_pretrained(base, local_files_only=True)
+    return _CLIP
+
+
+def cenas(imagens):
+    """Para cada imagem: [(rótulo, prob), ...] (3 melhores) — o CLIP compara com as descrições de CENAS."""
+    import torch
+    from PIL import Image
+    c, textos, out = _clip(), [x[1] for x in CENAS], []
+    for k in range(0, len(imagens), 16):
+        lote = [Image.open(p).convert("RGB") for p in imagens[k:k + 16]]
+        with torch.no_grad():
+            r = c["m"](**c["p"](text=textos, images=lote, return_tensors="pt", padding=True))
+            prob = r.logits_per_image.softmax(dim=-1)
+        for linha in prob.tolist():
+            top = sorted(range(len(CENAS)), key=lambda j: -linha[j])[:3]
+            out.append([(CENAS[j][0], round(linha[j], 2)) for j in top])
+    return out
+
+
+def analisar(projeto, nao_usados_em=None, fala=True, quadros=6):
+    """Um comando só: mídias do projeto + folhas de contato + o que aparece em cada vídeo (CLIP, por quadro e no
+    geral) + a fala dos vídeos com som (até 3 min cada). Grava mapa_<projeto>.json e devolve um resumo curto."""
+    fl = folha([projeto], quadros=quadros, por_folha=10, nao_usados_em=nao_usados_em)
+    vids = [v for f in fl for v in f["videos"]]
+    info = {x["path"]: x for x in midias(projeto, nao_usados_em)}
+    # quadros já extraídos pela folha (mesmos nomes de arquivo)
+    todos = []
+    for v in vids:
+        base = _chave(_assinatura(v["path"]), 170)
+        v["quadros"] = [os.path.join(_pasta(), f"q_{base}_{j}.jpg") for j in range(quadros)]
+        todos += [q for q in v["quadros"] if os.path.isfile(q)]
+    etiq = dict(zip(todos, cenas(todos))) if todos else {}
+    for v in vids:
+        porq = [etiq.get(q) for q in v["quadros"] if q in etiq]
+        soma = {}
+        for top in porq:
+            for rot, pr in top:
+                soma[rot] = soma.get(rot, 0) + pr / max(1, len(porq))
+        v["cenas"] = [(r, round(p, 2)) for r, p in sorted(soma.items(), key=lambda x: -x[1])[:3]]
+        v["cena_por_quadro"] = [top[0][0] for top in porq]
+        v["som"] = info.get(v["path"], {}).get("som")
+        if fala and v["som"] and (v.get("dur") or 0) <= 180:
+            t = transcrever(v["path"])
+            v["fala"] = " ".join(f[2] for f in t.get("frases", []))
+            v["suspeitas"] = [w[1] for w in t.get("suspeitas", [])]
+        del v["quadros"]
+    mapa = {"projeto": projeto, "nao_usados_em": nao_usados_em, "folhas": [f["imagem"] for f in fl], "videos": vids}
+    nome = os.path.splitext(os.path.basename(projeto))[0]
+    arq = os.path.join(_pasta(), f"mapa_{nome}_{_chave(projeto, nao_usados_em)}.json")
+    with open(arq, "w", encoding="utf-8") as f:
+        json.dump(mapa, f, ensure_ascii=False, indent=1)
+    linhas = [f"mapa: {arq}", "folhas: " + " | ".join(mapa["folhas"])]
+    for v in vids:
+        cen = ", ".join(f"{r} {p:.2f}" for r, p in v["cenas"])
+        txt = (v.get("fala") or "")[:140]
+        linhas.append(f"#{v['n']} id{v['id']} {v.get('dur') or 0:.1f}s [{cen}] {'/'.join(dict.fromkeys(v['cena_por_quadro']))}"
+                      + (f" | fala: {txt}" if txt else "") + (f" | conferir: {v['suspeitas']}" if v.get("suspeitas") else ""))
+    return "\n".join(linhas)
 
 
 # ─────────────────────────── batidas ───────────────────────────
@@ -341,6 +439,9 @@ def main(argv=None):
     a.add_argument("--inicio", type=float, default=0); a.add_argument("--fim", type=float, default=0)
     a.add_argument("--colunas", type=int, default=8); a.add_argument("--altura", type=int, default=200)
     a = sub.add_parser("transcrever"); a.add_argument("arquivo"); a.add_argument("--idioma", default="pt")
+    a.add_argument("--limpo", action="store_true")
+    a = sub.add_parser("analisar"); a.add_argument("projeto"); a.add_argument("--nao-usados-em")
+    a.add_argument("--sem-fala", action="store_true"); a.add_argument("--quadros", type=int, default=6)
     a = sub.add_parser("batidas"); a.add_argument("audio")
     o = ap.parse_args(argv)
     if o.cmd == "midias":
@@ -350,7 +451,10 @@ def main(argv=None):
     elif o.cmd == "storyboard":
         r = storyboard(o.video, o.passo, o.inicio, o.fim, o.colunas, o.altura)
     elif o.cmd == "transcrever":
-        r = transcrever(o.arquivo, o.idioma)
+        r = transcrever(o.arquivo, o.idioma, o.limpo)
+    elif o.cmd == "analisar":
+        print(analisar(o.projeto, o.nao_usados_em, not o.sem_fala, o.quadros))
+        return
     else:
         r = batidas(o.audio)
     print(json.dumps(r, ensure_ascii=False, indent=1))
