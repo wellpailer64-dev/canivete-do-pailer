@@ -373,7 +373,7 @@ async function veAfcPreparar(plano, bin) {
         const corte = bordas.filter(t => plano.fim - t >= df - 0.05 && t > t0 + (x.introFim || 0) + 0.5).pop();
         if (corte != null) { x.fimIni = corte - t0; plano.slots = plano.slots.filter(s => (s.cel ? s.grupo_a : s.a) < corte - 1e-3); }
     }
-    if (plano.slots.some(s => s.flash)) plano.branco = await veAfBranco(bin && bin.id, m.flashMarca ? m.paleta.secundaria : '#ffffff');
+    if (m.flashMarca && plano.slots.some(s => s.flash)) plano.branco = await veAfBranco(bin && bin.id, m.paleta.secundaria);
     x.total = plano.fim - t0;
     // intro animada: as melhores fotos viram cards, e um clarão branco quando o logo bate
     if (m.intro.tipo === 'animada') {
@@ -381,7 +381,6 @@ async function veAfcPreparar(plano, bin) {
         x.cards = [];
         for (const f of fotos) { const c = await imp(f.path); if (c) x.cards.push(c); }
         await veAfEsperar(() => x.cards.every(c => c.w > 0), 8000);
-        x.clarao = await veAfBranco(bin && bin.id, '#ffffff');
     }
     // efeitos sonoros (pack do Soundboard): carregado aqui se o painel ainda não abriu
     if (m.sfx !== false && typeof veSbCarregar === 'function') {
@@ -408,6 +407,28 @@ async function veAfcPreparar(plano, bin) {
     return x;
 }
 
+// Contraste (WCAG 2): luminância relativa e razão entre duas cores #rrggbb
+function veAfcLum(hex) {
+    const v = String(hex || '#000').replace('#', ''), c = [0, 2, 4].map(i => parseInt(v.substr(i, 2), 16) / 255 || 0)
+        .map(x => x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+const veAfcRazao = (a, b2) => { const [x, y] = [veAfcLum(a), veAfcLum(b2)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+// mesma cor com outra luminância (k < 1 escurece, > 1 clareia em direção ao branco)
+function veAfcTom(hex, k) {
+    const v = String(hex || '#000').replace('#', ''), c = [0, 2, 4].map(i => parseInt(v.substr(i, 2), 16) || 0);
+    const r = c.map(x => Math.round(k <= 1 ? x * k : x + (255 - x) * Math.min(1, k - 1)));
+    return '#' + r.map(x => Math.max(0, Math.min(255, x)).toString(16).padStart(2, '0')).join('');
+}
+// Selo de texto sobre o fundo `atras`: o fundo do selo precisa se destacar dele (≥ 2:1) e o texto, do selo (≥ 4,5:1)
+function veAfcSelo(pal, atras) {
+    const opcoes = [pal.secundaria, veAfcTom(pal.primaria, 0.35), '#ffffff', '#111111'];
+    const fundo = opcoes.find(c => veAfcRazao(c, atras) >= 2) || '#111111';
+    const textos = [pal.texto, '#ffffff', veAfcTom(pal.primaria, 0.3), '#111111'];
+    const cor = textos.find(c => veAfcRazao(c, fundo) >= 4.5) || (veAfcRazao('#ffffff', fundo) > veAfcRazao('#111111', fundo) ? '#ffffff' : '#111111');
+    return { fundo, cor };
+}
+
 // Cor sólida do projeto com essa cor (uma por cor)
 function veAfcCor(fill, nome) {
     let c = VE.media.find(m => m.kind === 'cor' && !m.removido && m.fill === fill);
@@ -416,7 +437,7 @@ function veAfcCor(fill, nome) {
 }
 
 // Quadros-chave: lista de [t, v, i] → [{t, v, i}] (i: 'out' freia, 'lin' linear, 'ease' suave)
-const veAfcK = l => l.map(([t, v, i]) => ({ t: +Math.max(0, t).toFixed(4), v: +(+v).toFixed(2), i: i || 'lin' }));
+const veAfcK = l => veAfK(l);   // [t, v, curva] (curvas em editor-autoframe.js: entra, sai, troca, mola, suave)
 
 // Depois de veAfClipes: fundo da marca, intro, logo no canto, encerramento, efeitos sonoros e a camada de cor
 // só sobre as cenas
@@ -434,7 +455,8 @@ function veAfcExtras(out, plano, x) {
     // cor (Luz e Cor) só nas cenas: a cor da marca fica exata. Cobre a transição de entrada/saída inteira
     // (começar no meio de uma transição deixa um trecho preto no quadro)
     const aIni = iniCenas ? Math.max(0, iniCenas - 0.3) : 0, aFim = x.fimIni != null ? Math.min(x.total, fimCenas + 0.3) : fimCenas;
-    out.filter(c => c.fx && c.fx.some(f => f.t === 'lc') && VE.media[c.m] && VE.media[c.m].kind === 'ajuste').forEach(c => {
+    // só o look (a camada longa); os efeitos curtos (clarão, P&B, pulso) ficam onde estão
+    out.filter(c => c.fx && c.fx.some(f => f.t === 'lc') && VE.media[c.m] && VE.media[c.m].kind === 'ajuste' && c.e - c.s > 1 && !(c.k && c.k.op)).forEach(c => {
         c.st = +aIni.toFixed(4); c.e = +(aFim - aIni).toFixed(4);
     });
     // a cena antes do encerramento não escurece (o encerramento entra no lugar)
@@ -458,9 +480,11 @@ function veAfcExtras(out, plano, x) {
     const logoSc = larg => x.logo ? W * larg / x.logo.w * 100 : 100;
     const texto = (st, dur, t, y, tr, selo) => {
         if (!t || !t.trim() || typeof veTxMidia !== 'function' || dur <= 0.1) return;
+        // selo: cores escolhidas pelo contraste com o fundo principal (texto legível com qualquer paleta)
+        const sl = selo ? veAfcSelo(m.paleta, m.paleta.primaria) : null;
         out.push({ tr, st: +st.toFixed(4), s: 0, e: +dur.toFixed(3), m: veTxMidia().id,
-            tx: { ...VE_TX_PADRAO, t: t.trim(), fonte: m.fonte || 'Arial', cor: m.paleta.texto, tam: selo ? 64 : 72, alin: 'center',
-                ...(selo ? { fOn: true, fCor: m.paleta.primaria, fOp: 100, fPad: 26, fRaio: 22 } : { sOn: true, sOp: 55, sBlur: 14 }) },   // selo na cor principal: contrasta com o círculo (destaque)
+            tx: { ...VE_TX_PADRAO, t: t.trim(), fonte: m.fonte || 'Arial', cor: sl ? sl.cor : m.paleta.texto, tam: selo ? 64 : 72, alin: 'center',
+                ...(selo ? { fOn: true, fCor: sl.fundo, fOp: 100, fPad: 28, fRaio: 24 } : { sOn: true, sOp: 55, sBlur: 14 }) },
             p: { sc: 100, x: W / 2, y, rot: 0, op: 100 },
             txa: typeof veTxaObj === 'function' ? { in: veTxaObj(selo ? 'pop' : 'subir'), out: veTxaObj('fade') } : undefined });
     };
@@ -469,50 +493,65 @@ function veAfcExtras(out, plano, x) {
         if (!x.logo) return;
         const sc = +logoSc(larg).toFixed(2), e = +dur.toFixed(4), d = Math.min(0.35, dur / 4);
         const c = { tr, st: +st.toFixed(4), s: 0, e, m: x.logo.id, p: { sc, x: W / 2, y, rot: 0, op: 100 } };
-        if (anim === 'pop') c.k = { sc: veAfcK([[0, sc * 0.6, 'out'], [d, sc * 1.06, 'out'], [d * 1.6, sc], [e - 0.2, sc], [e, sc * 1.08]]),
-            op: veAfcK([[0, 0, 'out'], [d * 0.6, 100], [e - 0.2, 100], [e, 0]]) };
+        if (anim === 'pop') c.k = { sc: veAfcK([[0, sc * 0.6, 'mola'], [d, sc, 'suave'], [e - 0.2, sc * 1.03, 'sai'], [e, sc * 1.15]]),
+            op: veAfcK([[0, 0, 'entra'], [d * 0.5, 100], [e - 0.2, 100, 'sai'], [e, 0]]) };
         else if (anim === 'zoom') c.k = { sc: veAfcK([[0, sc * 0.94], [e, sc * 1.06]]), op: veAfcK([[0, 0, 'out'], [d * 1.5, 100], [e - 0.3, 100], [e, 0]]) };
         else c.k = { op: veAfcK([[0, 0, 'ease'], [d * 1.5, 100], [e - 0.3, 100], [e, 0]]) };
         out.push(c);
     };
-    // bloco animado (intro e encerramento): círculo na cor de destaque, faixas cruzando, cards de fotos entrando na
-    // batida, logo batendo no compasso com clarão, texto em selo; sons no tempo
+    // bloco animado (intro e encerramento) — direcao-de-arte.md: 60-30-10 (fundo principal, destaque só no círculo e nos
+    // traços), um foco por vez (cards → logo → texto), escalonado, curvas entra/mola/sai, área segura (y 220–1500)
+    const LOGO_Y = 820, TXT_Y = 1260;
     const animado = (st, D, opts) => {
-        const N = Math.max(4, Math.round(D / b)), T = k => st + Math.min(D - 0.2, k * b);
-        const cards = opts.cards || [], L = opts.cards && opts.cards.length ? T(N / 2) : T(Math.min(1, N / 4));
-        // círculo
-        const circ = { tr: nova(), st: +st.toFixed(4), s: 0, e: +D.toFixed(4), m: veGrMidia('forma', 'Forma').id,
-            fm: { t: 'eli', w: 1250, h: 1250, cor: m.paleta.secundaria, cOn: false, cCor: '#ffffff', cLarg: 8, raio: 0 },
-            p: { sc: 100, x: W / 2, y: H * 0.45, rot: 0, op: 100 } };
-        circ.k = { sc: veAfcK([[0, 0, 'out'], [Math.min(b * 0.9, 0.6), 100], [L - st, 100, 'out'], [L - st + 0.12, 112, 'out'], [L - st + 0.4, 100], [D - 0.3, 100], [D, 0]]) };
-        out.push(circ);
-        // faixas diagonais cruzando a tela em velocidades diferentes
-        [[H * 0.2, -500, W + 500, 0.28], [H * 0.78, W + 500, -500, 0.2]].forEach(([y, a, z, op]) => out.push({
-            tr: nova(), st: +st.toFixed(4), s: 0, e: +D.toFixed(4), m: veGrMidia('forma', 'Forma').id,
-            fm: { t: 'ret', w: 1500, h: 40, cor: m.paleta.texto, cOn: false, cCor: '#ffffff', cLarg: 8, raio: 20 },
-            p: { sc: 100, x: a, y, rot: -16, op: op * 100 }, k: { x: veAfcK([[0, a, 'ease'], [D, z]]) } }));
-        // cards: entram um por batida, girados, e recuam quando o logo bate
-        const pos = [[W * 0.28, H * 0.3, -8], [W * 0.73, H * 0.47, 7], [W * 0.3, H * 0.67, -4]];
-        cards.forEach((md, i) => {
-            const t = T((i + 1) * N / 8) - st, sc = W * 0.44 / md.w * 100, [px, py, rot] = pos[i];
-            const fim = D - t, l = L - st - t;
-            out.push({ tr: nova(), st: +(st + t).toFixed(4), s: 0, e: +fim.toFixed(4), m: md.id,
-                p: { sc: +sc.toFixed(2), x: px, y: py, rot, op: 100 },
-                fx: [{ id: veFxNewId(), t: 'rounded', on: true, v: { raio: 7 } }],
-                k: { sc: veAfcK([[0, 0, 'out'], [0.16, sc * 1.08, 'out'], [0.3, sc], [Math.max(0.31, l), sc, 'out'], [Math.max(0.32, l + 0.25), sc * 0.9], [fim - 0.25, sc * 0.9], [fim, 0]]),
-                     op: veAfcK([[0, 100], [Math.max(0.31, l), 100, 'out'], [Math.max(0.32, l + 0.25), 45], [fim, 45]]) } });
-            som(i % 2 ? sx.pop2 : sx.pop, st + t - 0.02, -7);
+        const N = Math.max(4, Math.round(D / b)), T = k => st + Math.min(D - 0.25, k * b), Q = VE_AF_Q;
+        const cards = opts.cards || [], L = cards.length ? T(N / 2) : T(Math.min(1, N / 4)), l = L - st;
+        const sai = D - 6 * Q;   // começo da saída (6 quadros, mais rápida que a entrada)
+        // traços de destaque (10%): um entra pela esquerda no alto, outro pela direita embaixo, escalonados
+        [[330, -1, 0], [1440, 1, 0.5]].forEach(([y, lado, bt]) => {
+            const t0 = Math.min(D * 0.3, bt * b), xf = W / 2 + lado * 250, xi = xf - lado * 900;
+            out.push({ tr: nova(), st: +(st + t0).toFixed(4), s: 0, e: +(D - t0).toFixed(4), m: veGrMidia('forma', 'Forma').id,
+                fm: { t: 'ret', w: 520, h: 16, cor: m.paleta.secundaria, cOn: false, cCor: '#ffffff', cLarg: 8, raio: 8 },
+                p: { sc: 100, x: xf, y, rot: -16, op: 100 },
+                k: { x: veAfK([[0, xi, 'entra'], [12 * Q, xf, 'suave'], [sai - t0, xf + lado * 40, 'sai'], [D - t0, xf + lado * 1100]]) } });
         });
-        // logo batendo no compasso (entra grande e assenta), com clarão
+        // cards: foto + moldura branca + sombra, entram um por batida (mola, girando), recuam quando o logo bate
+        const pos = [[W * 0.29, 560, -7], [W * 0.72, 690, 6], [W * 0.36, 1130, -4]];
+        cards.forEach((md, i) => {
+            const t = T((i + 1) * N / 8) - st, fim = D - t, cw = W * 0.4, ch = cw * md.h / md.w, [px, py, rot] = pos[i];
+            const lt = Math.max(12 * Q, l - t);   // quando o logo bate, no tempo do card
+            const mult = [[0, 0, 'mola'], [10 * Q, 1, 'suave'], [lt, 1.02, 'entra'], [lt + 8 * Q, 0.86, 'suave'], [Math.max(lt + 9 * Q, sai - t), 0.84, 'sai'], [fim, 0.2]];
+            const gira = veAfK([[0, rot * 2.2, 'entra'], [12 * Q, rot]]);
+            const opk = veAfK([[0, 0, 'entra'], [4 * Q, 100], [lt, 100, 'entra'], [lt + 8 * Q, 40], [Math.max(lt + 9 * Q, sai - t), 40, 'sai'], [fim, 0]]);
+            const camada = (extra, base, dx = 0, dy = 0) => out.push({ tr: nova(), st: +(st + t).toFixed(4), s: 0, e: +fim.toFixed(4),
+                p: { sc: +base.toFixed(2), x: px + dx, y: py + dy, rot, op: 100 }, ...extra,
+                k: { sc: veAfK(mult.map(([tt, v, c]) => [tt, base * v, c])), rot: gira, op: opk } });
+            camada({ m: veGrMidia('forma', 'Forma').id, fm: { t: 'ret', w: Math.round(cw * 1.06), h: Math.round(ch + cw * 0.06), cor: '#000000', cOn: false, cCor: '#000000', cLarg: 0, raio: 14 },
+                fx: [{ id: veFxNewId(), t: 'blur', on: true, v: { amt: 14 } }] }, 100, 14, 22);   // sombra
+            out[out.length - 1].p.op = 38;
+            out[out.length - 1].k.op = veAfK([[0, 0, 'entra'], [4 * Q, 38], [lt, 38, 'entra'], [lt + 8 * Q, 15], [Math.max(lt + 9 * Q, sai - t), 15, 'sai'], [fim, 0]]);
+            camada({ m: veGrMidia('forma', 'Forma').id, fm: { t: 'ret', w: Math.round(cw * 1.06), h: Math.round(ch + cw * 0.06), cor: '#ffffff', cOn: false, cCor: '#ffffff', cLarg: 0, raio: 14 } }, 100);   // moldura
+            camada({ m: md.id, fx: [{ id: veFxNewId(), t: 'rounded', on: true, v: { raio: 3 } }] }, cw / md.w * 100);   // foto
+            som(i % 2 ? sx.pop2 : sx.pop, st + t - Q, -7);
+        });
+        // círculo de destaque atrás do logo: nasce com mola 2 quadros antes do logo (antecipação) e respira
+        const circ = { tr: nova(), st: +(L - 2 * Q).toFixed(4), s: 0, e: +(D - l + 2 * Q).toFixed(4), m: veGrMidia('forma', 'Forma').id,
+            fm: { t: 'eli', w: 760, h: 760, cor: m.paleta.secundaria, cOn: false, cCor: '#ffffff', cLarg: 8, raio: 0 },
+            p: { sc: 100, x: W / 2, y: LOGO_Y, rot: 0, op: 100 } };
+        const ce = circ.e;
+        circ.k = { sc: veAfK([[0, 0, 'mola'], [12 * Q, 100, 'suave'], [ce - 6 * Q, 104, 'sai'], [ce, 0]]) };
+        out.push(circ);
+        // logo bate no compasso: entra 150% girado e assenta com overshoot; respira; sai crescendo
         if (x.logo) {
-            const sc = logoSc(opts.larg || 0.62), e = st + D - L;
+            const sc = logoSc(opts.larg || 0.56), e = D - l;
             out.push({ tr: nova(), st: +L.toFixed(4), s: 0, e: +e.toFixed(4), m: x.logo.id,
-                p: { sc: +sc.toFixed(2), x: W / 2, y: H * 0.45, rot: 0, op: 100 },
-                k: { sc: veAfcK([[0, sc * 1.7, 'out'], [0.16, sc * 0.95, 'out'], [0.3, sc], [e - 0.3, sc * 1.04], [e, sc * 1.25]]),
-                     op: veAfcK([[0, 0, 'out'], [0.06, 100], [e - 0.2, 100], [e, 0]]), rot: veAfcK([[0, -7, 'out'], [0.3, 0]]) } });
-            if (x.clarao) out.push({ tr: nova(), st: +L.toFixed(4), s: 0, e: 0.3, m: x.clarao.id, p: { ...cheio }, k: { op: veAfcK([[0, 70, 'out'], [0.3, 0]]) } });
+                p: { sc: +sc.toFixed(2), x: W / 2, y: LOGO_Y, rot: 0, op: 100 },
+                k: { sc: veAfK([[0, sc * 1.5, 'mola'], [12 * Q, sc, 'suave'], [e - 6 * Q, sc * 1.05, 'sai'], [e, sc * 1.3]]),
+                     op: veAfK([[0, 0, 'entra'], [3 * Q, 100], [e - 6 * Q, 100, 'sai'], [e, 0]]), rot: veAfK([[0, -8, 'entra'], [12 * Q, 0]]) } });
         }
-        texto(L + b / 2, st + D - L - b / 2, opts.texto, H * 0.64, nova(), true);
+        // clarão de exposição no impacto (camada de ajuste por cima de tudo do bloco)
+        const fl = veAfAjuste(L - st - Q, 9 * Q, { exp: 1.4, ct: 10 }, [[0, 100, 'sai'], [8 * Q, 0]]);
+        fl.st = +(L - Q).toFixed(4); fl.tr = nova(); out.push(fl);
+        texto(L + b / 2, st + D - L - b / 2, opts.texto, TXT_Y, nova(), true);
         // sons: riser até o logo, impacto no logo, sucesso no texto
         if (opts.riser && sx.riser) som(sx.riser, L - sx.riser.dur, -5);
         som(sx.boom, L - 0.02, -3);
@@ -572,8 +611,9 @@ function veAfcExtras(out, plano, x) {
     // logo no canto, das cenas até o encerramento
     if (x.logo && m.marca.pos !== 'nao') {
         const larg = (m.marca.tam || 16) / 100, sc = +logoSc(larg).toFixed(2);
-        const lw = W * larg, lh = x.logo.h * lw / x.logo.w, mx = 56 + lw / 2, my = 90 + lh / 2;
-        const px = m.marca.pos.endsWith('d') ? W - mx : mx, py = m.marca.pos.startsWith('s') ? my : H - my - 140;
+        const lw = W * larg, lh = x.logo.h * lw / x.logo.w;
+        const embaixo = !m.marca.pos.startsWith('s'), direita = m.marca.pos.endsWith('d');
+        const px = direita ? W - (embaixo ? 160 : 70) - lw / 2 : 70 + lw / 2, py = embaixo ? H - 420 - lh / 2 : 230 + lh / 2;
         const st = x.introFim || 0, dur = fimCenas - st;
         if (dur > 0.5) out.push({ tr: nova(), st: +st.toFixed(4), s: 0, e: +dur.toFixed(4), m: x.logo.id,
             p: { sc, x: +px.toFixed(1), y: +py.toFixed(1), rot: 0, op: m.marca.op ?? 90 },

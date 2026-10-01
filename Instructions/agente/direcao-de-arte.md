@@ -201,6 +201,8 @@ contorna o limite). Receitas:
 
 ## 7. Plano proposto
 - **Fase 1, polimento:** itens 1, 2, 3 e 8 aplicados à intro, ao encerramento e às transições do AutoFrame.
+  FEITA (2026-10-01): curvas `VE_AF_CURVA`/`veAfK` e `veAfAjuste` em editor-autoframe.js; contraste `veAfcSelo`, área
+  segura e cards com moldura/sombra em editor-autoframe-cliente.js. Exportação 60 → 93 s no teste do Carlinhos (pulsos).
 - **Fase 2, acabamento:** itens 4 e 5, mais looks por energia (§4.2) e o arco de energia (§2.4).
 - **Fase 3, assinatura:** itens 6 e 7 como opções do modelo de cliente ("transição da marca", "pessoa destacada").
 - **Fase 4, motor:** item 9, se as receitas da Fase 1 ficarem limitadas.
