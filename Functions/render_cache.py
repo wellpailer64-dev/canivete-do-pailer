@@ -159,6 +159,76 @@ def renderizar(base, chave, h, job, on_progress):
     return {"success": True, "path": final, "url": media_server.register(final), "size": os.path.getsize(final)}
 
 
+_comp_lock = threading.Lock()
+_comp_stop = None
+_comp_proc = None
+
+
+def renderizar_comp(base, h, job, on_progress):
+    """Comp (editor-comp.js): a timeline de dentro vira um .mov ProRes 4444 com alfa (e o som dela, se tiver).
+    Fica em <raiz>/Comps/<hash>.mov — o hash é do conteúdo, então serve a qualquer projeto e desfazer reaproveita.
+    A limpeza automática pode apagar: o editor renderiza de novo quando o arquivo some."""
+    global _comp_stop, _comp_proc
+    from Functions.video_cutter import exportar_video
+    from Functions import media_server
+    if not _HASH_OK.match(str(h)):
+        return {"success": False, "error": "hash inválido"}
+    pasta = os.path.join(_raiz(base), "Comps")
+    os.makedirs(pasta, exist_ok=True)
+    final = os.path.join(pasta, h + ".mov")
+    if os.path.isfile(final):
+        agora = time.time()
+        try:
+            os.utime(final, (agora, agora))
+        except OSError:
+            pass
+        return {"success": True, "path": final, "url": media_server.register(final), "reuso": True}
+    parte = os.path.join(pasta, h + ".part.mov")
+    stop = threading.Event()
+    with _comp_lock:
+        _comp_stop = stop
+
+    def _hold(p):
+        global _comp_proc
+        _comp_proc = p
+
+    try:
+        r = exportar_video(
+            job.get("path") or "", job.get("base") or [], "mov", "high", "original", False, None,
+            on_progress=lambda p, m: on_progress(p),
+            stop_event=stop, sem_audio=not job.get("mix"), camadas=job.get("camadas") or [],
+            audio_segmentos=None, duracao=job.get("dur"), audio_clipes=job.get("mix") or [],
+            legendas=job.get("legendas"), quadro=job.get("quadro"),
+            saida=parte, proc_holder=_hold, alfa=True,
+        )
+    finally:
+        with _comp_lock:
+            _comp_stop = None
+            _comp_proc = None
+    if not r.get("success"):
+        _apagar(parte)
+        return r
+    try:
+        os.replace(parte, final)
+    except OSError as e:
+        _apagar(parte)
+        return {"success": False, "error": str(e)}
+    return {"success": True, "path": final, "url": media_server.register(final), "size": os.path.getsize(final)}
+
+
+def cancelar_comp():
+    with _comp_lock:
+        if _comp_stop is not None:
+            _comp_stop.set()
+        p = _comp_proc
+    if p is not None:
+        try:
+            p.kill()
+        except Exception:
+            pass
+    return {"success": True}
+
+
 def _prioridade_baixa(p):
     """Render de prévia em segundo plano: cede a CPU ao editor (play e prévia em tempo real)."""
     try:

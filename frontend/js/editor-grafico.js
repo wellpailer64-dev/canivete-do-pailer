@@ -130,8 +130,8 @@ function veGrafDesenho(c) {
 }
 
 // ── exportação: cada gráfico vira um PNG (junto com os textos, em veTxPngs) ──
-async function veGrafPngs(mapa, filtro) {
-    for (const c of VE.clips.filter(c => veEhGrafico(c) && (!filtro || filtro(c)))) {
+async function veGrafPngs(mapa, filtro, clips = VE.clips) {
+    for (const c of clips.filter(c => veEhGrafico(c) && (!filtro || filtro(c)))) {
         const cv = veGrafDesenho(c);
         const r = await window.pywebview.api.ve_salvar_png(cv.toDataURL('image/png'));
         if (r && r.success) mapa.set(c, { path: r.path, f: 1, w: cv.width, h: cv.height });

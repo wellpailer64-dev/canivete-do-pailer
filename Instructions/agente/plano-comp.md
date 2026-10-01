@@ -1,5 +1,5 @@
 # Plano: Comp (composição estilo After Effects) no Pocket Editor
-Combinado com o usuário em 2026-10-01. Status: **aprovado, não iniciado** — começar pela Fase 1.
+Combinado com o usuário em 2026-10-01. Status: **Fase 1 feita (2026-10-01)** — próxima: Fase 2 (prévia ao vivo).
 
 ## Por quê
 Projetos com muitas camadas (ex.: intro do AutoFrame com ~15 faixas: foto, Multiplicação, luz, grão, cards, logo...)
@@ -37,10 +37,17 @@ O usuário prefere o modelo do After (Comp) ao Nest do Premiere.
 - Salvar projeto: `veSaveProject` (editor.js ~3718) filtra `VE.media` por kinds conhecidos (~3686) → incluir
   o kind novo; abrir projeto antigo sem Comps deve continuar igual.
 
-## Modelo de dados proposto
+## Modelo de dados (como ficou na Fase 1 — código em `frontend/js/editor-comp.js`)
 - Comp = uma sequência em `VE.sequences` com `comp: true` (mesmos campos de timeline; `w/h` da mãe; `dur`).
-- Mídia no Projeto: `{ kind: 'comp', sequenceId, nome, cor: '#F97316', pasta }` (separada de `kind: 'timeline'`
-  para listar/arrastar diferente; laranja por padrão).
+- Mídia no Projeto: **`{ kind: 'video', comp: true, sequenceId, path, compSig, cor: 'laranja', pasta }`** — mudou do
+  `kind: 'comp'` proposto: sendo um vídeo cujo arquivo é a própria Comp renderizada com alfa, prévia, play, som,
+  miniaturas, cortar/velocidade/efeitos e exportação reaproveitam o caminho dos vídeos com transparência.
+  O painel mostra o tipo "Comp" (`vePjTipo`). `veSeqMedia` também acha a Comp.
+- Arquivo: `<cache de render>/Comps/<hash>.mov` (ProRes 4444 + PCM), hash = `veCompSig` (conteúdo + caminhos dos
+  arquivos de dentro). Render: `ve_comp_render` → `render_cache.renderizar_comp` → `exportar_video(alfa=True)`;
+  progresso em `veOnComp`. `veCompVerificar` roda ao trocar de timeline, ao abrir projeto e ao criar; a exportação
+  espera (`veCompProntas`). Arquivo apagado pela limpeza do cache → renderiza de novo (não vira mídia offline).
+- Desfazer: `veSnapshot` guarda `comps` (ids vivos); Comp criada na sessão (`_criada`) some/volta com o Ctrl+Z.
 - Clipe na mãe: `{ tr, st, s, e, m: idDaMidiaComp, p, k, fx, bm, tin/tout... }` — `s/e` = tempo DENTRO da Comp
   (como um vídeo). Áudio: a Comp ocupa também a trilha de áudio quando tem som (como vídeo com som; `x: 'v'/'a'`
   valem para desvincular).
@@ -64,6 +71,13 @@ O usuário prefere o modelo do After (Comp) ao Nest do Premiere.
    mostrar um quadro "renderizando Comp…" e disparar o render em segundo plano.
 Aceite: criar Comp de 5 camadas → 1 faixa; abrir, mudar um texto dentro, voltar → exportar mostra o texto novo;
 Ctrl+Z desfaz a criação; salvar/abrir projeto mantém a Comp; projeto antigo abre igual.
+**Feito e testado no app (modo agente):** criar (menu, Ctrl+Shift+C, caixa de nome) → 1 faixa laranja; duplo clique
+abre; texto mudado dentro → ao voltar re-renderiza e o monitor mostra; exportar logo após editar espera o render
+e o MP4 sai com o texto novo, transparente sobre o vídeo, só no trecho; Comp com som (has_audio, entra no mix);
+Ctrl+Z/Ctrl+Y; Comp não entra nela mesma; salvar/reabrir (com o .mov apagado do cache → renderiza de novo).
+Limitações conhecidas (para a Fase 2+): a mãe só atualiza ao voltar para ela (não ao vivo); camada com modo de
+mesclagem dentro da Comp deixa o trecho dela opaco onde o fundo era transparente (ffmpeg compõe em gbrp sem alfa);
+duplicar a Comp no Projeto cria uma Comp independente (timeline copiada).
 
 ### Fase 2 — prévia ao vivo e play fluido
 - Desenho recursivo: `veDrawMonitor` passa a desenhar uma Comp chamando o mesmo desenhista com os clipes da

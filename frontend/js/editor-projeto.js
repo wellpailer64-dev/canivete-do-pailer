@@ -16,12 +16,14 @@ const vePjTam = () => Math.max(90, Math.min(260, +PREFS.pjTam || 132));
 const VE_PJ_TIPOS = {
     video: ['i-film', 'Vídeo'], image: ['i-image', 'Imagem'], audio: ['i-music', 'Áudio'],
     ajuste: ['i-sliders', 'Camada de ajuste'], legenda: ['i-captions', 'Legendas'], timeline: ['i-film', 'Timeline'],
-    cor: ['i-drop', 'Cor sólida'],
+    cor: ['i-drop', 'Cor sólida'], comp: ['i-layers', 'Comp'],
 };
+// tipo mostrado no painel (a Comp é uma mídia de vídeo por baixo: editor-comp.js)
+const vePjTipo = m => VE_PJ_TIPOS[m.comp ? 'comp' : m.kind];
 const VE_EXT_LEG = /\.(srt|vtt|ass|ssa|sbv|txt)$/i;   // legendas (Functions/legendas_formatos.py)
 
 const vePjMidia = () => VE.media.filter(m => m && !m.removido && !m.base && m.rvDe == null && VE_PJ_TIPOS[m.kind]);
-const vePjNome = m => m.nome || m.name || VE_PJ_TIPOS[m.kind][1];
+const vePjNome = m => m.nome || m.name || vePjTipo(m)[1];
 const vePjBin = id => (VE.bins || []).find(b => b.id === id);
 function vePjUso(m) {
     if (m.kind === 'timeline') return m.sequenceId === VE.activeSequence ? 'ativa' : '';
@@ -53,6 +55,11 @@ function vePjInfo(m) {
         return { dur, info: m.sequenceId === VE.activeSequence ? veT('aberta agora') : `${(seq && (seq.clips || []).length) || 0} clipes` };
     }
     if (veMediaOffline(m)) return { dur: m.dur || (m.info && m.info.duration) || null, info: veT('Mídia offline · relinque ou apague') };
+    if (m.comp) {
+        const seq = (VE.sequences || []).find(s => s.id === m.sequenceId), r = typeof veCompInfo === 'function' ? veCompInfo(m) : null;
+        const n = m.sequenceId === VE.activeSequence ? VE.clips.length : ((seq && seq.clips) || []).length;
+        return { dur: m.dur || (m.info && m.info.duration) || null, info: `${n} ${veT(n === 1 ? 'camada' : 'camadas')}${r ? ' · ' + r : m.sequenceId === VE.activeSequence ? ' · ' + veT('aberta agora') : ''}` };
+    }
     if (m.kind === 'video') {
         const inf = m.id === 0 ? VE.info : m.info, fps = inf && (m.id === 0 ? VE.fps : inf.fps);
         if (m.erro) return { dur: null, info: veT('erro: ') + m.erro };
@@ -72,14 +79,14 @@ function vePjFilhos(pai) {
     const bins = (VE.bins || []).filter(b => (b.pai || null) === pai);
     const med = vePjMidia().filter(m => vePjPastaDe(m) === pai);
     const { col, dir } = VEPJ.ordem;
-    const chave = m => col === 'tipo' ? VE_PJ_TIPOS[m.kind][1] : col === 'dur' ? (vePjInfo(m).dur || 0) : vePjNome(m).toLowerCase();
+    const chave = m => col === 'tipo' ? vePjTipo(m)[1] : col === 'dur' ? (vePjInfo(m).dur || 0) : vePjNome(m).toLowerCase();
     bins.sort((a, b) => a.nome.localeCompare(b.nome) * (col === 'nome' ? dir : 1));
     med.sort((a, b) => { const x = chave(a), y = chave(b); return (x > y ? 1 : x < y ? -1 : 0) * dir; });
     return { bins, med };
 }
 
 function vePjLinhaMidia(m, nivel) {
-    const k = 'm:' + m.id, [ic, tipo] = VE_PJ_TIPOS[m.kind], inf = vePjInfo(m), uso = vePjUso(m);
+    const k = 'm:' + m.id, [ic, tipo] = vePjTipo(m), inf = vePjInfo(m), uso = vePjUso(m);
     const cor = m.cor ? veCor({ cor: m.cor }) : null;
     const ativa = m.kind === 'timeline' && m.sequenceId === VE.activeSequence;
     const lost = veMediaOffline(m);
@@ -115,7 +122,7 @@ function vePjCapa(m, f = 0.35) {
 }
 
 function vePjCardMidia(m) {
-    const k = 'm:' + m.id, [ic, tipo] = VE_PJ_TIPOS[m.kind], inf = vePjInfo(m), capa = vePjCapa(m);
+    const k = 'm:' + m.id, [ic, tipo] = vePjTipo(m), inf = vePjInfo(m), capa = vePjCapa(m);
     const cor = m.cor ? veCor({ cor: m.cor }) : null;
     const ativa = m.kind === 'timeline' && m.sequenceId === VE.activeSequence;
     const lost = veMediaOffline(m);
@@ -322,13 +329,13 @@ function vePjRenomear(k) {
             if (b) b.nome = v;
             else {
                 m.nome = v;
-                if (m.kind === 'timeline') {
+                if (m.kind === 'timeline' || m.comp) {
                     const seq = (VE.sequences || []).find(s => s.id === m.sequenceId);
                     if (seq) seq.name = v;
                 }
             }
             vePjAlterou();
-            if (!b && m.kind === 'timeline') veSeqTabsRender();
+            if (!b && (m.kind === 'timeline' || m.comp)) veSeqTabsRender();
         } else vePjRender();
     };
     inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') fim(true); if (e.key === 'Escape') fim(false); });
@@ -339,6 +346,7 @@ function vePjCopiaMidia(m, pasta) {
     if (m.kind === 'timeline') {
         return typeof veCreateTimeline === 'function' ? veCreateTimeline({ cloneId: m.sequenceId, pasta }) && veSeqMedia(VE.activeSequence) : null;
     }
+    if (m.comp) return veCompDuplicar(m, pasta);   // Comp nova com a timeline copiada (editor-comp.js)
     const n = vePjAddMidia({ ...m, nome: `${vePjNome(m)} ${veT('cópia')}`, itens: m.itens ? m.itens.map(x => ({ ...x })) : undefined }, pasta);
     delete n.removido;
     if (n.kind === 'audio' && n.url) veAudioRegistrar(n.id, n.url, n.quadros);
@@ -764,6 +772,8 @@ function vePjColocar(ids, drop) {
     ids.map(id => VE.media[id]).filter(m => m && !m.removido).forEach(m => {
         if (m.kind === 'timeline') { veOpenTimeline(m.sequenceId); return; }
         if (veMediaOffline(m)) { veToast('Relinque a mídia offline antes de colocar na timeline'); return; }
+        // uma Comp não entra nela mesma (nem numa Comp que está dentro dela)
+        if (m.comp && typeof veCompContem === 'function' && veCompContem(m.sequenceId, VE.activeSequence)) { veToast('Uma Comp não pode entrar nela mesma'); return; }
         const st = veSnapFrame(t);
         if (m.kind === 'image' || m.kind === 'ajuste' || m.kind === 'cor') {
             veInsertImageClip(m, naTl ? { x: wrap.left + (st - VE.view) * VE.pps, y: drop.y, at: Date.now() } : null, 0,
@@ -918,6 +928,7 @@ function vePjInit() {
         if (k.startsWith('m:')) {
             const m = VE.media[+k.slice(2)];
             if (m && m.kind === 'timeline') { veOpenTimeline(m.sequenceId); return; }
+            if (m && m.comp && veCompAbrir(m)) return;   // Comp: abre a timeline dela (editor-comp.js)
             if (m && m.kind === 'cor') { veGrCorEditar(m); return; }   // duplo clique troca a cor
             if (m && veMediaOffline(m)) { vePjRelink(m.id); return; }
             if (m && m.kind === 'video') { veSrcOpen(m.id); return; }

@@ -576,7 +576,9 @@ function veEditPoints(excluir) {
 }
 
 function veSnapshot() {
-    return JSON.stringify({ clips: VE.clips, inPt: VE.inPt, outPt: VE.outPt, markers: VE.markers || [], legendas: VE.legendas || [] });
+    // comps = Comps vivas no Projeto (editor-comp.js): desfazer "Criar Comp" também tira a Comp do painel
+    const comps = (VE.media || []).filter(m => m && m.comp && !m.removido).map(m => m.id);
+    return JSON.stringify({ clips: VE.clips, inPt: VE.inPt, outPt: VE.outPt, markers: VE.markers || [], legendas: VE.legendas || [], comps });
 }
 
 function vePushHistory() {
@@ -593,6 +595,8 @@ function veRestore(snap) {
     VE.clips = d.clips; VE.inPt = d.inPt; VE.outPt = d.outPt;
     VE.markers = d.markers || [];
     VE.legendas = d.legendas || [];
+    // Comp criada nesta sessão: volta ou sai do Projeto junto com o clipe dela (as do arquivo aberto ficam)
+    if (Array.isArray(d.comps)) VE.media.forEach(m => { if (m && m.comp && (m._criada || d.comps.includes(m.id))) m.removido = !d.comps.includes(m.id); });
     VE.sel = -1;
     VETX.legSel = -1;
     veCacheInvalidate();   // poda o cache RAM e recalcula os trechos renderizados (o do estado anterior volta a valer)
@@ -647,8 +651,9 @@ function veSeqTracks(trilhas, clips) {
 
 function veSeqId() { return 'seq_' + Date.now().toString(36) + '_' + (VE._seqN++); }
 
+// item do Projeto da timeline (ou da Comp: mídia de vídeo com comp, editor-comp.js)
 function veSeqMedia(seqId) {
-    return VE.media.find(m => m && !m.removido && m.kind === 'timeline' && m.sequenceId === seqId);
+    return VE.media.find(m => m && !m.removido && (m.kind === 'timeline' || m.comp) && m.sequenceId === seqId);
 }
 
 function veSeqNomeDisponivel(base = 'Timeline') {
@@ -729,7 +734,9 @@ function veSeqAplicar(seq, opts = {}) {
     else { VE.pps = veFitPps(); VE.view = 0; }
     veOpenTimelineTab(seq.id);
     veAfterEdit(seq.playhead || 0);
-    if (!opts.silent) veToast('Timeline aberta: ' + (seq.name || 'Timeline'));
+    if (!opts.silent) veToast((seq.comp ? 'Comp aberta: ' : 'Timeline aberta: ') + (seq.name || 'Timeline'));
+    // saiu de dentro de uma Comp (ou entrou em outra): a que mudou renderiza de novo (editor-comp.js)
+    if (typeof veCompVerificar === 'function') setTimeout(veCompVerificar, 0);
 }
 
 function veSeqCriarMidia(seq, pasta) {
@@ -2483,6 +2490,8 @@ function veClipMenu(i, x, y, doc) {
         <button class="ve-ctx-item" data-ctx="pp">Propriedades${veIsImage(c) ? '' : ' (velocidade, volume)'}</button>
         <button class="ve-ctx-item" data-ctx="fx">Controles de efeito</button>
         <button class="ve-ctx-item" data-ctx="pj">Mostrar no projeto</button>
+        ${typeof veEhComp === 'function' && veEhComp(veMediaOf(c)) ? '<button class="ve-ctx-item" data-ctx="abrircomp">Abrir Comp<kbd>duplo clique</kbd></button>' : ''}
+        <button class="ve-ctx-item" data-ctx="comp">Criar Comp…<kbd>Ctrl+Shift+C</kbd></button>
         <button class="ve-ctx-item" data-ctx="off">${veClipOff(c) ? '' : '✓ '}Ativar<kbd>Ctrl+Shift+E</kbd></button>
         ${veIsImage(c) ? '' : `<button class="ve-ctx-item" data-ctx="inv">${veInvertido(c) ? '✓ ' : ''}Inverter clipe (Reverse Speed)</button>`}
         ${typeof veMelMenuItens === 'function' && veTemSom(c) ? veMelMenuItens(veMediaOf(c), 'data-ctx') : ''}
@@ -2503,7 +2512,15 @@ function veClipMenu(i, x, y, doc) {
                 veRefresh();
             }
         } else if (it) {
+            // Criar Comp: o clipe clicado já selecionado (com o grupo) não perde a seleção múltipla
+            if (it.dataset.ctx === 'comp') {
+                if (!veSelLista().includes(VE.clips[i])) veSelDefinir([VE.clips[i]], VE.clips[i]);
+                veClipMenuFechar();
+                veCompDialogo();
+                return;
+            }
             VE.sel = i;
+            if (it.dataset.ctx === 'abrircomp') { veClipMenuFechar(); veCompAbrir(veMediaOf(VE.clips[i])); return; }
             if (it.dataset.ctx === 'gain') veOpenGain();
             else if (it.dataset.ctx === 'fx') veTab('props');
             else if (it.dataset.ctx === 'pp') { vedShow('pp'); veRefresh(); }
@@ -2908,6 +2925,9 @@ function veDrawMonitor() {
         const med = veMediaOf(c);
         if (veMediaOffline(med)) {
             src = 'offline';
+        } else if (med && med.comp && !med.url) {
+            src = 'comp';   // Comp ainda sem o primeiro render (editor-comp.js)
+            parcial = true;
         } else if (veIsAdj(c)) {
             src = 'ajuste';
         } else if (veIsTexto(c)) {
@@ -2962,6 +2982,7 @@ function veDrawMonitor() {
     itens.forEach(({ c, src }) => {
             if (!src) return;
             if (src === 'ajuste') { veAdjDraw(ctx, cv, c, pv); return; }
+            if (src === 'comp') { veCompDesenharPendente(ctx, VE.seqW, VE.seqH, veMediaOf(c)); return; }
             const p = veCaAplicar(c, veProps(c), t), sz = veMediaSize(c);   // + Rotação/Tremer/Pulsar em loop
             // texto animado vem com margem em volta (letras que saem da caixa): desenha maior, mesmo centro
             const pd = src && src._pad || 0, szd = pd ? { w: sz.w + 2 * pd, h: sz.h + 2 * pd } : sz;
@@ -3690,6 +3711,9 @@ function veProjectData() {
                 if (m.kind === 'image') Object.assign(o, { path: m.path, w: m.w, h: m.h });
                 if (m.kind === 'legenda') Object.assign(o, { path: m.path, itens: m.itens });
                 if (m.kind === 'video') o.path = m.path;
+                // Comp (editor-comp.js): a timeline dela + o arquivo renderizado e o hash do conteúdo dele
+                if (m.comp) Object.assign(o, { comp: true, sequenceId: m.sequenceId, compSig: m.compSig || null, dur: m.dur,
+                                               temSom: !!(m.info && m.info.has_audio) });
                 if (m.kind === 'timeline') o.sequenceId = m.sequenceId;
                 if (m.kind === 'cor') o.fill = m.fill;   // cor sólida (m.cor é a do rótulo)
                 if (m.rvDe != null) Object.assign(o, { rvDe: m.rvDe, rvA: m.rvA, rvB: m.rvB });   // cópia invertida (editor-reverse.js)
@@ -3700,7 +3724,8 @@ function veProjectData() {
         bins: VE.bins || [],
         m0: VE.media[0] ? { pasta: VE.media[0].pasta || null, cor: VE.media[0].cor, nome: VE.media[0].nome,
                             ...(VE.media[0].mel ? { mel: VE.media[0].mel, melOff: !!VE.media[0].melOff } : {}) } : null,
-        sequences: vePlain(VE.sequences || [], []),
+        // Comp apagada do Projeto não vai junto (a timeline dela ficava só para o desfazer)
+        sequences: vePlain((VE.sequences || []).filter(s => !s.comp || s.id === VE.activeSequence || veSeqMedia(s.id)), []),
         activeSequence: VE.activeSequence,
         clips: VE.clips,
         trilhas: VE_TRK,
@@ -3886,6 +3911,16 @@ function veApplyProject() {
             if (m.rvDe != null) Object.assign(nm, { rvDe: m.rvDe, rvA: m.rvA, rvB: m.rvB });
             VE.media.push(nm);
             ids[m.id] = nm.id;
+            if (m.comp) {
+                // Comp: o arquivo pode ter saído do cache (limpeza automática) — renderiza de novo (veCompVerificar)
+                const dur = m.dur || mediaDur.get(m.id) || 1;
+                Object.assign(nm, { comp: true, sequenceId: m.sequenceId, compSig: m.compSig || null, dur });
+                if (estaFaltando(m.path)) {
+                    Object.assign(nm, { path: null, compSig: null,
+                        info: { duration: dur, width: q.w, height: q.h, fps: VE.fps || 30, has_audio: !!m.temSom, alfa: true, provisoria: true } });
+                } else veMidiaPreparar(nm, true);
+                return;
+            }
             if (estaFaltando(m.path)) {
                 const dur = mediaDur.get(m.id) || m.dur || 1;
                 Object.assign(nm, {
@@ -3987,10 +4022,12 @@ function veApplyProject() {
             view: s.view || { pps: 0, x: 0 },
             w: s.w, h: s.h,
             master: s.master && s.master.lim ? s.master : null,
+            ...(s.comp ? { comp: true, dur: +s.dur || 0 } : {}),
         };
     });
     VE.sequences.forEach(seq => {
         let m = veSeqMedia(seq.id);
+        if (!m && seq.comp) return;   // a Comp aparece no Projeto pela mídia dela
         if (!m) m = veSeqCriarMidia(seq, null);
         m.sequenceId = seq.id;
         if (!m.nome && !m.name) m.name = seq.name;
@@ -4001,7 +4038,10 @@ function veApplyProject() {
     VE.dirty = false;
     veUpdateTitle();
     veRegistrarProjetoRecente(path, d);
-    const faltam = (missing || []).length;
+    if (typeof veCompVerificar === 'function') setTimeout(veCompVerificar, 0);
+    // arquivo de Comp que sumiu do cache não é mídia offline: ela renderiza de novo
+    const compArq = new Set((d.media || []).filter(m => m.comp && m.path).map(m => m.path));
+    const faltam = (missing || []).filter(p => !compArq.has(p)).length;
     veToast(faltam ? `Projeto aberto — ${faltam} mídia(s) offline`
                    : 'Projeto aberto: ' + name.replace(/\.vcnvt$/i, ''));
 }
@@ -5087,6 +5127,8 @@ async function veStartExport() {
     // vence, vazio = preto) + áudio + camadas por cima
     VE._txPng = null;
     try {
+        // Comps que mudaram renderizam antes (editor-comp.js): na exportação elas entram pelo arquivo delas
+        if (typeof veCompProntas === 'function') await veCompProntas(msg => { $ve('ve-exp-msg').textContent = msg; });
         if (VE.clips.some(c => veIsTexto(c) || veEhGrafico(c))) await veTxPngs();   // textos e gráficos viram PNG
         const plano = veExportPlan(true);
         await window.pywebview.api.video_cutter_export(
@@ -5454,6 +5496,8 @@ function veInitEvents() {
         veDrawMonitor();
         veDraw();
     });
+    // duplo clique numa Comp abre a timeline dela (editor-comp.js)
+    wrap.addEventListener('dblclick', e => { if (typeof veCompDuploClique === 'function') veCompDuploClique(e); });
 
     wrap.addEventListener('pointermove', e => {
         const { t, x } = veTimeFromEvent(e);

@@ -134,10 +134,11 @@ function veTxCanvas(c, alvo) {
 
 function veTxTamanho(c) { const L = veTxLayout(veTxt(c)); return { w: L.w, h: L.h }; }
 
-// Exportação: cada clipe de texto vira um PNG no tamanho em que ele aparece (a maior escala dele)
-async function veTxPngs(filtro) {
+// Exportação: cada clipe de texto vira um PNG no tamanho em que ele aparece (a maior escala dele).
+// clips = os de outra timeline (Comp, editor-comp.js); guardar = false devolve o mapa sem trocar o VE._txPng
+async function veTxPngs(filtro, clips = VE.clips, guardar = true) {
     const mapa = new Map();
-    for (const c of VE.clips.filter(c => veIsTexto(c) && (!filtro || filtro(c)))) {
+    for (const c of clips.filter(c => veIsTexto(c) && (!filtro || filtro(c)))) {
         const p = veStaticProps(c);
         const escalas = [p.sc].concat(veKfOn(c, 'sc') ? c.k.sc.map(q => q.v) : []);
         const f = Math.min(4, Math.max(1, Math.max(...escalas) / 100));
@@ -148,8 +149,9 @@ async function veTxPngs(filtro) {
         const r = await window.pywebview.api.ve_salvar_png(d.cv.toDataURL('image/png'));
         if (r && r.success) mapa.set(c, { path: r.path, f, w: d.cv.width, h: d.cv.height });
     }
-    await veGrafPngs(mapa, filtro);   // cor sólida, formas e desenhos (editor-grafico.js)
-    VE._txPng = mapa;
+    await veGrafPngs(mapa, filtro, clips);   // cor sólida, formas e desenhos (editor-grafico.js)
+    if (guardar) VE._txPng = mapa;
+    return mapa;
 }
 
 // ─────────────────────────── ferramenta Texto (T) ───────────────────────────

@@ -605,6 +605,26 @@ def ve_render_cancelar():
     return render_cache.cancelar()
 
 
+def ve_comp_render(base, h, job):
+    """Comp: renderiza a timeline de dentro com fundo transparente; progresso e fim em veOnComp(evento)."""
+    from Functions import render_cache
+
+    def run():
+        try:
+            r = render_cache.renderizar_comp(base, h, job, lambda p: _ve_emit("veOnComp", {"hash": h, "pct": p}))
+            _ve_emit("veOnComp", {"hash": h, "done": True, **r})
+        except Exception as e:
+            _ve_emit("veOnComp", {"hash": h, "done": True, "success": False, "error": str(e)})
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
+def ve_comp_cancelar():
+    from Functions import render_cache
+    return render_cache.cancelar_comp()
+
+
 def ve_render_tocar(base, chave, hashes):
     from Functions import render_cache
     return render_cache.tocar(base, chave, hashes)
@@ -2835,6 +2855,12 @@ class ApiBridge:
 
     def ve_render_cancelar(self):
         return ve_render_cancelar()
+
+    def ve_comp_render(self, base, h, job):
+        return ve_comp_render(base, h, job)
+
+    def ve_comp_cancelar(self):
+        return ve_comp_cancelar()
 
     def ve_render_tocar(self, base, chave, hashes):
         return ve_render_tocar(base, chave, hashes)

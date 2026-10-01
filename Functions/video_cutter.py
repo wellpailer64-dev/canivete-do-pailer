@@ -2227,11 +2227,13 @@ def _opcao_filtro_script():
 def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", resolucao="original",
                    usar_gpu=True, pasta_saida=None, on_progress=None, stop_event=None, sem_audio=False,
                    camadas=None, audio_segmentos=None, duracao=None, audio_clipes=None, legendas=None, quadro=None,
-                   saida=None, previa_h=0, proc_holder=None, opcoes=None):
+                   saida=None, previa_h=0, proc_holder=None, opcoes=None, alfa=False):
     """
     Exporta a timeline do editor.
     saida/previa_h  = prévia renderizada (render_cache.py): arquivo fixo, sem som, H.264 leve de decodificar
                       (GOP curto: buscar é rápido), lado menor até previa_h px; proc_holder guarda o processo
+    alfa            = Comp (render_cache.renderizar_comp): fundo transparente, ProRes 4444 com alfa em .mov
+                      (som em PCM), no tamanho do quadro; vazios e sobras ficam transparentes
     quadro          = [largura, altura] da sequência (Configurações da sequência); sem ele, o tamanho do vídeo aberto
     segmentos       = base de vídeo em ordem ([{start, end, gain}] do original ou {gap: s})
     audio_segmentos = trilha de áudio (mesmo formato); se None, usa os segmentos da base
@@ -2282,6 +2284,11 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         mbps = 0.0
     # formato de pixel do grafo: 10 bits de ponta a ponta quando a saída é 10 bits (fonte 10 bits não vira 8)
     pixfmt = "yuv422p10le" if cfg.get("vcodec") == "prores" else "yuv420p10le" if bits == 10 else "yuv420p"
+    if alfa:
+        # Comp: o grafo inteiro com alfa (o overlay "auto" compõe o alfa da base com o das camadas)
+        cfg = dict(FORMATOS_SAIDA["mov"], vcodec="prores4444", acodec="pcm_s16le")
+        alvo_h, usar_gpu, previa, pixfmt = 0, False, False, "yuva444p"
+    fundo = "black@0" if alfa else "black"
 
     info = probe(path)
     audio_only = bool(cfg.get("audio_only")) or not info["has_video"]
@@ -2434,7 +2441,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
 
             for k, p in enumerate([] if audio_only else pecas):
                 if p[0] == "gap":
-                    filtros.append(f"color=c=black:s={W}x{H}:r={fps}:d={_tempo_ffmpeg(p[1])},"
+                    filtros.append(f"color=c={fundo}:s={W}x{H}:r={fps}:d={_tempo_ffmpeg(p[1])},"
                                    + (f"format={fmt_cuda},hwupload_cuda[v{k}]" if turbo else f"format={pixfmt}[v{k}]"))
                 elif turbo:
                     g = _grupo(p[0])
@@ -2445,7 +2452,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                     g = _grupo(p[0])
                     filtros.append(f"[{g[0]}:v:0]trim=start={_tempo_ffmpeg(p[0] - g[1])}:end={_tempo_ffmpeg(p[1] - g[1])},"
                                    f"setpts=PTS-STARTPTS,scale={W}:{H}:force_original_aspect_ratio=decrease,"
-                                   f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2,setsar=1,"
+                                   + (f"format={pixfmt}," if alfa else "")
+                                   + f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color={fundo},setsar=1,"
                                    f"fps=fps={fps}:start_time=0,format={pixfmt}[v{k}]")
                 pares += f"[v{k}]"
                 if junto:
@@ -2751,6 +2759,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         if previa:
             video_args = ["-c:v", "libx264", "-preset", "ultrafast", "-tune", "fastdecode", "-crf", "20",
                           "-g", "10", "-pix_fmt", "yuv420p"]
+        elif alfa:
+            video_args = ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le"] + prep["args_cor"]
         else:
             video_args = ["-vn"] if audio_only else _args_video(cfg, q, gpu, bits, mbps) + prep["args_cor"]
             if prep["turbo"] and "-pix_fmt" in video_args:
