@@ -297,7 +297,8 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
 - **Trocar o arquivo, mantendo os clipes** (`veTrocarArquivo`, botão direito):
   - **Substituir mídia...** troca uma mídia, como o Replace Footage do Premiere.
   - **Substituir N mídias** escolhe uma pasta e cada mídia pega o arquivo de mesmo nome ou que começa com o nome dela.
-  - **Melhorar áudio** roda Sidon + OmniVoice no fundo e troca pelo `_melhorado`.
+  - **Melhorar áudio** roda Sidon + OmniVoice no fundo, gera só o `_melhorado.wav` e troca o som da mídia (imagem e
+    cortes iguais; chave melhorado/original). Também no botão direito do clipe. Ver `melhorar-audio.md`.
     Ver `Instructions/melhorar-audio.md`.
   - No clipe da timeline, **Mostrar no projeto** acha a mídia.
 - O arquivo do projeto (.vcnvt) guarda `bins`, `m0` (organização do vídeo principal) e os itens que ainda não estão na timeline.

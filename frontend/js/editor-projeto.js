@@ -85,7 +85,7 @@ function vePjLinhaMidia(m, nivel) {
     const lost = veMediaOffline(m);
     return `<div class="ve-pj-row${VEPJ.sel.has(k) ? ' sel' : ''}${ativa ? ' atual' : ''}${m.kind === 'video' && m.id && !m.url ? ' fraco' : ''}${lost ? ' lost' : ''}" data-k="${k}" data-kind="${m.kind}" draggable="true" style="--n:${nivel}">
         <span class="ve-pj-cor"${cor ? ` style="background:${cor}"` : ''}></span><span class="ve-pj-seta"></span>
-        <svg class="i"><use href="#${ic}"/></svg><span class="ve-pj-nome" title="${veEsc(m.path || vePjNome(m))}">${veEsc(vePjNome(m))}</span>
+        <svg class="i"><use href="#${ic}"/></svg><span class="ve-pj-nome" title="${veEsc(m.path || vePjNome(m))}">${veEsc(vePjNome(m))}</span>${veMelSelo(m)}
         <span class="ve-pj-c">${veT(tipo)}</span><span class="ve-pj-c mono">${inf.dur ? veTC(inf.dur).slice(0, 11) : ''}</span>
         <span class="ve-pj-c">${veEsc(inf.info)}</span><span class="ve-pj-c mono">${uso || ''}</span></div>`;
 }
@@ -122,7 +122,7 @@ function vePjCardMidia(m) {
     return `<div class="ve-pj-card${VEPJ.sel.has(k) ? ' sel' : ''}${ativa ? ' atual' : ''}${m.kind === 'video' && m.id && !m.url ? ' fraco' : ''}${lost ? ' lost' : ''}" data-k="${k}" data-kind="${m.kind}" draggable="true" title="${veEsc((m.path || vePjNome(m)) + (inf.info ? '\n' + inf.info : ''))}">
         <div class="ve-pj-capa">${m.kind === 'cor' ? `<div class="ve-pj-swatch" style="background:${veEsc(m.fill || '#000')}"></div>` : lost ? `<div class="ve-pj-lost">${veT('MÍDIA OFFLINE')}</div>` : capa ? `<img src="${veEsc(capa)}" alt="" draggable="false">` : `<svg class="i"><use href="#${ic}"/></svg>`}
             ${inf.dur ? `<span class="ve-pj-dur">${veTC(inf.dur).slice(0, 11)}</span>` : ''}</div>
-        <div class="ve-pj-rotulo"><span class="ve-pj-cor"${cor ? ` style="background:${cor}"` : ''}></span><svg class="i"><use href="#${ic}"/></svg><span class="ve-pj-nome">${veEsc(vePjNome(m))}</span></div>
+        <div class="ve-pj-rotulo"><span class="ve-pj-cor"${cor ? ` style="background:${cor}"` : ''}></span><svg class="i"><use href="#${ic}"/></svg><span class="ve-pj-nome">${veEsc(vePjNome(m))}</span></div>${veMelSelo(m)}
         <div class="ve-pj-sub">${veT(tipo)}${inf.info ? ' · ' + veEsc(inf.info) : ''}</div></div>`;
 }
 
@@ -493,6 +493,7 @@ function veTrocarArquivo(m, path, silencioso) {
     if (typeof vePrInvalidar === 'function') vePrInvalidar();
     // cópias invertidas (Reverse Speed) da mídia antiga: geradas de novo a partir do arquivo novo
     const invertidas = VE.media.filter(x => x && !x.removido && x.rvDe === m.id);
+    ['mel', 'melOff', '_aMel', '_aOrig'].forEach(k => delete m[k]);
     Object.assign(m, { path, name: m.nome ? m.name || nome : nome });
     delete m.offline; delete m.missing; delete m.lost; delete m.erro;
     if (m.kind === 'image') {
@@ -564,9 +565,10 @@ function vePjSubstituirVarios(ids) {
     });
 }
 
-// ── Melhorar áudio (botão direito no Projeto): Sidon + OmniVoice no fundo, uma mídia por vez; no fim a mídia passa
-// a usar o "<nome>_melhorado" (veTrocarArquivo: os clipes da timeline continuam com os mesmos cortes) ──
-const VEMA = { fila: [], atual: null, path: '', ultimo: 0 };
+// ── Melhorar áudio (botão direito no Projeto ou no clipe): Sidon + OmniVoice no fundo, uma mídia por vez. Gera só o
+// som ("<nome>_melhorado.wav", no tempo do vídeo) e a mídia passa a tocar e exportar esse som no lugar do dela:
+// a imagem e os cortes não mudam. O original fica guardado: a chave "Áudio melhorado" volta a ele (m.melOff). ──
+const VEMA = { fila: [], atual: null, path: '', pct: -1, anim: 0 };
 
 function vePjMelhorarAudio(ids) {
     const api = window.pywebview && window.pywebview.api;
@@ -574,37 +576,158 @@ function vePjMelhorarAudio(ids) {
     ids.forEach(id => { if (VEMA.atual !== id && !VEMA.fila.includes(id)) VEMA.fila.push(id); });
     veToast(veT('Melhorando o áudio no fundo — dá para continuar editando'));
     veMaProximo();
+    veMaAtualizar(true);
 }
 
 function veMaProximo() {
     while (VEMA.atual == null && VEMA.fila.length) {
         const id = VEMA.fila.shift(), m = VE.media[id];
         if (!m || m.removido || !m.path) continue;
-        Object.assign(VEMA, { atual: id, path: m.path, ultimo: -100 });
+        Object.assign(VEMA, { atual: id, path: m.path, pct: -1 });
         window.pywebview.api.melhorar_audio_midia(m.path, id);
     }
+}
+
+// a mídia está melhorando agora ({pct}) ou na fila ({fila: n})? (outro projeto aberto no meio: o id não vale)
+function veMaEstado(id) {
+    const m = VE.media[id];
+    if (!m) return null;
+    if (VEMA.atual === id && m.path === VEMA.path) return { pct: VEMA.pct };
+    const n = VEMA.fila.indexOf(id);
+    return n >= 0 ? { fila: n + 1 } : null;
+}
+
+function veMaRotulo(e) {
+    return e.fila ? `${veT('Melhorando')} · ${veT('na fila')}` : `${veT('Melhorando')}${e.pct >= 0 ? ` ${Math.round(e.pct)}%` : '…'}`;
+}
+
+// por cima da faixa de áudio: escurece a onda, listras andando, barra de progresso e o rótulo
+function veMaDesenhar(ctx, x, y, w, h, e) {
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(x, y, w, h);
+    const d = (performance.now() / 45) % 16;
+    ctx.strokeStyle = e.fila ? 'rgba(255,255,255,0.07)' : 'rgba(249,115,22,0.22)';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    for (let k = x - h - 16 + d; k < x + w + 16; k += 16) { ctx.moveTo(k, y + h); ctx.lineTo(k + h, y); }
+    ctx.stroke();
+    if (!e.fila && e.pct >= 0) {
+        ctx.fillStyle = '#F97316';
+        ctx.fillRect(x, y + h - 3, w * Math.min(1, e.pct / 100), 3);
+    }
+    if (w > 46 && h >= 12) {
+        ctx.font = '600 10px Segoe UI';
+        const txt = veMaRotulo(e), tw = Math.min(w - 8, ctx.measureText(txt).width + 12), ty = y + Math.min(h / 2 - 7, 4);
+        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+        ctx.fillRect(x + 4, ty, tw, 14);
+        ctx.fillStyle = e.fila ? '#bbb' : '#FB8A3C';
+        ctx.fillText(txt, x + 10, ty + 10.5, tw - 12);
+    }
+    ctx.restore();
+}
+
+// timeline animada e selos do painel Projeto enquanto houver algo melhorando
+function veMaAtualizar(redesenharPainel) {
+    const ativo = VEMA.atual != null || VEMA.fila.length > 0;
+    if (ativo && !VEMA.anim) VEMA.anim = setInterval(veDraw, 120);
+    if (!ativo && VEMA.anim) { clearInterval(VEMA.anim); VEMA.anim = 0; }
+    veDraw();
+    if (redesenharPainel) { vePjRender(); return; }
+    const lista = $ve('ve-pj-lista');
+    if (lista) lista.querySelectorAll('[data-enh]').forEach(el => {
+        const e = veMaEstado(+el.dataset.enh);
+        if (e) el.textContent = veMaRotulo(e);
+    });
 }
 
 function veMelhorarAudioProgresso(d) {
     const id = VEMA.atual, m = VE.media[id];
     const nome = m ? vePjNome(m) : '';
     if (!d.complete) {
-        const p = Math.round(d.percent == null ? -1 : d.percent);
-        if (p >= 0 && p - VEMA.ultimo >= 10) {
-            VEMA.ultimo = p;
-            veToast(`${nome}: ${veT('melhorando o áudio')} ${p}%${VEMA.fila.length ? ` (+${VEMA.fila.length})` : ''}`);
-        }
+        if (d.percent != null && d.percent >= 0) VEMA.pct = d.percent;
+        veMaAtualizar(false);
         return;
     }
     VEMA.atual = null;
     if (d.error) veToast(`${nome}: ${veT('não foi possível melhorar o áudio')} — ${d.error}`);
     else if (d.saida && m && m.path === VEMA.path) {   // outro projeto aberto no meio: não troca nada
-        veTrocarArquivo(m, d.saida, true);
-        veToast(`${nome}: ${veT('áudio melhorado — os clipes continuam com os mesmos cortes')}`);
+        m.mel = d.saida;
+        delete m.melOff;
+        veMelCarregar(m, true);
     } else if (d.saida) veToast(`${veT('Áudio melhorado salvo em')} ${vePathNome(d.saida)}`);
     veMaProximo();
+    veMaAtualizar(true);
 }
 window.veMelhorarAudioProgresso = veMelhorarAudioProgresso;
+
+// ── som melhorado da mídia ──
+function veMelLigado(m) { return !!(m && m.mel && !m.melOff && m._aMel); }
+
+// veAudioRegistrar (editor-audio.js) passa por aqui: guarda o som original e devolve o que deve tocar
+function veMelFonte(m, url, quadros) {
+    if (!m._aMel || url !== m._aMel.url) m._aOrig = { url, quadros };
+    const f = m.melOff || !m._aMel ? m._aOrig : m._aMel;
+    return f ? [f.url, f.quadros] : null;
+}
+
+// arquivo de som do clipe na exportação (null = o vídeo aberto)
+function veMelArquivo(id) {
+    const m = VE.media[id];
+    if (m && m.mel && !m.melOff) return m.mel;
+    return id ? m.path : null;
+}
+
+// lê o .wav (PCM para o mixer e forma de onda) e passa a tocá-lo
+function veMelCarregar(m, avisar) {
+    window.pywebview.api.video_cutter_add_audio(m.mel).then(r => {
+        if (!r || !r.success) {
+            veToast(`${vePjNome(m)}: ${veT('o áudio melhorado não foi encontrado — voltou ao original')}`);
+            ['mel', 'melOff', '_aMel'].forEach(k => delete m[k]);
+            if (m._aOrig) veAudioRegistrar(m.id, m._aOrig.url, m._aOrig.quadros);
+            vePjAlterou();
+            veDraw();
+            return;
+        }
+        // o som original já tocava antes de a mídia ganhar o melhorado: guarda para a chave voltar a ele
+        const atual = typeof VEAU !== 'undefined' && VEAU.fontes.get(m.id);
+        if (!m._aOrig && atual && atual.url !== r.url) m._aOrig = { url: atual.url, quadros: atual.quadros };
+        m._aMel = { url: r.url, quadros: r.quadros, peaks: r.peaks || [] };
+        veAudioRegistrar(m.id, r.url, r.quadros);
+        if (avisar) {
+            if (!VE.dirty) { VE.dirty = true; veUpdateTitle(); }
+            veToast(`${vePjNome(m)}: ${veT('áudio melhorado — a imagem e os cortes continuam iguais')}`);
+        }
+        vePjRender();
+        veDraw();
+    });
+}
+
+// chave melhorado / original (dá para comparar tocando: o mixer troca a fonte no próximo bloco)
+function veMelAlternar(m) {
+    if (!m || !m.mel) return;
+    m.melOff = !m.melOff;
+    const f = m.melOff ? m._aOrig : m._aMel;
+    if (f) veAudioRegistrar(m.id, f.url, f.quadros);
+    vePjAlterou();
+    veDraw();
+    veToast(`${vePjNome(m)}: ${veT(m.melOff ? 'áudio original' : 'áudio melhorado')}`);
+}
+
+// selo no painel Projeto: "Melhorando 42%" enquanto processa; depois, a chave do som melhorado
+function veMelSelo(m) {
+    const e = veMaEstado(m.id);
+    if (e) return `<span class="ve-pj-enh${e.fila ? ' fila' : ''}" data-enh="${m.id}">${veMaRotulo(e)}</span>`;
+    if (!m.mel) return '';
+    return `<span class="ve-pj-mel${m.melOff ? ' off' : ''}" data-mel title="${veT(m.melOff ? 'Tocando o áudio original: clique para usar o melhorado' : 'Tocando o áudio melhorado: clique para ouvir o original')}">${veT(m.melOff ? 'Original' : 'Melhorado')}</span>`;
+}
+
+function veMelMenuItens(m, attr, soChave) {
+    if (!m || !['video', 'audio'].includes(m.kind) || !m.path || veMediaOffline(m)) return '';
+    const chave = m.mel ? `<button class="ve-ctx-item" ${attr}="mel">${m.melOff ? '' : '✓ '}${veT('Áudio melhorado')}</button>` : '';
+    return soChave ? chave : `<div class="ve-ctx-sep"></div><button class="ve-ctx-item" ${attr}="ma">${veT('Melhorar áudio')}</button>${chave}`;
+}
 
 // ── Mostrar no projeto (botão direito no clipe da timeline, como o Reveal in Project do Premiere) ──
 function veMostrarNoProjeto(c) {
@@ -734,7 +857,8 @@ function vePjMenu(x, y, doc) {
         ${um ? '<button class="ve-ctx-item" data-pj="ren">Renomear<kbd>F2</kbd></button>' : ''}
         ${podeRelink ? `<button class="ve-ctx-item${veMediaOffline(midiaUm) ? ' offline' : ''}" data-pj="rel" title="${veMediaOffline(midiaUm) ? '' : 'Troca o arquivo e mantém os clipes na timeline com os mesmos cortes e posições'}">${veMediaOffline(midiaUm) ? 'Relincar mídia...' : 'Substituir mídia...'}</button>` : ''}
         ${varias.length > 1 ? `<button class="ve-ctx-item" data-pj="relv" title="Escolha a pasta com as versões novas: cada mídia pega o arquivo de mesmo nome">Substituir ${varias.length} mídias (escolher pasta)...</button>` : ''}
-        ${comSom.length ? `<button class="ve-ctx-item" data-pj="ma" title="${veT('Voz com som de estúdio (Sidon + OmniVoice). Cria o arquivo _melhorado ao lado do original e troca a mídia, mantendo os cortes')}">${veT('Melhorar áudio')}${comSom.length > 1 ? ` (${comSom.length})` : ''}</button>` : ''}
+        ${comSom.length ? `<button class="ve-ctx-item" data-pj="ma" title="${veT('Voz com som de estúdio (Sidon + OmniVoice). Gera o _melhorado.wav ao lado do original e troca só o som: a imagem e os cortes ficam iguais')}">${veT('Melhorar áudio')}${comSom.length > 1 ? ` (${comSom.length})` : ''}</button>` : ''}
+        ${midiaUm && midiaUm.mel ? veMelMenuItens(midiaUm, 'data-pj', true) : ''}
         ${keys.length ? `<button class="ve-ctx-item" data-pj="dup">Duplicar<kbd>Ctrl+D</kbd></button>
         <button class="ve-ctx-item" data-pj="cut">Recortar<kbd>Ctrl+X</kbd></button>
         <button class="ve-ctx-item" data-pj="copy">Copiar<kbd>Ctrl+C</kbd></button>` : ''}
@@ -755,7 +879,7 @@ function vePjMenu(x, y, doc) {
         if (cor) vePjCor(keys, cor.dataset.cor);
         else if (it) ({ ren: () => vePjRenomear(keys[0]), dup: () => vePjDuplicar(keys), cut: () => vePjCopiar('recortar'),
             copy: () => vePjCopiar('copiar'), paste: vePjColar, bin: vePjNovaPasta, aj: vePjNovoAjuste, cor: vePjNovaCor, imp: vePjImportarDialogo,
-            tl: () => veCreateTimeline(), rel: () => vePjRelink(+keys[0].slice(2)), relv: () => vePjSubstituirVarios(varias), ma: () => vePjMelhorarAudio(comSom), del: () => vePjApagar(keys) })[it.dataset.pj]();
+            tl: () => veCreateTimeline(), rel: () => vePjRelink(+keys[0].slice(2)), relv: () => vePjSubstituirVarios(varias), ma: () => vePjMelhorarAudio(comSom), mel: () => veMelAlternar(midiaUm), del: () => vePjApagar(keys) })[it.dataset.pj]();
         else return;
         veClipMenuFechar();
     });
@@ -775,6 +899,7 @@ function vePjInit() {
         const ir = e.target.closest('[data-ir]');
         if (ir) { vePjAbrirPasta(ir.dataset.ir); return; }
         const row = e.target.closest('[data-k]');
+        if (row && e.target.closest('[data-mel]')) { veMelAlternar(VE.media[+row.dataset.k.slice(2)]); return; }
         if (e.target.closest('[data-seta]')) { const b = vePjBin(row.dataset.k.slice(2)); b.aberta = !b.aberta; vePjRender(); return; }
         if (!row || row.dataset.k === 'raiz') { VEPJ.sel.clear(); VEPJ.foco = null; vePjRender(); return; }
         const k = row.dataset.k;

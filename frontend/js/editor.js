@@ -2479,6 +2479,7 @@ function veClipMenu(i, x, y, doc) {
         <button class="ve-ctx-item" data-ctx="fx">Controles de efeito</button>
         <button class="ve-ctx-item" data-ctx="pj">Mostrar no projeto</button>
         ${veIsImage(c) ? '' : `<button class="ve-ctx-item" data-ctx="inv">${veInvertido(c) ? '✓ ' : ''}Inverter clipe (Reverse Speed)</button>`}
+        ${typeof veMelMenuItens === 'function' && veTemSom(c) ? veMelMenuItens(veMediaOf(c), 'data-ctx') : ''}
         <button class="ve-ctx-item perigo" data-ctx="del">Apagar clipe<kbd>D</kbd></button>`;
     doc.body.appendChild(m);
     // dentro da janela
@@ -2503,6 +2504,8 @@ function veClipMenu(i, x, y, doc) {
             else if (it.dataset.ctx === 'del') veDeleteClip(i);
             else if (it.dataset.ctx === 'inv') veInverterClipes();
             else if (it.dataset.ctx === 'pj') veMostrarNoProjeto(VE.clips[i]);
+            else if (it.dataset.ctx === 'ma') vePjMelhorarAudio([VE.clips[i].m || 0]);
+            else if (it.dataset.ctx === 'mel') veMelAlternar(veMediaOf(VE.clips[i]));
         } else return;
         veClipMenuFechar();
     });
@@ -3275,7 +3278,7 @@ function veExportPlanClips() {
                      ox: (veMediaSize(c).w / 2 - veAnc(c, p)[0]) * f, oy: (veMediaSize(c).h / 2 - veAnc(c, p)[1]) * f };
         });
     // o arquivo de cada clipe com som (null = o vídeo aberto)
-    const mix = veMixClipes().map(([st, s0, e0, g, id, v, tom, fi, fo, afx]) => [st, s0, e0, g, id ? VE.media[id].path : null, v, tom, fi, fo, afx]);
+    const mix = veMixClipes().map(([st, s0, e0, g, id, v, tom, fi, fo, afx]) => [st, s0, e0, g, veMelArquivo(id), v, tom, fi, fo, afx]);
     return { base, audio, camadas, mix };
 }
 
@@ -3618,11 +3621,13 @@ function veProjectData() {
                 if (m.kind === 'timeline') o.sequenceId = m.sequenceId;
                 if (m.kind === 'cor') o.fill = m.fill;   // cor sólida (m.cor é a do rótulo)
                 if (m.rvDe != null) Object.assign(o, { rvDe: m.rvDe, rvA: m.rvA, rvB: m.rvB });   // cópia invertida (editor-reverse.js)
+                if (m.mel) Object.assign(o, { mel: m.mel, melOff: !!m.melOff });   // som melhorado (editor-projeto.js)
                 return o;
             }),
         // painel Projeto: pastas e a organização do vídeo principal
         bins: VE.bins || [],
-        m0: VE.media[0] ? { pasta: VE.media[0].pasta || null, cor: VE.media[0].cor, nome: VE.media[0].nome } : null,
+        m0: VE.media[0] ? { pasta: VE.media[0].pasta || null, cor: VE.media[0].cor, nome: VE.media[0].nome,
+                            ...(VE.media[0].mel ? { mel: VE.media[0].mel, melOff: !!VE.media[0].melOff } : {}) } : null,
         sequences: vePlain(VE.sequences || [], []),
         activeSequence: VE.activeSequence,
         clips: VE.clips,
@@ -3803,6 +3808,7 @@ function veApplyProject() {
             ids[m.id] = nm.id;
             return;
         }
+        if (m.mel) Object.assign(org, { mel: m.mel, melOff: !!m.melOff });
         if (m.kind === 'video' || m.kind === 'video2') {
             const nm = { id: VE.media.length, kind: 'video', name: m.name, path: m.path, ...org };
             if (m.rvDe != null) Object.assign(nm, { rvDe: m.rvDe, rvA: m.rvA, rvB: m.rvB });
@@ -3874,6 +3880,7 @@ function veApplyProject() {
         .filter(c => c.e - c.s > 1e-3);
     VE.bins = Array.isArray(d.bins) ? d.bins : [];
     if (d.m0 && VE.media[0]) Object.assign(VE.media[0], d.m0);
+    VE.media.forEach(nm => { if (nm && nm.mel && !veMediaOffline(nm)) veMelCarregar(nm); });
     const savedSeqs = Array.isArray(d.sequences) && d.sequences.length ? d.sequences : null;
     VE.sequences = (savedSeqs || [{
         id: d.activeSequence || 'seq_legacy',
@@ -4352,7 +4359,7 @@ function veRender() {
         if (veLocked(c)) veListras(ctx, cx, ay, cw, ah);
         // forma de onda: a do vídeo aberto, ou a do próprio arquivo (áudio solto)
         const outra = veMid(c);
-        const picos = outra ? (med.peaks || []) : VE.peaks, np = picos.length, durP = outra ? veDurMidia(c) : VE.srcDur;
+        const picos = veMelLigado(med) && med._aMel.peaks ? med._aMel.peaks : outra ? (med.peaks || []) : VE.peaks, np = picos.length, durP = outra ? veDurMidia(c) : VE.srcDur;
         if (np && veTemSom(c)) {
             const mid = ay + ah / 2, amp = ah / 2 - 3, gl = veDb(c.g);
             const xa = Math.max(cx, 0), xb = Math.min(cx + cw, W);
@@ -4388,6 +4395,8 @@ function veRender() {
             ctx.font = '600 10px Segoe UI';
             ctx.fillText((med.nome || med.name || veT('Áudio')) + velTxt + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, ay + 10);
         }
+        const enh = typeof veMaEstado === 'function' ? veMaEstado(c.m || 0) : null;
+        if (enh && !ghost) veMaDesenhar(ctx, cx, ay, cw, ah, enh);
         ctx.restore();
         ctx.globalAlpha = 1;
 

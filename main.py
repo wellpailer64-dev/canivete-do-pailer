@@ -1791,17 +1791,23 @@ def melhorar_audio(caminho):
                   else f"Pronto em {r['segundos']:.0f}s: {os.path.basename(r['feitos'][0])}")
         if falhas:
             resumo += f" • {len(falhas)} falha(s)"
-        return {"resumo": resumo, "feitos": r["feitos"], "abrir": r["feitos"][0] if r["feitos"] else None}
+        from Functions import media_server
+        previas = [{"arquivo": p["arquivo"], "nome": os.path.basename(p["arquivo"]),
+                    "orig": media_server.register(p["orig"]), "mel": media_server.register(p["mel"])}
+                   for p in r.get("previas") or []]
+        # sem "abrir": a tela mostra o player (antes/depois) e o botão Abrir pasta
+        return {"resumo": resumo, "feitos": r["feitos"], "previas": previas}
 
     return _tarefa("updateMelhorarAudioProgress", trabalho)
 
 
 def melhorar_audio_midia(caminho, mid):
-    """Pocket Editor (botão direito no Projeto): melhora e devolve o arquivo novo para substituir a mídia."""
+    """Pocket Editor: gera só o som melhorado ("<nome>_melhorado.wav", no tempo do vídeo); o editor troca o áudio
+    da mídia por ele e a imagem e os cortes ficam como estão."""
     from Functions.melhorar_audio import melhorar_arquivo
 
     def trabalho(log, progresso):
-        saida = melhorar_arquivo(caminho, log, lambda v, m=None: progresso(v * 100 if v >= 0 else -1, m))
+        saida = melhorar_arquivo(caminho, log, lambda v, m=None: progresso(v * 100 if v >= 0 else -1, m), so_audio=True)
         return {"saida": saida, "mid": mid, "origem": caminho}
 
     return _tarefa("veMelhorarAudioProgresso", trabalho)

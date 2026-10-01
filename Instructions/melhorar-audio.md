@@ -6,6 +6,10 @@ Deixa a voz com som de estúdio, como o Adobe Podcast Enhance. Aceita áudio, v�
 é copiada sem recodificar e só o áudio é trocado. A duração não muda, então a sincronia labial continua igual.
 Saída ao lado do original: `<nome>_melhorado.<ext>` (o original é mantido).
 
+Na ferramenta, ao terminar aparece um player antes/depois: os dois sons (`.m4a` alinhados em
+`modelos_ia/melhorar_audio/tmp/previa`, apagados na próxima rodada) tocam juntos e a chave só troca qual está mudo,
+então a comparação é no mesmo ponto. O botão **Abrir pasta** mostra o arquivo no Explorer (a pasta não abre sozinha).
+
 ## Arquivos
 
 - `Functions/melhorar_audio.py`: orquestra tudo dentro do app. Lê o áudio (ffmpeg, 48 kHz mono), transcreve,
@@ -44,9 +48,18 @@ Sem fala reconhecida, fica só a limpeza do Sidon.
 
 ## Pocket Editor
 
-Botão direito no painel Projeto → **Melhorar áudio**:
+Botão direito no painel Projeto ou num clipe da timeline → **Melhorar áudio**:
 - Funciona com uma ou várias mídias, uma por vez em fila, no fundo.
-- No fim, `veTrocarArquivo` troca a mídia pelo `_melhorado` e os clipes mantêm cortes, posições e efeitos.
+- Gera só o som: `melhorar_arquivo(..., so_audio=True)` → `<nome>_melhorado.wav` (48 kHz, 24 bits). Se o som do vídeo
+  começa depois da imagem (`start_time`), o `.wav` ganha esse silêncio no início para ficar no tempo do vídeo.
+- A mídia guarda `mel` (o `.wav`) e `melOff` (chave desligada). O vídeo, os cortes, posições e efeitos não mudam:
+  o mixer (`veAudioRegistrar` → `veMelFonte`) toca o `.wav` no lugar do som da mídia, a forma de onda é a dele e a
+  exportação usa o `.wav` (`veMelArquivo`). Fica salvo no projeto (`media[].mel`, `m0.mel`).
+- Enquanto processa, os clipes de áudio da mídia ficam listrados com "Melhorando N%" (`veMaDesenhar`) e o item do
+  Projeto ganha o mesmo selo. Na fila: "Melhorando · na fila".
+- Chave melhorado/original: selo "Melhorado" no painel Projeto (clique) ou "✓ Áudio melhorado" no botão direito.
+  Troca na hora, inclusive tocando.
+- Substituir mídia apaga o som melhorado (era do arquivo antigo). Se o `.wav` sumir, a mídia volta ao original.
 - Se outro projeto foi aberto no meio, nada é trocado: só avisa onde o arquivo foi salvo.
 
 ## Por que essa combinação

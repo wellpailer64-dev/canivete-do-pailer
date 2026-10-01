@@ -695,13 +695,104 @@ function updateConverterAudioProgress(data) {
 function runMelhorarAudio() {
     const path = _exigirSelecao('melhorar-audio');
     if (!path) return;
+    maFechar();
     uiIniciar('melhorar-audio');
     window.pywebview.api.melhorar_audio(path);
 }
 
 function updateMelhorarAudioProgress(data) {
     uiAtualizar('melhorar-audio', data);
+    if (data.complete && !data.error && (data.previas || []).length) maMostrar(data.previas);
 }
+
+// Player antes/depois: os dois tocam juntos e a chave só troca qual está mudo — a troca é no mesmo ponto, sem pulo
+const MA = { lista: [], atual: null, timer: 0 };
+const _maMel = () => _el('ma-a-mel'), _maOrig = () => _el('ma-a-orig');
+const _maTempo = s => { s = Math.max(0, Math.floor(s || 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+
+function maMostrar(previas) {
+    MA.lista = previas;
+    const sel = _el('ma-arq');
+    sel.innerHTML = previas.map((p, i) => `<option value="${i}">${_escHtml(p.nome)}</option>`).join('');
+    sel.hidden = previas.length < 2;
+    _el('ma-player').hidden = false;
+    maEscolher(0);
+}
+
+function maEscolher(i) {
+    maPausar();
+    MA.atual = MA.lista[+i] || null;
+    if (!MA.atual) return;
+    const mel = _maMel(), orig = _maOrig();
+    mel.src = MA.atual.mel;
+    orig.src = MA.atual.orig;
+    mel.onloadedmetadata = () => { _el('ma-total').textContent = _maTempo(mel.duration); };
+    mel.onended = () => { maPausar(); mel.currentTime = orig.currentTime = 0; maTick(); };
+    maEfeito(_el('ma-efeito').checked);
+    maTick();
+}
+
+function maEfeito(on) {
+    const a = _maMel(), b = _maOrig();
+    a.muted = !on;
+    b.muted = on;
+    _el('ma-efeito-txt').textContent = on ? 'Melhorado' : 'Original';
+    _el('ma-player').classList.toggle('orig', !on);
+    if (Math.abs(a.currentTime - b.currentTime) > 0.04) b.currentTime = a.currentTime;
+}
+
+function maPlay() {
+    const a = _maMel(), b = _maOrig();
+    if (!MA.atual) return;
+    if (!a.paused) { maPausar(); return; }
+    b.currentTime = a.currentTime;
+    Promise.all([a.play(), b.play()]).catch(() => {});
+    _el('ma-play').innerHTML = ico('pause');
+    clearInterval(MA.timer);
+    MA.timer = setInterval(maTick, 120);
+}
+
+function maPausar() {
+    const a = _maMel(), b = _maOrig();
+    if (a) a.pause();
+    if (b) b.pause();
+    clearInterval(MA.timer);
+    if (_el('ma-play')) _el('ma-play').innerHTML = ico('play');
+}
+
+function maTick() {
+    const a = _maMel(), b = _maOrig();
+    _el('ma-tempo').textContent = _maTempo(a.currentTime);
+    if (a.duration) _el('ma-barra').value = Math.round(a.currentTime / a.duration * 1000);
+    // os dois relógios se afastam um pouco com o tempo: realinha o que está mudo
+    if (!a.paused && Math.abs(a.currentTime - b.currentTime) > 0.06) b.currentTime = a.currentTime;
+}
+
+function maBuscar(v) {
+    const a = _maMel();
+    if (!a.duration) return;
+    a.currentTime = _maOrig().currentTime = v / 1000 * a.duration;
+    maTick();
+}
+
+function maAbrirPasta() {
+    if (MA.atual) window.pywebview.api.reveal_file(MA.atual.arquivo);
+}
+
+function maFechar() {
+    maPausar();
+    MA.lista = []; MA.atual = null;
+    if (_el('ma-player')) _el('ma-player').hidden = true;
+    [_maMel(), _maOrig()].forEach(x => { if (x) x.removeAttribute('src'); });
+}
+
+// espaço toca/pausa quando o player está na tela
+document.addEventListener('keydown', e => {
+    if (e.code !== 'Space' || !MA.atual || !_el('page-melhorar-audio')?.classList.contains('active')) return;
+    if (e.target.closest('input:not([type=range]):not([type=checkbox]), textarea, select, button')) return;
+    e.preventDefault();
+    maPlay();
+});
 
 
 // =========================

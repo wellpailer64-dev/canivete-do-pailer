@@ -417,6 +417,38 @@ body.arrastando .tool-page.active .dropzone { transform: scale(1.006); }
 .opt-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .opt-label { width: 128px; flex-shrink: 0; font-size: 12.5px; font-weight: 500; color: var(--text-2); }
 .ma-como { flex: 1; min-width: 240px; font-size: 12.5px; line-height: 1.5; color: var(--text-2); }
+/* player antes/depois do Melhorar Áudio */
+.ma-player[hidden] { display: none !important; }
+.ma-player {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: var(--r-lg);
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+}
+.ma-arq { align-self: flex-start; max-width: 100%; }
+.ma-linha { display: flex; align-items: center; gap: 12px; }
+.ma-baixo { justify-content: space-between; flex-wrap: wrap; }
+.ma-play {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    border: none;
+    background: var(--primary);
+    color: #fff;
+    cursor: pointer;
+    transition: background .15s;
+}
+.ma-play:hover { background: var(--primary-hover); }
+.ma-play .i { width: 18px; height: 18px; }
+.ma-tempo { font-family: var(--mono); font-size: 12px; color: var(--text-2); min-width: 38px; text-align: center; }
+.ma-barra { flex: 1; min-width: 0; accent-color: var(--primary); cursor: pointer; }
+.ma-player.orig #ma-efeito-txt { color: var(--text-2); }
 
 .pills { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
 .pill { position: relative; cursor: pointer; }

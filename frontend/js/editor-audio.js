@@ -116,6 +116,13 @@ function veAudioMsg(m) {
 
 // Registra uma fonte de som (áudio conformado) no mixer: id 0 = vídeo aberto; demais = áudios soltos
 function veAudioRegistrar(id, url, quadros) {
+    // som melhorado (editor-projeto.js: veMelFonte): guarda o original e registra o que estiver ligado
+    const m = VE.media && VE.media[id];
+    if (m && m.mel && typeof veMelFonte === 'function') {
+        const f = veMelFonte(m, url, quadros);
+        if (!f) return Promise.resolve(false);
+        [url, quadros] = f;
+    }
     VEAU.fontes.set(id, { url, quadros, blocos: new Map(), pedidos: new Map() });
     VEAU.chave = '';
     return veAudioIniciar().then(ok => { if (ok) { veApplyAudioGain(); veAudioPrever(VE.playhead); veAudioEditou(); } return ok; });

@@ -370,6 +370,24 @@
                         <div class="progress-bar"><div class="progress-fill" id="progress-fill-melhorar-audio"></div></div>
                     </div>
                     <div class="result-banner" id="result-melhorar-audio" hidden></div>
+                    <div class="ma-player" id="ma-player" hidden>
+                        <select class="field field-select ma-arq" id="ma-arq" onchange="maEscolher(this.value)" hidden></select>
+                        <div class="ma-linha">
+                            <button class="ma-play" id="ma-play" onclick="maPlay()" title="Tocar / pausar (espaço)"><svg class="i"><use href="#i-play"/></svg></button>
+                            <span class="ma-tempo" id="ma-tempo">0:00</span>
+                            <input type="range" class="ma-barra" id="ma-barra" min="0" max="1000" value="0" oninput="maBuscar(this.value)">
+                            <span class="ma-tempo" id="ma-total">0:00</span>
+                        </div>
+                        <div class="ma-linha ma-baixo">
+                            <label class="switch-row" title="Liga e desliga o efeito enquanto ouve, no mesmo ponto">
+                                <input type="checkbox" id="ma-efeito" checked onchange="maEfeito(this.checked)"><span class="switch"></span>
+                                <span><b id="ma-efeito-txt">Melhorado</b><small>Desligue para ouvir o original</small></span>
+                            </label>
+                            <button class="btn-secondary" onclick="maAbrirPasta()"><svg class="i"><use href="#i-folder"/></svg>Abrir pasta</button>
+                        </div>
+                        <audio id="ma-a-mel" preload="auto"></audio>
+                        <audio id="ma-a-orig" preload="auto"></audio>
+                    </div>
                     <details class="log-wrap" id="logwrap-melhorar-audio">
                         <summary>Ver detalhes</summary>
                         <div class="log-section" id="log-melhorar-audio"></div>
