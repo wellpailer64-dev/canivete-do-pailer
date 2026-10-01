@@ -2659,16 +2659,36 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             ena = f"between(t,{_tempo_ffmpeg(c['st'])},{_tempo_ffmpeg(fim)})"
             if bm:
                 # Modo de mesclagem: a camada é posicionada num quadro transparente do tamanho do vídeo, misturada
-                # com o fundo (blend) e aplicada pela transparência dela (maskedmerge) — como o canvas da prévia
+                # com o fundo (blend) e aplicada pela transparência dela (maskedmerge) — como o canvas da prévia.
+                # Só o trecho da camada passa por isso (antes/trecho/depois emendados, como na camada de ajuste): antes o
+                # vídeo inteiro ia para RGB e voltava a cada camada mesclada (exportação ~4x mais lenta).
+                # yuv → gbrp direto deixava as últimas 8 colunas pretas no ffmpeg atual: passa por rgba antes.
                 r = f"bm{n}"
-                filtros.append(f"{vf}scale=in_color_matrix={mtx},format=gbrp,split=3[{r}a][{r}b][{r}c]")
+                ini, fim_bm = max(0.0, c["st"]), min(c["st"] + c["dur"], total)
+                if fim_bm - ini < 1e-3:
+                    filtros.append(f"[l{n}]nullsink")
+                    continue
+                antes, depois = ini > 1e-3, fim_bm < total - 1e-3
+                nseg = 1 + antes + depois
+                filtros.append(f"{vf}split={nseg}" + "".join(f"[{r}s{j}]" for j in range(nseg)))
+                j = 0
+                if antes:
+                    filtros.append(f"[{r}s{j}]trim=end={ini:.4f},setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
+                    j += 1
+                filtros.append(f"[{r}s{j}]trim=start={ini:.4f}:end={fim_bm:.4f},"
+                               f"scale=in_color_matrix={mtx},format=rgba,format=gbrp,split=3[{r}a][{r}b][{r}c]")
                 filtros.append(f"[{r}c]format=rgba,colorchannelmixer=aa=0[{r}z]")
                 filtros.append(f"[{r}z][l{n}]overlay=x='{px}-w/2':y='{py}-h/2':enable='{ena}'"
                                f":eof_action=pass:format=rgb,split[{r}d][{r}e]")
                 filtros.append(f"[{r}d]format=gbrp[{r}t]")
                 filtros.append(f"[{r}e]alphaextract,format=gbrp[{r}k]")
                 filtros.append(f"[{r}t][{r}a]blend=all_mode={bm}[{r}x]")
-                filtros.append(f"[{r}b][{r}x][{r}k]maskedmerge,{de_rgb}[o{n}]")
+                filtros.append(f"[{r}b][{r}x][{r}k]maskedmerge,{de_rgb},setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
+                j += 1
+                if depois:
+                    filtros.append(f"[{r}s{j}]trim=start={fim_bm:.4f},setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
+                    j += 1
+                filtros.append("".join(f"[{r}p{k}]" for k in range(nseg)) + f"concat=n={nseg}:v=1:a=0[o{n}]")
             else:
                 filtros.append(f"{vf}[l{n}]overlay=x='{px}-w/2':y='{py}-h/2'"
                                f":enable='{ena}':eof_action=pass:format=auto[o{n}]")

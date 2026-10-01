@@ -382,6 +382,14 @@ async function veAfcPreparar(plano, bin) {
         for (const f of fotos) { const c = await imp(f.path); if (c) x.cards.push(c); }
         await veAfEsperar(() => x.cards.every(c => c.w > 0), 8000);
     }
+    // blocos animados: a foto do fundo (uma diferente na intro e no encerramento) e as texturas geradas
+    if (m.intro.tipo === 'animada' || m.fim.tipo === 'animada') {
+        const boas = VEAF.midias.filter(y => y.tipo === 'foto' && !VEAF.fora.has(y.path)).sort((a, b) => b.nota - a.nota);
+        const pega = async i => { const f = boas[Math.min(i, boas.length - 1)]; if (!f) return null; const c = await imp(f.path); await veAfEsperar(() => c && c.w > 0, 8000); return c; };
+        x.heroiI = await pega(3);
+        x.heroiF = await pega(4);
+        Object.assign(x, await veAfcTexturas(m, bin && bin.id));
+    }
     // efeitos sonoros (pack do Soundboard): carregado aqui se o painel ainda não abriu
     if (m.sfx !== false && typeof veSbCarregar === 'function') {
         if (!VESB.dados) { veSbCarregar(); await veAfEsperar(() => VESB.dados, 6000); }
@@ -427,6 +435,56 @@ function veAfcSelo(pal, atras) {
     const textos = [pal.texto, '#ffffff', veAfcTom(pal.primaria, 0.3), '#111111'];
     const cor = textos.find(c => veAfcRazao(c, fundo) >= 4.5) || (veAfcRazao('#ffffff', fundo) > veAfcRazao('#111111', fundo) ? '#ffffff' : '#111111');
     return { fundo, cor };
+}
+
+// PNG desenhado aqui (canvas) e importado no projeto; um por chave (ex.: luz na cor do cliente)
+async function veAfcPng(chave, nome, w, h, desenha, pasta) {
+    const ja = VE.media.find(m => m.kind === 'image' && !m.removido && m._afPng === chave);
+    if (ja) return ja;
+    const cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    desenha(cv.getContext('2d'), w, h);
+    const r = await veAfApi().ve_salvar_png(cv.toDataURL('image/png'));
+    if (!r || !r.success) return null;
+    await vePjImportarArquivo(r.path, pasta);
+    const m = veAfMidiaDe(r.path);
+    if (m) { m._afPng = chave; m.nome = nome; await veAfEsperar(() => m.w > 0, 5000); }
+    return m;
+}
+const veAfcRgba = (hex, a) => { const v = String(hex).replace('#', ''); return `rgba(${[0, 2, 4].map(i => parseInt(v.substr(i, 2), 16) || 0).join(',')},${a})`; };
+async function veAfcTexturas(m, pasta) {
+    const luz = await veAfcPng('luz' + m.paleta.secundaria, `Luz · ${m.paleta.secundaria}`, 600, 600, (g, w, h) => {
+        const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+        gr.addColorStop(0, veAfcRgba(m.paleta.secundaria, 0.95)); gr.addColorStop(0.35, veAfcRgba(m.paleta.secundaria, 0.45));
+        gr.addColorStop(1, veAfcRgba(m.paleta.secundaria, 0));
+        g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    }, pasta);
+    const grao = await veAfcPng('grao1', 'Textura · grão', 540, 960, (g, w, h) => {
+        const im = g.createImageData(w, h);
+        let sem = 12345;
+        for (let i = 0; i < im.data.length; i += 4) {
+            sem = (sem * 1103515245 + 12345) & 0x7fffffff;
+            const v = 128 + ((sem >> 8) % 70) - 35;
+            im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255;
+        }
+        g.putImageData(im, 0, 0);
+    }, pasta);
+    const feixe = await veAfcPng('feixe1', 'Luz · feixe', 360, 2600, (g, w, h) => {
+        const gr = g.createLinearGradient(0, 0, w, 0);
+        gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    }, pasta);
+    return { luz, grao, feixe };
+}
+
+// Estilo mais grosso instalado da família (Black > Heavy > ExtraBold > Bold), sem itálico: {fonte, neg, ita, fam}
+function veAfcFonteForte(fam) {
+    // só estilos que o desenho consegue pedir: nome próprio no sistema, ou o negrito da família (fontes como a SF Pro
+    // registram Heavy/Black com o mesmo nome do Regular — pedi-los dá Regular)
+    const lista = ((typeof VEPP !== 'undefined' && VEPP.estilos && VEPP.estilos[fam]) || [])
+        .filter(e => !e.italico && !/italic|oblique|itálic/i.test(e.estilo || '') && (e.gdi !== fam || e.gdi_negrito || (e.peso || 400) <= 400));
+    const e = lista.sort((a, b) => (b.peso || 0) - (a.peso || 0))[0];
+    return e ? { fonte: e.gdi, neg: !!e.gdi_negrito, ita: false, fam } : { fonte: fam || 'Arial', neg: true, ita: false };
 }
 
 // Cor sólida do projeto com essa cor (uma por cor)
@@ -478,7 +536,7 @@ function veAfcExtras(out, plano, x) {
     };
     const sx = x.sfx || {};
     const logoSc = larg => x.logo ? W * larg / x.logo.w * 100 : 100;
-    const texto = (st, dur, t, y, tr, selo) => {
+    const texto = (st, dur, t, y, tr, selo, anima) => {
         if (!t || !t.trim() || typeof veTxMidia !== 'function' || dur <= 0.1) return;
         // selo: cores escolhidas pelo contraste com o fundo principal (texto legível com qualquer paleta)
         const sl = selo ? veAfcSelo(m.paleta, m.paleta.primaria) : null;
@@ -486,7 +544,7 @@ function veAfcExtras(out, plano, x) {
             tx: { ...VE_TX_PADRAO, t: t.trim(), fonte: m.fonte || 'Arial', cor: sl ? sl.cor : m.paleta.texto, tam: selo ? 64 : 72, alin: 'center',
                 ...(selo ? { fOn: true, fCor: sl.fundo, fOp: 100, fPad: 28, fRaio: 24 } : { sOn: true, sOp: 55, sBlur: 14 }) },
             p: { sc: 100, x: W / 2, y, rot: 0, op: 100 },
-            txa: typeof veTxaObj === 'function' ? { in: veTxaObj(selo ? 'pop' : 'subir'), out: veTxaObj('fade') } : undefined });
+            txa: typeof veTxaObj === 'function' ? { in: veTxaObj(anima || (selo ? 'pop' : 'subir')), out: veTxaObj('fade') } : undefined });
     };
     // logo simples (intro "logo sobre a cor/cenas" e encerramento simples)
     const logoEm = (st, dur, larg, y, anim, tr) => {
@@ -499,59 +557,96 @@ function veAfcExtras(out, plano, x) {
         else c.k = { op: veAfcK([[0, 0, 'ease'], [d * 1.5, 100], [e - 0.3, 100], [e, 0]]) };
         out.push(c);
     };
-    // bloco animado (intro e encerramento) — direcao-de-arte.md: 60-30-10 (fundo principal, destaque só no círculo e nos
-    // traços), um foco por vez (cards → logo → texto), escalonado, curvas entra/mola/sai, área segura (y 220–1500)
-    const LOGO_Y = 820, TXT_Y = 1260;
+    // bloco animado (intro e encerramento) — composição em camadas (direcao-de-arte.md §3–4): a foto da vez desfocada
+    // no fundo, a cor da marca em Multiplicação por cima (duotone), luz em degradê na cor de destaque (Tela) se
+    // movendo, grão vivo (Sobrepor) e vinheta; por cima, cards de fotos e o logo com puxada de foco e feixe de luz
+    const LOGO_Y = 800, TXT_Y = 1290;   // título mais baixo, em 2 linhas, ainda dentro da área segura (até y 1500)
     const animado = (st, D, opts) => {
         const N = Math.max(4, Math.round(D / b)), T = k => st + Math.min(D - 0.25, k * b), Q = VE_AF_Q;
         const cards = opts.cards || [], L = cards.length ? T(N / 2) : T(Math.min(1, N / 4)), l = L - st;
         const sai = D - 6 * Q;   // começo da saída (6 quadros, mais rápida que a entrada)
-        // traços de destaque (10%): um entra pela esquerda no alto, outro pela direita embaixo, escalonados
-        [[330, -1, 0], [1440, 1, 0.5]].forEach(([y, lado, bt]) => {
-            const t0 = Math.min(D * 0.3, bt * b), xf = W / 2 + lado * 250, xi = xf - lado * 900;
-            out.push({ tr: nova(), st: +(st + t0).toFixed(4), s: 0, e: +(D - t0).toFixed(4), m: veGrMidia('forma', 'Forma').id,
-                fm: { t: 'ret', w: 520, h: 16, cor: m.paleta.secundaria, cOn: false, cCor: '#ffffff', cLarg: 8, raio: 8 },
-                p: { sc: 100, x: xf, y, rot: -16, op: 100 },
-                k: { x: veAfK([[0, xi, 'entra'], [12 * Q, xf, 'suave'], [sai - t0, xf + lado * 40, 'sai'], [D - t0, xf + lado * 1100]]) } });
-        });
+        const camada = (c) => { c.tr = nova(); c.st = +(st + (c._t || 0)).toFixed(4); delete c._t; out.push(c); return c; };
+        const somem = (d0) => veAfK([[0, 0, 'entra'], [8 * Q, 100], [d0 - 6 * Q, 100, 'sai'], [d0, 0]]);
+        // 1) a foto da vez, cobrindo e desfocada, com deriva lenta
+        const heroi = opts.heroi;
+        if (heroi) {
+            const k = Math.max(W / heroi.w, H / heroi.h) * 100;
+            camada({ s: 0, e: +D.toFixed(4), m: heroi.id, p: { sc: +(k * 1.12).toFixed(2), x: W / 2, y: H / 2, rot: 0, op: 100 },
+                fx: [{ id: veFxNewId(), t: 'blur', on: true, v: { amt: 38 } }],
+                k: { sc: veAfK([[0, k * 1.18, 'suave'], [D, k * 1.06]]), op: somem(D) } });
+            // 2) a cor da marca em Multiplicação: a foto vira um duotone na identidade
+            camada({ s: 0, e: +D.toFixed(4), m: veAfcCor(m.paleta.primaria, `${m.nome} · ${veT('cor principal')}`).id, bm: 'multiply',
+                p: { sc: 100, x: W / 2, y: H / 2, rot: 0, op: 88 }, k: { op: veAfK([[0, 0, 'entra'], [8 * Q, 88], [D - 6 * Q, 88, 'sai'], [D, 0]]) } });
+        }
+        // 3) luz: degradê radial na cor de destaque, em Tela, atravessando devagar
+        if (x.luz) {
+            const sc = 260;
+            camada({ s: 0, e: +D.toFixed(4), m: x.luz.id, bm: 'screen', p: { sc, x: W * 0.3, y: H * 0.3, rot: 0, op: 70 },
+                k: { x: veAfK([[0, W * 0.15, 'suave'], [D, W * 0.75]]), y: veAfK([[0, H * 0.22, 'suave'], [D, H * 0.48]]),
+                     sc: veAfK([[0, sc * 0.9, 'suave'], [D, sc * 1.15]]), op: veAfK([[0, 0, 'entra'], [12 * Q, 70], [D - 6 * Q, 70, 'sai'], [D, 0]]) } });
+        }
+        // 4) grão vivo: a mesma textura muda de lugar a cada 3 quadros (degrau), em Sobrepor
+        if (x.grao) {
+            const xs = [], ys = [];
+            for (let t = 0, n = 0; t < D; t += 3 * Q, n++) { xs.push([t, W / 2 + ((n * 37) % 41) - 20, 'hold']); ys.push([t, H / 2 + ((n * 53) % 43) - 21, 'hold']); }
+            camada({ s: 0, e: +D.toFixed(4), m: x.grao.id, bm: 'overlay', p: { sc: 215, x: W / 2, y: H / 2, rot: 0, op: 35 },
+                k: { x: veAfK(xs), y: veAfK(ys) } });
+        }
+        // 5) vinheta (leva o olho para o centro)
+        const vin = veAfAjuste(0, D, { vig: 55, ct: 8 });
+        camada(vin);
         // cards: foto + moldura branca + sombra, entram um por batida (mola, girando), recuam quando o logo bate
         const pos = [[W * 0.29, 560, -7], [W * 0.72, 690, 6], [W * 0.36, 1130, -4]];
         cards.forEach((md, i) => {
             const t = T((i + 1) * N / 8) - st, fim = D - t, cw = W * 0.4, ch = cw * md.h / md.w, [px, py, rot] = pos[i];
-            const lt = Math.max(12 * Q, l - t);   // quando o logo bate, no tempo do card
+            const lt = Math.max(12 * Q, l - t);
             const mult = [[0, 0, 'mola'], [10 * Q, 1, 'suave'], [lt, 1.02, 'entra'], [lt + 8 * Q, 0.86, 'suave'], [Math.max(lt + 9 * Q, sai - t), 0.84, 'sai'], [fim, 0.2]];
             const gira = veAfK([[0, rot * 2.2, 'entra'], [12 * Q, rot]]);
-            const opk = veAfK([[0, 0, 'entra'], [4 * Q, 100], [lt, 100, 'entra'], [lt + 8 * Q, 40], [Math.max(lt + 9 * Q, sai - t), 40, 'sai'], [fim, 0]]);
-            const camada = (extra, base, dx = 0, dy = 0) => out.push({ tr: nova(), st: +(st + t).toFixed(4), s: 0, e: +fim.toFixed(4),
-                p: { sc: +base.toFixed(2), x: px + dx, y: py + dy, rot, op: 100 }, ...extra,
-                k: { sc: veAfK(mult.map(([tt, v, c]) => [tt, base * v, c])), rot: gira, op: opk } });
-            camada({ m: veGrMidia('forma', 'Forma').id, fm: { t: 'ret', w: Math.round(cw * 1.06), h: Math.round(ch + cw * 0.06), cor: '#000000', cOn: false, cCor: '#000000', cLarg: 0, raio: 14 },
-                fx: [{ id: veFxNewId(), t: 'blur', on: true, v: { amt: 14 } }] }, 100, 14, 22);   // sombra
-            out[out.length - 1].p.op = 38;
-            out[out.length - 1].k.op = veAfK([[0, 0, 'entra'], [4 * Q, 38], [lt, 38, 'entra'], [lt + 8 * Q, 15], [Math.max(lt + 9 * Q, sai - t), 15, 'sai'], [fim, 0]]);
-            camada({ m: veGrMidia('forma', 'Forma').id, fm: { t: 'ret', w: Math.round(cw * 1.06), h: Math.round(ch + cw * 0.06), cor: '#ffffff', cOn: false, cCor: '#ffffff', cLarg: 0, raio: 14 } }, 100);   // moldura
-            camada({ m: md.id, fx: [{ id: veFxNewId(), t: 'rounded', on: true, v: { raio: 3 } }] }, cw / md.w * 100);   // foto
+            const opk = (v1, v2) => veAfK([[0, 0, 'entra'], [4 * Q, v1], [lt, v1, 'entra'], [lt + 8 * Q, v2], [Math.max(lt + 9 * Q, sai - t), v2, 'sai'], [fim, 0]]);
+            const peca = (extra, base, op1, op2, dx = 0, dy = 0) => camada({ _t: t, s: 0, e: +fim.toFixed(4),
+                p: { sc: +base.toFixed(2), x: px + dx, y: py + dy, rot, op: op1 }, ...extra,
+                k: { sc: veAfK(mult.map(([tt, v, c]) => [tt, base * v, c])), rot: gira, op: opk(op1, op2) } });
+            const fm = cor => ({ t: 'ret', w: Math.round(cw * 1.06), h: Math.round(ch + cw * 0.06), cor, cOn: false, cCor: cor, cLarg: 0, raio: 14 });
+            peca({ m: veGrMidia('forma', 'Forma').id, fm: fm('#000000'), fx: [{ id: veFxNewId(), t: 'blur', on: true, v: { amt: 14 } }] }, 100, 45, 15, 14, 22);
+            peca({ m: veGrMidia('forma', 'Forma').id, fm: fm('#ffffff') }, 100, 100, 40);
+            peca({ m: md.id, fx: [{ id: veFxNewId(), t: 'rounded', on: true, v: { raio: 3 } }] }, cw / md.w * 100, 100, 40);
             som(i % 2 ? sx.pop2 : sx.pop, st + t - Q, -7);
         });
-        // círculo de destaque atrás do logo: nasce com mola 2 quadros antes do logo (antecipação) e respira
-        const circ = { tr: nova(), st: +(L - 2 * Q).toFixed(4), s: 0, e: +(D - l + 2 * Q).toFixed(4), m: veGrMidia('forma', 'Forma').id,
-            fm: { t: 'eli', w: 760, h: 760, cor: m.paleta.secundaria, cOn: false, cCor: '#ffffff', cLarg: 8, raio: 0 },
-            p: { sc: 100, x: W / 2, y: LOGO_Y, rot: 0, op: 100 } };
-        const ce = circ.e;
-        circ.k = { sc: veAfK([[0, 0, 'mola'], [12 * Q, 100, 'suave'], [ce - 6 * Q, 104, 'sai'], [ce, 0]]) };
-        out.push(circ);
-        // logo bate no compasso: entra 150% girado e assenta com overshoot; respira; sai crescendo
+        // logo: puxada de foco — uma cópia desfocada em Tela chega primeiro e vira o brilho; a nítida assenta por cima
         if (x.logo) {
             const sc = logoSc(opts.larg || 0.56), e = D - l;
-            out.push({ tr: nova(), st: +L.toFixed(4), s: 0, e: +e.toFixed(4), m: x.logo.id,
-                p: { sc: +sc.toFixed(2), x: W / 2, y: LOGO_Y, rot: 0, op: 100 },
-                k: { sc: veAfK([[0, sc * 1.5, 'mola'], [12 * Q, sc, 'suave'], [e - 6 * Q, sc * 1.05, 'sai'], [e, sc * 1.3]]),
-                     op: veAfK([[0, 0, 'entra'], [3 * Q, 100], [e - 6 * Q, 100, 'sai'], [e, 0]]), rot: veAfK([[0, -8, 'entra'], [12 * Q, 0]]) } });
+            camada({ _t: l - 2 * Q, s: 0, e: +(e + 2 * Q).toFixed(4), m: x.logo.id, bm: 'screen', fx: [{ id: veFxNewId(), t: 'blur', on: true, v: { amt: 30 } }],
+                p: { sc: +(sc * 1.08).toFixed(2), x: W / 2, y: opts.logoY || LOGO_Y, rot: 0, op: 80 },
+                k: { sc: veAfK([[0, sc * 1.6, 'entra'], [14 * Q, sc * 1.08, 'suave'], [e - 4 * Q, sc * 1.14, 'sai'], [e + 2 * Q, sc * 1.4]]),
+                     op: veAfK([[0, 0, 'entra'], [4 * Q, 100], [14 * Q, 75, 'suave'], [e - 4 * Q, 75, 'sai'], [e + 2 * Q, 0]]) } });
+            camada({ _t: l, s: 0, e: +e.toFixed(4), m: x.logo.id, p: { sc: +sc.toFixed(2), x: W / 2, y: opts.logoY || LOGO_Y, rot: 0, op: 100 },
+                k: { sc: veAfK([[0, sc * 1.12, 'entra'], [14 * Q, sc, 'suave'], [e - 6 * Q, sc * 1.04, 'sai'], [e, sc * 1.25]]),
+                     op: veAfK([[0, 0, 'entra'], [6 * Q, 100], [e - 6 * Q, 100, 'sai'], [e, 0]]) } });
+            // feixe de luz atravessando o logo logo depois do impacto
+            if (x.feixe) camada({ _t: l + 4 * Q, s: 0, e: +(16 * Q).toFixed(4), m: x.feixe.id, bm: 'screen',
+                p: { sc: 100, x: -400, y: opts.logoY || LOGO_Y, rot: 18, op: 85 }, k: { x: veAfK([[0, -400, 'troca'], [16 * Q, W + 400]]) } });
         }
         // clarão de exposição no impacto (camada de ajuste por cima de tudo do bloco)
-        const fl = veAfAjuste(L - st - Q, 9 * Q, { exp: 1.4, ct: 10 }, [[0, 100, 'sai'], [8 * Q, 0]]);
-        fl.st = +(L - Q).toFixed(4); fl.tr = nova(); out.push(fl);
-        texto(L + b / 2, st + D - L - b / 2, opts.texto, TXT_Y, nova(), true);
+        const fl = veAfAjuste(0, 9 * Q, { exp: 1.1, ct: 10 }, [[0, 100, 'sai'], [8 * Q, 0]]);
+        fl._t = l - Q; camada(fl);
+        // título: "começo da frase" em branco + a última palavra (o destaque) maior na cor de destaque, 2 linhas,
+        // fonte no peso mais forte; entram escalonadas (a 2ª 4 quadros depois). Sem contraste, o destaque fica branco
+        const frase = String(opts.texto || '').trim();
+        if (frase) {
+            const fundo = heroi ? veAfcTom(m.paleta.primaria, 0.55) : m.paleta.primaria;
+            const forte = veAfcFonteForte(m.fonte), t1 = L + b / 2, dur = st + D - t1;
+            const pals = frase.split(/\s+/), fim = pals.length > 1 ? pals.pop() : null, ini = pals.join(' ');
+            const corDest = veAfcRazao(m.paleta.secundaria, fundo) >= 3 ? m.paleta.secundaria : '#ffffff';
+            const corTx = veAfcRazao('#ffffff', fundo) >= 3 ? '#ffffff' : veAfcTom(m.paleta.primaria, 0.3);
+            const linha = (t, y, tam, cor, anima, atraso) => out.push({ tr: nova(), st: +(t1 + atraso).toFixed(4), s: 0, e: +(dur - atraso).toFixed(3), m: veTxMidia().id,
+                tx: { ...VE_TX_PADRAO, ...forte, t, tam, cor, alin: 'center', esp: 10, sOn: true, sCor: '#000000', sOp: 45, sDist: 6, sBlur: 22 },
+                p: { sc: 100, x: W / 2, y, rot: 0, op: 100 },
+                txa: typeof veTxaObj === 'function' ? { in: veTxaObj(anima), out: veTxaObj('fade') } : undefined });
+            if (fim) {
+                linha(ini, TXT_Y, 84, corTx, 'revelar', 0);
+                linha(fim, TXT_Y + 112, 132, corDest, 'elastico', 4 * Q);
+            } else linha(frase, TXT_Y + 40, 110, corDest, 'elastico', 0);
+        }
         // sons: riser até o logo, impacto no logo, sucesso no texto
         if (opts.riser && sx.riser) som(sx.riser, L - sx.riser.dur, -5);
         som(sx.boom, L - 0.02, -3);
@@ -561,7 +656,7 @@ function veAfcExtras(out, plano, x) {
     // intro
     if (m.intro.tipo === 'animada' && x.introFim) {
         out.push({ tr: SC, st: 0, s: 0, e: +x.introFim.toFixed(4), m: corP(), p: { ...cheio } });
-        animado(0, x.introFim, { cards: x.cards, texto: VEAF.titulo, riser: true });
+        animado(0, x.introFim, { cards: x.cards, texto: VEAF.titulo, riser: true, heroi: x.heroiI });
         const primeira = out.find(c => c.tr === SC && Math.abs(c.st - x.introFim) < 0.02 && VE.media[c.m] && VE.media[c.m].kind !== 'cor');
         if (primeira) primeira.tin = { ...tin };
         som(sx.whoosh, x.introFim - (sx.whoosh ? sx.whoosh.dur * 0.45 : 0), -6);
@@ -599,7 +694,7 @@ function veAfcExtras(out, plano, x) {
         if (m.fim.tipo === 'animada' || m.fim.tipo === 'logo_cor') {
             out.push({ tr: SC, st: +x.fimIni.toFixed(4), s: 0, e: +df.toFixed(4), m: corP(), p: { ...cheio }, tin: { ...tin } });
             som(sx.whoosh2 || sx.whoosh, x.fimIni - ((sx.whoosh2 || sx.whoosh) ? (sx.whoosh2 || sx.whoosh).dur * 0.45 : 0), -6);
-            if (m.fim.tipo === 'animada') animado(x.fimIni, df, { texto: m.fim.texto, larg: 0.55, fimSom: true });
+            if (m.fim.tipo === 'animada') animado(x.fimIni, df, { texto: '', larg: 0.6, fimSom: true, heroi: x.heroiF, logoY: H / 2 });
             else {
                 logoEm(x.fimIni, df, 0.5, H * (m.fim.texto ? 0.44 : 0.5), 'fade', nova());
                 texto(x.fimIni + Math.min(b, df / 3), df - Math.min(b, df / 3), m.fim.texto, H * 0.6, nova());
@@ -619,6 +714,10 @@ function veAfcExtras(out, plano, x) {
             p: { sc, x: +px.toFixed(1), y: +py.toFixed(1), rot: 0, op: m.marca.op ?? 90 },
             k: { op: veAfcK([[0, 0, 'ease'], [0.4, m.marca.op ?? 90]]) } });
     }
+    // fade para preto no fim (a música já sai em fade junto)
+    const fp = Math.min(1.2, x.total * 0.08);
+    out.push({ tr: nova(), st: +(x.total - fp).toFixed(4), s: 0, e: +fp.toFixed(4), m: veAfcCor('#000000', veT('Preto (fade final)')).id,
+        p: { ...cheio }, k: { op: veAfK([[0, 0, 'suave'], [fp, 100]]) } });
     if (x.semPack) veToast(veT('Dica: baixe o pack no painel Soundboard para o AutoFrame pôr efeitos sonoros'));
     return out;
 }

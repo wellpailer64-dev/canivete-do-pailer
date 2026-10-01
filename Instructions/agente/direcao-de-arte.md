@@ -212,3 +212,12 @@ contato) com a versão anterior. Registrar a nota do usuário em CALIBRACAO de `
 
 Fontes das áreas seguras: hopperhq.com/blog/instagram-reel-size, outfy.com/blog/instagram-safe-zone,
 zeely.ai/blog/master-instagram-safe-zones (2026; adotada a margem mais conservadora entre elas).
+
+## 8. Calibração com o usuário (mais novo em cima)
+- 2026-10-01 intro em camadas APROVADA ("agora sim, mesma língua"): foto desfocada + cor da marca em Multiplicação,
+  luz em degradê (Tela), grão vivo (Sobrepor), logo com puxada de foco piscando e feixe de luz. REPROVADO antes:
+  traços coloridos soltos e círculo de destaque atrás do logo (genérico, "infantil"). Regra: nada de forma
+  decorativa sem contexto; preferir composição de foto + cor + luz + textura com modos de mesclagem.
+- Título: 2 linhas, última palavra em destaque (cor de destaque, maior), fonte no peso mais grosso, mais baixo.
+- Encerramento: só o logo centralizado e animado, sem frase, e fade para preto no fim.
+- Corpo (Fase 1: curvas, clarão, P&B nos acentos, pulso): aprovado ("ficou top").
