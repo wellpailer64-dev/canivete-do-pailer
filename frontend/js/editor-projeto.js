@@ -1132,6 +1132,7 @@ function veOnMidia(ev) {
         m.url = ev.url;
         m.proxy = ev.proxy;
         m.pct = 100;
+        if (m.comp && typeof veCompUrlPronta === 'function') veCompUrlPronta(m);   // Comp: volta a tocar pelo arquivo
         if (m.id === 0) {
             veLoading(null);
             $ve('ve-export-btn').disabled = false;

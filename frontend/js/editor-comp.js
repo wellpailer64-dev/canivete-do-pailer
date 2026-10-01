@@ -219,12 +219,16 @@ function veCompPendentes() {
 
 // Confere as Comps e renderiza a próxima que mudou (uma por vez; a seguinte quando esta terminar)
 function veCompVerificar() {
-    if (!VE.ready || VECOMP.atual) return;
-    const api = window.pywebview && window.pywebview.api;
-    if (!api || !api.ve_comp_render) return;
+    if (!VE.ready) return;
     if (!veCompMidias().length) { veCompAvisar(); return; }
     veSeqSalvarAtiva();
-    const prox = veCompPendentes().find(e => e.pronta && !VECOMP.falhas.has(e.sig));
+    const pend = veCompPendentes();
+    veCompMarcarVivas(pend);   // a prévia passa a desenhar ao vivo as que mudaram (Fase 2)
+    const api = window.pywebview && window.pywebview.api;
+    if (VECOMP.atual || !api || !api.ve_comp_render) return;
+    // tocando, o render espera (veCompTick): a Comp segue certa na tela, desenhada ao vivo. A exportação não espera.
+    if (VE.playing && !VECOMP.exportando) return;
+    const prox = pend.find(e => e.pronta && !VECOMP.falhas.has(e.sig));
     if (prox) veCompRenderizar(prox.seq, prox.sig);
     else veCompAvisar();
 }
@@ -250,6 +254,8 @@ async function veCompRenderizar(seq, sig) {
     veCompUi();
     try {
         const job = await veCompJob(vePlain(seq, {}));
+        // começou a tocar enquanto preparava: nem chega a abrir o ffmpeg
+        if (VECOMP.atual && VECOMP.atual.cancelando) { VECOMP.atual = null; VECOMP.pausado = true; veCompUi(); veCompAvisar(); return; }
         const r = await window.pywebview.api.ve_comp_render(vePrPrefs().dir, sig, job);
         if (!r || !r.success) throw new Error((r && r.error) || 'falhou');
     } catch (e) {
@@ -273,14 +279,16 @@ function veOnComp(ev) {
             m.path = ev.path;
             m.compSig = a.sig;
             delete m.erro;
-            // prévia com alfa, miniaturas e som do arquivo novo (a prévia antiga segue na tela até a nova sair)
-            if (trocou) veMidiaPreparar(m, true);
+            // prévia com alfa, miniaturas e som do arquivo novo; até ela sair, a Comp segue desenhada ao vivo
+            if (trocou) { m._esperaUrl = true; veMidiaPreparar(m, true); } else delete m._aoVivo;
         });
         VE.dirty = true;
         veUpdateTitle();
         // arquivo novo: os trechos da prévia renderizada e o cache RAM com a Comp antiga deixam de valer
         veCacheInvalidate();
-    } else if (!ev.cancelled) {
+    } else if (ev.cancelled) {
+        VECOMP.pausado = true;   // parou para o play: recomeça quando parar de tocar (veCompTick)
+    } else {
         VECOMP.falhas.set(a.sig, ev.error || 'erro');
         veToast(`${veT('Falha ao renderizar a Comp')} ${a.nome}: ${ev.error || ''}`);
     }
@@ -308,6 +316,11 @@ function veCompAvisar() {
 // Exportação: espera as Comps ficarem em dia (aviso(msg) mostra o andamento). Erro se alguma falhar.
 async function veCompProntas(aviso) {
     if (!veCompMidias().length) return;
+    VECOMP.exportando = true;
+    try { await veCompProntasLaco(aviso); } finally { VECOMP.exportando = false; }
+}
+
+async function veCompProntasLaco(aviso) {
     for (let volta = 0; volta < 10000; volta++) {
         veCompVerificar();
         const a = VECOMP.atual;
@@ -350,6 +363,122 @@ function veCompDesenharPendente(ctx, w, h, m) {
     ctx.fillText(vePjNome(m), w / 2, h / 2 + Math.max(24, h * 0.06), w * 0.86);
     ctx.restore();
 }
+
+// ─────────────────────────── prévia ao vivo (Fase 2) ───────────────────────────
+// Comp mudada (ou ainda sem arquivo): até o arquivo novo ficar pronto, o monitor desenha a Comp com as camadas
+// de dentro, no instante dela — o mesmo desenhista do monitor (veDesenharItens) num canvas transparente.
+// Vídeos de dentro usam os players extras (veCamPreparar reserva via veCompVideosVivos); Comp dentro de Comp
+// desatualizada é desenhada do mesmo jeito. Com o arquivo em dia, a Comp volta a tocar como um vídeo.
+// O som de dentro só muda com o arquivo novo.
+const veCompVivo = m => !!(m && m.comp && (m._aoVivo || !m.url));
+VECOMP.telas = new WeakMap();   // clipe → canvas da Comp desenhada ao vivo
+VECOMP.chaves = new Map();      // "seq:índice" → chave fixa do player extra de um vídeo de dentro
+
+function veCompChave(seqId, i) {
+    const k = seqId + ':' + i;
+    if (!VECOMP.chaves.has(k)) VECOMP.chaves.set(k, { comp: k });
+    return VECOMP.chaves.get(k);
+}
+
+// Clipes de dentro visíveis no instante tc da Comp (já com a timeline dela no lugar: veCompComo)
+function veCompVisiveis(tc) {
+    return VE.clips.filter(ic => !veIsAudio(ic) && !veOculto(ic) && tc >= ic.st - VE_EPS && tc < veEnd(ic) - VE_EPS)
+        .sort((a, b) => a.tr - b.tr || a.st - b.st);
+}
+
+// Vídeos de dentro das Comps ao vivo visíveis em t: [[chave, clipe]] para veCamPreparar reservar os players
+function veCompVideosVivos(t, lista) {
+    const out = [];
+    const juntar = (c, T, d) => {
+        const m = veMediaOf(c), seq = veCompSeqDe(m);
+        if (!seq || d > 8) return;
+        const tc = veSrcAt(c, T);
+        veCompComo(seq, () => veCompVisiveis(tc).forEach(ic => {
+            const mi = veMediaOf(ic);
+            if (veCompVivo(mi)) juntar(ic, tc, d + 1);
+            else if (!veIsImage(ic) && mi && mi.url && !veMediaOffline(mi)) out.push([veCompChave(seq.id, VE.clips.indexOf(ic)), ic]);
+        }));
+    };
+    (lista || []).forEach(c => {
+        if (veCompVivo(veMediaOf(c)) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS) juntar(c._o || c, t, 0);
+    });
+    return out;
+}
+
+// Quadro da Comp do clipe c no instante T (da timeline de fora); alvo = px do monitor por px da Comp
+function veCompQuadro(c, T, alvo, d = 0, fator = 1) {
+    const m = veMediaOf(c), seq = veCompSeqDe(m);
+    if (!seq || d > 8) return null;
+    const k = Math.min(1, Math.max(0.15, alvo || 1)), W = seq.w || VE.seqW, H = seq.h || VE.seqH;
+    const o = c._o || c;
+    let cv = VECOMP.telas.get(o);
+    if (!cv) { cv = document.createElement('canvas'); VECOMP.telas.set(o, cv); }
+    const cw = Math.max(2, Math.round(W * k)), ch = Math.max(2, Math.round(H * k));
+    if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; }
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, cw, ch);
+    const tc = veSrcAt(c, T), f = fator * veVel(c);
+    veCompComo(seq, () => {
+        const ph = VE.playhead;
+        VE.playhead = tc;   // quadros-chave, animações de texto etc. no tempo da Comp
+        try {
+            const itens = veCompVisiveis(tc).map(ic => ({ c: ic, src: veCompSrc(seq, ic, tc, k, f, d) }));
+            ctx.setTransform(k, 0, 0, k, 0, 0);
+            ctx.imageSmoothingQuality = 'high';
+            veDesenharItens(ctx, cv, itens, k, tc);
+        } finally { VE.playhead = ph; }
+    });
+    return cv;
+}
+
+// O que desenhar de uma camada de dentro (null = ainda sem quadro)
+function veCompSrc(seq, ic, tc, k, fator, d) {
+    const mi = veMediaOf(ic);
+    if (veMediaOffline(mi)) return 'offline';
+    const alvo = k * veProps(ic, tc).sc / 100;
+    if (veCompVivo(mi)) return veCompQuadro(ic, tc, alvo, d + 1, fator) || 'comp';
+    if (veIsAdj(ic)) return 'ajuste';
+    if (veIsTexto(ic)) return (typeof veTxaCanvas === 'function' && veTxaCanvas(ic, alvo)) || veTxCanvas(ic, alvo).cv;
+    if (veEhGrafico(ic)) return veGrafDesenho(ic);
+    if (veIsImage(ic)) return mi.img && mi.img.complete && mi.w ? mi.img : null;
+    const n = VECAM.slot.get(veCompChave(seq.id, VE.clips.indexOf(ic)));
+    if (n == null) return null;
+    const x = VEX[n];
+    veSyncExtra(x, veSrcAt(ic, tc), Math.min(16, Math.max(0.0625, VE.rate * fator * veVel(ic))));
+    return x.readyState >= 2 ? x : null;
+}
+
+// Comps que precisam de render passam a ser desenhadas ao vivo (o arquivo delas está velho)
+function veCompMarcarVivas(pend) {
+    const ids = new Set(pend.map(e => e.seq.id));
+    let mudou = false;
+    veCompMidias().forEach(m => { if (ids.has(m.sequenceId) && !m._aoVivo) { m._aoVivo = true; mudou = true; } });
+    if (mudou) { veCacheInvalidate(); if (VE.ready) veDrawMonitorSoon(); }
+}
+
+// Prévia do arquivo novo pronta (veOnMidia): a Comp volta a tocar pelo arquivo, se ainda estiver em dia
+function veCompUrlPronta(m) {
+    if (!m._esperaUrl) return;
+    delete m._esperaUrl;
+    delete m._aoVivo;
+    veCacheInvalidate();
+    veCompVerificar();   // mudou de novo enquanto renderizava: volta a ser ao vivo
+}
+
+// Render da Comp disputava a CPU com o play (travadas mesmo em prioridade baixa): tocando, ele para; parado, volta
+function veCompTick() {
+    if (!VE.ready) return;
+    const api = window.pywebview && window.pywebview.api;
+    if (VE.playing && VECOMP.atual && !VECOMP.exportando && !VECOMP.atual.cancelando && api && api.ve_comp_cancelar) {
+        VECOMP.atual.cancelando = true;
+        api.ve_comp_cancelar();
+    } else if (!VE.playing && VECOMP.pausado && !VECOMP.atual) {
+        VECOMP.pausado = false;
+        veCompVerificar();
+    }
+}
+setInterval(veCompTick, 400);
 
 // Duplo clique numa faixa de Comp na timeline: abre a Comp
 function veCompDuploClique(e) {

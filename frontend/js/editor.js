@@ -303,7 +303,7 @@ function veCacheSig(f) {
     VE.clips.forEach(c => {
         if (veIsAudio(c) || t < c.st - VE_CACHE_MARGEM || t >= veEnd(c) + VE_CACHE_MARGEM) return;
         const m = veMediaOf(c);
-        partes.push(c, veOculto(c), m && (m.url || m.path || ''), veMediaOffline(m));
+        partes.push(c, veOculto(c), m && (m.url || m.path || ''), veMediaOffline(m), !!(m && m._aoVivo));   // Comp ao vivo: quadro guardado não vale
     });
     const li = typeof veTxLegendaEm === 'function' ? veTxLegendaEm(t) : -1;
     if (li >= 0) partes.push(VE.legendas[li], VE.legEstilo, VE.legGravar);
@@ -2610,7 +2610,7 @@ function veCamVisiveis(t, lista, cur) {
     if (cobre > 0) vis = vis.slice(cobre);
     return vis.filter(c => {
         const m = veMediaOf(c);
-        return !veIsImage(c) && !c._tr && (c._o || c) !== cur && m && m.url && !veMediaOffline(m);
+        return !veIsImage(c) && !c._tr && (c._o || c) !== cur && m && m.url && !veMediaOffline(m) && !(m.comp && m._aoVivo);
     });
 }
 
@@ -2620,6 +2620,8 @@ function veCamPreparar(t, lista, virt) {
     const precisa = new Map();   // clipe → instante em que aparece (t = já aparece)
     const cur = VE.clips[VE.cur];
     veCamVisiveis(t, lista, cur).forEach(c => precisa.set(c._o || c, { c, quando: t }));
+    // vídeos de dentro das Comps desenhadas ao vivo (editor-comp.js)
+    if (typeof veCompVideosVivos === 'function') veCompVideosVivos(t, lista).forEach(([k, c]) => precisa.set(k, { c, quando: t }));
     if (VE.playing) {
         const ate = t + VE_CAM_PRE * Math.max(1, VE.rate), cortes = new Set();
         VE.clips.forEach(c => [c.st, veEnd(c)].forEach(b => { if (b > t + VE_EPS && b <= ate) cortes.add(b); }));
@@ -2876,6 +2878,34 @@ function veDrawOfflineMedia(ctx, w, h, nome) {
     ctx.restore();
 }
 
+// Desenha as camadas (de baixo para cima) no ctx já em coordenadas do quadro (escala pv). itens = [{c, src}]:
+// src = imagem/vídeo/canvas, 'ajuste', 'offline' ou 'comp' (Comp sem nada para mostrar ainda)
+function veDesenharItens(ctx, cv, itens, pv, t) {
+    itens.forEach(({ c, src }) => {
+            if (!src) return;
+            if (src === 'ajuste') { veAdjDraw(ctx, cv, c, pv); return; }
+            if (src === 'comp') { veCompDesenharPendente(ctx, VE.seqW, VE.seqH, veMediaOf(c)); return; }
+            const p = veCaAplicar(c, veProps(c), t), sz = veMediaSize(c);   // + Rotação/Tremer/Pulsar em loop
+            // texto animado vem com margem em volta (letras que saem da caixa): desenha maior, mesmo centro
+            const pd = src && src._pad || 0, szd = pd ? { w: sz.w + 2 * pd, h: sz.h + 2 * pd } : sz;
+            if (src !== 'offline') src = veFxRender(c, src, szd, pv * p.sc / 100);   // efeitos rodam antes do movimento (como no Premiere)
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, Math.min(1, p.op / 100));
+            const gco = src !== 'offline' && veBmGco(c);   // modo de mesclagem (Tela, Multiplicação...)
+            if (gco) ctx.globalCompositeOperation = gco;
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rot * Math.PI / 180);
+            const k = p.sc / 100;
+            ctx.scale(k * (p.sx == null ? 1 : p.sx), k * (p.sy == null ? 1 : p.sy));
+            const [ax, ay] = veAnc(c, p, sz);   // a Posição é onde fica o ponto de ancoragem
+            if (src === 'offline') {
+                ctx.translate(-ax, -ay);
+                veDrawOfflineMedia(ctx, sz.w, sz.h, vePjNome(veMediaOf(c)));
+            } else ctx.drawImage(src, -ax - pd, -ay - pd, szd.w, szd.h);
+            ctx.restore();
+        });
+}
+
 function veDrawMonitor() {
     const cv = $ve('ve-canvas');
     if (!cv) return;
@@ -2925,8 +2955,9 @@ function veDrawMonitor() {
         const med = veMediaOf(c);
         if (veMediaOffline(med)) {
             src = 'offline';
-        } else if (med && med.comp && !med.url) {
-            src = 'comp';   // Comp ainda sem o primeiro render (editor-comp.js)
+        } else if (med && med.comp && (med._aoVivo || !med.url)) {
+            // Comp mudada e ainda sem o arquivo novo: desenhada ao vivo com as camadas de dentro (editor-comp.js)
+            src = veCompQuadro(c, t, pv * veProps(c).sc / 100) || 'comp';
             parcial = true;
         } else if (veIsAdj(c)) {
             src = 'ajuste';
@@ -2979,29 +3010,7 @@ function veDrawMonitor() {
     ctx.fillRect(0, 0, cw, ch);
     ctx.setTransform(pv, 0, 0, pv, 0, 0);
     ctx.imageSmoothingQuality = 'high';
-    itens.forEach(({ c, src }) => {
-            if (!src) return;
-            if (src === 'ajuste') { veAdjDraw(ctx, cv, c, pv); return; }
-            if (src === 'comp') { veCompDesenharPendente(ctx, VE.seqW, VE.seqH, veMediaOf(c)); return; }
-            const p = veCaAplicar(c, veProps(c), t), sz = veMediaSize(c);   // + Rotação/Tremer/Pulsar em loop
-            // texto animado vem com margem em volta (letras que saem da caixa): desenha maior, mesmo centro
-            const pd = src && src._pad || 0, szd = pd ? { w: sz.w + 2 * pd, h: sz.h + 2 * pd } : sz;
-            if (src !== 'offline') src = veFxRender(c, src, szd, pv * p.sc / 100);   // efeitos rodam antes do movimento (como no Premiere)
-            ctx.save();
-            ctx.globalAlpha = Math.max(0, Math.min(1, p.op / 100));
-            const gco = src !== 'offline' && veBmGco(c);   // modo de mesclagem (Tela, Multiplicação...)
-            if (gco) ctx.globalCompositeOperation = gco;
-            ctx.translate(p.x, p.y);
-            ctx.rotate(p.rot * Math.PI / 180);
-            const k = p.sc / 100;
-            ctx.scale(k * (p.sx == null ? 1 : p.sx), k * (p.sy == null ? 1 : p.sy));
-            const [ax, ay] = veAnc(c, p, sz);   // a Posição é onde fica o ponto de ancoragem
-            if (src === 'offline') {
-                ctx.translate(-ax, -ay);
-                veDrawOfflineMedia(ctx, sz.w, sz.h, vePjNome(veMediaOf(c)));
-            } else ctx.drawImage(src, -ax - pd, -ay - pd, szd.w, szd.h);
-            ctx.restore();
-        });
+    veDesenharItens(ctx, cv, itens, pv, t);
     veTxDesenhar(ctx);
     veCacheStore(cv, cw, ch, pv, itens, trans, falta || parcial);
     // caixa com alças e ponto de ancoragem do selecionado (editor-transform.js)

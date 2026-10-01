@@ -191,6 +191,8 @@ def renderizar_comp(base, h, job, on_progress):
     def _hold(p):
         global _comp_proc
         _comp_proc = p
+        if p is not None:
+            _prioridade_baixa(p)   # em segundo plano enquanto se edita/toca: o play fica com a CPU
 
     try:
         r = exportar_video(

@@ -78,7 +78,7 @@ function vePrLimpo(c) {
 function vePrSig(a, b, visuais) {
     const clips = veRecortarClips(visuais, a, b).map(c => {
         const m = veMediaOf(c);
-        return [vePrLimpo(c), m && (m.path || m.url || ''), veMediaOffline(m)];
+        return [vePrLimpo(c), m && (m.path || m.url || ''), veMediaOffline(m), !!(m && m.comp && (m._aoVivo || !m.url))];
     });
     const legs = (VE.legendas || []).filter(l => l.st < b && l.en > a)
         .map(l => ({ ...l, st: +(l.st - a).toFixed(4), en: +(l.en - a).toFixed(4) }));
@@ -163,6 +163,7 @@ function vePrRenderizar() {
     if (!api || !api.ve_render_trecho) { veToast('A ponte com o app ainda não está pronta'); return; }
     if (VE.exportRunning) { veToast('Espere a exportação terminar'); return; }
     const a = VE.inPt ?? 0, b = VE.outPt ?? VE.dur;
+    if (VE.clips.some(c => { const m = VE.media[veMid(c)]; return m && m.comp && (m._aoVivo || !m.url); })) { veToast('Espere: a Comp ainda está renderizando'); return; }
     VEPRA.ativo = false;   // Enter: a fila passa a ser do render manual (avisos e não para no play)
     VEPR.sujo = true;
     const novos = vePrSegmentos().filter(s => s.pesado && s.b > a + 1e-4 && s.a < b - 1e-4 && !VEPR.files.has(s.sig));
@@ -327,7 +328,7 @@ function vePrAutoTick() {
     const api = vePrApi();
     if (!api || !api.ve_render_trecho || !vePrChave()) return;
     // vídeo da timeline ainda sem prévia de edição: espera (o render sairia com ele faltando)
-    if (VE.clips.some(c => { const m = VE.media[veMid(c)]; return m && m.id && m.kind === 'video' && !m.url && !m.offline && !m.erro; })) return;
+    if (VE.clips.some(c => { const m = VE.media[veMid(c)]; return m && m.id && m.kind === 'video' && (!m.url || m._aoVivo) && !m.offline && !m.erro; })) return;
     const ph = VE.playhead, dist = s => ph < s.a ? s.a - ph : ph > s.b ? (ph - s.b) * 1.5 : 0;   // à frente primeiro
     const add = vePrSegmentos().filter(s => s.pesado && !VEPR.files.has(s.sig) && !VEPRA.falhas.has(s.sig))
         .sort((x, y) => dist(x) - dist(y)).map(s => ({ a: s.a, b: s.b, sig: s.sig }));

@@ -1,5 +1,5 @@
 # Plano: Comp (composição estilo After Effects) no Pocket Editor
-Combinado com o usuário em 2026-10-01. Status: **Fase 1 feita (2026-10-01)** — próxima: Fase 2 (prévia ao vivo).
+Combinado com o usuário em 2026-10-01. Status: **Fases 1 e 2 feitas (2026-10-01)** — próxima: Fase 3 (fluxo e reaproveitamento).
 
 ## Por quê
 Projetos com muitas camadas (ex.: intro do AutoFrame com ~15 faixas: foto, Multiplicação, luz, grão, cards, logo...)
@@ -75,17 +75,25 @@ Ctrl+Z desfaz a criação; salvar/abrir projeto mantém a Comp; projeto antigo a
 abre; texto mudado dentro → ao voltar re-renderiza e o monitor mostra; exportar logo após editar espera o render
 e o MP4 sai com o texto novo, transparente sobre o vídeo, só no trecho; Comp com som (has_audio, entra no mix);
 Ctrl+Z/Ctrl+Y; Comp não entra nela mesma; salvar/reabrir (com o .mov apagado do cache → renderiza de novo).
-Limitações conhecidas (para a Fase 2+): a mãe só atualiza ao voltar para ela (não ao vivo); camada com modo de
+Limitações conhecidas: camada com modo de
 mesclagem dentro da Comp deixa o trecho dela opaco onde o fundo era transparente (ffmpeg compõe em gbrp sem alfa);
 duplicar a Comp no Projeto cria uma Comp independente (timeline copiada).
 
-### Fase 2 — prévia ao vivo e play fluido
-- Desenho recursivo: `veDrawMonitor` passa a desenhar uma Comp chamando o mesmo desenhista com os clipes da
-  sequência dela no tempo `s + (t - st) * vel` num canvas próprio (transparente) e usa o canvas como `src`.
-  Imagens/textos/formas/ajustes ao vivo; vídeos dentro da Comp usam o arquivo pré-renderizado no play.
-- Invalidação: hash do conteúdo da Comp (como `vePrSig`); mudou → re-render em segundo plano.
-- Miniatura/forma de onda da Comp na timeline mãe.
-Aceite: rodar `testes/teste_play.py` num projeto com Comp sem travadas novas.
+### Fase 2 — prévia ao vivo e play fluido (feita)
+- Comp desatualizada (`m._aoVivo`, marcada em `veCompVerificar`) ou sem arquivo: o monitor desenha ao vivo
+  (`veCompQuadro`) — as camadas de dentro no tempo `s + (t - st) * vel`, num canvas transparente, com o mesmo
+  desenhista do monitor (`veDesenharItens`, extraído de `veDrawMonitor`). Imagem/texto/forma/ajuste ao vivo; vídeos
+  de dentro em players extras (`veCompVideosVivos` → `veCamPreparar`); Comp dentro de Comp desatualizada, recursivo.
+  A prévia nova do arquivo pronta (`veCompUrlPronta`, chamada em `veOnMidia`) → volta a tocar pelo arquivo.
+  Ao vivo × arquivo: mesma imagem (só bordas do vídeo meio quadro deslocadas).
+- Cache RAM e prévia em disco não usam/geram quadro com Comp ao vivo; Enter e render automático esperam.
+- O render da Comp **pausa enquanto toca** (`veCompTick`; mesmo em prioridade baixa ele causava ~9 travadas em 20 s)
+  e recomeça ao parar; a exportação não pausa (`VECOMP.exportando`). Processo em prioridade baixa.
+- Miniatura e forma de onda na timeline mãe vêm do arquivo da Comp (já da Fase 1).
+- `teste_play` (Portugal com Comp de 12 camadas, 20 s): arquivo em dia 0 travadas; ao vivo com render pendente
+  1 travada (a do arranque); Portugal sem Comp igual ao de antes.
+- Fica para depois: o som de dentro só muda com o arquivo novo; transições de dentro da Comp não aparecem no
+  desenho ao vivo (aparecem no arquivo).
 
 ### Fase 3 — fluxo e reaproveitamento
 - **Descompactar comp** (devolve as camadas à mãe, no lugar).
