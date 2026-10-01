@@ -412,7 +412,7 @@ function veBordaDesenhar(ctx, rows) {
     if (veOcupaV(c)) ids.push('V' + (c.tr + 1));
     if (veOcupaA(c)) ids.push('A' + (c.tr + 1));
     ctx.save();
-    ctx.strokeStyle = '#F97316';
+    ctx.strokeStyle = '#D4814A';
     ctx.lineWidth = 3;
     ids.forEach(id => {
         const r = rows.find(r => r.id === id);
@@ -447,7 +447,7 @@ function veTransDesenhar(ctx, rows) {
         ctx.save();
         ctx.globalAlpha = j._prev ? 0.7 : 1;
         ctx.fillStyle = cor[0];
-        veRoundRect(ctx, b.x, b.y, b.w, b.h, 3); ctx.fill();
+        veRoundRect(ctx, b.x, b.y, b.w, b.h, 2); ctx.fill();
         // diagonal, como o bloco de transição do Premiere
         ctx.strokeStyle = cor[1];
         ctx.lineWidth = 1;
@@ -456,10 +456,10 @@ function veTransDesenhar(ctx, rows) {
         else if (!j.B) { ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + b.w, b.y + b.h); }
         else { ctx.moveTo(b.x, b.y + b.h); ctx.lineTo(b.x + b.w, b.y); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + b.w, b.y + b.h); }
         ctx.stroke();
-        ctx.strokeStyle = on ? '#F97316' : j._prev ? '#c4b5fd' : cor[2];
+        ctx.strokeStyle = on ? '#D4814A' : j._prev ? '#c4b5fd' : cor[2];
         ctx.lineWidth = on ? 2 : 1;
         if (j._prev) ctx.setLineDash([4, 3]);
-        veRoundRect(ctx, b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1, 3); ctx.stroke();
+        veRoundRect(ctx, b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1, 2); ctx.stroke();
         if (b.w > 46 && b.h >= 12) {
             ctx.beginPath(); ctx.rect(b.x, b.y, b.w, b.h); ctx.clip();
             ctx.font = '600 10px Segoe UI';
@@ -793,6 +793,7 @@ function veCaInit() {
 function veAnInit() {
     const box = $ve('ve-an-rolagem');
     if (!box) return;
+    veCliqueHover(box, '.ve-tr-card');   // tic ao passar o mouse por uma transição/animação
     box.querySelectorAll('details[data-an]').forEach(d => {
         if (veLsGet('ve-an-' + d.dataset.an) === '0') d.open = false;
         d.addEventListener('toggle', () => veLsSet('ve-an-' + d.dataset.an, d.open ? '1' : '0'));

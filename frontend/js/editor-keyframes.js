@@ -367,7 +367,7 @@ function veKlDesenhar(ctx, rows, X, W) {
         const tempos = veKlTempos(c, r.g);
         // linha fina entre os ◆ (trecho animado)
         if (tempos.length > 1) {
-            ctx.fillStyle = 'rgba(249,115,22,0.25)';
+            ctx.fillStyle = 'rgba(212,129,74,0.25)';
             ctx.fillRect(X(veTlAt(c, tempos[0].t)), y - 0.5, X(veTlAt(c, tempos[tempos.length - 1].t)) - X(veTlAt(c, tempos[0].t)), 1);
         }
         tempos.forEach(({ t, q, ant, ult }) => {
@@ -382,9 +382,9 @@ function veKlDesenhar(ctx, rows, X, W) {
     });
     if (d && d.modo === 'marq' && d.ativo) {
         const xa = X(d.ta), xb = X(d.tb);
-        ctx.fillStyle = 'rgba(249,115,22,0.10)';
+        ctx.fillStyle = 'rgba(212,129,74,0.10)';
         ctx.fillRect(Math.min(xa, xb), Math.min(d.ya, d.yb), Math.abs(xb - xa), Math.abs(d.yb - d.ya));
-        ctx.strokeStyle = 'rgba(249,115,22,0.85)';
+        ctx.strokeStyle = 'rgba(212,129,74,0.85)';
         ctx.setLineDash([4, 3]);
         ctx.strokeRect(Math.min(xa, xb) + 0.5, Math.min(d.ya, d.yb) + 0.5, Math.abs(xb - xa), Math.abs(d.yb - d.ya));
         ctx.setLineDash([]);
@@ -420,7 +420,7 @@ function veKlForma(ctx, x, y, lados, sel, fantasma, agulha) {
     else ctx.lineTo(x - r, y);
     ctx.closePath();
     ctx.globalAlpha = fantasma ? 0.35 : 1;
-    ctx.fillStyle = sel ? '#F97316' : agulha ? '#fbbf24' : '#c9ccd6';
+    ctx.fillStyle = sel ? '#D4814A' : agulha ? '#fbbf24' : '#c9ccd6';
     ctx.strokeStyle = sel ? '#fff' : 'rgba(0,0,0,0.8)';
     ctx.lineWidth = sel ? 1.5 : 1;
     ctx.fill();

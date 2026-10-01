@@ -113,10 +113,30 @@ function vePjArvore(pai, nivel) {
         med.map(m => vePjLinhaMidia(m, nivel)).join('');
 }
 
+// Capa de uma timeline: o primeiro quadro da camada de base (a trilha mais baixa com imagem/vídeo no começo;
+// vídeo com transparência — GC, assinatura — e logos por cima não contam se houver outra)
+function veSeqCapa(seqId) {
+    const seq = (VE.sequences || []).find(s => s.id === seqId);
+    const clips = seqId === VE.activeSequence ? VE.clips : (seq && seq.clips) || [];
+    const cands = clips.filter(c => {
+        const m = VE.media[c.m || 0];
+        return m && !m.removido && !veMediaOffline(m) && c.x !== 'a' && (m.kind === 'image' || m.kind === 'video');
+    });
+    if (!cands.length) return '';
+    const alfa = c => { const m = VE.media[c.m || 0]; return m.kind === 'image' || !!(m.info && m.info.alfa); };
+    const c = cands.sort((a, b) => a.st - b.st || alfa(a) - alfa(b) || a.tr - b.tr)[0];
+    const m = VE.media[c.m || 0];
+    if (m.kind === 'image') return m.url || '';
+    const th = (m.id === 0 ? VE.thumbs : m.thumbs) || [];
+    const tb = th.length ? veThumbFor(c.s + 0.05, th) || th[0] : null;
+    return tb ? tb.url : '';
+}
+
 // ─────────────────────────── grade (cards com prévia, como o modo ícones do Premiere) ───────────────────────────
 // capa do card: a imagem, ou a miniatura do vídeo no ponto f (0..1) — passar o mouse percorre o vídeo
 function vePjCapa(m, f = 0.35) {
     if (veMediaOffline(m)) return '';
+    if (m.kind === 'timeline') return veSeqCapa(m.sequenceId);
     if (m.kind === 'image') return m.url || '';
     const th = m.kind === 'video' ? (m.id === 0 ? VE.thumbs : m.thumbs) || [] : [];
     return th.length ? th[Math.min(th.length - 1, Math.floor(f * th.length))].url : '';
@@ -128,7 +148,7 @@ function vePjCardMidia(m) {
     const ativa = m.kind === 'timeline' && m.sequenceId === VE.activeSequence;
     const lost = veMediaOffline(m);
     return `<div class="ve-pj-card${VEPJ.sel.has(k) ? ' sel' : ''}${ativa ? ' atual' : ''}${m.kind === 'video' && m.id && !m.url ? ' fraco' : ''}${lost ? ' lost' : ''}" data-k="${k}" data-kind="${m.kind}" draggable="true" title="${veEsc((m.path || vePjNome(m)) + (inf.info ? '\n' + inf.info : ''))}">
-        <div class="ve-pj-capa">${m.kind === 'cor' ? `<div class="ve-pj-swatch" style="background:${veEsc(m.fill || '#000')}"></div>` : lost ? `<div class="ve-pj-lost">${veT('MÍDIA OFFLINE')}</div>` : capa ? `<img src="${veEsc(capa)}" alt="" draggable="false">` : `<svg class="i"><use href="#${ic}"/></svg>`}
+        <div class="ve-pj-capa">${m.kind === 'cor' ? `<div class="ve-pj-swatch" style="background:${veEsc(m.fill || '#000')}"></div>` : lost ? `<div class="ve-pj-lost">${veT('MÍDIA OFFLINE')}</div>` : capa ? `<img src="${veEsc(capa)}" alt="" draggable="false">${m.kind === 'timeline' ? `<svg class="i ve-pj-capa-ic"><use href="#${ic}"/></svg>` : ''}` : `<svg class="i"><use href="#${ic}"/></svg>`}
             ${inf.dur ? `<span class="ve-pj-dur">${veTC(inf.dur).slice(0, 11)}</span>` : ''}</div>
         <div class="ve-pj-rotulo"><span class="ve-pj-cor"${cor ? ` style="background:${cor}"` : ''}></span><svg class="i"><use href="#${ic}"/></svg><span class="ve-pj-nome">${veEsc(vePjNome(m))}</span></div>${veMelSelo(m)}
         <div class="ve-pj-sub">${veT(tipo)}${inf.info ? ' · ' + veEsc(inf.info) : ''}</div></div>`;
@@ -617,13 +637,13 @@ function veMaDesenhar(ctx, x, y, w, h, e) {
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillRect(x, y, w, h);
     const d = (performance.now() / 45) % 16;
-    ctx.strokeStyle = e.fila ? 'rgba(255,255,255,0.07)' : 'rgba(249,115,22,0.22)';
+    ctx.strokeStyle = e.fila ? 'rgba(255,255,255,0.07)' : 'rgba(212,129,74,0.22)';
     ctx.lineWidth = 5;
     ctx.beginPath();
     for (let k = x - h - 16 + d; k < x + w + 16; k += 16) { ctx.moveTo(k, y + h); ctx.lineTo(k + h, y); }
     ctx.stroke();
     if (!e.fila && e.pct >= 0) {
-        ctx.fillStyle = '#F97316';
+        ctx.fillStyle = '#D4814A';
         ctx.fillRect(x, y + h - 3, w * Math.min(1, e.pct / 100), 3);
     }
     if (w > 46 && h >= 12) {

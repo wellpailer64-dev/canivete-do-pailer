@@ -503,9 +503,9 @@ function veCompInfo(m) {
 // Monitor: Comp que ainda não tem arquivo nenhum (o primeiro render)
 function veCompDesenharPendente(ctx, w, h, m) {
     ctx.save();
-    ctx.fillStyle = 'rgba(249,115,22,0.10)';
+    ctx.fillStyle = 'rgba(212,129,74,0.10)';
     ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = 'rgba(249,115,22,0.7)';
+    ctx.strokeStyle = 'rgba(212,129,74,0.7)';
     ctx.lineWidth = Math.max(2, Math.min(w, h) * 0.004);
     ctx.setLineDash([ctx.lineWidth * 4, ctx.lineWidth * 3]);
     ctx.strokeRect(ctx.lineWidth / 2, ctx.lineWidth / 2, w - ctx.lineWidth, h - ctx.lineWidth);

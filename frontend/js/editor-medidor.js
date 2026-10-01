@@ -155,7 +155,7 @@ function veMedVertical(x, w, h) {
         x.fillStyle = '#1c130a';
         x.fillRect(xg, topo, lg, hb);
         if (VEMED.reducao > 0.05) {
-            x.fillStyle = '#f97316';
+            x.fillStyle = '#D4814A';
             x.fillRect(xg, topo, lg, Math.min(hb, hb * VEMED.reducao / -VE_MED_MIN));
         }
     }

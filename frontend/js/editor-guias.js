@@ -128,7 +128,7 @@ function veGuiasMarcasReguas(ctx, g, w, h, topH, leftW) {
     }
     const m = VEG.mouse;
     if (m) {
-        ctx.fillStyle = 'rgba(249,115,22,0.95)';
+        ctx.fillStyle = 'rgba(212,129,74,0.95)';
         if (m.x >= leftW) ctx.fillRect(Math.round(m.x), 0, 1, topH);
         if (m.y >= topH) ctx.fillRect(0, Math.round(m.y), leftW, 1);
     }

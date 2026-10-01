@@ -93,7 +93,7 @@ function veTfDesenhar(ctx, cv, pv) {
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.lineWidth = 1.5 * tela;
-    ctx.strokeStyle = 'rgba(249,115,22,0.95)';
+    ctx.strokeStyle = 'rgba(212,129,74,0.95)';
     ctx.beginPath();
     [[0, 0], [1, 0], [1, 1], [0, 1]].forEach(([u, v], j) => { const [x, y] = P(u, v); j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
     ctx.closePath();

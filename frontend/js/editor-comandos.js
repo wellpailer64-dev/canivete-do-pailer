@@ -101,6 +101,7 @@ const VE_CMDS = [
     { id: 'guias-limpar', grupo: 'exibir', nome: 'Limpar guias', teclas: [], fn: () => veGuiasLimpar(), pode: () => veGuias().length > 0 },
     { id: 'res-full', grupo: 'exibir', nome: 'Resolução da prévia: Full', teclas: [], sep: true, fn: () => veSetPreviewRes(1), marcado: () => VEM.res === 1 },
     { id: 'res-half', grupo: 'exibir', nome: 'Resolução da prévia: 1/2', teclas: [], fn: () => veSetPreviewRes(0.5), marcado: () => VEM.res !== 1 },
+    { id: 'sons-interface', grupo: 'exibir', nome: 'Sons da interface (clique)', teclas: [], sep: true, sempre: true, fn: () => veCliqueAlternar(), marcado: () => VECLQ.on },
 
     // ── só atalho: reprodução e navegação ──
     { id: 'parar', grupo: 'reproducao', nome: 'Parar', teclas: ['K'], fn: () => { veStop(); veSetRate(1); } },

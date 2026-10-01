@@ -692,6 +692,8 @@ const I18N_EN = {
     'Devolver os painéis desta janela ao editor (ou só feche a janela)': 'Return this window’s panels to the editor (or just close the window)',
     'Programa': 'Program', 'Monitor': 'Monitor', 'Linha do tempo': 'Timeline', 'Propriedades': 'Properties', 'Controles de efeito': 'Effect Controls',
     'Mídia': 'Media', 'Clipes': 'Clips', 'Timeline': 'Timeline', 'Projeto': 'Project', 'Controles': 'Controls', 'Atalhos': 'Shortcuts',
+    'Sons da interface (clique)': 'Interface sounds (click)', 'Sons da interface ligados': 'Interface sounds on',
+    'Sons da interface desligados': 'Interface sounds off',
     // ── Comp (editor-comp.js) ──
     'Criar Comp': 'Create Comp',
     'Criar Comp…': 'Create Comp…',

@@ -815,6 +815,7 @@ function veFxInit() {
     $ve('ve-fx-q').addEventListener('input', veRenderFxList);
     $ve('ve-fx-q').addEventListener('keydown', e => { if (e.key === 'Escape') { e.target.value = ''; veRenderFxList(); e.target.blur(); } e.stopPropagation(); });
     const list = $ve('ve-fx-list');
+    veCliqueHover(list, '.ve-fx-item');   // tic ao passar o mouse por um efeito
     list.addEventListener('dblclick', e => {
         const it = e.target.closest('[data-fxt],[data-aft]');
         if (!it) return;

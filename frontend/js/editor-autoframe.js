@@ -511,7 +511,7 @@ function veAfOnda() {
     });
     g.fillStyle = 'rgba(255,255,255,0.75)';
     mu.beats.forEach((t, i) => { const e = mu.energia[i] ?? 0.3; const h = 3 + e * (H - 8); g.fillRect(X(t), (H - h) / 2, 1, h); });
-    g.fillStyle = '#F97316';
+    g.fillStyle = '#D4814A';
     (mu.downbeats || []).forEach(t => g.fillRect(X(t), H - 3, 1.5, 3));
     if (mu.drop != null) { g.fillStyle = '#a855f7'; g.fillRect(X(mu.drop) - 1, 0, 2, H); }
     // refrão (faixa amarela no alto) e o trecho que vai virar vídeo (moldura laranja)
@@ -521,7 +521,7 @@ function veAfOnda() {
         g.fillStyle = 'rgba(0,0,0,0.55)';
         g.fillRect(0, 0, X(VEAF.inicioT), H);
         g.fillRect(X(fim), 0, W - X(fim), H);
-        g.strokeStyle = '#F97316';
+        g.strokeStyle = '#D4814A';
         g.lineWidth = 2;
         g.strokeRect(X(VEAF.inicioT) + 1, 1, X(fim) - X(VEAF.inicioT) - 2, H - 2);
     }

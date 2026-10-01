@@ -1195,7 +1195,7 @@ function getAudioWaveformData(layerId) {
             peaks: audioCutterState.peaks,
             duration: audioCutterState.originalDuration,
             offset: audioCutterState.mainOffset || 0,
-            color: '#F97316',
+            color: '#D4814A',
             cutPoints: audioCutterState.cutPoints,
             layerId: 'main'
         };

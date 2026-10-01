@@ -137,7 +137,7 @@ function veSbAplicarSelecionado() {
     let k = null;
     (d && d.categorias || []).forEach((c, ci) => c.sons.forEach((s, si) => { if (s.arq === VESB.sel) k = `${ci}:${si}`; }));
     if (!k) { veToast('Selecione um som no Soundboard (um clique) para aplicar com Shift+1'); return; }
-    veSbInserir(k);
+    Promise.resolve(veSbInserir(k)).then(() => veClique());   // o tic confirma que entrou na timeline
 }
 
 function veSbBaixar() {

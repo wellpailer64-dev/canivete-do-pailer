@@ -145,12 +145,12 @@ function veAvisoBloqueio() { veToast('Trilha bloqueada: clique no cadeado para d
 
 // Cores do rótulo do clipe (menu do botão direito na timeline)
 const VE_CORES = [
-    ['violeta', 'Violeta', '#8b5cf6'], ['iris', 'Íris', '#6366f1'], ['azul', 'Azul', '#3b82f6'],
-    ['ceruleo', 'Cerúleo', '#0ea5e9'], ['caribe', 'Caribe', '#06b6d4'], ['verdeazul', 'Verde-azulado', '#14b8a6'],
-    ['floresta', 'Floresta', '#16a34a'], ['verde', 'Verde', '#65a30d'], ['amarelo', 'Amarelo', '#eab308'],
-    ['manga', 'Manga', '#f59e0b'], ['laranja', 'Laranja', '#f97316'], ['rosa', 'Rosa', '#f43f5e'],
-    ['magenta', 'Magenta', '#d946ef'], ['lavanda', 'Lavanda', '#c4b5fd'], ['bege', 'Bege', '#d6b48a'],
-    ['marrom', 'Marrom', '#a16207'],
+    ['violeta', 'Violeta', '#9d82db'], ['iris', 'Íris', '#8688d9'], ['azul', 'Azul', '#7198d8'],
+    ['ceruleo', 'Cerúleo', '#57a9ce'], ['caribe', 'Caribe', '#44bace'], ['verdeazul', 'Verde-azulado', '#48c2b4'],
+    ['floresta', 'Floresta', '#43bb6f'], ['verde', 'Verde', '#88be3b'], ['amarelo', 'Amarelo', '#d1b251'],
+    ['manga', 'Manga', '#d2a559'], ['laranja', 'Laranja', '#d58f5e'], ['rosa', 'Rosa', '#d77384'],
+    ['magenta', 'Magenta', '#c877d4'], ['lavanda', 'Lavanda', '#bbafea'], ['bege', 'Bege', '#cab59c'],
+    ['marrom', 'Marrom', '#bf8635'],
 ];
 const veCor = c => { const k = c && c.cor && VE_CORES.find(x => x[0] === c.cor); return k ? k[2] : null; };
 function veRgba(hex, a) {
@@ -190,7 +190,10 @@ function veEsc(t) {
 
 function veFrame() { return 1 / (VE.fps || 30); }
 function veNavDur() { return VE.dur > 0 ? VE.dur : Math.max(VE.srcDur || 0, 60); }
-function veClamp(t) { return Math.min(Math.max(t, 0), veNavDur()); }
+// Até onde a agulha e a visão andam: o conteúdo + uma folga livre (no mínimo 1 min, ou meia duração), como no Premiere —
+// dá para navegar e marcar depois do último clipe. O zoom "encaixar" continua só no conteúdo (veNavDur)
+function veNavLivre() { const d = veNavDur(); return d + Math.max(60, d * 0.5); }
+function veClamp(t) { return Math.min(Math.max(t, 0), veNavLivre()); }
 function veSnapFrame(t) { return Math.round(t * VE.fps) / VE.fps; }
 
 function veToast(msg) {
@@ -208,6 +211,56 @@ function veToast(msg) {
     el.classList.add('show');
     clearTimeout(el._t);
     el._t = setTimeout(() => el.classList.remove('show'), 1600);
+}
+
+// ─────────────────────────── clique de interface ───────────────────────────
+// Um "tic" bem seco, curto (4 ms de ruído com queda rápida, sem grave) e baixo: ímã grudando, som posto com Shift+1,
+// mouse passando por uma transição/efeito nos painéis. Sintetizado aqui (sem arquivo). Menu Exibir liga/desliga.
+const VECLQ = { ctx: null, buf: null, ult: 0, on: veLsGet('ve-clique') !== '0' };
+function veClique(vol = 1) {
+    if (!VECLQ.on) return;
+    const agora = performance.now();
+    if (agora - VECLQ.ult < 35) return;   // vários seguidos (passar rápido pela lista) não viram um zumbido
+    VECLQ.ult = agora;
+    try {
+        if (!VECLQ.ctx) VECLQ.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const ac = VECLQ.ctx;
+        if (ac.state === 'suspended') ac.resume();
+        if (!VECLQ.buf) {
+            const n = Math.round(ac.sampleRate * 0.004), b = ac.createBuffer(1, n, ac.sampleRate), d = b.getChannelData(0);
+            let sem = 7;
+            for (let i = 0; i < n; i++) {
+                sem = (sem * 1103515245 + 12345) & 0x7fffffff;   // sempre o mesmo ruído: o tic soa igual toda vez
+                d[i] = ((sem / 0x7fffffff) * 2 - 1) * Math.exp(-i / (n * 0.16));
+            }
+            VECLQ.buf = b;
+        }
+        const s = ac.createBufferSource(), hp = ac.createBiquadFilter(), g = ac.createGain();
+        s.buffer = VECLQ.buf;
+        hp.type = 'highpass';
+        hp.frequency.value = 2200;
+        g.gain.value = 0.14 * vol;
+        s.connect(hp).connect(g).connect(ac.destination);
+        s.start();
+    } catch (e) { /* sem áudio: segue sem o tic */ }
+}
+function veCliqueAlternar() {
+    VECLQ.on = !VECLQ.on;
+    veLsSet('ve-clique', VECLQ.on ? '1' : '0');
+    if (VECLQ.on) veClique();
+    veToast(VECLQ.on ? 'Sons da interface ligados' : 'Sons da interface desligados');
+}
+// Passar o mouse por um item novo da lista (transição, animação, efeito) faz o tic
+function veCliqueHover(el, seletor) {
+    if (!el || el._clqHover) return;
+    el._clqHover = true;
+    let ult = null;
+    el.addEventListener('mouseover', e => {
+        const it = e.target.closest(seletor);
+        if (it && it !== ult) veClique(0.7);
+        ult = it;
+    });
+    el.addEventListener('mouseleave', () => { ult = null; });
 }
 
 function veIsActive() {
@@ -550,7 +603,7 @@ function veRelayout() {
     VE.clips.sort((a, b) => a.st - b.st || a.tr - b.tr);
     VE.sel = selC ? VE.clips.indexOf(selC) : -1;
     VE.dur = VE.clips.reduce((m, c) => Math.max(m, veEnd(c)), 0);
-    VE.playhead = Math.min(VE.playhead, veNavDur());
+    VE.playhead = Math.min(VE.playhead, veNavLivre());
 }
 
 // Clipe visível no instante t (o da trilha mais alta), ou -1 se for espaço vazio
@@ -1392,21 +1445,54 @@ function veTrocarTrilha(dir) {
     veMoveClip(VE.sel, tr, c.st);
 }
 
+// ── Ímã (como o do Premiere) ──
+// Arrastando a agulha, uma camada ou a borda dela, perto (VE_IMA_PX) das pontas das camadas, da agulha, das marcas
+// de entrada/saída e dos marcadores, ela "puxa" e gruda — e uma linha com dois triângulos mostra onde grudou
+// (VE.imaT, desenhada em veDraw enquanto arrasta). Tecla N liga/desliga.
+const VE_IMA_PX = 12;
+VE.imaT = null;
+// Marca onde o ímã grudou (null = solto). O tic seco (veClique) só quando duas camadas se ENCOSTAM — borda com borda
+// na mesma trilha (encosta = true); grudar na agulha, num marcador ou na ponta de uma camada de outra trilha não toca
+function veImaMarcar(t, encosta) {
+    const ant = VE.imaT, antE = VE.imaEncosta;
+    VE.imaT = t;
+    VE.imaEncosta = t != null && !!encosta;
+    if (VE.imaEncosta && VE.drag && (!antE || ant == null || Math.abs(ant - t) > 1e-6)) veClique();
+}
+// Alguma camada da trilha tr (que divida a linha com c) termina ou começa exatamente em t?
+function veImaEncostaEm(c, tr, t, fora) {
+    return VE.clips.some(o => !fora.has(o) && o.tr === tr && veConflita(o, c) &&
+        (Math.abs(veEnd(o) - t) < 1e-6 || Math.abs(o.st - t) < 1e-6));
+}
+function veImaPontos(fora, comAgulha = true) {
+    const pts = [0, VE.dur];
+    VE.clips.forEach(c => { if (!fora.has(c)) pts.push(c.st, veEnd(c)); });
+    if (comAgulha) pts.push(VE.playhead);
+    if (VE.inPt != null) pts.push(VE.inPt);
+    if (VE.outPt != null) pts.push(VE.outPt);
+    (VE.markers || []).forEach(m => { pts.push(+m.t || 0); if (+m.d > 0) pts.push((+m.t || 0) + (+m.d)); });
+    return pts;
+}
+
 // ── Mover clipe (arrastar) ──
-// Onde o clipe cairia: início com ímã nos cortes/agulha, sem ficar antes do zero.
+// Onde o clipe cairia: início ou fim com ímã nas pontas das outras camadas/agulha/marcas, sem ficar antes do zero.
+// Arrastando um grupo, as camadas dele não contam (não gruda na posição antiga delas).
 function veMoveTarget(i, start) {
     const c = VE.clips[i], len = veLen(c);
     start = Math.max(0, start);
+    let ima = null;
     if (VE.snap) {
-        const lim = 8 / VE.pps;
-        const cands = veEditPoints(i).concat([VE.playhead]);
-        let best = null, bd = lim;
-        for (const p of cands) {
-            if (Math.abs(p - start) < bd) { bd = Math.abs(p - start); best = p; }
-            if (Math.abs(p - (start + len)) < bd) { bd = Math.abs(p - (start + len)); best = p - len; }
+        const grupo = VE.drag && VE.drag.grupo, fora = new Set(grupo || [c]);
+        let best = null, bd = VE_IMA_PX / VE.pps, onde = null;
+        for (const p of veImaPontos(fora)) {
+            if (Math.abs(p - start) < bd) { bd = Math.abs(p - start); best = p; onde = p; }
+            if (Math.abs(p - (start + len)) < bd) { bd = Math.abs(p - (start + len)); best = p - len; onde = p; }
         }
-        if (best != null) start = Math.max(0, best);
+        if (best != null && best >= 0) { start = best; ima = onde; }
     }
+    // encostou: o começo dela na ponta de uma camada da trilha de destino, ou o fim dela no começo de outra
+    const tr = VE.drag && VE.drag.tr != null ? VE.drag.tr : c.tr, fora = new Set((VE.drag && VE.drag.grupo) || [c]);
+    veImaMarcar(ima, ima != null && (veImaEncostaEm(c, tr, start, fora) || veImaEncostaEm(c, tr, start + len, fora)));
     return veSnapFrame(start);
 }
 
@@ -3229,7 +3315,7 @@ function veKfGraphDraw(q) {
     ctx.beginPath();
     if (hold) { ctx.moveTo(m.X(0), m.Y(0)); ctx.lineTo(m.X(1), m.Y(0)); ctx.lineTo(m.X(1), m.Y(1)); }
     else ys.forEach((y, n) => ctx[n ? 'lineTo' : 'moveTo'](m.X(n / N), m.Y(y)));
-    ctx.strokeStyle = '#F97316';
+    ctx.strokeStyle = '#D4814A';
     ctx.lineWidth = 2;
     ctx.stroke();
     if (hold) return;
@@ -3247,7 +3333,7 @@ function veKfGraphDraw(q) {
         ctx.fillStyle = VE_KG.drag === n ? '#fbbf24' : '#fff';
         ctx.fill();
     });
-    [[0, 0], [1, 1]].forEach(([x, y]) => { ctx.fillStyle = '#F97316'; ctx.fillRect(m.X(x) - 3, m.Y(y) - 3, 6, 6); });
+    [[0, 0], [1, 1]].forEach(([x, y]) => { ctx.fillStyle = '#D4814A'; ctx.fillRect(m.X(x) - 3, m.Y(y) - 3, 6, 6); });
 }
 
 function veKfGraphInit(cv) {
@@ -3509,12 +3595,13 @@ function veTrimTo(d, t, semSnap) {
 
 function veMoveSnap(t, excluir) {
     t = Math.max(0, t);
-    if (!VE.snap) return veSnapFrame(t);
-    const lim = 8 / VE.pps;
-    let best = null, bd = lim;
-    for (const p of veEditPoints(excluir).concat([VE.playhead])) {
+    if (!VE.snap) { veImaMarcar(null); return veSnapFrame(t); }
+    let best = null, bd = VE_IMA_PX / VE.pps;
+    for (const p of veImaPontos(new Set([VE.clips[excluir]]))) {
         if (Math.abs(p - t) < bd) { bd = Math.abs(p - t); best = p; }
     }
+    const c = VE.clips[excluir];   // aparando: a borda encostou na ponta de outra camada da mesma trilha
+    veImaMarcar(best, best != null && !!c && veImaEncostaEm(c, c.tr, best, new Set([c])));
     return best != null ? best : veSnapFrame(t);
 }
 
@@ -3630,7 +3717,8 @@ function veRecentesProjetosSincronizar() {
 function veRegistrarProjetoRecente(path, dados) {
     if (!path) return;
     const nome = path.split(/[\\/]/).pop().replace(/\.vcnvt$/i, '');
-    const atual = { path, nome, video: (dados && dados.video) || VE.path || '', atualizado: Date.now(), thumb: (VE.thumbs && VE.thumbs[0] && VE.thumbs[0].url) || '' };
+    const atual = { path, nome, video: (dados && dados.video) || VE.path || '', atualizado: Date.now() };
+    if (VE._capas) delete VE._capas[path];   // salvou/abriu: a capa é tirada de novo (pode ter mudado)
     const chave = path.toLocaleLowerCase();
     veSalvarRecentesProjetos([atual, ...veRecentesProjetos().filter(p => String(p.path || '').toLocaleLowerCase() !== chave)]);
     veOnboardingRender();
@@ -3690,7 +3778,9 @@ function veOnboardingRender() {
     }
     box.innerHTML = lista.map((p, i) => {
         const pasta = (p.path || '').split(/[\\/]/).slice(0, -1).join('\\');
-        const capa = p.thumb ? `<img src="${veEsc(p.thumb)}" alt="" onerror="this.remove()">` : '<svg class="i"><use href="#i-film"/></svg>';
+        // a capa vem do Python a cada abertura (o endereço antigo guardado não vale depois de reiniciar o app)
+        const url = (VE._capas || {})[p.path];
+        const capa = url ? `<img src="${veEsc(url)}" alt="">` : '<svg class="i"><use href="#i-film"/></svg>';
         return `<button class="ve-start-card" data-proj="${i}" title="${veEsc(p.path)}">
             <span class="ve-start-thumb" data-thumb="${i}">${capa}</span>
             <span class="ve-start-info"><b class="ve-start-name">${veEsc(p.nome || p.path.split(/[\\/]/).pop())}</b>
@@ -3703,12 +3793,13 @@ function veOnboardingRender() {
     }));
     const api = window.pywebview && window.pywebview.api;
     if (!api || !api.ve_project_thumb) return;
+    // primeiro quadro da timeline ativa de cada projeto (Python: main.ve_project_thumb; refeito só se o projeto mudou)
+    VE._capas = VE._capas || {};
     lista.forEach((p, i) => {
-        if (p.thumb) return;
+        if (VE._capas[p.path]) return;
         api.ve_project_thumb(p.path).then(r => {
             if (!r || !r.success || !r.url) return;
-            const atuais = veRecentesProjetos(), item = atuais.find(x => x.path === p.path);
-            if (item) { item.thumb = r.url; veSalvarRecentesProjetos(atuais); }
+            VE._capas[p.path] = r.url;
             const alvo = $ve('ve-start-recentes')?.querySelector(`[data-thumb="${i}"]`);
             if (alvo) alvo.innerHTML = `<img src="${veEsc(r.url)}" alt="">`;
         }).catch(() => {});
@@ -4076,8 +4167,8 @@ function veMinPps() { return Math.min(veFitPps(), (veCanvasWidth() - 16) / Math.
 function veVisibleDur() { return veCanvasWidth() / VE.pps; }
 
 function veClampView() {
-    // deixa meia tela livre depois do fim, para dar para arrastar clipes para lá
-    const maxView = Math.max(0, veNavDur() - veVisibleDur() * 0.5);
+    // rola até o fim da folga livre depois do conteúdo (veNavLivre): navegar e arrastar clipes para lá
+    const maxView = Math.max(0, veNavLivre() - veVisibleDur() * 0.5);
     VE.view = Math.min(Math.max(VE.view, 0), maxView);
 }
 
@@ -4425,7 +4516,7 @@ function veRender() {
         const vy = vr.y + 3, vh = vr.h - 6;
         if (!aud) {
         ctx.save();
-        veRoundRect(ctx, cx, vy, cw, vh, 4);
+        veRoundRect(ctx, cx, vy, cw, vh, 2);
         ctx.clip();
         const apagado = veOculto(c);
         if (apagado && !dim && !ghost) ctx.globalAlpha = 0.35;
@@ -4459,7 +4550,7 @@ function veRender() {
         }
         if (veHasFx(c) && cw > 34 && vh >= 12) {
             // selo fx (como no Premiere): laranja = efeitos ligados; cinza = todos desligados/neutros
-            ctx.fillStyle = veFxActive(c).length ? '#F97316' : '#666';
+            ctx.fillStyle = veFxActive(c).length ? '#D4814A' : '#666';
             ctx.fillRect(cx + cw - 20, vy + 2, 17, 10);
             ctx.fillStyle = '#1a0d02';
             ctx.font = '700 8.5px Cascadia Mono, Consolas, monospace';
@@ -4469,22 +4560,22 @@ function veRender() {
         if (!ghost && i === VE.fxHover) {
             ctx.save();
             ctx.globalAlpha = 1;
-            ctx.fillStyle = 'rgba(249,115,22,0.18)';
+            ctx.fillStyle = 'rgba(212,129,74,0.18)';
             ctx.fillRect(cx, vy, cw, vh);
-            ctx.strokeStyle = '#F97316';
+            ctx.strokeStyle = '#D4814A';
             ctx.lineWidth = 2;
             ctx.setLineDash([4, 3]);
-            veRoundRect(ctx, cx, vy, cw, vh, 4); ctx.stroke();
+            veRoundRect(ctx, cx, vy, cw, vh, 2); ctx.stroke();
             ctx.restore();
         }
         if (!ghost && veHasKf(c)) veDrawKfMarks(ctx, c, i, st, veKfMarkY(vr));
         if (img || c.x === 'v' || !veOcupaA(c)) {   // imagem, vídeo com o som separado ou sem som: sem linha de áudio
             ctx.globalAlpha = 1;
             if ((selSet.has(c) && !dim) || ghost) {
-                ctx.strokeStyle = '#F97316';
+                ctx.strokeStyle = '#D4814A';
                 ctx.lineWidth = 2;
                 if (ghost) ctx.setLineDash([5, 3]);
-                veRoundRect(ctx, cx, vy, cw, vh, 4); ctx.stroke();
+                veRoundRect(ctx, cx, vy, cw, vh, 2); ctx.stroke();
                 ctx.setLineDash([]);
             }
             return;   // imagem não tem trilha de áudio
@@ -4494,7 +4585,7 @@ function veRender() {
         // ---- áudio (a altura da onda acompanha o ganho do clipe)
         const ay = ar.y + 3, ah = ar.h - 6;
         ctx.save();
-        veRoundRect(ctx, cx, ay, cw, ah, 4);
+        veRoundRect(ctx, cx, ay, cw, ah, 2);
         ctx.clip();
         ctx.globalAlpha = dim ? 0.28 : ghost ? 0.8 : veMudo(c) ? 0.35 : 1;
         ctx.fillStyle = cor ? veRgba(cor, 0.30) : '#163a2b';
@@ -4549,11 +4640,11 @@ function veRender() {
 
         // seleção (o fantasma do arraste ganha contorno tracejado)
         if ((selSet.has(c) && !dim) || ghost) {
-            ctx.strokeStyle = '#F97316';
+            ctx.strokeStyle = '#D4814A';
             ctx.lineWidth = 2;
             if (ghost) ctx.setLineDash([5, 3]);
-            if (!aud) { veRoundRect(ctx, cx, vy, cw, vh, 4); ctx.stroke(); }
-            veRoundRect(ctx, cx, ay, cw, ah, 4); ctx.stroke();
+            if (!aud) { veRoundRect(ctx, cx, vy, cw, vh, 2); ctx.stroke(); }
+            veRoundRect(ctx, cx, ay, cw, ah, 2); ctx.stroke();
             ctx.setLineDash([]);
         }
         if (lead) {
@@ -4561,7 +4652,7 @@ function veRender() {
             const txt = `${mv && mv.alt ? '+ ' : ''}${aud ? 'A' : 'V'}${tr + 1} · ${veShort(st)}`, ty = aud ? ay : vy;
             ctx.fillStyle = 'rgba(0,0,0,0.75)';
             ctx.fillRect(Math.max(2, x1), ty - 17, ctx.measureText(txt).width + 10, 15);
-            ctx.fillStyle = '#F97316';
+            ctx.fillStyle = '#D4814A';
             ctx.fillText(txt, Math.max(2, x1) + 5, ty - 6);
         }
     });
@@ -4593,10 +4684,10 @@ function veRender() {
                 ctx.restore();
             }
             if (legSel.has(i)) {
-                ctx.strokeStyle = '#F97316';
+                ctx.strokeStyle = '#D4814A';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(x1 + 1, y + 1, w - 2, h - 2);
-                ctx.fillStyle = '#F97316';
+                ctx.fillStyle = '#D4814A';
                 ctx.fillRect(x1 + 1, y + 2, Math.min(4, w / 2), h - 4);
                 ctx.fillRect(x1 + w - Math.min(5, w / 2), y + 2, Math.min(4, w / 2), h - 4);
             }
@@ -4609,9 +4700,9 @@ function veRender() {
     // retângulo de seleção
     if (VE.drag && VE.drag.mode === 'marq') {
         const d = VE.drag, xa = X(d.ta), xb = X(d.tb);
-        ctx.fillStyle = 'rgba(249,115,22,0.10)';
+        ctx.fillStyle = 'rgba(212,129,74,0.10)';
         ctx.fillRect(Math.min(xa, xb), Math.min(d.ya, d.yb), Math.abs(xb - xa), Math.abs(d.yb - d.ya));
-        ctx.strokeStyle = 'rgba(249,115,22,0.85)';
+        ctx.strokeStyle = 'rgba(212,129,74,0.85)';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 3]);
         ctx.strokeRect(Math.min(xa, xb) + 0.5, Math.min(d.ya, d.yb) + 0.5, Math.abs(xb - xa), Math.abs(d.yb - d.ya));
@@ -4635,10 +4726,27 @@ function veRender() {
     veDrawMarkers(ctx, X, W, H);
     if (typeof veIoChip === 'function') veIoChip();
 
+    // ímã: enquanto arrasta (agulha, camada ou borda) e grudou, uma linha com triângulos no ponto
+    const dr = VE.drag;
+    if (VE.snap && VE.imaT != null && dr && (dr.mode === 'scrub' || dr.mode === 'trim' || (dr.mode === 'move' && dr.active))) {
+        const ix = Math.round(X(VE.imaT)) + 0.5;
+        if (ix >= 0 && ix <= W) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(235,238,245,0.9)';
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(ix, VE_RULER); ctx.lineTo(ix, H); ctx.stroke();
+            ctx.fillStyle = 'rgba(235,238,245,0.95)';
+            const tri = (y, dir) => { ctx.beginPath(); ctx.moveTo(ix - 5, y); ctx.lineTo(ix + 5, y); ctx.lineTo(ix, y + 6 * dir); ctx.closePath(); ctx.fill(); };
+            tri(VE_RULER, 1);
+            tri(H - 1, -1);
+            ctx.restore();
+        }
+    }
+
     // agulha
     const px = Math.round(X(VE.playhead)) + 0.5;
     if (px >= -8 && px <= W + 8) {
-        ctx.fillStyle = '#F97316';
+        ctx.fillStyle = '#D4814A';
         ctx.fillRect(px - 0.5, VE_RULER - 2, 1.5, H);
         ctx.beginPath();
         ctx.moveTo(px - 6, 2); ctx.lineTo(px + 6, 2); ctx.lineTo(px + 6, 14); ctx.lineTo(px, 20); ctx.lineTo(px - 6, 14);
@@ -4670,7 +4778,7 @@ function veDrawKfMarks(ctx, c, i, st, y) {
         // ◆ selecionado (editor-keyframes.js: Delete apaga só ele): contorno branco
         const kSel = sel && typeof veKlTemSel === 'function' && veKlTemSel() &&
             VEKL.sel.some(s => Math.abs(veTlAt(c, s.t) - t) < veFrame() / 2);
-        ctx.fillStyle = naAgulha ? '#fbbf24' : sel ? '#F97316' : 'rgba(255,255,255,0.7)';
+        ctx.fillStyle = naAgulha ? '#fbbf24' : sel ? '#D4814A' : 'rgba(255,255,255,0.7)';
         ctx.strokeStyle = kSel ? '#fff' : 'rgba(0,0,0,0.7)';
         ctx.lineWidth = kSel ? 2 : 1;
         ctx.beginPath();
@@ -4717,7 +4825,7 @@ function veUpdateScrollbar() {
     const bar = $ve('ve-scrollbar'), thumb = $ve('ve-scroll-thumb');
     if (!bar || !thumb) return;
     if (!VE.ready) { thumb.style.left = '0'; thumb.style.width = '100%'; return; }
-    const navDur = veNavDur();
+    const navDur = veNavLivre();
     const frac = Math.min(1, veVisibleDur() / navDur);
     thumb.style.width = Math.max(4, frac * 100) + '%';
     thumb.style.left = (VE.view / navDur * 100) + '%';
@@ -4814,14 +4922,12 @@ function veToggleSnap() {
 function veSnapTime(t, forRazor) {
     t = veClamp(t);
     if (VE.snap) {
-        const lim = 8 / VE.pps;
-        const cands = veEditPoints();
-        if (forRazor) cands.push(VE.playhead);
-        if (VE.inPt != null) cands.push(VE.inPt);
-        if (VE.outPt != null) cands.push(VE.outPt);
-        (VE.markers || []).forEach(m => cands.push(+m.t || 0));
-        let best = null, bd = lim;
+        const cands = veImaPontos(new Set(), !!forRazor);   // a agulha não gruda nela mesma
+        let best = null, bd = VE_IMA_PX / VE.pps;
         for (const c of cands) { const d = Math.abs(c - t); if (d < bd) { bd = d; best = c; } }
+        // só arrastando a agulha mexe no estado do ímã (o desenho da linha de hover também passa por aqui e,
+        // no meio de um arraste de camada, zerava o "encostou" e o tic tocava de novo a cada movimento)
+        if (VE.drag && VE.drag.mode === 'scrub') veImaMarcar(best, false);   // agulha: gruda, sem o tic
         if (best != null) return best;
     }
     return veSnapFrame(t);
@@ -5598,6 +5704,16 @@ function veInitEvents() {
             // trilha sob o mouse (arrastando pelo vídeo ou pelo áudio, o par vinculado vai junto)
             const r = veRowAt(p.y);
             if (r && r.kind !== 'l') d.tr = veTrackIndex(r);
+            else if (p.y > VE_RULER) {
+                // acima da trilha de vídeo de cima (na folga ou na LEG) — ou, áudio solto, abaixo da última de áudio:
+                // trilha nova (como no Premiere). Uma por arraste; solta em outra trilha, ela some (endDrag)
+                const rows = veTrackRows(), topoV = rows.find(x => x.kind === 'v'), ultA = [...rows].reverse().find(x => x.kind === 'a');
+                const aud = veIsAudio(VE.clips[d.i]);
+                if ((!aud && topoV && p.y < topoV.y) || (aud && ultA && p.y >= ultA.y + ultA.h)) {
+                    if (d.novaTr == null) { d.novaTr = veTrackCount(); veEnsureTrackIndex(d.novaTr, { refresh: true }); }
+                    d.tr = d.novaTr;
+                }
+            }
             veDraw();
             return;
         }
@@ -5618,6 +5734,7 @@ function veInitEvents() {
     const endDrag = () => {
         const d = VE.drag;
         VE.drag = null;
+        VE.imaT = null;   // a linha do ímã some ao soltar
         wrap.classList.remove('dragging', 'scrub', 'moving', 'trimming');
         if (d && d.mode === 'leg') {
             if (d.active) veLegOrdenar((VE.legendas || [])[VETX.legSel]);
@@ -5646,6 +5763,15 @@ function veInitEvents() {
             if (d.grupo) veMoverGrupo(d.grupo, d.st - VE.clips[d.i].st, d.tr - VE.clips[d.i].tr, d.alt);
             else if (d.alt) veDuplicarEm(d.i, d.tr, d.st); else veMoveClip(d.i, d.tr, d.st);
         } else veDraw();
+        // trilha criada no arraste e que ficou vazia (soltou em outra): sai
+        if (d && d.novaTr != null && d.novaTr >= VE_MIN_TRACKS && !VE.clips.some(c => c.tr >= d.novaTr)) {
+            VE_TRK.v.length = Math.min(VE_TRK.v.length, d.novaTr);
+            VE_TRK.a.length = Math.min(VE_TRK.a.length, d.novaTr);
+            veRebuildTracks(veTrackCount());
+            veBuildHeads();
+            veClampVScroll();
+            veDraw();
+        }
     };
     wrap.addEventListener('pointerup', endDrag);
     wrap.addEventListener('contextmenu', e => {
@@ -5657,7 +5783,11 @@ function veInitEvents() {
         if (i < 0) return;
         if (veLocked(VE.clips[i])) { veAvisoBloqueio(); return; }
         VETX.legSel = -1;
-        veSelDefinir(vePegar(VE.clips[i], row.kind), VE.clips[i]);
+        // botão direito numa camada que já está numa seleção múltipla mantém o grupo (cor do rótulo, Criar Comp...
+        // valem para todas); fora dela, seleciona só a clicada
+        const atual = veSelLista(), pega = vePegar(VE.clips[i], row.kind);
+        if (atual.length > 1 && pega.some(o => atual.includes(o))) veSelDefinir(atual, VE.clips[i]);
+        else veSelDefinir(pega, VE.clips[i]);
         veRefresh();
         veClipMenu(VE.sel >= 0 ? VE.sel : i, e.clientX, e.clientY, wrap.ownerDocument);
     });
@@ -5693,7 +5823,7 @@ function veInitEvents() {
         thumb.setPointerCapture(e.pointerId);
         const x0 = e.clientX, v0 = VE.view;
         const move = ev => {
-            VE.view = v0 + (ev.clientX - x0) / bar.clientWidth * veNavDur();
+            VE.view = v0 + (ev.clientX - x0) / bar.clientWidth * veNavLivre();
             veClampView();
             veDraw();
         };
@@ -5704,7 +5834,7 @@ function veInitEvents() {
     bar.addEventListener('pointerdown', e => {
         if (e.target !== bar || !VE.ready) return;
         const r = bar.getBoundingClientRect();
-        VE.view = (e.clientX - r.left) / r.width * veNavDur() - veVisibleDur() / 2;
+        VE.view = (e.clientX - r.left) / r.width * veNavLivre() - veVisibleDur() / 2;
         veClampView();
         veDraw();
     });

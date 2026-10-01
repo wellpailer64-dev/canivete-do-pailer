@@ -1161,24 +1161,66 @@ def af_escolher(tipo):
     return {"success": True, "paths": list(r) if isinstance(r, (list, tuple)) else [r]}
 
 
+def _capa_do_projeto(dados):
+    """(arquivo, segundo) da capa: o primeiro quadro da timeline ativa — a camada de base no começo (trilha mais baixa
+    com imagem/vídeo; vídeo com transparência e imagens por cima só se não houver outra). Sem clipes: o vídeo principal."""
+    midias = {m.get("id"): m for m in dados.get("media") or [] if isinstance(m, dict)}
+    seqs = dados.get("sequences") or [{"id": None, "clips": dados.get("clips") or []}]
+    ativa = next((s for s in seqs if s.get("id") == dados.get("activeSequence") and not s.get("comp")), None)
+    for seq in [ativa] + [s for s in seqs if s is not ativa and not s.get("comp")]:
+        if not seq:
+            continue
+        cands = []
+        for c in seq.get("clips") or []:
+            if c.get("x") == "a":
+                continue
+            mid = c.get("m") or 0
+            if mid == 0:
+                arq, kind, alfa = dados.get("video"), "video", False
+            else:
+                m = midias.get(mid) or {}
+                arq, kind, alfa = m.get("path"), m.get("kind"), bool(m.get("comp"))
+            if kind not in ("video", "image") or not arq or not os.path.isfile(arq):
+                continue
+            ext = os.path.splitext(arq)[1].lower()
+            camada = kind == "image" or alfa or ext == ".mov"   # logo, GC, assinatura (.mov com alfa)
+            cands.append((float(c.get("st") or 0), camada, int(c.get("tr") or 0), arq, kind, float(c.get("s") or 0)))
+        if cands:
+            cands.sort(key=lambda x: (x[0], x[1], x[2]))
+            _, _, _, arq, kind, s = cands[0]
+            return arq, (0.0 if kind == "image" else s + 0.05)
+    video = dados.get("video")
+    return (video, 1.0) if video and os.path.isfile(video) else (None, 0)
+
+
 def ve_project_thumb(path):
-    """Gera uma miniatura leve do vídeo principal de um projeto recente."""
-    from Functions import projeto
+    """Miniatura de um projeto recente (tela inicial): o primeiro quadro da timeline ativa. Fica no disco e só é refeita
+    quando o projeto muda (o endereço que o JS recebe vale nesta sessão do app; ele pede de novo a cada abertura)."""
+    import subprocess
+    from Functions import projeto, media_server
+    from Functions.video_cutter import ffmpeg_path
     try:
         path = os.path.abspath(path or "")
         if not os.path.isfile(path):
             return {"success": False, "error": "Projeto não encontrado"}
-        dados, faltando = projeto.abrir(path)
-        video = dados.get("video")
-        if not video or video in faltando or not os.path.isfile(video):
-            return {"success": False, "error": "Vídeo do projeto não encontrado"}
-        from Functions.video_cutter import probe, gerar_thumbs
-        info = probe(video)
         pasta = os.path.join(tempfile.gettempdir(), "canivete_editor_recentes",
                              hashlib.sha1(path.encode("utf-8", "ignore")).hexdigest()[:16])
         os.makedirs(pasta, exist_ok=True)
-        thumbs = gerar_thumbs(video, float(info.get("duration") or dados.get("dur") or 1), pasta, 1)
-        return {"success": True, "url": thumbs[0]["url"] if thumbs else "", "video": video}
+        capa = os.path.join(pasta, "capa.jpg")
+        if os.path.isfile(capa) and os.path.getmtime(capa) >= os.path.getmtime(path):
+            return {"success": True, "url": media_server.register(capa)}
+        dados, _ = projeto.abrir(path)
+        arq, t = _capa_do_projeto(dados)
+        if not arq:
+            return {"success": False, "error": "Projeto sem imagem para a capa"}
+        tmp = capa + ".tmp.jpg"
+        subprocess.run([ffmpeg_path(), "-y", "-v", "error", "-ss", f"{max(0.0, t):.3f}", "-i", arq, "-frames:v", "1",
+                        "-vf", "scale=-2:240", "-q:v", "4", tmp],
+                       capture_output=True, timeout=30, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        if not os.path.isfile(tmp):
+            return {"success": False, "error": "Não foi possível tirar a capa"}
+        os.replace(tmp, capa)
+        return {"success": True, "url": media_server.register(capa)}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
