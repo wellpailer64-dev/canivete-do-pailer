@@ -1091,8 +1091,9 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-menu-form small { font-size: 11px; line-height: 1.5; color: var(--ve-faint); }
 .ve-menu-form div { display: flex; justify-content: flex-end; gap: 6px; }
 .ve-menu .ve-menu-form button { width: auto; }
-/* menu, fantasma e guias de encaixe ficam no <body>, fora do .ve: precisam das cores do editor */
-.ve-menu, .ve-mbar-menu, .ve-dghost, .ve-ddrop, .ve-dzones {
+/* menus (barra, botão direito na timeline/Projeto/ferramentas), fantasma e guias de encaixe ficam no <body>, fora do
+   .ve (e nos painéis soltos, em outra janela): precisam das cores do editor — sem elas o fundo fica transparente */
+.ve-menu, .ve-mbar-menu, .ve-ctx, .ve-dghost, .ve-ddrop, .ve-dzones {
     --ve-bg: var(--bg-0); --ve-panel: var(--bg-1); --ve-panel-2: var(--bg-3);
     --ve-line: var(--line); --ve-line-2: var(--line-2); --ve-text: var(--text); --ve-dim: var(--text-2);
     --ve-faint: var(--text-3); --ve-accent: #F97316; --ve-accent-2: var(--primary-hover);
