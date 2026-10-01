@@ -133,6 +133,7 @@ def renderizar(base, chave, h, job, on_progress):
     def _hold(p):
         global _proc
         _proc = p
+        _prioridade_baixa(p)
 
     try:
         r = exportar_video(
@@ -156,6 +157,18 @@ def renderizar(base, chave, h, job, on_progress):
         return {"success": False, "error": str(e)}
     from Functions import media_server
     return {"success": True, "path": final, "url": media_server.register(final), "size": os.path.getsize(final)}
+
+
+def _prioridade_baixa(p):
+    """Render de prévia em segundo plano: cede a CPU ao editor (play e prévia em tempo real)."""
+    try:
+        if os.name == "nt":
+            import ctypes
+            ctypes.windll.kernel32.SetPriorityClass(int(p._handle), 0x00004000)   # BELOW_NORMAL_PRIORITY_CLASS
+        else:
+            os.setpriority(os.PRIO_PROCESS, p.pid, 10)
+    except Exception:
+        pass
 
 
 def cancelar():

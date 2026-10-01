@@ -1829,6 +1829,13 @@
                         <option value="60">60 dias</option>
                         <option value="90">90 dias</option>
                     </select>
+                    <label class="modal-label" for="pref-cache-auto">Renderizar prévias sozinho</label>
+                    <select id="pref-cache-auto" class="modal-input" onchange="vePrefsCacheCampo('autoSeg', this.value)">
+                        <option value="3">Depois de 3 s parado</option>
+                        <option value="10">Depois de 10 s parado</option>
+                        <option value="30">Depois de 30 s parado</option>
+                        <option value="0">Desligado (só com Enter)</option>
+                    </select>
                     <label class="modal-label" for="pref-cache-ram">Cache de quadros na RAM (máximo)</label>
                     <select id="pref-cache-ram" class="modal-input" onchange="vePrefsCacheCampo('ramGB', this.value)">
                         <option value="0.5">512 MB</option>
@@ -1844,6 +1851,7 @@
                     </select>
                 </div>
                 <p>Vale para os próximos vídeos abertos. A qualidade das prévias também define o tamanho da prévia leve de edição. H.265 direto poupa a conversão, mas os cortes buscam mais devagar.</p>
+                <p>Renderizar sozinho: com o editor parado, os trechos vermelhos vão para o disco em segundo plano (prioridade baixa) e ficam verdes; dar play interrompe e ele continua quando você parar.</p>
                 <p>A limpeza é automática: ao abrir o app e depois de cada render, o que passou da idade é apagado; se o total passar do máximo, saem primeiro as prévias usadas há mais tempo.</p>
                 <div class="pref-cache-uso" id="pref-cache-uso"></div>
                 <div class="pref-cache-btns">

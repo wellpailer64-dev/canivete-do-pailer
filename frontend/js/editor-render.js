@@ -23,7 +23,7 @@ const VEPR = {
     hold: 0,
 };
 
-const VE_PR_PREFS_PADRAO = { dir: '', maxGB: 20, dias: 30, altura: 1080, ramGB: 1.5 };
+const VE_PR_PREFS_PADRAO = { dir: '', maxGB: 20, dias: 30, altura: 1080, ramGB: 1.5, autoSeg: 3 };
 function vePrPrefs() {
     const p = (typeof PREFS !== 'undefined' && PREFS.cache) || {};
     return { ...VE_PR_PREFS_PADRAO, ...p };
@@ -66,7 +66,7 @@ function vePrProjetoSalvo(chaveAntiga) {
 }
 
 // Edição: recalcula os segmentos depois (veCachePodar chama quando a edição termina)
-function vePrInvalidar() { VEPR.sujo = true; }
+function vePrInvalidar() { VEPR.sujo = true; VEPRA.pausado = false; VEPRA.mexeu = performance.now(); }
 
 // ── segmentos ──
 function vePrLimpo(c) {
@@ -96,7 +96,11 @@ function vePrSegmentos() {
     const eps = veFrame() / 2;
     const visuais = veTransVirtuais().filter(c => !veIsAudio(c) && !veTrkHidden(c.tr));
     const pts = new Set([0, +VE.dur.toFixed(4)]);
-    visuais.forEach(c => { pts.add(+c.st.toFixed(4)); pts.add(+veEnd(c).toFixed(4)); });
+    // no primeiro quadro em que o corte já vale (como o monitor decide: quadro em t mostra o clipe se t >= início).
+    // Arredondado (14,5333 em vez de 14,53333…, ou um corte fora da grade) o clipe que começa no corte entrava
+    // um tiquinho depois do quadro 0 do trecho e o primeiro quadro renderizado saía preto
+    const fps = VE.fps || 30, grade = t => Math.ceil(t * fps - 1e-4) / fps;
+    visuais.forEach(c => { pts.add(grade(c.st)); pts.add(grade(veEnd(c))); });
     const lista = [...pts].filter(t => t >= 0 && t <= VE.dur + eps).sort((x, y) => x - y);
     const segs = [];
     for (let k = 0; k + 1 < lista.length; k++) {
@@ -158,6 +162,7 @@ function vePrRenderizar() {
     if (!api || !api.ve_render_trecho) { veToast('A ponte com o app ainda não está pronta'); return; }
     if (VE.exportRunning) { veToast('Espere a exportação terminar'); return; }
     const a = VE.inPt ?? 0, b = VE.outPt ?? VE.dur;
+    VEPRA.ativo = false;   // Enter: a fila passa a ser do render manual (avisos e não para no play)
     VEPR.sujo = true;
     const novos = vePrSegmentos().filter(s => s.pesado && s.b > a + 1e-4 && s.a < b - 1e-4 && !VEPR.files.has(s.sig));
     const naFila = new Set(VEPR.fila.map(s => s.sig).concat(VEPR.atual ? [VEPR.atual.sig] : []));
@@ -195,15 +200,21 @@ async function vePrProximo() {
     const s = VEPR.fila.shift();
     // mudou desde que entrou na fila? só renderiza se o trecho ainda existir igual
     VEPR.sujo = true;
-    if (!vePrSegmentos().some(x => x.sig === s.sig) || VEPR.files.has(s.sig)) { VEPR.feitos++; vePrProximo(); vePrStatus(); return; }
+    if (!vePrSegmentos().some(x => x.sig === s.sig) || VEPR.files.has(s.sig)) {
+        VEPR.feitos++;
+        if (VEPR.fila.length) { vePrProximo(); vePrStatus(); } else vePrFimLote(null);
+        return;
+    }
     VEPR.atual = { ...s, pct: 0 };
     vePrStatus();
     try {
         const job = await vePrJob(s);
+        if (VEPR.atual && VEPR.atual.cancelado) { VEPR.atual = null; vePrFimLote(null); return; }
         const r = await vePrApi().ve_render_trecho(vePrPrefs().dir, VEPR.chave || vePrChave(), s.sig, job);
         if (!r || !r.success) throw new Error((r && r.error) || 'falhou');
     } catch (e) {
         VEPR.atual = null;
+        VEPRA.falhas.add(s.sig);
         vePrFimLote('Falha ao renderizar: ' + (e.message || e));
     }
 }
@@ -226,6 +237,7 @@ function veOnRender(ev) {
         if (VEPR.fila.length) { vePrProximo(); vePrStatus(); return; }
         vePrFimLote(null);
     } else {
+        if (!ev.cancelled) VEPRA.falhas.add(s.sig);
         vePrFimLote(ev.cancelled ? 'Render cancelado' : 'Falha ao renderizar: ' + (ev.error || ''));
     }
 }
@@ -235,7 +247,10 @@ function vePrFimLote(erro) {
     VEPR.fila = [];
     VEPR.total = VEPR.feitos = 0;
     vePrStatus();
-    if (erro) veToast(erro);
+    const auto = VEPRA.ativo;
+    VEPRA.ativo = false;
+    if (auto) { if (erro && !/cancelado/.test(erro)) console.warn('[render automático]', erro); }
+    else if (erro) veToast(erro);
     else veToast(`Prévia renderizada (${feitos} trecho${feitos === 1 ? '' : 's'})`);
     vePrManutencao();
     if (VE.ready) veDraw();
@@ -243,6 +258,7 @@ function vePrFimLote(erro) {
 
 function vePrCancelar() {
     if (!VEPR.atual && !VEPR.fila.length) return;
+    VEPRA.pausado = VEPRA.ativo;   // ✕ no render automático: espera a próxima edição para recomeçar
     VEPR.fila = [];
     const api = vePrApi();
     if (api && api.ve_render_cancelar) api.ve_render_cancelar();
@@ -270,8 +286,59 @@ function vePrStatus() {
     el.hidden = !ativo;
     if (!ativo) return;
     const n = Math.min(VEPR.total, VEPR.feitos + 1);
-    $ve('ve-render-txt').textContent = `Render ${n}/${VEPR.total} · ${VEPR.atual ? VEPR.atual.pct || 0 : 0}%`;
+    $ve('ve-render-txt').textContent = `${VEPRA.ativo ? 'Render auto' : 'Render'} ${n}/${VEPR.total} · ${VEPR.atual ? VEPR.atual.pct || 0 : 0}%`;
 }
+
+// ── render automático (como o "auto render" do Premiere/Resolve) ──
+// Com o editor parado alguns segundos (sem tocar, editar nem mexer), os trechos vermelhos vão sozinhos para o disco,
+// do mais perto da agulha para os mais longe. O ffmpeg roda com prioridade baixa (render_cache.py). Tocar
+// interrompe (o play fica com a CPU); editar só interrompe o trecho que deixou de valer. Parado de novo, continua.
+// Trecho que falhou não é tentado de novo (até reabrir o app); ✕ no indicador pausa até a próxima edição.
+const VEPRA = { ativo: false, pausado: false, mexeu: 0, tocava: false, falhas: new Set() };
+
+function vePrAutoParar() {
+    VEPR.fila = [];
+    if (VEPR.atual) {
+        VEPR.atual.cancelado = true;
+        const api = vePrApi();
+        if (api && api.ve_render_cancelar) api.ve_render_cancelar();
+    } else {
+        VEPR.total = VEPR.feitos = 0;
+        VEPRA.ativo = false;
+        vePrStatus();
+    }
+}
+
+function vePrAutoTick() {
+    const agora = performance.now();
+    if (VE.playing || VEPRA.tocava) VEPRA.mexeu = agora;   // o fim do play conta como mexer
+    VEPRA.tocava = !!VE.playing;
+    if (!VE.ready) return;
+    const espera = +vePrPrefs().autoSeg;
+    if (VEPRA.ativo && (VEPR.atual || VEPR.fila.length)) {
+        if (VE.playing || VE.exportRunning || !espera) { vePrAutoParar(); return; }
+        // editou: o trecho em render ainda existe igual? (a fila é conferida trecho a trecho em vePrProximo)
+        if (VEPR.sujo && VEPR.atual && !vePrSegmentos().some(x => x.sig === VEPR.atual.sig)) vePrAutoParar();
+        return;
+    }
+    if (!espera || VEPRA.pausado || VEPR.atual || VEPR.fila.length || VE.playing || VE.exportRunning) return;
+    if (agora - VEPRA.mexeu < espera * 1000 || veCacheEditando() || (VE.drag && VE.drag.mode)) return;
+    const api = vePrApi();
+    if (!api || !api.ve_render_trecho || !vePrChave()) return;
+    // vídeo da timeline ainda sem prévia de edição: espera (o render sairia com ele faltando)
+    if (VE.clips.some(c => { const m = VE.media[veMid(c)]; return m && m.id && m.kind === 'video' && !m.url && !m.offline && !m.erro; })) return;
+    const ph = VE.playhead, dist = s => ph < s.a ? s.a - ph : ph > s.b ? (ph - s.b) * 1.5 : 0;   // à frente primeiro
+    const add = vePrSegmentos().filter(s => s.pesado && !VEPR.files.has(s.sig) && !VEPRA.falhas.has(s.sig))
+        .sort((x, y) => dist(x) - dist(y)).map(s => ({ a: s.a, b: s.b, sig: s.sig }));
+    if (!add.length) return;
+    VEPRA.ativo = true;
+    VEPR.fila.push(...add);
+    VEPR.total += add.length;
+    vePrStatus();
+    vePrProximo();
+}
+setInterval(vePrAutoTick, 500);
+['pointerdown', 'keydown', 'wheel'].forEach(ev => window.addEventListener(ev, () => { VEPRA.mexeu = performance.now(); }, true));
 
 // ── reprodução: o player da prévia renderizada no lugar da composição ──
 function vePrPlayer(url) {
@@ -406,6 +473,7 @@ function vePrefsCacheRender() {
     el('pref-cache-dias').value = String(p.dias);
     el('pref-cache-alt').value = String(p.altura);
     el('pref-cache-ram').value = String(p.ramGB);
+    if (el('pref-cache-auto')) el('pref-cache-auto').value = String(p.autoSeg);
     if (el('pref-hevc')) el('pref-hevc').value = PREFS.hevcModo === 'direto' ? 'direto' : 'converter';
     vePrefsCacheInfo();
 }
@@ -456,6 +524,7 @@ function vePrefsCacheCampo(campo, valor) {
     if (campo === 'dias') vePrefsCacheSalvar({ dias: n || 30 });
     if (campo === 'altura') { vePrefsCacheSalvar({ altura: n || 1080 }); VEPR.sujo = true; if (VE.ready) veDraw(); }
     if (campo === 'ramGB') vePrefsCacheSalvar({ ramGB: n || 1.5 });
+    if (campo === 'autoSeg') { vePrefsCacheSalvar({ autoSeg: Math.max(0, n || 0) }); VEPRA.pausado = false; }
     if (campo === 'hevc') { PREFS.hevcModo = valor === 'direto' ? 'direto' : 'converter'; prefsSave(); }
     if (campo === 'maxGB' || campo === 'dias') vePrManutencao();
 }
