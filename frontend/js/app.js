@@ -312,12 +312,12 @@ function renderRecentes() {
 const EXT_AUDIO = /\.(mp3|wav|flac|m4a|aac|ogg|opus|wma|aiff?)$/i;
 const EXT_IMAGEM = /\.(jpe?g|png|webp|gif|heic|heif|avif|tiff?|bmp|ico|cr2|cr3|nef|arw|dng|raw|orf|rw2)$/i;
 const HOME_SUGESTOES = {
-    video: ['video-cutter', 'compressor-video', 'video-converter', 'converter-audio', 'transcrever-audio', 'omnivoice'],
-    audio: ['video-cutter', 'converter-audio', 'transcrever-audio', 'omnivoice'],
+    video: ['video-cutter', 'compressor-video', 'video-converter', 'melhorar-audio', 'converter-audio', 'transcrever-audio'],
+    audio: ['video-cutter', 'melhorar-audio', 'converter-audio', 'transcrever-audio', 'omnivoice'],
     imagem: ['converter-imagem', 'compressor-imagem', 'remover-fundo', 'favicon'],
     pdf: ['compressor-imagem'],
     pasta: ['compressor-video', 'video-converter', 'converter-imagem', 'compressor-imagem', 'remover-fundo',
-            'organizador-imagens', 'organizador-videos', 'converter-audio', 'transcrever-audio', 'omnivoice'],
+            'organizador-imagens', 'organizador-videos', 'melhorar-audio', 'converter-audio', 'transcrever-audio', 'omnivoice'],
 };
 let _homeItens = null;
 
@@ -685,6 +685,22 @@ function runConverterAudio() {
 // Callback para atualizar progresso do conversor de áudio
 function updateConverterAudioProgress(data) {
     uiAtualizar('converter-audio', data);
+}
+
+
+// =========================
+// Melhorar Áudio
+// =========================
+
+function runMelhorarAudio() {
+    const path = _exigirSelecao('melhorar-audio');
+    if (!path) return;
+    uiIniciar('melhorar-audio');
+    window.pywebview.api.melhorar_audio(path);
+}
+
+function updateMelhorarAudioProgress(data) {
+    uiAtualizar('melhorar-audio', data);
 }
 
 
@@ -2926,6 +2942,7 @@ window.updateVideoDownloaderProgress = updateVideoDownloaderProgress;
 window.updateWebScraperProgress = updateWebScraperProgress;
 window.updateTranscreverAudioProgress = updateTranscreverAudioProgress;
 window.updateOmniVoiceProgress = updateOmniVoiceProgress;
+window.updateMelhorarAudioProgress = updateMelhorarAudioProgress;
 window.updateRemoverFundoProgress = updateRemoverFundoProgress;
 window.updateOrganizadorImagensProgress = updateOrganizadorImagensProgress;
 window.updateOrganizadorVideosProgress = updateOrganizadorVideosProgress;

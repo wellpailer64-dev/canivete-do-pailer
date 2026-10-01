@@ -127,6 +127,9 @@
                 <button class="menu-item" data-tool="transcrever-audio" onclick="switchTool('transcrever-audio')">
                     <span class="icon"><svg class="i"><use href="#i-captions"/></svg></span><span class="label">Transcrever</span>
                 </button>
+                <button class="menu-item" data-tool="melhorar-audio" onclick="switchTool('melhorar-audio')">
+                    <span class="icon"><svg class="i"><use href="#i-wand"/></svg></span><span class="label">Melhorar Áudio</span>
+                </button>
                 <button class="menu-item" data-tool="omnivoice" onclick="switchTool('omnivoice')">
                     <span class="icon"><svg class="i"><use href="#i-sparkles"/></svg></span><span class="label">Geração de Voz</span>
                 </button>
@@ -262,6 +265,10 @@
                                     <span class="hc-media"><img src="img/tools/transcrever-audio.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-captions"/></svg></span></span>
                                     <b>Transcrever</b><small>Texto e legenda .srt com Whisper</small>
                                 </button>
+                                <button class="home-card" onclick="switchTool('melhorar-audio')">
+                                    <span class="hc-media"><img src="img/tools/transcrever-audio.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-wand"/></svg></span></span>
+                                    <b>Melhorar Áudio</b><small>Voz com som de estúdio, como o Adobe Podcast — áudio ou vídeo</small>
+                                </button>
                                 <button class="home-card" onclick="switchTool('omnivoice')">
                                     <span class="hc-media"><img src="img/tools/geracao-voz.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-sparkles"/></svg></span></span>
                                     <b>Geração de Voz</b><small>Salve vozes por referência curta e sintetize textos com OmniVoice</small>
@@ -327,6 +334,45 @@
                     <details class="log-wrap" id="logwrap-converter-audio">
                         <summary>Ver detalhes</summary>
                         <div class="log-section" id="log-converter-audio"></div>
+                    </details>
+                </div>
+
+                <!-- Melhorar Áudio -->
+                <div class="tool-page" id="page-melhorar-audio" data-drop="ambos">
+                    <div class="tool-head">
+                        <div class="tool-icon"><svg class="i"><use href="#i-wand"/></svg></div>
+                        <div><h2>Melhorar Áudio</h2><p>Deixa a voz com som de estúdio, como o Adobe Podcast. Em vídeo, só o som é trocado. O original é mantido.</p></div>
+                    </div>
+                    <div class="dropzone" data-tool="melhorar-audio">
+                        <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
+                        <div class="dz-title">Arraste um áudio, um vídeo ou uma pasta aqui</div>
+                        <div class="dz-sub">MP3, WAV, M4A… e vídeos (MP4, MOV, MKV). Sai ao lado do original como "nome_melhorado".</div>
+                        <div class="dz-actions">
+                            <button class="btn-secondary" onclick="selectFolder('melhorar-audio')"><svg class="i"><use href="#i-folder"/></svg>Escolher pasta</button>
+                            <button class="btn-secondary" onclick="selectFile('melhorar-audio')"><svg class="i"><use href="#i-file"/></svg>Escolher arquivo</button>
+                        </div>
+                        <div id="melhorar-audio-selected" class="selected-info"></div>
+                    </div>
+                    <div class="options-card">
+                        <div class="opt-row">
+                            <span class="opt-label">Como funciona</span>
+                            <span class="ma-como">Transcreve a fala, limpa a voz (Sidon) e reconstrói os detalhes com o OmniVoice usando o texto e a própria voz. A duração não muda: a boca continua sincronizada. Termina em −16 LUFS. Na primeira vez baixa os modelos (~1 GB, mais o OmniVoice se ainda não tiver).</span>
+                        </div>
+                    </div>
+                    <div class="run-row">
+                        <button class="btn-run" id="btn-melhorar-audio" onclick="runMelhorarAudio()"><svg class="i"><use href="#i-wand"/></svg>Melhorar</button>
+                    </div>
+                    <div class="progress-card" id="progress-melhorar-audio" hidden>
+                        <div class="progress-top">
+                            <span class="progress-status" id="status-melhorar-audio">Preparando...</span>
+                            <span class="progress-text" id="progress-text-melhorar-audio">0%</span>
+                        </div>
+                        <div class="progress-bar"><div class="progress-fill" id="progress-fill-melhorar-audio"></div></div>
+                    </div>
+                    <div class="result-banner" id="result-melhorar-audio" hidden></div>
+                    <details class="log-wrap" id="logwrap-melhorar-audio">
+                        <summary>Ver detalhes</summary>
+                        <div class="log-section" id="log-melhorar-audio"></div>
                     </details>
                 </div>
 

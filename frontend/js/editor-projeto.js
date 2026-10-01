@@ -564,6 +564,48 @@ function vePjSubstituirVarios(ids) {
     });
 }
 
+// ── Melhorar áudio (botão direito no Projeto): Sidon + OmniVoice no fundo, uma mídia por vez; no fim a mídia passa
+// a usar o "<nome>_melhorado" (veTrocarArquivo: os clipes da timeline continuam com os mesmos cortes) ──
+const VEMA = { fila: [], atual: null, path: '', ultimo: 0 };
+
+function vePjMelhorarAudio(ids) {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.melhorar_audio_midia) return;
+    ids.forEach(id => { if (VEMA.atual !== id && !VEMA.fila.includes(id)) VEMA.fila.push(id); });
+    veToast(veT('Melhorando o áudio no fundo — dá para continuar editando'));
+    veMaProximo();
+}
+
+function veMaProximo() {
+    while (VEMA.atual == null && VEMA.fila.length) {
+        const id = VEMA.fila.shift(), m = VE.media[id];
+        if (!m || m.removido || !m.path) continue;
+        Object.assign(VEMA, { atual: id, path: m.path, ultimo: -100 });
+        window.pywebview.api.melhorar_audio_midia(m.path, id);
+    }
+}
+
+function veMelhorarAudioProgresso(d) {
+    const id = VEMA.atual, m = VE.media[id];
+    const nome = m ? vePjNome(m) : '';
+    if (!d.complete) {
+        const p = Math.round(d.percent == null ? -1 : d.percent);
+        if (p >= 0 && p - VEMA.ultimo >= 10) {
+            VEMA.ultimo = p;
+            veToast(`${nome}: ${veT('melhorando o áudio')} ${p}%${VEMA.fila.length ? ` (+${VEMA.fila.length})` : ''}`);
+        }
+        return;
+    }
+    VEMA.atual = null;
+    if (d.error) veToast(`${nome}: ${veT('não foi possível melhorar o áudio')} — ${d.error}`);
+    else if (d.saida && m && m.path === VEMA.path) {   // outro projeto aberto no meio: não troca nada
+        veTrocarArquivo(m, d.saida, true);
+        veToast(`${nome}: ${veT('áudio melhorado — os clipes continuam com os mesmos cortes')}`);
+    } else if (d.saida) veToast(`${veT('Áudio melhorado salvo em')} ${vePathNome(d.saida)}`);
+    veMaProximo();
+}
+window.veMelhorarAudioProgresso = veMelhorarAudioProgresso;
+
 // ── Mostrar no projeto (botão direito no clipe da timeline, como o Reveal in Project do Premiere) ──
 function veMostrarNoProjeto(c) {
     let m = c && veMediaOf(c);
@@ -678,6 +720,8 @@ function vePjMenu(x, y, doc) {
     const keys = [...VEPJ.sel], um = keys.length === 1;
     const midiaUm = um && keys[0].startsWith('m:') ? VE.media[+keys[0].slice(2)] : null;
     const podeRelink = midiaUm && ['video', 'audio', 'image'].includes(midiaUm.kind);
+    const comSom = keys.filter(k => k.startsWith('m:')).map(k => +k.slice(2))
+        .filter(id => { const x = VE.media[id]; return x && !x.removido && ['video', 'audio'].includes(x.kind) && x.path && !veMediaOffline(x); });
     const varias = keys.length > 1 ? keys.filter(k => k.startsWith('m:')).map(k => +k.slice(2)).filter(id => ['video', 'audio', 'image'].includes((VE.media[id] || {}).kind)) : [];
     const m = doc.createElement('div');
     m.className = 've-ctx';
@@ -690,6 +734,7 @@ function vePjMenu(x, y, doc) {
         ${um ? '<button class="ve-ctx-item" data-pj="ren">Renomear<kbd>F2</kbd></button>' : ''}
         ${podeRelink ? `<button class="ve-ctx-item${veMediaOffline(midiaUm) ? ' offline' : ''}" data-pj="rel" title="${veMediaOffline(midiaUm) ? '' : 'Troca o arquivo e mantém os clipes na timeline com os mesmos cortes e posições'}">${veMediaOffline(midiaUm) ? 'Relincar mídia...' : 'Substituir mídia...'}</button>` : ''}
         ${varias.length > 1 ? `<button class="ve-ctx-item" data-pj="relv" title="Escolha a pasta com as versões novas: cada mídia pega o arquivo de mesmo nome">Substituir ${varias.length} mídias (escolher pasta)...</button>` : ''}
+        ${comSom.length ? `<button class="ve-ctx-item" data-pj="ma" title="${veT('Voz com som de estúdio (Sidon + OmniVoice). Cria o arquivo _melhorado ao lado do original e troca a mídia, mantendo os cortes')}">${veT('Melhorar áudio')}${comSom.length > 1 ? ` (${comSom.length})` : ''}</button>` : ''}
         ${keys.length ? `<button class="ve-ctx-item" data-pj="dup">Duplicar<kbd>Ctrl+D</kbd></button>
         <button class="ve-ctx-item" data-pj="cut">Recortar<kbd>Ctrl+X</kbd></button>
         <button class="ve-ctx-item" data-pj="copy">Copiar<kbd>Ctrl+C</kbd></button>` : ''}
@@ -710,7 +755,7 @@ function vePjMenu(x, y, doc) {
         if (cor) vePjCor(keys, cor.dataset.cor);
         else if (it) ({ ren: () => vePjRenomear(keys[0]), dup: () => vePjDuplicar(keys), cut: () => vePjCopiar('recortar'),
             copy: () => vePjCopiar('copiar'), paste: vePjColar, bin: vePjNovaPasta, aj: vePjNovoAjuste, cor: vePjNovaCor, imp: vePjImportarDialogo,
-            tl: () => veCreateTimeline(), rel: () => vePjRelink(+keys[0].slice(2)), relv: () => vePjSubstituirVarios(varias), del: () => vePjApagar(keys) })[it.dataset.pj]();
+            tl: () => veCreateTimeline(), rel: () => vePjRelink(+keys[0].slice(2)), relv: () => vePjSubstituirVarios(varias), ma: () => vePjMelhorarAudio(comSom), del: () => vePjApagar(keys) })[it.dataset.pj]();
         else return;
         veClipMenuFechar();
     });

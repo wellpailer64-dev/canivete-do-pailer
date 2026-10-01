@@ -1779,6 +1779,35 @@ def transcrever_salvar_txt(texto, pasta_origem):
 
 
 # ========================================
+# Tools: Melhorar áudio (Sidon + OmniVoice, como o Adobe Podcast)
+# ========================================
+def melhorar_audio(caminho):
+    from Functions.melhorar_audio import melhorar
+
+    def trabalho(log, progresso):
+        r = melhorar(caminho, log, progresso)
+        n, falhas = len(r["feitos"]), r["falhas"]
+        resumo = (f"{n} arquivo(s) melhorado(s) em {r['segundos']:.0f}s" if n != 1
+                  else f"Pronto em {r['segundos']:.0f}s: {os.path.basename(r['feitos'][0])}")
+        if falhas:
+            resumo += f" • {len(falhas)} falha(s)"
+        return {"resumo": resumo, "feitos": r["feitos"], "abrir": r["feitos"][0] if r["feitos"] else None}
+
+    return _tarefa("updateMelhorarAudioProgress", trabalho)
+
+
+def melhorar_audio_midia(caminho, mid):
+    """Pocket Editor (botão direito no Projeto): melhora e devolve o arquivo novo para substituir a mídia."""
+    from Functions.melhorar_audio import melhorar_arquivo
+
+    def trabalho(log, progresso):
+        saida = melhorar_arquivo(caminho, log, lambda v, m=None: progresso(v * 100 if v >= 0 else -1, m))
+        return {"saida": saida, "mid": mid, "origem": caminho}
+
+    return _tarefa("veMelhorarAudioProgresso", trabalho)
+
+
+# ========================================
 # Tools: OmniVoice / geração de voz
 # ========================================
 def omnivoice_status():
@@ -2932,6 +2961,12 @@ class ApiBridge:
 
     def transcrever_cena(self, folder_path):
         return transcrever_cena(folder_path)
+
+    def melhorar_audio(self, caminho):
+        return melhorar_audio(caminho)
+
+    def melhorar_audio_midia(self, caminho, mid):
+        return melhorar_audio_midia(caminho, mid)
 
     def omnivoice_status(self):
         return omnivoice_status()

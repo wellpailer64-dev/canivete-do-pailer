@@ -61,6 +61,9 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "requests" ^
  --hidden-import "Functions.updater" ^
  --hidden-import "Functions.omnivoice_tool" ^
+ --hidden-import "Functions.melhorar_audio" ^
+ --hidden-import "Functions.melhorar_audio_runner" ^
+ --hidden-import "scipy.signal" ^
  --hidden-import "huggingface_hub" ^
  --hidden-import "whisper" ^
  --hidden-import "omnivoice" ^
