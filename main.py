@@ -3028,6 +3028,26 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e), "prefs": {}}
 
+    def ie_amostras(self, origem="photoshop"):
+        """Painel Amostras: 'photoshop' = as do Photoshop instalado (com grupos); 'arquivo' = escolher um .aco/.ase."""
+        try:
+            from Functions import amostras
+            if origem == "photoshop":
+                lista, versao = amostras.do_photoshop()
+                if lista is None:
+                    return {"success": False, "error": "Photoshop não encontrado neste computador"}
+                return {"success": True, "lista": lista, "origem": versao}
+            if not _window:
+                return {"success": False}
+            r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), allow_multiple=False, file_types=(
+                "Amostras do Adobe (*.aco;*.ase)", "Todos os arquivos (*.*)"))
+            if not r:
+                return {"success": False, "cancelled": True}
+            path = r[0]
+            return {"success": True, "lista": amostras.ler_arquivo(path), "origem": os.path.splitext(os.path.basename(path))[0]}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def ie_fonte_url(self, arquivo):
         """URL local de um arquivo de fonte instalado (a página carrega com FontFace: o nome GDI de 31 letras
         e famílias tipográficas não batem com o CSS). Só serve arquivos das pastas de fontes do Windows."""

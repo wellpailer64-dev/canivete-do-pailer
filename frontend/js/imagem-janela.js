@@ -59,53 +59,198 @@ function ieHsv(hex) {
 }
 function ieDeHsv(h, s, v) { s /= 100; v /= 100; const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); }; return ieRgbHex(f(5) * 255, f(3) * 255, f(1) * 255); }
 function ieDefinirCor(c, alvo = IE.corAlvo) { IE.cor[alvo] = c; ieUiCores(); }
+// modos: 'cubo' (quadrado de saturação/brilho + faixa de matiz, o padrão do Photoshop), 'rgb', 'hsb'
+IE.corMatiz = 0;
 ieJanRegistrar('cor', 'Cor', ['cor'], corpo => {
-    const modo = iePref('corModo', 'rgb'), cor = IE.cor[IE.corAlvo];
+    const modo = iePref('corModo', 'cubo'), cor = IE.cor[IE.corAlvo];
     const [r, g, b] = ieHexRgb(cor), [h, s, v] = ieHsv(cor);
-    const faixas = modo === 'hsb' ? [['H', h, 360, 'linear-gradient(90deg,red,yellow,lime,cyan,blue,magenta,red)'], ['S', s, 100, `linear-gradient(90deg,${ieDeHsv(h, 0, v)},${ieDeHsv(h, 100, v)})`], ['B', v, 100, `linear-gradient(90deg,#000,${ieDeHsv(h, s, 100)})`]]
-        : [['R', r, 255, `linear-gradient(90deg,${ieRgbHex(0, g, b)},${ieRgbHex(255, g, b)})`], ['G', g, 255, `linear-gradient(90deg,${ieRgbHex(r, 0, b)},${ieRgbHex(r, 255, b)})`], ['B', b, 255, `linear-gradient(90deg,${ieRgbHex(r, g, 0)},${ieRgbHex(r, g, 255)})`]];
-    corpo.innerHTML = `<div class="ie-pn-cor"><div class="ie-pn-duas"><button class="ie-pn-c ${IE.corAlvo ? '' : 'on'}" data-alvo="0" style="background:${IE.cor[0]}" title="${ieJanH('Cor de frente')}"></button>
-        <button class="ie-pn-c f ${IE.corAlvo ? 'on' : ''}" data-alvo="1" style="background:${IE.cor[1]}" title="${ieJanH('Cor de fundo')}"></button></div>
-        <div class="ie-pn-fx">${faixas.map(([n, val, max, fundo]) => `<label><b>${n}</b><input type="range" data-c="${n}" min="0" max="${max}" value="${val}" style="background:${fundo}"><input type="number" data-cn="${n}" min="0" max="${max}" value="${val}"></label>`).join('')}
-        <label><b>#</b><input type="text" data-hex value="${cor.slice(1)}" maxlength="6"><select data-modo><option value="rgb" ${modo === 'rgb' ? 'selected' : ''}>RGB</option><option value="hsb" ${modo === 'hsb' ? 'selected' : ''}>HSB</option></select></label></div></div>
-        <canvas class="ie-pn-espectro" width="520" height="56"></canvas>`;
-    const ler = () => {
-        const val = n => +corpo.querySelector(`[data-cn="${n}"]`).value;
-        return modo === 'hsb' ? ieDeHsv(val('H'), val('S'), val('B')) : ieRgbHex(val('R'), val('G'), val('B'));
-    };
-    corpo.querySelectorAll('[data-c]').forEach(el => el.addEventListener('input', () => { corpo.querySelector(`[data-cn="${el.dataset.c}"]`).value = el.value; ieDefinirCor(ler()); }));
-    corpo.querySelectorAll('[data-cn]').forEach(el => el.addEventListener('change', () => ieDefinirCor(ler())));
-    corpo.querySelector('[data-hex]').addEventListener('change', ev => { const v = ev.target.value.replace('#', ''); if (/^[0-9a-f]{6}$/i.test(v)) ieDefinirCor('#' + v.toLowerCase()); });
+    if (s > 0 && v > 0) IE.corMatiz = h;
+    const H = IE.corMatiz;
+    const chips = `<div class="ie-pn-duas"><button class="ie-pn-c ${IE.corAlvo ? '' : 'on'}" data-alvo="0" style="background:${IE.cor[0]}" title="${ieJanH('Cor de frente')}"></button>
+        <button class="ie-pn-c f ${IE.corAlvo ? 'on' : ''}" data-alvo="1" style="background:${IE.cor[1]}" title="${ieJanH('Cor de fundo')}"></button></div>`;
+    const seletor = `<select data-modo class="ie-pn-cmodo" title="${ieJanH('Modo do painel')}">${[['cubo', 'Cubo de cores'], ['rgb', 'Controles RGB'], ['hsb', 'Controles HSB']].map(([k, n]) => `<option value="${k}" ${modo === k ? 'selected' : ''}>${ieJanH(n)}</option>`).join('')}</select>`;
+    if (modo === 'cubo') {
+        corpo.innerHTML = `<div class="ie-pn-cubo">${chips}<div class="ie-pn-sv"><canvas width="256" height="256"></canvas><i></i></div><div class="ie-pn-mt"><canvas width="16" height="256"></canvas><i></i></div></div>
+            <div class="ie-pn-linha"><b>#</b><input type="text" data-hex value="${cor.slice(1)}" maxlength="6" style="width:70px">${seletor}</div>`;
+        const sv = corpo.querySelector('.ie-pn-sv canvas'), sx = ieCtx(sv);
+        sx.fillStyle = ieDeHsv(H, 100, 100); sx.fillRect(0, 0, 256, 256);
+        let gr = sx.createLinearGradient(0, 0, 256, 0); gr.addColorStop(0, '#fff'); gr.addColorStop(1, 'rgba(255,255,255,0)'); sx.fillStyle = gr; sx.fillRect(0, 0, 256, 256);
+        gr = sx.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, '#000'); sx.fillStyle = gr; sx.fillRect(0, 0, 256, 256);
+        const mk = corpo.querySelector('.ie-pn-sv i');
+        Object.assign(mk.style, { left: s + '%', top: (100 - v) + '%' });
+        const mt = corpo.querySelector('.ie-pn-mt canvas'), mx = ieCtx(mt);
+        gr = mx.createLinearGradient(0, 0, 0, 256);
+        for (let k = 0; k <= 6; k++) gr.addColorStop(k / 6, ieDeHsv(360 - k * 60, 100, 100));
+        mx.fillStyle = gr; mx.fillRect(0, 0, 16, 256);
+        corpo.querySelector('.ie-pn-mt i').style.top = (100 - H / 3.6) + '%';
+        const arrastar = (el, f) => el.addEventListener('pointerdown', e => {
+            el.setPointerCapture(e.pointerId);
+            const mover = ev => { const rc = el.getBoundingClientRect(); f(ieClamp((ev.clientX - rc.left) / rc.width, 0, 1), ieClamp((ev.clientY - rc.top) / rc.height, 0, 1)); };
+            mover(e); el.onpointermove = mover; el.onpointerup = () => { el.onpointermove = null; };
+        });
+        arrastar(sv.parentNode, (x, y) => ieDefinirCor(ieDeHsv(IE.corMatiz, x * 100, (1 - y) * 100)));
+        arrastar(mt.parentNode, (x, y) => { IE.corMatiz = Math.round((1 - y) * 360) % 360; const [, s2, v2] = ieHsv(IE.cor[IE.corAlvo]); ieDefinirCor(ieDeHsv(IE.corMatiz, s2 || 100, v2 || 100)); });
+    } else {
+        const faixas = modo === 'hsb' ? [['H', h, 360, 'linear-gradient(90deg,red,yellow,lime,cyan,blue,magenta,red)'], ['S', s, 100, `linear-gradient(90deg,${ieDeHsv(h, 0, v)},${ieDeHsv(h, 100, v)})`], ['B', v, 100, `linear-gradient(90deg,#000,${ieDeHsv(h, s, 100)})`]]
+            : [['R', r, 255, `linear-gradient(90deg,${ieRgbHex(0, g, b)},${ieRgbHex(255, g, b)})`], ['G', g, 255, `linear-gradient(90deg,${ieRgbHex(r, 0, b)},${ieRgbHex(r, 255, b)})`], ['B', b, 255, `linear-gradient(90deg,${ieRgbHex(r, g, 0)},${ieRgbHex(r, g, 255)})`]];
+        corpo.innerHTML = `<div class="ie-pn-cor">${chips}
+            <div class="ie-pn-fx">${faixas.map(([n, val, max, fundo]) => `<label><b>${n}</b><input type="range" data-c="${n}" min="0" max="${max}" value="${val}" style="background:${fundo}"><input type="number" data-cn="${n}" min="0" max="${max}" value="${val}"></label>`).join('')}
+            <label><b>#</b><input type="text" data-hex value="${cor.slice(1)}" maxlength="6">${seletor}</label></div></div>
+            <canvas class="ie-pn-espectro" width="520" height="56"></canvas>`;
+        const ler = () => {
+            const val = n => +corpo.querySelector(`[data-cn="${n}"]`).value;
+            return modo === 'hsb' ? ieDeHsv(val('H'), val('S'), val('B')) : ieRgbHex(val('R'), val('G'), val('B'));
+        };
+        corpo.querySelectorAll('[data-c]').forEach(el => el.addEventListener('input', () => { corpo.querySelector(`[data-cn="${el.dataset.c}"]`).value = el.value; ieDefinirCor(ler()); }));
+        corpo.querySelectorAll('[data-cn]').forEach(el => el.addEventListener('change', () => ieDefinirCor(ler())));
+        const cv = corpo.querySelector('.ie-pn-espectro'), x = ieCtx(cv);
+        const gh = x.createLinearGradient(0, 0, cv.width, 0);
+        for (let k = 0; k <= 6; k++) gh.addColorStop(k / 6, ieDeHsv(k * 60, 100, 100));
+        x.fillStyle = gh; x.fillRect(0, 0, cv.width, cv.height);
+        const gv = x.createLinearGradient(0, 0, 0, cv.height); gv.addColorStop(0, 'rgba(255,255,255,1)'); gv.addColorStop(0.5, 'rgba(255,255,255,0)'); gv.addColorStop(0.5, 'rgba(0,0,0,0)'); gv.addColorStop(1, 'rgba(0,0,0,1)');
+        x.fillStyle = gv; x.fillRect(0, 0, cv.width, cv.height);
+        const pegar = e => { const rc = cv.getBoundingClientRect(), d = x.getImageData(Math.floor(ieClamp((e.clientX - rc.left) / rc.width, 0, 0.999) * cv.width), Math.floor(ieClamp((e.clientY - rc.top) / rc.height, 0, 0.999) * cv.height), 1, 1).data; ieDefinirCor(ieRgbHex(d[0], d[1], d[2])); };
+        cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); pegar(e); cv.onpointermove = pegar; cv.onpointerup = () => { cv.onpointermove = null; }; });
+    }
+    corpo.querySelector('[data-hex]').addEventListener('change', ev => { const v2 = ev.target.value.replace('#', ''); if (/^[0-9a-f]{6}$/i.test(v2)) ieDefinirCor('#' + v2.toLowerCase()); });
     corpo.querySelector('[data-modo]').addEventListener('change', ev => { iePrefGravar('corModo', ev.target.value); ieJanAtualizar('cor'); });
     corpo.querySelectorAll('[data-alvo]').forEach(el => {
         el.addEventListener('click', () => { IE.corAlvo = +el.dataset.alvo; ieJanAtualizar('cor'); });
         el.addEventListener('dblclick', () => ieSeletorCor(el, IE.cor[+el.dataset.alvo], c => ieDefinirCor(c, +el.dataset.alvo)));
     });
     corpo.querySelectorAll('input').forEach(i => i.addEventListener('keydown', e => e.stopPropagation()));
-    const cv = corpo.querySelector('.ie-pn-espectro'), x = ieCtx(cv);
-    const gh = x.createLinearGradient(0, 0, cv.width, 0);
-    for (let k = 0; k <= 6; k++) gh.addColorStop(k / 6, ieDeHsv(k * 60, 100, 100));
-    x.fillStyle = gh; x.fillRect(0, 0, cv.width, cv.height);
-    let gv = x.createLinearGradient(0, 0, 0, cv.height); gv.addColorStop(0, 'rgba(255,255,255,1)'); gv.addColorStop(0.5, 'rgba(255,255,255,0)'); gv.addColorStop(0.5, 'rgba(0,0,0,0)'); gv.addColorStop(1, 'rgba(0,0,0,1)');
-    x.fillStyle = gv; x.fillRect(0, 0, cv.width, cv.height);
-    const pegar = e => { const rc = cv.getBoundingClientRect(), d = x.getImageData(Math.floor(ieClamp((e.clientX - rc.left) / rc.width, 0, 0.999) * cv.width), Math.floor(ieClamp((e.clientY - rc.top) / rc.height, 0, 0.999) * cv.height), 1, 1).data; ieDefinirCor(ieRgbHex(d[0], d[1], d[2])); };
-    cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); pegar(e); cv.onpointermove = pegar; cv.onpointerup = () => { cv.onpointermove = null; }; });
 });
 
-// ─────────────────────────── Amostras ───────────────────────────
+// ─────────────────────────── Amostras (com grupos, como no Photoshop) ───────────────────────────
+// iePref('amostrasLista') = [{g: nome, fechado?, cores: [{c, n}]} | {c, n}]; na 1ª vez vêm do Photoshop instalado
+// (Swatches.psp, com os grupos de cada cliente) ou, sem Photoshop, as básicas. Cores recentes: iePref('coresRecentes').
 const IE_AMOSTRAS = ['#000000', '#ffffff', '#ff0000', '#ffff00', '#00ff00', '#00ffff', '#0000ff', '#ff00ff', '#404040', '#808080', '#c0c0c0',
     '#ed1c24', '#f26522', '#f7941d', '#fff200', '#8dc63f', '#39b54a', '#00a651', '#00a99d', '#00aeef', '#0072bc', '#0054a6', '#2e3192', '#662d91', '#92278f', '#ec008c', '#ed145b',
     '#9e0b0f', '#a0410d', '#a36209', '#aba000', '#598527', '#1a7b30', '#007236', '#00746b', '#0076a3', '#004b80', '#003471', '#1b1464', '#440e62', '#630460', '#9e005d', '#9e0039',
     '#f5d7b5', '#e8b88a', '#c68642', '#8d5524', '#5c3a1e'];
+const ieAmBasicas = () => [{ g: ieT('Básicas'), cores: IE_AMOSTRAS.map(c => ({ c, n: '' })) }];
+IE.amSel = null;   // {gi, ci} ou {gi} (grupo)
+let ieAmCarregando = false;
+async function ieAmostrasImportar(origem, substituir) {
+    const r = await window.pywebview?.api?.ie_amostras(origem).catch(() => null);
+    if (!r || !r.success) { if (r && !r.cancelled) ieToast(`${ieT('Amostras não importadas')}: ${r.error || ''}`); return false; }
+    const lista = substituir ? [] : ieJanLista('amostrasLista');
+    if (origem === 'photoshop' || substituir) lista.push(...r.lista);
+    else lista.push({ g: r.origem, cores: r.lista.flatMap(x => (x.cores ? x.cores : [x])) });
+    iePrefGravar('amostrasLista', lista);
+    ieToast(`${ieT('Amostras importadas de')} ${r.origem}`);
+    ieJanAtualizar('cor');
+    return true;
+}
+(function () {   // cores recentes: cada cor de frente nova
+    const orig = ieUiCores;
+    ieUiCores = function (...a) {
+        const r = orig.apply(this, a), c = IE.cor[0];
+        if (c && c !== IE._ultCor) {
+            IE._ultCor = c;
+            clearTimeout(IE._recT);
+            IE._recT = setTimeout(() => { const l = ieJanLista('coresRecentes'); if (l[0] !== c) iePrefGravar('coresRecentes', [c, ...l.filter(x => x !== c)].slice(0, 14)); }, 600);
+        }
+        return r;
+    };
+})();
 ieJanRegistrar('amostras', 'Amostras', ['cor'], corpo => {
-    const meus = ieJanLista('amostras');
-    corpo.innerHTML = `<div class="ie-pn-amostras">${[...meus.map(c => [c, 1]), ...IE_AMOSTRAS.map(c => [c, 0])].map(([c, m]) => `<button class="ie-pn-a" data-cor="${c}" ${m ? 'data-meu' : ''} style="background:${c}" title="${c}${m ? ' — ' + ieT('botão direito: excluir') : ''}"></button>`).join('')}
-        <button class="ie-pn-a mais" data-mais title="${ieJanH('Nova amostra com a cor de frente')}">+</button></div><div class="ie-prop-nota">${ieJanH('Clique: cor de frente · Ctrl+clique: cor de fundo')}</div>`;
-    corpo.querySelectorAll('[data-cor]').forEach(b => {
-        b.addEventListener('click', e => ieDefinirCor(b.dataset.cor, e.ctrlKey || e.altKey ? 1 : 0));
-        b.addEventListener('contextmenu', e => { e.preventDefault(); if (b.hasAttribute('data-meu')) { iePrefGravar('amostras', meus.filter(c => c !== b.dataset.cor)); ieJanAtualizar('cor'); } });
+    let lista = iePref('amostrasLista', null);
+    if (!lista) {
+        if (!ieAmCarregando) {
+            ieAmCarregando = true;
+            (async () => {
+                const antigas = ieJanLista('amostras');   // as que o usuário criou antes dos grupos
+                const ok = await ieAmostrasImportar('photoshop', true);
+                if (!ok) iePrefGravar('amostrasLista', ieAmBasicas());
+                if (antigas.length) iePrefGravar('amostrasLista', [...antigas.map(c => ({ c, n: '' })), ...ieJanLista('amostrasLista')]);
+                ieAmCarregando = false;
+                ieJanAtualizar('cor');
+            })();
+        }
+        corpo.innerHTML = `<div class="ie-vazio">${ieJanH('Carregando amostras...')}</div>`;
+        return;
+    }
+    lista = [...lista];
+    const q = (corpo._busca || '').trim().toLowerCase(), recentes = ieJanLista('coresRecentes');
+    const casa = x => !q || (x.n || '').toLowerCase().includes(q) || x.c.includes(q);
+    const sel = IE.amSel;
+    const amostra = (x, gi, ci) => casa(x) ? `<button class="ie-am ${sel && sel.gi === gi && sel.ci === ci ? 'sel' : ''}" data-gi="${gi}" ${ci !== undefined ? `data-ci="${ci}"` : ''} style="background:${x.c}" title="${ieEsc(x.n || x.c)}"></button>` : '';
+    let h = `<div class="ie-am-busca"><input type="search" data-busca placeholder="${ieJanH('Buscar amostras')}" value="${ieEsc(corpo._busca || '')}"></div>
+        <div class="ie-am-rec" title="${ieJanH('Cores usadas recentemente')}">${recentes.map(c => `<button class="ie-am" data-rec="${c}" style="background:${c}" title="${c}"></button>`).join('')}</div><div class="ie-am-lista">`;
+    let soltas = [];
+    const fecharSoltas = () => { if (soltas.length) { h += `<div class="ie-am-grade">${soltas.join('')}</div>`; soltas = []; } };
+    lista.forEach((x, gi) => {
+        if (!x.cores) { soltas.push(amostra(x, gi)); return; }
+        fecharSoltas();
+        const cores = x.cores.map((c, ci) => amostra(c, gi, ci)).join('');
+        if (q && !cores && !x.g.toLowerCase().includes(q)) return;
+        h += `<div class="ie-am-g ${sel && sel.gi === gi && sel.ci === undefined ? 'sel' : ''}" data-g="${gi}"><span class="ie-am-seta">${x.fechado && !q ? '›' : '⌄'}</span>${ieIco('folder')}<span class="ie-am-nome">${ieEsc(x.g)}</span></div>`;
+        if (!x.fechado || q) h += `<div class="ie-am-grade ie-am-dentro">${cores}</div>`;
     });
-    corpo.querySelector('[data-mais]').onclick = () => { if (!meus.includes(IE.cor[0])) iePrefGravar('amostras', [IE.cor[0], ...meus]); ieJanAtualizar('cor'); };
+    fecharSoltas();
+    h += `</div><div class="ie-pn-rod ie-am-rod">
+        <button class="ie-ico-btn" data-amenu title="${ieJanH('Importar e outras opções')}">≡</button><span class="ie-op-esp"></span>
+        <button class="ie-ico-btn" data-novog title="${ieJanH('Criar novo grupo')}">${ieIco('folder')}</button>
+        <button class="ie-ico-btn" data-nova title="${ieJanH('Criar nova amostra (cor de frente)')}">${ieIco('plus')}</button>
+        <button class="ie-ico-btn" data-exc title="${ieJanH('Excluir amostra ou grupo')}" ${sel ? '' : 'disabled'}>${ieIco('trash')}</button></div>`;
+    const rolagem = corpo.querySelector('.ie-am-lista')?.scrollTop || 0;
+    corpo.innerHTML = h;
+    corpo.querySelector('.ie-am-lista').scrollTop = rolagem;
+    const gravar = () => { iePrefGravar('amostrasLista', lista); ieJanAtualizar('cor'); };
+    const item = el => { const gi = +el.dataset.gi, ci = el.dataset.ci !== undefined ? +el.dataset.ci : undefined; return ci !== undefined ? lista[gi].cores[ci] : lista[gi]; };
+    const busca = corpo.querySelector('[data-busca]');
+    busca.addEventListener('input', () => { corpo._busca = busca.value; ieJanAtualizar('cor'); setTimeout(() => { const b = corpo.querySelector('[data-busca]'); b.focus(); b.setSelectionRange(b.value.length, b.value.length); }, 70); });
+    busca.addEventListener('keydown', e => e.stopPropagation());
+    corpo.querySelectorAll('[data-rec]').forEach(b => b.onclick = e => ieDefinirCor(b.dataset.rec, e.ctrlKey || e.altKey ? 1 : 0));
+    corpo.querySelectorAll('.ie-am[data-gi]').forEach(b => {
+        b.onclick = e => { IE.amSel = { gi: +b.dataset.gi, ci: b.dataset.ci !== undefined ? +b.dataset.ci : undefined }; ieDefinirCor(item(b).c, e.ctrlKey || e.altKey ? 1 : 0); ieJanAtualizar('cor'); };
+        b.ondblclick = async () => {
+            const x = item(b);
+            const v = await ieDialogo({ titulo: 'Nome da amostra', campos: [{ id: 'n', rotulo: 'Nome', tipo: 'texto', valor: x.n || '' }] });
+            if (v) { x.n = v.n; gravar(); }
+        };
+        b.oncontextmenu = e => {
+            e.preventDefault();
+            IE.amSel = { gi: +b.dataset.gi, ci: b.dataset.ci !== undefined ? +b.dataset.ci : undefined };
+            ieMenuContextoItens(e, [['Renomear amostra...', 'am:renomear'], ['Excluir amostra', 'am:excluir']]);
+        };
+    });
+    corpo.querySelectorAll('[data-g]').forEach(gEl => {
+        const gi = +gEl.dataset.g;
+        gEl.onclick = e => { if (e.target.closest('.ie-am-seta') || IE.amSel?.gi === gi && IE.amSel.ci === undefined) { lista[gi].fechado = !lista[gi].fechado; gravar(); } else { IE.amSel = { gi }; ieJanAtualizar('cor'); } };
+        gEl.ondblclick = async () => { const v = await ieDialogo({ titulo: 'Nome do grupo', campos: [{ id: 'n', rotulo: 'Nome', tipo: 'texto', valor: lista[gi].g }] }); if (v && v.n.trim()) { lista[gi].g = v.n.trim(); gravar(); } };
+        gEl.oncontextmenu = e => { e.preventDefault(); IE.amSel = { gi }; ieMenuContextoItens(e, [['Renomear grupo...', 'am:renomear'], ['Excluir grupo', 'am:excluir']]); };
+    });
+    corpo.querySelector('[data-novog]').onclick = async () => {
+        const v = await ieDialogo({ titulo: 'Novo grupo de amostras', campos: [{ id: 'n', rotulo: 'Nome', tipo: 'texto', valor: `${ieT('Grupo')} ${lista.filter(x => x.cores).length + 1}` }] });
+        if (!v || !v.n.trim()) return;
+        lista.unshift({ g: v.n.trim(), cores: [] }); IE.amSel = { gi: 0 }; gravar();
+    };
+    corpo.querySelector('[data-nova]').onclick = () => {   // dentro do grupo selecionado (ou do grupo da amostra selecionada)
+        const s = IE.amSel, nova = { c: IE.cor[0], n: '' };
+        if (s && lista[s.gi] && lista[s.gi].cores) { lista[s.gi].cores.push(nova); lista[s.gi].fechado = false; IE.amSel = { gi: s.gi, ci: lista[s.gi].cores.length - 1 }; }
+        else { lista.unshift(nova); IE.amSel = { gi: 0 }; }
+        gravar();
+    };
+    corpo.querySelector('[data-exc]').onclick = () => IE_CMDS['am:excluir']();
+    corpo.querySelector('[data-amenu]').onclick = e => ieMenuContextoItens(e, [['Importar do Photoshop (adicionar)', 'am:ps'], ['Importar amostras (.aco, .ase)...', 'am:arquivo'], '-',
+        ['Substituir pelas do Photoshop', 'am:psSubst'], ['Restaurar amostras básicas', 'am:basicas'], '-', ['Limpar cores recentes', 'am:limparRec']]);
+    IE._amLista = lista; IE._amGravar = gravar;
+});
+Object.assign(IE_CMDS, {
+    'am:excluir': () => { const s = IE.amSel, l = IE._amLista; if (!s || !l || !l[s.gi]) return; if (s.ci !== undefined) l[s.gi].cores.splice(s.ci, 1); else l.splice(s.gi, 1); IE.amSel = null; IE._amGravar(); },
+    'am:renomear': async () => {
+        const s = IE.amSel, l = IE._amLista; if (!s || !l || !l[s.gi]) return;
+        const x = s.ci !== undefined ? l[s.gi].cores[s.ci] : l[s.gi], k = x.cores ? 'g' : 'n';
+        const v = await ieDialogo({ titulo: x.cores ? 'Nome do grupo' : 'Nome da amostra', campos: [{ id: 'n', rotulo: 'Nome', tipo: 'texto', valor: x[k] || '' }] });
+        if (v) { x[k] = v.n; IE._amGravar(); }
+    },
+    'am:ps': () => ieAmostrasImportar('photoshop', false),
+    'am:psSubst': () => ieAmostrasImportar('photoshop', true),
+    'am:arquivo': () => ieAmostrasImportar('arquivo', false),
+    'am:basicas': () => { iePrefGravar('amostrasLista', ieAmBasicas()); ieJanAtualizar('cor'); },
+    'am:limparRec': () => { iePrefGravar('coresRecentes', []); ieJanAtualizar('cor'); },
 });
 
 // ─────────────────────────── Informações (F8) ───────────────────────────
@@ -196,21 +341,17 @@ ieJanRegistrar('histograma', 'Histograma', ['comp', 'doc'], (corpo, doc) => {
 
 // ─────────────────────────── Caractere e Parágrafo ───────────────────────────
 const ieJanTexto = doc => { const L = doc && ieAtiva(doc); return L && L.tipo === 'texto' ? L : null; };
+const ieJanTxt = doc => { const L = ieJanTexto(doc); if (L && !L.txt && L.texto && !L._txtPsd && !L._lendoTxt) { L._lendoTxt = true; ieTextoDoPsd(L, true).then(t => { L._lendoTxt = false; L._txtPsd = t; ieJanAtualizar('doc'); }); } return L ? (L.txt || L._txtPsd) : null; };
 ieJanRegistrar('caractere', 'Caractere', ['doc', 'ferr'], (corpo, doc) => {
-    const L = ieJanTexto(doc), t = L ? (L.txt || L._txtPsd) : null;
-    corpo.innerHTML = ieTextoPropsHtml(t, L && L.texto && L.texto.runs ? L.texto.runs[0] : null) +
-        (L ? '' : `<div class="ie-prop-nota">${ieJanH('Sem camada de texto: vale para o próximo texto')}</div>`);
+    const L = ieJanTexto(doc), t = ieJanTxt(doc);
+    corpo.innerHTML = ieCaractereHtml(t, L && L.texto && L.texto.runs ? L.texto.runs[0] : null);
     ieTextoPropsInstalar(corpo);
 });
 ieJanRegistrar('paragrafo', 'Parágrafo', ['doc', 'ferr'], (corpo, doc) => {
-    const L = ieJanTexto(doc), t = L ? (L.txt || L._txtPsd) : null, alin = (t && t.alin) || IE.op.texto.alin || 'left';
-    corpo.innerHTML = `<div class="ie-pn-linha"><div class="ie-segm">${[['left', 'Esq.'], ['center', 'Centro'], ['right', 'Dir.'], ['justify', 'Justificar']].map(([a, r]) => `<button data-alin="${a}" class="${alin === a ? 'on' : ''}">${ieJanH(r)}</button>`).join('')}</div></div>
-        <label class="ie-pn-linha">${ieJanH('Entrelinha')} <input type="number" data-ent min="0" value="${Math.round(t ? t.ent : IE.op.texto.ent)}"> px <em class="ie-prop-nota">${ieJanH('0 = automática')}</em></label>
-        <div class="ie-prop-nota">${ieJanH('Justificar vale para texto de parágrafo (caixa): a última linha fica à esquerda.')}</div>`;
-    corpo.querySelectorAll('[data-alin]').forEach(b => b.onclick = () => { ieTextoEstilo({ alin: b.dataset.alin }); setTimeout(() => ieJanAtualizar('doc'), 300); });
-    const e = corpo.querySelector('[data-ent]');
-    e.addEventListener('change', () => ieTextoEstilo({ ent: +e.value || 0 }));
-    e.addEventListener('keydown', ev => ev.stopPropagation());
+    const L = ieJanTexto(doc), t = ieJanTxt(doc);
+    corpo.innerHTML = ieParagrafoHtml(t, L && L.texto && L.texto.runs ? L.texto.runs[0] : null) +
+        `<div class="ie-ls-tit">${ieJanH('Marcadores e numeração')}</div><div class="ie-prop-nota">${ieJanH('Ainda não existe no editor.')}</div>`;
+    ieTextoPropsInstalar(corpo);
 });
 
 // estilos de caractere e de parágrafo: o que o texto selecionado tem, guardado com um nome
@@ -233,8 +374,8 @@ function ieJanEstilosTexto(id, chave, campos, titulo) {
         };
     });
 }
-ieJanEstilosTexto('estilosCar', 'estilosCaractere', ['fam', 'estilo', 'tam', 'cor', 'esp', 'ent', 'caixaAlta', 'negFalso', 'itaFalso'], 'Estilos de caractere');
-ieJanEstilosTexto('estilosPar', 'estilosParagrafo', ['alin', 'ent'], 'Estilos de parágrafo');
+ieJanEstilosTexto('estilosCar', 'estilosCaractere', ['fam', 'estilo', 'tam', 'cor', 'esp', 'ent', 'kern', 'escH', 'escV', 'desloc', 'caixaAlta', 'versalete', 'pos', 'sublinhado', 'tachado', 'negFalso', 'itaFalso'], 'Estilos de caractere');
+ieJanEstilosTexto('estilosPar', 'estilosParagrafo', ['alin', 'recuoEsq', 'recuoDir', 'recuo1', 'espAntes', 'espDepois', 'hifen'], 'Estilos de parágrafo');
 
 // ─────────────────────────── Glifos ───────────────────────────
 const IE_GLIFOS_EXTRA = '“”‘’«»–—…•·€£¥¢$%‰™©®°±×÷≈≠≤≥∞√∑πµΩ→←↑↓↔⇒★☆♥♡♦♣♠✓✔✗✕☺☻☀☁☂☎✈✉✂✏❤❝❞¡¿';
@@ -760,7 +901,7 @@ const IE_JAN_INDISP = [['Ações', 'Alt+F9'], ['Bibliotecas', ''], ['Comentário
 // ─────────────────────────── Espaço de trabalho ───────────────────────────
 // colunas de cada lado (da esquerda para a direita) e as larguras
 const IE_ESPACOS = {
-    essenciais: ['Essenciais', { esq: [], dir: [['props', 'camadas', 'hist']], largDir: [292] }],
+    essenciais: ['Essenciais', { esq: [['amostras', 'cor']], largEsq: [250], dir: [['paragrafo', 'caractere', 'props'], ['camadas']], largDir: [280, 310], alturas: { cor: 230 } }],
     pintura: ['Pintura', { esq: [['pinceis', 'configPincel']], largEsq: [270], dir: [['cor', 'amostras'], ['camadas', 'hist']], largDir: [250, 270] }],
     fotografia: ['Fotografia', { esq: [], dir: [['histograma', 'navegador', 'info'], ['props', 'ajustes', 'camadas']], largDir: [250, 290] }],
     graficos: ['Gráficos e Web', { esq: [['caractere', 'paragrafo', 'glifos']], largEsq: [270], dir: [['estilos', 'amostras'], ['props', 'camadas']], largDir: [230, 290] }],
@@ -771,7 +912,7 @@ function ieEspacoLayout(nome) {
     const p = IE_ESPACOS[nome] && IE_ESPACOS[nome][1];
     if (!p) return null;
     const usados = [...p.esq.flat(), ...p.dir.flat()];
-    return { ...ieClone(IE_DOCK_PADRAO), ...ieClone(p), soltos: {}, recolhidos: [], alturas: {}, fechados: Object.keys(IE_DOCK_PAINEIS).filter(id => !usados.includes(id)) };
+    return { ...ieClone(IE_DOCK_PADRAO), alturas: {}, ...ieClone(p), soltos: {}, recolhidos: [], fechados: Object.keys(IE_DOCK_PAINEIS).filter(id => !usados.includes(id)) };
 }
 function ieEspacoUsar(nome, redefinir) {
     const meus = iePref('espacos', {}) || {}, salvo = iePref('espacoEstado', {}) || {};
@@ -907,10 +1048,78 @@ Object.assign(IE_CMDS, {
         return orig(c);
     };
     const pode = ieCmdPode;
-    ieCmdPode = function (c) { if (String(c).startsWith('indisp:')) return false; if (/^(janela|espaco|docIr):|^(espaco|arr|mostrar|barraCtx)/.test(c)) return true; return pode(c); };
+    ieCmdPode = function (c) { if (String(c).startsWith('am:')) return true; if (String(c).startsWith('indisp:')) return false; if (/^(janela|espaco|docIr):|^(espaco|arr|mostrar|barraCtx)/.test(c)) return true; return pode(c); };
 })();
 // arrastar painéis respeita "Travar espaço de trabalho"
 (function () {
     const orig = ieDockArrIni;
     ieDockArrIni = function (ev, id) { if (iePref('espacoTravado', false)) return; return orig(ev, id); };
+})();
+
+// ─────────────────────────── barra Ferramentas: ordem e grupos do Photoshop ───────────────────────────
+// cada espaço mostra a última ferramenta usada do grupo; o triângulo no canto indica que há mais; botão direito ou
+// segurar abre a lista (como no Photoshop). Shift+tecla alterna dentro do grupo.
+const IE_FERR_GRUPOS = [['mover'], '|', ['letreiro'], ['laco'], ['varinha'], ['corte', 'fatia'], '|', ['contagotas'], ['pincel'], ['carimbo'], ['borracha'], ['degrade', 'balde'], '|',
+    ['texto'], ['forma'], '|', ['mao'], ['zoom']];
+function ieFerrGrupos() {
+    const usados = new Set(IE_FERR_GRUPOS.flat()), g = IE_FERR_GRUPOS.map(x => (x === '|' ? x : x.filter(n => IE_FERR[n]))).filter(x => x === '|' || x.length);
+    const resto = Object.keys(IE_FERR).filter(n => !usados.has(n) && IE_FERR_ORDEM.includes(n));
+    return resto.length ? [...g, '|', ...resto.map(n => [n])] : g;
+}
+function ieFerrNoEspaco(grupo) { const m = iePref('ferrGrupo', {}) || {}; return grupo.includes(IE.ferr) ? IE.ferr : grupo.includes(m[grupo[0]]) ? m[grupo[0]] : grupo[0]; }
+ieUiFerr = function () {
+    const box = ieEl('ie-ferr');
+    if (!box) return;
+    if (!box._ok2) {
+        box._ok2 = true; box._ok = true;
+        const cores = box.querySelector('.ie-cores');
+        box.innerHTML = ieFerrGrupos().map((g, i) => g === '|' ? '<i class="ie-ferr-sep"></i>' : `<button class="ie-ferr-btn ${g.length > 1 ? 'grupo' : ''}" data-gi="${i}"></button>`).join('');
+        if (cores) box.appendChild(cores);
+        else box.insertAdjacentHTML('beforeend', `<div class="ie-cores" title="${ieT('Cor de frente e de fundo (D: padrão, X: trocar)')}">
+                <button class="ie-cor ie-cor-frente" id="ie-cor0" onclick="ieEscolherCor(0, this)"></button>
+                <button class="ie-cor ie-cor-fundo" id="ie-cor1" onclick="ieEscolherCor(1, this)"></button>
+                <button class="ie-cor-troca" onclick="ieTrocarCores()" title="${ieT('Trocar (X)')}">${ieIco('swap')}</button>
+                <button class="ie-cor-padrao" onclick="ieCoresPadrao()" title="${ieT('Padrão (D)')}"><i></i><i></i></button></div>`);
+        let seg = 0;
+        const lista = b => {   // lista do grupo ao lado do botão
+            const g = ieFerrGrupos()[+b.dataset.gi], pop = ieEl('ie-pop'), rb = ieEl('ie').getBoundingClientRect(), r = b.getBoundingClientRect();
+            pop.innerHTML = `<div class="ie-menu ie-ferr-lista">${g.map(n => `<button class="ie-menu-item" data-ferr="${n}"><i class="ie-menu-chk">${n === IE.ferr ? '■' : ''}</i>${ieIco(IE_FERR[n].icone)}<span>${ieT(IE_FERR[n].nome)}</span><kbd>${IE_FERR[n].tecla || ''}</kbd></button>`).join('')}</div>`;
+            pop.hidden = false;
+            pop.style.left = r.right - rb.left + 4 + 'px'; pop.style.top = r.top - rb.top + 'px';
+            const fora = e => { if (!pop.contains(e.target)) { pop.hidden = true; document.removeEventListener('pointerdown', fora, true); } };
+            pop.onclick = e => { const x = e.target.closest('[data-ferr]'); if (x) { pop.hidden = true; document.removeEventListener('pointerdown', fora, true); ieEscolherFerr(x.dataset.ferr); } };
+            setTimeout(() => document.addEventListener('pointerdown', fora, true), 0);
+        };
+        box.addEventListener('pointerdown', ev => {
+            const b = ev.target.closest('.ie-ferr-btn.grupo');
+            clearTimeout(seg);
+            if (b && ev.button === 0) seg = setTimeout(() => { b._segurou = true; lista(b); }, 350);
+        });
+        box.addEventListener('pointerup', () => clearTimeout(seg));
+        box.addEventListener('contextmenu', ev => { const b = ev.target.closest('.ie-ferr-btn.grupo'); if (b) { ev.preventDefault(); lista(b); } });
+        box.addEventListener('click', ev => {
+            const b = ev.target.closest('.ie-ferr-btn');
+            if (!b) return;
+            if (b._segurou) { b._segurou = false; return; }
+            ieEscolherFerr(b.dataset.f);
+        });
+    }
+    const grupos = ieFerrGrupos();
+    box.querySelectorAll('.ie-ferr-btn').forEach(b => {
+        const g = grupos[+b.dataset.gi], n = ieFerrNoEspaco(g);
+        if (b.dataset.f !== n) { b.dataset.f = n; b.innerHTML = ieIco(IE_FERR[n].icone); }
+        b.title = g.map(x => `${ieT(IE_FERR[x].nome)} (${IE_FERR[x].tecla})`).join(' · ');
+        b.classList.toggle('on', g.includes(IE.ferr));
+    });
+    ieUiCores();
+};
+(function () {   // lembra a última do grupo
+    const orig = ieEscolherFerr;
+    ieEscolherFerr = function (n, ...a) {
+        const r = orig.call(this, n, ...a);
+        const g = IE_FERR_GRUPOS.find(x => Array.isArray(x) && x.length > 1 && x.includes(n));
+        if (g) { const m = iePref('ferrGrupo', {}) || {}; if (m[g[0]] !== n) iePrefGravar('ferrGrupo', { ...m, [g[0]]: n }); }
+        ieUiFerr();
+        return r;
+    };
 })();

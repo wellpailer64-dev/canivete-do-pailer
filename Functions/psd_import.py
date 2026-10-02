@@ -328,6 +328,14 @@ def _texto(layer, angulo_global):
                 "ent": float(d.get("Leading", 0) or 0),
                 "neg": _vb(d.get("FauxBold", False)), "ita": _vb(d.get("FauxItalic", False)),
                 "caixa_alta": int(d.get("FontCaps", 0) or 0) == 2,
+                # o resto do painel Caractere (o editor de imagem usa; o de vídeo ignora)
+                "versalete": int(d.get("FontCaps", 0) or 0) == 1,
+                "esc_h": round(float(d.get("HorizontalScale", 1) or 1) * 100, 2),
+                "esc_v": round(float(d.get("VerticalScale", 1) or 1) * 100, 2),
+                "desloc": float(d.get("BaselineShift", 0) or 0),
+                "pos": {1: "sobrescrito", 2: "subscrito"}.get(int(d.get("FontBaseline", 0) or 0), ""),
+                "sublinhado": _vb(d.get("Underline", False)), "tachado": _vb(d.get("Strikethrough", False)),
+                "kern": "metricas" if _vb(d.get("AutoKerning", True)) else 0,
             })
         if not runs:
             return None
@@ -346,6 +354,11 @@ def _texto(layer, angulo_global):
         return {
             "texto": texto.rstrip(chr(10)), "runs": runs, "misto": len({chave(r) for r in runs}) > 1,
             "alin": {1: "right", 2: "center"}.get(just, "left"), "caixa": caixa,
+            "par": {"alin": {0: "left", 1: "right", 2: "center", 3: "justify-left", 4: "justify-right", 5: "justify-center",
+                             6: "justify-all"}.get(just, "left"),
+                    "recuo_esq": float(par.get("StartIndent", 0) or 0), "recuo_dir": float(par.get("EndIndent", 0) or 0),
+                    "recuo1": float(par.get("FirstLineIndent", 0) or 0), "esp_antes": float(par.get("SpaceBefore", 0) or 0),
+                    "esp_depois": float(par.get("SpaceAfter", 0) or 0), "hifen": _vb(par.get("AutoHyphenate", False))},
             "tf": [xx, xy, yx, yy, tx, ty], "tinta": [int(v) for v in layer.bbox],
             "efeitos": _params_efeitos(layer, angulo_global),
         }

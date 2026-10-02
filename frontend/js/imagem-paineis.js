@@ -266,7 +266,15 @@ function ieUiCamadas() {
     // topo: mesclagem, opacidade, travas, preenchimento
     const bm = L ? L.bm : 'NORMAL';
     const opts = (L && L.tipo === 'grupo' ? [['PASS_THROUGH', 'Passagem']] : []).concat(IE_BM.map(b => b || null));
-    topo.innerHTML = `
+    // filtro (como o do Photoshop): por tipo (pixels, ajuste, texto, forma, objeto inteligente) ou pelo nome
+    const F = IE.filtroCam || (IE.filtroCam = { modo: 'tipo', tipos: [], nome: '', on: true });
+    const FT = [['pixel', 'Filtro de camadas de pixels', 'image'], ['ajuste', 'Filtro de camadas de ajuste', 'adj'], ['texto', 'Filtro de camadas de texto', 'type'], ['forma', 'Filtro de camadas de forma', 'shape'], ['inteligente', 'Filtro de objetos inteligentes', 'smart']];
+    const filtroHtml = `<div class="ie-cam-filtro ${F.on ? '' : 'off'}">
+        <select data-fmodo title="${ieT('Filtrar camadas por')}"><option value="tipo" ${F.modo === 'tipo' ? 'selected' : ''}>${ieT('Tipo')}</option><option value="nome" ${F.modo === 'nome' ? 'selected' : ''}>${ieT('Nome')}</option></select>
+        ${F.modo === 'nome' ? `<input type="search" data-fnome value="${ieEsc(F.nome)}" placeholder="${ieT('Nome da camada')}">`
+            : FT.map(([k, t, ic]) => `<button class="ie-cam-fbt ${F.tipos.includes(k) ? 'on' : ''}" data-ftipo="${k}" title="${ieT(t)}">${k === 'texto' ? '<b>T</b>' : ieIco(ic === 'image' ? 'brush' : ic)}</button>`).join('')}
+        <button class="ie-cam-fon ${F.on ? 'on' : ''}" data-fon title="${ieT('Ligar/desligar o filtro')}"></button></div>`;
+    topo.innerHTML = filtroHtml + `
         <select id="ie-cam-bm" ${L ? '' : 'disabled'} title="${ieT('Modo de mesclagem')}">${opts.map(b => b ? `<option value="${b[0]}" ${b[0] === bm ? 'selected' : ''}>${ieT(b[1])}${b[3] ? ' ≈' : ''}</option>` : '<option disabled>──────</option>').join('')}</select>
         <label class="ie-cam-num">${ieT('Opacidade')} <input type="number" id="ie-cam-op" min="0" max="100" value="${L ? Math.round(L.op * 100) : 100}" ${L ? '' : 'disabled'}>%</label>
         <div class="ie-cam-travas"><span>${ieT('Travar')}</span>
@@ -276,11 +284,13 @@ function ieUiCamadas() {
         <label class="ie-cam-num">${ieT('Preench.')} <input type="number" id="ie-cam-fill" min="0" max="100" value="${L && L.tipo !== 'grupo' ? Math.round(L.fill * 100) : 100}" ${L && L.tipo !== 'grupo' ? '' : 'disabled'}>%</label>`;
     // lista: de cima para baixo
     const linhas = [];
+    const filtra = F.on && (F.modo === 'tipo' ? F.tipos.length > 0 : !!F.nome.trim());
+    const passa = X => F.modo === 'tipo' ? F.tipos.includes(X.tipo === 'preenchimento' ? 'forma' : X.tipo) : X.nome.toLowerCase().includes(F.nome.trim().toLowerCase());
     const visitar = (camadas, nivel) => {
         for (let i = camadas.length - 1; i >= 0; i--) {
             const X = camadas[i];
-            linhas.push({ X, nivel });
-            if (X.filhos && X.aberto) visitar(X.filhos, nivel + 1);
+            if (!filtra || passa(X)) linhas.push({ X, nivel: filtra ? 0 : nivel });
+            if (X.filhos && (X.aberto || filtra)) visitar(X.filhos, nivel + 1);
         }
     };
     visitar(doc.camadas, 0);
@@ -311,6 +321,12 @@ function ieUiCamadas() {
         <button class="ie-ico-btn" onclick="ieCmd('grupoNovo')" title="${ieT('Novo grupo')}">${ieIco('folder')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('novaCamada')" title="${ieT('Nova camada (Shift+Ctrl+N)')}">${ieIco('plus')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('excluirCamada')" title="${ieT('Excluir camada')}">${ieIco('trash')}</button>`;
+    topo.querySelector('[data-fmodo]').onchange = e => { F.modo = e.target.value; ieUiCamadas(); };
+    topo.querySelectorAll('[data-ftipo]').forEach(b => b.onclick = () => { const k = b.dataset.ftipo; F.tipos = F.tipos.includes(k) ? F.tipos.filter(x => x !== k) : [...F.tipos, k]; F.on = true; ieUiCamadas(); });
+    topo.querySelector('[data-fon]').onclick = () => { F.on = !F.on; ieUiCamadas(); };
+    const fn = topo.querySelector('[data-fnome]');
+    if (fn) { fn.addEventListener('input', () => { F.nome = fn.value; clearTimeout(IE._fnT); IE._fnT = setTimeout(() => { ieUiCamadas(); const n = ieEl('ie-cam-topo').querySelector('[data-fnome]'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 200); }); fn.addEventListener('keydown', e => e.stopPropagation()); }
+    if (filtra && !linhas.length) lista.innerHTML = `<div class="ie-vazio">${ieT('Nenhuma camada passa no filtro')}</div>`;
     ieMiniaturas(true);
     ieUiProps();
 }

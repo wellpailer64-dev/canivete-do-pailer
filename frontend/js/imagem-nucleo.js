@@ -794,18 +794,22 @@ function ieDesenharVista() {
     const doc = IE.doc;
     if (!doc) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const x = doc.px, y = doc.py, w = doc.w * doc.zoom, h = doc.h * doc.zoom;
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,.6)';
-    ctx.shadowBlur = 18;
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(x, y, w, h);
-    ctx.restore();
-    ctx.fillStyle = ieXadrezPadrao(ctx);
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.fillRect(0, 0, w, h);
-    ctx.restore();
+    // com pranchetas, fora delas é a área de montagem (sem xadrez): sombra e xadrez só em cada prancheta
+    const areas = doc.camadas.some(L => L.prancheta) ? doc.camadas.filter(L => L.prancheta && L.visivel).map(L => L.prancheta) : [{ x: 0, y: 0, w: doc.w, h: doc.h }];
+    for (const P of areas) {
+        const x = doc.px + P.x * doc.zoom, y = doc.py + P.y * doc.zoom, w = P.w * doc.zoom, h = P.h * doc.zoom;
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,.6)';
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(x, y, w, h);
+        ctx.restore();
+        ctx.fillStyle = ieXadrezPadrao(ctx);
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+    }
     const fonte = doc._verAchatado && doc.achatadoC ? doc.achatadoC : doc.comp;
     ieDesenharNitido(ctx, fonte, doc, dpr);
 }

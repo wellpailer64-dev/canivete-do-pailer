@@ -370,6 +370,8 @@ def _abrir_psd(path, doc, on_progress):
             if layer.is_group():
                 no["tipo"] = "grupo"
                 no["aberto"] = bool(getattr(layer, "open_folder", True))
+                if k == "artboard":
+                    no["prancheta"] = _ler_prancheta(layer)
                 no["filhos"] = nivel(layer)
                 mascara(layer, no)
                 out.append(no)
@@ -429,7 +431,7 @@ def _abrir_psd(path, doc, on_progress):
     return {"success": True, "nome": os.path.splitext(os.path.basename(path))[0], "w": int(psd.width),
             "h": int(psd.height), "dpi": _dpi(psd), "modo": modo, "bits": int(psd.depth), "psd": True,
             "psb": int(psd.version) == 2, "camadas": camadas, "achatado": achatado, "avisos": sorted(set(avisos)), "luz": luz,
-            "fatias": _ler_fatias(psd)}
+            "fatias": _ler_fatias(psd), "guias": _ler_guias(psd)}
 
 
 # ─────────────────────────── estilo de camada: os 10 efeitos do Photoshop ───────────────────────────
@@ -874,6 +876,79 @@ def _gravar_mescla(layer, m):
             logging.debug("misturar se: %s", e)
 
 
+# ─────────────────────────── pranchetas e guias ───────────────────────────
+def _ler_prancheta(layer):
+    """Retângulo e fundo da prancheta (artb): fundo 1 branco, 2 preto, 3 transparente, 4 cor."""
+    from psd_tools.constants import Tag
+    try:
+        d = None
+        for t in (Tag.ARTBOARD_DATA1, Tag.ARTBOARD_DATA2, Tag.ARTBOARD_DATA3):
+            d = layer.tagged_blocks.get_data(t)
+            if d is not None:
+                break
+        r = d[b"artboardRect"]
+        x, y = float(r[b"Left"]), float(r[b"Top "])
+        tipo = int(d.get(b"artboardBackgroundType", 1))
+        fundo = {1: "#ffffff", 2: "#000000", 3: None}.get(tipo, "#ffffff")
+        if tipo == 4:
+            c = d[b"Clr "]
+            fundo = "#%02x%02x%02x" % tuple(max(0, min(255, int(round(float(c[k]))))) for k in (b"Rd  ", b"Grn ", b"Bl  "))
+        return {"x": int(round(x)), "y": int(round(y)), "w": int(round(float(r[b"Rght"]) - x)), "h": int(round(float(r[b"Btom"]) - y)), "fundo": fundo}
+    except Exception:
+        x1, y1, x2, y2 = layer.bbox
+        return {"x": x1, "y": y1, "w": x2 - x1, "h": y2 - y1, "fundo": "#ffffff"}
+
+
+def _gravar_prancheta(layer, p):
+    """Atualiza retângulo e fundo da prancheta (artb) que o editor mudou."""
+    from psd_tools.constants import Tag
+    from psd_tools.psd.descriptor import Double, Descriptor
+    for t in (Tag.ARTBOARD_DATA1, Tag.ARTBOARD_DATA2, Tag.ARTBOARD_DATA3):
+        d = layer.tagged_blocks.get_data(t)
+        if d is None:
+            continue
+        r = d[b"artboardRect"]
+        for k, v in ((b"Left", p["x"]), (b"Top ", p["y"]), (b"Rght", p["x"] + p["w"]), (b"Btom", p["y"] + p["h"])):
+            r[k] = Double(float(v))
+        f = p.get("fundo")
+        if f is None:
+            d[b"artboardBackgroundType"] = type(d[b"artboardBackgroundType"])(3)
+        elif f.lower() in ("#ffffff", "#000000"):
+            d[b"artboardBackgroundType"] = type(d[b"artboardBackgroundType"])(1 if f.lower() == "#ffffff" else 2)
+        else:
+            d[b"artboardBackgroundType"] = type(d[b"artboardBackgroundType"])(4)
+            c = d[b"Clr "]
+            for k, i in ((b"Rd  ", 1), (b"Grn ", 3), (b"Bl  ", 5)):
+                c[k] = Double(float(int(f[i:i + 2], 16)))
+        return
+
+
+def _ler_guias(psd):
+    """Guias do documento: [{o: 'v'|'h', p: px}] (o PSD guarda em 1/32 de pixel)."""
+    from psd_tools.constants import Resource
+    try:
+        g = psd.image_resources.get_data(Resource.GRID_AND_GUIDES_INFO)
+        out = []
+        for loc, dire in (g.data if g is not None else []):
+            loc = loc - (1 << 32) if loc >= (1 << 31) else loc
+            out.append({"o": "v" if int(dire) == 0 else "h", "p": round(loc / 32, 3)})
+        return out
+    except Exception:
+        return []
+
+
+def _gravar_guias(psd, guias):
+    from psd_tools.constants import Resource
+    import psd_tools.psd.image_resources as ir
+    res = psd._record.image_resources
+    dados = [((int(round(float(g["p"]) * 32))) & 0xFFFFFFFF, 0 if g["o"] == "v" else 1) for g in guias or []]
+    if Resource.GRID_AND_GUIDES_INFO in res:
+        res[Resource.GRID_AND_GUIDES_INFO].data.data = dados
+    else:
+        res[Resource.GRID_AND_GUIDES_INFO] = ir.ImageResource(key=Resource.GRID_AND_GUIDES_INFO.value, name="",
+                                                              data=ir.GridGuidesInfo(version=1, horizontal=576, vertical=576, data=dados))
+
+
 # ─────────────────────────── fatias (ferramenta Fatia) ───────────────────────────
 def _ler_fatias(psd):
     """Fatias criadas pelo usuário (as automáticas o Photoshop refaz): [{x, y, w, h, nome, url, alt}]."""
@@ -1196,9 +1271,30 @@ def _trocar_texto(layer, texto, estilo=None):
                 fs.append(_ed_dict([("Name", E.String(ps)), ("Script", E.Integer(0)), ("FontType", E.Integer(1)), ("Synthetic", E.Integer(0))]))
                 nomes.append(ps)
             _ed_set(sd, "Font", E.Integer(nomes.index(ps)))
+        # resto do painel Caractere
+        for k, chave, conv in (("escH", "HorizontalScale", lambda v: E.Float(float(v) / 100)),
+                               ("escV", "VerticalScale", lambda v: E.Float(float(v) / 100)),
+                               ("desloc", "BaselineShift", lambda v: E.Float(float(v))),
+                               ("negFalso", "FauxBold", lambda v: E.Bool(bool(v))),
+                               ("itaFalso", "FauxItalic", lambda v: E.Bool(bool(v))),
+                               ("pos", "FontBaseline", lambda v: E.Integer({"sobrescrito": 1, "subscrito": 2}.get(v, 0))),
+                               ("sublinhado", "Underline", lambda v: E.Bool(bool(v))),
+                               ("tachado", "Strikethrough", lambda v: E.Bool(bool(v))),
+                               ("kern", "AutoKerning", lambda v: E.Bool(v == "metricas" or v == "optico"))):
+            if k in estilo:
+                _ed_set(sd, chave, conv(estilo[k]))
+        if "caixaAlta" in estilo or "versalete" in estilo:
+            _ed_set(sd, "FontCaps", E.Integer(2 if estilo.get("caixaAlta") else 1 if estilo.get("versalete") else 0))
+        props = edd["ParagraphRun"]["RunArray"][0]["ParagraphSheet"]["Properties"]
         if estilo.get("alin"):
-            props = edd["ParagraphRun"]["RunArray"][0]["ParagraphSheet"]["Properties"]
-            _ed_set(props, "Justification", E.Integer({"left": 0, "right": 1, "center": 2}.get(estilo["alin"], 0)))
+            _ed_set(props, "Justification", E.Integer({"left": 0, "right": 1, "center": 2, "justify": 3, "justify-left": 3,
+                                                       "justify-right": 4, "justify-center": 5, "justify-all": 6}.get(estilo["alin"], 0)))
+        for k, chave in (("recuoEsq", "StartIndent"), ("recuoDir", "EndIndent"), ("recuo1", "FirstLineIndent"),
+                         ("espAntes", "SpaceBefore"), ("espDepois", "SpaceAfter")):
+            if k in estilo:
+                _ed_set(props, chave, E.Float(float(estilo[k] or 0)))
+        if "hifen" in estilo:
+            _ed_set(props, "AutoHyphenate", E.Bool(bool(estilo["hifen"])))
     return True
 
 
@@ -1251,6 +1347,11 @@ def salvar(spec):
                     ob.open_folder = bool(no.get("aberto", True))
                 except Exception:
                     pass
+                if no.get("prancheta") and orig is not None:
+                    try:
+                        _gravar_prancheta(ob, no["prancheta"])
+                    except Exception as e:
+                        avisos.append(f"{no.get('nome')}: prancheta não atualizada ({e})")
             elif no["tipo"] == "ajuste":
                 if orig is None:   # camada de ajuste criada no editor: o psd-tools não cria ajuste novo
                     avisos.append(f"{no.get('nome')}: camada de ajuste nova fica só no projeto .iknv (não vai para o PSD)")
@@ -1364,6 +1465,11 @@ def salvar(spec):
                     res[rid] = ir.ImageResource(key=rid.value, name="", data=IntegerElement(int(round(float(v)))))
         except Exception as e:
             avisos.append(f"luz global não salva ({e})")
+    if spec.get("guias") is not None and (spec.get("guias_mudou") or not ida):
+        try:
+            _gravar_guias(psd, spec["guias"])
+        except Exception as e:
+            avisos.append(f"guias não salvas ({e})")
     if spec.get("fatias") is not None and (spec.get("fatias_mudou") or not ida):
         try:
             _gravar_fatias(psd, spec["fatias"], W, H, os.path.splitext(os.path.basename(destino))[0])

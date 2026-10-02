@@ -68,6 +68,7 @@ async function ieAbrirArquivo(path) {
         doc.fatiasOrig = JSON.stringify(ieFatiasSpec(doc));
         doc.psb = !!r.psb;
         if (r.luz) doc.luzGlobal = { ang: r.luz.ang, alt: r.luz.alt };
+        doc.guias = (r.guias || []).map(g => ({ ...g })); doc.guiasOrig = JSON.stringify(doc.guias);
         const pend = [];
         const montar = (nos) => nos.map(no => {
             const L = ieNovaCamada(doc, {
@@ -76,6 +77,7 @@ async function ieAbrirArquivo(path) {
                 fx: ieFxNorm(no.fx) || null, ajuste: no.ajuste || null, texto: no.texto || null, fxOculto: !!no.fx_oculto,
             });
             for (const k of IE_MESCLA_CHAVES) if (no[k] !== undefined) L[k] = no[k];
+            if (no.prancheta) L.prancheta = { ...no.prancheta };
             if (no.tipo === 'grupo') L.filhos = montar(no.filhos || []);
             if (no.url) pend.push({ url: no.url, fim: c => { L.c = c; if (['texto', 'inteligente', 'forma', 'preenchimento'].includes(L.tipo)) { L.c0 = { c, x: L.x, y: L.y }; L.tf = [...IE_ID]; L.tfBase = [...IE_ID]; } } });
             else if (['texto', 'inteligente', 'forma', 'preenchimento'].includes(L.tipo)) { L.tf = [...IE_ID]; L.tfBase = [...IE_ID]; }
@@ -280,7 +282,7 @@ async function ieSalvar(comoNovo = false) {
         let n = 0;
         const no = L => {
             const s = { uid: L.uid, ref: ida ? L.ref : null, tipo: L.tipo, nome: L.nome, visivel: L.visivel, op: L.op, fill: L.fill, bm: L.bm, clip: !!L.clip, aberto: L.aberto !== false };
-            if (L.tipo === 'grupo') s.filhos = L.filhos.map(no);
+            if (L.tipo === 'grupo') { s.filhos = L.filhos.map(no); if (L.prancheta && L.pranchetaMudou) s.prancheta = L.prancheta; }
             // efeitos: só vão quando mudaram no editor (ou camada nova); o Python troca só os 4 que o editor conhece
             else if (L.fxMudou || ((!ida || L.ref == null) && L.fx && ieTemFx(L.fx))) { s.fx = ieFxNorm(L.fx) || {}; s.fx_oculto = !!L.fxOculto; }
             if (L.mesclaMudou || !ida || L.ref == null) s.mescla = Object.fromEntries(IE_MESCLA_CHAVES.filter(k => L[k] !== undefined).map(k => [k, L[k]]));
@@ -322,7 +324,8 @@ async function ieSalvar(comoNovo = false) {
         });
         ieCarregando(`${ieT('Gravando o PSD')}...`, 80);
         const spec = { doc: doc.pyId, sessao: ini.sessao, destino, w: doc.w, h: doc.h, camadas, composto: 'composto.png', ida_e_volta: ida,
-            fatias: ieFatiasSpec(doc), fatias_mudou: JSON.stringify(ieFatiasSpec(doc)) !== doc.fatiasOrig, luz: doc.luzGlobal || null };
+            fatias: ieFatiasSpec(doc), fatias_mudou: JSON.stringify(ieFatiasSpec(doc)) !== doc.fatiasOrig, luz: doc.luzGlobal || null,
+            guias: doc.guias || [], guias_mudou: JSON.stringify(doc.guias || []) !== (doc.guiasOrig || '[]') };
         const r = await api.ie_salvar(spec);
         if (!r || !r.success) { ieToast(`${ieT('Não salvou')}: ${(r && r.error) || ''}`); return false; }
         // o arquivo salvo vira a origem
@@ -331,13 +334,13 @@ async function ieSalvar(comoNovo = false) {
         doc.nome = ieNomeArq(destino).replace(/\.(psd|psb)$/i, '');
         iePercorrer(doc.camadas, L => {
             if (r.refs && r.refs[L.uid] !== undefined && r.refs[L.uid] !== null) L.ref = r.refs[L.uid];
-            L.sujoPx = false; L.sujoM = false; L.rasterizar = false; L.movido = false; L.fxMudou = false; L.mesclaMudou = false;
+            L.sujoPx = false; L.sujoM = false; L.rasterizar = false; L.movido = false; L.pranchetaMudou = false; L.fxMudou = false; L.mesclaMudou = false;
             if (L.tf) L.tfBase = [...L.tf];
             if (L.textoNovo != null && L.texto) { L.texto.texto = L.textoNovo; }
             L.textoNovo = null;
         });
         doc.achatadoC = ieClonar(doc.comp); doc.achatado = true;
-        doc.fatiasOrig = JSON.stringify(ieFatiasSpec(doc));
+        doc.fatiasOrig = JSON.stringify(ieFatiasSpec(doc)); doc.guiasOrig = JSON.stringify(doc.guias || []);
         doc.sujo = false;
         ieAbasRender();
         ieRecentesAdd(destino);
@@ -376,7 +379,7 @@ async function ieSalvarIknv(doc, destino) {
             nome: doc.nome, w: doc.w, h: doc.h, dpi: doc.dpi, bits: doc.bits, modo: doc.modo,
             camadas: ieIknvSerial(doc.camadas, png), ativa: doc.ativa, selIds: doc.selIds, seq: doc.seq,
             fatias: ieFatiasSpec(doc), cor: IE.cor, luzGlobal: doc.luzGlobal || null,
-            alfas: ieIknvSerial(doc.alfas || [], png), notas: doc.notas || [], compsCamadas: doc.compsCamadas || [],
+            alfas: ieIknvSerial(doc.alfas || [], png), notas: doc.notas || [], compsCamadas: doc.compsCamadas || [], guias: doc.guias || [],
         };
         ieCompor(doc, ieRDoc(doc));
         const previa = ieTransformarPlano({ c: doc.comp, x: 0, y: 0 }, (k => [k, 0, 0, k, 0, 0])(Math.min(1, 512 / Math.max(doc.w, doc.h)))).c;
@@ -432,13 +435,13 @@ async function ieMontarIknv(r, path) {
         return v;
     };
     doc.camadas = canvas(arvore);
-    doc.alfas = canvas(alfas); doc.notas = d.notas || []; doc.compsCamadas = d.compsCamadas || [];
+    doc.alfas = canvas(alfas); doc.notas = d.notas || []; doc.compsCamadas = d.compsCamadas || []; doc.guias = d.guias || [];
     iePercorrer(doc.camadas, L => { if (L.fx) L.fx = ieFxNorm(L.fx); });
     if (d.luzGlobal) doc.luzGlobal = d.luzGlobal;
     doc.seq = d.seq || 0;
     iePercorrer(doc.camadas, L => { doc.seq = Math.max(doc.seq, L.id || 0); });
     doc.fatias = (d.fatias || []).map(f => ({ ...f, id: ++doc.seqFatia }));
-    doc.fatiasOrig = JSON.stringify(ieFatiasSpec(doc));
+    doc.fatiasOrig = JSON.stringify(ieFatiasSpec(doc)); doc.guiasOrig = JSON.stringify(doc.guias || []);
     doc.ativa = d.ativa ?? null;
     doc.selIds = d.selIds || (doc.ativa != null ? [doc.ativa] : []);
     if (doc.ativa != null && !ieAchar(doc, doc.ativa)) { const t = doc.camadas[doc.camadas.length - 1]; doc.ativa = t ? t.id : null; doc.selIds = doc.ativa != null ? [doc.ativa] : []; }

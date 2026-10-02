@@ -11,7 +11,10 @@
 // =========================================================
 
 const IE_DOCK_PAINEIS = { props: 'Propriedades', camadas: 'Camadas', hist: 'Histórico' };
-const IE_DOCK_PADRAO = { esq: [], dir: [['props', 'camadas', 'hist']], largEsq: [], largDir: [292], soltos: {}, fechados: [], recolhidos: [], alturas: {} };
+// padrão = o espaço de trabalho do Pailer no Photoshop: Amostras e Cor à esquerda; Parágrafo, Caractere e
+// Propriedades numa coluna e Camadas em outra, à direita
+const IE_DOCK_PADRAO = { esq: [['amostras', 'cor']], dir: [['paragrafo', 'caractere', 'props'], ['camadas']], largEsq: [250], largDir: [280, 310],
+    soltos: {}, fechados: [], recolhidos: [], alturas: { cor: 230 } };
 const IE_DOCK = { lay: null, arr: null };
 const IE_DOCK_LARG = 270;
 
@@ -85,13 +88,16 @@ function ieDockAplicar(gravar = true) {
             col.className = 'ie-dock-col';
             col.dataset.lado = lado; col.dataset.col = ci;
             col.style.width = l[lk][ci] + 'px';
+            // quem ocupa o resto da coluna: o último, ou (se ele tem altura própria) o primeiro sem altura
+            const abertos = ids.filter(id => !l.recolhidos.includes(id));
+            const cresce = !l.alturas[abertos[abertos.length - 1]] ? abertos[abertos.length - 1] : (abertos.find(id => !l.alturas[id]) || abertos[abertos.length - 1]);
             ids.forEach((id, i) => {
                 const p = ieDockPainel(id);
                 p.classList.remove('solto');
                 p.style.left = p.style.top = p.style.width = p.style.height = '';
                 if (i) { const d = document.createElement('div'); d.className = 'ie-dock-div'; d.dataset.acima = ids[i - 1]; col.appendChild(d); ieDockDivisoria(d); }
                 col.appendChild(p);
-                p.classList.toggle('ultimo', i === ids.length - 1);   // o último ocupa o resto da coluna
+                p.classList.toggle('ultimo', id === cresce);
             });
             const b = document.createElement('div');   // borda de largura (do lado da imagem)
             b.className = 'ie-dock-borda ie-dock-borda-' + lado;
@@ -115,7 +121,7 @@ function ieDockAplicar(gravar = true) {
         p.hidden = l.fechados.includes(id);
         p.classList.toggle('recolhido', l.recolhidos.includes(id));
         const h = l.alturas[id];
-        p.style.flex = !l.soltos[id] && h && !l.recolhidos.includes(id) ? `0 0 ${h}px` : '';
+        p.style.flex = !l.soltos[id] && h && !l.recolhidos.includes(id) && !p.classList.contains('ultimo') ? `0 0 ${h}px` : '';
     }
     if (gravar) ieDockGravar();
     ieDesenharVista?.(); ieDesenharSobre?.();
@@ -139,9 +145,11 @@ function ieDockBorda(b, lado, ci) {
 function ieDockDivisoria(d) {
     d.addEventListener('pointerdown', ev => {
         ev.preventDefault(); d.setPointerCapture(ev.pointerId);
-        const id = d.dataset.acima, p = ieDockPainel(id), y0 = ev.clientY, h0 = p.getBoundingClientRect().height;
-        d.onpointermove = e => { IE_DOCK.lay.alturas[id] = Math.max(60, Math.round(h0 + e.clientY - y0)); p.style.flex = `0 0 ${IE_DOCK.lay.alturas[id]}px`; };
-        d.onpointerup = () => { d.onpointermove = null; ieDockGravar(); };
+        const cima = ieDockPainel(d.dataset.acima), baixo = d.nextElementSibling;
+        const usarBaixo = cima.classList.contains('ultimo') && baixo && baixo.dataset.painel;   // o de cima cresce: muda o de baixo
+        const p = usarBaixo ? baixo : cima, id = p.dataset.painel, y0 = ev.clientY, h0 = p.getBoundingClientRect().height, sinal = usarBaixo ? -1 : 1;
+        d.onpointermove = e => { IE_DOCK.lay.alturas[id] = Math.max(60, Math.round(h0 + sinal * (e.clientY - y0))); p.style.flex = `0 0 ${IE_DOCK.lay.alturas[id]}px`; };
+        d.onpointerup = () => { d.onpointermove = null; ieDockGravar(); ieDockAplicar(); };
     });
     d.addEventListener('dblclick', () => { delete IE_DOCK.lay.alturas[d.dataset.acima]; ieDockAplicar(); });
 }

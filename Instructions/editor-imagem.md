@@ -100,6 +100,23 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 - Texto com estilos misturados vira um estilo só quando editado.
 - Fidelidade medida contra o achatado do Photoshop nos 43 PSDs do portfólio: média < 1/255 na maioria, pior caso ~4/255.
 
+## Espaço de trabalho padrão, pranchetas, réguas e guias (imagem-prancheta.js)
+- Padrão = o workspace do Pailer no Photoshop: Amostras + Cor à esquerda; Parágrafo, Caractere e Propriedades numa
+  coluna e Camadas em outra à direita (`IE_DOCK_PADRAO` e o espaço Essenciais). Ferramentas na ordem e nos grupos do
+  Photoshop (`IE_FERR_GRUPOS`: Corte/Fatia, Degradê/Balde; botão direito ou segurar abre a lista).
+- Amostras com grupos: na 1ª vez vêm do Photoshop instalado do próprio usuário (`Functions/amostras.py` lê o
+  Swatches.psp com a hierarquia 8BIMphry); importa .aco/.ase. Ficam só nas preferências locais (%APPDATA%), nunca
+  no git: cada usuário tem as suas.
+- Pranchetas do PSD (artb): grupo com `L.prancheta = {x, y, w, h, fundo}`, composto isolado com fundo e recorte;
+  fora delas é área de montagem; nome em cima (clique seleciona); Propriedades edita L/A/X/Y/fundo (grava no artb);
+  Arquivo > Pranchetas para arquivos. Ainda não há ferramenta Prancheta (criar prancheta nova).
+- Réguas (Ctrl+R, unidade no canto), guias (arrastar da régua; Mover arrasta; de volta à régua apaga; Ctrl+;,
+  Alt+Ctrl+; trava, Nova guia, Novo layout de guias), lidas e gravadas no PSD (recurso 1032).
+- Caractere/Parágrafo completos (escala H/V, deslocamento, kerning, versalete, sobrescrito/subscrito, sublinhado,
+  tachado, 7 alinhamentos, recuos, espaço antes/depois, hifenizar só grava no PSD), gravados no EngineData do texto
+  do PSD; texto novo continua indo para o PSD como pixels.
+- Camadas: filtro por tipo e por nome. Propriedades sem camada = Documento (tela, réguas e grades, guias, ações rápidas).
+
 ## Tela
 - Zoom em pixels da tela (100% = 1 pixel da imagem por pixel da tela, como no Photoshop, mesmo com a escala do
   Windows); `ieDesenharNitido` desenha 1:1 sem reamostrar, amplia inteiro sem suavizar e reduz em etapas (ieMipmap).

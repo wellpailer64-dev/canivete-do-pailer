@@ -288,6 +288,15 @@ function ieTextoAtalho(ev) {
     if (c && s && !a && code === 'KeyC') { ieTextoEstilo({ alin: 'center' }); return true; }
     if (c && s && !a && code === 'KeyR') { ieTextoEstilo({ alin: 'right' }); return true; }
     if (c && s && !a && code === 'KeyQ') { ieTextoEstilo({ esp: 0 }); return true; }
+    // resto da referência da Adobe: justificar, maiúsculas, versalete, sobrescrito/subscrito, sublinhado, tachado, escala 100%
+    if (c && s && !a && code === 'KeyJ') { ieTextoEstilo({ alin: 'justify-left' }); return true; }
+    if (c && s && !a && code === 'KeyF') { ieTextoEstilo({ alin: 'justify-all' }); return true; }
+    if (c && s && !a && code === 'KeyK') { ieTextoEstilo({ caixaAlta: !t.caixaAlta }); return true; }
+    if (c && s && !a && code === 'KeyH') { ieTextoEstilo({ versalete: !t.versalete }); return true; }
+    if (c && s && code === 'Equal') { const v = a ? 'subscrito' : 'sobrescrito'; ieTextoEstilo({ pos: t.pos === v ? '' : v }); return true; }
+    if (c && s && !a && code === 'KeyU') { ieTextoEstilo({ sublinhado: !t.sublinhado }); return true; }
+    if (c && s && !a && code === 'Slash') { ieTextoEstilo({ tachado: !t.tachado }); return true; }
+    if (c && s && code === 'KeyX') { ieTextoEstilo(a ? { escV: 100 } : { escH: 100 }); return true; }
     if (c && s && a && code === 'KeyA') { ieTextoEstilo({ ent: 0 }); return true; }
     if (c && s && (code === 'Period' || code === 'Comma')) {
         const d = (code === 'Period' ? 1 : -1) * (a ? 10 : 2);
