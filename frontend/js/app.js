@@ -201,14 +201,15 @@ function toggleNav(forcar) {
 }
 
 // o editor de vídeo recalcula a timeline quando a largura muda
-function navLarguraMudou() {
-    if (typeof veDraw === 'function') setTimeout(() => { try { veDraw(); } catch (e) {} }, 240);
+function navLarguraMudou(ms = 240) {
+    if (typeof veDraw === 'function') setTimeout(() => { try { veDraw(); } catch (e) {} }, ms);
 }
 
 // ── Menu automático: dentro de uma ferramenta (fora do Início) o menu recolhe para só ícones depois de
 // 4 s sem o mouse em cima; passar o mouse abre por cima do conteúdo (nav-peek), sem reorganizar a tela.
 // Com o menu recolhido pelo botão (nav-mini) fica como o usuário deixou.
-const NAV_AUTO_MS = 4000;
+// 3 s depois de recolher, some de vez (nav-oculto): fica só o logo ao lado das abas; clicar nele volta.
+const NAV_AUTO_MS = 4000, NAV_OCULTO_MS = 3000;
 let _navT = 0;
 function _navNaFerramenta() { return !_el('page-home')?.classList.contains('active'); }
 function _navEmUso() {
@@ -219,21 +220,40 @@ function navAutoAgendar() {
     clearTimeout(_navT);
     const b = document.body;
     if (b.classList.contains('nav-mini') || !_navNaFerramenta()) {
-        if (b.classList.contains('nav-auto')) { b.classList.remove('nav-auto', 'nav-peek'); navLarguraMudou(); }
+        if (b.classList.contains('nav-auto')) { b.classList.remove('nav-auto', 'nav-peek', 'nav-oculto'); navLarguraMudou(700); }
         return;
     }
+    if (b.classList.contains('nav-oculto')) return;
     const espera = b.classList.contains('nav-auto') ? 500 : NAV_AUTO_MS;   // já recolhido: fecha logo ao sair
     _navT = setTimeout(() => {
         if (_navEmUso() || b.classList.contains('nav-mini') || !_navNaFerramenta()) return;
-        const antes = b.classList.contains('nav-auto');
+        const antes = b.classList.contains('nav-auto'), peek = b.classList.contains('nav-peek');
         b.classList.add('nav-auto');
         b.classList.remove('nav-peek');
         if (!antes) navLarguraMudou();
+        if (!antes || peek) navSom('recolhe', antes ? 0.6 : 1);
+        _navT = setTimeout(navOcultar, NAV_OCULTO_MS);
     }, espera);
+}
+function navOcultar() {
+    const b = document.body;
+    if (_navEmUso() || !b.classList.contains('nav-auto') || b.classList.contains('nav-peek')) return;
+    b.classList.add('nav-oculto');
+    navSom('guarda');
+    navLarguraMudou(800);
+}
+function navMostrar() {
+    document.body.classList.remove('nav-oculto');
+    navSom('saca');
+    navLarguraMudou(800);
+    navAutoAgendar();
 }
 function navAutoAbrir() {
     clearTimeout(_navT);
-    if (document.body.classList.contains('nav-auto')) document.body.classList.add('nav-peek');
+    const b = document.body;
+    if (!b.classList.contains('nav-auto') || b.classList.contains('nav-oculto') || b.classList.contains('nav-peek')) return;
+    b.classList.add('nav-peek');
+    navSom('abre');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -242,6 +262,14 @@ document.addEventListener('DOMContentLoaded', () => {
     sb.addEventListener('mouseenter', navAutoAbrir);
     sb.addEventListener('mouseleave', navAutoAgendar);
     sb.addEventListener('focusout', () => setTimeout(navAutoAgendar, 0));
+    // depois de voltar pelo logo o mouse já está dentro da barra: descer para os ícones abre o menu
+    sb.querySelector('.menu').addEventListener('mouseenter', navAutoAbrir);
+    // escondido: o logo traz a barra de volta (em vez de ir para o Início)
+    sb.querySelector('.brand').addEventListener('click', e => {
+        if (!document.body.classList.contains('nav-oculto')) return;
+        e.stopPropagation();
+        navMostrar();
+    }, true);
     // No modo compacto o nome aparece como dica
     document.querySelectorAll('.menu-item').forEach(b => { b.title = b.querySelector('.label')?.textContent || ''; });
     renderRecentes();
@@ -260,6 +288,7 @@ document.addEventListener('keydown', e => {
     if (_el('page-video-cutter')?.classList.contains('active')) return;
     e.preventDefault();
     if (document.body.classList.contains('nav-mini')) toggleNav(false);
+    if (document.body.classList.contains('nav-oculto')) navMostrar();
     navAutoAbrir();
     _el('menu-search')?.focus();
 });
@@ -664,6 +693,88 @@ function playEtereo() {
                 });
             });
         setTimeout(() => { try { mestre.disconnect(); } catch (e) {} }, 6500);
+    } catch (e) { /* sem áudio: segue em silêncio */ }
+}
+
+// Sons da barra lateral, sintetizados (ruído filtrado = sopro/deslize; parciais inarmônicas = metal):
+// 'recolhe' 1ª contração (dobra), 'abre' hover (sopro curto), 'guarda' 2ª contração (lâmina entra e trava,
+// casado com o clip de .45 s), 'saca' volta pelo logo (lâmina sai e brilha). Desliga com Sons da interface.
+const NAVSOM = { ctx: null, ruido: null, ult: {} };
+function navSom(tipo, vol = 1) {
+    if (typeof VECLQ !== 'undefined' && !VECLQ.on) return;
+    const agora = performance.now();
+    if (NAVSOM.ult[tipo] && agora - NAVSOM.ult[tipo] < 350) return;
+    NAVSOM.ult[tipo] = agora;
+    try {
+        if (!NAVSOM.ctx) NAVSOM.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const ac = NAVSOM.ctx, t0 = ac.currentTime + 0.01, sr = ac.sampleRate;
+        if (ac.state === 'suspended') ac.resume();
+        if (!NAVSOM.ruido) {
+            const b = ac.createBuffer(1, sr, sr), d = b.getChannelData(0);
+            for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+            NAVSOM.ruido = b;
+        }
+        const mestre = ac.createGain();
+        mestre.gain.value = 3.6 * vol;
+        mestre.connect(ac.destination);
+        const saida = pan => {
+            if (!ac.createStereoPanner) return mestre;
+            const p = ac.createStereoPanner(); p.pan.value = pan; p.connect(mestre); return p;
+        };
+        // sopro/deslize: ruído num passa-faixa que varre f0 → f1
+        const deslize = (ini, dur, f0, f1, q, v, pan = -0.3) => {
+            const s = ac.createBufferSource(), bp = ac.createBiquadFilter(), g = ac.createGain();
+            s.buffer = NAVSOM.ruido;
+            bp.type = 'bandpass'; bp.Q.value = q;
+            bp.frequency.setValueAtTime(f0, ini);
+            bp.frequency.exponentialRampToValueAtTime(f1, ini + dur);
+            g.gain.setValueAtTime(0.0001, ini);
+            g.gain.exponentialRampToValueAtTime(v, ini + dur * 0.35);
+            g.gain.exponentialRampToValueAtTime(0.0001, ini + dur);
+            s.connect(bp).connect(g).connect(saida(pan));
+            s.start(ini, Math.random() * 0.5); s.stop(ini + dur + 0.02);
+        };
+        // estalo: rajada curtíssima de ruído (trava, clique)
+        const estalo = (ini, freq, v, dur = 0.012) => {
+            const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+            s.buffer = NAVSOM.ruido;
+            f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 0.8;
+            g.gain.setValueAtTime(v, ini);
+            g.gain.exponentialRampToValueAtTime(0.0001, ini + dur);
+            s.connect(f).connect(g).connect(saida(-0.2));
+            s.start(ini, Math.random() * 0.5); s.stop(ini + dur + 0.01);
+        };
+        // metal: parciais inarmônicas (barra/lâmina) com queda exponencial
+        const metal = (ini, f, v, queda, pan = 0.2) => {
+            [[1, 1], [2.76, 0.5], [5.4, 0.28], [8.93, 0.14]].forEach(([m, a]) => {
+                const o = ac.createOscillator(), g = ac.createGain();
+                o.type = 'sine'; o.frequency.value = f * m;
+                g.gain.setValueAtTime(0.0001, ini);
+                g.gain.exponentialRampToValueAtTime(v * a, ini + 0.004);
+                g.gain.exponentialRampToValueAtTime(0.0001, ini + queda / Math.sqrt(m));
+                o.connect(g).connect(saida(pan));
+                o.start(ini); o.stop(ini + queda + 0.05);
+            });
+        };
+        let fim = 0.6;
+        if (tipo === 'recolhe') {          // menu dobra para os ícones
+            deslize(t0, 0.22, 1800, 520, 1.1, 0.05);
+            estalo(t0 + 0.2, 900, 0.035, 0.02);
+        } else if (tipo === 'abre') {      // hover: sopro leve que abre
+            deslize(t0, 0.15, 650, 1700, 1.0, 0.035, 0.3);
+        } else if (tipo === 'guarda') {    // lâmina desliza para dentro e trava
+            deslize(t0, 0.42, 4200, 900, 3.2, 0.045, 0.25);
+            estalo(t0 + 0.43, 2600, 0.07);
+            metal(t0 + 0.43, 1250, 0.016, 0.14);
+            estalo(t0 + 0.72, 700, 0.03, 0.025);   // a tela se acomoda na lateral
+            fim = 1.0;
+        } else if (tipo === 'saca') {      // trava solta e a lâmina sai brilhando
+            estalo(t0, 2400, 0.06);
+            deslize(t0 + 0.02, 0.34, 900, 5600, 4.0, 0.04, -0.25);
+            metal(t0 + 0.26, 2350, 0.02, 0.7, 0.35);
+            fim = 1.2;
+        }
+        setTimeout(() => { try { mestre.disconnect(); } catch (e) {} }, fim * 1000 + 300);
     } catch (e) { /* sem áudio: segue em silêncio */ }
 }
 

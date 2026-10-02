@@ -4,11 +4,6 @@
    (O Pocket Editor tem o próprio editor.css, que herda estes tokens.)
    ========================================================= */
 
-@font-face {
-    font-family: 'CreateFuture';
-    src: url('../identidade/CreateFutureRegular-m2Mw2.otf') format('opentype');
-    font-display: swap;
-}
 
 :root {
     /* Laranja — só ação principal e estado ativo */
@@ -42,7 +37,6 @@
     --ease: cubic-bezier(.2, .7, .2, 1);
     --font-ui: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
     --font-display: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
-    --font-brand: 'CreateFuture', 'Segoe UI', sans-serif;
     --mono: "Cascadia Mono", Consolas, monospace;
     --shadow-pop: 0 20px 60px -12px rgba(0, 0, 0, .8), 0 0 0 1px var(--line-2);
 
@@ -134,7 +128,11 @@ button { cursor: pointer; }
     box-shadow: 0 0 0 1px var(--line-2);
 }
 .brand-text { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; white-space: nowrap; }
-.brand-text b { font-family: var(--font-brand); font-weight: normal; font-size: 17px; color: var(--text); letter-spacing: .3px; }
+.brand-text b { display: block; color: var(--text); line-height: 0; }
+/* Marca KANIVETE: desenho vetorial (símbolo #i-kanivete no index.html), a cor vem de currentColor */
+.wordmark { display: block; height: 17px; width: auto; aspect-ratio: 5270 / 1060; fill: currentColor; }
+.wordmark-duo { --wm-b: var(--primary); }
+#i-kanivete .wm-b { fill: var(--wm-b, currentColor); }
 .brand-text b em { font-style: normal; color: var(--primary); }
 .brand-text span { font-size: 11px; color: var(--text-3); margin-top: 3px; }
 .nav-toggle {
@@ -272,8 +270,23 @@ body.nav-mini .nav-toggle, body.nav-auto:not(.nav-peek) .nav-toggle { transform:
 
 /* Automática: passar o mouse abre o menu POR CIMA do conteúdo (a tela não se reorganiza a cada passada).
    A margem negativa mantém só 64 px no fluxo enquanto a barra tem 228 px. */
-body.nav-auto .sidebar { width: 64px; position: relative; z-index: 60; transition: width .2s var(--ease), margin-right .2s var(--ease), box-shadow .2s; }
-body.nav-auto.nav-peek .sidebar { width: 228px; margin-right: -164px; box-shadow: 8px 0 24px rgba(0, 0, 0, .45); }
+body.nav-auto .sidebar {
+    width: 64px; position: relative; z-index: 60; clip-path: inset(0 0 0 0);
+    transition: width .2s var(--ease), margin-right .3s var(--ease), box-shadow .2s, clip-path .45s var(--ease) .25s;
+}
+body.nav-auto.nav-peek .sidebar { width: 228px; margin-right: -164px; box-shadow: 8px 0 24px rgba(0, 0, 0, .45); transition: width .2s var(--ease), margin-right .2s var(--ease), box-shadow .2s; }
+body.nav-auto:not(.nav-peek) .brand { transition: padding .35s var(--ease) .25s; }
+
+/* Segunda contração (nav-oculto): os ícones somem de baixo para cima e fica só o logo ao lado das abas;
+   depois a tela ocupa a lateral. O clip-path também tira o clique/hover da parte escondida. */
+body.nav-oculto .sidebar {
+    margin-right: -64px; clip-path: inset(0 0 calc(100% - 39px) 0);
+    transition: clip-path .45s var(--ease), margin-right .3s var(--ease) .4s;
+}
+body.nav-auto.nav-oculto:not(.nav-peek) .brand { padding-top: 3px; transition: padding .35s var(--ease) .1s; }
+body.nav-oculto .brand-home { cursor: pointer; }
+.tabbar { transition: padding-left .3s var(--ease); }
+body.nav-oculto .tabbar { padding-left: 74px; transition: padding-left .3s var(--ease) .4s; }
 
 /* ---------- Área principal ---------- */
 .main-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-0); position: relative; }
@@ -1495,8 +1508,8 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 /* Os cliques passam direto para o app enquanto o splash some */
 #splash-overlay, #splash-overlay * { pointer-events: none; }
 #splash-overlay img { width: 180px; height: auto; animation: splash-rise .8s var(--ease) both; }
-.splash-title { margin-top: 20px; font-family: var(--font-brand); font-size: 24px; letter-spacing: .5px; color: var(--text); animation: splash-rise .8s .1s var(--ease) both; }
-.splash-title em { font-style: normal; color: var(--primary); }
+.splash-title { margin-top: 20px; color: var(--text); animation: splash-rise .8s .1s var(--ease) both; }
+.splash-title .wordmark { height: 30px; }
 .splash-bar { width: 120px; height: 2px; margin-top: 18px; border-radius: 2px; background: rgba(255, 255, 255, .08); overflow: hidden; }
 .splash-bar::after { content: ""; display: block; height: 100%; width: 40%; background: var(--primary); animation: indeterminado 1.2s ease-in-out infinite; }
 @keyframes splash-rise { from { opacity: 0; transform: translateY(8px); } }
