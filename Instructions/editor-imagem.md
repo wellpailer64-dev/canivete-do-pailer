@@ -15,8 +15,15 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   opções (nome/URL/alt), Arquivo > Exportar fatias; lidas e gravadas no PSD (recurso de fatias, versão 6).
 - `frontend/js/imagem-dock.js` — painéis móveis: arrastar o título para a outra coluna, entre painéis ou solto
   sobre a imagem; duplo clique recolhe; divisórias e bordas mudam o tamanho; menu Janela (layout em localStorage).
-- `frontend/js/imagem-estilo.js` — Estilo de camada (Sombra projetada, Brilho externo, Traçado, Sobreposição de cor)
-  com prévia; duplo clique na linha da camada, botão fx do painel ou Camada > Estilo de camada.
+- `frontend/js/imagem-fx.js` — efeitos de camada (modelo e desenho): os 10 do Photoshop — Chanfro e entalhe (com
+  Contorno e Textura), Traçado (+), Sombra interna (+), Brilho interno, Acetinado, Sobreposição de cor (+), de degradê (+),
+  de padrão, Brilho externo e Sombra projetada (+); (+) = várias instâncias. `L.fx = {tipo: [instâncias]}`.
+- `frontend/js/imagem-estilo.js` — janela Estilo de camada (igual à do Photoshop): Estilos (prontos + "Novo estilo..."),
+  Opções de mesclagem (modo, opacidade, preenchimento, canais R/G/B, vazamento raso/profundo, mesclar interiores e
+  cortadas como grupo, máscara oculta efeitos, Misturar se com as setas divididas por Alt), os efeitos com "+", setas,
+  lixeira, menu fx, Tornar padrão / Redefinir, Visualizar e a amostra. Abre pelo botão direito na camada (primeiro item
+  "Opções de mesclagem..."), duplo clique na camada, botão fx do painel, Camada > Estilo de camada. No app em inglês
+  a janela usa os termos oficiais do Photoshop (IE_LS_EN). Efeitos aparecem sob a camada (fx ›) com olho por efeito.
 - `frontend/css/imagem.css`, `Functions/editor_imagem.py`, `main.py` (métodos `ie_*`), `Functions/media_server.py`
   (servir bytes da memória e receber POST).
 
@@ -41,6 +48,16 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 - Editando, o texto é desenhado na tela com a fonte, a cor e os efeitos da camada; a caixa por cima é transparente
   (só cursor e seleção). Sem mudança, volta aos pixels do Photoshop.
 
+## Efeitos e opções de mesclagem na composição
+- Ordem de desenho como no Photoshop (de baixo para cima): sombra, brilho externo, conteúdo (com o Preenchimento),
+  padrão, degradê, cor, acetinado, brilho interno, sombra interna, traçado, chanfro. Sombra e brilho externo saem como
+  `ext` e misturam com o que está embaixo no modo deles; a parte de fora do chanfro externo/entalhe sai como `acima`.
+- Canais, Misturar se e Vazamento são aplicados em `ieComporCamada` (imagem-nucleo.js); a máscara de corte usa só a
+  forma da base (`raster.forma`), sem a sombra dela. Luz global do documento (`doc.luzGlobal`, recursos 1037/1049 do PSD).
+- PSD: `_ler_fx`/`_gravar_efeitos` (lfx2, chaves únicas e *Multi) e `_ler_mescla`/`_gravar_mescla` (knko, infx, clbl,
+  tsly, lmgm, vmgm, brst e as faixas do Misturar se) em Functions/editor_imagem.py. Preferências do editor (estilos
+  salvos, padrões dos efeitos, painéis, fontes e arquivos recentes) em %APPDATA%/CaniveteDoPailer/editor_imagem.json.
+
 ## Abrir e salvar
 - As camadas vêm do Python como PNG **servido da memória** (nada em disco); a página libera com `ie_liberar`.
 - Salvar é de ida e volta: o Python relê o PSD de origem e troca só o que mudou. Camada não pintada fica como estava
@@ -54,8 +71,11 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 - Fatias: gravadas quando mudaram (ou em arquivo novo).
 
 ## Limitações conhecidas (MVP)
-- Efeitos de camada desenhados e editáveis: Sombra projetada, Brilho externo, Traçado, Sobreposição de cor (os outros
-  ficam no arquivo, sem aparecer). Não se editam os parâmetros das camadas de ajuste (só mostrar/manter).
+- Efeitos: Contorno (curva) de sombra/brilho, Ruído, Brilho com degradê e Traçado com padrão do PSD não são
+  desenhados (ficam no arquivo). Sobreposição de padrão usa os padrões do editor: a do PSD aparece com um padrão do
+  editor e continua a do Photoshop no arquivo; uma nova não vai para o PSD (o PSD guarda o padrão dentro do arquivo).
+  A Textura do chanfro não vai para o PSD. Grupos ainda não têm estilo de camada. Não se editam os parâmetros das
+  camadas de ajuste (só mostrar/manter).
 - Caixa alta e negrito/itálico falso de texto do PSD aparecem no editor, mas não vão para o arquivo.
 - Fatias de camada (origem "camada") e fatias automáticas não são editadas; só as do usuário.
 - `TÍTULO PRINCIPAL BENTO E RONALD.psd` (portfólio) abre com diferença média 5,6 contra o achatado (sombra dos

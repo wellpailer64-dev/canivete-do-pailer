@@ -225,7 +225,7 @@ function ieCursorPincel(ctx, doc, tam) {
 function ieAmostra(doc, todas, L) {
     if (todas || !L) return ieCtx(doc.comp).getImageData(0, 0, doc.w, doc.h);
     const c = ieCanvas(doc.w, doc.h), x = ieCtx(c);
-    const r = L.tipo === 'grupo' ? { c: ieAchatar(doc, [L]), x: 0, y: 0 } : ieRaster(L);
+    const r = L.tipo === 'grupo' ? { c: ieAchatar(doc, [L]), x: 0, y: 0 } : ieRasterTudo(L);
     if (r && r.c) x.drawImage(r.c, r.x, r.y);
     return x.getImageData(0, 0, doc.w, doc.h);
 }
@@ -349,7 +349,10 @@ function ieMoverCamada(L, dx, dy) {
     if (L.m) { L.m.x += dx; L.m.y += dy; }
     if (L.tf) L.tf = ieMatMul([1, 0, 0, 1, dx, dy], L.tf);
     if (L.txt) L.txt.m = ieMatMul([1, 0, 0, 1, dx, dy], L.txt.m || IE_ID);
-    if (L._raster && L._raster.c !== L.c) { L._raster = { ...L._raster, x: L._raster.x + dx, y: L._raster.y + dy }; }
+    if (L._raster && L._raster.c !== L.c) {
+        const f = L._raster.forma;
+        L._raster = { ...L._raster, x: L._raster.x + dx, y: L._raster.y + dy, forma: f && { ...f, x: f.x + dx, y: f.y + dy } };
+    }
 }
 
 function ieDuplicarCamada(doc, L) {
@@ -649,7 +652,7 @@ function ieAmostrarCor(doc, p, todas) {
     let d;
     if (todas) d = ieCtx(doc.comp).getImageData(Math.floor(p.x), Math.floor(p.y), 1, 1).data;
     else {
-        const L = ieAtiva(doc), r = L && ieRaster(L);
+        const L = ieAtiva(doc), r = L && ieRasterTudo(L);
         if (!r) return null;
         d = ieCtx(r.c).getImageData(Math.floor(p.x - r.x), Math.floor(p.y - r.y), 1, 1).data;
     }

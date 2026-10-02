@@ -3010,6 +3010,24 @@ class ApiBridge:
     def ie_existe(self, path):
         return {"existe": bool(path) and os.path.isfile(path)}
 
+    def ie_prefs(self, dados=None):
+        """Preferências do Editor de Imagem (estilos salvos, padrões dos efeitos, painéis, fontes recentes):
+        %APPDATA%/CaniveteDoPailer/editor_imagem.json. Sem dados, lê tudo; com dados, grava tudo."""
+        arq = os.path.join(os.path.dirname(_ve_layout_path()), "editor_imagem.json")
+        try:
+            if dados is None:
+                if not os.path.isfile(arq):
+                    return {"success": True, "prefs": {}}
+                with open(arq, "r", encoding="utf-8") as f:
+                    return {"success": True, "prefs": json.load(f)}
+            tmp = arq + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(dados, f, ensure_ascii=False)
+            os.replace(tmp, arq)
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e), "prefs": {}}
+
     def ie_fonte_url(self, arquivo):
         """URL local de um arquivo de fonte instalado (a página carrega com FontFace: o nome GDI de 31 letras
         e famílias tipográficas não batem com o CSS). Só serve arquivos das pastas de fontes do Windows."""

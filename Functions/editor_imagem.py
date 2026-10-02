@@ -301,6 +301,11 @@ def _abrir_psd(path, doc, on_progress):
         angulo = float(psd.image_resources.get_data(1037) or 120)
     except Exception:
         angulo = 120.0
+    try:
+        altitude = float(psd.image_resources.get_data(1049) or 30)
+    except Exception:
+        altitude = 30.0
+    luz = {"ang": angulo, "alt": altitude}
     todas = _todas(psd)
     indice = {id(l): i for i, l in enumerate(todas)}
     total = max(1, len(todas))
@@ -355,6 +360,7 @@ def _abrir_psd(path, doc, on_progress):
             no = {"ref": indice.get(id(layer)), "nome": layer.name, "visivel": bool(layer.visible),
                   "op": round(layer.opacity / 255, 4), "fill": round(layer.fill_opacity / 255, 4),
                   "bm": _bm_key(layer), "clip": bool(layer.clipping), "kind": k}
+            no.update(_ler_mescla(layer))
             try:
                 lk = layer.locks
                 if lk is not None:
@@ -394,11 +400,16 @@ def _abrir_psd(path, doc, on_progress):
                     avisos.append(f"{layer.name}: máscara vetorial não aparece no editor (fica no arquivo)")
             except Exception:
                 pass
-            fx = pi._params_efeitos(layer, angulo)
-            if fx:
+            try:
+                fx, fx_ligado = _ler_fx(layer, luz)
+            except Exception:
+                logging.debug("efeitos não lidos", exc_info=True)
+                fx, fx_ligado = None, True
+            if fx and len(fx) > 1:
                 no["fx"] = fx
-                for n in fx.get("outros", []):
-                    avisos.append(f"{layer.name}: efeito {n} fica no arquivo, mas o editor não desenha")
+                no["fx_oculto"] = not fx_ligado
+                if any(e.get("psd") and e.get("on") for e in fx.get("padraoSob", [])):
+                    avisos.append(f"{layer.name}: Sobreposição de padrão do Photoshop aparece com um padrão do editor (fica no arquivo)")
             if k == "type":
                 t = pi._texto(layer, angulo)
                 if t:
@@ -417,22 +428,220 @@ def _abrir_psd(path, doc, on_progress):
         pass
     return {"success": True, "nome": os.path.splitext(os.path.basename(path))[0], "w": int(psd.width),
             "h": int(psd.height), "dpi": _dpi(psd), "modo": modo, "bits": int(psd.depth), "psd": True,
-            "psb": int(psd.version) == 2, "camadas": camadas, "achatado": achatado, "avisos": sorted(set(avisos)),
+            "psb": int(psd.version) == 2, "camadas": camadas, "achatado": achatado, "avisos": sorted(set(avisos)), "luz": luz,
             "fatias": _ler_fatias(psd)}
 
 
-# ─────────────────────────── estilo de camada (efeitos editados no editor) ───────────────────────────
-def _fx_desc(tipo, p):
+# ─────────────────────────── estilo de camada: os 10 efeitos do Photoshop ───────────────────────────
+# Modelo do editor (frontend/js/imagem-fx.js): {tipo: [instância...]}, tipos chanfro, tracado, sombraInt, brilhoInt,
+# acetinado, corSob, degSob, padraoSob, brilho, sombra. No PSD (lfx2): uma chave por efeito (DrSh, IrSh, OrGl, IrGl,
+# ebbl, ChFX, SoFi, GrFl, patternFill, FrFX) e, para os que podem repetir, a lista *Multi (dropShadowMulti...).
+_FX_CHAVES = {   # tipo: (chave única, chave da lista, classe)
+    "sombra": (b"DrSh", b"dropShadowMulti", b"DrSh"), "sombraInt": (b"IrSh", b"innerShadowMulti", b"IrSh"),
+    "brilho": (b"OrGl", None, b"OrGl"), "brilhoInt": (b"IrGl", None, b"IrGl"), "chanfro": (b"ebbl", None, b"ebbl"),
+    "acetinado": (b"ChFX", None, b"ChFX"), "corSob": (b"SoFi", b"solidFillMulti", b"SoFi"),
+    "degSob": (b"GrFl", b"gradientFillMulti", b"GrFl"), "padraoSob": (b"patternFill", None, b"patternFill"),
+    "tracado": (b"FrFX", b"frameFXMulti", b"FrFX"),
+}
+
+
+def _bm_codigos():
+    from psd_tools.api._descriptor import DESCRIPTOR_BLEND_MODES
+    de, para = {}, {}
+    for codigo, modo in DESCRIPTOR_BLEND_MODES.items():
+        de[codigo] = modo.name
+        para.setdefault(modo.name, codigo)
+    return de, para
+
+
+def _v(d, k, padrao=None):
+    x = d.get(k) if d is not None and hasattr(d, "get") else None
+    if x is None:
+        return padrao
+    x = getattr(x, "value", x)
+    return x
+
+
+def _enum(d, k, padrao=""):
+    x = d.get(k) if d is not None else None
+    e = getattr(x, "enum", None)
+    return e.decode("latin1", "ignore") if isinstance(e, bytes) else (padrao if e is None else str(e))
+
+
+def _hex(cor, padrao="#000000"):
+    try:
+        if cor is None:
+            return padrao
+        cls = getattr(cor, "classID", b"")
+        if cls in (b"Grsc", b"GRYC") or b"Gry " in cor:
+            g = 255 - float(_v(cor, b"Gry ", 0)) * 2.55
+            return "#%02x%02x%02x" % ((int(round(g)),) * 3)
+        r, g, b = (float(_v(cor, k, 0)) for k in (b"Rd  ", b"Grn ", b"Bl  "))
+        return "#%02x%02x%02x" % tuple(max(0, min(255, int(round(x)))) for x in (r, g, b))
+    except Exception:
+        return padrao
+
+
+def _grad_ler(g):
+    """Degradê do PSD (Grdn) → {cores: [[pos, hex]], ops: [[pos, %]]}."""
+    try:
+        cores = [[float(_v(c, b"Lctn", 0)) / 4096, _hex(c.get(b"Clr "))] for c in g.get(b"Clrs", [])]
+        ops = [[float(_v(t, b"Lctn", 0)) / 4096, float(_v(t, b"Opct", 100))] for t in g.get(b"Trns", [])]
+        if cores:
+            return {"cores": cores, "ops": ops or [[0, 100], [1, 100]], "nome": str(_v(g, b"Nm  ", "")).strip("\x00")}
+    except Exception:
+        pass
+    return {"cores": [[0, "#000000"], [1, "#ffffff"]], "ops": [[0, 100], [1, 100]]}
+
+
+def _ler_fx(layer, luz):
+    """Efeitos da camada no modelo do editor (todos os 10 tipos, inclusive os desligados)."""
+    from psd_tools.constants import Tag
+    blk = None
+    for t in (Tag.OBJECT_BASED_EFFECTS_LAYER_INFO, Tag.OBJECT_BASED_EFFECTS_LAYER_INFO_V0, Tag.OBJECT_BASED_EFFECTS_LAYER_INFO_V1):
+        if t in layer.tagged_blocks:
+            blk = layer.tagged_blocks.get_data(t)
+            break
+    if blk is None or not hasattr(blk, "items"):
+        return None, True
+    de, _ = _bm_codigos()
+    bm = lambda d, k=b"Md  ", p="NORMAL": de.get((d.get(k).enum if d.get(k) is not None else b""), p)
+    out = {"_v2": True}
+    for tipo, (unico, multi, _cls) in _FX_CHAVES.items():
+        itens = list(blk[multi]) if multi and multi in blk else ([blk[unico]] if unico in blk else [])
+        lista = []
+        for d in itens:
+            if not hasattr(d, "get") or not _v(d, b"present", True):
+                continue
+            e = {"on": bool(_v(d, b"enab", False))}
+            glob = bool(_v(d, b"uglg", False))
+            ang = luz["ang"] if glob else float(_v(d, b"lagl", 120))
+            if tipo in ("sombra", "sombraInt"):
+                e.update(bm=bm(d, p="MULTIPLY"), cor=_hex(d.get(b"Clr ")), op=float(_v(d, b"Opct", 75)), ang=ang, global_=glob,
+                         dist=float(_v(d, b"Dstn", 0)), tam=float(_v(d, b"blur", 0)))
+                e["spread" if tipo == "sombra" else "choke"] = float(_v(d, b"Ckmt", 0))
+                if tipo == "sombra":
+                    e["ocultar"] = bool(_v(d, b"layerConceals", True))
+            elif tipo in ("brilho", "brilhoInt"):
+                e.update(bm=bm(d, p="SCREEN"), cor=_hex(d.get(b"Clr "), "#ffffbe"), op=float(_v(d, b"Opct", 75)),
+                         tam=float(_v(d, b"blur", 0)), tecnica="precisa" if _enum(d, b"GlwT") == "PrBL" else "suave")
+                e["spread" if tipo == "brilho" else "choke"] = float(_v(d, b"Ckmt", 0))
+                if tipo == "brilhoInt":
+                    e["fonte"] = "centro" if _enum(d, b"glwS") == "SrcC" else "borda"
+                if d.get(b"Grad") is not None and d.get(b"Clr ") is None:
+                    e["cor"] = _grad_ler(d.get(b"Grad"))["cores"][0][1]
+            elif tipo == "chanfro":
+                est = {"OtrB": "externo", "InrB": "interno", "Embs": "entalhe", "PlEb": "almofada", "strokeEmboss": "traco"}
+                tec = {"SfBL": "suave", "PrBL": "cinzelDuro", "Slmt": "cinzelSuave"}
+                e.update(estilo=est.get(_enum(d, b"bvlS"), "interno"), tecnica=tec.get(_enum(d, b"bvlT"), "suave"),
+                         prof=float(_v(d, b"srgR", 100)), dir="baixo" if _enum(d, b"bvlD") == "Out " or _enum(d, b"bvlD").startswith("Out") else "cima",
+                         tam=float(_v(d, b"blur", 5)), suav=float(_v(d, b"Sftn", 0)), ang=ang, global_=glob,
+                         alt=luz["alt"] if glob else float(_v(d, b"Lald", 30)),
+                         hBm=bm(d, b"hglM", "SCREEN"), hCor=_hex(d.get(b"hglC"), "#ffffff"), hOp=float(_v(d, b"hglO", 50)),
+                         sBm=bm(d, b"sdwM", "MULTIPLY"), sCor=_hex(d.get(b"sdwC")), sOp=float(_v(d, b"sdwO", 50)),
+                         contorno={"on": bool(_v(d, b"useShape", False)), "forma": "linear", "intervalo": float(_v(d, b"Inpr", 50))},
+                         textura={"on": bool(_v(d, b"useTexture", False)), "padrao": "xadrez", "escala": float(_v(d, b"Scl ", 100)),
+                                  "prof": float(_v(d, b"textureDepth", 100)), "inverter": bool(_v(d, b"InvT", False))})
+            elif tipo == "acetinado":
+                e.update(bm=bm(d, p="MULTIPLY"), cor=_hex(d.get(b"Clr ")), op=float(_v(d, b"Opct", 50)), ang=float(_v(d, b"lagl", 19)),
+                         dist=float(_v(d, b"Dstn", 11)), tam=float(_v(d, b"blur", 14)), inverter=bool(_v(d, b"Invr", True)))
+            elif tipo == "corSob":
+                e.update(bm=bm(d), cor=_hex(d.get(b"Clr ")), op=float(_v(d, b"Opct", 100)))
+            elif tipo == "degSob":
+                tipos = {"Lnr ": "linear", "Rdl ": "radial", "Angl": "angulo", "Rflc": "refletido", "Dmnd": "diamante"}
+                of = d.get(b"Ofst")
+                e.update(bm=bm(d), op=float(_v(d, b"Opct", 100)), grad=_grad_ler(d.get(b"Grad")), estilo=tipos.get(_enum(d, b"Type"), "linear"),
+                         ang=float(_v(d, b"Angl", 90)), escala=float(_v(d, b"Scl ", 100)), inverter=bool(_v(d, b"Rvrs", False)),
+                         alinhar=bool(_v(d, b"Algn", True)), ofx=float(_v(of, b"Hrzn", 0)), ofy=float(_v(of, b"Vrtc", 0)))
+            elif tipo == "padraoSob":
+                e.update(bm=bm(d), op=float(_v(d, b"Opct", 100)), padrao="xadrez", escala=float(_v(d, b"Scl ", 100)), psd=True)
+            elif tipo == "tracado":
+                pos = {"OutF": "fora", "InsF": "dentro", "CtrF": "centro"}.get(_enum(d, b"Styl"), "fora")
+                pt = {"SClr": "cor", "GrFl": "degrade", "Ptrn": "padrao"}.get(_enum(d, b"PntT"), "cor")
+                e.update(tam=float(_v(d, b"Sz  ", 3)), pos=pos, bm=bm(d), op=float(_v(d, b"Opct", 100)), tipo=pt, cor=_hex(d.get(b"Clr ")))
+                if pt == "degrade":
+                    tipos = {"Lnr ": "linear", "Rdl ": "radial", "Angl": "angulo", "Rflc": "refletido", "Dmnd": "diamante"}
+                    e.update(grad=_grad_ler(d.get(b"Grad")), estilo=tipos.get(_enum(d, b"Type"), "linear"), ang=float(_v(d, b"Angl", 90)),
+                             escala=float(_v(d, b"Scl ", 100)), inverter=bool(_v(d, b"Rvrs", False)))
+            e["global"] = e.pop("global_", False) if "global_" in e else False
+            lista.append(e)
+        if lista:
+            out[tipo] = lista
+    return out, bool(_v(blk, b"masterFXSwitch", True))
+
+
+def _ler_mescla(layer):
+    """Opções de mesclagem avançadas: canais, vazamento, misturar interior/cortadas, máscaras e Misturar se."""
+    from psd_tools.constants import Tag
+    tb = layer.tagged_blocks
+    out = {}
+    try:
+        k = tb.get_data(Tag.KNOCKOUT_SETTING) if Tag.KNOCKOUT_SETTING in tb else 0
+        out["vazamento"] = {1: "raso", 2: "profundo"}.get(int(getattr(k, "value", k) or 0), "nenhum")
+        for tag, chave, padrao in ((Tag.BLEND_INTERIOR_ELEMENTS, "misturaInterior", False), (Tag.BLEND_CLIPPING_ELEMENTS, "misturaCorte", True),
+                                   (Tag.TRANSPARENCY_SHAPES_LAYER, "formaTransp", True), (Tag.LAYER_MASK_AS_GLOBAL_MASK, "mascaraOcultaFx", False),
+                                   (Tag.VECTOR_MASK_AS_GLOBAL_MASK, "vetorOcultaFx", False)):
+            v = tb.get_data(tag) if tag in tb else None
+            out[chave] = bool(getattr(v, "value", v)) if v is not None else padrao
+        if Tag.CHANNEL_BLENDING_RESTRICTIONS_SETTING in tb:
+            fora = set(int(x) for x in tb.get_data(Tag.CHANNEL_BLENDING_RESTRICTIONS_SETTING))
+            out["canais"] = {"r": 0 not in fora, "g": 1 not in fora, "b": 2 not in fora}
+        rg = layer._record.blending_ranges
+
+        def faixa(par16):
+            (b, w) = par16
+            return [b >> 8, b & 255, w >> 8, w & 255]
+        if rg is not None and rg.composite_ranges:
+            m = {"cinza": {"atual": faixa(rg.composite_ranges[0]), "baixo": faixa(rg.composite_ranges[1])}}
+            for nome, cr in zip(("r", "g", "b"), rg.channel_ranges or []):
+                m[nome] = {"atual": faixa(cr[0]), "baixo": faixa(cr[1])}
+            out["mescSe"] = m
+    except Exception:
+        logging.debug("opções de mesclagem não lidas", exc_info=True)
+    return out
+
+
+def _grad_desc(g):
+    import psd_tools.psd.descriptor as D
+    from psd_tools.psd.descriptor import Unit
+    d = D.Descriptor(classID=b"Grdn")
+    d[b"Nm  "] = D.String(str(g.get("nome") or "Personalizado"))
+    d[b"GrdF"] = D.Enumerated(typeID=b"GrdF", enum=b"CstS")
+    d[b"Intr"] = D.Double(4096.0)
+    cores = []
+    for pos, cor in g.get("cores") or [[0, "#000000"], [1, "#ffffff"]]:
+        c = D.Descriptor(classID=b"Clrt")
+        c[b"Clr "] = _cor_desc(cor)
+        c[b"Type"] = D.Enumerated(typeID=b"Clry", enum=b"UsrS")
+        c[b"Lctn"] = D.Integer(int(round(float(pos) * 4096)))
+        c[b"Mdpn"] = D.Integer(50)
+        cores.append(c)
+    d[b"Clrs"] = D.List(cores)
+    trans = []
+    for pos, op in g.get("ops") or [[0, 100], [1, 100]]:
+        t = D.Descriptor(classID=b"TrnS")
+        t[b"Opct"] = D.UnitFloat(unit=Unit.Percent, value=float(op))
+        t[b"Lctn"] = D.Integer(int(round(float(pos) * 4096)))
+        t[b"Mdpn"] = D.Integer(50)
+        trans.append(t)
+    d[b"Trns"] = D.List(trans)
+    return d
+
+
+def _cor_desc(hexa):
+    import psd_tools.psd.descriptor as D
+    h = str(hexa or "#000000").lstrip("#")
+    r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    c = D.Descriptor(classID=b"RGBC")
+    c[b"Rd  "], c[b"Grn "], c[b"Bl  "] = D.Double(float(r)), D.Double(float(g)), D.Double(float(b))
+    return c
+
+
+def _fx_desc(tipo, p, antigo=None):
     """Descritor de um efeito do Photoshop (lfx2) a partir do efeito do editor."""
     import psd_tools.psd.descriptor as D
     from psd_tools.psd.descriptor import Unit
-
-    def cor(hexa):
-        h = str(hexa or "#000000").lstrip("#")
-        r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
-        c = D.Descriptor(classID=b"RGBC")
-        c[b"Rd  "], c[b"Grn "], c[b"Bl  "] = D.Double(float(r)), D.Double(float(g)), D.Double(float(b))
-        return c
+    _, para = _bm_codigos()
 
     def curva():
         c = D.Descriptor(classID=b"ShpC")
@@ -446,95 +655,223 @@ def _fx_desc(tipo, p):
         return c
 
     px = lambda v: D.UnitFloat(unit=Unit.Pixels, value=float(v or 0))
-    pc = lambda v: D.UnitFloat(unit=Unit.Percent, value=float(100 if v is None else v))
-    modo = lambda m: D.Enumerated(typeID=b"BlnM", enum=m)
-    classe = {"sombra": b"DrSh", "brilho": b"OrGl", "contorno": b"FrFX", "sobreposicao": b"SoFi"}[tipo]
-    d = D.Descriptor(classID=classe)
-    d[b"enab"], d[b"present"], d[b"showInDialog"] = D.Bool(True), D.Bool(True), D.Bool(True)
-    if tipo == "sombra":
-        d[b"Md  "] = modo(b"Mltp")
-        d[b"Clr "] = cor(p.get("cor"))
-        d[b"Opct"] = pc(p.get("op", 75))
-        d[b"uglg"] = D.Bool(False)
-        d[b"lagl"] = D.UnitFloat(unit=Unit.Angle, value=float(p.get("ang", 120)))
+    pc = lambda v, pad=100: D.UnitFloat(unit=Unit.Percent, value=float(pad if v is None else v))
+    ang = lambda v: D.UnitFloat(unit=Unit.Angle, value=float(v if v is not None else 120))
+    modo = lambda m, pad="NORMAL": D.Enumerated(typeID=b"BlnM", enum=para.get(m or pad, para["NORMAL"]))
+    en = lambda t, e: D.Enumerated(typeID=t, enum=e)
+    d = D.Descriptor(classID=_FX_CHAVES[tipo][2])
+    d[b"enab"], d[b"present"], d[b"showInDialog"] = D.Bool(bool(p.get("on", True))), D.Bool(True), D.Bool(True)
+    if tipo in ("sombra", "sombraInt"):
+        d[b"Md  "] = modo(p.get("bm"), "MULTIPLY")
+        d[b"Clr "] = _cor_desc(p.get("cor"))
+        d[b"Opct"] = pc(p.get("op"), 75)
+        d[b"uglg"] = D.Bool(bool(p.get("global")))
+        d[b"lagl"] = ang(p.get("ang"))
         d[b"Dstn"] = px(p.get("dist"))
-        d[b"Ckmt"] = px(0)
+        d[b"Ckmt"] = px(p.get("spread" if tipo == "sombra" else "choke"))
         d[b"blur"] = px(p.get("tam"))
-        d[b"Nose"] = pc(0)
+        d[b"Nose"] = pc(0, 0)
         d[b"AntA"] = D.Bool(False)
         d[b"TrnS"] = curva()
-        d[b"layerConceals"] = D.Bool(True)
-    elif tipo == "brilho":
-        d[b"Md  "] = modo(b"Scrn")
-        d[b"Clr "] = cor(p.get("cor"))
-        d[b"Opct"] = pc(p.get("op", 75))
-        d[b"GlwT"] = D.Enumerated(typeID=b"BETE", enum=b"SfBL")
-        d[b"Ckmt"] = px(0)
+        if tipo == "sombra":
+            d[b"layerConceals"] = D.Bool(p.get("ocultar", True) is not False)
+    elif tipo in ("brilho", "brilhoInt"):
+        d[b"Md  "] = modo(p.get("bm"), "SCREEN")
+        d[b"Clr "] = _cor_desc(p.get("cor") or "#ffffbe")
+        d[b"Opct"] = pc(p.get("op"), 75)
+        d[b"GlwT"] = en(b"BETE", b"PrBL" if p.get("tecnica") == "precisa" else b"SfBL")
+        d[b"Ckmt"] = px(p.get("spread" if tipo == "brilho" else "choke"))
         d[b"blur"] = px(p.get("tam"))
-        d[b"Nose"] = pc(0)
-        d[b"ShdN"] = pc(0)
+        d[b"Nose"] = pc(0, 0)
+        d[b"ShdN"] = pc(0, 0)
         d[b"AntA"] = D.Bool(False)
         d[b"TrnS"] = curva()
         d[b"Inpr"] = pc(50)
-    elif tipo == "contorno":
-        pos = str(p.get("pos") or "outside")
-        d[b"Styl"] = D.Enumerated(typeID=b"FStl", enum=b"InsF" if "inside" in pos else b"CtrF" if "center" in pos else b"OutF")
-        d[b"PntT"] = D.Enumerated(typeID=b"FrFl", enum=b"SClr")
-        d[b"Md  "] = modo(b"Nrml")
-        d[b"Opct"] = pc(p.get("op", 100))
-        d[b"Sz  "] = px(p.get("larg", 3))
-        d[b"Clr "] = cor(p.get("cor"))
-        d[b"overprint"] = D.Bool(False)
-    else:
-        d[b"Md  "] = modo(b"Nrml")
-        d[b"Clr "] = cor(p.get("cor"))
-        d[b"Opct"] = pc(p.get("op", 100))
+        if tipo == "brilhoInt":
+            d[b"glwS"] = en(b"IGSr", b"SrcC" if p.get("fonte") == "centro" else b"SrcE")
+    elif tipo == "chanfro":
+        est = {"externo": b"OtrB", "interno": b"InrB", "entalhe": b"Embs", "almofada": b"PlEb", "traco": b"strokeEmboss"}
+        tec = {"suave": b"SfBL", "cinzelDuro": b"PrBL", "cinzelSuave": b"Slmt"}
+        d[b"hglM"] = modo(p.get("hBm"), "SCREEN")
+        d[b"hglC"] = _cor_desc(p.get("hCor") or "#ffffff")
+        d[b"hglO"] = pc(p.get("hOp"), 50)
+        d[b"sdwM"] = modo(p.get("sBm"), "MULTIPLY")
+        d[b"sdwC"] = _cor_desc(p.get("sCor") or "#000000")
+        d[b"sdwO"] = pc(p.get("sOp"), 50)
+        d[b"bvlT"] = en(b"bvlT", tec.get(p.get("tecnica"), b"SfBL"))
+        d[b"bvlS"] = en(b"BESl", est.get(p.get("estilo"), b"InrB"))
+        d[b"uglg"] = D.Bool(bool(p.get("global")))
+        d[b"lagl"] = ang(p.get("ang"))
+        d[b"Lald"] = ang(p.get("alt") if p.get("alt") is not None else 30)
+        d[b"srgR"] = pc(p.get("prof"), 100)
+        d[b"blur"] = px(p.get("tam"))
+        d[b"bvlD"] = en(b"BESs", b"Out " if p.get("dir") == "baixo" else b"In  ")
+        d[b"TrnS"] = curva()
+        d[b"antialiasGloss"] = D.Bool(False)
+        d[b"Sftn"] = px(p.get("suav"))
+        cont, tex = p.get("contorno") or {}, p.get("textura") or {}
+        d[b"useShape"] = D.Bool(bool(cont.get("on")))
+        d[b"MpgS"] = curva()
+        d[b"AntA"] = D.Bool(False)
+        d[b"Inpr"] = pc(cont.get("intervalo"), 50)
+        d[b"useTexture"] = D.Bool(False)   # a textura do editor usa padrões próprios (não vão para o PSD)
+    elif tipo == "acetinado":
+        d[b"Md  "] = modo(p.get("bm"), "MULTIPLY")
+        d[b"Clr "] = _cor_desc(p.get("cor"))
+        d[b"AntA"] = D.Bool(False)
+        d[b"Invr"] = D.Bool(bool(p.get("inverter", True)))
+        d[b"Opct"] = pc(p.get("op"), 50)
+        d[b"lagl"] = ang(p.get("ang") if p.get("ang") is not None else 19)
+        d[b"Dstn"] = px(p.get("dist"))
+        d[b"blur"] = px(p.get("tam"))
+        d[b"MpgS"] = curva()
+    elif tipo == "corSob":
+        d[b"Md  "] = modo(p.get("bm"))
+        d[b"Clr "] = _cor_desc(p.get("cor"))
+        d[b"Opct"] = pc(p.get("op"))
+    elif tipo in ("degSob", "tracado"):
+        tipos = {"linear": b"Lnr ", "radial": b"Rdl ", "angulo": b"Angl", "refletido": b"Rflc", "diamante": b"Dmnd"}
+        if tipo == "tracado":
+            d[b"Styl"] = en(b"FStl", {"dentro": b"InsF", "centro": b"CtrF"}.get(p.get("pos"), b"OutF"))
+            d[b"PntT"] = en(b"FrFl", b"GrFl" if p.get("tipo") == "degrade" else b"SClr")
+            d[b"Md  "] = modo(p.get("bm"))
+            d[b"Opct"] = pc(p.get("op"))
+            d[b"Sz  "] = px(p.get("tam", 3))
+            d[b"Clr "] = _cor_desc(p.get("cor"))
+            d[b"overprint"] = D.Bool(False)
+        else:
+            d[b"Md  "] = modo(p.get("bm"))
+            d[b"Opct"] = pc(p.get("op"))
+        if tipo == "degSob" or p.get("tipo") == "degrade":
+            d[b"Grad"] = _grad_desc(p.get("grad") or {})
+            d[b"Angl"] = ang(p.get("ang") if p.get("ang") is not None else 90)
+            d[b"Type"] = en(b"GrdT", tipos.get(p.get("estilo"), b"Lnr "))
+            d[b"Rvrs"] = D.Bool(bool(p.get("inverter")))
+            d[b"Dthr"] = D.Bool(False)
+            d[b"Algn"] = D.Bool(p.get("alinhar", True) is not False)
+            d[b"Scl "] = pc(p.get("escala"))
+            of = D.Descriptor(classID=b"Pnt ")
+            of[b"Hrzn"] = D.UnitFloat(unit=Unit.Percent, value=float(p.get("ofx") or 0))
+            of[b"Vrtc"] = D.UnitFloat(unit=Unit.Percent, value=float(p.get("ofy") or 0))
+            d[b"Ofst"] = of
+    elif tipo == "padraoSob":
+        if antigo is not None:   # padrão vindo do PSD: mantém o desenho dele, troca o resto
+            d = antigo
+            d[b"enab"] = D.Bool(bool(p.get("on", True)))
+            d[b"Md  "] = modo(p.get("bm"))
+            d[b"Opct"] = pc(p.get("op"))
+            d[b"Scl "] = pc(p.get("escala"))
+        else:
+            return None   # padrão novo do editor: o PSD precisa do padrão gravado no arquivo (fica só no editor)
     return d
 
 
-def _gravar_efeitos(layer, fx, oculto=False):
-    """Troca no PSD os 4 efeitos que o editor edita (Sombra projetada, Brilho externo, Traçado, Sobreposição de
-    cor), mantendo os outros efeitos da camada como estavam. Efeito tirado no editor fica desligado."""
+def _gravar_efeitos(layer, fx, oculto=False, avisos=None):
+    """Reescreve no PSD os efeitos do editor (todos os tipos e instâncias). O que não é efeito conhecido fica."""
     import psd_tools.psd.descriptor as D
     from psd_tools.constants import Tag
     from psd_tools.psd.descriptor import Unit
     tb = layer._record.tagged_blocks
     blk = tb.get_data(Tag.OBJECT_BASED_EFFECTS_LAYER_INFO)
     fx = fx or {}
+    if "_v2" not in fx and any(k in fx for k in ("contorno", "sobreposicao")) or isinstance(fx.get("sombra"), dict):
+        fx = _fx_antigo_para_v2(fx)
+    algum = any(fx.get(k) for k in _FX_CHAVES)
     if blk is None:
-        if not any(fx.get(k) for k in ("sombra", "brilho", "contorno", "sobreposicao")):
+        if not algum:
             return
         blk = D.DescriptorBlock2(classID=b"null", version=0, data_version=16)
         blk[b"Scl "] = D.UnitFloat(unit=Unit.Percent, value=100.0)
         blk[b"masterFXSwitch"] = D.Bool(True)
     blk[b"masterFXSwitch"] = D.Bool(not oculto)
-    chaves = {"sombra": (b"DrSh", b"dropShadowMulti"), "brilho": (b"OrGl", None), "contorno": (b"FrFX", b"frameFXMulti"),
-              "sobreposicao": (b"SoFi", b"solidFillMulti")}
-    for k, (unico, multi) in chaves.items():
-        p = fx.get(k)
-        if p:
-            novo = _fx_desc(k, p)
-            if multi and multi in blk:
-                lista = list(blk[multi])
-                lista[0:1] = [novo]
-                blk[multi] = D.List(lista)
-            else:
-                blk[unico] = novo
-        else:
-            for chave in (unico, multi):
-                if not chave or chave not in blk:
-                    continue
-                itens = list(blk[chave]) if chave == multi else [blk[chave]]
-                for it in itens:
-                    if b"enab" in it:
-                        it[b"enab"] = D.Bool(False)
+    for tipo, (unico, multi, _cls) in _FX_CHAVES.items():
+        antigos = list(blk[multi]) if multi and multi in blk else ([blk[unico]] if unico in blk else [])
+        novos = []
+        for i, p in enumerate(fx.get(tipo) or []):
+            d = _fx_desc(tipo, p, antigos[i] if i < len(antigos) and tipo == "padraoSob" else None)
+            if d is None:
+                if avisos is not None:
+                    avisos.append(f"{layer.name}: Sobreposição de padrão do editor não vai para o PSD")
+                continue
+            novos.append(d)
+        for k in (unico, multi):
+            if k and k in blk:
+                del blk[k]
+        if not novos:
+            continue
+        if multi and len(novos) > 1:
+            blk[multi] = D.List(novos)
+        blk[unico] = novos[0]
     tb.set_data(Tag.OBJECT_BASED_EFFECTS_LAYER_INFO, blk)
-    # o bloco antigo (lrFX) ficaria diferente: o Photoshop refaz a partir do lfx2
     try:
-        if Tag.EFFECTS_LAYER in tb:
+        if Tag.EFFECTS_LAYER in tb:   # o bloco antigo (lrFX) ficaria diferente: o Photoshop refaz a partir do lfx2
             del tb[Tag.EFFECTS_LAYER]
     except Exception:
         pass
+
+
+def _fx_antigo_para_v2(fx):
+    out = {"_v2": True}
+    if fx.get("sombra"):
+        s = fx["sombra"]
+        out["sombra"] = [{"on": True, "bm": "MULTIPLY", "cor": s.get("cor"), "op": s.get("op", 75), "ang": s.get("ang", 120), "dist": s.get("dist", 0), "tam": s.get("tam", 0)}]
+    if fx.get("brilho"):
+        g = fx["brilho"]
+        out["brilho"] = [{"on": True, "bm": "SCREEN", "cor": g.get("cor"), "op": g.get("op", 75), "tam": g.get("tam", 0)}]
+    if fx.get("contorno"):
+        t = fx["contorno"]
+        pos = str(t.get("pos") or "")
+        out["tracado"] = [{"on": True, "cor": t.get("cor"), "op": t.get("op", 100), "tam": t.get("larg", 3),
+                           "pos": "dentro" if "inside" in pos else "centro" if "center" in pos else "fora"}]
+    if fx.get("sobreposicao"):
+        o = fx["sobreposicao"]
+        out["corSob"] = [{"on": True, "cor": o.get("cor"), "op": o.get("op", 100)}]
+    return out
+
+
+def _gravar_mescla(layer, m):
+    """Opções de mesclagem avançadas (blocos knko, infx, clbl, tsly, lmgm, vmgm, brst e Misturar se)."""
+    from psd_tools.constants import Tag
+    tb = layer._record.tagged_blocks
+    if not m:
+        return
+    vals = {Tag.KNOCKOUT_SETTING: {"raso": 1, "profundo": 2}.get(m.get("vazamento"), 0),
+            Tag.BLEND_INTERIOR_ELEMENTS: int(bool(m.get("misturaInterior"))),
+            Tag.BLEND_CLIPPING_ELEMENTS: int(m.get("misturaCorte", True) is not False),
+            Tag.TRANSPARENCY_SHAPES_LAYER: int(m.get("formaTransp", True) is not False),
+            Tag.LAYER_MASK_AS_GLOBAL_MASK: int(bool(m.get("mascaraOcultaFx"))),
+            Tag.VECTOR_MASK_AS_GLOBAL_MASK: int(bool(m.get("vetorOcultaFx")))}
+    for tag, v in vals.items():
+        try:
+            tb.set_data(tag, v)
+        except Exception as e:
+            logging.debug("bloco %s: %s", tag, e)
+    can = m.get("canais") or {}
+    fora = [i for i, k in enumerate(("r", "g", "b")) if can.get(k) is False]
+    try:
+        if fora:
+            from psd_tools.psd.tagged_blocks import ChannelBlendingRestrictionsSetting
+            tb.set_data(Tag.CHANNEL_BLENDING_RESTRICTIONS_SETTING, ChannelBlendingRestrictionsSetting(fora))
+        elif Tag.CHANNEL_BLENDING_RESTRICTIONS_SETTING in tb:
+            del tb[Tag.CHANNEL_BLENDING_RESTRICTIONS_SETTING]
+    except Exception as e:
+        logging.debug("canais: %s", e)
+    ms = m.get("mescSe")
+    if ms:
+        try:
+            from psd_tools.psd.layer_and_mask import LayerBlendingRanges
+
+            def par(f):
+                f = [max(0, min(255, int(round(x)))) for x in (f or [0, 0, 255, 255])]
+                return (f[0] << 8 | f[1], f[2] << 8 | f[3])
+            cinza = ms.get("cinza") or {}
+            canais = [[par((ms.get(k) or {}).get("atual")), par((ms.get(k) or {}).get("baixo"))] for k in ("r", "g", "b")]
+            antigo = layer._record.blending_ranges
+            extra = list(antigo.channel_ranges[3:]) if antigo is not None and antigo.channel_ranges else []
+            layer._record.blending_ranges = LayerBlendingRanges(
+                composite_ranges=[par(cinza.get("atual")), par(cinza.get("baixo"))], channel_ranges=canais + extra)
+        except Exception as e:
+            logging.debug("misturar se: %s", e)
 
 
 # ─────────────────────────── fatias (ferramenta Fatia) ───────────────────────────
@@ -964,9 +1301,14 @@ def salvar(spec):
                                 logging.debug("máscara da rasterizada: %s", e)
             if "fx" in no and no["tipo"] != "grupo":
                 try:
-                    _gravar_efeitos(ob, no["fx"], no.get("fx_oculto"))
+                    _gravar_efeitos(ob, no["fx"], no.get("fx_oculto"), avisos)
                 except Exception as e:
                     avisos.append(f"{no.get('nome')}: efeitos não salvos ({e})")
+            if no.get("mescla"):
+                try:
+                    _gravar_mescla(ob, no["mescla"])
+                except Exception as e:
+                    avisos.append(f"{no.get('nome')}: opções de mesclagem não salvas ({e})")
             if "mascara" in no:
                 try:
                     _mascara(ob, no["mascara"], arquivos)
@@ -1005,6 +1347,22 @@ def salvar(spec):
     hdr = psd._record.header
     usar_alfa = hdr.channels > 3
     psd._record.image_data.set_data(numpy_io.encode_image_data(psd, cor if usar_alfa else fundo_branco, alfa), hdr)
+    if spec.get("luz"):   # luz global (ângulo e altitude usados pelos efeitos com "Usar luz global")
+        try:
+            from psd_tools.constants import Resource
+            res = psd._record.image_resources
+            for rid, v in ((Resource.GLOBAL_ANGLE, spec["luz"].get("ang")), (Resource.GLOBAL_ALTITUDE, spec["luz"].get("alt"))):
+                if v is None:
+                    continue
+                if rid in res:
+                    r_ = res[rid]
+                    r_.data = type(r_.data)(int(round(float(v))))
+                else:
+                    import psd_tools.psd.image_resources as ir
+                    from psd_tools.psd.base import IntegerElement
+                    res[rid] = ir.ImageResource(key=rid.value, name="", data=IntegerElement(int(round(float(v)))))
+        except Exception as e:
+            avisos.append(f"luz global não salva ({e})")
     if spec.get("fatias") is not None and (spec.get("fatias_mudou") or not ida):
         try:
             _gravar_fatias(psd, spec["fatias"], W, H, os.path.splitext(os.path.basename(destino))[0])

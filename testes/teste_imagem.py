@@ -286,18 +286,19 @@ def main():
             novo = J("""async () => {
                 const L = ieTodas(IE.doc).filter(X => X.tipo === 'pixel' && X.c).pop();
                 ieAtivar(L.id);
-                const p = ieEstiloCamada(L);
+                // janela Estilo de camada (imagem-estilo.js): liga Traçado e Sombra projetada pelos itens da lista e dá OK
+                await ieEstiloCamada(L);
                 await new Promise(r => setTimeout(r, 200));
-                const q = s => document.querySelector('#ie-modal ' + s);
-                q('[data-id=t_on]').checked = true; q('[data-id=t_on]').dispatchEvent(new Event('input'));
-                q('[data-id=s_on]').checked = true; q('[data-id=s_on]').dispatchEvent(new Event('input'));
-                q('[data-r="1"]').click(); await p;
+                for (const t of ['tracado', 'sombra']) document.querySelector(`#ie-modal .ie-ls-item[data-sel*='"${t}"'] span`).click();
+                await new Promise(r => setTimeout(r, 100));
+                document.querySelector('#ie-modal [data-ls=ok]').click();
+                await new Promise(r => setTimeout(r, 100));
                 ieEscolherFerr('mover');
                 const R = ieCaixaAlvos(IE.doc);
                 const mini = document.querySelector(`#ie-cam-lista canvas[data-mini="${L.id}"]`);
                 return {nome: L.nome, fx: L.fx, caixa: R, mini: !!mini && mini.width > 34};
             }""")
-            ok(novo["fx"] and novo["fx"].get("contorno") and novo["fx"].get("sombra"), f"Estilo de camada: traçado e sombra em {novo['nome']}")
+            ok(novo["fx"] and novo["fx"].get("tracado") and novo["fx"].get("sombra") and J("!IE_LS.st && document.getElementById('ie-modal').hidden"), f"Estilo de camada: traçado e sombra em {novo['nome']} (janela fechou no OK)")
             ok(novo["caixa"] is not None and novo["mini"], f"controles do Mover e miniatura em alta ({novo['caixa']})")
             # alça do canto: arrastar entra na Transformação livre; Esc cancela
             c = novo["caixa"]

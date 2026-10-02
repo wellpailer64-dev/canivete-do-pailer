@@ -2,7 +2,7 @@
 // Editor de Imagem — painéis móveis (como no Photoshop/Premiere): arrastar o título do painel para a outra coluna
 // (esquerda ou direita), para cima/baixo de outro painel, ou para cima da imagem (vira janela solta). Duplo clique no
 // título recolhe; × fecha (Janela no menu reabre); a divisória entre painéis e a borda da coluna mudam o tamanho.
-// Layout em localStorage 'ie-dock-v1': {esq: [ids], dir: [ids], soltos: {id: {x, y, w, h}}, fechados: [ids],
+// Layout nas preferências do editor (iePref 'paineis', %APPDATA%): {esq: [ids], dir: [ids], soltos: {id: {x, y, w, h}}, fechados: [ids],
 // recolhidos: [ids], alturas: {id: px}, largEsq, largDir}.
 // =========================================================
 
@@ -11,8 +11,8 @@ const IE_DOCK_PADRAO = { esq: [], dir: ['props', 'camadas', 'hist'], soltos: {},
 const IE_DOCK = { lay: null, arr: null };
 
 function ieDockLer() {
-    let l = null;
-    try { l = JSON.parse(localStorage.getItem('ie-dock-v1') || 'null'); } catch (e) { /* sem armazenamento */ }
+    const l0 = iePref('paineis', null);
+    let l = l0 ? JSON.parse(JSON.stringify(l0)) : null;
     l = Object.assign(JSON.parse(JSON.stringify(IE_DOCK_PADRAO)), l || {});
     // painel novo (versão mais nova do app) ou perdido: volta para a direita
     const todos = new Set([...l.esq, ...l.dir, ...Object.keys(l.soltos), ...l.fechados]);
@@ -20,7 +20,7 @@ function ieDockLer() {
     for (const k of ['esq', 'dir']) l[k] = l[k].filter(id => IE_DOCK_PAINEIS[id]);
     return l;
 }
-function ieDockGravar() { try { localStorage.setItem('ie-dock-v1', JSON.stringify(IE_DOCK.lay)); } catch (e) { /* sem armazenamento */ } }
+function ieDockGravar() { iePrefGravar('paineis', JSON.parse(JSON.stringify(IE_DOCK.lay))); }
 const ieDockPainel = id => ieEl('ie-p-' + id);
 
 function ieDockInstalar() {

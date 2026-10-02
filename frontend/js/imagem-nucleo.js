@@ -35,6 +35,19 @@ const IE = {
     },
 };
 
+// ─────────────────────────── preferências (%APPDATA%, via ie_prefs: o localStorage do WebView não sobrevive) ───────────────────────────
+IE.prefs = {};
+async function iePrefsCarregar() {
+    try { const r = await window.pywebview.api.ie_prefs(); if (r && r.success) IE.prefs = r.prefs || {}; } catch (e) { /* sem API */ }
+    return IE.prefs;
+}
+function iePref(k, padrao) { return IE.prefs[k] !== undefined ? IE.prefs[k] : padrao; }
+function iePrefGravar(k, v) {
+    IE.prefs[k] = v;
+    clearTimeout(IE.prefsT);
+    IE.prefsT = setTimeout(() => { try { window.pywebview.api.ie_prefs(IE.prefs); } catch (e) { /* sem API */ } }, 400);
+}
+
 // ─────────────────────────── utilidades ───────────────────────────
 const ieEl = id => document.getElementById(id);
 const ieT = s => (typeof veT === 'function' ? veT(s) : s);
@@ -121,6 +134,7 @@ function ieNovoDoc(o) {
         camadas: [], ativa: null, selIds: [], sel: null, seq: 0, sujo: false, avisos: o.avisos || [],
         achatado: null, zoom: 1, px: 0, py: 0, hist: { itens: [], i: -1 }, mascaraAlvo: false,
         fatias: [], seqFatia: 0, fatiaSel: null, fatiasOrig: '[]',   // ferramenta Fatia (imagem-fatias.js)
+        luzGlobal: { ang: 120, alt: 30 },   // "Usar luz global" dos efeitos (vai para o PSD)
     };
     doc.comp = ieCanvas(doc.w, doc.h);
     return doc;
@@ -369,7 +383,6 @@ function ieMascaraRegiao(m, R, alvo) {
 }
 
 // efeitos de camada: algum para desenhar?
-function ieTemFx(fx) { return !!(fx && (fx.sombra || fx.brilho || fx.contorno || fx.sobreposicao)); }
 
 function ieRgba(hex, a) { const [r, g, b] = ieHexRgb(hex); return `rgba(${r},${g},${b},${a})`; }
 
@@ -384,7 +397,8 @@ function ieSilhueta(base, cor, alfa = 1) {
     return s;
 }
 
-// pixels finais da camada (máscara, preenchimento e efeitos), guardados até a camada mudar
+// pixels finais da camada (máscara, preenchimento e efeitos), guardados até a camada mudar.
+// {c, x, y, src, ext: [{c, bm, op}] (sombra/brilho, por baixo), acima: [...] (fora do chanfro), forma: {c, x, y}}
 function ieRaster(L) {
     const src = L._tfPrev || (L.c ? { c: L.c, x: L.x, y: L.y } : null);
     if (!src || !src.c) return null;
@@ -393,94 +407,61 @@ function ieRaster(L) {
     const fx = L.fxOculto ? null : (ieTemFx(L.fx) ? L.fx : null);
     if (!mask && !fx && L.fill >= 1) return src;
     const w = src.c.width, h = src.c.height;
-    let base = src.c;
+    let base = src.c, mreg = null;
     if (mask) {
-        base = ieCanvas(w, h);
-        const x = ieCtx(base);
-        x.drawImage(src.c, 0, 0);
-        x.globalCompositeOperation = 'destination-in';
-        x.drawImage(ieMascaraRegiao(mask, { x: src.x, y: src.y, w, h }), 0, 0);
+        mreg = ieMascaraRegiao(mask, { x: src.x, y: src.y, w, h });
+        if (!(fx && L.mascaraOcultaFx)) {
+            base = ieCanvas(w, h);
+            const x = ieCtx(base);
+            x.drawImage(src.c, 0, 0);
+            x.globalCompositeOperation = 'destination-in';
+            x.drawImage(mreg, 0, 0);
+        }
     }
     if (!fx) {
         const c = ieCanvas(w, h), x = ieCtx(c);
         x.globalAlpha = L.fill;
         x.drawImage(base, 0, 0);
-        return (L._raster = { c, x: src.x, y: src.y, src: src.c });
+        return (L._raster = { c, x: src.x, y: src.y, src: src.c, forma: { c: base, x: src.x, y: src.y } });
     }
-    // margem para sombra, brilho e traçado
-    const s = fx.sombra, g = fx.brilho, t = fx.contorno, o = fx.sobreposicao;
-    let mg = 2;
-    if (s) mg = Math.max(mg, Math.ceil((s.tam || 0) * 1.5 + (s.dist || 0)) + 4);
-    if (g) mg = Math.max(mg, Math.ceil((g.tam || 0) * 1.5) + 4);
-    if (t) mg = Math.max(mg, Math.ceil(t.larg || 0) + 3);
-    const F = ieCanvas(w + 2 * mg, h + 2 * mg), fc = ieCtx(F);
-    const longe = 20000;
-    const sombra = (cor, op, blur, dx, dy) => {
-        fc.save();
-        fc.shadowColor = ieRgba(cor, op);
-        fc.shadowBlur = blur;
-        fc.shadowOffsetX = dx + longe;
-        fc.shadowOffsetY = dy;
-        fc.drawImage(base, mg - longe, mg);
-        fc.restore();
-    };
-    if (s) {
-        const ang = (s.ang ?? 120) * Math.PI / 180, d = s.dist || 0;
-        sombra(s.cor || '#000', (s.op ?? 75) / 100, s.tam || 0, -Math.cos(ang) * d, Math.sin(ang) * d);
+    const r = ieFxRender(base, fx, { fill: L.fill, interiorComFill: !!L.misturaInterior, doc: IE.doc, org: { x: src.x, y: src.y } });
+    if (mreg && L.mascaraOcultaFx) {
+        // "a máscara oculta os efeitos": efeitos feitos da camada inteira e a máscara corta tudo
+        const W = r.c.width, H = r.c.height, M = ieCanvas(W, H), mx = ieCtx(M);
+        mx.fillStyle = '#fff'; mx.globalAlpha = (mask.fundo || 0) / 255; mx.fillRect(0, 0, W, H); mx.globalAlpha = 1;
+        mx.clearRect(r.mg, r.mg, w, h);
+        mx.drawImage(mreg, r.mg, r.mg);
+        for (const c of [r.c, ...r.ext.map(e => e.c), ...r.acima.map(e => e.c)]) { const x = ieCtx(c); x.globalCompositeOperation = 'destination-in'; x.drawImage(M, 0, 0); x.globalCompositeOperation = 'source-over'; }
+        base = ieCanvas(w, h);
+        const bx = ieCtx(base); bx.drawImage(src.c, 0, 0); bx.globalCompositeOperation = 'destination-in'; bx.drawImage(mreg, 0, 0);
     }
-    if (g) { sombra(g.cor || '#ffffbe', (g.op ?? 75) / 100, g.tam || 0, 0, 0); }
-    if (t && t.larg > 0) {
-        // traçado por fora: silhueta repetida em volta (dilatação)
-        const r = t.pos && t.pos.includes('inside') ? 0 : (t.pos && t.pos.includes('center') ? t.larg / 2 : t.larg);
-        if (r > 0) {
-            const sil = ieSilhueta(base, t.cor || '#000');
-            const tc = ieCanvas(F.width, F.height), tx = ieCtx(tc);
-            const passos = Math.max(8, Math.ceil(2 * Math.PI * r / 1.5));
-            for (let raio = r; raio > 0; raio -= Math.max(1, r / 3)) {
-                for (let k = 0; k < passos; k++) {
-                    const a = k / passos * Math.PI * 2;
-                    tx.drawImage(sil, mg + Math.cos(a) * raio, mg + Math.sin(a) * raio);
-                }
-            }
-            fc.globalAlpha = (t.op ?? 100) / 100;
-            fc.drawImage(tc, 0, 0);
-            fc.globalAlpha = 1;
-        }
-    }
-    let px = base;
-    if (o) {
-        px = ieCanvas(w, h);
-        const x = ieCtx(px);
-        x.drawImage(base, 0, 0);
-        x.globalCompositeOperation = 'source-atop';
-        x.globalAlpha = (o.op ?? 100) / 100;
-        x.fillStyle = o.cor || '#000';
-        x.fillRect(0, 0, w, h);
-    }
-    fc.globalAlpha = L.fill;
-    fc.drawImage(px, mg, mg);
-    fc.globalAlpha = 1;
-    if (t && t.larg > 0 && t.pos && t.pos.includes('inside')) {
-        // traçado por dentro: borda da silhueta por cima dos pixels
-        const sil = ieSilhueta(base, t.cor || '#000', (t.op ?? 100) / 100);
-        const ero = ieCanvas(w, h), ex = ieCtx(ero);
-        ex.drawImage(base, 0, 0);
-        const passos = Math.max(8, Math.ceil(2 * Math.PI * t.larg / 1.5));
-        ex.globalCompositeOperation = 'destination-in';
-        for (let k = 0; k < passos; k++) {
-            const a = k / passos * Math.PI * 2;
-            ex.drawImage(base, Math.cos(a) * t.larg, Math.sin(a) * t.larg);
-        }
-        const sx = ieCtx(sil);
-        sx.globalCompositeOperation = 'destination-out';
-        sx.drawImage(ero, 0, 0);
-        fc.drawImage(sil, mg, mg);
-    }
-    return (L._raster = { c: F, x: src.x - mg, y: src.y - mg, src: src.c });
+    return (L._raster = { c: r.c, x: src.x - r.mg, y: src.y - r.mg, src: src.c, ext: r.ext, acima: r.acima, forma: { c: base, x: src.x, y: src.y } });
 }
 
-// o = deslocamento do contexto: ponto (X, Y) do documento cai em (X - o.x, Y - o.y) no canvas
+// a camada inteira achatada (sombra, conteúdo e o resto), para miniatura e seleção
+function ieRasterTudo(L) {
+    const r = ieRaster(L);
+    if (!r || (!(r.ext && r.ext.length) && !(r.acima && r.acima.length))) return r;
+    const c = ieCanvas(r.c.width, r.c.height), x = ieCtx(c);
+    for (const e of [...r.ext, { c: r.c, bm: 'NORMAL', op: 1 }, ...r.acima]) { x.globalAlpha = e.op; x.drawImage(e.c, 0, 0); }
+    return { c, x: r.x, y: r.y };
+}
+
+// fundo do documento (para o Vazamento profundo): a camada Fundo, se houver
+function ieFundoDoc(doc) {
+    const L = doc && doc.camadas[0];
+    if (!L || L.tipo !== 'pixel' || !L.visivel || !(L.fundo || /^(fundo|background|plano de fundo)$/i.test(L.nome))) return null;
+    return ieRaster(L);
+}
+
+// o = deslocamento do contexto: ponto (X, Y) do documento cai em (X - o.x, Y - o.y) no canvas.
+// o.base = como estava o canvas no começo desta lista (Vazamento raso dentro de um grupo).
 function ieComporLista(ctx, lista, R, o, prof) {
+    if (lista.some(L => L.visivel && L.vazamento && L.vazamento !== 'nenhum')) {
+        const b = ieCanvas(R.w, R.h);
+        ieCtx(b).drawImage(ctx.canvas, R.x - o.x, R.y - o.y, R.w, R.h, 0, 0, R.w, R.h);
+        o = { ...o, base: { c: b, x: R.x, y: R.y } };
+    }
     for (let i = 0; i < lista.length; i++) {
         const L = lista[i];
         let j = i + 1;
@@ -502,7 +483,73 @@ function ieDesenhar(ctx, c, sx, sy, sw, sh, dx, dy, alfa, gco) {
     ctx.restore();
 }
 
-function ieComporCamada(ctx, L, R, o, prof, forcarNormal) {
+// Misturar se (Blend If): quanto da camada fica, pelo valor dela e pelo de baixo. faixa = [preto0, preto1, branco0, branco1]
+function ieFaixaMescSe(v, f) {
+    if (!f) return 1;
+    const [b0, b1, w0, w1] = f;
+    if (v < b0) return 0;
+    if (v < b1) return (v - b0) / (b1 - b0);
+    if (v <= w0) return 1;
+    if (v <= w1) return w1 > w0 ? (w1 - v) / (w1 - w0) : 0;
+    return 0;
+}
+const ieMescSeNeutro = m => !m || ['cinza', 'r', 'g', 'b'].every(k => !m[k] || [m[k].atual, m[k].baixo].every(f => !f || (f[0] <= 0 && f[1] <= 0 && f[2] >= 255 && f[3] >= 255)));
+const ieCanaisTodos = c => !c || (c.r !== false && c.g !== false && c.b !== false);
+
+// desenho com contas por pixel: Misturar se e canais R/G/B desligados
+function ieDesenharEspecial(ctx, L, c, x0, y0, R, o, alfa, gco) {
+    const Ri = ieRInter(ieRInt({ x: x0, y: y0, w: c.width, h: c.height }), R);
+    if (!Ri) return;
+    const ix = Ri.x - o.x, iy = Ri.y - o.y;
+    let fundo;
+    try { fundo = ctx.getImageData(ix, iy, Ri.w, Ri.h); } catch (e) { return; }
+    const T = ieCanvas(Ri.w, Ri.h), tx = ieCtx(T);
+    tx.drawImage(c, Ri.x - x0, Ri.y - y0, Ri.w, Ri.h, 0, 0, Ri.w, Ri.h);
+    const m = L.mescSe;
+    if (!ieMescSeNeutro(m)) {
+        const img = tx.getImageData(0, 0, Ri.w, Ri.h), d = img.data, f = fundo.data;
+        const lum = (p, k) => 0.299 * p[k] + 0.587 * p[k + 1] + 0.114 * p[k + 2];
+        for (let k = 0; k < d.length; k += 4) {
+            if (!d[k + 3]) continue;
+            let a = ieFaixaMescSe(lum(d, k), m.cinza && m.cinza.atual) * ieFaixaMescSe(lum(f, k), m.cinza && m.cinza.baixo);
+            for (const [ch, q] of [['r', 0], ['g', 1], ['b', 2]]) if (m[ch]) a *= ieFaixaMescSe(d[k + q], m[ch].atual) * ieFaixaMescSe(f[k + q], m[ch].baixo);
+            d[k + 3] *= a;
+        }
+        tx.putImageData(img, 0, 0);
+    }
+    const Bk = ieCanvas(Ri.w, Ri.h), bx = ieCtx(Bk);
+    bx.putImageData(fundo, 0, 0);
+    bx.globalAlpha = alfa; bx.globalCompositeOperation = gco;
+    bx.drawImage(T, 0, 0);
+    const res = bx.getImageData(0, 0, Ri.w, Ri.h);
+    const can = L.canais;
+    if (!ieCanaisTodos(can)) {
+        const d = res.data, f = fundo.data, liga = [can.r !== false, can.g !== false, can.b !== false];
+        for (let k = 0; k < d.length; k += 4) for (let q = 0; q < 3; q++) if (!liga[q]) d[k + q] = f[k + q];
+    }
+    ctx.putImageData(res, ix, iy);
+}
+
+// Vazamento (Knockout): onde a camada tem forma, aparece o começo do grupo (raso) ou o fundo (profundo)
+function ieVazar(ctx, L, r, o) {
+    const f = r.forma;
+    if (!f) return;
+    const base = L.vazamento === 'profundo' || !o.base ? (IE._fundoComp || null) : o.base;
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.drawImage(f.c, f.x, f.y);
+    if (base) {
+        const T = ieCanvas(f.c.width, f.c.height), tx = ieCtx(T);
+        tx.drawImage(base.c, base.x - f.x, base.y - f.y);
+        tx.globalCompositeOperation = 'destination-in';
+        tx.drawImage(f.c, 0, 0);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(T, f.x, f.y);
+    }
+    ctx.restore();
+}
+
+function ieComporCamada(ctx, L, R, o, prof, forcarNormal, semExt) {
     if (L.tipo === 'grupo') {
         const mask = L.m && !L.m.desativada ? L.m : null;
         if (L.bm === 'PASS_THROUGH' && L.op >= 1 && !mask && !forcarNormal) return ieComporLista(ctx, L.filhos, R, o, prof);
@@ -521,26 +568,59 @@ function ieComporCamada(ctx, L, R, o, prof, forcarNormal) {
     if (L.tipo === 'ajuste') return ieComporAjuste(ctx, L, R, o, prof);
     const r = ieRaster(L);
     if (!r) return;
-    ctx.save();
-    ctx.globalAlpha = forcarNormal ? 1 : L.op;
-    ctx.globalCompositeOperation = forcarNormal ? 'source-over' : ieGco(L.bm);
-    ctx.drawImage(r.c, r.x, r.y);
-    ctx.restore();
+    const op = forcarNormal ? 1 : L.op, gco = forcarNormal ? 'source-over' : ieGco(L.bm);
+    const extra = (lista) => { for (const e of lista || []) { ctx.save(); ctx.globalAlpha = e.op * op; ctx.globalCompositeOperation = ieGco(e.bm); ctx.drawImage(e.c, r.x, r.y); ctx.restore(); } };
+    if (!forcarNormal && L.vazamento && L.vazamento !== 'nenhum') ieVazar(ctx, L, r, o);
+    if (!semExt) extra(r.ext);
+    if (!ieMescSeNeutro(L.mescSe) || !ieCanaisTodos(L.canais)) ieDesenharEspecial(ctx, L, r.c, r.x, r.y, R, o, op, gco);
+    else { ctx.save(); ctx.globalAlpha = op; ctx.globalCompositeOperation = gco; ctx.drawImage(r.c, r.x, r.y); ctx.restore(); }
+    extra(r.acima);
 }
 
-// base + camadas com máscara de corte: compostas à parte e limitadas ao alfa da base
+// base + camadas com máscara de corte. "Mesclar camadas cortadas como grupo" (padrão): compostas à parte e limitadas
+// ao alfa da base; desligado: cada cortada mistura direto com o que está embaixo, recortada pela base
 function ieComporCorte(ctx, base, clipados, R, o, prof) {
+    if (base.misturaCorte === false && base.tipo !== 'grupo') {
+        ieComporCamada(ctx, base, R, o, prof);
+        const rb = ieRaster(base), f = rb && rb.forma;
+        if (!f) return;
+        for (const c of clipados) {
+            const t = ieTemp(prof + 1, R.w, R.h), tc = ieCtx(t);
+            tc.setTransform(1, 0, 0, 1, -R.x, -R.y);
+            ieComporCamada(tc, c, R, { x: R.x, y: R.y }, prof + 3, true);
+            tc.globalCompositeOperation = 'destination-in';
+            tc.drawImage(f.c, f.x, f.y);
+            tc.setTransform(1, 0, 0, 1, 0, 0);
+            tc.globalCompositeOperation = 'source-over';
+            ieDesenhar(ctx, t, 0, 0, R.w, R.h, R.x, R.y, c.op, ieGco(c.bm));
+        }
+        return;
+    }
+    // a base desenha os efeitos de baixo (sombra, brilho) direto; o recorte usa só a forma dela
+    const rb = base.tipo !== 'grupo' ? ieRaster(base) : null, f = rb && rb.forma;
+    if (rb) for (const e of rb.ext || []) { ctx.save(); ctx.globalAlpha = e.op * base.op; ctx.globalCompositeOperation = ieGco(e.bm); ctx.drawImage(e.c, rb.x, rb.y); ctx.restore(); }
     const t = ieTemp(prof + 1, R.w, R.h), tc = ieCtx(t);
     tc.setTransform(1, 0, 0, 1, -R.x, -R.y);
-    ieComporCamada(tc, base, R, { x: R.x, y: R.y }, prof + 3, true);
+    ieComporCamada(tc, base, R, { x: R.x, y: R.y }, prof + 3, true, true);
+    tc.setTransform(1, 0, 0, 1, 0, 0);
     const b = ieTemp(prof + 2, R.w, R.h), bc = ieCtx(b);
     bc.drawImage(t, 0, 0, R.w, R.h, 0, 0, R.w, R.h);
-    for (const c of clipados) ieComporCamada(tc, c, R, { x: R.x, y: R.y }, prof + 3);
-    tc.setTransform(1, 0, 0, 1, 0, 0);
-    tc.globalCompositeOperation = 'destination-in';
-    tc.drawImage(b, 0, 0, R.w, R.h, 0, 0, R.w, R.h);
-    tc.globalCompositeOperation = 'source-over';
-    ieDesenhar(ctx, t, 0, 0, R.w, R.h, R.x, R.y, base.op, ieGco(base.bm));
+    bc.setTransform(1, 0, 0, 1, -R.x, -R.y);
+    for (const c of clipados) ieComporCamada(bc, c, R, { x: R.x, y: R.y }, prof + 3);
+    bc.globalCompositeOperation = 'destination-in';
+    if (f) bc.drawImage(f.c, f.x, f.y);
+    else { bc.setTransform(1, 0, 0, 1, 0, 0); bc.drawImage(t, 0, 0, R.w, R.h, 0, 0, R.w, R.h); }
+    bc.setTransform(1, 0, 0, 1, 0, 0);
+    bc.globalCompositeOperation = 'source-over';
+    if (f) {   // fora da forma fica o que a base tem de efeito (traçado, chanfro); dentro, base + cortadas
+        tc.setTransform(1, 0, 0, 1, -R.x, -R.y);
+        tc.globalCompositeOperation = 'destination-out';
+        tc.drawImage(f.c, f.x, f.y);
+        tc.setTransform(1, 0, 0, 1, 0, 0);
+        tc.globalCompositeOperation = 'source-over';
+        tc.drawImage(b, 0, 0, R.w, R.h, 0, 0, R.w, R.h);
+        ieDesenhar(ctx, t, 0, 0, R.w, R.h, R.x, R.y, base.op, ieGco(base.bm));
+    } else ieDesenhar(ctx, b, 0, 0, R.w, R.h, R.x, R.y, base.op, ieGco(base.bm));
 }
 
 function ieComporAjuste(ctx, L, R, o, prof) {
@@ -577,7 +657,8 @@ function ieCompor(doc, R) {
     ctx.beginPath();
     ctx.rect(R.x, R.y, R.w, R.h);
     ctx.clip();
-    ieComporLista(ctx, doc.camadas, R, { x: 0, y: 0 }, 0);
+    IE._fundoComp = ieTodas(doc).some(L => L.vazamento && L.vazamento !== 'nenhum') ? ieFundoDoc(doc) : null;
+    ieComporLista(ctx, doc.camadas, R, { x: 0, y: 0, base: IE._fundoComp }, 0);
     ctx.restore();
 }
 

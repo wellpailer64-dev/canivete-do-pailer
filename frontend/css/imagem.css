@@ -338,3 +338,73 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 .ie-at-lin span { color: var(--text-2); }
 .ie-at-lin.falta kbd, .ie-at-lin.falta span { color: var(--text-3); }
 .ie-at-lin em { font-style: normal; font-size: 11px; }
+
+/* lista de efeitos sob a camada (painel Camadas) */
+.ie-cam-fx { display: inline-flex; align-items: center; gap: 2px; border: 0; background: none; color: var(--text-2); cursor: pointer; font: italic 600 11px var(--font-ui); padding: 2px 3px; border-radius: 3px; }
+.ie-cam-fx:hover { background: var(--ie-hover); color: var(--text); }
+.ie-cam-fx .ie-i { width: 10px; height: 10px; transition: transform .12s; }
+.ie-cam-fx.aberto .ie-i { transform: rotate(90deg); }
+.ie-cam-fxl { border-bottom: 1px solid var(--ie-linha); }
+.ie-cam-fxi { display: flex; align-items: center; gap: 6px; height: 22px; font-size: 11.5px; color: var(--text-2); padding-left: calc(var(--nivel) * 14px + 52px); cursor: default; }
+.ie-cam-fxi .ie-cam-olho { width: 22px; height: 22px; border-right: 0; }
+.ie-cam-fxi .ie-cam-olho .ie-i { width: 13px; height: 13px; }
+.ie-cam-fxi:hover { background: rgba(255, 255, 255, .03); }
+/* janela Estilo de camada */
+.ie-ls { width: min(1040px, calc(100% - 40px)); height: min(720px, calc(100% - 40px)); max-height: none; }
+.ie-ls-cab { display: flex; align-items: center; gap: 20px; padding-right: 16px; }
+.ie-ls-cab h3 { flex: none; }
+.ie-ls-nome { display: flex; align-items: center; gap: 8px; color: var(--text-2); flex: 1; }
+.ie-ls-nome input { flex: 1; max-width: 340px; height: 26px; background: var(--bg-input); color: var(--text); border: 1px solid var(--ie-linha-2); border-radius: 4px; padding: 0 8px; font: inherit; }
+.ie-ls-corpo { flex: 1; min-height: 0; display: grid; grid-template-columns: 230px minmax(0, 1fr) 170px; gap: 12px; padding: 0 16px 16px; }
+.ie-ls-esq { display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--ie-linha-2); border-radius: 4px; background: var(--ie-painel-2); }
+.ie-ls-lista { flex: 1; overflow-y: auto; }
+.ie-ls-item { display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 8px; border-bottom: 1px solid var(--ie-linha); cursor: pointer; color: var(--text); user-select: none; }
+.ie-ls-item.recuo { padding-left: 26px; color: var(--text-2); }
+.ie-ls-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ie-ls-item em { font-style: normal; color: var(--text-3); font-size: 11px; }
+.ie-ls-item:hover { background: var(--ie-hover); }
+.ie-ls-item.sel { background: var(--ie-sel); }
+.ie-ls-item input { accent-color: var(--ie-acento); margin: 0; }
+.ie-ls-mais { width: 20px; height: 20px; border: 1px solid var(--ie-linha-2); border-radius: 3px; background: none; color: var(--text-2); cursor: pointer; line-height: 1; padding: 0; }
+.ie-ls-mais:hover { color: var(--text); border-color: var(--ie-acento); }
+.ie-ls-rod { display: flex; align-items: center; gap: 4px; padding: 6px; border-top: 1px solid var(--ie-linha); }
+.ie-ls-ico { min-width: 26px; height: 24px; border: 0; background: none; color: var(--text-2); cursor: pointer; border-radius: 3px; font: italic 600 12px var(--font-ui); display: grid; place-items: center; }
+.ie-ls-ico:hover { background: var(--ie-hover); color: var(--text); }
+.ie-ls-ico .ie-i { width: 14px; height: 14px; }
+.ie-ls-meio { overflow-y: auto; min-height: 0; border: 1px solid var(--ie-linha-2); border-radius: 4px; padding: 10px 16px; display: flex; flex-direction: column; gap: 6px; }
+.ie-ls-titulo { font-weight: 600; font-size: 13px; color: var(--text); margin-bottom: 2px; }
+.ie-ls-tit { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); margin: 8px 0 2px; display: flex; align-items: center; gap: 8px; }
+.ie-ls-faixa { display: grid; grid-template-columns: 170px minmax(0, 1fr) 62px 18px; gap: 8px; align-items: center; color: var(--text-2); }
+.ie-ls-faixa input[type=range] { width: 100%; accent-color: var(--ie-acento); }
+.ie-ls-faixa input[type=number], .ie-ls-lin input[type=number], .ie-ls-lin select, .ie-ls-tit select { height: 24px; background: var(--bg-input); color: var(--text); border: 1px solid var(--ie-linha-2); border-radius: 4px; padding: 0 5px; font: inherit; }
+.ie-ls-faixa em, .ie-ls-lin em { font-style: normal; color: var(--text-3); }
+.ie-ls-lin { display: flex; align-items: center; gap: 10px; color: var(--text-2); flex-wrap: wrap; }
+.ie-ls-lin > span:first-child { width: 170px; flex: none; }
+.ie-ls-lin input[type=number] { width: 70px; }
+.ie-ls-chk { display: flex; align-items: center; gap: 6px; color: var(--text-2); }
+.ie-ls-chk input { accent-color: var(--ie-acento); }
+.ie-ls-cor { width: 30px; height: 22px; }
+.ie-ls-dial { width: 68px; height: 68px; cursor: pointer; flex: none; }
+.ie-ls-grad { width: 240px; height: 22px; border: 1px solid var(--ie-linha-2); border-radius: 3px; cursor: pointer; background-size: 100% 100%; }
+.ie-ls-padroes { display: flex; flex-wrap: wrap; gap: 4px; }
+.ie-ls-padrao, .ie-ls-contorno { width: 32px; height: 32px; border: 1px solid var(--ie-linha-2); border-radius: 3px; cursor: pointer; background-size: 32px 32px; padding: 0; }
+.ie-ls-padrao.on, .ie-ls-contorno.on { outline: 2px solid var(--ie-acento); outline-offset: 1px; }
+.ie-ls-botoes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.ie-ls-dir { display: flex; flex-direction: column; gap: 8px; }
+.ie-ls-dir .ie-btn { justify-content: center; }
+.ie-ls-amostra { width: 150px; height: 150px; border: 1px solid var(--ie-linha-2); border-radius: 3px; align-self: center; margin-top: 6px; }
+.ie-ls-novo { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid var(--ie-linha-2); border-radius: 4px; }
+.ie-ls-novo input[type=text] { height: 26px; background: var(--bg-input); color: var(--text); border: 1px solid var(--ie-linha-2); border-radius: 4px; padding: 0 6px; font: inherit; }
+.ie-ls-mescse { display: flex; flex-direction: column; gap: 4px; color: var(--text-2); }
+.ie-ls-mescse canvas { width: 360px; height: 34px; cursor: pointer; }
+.ie-ls-estilos { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; }
+.ie-ls-estilo { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border: 1px solid var(--ie-linha-2); border-radius: 4px; background: var(--ie-painel-2); color: var(--text-2); cursor: pointer; font-size: 11px; }
+.ie-ls-estilo:hover { border-color: var(--ie-acento); color: var(--text); }
+.ie-ls-estilo canvas { width: 72px; height: 72px; border-radius: 3px; }
+.ie-ls-pop { position: absolute; z-index: 40; }
+.ie-ls-gradpop { width: 350px; padding: 10px; background: var(--ie-painel-2); border: 1px solid var(--ie-linha-2); border-radius: 6px; box-shadow: var(--shadow-pop); display: flex; flex-direction: column; gap: 6px; }
+.ie-ls-grads { display: flex; flex-wrap: wrap; gap: 4px; }
+.ie-ls-gradp { width: 76px; height: 20px; border: 1px solid var(--ie-linha-2); border-radius: 3px; cursor: pointer; background-size: 100% 100%; padding: 0; }
+.ie-ls-gradbar { width: 320px; height: 64px; cursor: pointer; }
+.ie-ls-gradsel { display: flex; flex-direction: column; gap: 4px; }
+.ie-ls-gradsel .ie-ls-lin > span:first-child { width: 80px; }

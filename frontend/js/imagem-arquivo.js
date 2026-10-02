@@ -67,13 +67,15 @@ async function ieAbrirArquivo(path) {
         doc.fatias = (r.fatias || []).map(f => ({ ...f, id: ++doc.seqFatia }));
         doc.fatiasOrig = JSON.stringify(ieFatiasSpec(doc));
         doc.psb = !!r.psb;
+        if (r.luz) doc.luzGlobal = { ang: r.luz.ang, alt: r.luz.alt };
         const pend = [];
         const montar = (nos) => nos.map(no => {
             const L = ieNovaCamada(doc, {
                 tipo: no.tipo, nome: no.nome, visivel: no.visivel, op: no.op, fill: no.fill ?? 1, bm: no.bm || 'NORMAL', clip: !!no.clip,
                 travas: no.travas || 0, ref: no.ref ?? null, kind: no.kind || null, aberto: no.aberto, x: no.x || 0, y: no.y || 0,
-                fx: no.fx || null, ajuste: no.ajuste || null, texto: no.texto || null,
+                fx: ieFxNorm(no.fx) || null, ajuste: no.ajuste || null, texto: no.texto || null, fxOculto: !!no.fx_oculto,
             });
+            for (const k of IE_MESCLA_CHAVES) if (no[k] !== undefined) L[k] = no[k];
             if (no.tipo === 'grupo') L.filhos = montar(no.filhos || []);
             if (no.url) pend.push({ url: no.url, fim: c => { L.c = c; if (['texto', 'inteligente', 'forma', 'preenchimento'].includes(L.tipo)) { L.c0 = { c, x: L.x, y: L.y }; L.tf = [...IE_ID]; L.tfBase = [...IE_ID]; } } });
             else if (['texto', 'inteligente', 'forma', 'preenchimento'].includes(L.tipo)) { L.tf = [...IE_ID]; L.tfBase = [...IE_ID]; }
@@ -280,7 +282,8 @@ async function ieSalvar(comoNovo = false) {
             const s = { uid: L.uid, ref: ida ? L.ref : null, tipo: L.tipo, nome: L.nome, visivel: L.visivel, op: L.op, fill: L.fill, bm: L.bm, clip: !!L.clip, aberto: L.aberto !== false };
             if (L.tipo === 'grupo') s.filhos = L.filhos.map(no);
             // efeitos: só vão quando mudaram no editor (ou camada nova); o Python troca só os 4 que o editor conhece
-            else if (L.fxMudou || ((!ida || L.ref == null) && L.fx && ieTemFx(L.fx))) { s.fx = L.fx || {}; s.fx_oculto = !!L.fxOculto; }
+            else if (L.fxMudou || ((!ida || L.ref == null) && L.fx && ieTemFx(L.fx))) { s.fx = ieFxNorm(L.fx) || {}; s.fx_oculto = !!L.fxOculto; }
+            if (L.mesclaMudou || !ida || L.ref == null) s.mescla = Object.fromEntries(IE_MESCLA_CHAVES.filter(k => L[k] !== undefined).map(k => [k, L[k]]));
             if (ieRaster0(L)) {
                 const novo = !ida || L.ref == null || L.sujoPx || L.rasterizar;
                 if (L.c) {
@@ -319,7 +322,7 @@ async function ieSalvar(comoNovo = false) {
         });
         ieCarregando(`${ieT('Gravando o PSD')}...`, 80);
         const spec = { doc: doc.pyId, sessao: ini.sessao, destino, w: doc.w, h: doc.h, camadas, composto: 'composto.png', ida_e_volta: ida,
-            fatias: ieFatiasSpec(doc), fatias_mudou: JSON.stringify(ieFatiasSpec(doc)) !== doc.fatiasOrig };
+            fatias: ieFatiasSpec(doc), fatias_mudou: JSON.stringify(ieFatiasSpec(doc)) !== doc.fatiasOrig, luz: doc.luzGlobal || null };
         const r = await api.ie_salvar(spec);
         if (!r || !r.success) { ieToast(`${ieT('Não salvou')}: ${(r && r.error) || ''}`); return false; }
         // o arquivo salvo vira a origem
@@ -328,7 +331,7 @@ async function ieSalvar(comoNovo = false) {
         doc.nome = ieNomeArq(destino).replace(/\.(psd|psb)$/i, '');
         iePercorrer(doc.camadas, L => {
             if (r.refs && r.refs[L.uid] !== undefined && r.refs[L.uid] !== null) L.ref = r.refs[L.uid];
-            L.sujoPx = false; L.sujoM = false; L.rasterizar = false; L.movido = false; L.fxMudou = false;
+            L.sujoPx = false; L.sujoM = false; L.rasterizar = false; L.movido = false; L.fxMudou = false; L.mesclaMudou = false;
             if (L.tf) L.tfBase = [...L.tf];
             if (L.textoNovo != null && L.texto) { L.texto.texto = L.textoNovo; }
             L.textoNovo = null;
@@ -372,7 +375,7 @@ async function ieSalvarIknv(doc, destino) {
         const documento = {
             nome: doc.nome, w: doc.w, h: doc.h, dpi: doc.dpi, bits: doc.bits, modo: doc.modo,
             camadas: ieIknvSerial(doc.camadas, png), ativa: doc.ativa, selIds: doc.selIds, seq: doc.seq,
-            fatias: ieFatiasSpec(doc), cor: IE.cor,
+            fatias: ieFatiasSpec(doc), cor: IE.cor, luzGlobal: doc.luzGlobal || null,
         };
         ieCompor(doc, ieRDoc(doc));
         const previa = ieTransformarPlano({ c: doc.comp, x: 0, y: 0 }, (k => [k, 0, 0, k, 0, 0])(Math.min(1, 512 / Math.max(doc.w, doc.h)))).c;
@@ -428,6 +431,8 @@ async function ieMontarIknv(r, path) {
         return v;
     };
     doc.camadas = canvas(arvore);
+    iePercorrer(doc.camadas, L => { if (L.fx) L.fx = ieFxNorm(L.fx); });
+    if (d.luzGlobal) doc.luzGlobal = d.luzGlobal;
     doc.seq = d.seq || 0;
     iePercorrer(doc.camadas, L => { doc.seq = Math.max(doc.seq, L.id || 0); });
     doc.fatias = (d.fatias || []).map(f => ({ ...f, id: ++doc.seqFatia }));
@@ -475,13 +480,11 @@ async function ieExportarDialogo() {
 }
 
 // ─────────────────────────── recentes ───────────────────────────
-function ieRecentes() { try { return JSON.parse(localStorage.getItem('ie-recentes') || '[]'); } catch (e) { return []; } }
+function ieRecentes() { return [...(iePref('recentes', []) || [])]; }
 function ieRecentesAdd(p) {
-    try {
-        const l = ieRecentes().filter(x => x.toLowerCase() !== p.toLowerCase());
-        l.unshift(p);
-        localStorage.setItem('ie-recentes', JSON.stringify(l.slice(0, 12)));
-    } catch (e) { /* sem armazenamento */ }
+    const l = ieRecentes().filter(x => x.toLowerCase() !== p.toLowerCase());
+    l.unshift(p);
+    iePrefGravar('recentes', l.slice(0, 12));
 }
 function ieRecentesRender() {
     const box = ieEl('ie-recentes');
@@ -955,6 +958,11 @@ function ieIniciar() {
     ieOpcoesRender();
     ieCamadasInstalar();
     ieDockInstalar?.();
+    // preferências do %APPDATA% (painéis, estilos, padrões): chegam um instante depois
+    iePrefsCarregar().then(() => {
+        if (typeof IE_DOCK !== 'undefined' && IE_DOCK.lay) { IE_DOCK.lay = ieDockLer(); ieDockAplicar(false); }
+        if (!IE.doc) ieRecentesRender();
+    });
     ieUiCamadas();
     ieHistRender();
     ieAbasRender();

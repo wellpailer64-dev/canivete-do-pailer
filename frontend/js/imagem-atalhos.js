@@ -417,7 +417,7 @@ document.addEventListener('click', ev => {
 function ieSelDaCamadaOp(L, mascara, op) {
     const doc = IE.doc;
     const r = mascara && L.m ? { c: ieMascaraRegiao(L.m, ieRDoc(doc)), x: 0, y: 0 }
-        : L.tipo === 'grupo' ? { c: ieAchatar(doc, [L]), x: 0, y: 0 } : (L.c ? { c: (ieRaster(L) || L).c, x: (ieRaster(L) || L).x, y: (ieRaster(L) || L).y } : null);
+        : L.tipo === 'grupo' ? { c: ieAchatar(doc, [L]), x: 0, y: 0 } : (L.c ? ((ieRaster(L) || {}).forma || { c: L.c, x: L.x, y: L.y }) : null);
     if (!r) return;
     ieSelAplicar(doc, x => { x.drawImage(r.c, r.x, r.y); }, op);
     ieHist(ieT('Carregar seleção'));

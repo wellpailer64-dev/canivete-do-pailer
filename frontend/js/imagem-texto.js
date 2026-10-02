@@ -450,8 +450,7 @@ function ieEstiloPadrao(fam) {
 async function ieFonteEscolher(ancora, atual, aoEscolher) {
     const estilos = await ieCarregarFontes();
     const pop = ieEl('ie-pop'), rb = ieEl('ie').getBoundingClientRect(), ra = ancora.getBoundingClientRect();
-    let recentes = [];
-    try { recentes = JSON.parse(localStorage.getItem('ie-fontes-recentes') || '[]').filter(f => estilos[f]); } catch (e) { /* sem armazenamento */ }
+    const recentes = (iePref('fontesRecentes', []) || []).filter(f => estilos[f]);
     const todas = Object.keys(estilos);
     pop.innerHTML = `<div class="ie-fontes"><input class="ie-fontes-busca" placeholder="${ieT('Buscar fonte')}"><div class="ie-fontes-lista"></div></div>`;
     const lista = pop.querySelector('.ie-fontes-lista'), busca = pop.querySelector('.ie-fontes-busca');
@@ -476,7 +475,7 @@ async function ieFonteEscolher(ancora, atual, aoEscolher) {
         const b = ev.target.closest('[data-f]');
         if (!b) return;
         const f = b.dataset.f;
-        try { localStorage.setItem('ie-fontes-recentes', JSON.stringify([f, ...recentes.filter(x => x !== f)].slice(0, 8))); } catch (e) { /* sem armazenamento */ }
+        iePrefGravar('fontesRecentes', [f, ...recentes.filter(x => x !== f)].slice(0, 8));
         fechar();
         aoEscolher(f);
     });

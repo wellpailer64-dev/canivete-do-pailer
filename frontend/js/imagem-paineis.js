@@ -298,11 +298,14 @@ function ieUiCamadas() {
             <span class="ie-cam-recuo"></span>${X.clip ? `<span class="ie-cam-clip">${ieIco('clip')}</span>` : ''}
             ${miniatura}${masc}
             <span class="ie-cam-nome" data-nome="${X.id}">${ieEsc(X.nome)}</span>
-            ${tipoIco}${X.fx && ieTemFx(X.fx) ? `<span class="ie-cam-fx" title="${ieT('Efeitos de camada')}">fx</span>` : ''}${X.travas ? ieIco('lock', 'ie-cam-cad') : ''}
-        </div>`;
+            ${tipoIco}${ieFxLista(X.fx).length ? `<button class="ie-cam-fx ${X.fxAberto ? 'aberto' : ''}" data-fxabrir="${X.id}" title="${ieT('Efeitos de camada (clique: mostrar a lista)')}">fx ${ieIco('chev')}</button>` : ''}${X.travas ? ieIco('lock', 'ie-cam-cad') : ''}
+        </div>` + (X.fxAberto && ieFxLista(X.fx).length ? `<div class="ie-cam-fxl" style="--nivel:${nivel}" data-id="${X.id}">
+            <div class="ie-cam-fxi" data-fxi="todos"><button class="ie-cam-olho ${X.fxOculto ? '' : 'on'}" data-fxolho="todos">${X.fxOculto ? '' : ieIco('eye')}</button><span>${ieLsT('Efeitos')}</span></div>
+            ${ieFxLista(X.fx).map(({ tipo, i, e }) => `<div class="ie-cam-fxi" data-fxi="${tipo}:${i}"><button class="ie-cam-olho ${e.on ? 'on' : ''}" data-fxolho="${tipo}:${i}">${e.on ? ieIco('eye') : ''}</button><span>${ieLsT(IE_FX_NOME[tipo])}</span></div>`).join('')}
+        </div>` : '');
     }).join('') || `<div class="ie-vazio">${ieT('Sem camadas')}</div>`;
     rod.innerHTML = `
-        <button class="ie-ico-btn" onclick="ieCmd('estiloCamada')" title="${ieT('Estilo de camada (efeitos)')}">${ieIco('fx')}</button>
+        <button class="ie-ico-btn" data-fxmenu title="${ieT('Adicionar um estilo de camada')}">${ieIco('fx')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('mascara')" title="${ieT('Adicionar máscara de camada')}">${ieIco('mask')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('corte')" title="${ieT('Criar/soltar máscara de corte (Alt+Ctrl+G)')}">${ieIco('clip')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('grupoNovo')" title="${ieT('Novo grupo')}">${ieIco('folder')}</button>
@@ -335,7 +338,7 @@ function ieMiniatura(cv, L, mascara) {
     x.imageSmoothingQuality = 'high';
     if (!mascara) {
         // como o "Limites da camada" do Photoshop: o conteúdo da camada (com efeitos) ocupa a miniatura
-        const r = ieRaster(L) || (L.c ? { c: L.c, x: L.x, y: L.y } : null);
+        const r = ieRasterTudo(L) || (L.c ? { c: L.c, x: L.x, y: L.y } : null);
         x.fillStyle = ieXadrezMiniPadrao(x, Math.max(3, Math.round(4 * dpr)));
         x.fillRect(0, 0, W, H);
         if (!r || !r.c) return;
@@ -398,6 +401,22 @@ function ieCamadasInstalar() {
             ieHist(ieT(L.visivel ? 'Mostrar camada' : 'Ocultar camada'));
             return;
         }
+        const fxa = ev.target.closest('[data-fxabrir]');
+        if (fxa) { const L = ieAchar(doc, +fxa.dataset.fxabrir)?.L; if (L) { L.fxAberto = !L.fxAberto; ieUiCamadas(); } return; }
+        const fxo = ev.target.closest('[data-fxolho]');
+        if (fxo) {
+            const L = ieAchar(doc, +fxo.closest('.ie-cam-fxl').dataset.id)?.L;
+            if (!L) return;
+            const R = ieRCamada(L);
+            if (fxo.dataset.fxolho === 'todos') L.fxOculto = !L.fxOculto;
+            else { const [t, i] = fxo.dataset.fxolho.split(':'); const e = L.fx[t][+i]; e.on = !e.on; }
+            L.fxMudou = true;
+            ieCamadaMudou(L, R);
+            ieHist(ieT('Mostrar/ocultar efeito'));
+            ieUiCamadas();
+            return;
+        }
+        if (ev.target.closest('.ie-cam-fxl')) { ieAtivar(+ev.target.closest('.ie-cam-fxl').dataset.id, doc); ieUiCamadas(); return; }
         const abrir = ev.target.closest('[data-abrir]');
         if (abrir) { const L = ieAchar(doc, +abrir.dataset.abrir)?.L; if (L) { L.aberto = !L.aberto; ieUiCamadas(); } return; }
         const linha = ev.target.closest('.ie-cam');
@@ -419,6 +438,13 @@ function ieCamadasInstalar() {
         const doc = IE.doc;
         const nome = ev.target.closest('[data-nome]');
         if (nome && doc) { ieRenomear(+nome.dataset.nome, nome); return; }
+        const fxi = ev.target.closest('[data-fxi]');
+        if (fxi && doc) {
+            const L = ieAchar(doc, +fxi.closest('.ie-cam-fxl').dataset.id)?.L;
+            const v = fxi.dataset.fxi;
+            if (L) ieEstiloCamada(L, v === 'todos' ? 'mescla' : { tipo: v.split(':')[0], i: +v.split(':')[1] });
+            return;
+        }
         const linha = ev.target.closest('.ie-cam');
         const L = linha && ieAchar(doc, +linha.dataset.id)?.L;
         if (L && (L.txt || L.texto) && ev.target.closest('[data-alvo]')) { ieEscolherFerr('texto'); ieTextoEditar(L); return; }
@@ -431,7 +457,7 @@ function ieCamadasInstalar() {
         ev.preventDefault();
         const doc = IE.doc;
         if (!doc.selIds.includes(+linha.dataset.id)) ieAtivar(+linha.dataset.id, doc);
-        ieMenuContexto(ev);
+        ieMenuContexto(ev, true);
     });
     // arrastar para reordenar (acima/abaixo de outra camada ou para dentro de um grupo)
     let arrast = null;
@@ -607,14 +633,14 @@ function ieUiProps() {
         h += `<div class="ie-prop-nota">${ieT('Mover e transformar mantêm a camada editável no Photoshop. Pintar pede para rasterizar.')}</div>
             <div class="ie-prop-acoes"><button class="ie-btn ie-btn-mini" onclick="ieCmd('rasterizar')">${ieT('Rasterizar camada')}</button></div>`;
     }
-    if (L.fx && ieTemFx(L.fx)) {
-        const nomes = [['sombra', 'Sombra projetada'], ['brilho', 'Brilho externo'], ['contorno', 'Traçado'], ['sobreposicao', 'Sobreposição de cor']].filter(([k]) => L.fx[k]);
+    if (L.fx && ieFxLista(L.fx).length) {
+        const nomes = ieFxLista(L.fx).map(({ tipo, e }) => [tipo, IE_FX_NOME[tipo] + (e.on ? '' : ' (' + ieT('desligado') + ')')]);
         h += `<div class="ie-prop-tit ie-prop-sub">${ieT('Efeitos')}</div>
             <label class="ie-op-chk"><input type="checkbox" id="ie-prop-fx" ${L.fxOculto ? '' : 'checked'}> ${ieT('Mostrar efeitos')}</label>
             <div class="ie-prop-acoes"><button class="ie-btn ie-btn-mini" onclick="ieEstiloCamada()">fx ${ieT('Editar efeitos...')}</button></div>
             <ul class="ie-prop-lista">${nomes.map(([, n]) => `<li>${ieT(n)}</li>`).join('')}${(L.fx.outros || []).map(n => `<li class="ie-aviso">${ieEsc(n)} (${ieT('não exibido')})</li>`).join('')}</ul>`;
     }
-    if (L.tipo !== 'grupo' && L.tipo !== 'ajuste' && !(L.fx && ieTemFx(L.fx)))
+    if (L.tipo !== 'grupo' && L.tipo !== 'ajuste' && !(L.fx && ieFxLista(L.fx).length))
         h += `<div class="ie-prop-acoes"><button class="ie-btn ie-btn-mini" onclick="ieEstiloCamada()">fx ${ieT('Adicionar efeito...')}</button></div>`;
     box.innerHTML = h;
     box.querySelector('[data-ppelo]')?.addEventListener('click', () => { IE.propElo = IE.propElo === false; ieUiProps(); });
@@ -971,12 +997,13 @@ function ieMenuHtml(itens) {
     }).join('')}</div>`;
 }
 
-function ieMenuContexto(ev) {
+function ieMenuContexto(ev, painelCamadas) {
     const doc = IE.doc;
     if (!doc) return;
     const pop = ieEl('ie-pop'), rb = ieEl('ie').getBoundingClientRect();
-    const itens = [['Duplicar camada', 'duplicar'], ['Excluir camada', 'excluirCamada'], '-', ['Mesclar para baixo', 'mesclarBaixo'], ['Rasterizar camada', 'rasterizar'],
-        ['Criar máscara de corte', 'corte'], ['Adicionar máscara', 'mascara'], '-', ['Selecionar pixels', 'selCamada'], ['Transformação livre', 'transformar']];
+    const itens = [...(painelCamadas ? [['Opções de mesclagem...', 'opcoesMescla'], '-'] : []),['Duplicar camada', 'duplicar'], ['Excluir camada', 'excluirCamada'], '-', ['Mesclar para baixo', 'mesclarBaixo'], ['Rasterizar camada', 'rasterizar'],
+        ['Criar máscara de corte', 'corte'], ['Adicionar máscara', 'mascara'], '-', ['Selecionar pixels', 'selCamada'], ['Transformação livre', 'transformar'],
+        ...(painelCamadas ? ['-', ['Copiar estilo de camada', 'copiarEstilo'], ['Colar estilo de camada', 'colarEstilo'], ['Limpar estilo de camada', 'limparEstilo']] : [])];
     if (doc.sel) itens.unshift(['Desmarcar', 'selNada'], ['Inverter seleção', 'selInverter'], ['Camada via cópia', 'duplicar'], '-');
     pop.innerHTML = ieMenuHtml(itens);
     pop.hidden = false;
