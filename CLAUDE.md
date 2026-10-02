@@ -19,6 +19,8 @@ python main.py --agente                                  # pelo código
 Conecte por CDP (ex.: Playwright `connect_over_cdp`), rode JS na página (`veSeek`, `VE.clips`...),
 clique e tire print. Detalhes e segurança em `Instructions/modo-agente.md`.
 Fechar o app aberto do usuário (para trocar o exe ou relançar com `--agente`) exige o ok dele antes.
+App de teste (porta 9333) com preferências próprias, para não gravar nas do usuário (estilos, painéis, recentes...):
+`APPDATA=<pasta temporária> python main.py --agente=9333`.
 
 Play do Pocket Editor: `python testes/teste_play.py "<projeto.vknv>" [--segundos 20] [--inicio 0]` (app em
 `--agente=9333`) mede agulha voltando, buscas, esperas, quadros perdidos e travadas; sai com 1 se passar dos limites.

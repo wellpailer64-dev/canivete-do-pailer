@@ -13,8 +13,20 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 - `frontend/js/imagem-arquivo.js` — abrir, salvar, exportar, comandos dos menus, área de transferência.
 - `frontend/js/imagem-fatias.js` — ferramenta Fatia (C / Shift+C): criar, mover/redimensionar, dividir, das camadas,
   opções (nome/URL/alt), Arquivo > Exportar fatias; lidas e gravadas no PSD (recurso de fatias, versão 6).
-- `frontend/js/imagem-dock.js` — painéis móveis: arrastar o título para a outra coluna, entre painéis ou solto
-  sobre a imagem; duplo clique recolhe; divisórias e bordas mudam o tamanho; menu Janela (layout em localStorage).
+- `frontend/js/imagem-dock.js` — painéis móveis em colunas lado a lado (cada lado da imagem: 0+ colunas, cada uma uma
+  pilha): arrastar o título para cima/baixo de outro painel empilha, para a borda lateral de uma coluna cria coluna nova
+  ao lado, para a faixa da borda da imagem cria coluna colada nela, sobre a imagem vira janela solta; duplo clique
+  recolhe; divisórias mudam altura e a borda de cada coluna a largura. Layout em iePref('paineis').
+- `frontend/js/imagem-janela.js` — menu Janela do Photoshop: Organizar (igualar zoom/local), Espaço de trabalho
+  (Essenciais, Pintura, Fotografia, Gráficos e Web + os do usuário, Redefinir, Travar; cada espaço lembra como ficou),
+  22 painéis (Ajustes = camadas de ajuste novas com os valores no Propriedades, Amostras, Canais com canais alfa e
+  Salvar/Carregar seleção, Caractere, Estilos de caractere/parágrafo, Composições de camadas, Configurações do pincel
+  e Pincéis (forma da ponta, espaçamento, ângulo, redondeza, variação, dispersão), Cor (F6), Degradês (ferramenta
+  Degradê "Personalizado"), Estilos, Formas (Forma personalizada), Glifos, Histograma, Informações (F8), Navegador,
+  Observações, Origem do clone, Padrões (Definir padrão, Preencher > Padrão), Parágrafo (inclui Justificar),
+  Predefinições de ferramentas), Opções, Ferramentas, Barra de tarefas contextual e a lista de documentos. Os de
+  nuvem/3D/vídeo (Ações, Bibliotecas, Comentários, Credenciais, Demarcadores, Histórico de versões, Linha do tempo,
+  Materiais, Registro de medidas) aparecem como "ainda não".
 - `frontend/js/imagem-fx.js` — efeitos de camada (modelo e desenho): os 10 do Photoshop — Chanfro e entalhe (com
   Contorno e Textura), Traçado (+), Sombra interna (+), Brilho interno, Acetinado, Sobreposição de cor (+), de degradê (+),
   de padrão, Brilho externo e Sombra projetada (+); (+) = várias instâncias. `L.fx = {tipo: [instâncias]}`.
@@ -87,6 +99,10 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 - Não há criação de camada de ajuste nova, estilos de camada novos, máscara vetorial, pincel de recuperação.
 - Texto com estilos misturados vira um estilo só quando editado.
 - Fidelidade medida contra o achatado do Photoshop nos 43 PSDs do portfólio: média < 1/255 na maioria, pior caso ~4/255.
+
+## Tela
+- Zoom em pixels da tela (100% = 1 pixel da imagem por pixel da tela, como no Photoshop, mesmo com a escala do
+  Windows); `ieDesenharNitido` desenha 1:1 sem reamostrar, amplia inteiro sem suavizar e reduz em etapas (ieMipmap).
 
 ## Teste
 `python testes/teste_imagem.py` (abre o app em `--agente=9333`; `--psd <arquivo>` para um PSD real): mover, pincel,

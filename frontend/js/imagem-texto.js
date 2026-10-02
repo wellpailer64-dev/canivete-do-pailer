@@ -67,6 +67,7 @@ function ieTextoLayout(t) {
     const adv = t.ent > 0 ? t.ent : t.tam * 1.2;
     const txt = t.caixaAlta ? String(t.s || '').toUpperCase() : String(t.s || '');
     let linhas = [];
+    const fimPar = new Set();
     if (t.caixa) {
         const larg = t.caixa[2] - t.caixa[0];
         txt.split(IE_NL).forEach(par => {
@@ -76,6 +77,7 @@ function ieTextoLayout(t) {
                 if (atual && x.measureText(tenta).width > larg) { linhas.push(atual); atual = p; } else atual = tenta;
             });
             linhas.push(atual);
+            fimPar.add(linhas.length - 1);
         });
     } else linhas = txt.split(IE_NL);
     const m0 = x.measureText('Hg');
@@ -86,7 +88,8 @@ function ieTextoLayout(t) {
         let lx;
         if (t.caixa) lx = t.alin === 'center' ? (t.caixa[0] + t.caixa[2]) / 2 - w / 2 : t.alin === 'right' ? t.caixa[2] - w : t.caixa[0];
         else lx = t.alin === 'center' ? -w / 2 : t.alin === 'right' ? -w : 0;
-        return { s, x: lx, y: base0 + i * adv, w };
+        const just = t.alin === 'justify' && t.caixa && !fimPar.has(i) && s.includes(' ') ? (t.caixa[2] - t.caixa[0] - w) / (s.split(' ').length - 1) : 0;
+        return { s, x: lx, y: base0 + i * adv, w, just };
     });
 }
 
@@ -122,7 +125,11 @@ function ieTextoRender(L) {
     x.letterSpacing = (t.esp || 0) / 1000 * t.tam + 'px';
     x.fillStyle = t.cor || '#000';
     x.textBaseline = 'alphabetic';
-    for (const l of linhas) x.fillText(l.s, l.x, l.y);
+    for (const l of linhas) {
+        if (!l.just) { x.fillText(l.s, l.x, l.y); continue; }
+        let px = l.x;   // justificado: palavra por palavra, com o espaço que sobra dividido entre elas
+        for (const p of l.s.split(' ')) { x.fillText(p, px, l.y); px += x.measureText(p + ' ').width + l.just; }
+    }
     L.c = c; L.x = x1; L.y = y1;
     L.sujoPx = true;
     ieInvalidar(L);

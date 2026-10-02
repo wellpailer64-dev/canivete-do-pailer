@@ -1,27 +1,54 @@
 // =========================================================
-// Editor de Imagem — painéis móveis (como no Photoshop/Premiere): arrastar o título do painel para a outra coluna
-// (esquerda ou direita), para cima/baixo de outro painel, ou para cima da imagem (vira janela solta). Duplo clique no
-// título recolhe; × fecha (Janela no menu reabre); a divisória entre painéis e a borda da coluna mudam o tamanho.
-// Layout nas preferências do editor (iePref 'paineis', %APPDATA%): {esq: [ids], dir: [ids], soltos: {id: {x, y, w, h}}, fechados: [ids],
-// recolhidos: [ids], alturas: {id: px}, largEsq, largDir}.
+// Editor de Imagem — painéis móveis (como no Photoshop/Premiere), em colunas lado a lado.
+// Cada lado da imagem (esq/dir) tem 0 ou mais colunas; cada coluna, uma pilha de painéis e a sua largura.
+// Arrastar o título: para cima/baixo de outro painel = empilha; na borda esquerda/direita de uma coluna = coluna nova
+// ao lado; na faixa da borda da imagem = coluna nova colada à imagem; sobre a imagem = janela solta.
+// Duplo clique no título recolhe; × fecha (Janela no menu reabre); divisórias mudam altura (entre painéis) e
+// largura (borda de cada coluna).
+// Layout nas preferências (iePref 'paineis', %APPDATA%): {esq: [[ids]], dir: [[ids]], largEsq: [px], largDir: [px],
+// soltos: {id: {x, y, w, h}}, fechados: [ids], recolhidos: [ids], alturas: {id: px}}.
+// (O formato antigo, uma lista só por lado, vira uma coluna.)
 // =========================================================
 
 const IE_DOCK_PAINEIS = { props: 'Propriedades', camadas: 'Camadas', hist: 'Histórico' };
-const IE_DOCK_PADRAO = { esq: [], dir: ['props', 'camadas', 'hist'], soltos: {}, fechados: [], recolhidos: [], alturas: {}, largEsq: 260, largDir: 292 };
+const IE_DOCK_PADRAO = { esq: [], dir: [['props', 'camadas', 'hist']], largEsq: [], largDir: [292], soltos: {}, fechados: [], recolhidos: [], alturas: {} };
 const IE_DOCK = { lay: null, arr: null };
+const IE_DOCK_LARG = 270;
 
-function ieDockLer() {
-    const l0 = iePref('paineis', null);
-    let l = l0 ? JSON.parse(JSON.stringify(l0)) : null;
-    l = Object.assign(JSON.parse(JSON.stringify(IE_DOCK_PADRAO)), l || {});
-    // painel novo (versão mais nova do app) ou perdido: volta para a direita
-    const todos = new Set([...l.esq, ...l.dir, ...Object.keys(l.soltos), ...l.fechados]);
-    for (const id of Object.keys(IE_DOCK_PAINEIS)) if (!todos.has(id)) l.dir.push(id);
-    for (const k of ['esq', 'dir']) l[k] = l[k].filter(id => IE_DOCK_PAINEIS[id]);
+// layout em qualquer formato → colunas, sem painéis que não existem e com as larguras certas
+function ieDockNormalizar(l) {
+    l = Object.assign(JSON.parse(JSON.stringify(IE_DOCK_PADRAO)), l ? JSON.parse(JSON.stringify(l)) : {});
+    for (const lado of ['esq', 'dir']) {
+        const lk = lado === 'esq' ? 'largEsq' : 'largDir';
+        let cols = l[lado] || [];
+        if (cols.length && !Array.isArray(cols[0])) cols = [cols];   // formato antigo
+        let larg = Array.isArray(l[lk]) ? l[lk] : (typeof l[lk] === 'number' ? [l[lk]] : []);
+        const out = [], outL = [];
+        cols.forEach((c, i) => { const ids = (c || []).filter(id => IE_DOCK_PAINEIS[id]); if (ids.length) { out.push(ids); outL.push(ieClamp(+larg[i] || IE_DOCK_LARG, 180, 600)); } });
+        l[lado] = out; l[lk] = outL;
+    }
+    l.soltos = Object.fromEntries(Object.entries(l.soltos || {}).filter(([id]) => IE_DOCK_PAINEIS[id]));
+    l.fechados = (l.fechados || []).filter(id => IE_DOCK_PAINEIS[id]);
+    return l;
+}
+const ieDockIds = l => [...l.esq.flat(), ...l.dir.flat(), ...Object.keys(l.soltos), ...l.fechados];
+
+function ieDockLer(padrao) {
+    const l = ieDockNormalizar(padrao ? null : iePref('paineis', null));
+    // painel novo (versão mais nova do app) ou perdido: os do padrão voltam à direita, os outros começam fechados
+    const todos = new Set(ieDockIds(l));
+    for (const id of Object.keys(IE_DOCK_PAINEIS)) {
+        if (todos.has(id)) continue;
+        if (IE_DOCK_PADRAO.dir.flat().includes(id)) { if (!l.dir.length) { l.dir.push([]); l.largDir.push(292); } l.dir[l.dir.length - 1].push(id); }
+        else l.fechados.push(id);
+    }
     return l;
 }
 function ieDockGravar() { iePrefGravar('paineis', JSON.parse(JSON.stringify(IE_DOCK.lay))); }
-const ieDockPainel = id => ieEl('ie-p-' + id);
+// os elementos ficam guardados: enquanto o layout é refeito eles saem do documento (getElementById não acha)
+const IE_DOCK_EL = {};
+const ieDockPainel = id => IE_DOCK_EL[id] || (IE_DOCK_EL[id] = ieEl('ie-p-' + id));
+const ieDockLado = lado => ieEl(lado === 'esq' ? 'ie-paineis-esq' : 'ie-paineis');
 
 function ieDockInstalar() {
     const ie = ieEl('ie');
@@ -41,47 +68,41 @@ function ieDockInstalar() {
         cab.querySelector('[data-dock=fechar]').onclick = () => ieDockFechar(id);
     }
     ieDockObservar();
-    // bordas das colunas: arrastar muda a largura
-    for (const lado of ['esq', 'dir']) {
-        const b = document.createElement('div');
-        b.className = 'ie-dock-borda ie-dock-borda-' + lado;
-        b.title = ieT('Arrastar: largura dos painéis');
-        ieDockColuna(lado).appendChild(b);
-        b.addEventListener('pointerdown', ev => {
-            ev.preventDefault(); b.setPointerCapture(ev.pointerId);
-            const x0 = ev.clientX, w0 = IE_DOCK.lay[lado === 'esq' ? 'largEsq' : 'largDir'];
-            b.onpointermove = e => {
-                const d = (e.clientX - x0) * (lado === 'esq' ? 1 : -1);
-                IE_DOCK.lay[lado === 'esq' ? 'largEsq' : 'largDir'] = ieClamp(Math.round(w0 + d), 200, 560);
-                ieDockAplicar(false);
-            };
-            b.onpointerup = () => { b.onpointermove = null; ieDockGravar(); };
-        });
-    }
     ieDockAplicar();
 }
-
-const ieDockColuna = lado => ieEl(lado === 'esq' ? 'ie-paineis-esq' : 'ie-paineis');
 
 // põe cada painel no lugar do layout
 function ieDockAplicar(gravar = true) {
     const l = IE_DOCK.lay, ie = ieEl('ie');
     if (!l || !ie) return;
+    const guarda = document.createDocumentFragment();   // tira os painéis do lugar antes de refazer as colunas
+    for (const id of Object.keys(IE_DOCK_PAINEIS)) { const p = ieDockPainel(id); if (p) guarda.appendChild(p); }
     for (const lado of ['esq', 'dir']) {
-        const col = ieDockColuna(lado), borda = col.querySelector('.ie-dock-borda');
-        col.querySelectorAll('.ie-dock-div').forEach(d => d.remove());
-        l[lado].forEach((id, i) => {
-            const p = ieDockPainel(id);
-            p.classList.remove('solto');
-            p.style.left = p.style.top = p.style.width = p.style.height = '';
-            if (i) { const d = document.createElement('div'); d.className = 'ie-dock-div'; d.dataset.acima = l[lado][i - 1]; col.insertBefore(d, borda); ieDockDivisoria(d); }
-            col.insertBefore(p, borda);
-            p.classList.toggle('ultimo', i === l[lado].length - 1);   // o último ocupa o resto da coluna
+        const box = ieDockLado(lado), lk = lado === 'esq' ? 'largEsq' : 'largDir';
+        box.innerHTML = '';
+        l[lado].forEach((ids, ci) => {
+            const col = document.createElement('div');
+            col.className = 'ie-dock-col';
+            col.dataset.lado = lado; col.dataset.col = ci;
+            col.style.width = l[lk][ci] + 'px';
+            ids.forEach((id, i) => {
+                const p = ieDockPainel(id);
+                p.classList.remove('solto');
+                p.style.left = p.style.top = p.style.width = p.style.height = '';
+                if (i) { const d = document.createElement('div'); d.className = 'ie-dock-div'; d.dataset.acima = ids[i - 1]; col.appendChild(d); ieDockDivisoria(d); }
+                col.appendChild(p);
+                p.classList.toggle('ultimo', i === ids.length - 1);   // o último ocupa o resto da coluna
+            });
+            const b = document.createElement('div');   // borda de largura (do lado da imagem)
+            b.className = 'ie-dock-borda ie-dock-borda-' + lado;
+            b.title = ieT('Arrastar: largura da coluna');
+            col.appendChild(b);
+            ieDockBorda(b, lado, ci);
+            box.appendChild(col);
         });
-        col.classList.toggle('vazia', !l[lado].length);
+        box.classList.toggle('vazia', !l[lado].length);
+        ie.style.setProperty(lado === 'esq' ? '--ie-esq-w' : '--ie-dir-w', l[lk].reduce((a, b) => a + b + 1, 0) + 'px');
     }
-    ie.style.setProperty('--ie-esq-w', l.esq.length ? l.largEsq + 'px' : '0px');
-    ie.style.setProperty('--ie-dir-w', l.dir.length ? l.largDir + 'px' : '0px');
     for (const [id, r] of Object.entries(l.soltos)) {
         const p = ieDockPainel(id);
         p.classList.add('solto');
@@ -90,6 +111,7 @@ function ieDockAplicar(gravar = true) {
     }
     for (const id of Object.keys(IE_DOCK_PAINEIS)) {
         const p = ieDockPainel(id);
+        if (!p.parentNode || p.parentNode === guarda) ieDockLado('dir').appendChild(p);   // fechado: fica guardado escondido
         p.hidden = l.fechados.includes(id);
         p.classList.toggle('recolhido', l.recolhidos.includes(id));
         const h = l.alturas[id];
@@ -97,6 +119,20 @@ function ieDockAplicar(gravar = true) {
     }
     if (gravar) ieDockGravar();
     ieDesenharVista?.(); ieDesenharSobre?.();
+    if (typeof ieJanAtualizar === 'function') ieJanAtualizar();
+}
+
+function ieDockBorda(b, lado, ci) {
+    b.addEventListener('pointerdown', ev => {
+        ev.preventDefault(); b.setPointerCapture(ev.pointerId);
+        const lk = lado === 'esq' ? 'largEsq' : 'largDir', x0 = ev.clientX, w0 = IE_DOCK.lay[lk][ci];
+        b.onpointermove = e => {
+            IE_DOCK.lay[lk][ci] = ieClamp(Math.round(w0 + (e.clientX - x0) * (lado === 'esq' ? 1 : -1)), 180, 600);
+            b.parentNode.style.width = IE_DOCK.lay[lk][ci] + 'px';
+            ieEl('ie').style.setProperty(lado === 'esq' ? '--ie-esq-w' : '--ie-dir-w', IE_DOCK.lay[lk].reduce((a, c) => a + c + 1, 0) + 'px');
+        };
+        b.onpointerup = () => { b.onpointermove = null; ieDockGravar(); ieDesenharVista(); ieDesenharSobre(); ieJanAtualizar?.(); };
+    });
 }
 
 // divisória entre dois painéis: arrastar muda a altura do de cima
@@ -112,7 +148,11 @@ function ieDockDivisoria(d) {
 
 function ieDockTirar(id) {
     const l = IE_DOCK.lay;
-    l.esq = l.esq.filter(x => x !== id); l.dir = l.dir.filter(x => x !== id);
+    for (const lado of ['esq', 'dir']) {
+        const lk = lado === 'esq' ? 'largEsq' : 'largDir';
+        for (const c of l[lado]) { const k = c.indexOf(id); if (k >= 0) c.splice(k, 1); }   // no lugar: quem guardou a coluna continua com ela
+        for (let i = l[lado].length - 1; i >= 0; i--) if (!l[lado][i].length) { l[lado].splice(i, 1); l[lk].splice(i, 1); }   // coluna vazia some
+    }
     delete l.soltos[id];
     l.fechados = l.fechados.filter(x => x !== id);
 }
@@ -124,11 +164,15 @@ function ieDockRecolher(id) {
 function ieDockFechar(id) { ieDockTirar(id); IE_DOCK.lay.fechados.push(id); ieDockAplicar(); }
 function ieDockAlternar(id) {
     const l = IE_DOCK.lay;
-    if (l.fechados.includes(id)) { ieDockTirar(id); l.dir.push(id); l.recolhidos = l.recolhidos.filter(x => x !== id); }
-    else ieDockFechar(id);
+    if (l.fechados.includes(id)) {   // abre na coluna da direita mais perto da borda da janela
+        ieDockTirar(id);
+        if (!l.dir.length) { l.dir.push([]); l.largDir.push(IE_DOCK_LARG); }
+        l.dir[l.dir.length - 1].push(id);
+        l.recolhidos = l.recolhidos.filter(x => x !== id);
+    } else ieDockFechar(id);
     ieDockAplicar();
 }
-function ieDockRedefinir() { IE_DOCK.lay = JSON.parse(JSON.stringify(IE_DOCK_PADRAO)); ieDockAplicar(); }
+function ieDockRedefinir() { IE_DOCK.lay = ieDockLer(true); ieDockAplicar(); }
 
 // ─────────────────────────── arrastar pelo título ───────────────────────────
 function ieDockArrIni(ev, id) {
@@ -141,27 +185,28 @@ function ieDockArrIni(ev, id) {
     document.addEventListener('pointerup', up);
 }
 
+// alvo: {lado, col, i} empilha na coluna; {lado, nova: k} cria coluna na posição k; com a marca (retângulo) para mostrar
 function ieDockAlvo(ev) {
-    // coluna sob o ponteiro (ou a faixa da borda da área central, para criar a coluna vazia)
+    const l = IE_DOCK.lay, x = ev.clientX, y = ev.clientY, BORDA = 30;
     const centro = document.querySelector('#ie .ie-centro').getBoundingClientRect();
     for (const lado of ['esq', 'dir']) {
-        const col = ieDockColuna(lado);
-        let r = col.getBoundingClientRect();
-        const vazia = !IE_DOCK.lay[lado].filter(x => x !== IE_DOCK.arr.id).length;
-        if (vazia) r = lado === 'esq' ? { left: centro.left, right: centro.left + 48, top: centro.top, bottom: centro.bottom } : { left: centro.right - 48, right: centro.right, top: centro.top, bottom: centro.bottom };
-        if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) {
-            const ids = IE_DOCK.lay[lado].filter(x => x !== IE_DOCK.arr.id);
+        const cols = [...ieDockLado(lado).querySelectorAll('.ie-dock-col')];
+        for (const col of cols) {
+            const r = col.getBoundingClientRect(), ci = +col.dataset.col;
+            if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+            if (x < r.left + BORDA) return { lado, nova: ci, marca: { left: r.left, top: r.top, width: 4, height: r.height } };
+            if (x > r.right - BORDA) return { lado, nova: ci + 1, marca: { left: r.right - 4, top: r.top, width: 4, height: r.height } };
+            const ids = l[lado][ci].filter(id => id !== IE_DOCK.arr.id);
             let i = ids.length;
-            for (let k = 0; k < ids.length; k++) {
-                const pr = ieDockPainel(ids[k]).getBoundingClientRect();
-                if (ev.clientY < pr.top + pr.height / 2) { i = k; break; }
-            }
-            let y;
-            if (!ids.length) y = r.top;
-            else if (i < ids.length) y = ieDockPainel(ids[i]).getBoundingClientRect().top;
-            else y = ieDockPainel(ids[ids.length - 1]).getBoundingClientRect().bottom;
-            return { lado, i, r, y };
+            for (let k = 0; k < ids.length; k++) { const pr = ieDockPainel(ids[k]).getBoundingClientRect(); if (y < pr.top + pr.height / 2) { i = k; break; } }
+            const yy = !ids.length ? r.top : i < ids.length ? ieDockPainel(ids[i]).getBoundingClientRect().top : ieDockPainel(ids[ids.length - 1]).getBoundingClientRect().bottom;
+            return { lado, col: ci, i, marca: { left: r.left, top: yy - 2, width: r.width, height: 4 } };
         }
+    }
+    // faixas na borda da imagem: coluna nova colada à imagem
+    if (y >= centro.top && y <= centro.bottom) {
+        if (x >= centro.left && x <= centro.left + 48) return { lado: 'esq', nova: l.esq.length, marca: { left: centro.left, top: centro.top, width: 4, height: centro.height } };
+        if (x <= centro.right && x >= centro.right - 48) return { lado: 'dir', nova: 0, marca: { left: centro.right - 4, top: centro.top, width: 4, height: centro.height } };
     }
     return null;
 }
@@ -183,7 +228,7 @@ function ieDockArrMove(ev) {
     a.alvo = ieDockAlvo(ev);
     Object.assign(a.fantasma.style, { left: ev.clientX - rb.left - a.dx + 'px', top: ev.clientY - rb.top - a.dy + 'px', width: a.w + 'px', height: (a.alvo ? 30 : a.h) + 'px' });
     a.fantasma.classList.toggle('solto', !a.alvo);
-    if (a.alvo) Object.assign(a.marca.style, { display: 'block', left: a.alvo.r.left - rb.left + 'px', width: a.alvo.r.right - a.alvo.r.left + 'px', top: a.alvo.y - rb.top - 2 + 'px' });
+    if (a.alvo) { const m = a.alvo.marca; Object.assign(a.marca.style, { display: 'block', left: m.left - rb.left + 'px', top: m.top - rb.top + 'px', width: m.width + 'px', height: m.height + 'px' }); }
     else a.marca.style.display = 'none';
 }
 
@@ -193,9 +238,19 @@ function ieDockArrFim(ev) {
     if (!a || !a.ativo) return;
     a.fantasma.remove(); a.marca.remove();
     const l = IE_DOCK.lay, rb = ieEl('ie').getBoundingClientRect();
+    const alvo = a.alvo;
+    let destinoCol = null;
+    if (alvo && alvo.col !== undefined) destinoCol = l[alvo.lado][alvo.col];   // guarda a coluna antes de tirar (os índices mudam)
+    const largura = Math.round(Math.max(200, Math.min(400, a.w)));
     ieDockTirar(a.id);
-    if (a.alvo) l[a.alvo.lado].splice(a.alvo.i, 0, a.id);
-    else l.soltos[a.id] = {
+    if (alvo && destinoCol) {
+        const ci = l[alvo.lado].indexOf(destinoCol);
+        if (ci >= 0) destinoCol.splice(Math.min(alvo.i, destinoCol.length), 0, a.id);
+        else { l[alvo.lado].push([a.id]); l[alvo.lado === 'esq' ? 'largEsq' : 'largDir'].push(largura); }
+    } else if (alvo) {
+        const lk = alvo.lado === 'esq' ? 'largEsq' : 'largDir', k = Math.min(alvo.nova, l[alvo.lado].length);
+        l[alvo.lado].splice(k, 0, [a.id]); l[lk].splice(k, 0, largura);
+    } else l.soltos[a.id] = {
         x: ieClamp(Math.round(ev.clientX - rb.left - a.dx), 0, rb.width - 120), y: ieClamp(Math.round(ev.clientY - rb.top - a.dy), 0, rb.height - 40),
         w: Math.round(Math.max(240, a.w)), h: Math.round(a.h),
     };

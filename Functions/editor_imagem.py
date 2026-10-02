@@ -1252,8 +1252,9 @@ def salvar(spec):
                 except Exception:
                     pass
             elif no["tipo"] == "ajuste":
-                if orig is None:
-                    continue   # ajuste novo ainda não existe no editor
+                if orig is None:   # camada de ajuste criada no editor: o psd-tools não cria ajuste novo
+                    avisos.append(f"{no.get('nome')}: camada de ajuste nova fica só no projeto .iknv (não vai para o PSD)")
+                    continue
                 ob = orig
             else:
                 im = _img(arquivos, no.get("chave"))

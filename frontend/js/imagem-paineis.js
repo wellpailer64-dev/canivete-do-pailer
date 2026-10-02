@@ -162,7 +162,7 @@ function ieOpcoesRender(soValores) {
             break;
         case 'degrade':
             h += ieSegm('tipo', 'degrade', [['linear', 'Linear'], ['radial', 'Radial'], ['refletido', 'Refletido']]) +
-                ieSegm('cores', 'degrade', [['frente-fundo', 'Frente → fundo'], ['frente-transp', 'Frente → transparente']]) +
+                ieSegm('cores', 'degrade', [['frente-fundo', 'Frente → fundo'], ['frente-transp', 'Frente → transparente'], ...(IE.op.degrade.grad ? [['personalizado', 'Personalizado']] : [])]) +
                 ieChk('Inverter', 'inverter', 'degrade') + ieNum('Opacidade', 'opac', 'degrade', 1, 100, 1, '%');
             break;
         case 'balde':
@@ -193,7 +193,7 @@ function ieOpcoesRender(soValores) {
             break;
         }
         case 'forma':
-            h += ieSegm('tipo', 'forma', [['ret', 'Retângulo'], ['eli', 'Elipse'], ['linha', 'Linha']]) +
+            h += ieSegm('tipo', 'forma', [['ret', 'Retângulo'], ['eli', 'Elipse'], ['linha', 'Linha'], ...(IE.op.forma.custom ? [['custom', 'Personalizada']] : [])]) +
                 (IE.op.forma.tipo === 'linha' ? ieNum('Espessura', 'contorno', 'forma', 1, 500, 1, ' px') : ieNum('Cantos', 'raio', 'forma', 0, 2000, 1, ' px')) +
                 `<span class="ie-op-dica">${ieT('Usa a cor de frente · Shift: proporcional')}</span>`;
             break;
@@ -967,7 +967,8 @@ function ieMenusRender() {
         aberto = i;
         nav.querySelectorAll('.ie-mbar-btn').forEach(b => b.classList.toggle('on', +b.dataset.m === i));
         const btn = nav.querySelector(`[data-m="${i}"]`), rb = ieEl('ie').getBoundingClientRect(), ra = btn.getBoundingClientRect();
-        pop.innerHTML = ieMenuHtml(IE_MENUS[i][1]);
+        const def = IE_MENUS[i];
+        pop.innerHTML = ieMenuHtml(typeof def[2] === 'function' ? def[2]() : def[1]);
         pop.hidden = false;
         pop.style.left = ra.left - rb.left + 'px';
         pop.style.top = ra.bottom - rb.top + 2 + 'px';
@@ -991,10 +992,10 @@ function ieMenusRender() {
 function ieMenuHtml(itens) {
     return `<div class="ie-menu">${itens.map(it => {
         if (it === '-') return '<i class="ie-menu-sep"></i>';
-        const [r, c, at] = it;
-        if (Array.isArray(c)) return `<div class="ie-menu-sub"><span>${ieT(r)}</span><b>›</b>${ieMenuHtml(c)}</div>`;
+        const [r, c, at, marcado] = it;
+        if (Array.isArray(c)) return `<div class="ie-menu-sub"><i class="ie-menu-chk"></i><span>${ieT(r)}</span><b>›</b>${ieMenuHtml(c)}</div>`;
         const off = !ieCmdPode(c);
-        return `<button class="ie-menu-item ${off ? 'off' : ''}" data-cmd="${c}"><span>${ieT(r)}</span><kbd>${at || ''}</kbd></button>`;
+        return `<button class="ie-menu-item ${off ? 'off' : ''}" data-cmd="${c}"><i class="ie-menu-chk">${marcado ? '✓' : ''}</i><span>${ieT(r)}</span><kbd>${at || ''}</kbd></button>`;
     }).join('')}</div>`;
 }
 

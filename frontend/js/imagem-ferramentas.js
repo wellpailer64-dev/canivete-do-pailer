@@ -7,13 +7,25 @@
 // =========================================================
 
 // ─────────────────────────── ponta do pincel ───────────────────────────
+// forma: redondo | quadrado | giz (borda com ruído); ang (graus) e red (redondeza %) achatam e giram a ponta
 const iePontas = new Map();
-function iePonta(tam, dureza) {
+function iePonta(tam, dureza, forma = 'redondo', ang = 0, red = 100) {
     tam = Math.max(1, Math.round(tam));
-    const k = tam + '|' + dureza;
+    ang = ((Math.round(ang / 5) * 5) % 180 + 180) % 180;
+    red = ieClamp(Math.round(red / 5) * 5, 5, 100);
+    const k = [tam, dureza, forma, ang, red].join('|');
     if (iePontas.has(k)) return iePontas.get(k);
-    const c = ieCanvas(tam + 2, tam + 2), x = ieCtx(c), r = tam / 2, m = (tam + 2) / 2;
-    if (tam <= 2 || dureza >= 100) {
+    const lado = Math.ceil(forma === 'quadrado' ? tam * 1.42 : tam) + 2;
+    const c = ieCanvas(lado, lado), x = ieCtx(c), r = tam / 2, m = lado / 2;
+    x.translate(m, m);
+    x.rotate(-ang * Math.PI / 180);
+    x.scale(1, red / 100);
+    x.translate(-m, -m);
+    if (forma === 'quadrado') {
+        x.fillStyle = '#fff';
+        if (dureza < 100 && tam > 2) x.filter = `blur(${(1 - dureza / 100) * r / 3}px)`;
+        x.fillRect(m - r * (dureza < 100 ? 0.85 : 1), m - r * (dureza < 100 ? 0.85 : 1), 2 * r * (dureza < 100 ? 0.85 : 1), 2 * r * (dureza < 100 ? 0.85 : 1));
+    } else if (tam <= 2 || dureza >= 100) {
         x.fillStyle = '#fff';
         x.beginPath(); x.arc(m, m, r, 0, Math.PI * 2); x.fill();
     } else {
@@ -29,7 +41,16 @@ function iePonta(tam, dureza) {
         x.fillStyle = g;
         x.fillRect(0, 0, c.width, c.height);
     }
-    if (iePontas.size > 40) iePontas.clear();
+    if (forma === 'giz' && tam > 3) {   // giz: textura de grãos (sempre a mesma para o mesmo tamanho)
+        x.setTransform(1, 0, 0, 1, 0, 0);
+        const ruido = ieCanvas(lado, lado), rx = ieCtx(ruido), img = rx.createImageData(lado, lado);
+        let s = tam * 7919;
+        for (let i = 0; i < img.data.length; i += 4) { s = (s * 16807) % 2147483647; img.data[i] = img.data[i + 1] = img.data[i + 2] = 255; img.data[i + 3] = s % 100 < 55 ? 255 : 40; }
+        rx.putImageData(img, 0, 0);
+        x.globalCompositeOperation = 'destination-in';
+        x.drawImage(ruido, 0, 0);
+    }
+    if (iePontas.size > 120) iePontas.clear();
     iePontas.set(k, c);
     return c;
 }
@@ -95,7 +116,13 @@ function ieTracoIniciar(p, ev, doc, tipo) {
 }
 
 function ieTracoDab(t, x, y) {
-    const tam = t.op.tam, ponta = iePonta(tam, t.op.dureza);
+    const o = t.op;
+    // dinâmica da ponta (Configurações do pincel): variação de tamanho e ângulo, dispersão
+    let tam = o.tam, ang = o.angulo || 0;
+    if (o.varTam) tam *= 1 - Math.random() * o.varTam / 100;
+    if (o.varAng) ang += (Math.random() * 2 - 1) * o.varAng / 100 * 180;
+    if (o.dispersao) { const d = Math.random() * o.dispersao / 100 * o.tam, a = Math.random() * Math.PI * 2; x += Math.cos(a) * d; y += Math.sin(a) * d; }
+    const ponta = iePonta(tam, o.dureza, o.forma || 'redondo', ang, o.redondeza ?? 100);
     const ctx = ieCtx(t.traco);
     const dx = x - ponta.width / 2, dy = y - ponta.height / 2;
     if (t.tipo === 'carimbo') {
@@ -119,7 +146,7 @@ function ieTracoPara(p, primeiro) {
     t.sujoPasso = null;
     if (primeiro || !t.ult) { ieTracoDab(t, p.x, p.y); t.ult = { x: p.x, y: p.y }; }
     else {
-        const passo = Math.max(1, t.op.tam * 0.18);
+        const passo = Math.max(1, t.op.tam * (t.op.espaco ?? 18) / 100);
         const dx = p.x - t.ult.x, dy = p.y - t.ult.y, dist = Math.hypot(dx, dy);
         let s = passo - t.resto;
         while (s <= dist) {

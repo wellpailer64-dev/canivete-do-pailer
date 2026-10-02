@@ -376,6 +376,7 @@ async function ieSalvarIknv(doc, destino) {
             nome: doc.nome, w: doc.w, h: doc.h, dpi: doc.dpi, bits: doc.bits, modo: doc.modo,
             camadas: ieIknvSerial(doc.camadas, png), ativa: doc.ativa, selIds: doc.selIds, seq: doc.seq,
             fatias: ieFatiasSpec(doc), cor: IE.cor, luzGlobal: doc.luzGlobal || null,
+            alfas: ieIknvSerial(doc.alfas || [], png), notas: doc.notas || [], compsCamadas: doc.compsCamadas || [],
         };
         ieCompor(doc, ieRDoc(doc));
         const previa = ieTransformarPlano({ c: doc.comp, x: 0, y: 0 }, (k => [k, 0, 0, k, 0, 0])(Math.min(1, 512 / Math.max(doc.w, doc.h)))).c;
@@ -415,7 +416,7 @@ async function ieMontarIknv(r, path) {
         }
         return v;
     };
-    const arvore = ler(d.camadas || []);
+    const arvore = ler(d.camadas || []), alfas = ler(d.alfas || []);
     let feitos = 0;
     await iePool(pend, 6, async p => {
         try { p.alvo.c = await ieImagemDeUrl(p.url); } catch (e) { doc.avisos.push(`${ieT('camada não carregada')}: ${e.message}`); }
@@ -431,6 +432,7 @@ async function ieMontarIknv(r, path) {
         return v;
     };
     doc.camadas = canvas(arvore);
+    doc.alfas = canvas(alfas); doc.notas = d.notas || []; doc.compsCamadas = d.compsCamadas || [];
     iePercorrer(doc.camadas, L => { if (L.fx) L.fx = ieFxNorm(L.fx); });
     if (d.luzGlobal) doc.luzGlobal = d.luzGlobal;
     doc.seq = d.seq || 0;
@@ -707,11 +709,18 @@ const IE_CMDS = {
         let cor = corDireta, opac = 1;
         if (!cor) {
             const v = await ieDialogo({ titulo: 'Preencher', campos: [
-                { id: 'cont', rotulo: 'Conteúdo', tipo: 'select', valor: 'frente', opcoes: [['frente', 'Cor de frente'], ['fundo', 'Cor de fundo'], ['preto', 'Preto'], ['branco', 'Branco'], ['cinza', '50% cinza'], ['cor', 'Cor...']] },
+                { id: 'cont', rotulo: 'Conteúdo', tipo: 'select', valor: 'frente', opcoes: [['frente', 'Cor de frente'], ['fundo', 'Cor de fundo'], ['preto', 'Preto'], ['branco', 'Branco'], ['cinza', '50% cinza'], ['cor', 'Cor...'], ['padrao', 'Padrão (painel Padrões)']] },
                 { id: 'cor', rotulo: 'Cor', tipo: 'cor', valor: IE.cor[0] }, { id: 'op', rotulo: 'Opacidade (%)', min: 1, max: 100, valor: 100 }] });
             if (!v) return;
             cor = { frente: IE.cor[0], fundo: IE.cor[1], preto: '#000000', branco: '#ffffff', cinza: '#808080', cor: v.cor }[v.cont];
             opac = v.op / 100;
+            if (v.cont === 'padrao') {
+                if (!doc.mascaraAlvo && !(await iePodePintar(L, 'preencher'))) return;
+                const c = ieCanvas(doc.w, doc.h), x = ieCtx(c);
+                x.fillStyle = x.createPattern(iePadraoCanvas(IE.op.padrao || 'xadrez'), 'repeat'); x.fillRect(0, 0, doc.w, doc.h);
+                iePintarCobertura(doc, L, c, doc.sel ? doc.sel.bbox : ieRDoc(doc), 'Preencher', { opac, colorido: true });
+                return;
+            }
         }
         if (!doc.mascaraAlvo && !(await iePodePintar(L, 'preencher'))) return;
         const c = ieCanvas(doc.w, doc.h), x = ieCtx(c);
