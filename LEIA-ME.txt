@@ -1,6 +1,6 @@
-CANIVETE DO PAILER - LEIA-ME
+KANIVETE - LEIA-ME
 
-Obrigado por usar o Canivete do Pailer.
+Obrigado por usar o KANIVETE (antes chamado Canivete do Pailer).
 
 Este aplicativo foi criado de forma autonoma e artesanal, usando Python e ferramentas de codigo aberto. Ele nao esta publicado na Microsoft Store e tambem nao possui assinatura paga de distribuidor, porque manter esse tipo de cadastro/certificacao no ecossistema da Microsoft tem custo em dolar.
 

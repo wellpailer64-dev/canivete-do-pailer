@@ -398,7 +398,7 @@ def _configurar_rclone(on_label=None, on_progress=None):
 def executar_instalacao():
     """Abre janela de instalação Tkinter e bloqueia até concluir."""
     root = tk.Tk()
-    root.title("Canivete do Pailer — Instalação")
+    root.title("KANIVETE — Instalação")
     root.configure(bg="#0D0D0D")
     root.resizable(False, False)
 
@@ -411,7 +411,7 @@ def executar_instalacao():
 
     # ── Widgets ──────────────────────────────────────────────────────────────
     tk.Label(
-        root, text="Canivete do Pailer",
+        root, text="KANIVETE",
         font=("Segoe UI", 18, "bold"), fg="#00FF88", bg="#0D0D0D",
     ).pack(pady=(20, 4))
 

@@ -839,6 +839,7 @@ function ieSelTudo() {
 }
 function ieSelNada() {
     const d = IE.doc; if (!d || !d.sel) return;
+    d.selAnterior = d.sel;   // Selecionar novamente (Shift+Ctrl+D)
     d.sel = null; ieDesenharSobre(); ieHist('Desmarcar');
 }
 function ieSelInverter() {

@@ -239,7 +239,9 @@ def abrir(path, on_progress=None):
     doc_id = uuid.uuid4().hex[:12]
     doc = {"path": os.path.abspath(path), "mtime": os.stat(path).st_mtime_ns, "rgb": False, "tokens": []}
     try:
-        if path.lower().endswith(EXT_PSD):
+        if path.lower().endswith(EXT_IKNV):
+            r = _abrir_iknv(path, doc)
+        elif path.lower().endswith(EXT_PSD):
             r = _abrir_psd(path, doc, on_progress)
         else:
             r = _abrir_imagem(path, doc)
@@ -1086,3 +1088,74 @@ def colar_windows():
         tok, url = media_server.register_bytes(_png(dado.convert("RGBA")), "colado.png", "image/png")
         return {"success": True, "tipo": "imagem", "url": url, "token": tok, "w": dado.size[0], "h": dado.size[1]}
     return {"success": False}
+
+
+# ─────────────────────────── projeto do editor (.iknv) ───────────────────────────
+# Pacote zip: documento.json (a árvore de camadas do editor, com todas as propriedades: texto editável, efeitos,
+# máscaras, fatias...) + pixels/<chave>.png (cada canvas uma vez) + previa.png (composição, para miniaturas).
+# Se o documento veio de um PSD que não mudou desde então, guarda o vínculo (psd_origem): ao reabrir, "Salvar como
+# PSD" continua fazendo a ida e volta (texto e objeto inteligente continuam editáveis no Photoshop).
+EXT_IKNV = ".iknv"
+FORMATO_IKNV = "iknv"
+VERSAO_IKNV = 1
+
+
+def salvar_iknv(spec):
+    """spec = {sessao, destino, documento (JSON), doc (id do documento no Python, opcional)}."""
+    import json
+    import zipfile
+    arquivos = media_server.fechar_envio(spec.get("sessao"))
+    destino = spec["destino"]
+    if not destino.lower().endswith(EXT_IKNV):
+        destino += EXT_IKNV
+    try:
+        dados = spec["documento"]
+        dados = json.loads(dados) if isinstance(dados, str) else dados
+        dados.update({"formato": FORMATO_IKNV, "versao": VERSAO_IKNV, "app": "KANIVETE"})
+        origem = _DOCS.get(spec.get("doc"))
+        dados["psd_origem"] = None
+        if origem and origem.get("rgb") and origem["path"].lower().endswith(EXT_PSD) and os.path.isfile(origem["path"]) \
+                and os.stat(origem["path"]).st_mtime_ns == origem["mtime"]:
+            dados["psd_origem"] = {"path": origem["path"], "mtime": origem["mtime"]}
+        tmp = destino + ".salvando"
+        with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED, compresslevel=1) as z:
+            z.writestr("documento.json", json.dumps(dados, ensure_ascii=False))
+            for chave, b in arquivos.items():
+                nome = os.path.basename(chave)
+                # PNG já é comprimido: guardado sem recomprimir (abre e salva mais rápido)
+                z.writestr(zipfile.ZipInfo("pixels/" + nome) if nome != "previa.png" else "previa.png", b,
+                           compress_type=zipfile.ZIP_STORED)
+        os.replace(tmp, destino)
+    except Exception as e:
+        try:
+            os.remove(destino + ".salvando")
+        except OSError:
+            pass
+        logging.exception("editor de imagem: salvar .iknv")
+        return {"success": False, "error": str(e)}
+    return {"success": True, "path": destino}
+
+
+def _abrir_iknv(path, doc):
+    import json
+    import zipfile
+    with zipfile.ZipFile(path) as z:
+        dados = json.loads(z.read("documento.json").decode("utf-8"))
+        if dados.get("formato") != FORMATO_IKNV:
+            return {"success": False, "error": "não é um projeto de imagem do KANIVETE"}
+        if int(dados.get("versao", 1)) > VERSAO_IKNV:
+            return {"success": False, "error": "projeto criado numa versão mais nova do KANIVETE: atualize o app"}
+        urls = {}
+        for info in z.infolist():
+            if info.filename.startswith("pixels/") and not info.is_dir():
+                urls[os.path.basename(info.filename)] = _servir(doc, z.read(info), os.path.basename(info.filename))
+    psd = dados.get("psd_origem") or None
+    psd_ok = False
+    if psd and os.path.isfile(psd.get("path", "")) and os.stat(psd["path"]).st_mtime_ns == psd.get("mtime"):
+        # o PSD de origem não mudou: o documento continua ligado a ele (salvar em PSD faz a ida e volta)
+        doc.update({"path": psd["path"], "mtime": psd["mtime"], "rgb": True})
+        psd_ok = True
+    return {"success": True, "iknv": True, "nome": dados.get("nome") or os.path.splitext(os.path.basename(path))[0],
+            "w": int(dados["w"]), "h": int(dados["h"]), "dpi": dados.get("dpi", 72), "bits": dados.get("bits", 8),
+            "modo": dados.get("modo", "RGB"), "documento": dados, "urls": urls,
+            "psd_path": psd["path"] if psd_ok else None, "avisos": []}

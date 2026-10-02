@@ -5,7 +5,7 @@
 // PSD de origem e troca só isso (ver o cabeçalho de editor_imagem.py).
 // =========================================================
 
-const IE_EXT = /\.(psd|psb|png|jpe?g|webp|bmp|gif|tiff?|heic|heif|avif)$/i;
+const IE_EXT = /\.(iknv|psd|psb|png|jpe?g|webp|bmp|gif|tiff?|heic|heif|avif)$/i;
 const ieApi = () => window.pywebview && window.pywebview.api;
 const ieNomeArq = p => String(p || '').split(/[\\/]/).pop();
 
@@ -62,6 +62,7 @@ async function ieAbrirArquivo(path) {
     try {
         const r = await api.ie_abrir(path);
         if (!r || !r.success) { ieToast(`${ieT('Não abriu')}: ${(r && r.error) || ''}`); return null; }
+        if (r.iknv) return await ieMontarIknv(r, path);
         const doc = ieNovoDoc({ nome: r.nome, w: r.w, h: r.h, dpi: r.dpi, path, psdPath: r.psd ? path : null, pyId: r.doc, bits: r.bits, modo: r.modo, avisos: r.avisos || [] });
         doc.fatias = (r.fatias || []).map(f => ({ ...f, id: ++doc.seqFatia }));
         doc.fatiasOrig = JSON.stringify(ieFatiasSpec(doc));
@@ -257,14 +258,18 @@ async function ieSalvar(comoNovo = false) {
     if (!doc || !api) return false;
     ieTextoEncerrar(true);
     if (IE.transf) ieTransfAplicar();
-    let destino = !comoNovo && doc.psdPath ? doc.psdPath : null;
+    // Ctrl+S: projeto (.iknv) aberto salva nele; PSD aberto salva no PSD (ida e volta); o resto pergunta.
+    // No diálogo dá para escolher .iknv (projeto do KANIVETE, padrão do documento novo) ou .psd.
+    let destino = comoNovo ? null : (/\.iknv$/i.test(doc.path || '') ? doc.path : doc.psdPath);
     const grande = doc.w > 30000 || doc.h > 30000 || doc.psb;
     if (!destino) {
         const pasta = doc.path ? doc.path.replace(/[\\/][^\\/]*$/, '') : '';
-        const r = await api.ie_dialogo_salvar(doc.nome, grande ? 'psb' : 'psd', pasta);
+        const padrao = grande ? 'psb' : (doc.psdPath && !/\.iknv$/i.test(doc.path || '') ? 'psd' : 'iknv');
+        const r = await api.ie_dialogo_salvar(doc.nome, padrao, pasta);
         if (!r || !r.success) return false;
         destino = r.path;
     }
+    if (/\.iknv$/i.test(destino)) return ieSalvarIknv(doc, destino);
     ieCarregando(`${ieT('Salvando')} ${ieNomeArq(destino)}...`, 5);
     try {
         const ini = await api.ie_salvar_inicio(doc.pyId);
@@ -342,6 +347,104 @@ async function ieSalvar(comoNovo = false) {
         ieToast(`${ieT('Não salvou')}: ${e.message || e}`);
         return false;
     } finally { ieCarregando(false); }
+}
+
+// ─────────────────────────── projeto do editor (.iknv) ───────────────────────────
+// documento.json = a árvore de camadas inteira (tudo menos os caches "_"), com cada canvas trocado por {$png: chave};
+// os pixels vão como PNG (cada canvas uma vez). Ver Functions/editor_imagem.py (salvar_iknv / _abrir_iknv).
+function ieIknvSerial(v, png) {
+    if (v instanceof HTMLCanvasElement) return { $png: png(v) };
+    if (Array.isArray(v)) return v.map(x => ieIknvSerial(x, png));
+    if (v && typeof v === 'object') { const o = {}; for (const k in v) if (k[0] !== '_') o[k] = ieIknvSerial(v[k], png); return o; }
+    return v;
+}
+
+async function ieSalvarIknv(doc, destino) {
+    const api = ieApi();
+    ieCarregando(`${ieT('Salvando')} ${ieNomeArq(destino)}...`, 5);
+    try {
+        const ini = await api.ie_salvar_inicio(null);
+        const chaves = new Map(), envios = [];
+        const png = c => {
+            if (!chaves.has(c)) { const k = 'p' + (chaves.size + 1) + '.png'; chaves.set(c, k); envios.push({ k, c }); }
+            return chaves.get(c);
+        };
+        const documento = {
+            nome: doc.nome, w: doc.w, h: doc.h, dpi: doc.dpi, bits: doc.bits, modo: doc.modo,
+            camadas: ieIknvSerial(doc.camadas, png), ativa: doc.ativa, selIds: doc.selIds, seq: doc.seq,
+            fatias: ieFatiasSpec(doc), cor: IE.cor,
+        };
+        ieCompor(doc, ieRDoc(doc));
+        const previa = ieTransformarPlano({ c: doc.comp, x: 0, y: 0 }, (k => [k, 0, 0, k, 0, 0])(Math.min(1, 512 / Math.max(doc.w, doc.h)))).c;
+        envios.push({ k: 'previa.png', c: previa });
+        let feitos = 0;
+        await iePool(envios, 4, async e => {
+            await ieEnviar(ini.url, e.k, e.c);
+            ieCarregando(null, 5 + ++feitos / envios.length * 85);
+        });
+        const r = await api.ie_salvar_iknv({ sessao: ini.sessao, destino, documento: JSON.stringify(documento), doc: doc.pyId });
+        if (!r || !r.success) { ieToast(`${ieT('Não salvou')}: ${(r && r.error) || ''}`); return false; }
+        doc.path = r.path;
+        doc.nome = ieNomeArq(r.path).replace(/\.iknv$/i, '');
+        doc.sujo = false;
+        ieAbasRender();
+        ieRecentesAdd(r.path);
+        ieToast(`${ieT('Projeto salvo')}: ${ieNomeArq(r.path)}`);
+        return true;
+    } catch (e) {
+        console.error('[editor de imagem] salvar .iknv', e);
+        ieToast(`${ieT('Não salvou')}: ${e.message || e}`);
+        return false;
+    } finally { ieCarregando(false); }
+}
+
+async function ieMontarIknv(r, path) {
+    const api = ieApi(), d = r.documento;
+    const doc = ieNovoDoc({ nome: r.nome, w: r.w, h: r.h, dpi: r.dpi, path, psdPath: r.psd_path || null, pyId: r.doc, bits: r.bits, modo: r.modo, avisos: r.avisos || [] });
+    const pend = [];
+    const ler = v => {
+        if (Array.isArray(v)) return v.map(ler);
+        if (v && typeof v === 'object') {
+            if (v.$png) { const alvo = { c: null }; pend.push({ url: r.urls[v.$png], alvo }); return alvo; }
+            const o = {};
+            for (const k in v) o[k] = ler(v[k]);
+            return o;
+        }
+        return v;
+    };
+    const arvore = ler(d.camadas || []);
+    let feitos = 0;
+    await iePool(pend, 6, async p => {
+        try { p.alvo.c = await ieImagemDeUrl(p.url); } catch (e) { doc.avisos.push(`${ieT('camada não carregada')}: ${e.message}`); }
+        ieCarregando(`${ieT('Montando camadas')} (${++feitos}/${pend.length})`, feitos * 100 / Math.max(1, pend.length));
+    });
+    // troca os marcadores {c} pelos canvases de verdade
+    const canvas = v => {
+        if (Array.isArray(v)) return v.map(canvas);
+        if (v && typeof v === 'object') {
+            if ('c' in v && Object.keys(v).length === 1 && (v.c === null || v.c instanceof HTMLCanvasElement)) return v.c;
+            for (const k in v) v[k] = canvas(v[k]);
+        }
+        return v;
+    };
+    doc.camadas = canvas(arvore);
+    doc.seq = d.seq || 0;
+    iePercorrer(doc.camadas, L => { doc.seq = Math.max(doc.seq, L.id || 0); });
+    doc.fatias = (d.fatias || []).map(f => ({ ...f, id: ++doc.seqFatia }));
+    doc.fatiasOrig = JSON.stringify(ieFatiasSpec(doc));
+    doc.ativa = d.ativa ?? null;
+    doc.selIds = d.selIds || (doc.ativa != null ? [doc.ativa] : []);
+    if (doc.ativa != null && !ieAchar(doc, doc.ativa)) { const t = doc.camadas[doc.camadas.length - 1]; doc.ativa = t ? t.id : null; doc.selIds = doc.ativa != null ? [doc.ativa] : []; }
+    api.ie_liberar(r.doc);
+    // fontes dos textos editados (os pixels já vêm desenhados; a fonte serve para editar de novo)
+    iePercorrer(doc.camadas, L => { if (L.txt) ieGarantirFonte(L.txt).catch(() => {}); });
+    IE.docs.push(doc);
+    ieMostrarDoc(doc);
+    ieAjustarVista(doc);
+    ieHist('Abrir', doc);
+    doc.sujo = false;
+    ieRecentesAdd(path);
+    return doc;
 }
 
 async function ieExportarDialogo() {

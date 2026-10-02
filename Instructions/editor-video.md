@@ -157,7 +157,7 @@ Botão **Ajuste** (ao lado de Imagem): cria um clipe de 5 s na primeira trilha l
 - Prévia: `veAdjDraw` aplica `veFxRender` no próprio canvas do monitor e desenha por cima com a opacidade.
 - Exportação (`tipo: 'ajuste'`): `split` do vídeo composto → ramo com `trim` no trecho + efeitos + opacidade →
   `overlay` de volta. Opacidade animada: `_opacidade_animada(..., inicio=st)` (o ramo mantém o tempo absoluto).
-- Projeto .vcnvt salva a mídia `ajuste` (sem path) e recria ao abrir.
+- Projeto .vknv salva a mídia `ajuste` (sem path) e recria ao abrir.
 
 ## Luz e Cor (estilo Lumetri)
 Painel `lc` que edita o efeito `lc` do clipe selecionado (criado no primeiro ajuste; um por clipe). Seções:
@@ -301,7 +301,7 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
     cortes iguais; chave melhorado/original). Também no botão direito do clipe. Ver `melhorar-audio.md`.
     Ver `Instructions/melhorar-audio.md`.
   - No clipe da timeline, **Mostrar no projeto** acha a mídia.
-- O arquivo do projeto (.vcnvt) guarda `bins`, `m0` (organização do vídeo principal) e os itens que ainda não estão na timeline.
+- O arquivo do projeto (.vknv; os .vcnvt antigos abrem e viram .vknv ao salvar) guarda `bins`, `m0` (organização do vídeo principal) e os itens que ainda não estão na timeline.
 
 ## Vários vídeos por projeto (como no Premiere)
 - O vídeo aberto (`VE.media[0]`) define a sequência: tamanho, qps e duração de fonte. Outros vídeos entram pelo painel Projeto.

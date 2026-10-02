@@ -2,7 +2,7 @@
 teste_play.py — Mede o play do Pocket Editor no app de verdade (modo agente) e reprova se engasgar.
 
 Uso (com o app aberto em modo agente: python main.py --agente=9333):
-    python testes/teste_play.py "C:/caminho/projeto.vcnvt" [--porta 9333] [--segundos 20] [--inicio 0]
+    python testes/teste_play.py "C:/caminho/projeto.vknv" [--porta 9333] [--segundos 20] [--inicio 0]
 
 Abre o projeto (se ainda não estiver aberto), espera os vídeos da timeline ficarem prontos, toca e conta:
   - agulha voltando para trás (relógio quebrado: foi o bug dos vários mixers de áudio)

@@ -967,18 +967,19 @@ def ve_win_place(titulo, x, y, w, h, maximizada=False):
 
 
 def ve_project_save(path, dados, salvar_como=False):
-    """Salva o projeto .vcnvt. Sem caminho (ou 'salvar como'), pergunta onde salvar."""
+    """Salva o projeto .vknv. Sem caminho (ou 'salvar como'), pergunta onde salvar.
+    Projeto antigo (.vcnvt): grava um .vknv com o mesmo nome ao lado (o antigo fica como estava)."""
     from Functions import projeto
     try:
         if not path or salvar_como:
             if not _window:
                 return {"success": False}
-            sugestao = os.path.basename(path) if path else "Meu projeto.vcnvt"
+            sugestao = os.path.basename(projeto.com_extensao(path)) if path else "Meu projeto.vknv"
             pasta = os.path.dirname(path) if path else ""
             r = _window.create_file_dialog(
                 _file_dialog_kind("SAVE", webview.SAVE_DIALOG),
                 directory=pasta, save_filename=sugestao,
-                file_types=("Projeto do Canivete (*.vcnvt)",),
+                file_types=("Projeto de vídeo do KANIVETE (*.vknv)",),
             )
             if not r:
                 return {"success": False, "cancelled": True}
@@ -990,7 +991,7 @@ def ve_project_save(path, dados, salvar_como=False):
 
 
 def ve_project_open(path=None):
-    """Abre um .vcnvt (pergunta qual, se não vier o caminho) e avisa o que estiver faltando."""
+    """Abre um .vknv (ou .vcnvt antigo; pergunta qual, se não vier o caminho) e avisa o que estiver faltando."""
     from Functions import projeto
     try:
         if not path:
@@ -998,7 +999,7 @@ def ve_project_open(path=None):
                 return {"success": False}
             r = _window.create_file_dialog(
                 _file_dialog_kind("OPEN", webview.OPEN_DIALOG),
-                file_types=("Projeto do Canivete (*.vcnvt)", "Todos os arquivos (*.*)"),
+                file_types=("Projeto de vídeo do KANIVETE (*.vknv;*.vcnvt)", "Todos os arquivos (*.*)"),
             )
             if not r:
                 return {"success": False, "cancelled": True}
@@ -1018,7 +1019,7 @@ def _autosave_dir():
 
 
 def ve_autosave(chave, nome, dados):
-    """Cópia de segurança do projeto aberto (nunca sobrescreve o .vcnvt do usuário).
+    """Cópia de segurança do projeto aberto (nunca sobrescreve o .vknv do usuário).
     Guarda as 5 últimas de cada projeto e no máximo 40 no total."""
     from Functions import projeto
     import re
@@ -1027,8 +1028,8 @@ def ve_autosave(chave, nome, dados):
         h = hashlib.sha1(str(chave or nome or "sem-projeto").encode("utf-8", "replace")).hexdigest()[:8]
         base = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(nome or "projeto")).strip(" .")[:40] or "projeto"
         pasta = _autosave_dir()
-        final = projeto.salvar(os.path.join(pasta, f"{base}-{h}-{_t.strftime('%Y%m%d-%H%M%S')}.vcnvt"), dados)
-        todos = sorted((os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith(".vcnvt")),
+        final = projeto.salvar(os.path.join(pasta, f"{base}-{h}-{_t.strftime('%Y%m%d-%H%M%S')}.vknv"), dados)
+        todos = sorted((os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith((".vknv", ".vcnvt"))),
                        key=os.path.getmtime, reverse=True)
         deste = [f for f in todos if f"-{h}-" in os.path.basename(f)]
         for f in deste[5:] + [f for f in todos if f not in deste[:5]][40:]:
@@ -1046,9 +1047,9 @@ def ve_autosave_lista():
     try:
         pasta = _autosave_dir()
         vistos, out = set(), []
-        for f in sorted((os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith(".vcnvt")),
+        for f in sorted((os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith((".vknv", ".vcnvt"))),
                         key=os.path.getmtime, reverse=True):
-            partes = os.path.basename(f)[:-6].rsplit("-", 3)
+            partes = os.path.splitext(os.path.basename(f))[0].rsplit("-", 3)
             h = partes[1] if len(partes) == 4 else f
             if h in vistos:
                 continue
@@ -1259,8 +1260,8 @@ def select_video_file(tool):
         result = None
         try:
             file_types = (
-                "Vídeos, áudios, imagens e projetos (*.mp4;*.mov;*.mxf;*.mkv;*.avi;*.webm;*.flv;*.f4v;*.wmv;*.asf;*.m4v;*.ts;*.mts;*.m2ts;*.3gp;*.mpg;*.mpeg;*.m2v;*.r3d;*.braw;*.ari;*.arx;*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.wma;*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.avif;*.vcnvt)",
-                "Projeto do Canivete (*.vcnvt)",
+                "Vídeos, áudios, imagens e projetos (*.mp4;*.mov;*.mxf;*.mkv;*.avi;*.webm;*.flv;*.f4v;*.wmv;*.asf;*.m4v;*.ts;*.mts;*.m2ts;*.3gp;*.mpg;*.mpeg;*.m2v;*.r3d;*.braw;*.ari;*.arx;*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.wma;*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.avif;*.vknv;*.vcnvt)",
+                "Projeto de vídeo do KANIVETE (*.vknv;*.vcnvt)",
                 "Todos os arquivos (*.*)",
             )
             result = _window.create_file_dialog(
@@ -2957,6 +2958,10 @@ class ApiBridge:
             logging.exception("editor de imagem: salvar")
             return {"success": False, "error": str(e)}
 
+    def ie_salvar_iknv(self, spec):
+        from Functions import editor_imagem
+        return editor_imagem.salvar_iknv(spec)
+
     def ie_exportar(self, spec):
         from Functions import editor_imagem
         return editor_imagem.exportar(spec)
@@ -2969,22 +2974,27 @@ class ApiBridge:
         if not _window:
             return {"success": False}
         r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), allow_multiple=bool(multiplos), file_types=(
-            "Imagens e PSD (*.psd;*.psb;*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.tif;*.tiff)", "Todos os arquivos (*.*)"))
+            "Projetos, imagens e PSD (*.iknv;*.psd;*.psb;*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.tif;*.tiff)",
+            "Projeto de imagem do KANIVETE (*.iknv)", "Todos os arquivos (*.*)"))
         paths = list(r or [])
         return {"success": bool(paths), "paths": paths}
 
     def ie_dialogo_salvar(self, nome, ext="psd", pasta=""):
         if not _window:
             return {"success": False}
-        tipos = {"psd": "Photoshop (*.psd)", "psb": "Photoshop grande (*.psb)", "png": "PNG (*.png)",
+        tipos = {"iknv": "Projeto de imagem do KANIVETE (*.iknv)", "psd": "Photoshop (*.psd)",
+                 "psb": "Photoshop grande (*.psb)", "png": "PNG (*.png)",
                  "jpg": "JPEG (*.jpg)", "webp": "WebP (*.webp)", "tif": "TIFF (*.tif)"}
         ext = ext if ext in tipos else "psd"
+        # projeto (.iknv) ou PSD: os dois tipos no diálogo; vale a extensão que o nome tiver
+        extras = (tipos["psd"],) if ext == "iknv" else (tipos["iknv"],) if ext in ("psd", "psb") else ()
         r = _window.create_file_dialog(_file_dialog_kind("SAVE", webview.SAVE_DIALOG), directory=pasta or "",
-                                       save_filename=f"{nome}.{ext}", file_types=(tipos[ext], "Todos os arquivos (*.*)"))
+                                       save_filename=f"{nome}.{ext}", file_types=(tipos[ext],) + extras + ("Todos os arquivos (*.*)",))
         if not r:
             return {"success": False, "cancelled": True}
         path = r[0] if isinstance(r, (list, tuple)) else r
-        if not path.lower().endswith("." + ext) and not (ext == "jpg" and path.lower().endswith(".jpeg")):
+        aceitas = ("." + ext,) + ((".iknv", ".psd", ".psb") if ext in ("iknv", "psd", "psb") else ()) + ((".jpeg",) if ext == "jpg" else ())
+        if not path.lower().endswith(aceitas):
             path += "." + ext
         return {"success": True, "path": path}
 
@@ -3639,7 +3649,7 @@ def _receber_de_outra_copia(pedido):
                 u.ShowWindow(hwnd, 9)   # SW_RESTORE
             u.SetForegroundWindow(hwnd)
     if pedido.get("projeto"):
-        _window.evaluate_js(f"veOpenProjectExternal({json.dumps(pedido['projeto'])})")
+        _window.evaluate_js(f"abrirProjetoExterno({json.dumps(pedido['projeto'])})")
 
 
 def main():
@@ -3665,7 +3675,7 @@ def main():
         webview = _webview
     except Exception as e:
         show_startup_error(
-            "Falha ao carregar a interface do Canivete do Pailer",
+            "Falha ao carregar a interface do KANIVETE",
             format_webview_import_error(e),
         )
         return
@@ -3721,7 +3731,7 @@ def main():
 
     # Criar a janela ANTES de qualquer operação que use Tcl/Tkinter residual
     _create_kwargs = dict(
-        title="Canivete do Pailer",
+        title="KANIVETE",
         url=html_path,
         js_api=api,
         width=_w,
@@ -3761,14 +3771,14 @@ def main():
 
     window.events.loaded += _bind_drop
 
-    # Projeto .vcnvt aberto por duplo clique: vai direto para o editor com ele carregado
+    # Projeto aberto por duplo clique: .vknv/.vcnvt vai para o editor de vídeo, .iknv para o de imagem
     from Functions import projeto as _projeto
     _projeto.registrar_associacao()
     _proj_arg = _projeto.projeto_na_linha_de_comando()
     if _proj_arg:
         def _abrir_projeto_arg():
             try:
-                window.evaluate_js(f"veOpenProjectExternal({json.dumps(_proj_arg)})")
+                window.evaluate_js(f"abrirProjetoExterno({json.dumps(_proj_arg)})")
             except Exception as e:
                 print("[projeto] não abriu:", e)
         window.events.loaded += _abrir_projeto_arg

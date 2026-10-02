@@ -1,5 +1,6 @@
 """
-projeto.py — Projetos do Pocket Editor (.vcnvt = "vídeo canivete")
+projeto.py — Projetos do KANIVETE: .vknv = editor de vídeo (Pocket Editor), .iknv = editor de imagem.
+Os .vcnvt (nome antigo do projeto de vídeo) continuam abrindo; salvar um deles grava um .vknv ao lado.
 
 O arquivo é um JSON pequeno: guarda a timeline (clipes, trilhas, cortes, ganho, propriedades)
 e os CAMINHOS do vídeo e das imagens usadas — as mídias não são copiadas para dentro dele.
@@ -8,13 +9,27 @@ import json
 import os
 import sys
 
-EXTENSAO = ".vcnvt"
-FORMATO = "vcnvt"
+EXTENSAO = ".vknv"                      # projeto do editor de vídeo
+EXTENSOES_VIDEO = (".vknv", ".vcnvt")   # .vcnvt = nome antigo (abre; salvar grava um .vknv ao lado)
+EXTENSAO_IMAGEM = ".iknv"               # projeto do editor de imagem (Functions/editor_imagem.py)
+FORMATO = "vknv"
+FORMATOS_ACEITOS = ("vknv", "vcnvt")
 VERSAO = 1
-_PROGID = "CaniveteDoPailer.vcnvt"
+# tipo do arquivo no Windows (o ProgId antigo do .vcnvt continua valendo para os arquivos velhos)
+_TIPOS = {".vknv": ("CaniveteDoPailer.vknv", "Projeto de vídeo do KANIVETE"),
+          ".vcnvt": ("CaniveteDoPailer.vcnvt", "Projeto de vídeo do KANIVETE (antigo)"),
+          ".iknv": ("CaniveteDoPailer.iknv", "Projeto de imagem do KANIVETE")}
+
+
+def eh_projeto_video(path):
+    return str(path or "").lower().endswith(EXTENSOES_VIDEO)
 
 
 def com_extensao(path):
+    """Caminho com .vknv (um .vcnvt antigo vira .vknv com o mesmo nome, ao lado)."""
+    base, ext = os.path.splitext(path)
+    if ext.lower() == ".vcnvt":
+        return base + EXTENSAO
     return path if path.lower().endswith(EXTENSAO) else path + EXTENSAO
 
 
@@ -36,10 +51,10 @@ def abrir(path):
     """Lê o projeto e lista os arquivos referenciados que não existem mais."""
     with open(path, "r", encoding="utf-8") as f:
         dados = json.load(f)
-    if dados.get("formato") != FORMATO:
-        raise ValueError("Este arquivo não é um projeto do Canivete do Pailer.")
+    if dados.get("formato") not in FORMATOS_ACEITOS:
+        raise ValueError("Este arquivo não é um projeto de vídeo do KANIVETE.")
     if int(dados.get("versao", 1)) > VERSAO:
-        raise ValueError("Projeto criado numa versão mais nova do Canivete. Atualize o app para abrir.")
+        raise ValueError("Projeto criado numa versão mais nova do KANIVETE. Atualize o app para abrir.")
     faltando = []
     video = dados.get("video")
     if not video or not os.path.isfile(video):
@@ -52,7 +67,7 @@ def abrir(path):
 
 def registrar_associacao():
     """
-    Faz o Windows abrir arquivos .vcnvt com o Canivete (duplo clique), só para o usuário atual
+    Faz o Windows abrir .vknv, .iknv (e os .vcnvt antigos) com o KANIVETE (duplo clique), só para o usuário atual
     (HKCU, sem pedir administrador). Só no executável; é idempotente e silencioso se falhar.
     """
     if not getattr(sys, "frozen", False) or os.name != "nt":
@@ -65,23 +80,25 @@ def registrar_associacao():
             icone = exe
         comando = f'"{exe}" "%1"'
         base = r"Software\Classes"
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\{EXTENSAO}") as k:
-            atual = winreg.QueryValue(k, None) if _tem_valor(k) else ""
-            if atual != _PROGID:
-                winreg.SetValue(k, "", winreg.REG_SZ, _PROGID)
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\{_PROGID}") as k:
-            winreg.SetValue(k, "", winreg.REG_SZ, "Projeto do Canivete do Pailer")
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\{_PROGID}\DefaultIcon") as k:
-            winreg.SetValue(k, "", winreg.REG_SZ, icone)
-        cmd_key = rf"{base}\{_PROGID}\shell\open\command"
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_key) as k:
-            antigo = winreg.QueryValue(k, None) if _tem_valor(k) else ""
-            if antigo == comando:
-                return True
-            winreg.SetValue(k, "", winreg.REG_SZ, comando)
-        # avisa o Explorer para atualizar ícones/associações
-        import ctypes
-        ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)
+        mudou = False
+        for ext, (progid, descricao) in _TIPOS.items():
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\{ext}") as k:
+                atual = winreg.QueryValue(k, None) if _tem_valor(k) else ""
+                if atual != progid:
+                    winreg.SetValue(k, "", winreg.REG_SZ, progid)
+                    mudou = True
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\{progid}") as k:
+                winreg.SetValue(k, "", winreg.REG_SZ, descricao)
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\{progid}\DefaultIcon") as k:
+                winreg.SetValue(k, "", winreg.REG_SZ, icone)
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\{progid}\shell\open\command") as k:
+                antigo = winreg.QueryValue(k, None) if _tem_valor(k) else ""
+                if antigo != comando:
+                    winreg.SetValue(k, "", winreg.REG_SZ, comando)
+                    mudou = True
+        if mudou:   # avisa o Explorer para atualizar ícones/associações
+            import ctypes
+            ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)
         return True
     except Exception:
         return False
@@ -97,8 +114,8 @@ def _tem_valor(chave):
 
 
 def projeto_na_linha_de_comando(argv=None):
-    """Caminho do .vcnvt recebido ao abrir o app por duplo clique (ou None)."""
+    """Caminho do projeto (.vknv, .vcnvt ou .iknv) recebido ao abrir o app por duplo clique (ou None)."""
     for a in (argv if argv is not None else sys.argv[1:]):
-        if a.lower().endswith(EXTENSAO) and os.path.isfile(a):
+        if a.lower().endswith(EXTENSOES_VIDEO + (EXTENSAO_IMAGEM,)) and os.path.isfile(a):
             return os.path.abspath(a)
     return None

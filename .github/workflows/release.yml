@@ -70,7 +70,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.version }}
-          name: Canivete do Pailer v${{ steps.ver.outputs.version }}
+          name: KANIVETE v${{ steps.ver.outputs.version }}
           body: |
             ${{ github.event.head_commit.message }}
 

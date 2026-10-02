@@ -283,7 +283,7 @@ function ieOpSel(ev) {
 }
 
 // pinta uma cobertura (canvas do tamanho do documento) na camada ativa com cor/opacidade, respeitando a seleção
-function iePintarCobertura(doc, L, cob, R, nome, { cor, opac = 1, borracha = false, colorido = false } = {}) {
+function iePintarCobertura(doc, L, cob, R, nome, { cor, opac = 1, borracha = false, colorido = false, preservar = false } = {}) {
     const alvo = ieModPinturaAlvo(doc, L);
     const o = ieGravavel(L, alvo);
     const fundo = alvo === 'm' ? (L.m.fundo || 0) : 0;
@@ -306,7 +306,7 @@ function iePintarCobertura(doc, L, cob, R, nome, { cor, opac = 1, borracha = fal
     } else {
         if (!colorido && !borracha) { tc.globalCompositeOperation = 'source-in'; tc.fillStyle = cor || IE.cor[0]; tc.fillRect(0, 0, R.w, R.h); }
         ctx.globalAlpha = opac;
-        ctx.globalCompositeOperation = borracha ? 'destination-out' : (L.travas & 1 ? 'source-atop' : 'source-over');
+        ctx.globalCompositeOperation = borracha ? 'destination-out' : (L.travas & 1 || preservar ? 'source-atop' : 'source-over');
         ctx.drawImage(tmp, lx, ly);
         L.sujoPx = true;
     }
@@ -506,7 +506,7 @@ const IE_MOVER = {
         }
     },
     sobre(ctx, doc) {
-        if (!IE.op.mover.controles || IE.transf || IE.mov) return;
+        if (!IE.op.mover.controles || IE.transf || IE.mov || IE.semExtras) return;
         const R = ieCaixaAlvos(doc);
         if (!R) return;
         const a = ieDocTela(R.x, R.y, doc), w = R.w * doc.zoom, h = R.h * doc.zoom;
@@ -1121,7 +1121,7 @@ function ieTransfAplicar() {
         R = ieRUniao(R, ieRCamada(L));
     }
     ieAgendar(R, doc);
-    if (!ident) ieHist(ieT('Transformação livre'));
+    if (!ident) { IE.ultimaTransf = M; ieHist(ieT('Transformação livre')); }   // Transformar de novo (Shift+Ctrl+T)
     ieOpcoesRender?.();
     ieDesenharSobre();
 }

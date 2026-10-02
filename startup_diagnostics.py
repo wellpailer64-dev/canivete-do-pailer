@@ -82,7 +82,7 @@ def preflight_problem():
     blocked = blocked_files()
     if blocked:
         return (
-            "O Windows esta bloqueando arquivos do Canivete do Pailer.",
+            "O Windows esta bloqueando arquivos do KANIVETE.",
             _format_blocked_files_message(blocked),
         )
 

@@ -24,7 +24,7 @@ const VE = {
     activeSequence: null,
     openSequences: [],
     _seqN: 0,
-    projectPath: null,  // .vcnvt salvo/aberto
+    projectPath: null,  // .vknv salvo/aberto (ou .vcnvt antigo)
     dirty: false,       // alterações desde o último salvar
     quickEdit: false,   // edição descartável: exporta e fecha sem pedir salvar projeto
     quickEditPending: false, // Quick edit aberto sem mídia: o próximo arquivo herda o modo descartável
@@ -2332,7 +2332,7 @@ function veGuardarDrop(e) {
 }
 
 function veDropFiles(itens) {
-    const proj = itens.find(i => !i.pasta && /\.vcnvt$/i.test(i.path));
+    const proj = itens.find(i => !i.pasta && /\.(vknv|vcnvt)$/i.test(i.path));
     if (proj) { veOpenProject(proj.path); return; }
     // PSD/PSB: Comp com as camadas (editor-psd.js); no painel Projeto, só entra no projeto
     const psds = itens.filter(i => !i.pasta && typeof VE_EXT_PSD !== 'undefined' && VE_EXT_PSD.test(i.path));
@@ -3634,14 +3634,14 @@ function veMoveSnap(t, excluir) {
     return best != null ? best : veSnapFrame(t);
 }
 
-// ─────────────────────────── projeto (.vcnvt) ───────────────────────────
+// ─────────────────────────── projeto (.vknv; abre os .vcnvt antigos) ───────────────────────────
 // Ctrl+S salva, Ctrl+Shift+S salva como, Ctrl+O abre (vídeo ou projeto). O arquivo guarda a timeline
-// e os caminhos das mídias (nada é copiado). Duplo clique num .vcnvt abre o app direto aqui.
+// e os caminhos das mídias (nada é copiado). Duplo clique num .vknv abre o app direto aqui.
 
 function veUpdateTitle() {
     const el = $ve('ve-proj');
     if (!el) return;
-    const nome = VE.projectPath ? VE.projectPath.split(/[\\/]/).pop().replace(/\.vcnvt$/i, '') : '';
+    const nome = VE.projectPath ? VE.projectPath.split(/[\\/]/).pop().replace(/\.(vknv|vcnvt)$/i, '') : '';
     el.textContent = nome ? nome + (VE.dirty ? ' •' : '') : (VE.ready && VE.dirty ? 'Não salvo •' : '');
     el.title = VE.projectPath || (VE.dirty ? 'Projeto ainda não salvo (Ctrl+S)' : '');
     el.hidden = !el.textContent;
@@ -3745,7 +3745,7 @@ function veRecentesProjetosSincronizar() {
 }
 function veRegistrarProjetoRecente(path, dados) {
     if (!path) return;
-    const nome = path.split(/[\\/]/).pop().replace(/\.vcnvt$/i, '');
+    const nome = path.split(/[\\/]/).pop().replace(/\.(vknv|vcnvt)$/i, '');
     const atual = { path, nome, video: (dados && dados.video) || VE.path || '', atualizado: Date.now() };
     if (VE._capas) delete VE._capas[path];   // salvou/abriu: a capa é tirada de novo (pode ter mudado)
     const chave = path.toLocaleLowerCase();
@@ -3803,7 +3803,7 @@ function veOnboardingRender() {
     veAutosaveRender();
     const lista = veRecentesProjetos();
     if (!lista.length) {
-        box.innerHTML = `<div class="ve-start-empty">${veT('Nenhum projeto recente ainda. Crie um projeto ou abra um .vcnvt para ele aparecer aqui.')}</div>`;
+        box.innerHTML = `<div class="ve-start-empty">${veT('Nenhum projeto recente ainda. Crie um projeto ou abra um .vknv para ele aparecer aqui.')}</div>`;
         return;
     }
     box.innerHTML = lista.map((p, i) => {
@@ -3839,7 +3839,7 @@ function veOnboardingRender() {
 function veProjectData() {
     veSeqSalvarAtiva();
     return {
-        app: 'Canivete do Pailer',
+        app: 'KANIVETE',
         video: VE.path,
         media: VE.media.filter(m => m.id && !m.removido && ['image', 'ajuste', 'audio', 'texto', 'legenda', 'video', 'timeline', 'cor', 'forma', 'pincel'].includes(m.kind)
                 && (m.ovDe == null || veMidiaNaTimeline(m.id)))   // variação de Comp que nenhuma faixa usa não vai
@@ -3883,7 +3883,9 @@ function veSaveProject(comoNovo) {
     const chaveAntiga = typeof vePrChave === 'function' ? vePrChave() : null;
     return window.pywebview.api.ve_project_save(VE.projectPath, JSON.stringify(veProjectData()), !!comoNovo).then(r => {
         if (!r || !r.success) { if (r && r.error) veToast('Não foi possível salvar: ' + r.error); return false; }
+        const convertido = /\.vcnvt$/i.test(VE.projectPath || '') && /\.vknv$/i.test(r.path);
         VE.projectPath = r.path;
+        if (convertido) setTimeout(() => veToast(veT('Projeto convertido para .vknv (o .vcnvt antigo continua na pasta)')), 1600);
         if (typeof vePrProjetoSalvo === 'function') vePrProjetoSalvo(chaveAntiga);   // renders vão junto
         VE.dirty = false;
         VE.quickEdit = false;
@@ -4003,7 +4005,7 @@ function veOpenLostProject() {
     veApplyProject();
 }
 
-// Chamado pelo Python quando o app abre por duplo clique num .vcnvt
+// Chamado (por abrirProjetoExterno) quando o app abre por duplo clique num .vknv/.vcnvt
 function veOpenProjectExternal(path) {
     if (typeof switchTool === 'function') switchTool('video-cutter');
     setTimeout(() => veOpenProject(path), 60);
@@ -4183,7 +4185,7 @@ function veApplyProject() {
     const compArq = new Set((d.media || []).filter(m => m.comp && m.path).map(m => m.path));
     const faltam = (missing || []).filter(p => !compArq.has(p)).length;
     veToast(faltam ? `Projeto aberto — ${faltam} mídia(s) offline`
-                   : 'Projeto aberto: ' + name.replace(/\.vcnvt$/i, ''));
+                   : 'Projeto aberto: ' + name.replace(/\.(vknv|vcnvt)$/i, ''));
 }
 
 // ─────────────────────────── visão / zoom ───────────────────────────
@@ -5036,7 +5038,7 @@ function veQuickEdit() {
 
 function veAbrirArquivoEscolhido(path, inserirNaTimeline, quickEdit) {
     if (!path) return;
-    if (/\.vcnvt$/i.test(path)) { veOpenProject(path); return; }
+    if (/\.(vknv|vcnvt)$/i.test(path)) { veOpenProject(path); return; }
     if (typeof VE_EXT_PSD !== 'undefined' && VE_EXT_PSD.test(path)) { if (VE.ready || veConfirmDiscard()) vePsdAbrir(path, { inserir: !!inserirNaTimeline }); return; }
     if (inserirNaTimeline && VE.ready) { veDropFiles([{ path, pasta: false }]); return; }
     if (VE.ready && inserirNaTimeline !== false) { veDropFiles([{ path, pasta: false }]); return; }

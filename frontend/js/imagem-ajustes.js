@@ -400,6 +400,21 @@ async function ieAplicarComDialogo({ titulo, campos, ajuste, proc, margem, largu
     L.sujoPx = true;
     ieCamadaMudou(L, Rantes);
     ieHist(ieT(titulo));
+    IE.ultimoFiltro = { titulo, ajuste, proc, margem, vals };   // Filtro > Último filtro (Ctrl+F)
+}
+
+// Ctrl+F: o último filtro/ajuste com os mesmos valores, sem abrir o diálogo
+async function ieRepetirFiltro() {
+    const u = IE.ultimoFiltro, doc = IE.doc, L = ieAtiva(doc);
+    if (!u || !doc) { ieToast(ieT('Nenhum filtro aplicado ainda')); return; }
+    if (!(await iePodePintar(L, 'aplicar o filtro'))) return;
+    if (!L.c) return;
+    const Rantes = ieRCamada(L);
+    const r = ieProcessarCamada(L, u.proc ? u.proc(u.vals) : iePorPixel(u.ajuste(u.vals)), u.margem ? u.margem(u.vals) : 0, doc);
+    ieGravavel(L);
+    L.c = r.c; L.x = r.x; L.y = r.y; L.sujoPx = true;
+    ieCamadaMudou(L, Rantes);
+    ieHist(ieT(u.titulo));
 }
 
 const IE_AJUSTES = {

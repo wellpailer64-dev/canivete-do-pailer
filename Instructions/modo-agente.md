@@ -46,7 +46,7 @@ with sync_playwright() as p:
 
 ```
 python main.py --agente=9333
-python testes/teste_play.py "C:/caminho/projeto.vcnvt" --segundos 20 --inicio 0
+python testes/teste_play.py "C:/caminho/projeto.vknv" --segundos 20 --inicio 0
 ```
 
 Abre o projeto, espera os vídeos da timeline, toca e reprova (código 1) se a agulha voltar para trás, se houver
@@ -65,8 +65,8 @@ Rodam pelo terminal, fora do app (processo próprio, prioridade baixa) — não 
 Saída em JSON; imagens e resultados ficam em cache em `<cache do editor>/agente`.
 
 ```
-python -m Functions.agente_midia midias  "<projeto.vcnvt>" [--nao-usados-em "V1 MAIOR"]
-python -m Functions.agente_midia folha   "<projeto.vcnvt>" --nao-usados-em "V1 MAIOR" --quadros 6 --por-folha 10
+python -m Functions.agente_midia midias  "<projeto.vknv>" [--nao-usados-em "V1 MAIOR"]
+python -m Functions.agente_midia folha   "<projeto.vknv>" --nao-usados-em "V1 MAIOR" --quadros 6 --por-folha 10
 python -m Functions.agente_midia storyboard "<vídeo>" --passo 2 [--inicio 10 --fim 30]
 python -m Functions.agente_midia transcrever "<vídeo ou áudio>"     # frases e palavras com tempo
 python -m Functions.agente_midia batidas "<música>"                 # bpm, batidas e fortes (de 4 em 4)

@@ -1,7 +1,7 @@
 """
 instancia_unica.py — Uma cópia só do app aberta.
 
-Abrir o app de novo (atalho ou duplo clique num .vcnvt) com ele já aberto não cria outra janela na barra
+Abrir o app de novo (atalho ou duplo clique num .vknv ou .iknv) com ele já aberto não cria outra janela na barra
 de tarefas: o pedido vai para a cópia que já está rodando (que vem para a frente e abre o projeto).
 A conversa é por um soquete só em 127.0.0.1, com um token gravado na pasta do usuário.
 """

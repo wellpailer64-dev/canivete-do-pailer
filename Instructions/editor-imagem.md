@@ -20,6 +20,15 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 - `frontend/css/imagem.css`, `Functions/editor_imagem.py`, `main.py` (métodos `ie_*`), `Functions/media_server.py`
   (servir bytes da memória e receber POST).
 
+## Projeto (.iknv) e atalhos
+- `.iknv` = projeto do editor: zip com `documento.json` (árvore de camadas inteira, canvases como `{$png}`), `pixels/*.png`
+  e `previa.png`. Documento novo salva em `.iknv` por padrão (o diálogo também oferece `.psd`); Ctrl+S num `.iknv`
+  salva nele. Se veio de um PSD que não mudou, guarda `psd_origem` e "Salvar como PSD" continua de ida e volta.
+- `frontend/js/imagem-atalhos.js`: atalhos padrão do Photoshop (Windows) conferidos na referência oficial da Adobe
+  (PDFs "Keyboard shortcuts | Photoshop" e "Photoshop CC Windows Keyboard Shortcuts Reference"); Ajuda > Atalhos do
+  teclado (Alt+Shift+Ctrl+K) lista todos, marcando os que o editor ainda não tem (Q, J, O, P, R, réguas/guias...).
+  Modos de mesclagem por Shift+Alt+letra valem para a camada (o editor não tem modo no pincel).
+
 ## Reaproveitado do editor de vídeo
 - Filtro > Filtro Camera Raw (Shift+Ctrl+A): a conta do Luz e Cor (`veLcBuildLut`, editor-lc.js) vira LUT 3D aplicada
   na camada (trilinear), mais nitidez na luma e vinheta; painel na lateral com a imagem à vista.

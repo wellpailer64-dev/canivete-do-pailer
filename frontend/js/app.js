@@ -386,7 +386,7 @@ function renderTabs() {
         const { icone, nome } = _menuInfo(t);
         let extra = '';
         if (t === 'video-cutter' && typeof VE !== 'undefined' && VE.ready) {
-            const proj = VE.projectPath ? VE.projectPath.split(/[\\/]/).pop().replace(/\.vcnvt$/i, '') : '';
+            const proj = VE.projectPath ? VE.projectPath.split(/[\\/]/).pop().replace(/\.(vknv|vcnvt)$/i, '') : '';
             extra = (proj ? ` · ${_escHtml(proj)}` : '') + (VE.dirty ? ' •' : '');
         }
         const rodando = _abaRodando(t);
@@ -538,10 +538,23 @@ function onArquivosSoltos(itens) {
     const pagina = document.querySelector('.tool-page.active');
     const tool = pagina?.id.replace('page-', '');
     if (!tool || !itens?.length) return;
-    const proj = itens.find(i => !i.pasta && /\.vcnvt$/i.test(i.path));
+    const proj = itens.find(i => !i.pasta && /\.(vknv|vcnvt)$/i.test(i.path));
     if (proj && tool !== 'video-cutter') { switchTool('video-cutter'); setTimeout(() => veOpenProject(proj.path), 60); return; }
+    const projImg = itens.find(i => !i.pasta && /\.iknv$/i.test(i.path));
+    if (projImg && tool !== 'editor-imagem') { abrirProjetoExterno(projImg.path); return; }
     if (tool === 'home') return homeSugerir(itens);
     _entregarItens(tool, itens);
+}
+
+// Projeto aberto por fora (duplo clique no Explorer ou outra cópia do app): cada extensão no seu editor
+// .vknv (e o antigo .vcnvt) = editor de vídeo; .iknv = editor de imagem
+function abrirProjetoExterno(path) {
+    if (/\.iknv$/i.test(path || '')) {
+        switchTool('editor-imagem');
+        setTimeout(() => ieAbrirArquivo(path), 60);
+        return;
+    }
+    veOpenProjectExternal(path);
 }
 
 // Entrega arquivos/pastas (arrastados ou escolhidos na Home) para uma ferramenta
@@ -2442,9 +2455,9 @@ function renderOmniVoiceStatus(data) {
         if (!data.engine_ready) {
             detail.innerHTML = '<span class="txt-err">OmniVoice não está instalado nesta build.</span>';
         } else if (data.model_installed) {
-            detail.innerHTML = '<span class="txt-ok">Modelo organizado na pasta do Canivete.</span>';
+            detail.innerHTML = '<span class="txt-ok">Modelo organizado na pasta do Kanivete.</span>';
         } else if (data.external_model_cache) {
-            detail.innerHTML = 'Modelo encontrado em outro projeto. O botão abaixo importa para o Canivete.';
+            detail.innerHTML = 'Modelo encontrado em outro projeto. O botão abaixo importa para o Kanivete.';
         } else {
             detail.innerHTML = 'Baixe o modelo apenas quando for usar esta ferramenta.';
         }
@@ -2560,7 +2573,7 @@ async function deleteOmniVoiceVoice(id) {
     const name = _voiceNameById(id) || 'esta voz';
     const ok = await appConfirm({
         titulo: `Excluir ${name}?`,
-        texto: 'A voz salva e a amostra de referência serão removidas do Canivete.',
+        texto: 'A voz salva e a amostra de referência serão removidas do Kanivete.',
         botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Excluir', valor: 1, tipo: 'perigo' }],
     });
     if (!ok) return;
@@ -3124,7 +3137,7 @@ function openFolder(path) {
 // Inicialização
 // =========================
 
-console.log('Canivete do Pailer - Frontend carregado');
+console.log('KANIVETE - Frontend carregado');
 
 // Expor todas as funções para o Python chamar
 window.updateConverterAudioProgress = updateConverterAudioProgress;

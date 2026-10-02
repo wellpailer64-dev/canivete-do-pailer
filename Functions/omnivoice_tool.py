@@ -290,7 +290,7 @@ def _external_python_ready(path: str) -> bool:
 
 def _select_engine() -> dict[str, Any]:
     if _inprocess_engine_ready():
-        return {"kind": "inprocess", "label": "embutido no Canivete"}
+        return {"kind": "inprocess", "label": "embutido no Kanivete"}
     for py in _candidate_external_pythons():
         if _external_python_ready(py):
             return {"kind": "external", "python": py, "label": os.path.dirname(os.path.dirname(py))}
@@ -324,7 +324,7 @@ def _run_external(action: str, payload: dict[str, Any], callback_log: LogFn = No
                   callback_progresso: ProgressFn = None, timeout: int | None = None) -> dict[str, Any]:
     engine = _select_engine()
     if engine.get("kind") != "external":
-        raise RuntimeError("OmniVoice nao esta instalado neste Canivete e nenhum ambiente externo foi encontrado.")
+        raise RuntimeError("OmniVoice nao esta instalado neste Kanivete e nenhum ambiente externo foi encontrado.")
 
     _ensure_dirs()
     token = uuid.uuid4().hex
@@ -411,13 +411,13 @@ def _load_model_inprocess(hf_home: str, callback_log: LogFn = None,
 def download_model(callback_log: LogFn = None, callback_progresso: ProgressFn = None) -> dict[str, Any]:
     _ensure_dirs()
     if _snapshot_exists(_hf_home()):
-        _log(callback_log, "Modelo OmniVoice ja esta na pasta do Canivete.")
+        _log(callback_log, "Modelo OmniVoice ja esta na pasta do Kanivete.")
         return status()
 
     external_cache = _external_hf_home()
     if external_cache:
         _progress(callback_progresso, -1, "Importando modelo local existente...")
-        _log(callback_log, f"Cache encontrado fora do Canivete: {external_cache}")
+        _log(callback_log, f"Cache encontrado fora do Kanivete: {external_cache}")
         _log(callback_log, "Copiando para modelos_ia/omnivoice/models/hf_cache...")
         shutil.copytree(external_cache, _hf_home(), dirs_exist_ok=True)
         _progress(callback_progresso, 100, "Modelo importado.")

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canivete do Pailer</title>
+    <title>KANIVETE</title>
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/editor.css">
     <link rel="stylesheet" href="css/imagem.css">
@@ -76,13 +76,13 @@
     <!-- Splash -->
     <div id="splash-overlay">
         <img src="identidade/splash.png" alt="">
-        <div class="splash-title">Canivete <em>do Pailer</em></div>
+        <div class="splash-title">KANI<em>VETE</em></div>
         <div class="splash-bar"></div>
     </div>
 
     <!-- Barra de título própria (main.py: _barra_propria tira a do Windows e liga html.barra-propria) -->
     <div class="titlebar">
-        <span class="titlebar-nome">Canivete do Pailer</span>
+        <span class="titlebar-nome">KANIVETE</span>
         <div class="tb-bolas">
             <button class="tb-bola tb-min" onclick="janelaCmd('minimizar')" title="Minimizar"></button>
             <button class="tb-bola tb-max" onclick="janelaCmd('maximizar')" title="Maximizar / restaurar"></button>
@@ -97,8 +97,8 @@
                 <button class="brand-home" onclick="switchTool('home')" title="Início">
                     <img src="identidade/splash.png" alt="" class="brand-logo">
                     <div class="brand-text">
-                        <b>Canivete</b>
-                        <span>do Pailer</span>
+                        <b>KANIVETE</b>
+                        <span>vídeo · áudio · imagem</span>
                     </div>
                 </button>
                 <button class="nav-toggle" onclick="toggleNav()" title="Recolher menu"><svg class="i"><use href="#i-sidebar"/></svg></button>
@@ -196,7 +196,7 @@
                     <header class="home-top">
                         <div>
                             <h1 class="home-title">O que vamos fazer <em>hoje?</em></h1>
-                            <p class="home-sub">Vídeo, áudio e imagem direto no seu PC. Solte um arquivo abaixo e o Canivete sugere a ferramenta certa.</p>
+                            <p class="home-sub">Vídeo, áudio e imagem direto no seu PC. Solte um arquivo abaixo e o Kanivete sugere a ferramenta certa.</p>
                         </div>
                         <span class="home-badge"><svg class="i"><use href="#i-shield"/></svg>Nada vai para a nuvem</span>
                     </header>
@@ -840,7 +840,7 @@
                                         <div><b>⧉</b> na aba, <kbd>Ctrl</kbd> ao soltar, ou soltar fora dos painéis: o painel vira uma janela própria (dá para levar a outro monitor). Fechar a janela devolve o painel ao lugar de antes</div>
                                         <div><kbd>N</kbd> Ímã (encaixe) liga/desliga</div>
                                         <div><kbd>Ctrl</kbd>+<kbd>M</kbd> Exportar · <kbd>Ctrl</kbd>+<kbd>O</kbd> Abrir vídeo ou projeto</div>
-                                        <div><kbd>Ctrl</kbd>+<kbd>S</kbd> Salvar projeto (.vcnvt) · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> Salvar como</div>
+                                        <div><kbd>Ctrl</kbd>+<kbd>S</kbd> Salvar projeto (.vknv) · <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> Salvar como</div>
                                         <h4>Quadros-chave (Controles de efeito)</h4>
                                         <div>⏱ liga a animação da propriedade e marca o 1º quadro-chave na agulha</div>
                                         <div>Com ⏱ ligado, mova a agulha e mude o valor (ou arraste no monitor): o quadro-chave é criado sozinho</div>
@@ -1513,7 +1513,7 @@
                             <div class="dropzone ov-drop" data-tool="omnivoice">
                                 <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
                                 <div class="dz-title">Nova voz</div>
-                                <div class="dz-sub">Arraste um áudio. O Canivete usa até 8s úteis da fala.</div>
+                                <div class="dz-sub">Arraste um áudio. O Kanivete usa até 8s úteis da fala.</div>
                                 <div class="dz-actions">
                                     <button class="btn-secondary" onclick="selectFile('omnivoice')"><svg class="i"><use href="#i-file"/></svg>Escolher áudio</button>
                                 </div>
@@ -1526,7 +1526,7 @@
                                     <button class="btn-secondary" onclick="createOmniVoiceVoice()"><svg class="i"><use href="#i-save"/></svg>Salvar</button>
                                 </div>
                                 <label class="switch-row ov-reference-switch"><input type="checkbox" id="omnivoice-ref-treatment" checked><span class="switch"></span><span><b>Tratar amostra</b><small>Reduz ruído de fundo e nivela a voz antes de salvar</small></span></label>
-                                <textarea id="omnivoice-ref-text" class="field ov-textarea ov-ref-text" rows="2" placeholder="Texto da amostra, opcional. Se deixar vazio, o Canivete transcreve."></textarea>
+                                <textarea id="omnivoice-ref-text" class="field ov-textarea ov-ref-text" rows="2" placeholder="Texto da amostra, opcional. Se deixar vazio, o Kanivete transcreve."></textarea>
                             </div>
                         </section>
 
@@ -2019,5 +2019,6 @@
     <script src="js/imagem-fatias.js"></script>
     <script src="js/imagem-dock.js"></script>
     <script src="js/imagem-estilo.js"></script>
+    <script src="js/imagem-atalhos.js"></script>
 </body>
 </html>

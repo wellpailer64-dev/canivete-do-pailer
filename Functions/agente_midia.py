@@ -2,8 +2,8 @@
 agente_midia.py — ferramentas para um agente (Claude) entender as mídias de um projeto sem assistir/ouvir tudo.
 
 Rodam FORA do app (processo próprio, prioridade baixa), então não atrapalham a edição manual:
-    python -m Functions.agente_midia midias  <projeto.vcnvt> [--nao-usados-em "V1 MAIOR"]
-    python -m Functions.agente_midia folha   <projeto.vcnvt | vídeos...> [--nao-usados-em NOME] [--quadros 5] [--por-folha 8]
+    python -m Functions.agente_midia midias  <projeto.vknv> [--nao-usados-em "V1 MAIOR"]
+    python -m Functions.agente_midia folha   <projeto.vknv | vídeos...> [--nao-usados-em NOME] [--quadros 5] [--por-folha 8]
     python -m Functions.agente_midia storyboard <vídeo> [--passo 1.5] [--inicio 0] [--fim 0] [--colunas 8]
     python -m Functions.agente_midia transcrever <arquivo> [--idioma pt]
     python -m Functions.agente_midia batidas <áudio>
@@ -132,9 +132,9 @@ def _fonte(tam):
 
 def folha(fontes, quadros=5, por_folha=8, altura=170, nao_usados_em=None):
     """Folha de contato: cada linha = um vídeo (nº, nome, duração) + `quadros` quadros espaçados.
-    fontes = um projeto .vcnvt (todos os vídeos, ou os que não estão na timeline `nao_usados_em`) ou vídeos."""
+    fontes = um projeto .vknv (ou .vcnvt antigo) (todos os vídeos, ou os que não estão na timeline `nao_usados_em`) ou vídeos."""
     from PIL import Image, ImageDraw
-    if len(fontes) == 1 and fontes[0].lower().endswith(".vcnvt"):
+    if len(fontes) == 1 and fontes[0].lower().endswith((".vknv", ".vcnvt")):
         vids = [x for x in midias(fontes[0], nao_usados_em) if x["tipo"] == "video" and x["existe"]]
     else:
         vids = []

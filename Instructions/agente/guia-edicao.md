@@ -11,7 +11,7 @@
 - testes de código: outra instância `python main.py --agente=9333` (não usar a do usuário)
 
 ## 1 LER MÍDIA (barato em tokens) — Functions/agente_midia.py
-- `python -m Functions.agente_midia analisar "<proj.vcnvt>" --nao-usados-em "<timeline>"` → 1 comando:
+- `python -m Functions.agente_midia analisar "<proj.vknv>" --nao-usados-em "<timeline>"` → 1 comando:
   folhas de contato (10 vídeos/img) + cena por CLIP local (rótulos em CENAS) + fala (vídeos ≤180 s) + suspeitas
   saída: resumo 1 linha/vídeo + mapa_*.json. ~40 s p/ 19 vídeos (cache depois)
 - no app: `await veAgenteMidia('analisar', [proj, '--nao-usados-em', nome])` (processo à parte)

@@ -271,6 +271,7 @@ function ieTextoInstalar() {
     });
     ta.addEventListener('keydown', ev => {
         ev.stopPropagation();
+        if (typeof ieTextoAtalho === 'function' && ieTextoAtalho(ev)) { ev.preventDefault(); return; }
         if (ev.key === 'Escape' || (ev.key === 'Enter' && (ev.ctrlKey || ev.location === 3))) { ev.preventDefault(); ieTextoEncerrar(true); }
     });
     ta.addEventListener('pointerdown', ev => ev.stopPropagation());

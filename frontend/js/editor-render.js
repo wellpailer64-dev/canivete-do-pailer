@@ -11,7 +11,7 @@
 
 const VEPR = {
     files: new Map(),     // hash → {url, path, size}
-    chave: null,          // projeto (caminho do .vcnvt ou, sem salvar, da mídia) dono da pasta carregada
+    chave: null,          // projeto (caminho do .vknv ou, sem salvar, da mídia) dono da pasta carregada
     carregando: false,
     sujo: true,           // segmentos a recalcular
     segs: [],             // [{a, b, pesado, sig}]

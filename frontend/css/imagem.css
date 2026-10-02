@@ -313,3 +313,28 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 .ie-fonte-item small { font: 10.5px var(--font-ui); color: var(--text-3); flex: none; }
 .ie-fonte-item:hover { background: var(--ie-hover); }
 .ie-fonte-item.on { background: var(--ie-sel); }
+
+/* modos de tela (F) e painéis escondidos (Tab / Shift+Tab) — imagem-atalhos.js */
+.ie.ie-tela-1, .ie.ie-tela-2 { position: fixed; inset: 0; z-index: 2000; }
+.ie.ie-tela-2 { grid-template-rows: 0 0 minmax(0, 1fr); background: #000; }
+.ie.ie-tela-2 .ie-top, .ie.ie-tela-2 .ie-opcoes, .ie.ie-tela-2 .ie-ferr, .ie.ie-tela-2 .ie-paineis, .ie.ie-tela-2 .ie-abas,
+.ie.ie-tela-2 .ie-status { display: none !important; }
+.ie.ie-tela-2 .ie-corpo { grid-template-columns: 0 0 minmax(0, 1fr) 0 !important; }
+.ie.ie-tela-2 .ie-centro { grid-template-rows: 0 minmax(0, 1fr) 0; }
+.ie.ie-tela-2 .ie-vista { background: #000; }
+.ie.ie-sem-paineis { grid-template-rows: 40px 0 minmax(0, 1fr); }
+.ie.ie-sem-paineis .ie-opcoes, .ie.ie-sem-paineis .ie-ferr, .ie.ie-sem-paineis .ie-paineis { display: none !important; }
+.ie.ie-sem-paineis .ie-corpo { grid-template-columns: 0 0 minmax(0, 1fr) 0 !important; }
+.ie.ie-sem-lado .ie-paineis { display: none !important; }
+.ie.ie-sem-lado .ie-corpo { grid-template-columns: 46px 0 minmax(0, 1fr) 0 !important; }
+/* Ajuda > Atalhos do teclado */
+.ie-at { max-height: calc(100% - 40px); }
+.ie-at-busca { padding: 0 16px 8px; }
+.ie-at-busca input { width: 100%; height: 30px; background: var(--bg-input); color: var(--text); border: 1px solid var(--ie-linha-2); border-radius: 4px; padding: 0 8px; font: inherit; outline: none; }
+.ie-at-lista { gap: 0; }
+.ie-at-sec { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); margin: 10px 0 4px; }
+.ie-at-lin { display: grid; grid-template-columns: 250px 1fr; gap: 10px; padding: 3px 0; border-bottom: 1px solid var(--ie-linha); align-items: baseline; }
+.ie-at-lin kbd { font: 11.5px var(--font-mono, monospace); color: var(--text); }
+.ie-at-lin span { color: var(--text-2); }
+.ie-at-lin.falta kbd, .ie-at-lin.falta span { color: var(--text-3); }
+.ie-at-lin em { font-style: normal; font-size: 11px; }

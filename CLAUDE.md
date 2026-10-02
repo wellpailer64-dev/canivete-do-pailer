@@ -1,4 +1,12 @@
-# Canivete do Pailer — notas para o Claude
+# KANIVETE (antes Canivete do Pailer) — notas para o Claude
+
+## Nome e extensões
+- Nome visível: **KANIVETE** (janela, splash, marca, textos, release). Identificadores internos continuam
+  `CaniveteDoPailer` (exe, zip do release, `%APPDATA%\CaniveteDoPailer`, mutex, `CANIVETE_*`): o updater instalado nos
+  amigos procura esses nomes; trocar exige uma migração planejada.
+- Projetos: `.vknv` = editor de vídeo (os `.vcnvt` antigos abrem; Ctrl+S grava um `.vknv` ao lado),
+  `.iknv` = editor de imagem (zip com documento.json + PNGs; `Functions/editor_imagem.py`). Associação no Windows
+  (HKCU) em `Functions/projeto.py`; duplo clique roteado por `abrirProjetoExterno` (frontend/js/app.js).
 
 ## Testar a interface: use o modo agente (não monte teste no navegador)
 O app expõe o painel real via Chrome DevTools Protocol, com a API pywebview de verdade:
@@ -12,7 +20,7 @@ Conecte por CDP (ex.: Playwright `connect_over_cdp`), rode JS na página (`veSee
 clique e tire print. Detalhes e segurança em `Instructions/modo-agente.md`.
 Fechar o app aberto do usuário (para trocar o exe ou relançar com `--agente`) exige o ok dele antes.
 
-Play do Pocket Editor: `python testes/teste_play.py "<projeto.vcnvt>" [--segundos 20] [--inicio 0]` (app em
+Play do Pocket Editor: `python testes/teste_play.py "<projeto.vknv>" [--segundos 20] [--inicio 0]` (app em
 `--agente=9333`) mede agulha voltando, buscas, esperas, quadros perdidos e travadas; sai com 1 se passar dos limites.
 Rodar antes de release quando mexer em reprodução, áudio ou prévias.
 
