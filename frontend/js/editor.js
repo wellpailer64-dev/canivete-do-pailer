@@ -2338,7 +2338,7 @@ function veDropFiles(itens) {
     const psds = itens.filter(i => !i.pasta && typeof VE_EXT_PSD !== 'undefined' && VE_EXT_PSD.test(i.path));
     if (psds.length) {
         const noProj = VE.ready && typeof vePjSoltouAqui === 'function' ? vePjSoltouAqui(veDropAtual()) : null;
-        (async () => { for (const p of psds) await vePsdAbrir(p.path, noProj ? { pasta: noProj.pasta, soProjeto: true } : {}); })();
+        (async () => { for (const p of psds) await vePsdAbrir(p.path, noProj ? { pasta: noProj.pasta, soProjeto: true } : { inserir: true }); })();
         itens = itens.filter(i => !psds.includes(i));
         if (!itens.length) return;
     }
@@ -3007,6 +3007,7 @@ function veDesenharItens(ctx, cv, itens, pv, t) {
             if (src !== 'offline') src = veFxRender(c, src, szd, pv * p.sc / 100);   // efeitos rodam antes do movimento (como no Premiere)
             ctx.save();
             ctx.globalAlpha = Math.max(0, Math.min(1, p.op / 100));
+            if (src !== 'offline' && typeof veSombraDe === 'function') veSombraAplicar(ctx, veSombraDe(c), pv);   // Sombra projetada
             const gco = src !== 'offline' && veBmGco(c);   // modo de mesclagem (Tela, Multiplicação...)
             if (gco) ctx.globalCompositeOperation = gco;
             ctx.translate(p.x, p.y);
@@ -5036,7 +5037,7 @@ function veQuickEdit() {
 function veAbrirArquivoEscolhido(path, inserirNaTimeline, quickEdit) {
     if (!path) return;
     if (/\.vcnvt$/i.test(path)) { veOpenProject(path); return; }
-    if (typeof VE_EXT_PSD !== 'undefined' && VE_EXT_PSD.test(path)) { if (VE.ready || veConfirmDiscard()) vePsdAbrir(path); return; }
+    if (typeof VE_EXT_PSD !== 'undefined' && VE_EXT_PSD.test(path)) { if (VE.ready || veConfirmDiscard()) vePsdAbrir(path, { inserir: !!inserirNaTimeline }); return; }
     if (inserirNaTimeline && VE.ready) { veDropFiles([{ path, pasta: false }]); return; }
     if (VE.ready && inserirNaTimeline !== false) { veDropFiles([{ path, pasta: false }]); return; }
     if (veConfirmDiscard()) {

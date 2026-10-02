@@ -201,7 +201,7 @@ def renderizar_comp(base, h, job, on_progress):
             stop_event=stop, sem_audio=not job.get("mix"), camadas=job.get("camadas") or [],
             audio_segmentos=None, duracao=job.get("dur"), audio_clipes=job.get("mix") or [],
             legendas=job.get("legendas"), quadro=job.get("quadro"),
-            saida=parte, proc_holder=_hold, alfa=True,
+            saida=parte, proc_holder=_hold, alfa=True, alfa_leve=bool(job.get("estatico")) and not job.get("mix"),
         )
     finally:
         with _comp_lock:

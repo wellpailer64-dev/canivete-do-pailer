@@ -425,10 +425,31 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
   Sobreposição de cor, Sombra projetada, Brilho externo e Traçado (desenhados no Python; a biblioteca não desenha).
   Brilho/Contraste vira camada de ajuste; as outras camadas de ajuste e modos sem equivalente (Luminosidade, Matiz...)
   saem em `m.psdAvisos` e no console. Texto e objeto inteligente entram com os pixels guardados (texto em `c.psdTexto`).
+- **Texto vira texto editável** (`vePsdTexto`): fonte pelo nome PostScript (`fontes.py` lê o nome 6; a busca compara só
+  letras e números; sem a exata, a família no peso mais perto, com aviso; sem a família, fica imagem), peso numérico
+  (`x.peso`: família tipográfica + peso no canvas, o nome GDI "SF UI Display Black" saía fino), tamanho = tamanho ×
+  escala da transformação, espaçamento (Tracking = milésimos de em, a mesma unidade), entrelinha (automática = 120%),
+  alinhamento, cor, sombra/brilho → sombra do texto (com ângulo, `sAng`), traçado → contorno, sobreposição de cor → cor.
+  Caixa de parágrafo: quebra palavra a palavra na largura da caixa. A tinta do Photoshop (bbox dos pixels) posiciona o
+  texto e corrige tamanho/espaçamento em texto reto de uma linha. Giro sim; inclinado/esticado fica imagem.
+- **Estilos misturados** (`vePsdTextoMisto`): um texto por trecho de estilo de cada linha (larguras medidas com a fonte de
+  cada trecho, alinhamento e entrelinha da linha), numa Comp com o nome da camada.
+- Sombra projetada de camada que não é texto vira o efeito **Sombra projetada** do editor (editável), não vai no PNG.
+- Importar/Abrir cria a Comp no Projeto e abre; só arrastar para a timeline (ou "importar para a timeline") insere na
+  timeline aberta (antes o 2º PSD ia para dentro da Comp aberta do 1º).
 - PNGs em `%LOCALAPPDATA%/CaniveteDoPailer/PSD importados/<nome>-<hash>/` (fora do cache limpo sozinho; mesmo arquivo
   sem mudança reaproveita). cv2.imwrite não grava caminho com acento: PNG pelo Pillow.
 - Conferido: recompor as camadas extraídas dá o achatado do Photoshop (25 PSDs do portfólio + o PSB: 0–1,5 de 255 nos
   sem camada de ajuste); prévia do PSB 0,4; exportação 2,2.
+
+## Efeito Sombra projetada (VE_FX.sombra) e Comps estáticas
+- Cor, opacidade, ângulo (135° = para baixo à direita, como o Photoshop), distância e tamanho (desvio = tamanho/2).
+  Prévia: `shadow*` do canvas na hora de desenhar a camada (`veSombraAplicar`; não gira nem escala com ela, como a luz
+  global). Exportação: `_sombra_camada` — a camada transformada vira a forma da sombra (lutrgb, gblur só no alfa) por
+  baixo, deslocada. `_reduzir_camada` escala distância/tamanho. Caso "sombra" no teste_export.
+- Comp em que nada anima (`veCompEstatica`: imagens/textos/formas/ajustes sem quadro-chave, animação, transição, legenda;
+  Comps de dentro também) renderiza em QuickTime Animation (`alfa_leve`, -g 300): arte de 5 s 1080×1920 ~3 MB (ProRes
+  4444 ~130–400 MB; os testes de PSD encheram o disco D: com 11 GB de Comps).
 
 ## Exportação: cor igual à prévia (achados do teste_export, 2026-10-02)
 - Vídeo HD sem marca de cor: o navegador (prévia) assume BT.709; o ffmpeg novo assumia BT.601 e convertia ao gravar a

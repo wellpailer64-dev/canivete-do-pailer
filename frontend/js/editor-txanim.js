@@ -235,7 +235,9 @@ function veTxaDesenho(x, f, txa, estados, tl) {
             if (on && x.sOn) {
                 ctx.shadowColor = veTxRGBA(x.sCor, x.sOp / 100);
                 ctx.shadowBlur = x.sBlur * f;
-                ctx.shadowOffsetX = ctx.shadowOffsetY = x.sDist * 0.7071 * f;
+                const [sx, sy] = veTxSombraOff(x);
+                ctx.shadowOffsetX = sx * f;
+                ctx.shadowOffsetY = sy * f;
             } else ctx.shadowColor = 'transparent';
         };
         if (x.cOn && x.cLarg > 0) {

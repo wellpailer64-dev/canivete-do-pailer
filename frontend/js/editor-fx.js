@@ -171,6 +171,22 @@ const VE_FX = {
             return a;
         },
     },
+    // Sombra projetada (como a do Photoshop): a forma da camada (transparência), na cor escolhida, deslocada no ângulo
+    // da luz (135° = luz de cima à esquerda, sombra para baixo à direita) e desfocada. Não mexe nos pixels da mídia:
+    // é desenhada junto com a camada (veDesenharItens: shadow* do canvas, que não gira nem escala com ela, como a luz
+    // global do Photoshop). Exportação: _sombra_camada em video_cutter.py (mesma conta: desvio = tamanho / 2).
+    sombra: {
+        nome: 'Sombra projetada', cat: 'Estilizar', tag: 'Drop Shadow', aoDesenhar: true,
+        params: [
+            { k: 'cor', nome: 'Cor', tipo: 'cor', def: '#000000', gotas: false },
+            { k: 'op', nome: 'Opacidade', min: 0, max: 100, step: 1, def: 60, un: '%' },
+            { k: 'ang', nome: 'Ângulo', min: 0, max: 360, step: 1, def: 135, un: '°' },
+            { k: 'dist', nome: 'Distância', min: 0, max: 500, step: 0.5, def: 12, un: 'px' },
+            { k: 'tam', nome: 'Tamanho', min: 0, max: 250, step: 0.5, def: 16, un: 'px' },
+        ],
+        neutro: v => !(v.op > 0),
+        draw: a => a,
+    },
     // ── Constante (painel Animação): movimento em loop durante o clipe inteiro. Não mexem nos pixels: somam à
     // Escala/Rotação/Posição na hora de desenhar (veCaAplicar) e viram fórmulas na exportação (_ca_exprs).
     ca_rot: {
@@ -528,7 +544,7 @@ function veTemAlfa(c) { const m = veMediaOf(c); return !!(m && m.info && m.info.
 // alvo = pixels do monitor por pixel da mídia: os efeitos rodam só na resolução em que a mídia aparece
 // (em degraus de 1/8, para não recriar os canvases a cada quadro de uma escala animada)
 function veFxRender(c, src, sz, alvo) {
-    const fx = veFxActive(c).filter(f => !VE_FX[f.t].constante && !VE_FX[f.t].ovt);
+    const fx = veFxActive(c).filter(f => !VE_FX[f.t].constante && !VE_FX[f.t].ovt && !VE_FX[f.t].aoDesenhar);
     if (!fx.length) return src;
     let q = Math.min(1, 1920 / Math.max(sz.w, sz.h));
     if (alvo > 0) q = Math.min(q, Math.max(0.125, Math.ceil(alvo * 8) / 8));
@@ -539,6 +555,22 @@ function veFxRender(c, src, sz, alvo) {
     const env = { w, h, q, mw: sz.w, mh: sz.h };
     fx.forEach(f => { a = VE_FX[f.t].draw(a, veFxValues(f), env); });
     return a.cv;
+}
+
+// Sombra projetada ativa do clipe: {cor, op, ang, dist, tam} ou null (desenhada com a camada)
+function veSombraDe(c) {
+    const f = veFxActive(c).find(f => f.t === 'sombra');
+    return f ? veFxValues(f) : null;
+}
+// Liga o shadow* do canvas para a próxima camada. k = pixels do canvas por pixel do quadro (o shadow* não segue a
+// transformação do contexto). Desvio do desfoque = tamanho / 2 (shadowBlur = 2 × desvio, pela especificação).
+function veSombraAplicar(ctx, s, k) {
+    if (!s) return;
+    const a = s.ang * Math.PI / 180;
+    ctx.shadowColor = veTxRGBA(s.cor, s.op / 100);
+    ctx.shadowBlur = s.tam * k;
+    ctx.shadowOffsetX = -Math.cos(a) * s.dist * k;
+    ctx.shadowOffsetY = Math.sin(a) * s.dist * k;
 }
 
 // Para a exportação: [{t, v}] só dos efeitos ativos

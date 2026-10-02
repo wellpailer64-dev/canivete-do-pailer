@@ -387,6 +387,22 @@ function veCompVerificar() {
     else veCompAvisar();
 }
 
+// Comp em que nada muda com o tempo (só imagens, textos, formas e ajustes, sem quadro-chave, animação, transição
+// nem efeito em loop; as Comps de dentro também): o render sai em QuickTime Animation (~3 MB em vez de ~130 MB)
+function veCompEstatica(seq, vistos = new Set()) {
+    if (!seq || vistos.has(seq.id)) return false;
+    if (seq.legGravar !== false && (seq.legendas || []).length) return false;   // legendas mudam com o tempo
+    vistos.add(seq.id);
+    return (seq.clips || []).every(c => {
+        const m = VE.media[c.m || 0];
+        if (!m) return false;
+        if (veEhComp(m)) return veCompEstatica(veCompSeqDe(m), vistos) && !veHasKf(c) && !c.tin && !c.tout;
+        if (!['image', 'texto', 'cor', 'forma', 'pincel', 'ajuste'].includes(m.kind)) return false;
+        if (veHasKf(c) || c.tin || c.tout || c.txa || m.seq) return false;
+        return !(c.fx || []).some(f => f.on !== false && VE_FX[f.t] && (VE_FX[f.t].constante || VE_FX[f.t].ovt));
+    });
+}
+
 async function veCompJob(seq) {
     // imagem recém-importada (colar Comp, AutoFrame) ainda sem tamanho: sairia com 1 px no render
     const imgs = seq.clips.map(c => VE.media[c.m || 0]).filter(m => m && m.kind === 'image' && !veMediaOffline(m));
@@ -400,7 +416,7 @@ async function veCompJob(seq) {
             const plano = veExportPlan(false), lim = veMasterLim();
             const mix = plano.mix.length ? (lim ? [...plano.mix, { master: lim }] : plano.mix) : [];
             return { path: VE.path, base: plano.base, camadas: plano.camadas, dur: VE.dur, mix,
-                     legendas: veTxExport(null), quadro: [VE.seqW, VE.seqH] };
+                     legendas: veTxExport(null), quadro: [VE.seqW, VE.seqH], estatico: veCompEstatica(seq) };
         } finally { VE._txPng = ant; }
     });
 }

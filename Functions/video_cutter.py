@@ -2278,6 +2278,28 @@ def _camadas_na_grade(lay, fps):
         c["fonte"] = c["dur"] * c["v"]
 
 
+def _sombra_camada(c):
+    """Sombra projetada da camada (efeito 'sombra'): (R, G, B, opacidade 0..1, dx, dy, desvio do desfoque) ou None."""
+    if c.get("tipo") == "ajuste":
+        return None
+    for f in c.get("fx") or []:
+        if f.get("t") != "sombra" or f.get("on") is False:
+            continue
+        v = f.get("v") or {}
+        op = _num(v.get("op"), 0, 100, 60) / 100
+        if op <= 0.001:
+            return None
+        cor = str(v.get("cor") or "#000000")
+        try:
+            R, G, B = int(cor[1:3], 16), int(cor[3:5], 16), int(cor[5:7], 16)
+        except ValueError:
+            R = G = B = 0
+        a = math.radians(_num(v.get("ang"), -720, 720, 135))
+        d = _num(v.get("dist"), 0, 5000, 12)
+        return R, G, B, op, -math.cos(a) * d, math.sin(a) * d, _num(v.get("tam"), 0, 2500, 16) / 2
+    return None
+
+
 def _reduzir_camada(c, k):
     """Camada normalizada (_normalizar_camadas) num quadro k vezes menor: px do quadro × k."""
     c["sc"] *= k
@@ -2290,6 +2312,10 @@ def _reduzir_camada(c, k):
         v = f.get("v")
         if f.get("t") == "ca_wig" and isinstance(v, dict):
             f["v"] = dict(v, area=_num(v.get("area"), 0, 5000) * k)
+    for f in c.get("fx") or []:   # a sombra é medida em px do quadro
+        v = f.get("v")
+        if f.get("t") == "sombra" and isinstance(v, dict):
+            f["v"] = dict(v, dist=_num(v.get("dist"), 0, 5000, 12) * k, tam=_num(v.get("tam"), 0, 2500, 16) * k)
 
 
 _opcao_script = None
@@ -2314,7 +2340,7 @@ def _opcao_filtro_script():
 def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", resolucao="original",
                    usar_gpu=True, pasta_saida=None, on_progress=None, stop_event=None, sem_audio=False,
                    camadas=None, audio_segmentos=None, duracao=None, audio_clipes=None, legendas=None, quadro=None,
-                   saida=None, previa_h=0, proc_holder=None, opcoes=None, alfa=False):
+                   saida=None, previa_h=0, proc_holder=None, opcoes=None, alfa=False, alfa_leve=False):
     """
     Exporta a timeline do editor.
     saida/previa_h  = prévia renderizada (render_cache.py): arquivo fixo, sem som, H.264 leve de decodificar
@@ -2787,6 +2813,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                                                   + [para_rgb] + fim_cadeia)
             # round: em segundos o deslocamento era truncado (0,233333/TB = 6,99999 → 6) e o último quadro sumia
             cadeia += f",setpts=PTS-STARTPTS+round({c['st']:.9f}/TB)[l{n}]"
+            i_cadeia = len(filtros)
             filtros.append(cadeia)
             fim = c["st"] + c["dur"]
             tl = f"(t-{c['st']:.4f})"
@@ -2815,6 +2842,21 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             # quadros com t em [início, fim), com meia-quadro de folga: igual à prévia (a camada aparece de t >= início até
             # antes do fim). O between exato perdia o 1º quadro (o t do quadro chega arredondado para baixo)
             ena = f"gte(t,{c['st'] - frame_dur / 2:.6f})*lt(t,{fim - frame_dur / 2:.6f})"
+            sombra = _sombra_camada(c)
+            if sombra:
+                # Sombra projetada (VE_FX.sombra; veSombraAplicar faz a mesma conta na prévia): a transparência da camada
+                # já transformada, na cor da sombra, com margem para o desfoque, desfocada só no alfa e posta por baixo,
+                # deslocada (o desvio não gira nem escala com a camada, como a luz global do Photoshop)
+                filtros[i_cadeia] = filtros[i_cadeia][:-len(f"[l{n}]")] + f"[l{n}r]"
+                r, (R, G, B, op, dx, dy, sig) = f"sh{n}", sombra
+                m = int(math.ceil(3 * sig)) + 2
+                filtros.append(f"[l{n}r]split[l{n}][{r}a]")
+                filtros.append(f"[{r}a]format=rgba,pad=iw+{2 * m}:ih+{2 * m}:{m}:{m}:color=black@0,"
+                               f"lutrgb=r={R}:g={G}:b={B}:a='val*{op:.4f}'"
+                               + (f",format=gbrap,gblur=sigma={sig:.3f}:planes=8,format=rgba" if sig >= 0.3 else "") + f"[{r}b]")
+                filtros.append(f"{vf}[{r}b]overlay=x='({px})+{dx:.3f}-w/2':y='({py})+{dy:.3f}-h/2'"
+                               f":enable='{ena}':eof_action=pass:format=auto[{r}o]")
+                vf = f"[{r}o]"
             if bm:
                 # Modo de mesclagem: a camada é posicionada num quadro transparente do tamanho do vídeo, misturada
                 # com o fundo (blend) e aplicada pela transparência dela (maskedmerge) — como o canvas da prévia.
@@ -2916,6 +2958,11 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         if previa:
             video_args = ["-c:v", "libx264", "-preset", "ultrafast", "-tune", "fastdecode", "-crf", "20",
                           "-g", "10", "-pix_fmt", "yuv420p"]
+        elif alfa and alfa_leve:
+            # Comp sem nada animado (PSD, arte parada): QuickTime Animation guarda só o que muda entre quadros, sem
+            # perda e com alfa. Uma arte de 5 s em 1080×1920: ~3 MB (em ProRes 4444 eram ~130 MB). Quadro-chave a cada
+            # 10 s: buscar decodifica do começo, e RLE decodifica rápido
+            video_args = ["-c:v", "qtrle", "-g", "300", "-pix_fmt", "argb"] + prep["args_cor"]
         elif alfa:
             video_args = ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le"] + prep["args_cor"]
         else:

@@ -236,6 +236,18 @@ CASOS = {
         });
         return out;
     """, ""),
+    # sombra projetada: efeito numa imagem girada e com escala, logo com transparência e sombra do texto em ângulo
+    "sombra": (1080, 1920, """
+        const { clip } = __te, W = 1080, H = 1920, id = () => veFxNewId();
+        const f = clip(1, 0, 0, 2, 'foto4.jpg', { p: { sc: 40, x: 520, y: 700, rot: 12, op: 100 },
+            fx: [{ id: id(), t: 'sombra', on: true, v: { cor: '#000000', op: 75, ang: 120, dist: 30, tam: 40 } }] });
+        const logo = clip(2, 0, 0, 2, 'logo.png', { p: { sc: 90, x: 560, y: 1350, rot: 0, op: 100 },
+            fx: [{ id: id(), t: 'sombra', on: true, v: { cor: '#ff2a00', op: 90, ang: 45, dist: 18, tam: 10 } }] });
+        const tm = veTxMidia();
+        const tx = { tr: 3, st: 0, s: 0, e: 2, m: tm.id, tx: { ...VE_TX_PADRAO, t: 'SOMBRA', tam: 140, sOn: true, sCor: '#102030', sOp: 80, sDist: 14, sBlur: 12, sAng: 60 } };
+        tx.p = Object.assign(veDefProps(tx), { sc: 100, x: W / 2, y: 300 });
+        return [clip(0, 0, 0, 2, 'b.mp4'), f, logo, tx];
+    """, ""),
     # sobreposições: zoom para dentro, giro, lente e flare
     "sobreposicao": (1080, 1920, """
         const { clip } = __te;

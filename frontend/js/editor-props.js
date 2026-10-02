@@ -14,8 +14,13 @@ const VE_TX_PADRAO = {
     cor: '#ffffff',
     cOn: false, cCor: '#000000', cLarg: 6,
     fOn: false, fCor: '#000000', fOp: 60, fPad: 24, fRaio: 12,
-    sOn: false, sCor: '#000000', sOp: 60, sDist: 6, sBlur: 10,
+    sOn: false, sCor: '#000000', sOp: 60, sDist: 6, sBlur: 10, sAng: 135,
 };
+// Deslocamento da sombra do texto (ângulo como o do Photoshop: 135° = para baixo à direita, o padrão antigo)
+function veTxSombraOff(x) {
+    const a = (x.sAng == null ? 135 : +x.sAng) * Math.PI / 180;
+    return [-Math.cos(a) * x.sDist, Math.sin(a) * x.sDist];
+}
 const VE_TX_DUR = 5;
 
 const VEPP = { chave: '', fontes: null, estilos: null, ripple: true, edit: null, cache: new Map() };
@@ -49,7 +54,16 @@ function veNomeTexto(c) { return (veTxt(c).t.split('\n').find(l => l.trim()) || 
 
 // ─────────────────────────── desenho do texto ───────────────────────────
 let veTxMedidor = null;
-function veTxFonte(x, tam) { return `${x.ita ? 'italic ' : ''}${x.neg ? 'bold ' : ''}${tam}px "${x.fonte}", Arial, sans-serif`; }
+// Com x.peso (100..900): família tipográfica + peso, como o navegador acha cada estilo (Black, Semibold...); o nome
+// antigo do Windows ("SF UI Display Black") nem sempre resolve e saía fino. Sem x.peso (textos antigos): como antes.
+// Negrito falso (x.neg num estilo leve) pede 700: o navegador engrossa a fonte que só tem o peso normal.
+function veTxFonte(x, tam) {
+    if (x.peso) {
+        const p = x.neg && x.peso < 600 ? 700 : x.peso;
+        return `${x.ita ? 'italic ' : ''}${p} ${tam}px "${x.fam || x.fonte}", "${x.fonte}", Arial, sans-serif`;
+    }
+    return `${x.ita ? 'italic ' : ''}${x.neg ? 'bold ' : ''}${tam}px "${x.fonte}", Arial, sans-serif`;
+}
 
 // Medidas do bloco de texto em pixels do quadro (tamanho "lógico" do clipe)
 function veTxLayout(x) {
@@ -98,7 +112,9 @@ function veTxDesenho(x, f) {
         if (on && x.sOn) {
             ctx.shadowColor = veTxRGBA(x.sCor, x.sOp / 100);
             ctx.shadowBlur = x.sBlur * f;
-            ctx.shadowOffsetX = ctx.shadowOffsetY = x.sDist * 0.7071 * f;
+            const [sx, sy] = veTxSombraOff(x);
+            ctx.shadowOffsetX = sx * f;
+            ctx.shadowOffsetY = sy * f;
         } else ctx.shadowColor = 'transparent';
     };
     L.linhas.forEach((l, k) => {
@@ -473,7 +489,7 @@ function vePpHtml(a) {
                 <div class="ve-pp-grupo">${vePpChk('tx.fOn', 'Fundo')}${vePpCor('tx.fCor', '')}
                     <div class="ve-pp-sub" data-ppse="tx.fOn">${vePpNum('tx.fOp', 'Opacidade', 0, 100, 1, '%')}${vePpNum('tx.fPad', 'Margem', 0, 120, 1, 'px')}${vePpNum('tx.fRaio', 'Cantos', 0, 120, 1, 'px')}</div></div>
                 <div class="ve-pp-grupo">${vePpChk('tx.sOn', 'Sombra')}${vePpCor('tx.sCor', '')}
-                    <div class="ve-pp-sub" data-ppse="tx.sOn">${vePpNum('tx.sOp', 'Opacidade', 0, 100, 1, '%')}${vePpNum('tx.sDist', 'Distância', 0, 60, 0.5, 'px')}${vePpNum('tx.sBlur', 'Desfoque', 0, 80, 0.5, 'px')}</div></div>`) +
+                    <div class="ve-pp-sub" data-ppse="tx.sOn">${vePpNum('tx.sOp', 'Opacidade', 0, 100, 1, '%')}${vePpNum('tx.sDist', 'Distância', 0, 60, 0.5, 'px')}${vePpNum('tx.sBlur', 'Desfoque', 0, 80, 0.5, 'px')}${vePpNum('tx.sAng', 'Ângulo', 0, 360, 1, '°')}</div></div>`) +
             transformar(true, false) +
             vePpSec('Duração', `<div class="ve-pp-l"><label>Duração</label><span></span><span class="ve-prop-num"><input type="number" data-pp="dur" min="0.04" step="0.01"><i>s</i></span></div>`) +
             `<small class="ve-pp-dica">Duplo clique no texto do monitor para editar ali mesmo. Quadros-chave: Controles de efeito.</small>` +
@@ -561,7 +577,8 @@ function vePpSet(k, v) {
         const novo = e ? { fam, fonte: e.gdi } : { fam, fonte: fam };
         if (leg) vePpSetLegEstilo({ ...novo, negrito: e ? e.gdi_negrito : atual.negrito, ita: e ? e.gdi_italico : atual.ita });
         else {
-            c.tx = { ...atual, ...novo, neg: e ? e.gdi_negrito : atual.neg, ita: e ? e.gdi_italico : atual.ita };
+            c.tx = { ...atual, ...novo, neg: e ? e.gdi_negrito : atual.neg, ita: e ? e.gdi_italico || e.italico : atual.ita, peso: e ? e.peso : undefined };
+            if (e && c.tx.peso) c.tx.neg = false;   // o peso já diz o estilo
             if (VEPP.edit && VEPP.edit.c === c) veTxEditarPos();
         }
         return 'monitor';

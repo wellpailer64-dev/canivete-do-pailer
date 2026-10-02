@@ -32,7 +32,7 @@ def _nomes(dados, off):
     melhor = {}
     for k in range(n):
         plat, enc, lang, nid, tam, pos = struct.unpack_from(">HHHHHH", dados, off + 6 + k * 12)
-        if nid not in (1, 2, 4, 16, 17):
+        if nid not in (1, 2, 4, 6, 16, 17):
             continue
         bruto = dados[off + base + pos: off + base + pos + tam]
         if plat == 3 and enc in (0, 1, 10):
@@ -74,6 +74,8 @@ def _uma_fonte(dados, off):
         "familia": nm.get(16) or fam1, "estilo": nm.get(17) or est2,
         "gdi": fam1, "gdi_negrito": "bold" in est2.lower(), "gdi_italico": "italic" in est2.lower(),
         "peso": max(100, min(1000, int(peso))), "italico": ita,
+        # nome PostScript (é por ele que o PSD guarda a fonte de cada texto: Montserrat-Bold, ArialMT...)
+        "ps": nm.get(6) or "", "completo": nm.get(4) or "",
     }
 
 
@@ -105,7 +107,7 @@ def listar():
                 for f in _ler(os.path.join(pasta, nome)):
                     lista = fams.setdefault(f["familia"], [])
                     if not any(e["estilo"] == f["estilo"] for e in lista):
-                        lista.append({k: f[k] for k in ("estilo", "peso", "italico", "gdi", "gdi_negrito", "gdi_italico")})
+                        lista.append({k: f[k] for k in ("estilo", "peso", "italico", "gdi", "gdi_negrito", "gdi_italico", "ps", "completo")})
         for lista in fams.values():
             lista.sort(key=lambda e: (e["italico"], e["peso"]))
         _cache = dict(sorted(fams.items(), key=lambda kv: kv[0].lower()))

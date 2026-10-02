@@ -29,7 +29,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-VERSAO = 2
+VERSAO = 4
 
 # modo de mesclagem do Photoshop → o do editor (VE_BM em editor-fx.js); fora da lista = normal + aviso
 _BM = {
@@ -169,12 +169,13 @@ def _sombra_brilho(alfa, tamanho, espalhar):
     return np.clip(a, 0, 1)
 
 
-def _efeitos(layer, rgba, x0, y0, avisos, angulo_global):
-    """Desenha os efeitos de camada suportados no próprio PNG (aumentando a margem quando precisa)."""
+def _efeitos(layer, rgba, x0, y0, avisos, angulo_global, pular=()):
+    """Desenha os efeitos de camada suportados no próprio PNG (aumentando a margem quando precisa).
+    pular = efeitos que o editor faz sozinho (Sombra projetada vira o efeito do editor, editável)."""
     try:
         if not layer.has_effects() or not layer.effects.enabled:
             return rgba, x0, y0
-        lista = [e for e in layer.effects if getattr(e, "enabled", True)]
+        lista = [e for e in layer.effects if getattr(e, "enabled", True) and type(e).__name__ not in pular]
     except Exception:
         return rgba, x0, y0
     nomes = [type(e).__name__ for e in lista]
@@ -250,21 +251,106 @@ def _clip_base(rgba, x0, y0, base):
     return out
 
 
-def _texto(layer):
+def _str(v):
+    """Texto de um valor do EngineData (o psd-tools devolve com aspas)."""
+    v = getattr(v, "value", v)
+    return str(v).strip().strip("'\"")
+
+
+def _vb(v):
+    return bool(getattr(v, "value", v))
+
+
+def _params_efeitos(layer, angulo_global):
+    """Efeitos de camada que o editor tem equivalente: {sombra, contorno, sobreposicao, brilho} (px do documento)."""
+    out = {}
     try:
-        info = {"texto": str(layer.text)}
+        if not layer.has_effects() or not layer.effects.enabled:
+            return out
+        lista = [e for e in layer.effects if getattr(e, "enabled", True)]
+    except Exception:
+        return out
+    hexa = lambda c: "#%02x%02x%02x" % tuple(max(0, min(255, int(round(x)))) for x in c)
+    for e in lista:
+        n = type(e).__name__
+        op = _num(getattr(e, "opacity", 100), 100)
+        if n == "DropShadow" and "sombra" not in out:
+            ang = angulo_global if getattr(e, "use_global_light", False) else _num(getattr(e, "angle", 120), 120)
+            out["sombra"] = {"cor": hexa(_cor_fx(e)), "op": op, "ang": ang, "dist": _num(getattr(e, "distance", 0)),
+                             "tam": _num(getattr(e, "size", 0))}
+        elif n == "OuterGlow" and "brilho" not in out:
+            out["brilho"] = {"cor": hexa(_cor_fx(e)), "op": op, "tam": _num(getattr(e, "size", 0))}
+        elif n == "Stroke" and "contorno" not in out:
+            out["contorno"] = {"cor": hexa(_cor_fx(e)), "op": op, "larg": _num(getattr(e, "size", 0)),
+                               "pos": str(getattr(e, "position", "")).lower()}
+        elif n == "ColorOverlay" and "sobreposicao" not in out:
+            out["sobreposicao"] = {"cor": hexa(_cor_fx(e)), "op": op}
+        else:
+            out.setdefault("outros", []).append(n)
+    return out
+
+
+def _texto(layer, angulo_global):
+    """Tudo o que o editor precisa para refazer a camada de texto como texto editável (editor-psd.js)."""
+    try:
+        ed, rd = layer.engine_dict, layer.resource_dict
+        fontes = [_str(f["Name"]) for f in rd["FontSet"]]
+        base = {}
         try:
-            estilo = layer.engine_dict["StyleRun"]["RunArray"][0]["StyleSheet"]["StyleSheetData"]
-            fontes = layer.resource_dict["FontSet"]
-            info["fonte"] = str(fontes[int(estilo.get("Font", 0))]["Name"])
-            info["tam"] = float(estilo.get("FontSize", 0))
-            cor = estilo.get("FillColor", {}).get("Values")
-            if cor:
-                info["cor"] = "#%02x%02x%02x" % tuple(int(round(float(v) * 255)) for v in list(cor)[1:4])
+            base = dict(rd["StyleSheetSet"][0]["StyleSheetData"])
         except Exception:
             pass
-        return info
-    except Exception:
+        texto = str(layer.text).replace(chr(13), chr(10)).replace(chr(3), chr(10))
+        runs, pos = [], 0
+        lens = list(ed["StyleRun"]["RunLengthArray"])
+        for r, n in zip(ed["StyleRun"]["RunArray"], lens):
+            d = dict(base)
+            d.update(dict(r["StyleSheet"]["StyleSheetData"]))
+            trecho = texto[pos:pos + int(n)]
+            pos += int(n)
+            if not trecho.strip():
+                # trecho só de espaço/quebra (o fim do texto costuma ter estilo à parte): vai junto do anterior
+                if runs:
+                    runs[-1]["trecho"] += trecho
+                else:
+                    sobra_ini = trecho
+                continue
+            cor = [float(v) for v in list(d.get("FillColor", {}).get("Values", [1, 0, 0, 0]))]
+            if not runs and "sobra_ini" in locals():
+                trecho = sobra_ini + trecho
+            runs.append({
+                "trecho": trecho,
+                "fonte": fontes[int(d.get("Font", 0))] if fontes else "",
+                "tam": float(d.get("FontSize", 12)),
+                "cor": "#%02x%02x%02x" % tuple(max(0, min(255, int(round(x * 255)))) for x in cor[1:4]),
+                "esp": float(d.get("Tracking", 0) or 0),
+                "auto_ent": _vb(d.get("AutoLeading", True)),
+                "ent": float(d.get("Leading", 0) or 0),
+                "neg": _vb(d.get("FauxBold", False)), "ita": _vb(d.get("FauxItalic", False)),
+                "caixa_alta": int(d.get("FontCaps", 0) or 0) == 2,
+            })
+        if not runs:
+            return None
+        chave = lambda r: (r["fonte"], round(r["tam"], 2), r["cor"], r["esp"], r["neg"], r["ita"], r["caixa_alta"])
+        par = dict(ed["ParagraphRun"]["RunArray"][0]["ParagraphSheet"]["Properties"])
+        just = int(par.get("Justification", 0) or 0)
+        caixa = None
+        try:
+            forma = ed["Rendered"]["Shapes"]["Children"][0]
+            if int(forma["ShapeType"]) == 1:
+                bb = [float(v) for v in forma["Cookie"]["Photoshop"]["BoxBounds"]]
+                caixa = bb
+        except Exception:
+            pass
+        xx, xy, yx, yy, tx, ty = (float(v) for v in layer.transform)
+        return {
+            "texto": texto.rstrip(chr(10)), "runs": runs, "misto": len({chave(r) for r in runs}) > 1,
+            "alin": {1: "right", 2: "center"}.get(just, "left"), "caixa": caixa,
+            "tf": [xx, xy, yx, yy, tx, ty], "tinta": [int(v) for v in layer.bbox],
+            "efeitos": _params_efeitos(layer, angulo_global),
+        }
+    except Exception as e:
+        logging.debug("texto %s: %s", layer.name, e)
         return None
 
 
@@ -356,7 +442,11 @@ def importar(path, on_progress=None):
                 rgba = _clip_base(rgba, x0, y0, base_clip)
             else:
                 base_clip = (rgba, x0, y0)   # base de recorte: sem efeitos (o recorte usa a forma da camada)
-            rgba, x0, y0 = _efeitos(layer, rgba, x0, y0, avisos, angulo)
+            texto = _texto(layer, angulo) if layer.kind == "type" else None
+            # texto: o PNG (com todos os efeitos) fica de reserva para quando não der para refazer como texto
+            fx = {} if texto else _params_efeitos(layer, angulo)
+            pular = ("DropShadow",) if "sombra" in fx else ()
+            rgba, x0, y0 = _efeitos(layer, rgba, x0, y0, avisos, angulo, pular)
             rgba, dx, dy = _recortar(rgba)
             if rgba is None:
                 continue
@@ -364,8 +454,10 @@ def importar(path, on_progress=None):
             png = arquivo(layer.name)
             Image.fromarray(rgba, "RGBA").save(png, compress_level=3)   # cv2.imwrite não grava caminho com acento
             no.update({"x": int(x0), "y": int(y0), "w": int(rgba.shape[1]), "h": int(rgba.shape[0]), "png": png})
-            if layer.kind == "type":
-                no["texto"] = _texto(layer)
+            if texto:
+                no["texto"] = texto
+            if "sombra" in fx:
+                no["sombra"] = fx["sombra"]
             out.append(no)
         return out
 
