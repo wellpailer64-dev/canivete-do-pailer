@@ -875,7 +875,9 @@ class _Vagas:
             while chave in self._fila:   # mesmo arquivo pedido duas vezes: espera o anterior
                 self._cv.wait()
             self._fila[chave] = eu
-            while self._livres <= 0 or min(self._fila.values()) is not eu:
+            # prioridade 2 (prévia no fundo de vídeo que só está no painel) deixa sempre uma vaga livre: o vídeo
+            # solto na timeline não espera a conversão de outro terminar
+            while (self._livres <= (1 if eu[0] >= 2 else 0)) or min(self._fila.values()) is not eu:
                 self._cv.wait()
             del self._fila[chave]
             self._livres -= 1
@@ -892,6 +894,16 @@ class _Vagas:
 # os que estão na timeline primeiro
 _VAGAS_EXTRAS = _Vagas(2)
 _VAGAS_PROXY = _Vagas(2)
+
+
+_travas_proxy: dict = {}
+_travas_proxy_lock = threading.Lock()
+
+
+def _trava_proxy(proxy):
+    """Uma conversão por arquivo de prévia (dentro desta cópia do app)."""
+    with _travas_proxy_lock:
+        return _travas_proxy.setdefault(os.path.abspath(proxy), threading.Lock())
 
 
 def priorizar_midia(path):
@@ -985,17 +997,22 @@ def preparar_midia(path, emit, stop_event=None, prioridade=1, leve=False):
                 th = _guardar_thumbs(work, "fonte", gerar_thumbs(path, info["duration"], work, count))
         emit({"stage": "thumbs", "thumbs": th})
     else:
-        if os.path.isfile(proxy):
-            ok, err, thumbs = True, "", None
-        else:
-            tmp = f"{proxy}.{os.getpid()}.tmp{os.path.splitext(proxy)[1]}"   # por cópia do app: duas abrindo o mesmo vídeo não se atropelam
-            with _VAGAS_PROXY.vaga(chave, prioridade):   # 2 conversões por vez (os que tocam direto não esperam)
-                ok, err, thumbs = gerar_proxy(path, info, tmp, lambda p: emit({"stage": "proxy", "pct": p}),
-                                              stop_event, thumbs_dir=work, thumbs_n=count, lado=lado)
-            if ok:
-                os.replace(tmp, proxy)   # interrompida no meio não vira prévia "pronta" quebrada
-            else:
-                _apagar_item(tmp)
+        ok, err, thumbs = True, "", None
+        if not os.path.isfile(proxy):
+            # o mesmo vídeo pedido de novo (estava fazendo a prévia no fundo e foi para a timeline): espera a
+            # conversão que já anda — passando-a na frente — em vez de converter duas vezes ao mesmo tempo
+            if prioridade == 0:
+                _VAGAS_PROXY.priorizar(chave)
+            with _trava_proxy(proxy):
+                if not os.path.isfile(proxy):
+                    tmp = f"{proxy}.{os.getpid()}.tmp{os.path.splitext(proxy)[1]}"   # por cópia do app: duas abrindo o mesmo vídeo não se atropelam
+                    with _VAGAS_PROXY.vaga(chave, prioridade):   # 2 conversões por vez (os que tocam direto não esperam)
+                        ok, err, thumbs = gerar_proxy(path, info, tmp, lambda p: emit({"stage": "proxy", "pct": p}),
+                                                      stop_event, thumbs_dir=work, thumbs_n=count, lado=lado)
+                    if ok:
+                        os.replace(tmp, proxy)   # interrompida no meio não vira prévia "pronta" quebrada
+                    else:
+                        _apagar_item(tmp)
         if stop_event is not None and stop_event.is_set():
             return
         if not ok:
@@ -1454,7 +1471,11 @@ def _normalizar_afx(efeitos):
         t, v = str(f.get("t") or ""), f.get("v") or {}
         if not isinstance(v, dict):
             v = {}
-        if t == "denoise":
+        if t == "antinoise":   # Anti Noise (_pre_antinoise)
+            amt = _afx_lim(v.get("amt"), 0.0, 100.0, 100.0)
+            if amt > 0:
+                out.append((t, {"amt": amt}))
+        elif t == "denoise":
             amt = _afx_lim(v.get("amt"), 0.0, 100.0, 35.0)
             if amt > 0:
                 out.append((t, {"amt": amt, "floor": _afx_lim(v.get("floor"), -75.0, -25.0, -50.0)}))
@@ -1581,6 +1602,38 @@ def _pre_limitar(mix, path, tem_audio_fonte, work):
         raw = os.path.join(work, f"lim_{uuid.uuid4().hex[:10]}.f32")
         y.tofile(raw)
         out.append((st, 0.0, len(y) / AUDIO_SR, 0.0, raw, 1.0, True, fi, fo, pos))
+    return out
+
+
+def _pre_antinoise(mix, path, tem_audio_fonte, work):
+    """Clipes com Anti Noise: o som limpo (DeepFilterNet3, anti_noise.limpo: feito uma vez por arquivo) misturado
+    com o original na Quantidade do efeito, só no trecho do clipe. É a mesma mistura do mixer da prévia
+    (editor-audio.js: veAudioAmostra). O clipe passa a ler esse .wav, sem o efeito."""
+    from Functions import anti_noise
+    out = []
+    for c in mix:
+        st, s0, e0, g, arq, vel, tom, fi, fo, afx = c
+        an = next((v for t, v in afx if t == "antinoise"), None)
+        if an is None or (arq is None and not tem_audio_fonte):
+            out.append(c)
+            continue
+        fonte = path if arq is None else arq
+        limpo = anti_noise.limpo(fonte)
+        # peso do limpo: a Quantidade anda em dB de ruído tirado (editor-audio.js: veAnPeso)
+        q = an["amt"] / 100.0
+        a = 1.0 if q >= 1 else 1.0 - 10.0 ** (-q * 36.0 / 20.0)
+        cadeia = ("aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,"
+                  f"atrim=start={s0:.5f}:end={e0:.5f},asetpts=PTS-STARTPTS")
+        grafo = (f"[0:a:0]{cadeia},volume={1 - a:.5f}[o];[1:a:0]{cadeia},volume={a:.5f}[l];"
+                 "[o][l]amix=inputs=2:normalize=0:duration=first[s]")
+        wav = os.path.join(work, f"an_{uuid.uuid4().hex[:10]}.wav")
+        r = subprocess.run([ffmpeg_path(), "-y", "-v", "error", "-i", fonte, "-i", limpo, "-filter_complex", grafo,
+                            "-map", "[s]", "-c:a", "pcm_f32le", wav],
+                           capture_output=True, timeout=3600, creationflags=_creationflags())
+        if r.returncode != 0 or not os.path.isfile(wav):
+            raise RuntimeError("Anti Noise: não foi possível misturar o som limpo: "
+                               + (r.stderr.decode("utf-8", "replace").strip().splitlines() or ["?"])[-1])
+        out.append((st, 0.0, e0 - s0, g, wav, vel, tom, fi, fo, [f for f in afx if f[0] != "antinoise"]))
     return out
 
 
@@ -2499,6 +2552,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     if not simples:
         pecas, pecas_a = _completar(pecas), _completar(pecas_a)
     saida = saida or _nome_saida(aberto, cfg["ext"], pasta_saida, op.get("nome"))
+    if mix and not sem_audio and any(t == "antinoise" for c in mix for t, _ in c[9]):
+        prog(0, "Aplicando Anti Noise...")
+        mix = _pre_antinoise(mix, path, info["has_audio"], _work_dir())
     if mix and not sem_audio and any(t == "limiter" for c in mix for t, _ in c[9]):
         prog(0, "Aplicando Hard Limiter...")
         mix = _pre_limitar(mix, path, info["has_audio"], _work_dir())

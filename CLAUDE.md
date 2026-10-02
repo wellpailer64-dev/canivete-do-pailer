@@ -23,7 +23,8 @@ clique e tire print. Detalhes e segurança em `Instructions/modo-agente.md`.
 Fechar o app aberto do usuário (para trocar o exe ou relançar com `--agente`) exige o ok dele antes.
 App de teste (porta 9333) com preferências e temporários próprios, **no disco D** (o C enche e deixa o sistema lento;
 testes, cache, modelos e saídas nunca no C): `APPDATA=D:\kanivete_testes\appdata TEMP=D:\kanivete_testes\tmp
-TMP=D:\kanivete_testes\tmp python main.py --agente=9333`; rode os testes (`testes/*.py`) com o mesmo TEMP/TMP.
+TMP=D:\kanivete_testes\tmp LOCALAPPDATA=D:\kanivete_testes\localappdata python main.py --agente=9333`; rode os testes
+(`testes/*.py`) com o mesmo TEMP/TMP/LOCALAPPDATA (o cache de mídia vai para %LOCALAPPDATA%).
 Scripts e prints de teste avulsos em `D:\kanivete_testes\scripts`.
 
 Play do Pocket Editor: `python testes/teste_play.py "<projeto.vknv>" [--segundos 20] [--inicio 0]` (app em

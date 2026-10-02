@@ -284,16 +284,18 @@ def video_cutter_prepare(file_path):
     return {"success": True}
 
 
-def ve_preparar_midia(path, mid, urgente=False, leve=False):
+def ve_preparar_midia(path, mid, urgente=False, leve=False, fundo=False):
     """Outro vídeo do projeto (painel Projeto → timeline): prepara em background; eventos em veOnMidia({id, ...}).
     urgente = está na timeline: a prévia dele sai antes das dos vídeos que só estão no painel.
-    leve = só no painel: dados e miniaturas; a prévia leve fica para quando ele for usado."""
+    leve = só no painel: dados e miniaturas; a prévia leve fica para quando ele for usado.
+    fundo = prévia leve de um vídeo só do painel, com o app sem nada mais urgente (prioridade 2: uma conversão
+    por vez e sempre com vaga livre para o que for para a timeline)."""
     from Functions.video_cutter import preparar_midia
 
     def run():
         try:
-            preparar_midia(path, lambda ev: _ve_emit("veOnMidia", {"id": mid, **ev}), prioridade=0 if urgente else 1,
-                           leve=bool(leve) and not urgente)
+            preparar_midia(path, lambda ev: _ve_emit("veOnMidia", {"id": mid, **ev}),
+                           prioridade=0 if urgente else 2 if fundo else 1, leve=bool(leve) and not urgente and not fundo)
         except Exception as e:
             _ve_emit("veOnMidia", {"id": mid, "stage": "error", "error": str(e)})
 
@@ -521,6 +523,12 @@ def video_cutter_add_audio(path):
     """Áudio solto na timeline (arrastado): conforma, forma de onda e duração."""
     from Functions.video_cutter import adicionar_audio
     return adicionar_audio(path)
+
+
+def anti_noise_preparar(path):
+    """Efeito Anti Noise: som limpo (DeepFilterNet3) do arquivo, feito uma vez; o editor mistura na Quantidade."""
+    from Functions.anti_noise import preparar
+    return preparar(path)
 
 
 def video_cutter_audio_fonte():
@@ -2869,8 +2877,8 @@ class ApiBridge:
     def ve_fontes(self):
         return ve_fontes()
 
-    def ve_preparar_midia(self, path, mid, urgente=False, leve=False):
-        return ve_preparar_midia(path, mid, urgente, leve)
+    def ve_preparar_midia(self, path, mid, urgente=False, leve=False, fundo=False):
+        return ve_preparar_midia(path, mid, urgente, leve, fundo)
 
     def ve_area_transferencia(self, projeto=""):
         """Ctrl+V na timeline: o que foi copiado no Windows (arquivos, imagem ou texto)."""
@@ -2912,6 +2920,9 @@ class ApiBridge:
 
     def video_cutter_add_audio(self, path):
         return video_cutter_add_audio(path)
+
+    def anti_noise_preparar(self, path):
+        return anti_noise_preparar(path)
 
     def video_cutter_add_media(self, path):
         return video_cutter_add_media(path)

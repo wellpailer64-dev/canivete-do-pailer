@@ -231,6 +231,14 @@ const VE_FX = {
 };
 
 const VE_AFX = {
+    // Anti Noise: DeepFilterNet3 (rede neural), roda uma vez por arquivo no fundo (Functions/anti_noise.py). A
+    // Quantidade só mistura o som limpo com o original (editor-audio.js: veAudioFonteClipe): muda na hora, tocando.
+    // Vale na fonte do clipe, antes dos outros efeitos, em qualquer posição da lista.
+    antinoise: {
+        nome: 'Anti Noise', cat: 'Áudio · Restauração', tag: 'Remove o ruído de fundo (IA)',
+        params: [{ k: 'amt', nome: 'Quantidade', min: 0, max: 100, step: 1, def: 100, un: '%' }],
+        neutro: v => !(v.amt > 0),
+    },
     denoise: {
         nome: 'Limpeza de ruído', cat: 'Áudio · Restauração', tag: 'Noise cleanup',
         params: [

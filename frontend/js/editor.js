@@ -874,10 +874,23 @@ function veSeqQuadro(w, h) {
     if (typeof veApplyMonitor === 'function' && $ve('ve-canvas')) veApplyMonitor();
 }
 
+// [tamanho, nome, grupo] — o grupo vira um <optgroup> na Predefinição
 const VE_SEQ_PRESETS = [
-    ['1920x1080', '1920 × 1080 · Full HD 16:9'], ['1280x720', '1280 × 720 · HD 16:9'], ['3840x2160', '3840 × 2160 · 4K UHD 16:9'],
-    ['1080x1920', '1080 × 1920 · Vertical 9:16 (Reels, TikTok, Shorts)'], ['1080x1350', '1080 × 1350 · Retrato 4:5 (Instagram)'],
-    ['1080x1080', '1080 × 1080 · Quadrado 1:1'], ['2560x1080', '2560 × 1080 · Ultrawide 21:9'],
+    ['1080x1920', '1080 × 1920 · 9:16 Full HD (Reels, TikTok, Shorts, Stories)', 'Vertical'],
+    ['720x1280', '720 × 1280 · 9:16 HD', 'Vertical'],
+    ['1440x2560', '1440 × 2560 · 9:16 2K', 'Vertical'],
+    ['2160x3840', '2160 × 3840 · 9:16 4K', 'Vertical'],
+    ['1080x1350', '1080 × 1350 · 4:5 Retrato (feed do Instagram)', 'Vertical'],
+    ['1080x1440', '1080 × 1440 · 3:4 Retrato', 'Vertical'],
+    ['1920x1080', '1920 × 1080 · 16:9 Full HD', 'Horizontal'],
+    ['1280x720', '1280 × 720 · 16:9 HD', 'Horizontal'],
+    ['2560x1440', '2560 × 1440 · 16:9 2K', 'Horizontal'],
+    ['3840x2160', '3840 × 2160 · 16:9 4K UHD', 'Horizontal'],
+    ['4096x2160', '4096 × 2160 · 17:9 4K DCI (cinema)', 'Horizontal'],
+    ['1440x1080', '1440 × 1080 · 4:3', 'Horizontal'],
+    ['2560x1080', '2560 × 1080 · 21:9 Ultrawide', 'Horizontal'],
+    ['1080x1080', '1080 × 1080 · 1:1 Quadrado (feed)', 'Quadrado'],
+    ['2160x2160', '2160 × 2160 · 1:1 Quadrado 4K', 'Quadrado'],
 ];
 
 function veSeqConfigAbrir() {
@@ -930,8 +943,11 @@ function veSeqConfigAbrir() {
     const m = veSeqMedia(VE.activeSequence);
     md.querySelector('#ve-sq-nome').textContent = (m && (m.nome || m.name)) || 'Timeline';
     const v = VE.info && VE.info.width && !VE.info.audio_only ? `${VE.info.width}x${VE.info.height}` : null;
-    md.querySelector('#ve-sq-preset').innerHTML = VE_SEQ_PRESETS.map(([k, n]) => `<option value="${k}">${n}</option>`).join('') +
-        (v ? `<option value="video">Igual ao vídeo (${v.replace('x', ' × ')})</option>` : '') + '<option value="custom">Personalizado</option>';
+    const grupos = [...new Set(VE_SEQ_PRESETS.map(p => p[2]))];
+    md.querySelector('#ve-sq-preset').innerHTML = grupos.map(g => `<optgroup label="${veT(g)}">` +
+        VE_SEQ_PRESETS.filter(p => p[2] === g).map(([k, n]) => `<option value="${k}">${veT(n)}</option>`).join('') + '</optgroup>').join('') +
+        `<optgroup label="${veT('Outros')}">` + (v ? `<option value="video">${veT('Igual ao vídeo')} (${v.replace('x', ' × ')})</option>` : '') +
+        `<option value="custom">${veT('Personalizado')}</option></optgroup>`;
     md.querySelector('#ve-sq-w').value = VE.seqW;
     md.querySelector('#ve-sq-h').value = VE.seqH;
     md.querySelector('#ve-sq-fps').innerHTML = `${String(+(VE.fps || 30).toFixed(3)).replace('.', ',')} qps <small>(a do vídeo)</small>`;
@@ -2355,8 +2371,9 @@ function veDropFiles(itens) {
     const videos = itens.filter(i => !i.pasta && (EXT_VIDEO.test(i.path) || EXT_AUDIO.test(i.path)));
     const imgs = itens.filter(i => !i.pasta && VE_EXT_IMG.test(i.path));
     if (!VE.ready) {
-        // sem nada aberto: vídeo/áudio abre como sempre; imagem começa a timeline com ela (5 s)
-        if (videos.length) veOpenPath(videos[0].path);
+        // sem nada aberto: o primeiro vídeo/áudio abre (o resto, pastas inclusive, entra no painel Projeto);
+        // imagem começa a timeline com ela (5 s)
+        if (videos.length || itens.some(i => i.pasta)) veAbrirComResto(itens).then(ok => { if (!ok) veToast('Nenhum vídeo nessa pasta'); });
         else if (imgs.length) { VE._imgsIni = imgs.slice(1).map(i => i.path); veOpenPath(imgs[0].path); }
         else veToast('Solte um arquivo de vídeo, áudio ou imagem');
         return;
@@ -2377,6 +2394,25 @@ function veDropFiles(itens) {
         return;
     }
     veToast('Arraste vídeos, áudios ou imagens para a timeline');
+}
+
+// Nada aberto e vários itens soltos: abre o primeiro vídeo (o de dentro da pasta, se só vierem pastas) e o resto
+// entra no painel Projeto quando ele abrir (VE._pjIni). Antes só o primeiro abria e o resto se perdia.
+async function veAbrirComResto(itens) {
+    let v = itens.find(i => !i.pasta && (EXT_VIDEO.test(i.path) || EXT_AUDIO.test(i.path)));
+    if (!v) {
+        const achar = no => no.arquivos.find(a => EXT_VIDEO.test(a)) || no.pastas.map(achar).find(Boolean);
+        for (const p of itens.filter(i => i.pasta)) {
+            const r = await window.pywebview.api.ve_listar_pasta(p.path);
+            const a = r && r.success && achar(r);
+            if (a) { v = { path: a, pasta: false }; break; }
+        }
+    }
+    if (!v) return false;
+    const resto = itens.filter(i => i !== v);
+    VE._pjIni = resto.length ? resto : null;
+    veOpenPath(v.path);
+    return true;
 }
 
 function veTimelineDropPoint(drop) {
@@ -2994,13 +3030,55 @@ function veDrawOfflineMedia(ctx, w, h, nome) {
     ctx.restore();
 }
 
+// Vídeo ainda sem prévia: a miniatura mais perto do instante (escurecida) e "Preparando prévia NN%"
+function veDrawPreparando(ctx, w, h, m, srcT) {
+    ctx.save();
+    ctx.fillStyle = '#0b0b0c';
+    ctx.fillRect(0, 0, w, h);
+    const ths = (m && (m.id === 0 ? VE.thumbs : m.thumbs)) || [];
+    let tb = null;
+    ths.forEach(x => { if (x.img && x.img.complete && x.img.naturalWidth && (!tb || Math.abs(x.t - srcT) < Math.abs(tb.t - srcT))) tb = x; });
+    if (tb) {
+        ctx.globalAlpha = 0.45;
+        ctx.drawImage(tb.img, 0, 0, w, h);
+        ctx.globalAlpha = 1;
+    }
+    const pct = m && m.pct > 0 && m.pct < 100 ? Math.round(m.pct) : null;
+    const fs = Math.max(14, Math.min(56, w / 16));
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    ctx.font = `700 ${fs}px Segoe UI`;
+    ctx.fillText(veT('Preparando prévia') + (pct != null ? ` ${pct}%` : '…'), w / 2, h / 2, w * 0.86);
+    if (pct != null) {
+        const bw = w * 0.5, bh = Math.max(3, fs / 6), by = h / 2 + fs;
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.fillRect((w - bw) / 2, by, bw, bh);
+        ctx.fillStyle = '#FB8A3C';
+        ctx.fillRect((w - bw) / 2, by, bw * pct / 100, bh);
+    }
+    ctx.restore();
+}
+
 // Desenha as camadas (de baixo para cima) no ctx já em coordenadas do quadro (escala pv). itens = [{c, src}]:
-// src = imagem/vídeo/canvas, 'ajuste', 'offline' ou 'comp' (Comp sem nada para mostrar ainda)
+// src = imagem/vídeo/canvas, 'ajuste', 'offline', 'preparando' (vídeo sem prévia ainda) ou 'comp' (Comp sem nada
+// para mostrar ainda)
 function veDesenharItens(ctx, cv, itens, pv, t) {
     itens.forEach(({ c, src }) => {
             if (!src) return;
             if (src === 'ajuste') { veAdjDraw(ctx, cv, c, pv, t); return; }
             if (src === 'comp') { veCompDesenharPendente(ctx, VE.seqW, VE.seqH, veMediaOf(c)); return; }
+            if (src === 'preparando') {
+                const p = veProps(c), sz = veMediaSize(c), [ax, ay] = veAnc(c, p, sz);
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rot * Math.PI / 180);
+                ctx.scale(p.sc / 100, p.sc / 100);
+                ctx.translate(-ax, -ay);
+                veDrawPreparando(ctx, sz.w, sz.h, veMediaOf(c), veSrcAt(c, t));
+                ctx.restore();
+                return;
+            }
             const p = veCaAplicar(c, veProps(c), t), sz = veMediaSize(c);   // + Rotação/Tremer/Pulsar em loop
             // texto animado vem com margem em volta (letras que saem da caixa): desenha maior, mesmo centro
             const pd = src && src._pad || 0, szd = pd ? { w: sz.w + 2 * pd, h: sz.h + 2 * pd } : sz;
@@ -3072,6 +3150,10 @@ function veDrawMonitor() {
         const med = veMediaOf(c);
         if (veMediaOffline(med)) {
             src = 'offline';
+        } else if (med && med.kind === 'video' && !med.url && !med.comp) {
+            // sem a prévia ainda: a miniatura dele com "Preparando" (o player ainda tem o arquivo de OUTRO vídeo)
+            src = 'preparando';
+            parcial = true;
         } else if (med && med.comp && (med._aoVivo || !med.url)) {
             // Comp mudada e ainda sem o arquivo novo: desenhada ao vivo com as camadas de dentro (editor-comp.js)
             src = veCompQuadro(c, t, pv * veProps(c).sc / 100) || 'comp';
@@ -4683,7 +4765,7 @@ function veRender() {
             ctx.font = '600 10px Segoe UI';
             ctx.fillText((med.nome || med.name || veT('Áudio')) + velTxt + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, ay + 10);
         }
-        const enh = typeof veMaEstado === 'function' ? veMaEstado(c.m || 0) : null;
+        const enh = (typeof veMaEstado === 'function' ? veMaEstado(c.m || 0) : null) || (typeof veAnEstado === 'function' ? veAnEstado(c) : null);
         if (enh && !ghost) veMaDesenhar(ctx, cx, ay, cw, ah, enh);
         ctx.restore();
         ctx.globalAlpha = 1;
@@ -5169,6 +5251,7 @@ function veOnPrepare(ev) {
             veRefresh();
             if (VE._pendingProject) veApplyProject();
             veUpdateTitle();
+            if (VE._pjIni) { const resto = VE._pjIni; VE._pjIni = null; setTimeout(() => vePjImportar(resto, null), 0); }   // veAbrirComResto
             break;
         }
         case 'proxy':

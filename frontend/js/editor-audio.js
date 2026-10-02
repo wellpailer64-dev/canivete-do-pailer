@@ -172,13 +172,15 @@ function veAudioBloco(F, k) {
 function veAudioPrever(t) {
     const esperas = [];
     const a = t, b = t + VE_AU_PREVER * VEAU.taxa;
-    (VEAU.clipes.length ? VEAU.clipes : veAudioClipes()).forEach(([st, s0, e0, , id, v]) => {
-        const F = VEAU.fontes.get(id), fimC = st + (e0 - s0) / v;
-        if (!F || fimC <= a || st >= b) return;
+    (VEAU.clipes.length ? VEAU.clipes : veAudioClipes()).forEach(([st, s0, e0, , id, v, , , , fx]) => {
+        const F0 = veAudioFonteClipe(id, fx), fimC = st + (e0 - s0) / v;
+        if (!F0 || fimC <= a || st >= b) return;
         // (com folga de um grão: a mudança de velocidade lê um pouco além do ponto)
         const i0 = Math.max(0, s0 + Math.max(0, a - st) * v - 0.05), i1 = s0 + (Math.min(fimC, b) - st) * v + 0.05;
-        for (let k = Math.floor(i0 * VE_AU_SR / VE_AU_BLOCO); k <= Math.floor(i1 * VE_AU_SR / VE_AU_BLOCO); k++) {
-            if (!F.blocos.has(k)) { veAudioBloco(F, k); if (F.pedidos.has(k)) esperas.push(F.pedidos.get(k)); }
+        for (const F of F0.l ? [F0.o, F0.l] : [F0]) {   // Anti Noise: o original e o limpo
+            for (let k = Math.floor(i0 * VE_AU_SR / VE_AU_BLOCO); k <= Math.floor(i1 * VE_AU_SR / VE_AU_BLOCO); k++) {
+                if (!F.blocos.has(k)) { veAudioBloco(F, k); if (F.pedidos.has(k)) esperas.push(F.pedidos.get(k)); }
+            }
         }
     });
     return esperas;
@@ -187,7 +189,72 @@ function veAudioPrever(t) {
 // Clipes com som, prontos para o mixer: [início, entrada, saída, ganho linear, id da fonte, velocidade, manter tom,
 // fade de entrada (s), fade de saída (s), efeitos de áudio]
 function veAudioClipes() {
-    return veMixClipes().map(([st, s0, e0, g, id, v, tom, fi, fo, afx]) => [st, s0, e0, Math.pow(10, g / 20), id, v || 1, tom !== 0, fi || 0, fo || 0, afx || []]);
+    return veMixClipes().map(([st, s0, e0, g, id, v, tom, fi, fo, afx]) => {
+        if (afx && afx.some(f => f.t === 'antinoise')) veAnGarantir(id);
+        return [st, s0, e0, Math.pow(10, g / 20), id, v || 1, tom !== 0, fi || 0, fo || 0, afx || []];
+    });
+}
+
+// ── Anti Noise (DeepFilterNet3: Functions/anti_noise.py) ──
+// O modelo roda uma vez por arquivo, no fundo, e grava o som limpo no tempo do original (extraído do mesmo jeito).
+// A Quantidade é só a mistura dos dois, amostra a amostra (veAudioAmostra): muda na hora, tocando. A exportação faz
+// a mesma mistura (video_cutter._pre_antinoise). Enquanto o limpo não fica pronto, toca o original.
+const VEAN = { arqs: new Map(), anim: 0 };   // arquivo → { estado: 'fazendo' | 'pronto' | 'erro', F }
+
+function veAnArquivo(id) {
+    const m = VE.media && VE.media[id];
+    if (id && !m) return '';
+    return (typeof veMelArquivo === 'function' && veMelArquivo(id)) || (id ? m.path : VE.path) || '';
+}
+
+function veAnGarantir(id) {
+    const arq = veAnArquivo(id), api = window.pywebview && window.pywebview.api;
+    if (!arq || VEAN.arqs.has(arq) || !api || !api.anti_noise_preparar) return;
+    VEAN.arqs.set(arq, { estado: 'fazendo' });
+    veAnAnimar();
+    veToast(veT('Anti Noise: limpando o som no fundo — toca o original até ficar pronto'));
+    const fim = (r, erro) => {
+        if (r && r.success) VEAN.arqs.set(arq, { estado: 'pronto', F: { url: r.url, quadros: r.quadros, blocos: new Map(), pedidos: new Map() } });
+        else { VEAN.arqs.set(arq, { estado: 'erro' }); veToast(`Anti Noise: ${(r && r.error) || erro || veT('não foi possível limpar o som')}`); }
+        VEAU.chave = '';
+        if (veAudioPronto()) veAudioEditou();
+        veAnAnimar();
+    };
+    api.anti_noise_preparar(arq)
+        .then(r => r && r.success ? api.video_cutter_add_audio(r.saida) : r)
+        .then(r => fim(r), e => fim(null, String(e)));
+}
+
+// faixa do clipe enquanto limpa (listras andando, como o Melhorar áudio: veMaDesenhar)
+function veAnEstado(c) {
+    if (!VEAN.arqs.size || !c || !(c.afx || []).some(f => f.t === 'antinoise' && f.on !== false)) return null;
+    const L = VEAN.arqs.get(veAnArquivo(c.m || 0));
+    return L && L.estado === 'fazendo' ? { pct: -1, rot: veT('Anti Noise') + '…' } : null;
+}
+
+function veAnAnimar() {
+    const ativo = [...VEAN.arqs.values()].some(L => L.estado === 'fazendo');
+    if (ativo && !VEAN.anim) VEAN.anim = setInterval(veDraw, 120);
+    if (!ativo && VEAN.anim) { clearInterval(VEAN.anim); VEAN.anim = 0; }
+    veDraw();
+}
+
+// Fonte do clipe: com Anti Noise e o som limpo pronto, a mistura dos dois na Quantidade (veAudioAmostra)
+function veAudioFonteClipe(id, fx) {
+    const F = VEAU.fontes.get(id);
+    const an = F && fx && fx.find(f => f.t === 'antinoise');
+    if (!an) return F;
+    const L = VEAN.arqs.get(veAnArquivo(id));
+    if (!L || !L.F) return F;
+    return { o: F, l: L.F, a: veAnPeso(an.v && an.v.amt) };
+}
+
+// Peso do som limpo na mistura: a Quantidade anda em dB de ruído tirado (0% = original, 50% = −18 dB, 100% = o limpo
+// inteiro), não em proporção — misturado em proporção, 50% só tiraria 6 dB. A exportação usa a mesma conta
+// (video_cutter._pre_antinoise).
+function veAnPeso(amt) {
+    const q = Math.max(0, Math.min(100, +amt || 0)) / 100;
+    return q >= 1 ? 1 : 1 - Math.pow(10, -q * 36 / 20);
 }
 
 // Ganho do fade no instante u (s desde o início do clipe na timeline): Potência constante = seno / cosseno
@@ -201,6 +268,12 @@ function veAudioFade(u, dur, fi, fo) {
 
 // Amostra (esquerda, direita) da fonte F no quadro fracionário f, ou null se o bloco ainda não chegou
 function veAudioAmostra(F, f) {
+    if (F.l) {   // Anti Noise: original + (limpo − original) × Quantidade (sem o limpo ainda lido: o original)
+        const x = veAudioAmostra(F.o, f);
+        const y = x && veAudioAmostra(F.l, f);
+        if (y) { x[0] += (y[0] - x[0]) * F.a; x[1] += (y[1] - x[1]) * F.a; }
+        return x;
+    }
     const q = Math.floor(f), fr = f - q;
     const k = Math.floor(q / VE_AU_BLOCO), b = F.blocos.get(k);
     if (!b || q < 0) return null;
@@ -304,7 +377,7 @@ function veAudioMixarBruto(t, n) {
     const L = new Float32Array(n), R = new Float32Array(n), passo = VEAU.taxa / VE_AU_SR;
     for (const cl of VEAU.clipes) {
         const [st, s0, e0, g, id, v, tom, fi, fo, fx] = cl;
-        const F = VEAU.fontes.get(id), fimC = st + (e0 - s0) / v, tFim = t + n * passo;
+        const F = veAudioFonteClipe(id, fx), fimC = st + (e0 - s0) / v, tFim = t + n * passo;
         if (!F || fimC <= t || st >= tFim) continue;
         if (fx.some(f => f.t === 'limiter')) { veAudioMixarLim(cl, F, t, n, passo, L, R); continue; }
         const i0 = Math.max(0, Math.ceil((st - t) / passo)), i1 = Math.min(n, Math.ceil((fimC - t) / passo));

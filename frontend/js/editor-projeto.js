@@ -286,9 +286,10 @@ async function vePjImportarPasta(path, pai) {
 // itens = [{path, pasta: bool}]; destino = pasta do projeto (ou raiz)
 async function vePjImportar(itens, destino = vePjDestino()) {
     if (!VE.ready) {
-        const v = itens.find(i => !i.pasta && (EXT_VIDEO.test(i.path) || EXT_AUDIO.test(i.path)));
+        // o primeiro vídeo abre e o resto entra no painel quando ele abrir (editor.js: veAbrirComResto)
+        if (await veAbrirComResto(itens)) return;
         const psd = itens.find(i => !i.pasta && typeof VE_EXT_PSD !== 'undefined' && VE_EXT_PSD.test(i.path));
-        if (v) veOpenPath(v.path); else if (psd) vePsdAbrir(psd.path); else veToast('Abra um vídeo primeiro');
+        if (psd) vePsdAbrir(psd.path); else veToast('Abra um vídeo primeiro');
         return;
     }
     veToast('Importando...');
@@ -630,6 +631,7 @@ function veMaEstado(id) {
 }
 
 function veMaRotulo(e) {
+    if (e.rot) return e.rot;   // outro processo no fundo (Anti Noise: editor-audio.js)
     return e.fila ? `${veT('Melhorando')} · ${veT('na fila')}` : `${veT('Melhorando')}${e.pct >= 0 ? ` ${Math.round(e.pct)}%` : '…'}`;
 }
 
@@ -1106,9 +1108,30 @@ function veMidiaProxima() {
         window.pywebview.api.ve_preparar_midia(m.path, id, !!m._urgente, !m._urgente);
     }
 }
+// Prévia no fundo: com nada urgente andando e sem tocar, o próximo vídeo só do painel (sem prévia ainda) já ganha a
+// prévia leve — um por vez e com prioridade baixa no Python (sempre sobra vaga para o que for para a timeline).
+// Ao soltá-lo na timeline ela já está pronta ou adiantada, em vez de começar do zero.
+function veMidiaFundo() {
+    if (typeof VE === 'undefined' || !window.pywebview) return;
+    if (VEPJF.fundo != null) {   // outro projeto aberto no meio, mídia apagada ou já pronta: libera
+        const f = VE.media && VE.media[VEPJF.fundo];
+        if (!f || f.removido || f.url) VEPJF.fundo = null;
+    }
+    if (!VE.ready || VEPJF.fundo != null || VEPJF.ativos.size || VEPJF.fila.length || VE.playing) return;
+    const api = window.pywebview && window.pywebview.api;
+    const m = (VE.media || []).find(x => x && x.kind === 'video' && x.id && x.path && x.leve && !x.url && !x.removido
+        && !x.erro && !x._fundoFeito && !veMediaOffline(x));
+    if (!m || !api || !api.ve_preparar_midia) return;
+    VEPJF.fundo = m.id;
+    m._fundoFeito = true;
+    api.ve_preparar_midia(m.path, m.id, false, false, true);
+}
+setInterval(veMidiaFundo, 4000);   // parou de tocar ou terminou a fila sem evento novo
+
 function veMidiaPriorizar(m) {
     if (!m) return;
-    // só com os dados (vídeo do painel): agora que vai ser usado, pede a prévia leve na frente da fila
+    // só com os dados (vídeo do painel): agora que vai ser usado, pede a prévia leve na frente da fila (fazendo no
+    // fundo: o Python junta os dois pedidos numa conversão só e a passa na frente)
     if (m.leve && !m.url && !VEPJF.ativos.has(m.id) && !VEPJF.fila.includes(m.id)) { veMidiaPreparar(m, true); return; }
     if (m._urgente) return;
     m._urgente = true;
@@ -1124,6 +1147,8 @@ function veOnMidia(ev) {
     // a vaga libera quando o vídeo já foi lido (info): as conversões pesadas têm fila própria no Python
     const livre = ev.stage === 'info' || ev.stage === 'video' || ev.stage === 'done' || ev.stage === 'error';
     if (livre && VEPJF.ativos.delete(ev.id)) veMidiaProxima();
+    if (VEPJF.fundo === ev.id && (ev.stage === 'video' || ev.stage === 'done' || ev.stage === 'error')) VEPJF.fundo = null;
+    setTimeout(veMidiaFundo, 0);
     if (!m || m.kind !== 'video') return;
     if (ev.stage === 'info') {
         m.info = ev;
