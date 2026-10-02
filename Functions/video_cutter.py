@@ -2235,6 +2235,24 @@ def _normalizar_camadas(camadas, path_video):
     return out
 
 
+def _camadas_na_grade(lay, fps):
+    """Início e fim de cada camada no quadro em que a prévia passa a mostrá-la (o 1º quadro com t >= início).
+    Fora da grade (corte na batida exata, 1,997 s; ou 0,2333340 por arredondamento num trecho recortado) a camada
+    que sai e a que entra não cobriam o quadro do corte: saía um quadro preto. O que anda junto (trecho da fonte,
+    quadros-chave) acompanha o deslocamento, que é menor que um quadro."""
+    fps = max(1.0, float(fps or 30))
+    for c in lay:
+        a = math.ceil(c["st"] * fps - 1e-3) / fps
+        b = math.ceil((c["st"] + c["dur"]) * fps - 1e-3) / fps
+        if b - a < 0.5 / fps:
+            continue
+        d = a - c["st"]
+        c["s"] = max(0.0, c["s"] + d * c["v"])
+        c["kf"] = {k: [(t - d, v, i, bz) for t, v, i, bz in pts] for k, pts in c["kf"].items()}
+        c["st"], c["dur"] = a, b - a
+        c["fonte"] = c["dur"] * c["v"]
+
+
 def _reduzir_camada(c, k):
     """Camada normalizada (_normalizar_camadas) num quadro k vezes menor: px do quadro × k."""
     c["sc"] *= k
@@ -2358,6 +2376,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     pecas = _normalizar_segmentos(segmentos, info["duration"])
     pecas_a = pecas if audio_segmentos is None else _normalizar_segmentos(audio_segmentos, info["duration"])
     lay = _normalizar_camadas(camadas, path)
+    _camadas_na_grade(lay, info["fps"])
     # Saída menor que o quadro (4K → 1080p) com camadas: compõe direto no tamanho da saída em vez de compor em 4K e
     # reduzir no fim. Posição, escala, quadros-chave e tremida das camadas são em px do quadro e vão na mesma
     # proporção; os efeitos já medem em % da mídia. Medido (teste 4K, 3 PiPs + texto + ajuste, 20 s): 4K e 1080p
@@ -2731,7 +2750,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                     fim_cadeia = filtros_clip + [de_rgb]
                 cadeia = f"{src}{vel}" + ",".join([f"fps=fps={fps}:start_time=0"] + ([reducao] if reducao else [])
                                                   + [para_rgb] + fim_cadeia)
-            cadeia += f",setpts=PTS-STARTPTS+{_tempo_ffmpeg(c['st'])}/TB[l{n}]"
+            # round: em segundos o deslocamento era truncado (0,233333/TB = 6,99999 → 6) e o último quadro sumia
+            cadeia += f",setpts=PTS-STARTPTS+round({c['st']:.9f}/TB)[l{n}]"
             filtros.append(cadeia)
             fim = c["st"] + c["dur"]
             tl = f"(t-{c['st']:.4f})"
@@ -2757,7 +2777,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                     px, py = f"({px})+{dx:.3f}", f"({py})+{dy:.3f}"
             if ca_tl["dx"]:   # Tremer: desloca a posição
                 px, py = f"({px})+{ca_tl['dx']}", f"({py})+{ca_tl['dy']}"
-            ena = f"between(t,{_tempo_ffmpeg(c['st'])},{_tempo_ffmpeg(fim)})"
+            # quadros com t em [início, fim), com meia-quadro de folga: igual à prévia (a camada aparece de t >= início até
+            # antes do fim). O between exato perdia o 1º quadro (o t do quadro chega arredondado para baixo)
+            ena = f"gte(t,{c['st'] - frame_dur / 2:.6f})*lt(t,{fim - frame_dur / 2:.6f})"
             if bm:
                 # Modo de mesclagem: a camada é posicionada num quadro transparente do tamanho do vídeo, misturada
                 # com o fundo (blend) e aplicada pela transparência dela (maskedmerge) — como o canvas da prévia.

@@ -16,7 +16,10 @@ const veAfcPronto = t => t === 'video' || t === 'comp';
 const VE_AFC_ANIM = { pop: 'Pop', fade: 'Fade', zoom: 'Zoom lento' };
 const VE_AFC_ESTILOS = { auto: 'Automático', dinamico: 'Dinâmico', batida: 'Batida', memorias: 'Memórias', drop: 'Drop', viagem: 'Viagem', cinematico: 'Cinemático' };
 const VE_AFC_LOOKS = { estilo: 'Do estilo', vivo: 'Vivo', suave: 'Tons suaves', quente: 'Quente', filme: 'Filme', nenhum: 'Natural' };
-const VE_AFC_TRANS = ['dissolve', 'crossfade', 'fadeblack', 'push', 'slide', 'pull', 'pop', 'chicote', 'fold'];
+const VE_AFC_TRANS = ['dissolve', 'crossfade', 'fadeblack', 'push', 'slide', 'pull', 'pop', 'chicote', 'fold', 'splith', 'splitv',
+    // sobreposições (editor-ovt.js): camada por cima do corte
+    'ovt:zoomin', 'ovt:zoomout', 'ovt:panblur', 'ovt:spin', 'ovt:stretch', 'ovt:lens', 'ovt:glitch', 'ovt:flash', 'ovt:flare', 'ovt:leak'];
+const veAfcTrNome = t => t.startsWith('ovt:') ? (typeof VE_OVT === 'object' && VE_OVT[t.slice(4)] ? '✦ ' + veT(VE_OVT[t.slice(4)].nome) : t) : veT(VE_TR[t] ? VE_TR[t].nome : t);
 const VE_AFC_FREQ = { base: 'Onde o estilo pede', tres: '1 a cada 3 cortes', todos: 'Todo corte' };
 const VE_AFC_CANTOS = { nao: 'Não', se: '↖', sd: '↗', ie: '↙', id: '↘' };
 
@@ -182,7 +185,7 @@ function veAfcForm() {
             <div class="ve-af-h">${veT('Edição')}</div>
             ${linha('Estilo', pills('estilo', VE_AFC_ESTILOS))}
             ${linha('Cor', pills('look', VE_AFC_LOOKS))}
-            ${linha('Transições', VE_AFC_TRANS.map(t => `<button class="ve-af-pill${m.trans.includes(t) ? ' on' : ''}" data-afc-tr="${t}">${veT(VE_TR[t] ? VE_TR[t].nome : t)}</button>`).join(''))}
+            ${linha('Transições', VE_AFC_TRANS.map(t => `<button class="ve-af-pill${m.trans.includes(t) ? ' on' : ''}" data-afc-tr="${t}">${veAfcTrNome(t)}</button>`).join(''))}
             <small class="ve-af-info">${veT(m.trans.length ? 'Alterna entre as marcadas.' : 'Nenhuma marcada: usa as do estilo.')}</small>
             ${m.trans.length ? linha('Frequência', pills('transFreq', VE_AFC_FREQ)) : ''}
             <label class="ve-afc-chk"><input type="checkbox" data-afc-chk="flashMarca"${m.flashMarca ? ' checked' : ''}> ${veT('Flash de impacto na cor de destaque (em vez de branco)')}</label>
@@ -542,7 +545,7 @@ function veAfcExtras(out, plano, x) {
     });
     // a cena antes do encerramento não escurece (o encerramento entra no lugar)
     if (x.fimIni != null) out.forEach(c => { if (c.tout && c.tout.t === 'fadeblack' && Math.abs(c.st + c.e - c.s - x.fimIni) < 0.05) delete c.tout; });
-    const tAuto = m.trans.length ? m.trans[0] : 'pull';
+    const tAuto = m.trans.find(t => VE_TR[t]) || 'pull';   // a do encerramento é de camada (as sobreposições não entram aqui)
     const tin = { t: tAuto, d: 0.4, speed: 'fast', ...(VE_TR[tAuto] && VE_TR[tAuto].dir ? { dir: 'u' } : {}) };
     // efeitos sonoros: trilhas de áudio A2 em diante, sem sobrepor
     const fimA = [];
@@ -555,7 +558,8 @@ function veAfcExtras(out, plano, x) {
         let k = fimA.findIndex(f => f <= st + 1e-3);
         if (k < 0) { fimA.push(0); k = fimA.length - 1; }
         fimA[k] = st + dur;
-        out.push({ tr: k + 1, st: +st.toFixed(4), s: +ini.toFixed(4), e: +(ini + dur).toFixed(4), m: s.md.id, g, ...(extra || {}) });
+        // +3 dB sobre o ganho de cada som (o cliente pediu os efeitos um pouco mais altos, 2026-10-01)
+        out.push({ tr: k + 1, st: +st.toFixed(4), s: +ini.toFixed(4), e: +(ini + dur).toFixed(4), m: s.md.id, g: g + 3, ...(extra || {}) });
     };
     const sx = x.sfx || {};
     const logoSc = larg => x.logo ? W * larg / x.logo.w * 100 : 100;
@@ -662,14 +666,15 @@ function veAfcExtras(out, plano, x) {
         const frase = String(opts.texto || '').trim();
         if (frase) {
             const fundo = heroi ? veAfcTom(m.paleta.primaria, 0.55) : m.paleta.primaria;
-            const forte = veAfcFonteForte(m.fonte), t1 = L + b / 2, dur = st + D - t1;
+            // entra um quarto de batida antes de o logo bater (antes: meia batida depois) e fica mais tempo na tela
+            const forte = veAfcFonteForte(m.fonte), t1 = L - b / 4, dur = st + D - t1;
             const pals = frase.split(/\s+/), fim = pals.length > 1 ? pals.pop() : null, ini = pals.join(' ');
             const corDest = veAfcRazao(m.paleta.secundaria, fundo) >= 3 ? m.paleta.secundaria : '#ffffff';
             const corTx = veAfcRazao('#ffffff', fundo) >= 3 ? '#ffffff' : veAfcTom(m.paleta.primaria, 0.3);
             const linha = (t, y, tam, cor, anima, atraso, extra) => out.push({ ...(extra || {}), tr: nova(), st: +(t1 + atraso).toFixed(4), s: 0, e: +(dur - atraso).toFixed(3), m: veTxMidia().id,
                 tx: { ...VE_TX_PADRAO, ...forte, t, tam, cor, alin: 'center', esp: 10, sOn: true, sCor: '#000000', sOp: 45, sDist: 6, sBlur: 22 },
                 p: { sc: 100, x: W / 2, y, rot: 0, op: 100 },
-                txa: typeof veTxaObj === 'function' ? { in: veTxaObj(anima), out: veTxaObj('fade') } : undefined });
+                txa: typeof veTxaObj === 'function' ? { in: veTxaObj(anima), out: { ...veTxaObj('fade'), d: 0.35 } } : undefined });
             // o destaque pulsa no ritmo da música (um pulso por batida)
             const pulsa = { fx: [{ id: veFxNewId(), t: 'ca_pul', on: true, v: { tam: 7, vel: +(1 / b).toFixed(3) } }] };
             const ty = opts.txtY || TXT_Y;
@@ -720,10 +725,13 @@ function veAfcExtras(out, plano, x) {
     } else texto(0, Math.min(x.total, Math.max(2.5, b * 8)), VEAF.titulo, H * 0.42, nova());
     // corpo: whoosh em cada transição (no máximo um a cada ~1,5 s), impacto nos flashes
     let ult = -9, alt = 0;
-    out.filter(c => c.tin && c.tr === SC && c.st > iniCenas + 0.1 && c.st < fimCenas - 0.1).sort((a, b2) => a.st - b2.st).forEach(c => {
-        if (c.st - ult < 1.5) return;
+    // cortes com transição: de camada (tin) ou de sobreposição (camada de ajuste centrada no corte)
+    const cortes = out.filter(c => c.tin && c.tr === SC).map(c => c.st)
+        .concat(out.filter(c => typeof veOvtFx === 'function' && VE.media[c.m] && VE.media[c.m].kind === 'ajuste' && veOvtFx(c).length).map(c => c.st + (c.e - c.s) / 2));
+    cortes.filter(t => t > iniCenas + 0.1 && t < fimCenas - 0.1).sort((a, b2) => a - b2).forEach(t => {
+        if (t - ult < 1.5) return;
         const s = alt++ % 2 ? sx.whoosh2 : sx.whoosh;
-        if (s) { som(s, c.st - s.dur * 0.45, -9); ult = c.st; }
+        if (s) { som(s, t - s.dur * 0.45, -9); ult = t; }
     });
     out.filter(c => VE.media[c.m] && VE.media[c.m]._afBranco && c.st > iniCenas + 0.1 && c.st < fimCenas).forEach(c => som(sx.boom, c.st + 0.02, -8));
     // encerramento
@@ -752,9 +760,19 @@ function veAfcExtras(out, plano, x) {
         // em cima: a 150 px do topo (era 230; o cliente pediu mais alto, e longe do logo impresso nos painéis das fotos)
         const px = direita ? W - (embaixo ? 160 : 70) - lw / 2 : 70 + lw / 2, py = embaixo ? H - 420 - lh / 2 : 150 + lh / 2;
         const st = x.introFim || 0, dur = fimCenas - st;
+        // tela dividida de 4 fotos: o logo vai para o centro (no encontro das fotos, sem cobrir rosto) e volta ao canto
+        const grades = [...new Map(plano.slots.filter(s => s.cel && s.layout === 'grade4').map(s => [s.grupo_a, s.b])).entries()]
+            .map(([a, b2]) => [a - plano.inicio - st, b2 - plano.inicio - st]).filter(([a, b2]) => a > 0.3 && b2 < dur - 0.3);
+        const kx = [[0, px]], ky = [[0, py]], ks = [[0, sc]], T = 0.2;
+        grades.forEach(([a, b2]) => {
+            kx.push([a - T, px, 'troca'], [a, W / 2], [b2 - T, W / 2, 'troca'], [b2, px]);
+            ky.push([a - T, py, 'troca'], [a, H / 2], [b2 - T, H / 2, 'troca'], [b2, py]);
+            ks.push([a - T, sc, 'troca'], [a, sc * 1.6], [b2 - T, sc * 1.6, 'troca'], [b2, sc]);
+        });
         if (dur > 0.5) out.push({ tr: nova(), st: +st.toFixed(4), s: 0, e: +dur.toFixed(4), m: x.logo.id,
             p: { sc, x: +px.toFixed(1), y: +py.toFixed(1), rot: 0, op: m.marca.op ?? 90 },
-            k: { op: veAfcK([[0, 0, 'ease'], [0.4, m.marca.op ?? 90]]) } });
+            k: { op: veAfcK([[0, 0, 'ease'], [0.4, m.marca.op ?? 90]]),
+                 ...(grades.length ? { x: veAfcK(kx), y: veAfcK(ky), sc: veAfcK(ks) } : {}) } });
     }
     // fade para preto no fim (a música já sai em fade junto)
     const fp = Math.min(1.2, x.total * 0.08);

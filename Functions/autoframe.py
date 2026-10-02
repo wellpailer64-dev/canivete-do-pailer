@@ -1000,6 +1000,10 @@ def _encaixe_custo(c, s, M, dur, i, n):
         # célula da tela dividida: orientação da mídia parecida com a da célula (menos corte)
         ar_c, ar_m = s["cel"]["w"] / s["cel"]["h"], c["w"] / max(1, c["h"])
         v -= 0.35 * abs(math.log(ar_c / max(ar_m, 1e-3)))
+        # célula pede foto: vídeo num quadro pequeno (pior: um reel já editado, com a própria tela dividida dentro)
+        # ficava estranho (pedido do cliente, 2026-10-01)
+        if c["tipo"] == "video":
+            v -= 3
     elif i == 0 or i == n - 1:
         v += 0.3 * c["nota"] + 0.1 * min(1, c["rostos"])   # abertura e fecho: as mais fortes
     return v

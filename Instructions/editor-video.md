@@ -375,6 +375,46 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
   Os coeficientes saem prontos do JS (`exportar`); a prévia faz as mesmas contas.
 - Não vale em camada de ajuste (`soClipe`).
 
+## Transições de sobreposição (estilo Mister Horse / Motion Bro) — `editor-ovt.js` + `Functions/transicoes.py`
+- Painel Animação → **Sobreposição** (15): Zoom para dentro/fora, Giro, Pan com desfoque, Esticar, Redemoinho, Distorção
+  de lente, Ondulação, Glitch, Pixelar, Tremor, Desfoque, Flash, Lens flare, Vazamento de luz. Arrastar até o corte (ou
+  duplo clique = corte mais perto da agulha) cria uma **camada de ajuste** centrada no corte, logo acima da imagem mais
+  alta ali, com o efeito em `c.fx` (tipo marcado `ovt` no VE_FX; parâmetros no Controles de efeito). Duração pela
+  Velocidade do painel (0,5 / 0,8 / 1,2 s); aparar a camada muda a duração. API: `veOvtAdd(tipo, corteSeg, {d, tr, v})`.
+- O corte dentro da camada (`veOvtCorte`) é a borda de clipe das trilhas de baixo mais perto do meio; o tempo é remapeado
+  para o corte cair em 0,5 da curva. Até o corte o efeito age no clipe que sai, depois no que entra (é o composto de baixo).
+- Conta (igual em JS e Python, conferido: parâmetros iguais a 1e-15, imagem < 0,1 nível de diferença): `veOvtParams` /
+  `parametros()` dão K amostras de "obturador" (matriz 2×2 + deslocamento + redemoinho + lente) e globais (ondulação,
+  pixel, aberração, glitch, flash, flare, vazamento). Núcleo: borda espelhada (Mirror Edges), média das K amostras =
+  desfoque de movimento real (zoom → radial, giro → rotacional, pan → direcional), luz em modo Tela. Coordenadas em
+  unidades da meia diagonal: igual em qualquer resolução. Zoom/giro/pan usam uma curva só que passa pelo corte
+  (zoom contínuo em log), easeInOutQuint.
+- Prévia: shader WebGL sobre o quadro composto (`veAdjDraw` → `veOvtAplicar`). Exportação/prévia renderizada:
+  `veOvtProntas(faixa)` manda o trecho das trilhas de baixo (`veOvtJob`: plano recortado) para `ve_ovt_render`; o Python
+  exporta o trecho em ProRes, aplica o núcleo (numpy/cv2, mapas em meia resolução, 4 threads; 60–700 ms/quadro 1080×1920)
+  e grava `<cache>/Transicoes/<hash>.mp4`; o plano troca a camada pelo vídeo (`veOvtNoPlano`). Sem o arquivo, a camada sai
+  sem o efeito. Comps com sobreposição dentro ainda não renderizam o efeito.
+
+- Arquivos prontos ficam em `VEOVT.arq` (assinatura → caminho; `veOvtSig` = a camada + os clipes de baixo no trecho)
+  e não são zerados: a prévia renderizada e a exportação chamam `veOvtProntas` ao mesmo tempo. `veExportPlan` calcula
+  `VEOVT.sigs` com os clipes reais antes de trocar `VE.clips`. Mudou a conta do Python? Suba o nº em
+  `vePrHash(JSON.stringify([N, job]))` (senão o arquivo antigo é reaproveitado).
+- AutoFrame: `VE_AF_MISTO` (Dinâmico) alterna camada e `ovt:*`; estilo Batida/Drop (troca de energia) → zoom
+  para dentro/fora; Viagem → Pan com desfoque; Memórias → luz vazando a cada 4 dissoluções. Trilha própria (TR_OV, abaixo
+  da cor). Modelo de cliente: as `ovt:*` aparecem em Transições (✦) e ganham whoosh no corte.
+
+## Transições de camada: Dividir (horizontal, vertical, em 4) — `editor-trans.js`
+- `VE_TR.splith/splitv/split4` (`baixo: true`, `fn` devolve em `a` uma lista de pedaços com `crop` fixo + movimento).
+  `veTransVirtuais` cria um clipe por pedaço só no trecho da transição (Cortar fixo, `_z = 1` = por cima do que entra; as
+  ordenações da prévia e da exportação usam `tr`, `_z`, `st`); a cópia inteira fica com opacidade 0 no meio (nas pontas
+  aparece, senão o 1º quadro-chave valia para trás e deixava preto antes da transição).
+
+## Exportação: camadas na grade de quadros (`_camadas_na_grade`, video_cutter.py)
+- Início/fim de cada camada vão para o 1º quadro com t >= início (regra da prévia); o deslocamento da camada é
+  `round(st/TB)` e o `enable` é `[início, fim)` com meia-quadro de folga. Antes, cortes fora da grade (AutoFrame na
+  batida exata, 1,997 s; ou 0,2333340 num trecho recortado) davam 1 quadro preto no corte (o 1º quadro da camada que
+  entra sumia pelo `between` exato e o último pelo `0,233333/TB` truncado). O AutoFrame também alinha os clipes à grade.
+
 ## Transição padrão (Ctrl+D / Ctrl+Shift+D) e fade de áudio (Potência constante)
 - Clicar na borda de um clipe seleciona a ponta (colchete laranja, `VE.bordaSel`), como a seleção de ponto de edição do Premiere.
 - **Ctrl+D:** aplica a transição de vídeo marcada no painel Transições (clique no cartão = contorno laranja,

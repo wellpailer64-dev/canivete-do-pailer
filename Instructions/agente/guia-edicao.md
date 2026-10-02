@@ -62,6 +62,11 @@
 - se houver música: alinhar o MEIO da transição (ou o corte) a uma batida de `batidas` (fortes p/ momentos-chave)
 - evitar transição sobre o GC e na assinatura ; nunca dissolve longo em reel dinâmico
 - novas transições do painel Animação: ler VE_TR (editor-trans.js) para nomes/opções
+- sobreposição (Mister Horse): `veOvtAdd('zoomin'|'zoomout'|'spin'|'panblur'|'stretch'|'twirl'|'lens'|'ripple'|'glitch'|
+  'pixel'|'shake'|'blurx'|'flash'|'flare'|'leak', corteSeg, {d: 0.5, v: {mb: 70, ...}})` — camada de ajuste centrada no
+  corte; parâmetros em VE_OVT (editor-ovt.js). Pico no corte: alinhar o corte à batida. Reel dinâmico: zoomin/panblur
+  0,4–0,6 s; flash/flare em momento-chave; não empilhar sobre GC/legenda (fica acima da imagem, abaixo de texto se houver trilha livre)
+- camada: `splith`/`splitv`/`split4` (Dividir) via tin, como as outras do VE_TR
 
 ## 6 LEGENDAS: QUALIDADE
 - dicionário de nomes: %APPDATA%/CaniveteDoPailer/dicionario_fala.json {"errado":"certo"} (vale p/ painel Texto e ferramentas)

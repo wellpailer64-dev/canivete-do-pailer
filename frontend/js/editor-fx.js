@@ -528,7 +528,7 @@ function veTemAlfa(c) { const m = veMediaOf(c); return !!(m && m.info && m.info.
 // alvo = pixels do monitor por pixel da mídia: os efeitos rodam só na resolução em que a mídia aparece
 // (em degraus de 1/8, para não recriar os canvases a cada quadro de uma escala animada)
 function veFxRender(c, src, sz, alvo) {
-    const fx = veFxActive(c).filter(f => !VE_FX[f.t].constante);
+    const fx = veFxActive(c).filter(f => !VE_FX[f.t].constante && !VE_FX[f.t].ovt);
     if (!fx.length) return src;
     let q = Math.min(1, 1920 / Math.max(sz.w, sz.h));
     if (alvo > 0) q = Math.min(q, Math.max(0.125, Math.ceil(alvo * 8) / 8));
@@ -543,7 +543,7 @@ function veFxRender(c, src, sz, alvo) {
 
 // Para a exportação: [{t, v}] só dos efeitos ativos
 function veFxExport(c) {
-    return veFxActive(c).filter(f => !VE_FX[f.t].constante).map(f => {
+    return veFxActive(c).filter(f => !VE_FX[f.t].constante && !VE_FX[f.t].ovt).map(f => {
         const d = VE_FX[f.t], v = veFxValues(f);
         return { t: f.t, v: d.exportar ? d.exportar(v) : v };
     });
@@ -725,7 +725,7 @@ function veRenderFxControls() {
                     <div class="ve-prop ve-prop-cor">
                         <label>${p.nome}</label>
                         <input type="color" data-fk="${p.k}">
-                        <button class="ve-btn ve-btn-sm" data-fa="gotas" title="Conta-gotas: clique na tela verde/azul no monitor">⌖ Conta-gotas</button>
+                        ${p.gotas === false ? '' : '<button class="ve-btn ve-btn-sm" data-fa="gotas" title="Conta-gotas: clique na tela verde/azul no monitor">⌖ Conta-gotas</button>'}
                     </div>` : p.tipo === 'bool' ? `
                     <label class="ve-prop-bool"><input type="checkbox" data-fk="${p.k}"> ${p.nome}</label>` : `
                     <div class="ve-prop">
@@ -793,7 +793,7 @@ function veRenderFxList() {
         if (q && !alvo.includes(q)) return;
         (cats[d.cat] = cats[d.cat] || []).push([t, d, tipo]);
     };
-    Object.entries(VE_FX).forEach(([t, d]) => { if (!d.constante) add(t, d, 'v'); });   // constantes: painel Animação
+    Object.entries(VE_FX).forEach(([t, d]) => { if (!d.constante && !d.ovt) add(t, d, 'v'); });   // constantes e sobreposição: painel Animação
     Object.entries(VE_AFX).forEach(([t, d]) => add(t, d, 'a'));
     const html = Object.entries(cats).map(([cat, list]) => `<div class="ve-fx-cat">${cat}</div>` +
         list.map(([t, d, tipo]) => `<div class="ve-fx-item" data-${tipo === 'a' ? 'aft' : 'fxt'}="${t}" title="Arraste até um clipe · duplo clique aplica no clipe selecionado"><i>${tipo === 'a' ? 'aud' : 'fx'}</i><span>${d.nome}</span><small>${d.tag}</small></div>`).join('')).join('');

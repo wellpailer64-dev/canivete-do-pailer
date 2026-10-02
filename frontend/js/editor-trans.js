@@ -96,6 +96,19 @@ const VE_TR = {
         },
     },
 };
+// Dividir: o quadro que sai se parte em pedaços (cópias com Cortar) que saem pelas bordas e revelam o que entra,
+// que fica por baixo (baixo). fn devolve em `a` uma lista: um item por pedaço, com `crop` fixo ({l, t, r, b} em %)
+// e o movimento; a cópia inteira do clipe some (op 0) enquanto os pedaços correm (veTransVirtuais).
+const veTrSplit = pedacos => u => { const e = veEaseIO(u); return { a: pedacos.map(([crop, x, y]) => ({ crop, dx: x * e, dy: y * e })), b: {} }; };
+Object.assign(VE_TR, {
+    splith: { nome: 'Dividir (horizontal)', tag: 'Split', baixo: true, pausa: 0.4, fn: veTrSplit([[{ b: 50 }, 0, -0.5], [{ t: 50 }, 0, 0.5]]) },
+    splitv: { nome: 'Dividir (vertical)', tag: 'Split', baixo: true, pausa: 0.4, fn: veTrSplit([[{ r: 50 }, -0.5, 0], [{ l: 50 }, 0.5, 0]]) },
+    split4: {
+        nome: 'Dividir em 4', tag: 'Split Quad', baixo: true, pausa: 0.4,
+        fn: veTrSplit([[{ r: 50, b: 50 }, -0.5, -0.5], [{ l: 50, b: 50 }, 0.5, -0.5], [{ r: 50, t: 50 }, -0.5, 0.5], [{ l: 50, t: 50 }, 0.5, 0.5]]),
+    },
+});
+
 // Transição de áudio (a do Ctrl+Shift+D): ganho seno/cosseno — soma de potência constante no crossfade
 const VE_TR_AUD = { cp: { nome: 'Potência constante', tag: 'Constant Power' } };
 
@@ -162,13 +175,27 @@ function veAudFades() {
     return m;
 }
 
-// Efeito da transição no instante T para o papel ('a' sai / 'b' entra)
-function veTransFx(j, papel, T) {
+// Efeito da transição no instante T para o papel ('a' sai / 'b' entra). parte = nº do pedaço (Dividir);
+// sem parte, num papel com pedaços, a cópia inteira some (os pedaços aparecem no lugar)
+function veTransFx(j, papel, T, parte) {
     const u = Math.min(1, Math.max(0, (T - j.ws) / (j.we - j.ws))), tipo = VE_TR[j.t], fn = tipo.fn;
     const tr = veTrAnim(j.t, j.tr || (j.c && j.c[veTrCampo(j.lado, j.aud)]) || j);
-    if (papel === 'a' && !j.B) return ((tipo.solo || fn)(1 - u, tr).b || {});   // saída para o nada: o contrário da entrada
-    if (papel === 'b' && !j.A && tipo.solo) return tipo.solo(u, tr).b || {};
-    return fn(u, tr)[papel] || {};
+    let f;
+    if (papel === 'a' && !j.B) {
+        // saída para o nada: o contrário da entrada (Dividir: os pedaços saem do mesmo jeito)
+        f = Array.isArray(fn(u, tr).a) ? fn(u, tr).a : (tipo.solo || fn)(1 - u, tr).b;
+    } else if (papel === 'b' && !j.A && tipo.solo) f = tipo.solo(u, tr).b;
+    else if (papel === 'b' && !j.A && Array.isArray(fn(u, tr).a)) f = fn(1 - u, tr).a;   // entrada do nada: pedaços se juntam
+    else f = fn(u, tr)[papel];
+    // nas pontas (u = 0 e 1) a cópia inteira aparece: o 1º quadro-chave vale para trás e o último para frente
+    if (Array.isArray(f)) return parte == null ? (u <= 0 || u >= 1 ? {} : { op: 0 }) : f[parte] || {};
+    return f || {};
+}
+// Pedaços do papel (Dividir): [{crop}] ou null
+function veTransPedacos(j, papel) {
+    const tipo = VE_TR[j.t], tr = veTrAnim(j.t, j.tr || j);
+    const f = (papel === 'b' && !j.A) ? tipo.fn(0, tr).a : tipo.fn(0, tr)[papel];
+    return (papel === 'a' || !j.A) && Array.isArray(f) ? f : null;
 }
 
 // Clipes com as transições aplicadas: os envolvidos viram cópias (só a imagem; o som fica numa cópia à parte,
@@ -186,19 +213,32 @@ function veTransVirtuais() {
         }
         return mapa.get(c);
     };
+    const pedacos = [];
+    // Dividir: um clipe por pedaço, só no trecho da transição, com Cortar fixo e por cima do que entra (_z)
+    const pedaco = (c, j, papel) => (veTransPedacos(j, papel) || []).forEach((q, n) => {
+        const v = JSON.parse(JSON.stringify(c));
+        v._o = c; v._tr = [[j, papel, n]]; v._base = JSON.parse(JSON.stringify(c)); v._z = 1;
+        if (!veIsImage(c)) v.x = 'v';
+        v.s = c.s + (j.ws - c.st) * veVel(c); v.st = j.ws; v.e = v.s + (j.we - j.ws) * veVel(c);
+        const cr = q.crop || {};
+        v.fx = [{ id: 'trp' + n, t: 'crop', on: true, v: { l: cr.l || 0, t: cr.t || 0, r: cr.r || 0, b: cr.b || 0 } }].concat(v.fx || []);
+        pedacos.push(v);
+    });
     lista.forEach(j => {
         if (j.B) {
             const v = virt(j.B);
             if (j.ws < v.st) { v.s -= (v.st - j.ws) * veVel(v); v.st = j.ws; }
             v._tr.push([j, 'b']);
+            if (!j.A) pedaco(j.B, j, 'b');
         }
         if (j.A) {
             const v = virt(j.A);
             if (j.we > veEnd(v)) v.e += (j.we - veEnd(v)) * veVel(v);
             v._tr.push([j, 'a']);
+            pedaco(j.A, j, 'a');
         }
     });
-    mapa.forEach(v => {
+    [...mapa.values(), ...pedacos].forEach(v => {
         // valores originais (sem a transição) em cada instante, a partir do clipe como era, reposicionado
         const base = Object.assign(v._base, { st: v.st, s: v.s, e: v.e });
         const ts = new Set();
@@ -214,9 +254,9 @@ function veTransVirtuais() {
         tempos.forEach(T => {
             const p = veProps(base, T);
             let x = p.x, y = p.y, sc = p.sc, op = p.op, sx = p.sx == null ? 1 : p.sx, sy = p.sy == null ? 1 : p.sy;
-            v._tr.forEach(([j, papel]) => {
+            v._tr.forEach(([j, papel, parte]) => {
                 if (T < j.ws - VE_EPS || T > j.we + VE_EPS) return;
-                const f = veTransFx(j, papel, T), s = f.s == null ? 1 : f.s, fx = f.sx == null ? 1 : f.sx, fy = f.sy == null ? 1 : f.sy;
+                const f = veTransFx(j, papel, T, parte), s = f.s == null ? 1 : f.s, fx = f.sx == null ? 1 : f.sx, fy = f.sy == null ? 1 : f.sy;
                 if (f.sx != null) usaSx = true;
                 if (f.sy != null) usaSy = true;
                 x = W / 2 + (f.dx || 0) * W + s * fx * (x - W / 2);
@@ -238,7 +278,7 @@ function veTransVirtuais() {
     });
     // o som dos clipes que viraram só imagem continua numa cópia no trecho original
     const sons = [...mapa.values()].filter(v => v.x === 'v' && !v._o.x).map(v => ({ ...v._o, x: 'a' }));
-    return VE.clips.map(c => mapa.get(c) || c).concat(sons);
+    return VE.clips.map(c => mapa.get(c) || c).concat(pedacos, sons);
 }
 
 // ── adicionar / remover / duração ──
@@ -568,7 +608,7 @@ function veTransPlayers(t, virt) {
     veTransLista().filter(j => t >= j.ws - pre && t <= j.we + 0.05)
         .forEach(j => [j.A, j.B].forEach(c => { if (c && !veIsImage(c)) precisa.add(c); }));
     veTransSoltar(precisa);
-    const porO = new Map(virt.filter(v => v._o && v._tr).map(v => [v._o, v]));
+    const porO = new Map(virt.filter(v => v._o && v._tr && !v._z).map(v => [v._o, v]));
     precisa.forEach(o => {
         const v = porO.get(o);
         if (!v) return;
@@ -627,16 +667,19 @@ function veTrvDesenhar(cv, t, u) {
     if (!VETRV.B) return;
     const sel = veTrSelecionadaObj();
     const r = VE_TR[t].fn(u, veTrAnim(t, sel && sel.t === t ? sel : null));
-    [[VETRV.A, r.a], [VETRV.B, r.b]].forEach(([src, f]) => {
-        f = f || {};
-        const s = f.s == null ? 1 : f.s, sx = f.sx == null ? 1 : f.sx, sy = f.sy == null ? 1 : f.sy;
+    const camadas = [[VETRV.A, r.a], [VETRV.B, r.b]];
+    if (VE_TR[t].baixo) camadas.reverse();   // Dividir: o que entra fica por baixo
+    camadas.forEach(([src, f]) => (Array.isArray(f) ? f : [f || {}]).forEach(f => {
+        const s = f.s == null ? 1 : f.s, sx = f.sx == null ? 1 : f.sx, sy = f.sy == null ? 1 : f.sy, cr = f.crop || {};
+        const l = (cr.l || 0) / 100, tp = (cr.t || 0) / 100, w = 1 - l - (cr.r || 0) / 100, h = 1 - tp - (cr.b || 0) / 100;
+        if (w <= 0 || h <= 0) return;
         x.save();
         x.globalAlpha = Math.max(0, Math.min(1, f.op == null ? 1 : f.op));
         x.translate(W / 2 + (f.dx || 0) * W, H / 2 + (f.dy || 0) * H);
         x.scale(s * sx, s * sy);
-        x.drawImage(src, -W / 2, -H / 2, W, H);
+        x.drawImage(src, l * W, tp * H, w * W, h * H, -W / 2 + l * W, -H / 2 + tp * H, w * W, h * H);
         x.restore();
-    });
+    }));
 }
 
 // Parado: um instante que mostra a transição (o meio, ou o `pausa` dela)

@@ -2078,7 +2078,7 @@ function veIsImage(c) { const m = veMediaOf(c); return !!m && ['image', 'ajuste'
 function veIsAdj(c) { const m = veMediaOf(c); return !!m && m.kind === 'ajuste'; }
 function veNomeClipe(c) {
     const k = veMediaOf(c) && veMediaOf(c).kind;
-    return veIsAudio(c) ? 'Áudio' : veIsAdj(c) ? 'Ajuste' : veIsTexto(c) ? 'Texto' : k === 'cor' ? 'Cor sólida' : k === 'forma' ? 'Forma' : k === 'pincel' ? 'Desenho' : veIsImage(c) ? 'Imagem' : 'Clipe';
+    return veIsAudio(c) ? 'Áudio' : veIsAdj(c) ? ((typeof veOvtNome === 'function' && veOvtNome(c)) || 'Ajuste') : veIsTexto(c) ? 'Texto' : k === 'cor' ? 'Cor sólida' : k === 'forma' ? 'Forma' : k === 'pincel' ? 'Desenho' : veIsImage(c) ? 'Imagem' : 'Clipe';
 }
 // Áudio solto na timeline (MP3, WAV...): só a linha A da trilha, sem imagem.
 // c.x = 'a': só o áudio de um vídeo (separado da imagem); c.x = 'v': só a imagem de um vídeo (sem som).
@@ -2655,10 +2655,13 @@ function veAddAdjust() {
 }
 
 // Aplica os efeitos da camada de ajuste sobre o que já foi desenhado no monitor (as trilhas de baixo)
-function veAdjDraw(ctx, cv, c, pv) {
+function veAdjDraw(ctx, cv, c, pv, t) {
     const op = Math.max(0, Math.min(1, veProps(c).op / 100));
     if (op <= 0 || !veFxActive(c).length) return;
-    const res = veFxRender(c, cv, { w: VE.seqW, h: VE.seqH }, pv);
+    // transições de sobreposição (editor-ovt.js) rodam primeiro, sobre o quadro composto
+    const src = typeof veOvtAplicar === 'function' ? veOvtAplicar(c, cv, t == null ? VE.playhead : t) : cv;
+    const res = veFxRender(c, src, { w: VE.seqW, h: VE.seqH }, pv);
+    if (res === cv) return;
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = op;
@@ -2709,7 +2712,7 @@ const VECAM = { slot: new Map() };     // clipe → nº do player (abaixo de VE_
 // Clipes de vídeo que precisam de player extra no instante t (visíveis, fora o do player principal)
 function veCamVisiveis(t, lista, cur) {
     let vis = lista.filter(c => !veIsAudio(c) && !veOculto(c) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS)
-        .sort((a, b) => a.tr - b.tr || a.st - b.st);
+        .sort((a, b) => a.tr - b.tr || (a._z || 0) - (b._z || 0) || a.st - b.st);
     const cobre = vis.map(c => !veIsImage(c) && veIsPlain(c) && !c._tr && !veTemAlfa(c)).lastIndexOf(true);
     if (cobre > 0) vis = vis.slice(cobre);
     return vis.filter(c => {
@@ -2988,7 +2991,7 @@ function veDrawOfflineMedia(ctx, w, h, nome) {
 function veDesenharItens(ctx, cv, itens, pv, t) {
     itens.forEach(({ c, src }) => {
             if (!src) return;
-            if (src === 'ajuste') { veAdjDraw(ctx, cv, c, pv); return; }
+            if (src === 'ajuste') { veAdjDraw(ctx, cv, c, pv, t); return; }
             if (src === 'comp') { veCompDesenharPendente(ctx, VE.seqW, VE.seqH, veMediaOf(c)); return; }
             const p = veCaAplicar(c, veProps(c), t), sz = veMediaSize(c);   // + Rotação/Tremer/Pulsar em loop
             // texto animado vem com margem em volta (letras que saem da caixa): desenha maior, mesmo centro
@@ -3048,7 +3051,7 @@ function veDrawMonitor() {
     let vis = (trans ? virt : VE.clips)
         .map(c => ({ c, i: VE.clips.indexOf(c._o || c) }))
         .filter(({ c }) => !veIsAudio(c) && !veOculto(c) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS)
-        .sort((a, b) => a.c.tr - b.c.tr || a.c.st - b.c.st);
+        .sort((a, b) => a.c.tr - b.c.tr || (a.c._z || 0) - (b.c._z || 0) || a.c.st - b.c.st);
     // o que está abaixo de um vídeo que cobre o quadro inteiro não aparece: nem decodifica
     const cobre = vis.map(({ c }) => !veIsImage(c) && veIsPlain(c) && !c._tr && !veTemAlfa(c)).lastIndexOf(true);
     if (cobre > 0) vis = vis.slice(cobre);
@@ -3446,6 +3449,7 @@ function veRecortarClips(clips, a, b) {
 function veExportPlan(emFaixa, faixa) {
     // transições (editor-trans.js): o plano sai dos clipes estendidos e animados
     const orig = VE.clips, dur0 = VE.dur, f = faixa || (emFaixa ? veExportFaixa() : null);
+    if (typeof veOvtSigs === 'function') VEOVT.sigs = veOvtSigs();   // sobreposições prontas (editor-ovt.js)
     VE.clips = f ? veRecortarClips(veTransVirtuais(), f.a, f.b) : veTransVirtuais();
     if (f) VE.dur = f.b - f.a;
     try { return Object.assign(veExportPlanClips(), { dur: VE.dur, faixa: f }); } finally { VE.clips = orig; VE.dur = dur0; }
@@ -3465,7 +3469,7 @@ function veExportPlanClips() {
         overlays.some(o => o.tr < c.tr && o.st < veEnd(c) - VE_EPS && veEnd(o) > c.st + VE_EPS);
     const camadas = VE.clips
         .filter(c => overlays.includes(c) || cobre(c))
-        .sort((a, b) => a.tr - b.tr || a.st - b.st)
+        .sort((a, b) => a.tr - b.tr || (a._z || 0) - (b._z || 0) || a.st - b.st)
         .map(c => {
             const p = veStaticProps(c), m = veMediaOf(c);
             // texto: PNG desenhado f vezes maior (nítido na maior escala dele); a escala desconta isso
@@ -3478,12 +3482,15 @@ function veExportPlanClips() {
             const sz = png ? { w: png.w, h: png.h } : veMediaSize(c);
             // texto animado: lista de quadros (editor-txanim.js), recortada no trecho exportado
             const seq = png && png.seq ? png.seq : null, sq = seq ? Math.max(0, c.s - (c._o || c).s) : 0;
-            return { tipo: veIsAdj(c) ? 'ajuste' : veIsImage(c) ? 'imagem' : 'video', path: png ? png.path : veIsImage(c) || veMid(c) ? m.path || null : null,
+            return { _c: c, tipo: veIsAdj(c) ? 'ajuste' : veIsImage(c) ? 'imagem' : 'video', path: png ? png.path : veIsImage(c) || veMid(c) ? m.path || null : null,
                      seq, st: c.st, s: seq ? sq : veIsImage(c) ? 0 : c.s, e: seq ? sq + veLen(c) : veIsImage(c) ? veLen(c) : c.e,
                      sc: p.sc / f, x: p.x, y: p.y, rot: p.rot, op: p.op, kf,
                      fx: veFxExport(c), ca: veCaExport(c), mw: sz.w, mh: sz.h, v: veVel(c), bm: veBmAtivo(c) ? c.bm : null,
                      ox: (veMediaSize(c).w / 2 - veAnc(c, p)[0]) * f, oy: (veMediaSize(c).h / 2 - veAnc(c, p)[1]) * f };
-        });
+        })
+        // transição de sobreposição: a camada vira o trecho já renderizado (editor-ovt.js)
+        .map(o => typeof veOvtNoPlano === 'function' ? veOvtNoPlano(o._c, o) : o)
+        .map(o => { delete o._c; return o; });
     // o arquivo de cada clipe com som (null = o vídeo aberto)
     const mix = veMixClipes().map(([st, s0, e0, g, id, v, tom, fi, fo, afx]) => [st, s0, e0, g, veMelArquivo(id), v, tom, fi, fo, afx]);
     return { base, audio, camadas, mix };
@@ -4542,7 +4549,7 @@ function veRender() {
         if (cw > 50 && vh >= 12) {
             ctx.fillStyle = '#eef0ff';
             ctx.font = '600 10.5px Segoe UI';
-            const nome = adj ? veT('Camada de ajuste') : txt ? 'T  ' + veNomeTexto(c) : img ? (med.nome || med.name || veT('Imagem'))
+            const nome = adj ? ((typeof veOvtNome === 'function' && veOvtNome(c) && '✦ ' + veOvtNome(c)) || veT('Camada de ajuste')) : txt ? 'T  ' + veNomeTexto(c) : img ? (med.nome || med.name || veT('Imagem'))
                 : veMid(c) ? (med.nome || med.name) : veT(`Clipe ${i + 1}`);
             ctx.fillText(nome + velTxt + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, vy + 10.5);
         }
@@ -5318,6 +5325,8 @@ async function veStartExport() {
     try {
         // Comps que mudaram renderizam antes (editor-comp.js): na exportação elas entram pelo arquivo delas
         if (typeof veCompProntas === 'function') await veCompProntas(msg => { $ve('ve-exp-msg').textContent = msg; });
+        // transições de sobreposição: o trecho de cada uma renderizado das trilhas de baixo (editor-ovt.js)
+        if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg => { $ve('ve-exp-msg').textContent = msg; });
         if (VE.clips.some(c => veIsTexto(c) || veEhGrafico(c))) await veTxPngs();   // textos e gráficos viram PNG
         const plano = veExportPlan(true);
         await window.pywebview.api.video_cutter_export(

@@ -668,10 +668,22 @@ def ve_render_info(base, chave=None):
 
 def video_cutter_cancel_export():
     from Functions.video_cutter import cancelar_exportacao
+    from Functions import transicoes
     if _ve_export_stop is not None:
         _ve_export_stop.set()
+    transicoes.cancelar()
     cancelar_exportacao()
     return {"success": True}
+
+
+def ve_ovt_render(base, h, job):
+    """Transição de sobreposição (editor-ovt.js): o trecho da camada renderizado das trilhas de baixo com o efeito
+    (Functions/transicoes.py). Espera terminar; devolve {success, path}."""
+    from Functions import transicoes
+    try:
+        return transicoes.render(base, h, job)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 def reveal_file(path):
@@ -2903,6 +2915,9 @@ class ApiBridge:
 
     def ve_comp_cancelar(self):
         return ve_comp_cancelar()
+
+    def ve_ovt_render(self, base, h, job):
+        return ve_ovt_render(base, h, job)
 
     def ve_render_tocar(self, base, chave, hashes):
         return ve_render_tocar(base, chave, hashes)

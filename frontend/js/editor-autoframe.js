@@ -38,8 +38,13 @@ function veAfAjuste(st, dur, lc, op) {
     return c;
 }
 
-// estilo Dinâmico: transições que se alternam na virada do compasso (nunca a mesma duas vezes seguidas)
-const VE_AF_MISTO = ['push', 'pull', 'slide', 'chicote', 'pop', 'fold'];
+// estilo Dinâmico: transições que se alternam na virada do compasso (nunca a mesma duas vezes seguidas).
+// 'ovt:x' = transição de sobreposição (editor-ovt.js): camada por cima do corte, não precisa de mídia sobrando
+const VE_AF_MISTO = ['ovt:zoomin', 'push', 'ovt:panblur', 'pull', 'ovt:zoomout', 'slide', 'ovt:spin', 'chicote', 'ovt:stretch', 'pop', 'ovt:lens', 'fold'];
+// parâmetros de cada sobreposição no AutoFrame (mais contidos que o padrão do painel: o corte é rápido)
+const VE_AF_OVT = { zoomin: { amt: 250 }, zoomout: { amt: 250 }, spin: { ang: 180, zoom: 15 }, stretch: { amt: 300 },
+                    lens: { amt: 50, ca: 25 }, leak: { amt: 80 }, flare: { amt: 90 } };
+const veAfOvtPode = t => typeof VE_OVT === 'object' && !!VE_OVT[t];
 const VE_AF_NOTA_MIN = 0.3;             // abaixo disso a mídia já vem desmarcada
 const VE_AF_LOOKS = {
     vivo: { sat: 115, ct: 12, vib: 15 },
@@ -227,6 +232,13 @@ async function veAfGerar(outra) {
         veSeqQuadro(VE_AF_W, VE_AF_H);
         seq.w = VE_AF_W; seq.h = VE_AF_H;
         const clips = extra ? veAfcExtras(veAfClipes(plano), plano, extra) : veAfClipes(plano);
+        // cortes na grade de quadros: na batida exata (ex.: 1,997 s) a exportação perdia o último quadro da cena (preto)
+        const fq = VE.fps || 30, grade = t => Math.round(t * fq) / fq;
+        clips.forEach(c => {
+            const v = veVel(c), fim = grade(c.st + (c.e - c.s) / v);
+            c.st = grade(c.st);
+            if (fim > c.st) c.e = +(c.s + (fim - c.st) * v).toFixed(6);
+        });
         VE.clips = clips;
         VE.markers = veAfMarcadores(plano);
         veEnsureTracks(Math.max(4, ...clips.map(c => c.tr + 1)));
@@ -285,7 +297,14 @@ function veAfClipes(plano) {
     // trilhas: cenas na 0 (células da tela dividida nas 0..n-1); cor, flash e título por cima de todas
     const NV = Math.max(1, ...plano.slots.map(s => s.cel ? s.cel_i + 1 : 1));
     // a trilha logo acima das cenas recebe a foto inteira quando ela vai sobre fundo desfocado (enquadramento seguro)
-    const TR_FR = NV, TR_AJ = NV + 1, TR_FL = NV + 2, TR_FL2 = NV + 3, TR_TX = NV + 4;
+    // TR_OV: sobreposições (acima das cenas e da foto inteira, abaixo da cor: o look vale também sobre elas)
+    const TR_FR = NV, TR_OV = NV + 1, TR_AJ = NV + 2, TR_FL = NV + 3, TR_FL2 = NV + 4, TR_TX = NV + 5;
+    const ovts = [];   // {t, corte, d, v}: viram camadas de ajuste depois do laço (sem se sobrepor)
+    const sobrepor = (t, i, st, len, extra) => {
+        const ant = plano.slots[i - 1], lenAnt = ant ? ant.b - ant.a : len;
+        const d = Math.min(0.6, Math.max(0.3, batida), len * 0.9, lenAnt * 0.9);
+        ovts.push({ t, corte: st, d, v: { ...(VE_AF_OVT[t] || {}), ...(extra || {}) } });
+    };
     const total = plano.fim - t0, bpm = plano.bpm || 120, batida = 60 / bpm;
     let nMisto = 0;
     const efeitos = [];   // camadas de ajuste curtas: clarão, P&B, pulso (trilhas TR_FL/TR_FL2)
@@ -344,12 +363,21 @@ function veAfClipes(plano) {
         }
         // transição de entrada, escolhida pelo modelo em cada corte (autoframe.py: _transicoes)
         const tr = s.trans, meio = batida / 2;
-        if (tr === 'dissolve') c.tin = { t: 'dissolve', d: +Math.min(M.id === 'memorias' ? 0.8 : 0.6, len * 0.35).toFixed(3), speed: 'fast' };
+        // cortes rápidos e trocas de energia: sobreposições (zoom e pan com desfoque de movimento de verdade)
+        if (tr === 'zoom' && veAfOvtPode('zoomin')) sobrepor(i % 3 === 2 ? 'zoomout' : 'zoomin', i, st, len);
+        else if (tr === 'chicote' && veAfOvtPode('panblur')) sobrepor('panblur', i, st, len, { ang: i % 4 < 2 ? 180 : 0 });
+        else if (tr === 'misto' && VE_AF_MISTO[nMisto % VE_AF_MISTO.length].startsWith('ovt:') && veAfOvtPode(VE_AF_MISTO[nMisto % VE_AF_MISTO.length].slice(4))) {
+            const t = VE_AF_MISTO[nMisto++ % VE_AF_MISTO.length].slice(4);
+            sobrepor(t, i, st, len, t === 'panblur' ? { ang: [0, 180, 90, 270][nMisto % 4] } : null);
+        }
+        else if (tr && tr.startsWith('tr:ovt:') && veAfOvtPode(tr.slice(7))) sobrepor(tr.slice(7), i, st, len);
+        else if (tr === 'dissolve') c.tin = { t: 'dissolve', d: +Math.min(M.id === 'memorias' ? 0.8 : 0.6, len * 0.35).toFixed(3), speed: 'fast' };
         else if (tr === 'zoom') c.tin = { t: 'pull', d: +Math.min(0.35, meio, len * 0.4).toFixed(3), speed: 'fast' };
         else if (tr === 'chicote') c.tin = { t: 'chicote', d: +Math.min(0.32, meio, len * 0.4).toFixed(3), speed: 'fast', dir: i % 4 < 2 ? 'l' : 'r' };
         else if (tr === 'preto') c.tin = { t: 'fadeblack', d: +Math.min(0.8, len * 0.4).toFixed(3), speed: 'fast' };
         else if (tr === 'misto') {
-            const t = VE_AF_MISTO[nMisto++ % VE_AF_MISTO.length];
+            let t = VE_AF_MISTO[nMisto++ % VE_AF_MISTO.length];
+            if (t.startsWith('ovt:')) t = 'pull';   // sem o editor-ovt.js
             c.tin = { t, d: +Math.min(0.4, meio * 1.2, len * 0.45).toFixed(3), speed: 'fast', ...(VE_TR[t] && VE_TR[t].dir ? { dir: ['r', 'l', 'u', 'd'][nMisto % 4] } : {}) };
         }
         else if (tr && tr.startsWith('tr:') && VE_TR[tr.slice(3)]) {
@@ -358,6 +386,8 @@ function veAfClipes(plano) {
             c.tin = { t, d: +Math.min(longa ? 0.6 : 0.4, len * 0.4).toFixed(3), speed: 'fast', ...(VE_TR[t].dir ? { dir: i % 4 < 2 ? 'l' : 'r' } : {}) };
         }
         if (alvo !== c && c.tin) alvo.tin = { ...c.tin };
+        // Memórias: luz vazando de vez em quando sobre a dissolução (calor de filme)
+        if (M.id === 'memorias' && tr === 'dissolve' && i % 4 === 2 && veAfOvtPode('leak')) sobrepor('leak', i, st, len);
         // flash de impacto: clarão branco que some em ~meia batida, começando no corte
         if (s.flash && !(plano.branco && VEAF.cli && VEAF.cli.flashMarca)) {
             efeitos.push(veAfAjuste(st - VE_AF_Q, Math.min(0.4, batida * 0.7, len), { exp: 1.6, ct: 10 }, [[0, 100, 'sai'], [Math.min(0.4, batida * 0.7, len) * 0.9, 0]]));
@@ -373,6 +403,17 @@ function veAfClipes(plano) {
     const ultima = out.filter(c => !c.fx || !c.fx.some(f => f.t === 'crop')).pop();
     if (ultima) ultima.tout = { t: 'fadeblack', d: +Math.min(2, batida * 4, (ultima.e - ultima.s) * 0.8).toFixed(3), speed: 'fast' };
     out.push(...flashes);
+    // sobreposições: camada de ajuste centrada no corte, sem invadir a anterior (encolhe; curta demais, sai)
+    let fimOv = -9;
+    ovts.sort((a, b) => a.corte - b.corte).forEach(o => {
+        const d = Math.min(o.d, 2 * (o.corte - fimOv));
+        if (d < 0.2) return;
+        const aj = veAfAjuste(o.corte - d / 2, d, {});
+        aj.tr = TR_OV;
+        aj.fx = [{ id: veFxNewId(), t: o.t, on: true, v: o.v }];
+        fimOv = o.corte + d / 2;
+        out.push(aj);
+    });
     // estilos com energia: P&B de 3 quadros nos acentos fortes e pulso (luz + vinheta) no "1" de cada compasso alto
     if (['dinamico', 'batida', 'drop'].includes(M.id)) {
         let ultPB = -9;
