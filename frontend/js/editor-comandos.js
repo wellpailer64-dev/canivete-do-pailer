@@ -31,8 +31,8 @@ const VE_CMDS = [
     // ── Editar ──
     { id: 'desfazer', grupo: 'editar', nome: 'Desfazer', teclas: ['Ctrl+Z'], fn: () => veUndo(), pode: () => VE.history.length > 0 },
     { id: 'refazer', grupo: 'editar', nome: 'Refazer', teclas: ['Ctrl+Shift+Z', 'Ctrl+Y'], fn: () => veRedo(), pode: () => VE.future.length > 0 },
-    { id: 'recortar', grupo: 'editar', nome: 'Recortar', teclas: ['Ctrl+X'], sep: true, fn: () => { veCopiar(true); veCeMarcarCopia(); }, pode: veSel },
-    { id: 'copiar', grupo: 'editar', nome: 'Copiar', teclas: ['Ctrl+C'], fn: () => { veCopiar(false); veCeMarcarCopia(); }, pode: veSel },
+    { id: 'recortar', grupo: 'editar', nome: 'Recortar', teclas: ['Ctrl+X'], sep: true, fn: () => { if (!veCpSelCopiar(true)) veCopiar(true); veCeMarcarCopia(); }, pode: veSel },
+    { id: 'copiar', grupo: 'editar', nome: 'Copiar', teclas: ['Ctrl+C'], fn: () => { if (!veCpSelCopiar(false)) veCopiar(false); veCeMarcarCopia(); }, pode: veSel },
     { id: 'colar', grupo: 'editar', nome: 'Colar', teclas: ['Ctrl+V'], fn: () => veColarTudo() },   // também o copiado fora do editor
     { id: 'apagar', grupo: 'editar', nome: 'Apagar', teclas: ['Delete', 'Backspace', 'D'], fn: () => veDeleteSelected(false), pode: () => veSel() || !!VE.gapSel },
     { id: 'apagar-ripple', grupo: 'editar', nome: 'Apagar e fechar o espaço', teclas: ['Shift+Delete', 'Shift+Backspace', 'Shift+D'], fn: () => veDeleteSelected(true), pode: () => veSel() || !!VE.gapSel },

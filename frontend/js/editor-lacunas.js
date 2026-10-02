@@ -32,7 +32,8 @@ function veGapValido(g) {
     return pista.some(c => Math.abs(c.st - g.b) < VE_EPS) ? g : null;
 }
 
-// Delete com o espaço selecionado: fecha e puxa o que vem depois (todas as trilhas destravadas e as legendas)
+// Delete com o espaço selecionado: fecha e puxa o que vem depois (todas as trilhas destravadas e as legendas);
+// a agulha vai para o ponto da junção
 function veFecharEspaco() {
     const g = veGapValido(VE.gapSel);
     VE.gapSel = null;
@@ -50,7 +51,9 @@ function veFecharEspaco() {
     VE.legendas = (VE.legendas || []).map(l => (l.st >= g.b - VE_EPS ? veLegMover(l, -Math.min(d, l.st)) : l));
     VE.sel = -1; VE.selx = null;
     veRelayout();
-    veAfterEdit(VE.playhead >= g.b ? VE.playhead - d : Math.min(VE.playhead, veNavDur()));
+    // a agulha vai para a junção (onde um clipe encostou no outro): a vista fica onde se clicou, para ver o que
+    // aconteceu — antes ela voltava para a agulha, que podia estar longe, e a timeline pulava para lá
+    veAfterEdit(veSnapFrame(g.a));
     veToast(`${veT('Espaço fechado')} (${veShort(d)})`);
     return true;
 }

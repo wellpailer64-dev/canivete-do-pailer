@@ -26,13 +26,13 @@ function veCeTrilhaAcima(kind) {
 
 async function veColarTudo() {
     const api = veCeApi();
-    if (!VE.ready || !api || !api.ve_area_transferencia) { veColar(); return; }
+    if (!VE.ready || !api || !api.ve_area_transferencia) { veColarInterno(); return; }
     let r = null;
     try { r = await api.ve_area_transferencia(VE.projectPath || ''); } catch (e) { r = null; }
-    const externo = r && r.success && r.tipo && (!VE.clipboard || r.seq !== VE.cbSeq);
+    const externo = r && r.success && r.tipo && (!(VE.clipboard || VECP.ef) || r.seq !== VE.cbSeq);
     if (!externo) {
         if (r && !r.success && r.error) veToast(r.error);
-        veColar();
+        veColarInterno();   // efeitos ou clipes, o copiado por último (editor-copiar.js)
         return;
     }
     if (VE.playing) veStop();

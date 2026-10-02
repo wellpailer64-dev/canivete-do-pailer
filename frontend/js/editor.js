@@ -1381,6 +1381,7 @@ function veDuplicarEm(i, tr, st) {
 
 // Ctrl+C / Ctrl+X / Ctrl+V: cola na agulha, na mesma trilha de onde saiu (a agulha vai para o fim do colado)
 function veCopiar(recortar) {
+    if (typeof VECP !== 'undefined') VECP.ultimo = 'clip';   // Ctrl+V cola clipes (não os efeitos copiados antes)
     const c = VE.clips[VE.sel];
     const l = (VE.legendas || [])[VETX.legSel];
     if (!c && l) {
@@ -1395,6 +1396,21 @@ function veCopiar(recortar) {
         return;
     }
     if (!c) { veToast('Selecione um clipe ou legenda para copiar'); return; }
+    // vários selecionados: vão todos, com as distâncias entre eles e as trilhas de cada um (como no Premiere)
+    const lista = veSelLista();
+    if (lista.length > 1) {
+        const t0 = Math.min(...lista.map(x => x.st));
+        const cs = lista.map(x => {
+            const n = JSON.parse(JSON.stringify(x));
+            n.st = x.st - t0;
+            if (!n.lk || !lista.some(o => o !== x && o.lk === x.lk)) delete n.lk;   // só o vínculo entre os copiados
+            return n;
+        });
+        VE.clipboard = { cs, path: VE.path };
+        if (recortar) { veApagarVarios(lista, false); veToast(`${lista.length} ${veT('clipes recortados: Ctrl+V cola na agulha')}`); }
+        else veToast(`${lista.length} ${veT('clipes copiados: Ctrl+V cola na agulha')}`);
+        return;
+    }
     VE.clipboard = { c: veCopiaClipe(c), path: VE.path };
     // Comp: leva junto o pacote (timeline e mídias), para colar em outro projeto (editor-comp.js)
     const mc = veMediaOf(c);
@@ -1421,6 +1437,7 @@ function veColar() {
         veToast('Legenda colada na trilha LEG');
         return;
     }
+    if (cb.cs) { veColarVarios(cb.cs); return; }
     if (cb.c.m && !VE.media[cb.c.m]) { veToast('A mídia desse clipe não está mais no projeto'); return; }
     veEnsureTrackIndex(cb.c.tr);
     if (veTrkLocked(cb.c.tr)) { veAvisoBloqueio(); return; }
@@ -1429,6 +1446,25 @@ function veColar() {
     vePlaceClip(novo);
     veAfterEdit(veEnd(novo));
     veToast(`Colado em ${veIsAudio(novo) ? 'A' : 'V'}${novo.tr + 1}`);
+}
+
+// Vários clipes copiados: o primeiro cai na agulha e os outros mantêm a distância e a trilha de cada um; os vínculos
+// entre eles (imagem + som) viram vínculos novos. Ficam todos selecionados e a agulha vai para o fim do colado.
+function veColarVarios(cs) {
+    if (cs.some(c => c.m && !VE.media[c.m])) { veToast('A mídia de algum desses clipes não está mais no projeto'); return; }
+    const trs = [...new Set(cs.map(c => c.tr))];
+    trs.forEach(tr => veEnsureTrackIndex(tr));
+    if (trs.some(veTrkLocked)) { veAvisoBloqueio(); return; }
+    vePushHistory();
+    const t = veSnapFrame(VE.playhead), lk = veLkMapa(), novos = [];
+    cs.forEach(c => {
+        const n = lk({ ...JSON.parse(JSON.stringify(c)), st: t + c.st });
+        vePlaceClip(n);
+        novos.push(n);
+    });
+    veSelDefinir(novos, novos[0]);
+    veAfterEdit(Math.max(...novos.map(veEnd)));
+    veToast(`${novos.length} ${veT('clipes colados')}`);
 }
 
 // Alt+arrastar no monitor: a cópia nasce na primeira trilha livre acima, no mesmo tempo, e é ela que se move.

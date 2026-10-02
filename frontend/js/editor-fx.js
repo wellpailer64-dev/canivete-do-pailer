@@ -753,8 +753,9 @@ function veRenderFxControls() {
             const marca = tipo === 'a' ? 'aud' : 'fx';
             return `<div class="ve-fxe${off ? ' off' : ''}${VEFX.collapsed.has(f.id) ? ' collapsed' : ''}" ${attr}="${f.id}">
                 <div class="ve-fxe-head">
+                    <button class="ve-fxe-fold" data-fa="fold" title="Recolher/expandir">${VEFX.collapsed.has(f.id) ? '▸' : '▾'}</button>
                     <button class="ve-fxe-on" data-fa="on" title="${off ? 'Ligar' : 'Desligar'} efeito">${marca}</button>
-                    <b data-fa="fold" title="Recolher/expandir">${d.nome}</b>
+                    <b title="${veT('Clique para selecionar (Ctrl+clique junta outros) · Ctrl+C copia, Ctrl+V cola em outro clipe')}">${d.nome}</b>
                     <button data-fa="up" title="Aplicar antes (subir)" ${j ? '' : 'disabled'}>▲</button>
                     <button data-fa="down" title="Aplicar depois (descer)" ${j < lista.length - 1 ? '' : 'disabled'}>▼</button>
                     <button data-fa="reset" title="Restaurar valores">↺</button>
@@ -796,6 +797,7 @@ function veRenderFxControls() {
             else if (inp.ownerDocument.activeElement !== inp) inp.value = veFxFmt(p, v[p.k]);
         }));
     });
+    if (typeof veCpSelPintar === 'function') veCpSelPintar();   // efeitos escolhidos para copiar (editor-copiar.js)
 }
 
 function veFxSetParam(id, k, val) {
