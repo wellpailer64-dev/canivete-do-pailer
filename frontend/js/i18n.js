@@ -474,6 +474,8 @@ const I18N_EN = {
     'Animado': 'Animated',
     'Dinâmico': 'Dynamic',
     'Automática (~4 s)': 'Automatic (~4 s)',
+    'segundos': 'seconds',
+    'Fecha no corte da música mais perto': 'Ends on the nearest cut of the song',
     'Usar todas as fotos e vídeos (a duração se ajusta)': 'Use every photo and video (the length adapts)',
     'Efeitos sonoros (whoosh nas transições, impacto no logo...) do Soundboard': 'Sound effects (whoosh on transitions, impact on the logo...) from the Soundboard',
     'Escolher o arquivo da intro': 'Choose the intro file',

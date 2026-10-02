@@ -24,7 +24,7 @@ function veAfcNovo() {
     return {
         nome: '', cor: '#F97316', logo: null,
         paleta: { primaria: '#111111', secundaria: '#F97316', texto: '#ffffff' }, fonte: 'Arial',
-        intro: { tipo: 'animada', compassos: 'auto', anim: 'pop', texto: '', video: null, transparente: false },
+        intro: { tipo: 'animada', seg: 3, anim: 'pop', texto: '', video: null, transparente: false },
         marca: { pos: 'sd', tam: 16, op: 90 },
         fim: { tipo: 'animada', compassos: 'auto', texto: '', video: null },
         estilo: 'dinamico', look: 'estilo', trans: [], transFreq: 'base', flashMarca: false, todas: true, sfx: true,
@@ -161,7 +161,7 @@ function veAfcForm() {
             ${m.intro.tipo === 'comp' ? veAfcCompCampo(m, 'intro') +
                 `<label class="ve-afc-chk"><input type="checkbox" data-afc-chk="intro.transparente"${m.intro.transparente ? ' checked' : ''}> ${veT('Tem fundo transparente (fica por cima das cenas)')}</label>` : ''}
             ${m.intro.tipo === 'animada' ? `<small class="ve-af-info">${veT('Formas na cor de destaque, as melhores fotos entrando na batida, o logo batendo no compasso e o texto em selo. Com efeitos sonoros do Soundboard.')}</small>` : ''}
-            ${['animada', 'logo_cor', 'logo_cena'].includes(m.intro.tipo) ? linha('Duração', pill('intro.compassos', 'auto', 'Automática (~4 s)') + pill('intro.compassos', 1, '1 compasso') + pill('intro.compassos', 2, '2 compassos') + pill('intro.compassos', 4, '4 compassos')) +
+            ${['animada', 'logo_cor', 'logo_cena'].includes(m.intro.tipo) ? linha('Duração', `<input type="number" class="ve-afc-in ve-afc-seg" min="1" max="15" step="0.5" data-afc-num="intro.seg" value="${veAfcIntroSeg(m)}" title="${veT('Fecha no corte da música mais perto')}"><span class="ve-afc-un">${veT('segundos')}</span>`) +
                 (m.intro.tipo !== 'animada' ? linha('Animação do logo', pills('intro.anim', VE_AFC_ANIM)) : '') + linha('Texto', txt('intro.texto', 'opcional: slogan ou título padrão')) : ''}
         </div>
         <div class="ve-af-sec">
@@ -297,7 +297,7 @@ function veAfcInput(e) {
     if (!campo) return false;
     const ch = campo.split('.'), alvo = ch.slice(0, -1).reduce((o, k) => o[k], m), k = ch[ch.length - 1];
     alvo[k] = t.dataset.afcChk ? t.checked : t.dataset.afcNum ? +t.value : t.value;
-    if (t.dataset.afcNum && t.nextElementSibling) t.nextElementSibling.textContent = t.value + '%';
+    if (t.dataset.afcNum && t.type === 'range' && t.nextElementSibling) t.nextElementSibling.textContent = t.value + '%';
     // a cor principal muda o fundo da prévia do logo; o resto não precisa redesenhar (o campo perderia o foco)
     if (campo === 'paleta.primaria') { const p = t.ownerDocument.querySelector('.ve-afc-logo-prev'); if (p) p.style.setProperty('--bg', t.value); }
     if (t.dataset.afcChk) veAfRender();
@@ -313,18 +313,23 @@ function veAfcCompassos(n, bpm) {
     return Math.max(1, Math.min(4, Math.ceil(3.4 / bar - 0.05)));
 }
 const veAfcCobre = t => t === 'animada' || t === 'logo_cor';
+// Intro feita pelo sistema (animada, logo na cor, logo sobre as cenas): em segundos, padrão 3 s (modelos antigos,
+// que guardavam compassos, também). Intro de vídeo/Comp tem a duração do arquivo.
+const veAfcIntroSeg = m => Math.max(1, Math.min(15, +(m.intro && m.intro.seg) || 3));
 
 // Segundos de intro + encerramento (para "usar todas as fotos" calcular a duração do vídeo)
 function veAfcExtraSeg(m, bpm) {
     const bar = 4 * 60 / (bpm || 120);
-    return (veAfcCobre(m.intro.tipo) ? veAfcCompassos(m.intro.compassos, bpm) * bar : 0) +
+    return (veAfcCobre(m.intro.tipo) ? veAfcIntroSeg(m) : 0) +
         (veAfcCobre(m.fim.tipo) ? veAfcCompassos(m.fim.compassos, bpm) * bar : 0);
 }
 
 // Segundos reservados no começo/fim (intro e encerramento que cobrem a tela): o plano não põe cena ali
 function veAfcReserva(m, bpm) {
     const bar = 4 * 60 / (bpm || 120);
-    return [veAfcCobre(m.intro.tipo) ? veAfcCompassos(m.intro.compassos, bpm) * bar : 0,
+    // intro: meia batida a menos, para o plano poder cortar na batida mais perto dos segundos pedidos (com a reserva
+    // cheia, 3 s viravam 3,6 s a 83 BPM)
+    return [veAfcCobre(m.intro.tipo) ? Math.max(1, veAfcIntroSeg(m) - 30 / (bpm || 120)) : 0,
             veAfcCobre(m.fim.tipo) ? veAfcCompassos(m.fim.compassos, bpm) * bar : 0];
 }
 
@@ -373,12 +378,14 @@ async function veAfcPreparar(plano, bin) {
     const bordas = [...new Set([...inicios, ...plano.slots.map(s => s.b)])].sort((a, b) => a - b);
     // intro que cobre a tela: as cenas começam no primeiro corte depois dela
     let di = 0;
-    if (veAfcCobre(m.intro.tipo)) di = veAfcCompassos(m.intro.compassos, plano.bpm) * compasso;
+    if (veAfcCobre(m.intro.tipo)) di = veAfcIntroSeg(m);
     else if (veAfcPronto(m.intro.tipo) && x.introV && !m.intro.transparente) di = x.introV.info.duration;
     if (di > 0) {
+        // feita pelo sistema: o corte da música mais perto dos segundos escolhidos (fica na batida)
+        const perto = bordas.filter(t => t - t0 >= 1).sort((a, b) => Math.abs(a - t0 - di) - Math.abs(b - t0 - di))[0];
         const corte = veAfcPronto(m.intro.tipo)
             ? inicios.filter(t => t - t0 <= di + 0.05 && t > t0).pop() ?? inicios.find(t => t > t0)
-            : bordas.find(t => t - t0 >= di - 0.05);
+            : perto;
         if (corte != null) { x.introFim = corte - t0; plano.slots = plano.slots.filter(s => (s.cel ? s.grupo_a : s.a) >= corte - 1e-3); }
     }
     // encerramento: as cenas acabam no último corte antes dele
@@ -577,8 +584,9 @@ function veAfcExtras(out, plano, x) {
     // no fundo, a cor da marca em Multiplicação por cima (duotone), luz em degradê na cor de destaque (Tela) se
     // movendo, grão vivo (Sobrepor) e vinheta; por cima, cards de fotos e o logo com puxada de foco e feixe de luz
     const LOGO_Y = 800, TXT_Y = 1290;   // título mais baixo, em 2 linhas, ainda dentro da área segura (até y 1500)
-    // intro: logo menor no alto, 4 cards no meio (2 × 2) e o título embaixo (ajuste do cliente, 2026-10-01)
-    const INTRO = { logoY: 330, larg: 0.4, txtY: 1345 };
+    // intro: logo menor bem no alto, 4 cards no meio (2 × 2) e o título embaixo, abaixo dos cards (2ª linha até
+    // ~y 1590: passa um pouco da área segura de 1500, a pedido do cliente em 2026-10-01)
+    const INTRO = { logoY: 215, larg: 0.4, txtY: 1430 };
     const animado = (st, D, opts) => {
         const N = Math.max(4, Math.round(D / b)), T = k => st + Math.min(D - 0.25, k * b), Q = VE_AF_Q;
         const cards = opts.cards || [], L = cards.length ? T(N / 2) : T(Math.min(1, N / 4)), l = L - st;
@@ -697,7 +705,7 @@ function veAfcExtras(out, plano, x) {
         som(sx.boom, 0, -4);
         som(sx.whoosh, x.introFim - (sx.whoosh ? sx.whoosh.dur * 0.45 : 0), -6);
     } else if (m.intro.tipo === 'logo_cena') {
-        const di = Math.min(x.total / 3, veAfcCompassos(m.intro.compassos, plano.bpm) * 4 * b);
+        const di = Math.min(x.total / 3, veAfcIntroSeg(m));
         logoEm(0, di, 0.5, H * 0.45, m.intro.anim, nova());
         texto(Math.min(b, di / 3), di - Math.min(b, di / 3), VEAF.titulo, H * 0.6, nova());
         som(sx.boom, 0, -4);
@@ -741,7 +749,8 @@ function veAfcExtras(out, plano, x) {
         const larg = (m.marca.tam || 16) / 100, sc = +logoSc(larg).toFixed(2);
         const lw = W * larg, lh = x.logo.h * lw / x.logo.w;
         const embaixo = !m.marca.pos.startsWith('s'), direita = m.marca.pos.endsWith('d');
-        const px = direita ? W - (embaixo ? 160 : 70) - lw / 2 : 70 + lw / 2, py = embaixo ? H - 420 - lh / 2 : 230 + lh / 2;
+        // em cima: a 150 px do topo (era 230; o cliente pediu mais alto, e longe do logo impresso nos painéis das fotos)
+        const px = direita ? W - (embaixo ? 160 : 70) - lw / 2 : 70 + lw / 2, py = embaixo ? H - 420 - lh / 2 : 150 + lh / 2;
         const st = x.introFim || 0, dur = fimCenas - st;
         if (dur > 0.5) out.push({ tr: nova(), st: +st.toFixed(4), s: 0, e: +dur.toFixed(4), m: x.logo.id,
             p: { sc, x: +px.toFixed(1), y: +py.toFixed(1), rot: 0, op: m.marca.op ?? 90 },
