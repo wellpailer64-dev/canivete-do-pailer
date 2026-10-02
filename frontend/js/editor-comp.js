@@ -415,7 +415,8 @@ async function veCompJob(seq) {
         try {
             const plano = veExportPlan(false), lim = veMasterLim();
             const mix = plano.mix.length ? (lim ? [...plano.mix, { master: lim }] : plano.mix) : [];
-            return { path: VE.path, base: plano.base, camadas: plano.camadas, dur: VE.dur, mix,
+            const fonte = typeof veFonteParaPlano === 'function' ? veFonteParaPlano({ ...plano, mix }, true) : VE.path;
+            return { path: fonte, base: plano.base, camadas: plano.camadas, dur: VE.dur, mix,
                      legendas: veTxExport(null), quadro: [VE.seqW, VE.seqH], estatico: veCompEstatica(seq) };
         } finally { VE._txPng = ant; }
     });

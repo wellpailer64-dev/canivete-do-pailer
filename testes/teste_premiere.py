@@ -26,7 +26,7 @@ def main():
     raiz = ET.fromstring(gzip.open(path).read())
     g = premiere._Grafo(raiz)
     falhas = []
-    sem_clipe = sum(i['qtd'] for i in rel['ignorados'] if i['o_que'].startswith(('Gráfico/título', 'Clipe sem mídia')))
+    sem_clipe = sum(i['qtd'] for i in rel['ignorados'] if i['o_que'].startswith(('Gráfico', 'Clipe sem mídia')))
     total_pr = total_conv = 0
     for i, seq in enumerate(e for e in raiz if e.tag == 'Sequence'):
         nome = seq.findtext('Name')

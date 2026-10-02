@@ -51,6 +51,9 @@ do .vknv; abre sem caminho (Ctrl+S grava um .vknv ao lado). Vêm cortes, trilhas
 (com quadros-chave), transições (Cross Dissolve, Pop, Constant Power), sequências aninhadas e Ultra Key → Chroma Key
 (aproximado); o resto vai para o relatório. Teste: `python testes/teste_premiere.py "<projeto.prproj>"`
 (use uma CÓPIA do projeto do usuário, ex. `D:\kanivete_testes\premiere\`).
+Mapa do formato, mapeamento, limitações e pendências: `Instructions/importar-premiere.md`.
+**AJUSTE PREMIERE** (próxima rodada: clipes trocados/fora do tempo, camadas de ajuste, transições de sobreposição,
+textos): plano em `Instructions/agente/ajuste-premiere.md`.
 
 ## Comp (estilo After Effects)
 Plano, modelo e limitações em `Instructions/agente/plano-comp.md`; código em `frontend/js/editor-comp.js`.

@@ -2337,6 +2337,36 @@ def _opcao_filtro_script():
     return _opcao_script
 
 
+def _export_usa_fonte(segmentos, audio_segmentos=None, camadas=None, audio_clipes=None, sem_audio=False):
+    """True quando o plano ainda precisa ler o arquivo aberto em `path`."""
+    def trecho_fonte(lista):
+        for s in lista or []:
+            if isinstance(s, dict):
+                if s.get("gap") is None:
+                    return True
+            elif isinstance(s, (list, tuple)) and (not s or s[0] != "gap"):
+                return True
+        return False
+
+    if trecho_fonte(segmentos):
+        return True
+    if not sem_audio and audio_segmentos is not None and trecho_fonte(audio_segmentos):
+        return True
+    for c in camadas or []:
+        if not isinstance(c, dict):
+            continue
+        tipo = c.get("tipo")
+        if tipo not in ("imagem", "ajuste") and not c.get("path"):
+            return True
+    if not sem_audio:
+        for c in audio_clipes or []:
+            if isinstance(c, dict):
+                continue
+            if isinstance(c, (list, tuple)) and (len(c) <= 4 or not c[4]):
+                return True
+    return False
+
+
 def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", resolucao="original",
                    usar_gpu=True, pasta_saida=None, on_progress=None, stop_event=None, sem_audio=False,
                    camadas=None, audio_segmentos=None, duracao=None, audio_clipes=None, legendas=None, quadro=None,
@@ -2359,6 +2389,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     """
     global _export_proc
     prog = on_progress or (lambda p, m: None)
+    if path and not os.path.isfile(path) and not _export_usa_fonte(segmentos, audio_segmentos, camadas, audio_clipes, sem_audio):
+        path = ""
     if not path:
         # projeto sem vídeo principal (tudo veio do painel Projeto): fundo preto no tamanho da sequência;
         # a saída leva o nome e a pasta do projeto

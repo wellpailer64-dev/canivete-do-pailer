@@ -20,6 +20,7 @@ O **Canivete do Pailer** é um app desktop Windows que reúne 15 ferramentas par
 | Área | Ferramenta | O que faz |
 |---|---|---|
 | 🎬 Vídeo | **Editor Kanivete** | Corta, divide e exporta com atalhos estilo Premiere |
+| | **Importar Premiere** | Abre projetos .prproj no Editor Kanivete (cortes, trilhas, Motion, velocidade, chroma key) sem alterar o original |
 | | **Comprimir Vídeo** | H.265 com GPU (NVIDIA/Intel/AMD); mantém o original se já estiver otimizado |
 | | **Converter Vídeo** | MP4, MOV, MKV, WEBM, AVI, GIF e MP3; troca o formato sem recodificar quando dá |
 | | **Baixar Vídeo** | YouTube, Instagram, TikTok e mais, até 4K (yt-dlp) |

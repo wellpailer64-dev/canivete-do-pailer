@@ -3505,6 +3505,20 @@ function veExportPlanClips() {
     return { base, audio, camadas, mix };
 }
 
+function vePlanoUsaFonte(plano, audio = true) {
+    if (!plano) return true;
+    const usaTrecho = p => p && !p.gap;
+    if ((plano.base || []).some(usaTrecho)) return true;
+    if (audio && (plano.audio || []).some(usaTrecho)) return true;
+    if ((plano.camadas || []).some(c => c && c.tipo === 'video' && !c.path)) return true;
+    if (audio && (plano.mix || []).some(c => Array.isArray(c) && !c[4])) return true;
+    return false;
+}
+
+function veFonteParaPlano(plano, audio = true) {
+    return vePlanoUsaFonte(plano, audio) ? VE.path : '';
+}
+
 // ── legendas na timeline: clicar seleciona; arrastar move; pelas bordas, apara ──
 function veLegPointer(e, x, t) {
     const L = VE.legendas || [];
@@ -5360,11 +5374,12 @@ async function veStartExport() {
         // transições de sobreposição: o trecho de cada uma renderizado das trilhas de baixo (editor-ovt.js)
         if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg => { $ve('ve-exp-msg').textContent = msg; });
         if (VE.clips.some(c => veIsTexto(c) || veEhGrafico(c))) await veTxPngs();   // textos e gráficos viram PNG
-        const plano = veExportPlan(true);
+        const plano = veExportPlan(true), master = veMasterLim();
+        const mix = master ? [...plano.mix, { master }] : plano.mix;
         await window.pywebview.api.video_cutter_export(
-            VE.path, plano.base, vePill('format') || 'mp4', vePill('quality') || 'medium',
+            veFonteParaPlano({ ...plano, mix }, !noAudio), plano.base, vePill('format') || 'mp4', vePill('quality') || 'medium',
             $ve('ve-res').value, $ve('ve-gpu').checked, VE.dest, noAudio,
-            plano.camadas, plano.audio, plano.dur, veMasterLim() ? [...plano.mix, { master: veMasterLim() }] : plano.mix,
+            plano.camadas, plano.audio, plano.dur, mix,
             veTxExport(plano.faixa), [VE.seqW, VE.seqH],
             veExpOpcoes()
         );

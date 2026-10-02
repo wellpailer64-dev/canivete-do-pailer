@@ -22,7 +22,9 @@ EXT_IMAGEM = {'.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif', '.tif', '.tiff',
 TRANS_VIDEO = {'AE.AE_Impact_Pop': 'pop', 'AE.ADBE Cross Dissolve New': 'dissolve', 'AE.AE_Impact_Dissolve': 'dissolve',
                'ADBE Cross Dissolve New': 'dissolve'}
 # efeitos que viram propriedades do clipe (o resto entra no relatório)
-EFEITOS_LIDOS = {'AE.ADBE Motion', 'AE.ADBE Opacity', 'AE.ADBE MPEG.SourceSettings', 'AE.ADBE Ultra Key'}
+EFEITOS_LIDOS = {'AE.ADBE Motion', 'AE.ADBE Opacity', 'AE.ADBE MPEG.SourceSettings', 'AE.ADBE Ultra Key',
+                 'AE.Impact_Blur_FX', 'AE.ADBE Gaussian Blur 2', 'AE.ADBE Text', 'AE.ADBE Capsule'}
+EXT_SEM_PLAYER = {'.aegraphic', '.mogrt', '.aep'}   # Animation Composer / gráficos animados: o editor não toca
 
 
 def _seg(ticks):
@@ -286,9 +288,15 @@ class _Conversor:
                 return None
         else:
             med = self.g.ref(fonte.find('MediaSource/Media'))
+            titulo = (med.findtext('Title') or '').strip() if med is not None else ''
+            ext = os.path.splitext(self._caminho(med)[0])[1].lower() if med is not None else ''
+            if ext in EXT_SEM_PLAYER:
+                self.rel['ignorados'][f'Gráfico animado {ext} (Animation Composer etc.; o editor não toca)'] += 1
+                return None
             m = self._midia(med, fonte) if med is not None else None
+            if m is None and tipo == 'v':
+                return self._clipe_sintetico(cti, titulo, nome_sub, k, st, fim, W, H)
             if m is None:
-                self.rel['ignorados'][f'Gráfico/título do Premiere ({nome_sub or "sem nome"})'] += 1
                 return None
         if vel < 0:
             self.rel['ignorados']['Velocidade invertida (tocará para a frente)'] += 1
@@ -313,6 +321,51 @@ class _Conversor:
             self._efeitos(cti, c, m, W, H, ent)
         return c
 
+    def _midia_fixa(self, kind, nome):
+        chave = f'::{kind}'
+        if chave not in self.midias:
+            m = {'id': None, 'kind': kind, 'name': nome}
+            self.midias[chave] = m
+            self.midia_lista.append(m)
+        return self.midias[chave]
+
+    def _texto_do_grafico(self, cti):
+        chain = self.g.ref(cti.find('ComponentOwner/Components'))
+        if chain is None:
+            return None
+        for comp in chain.findall('.//Components/Component'):
+            fx = self.g.ref(comp)
+            if fx is not None and (fx.findtext('.//MatchName') == 'AE.ADBE Text'):
+                t = fx.findtext('.//InstanceName') or ''
+                t = t.replace(chr(13) + chr(10), chr(10)).replace(chr(13), chr(10)).strip()
+                if t:
+                    return t
+        return None
+
+    def _clipe_sintetico(self, cti, titulo, nome_sub, k, st, fim, W, H):
+        """Camada de ajuste → mídia 'ajuste'; gráfico com texto → mídia 'texto' (só o texto; estilo padrão)."""
+        dur = round(fim - st, 6)
+        if 'adjustment layer' in (titulo + ' ' + nome_sub).lower() or 'camada de ajuste' in nome_sub.lower():
+            m = self._midia_fixa('ajuste', 'Camada de ajuste')
+            c = {'tr': k, 'st': round(st, 6), 's': 0, 'e': dur, '_m': m}
+            self._efeitos(cti, c, m, W, H, 0)
+            c.pop('p', None)   # camada de ajuste não tem posição
+            c.pop('k', None)
+            self.rel['convertidos']['Camada de ajuste'] += 1
+            return c
+        texto = self._texto_do_grafico(cti)
+        if texto:
+            m = self._midia_fixa('texto', 'Texto')
+            tx = {'t': texto, 'fonte': 'Arial', 'tam': 90, 'neg': True, 'ita': False, 'alin': 'center', 'esp': 0, 'ent': 120,
+                  'cor': '#ffffff', 'cOn': False, 'cCor': '#000000', 'cLarg': 6, 'fOn': False, 'fCor': '#000000', 'fOp': 60,
+                  'fPad': 24, 'fRaio': 12, 'sOn': True, 'sCor': '#000000', 'sOp': 60, 'sDist': 6, 'sBlur': 10, 'sAng': 135}
+            c = {'tr': k, 'st': round(st, 6), 's': 0, 'e': dur, '_m': m, 'tx': tx,
+                 'p': {'sc': 100, 'x': W / 2, 'y': H * 0.82, 'rot': 0, 'op': 100}}
+            self.rel['convertidos']['Texto (só o texto; fonte e estilo padrão do editor)'] += 1
+            return c
+        self.rel['ignorados'][f'Gráfico do Premiere sem texto ({titulo or "sem nome"})'] += 1
+        return None
+
     def _efeitos(self, cti, c, m, W, H, ent):
         chain = self.g.ref(cti.find('ComponentOwner/Components'))
         if chain is None:
@@ -325,6 +378,21 @@ class _Conversor:
             mn = fx.findtext('.//MatchName') or fx.findtext('FilterMatchName') or '?'
             if mn not in EFEITOS_LIDOS:
                 self.rel['ignorados'][f'Efeito {fx.findtext(".//DisplayName") or mn}'] += 1
+                continue
+            if mn in ('AE.ADBE Text', 'AE.ADBE Capsule'):
+                continue   # texto: lido em _texto_do_grafico
+            if mn in ('AE.Impact_Blur_FX', 'AE.ADBE Gaussian Blur 2'):
+                vals = {}
+                for pp in fx.findall('.//Params/Param'):
+                    pr = self.g.ref(pp)
+                    if pr is not None and pr.findtext('Name'):
+                        vals.setdefault(pr.findtext('Name'), _param_valor(pr))
+                # editor: 100% = sigma de 5% do lado menor (54 px em 1080); Impact Amount ≈ %, Blurriness em px
+                amt = _num(vals.get('Amount'), 0) if mn == 'AE.Impact_Blur_FX' else _num(vals.get('Blurriness'), 0) / 54 * 100
+                if amt > 0:
+                    self.n_fx = getattr(self, 'n_fx', 0) + 1
+                    fx_lista.append({'id': f'fpr{self.n_fx}', 't': 'blur', 'on': True, 'v': {'amt': round(min(100, amt), 1)}})
+                    self.rel['convertidos']['Desfoque gaussiano'] += 1
                 continue
             if mn == 'AE.ADBE Ultra Key':
                 if any(f['t'] == 'key' for f in fx_lista):
