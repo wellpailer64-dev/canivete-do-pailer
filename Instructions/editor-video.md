@@ -415,11 +415,29 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
   batida exata, 1,997 s; ou 0,2333340 num trecho recortado) davam 1 quadro preto no corte (o 1º quadro da camada que
   entra sumia pelo `between` exato e o último pelo `0,233333/TB` truncado). O AutoFrame também alinha os clipes à grade.
 
+## Importar PSD/PSB com as camadas — `editor-psd.js` + `Functions/psd_import.py` (psd-tools 1.23)
+- Arrastar o arquivo (timeline ou Projeto), Importar do Projeto ou Abrir: vira uma Comp no tamanho do documento, uma
+  trilha por camada na ordem do Photoshop (a de baixo na V1), na posição dela (inclusive o que passa da borda), com
+  opacidade, modo de mesclagem e visibilidade (oculta = clipe desativado). Grupo = Comp dentro da Comp. A Comp abre
+  numa aba (as camadas nas trilhas, como no AE). Sem projeto aberto: começa pelo PNG do documento (tamanho da
+  sequência = o do PSD) e troca pela Comp. Duração 5 s.
+- No PNG de cada camada (o editor não tem isso por camada): máscara de pixel, recorte (máscara de corte) e os efeitos
+  Sobreposição de cor, Sombra projetada, Brilho externo e Traçado (desenhados no Python; a biblioteca não desenha).
+  Brilho/Contraste vira camada de ajuste; as outras camadas de ajuste e modos sem equivalente (Luminosidade, Matiz...)
+  saem em `m.psdAvisos` e no console. Texto e objeto inteligente entram com os pixels guardados (texto em `c.psdTexto`).
+- PNGs em `%LOCALAPPDATA%/CaniveteDoPailer/PSD importados/<nome>-<hash>/` (fora do cache limpo sozinho; mesmo arquivo
+  sem mudança reaproveita). cv2.imwrite não grava caminho com acento: PNG pelo Pillow.
+- Conferido: recompor as camadas extraídas dá o achatado do Photoshop (25 PSDs do portfólio + o PSB: 0–1,5 de 255 nos
+  sem camada de ajuste); prévia do PSB 0,4; exportação 2,2.
+
 ## Exportação: cor igual à prévia (achados do teste_export, 2026-10-02)
 - Vídeo HD sem marca de cor: o navegador (prévia) assume BT.709; o ffmpeg novo assumia BT.601 e convertia ao gravar a
   saída BT.709 (até ~30 níveis mais saturado). `_marca_hd(path)` põe `setparams=...bt709` na entrada (base e camadas).
 - Fotos (JPEG/WebP) entram com `para_rgb_img` (BT.601), não com a matriz do vídeo HD (saíam mais escuras/saturadas).
 - O arquivo das sobreposições é gravado com a mesma matriz da ida para RGB e com a marca de cor.
+- Camada com mesclagem/ajuste: a composição trabalha em 4:4:4 (`pixfmt`; a saída volta a `pixfmt_saida`); antes cada
+  camada degradava a cor em 4:2:0. Luz suave pela fórmula W3C/Photoshop em `lut2` (a do blend do ffmpeg clareava).
+  Comps: `veCompSig` versão 4 (renderiza de novo as antigas).
 - `veTransVirtuais`: trecho de quadro-chave com curva vira um ponto por quadro (antes virava reta fora da transição:
   zoom-soco e entrada da tela dividida do AutoFrame diferentes na exportação).
 

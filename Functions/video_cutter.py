@@ -2476,6 +2476,13 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     # escuras e saturadas que na prévia (teste_export, caso grade: verde 8 níveis). PNG é RGB: não muda nada
     para_rgb_img = "scale=in_color_matrix=bt601,format=rgba"
     de_rgb = f"scale=out_color_matrix={mtx}:out_range=tv,format=yuva420p"
+    # Camada com mesclagem ou de ajuste leva o quadro inteiro para RGB e de volta: em 4:2:0 a cor perdia um pouco a
+    # cada camada (12 camadas = faixas e ~12 níveis de diferença no teste_export). Com elas a composição trabalha em
+    # 4:4:4 e só a saída volta para o formato do arquivo.
+    pixfmt_saida = pixfmt
+    if pixfmt == "yuv420p" and any(c.get("bm") or c["tipo"] == "ajuste" for c in lay):
+        pixfmt = "yuv444p"
+    de_rgb_t = f"scale=out_color_matrix={mtx}:out_range=tv,format={'yuva444p' if pixfmt == 'yuv444p' else 'yuva420p'}"
     # Modo turbo: timeline só de cortes (sem camadas, textos, legendas, efeitos) com NVENC → a fonte é decodificada
     # na placa e fica na memória dela até o encoder (sem descer para a RAM). Mesma velocidade ou mais, com a CPU
     # quase parada. Fonte girada, 4:2:2/4:4:4 ou quadro com outra proporção ficam no modo normal.
@@ -2639,11 +2646,11 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                     # com opacidade: os efeitos por cima do próprio trecho (o tempo ainda é o da timeline: o sendcmd
                     # da opacidade animada conta a partir do início da camada)
                     filtros.append(f"{trecho},split[{r}x][{r}y]")
-                    _com_efeitos(f"[{r}y]", opac + [f"{de_rgb}[{r}z]"])
+                    _com_efeitos(f"[{r}y]", opac + [f"{de_rgb_t}[{r}z]"])
                     filtros.append(f"[{r}x][{r}z]overlay=0:0:eof_action=pass:format=auto,"
                                    f"setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
                 else:
-                    _com_efeitos(f"{trecho},", [de_rgb, f"setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]"])
+                    _com_efeitos(f"{trecho},", [de_rgb_t, f"setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]"])
                 j += 1
                 if depois:
                     filtros.append(f"[{r}s{j}]trim=start={fim:.4f},setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
@@ -2757,7 +2764,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             if c["tipo"] == "imagem" and not c.get("seq") and fixa:
                 cadeia = f"{src}fps=fps={fps}:start_time=0"
             elif c["tipo"] == "video" and not efeitos and not giro and not opac and not bm \
-                    and pixfmt == "yuv420p" and not _clipe_tem_alfa(c["path"] or path):
+                    and pixfmt in ("yuv420p", "yuv444p") and not _clipe_tem_alfa(c["path"] or path):
                 # clipe opaco só cortado/redimensionado/posicionado: fica em YUV do começo ao fim. A ida e volta para
                 # RGBA (quadro inteiro, 2 conversões por quadro) não muda nada na imagem e era o mais caro do grafo.
                 # Clipe com transparência (ProRes 4444, Animation/qtrle...) não: em YUV o alfa some e o fundo fica preto
@@ -2833,8 +2840,15 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                                f":eof_action=pass:format=rgb,split[{r}d][{r}e]")
                 filtros.append(f"[{r}d]format=gbrp[{r}t]")
                 filtros.append(f"[{r}e]alphaextract,format=gbrp[{r}k]")
-                filtros.append(f"[{r}t][{r}a]blend=all_mode={bm}[{r}x]")
-                filtros.append(f"[{r}b][{r}x][{r}k]maskedmerge,{de_rgb},setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
+                if bm == "softlight":
+                    # Luz suave: a fórmula do navegador/W3C (= Photoshop); a do blend do ffmpeg é outra e clareava
+                    # demais (teste_export, caso mesclagem: 28 níveis). x = camada, y = fundo, tabela 256×256 por canal
+                    d = "if(lte(y,63.75),((16*y/255-12)*y/255+4)*y,sqrt(y/255)*255)"
+                    e = f"if(lte(x,127.5),y-(255-2*x)*y*(255-y)/65025,y+(2*x-255)*({d}-y)/255)"
+                    filtros.append(f"[{r}t][{r}a]lut2=c0='{e}':c1='{e}':c2='{e}'[{r}x]")
+                else:
+                    filtros.append(f"[{r}t][{r}a]blend=all_mode={bm}[{r}x]")
+                filtros.append(f"[{r}b][{r}x][{r}k]maskedmerge,{de_rgb_t},setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
                 j += 1
                 if depois:
                     filtros.append(f"[{r}s{j}]trim=start={fim_bm:.4f},setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
@@ -2845,7 +2859,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                                f":enable='{ena}':eof_action=pass:format=auto[o{n}]")
             vf = f"[o{n}]"
         if lay:
-            filtros.append(f"{vf}format={pixfmt}[vlay]")
+            filtros.append(f"{vf}format={pixfmt_saida}[vlay]")
             vf = "[vlay]"
 
         # legendas gravadas no vídeo (mesmo estilo da prévia do editor), antes de reduzir a resolução

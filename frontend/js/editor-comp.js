@@ -342,7 +342,8 @@ function veCompSig(seq) {
     const tr = seq.trilhas || {};
     // 2: tamanho das imagens (render feito antes de a imagem carregar saía sem ela)
     // 3: camada de ajuste dentro da Comp deixava o fundo preto (o render corrigido precisa sair de novo)
-    const partes = [3, seq.w, seq.h, VE.fps, VE.path || '', +seq.dur || 0, clips,
+    // 4: Luz suave e cor das camadas com mesclagem corrigidas na exportação (2026-10-02)
+    const partes = [4, seq.w, seq.h, VE.fps, VE.path || '', +seq.dur || 0, clips,
         (tr.v || []).map(t => !!(t && t.hide)), (tr.a || []).map(t => !!(t && t.mute)),
         seq.legGravar !== false && (seq.legendas || []).length ? [seq.legendas, seq.legEstilo] : null, seq.master || null];
     return 'comp.' + vePrHash(JSON.stringify(partes));

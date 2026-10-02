@@ -225,6 +225,17 @@ CASOS = {
         g.tin = { t: 'push', d: 0.45, speed: 'fast', dir: 'u' };
         return [f, g];
     """, ""),
+    # modos de mesclagem: uma faixa de foto por modo sobre o vídeo (a fórmula do ffmpeg tem de ser a do navegador)
+    "mesclagem": (1080, 1920, """
+        const { clip } = __te, modos = ['multiply', 'screen', 'overlay', 'softlight', 'hardlight', 'darken', 'lighten', 'colorburn', 'colordodge', 'add', 'difference', 'exclusion'];
+        const out = [clip(0, 0, 0, 2, 'b.mp4')];
+        modos.forEach((bm, i) => {
+            const c = clip(1 + i, 0, 0, 2, i % 2 ? 'foto3.jpg' : 'foto8.jpg', { bm, p: { sc: 20, x: 270 + (i % 2) * 540, y: 160 * Math.floor(i / 2) + 160, rot: 0, op: i % 3 ? 100 : 70 } });
+            c.fx = [{ id: veFxNewId(), t: 'crop', on: true, v: { l: 0, t: 0, r: 0, b: 40 } }];
+            out.push(c);
+        });
+        return out;
+    """, ""),
     # sobreposições: zoom para dentro, giro, lente e flare
     "sobreposicao": (1080, 1920, """
         const { clip } = __te;

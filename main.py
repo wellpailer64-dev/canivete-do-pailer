@@ -373,7 +373,7 @@ def ve_importar_dialogo():
         return {"success": False}
     tipos = ("Mídia (*.mp4;*.mov;*.mxf;*.mkv;*.avi;*.webm;*.flv;*.f4v;*.wmv;*.asf;*.m4v;*.ts;*.mts;*.m2ts;"
              "*.mpg;*.mpeg;*.m2v;*.r3d;*.braw;*.ari;*.arx;*.mp3;*.wav;*.flac;*.m4a;*.aac;*.ogg;"
-             "*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp;*.srt;*.vtt;*.ass;*.ssa;*.sbv;*.txt)",
+             "*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp;*.psd;*.psb;*.srt;*.vtt;*.ass;*.ssa;*.sbv;*.txt)",
              "Legendas (*.srt;*.vtt;*.ass;*.ssa;*.sbv;*.txt)", "Todos os arquivos (*.*)")
     r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), allow_multiple=True, file_types=tipos)
     if not r:
@@ -674,6 +674,15 @@ def video_cutter_cancel_export():
     transicoes.cancelar()
     cancelar_exportacao()
     return {"success": True}
+
+
+def ve_psd_importar(path):
+    """PSD/PSB → um PNG por camada + a árvore (Functions/psd_import.py); o editor monta a Comp (editor-psd.js)."""
+    from Functions import psd_import
+    try:
+        return psd_import.importar(path)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 def ve_ovt_render(base, h, job):
@@ -2918,6 +2927,9 @@ class ApiBridge:
 
     def ve_ovt_render(self, base, h, job):
         return ve_ovt_render(base, h, job)
+
+    def ve_psd_importar(self, path):
+        return ve_psd_importar(path)
 
     def ve_render_tocar(self, base, chave, hashes):
         return ve_render_tocar(base, chave, hashes)

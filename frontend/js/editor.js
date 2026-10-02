@@ -2334,6 +2334,14 @@ function veGuardarDrop(e) {
 function veDropFiles(itens) {
     const proj = itens.find(i => !i.pasta && /\.vcnvt$/i.test(i.path));
     if (proj) { veOpenProject(proj.path); return; }
+    // PSD/PSB: Comp com as camadas (editor-psd.js); no painel Projeto, só entra no projeto
+    const psds = itens.filter(i => !i.pasta && typeof VE_EXT_PSD !== 'undefined' && VE_EXT_PSD.test(i.path));
+    if (psds.length) {
+        const noProj = VE.ready && typeof vePjSoltouAqui === 'function' ? vePjSoltouAqui(veDropAtual()) : null;
+        (async () => { for (const p of psds) await vePsdAbrir(p.path, noProj ? { pasta: noProj.pasta, soProjeto: true } : {}); })();
+        itens = itens.filter(i => !psds.includes(i));
+        if (!itens.length) return;
+    }
     const drop = veDropAtual();
     // no painel AutoFrame: pastas/fotos/vídeos/música vão para ele (editor-autoframe.js)
     if (typeof veAfSoltouAqui === 'function' && veAfSoltouAqui(drop)) { veAfAdicionar(itens); return; }
@@ -5028,6 +5036,7 @@ function veQuickEdit() {
 function veAbrirArquivoEscolhido(path, inserirNaTimeline, quickEdit) {
     if (!path) return;
     if (/\.vcnvt$/i.test(path)) { veOpenProject(path); return; }
+    if (typeof VE_EXT_PSD !== 'undefined' && VE_EXT_PSD.test(path)) { if (VE.ready || veConfirmDiscard()) vePsdAbrir(path); return; }
     if (inserirNaTimeline && VE.ready) { veDropFiles([{ path, pasta: false }]); return; }
     if (VE.ready && inserirNaTimeline !== false) { veDropFiles([{ path, pasta: false }]); return; }
     if (veConfirmDiscard()) {

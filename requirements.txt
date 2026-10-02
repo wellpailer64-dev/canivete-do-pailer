@@ -33,4 +33,6 @@ ImageHash==4.3.2
 rawpy==0.27.0
 PyMuPDF==1.27.2.2
 av==17.0.0
+# importar PSD/PSB com as camadas (editor-psd.js)
+psd-tools==1.23.0
 pyinstaller==6.19.0
