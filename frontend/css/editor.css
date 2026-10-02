@@ -1178,6 +1178,8 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-lc-tint { --trk: linear-gradient(90deg, #22c55e, #d6d6d6 50%, #d946ef); }
 .ve-lc-exp { --trk: linear-gradient(90deg, #0a0a0a, #f5f5f5); }
 .ve-lc-sat, .ve-lc-vib { --trk: linear-gradient(90deg, #7a7a7a, #ef4444 50%, #f59e0b 75%, #22c55e); }
+.ve-lc-hue { --trk: linear-gradient(90deg, #22d3ee, #3b82f6, #a855f7, #ef4444 50%, #f59e0b, #84cc16, #22d3ee); }
+.ve-lc-clar { --trk: linear-gradient(90deg, #9ca3af, #3a3a3a 50%, #f5f5f5); }
 
 /* curvas */
 .ve-lc-chs { display: flex; gap: 4px; }
@@ -1692,12 +1694,36 @@ body.ve-kl-scrub, body.ve-kl-scrub * { cursor: ew-resize !important; }
 .ve-start-auto-item span { color: var(--ve-faint); font: 11px var(--ve-mono); }
 .ve-start-auto-item .i { color: var(--ve-accent); }
 
-/* Luz e Cor: rodas de cor (Sombras / Meios-tons / Realces) */
-.ve-lc-rodas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 4px 2px; }
-.ve-lc-roda { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
-.ve-lc-roda-cv { width: 100%; max-width: 150px; aspect-ratio: 1; cursor: crosshair; touch-action: none; }
+/* Luz e Cor: rodas de cor (Lift / Gamma / Gain / Offset, como as primárias do DaVinci Resolve) */
+.ve-lc-rodas { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px 10px; padding: 4px 2px; }
+.ve-lc-roda {
+    display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0;
+    padding: 6px 6px 8px; border-radius: 6px; background: #121214; border: 1px solid var(--ve-line);
+}
+.ve-lc-roda.mod { border-color: color-mix(in srgb, var(--ve-accent) 45%, var(--ve-line)); }
+.ve-lc-roda-top { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.ve-lc-roda b { font: 700 10.5px var(--ve-ui); color: var(--ve-dim); letter-spacing: .06em; text-transform: uppercase; }
+.ve-lc-roda.mod b { color: var(--ve-text); }
+.ve-lc-roda-top button {
+    border: 0; background: transparent; color: var(--ve-faint); cursor: pointer; font-size: 12px; padding: 0 3px; border-radius: 3px;
+}
+.ve-lc-roda-top button:hover { color: var(--ve-text); background: var(--ve-panel-2); }
+.ve-lc-roda-cv { width: 100%; max-width: 150px; aspect-ratio: 1; cursor: grab; touch-action: none; }
+.ve-lc-roda-cv:active { cursor: grabbing; }
+.ve-lc-roda-num { display: flex; gap: 8px; font: 600 10px var(--ve-mono); }
+.ve-lc-roda-num .c0 { color: #f87171; } .ve-lc-roda-num .c1 { color: #4ade80; } .ve-lc-roda-num .c2 { color: #60a5fa; }
 .ve-lc-roda input[type=range] { width: 100%; max-width: 150px; }
-.ve-lc-roda b { font: 600 11px var(--ve-ui); color: var(--ve-dim); }
+
+/* Luz e Cor: abas das curvas (RGB e as de Matiz/Saturação do Lumetri) */
+.ve-lc-ctabs { display: flex; flex-wrap: wrap; gap: 3px; }
+.ve-lc-ctab {
+    flex: 1 1 auto; height: 22px; padding: 0 6px; border: 1px solid var(--ve-line-2); border-radius: 3px; background: var(--ve-bg);
+    color: var(--ve-dim); font: 600 10px var(--ve-ui); cursor: pointer; position: relative; white-space: nowrap;
+}
+.ve-lc-ctab:hover { color: var(--ve-text); }
+.ve-lc-ctab.active { border-color: var(--ve-accent); color: var(--ve-text); background: color-mix(in srgb, var(--ve-accent) 14%, var(--ve-bg)); }
+.ve-lc-ctab.mod::after { content: ''; position: absolute; top: 3px; right: 3px; width: 4px; height: 4px; border-radius: 50%; background: var(--ve-accent); }
+.ve-lc-chs[hidden] { display: none; }
 
 /* painel Escopos */
 .ve-sc { display: flex; flex-direction: column; min-height: 0; background: #08090b; }

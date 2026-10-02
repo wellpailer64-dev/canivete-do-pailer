@@ -2181,6 +2181,23 @@ def _filtros_fx(fx, mw, mh, tag="x"):
                     cube = None
                 if cube:
                     out.append(f"lut3d=file={_caminho_filtro(cube)}:interp=trilinear")
+            # Clareza (editor-lc.js: VE_LC_FS_CLAR): Y += k·(Y − gaussiano de Y)·4Y(1−Y), só na luma (BT.709, faixa
+            # cheia, como a prévia); a cor (U/V) fica como está
+            kc = _num(v.get("clar"), -2, 2)
+            sig = _num(v.get("clar_s"), 0, 0.2) * min(mw, mh)
+            if abs(kc) > 1e-4 and sig > 0.3:
+                r = f"{tag}f{j}k"
+                # em 10 bits: menos arredondamento nas duas conversões (a prévia faz em ponto flutuante)
+                ida = "scale=out_color_matrix=bt709:out_range=pc,format=yuv444p10le"
+                volta = "scale=in_color_matrix=bt709:in_range=pc,format=rgba"
+                expr = f"clip(x+{kc:.5f}*(x-y)*4*x*(1023-x)/1046529,0,1023)"
+                miolo = (f"{ida},split[{r}a][{r}b];[{r}b]gblur=sigma={sig:.3f}:planes=1[{r}c];"
+                         f"[{r}a][{r}c]lut2=c0='{expr}':c1=x:c2=x,{volta}")
+                if tag.startswith("a"):   # camada de ajuste: sem alfa para guardar
+                    out.append(miolo)
+                else:
+                    out.append(f"format=rgba,split[{r}A][{r}B];[{r}B]alphaextract[{r}M];[{r}A]{miolo}[{r}C];"
+                               f"[{r}C][{r}M]alphamerge,format=rgba")
             nit = _num(v.get("sharp"), 0, 5)
             if nit > 0.001:
                 # unsharp 5×5 só na luma (a prévia usa o mesmo núcleo binomial)

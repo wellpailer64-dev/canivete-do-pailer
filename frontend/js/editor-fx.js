@@ -74,13 +74,18 @@ const VE_FX = {
             { k: 'ls', nome: 'Sombras (luz)', min: -100, max: 100, step: 1, def: 0, un: '' },
             { k: 'lm', nome: 'Meios-tons (luz)', min: -100, max: 100, step: 1, def: 0, un: '' },
             { k: 'lh', nome: 'Realces (luz)', min: -100, max: 100, step: 1, def: 0, un: '' },
+            { k: 'lo', nome: 'Offset (luz)', min: -100, max: 100, step: 1, def: 0, un: '' },
+            { k: 'piv', nome: 'Pivô do contraste', min: 5, max: 95, step: 1, def: 50, un: '' },
+            { k: 'hue', nome: 'Rotação de matiz', min: -180, max: 180, step: 1, def: 0, un: '°' },
+            // Clareza (Clarity do Camera Raw): contraste local nos meios-tons; roda depois da LUT, como a nitidez
+            { k: 'clar', nome: 'Clareza', min: -100, max: 100, step: 1, def: 0, un: '' },
         ],
-        extra: ['cv', 'cw'],
-        neutro: v => veLcColorNeutral(v) && !(v.sharp > 0) && !(v.vig > 0),
+        extra: ['cv', 'cw', 'hc'],
+        neutro: v => veLcColorNeutral(v) && !(v.sharp > 0) && !(v.vig > 0) && !v.clar,
         draw: (a, v, env) => veLcDraw(a, v, env),
         exportar: v => {
-            const o = { sharp: veLcSharpAmt(v), vig: veLcVigAngle(v) };
-            if (!veLcColorNeutral(v)) { o.n = VE_LC_N; o.lut = veLcLutB64(v); }
+            const o = { sharp: veLcSharpAmt(v), vig: veLcVigAngle(v), clar: veLcClarAmt(v), clar_s: VE_LC_CLAR_SIGMA };
+            if (!veLcColorNeutral(v)) { o.n = veLcLut(v).n; o.lut = veLcLutB64(v); }
             return o;
         },
     },

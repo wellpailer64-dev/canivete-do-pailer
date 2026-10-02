@@ -208,6 +208,23 @@ CASOS = {
         adj.p = Object.assign(veDefProps(adj), { op: 60 });
         return [base, img, adj];
     """, ""),
+    # Luz e Cor completo: Clareza (+ e −, também numa camada de ajuste), curvas de Matiz/Saturação (LUT 65³),
+    # as 4 rodas (Lift/Gamma/Gain/Offset), pivô do contraste e rotação de matiz
+    "cor": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const lc = v => ({ id: id(), t: 'lc', on: true, v: Object.assign(veLcDefaults(), v) });
+        const base = clip(0, 0, 0, 4, 'b.mp4', { fx: [lc({ clar: 60, ct: 30, piv: 35, hue: 20,
+            hc: { hs: [[0.0, 0.5], [0.12, 0.95], [0.25, 0.5]], hh: [[0.45, 0.5], [0.55, 0.7], [0.65, 0.5]], hl: [[0.55, 0.5], [0.66, 0.2], [0.78, 0.5]],
+                  ls: [[0.1, 0.2], [0.9, 0.7]], ss: [[0.2, 0.5], [0.8, 0.35]] },
+            cw: { s: [0.3, -0.2], m: [-0.2, 0.25], h: [0.1, 0.3], o: [-0.15, 0.1] }, ls: 10, lm: -15, lh: 12, lo: -8 })] });
+        const img = clip(1, 0.3, 0, 3.2, 'foto3.jpg', { p: { sc: 45, x: 540, y: 900, rot: 0, op: 100 },
+            fx: [lc({ clar: -70, sat: 130 })] });
+        let aj = VE.media.find(x => x.kind === 'ajuste');
+        if (!aj) { aj = { id: VE.media.length, kind: 'ajuste', name: 'Camada de ajuste' }; VE.media.push(aj); }
+        const adj = { tr: 2, st: 2, s: 0, e: 2, m: aj.id, fx: [lc({ clar: 40, hc: { hs: [[0.6, 0.5], [0.7, 0.1], [0.8, 0.5]] } })] };
+        adj.p = Object.assign(veDefProps(adj), { op: 80 });
+        return [base, img, adj];
+    """, ""),
     # transições de camada: dissolução, empurrar, chicote e dividir em 4
     "transicoes": (1080, 1920, """
         const { clip } = __te;
