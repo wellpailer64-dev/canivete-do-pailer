@@ -1340,29 +1340,40 @@ _KF_AMOSTRAS = 24   # curva vira trechos retos no ffmpeg (a expressão não tem 
 def _expr_kf(pts, tv):
     """Expressão do ffmpeg que interpola os quadros-chave no tempo `tv` (igual à prévia do editor):
     antes do 1º e depois do último o valor fica parado; 'ease' = smoothstep, 'hold' = degrau,
-    curva de Bézier = trechos retos (_KF_AMOSTRAS por segmento)."""
+    curva de Bézier = trechos retos (_KF_AMOSTRAS por segmento).
+    Os trechos viram uma árvore BALANCEADA de if(lt(t, início), ...): o avaliador do ffmpeg aceita só ~100 níveis
+    de aninhamento, e a corrente de antes (um if por trecho) quebrava a exportação de camadas com muitos
+    quadros-chave curvos ("Missing ')' or too many args")."""
     f = lambda v: f"{v:.6f}"
-    expr = f(pts[-1][1])
-    for j in range(len(pts) - 2, -1, -1):
+    trechos = [(None, f(pts[0][1]))]   # (a partir de quando vale, expressão); o 1º vale antes de tudo
+    for j in range(len(pts) - 1):
         (ta, va, ia, bz), (tb, vb, _, _) = pts[j], pts[j + 1]
         d = tb - ta
         if d < 1e-6 or ia == "hold" or abs(vb - va) < 1e-9:
-            seg = f(va)
+            trechos.append((ta, f(va)))
         elif ia in ("lin", "ease") or bz is None:
             u = f"clip(({tv}-{ta:.4f})/{d:.4f},0,1)"
             curva = f"{u}*{u}*(3-2*{u})" if ia == "ease" else u
-            seg = f"({f(va)}+{f(vb - va)}*{curva})"
+            trechos.append((ta, f"({f(va)}+{f(vb - va)}*{curva})"))
         else:
             n = _KF_AMOSTRAS
             ys = [_bez_y(bz, i / n) for i in range(n + 1)]
-            seg = f(vb)
-            for i in range(n - 1, -1, -1):
+            for i in range(n):
                 t0, t1 = ta + d * i / n, ta + d * (i + 1) / n
                 v0, v1 = va + (vb - va) * ys[i], va + (vb - va) * ys[i + 1]
-                reta = f"({f(v0)}+{f(v1 - v0)}*({tv}-{t0:.5f})/{t1 - t0:.5f})"
-                seg = f"if(lt({tv},{t1:.5f}),{reta},{seg})"
-        expr = f"if(lt({tv},{tb:.4f}),{seg},{expr})"
-    return f"if(lt({tv},{pts[0][0]:.4f}),{f(pts[0][1])},{expr})"
+                trechos.append((t0, f"({f(v0)}+{f(v1 - v0)}*({tv}-{t0:.5f})/{t1 - t0:.5f})"))
+    trechos.append((pts[-1][0], f(pts[-1][1])))
+    # trechos vizinhos com a mesma expressão (quadro-chave a cada quadro com o mesmo valor, comum vindo do Premiere)
+    # viram um só
+    trechos = [x for k, x in enumerate(trechos) if k == 0 or x[1] != trechos[k - 1][1]]
+
+    def arvore(lo, hi):
+        if lo == hi:
+            return trechos[lo][1]
+        meio = (lo + hi + 1) // 2
+        return f"if(lt({tv},{trechos[meio][0]:.5f}),{arvore(lo, meio - 1)},{arvore(meio, hi)})"
+
+    return arvore(0, len(trechos) - 1)
 
 
 def _valor_kf(pts, t):

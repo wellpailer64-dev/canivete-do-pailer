@@ -242,6 +242,19 @@ CASOS = {
         g.tin = { t: 'push', d: 0.45, speed: 'fast', dir: 'u' };
         return [f, g];
     """, ""),
+    # muitos quadros-chave curvos (como vêm do Premiere): a expressão do ffmpeg passava do limite de aninhamento
+    # ("Missing ')' or too many args") — agora é uma árvore balanceada de if (_expr_kf)
+    "kfmuitos": (1080, 1920, """
+        const { clip } = __te, f = clip(1, 0, 0, 3, 'foto4.jpg', { p: { sc: 50, x: 540, y: 960, rot: 0, op: 100 } });
+        const sc = [], x = [];
+        for (let i = 0; i <= 150; i++) {
+            const t = i * 0.02;
+            sc.push({ t, v: 45 + 15 * Math.sin(i / 7), i: 'bez', b: [0.2, 0.9, 0.3, 1] });
+            x.push({ t, v: i < 60 || i > 110 ? 540 + 200 * Math.sin(i / 11) : 540, i: 'bez', b: [0.3, 0, 0.7, 1] });
+        }
+        f.k = { sc, x };
+        return [clip(0, 0, 0, 3, 'b.mp4'), f];
+    """, ""),
     # modos de mesclagem: uma faixa de foto por modo sobre o vídeo (a fórmula do ffmpeg tem de ser a do navegador)
     "mesclagem": (1080, 1920, """
         const { clip } = __te, modos = ['multiply', 'screen', 'overlay', 'softlight', 'hardlight', 'darken', 'lighten', 'colorburn', 'colordodge', 'add', 'difference', 'exclusion'];
