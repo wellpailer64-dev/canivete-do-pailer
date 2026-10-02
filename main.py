@@ -976,6 +976,14 @@ def ve_project_save(path, dados, salvar_como=False):
                 return {"success": False}
             sugestao = os.path.basename(projeto.com_extensao(path)) if path else "Meu projeto.vknv"
             pasta = os.path.dirname(path) if path else ""
+            if not path:   # importado do Premiere: sugere um .vknv com o mesmo nome, ao lado do .prproj
+                try:
+                    origem = (json.loads(dados) if isinstance(dados, str) else dados).get("importado_de", {}).get("premiere")
+                except Exception:
+                    origem = None
+                if origem:
+                    sugestao = os.path.splitext(os.path.basename(origem))[0] + ".vknv"
+                    pasta = os.path.dirname(origem)
             r = _window.create_file_dialog(
                 _file_dialog_kind("SAVE", webview.SAVE_DIALOG),
                 directory=pasta, save_filename=sugestao,
@@ -991,7 +999,9 @@ def ve_project_save(path, dados, salvar_como=False):
 
 
 def ve_project_open(path=None):
-    """Abre um .vknv (ou .vcnvt antigo; pergunta qual, se não vier o caminho) e avisa o que estiver faltando."""
+    """Abre um .vknv (ou .vcnvt antigo; pergunta qual, se não vier o caminho) e avisa o que estiver faltando.
+    Um .prproj (Premiere) é convertido só lendo (Functions/premiere.py) e abre como projeto novo, sem caminho:
+    o Ctrl+S grava um .vknv e o arquivo do Premiere nunca é tocado."""
     from Functions import projeto
     try:
         if not path:
@@ -999,11 +1009,19 @@ def ve_project_open(path=None):
                 return {"success": False}
             r = _window.create_file_dialog(
                 _file_dialog_kind("OPEN", webview.OPEN_DIALOG),
-                file_types=("Projeto de vídeo do KANIVETE (*.vknv;*.vcnvt)", "Todos os arquivos (*.*)"),
+                file_types=("Projeto de vídeo do KANIVETE (*.vknv;*.vcnvt)", "Projeto do Premiere Pro (*.prproj)",
+                            "Todos os arquivos (*.*)"),
             )
             if not r:
                 return {"success": False, "cancelled": True}
             path = r[0] if isinstance(r, (list, tuple)) else r
+        if str(path).lower().endswith(".prproj"):
+            from Functions import premiere
+            dados, relatorio = premiere.converter(path)
+            faltando = [p for p in [dados.get("video")] + [m.get("path") for m in dados.get("media") or []]
+                        if p and not os.path.isfile(p)]
+            return {"success": True, "path": None, "name": os.path.basename(path), "data": dados,
+                    "missing": faltando, "premiere": relatorio}
         dados, faltando = projeto.abrir(path)
         return {"success": True, "path": os.path.abspath(path), "name": os.path.basename(path),
                 "data": dados, "missing": faltando}
@@ -1260,8 +1278,9 @@ def select_video_file(tool):
         result = None
         try:
             file_types = (
-                "Mídia e projetos (*.mp4;*.mov;*.mxf;*.mkv;*.avi;*.webm;*.flv;*.f4v;*.wmv;*.asf;*.m4v;*.ts;*.mts;*.m2ts;*.3gp;*.mpg;*.mpeg;*.m2v;*.r3d;*.braw;*.ari;*.arx;*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.wma;*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.avif;*.vknv;*.vcnvt)",
+                "Mídia e projetos (*.mp4;*.mov;*.mxf;*.mkv;*.avi;*.webm;*.flv;*.f4v;*.wmv;*.asf;*.m4v;*.ts;*.mts;*.m2ts;*.3gp;*.mpg;*.mpeg;*.m2v;*.r3d;*.braw;*.ari;*.arx;*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.wma;*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.avif;*.vknv;*.vcnvt;*.prproj)",
                 "Projeto de vídeo do KANIVETE (*.vknv;*.vcnvt)",
+                "Projeto do Premiere Pro (*.prproj)",
                 "Todos os arquivos (*.*)",
             )
             result = _window.create_file_dialog(

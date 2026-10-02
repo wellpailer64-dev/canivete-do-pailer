@@ -1605,6 +1605,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .app-confirm[hidden] { display: none; }
 .app-confirm { z-index: 20000; }
 .app-confirm-box { width: min(440px, 92vw); gap: 10px; }
+#app-confirm-texto { white-space: pre-line; max-height: 60vh; overflow-y: auto; }
 .app-confirm-box .modal-actions { margin-top: 8px; }
 .btn-perigo { padding: 8px 14px; border: 1px solid rgba(239, 68, 68, .45); background: transparent; color: #fca5a5; border-radius: var(--r-md); font-size: 13px; font-weight: 600; }
 .btn-perigo:hover { background: rgba(239, 68, 68, .12); }

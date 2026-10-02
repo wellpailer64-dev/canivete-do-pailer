@@ -45,6 +45,13 @@ Atualize a seção CALIBRACAO dele a cada feedback do usuário sobre uma ediçã
 Composição, motion, cor e contraste (curvas, tempos, área segura do 9:16, receitas com camadas de ajuste e o plano
 de evolução do AutoFrame): `Instructions/agente/direcao-de-arte.md`.
 
+## Importar Premiere (.prproj)
+`Functions/premiere.py` converte só LENDO (gzip + XML de objetos por ObjectID; ticks 254016000000/s) para o formato
+do .vknv; abre sem caminho (Ctrl+S grava um .vknv ao lado). Vêm cortes, trilhas, vínculos, velocidade, Motion/Opacidade
+(com quadros-chave), transições (Cross Dissolve, Pop, Constant Power), sequências aninhadas e Ultra Key → Chroma Key
+(aproximado); o resto vai para o relatório. Teste: `python testes/teste_premiere.py "<projeto.prproj>"`
+(use uma CÓPIA do projeto do usuário, ex. `D:\kanivete_testes\premiere\`).
+
 ## Comp (estilo After Effects)
 Plano, modelo e limitações em `Instructions/agente/plano-comp.md`; código em `frontend/js/editor-comp.js`.
 Plano completo (Fases 1–3 + Propriedades essenciais por faixa).

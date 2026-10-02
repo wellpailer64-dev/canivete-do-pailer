@@ -2332,7 +2332,7 @@ function veGuardarDrop(e) {
 }
 
 function veDropFiles(itens) {
-    const proj = itens.find(i => !i.pasta && /\.(vknv|vcnvt)$/i.test(i.path));
+    const proj = itens.find(i => !i.pasta && /\.(vknv|vcnvt|prproj)$/i.test(i.path));
     if (proj) { veOpenProject(proj.path); return; }
     // PSD/PSB: Comp com as camadas (editor-psd.js); no painel Projeto, só entra no projeto
     const psds = itens.filter(i => !i.pasta && typeof VE_EXT_PSD !== 'undefined' && VE_EXT_PSD.test(i.path));
@@ -3951,7 +3951,7 @@ function veOpenProject(path) {
         VE.quickEditPending = false;
         VE.startScreenDismissed = true;
         const d = r.data;
-        VE._pendingProject = { data: d, path: r.path, name: r.name, missing: r.missing || [] };
+        VE._pendingProject = { data: d, path: r.path, name: r.name, missing: r.missing || [], premiere: r.premiere || null };
         VE.dirty = false;
         const faltaBase = !d.video || (r.missing || []).includes(d.video);
         if (faltaBase) veOpenLostProject();
@@ -4013,7 +4013,7 @@ function veOpenProjectExternal(path) {
 
 // Depois que o vídeo do projeto carregou: recoloca imagens, clipes, marcas e visão
 function veApplyProject() {
-    const { data: d, path, name, missing } = VE._pendingProject;
+    const { data: d, path, name, missing, premiere } = VE._pendingProject;
     VE._pendingProject = null;
     VE.projectPath = path;
     // cópia do salvamento automático: Ctrl+S volta a salvar no projeto de origem (ou pergunta, se não havia)
@@ -4185,7 +4185,27 @@ function veApplyProject() {
     const compArq = new Set((d.media || []).filter(m => m.comp && m.path).map(m => m.path));
     const faltam = (missing || []).filter(p => !compArq.has(p)).length;
     veToast(faltam ? `Projeto aberto — ${faltam} mídia(s) offline`
-                   : 'Projeto aberto: ' + name.replace(/\.(vknv|vcnvt)$/i, ''));
+                   : 'Projeto aberto: ' + name.replace(/\.(vknv|vcnvt|prproj)$/i, ''));
+    // importado do Premiere: ainda não é um projeto nosso (Ctrl+S grava um .vknv) e mostra o que não veio
+    if (premiere) setTimeout(() => { VE.dirty = true; veUpdateTitle(); vePremiereRelatorio(name, premiere); }, 400);
+}
+
+// Relatório da importação do Premiere (Functions/premiere.py): sequências, o que ficou de fora e mídia faltando
+function vePremiereRelatorio(nome, r) {
+    const linhas = [];
+    const seqs = (r.sequencias || []).map(s => `${s.nome} (${s.clipes})`).join(', ');
+    linhas.push(`${veT('Sequências')}: ${seqs}`);
+    if ((r.faltando || []).length) linhas.push(`${veT('Mídia não encontrada')}: ${r.faltando.length}`);
+    (r.convertidos || []).forEach(i => linhas.push(`${veT('Convertido')}: ${i.o_que} (${i.qtd})`));
+    if ((r.ignorados || []).length) {
+        linhas.push('', veT('Não veio (o editor ainda não tem):'));
+        r.ignorados.slice(0, 14).forEach(i => linhas.push(`• ${i.o_que}: ${i.qtd}`));
+        if (r.ignorados.length > 14) linhas.push(`• … ${r.ignorados.length - 14} ${veT('outros')}`);
+    }
+    linhas.push('', veT('O arquivo do Premiere não foi alterado. Salve (Ctrl+S) para criar o projeto .vknv.'));
+    console.info('[premiere] relatório da importação', r);
+    if (typeof appConfirm === 'function') appConfirm({ titulo: `${veT('Importado do Premiere')}: ${nome}`, texto: linhas.join('\n'),
+        botoes: [{ rotulo: 'OK', valor: true, tipo: 'primario' }] });
 }
 
 // ─────────────────────────── visão / zoom ───────────────────────────
@@ -5038,7 +5058,7 @@ function veQuickEdit() {
 
 function veAbrirArquivoEscolhido(path, inserirNaTimeline, quickEdit) {
     if (!path) return;
-    if (/\.(vknv|vcnvt)$/i.test(path)) { veOpenProject(path); return; }
+    if (/\.(vknv|vcnvt|prproj)$/i.test(path)) { veOpenProject(path); return; }
     if (typeof VE_EXT_PSD !== 'undefined' && VE_EXT_PSD.test(path)) { if (VE.ready || veConfirmDiscard()) vePsdAbrir(path, { inserir: !!inserirNaTimeline }); return; }
     if (inserirNaTimeline && VE.ready) { veDropFiles([{ path, pasta: false }]); return; }
     if (VE.ready && inserirNaTimeline !== false) { veDropFiles([{ path, pasta: false }]); return; }
