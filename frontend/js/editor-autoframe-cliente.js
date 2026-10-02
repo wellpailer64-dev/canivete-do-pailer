@@ -393,7 +393,7 @@ async function veAfcPreparar(plano, bin) {
     x.total = plano.fim - t0;
     // intro animada: as melhores fotos viram cards, e um clarão branco quando o logo bate
     if (m.intro.tipo === 'animada') {
-        const fotos = VEAF.midias.filter(y => y.tipo === 'foto' && !VEAF.fora.has(y.path)).sort((a, b) => b.nota - a.nota).slice(0, 3);
+        const fotos = VEAF.midias.filter(y => y.tipo === 'foto' && !VEAF.fora.has(y.path)).sort((a, b) => b.nota - a.nota).slice(0, 4);
         x.cards = [];
         for (const f of fotos) { const c = await imp(f.path); if (c) x.cards.push(c); }
         await veAfEsperar(() => x.cards.every(c => c.w > 0), 8000);
@@ -577,6 +577,8 @@ function veAfcExtras(out, plano, x) {
     // no fundo, a cor da marca em Multiplicação por cima (duotone), luz em degradê na cor de destaque (Tela) se
     // movendo, grão vivo (Sobrepor) e vinheta; por cima, cards de fotos e o logo com puxada de foco e feixe de luz
     const LOGO_Y = 800, TXT_Y = 1290;   // título mais baixo, em 2 linhas, ainda dentro da área segura (até y 1500)
+    // intro: logo menor no alto, 4 cards no meio (2 × 2) e o título embaixo (ajuste do cliente, 2026-10-01)
+    const INTRO = { logoY: 330, larg: 0.4, txtY: 1345 };
     const animado = (st, D, opts) => {
         const N = Math.max(4, Math.round(D / b)), T = k => st + Math.min(D - 0.25, k * b), Q = VE_AF_Q;
         const cards = opts.cards || [], L = cards.length ? T(N / 2) : T(Math.min(1, N / 4)), l = L - st;
@@ -612,9 +614,11 @@ function veAfcExtras(out, plano, x) {
         const vin = veAfAjuste(0, D, { vig: 55, ct: 8 });
         camada(vin);
         // cards: foto + moldura branca + sombra, entram um por batida (mola, girando), recuam quando o logo bate
-        const pos = [[W * 0.29, 560, -7], [W * 0.72, 690, 6], [W * 0.36, 1130, -4]];
+        const pos = cards.length > 3 ? [[W * 0.29, 640, -7], [W * 0.71, 700, 6], [W * 0.31, 1090, 5], [W * 0.7, 1130, -5]]
+            : [[W * 0.29, 560, -7], [W * 0.72, 690, 6], [W * 0.36, 1130, -4]];
         cards.forEach((md, i) => {
-            const t = T((i + 1) * N / 8) - st, fim = D - t, cw = W * 0.4, ch = cw * md.h / md.w, [px, py, rot] = pos[i];
+            // um por batida, todos antes de o logo bater (na metade do bloco)
+            const t = T((i + 1) * N / (2 * (cards.length + 1))) - st, fim = D - t, cw = W * 0.4, ch = cw * md.h / md.w, [px, py, rot] = pos[i];
             const lt = Math.max(12 * Q, l - t);
             const mult = [[0, 0, 'mola'], [10 * Q, 1, 'suave'], [lt, 1.02, 'entra'], [lt + 8 * Q, 0.86, 'suave'], [Math.max(lt + 9 * Q, sai - t), 0.84, 'sai'], [fim, 0.2]];
             const gira = veAfK([[0, rot * 2.2, 'entra'], [12 * Q, rot]]);
@@ -654,14 +658,17 @@ function veAfcExtras(out, plano, x) {
             const pals = frase.split(/\s+/), fim = pals.length > 1 ? pals.pop() : null, ini = pals.join(' ');
             const corDest = veAfcRazao(m.paleta.secundaria, fundo) >= 3 ? m.paleta.secundaria : '#ffffff';
             const corTx = veAfcRazao('#ffffff', fundo) >= 3 ? '#ffffff' : veAfcTom(m.paleta.primaria, 0.3);
-            const linha = (t, y, tam, cor, anima, atraso) => out.push({ tr: nova(), st: +(t1 + atraso).toFixed(4), s: 0, e: +(dur - atraso).toFixed(3), m: veTxMidia().id,
+            const linha = (t, y, tam, cor, anima, atraso, extra) => out.push({ ...(extra || {}), tr: nova(), st: +(t1 + atraso).toFixed(4), s: 0, e: +(dur - atraso).toFixed(3), m: veTxMidia().id,
                 tx: { ...VE_TX_PADRAO, ...forte, t, tam, cor, alin: 'center', esp: 10, sOn: true, sCor: '#000000', sOp: 45, sDist: 6, sBlur: 22 },
                 p: { sc: 100, x: W / 2, y, rot: 0, op: 100 },
                 txa: typeof veTxaObj === 'function' ? { in: veTxaObj(anima), out: veTxaObj('fade') } : undefined });
+            // o destaque pulsa no ritmo da música (um pulso por batida)
+            const pulsa = { fx: [{ id: veFxNewId(), t: 'ca_pul', on: true, v: { tam: 7, vel: +(1 / b).toFixed(3) } }] };
+            const ty = opts.txtY || TXT_Y;
             if (fim) {
-                linha(ini, TXT_Y, 84, corTx, 'revelar', 0);
-                linha(fim, TXT_Y + 112, 132, corDest, 'elastico', 4 * Q);
-            } else linha(frase, TXT_Y + 40, 110, corDest, 'elastico', 0);
+                linha(ini, ty, 84, corTx, 'revelar', 0);
+                linha(fim, ty + 94, 132, corDest, 'elastico', 4 * Q, pulsa);
+            } else linha(frase, ty + 40, 110, corDest, 'elastico', 0, pulsa);
         }
         // sons: riser até o logo, impacto no logo, sucesso no texto
         if (opts.riser && sx.riser) som(sx.riser, L - sx.riser.dur, -5);
@@ -675,7 +682,7 @@ function veAfcExtras(out, plano, x) {
     const nI = out.length;
     if (m.intro.tipo === 'animada' && x.introFim) {
         out.push({ tr: SC, st: 0, s: 0, e: +x.introFim.toFixed(4), m: corP(), p: { ...cheio } });
-        animado(0, x.introFim, { cards: x.cards, texto: VEAF.titulo, riser: true, heroi: x.heroiI });
+        animado(0, x.introFim, { cards: x.cards, texto: VEAF.titulo, riser: true, heroi: x.heroiI, ...INTRO });
         grupo('intro', nI);
         const primeira = out.find(c => c.tr === SC && Math.abs(c.st - x.introFim) < 0.02 && VE.media[c.m] && VE.media[c.m].kind !== 'cor');
         if (primeira) primeira.tin = { ...tin };
@@ -763,12 +770,27 @@ function veAfComps(cli, pasta) {
         if (c && tin) c.tin = tin;
     });
     VE.clips.forEach(c => { delete c._grupo; });
+    veAfCompactarTrilhas();
     // gerar não entra no desfazer (como antes): Ctrl+Z não desmonta as Comps
     VE.history = [];
     VE.future = [];
     VE.media.forEach(m => { if (m && m.comp) delete m._criada; });
     veRelayout();
     veSeqSalvarAtiva();
+}
+
+// Cada peça da intro e do encerramento nasce numa trilha nova (até a V38); depois que elas viram Comps, o logo e a
+// cor final ficavam lá em cima com ~30 trilhas vazias no meio. As trilhas usadas são renumeradas em sequência
+// (mesma ordem de empilhamento; V1/A1 ficam) e as vazias saem.
+function veAfCompactarTrilhas() {
+    const usadas = [...new Set([0, ...VE.clips.map(c => Math.max(0, +c.tr || 0))])].sort((a, b) => a - b);
+    const n = Math.max(VE_MIN_TRACKS, usadas.length);
+    if (usadas.every((t, k) => t === k) && veTrackCount() <= n) return;
+    const novo = new Map(usadas.map((t, k) => [t, k]));
+    VE.clips.forEach(c => { c.tr = novo.get(Math.max(0, +c.tr || 0)); });
+    VE_TRK = veTrkNovo(n);
+    veRebuildTracks(n);
+    veBuildHeads();
 }
 
 // Formulário: a Comp guardada como intro/encerramento (o pacote fica no modelo)
