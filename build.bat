@@ -87,6 +87,9 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "Functions.autoframe" ^
  --hidden-import "Functions.autoframe_modelos" ^
  --hidden-import "Functions.soundboard" ^
+ --hidden-import "Functions.transicoes" ^
+ --hidden-import "Functions.psd_import" ^
+ --hidden-import "psd_tools" ^
  --collect-data "cv2" ^
  --copy-metadata "pywebview" ^
  --copy-metadata "pythonnet" ^
