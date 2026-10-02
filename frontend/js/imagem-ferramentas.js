@@ -941,7 +941,7 @@ const IE_ZOOM = {
         const z = IE.zm; IE.zm = null;
         if (z && !z.mov) ieZoomPasso(ev.altKey ? -1 : 1, p.sx, p.sy);
     },
-    dbl(p, ev, doc) { ieZoomEm(1); },
+    dbl(p, ev, doc) { ieZoomReal(1); },
 };
 
 // ─────────────────────────── registro ───────────────────────────

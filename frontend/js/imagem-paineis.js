@@ -198,7 +198,7 @@ function ieOpcoesRender(soValores) {
                 `<span class="ie-op-dica">${ieT('Usa a cor de frente · Shift: proporcional')}</span>`;
             break;
         case 'mao': case 'zoom':
-            h += `<button class="ie-btn ie-btn-mini" onclick="ieZoomEm(1)">100%</button><button class="ie-btn ie-btn-mini" onclick="ieAjustarVista()">${ieT('Ajustar à tela')}</button>` +
+            h += `<button class="ie-btn ie-btn-mini" onclick="ieZoomReal(1)">100%</button><button class="ie-btn ie-btn-mini" onclick="ieAjustarVista()">${ieT('Ajustar à tela')}</button>` +
                 (IE.ferr === 'zoom' ? `<span class="ie-op-dica">${ieT('Clique: aproximar · Alt+clique: afastar · arrastar: zoom contínuo')}</span>` : '');
             break;
     }
@@ -701,7 +701,7 @@ function ieAbasRender() {
     const box = ieEl('ie-abas');
     if (!box) return;
     box.innerHTML = IE.docs.map(d => `<div class="ie-aba ${d === IE.doc ? 'on' : ''}" data-doc="${d.id}" title="${ieEsc(d.psdPath || d.path || d.nome)}">
-        <span>${ieEsc(d.nome)}${d.psdPath || d.path ? '' : ''} @ ${Math.round(d.zoom * 100)}%${d.sujo ? ' •' : ''}</span>
+        <span>${ieEsc(d.nome)}${d.psdPath || d.path ? '' : ''} @ ${Math.round(ieZoomTela(d) * 100)}%${d.sujo ? ' •' : ''}</span>
         <button class="ie-aba-x" data-fechar="${d.id}" title="${ieT('Fechar (Ctrl+W)')}">${ieIco('x')}</button></div>`).join('');
     if (!box._ok) {
         box._ok = true;
@@ -732,14 +732,15 @@ function ieStatusRender() {
         box._ok = true;
         box.innerHTML = `<input class="ie-status-zoom" id="ie-st-zoom"><span id="ie-st-doc"></span><span id="ie-st-pos"></span><span id="ie-st-cor"></span><span class="ie-status-dica" id="ie-st-dica"></span>`;
         const z = ieEl('ie-st-zoom');
-        z.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') { const v = parseFloat(z.value); if (v > 0) ieZoomEm(v / 100); z.blur(); } });
+        z.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') { const v = parseFloat(z.value); if (v > 0) ieZoomReal(v / 100); z.blur(); } });
     }
     const z = ieEl('ie-st-zoom');
-    if (document.activeElement !== z) z.value = (doc.zoom * 100 >= 10 ? Math.round(doc.zoom * 100) : (doc.zoom * 100).toFixed(2)) + '%';
+    const zt = ieZoomTela(doc) * 100;
+    if (document.activeElement !== z) z.value = (zt >= 10 ? Math.round(zt) : zt.toFixed(2)) + '%';
     ieEl('ie-st-doc').textContent = `${doc.w} × ${doc.h} px · ${doc.dpi} ppi`;
     ieAbasZoom();
 }
-function ieAbasZoom() { const a = document.querySelector('.ie-aba.on span'); const d = IE.doc; if (a && d) a.textContent = `${d.nome} @ ${Math.round(d.zoom * 100)}%${d.sujo ? ' •' : ''}`; }
+function ieAbasZoom() { const a = document.querySelector('.ie-aba.on span'); const d = IE.doc; if (a && d) a.textContent = `${d.nome} @ ${Math.round(ieZoomTela(d) * 100)}%${d.sujo ? ' •' : ''}`; }
 function ieStatusMouse(p) {
     const doc = IE.doc, pos = ieEl('ie-st-pos'), cor = ieEl('ie-st-cor');
     if (!doc || !pos) return;

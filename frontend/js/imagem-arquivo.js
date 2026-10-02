@@ -903,7 +903,7 @@ const IE_CMDS = {
         x.filter = `blur(${v.px / 2}px)`; x.drawImage(doc.sel.c, 0, 0);
         ieSelDefinir(doc, c); ieHist(ieT('Suavizar'));
     },
-    zoomMais: () => ieZoomPasso(1), zoomMenos: () => ieZoomPasso(-1), zoomAjustar: () => ieAjustarVista(), zoom100: () => ieZoomEm(1),
+    zoomMais: () => ieZoomPasso(1), zoomMenos: () => ieZoomPasso(-1), zoomAjustar: () => ieAjustarVista(), zoom100: () => ieZoomReal(1),
     verAchatado: doc => { doc._verAchatado = !doc._verAchatado; ieToast(ieT(doc._verAchatado ? 'Mostrando a imagem salva no PSD (Exibir > Comparar de novo para voltar)' : 'Mostrando as camadas')); ieDesenharVista(); },
     avisos: doc => {
         const l = [...(doc.avisos || []), ...(doc.avisosSalvar || [])];

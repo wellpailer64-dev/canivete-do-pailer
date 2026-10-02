@@ -654,6 +654,7 @@ function ieCompor(doc, R) {
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(R.x, R.y, R.w, R.h);
+    doc._compV = (doc._compV || 0) + 1;   // a tela reduzida (ieMipmap) refaz as etapas
     ctx.beginPath();
     ctx.rect(R.x, R.y, R.w, R.h);
     ctx.clip();
@@ -719,6 +720,12 @@ function ieRCamada(L) {   // região que a camada ocupa na tela (com efeitos)
 }
 
 // ─────────────────────────── vista (zoom e rolagem) ───────────────────────────
+// doc.zoom é em pixels de CSS; o que o usuário vê (e os passos) é em pixels da tela: zoom × devicePixelRatio.
+// Assim "100%" é 1 pixel da imagem por pixel da tela, como no Photoshop (com a escala do Windows em 192%, o 100%
+// antigo esticava 1,92× sem suavizar e serrilhava).
+const ieDpr = () => window.devicePixelRatio || 1;
+const ieZoomTela = (doc = IE.doc) => (doc ? doc.zoom * ieDpr() : 1);
+function ieZoomReal(z, sx, sy) { ieZoomEm(z / ieDpr(), sx, sy); }
 const IE_ZOOMS = [0.01, 0.02, 0.03, 0.05, 0.0667, 0.0833, 0.125, 0.1667, 0.25, 0.3333, 0.5, 0.6667, 1, 2, 3, 4, 5, 6, 7, 8, 12, 16, 20, 24, 32];
 
 function ieVistaTam() {
@@ -728,7 +735,7 @@ function ieVistaTam() {
 function ieAjustarVista(doc = IE.doc) {
     if (!doc) return;
     const { w, h } = ieVistaTam();
-    const z = Math.min((w - 60) / doc.w, (h - 60) / doc.h, 1);
+    const z = Math.min((w - 60) / doc.w, (h - 60) / doc.h, 1 / ieDpr());   // no máximo 100% (de verdade)
     doc.zoom = Math.max(0.01, z);
     doc.px = Math.round((w - doc.w * doc.zoom) / 2);
     doc.py = Math.round((h - doc.h * doc.zoom) / 2);
@@ -748,9 +755,9 @@ function ieZoomEm(z, sx, sy, doc = IE.doc) {   // sx, sy = ponto da tela que fic
 function ieZoomPasso(dir, sx, sy) {
     const doc = IE.doc;
     if (!doc) return;
-    const z = doc.zoom;
+    const z = ieZoomTela(doc);
     const prox = dir > 0 ? IE_ZOOMS.find(v => v > z * 1.001) : [...IE_ZOOMS].reverse().find(v => v < z / 1.001);
-    if (prox) ieZoomEm(prox, sx, sy);
+    if (prox) ieZoomReal(prox, sx, sy);
 }
 function ieTelaDoc(ev, doc = IE.doc) {
     const r = ieEl('ie-canvas').getBoundingClientRect();
@@ -799,10 +806,49 @@ function ieDesenharVista() {
     ctx.translate(x, y);
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
-    ctx.imageSmoothingEnabled = doc.zoom < 1;
-    ctx.imageSmoothingQuality = 'high';
     const fonte = doc._verAchatado && doc.achatadoC ? doc.achatadoC : doc.comp;
-    ctx.drawImage(fonte, x, y, w, h);
+    ieDesenharNitido(ctx, fonte, doc, dpr);
+}
+
+// a imagem na tela em pixels da tela (origem alinhada ao pixel): 1:1 sem reamostrar; ampliar por número inteiro ou
+// muito (≥ 300%) sem suavizar (pixels nítidos, como no Photoshop); ampliar quebrado suavizado (sem escadinha);
+// reduzir em etapas de metade (nítido, sem serrilhar)
+function ieDesenharNitido(ctx, fonte, doc, dpr) {
+    const s = doc.zoom * dpr;
+    const dx = Math.round(doc.px * dpr), dy = Math.round(doc.py * dpr);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (Math.abs(s - 1) < 1e-3) { ctx.imageSmoothingEnabled = false; ctx.drawImage(fonte, dx, dy); ctx.restore(); return; }
+    const dw = Math.round(doc.w * s), dh = Math.round(doc.h * s);
+    if (s > 1) {
+        ctx.imageSmoothingEnabled = !(s >= 3 || Math.abs(s - Math.round(s)) < 1e-3);
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(fonte, dx, dy, dw, dh);
+        ctx.restore();
+        return;
+    }
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(ieMipmap(fonte, doc, s), dx, dy, dw, dh);
+    ctx.restore();
+}
+// reduções pela metade da composição, guardadas até ela mudar (doc._compV)
+function ieMipmap(fonte, doc, s) {
+    if (s >= 0.5) return fonte;
+    const chave = (fonte === doc.comp ? 'c' + (doc._compV || 0) : 'a') + ':' + fonte.width;
+    if (!doc._mip || doc._mip.chave !== chave) doc._mip = { chave, niveis: [fonte] };
+    const nv = doc._mip.niveis;
+    let k = 0;
+    while (s * Math.pow(2, k + 1) <= 1 && nv[k].width > 2 && nv[k].height > 2) {
+        if (!nv[k + 1]) {
+            const a = nv[k], n = ieCanvas(Math.ceil(a.width / 2), Math.ceil(a.height / 2)), x = ieCtx(n);
+            x.imageSmoothingQuality = 'high';
+            x.drawImage(a, 0, 0, n.width, n.height);
+            nv[k + 1] = n;
+        }
+        k++;
+    }
+    return nv[k];
 }
 
 // camada de cima: seleção, alças, cursor do pincel, prévias das ferramentas
