@@ -417,7 +417,7 @@ function vedNewHost(root, b) { return { n: VED.proxN++, root, max: null, b, win:
 // Título da janela solta (nomes dos painéis). Os espaços invisíveis no fim deixam o título único:
 // o Python acha a janela por ele para colocá-la no monitor/posição salvos
 function vedWinTitle(h) {
-    return vedPanelsOf(h.root).map(vedTitle).join(' · ') + ' — Editor de Vídeo' + '​'.repeat(h.n);
+    return vedPanelsOf(h.root).map(vedTitle).join(' · ') + ' — Editor Kanivete' + '​'.repeat(h.n);
 }
 
 // Tira o painel de onde estiver; se sair da área principal, lembra de onde saiu
@@ -726,7 +726,7 @@ function veDockMenu(e) {
         m.innerHTML = '<div class="ve-menu-form"><label for="ve-ws-nome">Nome do workspace</label>' +
             `<input id="ve-ws-nome" maxlength="40" placeholder="ex.: Edição 2 monitores" value="${veEsc(VED.ativo || '')}" autocomplete="off">` +
             '<small>Guarda a organização dos painéis e as janelas soltas (com o monitor e a posição de cada uma). ' +
-            'O Editor de Vídeo passa a abrir sempre assim.</small>' +
+            'O Editor Kanivete passa a abrir sempre assim.</small>' +
             '<div><button class="ve-btn ve-btn-sm ve-btn-ghost" data-f="cancel">Cancelar</button>' +
             '<button class="ve-btn ve-btn-sm ve-btn-primary" data-f="ok">Salvar</button></div></div>';
         posiciona();

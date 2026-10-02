@@ -474,7 +474,7 @@ async function appSair() {
             if (VE.dirty && !VE.quickEdit) {
                 const r = await appConfirm({
                     titulo: 'Salvar o projeto antes de sair?',
-                    texto: 'Há alterações no editor de vídeo que ainda não foram salvas.',
+                    texto: 'Há alterações no Editor Kanivete que ainda não foram salvas.',
                     botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Não salvar', valor: 'descartar', tipo: 'perigo' }, { rotulo: 'Salvar', valor: 'salvar', tipo: 'primario' }],
                 });
                 if (!r) return;
@@ -505,13 +505,13 @@ async function fecharAba(tool, ev) {
         if (VE.dirty) {
             const r = await appConfirm({
                 titulo: 'Salvar o projeto antes de fechar?',
-                texto: 'Há alterações no editor de vídeo que ainda não foram salvas.',
+                texto: 'Há alterações no Editor Kanivete que ainda não foram salvas.',
                 botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Não salvar', valor: 'descartar', tipo: 'perigo' }, { rotulo: 'Salvar', valor: 'salvar', tipo: 'primario' }],
             });
             if (!r) return;
             if (r === 'salvar' && !(await veSaveProject())) return;
         } else {
-            const r = await appConfirm({ titulo: 'Fechar o editor de vídeo?', texto: 'O projeto aberto será fechado.', botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Fechar', valor: 1, tipo: 'primario' }] });
+            const r = await appConfirm({ titulo: 'Fechar o Editor Kanivete?', texto: 'O projeto aberto será fechado.', botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Fechar', valor: 1, tipo: 'primario' }] });
             if (!r) return;
         }
         veCloseProject();

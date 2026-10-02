@@ -19,7 +19,7 @@ O **Canivete do Pailer** é um app desktop Windows que reúne 15 ferramentas par
 
 | Área | Ferramenta | O que faz |
 |---|---|---|
-| 🎬 Vídeo | **Editor de Vídeo** | Corta, divide e exporta com atalhos estilo Premiere |
+| 🎬 Vídeo | **Editor Kanivete** | Corta, divide e exporta com atalhos estilo Premiere |
 | | **Comprimir Vídeo** | H.265 com GPU (NVIDIA/Intel/AMD); mantém o original se já estiver otimizado |
 | | **Converter Vídeo** | MP4, MOV, MKV, WEBM, AVI, GIF e MP3; troca o formato sem recodificar quando dá |
 | | **Baixar Vídeo** | YouTube, Instagram, TikTok e mais, até 4K (yt-dlp) |
@@ -31,6 +31,7 @@ O **Canivete do Pailer** é um app desktop Windows que reúne 15 ferramentas par
 | | **Geração de Voz** | Clona uma voz por amostra curta e sintetiza textos (OmniVoice) |
 | 🖼️ Imagem | **Converter Imagem** | HEIC, RAW, WEBP, AVIF, PNG, JPG, TIFF (mantém EXIF e perfil de cor) |
 | | **Comprimir Imagem** | Fotos e PDFs mais leves, em paralelo |
+| | **Photo Kanivete** | Editor de imagem estilo Photoshop: camadas, texto editável, abre e salva PSD |
 | | **Remover Fundo** | Recorte com IA (ISNet) e revisão antes de salvar |
 | | **Organizar Imagens** | Duplicadas, thumbs, gráficos e renomeação por contexto (CLIP) |
 | | **Gerar Favicon** | Todos os ícones do site + manifest + código para o `<head>` |

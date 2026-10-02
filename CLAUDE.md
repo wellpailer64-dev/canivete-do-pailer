@@ -4,6 +4,8 @@
 - Nome visível: **KANIVETE** (janela, splash, marca, textos, release). Identificadores internos continuam
   `CaniveteDoPailer` (exe, zip do release, `%APPDATA%\CaniveteDoPailer`, mutex, `CANIVETE_*`): o updater instalado nos
   amigos procura esses nomes; trocar exige uma migração planejada.
+- Nomes visíveis dos editores: **Editor Kanivete** (vídeo) e **Photo Kanivete** (imagem); no código continuam
+  editor de vídeo (`editor*.js`, "Pocket Editor" nos comentários) e editor de imagem (`imagem-*.js`).
 - Projetos: `.vknv` = editor de vídeo (os `.vcnvt` antigos abrem; Ctrl+S grava um `.vknv` ao lado),
   `.iknv` = editor de imagem (zip com documento.json + PNGs; `Functions/editor_imagem.py`). Associação no Windows
   (HKCU) em `Functions/projeto.py`; duplo clique roteado por `abrirProjetoExterno` (frontend/js/app.js).

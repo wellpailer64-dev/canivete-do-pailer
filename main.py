@@ -1260,7 +1260,7 @@ def select_video_file(tool):
         result = None
         try:
             file_types = (
-                "Vídeos, áudios, imagens e projetos (*.mp4;*.mov;*.mxf;*.mkv;*.avi;*.webm;*.flv;*.f4v;*.wmv;*.asf;*.m4v;*.ts;*.mts;*.m2ts;*.3gp;*.mpg;*.mpeg;*.m2v;*.r3d;*.braw;*.ari;*.arx;*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.wma;*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.avif;*.vknv;*.vcnvt)",
+                "Mídia e projetos (*.mp4;*.mov;*.mxf;*.mkv;*.avi;*.webm;*.flv;*.f4v;*.wmv;*.asf;*.m4v;*.ts;*.mts;*.m2ts;*.3gp;*.mpg;*.mpeg;*.m2v;*.r3d;*.braw;*.ari;*.arx;*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus;*.wma;*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.avif;*.vknv;*.vcnvt)",
                 "Projeto de vídeo do KANIVETE (*.vknv;*.vcnvt)",
                 "Todos os arquivos (*.*)",
             )
@@ -2973,9 +2973,14 @@ class ApiBridge:
     def ie_dialogo_abrir(self, multiplos=True):
         if not _window:
             return {"success": False}
-        r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), allow_multiple=bool(multiplos), file_types=(
-            "Projetos, imagens e PSD (*.iknv;*.psd;*.psb;*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.tif;*.tiff)",
-            "Projeto de imagem do KANIVETE (*.iknv)", "Todos os arquivos (*.*)"))
+        # pywebview só aceita letras e espaços na descrição do filtro (vírgula derruba o diálogo)
+        tipos = ("Imagens PSD e projetos (*.iknv;*.psd;*.psb;*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.tif;*.tiff)",
+                 "Projeto de imagem do KANIVETE (*.iknv)", "Todos os arquivos (*.*)")
+        try:
+            r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), allow_multiple=bool(multiplos), file_types=tipos)
+        except ValueError as e:
+            print("[ie_dialogo_abrir] filtro falhou, usando seletor genérico:", e)
+            r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), allow_multiple=bool(multiplos))
         paths = list(r or [])
         return {"success": bool(paths), "paths": paths}
 
@@ -3508,7 +3513,7 @@ def _janela_solta_propria(chrome, sender, args):
 
     adiado = args.GetDeferral()
     form = WinForms.Form()
-    form.Text = "Editor de Vídeo"
+    form.Text = "Editor Kanivete"
     form.BackColor = Color.FromArgb(255, 8, 8, 8)
     try:
         form.Icon = chrome.form.Icon
