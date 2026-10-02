@@ -26,6 +26,11 @@ const IE_ICONES = {
     trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
     mask: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="12" r="4.5"/>',
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    travaTransp: '<rect x="4" y="4" width="16" height="16"/><path d="M4 4h4v4H4zM12 4h4v4h-4zM8 8h4v4H8zM16 8h4v4h-4zM4 12h4v4H4zM12 12h4v4h-4zM8 16h4v4H8zM16 16h4v4h-4z" fill="currentColor" stroke="none"/>',
+    travaPx: '<path d="M9.5 14.5 19 5a2.1 2.1 0 0 1 3 3l-9.5 9.5"/><path d="M7 15c-2 0-3.5 1.5-3.5 3.5 0 1.2-.5 2-1.5 2.5 3 .5 7-.5 7-4 0-1.1-.9-2-2-2z"/>',
+    travaPos: '<path d="M12 2v20M2 12h20M12 2l-3 3M12 2l3 3M12 22l-3-3M12 22l3-3M2 12l3-3M2 12l3 3M22 12l-3-3M22 12l-3 3"/>',
+    slice: '<path d="M4 20 20 4"/><path d="M14 4h6v6"/><path d="M4 14v6h6"/>',
+    raw: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18" opacity=".5"/><circle cx="12" cy="12" r="3.5"/>',
     clip: '<path d="M6 4v9a4 4 0 0 0 4 4h8"/><path d="m15 13 4 4-4 4"/>',
     fx: '<path d="M6 20c2 0 2.5-2 3-5l1.5-8c.5-2.5 1.5-3 3-3M7 10h7M14 12l6 7M20 12l-6 7"/>',
     smart: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M14 4v6h6"/>',
@@ -106,7 +111,7 @@ function ieOpcoesRender(soValores) {
     let h = `<span class="ie-op-ico">${ieIco(f.icone)}</span>`;
     switch (IE.ferr) {
         case 'mover':
-            h += ieChk('Seleção automática', 'auto', 'mover') + ieChk('Mostrar caixa', 'controles', 'mover') +
+            h += ieChk('Seleção automática', 'auto', 'mover') + ieChk('Mostrar controles de transformação', 'controles', 'mover') +
                 `<i class="ie-op-sep"></i><span class="ie-op-dica">${ieT('Alinhar')}</span>` +
                 [['alinE', 'esq'], ['alinCH', 'ch'], ['alinD', 'dir'], ['alinT', 'topo'], ['alinCV', 'cv'], ['alinB', 'base']]
                     .map(([i, a]) => `<button class="ie-ico-btn" onclick="ieAlinhar('${a}')" title="${ieT('Alinhar')}">${ieIco(i)}</button>`).join('') +
@@ -128,6 +133,17 @@ function ieOpcoesRender(soValores) {
             h += `<span class="ie-op-dica">${r ? `${r.w} × ${r.h} px` : ''}</span>` + ieChk('Apagar pixels cortados', 'apagar', 'corte') +
                 `<div class="ie-op-esp"></div><button class="ie-btn ie-btn-mini" onclick="IE_CORTE.ativar(IE.doc)">${ieIco('x')} ${ieT('Desfazer caixa')}</button>
                 <button class="ie-btn ie-btn-mini ie-btn-primario" onclick="ieCorteAplicar()">${ieIco('check')} ${ieT('Cortar')}</button>`;
+            break;
+        }
+        case 'fatia': {
+            const f = ieFatiaSel(doc);
+            h += (f ? `<span class="ie-op-dica">${ieT('Fatia')} ${doc.fatias.indexOf(f) + 1}: ${f.w} × ${f.h} px</span>` : `<span class="ie-op-dica">${ieT('Arraste para criar · clique para escolher · duplo clique: opções')}</span>`) +
+                `<button class="ie-btn ie-btn-mini" onclick="ieCmd('fatiasCamadas')" title="${ieT('Uma fatia do tamanho de cada camada selecionada')}">${ieT('Das camadas')}</button>` +
+                `<button class="ie-btn ie-btn-mini" onclick="ieCmd('fatiaDividir')" ${f ? '' : 'disabled'}>${ieT('Dividir...')}</button>` +
+                `<button class="ie-btn ie-btn-mini" onclick="ieCmd('fatiaOpcoes')" ${f ? '' : 'disabled'}>${ieT('Opções...')}</button>` +
+                `<button class="ie-btn ie-btn-mini" onclick="ieCmd('fatiaExcluir')" ${f ? '' : 'disabled'}>${ieIco('trash')} ${ieT('Excluir')}</button>` +
+                `<button class="ie-btn ie-btn-mini" onclick="ieCmd('fatiasExcluir')" ${doc && doc.fatias.length ? '' : 'disabled'}>${ieT('Excluir todas')}</button>` +
+                `<div class="ie-op-esp"></div><button class="ie-btn ie-btn-mini ie-btn-primario" onclick="ieCmd('exportarFatias')" ${doc && doc.fatias.length ? '' : 'disabled'}>${ieIco('check')} ${ieT('Exportar fatias...')}</button>`;
             break;
         }
         case 'contagotas':
@@ -254,8 +270,8 @@ function ieUiCamadas() {
         <select id="ie-cam-bm" ${L ? '' : 'disabled'} title="${ieT('Modo de mesclagem')}">${opts.map(b => b ? `<option value="${b[0]}" ${b[0] === bm ? 'selected' : ''}>${ieT(b[1])}${b[3] ? ' ≈' : ''}</option>` : '<option disabled>──────</option>').join('')}</select>
         <label class="ie-cam-num">${ieT('Opacidade')} <input type="number" id="ie-cam-op" min="0" max="100" value="${L ? Math.round(L.op * 100) : 100}" ${L ? '' : 'disabled'}>%</label>
         <div class="ie-cam-travas"><span>${ieT('Travar')}</span>
-            ${[['transp', 'Transparência'], ['pixels', 'Pixels'], ['pos', 'Posição'], ['tudo', 'Tudo']].map(([k, r]) =>
-                `<button class="ie-trava ${L && L.travas & IE_TRAVA[k] ? 'on' : ''}" data-trava="${k}" title="${ieT('Travar')} ${ieT(r)}">${k === 'tudo' ? ieIco('lock') : `<span>${ieT(r)[0]}</span>`}</button>`).join('')}
+            ${[['transp', 'pixels transparentes', 'travaTransp'], ['pixels', 'pixels da imagem', 'travaPx'], ['pos', 'posição', 'travaPos'], ['tudo', 'tudo', 'lock']].map(([k, r, ic]) =>
+                `<button class="ie-trava ${L && L.travas & IE_TRAVA[k] ? 'on' : ''}" data-trava="${k}" title="${ieT('Travar')} ${ieT(r)}">${ieIco(ic)}</button>`).join('')}
         </div>
         <label class="ie-cam-num">${ieT('Preench.')} <input type="number" id="ie-cam-fill" min="0" max="100" value="${L && L.tipo !== 'grupo' ? Math.round(L.fill * 100) : 100}" ${L && L.tipo !== 'grupo' ? '' : 'disabled'}>%</label>`;
     // lista: de cima para baixo
@@ -275,8 +291,8 @@ function ieUiCamadas() {
         const miniatura = X.tipo === 'grupo'
             ? `<button class="ie-cam-seta ${X.aberto ? 'aberta' : ''}" data-abrir="${X.id}">${ieIco('chev')}</button>${ieIco('folder', 'ie-cam-pasta')}`
             : X.tipo === 'ajuste' ? `<span class="ie-cam-mini ie-cam-mini-aj ${doc.mascaraAlvo && X.id === doc.ativa ? '' : 'alvo'}" data-alvo="px">${ieIco('adj')}</span>`
-            : `<canvas class="ie-cam-mini ${!(doc.mascaraAlvo && X.id === doc.ativa) ? 'alvo' : ''}" data-alvo="px" data-mini="${X.id}" width="34" height="34"></canvas>`;
-        const masc = X.m ? `<canvas class="ie-cam-mini ie-cam-masc ${X.m.desativada ? 'off' : ''} ${doc.mascaraAlvo && X.id === doc.ativa ? 'alvo' : ''}" data-alvo="m" data-mmini="${X.id}" width="34" height="34" title="${ieT('Máscara (Shift+clique: desativar)')}"></canvas>` : '';
+            : `<canvas class="ie-cam-mini ${!(doc.mascaraAlvo && X.id === doc.ativa) ? 'alvo' : ''}" data-alvo="px" data-mini="${X.id}" width="40" height="40"></canvas>`;
+        const masc = X.m ? `<canvas class="ie-cam-mini ie-cam-masc ${X.m.desativada ? 'off' : ''} ${doc.mascaraAlvo && X.id === doc.ativa ? 'alvo' : ''}" data-alvo="m" data-mmini="${X.id}" width="40" height="40" title="${ieT('Máscara (Shift+clique: desativar)')}"></canvas>` : '';
         return `<div class="ie-cam ${sel.has(X.id) ? 'sel' : ''} ${X.visivel ? '' : 'oculta'} ${X.clip ? 'clip' : ''}" data-id="${X.id}" draggable="true" style="--nivel:${nivel}">
             <button class="ie-cam-olho ${X.visivel ? 'on' : ''}" data-olho="${X.id}" title="${ieT('Mostrar/ocultar (Alt+clique: só esta)')}">${X.visivel ? ieIco('eye') : ''}</button>
             <span class="ie-cam-recuo"></span>${X.clip ? `<span class="ie-cam-clip">${ieIco('clip')}</span>` : ''}
@@ -286,6 +302,7 @@ function ieUiCamadas() {
         </div>`;
     }).join('') || `<div class="ie-vazio">${ieT('Sem camadas')}</div>`;
     rod.innerHTML = `
+        <button class="ie-ico-btn" onclick="ieCmd('estiloCamada')" title="${ieT('Estilo de camada (efeitos)')}">${ieIco('fx')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('mascara')" title="${ieT('Adicionar máscara de camada')}">${ieIco('mask')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('corte')" title="${ieT('Criar/soltar máscara de corte (Alt+Ctrl+G)')}">${ieIco('clip')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('grupoNovo')" title="${ieT('Novo grupo')}">${ieIco('folder')}</button>
@@ -295,30 +312,52 @@ function ieUiCamadas() {
     ieUiProps();
 }
 
+// xadrez miúdo e cinza médio: conteúdo branco e preto aparecem na miniatura
+let ieXadrezMini = null;
+function ieXadrezMiniPadrao(ctx, q) {
+    if (!ieXadrezMini || ieXadrezMini.width !== q * 2) {
+        const c = ieCanvas(q * 2, q * 2), x = ieCtx(c);
+        x.fillStyle = '#a3a3a3'; x.fillRect(0, 0, q * 2, q * 2);
+        x.fillStyle = '#7d7d7d'; x.fillRect(0, 0, q, q); x.fillRect(q, q, q, q);
+        ieXadrezMini = c;
+    }
+    return ctx.createPattern(ieXadrezMini, 'repeat');
+}
+
 function ieMiniatura(cv, L, mascara) {
+    const dpr = window.devicePixelRatio || 1, css = cv.clientWidth || 40;
+    const tam = Math.round(css * dpr);
+    if (cv.width !== tam) { cv.width = tam; cv.height = tam; }
     const x = ieCtx(cv), W = cv.width, H = cv.height, doc = IE.doc;
     x.setTransform(1, 0, 0, 1, 0, 0);
     x.clearRect(0, 0, W, H);
-    const k = Math.min(W / doc.w, H / doc.h), dw = doc.w * k, dh = doc.h * k, ox = (W - dw) / 2, oy = (H - dh) / 2;
-    if (mascara) {
-        x.fillStyle = '#000'; x.fillRect(ox, oy, dw, dh);
-        const m = L.m;
-        const c = ieMascaraRegiao(m, ieRDoc(doc));
-        x.save(); x.beginPath(); x.rect(ox, oy, dw, dh); x.clip();
-        x.imageSmoothingQuality = 'high';
-        x.drawImage(c, ox, oy, dw, dh);
-        x.restore();
+    x.imageSmoothingEnabled = true;
+    x.imageSmoothingQuality = 'high';
+    if (!mascara) {
+        // como o "Limites da camada" do Photoshop: o conteúdo da camada (com efeitos) ocupa a miniatura
+        const r = ieRaster(L) || (L.c ? { c: L.c, x: L.x, y: L.y } : null);
+        x.fillStyle = ieXadrezMiniPadrao(x, Math.max(3, Math.round(4 * dpr)));
+        x.fillRect(0, 0, W, H);
+        if (!r || !r.c) return;
+        const b = ieLimites(r.c, r.x, r.y) || { x: r.x, y: r.y, w: r.c.width, h: r.c.height };
+        const pad = 2 * dpr, k = Math.min((W - 2 * pad) / b.w, (H - 2 * pad) / b.h);
+        const dw = b.w * k, dh = b.h * k, ox = (W - dw) / 2, oy = (H - dh) / 2;
+        // redução em passos (miniatura nítida mesmo de camada grande)
+        let src = r.c, sx = b.x - r.x, sy = b.y - r.y, sw = b.w, sh = b.h;
+        while (dw < sw / 2 && sw > 2 && sh > 2) {
+            const n = ieCanvas(Math.ceil(sw / 2), Math.ceil(sh / 2)), nx = ieCtx(n);
+            nx.imageSmoothingQuality = 'high';
+            nx.drawImage(src, sx, sy, sw, sh, 0, 0, n.width, n.height);
+            src = n; sx = 0; sy = 0; sw = n.width; sh = n.height;
+        }
+        x.drawImage(src, sx, sy, sw, sh, ox, oy, dw, dh);
         return;
     }
-    x.fillStyle = ieXadrezPadrao(x);
-    x.fillRect(ox, oy, dw, dh);
-    const src = L._tfPrev || (L.c ? { c: L.c, x: L.x, y: L.y } : null);
-    if (src && src.c) {
-        x.save(); x.beginPath(); x.rect(ox, oy, dw, dh); x.clip();
-        x.imageSmoothingQuality = 'high';
-        x.drawImage(src.c, ox + src.x * k, oy + src.y * k, src.c.width * k, src.c.height * k);
-        x.restore();
-    }
+    // máscara: o documento inteiro (preto = oculta)
+    const k = Math.min(W / doc.w, H / doc.h), dw = doc.w * k, dh = doc.h * k, ox = (W - dw) / 2, oy = (H - dh) / 2;
+    x.fillStyle = '#000'; x.fillRect(ox, oy, dw, dh);
+    const c = ieMascaraRegiao(L.m, ieRDoc(doc));
+    x.drawImage(c, ox, oy, dw, dh);
 }
 let ieMiniTimer = 0;
 function ieMiniaturas(ja) {
@@ -382,7 +421,9 @@ function ieCamadasInstalar() {
         if (nome && doc) { ieRenomear(+nome.dataset.nome, nome); return; }
         const linha = ev.target.closest('.ie-cam');
         const L = linha && ieAchar(doc, +linha.dataset.id)?.L;
-        if (L && (L.txt || L.texto) && ev.target.closest('[data-alvo]')) { ieEscolherFerr('texto'); ieTextoEditar(L); }
+        if (L && (L.txt || L.texto) && ev.target.closest('[data-alvo]')) { ieEscolherFerr('texto'); ieTextoEditar(L); return; }
+        // duplo clique no resto da linha (ou no fx): Estilo de camada, como no Photoshop
+        if (L && !ev.target.closest('[data-alvo], [data-olho], [data-abrir]')) ieEstiloCamada(L);
     });
     lista.addEventListener('contextmenu', ev => {
         const linha = ev.target.closest('.ie-cam');
@@ -524,11 +565,19 @@ function ieUiProps() {
             <div class="ie-prop-acoes"><button class="ie-btn ie-btn-mini" onclick="ieCmd('tamImagem')">${ieT('Tamanho da imagem...')}</button><button class="ie-btn ie-btn-mini" onclick="ieCmd('tamTela')">${ieT('Tamanho da tela...')}</button></div>`;
         return;
     }
-    const R = L.tipo === 'grupo' || L.tipo === 'ajuste' ? null : (L.c ? ieRPlano(L) : null);
+    const R = L.tipo === 'ajuste' ? null : ieCaixaCamada(L);
     let h = `<div class="ie-prop-tit">${ieT(IE_NOME_TIPO[L.tipo] || 'Camada')}${doc.mascaraAlvo && L.m ? ' · ' + ieT('Máscara') : ''}</div>`;
-    if (R) h += `<div class="ie-prop-grade ie-prop-pos">
-        <label>X <input type="number" data-pp="x" value="${R.x}"></label><label>Y <input type="number" data-pp="y" value="${R.y}"></label>
-        <span>L ${R.w}</span><span>A ${R.h}</span></div>`;
+    // Transformar (como o "Alinhar e transformar" do editor de vídeo): posição e tamanho dos pixels, sem os efeitos
+    if (R) h += `<div class="ie-prop-sub2">${ieT('Transformar')}</div><div class="ie-prop-grade ie-prop-pos">
+        <label>X <input type="number" data-pp="x" value="${Math.round(R.x)}"></label><label>Y <input type="number" data-pp="y" value="${Math.round(R.y)}"></label>
+        <label>L <input type="number" data-pp="w" min="1" value="${Math.round(R.w)}"></label><label>A <input type="number" data-pp="h" min="1" value="${Math.round(R.h)}"></label></div>
+        <div class="ie-prop-acoes">
+            <button class="ie-btn ie-btn-mini ${IE.propElo === false ? '' : 'on'}" data-ppelo title="${ieT('Manter a proporção de L e A')}">⛓ ${ieT('Proporção')}</button>
+            <button class="ie-btn ie-btn-mini" onclick="ieCmd('fh')" title="${ieT('Inverter horizontal')}">⇋</button>
+            <button class="ie-btn ie-btn-mini" onclick="ieCmd('fv')" title="${ieT('Inverter vertical')}">⇵</button>
+            <button class="ie-btn ie-btn-mini" onclick="ieCmd('g90a')" title="${ieT('Girar 90° anti-horário')}">⟲</button>
+            <button class="ie-btn ie-btn-mini" onclick="ieCmd('g90h')" title="${ieT('Girar 90° horário')}">⟳</button>
+            <button class="ie-btn ie-btn-mini" onclick="ieCmd('transformar')" title="Ctrl+T">${ieT('Transformação livre')}</button></div>`;
     if (doc.mascaraAlvo && L.m) {
         h += `<div class="ie-prop-acoes">
             <button class="ie-btn ie-btn-mini" onclick="ieCmd('mascaraInverter')">${ieT('Inverter')}</button>
@@ -537,13 +586,16 @@ function ieUiProps() {
             <button class="ie-btn ie-btn-mini" onclick="ieCmd('mascaraExcluir')">${ieT('Excluir')}</button></div>`;
     }
     if (L.tipo === 'texto') {
-        const t = L.txt, tx = L.texto;
+        if (!L.txt && L.texto && !L._lendoTxt && !L._txtPsd) {   // texto do PSD: lê o estilo (fonte de verdade) para mostrar aqui
+            L._lendoTxt = true;
+            ieTextoDoPsd(L).then(t => { L._lendoTxt = false; L._txtPsd = t; if (ieAtiva() === L) ieUiProps(); });
+        }
+        const t = L.txt || L._txtPsd, tx = L.texto;
         const run = tx && tx.runs ? tx.runs[0] : null;
-        h += `<div class="ie-prop-grade">
-            <span>${ieT('Fonte')}</span><b>${ieEsc(t ? `${t.fam} ${t.estilo || ''}` : run ? run.fonte : '')}</b>
-            <span>${ieT('Tamanho')}</span><b>${t ? +t.tam.toFixed(1) : run ? +run.tam.toFixed(1) : ''} px</b></div>
+        h += ieTextoPropsHtml(t, run) + `
             <textarea class="ie-prop-texto" id="ie-prop-texto" rows="3">${ieEsc(t ? t.s : tx ? tx.texto : '')}</textarea>
-            <div class="ie-prop-acoes"><button class="ie-btn ie-btn-mini" onclick="ieEscolherFerr('texto'); ieTextoEditar(ieAtiva())">${ieT('Editar na tela')}</button></div>`;
+            <div class="ie-prop-acoes"><button class="ie-btn ie-btn-mini" onclick="ieEscolherFerr('texto'); ieTextoEditar(ieAtiva())">${ieT('Editar na tela')}</button>
+            <button class="ie-btn ie-btn-mini" onclick="ieCmd('rasterizar')">${ieT('Rasterizar texto')}</button></div>`;
     }
     if (L.tipo === 'ajuste') {
         const a = L.ajuste;
@@ -559,12 +611,26 @@ function ieUiProps() {
         const nomes = [['sombra', 'Sombra projetada'], ['brilho', 'Brilho externo'], ['contorno', 'Traçado'], ['sobreposicao', 'Sobreposição de cor']].filter(([k]) => L.fx[k]);
         h += `<div class="ie-prop-tit ie-prop-sub">${ieT('Efeitos')}</div>
             <label class="ie-op-chk"><input type="checkbox" id="ie-prop-fx" ${L.fxOculto ? '' : 'checked'}> ${ieT('Mostrar efeitos')}</label>
+            <div class="ie-prop-acoes"><button class="ie-btn ie-btn-mini" onclick="ieEstiloCamada()">fx ${ieT('Editar efeitos...')}</button></div>
             <ul class="ie-prop-lista">${nomes.map(([, n]) => `<li>${ieT(n)}</li>`).join('')}${(L.fx.outros || []).map(n => `<li class="ie-aviso">${ieEsc(n)} (${ieT('não exibido')})</li>`).join('')}</ul>`;
     }
+    if (L.tipo !== 'grupo' && L.tipo !== 'ajuste' && !(L.fx && ieTemFx(L.fx)))
+        h += `<div class="ie-prop-acoes"><button class="ie-btn ie-btn-mini" onclick="ieEstiloCamada()">fx ${ieT('Adicionar efeito...')}</button></div>`;
     box.innerHTML = h;
+    box.querySelector('[data-ppelo]')?.addEventListener('click', () => { IE.propElo = IE.propElo === false; ieUiProps(); });
+    ieTextoPropsInstalar(box);
     box.querySelectorAll('input[data-pp]').forEach(inp => inp.addEventListener('change', () => {
-        const v = Math.round(+inp.value || 0), R2 = ieRPlano(L);
+        const v = Math.round(+inp.value || 0), R2 = ieCaixaCamada(L);
         if (!R2) return;
+        if (inp.dataset.pp === 'w' || inp.dataset.pp === 'h') {
+            // tamanho: escala a partir do canto de cima à esquerda (Transformação livre aplicada na hora)
+            if (v < 1) { ieUiProps(); return; }
+            let sx = inp.dataset.pp === 'w' ? v / R2.w : 1, sy = inp.dataset.pp === 'h' ? v / R2.h : 1;
+            if (IE.propElo !== false) { if (inp.dataset.pp === 'w') sy = sx; else sx = sy; }
+            ieTransfIniciar([sx, 0, 0, sy, R2.x - sx * R2.x, R2.y - sy * R2.y]);
+            setTimeout(ieUiProps, 0);
+            return;
+        }
         const dx = inp.dataset.pp === 'x' ? v - R2.x : 0, dy = inp.dataset.pp === 'y' ? v - R2.y : 0;
         const Ra = ieRCamada(L);
         ieMoverCamada(L, dx, dy);
@@ -574,7 +640,7 @@ function ieUiProps() {
     }));
     box.querySelectorAll('input, textarea').forEach(i => i.addEventListener('keydown', ev => ev.stopPropagation()));
     const fxc = ieEl('ie-prop-fx');
-    if (fxc) fxc.addEventListener('change', () => { L.fxOculto = !fxc.checked; ieCamadaMudou(L, ieRCamada(L)); });
+    if (fxc) fxc.addEventListener('change', () => { L.fxOculto = !fxc.checked; L.fxMudou = true; ieCamadaMudou(L, ieRCamada(L)); ieHist(ieT(L.fxOculto ? 'Ocultar efeitos' : 'Mostrar efeitos')); });
     const ta = ieEl('ie-prop-texto');
     if (ta) ta.addEventListener('change', async () => {
         if (!L.txt) { L.txt = await ieTextoDoPsd(L); if (!L.txt) return; }
@@ -587,9 +653,9 @@ function ieUiProps() {
     });
 }
 function ieUiPropsPos() {
-    const doc = IE.doc, L = ieAtiva(doc);
-    if (!L || !L.c) return;
-    document.querySelectorAll('#ie-props input[data-pp]').forEach(i => { if (document.activeElement !== i) i.value = i.dataset.pp === 'x' ? L.x : L.y; });
+    const doc = IE.doc, L = ieAtiva(doc), R = L && ieCaixaCamada(L);
+    if (!R) return;
+    document.querySelectorAll('#ie-props input[data-pp]').forEach(i => { if (document.activeElement !== i) i.value = Math.round(R[i.dataset.pp]); });
 }
 
 // ─────────────────────────── histórico ───────────────────────────
@@ -734,12 +800,13 @@ function ieSeletorCor(ancora, inicial, aoMudar) {
 
 // ─────────────────────────── diálogos ───────────────────────────
 // campos: [{id, rotulo, tipo: 'faixa'(padrão)|'numero'|'check'|'select'|'cor'|'texto'|'curva', min, max, passo, valor, opcoes}]
-function ieDialogo({ titulo, campos, previa, ok = 'OK', largura }) {
+function ieDialogo({ titulo, campos, previa, ok = 'OK', largura, lado }) {
     return new Promise(resolve => {
         const box = ieEl('ie-modal');
-        const vals = Object.fromEntries(campos.map(c => [c.id, c.valor]));
+        const vals = Object.fromEntries(campos.filter(c => c.tipo !== 'titulo').map(c => [c.id, c.valor]));
         const campoHtml = c => {
             const t = c.tipo || 'faixa';
+            if (t === 'titulo') return `<div class="ie-dlg-tit">${ieT(c.rotulo)}</div>`;
             if (t === 'check') return `<label class="ie-dlg-chk"><input type="checkbox" data-id="${c.id}" ${c.valor ? 'checked' : ''}> ${ieT(c.rotulo)}</label>`;
             if (t === 'select') return `<label class="ie-dlg-lin"><span>${ieT(c.rotulo)}</span><select data-id="${c.id}">${c.opcoes.map(([v, r]) => `<option value="${v}" ${v === c.valor ? 'selected' : ''}>${ieT(r)}</option>`).join('')}</select></label>`;
             if (t === 'cor') return `<label class="ie-dlg-lin"><span>${ieT(c.rotulo)}</span><button class="ie-cor ie-dlg-cor" data-id="${c.id}" style="background:${c.valor}"></button></label>`;
@@ -749,15 +816,16 @@ function ieDialogo({ titulo, campos, previa, ok = 'OK', largura }) {
             return `<label class="ie-dlg-faixa"><span>${ieT(c.rotulo)}</span><input type="range" data-id="${c.id}" min="${c.min}" max="${c.max}" step="${c.passo || 1}" value="${c.valor}">
                 <input type="number" data-num="${c.id}" min="${c.min}" max="${c.max}" step="${c.passo || 1}" value="${c.valor}"></label>`;
         };
+        box.classList.toggle('lado', !!lado);   // painel na lateral (a imagem fica à vista, como no Camera Raw)
         box.innerHTML = `<div class="ie-dlg" style="${largura ? `width:${largura}px` : ''}"><h3>${ieT(titulo)}</h3><div class="ie-dlg-corpo">${campos.map(campoHtml).join('')}</div>
             <div class="ie-dlg-rod">${previa ? `<label class="ie-dlg-chk"><input type="checkbox" class="ie-dlg-previa" checked> ${ieT('Visualizar')}</label>` : ''}<div class="ie-op-esp"></div>
             <button class="ie-btn" data-r="0">${ieT('Cancelar')}</button><button class="ie-btn ie-btn-primario" data-r="1">${ieT(ok)}</button></div></div>`;
         box.hidden = false;
         let tm = 0;
         const atualizar = () => {
-            if (!previa) return;
+            if (!previa || tm === -1) return;   // fechado: prévia atrasada não desfaz o OK
             clearTimeout(tm);
-            tm = setTimeout(() => { if (box.querySelector('.ie-dlg-previa')?.checked) previa({ ...vals }); else previa(null); }, 60);
+            tm = setTimeout(() => { if (tm === -1) return; if (box.querySelector('.ie-dlg-previa')?.checked) previa({ ...vals }); else previa(null); }, 60);
         };
         box.querySelectorAll('[data-id]').forEach(el => {
             const id = el.dataset.id, c = campos.find(x => x.id === id);
@@ -773,7 +841,7 @@ function ieDialogo({ titulo, campos, previa, ok = 'OK', largura }) {
             const r = box.querySelector(`[data-id="${el.dataset.num}"]`); r.value = el.value; vals[el.dataset.num] = parseFloat(el.value) || 0; atualizar();
         }));
         box.querySelector('.ie-dlg-previa')?.addEventListener('change', atualizar);
-        const fim = v => { box.hidden = true; box.innerHTML = ''; document.removeEventListener('keydown', tecla, true); resolve(v); };
+        const fim = v => { clearTimeout(tm); tm = -1; box.hidden = true; box.innerHTML = ''; box.classList.remove('lado'); document.removeEventListener('keydown', tecla, true); resolve(v); };
         const tecla = ev => {
             if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); fim(null); }
             if (ev.key === 'Enter' && ev.target.tagName !== 'TEXTAREA') { ev.preventDefault(); ev.stopPropagation(); fim({ ...vals }); }
@@ -830,7 +898,7 @@ function ieCurvaEditor(cv, pts, aoMudar) {
 // [rótulo, comando, atalho] | '-' | [rótulo, [submenu]]
 const IE_MENUS = [
     ['Arquivo', [['Novo...', 'novo', 'Ctrl+N'], ['Abrir...', 'abrir', 'Ctrl+O'], ['Colocar imagem...', 'colocar', 'Shift+Ctrl+P'], '-',
-        ['Salvar', 'salvar', 'Ctrl+S'], ['Salvar como...', 'salvarComo', 'Shift+Ctrl+S'], ['Exportar como...', 'exportar', 'Alt+Shift+Ctrl+W'], '-',
+        ['Salvar', 'salvar', 'Ctrl+S'], ['Salvar como...', 'salvarComo', 'Shift+Ctrl+S'], ['Exportar como...', 'exportar', 'Alt+Shift+Ctrl+W'], ['Exportar fatias...', 'exportarFatias'], '-',
         ['Fechar', 'fechar', 'Ctrl+W']]],
     ['Editar', [['Desfazer', 'desfazer', 'Ctrl+Z'], ['Refazer', 'refazer', 'Shift+Ctrl+Z'], '-',
         ['Recortar', 'recortar', 'Ctrl+X'], ['Copiar', 'copiar', 'Ctrl+C'], ['Copiar mesclado', 'copiarMesclado', 'Shift+Ctrl+C'], ['Colar', 'colar', 'Ctrl+V'],
@@ -855,9 +923,9 @@ const IE_MENUS = [
         ['Mesclar para baixo', 'mesclarBaixo', 'Ctrl+E'], ['Mesclar visíveis', 'mesclarVisiveis', 'Shift+Ctrl+E'], ['Achatar imagem', 'achatar']]],
     ['Selecionar', [['Tudo', 'selTudo', 'Ctrl+A'], ['Desmarcar', 'selNada', 'Ctrl+D'], ['Inverter', 'selInverter', 'Shift+Ctrl+I'], '-',
         ['Pixels da camada', 'selCamada'], ['Modificar', [['Expandir...', 'selExpandir'], ['Contrair...', 'selContrair'], ['Suavizar...', 'selSuavizar', 'Shift+F6']]]]],
-    ['Filtro', [['Desfoque gaussiano...', 'f:gaussiano'], ['Desfoque de movimento...', 'f:movimento'], ['Máscara de nitidez...', 'f:nitidez'], ['Adicionar ruído...', 'f:ruido'], ['Mosaico...', 'f:mosaico']]],
+    ['Filtro', [['Filtro Camera Raw...', 'f:cameraRaw', 'Shift+Ctrl+A'], '-', ['Desfoque gaussiano...', 'f:gaussiano'], ['Desfoque de movimento...', 'f:movimento'], ['Máscara de nitidez...', 'f:nitidez'], ['Adicionar ruído...', 'f:ruido'], ['Mosaico...', 'f:mosaico']]],
     ['Exibir', [['Aproximar', 'zoomMais', 'Ctrl++'], ['Afastar', 'zoomMenos', 'Ctrl+-'], ['Ajustar à tela', 'zoomAjustar', 'Ctrl+0'], ['100%', 'zoom100', 'Ctrl+1'], '-',
-        ['Comparar com a imagem salva no PSD', 'verAchatado'], ['Avisos da abertura', 'avisos']]],
+        ['Fatias', 'verFatias'], ['Comparar com a imagem salva no PSD', 'verAchatado'], ['Avisos da abertura', 'avisos']]],
 ];
 
 function ieMenusRender() {
@@ -930,7 +998,7 @@ const IE_ATALHOS = {
     'Shift+Ctrl+]': 'frente', 'Ctrl+]': 'avancar', 'Ctrl+[': 'recuar', 'Shift+Ctrl+[': 'tras', 'Ctrl+E': 'mesclarBaixo', 'Shift+Ctrl+E': 'mesclarVisiveis',
     'Ctrl+A': 'selTudo', 'Ctrl+D': 'selNada', 'Shift+Ctrl+I': 'selInverter', 'Shift+F6': 'selSuavizar',
     'Ctrl+=': 'zoomMais', 'Ctrl++': 'zoomMais', 'Ctrl+-': 'zoomMenos', 'Ctrl+0': 'zoomAjustar', 'Ctrl+1': 'zoom100', 'Alt+Ctrl+0': 'zoom100',
-    'Alt+[': 'camAbaixo', 'Alt+]': 'camAcima',
+    'Shift+Ctrl+A': 'f:cameraRaw', 'Alt+[': 'camAbaixo', 'Alt+]': 'camAcima',
 };
 
 function ieTeclaNome(ev) {
@@ -976,8 +1044,10 @@ function ieTecla(ev) {
         if (IE.transf) { ev.preventDefault(); ieTransfCancelar(); return; }
         if (IE.laco) { IE.laco = null; ieDesenharSobre(); return; }
         if (IE.ferr === 'corte') { IE_CORTE.ativar(doc); return; }
+        if (IE.ferr === 'fatia' && doc && doc.fatiaSel != null) { doc.fatiaSel = null; ieDesenharSobre(); ieOpcoesRender(); return; }
         return;
     }
+    if ((ev.key === 'Delete' || ev.key === 'Backspace') && IE.ferr === 'fatia' && doc && ieFatiaSel(doc) && !ev.ctrlKey && !ev.altKey) { ev.preventDefault(); ieFatiaExcluir(doc); return; }
     if (ev.key === 'Backspace' && IE.laco && IE.laco.poli) { ev.preventDefault(); IE.laco.pts.pop(); ieDesenharSobre(); return; }
     const cmd = IE_ATALHOS[nome];
     if (cmd) { ev.preventDefault(); ev.stopPropagation(); ieCmd(cmd); return; }
@@ -1014,6 +1084,7 @@ function ieTecla(ev) {
                 if (k === 'L') { IE.op.laco.modo = IE.op.laco.modo === 'livre' ? 'poligonal' : 'livre'; ieEscolherFerr('laco'); return; }
                 if (k === 'U') { const t = ['ret', 'eli', 'linha']; IE.op.forma.tipo = t[(t.indexOf(IE.op.forma.tipo) + 1) % 3]; ieEscolherFerr('forma'); return; }
                 if (k === 'G') { ieEscolherFerr(IE.ferr === 'degrade' ? 'balde' : 'degrade'); return; }
+                if (k === 'C') { ieEscolherFerr(IE.ferr === 'corte' ? 'fatia' : 'corte'); return; }
             }
             ieEscolherFerr(alvo.includes(IE.ferr) ? IE.ferr : alvo[0]);
             return;
@@ -1051,6 +1122,7 @@ function ieCmdPode(c) {
     if (c === 'mesclarBaixo') { const a = L && ieAchar(doc, L.id); return !!(a && a.i > 0); }
     if (c.startsWith('mascara') && c !== 'mascara' && c !== 'mascaraOcultar' && !c.startsWith('mascaraSel')) return !!(L && L.m);
     if (c === 'verAchatado') return !!doc.achatado;
+    if (c === 'exportarFatias' || c === 'fatiasExcluir') return !!(doc.fatias && doc.fatias.length);
     if (c === 'cortarSel' || c === 'selExpandir' || c === 'selContrair' || c === 'selSuavizar' || c === 'mascaraSel' || c === 'mascaraSelOcultar' || c === 'selNada' || c === 'selInverter') return !!doc.sel;
     if (c === 'rasterizar') return !!(L && ieRaster0(L) && L.tipo !== 'pixel');
     return true;

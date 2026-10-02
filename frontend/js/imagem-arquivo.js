@@ -63,6 +63,8 @@ async function ieAbrirArquivo(path) {
         const r = await api.ie_abrir(path);
         if (!r || !r.success) { ieToast(`${ieT('Não abriu')}: ${(r && r.error) || ''}`); return null; }
         const doc = ieNovoDoc({ nome: r.nome, w: r.w, h: r.h, dpi: r.dpi, path, psdPath: r.psd ? path : null, pyId: r.doc, bits: r.bits, modo: r.modo, avisos: r.avisos || [] });
+        doc.fatias = (r.fatias || []).map(f => ({ ...f, id: ++doc.seqFatia }));
+        doc.fatiasOrig = JSON.stringify(ieFatiasSpec(doc));
         doc.psb = !!r.psb;
         const pend = [];
         const montar = (nos) => nos.map(no => {
@@ -272,6 +274,8 @@ async function ieSalvar(comoNovo = false) {
         const no = L => {
             const s = { uid: L.uid, ref: ida ? L.ref : null, tipo: L.tipo, nome: L.nome, visivel: L.visivel, op: L.op, fill: L.fill, bm: L.bm, clip: !!L.clip, aberto: L.aberto !== false };
             if (L.tipo === 'grupo') s.filhos = L.filhos.map(no);
+            // efeitos: só vão quando mudaram no editor (ou camada nova); o Python troca só os 4 que o editor conhece
+            else if (L.fxMudou || ((!ida || L.ref == null) && L.fx && ieTemFx(L.fx))) { s.fx = L.fx || {}; s.fx_oculto = !!L.fxOculto; }
             if (ieRaster0(L)) {
                 const novo = !ida || L.ref == null || L.sujoPx || L.rasterizar;
                 if (L.c) {
@@ -309,7 +313,8 @@ async function ieSalvar(comoNovo = false) {
             ieCarregando(null, 5 + feitos / envios.length * 70);
         });
         ieCarregando(`${ieT('Gravando o PSD')}...`, 80);
-        const spec = { doc: doc.pyId, sessao: ini.sessao, destino, w: doc.w, h: doc.h, camadas, composto: 'composto.png', ida_e_volta: ida };
+        const spec = { doc: doc.pyId, sessao: ini.sessao, destino, w: doc.w, h: doc.h, camadas, composto: 'composto.png', ida_e_volta: ida,
+            fatias: ieFatiasSpec(doc), fatias_mudou: JSON.stringify(ieFatiasSpec(doc)) !== doc.fatiasOrig };
         const r = await api.ie_salvar(spec);
         if (!r || !r.success) { ieToast(`${ieT('Não salvou')}: ${(r && r.error) || ''}`); return false; }
         // o arquivo salvo vira a origem
@@ -318,12 +323,13 @@ async function ieSalvar(comoNovo = false) {
         doc.nome = ieNomeArq(destino).replace(/\.(psd|psb)$/i, '');
         iePercorrer(doc.camadas, L => {
             if (r.refs && r.refs[L.uid] !== undefined && r.refs[L.uid] !== null) L.ref = r.refs[L.uid];
-            L.sujoPx = false; L.sujoM = false; L.rasterizar = false; L.movido = false;
+            L.sujoPx = false; L.sujoM = false; L.rasterizar = false; L.movido = false; L.fxMudou = false;
             if (L.tf) L.tfBase = [...L.tf];
             if (L.textoNovo != null && L.texto) { L.texto.texto = L.textoNovo; }
             L.textoNovo = null;
         });
         doc.achatadoC = ieClonar(doc.comp); doc.achatado = true;
+        doc.fatiasOrig = JSON.stringify(ieFatiasSpec(doc));
         doc.sujo = false;
         ieAbasRender();
         ieRecentesAdd(destino);
@@ -500,6 +506,7 @@ function ieTransformarTudo(doc, M, w, h) {
         ieInvalidar(L);
     });
     doc.w = w; doc.h = h;
+    ieFatiasTransformar?.(doc, M);
     doc.comp = ieCanvas(w, h);
     doc.sel = null;
     ieAjustarVista(doc);
@@ -551,13 +558,13 @@ function ieAlinhar(a) {
     if (!doc) return;
     const sel = ieSelecionadas(doc);
     if (!sel.length) return;
-    const caixa = L => ieRCamada(L);
+    const caixa = L => ieCaixaCamada(L);
     const ref = sel.length > 1 ? sel.reduce((R, L) => ieRUniao(R, caixa(L)), null) : (doc.sel ? doc.sel.bbox : ieRDoc(doc));
     let R0 = null;
     for (const L of sel) {
         const b = caixa(L);
         if (!b) continue;
-        R0 = ieRUniao(R0, b);
+        R0 = ieRUniao(R0, ieRCamada(L));
         let dx = 0, dy = 0;
         if (a === 'esq') dx = ref.x - b.x; if (a === 'dir') dx = ref.x + ref.w - (b.x + b.w); if (a === 'ch') dx = Math.round(ref.x + ref.w / 2 - (b.x + b.w / 2));
         if (a === 'topo') dy = ref.y - b.y; if (a === 'base') dy = ref.y + ref.h - (b.y + b.h); if (a === 'cv') dy = Math.round(ref.y + ref.h / 2 - (b.y + b.h / 2));
@@ -566,8 +573,9 @@ function ieAlinhar(a) {
         add(L);
         alvos.forEach(X => { ieMoverCamada(X, dx, dy); X.movido = true; });
     }
-    ieAgendar(ieRUniao(R0, sel.reduce((R, L) => ieRUniao(R, caixa(L)), null)), doc);
+    ieAgendar(ieRUniao(R0, sel.reduce((R, L) => ieRUniao(R, ieRCamada(L)), null)), doc);
     ieHist(ieT('Alinhar'));
+    ieDesenharSobre();
 }
 
 const IE_CMDS = {
@@ -843,6 +851,7 @@ function ieIniciar() {
     ieOpcoesInstalar();
     ieOpcoesRender();
     ieCamadasInstalar();
+    ieDockInstalar?.();
     ieUiCamadas();
     ieHistRender();
     ieAbasRender();

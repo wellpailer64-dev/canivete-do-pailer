@@ -370,9 +370,58 @@ function ieDuplicarCamada(doc, L) {
     return N;
 }
 
+// caixa dos pixels das camadas selecionadas (a mesma que a Transformação livre usa), guardada até mudarem
+// caixa dos pixels de uma camada, sem os efeitos (como o Photoshop alinha e mostra os controles)
+function ieCaixaCamada(L) {
+    if (!L) return null;
+    if (L.tipo === 'grupo') { let R = null; L.filhos.forEach(X => { if (X.visivel) R = ieRUniao(R, ieCaixaCamada(X)); }); return R; }
+    if (!ieRaster0(L) || !L.c) return null;
+    if (L._caixa && L._caixa.v === L._v && L._caixa.c === L.c) {   // só andou: desloca a caixa guardada
+        const k = L._caixa, R = k.R;
+        return R && { x: R.x + L.x - k.x, y: R.y + L.y - k.y, w: R.w, h: R.h };
+    }
+    const b = L.c0 ? { x: L.x, y: L.y, w: L.c.width, h: L.c.height } : ieLimites(L.c, L.x, L.y);
+    L._caixa = { v: L._v, c: L.c, x: L.x, y: L.y, R: b };
+    return b;
+}
+function ieCaixaAlvos(doc) {
+    return ieSelecionadas(doc).reduce((R, L) => ieRUniao(R, ieCaixaCamada(L)), null);
+}
+// alça da caixa de controles da ferramenta Mover (Mostrar controles de transformação); fora dos cantos = girar
+function ieMoverAlca(doc, p) {
+    if (!IE.op.mover.controles || IE.transf) return null;
+    const R = ieCaixaAlvos(doc);
+    if (!R) return null;
+    const h = ieAlcaRet(R, p, doc);
+    if (h && h !== 'dentro') return h;
+    if (h === 'dentro') return null;
+    const tol = 7 / doc.zoom;
+    const cantos = [[R.x, R.y], [R.x + R.w, R.y], [R.x, R.y + R.h], [R.x + R.w, R.y + R.h]];
+    if (cantos.some(([x, y]) => Math.hypot(p.x - x, p.y - y) <= tol * 3.5)) return 'girar';
+    return null;
+}
+
 const IE_MOVER = {
-    nome: 'Mover', tecla: 'V', icone: 'pointer', cursor: 'default',
+    nome: 'Mover', tecla: 'V', icone: 'pointer',
+    cursor() {
+        const doc = IE.doc;
+        const h = doc && IE.mouse && !IE.mov ? ieMoverAlca(doc, IE.mouse) : null;
+        if (!h) return 'default';
+        if (h === 'girar') return 'alias';
+        return ['tl', 'br'].includes(h) ? 'nwse-resize' : ['tr', 'bl'].includes(h) ? 'nesw-resize' : ['t', 'b'].includes(h) ? 'ns-resize' : 'ew-resize';
+    },
     down(p, ev, doc) {
+        // alça da caixa: entra na Transformação livre já arrastando (Enter aplica, Esc cancela)
+        const alca = ieMoverAlca(doc, p);
+        if (alca) {
+            ieTransfIniciar();
+            if (IE.transf) {
+                const t = IE.transf;
+                t.arr = { h: alca, p0: p, s: { cx: t.cx, cy: t.cy, sx: t.sx, sy: t.sy, rot: t.rot } };
+                IE.mov = { transf: true };
+                return;
+            }
+        }
         const auto = IE.op.mover.auto !== ev.ctrlKey;
         if (auto) {
             const L = ieCamadaNoPonto(doc, p.x, p.y);
@@ -409,6 +458,7 @@ const IE_MOVER = {
     move(p, ev, doc) {
         const m = IE.mov;
         if (!m) return;
+        if (m.transf) { IE_TRANSF.move(p, ev, doc); return; }
         let dx = Math.round(p.x - m.p0.x), dy = Math.round(p.y - m.p0.y);
         if (ev.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
         const ddx = dx - m.dx, ddy = dy - m.dy;
@@ -437,6 +487,7 @@ const IE_MOVER = {
         const m = IE.mov;
         IE.mov = null;
         if (!m) return;
+        if (m.transf) { IE_TRANSF.up(p, ev, doc); return; }
         if (m.flut) {
             doc._selDx = doc._selDy = 0;
             if (m.dx || m.dy) {
@@ -455,15 +506,16 @@ const IE_MOVER = {
         }
     },
     sobre(ctx, doc) {
-        if (!IE.op.mover.controles || IE.transf) return;
-        const R = ieSelecionadas(doc).reduce((R, X) => ieRUniao(R, ieRCamada(X)), null);
+        if (!IE.op.mover.controles || IE.transf || IE.mov) return;
+        const R = ieCaixaAlvos(doc);
         if (!R) return;
-        const a = ieDocTela(R.x, R.y, doc);
+        const a = ieDocTela(R.x, R.y, doc), w = R.w * doc.zoom, h = R.h * doc.zoom;
         ctx.save();
         ctx.strokeStyle = '#4aa3ff';
         ctx.lineWidth = 1;
-        ctx.strokeRect(Math.round(a.x) + 0.5, Math.round(a.y) + 0.5, Math.round(R.w * doc.zoom), Math.round(R.h * doc.zoom));
+        ctx.strokeRect(Math.round(a.x) + 0.5, Math.round(a.y) + 0.5, Math.round(w), Math.round(h));
         ctx.restore();
+        ieAlcasDesenhar(ctx, [[a.x, a.y], [a.x + w / 2, a.y], [a.x + w, a.y], [a.x + w, a.y + h / 2], [a.x + w, a.y + h], [a.x + w / 2, a.y + h], [a.x, a.y + h], [a.x, a.y + h / 2]]);
     },
 };
 
@@ -857,6 +909,7 @@ function ieRedimTela(doc, x, y, w, h, apagar) {
         L.movido = true;
     });
     doc.w = Math.round(w); doc.h = Math.round(h);
+    ieFatiasTransformar?.(doc, [1, 0, 0, 1, -x, -y]);
     doc.comp = ieCanvas(doc.w, doc.h);
     doc.sel = null;
     doc.telaMudou = true;

@@ -11,8 +11,26 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 - `frontend/js/imagem-texto.js` — camada de texto (edição na tela) e texto do PSD editável.
 - `frontend/js/imagem-paineis.js` — menus, barra de opções, painéis Camadas/Propriedades/Histórico, cor, atalhos.
 - `frontend/js/imagem-arquivo.js` — abrir, salvar, exportar, comandos dos menus, área de transferência.
+- `frontend/js/imagem-fatias.js` — ferramenta Fatia (C / Shift+C): criar, mover/redimensionar, dividir, das camadas,
+  opções (nome/URL/alt), Arquivo > Exportar fatias; lidas e gravadas no PSD (recurso de fatias, versão 6).
+- `frontend/js/imagem-dock.js` — painéis móveis: arrastar o título para a outra coluna, entre painéis ou solto
+  sobre a imagem; duplo clique recolhe; divisórias e bordas mudam o tamanho; menu Janela (layout em localStorage).
+- `frontend/js/imagem-estilo.js` — Estilo de camada (Sombra projetada, Brilho externo, Traçado, Sobreposição de cor)
+  com prévia; duplo clique na linha da camada, botão fx do painel ou Camada > Estilo de camada.
 - `frontend/css/imagem.css`, `Functions/editor_imagem.py`, `main.py` (métodos `ie_*`), `Functions/media_server.py`
   (servir bytes da memória e receber POST).
+
+## Reaproveitado do editor de vídeo
+- Filtro > Filtro Camera Raw (Shift+Ctrl+A): a conta do Luz e Cor (`veLcBuildLut`, editor-lc.js) vira LUT 3D aplicada
+  na camada (trilinear), mais nitidez na luma e vinheta; painel na lateral com a imagem à vista.
+- Painel Propriedades: Transformar (X/Y/L/A com proporção, inverter, girar) e Caractere (seletor de fonte com prévia,
+  estilo, tamanho, VA, entrelinha, cor, alinhamento, negrito/itálico falso, maiúsculas).
+
+## Texto de verdade
+- A fonte de cada estilo é carregada do arquivo instalado (`FontFace` com `local()` + arquivo servido por
+  `ie_fonte_url`): o nome GDI (cortado em 31 letras) não batia com o CSS e o texto caía numa fonte qualquer.
+- Editando, o texto é desenhado na tela com a fonte, a cor e os efeitos da camada; a caixa por cima é transparente
+  (só cursor e seleção). Sem mudança, volta aos pixels do Photoshop.
 
 ## Abrir e salvar
 - As camadas vêm do Python como PNG **servido da memória** (nada em disco); a página libera com `ie_liberar`.
@@ -22,10 +40,17 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   estilo do começo: fonte, tamanho, cor, espaçamento, entrelinha, alinhamento). Pintar troca só os pixels.
 - Camada nova (inclusive texto criado no editor) vai como camada de pixels. Documento que não veio de PSD RGB é montado do zero.
 - A composição feita pela página vira a imagem achatada do arquivo.
+- Efeitos editados no editor (`L.fxMudou`) ou de camada nova: o Python reescreve só Sombra projetada, Brilho externo,
+  Traçado e Sobreposição de cor no `lfx2` (os outros efeitos ficam; efeito tirado fica desligado; `lrFX` sai).
+- Fatias: gravadas quando mudaram (ou em arquivo novo).
 
 ## Limitações conhecidas (MVP)
-- Efeitos de camada desenhados: Sombra projetada, Brilho externo, Traçado, Sobreposição de cor (os outros ficam no
-  arquivo, sem aparecer). Não se editam os parâmetros dos efeitos nem das camadas de ajuste (só mostrar/manter).
+- Efeitos de camada desenhados e editáveis: Sombra projetada, Brilho externo, Traçado, Sobreposição de cor (os outros
+  ficam no arquivo, sem aparecer). Não se editam os parâmetros das camadas de ajuste (só mostrar/manter).
+- Caixa alta e negrito/itálico falso de texto do PSD aparecem no editor, mas não vão para o arquivo.
+- Fatias de camada (origem "camada") e fatias automáticas não são editadas; só as do usuário.
+- `TÍTULO PRINCIPAL BENTO E RONALD.psd` (portfólio) abre com diferença média 5,6 contra o achatado (sombra dos
+  textos); já era assim antes desta rodada.
 - Ajustes sem desenho: Pesquisa de cores (LUT). Cor seletiva, Equilíbrio de cores, Vibratilidade e Filtro de fotos são aproximados.
 - Não há criação de camada de ajuste nova, estilos de camada novos, máscara vetorial, pincel de recuperação.
 - Texto com estilos misturados vira um estilo só quando editado.
@@ -34,5 +59,6 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 ## Teste
 `python testes/teste_imagem.py` (abre o app em `--agente=9333`; `--psd <arquivo>` para um PSD real): mover, pincel,
 seleção+apagar, máscara, Ctrl+T, texto, desfazer/refazer, balde, degradê, varinha, laço, forma, carimbo, filtros,
-mesclar, agrupar, tamanho/girar/cortar, salvar e conferir com o psd-tools, reabrir. Sai com 1 se falhar.
+mesclar, agrupar, tamanho/girar/cortar, fatias, estilo de camada, alça da ferramenta Mover, miniaturas, fonte
+carregada, salvar e conferir com o psd-tools (fatias e efeitos no arquivo), reabrir. Sai com 1 se falhar.
 No console: `ieDiferencaAchatado()` mede a diferença do documento aberto contra o achatado do arquivo.

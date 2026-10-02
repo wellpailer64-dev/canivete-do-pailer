@@ -376,7 +376,7 @@ function ieRasterizar(L, doc = IE.doc) {
 }
 
 // aplica um processamento destrutivo na camada ativa, com diálogo e prévia
-async function ieAplicarComDialogo({ titulo, campos, ajuste, proc, margem }) {
+async function ieAplicarComDialogo({ titulo, campos, ajuste, proc, margem, largura, lado }) {
     const doc = IE.doc, L = ieAtiva(doc);
     if (!doc) return;
     if (doc.mascaraAlvo && L && L.m) { ieToast(ieT('Ajustes valem para os pixels: clique na miniatura da camada')); return; }
@@ -388,7 +388,7 @@ async function ieAplicarComDialogo({ titulo, campos, ajuste, proc, margem }) {
     };
     const Rantes = ieRCamada(L);
     const ok = await ieDialogo({
-        titulo, campos,
+        titulo, campos, largura, lado,
         previa: vals => { L._tfPrev = fazer(vals); ieCamadaMudou(L, Rantes); },
     });
     const vals = ok;
@@ -575,3 +575,82 @@ const IE_FILTROS = {
         },
     }),
 };
+
+// ─────────────────────────── Filtro Camera Raw ───────────────────────────
+// Mesma conta do painel Luz e Cor do editor de vídeo (veLcBuildLut, editor-lc.js): os ajustes de cor viram uma
+// LUT 3D aplicada aqui por interpolação trilinear; nitidez (máscara de nitidez na luma) e vinheta vêm depois.
+function ieAplicarLut3d(d, lut, N) {
+    const n1 = N - 1, s = n1 / 255;
+    for (let i = 0; i < d.length; i += 4) {
+        if (!d[i + 3]) continue;
+        const fr = d[i] * s, fg = d[i + 1] * s, fb = d[i + 2] * s;
+        const r0 = Math.min(fr | 0, n1 - 1), g0 = Math.min(fg | 0, n1 - 1), b0 = Math.min(fb | 0, n1 - 1);
+        const tr = fr - r0, tg = fg - g0, tb = fb - b0;
+        for (let c = 0; c < 3; c++) {
+            const at = (r, g, b) => lut[((b * N + g) * N + r) * 3 + c];
+            const c00 = at(r0, g0, b0) * (1 - tr) + at(r0 + 1, g0, b0) * tr;
+            const c10 = at(r0, g0 + 1, b0) * (1 - tr) + at(r0 + 1, g0 + 1, b0) * tr;
+            const c01 = at(r0, g0, b0 + 1) * (1 - tr) + at(r0 + 1, g0, b0 + 1) * tr;
+            const c11 = at(r0, g0 + 1, b0 + 1) * (1 - tr) + at(r0 + 1, g0 + 1, b0 + 1) * tr;
+            const v = (c00 * (1 - tg) + c10 * tg) * (1 - tb) + (c01 * (1 - tg) + c11 * tg) * tb;
+            d[i + c] = v * 255 + 0.5;
+        }
+    }
+}
+
+const IE_RAW_CAMPOS = [
+    ['Balanço de branco', [['temp', 'Temperatura', -100, 100, 0], ['tint', 'Matiz', -100, 100, 0]]],
+    ['Tom', [['exp', 'Exposição', -4, 4, 0, 0.05], ['ct', 'Contraste', -100, 100, 0], ['hi', 'Realces', -100, 100, 0], ['sh', 'Sombras', -100, 100, 0],
+        ['wh', 'Brancos', -100, 100, 0], ['bl', 'Pretos', -100, 100, 0]]],
+    ['Presença', [['vib', 'Vibração', -100, 100, 0], ['sat', 'Saturação', -100, 100, 0]]],
+    ['Efeitos', [['fade', 'Filme desbotado', 0, 100, 0], ['sharp', 'Nitidez', 0, 150, 0], ['vig', 'Vinheta', -100, 100, 0]]],
+];
+
+function ieCameraRawProc(v) {
+    const lc = { temp: v.temp, tint: v.tint, exp: v.exp, ct: v.ct, hi: v.hi, sh: v.sh, wh: v.wh, bl: v.bl, sat: 100 + v.sat, fade: v.fade, vib: v.vib,
+        ls: 0, lm: 0, lh: 0, cw: {}, cv: { m: (v.curva || [[0, 0], [255, 255]]).map(([a, b]) => [a / 255, b / 255]) } };
+    const neutro = typeof veLcColorNeutral === 'function' && veLcColorNeutral(lc);
+    const lut = !neutro && typeof veLcBuildLut === 'function' ? veLcBuildLut(lc, 33) : null;
+    return c => {
+        let n = ieClonar(c);
+        let x = ieCtx(n);
+        if (lut) {
+            const img = x.getImageData(0, 0, n.width, n.height);
+            ieAplicarLut3d(img.data, lut, 33);
+            x.putImageData(img, 0, 0);
+        }
+        if (v.sharp > 0) {
+            const b = ieDesfocar(n, 1 + v.sharp / 150);
+            const A = x.getImageData(0, 0, n.width, n.height), B = ieCtx(b).getImageData(0, 0, n.width, n.height);
+            const a = A.data, bd = B.data, k = v.sharp / 100 * 1.2;
+            for (let i = 0; i < a.length; i += 4) {
+                if (!a[i + 3]) continue;
+                // só na luma (não cria franja colorida)
+                const dl = (0.2126 * (a[i] - bd[i]) + 0.7152 * (a[i + 1] - bd[i + 1]) + 0.0722 * (a[i + 2] - bd[i + 2])) * k;
+                a[i] += dl; a[i + 1] += dl; a[i + 2] += dl;
+            }
+            x.putImageData(A, 0, 0);
+        }
+        if (v.vig) {
+            // vinheta pós-corte: escurece (ou clareia) as bordas da camada, com o alfa preservado
+            const w = n.width, h = n.height, g = x.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.25, w / 2, h / 2, Math.hypot(w, h) / 2);
+            const k = Math.abs(v.vig) / 100;
+            g.addColorStop(0, v.vig < 0 ? 'rgba(0,0,0,0)' : 'rgba(255,255,255,0)');
+            g.addColorStop(1, v.vig < 0 ? `rgba(0,0,0,${k})` : `rgba(255,255,255,${k})`);
+            x.globalCompositeOperation = 'source-atop';
+            x.fillStyle = g;
+            x.fillRect(0, 0, w, h);
+            x.globalCompositeOperation = 'source-over';
+        }
+        return n;
+    };
+}
+
+IE_FILTROS.cameraRaw = () => ieAplicarComDialogo({
+    titulo: 'Filtro Camera Raw',
+    largura: 340, lado: true,
+    campos: IE_RAW_CAMPOS.flatMap(([grupo, cs]) => [{ id: '_' + grupo, rotulo: grupo, tipo: 'titulo' },
+        ...cs.map(([id, rotulo, min, max, valor, passo]) => ({ id, rotulo, min, max, valor, passo }))])
+        .concat([{ id: '_curva', rotulo: 'Curva de tons', tipo: 'titulo' }, { id: 'curva', rotulo: 'Curva', tipo: 'curva', valor: [[0, 0], [255, 255]] }]),
+    proc: v => ieCameraRawProc(v),
+});

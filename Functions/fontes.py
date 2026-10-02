@@ -88,7 +88,13 @@ def _ler(caminho):
             offs = struct.unpack_from(f">{n}I", dados, 12)
         else:
             offs = (0,)
-        return [x for x in (_uma_fonte(dados, o) for o in offs) if x]
+        out = []
+        for i, o in enumerate(offs):
+            f = _uma_fonte(dados, o)
+            if f:
+                f["arquivo"], f["indice"] = caminho, i   # para o editor de imagem carregar a fonte (FontFace)
+                out.append(f)
+        return out
     except Exception:
         return []
 
@@ -107,7 +113,7 @@ def listar():
                 for f in _ler(os.path.join(pasta, nome)):
                     lista = fams.setdefault(f["familia"], [])
                     if not any(e["estilo"] == f["estilo"] for e in lista):
-                        lista.append({k: f[k] for k in ("estilo", "peso", "italico", "gdi", "gdi_negrito", "gdi_italico", "ps", "completo")})
+                        lista.append({k: f[k] for k in ("estilo", "peso", "italico", "gdi", "gdi_negrito", "gdi_italico", "ps", "completo", "arquivo", "indice")})
         for lista in fams.values():
             lista.sort(key=lambda e: (e["italico"], e["peso"]))
         _cache = dict(sorted(fams.items(), key=lambda kv: kv[0].lower()))

@@ -2961,6 +2961,10 @@ class ApiBridge:
         from Functions import editor_imagem
         return editor_imagem.exportar(spec)
 
+    def ie_exportar_fatias(self, spec):
+        from Functions import editor_imagem
+        return editor_imagem.exportar_fatias(spec)
+
     def ie_dialogo_abrir(self, multiplos=True):
         if not _window:
             return {"success": False}
@@ -2995,6 +2999,19 @@ class ApiBridge:
 
     def ie_existe(self, path):
         return {"existe": bool(path) and os.path.isfile(path)}
+
+    def ie_fonte_url(self, arquivo):
+        """URL local de um arquivo de fonte instalado (a página carrega com FontFace: o nome GDI de 31 letras
+        e famílias tipográficas não batem com o CSS). Só serve arquivos das pastas de fontes do Windows."""
+        from Functions import fontes, media_server
+        try:
+            p = os.path.abspath(arquivo or "")
+            if not os.path.isfile(p) or not any(os.path.normcase(p).startswith(os.path.normcase(os.path.abspath(d)) + os.sep)
+                                                 for d in fontes._pastas()):
+                return {"success": False}
+            return {"success": True, "url": media_server.register(p)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     def ve_render_tocar(self, base, chave, hashes):
         return ve_render_tocar(base, chave, hashes)

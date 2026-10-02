@@ -18,7 +18,7 @@ const IE = {
     docs: [], doc: null, ferr: 'mover', cor: ['#000000', '#ffffff'], temps: [], seqDoc: 0,
     fontes: null, estilos: null, area: null,   // área de transferência interna {c, x, y, nome}
     op: {
-        mover: { auto: true, controles: false },
+        mover: { auto: true, controles: true },
         letreiro: { forma: 'ret', suav: 0 },
         laco: { modo: 'livre', suav: 0 },
         varinha: { tol: 32, contiguo: true, todas: false },
@@ -120,6 +120,7 @@ function ieNovoDoc(o) {
         psdPath: o.psdPath || null, pyId: o.pyId || null, bits: o.bits || 8, modo: o.modo || 'RGB',
         camadas: [], ativa: null, selIds: [], sel: null, seq: 0, sujo: false, avisos: o.avisos || [],
         achatado: null, zoom: 1, px: 0, py: 0, hist: { itens: [], i: -1 }, mascaraAlvo: false,
+        fatias: [], seqFatia: 0, fatiaSel: null, fatiasOrig: '[]',   // ferramenta Fatia (imagem-fatias.js)
     };
     doc.comp = ieCanvas(doc.w, doc.h);
     return doc;
@@ -283,6 +284,7 @@ function ieRestaurarCamadas(lista) {
 function ieFoto(doc) {
     return {
         w: doc.w, h: doc.h, ativa: doc.ativa, selIds: [...doc.selIds], mascaraAlvo: doc.mascaraAlvo,
+        fatias: (doc.fatias || []).map(f => ({ ...f })), fatiaSel: doc.fatiaSel,
         camadas: ieFotoCamadas(doc.camadas),
         sel: doc.sel ? { c: ieCongelar(doc.sel.c), bbox: { ...doc.sel.bbox }, forma: doc.sel.forma || null } : null,
     };
@@ -322,6 +324,7 @@ function ieIrHist(i, doc = IE.doc) {
     doc.w = f.w; doc.h = f.h;
     doc.camadas = ieRestaurarCamadas(f.camadas);
     doc.ativa = f.ativa; doc.selIds = [...f.selIds]; doc.mascaraAlvo = !!f.mascaraAlvo;
+    doc.fatias = (f.fatias || []).map(x => ({ ...x })); doc.fatiaSel = f.fatiaSel ?? null;
     doc.sel = f.sel ? { c: f.sel.c, bbox: { ...f.sel.bbox }, forma: f.sel.forma } : null;
     if (doc.sel) ieSelContorno(doc);
     if (mudouTam) { doc.comp = ieCanvas(doc.w, doc.h); ieAjustarVista(doc); }
@@ -606,6 +609,7 @@ function ieQuadro() {
         const R = doc._sujo;
         doc._sujo = null;
         try { ieCompor(doc, R); } catch (e) { console.error('[editor de imagem] compor', e); }
+        ieMiniaturas?.();   // miniaturas acompanham a pintura (só as camadas que mudaram, com atraso)
     }
     ieDesenharVista();
     ieDesenharSobre();
@@ -888,6 +892,7 @@ function ieAtivar(id, doc = IE.doc, { somar = false, faixa = false } = {}) {
     const L = ieAtiva(doc);
     doc.mascaraAlvo = !!(L && L.m && doc.mascaraAlvo && doc.selIds.length === 1);
     ieUiCamadas?.();
+    ieDesenharSobre();   // caixa de controles da ferramenta Mover
 }
 
 // ─────────────────────────── eventos da vista ───────────────────────────

@@ -276,6 +276,37 @@ def main():
             ok(extra["agrupar"] == "grupo" and extra["desagrupar"] == 0, "agrupar/desagrupar")
             ok(extra["tam"] == [200, 150] and extra["girar"] == [150, 200] and extra["corte"] == [100, 80], f"tamanho/girar/cortar {extra['tam']} {extra['girar']} {extra['corte']}")
             ok(extra["voltou"] == [400, 300, 1], f"histórico voltou ao início {extra['voltou']}")
+            # 8b. novidades: fatias, estilo de camada, controles da ferramenta Mover, miniaturas, fonte de verdade
+            J("ieEscolherFerr('fatia')")
+            arrastar(W * 0.1, H * 0.1, W * 0.4, H * 0.3)
+            arrastar(W * 0.5, H * 0.6, W * 0.9, H * 0.9)
+            fat = J("IE.doc.fatias.map(f => [f.x, f.y, f.w, f.h])")
+            ok(len(fat) == 2, f"Fatia: duas fatias criadas arrastando ({fat})")
+            J("IE.doc.fatias[0].nome = 'topo'")
+            novo = J("""async () => {
+                const L = ieTodas(IE.doc).filter(X => X.tipo === 'pixel' && X.c).pop();
+                ieAtivar(L.id);
+                const p = ieEstiloCamada(L);
+                await new Promise(r => setTimeout(r, 200));
+                const q = s => document.querySelector('#ie-modal ' + s);
+                q('[data-id=t_on]').checked = true; q('[data-id=t_on]').dispatchEvent(new Event('input'));
+                q('[data-id=s_on]').checked = true; q('[data-id=s_on]').dispatchEvent(new Event('input'));
+                q('[data-r="1"]').click(); await p;
+                ieEscolherFerr('mover');
+                const R = ieCaixaAlvos(IE.doc);
+                const mini = document.querySelector(`#ie-cam-lista canvas[data-mini="${L.id}"]`);
+                return {nome: L.nome, fx: L.fx, caixa: R, mini: !!mini && mini.width > 34};
+            }""")
+            ok(novo["fx"] and novo["fx"].get("contorno") and novo["fx"].get("sombra"), f"Estilo de camada: traçado e sombra em {novo['nome']}")
+            ok(novo["caixa"] is not None and novo["mini"], f"controles do Mover e miniatura em alta ({novo['caixa']})")
+            # alça do canto: arrastar entra na Transformação livre; Esc cancela
+            c = novo["caixa"]
+            arrastar(c["x"] + c["w"], c["y"] + c["h"], c["x"] + c["w"] * 1.2, c["y"] + c["h"] * 1.2)
+            ok(J("!!IE.transf"), "alça da ferramenta Mover abriu a transformação")
+            tecla("Escape")
+            ok(J("!IE.transf"), "Esc cancelou")
+            fonte = J("""async () => { await ieCarregarFontes(); const t = {fam: 'Arial', estilo: 'Regular', tam: 40}; ieAplicarEstiloFonte(t, 'Arial', ieEstiloDe('Arial', 'Regular')); return await ieGarantirFonte(t); }""")
+            ok(fonte, "fonte carregada do arquivo (FontFace)")
             n_final = J("ieTodas(IE.doc).length")
             comp = J("(() => { ieCompor(IE.doc); return ieCtx(IE.doc.comp).getImageData(0, 0, IE.doc.w, IE.doc.h).data.reduce((s, v) => s + v, 0); })()")
             # 9. salvar como (o diálogo de arquivo é trocado por um caminho fixo)
@@ -303,6 +334,11 @@ def main():
                 ok(any("TEXTO EDITADO" in t for t in textos), "texto do Photoshop trocado e ainda é camada de texto")
             ok(any(l.has_mask() for l in ls), "máscara salva")
             ok(any(l.name.startswith("Olá") for l in ls), "camada de texto nova salva")
+            from Functions import editor_imagem as ei, psd_import as pi
+            fs = ei._ler_fatias(sp)
+            ok(len(fs) == 2 and fs[0]["nome"] == "topo", f"fatias no PSD salvo ({fs})")
+            com_fx = [l for l in ls if l.name == novo["nome"]]
+            ok(com_fx and "contorno" in pi._params_efeitos(com_fx[0], 120), f"estilo de camada salvo ({com_fx and pi._params_efeitos(com_fx[0], 120)})")
             m = np.asarray(sp.topil().convert("RGB")).astype(int)
             ok(m.shape[0] == orig.height and m.shape[1] == orig.width, "tamanho do documento")
             # 11. reabrir o salvo

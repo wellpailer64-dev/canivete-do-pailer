@@ -10,7 +10,46 @@
 const IE_NL = String.fromCharCode(10);
 
 function ieFonteCss(t, tam = t.tam) {
+    // fonte carregada do arquivo (FontFace): a face já é o estilo certo; negrito/itálico só se forem falsos (do PSD)
+    if (t.css && IE.fontesOk && IE.fontesOk.has(t.css))
+        return `${t.itaFalso ? 'italic ' : ''}${t.negFalso ? 'bold' : 'normal'} ${Math.max(0.5, tam)}px "${t.css}", "${t.gdi || t.fam || 'Arial'}", sans-serif`;
     return `${t.ital ? 'italic ' : ''}${t.neg ? 'bold' : (t.peso && !t.gdi ? t.peso : 'normal')} ${Math.max(0.5, tam)}px "${t.gdi || t.fam || 'Arial'}", sans-serif`;
+}
+
+// carrega o arquivo da fonte do estilo escolhido como uma família própria da página. O nome GDI (cortado em 31
+// letras) e as famílias tipográficas não batem com o CSS: sem isso o texto caía numa fonte qualquer.
+IE.fontesOk = new Set();
+IE.fontesCarregando = new Map();
+async function ieGarantirFonte(t) {
+    const e = ieEstiloDe(t.fam, t.estilo);
+    if (!e) { t.css = null; return false; }
+    const chave = (e.arquivo || e.ps || t.fam + ' ' + e.estilo) + '#' + (e.indice || 0);
+    const alias = 'ief-' + Array.from(chave).reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7).toString(36);
+    t.css = alias;
+    if (IE.fontesOk.has(alias)) return true;
+    if (!IE.fontesCarregando.has(alias)) {
+        IE.fontesCarregando.set(alias, (async () => {
+            const fontes = [];
+            for (const n of [e.completo, e.ps]) if (n) fontes.push(`local("${String(n).replace(/"/g, '')}")`);
+            if (e.arquivo && !(e.indice > 0)) {
+                try { const r = await window.pywebview.api.ie_fonte_url(e.arquivo); if (r && r.success) fontes.push(`url("${r.url}")`); } catch (x) { /* sem API */ }
+            }
+            for (const src of [fontes.join(', '), ...fontes]) {   // tudo junto; se falhar, uma por uma
+                if (!src) continue;
+                try {
+                    const ff = new FontFace(alias, src);
+                    await ff.load();
+                    document.fonts.add(ff);
+                    IE.fontesOk.add(alias);
+                    return true;
+                } catch (x) { /* tenta a próxima */ }
+            }
+            return false;
+        })());
+    }
+    const ok = await IE.fontesCarregando.get(alias);
+    if (!ok) t.css = null;
+    return ok;
 }
 
 let ieMedidor = null;
@@ -124,8 +163,9 @@ async function ieTextoDoPsd(L) {
     };
     if (f) ieAplicarEstiloFonte(txt, f.fam, f.e);
     else { ieAplicarEstiloFonte(txt, 'Arial', ieEstiloDe('Arial', 'Regular')); ieToast(`${ieT('Fonte')} ${run.fonte} ${ieT('não instalada: usando Arial')}`); }
-    if (run.neg && !txt.neg) txt.neg = true;
-    if (run.ita) txt.ital = true;
+    if (run.neg && !txt.neg) { txt.neg = true; txt.negFalso = true; }
+    if (run.ita && !txt.ital) { txt.ital = true; txt.itaFalso = true; }
+    await ieGarantirFonte(txt);
     if (t.misto) ieToast(ieT('Texto com estilos misturados: ao editar, fica com o estilo do começo'));
     txt.psOrig = run.fonte;
     txt.orig = { tam: txt.tam, cor: txt.cor, esp: txt.esp, ent: txt.ent, alin: txt.alin };
@@ -145,13 +185,12 @@ async function ieTextoEditar(L, nova = false) {
             L.txt = t;
         } else return;
     }
+    if (!L.txt.css || !IE.fontesOk.has(L.txt.css)) await ieGarantirFonte(L.txt);
     ieTextoEncerrar(true);
     ieAtivar(L.id, doc);
     IE.edTexto = { L, nova, antes: JSON.stringify(L.txt), sAntes: L.txt.s, Rantes: ieRCamada(L) };
     L._editando = true;
     L._rasterAntes = L.c ? { c: L.c, x: L.x, y: L.y } : null;
-    ieInvalidar(L);
-    ieAgendar(IE.edTexto.Rantes || null, doc);
     const ta = ieEl('ie-texto-edit');
     ta.value = L.txt.s || '';
     ta.hidden = false;
@@ -200,9 +239,10 @@ function ieTextoEncerrar(confirmar = true) {
         return;
     }
     if (!mudou && !ed.nova) {
-        if (L._rasterAntes && !L.c) { L.c = L._rasterAntes.c; L.x = L._rasterAntes.x; L.y = L._rasterAntes.y; }
+        const Rv = ieRCamada(L);
+        if (L._rasterAntes) { L.c = L._rasterAntes.c; L.x = L._rasterAntes.x; L.y = L._rasterAntes.y; }
         ieInvalidar(L);
-        ieAgendar(ed.Rantes || null, doc);
+        ieAgendar(ieRUniao(ed.Rantes, Rv), doc);
         if (L.texto && L.ref != null) delete L.txt;   // continua o texto original do Photoshop
         return;
     }
@@ -227,6 +267,7 @@ function ieTextoInstalar() {
         if (!ed) return;
         ed.L.txt.s = ta.value;
         ieTextoPosicionar();
+        ieTextoAoVivo(ed.L);
     });
     ta.addEventListener('keydown', ev => {
         ev.stopPropagation();
@@ -248,9 +289,15 @@ function ieTextoEstilo(mud) {
             if (!L.txt) { L.txt = await ieTextoDoPsd(L); if (!L.txt) continue; }
             const t = L.txt;
             if (mud.fam !== undefined || mud.estilo !== undefined) t.fonteMudou = true;
-            if (mud.fam !== undefined || mud.estilo !== undefined) ieAplicarEstiloFonte(t, mud.fam ?? t.fam, ieEstiloDe(mud.fam ?? t.fam, mud.estilo ?? t.estilo));
-            for (const k of ['tam', 'cor', 'alin', 'esp', 'ent']) if (mud[k] !== undefined) t[k] = mud[k];
-            if (ed) { ieTextoPosicionar(); continue; }
+            if (mud.fam !== undefined || mud.estilo !== undefined) {
+                ieAplicarEstiloFonte(t, mud.fam ?? t.fam, ieEstiloDe(mud.fam ?? t.fam, mud.estilo ?? t.estilo));
+                t.negFalso = t.itaFalso = false;
+                await ieGarantirFonte(t);
+            }
+            for (const k of ['tam', 'cor', 'alin', 'esp', 'ent', 'caixaAlta']) if (mud[k] !== undefined) t[k] = mud[k];
+            if (mud.negFalso !== undefined) { t.negFalso = mud.negFalso; const e = ieEstiloDe(t.fam, t.estilo); t.neg = mud.negFalso || !!(e && e.gdi_negrito); }
+            if (mud.itaFalso !== undefined) { t.itaFalso = mud.itaFalso; const e = ieEstiloDe(t.fam, t.estilo); t.ital = mud.itaFalso || !!(e && (e.italico || e.gdi_italico)); }
+            if (ed) { ieTextoPosicionar(); ieTextoAoVivo(L); continue; }
             const Ra = ieRCamada(L);
             if (L.ref != null && L.texto) {
                 L.textoNovo = t.s;
@@ -293,6 +340,7 @@ const IE_TEXTO = {
         const o = IE.op.texto;
         const t = { s: '', tam: o.tam, cor: IE.cor[0], alin: o.alin, esp: o.esp || 0, ent: o.ent || 0, caixa: null, m: [1, 0, 0, 1, a.p0.x, a.p0.y] };
         ieAplicarEstiloFonte(t, o.fam || 'Arial', ieEstiloDe(o.fam || 'Arial', o.estilo || 'Regular'));
+        await ieGarantirFonte(t);
         if (a.r && a.r.w > 8 && a.r.h > 8) { t.caixa = [0, 0, a.r.w, a.r.h]; t.m = [1, 0, 0, 1, a.r.x, a.r.y]; }
         const L = ieNovaCamada(doc, { tipo: 'texto', nome: ieT('Texto'), txt: t, sujoPx: true, _nomeAuto: true });
         ieInserirAcima(doc, L, ieAtiva(doc));
@@ -317,11 +365,15 @@ const IE_TEXTO = {
 };
 IE_FERR.texto = IE_TEXTO;
 
-// a camada em edição não aparece na composição (o texto fica na caixa de edição)
-(function () {
-    const orig = ieRaster;
-    ieRaster = function (L) { return L && L._editando ? null : orig(L); };
-})();
+// enquanto edita, o texto é desenhado de verdade na tela (fonte, cor e efeitos da camada); a caixa por cima é
+// transparente e só mostra o cursor e a seleção, como no Photoshop
+function ieTextoAoVivo(L) {
+    const doc = IE.doc;
+    if (!L || !L.txt || !doc) return;
+    const Ra = ieRCamada(L);
+    ieTextoRender(L);
+    ieAgendar(ieRUniao(Ra, ieRCamada(L)), doc);
+}
 
 // o que mudou no estilo de um texto do Photoshop (só isso vai para o arquivo; o resto fica como estava)
 function ieEstiloMudado(t) {
@@ -329,4 +381,106 @@ function ieEstiloMudado(t) {
     for (const k of ['tam', 'cor', 'esp', 'ent', 'alin']) if (t[k] !== o[k]) e[k] = t[k];
     if (t.fonteMudou && t.ps) e.ps = t.ps;
     return Object.keys(e).length ? e : null;
+}
+
+// ─────────────────────────── painel Propriedades: Caractere e Parágrafo ───────────────────────────
+function ieTextoPropsHtml(t, run) {
+    const o = IE.op.texto;
+    const fam = t ? t.fam : (run ? run.fonte : o.fam || 'Arial'), est = t ? t.estilo : '';
+    const estilos = ((IE.estilos || {})[fam] || []).map(e => e.estilo);
+    const v = (k, pad) => (t && t[k] !== undefined ? t[k] : run && run[k] !== undefined ? run[k] : pad);
+    const css = t && t.css && IE.fontesOk.has(t.css) ? `font-family:'${t.css}'` : `font-family:'${ieEsc(fam)}'`;
+    return `<div class="ie-prop-sub2">${ieT('Caractere')}</div>
+        <button class="ie-fonte-btn" data-tx="famPick" title="${ieT('Fonte')}"><span style="${css}">${ieEsc(fam)}</span>${ieIco('chev')}</button>
+        <div class="ie-prop-grade ie-prop-tx">
+            <label>${ieT('Estilo')} <select data-tx="estilo">${(estilos.length ? estilos : [est || 'Regular']).map(e => `<option ${e === est ? 'selected' : ''}>${ieEsc(e)}</option>`).join('')}</select></label>
+            <label title="${ieT('Tamanho')}">T <input type="number" data-tx="tam" min="1" max="2000" step="0.5" value="${+(+v('tam', 72)).toFixed(2)}"> px</label>
+            <label title="${ieT('Espaçamento entre letras (milésimos de eme)')}">VA <input type="number" data-tx="esp" step="10" value="${Math.round(v('esp', 0))}"></label>
+            <label title="${ieT('Entrelinha (0 = automática)')}">${ieT('Entrelinha')} <input type="number" data-tx="ent" min="0" value="${Math.round(t ? t.ent : 0)}"></label>
+            <label>${ieT('Cor')} <button class="ie-cor ie-cor-op" data-tx="cor" style="background:${v('cor', '#000')}"></button></label>
+        </div>
+        <div class="ie-prop-acoes">
+            <div class="ie-segm">${[['left', 'Esq.'], ['center', 'Centro'], ['right', 'Dir.']].map(([a, r]) => `<button data-tx="alin" data-v="${a}" class="${v('alin', 'left') === a ? 'on' : ''}">${ieT(r)}</button>`).join('')}</div>
+            <div class="ie-segm">
+                <button data-tx="negFalso" class="${t && t.negFalso ? 'on' : ''}" title="${ieT('Negrito falso')}"><b>T</b></button>
+                <button data-tx="itaFalso" class="${t && t.itaFalso ? 'on' : ''}" title="${ieT('Itálico falso')}"><i>T</i></button>
+                <button data-tx="caixaAlta" class="${t && t.caixaAlta ? 'on' : ''}" title="${ieT('Tudo em maiúsculas')}">TT</button></div>
+        </div>`;
+}
+
+function ieTextoPropsInstalar(box) {
+    box.querySelectorAll('[data-tx]').forEach(el => {
+        const k = el.dataset.tx;
+        if (k === 'famPick') {
+            el.onclick = () => {
+                const L = ieAtiva(), t = L && (L.txt || L._txtPsd);
+                ieFonteEscolher(el, (t && t.fam) || IE.op.texto.fam, fam => { ieTextoEstilo({ fam, estilo: (ieEstiloPadrao(fam) || {}).estilo || 'Regular' }); setTimeout(ieUiProps, 400); });
+            };
+            return;
+        }
+        if (k === 'cor') {
+            el.onclick = () => { const L = ieAtiva(); ieSeletorCor(el, (L && (L.txt || L._txtPsd || {}).cor) || IE.cor[0], c => { el.style.background = c; ieTextoEstilo({ cor: c }); }); };
+            return;
+        }
+        if (el.tagName === 'BUTTON') {
+            el.onclick = () => {
+                if (k === 'alin') ieTextoEstilo({ alin: el.dataset.v });
+                else { const L = ieAtiva(), t = L && (L.txt || L._txtPsd); ieTextoEstilo({ [k]: !(t && t[k]) }); }
+                setTimeout(ieUiProps, 300);
+            };
+            return;
+        }
+        el.addEventListener('change', () => {
+            const v = el.tagName === 'SELECT' ? el.value : parseFloat(el.value) || 0;
+            ieTextoEstilo({ [k]: v });
+            if (k === 'estilo') setTimeout(ieUiProps, 400);
+        });
+        el.addEventListener('keydown', ev => ev.stopPropagation());
+    });
+}
+
+function ieEstiloPadrao(fam) {
+    const lista = (IE.estilos || {})[fam] || [];
+    return lista.find(e => /^(regular|normal|book|roman)$/i.test(e.estilo)) ||
+        [...lista].filter(e => !e.italico).sort((a, b) => Math.abs(a.peso - 400) - Math.abs(b.peso - 400))[0] || lista[0];
+}
+
+// seletor de fonte com a prévia de cada família (como no editor de vídeo), busca e as recentes em cima
+async function ieFonteEscolher(ancora, atual, aoEscolher) {
+    const estilos = await ieCarregarFontes();
+    const pop = ieEl('ie-pop'), rb = ieEl('ie').getBoundingClientRect(), ra = ancora.getBoundingClientRect();
+    let recentes = [];
+    try { recentes = JSON.parse(localStorage.getItem('ie-fontes-recentes') || '[]').filter(f => estilos[f]); } catch (e) { /* sem armazenamento */ }
+    const todas = Object.keys(estilos);
+    pop.innerHTML = `<div class="ie-fontes"><input class="ie-fontes-busca" placeholder="${ieT('Buscar fonte')}"><div class="ie-fontes-lista"></div></div>`;
+    const lista = pop.querySelector('.ie-fontes-lista'), busca = pop.querySelector('.ie-fontes-busca');
+    const item = f => `<button class="ie-fonte-item ${f === atual ? 'on' : ''}" data-f="${ieEsc(f)}"><span style="font-family:&quot;${ieEsc(f)}&quot;, &quot;${ieEsc((estilos[f][0] || {}).gdi || f)}&quot;">${ieEsc(f)}</span><small>${estilos[f].length}</small></button>`;
+    const montar = q => {
+        q = (q || '').trim().toLowerCase();
+        const achadas = todas.filter(f => !q || f.toLowerCase().includes(q));
+        lista.innerHTML = (!q && recentes.length ? `<div class="ie-fontes-grupo">${ieT('Recentes')}</div>${recentes.map(item).join('')}<div class="ie-fontes-grupo">${ieT('Todas')}</div>` : '') +
+            achadas.map(item).join('') || `<div class="ie-vazio">${ieT('Nenhuma fonte')}</div>`;
+        lista.querySelector('.on')?.scrollIntoView({ block: 'center' });
+    };
+    montar('');
+    busca.addEventListener('input', () => montar(busca.value));
+    const fechar = () => { pop.hidden = true; document.removeEventListener('pointerdown', fora, true); };
+    const fora = e => { if (!pop.contains(e.target) && e.target !== ancora) fechar(); };
+    busca.addEventListener('keydown', ev => {
+        ev.stopPropagation();
+        if (ev.key === 'Escape') fechar();
+        if (ev.key === 'Enter') { const b = lista.querySelector('.ie-fonte-item'); if (b) b.click(); }
+    });
+    lista.addEventListener('click', ev => {
+        const b = ev.target.closest('[data-f]');
+        if (!b) return;
+        const f = b.dataset.f;
+        try { localStorage.setItem('ie-fontes-recentes', JSON.stringify([f, ...recentes.filter(x => x !== f)].slice(0, 8))); } catch (e) { /* sem armazenamento */ }
+        fechar();
+        aoEscolher(f);
+    });
+    pop.hidden = false;
+    pop.style.left = Math.max(4, Math.min(rb.width - 300, ra.left - rb.left)) + 'px';
+    pop.style.top = Math.max(4, Math.min(rb.height - 420, ra.bottom - rb.top + 4)) + 'px';
+    setTimeout(() => { document.addEventListener('pointerdown', fora, true); busca.focus(); }, 0);
 }

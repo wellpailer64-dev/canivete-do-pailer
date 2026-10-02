@@ -415,7 +415,193 @@ def _abrir_psd(path, doc, on_progress):
         pass
     return {"success": True, "nome": os.path.splitext(os.path.basename(path))[0], "w": int(psd.width),
             "h": int(psd.height), "dpi": _dpi(psd), "modo": modo, "bits": int(psd.depth), "psd": True,
-            "psb": int(psd.version) == 2, "camadas": camadas, "achatado": achatado, "avisos": sorted(set(avisos))}
+            "psb": int(psd.version) == 2, "camadas": camadas, "achatado": achatado, "avisos": sorted(set(avisos)),
+            "fatias": _ler_fatias(psd)}
+
+
+# ─────────────────────────── estilo de camada (efeitos editados no editor) ───────────────────────────
+def _fx_desc(tipo, p):
+    """Descritor de um efeito do Photoshop (lfx2) a partir do efeito do editor."""
+    import psd_tools.psd.descriptor as D
+    from psd_tools.psd.descriptor import Unit
+
+    def cor(hexa):
+        h = str(hexa or "#000000").lstrip("#")
+        r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+        c = D.Descriptor(classID=b"RGBC")
+        c[b"Rd  "], c[b"Grn "], c[b"Bl  "] = D.Double(float(r)), D.Double(float(g)), D.Double(float(b))
+        return c
+
+    def curva():
+        c = D.Descriptor(classID=b"ShpC")
+        c[b"Nm  "] = D.String("Linear")
+        pts = []
+        for x in (0.0, 255.0):
+            q = D.Descriptor(classID=b"CrPt")
+            q[b"Hrzn"], q[b"Vrtc"] = D.Double(x), D.Double(x)
+            pts.append(q)
+        c[b"Crv "] = D.List(pts)
+        return c
+
+    px = lambda v: D.UnitFloat(unit=Unit.Pixels, value=float(v or 0))
+    pc = lambda v: D.UnitFloat(unit=Unit.Percent, value=float(100 if v is None else v))
+    modo = lambda m: D.Enumerated(typeID=b"BlnM", enum=m)
+    classe = {"sombra": b"DrSh", "brilho": b"OrGl", "contorno": b"FrFX", "sobreposicao": b"SoFi"}[tipo]
+    d = D.Descriptor(classID=classe)
+    d[b"enab"], d[b"present"], d[b"showInDialog"] = D.Bool(True), D.Bool(True), D.Bool(True)
+    if tipo == "sombra":
+        d[b"Md  "] = modo(b"Mltp")
+        d[b"Clr "] = cor(p.get("cor"))
+        d[b"Opct"] = pc(p.get("op", 75))
+        d[b"uglg"] = D.Bool(False)
+        d[b"lagl"] = D.UnitFloat(unit=Unit.Angle, value=float(p.get("ang", 120)))
+        d[b"Dstn"] = px(p.get("dist"))
+        d[b"Ckmt"] = px(0)
+        d[b"blur"] = px(p.get("tam"))
+        d[b"Nose"] = pc(0)
+        d[b"AntA"] = D.Bool(False)
+        d[b"TrnS"] = curva()
+        d[b"layerConceals"] = D.Bool(True)
+    elif tipo == "brilho":
+        d[b"Md  "] = modo(b"Scrn")
+        d[b"Clr "] = cor(p.get("cor"))
+        d[b"Opct"] = pc(p.get("op", 75))
+        d[b"GlwT"] = D.Enumerated(typeID=b"BETE", enum=b"SfBL")
+        d[b"Ckmt"] = px(0)
+        d[b"blur"] = px(p.get("tam"))
+        d[b"Nose"] = pc(0)
+        d[b"ShdN"] = pc(0)
+        d[b"AntA"] = D.Bool(False)
+        d[b"TrnS"] = curva()
+        d[b"Inpr"] = pc(50)
+    elif tipo == "contorno":
+        pos = str(p.get("pos") or "outside")
+        d[b"Styl"] = D.Enumerated(typeID=b"FStl", enum=b"InsF" if "inside" in pos else b"CtrF" if "center" in pos else b"OutF")
+        d[b"PntT"] = D.Enumerated(typeID=b"FrFl", enum=b"SClr")
+        d[b"Md  "] = modo(b"Nrml")
+        d[b"Opct"] = pc(p.get("op", 100))
+        d[b"Sz  "] = px(p.get("larg", 3))
+        d[b"Clr "] = cor(p.get("cor"))
+        d[b"overprint"] = D.Bool(False)
+    else:
+        d[b"Md  "] = modo(b"Nrml")
+        d[b"Clr "] = cor(p.get("cor"))
+        d[b"Opct"] = pc(p.get("op", 100))
+    return d
+
+
+def _gravar_efeitos(layer, fx, oculto=False):
+    """Troca no PSD os 4 efeitos que o editor edita (Sombra projetada, Brilho externo, Traçado, Sobreposição de
+    cor), mantendo os outros efeitos da camada como estavam. Efeito tirado no editor fica desligado."""
+    import psd_tools.psd.descriptor as D
+    from psd_tools.constants import Tag
+    from psd_tools.psd.descriptor import Unit
+    tb = layer._record.tagged_blocks
+    blk = tb.get_data(Tag.OBJECT_BASED_EFFECTS_LAYER_INFO)
+    fx = fx or {}
+    if blk is None:
+        if not any(fx.get(k) for k in ("sombra", "brilho", "contorno", "sobreposicao")):
+            return
+        blk = D.DescriptorBlock2(classID=b"null", version=0, data_version=16)
+        blk[b"Scl "] = D.UnitFloat(unit=Unit.Percent, value=100.0)
+        blk[b"masterFXSwitch"] = D.Bool(True)
+    blk[b"masterFXSwitch"] = D.Bool(not oculto)
+    chaves = {"sombra": (b"DrSh", b"dropShadowMulti"), "brilho": (b"OrGl", None), "contorno": (b"FrFX", b"frameFXMulti"),
+              "sobreposicao": (b"SoFi", b"solidFillMulti")}
+    for k, (unico, multi) in chaves.items():
+        p = fx.get(k)
+        if p:
+            novo = _fx_desc(k, p)
+            if multi and multi in blk:
+                lista = list(blk[multi])
+                lista[0:1] = [novo]
+                blk[multi] = D.List(lista)
+            else:
+                blk[unico] = novo
+        else:
+            for chave in (unico, multi):
+                if not chave or chave not in blk:
+                    continue
+                itens = list(blk[chave]) if chave == multi else [blk[chave]]
+                for it in itens:
+                    if b"enab" in it:
+                        it[b"enab"] = D.Bool(False)
+    tb.set_data(Tag.OBJECT_BASED_EFFECTS_LAYER_INFO, blk)
+    # o bloco antigo (lrFX) ficaria diferente: o Photoshop refaz a partir do lfx2
+    try:
+        if Tag.EFFECTS_LAYER in tb:
+            del tb[Tag.EFFECTS_LAYER]
+    except Exception:
+        pass
+
+
+# ─────────────────────────── fatias (ferramenta Fatia) ───────────────────────────
+def _ler_fatias(psd):
+    """Fatias criadas pelo usuário (as automáticas o Photoshop refaz): [{x, y, w, h, nome, url, alt}]."""
+    from psd_tools.constants import Resource
+    try:
+        r = psd.image_resources.get_data(Resource.SLICES)
+    except Exception:
+        return []
+    if r is None:
+        return []
+    out = []
+    try:
+        if r.version == 6:
+            import attrs
+            for it in attrs.asdict(r.data, recurse=False)["items"]:
+                if it.origin != 2:   # 0 = automática, 1 = da camada, 2 = do usuário
+                    continue
+                x1, y1, x2, y2 = it.bbox
+                out.append({"x": int(x1), "y": int(y1), "w": int(x2 - x1), "h": int(y2 - y1), "nome": it.name or "",
+                            "url": it.url or "", "alt": it.alt_tag or ""})
+        else:   # 7/8: descritor (Photoshop CS2+)
+            def val(v):
+                return getattr(v, "value", v)
+
+            for it in r.data.get(b"slices", []):
+                origem = str(val(it.get(b"origin", "")))
+                if "user" not in origem.lower():
+                    continue
+                b = it.get(b"bounds")
+                x1, y1 = int(val(b.get(b"Left"))), int(val(b.get(b"Top ")))
+                x2, y2 = int(val(b.get(b"Rght"))), int(val(b.get(b"Btom")))
+                out.append({"x": x1, "y": y1, "w": x2 - x1, "h": y2 - y1, "nome": str(val(it.get(b"Nm  ", ""))).strip("\x00"),
+                            "url": str(val(it.get(b"url ", ""))).strip("\x00"), "alt": str(val(it.get(b"altTag", ""))).strip("\x00")})
+    except Exception:
+        logging.debug("fatias do PSD não lidas", exc_info=True)
+    return out
+
+
+def _gravar_fatias(psd, fatias, W, H, nome):
+    """Troca o recurso de fatias (versão 6, que o Photoshop lê): a automática do documento + as do usuário."""
+    import psd_tools.psd.image_resources as ir
+    from psd_tools.constants import Resource
+    res = psd._record.image_resources
+    itens = [ir.SliceV6(slice_id=0, group_id=0, origin=0, name="", slice_type=1, bbox=[0, 0, W, H])]
+    for i, f in enumerate(fatias or [], 1):
+        x, y = max(0, int(f["x"])), max(0, int(f["y"]))
+        x2, y2 = min(W, int(f["x"] + f["w"])), min(H, int(f["y"] + f["h"]))
+        if x2 <= x or y2 <= y:
+            continue
+        itens.append(ir.SliceV6(slice_id=i, group_id=0, origin=2, name=str(f.get("nome") or ""), slice_type=1,
+                                bbox=[x, y, x2, y2], url=str(f.get("url") or ""), alt_tag=str(f.get("alt") or "")))
+    dado = ir.Slices(version=6, data=ir.SlicesV6(bbox=[0, 0, H, W], name=nome or "", items=itens))
+    res[Resource.SLICES] = ir.ImageResource(key=Resource.SLICES.value, name="", data=dado)
+
+
+def exportar_fatias(spec):
+    """spec = {sessao, fatias: [{arquivo, destino}], qualidade, dpi}: grava cada recorte enviado pela página."""
+    arquivos = media_server.fechar_envio(spec.get("sessao"))
+    feitos, erros = [], []
+    for f in spec.get("fatias") or []:
+        im = _img(arquivos, f.get("arquivo"))
+        if im is None:
+            erros.append(f.get("destino"))
+            continue
+        r = _gravar_imagem(im, f["destino"], int(spec.get("qualidade", 92)), float(spec.get("dpi") or 72))
+        (feitos if r is None else erros).append(f["destino"])
+    return {"success": bool(feitos) and not erros, "feitos": feitos, "erros": erros}
 
 
 # ─────────────────────────── salvar ───────────────────────────
@@ -774,6 +960,11 @@ def salvar(spec):
                                     ob._record.mask_data.background_color = orig._record.mask_data.background_color
                             except Exception as e:
                                 logging.debug("máscara da rasterizada: %s", e)
+            if "fx" in no and no["tipo"] != "grupo":
+                try:
+                    _gravar_efeitos(ob, no["fx"], no.get("fx_oculto"))
+                except Exception as e:
+                    avisos.append(f"{no.get('nome')}: efeitos não salvos ({e})")
             if "mascara" in no:
                 try:
                     _mascara(ob, no["mascara"], arquivos)
@@ -812,6 +1003,11 @@ def salvar(spec):
     hdr = psd._record.header
     usar_alfa = hdr.channels > 3
     psd._record.image_data.set_data(numpy_io.encode_image_data(psd, cor if usar_alfa else fundo_branco, alfa), hdr)
+    if spec.get("fatias") is not None and (spec.get("fatias_mudou") or not ida):
+        try:
+            _gravar_fatias(psd, spec["fatias"], W, H, os.path.splitext(os.path.basename(destino))[0])
+        except Exception as e:
+            avisos.append(f"fatias não salvas ({e})")
     # miniatura antiga sairia errada: o Photoshop refaz
     try:
         from psd_tools.constants import Resource
@@ -849,11 +1045,16 @@ def exportar(spec):
     im = _img(arquivos, spec.get("composto"))
     if im is None:
         return {"success": False, "error": "composição não chegou"}
-    destino = spec["destino"]
+    erro = _gravar_imagem(im, spec["destino"], int(spec.get("qualidade", 92)), float(spec.get("dpi") or 72))
+    if erro:
+        return {"success": False, "error": erro}
+    return {"success": True, "path": spec["destino"]}
+
+
+def _gravar_imagem(im, destino, q, dpi):
+    """PNG/JPG/WEBP/TIFF pela extensão; devolve o erro ou None."""
     fmt = os.path.splitext(destino)[1].lower()
-    q = int(spec.get("qualidade", 92))
     try:
-        dpi = float(spec.get("dpi") or 72)
         if fmt in (".jpg", ".jpeg"):
             fundo = Image.new("RGB", im.size, (255, 255, 255))
             fundo.paste(im, mask=im.split()[3])
@@ -862,11 +1063,13 @@ def exportar(spec):
             im.save(destino, "WEBP", quality=q)
         elif fmt in (".tif", ".tiff"):
             im.save(destino, "TIFF", compression="tiff_lzw", dpi=(dpi, dpi))
+        elif fmt == ".gif":
+            im.save(destino, "GIF")
         else:
             im.save(destino, "PNG", dpi=(dpi, dpi))
     except Exception as e:
-        return {"success": False, "error": str(e)}
-    return {"success": True, "path": destino}
+        return str(e)
+    return None
 
 
 def colar_windows():
