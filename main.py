@@ -2931,6 +2931,71 @@ class ApiBridge:
     def ve_psd_importar(self, path):
         return ve_psd_importar(path)
 
+    # Editor de Imagem (frontend/js/imagem-*.js, Functions/editor_imagem.py)
+    def ie_abrir(self, path):
+        from Functions import editor_imagem
+        return editor_imagem.abrir(path, lambda p, nome: _js("ieProgresso", {"p": p, "nome": nome}))
+
+    def ie_liberar(self, doc):
+        from Functions import editor_imagem
+        return editor_imagem.liberar(doc)
+
+    def ie_fechar(self, doc):
+        from Functions import editor_imagem
+        return editor_imagem.fechar(doc)
+
+    def ie_salvar_inicio(self, doc):
+        from Functions import editor_imagem
+        return editor_imagem.salvar_inicio(doc)
+
+    def ie_salvar(self, spec):
+        from Functions import editor_imagem
+        try:
+            return editor_imagem.salvar(spec)
+        except Exception as e:
+            import logging
+            logging.exception("editor de imagem: salvar")
+            return {"success": False, "error": str(e)}
+
+    def ie_exportar(self, spec):
+        from Functions import editor_imagem
+        return editor_imagem.exportar(spec)
+
+    def ie_dialogo_abrir(self, multiplos=True):
+        if not _window:
+            return {"success": False}
+        r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), allow_multiple=bool(multiplos), file_types=(
+            "Imagens e PSD (*.psd;*.psb;*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.gif;*.tif;*.tiff)", "Todos os arquivos (*.*)"))
+        paths = list(r or [])
+        return {"success": bool(paths), "paths": paths}
+
+    def ie_dialogo_salvar(self, nome, ext="psd", pasta=""):
+        if not _window:
+            return {"success": False}
+        tipos = {"psd": "Photoshop (*.psd)", "psb": "Photoshop grande (*.psb)", "png": "PNG (*.png)",
+                 "jpg": "JPEG (*.jpg)", "webp": "WebP (*.webp)", "tif": "TIFF (*.tif)"}
+        ext = ext if ext in tipos else "psd"
+        r = _window.create_file_dialog(_file_dialog_kind("SAVE", webview.SAVE_DIALOG), directory=pasta or "",
+                                       save_filename=f"{nome}.{ext}", file_types=(tipos[ext], "Todos os arquivos (*.*)"))
+        if not r:
+            return {"success": False, "cancelled": True}
+        path = r[0] if isinstance(r, (list, tuple)) else r
+        if not path.lower().endswith("." + ext) and not (ext == "jpg" and path.lower().endswith(".jpeg")):
+            path += "." + ext
+        return {"success": True, "path": path}
+
+    def ie_colar_windows(self):
+        from Functions import editor_imagem
+        return editor_imagem.colar_windows()
+
+    def ie_soltar_memoria(self, tokens):
+        from Functions import media_server
+        media_server.unregister_bytes(tokens)
+        return {"success": True}
+
+    def ie_existe(self, path):
+        return {"existe": bool(path) and os.path.isfile(path)}
+
     def ve_render_tocar(self, base, chave, hashes):
         return ve_render_tocar(base, chave, hashes)
 

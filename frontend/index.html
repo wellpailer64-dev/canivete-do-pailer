@@ -6,6 +6,7 @@
     <title>Canivete do Pailer</title>
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/editor.css">
+    <link rel="stylesheet" href="css/imagem.css">
     <link rel="icon" href="identidade/icone.ico">
 </head>
 <body>
@@ -146,6 +147,9 @@
                 </button>
 
                 <div class="menu-group">Imagem</div>
+                <button class="menu-item" data-tool="editor-imagem" onclick="switchTool('editor-imagem')">
+                    <span class="icon"><svg class="i"><use href="#i-layers"/></svg></span><span class="label">Editor de Imagem</span>
+                </button>
                 <button class="menu-item" data-tool="converter-imagem" onclick="switchTool('converter-imagem')">
                     <span class="icon"><svg class="i"><use href="#i-image"/></svg></span><span class="label">Converter Imagem</span>
                 </button>
@@ -1012,6 +1016,63 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Editor de Imagem (estilo Photoshop): imagem-*.js, css/imagem.css, Functions/editor_imagem.py -->
+                <div class="tool-page ve-page ie-page" id="page-editor-imagem">
+                    <div class="ie" id="ie" tabindex="-1">
+                        <header class="ie-top">
+                            <div class="ie-brand"><span class="ie-brand-mark"><svg class="i"><use href="#i-layers"/></svg></span> Editor de Imagem</div>
+                            <nav class="ie-mbar" id="ie-mbar"></nav>
+                            <div class="ie-top-spacer"></div>
+                            <span class="ie-top-info" id="ie-top-info"></span>
+                            <button class="ie-btn" id="ie-btn-exportar" onclick="ieExportarDialogo()" disabled title="Exportar como PNG/JPG/WebP (Alt+Shift+Ctrl+W)"><svg class="i"><use href="#i-download"/></svg> Exportar</button>
+                            <button class="ie-btn ie-btn-primario" id="ie-btn-salvar" onclick="ieSalvar()" disabled title="Salvar em PSD (Ctrl+S)"><svg class="i"><use href="#i-save"/></svg> Salvar</button>
+                        </header>
+                        <div class="ie-opcoes" id="ie-opcoes"></div>
+                        <div class="ie-corpo">
+                            <aside class="ie-ferr" id="ie-ferr"></aside>
+                            <section class="ie-centro">
+                                <div class="ie-abas" id="ie-abas"></div>
+                                <div class="ie-vista" id="ie-vista">
+                                    <canvas id="ie-canvas"></canvas>
+                                    <textarea id="ie-texto-edit" class="ie-texto-edit" spellcheck="false" hidden></textarea>
+                                    <div class="ie-inicio" id="ie-inicio">
+                                        <div class="ie-inicio-box">
+                                            <div class="ie-inicio-ico"><svg class="i"><use href="#i-layers"/></svg></div>
+                                            <h2>Editor de Imagem</h2>
+                                            <p>Abra um PSD com as camadas, uma foto ou comece do zero. Arraste o arquivo para cá.</p>
+                                            <div class="ie-inicio-acoes">
+                                                <button class="ie-btn ie-btn-primario" onclick="ieAbrirDialogo()"><svg class="i"><use href="#i-folder"/></svg> Abrir...</button>
+                                                <button class="ie-btn" onclick="ieNovoDialogo()"><svg class="i"><use href="#i-file"/></svg> Novo documento</button>
+                                            </div>
+                                            <div class="ie-recentes" id="ie-recentes"></div>
+                                        </div>
+                                    </div>
+                                    <div class="ie-carregando" id="ie-carregando" hidden><div class="ie-carregando-box"><span id="ie-carregando-txt">Abrindo...</span><div class="ie-barra"><i id="ie-carregando-barra"></i></div></div></div>
+                                </div>
+                                <footer class="ie-status" id="ie-status"></footer>
+                            </section>
+                            <aside class="ie-paineis" id="ie-paineis">
+                                <section class="ie-painel ie-p-props" id="ie-p-props">
+                                    <header class="ie-painel-cab">Propriedades</header>
+                                    <div class="ie-painel-corpo" id="ie-props"></div>
+                                </section>
+                                <section class="ie-painel ie-p-camadas" id="ie-p-camadas">
+                                    <header class="ie-painel-cab">Camadas</header>
+                                    <div class="ie-cam-topo" id="ie-cam-topo"></div>
+                                    <div class="ie-cam-lista" id="ie-cam-lista"></div>
+                                    <div class="ie-cam-rodape" id="ie-cam-rodape"></div>
+                                </section>
+                                <section class="ie-painel ie-p-hist" id="ie-p-hist">
+                                    <header class="ie-painel-cab">Histórico</header>
+                                    <div class="ie-painel-corpo ie-hist-lista" id="ie-hist"></div>
+                                </section>
+                            </aside>
+                        </div>
+                        <div class="ie-modal" id="ie-modal" hidden></div>
+                        <div class="ie-pop" id="ie-pop" hidden></div>
                     </div>
                 </div>
 
@@ -1948,5 +2009,11 @@
     <script src="js/editor-ferramentas.js"></script>
     <script src="js/editor-dock.js"></script>
     <script src="js/editor-comandos.js"></script>
+    <script src="js/imagem-nucleo.js"></script>
+    <script src="js/imagem-ajustes.js"></script>
+    <script src="js/imagem-ferramentas.js"></script>
+    <script src="js/imagem-texto.js"></script>
+    <script src="js/imagem-paineis.js"></script>
+    <script src="js/imagem-arquivo.js"></script>
 </body>
 </html>

@@ -90,6 +90,8 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "Functions.transicoes" ^
  --hidden-import "Functions.psd_import" ^
  --hidden-import "psd_tools" ^
+ --hidden-import "Functions.editor_imagem" ^
+ --hidden-import "psd_tools.api.numpy_io" ^
  --collect-data "cv2" ^
  --copy-metadata "pywebview" ^
  --copy-metadata "pythonnet" ^

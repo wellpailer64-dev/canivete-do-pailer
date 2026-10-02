@@ -15,6 +15,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote
 
 _registry = {}
+_memoria = {}    # token -> (bytes, tipo): arquivos que só existem na memória (camadas do Editor de Imagem)
+_envios = {}     # sessão -> {chave: bytes}: o que a página manda por POST /u/<sessão>/<chave> (salvar PSD)
 _lock = threading.Lock()
 _server = None
 _port = 0
@@ -41,7 +43,8 @@ class _Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Range")
+        self.send_header("Access-Control-Allow-Methods", "GET, HEAD, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Range, Content-Type")
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -49,7 +52,50 @@ class _Handler(BaseHTTPRequestHandler):
         self._serve(head=True)
 
     def do_GET(self):
+        m = re.match(r"^/b/([A-Za-z0-9_-]+)/", self.path)
+        if m:
+            return self._serve_memoria(m.group(1))
         self._serve(head=False)
+
+    def _serve_memoria(self, token):
+        with _lock:
+            item = _memoria.get(token)
+        if not item:
+            self.send_error(404)
+            return
+        dados, tipo = item
+        self.send_response(200)
+        self.send_header("Content-Type", tipo)
+        self.send_header("Content-Length", str(len(dados)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        try:
+            self.wfile.write(dados)
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+            pass
+
+    def do_POST(self):
+        m = re.match(r"^/u/([A-Za-z0-9_-]+)/([A-Za-z0-9_.-]+)$", self.path)
+        with _lock:
+            caixa = _envios.get(m.group(1)) if m else None
+        n = int(self.headers.get("Content-Length") or 0)
+        if caixa is None or n <= 0 or n > 2_000_000_000:
+            self.send_error(404)
+            return
+        partes, falta = [], n
+        while falta > 0:
+            b = self.rfile.read(min(1 << 20, falta))
+            if not b:
+                break
+            partes.append(b)
+            falta -= len(b)
+        with _lock:
+            caixa[m.group(2)] = b"".join(partes)
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def _serve(self, head):
         path = self._resolve()
@@ -136,3 +182,33 @@ def unregister_prefix(folder):
     with _lock:
         for tok in [t for t, p in _registry.items() if p.startswith(folder)]:
             _registry.pop(tok, None)
+
+
+def register_bytes(dados, nome="arquivo.png", tipo=None):
+    """Serve bytes da memória (sem gravar em disco). Devolve (token, url); libere com unregister_bytes."""
+    _ensure_server()
+    token = secrets.token_urlsafe(12)
+    with _lock:
+        _memoria[token] = (bytes(dados), tipo or mimetypes.guess_type(nome)[0] or "application/octet-stream")
+    return token, f"http://127.0.0.1:{_port}/b/{token}/{quote(nome)}"
+
+
+def unregister_bytes(tokens):
+    with _lock:
+        for t in tokens or []:
+            _memoria.pop(t, None)
+
+
+def abrir_envio():
+    """Caixa para a página mandar arquivos por POST. Devolve (sessão, url base terminada em /)."""
+    _ensure_server()
+    sessao = secrets.token_urlsafe(12)
+    with _lock:
+        _envios[sessao] = {}
+    return sessao, f"http://127.0.0.1:{_port}/u/{sessao}/"
+
+
+def fechar_envio(sessao):
+    """Tira a caixa do servidor e devolve o que chegou ({chave: bytes})."""
+    with _lock:
+        return _envios.pop(sessao, None) or {}

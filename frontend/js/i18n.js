@@ -9,7 +9,7 @@ const I18N_EN = {
     // ── geral / menu ──
     'Início': 'Home', 'Buscar': 'Search', 'Recolher menu': 'Collapse menu', 'Expandir menu': 'Expand menu',
     'Vídeo': 'Video', 'Áudio': 'Audio', 'Imagem': 'Image', 'Web': 'Web',
-    'Editor de Vídeo': 'Video Editor', 'Comprimir Vídeo': 'Compress Video', 'Converter Vídeo': 'Convert Video',
+    'Editor de Vídeo': 'Video Editor', 'Editor de Imagem': 'Image Editor', 'Comprimir Vídeo': 'Compress Video', 'Converter Vídeo': 'Convert Video',
     'Baixar Vídeo': 'Download Video', 'Converter Áudio': 'Convert Audio', 'Transcrever': 'Transcribe',
     'Converter Imagem': 'Convert Image', 'Comprimir Imagem': 'Compress Image', 'Remover Fundo': 'Remove Background',
     'Organizar Imagens': 'Organize Images', 'Gerar Favicon': 'Generate Favicon', 'Cortar Áudio': 'Cut Audio',

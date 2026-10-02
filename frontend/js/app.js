@@ -269,7 +269,7 @@ function homeBgSync() {
     const v = _el('home-bg');
     if (!v) return;
     const ativa = document.querySelector('.tool-page.active');
-    const lobby = _el('ve-start'), naLobby = !!lobby && !lobby.hidden;   // lobby do editor usa o mesmo fundo
+    const lobby = _el('ve-start'), naLobby = !!lobby && !lobby.hidden && ativa?.id === 'page-video-cutter';   // lobby do editor usa o mesmo fundo
     const usarFundo = ativa && (!ativa.classList.contains('ve-page') || naLobby);
     const tocar = usarFundo && !document.hidden
         && !matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -317,11 +317,11 @@ function renderRecentes() {
 
 // ── Home: solta qualquer coisa e sugere a ferramenta certa ──
 const EXT_AUDIO = /\.(mp3|wav|flac|m4a|aac|ogg|opus|wma|aiff?)$/i;
-const EXT_IMAGEM = /\.(jpe?g|png|webp|gif|heic|heif|avif|tiff?|bmp|ico|cr2|cr3|nef|arw|dng|raw|orf|rw2)$/i;
+const EXT_IMAGEM = /\.(jpe?g|png|webp|gif|heic|heif|avif|tiff?|bmp|ico|cr2|cr3|nef|arw|dng|raw|orf|rw2|psd|psb)$/i;
 const HOME_SUGESTOES = {
     video: ['video-cutter', 'compressor-video', 'video-converter', 'melhorar-audio', 'converter-audio', 'transcrever-audio'],
     audio: ['video-cutter', 'melhorar-audio', 'converter-audio', 'transcrever-audio', 'omnivoice'],
-    imagem: ['converter-imagem', 'compressor-imagem', 'remover-fundo', 'favicon'],
+    imagem: ['editor-imagem', 'converter-imagem', 'compressor-imagem', 'remover-fundo', 'favicon'],
     pdf: ['compressor-imagem'],
     pasta: ['compressor-video', 'video-converter', 'converter-imagem', 'compressor-imagem', 'remover-fundo',
             'organizador-imagens', 'organizador-videos', 'melhorar-audio', 'converter-audio', 'transcrever-audio', 'omnivoice'],
