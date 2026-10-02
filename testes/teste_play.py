@@ -83,7 +83,8 @@ def main():
                 pg.evaluate("p => veOpenProjectExternal(p)", a.projeto)
                 pg.wait_for_function("VE.projectPath && VE.clips.length > 0 && !VE._pendingProject", timeout=60000)
         t0 = time.time()
-        pg.wait_for_function("VE.clips.every(c => { const m = VE.media[veMid(c)]; return !m || !m.id || m.kind !== 'video' || m.url || m.offline || m.erro })",
+        # o vídeo aberto (mídia 0) também: com prévia leve ele chega depois e a agulha volta ao início
+        pg.wait_for_function("VE.ready && $ve('ve-loading').hidden && VE.clips.every(c => { const m = VE.media[veMid(c)]; return !m || !m.id || m.kind !== 'video' || m.url || m.offline || m.erro })",
                              timeout=600000)
         print(f"vídeos da timeline prontos em {time.time() - t0:.1f} s")
         time.sleep(2)

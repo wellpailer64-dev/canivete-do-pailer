@@ -506,6 +506,12 @@ def _navegador_toca(path, info):
         return False
     if info["vcodec"] == "h264" and info["pix_fmt"] not in ("yuv420p", "yuvj420p"):
         return False  # H.264 10-bit / 4:2:2 não decodifica no navegador
+    # Maior que a qualidade das prévias (4K): prévia leve. Medido (teste 4K, 2026-10-01): H.264 4K direto travou a
+    # página 130–200 ms ~1 s antes de cada corte (a reserva buscando e decodificando o GOP em 4K); a prévia 1080p
+    # com quadro-chave a cada 0,5 s tocou limpa com corte e dissolução a cada 2 s.
+    lados = [x for x in (info.get("width"), info.get("height")) if x]
+    if lados and min(lados) > _cache_cfg()["lado"]:
+        return False
     if info["has_audio"] and info["acodec"] not in _NAVEGADOR_ACODECS:
         return False
     return True
@@ -803,14 +809,38 @@ def preparar(path, emit, stop_event=None):
     if direto:
         emit({"stage": "video", "url": media_server.register(path), "proxy": False})
     else:
-        proxy = os.path.join(work, _nome_proxy(1080, info.get("alfa")))
-        ok, err, thumbs = gerar_proxy(path, info, proxy, lambda p: emit({"stage": "proxy", "pct": p}), stop_event,
-                                      thumbs_dir=work, thumbs_n=count, lado=_cache_cfg()["lado"])
+        # prévia na pasta de cache do vídeo (a mesma de preparar_midia): reabrir o projeto não converte de novo.
+        # Medido (teste 4K): reconverter o vídeo aberto levava ~13 s a cada abertura de um projeto 4K.
+        lado = _cache_cfg()["lado"]
+        pasta = _pasta_midia(path)
+        try:
+            os.utime(pasta)
+        except OSError:
+            pass
+        proxy = os.path.join(pasta, _nome_proxy(lado, info.get("alfa")))
+        thumbs = None
+        if os.path.isfile(proxy):
+            ok, err = True, ""
+        else:
+            tmp = f"{proxy}.{os.getpid()}.tmp{os.path.splitext(proxy)[1]}"
+            with _VAGAS_PROXY.vaga(os.path.abspath(path), 0):
+                ok, err, thumbs = gerar_proxy(path, info, tmp, lambda p: emit({"stage": "proxy", "pct": p}), stop_event,
+                                              thumbs_dir=pasta, thumbs_n=count, lado=lado)
+            if ok:
+                os.replace(tmp, proxy)
+            else:
+                _apagar_item(tmp)
         if stop_event is not None and stop_event.is_set():
             return
         if ok:
             emit({"stage": "video", "url": media_server.register(proxy), "proxy": True})
-            emit({"stage": "thumbs", "thumbs": thumbs or gerar_thumbs(proxy, info["duration"], work, count)})
+            if thumbs:
+                th = _guardar_thumbs(pasta, lado, thumbs)
+            else:
+                th = _thumbs_guardadas(pasta, lado) or _thumbs_guardadas(pasta, "fonte")
+                if th is None:
+                    th = _guardar_thumbs(pasta, lado, gerar_thumbs(proxy, info["duration"], pasta, count))
+            emit({"stage": "thumbs", "thumbs": th})
         else:
             emit({"stage": "error", "error": "Falha ao gerar pré-visualização: " + (err.splitlines()[-1] if err else "?")})
             return
@@ -2205,6 +2235,20 @@ def _normalizar_camadas(camadas, path_video):
     return out
 
 
+def _reduzir_camada(c, k):
+    """Camada normalizada (_normalizar_camadas) num quadro k vezes menor: px do quadro × k."""
+    c["sc"] *= k
+    c["x"] *= k
+    c["y"] *= k
+    for p in ("sc", "x", "y"):
+        if p in c["kf"]:
+            c["kf"][p] = [(t, v * k, i, bz) for t, v, i, bz in c["kf"][p]]
+    for f in c.get("ca") or []:
+        v = f.get("v")
+        if f.get("t") == "ca_wig" and isinstance(v, dict):
+            f["v"] = dict(v, area=_num(v.get("area"), 0, 5000) * k)
+
+
 _opcao_script = None
 
 
@@ -2314,6 +2358,17 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     pecas = _normalizar_segmentos(segmentos, info["duration"])
     pecas_a = pecas if audio_segmentos is None else _normalizar_segmentos(audio_segmentos, info["duration"])
     lay = _normalizar_camadas(camadas, path)
+    # Saída menor que o quadro (4K → 1080p) com camadas: compõe direto no tamanho da saída em vez de compor em 4K e
+    # reduzir no fim. Posição, escala, quadros-chave e tremida das camadas são em px do quadro e vão na mesma
+    # proporção; os efeitos já medem em % da mídia. Medido (teste 4K, 3 PiPs + texto + ajuste, 20 s): 4K e 1080p
+    # levavam o mesmo tempo (~140 s). Legendas continuam medidas no quadro original (o libass escala o .ass).
+    Wq, Hq = W, H
+    red = 1.0
+    if lay and alvo_h and not audio_only and min(W, H) > alvo_h:
+        red = alvo_h / min(W, H)
+        W, H = int(round(W * red / 2)) * 2, int(round(H * red / 2)) * 2
+        for c in lay:
+            _reduzir_camada(c, red)
     # Hard Limiter no Master: vem no fim da lista do mix como {"master": {...}} (editor.js: veExportar)
     master_lim = None
     if audio_clipes is not None:
@@ -2451,7 +2506,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 else:
                     g = _grupo(p[0])
                     filtros.append(f"[{g[0]}:v:0]trim=start={_tempo_ffmpeg(p[0] - g[1])}:end={_tempo_ffmpeg(p[1] - g[1])},"
-                                   f"setpts=PTS-STARTPTS,scale={W}:{H}:force_original_aspect_ratio=decrease,"
+                                   f"setpts=PTS-STARTPTS,scale={W}:{H}:force_original_aspect_ratio=decrease"
+                                   + (":flags=lanczos," if red < 1 else ",")
                                    + (f"format={pixfmt}," if alfa else "")
                                    + f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color={fundo},setsar=1,"
                                    f"fps=fps={fps}:start_time=0,format={pixfmt}[v{k}]")
@@ -2570,8 +2626,19 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             sx = _expr_kf(kf["sx"], "t") if "sx" in kf else None
             sy = _expr_kf(kf["sy"], "t") if "sy" in kf else None
             ca = _ca_exprs(c.get("ca"), "t")   # Rotação / Tremer / Pulsar em loop (tempo da camada)
+            # Zoom animado de um vídeo (PiP 4K a 30–40%): a fonte é reduzida UMA vez ao maior tamanho que a camada
+            # chega a ter e o zoom por quadro trabalha nesse quadro menor. Medido (teste 4K, 3 PiPs 4K): o scale com
+            # tamanho mudando a cada quadro sobre o 4K inteiro era ~130 s de 140 s numa exportação de 20 s.
+            # Com efeitos não (os parâmetros deles são em px da mídia).
+            pre_red = None
+            if c["tipo"] == "video" and "sc" in kf and not sx and not sy and not ca["sc"] and not c["fx"]:
+                maior = max(p[1] for p in kf["sc"])
+                if maior < 0.95:
+                    pre_red = max(0.01, maior)
             if "sc" in kf or sx or sy or ca["sc"]:
                 e = _expr_kf(kf["sc"], "t") if "sc" in kf else f"{c['sc']:.5f}"
+                if pre_red:
+                    e = f"({e})/{pre_red:.6f}"
                 if ca["sc"]:
                     e = f"({e})*{ca['sc']}"
                 ew = f"({e})*({sx})" if sx else e
@@ -2620,6 +2687,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                        f"end={_tempo_ffmpeg(c['s'] - ss + c['fonte'])},")
                 vel = f"setpts=(PTS-STARTPTS)/{c['v']:.6f},"
             filtros_clip = efeitos + [f for f in ordem if f]
+            fixa = False
             if c["tipo"] == "imagem" and not c.get("seq"):
                 # imagem parada: efeitos, escala, giro e opacidade fixos são aplicados uma vez no único quadro
                 # (ex.: LUT num PNG grande antes de reduzir); só o que anima com o tempo roda a cada quadro
@@ -2629,17 +2697,30 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 while k < len(filtros_clip) and filtros_clip[k] not in animados:
                     k += 1
                 n_q = int(math.ceil(c["dur"] * float(fps))) + 1
-                src += ",".join([para_rgb] + filtros_clip[:k]
+                # nada anima: o quadro já vai pronto (YUV com alfa) para o loop. Antes cada um dos quadros repetidos
+                # passava por RGBA → YUV de novo (texto em PNG 4K: ~40 s numa exportação de 20 s)
+                fixa = len(filtros_clip) == k
+                src += ",".join([para_rgb] + filtros_clip[:k] + ([de_rgb] if fixa else [])
                                 + [f"loop=loop={n_q - 1}:size=1:start=0", f"setpts=N/({fps}*TB)"]) + ","
                 filtros_clip = filtros_clip[k:]
+            reducao = (f"scale=w='2*trunc(iw*{pre_red:.6f}/2)':h='2*trunc(ih*{pre_red:.6f}/2)':flags=bicubic"
+                       if pre_red else None)
             if c["tipo"] != "imagem":
                 filtros_clip.append(f"tpad=stop_mode=clone:stop_duration={_tempo_ffmpeg(frame_dur)}")
-            if c["tipo"] == "video" and not efeitos and not giro and not opac and not bm and not escala_animada                     and pixfmt == "yuv420p" and not _clipe_tem_alfa(c["path"] or path):
+            if c["tipo"] == "imagem" and not c.get("seq") and fixa:
+                cadeia = f"{src}fps=fps={fps}:start_time=0"
+            elif c["tipo"] == "video" and not efeitos and not giro and not opac and not bm \
+                    and pixfmt == "yuv420p" and not _clipe_tem_alfa(c["path"] or path):
                 # clipe opaco só cortado/redimensionado/posicionado: fica em YUV do começo ao fim. A ida e volta para
                 # RGBA (quadro inteiro, 2 conversões por quadro) não muda nada na imagem e era o mais caro do grafo.
                 # Clipe com transparência (ProRes 4444, Animation/qtrle...) não: em YUV o alfa some e o fundo fica preto
-                cadeia = f"{src}{vel}" + ",".join([f"fps=fps={fps}:start_time=0"] + filtros_clip
-                                                  + ["scale=out_range=tv,format=yuv420p"])
+                if escala_animada:
+                    # a conversão (e a redução) vem ANTES do zoom: um scale depois fixaria o tamanho no do 1º quadro
+                    conv = (reducao + ":out_range=tv" if reducao else "scale=out_range=tv") + ",format=yuv420p"
+                    cadeia = f"{src}{vel}" + ",".join([f"fps=fps={fps}:start_time=0", conv] + filtros_clip)
+                else:
+                    cadeia = f"{src}{vel}" + ",".join([f"fps=fps={fps}:start_time=0"] + filtros_clip
+                                                      + ["scale=out_range=tv,format=yuv420p"])
             else:
                 # zoom animado: a volta para YUV vem ANTES dele. Um scale de conversão depois fixa o tamanho de saída
                 # no do 1º quadro e a escala animada (Ken Burns, zoom-soco, pop) ficava parada na exportação
@@ -2648,7 +2729,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                     fim_cadeia = filtros_clip[:k] + [de_rgb] + filtros_clip[k:]
                 else:
                     fim_cadeia = filtros_clip + [de_rgb]
-                cadeia = f"{src}{vel}" + ",".join([f"fps=fps={fps}:start_time=0", para_rgb] + fim_cadeia)
+                cadeia = f"{src}{vel}" + ",".join([f"fps=fps={fps}:start_time=0"] + ([reducao] if reducao else [])
+                                                  + [para_rgb] + fim_cadeia)
             cadeia += f",setpts=PTS-STARTPTS+{_tempo_ffmpeg(c['st'])}/TB[l{n}]"
             filtros.append(cadeia)
             fim = c["st"] + c["dur"]
@@ -2719,7 +2801,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         # legendas gravadas no vídeo (mesmo estilo da prévia do editor), antes de reduzir a resolução
         ass = None
         if legendas and legendas.get("itens") and not audio_only:
-            ass = _gerar_ass(legendas["itens"], legendas.get("estilo") or {}, W, H)
+            ass = _gerar_ass(legendas["itens"], legendas.get("estilo") or {}, Wq, Hq)
             if ass:
                 filtros.append(f"{vf}subtitles=filename={_caminho_filtro(ass)}[vsub]")
                 vf = "[vsub]"

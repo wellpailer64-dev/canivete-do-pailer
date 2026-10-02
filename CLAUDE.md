@@ -16,6 +16,9 @@ Play do Pocket Editor: `python testes/teste_play.py "<projeto.vcnvt>" [--segundo
 `--agente=9333`) mede agulha voltando, buscas, esperas, quadros perdidos e travadas; sai com 1 se passar dos limites.
 Rodar antes de release quando mexer em reprodução, áudio ou prévias.
 
+Teste de 4K (estresse: material pesado, camadas, 10-bit, export, memória): plano e resultados em
+`Instructions/agente/teste-4k.md` — rodada 1 feita (2026-10-01), pendências no fim do arquivo.
+
 ## Editar vídeo pelo app (agente)
 Guia interno para IAs (acesso, leitura de mídia, receita, estilo do cliente, calibração): `Instructions/agente/guia-edicao.md`.
 Atualize a seção CALIBRACAO dele a cada feedback do usuário sobre uma edição.
