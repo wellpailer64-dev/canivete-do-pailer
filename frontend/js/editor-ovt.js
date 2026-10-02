@@ -391,7 +391,7 @@ async function veOvtProntas(faixa, msg) {
         if (msg) msg(`${veT('Transições de sobreposição')} ${i + 1}/${lista.length}...`);
         try {
             const job = await veOvtJob(c);
-            const r = await api.ve_ovt_render(vePrPrefs().dir, 'ovt.' + vePrHash(JSON.stringify([3, job])), job);
+            const r = await api.ve_ovt_render(vePrPrefs().dir, 'ovt.' + vePrHash(JSON.stringify([4, job])), job);
             if (r && r.success) VEOVT.arq.set(sig, r.path);
             else if (!(r && r.cancelled)) veToast(`${veT('Falha na transição')} ${veOvtNome(c)}: ${(r && r.error) || ''}`);
         } catch (e) {

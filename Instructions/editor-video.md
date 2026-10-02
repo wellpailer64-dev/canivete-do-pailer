@@ -415,6 +415,14 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
   batida exata, 1,997 s; ou 0,2333340 num trecho recortado) davam 1 quadro preto no corte (o 1º quadro da camada que
   entra sumia pelo `between` exato e o último pelo `0,233333/TB` truncado). O AutoFrame também alinha os clipes à grade.
 
+## Exportação: cor igual à prévia (achados do teste_export, 2026-10-02)
+- Vídeo HD sem marca de cor: o navegador (prévia) assume BT.709; o ffmpeg novo assumia BT.601 e convertia ao gravar a
+  saída BT.709 (até ~30 níveis mais saturado). `_marca_hd(path)` põe `setparams=...bt709` na entrada (base e camadas).
+- Fotos (JPEG/WebP) entram com `para_rgb_img` (BT.601), não com a matriz do vídeo HD (saíam mais escuras/saturadas).
+- O arquivo das sobreposições é gravado com a mesma matriz da ida para RGB e com a marca de cor.
+- `veTransVirtuais`: trecho de quadro-chave com curva vira um ponto por quadro (antes virava reta fora da transição:
+  zoom-soco e entrada da tela dividida do AutoFrame diferentes na exportação).
+
 ## Transição padrão (Ctrl+D / Ctrl+Shift+D) e fade de áudio (Potência constante)
 - Clicar na borda de um clipe seleciona a ponta (colchete laranja, `VE.bordaSel`), como a seleção de ponto de edição do Premiere.
 - **Ctrl+D:** aplica a transição de vídeo marcada no painel Transições (clique no cartão = contorno laranja,

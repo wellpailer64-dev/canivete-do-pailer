@@ -2184,6 +2184,31 @@ def _ca_exprs(ca, tv):
 _alfa_cache = {}
 
 
+_marca_cache = {}
+
+
+def _marca_hd(path):
+    """'setparams=...,' que marca como BT.709 um vídeo HD sem marca de cor (a convenção do navegador, ou seja, da prévia,
+    e dos players). Sem ela o ffmpeg novo trata a entrada como BT.601 e converte ao gravar a saída marcada BT.709: a
+    exportação saía mais saturada que a prévia (teste_export: até 30 níveis em vermelho/verde/ciano)."""
+    try:
+        chave = (path, os.path.getmtime(path))
+    except (OSError, TypeError):
+        return ""
+    if chave not in _marca_cache:
+        marca = ""
+        try:
+            if not _eh_imagem(path):
+                i = probe(path)
+                cs = str(i.get("color_space") or "").lower()
+                if cs in ("", "unknown", "unspecified", "reserved") and min(int(i.get("width") or 0), int(i.get("height") or 0)) >= 720:
+                    marca = "setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709,"
+        except Exception:
+            pass
+        _marca_cache[chave] = marca
+    return _marca_cache[chave]
+
+
 def _clipe_tem_alfa(path):
     """Clipe com transparência (o arquivo é consultado uma vez enquanto não mudar)."""
     try:
@@ -2447,6 +2472,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     mtx = ("bt2020" if cs.startswith("bt2020") else "bt601" if cs in ("bt470bg", "smpte170m")
            else "bt709" if cs == "bt709" or min(W0, H0) >= 720 else "bt601")
     para_rgb = f"scale=in_color_matrix={mtx},format=rgba"
+    # foto (JPEG, WebP): YUV em BT.601 (faixa cheia no JPEG) seja qual for o vídeo; com a matriz HD as fotos saíam mais
+    # escuras e saturadas que na prévia (teste_export, caso grade: verde 8 níveis). PNG é RGB: não muda nada
+    para_rgb_img = "scale=in_color_matrix=bt601,format=rgba"
     de_rgb = f"scale=out_color_matrix={mtx}:out_range=tv,format=yuva420p"
     # Modo turbo: timeline só de cortes (sem camadas, textos, legendas, efeitos) com NVENC → a fonte é decodificada
     # na placa e fica na memória dela até o encoder (sem descer para a RAM). Mesma velocidade ou mais, com a CPU
@@ -2524,7 +2552,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                                    f"fps=fps={fps}:start_time=0[v{k}]")
                 else:
                     g = _grupo(p[0])
-                    filtros.append(f"[{g[0]}:v:0]trim=start={_tempo_ffmpeg(p[0] - g[1])}:end={_tempo_ffmpeg(p[1] - g[1])},"
+                    filtros.append(f"[{g[0]}:v:0]{_marca_hd(path)}trim=start={_tempo_ffmpeg(p[0] - g[1])}:end={_tempo_ffmpeg(p[1] - g[1])},"
                                    f"setpts=PTS-STARTPTS,scale={W}:{H}:force_original_aspect_ratio=decrease"
                                    + (":flags=lanczos," if red < 1 else ",")
                                    + (f"format={pixfmt}," if alfa else "")
@@ -2555,7 +2583,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             cond = "+".join(f"between(t,{p[0]:.3f},{p[1]:.3f})" for p in segs)
             cmd += ["-i", path]
             entrada += 1
-            filtros.append(f"[0:v:0]select='{cond}',setpts=N/FRAME_RATE/TB[vc]")
+            filtros.append(f"[0:v:0]{_marca_hd(path)}select='{cond}',setpts=N/FRAME_RATE/TB[vc]")
             if has_audio and mix is None:
                 filtros.append(f"[0:a:0]aselect='{cond}',asetpts=N/SR/TB[ac]")
         if has_audio and mix is not None:
@@ -2702,7 +2730,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 vel = ""
             else:
                 ss = c.get("ss", 0.0)
-                src = (f"[{idx}:v:0]trim=start={_tempo_ffmpeg(c['s'] - ss)}:"
+                src = (f"[{idx}:v:0]{_marca_hd(c['path'] or path)}trim=start={_tempo_ffmpeg(c['s'] - ss)}:"
                        f"end={_tempo_ffmpeg(c['s'] - ss + c['fonte'])},")
                 vel = f"setpts=(PTS-STARTPTS)/{c['v']:.6f},"
             filtros_clip = efeitos + [f for f in ordem if f]
@@ -2719,7 +2747,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 # nada anima: o quadro já vai pronto (YUV com alfa) para o loop. Antes cada um dos quadros repetidos
                 # passava por RGBA → YUV de novo (texto em PNG 4K: ~40 s numa exportação de 20 s)
                 fixa = len(filtros_clip) == k
-                src += ",".join([para_rgb] + filtros_clip[:k] + ([de_rgb] if fixa else [])
+                src += ",".join([para_rgb_img] + filtros_clip[:k] + ([de_rgb] if fixa else [])
                                 + [f"loop=loop={n_q - 1}:size=1:start=0", f"setpts=N/({fps}*TB)"]) + ","
                 filtros_clip = filtros_clip[k:]
             reducao = (f"scale=w='2*trunc(iw*{pre_red:.6f}/2)':h='2*trunc(ih*{pre_red:.6f}/2)':flags=bicubic"

@@ -16,6 +16,12 @@ Play do Pocket Editor: `python testes/teste_play.py "<projeto.vcnvt>" [--segundo
 `--agente=9333`) mede agulha voltando, buscas, esperas, quadros perdidos e travadas; sai com 1 se passar dos limites.
 Rodar antes de release quando mexer em reprodução, áudio ou prévias.
 
+Exportação × prévia: `python testes/teste_export.py [--casos grade,camadas,...] [--4k]` abre o app sozinho (porta 9333),
+monta cada caso numa timeline nova com material gerado, exporta e compara quadro a quadro com o monitor (contagem de
+quadros, quadro preto só na exportação, diferença de imagem > 10, duração do som); sai com 1 se reprovar e guarda os
+pares em `%TEMP%/canivete_teste_export/saida`. Rodar antes de release quando mexer em exportação, camadas, efeitos,
+transições, cor ou AutoFrame. Caso novo para bug novo: acrescente em `CASOS` e confira que reprova sem a correção.
+
 Teste de 4K (estresse: material pesado, camadas, 10-bit, export, memória): plano e resultados em
 `Instructions/agente/teste-4k.md` — rodada 1 feita (2026-10-01), pendências no fim do arquivo.
 

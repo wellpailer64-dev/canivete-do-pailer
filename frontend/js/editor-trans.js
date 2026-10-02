@@ -246,7 +246,18 @@ function veTransVirtuais() {
             for (let T = j.ws; T < j.we; T += passo) ts.add(+T.toFixed(4));
             ts.add(+j.ws.toFixed(4)); ts.add(+j.we.toFixed(4));
         });
-        VE_KF_PROPS.forEach(k => { if (veKfOn(base, k)) base.k[k].forEach(q => ts.add(+veTlAt(base, q.t).toFixed(4))); });
+        // quadros-chave do clipe: os pontos e, nos trechos com curva (suave, entra, bézier...), um ponto por quadro —
+        // senão o trecho curvo fora da transição virava reta (zoom-soco e entrada da tela dividida no AutoFrame)
+        [...VE_KF_PROPS, 'sx', 'sy'].forEach(k => {
+            if (!veKfOn(base, k)) return;
+            const ks = base.k[k];
+            ks.forEach(q => ts.add(+veTlAt(base, q.t).toFixed(4)));
+            for (let j = 0; j < ks.length - 1; j++) {
+                if ((ks[j].i || 'lin') === 'lin' && !veKfCurve(ks[j])) continue;
+                const a = Math.max(veTlAt(base, ks[j].t), v.st), b = Math.min(veTlAt(base, ks[j + 1].t), veEnd(v));
+                for (let T = a; T < b; T += passo) ts.add(+T.toFixed(4));
+            }
+        });
         const tempos = [...ts].sort((a, b) => a - b);
         const k = {};
         let usaSx = false, usaSy = false;

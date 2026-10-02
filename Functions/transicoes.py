@@ -445,13 +445,21 @@ def render(base, h, job):
         W, H = int(info["width"]), int(info["height"])
         fps = float(info.get("fps") or 30)
         uc = _cl(float(job.get("uc", 0.5)), 0.0, 1.0)
+        # a mesma matriz de cor na ida para RGB e na volta, e a marca no arquivo (sem ela a exportação lê como BT.709
+        # um H.264 gravado em BT.601 e a cor da transição muda)
+        cs = str(info.get("color_space") or "").lower()
+        mtx = "bt709" if cs == "bt709" or (not cs and min(W, H) >= 720) else "bt601"
+        marca = {"bt709": ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"],
+                 "bt601": ["-colorspace", "smpte170m", "-color_primaries", "smpte170m", "-color_trc", "smpte170m"]}[mtx]
         ff = ffmpeg_path()
         sem_janela = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-        ler = subprocess.Popen([ff, "-v", "error", "-i", meio, "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"],
+        ler = subprocess.Popen([ff, "-v", "error", "-i", meio, "-vf", f"scale=in_color_matrix={mtx},format=rgb24",
+                                "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"],
                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, creationflags=sem_janela)
         grava = subprocess.Popen([ff, "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}",
-                                  "-r", f"{fps:.6f}", "-i", "pipe:0", "-c:v", "libx264", "-preset", "fast",
-                                  "-crf", "10", "-g", "15", "-pix_fmt", "yuv420p", "-movflags", "+faststart", parte],
+                                  "-r", f"{fps:.6f}", "-i", "pipe:0", "-vf", f"scale=out_color_matrix={mtx}:out_range=tv,format=yuv420p",
+                                  "-c:v", "libx264", "-preset", "fast", "-crf", "10", "-g", "15", "-pix_fmt", "yuv420p"]
+                                 + marca + ["-color_range", "tv", "-movflags", "+faststart", parte],
                                  stdin=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=sem_janela)
         tam = W * H * 3
         try:
