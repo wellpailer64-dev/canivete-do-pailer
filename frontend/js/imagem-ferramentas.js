@@ -1050,6 +1050,13 @@ async function ieTransfIniciar(M0) {
     if (!alvos.length) { ieToast(ieT('Selecione uma camada com pixels')); return; }
     if (alvos.some(L => L.travas & 4 || L.travas & 0x80000000)) { ieToast(ieT('Camada com posição travada')); return; }
     if (alvos.some(L => L.tipo === 'preenchimento')) { ieToast(ieT('Camada de preenchimento não se transforma')); return; }
+    // texto do PSD ainda não editado: vira texto do editor para ser redesenhado nítido em qualquer escala (como no
+    // Photoshop). Só se a fonte está instalada e o texto tem um estilo só; senão continua esticando os pixels.
+    const prep = alvos.filter(L => L.tipo === 'texto' && !L.txt && L.texto && !L._txtVetor && !L._txtSemVetor).map(async L => {
+        const t = await ieTextoDoPsd(L, true);
+        if (t && !t.semFonte && !t.misto && IE.fontesOk.has(t.css)) L._txtVetor = t; else L._txtSemVetor = true;
+    });
+    if (M0 && prep.length) await Promise.all(prep);
     // seleção numa camada de pixels: transforma só o recorte (vira a camada flutuante)
     let R0 = null;
     for (const L of alvos) {
@@ -1086,7 +1093,12 @@ function ieTransfPrevia() {
     for (const o of t.orig) {
         const L = o.L;
         R = ieRUniao(R, o.Rantes);
-        if (L.c0) {
+        const txt = L.tipo === 'texto' && (L.txt || L._txtVetor);
+        if (txt) {   // texto: redesenhado com a fonte na escala nova (nítido), não esticado
+            const tmp = { txt: { ...txt, m: ieMatMul(M, txt.m || IE_ID) } };
+            ieTextoRender(tmp);
+            L._tfPrev = tmp.c ? { c: tmp.c, x: tmp.x, y: tmp.y } : null;
+        } else if (L.c0) {
             const tf = ieMatMul(M, o.tf || IE_ID);
             L._tfPrev = ieTransformarPlano({ c: L.c0.c, x: L.c0.x, y: L.c0.y }, tf);
         } else L._tfPrev = ieTransformarPlano({ c: o.c, x: o.x, y: o.y }, M);
@@ -1112,6 +1124,8 @@ function ieTransfAplicar() {
         if (ident) continue;
         if (L.tf) L.tf = ieMatMul(M, o.tf || IE_ID);
         if (prev) { L.c = prev.c; L.x = prev.x; L.y = prev.y; }
+        if (!L.txt && L._txtVetor) { L.txt = L._txtVetor; delete L.c0; }   // a partir daqui a tela mostra o texto desenhado aqui
+        delete L._txtVetor;
         if (L.txt) L.txt.m = ieMatMul(M, L.txt.m || IE_ID);
         if (L.m && L.m.c) {
             const n = ieTransformarPlano(L.m, M, L.m.fundo || 0);

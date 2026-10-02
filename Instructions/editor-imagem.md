@@ -47,6 +47,9 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   `ie_fonte_url`): o nome GDI (cortado em 31 letras) não batia com o CSS e o texto caía numa fonte qualquer.
 - Editando, o texto é desenhado na tela com a fonte, a cor e os efeitos da camada; a caixa por cima é transparente
   (só cursor e seleção). Sem mudança, volta aos pixels do Photoshop.
+- Escalar/girar texto (Ctrl+T, alças, L/A) redesenha com a fonte na escala nova: nítido, como no Photoshop. Texto do
+  PSD vira texto do editor nessa hora (só com a fonte instalada e um estilo só; senão estica os pixels). O tamanho
+  mostrado é o real (tam × escala da matriz), como o painel Caractere do Photoshop.
 
 ## Efeitos e opções de mesclagem na composição
 - Ordem de desenho como no Photoshop (de baixo para cima): sombra, brilho externo, conteúdo (com o Preenchimento),

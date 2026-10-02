@@ -178,7 +178,7 @@ function ieOpcoesRender(soValores) {
             const estilos = ((IE.estilos || {})[fam] || []).map(e => e.estilo);
             h += `<input class="ie-op-fonte" list="ie-fontes-lista" value="${ieEsc(fam)}" data-tx="fam" title="${ieT('Fonte')}">
                 <select data-tx="estilo" title="${ieT('Estilo')}">${(estilos.length ? estilos : [est]).map(e => `<option ${e === est ? 'selected' : ''}>${ieEsc(e)}</option>`).join('')}</select>
-                <label class="ie-op-campo"><input type="number" data-tx="tam" value="${+(+tam).toFixed(2)}" min="1" max="2000" step="0.5" style="width:62px"> px</label>
+                <label class="ie-op-campo"><input type="number" data-tx="tamEf" value="${+(tam * (t ? ieTextoEscala(t) : 1)).toFixed(2)}" min="1" max="5000" step="0.5" style="width:62px"> px</label>
                 <div class="ie-segm">${[['left', 'Esq.'], ['center', 'Centro'], ['right', 'Dir.']].map(([v, r]) => `<button data-tx="alin" data-v="${v}" class="${alin === v ? 'on' : ''}">${ieT(r)}</button>`).join('')}</div>
                 <button class="ie-cor ie-cor-op" data-tx="cor" style="background:${cor}" title="${ieT('Cor do texto')}"></button>
                 <label class="ie-op-campo" title="${ieT('Espaçamento entre letras')}">VA <input type="number" data-tx="esp" value="${Math.round(t ? t.esp : o.esp)}" step="10" style="width:56px"></label>
@@ -223,7 +223,7 @@ function ieOpcoesInstalar() {
             const k = el.dataset.tx;
             if (k === 'cor') return;
             let v = el.dataset.v !== undefined ? el.dataset.v : el.value;
-            if (k === 'tam' || k === 'esp' || k === 'ent') v = parseFloat(v) || 0;
+            if (k === 'tam' || k === 'tamEf' || k === 'esp' || k === 'ent') v = parseFloat(v) || 0;
             if (k === 'fam') { if (!(IE.estilos || {})[v]) return; ieTextoEstilo({ fam: v, estilo: 'Regular' }); ieOpcoesRender(); return; }
             ieTextoEstilo({ [k]: v });
             if (k === 'alin') ieOpcoesRender();

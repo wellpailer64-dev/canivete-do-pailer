@@ -149,7 +149,8 @@ function ieAplicarEstiloFonte(t, fam, e) {
 }
 
 // texto vindo do PSD → modelo editável
-async function ieTextoDoPsd(L) {
+// silencioso: sem avisos (usado para redesenhar o texto ao transformar); semFonte/misto dizem se dá para redesenhar igual
+async function ieTextoDoPsd(L, silencioso = false) {
     const t = L.texto;
     if (!t || !t.runs || !t.runs.length) return null;
     const estilos = await ieCarregarFontes();
@@ -162,11 +163,11 @@ async function ieTextoDoPsd(L) {
         m: ieMatMul(L.tf || IE_ID, t.tf || IE_ID),
     };
     if (f) ieAplicarEstiloFonte(txt, f.fam, f.e);
-    else { ieAplicarEstiloFonte(txt, 'Arial', ieEstiloDe('Arial', 'Regular')); ieToast(`${ieT('Fonte')} ${run.fonte} ${ieT('não instalada: usando Arial')}`); }
+    else { ieAplicarEstiloFonte(txt, 'Arial', ieEstiloDe('Arial', 'Regular')); txt.semFonte = true; if (!silencioso) ieToast(`${ieT('Fonte')} ${run.fonte} ${ieT('não instalada: usando Arial')}`); }
     if (run.neg && !txt.neg) { txt.neg = true; txt.negFalso = true; }
     if (run.ita && !txt.ital) { txt.ital = true; txt.itaFalso = true; }
     await ieGarantirFonte(txt);
-    if (t.misto) ieToast(ieT('Texto com estilos misturados: ao editar, fica com o estilo do começo'));
+    if (t.misto) { txt.misto = true; if (!silencioso) ieToast(ieT('Texto com estilos misturados: ao editar, fica com o estilo do começo')); }
     txt.psOrig = run.fonte;
     txt.orig = { tam: txt.tam, cor: txt.cor, esp: txt.esp, ent: txt.ent, alin: txt.alin };
     return txt;
@@ -278,9 +279,13 @@ function ieTextoInstalar() {
 }
 
 // mudou estilo pela barra de opções: vale para o texto em edição ou para as camadas de texto selecionadas
+// escala da matriz do texto (o tamanho que aparece = t.tam × escala, como no Photoshop depois de transformar)
+function ieTextoEscala(t) { const m = (t && t.m) || IE_ID; return Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])) || 1; }
+
 function ieTextoEstilo(mud) {
     const doc = IE.doc;
     Object.assign(IE.op.texto, mud);
+    if (mud.tamEf !== undefined) IE.op.texto.tam = mud.tamEf;
     if (!doc) return;
     const ed = IE.edTexto;
     const alvos = ed ? [ed.L] : ieSelecionadas(doc).filter(L => L.txt || L.texto);
@@ -296,6 +301,7 @@ function ieTextoEstilo(mud) {
                 await ieGarantirFonte(t);
             }
             for (const k of ['tam', 'cor', 'alin', 'esp', 'ent', 'caixaAlta']) if (mud[k] !== undefined) t[k] = mud[k];
+            if (mud.tamEf !== undefined) t.tam = Math.max(0.5, mud.tamEf / ieTextoEscala(t));
             if (mud.negFalso !== undefined) { t.negFalso = mud.negFalso; const e = ieEstiloDe(t.fam, t.estilo); t.neg = mud.negFalso || !!(e && e.gdi_negrito); }
             if (mud.itaFalso !== undefined) { t.itaFalso = mud.itaFalso; const e = ieEstiloDe(t.fam, t.estilo); t.ital = mud.itaFalso || !!(e && (e.italico || e.gdi_italico)); }
             if (ed) { ieTextoPosicionar(); ieTextoAoVivo(L); continue; }
@@ -395,7 +401,7 @@ function ieTextoPropsHtml(t, run) {
         <button class="ie-fonte-btn" data-tx="famPick" title="${ieT('Fonte')}"><span style="${css}">${ieEsc(fam)}</span>${ieIco('chev')}</button>
         <div class="ie-prop-grade ie-prop-tx">
             <label>${ieT('Estilo')} <select data-tx="estilo">${(estilos.length ? estilos : [est || 'Regular']).map(e => `<option ${e === est ? 'selected' : ''}>${ieEsc(e)}</option>`).join('')}</select></label>
-            <label title="${ieT('Tamanho')}">T <input type="number" data-tx="tam" min="1" max="2000" step="0.5" value="${+(+v('tam', 72)).toFixed(2)}"> px</label>
+            <label title="${ieT('Tamanho')}">T <input type="number" data-tx="tamEf" min="1" max="5000" step="0.5" value="${+(v('tam', 72) * ieTextoEscala(t)).toFixed(2)}"> px</label>
             <label title="${ieT('Espaçamento entre letras (milésimos de eme)')}">VA <input type="number" data-tx="esp" step="10" value="${Math.round(v('esp', 0))}"></label>
             <label title="${ieT('Entrelinha (0 = automática)')}">${ieT('Entrelinha')} <input type="number" data-tx="ent" min="0" value="${Math.round(t ? t.ent : 0)}"></label>
             <label>${ieT('Cor')} <button class="ie-cor ie-cor-op" data-tx="cor" style="background:${v('cor', '#000')}"></button></label>

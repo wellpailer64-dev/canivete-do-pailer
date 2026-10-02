@@ -291,7 +291,7 @@ function ieTextoAtalho(ev) {
     if (c && s && a && code === 'KeyA') { ieTextoEstilo({ ent: 0 }); return true; }
     if (c && s && (code === 'Period' || code === 'Comma')) {
         const d = (code === 'Period' ? 1 : -1) * (a ? 10 : 2);
-        ieTextoEstilo({ tam: Math.max(1, (t.tam || 72) + d) });
+        ieTextoEstilo({ tamEf: Math.max(1, (t.tam || 72) * ieTextoEscala(t) + d) });
         return true;
     }
     if (a && !s && (ev.key === 'ArrowUp' || ev.key === 'ArrowDown')) {
