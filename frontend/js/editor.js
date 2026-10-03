@@ -2914,6 +2914,7 @@ function veParkExtras(n, limpar, soCamadas) {
 // Redesenho pedido por slider/arraste: no máximo um por quadro da tela (vários eventos viram um desenho)
 let veMonQueued = false;
 function veDrawMonitorSoon() {
+    if (typeof vePrConferir === 'function') vePrConferir();   // trecho renderizado só vale se ainda bater (editor-render.js)
     if (veMonQueued) return;
     veMonQueued = true;
     veRaf($ve('ve-canvas'), () => { veMonQueued = false; veDrawMonitor(); });

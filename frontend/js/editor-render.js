@@ -67,6 +67,10 @@ function vePrProjetoSalvo(chaveAntiga) {
 
 // Edição: recalcula os segmentos depois (veCachePodar chama quando a edição termina)
 function vePrInvalidar() { VEPR.sujo = true; VEPRA.pausado = false; VEPRA.mexeu = performance.now(); }
+// Algo mudou na imagem (veDrawMonitorSoon): o próximo desenho confere a assinatura dos trechos antes de usar o
+// arquivo renderizado. Sem isso, mexer num slider (Luz e Cor, efeitos) com o monitor parado num trecho já renderizado
+// continuava mostrando o arquivo antigo até a agulha andar. Não adia a renderização automática (vePrInvalidar adia).
+function vePrConferir() { VEPR.sujo = true; }
 
 // ── segmentos ──
 function vePrLimpo(c) {
