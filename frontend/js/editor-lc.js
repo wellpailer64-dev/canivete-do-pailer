@@ -559,10 +559,16 @@ function veLcClip() {
 }
 function veLcFx(c) { return c && c.fx ? c.fx.find(f => f.t === 'lc') : null; }
 
-// Garante o efeito Luz e Cor no clipe selecionado (entra no fim da lista, como no Premiere)
-function veLcEnsure() {
+// Clipes que o painel edita: o selecionado e, com vários selecionados, todos os que aceitam cor (como aplicar um
+// efeito). Cada mudança vale para cada um: o que foi mexido fica igual em todos, o resto de cada clipe continua dele.
+function veLcAlvos() {
     const c = veLcClip();
-    if (!c) return null;
+    if (!c) return [];
+    return [c, ...veSelLista().filter(x => x !== c && !veIsAudio(x) && !veLocked(x))];
+}
+
+// Garante o efeito Luz e Cor no clipe (entra no fim da lista, como no Premiere)
+function veLcEnsureEm(c) {
     let f = veLcFx(c);
     if (!f) {
         const v = {};
@@ -570,7 +576,19 @@ function veLcEnsure() {
         f = { id: veFxNewId(), t: 'lc', on: true, v };
         c.fx = [...(c.fx || []), f];
     }
-    return f.id;
+    return f;
+}
+function veLcEnsure() {
+    const c = veLcClip();
+    return c ? veLcEnsureEm(c).id : null;
+}
+
+// Aplica fn (recebe uma cópia do efeito e a devolve) no Luz e Cor de cada clipe alvo (cria onde faltar)
+function veLcEditarTodos(fn, criar = true) {
+    veLcAlvos().forEach(c => {
+        const f = criar ? veLcEnsureEm(c) : veLcFx(c);
+        if (f) c.fx = c.fx.map(x => (x.id === f.id ? fn({ ...x, v: { ...x.v } }) : x));
+    });
 }
 
 function veLcParam(k) { return VE_FX.lc.params.find(p => p.k === k); }
@@ -619,10 +637,12 @@ function veLcRender() {
     pane.hidden = !c;
     if (!c) { VELC.key = ''; return; }
     const v = f ? veFxValues(f) : veLcDefaults();
-    const key = VE.sel + '|' + (f ? f.id + (f.on !== false) : '') + '|' + JSON.stringify(v) + VELC.ch + VELC.ct;
+    const key = VE.sel + '|' + veLcAlvos().length + '|' + (f ? f.id + (f.on !== false) : '') + '|' + JSON.stringify(v) + VELC.ch + VELC.ct;
     if (key === VELC.key) return;
     VELC.key = key;
-    $ve('ve-lc-title').innerHTML = `${veNomeClipe(c)} ${VE.sel + 1}<span>${f ? (f.on === false ? 'desligado' : 'Luz e Cor aplicado') : 'sem ajustes'}</span>`;
+    const nAlvos = veLcAlvos().length;
+    $ve('ve-lc-title').innerHTML = `${veNomeClipe(c)} ${VE.sel + 1}<span>${nAlvos > 1 ? `${veT('e mais')} ${nAlvos - 1} · ${veT('as mudanças valem para os')} ${nAlvos} ${veT('selecionados')}`
+        : f ? (f.on === false ? 'desligado' : 'Luz e Cor aplicado') : 'sem ajustes'}</span>`;
     const on = $ve('ve-lc-on');
     on.classList.toggle('off', !!f && f.on === false);
     on.disabled = !f;
@@ -669,9 +689,8 @@ function veLcSecNeutral(sec, v) {
 
 // Muda o efeito do clipe selecionado (cria se preciso); fn recebe o efeito já copiado
 function veLcChange(fn) {
-    const id = veLcEnsure();
-    if (!id) return;
-    veFxEdit(id, x => { fn(x); return x; });
+    if (!veLcClip()) return;
+    veLcEditarTodos(x => { fn(x); return x; });   // todos os clipes selecionados (veLcAlvos)
     veRenderFxControls();
     veLcRender();
     veDrawMonitorSoon();
@@ -1017,24 +1036,26 @@ function veLcAction(el) {
     }
     if (a === 'ch') { VELC.ch = el.dataset.ch; VELC.key = ''; veLcRender(); return; }
     if (a === 'ctab') { VELC.ct = el.dataset.ct; VELC.key = ''; veLcRender(); return; }
+    // vale para todos os clipes selecionados que têm Luz e Cor (o principal decide liga/desliga)
     const c = veLcClip(), f = veLcFx(c);
     if (!f) return;
     vePushHistory();
     if (a === 'on') {
-        veFxEdit(f.id, x => ({ ...x, on: x.on === false }));
+        const on = f.on === false;
+        veLcEditarTodos(x => ({ ...x, on }), false);
     } else if (a === 'reset') {
-        veFxEdit(f.id, x => { x.v = veLcDefaults(); return x; });
+        veLcEditarTodos(x => { x.v = veLcDefaults(); return x; }, false);
     } else if (a === 'rodareset') {
         const r = VE_LC_RODAS.find(x => x[0] === el.dataset.w);
-        veFxEdit(f.id, x => { const cw = { ...(x.v.cw || {}) }; delete cw[r[0]]; x.v.cw = cw; x.v[r[2]] = 0; return x; });
+        veLcEditarTodos(x => { const cw = { ...(x.v.cw || {}) }; delete cw[r[0]]; x.v.cw = cw; x.v[r[2]] = 0; return x; }, false);
     } else if (a === 'resetsec') {
         const sec = VE_LC_SECOES.find(x => x.id === el.closest('[data-sec]').dataset.sec);
-        veFxEdit(f.id, x => {
+        veLcEditarTodos(x => {
             if (sec.curvas) { x.v.cv = {}; x.v.hc = {}; }
             else if (sec.rodas) { x.v.cw = {}; VE_LC_RODAS.forEach(([, , k]) => { x.v[k] = 0; }); }
             else sec.grupos.forEach(g => g.ks.forEach(k => { x.v[k] = veLcParam(k).def; }));
             return x;
-        });
+        }, false);
     }
     veRefresh();
 }
