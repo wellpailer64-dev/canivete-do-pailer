@@ -179,6 +179,26 @@ def instalar_google(familia):
         except Exception:
             continue
     if not arquivos:
+        # sem o GitHub (limite de 60 consultas/hora sem login): a API de CSS do Google Fonts entrega TTF quando o
+        # navegador "não conhece" woff2 — um arquivo por peso/itálico
+        try:
+            pesos = ",".join(f"{p}{i}" for i in ("", "i") for p in range(100, 1000, 100))
+            req = urllib.request.Request(f"https://fonts.googleapis.com/css?family={urllib.request.quote(familia)}:{pesos}", headers={"User-Agent": "Mozilla/4.0"})
+            with urllib.request.urlopen(req, timeout=20) as r:
+                css = r.read().decode("utf-8", "replace")
+            vistos = set()
+            arquivos = []
+            for bloco in re.findall(r"@font-face\s*\{(.*?)\}", css, re.S):
+                url = re.search(r"url\((https://[^)]+\.ttf)\)", bloco)
+                peso = re.search(r"font-weight:\s*(\d+)", bloco)
+                ital = "Italic" if re.search(r"font-style:\s*italic", bloco) else ""
+                if not url or url.group(1) in vistos:
+                    continue
+                vistos.add(url.group(1))
+                arquivos.append({"name": f"{re.sub(r'[^A-Za-z0-9]', '', familia)}-{peso.group(1) if peso else '400'}{ital}.ttf", "download_url": url.group(1)})
+        except Exception:
+            arquivos = None
+    if not arquivos:
         return {"success": False, "error": f"'{familia}' não encontrada no Google Fonts"}
     pasta = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "Microsoft", "Windows", "Fonts")
     os.makedirs(pasta, exist_ok=True)

@@ -134,3 +134,17 @@ Peça: `D:\kanivete_testes\carrossel3d\` (carrossel.html + .iknv + export/). Rep
 11. **Ferramentas novas que encurtam tudo isto** (plano-cena.md, "Fluxo barato"): `data-cor` no lugar do ajuste de cor à
    mão, `data-guardar`/`recurso:` para não gerar de novo, `--referencia --comparar` no lugar de medir à mão, `--ver
    slide:N` e `--variacoes` no lugar de prévias grandes, `KNV.etapa` para receitas que podem rodar de novo.
+
+## Carrossel "Valer" (corrida, 2026-10-03) — ~46 mil tokens (o 3D custou ~146 mil)
+Modelo de estudo: `D:\kanivete_biblioteca\modelos\carrossel-valer-corrida`. O que funcionou e as armadilhas:
+- Fluxo: `--amostras` (fontes) → HTML medido da referência (×2,7; 400×534 → 1080×1440) → `--referencia --comparar`
+  (3 rodadas) → `--ver` só no detalhe → `KNV.etapa` para o acabamento → `--exportar`. Sem prévia grande nenhuma vez.
+- Pessoa do FLUX atravessando a emenda: `data-proporcao="3:4"`, `object-fit: cover`, `object-position: 50% 0%`; luz
+  lateral = div com degradês escuros por cima da foto (atrás dos textos). Elementos soltos ANTES das sections no HTML
+  para ficarem atrás dos textos.
+- Título gasto: camada de manchas na cor do fundo (ruído fino + largo, limiar) presa ao GRUPO do título (corte).
+- Armadilha: fundo num `<span>` (palavra destacada) ocupa a altura da linha e cobre a cedilha/acento da linha de
+  cima — faça a caixa como div separada atrás do texto, no tamanho medido.
+- Confira a proporção largura/altura das letras na referência para escolher a fonte (Passion One 400, não Archivo).
+- Instalar fonte: se o GitHub der limite, `Functions/fontes.py` cai na API de CSS do Google Fonts (TTF por peso).
+- Pendente: `<g transform>` dentro de `<svg>` parece não ser aplicado pela cena (manchas não se moveram) — investigar.
