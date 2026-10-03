@@ -121,8 +121,10 @@ const KNV = {
     },
     // alinha a camada ativa a `a` (nome/id de camada, ou nada = página): h 'esq'|'centro'|'dir', v 'topo'|'meio'|'base';
     // dentro = false encosta por fora (ex.: h 'dir' + dentro false = logo à direita de `a`); folga em px
-    alinhar({ a, h, v, dentro = true, folga = 0 } = {}) {
-        const L = ieAtiva(IE.doc), me = KNV.caixa(L.id), R = a == null ? { x: 0, y: 0, w: IE.doc.w, h: IE.doc.h } : KNV.caixa(a);
+    // grupo = [nomes]: o bloco inteiro (caixa que junta todos) se move junto, como várias camadas selecionadas
+    alinhar({ a, h, v, dentro = true, folga = 0, grupo } = {}) {
+        const L = ieAtiva(IE.doc), R = a == null ? { x: 0, y: 0, w: IE.doc.w, h: IE.doc.h } : KNV.caixa(a);
+        const me = grupo ? KNV.caixaGrupo(grupo) : KNV.caixa(L.id);
         let dx = 0, dy = 0;
         if (h === 'centro') dx = R.x + R.w / 2 - (me.x + me.w / 2);
         else if (h === 'esq') dx = dentro ? R.x + folga - me.x : R.x - folga - (me.x + me.w);
@@ -130,7 +132,36 @@ const KNV = {
         if (v === 'meio') dy = R.y + R.h / 2 - (me.y + me.h / 2);
         else if (v === 'topo') dy = dentro ? R.y + folga - me.y : R.y - folga - (me.y + me.h);
         else if (v === 'base') dy = dentro ? R.y + R.h - folga - (me.y + me.h) : R.y + R.h + folga - me.y;
-        return KNV.mover(Math.round(dx), Math.round(dy));
+        if (!grupo) return KNV.mover(Math.round(dx), Math.round(dy));
+        for (const n of grupo) { KNV.ativar(n); KNV.mover(Math.round(dx), Math.round(dy)); }
+        return KNV.caixaGrupo(grupo);
+    },
+    // encosta a camada ativa nas camadas `em` (nome ou lista) andando para `lado` ('baixo'|'cima'|'esq'|'dir') até
+    // ficar a `respiro` px dos PIXELS delas (não da caixa): encaixe de palavras em script, folha rente ao texto.
+    // Só conta onde as duas se cruzam (colunas para baixo/cima, linhas para esq/dir). Sem cruzamento, não move.
+    encostar(em, { lado = 'baixo', respiro = 8 } = {}) {
+        const L = ieAtiva(IE.doc), Q = 2, alvo = [].concat(em);
+        const pts = X => { const r = ieRaster(X); if (!r) return []; const f = r.forma || r, w = f.c.width, h = f.c.height, a = ieCtx(f.c).getImageData(0, 0, w, h).data, o = [];
+            for (let y = 0; y < h; y += Q) for (let x = 0; x < w; x += Q) if (a[(y * w + x) * 4 + 3] >= 64) o.push([x + f.x, y + f.y]); return o; };
+        const vert = lado === 'baixo' || lado === 'cima', s = lado === 'baixo' || lado === 'dir' ? 1 : -1;
+        // por faixa (coluna ou linha): a borda da camada no sentido do movimento e a borda das outras do lado de lá
+        const borda = (ps, frente) => { const m = new Map(); for (const [x, y] of ps) { const k = Math.floor((vert ? x : y) / Q), v = vert ? y : x;
+            const ant = m.get(k); if (ant == null || (frente ? v * s > ant * s : v * s < ant * s)) m.set(k, v); } return m; };
+        const meus = pts(L), c = meus.reduce((t, p) => t + (vert ? p[1] : p[0]), 0) / (meus.length || 1), minha = borda(meus, true);
+        // das outras, só o que está à frente do meio da camada (o que fica atrás não bloqueia o caminho)
+        const delas = borda(alvo.flatMap(n => { let X = null; iePercorrer(IE.doc.camadas, Y => { if (!X && (Y.id === n || Y.nome === n)) X = Y; }); return X ? pts(X) : []; })
+            .filter(p => ((vert ? p[1] : p[0]) - c) * s > 0), false);
+        let folga = Infinity;
+        for (const [k, v] of minha) { const o = delas.get(k); if (o != null) folga = Math.min(folga, (o - v) * s); }
+        if (!isFinite(folga)) return KNV.info();
+        const d = Math.round((folga - respiro) * s);
+        return vert ? KNV.mover(0, d) : KNV.mover(d, 0);
+    },
+    // caixa que junta várias camadas (+ centro), para alinhar/girar um bloco: girar(a, {centro: [g.cx, g.cy]})
+    caixaGrupo(nomes) {
+        const bs = nomes.map(n => KNV.caixa(n)).filter(Boolean);
+        const x = Math.min(...bs.map(b => b.x)), y = Math.min(...bs.map(b => b.y)), x2 = Math.max(...bs.map(b => b.x + b.w)), y2 = Math.max(...bs.map(b => b.y + b.h));
+        return { x, y, w: x2 - x, h: y2 - y, cx: (x + x2) / 2, cy: (y + y2) / 2 };
     },
     mover(dx, dy) { const L = ieAtiva(IE.doc), R = ieRCamada(L); L.x += dx; L.y += dy; if (L.tf) L.tf = [...L.tf.slice(0, 4), L.tf[4] + dx, L.tf[5] + dy]; if (L.m) { L.m.x += dx; L.m.y += dy; } if (L.txt) L.txt.m = [...L.txt.m.slice(0, 4), L.txt.m[4] + dx, L.txt.m[5] + dy]; ieCamadaMudou(L, R); ieHist(ieT('Mover')); return KNV.info(); },
     // muda a camada ativa de lugar na pilha: logo acima da camada `ref` (nome ou id)
@@ -150,8 +181,9 @@ const KNV = {
     objetoInteligente() { IE_CMDS.objetoInteligente(IE.doc); return KNV.info(); },
     async duplicar(nome) { await ieCmd('duplicar'); return nome ? KNV.renomear(nome) : KNV.info(); },
     // Remover plano de fundo (IA): máscara do assunto; aplicar = true deixa os pixels já recortados
-    async removerFundo({ aplicar = false } = {}) {
-        await ieRemoverFundo(IE.doc);
+    // (recorte profissional: matting + filtro guiado + cores sem o fundo misturado, ~30 s; rapido = só a máscara lite, ~5 s)
+    async removerFundo({ aplicar = false, rapido = false } = {}) {
+        await ieRemoverFundo(IE.doc, { rapido });
         if (aplicar && ieAtiva(IE.doc).m) await ieCmd('mascaraAplicar');
         return KNV.info();
     },
@@ -164,6 +196,37 @@ const KNV = {
         for (const [x, y] of pontos) IE_BORRACHA_MAGICA.down({ x, y }, {}, IE.doc);
         Object.assign(o, antes);
         return KNV.info();
+    },
+
+    // ── gerar com IA (FLUX.2 klein, imagem-gerador.js): a imagem entra como camada nova acima da ativa (ou de `acima`)
+    // fundo = acrescenta "fundo branco liso, assunto inteiro" ao prompt; recortar = true: recorte profissional (máscara,
+    // borda sem halo, ~30 s); 'borracha' = Borracha mágica nos cantos + vãos (instantâneo, borda dura; 'cantos' = só o
+    // fundo contínuo). ref = nome de camada | 'doc' | caminho → edita a partir dela (descreva a MUDANÇA).
+    // x/y/larguraNoDoc posicionam o CONTEÚDO (como colocar). Mesmo prompt+tamanho+semente = mesma imagem (cache em disco):
+    // fixe a semente nas receitas. Devolve info() + {semente, segundos, cache}. ~20 s por 1024² na RTX 3050.
+    async gerar(prompt, { largura = 1024, altura = 1024, semente = -1, ref, fundo = true, recortar = false, tol = 40,
+        nome, acima, x, y, larguraNoDoc, angulo = 0 } = {}) {
+        if (acima != null) KNV.ativar(acima);
+        const ehCamada = ref != null && ieTodas(IE.doc).some(L => L.nome === ref || L.id === ref);
+        const refs = ref == null ? [] : [ehCamada || ref === 'doc' || ref === 'camada' ? ieGerRefPng(ref) : ref].filter(Boolean);
+        const p = prompt.trim() + (fundo && !refs.length ? IE_GER_FUNDO : '');
+        const r = await ieGerarCamada({ prompt: p, largura, altura, semente, refs }, nome || 'IA: ' + prompt.trim().slice(0, 40));
+        if (!r) throw new Error('não gerou: ' + prompt.slice(0, 60));
+        if (recortar === true || recortar === 'ia') await KNV.removerFundo();   // recorte profissional (máscara retocável)
+        else if (recortar === 'borracha' || recortar === 'cantos') {   // fundo pelos 4 cantos; depois os vãos (folha furada, entre pétalas): o mesmo branco, mais justo
+            const i = KNV.info(), cantos = [[i.x + 2, i.y + 2], [i.x + i.w - 3, i.y + 2], [i.x + 2, i.y + i.h - 3], [i.x + i.w - 3, i.y + i.h - 3]];
+            KNV.borrachaMagica(cantos, { tol });
+            if (recortar !== 'cantos') {   // um pixel branco puro e opaco que sobrou = um vão: apaga essa cor na camada toda
+                const L = ieAtiva(IE.doc), w = L.c.width, h = L.c.height, d = ieCtx(L.c).getImageData(0, 0, w, h).data;
+                for (let k = 0; k < d.length; k += 4 * 7) if (d[k + 3] === 255 && d[k] >= 250 && d[k + 1] >= 250 && d[k + 2] >= 250) {
+                    const px = (k / 4) % w, py = Math.floor(k / 4 / w);
+                    KNV.borrachaMagica([[L.x + px, L.y + py]], { tol, contiguo: false }); break;
+                }
+            }
+        }
+        if (x != null || y != null || larguraNoDoc || angulo) KNV.transformar({ x, y, largura: larguraNoDoc, angulo });
+        await KNV._quadro();
+        return { ...KNV.info(), semente: r.semente, segundos: r.segundos, cache: r.cache };
     },
 
     // ── seleção e pintura ──
@@ -311,12 +374,21 @@ const KNV = {
             const pts = []; for (let i = 0; i <= pontas * 2; i++) { const rr = i % 2 ? r * interno : r, t = (ang + i * 180 / pontas) * Math.PI / 180; pts.push([cx + Math.cos(t) * rr, cy + Math.sin(t) * rr]); }
             return [pts];
         },
-        // ramo: linha a→b com folhinhas alternadas (laços) a cada `passo`
-        ramo(a, b, { passo = 30, folha = 18 } = {}) {
-            const L = Math.hypot(b[0] - a[0], b[1] - a[1]), ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L, out = [[a, b]];
-            for (let s = passo / 2, i = 0; s < L; s += passo, i++) {
-                const l = i % 2 ? -1 : 1, px = a[0] + ux * s, py = a[1] + uy * s, P = (f, o) => [px + ux * f - uy * o * l, py + uy * f + ux * o * l];
-                out.push([P(0, 0), P(folha * 0.4, folha), P(folha, folha * 1.1), P(folha * 0.8, 0)]);
+        // ramo: haste a→b (curva = flecha em px, + = para a esquerda de a→b) com folhinhas em gota, fechadas, apontando
+        // para frente e para fora (angulo° da haste); pares = folha dos dois lados em cada nó (laurel), senão alternadas;
+        // as folhas diminuem no fim (ponta do ramo). Laurel centrado: dois ramos saindo do meio, um para cada lado.
+        ramo(a, b, { passo = 30, folha = 18, pares = false, curva = 0, angulo = 40 } = {}) {
+            const pt = t => { const L = Math.hypot(b[0] - a[0], b[1] - a[1]), nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L, f = 4 * t * (1 - t) * curva;
+                return [a[0] + (b[0] - a[0]) * t + nx * f, a[1] + (b[1] - a[1]) * t + ny * f]; };
+            const haste = []; for (let t = 0; t <= 1.0001; t += 0.05) haste.push(pt(t));
+            const L = haste.reduce((s, p, i) => s + (i ? Math.hypot(p[0] - haste[i - 1][0], p[1] - haste[i - 1][1]) : 0), 0), out = [haste];
+            const gota = ([x, y], dx, dy, tam) => {   // contorno fechado, ponta fina: largura sen(πf)·(1−0.45f)·0.2 ao longo de dx,dy
+                const c = []; for (let k = 0; k <= 24; k++) { const f = k <= 12 ? k / 12 : (24 - k) / 12, sd = k <= 12 ? 1 : -1, w = Math.sin(Math.PI * f) * (1 - 0.45 * f) * tam * 0.2 * sd;
+                    c.push([x + dx * f * tam - dy * w, y + dy * f * tam + dx * w]); } return c; };
+            for (let s = passo * 0.6, i = 0; s < L - passo * 0.3; s += passo, i++) {
+                const t = s / L, p = pt(t), q = pt(Math.min(1, t + 0.01)), m = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1, ux = (q[0] - p[0]) / m, uy = (q[1] - p[1]) / m;
+                const tam = folha * (1 - 0.45 * t ** 2), lados = pares ? [1, -1] : [i % 2 ? -1 : 1];
+                for (const l of lados) { const r = angulo * Math.PI / 180 * l, dx = ux * Math.cos(r) - uy * Math.sin(r), dy = ux * Math.sin(r) + uy * Math.cos(r); out.push(gota(p, dx, dy, tam)); }
             }
             return out;
         },
@@ -336,8 +408,13 @@ const KNV = {
     // corte seco (borda reta e dura de foto/recorte que aparece: limite do quadro da foto, ombro cortado),
     // camada fora da página, texto colado na borda, camada vazia. Devolve [{camada, problema, ...}].
     // ignorar = nomes de camadas cuja borda reta é de propósito (ex.: um retângulo da composição)
-    revisar({ ignorar = [], margem = 24, minimo = 50 } = {}) {
+    // margem = área de segurança (padrão 5% do lado menor): texto e `elementos` (nomes) não passam dela.
+    // Texto atropelando texto: pixels de dois textos a menos de `respiro` px um do outro (dois nomes em `juntos`
+    // = [['Título Baile','Título da']] encaixados de propósito; `colidem` = outras camadas que contam como texto, ex. 'Rabiscos'). protegidas = [{nome:'rosto', caixa:[x,y,w,h], de:'Mulher'}]:
+    // camada acima de `de` cobrindo mais de 2% da caixa (folha na frente do rosto).
+    revisar({ ignorar = [], margem, minimo = 50, elementos = [], respiro = 6, juntos = [], protegidas = [], colidem = [] } = {}) {
         const doc = IE.doc, W = doc.w, H = doc.h, out = [];
+        margem ??= Math.round(Math.min(W, H) * 0.05);
         const folhas = [];
         iePercorrer(doc.camadas, (L, l, i, pai) => { if (!L.filhos) folhas.push({ L, vis: L.visivel !== false && (!pai || pai.visivel !== false) }); });
         folhas.forEach(({ L, vis }, idx) => {
@@ -350,10 +427,10 @@ const KNV = {
             if (!b) { out.push({ camada: L.nome, problema: 'vazia' }); return; }
             const R = { x: f.x + b.x, y: f.y + b.y, w: b.w, h: b.h };
             if (R.x >= W || R.y >= H || R.x + R.w <= 0 || R.y + R.h <= 0) { out.push({ camada: L.nome, problema: 'fora da página', caixa: R }); return; }
-            if (L.tipo === 'texto') {
+            if (L.tipo === 'texto' || elementos.includes(L.nome)) {
                 const d = Math.min(R.x, R.y, W - R.x - R.w, H - R.y - R.h);
-                if (d < margem) out.push({ camada: L.nome, problema: `texto a ${Math.round(d)}px da borda (margem ${margem})`, caixa: R });
-                return;
+                if (d < margem) out.push({ camada: L.nome, problema: `${L.tipo === 'texto' ? 'texto' : 'elemento'} a ${Math.round(d)}px da borda (margem ${margem})`, caixa: R });
+                if (L.tipo === 'texto') return;
             }
             if (ignorar.includes(L.nome) || L.clip || L.tipo === 'ajuste') return;
             // bordas duras: opaco (≥200) com transparente (≤25) a 2px numa das 4 direções
@@ -409,6 +486,43 @@ const KNV = {
             }
             achados.sort((p, q) => q.comp - p.comp).slice(0, 3).forEach(c => out.push({ camada: L.nome, problema: `corte seco de ${c.comp}px`, ...c }));
         });
+        // ocupação de cada camada numa grade de 4px (alfa ≥ 64), para colisões e áreas protegidas
+        const Q = 4, GW = Math.ceil(W / Q), GH = Math.ceil(H / Q);
+        const ocup = L => {
+            const r = ieRaster(L); if (!r) return null;
+            const f = r.forma || r, w = f.c.width, h = f.c.height, a = ieCtx(f.c).getImageData(0, 0, w, h).data, g = new Uint8Array(GW * GH);
+            for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x += 2) {
+                if (a[(y * w + x) * 4 + 3] < 64) continue;
+                const gx = Math.floor((x + f.x) / Q), gy = Math.floor((y + f.y) / Q);
+                if (gx >= 0 && gy >= 0 && gx < GW && gy < GH) g[gy * GW + gx] = 1;
+            }
+            return g;
+        };
+        const textos = folhas.filter(o => o.vis && (o.L.tipo === 'texto' || colidem.includes(o.L.nome))).map(o => ({ L: o.L, g: ocup(o.L) })).filter(t => t.g);
+        const raio = Math.max(1, Math.round(respiro / Q));
+        for (let i = 0; i < textos.length; i++) {
+            // dilata o texto i pelo respiro e conta as células do j que caem dentro
+            const d = new Uint8Array(GW * GH), gi = textos[i].g;
+            for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (gi[y * GW + x])
+                for (let v = -raio; v <= raio; v++) for (let u = -raio; u <= raio; u++) { const X = x + u, Y = y + v; if (X >= 0 && Y >= 0 && X < GW && Y < GH) d[Y * GW + X] = 1; }
+            for (let j = i + 1; j < textos.length; j++) {
+                const A = textos[i].L.nome, B = textos[j].L.nome;
+                if (juntos.some(p => p.includes(A) && p.includes(B))) continue;
+                let n = 0, sx = 0, sy = 0; const gj = textos[j].g;
+                for (let k = 0; k < gj.length; k++) if (gj[k] && d[k]) { n++; sx += k % GW; sy += Math.floor(k / GW); }
+                if (n >= 3) out.push({ camada: A, problema: `texto atropela "${B}" (${n * Q * Q}px² a menos de ${respiro}px)`, de: [Math.round(sx / n * Q), Math.round(sy / n * Q)] });
+            }
+        }
+        for (const p of protegidas) {
+            const [px, py, pw, ph] = p.caixa, iDe = folhas.findIndex(o => o.L.nome === p.de);
+            const x0 = Math.floor(px / Q), y0 = Math.floor(py / Q), x1 = Math.ceil((px + pw) / Q), y1 = Math.ceil((py + ph) / Q), tot = (x1 - x0) * (y1 - y0);
+            folhas.forEach((o, idx) => {
+                if (idx <= iDe || !o.vis || !o.L.c || o.L.clip || o.L.tipo === 'ajuste' || (o.L.op ?? 1) < 0.3 || ignorar.includes(o.L.nome)) return;
+                const g = ocup(o.L); if (!g) return;
+                let n = 0; for (let y = Math.max(0, y0); y < Math.min(GH, y1); y++) for (let x = Math.max(0, x0); x < Math.min(GW, x1); x++) n += g[y * GW + x];
+                if (n / tot > 0.02) out.push({ camada: o.L.nome, problema: `cobre ${Math.round(n / tot * 100)}% de ${p.nome || 'área protegida'}`, caixa: { x: px, y: py, w: pw, h: ph } });
+            });
+        }
         return out;
     },
 
@@ -464,6 +578,19 @@ const KNV = {
             `grade ${GC}x${GL} (célula ${Math.round(W / GC)}x${Math.round(H / GL)}px):`, ...g].join('\n');
     },
 
+    // ── CENA: a peça escrita em HTML/CSS vira camadas nativas (imagem-cena.js; guia Instructions/agente/plano-cena.md).
+    //    opções: formato ('quadrado'|'feed'|'retrato'|'story'|'paisagem'|'a4') ou w/h, nome, base (pasta dos caminhos
+    //    relativos), novo (true = documento novo; padrão: novo se o documento atual não veio de uma cena), margem (px),
+    //    refazer (true | [nomes]: refaz também as camadas mexidas). Devolve {camadas, mantidas, avisos, ms}.
+    async cena(html, opc = {}) { const r = await ieCena(html, opc); await KNV._quadro(); return r; },
+    cenaFonte() { return IE.doc && IE.doc.cena ? IE.doc.cena.html : null; },
+    // famílias instaladas (filtro = pedaço do nome); com estilos: {família: ['Regular', 'Bold'...]}
+    async fontes(filtro = '', { estilos = false } = {}) {
+        const e = await ieCarregarFontes(), f = String(filtro).toLowerCase();
+        const nomes = Object.keys(e).filter(n => !f || n.toLowerCase().includes(f)).sort();
+        return estilos ? Object.fromEntries(nomes.map(n => [n, e[n].map(x => x.estilo)])) : nomes;
+    },
+
     // ── conferir ──
     // composição do documento em PNG (base64) — o mesmo que a exportação grava; escala < 1 reduz
     png(escala = 1) {
@@ -479,5 +606,61 @@ const KNV = {
         return s.map(v => Math.round(v / n));
     },
     _quadro: () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 30))),
+
+    // ── diálogos (um agente esperando um clique que nunca vem trava a receita) ──
+    // automacao(): nenhuma janela do app abre enquanto ligada. Confirmação (appConfirm: "Rasterizar a camada?",
+    // "Salvar as alterações?"...) é respondida por `respostas` ({'Rasterizar a camada?': 'Rasterizar'}, o título
+    // ou um pedaço dele → rótulo do botão, 'primario' ou 'cancelar'); sem resposta, vale `padrao`:
+    // 'erro' (padrão: a promessa falha com o título e os botões, a receita para na hora e diz o que perguntou),
+    // 'primario' (o botão principal) ou 'cancelar'. Janela de valores (ieDialogo) sem KNV.cmd: OK com os valores
+    // padrão. Tudo fica em KNV.dialogos (o que perguntou e o que respondeu). automacao(false) desliga.
+    // Diálogos nativos do sistema (abrir/salvar arquivo do pywebview) não passam por aqui: use caminhos (abrir/salvar/colocar).
+    dialogos: [],
+    automacao(ligar = true, { respostas = {}, padrao = 'erro' } = {}) {
+        const w = window;
+        if (!w._knvOrig) w._knvOrig = { confirm: w.appConfirm };
+        if (w.ieDialogo && !w.ieDialogo._knv) w._knvOrig.dialogo = w.ieDialogo;   // recarga dos imagem-*.js troca a função
+        if (!ligar) { w.appConfirm = w._knvOrig.confirm; if (w._knvOrig.dialogo) w.ieDialogo = w._knvOrig.dialogo; w._knvAuto = null; return false; }
+        w._knvAuto = { respostas, padrao };
+        w.appConfirm = function ({ titulo, texto, botoes }) {
+            const cfg = w._knvAuto, rot = botoes.map(b => b.rotulo);
+            const chave = Object.keys(cfg.respostas).find(k => titulo === k || titulo.includes(k));
+            const pedido = chave != null ? cfg.respostas[chave] : cfg.padrao;
+            const b = pedido === 'primario' ? botoes.find(x => x.tipo === 'primario') || botoes[botoes.length - 1]
+                : pedido === 'cancelar' ? botoes.find(x => x.valor == null) || botoes[0]
+                : botoes.find(x => x.rotulo === pedido);
+            KNV.dialogos.push({ titulo, texto, botoes: rot, resposta: b ? b.rotulo : null });
+            if (!b) return Promise.reject(new Error(`diálogo "${titulo}" (botões: ${rot.join(' | ')}) — responda com KNV.automacao(true, {respostas: {'${titulo}': '<botão>'}})`));
+            return Promise.resolve(b.valor);
+        };
+        const dlg = w._knvOrig.dialogo;
+        if (dlg) {
+            w.ieDialogo = function (o) {
+                if (IE._auto) return dlg(o);
+                const vals = Object.fromEntries(o.campos.filter(c => c.tipo !== 'titulo').map(c => [c.id, c.valor]));
+                KNV.dialogos.push({ titulo: o.titulo, resposta: 'OK (valores padrão)', valores: vals });
+                return Promise.resolve(vals);
+            };
+            w.ieDialogo._knv = true;
+        }
+        return true;
+    },
+    // há uma janela aberta na tela? {tipo: 'confirmar'|'valores', titulo, texto, botoes} ou null — para conferir
+    // de fora (CDP) antes de esperar por algo; responder(rotulo | índice | 'cancelar') clica o botão
+    dialogo() {
+        const c = document.getElementById('app-confirm');
+        if (c && !c.hidden) return { tipo: 'confirmar', titulo: c.querySelector('#app-confirm-titulo')?.textContent, texto: c.querySelector('#app-confirm-texto')?.textContent,
+            botoes: [...c.querySelectorAll('#app-confirm-botoes button')].map(b => b.textContent) };
+        const m = document.getElementById('ie-modal');
+        if (m && !m.hidden && m.innerHTML) return { tipo: 'valores', titulo: m.querySelector('h3')?.textContent, botoes: [...m.querySelectorAll('.ie-dlg-rod button')].map(b => b.textContent) };
+        return null;
+    },
+    responder(qual = 'cancelar') {
+        const d = KNV.dialogo(); if (!d) return null;
+        const bs = [...document.querySelectorAll(d.tipo === 'confirmar' ? '#app-confirm-botoes button' : '#ie-modal .ie-dlg-rod button')];
+        const b = typeof qual === 'number' ? bs[qual] : qual === 'cancelar' ? (d.tipo === 'valores' ? bs.find(x => x.dataset.r === '0') : bs[0]) : bs.find(x => x.textContent === qual);
+        if (!b) throw new Error(`botão "${qual}" não existe (${d.botoes.join(' | ')})`);
+        b.click(); return d;
+    },
 };
 window.KNV = KNV;

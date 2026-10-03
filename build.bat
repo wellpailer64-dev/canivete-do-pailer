@@ -92,6 +92,8 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "Functions.psd_import" ^
  --hidden-import "psd_tools" ^
  --hidden-import "Functions.editor_imagem" ^
+ --hidden-import "Functions.gerador_imagem" ^
+ --hidden-import "Functions.recorte_pro" ^
  --hidden-import "psd_tools.api.numpy_io" ^
  --collect-data "cv2" ^
  --copy-metadata "pywebview" ^

@@ -4,6 +4,9 @@ Objetivo: montar peças (flyers, posts, capas) no editor de imagem como um desig
 pouco: números em vez de prints, etapas salvas em vez de recomeçar, ferramentas certas em vez de força bruta.
 Primeiro caso: flyer "Baile da Bonita" (`D:\kanivete_testes\flyer\`, referência `referencia.png`, receitas `f1..f6`).
 
+**Peças de diagramação (carrossel, feed, story, post): comece por `KNV.cena` (HTML/CSS → camadas) — guia em
+`Instructions/agente/plano-cena.md`. A API abaixo fica para foto, pintura, recorte e retoques depois da cena.**
+
 ## Fluxo
 1. App de teste visível (o usuário gosta de assistir): `APPDATA=D:\kanivete_testes\appdata LOCALAPPDATA=D:\kanivete_testes\localappdata
    TEMP=D:\kanivete_testes\tmp TMP=D:\kanivete_testes\tmp py -3.13 main.py --agente=9333` (Python 3.13 tem as dependências).
@@ -31,23 +34,48 @@ Armadilhas: na página existe a `const KNV` original; depois da recarga use `win
 - Revisar: `revisar({ignorar, margem, minimo})` — corte seco visível (borda reta e dura com a foto de um lado e o vazio
   do outro, não coberta por nada acima), texto perto da borda, fora da página, vazia. Passe em `ignorar` o que é reto de
   propósito (retângulos da composição). Ainda dá falso positivo em pétala/folha muito reta: confira no print.
+  Também: margem de segurança (padrão 5% do lado menor) para textos e `elementos`; texto atropelando texto (a menos de
+  `respiro` px; `juntos` = pares encaixados de propósito; `colidem` = camadas de traço que contam como texto, ex.
+  'Rabiscos'); `protegidas: [{nome, caixa:[x,y,w,h], de:'Mulher'}]` = nada acima de `de` cobrindo o rosto. O `rodar.py`
+  lê essas opções de `revisao.json` na pasta da arte.
 - Colocar e transformar: `colocar(path,{nome,x,y,largura,angulo,acima})`, `transformar({x,y,largura,angulo,espelhar})`
   (canto do conteúdo), `girar(ang,{escala,centro})` / `escalar(k)` (em volta do centro; texto continua editável),
   `mover(dx,dy)`, `alinhar({a,h,v,dentro,folga})` (à página ou a outra camada; `dentro:false` encosta por fora),
   `moverPara(ref)` (ordem na pilha), `modo(bm,op)`, `duplicar(nome)`, `objetoInteligente()`.
+- Diagramar: `alinhar({grupo:[nomes], h, v, folga})` move o bloco inteiro (ex.: título em 3 camadas, data+horário);
+  `caixaGrupo(nomes)` (caixa + cx/cy, para `girar(a,{centro})` do bloco); `encostar(em,{lado,respiro})` aproxima a
+  ativa das camadas `em` pelo CONTORNO dos pixels (encaixe de palavras em script: Bonita base → "da" encosta nela →
+  "Baile" encosta nas duas), sem atropelar.
+- **Gerar com IA** (melhor que caçar foto no navegador): `gerar(prompt,{largura,altura,semente,recortar,ref,nome,acima,
+  x,y,larguraNoDoc,angulo})` — FLUX.2 klein (~20 s por 1024² na RTX 3050, 12 s em 768). Prompt em inglês, descrevendo o
+  ASSUNTO INTEIRO (`fundo:true` já acrescenta fundo branco liso + assunto inteiro no quadro). `recortar:true` = Borracha
+  mágica nos cantos + vãos (sobra sombra cinza em vão pequeno: retoque ou `recortar:'ia'`). `ref` (camada | 'doc' |
+  caminho) edita a partir dela — descreva a MUDANÇA ("make it golden, keep the exact shape"); vai sobre branco.
+  FIXE a `semente` nas receitas: mesmo pedido = mesma imagem, do cache (instantâneo ao refazer a etapa).
+  Sem o gerador instalado, a 1ª chamada pede para baixar ~7 GB (em automação: responda 'Baixar a…' ou instale antes).
 - Recorte: `borrachaMagica([[x,y],...],{tol,contiguo,suave})` para fundo liso (instantâneo; `contiguo:false` pega os vãos),
   `removerFundo({aplicar})` (IA BiRefNet, ~30 s na 1ª vez, depois cache), `selecionar`, `selecionarPoligono`.
 - Pintura: `pincel(traços,{tam,dureza,cor,opac,borracha,alvo:'mascara'})` — aceita VÁRIOS traços: um passo no histórico;
   `formas.*` (devolvem listas de traços): `linha, tracejado, zigue, onda, circulo, espiral, coracao({listras}), estrela,
-  ramo, folha`; `degrade(de,ate,c1,c2,tipo,opac)`, `preencher(cor|'padrao')`, `definirPadrao(nome)`.
+  ramo({pares,curva,angulo}) (laurel: dois ramos saindo do meio, pares:true), folha`; `degrade(de,ate,c1,c2,tipo,opac)`, `preencher(cor|'padrao')`, `definirPadrao(nome)`.
 - `lote(fn, nome)`: tudo dentro vira UM passo do histórico (como uma Ação). Use em sequências de pintura.
 - Menus com valores: `cmd('aj:matiz', {...})`, `cmd('f:respingos', {...})` — os nomes de `IE_CMDS`/`IE_AJUSTES`/`IE_FILTROS`.
   Cuidado com o sentido dos campos (no Níveis, `i1` é o PONTO BRANCO de entrada; `i1:0` estoura tudo).
 - Texto: `texto(t,{x,y,fonte,estilo,tam,cor,alin,esp,caixa,nome,acima})` (y = topo). Efeitos: `efeito(tipo,valores,{somar})`.
+- Diálogos (janela esperando clique = receita travada): `automacao(true,{respostas,padrao})` — nenhuma janela abre;
+  confirmação ("Rasterizar a camada?", "Salvar as alterações?") responde por `respostas` ({título ou pedaço: rótulo do
+  botão | 'primario' | 'cancelar'}); sem resposta, `padrao:'erro'` faz a promessa falhar NA HORA com título e botões.
+  Janela de valores fora do `cmd` = OK com o padrão. Histórico em `KNV.dialogos`. De fora: `dialogo()` (tem janela
+  aberta?) e `responder(rotulo|índice|'cancelar')`. O `rodar.py` liga a automação, cancela janela pendente antes de
+  começar e, no limite de tempo, diz em qual diálogo travou. Diálogo nativo de arquivo não passa aqui: use caminhos.
 
 ## Técnicas (o que o usuário espera de um designer)
 - Nada de **corte seco**: limite de foto (ombro, braço, cabeça, barriga, borda reta do quadro de uma folha) fica escondido
   atrás de elementos — textura rasgada, folhas, texto. Escolha recursos com o assunto inteiro no quadro. `revisar()` acha.
+- **Diagramação** (o usuário cobra): margem de segurança respeitada em tudo (5%); título em BLOCO centrado e com
+  hierarquia (palavra-chave maior, conectivo "da" pequeno encaixado na ordem de leitura); nenhuma palavra encostando
+  noutra; infos em pilha a partir da margem de baixo com respiro constante; data+horário como um bloco no canto.
+  Folhas/flores nunca na frente do rosto; inclinadas para FORA, nascendo atrás de outro elemento (caule escondido).
 - Fundo liso → Borracha mágica (não IA). Fundo complexo → IA. Também valem Varinha e Pena.
 - Mesma imagem 2× → recorte uma vez, `objetoInteligente()`, `duplicar()` e transforme a cópia (espelhar, girar) sem perda.
 - Cor de foto para a paleta: Matiz/Saturação "colorir" (matiz −180..180) + Níveis; fundo = cor sólida + textura

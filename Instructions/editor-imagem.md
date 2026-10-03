@@ -36,6 +36,8 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   lixeira, menu fx, Tornar padrão / Redefinir, Visualizar e a amostra. Abre pelo botão direito na camada (primeiro item
   "Opções de mesclagem..."), duplo clique na camada, botão fx do painel, Camada > Estilo de camada. No app em inglês
   a janela usa os termos oficiais do Photoshop (IE_LS_EN). Efeitos aparecem sob a camada (fx ›) com olho por efeito.
+- `frontend/js/imagem-cena.js` — `KNV.cena`: peça em HTML/CSS vira camadas nativas (runner `tools/knv.py`); guia em
+  `Instructions/agente/plano-cena.md`.
 - `frontend/js/imagem-api.js` — API de automação `window.KNV` (scripts/Ações para agentes): guia em
   `Instructions/agente/design-photo-kanivete.md`.
 - `frontend/css/imagem.css`, `Functions/editor_imagem.py`, `main.py` (métodos `ie_*`), `Functions/media_server.py`
@@ -98,6 +100,21 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   (`L.tf`); transformar de novo sai do original, sem perda. Duplicar mantém objeto inteligente criado no editor.
 - Filtro > Distorcer: **Ondulação**, **Respingos**, **Torcer** (`ieDeslocar`, imagem-ajustes.js).
 - API de automação `window.KNV` (imagem-api.js): ver `Instructions/agente/design-photo-kanivete.md`.
+## Gerar imagem com IA (imagem-gerador.js, Functions/gerador_imagem.py)
+- Arquivo > Gerar imagem com IA...: prompt, fundo branco liso (para a Borracha mágica), proporção (ou a do documento),
+  tamanho 768/1024/1536, referência (camada ativa ou documento: edição guiada pelo texto), semente. Entra como camada
+  "IA: ..." (guarda prompt e semente em `L.gerada`). Barra com as fases e Cancelar (job na fila: API; já gerando: fecha
+  o servidor).
+- Motor: stable-diffusion.cpp `sd-server.exe` build **Vulkan** (30 MB; na RTX 3050 empatou com o CUDA de 1,1 GB) +
+  FLUX.2 klein 4B Q8_0 GGUF (leejet) + Qwen3-4B Q4_K_M (unsloth, lê o prompt) + VAE flux2 (Comfy-Org), tudo sem login,
+  ~7,2 GB em `<app>/modelos_ia/gerador_imagem/` (baixado na 1ª vez, com retomada `.part`). `--offload-to-cpu --fa
+  --vae-tiling` (o VAE inteiro em 1024² pede ~10 GB e falhava). 4 passos, cfg 1, euler.
+- Servidor sobe na 1ª geração (~10 s; na 1ª vez do PC o Vulkan compila shaders, ~40 s a mais), API nativa assíncrona
+  `/sdcpp/v1/img_gen` + consulta do job; fecha sozinho após 5 min parado; preso a um Job do Windows (fecha junto com o
+  app, mesmo se ele cair). Cache em `%LOCALAPPDATA%/CaniveteDoPailer/cache_gerador` (hash de prompt+tamanho+semente+refs).
+- Referência vai achatada sobre branco: transparente o modelo lê como preto.
+- Trocar de versão do sd.cpp: `SD_TAG` em gerador_imagem.py (a API do servidor muda entre versões; testar).
+
 
 ## Limitações conhecidas (MVP)
 - Efeitos: Contorno (curva) de sombra/brilho, Ruído, Brilho com degradê e Traçado com padrão do PSD não são

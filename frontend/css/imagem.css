@@ -288,6 +288,10 @@
 .ie-dlg-lin input, .ie-dlg-lin select { width: 100%; }
 .ie-dlg-lin em { font-style: normal; color: var(--text-3); }
 .ie-dlg-cor { width: 40px; height: 24px; }
+.ie-dlg-area { display: flex; flex-direction: column; gap: 6px; color: var(--text-2); }
+.ie-dlg-area textarea { width: 100%; min-width: 380px; resize: vertical; font: inherit; padding: 8px; border-radius: 4px; border: 1px solid var(--ie-linha-2); background: var(--bg-input); color: var(--text); outline: none; }
+.ie-dlg-area textarea:focus { border-color: var(--primary-line); }
+.ie-carregando-box .ie-btn { align-self: flex-end; }
 .ie-dlg-curva { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .ie-dlg-curva canvas { width: 256px; height: 256px; border: 1px solid var(--ie-linha-2); border-radius: 3px; cursor: crosshair; touch-action: none; }
 

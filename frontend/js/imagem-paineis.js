@@ -6,6 +6,9 @@
 // ─────────────────────────── ícones das ferramentas (traço 24x24) ───────────────────────────
 const IE_ICONES = {
     pointer: '<path d="M5 3v14l4-4 3 7 2.5-1-3-7h6z"/><path d="M19 15v6M16 18h6"/>',
+    rotate: '<path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 3v5h-5"/>',
+    rotEsq: '<path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 3v5h5"/>',
+    espelharH: '<path d="M12 3v18"/><path d="M8 7 3 12l5 5zM16 7l5 5-5 5z"/>',
     marquee: '<rect x="4" y="4" width="16" height="16" stroke-dasharray="3 2.4"/>',
     lasso: '<path d="M7 17c-3-1-4-4-3-7 2-5 12-7 15-3 2 3-1 7-6 8-3 .5-5 0-6-1"/><path d="M7 17c0 2 1 4 3 4"/>',
     wand: '<path d="m4 20 11-11M13 7l4 4M18 2v4M16 4h4M8 3v2M7 4h2M20 12v3M18.5 13.5h3"/>',
@@ -115,7 +118,11 @@ function ieOpcoesRender(soValores) {
                 `<i class="ie-op-sep"></i><span class="ie-op-dica">${ieT('Alinhar')}</span>` +
                 [['alinE', 'esq'], ['alinCH', 'ch'], ['alinD', 'dir'], ['alinT', 'topo'], ['alinCV', 'cv'], ['alinB', 'base']]
                     .map(([i, a]) => `<button class="ie-ico-btn" onclick="ieAlinhar('${a}')" title="${ieT('Alinhar')}">${ieIco(i)}</button>`).join('') +
-                `<span class="ie-op-dica">${ieT('Ctrl: escolher camada · Alt: duplicar · setas: 1 px (Shift: 10)')}</span>`;
+                ieBotoesGirar() +
+                `<span class="ie-op-dica">${ieT('Ctrl: escolher camada · Alt: duplicar · setas: 1 px (Shift: 10) · perto dos cantos: girar')}</span>`;
+            break;
+        case 'girar':
+            h += ieBotoesGirar(true) + `<span class="ie-op-dica">${ieT('Arraste para girar a camada em volta do centro · Shift: de 15 em 15° · Enter aplica, Esc cancela')}</span>`;
             break;
         case 'letreiro':
             h += ieSegm('forma', 'letreiro', [['ret', 'Retângulo'], ['eli', 'Elipse']]) + ieNum('Suavizar', 'suav', 'letreiro', 0, 250, 1, ' px') +
@@ -851,11 +858,11 @@ function ieSeletorCor(ancora, inicial, aoMudar) {
 }
 
 // ─────────────────────────── diálogos ───────────────────────────
-// campos: [{id, rotulo, tipo: 'faixa'(padrão)|'numero'|'check'|'select'|'cor'|'texto'|'curva', min, max, passo, valor, opcoes}]
+// campos: [{id, rotulo, tipo: 'faixa'(padrão)|'numero'|'check'|'select'|'cor'|'texto'|'area'|'nota'|'curva', min, max, passo, valor, opcoes}]
 function ieDialogo({ titulo, campos, previa, ok = 'OK', largura, lado }) {
     return new Promise(resolve => {
         const box = ieEl('ie-modal');
-        const vals = Object.fromEntries(campos.filter(c => c.tipo !== 'titulo').map(c => [c.id, c.valor]));
+        const vals = Object.fromEntries(campos.filter(c => c.tipo !== 'titulo' && c.tipo !== 'nota').map(c => [c.id, c.valor]));
         // automação (KNV.cmd, imagem-api.js): valores prontos, sem abrir a janela — como uma Ação gravada do Photoshop
         if (IE._auto) { const a = IE._auto; IE._auto = null; resolve({ ...vals, ...a }); return; }
         const campoHtml = c => {
@@ -865,6 +872,8 @@ function ieDialogo({ titulo, campos, previa, ok = 'OK', largura, lado }) {
             if (t === 'select') return `<label class="ie-dlg-lin"><span>${ieT(c.rotulo)}</span><select data-id="${c.id}">${c.opcoes.map(([v, r]) => `<option value="${v}" ${v === c.valor ? 'selected' : ''}>${ieT(r)}</option>`).join('')}</select></label>`;
             if (t === 'cor') return `<label class="ie-dlg-lin"><span>${ieT(c.rotulo)}</span><button class="ie-cor ie-dlg-cor" data-id="${c.id}" style="background:${c.valor}"></button></label>`;
             if (t === 'texto') return `<label class="ie-dlg-lin"><span>${ieT(c.rotulo)}</span><input type="text" data-id="${c.id}" value="${ieEsc(c.valor)}"></label>`;
+            if (t === 'area') return `<label class="ie-dlg-area"><span>${ieT(c.rotulo)}</span><textarea data-id="${c.id}" rows="${c.linhas || 4}" placeholder="${ieEsc(ieT(c.dica || ''))}">${ieEsc(c.valor)}</textarea></label>`;
+            if (t === 'nota') return `<div class="ie-prop-nota">${ieT(c.rotulo)}</div>`;
             if (t === 'numero') return `<label class="ie-dlg-lin"><span>${ieT(c.rotulo)}</span><input type="number" data-id="${c.id}" min="${c.min ?? ''}" max="${c.max ?? ''}" step="${c.passo || 1}" value="${c.valor}">${c.suf ? `<em>${ieT(c.suf)}</em>` : ''}</label>`;
             if (t === 'curva') return `<div class="ie-dlg-curva"><canvas data-id="${c.id}" width="256" height="256"></canvas><div class="ie-prop-nota">${ieT('Clique para pôr pontos, arraste para mover, duplo clique para tirar')}</div></div>`;
             return `<label class="ie-dlg-faixa"><span>${ieT(c.rotulo)}</span><input type="range" data-id="${c.id}" min="${c.min}" max="${c.max}" step="${c.passo || 1}" value="${c.valor}">
@@ -886,7 +895,7 @@ function ieDialogo({ titulo, campos, previa, ok = 'OK', largura, lado }) {
             if (el.tagName === 'CANVAS') { ieCurvaEditor(el, vals[id], pts => { vals[id] = pts; atualizar(); }); return; }
             if (el.classList.contains('ie-dlg-cor')) { el.onclick = () => ieSeletorCor(el, vals[id], cc => { el.style.background = cc; vals[id] = cc; atualizar(); }); return; }
             el.addEventListener('input', () => {
-                vals[id] = el.type === 'checkbox' ? el.checked : (c.tipo === 'select' || c.tipo === 'texto') ? el.value : parseFloat(el.value);
+                vals[id] = el.type === 'checkbox' ? el.checked : (c.tipo === 'select' || c.tipo === 'texto' || c.tipo === 'area') ? el.value : parseFloat(el.value);
                 const n = box.querySelector(`[data-num="${id}"]`); if (n) n.value = el.value;
                 atualizar();
             });
@@ -948,10 +957,18 @@ function ieCurvaEditor(cv, pts, aoMudar) {
     desenhar();
 }
 
+// botões de girar (barra de opções do Mover e da ferramenta Girar): 90° para cada lado, 180°, espelhar e um ângulo livre
+function ieBotoesGirar(comAngulo) {
+    const b = (ico, tipo, tit) => `<button class="ie-ico-btn" onclick="ieTransfRapida('${tipo}')" title="${ieT(tit)}">${ieIco(ico)}</button>`;
+    return `<i class="ie-op-sep"></i><span class="ie-op-dica">${ieT('Girar')}</span>` + b('rotEsq', 'g90a', 'Girar 90° anti-horário') + b('rotate', 'g90h', 'Girar 90° horário') +
+        b('espelharH', 'fh', 'Inverter na horizontal') +
+        (comAngulo ? `<label class="ie-op-num">${ieT('Ângulo')} <input type="number" step="1" value="0" style="width:56px" onkeydown="if(event.key==='Enter'){ieGirarAngulo(+this.value);event.stopPropagation()}" onchange="ieGirarAngulo(+this.value)"> °</label>` : '');
+}
+
 // ─────────────────────────── menus ───────────────────────────
 // [rótulo, comando, atalho] | '-' | [rótulo, [submenu]]
 const IE_MENUS = [
-    ['Arquivo', [['Novo...', 'novo', 'Ctrl+N'], ['Abrir...', 'abrir', 'Ctrl+O'], ['Colocar imagem...', 'colocar', 'Shift+Ctrl+P'], '-',
+    ['Arquivo', [['Novo...', 'novo', 'Ctrl+N'], ['Abrir...', 'abrir', 'Ctrl+O'], ['Colocar imagem...', 'colocar', 'Shift+Ctrl+P'], ['Gerar imagem com IA...', 'gerarImagem', ''], '-',
         ['Salvar', 'salvar', 'Ctrl+S'], ['Salvar como...', 'salvarComo', 'Shift+Ctrl+S'], ['Exportar como...', 'exportar', 'Alt+Shift+Ctrl+W'], ['Exportar fatias...', 'exportarFatias'], '-',
         ['Fechar', 'fechar', 'Ctrl+W']]],
     ['Editar', [['Desfazer', 'desfazer', 'Ctrl+Z'], ['Refazer', 'refazer', 'Shift+Ctrl+Z'], '-',

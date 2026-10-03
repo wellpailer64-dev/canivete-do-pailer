@@ -2996,6 +2996,55 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def ie_recorte_pro(self, png_b64):
+        """Photo Kanivete: recorte profissional (Functions/recorte_pro.py) — cores sem o fundo misturado + máscara."""
+        import hashlib
+        pasta = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "cache_recorte")
+        arq = os.path.join(pasta, "pro_" + hashlib.sha1(png_b64.encode()).hexdigest() + ".json")
+        try:
+            if os.path.exists(arq):
+                with open(arq, encoding="ascii") as f:
+                    return {"success": True, **json.load(f), "cache": True}
+            from Functions.recorte_pro import recorte_b64
+            r = recorte_b64(png_b64)
+            try:
+                os.makedirs(pasta, exist_ok=True)
+                with open(arq, "w", encoding="ascii") as f:
+                    json.dump(r, f)
+                velhos = sorted((os.path.join(pasta, n) for n in os.listdir(pasta)), key=os.path.getmtime)
+                for v in velhos[:-200]:
+                    os.remove(v)
+            except OSError:
+                pass
+            return {"success": True, **r}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    # Gerar imagem com IA (Functions/gerador_imagem.py): FLUX.2 klein via stable-diffusion.cpp, baixado sob demanda
+    def ie_gerador_estado(self):
+        from Functions import gerador_imagem
+        return gerador_imagem.estado()
+
+    def ie_gerador_baixar(self):
+        from Functions import gerador_imagem
+        return gerador_imagem.baixar(lambda d: _js("ieGeradorProgresso", d))
+
+    def ie_gerar(self, spec):
+        from Functions import gerador_imagem
+        return gerador_imagem.gerar(spec, lambda d: _js("ieGeradorProgresso", d))
+
+    def ie_gerador_cancelar(self, job):
+        from Functions import gerador_imagem
+        return gerador_imagem.cancelar(job)
+
+    def ie_gerador_parar(self):
+        from Functions import gerador_imagem
+        return gerador_imagem.parar()
+
+    def ie_gerador_remover(self):
+        from Functions import gerador_imagem
+        return gerador_imagem.remover()
+
     def ie_fechar(self, doc):
         from Functions import editor_imagem
         return editor_imagem.fechar(doc)

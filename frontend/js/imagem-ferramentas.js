@@ -419,6 +419,13 @@ function ieCaixaCamada(L) {
 function ieCaixaAlvos(doc) {
     return ieSelecionadas(doc).reduce((R, L) => ieRUniao(R, ieCaixaCamada(L)), null);
 }
+// cursor de girar: seta curva dupla, branca com contorno preto (legível em qualquer fundo)
+const IE_CURSOR_GIRAR = (() => {
+    const seta = 'M6 9a8 8 0 0 1 12 0M18 9l1-4M18 9l-4-1M18 15a8 8 0 0 1-12 0M6 15l-1 4M6 15l4 1';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="${seta}" stroke="#000" stroke-width="4"/><path d="${seta}" stroke="#fff" stroke-width="2"/></svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 12 12, alias`;
+})();
+
 // alça da caixa de controles da ferramenta Mover (Mostrar controles de transformação); fora dos cantos = girar
 function ieMoverAlca(doc, p) {
     if (!IE.op.mover.controles || IE.transf) return null;
@@ -439,7 +446,7 @@ const IE_MOVER = {
         const doc = IE.doc;
         const h = doc && IE.mouse && !IE.mov ? ieMoverAlca(doc, IE.mouse) : null;
         if (!h) return 'default';
-        if (h === 'girar') return 'alias';
+        if (h === 'girar') return IE_CURSOR_GIRAR;
         return ['tl', 'br'].includes(h) ? 'nwse-resize' : ['tr', 'bl'].includes(h) ? 'nesw-resize' : ['t', 'b'].includes(h) ? 'ns-resize' : 'ew-resize';
     },
     down(p, ev, doc) {
@@ -1073,9 +1080,21 @@ const IE_ZOOM = {
     dbl(p, ev, doc) { ieZoomReal(1); },
 };
 
+// ferramenta Girar (R): arrastar gira as camadas selecionadas em volta do centro (entra na Transformação livre:
+// Enter aplica, Esc cancela; Shift = de 15 em 15°). A barra de opções tem 90°, espelhar e ângulo exato.
+const IE_GIRAR = {
+    nome: 'Girar', tecla: 'R', icone: 'rotate', cursor: () => IE_CURSOR_GIRAR,
+    down(p, ev, doc) {
+        if (!IE.transf) ieTransfIniciar();
+        const t = IE.transf;
+        if (!t) return;
+        t.arr = { h: 'girar', p0: p, s: { cx: t.cx, cy: t.cy, sx: t.sx, sy: t.sy, rot: t.rot } };
+    },
+};
 // ─────────────────────────── registro ───────────────────────────
 const IE_FERR = {
     mover: IE_MOVER,
+    girar: IE_GIRAR,
     letreiro: IE_LETREIRO,
     laco: IE_LACO,
     varinha: IE_VARINHA,
@@ -1093,7 +1112,7 @@ const IE_FERR = {
     mao: IE_MAO,
     zoom: IE_ZOOM,
 };
-const IE_FERR_ORDEM = ['mover', 'letreiro', 'laco', 'varinha', 'corte', 'contagotas', '|', 'carimbo', 'pincel', 'borracha', 'borrachaFundo', 'borrachaMagica', 'degrade', 'balde', '|', 'texto', 'forma', '|', 'mao', 'zoom'];
+const IE_FERR_ORDEM = ['mover', 'girar', 'letreiro', 'laco', 'varinha', 'corte', 'contagotas', '|', 'carimbo', 'pincel', 'borracha', 'borrachaFundo', 'borrachaMagica', 'degrade', 'balde', '|', 'texto', 'forma', '|', 'mao', 'zoom'];
 
 function ieFerrCancelar() {
     IE.laco = null; IE.arr = null; IE.deg = null;
@@ -1322,7 +1341,7 @@ function ieTransfAlca(t, p, doc) {
 const IE_TRANSF = {
     down(p, ev, doc) {
         const t = IE.transf;
-        const h = ieTransfAlca(t, p, doc);
+        const h = IE.ferr === 'girar' ? 'girar' : ieTransfAlca(t, p, doc);   // ferramenta Girar: arrastar em qualquer lugar gira
         t.arr = { h, p0: p, s: { cx: t.cx, cy: t.cy, sx: t.sx, sy: t.sy, rot: t.rot } };
     },
     move(p, ev, doc) {
@@ -1378,11 +1397,22 @@ const IE_TRANSF = {
         const t = IE.transf, doc = IE.doc;
         if (!t || !IE.mouse) return 'default';
         const h = t.arr ? t.arr.h : ieTransfAlca(t, IE.mouse, doc);
+        if (IE.ferr === 'girar') return IE_CURSOR_GIRAR;
         if (h === 'dentro') return 'move';
-        if (h === 'girar') return 'alias';
+        if (h === 'girar') return IE_CURSOR_GIRAR;
         return ['tl', 'br'].includes(h) ? 'nwse-resize' : ['tr', 'bl'].includes(h) ? 'nesw-resize' : ['t', 'b'].includes(h) ? 'ns-resize' : 'ew-resize';
     },
 };
+
+// girar as camadas selecionadas um ângulo exato (°, + = horário), em volta do centro — prévia na Transformação livre
+function ieGirarAngulo(graus) {
+    if (!graus || !IE.doc) return;
+    if (!IE.transf) ieTransfIniciar();
+    const t = IE.transf;
+    if (!t) return;
+    t.rot += graus * Math.PI / 180;
+    ieTransfPrevia(); ieOpcoesRender?.(true); ieDesenharSobre();
+}
 
 // girar/inverter a camada (Editar > Transformar)
 function ieTransfRapida(tipo) {

@@ -380,6 +380,7 @@ async function ieSalvarIknv(doc, destino) {
             camadas: ieIknvSerial(doc.camadas, png), ativa: doc.ativa, selIds: doc.selIds, seq: doc.seq,
             fatias: ieFatiasSpec(doc), cor: IE.cor, luzGlobal: doc.luzGlobal || null,
             alfas: ieIknvSerial(doc.alfas || [], png), notas: doc.notas || [], compsCamadas: doc.compsCamadas || [], guias: doc.guias || [],
+            cena: doc.cena || null,
         };
         ieCompor(doc, ieRDoc(doc));
         const previa = ieTransformarPlano({ c: doc.comp, x: 0, y: 0 }, (k => [k, 0, 0, k, 0, 0])(Math.min(1, 512 / Math.max(doc.w, doc.h)))).c;
@@ -435,7 +436,7 @@ async function ieMontarIknv(r, path) {
         return v;
     };
     doc.camadas = canvas(arvore);
-    doc.alfas = canvas(alfas); doc.notas = d.notas || []; doc.compsCamadas = d.compsCamadas || []; doc.guias = d.guias || [];
+    doc.alfas = canvas(alfas); doc.notas = d.notas || []; doc.compsCamadas = d.compsCamadas || []; doc.guias = d.guias || []; doc.cena = d.cena || null;
     iePercorrer(doc.camadas, L => { if (L.fx) L.fx = ieFxNorm(L.fx); });
     if (d.luzGlobal) doc.luzGlobal = d.luzGlobal;
     doc.seq = d.seq || 0;
@@ -983,14 +984,41 @@ async function ieMascaraAssunto(L) {
     return c;
 }
 
-async function ieRemoverFundo(doc) {
+// Remover plano de fundo = recorte profissional (Functions/recorte_pro.py): matting + filtro guiado + cores
+// descontaminadas. Os pixels da borda perdem a cor do fundo antigo (sem halo) e o recorte vira MÁSCARA de camada
+// (retocável: pinte de preto/branco). rapido = o recorte antigo (só a máscara do BiRefNet lite, ~5 s).
+async function ieRemoverFundo(doc, { rapido = false } = {}) {
     const L = ieAtiva(doc);
     if (!L || L.tipo === 'grupo' || L.tipo === 'ajuste') { ieToast(ieT('Selecione uma camada de imagem')); return; }
-    const c = await ieMascaraAssunto(L);
-    if (!c) return;
+    const api = ieApi();
+    if (rapido || !api || !api.ie_recorte_pro) {
+        const c = await ieMascaraAssunto(L);
+        if (!c) return;
+        ieAplicarRecorte(doc, L, null, c);
+        return;
+    }
+    if (!L.c) { ieToast(ieT('Selecione uma camada com pixels')); return; }
+    if (!(await iePodePintar(L, 'remover o plano de fundo'))) return;
+    ieCarregando(ieT('Recortando com precisão (borda, cabelo, cor)... a primeira vez baixa o modelo (~930 MB)'), 50);
+    let r;
+    try { r = await api.ie_recorte_pro(L.c.toDataURL('image/png')); } finally { ieCarregando(false); }
+    if (!r || !r.success) { ieToast((r && r.error) || ieT('Não foi possível recortar')); return; }
+    const carregar = async b64 => { const im = new Image(); im.src = 'data:image/png;base64,' + b64; await im.decode(); return im; };
+    const [cores, masc] = await Promise.all([carregar(r.png), carregar(r.mascara)]);
+    const px = ieCanvas(L.c.width, L.c.height); ieCtx(px).drawImage(cores, 0, 0);
+    // cinza → alfa (o formato das máscaras do editor)
+    const c = ieCanvas(L.c.width, L.c.height), x = ieCtx(c);
+    x.drawImage(masc, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+    for (let i = 0; i < p.length; i += 4) { p[i + 3] = p[i]; p[i] = p[i + 1] = p[i + 2] = 255; }
+    x.putImageData(d, 0, 0);
+    ieAplicarRecorte(doc, L, px, c);
+}
+function ieAplicarRecorte(doc, L, pixels, mascara) {
     const Rantes = ieRCamada(L);
+    if (pixels) { ieGravavel(L); L.c = pixels; L.sujoPx = true; ieInvalidar(L); }
     ieGravavel(L, 'm');
-    L.m = { c, x: L.x, y: L.y, fundo: 0 };
+    L.m = { c: mascara, x: L.x, y: L.y, fundo: 0 };
     L.sujoM = true;
     doc.mascaraAlvo = true;
     ieCamadaMudou(L, Rantes);

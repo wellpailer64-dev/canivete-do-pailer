@@ -64,7 +64,9 @@ Plano completo (Fases 1–3 + Propriedades essenciais por faixa).
 Guia, arquivos e limitações em `Instructions/editor-imagem.md`; código em `frontend/js/imagem-*.js` e
 `Functions/editor_imagem.py` (salvar PSD de ida e volta: só troca o que mudou). Teste: `python testes/teste_imagem.py`
 (rodar antes de release quando mexer no editor de imagem, em `psd_tools` ou no `media_server`).
-Fazer arte pelo app (API `window.KNV`, receitas em etapas .iknv, `rodar.py`, `KNV.mapa()`/`KNV.revisar()`, técnicas):
+Gerar imagem com IA (FLUX.2 klein via stable-diffusion.cpp Vulkan, baixado sob demanda; `KNV.gerar`): seção no mesmo guia.
+**Diagramar (carrossel, feed, story): `KNV.cena` — HTML/CSS vira camadas; `py -3.13 tools/knv.py peca.html --formato feed`**;
+guia `Instructions/agente/plano-cena.md`. Fazer arte pelo app (API `window.KNV`, receitas em etapas .iknv, `rodar.py`, `KNV.mapa()`/`KNV.revisar()`, técnicas):
 `Instructions/agente/design-photo-kanivete.md`.
 
 ## Build local

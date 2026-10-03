@@ -52,6 +52,18 @@ MODELOS = {
         "md5": "4fab47adc4ff364be1713e97b7e66334",
         "tamanho_mb": 214,
     },
+    # Matting (alfa fino: cabelo, vapor, borda antisserrilhada) — usado pelo recorte profissional (recorte_pro.py)
+    "birefnet-matting": {
+        "nome": "BiRefNet Matting (recorte profissional)",
+        "arquivo": "birefnet-matting.onnx",
+        "lado": 1024,
+        "mean": (0.485, 0.456, 0.406),
+        "std": (0.229, 0.224, 0.225),
+        "sigmoid": True,
+        "url": "https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet-matting-epoch_100.onnx",
+        "md5": "95d7129b7abd6120b571e848f269a8ab",
+        "tamanho_mb": 928,
+    },
     # Fallback legado: menor qualidade, mas salva o fluxo se só ele existir.
     "u2net": {
         "nome": "U2Net (legado)",
@@ -62,7 +74,7 @@ MODELOS = {
     },
 }
 ORDEM_FALLBACK = ("isnet", "u2net")
-_sessao = {"path": None, "sess": None}
+_sessoes = {}
 
 
 def _modelo_cfg(modelo_id=None):
@@ -149,11 +161,10 @@ def garantir_modelo(modelo_id="isnet", callback_log=None, callback_progresso=Non
 
 def _get_sessao(modelo_path):
     """Carregar o modelo leva segundos: a sessão é criada uma vez e reaproveitada."""
-    if _sessao["path"] != modelo_path:
+    if modelo_path not in _sessoes:   # uma por modelo (o recorte profissional usa dois em seguida)
         import onnxruntime as ort
-        _sessao["sess"] = ort.InferenceSession(modelo_path, providers=["CPUExecutionProvider"])
-        _sessao["path"] = modelo_path
-    return _sessao["sess"]
+        _sessoes[modelo_path] = ort.InferenceSession(modelo_path, providers=["CPUExecutionProvider"])
+    return _sessoes[modelo_path]
 
 
 def _estimar_cor_fundo(rgb_np, alpha_np):
