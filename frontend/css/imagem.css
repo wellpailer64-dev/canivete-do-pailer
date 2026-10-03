@@ -608,3 +608,6 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 .ie-ctb { align-items: center; }
 .ie-ctb-alca { cursor: grab; color: var(--text-3); padding: 2px 5px 2px 3px; letter-spacing: -3px; font-size: 13px; user-select: none; }
 .ie-ctb-alca:active { cursor: grabbing; }
+
+.ie-sel-modos button { padding: 2px 5px; }
+.ie-sel-modos svg { width: 18px; height: 18px; }

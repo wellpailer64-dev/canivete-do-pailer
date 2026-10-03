@@ -302,12 +302,36 @@ function ieRegiaoCanvas(reg, W, H) {
     return c;
 }
 
+// modo da seleção como no Photoshop: Shift = adicionar, Alt = subtrair, Shift+Alt = interseção; sem tecla, o modo
+// escolhido nos 4 botões da barra de opções (Nova / Adicionar / Subtrair / Interseção)
+IE.op.sel = IE.op.sel || { modo: 'nova' };
 function ieOpSel(ev) {
     if (ev.shiftKey && ev.altKey) return 'cruzar';
     if (ev.shiftKey) return 'somar';
     if (ev.altKey) return 'subtrair';
-    return 'nova';
+    return (IE.op.sel && IE.op.sel.modo) || 'nova';
 }
+// cursor das ferramentas de seleção com o sinal do modo no canto (+ adicionar, − subtrair, × interseção)
+function ieCursorSel(base, ev) {
+    const e = ev && 'shiftKey' in ev ? ev : (IE._mods || {});
+    const op = ieOpSel({ shiftKey: !!e.shiftKey, altKey: !!e.altKey });
+    const sinal = { somar: '<path d="M18 15v6M15 18h6"/>', subtrair: '<path d="M15 18h6"/>', cruzar: '<path d="M15.5 15.5l5 5M20.5 15.5l-5 5"/>' }[op] || '';
+    const icone = {
+        laco: '<path d="M7 13c-3-1-4-3.5-3-6 2-4 11-5 13-1.5 1.5 2.5-1 5.5-5 6.5-2.5.5-4.5 0-5.2-.8"/><path d="M6.8 13c0 1.8.8 3.5 2.6 3.5"/>',
+        lacoMag: '<path d="M7 13c-3-1-4-3.5-3-6 2-4 11-5 13-1.5 1.5 2.5-1 5.5-5 6.5"/><path d="M10 11l1.5 4 1.2-1.3 1.5 1.3"/>',
+        varinha: '<path d="m3 14 9-9M10.5 3.5l3 3M14 1v3M12.5 2.5h3"/>',
+        cruz: '<path d="M8 1v14M1 8h14"/>',
+    }[base] || '';
+    const pt = base === 'cruz' ? '8 8' : base === 'varinha' ? '3 14' : '7 13';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke-linecap="round" stroke-linejoin="round"><g stroke="#fff" stroke-width="3">${icone}${sinal}</g><g stroke="#000" stroke-width="1.2">${icone}${sinal}</g></svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${pt}, crosshair`;
+}
+// Shift/Alt apertados: o cursor troca na hora (sem precisar mexer o mouse)
+for (const t of ['keydown', 'keyup']) document.addEventListener(t, ev => {
+    if (ev.key !== 'Shift' && ev.key !== 'Alt') return;
+    IE._mods = { shiftKey: ev.shiftKey, altKey: ev.altKey };
+    if (['letreiro', 'laco', 'lacoMag', 'varinha'].includes(IE.ferr) && IE.mouse) { ieCursor(IE._mods); if (ev.key === 'Alt') ev.preventDefault(); }
+}, true);
 
 // pinta uma cobertura (canvas do tamanho do documento) na camada ativa com cor/opacidade, respeitando a seleção
 function iePintarCobertura(doc, L, cob, R, nome, { cor, opac = 1, borracha = false, colorido = false, preservar = false } = {}) {
@@ -575,7 +599,7 @@ function ieRetArrasto(p0, p, ev, quadrado) {
 }
 
 const IE_LETREIRO = {
-    nome: 'Letreiro', tecla: 'M', icone: 'marquee', cursor: 'crosshair',
+    nome: 'Letreiro', tecla: 'M', icone: 'marquee', cursor: ev => ieCursorSel('cruz', ev),
     down(p, ev, doc) {
         const op = ieOpSel(ev);
         if (op === 'nova' && doc.sel && ieSelDentro(doc, p)) { IE.arr = { moverSel: true, p0: p, dx: 0, dy: 0 }; return; }
@@ -631,7 +655,7 @@ function ieSelDeslocar(doc, dx, dy) {
 
 // ─────────────────────────── laço ───────────────────────────
 const IE_LACO = {
-    nome: 'Laço', tecla: 'L', icone: 'lasso', cursor: 'crosshair',
+    nome: 'Laço', tecla: 'L', icone: 'lasso', cursor: ev => ieCursorSel('laco', ev),
     down(p, ev, doc) {
         const poli = IE.op.laco.modo === 'poligonal';
         if (poli) {
@@ -678,7 +702,7 @@ function ieLacoFechar(doc) {
 
 // ─────────────────────────── varinha mágica ───────────────────────────
 const IE_VARINHA = {
-    nome: 'Varinha mágica', tecla: 'W', icone: 'wand', cursor: 'crosshair',
+    nome: 'Varinha mágica', tecla: 'W', icone: 'wand', cursor: ev => ieCursorSel('varinha', ev),
     down(p, ev, doc) {
         const o = IE.op.varinha;
         const img = ieAmostra(doc, o.todas, ieAtiva(doc));

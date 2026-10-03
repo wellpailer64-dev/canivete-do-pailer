@@ -207,7 +207,7 @@ function ieLacoMagFechar(doc) {
     ieHist(ieT('Laço magnético'));
 }
 const IE_LACO_MAG = {
-    nome: 'Laço magnético', tecla: 'L', icone: 'lassoMag', cursor: 'crosshair',
+    nome: 'Laço magnético', tecla: 'L', icone: 'lassoMag', cursor: ev => ieCursorSel('lacoMag', ev),
     down(p, ev, doc) {
         const l = IE.lacoMag;
         if (!l) { const b = ieDemBorda(doc, p, IE.op.lacoMag.largura); IE.lacoMag = { pts: [{ x: b[0], y: b[1] }], fixos: [0], prov: [], op: ieOpSel(ev) }; return; }
@@ -272,7 +272,7 @@ Object.assign(IE_FERR, { recManchas: IE_REC_MANCHAS, recPincel: IE_REC_PINCEL, r
         (IE.op.remendo.modo === 'normal' ? ieSegm('sentido', 'remendo', [['origem', 'Origem'], ['destino', 'Destino']]) : '') +
         ieNum('Difusão', 'difusao', 'remendo', 0, 7, 1) +
         `<span class="ie-op-dica">${ieT(IE.op.remendo.modo === 'normal' ? 'Selecione a área (arrastar desenha) e arraste de dentro dela até a área boa' : 'Selecione e clique dentro: reconstrói pela vizinhança')}</span>`;
-    if (f === 'lacoMag') return ieNum('Largura', 'largura', 'lacoMag', 1, 64, 1, ' px') + ieNum('Frequência', 'freq', 'lacoMag', 5, 200, 1) + ieNum('Suavizar', 'suav', 'lacoMag', 0, 250, 1, ' px') +
+    if (f === 'lacoMag') return ieSelModos() + ieNum('Largura', 'largura', 'lacoMag', 1, 64, 1, ' px') + ieNum('Frequência', 'freq', 'lacoMag', 5, 200, 1) + ieNum('Suavizar', 'suav', 'lacoMag', 0, 250, 1, ' px') +
         `<span class="ie-op-dica">${ieT('Clique e mova pela borda · clique fixa um ponto · Backspace desfaz · duplo clique ou Enter fecha')}</span>`;
     return '';
 });

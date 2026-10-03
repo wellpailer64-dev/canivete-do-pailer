@@ -80,6 +80,13 @@ const ieNum = (rotulo, k, obj, min, max, passo = 1, suf = '', larg = 54) =>
 const ieChk = (rotulo, k, obj) => `<label class="ie-op-chk"><input type="checkbox" data-k="${k}" data-o="${obj}" ${IE.op[obj][k] ? 'checked' : ''}> ${ieT(rotulo)}</label>`;
 const ieSegm = (k, obj, opcoes) => `<div class="ie-segm">${opcoes.map(([v, r]) => `<button data-k="${k}" data-o="${obj}" data-v="${v}" class="${IE.op[obj][k] === v ? 'on' : ''}">${ieT(r)}</button>`).join('')}</div>`;
 
+// os 4 modos de seleção do Photoshop (Nova / Adicionar / Subtrair / Interseção), com o ícone de cada um
+function ieSelModos() {
+    const ic = { nova: '<rect x="4" y="4" width="12" height="12"/>', somar: '<rect x="3" y="3" width="10" height="10"/><rect x="9" y="9" width="10" height="10"/>',
+        subtrair: '<rect x="3" y="3" width="10" height="10"/><rect x="9" y="9" width="10" height="10" stroke-dasharray="2 2"/>', cruzar: '<rect x="3" y="3" width="10" height="10" stroke-dasharray="2 2"/><rect x="9" y="9" width="10" height="10" stroke-dasharray="2 2"/><rect x="9" y="9" width="4" height="4" fill="currentColor"/>' };
+    const nomes = { nova: 'Nova seleção', somar: 'Adicionar à seleção (Shift)', subtrair: 'Subtrair da seleção (Alt)', cruzar: 'Interseção com a seleção (Shift+Alt)' };
+    return `<div class="ie-segm ie-sel-modos">${Object.keys(ic).map(k => `<button data-k="modo" data-o="sel" data-v="${k}" class="${IE.op.sel.modo === k ? 'on' : ''}" title="${ieT(nomes[k])}"><svg class="ie-i" viewBox="0 0 22 22">${ic[k]}</svg></button>`).join('')}</div><i class="ie-op-sep"></i>`;
+}
 function ieOpcoesRender(soValores) {
     const box = ieEl('ie-opcoes');
     if (!box) return;
@@ -125,15 +132,15 @@ function ieOpcoesRender(soValores) {
             h += ieBotoesGirar(true) + `<span class="ie-op-dica">${ieT('Arraste para girar a camada em volta do centro · Shift: de 15 em 15° · Enter aplica, Esc cancela')}</span>`;
             break;
         case 'letreiro':
-            h += ieSegm('forma', 'letreiro', [['ret', 'Retângulo'], ['eli', 'Elipse']]) + ieNum('Suavizar', 'suav', 'letreiro', 0, 250, 1, ' px') +
+            h += ieSelModos() + ieSegm('forma', 'letreiro', [['ret', 'Retângulo'], ['eli', 'Elipse']]) + ieNum('Suavizar', 'suav', 'letreiro', 0, 250, 1, ' px') +
                 `<span class="ie-op-dica">${ieT('Shift: somar · Alt: subtrair · Shift+Alt: cruzar')}</span>`;
             break;
         case 'laco':
-            h += ieSegm('modo', 'laco', [['livre', 'Livre'], ['poligonal', 'Poligonal']]) + ieNum('Suavizar', 'suav', 'laco', 0, 250, 1, ' px') +
-                `<span class="ie-op-dica">${ieT('Poligonal: clique os pontos, duplo clique ou Enter fecha')}</span>`;
+            h += ieSelModos() + ieSegm('modo', 'laco', [['livre', 'Livre'], ['poligonal', 'Poligonal']]) + ieNum('Suavizar', 'suav', 'laco', 0, 250, 1, ' px') +
+                `<span class="ie-op-dica">${ieT('Shift: adicionar · Alt: subtrair · Shift+Alt: interseção · Poligonal: duplo clique ou Enter fecha')}</span>`;
             break;
         case 'varinha':
-            h += ieNum('Tolerância', 'tol', 'varinha', 0, 255) + ieChk('Contíguo', 'contiguo', 'varinha') + ieChk('Todas as camadas', 'todas', 'varinha');
+            h += ieSelModos() + ieNum('Tolerância', 'tol', 'varinha', 0, 255) + ieChk('Contíguo', 'contiguo', 'varinha') + ieChk('Todas as camadas', 'todas', 'varinha');
             break;
         case 'corte': {
             const r = IE.corte && IE.corte.r;
