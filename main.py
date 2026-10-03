@@ -2971,6 +2971,31 @@ class ApiBridge:
         from Functions import editor_imagem
         return editor_imagem.liberar(doc)
 
+    def ie_mascara_assunto(self, png_b64, modelo="birefnet-lite"):
+        """Photo Kanivete: máscara do assunto (Remover plano de fundo / Selecionar assunto) em PNG base64."""
+        import hashlib
+        from Functions.removerfundo import mascara_assunto_b64
+        # mesma imagem + mesmo modelo = mesma máscara: guarda em disco (refazer uma arte não roda a IA de novo)
+        pasta = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "cache_recorte")
+        arq = os.path.join(pasta, hashlib.sha1(f"{modelo}|{png_b64}".encode()).hexdigest() + ".txt")
+        try:
+            if os.path.exists(arq):
+                with open(arq, encoding="ascii") as f:
+                    return {"success": True, "png": f.read(), "cache": True}
+            png = mascara_assunto_b64(png_b64, modelo)
+            try:
+                os.makedirs(pasta, exist_ok=True)
+                with open(arq, "w", encoding="ascii") as f:
+                    f.write(png)
+                velhos = sorted((os.path.join(pasta, n) for n in os.listdir(pasta)), key=os.path.getmtime)
+                for v in velhos[:-200]:
+                    os.remove(v)
+            except OSError:
+                pass
+            return {"success": True, "png": png}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def ie_fechar(self, doc):
         from Functions import editor_imagem
         return editor_imagem.fechar(doc)

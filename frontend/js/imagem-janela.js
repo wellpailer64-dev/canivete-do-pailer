@@ -1059,7 +1059,7 @@ Object.assign(IE_CMDS, {
 // ─────────────────────────── barra Ferramentas: ordem e grupos do Photoshop ───────────────────────────
 // cada espaço mostra a última ferramenta usada do grupo; o triângulo no canto indica que há mais; botão direito ou
 // segurar abre a lista (como no Photoshop). Shift+tecla alterna dentro do grupo.
-const IE_FERR_GRUPOS = [['mover'], '|', ['letreiro'], ['laco'], ['varinha'], ['corte', 'fatia'], '|', ['contagotas'], ['pincel'], ['carimbo'], ['borracha'], ['degrade', 'balde'], '|',
+const IE_FERR_GRUPOS = [['mover'], '|', ['letreiro'], ['laco'], ['varinha'], ['corte', 'fatia'], '|', ['contagotas'], ['pincel'], ['carimbo'], ['borracha', 'borrachaFundo', 'borrachaMagica'], ['degrade', 'balde'], '|',
     ['texto'], ['forma'], '|', ['mao'], ['zoom']];
 function ieFerrGrupos() {
     const usados = new Set(IE_FERR_GRUPOS.flat()), g = IE_FERR_GRUPOS.map(x => (x === '|' ? x : x.filter(n => IE_FERR[n]))).filter(x => x === '|' || x.length);

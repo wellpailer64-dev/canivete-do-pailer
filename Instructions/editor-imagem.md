@@ -36,6 +36,8 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   lixeira, menu fx, Tornar padrão / Redefinir, Visualizar e a amostra. Abre pelo botão direito na camada (primeiro item
   "Opções de mesclagem..."), duplo clique na camada, botão fx do painel, Camada > Estilo de camada. No app em inglês
   a janela usa os termos oficiais do Photoshop (IE_LS_EN). Efeitos aparecem sob a camada (fx ›) com olho por efeito.
+- `frontend/js/imagem-api.js` — API de automação `window.KNV` (scripts/Ações para agentes): guia em
+  `Instructions/agente/design-photo-kanivete.md`.
 - `frontend/css/imagem.css`, `Functions/editor_imagem.py`, `main.py` (métodos `ie_*`), `Functions/media_server.py`
   (servir bytes da memória e receber POST).
 
@@ -84,6 +86,18 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 - Efeitos editados no editor (`L.fxMudou`) ou de camada nova: o Python reescreve só Sombra projetada, Brilho externo,
   Traçado e Sobreposição de cor no `lfx2` (os outros efeitos ficam; efeito tirado fica desligado; `lrFX` sai).
 - Fatias: gravadas quando mudaram (ou em arquivo novo).
+
+## Recorte, objeto inteligente e distorção (rodada do flyer, 2026-10-03)
+- Grupo da Borracha (E / Shift+E): **Borracha de plano de fundo** (amostra contínua/uma vez, limites contíguo/
+  descontíguo, tolerância, proteger cor de frente) e **Borracha mágica** (apaga a cor clicada: tolerância, suavizar,
+  contíguo, todas as camadas, opacidade) — `IE_BORRACHA_FUNDO`/`IE_BORRACHA_MAGICA` em imagem-ferramentas.js.
+- Camada > **Remover plano de fundo** (máscara do assunto) e Selecionar > **Assunto**: IA BiRefNet-lite (onnxruntime,
+  `mascara_assunto_b64` em Functions/removerfundo.py, `ie_mascara_assunto` no main.py) com cache em disco
+  (`%LOCALAPPDATA%\CaniveteDoPailer\cache_recorte`, 200 últimas): a mesma imagem não roda a IA de novo.
+- Camada > Objetos inteligentes > **Converter em objeto inteligente**: guarda o original (`L.c0`) e acumula a matriz
+  (`L.tf`); transformar de novo sai do original, sem perda. Duplicar mantém objeto inteligente criado no editor.
+- Filtro > Distorcer: **Ondulação**, **Respingos**, **Torcer** (`ieDeslocar`, imagem-ajustes.js).
+- API de automação `window.KNV` (imagem-api.js): ver `Instructions/agente/design-photo-kanivete.md`.
 
 ## Limitações conhecidas (MVP)
 - Efeitos: Contorno (curva) de sombra/brilho, Ruído, Brilho com degradê e Traçado com padrão do PSD não são

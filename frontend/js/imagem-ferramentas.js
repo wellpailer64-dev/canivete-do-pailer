@@ -386,12 +386,14 @@ function ieDuplicarCamada(doc, L) {
     const s = ieFotoCamadas([L])[0];
     const N = ieRestaurarCamadas([s])[0];
     const renova = X => {
+        const doPsd = X.ref != null;
         X.id = ++doc.seq;
         X.uid = 'u' + doc.id + '_' + X.id + '_' + Math.random().toString(36).slice(2, 7);
         X.ref = null; X.sujoPx = true; X.sujoM = !!X.m;
         if (X.tipo !== 'pixel' && X.tipo !== 'grupo' && X.tipo !== 'ajuste') {
-            // cópia de texto/objeto inteligente do PSD: vira pixels (o original continua vivo)
-            if (!X.txt) { X.tipo = 'pixel'; delete X.c0; delete X.tf; delete X.texto; }
+            // cópia de texto/objeto inteligente do PSD: vira pixels (o original continua vivo). Objeto inteligente
+            // criado no editor continua objeto inteligente, com o MESMO original (como as instâncias do Photoshop)
+            if (!X.txt && !(X.tipo === 'inteligente' && X.c0 && !doPsd)) { X.tipo = 'pixel'; delete X.c0; delete X.tf; delete X.texto; }
         }
         if (X.filhos) X.filhos.forEach(renova);
     };
@@ -731,6 +733,106 @@ const IE_BALDE = {
     },
 };
 
+// ─────────────────────────── borracha mágica e borracha de plano de fundo (como no Photoshop) ───────────────────────────
+// Diferença de cor (a mesma régua do Balde/Varinha: o maior desvio entre os canais) → quanto apagar: até a tolerância
+// apaga tudo; numa faixa de mais 50% da tolerância apaga em degradê (borda sem serrilhado e sem auréola da cor do fundo)
+function ieApagarCor(dif, tol, suave) {
+    if (dif <= tol) return 1;
+    if (!suave) return 0;
+    const faixa = Math.max(4, tol * 0.5);
+    return dif >= tol + faixa ? 0 : 1 - (dif - tol) / faixa;
+}
+
+// Borracha mágica: um clique apaga a cor clicada (contígua ou em toda a camada)
+const IE_BORRACHA_MAGICA = {
+    nome: 'Borracha mágica', tecla: 'E', icone: 'eraser', cursor: 'crosshair',
+    down(p, ev, doc) {
+        const L = ieAtiva(doc);
+        if (!ieChecarPintavel(L, 'apagar')) return;
+        if (p.x < 0 || p.y < 0 || p.x >= doc.w || p.y >= doc.h) return;
+        const o = IE.op.borrachaMagica;
+        const img = ieAmostra(doc, o.todas, L), d = img.data, W = img.width, H = img.height;
+        const tolMax = o.tol + (o.suave ? Math.max(4, o.tol * 0.5) : 0);
+        const reg = ieRegiao(img, p.x, p.y, tolMax, o.contiguo);   // o que a cor alcança (com a faixa suave)
+        const i0 = (Math.floor(p.y) * W + Math.floor(p.x)) * 4, r0 = d[i0], g0 = d[i0 + 1], b0 = d[i0 + 2];
+        const cob = ieCanvas(W, H), cx = ieCtx(cob), ci = cx.createImageData(W, H), c = ci.data;
+        for (let i = 0; i < reg.length; i++) {
+            if (!reg[i]) continue;
+            const k = i * 4, dif = Math.max(Math.abs(d[k] - r0), Math.abs(d[k + 1] - g0), Math.abs(d[k + 2] - b0));
+            const a = ieApagarCor(dif, o.tol, o.suave);
+            if (a > 0) { c[k] = c[k + 1] = c[k + 2] = 255; c[k + 3] = Math.round(a * 255); }
+        }
+        cx.putImageData(ci, 0, 0);
+        iePintarCobertura(doc, L, cob, ieRDoc(doc), 'Borracha mágica', { opac: o.opac / 100, borracha: true });
+    },
+};
+
+// Borracha de plano de fundo: pincel que só apaga a cor que está debaixo da mira (amostra contínua ou só no clique),
+// com tolerância; "proteger a cor de frente" deixa intacta a cor escolhida (ex.: o cabelo). O tamanho grande pega a
+// imagem inteira de uma vez, como no Photoshop.
+const IE_BORRACHA_FUNDO = {
+    nome: 'Borracha de plano de fundo', tecla: 'E', icone: 'eraser', cursorPincel: true,
+    cursor: () => 'none',
+    down(p, ev, doc) {
+        const L = ieAtiva(doc);
+        if (!ieChecarPintavel(L, 'apagar') || !L.c) return;
+        ieGravavel(L);
+        IE.bfundo = { L, Rantes: ieRCamada(L), amostra: null, ult: null };
+        IE_BORRACHA_FUNDO.dab(p, doc);
+    },
+    move(p, ev, doc) {
+        const b = IE.bfundo;
+        if (!b) return;
+        const o = IE.op.borrachaFundo, passo = Math.max(1, o.tam * 0.25), u = b.ult;
+        const dist = Math.hypot(p.x - u.x, p.y - u.y), n = Math.ceil(dist / passo);
+        for (let k = 1; k <= n; k++) IE_BORRACHA_FUNDO.dab({ x: u.x + (p.x - u.x) * k / n, y: u.y + (p.y - u.y) * k / n }, doc);
+    },
+    up(p, ev, doc) {
+        const b = IE.bfundo; IE.bfundo = null;
+        if (!b) return;
+        b.L.sujoPx = true;
+        ieCamadaMudou(b.L, b.Rantes);
+        ieHist(ieT('Borracha de plano de fundo'));
+    },
+    dab(p, doc) {
+        const b = IE.bfundo, L = b.L, o = IE.op.borrachaFundo, R = o.tam / 2;
+        b.ult = { x: p.x, y: p.y };
+        const lx = Math.floor(p.x - L.x), ly = Math.floor(p.y - L.y);
+        const x0 = Math.max(0, Math.floor(lx - R)), y0 = Math.max(0, Math.floor(ly - R));
+        const x1 = Math.min(L.c.width, Math.ceil(lx + R)), y1 = Math.min(L.c.height, Math.ceil(ly + R));
+        if (x1 <= x0 || y1 <= y0) return;
+        const ctx = ieCtx(L.c), img = ctx.getImageData(x0, y0, x1 - x0, y1 - y0), d = img.data, w = x1 - x0;
+        // amostra: a cor debaixo da mira (contínua) ou a do primeiro clique (uma vez)
+        if (!b.amostra || o.amostra === 'continuo') {
+            const mx = Math.min(x1 - 1, Math.max(x0, lx)) - x0, my = Math.min(y1 - 1, Math.max(y0, ly)) - y0, k = (my * w + mx) * 4;
+            if (d[k + 3] === 0 && b.amostra) { /* mira em área já apagada: mantém a amostra */ }
+            else b.amostra = [d[k], d[k + 1], d[k + 2]];
+        }
+        const [r0, g0, b0] = b.amostra, prot = o.proteger ? ieHexRgb(IE.cor[0]) : null;
+        const reg = o.limites === 'contiguo' ? ieRegiao(img, Math.min(w - 1, Math.max(0, lx - x0)), Math.min(y1 - y0 - 1, Math.max(0, ly - y0)), o.tol + Math.max(4, o.tol * 0.5), true) : null;
+        for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+            const dx = x + 0.5 - lx, dy = y + 0.5 - ly;
+            if (dx * dx + dy * dy > R * R) continue;
+            const i = (y - y0) * w + (x - x0), k = i * 4;
+            if (!d[k + 3] || (reg && !reg[i])) continue;
+            if (prot && Math.max(Math.abs(d[k] - prot[0]), Math.abs(d[k + 1] - prot[1]), Math.abs(d[k + 2] - prot[2])) <= o.tol) continue;
+            const a = ieApagarCor(Math.max(Math.abs(d[k] - r0), Math.abs(d[k + 1] - g0), Math.abs(d[k + 2] - b0)), o.tol, true);
+            if (a > 0) d[k + 3] = Math.round(d[k + 3] * (1 - a));
+        }
+        ctx.putImageData(img, x0, y0);
+        ieInvalidar(L);
+        ieDesenharVista?.();
+    },
+    sobre(ctx, doc) {
+        ieCursorPincel(ctx, doc, IE.op.borrachaFundo.tam);
+        if (IE.mouse) {   // mira no centro (o ponto que dá a cor a apagar)
+            const s = ieDocTela(IE.mouse.x, IE.mouse.y, doc);
+            ctx.save(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(s.x - 5, s.y); ctx.lineTo(s.x + 5, s.y); ctx.moveTo(s.x, s.y - 5); ctx.lineTo(s.x, s.y + 5); ctx.stroke(); ctx.restore();
+        }
+    },
+};
+
 // ─────────────────────────── degradê ───────────────────────────
 const IE_DEGRADE = {
     nome: 'Degradê', tecla: 'G', icone: 'gradient', cursor: 'crosshair',
@@ -982,6 +1084,8 @@ const IE_FERR = {
     carimbo: iePintor('carimbo', 'Carimbo', 'S', 'stamp'),
     pincel: iePintor('pincel', 'Pincel', 'B', 'brush'),
     borracha: iePintor('borracha', 'Borracha', 'E', 'eraser'),
+    borrachaFundo: IE_BORRACHA_FUNDO,
+    borrachaMagica: IE_BORRACHA_MAGICA,
     degrade: IE_DEGRADE,
     balde: IE_BALDE,
     texto: null,   // imagem-texto.js
@@ -989,7 +1093,7 @@ const IE_FERR = {
     mao: IE_MAO,
     zoom: IE_ZOOM,
 };
-const IE_FERR_ORDEM = ['mover', 'letreiro', 'laco', 'varinha', 'corte', 'contagotas', '|', 'carimbo', 'pincel', 'borracha', 'degrade', 'balde', '|', 'texto', 'forma', '|', 'mao', 'zoom'];
+const IE_FERR_ORDEM = ['mover', 'letreiro', 'laco', 'varinha', 'corte', 'contagotas', '|', 'carimbo', 'pincel', 'borracha', 'borrachaFundo', 'borrachaMagica', 'degrade', 'balde', '|', 'texto', 'forma', '|', 'mao', 'zoom'];
 
 function ieFerrCancelar() {
     IE.laco = null; IE.arr = null; IE.deg = null;

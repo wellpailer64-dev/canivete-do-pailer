@@ -165,6 +165,15 @@ function ieOpcoesRender(soValores) {
                 ieSegm('cores', 'degrade', [['frente-fundo', 'Frente → fundo'], ['frente-transp', 'Frente → transparente'], ...(IE.op.degrade.grad ? [['personalizado', 'Personalizado']] : [])]) +
                 ieChk('Inverter', 'inverter', 'degrade') + ieNum('Opacidade', 'opac', 'degrade', 1, 100, 1, '%');
             break;
+        case 'borrachaMagica':
+            h += ieNum('Tolerância', 'tol', 'borrachaMagica', 0, 255) + ieChk('Suavização de serrilhado', 'suave', 'borrachaMagica') + ieChk('Contíguo', 'contiguo', 'borrachaMagica') +
+                ieChk('Amostrar todas as camadas', 'todas', 'borrachaMagica') + ieNum('Opacidade', 'opac', 'borrachaMagica', 1, 100, 1, '%');
+            break;
+        case 'borrachaFundo':
+            h += ieNum('Tamanho', 'tam', 'borrachaFundo', 1, 2500, 1, 'px') + ieSegm('amostra', 'borrachaFundo', [['continuo', 'Amostra contínua'], ['uma', 'Amostra uma vez']]) +
+                ieSegm('limites', 'borrachaFundo', [['contiguo', 'Contíguo'], ['descontiguo', 'Descontíguo']]) + ieNum('Tolerância', 'tol', 'borrachaFundo', 0, 255) +
+                ieChk('Proteger a cor de frente', 'proteger', 'borrachaFundo');
+            break;
         case 'balde':
             h += ieNum('Tolerância', 'tol', 'balde', 0, 255) + ieChk('Contíguo', 'contiguo', 'balde') + ieChk('Todas as camadas', 'todas', 'balde') +
                 ieNum('Opacidade', 'opac', 'balde', 1, 100, 1, '%');
@@ -847,6 +856,8 @@ function ieDialogo({ titulo, campos, previa, ok = 'OK', largura, lado }) {
     return new Promise(resolve => {
         const box = ieEl('ie-modal');
         const vals = Object.fromEntries(campos.filter(c => c.tipo !== 'titulo').map(c => [c.id, c.valor]));
+        // automação (KNV.cmd, imagem-api.js): valores prontos, sem abrir a janela — como uma Ação gravada do Photoshop
+        if (IE._auto) { const a = IE._auto; IE._auto = null; resolve({ ...vals, ...a }); return; }
         const campoHtml = c => {
             const t = c.tipo || 'faixa';
             if (t === 'titulo') return `<div class="ie-dlg-tit">${ieT(c.rotulo)}</div>`;
@@ -959,14 +970,17 @@ const IE_MENUS = [
     ['Camada', [['Nova camada', 'novaCamada', 'Shift+Ctrl+N'], ['Duplicar camada', 'duplicar', 'Ctrl+J'], ['Camada via recorte', 'viaRecorte', 'Shift+Ctrl+J'], ['Excluir camada', 'excluirCamada'], '-',
         ['Máscara de camada', [['Revelar tudo', 'mascara'], ['Ocultar tudo', 'mascaraOcultar'], ['Revelar seleção', 'mascaraSel'], ['Ocultar seleção', 'mascaraSelOcultar'], '-',
             ['Inverter máscara', 'mascaraInverter'], ['Desativar/ativar', 'mascaraDesativar'], ['Aplicar', 'mascaraAplicar'], ['Excluir', 'mascaraExcluir']]],
+        ['Objetos inteligentes', [['Converter em objeto inteligente', 'objetoInteligente'], ['Rasterizar', 'rasterizar']]],
+        ['Remover plano de fundo', 'removerFundo'],
         ['Criar máscara de corte', 'corte', 'Alt+Ctrl+G'], '-',
         ['Agrupar camadas', 'agrupar', 'Ctrl+G'], ['Desagrupar camadas', 'desagrupar', 'Shift+Ctrl+G'], ['Novo grupo', 'grupoNovo'], '-',
         ['Organizar', [['Trazer para a frente', 'frente', 'Shift+Ctrl+]'], ['Avançar', 'avancar', 'Ctrl+]'], ['Recuar', 'recuar', 'Ctrl+['], ['Enviar para trás', 'tras', 'Shift+Ctrl+[']]],
         ['Rasterizar camada', 'rasterizar'], '-',
         ['Mesclar para baixo', 'mesclarBaixo', 'Ctrl+E'], ['Mesclar visíveis', 'mesclarVisiveis', 'Shift+Ctrl+E'], ['Achatar imagem', 'achatar']]],
     ['Selecionar', [['Tudo', 'selTudo', 'Ctrl+A'], ['Desmarcar', 'selNada', 'Ctrl+D'], ['Inverter', 'selInverter', 'Shift+Ctrl+I'], '-',
-        ['Pixels da camada', 'selCamada'], ['Modificar', [['Expandir...', 'selExpandir'], ['Contrair...', 'selContrair'], ['Suavizar...', 'selSuavizar', 'Shift+F6']]]]],
-    ['Filtro', [['Filtro Camera Raw...', 'f:cameraRaw', 'Shift+Ctrl+A'], '-', ['Desfoque gaussiano...', 'f:gaussiano'], ['Desfoque de movimento...', 'f:movimento'], ['Máscara de nitidez...', 'f:nitidez'], ['Adicionar ruído...', 'f:ruido'], ['Mosaico...', 'f:mosaico']]],
+        ['Pixels da camada', 'selCamada'], ['Assunto', 'selAssunto'], ['Modificar', [['Expandir...', 'selExpandir'], ['Contrair...', 'selContrair'], ['Suavizar...', 'selSuavizar', 'Shift+F6']]]]],
+    ['Filtro', [['Filtro Camera Raw...', 'f:cameraRaw', 'Shift+Ctrl+A'], '-', ['Desfoque gaussiano...', 'f:gaussiano'], ['Desfoque de movimento...', 'f:movimento'], ['Máscara de nitidez...', 'f:nitidez'], ['Adicionar ruído...', 'f:ruido'], ['Mosaico...', 'f:mosaico'], '-',
+        ['Distorcer', [['Ondulação...', 'f:ondulacao'], ['Respingos...', 'f:respingos'], ['Torcer...', 'f:torcer']]]]],
     ['Exibir', [['Aproximar', 'zoomMais', 'Ctrl++'], ['Afastar', 'zoomMenos', 'Ctrl+-'], ['Ajustar à tela', 'zoomAjustar', 'Ctrl+0'], ['100%', 'zoom100', 'Ctrl+1'], '-',
         ['Fatias', 'verFatias'], ['Comparar com a imagem salva no PSD', 'verAchatado'], ['Avisos da abertura', 'avisos']]],
 ];

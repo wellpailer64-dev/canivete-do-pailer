@@ -264,6 +264,28 @@ def _remover_fundo_onnx(img_pil, modelo_path, cfg=None):
     return resultado
 
 
+def mascara_assunto_b64(png_b64, modelo_id="birefnet-lite"):
+    """Photo Kanivete (Remover plano de fundo / Selecionar assunto): recebe a camada em PNG (base64) e devolve a
+    máscara do assunto em PNG cinza (base64, branco = fica), no tamanho da camada. Só a máscara: a camada continua
+    com os pixels dela (máscara de camada, como o Photoshop faz)."""
+    import base64
+    import io
+    path, cfg = garantir_modelo(modelo_id)
+    img = Image.open(io.BytesIO(base64.b64decode(png_b64.split(",", 1)[-1])))
+    alfa_original = img.getchannel("A") if img.mode in ("RGBA", "LA") else None
+    fundo = Image.new("RGB", img.size, (255, 255, 255))
+    if alfa_original is not None:
+        fundo.paste(img.convert("RGB"), mask=alfa_original)   # transparente vira branco (o modelo não vê alfa)
+    else:
+        fundo = img.convert("RGB")
+    mascara = _remover_fundo_onnx(fundo, path, cfg).getchannel("A")
+    if alfa_original is not None:   # onde a camada já era transparente continua fora
+        mascara = Image.fromarray(np.minimum(np.array(mascara), np.array(alfa_original)))
+    buf = io.BytesIO()
+    mascara.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
 # =========================
 # ✂️ REMOVER FUNDO DE UM ARQUIVO
 # =========================

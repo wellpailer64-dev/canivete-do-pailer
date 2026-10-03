@@ -887,6 +887,28 @@ const IE_CMDS = {
     mascaraSel: doc => ieMascaraNova(doc, true, true),
     mascaraSelOcultar: doc => ieMascaraNova(doc, false, true),
     mascaraInverter: doc => { doc.mascaraAlvo = true; IE_AJUSTES.inverter(); },
+    // Converter em objeto inteligente (como no Photoshop): os pixels de agora (com a máscara aplicada dentro) viram o
+    // original; escalar/girar depois sempre parte dele (diminuir e aumentar de novo não perde nitidez) e Ctrl+J faz
+    // cópias que usam o mesmo original
+    objetoInteligente: doc => {
+        const L = ieAtiva(doc);
+        if (!L || !L.c || L.tipo !== 'pixel') { ieToast(ieT('Selecione uma camada de pixels para converter')); return; }
+        const Rantes = ieRCamada(L);
+        let c = L.c;
+        if (L.m && L.m.c) {
+            c = ieClonar(L.c);
+            const x = ieCtx(c); x.globalCompositeOperation = 'destination-in'; x.drawImage(ieMascaraRegiao(L.m, ieRPlano(L)), 0, 0);
+            L.m = null; doc.mascaraAlvo = false;
+        }
+        const b = ieLimites(c);
+        if (!b) { ieToast(ieT('A camada está vazia')); return; }
+        const n = ieCanvas(b.w, b.h); ieCtx(n).drawImage(c, -b.x, -b.y);
+        Object.assign(L, { tipo: 'inteligente', c: n, x: L.x + b.x, y: L.y + b.y, tf: [...IE_ID], tfBase: [...IE_ID], sujoPx: true });
+        L.c0 = { c: n, x: L.x, y: L.y };
+        ieInvalidar(L); ieCamadaMudou(L, Rantes); ieHist(ieT('Converter em objeto inteligente')); ieUiCamadas();
+    },
+    removerFundo: doc => ieRemoverFundo(doc),
+    selAssunto: doc => ieSelAssunto(doc),
     mascaraDesativar: doc => { const L = ieAtiva(doc); if (L && L.m) { L.m.desativada = !L.m.desativada; ieCamadaMudou(L, ieRCamada(L)); ieHist(ieT('Desativar máscara')); ieUiCamadas(); } },
     mascaraExcluir: doc => { const L = ieAtiva(doc); if (L && L.m) { const R = ieRCamada(L); L.m = null; doc.mascaraAlvo = false; ieCamadaMudou(L, R); ieHist(ieT('Excluir máscara')); ieUiCamadas(); } },
     mascaraAplicar: async doc => {
@@ -937,6 +959,54 @@ function ieOrdem(doc, modo) {
     else if (modo === 'avancar') { const max = Math.max(...idx); if (max >= lista.length - 1) return; const viz = lista[max + 1]; tira(); lista.splice(lista.indexOf(viz) + 1, 0, ...sel); }
     else if (modo === 'recuar') { const min = Math.min(...idx); if (min <= 0) return; const viz = lista[min - 1]; tira(); lista.splice(lista.indexOf(viz), 0, ...sel); }
     ieTudo(doc); ieHist(ieT('Organizar'));
+}
+
+// ── Remover plano de fundo / Selecionar assunto (como no Photoshop): a IA de recorte do Kanivete (BiRefNet,
+// Functions/removerfundo.py) acha o assunto da camada e devolve a máscara; o editor usa como máscara da camada
+// (os pixels continuam, dá para retocar a máscara com o pincel) ou como seleção ──
+async function ieMascaraAssunto(L) {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.ie_mascara_assunto) { ieToast(ieT('Recurso indisponível nesta versão')); return null; }
+    if (!L || !L.c) { ieToast(ieT('Selecione uma camada com pixels')); return null; }
+    ieToast(ieT('Procurando o assunto da camada... (a primeira vez baixa o modelo de IA)'));
+    const r = await api.ie_mascara_assunto(L.c.toDataURL('image/png'));
+    if (!r || !r.success) { ieToast((r && r.error) || ieT('Não foi possível achar o assunto')); return null; }
+    const img = new Image();
+    img.src = 'data:image/png;base64,' + r.png;
+    await img.decode();
+    // cinza da IA → alfa (o formato das máscaras e seleções do editor)
+    const c = ieCanvas(L.c.width, L.c.height), x = ieCtx(c);
+    x.drawImage(img, 0, 0, c.width, c.height);
+    const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+    for (let i = 0; i < p.length; i += 4) { p[i + 3] = p[i]; p[i] = p[i + 1] = p[i + 2] = 255; }
+    x.putImageData(d, 0, 0);
+    return c;
+}
+
+async function ieRemoverFundo(doc) {
+    const L = ieAtiva(doc);
+    if (!L || L.tipo === 'grupo' || L.tipo === 'ajuste') { ieToast(ieT('Selecione uma camada de imagem')); return; }
+    const c = await ieMascaraAssunto(L);
+    if (!c) return;
+    const Rantes = ieRCamada(L);
+    ieGravavel(L, 'm');
+    L.m = { c, x: L.x, y: L.y, fundo: 0 };
+    L.sujoM = true;
+    doc.mascaraAlvo = true;
+    ieCamadaMudou(L, Rantes);
+    ieHist(ieT('Remover plano de fundo'));
+    ieUiCamadas();
+    ieToast(ieT('Fundo removido com uma máscara: pinte nela de preto ou branco para retocar'));
+}
+
+async function ieSelAssunto(doc) {
+    const L = ieAtiva(doc);
+    const c = await ieMascaraAssunto(L);
+    if (!c) return;
+    const s = ieCanvas(doc.w, doc.h);
+    ieCtx(s).drawImage(c, L.x, L.y);
+    ieSelDefinir(doc, s);
+    ieHist(ieT('Selecionar assunto'));
 }
 
 function ieMascaraNova(doc, revelar, daSelecao) {

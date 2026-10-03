@@ -64,6 +64,8 @@ Plano completo (Fases 1–3 + Propriedades essenciais por faixa).
 Guia, arquivos e limitações em `Instructions/editor-imagem.md`; código em `frontend/js/imagem-*.js` e
 `Functions/editor_imagem.py` (salvar PSD de ida e volta: só troca o que mudou). Teste: `python testes/teste_imagem.py`
 (rodar antes de release quando mexer no editor de imagem, em `psd_tools` ou no `media_server`).
+Fazer arte pelo app (API `window.KNV`, receitas em etapas .iknv, `rodar.py`, `KNV.mapa()`/`KNV.revisar()`, técnicas):
+`Instructions/agente/design-photo-kanivete.md`.
 
 ## Build local
 - `build.bat` apaga `dist/` inteiro, onde ficam os modelos do usuário (`modelos_ia/`, `models/`, ~8 GB).

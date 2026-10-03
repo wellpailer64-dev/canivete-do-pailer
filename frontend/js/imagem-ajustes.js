@@ -515,7 +515,84 @@ function ieDesfocar(c, raio) {
     return n;
 }
 
+// ── Distorcer (Ondulação, Respingos, Torcer, como no Photoshop) ──
+// Ruído suave −1..1 (ruído de valor: grade aleatória a cada `cel` pixels, interpolada em cosseno; 2 oitavas)
+function ieRuidoSuave(w, h, cel, semente) {
+    const out = new Float32Array(w * h);
+    let s = semente >>> 0 || 1;
+    const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296 * 2 - 1; };
+    [[cel, 0.7], [Math.max(1, cel / 2.7), 0.3]].forEach(([c, peso]) => {
+        const gw = Math.ceil(w / c) + 2, gh = Math.ceil(h / c) + 2, g = new Float32Array(gw * gh);
+        for (let i = 0; i < g.length; i++) g[i] = rnd();
+        const suave = t => (1 - Math.cos(t * Math.PI)) / 2;
+        for (let y = 0; y < h; y++) {
+            const gy = y / c, y0 = Math.floor(gy), ty = suave(gy - y0);
+            for (let x = 0; x < w; x++) {
+                const gx = x / c, x0 = Math.floor(gx), tx = suave(gx - x0), k = y0 * gw + x0;
+                const a = g[k] + (g[k + 1] - g[k]) * tx, b = g[k + gw] + (g[k + gw + 1] - g[k + gw]) * tx;
+                out[y * w + x] += (a + (b - a) * ty) * peso;
+            }
+        }
+    });
+    return out;
+}
+// Desloca cada pixel: o pixel (x, y) do resultado vem de (x + dx, y + dy) da imagem (bilinear, fora = transparente)
+function ieDeslocar(c, dxy) {
+    const w = c.width, h = c.height, src = ieCtx(c).getImageData(0, 0, w, h).data;
+    const n = ieCanvas(w, h), nx = ieCtx(n), img = nx.createImageData(w, h), o = img.data;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const [dx, dy] = dxy(x, y), sx = x + dx, sy = y + dy;
+        const x0 = Math.floor(sx), y0 = Math.floor(sy), fx = sx - x0, fy = sy - y0, j = (y * w + x) * 4;
+        let r = 0, g = 0, b = 0, a = 0;
+        for (const [px, py, wt] of [[x0, y0, (1 - fx) * (1 - fy)], [x0 + 1, y0, fx * (1 - fy)], [x0, y0 + 1, (1 - fx) * fy], [x0 + 1, y0 + 1, fx * fy]]) {
+            if (px < 0 || py < 0 || px >= w || py >= h || !wt) continue;
+            const i = (py * w + px) * 4, al = src[i + 3] * wt;
+            r += src[i] * al; g += src[i + 1] * al; b += src[i + 2] * al; a += al;
+        }
+        if (a > 0) { o[j] = r / a; o[j + 1] = g / a; o[j + 2] = b / a; o[j + 3] = a; }
+    }
+    nx.putImageData(img, 0, 0);
+    return n;
+}
+
 const IE_FILTROS = {
+    // Ondulação: ondas irregulares (borda de papel rasgado, água); tamanho = largura das ondas
+    ondulacao: () => ieAplicarComDialogo({
+        titulo: 'Ondulação',
+        campos: [{ id: 'q', rotulo: 'Quantidade (%)', min: -999, max: 999, valor: 100 },
+            { id: 'tam', rotulo: 'Tamanho', tipo: 'select', opcoes: [['p', 'Pequeno'], ['m', 'Médio'], ['g', 'Grande']], valor: 'm' }],
+        proc: v => c => {
+            const cel = { p: 6, m: 14, g: 32 }[v.tam] || 14, amp = v.q / 100 * cel * 0.45;
+            const nx = ieRuidoSuave(c.width, c.height, cel, 101), ny = ieRuidoSuave(c.width, c.height, cel, 202);
+            return ieDeslocar(c, (x, y) => { const k = y * c.width + x; return [nx[k] * amp, ny[k] * amp]; });
+        },
+        margem: v => Math.ceil(Math.abs(v.q) / 100 * 15),
+    }),
+    // Respingos: cada pixel vem de um ponto sorteado em volta (raio), alisado pela suavização: borda áspera e fibrosa
+    respingos: () => ieAplicarComDialogo({
+        titulo: 'Respingos',
+        campos: [{ id: 'r', rotulo: 'Raio de borrifo', min: 0, max: 25, valor: 10 }, { id: 'suave', rotulo: 'Suavização', min: 1, max: 15, valor: 5 }],
+        proc: v => c => {
+            const cel = Math.max(1, v.suave * 0.6);
+            const nx = ieRuidoSuave(c.width, c.height, cel, 303), ny = ieRuidoSuave(c.width, c.height, cel, 404);
+            return ieDeslocar(c, (x, y) => { const k = y * c.width + x; return [nx[k] * v.r, ny[k] * v.r]; });
+        },
+        margem: v => Math.ceil(v.r),
+    }),
+    // Torcer: gira mais no centro e nada na borda do círculo inscrito
+    torcer: () => ieAplicarComDialogo({
+        titulo: 'Torcer',
+        campos: [{ id: 'ang', rotulo: 'Ângulo (°)', min: -999, max: 999, valor: 50 }],
+        proc: v => c => {
+            const cx = c.width / 2, cy = c.height / 2, R = Math.min(cx, cy), a0 = v.ang * Math.PI / 180;
+            return ieDeslocar(c, (x, y) => {
+                const dx = x - cx, dy = y - cy, d = Math.hypot(dx, dy);
+                if (d >= R) return [0, 0];
+                const a = a0 * (1 - d / R), cs = Math.cos(a), sn = Math.sin(a);
+                return [dx * cs - dy * sn - dx, dx * sn + dy * cs - dy];
+            });
+        },
+    }),
     gaussiano: () => ieAplicarComDialogo({
         titulo: 'Desfoque gaussiano',
         campos: [{ id: 'r', rotulo: 'Raio (px)', min: 0.1, max: 250, passo: 0.1, valor: 4 }],

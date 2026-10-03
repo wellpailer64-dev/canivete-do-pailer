@@ -29,6 +29,8 @@ const IE = {
         borracha: { tam: 40, dureza: 80, opac: 100, fluxo: 100, forma: 'redondo', espaco: 18, angulo: 0, redondeza: 100, varTam: 0, varAng: 0, dispersao: 0 },
         degrade: { tipo: 'linear', cores: 'frente-fundo', opac: 100, inverter: false },
         balde: { tol: 32, contiguo: true, todas: false, opac: 100 },
+        borrachaMagica: { tol: 32, contiguo: true, todas: false, opac: 100, suave: true },
+        borrachaFundo: { tam: 80, tol: 40, limites: 'contiguo', amostra: 'continuo', proteger: false },
         texto: { fonte: 'Arial', gdi: 'Arial', peso: 400, ital: false, tam: 72, alin: 'left', esp: 0, ent: 0 },
         forma: { tipo: 'ret', raio: 0, contorno: 0 },
         mao: {}, zoom: {},
