@@ -937,31 +937,56 @@ function ieBarraCtx() {
         b = document.createElement('div');
         b.id = 'ie-ctb'; b.className = 'ie-ctb';
         ieEl('ie-vista').appendChild(b);
-        b.addEventListener('pointerdown', e => e.stopPropagation());
+        b.addEventListener('pointerdown', e => {
+            e.stopPropagation();
+            const alca = e.target.closest('.ie-ctb-alca');
+            if (!alca) return;
+            // arrastar pela alça: a barra fica onde soltar (e lembra; duplo clique na alça volta a seguir a camada)
+            e.preventDefault();
+            const rv = ieEl('ie-vista').getBoundingClientRect(), rb = b.getBoundingClientRect(), dx = e.clientX - rb.left, dy = e.clientY - rb.top;
+            const mover = ev => {
+                const x = ieClamp(ev.clientX - rv.left - dx, 0, rv.width - b.offsetWidth), y = ieClamp(ev.clientY - rv.top - dy, 0, rv.height - b.offsetHeight);
+                b.style.left = x + 'px'; b.style.top = y + 'px'; b._pos = { x, y };
+            };
+            const soltar = () => { document.removeEventListener('pointermove', mover); document.removeEventListener('pointerup', soltar); if (b._pos) iePrefGravar('barraCtxPos', b._pos); };
+            document.addEventListener('pointermove', mover); document.addEventListener('pointerup', soltar);
+        });
+        b.addEventListener('dblclick', e => { if (e.target.closest('.ie-ctb-alca')) { iePrefGravar('barraCtxPos', null); ieBarraCtxAtualizar(); } });
         b.addEventListener('click', e => { const x = e.target.closest('[data-cmd]'); if (x) ieCmd(x.dataset.cmd); });
     }
     return b;
 }
+// clicar numa camada na tela traz a barra de volta (o × só esconde até o próximo clique)
+document.addEventListener('pointerdown', e => { if (e.target && e.target.id === 'ie-sobre') IE._ctbOculta = false; }, true);
+// a barra some enquanto o botão está apertado (arrastando): ao soltar, volta na hora (sem esperar outro redesenho)
+document.addEventListener('pointerup', () => { if (IE.doc) setTimeout(() => { try { ieBarraCtxAtualizar(); } catch (e) { /* sem barra */ } }, 0); }, true);
 function ieBarraCtxAtualizar() {
     const doc = IE.doc, b = ieBarraCtx();
+    if (doc && !iePref('barraCtxV2', false)) { iePrefGravar('barraCtxV2', true); iePrefGravar('barraCtx', true); }   // o × antigo desligava de vez
     const ligada = iePref('barraCtx', true);
-    if (!doc || !ligada || IE.ponteiro || IE.edTexto || IE.transf || IE.semExtras || !ieAtivoVisivel()) { b.hidden = true; return; }
+    if (!doc || !ligada || IE._ctbOculta || IE.ponteiro || IE.edTexto || IE.transf || IE.semExtras || !ieAtivoVisivel()) { b.hidden = true; return; }
     let R, itens;
     if (doc.sel) {
         R = doc.sel.bbox;
-        itens = [['selInverter', 'Inverter seleção'], ['selSuavizar', 'Suavizar...'], ['selExpandir', 'Expandir...'], ['mascaraSel', 'Criar máscara'], ['preencher', 'Preencher...'], ['viaRecorte', 'Nova camada'], ['selNada', 'Desmarcar']];
+        itens = [['selInverter', 'Inverter seleção'], ['selSuavizar', 'Suavizar...'], ['selExpandir', 'Expandir...'], ['mascaraSel', 'Criar máscara'], ['preencher', 'Preencher...'], ['viaRecorte', 'Nova camada'], ['selAssunto', 'Selecionar assunto'], ['selNada', 'Desmarcar']];
     } else {
         const L = ieAtiva(doc);
         R = L && ieCaixaCamada(L);
         if (!R) { b.hidden = true; return; }
-        itens = [['transformar', 'Transformar'], ['mascara', 'Máscara'], ['opcoesMescla', 'fx Estilo'], ['duplicar', 'Duplicar'], ['ajuste:matiz', 'Ajuste'], ['rasterizar', 'Rasterizar']];
+        itens = [['selAssunto', 'Selecionar assunto'], ['removerFundo', 'Remover fundo'], ['transformar', 'Transformar'], ['mascara', 'Máscara'], ['opcoesMescla', 'fx Estilo'], ['duplicar', 'Duplicar'], ['ajuste:matiz', 'Ajuste'], ['rasterizar', 'Rasterizar']];
+        if (!['pixel', 'inteligente'].includes(L.tipo)) itens = itens.filter(i => i[0] !== 'selAssunto' && i[0] !== 'removerFundo');
         if (['pixel', 'ajuste', 'grupo'].includes(L.tipo)) itens = itens.filter(i => i[0] !== 'rasterizar');
     }
     const chave = itens.map(i => i[0]).join('|');
-    if (b._chave !== chave) { b._chave = chave; b.innerHTML = itens.map(([c, r]) => `<button data-cmd="${c}">${ieJanH(r)}</button>`).join('') + `<button class="ie-ctb-x" data-cmd="barraCtxDesligar" title="${ieJanH('Esconder a barra (Janela > Barra de tarefas contextual)')}">×</button>`; }
+    if (b._chave !== chave) { b._chave = chave; b.innerHTML = `<span class="ie-ctb-alca" title="${ieJanH('Arraste para mover a barra · duplo clique: volta a seguir a camada')}">⋮⋮</span>` + itens.map(([c, r]) => `<button data-cmd="${c}">${ieJanH(r)}</button>`).join('') + `<button class="ie-ctb-x" data-cmd="barraCtxDesligar" title="${ieJanH('Esconder até clicar numa camada (desligar de vez: Janela > Barra de tarefas contextual)')}">×</button>`; }
     const v = ieVistaTam(), s = ieDocTela(R.x + R.w / 2, R.y + R.h, doc);
     b.hidden = false;
-    const w = b.offsetWidth || 300;
+    const w = b.offsetWidth || 300, fixa = iePref('barraCtxPos', null);
+    if (fixa) {   // o lugar onde o usuário deixou (dentro da vista)
+        b.style.left = ieClamp(fixa.x, 0, Math.max(0, v.w - w)) + 'px';
+        b.style.top = ieClamp(fixa.y, 0, Math.max(0, v.h - b.offsetHeight)) + 'px';
+        return;
+    }
     b.style.left = ieClamp(s.x - w / 2, 8, v.w - w - 8) + 'px';
     b.style.top = ieClamp(s.y + 14, 8, v.h - 46) + 'px';
 }
@@ -970,7 +995,7 @@ function ieBarraCtxAtualizar() {
     ieDesenharSobre = function () { orig(); try { ieBarraCtxAtualizar(); } catch (e) { /* sem barra */ } };
 })();
 IE_CMDS['ajuste:matiz'] = () => ieAjNova('matiz');
-IE_CMDS.barraCtxDesligar = () => { iePrefGravar('barraCtx', false); ieBarraCtxAtualizar(); };
+IE_CMDS.barraCtxDesligar = () => { IE._ctbOculta = true; ieBarraCtxAtualizar(); };   // só até o próximo clique numa camada
 
 // ─────────────────────────── menu Janela ───────────────────────────
 const IE_JAN_TECLAS = { configPincel: 'F5', cor: 'F6', camadas: 'F7', info: 'F8' };

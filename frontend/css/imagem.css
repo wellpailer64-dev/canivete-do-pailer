@@ -604,3 +604,7 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 .ie-dem.sel { background: var(--ie-sel, rgba(255,255,255,.08)); }
 .ie-dem canvas { border: 1px solid var(--ie-linha-2); border-radius: 2px; flex: none; }
 .ie-op-cor { width: 22px; height: 18px; border-radius: 3px; border: 1px solid var(--ie-linha-2); vertical-align: middle; }
+
+.ie-ctb { align-items: center; }
+.ie-ctb-alca { cursor: grab; color: var(--text-3); padding: 2px 5px 2px 3px; letter-spacing: -3px; font-size: 13px; user-select: none; }
+.ie-ctb-alca:active { cursor: grabbing; }
