@@ -59,12 +59,18 @@ async function ieCena(html, o = {}) {
     return { w: W, h: H, slides: nSlides || undefined, camadas: ctx.n, mantidas: ctx.mantidas, avisos, ms: Math.round(performance.now() - t0) };
 }
 // carrossel: guias nas emendas e uma fatia por slide (Arquivo > Exportar fatias também serve), sem tocar nas do usuário
+// (as do Novo layout de guias / Fatias das guias no mesmo lugar valem: não duplica) e deixa guias e fatias à mostra
 function ieCenaEmendas(doc, S) {
     doc.guias = (doc.guias || []).filter(g => !g.cena);
-    for (let i = 1; i < S.n; i++) doc.guias.push({ o: 'v', p: i * S.w, cena: true });
+    for (let i = 1; i < S.n; i++) if (!doc.guias.some(g => g.o === 'v' && Math.abs(g.p - i * S.w) < 0.5)) doc.guias.push({ o: 'v', p: i * S.w, cena: true });
     doc.fatias = (doc.fatias || []).filter(f => !f.cena && !(f.y === 0 && f.w === S.w && f.h === S.h && f.x % S.w === 0 && /^\d\d$/.test(f.nome)));   // .iknv não guarda o 'cena' da fatia
     doc.seqFatia = doc.seqFatia || 0;
-    for (let i = 0; i < S.n; i++) doc.fatias.push({ id: ++doc.seqFatia, x: i * S.w, y: 0, w: S.w, h: S.h, nome: String(i + 1).padStart(2, '0'), url: '', alt: '', cena: true });
+    for (let i = 0; i < S.n; i++) {
+        if (doc.fatias.some(f => f.x === i * S.w && f.y === 0 && f.w === S.w && f.h === S.h)) continue;
+        doc.fatias.push({ id: ++doc.seqFatia, x: i * S.w, y: 0, w: S.w, h: S.h, nome: String(i + 1).padStart(2, '0'), url: '', alt: '', cena: true });
+    }
+    doc.fatias.sort((a, b) => a.y - b.y || a.x - b.x);
+    IE.verGuias = true; doc.verFatias = true;
 }
 // componentes prontos (classes k-*, especificidade zero: o CSS da peça sempre ganha). Cores e fonte vêm do kit de
 // marca (--cor-primaria, --cor-texto, --cor-fundo, --cor-suave, --fonte) com padrão neutro

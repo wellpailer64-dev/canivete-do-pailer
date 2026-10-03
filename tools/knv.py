@@ -28,13 +28,20 @@ barra = lambda p: os.path.abspath(p).replace("\\", "/") if p else p
 
 def recarga_js():
     """Funções de nível superior e tabelas const IE_* = {...} de cada imagem-*.js; a API por último."""
-    partes = []
-    for nome in sorted(os.listdir(JS)):
-        if not (nome.startswith("imagem-") and nome.endswith(".js")) or nome == "imagem-api.js": continue
-        src = open(os.path.join(JS, nome), encoding="utf-8").read().splitlines()
+    partes, arquivos = [], [n for n in sorted(os.listdir(JS)) if n.startswith("imagem-") and n.endswith(".js") and n != "imagem-api.js"]
+    textos = {n: open(os.path.join(JS, n), encoding="utf-8").read() for n in arquivos}
+    # funções que outro módulo embrulha (ieDesenharSobre = function () { orig(); ... }): recarregar a original
+    # apagaria o embrulho (guias, fatias, réguas, painéis somem) — essas ficam como estão
+    embrulhadas = {m for s in textos.values() for m in re.findall(r"^\s*(\w+) = (?:async )?function\b", s, re.M)}
+    for nome in arquivos:
+        src = textos[nome].splitlines()
         i = 0
         while i < len(src):
-            m = re.match(r"(async )?function \w+\s*\(", src[i]); t = re.match(r"const (IE_[A-Z0-9_]+) = \{\s*$", src[i])
+            m = re.match(r"(async )?function (\w+)\s*\(", src[i]); t = re.match(r"const (IE_[A-Z0-9_]+) = \{\s*$", src[i])
+            if m and m.group(2) in embrulhadas:
+                j = i
+                while j < len(src) and not re.match(r"\}\)?;?\s*$", src[j]): j += 1
+                i = j + 1; continue
             if m or t:
                 j = i
                 while j < len(src) and not re.match(r"\}\)?;?\s*$", src[j]): j += 1

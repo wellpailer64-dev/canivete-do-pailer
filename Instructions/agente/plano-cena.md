@@ -109,3 +109,6 @@ como mexida: a camada refeita pelo HTML leva os filtros da antiga (`ieCenaLevarF
   novo sem duplicar fatias/guias, exportação em 4 PNGs. Próximo: Fase 3 (biblioteca de estilos/receitas, KNV.ver,
   forma vetorial se o usuário pedir).
 - Notado: `KNV.mover` num grupo muda só o x/y do grupo (os filhos não andam).
+- 2026-10-03: carrossel 3D (Instructions/agente/design-photo-kanivete.md): cena mostra guias e fatias do carrossel;
+  o runner não recarrega funções embrulhadas por outro módulo (ex.: `ieDesenharSobre`; recarregar a original fazia
+  guias, fatias e réguas sumirem do app de teste).
