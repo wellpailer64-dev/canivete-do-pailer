@@ -190,3 +190,15 @@ seleção+apagar, máscara, Ctrl+T, texto, desfazer/refazer, balde, degradê, va
 mesclar, agrupar, tamanho/girar/cortar, fatias, estilo de camada, alça da ferramenta Mover, miniaturas, fonte
 carregada, salvar e conferir com o psd-tools (fatias e efeitos no arquivo), reabrir. Sai com 1 se falhar.
 No console: `ieDiferencaAchatado()` mede a diferença do documento aberto contra o achatado do arquivo.
+
+## Próximos passos (combinado com o usuário em 2026-10-03)
+1. **Dissolver (Liquify)** — Filtro > Dissolver: janela própria com pincel de deformar para frente, reconstruir,
+   torcer, comprimir, inchar, empurrar para a esquerda; congelar/descongelar máscara; tamanho, densidade, pressão.
+2. **Galeria de filtros** — os artísticos do Photoshop (Pincel seco, Recorte, Bordas posterizadas, Granulado...).
+3. **Filtro Camera Raw como filtro inteligente** (hoje tem painel próprio e não entra na lista não destrutiva).
+4. Desabilitados no menu Filtro: Desfoque de forma/caminho, Deslocamento de pixels, Chama/Moldura/Árvore, Extrusão,
+   Redução de tremido, Grande angular adaptável, Ponto de fuga, Neural Filters.
+5. KNV.cena Fase 3 (Instructions/agente/plano-cena.md): biblioteca de estilos/receitas, KNV.ver, forma vetorial nas caixas.
+6. Ferramentas: Curvatura (grupo da Caneta), Movimento sensível ao conteúdo (grupo J), máscara vetorial pelo demarcador.
+Testes com mouse (app em --agente=9333; avisar o usuário para não mexer no mouse durante): testes/teste_{caneta,guias,
+laco,barra,filtros}.py; geral: testes/teste_imagem.py.
