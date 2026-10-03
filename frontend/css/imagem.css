@@ -628,3 +628,24 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 .ie-dv-corpo .ie-dlg-faixa { grid-template-columns: 1fr 58px; gap: 0 8px; }
 .ie-dv-corpo { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; overflow-y: auto; }
 .ie-dv-bts { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Filtro > Galeria de filtros (imagem-galeria.js) */
+.ie-gal { grid-template-columns: minmax(0, 1fr) 318px 280px; }
+.ie-gal-cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.ie-gal-calc { position: absolute; right: 10px; bottom: 10px; padding: 3px 8px; border-radius: 5px; background: var(--ie-painel); color: var(--text-2); font-size: 11px; }
+.ie-gal-lista { overflow-y: auto; background: var(--ie-painel); border-left: 1px solid var(--ie-linha); padding: 6px 8px; }
+.ie-gal-lista summary { cursor: pointer; padding: 5px 2px; color: var(--text); font-weight: 600; font-size: 12px; }
+.ie-gal-grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 2px 0 8px; }
+.ie-gal-mini { display: flex; flex-direction: column; gap: 3px; align-items: center; padding: 3px; border: 1px solid transparent; border-radius: 5px; background: none; color: var(--text-2); cursor: pointer; font: inherit; font-size: 10.5px; }
+.ie-gal-mini canvas { width: 100%; aspect-ratio: 4 / 3; border-radius: 3px; background: var(--ie-painel-2); }
+.ie-gal-mini span { line-height: 1.15; text-align: center; }
+.ie-gal-mini:hover { background: var(--ie-hover); color: var(--text); }
+.ie-gal-mini.on { border-color: var(--ie-acento); color: var(--ie-acento); }
+.ie-gal-filtro { width: 100%; }
+.ie-gal-campos { display: flex; flex-direction: column; gap: 6px; }
+.ie-gal .ie-dv-lado { min-height: 0; }
+.ie-gal .ie-dv-corpo { flex: 1; min-height: 0; }
+.ie-gal-pilha { border-top: 1px solid var(--ie-linha); display: flex; flex-direction: column; max-height: 40%; }
+.ie-gal-itens { overflow-y: auto; padding: 4px; }
+.ie-gal-item { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; cursor: pointer; color: var(--text-2); }
+.ie-gal-item.on { background: var(--ie-sel); color: var(--text); }
+.ie-gal-pbts { display: flex; justify-content: flex-end; gap: 2px; padding: 4px 6px; border-top: 1px solid var(--ie-linha); }

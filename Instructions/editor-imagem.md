@@ -65,7 +65,7 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   iluminação), Nitidez (5), Estilização (difusão, entalhe, arestas, óleo/Kuwahara, solarização, ladrilhos, contorno,
   vento), Vídeo, Outros (personalizado 3×3, passa-alta, HSB/HSL, máximo, mínimo, deslocamento), Correção de lente,
   Converter para filtros inteligentes. Todos com prévia e como filtro inteligente; sem parâmetro aplica direto.
-  Desabilitados (ainda não): Neural Filters, Galeria de filtros, Grande angular, Ponto de fuga,
+  Desabilitados (ainda não): Neural Filters, Grande angular, Ponto de fuga,
   Desfoque de forma/caminho, Deslocamento de pixels, Chama/Moldura/Árvore, Extrusão, Redução de tremido.
 - `frontend/js/imagem-dissolver.js` — Filtro > **Dissolver** (Liquify, Shift+Ctrl+X): janela própria (`.ie-dv`) com
   Deformação para frente (W), Reconstruir (R), Suavizar (E), Torcer (C, Alt = anti-horário), Comprimir (S), Inchar (B),
@@ -78,6 +78,14 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   'deformar'|'torcer'|'comprimir'|'inchar'|'esquerda'|'reconstruir'|'suavizar', pts: [[x, y], ...], tam, dens,
   pressao, taxa, alt, passos}]})` (px da camada). Teclado na janela vai por `window` (antes dos atalhos do editor).
   Teste: `testes/teste_dissolver.py` (mouse de verdade, app em --agente=9333).
+- `frontend/js/imagem-galeria.js` — Filtro > **Galeria de filtros**: prévia grande (arrastar, roda/Ctrl+roda, Ajustar,
+  100%), pastas com miniaturas (um pedaço do centro da camada) e camadas de efeito empilhadas (olho, nova, excluir;
+  a pilha da última vez volta, como no PS). 47 filtros (`IE_GAL`): Artístico 15, Traçados de pincel 8, Distorção 3,
+  Esboço 14 (cores de frente/fundo), Estilização 1, Textura 6 — aproximações próprias, não cópia do algoritmo da Adobe.
+  Cada filtro `fn(P, v, e)`: P = canais Float32 + posição absoluta (ox, oy) e e = escala; a prévia calcula só a área
+  visível na escala do zoom (parâmetros em pixel × e) e ruído/texturas usam a posição absoluta (não "andam"). Objeto
+  inteligente → filtro inteligente; automação `KNV.cmd('f:galeria', {pilha: [{f: 'aquarela', v: {...}}]})`.
+  Teste: `testes/teste_galeria.py` (todos os 47 por automação; ~0,5 s cada em 900×1200).
   Teste: `testes/teste_filtros.py` (app em --agente=9333) aplica todos numa foto e mede.
 - `frontend/js/imagem-cena.js` — `KNV.cena`: peça em HTML/CSS vira camadas nativas (runner `tools/knv.py`); guia em
   `Instructions/agente/plano-cena.md`.
@@ -205,7 +213,7 @@ No console: `ieDiferencaAchatado()` mede a diferença do documento aberto contra
 ## Próximos passos (combinado com o usuário em 2026-10-03)
 1. ~~Dissolver (Liquify)~~ — feito 2026-10-03 (imagem-dissolver.js). Falta: Dissolver sensível a rosto
    (olhos/nariz/boca por detecção de rosto), Carregar/Salvar malha, Mostrar fundo (outras camadas atrás).
-2. **Galeria de filtros** — os artísticos do Photoshop (Pincel seco, Recorte, Bordas posterizadas, Granulado...).
+2. ~~Galeria de filtros~~ — feita 2026-10-03 (imagem-galeria.js). Falta: arrastar para reordenar as camadas de efeito.
 3. **Filtro Camera Raw como filtro inteligente** (hoje tem painel próprio e não entra na lista não destrutiva).
 4. Desabilitados no menu Filtro: Desfoque de forma/caminho, Deslocamento de pixels, Chama/Moldura/Árvore, Extrusão,
    Redução de tremido, Grande angular adaptável, Ponto de fuga, Neural Filters.
