@@ -131,3 +131,6 @@ Peça: `D:\kanivete_testes\carrossel3d\` (carrossel.html + .iknv + export/). Rep
    Texturizador (tela, escala 150, relevo 32) + Adicionar ruído 14% mono, em Sobrepor 85%. Em fundo branco o Sobrepor
    não aparece (ok: slide claro fica limpo). Mais grão/textura no Camera Raw de acabamento (grao 30, graoT 30, graoA 60,
    tex 18).
+11. **Ferramentas novas que encurtam tudo isto** (plano-cena.md, "Fluxo barato"): `data-cor` no lugar do ajuste de cor à
+   mão, `data-guardar`/`recurso:` para não gerar de novo, `--referencia --comparar` no lugar de medir à mão, `--ver
+   slide:N` e `--variacoes` no lugar de prévias grandes, `KNV.etapa` para receitas que podem rodar de novo.

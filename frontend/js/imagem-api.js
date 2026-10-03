@@ -628,6 +628,105 @@ const KNV = {
         return estilos ? Object.fromEntries(nomes.map(n => [n, e[n].map(x => x.estilo)])) : nomes;
     },
 
+    // ── olhar barato, variações, etapas, referência, recursos (tools/knv.py usa estes) ──
+    // JPEG pequeno de uma região (ou de um slide do carrossel: {slide: 2}); escala padrão 0.4. Sem camada "Referência".
+    ver({ x = 0, y = 0, w, h, slide, escala = 0.4, q = 0.82 } = {}) {
+        const d = IE.doc, S = d.cena && d.cena.slide;
+        if (slide && S) { x = (slide - 1) * S.w; y = 0; w = S.w; h = S.h; }
+        w = w || d.w - x; h = h || d.h - y;
+        const ref = ieTodas(d).find(L => L.referencia), vis = ref && ref.visivel;
+        if (ref) ref.visivel = false;
+        ieCompor(d);
+        const c = ieCanvas(Math.max(1, Math.round(w * escala)), Math.max(1, Math.round(h * escala))), x2 = ieCtx(c);
+        x2.fillStyle = '#fff'; x2.fillRect(0, 0, c.width, c.height);
+        x2.imageSmoothingQuality = 'high'; x2.drawImage(d.comp, x, y, w, h, 0, 0, c.width, c.height);
+        if (ref) { ref.visivel = vis; ieCompor(d); }
+        return c.toDataURL('image/jpeg', q);
+    },
+    // variações lado a lado num JPEG (para escolher sem rodar várias vezes):
+    //   {camada: 'cavalo', filtro: 'aj:matiz', lista: [{h: 30, s: -40}, ...]}  → valores do filtro inteligente (cria se não tem)
+    //   {ajuste: 'Acabamento (Camera Raw)', lista: [{clar: 10}, ...]}         → valores da camada de ajuste
+    //   regiao {x, y, w, h} (padrão: a caixa da camada), escala. Volta ao que era no fim.
+    variacoes({ camada, filtro, ajuste, lista = [], regiao, escala = 0.5 } = {}) {
+        const d = IE.doc, achar = n => ieTodas(d).find(L => L.nome === n || L.id === n);
+        const L = achar(camada || ajuste);
+        if (!L) throw new Error(`camada "${camada || ajuste}" não existe`);
+        const R = regiao || ieRCamada(L) || ieRDoc(d);
+        const cw = Math.max(1, Math.round(R.w * escala)), ch = Math.max(1, Math.round(R.h * escala)), rotulo = 22;
+        const out = ieCanvas(cw * lista.length + 8 * (lista.length - 1), ch + rotulo), ox = ieCtx(out);
+        ox.fillStyle = '#202020'; ox.fillRect(0, 0, out.width, out.height);
+        const antes = JSON.stringify(ajuste ? L.ajVals : L.filtrosInt || []);
+        lista.forEach((v, i) => {
+            if (ajuste) { L.ajVals = { ...JSON.parse(antes), ...v }; L.ajuste = IE_AJ_CAMADAS[L.ajChave].aj(L.ajVals); ieInvalidar(L); }
+            else {
+                const fs = JSON.parse(antes), k = fs.findIndex(f => f.cmd === filtro);
+                if (k >= 0) fs[k] = { ...fs[k], vals: { ...fs[k].vals, ...v } }; else fs.push({ cmd: filtro, titulo: filtro, vals: v, on: true });
+                L.filtrosInt = fs; const o = ieIntPlano(L); L.c = o.c; L.x = o.x; L.y = o.y; ieInvalidar(L);
+            }
+            ieCompor(d);
+            ox.drawImage(d.comp, R.x, R.y, R.w, R.h, i * (cw + 8), rotulo, cw, ch);
+            ox.fillStyle = '#ddd'; ox.font = '13px sans-serif'; ox.fillText(`${i + 1}: ${JSON.stringify(v).replace(/"/g, '')}`.slice(0, 60), i * (cw + 8) + 4, 15);
+        });
+        if (ajuste) { L.ajVals = JSON.parse(antes); L.ajuste = IE_AJ_CAMADAS[L.ajChave].aj(L.ajVals); }
+        else { L.filtrosInt = JSON.parse(antes); const o = ieIntPlano(L); L.c = o.c; L.x = o.x; L.y = o.y; }
+        ieInvalidar(L); ieCompor(d); ieAgendar(null, d);
+        return out.toDataURL('image/jpeg', 0.85);
+    },
+    // etapa nomeada e idempotente: roda de novo SUBSTITUI o que ela fez (camadas criadas e filtros inteligentes que
+    // ela pôs saem antes); mesmo código já rodado = pula (forcar: true roda igual). Fica no .iknv (doc.cena.etapas).
+    async etapa(nome, fn, { forcar = false } = {}) {
+        const d = IE.doc;
+        d.cena = d.cena || {}; d.cena.etapas = d.cena.etapas || {};
+        const src = String(fn), hsh = [...src].reduce((h, ch) => Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0, 2166136261).toString(36);
+        if (!forcar && d.cena.etapas[nome] === hsh) return { etapa: nome, pulou: true };
+        // desfaz a vez anterior
+        const sai = [];
+        iePercorrer(d.camadas, L => { if (L.etapa === nome) sai.push(L); });
+        for (const L of sai) { const a = ieAchar(d, L.id); if (a) a.lista.splice(a.i, 1); }
+        iePercorrer(d.camadas, L => {
+            if ((L.filtrosInt || []).some(f => f.etapa === nome)) { L.filtrosInt = L.filtrosInt.filter(f => f.etapa !== nome); if (L.c0) { const o = ieIntPlano(L); L.c = o.c; L.x = o.x; L.y = o.y; } ieInvalidar(L); }
+        });
+        const ids = new Set(), nf = new Map();
+        iePercorrer(d.camadas, L => { ids.add(L.id); nf.set(L.id, (L.filtrosInt || []).length); });
+        await fn();
+        iePercorrer(d.camadas, L => {
+            if (!ids.has(L.id)) L.etapa = nome;
+            else (L.filtrosInt || []).slice(nf.get(L.id) || 0).forEach(f => { f.etapa = nome; });
+        });
+        d.cena.etapas[nome] = hsh;
+        ieTudo(d); ieUiCamadas();
+        return { etapa: nome, camadas: sai.length ? `refez (${sai.length} saíram)` : 'nova' };
+    },
+    // imagem de referência como camada travada e oculta no topo, ajustada ao documento (cover); a prévia não mostra
+    async referencia(path, { opacidade = 50 } = {}) {
+        const d = IE.doc, c = await ieCenaImagem(path);
+        const k = Math.max(d.w / c.width, d.h / c.height), w = Math.round(c.width * k), h = Math.round(c.height * k);
+        const r = ieCanvas(d.w, d.h); ieCtx(r).drawImage(c, (d.w - w) / 2, (d.h - h) / 2, w, h);
+        iePercorrer(d.camadas, L => { if (L.referencia) { const a = ieAchar(d, L.id); a.lista.splice(a.i, 1); } });
+        const L = ieNovaCamada(d, { nome: 'Referência', c: r, x: 0, y: 0 });
+        L.referencia = true; L.visivel = false; L.op = opacidade / 100; L.travas = 0x80000000;
+        d.camadas.push(L); ieTudo(d); ieUiCamadas();
+        return { w, h };
+    },
+    // referência (em cima) × peça (embaixo), pequenas, num JPEG só — conferir o todo sem ler duas imagens grandes
+    comparar({ escala = 0.3 } = {}) {
+        const d = IE.doc, ref = ieTodas(d).find(L => L.referencia);
+        if (!ref) throw new Error('sem referência (KNV.referencia ou --referencia)');
+        const w = Math.round(d.w * escala), h = Math.round(d.h * escala), out = ieCanvas(w, h * 2 + 6), x = ieCtx(out);
+        x.fillStyle = '#202020'; x.fillRect(0, 0, out.width, out.height);
+        x.drawImage(ref.c, 0, 0, d.w, d.h, 0, 0, w, h);
+        const vis = ref.visivel; ref.visivel = false; ieCompor(d);
+        x.drawImage(d.comp, 0, 0, d.w, d.h, 0, h + 6, w, h);
+        ref.visivel = vis; ieCompor(d);
+        return out.toDataURL('image/jpeg', 0.82);
+    },
+    // recursos marcados com data-guardar desde a última chamada: [{nome, png (base64), meta}] (o runner grava)
+    recursosNovos() {
+        const l = (IE._recursosNovos || []).map(r => ({ nome: r.nome, meta: r.meta, png: r.c.toDataURL('image/png').split(',')[1] }));
+        IE._recursosNovos = [];
+        return l;
+    },
+
     // ── conferir ──
     // composição do documento em PNG (base64) — o mesmo que a exportação grava; escala < 1 reduz
     png(escala = 1) {

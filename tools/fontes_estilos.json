@@ -1,0 +1,21 @@
+{
+ "_sobre": "Fontes do Google por estilo, para a folha de amostras (tools/knv.py --amostras \"texto\" --estilo nome). Acrescente as que funcionarem nas peças.",
+ "estilos": {
+  "caixa-unica-divertida": {"fontes": ["Chewy", "Bubblegum Sans", "Sour Gummy", "Grandstander", "Gluten", "Luckiest Guy", "Coiny", "Sniglet"], "uso": "títulos jovens e tech-friendly; trocar minúsculas no meio (MaIS, INSTaGRaM) como no carrossel 3D"},
+  "geometrica-sans": {"fontes": ["Poppins", "Lexend", "Outfit", "Montserrat", "Sora", "Plus Jakarta Sans", "Manrope", "Urbanist"], "uso": "corpo de texto e títulos limpos"},
+  "condensada-impacto": {"fontes": ["Bebas Neue", "Anton", "Oswald", "Barlow Condensed", "Big Shoulders Display", "Staatliches", "League Gothic"], "uso": "promoção, esporte, chamada grande em pouco espaço"},
+  "serifada-elegante": {"fontes": ["Playfair Display", "DM Serif Display", "Fraunces", "Cormorant Garamond", "Libre Caslon Display", "Prata"], "uso": "moda, beleza, gastronomia, editorial"},
+  "manuscrita": {"fontes": ["Caveat", "Kalam", "Permanent Marker", "Shadows Into Light", "Patrick Hand", "Gochi Hand"], "uso": "anotações, setas, toque pessoal sobre foto"},
+  "script-assinatura": {"fontes": ["Great Vibes", "Allura", "Pinyon Script", "Satisfy", "Sacramento"], "uso": "convite, assinatura, palavra de destaque romântica"},
+  "arredondada-amigavel": {"fontes": ["Nunito", "Quicksand", "Fredoka", "Baloo 2", "Varela Round", "Comfortaa"], "uso": "infantil, saúde, serviços simpáticos"},
+  "tecnologica": {"fontes": ["Space Grotesk", "Orbitron", "Rajdhani", "Exo 2", "Chakra Petch", "Syne"], "uso": "tecnologia, games, eventos noturnos"},
+  "retro-display": {"fontes": ["Righteous", "Monoton", "Bungee", "Rubik Mono One", "Shrikhand", "Lobster"], "uso": "festa, retrô, estampa"}
+ },
+ "pares": [
+  {"fontes": ["Chewy", "Lexend"], "uso": "carrossel 3D \"Design que vende\" (aprovado pelo usuário)"},
+  {"fontes": ["Bebas Neue", "Inter"], "uso": "promoção e informação direta"},
+  {"fontes": ["Playfair Display", "Lato"], "uso": "elegante e legível"},
+  {"fontes": ["Space Grotesk", "Inter"], "uso": "tech/SaaS"},
+  {"fontes": ["Fredoka", "Nunito"], "uso": "amigável"}
+ ]
+}

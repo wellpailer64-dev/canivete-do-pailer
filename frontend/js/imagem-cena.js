@@ -49,7 +49,8 @@ async function ieCena(html, o = {}) {
         IE._cenaMontando = false;
         host.remove();
     }
-    doc.cena = { html: String(html), base: o.base || ant.base || null, formato: o.formato || ant.formato || null, margem: o.margem ?? ant.margem ?? null, slide: ctx.slide };
+    doc.cena = { html: String(html), base: o.base || ant.base || null, formato: o.formato || ant.formato || null, margem: o.margem ?? ant.margem ?? null, slide: ctx.slide,
+        biblioteca: o.biblioteca || ant.biblioteca || null, etapas: ant.etapas || (doc.cena && doc.cena.etapas) || undefined };
     if (ctx.slide) ieCenaEmendas(doc, ctx.slide);
     const topo = doc.camadas[doc.camadas.length - 1];
     if (topo) { doc.ativa = topo.id; doc.selIds = [topo.id]; }
@@ -187,7 +188,10 @@ async function ieCenaImagensPre(raiz, ctx) {
             await ieCenaMarcador(im, (pr[0] || 1) * 1000, (pr[1] || 1) * 1000);
             continue;
         }
-        const path = ieCenaCaminho(src, ctx.o.base);
+        // recurso:nome = PNG já recortado da biblioteca (<biblioteca>/recursos/nome.png, guardado com data-guardar)
+        const bib = ctx.o.biblioteca || (IE.doc && IE.doc.cena && IE.doc.cena.biblioteca);
+        if (/^recurso:/i.test(src) && !bib) { ctx.avisos.push(`${src}: sem biblioteca (rode pelo tools/knv.py)`); im._knv = { falta: true }; await ieCenaMarcador(im, 1, 1); continue; }
+        const path = /^recurso:/i.test(src) ? `${String(bib).replace(/[\\/]+$/, '')}/recursos/${src.slice(8).trim()}.png` : ieCenaCaminho(src, ctx.o.base);
         try {
             const c = await ieCenaImagem(path);
             im._knv = { c, path };
@@ -449,6 +453,12 @@ async function ieCenaSvgCamada(el, cs, ctx, h) {
     const r = ieCenaRet(el, ctx);
     if (r.w < 0.5 || r.h < 0.5) return null;
     const cl = el.cloneNode(true);
+    // var(--cor) em atributo (stroke=, fill=...) só vale dentro da página: troca pelo valor já resolvido
+    const orig = [el, ...el.querySelectorAll('*')], copia = [cl, ...cl.querySelectorAll('*')];
+    copia.forEach((n, i) => { for (const at of [...n.attributes]) if (/var\(/.test(at.value)) {
+        const v = getComputedStyle(orig[i]).getPropertyValue(at.name);
+        if (v && !/var\(/.test(v)) n.setAttribute(at.name, v.trim());
+    } });
     cl.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     cl.setAttribute('width', r.w); cl.setAttribute('height', r.h);
     cl.style.color = cs.color;
@@ -475,8 +485,13 @@ async function ieCenaImg(el, cs, ctx, h) {
     let c = k.c, nome = el.dataset.nome || el.id || el.getAttribute('alt') || (k.path ? ieNomeArq(k.path) : 'Imagem');
     let gerada = null;
     if (k.gerar) {
-        const lado = +el.dataset.lado || 1024, kk = lado / Math.max(B.w, B.h);
-        const gw = Math.max(256, Math.round(B.w * kk / 64) * 64), gh = Math.max(256, Math.round(B.h * kk / 64) * 64);
+        // tamanho gerado: data-proporcao manda; object-fit contain (objeto inteiro na caixa) = quadrado; senão a da caixa.
+        // (antes a caixa sempre mandava: caixa retrato gerava OUTRA imagem e perdia a folha de contato do cache)
+        const pr = el.dataset.proporcao ? String(el.dataset.proporcao).split(/[:x/]/).map(Number) : null;
+        const contem = /contain|scale-down/.test(cs.objectFit || '');
+        const [aw, ah] = pr && pr[0] && pr[1] ? pr : contem ? [1, 1] : [B.w, B.h];
+        const lado = +el.dataset.lado || 1024, kk = lado / Math.max(aw, ah);
+        const gw = Math.max(256, Math.round(aw * kk / 64) * 64), gh = Math.max(256, Math.round(ah * kk / 64) * 64);
         const semente = el.dataset.semente != null ? +el.dataset.semente : -1;
         if (semente < 0) ctx.avisos.push(`gerar sem data-semente (${k.gerar.slice(0, 40)}): fixe a semente para refazer igual e do cache`);
         const prompt = k.gerar + (el.dataset.fundo === 'branco' ? IE_GER_FUNDO : '');
@@ -495,11 +510,16 @@ async function ieCenaImg(el, cs, ctx, h) {
     }
     const iw = c.width, ih = c.height;
     let px = 0, py = 0;
-    const rec = el.dataset.recortar;
-    if (rec) {
+    // recorte: objeto gerado sobre branco sai com recorte de IA por padrão (a Borracha deixa a sombra de chão do
+    // gerador); data-recortar="nao" desliga
+    const rec = el.dataset.recortar || (k.gerar && el.dataset.fundo === 'branco' ? 'ia' : '');
+    if (rec && rec !== 'nao') {
         const cut = await ieCenaRecortar(c, rec, (k.path || 'gerar:' + k.gerar) + '|' + iw + 'x' + ih);
         if (cut) { c = cut.c; px = cut.x; py = cut.y; }
     }
+    // data-guardar="nome": o recurso (já recortado) vai para a biblioteca (o tools/knv.py grava em recursos/nome.png)
+    if (el.dataset.guardar) (IE._recursosNovos = IE._recursosNovos || []).push({ nome: el.dataset.guardar, c,
+        meta: { prompt: k.gerar || null, semente: el.dataset.semente != null ? +el.dataset.semente : null, recorte: rec || null, origem: k.path || null } });
     // object-fit / object-position
     const fit = cs.objectFit || 'fill';
     let sx = B.w / iw, sy = B.h / ih;
@@ -517,6 +537,12 @@ async function ieCenaImg(el, cs, ctx, h) {
     // depois parte do original e filtros viram filtros inteligentes
     const L = ieCenaCamada(ctx, h, ':img', { tipo: 'inteligente', nome, c: P.c, x: P.x, y: P.y, c0: { c, x: px, y: py }, tf: S, tfBase: [...IE_ID] });
     if (gerada) L.gerada = gerada;
+    // data-cor="#3cbf4a" (+ data-contraste="35"): a cor do objeto vira essa, por filtros inteligentes medidos
+    if (el.dataset.cor) {
+        L.filtrosInt = ieCenaCorFiltros(c, el.dataset.cor, +el.dataset.contraste || 0);
+        const o = ieIntPlano(L);
+        L.c = o.c; L.x = o.x; L.y = o.y;
+    }
     // máscara: o que passa da caixa (cover, posição) ou canto arredondado — a foto inteira continua na camada
     const raio = ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].map(c2 => { const v = cs['border' + c2 + 'Radius']; return /%/.test(v) ? parseFloat(v) / 100 * Math.min(B.r.w, B.r.h) : parseFloat(v) || 0; });
     const passa = dx < B.x - 0.5 || dy < B.y - 0.5 || dx + dw > B.x + B.w + 0.5 || dy + dh > B.y + B.h + 0.5;
@@ -532,6 +558,40 @@ async function ieCenaImg(el, cs, ctx, h) {
     }
     ieCenaFxSombras(L, ieCenaSombras(cs.boxShadow));
     return L;
+}
+// cor alvo de um objeto (data-cor): Matiz/Saturação (+ Brilho/Contraste) achados medindo — miniatura do objeto,
+// média dos meios-tons em HSL (matiz por média circular), corrige e mede de novo até chegar perto do alvo.
+// Os filtros saem marcados cena: true (rodar de novo refaz estes e mantém os que o usuário pôs)
+function ieCenaCorFiltros(c, hex, ct = 0) {
+    const k = Math.min(1, 160 / Math.max(c.width, c.height)), a = ieCanvas(Math.max(1, Math.round(c.width * k)), Math.max(1, Math.round(c.height * k)));
+    ieCtx(a).drawImage(c, 0, 0, a.width, a.height);
+    const base = ieCtx(a).getImageData(0, 0, a.width, a.height).data, alvo = ieRgbHsl(...ieHexRgb(hex).map(v => v / 255));
+    const medir = v => {
+        const d = new Uint8ClampedArray(base);
+        ieAjustar(d, { t: 'huesaturation', h: v.h, s: v.s, l: v.l });
+        if (ct) ieAjustar(d, { t: 'brightnesscontrast', br: 0, ct, legado: false });
+        let cx = 0, cy = 0, ss = 0, sl = 0, n = 0;
+        for (let i = 0; i < d.length; i += 4) {
+            if (d[i + 3] < 200) continue;
+            const [h, s, l] = ieRgbHsl(d[i] / 255, d[i + 1] / 255, d[i + 2] / 255);
+            if (l < 0.18 || l > 0.85) continue;   // só meios-tons: brilho especular e sombra funda não contam
+            cx += Math.cos(h * Math.PI / 180) * s; cy += Math.sin(h * Math.PI / 180) * s; ss += s; sl += l; n++;
+        }
+        return n ? { h: Math.atan2(cy, cx) * 180 / Math.PI, s: ss / n, l: sl / n } : null;
+    };
+    const v = { h: 0, s: 0, l: 0 };
+    for (let it = 0; it < 10; it++) {
+        const m = medir(v);
+        if (!m) break;
+        const dh = ((alvo[0] - m.h) % 360 + 540) % 360 - 180;
+        v.h = ieClamp(Math.round(v.h + dh), -180, 180);
+        v.s = ieClamp(Math.round(v.s + (alvo[1] - m.s) * 120), -100, 100);
+        v.l = ieClamp(Math.round(v.l + (alvo[2] - m.l) * 120), -100, 100);
+        if (Math.abs(dh) < 1.5 && Math.abs(alvo[1] - m.s) < 0.02 && Math.abs(alvo[2] - m.l) < 0.015) break;
+    }
+    const f = [{ cmd: 'aj:matiz', titulo: 'Matiz/Saturação', vals: { h: v.h, s: v.s, l: v.l, colorir: false }, on: true, cena: true }];
+    if (ct) f.push({ cmd: 'aj:brilho', titulo: 'Brilho/Contraste', vals: { br: 0, ct, legado: false }, on: true, cena: true });
+    return f;
 }
 // recorte do fundo numa camada temporária (as mesmas ferramentas do editor); fica em memória por imagem
 async function ieCenaRecortar(c, modo, chave) {
@@ -706,8 +766,9 @@ function ieCenaMexida(L, ctx) {
 // filtros inteligentes postos depois (cor, contraste...) não são "mexer na camada": a cena refaz posição/tamanho pelo
 // HTML e a camada nova leva os filtros da antiga
 function ieCenaLevarFiltros(V, N) {
-    if (!(V.filtrosInt || []).length || N.tipo !== 'inteligente' || !N.c0) return;
-    N.filtrosInt = V.filtrosInt.map(f => ({ ...f })); N.filtrosAberto = V.filtrosAberto;
+    const doUsuario = (V.filtrosInt || []).filter(f => !f.cena);   // os da cena (data-cor) vêm refeitos em N
+    if (!doUsuario.length || N.tipo !== 'inteligente' || !N.c0) return;
+    N.filtrosInt = [...(N.filtrosInt || []), ...doUsuario.map(f => ({ ...f }))]; N.filtrosAberto = V.filtrosAberto;
     const o = ieIntPlano(N);
     N.c = o.c; N.x = o.x; N.y = o.y;
     ieCenaMarcar(N);

@@ -112,3 +112,24 @@ como mexida: a camada refeita pelo HTML leva os filtros da antiga (`ieCenaLevarF
 - 2026-10-03: carrossel 3D (Instructions/agente/design-photo-kanivete.md): cena mostra guias e fatias do carrossel;
   o runner não recarrega funções embrulhadas por outro módulo (ex.: `ieDesenharSobre`; recarregar a original fazia
   guias, fatias e réguas sumirem do app de teste).
+
+## Fluxo barato (2026-10-03, depois do carrossel 3D)
+Biblioteca local `D:\kanivete_biblioteca` (ou `--biblioteca` / `%KANIVETE_BIBLIOTECA%`): `recursos/` (objetos já
+recortados + .json com prompt/semente), `modelos/` (peças aprovadas, para ESTUDO — as peças nascem do zero),
+`amostras/` (folhas de fontes). `py -3.13 tools/knv.py --listar` mostra o que tem.
+- **Recursos**: `<img src="gerar:..." data-guardar="cavalo">` grava o objeto recortado; depois `<img src="recurso:cavalo">`
+  em qualquer peça (sem gerar de novo). Objeto gerado com `data-fundo="branco"` já sai com recorte de IA
+  (`data-recortar="nao"` desliga). Tamanho gerado: `data-proporcao`; `object-fit: contain` = quadrado.
+- **Cor automática**: `data-cor="#46c33f"` (+ `data-contraste="35"`) mede o objeto e põe Matiz/Saturação (+ Brilho/
+  Contraste) como filtros inteligentes até a média dos meios-tons chegar na cor (o verde-limão do FLUX → h33 s−60 l−15).
+  Rodar de novo refaz esses filtros e mantém os que o usuário pôs.
+- **Olhar barato**: `--ver slide:2` (ou `x,y,w,h`, `--escala-ver 0.4`) → só o pedaço; `--sem-previa` pula a tira inteira.
+- **Referência**: `--referencia ref.png --comparar` → camada oculta "Referência" + `<peca>_comparar.jpg` (referência em
+  cima, peça embaixo, pequenas).
+- **Variações**: `--variacoes '{"camada": "cavalo", "filtro": "aj:matiz", "lista": [{...}, {...}]}'` (ou `"ajuste":
+  "Nome da camada de ajuste"`) → `<peca>_variacoes.jpg` lado a lado; o documento volta ao que era.
+- **Receita idempotente**: no `--depois`, `return await KNV.etapa('textura', async () => {...})`: código igual = pula;
+  mudou = desfaz o que a etapa fez (camadas criadas, filtros postos) e roda de novo. Fica no .iknv.
+- **Fontes**: `--amostras "TEXTO" --estilo condensada-impacto` (ou `--fontes "A,B"`) instala as que faltam e monta a
+  folha; `--estilos` lista estilos e pares (`tools/fontes_estilos.json` — acrescente os pares que forem aprovados).
+- **Modelos**: `--de peca.iknv --guardar-modelo nome --nota "o que funcionou" [--exportar pasta]`.

@@ -6,7 +6,18 @@ uso: py -3.13 tools/knv.py peca.html [--formato feed] [--salvar peca.iknv] [--pr
   --novo      documento novo mesmo com um aberto; --refazer refaz também as camadas mexidas
   --depois    JS com chamadas KNV.* depois da cena (ajustes de foto, pincel, recorte...)
   --exportar  pasta: carrossel = um arquivo por slide (base_01.png...), senão a peça inteira (--fmt png|jpg|webp)
-  --previa    JPEG da composição (padrão: <peca>.jpg ao lado, escala 0.5) para julgar a estética
+  --previa    JPEG da composição (padrão: <peca>.jpg ao lado, escala 0.5) para julgar a estética; --sem-previa não grava
+  --ver       só um pedaço, barato: "slide:2" ou "x,y,w,h" (escala --escala-ver 0.4) → <peca>_ver.jpg
+  --referencia ref.png   imagem de referência como camada oculta e travada (escalada ao documento)
+  --comparar  referência (em cima) × peça (embaixo), pequenas → <peca>_comparar.jpg
+  --variacoes var.json   {"camada": "cavalo", "filtro": "aj:matiz", "lista": [{...}, {...}]} ou {"ajuste": "Nome", "lista": [...]}
+              → <peca>_variacoes.jpg (lado a lado; o documento volta ao que era)
+  --amostras "texto" [--fontes "Chewy,Gluten" | --estilo caixa-unica] → instala as que faltam e monta uma folha
+              (estilos em tools/fontes_estilos.json); --estilos lista os estilos e pares
+  --biblioteca pasta (padrão D:/kanivete_biblioteca ou %KANIVETE_BIBLIOTECA%): <img src="recurso:nome"> lê
+              recursos/nome.png; <img data-guardar="nome"> grava lá o recurso recortado (+ nome.json com prompt/semente)
+  --guardar-modelo nome [--nota "..."]  copia html, .iknv, receitas, exportados e prévia para modelos/nome (estudo)
+  --listar    recursos e modelos da biblioteca
 Recarrega frontend/js/imagem-*.js do disco (mudou o código do editor → não precisa reiniciar o app).
 Guia: Instructions/agente/plano-cena.md"""
 import argparse, base64, io, json, os, re, sys, time
@@ -15,13 +26,20 @@ from playwright.sync_api import sync_playwright
 
 JS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "js")
 ap = argparse.ArgumentParser()
-ap.add_argument("html"); ap.add_argument("--formato"); ap.add_argument("--nome")
+ap.add_argument("html", nargs="?", default="-"); ap.add_argument("--formato"); ap.add_argument("--nome")
 ap.add_argument("--salvar"); ap.add_argument("--previa"); ap.add_argument("--escala", type=float, default=0.5)
 ap.add_argument("--de"); ap.add_argument("--novo", action="store_true"); ap.add_argument("--refazer", action="store_true")
 ap.add_argument("--depois"); ap.add_argument("--porta", type=int, default=9333); ap.add_argument("--margem", type=float)
 ap.add_argument("--exportar", help="pasta: um arquivo por slide (ou a peça inteira)"); ap.add_argument("--fmt", default="png")
 ap.add_argument("--mapa", action="store_true"); ap.add_argument("--sem-recarga", action="store_true")
+ap.add_argument("--sem-previa", action="store_true"); ap.add_argument("--ver"); ap.add_argument("--escala-ver", type=float, default=0.4)
+ap.add_argument("--referencia"); ap.add_argument("--comparar", action="store_true"); ap.add_argument("--variacoes")
+ap.add_argument("--amostras"); ap.add_argument("--fontes"); ap.add_argument("--estilo"); ap.add_argument("--estilos", action="store_true")
+ap.add_argument("--biblioteca", default=os.environ.get("KANIVETE_BIBLIOTECA", r"D:\kanivete_biblioteca"))
+ap.add_argument("--guardar-modelo"); ap.add_argument("--nota", default=""); ap.add_argument("--listar", action="store_true")
 a = ap.parse_args()
+BIB = os.path.abspath(a.biblioteca)
+ESTILOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fontes_estilos.json")
 if a.exportar: os.makedirs(a.exportar, exist_ok=True)   # a pasta de exportação pode não existir
 barra = lambda p: os.path.abspath(p).replace("\\", "/") if p else p
 
@@ -53,14 +71,59 @@ def recarga_js():
     return "\n".join(partes), "(() => {" + api + "})()"
 
 
+def estilos():
+    try: return json.load(open(ESTILOS, encoding="utf-8"))
+    except Exception: return {"estilos": {}, "pares": []}
+
+
+if a.estilos:
+    e = estilos()
+    for k, v in e["estilos"].items(): print(f"{k}: {', '.join(v['fontes'])}  — {v.get('uso', '')}")
+    print("pares:"); [print("  ", " + ".join(p["fontes"]), "—", p.get("uso", "")) for p in e["pares"]]
+    sys.exit(0)
+if a.listar:
+    for sub in ("recursos", "modelos"):
+        pasta = os.path.join(BIB, sub); print(f"{sub} ({pasta}):")
+        if not os.path.isdir(pasta): print("   (vazio)"); continue
+        for n in sorted(os.listdir(pasta)):
+            if sub == "recursos" and n.endswith(".png"):
+                m = os.path.join(pasta, n[:-4] + ".json"); meta = json.load(open(m, encoding="utf-8")) if os.path.isfile(m) else {}
+                print(f"   recurso:{n[:-4]}  {(meta.get('prompt') or meta.get('origem') or '')[:90]}")
+            elif sub == "modelos" and os.path.isdir(os.path.join(pasta, n)):
+                m = os.path.join(pasta, n, "modelo.json"); meta = json.load(open(m, encoding="utf-8")) if os.path.isfile(m) else {}
+                print(f"   {n}: {meta.get('nota', '')[:120]}  fontes: {', '.join(meta.get('fontes', []))}")
+    sys.exit(0)
+
+instalar = []
+if a.amostras:   # folha de amostras de fontes: um documento novo só para olhar
+    lista = [x.strip() for x in (a.fontes or "").split(",") if x.strip()] or estilos()["estilos"].get(a.estilo or "", {}).get("fontes", [])
+    if not lista: sys.exit("--amostras pede --fontes \"A,B\" ou --estilo (veja --estilos)")
+    instalar = lista
+    os.makedirs(os.path.join(BIB, "amostras"), exist_ok=True)
+    linhas = "\n".join(f'<div class="l"><span>{n}</span><b style="font-family:\'{n}\'">{a.amostras}</b></div>' for n in lista)
+    pasta_am = os.path.join(BIB, "amostras"); a.html = os.path.join(pasta_am, re.sub(r"\W+", "_", (a.estilo or "fontes")) + ".html")
+    open(a.html, "w", encoding="utf-8").write(f"""<!doctype html><html><head><style>
+body {{ margin: 0; width: 1080px; height: 1350px; background: #fff; padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; }}
+.l {{ display: flex; flex-direction: column; gap: 2px; }} .l span {{ font: 16px Poppins; color: #999; }}
+.l b {{ font-size: {max(36, min(84, int(900 / max(8, len(a.amostras)) * 1.6)))}px; font-weight: 400; line-height: 1.05; color: #111; white-space: nowrap; }}
+</style></head><body>{linhas}</body></html>""")
+    a.formato = a.formato or "feed"; a.novo = True; a.de = None
+
 html = open(a.html, encoding="utf-8").read() if a.html != "-" else None
-opc = {"base": barra(os.path.dirname(os.path.abspath(a.html))) if html else None}
+opc = {"base": barra(os.path.dirname(os.path.abspath(a.html))) if html else None, "biblioteca": barra(BIB)}
 for k in ("formato", "nome", "margem"):
     if getattr(a, k) is not None: opc[k] = getattr(a, k)
 if a.novo: opc["novo"] = True
 if a.refazer: opc["refazer"] = True
 if a.de: opc["novo"] = False
 depois = open(a.depois, encoding="utf-8").read() if a.depois else ""
+variacoes = json.load(open(a.variacoes, encoding="utf-8")) if a.variacoes and os.path.isfile(a.variacoes) else (json.loads(a.variacoes) if a.variacoes else None)
+ver = None
+if a.ver:
+    if a.ver.startswith("slide:"): ver = {"slide": int(a.ver[6:]), "escala": a.escala_ver}
+    else: x, y, w, h = map(float, a.ver.split(",")); ver = {"x": x, "y": y, "w": w, "h": h, "escala": a.escala_ver}
+raiz = os.path.splitext(a.html)[0] if html else os.path.splitext(a.de or a.salvar or os.path.join(BIB, "peca"))[0]
+salvar_jpg = lambda url, sufixo: (open(raiz + sufixo, "wb").write(base64.b64decode(url.split(",")[1])), print(sufixo[1:-4] + ":", raiz + sufixo))
 
 with sync_playwright() as p:
     for _ in range(60):
@@ -77,16 +140,28 @@ with sync_playwright() as p:
     if pg.evaluate("window.KNV.dialogo()"): pg.evaluate("window.KNV.responder('cancelar')")
     pg.evaluate("window.KNV.automacao(true, {respostas: {'Salvar as alterações': 'Não salvar', 'Salvar alterações': 'Não salvar'}})")
     pg.evaluate("if (!document.querySelector('#page-editor-imagem.active')) switchTool('editor-imagem')")
+    if instalar:
+        tem = set(pg.evaluate("async () => KNV.fontes()"))
+        for n in instalar:
+            if n in tem: continue
+            try: pg.evaluate("f => KNV.instalarFonte(f)", n); print("fonte instalada:", n)
+            except Exception as e: print("!! fonte", n, str(e).splitlines()[0][:100])
     t = time.time()
     try:
-        r = pg.evaluate("""async ({html, opc, de, depois, salvar, exportar, fmt}) => {
+        r = pg.evaluate("""async ({html, opc, de, depois, salvar, exportar, fmt, referencia, variacoes, comparar, ver}) => {
             const KNV = window.KNV; const out = {};
-            if (de) { await KNV.fecharTudo(); await KNV.abrir(de); if (!IE.doc || !IE.doc.path) throw new Error('não abriu ' + de); }
+            if (de) { await KNV.fecharTudo(); await KNV.abrir(de); if (!IE.doc || !IE.doc.path) throw new Error('não abriu ' + de); if (IE.doc.cena) IE.doc.cena.biblioteca = opc.biblioteca; }
             if (html != null) out.cena = await KNV.cena(html, opc);
+            if (referencia) out.referencia = await KNV.referencia(referencia);
             if (depois) { const f = new Function('KNV', 'return (async () => {' + depois + '\\n})()'); out.depois = await f(KNV); }
+            if (variacoes) out.variacoes = KNV.variacoes(variacoes);
+            if (comparar) out.comparar = KNV.comparar();
+            if (ver) out.ver = KNV.ver(ver);
+            out.recursos = KNV.recursosNovos();
             if (salvar) out.salvo = await KNV.salvar(salvar);
             if (exportar) out.exportados = await KNV.exportar(exportar, {fmt});
-            return out; }""", {"html": html, "opc": opc, "de": barra(a.de), "depois": depois, "salvar": barra(a.salvar), "exportar": os.path.abspath(a.exportar) if a.exportar else None, "fmt": a.fmt})
+            return out; }""", {"html": html, "opc": opc, "de": barra(a.de), "depois": depois, "salvar": barra(a.salvar), "exportar": os.path.abspath(a.exportar) if a.exportar else None, "fmt": a.fmt,
+                              "referencia": barra(a.referencia), "variacoes": variacoes, "comparar": a.comparar, "ver": ver})
     except Exception as e:
         print("!! erro:", str(e).splitlines()[0][:600]); r = None
     finally:
@@ -97,12 +172,39 @@ with sync_playwright() as p:
         for av in c.get("avisos", []): print("  aviso:", av)
         for f in r.get("exportados") or []: print("exportado:", f)
         if r.get("depois") is not None: print("depois:", json.dumps(r["depois"], ensure_ascii=False)[:800])
+        for rc in r.get("recursos") or []:   # data-guardar → biblioteca/recursos
+            os.makedirs(os.path.join(BIB, "recursos"), exist_ok=True)
+            base_r = os.path.join(BIB, "recursos", re.sub(r"[^\w\-]+", "_", rc["nome"]))
+            open(base_r + ".png", "wb").write(base64.b64decode(rc["png"]))
+            json.dump({**rc["meta"], "nome": rc["nome"], "data": time.strftime("%Y-%m-%d")}, open(base_r + ".json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+            print("recurso guardado:", f"recurso:{rc['nome']}", "→", base_r + ".png")
+        if r.get("variacoes"): salvar_jpg(r["variacoes"], "_variacoes.jpg")
+        if r.get("comparar"): salvar_jpg(r["comparar"], "_comparar.jpg")
+        if r.get("ver"): salvar_jpg(r["ver"], "_ver.jpg")
         print(f"total {time.time() - t:.1f}s")
     if a.mapa: print(pg.evaluate("window.KNV.mapa()"))
-    png = base64.b64decode(pg.evaluate("e => window.KNV.png(e)", a.escala))
+    png = None if a.sem_previa else base64.b64decode(pg.evaluate("e => window.KNV.png(e)", a.escala))
 
-previa = a.previa or (os.path.splitext(a.html)[0] + ".jpg" if html else None)
-if previa:
+previa = None if a.sem_previa else (a.previa or (os.path.splitext(a.html)[0] + ".jpg" if html else None))
+if previa and png:
     from PIL import Image
     Image.open(io.BytesIO(png)).convert("RGB").save(previa, quality=85)
     print("prévia:", previa)
+
+if a.guardar_modelo:   # banco de estudo: o que funcionou, para consultar (não é fôrma: as peças nascem do zero)
+    import shutil, glob
+    dest = os.path.join(BIB, "modelos", re.sub(r"[^\w\-]+", "_", a.guardar_modelo)); os.makedirs(dest, exist_ok=True)
+    pasta_peca = os.path.dirname(os.path.abspath(a.html if html else (a.de or a.salvar)))
+    copiados = []
+    for arq in glob.glob(os.path.join(pasta_peca, "*")):
+        if os.path.isfile(arq) and os.path.splitext(arq)[1].lower() in (".html", ".js", ".iknv", ".jpg", ".md", ".json"):
+            shutil.copy2(arq, dest); copiados.append(os.path.basename(arq))
+    if a.exportar and os.path.isdir(a.exportar):
+        os.makedirs(os.path.join(dest, "export"), exist_ok=True)
+        for arq in glob.glob(os.path.join(a.exportar, "*")): shutil.copy2(arq, os.path.join(dest, "export")); copiados.append("export/" + os.path.basename(arq))
+    par = os.path.splitext(a.de or a.salvar or "")[0] + ".html"   # o HTML com o nome do .iknv; senão o primeiro da pasta
+    fonte_html = html or (open(par, encoding="utf-8").read() if os.path.isfile(par) else next((open(x, encoding="utf-8").read() for x in sorted(glob.glob(os.path.join(pasta_peca, "*.html")))), ""))
+    fontes = sorted(set(re.findall(r"font-family\s*:\s*['\"]?([^;'\",}]+)", fonte_html)) | set(re.findall(r"font:[^;]*?\d+px(?:/[\d.]+)?\s+['\"]?([A-Z][^;'\",}]+)", fonte_html)))
+    json.dump({"nome": a.guardar_modelo, "data": time.strftime("%Y-%m-%d"), "nota": a.nota, "fontes": fontes, "formato": a.formato,
+               "arquivos": copiados}, open(os.path.join(dest, "modelo.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    print("modelo guardado:", dest, f"({len(copiados)} arquivos)")
