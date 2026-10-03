@@ -538,6 +538,8 @@ async function ieDemSelecao(doc, dialogo = false) {
         if (!v) return;
     }
     ieSelAplicar(doc, x => x.drawImage(m, 0, 0), v.op, null, +v.suav || 0);
+    if (!alvo.L) { doc.demAtivo = null; IE.canetaRef = null; IE.demSel = { subs: new Set(), pts: new Set() }; ieJanAtualizar?.('doc'); }   // fica só o pontilhado
+    ieDesenharSobre();
     ieHist(ieT('Fazer seleção'));
 }
 function ieDemPreencher(doc) {
@@ -693,3 +695,20 @@ ieJanRegistrar('demarcadores', 'Demarcadores', ['doc'], () => {
     };
 });
 if (typeof IE_JAN_INDISP !== 'undefined') { const i = IE_JAN_INDISP.findIndex(x => x[0] === 'Demarcadores'); if (i >= 0) IE_JAN_INDISP.splice(i, 1); }
+
+// botão direito com a Caneta / seleção de demarcador: menu do Photoshop (Fazer seleção..., Preencher, Traçar...)
+document.addEventListener('contextmenu', ev => {
+    const doc = IE.doc, sobre = ieEl('ie-sobre');
+    if (!doc || ev.target !== sobre) return;
+    if (!['caneta', 'canetaLivre', 'pontoAdd', 'pontoDel', 'pontoConv', 'selCaminho', 'selDireta'].includes(IE.ferr)) return;
+    const alvo = ieDemAlvo(doc);
+    if (!alvo || !alvo.subs.some(s => s.pts.length > 1)) return;
+    ev.preventDefault(); ev.stopPropagation();
+    IE.canetaRef = null;
+    const forma = !!alvo.L;
+    ieMenuContextoItens(ev, [
+        ['Fazer seleção...', 'demSelecao'], ['Preencher demarcador...', 'demPreencher'], ['Traçar demarcador...', 'demTracar'], '-',
+        ['Máscara', 'demMascara'], ...(forma ? [] : [['Criar forma', 'demForma']]), '-',
+        ...(forma ? [] : [['Salvar demarcador', 'demSalvar'], ['Excluir demarcador', 'demExcluir']]), ['Demarcador de trabalho da seleção...', 'demDaSelecao'],
+    ]);
+}, true);
