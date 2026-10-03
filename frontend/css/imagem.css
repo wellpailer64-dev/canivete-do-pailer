@@ -597,3 +597,10 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 .ie-cam-selo svg { width: 11px; height: 11px; }
 .ie-cam-fxi .ie-cam-fidel { margin-left: auto; background: none; border: 0; width: auto; height: auto; color: var(--text-3); cursor: pointer; font-size: 14px; padding: 0 6px; }
 .ie-cam-fxi .ie-cam-fidel:hover { color: var(--text-1); }
+
+/* painel Demarcadores (imagem-caneta.js) */
+.ie-dem-lista { display: flex; flex-direction: column; }
+.ie-dem { display: flex; align-items: center; gap: 8px; padding: 4px 8px; cursor: pointer; border-bottom: 1px solid var(--ie-linha); }
+.ie-dem.sel { background: var(--ie-sel, rgba(255,255,255,.08)); }
+.ie-dem canvas { border: 1px solid var(--ie-linha-2); border-radius: 2px; flex: none; }
+.ie-op-cor { width: 22px; height: 18px; border-radius: 3px; border: 1px solid var(--ie-linha-2); vertical-align: middle; }

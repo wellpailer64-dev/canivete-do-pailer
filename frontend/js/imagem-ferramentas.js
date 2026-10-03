@@ -373,6 +373,7 @@ function ieAlvosMover(doc) {
 
 function ieMoverCamada(L, dx, dy) {
     if (L.c) { L.x += dx; L.y += dy; }
+    if (L.vet) for (const s of L.vet.subs) for (const q of s.pts) { q.x += dx; q.y += dy; if (q.i) q.i = [q.i[0] + dx, q.i[1] + dy]; if (q.o) q.o = [q.o[0] + dx, q.o[1] + dy]; }   // camada de forma
     if (L.m) { L.m.x += dx; L.m.y += dy; }
     if (L.tf) L.tf = ieMatMul([1, 0, 0, 1, dx, dy], L.tf);
     if (L.txt) L.txt.m = ieMatMul([1, 0, 0, 1, dx, dy], L.txt.m || IE_ID);
@@ -1283,6 +1284,11 @@ function ieTransfAplicar() {
         if (!L.txt && L._txtVetor) { L.txt = L._txtVetor; delete L.c0; }   // a partir daqui a tela mostra o texto desenhado aqui
         delete L._txtVetor;
         if (L.txt) L.txt.m = ieMatMul(M, L.txt.m || IE_ID);
+        if (L.vet) {   // camada de forma: transforma os pontos e redesenha (fica nítida, como vetor)
+            const T = (x, y) => { const q = ieMatPt(M, x, y); return [q.x, q.y]; };
+            for (const s of L.vet.subs) for (const q of s.pts) { [q.x, q.y] = T(q.x, q.y); if (q.i) q.i = T(...q.i); if (q.o) q.o = T(...q.o); }
+            ieFormaRender(L, doc);
+        }
         if (L.m && L.m.c) {
             const n = ieTransformarPlano(L.m, M, L.m.fundo || 0);
             if (n) { L.m = { ...L.m, ...n }; L.sujoM = true; }

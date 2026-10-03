@@ -2877,6 +2877,22 @@ class ApiBridge:
     def ve_fontes(self):
         return ve_fontes()
 
+    def ie_curar(self, regiao, mascara, dx, dy, difusao=0):
+        """Pincel de recuperação / Remendo (Functions/recuperar.py): clonagem de Poisson da origem no destino."""
+        from Functions import recuperar
+        try:
+            return recuperar.curar(regiao, mascara, dx, dy, difusao)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ie_preencher_conteudo(self, regiao, mascara, raio=6):
+        """Pincel de recuperação para manchas / Remendo sensível ao conteúdo: reconstrói pela vizinhança."""
+        from Functions import recuperar
+        try:
+            return recuperar.preencher(regiao, mascara, raio)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def ie_instalar_fonte(self, familia):
         """Instala uma família do Google Fonts para o usuário (Functions/fontes.py) e relê a lista."""
         from Functions import fontes

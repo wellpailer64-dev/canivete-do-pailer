@@ -45,6 +45,18 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   Carrossel à mão (o método do Photoshop): Arquivo > Novo > "Carrossel 1080 × 1440" + Páginas (largura = 1080 × páginas,
   já com as guias e uma fatia por página) → montar → Arquivo > Exportar fatias (`nome_01`, `_02`...).
   Teste com mouse de verdade: `D:\kanivete_testes\scripts	este_guias.py` (app em --agente=9333).
+- `frontend/js/imagem-caneta.js` — Caneta (P) como no Photoshop: clique = canto, arrastar = curva com alças simétricas,
+  clicar no 1º ponto fecha, Shift 45°, Alt = converter ponto / quebrar alça, Ctrl = seleção direta, adicionar/excluir
+  automaticamente, elástico, Enter/Esc termina, Backspace apaga o último; modo Demarcador ou Forma (camada de forma
+  vetorial `L.vet`, redesenhada; Mover e Ctrl+T levam os pontos). Caneta de forma livre (Magnética), Adicionar/Excluir/
+  Converter ponto, Seleção de demarcador e Seleção direta (A). Painel Demarcadores (Janela): trabalho/salvos, Preencher,
+  Traçar com o pincel, Carregar como seleção (Ctrl+Enter), Demarcador da seleção, Máscara. `doc.dems` no histórico/.iknv.
+- `frontend/js/imagem-recuperar.js` + `Functions/recuperar.py` (OpenCV) — grupo J: Pincel de recuperação para manchas
+  (sensível ao conteúdo = inpaint; proximidade = melhor pedaço ao redor), Pincel de recuperação (Alt+clique origem,
+  clonagem de Poisson: textura da origem, luz do destino), Remendo (Origem/Destino, Sensível ao conteúdo, Difusão).
+  Laço magnético (grupo L): gruda na borda mais forte dentro da Largura, pontos automáticos pela Frequência.
+  O Carimbo (S) já existia: Alt+clique origem, Alinhado, Todas as camadas.
+  Testes com mouse de verdade (app em `--agente=9333`): `testes/teste_caneta.py`, `testes/teste_guias.py`.
 - `frontend/js/imagem-cena.js` — `KNV.cena`: peça em HTML/CSS vira camadas nativas (runner `tools/knv.py`); guia em
   `Instructions/agente/plano-cena.md`.
 - `frontend/js/imagem-api.js` — API de automação `window.KNV` (scripts/Ações para agentes): guia em

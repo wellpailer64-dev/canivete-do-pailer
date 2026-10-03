@@ -300,7 +300,7 @@ function ieRestaurarCamadas(lista) {
 function ieFoto(doc) {
     return {
         w: doc.w, h: doc.h, ativa: doc.ativa, selIds: [...doc.selIds], mascaraAlvo: doc.mascaraAlvo,
-        fatias: (doc.fatias || []).map(f => ({ ...f })), fatiaSel: doc.fatiaSel, guias: (doc.guias || []).map(g => ({ ...g })),
+        fatias: (doc.fatias || []).map(f => ({ ...f })), fatiaSel: doc.fatiaSel, guias: (doc.guias || []).map(g => ({ ...g })), dems: doc.dems ? JSON.parse(JSON.stringify(doc.dems)) : null, demAtivo: doc.demAtivo ?? null,
         camadas: ieFotoCamadas(doc.camadas),
         sel: doc.sel ? { c: ieCongelar(doc.sel.c), bbox: { ...doc.sel.bbox }, forma: doc.sel.forma || null } : null,
     };
@@ -342,6 +342,7 @@ function ieIrHist(i, doc = IE.doc) {
     doc.ativa = f.ativa; doc.selIds = [...f.selIds]; doc.mascaraAlvo = !!f.mascaraAlvo;
     doc.fatias = (f.fatias || []).map(x => ({ ...x })); doc.fatiaSel = f.fatiaSel ?? null;
     if (f.guias) doc.guias = f.guias.map(x => ({ ...x }));
+    if (f.dems) { doc.dems = JSON.parse(JSON.stringify(f.dems)); doc.demAtivo = f.demAtivo; }
     doc.sel = f.sel ? { c: f.sel.c, bbox: { ...f.sel.bbox }, forma: f.sel.forma } : null;
     if (doc.sel) ieSelContorno(doc);
     if (mudouTam) { doc.comp = ieCanvas(doc.w, doc.h); ieAjustarVista(doc); }

@@ -218,6 +218,8 @@ function ieOpcoesRender(soValores) {
             h += `<button class="ie-btn ie-btn-mini" onclick="ieZoomReal(1)">100%</button><button class="ie-btn ie-btn-mini" onclick="ieAjustarVista()">${ieT('Ajustar à tela')}</button>` +
                 (IE.ferr === 'zoom' ? `<span class="ie-op-dica">${ieT('Clique: aproximar · Alt+clique: afastar · arrastar: zoom contínuo')}</span>` : '');
             break;
+        default:   // ferramentas de outros arquivos (Caneta, recuperação...) registram ieOpcoesXxx em IE_OPCOES_EXTRA
+            for (const fn of (window.IE_OPCOES_EXTRA || [])) h += fn(IE.ferr) || '';
     }
     box.innerHTML = h;
 }
@@ -251,6 +253,7 @@ function ieOpcoesInstalar() {
         let v;
         if (el.type === 'checkbox') v = el.checked;
         else if (el.dataset.v !== undefined) v = el.dataset.v === 'true' ? true : el.dataset.v === 'false' ? false : el.dataset.v;
+        else if (el.tagName === 'SELECT') v = el.value;
         else v = parseFloat(el.value);
         if (typeof v === 'number' && !isFinite(v)) return;
         IE.op[o][k] = v;
@@ -1189,6 +1192,7 @@ function ieTecla(ev) {
                 if (k === 'G') { ieEscolherFerr(IE.ferr === 'degrade' ? 'balde' : 'degrade'); return; }
                 if (k === 'C') { ieEscolherFerr(IE.ferr === 'corte' ? 'fatia' : 'corte'); return; }
             }
+            if (ev.shiftKey && alvo.length > 1) { ieEscolherFerr(alvo[(alvo.indexOf(IE.ferr) + 1) % alvo.length]); return; }
             ieEscolherFerr(alvo.includes(IE.ferr) ? IE.ferr : alvo[0]);
             return;
         }
