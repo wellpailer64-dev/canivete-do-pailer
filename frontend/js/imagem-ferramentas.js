@@ -330,7 +330,9 @@ function ieCursorSel(base, ev) {
 for (const t of ['keydown', 'keyup']) document.addEventListener(t, ev => {
     if (ev.key !== 'Shift' && ev.key !== 'Alt') return;
     IE._mods = { shiftKey: ev.shiftKey, altKey: ev.altKey };
-    if (['letreiro', 'laco', 'lacoMag', 'varinha'].includes(IE.ferr) && IE.mouse) { ieCursor(IE._mods); if (ev.key === 'Alt') ev.preventDefault(); }
+    // o Alt sozinho liga o "modo menu" do Windows e o próximo clique/arrasto é engolido em parte: no editor, nunca
+    if (ev.key === 'Alt' && document.querySelector('#page-editor-imagem.active') && !/INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) ev.preventDefault();
+    if (['letreiro', 'laco', 'lacoPoli', 'lacoMag', 'varinha'].includes(IE.ferr) && IE.mouse) ieCursor(IE._mods);
 }, true);
 
 // pinta uma cobertura (canvas do tamanho do documento) na camada ativa com cor/opacidade, respeitando a seleção
@@ -657,7 +659,7 @@ function ieSelDeslocar(doc, dx, dy) {
 const IE_LACO = {
     nome: 'Laço', tecla: 'L', icone: 'lasso', cursor: ev => ieCursorSel('laco', ev),
     down(p, ev, doc) {
-        const poli = IE.op.laco.modo === 'poligonal';
+        const poli = IE.ferr === 'lacoPoli';   // Laço = livre (arrastar); Laço poligonal = clicar os pontos
         if (poli) {
             if (!IE.laco) IE.laco = { pts: [], op: ieOpSel(ev), poli: true };
             const l = IE.laco, q = l.pts[0];
@@ -1143,7 +1145,10 @@ const IE_FERR = {
     mao: IE_MAO,
     zoom: IE_ZOOM,
 };
-const IE_FERR_ORDEM = ['mover', 'girar', 'letreiro', 'laco', 'varinha', 'corte', 'contagotas', '|', 'carimbo', 'pincel', 'borracha', 'borrachaFundo', 'borrachaMagica', 'degrade', 'balde', '|', 'texto', 'forma', '|', 'mao', 'zoom'];
+// Laço poligonal: a mesma ferramenta, clicando os pontos (duplo clique, Enter ou clicar no início fecha)
+const IE_LACO_POLI = { ...IE_LACO, nome: 'Laço poligonal', icone: 'lassoPoli', cursor: ev => ieCursorSel('laco', ev) };
+IE_FERR.lacoPoli = IE_LACO_POLI;
+const IE_FERR_ORDEM = ['mover', 'girar', 'letreiro', 'laco', 'lacoPoli', 'varinha', 'corte', 'contagotas', '|', 'carimbo', 'pincel', 'borracha', 'borrachaFundo', 'borrachaMagica', 'degrade', 'balde', '|', 'texto', 'forma', '|', 'mao', 'zoom'];
 
 function ieFerrCancelar() {
     IE.laco = null; IE.arr = null; IE.deg = null;

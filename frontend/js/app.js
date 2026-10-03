@@ -211,6 +211,11 @@ function navLarguraMudou(ms = 240) {
 // 3 s depois de recolher, some de vez (nav-oculto): fica só o logo ao lado das abas; clicar nele volta.
 const NAV_AUTO_MS = 4000, NAV_OCULTO_MS = 3000;
 let _navT = 0;
+// botão do mouse apertado (desenhando, arrastando): o menu não recolhe nem some agora — a área de trabalho mudaria de
+// largura no meio do traço e a imagem deslizaria embaixo do mouse; espera soltar
+let _navApertado = false;
+document.addEventListener('pointerdown', () => { _navApertado = true; }, true);
+for (const t of ['pointerup', 'pointercancel']) document.addEventListener(t, () => { _navApertado = false; }, true);
 function _navNaFerramenta() { return !_el('page-home')?.classList.contains('active'); }
 function _navEmUso() {
     const sb = document.querySelector('.sidebar');
@@ -225,7 +230,8 @@ function navAutoAgendar() {
     }
     if (b.classList.contains('nav-oculto')) return;
     const espera = b.classList.contains('nav-auto') ? 500 : NAV_AUTO_MS;   // já recolhido: fecha logo ao sair
-    _navT = setTimeout(() => {
+    _navT = setTimeout(function recolher() {
+        if (_navApertado) { _navT = setTimeout(recolher, 400); return; }
         if (_navEmUso() || b.classList.contains('nav-mini') || !_navNaFerramenta()) return;
         const antes = b.classList.contains('nav-auto'), peek = b.classList.contains('nav-peek');
         b.classList.add('nav-auto');
@@ -237,6 +243,7 @@ function navAutoAgendar() {
 }
 function navOcultar() {
     const b = document.body;
+    if (_navApertado) { _navT = setTimeout(navOcultar, 400); return; }
     if (_navEmUso() || !b.classList.contains('nav-auto') || b.classList.contains('nav-peek')) return;
     b.classList.add('nav-oculto');
     navSom('guarda');

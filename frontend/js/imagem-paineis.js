@@ -7,6 +7,7 @@
 const IE_ICONES = {
     pointer: '<path d="M5 3v14l4-4 3 7 2.5-1-3-7h6z"/><path d="M19 15v6M16 18h6"/>',
     rotate: '<path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 3v5h-5"/>',
+    lassoPoli: '<path d="M5 17 4 7l9-4 7 6-5 9z"/><path d="M5 17c0 2 1 4 3 4"/>',
     rotEsq: '<path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 3v5h5"/>',
     espelharH: '<path d="M12 3v18"/><path d="M8 7 3 12l5 5zM16 7l5 5-5 5z"/>',
     marquee: '<rect x="4" y="4" width="16" height="16" stroke-dasharray="3 2.4"/>',
@@ -136,8 +137,12 @@ function ieOpcoesRender(soValores) {
                 `<span class="ie-op-dica">${ieT('Shift: somar · Alt: subtrair · Shift+Alt: cruzar')}</span>`;
             break;
         case 'laco':
-            h += ieSelModos() + ieSegm('modo', 'laco', [['livre', 'Livre'], ['poligonal', 'Poligonal']]) + ieNum('Suavizar', 'suav', 'laco', 0, 250, 1, ' px') +
-                `<span class="ie-op-dica">${ieT('Shift: adicionar · Alt: subtrair · Shift+Alt: interseção · Poligonal: duplo clique ou Enter fecha')}</span>`;
+            h += ieSelModos() + ieNum('Suavizar', 'suav', 'laco', 0, 250, 1, ' px') +
+                `<span class="ie-op-dica">${ieT('Clique e arraste para desenhar · Shift: adicionar · Alt: subtrair · Shift+Alt: interseção')}</span>`;
+            break;
+        case 'lacoPoli':
+            h += ieSelModos() + ieNum('Suavizar', 'suav', 'laco', 0, 250, 1, ' px') +
+                `<span class="ie-op-dica">${ieT('Clique os pontos · clique no início, duplo clique ou Enter fecha · Backspace apaga o último')}</span>`;
             break;
         case 'varinha':
             h += ieSelModos() + ieNum('Tolerância', 'tol', 'varinha', 0, 255) + ieChk('Contíguo', 'contiguo', 'varinha') + ieChk('Todas as camadas', 'todas', 'varinha');
@@ -1194,7 +1199,6 @@ function ieTecla(ev) {
             // Shift+tecla alterna variantes (letreiro ret/elipse, laço livre/poligonal, degradê/balde, formas)
             if (ev.shiftKey) {
                 if (k === 'M') { IE.op.letreiro.forma = IE.op.letreiro.forma === 'ret' ? 'eli' : 'ret'; ieEscolherFerr('letreiro'); return; }
-                if (k === 'L') { IE.op.laco.modo = IE.op.laco.modo === 'livre' ? 'poligonal' : 'livre'; ieEscolherFerr('laco'); return; }
                 if (k === 'U') { const t = ['ret', 'eli', 'linha']; IE.op.forma.tipo = t[(t.indexOf(IE.op.forma.tipo) + 1) % 3]; ieEscolherFerr('forma'); return; }
                 if (k === 'G') { ieEscolherFerr(IE.ferr === 'degrade' ? 'balde' : 'degrade'); return; }
                 if (k === 'C') { ieEscolherFerr(IE.ferr === 'corte' ? 'fatia' : 'corte'); return; }

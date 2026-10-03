@@ -7,7 +7,7 @@ def ok(c, m): print(("  ok  " if c else "  FALHOU  ") + m); F.append(m) if not c
 with sync_playwright() as p:
     b = p.chromium.connect_over_cdp("http://127.0.0.1:9333"); pg = next(x for c in b.contexts for x in c.pages if "index.html" in x.url)
     pg.wait_for_function("typeof IE_LACO !== 'undefined'", timeout=60000); pg.evaluate("switchTool('editor-imagem')"); time.sleep(1)
-    pg.evaluate("KNV.automacao(true, {padrao: 'primario'}); KNV.fecharTudo().then(() => { KNV.novo('laco', 800, 600); KNV.ajustar(false); ieAjustarVista(); IE.op.laco.modo = 'livre'; ieEscolherFerr('laco'); })"); time.sleep(1)
+    pg.evaluate("KNV.automacao(true, {padrao: 'primario'}); KNV.fecharTudo().then(() => { KNV.novo('laco', 800, 600); KNV.ajustar(false); ieAjustarVista(); ieEscolherFerr('laco'); })"); time.sleep(1)
     T = lambda x, y: pg.evaluate(f"(() => {{ const r = ieEl('ie-sobre').getBoundingClientRect(), s = ieDocTela({x}, {y}, IE.doc); return [r.left + s.x, r.top + s.y]; }})()")
     def laco(pts, mods=()):
         for m in mods: pg.keyboard.down(m)
@@ -29,6 +29,12 @@ with sync_playwright() as p:
     pg.keyboard.down("Shift"); pg.mouse.move(*T(600, 500)); time.sleep(0.15); c1 = pg.evaluate("ieEl('ie-sobre').style.cursor"); pg.keyboard.up("Shift")
     pg.keyboard.down("Alt"); pg.mouse.move(*T(610, 500)); time.sleep(0.15); c2 = pg.evaluate("ieEl('ie-sobre').style.cursor"); pg.keyboard.up("Alt")
     ok('url(' in c1 and c1 != c2, f"cursor do laço mostra + com Shift e − com Alt ({c1[:40]}... / {c2[:40]}...)")
+    # Laço poligonal (ferramenta separada, como no Photoshop): clicar os pontos e clicar no início fecha
+    pg.evaluate("ieCmd('selNada'); ieEscolherFerr('lacoPoli')"); time.sleep(0.2)
+    for q in quad(100, 300, 150) + [(100, 300)]: pg.mouse.click(*T(*q)); time.sleep(0.05)
+    time.sleep(0.2); ap = area()
+    ok(abs(ap - 22500) < 1500, f"Laço poligonal: clicar os pontos e fechar no início ({ap})")
+    pg.evaluate("ieEscolherFerr('laco')"); laco(quad(100, 100, 200)); laco(quad(400, 100, 200), ("Shift",)); laco(quad(150, 150, 100), ("Alt",)); laco(quad(250, 120, 300), ("Shift", "Alt"))
     # botões da barra de opções: Subtrair sem tecla nenhuma
     pg.click(".ie-sel-modos [data-v='subtrair']"); time.sleep(0.2)
     s0 = area(); laco(quad(260, 130, 60)); s1 = area()
