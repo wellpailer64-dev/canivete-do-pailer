@@ -580,3 +580,12 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 .ie-cam-fon { margin-left: auto; width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--text-3); background: none; cursor: pointer; padding: 0; }
 .ie-cam-fon.on { background: var(--ie-acento); border-color: var(--ie-acento); }
 .ie-cam-filtro.off .ie-cam-fbt, .ie-cam-filtro.off input { opacity: .4; }
+
+/* Novo layout de guias (imagem-guias.js) */
+.ie-gl { width: 560px; }
+.ie-gl-bloco { display: grid; grid-template-columns: 110px repeat(3, 1fr); gap: 8px; align-items: end; padding: 8px 0; border-top: 1px solid var(--ie-linha-2); }
+.ie-gl-marg { grid-template-columns: 110px repeat(4, 1fr); }
+.ie-gl-num { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--text-3); }
+.ie-gl-num input { width: 100%; }
+.ie-gl-num input:disabled { opacity: .45; }
+.ie-gl-amostra { width: 22px; height: 22px; border-radius: 4px; border: 1px solid var(--ie-linha-2); }

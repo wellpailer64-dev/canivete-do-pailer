@@ -84,7 +84,10 @@ Carrossel (Fase 2):
 - O que fica fora das sections é solto na tira inteira: `position:absolute` com `left` em px da tira atravessa a
   emenda (foto entre o slide 1 e 2, linha contínua). `var(--slide)` = largura do slide, `var(--slides)` = quantos.
   O fundo do `body` já é contínuo.
-- Exportar: `--exportar pasta [--fmt png|jpg|webp]` → `base_01.png`... (`KNV.exportar(pasta, {fmt, q, base, escala})`;
+- Mesmo método do Photoshop (e do Arquivo > Novo > Carrossel do editor): largura = 1080 × páginas, altura do formato
+  (feed 1440); guias nas divisas, uma fatia por página. Pela API: `KNV.layoutGuias({colunas: {n: 5, medianiz: 0}})`,
+  `KNV.fatiasDasGuias()`, `KNV.novaGuia('v', 540)`, `KNV.guias()`, `KNV.ajustar(true)`.
+- Exportar: `--exportar pasta [--fmt png|jpg|webp]` (usa as fatias do documento, na ordem) → `base_01.png`... (`KNV.exportar(pasta, {fmt, q, base, escala})`;
   sem slides exporta a peça inteira). Aviso "cortado na emenda" para texto que cruza slides.
 - Kit de marca: `KNV.marca({'cor-primaria': '#ffb703', 'cor-fundo': '#0f1b2d', 'cor-texto': '#f1f5f9', 'cor-suave':
   '#94a3b8', fonte: 'Poppins'})` (fica no app) → `var(--cor-primaria)` em toda cena; os componentes já usam.

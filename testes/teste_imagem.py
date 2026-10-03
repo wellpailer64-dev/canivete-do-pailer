@@ -154,7 +154,7 @@ def main():
             J("document.getElementById('ie').focus()")
             W, H = J("[IE.doc.w, IE.doc.h]")
             # 1. mover: a camada do topo (ativa) 40 px para a direita
-            J("ieEscolherFerr('mover'); IE.op.mover.auto = false")
+            J("ieEscolherFerr('mover'); IE.op.mover.auto = false; iePrefGravar('ajustar', false)")   # sem encaixe: deslocamento exato
             J("(() => { const t = ieTodas(IE.doc).filter(L => ieRaster0(L) && L.c && L.visivel); if (t.length) ieAtivar(t[t.length - 1].id); })()")
             antes = J("(() => { const L = ieAtiva(); return [L.nome, ieRCamada(L)]; })()")
             cx = antes[1]["x"] + antes[1]["w"] / 2 if antes[1] else W / 2
@@ -162,6 +162,7 @@ def main():
             arrastar(cx, cy, cx + 40, cy + 10)
             depois = J("ieRCamada(ieAtiva())")
             ok(depois and antes[1] and depois["x"] - antes[1]["x"] == 40 and depois["y"] - antes[1]["y"] == 10, f"Mover: {antes[0]} andou 40,10 ({antes[1]} → {depois})")
+            J("iePrefGravar('ajustar', true)")
             # 2. nova camada + pincel
             tecla("Control+Shift+N")
             ok(J("ieTodas(IE.doc).length") == n0 + 1, "Shift+Ctrl+N criou camada")

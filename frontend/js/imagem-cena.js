@@ -747,19 +747,20 @@ function ieCenaChecar(raiz, ctx) {
 }
 
 // ─────────────────────────── exportar ───────────────────────────
-// cada slide do carrossel (ou o documento inteiro) em arquivo: pasta/base_01.png ...; devolve os caminhos gravados
+// cada fatia (slides do carrossel, Fatias das guias...) em arquivo: pasta/base_01.png ...; sem fatias, a peça inteira
 async function ieCenaExportar(pasta, { fmt = 'png', q = 92, base, escala = 1 } = {}) {
     const doc = IE.doc, api = ieApi();
     if (!doc || !api) throw new Error('sem documento');
-    const S = doc.cena && doc.cena.slide;
-    const partes = S ? Array.from({ length: S.n }, (_, i) => ({ x: i * S.w, w: S.w, h: S.h, nome: String(i + 1).padStart(2, '0') })) : [{ x: 0, w: doc.w, h: doc.h, nome: '' }];
+    // as fatias do documento (carrossel da cena ou feitas à mão / Fatias das guias), na ordem; sem fatias, a peça inteira
+    const fs = doc.fatias || [];
+    const partes = fs.length ? fs.map((f, i) => ({ x: f.x, y: f.y, w: f.w, h: f.h, nome: f.nome || String(i + 1).padStart(2, '0') })) : [{ x: 0, y: 0, w: doc.w, h: doc.h, nome: '' }];
     ieCompor(doc, ieRDoc(doc));
     const ini = await api.ie_salvar_inicio(null), itens = [];
     const nomeBase = String(base || doc.nome || 'peca').replace(/[\\/:*?"<>|]/g, '_');
     const dir = String(pasta).replace(/[\\/]+$/, '');
     for (const [i, P] of partes.entries()) {
         let c = ieCanvas(P.w, P.h);
-        ieCtx(c).drawImage(doc.comp, P.x, 0, P.w, P.h, 0, 0, P.w, P.h);
+        ieCtx(c).drawImage(doc.comp, P.x, P.y, P.w, P.h, 0, 0, P.w, P.h);
         if (escala !== 1) c = ieTransformarPlano({ c, x: 0, y: 0 }, [escala, 0, 0, escala, 0, 0]).c;
         const k = `slide_${i}.png`;
         await ieEnviar(ini.url, k, c);

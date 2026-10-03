@@ -59,6 +59,7 @@ const IE_FATIA = {
         let { x, y, w, h } = a.r0;
         if (a.h === 'dentro') {
             f.x = ieClamp(x + dx, 0, doc.w - w); f.y = ieClamp(y + dy, 0, doc.h - h);
+            if (typeof ieAjustarDelta === 'function' && !ev.ctrlKey) { const d = ieAjustarDelta(f, { fatia: f }, doc); f.x = ieClamp(Math.round(f.x + d.dx), 0, doc.w - w); f.y = ieClamp(Math.round(f.y + d.dy), 0, doc.h - h); }
         } else {
             let x1 = x, y1 = y, x2 = x + w, y2 = y + h;
             if (a.h.includes('l')) x1 += dx;

@@ -145,6 +145,7 @@ function ieOpcoesRender(soValores) {
         case 'fatia': {
             const f = ieFatiaSel(doc);
             h += (f ? `<span class="ie-op-dica">${ieT('Fatia')} ${doc.fatias.indexOf(f) + 1}: ${f.w} × ${f.h} px</span>` : `<span class="ie-op-dica">${ieT('Arraste para criar · clique para escolher · duplo clique: opções')}</span>`) +
+                `<button class="ie-btn ie-btn-mini" onclick="ieCmd('fatiasGuias')" ${doc && (doc.guias || []).length ? '' : 'disabled'} title="${ieT('Uma fatia por célula entre as guias (apaga as fatias que existem)')}">${ieT('Fatias das guias')}</button>` +
                 `<button class="ie-btn ie-btn-mini" onclick="ieCmd('fatiasCamadas')" title="${ieT('Uma fatia do tamanho de cada camada selecionada')}">${ieT('Das camadas')}</button>` +
                 `<button class="ie-btn ie-btn-mini" onclick="ieCmd('fatiaDividir')" ${f ? '' : 'disabled'}>${ieT('Dividir...')}</button>` +
                 `<button class="ie-btn ie-btn-mini" onclick="ieCmd('fatiaOpcoes')" ${f ? '' : 'disabled'}>${ieT('Opções...')}</button>` +
@@ -1042,7 +1043,8 @@ function ieMenuHtml(itens) {
         const [r, c, at, marcado] = it;
         if (Array.isArray(c)) return `<div class="ie-menu-sub"><i class="ie-menu-chk"></i><span>${ieT(r)}</span><b>›</b>${ieMenuHtml(c)}</div>`;
         const off = !ieCmdPode(c);
-        return `<button class="ie-menu-item ${off ? 'off' : ''}" data-cmd="${c}"><i class="ie-menu-chk">${marcado ? '✓' : ''}</i><span>${ieT(r)}</span><kbd>${at || ''}</kbd></button>`;
+        const mk = marcado || (typeof ieCmdMarcado === 'function' && ieCmdMarcado(c));
+        return `<button class="ie-menu-item ${off ? 'off' : ''}" data-cmd="${c}"><i class="ie-menu-chk">${mk ? '✓' : ''}</i><span>${ieT(r)}</span><kbd>${at || ''}</kbd></button>`;
     }).join('')}</div>`;
 }
 

@@ -300,7 +300,7 @@ function ieRestaurarCamadas(lista) {
 function ieFoto(doc) {
     return {
         w: doc.w, h: doc.h, ativa: doc.ativa, selIds: [...doc.selIds], mascaraAlvo: doc.mascaraAlvo,
-        fatias: (doc.fatias || []).map(f => ({ ...f })), fatiaSel: doc.fatiaSel,
+        fatias: (doc.fatias || []).map(f => ({ ...f })), fatiaSel: doc.fatiaSel, guias: (doc.guias || []).map(g => ({ ...g })),
         camadas: ieFotoCamadas(doc.camadas),
         sel: doc.sel ? { c: ieCongelar(doc.sel.c), bbox: { ...doc.sel.bbox }, forma: doc.sel.forma || null } : null,
     };
@@ -341,6 +341,7 @@ function ieIrHist(i, doc = IE.doc) {
     doc.camadas = ieRestaurarCamadas(f.camadas);
     doc.ativa = f.ativa; doc.selIds = [...f.selIds]; doc.mascaraAlvo = !!f.mascaraAlvo;
     doc.fatias = (f.fatias || []).map(x => ({ ...x })); doc.fatiaSel = f.fatiaSel ?? null;
+    if (f.guias) doc.guias = f.guias.map(x => ({ ...x }));
     doc.sel = f.sel ? { c: f.sel.c, bbox: { ...f.sel.bbox }, forma: f.sel.forma } : null;
     if (doc.sel) ieSelContorno(doc);
     if (mudouTam) { doc.comp = ieCanvas(doc.w, doc.h); ieAjustarVista(doc); }
@@ -1033,6 +1034,8 @@ function ieAtivar(id, doc = IE.doc, { somar = false, faixa = false } = {}) {
 IE.ponteiro = null;   // {id, ferr}
 IE.espaco = false;
 
+// Exibir > Ajustar: o ponteiro das ferramentas de retângulo encaixa nas guias/camadas/fatias (imagem-guias.js)
+function ieAjustarPt(p, f) { return typeof ieAjustarPonto === 'function' ? ieAjustarPonto(p, f) : p; }
 function ieFerrAtual() {
     if (IE.transf && !IE.ferrTemp) return IE_TRANSF;
     return IE_FERR[IE.ferrTemp || IE.ferr];
@@ -1058,7 +1061,8 @@ function ieInstalarVista() {
         sobre.setPointerCapture(ev.pointerId);
         const f = ieFerrAtual();
         IE.ponteiro = { id: ev.pointerId, f, ini: ieTelaDoc(ev) };
-        try { f?.down?.(ieTelaDoc(ev), ev, doc); } catch (e) { console.error('[editor de imagem]', e); IE.ponteiro = null; }
+        IE._ajCache = null;
+        try { f?.down?.(ieAjustarPt(ieTelaDoc(ev), f), ev, doc); } catch (e) { console.error('[editor de imagem]', e); IE.ponteiro = null; }
         ieCursor(ev);
     });
     sobre.addEventListener('pointermove', ev => {
@@ -1069,7 +1073,7 @@ function ieInstalarVista() {
         ieStatusMouse?.(p);
         if (IE.ponteiro && IE.ponteiro.id === ev.pointerId) {
             const evs = ev.getCoalescedEvents ? ev.getCoalescedEvents() : [ev];
-            try { for (const e of (evs.length ? evs : [ev])) IE.ponteiro.f?.move?.(ieTelaDoc(e), e, doc); } catch (e) { console.error('[editor de imagem]', e); }
+            try { for (const e of (evs.length ? evs : [ev])) IE.ponteiro.f?.move?.(ieAjustarPt(ieTelaDoc(e), IE.ponteiro.f), e, doc); } catch (e) { console.error('[editor de imagem]', e); }
         } else ieFerrAtual()?.hover?.(p, ev, doc);
         ieCursor(ev);
         if (ieFerrAtual()?.cursorPincel) ieDesenharSobre();
@@ -1079,7 +1083,7 @@ function ieInstalarVista() {
         if (!IE.ponteiro || IE.ponteiro.id !== ev.pointerId) return;
         const f = IE.ponteiro.f;
         IE.ponteiro = null;
-        try { f?.up?.(ieTelaDoc(ev), ev, doc); } catch (e) { console.error('[editor de imagem]', e); }
+        try { f?.up?.(ieAjustarPt(ieTelaDoc(ev), f), ev, doc); } catch (e) { console.error('[editor de imagem]', e); }
         if (IE.ferrTemp === 'mao' && !IE.espaco) IE.ferrTemp = null;
         ieCursor(ev);
     };

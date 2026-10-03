@@ -578,6 +578,18 @@ const KNV = {
             `grade ${GC}x${GL} (célula ${Math.round(W / GC)}x${Math.round(H / GL)}px):`, ...g].join('\n');
     },
 
+    // ── guias e fatias (como no Photoshop: Exibir > Guias > Novo layout de guias; ferramenta Fatia > Fatias das guias) ──
+    // layoutGuias({colunas: {n, largura, medianiz}, linhas: {n, altura, medianiz}, margem: {sup, esq, inf, dir}, centralizar,
+    //   cor, alvo: 'tela'|'pranchetas'|'selecionadas', limpar = true}) → guias; carrossel: {colunas: {n: 5, medianiz: 0}}
+    layoutGuias(o = {}) { return ieGuiasLayoutAplicar(IE.doc, o, o.limpar !== false); },
+    novaGuia(o, p, cor) { return ieNovaGuia(IE.doc, { o, p, cor }); },
+    guias() { return (IE.doc && IE.doc.guias || []).map(g => ({ ...g })); },
+    limparGuias() { ieGuiasLimpar(IE.doc, 'todas'); return []; },
+    guiasDaForma() { ieGuiasDaForma(IE.doc); return KNV.guias(); },
+    // uma fatia por célula entre as guias, na ordem de leitura (apaga as que existem) → [{x, y, w, h}]
+    fatiasDasGuias() { return ieFatiasDasGuias(IE.doc, { perguntar: false }).map(f => ({ x: f.x, y: f.y, w: f.w, h: f.h })); },
+    ajustar(ligar = true, a) { iePrefGravar('ajustar', !!ligar); if (a) iePrefGravar('ajustarA', { ...ieAjustarA(), ...a }); return { ajustar: ieAjustarLigado(), a: ieAjustarA() }; },
+
     // ── CENA: a peça escrita em HTML/CSS vira camadas nativas (imagem-cena.js; guia Instructions/agente/plano-cena.md).
     //    opções: formato ('quadrado'|'feed'|'retrato'|'story'|'paisagem'|'a4') ou w/h, nome, base (pasta dos caminhos
     //    relativos), novo (true = documento novo; padrão: novo se o documento atual não veio de uma cena), margem (px),

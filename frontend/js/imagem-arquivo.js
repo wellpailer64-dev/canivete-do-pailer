@@ -167,7 +167,9 @@ function ieColocarCanvas(c, nome, x, y) {
 }
 
 // ─────────────────────────── novo ───────────────────────────
-const IE_PREDEF = [['1080 × 1080 (post)', 1080, 1080, 72], ['1080 × 1350 (retrato)', 1080, 1350, 72], ['1080 × 1920 (story/reels)', 1080, 1920, 72],
+// 5º item 'car' = carrossel: a largura é a de uma página × Páginas, com guias e fatias por página (1080 × 1440, 3 páginas = 3240 × 1440)
+const IE_PREDEF = [['1080 × 1080 (post)', 1080, 1080, 72], ['1080 × 1350 (retrato)', 1080, 1350, 72], ['1080 × 1440 (feed)', 1080, 1440, 72], ['1080 × 1920 (story/reels)', 1080, 1920, 72],
+    ['Carrossel 1080 × 1440 (feed)', 1080, 1440, 72, 'car'], ['Carrossel 1080 × 1350 (retrato)', 1080, 1350, 72, 'car'], ['Carrossel 1080 × 1080 (quadrado)', 1080, 1080, 72, 'car'],
     ['1920 × 1080 (Full HD)', 1920, 1080, 72], ['3840 × 2160 (4K)', 3840, 2160, 72], ['A4 300 ppi', 2480, 3508, 300], ['1280 × 720 (thumbnail)', 1280, 720, 72]];
 
 async function ieNovoDialogo() {
@@ -179,15 +181,22 @@ async function ieNovoDialogo() {
             { id: 'w', rotulo: 'Largura (px)', tipo: 'numero', min: 1, max: 30000, valor: IE.ultNovo?.w || 1080 },
             { id: 'h', rotulo: 'Altura (px)', tipo: 'numero', min: 1, max: 30000, valor: IE.ultNovo?.h || 1080 },
             { id: 'dpi', rotulo: 'Resolução (ppi)', tipo: 'numero', min: 1, max: 2400, valor: IE.ultNovo?.dpi || 72 },
+            { id: 'pag', rotulo: 'Páginas (carrossel)', tipo: 'numero', min: 1, max: 20, valor: IE.ultNovo?.pag || 3 },
             { id: 'fundo', rotulo: 'Conteúdo do fundo', tipo: 'select', valor: 'branco', opcoes: [['branco', 'Branco'], ['preto', 'Preto'], ['frente', 'Cor de frente'], ['fundo', 'Cor de fundo'], ['transp', 'Transparente']] },
         ],
     });
     if (!v) return;
     let { w, h, dpi } = v;
-    if (v.pre !== '') { const p = IE_PREDEF[+v.pre]; w = p[1]; h = p[2]; dpi = p[3]; }
+    const pre = v.pre !== '' ? IE_PREDEF[+v.pre] : null, pag = pre && pre[4] === 'car' ? ieClamp(Math.round(v.pag) || 1, 1, 20) : 0;
+    if (pre) { w = pre[1] * (pag || 1); h = pre[2]; dpi = pre[3]; }
     w = ieClamp(Math.round(w) || 1080, 1, 30000); h = ieClamp(Math.round(h) || 1080, 1, 30000);
-    IE.ultNovo = { w, h, dpi };
-    ieNovoDoc2(v.nome || ieT('Sem título'), w, h, dpi, v.fundo);
+    IE.ultNovo = { w, h, dpi, pag: pag || IE.ultNovo?.pag };
+    const doc = ieNovoDoc2(v.nome || ieT('Sem título'), w, h, dpi, v.fundo);
+    if (pag > 1 && typeof ieGuiasLayoutAplicar === 'function') {   // uma coluna por página (medianiz 0) e uma fatia por página, como se faz no Photoshop
+        ieGuiasLayoutAplicar(doc, { colunas: { n: pag, largura: '', medianiz: 0 } });
+        ieFatiasDasGuias(doc, { perguntar: false });
+        doc.sujo = false;
+    }
 }
 function ieNovoDoc2(nome, w, h, dpi = 72, fundo = 'branco') {
     const doc = ieNovoDoc({ nome, w, h, dpi });

@@ -36,6 +36,15 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   lixeira, menu fx, Tornar padrão / Redefinir, Visualizar e a amostra. Abre pelo botão direito na camada (primeiro item
   "Opções de mesclagem..."), duplo clique na camada, botão fx do painel, Camada > Estilo de camada. No app em inglês
   a janela usa os termos oficiais do Photoshop (IE_LS_EN). Efeitos aparecem sob a camada (fx ›) com olho por efeito.
+- `frontend/js/imagem-guias.js` — guias e encaixe como no Photoshop: Exibir > Guias (Nova guia com cor, Novo layout de
+  guias com predefinições 8/12/18/24 colunas + "Carrossel: N slides" + as salvas, destino, cor, colunas/linhas com
+  largura vazia = automática e medianiz, margem nos 4 lados, centralizar, limpar, visualizar; Novas guias da forma;
+  limpar), duplo clique na guia com o Mover = editar; arrastar da régua: Alt troca a orientação, Shift encaixa nas marcas;
+  guias no histórico (Ctrl+Z). Exibir > Ajustar (Shift+Ctrl+;) e Ajustar a (guias, grade, camadas, fatias, limites):
+  Letreiro, Fatia, Corte, Forma, Mover e a própria guia encaixam (Ctrl segura). Ferramenta Fatia > **Fatias das guias**.
+  Carrossel à mão (o método do Photoshop): Arquivo > Novo > "Carrossel 1080 × 1440" + Páginas (largura = 1080 × páginas,
+  já com as guias e uma fatia por página) → montar → Arquivo > Exportar fatias (`nome_01`, `_02`...).
+  Teste com mouse de verdade: `D:\kanivete_testes\scripts	este_guias.py` (app em --agente=9333).
 - `frontend/js/imagem-cena.js` — `KNV.cena`: peça em HTML/CSS vira camadas nativas (runner `tools/knv.py`); guia em
   `Instructions/agente/plano-cena.md`.
 - `frontend/js/imagem-api.js` — API de automação `window.KNV` (scripts/Ações para agentes): guia em

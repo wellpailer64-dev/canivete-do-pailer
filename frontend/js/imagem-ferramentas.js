@@ -480,7 +480,7 @@ const IE_MOVER = {
         }
         const L = ieAtiva(doc);
         const flutuar = doc.sel && alvos.length === 1 && L && L.tipo === 'pixel' && L.c && !doc.mascaraAlvo;
-        IE.mov = { p0: p, dx: 0, dy: 0, alvos, R: alvos.reduce((R, X) => ieRUniao(R, ieRCamada(X)), null), dup: ev.altKey };
+        IE.mov = { p0: p, dx: 0, dy: 0, alvos, R: alvos.reduce((R, X) => ieRUniao(R, ieRCamada(X)), null), dup: ev.altKey, B: ieCaixaAlvos(doc) };
         if (flutuar) {
             ieGravavel(L);
             const R = ieRPlano(L);
@@ -500,6 +500,12 @@ const IE_MOVER = {
         if (m.transf) { IE_TRANSF.move(p, ev, doc); return; }
         let dx = Math.round(p.x - m.p0.x), dy = Math.round(p.y - m.p0.y);
         if (ev.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+        if (m.B && typeof ieAjustarDelta === 'function' && !ev.ctrlKey) {   // Exibir > Ajustar (Ctrl segura o encaixe, como no Photoshop)
+            const ids = []; for (const X of m.alvos) iePercorrer([X], Y => { ids.push(Y.id); });
+            const a = ieAjustarDelta({ x: m.B.x + dx, y: m.B.y + dy, w: m.B.w, h: m.B.h }, { camadas: ids }, doc);
+            if (!(ev.shiftKey && Math.abs(dx) <= Math.abs(dy))) dx += Math.round(a.dx);
+            if (!(ev.shiftKey && Math.abs(dx) > Math.abs(dy))) dy += Math.round(a.dy);
+        }
         const ddx = dx - m.dx, ddy = dy - m.dy;
         if (!ddx && !ddy) return;
         m.dx = dx; m.dy = dy;

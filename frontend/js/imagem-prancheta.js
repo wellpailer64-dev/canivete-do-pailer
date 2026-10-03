@@ -131,16 +131,31 @@ function ieGuiaPerto(doc, sx, sy) {
     }
     return melhor;
 }
+// arrastar guia (nova, da régua, ou existente): Alt troca vertical/horizontal; Shift encaixa nas marcas da régua;
+// com Exibir > Ajustar, encaixa em camadas, limites e fatias; solta fora da imagem/na régua = apaga (como no Photoshop)
 function ieGuiaArrastar(doc, g, ev, nova) {
     const vista = ieEl('ie-vista'), rv = vista.getBoundingClientRect();
     doc.guias = doc.guias || [];
     if (nova) doc.guias.push(g);
+    const o0 = g.o, p0 = g.p;
     IE.guiaArr = g;
     const mover = e => {
         const p = ieTelaDoc(e, doc);
+        g.o = e.altKey ? (o0 === 'v' ? 'h' : 'v') : o0;
         let v = g.o === 'v' ? p.x : p.y;
-        if (!e.shiftKey) v = Math.round(v);   // em pixel inteiro; Shift deixa livre
-        if (e.shiftKey && IE.grade) { const k = 25; v = Math.round(v / k) * k; }   // Shift com grade: encaixa na grade
+        if (e.shiftKey) {   // marcas da régua no zoom atual
+            const eixo = g.o === 'v' ? 'h' : 'v', fat = ieUnidadeFator(doc, eixo), pxUn = fat * doc.zoom;
+            const passos = [0.01, 0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000];
+            const passo = passos.find(q => q * pxUn >= 50) || 10000, sub = passo * pxUn >= 100 ? 10 : passo * pxUn >= 60 ? 5 : 2;
+            const k = passo / sub * fat;
+            v = Math.round(v / k) * k;
+        } else {
+            v = Math.round(v);
+            if (typeof ieAjustarLigado === 'function' && ieAjustarLigado()) {
+                const L = ieAjustarLinhas(doc, { guia: g }), a = ieAjustarValor(v, g.o === 'v' ? L.xs : L.ys, 8 / doc.zoom);
+                if (a != null) v = a;
+            }
+        }
         g.p = v;
         ieDesenharSobre();
     };
@@ -151,6 +166,7 @@ function ieGuiaArrastar(doc, g, ev, nova) {
         const fora = sx < (ieReguas() ? IE_REGUA : 0) || sy < (ieReguas() ? IE_REGUA : 0) || sx > rv.width || sy > rv.height;
         if (fora) doc.guias = doc.guias.filter(x => x !== g);   // de volta para a régua: apaga
         doc.sujo = true;
+        if (!(nova && fora) && (nova || fora || g.p !== p0 || g.o !== o0)) ieHist(ieT(fora ? 'Excluir guia' : nova ? 'Nova guia' : 'Mover guia'), doc);
         ieDesenharSobre();
         ieJanAtualizar?.('doc');
     };
@@ -202,13 +218,17 @@ document.addEventListener('pointermove', ev => {
         }
         if (IE.verGuias && !IE.semExtras && doc.guias && doc.guias.length) {
             const { w, h } = ieVistaTam();
-            ctx.strokeStyle = doc.guiasTravadas ? 'rgba(0,200,220,.6)' : '#00d5ee'; ctx.lineWidth = 1;
-            ctx.beginPath();
-            for (const g of doc.guias) {
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = doc.guiasTravadas ? 0.6 : 1;
+            const padrao = typeof ieGuiaCorPadrao === 'function' ? ieGuiaCorPadrao() : '#00ffff';
+            for (const g of doc.guias) {   // cada guia na cor dela (Nova guia / layout com cor), senão a padrão
                 const s = Math.round(g.o === 'v' ? doc.px + g.p * doc.zoom : doc.py + g.p * doc.zoom) + 0.5;
+                ctx.strokeStyle = g === IE.guiaArr ? '#ffffff' : g.cor || padrao;
+                ctx.beginPath();
                 if (g.o === 'v') { ctx.moveTo(s, 0); ctx.lineTo(s, h); } else { ctx.moveTo(0, s); ctx.lineTo(w, s); }
+                ctx.stroke();
             }
-            ctx.stroke();
+            ctx.globalAlpha = 1;
             if (IE.guiaArr) {   // posição enquanto arrasta
                 const g = IE.guiaArr, fat = ieUnidadeFator(doc, g.o === 'v' ? 'h' : 'v'), val = (g.p / fat).toFixed(iePref('unidade', 'px') === 'px' ? 0 : 2);
                 const m = IE.mouse ? ieDocTela(IE.mouse.x, IE.mouse.y, doc) : { x: 40, y: 40 };
@@ -237,35 +257,7 @@ document.addEventListener('pointermove', ev => {
 })();
 
 // ─────────────────────────── comandos e menus ───────────────────────────
-async function ieNovaGuia(doc) {
-    const v = await ieDialogo({ titulo: 'Nova guia', campos: [
-        { id: 'o', rotulo: 'Orientação', tipo: 'select', valor: 'h', opcoes: [['h', 'Horizontal'], ['v', 'Vertical']] },
-        { id: 'p', rotulo: `Posição (${iePref('unidade', 'px')})`, tipo: 'numero', valor: 0, min: -100000, max: 100000 }] });
-    if (!v) return;
-    (doc.guias = doc.guias || []).push({ o: v.o, p: +v.p * ieUnidadeFator(doc, v.o === 'v' ? 'h' : 'v') });
-    IE.verGuias = true; doc.sujo = true;
-    ieDesenharSobre();
-}
-async function ieGuiasLayout(doc) {   // Exibir > Guias > Novo layout de guias (colunas, linhas e margem)
-    const v = await ieDialogo({ titulo: 'Novo layout de guias', campos: [
-        { id: 'col', rotulo: 'Colunas', tipo: 'numero', valor: 3, min: 0, max: 50 }, { id: 'gc', rotulo: 'Medianiz das colunas (px)', tipo: 'numero', valor: 0, min: 0, max: 5000 },
-        { id: 'lin', rotulo: 'Linhas', tipo: 'numero', valor: 0, min: 0, max: 50 }, { id: 'gl', rotulo: 'Medianiz das linhas (px)', tipo: 'numero', valor: 0, min: 0, max: 5000 },
-        { id: 'm', rotulo: 'Margem (px)', tipo: 'numero', valor: 0, min: 0, max: 5000 }, { id: 'lim', rotulo: 'Limpar guias existentes', tipo: 'check', valor: true }] });
-    if (!v) return;
-    const alvo = ieAtiva(doc) && ieAtiva(doc).prancheta ? ieAtiva(doc).prancheta : { x: 0, y: 0, w: doc.w, h: doc.h };
-    const g = v.lim ? [] : [...(doc.guias || [])];
-    const faixas = (o, n, med, ini, tam) => {
-        if (n <= 0) return;
-        const m = +v.m, util = tam - 2 * m, cel = (util - med * (n - 1)) / n;
-        if (m > 0) { g.push({ o, p: ini + m }); g.push({ o, p: ini + tam - m }); }
-        for (let i = 0; i < n; i++) { const a = ini + m + i * (cel + med); g.push({ o, p: a }); g.push({ o, p: a + cel }); }
-    };
-    faixas('v', +v.col, +v.gc, alvo.x, alvo.w);
-    faixas('h', +v.lin, +v.gl, alvo.y, alvo.h);
-    doc.guias = g.filter((a, i) => g.findIndex(b => b.o === a.o && Math.abs(b.p - a.p) < 0.01) === i);
-    IE.verGuias = true; doc.sujo = true;
-    ieDesenharSobre();
-}
+// Nova guia, Novo layout de guias, Novas guias da forma, limpar: imagem-guias.js
 async function ieExportarPranchetas(doc = IE.doc) {
     const api = ieApi(), lista = iePranchetas(doc);
     if (!api || !doc) return;
