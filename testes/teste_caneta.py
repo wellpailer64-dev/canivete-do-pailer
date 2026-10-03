@@ -21,7 +21,7 @@ with sync_playwright() as p:
     pg.on("pageerror", lambda e: erros.append(str(e)))
     pg.wait_for_function("typeof IE_CANETA !== 'undefined' && typeof IE_REMENDO !== 'undefined'", timeout=90000)
     pg.evaluate("switchTool('editor-imagem')"); time.sleep(1)
-    pg.evaluate("KNV.automacao(true, {respostas: {'Salvar': 'Não salvar'}, padrao: 'primario'}); KNV.novo('caneta', 800, 600); KNV.ajustar(false); ieAjustarVista()"); time.sleep(0.5)
+    pg.evaluate("KNV.automacao(true, {respostas: {'Salvar': 'Não salvar'}, padrao: 'primario'}); KNV.novo('caneta', 800, 600); KNV.ajustar(false); Object.assign(IE.op.caneta, {modo: 'demarcador', auto: true, elastico: true}); ieAjustarVista()"); time.sleep(0.5)
     T = lambda x, y: pg.evaluate(f"(() => {{ const r = ieEl('ie-sobre').getBoundingClientRect(), s = ieDocTela({x}, {y}, IE.doc); return [r.left + s.x, r.top + s.y]; }})()")
     def clique(x, y, mods=()):
         for m in mods: pg.keyboard.down(m)
