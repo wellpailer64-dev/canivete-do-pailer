@@ -65,8 +65,19 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   iluminação), Nitidez (5), Estilização (difusão, entalhe, arestas, óleo/Kuwahara, solarização, ladrilhos, contorno,
   vento), Vídeo, Outros (personalizado 3×3, passa-alta, HSB/HSL, máximo, mínimo, deslocamento), Correção de lente,
   Converter para filtros inteligentes. Todos com prévia e como filtro inteligente; sem parâmetro aplica direto.
-  Desabilitados (ainda não): Neural Filters, Galeria de filtros, Grande angular, Dissolver (Liquify), Ponto de fuga,
+  Desabilitados (ainda não): Neural Filters, Galeria de filtros, Grande angular, Ponto de fuga,
   Desfoque de forma/caminho, Deslocamento de pixels, Chama/Moldura/Árvore, Extrusão, Redução de tremido.
+- `frontend/js/imagem-dissolver.js` — Filtro > **Dissolver** (Liquify, Shift+Ctrl+X): janela própria (`.ie-dv`) com
+  Deformação para frente (W), Reconstruir (R), Suavizar (E), Torcer (C, Alt = anti-horário), Comprimir (S), Inchar (B),
+  Empurrar para a esquerda (O), Congelar/Descongelar máscara (F/D), Mão (H/espaço), Zoom (Z/Ctrl+espaço); Tamanho
+  ([ ]), Densidade, Pressão, Taxa, Fixar bordas; Reconstruir (quantidade) e Restaurar tudo; máscara Nenhuma/Mascarar
+  tudo/Inverter; Mostrar malha/máscara, Visualizar; Ctrl+Z/Ctrl+Shift+Z dentro da janela (por pincelada). A seleção
+  vira máscara congelada. Campo de deslocamento numa grade (≤ 1200 nós no lado maior), prévia na GPU (WebGL2, shader
+  `IE_DV_FS`), OK aplica na CPU (`ieDvAplicar`; 4000×5333 ≈ 2 s). Objeto inteligente: entra como filtro inteligente e
+  reabre com a deformação (`vals.d` = Int16 em 1/8 px, base64). Automação: `KNV.cmd('f:dissolver', {ops: [{f:
+  'deformar'|'torcer'|'comprimir'|'inchar'|'esquerda'|'reconstruir'|'suavizar', pts: [[x, y], ...], tam, dens,
+  pressao, taxa, alt, passos}]})` (px da camada). Teclado na janela vai por `window` (antes dos atalhos do editor).
+  Teste: `testes/teste_dissolver.py` (mouse de verdade, app em --agente=9333).
   Teste: `testes/teste_filtros.py` (app em --agente=9333) aplica todos numa foto e mede.
 - `frontend/js/imagem-cena.js` — `KNV.cena`: peça em HTML/CSS vira camadas nativas (runner `tools/knv.py`); guia em
   `Instructions/agente/plano-cena.md`.
@@ -192,8 +203,8 @@ carregada, salvar e conferir com o psd-tools (fatias e efeitos no arquivo), reab
 No console: `ieDiferencaAchatado()` mede a diferença do documento aberto contra o achatado do arquivo.
 
 ## Próximos passos (combinado com o usuário em 2026-10-03)
-1. **Dissolver (Liquify)** — Filtro > Dissolver: janela própria com pincel de deformar para frente, reconstruir,
-   torcer, comprimir, inchar, empurrar para a esquerda; congelar/descongelar máscara; tamanho, densidade, pressão.
+1. ~~Dissolver (Liquify)~~ — feito 2026-10-03 (imagem-dissolver.js). Falta: Dissolver sensível a rosto
+   (olhos/nariz/boca por detecção de rosto), Carregar/Salvar malha, Mostrar fundo (outras camadas atrás).
 2. **Galeria de filtros** — os artísticos do Photoshop (Pincel seco, Recorte, Bordas posterizadas, Granulado...).
 3. **Filtro Camera Raw como filtro inteligente** (hoje tem painel próprio e não entra na lista não destrutiva).
 4. Desabilitados no menu Filtro: Desfoque de forma/caminho, Deslocamento de pixels, Chama/Moldura/Árvore, Extrusão,
@@ -201,4 +212,4 @@ No console: `ieDiferencaAchatado()` mede a diferença do documento aberto contra
 5. KNV.cena Fase 3 (Instructions/agente/plano-cena.md): biblioteca de estilos/receitas, KNV.ver, forma vetorial nas caixas.
 6. Ferramentas: Curvatura (grupo da Caneta), Movimento sensível ao conteúdo (grupo J), máscara vetorial pelo demarcador.
 Testes com mouse (app em --agente=9333; avisar o usuário para não mexer no mouse durante): testes/teste_{caneta,guias,
-laco,barra,filtros}.py; geral: testes/teste_imagem.py.
+laco,barra,filtros,dissolver}.py; geral: testes/teste_imagem.py.

@@ -505,7 +505,7 @@ const IE_REF_ATALHOS = [
     ['Menus', 'Shift+Ctrl+C / Shift+Ctrl+V', 'Copiar mesclado / colar no lugar', 1],
     ['Menus', 'Ctrl+L / M / U / B / I', 'Níveis, curvas, matiz/saturação, equilíbrio de cores, inverter', 1], ['Menus', 'Alt+Shift+Ctrl+B / Shift+Ctrl+U', 'Preto e branco / dessaturar', 1],
     ['Menus', 'Shift+Ctrl+L / Alt+Shift+Ctrl+L / Shift+Ctrl+B', 'Tom, contraste e cor automáticos', 1], ['Menus', 'Alt+Ctrl+I / Alt+Ctrl+C', 'Tamanho da imagem / da tela', 1],
-    ['Menus', 'Ctrl+F', 'Último filtro', 1], ['Menus', 'Shift+Ctrl+A', 'Filtro Camera Raw', 1], ['Menus', 'Shift+Ctrl+X / Shift+Ctrl+R / Alt+Ctrl+V', 'Dissolver, correção de lente, ponto de fuga', 0],
+    ['Menus', 'Ctrl+F', 'Último filtro', 1], ['Menus', 'Shift+Ctrl+A', 'Filtro Camera Raw', 1], ['Menus', 'Shift+Ctrl+X', 'Dissolver', 1], ['Menus', 'Shift+Ctrl+R', 'Correção de lente', 1], ['Menus', 'Alt+Ctrl+V', 'Ponto de fuga', 0],
     ['Menus', 'Ctrl+K / Ctrl+P / Ctrl+Y', 'Preferências, imprimir, prova de cores', 0],
 ];
 

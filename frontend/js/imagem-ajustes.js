@@ -313,16 +313,17 @@ function ieCorSeletiva(d, a) {
 }
 
 // ─────────────────────────── aplicar numa camada (com seleção e prévia) ───────────────────────────
+// o plano que o proc recebe: a camada crescida pela margem (dentro do documento)
+function ieComMargem(L, margem, doc = IE.doc) {
+    const o = { c: L.c, x: L.x, y: L.y };
+    if (!(margem > 0)) return o;
+    const R = ieRInter({ x: L.x - margem, y: L.y - margem, w: L.c.width + 2 * margem, h: L.c.height + 2 * margem }, ieRDoc(doc)) || ieRPlano(o);
+    return ieCrescer({ ...o }, ieRUniao(ieRPlano(o), R), 0);
+}
 // proc(canvas) devolve um canvas novo do mesmo tamanho com o resultado; margem = quanto o efeito espalha
 function ieProcessarCamada(L, proc, margem = 0, doc = IE.doc) {
     if (!L || !L.c) return null;
-    let o = { c: L.c, x: L.x, y: L.y };
-    if (margem > 0) {
-        o = { c: L.c, x: L.x, y: L.y };
-        const R = ieRInter({ x: L.x - margem, y: L.y - margem, w: L.c.width + 2 * margem, h: L.c.height + 2 * margem }, ieRDoc(doc))
-            || ieRPlano(o);
-        o = ieCrescer({ ...o }, ieRUniao(ieRPlano(o), R), 0);
-    }
+    const o = ieComMargem(L, margem, doc);
     const res = proc(o.c);
     if (!doc.sel) return { c: res, x: o.x, y: o.y };
     const R = ieRPlano(o);
@@ -414,7 +415,11 @@ async function ieIntFiltro(L, def, cmd, idx = -1) {
     const campos = (def.campos || []).map(c => (atual && c.id in atual.vals ? { ...c, valor: atual.vals[c.id] } : c));
     const lista = vals => { const l = (L.filtrosInt || []).map((f, i) => (i === idx ? { ...f, vals } : f)); if (idx < 0) l.push({ cmd, vals, on: true }); return l; };
     let vals = {};
-    if (campos.length) {
+    if (def.janela) {   // janela própria (Dissolver): recebe o plano como chega a este filtro (com os de antes dele)
+        const antes = ieIntPlano(L, L.tf, (L.filtrosInt || []).slice(0, idx < 0 ? undefined : idx));
+        vals = await def.janela(ieComMargem(antes, def.margem ? def.margem({}) : 0, { w: IE.doc.w, h: IE.doc.h }), atual && atual.vals);
+        if (!vals) return;
+    } else if (campos.length) {
         vals = await ieDialogo({ titulo: def.titulo, campos, largura: def.largura, lado: def.lado, previa: v => { L._tfPrev = ieIntPlano(L, L.tf, lista(v)); ieCamadaMudou(L, Rantes); } });
         L._tfPrev = null;
         if (!vals) { ieCamadaMudou(L, Rantes); return; }
@@ -441,7 +446,7 @@ async function ieAplicarComDialogo(def) {
         return ieProcessarCamada(L, p, margem ? margem(vals) : 0, doc);
     };
     const Rantes = ieRCamada(L);
-    const ok = !campos || !campos.length ? {} : await ieDialogo({   // sem parâmetros (Média, Faceta...): aplica direto, como no Photoshop
+    const ok = def.janela ? await def.janela(ieComMargem(L, margem ? margem({}) : 0, doc), null, doc) : !campos || !campos.length ? {} : await ieDialogo({   // sem parâmetros (Média, Faceta...): aplica direto, como no Photoshop
         titulo, campos, largura, lado,
         previa: vals => { L._tfPrev = fazer(vals); ieCamadaMudou(L, Rantes); },
     });

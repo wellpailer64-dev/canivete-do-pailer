@@ -506,7 +506,7 @@ function ieFReflexo(c, v) {
     const nao = r => [r, 'naoTem:' + r];
     const menu = ['Filtro', [['Último filtro', 'filtroUltimo', 'Ctrl+F'], '-', ['Converter para filtros inteligentes', 'objetoInteligente'], '-', nao('Neural Filters...'), '-',
         nao('Galeria de filtros...'), nao('Grande angular adaptável...'), ['Filtro Camera Raw...', 'f:cameraRaw', 'Shift+Ctrl+A'], ['Correção de lente...', 'f:correcaoLente', 'Shift+Ctrl+R'],
-        nao('Dissolver...'), nao('Ponto de fuga...'), '-',
+        ['Dissolver...', 'f:dissolver', 'Shift+Ctrl+X'], nao('Ponto de fuga...'), '-',
         ['Desfoque', [['Média', 'f:media'], ['Desfoque', 'f:desfoque'], ['Desfoque mais', 'f:desfoqueMais'], ['Desfoque de caixa...', 'f:caixa'], ['Desfoque gaussiano...', 'f:gaussiano'],
             ['Desfoque de lente...', 'f:lente'], ['Desfoque de movimento...', 'f:movimento'], ['Desfoque radial...', 'f:radial'], nao('Desfoque de forma...'), ['Desfoque inteligente...', 'f:inteligente'], ['Desfoque de superfície...', 'f:superficie']]],
         ['Galeria de desfoque', [['Desfoque de campo...', 'f:campo'], ['Desfoque de íris...', 'f:iris'], ['Tilt-Shift...', 'f:tiltShift'], nao('Desfoque de caminho...'), ['Desfoque giratório...', 'f:giratorio']]],
@@ -525,4 +525,5 @@ function ieFReflexo(c, v) {
     const pode = ieCmdPode;
     ieCmdPode = function (c) { if (String(c).startsWith('naoTem:')) return false; return pode(c); };
     if (IE_ATALHOS && !IE_ATALHOS['Shift+Ctrl+R']) IE_ATALHOS['Shift+Ctrl+R'] = 'f:correcaoLente';
+    if (IE_ATALHOS && !IE_ATALHOS['Shift+Ctrl+X']) IE_ATALHOS['Shift+Ctrl+X'] = 'f:dissolver';
 }

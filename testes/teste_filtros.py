@@ -10,7 +10,7 @@ with sync_playwright() as p:
     r = pg.evaluate("""async () => {
         KNV.automacao(true, {padrao: 'primario'}); await KNV.fecharTudo(); KNV.novo('filtros', 900, 1200);
         await KNV.colocar('D:/kanivete_testes/cena/foto.jpg', {nome: 'Foto', x: 0, y: 0, largura: 900});
-        const cmds = []; const andar = l => l.forEach(it => { if (Array.isArray(it) && Array.isArray(it[1])) andar(it[1]); else if (Array.isArray(it) && String(it[1]).startsWith('f:') && it[1] !== 'f:cameraRaw') cmds.push(it[1]); });
+        const cmds = []; const andar = l => l.forEach(it => { if (Array.isArray(it) && Array.isArray(it[1])) andar(it[1]); else if (Array.isArray(it) && String(it[1]).startsWith('f:') && it[1] !== 'f:cameraRaw' && it[1] !== 'f:dissolver') cmds.push(it[1]); });
         andar(IE_MENUS.find(m => m[0] === 'Filtro')[1]);
         const L = ieAtiva(IE.doc), base = L.c, bx = L.x, by = L.y, out = [];
         const assin = c => { const d = ieCtx(c).getImageData(0, 0, c.width, c.height).data; let s = 0; for (let i = 0; i < d.length; i += 997) s = (s * 31 + d[i]) >>> 0; return s; };

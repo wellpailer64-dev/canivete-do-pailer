@@ -65,7 +65,7 @@ Guia, arquivos e limitações em `Instructions/editor-imagem.md`; código em `fr
 `Functions/editor_imagem.py` (salvar PSD de ida e volta: só troca o que mudou). Teste: `python testes/teste_imagem.py`
 (rodar antes de release quando mexer no editor de imagem, em `psd_tools` ou no `media_server`). Ferramentas com mouse de
 verdade (app em `--agente=9333`): `testes/teste_caneta.py` (Caneta, demarcadores, recuperação, laço magnético) e
-`testes/teste_guias.py` (guias, encaixe, fatias, carrossel).
+`testes/teste_guias.py` (guias, encaixe, fatias, carrossel), `testes/teste_dissolver.py` (Filtro > Dissolver/Liquify).
 Gerar imagem com IA (FLUX.2 klein via stable-diffusion.cpp Vulkan, baixado sob demanda; `KNV.gerar`): seção no mesmo guia.
 **Diagramar (carrossel, feed, story): `KNV.cena` — HTML/CSS vira camadas; `py -3.13 tools/knv.py peca.html --formato feed` (carrossel: `<section class="slide">`, `--exportar pasta`)**;
 guia `Instructions/agente/plano-cena.md`. Fazer arte pelo app (API `window.KNV`, receitas em etapas .iknv, `rodar.py`, `KNV.mapa()`/`KNV.revisar()`, técnicas):

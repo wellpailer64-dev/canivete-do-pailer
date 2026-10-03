@@ -611,3 +611,20 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 
 .ie-sel-modos button { padding: 2px 5px; }
 .ie-sel-modos svg { width: 18px; height: 18px; }
+
+/* Filtro > Dissolver (imagem-dissolver.js): janela própria como a do Photoshop */
+.ie-dv { position: absolute; inset: 0; z-index: 40; display: grid; grid-template-columns: 44px minmax(0, 1fr) 290px; background: var(--ie-bg); }
+.ie-dv-ferr { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; background: var(--ie-painel); border-right: 1px solid var(--ie-linha); overflow-y: auto; }
+.ie-dv-ferr .ie-ferr-btn.on { background: var(--primary-soft); color: var(--ie-acento); }
+.ie-dv-vista { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--ie-vista); }
+.ie-dv-vista canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.ie-dv-sobre { touch-action: none; }
+.ie-dv-zoom { position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 6px; background: var(--ie-painel); border: 1px solid var(--ie-linha); }
+.ie-dv-zv { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; color: var(--text-2); }
+.ie-dv-lado.ie-dlg { width: auto; max-width: none; max-height: none; border-radius: 0; box-shadow: none; padding: 0; }
+.ie-dv-lado { display: flex; flex-direction: column; min-height: 0; background: var(--ie-painel); border-left: 1px solid var(--ie-linha); }
+.ie-dv-topo { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--ie-linha); }
+.ie-dv-topo h3 { margin: 0 auto 0 0; font-size: 14px; }
+.ie-dv-corpo .ie-dlg-faixa { grid-template-columns: 1fr 58px; gap: 0 8px; }
+.ie-dv-corpo { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; overflow-y: auto; }
+.ie-dv-bts { display: flex; flex-wrap: wrap; gap: 6px; }
