@@ -119,9 +119,10 @@ function ieDemMascara(doc, subs) {
 }
 
 // ─────────────────────────── acerto do mouse (tela) ───────────────────────────
-function ieDemAcertar(doc, alvo, p, { soSel = false } = {}) {
+function ieDemAcertar(doc, alvo, p, { soSel = false, inicio = null } = {}) {
     if (!alvo) return null;
     const tol = 6 / doc.zoom, d = (x, y) => Math.hypot(x - p.x, y - p.y);
+    if (inicio && d(inicio.x, inicio.y) < 12 / doc.zoom) return { tipo: 'ponto', sub: alvo.subs.find(s => s.pts[0] === inicio), pt: inicio };   // ímã para fechar
     const sel = IE.demSel || { pts: new Set() };
     // alças dos pontos selecionados (e do último ponto desenhado)
     for (const s of alvo.subs) for (const q of s.pts) {
@@ -138,6 +139,25 @@ function ieDemAcertar(doc, alvo, p, { soSel = false } = {}) {
     }
     return null;
 }
+// linha em andamento: guardada por posição (o Ctrl+Z troca os objetos e a caneta continua de onde ficou)
+function ieCanetaChave(alvo) { return alvo ? (alvo.L ? 'L' + alvo.L.id : 'D' + alvo.id) : null; }
+function ieCanetaCur(doc, alvo = ieDemAlvo(doc)) {
+    const r = IE.canetaRef;
+    if (!r || !alvo || r.chave !== ieCanetaChave(alvo)) return null;
+    const s = alvo.subs[r.i];
+    if (!s || s.fechado || !s.pts.length) return null;
+    if (!s.pts.includes(IE.canetaUlt)) IE.canetaUlt = s.pts[s.pts.length - 1];
+    return s;
+}
+function ieCanetaFixar(alvo, sub) { IE.canetaRef = sub ? { chave: ieCanetaChave(alvo), i: alvo.subs.indexOf(sub) } : null; }
+// cursor da caneta como no Photoshop (bico com o sinal da ação); CapsLock = cruz de precisão
+function ieCanetaCursorSvg(sinal) {
+    const marca = { mais: '<path d="M17 3v6M14 6h6"/>', menos: '<path d="M14 6h6"/>', fechar: '<circle cx="17" cy="6" r="2.6"/>', novo: '<path d="M14.5 3.5l5 5M19.5 3.5l-5 5"/>',
+        converter: '<path d="M14 9l3-6 3 6"/>' }[sinal] || '';
+    const bico = '<path d="M3 21l2.2-7.5L13 6l5 5-7.5 7.8z"/><path d="M3 21l5.6-5.6"/><circle cx="9.6" cy="14.4" r="1.4"/>';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke-linecap="round" stroke-linejoin="round"><g stroke="#fff" stroke-width="3.2">${bico}${marca}</g><g stroke="#000" stroke-width="1.3">${bico}${marca}</g></svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 3 21, crosshair`;
+}
 function ie45(p0, p) {   // Shift: ângulo em passos de 45°
     const dx = p.x - p0[0], dy = p.y - p0[1], a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4), r = Math.hypot(dx, dy);
     return { x: p0[0] + Math.cos(a) * r, y: p0[1] + Math.sin(a) * r };
@@ -153,12 +173,12 @@ const IE_CANETA = {
         let alvo = ieDemAlvo(doc);
         if (forma && !(alvo && alvo.L)) {   // modo Forma: a primeira âncora cria a camada de forma
             const L = ieNovaCamada(doc, { tipo: 'forma', nome: ieNomeLivre(doc, ieT('Forma')), vet: { subs: [], cor: IE.op.caneta.cor }, sujoPx: true });
-            ieInserirAcima(doc, L, ieAtiva(doc)); ieAtivar(L.id, doc); IE.canetaSub = null;
+            ieInserirAcima(doc, L, ieAtiva(doc)); ieAtivar(L.id, doc); IE.canetaRef = null;
             alvo = { subs: L.vet.subs, L };
         }
         if (!alvo) alvo = ieDemAlvo(doc, true);
-        const cur = IE.canetaSub && alvo.subs.includes(IE.canetaSub) && !IE.canetaSub.fechado ? IE.canetaSub : null;
-        const h = ieDemAcertar(doc, alvo, p);
+        const cur = ieCanetaCur(doc, alvo);
+        const h = ieDemAcertar(doc, alvo, p, { inicio: cur && cur.pts.length > 1 ? cur.pts[0] : null });
         if (cur && h && h.tipo === 'ponto' && h.pt === cur.pts[0] && cur.pts.length > 1) {   // fechar
             cur.fechado = true; IE.canetaArr = { tipo: 'fechar', pt: cur.pts[0], alvo }; IE.canetaUlt = cur.pts[0]; return;
         }
@@ -179,7 +199,7 @@ const IE_CANETA = {
             ieDemMudou(doc, alvo); ieHist(ieT('Adicionar ponto de ancoragem')); return;
         }
         let sub = cur;
-        if (!sub) { sub = { pts: [], fechado: false, op: IE.op.caneta.op }; alvo.subs.push(sub); IE.canetaSub = sub; IE.demSel = { subs: new Set([sub]), pts: new Set() }; }
+        if (!sub) { sub = { pts: [], fechado: false, op: IE.op.caneta.op }; alvo.subs.push(sub); ieCanetaFixar(alvo, sub); IE.demSel = { subs: new Set([sub]), pts: new Set() }; }
         const ult = sub.pts[sub.pts.length - 1];
         const q = ev.shiftKey && ult ? ie45([ult.x, ult.y], p) : p;
         const pt = { x: q.x, y: q.y, i: null, o: null };
@@ -207,20 +227,21 @@ const IE_CANETA = {
         const a = IE.canetaArr;
         IE.canetaArr = null;
         if (!a) return;
-        if (a.tipo === 'fechar') IE.canetaSub = null;
+        if (a.tipo === 'fechar') IE.canetaRef = null;
         ieHist(ieT({ novo: 'Ponto de ancoragem', fechar: 'Fechar demarcador', converter: 'Converter ponto', saida: 'Converter ponto', alca: 'Mover alça' }[a.tipo] || 'Caneta'));
     },
     hover(p, ev, doc) {
-        const alvo = ieDemAlvo(doc), cur = IE.canetaSub && !IE.canetaSub.fechado ? IE.canetaSub : null;
-        const h = alvo && ieDemAcertar(doc, alvo, p);
-        let c = 'crosshair';
-        if (ev.ctrlKey) c = 'default';
-        else if (cur && h && h.tipo === 'ponto' && h.pt === cur.pts[0] && cur.pts.length > 1) c = 'cell';   // caneta com ○
-        else if (ev.altKey && h) c = 'alias';
-        else if (IE.op.caneta.auto && h && h.tipo === 'segmento') c = 'copy';   // caneta com +
-        else if (IE.op.caneta.auto && !cur && h && h.tipo === 'ponto') c = 'not-allowed';   // caneta com −
-        IE._canetaCursor = c;
-        if (IE.op.caneta.elastico && cur) ieDesenharSobre();
+        const alvo = ieDemAlvo(doc), cur = alvo && ieCanetaCur(doc, alvo);
+        const h = alvo && ieDemAcertar(doc, alvo, p, { inicio: cur && cur.pts.length > 1 ? cur.pts[0] : null });
+        let sinal = cur ? '' : 'novo';
+        IE.canetaFecha = !!(cur && h && h.tipo === 'ponto' && h.pt === cur.pts[0] && cur.pts.length > 1);
+        if (ev.ctrlKey) sinal = 'seta';
+        else if (IE.canetaFecha) sinal = 'fechar';   // caneta com ○: clicar fecha
+        else if (ev.altKey && h) sinal = 'converter';
+        else if (IE.op.caneta.auto && h && h.tipo === 'segmento') sinal = 'mais';
+        else if (IE.op.caneta.auto && !cur && h && h.tipo === 'ponto') sinal = 'menos';
+        IE._canetaCursor = sinal === 'seta' ? 'default' : ev.getModifierState && ev.getModifierState('CapsLock') ? 'crosshair' : ieCanetaCursorSvg(sinal);
+        ieDesenharSobre();
     },
 };
 
@@ -428,10 +449,15 @@ function ieDemDesenhar(ctx, doc) {
     if (deDem) {
         const sel = IE.demSel || { subs: new Set(), pts: new Set() };
         // elástico: do último ponto até o mouse
-        const cur = IE.canetaSub && !IE.canetaSub.fechado && alvo.subs.includes(IE.canetaSub) ? IE.canetaSub : null;
+        const cur = ieCanetaCur(doc, alvo);
         if (ferr === 'caneta' && cur && IE.op.caneta.elastico && IE.mouse && !IE.canetaArr && cur.pts.length) {
             const u = cur.pts[cur.pts.length - 1], P = [[u.x, u.y], u.o || [u.x, u.y], [IE.mouse.x, IE.mouse.y], [IE.mouse.x, IE.mouse.y]];
             ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(...T(...P[0])); ctx.bezierCurveTo(...T(...P[1]), ...T(...P[2]), ...T(...P[3])); ctx.stroke(); ctx.setLineDash([]);
+        }
+        if (cur && cur.pts.length > 1) {
+            const [x, y] = T(cur.pts[0].x, cur.pts[0].y), perto = IE.canetaFecha;
+            ctx.strokeStyle = perto ? '#ffb000' : '#2f6fff'; ctx.lineWidth = perto ? 2 : 1.5;
+            ctx.beginPath(); ctx.arc(x, y, perto ? 8 : 6, 0, Math.PI * 2); ctx.stroke(); ctx.lineWidth = 1;
         }
         for (const s of alvo.subs) {
             const ativo = sel.subs.has(s) || s === cur;
@@ -473,16 +499,23 @@ document.addEventListener('keydown', ev => {
     const nossas = ['caneta', 'canetaLivre', 'pontoAdd', 'pontoDel', 'pontoConv', 'selDireta', 'selCaminho'];
     if (ev.key === 'Enter' && ev.ctrlKey && ieDemAlvo(doc)) { ev.preventDefault(); ev.stopPropagation(); ieDemSelecao(doc); return; }
     if (!nossas.includes(ferr) || IE.transf) return;
-    if (ev.key === 'Enter' || ev.key === 'Escape') {
-        if (IE.canetaSub) { ev.preventDefault(); ev.stopPropagation(); IE.canetaSub = null; IE.canetaUlt = null; ieDesenharSobre(); }
+    if (ev.key === 'Enter' || ev.key === 'Escape') {   // Enter: termina e esconde (continua no painel Demarcadores); Esc: só termina a linha
+        const alvo = ieDemAlvo(doc), tinha = !!ieCanetaCur(doc, alvo);
+        if (!tinha && ev.key === 'Escape') return;
+        ev.preventDefault(); ev.stopPropagation();
+        IE.canetaRef = null; IE.canetaUlt = null;
+        if (ev.key === 'Enter' && alvo && !alvo.L) { doc.demAtivo = null; IE.demSel = { subs: new Set(), pts: new Set() }; ieJanAtualizar?.('doc'); }
+        ieDesenharSobre();
+        // o Enter também leva o foco à barra de opções: devolve à tela, senão o próximo atalho cai num campo
+        setTimeout(() => { const a = document.activeElement; if (a && /INPUT|SELECT|BUTTON/.test(a.tagName)) a.blur(); ieEl('ie')?.focus({ preventScroll: true }); }, 0);
         return;
     }
     if (ev.key === 'Backspace' || ev.key === 'Delete') {
         const alvo = ieDemAlvo(doc);
         if (!alvo) return;
         ev.preventDefault(); ev.stopPropagation();
-        const cur = IE.canetaSub && !IE.canetaSub.fechado ? IE.canetaSub : null;
-        if (ferr === 'caneta' && cur) { cur.pts.pop(); IE.canetaUlt = cur.pts[cur.pts.length - 1] || null; if (!cur.pts.length) { alvo.subs.splice(alvo.subs.indexOf(cur), 1); IE.canetaSub = null; } }
+        const cur = ieCanetaCur(doc, alvo);
+        if (ferr === 'caneta' && cur) { cur.pts.pop(); IE.canetaUlt = cur.pts[cur.pts.length - 1] || null; if (!cur.pts.length) { alvo.subs.splice(alvo.subs.indexOf(cur), 1); IE.canetaRef = null; } }
         else if (ferr === 'selCaminho') { const s = IE.demSel?.subs || new Set(); for (let i = alvo.subs.length - 1; i >= 0; i--) if (s.has(alvo.subs[i])) alvo.subs.splice(i, 1); IE.demSel = { subs: new Set(), pts: new Set() }; }
         else {
             const pts = IE.demSel?.pts || new Set();
@@ -598,10 +631,10 @@ Object.assign(IE_CMDS, {
     demDaSelecao: doc => ieDemDaSelecao(doc),
     demMascara: doc => ieDemMascaraCamada(doc),
     demForma: doc => ieDemFormaDeCamada(doc),
-    demNovo: doc => { const d = { id: (doc.seqDem = (doc.seqDem || 0) + 1), nome: `${ieT('Demarcador')} ${ieDemDoc(doc).filter(x => !x.trabalho).length + 1}`, trabalho: false, subs: [] }; doc.dems.push(d); doc.demAtivo = d.id; IE.canetaSub = null; ieDemMudou(doc); ieHist(ieT('Novo demarcador')); },
+    demNovo: doc => { const d = { id: (doc.seqDem = (doc.seqDem || 0) + 1), nome: `${ieT('Demarcador')} ${ieDemDoc(doc).filter(x => !x.trabalho).length + 1}`, trabalho: false, subs: [] }; doc.dems.push(d); doc.demAtivo = d.id; IE.canetaRef = null; ieDemMudou(doc); ieHist(ieT('Novo demarcador')); },
     demSalvar: doc => { const d = ieDemAtivo(doc); if (d && d.trabalho) { d.trabalho = false; d.nome = `${ieT('Demarcador')} ${ieDemDoc(doc).filter(x => !x.trabalho).length}`; ieDemMudou(doc); ieHist(ieT('Salvar demarcador')); } },
-    demExcluir: doc => { const d = ieDemAtivo(doc); if (d) { doc.dems = doc.dems.filter(x => x !== d); doc.demAtivo = null; IE.canetaSub = null; ieDemMudou(doc); ieHist(ieT('Excluir demarcador')); } },
-    demNenhum: doc => { doc.demAtivo = null; IE.canetaSub = null; ieDemMudou(doc); },
+    demExcluir: doc => { const d = ieDemAtivo(doc); if (d) { doc.dems = doc.dems.filter(x => x !== d); doc.demAtivo = null; IE.canetaRef = null; ieDemMudou(doc); ieHist(ieT('Excluir demarcador')); } },
+    demNenhum: doc => { doc.demAtivo = null; IE.canetaRef = null; ieDemMudou(doc); },
 });
 Object.assign(IE_ATALHOS, { 'Ctrl+Enter': 'demSelecaoJa' });
 
@@ -652,7 +685,7 @@ ieJanRegistrar('demarcadores', 'Demarcadores', ['doc'], () => {
         const b = ev.target.closest('[data-c]');
         if (b) { ieCmd(b.dataset.c); return; }
         const it = ev.target.closest('[data-dem]');
-        if (it) { doc.demAtivo = doc.demAtivo === +it.dataset.dem && !ev.ctrlKey ? null : +it.dataset.dem; IE.canetaSub = null; if (ev.ctrlKey) { doc.demAtivo = +it.dataset.dem; ieDemSelecao(doc); } ieDemMudou(doc); }
+        if (it) { doc.demAtivo = doc.demAtivo === +it.dataset.dem && !ev.ctrlKey ? null : +it.dataset.dem; IE.canetaRef = null; if (ev.ctrlKey) { doc.demAtivo = +it.dataset.dem; ieDemSelecao(doc); } ieDemMudou(doc); }
     };
     corpo.ondblclick = ev => {
         const it = ev.target.closest('[data-dem]'), d = it && lista.find(x => x.id === +it.dataset.dem);

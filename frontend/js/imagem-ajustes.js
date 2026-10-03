@@ -441,7 +441,7 @@ async function ieAplicarComDialogo(def) {
         return ieProcessarCamada(L, p, margem ? margem(vals) : 0, doc);
     };
     const Rantes = ieRCamada(L);
-    const ok = await ieDialogo({
+    const ok = !campos || !campos.length ? {} : await ieDialogo({   // sem parâmetros (Média, Faceta...): aplica direto, como no Photoshop
         titulo, campos, largura, lado,
         previa: vals => { L._tfPrev = fazer(vals); ieCamadaMudou(L, Rantes); },
     });

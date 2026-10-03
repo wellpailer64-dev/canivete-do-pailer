@@ -57,6 +57,17 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   Laço magnético (grupo L): gruda na borda mais forte dentro da Largura, pontos automáticos pela Frequência.
   O Carimbo (S) já existia: Alt+clique origem, Alinhado, Todas as camadas.
   Testes com mouse de verdade (app em `--agente=9333`): `testes/teste_caneta.py`, `testes/teste_guias.py`.
+- `frontend/js/imagem-filtros.js` — menu Filtro igual ao do Photoshop (pt-BR): Desfoque (Média, Desfoque, mais, caixa,
+  gaussiano, lente, movimento, radial, inteligente, superfície), Galeria de desfoque (campo, íris, tilt-shift, giratório),
+  Distorção (comprimir, polares, ondulação, cisalhamento, esferização, redemoinho, onda, ziguezague), Ruído (adicionar,
+  diminuir manchas, poeira e arranhões, mediana, reduzir), Pixelização (meio-tom, cristalizar, faceta, fragmento,
+  meia-tinta, mosaico, pontilhismo), Acabamento (nuvens, por diferença, fibras, reflexo de lente, efeitos de
+  iluminação), Nitidez (5), Estilização (difusão, entalhe, arestas, óleo/Kuwahara, solarização, ladrilhos, contorno,
+  vento), Vídeo, Outros (personalizado 3×3, passa-alta, HSB/HSL, máximo, mínimo, deslocamento), Correção de lente,
+  Converter para filtros inteligentes. Todos com prévia e como filtro inteligente; sem parâmetro aplica direto.
+  Desabilitados (ainda não): Neural Filters, Galeria de filtros, Grande angular, Dissolver (Liquify), Ponto de fuga,
+  Desfoque de forma/caminho, Deslocamento de pixels, Chama/Moldura/Árvore, Extrusão, Redução de tremido.
+  Teste: `testes/teste_filtros.py` (app em --agente=9333) aplica todos numa foto e mede.
 - `frontend/js/imagem-cena.js` — `KNV.cena`: peça em HTML/CSS vira camadas nativas (runner `tools/knv.py`); guia em
   `Instructions/agente/plano-cena.md`.
 - `frontend/js/imagem-api.js` — API de automação `window.KNV` (scripts/Ações para agentes): guia em
