@@ -468,12 +468,14 @@ function ieComporLista(ctx, lista, R, o, prof) {
     }
     for (let i = 0; i < lista.length; i++) {
         const L = lista[i];
+        if (IE._pararEm === L) { IE._parou = true; return; }   // ieAchatarAbaixo: só o que está embaixo de L
         let j = i + 1;
         if (!L.clip) while (j < lista.length && lista[j].clip) j++;
         if (L.visivel) {
             const clipados = lista.slice(i + 1, j).filter(c => c.visivel);
             if (clipados.length && L.tipo !== 'ajuste') ieComporCorte(ctx, L, clipados, R, o, prof);
             else ieComporCamada(ctx, L, R, o, prof);
+            if (IE._parou) return;
         }
         i = j - 1;
     }
@@ -632,7 +634,8 @@ function ieComporAjuste(ctx, L, R, o, prof) {
     const x0 = R.x - o.x, y0 = R.y - o.y;
     let img;
     try { img = ctx.getImageData(x0, y0, R.w, R.h); } catch (e) { return; }
-    ieAjustar(img.data, L.ajuste);
+    if (L.ajuste.t === 'cameraRaw') { if (typeof ieCrAjusteImg === 'function') ieCrAjusteImg(img, L, { x: R.x, y: R.y }); }   // imagem-cameraraw.js
+    else ieAjustar(img.data, L.ajuste);
     const mask = L.m && !L.m.desativada ? L.m : null;
     if (!mask && L.op >= 1 && (L.bm === 'NORMAL' || !L.bm)) { ctx.putImageData(img, x0, y0); return; }
     const t = ieTemp(prof + 1, R.w, R.h), tc = ieCtx(t);
@@ -659,10 +662,21 @@ function ieCompor(doc, R) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(R.x, R.y, R.w, R.h);
     doc._compV = (doc._compV || 0) + 1;   // a tela reduzida (ieMipmap) refaz as etapas
+    IE._fundoComp = ieTodas(doc).some(L => L.vazamento && L.vazamento !== 'nenhum') ? ieFundoDoc(doc) : null;
+    // camada de ajuste que olha os vizinhos (Camera Raw com Claridade, Névoa...): compõe a região com uma margem
+    // num canvas à parte e copia só o miolo (senão a borda da região sai diferente e aparece a emenda)
+    const M = typeof ieCrMargemDoc === 'function' ? ieCrMargemDoc(doc) : 0, R2 = M && ieRInter(ieRInt({ x: R.x - M, y: R.y - M, w: R.w + 2 * M, h: R.h + 2 * M }), ieRDoc(doc));
+    if (R2 && (R2.w > R.w || R2.h > R.h)) {
+        const t = ieCanvas(R2.w, R2.h), tc = ieCtx(t);
+        tc.setTransform(1, 0, 0, 1, -R2.x, -R2.y);
+        ieComporLista(tc, doc.camadas, R2, { x: R2.x, y: R2.y, base: IE._fundoComp }, 0);
+        ctx.drawImage(t, R.x - R2.x, R.y - R2.y, R.w, R.h, R.x, R.y, R.w, R.h);
+        ctx.restore();
+        return;
+    }
     ctx.beginPath();
     ctx.rect(R.x, R.y, R.w, R.h);
     ctx.clip();
-    IE._fundoComp = ieTodas(doc).some(L => L.vazamento && L.vazamento !== 'nenhum') ? ieFundoDoc(doc) : null;
     ieComporLista(ctx, doc.camadas, R, { x: 0, y: 0, base: IE._fundoComp }, 0);
     ctx.restore();
 }

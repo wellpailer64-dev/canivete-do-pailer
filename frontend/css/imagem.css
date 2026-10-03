@@ -688,4 +688,5 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 .ie-cr-rodav { min-height: 13px; font-style: normal; font-size: 10.5px; color: var(--text-3, #8a8a8a); }
 .ie-cr-roda .ie-cr-sl { align-self: stretch; }
 .ie-cr-rod { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-top: 1px solid var(--ie-linha); }
-.ie-cr .ie-dv-zoom .ie-btn.on { background: var(--primary-soft); color: var(--ie-acento); border-color: var(--primary-line); }
+.ie-cr .ie-dv-zoom .ie-btn.on { background: var(--primary-soft); color: var(--ie-acento); border-color: var(--primary-line); }.ie-cr-props { display: flex; flex-direction: column; gap: 7px; padding-top: 4px; }
+.ie-cr-props .ie-cr-abrir { align-self: stretch; }

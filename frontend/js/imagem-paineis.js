@@ -352,6 +352,7 @@ function ieUiCamadas() {
     rod.innerHTML = `
         <button class="ie-ico-btn" data-fxmenu title="${ieT('Adicionar um estilo de camada')}">${ieIco('fx')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('mascara')" title="${ieT('Adicionar máscara de camada')}">${ieIco('mask')}</button>
+        <button class="ie-ico-btn" data-ajmenu title="${ieT('Criar nova camada de ajuste')}">${ieIco('adj')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('corte')" title="${ieT('Criar/soltar máscara de corte (Alt+Ctrl+G)')}">${ieIco('clip')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('grupoNovo')" title="${ieT('Novo grupo')}">${ieIco('folder')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('novaCamada')" title="${ieT('Nova camada (Shift+Ctrl+N)')}">${ieIco('plus')}</button>

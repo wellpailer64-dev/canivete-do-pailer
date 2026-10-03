@@ -850,7 +850,7 @@ const IE_AJ_CAMADAS = {
 async function ieAjNova(chave) {
     const doc = IE.doc, def = IE_AJ_CAMADAS[chave];
     if (!doc || !def) return;
-    const vals = Object.fromEntries(def.campos.map(c => [c[0], ieClone(c[2] === 'check' || c[2] === 'cor' || c[2] === 'curva' ? c[3] : c[4])]));
+    const vals = def.padrao ? def.padrao() : Object.fromEntries(def.campos.map(c => [c[0], ieClone(c[2] === 'check' || c[2] === 'cor' || c[2] === 'curva' ? c[3] : c[4])]));
     const L = ieNovaCamada(doc, { tipo: 'ajuste', nome: ieNomeLivre(doc, ieT(def.nome)), kind: def.kind, ajChave: chave, ajVals: vals, ajuste: def.aj(vals) });
     ieInserirAcima(doc, L, ieAtiva(doc));
     if (doc.sel) { ieAtivar(L.id, doc); await ieCmd('mascaraSel'); doc.mascaraAlvo = false; }   // como no Photoshop: Propriedades mostra os valores
@@ -872,6 +872,7 @@ ieJanRegistrar('ajustes', 'Ajustes', ['doc'], () => {
         if (!L || L.tipo !== 'ajuste' || !L.ajChave || !box || doc.mascaraAlvo) return;
         const def = IE_AJ_CAMADAS[L.ajChave];
         box.querySelectorAll('.ie-prop-nota').forEach(n => n.remove());
+        if (def.propsUi) return def.propsUi(L, box, doc);   // painel próprio (Camera Raw)
         const div = document.createElement('div');
         div.className = 'ie-pn-ajprops';
         div.innerHTML = def.campos.map(([k, r, a, b, c, passo]) => {

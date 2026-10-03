@@ -72,6 +72,38 @@ with sync_playwright() as p:
         const L2 = ieAtiva(IE.doc); return [a !== b, L2.filtrosInt.map(f => f.cmd).join(), {assin}(L2.c) !== b]; }}""")
     conferir(r[0], "valores antigos (filtro inteligente salvo) ainda funcionam")
     conferir(r[1] == "f:cameraRaw,f:cameraRaw" and r[2], "automação num objeto inteligente vira filtro inteligente", r[1])
+    # camada de ajuste Camera Raw: muda o que está embaixo, ao vivo, sem emenda ao redesenhar só uma região
+    pg.evaluate(novo)
+    r = pg.evaluate(f"""async () => {{
+        const doc = IE.doc, comp = () => {{ ieCompor(doc); return {assin}(doc.comp); }}, a = comp();
+        KNV.automacao(true, {{padrao: 'primario'}}); await KNV.ajuste('cameraRaw', {{clar: 60, tex: 40, exp: 0.4, vig: -40, grao: 20, nevoa: 30}}); KNV.automacao(false);
+        const L = ieAtiva(doc), t = performance.now(), b = comp(), ms = performance.now() - t;
+        L.ajVals.sat = 25; L.ajuste = IE_AJ_CAMADAS.cameraRaw.aj(L.ajVals); const t2 = performance.now(); comp(); const ms2 = performance.now() - t2; L.ajVals.sat = 0; L.ajuste = IE_AJ_CAMADAS.cameraRaw.aj(L.ajVals); comp();
+        const cheio = ieCtx(doc.comp).getImageData(300, 400, 200, 200).data.slice();
+        ieCompor(doc, {{x: 350, y: 450, w: 100, h: 100}});   // região pequena (como ao pintar)
+        const parte = ieCtx(doc.comp).getImageData(300, 400, 200, 200).data;
+        let dif = 0; for (let i = 0; i < parte.length; i++) dif = Math.max(dif, Math.abs(parte[i] - cheio[i]));
+        L.visivel = false; const c = comp(); L.visivel = true; ieCompor(doc);
+        return [L.tipo, L.ajChave, a !== b, c === a, dif, Math.round(ms), Math.round(ms2)]; }}""")
+    conferir(r[0] == "ajuste" and r[1] == "cameraRaw", "KNV.ajuste('cameraRaw') cria a camada de ajuste")
+    conferir(r[2] and r[3], "muda o que está embaixo e some ao esconder")
+    conferir(r[4] <= 2, "sem emenda ao redesenhar só uma região", f"diferença máxima {r[4]}; composição inteira {r[5]} ms, mexendo numa barra {r[6]} ms")
+    # Propriedades: barras rápidas mexem ao vivo; o botão abre a janela com o que está embaixo
+    pg.evaluate("ieUiProps()"); time.sleep(0.3)
+    antes = pg.evaluate(f"{assin}(IE.doc.comp)")
+    tr = pg.locator(".ie-cr-props .ie-cr-sl[data-k='sat'] .ie-cr-tr").bounding_box()
+    conferir(tr is not None, "barras no painel Propriedades")
+    if tr:
+        x0, y = tr["x"] + tr["width"] / 2, tr["y"] + tr["height"] / 2
+        pg.mouse.move(x0, y); pg.mouse.down()
+        for k in range(1, 16): pg.mouse.move(x0 - 6 * k, y); time.sleep(0.01)
+        pg.mouse.up(); time.sleep(0.6)
+        conferir(pg.evaluate("ieAtiva(IE.doc).ajVals.sat") < -5 and pg.evaluate(f"{assin}(IE.doc.comp)") != antes, "barra do Propriedades muda a imagem ao vivo", f"sat {pg.evaluate('ieAtiva(IE.doc).ajVals.sat')}")
+        pg.screenshot(path="D:/kanivete_testes/scripts/cameraraw_camada.png")
+        pg.click(".ie-cr-abrir"); pg.wait_for_function("IE._cr && IE._cr.ultimo()", timeout=30000)
+        conferir(pg.evaluate("IE._cr.v.clar") == 60, "a janela abre com os valores da camada")
+        pg.evaluate("IE._cr.v.clar = 10"); pg.keyboard.press("Enter"); pg.wait_for_function("!IE._cr"); time.sleep(0.3)
+        conferir(pg.evaluate("ieAtiva(IE.doc).ajVals.clar") == 10, "OK da janela grava na camada")
     print("  tempos da prévia (ms):", tempos)
     print("erros JS:", erros[:3] or "nenhum")
     print("RESULTADO:", "PASSOU" if not falhas and not erros else f"FALHOU {falhas}")

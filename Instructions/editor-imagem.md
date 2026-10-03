@@ -111,7 +111,12 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   Cor), Gradação de cores (rodas Sombras/Meios-tons/Realces/Global = lift/gamma/gain/offset) e Efeitos (Granulação,
   Vinheta com ponto médio/arredondamento/difusão). Cor = LUT do `veLcBuildLut` (editor-lc.js); o resto local na luma.
   Barras finas com resistência (arrastar = metade do mouse, Shift 1/6, clique solto pula, duplo clique zera; pedido do
-  usuário 2026-10-03). Valores antigos (temp…sharp, vig, curva) continuam valendo. Teste: `testes/teste_cameraraw.py`.- Painel Propriedades: Transformar (X/Y/L/A com proporção, inverter, girar) e Caractere (seletor de fonte com prévia,
+  usuário 2026-10-03). Valores antigos (temp…sharp, vig, curva) continuam valendo. Teste: `testes/teste_cameraraw.py`.
+  **Camada de ajuste Camera Raw** (botão ◐ do painel Camadas, painel Ajustes, `KNV.ajuste('cameraRaw', {...})`): muda ao vivo
+  tudo embaixo (como a camada de ajuste do editor de vídeo); Propriedades = barras rápidas + Abrir no Camera Raw (janela
+  com `ieAchatarAbaixo`). Contas que olham vizinhos: `ieCompor` compõe a região com margem (`ieCrMargemDoc`) e copia o
+  miolo (sem emenda); cache por camada (WeakMap) das partes pesadas — mexer numa barra refaz só cor e somas (~80 ms em
+  900×1200 contra ~830 ms da conta inteira). Não vai para o PSD (fica no .iknv; o achatado leva o efeito).- Painel Propriedades: Transformar (X/Y/L/A com proporção, inverter, girar) e Caractere (seletor de fonte com prévia,
   estilo, tamanho, VA, entrelinha, cor, alinhamento, negrito/itálico falso, maiúsculas).
 
 ## Texto de verdade

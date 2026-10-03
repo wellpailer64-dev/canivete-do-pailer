@@ -87,9 +87,12 @@ Armadilhas: na página existe a `const KNV` original; depois da recarga use `win
   leitura de texto sobre foto = pincel dureza 0 na cor mais escura da paleta numa camada embaixo (op ~85%) ou caixa/sombra;
   máscara de camada + pincel macio preto da cintura para baixo em toda pessoa recortada; margem lateral generosa no
   rodapé (~100 px em 1080); luz de trás (pincel claro em Divisão) + luz da FRENTE vazando pelas brechas entre os corpos
-  (Divisão, traços verticais macios); acabamento no topo: Carimbar visíveis → objeto inteligente → filtros inteligentes
-  (Máscara de nitidez raio ~45 / 25% = "clarity", ruído mono 3% = grão) + camadas de ajuste (`KNV.ajuste('brilho'|
-  'vibratilidade'|'filtroFoto', {...})`); textura em Multiplicação ~20%.
+  (Divisão, traços verticais macios); acabamento no topo: **camada de ajuste Camera Raw** no alto da pilha
+  (`KNV.ajuste('cameraRaw', {clar: 25, tex: 15, vib: 15, vig: -20, grao: 12, temp: 5})` — muda tudo embaixo ao vivo e
+  continua editável; chaves = as do Filtro Camera Raw: exp, ct, hi, sh, wh, bl, temp, tint, tex, clar, nevoa, vib, sat,
+  nitQ, ruidoL, ruidoC, grao, vig, curva, hsl {r: [matiz, sat, lum]}, rodas {s|m|h|o: [x, y]}, rl {s|m|h|o: lum}),
+  ou o jeito antigo: Carimbar visíveis → objeto inteligente → filtros inteligentes + camadas de ajuste
+  (`KNV.ajuste('brilho'|'vibratilidade'|'filtroFoto', {...})`); textura em Multiplicação ~20%.
 - Objeto inteligente: `<img>` da cena já entra como objeto inteligente; `KNV.cmd('f:...'|'aj:...')` nele vira filtro
   inteligente (lista embaixo da camada, olho, duplo clique edita). Fontes: `KNV.instalarFonte('Nome do Google Fonts')`.
 

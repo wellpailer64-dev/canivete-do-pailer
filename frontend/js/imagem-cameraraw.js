@@ -79,75 +79,89 @@ function ieCrAtmosfera(c) {
     ord.forEach(i => { A[0] += d[i * 4]; A[1] += d[i * 4 + 1]; A[2] += d[i * 4 + 2]; });
     return A.map(x => Math.max(64, x / ord.length));
 }
-// processa: c = recorte (na escala e) cujo canto está em (ox, oy) da imagem inteira escalada (tw × th); A = cor do ar
-function ieCrProcessar(c, v, e = 1, ox = 0, oy = 0, tw = c.width, th = c.height, A = null) {
-    const w = c.width, h = c.height, n = w * h, out = ieCanvas(w, h), x = ieCtx(out);
-    const img = ieCtx(c).getImageData(0, 0, w, h), d = img.data, Y = new Float32Array(n);
-    const lerY = () => { for (let i = 0; i < n; i++) Y[i] = d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114; };
-    const somarY = (dY) => { for (let i = 0; i < n; i++) { const k = dY[i]; if (k) { d[i * 4] += k; d[i * 4 + 1] += k; d[i * 4 + 2] += k; } } };
+// LUT 3D trilinear sem funções por pixel (é o passo que roda a cada movimento de barra)
+function ieCrLut3d(d, lut, N) {
+    const n1 = N - 1, s = n1 / 255, N2 = N * N;
+    for (let i = 0; i < d.length; i += 4) {
+        if (!d[i + 3]) continue;
+        const fr = d[i] * s, fg = d[i + 1] * s, fb = d[i + 2] * s;
+        const r0 = Math.min(fr | 0, n1 - 1), g0 = Math.min(fg | 0, n1 - 1), b0 = Math.min(fb | 0, n1 - 1), tr = fr - r0, tg = fg - g0, tb = fb - b0;
+        const p000 = ((b0 * N2) + g0 * N + r0) * 3, p100 = p000 + 3, p010 = p000 + N * 3, p110 = p010 + 3, p001 = p000 + N2 * 3, p101 = p001 + 3, p011 = p001 + N * 3, p111 = p011 + 3;
+        const w000 = (1 - tr) * (1 - tg) * (1 - tb), w100 = tr * (1 - tg) * (1 - tb), w010 = (1 - tr) * tg * (1 - tb), w110 = tr * tg * (1 - tb);
+        const w001 = (1 - tr) * (1 - tg) * tb, w101 = tr * (1 - tg) * tb, w011 = (1 - tr) * tg * tb, w111 = tr * tg * tb;
+        for (let c = 0; c < 3; c++) d[i + c] = (lut[p000 + c] * w000 + lut[p100 + c] * w100 + lut[p010 + c] * w010 + lut[p110 + c] * w110 + lut[p001 + c] * w001 + lut[p101 + c] * w101 + lut[p011 + c] * w011 + lut[p111 + c] * w111) * 255 + 0.5;
+    }
+}
+function ieCrHash(d) { const q = new Uint32Array(d.buffer, d.byteOffset, d.length >> 2); let h = 2166136261; for (let i = 0; i < q.length; i++) h = Math.imul(h ^ q[i], 16777619); return h >>> 0; }
+// processa os pixels d (RGBA, no lugar) de um recorte (na escala e) cujo canto está em (ox, oy) da imagem inteira
+// escalada (tw × th); A = cor do ar (névoa). C = cache (objeto): as partes pesadas (redução de ruído, desfoques da
+// Claridade/Textura, mapa da névoa, nitidez, grão) saem do que está embaixo e ficam guardadas enquanto ele não muda —
+// mexer numa barra refaz só a cor (LUT) e as somas. Os contrastes locais olham a luma de antes da cor.
+function ieCrDados(d, w, h, v, e = 1, ox = 0, oy = 0, tw = w, th = h, A = null, C = null) {
+    const n = w * h, chave = [w, h, ox, oy, tw, th, e].join();
+    if (C) { const hs = ieCrHash(d); if (C.chave !== chave || C.hash !== hs) { for (const k of Object.keys(C)) delete C[k]; C.chave = chave; C.hash = hs; } }
+    const pega = (nome, k, fn) => { if (!C) return fn(); const x = C[nome]; if (x && x.k === k) return x.v; const r = fn(); C[nome] = { k, v: r }; return r; };
     // 1) redução de ruído (antes de tudo, como no ACR): luma com filtro guiado, cor com desfoque do Cb/Cr
-    if (v.ruidoL > 0 || v.ruidoC > 0) {
-        const Cb = new Float32Array(n), Cr = new Float32Array(n);
+    const temNr = v.ruidoL > 0 || v.ruidoC > 0, kNr = temNr ? [v.ruidoL, v.ruidoLD, v.ruidoC].join() : '-';
+    const base = !temNr ? null : pega('nr', kNr, () => {
+        const o = new Uint8ClampedArray(d), Y = new Float32Array(n), Cb = new Float32Array(n), Cr = new Float32Array(n);
         for (let i = 0; i < n; i++) { const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], y = r * 0.299 + g * 0.587 + b * 0.114; Y[i] = y; Cb[i] = b - y; Cr[i] = r - y; }
         let Yn = Y;
-        if (v.ruidoL > 0) {
-            const s = ieFGuiado(Y, w, h, Math.max(1, Math.round(2.5 * e)), (v.ruidoL / 100) ** 2 * 900), det = v.ruidoLD / 100 * 0.6;
-            Yn = s.map((q, i) => q + (Y[i] - q) * det);
-        }
+        if (v.ruidoL > 0) { const s = ieFGuiado(Y, w, h, Math.max(1, Math.round(2.5 * e)), (v.ruidoL / 100) ** 2 * 900), det = v.ruidoLD / 100 * 0.6; Yn = s.map((q, i) => q + (Y[i] - q) * det); }
         const rc = v.ruidoC / 100 * 8 * e, Cbn = rc >= 0.5 ? gfDesf(Cb, w, h, rc) : Cb, Crn = rc >= 0.5 ? gfDesf(Cr, w, h, rc) : Cr;
-        for (let i = 0; i < n; i++) { const y = Yn[i], r = Crn[i] + y, b = Cbn[i] + y; d[i * 4] = r; d[i * 4 + 2] = b; d[i * 4 + 1] = (y - 0.299 * r - 0.114 * b) / 0.587; }
-    }
-    // 2) cor (LUT do Luz e Cor)
-    const L = ieCrLut(v);
-    if (L) ieAplicarLut3d(d, L.lut, L.N);
-    // 3) Textura, Claridade e Remover névoa (contraste local na luma)
-    if (v.tex || v.clar) {
-        lerY();
-        const dY = new Float32Array(n), S = Math.min(tw, th);
-        if (v.clar) { const b = gfDesf(Y, w, h, Math.max(1, S * 0.015)), k = v.clar / 100 * 1.2; for (let i = 0; i < n; i++) { const y = Y[i] / 255; dY[i] += k * (Y[i] - b[i]) * 4 * y * (1 - y); } }
-        if (v.tex) { const b = gfDesf(Y, w, h, Math.max(1, S * 0.0035)), k = v.tex / 100 * 0.9; for (let i = 0; i < n; i++) dY[i] += k * (Y[i] - b[i]); }
-        somarY(dY);
-    }
-    if (v.nevoa) {
-        const a = v.nevoa / 100, Ar = A || [235, 235, 235];
-        if (a > 0) {
-            const esc = new Float32Array(n);
-            for (let i = 0; i < n; i++) esc[i] = Math.min(d[i * 4] / Ar[0], d[i * 4 + 1] / Ar[1], d[i * 4 + 2] / Ar[2]);
-            const r = Math.max(1, Math.round(7 * e)), t = gfDesf(ieFMinMax(esc, w, h, r, false), w, h, r * 2);
-            for (let i = 0; i < n; i++) {
-                const tt = Math.max(0.15, 1 - 0.95 * t[i]);
-                for (let k = 0; k < 3; k++) { const I = d[i * 4 + k], J = (I - Ar[k]) / tt + Ar[k]; d[i * 4 + k] = I + (J - I) * a; }
-            }
-        } else for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) d[i * 4 + k] += (Ar[k] - d[i * 4 + k]) * -a * 0.55;
-    }
-    // 4) Nitidez (máscara de nitidez na luma; Detalhe = quanto da textura fina entra; Mascaramento = só nas bordas)
-    if (v.nitQ > 0) {
-        lerY();
-        const b = gfDesf(Y, w, h, Math.max(0.5, v.nitR * e)), k = v.nitQ / 100 * 1.4, lim = (100 - v.nitD) * 0.06;
+        for (let i = 0; i < n; i++) { const y = Yn[i], r = Crn[i] + y, b = Cbn[i] + y; o[i * 4] = r; o[i * 4 + 2] = b; o[i * 4 + 1] = (y - 0.299 * r - 0.114 * b) / 0.587; }
+        return o;
+    });
+    const src = base || d, S = Math.min(tw, th);
+    const Y0 = (v.clar || v.tex || v.nitQ > 0) ? pega('y0', kNr, () => { const Y = new Float32Array(n); for (let i = 0; i < n; i++) Y[i] = src[i * 4] * 0.299 + src[i * 4 + 1] * 0.587 + src[i * 4 + 2] * 0.114; return Y; }) : null;
+    const dClar = v.clar ? pega('clar', kNr, () => { const b = gfDesf(Y0, w, h, Math.max(1, S * 0.015)); return Y0.map((y, i) => (y - b[i]) * 4 * (y / 255) * (1 - y / 255)); }) : null;
+    const dTex = v.tex ? pega('tex', kNr, () => { const b = gfDesf(Y0, w, h, Math.max(1, S * 0.0035)); return Y0.map((y, i) => y - b[i]); }) : null;
+    const dNit = v.nitQ > 0 ? pega('nit', [kNr, v.nitR, v.nitD, v.nitM].join(), () => {
+        const b = gfDesf(Y0, w, h, Math.max(0.5, v.nitR * e)), lim = (100 - v.nitD) * 0.06;
         let msk = null;
-        if (v.nitM > 0) { const m = gfSobel(gfDesf(Y, w, h, e), w, h).m, t0 = v.nitM / 100 * 30; msk = m.map(q => gfSs(t0, t0 + 6, q)); }
-        const dY = new Float32Array(n);
-        for (let i = 0; i < n; i++) { const df = Y[i] - b[i], ad = Math.abs(df); if (ad <= lim) continue; dY[i] = (df - Math.sign(df) * lim) * k * (msk ? msk[i] : 1); }
-        somarY(dY);
+        if (v.nitM > 0) { const m = gfSobel(gfDesf(Y0, w, h, e), w, h).m, t0 = v.nitM / 100 * 30; msk = m.map(q => gfSs(t0, t0 + 6, q)); }
+        return Y0.map((y, i) => { const df = y - b[i]; return Math.abs(df) <= lim ? 0 : (df - Math.sign(df) * lim) * (msk ? msk[i] : 1); });
+    }) : null;
+    const Ar = A || [235, 235, 235];
+    const tNev = v.nevoa > 0 ? pega('nev', [kNr, Ar.map(Math.round)].join(), () => {
+        const esc = new Float32Array(n);
+        for (let i = 0; i < n; i++) esc[i] = Math.min(src[i * 4] / Ar[0], src[i * 4 + 1] / Ar[1], src[i * 4 + 2] / Ar[2]);
+        const r = Math.max(1, Math.round(7 * e));
+        return gfDesf(ieFMinMax(esc, w, h, r, false), w, h, r * 2).map(t => Math.max(0.15, 1 - 0.95 * t));
+    }) : null;
+    const grao = v.grao > 0 ? pega('grao', [v.graoT, v.graoA].join(), () => {
+        const P = { w, h, ox, oy }, liso = gfSuave(P, Math.max(0.6, (1 + v.graoT / 100 * 3) * e), 71), fino = gfRuido(P, 72), ra = v.graoA / 100;
+        return liso.map((l, i) => l * (1 - ra) + (fino[i] * 2 - 1) * ra);
+    }) : null;
+    const vinh = v.vig ? pega('vig', [v.vigM, v.vigR, v.vigD].join(), () => {
+        const p = 2 * Math.pow(3, -v.vigR / 100), m = 0.25 + v.vigM / 100 * 0.9, f = 0.05 + v.vigD / 100 * 0.9, o = new Float32Array(n);
+        for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const u = Math.abs(((i + ox) / tw - 0.5) * 2), q = Math.abs(((j + oy) / th - 0.5) * 2); o[j * w + i] = gfSs(m, m + f, Math.pow(Math.pow(u, p) + Math.pow(q, p), 1 / p)); }
+        return o;
+    }) : null;
+    // daqui para baixo é barato: cor, somas e misturas
+    if (base) d.set(base);
+    const L = ieCrLut(v);
+    if (L) ieCrLut3d(d, L.lut, L.N);
+    const kC = v.clar / 100 * 1.2, kT = v.tex / 100 * 0.9, kN = v.nitQ / 100 * 1.4, aN = v.nevoa / 100, aV = v.vig / 100, aG = v.grao / 100 * 38;
+    for (let i = 0, o = 0; i < n; i++, o += 4) {
+        if (!d[o + 3]) continue;
+        let r = d[o], g = d[o + 1], b = d[o + 2];
+        const dl = (dClar ? dClar[i] * kC : 0) + (dTex ? dTex[i] * kT : 0) + (dNit ? dNit[i] * kN : 0);
+        if (dl) { r += dl; g += dl; b += dl; }
+        if (tNev) { const tt = tNev[i]; r += ((r - Ar[0]) / tt + Ar[0] - r) * aN; g += ((g - Ar[1]) / tt + Ar[1] - g) * aN; b += ((b - Ar[2]) / tt + Ar[2] - b) * aN; }
+        else if (aN < 0) { r += (Ar[0] - r) * -aN * 0.55; g += (Ar[1] - g) * -aN * 0.55; b += (Ar[2] - b) * -aN * 0.55; }
+        if (vinh) { const t = vinh[i] * aV; if (aV < 0) { r *= 1 + t; g *= 1 + t; b *= 1 + t; } else { r += (255 - r) * t; g += (255 - g) * t; b += (255 - b) * t; } }
+        if (grao) { const y = Math.min(1, Math.max(0, (r * 0.299 + g * 0.587 + b * 0.114) / 255)), q = grao[i] * aG * (0.35 + 2.6 * y * (1 - y)); r += q; g += q; b += q; }
+        d[o] = r; d[o + 1] = g; d[o + 2] = b;
     }
-    // 5) Vinheta (pós-corte: na imagem inteira) e Granulação (presa à posição)
-    if (v.vig) {
-        const a = v.vig / 100, p = 2 * Math.pow(3, -v.vigR / 100), m = 0.25 + v.vigM / 100 * 0.9, f = 0.05 + v.vigD / 100 * 0.9;
-        for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
-            const u = Math.abs(((i + ox) / tw - 0.5) * 2), q = Math.abs(((j + oy) / th - 0.5) * 2), dd = Math.pow(Math.pow(u, p) + Math.pow(q, p), 1 / p), t = gfSs(m, m + f, dd), o = (j * w + i) * 4;
-            for (let k = 0; k < 3; k++) d[o + k] = a < 0 ? d[o + k] * (1 + a * t) : d[o + k] + (255 - d[o + k]) * a * t;
-        }
-    }
-    if (v.grao > 0) {
-        const P = { w, h, ox, oy }, cel = (1 + v.graoT / 100 * 3) * e, liso = gfSuave(P, Math.max(0.6, cel), 71), fino = gfRuido(P, 72), ra = v.graoA / 100, amp = v.grao / 100 * 38;
-        lerY();
-        for (let i = 0; i < n; i++) { const y = Y[i] / 255, g = (liso[i] * (1 - ra) + (fino[i] * 2 - 1) * ra) * amp * (0.35 + 2.6 * y * (1 - y)); d[i * 4] += g; d[i * 4 + 1] += g; d[i * 4 + 2] += g; }
-    }
-    x.putImageData(img, 0, 0);
+}
+function ieCrProcessar(c, v, e = 1, ox = 0, oy = 0, tw = c.width, th = c.height, A = null, C = null) {
+    const w = c.width, h = c.height, img = ieCtx(c).getImageData(0, 0, w, h), out = ieCanvas(w, h);
+    ieCrDados(img.data, w, h, v, e, ox, oy, tw, th, A, C);
+    ieCtx(out).putImageData(img, 0, 0);
     return out;
 }
 function ieCrProc(v0) { const v = ieCrNorm(v0); return c => ieCrProcessar(c, v, 1, 0, 0, c.width, c.height, v.nevoa ? ieCrAtmosfera(c) : null); }
-
 // ─────────────────────────── barra fina com resistência ───────────────────────────
 // el = .ie-cr-sl; aoMudar(v); arrastar = metade do mouse (Shift: 1/6); clique sem arrastar pula; duplo clique zera
 function ieCrBarra(el, c, valor, aoMudar) {
@@ -229,6 +243,7 @@ function ieCrJanela(fonte, atual) {
         // ── vista ──
         const V = { esc: 1, ox: 0, oy: 0, dpr: 1, modo: 'depois', original: false };
         let ult = null, quadro = 0, sujo = true;
+        const cache = {};
         const tamanho = () => { V.dpr = window.devicePixelRatio || 1; const w = Math.max(1, Math.round(vista.clientWidth * V.dpr)), h = Math.max(1, Math.round(vista.clientHeight * V.dpr)); if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; } };
         const ajustar = () => { V.esc = Math.min(1 * V.dpr, (cv.width - 40 * V.dpr) / W, (cv.height - 40 * V.dpr) / H); V.ox = (cv.width - W * V.esc) / 2; V.oy = (cv.height - H * V.esc) / 2; };
         const pintar = () => {
@@ -273,7 +288,7 @@ function ieCrJanela(fonte, atual) {
             const cw = Math.max(1, Math.round((x1 - x0) * e)), ch = Math.max(1, Math.round((y1 - y0) * e));
             let rec = ult && ult.chave === [x0, y0, x1, y1, e].join() ? ult.rec : null;
             if (!rec) { rec = ieCanvas(cw, ch); const rx = ieCtx(rec); rx.imageSmoothingQuality = 'high'; rx.drawImage(src, x0, y0, x1 - x0, y1 - y0, 0, 0, cw, ch); }
-            const t0 = performance.now(), c = ieCrProcessar(rec, v, e, x0 * e, y0 * e, Math.round(W * e), Math.round(H * e), Ar);
+            const t0 = performance.now(), c = ieCrProcessar(rec, v, e, x0 * e, y0 * e, Math.round(W * e), Math.round(H * e), Ar, cache);
             ult = { c, rec, x0, y0, x1, y1, chave: [x0, y0, x1, y1, e].join(), ms: performance.now() - t0 };
             calc.hidden = true; pintar(); histograma(c);
         };
@@ -418,3 +433,82 @@ function ieCrJanela(fonte, atual) {
 }
 
 IE_FILTROS.cameraRaw = () => ieAplicarComDialogo({ titulo: 'Filtro Camera Raw', janela: ieCrJanela, proc: v => ieCrProc(v) });
+
+// ─────────────────────────── camada de ajuste Camera Raw ───────────────────────────
+// Como a camada de ajuste do editor de vídeo: fica acima das outras e muda ao vivo tudo o que está embaixo (luz, cor,
+// Claridade, Textura, Névoa, Nitidez, Granulação, Vinheta...), com opacidade, modo e máscara de camada de ajuste.
+// Vinheta e grão usam o documento inteiro como referência. Painel Propriedades: barras rápidas + "Abrir no Camera Raw"
+// (a janela completa com o que está embaixo da camada). Não vai para o PSD (o Photoshop não tem esse tipo de camada).
+// quanto a conta olha em volta (px do documento): a composição por regiões pega essa margem
+function ieCrMargem(v, W, H) {
+    const S = Math.min(W, H);
+    let m = 0;
+    if (v.clar) m = Math.max(m, S * 0.015 * 3);
+    if (v.tex) m = Math.max(m, S * 0.0035 * 3 + 2);
+    if (v.nevoa) m = Math.max(m, 7 + 14 * 3);
+    if (v.nitQ > 0) m = Math.max(m, v.nitR * 3 + 3);
+    if (v.ruidoL > 0) m = Math.max(m, 8);
+    if (v.ruidoC > 0) m = Math.max(m, v.ruidoC / 100 * 8 * 3 + 2);
+    return Math.ceil(m);
+}
+function ieCrMargemDoc(doc) {
+    let m = 0;
+    iePercorrer(doc.camadas, L => { if (L.visivel && L.tipo === 'ajuste' && L.ajuste && L.ajuste.t === 'cameraRaw') m = Math.max(m, ieCrMargem(L.ajuste.v, doc.w, doc.h)); });
+    return m;
+}
+// aplica na região já composta (img = ImageData do que está embaixo; o = canto dela no documento)
+const IE_CR_CAMADA = new WeakMap();   // L → {cache, A}
+function ieCrAjusteImg(img, L, o) {
+    const doc = IE.doc, v = L.ajuste.v;
+    let s = IE_CR_CAMADA.get(L);
+    if (!s) IE_CR_CAMADA.set(L, s = { cache: {}, A: null });
+    if (v.nevoa && !s.A) { const c = ieCanvas(img.width, img.height); ieCtx(c).putImageData(img, 0, 0); s.A = ieCrAtmosfera(c); }   // cor do ar: guardada
+    ieCrDados(img.data, img.width, img.height, v, 1, o.x, o.y, doc.w, doc.h, s.A, s.cache);
+}// o documento achatado só com o que está embaixo da camada L (fonte da janela do Camera Raw)
+function ieAchatarAbaixo(doc, L) {
+    IE._pararEm = L; IE._parou = false;
+    try { return ieAchatar(doc); } finally { IE._pararEm = null; IE._parou = false; }
+}
+async function ieCrAbrirCamada(L, doc = IE.doc) {
+    const fonte = { c: ieAchatarAbaixo(doc, L), x: 0, y: 0 };
+    const vals = await ieCrJanela(fonte, L.ajVals);
+    if (!vals) return;
+    L.ajVals = vals; L.ajuste = IE_AJ_CAMADAS.cameraRaw.aj(vals); IE_CR_CAMADA.delete(L);
+    ieInvalidar(L); ieAgendar(null, doc); ieHist(ieT('Camera Raw')); ieUiProps?.();
+}
+const IE_CR_RAPIDAS = [['_', 'Luz'], 'exp', 'ct', 'hi', 'sh', 'wh', 'bl', ['_', 'Cor'], 'temp', 'tint', 'vib', 'sat', ['_', 'Presença'], 'tex', 'clar', 'nevoa',
+    ['_', 'Acabamento'], 'nitQ', 'grao', 'vig'];
+IE_AJ_CAMADAS.cameraRaw = {
+    nome: 'Camera Raw', kind: 'cameraRaw', campos: [],
+    padrao: () => ieCrPadrao(),
+    aj: v => ({ t: 'cameraRaw', v: ieCrNorm(v) }),
+    propsUi(L, box, doc) {
+        const defs = Object.fromEntries(IE_CR_SECOES.flatMap(([, , cs]) => (Array.isArray(cs) ? cs.filter(c => c[0] !== '_').map(c => [c[0], c]) : [])));
+        const div = document.createElement('div');
+        div.className = 'ie-pn-ajprops ie-cr-props';
+        div.innerHTML = `<button class="ie-btn ie-btn-primario ie-cr-abrir">${ieT('Abrir no Camera Raw...')}</button>
+            <div class="ie-prop-nota">${ieT('Muda tudo o que está embaixo desta camada, ao vivo. A janela tem também curva, HSL, rodas de cor, ruído e granulação completos.')}</div>` +
+            IE_CR_RAPIDAS.map(k => (Array.isArray(k) ? `<div class="ie-cr-sub">${ieT(k[1])}</div>` : ieCrBarraHtml(defs[k]))).join('');
+        box.appendChild(div);
+        div.querySelector('.ie-cr-abrir').onclick = () => ieCrAbrirCamada(L, doc);
+        const aplicar = () => { L.ajuste = IE_AJ_CAMADAS.cameraRaw.aj(L.ajVals); ieInvalidar(L); ieAgendar(null, doc); clearTimeout(L._ajT); L._ajT = setTimeout(() => ieHist(ieT('Camera Raw')), 500); };
+        div.querySelectorAll('.ie-cr-sl[data-k]').forEach(el => { const k = el.dataset.k; ieCrBarra(el, defs[k], L.ajVals[k] ?? defs[k][4], q => { L.ajVals[k] = q; aplicar(); }); });
+        div.querySelectorAll('input').forEach(i => i.addEventListener('keydown', e => e.stopPropagation()));
+    },
+};
+if (typeof IE_NOME_AJ === 'object') IE_NOME_AJ.cameraRaw = 'Camera Raw';
+// botão ◐ do painel Camadas (como no Photoshop): menu das camadas de ajuste, Camera Raw primeiro
+Object.keys(IE_AJ_CAMADAS).forEach(k => { IE_CMDS['ajuste:' + k] = () => ieAjNova(k); });
+document.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-ajmenu]');
+    if (!b || !IE.doc) return;
+    ev.stopPropagation();
+    const pop = ieEl('ie-pop'), rb = ieEl('ie').getBoundingClientRect(), r = b.getBoundingClientRect();
+    pop.innerHTML = ieMenuHtml([['Camera Raw (luz, cor, claridade, textura...)', 'ajuste:cameraRaw'], '-',
+        ...Object.entries(IE_AJ_CAMADAS).filter(([k]) => k !== 'cameraRaw').map(([k, d]) => [d.nome + '...', 'ajuste:' + k])]);
+    pop.hidden = false;
+    pop.style.left = Math.min(rb.width - 280, r.left - rb.left) + 'px';
+    pop.style.top = Math.max(4, r.top - rb.top - pop.offsetHeight - 4) + 'px';
+    const fora = e => { if (!pop.contains(e.target)) { pop.hidden = true; document.removeEventListener('pointerdown', fora, true); } };
+    setTimeout(() => document.addEventListener('pointerdown', fora, true), 0);
+}, true);
