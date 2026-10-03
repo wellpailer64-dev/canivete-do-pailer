@@ -235,8 +235,8 @@ def main():
                 r.varinha = d.sel && d.sel.bbox;
                 ieSelNada();
                 // laço poligonal
-                IE.op.laco.modo = 'poligonal'; IE.laco = null;
-                for (const p of [{x: 50, y: 50}, {x: 150, y: 50}, {x: 150, y: 150}]) IE_FERR.laco.down(p, {}, d);
+                IE.laco = null;
+                for (const p of [{x: 50, y: 50}, {x: 150, y: 50}, {x: 150, y: 150}]) IE_FERR.lacoPoli.down(p, {}, d);
                 ieLacoFechar(d);
                 r.laco = d.sel && d.sel.bbox;
                 ieSelNada();

@@ -659,7 +659,7 @@ function ieSelDeslocar(doc, dx, dy) {
 const IE_LACO = {
     nome: 'Laço', tecla: 'L', icone: 'lasso', cursor: ev => ieCursorSel('laco', ev),
     down(p, ev, doc) {
-        const poli = IE.ferr === 'lacoPoli';   // Laço = livre (arrastar); Laço poligonal = clicar os pontos
+        const poli = !!(this && this.poligonal);   // Laço = livre (arrastar); Laço poligonal = clicar os pontos
         if (poli) {
             if (!IE.laco) IE.laco = { pts: [], op: ieOpSel(ev), poli: true };
             const l = IE.laco, q = l.pts[0];
@@ -1146,7 +1146,7 @@ const IE_FERR = {
     zoom: IE_ZOOM,
 };
 // Laço poligonal: a mesma ferramenta, clicando os pontos (duplo clique, Enter ou clicar no início fecha)
-const IE_LACO_POLI = { ...IE_LACO, nome: 'Laço poligonal', icone: 'lassoPoli', cursor: ev => ieCursorSel('laco', ev) };
+const IE_LACO_POLI = { ...IE_LACO, nome: 'Laço poligonal', icone: 'lassoPoli', poligonal: true, cursor: ev => ieCursorSel('laco', ev) };
 IE_FERR.lacoPoli = IE_LACO_POLI;
 const IE_FERR_ORDEM = ['mover', 'girar', 'letreiro', 'laco', 'lacoPoli', 'varinha', 'corte', 'contagotas', '|', 'carimbo', 'pincel', 'borracha', 'borrachaFundo', 'borrachaMagica', 'degrade', 'balde', '|', 'texto', 'forma', '|', 'mao', 'zoom'];
 
