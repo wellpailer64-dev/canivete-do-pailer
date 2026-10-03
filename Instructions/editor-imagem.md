@@ -104,9 +104,14 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   Modos de mesclagem por Shift+Alt+letra valem para a camada (o editor não tem modo no pincel).
 
 ## Reaproveitado do editor de vídeo
-- Filtro > Filtro Camera Raw (Shift+Ctrl+A): a conta do Luz e Cor (`veLcBuildLut`, editor-lc.js) vira LUT 3D aplicada
-  na camada (trilinear), mais nitidez na luma e vinheta; painel na lateral com a imagem à vista.
-- Painel Propriedades: Transformar (X/Y/L/A com proporção, inverter, girar) e Caractere (seletor de fonte com prévia,
+- Filtro > **Filtro Camera Raw** (Shift+Ctrl+A), `frontend/js/imagem-cameraraw.js`: janela própria como o ACR — foto à
+  esquerda (zoom, mão, Antes/depois lado a lado = Y, Original = P), à direita histograma e as seções Básico (WB, tom,
+  Textura, Claridade, Remover névoa, Vibratilidade, Saturação), Curva (RGB/R/G/B), Detalhes (Nitidez com raio/detalhe/
+  mascaramento, Redução de ruído de luminância e de cor), Mistura de cores (HSL nas 8 cores → curvas de matiz do Luz e
+  Cor), Gradação de cores (rodas Sombras/Meios-tons/Realces/Global = lift/gamma/gain/offset) e Efeitos (Granulação,
+  Vinheta com ponto médio/arredondamento/difusão). Cor = LUT do `veLcBuildLut` (editor-lc.js); o resto local na luma.
+  Barras finas com resistência (arrastar = metade do mouse, Shift 1/6, clique solto pula, duplo clique zera; pedido do
+  usuário 2026-10-03). Valores antigos (temp…sharp, vig, curva) continuam valendo. Teste: `testes/teste_cameraraw.py`.- Painel Propriedades: Transformar (X/Y/L/A com proporção, inverter, girar) e Caractere (seletor de fonte com prévia,
   estilo, tamanho, VA, entrelinha, cor, alinhamento, negrito/itálico falso, maiúsculas).
 
 ## Texto de verdade
@@ -214,7 +219,7 @@ No console: `ieDiferencaAchatado()` mede a diferença do documento aberto contra
 1. ~~Dissolver (Liquify)~~ — feito 2026-10-03 (imagem-dissolver.js). Falta: Dissolver sensível a rosto
    (olhos/nariz/boca por detecção de rosto), Carregar/Salvar malha, Mostrar fundo (outras camadas atrás).
 2. ~~Galeria de filtros~~ — feita 2026-10-03 (imagem-galeria.js). Falta: arrastar para reordenar as camadas de efeito.
-3. **Filtro Camera Raw como filtro inteligente** (hoje tem painel próprio e não entra na lista não destrutiva).
+3. ~~Camera Raw~~ — janela própria feita 2026-10-03 (vale como filtro inteligente). Falta: Máscaras (pincel/linear/radial/assunto), Óptica, Geometria, predefinições.
 4. Desabilitados no menu Filtro: Desfoque de forma/caminho, Deslocamento de pixels, Chama/Moldura/Árvore, Extrusão,
    Redução de tremido, Grande angular adaptável, Ponto de fuga, Neural Filters.
 5. KNV.cena Fase 3 (Instructions/agente/plano-cena.md): biblioteca de estilos/receitas, KNV.ver, forma vetorial nas caixas.
