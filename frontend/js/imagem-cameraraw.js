@@ -161,6 +161,34 @@ function ieCrProcessar(c, v, e = 1, ox = 0, oy = 0, tw = c.width, th = c.height,
     ieCtx(out).putImageData(img, 0, 0);
     return out;
 }
+// balanço de branco automático: meios-tons pouco saturados viram neutros (média R = G = B), medindo e corrigindo
+// Temperatura (azul↔amarelo) e Matiz (verde↔magenta) pela mesma conta do filtro
+function ieCrAutoBalanco(c) {
+    const k = Math.min(1, 200 / Math.max(c.width, c.height)), a = ieCanvas(Math.max(1, Math.round(c.width * k)), Math.max(1, Math.round(c.height * k)));
+    ieCtx(a).drawImage(c, 0, 0, a.width, a.height);
+    const base = ieCtx(a).getImageData(0, 0, a.width, a.height).data, v = { temp: 0, tint: 0 };
+    const medir = () => {
+        const d = new Uint8ClampedArray(base);
+        ieCrDados(d, a.width, a.height, ieCrNorm(v), 1);
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let i = 0; i < d.length; i += 4) {
+            if (d[i + 3] < 220) continue;
+            const [, s, l] = ieRgbHsl(d[i] / 255, d[i + 1] / 255, d[i + 2] / 255);
+            if (l < 0.2 || l > 0.85 || s > 0.5) continue;
+            r += d[i]; g += d[i + 1]; b += d[i + 2]; n++;
+        }
+        return n ? [r / n, g / n, b / n] : null;
+    };
+    for (let it = 0; it < 10; it++) {
+        const m = medir();
+        if (!m) break;
+        const dt = (m[0] - m[2]) / 255, dg = (m[1] - (m[0] + m[2]) / 2) / 255;
+        if (Math.abs(dt) < 0.004 && Math.abs(dg) < 0.004) break;
+        v.temp = ieClamp(Math.round(v.temp - dt * 140), -100, 100);
+        v.tint = ieClamp(Math.round(v.tint + dg * 160), -100, 100);
+    }
+    return v;
+}
 function ieCrProc(v0) { const v = ieCrNorm(v0); return c => ieCrProcessar(c, v, 1, 0, 0, c.width, c.height, v.nevoa ? ieCrAtmosfera(c) : null); }
 // ─────────────────────────── barra fina com resistência ───────────────────────────
 // el = .ie-cr-sl; aoMudar(v); arrastar = metade do mouse (Shift: 1/6); clique sem arrastar pula; duplo clique zera
@@ -226,7 +254,7 @@ function ieCrJanela(fonte, atual) {
             else if (cs === 'hsl') corpo = `<div class="ie-segm ie-cr-habas">${[['0', 'Matiz'], ['1', 'Saturação'], ['2', 'Luminância']].map(([k, r], i) => `<button data-hab="${k}" class="${i ? '' : 'on'}">${ieT(r)}</button>`).join('')}</div>
                 ${IE_CR_HSL.map(([k, r, , cor]) => ieCrBarraHtml([k, r, -100, 100, 0, 1, ''], ` data-hsl="${k}" style="--cor-hsl:${cor}"`)).join('')}`;
             else if (cs === 'rodas') corpo = `<div class="ie-cr-rodas">${IE_CR_RODAS.map(([k, r]) => `<div class="ie-cr-roda" data-roda="${k}"><span>${ieT(r)}</span><canvas></canvas><em class="ie-cr-rodav"></em>${ieCrBarraHtml(['rl_' + k, 'Luminância', -100, 100, 0])}</div>`).join('')}</div>`;
-            else corpo = cs.map(c => (c[0] === '_' ? `<div class="ie-cr-sub">${ieT(c[1])}</div>` : ieCrBarraHtml(c))).join('');
+            else corpo = cs.map(c => (c[0] === '_' ? `<div class="ie-cr-sub">${ieT(c[1])}${c[1] === 'Balanço de branco' ? `<button class="ie-btn ie-btn-mini ie-cr-auto" title="${ieT('Balanço de branco automático (meios-tons neutros)')}">${ieT('Automático')}</button>` : ''}</div>` : ieCrBarraHtml(c))).join('');
             return `<section class="ie-cr-sec ${abertas.has(id) ? 'aberta' : ''}" data-sec="${id}"><button class="ie-cr-sect"><span>${ieT(nome)}</span><i class="ie-cr-seta"></i></button><div class="ie-cr-secc">${corpo}</div></section>`;
         };
         box.innerHTML = `<div class="ie-dv-vista ie-cr-vista"><canvas class="ie-gal-cv"></canvas><div class="ie-gal-calc" hidden>${ieT('Calculando...')}</div>
@@ -311,6 +339,10 @@ function ieCrJanela(fonte, atual) {
             if (el.dataset.hsl) return;
             if (k.startsWith('rl_')) { const r = k.slice(3); barras[k] = ieCrBarra(el, [k, '', -100, 100, 0], v.rl[r] || 0, q => { v.rl[r] = q; agendar(); }); return; }
             barras[k] = ieCrBarra(el, defs[k], v[k], q => { v[k] = q; agendar(); });
+        });
+        box.querySelector('.ie-cr-auto')?.addEventListener('click', () => {
+            const wb = ieCrAutoBalanco(src);
+            v.temp = wb.temp; v.tint = wb.tint; barras.temp.definir(wb.temp); barras.tint.definir(wb.tint); agendar();
         });
         // Mistura de cores: uma barra por cor, para a aba (matiz / saturação / luminância)
         let aba = 0;

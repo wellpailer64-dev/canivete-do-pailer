@@ -9,7 +9,9 @@ uso: py -3.13 tools/knv.py peca.html [--formato feed] [--salvar peca.iknv] [--pr
   --previa    JPEG da composição (padrão: <peca>.jpg ao lado, escala 0.5) para julgar a estética; --sem-previa não grava
   --ver       só um pedaço, barato: "slide:2" ou "x,y,w,h" (escala --escala-ver 0.4) → <peca>_ver.jpg
   --referencia ref.png   imagem de referência como camada oculta e travada (escalada ao documento)
-  --comparar  referência (em cima) × peça (embaixo), pequenas → <peca>_comparar.jpg
+  --comparar  referência (em cima) × peça (embaixo), pequenas → <peca>_comparar.jpg; --comparar slide:2 = só o slide, lado a lado
+  --gerar "prompt" [--sementes 7,11,23] [--proporcao 3:4] [--inteiro]  folha de contato do FLUX (recorte de IA, avisa
+              corte); rode em segundo plano enquanto escreve o HTML — a cena depois sai do cache (mesmo prompt/semente/tamanho)
   --variacoes var.json   {"camada": "cavalo", "filtro": "aj:matiz", "lista": [{...}, {...}]} ou {"ajuste": "Nome", "lista": [...]}
               → <peca>_variacoes.jpg (lado a lado; o documento volta ao que era)
   --amostras "texto" [--fontes "Chewy,Gluten" | --estilo caixa-unica] → instala as que faltam e monta uma folha
@@ -33,7 +35,8 @@ ap.add_argument("--depois"); ap.add_argument("--porta", type=int, default=9333);
 ap.add_argument("--exportar", help="pasta: um arquivo por slide (ou a peça inteira)"); ap.add_argument("--fmt", default="png")
 ap.add_argument("--mapa", action="store_true"); ap.add_argument("--sem-recarga", action="store_true")
 ap.add_argument("--sem-previa", action="store_true"); ap.add_argument("--ver"); ap.add_argument("--escala-ver", type=float, default=0.4)
-ap.add_argument("--referencia"); ap.add_argument("--comparar", action="store_true"); ap.add_argument("--variacoes")
+ap.add_argument("--referencia"); ap.add_argument("--comparar", nargs="?", const="tudo"); ap.add_argument("--variacoes")
+ap.add_argument("--gerar"); ap.add_argument("--sementes", default="7,11,23"); ap.add_argument("--proporcao", default="1:1"); ap.add_argument("--inteiro", action="store_true")
 ap.add_argument("--amostras"); ap.add_argument("--fontes"); ap.add_argument("--estilo"); ap.add_argument("--estilos", action="store_true")
 ap.add_argument("--biblioteca", default=os.environ.get("KANIVETE_BIBLIOTECA", r"D:\kanivete_biblioteca"))
 ap.add_argument("--guardar-modelo"); ap.add_argument("--nota", default=""); ap.add_argument("--listar", action="store_true")
@@ -64,7 +67,7 @@ def recarga_js():
                 j = i
                 while j < len(src) and not re.match(r"\}\)?;?\s*$", src[j]): j += 1
                 bloco = "\n".join(src[i:j + 1])
-                if t: bloco = f"if (typeof {t.group(1)} !== 'undefined') Object.assign({t.group(1)}, ({bloco[len(t.group(0)) - 1:].rstrip().rstrip(';')}));"
+                if t: bloco = f"if (typeof {t.group(1)} !== 'undefined') Object.assign({t.group(1)}, ({bloco[len(t.group(0)) - 1:].rstrip().rstrip(';')})); else window.{t.group(1)} = ({bloco[len(t.group(0)) - 1:].rstrip().rstrip(';')});"   # tabela nova: cria
                 partes.append(bloco); i = j + 1
             else: i += 1
     api = open(os.path.join(JS, "imagem-api.js"), encoding="utf-8").read().replace("const KNV =", "var KNV =")
@@ -109,8 +112,19 @@ body {{ margin: 0; width: 1080px; height: 1350px; background: #fff; padding: 40p
 </style></head><body>{linhas}</body></html>""")
     a.formato = a.formato or "feed"; a.novo = True; a.de = None
 
+if a.gerar:   # folha de contato: uma célula por semente, recortada, com o número da semente
+    sem = [s.strip() for s in a.sementes.split(",") if s.strip()]
+    pw, ph = (float(x) for x in a.proporcao.split(":"))
+    cw = int(1000 / len(sem)) - 20; chh = int(cw * ph / pw)
+    os.makedirs(os.path.join(BIB, "amostras"), exist_ok=True)
+    cel = "\n".join(f'<div style="display:flex;flex-direction:column;align-items:center;gap:6px"><img id="s{s}" src="gerar:{a.gerar}" data-semente="{s}" data-fundo="branco" data-proporcao="{a.proporcao}" data-lado="1024"{" data-inteiro" if a.inteiro else ""} style="width:{cw}px;height:{chh}px;object-fit:contain;background:#2a2a2a"><span style="font:600 22px Poppins;color:#ddd">semente {s}</span></div>' for s in sem)
+    a.html = os.path.join(BIB, "amostras", "gerar_" + re.sub(r"\W+", "_", a.gerar)[:40] + ".html")
+    open(a.html, "w", encoding="utf-8").write(f'<!doctype html><html><head><style>body{{margin:0;width:1080px;height:{chh + 140}px;background:#1b1b1b;display:flex;gap:20px;justify-content:center;align-items:center}}</style></head><body>{cel}</body></html>')
+    a.novo = True; a.de = None; a.w_gerar = (1080, chh + 140)
+
 html = open(a.html, encoding="utf-8").read() if a.html != "-" else None
 opc = {"base": barra(os.path.dirname(os.path.abspath(a.html))) if html else None, "biblioteca": barra(BIB)}
+if getattr(a, "w_gerar", None): opc["w"], opc["h"] = a.w_gerar
 for k in ("formato", "nome", "margem"):
     if getattr(a, k) is not None: opc[k] = getattr(a, k)
 if a.novo: opc["novo"] = True
@@ -155,7 +169,7 @@ with sync_playwright() as p:
             if (referencia) out.referencia = await KNV.referencia(referencia);
             if (depois) { const f = new Function('KNV', 'return (async () => {' + depois + '\\n})()'); out.depois = await f(KNV); }
             if (variacoes) out.variacoes = KNV.variacoes(variacoes);
-            if (comparar) out.comparar = KNV.comparar();
+            if (comparar) out.comparar = KNV.comparar(comparar.startsWith("slide:") ? {slide: +comparar.slice(6)} : {});
             if (ver) out.ver = KNV.ver(ver);
             out.recursos = KNV.recursosNovos();
             if (salvar) out.salvo = await KNV.salvar(salvar);

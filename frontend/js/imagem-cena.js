@@ -90,8 +90,26 @@ function ieCenaComponentesCss() {
         :where(.k-lista){display:flex;flex-direction:column;gap:24px;padding:0;margin:0}
         :where(.k-lista>li){display:flex;gap:20px;align-items:baseline;font-size:36px;line-height:1.35}
         :where(.k-marcador){flex:0 0 auto;color:${P};font-weight:800}
-        :where(.k-grande){font-size:300px;font-weight:900;line-height:.9;color:${P}}`;
+        :where(.k-grande){font-size:300px;font-weight:900;line-height:.9;color:${P}}
+        :where(.k-check,.k-x){display:flex;flex-direction:column;gap:28px;padding:0;margin:0;list-style:none}
+        :where(.k-check>li,.k-x>li){display:flex;gap:18px;align-items:center;font-size:32px;line-height:1.25}
+        :where(.k-icone){flex:none;display:inline-flex;width:1.15em;height:1.15em}
+        :where(.k-icone) svg{width:100%;height:100%}
+        :where(.k-barras){gap:22px}
+        :where(.k-barras>li){background:${P};color:${F};padding:0 28px;min-height:100px;box-sizing:border-box}
+        :where(.k-dica){display:flex;gap:16px;align-items:flex-start;background:#e8e8e8;color:#1e1e1e;padding:24px 28px;font-size:38px;line-height:1.2}
+        :where(.k-dica>.k-icone){width:1.1em;height:1.2em;margin-top:.05em}
+        :where(.k-pilula){display:inline-flex;align-items:center;gap:14px;padding:0 24px;height:60px;border-radius:999px;background:${P};color:${F};font-size:24px;white-space:nowrap}`;
 }
+// ícones dos componentes (SVG de verdade: viram camada). cor: --cor-ok / --cor-primaria / a do texto
+const IE_CENA_ICONES = {
+    check: '<svg viewBox="0 0 38 38"><rect width="38" height="38" rx="8" fill="var(--cor-ok,#3fb54a)"/><path d="M10 20l6 6 12-13" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    x: '<svg viewBox="0 0 40 40"><path d="M9 9l22 22M31 9L9 31" stroke="#fff" stroke-width="11" stroke-linecap="round"/><path d="M9 9l22 22M31 9L9 31" stroke="#ff2a2a" stroke-width="6" stroke-linecap="round"/></svg>',
+    dica: '<svg viewBox="0 0 42 46"><path d="M21 2a15 15 0 0 0-9 27c2 2 3 4 3 7h12c0-3 1-5 3-7A15 15 0 0 0 21 2z" fill="#ffc83a"/><rect x="14" y="38" width="14" height="6" rx="2" fill="#8a8a8a"/></svg>',
+    seta: '<svg viewBox="0 0 34 34"><circle cx="17" cy="17" r="16" fill="var(--cor-primaria,#ff5e3a)"/><path d="M13 10l8 7-8 7" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    play: '<svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z" fill="currentColor"/></svg>',
+    salvar: '<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" fill="currentColor"/></svg>',
+};
 // preenche os automáticos: k-num vazio = "01 / 05"; k-arraste vazio = "arraste →" (some no último slide);
 // k-citacao ganha as aspas; marcadores de lista viram elementos (o ::marker do navegador não vira camada)
 function ieCenaComponentes(raiz, S) {
@@ -103,10 +121,25 @@ function ieCenaComponentes(raiz, S) {
         if (S && idx(el) === n - 1 && !el.hasAttribute('data-sempre')) { el.remove(); continue; }
         if (!el.innerHTML.trim()) el.innerHTML = 'arraste <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
     }
+    // k-check / k-x: ícone de verdade em cada item; k-dica: lâmpada; k-pilula data-icone="seta|play|salvar|check"
+    // (antes do texto; com data-icone-fim, depois)
+    const icone = nome => `<span class="k-icone">${IE_CENA_ICONES[nome] || ''}</span>`;
+    for (const li of raiz.querySelectorAll('.k-check > li, .k-x > li')) {
+        if (li.querySelector(':scope > .k-icone')) continue;
+        li.insertAdjacentHTML('afterbegin', icone(li.parentElement.classList.contains('k-x') ? 'x' : 'check'));
+        li.dataset.juntos = '';
+    }
+    for (const el of raiz.querySelectorAll('.k-dica')) if (!el.querySelector(':scope > .k-icone')) { el.insertAdjacentHTML('afterbegin', icone('dica')); el.dataset.juntos = ''; }
+    for (const el of raiz.querySelectorAll('.k-pilula[data-icone]')) {
+        if (el.querySelector(':scope > .k-icone')) continue;
+        el.insertAdjacentHTML(el.hasAttribute('data-icone-fim') ? 'beforeend' : 'afterbegin', icone(el.dataset.icone));
+        el.dataset.juntos = '';
+    }
     for (const el of raiz.querySelectorAll('.k-citacao')) if (el.setAttribute('data-juntos', ''), !el.querySelector('.k-aspas')) el.insertAdjacentHTML('afterbegin', '<span class="k-aspas">\u201C</span>');
     for (const li of raiz.querySelectorAll('li')) {
         if (li.querySelector(':scope > .k-marcador')) continue;
         const lista = li.parentElement, cs = getComputedStyle(li);
+        if (lista.classList.contains('k-check') || lista.classList.contains('k-x')) continue;
         if (cs.listStyleType === 'none' && !lista.classList.contains('k-lista')) continue;
         const ol = lista.tagName === 'OL', i = [...lista.children].indexOf(li) + 1;
         const corpo = document.createElement('span');
@@ -251,6 +284,7 @@ async function ieCenaFontesPre(raiz, ctx) {
 function ieCenaTransformsPre(raiz) {
     const lista = [];
     for (const el of [raiz, ...raiz.querySelectorAll('*')]) {
+        if (el.ownerSVGElement) continue;   // <g transform> dentro do <svg> é desenho, não posição (zerar apagava o deslocamento)
         const cs = getComputedStyle(el);
         const v = { tr: cs.transform, ro: cs.rotate, sc: cs.scale, tl: cs.translate, orig: cs.transformOrigin };
         if ([v.tr, v.ro, v.sc, v.tl].some(x => x && x !== 'none')) lista.push([el, v]);
@@ -494,7 +528,8 @@ async function ieCenaImg(el, cs, ctx, h) {
         const gw = Math.max(256, Math.round(aw * kk / 64) * 64), gh = Math.max(256, Math.round(ah * kk / 64) * 64);
         const semente = el.dataset.semente != null ? +el.dataset.semente : -1;
         if (semente < 0) ctx.avisos.push(`gerar sem data-semente (${k.gerar.slice(0, 40)}): fixe a semente para refazer igual e do cache`);
-        const prompt = k.gerar + (el.dataset.fundo === 'branco' ? IE_GER_FUNDO : '');
+        // data-inteiro: pede o assunto inteiro no quadro (ombros, cabeça, pés) com folga em volta
+        const prompt = k.gerar + (el.hasAttribute('data-inteiro') ? ', the entire subject fully inside the frame with empty margin around it, both shoulders and the whole head visible, nothing cut off at the edges' : '') + (el.dataset.fundo === 'branco' ? IE_GER_FUNDO : '');
         const chave = `gerar:${prompt}|${gw}x${gh}|${semente}`;
         IE._cenaImgs = IE._cenaImgs || new Map();
         if (semente >= 0 && IE._cenaImgs.has(chave)) c = IE._cenaImgs.get(chave);
@@ -515,7 +550,23 @@ async function ieCenaImg(el, cs, ctx, h) {
     const rec = el.dataset.recortar || (k.gerar && el.dataset.fundo === 'branco' ? 'ia' : '');
     if (rec && rec !== 'nao') {
         const cut = await ieCenaRecortar(c, rec, (k.path || 'gerar:' + k.gerar) + '|' + iw + 'x' + ih);
-        if (cut) { c = cut.c; px = cut.x; py = cut.y; }
+        if (cut) {
+            c = cut.c; px = cut.x; py = cut.y;
+            // o assunto encosta na borda da imagem original = saiu cortado (ombro, cabeça...): avisa, com a semente
+            const pode = String(el.dataset.podeCortar || '').split(/[\s,]+/), bordas = [];
+            // caixa do que é opaco de verdade (a camada recortada pode continuar do tamanho da imagem, transparente)
+            const dd = ieCtx(c).getImageData(0, 0, c.width, c.height).data, passo = Math.max(1, Math.floor(Math.min(c.width, c.height) / 300));
+            let bx0 = c.width, by0 = c.height, bx1 = -1, by1 = -1;
+            for (let y = 0; y < c.height; y += passo) for (let x = 0; x < c.width; x += passo) if (dd[(y * c.width + x) * 4 + 3] > 40) { if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; }
+            const tol = 2 + passo;
+            if (bx1 >= 0) {
+                if (px + bx0 <= tol && !pode.includes('esquerda')) bordas.push('esquerda');
+                if (py + by0 <= tol && !pode.includes('topo')) bordas.push('topo');
+                if (px + bx1 >= iw - 1 - tol && !pode.includes('direita')) bordas.push('direita');
+                if (py + by1 >= ih - 1 - tol && !pode.includes('baixo')) bordas.push('baixo');
+            }
+            if (bordas.length) ctx.avisos.push(`"${nome}" saiu cortado na geração/foto (${bordas.join(', ')}): outra data-semente, data-inteiro, ou data-pode-cortar="${bordas.join(' ')}" se for de propósito`);
+        }
     }
     // data-guardar="nome": o recurso (já recortado) vai para a biblioteca (o tools/knv.py grava em recursos/nome.png)
     if (el.dataset.guardar) (IE._recursosNovos = IE._recursosNovos || []).push({ nome: el.dataset.guardar, c,
@@ -538,8 +589,9 @@ async function ieCenaImg(el, cs, ctx, h) {
     const L = ieCenaCamada(ctx, h, ':img', { tipo: 'inteligente', nome, c: P.c, x: P.x, y: P.y, c0: { c, x: px, y: py }, tf: S, tfBase: [...IE_ID] });
     if (gerada) L.gerada = gerada;
     // data-cor="#3cbf4a" (+ data-contraste="35"): a cor do objeto vira essa, por filtros inteligentes medidos
-    if (el.dataset.cor) {
-        L.filtrosInt = ieCenaCorFiltros(c, el.dataset.cor, +el.dataset.contraste || 0);
+    if (el.dataset.cor || el.dataset.pele != null) {
+        L.filtrosInt = [...(el.dataset.cor ? ieCenaCorFiltros(c, el.dataset.cor, +el.dataset.contraste || 0) : []),
+            ...(el.dataset.pele != null ? ieCenaPeleFiltros(c, el.dataset.pele, ctx, nome) : [])];
         const o = ieIntPlano(L);
         L.c = o.c; L.x = o.x; L.y = o.y;
     }
@@ -592,6 +644,45 @@ function ieCenaCorFiltros(c, hex, ct = 0) {
     const f = [{ cmd: 'aj:matiz', titulo: 'Matiz/Saturação', vals: { h: v.h, s: v.s, l: v.l, colorir: false }, on: true, cena: true }];
     if (ct) f.push({ cmd: 'aj:brilho', titulo: 'Brilho/Contraste', vals: { br: 0, ct, legado: false }, on: true, cena: true });
     return f;
+}
+// data-pele (vazio/"natural" ou um matiz em graus, padrão 24°): mede os tons de pele da foto e corrige pelo Camera Raw
+// (Matiz −verde/+magenta e HSL dos laranjas/amarelos) até a média ficar natural — o FLUX às vezes deixa a pele verde.
+// Pele = matiz 0..75°, saturação e luz médias, fora do vermelho forte (camiseta) — medida na foto original.
+function ieCenaPeleFiltros(c, alvo, ctx, nome) {
+    const hAlvo = isFinite(parseFloat(alvo)) ? parseFloat(alvo) : 24;
+    const k = Math.min(1, 200 / Math.max(c.width, c.height)), a = ieCanvas(Math.max(1, Math.round(c.width * k)), Math.max(1, Math.round(c.height * k)));
+    ieCtx(a).drawImage(c, 0, 0, a.width, a.height);
+    const img = ieCtx(a).getImageData(0, 0, a.width, a.height), base = img.data, pele = [];
+    for (let i = 0; i < base.length; i += 4) {
+        if (base[i + 3] < 220) continue;
+        const [h, s, l] = ieRgbHsl(base[i] / 255, base[i + 1] / 255, base[i + 2] / 255);
+        if (h > 75 || s < 0.1 || s > 0.75 || l < 0.22 || l > 0.85 || (h < 14 && s > 0.55)) continue;
+        pele.push(i);
+    }
+    if (pele.length < 50) { ctx.avisos.push(`"${nome}": data-pele não achou pele na foto`); return []; }
+    const medir = v => {
+        const d = new Uint8ClampedArray(base);
+        ieCrDados(d, a.width, a.height, ieCrNorm(v), 1);
+        let cx = 0, cy = 0, ss = 0, n = 0;
+        for (const i of pele) { const [h, s] = ieRgbHsl(d[i] / 255, d[i + 1] / 255, d[i + 2] / 255); cx += Math.cos(h * Math.PI / 180) * s; cy += Math.sin(h * Math.PI / 180) * s; ss += s; n++; }
+        return [Math.atan2(cy / n, cx / n) * 180 / Math.PI, ss / n];
+    };
+    const sAlvo = 0.4;   // pele natural: saturação média ~0,4 (acima disso fica alaranjada/"bronzeada de mais")
+    const [h0, s0] = medir({});
+    if (Math.abs(h0 - hAlvo) < 4 && Math.abs(s0 - sAlvo) < 0.06) return [];   // já natural
+    const v = { tint: 0, hsl: { o: [0, 0, 0], y: [0, 0, 0], r: [0, 0, 0] } };
+    for (let it = 0; it < 10; it++) {
+        const [h, s] = medir(v), dh = h - hAlvo, ds = s - sAlvo;
+        if (Math.abs(dh) < 1.5 && Math.abs(ds) < 0.02) break;
+        v.tint = ieClamp(Math.round(v.tint + dh * 1.6), -60, 60);
+        v.hsl.y[0] = ieClamp(Math.round(v.hsl.y[0] - dh * 1.2), -100, 100);
+        v.hsl.o[0] = ieClamp(Math.round(v.hsl.o[0] - dh * 0.6), -100, 100);
+        v.hsl.o[1] = ieClamp(Math.round(v.hsl.o[1] - ds * 160), -100, 100);
+        v.hsl.y[1] = ieClamp(Math.round(v.hsl.y[1] - ds * 120), -100, 100);
+        v.hsl.r[1] = ieClamp(Math.round((v.hsl.r ? v.hsl.r[1] : 0) - ds * 60), -100, 100);
+    }
+    ctx.avisos.push(`"${nome}": pele de ${Math.round(h0)}°/sat ${s0.toFixed(2)} para ~${hAlvo}°/${sAlvo} (Camera Raw: matiz ${v.tint}, amarelos ${v.hsl.y}, laranjas ${v.hsl.o}, vermelhos ${v.hsl.r})`);
+    return [{ cmd: 'f:cameraRaw', titulo: 'Filtro Camera Raw (pele)', vals: ieCrNorm(v), on: true, cena: true }];
 }
 // recorte do fundo numa camada temporária (as mesmas ferramentas do editor); fica em memória por imagem
 async function ieCenaRecortar(c, modo, chave) {
@@ -831,6 +922,23 @@ function ieCenaChecar(raiz, ctx) {
             return a.x < b.x + b.w && b.x < a.x + a.w && ya[0] < yb[1] && yb[0] < ya[1];
         }));
         if (bate) avisos.push(`${nome(A)} atropela ${nome(B)}`);
+    }
+    // fundo num trecho de texto (<span style="background">) é da altura da fonte, não da linha: com entrelinha
+    // apertada cobre acento/cedilha da linha vizinha
+    for (const sp of raiz.querySelectorAll('span, b, strong, em, i, mark')) {
+        const cs = getComputedStyle(sp);
+        if (cs.display !== 'inline' || !ieCenaTemCaixa(cs)) continue;
+        const lh = parseFloat(getComputedStyle(sp.parentElement).lineHeight), r = sp.getBoundingClientRect();
+        if (lh && r.height > lh * 1.08 && sp.parentElement.nextElementSibling || lh && r.height > lh * 1.08 && sp.parentElement.previousElementSibling)
+            avisos.push(`fundo do trecho "${sp.textContent.trim().slice(0, 20)}" é mais alto que a linha (${Math.round(r.height)} > ${Math.round(lh)}px): cobre acento/cedilha da linha vizinha — use uma caixa separada atrás do texto`);
+    }
+    // quase alinhados: bordas esquerdas de blocos de texto do mesmo slide a 1–8 px uma da outra (era para ser a mesma)
+    const esq = blocos.filter(b => b.R && !b.el.closest('[data-livre]')).map(b => ({ b, x: b.R.x1, s: Math.floor(b.R.x1 / SW) }));
+    const vistos = new Set();
+    for (const a of esq) for (const c of esq) {
+        if (a === c || a.s !== c.s) continue;
+        const d = Math.abs(a.x - c.x), chave = a.s + ':' + [Math.round(a.x), Math.round(c.x)].sort((p, q) => p - q).join('|');   // um aviso por par de posições
+        if (d >= 3 && d <= 8 && !vistos.has(chave)) { vistos.add(chave); avisos.push(`quase alinhados (${Math.round(d)}px): ${nome(a.b)} x=${Math.round(a.x % SW)} e ${nome(c.b)} x=${Math.round(c.x % SW)}`); }
     }
 }
 

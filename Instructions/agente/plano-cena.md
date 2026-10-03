@@ -133,3 +133,19 @@ recortados + .json com prompt/semente), `modelos/` (peças aprovadas, para ESTUD
 - **Fontes**: `--amostras "TEXTO" --estilo condensada-impacto` (ou `--fontes "A,B"`) instala as que faltam e monta a
   folha; `--estilos` lista estilos e pares (`tools/fontes_estilos.json` — acrescente os pares que forem aprovados).
 - **Modelos**: `--de peca.iknv --guardar-modelo nome --nota "o que funcionou" [--exportar pasta]`.
+- **Pessoas e objetos gerados** (2026-10-03, feedback do carrossel Valer): folha de contato antes da cena, em segundo
+  plano enquanto escreve o HTML: `--gerar "prompt" --sementes 7,11,23 --proporcao 4:3 --inteiro` (a cena depois sai do
+  cache se prompt/semente/tamanho/data-inteiro forem iguais). Pessoa da cintura para cima: gere LARGO (4:3) para os
+  ombros caberem e enquadre com a caixa. A cena avisa "saiu cortado na geração (direita...)" quando o recorte encosta na
+  borda; `data-pode-cortar="baixo"` para o corte de propósito. `data-inteiro` pede o assunto inteiro com folga.
+- **Pele**: `data-pele` (ou um matiz em graus) mede os tons de pele e corrige por Camera Raw (Matiz verde↔magenta + HSL
+  laranjas/amarelos/vermelhos) até ~24° e saturação ~0,4 — o FLUX deixa pele esverdeada/amarelada.
+- **Componentes novos**: `ul.k-check` (check verde), `ul.k-x` (X vermelho), `.k-barras` (itens em barras da cor
+  primária), `.k-dica` (lâmpada), `.k-pilula data-icone="seta|play|salvar|check" [data-icone-fim]`. Cores pelo kit:
+  `--cor-primaria`, `--cor-fundo` (texto sobre a primária), `--cor-ok`. `box-shadow` em caixa/imagem = Sombra projetada
+  editável (em imagem recortada, segue o recorte).
+- **Receitas prontas** (cada uma é etapa: mesmos parâmetros pula, mudou refaz): `KNV.receita.tituloGasto(['grupo'...],
+  {cor})`, `.texturaTecido(['fundo'...])`, `.sombra(['camada'], '0 30px 60px rgba(0,0,0,.5)')`, `.acabamento({...})`,
+  `.balancoAuto('foto')`. Camera Raw tem botão "Automático" no balanço de branco.
+- **Conferência**: `--comparar slide:2` (só o slide, lado a lado); avisos novos: fundo de trecho mais alto que a linha
+  (cobre acento/cedilha) e "quase alinhados" (bordas a 3–8 px). `<g transform>` dentro de `<svg>` agora vale.

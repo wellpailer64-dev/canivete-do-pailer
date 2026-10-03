@@ -674,10 +674,10 @@ const KNV = {
     },
     // etapa nomeada e idempotente: roda de novo SUBSTITUI o que ela fez (camadas criadas e filtros inteligentes que
     // ela pôs saem antes); mesmo código já rodado = pula (forcar: true roda igual). Fica no .iknv (doc.cena.etapas).
-    async etapa(nome, fn, { forcar = false } = {}) {
+    async etapa(nome, fn, { forcar = false, chave = '' } = {}) {   // chave: parâmetros (mudou = refaz)
         const d = IE.doc;
         d.cena = d.cena || {}; d.cena.etapas = d.cena.etapas || {};
-        const src = String(fn), hsh = [...src].reduce((h, ch) => Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0, 2166136261).toString(36);
+        const src = String(fn) + '|' + chave, hsh = [...src].reduce((h, ch) => Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0, 2166136261).toString(36);
         if (!forcar && d.cena.etapas[nome] === hsh) return { etapa: nome, pulou: true };
         // desfaz a vez anterior
         const sai = [];
@@ -708,17 +708,92 @@ const KNV = {
         d.camadas.push(L); ieTudo(d); ieUiCamadas();
         return { w, h };
     },
-    // referência (em cima) × peça (embaixo), pequenas, num JPEG só — conferir o todo sem ler duas imagens grandes
-    comparar({ escala = 0.3 } = {}) {
-        const d = IE.doc, ref = ieTodas(d).find(L => L.referencia);
+    // referência × peça num JPEG só — conferir sem ler duas imagens grandes. Inteira: referência em cima, peça embaixo;
+    // {slide: 2}: só esse slide, lado a lado (ajuste fino barato)
+    comparar({ escala, slide } = {}) {
+        const d = IE.doc, ref = ieTodas(d).find(L => L.referencia), S = d.cena && d.cena.slide;
         if (!ref) throw new Error('sem referência (KNV.referencia ou --referencia)');
-        const w = Math.round(d.w * escala), h = Math.round(d.h * escala), out = ieCanvas(w, h * 2 + 6), x = ieCtx(out);
+        let R = { x: 0, y: 0, w: d.w, h: d.h }, lado = false;
+        if (slide && S) { R = { x: (slide - 1) * S.w, y: 0, w: S.w, h: S.h }; lado = true; }
+        escala = escala || (lado ? 0.4 : 0.3);
+        const w = Math.round(R.w * escala), h = Math.round(R.h * escala), out = ieCanvas(lado ? w * 2 + 6 : w, lado ? h : h * 2 + 6), x = ieCtx(out);
         x.fillStyle = '#202020'; x.fillRect(0, 0, out.width, out.height);
-        x.drawImage(ref.c, 0, 0, d.w, d.h, 0, 0, w, h);
+        x.drawImage(ref.c, R.x, R.y, R.w, R.h, 0, 0, w, h);
         const vis = ref.visivel; ref.visivel = false; ieCompor(d);
-        x.drawImage(d.comp, 0, 0, d.w, d.h, 0, h + 6, w, h);
+        x.drawImage(d.comp, R.x, R.y, R.w, R.h, lado ? w + 6 : 0, lado ? 0 : h + 6, w, h);
         ref.visivel = vis; ieCompor(d);
         return out.toDataURL('image/jpeg', 0.82);
+    },
+    // ── receitas prontas de acabamento (cada uma é uma etapa: rodar de novo com os mesmos parâmetros pula; mudou, refaz) ──
+    receita: {
+        // textura gasta em títulos: manchas na cor do fundo presas (corte) a cada grupo/camada
+        async tituloGasto(nomes, { cor = '#0b0b0b', forca = 1, semente = 11 } = {}) {
+            const d = IE.doc, lista = [].concat(nomes);
+            return KNV.etapa('tituloGasto:' + lista.join(','), async () => {
+                lista.forEach((n, k) => {
+                    const G = ieTodas(d).find(L => L.nome === n || L.id === n);
+                    if (!G) return;
+                    const R = ieRCamada(G), c = ieCanvas(R.w, R.h), x = ieCtx(c), img = x.createImageData(R.w, R.h), p = img.data;
+                    const fino = ieRuidoSuave(R.w, R.h, 2.2, semente + k * 7), largo = ieRuidoSuave(R.w, R.h, 16, semente + k * 7 + 1), [cr, cg, cb] = ieHexRgb(cor);
+                    let s = semente + k; const rnd = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+                    const lim = 0.5 / Math.max(0.3, forca);
+                    for (let i = 0; i < R.w * R.h; i++) {
+                        const v = fino[i] * 0.55 + largo[i] * 0.45 + (rnd() - 0.5) * 0.35, al = v > lim ? 1 : v > lim - 0.08 ? (v - lim + 0.08) / 0.08 : 0;
+                        p[i * 4] = cr; p[i * 4 + 1] = cg; p[i * 4 + 2] = cb; p[i * 4 + 3] = al * 235;
+                    }
+                    x.putImageData(img, 0, 0);
+                    const L = ieNovaCamada(d, { tipo: 'pixel', nome: (G.nome || n) + ' · gasto', c, x: R.x, y: R.y });
+                    ieInserirAcima(d, L, G); L.clip = true;
+                });
+            }, { chave: JSON.stringify([lista, cor, forca, semente]) });
+        },
+        // textura de tecido acima de cada fundo (cinza 50% + Texturizador + ruído, em Sobrepor)
+        async texturaTecido(fundos, { escala = 150, relevo = 32, ruido = 14, op = 85, tex = 'tela' } = {}) {
+            const d = IE.doc, lista = [].concat(fundos);
+            return KNV.etapa('texturaTecido:' + lista.join(','), async () => {
+                for (const n of lista) {
+                    const bg = ieTodas(d).find(L => (L.nome === n || L.id === n) && L.c);
+                    if (!bg) continue;
+                    const c = ieCanvas(bg.c.width, bg.c.height), x = ieCtx(c);
+                    x.fillStyle = '#808080'; x.fillRect(0, 0, c.width, c.height);
+                    const L = ieNovaCamada(d, { tipo: 'pixel', nome: 'Textura ' + bg.nome, c, x: bg.x, y: bg.y });
+                    ieInserirAcima(d, L, bg); KNV.ativar(L.id);
+                    await KNV.cmd('f:galeria', { pilha: [{ f: 'texturizador', v: { tex, esc: escala, rel: relevo, luz: 'cimaEsq' } }] });
+                    await KNV.cmd('f:ruido', { q: ruido, mono: true });
+                    KNV.modo('OVERLAY', op);
+                }
+            }, { chave: JSON.stringify([lista, escala, relevo, ruido, op, tex]) });
+        },
+        // sombra projetada (efeito de camada, segue o recorte): css como no box-shadow ("0 30px 60px rgba(0,0,0,.55)")
+        async sombra(nomes, css = '0 30px 60px rgba(0,0,0,.55)') {
+            const d = IE.doc, lista = [].concat(nomes);
+            return KNV.etapa('sombra:' + lista.join(','), async () => {
+                for (const n of lista) {
+                    const L = ieTodas(d).find(x => x.nome === n || x.id === n);
+                    if (!L) continue;
+                    if (L.fx) { delete L.fx.sombra; delete L.fx.brilho; }
+                    ieCenaFxSombras(L, ieCenaSombras(css)); L.fxMudou = true; ieInvalidar(L);
+                }
+            }, { chave: css, forcar: true });
+        },
+        // Camera Raw de acabamento no topo (camada de ajuste)
+        async acabamento(vals = { clar: 14, tex: 10, grao: 14, graoT: 25, ct: 8, vib: 4 }) {
+            const d = IE.doc;
+            return KNV.etapa('acabamento', async () => {
+                KNV.ativar(d.camadas[d.camadas.length - 1].id);
+                await KNV.ajuste('cameraRaw', vals, { nome: 'Acabamento (Camera Raw)' });
+            }, { chave: JSON.stringify(vals) });
+        },
+        // balanço de branco automático numa foto (objeto inteligente): Camera Raw como filtro inteligente
+        async balancoAuto(nome) {
+            const d = IE.doc, L = ieTodas(d).find(x => x.nome === nome || x.id === nome);
+            if (!L || !L.c0) throw new Error(`"${nome}" não é um objeto inteligente`);
+            return KNV.etapa('balancoAuto:' + nome, async () => {
+                const wb = ieCrAutoBalanco(L.c0.c);
+                L.filtrosInt = [...(L.filtrosInt || []), { cmd: 'f:cameraRaw', titulo: 'Filtro Camera Raw (balanço)', vals: ieCrNorm(wb), on: true }];
+                const o = ieIntPlano(L); L.c = o.c; L.x = o.x; L.y = o.y; ieInvalidar(L);
+            });
+        },
     },
     // recursos marcados com data-guardar desde a última chamada: [{nome, png (base64), meta}] (o runner grava)
     recursosNovos() {
