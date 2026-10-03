@@ -1105,7 +1105,7 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-menu .ve-menu-form button { width: auto; }
 /* menus (barra, botão direito na timeline/Projeto/ferramentas), fantasma e guias de encaixe ficam no <body>, fora do
    .ve (e nos painéis soltos, em outra janela): precisam das cores do editor — sem elas o fundo fica transparente */
-.ve-menu, .ve-mbar-menu, .ve-ctx, .ve-dghost, .ve-ddrop, .ve-dzones {
+.ve-menu, .ve-mbar-menu, .ve-ctx, .ve-dghost, .ve-ddrop, .ve-dzones, .ve-cp-fundo {
     --ve-bg: var(--bg-0); --ve-panel: var(--bg-1); --ve-panel-2: var(--bg-3);
     --ve-line: var(--line); --ve-line-2: var(--line-2); --ve-text: var(--text); --ve-dim: var(--text-2);
     --ve-faint: var(--text-3); --ve-accent: #D4814A; --ve-accent-2: var(--primary-hover);
@@ -1384,6 +1384,8 @@ html.ve-float-html body { background: var(--bg-0); }
     white-space: pre; outline: none; box-sizing: border-box; padding-bottom: 0; transform-origin: 50% 50%;
 }
 .ve-tx-edit::selection { background: rgba(212, 129, 74,.35); color: transparent; }
+/* ferramenta Texto: a caixa sendo desenhada (clicar e arrastar no monitor) */
+.ve-tx-caixa-nova { position: absolute; z-index: 6; border: 1px dashed #D4814A; background: rgba(212, 129, 74, 0.08); pointer-events: none; }
 
 /* ferramenta Velocidade (R) */
 .ve-tl-wrap.tool-rate { cursor: default; }
@@ -1977,3 +1979,27 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-start-auto .ve-start-auto-lista { justify-content: center; padding-top: 8px; }
 .ve-start-auto .ve-start-auto-item { font-size: 11.5px; padding: 5px 9px; }
 @media (max-width: 760px) { .ve-start-hero { flex-direction: column; align-items: stretch; } }
+
+/* Seletor de cor do editor (Cor sólida: editor-grafico.js, veGrEscolherCor) */
+.ve-cp-fundo { position: fixed; inset: 0; z-index: 9000; background: rgba(0,0,0,0.35); }
+.ve-cp {
+    position: fixed; display: flex; flex-direction: column; gap: 10px; padding: 14px;
+    background: var(--ve-panel); border: 1px solid var(--ve-line-2); border-radius: 8px;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.55); color: var(--ve-text); font: 12px var(--ve-ui);
+}
+.ve-cp-tit { font-weight: 700; font-size: 13px; }
+.ve-cp-corpo { display: flex; gap: 10px; }
+.ve-cp-sv { width: 220px; height: 170px; border-radius: 4px; cursor: crosshair; touch-action: none; }
+.ve-cp-h { width: 18px; height: 170px; border-radius: 4px; cursor: ns-resize; touch-action: none; }
+.ve-cp-lado { display: flex; flex-direction: column; gap: 6px; width: 92px; }
+.ve-cp-comp { display: flex; flex-direction: column; height: 52px; border-radius: 4px; overflow: hidden; border: 1px solid var(--ve-line-2); }
+.ve-cp-comp i { flex: 1; }
+.ve-cp-lado label { display: flex; align-items: center; gap: 6px; color: var(--ve-dim); font: 600 11px var(--ve-mono); }
+.ve-cp-lado input {
+    width: 100%; min-width: 0; height: 24px; padding: 0 6px; border: 1px solid var(--ve-line-2); border-radius: 3px;
+    background: var(--ve-bg); color: var(--ve-text); font: 12px var(--ve-mono);
+}
+.ve-cp-amostras { display: flex; gap: 5px; flex-wrap: wrap; }
+.ve-cp-amostras button { width: 20px; height: 20px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.18); cursor: pointer; padding: 0; }
+.ve-cp-amostras button:hover { transform: scale(1.12); }
+.ve-cp-pe { display: flex; justify-content: flex-end; gap: 8px; }

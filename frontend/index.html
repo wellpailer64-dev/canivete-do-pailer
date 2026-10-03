@@ -31,6 +31,8 @@
         <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="11.5" cy="11.5" r="3.5"/><path d="m16 16-2-2"/></symbol>
         <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
         <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></symbol>
+        <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V3M7.5 7.5 12 3l4.5 4.5"/><path d="M3 14v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/></symbol>
+        <symbol id="i-swatch" viewBox="0 0 24 24"><path d="M12 3.2c-3.2 3.9-6 7.2-6 10.6a6 6 0 0 0 12 0c0-3.4-2.8-6.7-6-10.6z"/><path d="M9.2 14.6a3 3 0 0 0 2.6 2.6"/></symbol>
         <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3v11M7.5 9.5 12 14l4.5-4.5"/><path d="M3 14v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/></symbol>
         <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor" stroke="none"/></symbol>
         <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
@@ -626,11 +628,11 @@
                                     <div class="ve-pj-cab"><span data-ord="nome" data-dir="↑">Nome</span><span data-ord="tipo">Tipo</span><span data-ord="dur">Duração</span><span>Informações</span><span title="Clipes na timeline">Uso</span></div>
                                     <div class="ve-pj-lista" id="ve-pj-lista"></div>
                                     <div class="ve-pj-rodape">
-                                        <button class="ve-icon-btn" onclick="vePjImportarDialogo()" title="Importar arquivos (Ctrl+I) — ou arraste arquivos e pastas do Windows para cá"><svg class="i"><use href="#i-download"/></svg></button>
+                                        <button class="ve-icon-btn" onclick="vePjImportarDialogo()" title="Importar arquivos (Ctrl+I) — ou arraste arquivos e pastas do Windows para cá"><svg class="i"><use href="#i-upload"/></svg></button>
                                         <button class="ve-icon-btn" onclick="veCreateTimeline()" title="Nova timeline (Ctrl+N)"><svg class="i"><use href="#i-film"/></svg></button>
                                         <button class="ve-icon-btn" onclick="vePjNovaPasta()" title="Nova pasta (Ctrl+B)"><svg class="i"><use href="#i-folder"/></svg></button>
                                         <button class="ve-icon-btn" onclick="vePjNovoAjuste()" title="Nova camada de ajuste"><svg class="i"><use href="#i-sliders"/></svg></button>
-                                        <button class="ve-icon-btn" onclick="vePjNovaCor()" title="Nova cor sólida (camada de cor do tamanho do quadro)"><svg class="i"><use href="#i-drop"/></svg></button>
+                                        <button class="ve-icon-btn" onclick="vePjNovaCor()" title="Nova cor sólida (camada de cor do tamanho do quadro)"><svg class="i"><use href="#i-swatch"/></svg></button>
                                         <span class="ve-pj-sep"></span>
                                         <button class="ve-icon-btn ve-pj-modo" data-pj-modo="lista" title="Visualização em lista"><svg class="i"><use href="#i-table"/></svg></button>
                                         <button class="ve-icon-btn ve-pj-modo" data-pj-modo="grade" title="Visualização em grade (cards com prévia)"><svg class="i"><use href="#i-grid"/></svg></button>
@@ -859,7 +861,6 @@
                         <section class="ve-panel ve-timeline" data-panel="timeline" data-title="Timeline">
                             <div class="ve-tl-toolbar">
                                 <div class="ve-seq-tabs" id="ve-seq-tabs"></div>
-                                <button class="ve-icon-btn ve-tb-btn" onclick="veImportTimelineFile()" title="Importar mídia na timeline, na agulha"><svg class="i"><use href="#i-download"/></svg></button>
                                 <button class="ve-seg-btn ve-snap active" id="ve-vinculo" onclick="veToggleVinculo()" title="Seleção vinculada: ligada, clicar no vídeo ou no áudio seleciona os dois; desligada, só a parte clicada"><svg class="i"><use href="#i-link"/></svg></button>
                                 <button class="ve-seg-btn ve-snap active" id="ve-snap" onclick="veToggleSnap()" title="Ímã: encaixar na agulha e nos cortes (N)"><svg class="i"><use href="#i-magnet"/></svg></button>
                                 <div class="ve-io-chip" id="ve-io-chip" hidden>

@@ -65,18 +65,44 @@ function veTxFonte(x, tam) {
     return `${x.ita ? 'italic ' : ''}${x.neg ? 'bold ' : ''}${tam}px "${x.fonte}", Arial, sans-serif`;
 }
 
-// Medidas do bloco de texto em pixels do quadro (tamanho "lógico" do clipe)
+// Texto de caixa (como o "texto de parágrafo" do Premiere): a linha que passa da largura quebra na palavra; palavra
+// maior que a caixa quebra no meio. Os espaços do fim de cada linha quebrada somem.
+function veTxQuebrar(ctx, linha, larg) {
+    if (!linha || ctx.measureText(linha).width <= larg) return [linha];
+    const out = [];
+    let atual = '';
+    for (const pal of linha.split(/(?<=\s)/)) {
+        const tenta = atual + pal;
+        if (!atual || ctx.measureText(tenta.trimEnd()).width <= larg) { atual = tenta; continue; }
+        out.push(atual.trimEnd());
+        atual = pal;
+    }
+    if (atual) out.push(atual.trimEnd());
+    // palavra sozinha mais larga que a caixa: quebra por letra
+    return out.flatMap(l => {
+        if (ctx.measureText(l).width <= larg) return [l];
+        const p = [];
+        let a = '';
+        for (const ch of l) { if (a && ctx.measureText(a + ch).width > larg) { p.push(a); a = ch; } else a += ch; }
+        return a ? [...p, a] : p;
+    });
+}
+
+// Medidas do bloco de texto em pixels do quadro (tamanho "lógico" do clipe). Com x.caixa (largura, px do quadro)
+// a largura do bloco é a da caixa e as linhas quebram dentro dela; sem, é a da linha mais larga (texto de ponto).
 function veTxLayout(x) {
     if (!veTxMedidor) veTxMedidor = document.createElement('canvas').getContext('2d');
     const ctx = veTxMedidor;
     ctx.font = veTxFonte(x, x.tam);
     ctx.letterSpacing = (x.esp / 1000 * x.tam) + 'px';
-    const linhas = String(x.t || '').split('\n');
+    const caixa = +x.caixa > 0 ? +x.caixa : 0;
+    let linhas = String(x.t || '').split('\n');
+    if (caixa) linhas = linhas.flatMap(l => veTxQuebrar(ctx, l, caixa));
     const mt = ctx.measureText('Hg');
     const asc = mt.fontBoundingBoxAscent || x.tam * 0.9, desc = mt.fontBoundingBoxDescent || x.tam * 0.22;
     const lh = x.tam * x.ent / 100;
     const larg = linhas.map(l => ctx.measureText(l).width);
-    const tw = Math.max(x.tam * 0.35, ...larg), th = (linhas.length - 1) * lh + asc + desc;
+    const tw = caixa || Math.max(x.tam * 0.35, ...larg), th = (linhas.length - 1) * lh + asc + desc;
     const m = Math.ceil((x.fOn ? x.fPad : 0) + (x.cOn ? x.cLarg : 0) + (x.sOn ? x.sDist + x.sBlur * 1.5 : 0) + 4);
     return { linhas, larg, asc, desc, lh, tw, th, m, w: Math.ceil(tw + 2 * m), h: Math.ceil(th + 2 * m) };
 }
@@ -196,7 +222,9 @@ function veTxClipeEm(pt) {
     return veTfClipeEm(pt, veIsTexto);
 }
 
-function veTxNovo(pt) {
+// caixa = {larg, topo} (clicar e arrastar, px do quadro): texto de caixa com o canto de cima à esquerda no começo do
+// arraste, que cresce para baixo ao digitar; sem caixa (só clique): texto de ponto, como antes
+function veTxNovo(pt, caixa) {
     if (!VE.ready) return;
     if (VE.info && VE.info.audio_only) { veToast('Texto precisa de um vídeo'); return; }
     if (VE.playing) veStop();
@@ -207,18 +235,23 @@ function veTxNovo(pt) {
     if (veTrkLocked(tr) || !veTrackFree(tr, st, b, novo)) { veToast('Não há trilha de vídeo livre na agulha para o texto'); return; }
     vePushHistory();
     // como no Premiere: o texto novo começa no ponto clicado (alinhado à esquerda) e cresce para a direita
-    const clip = { tr, st, s: 0, e: VE_TX_DUR, m: m.id, tx: { ...VE_TX_PADRAO, alin: 'left' }, p: { sc: 100, x: Math.round(pt.x), y: Math.round(pt.y), rot: 0, op: 100 } };
+    const tx = { ...VE_TX_PADRAO, alin: 'left' };
+    if (caixa) {
+        tx.caixa = Math.max(20, Math.round(caixa.larg));
+        tx.tam = Math.min(tx.tam, Math.max(24, Math.round(caixa.larg / 6)));   // caixa estreita: letra que cabe nela
+    }
+    const clip = { tr, st, s: 0, e: VE_TX_DUR, m: m.id, tx, p: { sc: 100, x: Math.round(pt.x), y: Math.round(pt.y), rot: 0, op: 100 } };
     VE.clips.push(clip);
     VE.sel = VE.clips.indexOf(clip);
     veRelayout();
     veAfterEdit(VE.playhead);
     vedShow('pp');
-    veTxEditar(VE.sel, true);
+    veTxEditar(VE.sel, true, caixa ? caixa.topo : null);
 }
 
 // Digitar direto no monitor: uma caixa de texto transparente por cima do desenho (o monitor mostra o
 // resultado de verdade a cada tecla; a caixa só dá o cursor e a seleção)
-function veTxEditar(i, novo) {
+function veTxEditar(i, novo, topo = null) {
     veTxEditarFim();
     const c = VE.clips[i];
     if (!c || !veIsTexto(c)) return;
@@ -230,7 +263,7 @@ function veTxEditar(i, novo) {
     ta.spellcheck = false;
     ta.value = veTxt(c).t;
     scr.appendChild(ta);
-    VEPP.edit = { c, ta, novo, hist: !!novo, x0: novo ? c.p.x : null };
+    VEPP.edit = { c, ta, novo, hist: !!novo, x0: novo ? c.p.x : null, y0: novo && topo != null ? topo : null };
     if (novo) veTxAncorar();
     veTxEditarPos();
     ta.focus();
@@ -254,12 +287,15 @@ function veTxEditar(i, novo) {
     ta.addEventListener('blur', () => setTimeout(() => { if (VEPP.edit && VEPP.edit.ta === ta) veTxEditarFim(); }, 0));
 }
 
-// Texto recém-criado: a borda esquerda fica no ponto do clique enquanto ele é digitado
+// Texto recém-criado: a borda esquerda fica no ponto do clique enquanto ele é digitado (texto de caixa: o topo
+// também fica, e ele cresce para baixo, como no Premiere)
 function veTxAncorar() {
     const ed = VEPP.edit;
     if (!ed || ed.x0 == null || veKfOn(ed.c, 'x')) return;
     const L = veTxLayout(veTxt(ed.c)), k = veStaticProps(ed.c).sc / 100;
-    ed.c.p = { ...veStaticProps(ed.c), x: Math.round(ed.x0 + (L.w / 2 - L.m) * k) };
+    const p = { ...veStaticProps(ed.c), x: Math.round(ed.x0 + (L.w / 2 - L.m) * k) };
+    if (ed.y0 != null && !veKfOn(ed.c, 'y')) p.y = Math.round(ed.y0 + (L.h / 2 - L.m) * k);
+    ed.c.p = p;
 }
 
 // Posiciona a caixa sobre o texto no monitor (mesma fonte, tamanho e alinhamento, na escala da tela)
@@ -281,6 +317,9 @@ function veTxEditarPos() {
     s.letterSpacing = (x.esp / 1000 * x.tam * k) + 'px';
     s.lineHeight = (L.lh * k) + 'px';
     s.textAlign = x.alin;
+    // texto de caixa: a caixa de digitação quebra as linhas na mesma largura do desenho (a borda mostra a caixa)
+    s.whiteSpace = +x.caixa > 0 ? 'pre-wrap' : '';
+    s.overflowWrap = +x.caixa > 0 ? 'anywhere' : '';
     // a linha do CSS centraliza o texto na altura da linha; o desenho põe a 1ª linha de base em m + asc
     s.paddingTop = ((L.m - (L.lh - L.asc - L.desc) / 2) * k) + 'px';
     s.paddingLeft = s.paddingRight = (L.m * k) + 'px';
@@ -481,7 +520,9 @@ function vePpHtml(a) {
                     <button class="ve-pp-tog" data-ppalin="right" title="Alinhar à direita">≡⯈</button></div>
                 ${vePpNum('tx.tam', 'Tamanho', 8, 400, 1, 'px')}
                 ${vePpNum('tx.esp', 'Espaçamento', -100, 500, 5, '')}
-                ${vePpNum('tx.ent', 'Entrelinha', 70, 250, 1, '%')}`) +
+                ${vePpNum('tx.ent', 'Entrelinha', 70, 250, 1, '%')}
+                ${vePpNum('tx.caixa', 'Largura da caixa', 0, VE.seqW * 2, 1, 'px')}
+                <small class="ve-pp-dica">Largura da caixa: as linhas quebram dentro dela (0 = texto de ponto, sem quebra). Com a ferramenta Texto (T), clique e arraste no monitor para criar já com a caixa.</small>`) +
             vePpSec('Aparência', `
                 <div class="ve-pp-cores">${vePpCor('tx.cor', 'Preenchimento')}</div>
                 <div class="ve-pp-grupo">${vePpChk('tx.cOn', 'Contorno')}${vePpCor('tx.cCor', '')}
@@ -547,6 +588,7 @@ function vePpGet(k) {
     if (k === 'tx.estilo') { const x = veTxt(c); return veFonteEstiloAtual(x, x.neg, x.ita); }
     if (k === 'le.fam') return veFonteFamilia(vePpLegEstilo());
     if (k === 'le.estilo') { const e = vePpLegEstilo(); return veFonteEstiloAtual(e, e.negrito, e.ita); }
+    if (k === 'tx.caixa') return +veTxt(c).caixa || 0;
     if (k.startsWith('tx.')) return veTxt(c)[k.slice(3)];
     if (k === 'gr.fill') return veMediaOf(c).fill;
     if (k.startsWith('fm.')) return (c.fm || {})[k.slice(3)];
@@ -588,6 +630,21 @@ function vePpSet(k, v) {
         const n = k.slice(3);
         if ((n === 'w' || n === 'h' || n === 'cLarg' || n === 'raio') && !isFinite(v)) return;
         c.fm = { ...c.fm, [n]: n === 'w' || n === 'h' ? Math.max(2, Math.round(v)) : v };
+        return 'monitor';
+    }
+    if (k === 'tx.caixa') {
+        // largura da caixa: muda sem o texto sair do lugar pela borda esquerda (alinhado à esquerda) ou pelo centro
+        if (!isFinite(v)) return;
+        const x = veTxt(c), antes = veTxLayout(x).w, k0 = veStaticProps(c).sc / 100;
+        const novo = v > 0 ? Math.max(20, Math.round(v)) : 0;
+        const tx = { ...x };
+        if (novo) tx.caixa = novo; else delete tx.caixa;
+        c.tx = tx;
+        if (x.alin !== 'center' && !veKfOn(c, 'x')) {
+            const d = (veTxLayout(tx).w - antes) / 2 * k0 * (x.alin === 'right' ? -1 : 1);
+            c.p = { ...veStaticProps(c), x: Math.round(veStaticProps(c).x + d) };
+        }
+        if (VEPP.edit && VEPP.edit.c === c) veTxEditarPos();
         return 'monitor';
     }
     if (k.startsWith('tx.')) {
@@ -799,7 +856,33 @@ function veTxInitMonitor() {
             VE.sel = i;
             veRefresh();
             veTxEditar(i);
-        } else veTxNovo(pt);
+            return;
+        }
+        // no vazio: soltar sem arrastar = texto de ponto; arrastar = desenha a caixa do texto (como no Premiere)
+        const doc = scr.ownerDocument, rs = scr.getBoundingClientRect();
+        const ret = doc.createElement('div');
+        ret.className = 've-tx-caixa-nova';
+        let fim = null;
+        const mover = ev => {
+            fim = ev;
+            const x0 = Math.min(e.clientX, ev.clientX), y0 = Math.min(e.clientY, ev.clientY);
+            if (Math.abs(ev.clientX - e.clientX) < 6 && Math.abs(ev.clientY - e.clientY) < 6) { ret.remove(); return; }
+            if (!ret.parentNode) scr.appendChild(ret);
+            Object.assign(ret.style, { left: (x0 - rs.left) + 'px', top: (y0 - rs.top) + 'px',
+                width: Math.abs(ev.clientX - e.clientX) + 'px', height: Math.abs(ev.clientY - e.clientY) + 'px' });
+        };
+        const soltar = ev => {
+            doc.removeEventListener('pointermove', mover, true);
+            doc.removeEventListener('pointerup', soltar, true);
+            const arrastou = ret.parentNode;
+            ret.remove();
+            if (!arrastou) { veTxNovo(pt); return; }
+            const b = veTxPontoQuadro(fim || ev);
+            const esq = Math.min(pt.x, b.x), topo = Math.min(pt.y, b.y);
+            veTxNovo({ x: esq, y: topo }, { larg: Math.abs(b.x - pt.x), topo });
+        };
+        doc.addEventListener('pointermove', mover, true);
+        doc.addEventListener('pointerup', soltar, true);
     }, true);
     scr.addEventListener('dblclick', e => {
         if (!VE.ready || e.target.closest('button, textarea')) return;

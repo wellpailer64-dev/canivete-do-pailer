@@ -139,20 +139,103 @@ async function veGrafPngs(mapa, filtro, clips = VE.clips) {
 }
 
 // ── Cor sólida (painel Projeto) ──
-// seletor de cor do sistema (um input escondido, reaproveitado), criado na janela onde foi o clique: com o painel
-// numa janela solta, o seletor só abre se o input estiver nela
-function veGrEscolherCor(inicial, pronto, doc = document) {
-    let inp = doc.getElementById('ve-gr-cor');
-    if (!inp) {
-        inp = doc.createElement('input');
-        inp.type = 'color';
-        inp.id = 've-gr-cor';
-        inp.style.cssText = 'position:fixed;left:-100px;top:0;opacity:0;pointer-events:none';
-        doc.body.appendChild(inp);
-    }
-    inp.value = /^#[0-9a-f]{6}$/i.test(inicial) ? inicial : '#F97316';
-    inp.onchange = () => pronto(inp.value);
-    inp.click();
+// Seletor de cor do próprio editor (como o "Seletor de cores" do Premiere): quadrado de saturação/brilho, faixa de
+// matiz, hex, R/G/B, amostras rápidas, Cancelar e OK. Abre no meio do painel Projeto, na janela dele (pode estar solta),
+// sempre inteiro na tela. Antes era o seletor do Windows aberto por um input escondido fora da tela: aparecia num
+// canto e sem botões à vista.
+const VE_CP_AMOSTRAS = ['#000000', '#FFFFFF', '#808080', '#F97316', '#D4814A', '#EF4444', '#EAB308', '#22C55E', '#06B6D4', '#3B82F6', '#8B5CF6', '#EC4899'];
+function veGrEscolherCor(inicial, pronto, doc = document, { titulo = 'Cor sólida', ok = 'OK', aoVivo = null } = {}) {
+    doc.getElementById('ve-cp')?.remove();
+    const hex2 = n => Math.round(n).toString(16).padStart(2, '0');
+    const paraHex = (r, g, b) => ('#' + hex2(r) + hex2(g) + hex2(b)).toUpperCase();
+    const deHex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const hsvRgb = (h, s, v) => { const f = n => { const k = (n + h / 60) % 6; return (v - v * s * Math.max(0, Math.min(k, 4 - k, 1))) * 255; }; return [f(5), f(3), f(1)]; };
+    const rgbHsv = (r, g, b) => {
+        const mx = Math.max(r, g, b) / 255, mn = Math.min(r, g, b) / 255, d = mx - mn;
+        let h = 0;
+        if (d) h = mx === r / 255 ? ((g - b) / 255 / d) % 6 : mx === g / 255 ? (b - r) / 255 / d + 2 : (r - g) / 255 / d + 4;
+        return [((h * 60) + 360) % 360, mx ? d / mx : 0, mx];
+    };
+    const ini = /^#[0-9a-f]{6}$/i.test(inicial || '') ? inicial.toUpperCase() : '#F97316';
+    let [H, S, V] = rgbHsv(...deHex(ini)), atual = ini;
+    const box = doc.createElement('div');
+    box.id = 've-cp';
+    box.className = 've-cp-fundo';
+    box.innerHTML = `<div class="ve-cp" role="dialog">
+        <div class="ve-cp-tit">${veT(titulo)}</div>
+        <div class="ve-cp-corpo">
+            <canvas class="ve-cp-sv" width="220" height="170"></canvas><canvas class="ve-cp-h" width="18" height="170"></canvas>
+            <div class="ve-cp-lado">
+                <div class="ve-cp-comp"><i class="ve-cp-novo" title="${veT('Nova')}"></i><i class="ve-cp-velho" style="background:${ini}" title="${veT('Atual')}"></i></div>
+                <label>#<input class="ve-cp-hex" maxlength="7" spellcheck="false"></label>
+                ${['R', 'G', 'B'].map((n, i) => `<label>${n}<input type="number" class="ve-cp-c" data-c="${i}" min="0" max="255"></label>`).join('')}
+            </div>
+        </div>
+        <div class="ve-cp-amostras">${VE_CP_AMOSTRAS.map(c => `<button style="background:${c}" data-cor="${c}" title="${c}"></button>`).join('')}</div>
+        <div class="ve-cp-pe"><button class="ve-btn ve-btn-ghost" data-cp="nao">${veT('Cancelar')}</button><button class="ve-btn ve-btn-primary" data-cp="ok">${veT(ok)}</button></div>
+    </div>`;
+    doc.body.appendChild(box);
+    const sv = box.querySelector('.ve-cp-sv'), hc = box.querySelector('.ve-cp-h');
+    const desenhar = () => {
+        const x = sv.getContext('2d'), W = sv.width, Hh = sv.height;
+        const [hr, hg, hb] = hsvRgb(H, 1, 1);
+        x.fillStyle = `rgb(${hr},${hg},${hb})`; x.fillRect(0, 0, W, Hh);
+        let gr = x.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, '#fff'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, W, Hh);
+        gr = x.createLinearGradient(0, 0, 0, Hh); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, '#000'); x.fillStyle = gr; x.fillRect(0, 0, W, Hh);
+        x.lineWidth = 2; x.strokeStyle = V > 0.55 ? '#000' : '#fff'; x.beginPath(); x.arc(S * W, (1 - V) * Hh, 6, 0, Math.PI * 2); x.stroke();
+        const y = hc.getContext('2d'), gh = y.createLinearGradient(0, 0, 0, hc.height);
+        for (let k = 0; k <= 6; k++) { const [a, b2, c] = hsvRgb(k * 60, 1, 1); gh.addColorStop(k / 6, `rgb(${a},${b2},${c})`); }
+        y.fillStyle = gh; y.fillRect(0, 0, hc.width, hc.height);
+        y.strokeStyle = '#fff'; y.lineWidth = 2; y.strokeRect(1, H / 360 * hc.height - 2, hc.width - 2, 4);
+        const rgb = hsvRgb(H, S, V).map(Math.round);
+        atual = paraHex(...rgb);
+        box.querySelector('.ve-cp-novo').style.background = atual;
+        const hx = box.querySelector('.ve-cp-hex');
+        if (doc.activeElement !== hx) hx.value = atual.slice(1);
+        box.querySelectorAll('.ve-cp-c').forEach(i => { if (doc.activeElement !== i) i.value = rgb[+i.dataset.c]; });
+        if (aoVivo) aoVivo(atual);
+    };
+    const usarRgb = rgb => { [H, S, V] = rgbHsv(...rgb); desenhar(); };
+    const arrastar = (el, fn) => el.addEventListener('pointerdown', ev => {
+        el.setPointerCapture(ev.pointerId);
+        const mv = e => { const rc = el.getBoundingClientRect(); fn(Math.min(1, Math.max(0, (e.clientX - rc.left) / rc.width)), Math.min(1, Math.max(0, (e.clientY - rc.top) / rc.height))); desenhar(); };
+        mv(ev);
+        el.onpointermove = mv;
+        el.onpointerup = () => { el.onpointermove = null; };
+    });
+    arrastar(sv, (u, v) => { S = u; V = 1 - v; });
+    arrastar(hc, (u, v) => { H = Math.min(359.9, v * 360); });
+    box.querySelector('.ve-cp-hex').addEventListener('input', e => { const v = e.target.value.replace('#', ''); if (/^[0-9a-f]{6}$/i.test(v)) usarRgb(deHex('#' + v)); });
+    box.querySelectorAll('.ve-cp-c').forEach(i => i.addEventListener('input', () => {
+        const rgb = deHex(atual); rgb[+i.dataset.c] = Math.min(255, Math.max(0, +i.value || 0)); usarRgb(rgb);
+    }));
+    const fechar = escolheu => {
+        box.remove();
+        doc.removeEventListener('keydown', teclas, true);
+        if (escolheu) pronto(atual);
+        else if (aoVivo) aoVivo(ini);   // cancelou: volta a cor de antes
+    };
+    const teclas = e => {
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fechar(false); }
+        else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); fechar(true); }
+        else if (box.contains(e.target)) e.stopPropagation();   // digitar no hex não dispara atalhos do editor
+    };
+    doc.addEventListener('keydown', teclas, true);
+    box.addEventListener('click', e => {
+        const a = e.target.closest('[data-cor]');
+        if (a) { usarRgb(deHex(a.dataset.cor)); return; }
+        const b = e.target.closest('[data-cp]');
+        if (b) fechar(b.dataset.cp === 'ok');
+        else if (e.target === box) fechar(false);   // clique fora da caixa
+    });
+    // no meio do painel Projeto (ou da janela), sem sair da tela
+    const cx = box.querySelector('.ve-cp'), pj = $ve('ve-pj');
+    const ref = pj && pj.ownerDocument === doc && pj.offsetParent ? pj.getBoundingClientRect() : { left: 0, top: 0, width: doc.documentElement.clientWidth, height: doc.documentElement.clientHeight };
+    const vw = doc.documentElement.clientWidth, vh = doc.documentElement.clientHeight, w = cx.offsetWidth, h = cx.offsetHeight;
+    cx.style.left = Math.max(8, Math.min(vw - w - 8, ref.left + (ref.width - w) / 2)) + 'px';
+    cx.style.top = Math.max(8, Math.min(vh - h - 8, ref.top + (ref.height - h) / 2)) + 'px';
+    desenhar();
+    box.querySelector('[data-cp="ok"]').focus();
 }
 
 const veGrDocProjeto = () => { const el = $ve('ve-pj-lista'); return (el && el.ownerDocument) || document; };
@@ -164,18 +247,20 @@ function vePjNovaCor() {
         VEPJ.sel = new Set(['m:' + m.id]);
         vePjAlterou();
         veToast(veT('Cor sólida criada: arraste para a timeline'));
-    }, veGrDocProjeto());
+    }, veGrDocProjeto(), { titulo: 'Nova cor sólida', ok: 'Criar' });
 }
 
-// Trocar a cor: todos os clipes dela mudam juntos
+// Trocar a cor: todos os clipes dela mudam juntos (o monitor acompanha enquanto escolhe; Cancelar volta)
 function veGrCorEditar(m) {
+    const antes = m.fill;
     veGrEscolherCor(m.fill, fill => {
-        if (fill === m.fill) return;
+        m.fill = antes;
+        if (fill === antes) { veRefresh(); return; }
         vePushHistory();
         m.fill = fill;
         vePjAlterou();
         veRefresh();
-    }, veGrDocProjeto());
+    }, veGrDocProjeto(), { titulo: 'Cor da cor sólida', aoVivo: f => { m.fill = f; veDrawMonitorSoon(); } });
 }
 
 // ── ponto do monitor → ponto dentro do gráfico (desfaz posição, rotação e escala do clipe) ──

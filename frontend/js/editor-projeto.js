@@ -16,7 +16,7 @@ const vePjTam = () => Math.max(90, Math.min(260, +PREFS.pjTam || 132));
 const VE_PJ_TIPOS = {
     video: ['i-film', 'Vídeo'], image: ['i-image', 'Imagem'], audio: ['i-music', 'Áudio'],
     ajuste: ['i-sliders', 'Camada de ajuste'], legenda: ['i-captions', 'Legendas'], timeline: ['i-film', 'Timeline'],
-    cor: ['i-drop', 'Cor sólida'], comp: ['i-layers', 'Comp'],
+    cor: ['i-swatch', 'Cor sólida'], comp: ['i-layers', 'Comp'],
 };
 // tipo mostrado no painel (a Comp é uma mídia de vídeo por baixo: editor-comp.js)
 const vePjTipo = m => VE_PJ_TIPOS[m.comp ? 'comp' : m.kind];
