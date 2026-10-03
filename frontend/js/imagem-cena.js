@@ -697,6 +697,15 @@ function ieCenaMexida(L, ctx) {
     if (r === true || (Array.isArray(r) && (r.includes(L.nome) || r.includes(L.cena.k)))) return false;
     return !!L.cena.dono || ieCenaDigital(L) !== L.cena.f || (L.tipo === 'pixel' && ieCenaAssinMudou(L.c, L.cena.px)) || (L.m && ieCenaAssinMudou(L.m.c, L.cena.pm));
 }
+// filtros inteligentes postos depois (cor, contraste...) não são "mexer na camada": a cena refaz posição/tamanho pelo
+// HTML e a camada nova leva os filtros da antiga
+function ieCenaLevarFiltros(V, N) {
+    if (!(V.filtrosInt || []).length || N.tipo !== 'inteligente' || !N.c0) return;
+    N.filtrosInt = V.filtrosInt.map(f => ({ ...f })); N.filtrosAberto = V.filtrosAberto;
+    const o = ieIntPlano(N);
+    N.c = o.c; N.x = o.x; N.y = o.y;
+    ieCenaMarcar(N);
+}
 function ieCenaJuntar(velhos, novos, ctx) {
     const porChave = new Map(), usados = new Set(), out = [];
     for (const V of velhos) if (V.cena && V.cena.k) porChave.set(V.cena.k, V);
@@ -711,7 +720,10 @@ function ieCenaJuntar(velhos, novos, ctx) {
             out.push(V);
         } else if (V && ieCenaMexida(V, ctx)) {
             usados.add(V); V.cena.dono = true; ctx.mantidas.push(V.nome); ctx.n--; out.push(V);
-        } else { if (V) usados.add(V); out.push(N); }
+        } else {
+            if (V) { usados.add(V); ieCenaLevarFiltros(V, N); }
+            out.push(N);
+        }
     }
     // camadas do usuário (sem cena) e as mexidas que saíram do HTML ficam onde estavam: logo acima da vizinha de baixo
     let ancora = -1;

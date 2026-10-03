@@ -96,3 +96,31 @@ Armadilhas: na página existe a `const KNV` original; depois da recarga use `win
 - Objeto inteligente: `<img>` da cena já entra como objeto inteligente; `KNV.cmd('f:...'|'aj:...')` nele vira filtro
   inteligente (lista embaixo da camada, olho, duplo clique edita). Fontes: `KNV.instalarFonte('Nome do Google Fonts')`.
 
+## Técnicas aprendidas — carrossel 3D "Design que vende" (2026-10-03)
+Peça: `D:\kanivete_testes\carrossel3d\` (carrossel.html + .iknv + export/). Reproduzir uma referência, passo a passo:
+1. **Medir a referência**: escala = 1080 / largura de um slide na imagem de referência (ex.: 633 px → ×1,705). Anotar
+   x/y/tamanho de cada bloco na referência e converter; títulos pelo tamanho da caixa (largura do texto), não pelo olho.
+2. **Fonte de display parecida**: instalar candidatas do Google (`KNV.instalarFonte`) e montar uma folha de amostras
+   com as palavras da peça (`amostras.html`); escolher pelo print. Caixa-única com minúsculas trocadas no meio
+   ("MaIS", "INSTaGRaM", "FaVOR") = Chewy + Lexend no corpo.
+3. **Objetos 3D (FLUX)**: folha de contato com 3 sementes por objeto (`gerar:...` em `<img>` 330×330), prompt
+   "glossy ... 3D render, soft studio lighting, entire object fully visible, centered, isolated on pure white
+   background, product shot". Escolher a FORMA; a cor se corrige depois (pôr a cor no prompt escureceu demais).
+   - Recorte: **`data-recortar="ia"`** para objeto gerado (a Borracha deixa a sombra de chão do gerador).
+   - A proporção da caixa do `<img>` decide o tamanho gerado: caixa retrato gera OUTRA imagem. Use caixa quadrada
+     (com object-fit: contain) para reaproveitar o cache da folha de contato.
+   - Cor: o verde do FLUX sai saturado no máximo (176,249,0). Corrigir com **filtros inteligentes no próprio objeto**
+     (`KNV.ativar(peça); KNV.cmd('aj:matiz', {h: 34, s: -52, l: -4}); KNV.cmd('aj:brilho', {br: -4, ct: 35})`):
+     painel limpo e a cor anda junto ao mover/duplicar. Camada de ajuste presa (corte) só se um ajuste vale para várias.
+   - Antes de aplicar, comparar 3 variações lado a lado num recorte (`D:\kanivete_testes\scripts\cor_teste.py`:
+     muda os valores, `ieCompor`, copia a área para um canvas e salva JPEG).
+4. **Elementos que atravessam a emenda** (peão entre slides, faixa verde contínua): soltos na tira, fora das
+   `<section>`, `position:absolute` com `left` em px da tira, `data-livre`. Faixa = `<svg>` com `<path>` de stroke grosso.
+5. **SVG**: `var(--cor)` NÃO funciona em atributo (`stroke=`/`fill=`): use a cor direta (ou `style="stroke:var(...)"`).
+6. **Brilho atrás de objeto**: div com `radial-gradient` (verde .55 → transparente) atrás da peça.
+7. **Acabamento**: camada de ajuste Camera Raw no topo (`KNV.ajuste('cameraRaw', {clar: 12, tex: 8, grao: 14, graoT: 20,
+   ct: 6, vib: 6})`).
+8. **Iterar**: editar o HTML e rodar com `--de peca.iknv --salvar peca.iknv`; scripts de foto em `--depois x.js`
+   (rodam uma vez — não deixe no comando seguinte, senão duplica). Rodar a cena de novo leva os filtros inteligentes
+   das peças para a camada refeita. `--exportar pasta` cria a pasta. Conferir em tamanho real (export/*.png), não só
+   a prévia: botões encostados e ícones sumidos só aparecem lá.

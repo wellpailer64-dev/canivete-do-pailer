@@ -22,6 +22,7 @@ ap.add_argument("--depois"); ap.add_argument("--porta", type=int, default=9333);
 ap.add_argument("--exportar", help="pasta: um arquivo por slide (ou a peça inteira)"); ap.add_argument("--fmt", default="png")
 ap.add_argument("--mapa", action="store_true"); ap.add_argument("--sem-recarga", action="store_true")
 a = ap.parse_args()
+if a.exportar: os.makedirs(a.exportar, exist_ok=True)   # a pasta de exportação pode não existir
 barra = lambda p: os.path.abspath(p).replace("\\", "/") if p else p
 
 

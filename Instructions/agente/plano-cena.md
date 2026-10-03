@@ -70,7 +70,7 @@ Escrever o HTML:
 - `<img src="foto.jpg">` (relativo à pasta do HTML), `object-fit`/`object-position`/`border-radius` → máscara.
   `<img src="gerar:prompt em inglês" data-semente="7" data-fundo="branco" data-recortar="borracha|ia" data-lado="768">`
   (FIXE a semente: refazer sai do cache; `data-proporcao="4:5"` se a caixa não tiver altura).
-- `<svg>` inline (ícones, setas) vira camada; `currentColor` = `color` do elemento.
+- `<svg>` inline (ícones, setas) vira camada; `currentColor` = `color` do elemento. `var()` em atributo (`stroke=`/`fill=`) não vale: cor direta.
 - `box-shadow`/`text-shadow` → efeito Sombra (caixa translúcida: camada "(sombra)" própria); `-webkit-text-stroke` →
   Traçado; `opacity`, `mix-blend-mode`, `transform: rotate/scale` valem.
 - Texto com `<b>`/`<span>` no meio = uma camada por trecho de linha; bloco só de texto = uma camada (quebra natural
@@ -98,7 +98,8 @@ Carrossel (Fase 2):
 
 Rodar de novo: camadas da cena são refeitas; as MEXIDAS depois (texto editado, movida, efeito, pincelada — digital do
 modelo + assinatura 24×24 dos pixels) ficam e aparecem em "mantidas". Camadas criadas à mão nunca são tocadas.
-`--refazer` (ou `refazer: ['nome']`) refaz as mexidas também.
+`--refazer` (ou `refazer: ['nome']`) refaz as mexidas também. Filtros inteligentes postos depois (cor, contraste) não contam
+como mexida: a camada refeita pelo HTML leva os filtros da antiga (`ieCenaLevarFiltros`).
 
 ## Estado
 - 2026-10-03: Fase 1 pronta e testada (`frontend/js/imagem-cena.js`, `tools/knv.py`; testes em `D:\kanivete_testes\cena`):
