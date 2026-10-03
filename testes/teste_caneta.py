@@ -59,7 +59,8 @@ with sync_playwright() as p:
 
     sb = pg.evaluate("[IE.doc.sel && IE.doc.sel.bbox, IE.doc.demAtivo, IE.ferr, document.activeElement.tagName, KNV.dialogo()]")
     ok(sb[0] and sb[0]["w"] > 200, f"Ctrl+Enter carrega o demarcador como seleção {sb}")
-    pg.evaluate("ieCmd('desselecionar')")
+    ok(pg.evaluate("IE.doc.demAtivo") is None, "depois de Fazer seleção, fica só o pontilhado (demarcador sai da tela)")
+    pg.evaluate("ieCmd('desselecionar'); IE.doc.demAtivo = IE.doc.dems[0].id")   # como clicar no demarcador no painel
     # 3) Seleção direta: arrastar o ponto (300,300) para (320,340)
     pg.evaluate("ieEscolherFerr('selDireta')")
     arrastar(300, 300, 320, 340)
