@@ -2877,6 +2877,11 @@ class ApiBridge:
     def ve_fontes(self):
         return ve_fontes()
 
+    def ie_instalar_fonte(self, familia):
+        """Instala uma família do Google Fonts para o usuário (Functions/fontes.py) e relê a lista."""
+        from Functions import fontes
+        return fontes.instalar_google(familia)
+
     def ve_preparar_midia(self, path, mid, urgente=False, leve=False, fundo=False):
         return ve_preparar_midia(path, mid, urgente, leve, fundo)
 

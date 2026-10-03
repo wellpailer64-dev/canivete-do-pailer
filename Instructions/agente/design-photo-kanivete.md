@@ -83,3 +83,13 @@ Armadilhas: na página existe a `const KNV` original; depois da recarga use `win
 - Título de cartaz: palavras em camadas separadas em escada, giradas juntas (`girar(ang,{centro})` com o centro comum),
   sombra suave + traçado fino; rabiscos brancos à mão (formas + pincel 4–5 px) preenchem os vazios.
 - Material: Pexels por id (`baixar.py`), fontes do Google Fonts em `D:\kanivete_testes\flyer\fontes` registradas por usuário.
+- **Checklist de acabamento (feedback do designer, flyer Gospel `D:\kanivete_testes\gospel\e1..e3`)**:
+  leitura de texto sobre foto = pincel dureza 0 na cor mais escura da paleta numa camada embaixo (op ~85%) ou caixa/sombra;
+  máscara de camada + pincel macio preto da cintura para baixo em toda pessoa recortada; margem lateral generosa no
+  rodapé (~100 px em 1080); luz de trás (pincel claro em Divisão) + luz da FRENTE vazando pelas brechas entre os corpos
+  (Divisão, traços verticais macios); acabamento no topo: Carimbar visíveis → objeto inteligente → filtros inteligentes
+  (Máscara de nitidez raio ~45 / 25% = "clarity", ruído mono 3% = grão) + camadas de ajuste (`KNV.ajuste('brilho'|
+  'vibratilidade'|'filtroFoto', {...})`); textura em Multiplicação ~20%.
+- Objeto inteligente: `<img>` da cena já entra como objeto inteligente; `KNV.cmd('f:...'|'aj:...')` nele vira filtro
+  inteligente (lista embaixo da camada, olho, duplo clique edita). Fontes: `KNV.instalarFonte('Nome do Google Fonts')`.
+

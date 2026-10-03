@@ -375,11 +375,65 @@ function ieRasterizar(L, doc = IE.doc) {
     ieUiCamadas?.();
 }
 
-// aplica um processamento destrutivo na camada ativa, com diálogo e prévia
-async function ieAplicarComDialogo({ titulo, campos, ajuste, proc, margem, largura, lado }) {
+// ─────────────────────────── filtros inteligentes (objeto inteligente) ───────────────────────────
+// Como no Photoshop: filtro/ajuste num objeto inteligente não mexe nos pixels — entra em L.filtrosInt =
+// [{cmd: 'f:gaussiano' | 'aj:niveis' | 'direto:Inverter', titulo, vals, on}] e a camada é refeita do original (L.c0)
+// com a transformação (L.tf) e os filtros na ordem. Lista embaixo da camada (seta), olho por filtro, duplo clique edita.
+function ieIntDef(cmd) {
+    IE._intDefs = IE._intDefs || {};
+    if (IE._intDefs[cmd]) return IE._intDefs[cmd];
+    let def = null;
+    if (cmd.startsWith('direto:')) def = IE._intDiretos?.[cmd] || null;
+    else {
+        const fn = cmd.startsWith('aj:') ? IE_AJUSTES[cmd.slice(3)] : cmd.startsWith('f:') ? IE_FILTROS[cmd.slice(2)] : null;
+        if (fn) { IE._capturar = true; IE._capturado = null; try { fn(); } catch (e) { /* sem definição */ } finally { IE._capturar = false; } def = IE._capturado; }
+    }
+    if (def) IE._intDefs[cmd] = def;
+    return def;
+}
+function ieIntPlano(L, tf = L.tf, lista = L.filtrosInt) {
+    let o = ieTransformarPlano({ c: L.c0.c, x: L.c0.x, y: L.c0.y }, tf || IE_ID) || { c: L.c0.c, x: L.c0.x, y: L.c0.y };
+    if (L.filtrosOff) return o;
+    const sem = { w: IE.doc.w, h: IE.doc.h, sel: null };   // filtro inteligente vale na camada toda
+    for (const f of lista || []) {
+        const def = f.on && ieIntDef(f.cmd);
+        if (!def) continue;
+        const p = def.proc ? def.proc(f.vals) : iePorPixel(def.ajuste(f.vals));
+        o = ieProcessarCamada(o, p, def.margem ? def.margem(f.vals) : 0, sem) || o;
+    }
+    return o;
+}
+function ieIntAtualizar(L, Rantes = ieRCamada(L)) {
+    const o = ieIntPlano(L);
+    L.c = o.c; L.x = o.x; L.y = o.y; L.sujoPx = true;
+    ieInvalidar(L); ieCamadaMudou(L, Rantes);
+}
+// novo filtro inteligente (idx < 0) ou editar o idx-ésimo, com o diálogo do filtro e prévia ao vivo
+async function ieIntFiltro(L, def, cmd, idx = -1) {
+    const Rantes = ieRCamada(L), atual = idx >= 0 ? L.filtrosInt[idx] : null;
+    const campos = (def.campos || []).map(c => (atual && c.id in atual.vals ? { ...c, valor: atual.vals[c.id] } : c));
+    const lista = vals => { const l = (L.filtrosInt || []).map((f, i) => (i === idx ? { ...f, vals } : f)); if (idx < 0) l.push({ cmd, vals, on: true }); return l; };
+    let vals = {};
+    if (campos.length) {
+        vals = await ieDialogo({ titulo: def.titulo, campos, largura: def.largura, lado: def.lado, previa: v => { L._tfPrev = ieIntPlano(L, L.tf, lista(v)); ieCamadaMudou(L, Rantes); } });
+        L._tfPrev = null;
+        if (!vals) { ieCamadaMudou(L, Rantes); return; }
+    }
+    L.filtrosInt = lista(vals).map((f, i) => (i === (idx < 0 ? L.filtrosInt?.length || 0 : idx) ? { ...f, titulo: def.titulo } : f));
+    L.filtrosAberto = true;
+    ieIntAtualizar(L, Rantes);
+    ieHist(ieT(def.titulo));
+    ieUiCamadas?.();
+}
+
+// aplica um processamento destrutivo na camada ativa, com diálogo e prévia (objeto inteligente: filtro inteligente)
+async function ieAplicarComDialogo(def) {
+    if (IE._capturar) { IE._capturado = def; return; }   // ieIntDef: só quer a definição
+    const { titulo, campos, ajuste, proc, margem, largura, lado } = def;
     const doc = IE.doc, L = ieAtiva(doc);
     if (!doc) return;
     if (doc.mascaraAlvo && L && L.m) { ieToast(ieT('Ajustes valem para os pixels: clique na miniatura da camada')); return; }
+    if (L && L.tipo === 'inteligente' && L.c0 && IE._cmdAtual) return ieIntFiltro(L, def, IE._cmdAtual);
     if (!(await iePodePintar(L, 'aplicar o ajuste'))) return;
     if (!L.c) { ieToast(ieT('A camada está vazia')); return; }
     const fazer = vals => {
@@ -400,13 +454,18 @@ async function ieAplicarComDialogo({ titulo, campos, ajuste, proc, margem, largu
     L.sujoPx = true;
     ieCamadaMudou(L, Rantes);
     ieHist(ieT(titulo));
-    IE.ultimoFiltro = { titulo, ajuste, proc, margem, vals };   // Filtro > Último filtro (Ctrl+F)
+    IE.ultimoFiltro = { titulo, ajuste, proc, margem, vals, cmd: IE._cmdAtual };   // Filtro > Último filtro (Ctrl+F)
 }
 
 // Ctrl+F: o último filtro/ajuste com os mesmos valores, sem abrir o diálogo
 async function ieRepetirFiltro() {
     const u = IE.ultimoFiltro, doc = IE.doc, L = ieAtiva(doc);
     if (!u || !doc) { ieToast(ieT('Nenhum filtro aplicado ainda')); return; }
+    if (L && L.tipo === 'inteligente' && L.c0 && u.cmd) {
+        const R = ieRCamada(L);
+        L.filtrosInt = [...(L.filtrosInt || []), { cmd: u.cmd, titulo: u.titulo, vals: u.vals, on: true }];
+        L.filtrosAberto = true; ieIntAtualizar(L, R); ieHist(ieT(u.titulo)); ieUiCamadas?.(); return;
+    }
     if (!(await iePodePintar(L, 'aplicar o filtro'))) return;
     if (!L.c) return;
     const Rantes = ieRCamada(L);
@@ -479,8 +538,12 @@ const IE_AJUSTES = {
 };
 
 async function ieAplicarDireto(nome, ajuste) {
+    const cmd = 'direto:' + nome;
+    (IE._intDiretos = IE._intDiretos || {})[cmd] = { titulo: nome, campos: [], ajuste: () => ajuste };
+    if (IE._capturar) { IE._capturado = IE._intDiretos[cmd]; return; }
     const doc = IE.doc, L = ieAtiva(doc);
     if (!doc) return;
+    if (L && L.tipo === 'inteligente' && L.c0 && !doc.mascaraAlvo) return ieIntFiltro(L, IE._intDiretos[cmd], cmd);
     if (doc.mascaraAlvo && L && L.m) {   // inverter na máscara (Ctrl+I com a máscara selecionada)
         if (ajuste.t !== 'invert') return;
         ieGravavel(L, 'm');

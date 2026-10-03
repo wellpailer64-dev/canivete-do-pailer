@@ -13,8 +13,8 @@ const IE_TX_CHAVES = ['tam', 'cor', 'esp', 'ent', 'alin', 'escH', 'escV', 'deslo
 
 function ieFonteCss(t, tam = t.tam) {
     // fonte carregada do arquivo (FontFace): a face já é o estilo certo; negrito/itálico só se forem falsos (do PSD)
-    if (t.css && IE.fontesOk && IE.fontesOk.has(t.css))
-        return `${t.itaFalso ? 'italic ' : ''}${t.negFalso ? 'bold' : 'normal'} ${Math.max(0.5, tam)}px "${t.css}", "${t.gdi || t.fam || 'Arial'}", sans-serif`;
+    if (t.css && IE.fontesOk && IE.fontesOk.has(t.css))   // fonte variável: o peso escolhe a instância (Thin...Black)
+        return `${t.itaFalso ? 'italic ' : ''}${t.varPeso ? (t.negFalso ? Math.min(1000, t.varPeso + 300) : t.varPeso) : t.negFalso ? 'bold' : 'normal'} ${Math.max(0.5, tam)}px "${t.css}", "${t.gdi || t.fam || 'Arial'}", sans-serif`;
     return `${t.ital ? 'italic ' : ''}${t.neg ? 'bold' : (t.peso && !t.gdi ? t.peso : 'normal')} ${Math.max(0.5, tam)}px "${t.gdi || t.fam || 'Arial'}", sans-serif`;
 }
 
@@ -25,21 +25,22 @@ IE.fontesCarregando = new Map();
 async function ieGarantirFonte(t) {
     const e = ieEstiloDe(t.fam, t.estilo);
     if (!e) { t.css = null; return false; }
-    const chave = (e.arquivo || e.ps || t.fam + ' ' + e.estilo) + '#' + (e.indice || 0);
+    t.varPeso = e.var ? e.peso : 0;
+    const chave = (e.arquivo || e.ps || t.fam + ' ' + e.estilo) + '#' + (e.indice || 0) + (e.var ? '#var' : '');
     const alias = 'ief-' + Array.from(chave).reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7).toString(36);
     t.css = alias;
     if (IE.fontesOk.has(alias)) return true;
     if (!IE.fontesCarregando.has(alias)) {
         IE.fontesCarregando.set(alias, (async () => {
             const fontes = [];
-            for (const n of [e.completo, e.ps]) if (n) fontes.push(`local("${String(n).replace(/"/g, '')}")`);
+            if (!e.var) for (const n of [e.completo, e.ps]) if (n) fontes.push(`local("${String(n).replace(/"/g, '')}")`);
             if (e.arquivo && !(e.indice > 0)) {
                 try { const r = await window.pywebview.api.ie_fonte_url(e.arquivo); if (r && r.success) fontes.push(`url("${r.url}")`); } catch (x) { /* sem API */ }
             }
             for (const src of [fontes.join(', '), ...fontes]) {   // tudo junto; se falhar, uma por uma
                 if (!src) continue;
                 try {
-                    const ff = new FontFace(alias, src);
+                    const ff = new FontFace(alias, src, e.var ? { weight: `${e.var[0]} ${e.var[1]}` } : {});
                     await ff.load();
                     document.fonts.add(ff);
                     IE.fontesOk.add(alias);

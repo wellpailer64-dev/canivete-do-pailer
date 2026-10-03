@@ -229,7 +229,7 @@ async function ieCenaFontesPre(raiz, ctx) {
     for (const { el } of lidos) {
         const t = el._knvFonte, ok = t.css && IE.fontesOk.has(t.css);
         el.style.fontFamily = ok ? `"${t.css}"` : `"${t.gdi || t.fam}"`;
-        el.style.fontWeight = ok ? (t.negFalso ? '700' : '400') : (t.neg ? '700' : String(t.peso || 400));
+        el.style.fontWeight = ok ? (t.varPeso ? String(t.varPeso) : t.negFalso ? '700' : '400') : (t.neg ? '700' : String(t.peso || 400));
         el.style.fontStyle = (ok ? t.itaFalso : t.ital) ? 'italic' : 'normal';
         el.style.fontSynthesis = ok && !t.negFalso && !t.itaFalso ? 'none' : 'weight style';
     }
@@ -356,6 +356,13 @@ function ieCenaSombras(s) {
 // sombras do CSS → Sombra projetada / Sombra interna do editor (sigma = blur/2, como no CSS)
 function ieCenaFxSombras(L, lista, k = 1) {
     for (const s of lista) {
+        // sem deslocamento e por fora = brilho (neon, aura): vira o Brilho externo (um só por camada, como no Photoshop)
+        if (!s.inset && !s.x && !s.y && !(L.fx && L.fx.brilho && L.fx.brilho.length)) {
+            const tam = (s.blur + Math.max(0, s.spread)) * k;
+            L.fx = L.fx || {};
+            L.fx.brilho = [{ ...ieFxNovo('brilho'), bm: 'NORMAL', cor: s.cor, op: Math.round(s.a * 100), tam, spread: tam ? Math.round(Math.max(0, s.spread) * k / tam * 100) : 0, tecnica: 'suave' }];
+            continue;
+        }
         const tipo = s.inset ? 'sombraInt' : 'sombra', dist = Math.hypot(s.x, s.y) * k;
         const tam = (s.blur + Math.max(0, s.spread)) * k;
         const e = { ...ieFxNovo(tipo), bm: 'NORMAL', cor: s.cor, op: Math.round(s.a * 100), dist, tam, global: false,
@@ -500,7 +507,9 @@ async function ieCenaImg(el, cs, ctx, h) {
     let S = [sx, 0, 0, sy, dx, dy];
     if (h.M) S = ieMatMul(h.M, S);
     const P = ieTransformarPlano({ c, x: px, y: py }, S) || { c, x: Math.round(dx), y: Math.round(dy) };
-    const L = ieCenaCamada(ctx, h, ':img', { nome, c: P.c, x: P.x, y: P.y });
+    // objeto inteligente (como colocar imagem no Photoshop): o original fica em c0 e a escala/posição em tf — redimensionar
+    // depois parte do original e filtros viram filtros inteligentes
+    const L = ieCenaCamada(ctx, h, ':img', { tipo: 'inteligente', nome, c: P.c, x: P.x, y: P.y, c0: { c, x: px, y: py }, tf: S, tfBase: [...IE_ID] });
     if (gerada) L.gerada = gerada;
     // máscara: o que passa da caixa (cover, posição) ou canto arredondado — a foto inteira continua na camada
     const raio = ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].map(c2 => { const v = cs['border' + c2 + 'Radius']; return /%/.test(v) ? parseFloat(v) / 100 * Math.min(B.r.w, B.r.h) : parseFloat(v) || 0; });

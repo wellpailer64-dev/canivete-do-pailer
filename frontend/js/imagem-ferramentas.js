@@ -1256,7 +1256,7 @@ function ieTransfPrevia() {
             L._tfPrev = tmp.c ? { c: tmp.c, x: tmp.x, y: tmp.y } : null;
         } else if (L.c0) {
             const tf = ieMatMul(M, o.tf || IE_ID);
-            L._tfPrev = ieTransformarPlano({ c: L.c0.c, x: L.c0.x, y: L.c0.y }, tf);
+            L._tfPrev = (L.filtrosInt || []).length ? ieIntPlano(L, tf) : ieTransformarPlano({ c: L.c0.c, x: L.c0.x, y: L.c0.y }, tf);
         } else L._tfPrev = ieTransformarPlano({ c: o.c, x: o.x, y: o.y }, M);
         L._raster = null;
         if (L._tfPrev) R = ieRUniao(R, ieRCamada(L));

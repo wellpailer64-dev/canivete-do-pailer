@@ -178,6 +178,18 @@ const KNV = {
     // modo de mesclagem ('MULTIPLY', 'SCREEN', 'OVERLAY', 'SOFTLIGHT'...) e opacidade (%)
     modo(bm, op) { const L = ieAtiva(IE.doc), R = ieRCamada(L); if (bm) L.bm = bm; if (op != null) L.op = op / 100; ieCamadaMudou(L, R); ieHist(ieT('Modo de mesclagem')); ieUiCamadas(); return KNV.info(); },
     // Converter em objeto inteligente (recorte uma vez, depois Ctrl+J para cópias que transformam sem perda)
+    // camada de ajuste (não destrutiva, como no painel Ajustes) acima da ativa, já com os valores:
+    // chave = brilho | niveis | curvas | exposicao | vibratilidade | matiz | equilibrio | pb | filtroFoto | misturador | inverter | posterizar | limiar | mapaDeg
+    async ajuste(chave, vals = {}, { nome } = {}) {
+        const def = IE_AJ_CAMADAS[chave];
+        if (!def) throw new Error(`ajuste "${chave}" não existe (${Object.keys(IE_AJ_CAMADAS).join(', ')})`);
+        await ieAjNova(chave);
+        const L = ieAtiva(IE.doc);
+        L.ajVals = { ...L.ajVals, ...vals }; L.ajuste = def.aj(L.ajVals);
+        if (nome) { L.nome = nome; L._nomeAuto = false; }
+        ieTudo(IE.doc); ieUiCamadas();
+        return KNV.info();
+    },
     objetoInteligente() { IE_CMDS.objetoInteligente(IE.doc); return KNV.info(); },
     async duplicar(nome) { await ieCmd('duplicar'); return nome ? KNV.renomear(nome) : KNV.info(); },
     // Remover plano de fundo (IA): máscara do assunto; aplicar = true deixa os pixels já recortados
@@ -601,6 +613,14 @@ const KNV = {
     // kit de marca: variáveis CSS em toda cena ({'cor-primaria': '#ff5e3a', 'fonte-titulo': 'Poppins'} → var(--cor-primaria));
     // sem argumento devolve o kit; null apaga
     marca(vars) { if (vars !== undefined) iePrefGravar('marca', vars); return iePref('marca', null); },
+    // instala uma família do Google Fonts (ex.: 'Neonderthaw', 'Big Shoulders Stencil Display') e relê as fontes do editor
+    async instalarFonte(familia) {
+        const r = await window.pywebview.api.ie_instalar_fonte(familia);
+        if (!r || !r.success) throw new Error((r && r.error) || 'não instalou');
+        IE.estilos = null; IE.fontes = null;
+        await ieCarregarFontes();
+        return { familia, estilos: (IE.estilos[familia] || []).map(e => e.estilo), arquivos: r.arquivos };
+    },
     // famílias instaladas (filtro = pedaço do nome); com estilos: {família: ['Regular', 'Bold'...]}
     async fontes(filtro = '', { estilos = false } = {}) {
         const e = await ieCarregarFontes(), f = String(filtro).toLowerCase();

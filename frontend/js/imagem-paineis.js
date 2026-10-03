@@ -313,22 +313,25 @@ function ieUiCamadas() {
     visitar(doc.camadas, 0);
     const sel = new Set(doc.selIds.length ? doc.selIds : [doc.ativa]);
     lista.innerHTML = linhas.map(({ X, nivel }) => {
-        const tipoIco = X.tipo === 'texto' ? '<b class="ie-cam-t">T</b>' : X.tipo === 'inteligente' ? ieIco('smart', 'ie-cam-tipo') :
+        const tipoIco = X.tipo === 'texto' ? '<b class="ie-cam-t">T</b>' : X.tipo === 'inteligente' ? '' :
             X.tipo === 'ajuste' ? ieIco('adj', 'ie-cam-tipo') : X.tipo === 'forma' || X.tipo === 'preenchimento' ? ieIco('shape', 'ie-cam-tipo') : '';
         const miniatura = X.tipo === 'grupo'
             ? `<button class="ie-cam-seta ${X.aberto ? 'aberta' : ''}" data-abrir="${X.id}">${ieIco('chev')}</button>${ieIco('folder', 'ie-cam-pasta')}`
             : X.tipo === 'ajuste' ? `<span class="ie-cam-mini ie-cam-mini-aj ${doc.mascaraAlvo && X.id === doc.ativa ? '' : 'alvo'}" data-alvo="px">${ieIco('adj')}</span>`
-            : `<canvas class="ie-cam-mini ${!(doc.mascaraAlvo && X.id === doc.ativa) ? 'alvo' : ''}" data-alvo="px" data-mini="${X.id}" width="40" height="40"></canvas>`;
+            : `<span class="ie-cam-mini-box"><canvas class="ie-cam-mini ${!(doc.mascaraAlvo && X.id === doc.ativa) ? 'alvo' : ''}" data-alvo="px" data-mini="${X.id}" width="40" height="40"></canvas>${X.tipo === 'inteligente' ? `<i class="ie-cam-selo" title="${ieT('Objeto inteligente')}">${ieIco('smart')}</i>` : ''}</span>`;
         const masc = X.m ? `<canvas class="ie-cam-mini ie-cam-masc ${X.m.desativada ? 'off' : ''} ${doc.mascaraAlvo && X.id === doc.ativa ? 'alvo' : ''}" data-alvo="m" data-mmini="${X.id}" width="40" height="40" title="${ieT('Máscara (Shift+clique: desativar)')}"></canvas>` : '';
         return `<div class="ie-cam ${sel.has(X.id) ? 'sel' : ''} ${X.visivel ? '' : 'oculta'} ${X.clip ? 'clip' : ''}" data-id="${X.id}" draggable="true" style="--nivel:${nivel}">
             <button class="ie-cam-olho ${X.visivel ? 'on' : ''}" data-olho="${X.id}" title="${ieT('Mostrar/ocultar (Alt+clique: só esta)')}">${X.visivel ? ieIco('eye') : ''}</button>
             <span class="ie-cam-recuo"></span>${X.clip ? `<span class="ie-cam-clip">${ieIco('clip')}</span>` : ''}
             ${miniatura}${masc}
             <span class="ie-cam-nome" data-nome="${X.id}">${ieEsc(X.nome)}</span>
-            ${tipoIco}${ieFxLista(X.fx).length ? `<button class="ie-cam-fx ${X.fxAberto ? 'aberto' : ''}" data-fxabrir="${X.id}" title="${ieT('Efeitos de camada (clique: mostrar a lista)')}">fx ${ieIco('chev')}</button>` : ''}${X.travas ? ieIco('lock', 'ie-cam-cad') : ''}
+            ${tipoIco}${X.tipo === 'inteligente' && (X.filtrosInt || []).length ? `<button class="ie-cam-fx ${X.filtrosAberto ? 'aberto' : ''}" data-fiabrir="${X.id}" title="${ieT('Filtros inteligentes (clique: mostrar a lista)')}">${ieIco('smart')} ${ieIco('chev')}</button>` : ''}${ieFxLista(X.fx).length ? `<button class="ie-cam-fx ${X.fxAberto ? 'aberto' : ''}" data-fxabrir="${X.id}" title="${ieT('Efeitos de camada (clique: mostrar a lista)')}">fx ${ieIco('chev')}</button>` : ''}${X.travas ? ieIco('lock', 'ie-cam-cad') : ''}
         </div>` + (X.fxAberto && ieFxLista(X.fx).length ? `<div class="ie-cam-fxl" style="--nivel:${nivel}" data-id="${X.id}">
             <div class="ie-cam-fxi" data-fxi="todos"><button class="ie-cam-olho ${X.fxOculto ? '' : 'on'}" data-fxolho="todos">${X.fxOculto ? '' : ieIco('eye')}</button><span>${ieLsT('Efeitos')}</span></div>
             ${ieFxLista(X.fx).map(({ tipo, i, e }) => `<div class="ie-cam-fxi" data-fxi="${tipo}:${i}"><button class="ie-cam-olho ${e.on ? 'on' : ''}" data-fxolho="${tipo}:${i}">${e.on ? ieIco('eye') : ''}</button><span>${ieLsT(IE_FX_NOME[tipo])}</span></div>`).join('')}
+        </div>` : '') + (X.tipo === 'inteligente' && X.filtrosAberto && (X.filtrosInt || []).length ? `<div class="ie-cam-fxl ie-cam-fil" style="--nivel:${nivel}" data-id="${X.id}">
+            <div class="ie-cam-fxi" data-fii="todos"><button class="ie-cam-olho ${X.filtrosOff ? '' : 'on'}" data-fiolho="todos">${X.filtrosOff ? '' : ieIco('eye')}</button><span>${ieT('Filtros inteligentes')}</span></div>
+            ${X.filtrosInt.map((f, i) => `<div class="ie-cam-fxi" data-fii="${i}" title="${ieT('Duplo clique: editar')}"><button class="ie-cam-olho ${f.on ? 'on' : ''}" data-fiolho="${i}">${f.on ? ieIco('eye') : ''}</button><span>${ieEsc(ieT(f.titulo || f.cmd))}</span><button class="ie-cam-fidel" data-fidel="${i}" title="${ieT('Excluir filtro inteligente')}">×</button></div>`).join('')}
         </div>` : '');
     }).join('') || `<div class="ie-vazio">${ieT('Sem camadas')}</div>`;
     rod.innerHTML = `
@@ -434,6 +437,21 @@ function ieCamadasInstalar() {
             ieHist(ieT(L.visivel ? 'Mostrar camada' : 'Ocultar camada'));
             return;
         }
+        const fia = ev.target.closest('[data-fiabrir]');
+        if (fia) { const L = ieAchar(doc, +fia.dataset.fiabrir)?.L; if (L) { L.filtrosAberto = !L.filtrosAberto; ieUiCamadas(); } return; }
+        const fio = ev.target.closest('[data-fiolho], [data-fidel]');
+        if (fio) {
+            const L = ieAchar(doc, +fio.closest('.ie-cam-fil').dataset.id)?.L;
+            if (!L) return;
+            const R = ieRCamada(L);
+            if (fio.dataset.fidel != null) L.filtrosInt = L.filtrosInt.filter((f, i) => i !== +fio.dataset.fidel);
+            else if (fio.dataset.fiolho === 'todos') L.filtrosOff = !L.filtrosOff;
+            else L.filtrosInt = L.filtrosInt.map((f, i) => (i === +fio.dataset.fiolho ? { ...f, on: !f.on } : f));
+            ieIntAtualizar(L, R);
+            ieHist(ieT(fio.dataset.fidel != null ? 'Excluir filtro inteligente' : 'Mostrar/ocultar filtro inteligente'));
+            ieUiCamadas();
+            return;
+        }
         const fxa = ev.target.closest('[data-fxabrir]');
         if (fxa) { const L = ieAchar(doc, +fxa.dataset.fxabrir)?.L; if (L) { L.fxAberto = !L.fxAberto; ieUiCamadas(); } return; }
         const fxo = ev.target.closest('[data-fxolho]');
@@ -471,6 +489,13 @@ function ieCamadasInstalar() {
         const doc = IE.doc;
         const nome = ev.target.closest('[data-nome]');
         if (nome && doc) { ieRenomear(+nome.dataset.nome, nome); return; }
+        const fii = ev.target.closest('[data-fii]');
+        if (fii && doc && fii.dataset.fii !== 'todos') {
+            const L = ieAchar(doc, +fii.closest('.ie-cam-fil').dataset.id)?.L, i = +fii.dataset.fii, f = L && L.filtrosInt[i];
+            const def = f && ieIntDef(f.cmd);
+            if (def) { ieAtivar(L.id, doc); ieIntFiltro(L, def, f.cmd, i); }
+            return;
+        }
         const fxi = ev.target.closest('[data-fxi]');
         if (fxi && doc) {
             const L = ieAchar(doc, +fxi.closest('.ie-cam-fxl').dataset.id)?.L;
@@ -1209,8 +1234,10 @@ function ieCmdPode(c) {
 async function ieCmd(c) {
     const doc = IE.doc;
     IE.menuFechar?.();
-    if (c.startsWith('aj:')) return IE_AJUSTES[c.slice(3)]?.();
-    if (c.startsWith('f:')) return IE_FILTROS[c.slice(2)]?.();
+    if (c.startsWith('aj:') || c.startsWith('f:')) {   // o nome vai junto: num objeto inteligente vira filtro inteligente
+        IE._cmdAtual = c;
+        try { return await (c.startsWith('aj:') ? IE_AJUSTES[c.slice(3)] : IE_FILTROS[c.slice(2)])?.(); } finally { IE._cmdAtual = null; }
+    }
     if (c.startsWith('img:')) return ieGirarImagem(c.slice(4));
     if (['g180', 'g90h', 'g90a', 'fh', 'fv'].includes(c)) return ieTransfRapida(c);
     const fn = IE_CMDS[c];
