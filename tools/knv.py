@@ -5,6 +5,7 @@ uso: py -3.13 tools/knv.py peca.html [--formato feed] [--salvar peca.iknv] [--pr
   --de        abre esse .iknv antes (rodar de novo atualiza as camadas pela chave e não toca no que foi mexido)
   --novo      documento novo mesmo com um aberto; --refazer refaz também as camadas mexidas
   --depois    JS com chamadas KNV.* depois da cena (ajustes de foto, pincel, recorte...)
+  --exportar  pasta: carrossel = um arquivo por slide (base_01.png...), senão a peça inteira (--fmt png|jpg|webp)
   --previa    JPEG da composição (padrão: <peca>.jpg ao lado, escala 0.5) para julgar a estética
 Recarrega frontend/js/imagem-*.js do disco (mudou o código do editor → não precisa reiniciar o app).
 Guia: Instructions/agente/plano-cena.md"""
@@ -18,6 +19,7 @@ ap.add_argument("html"); ap.add_argument("--formato"); ap.add_argument("--nome")
 ap.add_argument("--salvar"); ap.add_argument("--previa"); ap.add_argument("--escala", type=float, default=0.5)
 ap.add_argument("--de"); ap.add_argument("--novo", action="store_true"); ap.add_argument("--refazer", action="store_true")
 ap.add_argument("--depois"); ap.add_argument("--porta", type=int, default=9333); ap.add_argument("--margem", type=float)
+ap.add_argument("--exportar", help="pasta: um arquivo por slide (ou a peça inteira)"); ap.add_argument("--fmt", default="png")
 ap.add_argument("--mapa", action="store_true"); ap.add_argument("--sem-recarga", action="store_true")
 a = ap.parse_args()
 barra = lambda p: os.path.abspath(p).replace("\\", "/") if p else p
@@ -69,21 +71,23 @@ with sync_playwright() as p:
     pg.evaluate("if (!document.querySelector('#page-editor-imagem.active')) switchTool('editor-imagem')")
     t = time.time()
     try:
-        r = pg.evaluate("""async ({html, opc, de, depois, salvar}) => {
+        r = pg.evaluate("""async ({html, opc, de, depois, salvar, exportar, fmt}) => {
             const KNV = window.KNV; const out = {};
             if (de) { await KNV.fecharTudo(); await KNV.abrir(de); if (!IE.doc || !IE.doc.path) throw new Error('não abriu ' + de); }
             if (html != null) out.cena = await KNV.cena(html, opc);
             if (depois) { const f = new Function('KNV', 'return (async () => {' + depois + '\\n})()'); out.depois = await f(KNV); }
             if (salvar) out.salvo = await KNV.salvar(salvar);
-            return out; }""", {"html": html, "opc": opc, "de": barra(a.de), "depois": depois, "salvar": barra(a.salvar)})
+            if (exportar) out.exportados = await KNV.exportar(exportar, {fmt});
+            return out; }""", {"html": html, "opc": opc, "de": barra(a.de), "depois": depois, "salvar": barra(a.salvar), "exportar": os.path.abspath(a.exportar) if a.exportar else None, "fmt": a.fmt})
     except Exception as e:
         print("!! erro:", str(e).splitlines()[0][:600]); r = None
     finally:
         pg.evaluate("window.KNV.automacao(false)")
     if r:
         c = r.get("cena") or {}
-        if c: print(f"cena {c['w']}x{c['h']}: {c['camadas']} camadas em {c['ms']} ms" + (f"; mantidas (mexidas): {', '.join(c['mantidas'])}" if c.get("mantidas") else ""))
+        if c: print(f"cena {c['w']}x{c['h']}" + (f" ({c['slides']} slides)" if c.get("slides") else "") + f": {c['camadas']} camadas em {c['ms']} ms" + (f"; mantidas (mexidas): {', '.join(c['mantidas'])}" if c.get("mantidas") else ""))
         for av in c.get("avisos", []): print("  aviso:", av)
+        for f in r.get("exportados") or []: print("exportado:", f)
         if r.get("depois") is not None: print("depois:", json.dumps(r["depois"], ensure_ascii=False)[:800])
         print(f"total {time.time() - t:.1f}s")
     if a.mapa: print(pg.evaluate("window.KNV.mapa()"))

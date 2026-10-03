@@ -39,10 +39,10 @@ medir. O resultado é um .iknv/PSD comum; o usuário continua usando o Photo Kan
 ## Fases
 - **Fase 1 — cena:** `KNV.cena(html, opções)`, `KNV.cenaFonte()`, reconciliação por id com proteção das camadas
   manuais, avisos de diagramação, formatos (`feed` 1080×1350, `feed4x5`, `retrato` 1080×1440, `story` 1080×1920 com área
-  segura, `quadrado`), runner genérico `tools/knv.py peca.html --salvar peca.iknv --png previa.png`.
-- **Fase 2 — carrossel e marca:** N slides (`<section class="slide">`) em pranchetas de um documento, fundo contínuo
-  entre slides, exportar todos em PNG num comando; kit de marca (variáveis CSS de cor/fonte guardadas no app);
-  componentes prontos (card, selo, número do slide, "arraste →", citação, lista).
+  segura, `quadrado`), runner genérico `tools/knv.py`. FEITA.
+- **Fase 2 — carrossel e marca:** N slides (`<section class="slide">`) lado a lado num documento largo (não pranchetas:
+  a prancheta recorta o conteúdo e mataria o carrossel contínuo), guias nas emendas e uma fatia por slide, exportar
+  todos num comando; kit de marca (variáveis CSS guardadas no app); componentes `k-*`. FEITA.
 - **Fase 3 — biblioteca e olho:** pares de fontes, paletas, receitas de capa/citação/lista/antes-depois; `KNV.ver()`
   (JPEG pequeno só para julgar estética); camadas de forma vetorial se o usuário sentir falta de editar o canto.
 
@@ -52,7 +52,7 @@ medir. O resultado é um .iknv/PSD comum; o usuário continua usando o Photo Kan
 - `background-image: url()` não entra (use `<img>`); `filter`, `backdrop-filter`, `clip-path` complexo: anotados no relatório.
 - `z-index` só reordena irmãos; perspectiva 3D é ignorada.
 
-## Como usar (Fase 1 pronta)
+## Como usar
 App de teste em `--agente=9333` (ver CLAUDE.md). Uma peça = um arquivo HTML; o runner faz o resto:
 ```
 py -3.13 tools/knv.py peca.html --formato feed --novo --salvar peca.iknv     # cria; prévia em peca.jpg (escala 0.5)
@@ -78,6 +78,21 @@ Escrever o HTML:
 - Não entram: `background-image: url()` (use `<img>`), `::before/::after`, `filter`, `backdrop-filter`, `clip-path`.
 - `data-livre` tira o elemento da checagem de margem; `data-juntos` num pai permite textos encostados.
 
+Carrossel (Fase 2):
+- Cada `<section class="slide">` (ou `[data-slide]`) é um slide do tamanho do formato; o documento é a tira
+  (4 slides retrato = 4320×1440), com guias nas emendas e fatias 01..N. Grupo por slide ("Slide 1"... ou o id).
+- O que fica fora das sections é solto na tira inteira: `position:absolute` com `left` em px da tira atravessa a
+  emenda (foto entre o slide 1 e 2, linha contínua). `var(--slide)` = largura do slide, `var(--slides)` = quantos.
+  O fundo do `body` já é contínuo.
+- Exportar: `--exportar pasta [--fmt png|jpg|webp]` → `base_01.png`... (`KNV.exportar(pasta, {fmt, q, base, escala})`;
+  sem slides exporta a peça inteira). Aviso "cortado na emenda" para texto que cruza slides.
+- Kit de marca: `KNV.marca({'cor-primaria': '#ffb703', 'cor-fundo': '#0f1b2d', 'cor-texto': '#f1f5f9', 'cor-suave':
+  '#94a3b8', fonte: 'Poppins'})` (fica no app) → `var(--cor-primaria)` em toda cena; os componentes já usam.
+- Componentes (`k-*`, o CSS da peça sempre ganha): `k-num` vazio = "01 / 04"; `k-arraste` vazio = "arraste →" no
+  canto (some no último slide; `data-sempre` mantém); `k-tag`, `k-selo` (círculo girado), `k-card`, `k-cta`,
+  `k-citacao` (+ aspas e `k-autor`), `k-lista` (marcador na cor primária; `ol` numera 01, 02...), `k-grande` (número
+  gigante). Qualquer `li` ganha marcador de verdade (o `::marker` do navegador não vira camada).
+
 Rodar de novo: camadas da cena são refeitas; as MEXIDAS depois (texto editado, movida, efeito, pincelada — digital do
 modelo + assinatura 24×24 dos pixels) ficam e aparecem em "mantidas". Camadas criadas à mão nunca são tocadas.
 `--refazer` (ou `refazer: ['nome']`) refaz as mexidas também.
@@ -85,5 +100,8 @@ modelo + assinatura 24×24 dos pixels) ficam e aparecem em "mantidas". Camadas c
 ## Estado
 - 2026-10-03: Fase 1 pronta e testada (`frontend/js/imagem-cena.js`, `tools/knv.py`; testes em `D:\kanivete_testes\cena`):
   capa de carrossel 1080×1350 idêntica ao Chrome (lado a lado), story com gerar+recorte, rodar de novo preservando
-  edições manuais após salvar/reabrir. Próximo: Fase 2 (carrossel em pranchetas + exportar todos, kit de marca).
+  edições manuais após salvar/reabrir.
+- 2026-10-03: Fase 2 pronta: carrossel de 4 slides retrato (foto atravessando a emenda, componentes, marca), rodar de
+  novo sem duplicar fatias/guias, exportação em 4 PNGs. Próximo: Fase 3 (biblioteca de estilos/receitas, KNV.ver,
+  forma vetorial se o usuário pedir).
 - Notado: `KNV.mover` num grupo muda só o x/y do grupo (os filhos não andam).

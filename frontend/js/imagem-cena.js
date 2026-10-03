@@ -13,22 +13,27 @@ function ieCenaFormatos() {
 async function ieCena(html, o = {}) {
     const t0 = performance.now();
     await ieCarregarFontes();
-    const fm = ieCenaFormatos()[o.formato] || null;
     let doc = IE.doc;
     const novo = !doc || o.novo === true || (!doc.cena && o.novo !== false);
+    const ant = !novo && doc.cena ? doc.cena : {};
+    const fm = ieCenaFormatos()[o.formato || ant.formato] || null;
+    // carrossel: cada <section class="slide"> (ou [data-slide]) é um slide; o documento é a tira inteira, lado a lado
+    const nSlides = new DOMParser().parseFromString(String(html), 'text/html').querySelectorAll('.slide, [data-slide]').length;
+    const sw = o.w || (fm ? fm[0] : ant.slide ? ant.slide.w : (!novo ? doc.w : 1080));
+    const sh = o.h || (fm ? fm[1] : ant.slide ? ant.slide.h : (!novo ? doc.h : 1350));
     const avisos = [];
     if (novo) {
         if (typeof switchTool === 'function' && !document.querySelector('#page-editor-imagem.active')) switchTool('editor-imagem');
-        doc = ieNovoDoc2(o.nome || 'Cena', o.w || (fm ? fm[0] : 1080), o.h || (fm ? fm[1] : 1350), 72, 'transp');
+        doc = ieNovoDoc2(o.nome || (nSlides ? 'Carrossel' : 'Cena'), sw * Math.max(1, nSlides), sh, 72, 'transp');
         doc.camadas = [];   // a camada vazia sai: o fundo vem do HTML
-    } else if ((fm || o.w) && ((o.w || fm[0]) !== doc.w || (o.h || fm[1]) !== doc.h)) avisos.push(`documento é ${doc.w}x${doc.h}: o tamanho pedido foi ignorado (novo: true cria outro)`);
+    } else if (doc.w !== sw * Math.max(1, nSlides) || doc.h !== sh) avisos.push(`documento é ${doc.w}x${doc.h}, a cena pede ${sw * Math.max(1, nSlides)}x${sh}${nSlides ? ` (${nSlides} slides)` : ''}: monte com novo: true`);
     const W = doc.w, H = doc.h;
     const host = document.createElement('div');
     host.style.cssText = `position:fixed;left:${-W - 40000}px;top:0;width:${W}px;height:${H}px;overflow:hidden;pointer-events:none;`;
     document.body.appendChild(host);
-    const ctx = { doc, W, H, o, avisos, chaves: new Map(), blocos: [], mantidas: [], n: 0 };
+    const ctx = { doc, W, H, o, avisos, chaves: new Map(), blocos: [], mantidas: [], n: 0, slide: nSlides ? { w: sw, h: sh, n: nSlides } : null };
     try {
-        const raiz = ieCenaMontarDom(host, String(html), W, H);
+        const raiz = ieCenaMontarDom(host, String(html), W, H, ctx.slide);
         await ieCenaImagensPre(raiz, ctx);
         await ieCenaFontesPre(raiz, ctx);
         ieCenaTransformsPre(raiz);
@@ -44,32 +49,99 @@ async function ieCena(html, o = {}) {
         IE._cenaMontando = false;
         host.remove();
     }
-    doc.cena = { html: String(html), base: o.base || null, formato: o.formato || null, margem: o.margem ?? null };
+    doc.cena = { html: String(html), base: o.base || ant.base || null, formato: o.formato || ant.formato || null, margem: o.margem ?? ant.margem ?? null, slide: ctx.slide };
+    if (ctx.slide) ieCenaEmendas(doc, ctx.slide);
     const topo = doc.camadas[doc.camadas.length - 1];
     if (topo) { doc.ativa = topo.id; doc.selIds = [topo.id]; }
     ieHist('Cena', doc);
     ieUiCamadas();
     ieAgendar(ieRDoc(doc), doc);
-    return { w: W, h: H, camadas: ctx.n, mantidas: ctx.mantidas, avisos, ms: Math.round(performance.now() - t0) };
+    return { w: W, h: H, slides: nSlides || undefined, camadas: ctx.n, mantidas: ctx.mantidas, avisos, ms: Math.round(performance.now() - t0) };
+}
+// carrossel: guias nas emendas e uma fatia por slide (Arquivo > Exportar fatias também serve), sem tocar nas do usuário
+function ieCenaEmendas(doc, S) {
+    doc.guias = (doc.guias || []).filter(g => !g.cena);
+    for (let i = 1; i < S.n; i++) doc.guias.push({ o: 'v', p: i * S.w, cena: true });
+    doc.fatias = (doc.fatias || []).filter(f => !f.cena && !(f.y === 0 && f.w === S.w && f.h === S.h && f.x % S.w === 0 && /^\d\d$/.test(f.nome)));   // .iknv não guarda o 'cena' da fatia
+    doc.seqFatia = doc.seqFatia || 0;
+    for (let i = 0; i < S.n; i++) doc.fatias.push({ id: ++doc.seqFatia, x: i * S.w, y: 0, w: S.w, h: S.h, nome: String(i + 1).padStart(2, '0'), url: '', alt: '', cena: true });
+}
+// componentes prontos (classes k-*, especificidade zero: o CSS da peça sempre ganha). Cores e fonte vêm do kit de
+// marca (--cor-primaria, --cor-texto, --cor-fundo, --cor-suave, --fonte) com padrão neutro
+function ieCenaComponentesCss() {
+    const P = 'var(--cor-primaria,#ff5e3a)', T = 'var(--cor-texto,#111)', F = 'var(--cor-fundo,#fff)', S = 'var(--cor-suave,#888)';
+    return `:where(.k-num){font-size:26px;font-weight:600;letter-spacing:4px;color:${S}}
+        :where(.k-arraste){position:absolute;right:80px;bottom:72px;display:flex;align-items:center;gap:12px;font-size:30px;font-weight:600;color:${P}}
+        :where(.k-arraste) svg{width:40px;height:40px}
+        :where(.k-tag){align-self:flex-start;display:inline-block;padding:10px 24px;border-radius:999px;background:${P};color:${F};font-size:26px;font-weight:700;letter-spacing:2px;text-transform:uppercase}
+        :where(.k-selo){position:absolute;width:200px;height:200px;border-radius:50%;background:${P};color:${F};display:flex;align-items:center;justify-content:center;text-align:center;font-size:34px;font-weight:800;line-height:1;rotate:12deg}
+        :where(.k-card){background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.16);border-radius:32px;padding:40px;box-shadow:0 24px 60px rgba(0,0,0,.35)}
+        :where(.k-cta){align-self:flex-start;background:${P};color:${F};font-size:44px;font-weight:800;padding:28px 48px;border-radius:20px}
+        :where(.k-citacao){font-size:56px;line-height:1.25;font-weight:600;color:${T}}
+        :where(.k-aspas){display:block;font-size:200px;line-height:.7;height:110px;color:${P};font-family:Georgia,serif}
+        :where(.k-autor){font-size:30px;color:${S};margin-top:24px}
+        :where(.k-lista){display:flex;flex-direction:column;gap:24px;padding:0;margin:0}
+        :where(.k-lista>li){display:flex;gap:20px;align-items:baseline;font-size:36px;line-height:1.35}
+        :where(.k-marcador){flex:0 0 auto;color:${P};font-weight:800}
+        :where(.k-grande){font-size:300px;font-weight:900;line-height:.9;color:${P}}`;
+}
+// preenche os automáticos: k-num vazio = "01 / 05"; k-arraste vazio = "arraste →" (some no último slide);
+// k-citacao ganha as aspas; marcadores de lista viram elementos (o ::marker do navegador não vira camada)
+function ieCenaComponentes(raiz, S) {
+    const slides = [...raiz.querySelectorAll('.slide, [data-slide]')];
+    const idx = el => { const s = el.closest('.slide, [data-slide]'); return s ? slides.indexOf(s) : 0; };
+    const n = Math.max(1, slides.length), pad = v => String(v).padStart(2, '0');
+    for (const el of raiz.querySelectorAll('.k-num')) if (!el.textContent.trim()) el.textContent = `${pad(idx(el) + 1)} / ${pad(n)}`;
+    for (const el of raiz.querySelectorAll('.k-arraste')) {
+        if (S && idx(el) === n - 1 && !el.hasAttribute('data-sempre')) { el.remove(); continue; }
+        if (!el.innerHTML.trim()) el.innerHTML = 'arraste <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+    }
+    for (const el of raiz.querySelectorAll('.k-citacao')) if (el.setAttribute('data-juntos', ''), !el.querySelector('.k-aspas')) el.insertAdjacentHTML('afterbegin', '<span class="k-aspas">\u201C</span>');
+    for (const li of raiz.querySelectorAll('li')) {
+        if (li.querySelector(':scope > .k-marcador')) continue;
+        const lista = li.parentElement, cs = getComputedStyle(li);
+        if (cs.listStyleType === 'none' && !lista.classList.contains('k-lista')) continue;
+        const ol = lista.tagName === 'OL', i = [...lista.children].indexOf(li) + 1;
+        const corpo = document.createElement('span');
+        corpo.append(...li.childNodes);
+        li.append(Object.assign(document.createElement('span'), { className: 'k-marcador', textContent: ol ? pad(i) : lista.dataset.marcador || '\u2022' }), corpo);
+        li.style.listStyle = 'none';
+        if (!lista.classList.contains('k-lista')) { li.style.display = 'flex'; li.style.gap = '0.5em'; lista.style.paddingLeft = lista.style.paddingLeft || '0'; }
+    }
+}
+// kit de marca: variáveis CSS que toda cena enxerga (var(--cor-primaria), var(--fonte-titulo)...), guardadas no app
+function ieCenaMarcaCss() {
+    const m = iePref('marca', null);
+    if (!m || typeof m !== 'object') return '';
+    return Object.entries(m).filter(([k]) => /^[\w-]+$/.test(k)).map(([k, v]) => `--${k}:${String(v).replace(/[;{}<]/g, '')}`).join(';');
 }
 function ieTodasDe(lista) { const out = []; iePercorrer(lista, L => { out.push(L); }); return out; }
 
 // HTML do agente dentro de um Shadow DOM (estilos isolados do app; as fontes do editor valem lá dentro).
 // body/html/:root do CSS viram a raiz da peça; margens padrão zeradas com :where (o CSS do agente sempre ganha)
-function ieCenaMontarDom(host, html, W, H) {
+function ieCenaMontarDom(host, html, W, H, S) {
     const P = new DOMParser().parseFromString(html, 'text/html');
     const css = [...P.querySelectorAll('style')].map(s => s.textContent).join('\n')
         .replace(/(^|[\s,}>~+(])(:root|html|body)(?=[\s,{.:#\[>~+)]|$)/g, '$1.knv-raiz');
     P.querySelectorAll('style,script,link,meta,title').forEach(x => x.remove());
     const sh = host.attachShadow({ mode: 'open' });
-    sh.innerHTML = `<style>:where(.knv-raiz){font-family:Arial;font-size:32px;line-height:1.2;color:#000}
+    const vars = [ieCenaMarcaCss(), S ? `--slide:${S.w}px;--slides:${S.n}` : `--slide:${W}px;--slides:1`].filter(Boolean).join(';');
+    sh.innerHTML = `<style>.knv-raiz{${vars}}:where(.knv-raiz){font-family:Arial;font-size:32px;line-height:1.2;color:#000}
         :where(.knv-raiz) *,:where(.knv-raiz) *::before,:where(.knv-raiz) *::after{box-sizing:border-box}
         :where(.knv-raiz) :where(h1,h2,h3,h4,h5,h6,p,ul,ol,figure,blockquote,dl,dd){margin:0}
-        :where(.knv-raiz) img,:where(.knv-raiz) svg{display:block}</style><style>${css}</style><div class="knv-raiz"></div>`;
+        :where(.knv-raiz) img,:where(.knv-raiz) svg{display:block}${ieCenaComponentesCss()}</style><style>${css}</style><div class="knv-raiz"></div>`;
     const raiz = sh.querySelector('.knv-raiz');
     if (P.body.className) raiz.className += ' ' + P.body.className;
     raiz.style.cssText = (P.body.getAttribute('style') || '') + `;position:relative;width:${W}px;height:${H}px;overflow:hidden;margin:0;box-sizing:border-box`;
     raiz.append(...[...P.body.childNodes].map(n => document.importNode(n, true)));
+    if (S) {   // slides lado a lado, cada um do tamanho do formato; o que não é slide fica solto por cima da tira inteira
+        Object.assign(raiz.style, { display: 'flex', flexDirection: 'row', alignItems: 'stretch', padding: '0', gap: '0' });
+        [...raiz.querySelectorAll('.slide, [data-slide]')].forEach((el, i) => {
+            el.style.cssText += `;flex:0 0 ${S.w}px;width:${S.w}px;height:${S.h}px;position:relative;margin:0`;
+            if (!el.id && !el.dataset.nome) el.dataset.nome = 'Slide ' + (i + 1);
+        });
+    }
+    ieCenaComponentes(raiz, S);
     return raiz;
 }
 
@@ -645,19 +717,22 @@ function ieCenaJuntar(velhos, novos, ctx) {
 
 // ─────────────────────────── conferência pelo próprio layout ───────────────────────────
 function ieCenaChecar(raiz, ctx) {
-    const { W, H, avisos, blocos, o } = ctx;
-    const m = o.margem ?? Math.round(Math.min(W, H) * 0.05);
-    const story = o.formato === 'story' || H / W > 1.7;
+    const { W, H, avisos, blocos, o } = ctx, S = ctx.slide;
+    const SW = S ? S.w : W;
+    const m = o.margem ?? Math.round(Math.min(SW, H) * 0.05);
+    const story = !S && (o.formato === 'story' || H / W > 1.7);
     const nome = b => '"' + String(b.L.txt.s).split(IE_NL)[0].slice(0, 28) + '"';
     for (const b of blocos) {
         const x1 = Math.min(...b.linhas.map(l => l.x)), y1 = Math.min(...b.linhas.map(l => l.y));
         const x2 = Math.max(...b.linhas.map(l => l.x + l.w)), y2 = Math.max(...b.linhas.map(l => l.y + l.h));
         b.R = { x1, y1, x2, y2 };
         if (x2 < 0 || y2 < 0 || x1 > W || y1 > H) { avisos.push(`${nome(b)} fora da página`); continue; }
-        const lados = [x1 < m && 'esquerda', x2 > W - m && 'direita', y1 < m && 'topo', y2 > H - m && 'base'].filter(Boolean);
-        if (lados.length && !b.el.closest('[data-livre]')) avisos.push(`${nome(b)} fora da margem de ${m}px (${lados.join(', ')})`);
+        const i0 = Math.floor(x1 / SW), i1 = Math.floor((x2 - 0.01) / SW), ox = i0 * SW;   // slide do texto
+        if (S && i0 !== i1 && !b.el.closest('[data-livre]')) { avisos.push(`${nome(b)} cortado na emenda dos slides ${i0 + 1}/${i1 + 1}`); continue; }
+        const lados = [x1 - ox < m && 'esquerda', x2 - ox > SW - m && 'direita', y1 < m && 'topo', y2 > H - m && 'base'].filter(Boolean);
+        if (lados.length && !b.el.closest('[data-livre]')) avisos.push(`${nome(b)} fora da margem de ${m}px (${lados.join(', ')}${S ? `, slide ${i0 + 1}` : ''})`);
         if (story && (y1 < H * 0.13 || y2 > H * 0.84) && !b.el.closest('[data-livre]')) avisos.push(`${nome(b)} na faixa coberta pela interface do story (topo 13% / base 16%)`);
-        if (b.tam < W * 0.022) avisos.push(`${nome(b)} com ${Math.round(b.tam)}px: pequeno para ler no celular (mín. ~${Math.round(W * 0.022)})`);
+        if (b.tam < SW * 0.022) avisos.push(`${nome(b)} com ${Math.round(b.tam)}px: pequeno para ler no celular (mín. ~${Math.round(SW * 0.022)})`);
     }
     // texto atropelando texto (linhas reais, sem a folga de ascendente/descendente)
     for (let i = 0; i < blocos.length; i++) for (let j = i + 1; j < blocos.length; j++) {
@@ -669,4 +744,28 @@ function ieCenaChecar(raiz, ctx) {
         }));
         if (bate) avisos.push(`${nome(A)} atropela ${nome(B)}`);
     }
+}
+
+// ─────────────────────────── exportar ───────────────────────────
+// cada slide do carrossel (ou o documento inteiro) em arquivo: pasta/base_01.png ...; devolve os caminhos gravados
+async function ieCenaExportar(pasta, { fmt = 'png', q = 92, base, escala = 1 } = {}) {
+    const doc = IE.doc, api = ieApi();
+    if (!doc || !api) throw new Error('sem documento');
+    const S = doc.cena && doc.cena.slide;
+    const partes = S ? Array.from({ length: S.n }, (_, i) => ({ x: i * S.w, w: S.w, h: S.h, nome: String(i + 1).padStart(2, '0') })) : [{ x: 0, w: doc.w, h: doc.h, nome: '' }];
+    ieCompor(doc, ieRDoc(doc));
+    const ini = await api.ie_salvar_inicio(null), itens = [];
+    const nomeBase = String(base || doc.nome || 'peca').replace(/[\\/:*?"<>|]/g, '_');
+    const dir = String(pasta).replace(/[\\/]+$/, '');
+    for (const [i, P] of partes.entries()) {
+        let c = ieCanvas(P.w, P.h);
+        ieCtx(c).drawImage(doc.comp, P.x, 0, P.w, P.h, 0, 0, P.w, P.h);
+        if (escala !== 1) c = ieTransformarPlano({ c, x: 0, y: 0 }, [escala, 0, 0, escala, 0, 0]).c;
+        const k = `slide_${i}.png`;
+        await ieEnviar(ini.url, k, c);
+        itens.push({ arquivo: k, destino: `${dir}\\${nomeBase}${P.nome ? '_' + P.nome : ''}.${fmt}` });
+    }
+    const e = await api.ie_exportar_fatias({ sessao: ini.sessao, fatias: itens, qualidade: q, dpi: doc.dpi });
+    if (!e || !e.success) throw new Error('não exportou: ' + ((e && e.erros) || []).join(', '));
+    return e.feitos;
 }

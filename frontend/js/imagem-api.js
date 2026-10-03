@@ -584,6 +584,11 @@ const KNV = {
     //    refazer (true | [nomes]: refaz também as camadas mexidas). Devolve {camadas, mantidas, avisos, ms}.
     async cena(html, opc = {}) { const r = await ieCena(html, opc); await KNV._quadro(); return r; },
     cenaFonte() { return IE.doc && IE.doc.cena ? IE.doc.cena.html : null; },
+    // carrossel → um arquivo por slide (pasta/base_01.png...); sem slides, o documento inteiro. {fmt: png|jpg|webp, q, base, escala}
+    async exportar(pasta, opc = {}) { return ieCenaExportar(pasta, opc); },
+    // kit de marca: variáveis CSS em toda cena ({'cor-primaria': '#ff5e3a', 'fonte-titulo': 'Poppins'} → var(--cor-primaria));
+    // sem argumento devolve o kit; null apaga
+    marca(vars) { if (vars !== undefined) iePrefGravar('marca', vars); return iePref('marca', null); },
     // famílias instaladas (filtro = pedaço do nome); com estilos: {família: ['Regular', 'Bold'...]}
     async fontes(filtro = '', { estilos = false } = {}) {
         const e = await ieCarregarFontes(), f = String(filtro).toLowerCase();
