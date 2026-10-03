@@ -773,25 +773,25 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 /* ---------- Aviso de atualização ---------- */
 .update-banner {
     position: fixed;
-    left: 50%;
-    bottom: 18px;
-    transform: translateX(-50%);
+    right: 14px;
+    bottom: 14px;
     z-index: 9999;
     display: flex;
     align-items: center;
-    gap: 12px;
-    max-width: calc(100% - 32px);
-    padding: 10px 10px 10px 16px;
+    gap: 8px;
+    max-width: calc(100% - 28px);
+    padding: 5px 5px 5px 10px;
     border-radius: 7px;
     background: var(--bg-3);
     box-shadow: var(--shadow-pop);
-    font-size: 13px;
+    font-size: 12px;
     animation: toast-in .3s var(--ease);
 }
-.update-banner > .i { color: var(--primary); font-size: 17px; }
+.update-banner > .i { color: var(--primary); font-size: 14px; }
+.update-banner .btn-primary { padding: 4px 10px; font-size: 12px; }
 .update-banner b { color: var(--primary); }
 .update-banner .ub-status { color: var(--text-3); font-size: 12px; }
-.update-banner .ub-close { border: 0; background: none; color: var(--text-3); font-size: 15px; padding: 4px 6px; border-radius: var(--r-sm); display: grid; }
+.update-banner .ub-close { border: 0; background: none; color: var(--text-3); font-size: 13px; padding: 3px 4px; border-radius: var(--r-sm); display: grid; }
 .update-banner .ub-close:hover { color: var(--text); background: rgba(255, 255, 255, .06); }
 
 /* =========================================================

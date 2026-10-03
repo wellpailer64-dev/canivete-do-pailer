@@ -3316,9 +3316,9 @@ function _showUpdateBanner(info) {
     bar.className = 'update-banner';
     bar.innerHTML =
         ico('arrow-up') +
-        '<span>Nova versão <b>' + _escHtml(info.latest) + '</b> disponível · você tem ' + _escHtml(info.current) + '</span>' +
+        '<span title="você tem ' + _escHtml(info.current) + '">Nova versão <b>' + _escHtml(info.latest) + '</b></span>' +
         '<span id="app-update-status" class="ub-status"></span>' +
-        '<button id="app-update-btn" class="btn-primary">Atualizar agora</button>' +
+        '<button id="app-update-btn" class="btn-primary">Atualizar</button>' +
         '<button id="app-update-close" class="ub-close" title="Depois">' + ico('x') + '</button>';
     document.body.appendChild(bar);
     document.getElementById('app-update-close').onclick = () => bar.remove();
