@@ -374,9 +374,13 @@
 })();
 
 function vkTodosDaCamada() { return VK.doc.camadas.filter(c => c.visivel !== false && !c.trava).flatMap(c => c.itens.filter(o => !o.trava && o.visivel !== false).map(o => o.id)); }
+function vkPranchetaDe(b) {   // prancheta que contém o centro da caixa (senão a ativa): medidas de agente fazem sentido em qualquer página
+    const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+    return VK.doc.pranchetas.find(q => cx >= q.x && cx <= q.x + q.w && cy >= q.y && cy <= q.y + q.h);
+}
 function vkCaixaMM(o, p = null) {
     const b = vkBox(o); if (!isFinite(b[0])) return null;
-    p = p || VK.doc.pranchetas.find(q => q.id === VK.ativa) || VK.doc.pranchetas[0];
+    p = p || vkPranchetaDe(b) || VK.doc.pranchetas.find(q => q.id === VK.ativa) || VK.doc.pranchetas[0];
     return { x: vkR(vkMM(b[0] - p.x)), y: vkR(vkMM(b[1] - p.y)), larg: vkR(vkMM(b[2] - b[0])), alt: vkR(vkMM(b[3] - b[1])) };
 }
 function vkInfo(o) {

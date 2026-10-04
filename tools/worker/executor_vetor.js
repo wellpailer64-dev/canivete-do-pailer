@@ -6,7 +6,11 @@
     const achar = n => {
         const t = vkTodos(), k = norm(n);
         const r = t.find(x => x.o.id === n) || t.find(x => norm(x.o.nome) === k) || t.find(x => x.o.tipo === 'texto' && norm(x.o.conteudo) === k);
-        if (!r) throw new Error(`objeto "${n}" não existe; nomes: ${t.filter(x => x.o.nome || x.o.tipo === 'texto').map(x => x.o.nome || x.o.conteudo.slice(0, 20)).slice(0, 25).join(', ')}`);
+        if (!r) {   // lista também os SEM nome (id + tamanho): o modelo costuma criar a forma e esquecer o nome
+            const sem = t.filter(x => !x.o.nome && x.o.tipo !== 'texto').slice(0, 10).map(x => { const c = vkCaixaMM(x.o) || {}; return `${x.o.id} (${x.o.tipo} ${c.larg}×${c.alt} mm)`; });
+            throw new Error(`objeto "${n}" não existe; nomes: ${t.filter(x => x.o.nome || x.o.tipo === 'texto').map(x => x.o.nome || x.o.conteudo.slice(0, 20)).slice(0, 25).join(', ')}`
+                + (sem.length ? `. Sem nome: ${sem.join(', ')} — se for um deles, use alterar com objetos:["<id>"] e nome:"${n}"` : ''));
+        }
         return r.o;
     };
     const ids = a => ({ ids: [].concat(a.objetos || a.objeto || []).map(n => achar(n).id) });
@@ -30,7 +34,7 @@
         },
         corrigir: a => C(a.correcao, {}),
         exportar_pdf: async (a, ctx) => {
-            const r = await VKN.exportarPdf((ctx.pasta || 'D:\\kanivete_testes\\vetor\\saida') + '\\' + (a.nome || VK.doc.nome || 'arte') + '.pdf', { padrao: a.padrao || 'x4' });
+            const r = await VKN.exportarPdf((ctx.pasta || 'D:\\kanivete_testes\\vetor\\saida') + '\\' + String(a.nome || VK.doc.nome || 'arte').replace(/\.pdf$/i, '') + '.pdf', { padrao: a.padrao || 'x4' });
             window.__vkwExportado = r.verificado; return { verificado: r.verificado, problemas: r.problemas };
         },
     };

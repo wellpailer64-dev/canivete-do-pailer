@@ -195,3 +195,19 @@ Limitações achadas → corrigidas na hora: arco `A` no `d` (não existia), QR 
 última cópia (`novos` = todas), fontes do usuário procuradas só por `LOCALAPPDATA` (agora registro HKCU + perfil real), e o
 fechamento pegou fatias passando 1 mm do corte sem chegar na sangria (aviso certo: fatias ajustadas).
 Ainda não: ampliar foto por IA (o gerador vai até 2048 px → 224 ppi na faixa: aviso `resolucao_baixa`), ferramenta de degradê na arte e Blend.
+
+## 8. Desafio: identidade visual completa "MARÉ" (2026-10-04)
+Manual de marca fictício feito só pelos comandos: `D:/kanivete_testes/idv/montar.py` (`--final` grava .aknv, PDF e PNGs na
+pasta pedida), fotos de direção pelo FLUX local (`gerar_fotos.py`). 16 pranchetas 16:9 (320×180 mm) nomeadas: capa,
+conceito, logotipo, construção/área de proteção/redução mínima, versões, usos incorretos, tipografia, paleta (CMYK/RGB/HEX/
+Pantone ref., largura = proporção de uso), elementos (padrão de ondas + ícones), fotografia, tom de voz (diga × evite), grid,
+papelaria, embalagem, digital, contracapa. Estrutura tirada de manuais bem avaliados (Behance/guias de brand guidelines):
+o que costuma faltar em manual amador é **tom de voz, direção de fotografia e grid** — sempre incluir.
+Técnicas: símbolo = elipse − fenda (caminho com traço → `contornar_traco` → `pathfinder subtrair`) e girar; tagline com
+tamanho medido para casar com a largura da palavra; amostras globais com os nomes da marca; **sem tagline na redução mínima**.
+Limitações achadas → corrigidas: `info`/caixas mediam pela prancheta ATIVA (com várias pranchetas, a tagline caía em outra
+página e o grupo girava em torno de um centro errado) — agora pela prancheta que contém o objeto; Worker não achava
+objeto criado sem nome (o erro agora lista os sem nome com id e tamanho) e gravava `.pdf.pdf`; gerador FLUX falhava sem VRAM
+com o Qwen do Worker carregado (agora descarrega os modelos do Ollama antes de gerar).
+Para peça de tela (manual, apresentação): exportar PDF com `marcas: false` (os avisos de traço fino / texto < 6 pt /
+sem sangria do fechamento são de gráfica). Ainda não: perfil de documento "tela" (RGB, sem sangria, fechamento próprio).

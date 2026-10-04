@@ -269,6 +269,24 @@ def _lado(v, padrao=1024):
     return max(256, min(LADO_MAX, round(v / 16) * 16))
 
 
+def _liberar_gpu_ollama():
+    """Modelos do Ollama (Worker local, olho) parados na GPU deixam o FLUX sem VRAM ("cannot make enough memory available"):
+    descarrega os que estiverem carregados (keep_alive 0). Sem Ollama rodando, não faz nada."""
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:11434/api/ps", timeout=0.5) as r:
+            modelos = [m.get("name") for m in json.load(r).get("models") or []]
+    except Exception:
+        return []
+    for m in modelos:
+        try:
+            req = urllib.request.Request("http://127.0.0.1:11434/api/generate", data=json.dumps({"model": m, "keep_alive": 0}).encode(),
+                                         headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=20).read()
+        except Exception:
+            pass
+    return modelos
+
+
 def gerar(spec, on_progress=lambda d: None):
     """spec: {prompt, largura, altura, semente (-1 = aleatória), passos, refs: [caminho|b64...]}.
     Devolve {success, path, semente, cache} — PNG no cache em disco."""
@@ -276,6 +294,7 @@ def gerar(spec, on_progress=lambda d: None):
     if not prompt:
         return {"success": False, "error": "Escreva o que gerar."}
     w, h = _lado(spec.get("largura")), _lado(spec.get("altura"))
+    _liberar_gpu_ollama()
     semente = int(spec.get("semente", -1))
     if semente < 0:
         semente = int.from_bytes(os.urandom(4), "little") & 0x7FFFFFFF
