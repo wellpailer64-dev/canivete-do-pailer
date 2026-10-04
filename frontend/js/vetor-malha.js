@@ -21,7 +21,7 @@ function vkMalhaDesenhar(ctx, o) {   // desenhada num canvas Ã  parte na resoluÃ
             const p00 = N[i][j], p01 = N[i][j + 1], p10 = N[i + 1][j], p11 = N[i + 1][j + 1];
             const c00 = vkMalhaCor(C[i][j]), c01 = vkMalhaCor(C[i][j + 1]), c10 = vkMalhaCor(C[i + 1][j]), c11 = vkMalhaCor(C[i + 1][j + 1]);
             const lado = Math.max(Math.hypot(p01[0] - p00[0], p01[1] - p00[1]), Math.hypot(p10[0] - p00[0], p10[1] - p00[1]), Math.hypot(p11[0] - p10[0], p11[1] - p10[1])) * k;
-            const n = Math.max(6, Math.min(80, Math.ceil(lado / 3)));
+            const n = Math.max(o.auto3d ? 1 : 6, Math.min(80, Math.ceil(lado / 3)));
             const P = (u, v) => lerp(lerp(p00, p01, u), lerp(p10, p11, u), v), K = (u, v) => lerp(lerp(c00, c01, u), lerp(c10, c11, u), v);
             for (let a = 0; a < n; a++) for (let bb = 0; bb < n; bb++) {
                 const u0 = bb / n, u1 = (bb + 1) / n, v0 = a / n, v1 = (a + 1) / n, q = [P(u0, v0), P(u1, v0), P(u1, v1), P(u0, v1)];

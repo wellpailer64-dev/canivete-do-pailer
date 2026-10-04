@@ -266,7 +266,7 @@ def _moldar(F, texto, track_em, feats=None):
 
 
 # atributos de CARACTERE (objeto = base; trechos = [{ini, fim, ...}] por cima, o último vence) e de PARÁGRAFO (objeto)
-_CAR = ("fam", "estilo", "tam", "track", "desl", "eh", "ev", "maius", "pos", "liga", "frac", "num", "preench", "traco")
+_CAR = ("fam", "estilo", "tam", "track", "desl", "eh", "ev", "rot", "maius", "pos", "liga", "frac", "num", "preench", "traco")
 _PAR = ("recuo_esq", "recuo_dir", "recuo_1a", "antes", "depois")
 _HIFEN = {}
 
@@ -346,7 +346,7 @@ def _glifos(texto, ini, fim, p, falta):
             out.append({"nome": nome, "ci": ci, "adv": av * sc * eh, "xo": ox * sc * eh, "yo": oy * sc * ev, "F": F, "sx": sc * eh, "sy": sc * ev,
                         "desl": desl, "tam": float(p["tam"]), "asc": F["asc"] * sc * ev, "desc": -F["desc"] * sc * ev,
                         "esp": ch in (" ", "\u00a0") or (nome in _ESPACOS and ch != "\t"), "tab": ch == "\t", "hif": ch in ("-", "‐", "–", "/"),
-                        "cor": (p.get("preench"), p.get("traco"))})
+                        "cor": (p.get("preench"), p.get("traco")), "rot": float(p.get("rot") or 0)})
         pos += len(s_)
     return out
 
@@ -395,6 +395,12 @@ def _tabs_layout(gl, tabs, x0=0):
 
 
 def _desenhar(g, M, partes, coleta=None):
+    if g.get("rot"):   # Retocar tipo: a letra gira em torno do meio da sua largura, na linha de base (positivo = anti-horário)
+        r = math.radians(g["rot"]); ca, sa = math.cos(r), math.sin(r); h = g["adv"] / 2
+        lx, ly = ca * -h + sa * 0, -sa * -h + ca * 0
+        a, b, c, d, e, f = M
+        R = [ca, -sa, sa, ca, lx + h, ly]
+        M = [a * R[0] + c * R[1], b * R[0] + d * R[1], a * R[2] + c * R[3], b * R[2] + d * R[3], a * R[4] + c * R[5] + e, b * R[4] + d * R[5] + f]
     cn = _Caneta(g["sx"], g["sy"], M); cn._gs = g["F"]["gs"]
     try:
         g["F"]["gs"][g["nome"]].draw(cn)

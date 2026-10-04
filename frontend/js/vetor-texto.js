@@ -29,7 +29,7 @@ function vkTxArgs(a, trecho) {
     else if (a.estilo) car.estilo = a.estilo;
     if (a.tamanho || a.tam) car.tam = +(a.tamanho || a.tam);
     if (a.track != null) car.track = +a.track;
-    for (const [api, k] of [['desl', 'desl'], ['deslocamento_base', 'desl'], ['escala_h', 'eh'], ['eh', 'eh'], ['escala_v', 'ev'], ['ev', 'ev']]) if (a[api] != null) car[k] = +a[api];
+    for (const [api, k] of [['desl', 'desl'], ['deslocamento_base', 'desl'], ['escala_h', 'eh'], ['eh', 'eh'], ['escala_v', 'ev'], ['ev', 'ev'], ['rot', 'rot'], ['girar_letra', 'rot']]) if (a[api] != null) car[k] = +a[api];
     if (a.maius !== undefined) car.maius = ['alta', 'versalete'].includes(a.maius) ? a.maius : '';
     if (a.caixa_alta != null) car.maius = a.caixa_alta ? 'alta' : '';
     if (a.versalete != null) car.maius = a.versalete ? 'versalete' : '';
@@ -598,3 +598,20 @@ vkTextoFim = function () {
     if (esp) { esp.hidden = true; esp.innerHTML = ''; if (esp._ro) esp._ro.disconnect(); if (esp._ta) { esp._ta.removeEventListener('input', esp._pinta); esp._ta.classList.remove('vk-texto-edit-rico'); } }
     return vkTxFimComEspelho();
 };
+
+// Retocar tipo (Touch Type do Illustrator): mexe numa letra (ou faixa) sem quebrar o texto — continua editável.
+// retocar_letra: id/nome, letra (índice, 0 = primeira) ou faixa [ini, fim] ou trecho (texto), rot (graus, + = anti-horário),
+// escala (%; ou escala_h/escala_v), subir (pt, linha de base), espaco (tracking em milésimos de em, como 'track')
+(() => {
+    vkRegistrar('retocar_letra', 'retocar letra', a => {
+        const o = vkTxAlvos(a).find(x => x.tipo === 'texto'); if (!o) throw new Error('retocar_letra: escolha um texto');
+        const faixa = a.faixa || (a.letra != null ? [+a.letra, +a.letra + 1] : null);
+        const args = { ids: [o.id], un: a.un, ...(faixa ? { faixa } : {}), ...(a.trecho != null ? { trecho: a.trecho } : {}) };
+        if (a.rot != null) args.rot = +a.rot;
+        if (a.escala != null) { args.escala_h = +a.escala; args.escala_v = +a.escala; }
+        if (a.escala_h != null) args.escala_h = +a.escala_h; if (a.escala_v != null) args.escala_v = +a.escala_v;
+        if (a.subir != null) args.desl = +a.subir; if (a.espaco != null) args.track = +a.espaco;
+        if (a.cor != null) args.preench = a.cor;
+        delete args.ids; vkTxAplicar(o, args); return { id: o.id, faixa: faixa || args.trecho || 'tudo' };
+    });
+})();

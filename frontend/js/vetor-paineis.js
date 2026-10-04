@@ -384,10 +384,10 @@ function vkAbaAmostras() {
     };
 }
 function vkAbaFechamento() {
-    const el = vkEl('vk-aba'), f = vkFechamento({ padrao: VK.padraoPdf || 'x4' });
+    const el = vkEl('vk-aba'), f = vkFechamento({ padrao: vkPadraoDoc() });
     const item = x => `<div class="vk-fc vk-fc-${x.nivel}"><b>${x.nivel === 'erro' ? '✖' : '⚠'}</b><span>${vkEsc_(x.msg)}${x.n > 1 ? ` <small>(${x.n})</small>` : ''}</span>
         ${x.ids.length ? `<button class="ie-btn ie-btn-mini" data-ver="${x.cod}">Ver</button>` : ''}${x.corrigir ? `<button class="ie-btn ie-btn-mini" data-fix="${x.corrigir}">Corrigir</button>` : ''}</div>`;
-    el.innerHTML = `<div class="vk-linha">Padrão <select id="vk-fc-padrao">${[['x4', 'PDF/X-4 (recomendado)'], ['x1a', 'PDF/X-1a'], ['cmyk', 'PDF CMYK'], ['rgb', 'PDF digital (RGB)']].map(([k, n]) => `<option value="${k}" ${k === (VK.padraoPdf || 'x4') ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    el.innerHTML = `<div class="vk-linha">Padrão <select id="vk-fc-padrao">${[['x4', 'PDF/X-4 (recomendado)'], ['x1a', 'PDF/X-1a'], ['cmyk', 'PDF CMYK'], ['rgb', 'PDF digital (RGB)']].map(([k, n]) => `<option value="${k}" ${k === (vkPadraoDoc()) ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="vk-fc-res ${f.ok ? 'ok' : 'ruim'}">${f.ok ? (f.avisos.length ? `Pronto para a gráfica, com ${f.avisos.length} alerta(s)` : 'Pronto para a gráfica ✓') : `${f.erros.length} erro(s) impedem o fechamento`}</div>
         ${f.erros.map(item).join('')}${f.avisos.map(item).join('')}
         <div class="vk-nota">Perfil ${f.perfil} · tinta máx. ${f.tac_max}% · sangria ${f.info.sangria_mm} mm${f.info.spots.length ? ' · especiais: ' + vkEsc_(f.info.spots.join(', ')) : ''}</div>
@@ -438,6 +438,7 @@ function vkNovoDialogo() {
         <div class="vk-nota">Impressão no Brasil: CMYK + FOGRA39 (papel couché) ou FOGRA29 (papel offset/não revestido), sangria de 3 mm.</div>
         </div><div class="ie-dlg-rod"><button class="ie-btn" data-x>Cancelar</button><button class="ie-btn ie-btn-primario" id="vkn-ok">Criar</button></div>`, (m, fechar) => {
         const ps = m.querySelector('#vkn-preset');
+        m.querySelector('#vkn-cor').onchange = e => { if (e.target.value === 'rgb') m.querySelector('#vkn-s').value = 0; };
         ps.onchange = () => { const v = VK_PRESETS[ps.value]; if (v) { m.querySelector('#vkn-l').value = vkR(v[0], 2); m.querySelector('#vkn-a').value = vkR(v[1], 2); } };
         m.querySelector('#vkn-ok').onclick = () => { const g = id => m.querySelector(id).value; fechar();
             vkCmdUi('novo', { nome: g('#vkn-nome'), larg: +g('#vkn-l'), alt: +g('#vkn-a'), pranchetas: +g('#vkn-n'), sangria: +g('#vkn-s'), modoCor: g('#vkn-cor'), perfil: g('#vkn-perfil') }); };
@@ -457,11 +458,11 @@ function vkDocDialogo() {
 }
 function vkExportarDialogo(qual = 'pdf') {
     if (!VK.doc) return;
-    const f = vkFechamento({ padrao: VK.padraoPdf || 'x4' });
+    const f = vkFechamento({ padrao: vkPadraoDoc() });
     vkModal(`<div class="ie-dlg-tit">Exportar</div><div class="ie-dlg-corpo">
         <div class="ie-segm vk-segm" id="vke-tipo"><button data-t="pdf" class="${qual === 'pdf' ? 'on' : ''}">PDF para gráfica</button><button data-t="img" class="${qual === 'img' ? 'on' : ''}">PNG / JPG</button><button data-t="svg">SVG</button></div>
         <div id="vke-pdf" ${qual === 'pdf' ? '' : 'hidden'}>
-            <div class="vk-linha"><span>Padrão</span><select id="vke-padrao">${[['x4', 'PDF/X-4:2010 (recomendado — transparência viva)'], ['x1a', 'PDF/X-1a:2001 (gráficas antigas — só CMYK, sem transparência)'], ['cmyk', 'PDF CMYK (gráfica rápida)'], ['rgb', 'PDF digital RGB (tela, sem marcas)']].map(([k, n]) => `<option value="${k}" ${k === (VK.padraoPdf || 'x4') ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+            <div class="vk-linha"><span>Padrão</span><select id="vke-padrao">${[['x4', 'PDF/X-4:2010 (recomendado — transparência viva)'], ['x1a', 'PDF/X-1a:2001 (gráficas antigas — só CMYK, sem transparência)'], ['cmyk', 'PDF CMYK (gráfica rápida)'], ['rgb', 'PDF digital RGB (tela, sem marcas)']].map(([k, n]) => `<option value="${k}" ${k === (vkPadraoDoc()) ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
             <div class="vk-grade">${vkNum('Sangria', vkR(vkMM(VK.doc.sangria), 2), 'id="vke-s" min="0"', 'mm', 0.5)}</div>
             <label class="vk-chk" title="Texto de verdade com a fonte embutida (selecionável e copiável). Para a gráfica, o padrão (curvas) é mais seguro."><input type="checkbox" id="vke-texto"> Texto editável (fonte embutida)</label>
             <label class="vk-chk"><input type="checkbox" id="vke-marcas" checked> Marcas de corte (cor de registro, fora da sangria)</label>

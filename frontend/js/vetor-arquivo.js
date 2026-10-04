@@ -60,7 +60,7 @@
     });
     vkRegistrar('exportar_pdf', 'exportar PDF', async a => {
         // padrao: x4 (PDF/X-4, recomendado) | x1a (PDF/X-1a) | cmyk | rgb. O fechamento roda antes: erro impede (forcar: true passa)
-        const padrao = a.padrao || 'x4';
+        const padrao = a.padrao || vkPadraoDoc();
         const f = vkFechamento({ padrao });
         if (f.erros.length && !a.forcar) {
             const e = new Error(`fechamento com ${f.erros.length} erro(s): ${f.erros.map(x => x.msg).slice(0, 4).join(' | ')} (corrija ou passe forcar: true)`);
@@ -84,7 +84,7 @@
         // pasta/<nome>/: <nome>.aknv + Links/ + Fontes/ + <nome>.pdf (padrao, default x4) + Relatório.txt. pdf: false = sem PDF
         const pasta = a.pasta || await api().vk_dialogo('pasta');
         if (!pasta) return { cancelado: true };
-        const padrao = a.padrao || VK.padraoPdf || 'x4', f = vkFechamento({ padrao });
+        const padrao = a.padrao || vkPadraoDoc(), f = vkFechamento({ padrao });
         const nome = (VK.doc.nome || 'Sem titulo').replace(/[<>:"/\\|?*]+/g, '_').trim() || 'Sem titulo';
         const dest = pasta.replace(/[\\/]+$/, '') + '/' + nome;
         let pdf = null;
@@ -240,7 +240,7 @@ function vkSvg(p) {   // SVG da prancheta: as mesmas pinturas da tela (Aparênci
         const N = o.nos, C = o.cores, lerp = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t); let h = '';
         for (let i = 0; i < N.length - 1; i++) for (let j = 0; j < N[0].length - 1; j++) {
             const P = (u, v) => lerp(lerp(N[i][j], N[i][j + 1], u), lerp(N[i + 1][j], N[i + 1][j + 1], u), v), K = (u, v) => lerp(lerp(vkMalhaCor(C[i][j]), vkMalhaCor(C[i][j + 1]), u), lerp(vkMalhaCor(C[i + 1][j]), vkMalhaCor(C[i + 1][j + 1]), u), v);
-            const k = 20;
+            const k = (N.length - 1) * (N[0].length - 1) > 60 ? 3 : 20;   // malha do 3D: muitas células pequenas
             for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) { const q = [P(b / k, a / k), P((b + 1) / k, a / k), P((b + 1) / k, (a + 1) / k), P(b / k, (a + 1) / k)], c = cor({ k: 'cmyk', v: K((b + 0.5) / k, (a + 0.5) / k) });
                 h += `<path d="M${q.map(x => `${e(x[0])} ${e(x[1])}`).join('L')}Z" fill="${c}" stroke="${c}" stroke-width="0.15"/>`; }
         }
@@ -275,7 +275,7 @@ const vkBoxArea = o => { const b = vkBox(o); return isFinite(b[0]) ? (b[2] - b[0
 function vkCores(o) { const out = []; const ad = c => { if (!c) return; if (c.k === 'grad') c.paradas.forEach(p => ad(p.cor)); else out.push(c); }; ad(o.preench); if (o.traco) ad(o.traco.cor); (o.trechos || []).forEach(t => { ad(t.preench); if (t.traco) ad(t.traco.cor); }); (o.aparencia || []).forEach(l => ad(l.cor)); (o.efeitos || []).forEach(e => ad(e.cor)); return out; }
 function vkFechamento(op = {}) {
     // Regras de pré-impressão (Instructions/vetor-kanivete.md › Fechamento). → {ok, erros, avisos, info}
-    const padrao = op.padrao || 'x4', impressao = padrao !== 'rgb', d = VK.doc;
+    const padrao = op.padrao || vkPadraoDoc(), impressao = padrao !== 'rgb', d = VK.doc;
     const tacMax = op.tac || (/29|UNCOATED/i.test(d.perfil) ? 260 : 300);
     const itens = []; const add = (nivel, cod, msg, ids, corrigir) => {
         const ja = itens.find(x => x.cod === cod); if (ja) { ja.ids.push(...ids); ja.n += ids.length || 1; return; }

@@ -45,7 +45,7 @@ function vkPadCanal(ctx, c, canal, m) {   // padrão na chapa: a peça desenhada
     pat.setTransform(m ? new DOMMatrix(vkInv(m)).multiply(D) : D); return pat;
 }
 function vkMalhaCanal(ctx, o, canal) {   // malha de degradê na chapa: células subdivididas em cinza da tinta
-    const N = o.nos, Cr = o.cores, L = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t), n = 16;
+    const N = o.nos, Cr = o.cores, L = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t), n = (N.length - 1) * (N[0].length - 1) > 60 ? 3 : 16;
     for (let i = 0; i < N.length - 1; i++) for (let j = 0; j < N[0].length - 1; j++) {
         const P = (u, v) => L(L(N[i][j], N[i][j + 1], u), L(N[i + 1][j], N[i + 1][j + 1], u), v);
         const K = (u, v) => L(L(vkMalhaCor(Cr[i][j]), vkMalhaCor(Cr[i][j + 1]), u), L(vkMalhaCor(Cr[i + 1][j]), vkMalhaCor(Cr[i + 1][j + 1]), u), v);

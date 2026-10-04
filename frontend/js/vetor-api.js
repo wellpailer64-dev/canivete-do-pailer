@@ -75,6 +75,7 @@
     });
     vkRegistrar('documento', 'propriedades do documento', a => {
         if (a.nome) VK.doc.nome = a.nome;
+        if (a.destino) { if (a.destino === 'tela') VK.doc.destino = 'tela'; else delete VK.doc.destino; }   // 'tela' (apresentação, manual, redes) | 'impressao'
         if (a.sangria != null) VK.doc.sangria = vkPT(+a.sangria);
         if (a.perfil) { VK.doc.perfil = a.perfil; VK.corTela.clear(); }
         if (a.modoCor) VK.doc.modoCor = a.modoCor;
@@ -117,7 +118,7 @@
             caixa: a.caixa != null ? c.D(a.caixa) : null, m: [1, 0, 0, 1, c.X(a.x), c.Y(a.y)] };
         estiloPadrao(o, { preench: '100K', traco: null, ...a });
         const extra = {};   // caractere/parágrafo/altura (vetor-texto.js)
-        for (const k of ['desl', 'deslocamento_base', 'escala_h', 'escala_v', 'maius', 'caixa_alta', 'versalete', 'pos', 'liga', 'ligaduras', 'frac', 'fracoes', 'num', 'numerais',
+        for (const k of ['desl', 'deslocamento_base', 'escala_h', 'escala_v', 'rot', 'girar_letra', 'maius', 'caixa_alta', 'versalete', 'pos', 'liga', 'ligaduras', 'frac', 'fracoes', 'num', 'numerais',
             'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois', 'hifen', 'hifenizar', 'tabs', 'estilo_paragrafo', 'altura', 'caixa_alt']) if (a[k] !== undefined) extra[k] = a[k];
         if (Object.keys(extra).length) vkTxAplicar(o, { un: a.un, ...extra });
         inserir(o, a);

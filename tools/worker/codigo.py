@@ -174,7 +174,7 @@ if __name__ == "__main__":
         mais, menos = re.search(r"(\d+) insert", st), re.search(r"(\d+) delet", st)
         ok_t = [t for t in ctx["testes"] if ctx["resultados"].get(t)]
         pend = conferir(c.get("success_conditions"))
-        okk = fim.upper().startswith("FEITO") and len(ok_t) == len(ctx["testes"]) and not pend and bool(ctx["mudados"] or c.get("pode_nao_mudar"))
+        okk = fim.upper().startswith("FEITO") and len(ok_t) == len(ctx["testes"]) and not pend and bool(ctx["mudados"] or c.get("pode_nao_mudar") or not c.get("arquivos"))
         saida = {"task_id": tid, "status": "success" if okk else ("partial" if ctx["mudados"] else "failed"), "worker": modelo, "files_changed": len(ctx["mudados"]),
                  "arquivos": sorted(x.replace("\\", "/") for x in ctx["mudados"]), "tests": f"{len(ok_t)}/{len(ctx['testes'])}",
                  "diff": f"+{mais.group(1) if mais else 0} -{menos.group(1) if menos else 0}", **({"pendente": pend[:4]} if pend else {}), "resumo": re.sub(r"^FEITO:?\s*", "", fim)[:240], "seconds": seg}

@@ -35,11 +35,13 @@ const vkInv = m => { const d = m[0] * m[3] - m[1] * m[2] || 1e-12; return [m[3] 
 const vkEsc = m => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])) || 1;
 const vkApi = () => (window.pywebview && window.pywebview.api) || null;
 function vkPt(x, y) { return [x, y, x, y, x, y]; }
+function vkPadraoDoc() { return VK.padraoPdf || (VK.doc && VK.doc.destino === 'tela' ? 'rgb' : 'x4'); }   // documento de tela: PDF/fechamento digitais
 function vkDocVazio(o = {}) {
+    if (o.modoCor === 'rgb' && !o.destino) o = { ...o, destino: 'tela' };
     const w = vkPT(o.larg || 210), h = vkPT(o.alt || 297), n = Math.max(1, o.pranchetas || 1);
     const pr = Array.from({ length: n }, (_, i) => ({ id: vkId('p'), nome: `Prancheta ${i + 1}`, x: i * (w + 36), y: 0, w, h }));
     return { versao: 1, nome: o.nome || 'Sem título', unidade: 'mm', modoCor: o.modoCor || 'cmyk', perfil: o.perfil || 'FOGRA39',
-        sangria: vkPT(o.sangria ?? 3), pranchetas: pr, camadas: [{ id: vkId('c'), nome: 'Camada 1', visivel: true, trava: false, itens: [] }],
+        sangria: vkPT(o.sangria ?? (o.destino === 'tela' ? 0 : 3)), ...(o.destino === 'tela' ? { destino: 'tela' } : {}), pranchetas: pr, camadas: [{ id: vkId('c'), nome: 'Camada 1', visivel: true, trava: false, itens: [] }],
         amostras: vkAmostrasPadrao(), imagens: {}, guias: [] };
 }
 function vkAmostrasPadrao() {
