@@ -3202,6 +3202,17 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.vetorizar(arquivo, cores, area_min, ignorar_fundo)
 
+    def vk_bibliotecas_cor(self):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.bibliotecas_cor()
+
+    def vk_ler_biblioteca(self, arquivo, cond="FOGRA39"):
+        from Functions import vetor_kanivete
+        try:
+            return vetor_kanivete.ler_biblioteca(arquivo, cond)
+        except Exception as e:
+            return {"success": False, "error": f"não leu a biblioteca: {e}"}
+
     def vk_qr(self, texto, correcao="M"):
         from Functions import vetor_kanivete
         return vetor_kanivete.qr_matriz(texto, correcao)

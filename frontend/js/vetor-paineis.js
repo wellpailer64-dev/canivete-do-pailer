@@ -374,8 +374,9 @@ function vkAbaAmostras() {
     const usadas = new Set(); for (const { o } of vkTodos()) vkCores(o).forEach(c => c.k === 'spot' && usadas.add(c.nome));
     el.innerHTML = `<div class="vk-am-grade">${d.amostras.map((a, i) => `<button class="vk-am" data-am="${i}" title="${vkEsc_(a.nome)} — ${vkCorTexto(a.cor)}">${vkCorSw(a.cor)}${a.cor.k === 'spot' ? '<i>●</i>' : ''}</button>`).join('')}</div>
         <div class="vk-nota">Clique aplica no ${VK.focoTraco ? 'traço' : 'preenchimento'} (X alterna). Cores especiais usadas: ${[...usadas].join(', ') || 'nenhuma'}.</div>
-        <div class="vk-acoes"><button class="ie-btn ie-btn-mini" data-nova>+ Amostra da cor atual</button></div>`;
+        <div class="vk-acoes"><button class="ie-btn ie-btn-mini" data-nova>+ Amostra da cor atual</button><button class="ie-btn ie-btn-mini" data-livros>Bibliotecas de cor (Pantone…)</button></div>`;
     el.onclick = e => {
+        if (e.target.closest('[data-livros]')) return vkCoresJanela(e.target.closest('[data-livros]'));
         const b = e.target.closest('[data-am]');
         if (b) { const c = vkClone(d.amostras[+b.dataset.am].cor); if (VK.sel.length) vkCmdUi('alterar', VK.focoTraco ? { traco: c } : { preench: c }); if (VK.focoTraco) VK.traco = c; else VK.preench = c; vkUiAgendar(); }
         if (e.target.dataset.nova != null) { const c = VK.focoTraco ? VK.traco : VK.preench; if (c) vkCmdUi('amostra', { cor: c }); }

@@ -339,9 +339,21 @@ with sync_playwright() as p:
     r = C("vetorizar", {"ids": [li["id"]], "cores": 6})
     subs = pg.evaluate("id => vkObj(id).itens.map(o => o.subs.length)", r["ids"][0])
     ok(r["cores"] == 3 and sorted(subs) == [1, 2, 6], f"vetorizar logo JPG: 3 cores, anel com furo, LOGO com os furos dos O ({subs})")
+    subprocess.run([sys.executable, r"D:\kanivete_testes\vetor\cores\gerar_livros.py"], check=False, capture_output=True)
+    pu = C("bibliotecas_cor")["pasta_usuario"]; os.makedirs(pu, exist_ok=True)
+    import shutil
+    for f_ in ("TESTE Solid Coated.acb", "marca.ase"): shutil.copy(os.path.join(r"D:\kanivete_testes\vetor\cores", f_), pu)
+    libs = [b_["nome"] for b_ in C("bibliotecas_cor")["bibliotecas"]]
+    ok("TESTE Solid Coated" in libs and "marca" in libs, f"bibliotecas de cor achadas na pasta do usuário ({libs})")
+    q = C("retangulo", {"x": 40, "y": 5, "larg": 15, "alt": 10, "nome": "pantone"})
+    r = C("cor_biblioteca", {"biblioteca": "TESTE Solid", "nome": "286", "ids": [q["id"]], "preench": True})
+    pr = pg.evaluate("id => vkObj(id).preench", q["id"])
+    ok(pr["k"] == "spot" and pr["nome"] == "TESTE 286 C" and pr["v"][0] > 80, f"cor do livro (.acb em Lab) vira especial com CMYK alternativo ({pr})")
+    r = C("cor_biblioteca", {"biblioteca": "marca", "todas": True})
+    ok(len(r["amostras"]) == 2, f"todas as cores do .ase viram amostras ({r['amostras']})")
     out = os.path.join(SAI, "formas_x4.pdf")
     r = pg.evaluate("([c]) => VKN.exportarPdf(c, {padrao: 'x4'})", [out])
-    ok(r["verificado"], f"PDF/X-4 com setor, QR e ícone ({r['problemas']})")
+    ok(r["verificado"] and "TESTE 286 C" in r["info"]["spots"], f"PDF/X-4 com setor, QR, ícone e cor do livro como especial ({r['problemas']}, {r['info']['spots']})")
 
     print("separações e sobreimpressão")
     C("novo", {"nome": "Sep teste", "larg": 100, "alt": 60, "sangria": 3})

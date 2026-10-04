@@ -1130,3 +1130,123 @@ def vetorizar(arquivo, cores=6, area_min=12, ignorar_fundo=True, lado_max=1600):
             regioes.append({"rgb": [int(x) for x in cent_rgb[c]], "area": area, "formas": formas})
     regioes.sort(key=lambda r: -r["area"])
     return {"success": True, "w": W0, "h": H0, "escala": esc, "fundo_ignorado": fundo is not None, "regioes": regioes}
+
+
+# ─────────────────────────── bibliotecas de cor (.acb Adobe Color Book, .ase Swatch Exchange) ───────────────────────────
+# Pantone e cia. são dados proprietários: o app NÃO traz os livros; lê os que o usuário tem (Illustrator/Photoshop instalados,
+# ou .acb/.ase que a gráfica mandar, copiados para %APPDATA%/CaniveteDoPailer/cores).
+_BIBLIO = {}
+
+
+def _lab_para_cmyk(labs, cond="FOGRA39"):
+    """[[L 0-100, a, b]] → [[c,m,y,k] 0-100] pelo perfil de saída (colorimétrico relativo + BPC, como a Adobe)."""
+    from PIL import Image, ImageCms
+    icc = perfil_arquivo(cond)
+    if not icc or not labs:
+        return [[0, 0, 0, round(100 - L, 1)] for L, a, b in labs]
+    t = ImageCms.buildTransform(ImageCms.createProfile("LAB"), ImageCms.getOpenProfile(icc), "LAB", "CMYK",
+                                ImageCms.Intent.RELATIVE_COLORIMETRIC, flags=ImageCms.Flags.BLACKPOINTCOMPENSATION)
+    im = Image.new("LAB", (len(labs), 1))
+    im.putdata([(max(0, min(255, round(L * 2.55))), max(0, min(255, round(a + 128))), max(0, min(255, round(b + 128)))) for L, a, b in labs])
+    return [[round(x / 2.55, 1) for x in v] for v in ImageCms.applyTransform(im, t).getdata()]
+
+
+def _str_acb(d, p):
+    import struct
+    n = struct.unpack_from(">I", d, p)[0]; p += 4
+    s = d[p:p + 2 * n].decode("utf-16-be", "replace").rstrip("\x00"); p += 2 * n
+    if s.startswith("$$$/") and "=" in s:   # textos localizados da Adobe: "$$$/colorbook/.../prefix=PANTONE "
+        s = s.split("=", 1)[1]
+    return s, p
+
+
+def _ler_acb(d, cond):
+    import struct
+    p = 8
+    titulo, p = _str_acb(d, p); pre, p = _str_acb(d, p); suf, p = _str_acb(d, p); _desc, p = _str_acb(d, p)
+    n, _pag, _sel, esp = struct.unpack_from(">HHHH", d, p); p += 8
+    tam = {0: 3, 2: 4, 7: 3}.get(esp)
+    if tam is None:
+        raise ValueError(f"espaço de cor {esp} não suportado no .acb")
+    cores = []
+    for _ in range(n):
+        nome, p = _str_acb(d, p); p += 6   # código de catálogo
+        v = list(d[p:p + tam]); p += tam
+        if nome.strip():
+            cores.append((f"{pre}{nome}{suf}".strip(), v))
+    spot = d[p:p + 4] != b"proc"   # livros novos terminam com "spot"/"proc"; os antigos (Pantone) são especiais
+    if esp == 7:
+        conv = _lab_para_cmyk([[v[0] / 2.55, v[1] - 128, v[2] - 128] for _, v in cores], cond)
+    elif esp == 0:
+        conv = rgb_para_cmyk([v for _, v in cores], cond)
+    else:
+        conv = [[round((255 - x) / 2.55, 1) for x in v] for _, v in cores]   # CMYK do .acb: 0 = 100% de tinta
+    out = []
+    for (nome, v), cmyk in zip(cores, conv):
+        c = {"nome": nome, "cmyk": cmyk, "spot": spot}
+        if esp == 7: c["lab"] = [round(v[0] / 2.55, 1), v[1] - 128, v[2] - 128]
+        out.append(c)
+    return titulo or "Livro de cores", out
+
+
+def _ler_ase(d, cond):
+    import struct
+    p = 8; nblocos = struct.unpack_from(">I", d, p)[0]; p += 4
+    cores, grupo = [], None
+    for _ in range(nblocos):
+        tipo, tam = struct.unpack_from(">HI", d, p); p += 6
+        fim = p + tam
+        if tipo == 0xC001:   # início de grupo
+            n = struct.unpack_from(">H", d, p)[0]; grupo = d[p + 2:p + 2 + 2 * n].decode("utf-16-be", "replace").rstrip("\x00")
+        elif tipo == 0xC002:
+            grupo = None
+        elif tipo == 0x0001:
+            n = struct.unpack_from(">H", d, p)[0]; q = p + 2
+            nome = d[q:q + 2 * n].decode("utf-16-be", "replace").rstrip("\x00"); q += 2 * n
+            modelo = d[q:q + 4].decode("ascii", "replace").strip(); q += 4
+            nv = {"CMYK": 4, "RGB": 3, "LAB": 3, "Gray": 1}.get(modelo, 0)
+            vals = struct.unpack_from(">" + "f" * nv, d, q); q += 4 * nv
+            tipo_cor = struct.unpack_from(">H", d, q)[0] if q + 2 <= fim else 2
+            c = {"nome": nome, "spot": tipo_cor == 1, "global": tipo_cor == 0}
+            if grupo: c["grupo"] = grupo
+            if modelo == "CMYK": c["cmyk"] = [round(x * 100, 1) for x in vals]
+            elif modelo == "RGB": c["rgb"] = [round(x * 255) for x in vals]
+            elif modelo == "LAB": c["lab"] = [vals[0] * 100, vals[1], vals[2]]
+            elif modelo == "Gray": c["cmyk"] = [0, 0, 0, round((1 - vals[0]) * 100, 1)]
+            cores.append(c)
+        p = fim
+    labs = [c for c in cores if "lab" in c]
+    for c, cm in zip(labs, _lab_para_cmyk([c["lab"] for c in labs], cond) if labs else []):
+        c["cmyk"] = cm
+    rg = [c for c in cores if "rgb" in c and "cmyk" not in c]
+    for c, cm in zip(rg, rgb_para_cmyk([c["rgb"] for c in rg], cond) if rg else []):
+        c["cmyk"] = cm
+    return None, cores
+
+
+def ler_biblioteca(arquivo, cond="FOGRA39"):
+    """.acb / .ase → {titulo, arquivo, cores: [{nome, cmyk (alternativo pelo perfil), spot, lab?, rgb?, grupo?}]}"""
+    chave = (os.path.abspath(arquivo), cond, os.path.getmtime(arquivo))
+    if chave not in _BIBLIO:
+        d = open(arquivo, "rb").read()
+        if d[:4] == b"8BCB": titulo, cores = _ler_acb(d, cond)
+        elif d[:4] == b"ASEF": titulo, cores = _ler_ase(d, cond)
+        else: return {"success": False, "error": "não é biblioteca de cores Adobe (.acb/.ase)"}
+        _BIBLIO[chave] = {"success": True, "titulo": titulo or os.path.splitext(os.path.basename(arquivo))[0], "arquivo": os.path.abspath(arquivo), "cores": cores}
+    return _BIBLIO[chave]
+
+
+def bibliotecas_cor():
+    """Livros encontrados: Adobe instalada (Presets/.../Color Books) + %APPDATA%/CaniveteDoPailer/cores. → {pasta_usuario, bibliotecas}"""
+    import glob
+    pastas = [os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "cores")]
+    for raiz in (os.environ.get("ProgramFiles", r"C:\Program Files"), os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")):
+        for padrao in ("*/Presets*/Color Books", "*/Presets*/*/Color Books", "*/Presets*/*/*/Color Books"):
+            pastas += glob.glob(os.path.join(raiz, "Adobe", padrao))
+    out, vistos = [], set()
+    for pa in pastas:
+        for arq in sorted(glob.glob(os.path.join(pa, "*.acb")) + glob.glob(os.path.join(pa, "*.ase"))):
+            n = os.path.splitext(os.path.basename(arq))[0]
+            if n.lower() not in vistos:
+                vistos.add(n.lower()); out.append({"nome": n, "arquivo": arq})
+    return {"pasta_usuario": pastas[0], "bibliotecas": out}

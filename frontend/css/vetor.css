@@ -117,3 +117,4 @@
 .vk-cor-mini span { font-size: 11px; }
 .vk-ef { border-top: 1px solid rgba(255,255,255,.06); padding-top: 4px; margin-top: 4px; }
 .vk-ef b { font-weight: 500; flex: 1; }
+.vk-cb { width: 300px; padding: 8px; } .vk-cb-grade { max-height: 260px; overflow-y: auto; margin-top: 6px; }
