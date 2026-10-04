@@ -966,3 +966,42 @@ async function ieCenaExportar(pasta, { fmt = 'png', q = 92, base, escala = 1 } =
     if (!e || !e.success) throw new Error('não exportou: ' + ((e && e.erros) || []).join(', '));
     return e.feitos;
 }
+
+// ─────────────────────────── atalhos de exportação rápida (pedido do usuário 2026-10-03) ───────────────────────────
+// Ctrl+Shift+, = cada camada selecionada em PNG (recortada no tamanho dela, com efeitos); Ctrl+Shift+. = o documento em
+// PNG: com fatias, uma por fatia; com pranchetas, uma por prancheta; senão a tela inteira. Pergunta a pasta uma vez.
+async function ieExportarRapido(tudo, pastaAuto) {   // pastaAuto: automação (KNV.exportarRapido), sem a janela de salvar
+    const doc = IE.doc, api = ieApi();
+    if (!doc || !api) return;
+    let pasta = pastaAuto;
+    if (!pasta) {
+        const d = await api.ie_dialogo_salvar(String(doc.nome || 'peca').replace(/\.\w+$/, ''), 'png');
+        if (!d || !d.success || !d.path) return;
+        pasta = d.path.replace(/[\\/][^\\/]*$/, '');
+    }
+    if (tudo && (doc.fatias || []).length) { const f = await ieCenaExportar(pasta, { fmt: 'png' }); ieToast(`${f.length} ${ieT('fatias exportadas')}`); return; }
+    ieCompor(doc, ieRDoc(doc));
+    const partes = [];
+    if (tudo) {
+        const pr = ieTodas(doc).filter(L => L.prancheta);
+        if (pr.length) pr.forEach(L => { const P = L.prancheta; partes.push({ c: ieAchatar(doc, [L], { x: P.x, y: P.y, w: P.w, h: P.h }), nome: L.nome }); });
+        else { const c = ieCanvas(doc.w, doc.h); ieCtx(c).drawImage(doc.comp, 0, 0); partes.push({ c, nome: doc.nome || 'peca' }); }
+    } else {
+        for (const L of ieSelecionadas(doc)) {
+            const R = ieRCamada(L);
+            if (!R || R.w < 1 || R.h < 1) continue;
+            partes.push({ c: ieAchatar(doc, [L], ieRInt(R)), nome: L.nome });
+        }
+    }
+    if (!partes.length) { ieToast(ieT('Nada para exportar')); return; }
+    const ini = await api.ie_salvar_inicio(null), itens = [];
+    for (const [i, p] of partes.entries()) {
+        const k = `rapido_${i}.png`;
+        await ieEnviar(ini.url, k, p.c);
+        itens.push({ arquivo: k, destino: `${pasta}\\${String(p.nome).replace(/[\\/:*?"<>|]/g, '_')}.png` });
+    }
+    const e = await api.ie_exportar_fatias({ sessao: ini.sessao, fatias: itens, qualidade: 100, dpi: doc.dpi });
+    ieToast(e && e.success ? `${partes.length} PNG ${ieT('exportado(s) em')} ${pasta}` : ieT('Não exportou'));
+}
+if (typeof IE_CMDS === 'object') { IE_CMDS.exportarCamadaPng = () => ieExportarRapido(false); IE_CMDS.exportarTudoPng = () => ieExportarRapido(true); }
+if (typeof IE_ATALHOS === 'object') for (const [k, c] of [['Shift+Ctrl+,', 'exportarCamadaPng'], ['Shift+Ctrl+<', 'exportarCamadaPng'], ['Shift+Ctrl+.', 'exportarTudoPng'], ['Shift+Ctrl+>', 'exportarTudoPng']]) IE_ATALHOS[k] = c;

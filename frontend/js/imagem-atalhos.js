@@ -500,7 +500,7 @@ const IE_REF_ATALHOS = [
     ['Camadas', 'Duplo clique na camada / no nome', 'Estilo de camada / renomear', 1], ['Camadas', 'Ctrl+clique em Nova camada', 'Nova camada abaixo', 1],
     ['Camadas', 'Alt+clique em Adicionar máscara', 'Máscara que esconde', 1],
     ['Menus', 'Ctrl+N / Ctrl+O / Ctrl+S', 'Novo / abrir / salvar', 1], ['Menus', 'Shift+Ctrl+S (ou Alt+Ctrl+S)', 'Salvar como (.iknv ou .psd)', 1],
-    ['Menus', 'Alt+Shift+Ctrl+W / Alt+Shift+Ctrl+S', 'Exportar como', 1], ['Menus', 'Ctrl+W / Alt+Ctrl+W', 'Fechar / fechar tudo', 1],
+    ['Menus', 'Alt+Shift+Ctrl+W / Alt+Shift+Ctrl+S', 'Exportar como', 1], ['Menus', 'Shift+Ctrl+,', 'Exportar a(s) camada(s) selecionada(s) em PNG', 1], ['Menus', 'Shift+Ctrl+.', 'Exportar tudo em PNG (uma por fatia ou prancheta)', 1], ['Menus', 'Ctrl+W / Alt+Ctrl+W', 'Fechar / fechar tudo', 1],
     ['Menus', 'Shift+Ctrl+Z / Alt+Ctrl+Z', 'Avançar / voltar no histórico', 1], ['Menus', 'Shift+Ctrl+T', 'Transformar de novo', 1],
     ['Menus', 'Shift+Ctrl+C / Shift+Ctrl+V', 'Copiar mesclado / colar no lugar', 1],
     ['Menus', 'Ctrl+L / M / U / B / I', 'Níveis, curvas, matiz/saturação, equilíbrio de cores, inverter', 1], ['Menus', 'Alt+Shift+Ctrl+B / Shift+Ctrl+U', 'Preto e branco / dessaturar', 1],

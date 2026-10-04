@@ -795,6 +795,8 @@ const KNV = {
             });
         },
     },
+    // Ctrl+Shift+, (tudo=false: camadas selecionadas) / Ctrl+Shift+. (tudo=true: fatias, pranchetas ou a tela) sem a janela
+    exportarRapido(tudo, pasta) { return ieExportarRapido(!!tudo, String(pasta).replace(/\//g, '\\')); },
     // recursos marcados com data-guardar desde a última chamada: [{nome, png (base64), meta}] (o runner grava)
     recursosNovos() {
         const l = (IE._recursosNovos || []).map(r => ({ nome: r.nome, meta: r.meta, png: r.c.toDataURL('image/png').split(',')[1] }));

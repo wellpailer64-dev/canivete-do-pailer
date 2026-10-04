@@ -1127,6 +1127,8 @@ function ieTeclaNome(ev) {
     if (ev.code && /^Bracket(Left|Right)$/.test(ev.code)) k = ev.code === 'BracketLeft' ? '[' : ']';
     if (ev.code === 'Equal') k = ev.shiftKey ? '+' : '=';
     if (ev.code === 'Minus') k = '-';
+    if (ev.code === 'Comma') k = ',';    // Shift+, vira "<" (e Shift+. vira ">") conforme o teclado: vale a tecla física
+    if (ev.code === 'Period') k = '.';
     if (ev.code === 'NumpadAdd') k = '+';
     if (ev.code === 'NumpadSubtract') k = '-';
     if (/^Digit\d$/.test(ev.code || '')) k = ev.code.slice(5);
