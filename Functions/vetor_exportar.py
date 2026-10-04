@@ -478,6 +478,28 @@ class _Escritor:
             return out + ["Q"]
         if t == "imagem":
             return self.imagem(o)
+        if t == "malha":   # malha de degradê: Coons patch mesh (ShadingType 6), bordas retas, CMYK
+            import struct, pikepdf
+            N = o.get("nos") or []; Cg = o.get("cores") or []
+            if len(N) < 2 or len(N[0]) < 2: return []
+            xs = [p[0] for l in N for p in l]; ys = [p[1] for l in N for p in l]
+            x0, x1, y0, y1 = min(xs), max(xs) + 1e-6, min(ys), max(ys) + 1e-6
+            q = lambda v, a, b: int(max(0, min(1, (v - a) / (b - a))) * 0xFFFFFFFF)
+            L = lambda a, b, t: (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
+            dados = bytearray()
+            for i in range(len(N) - 1):
+                for j in range(len(N[0]) - 1):
+                    A, B, C_, D = N[i][j], N[i][j + 1], N[i + 1][j + 1], N[i + 1][j]
+                    pts = [A, L(A, B, 1 / 3), L(A, B, 2 / 3), B, L(B, C_, 1 / 3), L(B, C_, 2 / 3), C_, L(C_, D, 1 / 3), L(C_, D, 2 / 3), D, L(D, A, 1 / 3), L(D, A, 2 / 3)]
+                    dados += struct.pack(">B", 0)
+                    for x, y in pts: dados += struct.pack(">II", q(x, x0, x1), q(y, y0, y1))
+                    for c in (Cg[i][j], Cg[i][j + 1], Cg[i + 1][j + 1], Cg[i + 1][j]):
+                        for v in self.cmyk_de(c): dados += struct.pack(">H", int(max(0, min(100, v)) / 100 * 65535))
+            sh = self.pdf.make_stream(bytes(dados), ShadingType=6, ColorSpace=pikepdf.Name.DeviceCMYK, BitsPerCoordinate=32, BitsPerComponent=16, BitsPerFlag=8,
+                                      Decode=[x0, x1, y0, y1, 0, 1, 0, 1, 0, 1, 0, 1])
+            nome = f"Sh{len(self.res['Shading']) + 1}"
+            self.res["Shading"][nome] = self.pdf.make_indirect(sh)
+            return ["q"] + self.estilo_ops(o) + [f"/{nome} sh", "Q"]
         if t == "instancia":   # símbolo: a definição com a matriz da instância
             S = (self.doc.get("simbolos") or {}).get(o.get("simbolo")) or {}
             out = ["q"] + self.estilo_ops(o) + [" ".join(_f(x) for x in (o.get("m") or [1, 0, 0, 1, 0, 0])) + " cm"]
@@ -522,6 +544,9 @@ def _bbox_obj(o):
         cx = [_bbox_obj(f) for f in (o.get("itens") or [])[:1 if o.get("clip") else None]]
         cx = [c for c in cx if c]
         return (min(c[0] for c in cx), min(c[1] for c in cx), max(c[2] for c in cx), max(c[3] for c in cx)) if cx else None
+    if t == "malha":
+        ps = [p for l in (o.get("nos") or []) for p in l]
+        return (min(p[0] for p in ps), min(p[1] for p in ps), max(p[0] for p in ps), max(p[1] for p in ps)) if ps else None
     m = o.get("m") or [1, 0, 0, 1, 0, 0]
     if t == "instancia":
         S = (o.get("_simbolos") or {}).get(o.get("simbolo")) or {}

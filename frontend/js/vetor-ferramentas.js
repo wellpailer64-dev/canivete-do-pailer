@@ -163,7 +163,7 @@ function vkEventos() {
         if (VKA.modo === 'guia') { vkReguaMove(VKA, sx, sy, x, y); return; }
         VKA.mx = x; VKA.my = y; VKA.msx = sx; VKA.msy = sy; VKA.shift = e.shiftKey; VKA.alt = e.altKey; VKA.moveu = VKA.moveu || Math.hypot(sx - VKA.sx, sy - VKA.sy) > 3;
         if (VKA.f === 'mao') { VK.vista.x = VKA.vx + sx - VKA.sx; VK.vista.y = VKA.vy + sy - VKA.sy; vkDesenhar(); return; }
-        if (VKA.modo === 'largura') { vkDsMove(VKA, x, y); return; }
+        if (VKA.modo === 'largura' || VKA.modo === 'malha_no') { VKA.mx = x; VKA.my = y; VKA.moveu = VKA.moveu || Math.hypot(sx - VKA.sx, sy - VKA.sy) > 3; vkDsMove(VKA, x, y); return; }
         if (VKA.trilha) { vkcMove(VKA, x, y); vkDesenhar(); return; }
         if (!VKA.moveu) return;
         let dx = x - VKA.x, dy = y - VKA.y;
@@ -246,7 +246,7 @@ function vkEventos() {
             return;
         }
         if (A.f === 'caneta') { vkCanetaUp(ex, ey); return; }
-        if (A.modo === 'desenho' || A.modo === 'largura' || A.modo === 'degrade') { await vkDsUp(A, ex, ey); vkDesenhar(); return; }
+        if (A.modo === 'desenho' || A.modo === 'largura' || A.modo === 'degrade' || A.modo === 'malha_no') { await vkDsUp(A, ex, ey); vkDesenhar(); return; }
         if (A.modo === 'construir' || A.modo === 'faca') { await vkcUp(A, ex, ey); vkDesenhar(); return; }
         if (A.modo === 'texto') {
             const caixa = A.moveu ? Math.abs(ex - A.x) : null, caixa_alt = A.moveu && Math.abs(ey - A.y) * VK.vista.z > 8 ? Math.abs(ey - A.y) : null;   // arrastar = caixa de área (com altura, como no Illustrator)
@@ -422,6 +422,7 @@ function vkDesenharSobreposicao(ctx) {
     if (typeof vkReguaSobreposicao === 'function') vkReguaSobreposicao(ctx, VKA);
     if (typeof vkTxSobreposicao === 'function') vkTxSobreposicao(ctx);
     if (typeof vkDsSobreposicao === 'function') vkDsSobreposicao(ctx, VKA);
+    if (typeof vkMalhaSobreposicao === 'function') vkMalhaSobreposicao(ctx);
     // guias inteligentes
     ctx.strokeStyle = '#ff2fd0';
     for (const g of VKG) { ctx.beginPath(); if (g.eixo === 'x') { const [x] = vkTela(g.pos, 0); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, 99999); } else { const [, y] = vkTela(0, g.pos); ctx.moveTo(0, y + 0.5); ctx.lineTo(99999, y + 0.5); } ctx.stroke(); }
@@ -495,7 +496,7 @@ function vkTeclas(e) {
     if (k === 'd' && !S) return faz(() => { VK.preench = { k: 'cmyk', v: [0, 0, 0, 0] }; VK.traco = { k: 'cmyk', v: [0, 0, 0, 100] }; vkUiAgendar(); });
     if (k === 'x' && !S) return faz(() => { VK.focoTraco = !VK.focoTraco; vkUiAgendar(); });
     if (k === '/') return faz(() => { if (VK.sel.length) vkCmdUi('alterar', VK.focoTraco ? { traco: null } : { preench: null }); else { if (VK.focoTraco) VK.traco = null; else VK.preench = null; vkUiAgendar(); } });
-    const mapa = { v: 'selecao', a: 'direta', p: 'caneta', t: 'texto', m: 'retangulo', l: 'elipse', '\\': 'linha', i: 'contagotas', h: 'mao', z: 'zoom', c: 'tesoura', n: 'lapis', b: 'pincel', g: 'degrade' };
+    const mapa = { v: 'selecao', a: 'direta', p: 'caneta', t: 'texto', m: 'retangulo', l: 'elipse', '\\': 'linha', i: 'contagotas', h: 'mao', z: 'zoom', c: 'tesoura', n: 'lapis', b: 'pincel', g: 'degrade', u: 'malha' };
     if (!S && !A && mapa[k]) return faz(() => vkFerramenta(mapa[k]));
 }
 function vkStatus(x, y) { const el = document.getElementById('vk-status-pos'); if (el) el.textContent = `X ${vkR(vkMM(x - ((VK.doc.pranchetas.find(p => p.id === VK.ativa) || {}).x || 0)), 1)}  Y ${vkR(vkMM(y - ((VK.doc.pranchetas.find(p => p.id === VK.ativa) || {}).y || 0)), 1)} mm`; }

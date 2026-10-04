@@ -67,7 +67,7 @@ function vkMontar() {
     <div class="ie-modal" id="vk-modal" hidden></div>
     <div class="ie-pop" id="vk-pop" hidden></div>`;
     // ferramentas
-    const grupos = [['selecao', 'direta'], ['caneta', 'texto', 'texto_caminho'], ['lapis', 'pincel', 'bolha', 'borracha', 'largura', 'degrade'], ['construtor', 'tesoura', 'faca'], ['retangulo', 'elipse', 'poligono', 'estrela', 'linha'], ['contagotas', 'prancheta'], ['mao', 'zoom']];
+    const grupos = [['selecao', 'direta'], ['caneta', 'texto', 'texto_caminho'], ['lapis', 'pincel', 'bolha', 'borracha', 'largura', 'degrade', 'malha'], ['construtor', 'tesoura', 'faca'], ['retangulo', 'elipse', 'poligono', 'estrela', 'linha'], ['contagotas', 'prancheta'], ['mao', 'zoom']];
     vkEl('vk-ferr').innerHTML = `<div class="ie-ferr-lista">${grupos.map(g => g.map(f => `<button class="ie-ferr-btn" data-f="${f}" title="${VK_FERR[f].nome}${VK_FERR[f].tecla ? ' (' + VK_FERR[f].tecla + ')' : ''}">${vkI(f)}</button>`).join('')).join('<div class="ie-ferr-sep"></div>')}</div>
         <div class="vk-cores-ferr" id="vk-cores-ferr"></div>`;
     vkEl('vk-ferr').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) vkFerramenta(b.dataset.f); });

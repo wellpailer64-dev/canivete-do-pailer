@@ -385,6 +385,9 @@ function vkDesenharObj(ctx, o, cam) {
     } else if (o.tipo === 'instancia') {
         const S = (VK.doc.simbolos || {})[o.simbolo];
         if (S) { ctx.transform(...o.m); S.itens.forEach(f => vkDesenharObj(ctx, f, cam)); }
+    } else if (o.tipo === 'malha') {
+        if (VK.contorno) { ctx.strokeStyle = '#000'; ctx.lineWidth = 1 / VK.vista.z; const b = vkBox(o); ctx.strokeRect(b[0], b[1], b[2] - b[0], b[3] - b[1]); }
+        else if (typeof vkMalhaDesenhar === 'function') vkMalhaDesenhar(ctx, o);
     } else if (o.tipo === 'imagem') {
         const im = VK.doc.imagens[o.img];
         ctx.transform(...o.m);
