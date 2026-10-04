@@ -7,7 +7,7 @@ Padrões (Instructions/vetor-kanivete.md, "Fechamento"):
 Em todos os de impressão: textos viram curvas (a mesma geometria da tela), RGB vetorial → CMYK pelo perfil de saída
 (preto puro → 0/0/0/100), TrimBox/BleedBox, sangria, marcas de corte em cor de registro (/All), sobreimpressão (OPM 1).
 No fim o PDF é RELIDO e conferido (verificar_pdf)."""
-import datetime, math, os, zlib
+import datetime, io, math, os, zlib
 
 from Functions import vetor_kanivete as vk
 
@@ -34,7 +34,9 @@ class _Escritor:
         self.perfil = op.get("perfil") or doc.get("perfil") or "FOGRA39"
         self.spots_processo = bool(op.get("spotsParaProcesso"))
         self.avisos = set()
-        self.res = {"ExtGState": {}, "ColorSpace": {}, "Shading": {}, "XObject": {}, "Pattern": {}}
+        self.res = {"ExtGState": {}, "ColorSpace": {}, "Shading": {}, "XObject": {}, "Pattern": {}, "Font": {}}
+        self.texto_editavel = bool(op.get("textoEditavel"))   # texto de verdade (fonte embutida) em vez de curvas
+        self._fontes = {}
         self.D = [1, 0, 0, 1, 0, 0]   # documento → página (definida a cada página)
         self._pad_cache, self._pads_pend = {}, []
         self.cache_rgb = {}
@@ -104,6 +106,80 @@ class _Escritor:
             nome = f"P{len(self.res['Pattern']) + 1}"
             self.res["Pattern"][nome] = st; self._pads_pend.append(st); self._pad_cache[chave] = nome
         return self._pad_cache[chave]
+
+    # ── texto editável: Type0/Identity-H, glifos posicionados um a um (a mesma geometria da tela), fonte embutida em subconjunto ──
+    def _fonte_pdf(self, F):
+        import pikepdf
+        k = id(F)
+        if k not in self._fontes:
+            arq, ind = next(key for key, v in vk._FONTES.items() if v is F)
+            nome = f"F{len(self._fontes) + 1}"
+            obj = self.pdf.make_indirect(pikepdf.Dictionary(Type=pikepdf.Name.Font, Subtype=pikepdf.Name.Type0, Encoding=pikepdf.Name("/Identity-H")))
+            self._fontes[k] = {"nome": nome, "obj": obj, "arq": arq, "ind": ind, "F": F, "gids": {}}
+            self.res["Font"][nome] = obj
+        return self._fontes[k]
+
+    def texto_real(self, o):
+        """→ operadores com texto de verdade, ou None (cai nas curvas): degradê/padrão/traço no texto não vão como texto."""
+        pr = o.get("preench")
+        if o.get("traco") or not pr or pr.get("k") in ("grad", "pad"): return None
+        spec = dict(_spec_texto(o), com_glifos=True)
+        geo = vk.texto_geometria(spec)
+        if not geo.get("glifos"): return None
+        if any((g["cor"][1] is not None) or (g["cor"][0] and g["cor"][0].get("k") in ("grad", "pad")) for g in geo["glifos"]): return None
+        if not geo["achou"]: self.avisos.add(f"fonte '{o.get('fam')}' não instalada: saiu em Arial")
+        texto = str(spec.get("conteudo") or "")
+        m = o.get("m") or [1, 0, 0, 1, 0, 0]
+        out, cor_atual = ["q"] + self.estilo_ops(o) + [" ".join(_f(x) for x in m) + " cm"], None
+        for g in geo["glifos"]:
+            F = g["F"]; fo = self._fonte_pdf(F)
+            gid = F["tt"].getGlyphID(g["nome"])
+            ch = g.get("uni") or (texto[g["ci"]] if g["ci"] < len(texto) else "")   # hífen da hifenização = "-"
+            fo["gids"].setdefault(gid, ch)
+            cor = g["cor"][0] or pr
+            if cor != cor_atual: out.append(self.cor_op(cor)); cor_atual = cor
+            T = mmul([F["upem"] * g["sx"], 0, 0, -F["upem"] * g["sy"], 0, 0], g["M"])
+            out.append(f"BT /{fo['nome']} 1 Tf {' '.join(_f(x) for x in T)} Tm <{gid:04X}> Tj ET")
+        return out + ["Q"]
+
+    def finalizar_fontes(self):
+        """Subconjunto de cada fonte (só os glifos usados, mesmos índices), larguras e ToUnicode (copiar/colar e busca)."""
+        import pikepdf, random, string
+        from fontTools import subset
+        from fontTools.ttLib import TTFont
+        for fo in self._fontes.values():
+            tt = TTFont(fo["arq"], fontNumber=fo["ind"])
+            upem = tt["head"].unitsPerEm; cff = "CFF " in tt
+            ps = (tt["name"].getDebugName(6) or os.path.splitext(os.path.basename(fo["arq"]))[0]).replace(" ", "")
+            gids = sorted(set(fo["gids"]) | {0})
+            hm = tt["hmtx"].metrics; ordem = tt.getGlyphOrder()
+            larg = {g: round(hm[ordem[g]][0] * 1000 / upem) for g in gids if g < len(ordem)}
+            op = subset.Options(); op.retain_gids = True; op.notdef_outline = True; op.name_IDs = ["*"]; op.hinting = False
+            op.layout_features = []; op.drop_tables += ["GSUB", "GPOS", "GDEF", "kern", "DSIG"]
+            sb = subset.Subsetter(op); sb.populate(gids=gids); sb.subset(tt)
+            buf = io.BytesIO(); tt.save(buf); dados = buf.getvalue()
+            tag = "".join(random.choice(string.ascii_uppercase) for _ in range(6))
+            head, hhea = tt["head"], tt["hhea"]; os2 = tt.get("OS/2")
+            desc = pikepdf.Dictionary(Type=pikepdf.Name.FontDescriptor, FontName=pikepdf.Name(f"/{tag}+{ps}"), Flags=4,
+                                      FontBBox=[round(v * 1000 / upem) for v in (head.xMin, head.yMin, head.xMax, head.yMax)], ItalicAngle=0,
+                                      Ascent=round(hhea.ascent * 1000 / upem), Descent=round(hhea.descent * 1000 / upem),
+                                      CapHeight=round((getattr(os2, "sCapHeight", 0) or hhea.ascent * 0.7) * 1000 / upem), StemV=80)
+            if cff: desc["/FontFile3"] = self.pdf.make_stream(dados, Subtype=pikepdf.Name.OpenType)
+            else: desc["/FontFile2"] = self.pdf.make_stream(dados, Length1=len(dados))
+            W = []
+            for g in gids:
+                if g in larg: W += [g, [larg[g]]]
+            cid = pikepdf.Dictionary(Type=pikepdf.Name.Font, Subtype=pikepdf.Name("/CIDFontType0" if cff else "/CIDFontType2"), BaseFont=pikepdf.Name(f"/{tag}+{ps}"),
+                                     CIDSystemInfo=pikepdf.Dictionary(Registry=pikepdf.String("Adobe"), Ordering=pikepdf.String("Identity"), Supplement=0),
+                                     FontDescriptor=self.pdf.make_indirect(desc), W=W, DW=1000)
+            if not cff: cid["/CIDToGIDMap"] = pikepdf.Name.Identity
+            mapa = "\n".join(f"<{g:04X}> <{''.join(f'{b:02X}' for b in ch.encode('utf-16-be'))}>" for g, ch in sorted(fo["gids"].items()) if ch)
+            n = len([1 for ch in fo["gids"].values() if ch])
+            cmap = ("/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n"
+                    "/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n"
+                    f"{n} beginbfchar\n{mapa}\nendbfchar\nendcmap\nCMapName currentdict /CMap defineresource pop\nend\nend")
+            o = fo["obj"]; o["/BaseFont"] = pikepdf.Name(f"/{tag}+{ps}"); o["/DescendantFonts"] = [self.pdf.make_indirect(cid)]
+            o["/ToUnicode"] = self.pdf.make_stream(cmap.encode("latin-1"))
 
     def _gs(self, **kw):
         import pikepdf
@@ -380,6 +456,9 @@ class _Escritor:
             if not (o.get("preench") or o.get("traco")) or not o.get("subs"): return []
             return self.pintar(o["subs"], o.get("regra"), o.get("preench"), o.get("traco"), self.estilo_ops(o))
         if t == "texto":
+            if self.texto_editavel and o.get("_pint") is None and not o.get("efeitos"):
+                ed = self.texto_real(o)
+                if ed is not None: return ed
             geo = vk.texto_geometria(_spec_texto(o))
             if not geo["achou"]: self.avisos.add(f"fonte '{o.get('fam')}' não instalada: saiu em Arial")
             if not geo["subs"]: return []
@@ -553,15 +632,16 @@ def exportar_pdf(doc, caminho, op=None):
             elif padrao == "x1a":
                 meta["{http://www.npes.org/pdfx/ns/id/}GTS_PDFXVersion"] = "PDF/X-1:2001"
                 meta["{http://www.npes.org/pdfx/ns/id/}GTS_PDFXConformance"] = "PDF/X-1a:2001"
+    W.finalizar_fontes()
     os.makedirs(os.path.dirname(os.path.abspath(caminho)) or ".", exist_ok=True)
     versao = {"x1a": "1.3", "x4": "1.6"}.get(padrao, "1.6")
     pdf.save(caminho, force_version=versao, object_stream_mode=pikepdf.ObjectStreamMode.disable if padrao == "x1a" else pikepdf.ObjectStreamMode.preserve,
              fix_metadata_version=False)
-    verif = verificar_pdf(caminho, padrao)
+    verif = verificar_pdf(caminho, padrao, texto_editavel=W.texto_editavel)
     return {"success": True, "path": caminho, "paginas": len(abs_), "avisos": sorted(W.avisos), "verificacao": verif}
 
 
-def verificar_pdf(caminho, padrao="x4"):
+def verificar_pdf(caminho, padrao="x4", texto_editavel=False):
     """Relê o PDF gerado e confere o fechamento: caixas, perfil de saída, espaços de cor, transparência, fontes.
     → {ok, problemas: [..], info: {...}}"""
     import pikepdf
@@ -604,7 +684,7 @@ def verificar_pdf(caminho, padrao="x4"):
         if info["transparencia"]: probs.append("PDF/X-1a com transparência")
     if padrao in ("x1a", "cmyk") and "RGB" in info["cores"]: probs.append("cor RGB no PDF de impressão")
     if padrao == "x4" and "RGB" in info["cores"]: probs.append("cor RGB vetorial no PDF/X-4 (devia ter virado CMYK)")
-    if info["fontes"]: probs.append(f"{info['fontes']} fontes no PDF (os textos deviam estar em curvas)")
+    if info["fontes"] and not texto_editavel: probs.append(f"{info['fontes']} fontes no PDF (os textos deviam estar em curvas)")
     info["cores"] = sorted(info["cores"]); info["spots"] = sorted(info["spots"])
     info["versao"] = pdf.pdf_version
     return {"ok": not probs, "problemas": probs, "info": info}

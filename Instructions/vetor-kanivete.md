@@ -47,6 +47,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 | Envelope / deformar (arco, arco inferior/superior, abaulado, concha, bandeira, onda, peixe, elevar, olho de peixe, inflar, espremer, torcer) | título em arco, bandeira, efeito de faixa | `efeito` tipo deformar (estilo, dobra %, dist_h %, dist_v %): vivo, também em TEXTO (não vira curva), grupo e forma; caminhos subdivididos e mapeados na caixa (u, v); PDF = tela; vale em X-1a |
 | Mala direta (Variáveis) | crachá, convite com nome, etiqueta numerada | `mala_direta` (csv com ; ou , detectado | linhas, campos {coluna: objeto} ou colunas com o nome do objeto, saida, padrao): texto troca conteúdo, imagem troca arquivo, grupo QR… refaz o QR; cada linha → exportar_pdf (fechamento + verificação) → um PDF só (pikepdf); o documento volta ao original |
 | Ampliar foto por IA (super-resolução) | foto pequena do cliente, aviso de ppi baixo | `ampliar_imagem` (ids/nomes; sem: todas abaixo de ppi_alvo 300; escala 2|3|4 automática; tipo foto|arte): Real-ESRGAN ncnn Vulkan (BSD-3, Functions/ampliar_imagem.py), baixado na 1ª vez (~45 MB) para modelos_ia/ampliar, cache; mesmo tamanho na página, o ppi multiplica. Correção de 1 clique do aviso de resolução no Fechamento |
+| PDF com texto editável | PDF digital, proposta, arquivo que o cliente vai copiar | `exportar_pdf` com `texto_editavel: true` (caixa no diálogo): Type0/Identity-H, cada glifo com a MESMA matriz da geometria da tela (kerning, justificado, trilha), fonte em subconjunto (fontTools, retain_gids) + larguras + ToUnicode (hífen automático = "-"); texto com degradê/padrão/traço/efeito/aparência continua em curvas. Para gráfica o padrão segue curvas |
 | Texto em caminho | selo, logo circular | ferramenta Texto em caminho (clique no caminho); `texto_caminho` (`ini` mm, `lado`, `manter_caminho`) |
 | Estilos de parágrafo / caractere, Glifos, juntar textos importados | padronizar, caracteres especiais, editar .ai/PDF | `estilo_texto` (tipo, nome, `de`, `aplicar`; mudar um estilo atualiza quem usa), `estilos_texto`, `glifos`, `inserir_texto` (`codigo`/`texto`, `pos`), `juntar_textos` (linhas → parágrafos; `quebras:'linhas'`) |
 | Alinhar/distribuir, guias inteligentes | precisão | caixa pelos extremos reais da cúbica (não pelas alças); encaixe magenta |
@@ -59,7 +60,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 `.aknv` abre no KANIVETE por duplo clique (associação HKCU em Functions/projeto.py; roteado em `abrirProjetoExterno`).
 
 Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): estilos dentro da caixa de edição (ela é texto puro);
-efeitos que faltam (Aparência em grupo; efeitos na prévia de separações e no SVG); malha; painel de vínculos; PDF com texto editável (hoje: curvas).
+efeitos que faltam (Aparência em grupo; efeitos na prévia de separações e no SVG); malha; painel de vínculos.
 
 ## 2. Modelo (pt = 1/72", y para baixo)
 ```

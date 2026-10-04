@@ -64,7 +64,7 @@
         await vkGeosProntas();
         const op = { padrao, perfil: a.perfil || VK.doc.perfil, marcas: a.marcas ?? (padrao !== 'rgb'), sangria: a.sangria != null ? vkPT(+a.sangria) : (padrao === 'rgb' ? 0 : VK.doc.sangria),
             pranchetas: a.pranchetas ? [].concat(a.pranchetas).map(n => (VK.doc.pranchetas.find(p => p.id === n || p.nome === n) || {}).id).filter(Boolean) : [],
-            spotsParaProcesso: !!a.spotsParaProcesso, titulo: VK.doc.nome };
+            spotsParaProcesso: !!a.spotsParaProcesso, titulo: VK.doc.nome, textoEditavel: !!a.texto_editavel };   // texto_editavel: fonte embutida, texto copiável (PDF digital)
         vkCarregando(true, 'Gerando PDF para gráfica...');
         let r;
         try { r = await api().vk_exportar_pdf(await vkDocPy(), caminho, op); } finally { vkCarregando(false); }

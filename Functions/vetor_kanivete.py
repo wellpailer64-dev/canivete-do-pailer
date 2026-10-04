@@ -354,7 +354,7 @@ def _glifos(texto, ini, fim, p, falta):
 def _glifo_hifen(g):
     """glifo '-' com a fonte/corpo/cor do glifo g (hífen da hifenização)."""
     nome, _cl, av, ox, oy = _moldar(g["F"], "-", 0)[0]
-    return dict(g, nome=nome, adv=av * g["sx"], xo=0, yo=0, esp=False, hif=True)
+    return dict(g, nome=nome, adv=av * g["sx"], xo=0, yo=0, esp=False, hif=True, uni="-")
 
 
 def _glifo_char(g, ch):
@@ -394,12 +394,14 @@ def _tabs_layout(gl, tabs, x0=0):
     return pos, guias
 
 
-def _desenhar(g, M, partes):
+def _desenhar(g, M, partes, coleta=None):
     cn = _Caneta(g["sx"], g["sy"], M); cn._gs = g["F"]["gs"]
     try:
         g["F"]["gs"][g["nome"]].draw(cn)
     except Exception:
         pass
+    if coleta is not None and g.get("ci") is not None:   # PDF com texto editável: a letra posicionada (fonte, glifo, matriz)
+        coleta.append({"F": g["F"], "nome": g["nome"], "M": M, "sx": g["sx"], "sy": g["sy"], "cor": g["cor"], "ci": g["ci"], "uni": g.get("uni")})
     if cn.subs:
         chave = json.dumps(g["cor"], sort_keys=True)
         partes.setdefault(chave, (g["cor"], []))[1].extend(cn.subs)
@@ -529,6 +531,7 @@ def texto_geometria(spec):
         return out
 
     partes, info, corte = {}, [], None
+    coleta = [] if spec.get("com_glifos") else None   # exportar com texto editável
     if trilha:   # ── texto em caminho: uma linha, cada glifo girado na tangente ──
         pl = _trilha_pontos(trilha.get("subs") or [], bool(trilha.get("lado")))
         L = pl[-1][2] if pl else 0
@@ -545,7 +548,7 @@ def texto_geometria(spec):
                 px, py, ang = _trilha_em(pl, meio)
                 c, s = math.cos(ang), math.sin(ang)
                 dx, dy = -g["adv"] / 2 + g["xo"], -(g["desl"] + g["yo"])
-                _desenhar(g, [c, s, -s, c, px + c * dx - s * dy, py + s * dx + c * dy], partes)
+                _desenhar(g, [c, s, -s, c, px + c * dx - s * dy, py + s * dx + c * dy], partes, coleta)
             x += g["adv"]
         larg_tot, alt_tot = L, asc0 + desc0
     else:   # ── ponto / área ──
@@ -642,12 +645,12 @@ def texto_geometria(spec):
                 dx = (par["recuo_esq"] if caixa else 0) + r1
                 pos, guias = _tabs_layout(gl, spec.get("tabs") or [], dx)
                 for g, px in zip(gl, pos):
-                    if not g.get("tab"): _desenhar(g, [1, 0, 0, 1, dx + px + g["xo"], y - g["desl"] - g["yo"]], partes)
-                for g, px in guias: _desenhar(g, [1, 0, 0, 1, dx + px, y - g["desl"]], partes)
+                    if not g.get("tab"): _desenhar(g, [1, 0, 0, 1, dx + px + g["xo"], y - g["desl"] - g["yo"]], partes, coleta)
+                for g, px in guias: _desenhar(g, [1, 0, 0, 1, dx + px, y - g["desl"]], partes, coleta)
                 x = (pos[-1] + gl[-1]["adv"]) if gl else 0
             else:
                 for g in gl:
-                    _desenhar(g, [1, 0, 0, 1, dx + x + g["xo"], y - g["desl"] - g["yo"]], partes)
+                    _desenhar(g, [1, 0, 0, 1, dx + x + g["xo"], y - g["desl"] - g["yo"]], partes, coleta)
                     x += g["adv"] + (extra if g["esp"] else 0)
             info.append({"base": round(y, 3), "x": round(dx, 3), "larg": round(x, 3), "ini": ci0, "fim": (gl[-1]["ci"] + 1) if gl else ci0,
                          "asc": round(asc_l, 3), "desc": round(desc_l, 3)})
@@ -662,7 +665,7 @@ def texto_geometria(spec):
     r = {"subs": [s for _c, ss in lista for s in ss], "linhas": info, "larg": larg_tot, "alt": alt_tot, "asc": asc0, "desc": desc0,
          "achou": False if any(not f.startswith("~") for f in falta) else ("embutida" if falta else True),
          "faltam": sorted(f for f in falta if not f.startswith("~")), "fonte": os.path.basename(arq0),
-         "corte": corte, "transborda": corte is not None}
+         "corte": corte, "transborda": corte is not None, **({"glifos": coleta} if coleta is not None else {})}
     if len(lista) > 1 or (lista and (lista[0][0][0] is not None or lista[0][0][1] is not None)):
         r["partes"] = [{"subs": ss, **({"preench": c[0]} if c[0] is not None else {}), **({"traco": c[1]} if c[1] is not None else {})} for c, ss in lista]
     if len(_GEO) > 2000:

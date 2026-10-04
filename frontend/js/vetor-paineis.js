@@ -463,6 +463,7 @@ function vkExportarDialogo(qual = 'pdf') {
         <div id="vke-pdf" ${qual === 'pdf' ? '' : 'hidden'}>
             <div class="vk-linha"><span>Padrão</span><select id="vke-padrao">${[['x4', 'PDF/X-4:2010 (recomendado — transparência viva)'], ['x1a', 'PDF/X-1a:2001 (gráficas antigas — só CMYK, sem transparência)'], ['cmyk', 'PDF CMYK (gráfica rápida)'], ['rgb', 'PDF digital RGB (tela, sem marcas)']].map(([k, n]) => `<option value="${k}" ${k === (VK.padraoPdf || 'x4') ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
             <div class="vk-grade">${vkNum('Sangria', vkR(vkMM(VK.doc.sangria), 2), 'id="vke-s" min="0"', 'mm', 0.5)}</div>
+            <label class="vk-chk" title="Texto de verdade com a fonte embutida (selecionável e copiável). Para a gráfica, o padrão (curvas) é mais seguro."><input type="checkbox" id="vke-texto"> Texto editável (fonte embutida)</label>
             <label class="vk-chk"><input type="checkbox" id="vke-marcas" checked> Marcas de corte (cor de registro, fora da sangria)</label>
             <label class="vk-chk"><input type="checkbox" id="vke-spots"> Converter cores especiais em CMYK</label>
             <div class="vk-linha"><span>Pranchetas</span><select id="vke-pr"><option value="">Todas</option>${VK.doc.pranchetas.map(p => `<option value="${p.id}">${vkEsc_(p.nome)}</option>`).join('')}</select></div>
@@ -485,8 +486,8 @@ function vkExportarDialogo(qual = 'pdf') {
                     VK.padraoPdf = g('#vke-padrao').value;
                     const pr = g('#vke-pr').value;
                     let r;
-                    try { r = await vkCmd('exportar_pdf', { padrao: VK.padraoPdf, sangria: +g('#vke-s').value, marcas: g('#vke-marcas').checked, spotsParaProcesso: g('#vke-spots').checked, ...(pr ? { pranchetas: [pr] } : {}) }); }
-                    catch (e) { if (e.fechamento && confirm(e.message + '\n\nExportar mesmo assim?')) r = await vkCmd('exportar_pdf', { padrao: VK.padraoPdf, forcar: true, sangria: +g('#vke-s').value, marcas: g('#vke-marcas').checked, ...(pr ? { pranchetas: [pr] } : {}) }); else if (!e.fechamento) throw e; else { VK.aba = 'fechamento'; vkUiAgendar(); } }
+                    try { r = await vkCmd('exportar_pdf', { padrao: VK.padraoPdf, sangria: +g('#vke-s').value, marcas: g('#vke-marcas').checked, texto_editavel: g('#vke-texto').checked, spotsParaProcesso: g('#vke-spots').checked, ...(pr ? { pranchetas: [pr] } : {}) }); }
+                    catch (e) { if (e.fechamento && confirm(e.message + '\n\nExportar mesmo assim?')) r = await vkCmd('exportar_pdf', { padrao: VK.padraoPdf, forcar: true, sangria: +g('#vke-s').value, marcas: g('#vke-marcas').checked, texto_editavel: g('#vke-texto').checked, ...(pr ? { pranchetas: [pr] } : {}) }); else if (!e.fechamento) throw e; else { VK.aba = 'fechamento'; vkUiAgendar(); } }
                     if (r && r.caminho) vkResultadoPdf(r);
                 } else if (tipo === 'img') await vkCmd('exportar_imagem', { ppi: +g('#vke-ppi').value, todas: g('#vke-todas').checked, fundo: g('#vke-transp').checked ? 'transparente' : 'branco' });
                 else await vkCmd('exportar_svg', {});

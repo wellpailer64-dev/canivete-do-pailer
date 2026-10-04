@@ -467,6 +467,12 @@ with sync_playwright() as p:
     r_ = C("ampliar_imagem", {"ids": [fi_["id"]], "escala": 2})
     cx1_ = C("info", {"ids": [fi_["id"]]})[0]["caixa_mm"]
     ok(r_["ampliadas"][0]["ppi"] == 2 * r_["ampliadas"][0]["ppi_antes"] and cx0_ == cx1_, f"ampliar imagem por IA: ppi dobra, mesmo tamanho na página ({r_['ampliadas'][0]})")
+    C("novo", {"nome": "Texto editavel", "larg": 100, "alt": 60})
+    C("texto", {"conteudo": "Olá, gráfica! Texto copiável.", "x": 5, "y": 12, "fonte": "Arial", "tamanho": 12})
+    C("texto", {"conteudo": "Some extraordinarily comprehensive internationalization documentation explains everything", "x": 5, "y": 20, "caixa": 30, "fonte": "Arial", "tamanho": 8, "alin": "just", "hifen": "en_US"})
+    out_te = os.path.join(SAI, "texto_editavel.pdf"); r_ = pg.evaluate("([c]) => VKN.exportarPdf(c, {padrao: 'x4', texto_editavel: true})", [out_te])
+    txt_ = fitz.open(out_te)[0].get_text()
+    ok(r_["verificado"] and r_["info"]["fontes"] >= 1 and "Olá, gráfica! Texto copiável." in txt_ and "-" in txt_, f"PDF com texto editável: fonte embutida, texto copiável, hífen da hifenização ({r_['info']['fontes']} fontes)")
     eps = os.path.join(SAI, "teste.eps"); open(eps, "w").write("%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 100 100\n0 0 1 setrgbcolor 10 10 80 80 rectfill\nshowpage\n")
     try:
         r_ = C("abrir", {"caminho": eps}); ok(r_ and not r_.get("cancelado"), "EPS aberto pelo Ghostscript")
