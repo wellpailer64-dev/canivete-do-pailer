@@ -475,3 +475,37 @@ vkRegistrar('degrade', 'degradê', a => {
     }
     return { alterados: objs.length };
 });
+
+// mesclar (Blend, Alt+Ctrl+B): passos intermediários entre 2 caminhos (forma, cor, traço, opacidade) → grupo [A, …, B].
+// Estrutura diferente: os dois são reamostrados no mesmo nº de pontos. passos (padrão 6).
+vkRegistrar('mesclar', 'mesclar', a => {
+    const objs = vkTxAlvos(a).filter(o => o.tipo === 'caminho');
+    if (objs.length !== 2) throw new Error('mesclar: escolha 2 caminhos (formas)');
+    const ordem = vkTodos().map(x => x.o), [A, B] = objs.sort((p, q) => ordem.indexOf(p) - ordem.indexOf(q)), n = Math.max(1, Math.min(200, +a.passos || 6));
+    const igual = A.subs.length === B.subs.length && A.subs.every((s, i) => s.pts.length === B.subs[i].pts.length);
+    const amostra = s => { const pl = vkDsAmostrar(s, 24, true), L = pl.at(-1)[2] || 1, out = [];   // 64 pontos por comprimento
+        for (let k = 0, j = 0; k < 64; k++) { const d = L * k / (s.fechado ? 64 : 63); while (j < pl.length - 2 && pl[j + 1][2] < d) j++; const p = pl[j], q = pl[j + 1] || p, t = (d - p[2]) / ((q[2] - p[2]) || 1);
+            const x = p[0] + (q[0] - p[0]) * t, y = p[1] + (q[1] - p[1]) * t; out.push([x, y, x, y, x, y]); } return { fechado: s.fechado, pts: out }; };
+    const SA = igual ? A.subs : [amostra(A.subs[0])], SB = igual ? B.subs : [amostra(B.subs[0])];
+    const lerp = (u, v, t) => u + (v - u) * t;
+    const cor = (c1, c2, t) => { if (!c1 || !c2) return vkClone(c1 || c2); if (c1.k === 'grad' || c2.k === 'grad') return vkClone(t < 0.5 ? c1 : c2);
+        if (c1.k === c2.k && c1.k !== 'spot') return { k: c1.k, v: c1.v.map((x, i) => lerp(x, c2.v[i], t)) };
+        if (c1.k === 'spot' && c2.k === 'spot' && c1.nome === c2.nome) return { ...c1, tint: lerp(c1.tint ?? 100, c2.tint ?? 100, t) };
+        const cm = c => c.k === 'cmyk' ? c.v : c.k === 'spot' ? c.v.map(x => x * (c.tint ?? 100) / 100) : [0, 0, 0, 100];
+        return { k: 'cmyk', v: cm(c1).map((x, i) => lerp(x, cm(c2)[i], t)) }; };
+    const itens = [A];
+    for (let k = 1; k <= n; k++) {
+        const t = k / (n + 1);
+        const subs = SA.map((s, i) => ({ fechado: s.fechado, pts: s.pts.map((p, j) => p.map((v, m) => lerp(v, SB[i].pts[j][m], t))) }));
+        const o = { id: vkId(), tipo: 'caminho', regra: A.regra || 'nonzero', subs, preench: cor(A.preench, B.preench, t),
+            traco: A.traco || B.traco ? { ...(A.traco || B.traco), cor: cor(A.traco && A.traco.cor, B.traco && B.traco.cor, t), larg: lerp(A.traco ? A.traco.larg : 0, B.traco ? B.traco.larg : 0, t) } : null };
+        const op = lerp(A.op ?? 1, B.op ?? 1, t); if (op < 1) o.op = op;
+        itens.push(o);
+    }
+    itens.push(B);
+    const l = vkListaDe(B.id), pos = l.indexOf(B);
+    const g = { id: vkId(), tipo: 'grupo', nome: a.nome || 'Mesclagem', itens };
+    for (const o of [A, B]) { const ll = vkListaDe(o.id); ll.splice(ll.indexOf(o), 1); }
+    l.splice(Math.min(pos, l.length), 0, g); VK.sel = [g.id];
+    return { id: g.id, passos: n, reamostrado: !igual };
+});

@@ -46,7 +46,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 
 Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): texto dentro de forma (área não retangular),
 tabulações, editar a trilha do texto em caminho com a Seleção direta, estilos dentro da caixa de edição (ela é texto puro);
-efeitos que faltam (brilho interno, distorcer/zigue-zague, Aparência em grupo; efeitos na prévia de separações e no SVG); ferramenta de degradê na arte, malha, mesclagem (Blend); símbolos, padrões, recolorir arte, livros Pantone; Image Trace,
+efeitos que faltam (brilho interno, distorcer/zigue-zague, Aparência em grupo; efeitos na prévia de separações e no SVG); ferramenta de degradê na arte (mouse), malha, Blend vivo/no caminho; símbolos, padrões, recolorir arte, livros Pantone; Image Trace,
 distorção de envelope, máscara de opacidade; painel de vínculos e variáveis; EPS; PDF com texto editável (hoje: curvas).
 
 ## 2. Modelo (pt = 1/72", y para baixo)
@@ -86,7 +86,7 @@ Unidades de agente: **mm relativos ao canto da prancheta** (`prancheta: nome|id|
 Comandos (`VKN.comandos()`): novo, documento, abrir, importar, salvar, exportar_pdf, exportar_imagem, exportar_svg,
 retangulo, elipse, poligono, estrela, linha, caminho (`d` SVG em mm ou `subs`), texto, imagem, alterar, mover,
 posicionar, redimensionar, girar, refletir, matriz, alinhar, distribuir, organizar, agrupar, desagrupar, mascara,
-soltar_mascara, composto, pathfinder, deslocar (`distancia` mm, `junc`), contornar_traco, repetir, transformar_cada, distribuir_espaco, construtor, pathfinder2, tesoura, faca, juntar, media, separacoes, tinta_em, exportar_separacoes, contornos, empacotar (`pasta`, `pdf`, `fontes`), setor, arco, qrcode, icone, degrade (tipo, cores|paradas, angulo, traco), aparencia, efeito, expandir_aparencia, lapis, simplificar, bolha, borracha, texto_caminho, encadear, desencadear, estilo_texto, estilos_texto, juntar_textos, glifos, inserir_texto, duplicar, apagar, selecionar, mover_para_camada, nova_camada, camada,
+soltar_mascara, composto, pathfinder, deslocar (`distancia` mm, `junc`), contornar_traco, repetir, transformar_cada, distribuir_espaco, construtor, pathfinder2, tesoura, faca, juntar, media, separacoes, tinta_em, exportar_separacoes, contornos, empacotar (`pasta`, `pdf`, `fontes`), setor, arco, qrcode, icone, degrade (tipo, cores|paradas, angulo, traco), mesclar (2 caminhos, passos: Blend assado em grupo), aparencia, efeito, expandir_aparencia, lapis, simplificar, bolha, borracha, texto_caminho, encadear, desencadear, estilo_texto, estilos_texto, juntar_textos, glifos, inserir_texto, duplicar, apagar, selecionar, mover_para_camada, nova_camada, camada,
 nova_prancheta, prancheta, mover_prancheta, amostra, cores_padrao, definir_subs, converter_cmyk, preto_texto,
 sobreimprimir_preto, tirar_sobre_branco, engrossar_tracos, limpar, mapa, info, ajuda.
 Fonte "Arial Bold" (família + estilo juntos) é entendida. Só `preench` informado = sem traço.

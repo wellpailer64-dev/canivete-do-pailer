@@ -324,6 +324,12 @@ with sync_playwright() as p:
     C("degrade", {"nomes": ["degrade"], "cores": ["C100 M0 Y0 K0", "C0 M100 Y0 K0", "0K"], "angulo": 90})
     g = pg.evaluate("vkTodos().find(x => x.o.nome === 'degrade').o.preench")
     ok(g["k"] == "grad" and len(g["paradas"]) == 3 and abs(g["a"][0] - g["b"][0]) < 0.01, "degradê por ângulo (90° = vertical)")
+    m1 = C("elipse", {"x": 40, "y": 60, "larg": 8, "preench": "C100 M0 Y0 K0", "traco": "nenhum"})
+    m2 = C("estrela", {"cx": 80, "cy": 70, "raio": 8, "pontas": 5, "preench": "C0 M100 Y0 K0", "traco": "nenhum"})
+    r = C("mesclar", {"ids": [m1["id"], m2["id"]], "passos": 5})
+    g = C("info", {"ids": [r["id"]]})[0]
+    meio = pg.evaluate("id => vkObj(id).itens[3].preench.v", r["id"])
+    ok(g["itens"] == 7 and r["reamostrado"] and abs(meio[0] - 50) < 1 and abs(meio[1] - 50) < 1, f"mesclar círculo → estrela em 5 passos (cor do meio {meio})")
     out = os.path.join(SAI, "formas_x4.pdf")
     r = pg.evaluate("([c]) => VKN.exportarPdf(c, {padrao: 'x4'})", [out])
     ok(r["verificado"], f"PDF/X-4 com setor, QR e ícone ({r['problemas']})")
