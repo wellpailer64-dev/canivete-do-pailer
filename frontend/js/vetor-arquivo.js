@@ -254,8 +254,8 @@ function vkFechamento(op = {}) {
         if (o.tipo === 'imagem') {
             const im = d.imagens[o.img] || {}, ppi = Math.round(72 / vkEsc(o.m));
             if (!im.arquivo || im.faltando) add('erro', 'link', 'Imagem com link quebrado', [o.id]);
-            if (impressao && ppi < 150) add('erro', 'resolucao', `Imagem com ${ppi} ppi (mínimo 150; ideal 300)`, [o.id]);
-            else if (impressao && ppi < 250) add('aviso', 'resolucao_baixa', `Imagem com ${ppi} ppi (ideal 300 no tamanho final)`, [o.id]);
+            if (impressao && ppi < 150) add('erro', 'resolucao', `Imagem com ${ppi} ppi (mínimo 150; ideal 300)`, [o.id], 'ampliar_imagem');
+            else if (impressao && ppi < 250) add('aviso', 'resolucao_baixa', `Imagem com ${ppi} ppi (ideal 300 no tamanho final)`, [o.id], 'ampliar_imagem');
             if (padrao === 'x1a' && im.alfa) add('erro', 'imagem_alfa', 'Imagem com transparência em PDF/X-1a (use PDF/X-4)', [o.id]);
         }
         // sangria e margem de segurança (só objetos de nível de camada)

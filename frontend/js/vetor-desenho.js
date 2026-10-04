@@ -618,3 +618,28 @@ vkRegistrar('vetorizar', 'traçado de imagem', async a => {
     const g = vkObj(ids[0]);
     return { ids, cores: g.itens.length, pontos: g.itens.reduce((s, o) => s + o.subs.reduce((t, sb) => t + sb.pts.length, 0), 0), caixa_mm: vkCaixaMM(g) };
 });
+
+// ampliar_imagem (super-resolução por IA, Real-ESRGAN local): ids/nomes das imagens (sem: todas abaixo de ppi_alvo) →
+// arquivo ampliado no lugar, MESMO tamanho no documento (o ppi efetivo multiplica). escala 2|3|4 (sem: a que chega no
+// ppi_alvo, padrão 300); tipo foto | arte. Baixa o motor na 1ª vez (~45 MB).
+vkRegistrar('ampliar_imagem', 'ampliar imagem (IA)', async a => {
+    const ppiDe = o => Math.round(72 / vkEsc(o.m)), alvo = +(a.ppi_alvo || 300);
+    let ims = (a.ids || a.nomes || VK.sel.some(id => (vkObj(id) || {}).tipo === 'imagem')) ? vkTxAlvos(a).filter(o => o.tipo === 'imagem') : vkTodos().map(x => x.o).filter(o => o.tipo === 'imagem' && ppiDe(o) < alvo);
+    if (!ims.length) throw new Error('ampliar_imagem: nenhuma imagem (ou todas já com ' + alvo + ' ppi)');
+    const out = [];
+    vkCarregando(true, 'Ampliando com IA (Real-ESRGAN)...');
+    try {
+        for (const o of ims) {
+            const im = VK.doc.imagens[o.img]; if (!im || !im.arquivo) continue;
+            const antes = ppiDe(o);
+            const esc = a.escala ? Math.max(2, Math.min(4, +a.escala)) : Math.max(2, Math.min(4, Math.ceil(alvo / Math.max(1, ppiDe(o)))));
+            const r = await vkApi().vk_ampliar(im.arquivo, esc, a.tipo || 'foto');
+            if (!r || !r.success) throw new Error((r && r.error) || 'não ampliou');
+            const inf = await vkApi().vk_imagem_info(r.path), iid = vkId('i');
+            VK.doc.imagens[iid] = { arquivo: inf.arquivo, w: inf.w, h: inf.h, modo: inf.modo, url: inf.url, nome: inf.nome, alfa: inf.alfa };
+            const k = im.w / inf.w; o.m = [o.m[0] * k, o.m[1] * k, o.m[2] * k, o.m[3] * k, o.m[4], o.m[5]]; o.img = iid;   // mesmo tamanho na página
+            out.push({ id: o.id, ppi_antes: antes, ppi: ppiDe(o), escala: esc });
+        }
+    } finally { vkCarregando(false); }
+    return { ampliadas: out };
+});

@@ -3213,6 +3213,13 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.juntar_pdfs(lista, saida, padrao)
 
+    def vk_ampliar(self, arquivo, escala=2, tipo="foto"):
+        from Functions import ampliar_imagem
+        try:
+            return ampliar_imagem.ampliar(arquivo, escala, tipo)
+        except Exception as e:
+            return {"success": False, "error": f"não ampliou: {e}"}
+
     def vk_registrar_fontes(self, lista):
         from Functions import vetor_kanivete
         return vetor_kanivete.registrar_fontes(lista)

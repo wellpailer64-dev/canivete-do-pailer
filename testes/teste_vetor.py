@@ -457,6 +457,12 @@ with sync_playwright() as p:
         lidos_.append(cv2.QRCodeDetector().detectAndDecode(cv2.cvtColor(im_, cv2.COLOR_RGB2BGR))[0])
     ok(r_["paginas"] == 2 and lidos_ == ["https://exemplo.com/ana", "https://exemplo.com/bruno"] and pg.evaluate("vkTodos().find(x => x.o.nome === 'nome').o.conteudo") == "Nome",
        f"mala direta: uma página por linha, QR de cada um lido no PDF, documento volta ao original ({r_['paginas']} páginas, {lidos_})")
+    C("novo", {"nome": "Ampliar", "larg": 100, "alt": 100})
+    fi_ = C("imagem", {"arquivo": "D:/kanivete_testes/flyer_webmart/f4.png", "x": 5, "y": 5, "larg": 80})
+    cx0_ = C("info", {"ids": [fi_["id"]]})[0]["caixa_mm"]
+    r_ = C("ampliar_imagem", {"ids": [fi_["id"]], "escala": 2})
+    cx1_ = C("info", {"ids": [fi_["id"]]})[0]["caixa_mm"]
+    ok(r_["ampliadas"][0]["ppi"] == 2 * r_["ampliadas"][0]["ppi_antes"] and cx0_ == cx1_, f"ampliar imagem por IA: ppi dobra, mesmo tamanho na página ({r_['ampliadas'][0]})")
     eps = os.path.join(SAI, "teste.eps"); open(eps, "w").write("%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 100 100\n0 0 1 setrgbcolor 10 10 80 80 rectfill\nshowpage\n")
     try:
         r_ = C("abrir", {"caminho": eps}); ok(r_ and not r_.get("cancelado"), "EPS aberto pelo Ghostscript")
