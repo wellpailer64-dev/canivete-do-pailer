@@ -171,3 +171,13 @@ Modelo de estudo: `D:\kanivete_biblioteca\modelos\flyer-prime-fest`; peça em `D
   "· rastro" embaixo), `luz([[x,y,raio]],{cor,intensidade,acima})`, `tratarFoto(nome,{ambiente})`,
   `profundidade(nome,raio)`. Contrato de exemplo: `D:\kanivete_testeslyer_prime\contrato_acab.json` (export2/).
   **Checklist padrão de toda peça com pessoa/objeto** — mande no contrato de finalização.
+
+## Carrossel "6 meses de gestão" (vereador, 3 slides, 2026-10-03) — ~44 mil tokens do Claude
+Peça: `D:\kanivete_testes\carrossel_vereador\` (carrossel.html, depois.js, contrato_acab.json, export/).
+- Referência 738×327 → 3 × 1080×1440 (×4,39): medir em recortes 3× por slide e converter (×1,4634).
+- Avatar redondo: `overflow:hidden` NÃO recorta na cena — a foto vem inteira; no `--depois`, `clip = true` na imagem
+  dentro do grupo do avatar (máscara de corte no círculo de baixo). A mesma geração (prompt/semente) serve de avatar.
+- Texto com `<b>` no meio (www.<b>site</b>) vira trechos com folga estranha: preferir um peso só no rodapé.
+- Papel de caderno: `repeating-linear-gradient` no div + textura de papel amassado gerada por cima em multiply ~30%.
+- Armadilha do FLUX: "apple emoji style" gera uma MAÇÃ; descreva só a mão ("only the hand and wrist, no face").
+- Worker fez o acabamento (tratar_foto, 2 luzes atrás, sombra no emoji, Camera Raw, exportar): 6 operações, 0 erros, 30 s.
