@@ -1522,6 +1522,7 @@ def _gravar_imagem(im, destino, q, dpi):
     """PNG/JPG/WEBP/TIFF pela extensão; devolve o erro ou None."""
     fmt = os.path.splitext(destino)[1].lower()
     try:
+        os.makedirs(os.path.dirname(destino) or ".", exist_ok=True)   # pasta nova (ex.: <projeto>.camadas da ponte)
         if fmt in (".jpg", ".jpeg"):
             fundo = Image.new("RGB", im.size, (255, 255, 255))
             fundo.paste(im, mask=im.split()[3])

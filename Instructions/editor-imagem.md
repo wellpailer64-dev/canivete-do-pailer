@@ -231,3 +231,18 @@ No console: `ieDiferencaAchatado()` mede a diferença do documento aberto contra
 6. Ferramentas: Curvatura (grupo da Caneta), Movimento sensível ao conteúdo (grupo J), máscara vetorial pelo demarcador.
 Testes com mouse (app em --agente=9333; avisar o usuário para não mexer no mouse durante): testes/teste_{caneta,guias,
 laco,barra,filtros,dissolver}.py; geral: testes/teste_imagem.py.
+
+## Ponte Photo Kanivete → Editor Kanivete (frontend/js/ponte-kanivete.js; 2026-10-03, Fase 1)
+Botão **Animar** (barra de cima) e Arquivo > Animar no Editor Kanivete / Animar a tira inteira; `KNV.levarParaEditor({modo})`.
+O documento (salvo em .iknv) vira Comps no editor de vídeo pela mesma montagem do PSD (`vePsdMontar`, editor-psd.js):
+pixel/objeto inteligente/forma → PNG com efeitos, máscara e filtros (posição, opacidade, mesclagem); texto → texto
+editável (fonte por família+estilo — o nome PostScript às vezes vem errado — via `vePsdTexto`; efeito diferente de
+sombra ou escala H/V → imagem); grupo → Comp; ajuste → camada de ajuste (Camera Raw → Luz e Cor; Textura/Névoa/Grão/
+Ruído ficam de fora com aviso; Brilho/Contraste → bc; Exposição/Vibratilidade/Matiz/Curvas → Luz e Cor); camadas
+presas por corte: pixel vai recortado pela forma da base, ajuste preso vai junto com a base numa imagem.
+Carrossel: uma Comp por fatia (6 s cada, em sequência na timeline); "tira inteira" = uma Comp do documento.
+PNGs em `<pasta do .iknv>/<nome>.camadas/<id da camada>.png`. Cada faixa e Comp guarda `knv: {camada}` / `{doc, parte}`.
+Próximas fases (combinadas): 2) atualização ao vivo Photo → Editor; 3) volta Editor → Photo (posição, tamanho, texto,
+opacidade, visibilidade); 4) "Levar e animar" (entradas por camada, estilos suave/enérgico, 6 s por slide).
+Atalhos: Ctrl+Shift+, exporta a(s) camada(s) selecionada(s) em PNG; Ctrl+Shift+. exporta tudo (fatias/pranchetas/tela);
+sem janela: `KNV.exportarRapido(tudo, pasta)`.

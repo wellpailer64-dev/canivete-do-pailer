@@ -795,6 +795,8 @@ const KNV = {
             });
         },
     },
+    // ponte: o documento (já salvo em .iknv) vira Comps no Editor Kanivete; {modo: 'slides' | 'inteiro'}
+    async levarParaEditor(opc = {}) { return ponteLevar(opc); },
     // Ctrl+Shift+, (tudo=false: camadas selecionadas) / Ctrl+Shift+. (tudo=true: fatias, pranchetas ou a tela) sem a janela
     exportarRapido(tudo, pasta) { return ieExportarRapido(!!tudo, String(pasta).replace(/\//g, '\\')); },
     // recursos marcados com data-guardar desde a última chamada: [{nome, png (base64), meta}] (o runner grava)

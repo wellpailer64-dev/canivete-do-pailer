@@ -1011,7 +1011,7 @@ function ieBotoesGirar(comAngulo) {
 // [rótulo, comando, atalho] | '-' | [rótulo, [submenu]]
 const IE_MENUS = [
     ['Arquivo', [['Novo...', 'novo', 'Ctrl+N'], ['Abrir...', 'abrir', 'Ctrl+O'], ['Colocar imagem...', 'colocar', 'Shift+Ctrl+P'], ['Gerar imagem com IA...', 'gerarImagem', ''], '-',
-        ['Salvar', 'salvar', 'Ctrl+S'], ['Salvar como...', 'salvarComo', 'Shift+Ctrl+S'], ['Exportar como...', 'exportar', 'Alt+Shift+Ctrl+W'], ['Exportar fatias...', 'exportarFatias'], '-',
+        ['Salvar', 'salvar', 'Ctrl+S'], ['Salvar como...', 'salvarComo', 'Shift+Ctrl+S'], ['Exportar como...', 'exportar', 'Alt+Shift+Ctrl+W'], ['Exportar fatias...', 'exportarFatias'], '-', ['Animar no Editor Kanivete...', 'ponteLevar'], ['Animar a tira inteira (carrossel)...', 'ponteLevarInteiro'], '-',
         ['Fechar', 'fechar', 'Ctrl+W']]],
     ['Editar', [['Desfazer', 'desfazer', 'Ctrl+Z'], ['Refazer', 'refazer', 'Shift+Ctrl+Z'], '-',
         ['Recortar', 'recortar', 'Ctrl+X'], ['Copiar', 'copiar', 'Ctrl+C'], ['Copiar mesclado', 'copiarMesclado', 'Shift+Ctrl+C'], ['Colar', 'colar', 'Ctrl+V'],

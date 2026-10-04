@@ -230,8 +230,9 @@ async function vePsdTextoMisto(no, estilos, avisos, dur) {
 }
 
 // Mídias (PNG de cada camada) e Comps (documento e grupos). Devolve a mídia da Comp do documento.
-async function vePsdMontar(r, pastaPai) {
-    const api = window.pywebview.api, bin = vePjNovoBin('PSD · ' + r.nome, pastaPai || null), dur = VE_PSD_DUR;
+// o: {dur, prefixo} — a ponte do Photo Kanivete (ponte-kanivete.js) usa a mesma montagem
+async function vePsdMontar(r, pastaPai, o = {}) {
+    const api = window.pywebview.api, bin = vePjNovoBin((o.prefixo ?? 'PSD · ') + r.nome, pastaPai || null), dur = o.dur || VE_PSD_DUR;
     const estilos = await vePsdEstilos(), avisos = r.avisos;
     let aj = null;
     const imagem = async no => {
@@ -284,6 +285,7 @@ async function vePsdMontar(r, pastaPai) {
                 if (no.sombra) c.fx = [{ id: veFxNewId(), t: 'sombra', on: true, v: { ...no.sombra } }];   // efeito do editor, editável
             }
             if (!c) continue;
+            if (no.knv) c.knv = no.knv;   // ligação com a camada do Photo Kanivete (atualização ao vivo, Fase 2)
             if (!c.tx) {
                 Object.assign(c, { tr: clips.length, st: 0, s: 0, e: dur });
                 c.p = Object.assign(veDefProps(c), { sc: 100, rot: 0 }, c.p || {}, { op: no.op });
