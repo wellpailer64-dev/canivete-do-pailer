@@ -51,7 +51,28 @@ py -3.13 tools/worker/worker.py contrato.json          # app em --agente=9333; O
   luz atrás (acima do painel) e na frente — 10 operações, 0 erros, 22 s. Receitas em `KNV.receita.*` (mascaraDegrade,
   rastro, luz, tratarFoto, profundidade), também para o Claude usar direto.
 Custo do lado do Claude: escrever o contrato (~250 tokens) + ler a linha de volta (~80).
-Próximo: mais ferramentas (texto novo, cena, gerar, receitas), ferramentas do editor de vídeo, medir jobs maiores.
+Próximo: mais ferramentas (texto novo, cena, gerar, receitas), medir jobs maiores.
+
+## Editor Kanivete (vídeo) — `"app": "editor"`
+Mesmo `worker.py`; executor `executor_editor.js` (window.VEW) + `ferramentas_editor.json` (22). Clipe = **trilha@tempo**
+(`V1@4.5` = clipe da trilha de vídeo 1 que passa por 4,5 s; `A3@1` áudio; `T@1` texto) — não envelhece depois de cortar.
+```json
+{"task_id": "EDITOR_01", "app": "editor",
+ "goal": "1) Troque Elon por Helo na legenda. 2) T@1 = 'BEM-VINDO' em #ffd400. 3) push na entrada de V1@4.5. 4) Música A3@1 em -18 dB. 5) whoosh em 3.8 com -8 dB. 6) flash no corte de 7 s.",
+ "constraints": {"projeto": "D:/.../copia.vknv", "timeline": "V2 MENOR", "salvar": false, "pasta_exportacao": "D:/.../export"},
+ "success_conditions": ["legenda_sem:Elon", "texto:T@1=BEM-VINDO", "cor:T@1=#ffd400", "transicao:V1@4.5=push", "ganho:A3@1=-18", "som_em:3.8", "sobreposicao:7", "exportado"]}
+```
+- Ferramentas: listar/abrir/duplicar_timeline, listar_clipes {trilha}, info_clipe, cortar {tempo, clipe?}, apagar_clipe
+  {fechar_espaco}, mover_clipe, aparar {inicio, fim}, ganho, velocidade, transicao {tipo, lado, duracao, direcao},
+  tirar_transicao, sobreposicao {tipo, tempo} (VE_OVT), efeito {tipo, valores} (VE_FX: blur bc lc key crop luma rounded
+  sombra ca_rot ca_wig ca_pul b3d), tirar_efeito, transformar {escala %, x, y, rotacao, opacidade}, alterar_texto,
+  estilo_texto, trocar_na_legenda {de, para}, efeito_sonoro {busca, tempo, ganho} (Soundboard), exportar (agendado).
+- Condições: `ganho|velocidade|transicao|efeito|texto|cor|escala|opacidade|inicio|fim:CLIPE=valor`, `existe:CLIPE`,
+  `sem_clipe:CLIPE`, `clipes:N`, `timeline:nome`, `legenda_contem:x`, `legenda_sem:x`, `som_em:t`, `sobreposicao:t`, `exportado`.
+- `projeto` = SEMPRE uma cópia (salvar grava por cima). O Claude decide tempos/cortes (plano em python, guia-edicao.md);
+  o Worker aplica a lista. Bom para: rodada de ajustes do cliente, efeitos sonoros, correção de legenda, transições, export.
+- Primeiros jobs (2026-10-04, `D:/kanivete_testes/worker/editor/teste.vknv`): EDITOR_01 8 ops 26 s (2 erros corrigidos:
+  direcao × lado) · EDITOR_02 corte+ripple, câmera lenta, efeito, escala, whoosh, export — 9 ops, 0 erros, 16,5 s.
 
 ## Code Worker / Debug Worker (infraestrutura) — `tools/worker/codigo.py`
 Mesmo Qwen3 8B, prompt e ferramentas próprios (não sabe de camadas; o de design não sabe de git). Ferramentas FECHADAS:

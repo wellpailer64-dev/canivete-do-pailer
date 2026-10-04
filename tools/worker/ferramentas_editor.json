@@ -1,0 +1,514 @@
+[
+{
+"type": "function",
+"function": {
+"name": "listar_timelines",
+"description": "Lista as timelines do projeto (nome, ativa, duração).",
+"parameters": {
+"type": "object",
+"properties": {}
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "abrir_timeline",
+"description": "Abre (ativa) uma timeline pelo nome.",
+"parameters": {
+"type": "object",
+"properties": {
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"nome"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "duplicar_timeline",
+"description": "Duplica a timeline ativa com outro nome e passa a trabalhar nela (use antes de mexer, se o contrato pedir versão nova).",
+"parameters": {
+"type": "object",
+"properties": {
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"nome"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "listar_clipes",
+"description": "Lista os clipes da timeline ativa: clipe (trilha@início), mídia, tipo, início, fim, ganho, efeitos, transições. trilha opcional: V1, V2, A1, T (textos).",
+"parameters": {
+"type": "object",
+"properties": {
+"trilha": {
+"type": "string"
+}
+}
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "info_clipe",
+"description": "Detalhes de um clipe (fonte, posição, escala, texto).",
+"parameters": {
+"type": "object",
+"properties": {
+"clipe": {
+"type": "string",
+"description": "trilha@tempo, ex. V1@3.5 (vídeo 1 em 3,5 s), A2@10 (áudio 2), T@5 (texto)"
+}
+},
+"required": [
+"clipe"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "cortar",
+"description": "Corta (lâmina) no tempo em segundos. Com clipe, só ele; sem clipe, todas as trilhas.",
+"parameters": {
+"type": "object",
+"properties": {
+"tempo": {
+"type": "number"
+},
+"clipe": {
+"type": "string",
+"description": "trilha@tempo, ex. V1@3.5 (vídeo 1 em 3,5 s), A2@10 (áudio 2), T@5 (texto)"
+}
+},
+"required": [
+"tempo"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "apagar_clipe",
+"description": "Apaga um clipe. fechar_espaco=true puxa o resto para trás (ripple).",
+"parameters": {
+"type": "object",
+"properties": {
+"clipe": {
+"type": "string",
+"description": "trilha@tempo, ex. V1@3.5 (vídeo 1 em 3,5 s), A2@10 (áudio 2), T@5 (texto)"
+},
+"fechar_espaco": {
+"type": "boolean"
+}
+},
+"required": [
+"clipe"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "mover_clipe",
+"description": "Move um clipe: inicio = novo início em s; trilha = V1, V2, A1...",
+"parameters": {
+"type": "object",
+"properties": {
+"clipe": {
+"type": "string",
+"description": "trilha@tempo, ex. V1@3.5 (vídeo 1 em 3,5 s), A2@10 (áudio 2), T@5 (texto)"
+},
+"inicio": {
+"type": "number"
+},
+"trilha": {
+"type": "string"
+}
+},
+"required": [
+"clipe"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "aparar",
+"description": "Muda onde o clipe começa e/ou termina na timeline (segundos), sem mover o conteúdo.",
+"parameters": {
+"type": "object",
+"properties": {
+"clipe": {
+"type": "string",
+"description": "trilha@tempo, ex. V1@3.5 (vídeo 1 em 3,5 s), A2@10 (áudio 2), T@5 (texto)"
+},
+"inicio": {
+"type": "number"
+},
+"fim": {
+"type": "number"
+}
+},
+"required": [
+"clipe"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "ganho",
+"description": "Volume do clipe em dB (0 = original, -6 = mais baixo, +3 = mais alto).",
+"parameters": {
+"type": "object",
+"properties": {
+"clipe": {
+"type": "string",
+"description": "trilha@tempo, ex. V1@3.5 (vídeo 1 em 3,5 s), A2@10 (áudio 2), T@5 (texto)"
+},
+"db": {
+"type": "number"
+}
+},
+"required": [
+"clipe",
+"db"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "velocidade",
+"description": "Velocidade do clipe (1 = normal, 2 = dobro, 0.5 = câmera lenta).",
+"parameters": {
+"type": "object",
+"properties": {
+"clipe": {
+"type": "string",
+"description": "trilha@tempo, ex. V1@3.5 (vídeo 1 em 3,5 s), A2@10 (áudio 2), T@5 (texto)"
+},
+"fator": {
+"type": "number"
+}
+},
+"required": [
+"clipe",
+"fator"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "transicao",
+"description": "Põe transição no clipe. tipo: dissolve, crossfade, fadeblack, push, slide, pull, pop, chicote, fold, splith, splitv, split4. lado: entrada (padrão), saida, ambas. duracao: omita (padrão rápido 0,45 s) a não ser que o contrato diga. direcao (só se o contrato disser): sentido do movimento r=para a direita, l=esquerda, u=cima, d=baixo.",
+"parameters": {
+"type": "object",
+"properties": {
+"clipe": {
+"type": "string",
+"description": "trilha@tempo, ex. V1@3.5 (vídeo 1 em 3,5 s), A2@10 (áudio 2), T@5 (texto)"
+},
+"tipo": {
+"type": "string"
+},
+"lado": {
+"type": "string",
+"enum": [
+"entrada",
+"saida",
+"ambas"
+]
+},
+"duracao": {
+"type": "number"
+},
+"direcao": {
+"type": "string",
+"enum": [
+"r",
+"l",
+"u",
+"d"
+]
+}
+},
+"required": [
+"clipe",
+"tipo"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "tirar_transicao",
+"description": "Tira as transições do clipe.",
+"parameters": {
+"type": "object",
+"properties": {
+"clipe": {
+"type": "string",
+"description": "trilha@tempo, ex. V1@3.5 (vídeo 1 em 3,5 s), A2@10 (áudio 2), T@5 (texto)"
+}
+},
+"required": [
+"clipe"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "sobreposicao",
+"description": "Transição de sobreposição centrada num corte (tempo em s). duracao: omita (padrão) a não ser que o contrato diga. tipo: zoomin, zoomout, spin, panblur, stretch, twirl, lens, ripple, glitch, pixel, shake, blurx, flash, flare, leak.",
+"parameters": {
+"type": "object",
+"properties": {
+"tipo": {
+"type": "string"
+},
+"tempo": {
+"type": "number"
+},
+"duracao": {
+"type": "number"
+}
+},
+"required": [
+"tipo",
+"tempo"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "efeito",
+"description": "Aplica um efeito de vídeo ao clipe (ex. blur, lc, crop, ca_rot, ca_pul). valores opcionais = parâmetros do efeito.",
+"parameters": {
+"type": "object",
+"properties": {
+"clipe": {
+"type": "string",
+"description": "trilha@tempo, ex. V1@3.5 (vídeo 1 em 3,5 s), A2@10 (áudio 2), T@5 (texto)"
+},
+"tipo": {
+"type": "string"
+},
+"valores": {
+"type": "object"
+}
+},
+"required": [
+"clipe",
+"tipo"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "tirar_efeito",
+"description": "Tira um efeito do clipe pelo tipo.",
+"parameters": {
+"type": "object",
+"properties": {
+"clipe": {
+"type": "string",
+"description": "trilha@tempo, ex. V1@3.5 (vídeo 1 em 3,5 s), A2@10 (áudio 2), T@5 (texto)"
+},
+"tipo": {
+"type": "string"
+}
+},
+"required": [
+"clipe",
+"tipo"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "transformar",
+"description": "Posição/escala/rotação/opacidade do clipe. escala em % (100 = igual), opacidade 0-100, x/y em px do quadro.",
+"parameters": {
+"type": "object",
+"properties": {
+"clipe": {
+"type": "string",
+"description": "trilha@tempo, ex. V1@3.5 (vídeo 1 em 3,5 s), A2@10 (áudio 2), T@5 (texto)"
+},
+"escala": {
+"type": "number"
+},
+"x": {
+"type": "number"
+},
+"y": {
+"type": "number"
+},
+"rotacao": {
+"type": "number"
+},
+"opacidade": {
+"type": "number"
+}
+},
+"required": [
+"clipe"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "alterar_texto",
+"description": "Troca o texto de um clipe de texto.",
+"parameters": {
+"type": "object",
+"properties": {
+"clipe": {
+"type": "string",
+"description": "trilha@tempo, ex. V1@3.5 (vídeo 1 em 3,5 s), A2@10 (áudio 2), T@5 (texto)"
+},
+"texto": {
+"type": "string"
+}
+},
+"required": [
+"clipe",
+"texto"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "estilo_texto",
+"description": "Muda cor (hex), tamanho (px) e/ou fonte de um clipe de texto. Mande só o que muda.",
+"parameters": {
+"type": "object",
+"properties": {
+"clipe": {
+"type": "string",
+"description": "trilha@tempo, ex. V1@3.5 (vídeo 1 em 3,5 s), A2@10 (áudio 2), T@5 (texto)"
+},
+"cor": {
+"type": "string"
+},
+"tamanho": {
+"type": "number"
+},
+"fonte": {
+"type": "string"
+}
+},
+"required": [
+"clipe"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "trocar_na_legenda",
+"description": "Troca uma palavra/expressão em todas as legendas (corrigir nome errado).",
+"parameters": {
+"type": "object",
+"properties": {
+"de": {
+"type": "string"
+},
+"para": {
+"type": "string"
+}
+},
+"required": [
+"de",
+"para"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "efeito_sonoro",
+"description": "Põe um efeito sonoro do Soundboard no tempo (s). busca = palavras do som (whoosh, riser, pop, impacto, dinheiro, glitch...). ganho em dB (ex. -8 sob fala).",
+"parameters": {
+"type": "object",
+"properties": {
+"busca": {
+"type": "string"
+},
+"tempo": {
+"type": "number"
+},
+"ganho": {
+"type": "number"
+}
+},
+"required": [
+"busca",
+"tempo"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "exportar",
+"description": "Exporta a timeline ativa em MP4 para a pasta do contrato. Roda no fim.",
+"parameters": {
+"type": "object",
+"properties": {
+"nome": {
+"type": "string"
+},
+"qualidade": {
+"type": "string",
+"enum": [
+"low",
+"medium",
+"high"
+]
+}
+}
+}
+}
+}
+]

@@ -12,8 +12,6 @@ sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-FERR = json.load(open(os.path.join(AQUI, "ferramentas.json"), encoding="utf-8"))
-ESQ = {t["function"]["name"]: t["function"]["parameters"] for t in FERR}
 FINAIS = ("exportar", "levar_para_editor")
 LOGS = r"D:\kanivete_testes\worker\logs"
 ap = argparse.ArgumentParser()
@@ -23,6 +21,11 @@ a = ap.parse_args()
 contrato = json.load(open(a.contrato, encoding="utf-8")) if os.path.isfile(a.contrato) else json.loads(a.contrato)
 tid = contrato.get("task_id") or time.strftime("TAREFA_%H%M%S")
 cons = contrato.get("constraints") or {}
+# app: "photo" (padrão, Photo Kanivete → KNVW) | "editor" (Editor Kanivete → VEW, clipes por trilha@tempo)
+APP = contrato.get("app", "photo")
+NS, EXECUTOR, FERR_ARQ = {"photo": ("KNVW", "executor.js", "ferramentas.json"), "editor": ("VEW", "executor_editor.js", "ferramentas_editor.json")}[APP]
+FERR = json.load(open(os.path.join(AQUI, FERR_ARQ), encoding="utf-8"))
+ESQ = {t["function"]["name"]: t["function"]["parameters"] for t in FERR}
 sem_acento = lambda s: unicodedata.normalize("NFD", str(s)).encode("ascii", "ignore").decode().lower().strip()
 
 
@@ -70,14 +73,22 @@ log = {"contrato": contrato, "passos": []}
 with sync_playwright() as p:
     b = p.chromium.connect_over_cdp(f"http://127.0.0.1:{a.porta}", timeout=20000)
     pg = next(x for c in b.contexts for x in c.pages if "index.html" in x.url)
-    pg.evaluate("src => (0, eval)(src)", open(os.path.join(AQUI, "executor.js"), encoding="utf-8").read())
+    pg.evaluate("src => (0, eval)(src)", open(os.path.join(AQUI, EXECUTOR), encoding="utf-8").read())
     pg.evaluate("async () => { try { await window.pywebview.api.ie_gerador_parar(); } catch (e) {} }")   # FLUX fora da GPU
-    if cons.get("documento"):
+    if APP == "editor" and cons.get("projeto"):   # .vknv (use uma CÓPIA): abre e espera; timeline opcional
+        pg.evaluate("""async p => { if (!document.querySelector('#page-video-cutter.active')) document.querySelector('.menu-item[data-tool="video-cutter"]')?.click();
+            VE.dirty = false; veOpenProject(p); for (let i = 0; i < 600 && !(VE.ready && (VE.projectPath || '').split(String.fromCharCode(92)).join('/') === p); i++) await new Promise(r => setTimeout(r, 100)); }""", cons["projeto"].replace("\\", "/"))
+        if cons.get("timeline"): pg.evaluate("n => VEW.f.abrir_timeline({nome: n})", cons["timeline"])
+    if APP == "photo" and cons.get("documento"):
         pg.evaluate("""async d => { KNV.automacao(true, {padrao: 'primario'}); await KNV.fecharTudo(); await KNV.abrir(d); KNV.automacao(false);
             if (!document.querySelector('#page-editor-imagem.active')) switchTool('editor-imagem'); }""", cons["documento"].replace("\\", "/"))
-    camadas = [c["nome"] for c in pg.evaluate("KNVW.f.listar_camadas()")]
+    camadas = [c["nome"] for c in pg.evaluate("KNVW.f.listar_camadas()")] if APP == "photo" else []
     ctx = {"pasta": (cons.get("pasta_exportacao") or "").replace("/", "\\")}
-    sistema = ("Você é o Canivete Worker: executa a tarefa do contrato no Photo Kanivete chamando as ferramentas, com os argumentos certos. "
+    sistema = ("Você é o Canivete Worker: executa a tarefa do contrato no Editor Kanivete (editor de vídeo) chamando as ferramentas. "
+               "Clipe = trilha@tempo (V1@3.5, A1@10, T@5 para textos): use o tempo que o contrato cita ou veja listar_clipes. Tempos em segundos. "
+               "Não invente conteúdo nem tome decisões criativas fora do contrato. Se uma ferramenta devolver erro, leia a mensagem (ela lista o que existe) e tente de novo. "
+               "Quando tudo estiver feito, responda só FEITO. Se for impossível, responda IMPOSSIVEL: motivo. Clipes agora: "
+               + json.dumps(pg.evaluate("VEW.f.listar_clipes({})"), ensure_ascii=False)[:2500]) if APP == "editor" else ("Você é o Canivete Worker: executa a tarefa do contrato no Photo Kanivete chamando as ferramentas, com os argumentos certos. "
                "Não invente conteúdo nem tome decisões criativas fora do contrato. Use exatamente os nomes de camada da lista. "
                "Se uma ferramenta devolver erro, corrija e tente de novo. Quando tudo do contrato estiver feito, responda só FEITO. "
                "Se for impossível, responda IMPOSSIVEL: motivo. Camadas: " + ", ".join(camadas))
@@ -93,7 +104,7 @@ with sync_playwright() as p:
             fim = (msg.get("content") or "").strip()
             # disse que terminou: confere antes de aceitar. Pendência = cobra (até 2x); continua = o de reserva assume
             if fim.upper().startswith("IMPOSS"): break
-            conds_ = pg.evaluate("c => KNVW.conferir(c)", contrato.get("success_conditions") or [])
+            conds_ = pg.evaluate(f"c => {NS}.conferir(c)", contrato.get("success_conditions") or [])
             abertos_ = [f"{n}: {e}" for i, (n, okk, e) in enumerate(eventos) if not okk and not any(n2 == n and ok2 for n2, ok2, _ in eventos[i + 1:])]
             falta = [c["condicao"] for c in conds_ if not c["ok"] and not (c["condicao"] == "exportado" and "exportar" in finais) and not (c["condicao"] == "no_editor" and "levar_para_editor" in finais)] + abertos_
             if not falta: break
@@ -116,8 +127,8 @@ with sync_playwright() as p:
                 msgs.append({"role": "tool", "content": json.dumps(saida, ensure_ascii=False)}); continue
             if not erro:
                 try:
-                    res = pg.evaluate("([n, a, c]) => KNVW.exec(n, a, c)", [nome, args, ctx]); ops += 1
-                    if nome == "listar_camadas": camadas = [x["nome"] for x in res]
+                    res = pg.evaluate(f"([n, a, c]) => {NS}.exec(n, a, c)", [nome, args, ctx]); ops += 1
+                    if nome == "listar_camadas" and APP == "photo": camadas = [x["nome"] for x in res]
                     saida = {"ok": True, "resultado": res}
                 except Exception as e:
                     erro = str(e).split("\n")[0].replace("Page.evaluate: Error: ", "")[:300]
@@ -136,10 +147,11 @@ with sync_playwright() as p:
     if not fim.upper().startswith("IMPOSS"):
         for nome in ("exportar", "levar_para_editor"):   # as finais, na ordem
             if nome in finais:
-                try: pg.evaluate("([n, a, c]) => KNVW.exec(n, a, c)", [nome, finais[nome], ctx]); ops += 1
+                try: pg.evaluate(f"([n, a, c]) => {NS}.exec(n, a, c)", [nome, finais[nome], ctx]); ops += 1
                 except Exception as e: eventos.append((nome, False, str(e).split("\n")[0][:200])); falhas.append(f"{nome}: {e}")
-    conds = pg.evaluate("c => KNVW.conferir(c)", contrato.get("success_conditions") or [])
-    if cons.get("salvar") and cons.get("documento"): pg.evaluate("d => KNV.salvar(d)", cons["documento"].replace("\\", "/"))
+    conds = pg.evaluate(f"c => {NS}.conferir(c)", contrato.get("success_conditions") or [])
+    if cons.get("salvar") and APP == "editor" and cons.get("projeto"): pg.evaluate("veSaveProject()")
+    if cons.get("salvar") and APP == "photo" and cons.get("documento"): pg.evaluate("d => KNV.salvar(d)", cons["documento"].replace("\\", "/"))
 
 # erro que nunca foi resolvido (a mesma ferramenta não deu certo depois) não passa batido, mesmo com "FEITO"
 abertos = [f"{n}: {e}" for i, (n, okk, e) in enumerate(eventos) if not okk and not any(n2 == n and ok2 for n2, ok2, _ in eventos[i + 1:])]
