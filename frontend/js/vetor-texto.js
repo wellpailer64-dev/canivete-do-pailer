@@ -199,7 +199,7 @@ function vkTxCorrente(o) { const out = []; let x = vkTxRaiz(o), n = 0; while (x 
         if (!cam) throw new Error('texto_caminho: passe um caminho (ids/nomes): ele vira a linha do texto');
         const [fam, est] = vkFonteNorm(a.fonte || a.fam || (VK.txPadrao && VK.txPadrao.fam) || 'Arial', a.estilo || (VK.txPadrao && VK.txPadrao.estilo));
         const o = { id: vkId(), tipo: 'texto', conteudo: String(a.conteudo ?? 'Texto no caminho'), fam, estilo: est || 'Regular', tam: +(a.tamanho || a.tam || (VK.txPadrao && VK.txPadrao.tam) || 12),
-            entrelinha: null, track: 0, alin: a.alin || 'esq', caixa: null, m: [1, 0, 0, 1, 0, 0], trilha: { subs: vkClone(cam.subs), ini: 0, lado: !!a.lado },
+            entrelinha: null, track: 0, alin: a.alin || 'esq', caixa: null, m: [1, 0, 0, 1, 0, 0], subs: vkClone(cam.subs), trilha: { ini: 0, lado: !!a.lado },
             preench: 'preench' in a ? vkCorDe(a.preench) : { k: 'cmyk', v: [0, 0, 0, 100] }, traco: null };
         if (a.ini != null) o.trilha.ini = a.un === 'pt' ? +a.ini : vkPT(+a.ini);
         if (a.nome) o.nome = a.nome;
@@ -216,9 +216,8 @@ function vkTxCorrente(o) { const out = []; let x = vkTxRaiz(o), n = 0; while (x 
         const cam = vkTxAlvos(a).find(o => o.tipo === 'caminho' && o.subs.some(s => s.fechado));
         if (!cam) throw new Error('texto_em_forma: passe uma forma FECHADA (ids/nomes): o texto corre por dentro dela');
         const b = vkBox(cam), [fam, est] = vkFonteNorm(a.fonte || a.fam || (VK.txPadrao && VK.txPadrao.fam) || 'Arial', a.estilo || (VK.txPadrao && VK.txPadrao.estilo));
-        const forma = cam.subs.filter(s => s.fechado).map(s => ({ fechado: true, pts: s.pts.map(p => [p[0] - b[0], p[1] - b[1], p[2] - b[0], p[3] - b[1], p[4] - b[0], p[5] - b[1]]) }));
         const o = { id: vkId(), tipo: 'texto', conteudo: String(a.conteudo ?? 'Texto'), fam, estilo: est || 'Regular', tam: +(a.tamanho || a.tam || (VK.txPadrao && VK.txPadrao.tam) || 10),
-            entrelinha: null, track: 0, alin: a.alin || 'esq', caixa: b[2] - b[0], caixa_alt: b[3] - b[1], forma, m: [1, 0, 0, 1, b[0], b[1]],
+            entrelinha: null, track: 0, alin: a.alin || 'esq', caixa: b[2] - b[0], caixa_alt: b[3] - b[1], forma: true, subs: cam.subs.filter(s => s.fechado).map(s => vkClone(s)), m: [1, 0, 0, 1, b[0], b[1]],
             preench: 'preench' in a ? vkCorDe(a.preench) : { k: 'cmyk', v: [0, 0, 0, 100] }, traco: null };
         if (a.recuo != null) o.forma_recuo = a.un === 'pt' ? +a.recuo : vkPT(+a.recuo);
         if (a.nome) o.nome = a.nome;
@@ -499,7 +498,7 @@ function vkTxSobreposicao(ctx) {
         const P = vkTxPortas(o);
         if (P) {
             ctx.save(); ctx.strokeStyle = 'rgba(47,140,255,.7)'; ctx.setLineDash([3, 3]); ctx.beginPath();
-            if (o.forma) { ctx.save(); ctx.translate(VK.vista.x, VK.vista.y); ctx.scale(VK.vista.z, VK.vista.z); ctx.transform(...o.m); ctx.lineWidth = 1 / VK.vista.z / vkEsc(o.m); ctx.stroke(vkPath2d(o.forma)); ctx.restore(); }
+            if (o.forma) { ctx.save(); ctx.translate(VK.vista.x, VK.vista.y); ctx.scale(VK.vista.z, VK.vista.z); ctx.lineWidth = 1 / VK.vista.z; ctx.stroke(vkPath2d(o.subs || [])); ctx.restore(); }
             else { const cs = [[0, 0], [o.caixa, 0], [o.caixa, P.h], [0, P.h]].map(([x, y]) => vkTela(...vkAp(o.m, x, y)));
                 ctx.moveTo(...cs[0]); cs.slice(1).forEach(c => ctx.lineTo(...c)); ctx.closePath(); ctx.stroke(); }
             ctx.setLineDash([]);
@@ -513,11 +512,12 @@ function vkTxSobreposicao(ctx) {
             ctx.restore();
         }
         if (o.trilha) {
-            ctx.save(); ctx.strokeStyle = 'rgba(47,140,255,.8)'; ctx.lineWidth = 1 / VK.vista.z / vkEsc(o.m);
-            ctx.translate(VK.vista.x, VK.vista.y); ctx.scale(VK.vista.z, VK.vista.z); ctx.transform(...o.m);
-            ctx.stroke(vkPath2d(o.trilha.subs)); ctx.restore();
+            ctx.save(); ctx.strokeStyle = 'rgba(47,140,255,.8)';
+            ctx.translate(VK.vista.x, VK.vista.y); ctx.scale(VK.vista.z, VK.vista.z);
+            if (o.subs) ctx.lineWidth = 1 / VK.vista.z; else { ctx.transform(...o.m); ctx.lineWidth = 1 / VK.vista.z / vkEsc(o.m); }   // trilha em o.subs (documento) ou antiga (local)
+            ctx.stroke(vkPath2d(o.subs || o.trilha.subs)); ctx.restore();
             const g = vkGeo(o);
-            if (g && g.transborda) { const sp = o.trilha.subs[0], P = sp.pts[o.trilha.lado ? 0 : sp.pts.length - 1], [x, y] = vkTela(...vkAp(o.m, P[0], P[1]));
+            if (g && g.transborda) { const sp = (o.subs || o.trilha.subs)[0], P = sp.pts[o.trilha.lado ? 0 : sp.pts.length - 1], [x, y] = o.subs ? vkTela(P[0], P[1]) : vkTela(...vkAp(o.m, P[0], P[1]));
                 ctx.save(); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#ff2b2b'; ctx.fillRect(x - 4.5, y - 4.5, 9, 9); ctx.strokeRect(x - 4.5, y - 4.5, 9, 9);
                 ctx.beginPath(); ctx.moveTo(x - 2.5, y); ctx.lineTo(x + 2.5, y); ctx.moveTo(x, y - 2.5); ctx.lineTo(x, y + 2.5); ctx.stroke(); ctx.restore(); }
         }

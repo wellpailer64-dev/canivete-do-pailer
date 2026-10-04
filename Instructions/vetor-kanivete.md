@@ -58,7 +58,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 
 `.aknv` abre no KANIVETE por duplo clique (associação HKCU em Functions/projeto.py; roteado em `abrirProjetoExterno`).
 
-Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): editar a trilha do texto em caminho com a Seleção direta, estilos dentro da caixa de edição (ela é texto puro);
+Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): estilos dentro da caixa de edição (ela é texto puro);
 efeitos que faltam (Aparência em grupo; efeitos na prévia de separações e no SVG); malha; painel de vínculos; PDF com texto editável (hoje: curvas).
 
 ## 2. Modelo (pt = 1/72", y para baixo)
@@ -70,7 +70,7 @@ caminho {tipo,subs:[{fechado,pts:[[x,y,inX,inY,outX,outY]]}],regra:'nonzero'|'ev
 texto   {tipo,conteudo,fam,estilo,tam(pt),entrelinha|null,track(1/1000 em),alin:esq|centro|dir|just|just_tudo,caixa(pt)|null,caixa_alt(pt),m:[a,b,c,d,e,f],preench,traco,
          desl,eh,ev,maius:alta|versalete,pos:sup|sub,liga,frac,num, recuo_esq,recuo_dir,recuo_1a,antes,depois (pt),
          trechos:[{ini,fim,<os de caractere>,preench,traco:{cor,larg}|null,ec}], ep (estilo ¶), anterior/seguinte (encadeado: o texto mora na raiz),
-         trilha:{subs,ini,lado} (texto em caminho)}       doc.estilosTexto = {par:{nome:{...}}, car:{nome:{...}}}
+         trilha:{ini,lado} + subs (a trilha, em pt do DOCUMENTO: a Seleção direta edita; o spec manda a versão local) (texto em caminho); forma:true + subs (texto em forma, idem)}       doc.estilosTexto = {par:{nome:{...}}, car:{nome:{...}}}
          A tela monta o spec (vkTxSpec: encadeado resolvido) e manda junto na exportação (`_spec`): PDF = tela.
 qualquer objeto: aparencia:[{tipo:'preench'|'traco',cor,larg,cap,junc,tracejado,op,bm,desloc(pt),atras,visivel}] (caminho/texto),
          efeitos:[{tipo:'sombra'|'brilho'|'desfoque'|'cantos',dx,dy,desfoque,raio (pt),cor,op,bm,visivel}];

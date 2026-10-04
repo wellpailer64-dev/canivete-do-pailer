@@ -99,7 +99,8 @@ function vkBox(o, comTraco = false) {   // caixa no documento
         for (const f of (o.clip ? o.itens.slice(0, 1) : o.itens)) { const c = vkBox(f, comTraco); if (isFinite(c[0])) { vkBoxAdd(b, c[0], c[1]); vkBoxAdd(b, c[2], c[3]); } }
     } else if (o.tipo === 'texto') {
         const g = vkGeo(o);
-        if (o.caixa && o.caixa_alt) for (const [x, y] of [[0, 0], [o.caixa, 0], [0, o.caixa_alt], [o.caixa, o.caixa_alt]]) { const p = vkAp(o.m, x, y); vkBoxAdd(b, p[0], p[1]); }
+        if (o.forma && o.subs) vkSubsBox(o.subs, null, b);   // texto em forma: a forma (editável) é a caixa
+        else if (o.caixa && o.caixa_alt) for (const [x, y] of [[0, 0], [o.caixa, 0], [0, o.caixa_alt], [o.caixa, o.caixa_alt]]) { const p = vkAp(o.m, x, y); vkBoxAdd(b, p[0], p[1]); }
         else if (g && g.subs.length) vkSubsBox(g.subs, o.m, b);
         else { const l = o.caixa || o.conteudo.length * o.tam * 0.55, x0 = o.alin === 'centro' && !o.caixa ? -l / 2 : 0;
             for (const [x, y] of [[x0, -o.tam * 0.8], [x0 + l, -o.tam * 0.8], [x0, o.tam * 0.25], [x0 + l, o.tam * 0.25]]) { const p = vkAp(o.m, x, o.caixa ? y + o.tam * 0.8 : y); vkBoxAdd(b, p[0], p[1]); } }
@@ -128,7 +129,10 @@ function vkTransformar(o, M) {   // aplica M (doc → doc) ao objeto: caminho as
         o.subs = o.subs.map(s => ({ fechado: s.fechado, pts: s.pts.map(p => [...vkAp(M, p[0], p[1]), ...vkAp(M, p[2], p[3]), ...vkAp(M, p[4], p[5])]) }));
         if (VK.pref.escalarTracos && o.traco) o.traco = { ...o.traco, larg: o.traco.larg * vkEsc(M) };
     } else if (o.tipo === 'grupo') o.itens.forEach(f => vkTransformar(f, M));
-    else { o.m = vkMul(o.m, M); }
+    else {
+        o.m = vkMul(o.m, M);
+        if (o.subs) o.subs = o.subs.map(s => ({ fechado: s.fechado, pts: s.pts.map(p => [...vkAp(M, p[0], p[1]), ...vkAp(M, p[2], p[3]), ...vkAp(M, p[4], p[5])]) }));   // trilha/forma do texto acompanha
+    }
     if (o.preench) o.preench = tc(o.preench);
     if (o.traco && o.traco.cor) o.traco = { ...o.traco, cor: tc(o.traco.cor) };
 }
@@ -288,6 +292,12 @@ function vkTxSpec(o) {
         delete s.recuo_1a;
     }
     if (s.trechos) s.trechos = s.trechos.map(({ ec, ...t }) => t);
+    if (o.subs && (o.trilha || o.forma)) {   // a guia (trilha/forma) mora em o.subs, no documento — a Seleção direta edita; o motor quer local
+        const iv = vkInv(o.m), r4 = v => Math.round(v * 1e4) / 1e4;   // arredonda: mover não muda a forma local → o cache da geometria acerta
+        const loc = o.subs.map(sb => ({ fechado: sb.fechado, pts: sb.pts.map(p => [...vkAp(iv, p[0], p[1]), ...vkAp(iv, p[2], p[3]), ...vkAp(iv, p[4], p[5])].map(r4)) }));
+        if (o.trilha) s.trilha = { ...o.trilha, subs: loc };
+        if (o.forma) { s.forma = loc; const b = vkSubsBox(loc); s.caixa = Math.max(1, b[2] - b[0]); s.caixa_alt = Math.max(1, b[3] - b[1]); }
+    }
     return s;
 }
 function vkGeoChave(o) { const s = vkTxSpec(o); return s ? JSON.stringify(s) : null; }
@@ -465,6 +475,7 @@ function vkAcerta(o, x, y, tol) {   // x, y no documento; tol em pt
     if (o.tipo === 'imagem') { const im = VK.doc.imagens[o.img] || { w: 1, h: 1 }; const [u, v] = vkAp(vkInv(o.m), x, y); return u >= 0 && v >= 0 && u <= im.w && v <= im.h; }
     if (o.tipo === 'texto') {
         const g = vkGeo(o), b = vkBox(o);
+        if (o.forma && o.subs) return x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3];
         if (!g || (o.caixa && o.caixa_alt)) { const [u, v] = vkAp(vkInv(o.m), x, y), t = tol / vkEsc(o.m); return o.caixa && o.caixa_alt ? u >= -t && v >= -t && u <= o.caixa + t && v <= o.caixa_alt + t : x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3]; }
         const [u, v] = vkAp(vkInv(o.m), x, y), s = vkEsc(o.m);
         // texto: a caixa das letras de cada linha (clicar entre letras também pega, como no Illustrator)

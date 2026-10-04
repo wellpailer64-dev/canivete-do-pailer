@@ -17,7 +17,7 @@ let VKG = [];     // guias inteligentes visíveis
 
 // comando genérico de geometria (a Seleção direta e a Caneta terminam aqui; agentes também podem usar)
 vkRegistrar('definir_subs', 'editar pontos', a => {
-    const o = vkObj(a.id); if (!o || o.tipo !== 'caminho') throw new Error('definir_subs: id de um caminho');
+    const o = vkObj(a.id); if (!o || !o.subs) throw new Error('definir_subs: id de um caminho (ou de um texto em caminho/forma)');
     o.subs = vkClone(a.subs); return { id: o.id, pontos: o.subs.reduce((s, x) => s + x.pts.length, 0) };
 });
 vkRegistrar('mover_prancheta', 'mover prancheta', a => {
@@ -70,7 +70,7 @@ function vkEncaixe(b, excluir) {
 // ── pontos (Seleção direta) ──
 function vkPontoEm(sx, sy) {   // âncora ou alça de um caminho selecionado
     for (const o of vkSelObjs()) {
-        if (o.tipo !== 'caminho') continue;
+        if (!o.subs) continue;   // caminho, ou a trilha/forma de um texto
         for (let si = 0; si < o.subs.length; si++) for (let i = 0; i < o.subs[si].pts.length; i++) {
             const p = o.subs[si].pts[i];
             for (const [qual, ix] of [['a', 0], ['in', 2], ['out', 4]]) {
@@ -231,7 +231,7 @@ function vkEventos() {
             const r = [Math.min(A.x, ex), Math.min(A.y, ey), Math.max(A.x, ex), Math.max(A.y, ey)];
             if (A.f === 'direta') {
                 VK.selPts = {};
-                for (const { o, cam } of vkTodos()) { if (o.tipo !== 'caminho' || vkTravado(o, cam)) continue;
+                for (const { o, cam } of vkTodos()) { if (!o.subs || vkTravado(o, cam)) continue;
                     o.subs.forEach((s, si) => s.pts.forEach((p, i) => { if (p[0] >= r[0] && p[0] <= r[2] && p[1] >= r[1] && p[1] <= r[3]) { (VK.selPts[o.id] = VK.selPts[o.id] || new Set()).add(`${si}:${i}`); } })); }
                 VK.sel = Object.keys(VK.selPts);
             } else {
@@ -380,7 +380,7 @@ function vkDesenharSobreposicao(ctx) {
     }
     // pontos de ancoragem (Seleção direta / Caneta)
     if (VK.ferr === 'direta' || VK.ferr === 'caneta') {
-        for (const o of sel) { if (o.tipo !== 'caminho') continue;
+        for (const o of sel) { if (!o.subs) continue;
             o.subs.forEach((s, si) => s.pts.forEach((p, i) => {
                 const on = VK.selPts && VK.selPts[o.id] && VK.selPts[o.id].has(`${si}:${i}`);
                 const [x, y] = vkTela(p[0], p[1]);

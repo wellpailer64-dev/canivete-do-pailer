@@ -206,6 +206,10 @@ with sync_playwright() as p:
     r = C("texto_caminho", {"nomes": ["circulo"], "conteudo": "TEXTO EM VOLTA DO CÍRCULO", "tamanho": 9, "nome": "volta"})
     g = G("volta")
     ok(g["subs"] > 10 and not g["transborda"] and r["caixa_mm"]["larg"] > 30, f"texto em caminho ({r['caixa_mm']})")
+    sub_ = pg.evaluate("id => vkClone(vkObj(id).subs)", r["id"]); topo0_ = C("info", {"ids": [r["id"]]})[0]["caixa_mm"]["y"]
+    sub_[0]["pts"][0][1] -= 30; sub_[0]["pts"][0][3] -= 30; sub_[0]["pts"][0][5] -= 30
+    C("definir_subs", {"id": r["id"], "subs": sub_}); pg.evaluate("async id => await vkGeoPronta(vkObj(id))", r["id"])
+    ok(C("info", {"ids": [r["id"]]})[0]["caixa_mm"]["y"] < topo0_ - 3, "editar a trilha (Seleção direta / definir_subs) refaz o texto em caminho")
     for i, (y, l) in enumerate([(80, "Primeira linha do"), (84.5, "parágrafo importado."), (93, "Outro parágrafo.")]):
         C("texto", {"conteudo": l, "x": 10, "y": y, "tamanho": 10, "nome": f"linha{i}"})
     r = C("juntar_textos", {"nomes": ["linha0", "linha1", "linha2"], "nome": "juntado"})
