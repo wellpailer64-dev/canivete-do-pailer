@@ -90,3 +90,7 @@ guia `Instructions/agente/plano-cena.md` (seção "Fluxo barato": biblioteca `D:
 ## ffmpeg
 - O ffmpeg baixado é recente (7+): `-filter_complex_script` não existe mais; use `-/filter_complex`
   (ver `_opcao_filtro_script` em `Functions/video_cutter.py`).
+
+## Canivete Worker (assistente local)
+Operações repetitivas no Photo Kanivete: escrever um contrato e delegar ao Qwen3 8B local (`py -3.13 tools/worker/worker.py contrato.json`),
+que volta numa linha JSON. Contrato, condições de sucesso e ferramentas: `Instructions/agente/worker.md`.

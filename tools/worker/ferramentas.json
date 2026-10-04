@@ -1,4 +1,5 @@
 [
+ {"type": "function", "function": {"name": "listar_camadas", "description": "Lista as camadas do documento (nome, tipo, posição, tamanho, visível). Use quando não souber o nome exato.", "parameters": {"type": "object", "properties": {}}}},
  {"type": "function", "function": {"name": "mover_camada", "description": "Move uma camada em pixels, relativo à posição atual (dx positivo = direita, dy positivo = para baixo).",
   "parameters": {"type": "object", "properties": {"camada": {"type": "string"}, "dx": {"type": "number"}, "dy": {"type": "number"}}, "required": ["camada", "dx", "dy"]}}},
  {"type": "function", "function": {"name": "posicionar_camada", "description": "Coloca o canto superior esquerdo da camada numa posição exata (x, y em pixels do documento).",
@@ -23,7 +24,7 @@
   "parameters": {"type": "object", "properties": {"camada": {"type": "string"}, "intensidade": {"type": "string", "enum": ["leve", "media", "forte"]}}, "required": ["camada", "intensidade"]}}},
  {"type": "function", "function": {"name": "titulo_gasto", "description": "Aplica textura gasta (grunge) em títulos.",
   "parameters": {"type": "object", "properties": {"camadas": {"type": "array", "items": {"type": "string"}}}, "required": ["camadas"]}}},
- {"type": "function", "function": {"name": "acabamento", "description": "Camada de ajuste de acabamento no topo (Camera Raw). Valores de -100 a 100; mande só os que mudam: claridade, textura, granulacao, vibracao, contraste, exposicao (de -2 a 2), temperatura.",
+ {"type": "function", "function": {"name": "acabamento", "description": "Acabamento (Camera Raw) no topo. Os valores SOMAM ao acabamento atual (ex.: temperatura 8 = um pouco mais quente). De -100 a 100; mande só os que mudam, nunca zeros: claridade, textura, granulacao, vibracao (cores mais vivas), contraste, exposicao (de -2 a 2), temperatura (positivo = esquentar/mais quente, negativo = esfriar).",
   "parameters": {"type": "object", "properties": {"claridade": {"type": "number"}, "textura": {"type": "number"}, "granulacao": {"type": "number"}, "vibracao": {"type": "number"}, "contraste": {"type": "number"}, "exposicao": {"type": "number"}, "temperatura": {"type": "number"}}}}},
  {"type": "function", "function": {"name": "alinhar", "description": "Alinha camadas entre si.",
   "parameters": {"type": "object", "properties": {"camadas": {"type": "array", "items": {"type": "string"}}, "modo": {"type": "string", "enum": ["esquerda", "centro_horizontal", "direita", "topo", "centro_vertical", "base"]}}, "required": ["camadas", "modo"]}}},
