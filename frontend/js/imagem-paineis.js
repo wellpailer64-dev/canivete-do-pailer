@@ -436,6 +436,32 @@ function ieCamadasInstalar() {
     const lista = ieEl('ie-cam-lista'), topo = ieEl('ie-cam-topo');
     if (!lista || lista._ok) return;
     lista._ok = true;
+    // Alt + divisa entre duas camadas (como no Photoshop): o cursor vira o ícone de corte e o clique prende a de cima
+    // na de baixo (máscara de corte); na divisa de uma já presa, solta
+    const divisa = ev => {
+        const doc = IE.doc, row = ev.target.closest && ev.target.closest('.ie-cam');
+        if (!doc || !ev.altKey || !row || ev.target.closest('[data-olho]')) return null;
+        const r = row.getBoundingClientRect(), y = ev.clientY - r.top, lin = [...lista.querySelectorAll('.ie-cam')], i = lin.indexOf(row);
+        const par = y < 6 ? [lin[i - 1], row] : y > r.height - 6 ? [row, lin[i + 1]] : null;
+        if (!par || !par[0] || !par[1]) return null;
+        const a = ieAchar(doc, +par[0].dataset.id), b = ieAchar(doc, +par[1].dataset.id);
+        if (!a || !b || a.lista !== b.lista || a.i !== b.i + 1) return null;   // irmãs vizinhas na pilha
+        return { cima: a.L, baixo: b.L };
+    };
+    const cursorCorte = ev => lista.classList.toggle('ie-cam-corte', !!divisa(ev));
+    lista.addEventListener('mousemove', cursorCorte);
+    lista.addEventListener('mouseleave', () => lista.classList.remove('ie-cam-corte'));
+    window.addEventListener('keyup', ev => { if (ev.key === 'Alt') lista.classList.remove('ie-cam-corte'); });
+    // a lista é redesenhada entre o mousedown e o click (o click chega solto, fora dela): o corte age já no mousedown
+    // (captura) e o Alt+clique de enquadrar a camada, no documento, é ignorado para esse clique
+    lista.addEventListener('mousedown', ev => {
+        const dv = ev.button === 0 && divisa(ev);
+        if (!dv) return;
+        ev.stopPropagation(); ev.preventDefault();
+        IE._corteClique = Date.now();
+        dv.cima.clip = !dv.cima.clip;
+        ieTudo(IE.doc); ieHist(ieT(dv.cima.clip ? 'Criar máscara de corte' : 'Soltar máscara de corte')); ieUiCamadas();
+    }, true);
     lista.addEventListener('click', ev => {
         const doc = IE.doc;
         if (!doc) return;

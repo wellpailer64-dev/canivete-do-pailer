@@ -175,8 +175,11 @@ Modelo de estudo: `D:\kanivete_biblioteca\modelos\flyer-prime-fest`; peça em `D
 ## Carrossel "6 meses de gestão" (vereador, 3 slides, 2026-10-03) — ~44 mil tokens do Claude
 Peça: `D:\kanivete_testes\carrossel_vereador\` (carrossel.html, depois.js, contrato_acab.json, export/).
 - Referência 738×327 → 3 × 1080×1440 (×4,39): medir em recortes 3× por slide e converter (×1,4634).
-- Avatar redondo: `overflow:hidden` NÃO recorta na cena — a foto vem inteira; no `--depois`, `clip = true` na imagem
-  dentro do grupo do avatar (máscara de corte no círculo de baixo). A mesma geração (prompt/semente) serve de avatar.
+- Avatar redondo: `<img data-corte>` dentro do círculo (máscara de corte); foto pequena o bastante para caber cabeça +
+  ombros (cabeça ≈ 55% do círculo, queixo dentro). A mesma geração (prompt/semente) serve de avatar.
+- Feedback do usuário: braço cortado pela caixa (`object-fit: cover` numa caixa mais estreita que a foto corta as
+  laterais — caixa na proporção da foto); sombra de objeto suave (desfoque grande, opacidade ~.22, cor do fundo);
+  texto sobre foto pede mancha escura macia por baixo (radial-gradient da cor escura da paleta, ~.85 no centro).
 - Texto com `<b>` no meio (www.<b>site</b>) vira trechos com folga estranha: preferir um peso só no rodapé.
 - Papel de caderno: `repeating-linear-gradient` no div + textura de papel amassado gerada por cima em multiply ~30%.
 - Armadilha do FLUX: "apple emoji style" gera uma MAÇÃ; descreva só a mão ("only the hand and wrist, no face").

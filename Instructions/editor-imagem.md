@@ -4,7 +4,7 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 
 ## Arquivos
 - `frontend/js/imagem-nucleo.js` — modelo (documento, camadas, máscaras), histórico (copy-on-write), composição
-  (modos de mesclagem do Photoshop, grupos com passagem, máscara de corte, máscaras, efeitos, camadas de ajuste), vista.
+  (modos de mesclagem do Photoshop, grupos com passagem, máscara de corte (Alt+Ctrl+G, botão do painel ou **Alt+clique na divisa entre duas camadas**: cursor de corte, prende a de cima na de baixo; de novo solta — `testes/teste_corte_alt.py`), máscaras, efeitos, camadas de ajuste), vista.
 - `frontend/js/imagem-ajustes.js` — matemática dos ajustes (camadas de ajuste do PSD e menu Imagem > Ajustes) e filtros.
 - `frontend/js/imagem-ferramentas.js` — ferramentas (Mover, Letreiro, Laço, Varinha, Corte, Conta-gotas, Carimbo,
   Pincel, Borracha, Degradê, Balde, Forma, Mão, Zoom) e Transformação livre (Ctrl+T).

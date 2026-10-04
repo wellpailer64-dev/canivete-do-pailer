@@ -28,7 +28,7 @@
     };
     const caixa = L => { const R = ieRCamada(L); return R ? { x: Math.round(R.x), y: Math.round(R.y), w: Math.round(R.w), h: Math.round(R.h) } : null; };
     const BM = { normal: 'NORMAL', multiplicacao: 'MULTIPLY', divisao: 'SCREEN', sobrepor: 'OVERLAY', luz_suave: 'SOFT_LIGHT', diferenca: 'DIFFERENCE' };
-    const SOMBRA = { leve: '0 10px 24px rgba(0,0,0,.35)', media: '0 20px 44px rgba(0,0,0,.5)', forte: '0 34px 70px rgba(0,0,0,.65)' };
+    const SOMBRA = { leve: '0 14px 32px rgba(0,0,0,.22)', media: '0 20px 44px rgba(0,0,0,.4)', forte: '0 34px 70px rgba(0,0,0,.65)' };
     const hist = n => ieHist('Worker: ' + n);
     const mudou = (L, R) => { ieInvalidar(L); ieCamadaMudou(L, R); };
     const ativo = L => { KNV.ativar(L.id); IE.doc.selIds = [L.id]; };

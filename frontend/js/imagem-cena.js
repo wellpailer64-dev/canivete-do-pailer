@@ -366,10 +366,13 @@ async function ieCenaVisitar(el, ctx, h) {
     if (nome && itens.length > 1) {
         const G = ieNovaCamada(ctx.doc, { tipo: 'grupo', nome, filhos: itens, op: op < 1 ? op : 1, bm: bm || 'PASS_THROUGH', aberto: false });
         G.cena = { k: ieCenaChave(ctx, me.chave + '|g') };
+        if (el.dataset.corte != null) G.clip = true;
         return [G];
     }
     if (nome && itens.length === 1 && itens[0].tipo !== 'grupo') itens[0].nome = nome;
     for (const L of itens) { if (op < 1) L.op *= op; if (bm && L.bm === 'NORMAL') L.bm = bm; }
+    // data-corte: máscara de corte na camada logo abaixo (o Alt+clique entre camadas do Photoshop): avatar no círculo
+    if (el.dataset.corte != null) for (const L of itens) L.clip = true;
     return itens;
 }
 

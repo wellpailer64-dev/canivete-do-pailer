@@ -76,6 +76,8 @@ Escrever o HTML:
 - Texto com `<b>`/`<span>` no meio = uma camada por trecho de linha; bloco só de texto = uma camada (quebra natural
   → texto de caixa que reflui ao editar).
 - Não entram: `background-image: url()` (use `<img>`), `::before/::after`, `filter`, `backdrop-filter`, `clip-path`.
+- `data-corte` = máscara de corte na camada logo abaixo (avatar: `<div class="av" style="border-radius:50%;background:..."><img data-corte ...></div>`;
+  `overflow:hidden` NÃO recorta). Enquadre a foto pelo tamanho/posição do `<img>` (cabeça ≈ 55% do círculo).
 - `data-livre` tira o elemento da checagem de margem; `data-juntos` num pai permite textos encostados.
 
 Carrossel (Fase 2):

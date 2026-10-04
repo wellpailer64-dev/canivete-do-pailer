@@ -380,6 +380,7 @@ document.addEventListener('click', ev => {
     if (!ieAtivoVisivel()) return;
     const doc = IE.doc;
     if (!doc) return;
+    if (ev.altKey && IE._corteClique && Date.now() - IE._corteClique < 800) { IE._corteClique = 0; return; }   // Alt+clique na divisa = corte
     const lista = ev.target.closest('#ie-cam-lista');
     if (lista && (ev.ctrlKey || ev.altKey)) {
         const linha = ev.target.closest('.ie-cam'), alvo = ev.target.closest('[data-alvo]');
