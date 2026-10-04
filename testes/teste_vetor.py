@@ -445,6 +445,18 @@ with sync_playwright() as p:
     out_d = os.path.join(SAI, "distorcer.pdf"); r_ = pg.evaluate("([c]) => VKN.exportarPdf(c, {padrao: 'x4'})", [out_d])
     f_ = pg.evaluate("VKN.fechamento({padrao: 'x1a'})")
     ok(r_["verificado"] and sum(1 for e in f_["erros"] if e["cod"] == "efeito_transparencia") == 1, f"PDF com distorções; em X-1a só o brilho interno é transparência ({[e['cod'] for e in f_['erros']]})")
+    C("novo", {"nome": "Cracha teste", "larg": 54, "alt": 86})
+    C("texto", {"conteudo": "Nome", "x": 5, "y": 40, "tamanho": 14, "nome": "nome"})
+    C("qrcode", {"conteudo": "x", "x": 15, "y": 50, "tamanho": 24, "nome": "qr"})
+    csv_ = os.path.join(SAI, "equipe.csv"); open(csv_, "w", encoding="utf-8").write("nome;qr\nAna;https://exemplo.com/ana\nBruno;https://exemplo.com/bruno\n")
+    out_md = os.path.join(SAI, "crachas.pdf"); r_ = C("mala_direta", {"csv": csv_, "saida": out_md})
+    import fitz, numpy as np, cv2
+    lidos_ = []
+    for pp_ in fitz.open(out_md):
+        px_ = pp_.get_pixmap(dpi=300); im_ = np.frombuffer(px_.samples, np.uint8).reshape(px_.height, px_.width, px_.n)[:, :, :3]
+        lidos_.append(cv2.QRCodeDetector().detectAndDecode(cv2.cvtColor(im_, cv2.COLOR_RGB2BGR))[0])
+    ok(r_["paginas"] == 2 and lidos_ == ["https://exemplo.com/ana", "https://exemplo.com/bruno"] and pg.evaluate("vkTodos().find(x => x.o.nome === 'nome').o.conteudo") == "Nome",
+       f"mala direta: uma página por linha, QR de cada um lido no PDF, documento volta ao original ({r_['paginas']} páginas, {lidos_})")
     eps = os.path.join(SAI, "teste.eps"); open(eps, "w").write("%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 100 100\n0 0 1 setrgbcolor 10 10 80 80 rectfill\nshowpage\n")
     try:
         r_ = C("abrir", {"caminho": eps}); ok(r_ and not r_.get("cancelado"), "EPS aberto pelo Ghostscript")

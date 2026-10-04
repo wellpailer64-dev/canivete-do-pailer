@@ -112,3 +112,43 @@ function vkOpMaskDesenhar(ctx, o, cam) {
 })();
 const vkCoresOpOrig = vkCores;
 vkCores = function (o) { const out = vkCoresOpOrig(o); if (o.opmask) out.push(...vkCores(o.opmask)); return out; };
+
+// ─────────────────────────── MALA DIRETA (Variáveis do Illustrator: crachá, convite com nome, etiqueta numerada) ───────────────────────────
+// csv (caminho; ; ou , detectado) ou linhas [{coluna: valor}]; campos {coluna: nome do objeto} (sem: colunas com o mesmo
+// nome de um objeto). Texto troca o conteúdo; imagem troca o arquivo; grupo "QR…" refaz o QR com o valor.
+// Cada linha vira uma página (pelo exportar_pdf, com o fechamento e a verificação) e no fim vira um PDF só.
+vkRegistrar('mala_direta', 'mala direta', async a => {
+    const api = vkApi();
+    let linhas = a.linhas;
+    if (!linhas) { if (!a.csv) throw new Error('mala_direta: passe csv (caminho) ou linhas'); const r = await api.vk_ler_csv(a.csv); if (!r || !r.success) throw new Error((r && r.error) || 'não leu o CSV'); linhas = r.linhas; }
+    if (!linhas.length) throw new Error('mala_direta: nenhuma linha');
+    if (a.limite) linhas = linhas.slice(0, +a.limite);
+    const porNome = n => vkTodos().find(x => (x.o.nome || '').toLowerCase() === String(n).toLowerCase());
+    const campos = a.campos || Object.fromEntries(Object.keys(linhas[0]).filter(c => porNome(c)).map(c => [c, c]));
+    if (!Object.keys(campos).length) throw new Error(`mala_direta: nenhuma coluna bate com o nome de um objeto; colunas: ${Object.keys(linhas[0]).join(', ')}`);
+    for (const nome of Object.values(campos)) if (!porNome(nome)) throw new Error(`mala_direta: objeto "${nome}" não existe`);
+    const saida = a.saida || await api.vk_dialogo('salvar', ['PDF (*.pdf)'], (VK.doc.nome || 'mala direta') + '.pdf');
+    if (!saida) return { cancelado: true };
+    const original = vkClone(VK.doc), sel = VK.sel, paginas = [];
+    try {
+        for (let i = 0; i < linhas.length; i++) {
+            VK.doc = vkClone(original);
+            for (const [col, nome] of Object.entries(campos)) {
+                const v = String(linhas[i][col] ?? ''), o = porNome(nome).o;
+                if (o.tipo === 'texto') { const r = vkTxRaiz(o); vkTxRemap(r, String(r.conteudo), v); }
+                else if (o.tipo === 'imagem' && v) { const inf = await api.vk_imagem_info(v); if (inf && inf.success) { const iid = vkId('i'); VK.doc.imagens[iid] = { arquivo: inf.arquivo, w: inf.w, h: inf.h, modo: inf.modo, url: inf.url, nome: inf.nome, alfa: inf.alfa };
+                    const s = vkEsc(o.m) * (VK.doc.imagens[o.img] ? VK.doc.imagens[o.img].w / inf.w : 1); o.m = [s, 0, 0, s, o.m[4], o.m[5]]; o.img = iid; } }
+                else if (o.tipo === 'grupo' && /^qr/i.test(o.nome || '') && v) {
+                    const b = vkBox(o), l = vkListaDe(o.id); l.splice(l.indexOf(o), 1);
+                    const r = await VK_CMDS.qrcode.fn({ un: 'pt', conteudo: v, x: b[0], y: b[1], tamanho: b[2] - b[0], nome: o.nome }); vkObj(r.id).id = o.id;
+                }
+            }
+            const tmp = saida.replace(/\.pdf$/i, '') + `__${String(i + 1).padStart(4, '0')}.pdf`;
+            const r = await VK_CMDS.exportar_pdf.fn({ caminho: tmp, padrao: a.padrao || 'x4', forcar: true, ...(a.sangria != null ? { sangria: a.sangria } : {}), ...(a.marcas != null ? { marcas: a.marcas } : {}) });
+            if (!r || r.cancelado) throw new Error('exportação da página ' + (i + 1) + ' falhou');
+            paginas.push(tmp);
+        }
+    } finally { VK.doc = original; VK.sel = sel; vkMudou(); }
+    const j = await api.vk_juntar_pdfs(paginas, saida, a.padrao || 'x4');
+    return { arquivo: j.path, paginas: j.paginas, verificado: !!(j.verificacao && (j.verificacao.ok ?? !j.verificacao.problemas?.length)), problemas: (j.verificacao && j.verificacao.problemas) || [] };
+});

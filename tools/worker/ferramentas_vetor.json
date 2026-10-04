@@ -924,5 +924,33 @@
 ]
 }
 }
+},
+{
+"type": "function",
+"function": {
+"name": "mala_direta",
+"description": "Mala direta: uma página por linha do CSV, trocando os objetos cujo NOME é igual à coluna (texto troca o conteúdo; grupo QR refaz o QR). Gera um PDF só.",
+"parameters": {
+"type": "object",
+"properties": {
+"csv": {
+"type": "string",
+"description": "caminho do .csv"
+},
+"saida": {
+"type": "string",
+"description": "caminho do PDF final"
+},
+"campos": {
+"type": "object",
+"description": "opcional: {coluna: nome do objeto} quando os nomes forem diferentes"
+}
+},
+"required": [
+"csv",
+"saida"
+]
+}
+}
 }
 ]

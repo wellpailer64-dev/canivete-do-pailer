@@ -433,11 +433,12 @@ function vkDsPainelEventos(el) {
         encadear(pts, r.ini, r.segs);
         return novo(a, [{ fechado: false, pts }], cor(a, 'preench', null), cor(a, 'traco', VK.traco ? vkClone(VK.traco) : { k: 'cmyk', v: [0, 0, 0, 100] }));
     });
-    // qrcode: conteudo, x, y, tamanho (mm, lado), cor, correcao L|M|Q|H, fundo (cor da margem branca, ou nenhum), margem (módulos)
+    // qrcode: conteudo, x, y, tamanho (mm, lado com a margem), cor, correcao L|M|Q|H, fundo (cor da margem branca, ou nenhum), margem (módulos, padrão 4)
     vkRegistrar('qrcode', 'QR code', async a => {
         const [X, Y, D] = conv(a), q = await vkApi().vk_qr(String(a.conteudo || ''), a.correcao || 'M');
         if (!q || !q.n) throw new Error('qrcode: não gerou (conteudo vazio?)');
-        const mg = a.margem ?? 0, lado = D(a.tamanho ?? 20), s = lado / (q.n + 2 * mg), x0 = X(a.x ?? 0) + mg * s, y0 = Y(a.y ?? 0) + mg * s, subs = [];
+        // margem (zona de silêncio) em módulos: a norma pede 4 — sem ela o celular não lê; com fundo 'nenhum' a margem fica vazia
+        const mg = a.margem ?? 4, lado = D(a.tamanho ?? 20), s = lado / (q.n + 2 * mg), x0 = X(a.x ?? 0) + mg * s, y0 = Y(a.y ?? 0) + mg * s, subs = [];
         const ret = (x, y, w, h) => ({ fechado: true, pts: [[x, y], [x + w, y], [x + w, y + h], [x, y + h]].map(([u, v]) => [u, v, u, v, u, v]) });
         q.linhas.forEach((l, i) => { let j = 0; while (j < q.n) { if (!l[j]) { j++; continue; } let k = j; while (k < q.n && l[k]) k++; subs.push(ret(x0 + j * s, y0 + i * s, (k - j) * s, s)); j = k; } });
         // os módulos encostados viram uma forma só (sem filete entre eles no RIP)

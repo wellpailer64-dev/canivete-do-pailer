@@ -1425,3 +1425,37 @@ def descartar_recuperacao(uid):
     if os.path.isfile(arq):
         os.remove(arq)
     return {"success": True}
+
+
+# ─────────────────────────── mala direta (variáveis) ───────────────────────────
+def ler_csv(caminho):
+    """CSV/TSV da planilha (Excel exporta com ; no Brasil) → {colunas, linhas: [{coluna: valor}]}"""
+    import csv
+    with open(caminho, encoding="utf-8-sig", newline="") as f:
+        amostra = f.read(4096); f.seek(0)
+        try:
+            dial = csv.Sniffer().sniff(amostra, delimiters=",;\t|")
+        except Exception:
+            dial = csv.excel
+        r = csv.DictReader(f, dialect=dial)
+        linhas = [{(k or "").strip(): (v or "").strip() for k, v in l.items() if k} for l in r]
+    return {"success": True, "colunas": [c.strip() for c in (r.fieldnames or [])], "linhas": linhas}
+
+
+def juntar_pdfs(lista, saida, padrao="x4"):
+    """PDFs de uma página (ou mais) → um PDF só, na ordem; o 1º dá o OutputIntent/metadados (PDF/X). Relê e confere."""
+    import pikepdf
+    from Functions import vetor_exportar
+    with pikepdf.open(lista[0]) as base:
+        for arq in lista[1:]:
+            with pikepdf.open(arq) as o:
+                base.pages.extend(o.pages)
+        base.save(saida)
+    try:
+        ver = vetor_exportar.verificar_pdf(saida, padrao)
+    except Exception as e:
+        ver = {"ok": False, "erro": str(e)}
+    for arq in lista:
+        try: os.remove(arq)
+        except OSError: pass
+    return {"success": True, "path": saida, "paginas": sum(1 for _ in pikepdf.open(saida).pages), "verificacao": ver}

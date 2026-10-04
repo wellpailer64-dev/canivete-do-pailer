@@ -3202,6 +3202,17 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.vetorizar(arquivo, cores, area_min, ignorar_fundo)
 
+    def vk_ler_csv(self, caminho):
+        from Functions import vetor_kanivete
+        try:
+            return vetor_kanivete.ler_csv(caminho)
+        except Exception as e:
+            return {"success": False, "error": f"não leu o CSV: {e}"}
+
+    def vk_juntar_pdfs(self, lista, saida, padrao="x4"):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.juntar_pdfs(lista, saida, padrao)
+
     def vk_registrar_fontes(self, lista):
         from Functions import vetor_kanivete
         return vetor_kanivete.registrar_fontes(lista)
