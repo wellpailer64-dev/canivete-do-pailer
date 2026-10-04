@@ -148,3 +148,19 @@ Modelo de estudo: `D:\kanivete_biblioteca\modelos\carrossel-valer-corrida`. O qu
 - Confira a proporção largura/altura das letras na referência para escolher a fonte (Passion One 400, não Archivo).
 - Instalar fonte: se o GitHub der limite, `Functions/fontes.py` cai na API de CSS do Google Fonts (TTF por peso).
 - Pendente: `<g transform>` dentro de `<svg>` parece não ser aplicado pela cena (manchas não se moveram) — investigar.
+
+## Flyer "Prime Fest" (2026-10-03) — primeiro com o Worker: ~30 mil tokens do Claude
+Modelo de estudo: `D:\kanivete_biblioteca\modelos\flyer-prime-fest`; peça em `D:\kanivete_testes\flyer_prime`.
+- Divisão: Claude = medir a referência (≈400×500 → 1080×1350, ×2,7), HTML da cena, prompts e escolha das sementes;
+  Worker (Qwen3 8B) = finalização por contrato (degradê do título, sombras dos adesivos, acabamento, exportar):
+  1 contrato, 7 operações, 0 erros, 28 s.
+- Imagens: folhas de contato em segundo plano (`--gerar ... --inteiro`) enquanto escreve o HTML; no HTML use os
+  MESMOS prompt, `data-proporcao`, `data-lado` e `data-inteiro` da folha, senão é outra imagem (cache por tudo isso).
+  Fundo (muro grafitado) e papel rasgado também gerados (`data-recortar="nao"` no fundo).
+- Puxar o fundo para uma cor: div com degradê radial em `mix-blend-mode: multiply` por cima do fundo gerado.
+- Título com contorno grosso (`-webkit-text-stroke`) + `text-shadow` duro (deslocamento sem desfoque) = cara de
+  letreiro; degradê de cor fica para o Worker (`degrade`, efeito Sobreposição de degradê).
+- Armadilhas: o Qwen3 do Worker ocupa a placa e o FLUX não gera (o runner agora descarrega o Ollama); camada de texto
+  com efeito pode ficar "mexida" para a cena — use `--refazer` ao mudar o tamanho do título.
+- Contra a referência: estrutura igual; faltou a energia do original (rabiscos pretos sobre o painel, adesivos maiores,
+  grading mais laranja) — próximo passo seria um 2º contrato de ajustes.

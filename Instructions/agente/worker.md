@@ -20,12 +20,12 @@ py -3.13 tools/worker/worker.py contrato.json          # app em --agente=9333; O
 - `goal` em português direto, citando as camadas pelo nome (o Worker vê a lista; nome repetido vira rótulo único:
   `s1-arraste [grupo]`, `s1-arraste [texto]`, `#2`...). Sem decisão criativa: valores claros ("5% maior", "um pouco
   mais quente" ele já interpreta bem).
-- **Escreva uma condição para CADA parte do pedido** — é o que impede "FEITO" falso. Condições: `visivel:N`,
+- **Escreva uma condição para CADA parte do pedido** — é o que impede "FEITO" falso. Condições: `efeito:N=tipo` (ex. `efeito:titulo=degSob`, `efeito:bola=sombra`), `acabamento`, `visivel:N`,
   `oculta:N`, `texto:N=valor`, `cor:N=#hex`, `tamanho:N=px`, `opacidade:N=n`, `exportado`, `no_editor`.
 - Exportar e levar para o editor são **agendados**: rodam uma vez, no fim, depois de conferir o resto.
 
 ## Como ele trabalha (tools/worker/)
-- `ferramentas.json` (19): listar_camadas, info_camada, mover/posicionar/escalar/girar_camada, opacidade,
+- `ferramentas.json` (20, com `degrade` e `titulo_gasto` com cor): listar_camadas, info_camada, mover/posicionar/escalar/girar_camada, opacidade,
   modo_mesclagem, visibilidade, alterar_texto, estilo_texto, cor_objeto (objeto inteligente), sombra_projetada
   (leve/media/forte), titulo_gasto, acabamento (SOMA ao acabamento atual; zeros ignorados), alinhar, exportar,
   levar_para_editor, gerar_imagem (ainda sem executor).
@@ -39,5 +39,6 @@ py -3.13 tools/worker/worker.py contrato.json          # app em --agente=9333; O
 ## Primeiros jobs (2026-10-03, carrossel Valer)
 - VALER_AJUSTES_01: 6 operações, 0 erros, 24 s (esconder, trocar texto, sombra, escala, acabamento, exportar).
 - VALER_AJUSTES_02: grupo × texto confundidos → erro que ensina + 1 cobrança → corrigiu sozinho; 33 s.
+- PRIME_FEST_FINAL (flyer): degradê no grupo do título, sombra em 4 adesivos, acabamento, exportar — 7 operações, 0 erros, 28 s.
 Custo do lado do Claude: escrever o contrato (~250 tokens) + ler a linha de volta (~80).
 Próximo: mais ferramentas (texto novo, cena, gerar, receitas), ferramentas do editor de vídeo, medir jobs maiores.
