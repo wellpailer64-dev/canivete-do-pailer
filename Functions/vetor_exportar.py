@@ -34,7 +34,9 @@ class _Escritor:
         self.perfil = op.get("perfil") or doc.get("perfil") or "FOGRA39"
         self.spots_processo = bool(op.get("spotsParaProcesso"))
         self.avisos = set()
-        self.res = {"ExtGState": {}, "ColorSpace": {}, "Shading": {}, "XObject": {}}
+        self.res = {"ExtGState": {}, "ColorSpace": {}, "Shading": {}, "XObject": {}, "Pattern": {}}
+        self.D = [1, 0, 0, 1, 0, 0]   # documento → página (definida a cada página)
+        self._pad_cache, self._pads_pend = {}, []
         self.cache_rgb = {}
         self._img_cache = {}
 
@@ -62,11 +64,18 @@ class _Escritor:
         if c["k"] == "spot": t = c.get("tint", 100) / 100; return [x * t for x in c["v"]]
         if c["k"] == "reg": return [100, 100, 100, 100]
         if c["k"] == "grad": return self.cmyk_de(c["paradas"][0]["cor"])
+        if c["k"] == "pad":   # padrão: a cor do 1º objeto da peça (efeitos e conversões)
+            P = (self.doc.get("padroes") or {}).get(c.get("id")) or {}
+            o = next((x for x in P.get("itens", []) if x.get("preench") or (x.get("traco") or {}).get("cor")), None)
+            return self.cmyk_de(o.get("preench") or o["traco"]["cor"]) if o else [0, 0, 0, 50]
         return [0, 0, 0, 100]
 
     def cor_op(self, c, traco=False):
         """→ string de operadores que define a cor (preenchimento ou traço)."""
         if c is None: return ""
+        if c["k"] == "pad":
+            nome = self._padrao(c)
+            return f"/Pattern {'CS' if traco else 'cs'} /{nome} {'SCN' if traco else 'scn'}" if nome else "0 0 0 0.5 " + ("K" if traco else "k")
         if c["k"] == "grad": c = c["paradas"][0]["cor"]; self.avisos.add("traço com degradê saiu na cor da 1ª parada")
         if c["k"] == "rgb" and not self.impressao:
             return " ".join(_f(x / 255) for x in c["v"]) + (" RG" if traco else " rg")
@@ -78,6 +87,23 @@ class _Escritor:
         if self.impressao or c["k"] != "rgb":
             return " ".join(_f(max(0, min(100, x)) / 100) for x in v) + (" K" if traco else " k")
         return ""
+
+    def _padrao(self, c):
+        """Amostra de padrão → tiling pattern colorido (PaintType 1) com a peça em vetor; Matrix = peça → documento → página."""
+        import pikepdf
+        P = (self.doc.get("padroes") or {}).get(c.get("id"))
+        if not P: return None
+        s = (c.get("esc") or 100) / 100; r = math.radians(c.get("ang") or 0)
+        T = [math.cos(r) * s, math.sin(r) * s, -math.sin(r) * s, math.cos(r) * s, c.get("dx") or 0, c.get("dy") or 0]
+        chave = (c["id"], tuple(round(x, 4) for x in T), tuple(round(x, 4) for x in self.D))
+        if chave not in self._pad_cache:
+            ops = []
+            for o in P.get("itens", []): ops += self.objeto(o)
+            st = self.pdf.make_stream("\n".join(x for x in ops if x).encode("latin-1"), Type=pikepdf.Name.Pattern, PatternType=1, PaintType=1, TilingType=1,
+                                      BBox=[0, 0, P["w"], P["h"]], XStep=P["w"], YStep=P["h"], Matrix=mmul(T, self.D))
+            nome = f"P{len(self.res['Pattern']) + 1}"
+            self.res["Pattern"][nome] = st; self._pads_pend.append(st); self._pad_cache[chave] = nome
+        return self._pad_cache[chave]
 
     def _gs(self, **kw):
         import pikepdf
@@ -433,6 +459,7 @@ def exportar_pdf(doc, caminho, op=None):
     for ab in abs_:
         PW, PH = ab["w"] + 2 * m, ab["h"] + 2 * m
         D = [1, 0, 0, -1, m - ab["x"], PH - m + ab["y"]]
+        W.D = D
         corpo = ["q", " ".join(_f(x) for x in D) + " cm"]
         x0, y0, x1, y1 = ab["x"] - b, ab["y"] - b, ab["x"] + ab["w"] + b, ab["y"] + ab["h"] + b
         for cam in doc.get("camadas", []):
@@ -449,6 +476,8 @@ def exportar_pdf(doc, caminho, op=None):
         res = pikepdf.Dictionary()
         for k, v in W.res.items():
             if v: res["/" + k] = pikepdf.Dictionary({"/" + n: x for n, x in v.items()})
+        for st in W._pads_pend: st.Resources = res   # a peça do padrão usa os mesmos recursos (cores especiais, transparência)
+        W._pads_pend = []
         pg = pikepdf.Dictionary(Type=pikepdf.Name.Page, MediaBox=[0, 0, PW, PH], CropBox=[0, 0, PW, PH],
                                 TrimBox=[m, m, m + ab["w"], m + ab["h"]],
                                 BleedBox=[max(0, m - b), max(0, m - b), min(PW, m + ab["w"] + b), min(PH, m + ab["h"] + b)],

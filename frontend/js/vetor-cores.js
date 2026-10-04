@@ -73,7 +73,7 @@ async function vkCoresJanela(ancora) {
 // Visita TODA cor de um objeto (preench, traço, paradas de degradê, trechos de texto, Aparência, efeitos, grupos):
 // fn(cor) → nova cor (ou undefined = mantém)
 function vkCadaCor(o, fn) {
-    const troca = c => { if (!c) return c; if (c.k === 'grad') { c.paradas.forEach(p => { const n = troca(p.cor); if (n !== undefined) p.cor = n; }); return undefined; } return fn(c); };
+    const troca = c => { if (!c || c.k === 'pad') return undefined; if (c.k === 'grad') { c.paradas.forEach(p => { const n = troca(p.cor); if (n !== undefined) p.cor = n; }); return undefined; } return fn(c); };
     const em = (obj, k) => { const n = troca(obj[k]); if (n !== undefined) obj[k] = n; };
     if (o.itens) o.itens.forEach(f => vkCadaCor(f, fn));
     if (o.preench) em(o, 'preench');

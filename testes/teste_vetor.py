@@ -362,8 +362,17 @@ with sync_playwright() as p:
     r = C("recolorir", {"tudo": True, "trocas": [{"de": "C100 M0 Y0 K0", "para": "spot:TESTE 286 C:94,78,0,0"}]})
     k_ = pg.evaluate("([a, t, b]) => [vkObj(a).preench.k, vkObj(t).trechos[0].preench.k, vkObj(b).preench.paradas[0].cor.k]", [a1["id"], t1["id"], a2["id"]])
     ok(r["trocadas"] == 3 and k_ == ["spot", "spot", "spot"], f"recolorir troca no preenchimento, no trecho do texto e na parada do degradê ({r}, {k_})")
+    pc1 = C("elipse", {"x": 70, "y": 40, "larg": 4, "preench": "C100 M0 Y0 K0", "traco": "nenhum"})
+    pc2 = C("estrela", {"cx": 80, "cy": 48, "raio": 2.5, "pontas": 5, "preench": "spot:PANTONE 1505 C:0,56,90,0", "traco": "nenhum"})
+    r = C("criar_padrao", {"ids": [pc1["id"], pc2["id"]], "nome": "Bolinhas", "espaco": 2, "apagar_originais": True})
+    pq = C("retangulo", {"x": 60, "y": 30, "larg": 30, "alt": 20, "traco": "nenhum"})
+    C("padrao", {"ids": [pq["id"]], "nome": "Bolinhas", "escala": 70, "angulo": 20})
+    ok(r["objetos"] == 2 and pg.evaluate("id => vkObj(id).preench.k", pq["id"]) == "pad", f"criar padrão e aplicar com escala/ângulo ({r})")
     out = os.path.join(SAI, "formas_x4.pdf")
     r = pg.evaluate("([c]) => VKN.exportarPdf(c, {padrao: 'x4'})", [out])
+    import pikepdf
+    with pikepdf.open(out) as pdf_: tem_pad = any("/Pattern" in pp_.Resources for pp_ in pdf_.pages)
+    ok(tem_pad and "PANTONE 1505 C" in r["info"]["spots"], f"padrão sai como tiling pattern vetorial, com a cor especial da peça ({r['info']['spots']})")
     ok(r["verificado"] and "TESTE 286 C" in r["info"]["spots"], f"PDF/X-4 com setor, QR, ícone e cor do livro como especial ({r['problemas']}, {r['info']['spots']})")
 
     print("separações e sobreimpressão")
