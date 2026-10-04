@@ -160,6 +160,17 @@ with sync_playwright() as p:
     b1, b2, b3 = cx(a1["id"]), cx(a2["id"]), cx(a3["id"])
     ok(abs(b2["x"] - (b1["x"] + b1["larg"] + 5)) < 0.01 and abs(b3["x"] - (b2["x"] + b2["larg"] + 5)) < 0.01 and abs(b1["x"] - 15) < 0.01, f"distribuir espaçamento 5 mm a partir do chave ({b1['x']}, {b2['x']}, {b3['x']})")
 
+    print("réguas, guias e grade")
+    g = C("guia", {"eixo": "x", "pos": 50})
+    C("guia", {"eixo": "y", "pos": 30})
+    ok(pg.evaluate("VK.doc.guias.length") == 2 and abs(pg.evaluate("vkMM(VK.doc.guias[0].pos - VK.doc.pranchetas.find(p => p.id === VK.ativa).x)") - 50) < 0.01, "guias criadas em mm da prancheta")
+    alvo_enc = pg.evaluate("() => { const o = vkTodos()[0].o, b = vkBox(o); const w = b[2] - b[0]; const r = vkEncaixe([VK.doc.guias[0].pos + 1, b[1], VK.doc.guias[0].pos + 1 + w, b[3]], new Set([o.id])); return r[0]; }")
+    ok(abs(alvo_enc + 1) < 0.01, f"encaixa na guia ({alvo_enc})")
+    r = C("exibir", {"grade": True, "encaixar_grade": True, "passo_grade": 10, "sub_grade": 2})
+    ok(r["ativo"] and r["encaixar"], "grade ligada com encaixe")
+    C("guia", {"acao": "limpar"}); C("exibir", {"grade": False, "encaixar_grade": False})
+    ok(pg.evaluate("VK.doc.guias.length") == 0, "limpar guias")
+
     print("separações e sobreimpressão")
     C("novo", {"nome": "Sep teste", "larg": 100, "alt": 60, "sangria": 3})
     C("retangulo", {"x": 0, "y": 0, "larg": 100, "alt": 60, "preench": "C0 M0 Y100 K0", "traco": "nenhum", "nome": "fundo"})

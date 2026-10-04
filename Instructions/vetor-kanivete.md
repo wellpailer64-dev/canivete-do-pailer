@@ -24,6 +24,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 | Deslocar caminho, Contornar traço | faca de adesivo, fio em volta do texto, traço → forma | skia-python (Stroker + PathOps): `deslocar` (+ fora atrás, − dentro na frente; cantos miter/round/bevel), `contornar_traco` (com preenchimento vira grupo [preench, traço]; tracejado e pontas entram) |
 | Texto de ponto / de área, criar contornos | tipografia | HarfBuzz + fontTools: a tela desenha as MESMAS curvas que vão para o PDF |
 | Alinhar/distribuir, guias inteligentes | precisão | caixa pelos extremos reais da cúbica (não pelas alças); encaixe magenta |
+| Réguas (Ctrl+R), guias arrastáveis (Ctrl+; mostrar, Alt+Ctrl+; travar), grade (Ctrl+'; Shift+Ctrl+' encaixar) | diagramação | `vetor-reguas.js`: réguas em mm com origem na prancheta ativa; arrastar da régua cria guia, soltar na régua apaga; `guia` (eixo x/y, pos mm; acao mover/apagar/limpar), `exibir` (reguas, guias, travar_guias, grade, encaixar_grade, passo_grade, sub_grade); guias e grade entram no encaixe |
 | Colocar imagem (link), resolução efetiva | fotos no layout | `imagem` com `m`; ppi efetivo no painel e no fechamento |
 | Sobreimpressão, separações, perfil de cor (CMYK + ICC) | **impressão profissional** | sobreimprimir por objeto (OP/op/OPM 1); prova de cor pelo perfil de saída (FOGRA39…) na tela |
 | Salvar como PDF/X-1a / PDF/X-4, marcas e sangria, Empacotar | **fechamento de arquivo** | Exportar › PDF para gráfica (abaixo) + aba Fechamento; Arquivo › Empacotar = `pasta/<nome>/` com .aknv, PDF X-4, Links/, Fontes/, Relatório.txt |
@@ -31,7 +32,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 
 `.aknv` abre no KANIVETE por duplo clique (associação HKCU em Functions/projeto.py; roteado em `abrirProjetoExterno`).
 
-Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): réguas e guias arrastáveis, grade; texto (caixa encadeada, texto em caminho,
+Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): texto (caixa encadeada, texto em caminho,
 estilos de parágrafo/caractere, glifos; o texto importado vem linha a linha); Aparência (vários preenchimentos/traços) e
 efeitos vivos (sombra, desfoque, cantos arredondados); lápis/pincel/borracha, setas e perfil de largura no traço;
 ferramenta de degradê na arte, malha, mesclagem (Blend); símbolos, padrões, recolorir arte, livros Pantone; Image Trace,

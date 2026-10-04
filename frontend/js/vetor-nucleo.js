@@ -335,6 +335,7 @@ function vkDesenharAgora() {
     for (const a of VK.doc.pranchetas) {
         ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 8 * dpr; ctx.fillStyle = '#fff'; ctx.fillRect(a.x, a.y, a.w, a.h); ctx.restore();
     }
+    if (typeof vkGradeDesenhar === 'function') vkGradeDesenhar(ctx);
     if (typeof vkSepPronto === 'function' && vkSepPronto()) vkSepDesenhar(ctx);   // Visualização de separações / sobreimpressão
     else for (let i = 0; i < VK.doc.camadas.length; i++) {
         const c = VK.doc.camadas[i]; if (c.visivel === false) continue;
@@ -351,9 +352,10 @@ function vkDesenharAgora() {
     }
     // guias
     ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.strokeStyle = 'rgba(0,200,255,.8)'; ctx.lineWidth = 1;
-    for (const g of VK.doc.guias || []) { ctx.beginPath(); if (g.eixo === 'x') { const x = g.pos * v.z + v.x; ctx.moveTo(x, 0); ctx.lineTo(x, cv.height); } else { const y = g.pos * v.z + v.y; ctx.moveTo(0, y); ctx.lineTo(cv.width, y); } ctx.stroke(); }
+    if (!VK.guiasOcultas) for (const g of VK.doc.guias || []) { ctx.beginPath(); if (g.eixo === 'x') { const x = g.pos * v.z + v.x; ctx.moveTo(x, 0); ctx.lineTo(x, cv.height); } else { const y = g.pos * v.z + v.y; ctx.moveTo(0, y); ctx.lineTo(cv.width, y); } ctx.stroke(); }
     ctx.restore();
     if (typeof vkDesenharSobreposicao === 'function') { ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); vkDesenharSobreposicao(ctx); ctx.restore(); }
+    if (typeof vkReguasDesenhar === 'function') { ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); vkReguasDesenhar(ctx); ctx.restore(); }
 }
 const vkTela = (x, y) => [x * VK.vista.z + VK.vista.x, y * VK.vista.z + VK.vista.y];
 const vkDoc = (sx, sy) => [(sx - VK.vista.x) / VK.vista.z, (sy - VK.vista.y) / VK.vista.z];

@@ -102,6 +102,9 @@ const VK_MENUS = [
     ['Exibir', [['Ajustar prancheta', 'Ctrl+0', () => vkEnquadrar()], ['Ajustar tudo', 'Alt+Ctrl+0', () => vkEnquadrar(vkBoxUniao(VK.doc.pranchetas.map(p => ({ tipo: 'caminho', subs: vkRetSubs(p.x, p.y, p.w, p.h) }))))],
         ['Tamanho real', 'Ctrl+1', () => vkZoom(1 / VK.vista.z * 96 / 72)], '-', ['Contornos (sem cor)', 'Ctrl+Y', () => { VK.contorno = !VK.contorno; vkMudou(); }],
         ['Mostrar sangria', '', () => { VK.mostrarSangria = !VK.mostrarSangria; vkMudou(); }], '-',
+        ['Réguas', 'Ctrl+R', () => vkCmdUi('exibir', { reguas: VK.reguas === false })], ['Guias', 'Ctrl+;', () => vkCmdUi('exibir', { guias: !!VK.guiasOcultas })],
+        ['Travar guias', 'Alt+Ctrl+;', () => vkCmdUi('exibir', { travar_guias: !VK.guiasTravadas })], ['Limpar guias', '', () => vkCmdUi('guia', { acao: 'limpar' })],
+        ['Grade', "Ctrl+'", () => vkCmdUi('exibir', { grade: !(VK.grade && VK.grade.ativo) })], ['Encaixar na grade', "Shift+Ctrl+'", () => vkCmdUi('exibir', { encaixar_grade: !(VK.grade && VK.grade.encaixar) })], '-',
         ['Prévia de sobreimpressão / separações', 'Alt+Shift+Ctrl+Y', () => { VK.aba = 'separacoes'; vkCmdUi('separacoes', { ativo: !(VK.sep && VK.sep.ativo) }); }]]],
 ];
 function vkMenus() {
