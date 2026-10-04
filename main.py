@@ -3206,6 +3206,13 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.contornar_traco(formas)
 
+    def vk_canais_imagem(self, path, mascara=None, cond="FOGRA39"):
+        from Functions import vetor_kanivete
+        try:
+            return vetor_kanivete.canais_imagem(path, mascara, cond)
+        except Exception as e:
+            return {"erro": str(e)}
+
     def vk_empacotar(self, doc, pasta, opcoes=None):
         from Functions import vetor_kanivete
         try:

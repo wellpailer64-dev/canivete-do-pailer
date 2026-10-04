@@ -335,7 +335,8 @@ function vkDesenharAgora() {
     for (const a of VK.doc.pranchetas) {
         ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 8 * dpr; ctx.fillStyle = '#fff'; ctx.fillRect(a.x, a.y, a.w, a.h); ctx.restore();
     }
-    for (let i = 0; i < VK.doc.camadas.length; i++) {
+    if (typeof vkSepPronto === 'function' && vkSepPronto()) vkSepDesenhar(ctx);   // Visualização de separações / sobreimpressão
+    else for (let i = 0; i < VK.doc.camadas.length; i++) {
         const c = VK.doc.camadas[i]; if (c.visivel === false) continue;
         for (const o of c.itens) vkDesenharObj(ctx, o, c);
     }
@@ -424,7 +425,7 @@ function vkHistorico(nome) {
 function vkDesfazer() { if (!VK.hist.length) return; const h = VK.hist.pop(); VK.futuro.push({ nome: h.nome, s: vkSnap() }); vkRestaurar(h.s); vkToast('Desfeito: ' + h.nome); }
 function vkRefazer() { if (!VK.futuro.length) return; const h = VK.futuro.pop(); VK.hist.push({ nome: h.nome, s: vkSnap() }); vkRestaurar(h.s); vkToast('Refeito: ' + h.nome); }
 function vkRestaurar(s) { const d = JSON.parse(s); VK.doc = d.doc; VK.sel = (d.sel || []).filter(id => vkObj(id)); VK.selPts = null; vkMudou(); }
-function vkMudou() { vkDesenhar(); vkUiAgendar(); VK.ouvintes.forEach(f => { try { f(); } catch (e) { /* ouvinte */ } }); }
+function vkMudou() { VK.versaoDoc = (VK.versaoDoc || 0) + 1; if (typeof vkSepInvalidar === 'function') vkSepInvalidar(); vkDesenhar(); vkUiAgendar(); VK.ouvintes.forEach(f => { try { f(); } catch (e) { /* ouvinte */ } }); }
 let vkUiTimer = 0;
 function vkUiAgendar() { if (!vkUiTimer) vkUiTimer = requestAnimationFrame(() => { vkUiTimer = 0; if (typeof vkUiAtualizar === 'function') vkUiAtualizar(); }); }
 function vkToast(t) { if (typeof vkAviso === 'function') vkAviso(t); else console.log('[Vetor]', t); }

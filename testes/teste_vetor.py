@@ -1,5 +1,5 @@
 """Teste do Vetor Kanivete pela API real (app em --agente=9333): monta um cartão de visita pelos comandos (window.VKN),
-Pathfinder, fechamento, PDF/X-4 e PDF/X-1a relidos e conferidos, PNG, salvar/reabrir .aknv, abrir PDF/SVG/PPTX e
+Pathfinder, deslocar/contornar traço, separações e sobreimpressão, fechamento, PDF/X-4 e PDF/X-1a relidos e conferidos, PNG, salvar/reabrir .aknv, abrir PDF/SVG/PPTX e
 desfazer. Sai com 1 se algo reprovar. Amostras em D:/kanivete_testes/vetor/amostras (geradas se faltarem).
 
     python testes/teste_vetor.py [--porta 9333] [--print saida.png]
@@ -104,6 +104,31 @@ with sync_playwright() as p:
     pg.evaluate("VKN.abrir(arguments[0])" if False else "c => VKN.abrir(c)", os.path.join(AM, "illustrator.svg"))
     r = C("converter_cmyk")
     ok(r["convertidas"] > 0 and pg.evaluate("VKN.fechamento({padrao:'x1a'}).erros.filter(e => e.cod === 'rgb').length") == 0, f"SVG RGB → CMYK ({r['convertidas']} cores)")
+
+    print("separações e sobreimpressão")
+    C("novo", {"nome": "Sep teste", "larg": 100, "alt": 60, "sangria": 3})
+    C("retangulo", {"x": 0, "y": 0, "larg": 100, "alt": 60, "preench": "C0 M0 Y100 K0", "traco": "nenhum", "nome": "fundo"})
+    C("retangulo", {"x": 5, "y": 5, "larg": 20, "alt": 20, "preench": "100K", "traco": "nenhum", "nome": "preto"})
+    C("retangulo", {"x": 30, "y": 5, "larg": 20, "alt": 20, "preench": "0K", "traco": "nenhum", "nome": "branco"})
+    C("elipse", {"x": 55, "y": 5, "larg": 20, "preench": "spot:PANTONE 286 C:100,75,0,0", "traco": "nenhum", "nome": "especial"})
+    C("retangulo", {"x": 80, "y": 5, "larg": 15, "alt": 20, "preench": "#ff0000", "traco": "nenhum", "nome": "rgb"})
+    T = lambda x, y: pg.evaluate("([x, y]) => VKN.cmd('tinta_em', {x, y})", [x, y])
+    ok(T(15, 15)["K"] == 100 and T(15, 15)["Y"] == 0, f"preto sem sobreimpressão vaza o amarelo ({T(15, 15)})")
+    C("alterar", {"nomes": ["preto", "branco"], "sobreimprimir": True})
+    ok(T(15, 15)["K"] == 100 and T(15, 15)["Y"] == 100, f"preto sobreimpresso fica sobre o amarelo ({T(15, 15)})")
+    ok(T(40, 15)["Y"] == 100, f"branco sobreimpresso some ({T(40, 15)})")
+    t = T(65, 15)
+    ok(t.get("PANTONE 286 C") == 100 and t["Y"] == 0, f"especial vaza o processo ({t})")
+    t = T(87, 15)
+    ok(t["M"] > 80 and t["Y"] > 80 and t["C"] < 10, f"RGB vira CMYK pelo perfil ({t})")
+    r = C("separacoes", {"ativo": True})
+    ok(r["ativo"] and len(r["tintas"]) == 5, f"prévia ligada com 4 + 1 especial ({[x['nome'] for x in r['tintas']]})")
+    pg.wait_for_timeout(400)
+    pg.locator("#vk").screenshot(path=os.path.join(SAI, "separacoes.png"))
+    seps = pg.evaluate("c => VKN.cmd('exportar_separacoes', {caminho: c, ppi: 72})", os.path.join(SAI, "sep.png"))["arquivos"]
+    ok(len(seps) == 4 and not any(x.endswith("_C.png") for x in seps) and all(os.path.isfile(x) for x in seps),
+       f"exportar separações: só as chapas com tinta ({[os.path.basename(x) for x in seps]})")
+    C("separacoes", {"ativo": False})
 
     pg.evaluate("c => VKN.abrir(c)", aknv)
     pg.wait_for_timeout(600)

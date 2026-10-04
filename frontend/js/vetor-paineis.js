@@ -55,7 +55,7 @@ function vkMontar() {
             <section class="ie-painel"><header class="ie-painel-cab">Propriedades</header><div class="ie-painel-corpo vk-props" id="vk-props"></div></section>
             <section class="ie-painel vk-p-abas">
                 <header class="ie-painel-cab vk-abas" id="vk-abas">
-                    <button data-a="camadas" class="on">Camadas</button><button data-a="pranchetas">Pranchetas</button><button data-a="amostras">Amostras</button><button data-a="fechamento">Fechamento</button>
+                    <button data-a="camadas" class="on">Camadas</button><button data-a="pranchetas">Pranchetas</button><button data-a="amostras">Amostras</button><button data-a="separacoes">Separações</button><button data-a="fechamento">Fechamento</button>
                 </header>
                 <div class="ie-painel-corpo vk-aba" id="vk-aba"></div>
             </section>
@@ -96,7 +96,8 @@ const VK_MENUS = [
     ['Texto', [['Criar contornos', 'Shift+Ctrl+O', () => vkCmdUi('contornos', {})], ['Textos pretos em 100K', '', () => vkCmdUi('preto_texto', {})]]],
     ['Exibir', [['Ajustar prancheta', 'Ctrl+0', () => vkEnquadrar()], ['Ajustar tudo', 'Alt+Ctrl+0', () => vkEnquadrar(vkBoxUniao(VK.doc.pranchetas.map(p => ({ tipo: 'caminho', subs: vkRetSubs(p.x, p.y, p.w, p.h) }))))],
         ['Tamanho real', 'Ctrl+1', () => vkZoom(1 / VK.vista.z * 96 / 72)], '-', ['Contornos (sem cor)', 'Ctrl+Y', () => { VK.contorno = !VK.contorno; vkMudou(); }],
-        ['Mostrar sangria', '', () => { VK.mostrarSangria = !VK.mostrarSangria; vkMudou(); }]]],
+        ['Mostrar sangria', '', () => { VK.mostrarSangria = !VK.mostrarSangria; vkMudou(); }], '-',
+        ['Prévia de sobreimpressão / separações', 'Alt+Shift+Ctrl+Y', () => { VK.aba = 'separacoes'; vkCmdUi('separacoes', { ativo: !(VK.sep && VK.sep.ativo) }); }]]],
 ];
 function vkMenus() {
     const nav = vkEl('vk-mbar'), pop = vkEl('vk-pop');
@@ -127,7 +128,7 @@ function vkUiAtualizar() {
     vkEl('vk-top-info').textContent = `${d.nome}${VK.sujo ? ' •' : ''} — ${d.modoCor.toUpperCase()} · ${d.perfil} · sangria ${vkR(vkMM(d.sangria), 1)} mm`;
     vkEl('vk-status-info').textContent = `${Math.round(VK.vista.z * 72 / 96 * 100)}%  ·  ${VK.sel.length ? VK.sel.length + ' selecionado(s)' : ''}${VK.contorno ? '  ·  CONTORNOS' : ''}`;
     vkProps();
-    ({ camadas: vkAbaCamadas, pranchetas: vkAbaPranchetas, amostras: vkAbaAmostras, fechamento: vkAbaFechamento })[VK.aba || 'camadas']();
+    ({ camadas: vkAbaCamadas, pranchetas: vkAbaPranchetas, amostras: vkAbaAmostras, separacoes: vkAbaSeparacoes, fechamento: vkAbaFechamento })[VK.aba || 'camadas']();
 }
 function vkCorSw(c, extra = '') {
     const bg = !c ? 'linear-gradient(to top right, transparent 46%, #e33 47% 53%, transparent 54%), #fff'
@@ -378,6 +379,26 @@ function vkAbaFechamento() {
         const v = e.target.dataset.ver, fx = e.target.dataset.fix;
         if (v) { const it = [...f.erros, ...f.avisos].find(x => x.cod === v); VK.sel = [...new Set(it.ids.map(id => (vkTopo(id) || {}).id).filter(Boolean))]; vkMudou(); const b = vkBoxUniao(vkSelObjs()); if (b) vkEnquadrar([b[0] - 20, b[1] - 20, b[2] + 20, b[3] + 20]); }
         if (fx) vkCmdUi(fx, {});
+    };
+}
+function vkAbaSeparacoes() {
+    const el = vkEl('vk-aba'), S = vkSepEstado(), ts = vkTintas();
+    el.innerHTML = `<label class="vk-chk"><input type="checkbox" id="vk-sep-on" ${S.ativo ? 'checked' : ''}> Prévia de sobreimpressão (como vai imprimir)</label>
+        <div class="vk-sep-lista">${ts.map(t => `<div class="vk-sep-t ${S.ocultas.has(t.nome) ? 'off' : ''}" data-t="${vkEsc_(t.nome)}">
+            <button class="vk-olho" title="mostrar/ocultar chapa">${S.ocultas.has(t.nome) ? '○' : '●'}</button>
+            <span class="vk-sw" style="background:${vkCmykCss(t.cmyk)}"></span><span>${t.proc ? { C: 'Ciano', M: 'Magenta', Y: 'Amarelo', K: 'Preto' }[t.nome] : vkEsc_(t.nome)}</span></div>`).join('')}</div>
+        <div class="vk-nota">${S.ativo ? 'Passe o mouse na arte: a barra de baixo mostra a % de cada tinta e o total.' : 'Ligue para ver as chapas: branco em sobreimpressão some, preto sobreimpresso fica por cima do fundo.'}
+        Clique numa tinta com Alt para ver só ela.</div>
+        <div class="vk-acoes"><button class="ie-btn" id="vk-sep-exp">Exportar separações (PNG)…</button></div>`;
+    el.onchange = e => { if (e.target.id === 'vk-sep-on') vkCmdUi('separacoes', { ativo: e.target.checked }); };
+    el.onclick = e => {
+        if (e.target.id === 'vk-sep-exp') return vkCmdUi('exportar_separacoes', { ppi: 300 });
+        const t = e.target.closest('[data-t]'); if (!t) return;
+        const n = t.dataset.t;
+        if (e.altKey) S.ocultas = new Set(ts.map(x => x.nome).filter(x => x !== n));
+        else if (S.ocultas.has(n)) S.ocultas.delete(n); else S.ocultas.add(n);
+        if (!S.ativo) { vkCmdUi('separacoes', { ativo: true }); return; }
+        vkSepRecolorir(); vkUiAgendar();
     };
 }
 function vkPainelFechamento() { if (!VK.doc) return; VK.aba = 'fechamento'; vkUiAgendar(); }

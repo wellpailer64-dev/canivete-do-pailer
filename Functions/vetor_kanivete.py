@@ -517,6 +517,40 @@ def _registrar_previa(arq, mascara=None):
     return media_server.register(dest)
 
 
+def canais_imagem(arq, mascara=None, cond="FOGRA39"):
+    """Chapas de uma imagem para a Visualização de separações: {C, M, Y, K, vazio} → URL de PNG LA (branco = sem tinta,
+    preto = 100%; alfa = transparência). RGB vai para CMYK pelo perfil (como na exportação); cinza vai só no K.
+    'vazio' = silhueta branca (a imagem vaza as cores especiais)."""
+    from PIL import Image, ImageCms, ImageOps
+    from Functions import media_server
+    os.makedirs(os.path.join(PASTA_TMP, "chapas"), exist_ok=True)
+    base = os.path.join(PASTA_TMP, "chapas", hashlib.md5(f"{os.path.abspath(arq)}|{mascara}|{cond}|{os.path.getmtime(arq)}".encode()).hexdigest()[:16])
+    nomes = ["C", "M", "Y", "K", "vazio"]
+    if not all(os.path.isfile(f"{base}_{n}.png") for n in nomes):
+        im = Image.open(arq); im.load()
+        alfa = None
+        if mascara and os.path.isfile(mascara):
+            alfa = Image.open(mascara).convert("L")
+        elif im.mode in ("RGBA", "LA", "PA") or (im.mode == "P" and "transparency" in im.info):
+            im = im.convert("RGBA"); alfa = im.getchannel("A")
+        if alfa is not None and alfa.size != im.size:
+            alfa = alfa.resize(im.size)
+        if im.mode in ("L", "LA", "1", "I", "I;16"):
+            g = im.convert("L"); branco = Image.new("L", im.size, 255)
+            canais = {"C": branco, "M": branco, "Y": branco, "K": g}
+        else:
+            if im.mode != "CMYK":
+                im = im.convert("RGB"); t = _transf(cond, False)
+                im = ImageCms.applyTransform(im, t) if t else im.convert("CMYK")
+            canais = {n: ImageOps.invert(c) for n, c in zip("CMYK", im.split())}
+        canais["vazio"] = Image.new("L", im.size, 255)
+        if alfa is None:
+            alfa = Image.new("L", im.size, 255)
+        for n, c in canais.items():
+            Image.merge("LA", (c, alfa)).save(f"{base}_{n}.png", compress_level=1)
+    return {n: media_server.register(f"{base}_{n}.png") for n in nomes}
+
+
 def imagem_info(arq):
     """Imagem colocada: {arquivo, w, h, modo, ppi, url}."""
     from PIL import Image

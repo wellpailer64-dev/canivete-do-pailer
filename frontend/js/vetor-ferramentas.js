@@ -146,7 +146,7 @@ function vkEventos() {
         const [sx, sy] = pos(e), [x, y] = vkDoc(sx, sy);
         VK.mouse = [x, y];
         if (VK.ferr === 'caneta' && VK.caneta) vkDesenhar();
-        if (!VKA) { vkStatus(x, y); return; }
+        if (!VKA) { vkStatus(x, y); if (VK.sep && VK.sep.ativo) vkSepStatus(x, y); return; }
         VKA.mx = x; VKA.my = y; VKA.msx = sx; VKA.msy = sy; VKA.shift = e.shiftKey; VKA.alt = e.altKey; VKA.moveu = VKA.moveu || Math.hypot(sx - VKA.sx, sy - VKA.sy) > 3;
         if (VKA.f === 'mao') { VK.vista.x = VKA.vx + sx - VKA.sx; VK.vista.y = VKA.vy + sy - VKA.sy; vkDesenhar(); return; }
         if (!VKA.moveu) return;
@@ -415,7 +415,7 @@ function vkTeclas(e) {
     if (e.code === 'Space' && !C) { if (!VK.espaco) { VK.espaco = true; const cv = vkCanvas(); if (cv) cv.style.cursor = 'grab'; } e.preventDefault(); return; }
     if (C) {
         if (k === 'z' && !S) return faz(vkDesfazer);
-        if ((k === 'z' && S) || k === 'y') return faz(vkRefazer);
+        if (k === 'z' && S) return faz(vkRefazer);   // Ctrl+Y é Contornos (como no Illustrator)
         if (k === 'n') return faz(() => vkNovoDialogo && vkNovoDialogo());
         if (k === 'o' && !S) return faz(() => vkCmdUi('abrir', {}));
         if (k === 's') return faz(() => vkCmdUi('salvar', S ? { como: true } : {}));
@@ -442,7 +442,8 @@ function vkTeclas(e) {
         if (k === '2') return faz(() => A ? vkCmdUi('alterar', { ids: vkTodos().filter(x => x.o.trava).map(x => x.o.id), trava: false }) : vkCmdUi('alterar', { trava: true }).then(() => { VK.sel = []; vkMudou(); }));
         if (k === '3') return faz(() => A ? vkCmdUi('alterar', { ids: vkTodos().filter(x => x.o.visivel === false).map(x => x.o.id), visivel: true }) : vkCmdUi('alterar', { visivel: false }).then(() => { VK.sel = []; vkMudou(); }));
         if (k === 'o' && S) return faz(() => vkCmdUi('contornos', {}));
-        if (k === 'y' || (k === 'y' && S)) return faz(() => { VK.contorno = !VK.contorno; vkDesenhar(); vkUiAgendar(); });
+        if (k === 'y' && A && S) return faz(() => { VK.aba = 'separacoes'; vkCmdUi('separacoes', { ativo: !(VK.sep && VK.sep.ativo) }); });
+        if (k === 'y') return faz(() => { VK.contorno = !VK.contorno; vkDesenhar(); vkUiAgendar(); });
         if (k === '0') return faz(() => vkEnquadrar(A ? vkBoxUniao(VK.doc.pranchetas.map(p => ({ tipo: 'caminho', subs: vkRetSubs(p.x, p.y, p.w, p.h) }))) : null));
         if (k === '1') return faz(() => { const cv = vkCanvas().getBoundingClientRect(); vkZoom(1 / VK.vista.z * (96 / 72), cv.width / 2, cv.height / 2); });
         if (k === '=' || k === '+') return faz(() => vkZoom(1.25));

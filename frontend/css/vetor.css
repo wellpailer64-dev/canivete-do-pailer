@@ -94,3 +94,10 @@
 .vk-aviso { background: rgba(20, 20, 20, .92); color: #eee; padding: 6px 12px; border-radius: 6px; font-size: 12px; box-shadow: var(--shadow-pop); max-width: 520px; }
 .vk-aviso-ag { background: rgba(110, 60, 200, .92); }
 .vk-dlg { width: 470px; }
+
+/* Visualização de separações */
+.vk-sep-lista { display: flex; flex-direction: column; gap: 2px; margin: 6px 0; }
+.vk-sep-t { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 4px; cursor: pointer; color: var(--text-1); }
+.vk-sep-t:hover { background: rgba(255, 255, 255, .05); }
+.vk-sep-t.off { opacity: .45; }
+.vk-olho { background: none; border: 0; color: var(--text-2); cursor: pointer; width: 16px; padding: 0; }
