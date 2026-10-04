@@ -184,3 +184,18 @@ Peça: `D:\kanivete_testes\carrossel_vereador\` (carrossel.html, depois.js, cont
 - Papel de caderno: `repeating-linear-gradient` no div + textura de papel amassado gerada por cima em multiply ~30%.
 - Armadilha do FLUX: "apple emoji style" gera uma MAÇÃ; descreva só a mão ("only the hand and wrist, no face").
 - Worker fez o acabamento (tratar_foto, 2 luzes atrás, sombra no emoji, Camera Raw, exportar): 6 operações, 0 erros, 30 s.
+
+## Fluxo barato v2 (2026-10-04): o Junior olha e mede, o Claude decide
+1. `py -3.13 tools/medir_ref.py ref.png --slides N --formato retrato --html rascunho.html --textos-ia` → escala, paleta,
+   formas grandes (card, papel, painel) e blocos de texto já convertidos (posição, tamanho, entrelinha, cor aproximada;
+   textos transcritos pelo olho local). Ler o RESUMO impresso; olhar a referência uma vez só, pequena.
+2. Escrever o HTML a partir do rascunho, com o kit (`k-perfil`, `k-post`, `k-check2`, `k-papel`, `k-rodape`...).
+3. `knv.py peca.html ... --revisar` → regras dos feedbacks (corte seco em recorte, contraste WCAG atrás das letras,
+   sombra dura, rosto no avatar via OpenCV) sem olhar imagem. Corrigir pelo HTML ou deixar para o passo 4.
+4. Worker: `finalizar_peca {preset}` + exportar (um contrato de 2 linhas).
+5. Opcional: `py -3.13 tools/olho.py comparar --ref ref.png --peca peca.jpg --slides N` (Gemma 4 E4B local, ~4 s por
+   slide). É PISTA, não verdade: em referência pequena ele inventa (viu "joinha" onde não tinha). `olho.py ler` (transcrever)
+   e `olho.py revisar` são mais confiáveis.
+6. Prévia só no fim. Quando uma ferramenta do app não responder, rastrear os eventos antes de tentar de novo.
+Recarregar o app de teste sem reabrir: CDP `Network.setCacheDisabled` + `Page.reload {ignoreCache: true}` (o WebView2
+guarda os .js em cache; `page.reload()` simples pode manter a versão velha).

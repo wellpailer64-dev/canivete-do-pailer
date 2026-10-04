@@ -14,7 +14,8 @@ with sync_playwright() as p:
     b = p.chromium.connect_over_cdp("http://127.0.0.1:9333")
     pg = next(x for c in b.contexts for x in c.pages if "index.html" in x.url)
     if "--recarregar" in sys.argv:
-        pg.reload(); time.sleep(2)
+        cdp = pg.context.new_cdp_session(pg); cdp.send('Network.setCacheDisabled', {'cacheDisabled': True})   # o WebView2 guarda o JS em cache
+        cdp.send('Page.reload', {'ignoreCache': True}); time.sleep(3)
     erros = []
     pg.on("pageerror", lambda e: erros.append(str(e)))
     pg.wait_for_function("typeof KNV === 'object' && typeof ieCmd === 'function'", timeout=90000)

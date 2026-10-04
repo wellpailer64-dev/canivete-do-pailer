@@ -97,6 +97,8 @@
         },
         tratar_foto: a => KNV.receita.tratarFoto(precisa(a.camada).nome, { ambiente: a.ambiente || 'neutro' }),
         profundidade: a => KNV.receita.profundidade(precisa(a.camada).nome, a.raio ?? 6),
+        finalizar_peca: async a => { const r = await KNV.receita.finalizar({ preset: a.preset || 'social_limpo' }); window.KNVW._finalizada = true; return r; },
+        leitura: a => KNV.receita.leitura((a.camadas || []).map(n => precisa(n).nome)),
         sombra_projetada: async a => { const L = precisa(a.camada); await KNV.receita.sombra([L.nome], SOMBRA[a.intensidade] || SOMBRA.media); hist('sombra'); return { sombra: a.intensidade }; },
         alinhar: a => {
             const Ls = (a.camadas || []).map(precisa), cx = Ls.map(caixa);
@@ -149,11 +151,12 @@
             else if (k === 'luz') ok = ieTodas(IE.doc).some(X => X.bm === 'SCREEN' && /^luz/i.test(X.nome));
             else if (k === 'tratada') ok = !!(L && (L.filtrosInt || []).some(f => f.tratarFoto));
             else if (k === 'profundidade') ok = !!(L && (L.filtrosInt || []).some(f => f.profundidade));
+            else if (k === 'finalizada') ok = !!window.KNVW._finalizada;
             else if (k === 'exportado') ok = !!window.KNVW._exportou;
             else if (k === 'no_editor') ok = !!window.KNVW._editor;
         } catch (e) { ok = false; }
         return { condicao: c, ok };
     });
-    window.KNVW = { f, conferir, _exportou: false, _editor: false,
+    window.KNVW = { f, conferir, _exportou: false, _editor: false, _finalizada: false,
         async exec(nome, a, ctx) { if (!f[nome]) throw new Error(`ferramenta "${nome}" não existe`); return await f[nome](a || {}, ctx || {}); } };
 })();

@@ -151,3 +151,10 @@ recortados + .json com prompt/semente), `modelos/` (peças aprovadas, para ESTUD
   `.balancoAuto('foto')`. Camera Raw tem botão "Automático" no balanço de branco.
 - **Conferência**: `--comparar slide:2` (só o slide, lado a lado); avisos novos: fundo de trecho mais alto que a linha
   (cobre acento/cedilha) e "quase alinhados" (bordas a 3–8 px). `<g transform>` dentro de `<svg>` agora vale.
+- **Kit social (2026-10-04)**: `.k-perfil data-perfil="Nome" data-usuario="@user" data-foto="gerar:..." (+ data-semente/
+  fundo/inteiro/pele/proporcao/lado)` = avatar redondo (foto presa por `data-corte`, cabeça e ombros) + nome com selo
+  (`data-sem-selo`) + usuário; `.k-post` = card de post com "•••" e barra de ações (`data-sem-mais`, `data-sem-acoes`);
+  `ul.k-check2` = check duplo na `--cor-primaria`; `.k-papel data-amassado=".3"` = folha pautada + papel amassado gerado em
+  multiplicação; `.k-rodape data-site data-insta` = linha de site/redes + o conteúdo como texto legal. Exemplo:
+  `D:\kanivete_testes\carrossel_vereador\carrossel_kit.html` (o carrossel vereador em ~1/3 do HTML).
+- Sombras: `box-shadow` com `0` sem `px` agora é lido certo (antes deslocava os números e zerava o desfoque).

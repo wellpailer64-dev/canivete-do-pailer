@@ -39,6 +39,7 @@ ap.add_argument("--referencia"); ap.add_argument("--comparar", nargs="?", const=
 ap.add_argument("--gerar"); ap.add_argument("--sementes", default="7,11,23"); ap.add_argument("--proporcao", default="1:1"); ap.add_argument("--inteiro", action="store_true")
 ap.add_argument("--amostras"); ap.add_argument("--fontes"); ap.add_argument("--estilo"); ap.add_argument("--estilos", action="store_true")
 ap.add_argument("--biblioteca", default=os.environ.get("KANIVETE_BIBLIOTECA", r"D:\kanivete_biblioteca"))
+ap.add_argument("--revisar", action="store_true", help="revisor (tools/revisor.py): corte, contraste, sombra dura, avatar");
 ap.add_argument("--guardar-modelo"); ap.add_argument("--nota", default=""); ap.add_argument("--listar", action="store_true")
 a = ap.parse_args()
 BIB = os.path.abspath(a.biblioteca)
@@ -203,6 +204,12 @@ with sync_playwright() as p:
         if r.get("comparar"): salvar_jpg(r["comparar"], "_comparar.jpg")
         if r.get("ver"): salvar_jpg(r["ver"], "_ver.jpg")
         print(f"total {time.time() - t:.1f}s")
+    if a.revisar:   # regras dos feedbacks do usuário, sem olhar a imagem
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from revisor import revisar as _revisar
+        rv = _revisar(pg)
+        print(f"revisor: {rv['problemas']} problema(s)")
+        for it in rv["itens"]: print("  ", it)
     if a.mapa: print(pg.evaluate("window.KNV.mapa()"))
     png = None if a.sem_previa else base64.b64decode(pg.evaluate("e => window.KNV.png(e)", a.escala))
 

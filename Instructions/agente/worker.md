@@ -21,11 +21,15 @@ py -3.13 tools/worker/worker.py contrato.json          # app em --agente=9333; O
   `s1-arraste [grupo]`, `s1-arraste [texto]`, `#2`...). Sem decisão criativa: valores claros ("5% maior", "um pouco
   mais quente" ele já interpreta bem).
 - **Escreva uma condição para CADA parte do pedido** — é o que impede "FEITO" falso. Condições: `efeito:N=tipo` (ex. `efeito:titulo=degSob`, `efeito:bola=sombra`), `acabamento`, `visivel:N`,
-  `oculta:N`, `mascara:N`, `rastro:N`, `luz`, `tratada:N`, `profundidade:N`, `texto:N=valor`, `cor:N=#hex`, `tamanho:N=px`, `opacidade:N=n`, `exportado`, `no_editor`.
+  `oculta:N`, `finalizada`, `mascara:N`, `rastro:N`, `luz`, `tratada:N`, `profundidade:N`, `texto:N=valor`, `cor:N=#hex`, `tamanho:N=px`, `opacidade:N=n`, `exportado`, `no_editor`.
 - Exportar e levar para o editor são **agendados**: rodam uma vez, no fim, depois de conferir o resto.
 
 ## Como ele trabalha (tools/worker/)
-- `ferramentas.json` (25): acabamento de designer = `mascara_degrade` (pessoa some suave embaixo, sem corte seco),
+- **`finalizar_peca {preset}`** (social_limpo | festa_noite | flyer_grunge | quente): o checklist inteiro numa chamada
+  (`KNV.receita.finalizar`): roda o revisor e aplica tratar_foto + máscara degradê nas pessoas com base cortada, `leitura`
+  sob textos ilegíveis, sombra suave nos recortes e no lugar das duras, acabamento; avatar e corte lateral só avisa.
+  Contrato típico: `"goal": "Finalize a peça com o preset social_limpo e exporte tudo."` + `["finalizada", "exportado"]`.
+- `ferramentas.json` (27, com `finalizar_peca` e `leitura`): acabamento de designer = `mascara_degrade` (pessoa some suave embaixo, sem corte seco),
   `rastro_movimento` (motion blur atrás do objeto; angulo = para onde ele vai), `luz` (manchas em Divisão, pontos
   [x, y, raio]), `tratar_foto` (Camera Raw por foto: neutro|quente|frio|noite|festa), `profundidade` (gaussiano
   editável no fundo); e listar_camadas, info_camada, mover/posicionar/escalar/girar_camada, opacidade,

@@ -99,7 +99,25 @@ function ieCenaComponentesCss() {
         :where(.k-barras>li){background:${P};color:${F};padding:0 28px;min-height:100px;box-sizing:border-box}
         :where(.k-dica){display:flex;gap:16px;align-items:flex-start;background:#e8e8e8;color:#1e1e1e;padding:24px 28px;font-size:38px;line-height:1.2}
         :where(.k-dica>.k-icone){width:1.1em;height:1.2em;margin-top:.05em}
-        :where(.k-pilula){display:inline-flex;align-items:center;gap:14px;padding:0 24px;height:60px;border-radius:999px;background:${P};color:${F};font-size:24px;white-space:nowrap}`;
+        :where(.k-pilula){display:inline-flex;align-items:center;gap:14px;padding:0 24px;height:60px;border-radius:999px;background:${P};color:${F};font-size:24px;white-space:nowrap}
+        :where(.k-perfil){display:flex;align-items:center;gap:16px}
+        :where(.k-avatar){position:relative;flex:none;width:82px;height:82px;border-radius:50%;background:${P}}
+        :where(.k-avatar) img{position:absolute;left:-26%;top:5%;width:151%;height:189%;object-fit:cover;object-position:50% 0%}
+        :where(.k-perfil-nome){display:flex;align-items:center;gap:8px;font-size:26px;font-weight:600;line-height:1.15}
+        :where(.k-perfil-nome) svg{width:22px;height:22px}
+        :where(.k-perfil-user){font-size:20px;line-height:1.2;opacity:.55}
+        :where(.k-post){position:relative;background:#fff;color:#2b2f3a;border-radius:26px;padding:70px 90px 40px;box-shadow:0 40px 80px rgba(0,10,60,.45)}
+        :where(.k-post-mais){position:absolute;right:80px;top:96px;width:74px;height:22px}
+        :where(.k-post-acoes){display:flex;justify-content:space-between;border-top:2px solid #e6e8ee;margin:40px -20px 0;padding:34px 20px 0}
+        :where(.k-post-acoes) svg{width:34px;height:34px}
+        :where(.k-check2){display:flex;flex-direction:column;gap:44px;padding:0;margin:0;list-style:none}
+        :where(.k-check2>li){display:flex;gap:30px;align-items:center;font-size:29px;line-height:1.45}
+        :where(.k-check2) .k-icone{width:64px;height:36px}
+        :where(.k-papel){position:relative;background-color:#fbfbfb;background-image:repeating-linear-gradient(180deg,transparent 0 40px,#e3e5ea 40px 42px),linear-gradient(100deg,#fff 0%,#f1f2f5 40%,#fff 60%,#eceef2 100%);box-shadow:0 30px 60px rgba(0,10,60,.4)}
+        :where(.k-rodape){display:flex;flex-direction:column;gap:18px}
+        :where(.k-rodape-linha){display:flex;align-items:center;gap:34px;font-size:26px;font-weight:500;line-height:1}
+        :where(.k-rodape-linha>span){display:flex;align-items:center;gap:12px}
+        :where(.k-legal){margin:0;font-size:11px;line-height:1.45;opacity:.8;max-width:720px}`;
 }
 // ícones dos componentes (SVG de verdade: viram camada). cor: --cor-ok / --cor-primaria / a do texto
 const IE_CENA_ICONES = {
@@ -108,6 +126,14 @@ const IE_CENA_ICONES = {
     dica: '<svg viewBox="0 0 42 46"><path d="M21 2a15 15 0 0 0-9 27c2 2 3 4 3 7h12c0-3 1-5 3-7A15 15 0 0 0 21 2z" fill="#ffc83a"/><rect x="14" y="38" width="14" height="6" rx="2" fill="#8a8a8a"/></svg>',
     seta: '<svg viewBox="0 0 34 34"><circle cx="17" cy="17" r="16" fill="var(--cor-primaria,#ff5e3a)"/><path d="M13 10l8 7-8 7" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     play: '<svg viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z" fill="currentColor"/></svg>',
+    check2: '<svg viewBox="0 0 64 36" fill="none" stroke="var(--cor-primaria,#1f49d6)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l9 9L32 5"/><path d="M22 24l5 5L58 5"/></svg>',
+    selo: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="var(--cor-selo,#2ea8ff)"/><path d="M7 12.5l3.2 3L17 8.8" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    mais: '<svg viewBox="0 0 74 22" fill="#8a8f9c"><circle cx="11" cy="11" r="9"/><circle cx="37" cy="11" r="9"/><circle cx="63" cy="11" r="9"/></svg>',
+    curtir: '<svg viewBox="0 0 36 36" fill="none" stroke="#5b6170" stroke-width="2.6" stroke-linejoin="round"><path d="M18 31c-8-6-14-11-14-18a7 7 0 0 1 14-2 7 7 0 0 1 14 2c0 7-6 12-14 18z"/></svg>',
+    repostar: '<svg viewBox="0 0 36 36" fill="none" stroke="#5b6170" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13h20v12M24 8l4 5 4-5M28 25H8V13M12 30l-4-5-4 5"/></svg>',
+    compartilhar: '<svg viewBox="0 0 36 36" fill="none" stroke="#5b6170" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M30 22v8H6v-8M18 26V4M10 11l8-8 8 8"/></svg>',
+    site: '<svg viewBox="0 0 48 18"><rect x="1" y="2" width="46" height="14" rx="7" fill="var(--cor-primaria,#ffd21f)"/><path d="M10 9h22" stroke="var(--cor-fundo,#0533c4)" stroke-width="2.5"/></svg>',
+    redes: '<svg viewBox="0 0 104 24" fill="none" stroke="var(--cor-primaria,#ffd21f)" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><rect x="28" y="2" width="20" height="20" rx="6"/><circle cx="38" cy="12" r="4.5"/><circle cx="64" cy="12" r="10"/><path d="M60 8v8M60 12h7"/><rect x="82" y="3" width="20" height="18" rx="4"/><path d="M89 8l6 4-6 4z" fill="var(--cor-primaria,#ffd21f)"/></svg>',
     salvar: '<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" fill="currentColor"/></svg>',
 };
 // preenche os automáticos: k-num vazio = "01 / 05"; k-arraste vazio = "arraste →" (some no último slide);
@@ -134,6 +160,41 @@ function ieCenaComponentes(raiz, S) {
         if (el.querySelector(':scope > .k-icone')) continue;
         el.insertAdjacentHTML(el.hasAttribute('data-icone-fim') ? 'beforeend' : 'afterbegin', icone(el.dataset.icone));
         el.dataset.juntos = '';
+    }
+    // k-perfil data-perfil="Nome" data-usuario="@user" data-foto="gerar:..." (+ data-semente etc. da foto): avatar redondo
+    // com a foto presa no círculo (data-corte), enquadrada em cabeça e ombros; nome com selo e usuário
+    for (const el of raiz.querySelectorAll('.k-perfil[data-perfil]')) {
+        if (el.querySelector('.k-avatar')) continue;
+        const base = el.id || el.dataset.nome || 'perfil', attrs = [...el.attributes].filter(a => /^data-(semente|fundo|inteiro|pele|proporcao|lado|recortar)$/.test(a.name)).map(a => `${a.name}="${a.value}"`).join(' ');
+        const foto = el.dataset.foto ? `<img id="${base}-foto" data-corte ${attrs} src="${el.dataset.foto.replace(/"/g, '&quot;')}">` : '';
+        el.innerHTML = `<div class="k-avatar" id="${base}-avatar">${foto}</div><div><div class="k-perfil-nome" id="${base}-nome" data-juntos>${el.dataset.perfil}${el.hasAttribute('data-sem-selo') ? '' : IE_CENA_ICONES.selo}</div>`
+            + (el.dataset.usuario ? `<div class="k-perfil-user" id="${base}-usuario">${el.dataset.usuario}</div>` : '') + '</div>';
+        el.dataset.juntos = '';
+    }
+    // k-post: card de post (o conteúdo é da peça) + "•••" no canto e barra de ações embaixo (data-sem-mais / data-sem-acoes)
+    for (const el of raiz.querySelectorAll('.k-post')) {
+        const base = el.id || 'post';
+        if (!el.hasAttribute('data-sem-mais') && !el.querySelector('.k-post-mais')) el.insertAdjacentHTML('beforeend', `<span class="k-post-mais" id="${base}-mais">${IE_CENA_ICONES.mais}</span>`);
+        if (!el.hasAttribute('data-sem-acoes') && !el.querySelector('.k-post-acoes'))
+            el.insertAdjacentHTML('beforeend', `<div class="k-post-acoes" id="${base}-acoes" data-livre>${['curtir', 'repostar', 'curtir', 'compartilhar'].map(n => IE_CENA_ICONES[n]).join('')}</div>`);
+    }
+    for (const li of raiz.querySelectorAll('.k-check2 > li')) {
+        if (li.querySelector(':scope > .k-icone')) continue;
+        li.insertAdjacentHTML('afterbegin', icone('check2')); li.dataset.juntos = '';
+    }
+    // k-papel data-amassado="0.3": textura de papel amassado gerada por cima (multiplicação)
+    for (const el of raiz.querySelectorAll('.k-papel[data-amassado]')) {
+        if (el.querySelector('.k-papel-amassado')) continue;
+        el.insertAdjacentHTML('afterbegin', `<img class="k-papel-amassado" id="${el.id || 'papel'}-amassado" data-livre data-semente="7" data-recortar="nao" data-proporcao="4:5" data-lado="1024" src="gerar:crumpled and flattened white paper sheet texture, soft wrinkles and folds, top view, even lighting, full frame, no text" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;mix-blend-mode:multiply;opacity:${el.dataset.amassado || '.3'}">`);
+    }
+    // k-rodape data-site="www.site.com.br" data-insta="@seuinsta": linha com ícones + o texto legal (o conteúdo do elemento)
+    for (const el of raiz.querySelectorAll('.k-rodape[data-site], .k-rodape[data-insta]')) {
+        if (el.querySelector('.k-rodape-linha')) continue;
+        const base = el.id || 'rodape', legal = el.innerHTML.trim();
+        el.innerHTML = `<div class="k-rodape-linha" id="${base}-linha" data-juntos>${el.dataset.site ? `<span id="${base}-site">${IE_CENA_ICONES.site.replace('<svg', '<svg width="48" height="18"')}${el.dataset.site}</span>` : ''}`
+            + `${el.dataset.insta ? `<span id="${base}-insta">${IE_CENA_ICONES.redes.replace('<svg', '<svg width="104" height="24"')}${el.dataset.insta}</span>` : ''}</div>`
+            + (legal ? `<p class="k-legal" id="${base}-legal" data-livre>${legal}</p>` : '');
+        el.dataset.juntos = ''; el.dataset.livre = '';
     }
     for (const el of raiz.querySelectorAll('.k-citacao')) if (el.setAttribute('data-juntos', ''), !el.querySelector('.k-aspas')) el.insertAdjacentHTML('afterbegin', '<span class="k-aspas">\u201C</span>');
     for (const li of raiz.querySelectorAll('li')) {
@@ -396,7 +457,7 @@ function ieCenaSombras(s) {
     partes.push(s.slice(ini));
     return partes.map(p => {
         const cor = ieCenaCor((/rgba?\([^)]*\)/.exec(p) || ['rgb(0,0,0)'])[0]);
-        const n = (p.replace(/rgba?\([^)]*\)/, '').match(/-?[\d.]+px/g) || []).map(parseFloat);
+        const n = (p.replace(/rgba?\([^)]*\)/, '').replace(/#[0-9a-f]{3,8}/gi, '').match(/-?\d*\.?\d+(?:px)?(?![\w%])/g) || []).map(parseFloat);   // '0' sem px também conta (senão o resto desloca e o desfoque vira 0)
         return { cor: cor.hex, a: cor.a, x: n[0] || 0, y: n[1] || 0, blur: n[2] || 0, spread: n[3] || 0, inset: /inset/.test(p) };
     }).filter(x => x.a > 0);
 }

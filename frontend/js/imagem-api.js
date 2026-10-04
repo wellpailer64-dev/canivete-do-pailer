@@ -430,6 +430,64 @@ const KNV = {
         },
     },
 
+    // ── revisor da peça (tools/revisor.py): os feedbacks do usuário viram regras. Cada achado = {regra, camada, problema,
+    // dica}. Regras: corte (corte seco pelo KNV.revisar), contraste (texto × o que está atrás das letras, WCAG),
+    // sombra (sombra projetada dura), avatar (camada presa num círculo: devolve o recorte para o rosto ser medido fora)
+    async revisarPeca({ corte = true, minimo = 60 } = {}) {
+        const d = IE.doc, out = [], lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+        const razao = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+        const folhas = [];
+        iePercorrer(d.camadas, (L, l, i, pai) => { if (!L.filhos) folhas.push({ L, vis: L.visivel !== false && (!pai || pai.visivel !== false) }); });
+        const lado = Math.min(d.w, d.h, ...(d.fatias || []).map(f => Math.min(f.w, f.h)));
+        // 1) corte seco: foto cortada pela caixa/geração ou pela máscara, aparecendo
+        // só foto/objeto recortado (original com transparência): caixa, painel e textura retos são de propósito
+        const recortada = L => { const c = L.c0 && L.c0.c; if (!c) return false; const w = Math.min(64, c.width), h = Math.min(64, c.height), t = ieCanvas(w, h); ieCtx(t).drawImage(c, 0, 0, w, h);
+            const p = ieCtx(t).getImageData(0, 0, w, h).data; let n = 0; for (let i = 3; i < p.length; i += 4) if (p[i] < 20) n++; return n > w * h * 0.05; };
+        const ignorar = folhas.filter(o => !recortada(o.L)).map(o => o.L.nome);
+        if (corte) for (const r of window.KNV.revisar({ minimo, ignorar }).filter(r => /corte seco/.test(r.problema)))
+            out.push({ regra: 'corte', camada: r.camada, problema: `${r.problema} de ${r.de} a ${r.ate}`, dica: 'caixa na proporção da foto (sem cover cortando a lateral), mascara_degrade, ou esconder atrás de um elemento' });
+        // 2) contraste do texto com o que está atrás das letras (10º percentil: o pior trecho conta)
+        for (const { L, vis } of folhas) {
+            if (!vis || !L.txt || !L.c || (L.op ?? 1) < 0.3) continue;
+            const r = ieRaster(L); if (!r) continue;
+            const f = r.forma || r, b = ieLimites(f.c); if (!b) continue;
+            const R = { x: Math.max(0, f.x + b.x), y: Math.max(0, f.y + b.y) }; R.w = Math.min(d.w, f.x + b.x + b.w) - R.x; R.h = Math.min(d.h, f.y + b.y + b.h) - R.y;
+            if (R.w < 2 || R.h < 2) continue;
+            IE._pararEm = L; IE._parou = false;
+            let fundo; try { fundo = ieAchatar(d, d.camadas, R); } finally { IE._pararEm = null; IE._parou = false; }
+            const pf = ieCtx(fundo).getImageData(0, 0, R.w, R.h).data, pt = ieCtx(f.c).getImageData(R.x - f.x, R.y - f.y, R.w, R.h).data;
+            const lt = lum(ieHexRgb(L.txt.cor || '#000000')), rz = [];
+            for (let i = 0; i < pt.length; i += 4 * 3) if (pt[i + 3] > 160) rz.push(razao(lt, lum([pf[i], pf[i + 1], pf[i + 2]])));
+            if (rz.length < 20) continue;
+            rz.sort((a, b) => a - b);
+            const p10 = rz[Math.floor(rz.length * 0.1)], tam = L.txt.tam * ieTextoEscala(L.txt) * 1080 / lado, min = tam >= 40 ? 3 : 4.5;
+            const ajuda = L.fx && ((L.fx.tracado || []).some(e => e.on && e.tam >= 2) || (L.fx.sombra || []).some(e => e.on && e.op >= 40));
+            if (p10 < min && !ajuda) out.push({ regra: 'contraste', camada: L.nome, problema: `contraste ${p10.toFixed(1)} (mín. ${min}) em ${Math.round(tam)}px`, caixa: R, dica: 'mancha escura macia por baixo (KNV.receita.leitura), caixa, ou cor do texto mais clara/escura' });
+        }
+        // 3) sombra projetada dura (pouco desfoque para a força)
+        for (const { L, vis } of folhas) {
+            if (!vis || !L.fx || L.fxOculto) continue;
+            for (const e of L.fx.sombra || []) if (e.on && e.op >= 30 && e.tam > 0.5 && e.tam < lado * 0.025)   // desfoque 0 = adesivo de propósito
+                out.push({ regra: 'sombra', camada: L.nome, problema: `sombra dura (desfoque ${Math.round(e.tam)}px, ${Math.round(e.op)}%)`, dica: 'desfoque ≥ 3% do lado, opacidade ~22%, cor do fundo escurecida' });
+        }
+        // 4) avatar: camada presa (máscara de corte) numa base redonda — o rosto é medido fora (Python, OpenCV)
+        const avatares = [];
+        iePercorrer(d.camadas, (L, l, i, pai) => {
+            if (!L.clip || !L.c || L.visivel === false) return;
+            const lista = pai ? pai.filhos : d.camadas;
+            let k = lista.indexOf(L) - 1; while (k >= 0 && lista[k].clip) k--;
+            const B = lista[k]; if (!B || !B.c) return;
+            const rb = ieRaster(B), fb = rb && (rb.forma || rb), bb = fb && ieLimites(fb.c); if (!bb) return;
+            const ab = ieCtx(fb.c).getImageData(bb.x, bb.y, 2, 2).data[3];   // canto da caixa vazio = base redonda
+            if (ab > 40 || Math.abs(bb.w - bb.h) > bb.w * 0.15) return;
+            const C = { x: fb.x + bb.x, y: fb.y + bb.y, w: bb.w, h: bb.h }, m = Math.round(C.w), Rr = { x: C.x - m, y: C.y - m, w: C.w + 2 * m, h: C.h + 2 * m };
+            const rl = ieRaster(L), fl = rl.forma || rl, c = ieCanvas(Rr.w, Rr.h), k2 = ieCtx(c);
+            k2.fillStyle = '#808080'; k2.fillRect(0, 0, Rr.w, Rr.h); k2.drawImage(fl.c, fl.x - Rr.x, fl.y - Rr.y);
+            avatares.push({ camada: L.nome, circulo: { x: C.x - Rr.x, y: C.y - Rr.y, d: C.w }, png: c.toDataURL('image/png').split(',')[1] });
+        });
+        return { achados: out, avatares };
+    },
+
     // ── revisor de design: o que um diretor de arte apontaria antes de entregar ──
     // corte seco (borda reta e dura de foto/recorte que aparece: limite do quadro da foto, ombro cortado),
     // camada fora da página, texto colado na borda, camada vazia. Devolve [{camada, problema, ...}].
@@ -881,6 +939,70 @@ const KNV = {
             L.filtrosInt = [...(L.filtrosInt || []).filter(f => !f.profundidade), { cmd: 'f:gaussiano', titulo: 'Desfoque gaussiano (profundidade)', vals: { r: +raio }, on: true, profundidade: true }];
             ieIntAtualizar(L, R); ieAgendar(null, IE.doc); ieHist(ieT('Profundidade')); ieUiCamadas();
             return { raio: +raio };
+        },
+        // leitura: mancha macia (radial) por baixo de um ou mais textos vizinhos, na cor do fundo escurecida (ou clareada,
+        // se o texto for escuro). Fica logo abaixo do bloco de textos (no nível de cima da pilha); "· leitura"
+        leitura(nomes, { forca = 0.85 } = {}) {
+            const d = IE.doc, Ls = [].concat(nomes).map(ieRec), topo = L => d.camadas.find(T => T === L || (T.filhos && ieTodasDe(T.filhos).includes(L)));
+            const Rs = Ls.map(ieRCamada).filter(Boolean);
+            if (!Rs.length) throw new Error('leitura: nenhum texto com caixa');
+            const U = Rs.reduce((u, r) => ({ x1: Math.min(u.x1, r.x), y1: Math.min(u.y1, r.y), x2: Math.max(u.x2, r.x + r.w), y2: Math.max(u.y2, r.y + r.h) }), { x1: 1e9, y1: 1e9, x2: -1e9, y2: -1e9 });
+            const px = (U.x2 - U.x1) * 0.18 + 40, py = (U.y2 - U.y1) * 0.6 + 40, R = { x: Math.round(U.x1 - px), y: Math.round(U.y1 - py), w: Math.round(U.x2 - U.x1 + 2 * px), h: Math.round(U.y2 - U.y1 + 2 * py) };
+            const base = Ls.map(topo).sort((a, b) => d.camadas.indexOf(a) - d.camadas.indexOf(b))[0];
+            IE._pararEm = base; IE._parou = false;
+            let fundo; try { fundo = ieAchatar(d, d.camadas, { x: Math.max(0, R.x), y: Math.max(0, R.y), w: Math.min(d.w, R.x + R.w) - Math.max(0, R.x), h: Math.min(d.h, R.y + R.h) - Math.max(0, R.y) }); } finally { IE._pararEm = null; IE._parou = false; }
+            const p = ieCtx(fundo).getImageData(0, 0, fundo.width, fundo.height).data, m = [0, 0, 0];
+            for (let i = 0; i < p.length; i += 16) { m[0] += p[i]; m[1] += p[i + 1]; m[2] += p[i + 2]; }
+            const n = p.length / 16, med = m.map(v => v / n), [tr, tg, tb] = ieHexRgb(Ls[0].txt?.cor || '#ffffff');
+            const claro = 0.299 * tr + 0.587 * tg + 0.114 * tb > 128;   // texto claro = mancha escura
+            const cor = claro ? med.map(v => Math.round(v * 0.22)) : med.map(v => Math.round(255 - (255 - v) * 0.15));
+            const c = ieCanvas(R.w, R.h), x = ieCtx(c);
+            x.setTransform(R.w / 2, 0, 0, R.h / 2, R.w / 2, R.h / 2);
+            const g = x.createRadialGradient(0, 0, 0, 0, 0, 1), rgba = a => `rgba(${cor.join(',')},${a})`;
+            g.addColorStop(0, rgba(forca)); g.addColorStop(0.5, rgba(forca * 0.8)); g.addColorStop(1, rgba(0));
+            x.fillStyle = g; x.fillRect(-1, -1, 2, 2);
+            const nome = Ls[0].nome + ' · leitura', a0 = d.camadas.findIndex(T => T.nome === nome);
+            if (a0 >= 0) d.camadas.splice(a0, 1);
+            const M = ieNovaCamada(d, { tipo: 'pixel', nome, c, x: R.x, y: R.y });
+            d.camadas.splice(d.camadas.indexOf(base), 0, M);
+            ieTudo(d); ieHist(ieT('Leitura')); ieUiCamadas();
+            return { leitura: nome, caixa: R };
+        },
+        // finalizar a peça sozinho: o revisor diz o que falta e a receita aplica (o checklist dos feedbacks do usuário)
+        //  pessoas recortadas grandes → tratar_foto (ambiente do preset) + máscara em degradê se a base corta seco
+        //  textos ilegíveis → leitura (vizinhos juntos) · sombra dura → sombra suave · objetos recortados sem sombra →
+        //  sombra suave · acabamento (Camera Raw no topo). Avatar com rosto cortado só é avisado (enquadrar é decisão).
+        async finalizar({ preset = 'social_limpo', sombras = true } = {}) {
+            const P = { social_limpo: { amb: 'neutro', acab: { clar: 8, vib: 5, grao: 4 } }, festa_noite: { amb: 'festa', acab: { clar: 15, grao: 12, ct: 10, vib: 10 } },
+                flyer_grunge: { amb: 'noite', acab: { clar: 18, tex: 12, grao: 15, ct: 12 } }, quente: { amb: 'quente', acab: { clar: 10, vib: 8, grao: 6, temp: 6 } } }[preset];
+            if (!P) throw new Error('preset: social_limpo, festa_noite, flyer_grunge ou quente');
+            const d = IE.doc, feito = [], SUAVE = '0 24px 44px rgba(8,16,48,.24)';
+            const rv = await window.KNV.revisarPeca({});
+            const recortadas = ieTodas(d).filter(L => L.c0 && L.visivel !== false && !L.clip && (() => { const c = L.c0.c, w = Math.min(64, c.width), h = Math.min(64, c.height), t = ieCanvas(w, h); ieCtx(t).drawImage(c, 0, 0, w, h);
+                const p = ieCtx(t).getImageData(0, 0, w, h).data; let n = 0; for (let i = 3; i < p.length; i += 4) if (p[i] < 20) n++; return n > w * h * 0.05; })());
+            const alto = Math.min(d.h, ...(d.fatias || []).map(f => f.h));
+            for (const L of recortadas) {
+                const R = ieRCamada(L); if (!R) continue;
+                if (R.h > alto * 0.4) {   // pessoa/assunto principal
+                    if (!(L.filtrosInt || []).some(f => f.tratarFoto)) { this.tratarFoto(L.nome, { ambiente: P.amb }); feito.push(`tratar_foto ${L.nome}`); }
+                    const base = rv.achados.find(a => a.regra === 'corte' && a.camada === L.nome && /de \d+,(\d+) a \d+,(\d+)/.test(a.problema) && (([, y1, y2]) => Math.abs(y1 - y2) < 4)(a.problema.match(/de \d+,(\d+) a \d+,(\d+)/)));
+                    if (base) { this.mascaraDegrade(L.nome, { lado: 'baixo', inicio: 0.72 }); feito.push(`mascara_degrade ${L.nome}`); }
+                } else if (sombras && !(L.fx && (L.fx.sombra || []).some(e => e.on))) { await this.sombra([L.nome], SUAVE); feito.push(`sombra ${L.nome}`); }
+            }
+            for (const a of rv.achados.filter(a => a.regra === 'sombra')) { await this.sombra([a.camada], SUAVE); feito.push(`sombra suave ${a.camada}`); }
+            // textos ilegíveis: vizinhos (caixas a < 60 px) numa mancha só
+            const ts = rv.achados.filter(a => a.regra === 'contraste'), grupos = [];
+            for (const t of ts) {
+                const g = grupos.find(g => g.some(o => t.caixa.x < o.caixa.x + o.caixa.w + 60 && o.caixa.x < t.caixa.x + t.caixa.w + 60 && t.caixa.y < o.caixa.y + o.caixa.h + 60 && o.caixa.y < t.caixa.y + t.caixa.h + 60));
+                g ? g.push(t) : grupos.push([t]);
+            }
+            for (const g of grupos) { this.leitura(g.map(t => t.camada)); feito.push(`leitura ${g.map(t => t.camada).join('+')}`); }
+            const A = ieTodas(d).find(L => L.tipo === 'ajuste' && L.ajChave === 'cameraRaw' && /acabamento/i.test(L.nome));
+            if (!A) { await this.acabamento(P.acab); feito.push('acabamento'); }
+            const avisos = rv.avatares.length ? [`${rv.avatares.length} avatar(es): conferir o rosto (tools/revisor.py)`] : [];
+            rv.achados.filter(a => a.regra === 'corte' && !feito.some(f => f.endsWith(a.camada))).forEach(a => avisos.push(`corte em ${a.camada}: ${a.problema}`));
+            d._finalizada = preset;
+            return { preset, feito, avisos };
         },
     },
     // ponte: o documento (já salvo em .iknv) vira Comps no Editor Kanivete; {modo: 'slides' | 'inteiro'}
