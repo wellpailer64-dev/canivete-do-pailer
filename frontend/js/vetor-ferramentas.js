@@ -8,6 +8,8 @@ const VK_FERR = {
     linha: { nome: 'Linha', tecla: '\\', cursor: 'crosshair' }, contagotas: { nome: 'Conta-gotas', tecla: 'I', cursor: 'copy' },
     prancheta: { nome: 'Prancheta', tecla: 'Shift+O', cursor: 'default' }, mao: { nome: 'Mão', tecla: 'H', cursor: 'grab' },
     zoom: { nome: 'Zoom', tecla: 'Z', cursor: 'zoom-in' },
+    construtor: { nome: 'Construtor de formas (Alt = apagar)', tecla: 'Shift+M', cursor: 'crosshair' }, tesoura: { nome: 'Tesoura', tecla: 'C', cursor: 'crosshair' },
+    faca: { nome: 'Faca', tecla: '', cursor: 'crosshair' },
 };
 const VK_OPC = { lados: 6, pontas: 5, raio: 0 };
 let VKA = null;   // arraste em andamento
@@ -140,15 +142,17 @@ function vkEventos() {
             if (o && o.tipo === 'texto') { VKA = null; VK.sel = [o.id]; vkTextoEditar(o); return; }
             VKA.modo = 'texto'; return;
         }
+        if (f === 'construtor' || f === 'tesoura' || f === 'faca') { if (vkcDown(VKA, x, y) === null) VKA = null; vkDesenhar(); return; }
         VKA.modo = 'forma';   // retângulo, elipse, polígono, estrela, linha
     });
     cv.addEventListener('pointermove', e => {
         const [sx, sy] = pos(e), [x, y] = vkDoc(sx, sy);
         VK.mouse = [x, y];
         if (VK.ferr === 'caneta' && VK.caneta) vkDesenhar();
-        if (!VKA) { vkStatus(x, y); if (VK.sep && VK.sep.ativo) vkSepStatus(x, y); return; }
+        if (!VKA) { vkStatus(x, y); if (VK.sep && VK.sep.ativo) vkSepStatus(x, y); vkcHover(x, y); return; }
         VKA.mx = x; VKA.my = y; VKA.msx = sx; VKA.msy = sy; VKA.shift = e.shiftKey; VKA.alt = e.altKey; VKA.moveu = VKA.moveu || Math.hypot(sx - VKA.sx, sy - VKA.sy) > 3;
         if (VKA.f === 'mao') { VK.vista.x = VKA.vx + sx - VKA.sx; VK.vista.y = VKA.vy + sy - VKA.sy; vkDesenhar(); return; }
+        if (VKA.trilha) { vkcMove(VKA, x, y); vkDesenhar(); return; }
         if (!VKA.moveu) return;
         let dx = x - VKA.x, dy = y - VKA.y;
         if (VKA.modo === 'mover') {
@@ -229,6 +233,7 @@ function vkEventos() {
             return;
         }
         if (A.f === 'caneta') { vkCanetaUp(ex, ey); return; }
+        if (A.modo === 'construir' || A.modo === 'faca') { await vkcUp(A, ex, ey); vkDesenhar(); return; }
         if (A.modo === 'texto') {
             const caixa = A.moveu ? Math.abs(ex - A.x) : null;
             const r = await vkCmdUi('texto', { x: Math.min(A.x, ex), y: A.moveu ? Math.min(A.y, ey) : A.y, conteudo: '', caixa, fonte: VK.txPadrao?.fam, estilo: VK.txPadrao?.estilo, tamanho: VK.txPadrao?.tam });
@@ -399,6 +404,7 @@ function vkDesenharSobreposicao(ctx) {
         }
         ctx.setLineDash([]);
     }
+    if (typeof vkcSobreposicao === 'function') vkcSobreposicao(ctx, VKA);
     // guias inteligentes
     ctx.strokeStyle = '#ff2fd0';
     for (const g of VKG) { ctx.beginPath(); if (g.eixo === 'x') { const [x] = vkTela(g.pos, 0); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, 99999); } else { const [, y] = vkTela(0, g.pos); ctx.moveTo(0, y + 0.5); ctx.lineTo(99999, y + 0.5); } ctx.stroke(); }
@@ -437,6 +443,7 @@ function vkTeclas(e) {
         if (k === 'g') return faz(() => vkCmdUi(S ? 'desagrupar' : 'agrupar', {}));
         if (k === '7') return faz(() => vkCmdUi(A ? 'soltar_mascara' : 'mascara', {}));
         if (k === '8') return faz(() => vkCmdUi('composto', {}));
+        if (k === 'j') return faz(() => vkCmdUi(A ? 'media' : 'juntar', A ? { eixo: 'ambos' } : {}));
         if (k === ']' || e.code === 'BracketRight') return faz(() => vkCmdUi('organizar', { modo: S ? 'frente' : 'acima' }));
         if (k === '[' || e.code === 'BracketLeft') return faz(() => vkCmdUi('organizar', { modo: S ? 'tras' : 'abaixo' }));
         if (k === '2') return faz(() => A ? vkCmdUi('alterar', { ids: vkTodos().filter(x => x.o.trava).map(x => x.o.id), trava: false }) : vkCmdUi('alterar', { trava: true }).then(() => { VK.sel = []; vkMudou(); }));
@@ -460,11 +467,12 @@ function vkTeclas(e) {
         return faz(() => vkCmdUi('mover', { dx: d[0], dy: d[1] }));
     }
     if (S && k === 'o') return faz(() => vkFerramenta('prancheta'));
+    if (S && k === 'm') return faz(() => vkFerramenta('construtor'));
     if (S && k === 'x') return faz(() => { [VK.preench, VK.traco] = [VK.traco, VK.preench]; vkUiAgendar(); });
     if (k === 'd' && !S) return faz(() => { VK.preench = { k: 'cmyk', v: [0, 0, 0, 0] }; VK.traco = { k: 'cmyk', v: [0, 0, 0, 100] }; vkUiAgendar(); });
     if (k === 'x' && !S) return faz(() => { VK.focoTraco = !VK.focoTraco; vkUiAgendar(); });
     if (k === '/') return faz(() => { if (VK.sel.length) vkCmdUi('alterar', VK.focoTraco ? { traco: null } : { preench: null }); else { if (VK.focoTraco) VK.traco = null; else VK.preench = null; vkUiAgendar(); } });
-    const mapa = { v: 'selecao', a: 'direta', p: 'caneta', t: 'texto', m: 'retangulo', l: 'elipse', '\\': 'linha', i: 'contagotas', h: 'mao', z: 'zoom' };
+    const mapa = { v: 'selecao', a: 'direta', p: 'caneta', t: 'texto', m: 'retangulo', l: 'elipse', '\\': 'linha', i: 'contagotas', h: 'mao', z: 'zoom', c: 'tesoura' };
     if (!S && !A && mapa[k]) return faz(() => vkFerramenta(mapa[k]));
 }
 function vkStatus(x, y) { const el = document.getElementById('vk-status-pos'); if (el) el.textContent = `X ${vkR(vkMM(x - ((VK.doc.pranchetas.find(p => p.id === VK.ativa) || {}).x || 0)), 1)}  Y ${vkR(vkMM(y - ((VK.doc.pranchetas.find(p => p.id === VK.ativa) || {}).y || 0)), 1)} mm`; }

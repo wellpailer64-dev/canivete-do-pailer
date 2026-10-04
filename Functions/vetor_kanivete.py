@@ -387,6 +387,71 @@ def booleana(op, formas):
     return {"subs": _de_skia(r)}
 
 
+def _vazio(p):
+    b = p.bounds if p is not None else None
+    return not b or (b[2] - b[0]) * (b[3] - b[1]) < 1e-6 or not any(True for _ in p.segments)
+
+
+def _pecas(p):
+    """Caminho → peças separadas (cada contorno externo com os seus furos), pela regra nonzero do resultado."""
+    import pathops
+    subs = _de_skia(p)
+    if len(subs) <= 1:
+        return [subs] if subs else []
+    def area(s):
+        pts = s["pts"]; return sum(pts[i][0] * pts[(i + 1) % len(pts)][1] - pts[(i + 1) % len(pts)][0] * pts[i][1] for i in range(len(pts))) / 2
+    def dentro(pt, s):
+        return _para_skia([s]).contains((pt[0], pt[1]))
+    ext = [s for s in subs if area(s) * area(subs[0]) > 0] or subs   # mesmo sentido do primeiro = externos
+    furos = [s for s in subs if s not in ext]
+    pecas = [[e] for e in ext]
+    for f in furos:
+        alvo = next((pc for pc in pecas if dentro(f["pts"][0][:2], pc[0])), pecas[0])
+        alvo.append(f)
+    return pecas
+
+
+def regioes(formas):
+    """Construtor de formas / Dividir: as áreas atômicas formadas pelas formas sobrepostas.
+    formas = [{subs, regra}] de baixo para cima → [{subs, fontes: [índices das formas que cobrem a área]}] (peças separadas)."""
+    import pathops
+    regs = []   # (path, set(fontes))
+    for i, f in enumerate(formas):
+        s = pathops.simplify(_para_skia(f["subs"], f.get("regra", "nonzero")))
+        novas = []
+        resto = s
+        for p, fs in regs:
+            dentro = pathops.op(p, s, pathops.PathOp.INTERSECTION)
+            fora = pathops.op(p, s, pathops.PathOp.DIFFERENCE)
+            if not _vazio(dentro): novas.append((dentro, fs | {i}))
+            if not _vazio(fora): novas.append((fora, fs))
+            resto = pathops.op(resto, p, pathops.PathOp.DIFFERENCE)
+        if not _vazio(resto): novas.append((resto, {i}))
+        regs = novas
+    out = []
+    for p, fs in regs:
+        for pc in _pecas(p):
+            out.append({"subs": pc, "fontes": sorted(fs)})
+    return out
+
+
+def faca(formas, linha, larg=0.02):
+    """Faca: corta formas fechadas ao longo de uma linha à mão livre (linha = [[x,y],...] pt). → [[peças (subs)] por forma]"""
+    import pathops, skia
+    corte = skia.Path(); corte.moveTo(*linha[0])
+    for x, y in linha[1:]:
+        corte.lineTo(x, y)
+    borda = skia.Path()
+    _sk_pincel(larg, "butt", "miter").getFillPath(corte, borda, None, 4.0)
+    b = _para_skia(_sk_subs(borda))
+    out = []
+    for f in formas:
+        p = pathops.simplify(_para_skia(f["subs"], f.get("regra", "nonzero")))
+        r = pathops.op(p, b, pathops.PathOp.DIFFERENCE)
+        out.append(_pecas(r))
+    return out
+
+
 # ─────────────── Deslocar caminho e Contornar traço (skia-python: Stroker + PathOps) ───────────────
 def _sk_path(subs, regra="nonzero"):
     import skia

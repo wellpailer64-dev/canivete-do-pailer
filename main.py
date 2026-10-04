@@ -3206,6 +3206,14 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.contornar_traco(formas)
 
+    def vk_regioes(self, formas):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.regioes(formas)
+
+    def vk_faca(self, formas, linha):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.faca(formas, linha)
+
     def vk_canais_imagem(self, path, mascara=None, cond="FOGRA39"):
         from Functions import vetor_kanivete
         try:

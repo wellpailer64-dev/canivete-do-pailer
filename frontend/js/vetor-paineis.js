@@ -4,6 +4,9 @@ const VK_ICO = {
     selecao: '<path d="M5 3l12 8-6 1.5L8 19z"/>', direta: '<path d="M5 3l12 8-6 1.5L8 19z" fill="currentColor"/>',
     caneta: '<path d="M12 3l6 9-6 9-6-9z"/><circle cx="12" cy="12" r="1.6"/>', texto: '<path d="M5 5h14M12 5v14M9 19h6"/>',
     retangulo: '<rect x="4" y="6" width="16" height="12"/>', elipse: '<ellipse cx="12" cy="12" rx="8" ry="6"/>',
+    construtor: '<circle cx="9" cy="10" r="5.5"/><circle cx="15" cy="14" r="5.5"/><path d="M12 9.5v6" stroke-dasharray="1.5 1.5"/>',
+    tesoura: '<circle cx="6" cy="7" r="2.6"/><circle cx="6" cy="17" r="2.6"/><path d="M8.3 8.4L20 16M8.3 15.6L20 8"/>',
+    faca: '<path d="M4 20L18.5 5.5a2 2 0 0 1 2.8 2.8L9 20z"/><path d="M4 20l5-5"/>',
     poligono: '<path d="M12 4l7 5-2.7 9H7.7L5 9z"/>', estrela: '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.5 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',
     linha: '<path d="M5 19L19 5"/>', contagotas: '<path d="M14 4l6 6-9 9H5v-6z"/><path d="M12 6l6 6"/>',
     prancheta: '<rect x="6" y="6" width="12" height="12"/><path d="M3 6h3M18 6h3M3 18h3M18 18h3M6 3v3M6 18v3M18 3v3M18 18v3"/>',
@@ -64,7 +67,7 @@ function vkMontar() {
     <div class="ie-modal" id="vk-modal" hidden></div>
     <div class="ie-pop" id="vk-pop" hidden></div>`;
     // ferramentas
-    const grupos = [['selecao', 'direta'], ['caneta', 'texto'], ['retangulo', 'elipse', 'poligono', 'estrela', 'linha'], ['contagotas', 'prancheta'], ['mao', 'zoom']];
+    const grupos = [['selecao', 'direta'], ['caneta', 'texto'], ['construtor', 'tesoura', 'faca'], ['retangulo', 'elipse', 'poligono', 'estrela', 'linha'], ['contagotas', 'prancheta'], ['mao', 'zoom']];
     vkEl('vk-ferr').innerHTML = `<div class="ie-ferr-lista">${grupos.map(g => g.map(f => `<button class="ie-ferr-btn" data-f="${f}" title="${VK_FERR[f].nome}${VK_FERR[f].tecla ? ' (' + VK_FERR[f].tecla + ')' : ''}">${vkI(f)}</button>`).join('')).join('<div class="ie-ferr-sep"></div>')}</div>
         <div class="vk-cores-ferr" id="vk-cores-ferr"></div>`;
     vkEl('vk-ferr').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) vkFerramenta(b.dataset.f); });
@@ -89,6 +92,7 @@ const VK_MENUS = [
         ['Recuar', 'Ctrl+[', () => vkCmdUi('organizar', { modo: 'abaixo' })], ['Enviar para trás', 'Shift+Ctrl+[', () => vkCmdUi('organizar', { modo: 'tras' })], '-',
         ['Máscara de corte', 'Ctrl+7', () => vkCmdUi('mascara', {})], ['Soltar máscara', 'Alt+Ctrl+7', () => vkCmdUi('soltar_mascara', {})],
         ['Caminho composto', 'Ctrl+8', () => vkCmdUi('composto', {})], '-',
+        ['Juntar', 'Ctrl+J', () => vkCmdUi('juntar', {})], ['Média', 'Alt+Ctrl+J', () => vkCmdUi('media', { eixo: 'ambos' })],
         ['Deslocar caminho...', '', () => vkDeslocarDialogo()], ['Contornar traço', '', () => vkCmdUi('contornar_traco', {})], '-',
         ['Refletir na vertical', '', () => vkCmdUi('refletir', { eixo: 'vertical' })], ['Refletir na horizontal', '', () => vkCmdUi('refletir', { eixo: 'horizontal' })],
         ['Girar 90°', '', () => vkCmdUi('girar', { graus: 90 })], '-', ['Travar', 'Ctrl+2', () => vkCmdUi('alterar', { trava: true })], ['Ocultar', 'Ctrl+3', () => vkCmdUi('alterar', { visivel: false })],
@@ -206,7 +210,8 @@ function vkProps() {
         ${[['esquerda', '⇤'], ['centro_h', '⇹'], ['direita', '⇥'], ['topo', '⤒'], ['centro_v', '⇳'], ['base', '⤓']].map(([m, s]) => `<button class="ie-btn ie-btn-mini" data-al="${m}" title="${m}">${s}</button>`).join('')}
         ${objs.length > 2 ? '<button class="ie-btn ie-btn-mini" data-dist="horizontal" title="distribuir">↔</button><button class="ie-btn ie-btn-mini" data-dist="vertical" title="distribuir">↕</button>' : ''}</div></div>`;
     if (objs.length > 1) h += `<div class="vk-sec"><div class="vk-sec-t">Pathfinder</div><div class="vk-bts">
-        ${[['unir', 'Unir'], ['subtrair', 'Subtrair'], ['intersecao', 'Interseção'], ['excluir', 'Excluir']].map(([op, n]) => `<button class="ie-btn ie-btn-mini" data-pf="${op}">${n}</button>`).join('')}</div></div>`;
+        ${[['unir', 'Unir'], ['subtrair', 'Subtrair'], ['intersecao', 'Interseção'], ['excluir', 'Excluir']].map(([op, n]) => `<button class="ie-btn ie-btn-mini" data-pf="${op}">${n}</button>`).join('')}</div>
+        <div class="vk-bts">${[['dividir', 'Dividir'], ['aparar', 'Aparar'], ['mesclar', 'Mesclar'], ['cortar', 'Cortar'], ['menos_fundo', 'Menos fundo']].map(([op, n]) => `<button class="ie-btn ie-btn-mini" data-pf2="${op}">${n}</button>`).join('')}</div></div>`;
     h += `<div class="vk-sec"><div class="vk-bts"><button class="ie-btn ie-btn-mini" onclick="vkCmdUi('${objs.length > 1 ? 'agrupar' : 'desagrupar'}', {})">${objs.length > 1 ? 'Agrupar' : 'Desagrupar'}</button>
         ${objs.length > 1 ? `<button class="ie-btn ie-btn-mini" onclick="vkCmdUi('mascara', {})">Máscara</button>` : ''}<button class="ie-btn ie-btn-mini" onclick="vkCmdUi('duplicar', {dx: ${vkPT(5)}, dy: ${vkPT(5)}})">Duplicar</button></div></div>`;
     el.innerHTML = h;
@@ -228,6 +233,7 @@ function vkProps() {
         vkCmdUi('alterar', { [a]: v });
     };
     el.onclick = e => {
+        const pf2 = e.target.closest('[data-pf2]'); if (pf2) return vkCmdUi('pathfinder2', { op: pf2.dataset.pf2 });
         const c = e.target.closest('[data-cor]'), al = e.target.closest('[data-al]'), pf = e.target.closest('[data-pf]'), ds = e.target.closest('[data-dist]'), an = e.target.closest('[data-alin]');
         if (c) { const k = c.dataset.cor, atual = k === 'preench' ? (o.tipo === 'grupo' ? (o.itens[0] || {}).preench : o.preench) : ((o.tipo === 'grupo' ? (o.itens[0] || {}).traco : o.traco) || {}).cor;
             vkCorPopup(c, atual, cor => vkCmdUi('alterar', { [k]: cor })); }
