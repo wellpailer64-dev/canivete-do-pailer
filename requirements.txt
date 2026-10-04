@@ -35,4 +35,11 @@ PyMuPDF==1.27.2.2
 av==17.0.0
 # importar PSD/PSB com as camadas (editor-psd.js)
 psd-tools==1.23.0
+# Vetor Kanivete (vetor_*.py): ler/gravar PDF, PowerPoint, texto em curvas (HarfBuzz), Pathfinder, SVG
+pikepdf==10.13.0.post1
+python-pptx==1.0.2
+fonttools==4.65.0
+uharfbuzz==0.56.2
+skia-pathops==0.9.2
+lxml==6.0.3
 pyinstaller==6.19.0

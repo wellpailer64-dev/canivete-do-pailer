@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/editor.css">
     <link rel="stylesheet" href="css/imagem.css">
+    <link rel="stylesheet" href="css/vetor.css">
     <link rel="icon" href="identidade/icone.ico">
 </head>
 <body>
@@ -153,6 +154,9 @@
                 <div class="menu-group">Imagem</div>
                 <button class="menu-item" data-tool="editor-imagem" onclick="switchTool('editor-imagem')">
                     <span class="icon"><svg class="i"><use href="#i-layers"/></svg></span><span class="label">Photo Kanivete</span>
+                </button>
+                <button class="menu-item" data-tool="vetor-kanivete" onclick="switchTool('vetor-kanivete')">
+                    <span class="icon"><svg class="i"><use href="#i-sparkles"/></svg></span><span class="label">Vetor Kanivete</span>
                 </button>
                 <button class="menu-item" data-tool="converter-imagem" onclick="switchTool('converter-imagem')">
                     <span class="icon"><svg class="i"><use href="#i-image"/></svg></span><span class="label">Converter Imagem</span>
@@ -1081,6 +1085,11 @@
                         <div class="ie-modal" id="ie-modal" hidden></div>
                         <div class="ie-pop" id="ie-pop" hidden></div>
                     </div>
+                </div>
+
+                <!-- Vetor Kanivete (estilo Illustrator): vetor-*.js, css/vetor.css, Functions/vetor_*.py -->
+                <div class="tool-page ve-page ie-page vk-page" id="page-vetor-kanivete">
+                    <div class="ie vk" id="vk" tabindex="-1"></div>
                 </div>
 
                 <!-- Converter Imagem -->
@@ -2040,5 +2049,10 @@
     <script src="js/imagem-gerador.js"></script>
     <script src="js/imagem-cena.js"></script>
     <script src="js/imagem-api.js"></script>
+    <script src="js/vetor-nucleo.js"></script>
+    <script src="js/vetor-ferramentas.js"></script>
+    <script src="js/vetor-paineis.js"></script>
+    <script src="js/vetor-arquivo.js"></script>
+    <script src="js/vetor-api.js"></script>
 </body>
 </html>

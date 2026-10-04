@@ -3178,6 +3178,69 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    # ─────────── Vetor Kanivete (Functions/vetor_kanivete.py, vetor_importar.py, vetor_exportar.py) ───────────
+    def vk_abrir(self, path):
+        from Functions import vetor_kanivete
+        try:
+            return vetor_kanivete.abrir(path)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def vk_salvar(self, doc, path):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.salvar(doc, path)
+
+    def vk_texto_geometria(self, spec):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.texto_geometria(spec)
+
+    def vk_booleana(self, op, formas):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.booleana(op, formas)
+
+    def vk_cores_tela(self, lista, cond="FOGRA39"):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.cores_tela(lista, cond)
+
+    def vk_rgb_para_cmyk(self, lista, cond="FOGRA39"):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.rgb_para_cmyk(lista, cond)
+
+    def vk_imagem_info(self, path):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.imagem_info(path)
+
+    def vk_salvar_png(self, dados, path):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.salvar_png(dados, path)
+
+    def vk_perfis(self):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.perfis_disponiveis()
+
+    def vk_exportar_pdf(self, doc, path, opcoes):
+        from Functions import vetor_exportar
+        try:
+            return vetor_exportar.exportar_pdf(doc, path, opcoes)
+        except Exception as e:
+            import traceback
+            return {"success": False, "error": str(e), "trace": traceback.format_exc()[-1500:]}
+
+    def vk_dialogo(self, modo, tipos=None, nome=""):
+        """Janela nativa de abrir/salvar do Vetor Kanivete. modo: abrir | salvar | pasta."""
+        if not _window:
+            return None
+        import webview
+        if modo == "pasta":
+            r = _window.create_file_dialog(webview.FOLDER_DIALOG)
+        elif modo == "salvar":
+            r = _window.create_file_dialog(webview.SAVE_DIALOG, save_filename=nome or "Sem titulo.aknv", file_types=tuple(tipos or ()))
+        else:
+            r = _window.create_file_dialog(webview.OPEN_DIALOG, file_types=tuple(tipos or ("Arquivos vetoriais (*.aknv;*.pdf;*.ai;*.svg;*.pptx)", "Todos (*.*)")))
+        if not r:
+            return None
+        return r if isinstance(r, str) else r[0]
+
     def ie_fonte_url(self, arquivo):
         """URL local de um arquivo de fonte instalado (a página carrega com FontFace: o nome GDI de 31 letras
         e famílias tipográficas não batem com o CSS). Só serve arquivos das pastas de fontes do Windows."""

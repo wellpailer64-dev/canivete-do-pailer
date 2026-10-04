@@ -1,0 +1,673 @@
+[
+{
+"type": "function",
+"function": {
+"name": "mapa",
+"description": "Mostra pranchetas, camadas e objetos (nome, tipo, caixa em mm, cores, texto). Use quando não souber o nome.",
+"parameters": {
+"type": "object",
+"properties": {}
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "retangulo",
+"description": "Cria retângulo. x, y, larg, alt em mm (canto sup. esq., relativo à prancheta). raio = canto arredondado.",
+"parameters": {
+"type": "object",
+"properties": {
+"x": {
+"type": "number"
+},
+"y": {
+"type": "number"
+},
+"larg": {
+"type": "number"
+},
+"alt": {
+"type": "number"
+},
+"raio": {
+"type": "number"
+},
+"preench": {
+"type": "string",
+"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+},
+"traco": {
+"type": "string",
+"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+},
+"espessura": {
+"type": "number"
+},
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"x",
+"y",
+"larg",
+"alt"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "elipse",
+"description": "Cria elipse/círculo na caixa x, y, larg, alt (mm).",
+"parameters": {
+"type": "object",
+"properties": {
+"x": {
+"type": "number"
+},
+"y": {
+"type": "number"
+},
+"larg": {
+"type": "number"
+},
+"alt": {
+"type": "number"
+},
+"preench": {
+"type": "string",
+"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+},
+"traco": {
+"type": "string",
+"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+},
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"x",
+"y",
+"larg"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "texto",
+"description": "Cria texto. x, y = linha de base (mm); caixa = largura (mm) para texto de área. tamanho em pt.",
+"parameters": {
+"type": "object",
+"properties": {
+"conteudo": {
+"type": "string"
+},
+"x": {
+"type": "number"
+},
+"y": {
+"type": "number"
+},
+"fonte": {
+"type": "string"
+},
+"estilo": {
+"type": "string"
+},
+"tamanho": {
+"type": "number"
+},
+"preench": {
+"type": "string",
+"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+},
+"alin": {
+"type": "string",
+"enum": [
+"esq",
+"centro",
+"dir",
+"just"
+]
+},
+"caixa": {
+"type": "number"
+},
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"conteudo",
+"x",
+"y"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "linha",
+"description": "Cria linha reta de (x1,y1) a (x2,y2) em mm.",
+"parameters": {
+"type": "object",
+"properties": {
+"x1": {
+"type": "number"
+},
+"y1": {
+"type": "number"
+},
+"x2": {
+"type": "number"
+},
+"y2": {
+"type": "number"
+},
+"traco": {
+"type": "string",
+"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+},
+"espessura": {
+"type": "number"
+},
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"x1",
+"y1",
+"x2",
+"y2"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "estrela",
+"description": "Cria estrela: centro cx, cy e raio em mm.",
+"parameters": {
+"type": "object",
+"properties": {
+"cx": {
+"type": "number"
+},
+"cy": {
+"type": "number"
+},
+"raio": {
+"type": "number"
+},
+"pontas": {
+"type": "number"
+},
+"preench": {
+"type": "string",
+"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+},
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"cx",
+"cy",
+"raio"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "alterar",
+"description": "Muda objetos: preench, traco, espessura (pt), opacidade (%), sobreimprimir, conteudo, fonte, estilo, tamanho, alin, nome.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+},
+"preench": {
+"type": "string",
+"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+},
+"traco": {
+"type": "string",
+"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+},
+"espessura": {
+"type": "number"
+},
+"opacidade": {
+"type": "number"
+},
+"sobreimprimir": {
+"type": "boolean"
+},
+"conteudo": {
+"type": "string"
+},
+"fonte": {
+"type": "string"
+},
+"estilo": {
+"type": "string"
+},
+"tamanho": {
+"type": "number"
+},
+"alin": {
+"type": "string"
+},
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"objetos"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "mover",
+"description": "Move objetos dx, dy em mm.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+},
+"dx": {
+"type": "number"
+},
+"dy": {
+"type": "number"
+}
+},
+"required": [
+"objetos"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "posicionar",
+"description": "Põe o canto superior esquerdo dos objetos em x, y (mm).",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+},
+"x": {
+"type": "number"
+},
+"y": {
+"type": "number"
+}
+},
+"required": [
+"objetos"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "redimensionar",
+"description": "Redimensiona: larg e/ou alt em mm (só um = proporcional) ou escala em %.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+},
+"larg": {
+"type": "number"
+},
+"alt": {
+"type": "number"
+},
+"escala": {
+"type": "number"
+}
+},
+"required": [
+"objetos"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "girar",
+"description": "Gira objetos em graus (anti-horário positivo).",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+},
+"graus": {
+"type": "number"
+}
+},
+"required": [
+"objetos",
+"graus"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "alinhar",
+"description": "Alinha. modo: esquerda, centro_h, direita, topo, centro_v, base. relativo: prancheta ou selecao.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+},
+"modo": {
+"type": "string",
+"enum": [
+"esquerda",
+"centro_h",
+"direita",
+"topo",
+"centro_v",
+"base"
+]
+},
+"relativo": {
+"type": "string",
+"enum": [
+"prancheta",
+"selecao"
+]
+}
+},
+"required": [
+"objetos",
+"modo"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "organizar",
+"description": "Ordem de empilhamento. modo: frente, tras, acima, abaixo.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+},
+"modo": {
+"type": "string",
+"enum": [
+"frente",
+"tras",
+"acima",
+"abaixo"
+]
+}
+},
+"required": [
+"objetos",
+"modo"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "agrupar",
+"description": "Agrupa objetos.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+},
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"objetos"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "duplicar",
+"description": "Duplica objetos (dx, dy em mm opcional).",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+},
+"dx": {
+"type": "number"
+},
+"dy": {
+"type": "number"
+}
+},
+"required": [
+"objetos"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "apagar",
+"description": "Apaga objetos.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+}
+},
+"required": [
+"objetos"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "pathfinder",
+"description": "Combina formas. op: unir, subtrair, intersecao, excluir.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+},
+"op": {
+"type": "string",
+"enum": [
+"unir",
+"subtrair",
+"intersecao",
+"excluir"
+]
+}
+},
+"required": [
+"objetos",
+"op"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "contornos",
+"description": "Converte textos em curvas.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+}
+},
+"required": [
+"objetos"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "fechamento",
+"description": "Confere o arquivo para a gráfica (preflight). padrao: x4, x1a, cmyk. Erros trazem a correção.",
+"parameters": {
+"type": "object",
+"properties": {
+"padrao": {
+"type": "string",
+"enum": [
+"x4",
+"x1a",
+"cmyk",
+"rgb"
+]
+}
+}
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "corrigir",
+"description": "Aplica uma correção do fechamento.",
+"parameters": {
+"type": "object",
+"properties": {
+"correcao": {
+"type": "string",
+"enum": [
+"converter_cmyk",
+"preto_texto",
+"sobreimprimir_preto",
+"tirar_sobre_branco",
+"engrossar_tracos",
+"limpar"
+]
+}
+},
+"required": [
+"correcao"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "exportar_pdf",
+"description": "Exporta PDF para gráfica na pasta do contrato. Roda no fim.",
+"parameters": {
+"type": "object",
+"properties": {
+"nome": {
+"type": "string"
+},
+"padrao": {
+"type": "string",
+"enum": [
+"x4",
+"x1a",
+"cmyk",
+"rgb"
+]
+}
+}
+}
+}
+}
+]

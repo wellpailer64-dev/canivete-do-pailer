@@ -74,6 +74,22 @@ Mesmo `worker.py`; executor `executor_editor.js` (window.VEW) + `ferramentas_edi
 - Primeiros jobs (2026-10-04, `D:/kanivete_testes/worker/editor/teste.vknv`): EDITOR_01 8 ops 26 s (2 erros corrigidos:
   direcao × lado) · EDITOR_02 corte+ripple, câmera lenta, efeito, escala, whoosh, export — 9 ops, 0 erros, 16,5 s.
 
+## Vetor Kanivete — `"app": "vetor"`
+`executor_vetor.js` (window.VKW) só repassa para os comandos do app (`VKN.cmd(..., 'worker')`) — mesma API da interface e
+do Claude. `ferramentas_vetor.json` (21): mapa, retangulo, elipse, texto, linha, estrela, alterar, mover, posicionar,
+redimensionar, girar, alinhar, organizar, agrupar, duplicar, apagar, pathfinder, contornos, fechamento, corrigir,
+exportar_pdf (agendado). Objetos pelo NOME; mm relativos à prancheta; `constraints`: `documento` (.aknv/.pdf/.ai/.svg/.pptx)
+ou `novo: {nome, larg, alt, sangria}`, `pasta_exportacao`. Condições: `existe|cor|traco|texto|tamanho|x|y|larg|alt|sobreimprimir:NOME=v`,
+`sem:NOME`, `objetos:N`, `fechamento_ok:x4`, `exportado`. Guia do app: `Instructions/vetor-kanivete.md`.
+- VETOR_FLYER_03 (2026-10-04): flyer A6 do zero + alinhar + fechamento + PDF/X-4 → 8 ops, 0 erros, 20 s (qwen3:8b).
+  Antes: fonte "Arial Bold" travou o fechamento (o app agora entende) e exportar_pdf não estava nas finais.
+
+## Onde o Worker rende e onde não (medido 2026-10-04, sincero)
+- RENDE: operar os apps (Editor, Photo, Vetor) por contrato — ~300 tokens meus por 8–10 operações.
+- NÃO RENDE: inserir código que eu já escrevi (o contrato carrega o texto todo; VETOR_API_MAIN apagou a âncora,
+  VETOR_INDEX espalhou 28 botões, VETOR_LINT não mudou nada e disse que corrigiu). Para código: só busca, rodar teste,
+  mastigar log/traceback — saída curta que eu leria de qualquer jeito.
+
 ## Code Worker / Debug Worker (infraestrutura) — `tools/worker/codigo.py`
 Mesmo Qwen3 8B, prompt e ferramentas próprios (não sabe de camadas; o de design não sabe de git). Ferramentas FECHADAS:
 `buscar_codigo` (git grep), `ler_arquivo` (≤120 linhas), `aplicar_troca` (trecho exato; `todas`), `rodar_teste` (só os do
@@ -88,6 +104,10 @@ não mexe em .git, dist, build, `_credenciais.py`, nem fora de `arquivos`.
 ```
 - O Claude escreve o contrato e **revisa o diff** (`git diff <arquivo>`), não o processo. Teste que compila não prova a
   mudança: ponha `success_conditions` (o 1º teste deu "success" sem criar a constante; py_compile → pyflakes + condições).
+- Condições: `contem:arq=txt`, `nao_contem:arq=txt`, **`uma_vez:arq=txt`** (exatamente 1 vez) e **`max_linhas:arq=N`** (tamanho
+  máximo do diff). Inserção SEMPRE com `uma_vez` + `max_linhas`: o VETOR_INDEX (2026-10-04) usou `todas=true` numa âncora
+  comum (`</button>`) e espalhou 28 botões — passou como "success" só com `contem`. Âncora longa e única; peça para o `novo`
+  repetir a âncora. `py:arquivo` reprova só aviso NOVO do pyflakes (os antigos do HEAD são ignorados).
 - Repetiu a mesma chamada → cobra outra abordagem; 3 erros seguidos → gemma4:e4b pensando assume (`worker` na saída).
 - Usar para: achar onde algo é tratado, troca mecânica/renomear, registrar ferramenta, rodar testes e mastigar log,
   diagnosticar traceback. NÃO para: arquitetura, bug de evento/estado, mudança grande.

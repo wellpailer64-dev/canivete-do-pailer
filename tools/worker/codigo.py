@@ -77,7 +77,15 @@ def executar(nome, a, ctx):
         if t not in ctx["testes"]: raise ValueError(f"teste fora do contrato; use um de: {', '.join(ctx['testes'])}")
         cmd = comando_de(t)
         if not cmd: raise ValueError(f'teste "{t}" não existe')
-        cod, out = rodar(cmd); ctx["resultados"][t] = cod == 0
+        cod, out = rodar(cmd)
+        if t.startswith("py:") and cod:   # arquivo grande já tem avisos antigos: reprova só o que é NOVO (comparado ao HEAD)
+            msg = lambda l: re.sub(r"^.*?:\d+:\d+:? ", "", l).strip()
+            base = subprocess.run([sys.executable, "-m", "pyflakes"], input=subprocess.run(["git", "show", "HEAD:" + t[3:]], cwd=RAIZ, capture_output=True).stdout,
+                                  capture_output=True, cwd=RAIZ).stdout.decode("utf-8", "replace")
+            antigos = {msg(l) for l in base.splitlines()}
+            novos = [l for l in out.splitlines() if l.strip() and msg(l) not in antigos]
+            cod, out = (1, "\n".join(novos)) if novos else (0, f"sem avisos novos ({len(antigos)} antigos ignorados)")
+        ctx["resultados"][t] = cod == 0
         return ("PASSOU" if cod == 0 else f"FALHOU (código {cod})") + "\n" + resumo_saida(out)
     if nome == "ver_diff":
         _, est = rodar(["git", "diff", "--stat"], 30); _, d = rodar(["git", "diff", "-U2"], 30)
@@ -86,13 +94,18 @@ def executar(nome, a, ctx):
 
 
 def conferir(conds):
-    """condições do contrato: "contem:arquivo=texto" / "nao_contem:arquivo=texto" → lista do que falta"""
+    """condições: "contem:arq=texto" / "nao_contem:arq=texto" / "uma_vez:arq=texto" (exatamente 1x) / "max_linhas:arq=N" → o que falta"""
     falta = []
     for cd in conds or []:
         k, _, resto = str(cd).partition(":"); arq, _, txt = resto.partition("=")
         try: s = open(rel(arq), encoding="utf-8").read()
         except Exception: s = ""
-        if (k == "contem" and txt not in s) or (k == "nao_contem" and txt in s): falta.append(cd)
+        if (k == "contem" and txt not in s) or (k == "nao_contem" and txt in s) or (k == "uma_vez" and s.count(txt) != 1): falta.append(cd)
+        # "max_linhas:arquivo=N": o diff do arquivo não pode passar de N linhas (+/-) — pega troca espalhada por "todas"
+        if k == "max_linhas":
+            _, d = rodar(["git", "diff", "--numstat", "--", arq], 30)
+            n = sum(int(a) + int(b) for a, b, *_ in (l.split("	") for l in d.splitlines() if l[:1].isdigit()))
+            if n > int(txt or 0): falta.append(f"{cd} (diff tem {n} linhas: desfaça o que trocou a mais, use todas=false)")
     return falta
 
 

@@ -1,0 +1,96 @@
+/* =========================================================
+   Vetor Kanivete (estilo Illustrator) — js/vetor-*.js
+   Reaproveita o visual do Photo Kanivete (classes ie-*); aqui só o que é próprio.
+   ========================================================= */
+.vk-page { padding: 0; }
+.vk { --vk-mesa: #3b3b3b; }
+.vk .vk-corpo { grid-template-columns: 46px minmax(0, 1fr) 300px; }
+.vk .ie-centro { grid-template-rows: minmax(0, 1fr) 24px; }
+.vk .vk-paineis { flex-direction: column !important; overflow: hidden; }
+.vk .vk-paineis > .ie-painel { min-height: 0; display: flex; flex-direction: column; }
+.vk .vk-paineis > .ie-painel:first-child { flex: 1 1 55%; }
+.vk .vk-paineis > .vk-p-abas { flex: 1 1 45%; border-top: 1px solid var(--ie-linha); }
+.vk .ie-painel-corpo { overflow-y: auto; padding: 8px 10px; }
+.vk-vista { position: relative; overflow: hidden; background: var(--vk-mesa); }
+.vk-vista canvas { position: absolute; inset: 0; display: block; touch-action: none; }
+.vk .ie-status { display: flex; gap: 18px; padding: 0 10px; align-items: center; color: var(--text-2); font-size: 11.5px; }
+
+/* cores na barra de ferramentas (preenchimento na frente, traço atrás) */
+.vk-cores-ferr { position: relative; width: 38px; height: 40px; margin-top: 10px; }
+.vk-cf { position: absolute; width: 24px; height: 24px; padding: 0; border: 1px solid var(--ie-linha-2); border-radius: 3px; background: none; cursor: pointer; }
+.vk-cf-p { left: 2px; top: 2px; z-index: 2; }
+.vk-cf-t { right: 2px; bottom: 2px; z-index: 1; }
+.vk-cf.on { z-index: 3; box-shadow: 0 0 0 2px var(--ie-acento); }
+.vk-cf .vk-sw { width: 100%; height: 100%; border-radius: 2px; }
+.vk-cf-t i { position: absolute; inset: 6px; background: var(--ie-painel); border: 1px solid var(--ie-linha-2); }
+
+/* amostra de cor */
+.vk-sw { display: inline-block; width: 18px; height: 18px; border-radius: 3px; border: 1px solid rgba(255, 255, 255, .18); flex: none; }
+.vk-sw-traco { box-shadow: inset 0 0 0 4px var(--ie-painel); }
+
+/* painéis */
+.vk-sec { padding: 6px 0 10px; border-bottom: 1px solid var(--ie-linha); }
+.vk-sec:last-child { border-bottom: 0; }
+.vk-sec-t { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); margin-bottom: 6px; }
+.vk-grade { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 8px; }
+.vk-campo { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.vk-campo span { color: var(--text-3); min-width: 14px; font-size: 11.5px; }
+.vk-campo input { width: 100%; min-width: 0; background: var(--ie-painel-2); border: 1px solid var(--ie-linha-2); color: var(--text); border-radius: 4px; padding: 3px 5px; font: inherit; }
+.vk-campo em { color: var(--text-3); font-style: normal; font-size: 11px; }
+.vk-linha { display: flex; align-items: center; gap: 6px; margin: 5px 0; flex-wrap: wrap; }
+.vk-linha > span { color: var(--text-2); min-width: 54px; }
+.vk-linha select, .vk-linha input[type=text], .vk-linha input:not([type]) { background: var(--ie-painel-2); border: 1px solid var(--ie-linha-2); color: var(--text); border-radius: 4px; padding: 3px 5px; font: inherit; }
+.vk-mini { font-size: 11.5px; color: var(--text-2); }
+.vk-chk { display: flex; align-items: center; gap: 6px; margin: 5px 0; color: var(--text-2); }
+.vk-acoes, .vk-bts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.vk-nota { color: var(--text-3); font-size: 11.5px; line-height: 1.45; margin: 6px 0; word-break: break-word; }
+.vk-cor-btn { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; padding: 4px 6px; background: var(--ie-painel-2); border: 1px solid var(--ie-linha-2); border-radius: 4px; color: var(--text); cursor: pointer; font: inherit; text-align: left; }
+.vk-cor-btn small { margin-left: auto; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vk-fonte { flex: 1; min-width: 0; }
+.vk-segm { margin: 6px 0; }
+
+/* abas de baixo */
+.vk-abas { display: flex; gap: 0; padding: 0 !important; }
+.vk-abas button { flex: 1; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--text-2); padding: 7px 2px; font: inherit; font-size: 11.5px; cursor: pointer; }
+.vk-abas button.on { color: var(--text); border-bottom-color: var(--ie-acento); }
+.vk-cam-lista { display: flex; flex-direction: column; }
+.vk-cam { display: flex; align-items: center; gap: 6px; padding: 5px 4px; border-radius: 4px; cursor: default; font-weight: 600; }
+.vk-cam.ativa { background: var(--ie-sel); }
+.vk-cam small { color: var(--text-3); font-weight: 400; margin-left: auto; }
+.vk-cam-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vk-cam-o { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 3px; color: var(--text-2); cursor: default; white-space: nowrap; overflow: hidden; }
+.vk-cam-o span { overflow: hidden; text-overflow: ellipsis; }
+.vk-cam-o:hover { background: var(--ie-hover); }
+.vk-cam-o.on { background: rgba(47, 140, 255, .22); color: var(--text); }
+.vk-olho { background: none; border: 0; color: var(--text-3); width: 16px; padding: 0; cursor: pointer; font-size: 10px; }
+.vk-am-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(26px, 1fr)); gap: 4px; }
+.vk-am { position: relative; padding: 0; background: none; border: 0; cursor: pointer; }
+.vk-am .vk-sw { width: 26px; height: 26px; }
+.vk-am i { position: absolute; right: 1px; bottom: -2px; font-size: 9px; color: #fff; text-shadow: 0 0 2px #000; font-style: normal; }
+
+/* fechamento */
+.vk-fc { display: flex; align-items: flex-start; gap: 6px; padding: 5px 4px; border-radius: 4px; margin: 3px 0; background: var(--ie-painel-2); }
+.vk-fc span { flex: 1; line-height: 1.35; }
+.vk-fc-erro b { color: #ff5a5a; }
+.vk-fc-aviso b { color: #ffb020; }
+.vk-fc-res { padding: 7px 9px; border-radius: 5px; margin: 6px 0; font-weight: 600; }
+.vk-fc-res.ok { background: rgba(40, 180, 90, .16); color: #6ee29a; }
+.vk-fc-res.ruim { background: rgba(255, 70, 70, .14); color: #ff8a8a; }
+
+/* seletor de cor */
+.vk-cp { width: 262px; padding: 8px; }
+.vk-cp-prev { display: flex; align-items: center; gap: 8px; margin: 8px 0; color: var(--text-2); }
+.vk-cp-prev .vk-sw { width: 34px; height: 22px; }
+.vk-sl { display: grid; grid-template-columns: 36px 1fr 52px; gap: 6px; align-items: center; margin: 4px 0; color: var(--text-2); }
+.vk-sl input[type=number], .vk-sl input[type=text] { background: var(--ie-painel); border: 1px solid var(--ie-linha-2); color: var(--text); border-radius: 4px; padding: 2px 4px; font: inherit; width: 100%; }
+.vk-sl input[type=text] { grid-column: 2 / 4; }
+.vk-cp-am { display: flex; flex-wrap: wrap; gap: 3px; margin: 8px 0 4px; }
+.vk-cp-am button { padding: 0; border: 0; background: none; cursor: pointer; color: var(--text-2); width: 18px; height: 18px; line-height: 16px; }
+.vk-grad-barra { height: 14px; border-radius: 3px; margin: 6px 0; border: 1px solid var(--ie-linha-2); }
+
+/* texto em edição, avisos */
+.vk-texto-edit { position: absolute; z-index: 6; min-height: 1.4em; padding: 2px 4px; background: rgba(255, 255, 255, .96); color: #111; border: 1px solid #2f8cff; border-radius: 2px; font-family: system-ui, sans-serif; resize: both; outline: none; }
+.vk-avisos { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none; z-index: 8; }
+.vk-aviso { background: rgba(20, 20, 20, .92); color: #eee; padding: 6px 12px; border-radius: 6px; font-size: 12px; box-shadow: var(--shadow-pop); max-width: 520px; }
+.vk-aviso-ag { background: rgba(110, 60, 200, .92); }
+.vk-dlg { width: 470px; }

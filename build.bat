@@ -96,6 +96,15 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "Functions.recorte_pro" ^
  --hidden-import "Functions.recuperar" ^
  --hidden-import "psd_tools.api.numpy_io" ^
+ --hidden-import "Functions.vetor_kanivete" ^
+ --hidden-import "Functions.vetor_importar" ^
+ --hidden-import "Functions.vetor_exportar" ^
+ --hidden-import "pikepdf" ^
+ --hidden-import "uharfbuzz" ^
+ --hidden-import "pathops" ^
+ --hidden-import "fontTools" ^
+ --hidden-import "lxml" ^
+ --collect-all "pptx" ^
  --collect-data "cv2" ^
  --copy-metadata "pywebview" ^
  --copy-metadata "pythonnet" ^

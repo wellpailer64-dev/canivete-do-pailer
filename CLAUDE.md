@@ -71,6 +71,13 @@ Gerar imagem com IA (FLUX.2 klein via stable-diffusion.cpp Vulkan, baixado sob d
 guia `Instructions/agente/plano-cena.md` (seção "Fluxo barato": biblioteca `D:\kanivete_biblioteca` com recursos/modelos/amostras, `data-cor`, `recurso:`, `--ver`, `--comparar`, `--variacoes`, `KNV.etapa`). Fazer arte pelo app (API `window.KNV`, receitas em etapas .iknv, `rodar.py`, `KNV.mapa()`/`KNV.revisar()`, técnicas):
 `Instructions/agente/design-photo-kanivete.md`.
 
+## Vetor Kanivete (estilo Illustrator, para gráfica)
+Estudo de caso, modelo, API, fechamento e pendências: `Instructions/vetor-kanivete.md`; código `frontend/js/vetor-*.js` +
+`Functions/vetor_*.py`. Abre PDF/AI/SVG/PPTX, salva `.aknv`, exporta PDF/X-4 e X-1a (curvas, CMYK pelo ICC, sangria,
+marcas, verificação relendo o PDF). **API primeiro**: tudo é `vkCmd`/`window.VKN.cmd` (interface, Claude e Worker iguais);
+ler o documento com `VKN.mapa()`, conferir com `VKN.fechamento()`. Worker: `"app": "vetor"`. Teste: `python testes/teste_vetor.py`
+(rodar antes de release quando mexer no Vetor).
+
 ## Build local
 - `build.bat` apaga `dist/` inteiro, onde ficam os modelos do usuário (`modelos_ia/`, `models/`, ~8 GB).
   Gere em outra pasta (`--distpath dist_novo --workpath build_novo`) e copie só `CaniveteDoPailer.exe`,
