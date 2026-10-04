@@ -12,6 +12,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 MODELO = "gemma4:e4b"
 OLLAMA = "http://127.0.0.1:11434"
+LADO_PECA = 1280
 
 
 def _post(rota, corpo, timeout=600):
@@ -89,14 +90,14 @@ def comparar(ref, peca, foco=""):
                      + "Liste até 8 diferenças visuais que importam para a cópia ficar igual (posição, tamanho, cor, elementos que "
                        "faltam ou sobram, enquadramento de pessoas, fontes, efeitos). Uma por linha, começando com '- ', curtas e "
                        "concretas (ex.: '- slide 1: título menor que na referência'). Ignore o conteúdo do texto e diferenças de "
-                       "pessoa/rosto gerado. Se estiverem praticamente iguais, responda só 'IGUAL'.", lado=1280)
+                       "pessoa/rosto gerado. Se estiverem praticamente iguais, responda só 'IGUAL'.", lado=LADO_PECA)
 
 
 def revisar(peca):
     return perguntar([peca], "Você é diretor de arte revisando esta peça de redes sociais antes da entrega. Liste até 6 problemas "
                      "reais, um por linha começando com '- ': pessoa ou objeto com corte seco (borda reta de foto aparecendo), texto "
                      "difícil de ler sobre a imagem, sombra dura ou suja, elementos atropelados, margens, rosto cortado em avatar. "
-                     "Diga ONDE está. Se não houver problema, responda só 'OK'.", lado=1280)
+                     "Diga ONDE está. Se não houver problema, responda só 'OK'.", lado=LADO_PECA)
 
 
 if __name__ == "__main__":

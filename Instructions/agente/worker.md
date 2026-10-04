@@ -52,3 +52,23 @@ py -3.13 tools/worker/worker.py contrato.json          # app em --agente=9333; O
   rastro, luz, tratarFoto, profundidade), também para o Claude usar direto.
 Custo do lado do Claude: escrever o contrato (~250 tokens) + ler a linha de volta (~80).
 Próximo: mais ferramentas (texto novo, cena, gerar, receitas), ferramentas do editor de vídeo, medir jobs maiores.
+
+## Code Worker / Debug Worker (infraestrutura) — `tools/worker/codigo.py`
+Mesmo Qwen3 8B, prompt e ferramentas próprios (não sabe de camadas; o de design não sabe de git). Ferramentas FECHADAS:
+`buscar_codigo` (git grep), `ler_arquivo` (≤120 linhas), `aplicar_troca` (trecho exato; `todas`), `rodar_teste` (só os do
+contrato: `node:arq.js` sintaxe, `py:arq.py` pyflakes, `teste:nome` = testes/teste_nome.py), `ver_diff`. Sem shell livre;
+não mexe em .git, dist, build, `_credenciais.py`, nem fora de `arquivos`.
+```
+{"task_id": "X", "modo": "codigo", "goal": "...", "arquivos": ["tools/olho.py"], "testes": ["py:tools/olho.py"],
+ "success_conditions": ["contem:tools/olho.py=LADO_PECA = 1280", "nao_contem:tools/olho.py=lado=1280)"]}
+→ {"status", "worker", "files_changed", "tests": "1/1", "diff": "+3 -2", "resumo", "seconds"}
+{"task_id": "Y", "modo": "debug", "goal": "...", "comando": "py:arq.py" | "log": "caminho"}
+→ {"status", "causa", "arquivo": "arq:linha", "funcao", "correcao", "confianca"}
+```
+- O Claude escreve o contrato e **revisa o diff** (`git diff <arquivo>`), não o processo. Teste que compila não prova a
+  mudança: ponha `success_conditions` (o 1º teste deu "success" sem criar a constante; py_compile → pyflakes + condições).
+- Repetiu a mesma chamada → cobra outra abordagem; 3 erros seguidos → gemma4:e4b pensando assume (`worker` na saída).
+- Usar para: achar onde algo é tratado, troca mecânica/renomear, registrar ferramenta, rodar testes e mastigar log,
+  diagnosticar traceback. NÃO para: arquitetura, bug de evento/estado, mudança grande.
+- Primeiros jobs (2026-10-04): troca com constante 10 s (errada sem condições) → 65 s certa com reserva; debug de nome
+  indefinido 11 s, causa e correção certas (0.95).

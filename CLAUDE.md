@@ -98,3 +98,5 @@ Antes de olhar imagem: `tools/medir_ref.py` (mede a referência: textos, formas,
 ("Fluxo barato v2"). Cada feedback novo do usuário vira regra no revisor (`KNV.revisarPeca` em imagem-api.js + revisor.py).
 Operações repetitivas no Photo Kanivete: escrever um contrato e delegar ao Qwen3 8B local (`py -3.13 tools/worker/worker.py contrato.json`),
 que volta numa linha JSON. Contrato, condições de sucesso e ferramentas: `Instructions/agente/worker.md`.
+Infraestrutura braçal (achar no código, troca mecânica, rodar teste, diagnosticar traceback): Code/Debug Worker
+`py -3.13 tools/worker/codigo.py contrato.json` (ferramentas fechadas); eu reviso só o diff. Mesmo guia.
