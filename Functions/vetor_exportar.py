@@ -227,8 +227,91 @@ class _Escritor:
         M = mmul([W, 0, 0, -H, 0, H], o["m"])
         return ["q"] + self.estilo_ops(o) + [" ".join(_f(x) for x in M) + " cm", f"/{nome} Do", "Q"]
 
+    # ── efeitos vivos rasterizados (sombra projetada, brilho externo, desfoque) ──
+    def _cs_cor(self, c):
+        """cor chapada → (espaço de cor, componentes 0-255) para uma imagem; tinta especial continua especial."""
+        import pikepdf
+        if c and c.get("k") == "grad": c = c["paradas"][0]["cor"]; self.avisos.add("efeito com degradê saiu na cor da 1ª parada")
+        if c and c["k"] in ("spot", "reg") and not (c["k"] == "spot" and self.spots_processo):
+            nome, alt, t = ("All", [100, 100, 100, 100], 1) if c["k"] == "reg" else (c["nome"], c["v"], c.get("tint", 100) / 100)
+            return self.res["ColorSpace"][self._sep(nome, alt)], [round(t * 255)]
+        if c and c["k"] == "rgb" and not self.impressao:
+            return pikepdf.Name.DeviceRGB, [int(x) for x in c["v"]]
+        return pikepdf.Name.DeviceCMYK, [round(max(0, min(100, x)) * 2.55) for x in self.cmyk_de(c or {"k": "cmyk", "v": [0, 0, 0, 100]})]
+
+    def efeito_raster(self, ef, pinturas, cor=None):
+        """pinturas = [{subs, regra, preench?, traco?}] (pt do documento) → imagem na cor do efeito com a silhueta
+        desfocada como SMask (300 ppi). Sombra/brilho: cor do efeito, deslocada; desfoque: cor = a do próprio objeto."""
+        import numpy as np, pikepdf, skia
+        if not self.transp:
+            self.avisos.add("efeitos (sombra/brilho/desfoque) não saem em PDF/X-1a: use PDF/X-4"); return []
+        sig = max(0.0, float(ef.get("desfoque") or 0)); dx, dy = float(ef.get("dx") or 0), float(ef.get("dy") or 0)
+        xs, ys = [], []
+        for p in pinturas:
+            w = ((p.get("traco") or {}).get("larg") or 0) / 2
+            for sb in p.get("subs") or []:
+                for q in sb["pts"]:
+                    for i in (0, 2, 4): xs += [q[i] - w, q[i] + w]
+                    for i in (1, 3, 5): ys += [q[i] - w, q[i] + w]
+        if not xs: return []
+        m = 3 * sig + 1
+        x0, y0, x1, y1 = min(xs) + dx - m, min(ys) + dy - m, max(xs) + dx + m, max(ys) + dy + m
+        esc = float(self.op.get("ppi_efeitos") or 300) / 72
+        esc = min(esc, 5000 / max(1e-6, x1 - x0), 5000 / max(1e-6, y1 - y0))
+        W, H = max(1, int(math.ceil((x1 - x0) * esc))), max(1, int(math.ceil((y1 - y0) * esc)))
+        sup = skia.Surface(W, H); cv = sup.getCanvas(); cv.clear(skia.ColorTRANSPARENT)
+        cv.scale(esc, esc); cv.translate(-x0 + dx, -y0 + dy)
+        pn = skia.Paint(AntiAlias=True, Color=skia.ColorBLACK)
+        if sig > 0: pn.setMaskFilter(skia.MaskFilter.MakeBlur(skia.kNormal_BlurStyle, sig))
+        for p in pinturas:
+            caminho = vk._sk_path(p["subs"], p.get("regra", "nonzero"))
+            if p.get("preench"):
+                pn.setStyle(skia.Paint.kFill_Style); cv.drawPath(caminho, pn)
+            t = p.get("traco")
+            if t and t.get("cor"):
+                pn.setStyle(skia.Paint.kStroke_Style); pn.setStrokeWidth(float(t.get("larg") or 1))
+                pn.setStrokeCap([skia.Paint.kButt_Cap, skia.Paint.kRound_Cap, skia.Paint.kSquare_Cap][["butt", "round", "square"].index(t.get("cap", "butt"))])
+                pn.setStrokeJoin([skia.Paint.kMiter_Join, skia.Paint.kRound_Join, skia.Paint.kBevel_Join][["miter", "round", "bevel"].index(t.get("junc", "miter"))])
+                cv.drawPath(caminho, pn)
+        alfa = np.ascontiguousarray(sup.makeImageSnapshot().toarray()[:, :, 3])
+        if not alfa.any(): return []
+        cs, comp = self._cs_cor(cor if cor is not None else ef.get("cor") or {"k": "cmyk", "v": [0, 0, 0, 100]})
+        cores = np.tile(np.array(comp, dtype=np.uint8), W * H).tobytes()
+        mascara = self.pdf.make_stream(zlib.compress(alfa.tobytes(), 6), Type=pikepdf.Name.XObject, Subtype=pikepdf.Name.Image, Width=W, Height=H,
+                                       ColorSpace=pikepdf.Name.DeviceGray, BitsPerComponent=8, Filter=pikepdf.Name.FlateDecode)
+        xo = self.pdf.make_stream(zlib.compress(cores, 9), Type=pikepdf.Name.XObject, Subtype=pikepdf.Name.Image, Width=W, Height=H,
+                                  ColorSpace=cs, BitsPerComponent=8, Filter=pikepdf.Name.FlateDecode, SMask=mascara)
+        nome = f"Im{len(self.res['XObject']) + 1}"
+        self.res["XObject"][nome] = xo
+        gs = {}
+        op = ef.get("op", 1)
+        if op < 1: gs.update(ca=round(op, 4), CA=round(op, 4))
+        if ef.get("bm") and ef["bm"] != "normal": gs["BM"] = _BM.get(ef["bm"], "Normal")
+        M = mmul([W, 0, 0, -H, 0, H], [1 / esc, 0, 0, 1 / esc, x0, y0])
+        return ["q"] + ([self._gs(**gs)] if gs else []) + [" ".join(_f(x) for x in M) + " cm", f"/{nome} Do", "Q"]
+
     def objeto(self, o):
         if o.get("visivel") is False: return []
+        efs = [e for e in (o.get("efeitos") or []) if e.get("visivel") is not False and e.get("tipo") in ("sombra", "brilho", "desfoque")]
+        if efs and o.get("_silh"):   # efeitos vivos: a tela mandou a silhueta (pinturas em pt do documento)
+            out = ["q"] + self.estilo_ops(o)
+            for e in efs:
+                if e["tipo"] in ("sombra", "brilho"): out += self.efeito_raster(e, o["_silh"])
+            desf = next((e for e in efs if e["tipo"] == "desfoque"), None)
+            if desf:   # o objeto inteiro desfocado: uma imagem por cor
+                if any(p.get("img") for p in o["_silh"]): self.avisos.add("desfoque em imagem colocada não sai no PDF (desfoque a foto no Photo Kanivete)")
+                for p in o["_silh"]:
+                    if p.get("img"): continue
+                    if p.get("preench"): out += self.efeito_raster(desf, [dict(p, traco=None)], p["preench"])
+                    if p.get("traco") and p["traco"].get("cor"): out += self.efeito_raster(desf, [dict(p, preench=None)], p["traco"]["cor"])
+                return out + ["Q"]
+            return out + self.objeto(dict(o, efeitos=None, op=1, bm="normal")) + ["Q"]   # opacidade/mesclagem já valem no q de fora
+        if o.get("_pint") is not None:   # Aparência (vários preenchimentos/traços, cantos arredondados): pinturas prontas da tela
+            out = []
+            for p in o["_pint"]:
+                est = self.estilo_ops(dict(op=o.get("op", 1) * p.get("op", 1), bm=p.get("bm") if p.get("bm") not in (None, "normal") else o.get("bm", "normal"), sobre=o.get("sobre")))
+                out += self.pintar(p["subs"], p.get("regra", "nonzero"), p.get("preench"), p.get("traco"), est)
+            return out
         t = o.get("tipo")
         if t == "grupo":
             itens = o.get("itens") or []

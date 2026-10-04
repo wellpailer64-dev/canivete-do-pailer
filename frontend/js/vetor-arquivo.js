@@ -122,6 +122,7 @@
             ver(o.preench, v => { o.preench = v; });
             if (o.traco) ver(o.traco.cor, v => { o.traco = { ...o.traco, cor: v }; });
             (o.trechos || []).forEach(t => { ver(t.preench, v => { t.preench = v; }); if (t.traco) ver(t.traco.cor, v => { t.traco = { ...t.traco, cor: v }; }); });
+            [...(o.aparencia || []), ...(o.efeitos || [])].forEach(l => ver(l.cor, v => { l.cor = v; }));
         }
         const E = VK.doc.estilosTexto; if (E) for (const L of [E.par, E.car]) for (const st of Object.values(L || {})) { ver(st.preench, v => { st.preench = v; }); if (st.traco) ver(st.traco.cor, v => { st.traco = { ...st.traco, cor: v }; }); }
         for (const am of VK.doc.amostras) ver(am.cor, v => { am.cor = v; });
@@ -218,7 +219,7 @@ const vkPretoRico = c => c && c.k === 'cmyk' && c.v[3] >= 90 && c.v[0] + c.v[1] 
 const vkPreto100 = c => c && c.k === 'cmyk' && c.v[3] >= 99.5 && c.v[0] + c.v[1] + c.v[2] < 0.5;
 const vkBranco = c => c && ((c.k === 'cmyk' && c.v.every(x => x < 0.5)) || (c.k === 'rgb' && c.v.every(x => x > 254)));
 const vkBoxArea = o => { const b = vkBox(o); return isFinite(b[0]) ? (b[2] - b[0]) * (b[3] - b[1]) : 0; };
-function vkCores(o) { const out = []; const ad = c => { if (!c) return; if (c.k === 'grad') c.paradas.forEach(p => ad(p.cor)); else out.push(c); }; ad(o.preench); if (o.traco) ad(o.traco.cor); (o.trechos || []).forEach(t => { ad(t.preench); if (t.traco) ad(t.traco.cor); }); return out; }
+function vkCores(o) { const out = []; const ad = c => { if (!c) return; if (c.k === 'grad') c.paradas.forEach(p => ad(p.cor)); else out.push(c); }; ad(o.preench); if (o.traco) ad(o.traco.cor); (o.trechos || []).forEach(t => { ad(t.preench); if (t.traco) ad(t.traco.cor); }); (o.aparencia || []).forEach(l => ad(l.cor)); (o.efeitos || []).forEach(e => ad(e.cor)); return out; }
 function vkFechamento(op = {}) {
     // Regras de pré-impressão (Instructions/vetor-kanivete.md › Fechamento). → {ok, erros, avisos, info}
     const padrao = op.padrao || 'x4', impressao = padrao !== 'rgb', d = VK.doc;
@@ -246,6 +247,8 @@ function vkFechamento(op = {}) {
         if (o.traco && o.traco.cor && o.traco.larg < 0.25 && o.tipo !== 'grupo') add('erro', 'traco_fino', 'Traço mais fino que 0,25 pt (some na impressão)', [o.id], 'engrossar_tracos');
         if (o.sobre && ((o.sobre.p && vkBranco(o.preench)) || (o.sobre.t && o.traco && vkBranco(o.traco.cor)))) add('erro', 'branco_sobre', 'Branco com sobreimpressão (o objeto SOME na impressão)', [o.id], 'tirar_sobre_branco');
         if (padrao === 'x1a' && ((o.op != null && o.op < 1) || (o.bm && o.bm !== 'normal'))) add('erro', 'transparencia', 'Transparência/mesclagem: PDF/X-1a não aceita (exporte em PDF/X-4)', [o.id]);
+        if (padrao === 'x1a' && (o.efeitos || []).some(e => e.visivel !== false && e.tipo !== 'cantos')) add('erro', 'efeito_transparencia', 'Sombra/brilho/desfoque usam transparência: PDF/X-1a não aceita (exporte em PDF/X-4)', [o.id]);
+        if ((o.aparencia || []).some(l => l.visivel !== false && l.tipo === 'traco' && (l.larg ?? 1) < 0.25)) add('erro', 'traco_fino', 'Traço extra (Aparência) mais fino que 0,25 pt (some na impressão)', [o.id]);
         if (o.tipo === 'caminho' && o.subs.some(s => s.pts.length < 2)) add('aviso', 'pontos_soltos', 'Pontos soltos (caminhos de 1 ponto)', [o.id], 'limpar');
         if (o.tipo === 'imagem') {
             const im = d.imagens[o.img] || {}, ppi = Math.round(72 / vkEsc(o.m));

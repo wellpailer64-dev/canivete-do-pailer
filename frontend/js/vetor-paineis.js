@@ -206,6 +206,7 @@ function vkProps() {
             <select data-a="mesclagem" title="Modo de mesclagem">${['normal', ...Object.keys(VK_BM)].map(v => `<option value="${v}" ${(o.bm || 'normal') === v ? 'selected' : ''}>${v.replace('_', ' ')}</option>`).join('')}</select></div>
         <label class="vk-chk"><input type="checkbox" data-a="sobreimprimir" ${o.sobre && (o.sobre.p || o.sobre.t) ? 'checked' : ''}> Sobreimprimir</label></div>`;
     }
+    h += vkApPainel(objs);   // Aparência extra e Efeitos (vetor-aparencia.js)
     if (tx) h += vkTxPainel(tx, objs);   // Caractere, Parágrafo, Caixa/Caminho, Estilos (vetor-texto.js)
     if (o.tipo === 'imagem' && objs.length === 1) { const im = VK.doc.imagens[o.img] || {}; h += `<div class="vk-sec"><div class="vk-sec-t">Imagem</div><div class="vk-nota">${vkEsc_(im.nome)} · ${im.w}×${im.h} px · ${im.modo} · <b>${Math.round(72 / vkEsc(o.m))} ppi</b> efetivos</div></div>`; }
     const chv = vkChaveAtiva();
@@ -221,7 +222,7 @@ function vkProps() {
     h += `<div class="vk-sec"><div class="vk-bts"><button class="ie-btn ie-btn-mini" onclick="vkCmdUi('${objs.length > 1 ? 'agrupar' : 'desagrupar'}', {})">${objs.length > 1 ? 'Agrupar' : 'Desagrupar'}</button>
         ${objs.length > 1 ? `<button class="ie-btn ie-btn-mini" onclick="vkCmdUi('mascara', {})">Máscara</button>` : ''}<button class="ie-btn ie-btn-mini" onclick="vkCmdUi('duplicar', {dx: ${vkPT(5)}, dy: ${vkPT(5)}})">Duplicar</button></div></div>`;
     el.innerHTML = h;
-    vkTxPainelEventos(el);
+    vkTxPainelEventos(el); vkApPainelEventos(el);
     el.onchange = e => {
         const t = e.target, a = t.dataset.a, tr = t.dataset.t;
         if (tr) {

@@ -110,3 +110,10 @@
 .vk-gl-grade { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; max-height: 300px; overflow-y: auto; }
 .vk-gl-grade button { height: 30px; font-size: 17px; font-family: inherit; background: rgba(255,255,255,.04); border: 1px solid transparent; color: inherit; border-radius: 3px; cursor: pointer; padding: 0; }
 .vk-gl-grade button:hover { border-color: #2f8cff; background: rgba(47,140,255,.15); }
+
+/* Aparência extra e Efeitos (vetor-aparencia.js) */
+.vk-ap-l { gap: 4px; flex-wrap: wrap; }
+.vk-cor-mini { padding: 2px 6px; min-width: 0; }
+.vk-cor-mini span { font-size: 11px; }
+.vk-ef { border-top: 1px solid rgba(255,255,255,.06); padding-top: 4px; margin-top: 4px; }
+.vk-ef b { font-weight: 500; flex: 1; }

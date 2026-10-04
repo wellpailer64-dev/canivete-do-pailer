@@ -175,6 +175,7 @@ async function vkDocPy() {
     const d = vkClone(VK.doc);
     const anda = l => l.forEach(o => { if (o.tipo === 'texto') { const src = vkObj(o.id), sp = src && vkTxSpec(src); if (sp) o._spec = sp; } if (o.itens) anda(o.itens); });
     d.camadas.forEach(c => anda(c.itens));
+    if (typeof vkApDocPy === 'function') await vkApDocPy(d);   // Aparência/efeitos: pinturas prontas
     return d;
 }
 

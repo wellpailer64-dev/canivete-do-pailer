@@ -25,6 +25,8 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 | Texto de ponto / de área, criar contornos | tipografia | HarfBuzz + fontTools: a tela desenha as MESMAS curvas que vão para o PDF |
 | Caractere por trecho (fonte, corpo, track, linha de base, escala H/V, caixa alta, versalete, sobrescrito/subscrito, ligaduras, frações, numerais, cor do trecho); Parágrafo (recuos, 1ª linha, espaço antes/depois, justificar a última) | tipografia de verdade | `vetor-texto.js` + `texto_geometria` (trechos → partes coloridas na tela e no PDF). Selecione o trecho no editor (caixa de texto) e mude no painel; agente: `alterar` com `trecho:"palavra"` (todas as ocorrências, ou `ocorrencia:n`) ou `faixa:[ini,fim]` |
 | Caixa de área com altura (arrastar com T), texto sobrando (+ vermelho), encadear caixas (clicar no + e noutra caixa / lugar vazio) | revista, folder, cardápio | `caixa_alt`; `encadear` (`ids` em ordem, ou `nova:{x,y}`), `desencadear`; apagar uma caixa fecha a corrente (a raiz passa o texto adiante) |
+| Aparência (vários preenchimentos/traços na mesma forma, cada um com cor, espessura, opacidade, mesclagem, deslocamento, atrás/na frente) e Expandir aparência | contorno duplo em texto, borda de adesivo, logo com camadas | `vetor-aparencia.js`: `aparencia` (acao adicionar/alterar/remover/subir/descer/limpar, tipo preench/traco, cor, espessura, opacidade, deslocar mm, atras), `expandir_aparencia` |
+| Efeitos vivos: Cantos arredondados (vetorial), Sombra projetada, Brilho externo, Desfoque | acabamento | `efeito` (tipo sombra/brilho/desfoque/cantos; dx, dy, desfoque, raio em mm; cor, opacidade, mesclagem). Sombra/brilho/desfoque saem rasterizados a 300 ppi NA COR DA TINTA (imagem CMYK ou Separation + SMask com a silhueta desfocada) — só PDF/X-4; o fechamento acusa em X-1a |
 | Texto em caminho | selo, logo circular | ferramenta Texto em caminho (clique no caminho); `texto_caminho` (`ini` mm, `lado`, `manter_caminho`) |
 | Estilos de parágrafo / caractere, Glifos, juntar textos importados | padronizar, caracteres especiais, editar .ai/PDF | `estilo_texto` (tipo, nome, `de`, `aplicar`; mudar um estilo atualiza quem usa), `estilos_texto`, `glifos`, `inserir_texto` (`codigo`/`texto`, `pos`), `juntar_textos` (linhas → parágrafos; `quebras:'linhas'`) |
 | Alinhar/distribuir, guias inteligentes | precisão | caixa pelos extremos reais da cúbica (não pelas alças); encaixe magenta |
@@ -38,8 +40,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 
 Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): texto dentro de forma (área não retangular),
 hifenização, tabulações, editar a trilha do texto em caminho com a Seleção direta, estilos dentro da caixa de edição (ela é texto puro);
-Aparência (vários preenchimentos/traços) e
-efeitos vivos (sombra, desfoque, cantos arredondados); lápis/pincel/borracha, setas e perfil de largura no traço;
+efeitos que faltam (brilho interno, distorcer/zigue-zague, Aparência em grupo; efeitos na prévia de separações e no SVG); lápis/pincel/borracha, setas e perfil de largura no traço;
 ferramenta de degradê na arte, malha, mesclagem (Blend); símbolos, padrões, recolorir arte, livros Pantone; Image Trace,
 distorção de envelope, máscara de opacidade; painel de vínculos e variáveis; EPS; PDF com texto editável (hoje: curvas).
 
@@ -54,6 +55,9 @@ texto   {tipo,conteudo,fam,estilo,tam(pt),entrelinha|null,track(1/1000 em),alin:
          trechos:[{ini,fim,<os de caractere>,preench,traco:{cor,larg}|null,ec}], ep (estilo ¶), anterior/seguinte (encadeado: o texto mora na raiz),
          trilha:{subs,ini,lado} (texto em caminho)}       doc.estilosTexto = {par:{nome:{...}}, car:{nome:{...}}}
          A tela monta o spec (vkTxSpec: encadeado resolvido) e manda junto na exportação (`_spec`): PDF = tela.
+qualquer objeto: aparencia:[{tipo:'preench'|'traco',cor,larg,cap,junc,tracejado,op,bm,desloc(pt),atras,visivel}] (caminho/texto),
+         efeitos:[{tipo:'sombra'|'brilho'|'desfoque'|'cantos',dx,dy,desfoque,raio (pt),cor,op,bm,visivel}];
+         na exportação a tela manda as pinturas prontas (`_pint`, pt do documento) e a silhueta dos efeitos (`_silh`).
 imagem  {tipo,img,m}  (m leva pixel → pt; ppi efetivo = 72 / escala)      grupo {tipo,itens,clip} (clip: itens[0] = caminho de corte)
 cor     {k:'cmyk',v:[c,m,y,k] 0-100} | {k:'rgb',v:[r,g,b]} | {k:'spot',nome,v:[cmyk alternativo],tint} | {k:'reg'}
         | {k:'grad',tipo:'lin'|'rad',a,b,f,r,paradas:[{p,cor}]}  (coordenadas do documento)
@@ -77,7 +81,7 @@ Unidades de agente: **mm relativos ao canto da prancheta** (`prancheta: nome|id|
 Comandos (`VKN.comandos()`): novo, documento, abrir, importar, salvar, exportar_pdf, exportar_imagem, exportar_svg,
 retangulo, elipse, poligono, estrela, linha, caminho (`d` SVG em mm ou `subs`), texto, imagem, alterar, mover,
 posicionar, redimensionar, girar, refletir, matriz, alinhar, distribuir, organizar, agrupar, desagrupar, mascara,
-soltar_mascara, composto, pathfinder, deslocar (`distancia` mm, `junc`), contornar_traco, repetir, transformar_cada, distribuir_espaco, construtor, pathfinder2, tesoura, faca, juntar, media, separacoes, tinta_em, exportar_separacoes, contornos, empacotar (`pasta`, `pdf`, `fontes`), texto_caminho, encadear, desencadear, estilo_texto, estilos_texto, juntar_textos, glifos, inserir_texto, duplicar, apagar, selecionar, mover_para_camada, nova_camada, camada,
+soltar_mascara, composto, pathfinder, deslocar (`distancia` mm, `junc`), contornar_traco, repetir, transformar_cada, distribuir_espaco, construtor, pathfinder2, tesoura, faca, juntar, media, separacoes, tinta_em, exportar_separacoes, contornos, empacotar (`pasta`, `pdf`, `fontes`), aparencia, efeito, expandir_aparencia, texto_caminho, encadear, desencadear, estilo_texto, estilos_texto, juntar_textos, glifos, inserir_texto, duplicar, apagar, selecionar, mover_para_camada, nova_camada, camada,
 nova_prancheta, prancheta, mover_prancheta, amostra, cores_padrao, definir_subs, converter_cmyk, preto_texto,
 sobreimprimir_preto, tirar_sobre_branco, engrossar_tracos, limpar, mapa, info, ajuda.
 Fonte "Arial Bold" (família + estilo juntos) é entendida. Só `preench` informado = sem traço.
@@ -149,7 +153,7 @@ Exportar com erro pede confirmação (agente: `forcar: true`).
 O que não vira objeto entra no `relatorio` (mostrado ao abrir).
 
 ## 6. Testes e histórico
-- `testes/teste_vetor.py`: cartão pelos comandos, texto (trechos, parágrafo, encadear, caminho, estilos, juntar, glifos, PDF), Pathfinder, alinhar, fechamento + correção, desfazer, PDF X-4 e X-1a
+- `testes/teste_vetor.py`: cartão pelos comandos, aparência/efeitos (PDF com efeitos na cor da tinta), texto (trechos, parágrafo, encadear, caminho, estilos, juntar, glifos, PDF), Pathfinder, alinhar, fechamento + correção, desfazer, PDF X-4 e X-1a
   verificados com a cor especial preservada, PNG, salvar/reabrir .aknv, abrir PDF/SVG/PPTX, SVG → CMYK, sem erro de JS.
 - Mouse de verdade: `D:\kanivete_testes\scripts\vetor_mouse.py` (retângulo, mover, elipse, caneta, texto, copiar/colar, desfazer);
   `vetor_texto_ui.py` (caixa com altura, + vermelho → encadear, texto em caminho, trecho no painel).
