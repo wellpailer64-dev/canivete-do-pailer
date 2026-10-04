@@ -339,6 +339,24 @@ class _Escritor:
                 out += self.pintar(p["subs"], p.get("regra", "nonzero"), p.get("preench"), p.get("traco"), est)
             return out
         t = o.get("tipo")
+        if t == "grupo" and o.get("opmask"):   # máscara de opacidade: SMask de luminosidade (branco mostra, preto esconde)
+            if not self.transp:
+                self.avisos.add("máscara de opacidade não sai em PDF/X-1a (transparência): use PDF/X-4")
+                return self.objeto(dict(o, opmask=None))
+            import pikepdf
+            mops = self.objeto(o["opmask"])
+            G = 1e5
+            form = self.pdf.make_stream("\n".join(x for x in mops if x).encode("latin-1"), Type=pikepdf.Name.XObject, Subtype=pikepdf.Name.Form,
+                                        BBox=[-G, -G, G, G], Group=pikepdf.Dictionary(S=pikepdf.Name.Transparency, CS=pikepdf.Name.DeviceGray))
+            self._pads_pend.append(form)   # recursos da página entram no fim (como os padrões)
+            sm = pikepdf.Dictionary(Type=pikepdf.Name.Mask, S=pikepdf.Name.Luminosity, G=form)
+            if o.get("opmask_inv"):
+                sm["/TR"] = pikepdf.Dictionary(FunctionType=2, Domain=[0, 1], C0=[1], C1=[0], N=1)
+            nome = f"GSm{len(self.res['ExtGState']) + 1}"
+            self.res["ExtGState"][nome] = pikepdf.Dictionary(Type=pikepdf.Name.ExtGState, SMask=sm)
+            out = ["q", f"/{nome} gs"] + self.estilo_ops(o)
+            for f in o.get("itens") or []: out += self.objeto(f)
+            return out + ["Q"]
         if t == "grupo":
             itens = o.get("itens") or []
             if o.get("clip") and itens:

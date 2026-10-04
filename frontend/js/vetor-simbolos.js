@@ -69,3 +69,46 @@ async function vkSimDocPy(d) {
         anda(src.itens, S.itens);
     }
 }
+
+// ─────────────────────────── MÁSCARA DE OPACIDADE (painel Transparência › Criar máscara) ───────────────────────────
+// grupo {opmask: objeto-máscara, opmask_inv, itens}: a LUMINOSIDADE da máscara vira a opacidade da arte (branco mostra,
+// preto esconde; fora da máscara = escondido, como "Recortar" ligado no Illustrator). PDF: SMask Luminosity (só X-4).
+function vkOpMaskDesenhar(ctx, o, cam) {
+    const T = ctx.getTransform(), W = ctx.canvas.width, H = ctx.canvas.height;
+    const b = vkBox(o.opmask); if (!isFinite(b[0])) return true;
+    const cs = [[b[0], b[1]], [b[2], b[1]], [b[0], b[3]], [b[2], b[3]]].map(([x, y]) => [T.a * x + T.c * y + T.e, T.b * x + T.d * y + T.f]);
+    const x0 = Math.max(0, Math.floor(Math.min(...cs.map(p => p[0])))), y0 = Math.max(0, Math.floor(Math.min(...cs.map(p => p[1]))));
+    const x1 = Math.min(W, Math.ceil(Math.max(...cs.map(p => p[0])))), y1 = Math.min(H, Math.ceil(Math.max(...cs.map(p => p[1]))));
+    const w = x1 - x0, h = y1 - y0; if (w < 1 || h < 1) return true;
+    const arte = new OffscreenCanvas(w, h), ma = new OffscreenCanvas(w, h), ca = arte.getContext('2d'), cm = ma.getContext('2d');
+    for (const c of [ca, cm]) c.setTransform(T.a, T.b, T.c, T.d, T.e - x0, T.f - y0);
+    o.itens.forEach(f => vkDesenharObj(ca, f, cam));
+    vkDesenharObj(cm, o.opmask, cam);
+    const im = cm.getImageData(0, 0, w, h), d = im.data;
+    // a prova de cor mostra 100K como cinza-escuro (não 0): normaliza preto de impressão → 0 e papel → 255 (= o SMask do PDF)
+    const pk = (String(vkCss({ k: 'cmyk', v: [0, 0, 0, 100] })).match(/\d+/g) || [0, 0, 0]).map(Number), Lk = 0.299 * pk[0] + 0.587 * pk[1] + 0.114 * pk[2], esc = 255 / Math.max(1, 255 - Lk);
+    for (let i = 0; i < d.length; i += 4) { const L = Math.max(0, Math.min(255, (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] - Lk) * esc)) * d[i + 3] / 255; d[i + 3] = o.opmask_inv ? (d[i + 3] ? 255 - L : 0) : L; }
+    cm.putImageData(im, 0, 0);
+    ca.setTransform(1, 0, 0, 1, 0, 0); ca.globalCompositeOperation = 'destination-in'; ca.drawImage(ma, 0, 0);
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(arte, x0, y0); ctx.restore();
+    return true;
+}
+(() => {
+    // mascara_opacidade: o objeto de CIMA vira a máscara dos outros (ids/nomes ou seleção); inverter
+    vkRegistrar('mascara_opacidade', 'máscara de opacidade', a => {
+        const ordem = vkTodos().map(x => x.o), objs = vkTxAlvos(a).sort((p, q) => ordem.indexOf(p) - ordem.indexOf(q));
+        if (objs.length < 2) throw new Error('máscara de opacidade: selecione a arte e, por cima, a máscara (branco mostra, preto esconde)');
+        const mask = objs.at(-1), arte = objs.slice(0, -1), l = vkListaDe(mask.id), pos = l.indexOf(mask);
+        const g = { id: vkId(), tipo: 'grupo', nome: a.nome || 'Máscara de opacidade', itens: arte, opmask: mask, ...(a.inverter ? { opmask_inv: true } : {}) };
+        l.splice(pos, 1, g);
+        arte.forEach(o => { const ll = vkListaDe(o.id); ll.splice(ll.indexOf(o), 1); });
+        VK.sel = [g.id]; return { id: g.id, arte: arte.length };
+    });
+    vkRegistrar('soltar_mascara_opacidade', 'soltar máscara de opacidade', a => {
+        const ids = [];
+        for (const g of vkTxAlvos(a).filter(o => o.opmask)) { const l = vkListaDe(g.id); l.splice(l.indexOf(g), 1, ...g.itens, g.opmask); ids.push(...g.itens.map(o => o.id), g.opmask.id); }
+        VK.sel = ids; return { soltos: ids.length };
+    });
+})();
+const vkCoresOpOrig = vkCores;
+vkCores = function (o) { const out = vkCoresOpOrig(o); if (o.opmask) out.push(...vkCores(o.opmask)); return out; };

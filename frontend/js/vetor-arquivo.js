@@ -247,6 +247,7 @@ function vkFechamento(op = {}) {
         if (o.traco && o.traco.cor && o.traco.larg < 0.25 && o.tipo !== 'grupo') add('erro', 'traco_fino', 'Traço mais fino que 0,25 pt (some na impressão)', [o.id], 'engrossar_tracos');
         if (o.sobre && ((o.sobre.p && vkBranco(o.preench)) || (o.sobre.t && o.traco && vkBranco(o.traco.cor)))) add('erro', 'branco_sobre', 'Branco com sobreimpressão (o objeto SOME na impressão)', [o.id], 'tirar_sobre_branco');
         if (padrao === 'x1a' && ((o.op != null && o.op < 1) || (o.bm && o.bm !== 'normal'))) add('erro', 'transparencia', 'Transparência/mesclagem: PDF/X-1a não aceita (exporte em PDF/X-4)', [o.id]);
+        if (padrao === 'x1a' && o.opmask) add('erro', 'transparencia', 'Máscara de opacidade: PDF/X-1a não aceita (exporte em PDF/X-4)', [o.id]);
         if (padrao === 'x1a' && (o.efeitos || []).some(e => e.visivel !== false && e.tipo !== 'cantos')) add('erro', 'efeito_transparencia', 'Sombra/brilho/desfoque usam transparência: PDF/X-1a não aceita (exporte em PDF/X-4)', [o.id]);
         if ((o.aparencia || []).some(l => l.visivel !== false && l.tipo === 'traco' && (l.larg ?? 1) < 0.25)) add('erro', 'traco_fino', 'Traço extra (Aparência) mais fino que 0,25 pt (some na impressão)', [o.id]);
         if (o.tipo === 'caminho' && o.subs.some(s => s.pts.length < 2)) add('aviso', 'pontos_soltos', 'Pontos soltos (caminhos de 1 ponto)', [o.id], 'limpar');

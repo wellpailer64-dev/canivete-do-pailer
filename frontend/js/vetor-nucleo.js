@@ -342,6 +342,7 @@ function vkDesenharObj(ctx, o, cam) {
     if (o.op != null && o.op < 1) ctx.globalAlpha *= o.op;
     if (o.bm && VK_BM[o.bm] && !VK.contorno) ctx.globalCompositeOperation = VK_BM[o.bm];
     if ((o.efeitos || o.aparencia || (o.traco && (o.traco.perfil || o.traco.seta_ini || o.traco.seta_fim))) && typeof vkApDesenhar === 'function' && vkApDesenhar(ctx, o)) { ctx.restore(); return; }   // Aparência/efeitos (vetor-aparencia.js)
+    if (o.tipo === 'grupo' && o.opmask && !VK.contorno && typeof vkOpMaskDesenhar === 'function' && vkOpMaskDesenhar(ctx, o, cam)) { ctx.restore(); return; }
     if (o.tipo === 'grupo') {
         if (o.clip && o.itens.length) { ctx.clip(vkPath2d(o.itens[0].subs), o.itens[0].regra === 'evenodd' ? 'evenodd' : 'nonzero'); o.itens.slice(1).forEach(f => vkDesenharObj(ctx, f, cam)); }
         else o.itens.forEach(f => vkDesenharObj(ctx, f, cam));
