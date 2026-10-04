@@ -210,4 +210,25 @@ página e o grupo girava em torno de um centro errado) — agora pela prancheta 
 objeto criado sem nome (o erro agora lista os sem nome com id e tamanho) e gravava `.pdf.pdf`; gerador FLUX falhava sem VRAM
 com o Qwen do Worker carregado (agora descarrega os modelos do Ollama antes de gerar).
 Para peça de tela (manual, apresentação): exportar PDF com `marcas: false` (os avisos de traço fino / texto < 6 pt /
-sem sangria do fechamento são de gráfica). Ainda não: perfil de documento "tela" (RGB, sem sangria, fechamento próprio).
+sem sangria do fechamento são de gráfica). Documento de tela: `novo {destino:'tela'}` (ou Cor RGB na janela) = sem sangria, fechamento e PDF digitais (`vkPadraoDoc`).
+
+## 9. 3D, mapear arte, retocar letra e IDV v2 (2026-10-04)
+`frontend/js/vetor-3d.js` (Efeito › 3D e Materiais do Illustrator), tudo vetorial e de gráfica:
+- `girar_3d` (revolve): perfil = metade do contorno, eixo na borda esquerda (`eixo:'dir'` = direita). Frente e fundo viram
+  **malhas de degradê** sombreadas (Coons no PDF, vale em X-1a); o fundo mostra o interior do copo. Retângulo como perfil = lata.
+- `extrudar_3d`: forma fechada → laterais (só as voltadas para quem olha, ordenadas por profundidade) + face com leve degradê.
+- parâmetros: `inclinar` (+ mostra o topo), `girar`, `rolar`, `perspectiva` 0–100, `material` fosco|papel|plastico|ceramica|metal
+  (reflexo do ambiente em faixas)|vidro, `luz` %, `luz_ang`/`luz_alt`, `volume` (bordas escurecem), `sombra_chao` (sombra suave +
+  sombra de CONTATO — é ela que assenta o objeto), `grao` % (padrão "Grão 3D" em multiplicação), `cor`, `cor_lado`, `profundidade`.
+- `mapear_arte` {id3d, arte, y|angulo|escala | face frente/direita/esquerda/topo/base, dx, dy}: a arte acompanha a superfície
+  (girar: x → ângulo pelo raio na altura; presa na borda visível; extrudar: plano da face, texto da lateral corre na
+  profundidade). Textos viram curvas na hora. Sombra sobre a arte = malha de preto em multiplicação **relativa ao ponto
+  mais claro do rótulo** (a cor verdadeira aparece onde a luz bate). `editar_3d` refaz com a arte guardada; `expandir_3d`.
+- Painel Propriedades › 3D (sliders) e menu Objeto › 3D.
+- `retocar_letra` {letra|faixa|trecho, rot, escala, subir, espaco, cor} = ferramenta Retocar tipo: o texto segue editável
+  (motor: `rot` por glifo em `_desenhar`, girando no meio da largura sobre a linha de base).
+IDV v2 (`D:/kanivete_testes/idv/marca.py` + `montar2.py`): símbolo = disco cortado por onda com vão (pathfinder: interseção/
+subtração com a faixa contornada); logotipo = Playfair Bold em curvas, tracking −25, acento trocado pelo sol (subcaminho mais
+alto removido com `definir_subs`); diagramação editorial (número de seção grande, grid, sumário); mockups 3D sobre fotos FLUX
+(mesa com luz lateral; areia com sombra de coqueiro para flat lay). Lições: criar a arte DENTRO da página antes de medir
+(`info` mede pela prancheta que contém o objeto); faixa mapeada ≤ meia volta; sombra de contato sempre.

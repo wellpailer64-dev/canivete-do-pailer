@@ -6,7 +6,7 @@
 const VK_MATERIAIS = {   // ambiente, difusa, especular, expoente do brilho
     fosco: { amb: 0.5, dif: 0.62, esp: 0.04, exp: 6 }, papel: { amb: 0.52, dif: 0.6, esp: 0.08, exp: 10 },
     plastico: { amb: 0.45, dif: 0.6, esp: 0.45, exp: 28 }, ceramica: { amb: 0.46, dif: 0.58, esp: 0.7, exp: 36 },
-    metal: { amb: 0.32, dif: 0.55, esp: 0.95, exp: 18 }, vidro: { amb: 0.55, dif: 0.35, esp: 1, exp: 50 },
+    metal: { amb: 0.32, dif: 0.55, esp: 0.95, exp: 18, amb_ref: 0.42 }, vidro: { amb: 0.55, dif: 0.35, esp: 1, exp: 50 },
 };
 function vk3dRot(p) {   // girar (y), inclinar (x: positivo mostra o topo), rolar (z) em graus → v ↦ v'
     const b = (p.girar || 0) * Math.PI / 180, a = -(p.inclinar || 0) * Math.PI / 180, c = (p.rolar || 0) * Math.PI / 180;
@@ -23,7 +23,9 @@ function vk3dCena(p, cx, cy, tam) {
         R, persp: !!f, proj: v => { const k = f ? f / (f - v[2]) : 1; return [cx + v[0] * k, cy + v[1] * k]; },
         luz: n => { const d = Math.max(0, n[0] * L[0] + n[1] * L[1] + n[2] * L[2]), s = Math.pow(Math.max(0, n[0] * Hh[0] + n[1] * Hh[1] + n[2] * Hh[2]), M.exp);
             const vol = 1 - (p.volume ?? 35) / 100 * (1 - Math.max(0, n[2]));   // bordas viradas escurecem: dá forma ao curvo
-            return { l: (M.amb + M.dif * d * I) * vol, s: M.esp * s * I }; },
+            let l = (M.amb + M.dif * d * I) * vol;
+            if (M.amb_ref) { const r = n[0]; l += M.amb_ref * (0.55 * Math.max(0, Math.sin(r * 5.2 + 0.6)) - 0.25 * Math.max(0, Math.sin(r * 9 - 1))); }   // reflexo do ambiente (faixas)
+            return { l, s: M.esp * s * I }; },
     };
 }
 function vk3dTom(c, { l, s }, sombra = 1) {   // cor CMYK sombreada: escurece somando preto, clareia tirando tinta, brilho especular → papel
@@ -103,9 +105,12 @@ function vk3dSombraChao(cena, P, sp) {   // elipse escura desfocada no "chão", 
     const pts = []; for (let j = 0; j < 48; j++) { const t = 2 * Math.PI * j / 48; pts.push(cena.proj(cena.R([P.rmax * 1.08 * Math.cos(t), P.base - P.cy, P.rmax * 1.08 * Math.sin(t)]))); }
     const b = [Math.min(...pts.map(p => p[0])), Math.min(...pts.map(p => p[1])), Math.max(...pts.map(p => p[0])), Math.max(...pts.map(p => p[1]))];
     const w = b[2] - b[0], h = Math.max(P.rmax * 0.18, b[3] - b[1]), cx = (b[0] + b[2]) / 2, cy = b[3] - h * 0.35;
-    const e = { id: vkId(), tipo: 'caminho', nome: '3D sombra', regra: 'nonzero', subs: vkElipseSubs(cx, cy, w * 0.55, h * 0.5), preench: { k: 'cmyk', v: [40, 40, 40, 90] }, traco: null, op: 0.55, bm: 'multiplicacao' };
-    e.efeitos = [{ tipo: 'desfoque', desfoque: Math.max(1, h * 0.45) }];
-    return e;
+    const e = { id: vkId(), tipo: 'caminho', nome: '3D sombra', regra: 'nonzero', subs: vkElipseSubs(cx, cy, w * 0.58, h * 0.55), preench: { k: 'cmyk', v: [40, 50, 55, 90] }, traco: null, op: 0.45, bm: 'multiplicacao' };
+    e.efeitos = [{ tipo: 'desfoque', desfoque: Math.max(1, h * 0.55) }];
+    // sombra de contato: curta e escura, colada na base (é ela que "assenta" o objeto na mesa)
+    const c = { id: vkId(), tipo: 'caminho', nome: '3D sombra de contato', regra: 'nonzero', subs: vkElipseSubs(cx, b[3] - (b[3] - b[1]) * 0.3, w * 0.47, Math.max(0.6, (b[3] - b[1]) * 0.45)), preench: { k: 'cmyk', v: [40, 50, 55, 100] }, traco: null, op: 0.7, bm: 'multiplicacao' };
+    c.efeitos = [{ tipo: 'desfoque', desfoque: Math.max(0.6, h * 0.16) }];
+    return { id: vkId(), tipo: 'grupo', nome: '3D sombra', itens: [e, c] };
 }
 function vk3dGrao(silh, forca, silh2) {   // grão fino (textura de papel/cerâmica) recortado pela silhueta: padrão de pontos em multiplicação
     vk3dPadraoGrao();
@@ -138,6 +143,11 @@ function vk3dArteCaminhos(objs, out = [], M = null) {   // arte → caminhos (gr
         if (o.visivel === false) continue;
         if (o.tipo === 'grupo') { vk3dArteCaminhos(o.clip ? o.itens.slice(1) : o.itens, out, M); continue; }
         if (o.tipo === 'caminho' && o.subs && o.subs.length) out.push(vkClone(o));
+        if (o.tipo === 'texto') {   // texto vira curvas na hora (cada cor de trecho é um caminho)
+            const g = vkGeo(o); if (!g) continue;
+            for (const pa of g.partes || [{ subs: g.subs }]) out.push({ id: vkId(), tipo: 'caminho', regra: 'nonzero', subs: vkApDoc ? vkApDoc(pa.subs, o.m) : pa.subs,
+                preench: vkClone('preench' in pa ? pa.preench : o.preench), traco: vkClone('traco' in pa ? (pa.traco ? { larg: 1, ...(o.traco || {}), ...pa.traco } : null) : o.traco) });
+        }
     }
     return out;
 }
@@ -145,7 +155,8 @@ function vk3dMapaGirar(o3, m, P, cena, sp, silh) {
     const arte = vk3dArteCaminhos(m.arte), ab = vkBoxUniao(m.arte); if (!arte.length || !isFinite(ab[0])) return [];
     const esc = (m.escala ?? 100) / 100, acx = (ab[0] + ab[2]) / 2, acy = (ab[1] + ab[3]) / 2;
     const yc = m.y != null ? P.top + m.y : P.cy, tc = sp + Math.PI / 2 + (m.angulo || 0) * Math.PI / 180;
-    const mapa = (x, y) => { const yy = yc + (y - acy) * esc, w = vk3dRaioEm(P, yy), t = tc - (x - acx) * esc / Math.max(1e-6, w.r);
+    const lim = Math.PI / 2 - 0.015;   // arte mais larga que meia volta: dobra na borda visível (não aparece "orelha" do lado de trás)
+    const mapa = (x, y) => { const yy = yc + (y - acy) * esc, w = vk3dRaioEm(P, yy), t = tc - Math.max(-lim, Math.min(lim, (x - acx) * esc / Math.max(1e-6, w.r)));
         return cena.proj(cena.R([w.r * Math.cos(t), yy - P.cy, w.r * Math.sin(t)])); };
     const caminhos = arte.map(c => {
         c.id = vkId();
@@ -158,8 +169,11 @@ function vk3dMapaGirar(o3, m, P, cena, sp, silh) {
     for (let i = 0; i <= L; i++) { const yy = yc - hpx / 2 + hpx * i / L, w = vk3dRaioEm(P, yy), ln = [], lc = [];
         for (let j = 0; j <= C; j++) { const t = tc + wpx / 2 / Math.max(1e-6, w.r) - (wpx / Math.max(1e-6, w.r)) * j / C;
             const v = cena.R([w.r * Math.cos(t), yy - P.cy, w.r * Math.sin(t)]), n = cena.R([w.nr * Math.cos(t), w.ny, w.nr * Math.sin(t)]), lz = cena.luz(n);
-            ln.push(cena.proj(v)); lc.push({ k: 'cmyk', v: [0, 0, 0, Math.round(Math.max(0, Math.min(0.75, 1 - lz.l)) * 85)] }); }
+            ln.push(cena.proj(v)); lc.push(lz.l); }
         nos.push(ln); cores.push(lc); ys.push(yy); }
+    // sombra RELATIVA ao ponto mais claro do rótulo: a arte mostra a cor verdadeira onde a luz bate e escurece para as bordas
+    const lmax = Math.max(...cores.flat(), 1e-6);
+    cores.forEach((l_, i) => l_.forEach((l, j) => { cores[i][j] = { k: 'cmyk', v: [0, 0, 0, Math.round(Math.max(0, Math.min(0.8, 1 - l / lmax)) * 70)] }; }));
     const corte = { id: vkId(), tipo: 'caminho', regra: 'nonzero', subs: caminhos.flatMap(c => c.subs.filter(s => s.fechado)), preench: null, traco: null };
     const sombra = { id: vkId(), tipo: 'malha', nos, cores, auto3d: true, bm: 'multiplicacao', nome: '3D sombra da arte' };
     const arteG = { id: vkId(), tipo: 'grupo', nome: '3D arte mapeada', itens: caminhos };
@@ -195,7 +209,10 @@ function vk3dExtrudar(o3) {
     face.preench = vk3dDegFace(o3.cor, cena.luz(nn), face.subs.flatMap(s_ => s_.pts));
     const itens = [];
     if (o3.sombra_chao) { const pts = f.subs.flatMap(s => s.pts.map(q => cena.proj(P3(q[0], q[1], z1)))), bb = [Math.min(...pts.map(p => p[0])), Math.max(...pts.map(p => p[0])), Math.max(...pts.map(p => p[1]))];
-        const w = bb[1] - bb[0], h = esc * 0.12; const e = { id: vkId(), tipo: 'caminho', regra: 'nonzero', subs: vkElipseSubs((bb[0] + bb[1]) / 2, bb[2] + h * 0.1, w * 0.53, h * 0.5), preench: { k: 'cmyk', v: [40, 40, 40, 90] }, traco: null, op: 0.5, bm: 'multiplicacao', nome: '3D sombra', efeitos: [{ tipo: 'desfoque', desfoque: h * 0.5 }] }; itens.push(e); }
+        const w = bb[1] - bb[0], h = esc * 0.12, mx = (bb[0] + bb[1]) / 2;
+        const e = { id: vkId(), tipo: 'caminho', regra: 'nonzero', subs: vkElipseSubs(mx, bb[2] + h * 0.05, w * 0.56, h * 0.55), preench: { k: 'cmyk', v: [40, 50, 55, 90] }, traco: null, op: 0.45, bm: 'multiplicacao', nome: '3D sombra', efeitos: [{ tipo: 'desfoque', desfoque: h * 0.55 }] };
+        const c = { id: vkId(), tipo: 'caminho', regra: 'nonzero', subs: vkElipseSubs(mx, bb[2] - h * 0.05, w * 0.5, h * 0.14), preench: { k: 'cmyk', v: [40, 50, 55, 100] }, traco: null, op: 0.7, bm: 'multiplicacao', nome: '3D sombra de contato', efeitos: [{ tipo: 'desfoque', desfoque: h * 0.12 }] };
+        itens.push({ id: vkId(), tipo: 'grupo', nome: '3D sombra', itens: [e, c] }); }
     itens.push(...lados.map(l => l.o), face);
     for (const m of o3.mapas || []) itens.push(...vk3dMapaExtrudar(o3, m, { b, cx, cy, d, z0, z1, P3, cena, lados, mapa, nn, zf }));
     if (o3.grao) { const corte = { id: vkId(), tipo: 'caminho', regra: 'nonzero', subs: [...face.subs, ...lados.map(l => l.o.subs[0])], preench: null, traco: null };
@@ -270,10 +287,11 @@ const VK_3D_PARAMS = ['volume', 'inclinar', 'girar', 'rolar', 'perspectiva', 'ma
     vkRegistrar('editar_3d', 'editar 3D', a => { const g = alvo3d(a); ler(g.tres_d, a); vk3dRefazer(g); return { id: g.id, ...Object.fromEntries(VK_3D_PARAMS.map(k => [k, g.tres_d[k]])) }; });
     // mapear_arte: arte (ids/nomes) → na superfície do 3D (id3d). Girar: angulo (graus, 0 = de frente), y (mm do topo do perfil),
     // escala %. Extrudar: face frente|direita|esquerda|topo|base, dx/dy (mm), escala %. A arte original é guardada e sai da página.
-    vkRegistrar('mapear_arte', 'mapear arte no 3D', a => {
+    vkRegistrar('mapear_arte', 'mapear arte no 3D', async a => {
         const g = vkObj(a.id3d || a.objeto_3d) || alvo3d({ ...a, ids: a.ids3d }); if (!g || !g.tres_d) throw new Error('mapear_arte: id3d = o objeto 3D');
         const arte = (a.arte ? [].concat(a.arte).map(n => vkObj(n) || vkTodos().map(x => x.o).find(x => x.nome === n)) : vkTxAlvos(a).filter(o => o !== g)).filter(Boolean);
         if (!arte.length) throw new Error('mapear_arte: arte = ids ou nomes dos objetos a mapear');
+        for (const { o } of vkTodos()) if (o.tipo === 'texto' && arte.some(x => x === o || (x.itens && JSON.stringify(x).includes(o.id)))) await vkGeoPronta(o);
         const m = { arte: arte.map(vkClone), escala: a.escala ?? 100 };
         if (a.angulo != null) m.angulo = +a.angulo; if (a.y != null) m.y = a.un === 'pt' ? +a.y : vkPT(+a.y);
         if (a.face != null) m.face = isNaN(+a.face) ? a.face : +a.face; if (a.dx != null) m.dx = vkPT(+a.dx); if (a.dy != null) m.dy = vkPT(+a.dy);

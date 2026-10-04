@@ -1034,5 +1034,188 @@
 }
 }
 }
+},
+{
+"type": "function",
+"function": {
+"name": "girar_3d",
+"description": "Transforma um caminho-perfil (metade do contorno de um copo/garrafa, eixo na borda esquerda) num objeto 3D girado.",
+"parameters": {
+"type": "object",
+"properties": {
+"objeto": {
+"type": "string",
+"description": "nome do caminho-perfil"
+},
+"inclinar": {
+"type": "number",
+"description": "graus; positivo mostra o topo"
+},
+"material": {
+"type": "string",
+"enum": [
+"fosco",
+"papel",
+"plastico",
+"ceramica",
+"metal",
+"vidro"
+]
+},
+"cor": {
+"type": "string"
+},
+"nome": {
+"type": "string",
+"description": "nome do objeto 3D"
+}
+},
+"required": [
+"objeto"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "extrudar_3d",
+"description": "Dá volume a uma forma fechada (caixa, logo).",
+"parameters": {
+"type": "object",
+"properties": {
+"objeto": {
+"type": "string"
+},
+"profundidade": {
+"type": "number",
+"description": "mm"
+},
+"girar": {
+"type": "number",
+"description": "graus"
+},
+"inclinar": {
+"type": "number"
+},
+"cor_lado": {
+"type": "string"
+},
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"objeto"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "mapear_arte",
+"description": "Aplica uma arte (logo, rótulo) na superfície de um objeto 3D, acompanhando a curva.",
+"parameters": {
+"type": "object",
+"properties": {
+"objeto_3d": {
+"type": "string",
+"description": "nome do objeto 3D"
+},
+"arte": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos da arte"
+},
+"y": {
+"type": "number",
+"description": "girar_3d: mm a partir do topo"
+},
+"face": {
+"type": "string",
+"description": "extrudar_3d: frente, direita, esquerda, topo"
+},
+"escala": {
+"type": "number",
+"description": "%"
+}
+},
+"required": [
+"objeto_3d",
+"arte"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "editar_3d",
+"description": "Muda parâmetros de um objeto 3D existente.",
+"parameters": {
+"type": "object",
+"properties": {
+"objeto": {
+"type": "string"
+},
+"inclinar": {
+"type": "number"
+},
+"girar": {
+"type": "number"
+},
+"material": {
+"type": "string"
+},
+"luz": {
+"type": "number"
+}
+},
+"required": [
+"objeto"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "retocar_letra",
+"description": "Ajusta uma letra de um texto (girar, escalar, subir, cor) sem perder a edição.",
+"parameters": {
+"type": "object",
+"properties": {
+"objeto": {
+"type": "string"
+},
+"letra": {
+"type": "integer",
+"description": "posição, 0 = primeira"
+},
+"rot": {
+"type": "number",
+"description": "graus"
+},
+"escala": {
+"type": "number",
+"description": "%"
+},
+"subir": {
+"type": "number",
+"description": "pt"
+},
+"cor": {
+"type": "string"
+}
+},
+"required": [
+"objeto",
+"letra"
+]
+}
+}
 }
 ]
