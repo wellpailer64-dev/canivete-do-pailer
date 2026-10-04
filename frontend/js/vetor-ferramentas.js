@@ -146,6 +146,7 @@ function vkEventos() {
             if (o && o.tipo === 'texto') { VKA = null; VK.sel = [o.id]; vkTextoEditar(o); return; }
             VKA.modo = 'texto'; return;
         }
+        { const ds = typeof vkDsDown === 'function' && vkDsDown(VKA, x, y); if (ds) { if (ds === 'nada') VKA = null; vkDesenhar(); return; } }   // lápis, pincel, bolha, borracha, largura
         if (f === 'construtor' || f === 'tesoura' || f === 'faca') { if (vkcDown(VKA, x, y) === null) VKA = null; vkDesenhar(); return; }
         VKA.modo = 'forma';   // retângulo, elipse, polígono, estrela, linha
     });
@@ -162,6 +163,7 @@ function vkEventos() {
         if (VKA.modo === 'guia') { vkReguaMove(VKA, sx, sy, x, y); return; }
         VKA.mx = x; VKA.my = y; VKA.msx = sx; VKA.msy = sy; VKA.shift = e.shiftKey; VKA.alt = e.altKey; VKA.moveu = VKA.moveu || Math.hypot(sx - VKA.sx, sy - VKA.sy) > 3;
         if (VKA.f === 'mao') { VK.vista.x = VKA.vx + sx - VKA.sx; VK.vista.y = VKA.vy + sy - VKA.sy; vkDesenhar(); return; }
+        if (VKA.modo === 'largura') { vkDsMove(VKA, x, y); return; }
         if (VKA.trilha) { vkcMove(VKA, x, y); vkDesenhar(); return; }
         if (!VKA.moveu) return;
         let dx = x - VKA.x, dy = y - VKA.y;
@@ -244,6 +246,7 @@ function vkEventos() {
             return;
         }
         if (A.f === 'caneta') { vkCanetaUp(ex, ey); return; }
+        if (A.modo === 'desenho' || A.modo === 'largura') { await vkDsUp(A, ex, ey); vkDesenhar(); return; }
         if (A.modo === 'construir' || A.modo === 'faca') { await vkcUp(A, ex, ey); vkDesenhar(); return; }
         if (A.modo === 'texto') {
             const caixa = A.moveu ? Math.abs(ex - A.x) : null, caixa_alt = A.moveu && Math.abs(ey - A.y) * VK.vista.z > 8 ? Math.abs(ey - A.y) : null;   // arrastar = caixa de área (com altura, como no Illustrator)
@@ -418,6 +421,7 @@ function vkDesenharSobreposicao(ctx) {
     if (typeof vkcSobreposicao === 'function') vkcSobreposicao(ctx, VKA);
     if (typeof vkReguaSobreposicao === 'function') vkReguaSobreposicao(ctx, VKA);
     if (typeof vkTxSobreposicao === 'function') vkTxSobreposicao(ctx);
+    if (typeof vkDsSobreposicao === 'function') vkDsSobreposicao(ctx, VKA);
     // guias inteligentes
     ctx.strokeStyle = '#ff2fd0';
     for (const g of VKG) { ctx.beginPath(); if (g.eixo === 'x') { const [x] = vkTela(g.pos, 0); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, 99999); } else { const [, y] = vkTela(0, g.pos); ctx.moveTo(0, y + 0.5); ctx.lineTo(99999, y + 0.5); } ctx.stroke(); }
@@ -484,11 +488,14 @@ function vkTeclas(e) {
     }
     if (S && k === 'o') return faz(() => vkFerramenta('prancheta'));
     if (S && k === 'm') return faz(() => vkFerramenta('construtor'));
+    if (S && k === 'b') return faz(() => vkFerramenta('bolha'));
+    if (S && k === 'e') return faz(() => vkFerramenta('borracha'));
+    if (S && k === 'w') return faz(() => vkFerramenta('largura'));
     if (S && k === 'x') return faz(() => { [VK.preench, VK.traco] = [VK.traco, VK.preench]; vkUiAgendar(); });
     if (k === 'd' && !S) return faz(() => { VK.preench = { k: 'cmyk', v: [0, 0, 0, 0] }; VK.traco = { k: 'cmyk', v: [0, 0, 0, 100] }; vkUiAgendar(); });
     if (k === 'x' && !S) return faz(() => { VK.focoTraco = !VK.focoTraco; vkUiAgendar(); });
     if (k === '/') return faz(() => { if (VK.sel.length) vkCmdUi('alterar', VK.focoTraco ? { traco: null } : { preench: null }); else { if (VK.focoTraco) VK.traco = null; else VK.preench = null; vkUiAgendar(); } });
-    const mapa = { v: 'selecao', a: 'direta', p: 'caneta', t: 'texto', m: 'retangulo', l: 'elipse', '\\': 'linha', i: 'contagotas', h: 'mao', z: 'zoom', c: 'tesoura' };
+    const mapa = { v: 'selecao', a: 'direta', p: 'caneta', t: 'texto', m: 'retangulo', l: 'elipse', '\\': 'linha', i: 'contagotas', h: 'mao', z: 'zoom', c: 'tesoura', n: 'lapis', b: 'pincel' };
     if (!S && !A && mapa[k]) return faz(() => vkFerramenta(mapa[k]));
 }
 function vkStatus(x, y) { const el = document.getElementById('vk-status-pos'); if (el) el.textContent = `X ${vkR(vkMM(x - ((VK.doc.pranchetas.find(p => p.id === VK.ativa) || {}).x || 0)), 1)}  Y ${vkR(vkMM(y - ((VK.doc.pranchetas.find(p => p.id === VK.ativa) || {}).y || 0)), 1)} mm`; }

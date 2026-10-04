@@ -146,6 +146,7 @@
             if ('traco' in a && !soTrecho) { const c = vkCorDe(a.traco); apl(x => { if (x.tipo === 'imagem') return; x.traco = c ? { cap: 'butt', junc: 'miter', miter: 4, tracejado: [], fase: 0, larg: 1, ...(x.traco || {}), cor: vkClone(c) } : null; }); }
             if (a.espessura != null) apl(x => { if (x.traco) x.traco = { ...x.traco, larg: +a.espessura }; });
             for (const k of ['cap', 'junc', 'miter', 'tracejado']) if (a[k] != null) apl(x => { if (x.traco) x.traco = { ...x.traco, [k]: k === 'miter' ? +a[k] : a[k] }; });
+            vkDsAlterar(a, apl);   // perfil de largura e setas (vetor-desenho.js)
             if (a.opacidade != null) o.op = Math.max(0, Math.min(1, +a.opacidade / 100));
             if (a.mesclagem) o.bm = a.mesclagem;
             if (a.sobreimprimir != null) { const v = !!a.sobreimprimir; apl(x => { x.sobre = { p: v && !!x.preench, t: v && !!x.traco }; }); }

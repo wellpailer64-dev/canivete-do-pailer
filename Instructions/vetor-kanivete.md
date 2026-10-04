@@ -27,6 +27,8 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 | Caixa de área com altura (arrastar com T), texto sobrando (+ vermelho), encadear caixas (clicar no + e noutra caixa / lugar vazio) | revista, folder, cardápio | `caixa_alt`; `encadear` (`ids` em ordem, ou `nova:{x,y}`), `desencadear`; apagar uma caixa fecha a corrente (a raiz passa o texto adiante) |
 | Aparência (vários preenchimentos/traços na mesma forma, cada um com cor, espessura, opacidade, mesclagem, deslocamento, atrás/na frente) e Expandir aparência | contorno duplo em texto, borda de adesivo, logo com camadas | `vetor-aparencia.js`: `aparencia` (acao adicionar/alterar/remover/subir/descer/limpar, tipo preench/traco, cor, espessura, opacidade, deslocar mm, atras), `expandir_aparencia` |
 | Efeitos vivos: Cantos arredondados (vetorial), Sombra projetada, Brilho externo, Desfoque | acabamento | `efeito` (tipo sombra/brilho/desfoque/cantos; dx, dy, desfoque, raio em mm; cor, opacidade, mesclagem). Sombra/brilho/desfoque saem rasterizados a 300 ppi NA COR DA TINTA (imagem CMYK ou Separation + SMask com a silhueta desfocada) — só PDF/X-4; o fechamento acusa em X-1a |
+| Lápis (N), Pincel (B, com perfil), Pincel de bolha (Shift+B), Borracha (Shift+E), Simplificar | desenho à mão, ilustração, retoque de forma | `vetor-desenho.js`: pontos → RDP + Catmull-Rom (cantos > 75° ficam vivos); `lapis` (pontos mm, fidelidade, fechar, espessura pt, perfil), `simplificar` (tolerancia mm), `bolha` (pontos, espessura mm, cor: junta com as formas da mesma cor que encosta), `borracha` (pontos, espessura; selecionados ou todos embaixo) |
+| Setas e perfil de largura no traço, ferramenta Largura (Shift+W) | setas de diagrama, traço caligráfico | `alterar` com `seta_ini`/`seta_fim` (seta, triangulo, circulo, quadrado, barra), `seta_esc` %, `perfil` (uniforme, lente, afinar, afinar_inicio, gota, bico ou [[t, larg]]); viram formas (tela = PDF) |
 | Texto em caminho | selo, logo circular | ferramenta Texto em caminho (clique no caminho); `texto_caminho` (`ini` mm, `lado`, `manter_caminho`) |
 | Estilos de parágrafo / caractere, Glifos, juntar textos importados | padronizar, caracteres especiais, editar .ai/PDF | `estilo_texto` (tipo, nome, `de`, `aplicar`; mudar um estilo atualiza quem usa), `estilos_texto`, `glifos`, `inserir_texto` (`codigo`/`texto`, `pos`), `juntar_textos` (linhas → parágrafos; `quebras:'linhas'`) |
 | Alinhar/distribuir, guias inteligentes | precisão | caixa pelos extremos reais da cúbica (não pelas alças); encaixe magenta |
@@ -40,8 +42,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 
 Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): texto dentro de forma (área não retangular),
 hifenização, tabulações, editar a trilha do texto em caminho com a Seleção direta, estilos dentro da caixa de edição (ela é texto puro);
-efeitos que faltam (brilho interno, distorcer/zigue-zague, Aparência em grupo; efeitos na prévia de separações e no SVG); lápis/pincel/borracha, setas e perfil de largura no traço;
-ferramenta de degradê na arte, malha, mesclagem (Blend); símbolos, padrões, recolorir arte, livros Pantone; Image Trace,
+efeitos que faltam (brilho interno, distorcer/zigue-zague, Aparência em grupo; efeitos na prévia de separações e no SVG); ferramenta de degradê na arte, malha, mesclagem (Blend); símbolos, padrões, recolorir arte, livros Pantone; Image Trace,
 distorção de envelope, máscara de opacidade; painel de vínculos e variáveis; EPS; PDF com texto editável (hoje: curvas).
 
 ## 2. Modelo (pt = 1/72", y para baixo)
@@ -81,7 +82,7 @@ Unidades de agente: **mm relativos ao canto da prancheta** (`prancheta: nome|id|
 Comandos (`VKN.comandos()`): novo, documento, abrir, importar, salvar, exportar_pdf, exportar_imagem, exportar_svg,
 retangulo, elipse, poligono, estrela, linha, caminho (`d` SVG em mm ou `subs`), texto, imagem, alterar, mover,
 posicionar, redimensionar, girar, refletir, matriz, alinhar, distribuir, organizar, agrupar, desagrupar, mascara,
-soltar_mascara, composto, pathfinder, deslocar (`distancia` mm, `junc`), contornar_traco, repetir, transformar_cada, distribuir_espaco, construtor, pathfinder2, tesoura, faca, juntar, media, separacoes, tinta_em, exportar_separacoes, contornos, empacotar (`pasta`, `pdf`, `fontes`), aparencia, efeito, expandir_aparencia, texto_caminho, encadear, desencadear, estilo_texto, estilos_texto, juntar_textos, glifos, inserir_texto, duplicar, apagar, selecionar, mover_para_camada, nova_camada, camada,
+soltar_mascara, composto, pathfinder, deslocar (`distancia` mm, `junc`), contornar_traco, repetir, transformar_cada, distribuir_espaco, construtor, pathfinder2, tesoura, faca, juntar, media, separacoes, tinta_em, exportar_separacoes, contornos, empacotar (`pasta`, `pdf`, `fontes`), aparencia, efeito, expandir_aparencia, lapis, simplificar, bolha, borracha, texto_caminho, encadear, desencadear, estilo_texto, estilos_texto, juntar_textos, glifos, inserir_texto, duplicar, apagar, selecionar, mover_para_camada, nova_camada, camada,
 nova_prancheta, prancheta, mover_prancheta, amostra, cores_padrao, definir_subs, converter_cmyk, preto_texto,
 sobreimprimir_preto, tirar_sobre_branco, engrossar_tracos, limpar, mapa, info, ajuda.
 Fonte "Arial Bold" (família + estilo juntos) é entendida. Só `preench` informado = sem traço.
@@ -156,6 +157,6 @@ O que não vira objeto entra no `relatorio` (mostrado ao abrir).
 - `testes/teste_vetor.py`: cartão pelos comandos, aparência/efeitos (PDF com efeitos na cor da tinta), texto (trechos, parágrafo, encadear, caminho, estilos, juntar, glifos, PDF), Pathfinder, alinhar, fechamento + correção, desfazer, PDF X-4 e X-1a
   verificados com a cor especial preservada, PNG, salvar/reabrir .aknv, abrir PDF/SVG/PPTX, SVG → CMYK, sem erro de JS.
 - Mouse de verdade: `D:\kanivete_testes\scripts\vetor_mouse.py` (retângulo, mover, elipse, caneta, texto, copiar/colar, desfazer);
-  `vetor_texto_ui.py` (caixa com altura, + vermelho → encadear, texto em caminho, trecho no painel).
+  `vetor_desenho_ui.py` (lápis, pincel, bolha, borracha, Largura, seta pelo painel); `vetor_texto_ui.py` (caixa com altura, + vermelho → encadear, texto em caminho, trecho no painel).
 - 2026-10-04 v1: Worker `VETOR_FLYER_03` (flyer A6 do zero, alinhar, fechamento, PDF/X-4) — 8 operações, 0 erros, 20 s.
   Lições: o modelo manda "Arial Bold" como fonte (agora entendido); exportar_pdf precisa estar nas finais do worker.py.

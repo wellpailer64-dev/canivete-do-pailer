@@ -9,7 +9,7 @@
 VK.apDesl = new Map(); VK.apPend = new Map();
 
 function vkApEf(o, tipo) { return (o.efeitos || []).find(e => e.tipo === tipo && e.visivel !== false); }
-function vkApTem(o) { return (o.aparencia || []).some(l => l.visivel !== false) || !!vkApEf(o, 'cantos'); }
+function vkApTem(o) { return (o.aparencia || []).some(l => l.visivel !== false) || !!vkApEf(o, 'cantos') || (o.tipo === 'caminho' && vkDsTracoEspecial(o.traco)); }
 
 // cantos arredondados (Efeito › Estilizar › Cantos arredondados): só cantos vivos entre segmentos retos
 function vkArredondar(subs, r) {
@@ -50,7 +50,11 @@ const vkApDoc = (subs, m) => subs.map(s => ({ fechado: s.fechado, pts: s.pts.map
 // pinturas básicas do objeto em pt do documento → [{subs, regra, preench, traco}] (null = geometria ainda vindo)
 function vkApBase(o) {
     if (o.visivel === false) return [];
-    if (o.tipo === 'caminho') { const c = vkApEf(o, 'cantos'); return [{ subs: c ? vkArredondar(o.subs, c.raio) : o.subs, regra: o.regra || 'nonzero', preench: o.preench, traco: o.traco }]; }
+    if (o.tipo === 'caminho') {
+        const c = vkApEf(o, 'cantos'), subs = c ? vkArredondar(o.subs, c.raio) : o.subs;
+        if (vkDsTracoEspecial(o.traco)) return vkDsTraco(subs, o.regra || 'nonzero', o.preench, o.traco);   // perfil de largura / setas
+        return [{ subs, regra: o.regra || 'nonzero', preench: o.preench, traco: o.traco }];
+    }
     if (o.tipo === 'texto') {
         const g = vkGeo(o); if (!g) return null;
         const e = vkEsc(o.m), tr = t => t ? { ...t, larg: (t.larg ?? 1) * e } : t;

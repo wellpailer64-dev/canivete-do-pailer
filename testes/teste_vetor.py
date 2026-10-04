@@ -259,6 +259,37 @@ with sync_playwright() as p:
     pg.evaluate("vkEnquadrar()"); pg.wait_for_timeout(600)
     pg.screenshot(path=os.path.join(SAI, "aparencia.png"))
 
+    print("desenho à mão e traço (lápis, bolha, borracha, setas, perfil)")
+    import math
+    C("novo", {"nome": "Desenho teste", "larg": 120, "alt": 80})
+    onda = [[5 + i * 2, 20 + 8 * math.sin(i / 3)] for i in range(40)]
+    r = C("lapis", {"pontos": onda, "espessura": 1.5, "nome": "onda"})
+    ok(4 <= r["pontos"] < 25 and not r["fechado"], f"lápis: 40 pontos viram curva suave ({r['pontos']} pontos)")
+    roda = [[60 + 10 * math.cos(i / 20 * 2 * math.pi), 20 + 10 * math.sin(i / 20 * 2 * math.pi)] for i in range(21)]
+    r = C("lapis", {"pontos": roda, "nome": "roda"})
+    bx = C("info", {"nomes": ["roda"]})[0]["caixa_mm"]
+    ok(r["fechado"] and r["pontos"] >= 4 and abs(bx["larg"] - 20) < 1, f"lápis fecha sozinho quando termina no começo ({r['pontos']} pontos, {bx})")
+    pl = [[90 + 10 * math.cos(i / 100 * 2 * math.pi), 20 + 10 * math.sin(i / 100 * 2 * math.pi)] for i in range(100)]
+    C("caminho", {"d": "M" + " L".join(f"{x:.3f} {y:.3f}" for x, y in pl) + " Z", "preench": "C0 M100 Y0 K0", "nome": "poligonao"})
+    r = C("simplificar", {"nomes": ["poligonao"], "tolerancia": 0.1})
+    bx = C("info", {"nomes": ["poligonao"]})[0]["caixa_mm"]
+    ok(4 <= r["pontos_depois"] < r["pontos_antes"] / 3 and abs(bx["larg"] - 20) < 0.5 and abs(bx["alt"] - 20) < 0.5, f"simplificar: menos pontos, mesma forma ({r}, {bx})")
+    C("linha", {"x1": 5, "y1": 45, "x2": 50, "y2": 45, "traco": "100K", "espessura": 3, "nome": "seta"})
+    C("alterar", {"nomes": ["seta"], "perfil": "lente", "seta_fim": "triangulo", "seta_ini": "circulo"})
+    p = P("seta")
+    ok(len(p) == 2 and p[0]["preench"] and p[1]["preench"], f"perfil de largura + setas viram formas ({p})")
+    C("bolha", {"pontos": [[60, 45], [80, 45]], "espessura": 4, "cor": "C100 M0 Y0 K0"})
+    r = C("bolha", {"pontos": [[70, 40], [70, 55]], "espessura": 4, "cor": "C100 M0 Y0 K0"})
+    ok(r["juntou"] == 1, "pincel de bolha junta com a forma da mesma cor que encosta")
+    C("retangulo", {"x": 85, "y": 40, "larg": 30, "alt": 20, "preench": "C0 M0 Y100 K0", "traco": "nenhum", "nome": "amarelo"})
+    C("selecionar", {"nomes": ["amarelo"]})
+    r = C("borracha", {"pontos": [[100, 35], [100, 65]], "espessura": 3})
+    n_subs = pg.evaluate("vkTodos().find(x => x.o.nome === 'amarelo').o.subs.length")
+    ok(r["recortados"] == 1 and n_subs == 2, f"borracha corta o retângulo em dois ({r}, {n_subs} partes)")
+    out = os.path.join(SAI, "desenho_x4.pdf")
+    r = pg.evaluate("([c]) => VKN.exportarPdf(c, {padrao: 'x4'})", [out])
+    ok(r["verificado"], f"PDF/X-4 com perfil e setas ({r['problemas']})")
+
     print("separações e sobreimpressão")
     C("novo", {"nome": "Sep teste", "larg": 100, "alt": 60, "sangria": 3})
     C("retangulo", {"x": 0, "y": 0, "larg": 100, "alt": 60, "preench": "C0 M0 Y100 K0", "traco": "nenhum", "nome": "fundo"})

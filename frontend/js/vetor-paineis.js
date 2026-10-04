@@ -67,7 +67,7 @@ function vkMontar() {
     <div class="ie-modal" id="vk-modal" hidden></div>
     <div class="ie-pop" id="vk-pop" hidden></div>`;
     // ferramentas
-    const grupos = [['selecao', 'direta'], ['caneta', 'texto', 'texto_caminho'], ['construtor', 'tesoura', 'faca'], ['retangulo', 'elipse', 'poligono', 'estrela', 'linha'], ['contagotas', 'prancheta'], ['mao', 'zoom']];
+    const grupos = [['selecao', 'direta'], ['caneta', 'texto', 'texto_caminho'], ['lapis', 'pincel', 'bolha', 'borracha', 'largura'], ['construtor', 'tesoura', 'faca'], ['retangulo', 'elipse', 'poligono', 'estrela', 'linha'], ['contagotas', 'prancheta'], ['mao', 'zoom']];
     vkEl('vk-ferr').innerHTML = `<div class="ie-ferr-lista">${grupos.map(g => g.map(f => `<button class="ie-ferr-btn" data-f="${f}" title="${VK_FERR[f].nome}${VK_FERR[f].tecla ? ' (' + VK_FERR[f].tecla + ')' : ''}">${vkI(f)}</button>`).join('')).join('<div class="ie-ferr-sep"></div>')}</div>
         <div class="vk-cores-ferr" id="vk-cores-ferr"></div>`;
     vkEl('vk-ferr').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) vkFerramenta(b.dataset.f); });
@@ -165,9 +165,10 @@ function vkOpcoes() {
     if (f === 'direta') h += `<span class="ie-op-dica">arraste pontos/alças · Alt na alça = quebra a curva · Shift soma pontos</span>`;
     if (f === 'selecao') h += `<span class="ie-op-dica">Shift = proporcional/eixo · Alt+arraste = duplica · Alt na alça = a partir do centro · fora do canto = girar</span>`;
     if (f === 'texto') h += `<span class="ie-op-dica">clique = texto de ponto · arraste = caixa de texto · Esc/Ctrl+Enter termina · selecione um trecho e mude no painel</span>`;
+    if (typeof vkDsOpcoes === 'function') h += vkDsOpcoes(f);
     if (f === 'texto_caminho') h += `<span class="ie-op-dica">clique num caminho (linha, curva, círculo) e escreva · Início/lado no painel</span>`;
     if (el.dataset.f === f && el.innerHTML) return;
-    el.dataset.f = f; el.innerHTML = h;
+    el.dataset.f = f; el.innerHTML = h; if (typeof vkDsOpcoesEventos === 'function') vkDsOpcoesEventos(el);
     el.oninput = e => { const k = e.target.dataset.o; if (!k) return; VK_OPC[k] = k === 'raio' ? vkPT(+e.target.value || 0) : Math.max(3, +e.target.value || 3); };
 }
 
@@ -201,7 +202,7 @@ function vkProps() {
             ${vkNum('', tr ? vkR(tr.larg, 3) : 0, 'data-a="espessura" min="0"', 'pt', 0.25)}</div>
         ${tr ? `<div class="vk-linha vk-mini">Ponta <select data-a="cap">${['butt', 'round', 'square'].map(v => `<option value="${v}" ${tr.cap === v ? 'selected' : ''}>${{ butt: 'reta', round: 'redonda', square: 'projetada' }[v]}</option>`).join('')}</select>
             Canto <select data-a="junc">${['miter', 'round', 'bevel'].map(v => `<option value="${v}" ${tr.junc === v ? 'selected' : ''}>${{ miter: 'vivo', round: 'redondo', bevel: 'chanfro' }[v]}</option>`).join('')}</select>
-            Tracejado <input type="text" data-a="tracejado" placeholder="ex. 4 2" value="${(tr.tracejado || []).map(v => vkR(v, 2)).join(' ')}" style="width:56px"></div>` : ''}
+            Tracejado <input type="text" data-a="tracejado" placeholder="ex. 4 2" value="${(tr.tracejado || []).map(v => vkR(v, 2)).join(' ')}" style="width:56px"></div>${vkDsPainelTraco(tr)}` : ''}
         <div class="vk-linha">${vkNum('Opacidade', Math.round((o.op ?? 1) * 100), 'data-a="opacidade" min="0" max="100"', '%', 1)}
             <select data-a="mesclagem" title="Modo de mesclagem">${['normal', ...Object.keys(VK_BM)].map(v => `<option value="${v}" ${(o.bm || 'normal') === v ? 'selected' : ''}>${v.replace('_', ' ')}</option>`).join('')}</select></div>
         <label class="vk-chk"><input type="checkbox" data-a="sobreimprimir" ${o.sobre && (o.sobre.p || o.sobre.t) ? 'checked' : ''}> Sobreimprimir</label></div>`;
@@ -222,7 +223,7 @@ function vkProps() {
     h += `<div class="vk-sec"><div class="vk-bts"><button class="ie-btn ie-btn-mini" onclick="vkCmdUi('${objs.length > 1 ? 'agrupar' : 'desagrupar'}', {})">${objs.length > 1 ? 'Agrupar' : 'Desagrupar'}</button>
         ${objs.length > 1 ? `<button class="ie-btn ie-btn-mini" onclick="vkCmdUi('mascara', {})">Máscara</button>` : ''}<button class="ie-btn ie-btn-mini" onclick="vkCmdUi('duplicar', {dx: ${vkPT(5)}, dy: ${vkPT(5)}})">Duplicar</button></div></div>`;
     el.innerHTML = h;
-    vkTxPainelEventos(el); vkApPainelEventos(el);
+    vkTxPainelEventos(el); vkApPainelEventos(el); vkDsPainelEventos(el);
     el.onchange = e => {
         const t = e.target, a = t.dataset.a, tr = t.dataset.t;
         if (tr) {
