@@ -99,7 +99,8 @@ function vkBox(o, comTraco = false) {   // caixa no documento
         for (const f of (o.clip ? o.itens.slice(0, 1) : o.itens)) { const c = vkBox(f, comTraco); if (isFinite(c[0])) { vkBoxAdd(b, c[0], c[1]); vkBoxAdd(b, c[2], c[3]); } }
     } else if (o.tipo === 'texto') {
         const g = vkGeo(o);
-        if (g && g.subs.length) vkSubsBox(g.subs, o.m, b);
+        if (o.caixa && o.caixa_alt) for (const [x, y] of [[0, 0], [o.caixa, 0], [0, o.caixa_alt], [o.caixa, o.caixa_alt]]) { const p = vkAp(o.m, x, y); vkBoxAdd(b, p[0], p[1]); }
+        else if (g && g.subs.length) vkSubsBox(g.subs, o.m, b);
         else { const l = o.caixa || o.conteudo.length * o.tam * 0.55, x0 = o.alin === 'centro' && !o.caixa ? -l / 2 : 0;
             for (const [x, y] of [[x0, -o.tam * 0.8], [x0 + l, -o.tam * 0.8], [x0, o.tam * 0.25], [x0 + l, o.tam * 0.25]]) { const p = vkAp(o.m, x, o.caixa ? y + o.tam * 0.8 : y); vkBoxAdd(b, p[0], p[1]); } }
     } else if (o.tipo === 'imagem') {
@@ -229,22 +230,47 @@ function vkCorDe(s) {   // texto → cor: "#ff0000", "cmyk(0,100,100,0)", "C0 M1
 }
 
 // ─────────────────────────── texto (geometria do Python) ───────────────────────────
-const VK_TX_CAMPOS = ['conteudo', 'fam', 'estilo', 'tam', 'entrelinha', 'track', 'alin', 'caixa'];
-function vkGeoChave(o) { return JSON.stringify(VK_TX_CAMPOS.map(k => o[k] ?? null)); }
+// campos que mudam a geometria (o spec do Python); estilos já vêm gravados no objeto, encadeamento e trilha em vkTxSpec
+const VK_TX_CAMPOS = ['conteudo', 'fam', 'estilo', 'tam', 'entrelinha', 'track', 'alin', 'caixa', 'caixa_alt', 'desl', 'eh', 'ev', 'maius', 'pos', 'liga', 'frac', 'num',
+    'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois', 'trechos', 'trilha'];
+const VK_TX_CAIXA = new Set(['caixa', 'caixa_alt', 'trilha']);   // da própria caixa; o resto vem do texto-raiz (encadeado)
+function vkTxFonte(o, n = 0) {   // texto encadeado: {raiz, ini} — de onde vem o conteúdo desta caixa (null = a anterior ainda calculando)
+    const p = o.anterior && vkObj(o.anterior);
+    if (!p || p.tipo !== 'texto' || n > 60) return { raiz: o, ini: 0 };
+    const fp = vkTxFonte(p, n + 1); if (!fp) return null;
+    const g = vkGeo(p); if (!g) return null;
+    return { raiz: fp.raiz, ini: g.corte == null ? String(fp.raiz.conteudo).length : fp.ini + g.corte };
+}
+function vkTxSpec(o) {
+    const f = vkTxFonte(o); if (!f) return null;
+    const src = f.raiz, s = {};
+    for (const k of VK_TX_CAMPOS) { const v = VK_TX_CAIXA.has(k) ? o[k] : src[k]; if (v != null && !(Array.isArray(v) && !v.length)) s[k] = v; }
+    if (f.ini) {
+        s.conteudo = String(src.conteudo).slice(f.ini);
+        if (s.trechos) s.trechos = s.trechos.map(t => ({ ...t, ini: t.ini - f.ini, fim: t.fim - f.ini })).filter(t => t.fim > 0);
+        delete s.recuo_1a;
+    }
+    if (s.trechos) s.trechos = s.trechos.map(({ ec, ...t }) => t);
+    return s;
+}
+function vkGeoChave(o) { const s = vkTxSpec(o); return s ? JSON.stringify(s) : null; }
 function vkGeo(o) {   // a mesma geometria do PDF (HarfBuzz + fontTools no Python): o que se vê é o que imprime
-    const k = vkGeoChave(o);
+    const spec = vkTxSpec(o); if (!spec) return null;
+    const k = JSON.stringify(spec);
     const g = VK.geo.get(k);
     if (g) return g;
     if (!VK.geoPend.has(k)) {
         const api = vkApi();
         if (!api || !api.vk_texto_geometria) return null;
-        const spec = {}; VK_TX_CAMPOS.forEach(c => { if (o[c] != null) spec[c] = o[c]; });
         VK.geoPend.set(k, api.vk_texto_geometria(spec).then(r => { VK.geo.set(k, r); VK.geoPend.delete(k); vkDesenhar(); vkUiAgendar(); return r; })
             .catch(() => VK.geoPend.delete(k)));
     }
     return null;
 }
-async function vkGeoPronta(o) { vkGeo(o); const p = VK.geoPend.get(vkGeoChave(o)); if (p) await p; return VK.geo.get(vkGeoChave(o)); }
+async function vkGeoPronta(o) {
+    const ant = o.anterior && vkObj(o.anterior); if (ant) await vkGeoPronta(ant);
+    vkGeo(o); const k = vkGeoChave(o), p = k && VK.geoPend.get(k); if (p) await p; return k ? VK.geo.get(k) : null;
+}
 async function vkGeosProntas() { for (const { o } of vkTodos()) if (o.tipo === 'texto') await vkGeoPronta(o); }
 
 // ─────────────────────────── desenho ───────────────────────────
@@ -295,11 +321,16 @@ function vkDesenharObj(ctx, o, cam) {
         const p = vkPath2d(subs), regra = o.regra === 'evenodd' ? 'evenodd' : 'nonzero';
         if (VK.contorno) { ctx.lineWidth = 1 / VK.vista.z / (m ? vkEsc(m) : 1); ctx.strokeStyle = '#000'; ctx.globalAlpha = 1; ctx.stroke(p); }
         else {
-            if (o.preench) { ctx.fillStyle = vkEstiloCanvas(ctx, o.preench, m); ctx.fill(p, regra); }
-            if (o.traco && o.traco.cor) {
-                const t = o.traco; ctx.strokeStyle = vkEstiloCanvas(ctx, t.cor, m); ctx.lineWidth = Math.max(t.larg, 0.0001);
-                ctx.lineCap = t.cap || 'butt'; ctx.lineJoin = t.junc || 'miter'; ctx.miterLimit = t.miter || 4; ctx.setLineDash(t.tracejado || []); ctx.lineDashOffset = t.fase || 0;
-                ctx.stroke(p);
+            const g = o.tipo === 'texto' && vkGeo(o);
+            for (const pa of (g && g.partes) || [null]) {   // texto com trechos coloridos (estilo de caractere): uma parte por cor
+                const pp = pa ? vkPath2d(pa.subs) : p, pr = pa && 'preench' in pa ? pa.preench : o.preench;
+                const t = pa && 'traco' in pa ? (pa.traco ? { larg: 1, cap: 'butt', junc: 'miter', miter: 4, ...(o.traco || {}), ...pa.traco } : null) : o.traco;
+                if (pr) { ctx.fillStyle = vkEstiloCanvas(ctx, pr, m); ctx.fill(pp, regra); }
+                if (t && t.cor) {
+                    ctx.strokeStyle = vkEstiloCanvas(ctx, t.cor, m); ctx.lineWidth = Math.max(t.larg, 0.0001);
+                    ctx.lineCap = t.cap || 'butt'; ctx.lineJoin = t.junc || 'miter'; ctx.miterLimit = t.miter || 4; ctx.setLineDash(t.tracejado || []); ctx.lineDashOffset = t.fase || 0;
+                    ctx.stroke(pp);
+                }
             }
         }
     } else if (o.tipo === 'imagem') {
@@ -391,7 +422,7 @@ function vkAcerta(o, x, y, tol) {   // x, y no documento; tol em pt
     if (o.tipo === 'imagem') { const im = VK.doc.imagens[o.img] || { w: 1, h: 1 }; const [u, v] = vkAp(vkInv(o.m), x, y); return u >= 0 && v >= 0 && u <= im.w && v <= im.h; }
     if (o.tipo === 'texto') {
         const g = vkGeo(o), b = vkBox(o);
-        if (!g) return x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3];
+        if (!g || (o.caixa && o.caixa_alt)) { const [u, v] = vkAp(vkInv(o.m), x, y), t = tol / vkEsc(o.m); return o.caixa && o.caixa_alt ? u >= -t && v >= -t && u <= o.caixa + t && v <= o.caixa_alt + t : x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3]; }
         const [u, v] = vkAp(vkInv(o.m), x, y), s = vkEsc(o.m);
         // texto: a caixa das letras de cada linha (clicar entre letras também pega, como no Illustrator)
         const lb = vkSubsBox(g.subs);

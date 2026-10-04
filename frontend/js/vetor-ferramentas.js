@@ -97,6 +97,7 @@ function vkEventos() {
         cv.setPointerCapture(e.pointerId);
         const [sx, sy] = pos(e), [x, y] = vkDoc(sx, sy);
         if (!VK.espaco && typeof vkReguaDown === 'function' && vkReguaDown(e, sx, sy, x, y)) return;   // régua → guia nova; guia → mover
+        if (!VK.espaco && e.button === 0 && typeof vkTxDown === 'function' && vkTxDown(e, sx, sy, x, y)) return;   // encadear texto, texto em caminho
         const f = (e.button === 1 || VK.espaco) ? 'mao' : VK.ferr;
         VKA = { f, sx, sy, x, y, alt: e.altKey, shift: e.shiftKey };
         if (f === 'mao') { VKA.vx = VK.vista.x; VKA.vy = VK.vista.y; return; }
@@ -154,8 +155,8 @@ function vkEventos() {
         if (VK.ferr === 'caneta' && VK.caneta) vkDesenhar();
         if (!VKA) {
             vkStatus(x, y); if (VK.sep && VK.sep.ativo) vkSepStatus(x, y); vkcHover(x, y);
-            if (VK.reguas !== false) vkDesenhar();   // marca do mouse nas réguas
-            if (VK.ferr === 'selecao' || VK.ferr === 'direta') { const gi = typeof vkGuiaEm === 'function' ? vkGuiaEm(sx, sy) : -1; cv.style.cursor = gi >= 0 ? (VK.doc.guias[gi].eixo === 'x' ? 'col-resize' : 'row-resize') : VK_FERR[VK.ferr].cursor; }
+            if (VK.reguas !== false || VK.txLigar) vkDesenhar();   // marca do mouse nas réguas; fio do encadeamento
+            if ((VK.ferr === 'selecao' || VK.ferr === 'direta') && !VK.txLigar) { const gi = typeof vkGuiaEm === 'function' ? vkGuiaEm(sx, sy) : -1; cv.style.cursor = gi >= 0 ? (VK.doc.guias[gi].eixo === 'x' ? 'col-resize' : 'row-resize') : VK_FERR[VK.ferr].cursor; }
             return;
         }
         if (VKA.modo === 'guia') { vkReguaMove(VKA, sx, sy, x, y); return; }
@@ -245,8 +246,8 @@ function vkEventos() {
         if (A.f === 'caneta') { vkCanetaUp(ex, ey); return; }
         if (A.modo === 'construir' || A.modo === 'faca') { await vkcUp(A, ex, ey); vkDesenhar(); return; }
         if (A.modo === 'texto') {
-            const caixa = A.moveu ? Math.abs(ex - A.x) : null;
-            const r = await vkCmdUi('texto', { x: Math.min(A.x, ex), y: A.moveu ? Math.min(A.y, ey) : A.y, conteudo: '', caixa, fonte: VK.txPadrao?.fam, estilo: VK.txPadrao?.estilo, tamanho: VK.txPadrao?.tam });
+            const caixa = A.moveu ? Math.abs(ex - A.x) : null, caixa_alt = A.moveu && Math.abs(ey - A.y) * VK.vista.z > 8 ? Math.abs(ey - A.y) : null;   // arrastar = caixa de área (com altura, como no Illustrator)
+            const r = await vkCmdUi('texto', { x: Math.min(A.x, ex), y: A.moveu ? Math.min(A.y, ey) : A.y, conteudo: '', caixa, ...(caixa_alt ? { caixa_alt } : {}), fonte: VK.txPadrao?.fam, estilo: VK.txPadrao?.estilo, tamanho: VK.txPadrao?.tam });
             if (r) { const o = vkObj(r.id); o._novo = true; vkTextoEditar(o); }
             return;
         }
@@ -416,6 +417,7 @@ function vkDesenharSobreposicao(ctx) {
     }
     if (typeof vkcSobreposicao === 'function') vkcSobreposicao(ctx, VKA);
     if (typeof vkReguaSobreposicao === 'function') vkReguaSobreposicao(ctx, VKA);
+    if (typeof vkTxSobreposicao === 'function') vkTxSobreposicao(ctx);
     // guias inteligentes
     ctx.strokeStyle = '#ff2fd0';
     for (const g of VKG) { ctx.beginPath(); if (g.eixo === 'x') { const [x] = vkTela(g.pos, 0); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, 99999); } else { const [, y] = vkTela(0, g.pos); ctx.moveTo(0, y + 0.5); ctx.lineTo(99999, y + 0.5); } ctx.stroke(); }

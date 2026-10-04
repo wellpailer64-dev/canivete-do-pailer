@@ -8,7 +8,7 @@ Modelo (unidade = pt, 1/72"; y para baixo, como no SVG): ver Instructions/vetor-
 - .aknv = zip com documento.json + imagens/ (salvar/abrir); Empacotar (pasta com .aknv, Links, Fontes, relatório)
 - imagens colocadas: tamanho, modo (RGB/CMYK), ppi, prévia RGB servida ao painel
 """
-import hashlib, io, json, os, re, shutil, tempfile, time, zipfile
+import hashlib, io, json, math, os, re, shutil, tempfile, time, zipfile
 
 PT_MM = 72 / 25.4
 PASTA_TMP = os.path.join(tempfile.gettempdir(), "vetor_kanivete")
@@ -196,12 +196,15 @@ def _fonte(arq, ind):
 
 
 class _Caneta:
-    """fontTools pen → subcaminhos [[x,y,ix,iy,ox,oy]...] já em pt do objeto (quadráticas viram cúbicas)."""
-    def __init__(self, s, dx, base):
-        self.s, self.dx, self.base, self.subs, self.cur = s, dx, base, [], None
+    """fontTools pen → subcaminhos [[x,y,ix,iy,ox,oy]...] em pt do objeto (quadráticas viram cúbicas).
+    Ponto da fonte (x, y para cima) → (x·sx, −y·sy) → matriz M (posição; rotação no texto em caminho)."""
+    def __init__(self, sx, sy, M):
+        self.sx, self.sy, self.M, self.subs, self.cur = sx, sy, M, [], None
 
     def _p(self, x, y):
-        return [self.dx + x * self.s, self.base - y * self.s]
+        X, Y = x * self.sx, -y * self.sy
+        a, b, c, d, e, f = self.M
+        return [a * X + c * Y + e, b * X + d * Y + f]
 
     def moveTo(self, p):
         x, y = self._p(*p); self.cur = {"fechado": False, "pts": [[x, y, x, y, x, y]]}; self.subs.append(self.cur); self._u = p
@@ -243,83 +246,282 @@ class _Caneta:
         self._gs[nome].draw(TransformPen(self, t))
 
 
-def _moldar(F, texto, track_em):
+def _tem_feat(F, tag):
+    c = F.setdefault("_feats", {})
+    if tag not in c:
+        try:
+            c[tag] = any(r.FeatureTag == tag for r in F["tt"]["GSUB"].table.FeatureList.FeatureRecord)
+        except Exception:
+            c[tag] = False
+    return c[tag]
+
+
+def _moldar(F, texto, track_em, feats=None):
     import uharfbuzz as hb
     buf = hb.Buffer(); buf.add_str(texto); buf.guess_segment_properties()
-    hb.shape(F["hb"], buf, {"kern": True, "liga": True})
+    f = {"kern": True, "liga": True}; f.update(feats or {})
+    hb.shape(F["hb"], buf, f)
     tr = track_em * F["upem"] / 1000
     return [(F["ordem"][i.codepoint], i.cluster, p.x_advance + tr, p.x_offset, p.y_offset) for i, p in zip(buf.glyph_infos, buf.glyph_positions)]
 
 
+# atributos de CARACTERE (objeto = base; trechos = [{ini, fim, ...}] por cima, o último vence) e de PARÁGRAFO (objeto)
+_CAR = ("fam", "estilo", "tam", "track", "desl", "eh", "ev", "maius", "pos", "liga", "frac", "num", "preench", "traco")
+_PAR = ("recuo_esq", "recuo_dir", "recuo_1a", "antes", "depois")
+_ESPACOS = ("space", "uni0020", "uni00A0", "nbspace")
+
+
+def _runs(spec, n):
+    """[(ini, fim, props)] cobrindo 0..n com os trechos aplicados."""
+    base = {k: spec.get(k) for k in _CAR}
+    base["fam"] = base["fam"] or "Arial"; base["estilo"] = base["estilo"] or "Regular"; base["tam"] = float(base["tam"] or 12)
+    tr = [t for t in (spec.get("trechos") or []) if isinstance(t, dict)]
+    if not tr:
+        return [(0, n, base)]
+    cortes = {0, n}
+    for t in tr:
+        cortes.add(max(0, min(n, int(t.get("ini", 0))))); cortes.add(max(0, min(n, int(t.get("fim", n)))))
+    cs = sorted(cortes); out = []
+    for a, b in zip(cs, cs[1:]):
+        p = dict(base)
+        for t in tr:
+            if int(t.get("ini", 0)) <= a and int(t.get("fim", n)) >= b:
+                p.update({k: v for k, v in t.items() if k in _CAR and v is not None})
+        if out and out[-1][2] == p:
+            out[-1] = (out[-1][0], b, p)
+        else:
+            out.append((a, b, p))
+    return out or [(0, n, base)]
+
+
+def _glifos(texto, ini, fim, p, falta):
+    """Glifos de um trecho uniforme (texto[ini:fim]) com os atributos p → lista de dicts em pt."""
+    arq, ind, achou = fonte_arquivo(p["fam"], p["estilo"])
+    if not achou:
+        falta.add(f"{p['fam']} {p['estilo']}")
+    elif achou == "embutida":
+        falta.add("~embutida")
+    F = _fonte(arq, ind)
+    tam = float(p["tam"]); desl = float(p.get("desl") or 0)
+    if p.get("pos") == "sup": desl += tam * 0.333; tam *= 0.583
+    elif p.get("pos") == "sub": desl -= tam * 0.333; tam *= 0.583
+    eh = float(p.get("eh") or 100) / 100; ev = float(p.get("ev") or 100) / 100
+    feats = {}
+    if p.get("liga") is False: feats.update({"liga": False, "clig": False})
+    if p.get("frac"): feats["frac"] = True
+    num = p.get("num")
+    if num: feats[{"old": "onum", "lin": "lnum", "tab": "tnum", "prop": "pnum"}.get(num, num)] = True
+    seg = texto[ini:fim]
+    pedacos = [(seg, tam, feats)]
+    if p.get("maius") == "alta":
+        pedacos = [("".join(c.upper() if len(c.upper()) == 1 else c for c in seg), tam, feats)]
+    elif p.get("maius") == "versalete":
+        if _tem_feat(F, "smcp"):
+            pedacos = [(seg, tam, dict(feats, smcp=True))]
+        else:   # versalete falso: minúsculas viram maiúsculas a 70%
+            grupos = []
+            for ch in seg:
+                mi = ch.islower() and len(ch.upper()) == 1
+                if not grupos or grupos[-1][0] != mi: grupos.append([mi, ""])
+                grupos[-1][1] += ch.upper() if mi else ch
+            pedacos = [(s_, tam * 0.7 if mi else tam, feats) for mi, s_ in grupos]
+    out, pos = [], ini
+    for s_, t_, f_ in pedacos:
+        sc = t_ / F["upem"]
+        for nome, cl, av, ox, oy in _moldar(F, s_, float(p.get("track") or 0), f_):
+            ci = pos + cl
+            ch = texto[ci] if ci < len(texto) else ""
+            out.append({"nome": nome, "ci": ci, "adv": av * sc * eh, "xo": ox * sc * eh, "yo": oy * sc * ev, "F": F, "sx": sc * eh, "sy": sc * ev,
+                        "desl": desl, "tam": float(p["tam"]), "asc": F["asc"] * sc * ev, "desc": -F["desc"] * sc * ev,
+                        "esp": ch in (" ", " ", "\t") or nome in _ESPACOS, "hif": ch in ("-", "‐", "–", "/"),
+                        "cor": (p.get("preench"), p.get("traco"))})
+        pos += len(s_)
+    return out
+
+
+def _desenhar(g, M, partes):
+    cn = _Caneta(g["sx"], g["sy"], M); cn._gs = g["F"]["gs"]
+    try:
+        g["F"]["gs"][g["nome"]].draw(cn)
+    except Exception:
+        pass
+    if cn.subs:
+        chave = json.dumps(g["cor"], sort_keys=True)
+        partes.setdefault(chave, (g["cor"], []))[1].extend(cn.subs)
+
+
+def _trilha_pontos(subs, lado=False):
+    """1º subcaminho → polilinha [(x, y, s acumulado)] (cúbicas amostradas); lado = do outro lado (invertido)."""
+    if not subs or not subs[0].get("pts"):
+        return []
+    P = subs[0]["pts"]; fechado = subs[0].get("fechado")
+    pts = [(P[0][0], P[0][1])]
+    n = len(P) if fechado else len(P) - 1
+    for i in range(n):
+        a, b = P[i], P[(i + 1) % len(P)]
+        reta = a[4] == a[0] and a[5] == a[1] and b[2] == b[0] and b[3] == b[1]
+        passos = 1 if reta else 32
+        for k in range(1, passos + 1):
+            t = k / passos; u = 1 - t
+            pts.append((u ** 3 * a[0] + 3 * u * u * t * a[4] + 3 * u * t * t * b[2] + t ** 3 * b[0],
+                        u ** 3 * a[1] + 3 * u * u * t * a[5] + 3 * u * t * t * b[3] + t ** 3 * b[1]))
+    if lado:
+        pts.reverse()
+    out, s = [], 0.0
+    for i, q in enumerate(pts):
+        if i: s += math.hypot(q[0] - pts[i - 1][0], q[1] - pts[i - 1][1])
+        out.append((q[0], q[1], s))
+    return out
+
+
+def _trilha_em(pl, s):
+    """posição e ângulo a s pt do início da polilinha."""
+    import bisect
+    i = max(1, min(len(pl) - 1, bisect.bisect_left([q[2] for q in pl], s)))
+    a, b = pl[i - 1], pl[i]
+    t = (s - a[2]) / ((b[2] - a[2]) or 1e-9)
+    return a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, math.atan2(b[1] - a[1], b[0] - a[0])
+
+
 def texto_geometria(spec):
-    """spec = {conteudo, fam, estilo, tam (pt), entrelinha (pt|None = 120%), track (1/1000 em), alin: esq|centro|dir|just,
-    caixa: largura em pt (texto de área) | None (texto de ponto)}. Origem = linha de base da 1ª linha no x da âncora
-    (ponto) ou canto superior esquerdo da caixa (área). → {subs, linhas, larg, alt, achou, fonte}"""
+    """spec = {conteudo, fam, estilo, tam (pt), entrelinha (pt|None = 120% do maior corpo da linha), track (1/1000 em),
+    alin: esq|centro|dir|just|just_tudo, caixa: largura pt (texto de área) | None (texto de ponto), caixa_alt: altura pt
+    (área de altura fixa: o que não cabe sobra → corte), desl (pt, linha de base), eh/ev (% escala), maius: alta|versalete,
+    pos: sup|sub, liga (bool), frac (bool), num: old|lin|tab|prop, trechos: [{ini, fim, <atributos de caractere>, preench, traco}],
+    recuo_esq, recuo_dir, recuo_1a, antes, depois (pt, parágrafo), trilha: {subs, ini (pt), lado (bool)} (texto em caminho)}.
+    Origem = linha de base da 1ª linha no x da âncora (ponto) ou canto superior esquerdo da caixa (área).
+    → {subs, partes:[{subs, preench?, traco?}] (só se algum trecho tem cor), linhas:[{base, x, larg, ini, fim, asc, desc}],
+       larg, alt, asc, desc, achou, faltam, fonte, corte (índice do 1º caractere que não coube | None), transborda}"""
     chave = hashlib.md5(json.dumps(spec, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     if chave in _GEO:
         return _GEO[chave]
-    arq, ind, achou = fonte_arquivo(spec.get("fam") or "Arial", spec.get("estilo") or "Regular")
-    F = _fonte(arq, ind)
-    tam = float(spec.get("tam") or 12); s = tam / F["upem"]
-    lead = float(spec.get("entrelinha") or tam * 1.2)
-    track = float(spec.get("track") or 0)
-    caixa = spec.get("caixa"); alin = spec.get("alin") or "esq"
-    # quebra: parágrafos por \n; texto de área quebra nos espaços pela largura
-    linhas = []
-    for par in str(spec.get("conteudo") or "").split("\n"):
-        gl = _moldar(F, par, track)
-        if not caixa or not gl:
-            linhas.append((gl, True)); continue
-        larg_max = float(caixa) / s
-        ini, acum, ult_esp = 0, 0, None
-        i = 0
-        while i < len(gl):
-            if par[gl[i][1]: gl[i][1] + 1] == " ":
-                ult_esp = i
-            acum += gl[i][2]
-            if acum > larg_max and i > ini:
-                corte = ult_esp if ult_esp is not None and ult_esp > ini else i
-                linhas.append((gl[ini:corte], False))
-                ini = corte + 1 if ult_esp is not None and corte == ult_esp else corte
-                i, acum, ult_esp = ini, 0, None
-                continue
-            i += 1
-        linhas.append((gl[ini:], True))
-    subs, info = [], []
-    asc = F["asc"] * s
-    y0 = asc if caixa else 0
-    for n, (gl, ultima) in enumerate(linhas):
-        while gl and gl[-1][0] in ("space", "uni0020"):
-            gl = gl[:-1]
-        larg = sum(g[2] for g in gl) * s
-        base = y0 + n * lead
-        extra = 0
-        if caixa:
-            sobra = float(caixa) - larg
-            dx = {"centro": sobra / 2, "dir": sobra}.get(alin, 0)
-            if alin == "just" and not ultima:
-                esp = [k for k, g in enumerate(gl) if g[0] in ("space", "uni0020")]
-                extra = sobra / s / len(esp) if esp else 0; dx = 0
-        else:
-            dx = {"centro": -larg / 2, "dir": -larg}.get(alin, 0)
+    texto = str(spec.get("conteudo") or "")
+    falta = set()
+    runs = _runs(spec, len(texto))
+    caixa = float(spec["caixa"]) if spec.get("caixa") else None
+    caixa_alt = float(spec["caixa_alt"]) if spec.get("caixa_alt") and caixa else None
+    alin = spec.get("alin") or "esq"
+    lead_fixo = float(spec["entrelinha"]) if spec.get("entrelinha") else None
+    par = {k: float(spec.get(k) or 0) for k in _PAR}
+    trilha = spec.get("trilha") if isinstance(spec.get("trilha"), dict) else None
+    arq0, ind0, _ = fonte_arquivo(runs[0][2]["fam"], runs[0][2]["estilo"]); F0 = _fonte(arq0, ind0)
+    tam0 = float(spec.get("tam") or 12); asc0, desc0 = F0["asc"] * tam0 / F0["upem"], -F0["desc"] * tam0 / F0["upem"]
+
+    def glifos_de(ini, fim, fonte_txt=None):
+        out = []
+        for a, b, p in runs:
+            a2, b2 = max(a, ini), min(b, fim)
+            if a2 < b2:
+                out += _glifos(fonte_txt if fonte_txt is not None else texto, a2, b2, p, falta)
+        return out
+
+    partes, info, corte = {}, [], None
+    if trilha:   # ── texto em caminho: uma linha, cada glifo girado na tangente ──
+        pl = _trilha_pontos(trilha.get("subs") or [], bool(trilha.get("lado")))
+        L = pl[-1][2] if pl else 0
+        plano = texto.replace("\n", " ")
+        gl = glifos_de(0, len(plano), plano)
+        larg = sum(g["adv"] for g in gl)
+        x0 = {"centro": (L - larg) / 2, "dir": L - larg}.get(alin, 0) + float(trilha.get("ini") or 0)
         x = 0
-        for nome, _cl, av, ox, oy in gl:
-            caneta = _Caneta(s, dx + (x + ox) * s, base - oy * s)
-            caneta._gs = F["gs"]
-            try:
-                F["gs"][nome].draw(caneta)
-            except Exception:
-                pass
-            subs.extend(caneta.subs)
-            x += av + (extra if nome in ("space", "uni0020") else 0)
-        info.append({"base": round(base, 3), "x": round(dx, 3), "larg": round(larg, 3)})
-    larg_tot = float(caixa) if caixa else max([l["larg"] for l in info] or [0])
-    r = {"subs": subs, "linhas": info, "larg": larg_tot, "alt": (len(linhas) - 1) * lead + asc - F["desc"] * s,
-         "asc": asc, "desc": -F["desc"] * s, "achou": achou, "fonte": os.path.basename(arq)}
+        for g in gl:
+            meio = x0 + x + g["adv"] / 2
+            if meio > L:
+                corte = g["ci"]; break
+            if meio >= 0 and pl:
+                px, py, ang = _trilha_em(pl, meio)
+                c, s = math.cos(ang), math.sin(ang)
+                dx, dy = -g["adv"] / 2 + g["xo"], -(g["desl"] + g["yo"])
+                _desenhar(g, [c, s, -s, c, px + c * dx - s * dy, py + s * dx + c * dy], partes)
+            x += g["adv"]
+        larg_tot, alt_tot = L, asc0 + desc0
+    else:   # ── ponto / área ──
+        paragrafos, pos = [], 0
+        for p_ in texto.split("\n"):
+            paragrafos.append((pos, pos + len(p_))); pos += len(p_) + 1
+        linhas = []   # (glifos, última do parágrafo, primeira do parágrafo, 1º caractere)
+        for (a, b) in paragrafos:
+            gl = glifos_de(a, b)
+            if not caixa or not gl:
+                linhas.append((gl, True, True, a)); continue
+            ini, primeira = 0, True
+            while ini < len(gl):
+                disp = caixa - par["recuo_esq"] - par["recuo_dir"] - (par["recuo_1a"] if primeira else 0)
+                acum, quebra, q, i = 0.0, None, None, ini
+                while i < len(gl):
+                    g = gl[i]
+                    if g["esp"]: quebra = (i, i + 1)   # quebra no espaço (ele some)
+                    acum += g["adv"]
+                    if acum > disp + 1e-6 and i > ini and not g["esp"]:
+                        q = quebra if quebra and quebra[0] > ini else (i, i)
+                        break
+                    if g["hif"]: quebra = (i + 1, i + 1)   # depois do hífen (ele fica)
+                    i += 1
+                if q is None:
+                    linhas.append((gl[ini:], True, primeira, gl[ini]["ci"])); break
+                linhas.append((gl[ini:q[0]], False, primeira, gl[ini]["ci"]))
+                ini, primeira = q[1], False
+                while ini < len(gl) and gl[ini]["esp"]: ini += 1
+                if ini >= len(gl):
+                    linhas[-1] = (linhas[-1][0], True, linhas[-1][2], linhas[-1][3])
+        y = None
+        for n, (gl, ultima, primeira, ci0) in enumerate(linhas):
+            while gl and gl[-1]["esp"]:
+                gl = gl[:-1]
+            asc_l = max([g["asc"] for g in gl] or [asc0]); desc_l = max([g["desc"] for g in gl] or [desc0])
+            lead = lead_fixo or 1.2 * max([g["tam"] for g in gl] or [tam0])
+            if y is None:
+                y = asc_l if caixa else 0
+            else:
+                y += lead + ((par["depois"] + par["antes"]) if primeira else 0)
+            if caixa_alt is not None and y + desc_l > caixa_alt + 0.01:
+                corte = ci0; break
+            larg = sum(g["adv"] for g in gl)
+            extra, r1 = 0, (par["recuo_1a"] if primeira else 0)
+            if caixa:
+                sobra = caixa - par["recuo_esq"] - par["recuo_dir"] - r1 - larg
+                dx = par["recuo_esq"] + r1 + {"centro": sobra / 2, "dir": sobra}.get(alin, 0)
+                if (alin == "just" and not ultima) or alin == "just_tudo":
+                    esp = [g for g in gl if g["esp"]]
+                    extra = sobra / len(esp) if esp and sobra > 0 else 0
+            else:
+                dx = {"centro": -larg / 2, "dir": -larg}.get(alin, 0) + r1
+            x = 0
+            for g in gl:
+                _desenhar(g, [1, 0, 0, 1, dx + x + g["xo"], y - g["desl"] - g["yo"]], partes)
+                x += g["adv"] + (extra if g["esp"] else 0)
+            info.append({"base": round(y, 3), "x": round(dx, 3), "larg": round(x, 3), "ini": ci0, "fim": (gl[-1]["ci"] + 1) if gl else ci0,
+                         "asc": round(asc_l, 3), "desc": round(desc_l, 3)})
+        larg_tot = caixa if caixa else max([l["larg"] for l in info] or [0])
+        if caixa_alt is not None:
+            alt_tot = caixa_alt
+        elif info:
+            alt_tot = info[-1]["base"] + info[-1]["desc"] + (0 if caixa else info[0]["asc"])
+        else:
+            alt_tot = asc0 + desc0
+    lista = list(partes.values())
+    r = {"subs": [s for _c, ss in lista for s in ss], "linhas": info, "larg": larg_tot, "alt": alt_tot, "asc": asc0, "desc": desc0,
+         "achou": False if any(not f.startswith("~") for f in falta) else ("embutida" if falta else True),
+         "faltam": sorted(f for f in falta if not f.startswith("~")), "fonte": os.path.basename(arq0),
+         "corte": corte, "transborda": corte is not None}
+    if len(lista) > 1 or (lista and (lista[0][0][0] is not None or lista[0][0][1] is not None)):
+        r["partes"] = [{"subs": ss, **({"preench": c[0]} if c[0] is not None else {}), **({"traco": c[1]} if c[1] is not None else {})} for c, ss in lista]
     if len(_GEO) > 2000:
         _GEO.clear()
     _GEO[chave] = r
     return r
+
+
+def fonte_glifos(fam, estilo="Regular", limite=4000):
+    """Caracteres que a fonte tem (painel Glifos) → {fam, estilo, achou, cars: [código Unicode...], total}"""
+    arq, ind, achou = fonte_arquivo(fam, estilo)
+    F = _fonte(arq, ind)
+    try:
+        cmap = F["tt"].getBestCmap() or {}
+    except Exception:
+        cmap = {}
+    cars = sorted(c for c in cmap if c >= 0x20 and not (0x7f <= c < 0xa0) and not (0xd800 <= c < 0xe000))
+    return {"fam": fam, "estilo": estilo, "achou": bool(achou), "cars": cars[:limite], "total": len(cars)}
 
 
 # ─────────────────────────── Pathfinder ───────────────────────────

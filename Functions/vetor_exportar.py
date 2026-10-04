@@ -245,21 +245,34 @@ class _Escritor:
             if not (o.get("preench") or o.get("traco")) or not o.get("subs"): return []
             return self.pintar(o["subs"], o.get("regra"), o.get("preench"), o.get("traco"), self.estilo_ops(o))
         if t == "texto":
-            geo = vk.texto_geometria({k: o.get(k) for k in ("conteudo", "fam", "estilo", "tam", "entrelinha", "track", "alin", "caixa")})
+            geo = vk.texto_geometria(_spec_texto(o))
             if not geo["achou"]: self.avisos.add(f"fonte '{o.get('fam')}' não instalada: saiu em Arial")
             if not geo["subs"]: return []
             m = o.get("m") or [1, 0, 0, 1, 0, 0]
             out = ["q", " ".join(_f(x) for x in m) + " cm"]
-            pr = o.get("preench")
-            if pr and pr.get("k") == "grad":   # degradê do texto está em coordenadas do documento: volta para o espaço local
+            def local(pr):   # degradê do texto está em coordenadas do documento: volta para o espaço local
+                if not (pr and pr.get("k") == "grad"): return pr
                 inv = _inv(m)
-                pr = dict(pr, a=_pt(inv, pr["a"]), b=_pt(inv, pr.get("b", pr["a"])), **({"f": _pt(inv, pr["f"])} if pr.get("f") else {}),
-                          **({"r": pr["r"] / (math.sqrt(abs(m[0] * m[3] - m[1] * m[2])) or 1)} if pr.get("r") else {}))
-            out += self.pintar(geo["subs"], "nonzero", pr, o.get("traco"), self.estilo_ops(o))
+                return dict(pr, a=_pt(inv, pr["a"]), b=_pt(inv, pr.get("b", pr["a"])), **({"f": _pt(inv, pr["f"])} if pr.get("f") else {}),
+                            **({"r": pr["r"] / (math.sqrt(abs(m[0] * m[3] - m[1] * m[2])) or 1)} if pr.get("r") else {}))
+            tr0 = o.get("traco")
+            for pa in geo.get("partes") or [{"subs": geo["subs"]}]:   # trechos com cor própria (estilo de caractere)
+                tr = tr0
+                if "traco" in pa:
+                    tr = (dict(tr0 or {"larg": 1, "cap": "butt", "junc": "miter", "miter": 4}, **pa["traco"]) if pa["traco"] else None)
+                out += self.pintar(pa["subs"], "nonzero", local(pa.get("preench", o.get("preench"))), tr, self.estilo_ops(o))
             return out + ["Q"]
         if t == "imagem":
             return self.imagem(o)
         return []
+
+
+_TX_CAMPOS = ("conteudo", "fam", "estilo", "tam", "entrelinha", "track", "alin", "caixa")
+
+
+def _spec_texto(o):
+    """o spec que a tela montou (estilos, encadeamento e trilha resolvidos: vkTxSpec) ou o básico do objeto."""
+    return o.get("_spec") or {k: o.get(k) for k in _TX_CAMPOS}
 
 
 _BM = {"multiplicacao": "Multiply", "divisao": "Screen", "sobrepor": "Overlay", "luz_suave": "SoftLight", "luz_forte": "HardLight", "escurecer": "Darken",
@@ -295,7 +308,7 @@ def _bbox_obj(o):
         im = o.get("_wh") or (1, 1)
         cantos = [_pt(m, p) for p in ((0, 0), (im[0], 0), (0, im[1]), (im[0], im[1]))]
     else:
-        g = vk.texto_geometria({k: o.get(k) for k in ("conteudo", "fam", "estilo", "tam", "entrelinha", "track", "alin", "caixa")})
+        g = vk.texto_geometria(_spec_texto(o))
         xs = [p[0] for s in g["subs"] for p in s["pts"]] or [0]; ys = [p[1] for s in g["subs"] for p in s["pts"]] or [0]
         cantos = [_pt(m, p) for p in ((min(xs), min(ys)), (max(xs), min(ys)), (min(xs), max(ys)), (max(xs), max(ys)))]
     return (min(c[0] for c in cantos), min(c[1] for c in cantos), max(c[0] for c in cantos), max(c[1] for c in cantos))

@@ -3194,6 +3194,10 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.texto_geometria(spec)
 
+    def vk_fonte_glifos(self, fam, estilo="Regular"):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.fonte_glifos(fam, estilo)
+
     def vk_booleana(self, op, formas):
         from Functions import vetor_kanivete
         return vetor_kanivete.booleana(op, formas)

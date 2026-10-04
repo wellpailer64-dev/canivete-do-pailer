@@ -61,7 +61,8 @@
             if (base) { const e = E[base].find(x => x.estilo.toLowerCase() === est.toLowerCase()); return [base, e ? e.estilo : (estilo || 'Regular')]; }
         }
         return [fam, estilo];
-    };
+    };    window.vkFonteNorm = fonteNorm;
+
     const res = o => ({ id: o.id, tipo: o.tipo, ...(o.nome ? { nome: o.nome } : {}), caixa_mm: vkCaixaMM(o) });
 
     vkRegistrar('ajuda', 'ajuda', () => Object.fromEntries(Object.entries(VK_CMDS).map(([k, v]) => [k, v.desc])), true);
@@ -115,6 +116,10 @@
             tam: +(a.tamanho || a.tam || 12), entrelinha: a.entrelinha ? +a.entrelinha : null, track: +(a.track || 0), alin: a.alin || 'esq',
             caixa: a.caixa != null ? c.D(a.caixa) : null, m: [1, 0, 0, 1, c.X(a.x), c.Y(a.y)] };
         estiloPadrao(o, { preench: '100K', traco: null, ...a });
+        const extra = {};   // caractere/parágrafo/altura (vetor-texto.js)
+        for (const k of ['desl', 'deslocamento_base', 'escala_h', 'escala_v', 'maius', 'caixa_alta', 'versalete', 'pos', 'liga', 'ligaduras', 'frac', 'fracoes', 'num', 'numerais',
+            'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois', 'estilo_paragrafo', 'altura', 'caixa_alt']) if (a[k] !== undefined) extra[k] = a[k];
+        if (Object.keys(extra).length) vkTxAplicar(o, { un: a.un, ...extra });
         inserir(o, a);
         const g = await vkGeoPronta(o);
         return { ...res(o), fonte_encontrada: g ? g.achou : null, linhas: g ? g.linhas.length : null };
@@ -136,8 +141,9 @@
         const objs = alvos(a), feitos = [];
         for (const o of objs) {
             const apl = f => { if (o.tipo === 'grupo' && !o.clip) o.itens.forEach(f); else f(o); };
-            if ('preench' in a) { const c = vkCorDe(a.preench); apl(x => { if (x.tipo !== 'imagem') x.preench = vkClone(c); }); }
-            if ('traco' in a) { const c = vkCorDe(a.traco); apl(x => { if (x.tipo === 'imagem') return; x.traco = c ? { cap: 'butt', junc: 'miter', miter: 4, tracejado: [], fase: 0, larg: 1, ...(x.traco || {}), cor: vkClone(c) } : null; }); }
+            const soTrecho = o.tipo === 'texto' && (a.faixa || a.trecho);   // cor só no trecho: vkTxAplicar
+            if ('preench' in a && !soTrecho) { const c = vkCorDe(a.preench); apl(x => { if (x.tipo !== 'imagem') x.preench = vkClone(c); }); }
+            if ('traco' in a && !soTrecho) { const c = vkCorDe(a.traco); apl(x => { if (x.tipo === 'imagem') return; x.traco = c ? { cap: 'butt', junc: 'miter', miter: 4, tracejado: [], fase: 0, larg: 1, ...(x.traco || {}), cor: vkClone(c) } : null; }); }
             if (a.espessura != null) apl(x => { if (x.traco) x.traco = { ...x.traco, larg: +a.espessura }; });
             for (const k of ['cap', 'junc', 'miter', 'tracejado']) if (a[k] != null) apl(x => { if (x.traco) x.traco = { ...x.traco, [k]: k === 'miter' ? +a[k] : a[k] }; });
             if (a.opacidade != null) o.op = Math.max(0, Math.min(1, +a.opacidade / 100));
@@ -147,15 +153,9 @@
             if (a.visivel != null) o.visivel = !!a.visivel;
             if (a.trava != null) o.trava = !!a.trava;
             if (a.regra) o.regra = a.regra;
-            if (o.tipo === 'texto') {
-                if (a.conteudo != null) o.conteudo = String(a.conteudo);
-                if (a.fonte || a.fam) { const [f2, e2] = fonteNorm(a.fonte || a.fam, a.estilo || o.estilo); o.fam = f2; o.estilo = e2 || o.estilo; }
-                else if (a.estilo) o.estilo = a.estilo;
-                if (a.tamanho || a.tam) o.tam = +(a.tamanho || a.tam);
-                if (a.entrelinha !== undefined) o.entrelinha = a.entrelinha ? +a.entrelinha : null;
-                if (a.track != null) o.track = +a.track;
-                if (a.alin) o.alin = a.alin;
-                if (a.caixa !== undefined) o.caixa = a.caixa ? (a.un === 'pt' ? +a.caixa : vkPT(+a.caixa)) : null;
+            if (o.tipo === 'texto') {   // caractere (texto inteiro ou faixa/trecho), parágrafo, caixa: vetor-texto.js
+                if (a.conteudo != null) { const r = vkTxRaiz(o); vkTxRemap(r, String(r.conteudo), String(a.conteudo)); }
+                vkTxAplicar(o, a);
                 await vkGeoPronta(o);
             }
             feitos.push(o.id);
@@ -327,7 +327,7 @@
         }
         VK.sel = novos; return { ids: novos };
     });
-    vkRegistrar('apagar', 'apagar', a => { const objs = alvos(a); tirar(objs); VK.sel = VK.sel.filter(id => vkObj(id)); return { apagados: objs.length }; });
+    vkRegistrar('apagar', 'apagar', a => { const objs = alvos(a); vkTxAntesDeApagar(objs); tirar(objs); VK.sel = VK.sel.filter(id => vkObj(id)); return { apagados: objs.length }; });
     vkRegistrar('selecionar', 'selecionar', a => { VK.sel = a.tudo ? vkTodosDaCamada() : alvos(a).map(o => o.id); return { sel: VK.sel.length }; }, true);
     vkRegistrar('mover_para_camada', 'mover para camada', a => { const objs = alvos(a), cam = camadaAlvo(a); tirar(objs); cam.itens.push(...objs); return { camada: cam.nome }; });
     // ── camadas ──
@@ -385,7 +385,13 @@ function vkInfo(o) {
     if (o.op != null && o.op < 1) r.opacidade = Math.round(o.op * 100);
     if (o.bm) r.mesclagem = o.bm;
     if (o.sobre && (o.sobre.p || o.sobre.t)) r.sobreimprimir = true;
-    if (o.tipo === 'texto') Object.assign(r, { conteudo: o.conteudo, fonte: `${o.fam} ${o.estilo}`, tamanho: o.tam, ...(o.caixa ? { caixa_mm: vkR(vkMM(o.caixa)) } : {}) });
+    if (o.tipo === 'texto') {
+        const rz = vkTxRaiz(o), sp = vkTxSpec(o), g = vkGeo(o);
+        Object.assign(r, { conteudo: sp ? sp.conteudo : o.conteudo, fonte: `${rz.fam} ${rz.estilo}`, tamanho: rz.tam, ...(o.caixa ? { largura_caixa_mm: vkR(vkMM(o.caixa)) } : {}),
+            ...(o.caixa_alt ? { altura_caixa_mm: vkR(vkMM(o.caixa_alt)) } : {}), ...(rz.alin && rz.alin !== 'esq' ? { alin: rz.alin } : {}), ...(rz.ep ? { estilo_paragrafo: rz.ep } : {}),
+            ...(rz.trechos ? { trechos: rz.trechos.map(t => ({ texto: String(rz.conteudo).slice(t.ini, t.fim), ...Object.fromEntries(Object.entries(t).filter(([k]) => k !== 'ini' && k !== 'fim').map(([k, v]) => [k, k === 'preench' ? vkCorTexto(v) : k === 'traco' ? (v ? vkCorTexto(v.cor) : 'nenhum') : v])) })) } : {}),
+            ...(o.trilha ? { em_caminho: true } : {}), ...(o.anterior ? { continua_de: o.anterior } : {}), ...(o.seguinte ? { continua_em: o.seguinte } : {}), ...(g && g.transborda ? { transborda: true } : {}) });
+    }
     if (o.tipo === 'imagem') { const im = VK.doc.imagens[o.img] || {}; r.arquivo = im.nome; r.ppi = Math.round(72 / vkEsc(o.m)); r.modo = im.modo; }
     if (o.tipo === 'grupo') { r.itens = o.itens.length; if (o.clip) r.mascara = true; }
     if (o.trava) r.travado = true; if (o.visivel === false) r.oculto = true;

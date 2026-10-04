@@ -67,7 +67,7 @@
             spotsParaProcesso: !!a.spotsParaProcesso, titulo: VK.doc.nome };
         vkCarregando(true, 'Gerando PDF para gráfica...');
         let r;
-        try { r = await api().vk_exportar_pdf(vkClone(VK.doc), caminho, op); } finally { vkCarregando(false); }
+        try { r = await api().vk_exportar_pdf(await vkDocPy(), caminho, op); } finally { vkCarregando(false); }
         VK._antes = null;
         if (!r || !r.success) throw new Error((r && r.error) || 'falhou');
         vkToast(`PDF ${padrao.toUpperCase()} pronto: ${r.paginas} página(s)` + (r.verificacao.ok ? ' — verificado ✓' : ' — verificar: ' + r.verificacao.problemas.join('; ')));
@@ -82,7 +82,7 @@
         const dest = pasta.replace(/[\\/]+$/, '') + '/' + nome;
         let pdf = null;
         if (a.pdf !== false) pdf = await VK_CMDS.exportar_pdf.fn({ padrao, forcar: true, caminho: dest + '/' + nome + '.pdf', ...(a.sangria != null ? { sangria: a.sangria } : {}) });
-        const r = await api().vk_empacotar(vkClone(VK.doc), pasta, { fontes: a.fontes !== false, padrao, pdf, spots: f.info.spots,
+        const r = await api().vk_empacotar(await vkDocPy(), pasta, { fontes: a.fontes !== false, padrao, pdf, spots: f.info.spots,
             fechamento: { erros: f.erros.map(x => ({ nivel: 'erro', msg: x.msg })), avisos: f.avisos.map(x => ({ nivel: 'aviso', msg: x.msg })) } });
         if (!r || !r.success) throw new Error((r && r.error) || 'não empacotou');
         VK._antes = null;
@@ -121,7 +121,9 @@
         for (const { o } of vkTodos()) {
             ver(o.preench, v => { o.preench = v; });
             if (o.traco) ver(o.traco.cor, v => { o.traco = { ...o.traco, cor: v }; });
+            (o.trechos || []).forEach(t => { ver(t.preench, v => { t.preench = v; }); if (t.traco) ver(t.traco.cor, v => { t.traco = { ...t.traco, cor: v }; }); });
         }
+        const E = VK.doc.estilosTexto; if (E) for (const L of [E.par, E.car]) for (const st of Object.values(L || {})) { ver(st.preench, v => { st.preench = v; }); if (st.traco) ver(st.traco.cor, v => { st.traco = { ...st.traco, cor: v }; }); }
         for (const am of VK.doc.amostras) ver(am.cor, v => { am.cor = v; });
         if (rgb.length) { const r = await api().vk_rgb_para_cmyk(rgb, VK.doc.perfil); refs.forEach((set, i) => set({ k: 'cmyk', v: r[i] })); }
         VK.doc.modoCor = 'cmyk';
@@ -216,7 +218,7 @@ const vkPretoRico = c => c && c.k === 'cmyk' && c.v[3] >= 90 && c.v[0] + c.v[1] 
 const vkPreto100 = c => c && c.k === 'cmyk' && c.v[3] >= 99.5 && c.v[0] + c.v[1] + c.v[2] < 0.5;
 const vkBranco = c => c && ((c.k === 'cmyk' && c.v.every(x => x < 0.5)) || (c.k === 'rgb' && c.v.every(x => x > 254)));
 const vkBoxArea = o => { const b = vkBox(o); return isFinite(b[0]) ? (b[2] - b[0]) * (b[3] - b[1]) : 0; };
-function vkCores(o) { const out = []; const ad = c => { if (!c) return; if (c.k === 'grad') c.paradas.forEach(p => ad(p.cor)); else out.push(c); }; ad(o.preench); if (o.traco) ad(o.traco.cor); return out; }
+function vkCores(o) { const out = []; const ad = c => { if (!c) return; if (c.k === 'grad') c.paradas.forEach(p => ad(p.cor)); else out.push(c); }; ad(o.preench); if (o.traco) ad(o.traco.cor); (o.trechos || []).forEach(t => { ad(t.preench); if (t.traco) ad(t.traco.cor); }); return out; }
 function vkFechamento(op = {}) {
     // Regras de pré-impressão (Instructions/vetor-kanivete.md › Fechamento). → {ok, erros, avisos, info}
     const padrao = op.padrao || 'x4', impressao = padrao !== 'rgb', d = VK.doc;
@@ -235,7 +237,7 @@ function vkFechamento(op = {}) {
         if (impressao && cores.some(c => vkTAC(c) > tacMax)) add('aviso', 'tac', `Tinta total acima de ${tacMax}% (seca mal, decalca)`, [o.id]);
         if (o.tipo === 'texto') {
             const g = vkGeo(o), tam = o.tam * vkEsc(o.m);
-            if (g && !g.achou) add('erro', 'fonte', `Fonte não instalada: ${o.fam} (sai em Arial)`, [o.id]);
+            if (g && !g.achou) add('erro', 'fonte', `Fonte não instalada: ${(g.faltam && g.faltam.join(', ')) || o.fam} (sai em Arial)`, [o.id]);
             else if (g && g.achou === 'embutida') add('aviso', 'fonte_embutida', `Fonte embutida do arquivo original (só as letras que já existiam): ${o.fam} — instale para editar à vontade`, [o.id]);
             if (vkPretoRico(o.preench) && tam < 14) add('aviso', 'preto_rico', 'Texto pequeno em preto de 4 cores (fica borrado se o registro variar): use 100K', [o.id], 'preto_texto');
             if (tam < 6) add('aviso', 'texto_pequeno', 'Texto menor que 6 pt (pode não sair legível)', [o.id]);

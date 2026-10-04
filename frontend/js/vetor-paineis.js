@@ -67,7 +67,7 @@ function vkMontar() {
     <div class="ie-modal" id="vk-modal" hidden></div>
     <div class="ie-pop" id="vk-pop" hidden></div>`;
     // ferramentas
-    const grupos = [['selecao', 'direta'], ['caneta', 'texto'], ['construtor', 'tesoura', 'faca'], ['retangulo', 'elipse', 'poligono', 'estrela', 'linha'], ['contagotas', 'prancheta'], ['mao', 'zoom']];
+    const grupos = [['selecao', 'direta'], ['caneta', 'texto', 'texto_caminho'], ['construtor', 'tesoura', 'faca'], ['retangulo', 'elipse', 'poligono', 'estrela', 'linha'], ['contagotas', 'prancheta'], ['mao', 'zoom']];
     vkEl('vk-ferr').innerHTML = `<div class="ie-ferr-lista">${grupos.map(g => g.map(f => `<button class="ie-ferr-btn" data-f="${f}" title="${VK_FERR[f].nome}${VK_FERR[f].tecla ? ' (' + VK_FERR[f].tecla + ')' : ''}">${vkI(f)}</button>`).join('')).join('<div class="ie-ferr-sep"></div>')}</div>
         <div class="vk-cores-ferr" id="vk-cores-ferr"></div>`;
     vkEl('vk-ferr').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) vkFerramenta(b.dataset.f); });
@@ -98,7 +98,12 @@ const VK_MENUS = [
         ['Refletir na vertical', '', () => vkCmdUi('refletir', { eixo: 'vertical' })], ['Refletir na horizontal', '', () => vkCmdUi('refletir', { eixo: 'horizontal' })],
         ['Girar 90°', '', () => vkCmdUi('girar', { graus: 90 })], '-', ['Travar', 'Ctrl+2', () => vkCmdUi('alterar', { trava: true })], ['Ocultar', 'Ctrl+3', () => vkCmdUi('alterar', { visivel: false })],
         ['Limpar pontos soltos', '', () => vkCmdUi('limpar', {})]]],
-    ['Texto', [['Criar contornos', 'Shift+Ctrl+O', () => vkCmdUi('contornos', {})], ['Textos pretos em 100K', '', () => vkCmdUi('preto_texto', {})]]],
+    ['Texto', [['Criar contornos', 'Shift+Ctrl+O', () => vkCmdUi('contornos', {})], ['Textos pretos em 100K', '', () => vkCmdUi('preto_texto', {})], '-',
+        ['Texto em caminho (ferramenta)', '', () => vkFerramenta('texto_caminho')], ['Encadear caixas selecionadas', '', () => vkCmdUi('encadear', {})],
+        ['Remover encadeamento', '', () => vkCmdUi('desencadear', {})], ['Juntar textos (linhas → parágrafo)', '', () => vkCmdUi('juntar_textos', {})], ['Glifos…', '', () => vkTxGlifos()], '-',
+        ['Caixa alta', '', () => vkCmdUi('alterar', vkTxComFaixa({ maius: 'alta' }))], ['Versalete', '', () => vkCmdUi('alterar', vkTxComFaixa({ maius: 'versalete' }))],
+        ['Sobrescrito', '', () => vkCmdUi('alterar', vkTxComFaixa({ pos: 'sup' }))], ['Subscrito', '', () => vkCmdUi('alterar', vkTxComFaixa({ pos: 'sub' }))],
+        ['Caractere normal', '', () => vkCmdUi('alterar', vkTxComFaixa({ maius: 'nenhuma', pos: 'normal', desl: 0, escala_h: 100, escala_v: 100 }))]]],
     ['Exibir', [['Ajustar prancheta', 'Ctrl+0', () => vkEnquadrar()], ['Ajustar tudo', 'Alt+Ctrl+0', () => vkEnquadrar(vkBoxUniao(VK.doc.pranchetas.map(p => ({ tipo: 'caminho', subs: vkRetSubs(p.x, p.y, p.w, p.h) }))))],
         ['Tamanho real', 'Ctrl+1', () => vkZoom(1 / VK.vista.z * 96 / 72)], '-', ['Contornos (sem cor)', 'Ctrl+Y', () => { VK.contorno = !VK.contorno; vkMudou(); }],
         ['Mostrar sangria', '', () => { VK.mostrarSangria = !VK.mostrarSangria; vkMudou(); }], '-',
@@ -159,7 +164,8 @@ function vkOpcoes() {
     if (f === 'caneta') h += `<span class="ie-op-dica">clique = canto · arraste = curva · clique no 1º ponto fecha · Enter termina · clique num segmento selecionado = novo ponto</span>`;
     if (f === 'direta') h += `<span class="ie-op-dica">arraste pontos/alças · Alt na alça = quebra a curva · Shift soma pontos</span>`;
     if (f === 'selecao') h += `<span class="ie-op-dica">Shift = proporcional/eixo · Alt+arraste = duplica · Alt na alça = a partir do centro · fora do canto = girar</span>`;
-    if (f === 'texto') h += `<span class="ie-op-dica">clique = texto de ponto · arraste = caixa de texto · Esc/Ctrl+Enter termina</span>`;
+    if (f === 'texto') h += `<span class="ie-op-dica">clique = texto de ponto · arraste = caixa de texto · Esc/Ctrl+Enter termina · selecione um trecho e mude no painel</span>`;
+    if (f === 'texto_caminho') h += `<span class="ie-op-dica">clique num caminho (linha, curva, círculo) e escreva · Início/lado no painel</span>`;
     if (el.dataset.f === f && el.innerHTML) return;
     el.dataset.f = f; el.innerHTML = h;
     el.oninput = e => { const k = e.target.dataset.o; if (!k) return; VK_OPC[k] = k === 'raio' ? vkPT(+e.target.value || 0) : Math.max(3, +e.target.value || 3); };
@@ -200,15 +206,7 @@ function vkProps() {
             <select data-a="mesclagem" title="Modo de mesclagem">${['normal', ...Object.keys(VK_BM)].map(v => `<option value="${v}" ${(o.bm || 'normal') === v ? 'selected' : ''}>${v.replace('_', ' ')}</option>`).join('')}</select></div>
         <label class="vk-chk"><input type="checkbox" data-a="sobreimprimir" ${o.sobre && (o.sobre.p || o.sobre.t) ? 'checked' : ''}> Sobreimprimir</label></div>`;
     }
-    if (tx) {
-        const fams = (typeof IE !== 'undefined' && IE.fontes) || [];
-        h += `<div class="vk-sec"><div class="vk-sec-t">Caractere</div>
-        <div class="vk-linha"><input list="vk-fontes" data-a="fonte" value="${vkEsc_(tx.fam)}" class="vk-fonte"><datalist id="vk-fontes">${fams.slice(0, 900).map(f => `<option value="${vkEsc_(f)}">`).join('')}</datalist>
-            <select data-a="estilo">${vkEstilosDe(tx.fam).map(s => `<option ${s === tx.estilo ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
-        <div class="vk-grade">${vkNum('Tam', vkR(tx.tam, 2), 'data-a="tamanho" min="1"', 'pt', 0.5)}${vkNum('Entrel.', tx.entrelinha ? vkR(tx.entrelinha, 2) : '', 'data-a="entrelinha" placeholder="auto"', 'pt', 0.5)}${vkNum('Track', tx.track || 0, 'data-a="track"', '', 10)}</div>
-        <div class="ie-segm vk-segm">${['esq', 'centro', 'dir', 'just'].map(a => `<button data-alin="${a}" class="${tx.alin === a ? 'on' : ''}">${{ esq: '⟸', centro: '⟺', dir: '⟹', just: '☰' }[a]}</button>`).join('')}</div>
-        <div class="vk-acoes"><button class="ie-btn" onclick="vkCmdUi('contornos', {})">Criar contornos</button></div></div>`;
-    }
+    if (tx) h += vkTxPainel(tx, objs);   // Caractere, Parágrafo, Caixa/Caminho, Estilos (vetor-texto.js)
     if (o.tipo === 'imagem' && objs.length === 1) { const im = VK.doc.imagens[o.img] || {}; h += `<div class="vk-sec"><div class="vk-sec-t">Imagem</div><div class="vk-nota">${vkEsc_(im.nome)} · ${im.w}×${im.h} px · ${im.modo} · <b>${Math.round(72 / vkEsc(o.m))} ppi</b> efetivos</div></div>`; }
     const chv = vkChaveAtiva();
     h += `<div class="vk-sec"><div class="vk-sec-t">Alinhar ${objs.length === 1 ? '(à prancheta)' : chv ? '(ao objeto-chave)' : ''}</div><div class="vk-bts">
@@ -223,6 +221,7 @@ function vkProps() {
     h += `<div class="vk-sec"><div class="vk-bts"><button class="ie-btn ie-btn-mini" onclick="vkCmdUi('${objs.length > 1 ? 'agrupar' : 'desagrupar'}', {})">${objs.length > 1 ? 'Agrupar' : 'Desagrupar'}</button>
         ${objs.length > 1 ? `<button class="ie-btn ie-btn-mini" onclick="vkCmdUi('mascara', {})">Máscara</button>` : ''}<button class="ie-btn ie-btn-mini" onclick="vkCmdUi('duplicar', {dx: ${vkPT(5)}, dy: ${vkPT(5)}})">Duplicar</button></div></div>`;
     el.innerHTML = h;
+    vkTxPainelEventos(el);
     el.onchange = e => {
         const t = e.target, a = t.dataset.a, tr = t.dataset.t;
         if (tr) {

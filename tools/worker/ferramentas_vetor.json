@@ -141,6 +141,10 @@
 },
 "nome": {
 "type": "string"
+},
+"caixa_alt": {
+"type": "number",
+"description": "altura da caixa de texto (mm); o que não couber sobra"
 }
 },
 "required": [
@@ -231,7 +235,7 @@
 "type": "function",
 "function": {
 "name": "alterar",
-"description": "Muda objetos: preench, traco, espessura (pt), opacidade (%), sobreimprimir, conteudo, fonte, estilo, tamanho, alin, nome.",
+"description": "Muda objetos: preench, traco, espessura (pt), opacidade (%), sobreimprimir, conteudo, fonte, estilo, tamanho, alin, nome. Com trecho, muda só aquela palavra do texto.",
 "parameters": {
 "type": "object",
 "properties": {
@@ -276,6 +280,10 @@
 },
 "nome": {
 "type": "string"
+},
+"trecho": {
+"type": "string",
+"description": "só este pedaço do texto (ex. uma palavra): fonte/estilo/tamanho/preench valem só nele"
 }
 },
 "required": [
