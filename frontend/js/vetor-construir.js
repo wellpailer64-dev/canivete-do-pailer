@@ -240,6 +240,8 @@ async function vkcUp(A, x, y) {
     }
 }
 function vkcSobreposicao(ctx, A) {
+    const ch = typeof vkChaveAtiva === 'function' && vkChaveAtiva();
+    if (ch) { const b = vkBox(vkObj(ch)), [x0, y0] = vkTela(b[0], b[1]), [x1, y1] = vkTela(b[2], b[3]); ctx.save(); ctx.strokeStyle = '#2f8cff'; ctx.lineWidth = 3; ctx.strokeRect(x0 - 1.5, y0 - 1.5, x1 - x0 + 3, y1 - y0 + 3); ctx.restore(); }
     if (VK.ferr === 'construtor' && VKC.regs) {
         ctx.save(); const z = VK.vista.z;
         ctx.setTransform(z * (window.devicePixelRatio || 1), 0, 0, z * (window.devicePixelRatio || 1), VK.vista.x * (window.devicePixelRatio || 1), VK.vista.y * (window.devicePixelRatio || 1));

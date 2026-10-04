@@ -84,7 +84,7 @@ const VK_MENUS = [
         ['Exportar PDF para gráfica...', '', () => vkExportarDialogo('pdf')], ['Exportar PNG/JPG...', '', () => vkExportarDialogo('img')], ['Exportar SVG...', '', () => vkCmdUi('exportar_svg', {})], '-',
         ['Empacotar...', '', () => vkCmdUi('empacotar', {})], '-',
         ['Configurar documento...', '', () => vkDocDialogo()]]],
-    ['Editar', [['Desfazer', 'Ctrl+Z', vkDesfazer], ['Refazer', 'Shift+Ctrl+Z', vkRefazer], '-', ['Duplicar', 'Ctrl+D', () => vkCmdUi('duplicar', { dx: vkPT(5), dy: vkPT(5) })],
+    ['Editar', [['Desfazer', 'Ctrl+Z', vkDesfazer], ['Refazer', 'Shift+Ctrl+Z', vkRefazer], '-', ['Duplicar', '', () => vkCmdUi('duplicar', { dx: vkPT(5), dy: vkPT(5) })],
         ['Apagar', 'Del', () => vkCmdUi('apagar', {})], ['Selecionar tudo', 'Ctrl+A', () => { VK.sel = vkTodosDaCamada(); vkMudou(); }], '-',
         ['Converter cores para CMYK', '', () => vkCmdUi('converter_cmyk', {})]]],
     ['Objeto', [['Agrupar', 'Ctrl+G', () => vkCmdUi('agrupar', {})], ['Desagrupar', 'Shift+Ctrl+G', () => vkCmdUi('desagrupar', {})], '-',
@@ -92,6 +92,7 @@ const VK_MENUS = [
         ['Recuar', 'Ctrl+[', () => vkCmdUi('organizar', { modo: 'abaixo' })], ['Enviar para trás', 'Shift+Ctrl+[', () => vkCmdUi('organizar', { modo: 'tras' })], '-',
         ['Máscara de corte', 'Ctrl+7', () => vkCmdUi('mascara', {})], ['Soltar máscara', 'Alt+Ctrl+7', () => vkCmdUi('soltar_mascara', {})],
         ['Caminho composto', 'Ctrl+8', () => vkCmdUi('composto', {})], '-',
+        ['Repetir transformação', 'Ctrl+D', () => vkCmdUi('repetir', {})], ['Transformar cada…', 'Alt+Shift+Ctrl+D', () => vkTransformarCadaDialogo()], '-',
         ['Juntar', 'Ctrl+J', () => vkCmdUi('juntar', {})], ['Média', 'Alt+Ctrl+J', () => vkCmdUi('media', { eixo: 'ambos' })],
         ['Deslocar caminho...', '', () => vkDeslocarDialogo()], ['Contornar traço', '', () => vkCmdUi('contornar_traco', {})], '-',
         ['Refletir na vertical', '', () => vkCmdUi('refletir', { eixo: 'vertical' })], ['Refletir na horizontal', '', () => vkCmdUi('refletir', { eixo: 'horizontal' })],
@@ -206,9 +207,13 @@ function vkProps() {
         <div class="vk-acoes"><button class="ie-btn" onclick="vkCmdUi('contornos', {})">Criar contornos</button></div></div>`;
     }
     if (o.tipo === 'imagem' && objs.length === 1) { const im = VK.doc.imagens[o.img] || {}; h += `<div class="vk-sec"><div class="vk-sec-t">Imagem</div><div class="vk-nota">${vkEsc_(im.nome)} · ${im.w}×${im.h} px · ${im.modo} · <b>${Math.round(72 / vkEsc(o.m))} ppi</b> efetivos</div></div>`; }
-    h += `<div class="vk-sec"><div class="vk-sec-t">Alinhar ${objs.length === 1 ? '(à prancheta)' : ''}</div><div class="vk-bts">
+    const chv = vkChaveAtiva();
+    h += `<div class="vk-sec"><div class="vk-sec-t">Alinhar ${objs.length === 1 ? '(à prancheta)' : chv ? '(ao objeto-chave)' : ''}</div><div class="vk-bts">
         ${[['esquerda', '⇤'], ['centro_h', '⇹'], ['direita', '⇥'], ['topo', '⤒'], ['centro_v', '⇳'], ['base', '⤓']].map(([m, s]) => `<button class="ie-btn ie-btn-mini" data-al="${m}" title="${m}">${s}</button>`).join('')}
-        ${objs.length > 2 ? '<button class="ie-btn ie-btn-mini" data-dist="horizontal" title="distribuir">↔</button><button class="ie-btn ie-btn-mini" data-dist="vertical" title="distribuir">↕</button>' : ''}</div></div>`;
+        ${objs.length > 2 ? '<button class="ie-btn ie-btn-mini" data-dist="horizontal" title="distribuir">↔</button><button class="ie-btn ie-btn-mini" data-dist="vertical" title="distribuir">↕</button>' : ''}</div>
+        ${objs.length > 1 ? `<div class="vk-linha">${vkNum('Espaço', VK.pref.espaco ?? 5, 'id="vk-esp" title="espaço entre as caixas, a partir do objeto-chave"', 'mm', 0.5)}
+            <button class="ie-btn ie-btn-mini" data-desp="horizontal" title="distribuir espaçamento na horizontal">↔</button><button class="ie-btn ie-btn-mini" data-desp="vertical" title="distribuir espaçamento na vertical">↕</button></div>
+            <div class="vk-nota">${chv ? 'Objeto-chave marcado (contorno grosso): ele não se move.' : 'Clique de novo num dos selecionados para torná-lo objeto-chave.'}</div>` : ''}</div>`;
     if (objs.length > 1) h += `<div class="vk-sec"><div class="vk-sec-t">Pathfinder</div><div class="vk-bts">
         ${[['unir', 'Unir'], ['subtrair', 'Subtrair'], ['intersecao', 'Interseção'], ['excluir', 'Excluir']].map(([op, n]) => `<button class="ie-btn ie-btn-mini" data-pf="${op}">${n}</button>`).join('')}</div>
         <div class="vk-bts">${[['dividir', 'Dividir'], ['aparar', 'Aparar'], ['mesclar', 'Mesclar'], ['cortar', 'Cortar'], ['menos_fundo', 'Menos fundo']].map(([op, n]) => `<button class="ie-btn ie-btn-mini" data-pf2="${op}">${n}</button>`).join('')}</div></div>`;
@@ -237,7 +242,8 @@ function vkProps() {
         const c = e.target.closest('[data-cor]'), al = e.target.closest('[data-al]'), pf = e.target.closest('[data-pf]'), ds = e.target.closest('[data-dist]'), an = e.target.closest('[data-alin]');
         if (c) { const k = c.dataset.cor, atual = k === 'preench' ? (o.tipo === 'grupo' ? (o.itens[0] || {}).preench : o.preench) : ((o.tipo === 'grupo' ? (o.itens[0] || {}).traco : o.traco) || {}).cor;
             vkCorPopup(c, atual, cor => vkCmdUi('alterar', { [k]: cor })); }
-        if (al) vkCmdUi('alinhar', { modo: al.dataset.al, relativo: objs.length === 1 ? 'prancheta' : 'selecao', prancheta: VK.ativa });
+        if (al) vkCmdUi('alinhar', { modo: al.dataset.al, relativo: objs.length === 1 ? 'prancheta' : vkChaveAtiva() ? 'chave' : 'selecao', prancheta: VK.ativa });
+        const de = e.target.closest('[data-desp]'); if (de) { VK.pref.espaco = +el.querySelector('#vk-esp').value; vkCmdUi('distribuir_espaco', { eixo: de.dataset.desp, espaco: VK.pref.espaco }); }
         if (ds) vkCmdUi('distribuir', { eixo: ds.dataset.dist });
         if (pf) vkCmdUi('pathfinder', { op: pf.dataset.pf });
         if (an) vkCmdUi('alterar', { alin: an.dataset.alin });

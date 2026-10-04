@@ -18,6 +18,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 | Amostras, cores globais e **especiais (spot/Pantone)**, registro | cor de marca exata na gráfica | `amostras[]`; cor `spot` = Separation no PDF com alternativo CMYK; `[Registro]` = /All |
 | Degradê linear/radial | arte | `{k:'grad'}` → shading tipo 2/3 em DeviceCMYK |
 | Pathfinder (unir, subtrair, interseção, excluir), caminho composto, máscara de corte | construir formas | skia-pathops (Python); Ctrl+8; Ctrl+7 |
+| Repetir transformação (Ctrl+D, com cópia = passo e repetição), Transformar cada (Alt+Shift+Ctrl+D), objeto-chave (clicar de novo num selecionado), distribuir espaçamento | diagramação rápida | `vetor-transformar.js`: `repetir` (`vezes`), `transformar_cada` (sx, sy, dx, dy, graus, refletir_x/y, aleatorio, copia, ancora), `alinhar` com `relativo:'chave'` (+`chave`), `distribuir_espaco` (eixo, espaco mm, chave) |
 | Construtor de formas (Shift+M; Alt apaga), Pathfinder Dividir/Aparar/Mesclar/Cortar/Menos fundo, Tesoura (C), Faca, Juntar (Ctrl+J), Média (Alt+Ctrl+J) | construir logo | `vetor-construir.js`; regiões atômicas no Python (`regioes`, skia-pathops); comandos `construtor` (`juntar`/`apagar` = pontos), `pathfinder2` (`op`), `tesoura` (x, y), `faca` (`linha`), `juntar`, `media` (`eixo`) |
 | Visualização de separações e prévia de sobreimpressão (Alt+Shift+Ctrl+Y) | conferir chapas, faca/verniz/hot stamping, branco sobreimpresso | `vetor-separacoes.js`: chapa por tinta com vazado/sobreimpressão, composto tinta sobre papel pelo ICC, % de tinta no cursor; `separacoes` (`ativo`, `ocultar`, `so`), `tinta_em` (x, y → % e total), `exportar_separacoes` (PNG por chapa) |
 | Deslocar caminho, Contornar traço | faca de adesivo, fio em volta do texto, traço → forma | skia-python (Stroker + PathOps): `deslocar` (+ fora atrás, − dentro na frente; cantos miter/round/bevel), `contornar_traco` (com preenchimento vira grupo [preench, traço]; tracejado e pontas entram) |
@@ -30,8 +31,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 
 `.aknv` abre no KANIVETE por duplo clique (associação HKCU em Functions/projeto.py; roteado em `abrirProjetoExterno`).
 
-Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): repetir transformação (Ctrl+D),
-Transformar cada, alinhar a objeto-chave; réguas e guias arrastáveis, grade; texto (caixa encadeada, texto em caminho,
+Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): réguas e guias arrastáveis, grade; texto (caixa encadeada, texto em caminho,
 estilos de parágrafo/caractere, glifos; o texto importado vem linha a linha); Aparência (vários preenchimentos/traços) e
 efeitos vivos (sombra, desfoque, cantos arredondados); lápis/pincel/borracha, setas e perfil de largura no traço;
 ferramenta de degradê na arte, malha, mesclagem (Blend); símbolos, padrões, recolorir arte, livros Pantone; Image Trace,
@@ -67,7 +67,7 @@ Unidades de agente: **mm relativos ao canto da prancheta** (`prancheta: nome|id|
 Comandos (`VKN.comandos()`): novo, documento, abrir, importar, salvar, exportar_pdf, exportar_imagem, exportar_svg,
 retangulo, elipse, poligono, estrela, linha, caminho (`d` SVG em mm ou `subs`), texto, imagem, alterar, mover,
 posicionar, redimensionar, girar, refletir, matriz, alinhar, distribuir, organizar, agrupar, desagrupar, mascara,
-soltar_mascara, composto, pathfinder, deslocar (`distancia` mm, `junc`), contornar_traco, construtor, pathfinder2, tesoura, faca, juntar, media, separacoes, tinta_em, exportar_separacoes, contornos, empacotar (`pasta`, `pdf`, `fontes`), duplicar, apagar, selecionar, mover_para_camada, nova_camada, camada,
+soltar_mascara, composto, pathfinder, deslocar (`distancia` mm, `junc`), contornar_traco, repetir, transformar_cada, distribuir_espaco, construtor, pathfinder2, tesoura, faca, juntar, media, separacoes, tinta_em, exportar_separacoes, contornos, empacotar (`pasta`, `pdf`, `fontes`), duplicar, apagar, selecionar, mover_para_camada, nova_camada, camada,
 nova_prancheta, prancheta, mover_prancheta, amostra, cores_padrao, definir_subs, converter_cmyk, preto_texto,
 sobreimprimir_preto, tirar_sobre_branco, engrossar_tracos, limpar, mapa, info, ajuda.
 Fonte "Arial Bold" (família + estilo juntos) é entendida. Só `preench` informado = sem traço.

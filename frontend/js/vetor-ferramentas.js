@@ -106,6 +106,7 @@ function vkEventos() {
             if (o) {
                 if (e.shiftKey) VK.sel = VK.sel.includes(o.id) ? VK.sel.filter(i => i !== o.id) : [...VK.sel, o.id];
                 else if (!VK.sel.includes(o.id)) VK.sel = [o.id];
+                else if (VK.sel.length > 1) VKA.chaveCand = o.id;   // clicar de novo num selecionado = objeto-chave (sem arrastar)
                 VKA.modo = 'mover'; VKA.g = vkGuardar(vkSelObjs()); VKA.b = vkBoxUniao(vkSelObjs());
             } else { if (!e.shiftKey) VK.sel = []; VKA.modo = 'laco'; }
             vkUiAgendar(); vkDesenhar(); return;
@@ -200,7 +201,7 @@ function vkEventos() {
         const [ex, ey] = [A.mx ?? A.x, A.my ?? A.y];
         if (A.f === 'mao') return;
         if (A.modo === 'mover' || A.modo === 'escala' || A.modo === 'girar') {
-            if (!A.moveu || !A.m) { vkDesenhar(); return; }
+            if (!A.moveu || !A.m) { if (A.chaveCand) { VK.chave = VK.chave === A.chaveCand ? null : A.chaveCand; vkUiAgendar(); } vkDesenhar(); return; }
             vkVoltar(A.g);
             if (A.modo === 'mover' && A.alt) { const r = await vkCmdUi('duplicar', { ids: VK.sel }); if (r) await vkCmdUi('matriz', { ids: r.ids, m: A.m }); }
             else await vkCmdUi('matriz', { ids: VK.sel, m: A.m });
@@ -439,7 +440,8 @@ function vkTeclas(e) {
             if (k === 'b') cam.itens.unshift(...novos); else cam.itens.push(...novos);
             VK.sel = novos.map(o => o.id); vkHistorico('colar'); vkMudou();
         });
-        if (k === 'd') return faz(() => vkCmdUi('duplicar', { dx: vkPT(5), dy: vkPT(5) }));
+        if (k === 'd' && A && S) return faz(() => vkTransformarCadaDialogo());
+        if (k === 'd') return faz(() => vkCmdUi(VK.ultimaTransf ? 'repetir' : 'duplicar', VK.ultimaTransf ? {} : { dx: vkPT(5), dy: vkPT(5) }));   // Ctrl+D = repetir transformação
         if (k === 'g') return faz(() => vkCmdUi(S ? 'desagrupar' : 'agrupar', {}));
         if (k === '7') return faz(() => vkCmdUi(A ? 'soltar_mascara' : 'mascara', {}));
         if (k === '8') return faz(() => vkCmdUi('composto', {}));
