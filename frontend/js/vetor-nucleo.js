@@ -314,7 +314,7 @@ function vkDesenharObj(ctx, o, cam) {
 function vkImagemEl(im) {
     if (!im.url) return null;
     let el = VK.imgs.get(im.url);
-    if (!el) { el = new Image(); el.onload = () => vkDesenhar(); el.src = im.url; VK.imgs.set(im.url, el); }
+    if (!el) { el = new Image(); el.crossOrigin = 'anonymous'; el.onload = () => vkDesenhar(); el.src = im.url; VK.imgs.set(im.url, el); }
     return el;
 }
 let vkPedido = 0;
@@ -325,7 +325,7 @@ function vkDesenharAgora() {
     if (cv.width !== Math.round(box.width * dpr) || cv.height !== Math.round(box.height * dpr)) {
         cv.width = Math.round(box.width * dpr); cv.height = Math.round(box.height * dpr); cv.style.width = box.width + 'px'; cv.style.height = box.height + 'px';
     }
-    const ctx = cv.getContext('2d');
+    const ctx = cv.getContext('2d'); ctx.imageSmoothingQuality = 'high';
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = getComputedStyle(cv).getPropertyValue('--vk-mesa') || '#3a3a3a'; ctx.fillRect(0, 0, cv.width, cv.height);
     if (!VK.doc) return;

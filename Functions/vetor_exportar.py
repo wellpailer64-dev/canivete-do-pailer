@@ -188,6 +188,9 @@ class _Escritor:
                 im = im.convert("RGBA"); alfa = im.getchannel("A")
                 if alfa.getextrema() == (255, 255): alfa = None
                 im = im.convert("RGB")
+            if im.mode == "CMYK" and im_d.get("mascara") and os.path.isfile(im_d["mascara"]):   # CMYK com transparência (máscara ao lado)
+                alfa = Image.open(im_d["mascara"]).convert("L")
+                if alfa.size != im.size: alfa = alfa.resize(im.size)
             if im.mode in ("P", "1", "I", "F", "I;16"): im = im.convert("RGB")
             if im.mode == "LA": im = im.convert("L")
             cs = None
@@ -195,7 +198,7 @@ class _Escritor:
                 if self.impressao and self.padrao != "x4":
                     icc = vk.perfil_arquivo(self.perfil)
                     if icc:
-                        t = ImageCms.buildTransform(ImageCms.createProfile("sRGB"), ImageCms.getOpenProfile(icc), "RGB", "CMYK", ImageCms.Intent.PERCEPTUAL)
+                        t = ImageCms.buildTransform(ImageCms.createProfile("sRGB"), ImageCms.getOpenProfile(icc), "RGB", "CMYK", ImageCms.Intent.RELATIVE_COLORIMETRIC, flags=ImageCms.Flags.BLACKPOINTCOMPENSATION)
                         im = ImageCms.applyTransform(im, t)
                     else:
                         im = im.convert("CMYK"); self.avisos.add("sem perfil ICC: imagem convertida para CMYK de forma simples")

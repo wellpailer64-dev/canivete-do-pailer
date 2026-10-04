@@ -92,7 +92,7 @@
     vkRegistrar('exportar_imagem', 'exportar imagem', async a => {   // PNG/JPG de cada prancheta, na resolução pedida (ppi)
         let caminho = a.caminho || await api().vk_dialogo('salvar', ['PNG (*.png)', 'JPG (*.jpg)'], (VK.doc.nome || 'arte') + '.png');
         if (!caminho) return { cancelado: true };
-        await vkGeosProntas(); await vkImagensProntas();
+        await vkGeosProntas(); await vkImagensProntas(); await vkCoresProntas();
         const ps = a.pranchetas ? VK.doc.pranchetas.filter(p => [].concat(a.pranchetas).includes(p.nome) || [].concat(a.pranchetas).includes(p.id)) : (a.todas ? VK.doc.pranchetas : [VK.doc.pranchetas.find(p => p.id === VK.ativa) || VK.doc.pranchetas[0]]);
         const saidas = [];
         for (const [i, p] of ps.entries()) {
@@ -107,7 +107,7 @@
     vkRegistrar('exportar_svg', 'exportar SVG', async a => {
         let caminho = a.caminho || await api().vk_dialogo('salvar', ['SVG (*.svg)'], (VK.doc.nome || 'arte') + '.svg');
         if (!caminho) return { cancelado: true };
-        await vkGeosProntas();
+        await vkGeosProntas(); await vkCoresProntas();
         const p = VK.doc.pranchetas.find(q => q.id === VK.ativa) || VK.doc.pranchetas[0];
         const svg = vkSvg(p);
         await api().vk_salvar_png(btoa(unescape(encodeURIComponent(svg))), caminho);
@@ -164,13 +164,20 @@
     });
 })();
 
+async function vkCoresProntas() {   // prova de cor (ICC) de todas as cores já calculada (render/exportação logo depois de abrir)
+    for (const { o } of vkTodos()) vkCores(o).forEach(c => vkCss(c));
+    if (!vkCoresFila.size) return;
+    clearTimeout(vkCoresTimer);
+    const f = [...vkCoresFila]; vkCoresFila = new Map();
+    try { const r = await vkApi().vk_cores_tela(f.map(x => x[1]), VK.doc.perfil || 'FOGRA39'); f.forEach(([kk], i) => VK.corTela.set(kk, `rgb(${r[i].join(',')})`)); } catch (e) { /* sem API */ }
+}
 async function vkImagensProntas() {
     for (const im of Object.values(VK.doc.imagens)) { const el = vkImagemEl(im); if (el && !el.complete) await new Promise(r => { el.addEventListener('load', r, { once: true }); el.addEventListener('error', r, { once: true }); }); }
 }
 function vkRenderPrancheta(p, esc, fundo = true, sangria = 0) {
     const cv = document.createElement('canvas');
     cv.width = Math.round((p.w + 2 * sangria) * esc); cv.height = Math.round((p.h + 2 * sangria) * esc);
-    const ctx = cv.getContext('2d');
+    const ctx = cv.getContext('2d'); ctx.imageSmoothingQuality = 'high';   // foto reduzida sem serrilhado/ruído
     if (fundo) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height); }
     ctx.setTransform(esc, 0, 0, esc, (sangria - p.x) * esc, (sangria - p.y) * esc);
     const z = VK.vista.z, cont = VK.contorno; VK.vista.z = esc; VK.contorno = false;
@@ -229,6 +236,7 @@ function vkFechamento(op = {}) {
         if (o.tipo === 'texto') {
             const g = vkGeo(o), tam = o.tam * vkEsc(o.m);
             if (g && !g.achou) add('erro', 'fonte', `Fonte não instalada: ${o.fam} (sai em Arial)`, [o.id]);
+            else if (g && g.achou === 'embutida') add('aviso', 'fonte_embutida', `Fonte embutida do arquivo original (só as letras que já existiam): ${o.fam} — instale para editar à vontade`, [o.id]);
             if (vkPretoRico(o.preench) && tam < 14) add('aviso', 'preto_rico', 'Texto pequeno em preto de 4 cores (fica borrado se o registro variar): use 100K', [o.id], 'preto_texto');
             if (tam < 6) add('aviso', 'texto_pequeno', 'Texto menor que 6 pt (pode não sair legível)', [o.id]);
             if (vkPreto100(o.preench) && tam < 14 && !(o.sobre && o.sobre.p)) add('aviso', 'preto_sem_sobre', 'Texto preto 100K sem sobreimprimir (risco de filete branco no registro)', [o.id], 'sobreimprimir_preto');

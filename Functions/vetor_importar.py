@@ -9,7 +9,7 @@
   transformações, degradês, clipPath, use, texto e imagens.
 - PPTX: um slide = uma prancheta; formas (preset e livre), preenchimento/linha (cores do tema), textos, imagens, grupos.
 O que não vira objeto editável entra no `relatorio` (o painel mostra ao abrir)."""
-import base64, math, os, re, tempfile, hashlib
+import base64, hashlib, io, math, os, re, tempfile, zlib
 from collections import Counter
 
 PASTA = os.path.join(tempfile.gettempdir(), "vetor_kanivete", "importados")
@@ -86,18 +86,23 @@ def _bbox_subs(subs):
     return (min(xs), min(ys), max(xs), max(ys)) if xs else (0, 0, 0, 0)
 
 
-def _salvar_imagem(im, doc, ids, nome_base="img"):
-    """PIL → arquivo em PASTA (CMYK vira TIFF CMYK, o resto PNG) e registro em doc.imagens. → id"""
+def _salvar_imagem(im, doc, ids, nome_base="img", mascara=None):
+    """PIL → arquivo em PASTA (CMYK vira TIFF CMYK, o resto PNG) e registro em doc.imagens. → id
+    mascara (PIL L) = transparência de imagem CMYK (fica num PNG ao lado: o TIFF continua CMYK para a gráfica)."""
     os.makedirs(PASTA, exist_ok=True)
     iid = ids("i")
-    h = hashlib.md5(im.tobytes()[:200000] + str(im.size).encode()).hexdigest()[:12]
+    h = hashlib.md5(im.tobytes() + im.mode.encode() + str(im.size).encode()).hexdigest()[:16]   # inteiro: topo igual (branco) não pode colidir
+    extra = {}
     if im.mode == "CMYK":
         arq = os.path.join(PASTA, f"{nome_base}_{h}.tif"); im.save(arq, compression="tiff_lzw")
+        if mascara is not None and mascara.getextrema() != (255, 255):
+            if mascara.size != im.size: mascara = mascara.resize(im.size)
+            ma = os.path.join(PASTA, f"{nome_base}_{h}_mascara.png"); mascara.save(ma); extra = {"mascara": ma, "alfa": True}
     else:
         if im.mode not in ("RGB", "RGBA", "L", "LA"):
             im = im.convert("RGBA" if "A" in im.mode or im.mode == "P" else "RGB")
         arq = os.path.join(PASTA, f"{nome_base}_{h}.png"); im.save(arq)
-    doc["imagens"][iid] = {"arquivo": arq, "w": im.width, "h": im.height, "modo": im.mode, "nome": os.path.basename(arq)}
+    doc["imagens"][iid] = {"arquivo": arq, "w": im.width, "h": im.height, "modo": im.mode, "nome": os.path.basename(arq), **extra}
     return iid
 
 
@@ -490,31 +495,42 @@ class _PDF:
                 self.rel["erros"].append(f"{op}: {str(e)[:80]}")
 
     def _imagem(self, pimg, xo, gs):
+        # sem a máscara aplicada pelo pikepdf (ele converteria CMYK → RGB sem perfil): a máscara é lida aqui
         try:
+            im = pimg.as_pil_image(apply_mask=False)
+        except TypeError:
             im = pimg.as_pil_image()
         except Exception as e:
             self.rel["erros"].append(f"imagem: {str(e)[:80]}"); return
-        if xo is not None and "/SMask" in xo:
+        ma = None
+        if xo is not None and ("/SMask" in xo or isinstance(xo.get("/Mask"), pikepdf_Stream())):
             try:
                 import pikepdf
-                ma = pikepdf.PdfImage(xo["/SMask"]).as_pil_image().convert("L")
+                if "/SMask" in xo:
+                    ma = pikepdf.PdfImage(xo["/SMask"]).as_pil_image().convert("L")
+                else:   # máscara de estêncil: 1 = escondido (a não ser que /Decode [1 0])
+                    mk = xo["/Mask"]; ma = pikepdf.PdfImage(mk).as_pil_image().convert("L")
+                    dec = [float(v) for v in mk.get("/Decode", [0, 1])]
+                    from PIL import ImageOps
+                    if dec[0] < dec[1]: ma = ImageOps.invert(ma)
                 if ma.size != im.size: ma = ma.resize(im.size)
-                if im.mode == "CMYK":
-                    self.rel["cmyk_com_alfa"] += 1
-                    from Functions.vetor_kanivete import _transf
-                    from PIL import ImageCms
-                    t = _transf("FOGRA39", True); im = ImageCms.applyTransform(im, t) if t else im.convert("RGB")
-                im = im.convert("RGBA"); im.putalpha(ma)
             except Exception:
-                pass
+                ma = None
         if im.mode == "1":
             im = im.convert("L")
-        iid = _salvar_imagem(im, self.doc, self.ids)
+        if ma is not None and im.mode != "CMYK":
+            im = im.convert("RGBA"); im.putalpha(ma)
+        iid = _salvar_imagem(im, self.doc, self.ids, mascara=ma if im.mode == "CMYK" else None)
         W, H = im.size
         m = mmul([1 / W, 0, 0, -1 / H, 0, 1], gs["ctm"])
         o = {"id": self.ids(), "tipo": "imagem", "img": iid, "m": [round(v, 6) for v in m]}
         if gs["ca"] < 1: o["op"] = gs["ca"]
         gs["cont"].append(o)
+
+
+def pikepdf_Stream():
+    import pikepdf
+    return pikepdf.Stream
 
 
 def _limpar_clips(itens):
@@ -534,7 +550,8 @@ def _limpar_clips(itens):
 _PDF14 = {"helvetica": "Arial", "arialmt": "Arial", "times": "Times New Roman", "timesnewromanpsmt": "Times New Roman", "courier": "Courier New"}
 
 
-def _fonte_nome(nome):
+def _fonte_nome(nome, doc_fontes=True):
+    """nome PostScript do PDF → (família, estilo, achou). doc_fontes: vale a fonte embutida registrada (achou="embutida")."""
     nome = re.sub(r"^[A-Z]{6}\+", "", nome or "")
     base_, _, est_ = nome.partition("-")
     if base_.replace(",", "").lower() in _PDF14:   # 14 fontes padrão do PDF → equivalentes do Windows
@@ -552,7 +569,171 @@ def _fonte_nome(nome):
             ests = [e["estilo"] for e in est[fam]]
             est_ok = next((s for s in ests if s.replace(" ", "").lower() == (estilo or "regular").lower()), None)
             return fam, est_ok or "Regular", True
+    if doc_fontes:
+        e = vk._fonte_doc(nome, "")
+        if e and (e.get("ps") or "").replace(" ", "").lower() == alvo:
+            return e["fam"], e["estilo"], "embutida"
     return nome or "Arial", "Regular", False
+
+
+def _nome_fonte(tt, ps):
+    """(família, estilo) pela tabela name (16/17 preferidos); senão pelo nome PostScript "Familia-Estilo"."""
+    try:
+        nm = tt["name"]
+        fam = nm.getDebugName(16) or nm.getDebugName(1); est = nm.getDebugName(17) or nm.getDebugName(2)
+        if fam and not re.match(r"^[A-Z]{6}\+", fam):
+            if not est or "-" in est or " " not in est and len(est) > 14:   # instância de fonte variável: "ArchivoRoman-SemiBold"
+                est = ps.partition("-")[2] or "Regular"
+                est = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", est)
+            return fam.strip(), est.strip()
+    except Exception:
+        pass
+    base, _, est = ps.partition("-")
+    return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", base), re.sub(r"(?<=[a-z])(?=[A-Z])", " ", est or "Regular")
+
+
+def _cff_para_otf(buf):
+    """CFF puro (FontFile3/Type1C, ex.: MyriadPro do Illustrator) → OTF com cmap pelos nomes dos glifos."""
+    from fontTools.cffLib import CFFFontSet
+    from fontTools.fontBuilder import FontBuilder
+    from fontTools.ttLib import newTable
+    from fontTools.agl import toUnicode
+    cff = CFFFontSet(); cff.decompile(io.BytesIO(buf), None)
+    nome = cff.fontNames[0]; top = cff[nome]
+    if hasattr(top, "ROS"):
+        raise ValueError("CFF CID")
+    ordem = list(top.charset); cs = top.CharStrings
+    upm = round(1 / top.FontMatrix[0]) if top.FontMatrix[0] else 1000
+    cmap, hm = {}, {}
+    for g in ordem:
+        u = toUnicode(g)
+        if len(u) == 1 and ord(u) not in cmap:
+            cmap[ord(u)] = g
+        c = cs[g]; c.decompile()
+        try:
+            b = c.calcBounds(cs)
+        except Exception:
+            b = None
+        hm[g] = (int(round(getattr(c, "width", None) or top.Private.defaultWidthX)), int(b[0]) if b else 0)
+    fb = FontBuilder(upm, isTTF=False)
+    fb.setupGlyphOrder(ordem); fb.setupCharacterMap(cmap); fb.setupHorizontalMetrics(hm)
+    fb.setupHorizontalHeader(ascent=int(upm * 0.75), descent=-int(upm * 0.25))
+    ps = re.sub(r"^[A-Z]{6}\+", "", nome)
+    fam, est = _nome_fonte(None, ps)
+    fb.setupNameTable({"familyName": fam, "styleName": est, "psName": ps})
+    fb.setupOS2(sTypoAscender=int(upm * 0.75), sTypoDescender=-int(upm * 0.25), usWinAscent=upm, usWinDescent=int(upm * 0.3))
+    fb.setupPost(); fb.setupMaxp() if hasattr(fb, "setupMaxp") else None
+    t = newTable("CFF "); t.cff = cff; cff.fontNames[0] = ps; fb.font["CFF "] = t
+    out = io.BytesIO(); fb.font.save(out)
+    return out.getvalue(), fam, est
+
+
+def _fontes_embutidas(fz, doc, rel):
+    """Fontes embutidas no PDF/AI que NÃO estão instaladas → arquivos (subconjuntos do mesmo nome juntados) registrados
+    como fontes do documento (doc.fontes). O texto fica editável e igual ao original; letras fora do subconjunto somem."""
+    from fontTools.ttLib import TTFont
+    from Functions import vetor_kanivete as vk
+    grupos, vistos = {}, set()
+    for pg in fz:
+        try:
+            lst = pg.get_fonts()
+        except Exception:
+            continue
+        for (xref, ext, tipo, base, *_r) in lst:
+            if xref in vistos: continue
+            vistos.add(xref)
+            ps = re.sub(r"^[A-Z]{6}\+", "", base or "")
+            if not ps or _fonte_nome(ps, doc_fontes=False)[2]:
+                continue   # instalada
+            try:
+                _n, e, _t, buf = fz.extract_font(xref)
+            except Exception:
+                continue
+            if buf and e in ("ttf", "otf", "cff"):
+                grupos.setdefault(ps, []).append((e, buf))
+    os.makedirs(PASTA, exist_ok=True)
+    regs = []
+    for ps, bufs in grupos.items():
+        try:
+            tts = [(e, b) for e, b in bufs if e in ("ttf", "otf")]
+            if tts:
+                fonts = [TTFont(io.BytesIO(b)) for _e, b in tts]
+                base_ = max(fonts, key=lambda t: len(t.getGlyphOrder()))
+                if "glyf" in base_:   # junta os subconjuntos (o Illustrator mantém os ids dos glifos)
+                    gb = base_["glyf"]
+                    for t in fonts:
+                        if t is base_ or "glyf" not in t or t.getGlyphOrder() != base_.getGlyphOrder(): continue
+                        for g in t.getGlyphOrder():
+                            if gb[g].numberOfContours == 0 and t["glyf"][g].numberOfContours != 0:
+                                gb[g] = t["glyf"][g]
+                if not base_.getBestCmap():
+                    rel["fonte_sem_cmap"] += 1; continue
+                fam, est = _nome_fonte(base_, ps)
+                out = io.BytesIO(); base_.save(out); dados, ext = out.getvalue(), ".ttf" if "glyf" in base_ else ".otf"
+            else:
+                dados, fam, est = _cff_para_otf(bufs[0][1]); ext = ".otf"
+            arq = os.path.join(PASTA, f"fonte_{re.sub(r'[^A-Za-z0-9_-]', '_', ps)}_{hashlib.md5(dados).hexdigest()[:8]}{ext}")
+            with open(arq, "wb") as f:
+                f.write(dados)
+            regs.append({"fam": fam, "estilo": est, "ps": ps, "arquivo": arq})
+        except Exception as e:
+            rel["erros"].append(f"fonte {ps}: {str(e)[:60]}")
+    if regs:
+        vk.registrar_fontes(regs)
+        doc["fontes"] = regs
+    return regs
+
+
+def _ai_privado(pdf, limite=16 << 20):
+    """Dados nativos do Illustrator (PieceInfo/Illustrator/Private, AIPrivateDataN): o começo do arquivo .ai em texto
+    (cabeçalho, cores, pranchetas, camadas). Zstandard (AI 2020+) ou zlib (antigos). → bytes | None"""
+    try:
+        pv = pdf.pages[0].obj["/PieceInfo"]["/Illustrator"]["/Private"]
+        n = int(pv["/NumBlock"])
+        raw = b"".join(pv[f"/AIPrivateData{i}"].read_bytes() for i in range(1, n + 1))
+    except Exception:
+        return None
+    try:
+        if raw.startswith(b"%AI24_ZStandard_Data"):
+            try:
+                import zstandard
+                with zstandard.ZstdDecompressor().stream_reader(io.BytesIO(raw[20:])) as r:   # só o começo (rápido)
+                    return r.read(limite)
+            except ImportError:
+                from compression import zstd   # Python 3.14+
+                return zstd.ZstdDecompressor().decompress(raw[20:], max_length=limite)
+        if raw.startswith(b"%AI12_CompressedData"):
+            return zlib.decompressobj().decompress(raw[20:], limite)
+        return raw[:limite]
+    except Exception:
+        return None
+
+
+def _ai_nativo(pdf, doc, rel, ids):
+    """Do .ai nativo: nomes das pranchetas e das cores especiais (viram amostras, como no painel do Illustrator)."""
+    d = _ai_privado(pdf)
+    if not d:
+        return
+    def txt(b):
+        b = re.sub(rb"\\([()\\])", rb"\1", b)
+        try:
+            return b.decode("utf-8")
+        except UnicodeDecodeError:
+            return b.decode("latin-1")
+    nomes = [txt(n) for n in re.findall(rb"\(((?:[^()\\]|\\.)*)\) /UnicodeString \(Name\)", d)]
+    ps = doc["pranchetas"]
+    if nomes and len(nomes) >= len(ps):
+        for p, n in zip(ps, nomes[:len(ps)]):
+            if n.strip(): p["nome"] = n.strip()
+        rel["ai_pranchetas"] += 1
+    ja = {a.get("nome") for a in doc.setdefault("amostras", [])}
+    for c, m, y, k, nome in re.findall(rb"%%(?:CMYKCustomColor:|\+) ([\d.]+) ([\d.]+) ([\d.]+) ([\d.]+) \(((?:[^()\\]|\\.)*)\)", d.split(b"%%EndComments", 1)[0]):
+        nome = txt(nome)
+        if nome in ja or nome in ("[Registration]", "[Registro]"):
+            continue
+        ja.add(nome)
+        doc["amostras"].append({"id": ids("a"), "nome": nome,
+                                "cor": {"k": "spot", "nome": nome, "v": [round(float(x) * 100, 2) for x in (c, m, y, k)], "tint": 100}})
 
 
 def importar_pdf(caminho):
@@ -566,6 +747,7 @@ def importar_pdf(caminho):
         return {"success": False, "error": f"não abriu como PDF: {e}" + (" — salve o .ai com 'Criar arquivo compatível com PDF'" if caminho.lower().endswith(".ai") else "")}
     fz = fitz.open(caminho, filetype="pdf")
     leitor = _PDF(pdf, doc, ids, rel)
+    embutidas = _fontes_embutidas(fz, doc, rel)
     x_ab = 0
     faltando = set()
     for i, page in enumerate(pdf.pages):
@@ -610,6 +792,7 @@ def importar_pdf(caminho):
                                     "m": [round(cs, 6), round(sn, 6), round(-sn, 6), round(cs, 6), round(X, 3), round(Y, 3)],
                                     "preench": cor, "traco": None, **({"fonte_original": sp.get("font")} if not ok else {})})
         x_ab += w + GAP
+    _ai_nativo(pdf, doc, rel, ids)
     for c in doc["camadas"]:
         c["itens"] = _limpar_clips(c["itens"])
     doc["camadas"] = [c for c in doc["camadas"] if c["itens"]] or [{"id": ids("c"), "nome": "Camada 1", "visivel": True, "trava": False, "itens": []}]
@@ -619,9 +802,11 @@ def importar_pdf(caminho):
     relatorio = []
     if texto_ai: relatorio.append("Este .ai foi salvo SEM conteúdo PDF: no Illustrator, salve de novo marcando 'Criar arquivo compatível com PDF'.")
     if faltando: relatorio.append("Fontes não instaladas (trocadas por Arial; instale e reabra): " + ", ".join(sorted(f for f in faltando if f)))
+    if embutidas: relatorio.append("Fontes não instaladas, usadas as EMBUTIDAS no arquivo (só as letras do original; para editar à vontade, instale): "
+                                   + ", ".join(f"{e['fam']} {e['estilo']}" for e in embutidas))
     nomes = {"sombreamento": "degradês de malha/forma livre (só os lineares e radiais viram degradê)", "padrao": "padrões (pattern) viraram cinza 30%",
              "mascara_suave": "máscaras de opacidade (ignoradas)", "devn": "cores DeviceN convertidas", "pagina_girada": "páginas giradas (abrem sem a rotação)",
-             "cmyk_com_alfa": "imagens CMYK com transparência (viraram RGB)"}
+             "cmyk_com_alfa": "imagens CMYK com transparência (viraram RGB)", "fonte_sem_cmap": "fontes embutidas sem tabela de caracteres (trocadas por Arial)"}
     for k, txt in nomes.items():
         if rel[k]: relatorio.append(f"{rel[k]}× {txt}")
     if rel["erros"]: relatorio.append(f"{len(rel['erros'])} operações não lidas (ex.: {rel['erros'][0]})")

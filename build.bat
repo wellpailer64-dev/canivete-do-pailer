@@ -103,6 +103,7 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "uharfbuzz" ^
  --hidden-import "pathops" ^
  --hidden-import "skia" ^
+ --hidden-import "zstandard" ^
  --hidden-import "fontTools" ^
  --hidden-import "lxml" ^
  --collect-all "pptx" ^

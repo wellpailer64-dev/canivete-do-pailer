@@ -116,6 +116,15 @@ Exportar com erro pede confirmação (agente: `forcar: true`).
   Form XObjects, **camadas do Illustrator** (`/OC` BDC → camadas com o nome). Texto: PyMuPDF (fonte, tamanho, posição,
   direção) com a cor do operador de texto mais próximo no content stream; nome PostScript → família instalada
   (Helvetica → Arial...). `.ai` sem conteúdo PDF → avisa para salvar com "Criar arquivo compatível com PDF".
+  **Fontes não instaladas**: usa as EMBUTIDAS no arquivo (TrueType: subconjuntos do mesmo nome são juntados; CFF puro
+  como o MyriadPro vira OTF) → `doc.fontes`, vão dentro do .aknv; o texto fica idêntico e editável, mas só com as letras
+  que o original tinha (fechamento: aviso `fonte_embutida`). Imagens: lidas SEM a máscara do pikepdf (ele converteria
+  CMYK→RGB sem perfil); CMYK com transparência continua CMYK e a máscara fica num PNG ao lado (`imagens[id].mascara`),
+  usada na tela, no .aknv, no Empacotar e como SMask no PDF/X-4. **Dados nativos do .ai** (AIPrivateData, Zstandard
+  ou zlib; só os primeiros 16 MB): nomes das pranchetas e cores especiais declaradas (viram amostras).
+  Cor: tela e conversões em Colorimétrico Relativo + compensação de ponto preto (igual ao padrão da Adobe; RGB→CMYK→tela
+  volta igual). Conferência com arquivos reais: `D:/kanivete_testes/scripts/vetor_comparar_ai.py` (render do PDF
+  embutido × Vetor) e `vetor_ida_volta.py` (abrir → mexer → .aknv → PDF/X-4 → reabrir).
 - **SVG**: lxml + parser próprio de `d` (inclui arcos A), formas, estilos (atributos, `style`, `<style>` com `.cls-N`
   do Illustrator), herança, transform, degradês (objectBoundingBox e userSpaceOnUse, href), clipPath, `use`/`symbol`,
   texto/tspan, imagem (data: ou arquivo). `<g id="Layer_1">` no topo vira camada. Unidades: px 96 dpi → pt.

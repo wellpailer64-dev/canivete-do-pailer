@@ -54,8 +54,11 @@ def _transf(cond, para_rgb=True):
             _TRANSF[chave] = None
         else:
             cmyk, srgb = ImageCms.getOpenProfile(icc), ImageCms.createProfile("sRGB")
-            _TRANSF[chave] = (ImageCms.buildTransform(cmyk, srgb, "CMYK", "RGB", ImageCms.Intent.RELATIVE_COLORIMETRIC) if para_rgb
-                              else ImageCms.buildTransform(srgb, cmyk, "RGB", "CMYK", ImageCms.Intent.RELATIVE_COLORIMETRIC))
+            # tela: colorimétrico relativo + compensação de ponto preto (como a prova do Illustrator/Photoshop; sem ela o preto fica lavado)
+            _TRANSF[chave] = (ImageCms.buildTransform(cmyk, srgb, "CMYK", "RGB", ImageCms.Intent.RELATIVE_COLORIMETRIC,
+                                                      flags=ImageCms.Flags.BLACKPOINTCOMPENSATION) if para_rgb
+                              else ImageCms.buildTransform(srgb, cmyk, "RGB", "CMYK", ImageCms.Intent.RELATIVE_COLORIMETRIC,
+                                                           flags=ImageCms.Flags.BLACKPOINTCOMPENSATION))
     return _TRANSF[chave]
 
 
@@ -113,8 +116,46 @@ def _estilos():
     return _ESTILOS
 
 
+# fontes que vieram embutidas num PDF/AI (subconjunto) e não estão instaladas: {fam minúscula: [{fam, estilo, ps, arquivo}]}
+_DOC_FONTES = {}
+
+
+def registrar_fontes(lista):
+    """Fontes do documento (doc.fontes = [{fam, estilo, ps, arquivo}]): usadas quando a família não está instalada."""
+    novas = 0
+    for f in lista or []:
+        if not (f.get("arquivo") and os.path.isfile(f["arquivo"])):
+            continue
+        l = _DOC_FONTES.setdefault(str(f["fam"]).lower(), [])
+        if not any(x["estilo"].lower() == str(f["estilo"]).lower() for x in l):
+            l.append(dict(f)); novas += 1
+    if novas:
+        _GEO.clear()
+    return novas
+
+
+def _fonte_doc(fam, estilo):
+    l = _DOC_FONTES.get(str(fam).lower())
+    if not l:   # nome PostScript
+        alvo = str(fam).replace(" ", "").lower()
+        l = [x for v in _DOC_FONTES.values() for x in v if (x.get("ps") or "").replace(" ", "").lower() == alvo]
+    if not l:
+        return None
+    return next((x for x in l if x["estilo"].lower() == str(estilo).lower()), l[0])
+
+
 def fonte_arquivo(fam, estilo="Regular"):
-    """→ (arquivo, indice, achou) — família/estilo instalados; senão Arial (achou=False: o fechamento avisa)."""
+    """→ (arquivo, indice, achou) — família/estilo instalados; senão a embutida do documento (achou="embutida");
+    senão Arial (achou=False: o fechamento avisa)."""
+    r = _fonte_instalada(fam, estilo)
+    if not r[2]:
+        e = _fonte_doc(fam, estilo)
+        if e:
+            return e["arquivo"], 0, "embutida"
+    return r
+
+
+def _fonte_instalada(fam, estilo="Regular"):
     est = _estilos()
     lista = est.get(fam) or next((v for k, v in est.items() if k.lower() == str(fam).lower()), None)
     if not lista:   # nome PostScript (vem do PDF/AI: "Montserrat-Bold")
@@ -452,15 +493,16 @@ def contornar_traco(formas):
 
 
 # ─────────────────────────── imagens ───────────────────────────
-def _registrar_previa(arq):
-    """URL de exibição: RGB/RGBA servido direto; CMYK/outros → PNG RGB em PASTA_TMP (prova pelo perfil)."""
+def _registrar_previa(arq, mascara=None):
+    """URL de exibição: RGB/RGBA servido direto; CMYK/outros → PNG RGB em PASTA_TMP (prova pelo perfil).
+    mascara = PNG L com a transparência de uma imagem CMYK (entra no alfa da prévia)."""
     from PIL import Image
     from Functions import media_server
     im = Image.open(arq)
-    if im.format in ("PNG", "JPEG", "WEBP", "GIF") and im.mode in ("RGB", "RGBA", "L", "P", "LA"):
+    if im.format in ("PNG", "JPEG", "WEBP", "GIF") and im.mode in ("RGB", "RGBA", "L", "P", "LA") and not mascara:
         return media_server.register(arq)
     os.makedirs(PASTA_TMP, exist_ok=True)
-    dest = os.path.join(PASTA_TMP, hashlib.md5(os.path.abspath(arq).encode()).hexdigest()[:16] + ".png")
+    dest = os.path.join(PASTA_TMP, hashlib.md5((os.path.abspath(arq) + str(mascara)).encode()).hexdigest()[:16] + ".png")
     if not os.path.isfile(dest) or os.path.getmtime(dest) < os.path.getmtime(arq):
         if im.mode == "CMYK":
             t = _transf("FOGRA39", True)
@@ -468,6 +510,9 @@ def _registrar_previa(arq):
             im = ImageCms.applyTransform(im, t) if t else im.convert("RGB")
         else:
             im = im.convert("RGBA")
+        if mascara and os.path.isfile(mascara):
+            ma = Image.open(mascara).convert("L")
+            im = im.convert("RGBA"); im.putalpha(ma if ma.size == im.size else ma.resize(im.size))
         im.save(dest)
     return media_server.register(dest)
 
@@ -510,7 +555,14 @@ def salvar(doc, caminho):
                 nome = f"imagens/{iid}{os.path.splitext(arq)[1].lower()}"
                 z.write(arq, nome, compress_type=zipfile.ZIP_STORED)
                 im["zip"] = nome
+                if im.get("mascara") and os.path.isfile(im["mascara"]):
+                    z.write(im["mascara"], f"imagens/{iid}_mascara.png", compress_type=zipfile.ZIP_STORED)
+                    im["zip_mascara"] = f"imagens/{iid}_mascara.png"
             im.pop("url", None)
+        for f in doc.get("fontes") or []:   # fontes embutidas (subconjuntos) que vieram do PDF/AI
+            if f.get("arquivo") and os.path.isfile(f["arquivo"]):
+                f["zip"] = "fontes/" + os.path.basename(f["arquivo"])
+                z.write(f["arquivo"], f["zip"])
         z.writestr("documento.json", json.dumps(doc, ensure_ascii=False))
     os.replace(tmp, caminho)
     return {"success": True, "path": caminho, "nome": os.path.basename(caminho)}
@@ -547,6 +599,8 @@ def empacotar(doc, pasta, opcoes=None):
         if not os.path.exists(alvo):
             shutil.copy2(arq, alvo)
         im["arquivo"] = alvo
+        if im.get("mascara") and os.path.isfile(im["mascara"]):
+            ma = os.path.splitext(alvo)[0] + "_mascara.png"; shutil.copy2(im["mascara"], ma); im["mascara"] = ma
         links.append(f"  {os.path.basename(alvo)} — {im.get('w')}×{im.get('h')} px, {im.get('modo')}")
     # fontes
     fontes, sem = [], []
@@ -605,9 +659,16 @@ def abrir_aknv(caminho):
             if im.get("zip"):
                 z.extract(im["zip"], pasta)
                 im["arquivo"] = os.path.join(pasta, im["zip"])
+            if im.get("zip_mascara"):
+                z.extract(im["zip_mascara"], pasta)
+                im["mascara"] = os.path.join(pasta, im["zip_mascara"])
+        for f in doc.get("fontes") or []:
+            if f.get("zip"):
+                z.extract(f["zip"], pasta); f["arquivo"] = os.path.join(pasta, f["zip"])
+    registrar_fontes(doc.get("fontes"))
     for im in (doc.get("imagens") or {}).values():
         if im.get("arquivo") and os.path.isfile(im["arquivo"]):
-            im["url"] = _registrar_previa(im["arquivo"])
+            im["url"] = _registrar_previa(im["arquivo"], im.get("mascara"))
         else:
             im["faltando"] = True
     return {"success": True, "doc": doc, "path": os.path.abspath(caminho), "nome": os.path.basename(caminho)}
@@ -622,5 +683,5 @@ def abrir(caminho):
     r = vetor_importar.importar(caminho)
     for im in (r.get("doc", {}).get("imagens") or {}).values():
         if im.get("arquivo") and os.path.isfile(im["arquivo"]):
-            im["url"] = _registrar_previa(im["arquivo"])
+            im["url"] = _registrar_previa(im["arquivo"], im.get("mascara"))
     return r
