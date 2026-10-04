@@ -68,3 +68,49 @@ async function vkCoresJanela(ancora) {
     };
     setTimeout(() => document.addEventListener('pointerdown', function fora(e) { if (!pop.contains(e.target)) { pop.hidden = true; document.removeEventListener('pointerdown', fora); } }), 0);
 }
+
+// ─────────────────────────── RECOLORIR ARTE (Editar › Editar cores › Recolorir arte) ───────────────────────────
+// Visita TODA cor de um objeto (preench, traço, paradas de degradê, trechos de texto, Aparência, efeitos, grupos):
+// fn(cor) → nova cor (ou undefined = mantém)
+function vkCadaCor(o, fn) {
+    const troca = c => { if (!c) return c; if (c.k === 'grad') { c.paradas.forEach(p => { const n = troca(p.cor); if (n !== undefined) p.cor = n; }); return undefined; } return fn(c); };
+    const em = (obj, k) => { const n = troca(obj[k]); if (n !== undefined) obj[k] = n; };
+    if (o.itens) o.itens.forEach(f => vkCadaCor(f, fn));
+    if (o.preench) em(o, 'preench');
+    if (o.traco && o.traco.cor) em(o.traco, 'cor');
+    (o.trechos || []).forEach(t => { if (t.preench) em(t, 'preench'); if (t.traco && t.traco.cor) em(t.traco, 'cor'); });
+    (o.aparencia || []).forEach(l => { if (l.cor) em(l, 'cor'); });
+    (o.efeitos || []).forEach(e => { if (e.cor) em(e, 'cor'); });
+}
+const vkCorChave = c => !c ? '' : c.k === 'spot' ? `spot:${c.nome}:${Math.round(c.tint ?? 100)}` : c.k === 'reg' ? 'reg' : `${c.k}:${c.v.map(x => Math.round(x)).join(',')}`;
+(() => {
+    const alvosOuTudo = a => (a.ids || a.nomes || (VK.sel.length && !a.tudo)) ? vkTxAlvos(a) : vkTodos().filter(x => !x.pai).map(x => x.o);
+    // cores_arte: as cores da seleção (ou de tudo), da mais usada para a menos
+    vkRegistrar('cores_arte', 'cores da arte', a => {
+        const m = new Map();
+        for (const o of alvosOuTudo(a)) vkCadaCor(o, c => { const k = vkCorChave(c); const r = m.get(k) || { cor: c, usos: 0 }; r.usos++; m.set(k, r); });
+        return { cores: [...m.values()].sort((x, y) => y.usos - x.usos).map(r => ({ cor: vkCorTexto(r.cor), usos: r.usos, especial: r.cor.k === 'spot' })) };
+    }, true);
+    // recolorir: trocas [{de, para}] (cores em texto: "C0 M100 Y0 K0", "#ff0000", "spot:...", nome de amostra);
+    // tolerancia (pontos de % por canal, padrão 1) — na seleção ou em tudo (tudo: true)
+    vkRegistrar('recolorir', 'recolorir arte', a => {
+        const trocas = [].concat(a.trocas || []).map(t => ({ de: vkCorDe(t.de), para: vkCorDe(t.para) }));
+        if (!trocas.length) throw new Error('recolorir: trocas = [{de: cor, para: cor}]');
+        const tol = a.tolerancia ?? 1;
+        const igual = (x, y) => x.k === y.k && (x.k === 'spot' ? x.nome === y.nome : x.k === 'reg' || x.v.every((v, i) => Math.abs(v - y.v[i]) <= tol * (x.k === 'rgb' ? 2.55 : 1)));
+        let n = 0;
+        for (const o of alvosOuTudo(a)) vkCadaCor(o, c => { const t = trocas.find(t => t.de && igual(c, t.de)); if (t) { n++; return vkClone(t.para); } });
+        return { trocadas: n };
+    });
+})();
+// janela: as cores da arte; clique numa = escolhe a nova
+async function vkRecolorirJanela(ancora) {
+    const r = await vkCmd('cores_arte', {}), pop = vkEl('vk-pop'), rr = vkEl('vk').getBoundingClientRect(), rb = (ancora || vkEl('vk-props')).getBoundingClientRect();
+    pop.innerHTML = `<div class="vk-cb"><div class="vk-gl-cab">Recolorir arte <small>${VK.sel.length ? 'seleção' : 'documento inteiro'} · ${r.cores.length} cores</small></div>
+        ${r.cores.map((c, i) => `<div class="vk-linha vk-mini"><button class="vk-cor-btn" data-rc="${i}">${vkCorSw(vkCorDe(c.cor))}<span>${vkEsc_(c.cor)}</span><small>${c.usos}×</small></button></div>`).join('')}
+        <div class="vk-nota">Clique numa cor para trocar por outra (inclusive Pantone das Amostras).</div></div>`;
+    Object.assign(pop.style, { left: Math.max(8, rb.left - rr.left - 300) + 'px', top: Math.max(8, rb.top - rr.top) + 'px' }); pop.hidden = false;
+    pop.onchange = null;
+    pop.onclick = e => { const b = e.target.closest('[data-rc]'); if (!b) return; const de = r.cores[+b.dataset.rc].cor;
+        vkCorPopup(b, vkCorDe(de), nova => vkCmdUi('recolorir', { trocas: [{ de, para: nova }] }).then(() => vkRecolorirJanela(ancora))); };
+}
