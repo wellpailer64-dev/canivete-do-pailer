@@ -375,6 +375,17 @@ with sync_playwright() as p:
     ok(tem_pad and "PANTONE 1505 C" in r["info"]["spots"], f"padrão sai como tiling pattern vetorial, com a cor especial da peça ({r['info']['spots']})")
     ok(r["verificado"] and "TESTE 286 C" in r["info"]["spots"], f"PDF/X-4 com setor, QR, ícone e cor do livro como especial ({r['problemas']}, {r['info']['spots']})")
 
+    print("recuperação (salvamento automático)")
+    C("recuperacao", {"acao": "descartar", "todos": True})
+    C("novo", {"nome": "Recup A", "larg": 50, "alt": 50}); C("retangulo", {"x": 5, "y": 5, "larg": 10, "alt": 10})
+    uid_a = pg.evaluate("vkUid()")
+    C("novo", {"nome": "Recup B", "larg": 50, "alt": 50})   # A tinha alteração: vai para a recuperação sozinho
+    ok(any(c_["uid"] == uid_a for c_ in C("recuperacao")["copias"]), "trocar de documento guarda a alteração não salva na recuperação")
+    C("recuperacao", {"acao": "recuperar", "uid": uid_a})
+    ok(pg.evaluate("VK.doc.nome") == "Recup A" and pg.evaluate("vkTodos().length") == 1, "recuperar devolve o documento")
+    C("salvar", {"caminho": os.path.join(SAI, "recup_a.aknv")})
+    ok(not any(c_["uid"] == uid_a for c_ in C("recuperacao")["copias"]), "salvar apaga a cópia de recuperação")
+
     print("separações e sobreimpressão")
     C("novo", {"nome": "Sep teste", "larg": 100, "alt": 60, "sangria": 3})
     C("retangulo", {"x": 0, "y": 0, "larg": 100, "alt": 60, "preench": "C0 M0 Y100 K0", "traco": "nenhum", "nome": "fundo"})

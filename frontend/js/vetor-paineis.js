@@ -75,6 +75,7 @@ function vkMontar() {
     vkMenus();
     vkEventos();
     vkRecentesUi();
+    setTimeout(() => typeof vkRecuperacaoVerificar === "function" && vkRecuperacaoVerificar(), 600);   // trabalho não salvo de uma sessão que caiu
 }
 
 // ─────────────────────────── menus ───────────────────────────

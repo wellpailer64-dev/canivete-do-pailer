@@ -3202,6 +3202,26 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.vetorizar(arquivo, cores, area_min, ignorar_fundo)
 
+    def vk_registrar_fontes(self, lista):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.registrar_fontes(lista)
+
+    def vk_autosalvar(self, doc, meta=None):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.autosalvar(doc, meta)
+
+    def vk_recuperaveis(self):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.recuperaveis()
+
+    def vk_recuperar(self, uid):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.recuperar(uid)
+
+    def vk_descartar_recuperacao(self, uid):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.descartar_recuperacao(uid)
+
     def vk_bibliotecas_cor(self):
         from Functions import vetor_kanivete
         return vetor_kanivete.bibliotecas_cor()

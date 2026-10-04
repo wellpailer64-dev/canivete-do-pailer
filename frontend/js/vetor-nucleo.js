@@ -503,7 +503,7 @@ function vkRegistrar(nome, desc, fn, leitura = false) { VK_CMDS[nome] = { desc, 
 async function vkCmd(nome, args = {}, origem = 'ui') {
     const c = VK_CMDS[nome];
     if (!c) throw new Error(`comando "${nome}" não existe; há: ${Object.keys(VK_CMDS).join(', ')}`);
-    if (!VK.doc && !['novo', 'abrir', 'ajuda'].includes(nome)) throw new Error('nenhum documento aberto: use novo ou abrir');
+    if (!VK.doc && !['novo', 'abrir', 'ajuda', 'recuperacao', 'bibliotecas_cor'].includes(nome)) throw new Error('nenhum documento aberto: use novo ou abrir');
     if (c.leitura) return await c.fn(args || {});
     VK._antes = VK.doc ? vkSnap() : null;
     try {

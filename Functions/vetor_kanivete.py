@@ -1250,3 +1250,54 @@ def bibliotecas_cor():
             if n.lower() not in vistos:
                 vistos.add(n.lower()); out.append({"nome": n, "arquivo": arq})
     return {"pasta_usuario": pastas[0], "bibliotecas": out}
+
+
+# ─────────────────────────── salvamento automático / recuperação ───────────────────────────
+def _pasta_recuperacao():
+    p = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "vetor_recuperacao")
+    os.makedirs(p, exist_ok=True)
+    return p
+
+
+def autosalvar(doc, meta=None):
+    """Cópia leve do documento (só o JSON; as imagens continuam nos arquivos de origem) para recuperar depois de uma queda.
+    meta = {nome, caminho} (o arquivo .aknv original, se já foi salvo). Escrita atômica (tmp + replace)."""
+    uid = re.sub(r"[^\w-]", "", str(doc.get("uid") or "sem-uid"))[:40]
+    pasta = _pasta_recuperacao()
+    dados = {"meta": {**(meta or {}), "uid": uid, "quando": time.time(), "nome": (meta or {}).get("nome") or doc.get("nome") or "Sem título"}, "doc": doc}
+    tmp = os.path.join(pasta, uid + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(dados, f, ensure_ascii=False)
+    os.replace(tmp, os.path.join(pasta, uid + ".json"))
+    return {"success": True, "uid": uid}
+
+
+def recuperaveis():
+    """Cópias deixadas por sessões que não salvaram (queda, fechamento) → [{uid, nome, caminho, quando}] mais nova primeiro."""
+    out = []
+    for arq in os.listdir(_pasta_recuperacao()):
+        if not arq.endswith(".json"):
+            continue
+        try:
+            with open(os.path.join(_pasta_recuperacao(), arq), encoding="utf-8") as f:
+                m = json.load(f)["meta"]
+            out.append({"uid": m["uid"], "nome": m.get("nome"), "caminho": m.get("caminho"), "quando": m.get("quando")})
+        except Exception:
+            continue
+    return sorted(out, key=lambda m: -(m["quando"] or 0))
+
+
+def recuperar(uid):
+    arq = os.path.join(_pasta_recuperacao(), re.sub(r"[^\w-]", "", str(uid)) + ".json")
+    if not os.path.isfile(arq):
+        return {"success": False, "error": "cópia de recuperação não existe"}
+    with open(arq, encoding="utf-8") as f:
+        d = json.load(f)
+    return {"success": True, "doc": d["doc"], "meta": d["meta"]}
+
+
+def descartar_recuperacao(uid):
+    arq = os.path.join(_pasta_recuperacao(), re.sub(r"[^\w-]", "", str(uid)) + ".json")
+    if os.path.isfile(arq):
+        os.remove(arq)
+    return {"success": True}
