@@ -3179,6 +3179,10 @@ class ApiBridge:
             return {"success": False, "error": str(e)}
 
     # ─────────── Vetor Kanivete (Functions/vetor_kanivete.py, vetor_importar.py, vetor_exportar.py) ───────────
+    def vk_baixar_ghostscript(self):
+        from Functions import vetor_importar
+        return vetor_importar.baixar_ghostscript()
+
     def vk_abrir(self, path):
         from Functions import vetor_kanivete
         try:

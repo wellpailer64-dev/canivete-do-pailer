@@ -1417,12 +1417,48 @@ def ghostscript():
     return sorted(cands)[-1] if cands else None
 
 
+GS_RELEASE = "gs10080"   # fallback se a API do GitHub não responder
+
+
+def baixar_ghostscript():
+    """Baixa o Ghostscript oficial (Artifex, AGPL — por isso não vai no app) para %APPDATA%/CaniveteDoPailer/ghostscript.
+    Com 7-Zip na máquina só extrai o instalador (sem admin); sem 7-Zip roda o instalador silencioso (/S /D=pasta)."""
+    import glob, json as _json, shutil, subprocess, urllib.request
+    gs = ghostscript()
+    if gs: return {"success": True, "gs": gs, "ja_tinha": True}
+    dest = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "ghostscript")
+    os.makedirs(dest, exist_ok=True)
+    url = f"https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/{GS_RELEASE}/{GS_RELEASE}w64.exe"
+    try:
+        with urllib.request.urlopen("https://api.github.com/repos/ArtifexSoftware/ghostpdl-downloads/releases/latest", timeout=15) as r:
+            url = next(a_["browser_download_url"] for a_ in _json.load(r)["assets"] if a_["name"].endswith("w64.exe"))
+    except Exception:
+        pass
+    exe = os.path.join(dest, "_instalador_gs.exe")
+    try:
+        with urllib.request.urlopen(url, timeout=60) as r, open(exe, "wb") as f:
+            shutil.copyfileobj(r, f, 1 << 20)
+        sete = shutil.which("7z") or next((p for p in (os.path.join(os.environ.get(v, ""), "7-Zip", "7z.exe") for v in ("ProgramFiles", "ProgramW6432", "ProgramFiles(x86)")) if os.path.isfile(p)), None)
+        sem_janela = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        if sete:
+            subprocess.run([sete, "x", "-y", "-o" + dest, exe, "bin", "lib", "Resource", "iccprofiles"], capture_output=True, timeout=300, creationflags=sem_janela)
+        if not glob.glob(os.path.join(dest, "bin", "gswin*c.exe")):
+            subprocess.run(f'"{exe}" /S /D={dest}', timeout=600)
+    except Exception as e:
+        return {"success": False, "error": f"não baixou o Ghostscript: {e}"}
+    finally:
+        try: os.remove(exe)
+        except OSError: pass
+    gs = ghostscript()
+    return {"success": True, "gs": gs} if gs else {"success": False, "error": "o Ghostscript baixou mas não instalou; instale em ghostscript.com/releases"}
+
+
 def importar_eps(caminho):
     """EPS/PS → PDF pelo Ghostscript (EPSCrop: a caixa do desenho) → importador de PDF (cores, especiais, texto)."""
     import subprocess, tempfile
     gs = ghostscript()
     if not gs:
-        return {"success": False, "error": "Para abrir EPS o Vetor usa o Ghostscript (gratuito), que não está instalado. Instale em "
+        return {"success": False, "sem_ghostscript": True, "error": "Para abrir EPS o Vetor usa o Ghostscript (gratuito), que não está instalado. Instale em "
                 "ghostscript.com/releases (Windows 64 bits) e abra de novo — ou peça ao cliente o arquivo em PDF ou .ai compatível com PDF."}
     pdf = os.path.join(tempfile.gettempdir(), "vetor_kanivete", os.path.splitext(os.path.basename(caminho))[0] + "_eps.pdf")
     os.makedirs(os.path.dirname(pdf), exist_ok=True)

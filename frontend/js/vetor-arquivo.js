@@ -13,7 +13,14 @@
         const md = document.getElementById('vk-modal'); if (md) { md.hidden = true; md.innerHTML = ''; }   // relatório do arquivo anterior
         vkCarregando(true, 'Abrindo ' + caminho.split(/[\\/]/).pop() + '...');
         let r;
-        try { r = await api().vk_abrir(caminho); } finally { vkCarregando(false); }
+        try {
+            r = await api().vk_abrir(caminho);
+            if (r && r.sem_ghostscript && a.baixar_ghostscript !== false && api().vk_baixar_ghostscript) {   // EPS: baixa o Ghostscript uma vez (~65 MB) e tenta de novo
+                vkCarregando(true, 'Baixando o Ghostscript para abrir EPS (uma vez só, ~65 MB)...');
+                const g = await api().vk_baixar_ghostscript(); if (!g || !g.success) throw new Error((g && g.error) || 'não baixou o Ghostscript');
+                vkCarregando(true, 'Abrindo ' + caminho.split(/[\\/]/).pop() + '...'); r = await api().vk_abrir(caminho);
+            }
+        } finally { vkCarregando(false); }
         if (!r || !r.success) throw new Error((r && r.error) || 'não abriu');
         VK.doc = prepararDoc(r.doc); VK.path = /\.aknv$/i.test(caminho) ? r.path : null;
         VK.hist = []; VK.futuro = []; VK.sel = []; VK._antes = null; VK.sujo = false;

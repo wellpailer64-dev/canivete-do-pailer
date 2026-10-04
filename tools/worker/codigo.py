@@ -117,7 +117,7 @@ def ollama(msgs, modelo="qwen3:8b", pensar=False):
 
 
 if __name__ == "__main__":
-    c = json.load(open(sys.argv[1], encoding="utf-8")) if os.path.isfile(sys.argv[1]) else json.loads(sys.argv[1])
+    c = json.load(open(sys.argv[1], encoding="utf-8-sig")) if os.path.isfile(sys.argv[1]) else json.loads(sys.argv[1])
     tid, modo, t0 = c.get("task_id") or time.strftime("CODIGO_%H%M%S"), c.get("modo", "codigo"), time.time()
     ctx = {"modo": modo, "arquivos": [x.replace("\\", "/") for x in c.get("arquivos") or []], "testes": list(c.get("testes") or []), "mudados": set(), "resultados": {}}
     inicio = ""
