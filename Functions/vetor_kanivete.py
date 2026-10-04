@@ -345,7 +345,7 @@ def _glifos(texto, ini, fim, p, falta):
             ch = texto[ci] if ci < len(texto) else ""
             out.append({"nome": nome, "ci": ci, "adv": av * sc * eh, "xo": ox * sc * eh, "yo": oy * sc * ev, "F": F, "sx": sc * eh, "sy": sc * ev,
                         "desl": desl, "tam": float(p["tam"]), "asc": F["asc"] * sc * ev, "desc": -F["desc"] * sc * ev,
-                        "esp": ch in (" ", " ", "\t") or nome in _ESPACOS, "hif": ch in ("-", "‐", "–", "/"),
+                        "esp": ch in (" ", "\u00a0") or (nome in _ESPACOS and ch != "\t"), "tab": ch == "\t", "hif": ch in ("-", "‐", "–", "/"),
                         "cor": (p.get("preench"), p.get("traco"))})
         pos += len(s_)
     return out
@@ -355,6 +355,43 @@ def _glifo_hifen(g):
     """glifo '-' com a fonte/corpo/cor do glifo g (hífen da hifenização)."""
     nome, _cl, av, ox, oy = _moldar(g["F"], "-", 0)[0]
     return dict(g, nome=nome, adv=av * g["sx"], xo=0, yo=0, esp=False, hif=True)
+
+
+def _glifo_char(g, ch):
+    """glifo do caractere ch com a fonte/corpo/cor do glifo g (pontilhado da tabulação)."""
+    nome, _cl, av, ox, oy = _moldar(g["F"], ch, 0)[0]
+    return dict(g, nome=nome, adv=av * g["sx"], xo=0, yo=0, esp=False, tab=False, hif=ch == "-")
+
+
+def _tabs_layout(gl, tabs, x0=0):
+    """Posições x dos glifos de uma linha com tabulação. tabs = [{pos (pt, da margem), alin: esq|dir|centro|decimal, guia: '.'}];
+    sem parada definida depois do cursor: a cada 36 pt (½ polegada, como o Illustrator). → (posições, [(glifo da guia, x)])"""
+    paradas = sorted((dict(t, pos=float(t.get("pos", 0))) for t in tabs if isinstance(t, dict)), key=lambda t: t["pos"])
+    pos, guias, x, i, n = [0.0] * len(gl), [], 0.0, 0, len(gl)
+    while i < n:
+        g = gl[i]
+        if not g.get("tab"):
+            pos[i] = x; x += g["adv"]; i += 1; continue
+        pos[i] = x
+        j = i + 1
+        while j < n and not gl[j].get("tab"): j += 1
+        seg = gl[i + 1:j]; w = sum(s["adv"] for s in seg)
+        t = next((t for t in paradas if t["pos"] - x0 > x + 0.01), None) or {"pos": x0 + (math.floor((x + 0.01) / 36) + 1) * 36, "alin": "esq"}
+        p = t["pos"] - x0; al = t.get("alin") or "esq"
+        if al == "dir": ini = p - w
+        elif al == "centro": ini = p - w / 2
+        elif al == "decimal":
+            k = next((k for k, s in enumerate(seg) if s.get("nome") in ("period", "comma")), len(seg))
+            ini = p - sum(s["adv"] for s in seg[:k])
+        else: ini = p
+        ini = max(ini, x)
+        if t.get("guia") and ini - x > 0:   # pontilhado numa grade fixa (os pontos de linhas diferentes batem)
+            gg = _glifo_char(g, str(t["guia"])[0]); passo = max(gg["adv"] * 1.6, 0.1)
+            k = math.ceil((x + passo * 0.4) / passo)
+            while (k + 1) * passo <= ini - passo * 0.4:
+                guias.append((gg, k * passo)); k += 1
+        x = ini; i += 1
+    return pos, guias
 
 
 def _desenhar(g, M, partes):
@@ -522,9 +559,17 @@ def texto_geometria(spec):
             else:
                 dx = {"centro": -larg / 2, "dir": -larg}.get(alin, 0) + r1
             x = 0
-            for g in gl:
-                _desenhar(g, [1, 0, 0, 1, dx + x + g["xo"], y - g["desl"] - g["yo"]], partes)
-                x += g["adv"] + (extra if g["esp"] else 0)
+            if any(g.get("tab") for g in gl):   # linha com tabulação: paradas em vez do alinhamento (como no Illustrator)
+                dx = (par["recuo_esq"] if caixa else 0) + r1
+                pos, guias = _tabs_layout(gl, spec.get("tabs") or [], dx)
+                for g, px in zip(gl, pos):
+                    if not g.get("tab"): _desenhar(g, [1, 0, 0, 1, dx + px + g["xo"], y - g["desl"] - g["yo"]], partes)
+                for g, px in guias: _desenhar(g, [1, 0, 0, 1, dx + px, y - g["desl"]], partes)
+                x = (pos[-1] + gl[-1]["adv"]) if gl else 0
+            else:
+                for g in gl:
+                    _desenhar(g, [1, 0, 0, 1, dx + x + g["xo"], y - g["desl"] - g["yo"]], partes)
+                    x += g["adv"] + (extra if g["esp"] else 0)
             info.append({"base": round(y, 3), "x": round(dx, 3), "larg": round(x, 3), "ini": ci0, "fim": (gl[-1]["ci"] + 1) if gl else ci0,
                          "asc": round(asc_l, 3), "desc": round(desc_l, 3)})
         larg_tot = caixa if caixa else max([l["larg"] for l in info] or [0])

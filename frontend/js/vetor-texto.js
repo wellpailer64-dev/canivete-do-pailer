@@ -6,7 +6,7 @@
 // sobreposição), ep (estilo de parágrafo), anterior/seguinte (ids, encadeado: o texto mora na 1ª caixa = raiz),
 // caixa_alt (pt), trilha:{subs (pt), ini (pt), lado}; doc.estilosTexto = {par:{nome:{...}}, car:{nome:{...}}}.
 const VK_TX_CAR = ['fam', 'estilo', 'tam', 'track', 'desl', 'eh', 'ev', 'maius', 'pos', 'liga', 'frac', 'num', 'preench', 'traco'];
-const VK_TX_PAR = ['alin', 'entrelinha', 'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois', 'hifen'];
+const VK_TX_PAR = ['alin', 'entrelinha', 'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois', 'hifen', 'tabs'];
 VK_FERR.texto_caminho = { nome: 'Texto em caminho (clique num caminho)', tecla: '', cursor: 'text' };
 VK_ICO.texto_caminho = '<path d="M3 17c4-8 8-8 12-4s5 2 6 0"/><path d="M8 4h7M11.5 4v7"/>';
 
@@ -47,6 +47,12 @@ function vkTxArgs(a, trecho) {
     if (a.alin) par.alin = a.alin === 'justificado' ? 'just' : a.alin;
     if (a.entrelinha !== undefined) par.entrelinha = a.entrelinha ? +a.entrelinha : null;
     for (const k of ['recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois']) if (a[k] != null) par[k] = +a[k];
+    // tabs: [{pos (mm, da margem), alin esq|dir|centro|decimal, guia '.'}] ou texto "60 dir ., 90 decimal"; [] / '' = tira
+    if (a.tabs !== undefined) {
+        const lista = typeof a.tabs === 'string' ? a.tabs.split(',').map(t => t.trim().split(/\s+/)).filter(t => t[0] !== '').map(([p, al, g]) => ({ pos: +p.replace(',', '.'), alin: al, guia: g })) : (a.tabs || []);
+        const al = { direita: 'dir', esquerda: 'esq', centralizada: 'centro', decimal: 'decimal', dir: 'dir', esq: 'esq', centro: 'centro' };
+        par.tabs = lista.length ? lista.map(t => ({ pos: a.un === 'pt' && typeof a.tabs !== 'string' ? +t.pos : vkPT(+t.pos), alin: al[t.alin] || 'esq', ...(t.guia ? { guia: String(t.guia)[0] } : {}) })) : null;
+    }
     const hf = a.hifenizar ?? a.hifen;   // true (pt_BR) | 'en_US'... | false
     if (hf !== undefined) par.hifen = hf === true || hf === 'sim' ? 'pt_BR' : (hf || null);
     const caixa = {};
@@ -346,6 +352,7 @@ vkTextoEditar = function (o) {
     const ta = document.getElementById('vk-texto-edit'); if (!ta || ta.hidden) return;
     const guarda = () => { VK.txFaixa = { id: o.id, ini: ta.selectionStart, fim: ta.selectionEnd, n: ta.value.length }; VK.txCaret = { id: o.id, pos: ta.selectionEnd }; };
     ta.onselect = ta.onkeyup = ta.onmouseup = guarda;
+    ta.addEventListener('keydown', e => { if (e.key === 'Tab' && !e.ctrlKey && !e.altKey) { e.preventDefault(); e.stopPropagation(); ta.setRangeText('	', ta.selectionStart, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input')); } });   // Tab = tabulação (não sai do campo)
     const ob = ta.onblur; ta.onblur = e => { guarda(); ob && ob(e); };
 };
 function vkTxFaixaAtiva(o) {   // trecho selecionado na edição que ainda vale para o texto selecionado → [ini, fim] | null
@@ -377,6 +384,7 @@ function vkTxPainel(tx, objs) {
         <div class="ie-segm vk-segm">${[['esq', '⟸', 'à esquerda'], ['centro', '⟺', 'centralizado'], ['dir', '⟹', 'à direita'], ['just', '☰', 'justificado (última à esquerda)'], ['just_tudo', '▤', 'justificar todas as linhas']].map(([a, s, t]) => `<button data-txalin="${a}" title="${t}" class="${(r.alin || 'esq') === a ? 'on' : ''}">${s}</button>`).join('')}</div>
         <div class="vk-grade">${vkNum('Entrel.', r.entrelinha ? vkR(r.entrelinha, 2) : '', 'data-tx="entrelinha" placeholder="auto"', 'pt', 0.5)}${vkNum('Recuo ⇤', r.recuo_esq || 0, 'data-tx="recuo_esq"', 'pt', 1)}${vkNum('Recuo ⇥', r.recuo_dir || 0, 'data-tx="recuo_dir"', 'pt', 1)}
             ${vkNum('1ª linha', r.recuo_1a || 0, 'data-tx="recuo_1a"', 'pt', 1)}${vkNum('Antes', r.antes || 0, 'data-tx="antes"', 'pt', 1)}${vkNum('Depois', r.depois || 0, 'data-tx="depois"', 'pt', 1)}</div>
+        <div class="vk-linha vk-mini" title="posição em mm a partir da margem; alinhamento esq, dir, centro ou decimal; guia (ex.: .) = pontilhado. Tab na edição insere a tabulação">Tabs <input type="text" data-tx="tabs" value="${vkEsc_((r.tabs || []).map(t => `${vkR(vkMM(t.pos), 1)} ${t.alin}${t.guia ? ' ' + t.guia : ''}`).join(', '))}" placeholder="ex.: 60 dir ., 90 decimal" style="flex:1;min-width:0"></div>
         ${tx.caixa ? `<div class="vk-linha vk-mini"><label class="vk-chk"><input type="checkbox" data-tx="hifenizar" ${r.hifen ? 'checked' : ''}> Hifenizar</label>
             ${r.hifen ? `<select data-tx="hifen">${[['pt_BR', 'português'], ['en_US', 'inglês'], ['es', 'espanhol'], ['fr', 'francês'], ['de_DE', 'alemão'], ['it_IT', 'italiano']].map(([v, n]) => `<option value="${v}" ${r.hifen === v ? 'selected' : ''}>${n}</option>`).join('')}</select>` : ''}</div>` : ''}</div>`;
     if (objs.length === 1 && tx.caixa) {

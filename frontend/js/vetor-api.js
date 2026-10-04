@@ -118,7 +118,7 @@
         estiloPadrao(o, { preench: '100K', traco: null, ...a });
         const extra = {};   // caractere/parágrafo/altura (vetor-texto.js)
         for (const k of ['desl', 'deslocamento_base', 'escala_h', 'escala_v', 'maius', 'caixa_alta', 'versalete', 'pos', 'liga', 'ligaduras', 'frac', 'fracoes', 'num', 'numerais',
-            'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois', 'hifen', 'hifenizar', 'estilo_paragrafo', 'altura', 'caixa_alt']) if (a[k] !== undefined) extra[k] = a[k];
+            'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois', 'hifen', 'hifenizar', 'tabs', 'estilo_paragrafo', 'altura', 'caixa_alt']) if (a[k] !== undefined) extra[k] = a[k];
         if (Object.keys(extra).length) vkTxAplicar(o, { un: a.un, ...extra });
         inserir(o, a);
         const g = await vkGeoPronta(o);
