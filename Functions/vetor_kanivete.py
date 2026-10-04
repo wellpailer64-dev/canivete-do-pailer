@@ -1029,6 +1029,8 @@ def salvar_png(dados_b64, caminho):
     ext = os.path.splitext(caminho)[1].lower()
     if ext in (".jpg", ".jpeg"):
         Image.open(io.BytesIO(raw)).convert("RGB").save(caminho, quality=95, dpi=(300, 300))
+    elif ext == ".webp":
+        Image.open(io.BytesIO(raw)).save(caminho, "WEBP", quality=90, method=6)
     else:
         open(caminho, "wb").write(raw)
     return {"success": True, "path": caminho}
@@ -1172,6 +1174,12 @@ def abrir(caminho):
     ext = os.path.splitext(caminho)[1].lower()
     if ext == ".aknv":
         return abrir_aknv(caminho)
+    if ext in (".ai", ".pdf"):   # salvo pelo Vetor: o .aknv vem anexado → fidelidade total
+        from Functions import vetor_saida
+        ak = vetor_saida.aknv_anexado(caminho)
+        if ak:
+            r = abrir_aknv(ak); r["relatorio"] = ["Aberto do documento do Vetor guardado dentro do arquivo (fidelidade total)."]
+            r["path"] = None; return r
     from Functions import vetor_importar
     r = vetor_importar.importar(caminho)
     for im in (r.get("doc", {}).get("imagens") or {}).values():

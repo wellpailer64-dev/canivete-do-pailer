@@ -3183,6 +3183,22 @@ class ApiBridge:
         from Functions import vetor_importar
         return vetor_importar.baixar_ghostscript()
 
+    def vk_exportar_ai(self, doc_py, doc_salvar, path, opcoes):
+        from Functions import vetor_saida
+        try:
+            return vetor_saida.exportar_ai(doc_py, doc_salvar, path, opcoes)
+        except Exception as e:
+            import traceback
+            return {"success": False, "error": str(e), "trace": traceback.format_exc()[-1200:]}
+
+    def vk_exportar_eps(self, doc_py, path, opcoes):
+        from Functions import vetor_saida
+        try:
+            return vetor_saida.exportar_eps(doc_py, path, opcoes)
+        except Exception as e:
+            import traceback
+            return {"success": False, "error": str(e), "trace": traceback.format_exc()[-1200:]}
+
     def vk_abrir(self, path):
         from Functions import vetor_kanivete
         try:

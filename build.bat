@@ -103,7 +103,7 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "pikepdf" ^
  --hidden-import "uharfbuzz" ^
  --hidden-import "qrcode" ^
- --hidden-import "Functions.ampliar_imagem" ^
+ --hidden-import "Functions.ampliar_imagem" --hidden-import "Functions.vetor_saida" ^
  --hidden-import "pathops" ^
  --hidden-import "skia" ^
  --hidden-import "zstandard" ^
