@@ -72,6 +72,21 @@
             const o = ieIntPlano(L); L.c = o.c; L.x = o.x; L.y = o.y; mudou(L, R); hist('cor do objeto');
             return { filtros: L.filtrosInt.length };
         },
+        titulo_gasto: async a => {
+            const Ls = (a.camadas || []).map(precisa);
+            if (!Ls.length) throw new Error('titulo_gasto precisa de pelo menos uma camada');
+            await KNV.receita.tituloGasto(Ls.map(L => L.nome), { cor: a.cor || '#0b0b0b' }); hist('título gasto'); return { camadas: Ls.length };
+        },
+        degrade: a => {   // Sobreposição de degradê (efeito de camada); grupo = em cada texto de dentro
+            const L = precisa(a.camada), alvos = L.filhos ? ieTodasDe(L.filhos).filter(x => x.txt || x.c) : [L];
+            for (const X of alvos) {
+                const R = ieRCamada(X);
+                X.fx = X.fx || {};
+                X.fx.degSob = [{ ...ieFxNovo('degSob'), grad: { cores: [[0, String(a.cor1)], [1, String(a.cor2)]], ops: [[0, 100], [1, 100]] }, ang: a.angulo ?? 90 }];
+                X.fxMudou = true; mudou(X, R);
+            }
+            hist('degradê'); return { camadas: alvos.length };
+        },
         sombra_projetada: async a => { const L = precisa(a.camada); await KNV.receita.sombra([L.nome], SOMBRA[a.intensidade] || SOMBRA.media); hist('sombra'); return { sombra: a.intensidade }; },
         alinhar: a => {
             const Ls = (a.camadas || []).map(precisa), cx = Ls.map(caixa);
@@ -117,6 +132,8 @@
             else if (k === 'opacidade') ok = !!L && Math.abs((L.op ?? 1) * 100 - +valor) < 1;
             else if (k === 'cor') ok = !!(L && L.txt && String(L.txt.cor).toLowerCase() === String(valor).toLowerCase());
             else if (k === 'tamanho') ok = !!(L && L.txt && Math.abs(L.txt.tam * ieTextoEscala(L.txt) - +valor) < 1.5);
+            else if (k === 'efeito') { const alvos = L ? (L.filhos ? ieTodasDe(L.filhos) : [L]) : []; ok = alvos.some(X => X.fx && (X.fx[valor] || []).some(e => e.on)); }
+            else if (k === 'acabamento') ok = ieTodas(IE.doc).some(X => X.tipo === 'ajuste' && X.ajChave === 'cameraRaw' && /acabamento/i.test(X.nome));
             else if (k === 'exportado') ok = !!window.KNVW._exportou;
             else if (k === 'no_editor') ok = !!window.KNVW._editor;
         } catch (e) { ok = false; }

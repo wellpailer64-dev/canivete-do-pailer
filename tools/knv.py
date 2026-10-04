@@ -123,6 +123,13 @@ if a.gerar:   # folha de contato: uma célula por semente, recortada, com o núm
     a.novo = True; a.de = None; a.w_gerar = (1080, chh + 140)
 
 html = open(a.html, encoding="utf-8").read() if a.html != "-" else None
+if html and "gerar:" in html:   # o FLUX precisa da placa: tira os modelos do Ollama (Worker) da memória de vídeo antes
+    try:
+        import urllib.request as _u
+        for _m in json.load(_u.urlopen("http://127.0.0.1:11434/api/ps", timeout=3)).get("models", []):
+            _u.urlopen(_u.Request("http://127.0.0.1:11434/api/generate", data=json.dumps({"model": _m["name"], "keep_alive": 0}).encode()), timeout=30)
+            print("ollama: descarregado", _m["name"])
+    except Exception: pass
 opc = {"base": barra(os.path.dirname(os.path.abspath(a.html))) if html else None, "biblioteca": barra(BIB)}
 if getattr(a, "w_gerar", None): opc["w"], opc["h"] = a.w_gerar
 for k in ("formato", "nome", "margem"):
