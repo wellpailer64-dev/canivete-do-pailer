@@ -44,6 +44,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 | Tabulações (esq, dir, centro, decimal) com pontilhado | cardápio, tabela de preços, lista | `tabs` no texto/alterar: [{pos mm da margem, alin, guia}] ou "60 dir ., 90 decimal"; sem parada: a cada 36 pt; decimal alinha pela vírgula/ponto; pontilhado numa grade fixa (pontos de linhas diferentes batem). Tab na caixa de edição insere a tabulação; campo Tabs no painel Parágrafo |
 | Texto dentro de forma (Área de texto) | texto em balão, estrela, silhueta | `texto_em_forma` (forma fechada vira a área; recuo mm; manter_forma): spec `forma` (subs locais) + `forma_recuo`. Por linha: o trecho livre no topo/meio/base das letras; a leitura desce pelo CENTRO (linha estreita demais no centro é pulada, não salta para um braço; centro fora da forma → o trecho mais largo); palavra que não cabe numa linha estreita desce (hifenização antes). Sobra = + vermelho, encadeia. Menu Texto |
 | Distorcer (zigue-zague, áspero, inflar/murchar, torcer) e Brilho interno | selo serrilhado, sol, mancha, botão | `efeito` tipo zigue (tamanho mm, cristas, suave), aspero (tamanho, detalhe /cm, suave; aleatório fixo pelo id), inflar (quantidade %, − murcha), torcer (graus), brilho_interno (desfoque, cor, opacidade). Distorções: vetoriais, nas pinturas (grupo também), PDF = tela, valem em X-1a; brilho interno: raster na cor da tinta, depois do objeto (só X-4) |
+| Envelope / deformar (arco, arco inferior/superior, abaulado, concha, bandeira, onda, peixe, elevar, olho de peixe, inflar, espremer, torcer) | título em arco, bandeira, efeito de faixa | `efeito` tipo deformar (estilo, dobra %, dist_h %, dist_v %): vivo, também em TEXTO (não vira curva), grupo e forma; caminhos subdivididos e mapeados na caixa (u, v); PDF = tela; vale em X-1a |
 | Texto em caminho | selo, logo circular | ferramenta Texto em caminho (clique no caminho); `texto_caminho` (`ini` mm, `lado`, `manter_caminho`) |
 | Estilos de parágrafo / caractere, Glifos, juntar textos importados | padronizar, caracteres especiais, editar .ai/PDF | `estilo_texto` (tipo, nome, `de`, `aplicar`; mudar um estilo atualiza quem usa), `estilos_texto`, `glifos`, `inserir_texto` (`codigo`/`texto`, `pos`), `juntar_textos` (linhas → parágrafos; `quebras:'linhas'`) |
 | Alinhar/distribuir, guias inteligentes | precisão | caixa pelos extremos reais da cúbica (não pelas alças); encaixe magenta |
@@ -56,7 +57,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 `.aknv` abre no KANIVETE por duplo clique (associação HKCU em Functions/projeto.py; roteado em `abrirProjetoExterno`).
 
 Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): editar a trilha do texto em caminho com a Seleção direta, estilos dentro da caixa de edição (ela é texto puro);
-efeitos que faltam (Aparência em grupo; efeitos na prévia de separações e no SVG); malha; distorção de envelope; painel de vínculos e variáveis; PDF com texto editável (hoje: curvas).
+efeitos que faltam (Aparência em grupo; efeitos na prévia de separações e no SVG); malha; painel de vínculos e variáveis; PDF com texto editável (hoje: curvas).
 
 ## 2. Modelo (pt = 1/72", y para baixo)
 ```

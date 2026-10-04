@@ -851,7 +851,8 @@
 "zigue",
 "aspero",
 "inflar",
-"torcer"
+"torcer",
+"deformar"
 ]
 },
 "dx": {
@@ -891,6 +892,30 @@
 "suave": {
 "type": "boolean",
 "description": "zigue/aspero: ondas suaves em vez de pontas"
+},
+"estilo": {
+"type": "string",
+"enum": [
+"arco",
+"arco_inferior",
+"arco_superior",
+"abaulado",
+"concha_inferior",
+"concha_superior",
+"bandeira",
+"onda",
+"peixe",
+"elevar",
+"olho_de_peixe",
+"inflar",
+"espremer",
+"torcer"
+],
+"description": "deformar: estilo do envelope"
+},
+"dobra": {
+"type": "number",
+"description": "deformar: dobra % (-100 a 100)"
 }
 },
 "required": [

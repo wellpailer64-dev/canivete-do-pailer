@@ -10,7 +10,7 @@ VK.apDesl = new Map(); VK.apPend = new Map();
 
 function vkApEf(o, tipo) { return (o.efeitos || []).find(e => e.tipo === tipo && e.visivel !== false); }
 function vkApTem(o) { return (o.aparencia || []).some(l => l.visivel !== false) || !!vkApEf(o, 'cantos') || (o.tipo === 'caminho' && vkDsTracoEspecial(o.traco)) || vkDistorce(o) || !!vkApEf(o, 'brilho_interno'); }
-const VK_DIST = new Set(['zigue', 'aspero', 'inflar', 'torcer']);
+const VK_DIST = new Set(['zigue', 'aspero', 'inflar', 'torcer', 'deformar']);
 function vkDistorce(o) { return (o.efeitos || []).some(e => e.visivel !== false && VK_DIST.has(e.tipo)); }
 
 // cantos arredondados (Efeito › Estilizar › Cantos arredondados): só cantos vivos entre segmentos retos
@@ -175,7 +175,8 @@ async function vkApDocPy(d) {
         if (a.visivel != null) x.visivel = !!a.visivel;
         for (const k of ['cap', 'junc', 'tracejado']) if (a[k] != null) x[k] = a[k];
         for (const k of ['dx', 'dy', 'desfoque', 'raio', 'tamanho']) if (a[k] != null) x[k] = D(a, a[k]);
-        for (const k of ['cristas', 'detalhe', 'quantidade', 'graus']) if (a[k] != null) x[k] = +a[k];
+        for (const k of ['cristas', 'detalhe', 'quantidade', 'graus', 'dobra', 'dist_h', 'dist_v']) if (a[k] != null) x[k] = +a[k];
+        if (a.estilo != null) { if (!VK_ENVELOPES[a.estilo]) throw new Error(`deformar: estilo "${a.estilo}" não existe; há: ${Object.keys(VK_ENVELOPES).join(', ')}`); x.estilo = a.estilo; }
         if (a.suave != null) x.suave = !!a.suave;
         if (x.visivel === true) delete x.visivel;
     };
@@ -214,13 +215,14 @@ async function vkApDocPy(d) {
         aspero: () => ({ tipo: 'aspero', tamanho: vkPT(1), detalhe: 4, suave: true }),
         inflar: () => ({ tipo: 'inflar', quantidade: 40 }),
         torcer: () => ({ tipo: 'torcer', graus: 45 }),
+        deformar: () => ({ tipo: 'deformar', estilo: 'arco', dobra: 50, dist_h: 0, dist_v: 0 }),
     };
     vkRegistrar('efeito', 'efeito', a => {
         const objs = vkTxAlvos(a), tipo = a.tipo || 'sombra';
         let acao = a.acao || 'adicionar';
         if (acao === 'adicionar' && !PADRAO[tipo]) throw new Error(`efeito "${tipo}" não existe; há: ${Object.keys(PADRAO).join(', ')}`);
         for (const o of objs) {
-            const ac = acao === 'adicionar' && ['desfoque', 'cantos', 'inflar', 'torcer'].includes(tipo) && (o.efeitos || []).some(e => e.tipo === tipo) ? 'alterar' : acao;
+            const ac = acao === 'adicionar' && ['desfoque', 'cantos', 'inflar', 'torcer', 'deformar'].includes(tipo) && (o.efeitos || []).some(e => e.tipo === tipo) ? 'alterar' : acao;
             lista(o, 'efeitos', ac, a, PADRAO[tipo] || PADRAO.sombra);
         }
         return { efeitos: (objs[0].efeitos || []).map(e => e.tipo + (e.visivel === false ? ' (oculto)' : '')) };
@@ -258,13 +260,14 @@ function vkApPainel(objs) {
             <button class="ie-btn ie-btn-mini" data-apa="remover:${i}" title="tirar">×</button></div>`).join('')}
         <div class="vk-bts"><button class="ie-btn ie-btn-mini" data-apa="novo:traco">+ Traço</button><button class="ie-btn ie-btn-mini" data-apa="novo:preench">+ Preenchimento</button>
         ${vkApTem(o) ? '<button class="ie-btn ie-btn-mini" data-apa="expandir" title="vira objetos comuns">Expandir</button>' : ''}</div></div>`;
-    const nomes = { sombra: 'Sombra projetada', brilho: 'Brilho externo', brilho_interno: 'Brilho interno', desfoque: 'Desfoque', cantos: 'Cantos arredondados', zigue: 'Zigue-zague', aspero: 'Áspero', inflar: 'Inflar / murchar', torcer: 'Torcer' };
+    const nomes = { sombra: 'Sombra projetada', brilho: 'Brilho externo', brilho_interno: 'Brilho interno', desfoque: 'Desfoque', cantos: 'Cantos arredondados', zigue: 'Zigue-zague', aspero: 'Áspero', inflar: 'Inflar / murchar', torcer: 'Torcer', deformar: 'Envelope (deformar)' };
     const num = (rot, i, k, v, u = 'mm', st = 0.25) => `<label class="vk-campo vk-campo-mini"><span>${rot}</span><input type="number" step="${st}" value="${v}" data-efn="${k}:${i}">${u ? `<em>${u}</em>` : ''}</label>`;
     h += `<div class="vk-sec"><div class="vk-sec-t">Efeitos</div>
         ${E.map((e, i) => `<div class="vk-ef"><div class="vk-linha vk-mini"><input type="checkbox" data-efv="${i}" ${e.visivel !== false ? 'checked' : ''}><b>${nomes[e.tipo] || e.tipo}</b>
             ${e.cor !== undefined ? `<button class="vk-cor-btn vk-cor-mini" data-efcor="${i}">${vkCorSw(e.cor)}</button>` : ''}<button class="ie-btn ie-btn-mini" data-efa="remover:${i}">×</button></div>
             <div class="vk-grade">${e.tipo === 'sombra' ? num('X', i, 'dx', vkR(vkMM(e.dx || 0), 2)) + num('Y', i, 'dy', vkR(vkMM(e.dy || 0), 2)) : ''}
             ${e.tipo === 'cantos' ? num('Raio', i, 'raio', vkR(vkMM(e.raio || 0), 2)) : e.tipo === 'zigue' || e.tipo === 'aspero' ? num('Tam.', i, 'tamanho', vkR(vkMM(e.tamanho || 0), 2)) + (e.tipo === 'zigue' ? num('Cristas', i, 'cristas', e.cristas || 6, '', 1) : num('Detalhe', i, 'detalhe', e.detalhe || 4, '/cm', 1))
+                : e.tipo === 'deformar' ? `<select data-efs="${i}">${Object.keys(VK_ENVELOPES).map(k => `<option value="${k}" ${e.estilo === k ? 'selected' : ''}>${k.replace(/_/g, ' ')}</option>`).join('')}</select>` + num('Dobra', i, 'dobra', e.dobra ?? 50, '%', 5) + num('H', i, 'dist_h', e.dist_h || 0, '%', 5) + num('V', i, 'dist_v', e.dist_v || 0, '%', 5)
                 : e.tipo === 'inflar' ? num('%', i, 'quantidade', e.quantidade || 0, '', 5) : e.tipo === 'torcer' ? num('Graus', i, 'graus', e.graus || 0, '°', 5) : num('Desf.', i, 'desfoque', vkR(vkMM(e.desfoque || 0), 2))}
             ${e.op != null ? num('Opac.', i, 'opacidade', Math.round(e.op * 100), '%', 1) : ''}</div></div>`).join('')}
         <div class="vk-linha vk-mini"><select data-efnovo="1"><option value="">+ efeito…</option>${Object.entries(nomes).map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></div>
@@ -279,7 +282,8 @@ function vkApPainelEventos(el) {
         if (d.apv != null) { e.stopPropagation(); return vkCmdUi('aparencia', { acao: 'alterar', indice: +d.apv, visivel: t.checked }); }
         if (d.apn) { e.stopPropagation(); const [k, i] = d.apn.split(':'); return vkCmdUi('aparencia', { acao: 'alterar', indice: +i, [k]: k === 'deslocar' ? vkPT(+t.value) : +t.value }); }
         if (d.efv != null) { e.stopPropagation(); return vkCmdUi('efeito', { acao: 'alterar', indice: +d.efv, visivel: t.checked }); }
-        if (d.efn) { e.stopPropagation(); const [k, i] = d.efn.split(':'); return vkCmdUi('efeito', { acao: 'alterar', indice: +i, [k]: ['opacidade', 'cristas', 'detalhe', 'quantidade', 'graus'].includes(k) ? +t.value : vkPT(+t.value) }); }
+        if (d.efn) { e.stopPropagation(); const [k, i] = d.efn.split(':'); return vkCmdUi('efeito', { acao: 'alterar', indice: +i, [k]: ['opacidade', 'cristas', 'detalhe', 'quantidade', 'graus', 'dobra', 'dist_h', 'dist_v'].includes(k) ? +t.value : vkPT(+t.value) }); }
+        if (d.efs) { e.stopPropagation(); return vkCmdUi('efeito', { acao: 'alterar', indice: +d.efs, estilo: t.value }); }
         if (d.efnovo) { e.stopPropagation(); if (t.value) vkCmdUi('efeito', { acao: 'adicionar', tipo: t.value }); t.value = ''; }
     }, true);
     el.addEventListener('click', e => {
@@ -323,8 +327,33 @@ function vkSuave(pts, fechado) {   // polilinha → cúbicas Catmull-Rom
     const n = pts.length, at = i => pts[fechado ? (i + n) % n : Math.max(0, Math.min(n - 1, i))];
     return pts.map((p, i) => { const a = at(i - 1), b = at(i + 1), tx = (b[0] - a[0]) / 6, ty = (b[1] - a[1]) / 6; return [p[0], p[1], p[0] - tx, p[1] - ty, p[0] + tx, p[1] + ty]; });
 }
-function vkDistSub(s, e, c, R, rnd) {
+// envelope (Distorcer com envelope › Criar com deformação): u, v ∈ [-1, 1] na caixa (v = -1 em cima); d = dobra (-1..1)
+const VK_ENVELOPES = {
+    arco: (u, v, d) => [0, -d * (1 - u * u)],
+    arco_inferior: (u, v, d) => [0, -d * (1 - u * u) * (v + 1) / 2],
+    arco_superior: (u, v, d) => [0, -d * (1 - u * u) * (1 - v) / 2],
+    abaulado: (u, v, d) => [0, d * (1 - u * u) * v],
+    concha_inferior: (u, v, d) => [0, d * u * u * (v + 1) / 2],
+    concha_superior: (u, v, d) => [0, -d * u * u * (1 - v) / 2],
+    bandeira: (u, v, d) => [0, d * 0.5 * Math.sin(Math.PI * u)],
+    onda: (u, v, d) => [0, d * 0.5 * Math.sin(Math.PI * u) * (1 - 0.6 * v)],
+    peixe: (u, v, d) => [0, d * v * (0.6 * (1 - u * u) - 0.9 * Math.max(0, u - 0.4))],   // incha no meio, afina na cauda
+    elevar: (u, v, d) => [0, -d * (u + 1) / 2],
+    olho_de_peixe: (u, v, d) => { const k = d * 0.3 * Math.max(0, 1 - (u * u + v * v)); return [u * k, v * k]; },
+    inflar: (u, v, d) => [d * 0.4 * u * (1 - v * v), d * 0.4 * v * (1 - u * u)],
+    espremer: (u, v, d) => [0, -d * 0.5 * v * (1 - u * u)],
+    torcer: (u, v, d) => { const r = Math.hypot(u, v), a = d * Math.PI / 2 * Math.max(0, 1 - r), cs = Math.cos(a), sn = Math.sin(a); return [u * cs - v * sn - u, u * sn + v * cs - v]; },
+};
+function vkDeformar(sb, e, b) {
+    const S = vkSubdividir(sb, 6), w = (b[2] - b[0]) / 2 || 1, h = (b[3] - b[1]) / 2 || 1, cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+    const f = VK_ENVELOPES[e.estilo] || VK_ENVELOPES.arco, d = (e.dobra ?? 50) / 100, dh = (e.dist_h || 0) / 100, dv = (e.dist_v || 0) / 100;
+    const mapa = (x, y) => { const u = (x - cx) / w, v = (y - cy) / h, [du, dv2] = f(u, v, d);
+        const uu = (u + du) * (1 + dh * v * 0.5), vv = (v + dv2) * (1 + dv * u * 0.5); return [cx + uu * w, cy + vv * h]; };
+    return { fechado: S.fechado, pts: S.pts.map(p => [...mapa(p[0], p[1]), ...mapa(p[2], p[3]), ...mapa(p[4], p[5])]) };
+}
+function vkDistSub(s, e, c, R, rnd, b) {
     if (s.pts.length < 2) return s;
+    if (e.tipo === 'deformar') return vkDeformar(s, e, b);
     if (e.tipo === 'torcer') {
         const S = vkSubdividir(s, 4), g = (e.graus || 0) * Math.PI / 180;
         const rot = (x, y) => { const d = Math.hypot(x - c[0], y - c[1]), a = g * Math.max(0, 1 - d / (R || 1)), cs = Math.cos(a), sn = Math.sin(a); return [c[0] + (x - c[0]) * cs - (y - c[1]) * sn, c[1] + (x - c[0]) * sn + (y - c[1]) * cs]; };
@@ -357,7 +386,7 @@ function vkDistorcer(o, pint) {
     for (const e of efs) {
         const b = [Infinity, Infinity, -Infinity, -Infinity]; out.forEach(p => vkSubsBox(p.subs, null, b));
         const c = [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2], R = Math.hypot(b[2] - b[0], b[3] - b[1]) / 2, rnd = vkRand(seed);
-        out = out.map(p => ({ ...p, subs: p.subs.map(sb => vkDistSub(sb, e, c, R, rnd)) }));
+        out = out.map(p => ({ ...p, subs: p.subs.map(sb => vkDistSub(sb, e, c, R, rnd, b)) }));
     }
     return out;
 }
