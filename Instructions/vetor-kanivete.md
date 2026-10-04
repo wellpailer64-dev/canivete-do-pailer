@@ -42,6 +42,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 | Abrir EPS | arquivo antigo de cliente | Ghostscript (AGPL, não vai no app): se instalado (PATH, Program Files/gs, %APPDATA%/CaniveteDoPailer/ghostscript) EPS → PDF (EPSCrop, prepress, cores inalteradas) → importador de PDF; sem ele, mensagem de como instalar |
 | Máscara de opacidade | foto esmaecida (fade), vinheta | grupo {opmask, opmask_inv, itens}: luminosidade da máscara = opacidade (branco mostra, preto esconde, fora = escondido). Tela: composição fora do canvas na região, luminosidade normalizada (100K de prova → 0, igual ao PDF); PDF: SMask Luminosity com Form em DeviceGray (só X-4; fechamento acusa em X-1a). `mascara_opacidade` (o de cima vira máscara; inverter), `soltar_mascara_opacidade`. Menu Objeto |
 | Tabulações (esq, dir, centro, decimal) com pontilhado | cardápio, tabela de preços, lista | `tabs` no texto/alterar: [{pos mm da margem, alin, guia}] ou "60 dir ., 90 decimal"; sem parada: a cada 36 pt; decimal alinha pela vírgula/ponto; pontilhado numa grade fixa (pontos de linhas diferentes batem). Tab na caixa de edição insere a tabulação; campo Tabs no painel Parágrafo |
+| Texto dentro de forma (Área de texto) | texto em balão, estrela, silhueta | `texto_em_forma` (forma fechada vira a área; recuo mm; manter_forma): spec `forma` (subs locais) + `forma_recuo`. Por linha: o trecho livre no topo/meio/base das letras; a leitura desce pelo CENTRO (linha estreita demais no centro é pulada, não salta para um braço; centro fora da forma → o trecho mais largo); palavra que não cabe numa linha estreita desce (hifenização antes). Sobra = + vermelho, encadeia. Menu Texto |
 | Texto em caminho | selo, logo circular | ferramenta Texto em caminho (clique no caminho); `texto_caminho` (`ini` mm, `lado`, `manter_caminho`) |
 | Estilos de parágrafo / caractere, Glifos, juntar textos importados | padronizar, caracteres especiais, editar .ai/PDF | `estilo_texto` (tipo, nome, `de`, `aplicar`; mudar um estilo atualiza quem usa), `estilos_texto`, `glifos`, `inserir_texto` (`codigo`/`texto`, `pos`), `juntar_textos` (linhas → parágrafos; `quebras:'linhas'`) |
 | Alinhar/distribuir, guias inteligentes | precisão | caixa pelos extremos reais da cúbica (não pelas alças); encaixe magenta |
@@ -53,8 +54,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 
 `.aknv` abre no KANIVETE por duplo clique (associação HKCU em Functions/projeto.py; roteado em `abrirProjetoExterno`).
 
-Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): texto dentro de forma (área não retangular),
-editar a trilha do texto em caminho com a Seleção direta, estilos dentro da caixa de edição (ela é texto puro);
+Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): editar a trilha do texto em caminho com a Seleção direta, estilos dentro da caixa de edição (ela é texto puro);
 efeitos que faltam (brilho interno, distorcer/zigue-zague, Aparência em grupo; efeitos na prévia de separações e no SVG); malha, Blend vivo/no caminho; distorção de envelope; painel de vínculos e variáveis; PDF com texto editável (hoje: curvas).
 
 ## 2. Modelo (pt = 1/72", y para baixo)

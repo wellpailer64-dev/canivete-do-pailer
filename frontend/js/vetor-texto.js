@@ -211,6 +211,25 @@ function vkTxCorrente(o) { const out = []; let x = vkTxRaiz(o), n = 0; while (x 
         const g = await vkGeoPronta(o);
         return { id: o.id, tipo: 'texto', transborda: !!(g && g.transborda), caixa_mm: vkCaixaMM(o) };
     });
+    // ── texto em forma (Área de texto): o caminho FECHADO vira a área (o texto corre por dentro); recuo (mm) = margem interna ──
+    vkRegistrar('texto_em_forma', 'texto em forma', async a => {
+        const cam = vkTxAlvos(a).find(o => o.tipo === 'caminho' && o.subs.some(s => s.fechado));
+        if (!cam) throw new Error('texto_em_forma: passe uma forma FECHADA (ids/nomes): o texto corre por dentro dela');
+        const b = vkBox(cam), [fam, est] = vkFonteNorm(a.fonte || a.fam || (VK.txPadrao && VK.txPadrao.fam) || 'Arial', a.estilo || (VK.txPadrao && VK.txPadrao.estilo));
+        const forma = cam.subs.filter(s => s.fechado).map(s => ({ fechado: true, pts: s.pts.map(p => [p[0] - b[0], p[1] - b[1], p[2] - b[0], p[3] - b[1], p[4] - b[0], p[5] - b[1]]) }));
+        const o = { id: vkId(), tipo: 'texto', conteudo: String(a.conteudo ?? 'Texto'), fam, estilo: est || 'Regular', tam: +(a.tamanho || a.tam || (VK.txPadrao && VK.txPadrao.tam) || 10),
+            entrelinha: null, track: 0, alin: a.alin || 'esq', caixa: b[2] - b[0], caixa_alt: b[3] - b[1], forma, m: [1, 0, 0, 1, b[0], b[1]],
+            preench: 'preench' in a ? vkCorDe(a.preench) : { k: 'cmyk', v: [0, 0, 0, 100] }, traco: null };
+        if (a.recuo != null) o.forma_recuo = a.un === 'pt' ? +a.recuo : vkPT(+a.recuo);
+        if (a.nome) o.nome = a.nome;
+        const { fonte, fam: _f, estilo, tamanho, tam, preench, traco, conteudo, recuo, alin, ...resto } = a;
+        vkTxAplicar(o, resto);
+        const l = vkListaDe(cam.id);
+        if (a.manter_forma) l.splice(l.indexOf(cam) + 1, 0, o); else l.splice(l.indexOf(cam), 1, o);
+        VK.sel = [o.id];
+        const g = await vkGeoPronta(o);
+        return { id: o.id, tipo: 'texto', linhas: g ? g.linhas.length : null, transborda: !!(g && g.transborda), caixa_mm: vkCaixaMM(o) };
+    });
     // ── encadear: ids na ordem (o texto corre de uma caixa para a seguinte); nova: {x, y} cria a caixa seguinte ali ──
     vkRegistrar('encadear', 'encadear textos', async a => {
         let objs = vkTxAlvos(a).filter(o => o.tipo === 'texto');
@@ -480,8 +499,10 @@ function vkTxSobreposicao(ctx) {
         const P = vkTxPortas(o);
         if (P) {
             ctx.save(); ctx.strokeStyle = 'rgba(47,140,255,.7)'; ctx.setLineDash([3, 3]); ctx.beginPath();
-            const cs = [[0, 0], [o.caixa, 0], [o.caixa, P.h], [0, P.h]].map(([x, y]) => vkTela(...vkAp(o.m, x, y)));
-            ctx.moveTo(...cs[0]); cs.slice(1).forEach(c => ctx.lineTo(...c)); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
+            if (o.forma) { ctx.save(); ctx.translate(VK.vista.x, VK.vista.y); ctx.scale(VK.vista.z, VK.vista.z); ctx.transform(...o.m); ctx.lineWidth = 1 / VK.vista.z / vkEsc(o.m); ctx.stroke(vkPath2d(o.forma)); ctx.restore(); }
+            else { const cs = [[0, 0], [o.caixa, 0], [o.caixa, P.h], [0, P.h]].map(([x, y]) => vkTela(...vkAp(o.m, x, y)));
+                ctx.moveTo(...cs[0]); cs.slice(1).forEach(c => ctx.lineTo(...c)); ctx.closePath(); ctx.stroke(); }
+            ctx.setLineDash([]);
             const porta = ([x, y], cor, mais, seta) => { ctx.fillStyle = '#fff'; ctx.strokeStyle = cor; ctx.fillRect(x - 4.5, y - 4.5, 9, 9); ctx.strokeRect(x - 4.5, y - 4.5, 9, 9);
                 if (mais) { ctx.beginPath(); ctx.moveTo(x - 2.5, y); ctx.lineTo(x + 2.5, y); ctx.moveTo(x, y - 2.5); ctx.lineTo(x, y + 2.5); ctx.stroke(); }
                 if (seta) { ctx.fillStyle = cor; ctx.beginPath(); ctx.moveTo(x - 2, y - 3); ctx.lineTo(x + 3, y); ctx.lineTo(x - 2, y + 3); ctx.fill(); } };

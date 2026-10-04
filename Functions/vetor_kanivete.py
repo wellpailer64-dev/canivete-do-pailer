@@ -438,6 +438,60 @@ def _trilha_em(pl, s):
     return a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, math.atan2(b[1] - a[1], b[0] - a[0])
 
 
+def _poligonos(subs):
+    """subcaminhos fechados → polígonos [(x, y), ...] (cúbicas amostradas) para a área de texto em forma."""
+    out = []
+    for sb in subs or []:
+        P = sb.get("pts") or []
+        if len(P) < 2: continue
+        pts = [(P[0][0], P[0][1])]
+        for i in range(len(P)):
+            a, b = P[i], P[(i + 1) % len(P)]
+            reta = a[4] == a[0] and a[5] == a[1] and b[2] == b[0] and b[3] == b[1]
+            for k in range(1, 2 if reta else 25):
+                t = k / (1 if reta else 24); u = 1 - t
+                pts.append((u ** 3 * a[0] + 3 * u * u * t * a[4] + 3 * u * t * t * b[2] + t ** 3 * b[0],
+                            u ** 3 * a[1] + 3 * u * u * t * a[5] + 3 * u * t * t * b[3] + t ** 3 * b[1]))
+        out.append(pts)
+    return out
+
+
+def _intervalos(polis, y):
+    """trechos [x0, x1] dentro da forma na altura y (par-ímpar: furos ficam de fora)."""
+    xs = []
+    for P in polis:
+        for i in range(len(P)):
+            (x0, y0), (x1, y1) = P[i], P[(i + 1) % len(P)]
+            if (y0 <= y < y1) or (y1 <= y < y0):
+                xs.append(x0 + (y - y0) * (x1 - x0) / (y1 - y0))
+    xs.sort()
+    return [(xs[i], xs[i + 1]) for i in range(0, len(xs) - 1, 2)]
+
+
+def _vao_forma(polis, y, asc, desc, recuo, minimo=0):
+    """trecho horizontal livre para uma linha de base y (vale do topo à base das letras) → (x0, x1) ou None.
+    Prefere o trecho que passa pelo centro da forma (a leitura desce pelo meio, não pula para um braço); senão o mais largo."""
+    amostras = [_intervalos(polis, yy) for yy in (y - asc * 0.9, y - asc * 0.45, y, y + desc * 0.8)]
+    xs = [p[0] for P in polis for p in P]; cx = (min(xs) + max(xs)) / 2 if xs else 0
+    cands = []
+    for a0, a1 in amostras[1]:
+        x0, x1 = a0, a1
+        for iv in amostras[:1] + amostras[2:]:
+            sob = [(max(x0, b0), min(x1, b1)) for b0, b1 in iv if min(x1, b1) > max(x0, b0)]
+            if not sob: x0 = x1; break
+            x0, x1 = max(sob, key=lambda v: v[1] - v[0])
+        x0 += recuo; x1 -= recuo
+        if x1 > x0: cands.append((x0, x1))
+    if any(c[0] <= cx <= c[1] for c in cands) or _dentro(polis, cx, y):   # a linha passa pelo centro: só o trecho do centro
+        meio = [c for c in cands if c[0] <= cx <= c[1] and c[1] - c[0] >= minimo]
+        return meio[0] if meio else None   # estreito demais: pula a linha (não salta para um braço)
+    return max(cands, key=lambda c: c[1] - c[0]) if cands else None   # centro fora da forma (rosca, letra U): o mais largo
+
+
+def _dentro(polis, x, y):
+    return any(a <= x <= b for a, b in _intervalos(polis, y))
+
+
 def texto_geometria(spec):
     """spec = {conteudo, fam, estilo, tam (pt), entrelinha (pt|None = 120% do maior corpo da linha), track (1/1000 em),
     alin: esq|centro|dir|just|just_tudo, caixa: largura pt (texto de área) | None (texto de ponto), caixa_alt: altura pt
@@ -459,6 +513,8 @@ def texto_geometria(spec):
     lead_fixo = float(spec["entrelinha"]) if spec.get("entrelinha") else None
     par = {k: float(spec.get(k) or 0) for k in _PAR}
     trilha = spec.get("trilha") if isinstance(spec.get("trilha"), dict) else None
+    polis = _poligonos(spec.get("forma")) if spec.get("forma") and caixa else None   # área de texto em forma
+    recuo_f = float(spec.get("forma_recuo") or 0)
     hif = spec.get("hifen")   # True | "pt_BR" | "en_US"...: hifeniza palavras de 6+ letras na quebra (como o Illustrator)
     hif = _hifenizador("pt_BR" if hif is True else str(hif)) if hif and caixa else None
     arq0, ind0, _ = fonte_arquivo(runs[0][2]["fam"], runs[0][2]["estilo"]); F0 = _fonte(arq0, ind0)
@@ -496,14 +552,31 @@ def texto_geometria(spec):
         paragrafos, pos = [], 0
         for p_ in texto.split("\n"):
             paragrafos.append((pos, pos + len(p_))); pos += len(p_) + 1
-        linhas = []   # (glifos, última do parágrafo, primeira do parágrafo, 1º caractere)
+        linhas = []   # (glifos, última do parágrafo, primeira do parágrafo, 1º caractere, (y, x0, largura) na forma | None)
+        lead_f, yf, alto_f, esgotou = (lead_fixo or 1.2 * tam0), None, max((p[1] for P in (polis or []) for p in P), default=0), False
+
+        def linha_forma(primeira):   # próxima linha de base que cabe na forma → (y, x0, largura) | None (acabou a forma)
+            nonlocal yf
+            yf = (min((p[1] for P in polis for p in P), default=0) + recuo_f + asc0) if yf is None else yf + lead_f + ((par["depois"] + par["antes"]) if primeira else 0)
+            while yf + desc0 <= alto_f - recuo_f + 0.01:
+                v = _vao_forma(polis, yf, asc0, desc0, recuo_f, tam0 * 2)
+                if v and v[1] - v[0] >= tam0 * 2:
+                    return (yf, v[0], v[1] - v[0])
+                yf += lead_f / 2
+            return None
         for (a, b) in paragrafos:
+            if esgotou: break
             gl = glifos_de(a, b)
             if not caixa or not gl:
-                linhas.append((gl, True, True, a)); continue
+                fi = linha_forma(True) if polis else None
+                if polis and not fi: esgotou = True; corte = a; break
+                linhas.append((gl, True, True, a, fi)); continue
             ini, primeira = 0, True
             while ini < len(gl):
-                disp = caixa - par["recuo_esq"] - par["recuo_dir"] - (par["recuo_1a"] if primeira else 0)
+                fi = linha_forma(primeira) if polis else None
+                if polis and not fi:
+                    esgotou = True; corte = gl[ini]["ci"]; break
+                disp = (fi[2] if fi else caixa) - par["recuo_esq"] - par["recuo_dir"] - (par["recuo_1a"] if primeira else 0)
                 acum, quebra, q, i = 0.0, None, None, ini
                 while i < len(gl):
                     g = gl[i]
@@ -526,33 +599,39 @@ def texto_geometria(spec):
                                     k = next((kk for kk in range(ws, we) if gl[kk]["ci"] >= c0 + pos), None)
                                     if k and k > ws and base + sum(x["adv"] for x in gl[ws:k]) + hg["adv"] <= disp + 1e-6:
                                         q = (k, k, hg); break
+                        if fi and q == (i, i) and disp < caixa * 0.6:   # forma: linha estreita demais para a palavra → pula a linha
+                            q = "pula"
                         break
                     if g["hif"]: quebra = (i + 1, i + 1)   # depois do hífen (ele fica)
                     i += 1
+                if q == "pula":
+                    continue
                 if q is None:
-                    linhas.append((gl[ini:], True, primeira, gl[ini]["ci"])); break
-                linhas.append((gl[ini:q[0]] + ([dict(q[2], ci=gl[q[0] - 1]["ci"])] if len(q) > 2 else []), False, primeira, gl[ini]["ci"]))
+                    linhas.append((gl[ini:], True, primeira, gl[ini]["ci"], fi)); break
+                linhas.append((gl[ini:q[0]] + ([dict(q[2], ci=gl[q[0] - 1]["ci"])] if len(q) > 2 else []), False, primeira, gl[ini]["ci"], fi))
                 ini, primeira = q[1], False
                 while ini < len(gl) and gl[ini]["esp"]: ini += 1
                 if ini >= len(gl):
-                    linhas[-1] = (linhas[-1][0], True, linhas[-1][2], linhas[-1][3])
+                    linhas[-1] = (linhas[-1][0], True, linhas[-1][2], linhas[-1][3], linhas[-1][4])
         y = None
-        for n, (gl, ultima, primeira, ci0) in enumerate(linhas):
+        for n, (gl, ultima, primeira, ci0, fi) in enumerate(linhas):
             while gl and gl[-1]["esp"]:
                 gl = gl[:-1]
             asc_l = max([g["asc"] for g in gl] or [asc0]); desc_l = max([g["desc"] for g in gl] or [desc0])
             lead = lead_fixo or 1.2 * max([g["tam"] for g in gl] or [tam0])
-            if y is None:
+            if fi:
+                y = fi[0]
+            elif y is None:
                 y = asc_l if caixa else 0
             else:
                 y += lead + ((par["depois"] + par["antes"]) if primeira else 0)
-            if caixa_alt is not None and y + desc_l > caixa_alt + 0.01:
+            if not fi and caixa_alt is not None and y + desc_l > caixa_alt + 0.01:
                 corte = ci0; break
             larg = sum(g["adv"] for g in gl)
             extra, r1 = 0, (par["recuo_1a"] if primeira else 0)
             if caixa:
-                sobra = caixa - par["recuo_esq"] - par["recuo_dir"] - r1 - larg
-                dx = par["recuo_esq"] + r1 + {"centro": sobra / 2, "dir": sobra}.get(alin, 0)
+                sobra = (fi[2] if fi else caixa) - par["recuo_esq"] - par["recuo_dir"] - r1 - larg
+                dx = (fi[1] if fi else 0) + par["recuo_esq"] + r1 + {"centro": sobra / 2, "dir": sobra}.get(alin, 0)
                 if (alin == "just" and not ultima) or alin == "just_tudo":
                     esp = [g for g in gl if g["esp"]]
                     extra = sobra / len(esp) if esp and sobra > 0 else 0

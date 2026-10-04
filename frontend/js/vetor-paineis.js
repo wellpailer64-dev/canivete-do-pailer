@@ -100,7 +100,7 @@ const VK_MENUS = [
         ['Girar 90°', '', () => vkCmdUi('girar', { graus: 90 })], '-', ['Travar', 'Ctrl+2', () => vkCmdUi('alterar', { trava: true })], ['Ocultar', 'Ctrl+3', () => vkCmdUi('alterar', { visivel: false })],
         ['Limpar pontos soltos', '', () => vkCmdUi('limpar', {})]]],
     ['Texto', [['Criar contornos', 'Shift+Ctrl+O', () => vkCmdUi('contornos', {})], ['Textos pretos em 100K', '', () => vkCmdUi('preto_texto', {})], '-',
-        ['Texto em caminho (ferramenta)', '', () => vkFerramenta('texto_caminho')], ['Encadear caixas selecionadas', '', () => vkCmdUi('encadear', {})],
+        ['Texto em caminho (ferramenta)', '', () => vkFerramenta('texto_caminho')], ['Texto dentro da forma (selecione a forma)', '', () => vkCmdUi('texto_em_forma', { conteudo: 'Texto dentro da forma.', recuo: 2 }).then(r => { const t = r && vkObj(r.id); if (t) vkTextoEditar(t); })], ['Encadear caixas selecionadas', '', () => vkCmdUi('encadear', {})],
         ['Remover encadeamento', '', () => vkCmdUi('desencadear', {})], ['Juntar textos (linhas → parágrafo)', '', () => vkCmdUi('juntar_textos', {})], ['Glifos…', '', () => vkTxGlifos()], '-',
         ['Caixa alta', '', () => vkCmdUi('alterar', vkTxComFaixa({ maius: 'alta' }))], ['Versalete', '', () => vkCmdUi('alterar', vkTxComFaixa({ maius: 'versalete' }))],
         ['Sobrescrito', '', () => vkCmdUi('alterar', vkTxComFaixa({ pos: 'sup' }))], ['Subscrito', '', () => vkCmdUi('alterar', vkTxComFaixa({ pos: 'sub' }))],

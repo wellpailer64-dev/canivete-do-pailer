@@ -412,6 +412,12 @@ with sync_playwright() as p:
     pg.evaluate("() => { const ta = document.getElementById('vk-texto-edit'); ta.setSelectionRange(0, 0); ta.focus(); }")
     pg.keyboard.press("Tab"); pg.keyboard.press("Escape"); pg.wait_for_timeout(300)
     ok(pg.evaluate("id => vkObj(id).conteudo", sem_["id"]).startswith("\t"), "Tab na edição de texto insere tabulação")
+    el_ = C("elipse", {"x": 5, "y": 30, "larg": 60, "alt": 28, "preench": "C0 M0 Y20 K0", "traco": "nenhum", "nome": "balao"})
+    tf_ = C("texto_em_forma", {"ids": [el_["id"]], "conteudo": ("Texto que corre dentro da elipse como no Illustrator. " * 3).strip(), "tamanho": 7, "recuo": 1.5, "alin": "centro"})
+    lg_ = pg.evaluate("id => vkGeo(vkObj(id)).linhas.map(l => +l.larg.toFixed(1))", tf_["id"])
+    ok(tf_["linhas"] >= 4 and lg_[0] < max(lg_) * 0.8, f"texto dentro da forma: linhas acompanham a elipse ({lg_})")
+    C("alterar", {"ids": [tf_["id"]], "tamanho": 14})
+    ok(pg.evaluate("id => vkGeo(vkObj(id)).transborda", tf_["id"]), "texto que não cabe na forma acusa sobra (+ vermelho)")
     eps = os.path.join(SAI, "teste.eps"); open(eps, "w").write("%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 100 100\n0 0 1 setrgbcolor 10 10 80 80 rectfill\nshowpage\n")
     try:
         r_ = C("abrir", {"caminho": eps}); ok(r_ and not r_.get("cancelado"), "EPS aberto pelo Ghostscript")

@@ -269,8 +269,8 @@ function vkCorDe(s) {   // texto → cor: "#ff0000", "cmyk(0,100,100,0)", "C0 M1
 // ─────────────────────────── texto (geometria do Python) ───────────────────────────
 // campos que mudam a geometria (o spec do Python); estilos já vêm gravados no objeto, encadeamento e trilha em vkTxSpec
 const VK_TX_CAMPOS = ['conteudo', 'fam', 'estilo', 'tam', 'entrelinha', 'track', 'alin', 'caixa', 'caixa_alt', 'desl', 'eh', 'ev', 'maius', 'pos', 'liga', 'frac', 'num',
-    'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois', 'hifen', 'tabs', 'trechos', 'trilha'];
-const VK_TX_CAIXA = new Set(['caixa', 'caixa_alt', 'trilha']);   // da própria caixa; o resto vem do texto-raiz (encadeado)
+    'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois', 'hifen', 'tabs', 'trechos', 'trilha', 'forma', 'forma_recuo'];
+const VK_TX_CAIXA = new Set(['caixa', 'caixa_alt', 'trilha', 'forma', 'forma_recuo']);   // da própria caixa; o resto vem do texto-raiz (encadeado)
 function vkTxFonte(o, n = 0) {   // texto encadeado: {raiz, ini} — de onde vem o conteúdo desta caixa (null = a anterior ainda calculando)
     const p = o.anterior && vkObj(o.anterior);
     if (!p || p.tipo !== 'texto' || n > 60) return { raiz: o, ini: 0 };
