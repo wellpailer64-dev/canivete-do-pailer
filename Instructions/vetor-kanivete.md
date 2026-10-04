@@ -55,7 +55,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 
 Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): texto dentro de forma (área não retangular),
 editar a trilha do texto em caminho com a Seleção direta, estilos dentro da caixa de edição (ela é texto puro);
-efeitos que faltam (brilho interno, distorcer/zigue-zague, Aparência em grupo; efeitos na prévia de separações e no SVG); malha, Blend vivo/no caminho; distorção de envelope,; painel de vínculos e variáveis; PDF com texto editável (hoje: curvas).
+efeitos que faltam (brilho interno, distorcer/zigue-zague, Aparência em grupo; efeitos na prévia de separações e no SVG); malha, Blend vivo/no caminho; distorção de envelope; painel de vínculos e variáveis; PDF com texto editável (hoje: curvas).
 
 ## 2. Modelo (pt = 1/72", y para baixo)
 ```
