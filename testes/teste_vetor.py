@@ -326,7 +326,7 @@ with sync_playwright() as p:
     ok(g["k"] == "grad" and len(g["paradas"]) == 3 and abs(g["a"][0] - g["b"][0]) < 0.01, "degradê por ângulo (90° = vertical)")
     m1 = C("elipse", {"x": 40, "y": 60, "larg": 8, "preench": "C100 M0 Y0 K0", "traco": "nenhum"})
     m2 = C("estrela", {"cx": 80, "cy": 70, "raio": 8, "pontas": 5, "preench": "C0 M100 Y0 K0", "traco": "nenhum"})
-    r = C("mesclar", {"ids": [m1["id"], m2["id"]], "passos": 5})
+    r = C("mesclar", {"ids": [m1["id"], m2["id"]], "passos": 5, "vivo": False})
     g = C("info", {"ids": [r["id"]]})[0]
     meio = pg.evaluate("id => vkObj(id).itens[3].preench.v", r["id"])
     ok(g["itens"] == 7 and r["reamostrado"] and abs(meio[0] - 50) < 1 and abs(meio[1] - 50) < 1, f"mesclar círculo → estrela em 5 passos (cor do meio {meio})")
@@ -368,6 +368,18 @@ with sync_playwright() as p:
     pq = C("retangulo", {"x": 60, "y": 30, "larg": 30, "alt": 20, "traco": "nenhum"})
     C("padrao", {"ids": [pq["id"]], "nome": "Bolinhas", "escala": 70, "angulo": 20})
     ok(r["objetos"] == 2 and pg.evaluate("id => vkObj(id).preench.k", pq["id"]) == "pad", f"criar padrão e aplicar com escala/ângulo ({r})")
+    v1 = C("elipse", {"x": 5, "y": 62, "larg": 6, "preench": "C100 M0 Y0 K0", "traco": "nenhum"})
+    v2 = C("retangulo", {"x": 40, "y": 62, "larg": 6, "alt": 6, "preench": "C0 M100 Y0 K0", "traco": "nenhum"})
+    rv = C("mesclar", {"ids": [v1["id"], v2["id"]], "passos": 3})
+    meio_v = lambda: pg.evaluate("id => vkMesclaTodos(vkObj(id))[2].preench.v.map(Math.round)", rv["id"])
+    antes_v = meio_v(); C("alterar", {"ids": [v1["id"]], "preench": "C0 M0 Y100 K0"}); depois_v = meio_v()
+    ok(rv["vivo"] and antes_v != depois_v and depois_v[2] == 50, f"mesclagem viva: mudar a forma A refaz os passos ({antes_v} → {depois_v})")
+    esp_ = C("caminho", {"d": "M5 75 C30 55 60 95 90 75", "traco": "100K", "preench": "nenhum", "nome": "espinha"})
+    C("mescla", {"ids": [rv["id"]], "espinha": "espinha", "passos": 6})
+    bx_ = C("info", {"ids": [rv["id"]]})[0]["caixa_mm"]
+    ok(bx_["larg"] > 80, f"mesclagem segue a espinha ({bx_})")
+    C("expandir_mescla", {"ids": [rv["id"]]})
+    ok(C("info", {"ids": [rv["id"]]})[0]["itens"] == 8, "expandir mesclagem vira objetos comuns")
     out = os.path.join(SAI, "formas_x4.pdf")
     r = pg.evaluate("([c]) => VKN.exportarPdf(c, {padrao: 'x4'})", [out])
     import pikepdf

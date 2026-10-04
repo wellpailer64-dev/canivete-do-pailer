@@ -111,7 +111,7 @@ function vkApTracar(ctx, p, estilo) {
 // tudo → true; senão false (o desenho normal continua, já com o desfoque ligado)
 function vkApDesenhar(ctx, o) {
     if (VK.contorno) return false;
-    const efs = (o.efeitos || []).filter(e => e.visivel !== false), vet = (o.tipo !== 'grupo' && o.tipo !== 'imagem' && vkApTem(o)) || (o.tipo === 'grupo' && vkDistorce(o));
+    const efs = (o.efeitos || []).filter(e => e.visivel !== false), vet = (o.tipo !== 'grupo' && o.tipo !== 'imagem' && vkApTem(o)) || (o.tipo === 'grupo' && (vkDistorce(o) || !!o.mescla));
     if (!efs.length && !vet) return false;
     const T = ctx.getTransform(), k = Math.hypot(T.a, T.b) || 1;
     const sombras = efs.filter(e => e.tipo === 'sombra' || e.tipo === 'brilho'), desf = efs.find(e => e.tipo === 'desfoque');
@@ -155,7 +155,7 @@ async function vkApDocPy(d) {
     const anda = async l => { for (const o of l) {
         const src = vkObj(o.id);
         if (src) {
-            if ((src.tipo !== 'grupo' && src.tipo !== 'imagem' && vkApTem(src)) || (src.tipo === 'grupo' && vkDistorce(src))) o._pint = await vkApPronto(src);
+            if ((src.tipo !== 'grupo' && src.tipo !== 'imagem' && vkApTem(src)) || (src.tipo === 'grupo' && (vkDistorce(src) || !!src.mescla))) o._pint = await vkApPronto(src);
             if ((src.efeitos || []).some(e => e.visivel !== false && e.tipo !== 'cantos')) o._silh = await vkApPronto(src);
         }
         if (o.itens) await anda(o.itens);

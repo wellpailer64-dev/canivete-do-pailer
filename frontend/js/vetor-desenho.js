@@ -501,39 +501,90 @@ vkRegistrar('degrade', 'degradê', a => {
     return { alterados: objs.length };
 });
 
-// mesclar (Blend, Alt+Ctrl+B): passos intermediários entre 2 caminhos (forma, cor, traço, opacidade) → grupo [A, …, B].
-// Estrutura diferente: os dois são reamostrados no mesmo nº de pontos. passos (padrão 6).
-vkRegistrar('mesclar', 'mesclar', a => {
-    const objs = vkTxAlvos(a).filter(o => o.tipo === 'caminho');
-    if (objs.length !== 2) throw new Error('mesclar: escolha 2 caminhos (formas)');
-    const ordem = vkTodos().map(x => x.o), [A, B] = objs.sort((p, q) => ordem.indexOf(p) - ordem.indexOf(q)), n = Math.max(1, Math.min(200, +a.passos || 6));
+// mesclar (Blend, Alt+Ctrl+B): passos intermediários entre 2 caminhos (forma, cor, traço, opacidade).
+// VIVO (padrão): grupo {mescla: {passos, espinha?}, itens: [A, B]} — os passos são calculados na hora (tela e PDF), então
+// mexer em A ou B (Seleção direta) refaz a mesclagem. espinha = caminho que a mesclagem segue (Substituir espinha).
+// Estrutura diferente: os dois são reamostrados no mesmo nº de pontos.
+function vkMesclaPassos(A, B, n) {
     const igual = A.subs.length === B.subs.length && A.subs.every((s, i) => s.pts.length === B.subs[i].pts.length);
     const amostra = s => { const pl = vkDsAmostrar(s, 24, true), L = pl.at(-1)[2] || 1, out = [];   // 64 pontos por comprimento
         for (let k = 0, j = 0; k < 64; k++) { const d = L * k / (s.fechado ? 64 : 63); while (j < pl.length - 2 && pl[j + 1][2] < d) j++; const p = pl[j], q = pl[j + 1] || p, t = (d - p[2]) / ((q[2] - p[2]) || 1);
             const x = p[0] + (q[0] - p[0]) * t, y = p[1] + (q[1] - p[1]) * t; out.push([x, y, x, y, x, y]); } return { fechado: s.fechado, pts: out }; };
     const SA = igual ? A.subs : [amostra(A.subs[0])], SB = igual ? B.subs : [amostra(B.subs[0])];
     const lerp = (u, v, t) => u + (v - u) * t;
-    const cor = (c1, c2, t) => { if (!c1 || !c2) return vkClone(c1 || c2); if (c1.k === 'grad' || c2.k === 'grad') return vkClone(t < 0.5 ? c1 : c2);
+    const cor = (c1, c2, t) => { if (!c1 || !c2) return vkClone(c1 || c2); if (c1.k === 'grad' || c2.k === 'grad' || c1.k === 'pad' || c2.k === 'pad') return vkClone(t < 0.5 ? c1 : c2);
         if (c1.k === c2.k && c1.k !== 'spot') return { k: c1.k, v: c1.v.map((x, i) => lerp(x, c2.v[i], t)) };
         if (c1.k === 'spot' && c2.k === 'spot' && c1.nome === c2.nome) return { ...c1, tint: lerp(c1.tint ?? 100, c2.tint ?? 100, t) };
         const cm = c => c.k === 'cmyk' ? c.v : c.k === 'spot' ? c.v.map(x => x * (c.tint ?? 100) / 100) : [0, 0, 0, 100];
         return { k: 'cmyk', v: cm(c1).map((x, i) => lerp(x, cm(c2)[i], t)) }; };
-    const itens = [A];
+    const out = [];
     for (let k = 1; k <= n; k++) {
         const t = k / (n + 1);
         const subs = SA.map((s, i) => ({ fechado: s.fechado, pts: s.pts.map((p, j) => p.map((v, m) => lerp(v, SB[i].pts[j][m], t))) }));
-        const o = { id: vkId(), tipo: 'caminho', regra: A.regra || 'nonzero', subs, preench: cor(A.preench, B.preench, t),
+        const o = { id: `${A.id}~${k}`, tipo: 'caminho', regra: A.regra || 'nonzero', subs, preench: cor(A.preench, B.preench, t),
             traco: A.traco || B.traco ? { ...(A.traco || B.traco), cor: cor(A.traco && A.traco.cor, B.traco && B.traco.cor, t), larg: lerp(A.traco ? A.traco.larg : 0, B.traco ? B.traco.larg : 0, t) } : null };
         const op = lerp(A.op ?? 1, B.op ?? 1, t); if (op < 1) o.op = op;
-        itens.push(o);
+        out.push(o);
     }
-    itens.push(B);
-    const l = vkListaDe(B.id), pos = l.indexOf(B);
-    const g = { id: vkId(), tipo: 'grupo', nome: a.nome || 'Mesclagem', itens };
-    for (const o of [A, B]) { const ll = vkListaDe(o.id); ll.splice(ll.indexOf(o), 1); }
-    l.splice(Math.min(pos, l.length), 0, g); VK.sel = [g.id];
-    return { id: g.id, passos: n, reamostrado: !igual };
-});
+    return { passos: out, reamostrado: !igual };
+}
+// todos os objetos de uma mesclagem viva (A, passos, B), já na espinha se houver
+function vkMesclaTodos(g) {
+    const [A, B] = g.itens, n = Math.max(1, Math.min(200, g.mescla.passos || 6));
+    if (!A || !B || A.tipo !== 'caminho' || B.tipo !== 'caminho') return g.itens;
+    const todos = [A, ...vkMesclaPassos(A, B, n).passos, B];
+    if (!g.mescla.espinha) return todos;
+    const pl = vkDsAmostrar(g.mescla.espinha[0], 24, true), L = pl.at(-1)[2] || 1;
+    const em = d => { let j = 1; while (j < pl.length - 1 && pl[j][2] < d) j++; const p = pl[j - 1], q = pl[j], t = (d - p[2]) / ((q[2] - p[2]) || 1e-9); return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]; };
+    return todos.map((o, k) => { const c = vkClone(o), b = vkBox(o), alvo = em(L * k / (todos.length - 1)); vkTransformar(c, [1, 0, 0, 1, alvo[0] - (b[0] + b[2]) / 2, alvo[1] - (b[1] + b[3]) / 2]); return c; });
+}
+(() => {
+    const achar = a => { const ordem = vkTodos().map(x => x.o); return vkTxAlvos(a).sort((p, q) => ordem.indexOf(p) - ordem.indexOf(q)); };
+    const espinha = a => { if (a.espinha == null) return undefined; if (!a.espinha) return null;
+        const r = vkTodos().find(x => x.o.id === a.espinha || (x.o.nome || '').toLowerCase() === String(a.espinha).toLowerCase()); if (!r || r.o.tipo !== 'caminho') throw new Error(`espinha "${a.espinha}" não é um caminho`); return r.o; };
+    vkRegistrar('mesclar', 'mesclar', a => {
+        const objs = achar(a).filter(o => o.tipo === 'caminho');
+        if (objs.length !== 2) throw new Error('mesclar: escolha 2 caminhos (formas)');
+        const [A, B] = objs, n = Math.max(1, Math.min(200, +a.passos || 6)), esp = espinha(a);
+        const l = vkListaDe(B.id), pos = l.indexOf(B);
+        let g;
+        if (a.vivo === false) { const r = vkMesclaPassos(A, B, n); r.passos.forEach(o => { o.id = vkId(); }); g = { id: vkId(), tipo: 'grupo', nome: a.nome || 'Mesclagem', itens: [A, ...r.passos, B] }; }
+        else g = { id: vkId(), tipo: 'grupo', nome: a.nome || 'Mesclagem', itens: [A, B], mescla: { passos: n, ...(esp ? { espinha: vkClone(esp.subs) } : {}) } };
+        for (const o of [A, B]) { const ll = vkListaDe(o.id); ll.splice(ll.indexOf(o), 1); }
+        if (esp) { const ll = vkListaDe(esp.id); if (ll) ll.splice(ll.indexOf(esp), 1); }
+        l.splice(Math.min(pos, l.length), 0, g); VK.sel = [g.id];
+        return { id: g.id, passos: n, vivo: !!g.mescla, espinha: !!esp, reamostrado: vkMesclaPassos(A, B, 1).reamostrado };
+    });
+    // mescla: muda uma mesclagem viva (passos, espinha: caminho | null para tirar)
+    vkRegistrar('mescla', 'opções da mesclagem', a => {
+        const gs = vkTxAlvos(a).filter(o => o.mescla); if (!gs.length) throw new Error('mescla: selecione uma mesclagem viva');
+        const esp = espinha(a);
+        for (const g of gs) { if (a.passos) g.mescla.passos = Math.max(1, Math.min(200, +a.passos)); if (esp !== undefined) { if (esp) { g.mescla.espinha = vkClone(esp.subs); const ll = vkListaDe(esp.id); ll.splice(ll.indexOf(esp), 1); } else delete g.mescla.espinha; } }
+        return { alterados: gs.length };
+    });
+    // expandir_mescla: os passos viram objetos comuns (sem vínculo)
+    vkRegistrar('expandir_mescla', 'expandir mesclagem', a => {
+        const ids = [];
+        for (const g of vkTxAlvos(a).filter(o => o.mescla)) { g.itens = vkMesclaTodos(g).map(o => ({ ...vkClone(o), id: o.id.includes('~') ? vkId() : o.id })); delete g.mescla; ids.push(g.id); }
+        return { expandidos: ids.length };
+    });
+})();
+// tela/PDF/caixa/clique: a mesclagem viva é desenhada pelas pinturas de todos os passos
+const vkApBaseSemMescla = vkApBase;
+vkApBase = function (o) {
+    if (!(o.tipo === 'grupo' && o.mescla)) return vkApBaseSemMescla(o);
+    const out = []; for (const f of vkMesclaTodos(o)) { const p = vkPinturas(f); if (!p) return null; out.push(...p); }
+    return o.efeitos ? vkDistorcer(o, out) : out;
+};
+const vkBoxSemMescla = vkBox;
+vkBox = function (o, comTraco) {
+    if (!(o.tipo === 'grupo' && o.mescla)) return vkBoxSemMescla(o, comTraco);
+    const b = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const f of vkMesclaTodos(o)) { const c = vkBoxSemMescla(f, comTraco); if (isFinite(c[0])) { vkBoxAdd(b, c[0], c[1]); vkBoxAdd(b, c[2], c[3]); } }
+    return b;
+};
+const vkAcertaSemMescla = vkAcerta;
+vkAcerta = function (o, x, y, tol) { return o.tipo === 'grupo' && o.mescla ? vkMesclaTodos(o).some(f => vkAcertaSemMescla(f, x, y, tol)) : vkAcertaSemMescla(o, x, y, tol); };
 
 // vetorizar (Traçado de imagem / Image Trace): imagem colocada (ids) → grupo com uma forma por cor (furos inclusos),
 // curvas ajustadas como o Lápis (cantos vivos ficam). cores (2-32, padrão 6), detalhe (área mínima em px², padrão 12),
