@@ -22,7 +22,8 @@ async function vkRevincular(img, arquivo) {   // troca o arquivo de todas as ima
     return { img, nome: r.nome, w: r.w, h: r.h, ppi: Math.min(...(vkVincUsos()[img] || []).map(o => Math.round(72 / vkEsc(o.m)))) };
 }
 (() => {
-    const alvo = a => { if (a.img) return a.img; const o = a.id ? vkObj(a.id) : a.nome ? vkTodos().map(x => x.o).find(x => x.nome === a.nome) : vkTodos().map(x => x.o).find(x => VK.sel.includes(x.id) && x.tipo === 'imagem');
+    const alvo = a => { if (a.img && VK.doc.imagens[a.img]) return a.img; if (a.img) a = { id: a.img, nome: a.img };
+        const o = a.id && vkObj(a.id) ? vkObj(a.id) : a.nome ? vkTodos().map(x => x.o).find(x => x.nome === a.nome) : a.id ? null : vkTodos().map(x => x.o).find(x => VK.sel.includes(x.id) && x.tipo === 'imagem');
         if (!o || o.tipo !== 'imagem') throw new Error('escolha a imagem: img (de vinculos), id ou nome de um objeto imagem'); return o.img; };
     // vinculos: lista as imagens (img, nome, origem, ppi efetivo mínimo, modo, usos, ids, estado)
     vkRegistrar('vinculos', 'vínculos', async () => ({ vinculos: (await vkVinculos()).map(({ url, ...v }) => v) }), true);

@@ -952,5 +952,87 @@
 ]
 }
 }
+},
+{
+"type": "function",
+"function": {
+"name": "imagem",
+"description": "Coloca uma imagem (png/jpg/tif) do disco no documento.",
+"parameters": {
+"type": "object",
+"properties": {
+"arquivo": {
+"type": "string",
+"description": "caminho da imagem"
+},
+"x": {
+"type": "number"
+},
+"y": {
+"type": "number"
+},
+"larg": {
+"type": "number",
+"description": "largura em mm"
+},
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"arquivo"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "vinculos",
+"description": "Lista as imagens do documento: img, nome, ppi efetivo, modo, usos e estado (ok, mudou, sem_original, faltando).",
+"parameters": {
+"type": "object",
+"properties": {}
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "revincular",
+"description": "Troca o arquivo de uma imagem mantendo largura e posição.",
+"parameters": {
+"type": "object",
+"properties": {
+"img": {
+"type": "string",
+"description": "img vindo de vinculos"
+},
+"arquivo": {
+"type": "string",
+"description": "caminho da nova imagem"
+}
+},
+"required": [
+"img",
+"arquivo"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "atualizar_vinculo",
+"description": "Relê do original as imagens com estado mudou (img opcional: só essa).",
+"parameters": {
+"type": "object",
+"properties": {
+"img": {
+"type": "string"
+}
+}
+}
+}
 }
 ]

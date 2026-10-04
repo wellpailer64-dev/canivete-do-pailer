@@ -23,7 +23,7 @@
         pathfinder: a => C('pathfinder', { ...a, ...ids(a) }),
         icone: a => C('icone', a), qrcode: a => C('qrcode', a), degrade: a => C('degrade', { ...a, ...ids(a) }),
         mesclar: a => C('mesclar', { ...a, ...ids(a) }), efeito: a => C('efeito', { ...a, ...ids(a) }),
-        mala_direta: a => C('mala_direta', a), contornos: a => C('contornos', ids(a)), mascara: a => C('mascara', ids(a)),
+        mala_direta: a => C('mala_direta', a), imagem: a => C('imagem', a), vinculos: () => C('vinculos'), revincular: a => C('revincular', a), atualizar_vinculo: a => C('atualizar_vinculo', a), contornos: a => C('contornos', ids(a)), mascara: a => C('mascara', ids(a)),
         fechamento: a => {
             const r = VKN.fechamento({ padrao: a.padrao || 'x4' });
             return { ok: r.ok, erros: r.erros.map(e => `${e.cod}: ${e.msg}${e.corrigir ? ' (corrigir: ' + e.corrigir + ')' : ''}`), avisos: r.avisos.map(e => `${e.cod}${e.corrigir ? ' (corrigir: ' + e.corrigir + ')' : ''}`) };
