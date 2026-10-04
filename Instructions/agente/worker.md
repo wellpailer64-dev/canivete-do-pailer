@@ -81,6 +81,10 @@ redimensionar, girar, alinhar, organizar, agrupar, duplicar, apagar, pathfinder,
 exportar_pdf (agendado). Objetos pelo NOME; mm relativos à prancheta; `constraints`: `documento` (.aknv/.pdf/.ai/.svg/.pptx)
 ou `novo: {nome, larg, alt, sangria}`, `pasta_exportacao`. Condições: `existe|cor|traco|texto|tamanho|x|y|larg|alt|sobreimprimir:NOME=v`,
 `sem:NOME`, `objetos:N`, `fechamento_ok:x4`, `exportado`. Guia do app: `Instructions/vetor-kanivete.md`.
+- `ferramentas_vetor.json` (26): + icone, qrcode, degrade, mesclar, efeito. VETOR_CARTAO_NOVOS_03 (2026-10-04): cartão com
+  degradê, sombra, ícones Tabler e QR → 10 ops, 0 erros, 28 s (qwen3:8b). Lição: o modelo COPIA o 1º exemplo da descrição de
+  um parâmetro opcional (pôs traço/preench "C0 M100 Y100 K0" sem pedirem) — descrição de parâmetro opcional diz "se o pedido
+  não falar disso, NÃO mande"; `traco:N=nenhum` agora confere ausência de traço.
 - VETOR_FLYER_03 (2026-10-04): flyer A6 do zero + alinhar + fechamento + PDF/X-4 → 8 ops, 0 erros, 20 s (qwen3:8b).
   Antes: fonte "Arial Bold" travou o fechamento (o app agora entende) e exportar_pdf não estava nas finais.
 

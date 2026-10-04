@@ -35,11 +35,11 @@
 },
 "preench": {
 "type": "string",
-"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+"description": "a cor que o pedido disser (ex.: 100K, #1a73e8, C78 M0 Y95 K0); se o pedido não falar de cor, NÃO mande"
 },
 "traco": {
 "type": "string",
-"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+"description": "só se o pedido falar em traço/contorno; senão NÃO mande (fica sem traço). Ex.: 100K, nenhum"
 },
 "espessura": {
 "type": "number"
@@ -79,11 +79,11 @@
 },
 "preench": {
 "type": "string",
-"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+"description": "a cor que o pedido disser (ex.: 100K, #1a73e8, C78 M0 Y95 K0); se o pedido não falar de cor, NÃO mande"
 },
 "traco": {
 "type": "string",
-"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+"description": "só se o pedido falar em traço/contorno; senão NÃO mande (fica sem traço). Ex.: 100K, nenhum"
 },
 "nome": {
 "type": "string"
@@ -125,7 +125,7 @@
 },
 "preench": {
 "type": "string",
-"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+"description": "a cor que o pedido disser (ex.: 100K, #1a73e8, C78 M0 Y95 K0); se o pedido não falar de cor, NÃO mande"
 },
 "alin": {
 "type": "string",
@@ -217,7 +217,7 @@
 },
 "preench": {
 "type": "string",
-"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+"description": "a cor que o pedido disser (ex.: 100K, #1a73e8, C78 M0 Y95 K0); se o pedido não falar de cor, NÃO mande"
 },
 "nome": {
 "type": "string"
@@ -248,11 +248,11 @@
 },
 "preench": {
 "type": "string",
-"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+"description": "a cor que o pedido disser (ex.: 100K, #1a73e8, C78 M0 Y95 K0); se o pedido não falar de cor, NÃO mande"
 },
 "traco": {
 "type": "string",
-"description": "C0 M100 Y100 K0 | 100K | #ff0000 | spot:NOME:c,m,y,k | nenhum"
+"description": "só se o pedido falar em traço/contorno; senão NÃO mande (fica sem traço). Ex.: 100K, nenhum"
 },
 "espessura": {
 "type": "number"
@@ -675,6 +675,203 @@
 ]
 }
 }
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "icone",
+"description": "Ícone pronto (tabler.io/icons, ex.: phone, mail, map-pin, world, home, trophy, brand-instagram). x, y = canto (mm); tamanho = lado (mm).",
+"parameters": {
+"type": "object",
+"properties": {
+"nome": {
+"type": "string"
+},
+"x": {
+"type": "number"
+},
+"y": {
+"type": "number"
+},
+"tamanho": {
+"type": "number"
+},
+"cor": {
+"type": "string",
+"description": "a cor que o pedido disser (ex.: 100K, #1a73e8, C78 M0 Y95 K0); se o pedido não falar de cor, NÃO mande"
+},
+"estilo": {
+"type": "string",
+"enum": [
+"outline",
+"filled"
+]
+},
+"nome_obj": {
+"type": "string",
+"description": "nome do objeto criado"
+}
+},
+"required": [
+"nome",
+"x",
+"y"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "qrcode",
+"description": "QR code vetorial. x, y = canto (mm); tamanho = lado (mm).",
+"parameters": {
+"type": "object",
+"properties": {
+"conteudo": {
+"type": "string"
+},
+"x": {
+"type": "number"
+},
+"y": {
+"type": "number"
+},
+"tamanho": {
+"type": "number"
+},
+"cor": {
+"type": "string",
+"description": "a cor que o pedido disser (ex.: 100K, #1a73e8, C78 M0 Y95 K0); se o pedido não falar de cor, NÃO mande"
+},
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"conteudo",
+"x",
+"y"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "degrade",
+"description": "Degradê no preenchimento: cores (lista) e angulo (graus; 0 = esquerda→direita, 90 = vertical); tipo linear|radial.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+},
+"cores": {
+"type": "array",
+"items": {
+"type": "string"
+}
+},
+"angulo": {
+"type": "number"
+},
+"tipo": {
+"type": "string",
+"enum": [
+"linear",
+"radial"
+]
+}
+},
+"required": [
+"objetos",
+"cores"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "mesclar",
+"description": "Mescla (Blend) 2 formas em passos intermediários (vira um grupo).",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+},
+"passos": {
+"type": "number"
+},
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"objetos"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "efeito",
+"description": "Efeito vivo: sombra | brilho | desfoque | cantos. dx, dy, desfoque, raio em mm; opacidade %.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos (veja mapa)"
+},
+"tipo": {
+"type": "string",
+"enum": [
+"sombra",
+"brilho",
+"desfoque",
+"cantos"
+]
+},
+"dx": {
+"type": "number"
+},
+"dy": {
+"type": "number"
+},
+"desfoque": {
+"type": "number"
+},
+"raio": {
+"type": "number"
+},
+"cor": {
+"type": "string"
+},
+"opacidade": {
+"type": "number"
+}
+},
+"required": [
+"objetos",
+"tipo"
+]
 }
 }
 }

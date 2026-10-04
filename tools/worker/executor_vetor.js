@@ -20,7 +20,9 @@
         redimensionar: a => C('redimensionar', { ...a, ...ids(a) }), girar: a => C('girar', { ...a, ...ids(a) }),
         alinhar: a => C('alinhar', { ...a, ...ids(a) }), organizar: a => C('organizar', { ...a, ...ids(a) }),
         agrupar: a => C('agrupar', { ...a, ...ids(a) }), duplicar: a => C('duplicar', { ...a, ...ids(a) }), apagar: a => C('apagar', ids(a)),
-        pathfinder: a => C('pathfinder', { ...a, ...ids(a) }), contornos: a => C('contornos', ids(a)), mascara: a => C('mascara', ids(a)),
+        pathfinder: a => C('pathfinder', { ...a, ...ids(a) }),
+        icone: a => C('icone', a), qrcode: a => C('qrcode', a), degrade: a => C('degrade', { ...a, ...ids(a) }),
+        mesclar: a => C('mesclar', { ...a, ...ids(a) }), efeito: a => C('efeito', { ...a, ...ids(a) }), contornos: a => C('contornos', ids(a)), mascara: a => C('mascara', ids(a)),
         fechamento: a => {
             const r = VKN.fechamento({ padrao: a.padrao || 'x4' });
             return { ok: r.ok, erros: r.erros.map(e => `${e.cod}: ${e.msg}${e.corrigir ? ' (corrigir: ' + e.corrigir + ')' : ''}`), avisos: r.avisos.map(e => `${e.cod}${e.corrigir ? ' (corrigir: ' + e.corrigir + ')' : ''}`) };
@@ -43,7 +45,7 @@
                 const o = achar(alvo), i = vkInfo(o);
                 if (k === 'existe') ok = true;
                 else if (k === 'cor') { visto = i.preench; ok = norm(visto) === norm(vkCorTexto(vkCorDe(val))); }
-                else if (k === 'traco') { visto = i.traco; ok = norm(visto || '').startsWith(norm(vkCorTexto(vkCorDe(val)))); }
+                else if (k === 'traco') { visto = i.traco || 'nenhum'; ok = /^(nenhum|none)$/i.test(String(val).trim()) ? !i.traco : norm(i.traco || '').startsWith(norm(vkCorTexto(vkCorDe(val)))); }
                 else if (k === 'texto') { visto = o.conteudo; ok = norm(visto) === norm(val); }
                 else if (k === 'tamanho') { visto = o.tam; ok = Math.abs(o.tam - +val) < 0.05; }
                 else if (['x', 'y', 'larg', 'alt'].includes(k)) { visto = i.caixa_mm[k]; ok = Math.abs(visto - +val) < 0.3; }
