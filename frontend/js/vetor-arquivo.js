@@ -211,16 +211,21 @@ function vkSvg(p) {   // SVG da prancheta: as mesmas pinturas da tela (Aparênci
     };
     const tracoAttr = t => t && t.cor ? ` stroke="${pint(t.cor)}" stroke-width="${e(t.larg ?? 1)}" stroke-linecap="${t.cap || 'butt'}" stroke-linejoin="${t.junc || 'miter'}"${(t.tracejado || []).length ? ` stroke-dasharray="${t.tracejado.map(e).join(' ')}"` : ''}` : '';
     const pinturaSvg = q => `<path d="${d(q.subs)}" fill="${q.preench ? pint(q.preench) : 'none'}"${q.regra === 'evenodd' ? ' fill-rule="evenodd"' : ''}${tracoAttr(q.traco)}${q.op != null && q.op < 1 ? ` opacity="${q.op}"` : ''}/>`;
-    const filtro = o => {   // sombra / brilho externo / desfoque → <filter> (brilho interno fica de fora do SVG)
-        const efs = (o.efeitos || []).filter(x => x.visivel !== false && ['sombra', 'brilho', 'desfoque'].includes(x.tipo)); if (!efs.length) return '';
-        const id = 'f' + (++n); let corpo = '', camadas = [];
+    const filtro = o => {   // sombra / brilho externo / desfoque / brilho interno → <filter>
+        const efs = (o.efeitos || []).filter(x => x.visivel !== false && ['sombra', 'brilho', 'desfoque', 'brilho_interno'].includes(x.tipo)); if (!efs.length) return '';
+        const id = 'f' + (++n); let corpo = '', camadas = [], dentro = [];
         efs.forEach((x, i) => {
+            if (x.tipo === 'brilho_interno') {   // borda de dentro: alfa invertido, desfocado, recortado pela forma
+                corpo += `<feComponentTransfer in="SourceAlpha" result="v${i}"><feFuncA type="table" tableValues="1 0"/></feComponentTransfer><feGaussianBlur in="v${i}" stdDeviation="${e(x.desfoque || 0)}" result="w${i}"/>`
+                    + `<feFlood flood-color="${cor(x.cor || { k: 'cmyk', v: [0, 0, 0, 0] })}" flood-opacity="${x.op ?? 0.75}"/><feComposite in2="w${i}" operator="in" result="x${i}"/><feComposite in="x${i}" in2="SourceAlpha" operator="in" result="i${i}"/>`;
+                dentro.push(`i${i}`); return; }
             if (x.tipo === 'desfoque') { corpo += `<feGaussianBlur in="SourceGraphic" stdDeviation="${e(x.desfoque || 0)}" result="d${i}"/>`; camadas.push(`d${i}`); return; }
             corpo += `<feGaussianBlur in="SourceAlpha" stdDeviation="${e(x.desfoque || 0)}" result="b${i}"/><feOffset in="b${i}" dx="${e(x.dx || 0)}" dy="${e(x.dy || 0)}" result="o${i}"/>`
                 + `<feFlood flood-color="${cor(x.cor || { k: 'cmyk', v: [0, 0, 0, 100] })}" flood-opacity="${x.op ?? 0.75}" result="c${i}"/><feComposite in="c${i}" in2="o${i}" operator="in" result="s${i}"/>`;
             camadas.unshift(`s${i}`);
         });
         if (!efs.some(x => x.tipo === 'desfoque')) camadas.push('SourceGraphic');
+        camadas.push(...dentro);
         defs += `<filter id="${id}" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">${corpo}<feMerge>${camadas.map(r => `<feMergeNode in="${r}"/>`).join('')}</feMerge></filter>`;
         return ` filter="url(#${id})"`;
     };

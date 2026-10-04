@@ -63,7 +63,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 
 - Aparência em grupo (contorno/preenchimento extra no conjunto); prévia de separações e `tinta_em` com efeitos, Aparência, malha, símbolos, máscara de opacidade e padrões; SVG com `<filter>` (sombra, brilho, desfoque), `<pattern>`, `<mask>`, símbolos e malha.
 - Vínculos (aba): cada imagem com ppi efetivo, modo, usos e estado (ok / mudou / sem_original / faltando, pela assinatura sha1 do original); `vinculos`, `revincular` (mantém largura e posição), `atualizar_vinculo` (sem alvo: todas as alteradas). `frontend/js/vetor-vinculos.js`.
-Ainda NÃO (pendências): brilho interno no SVG.
+Ainda NÃO (pendências): nada aberto do levantamento de 2026-10-04 (SVG já leva também o brilho interno).
 
 ## 2. Modelo (pt = 1/72", y para baixo)
 ```
