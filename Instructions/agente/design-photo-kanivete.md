@@ -164,3 +164,10 @@ Modelo de estudo: `D:\kanivete_biblioteca\modelos\flyer-prime-fest`; peça em `D
   com efeito pode ficar "mexida" para a cena — use `--refazer` ao mudar o tamanho do título.
 - Contra a referência: estrutura igual; faltou a energia do original (rabiscos pretos sobre o painel, adesivos maiores,
   grading mais laranja) — próximo passo seria um 2º contrato de ajustes.
+- Feedback do usuário (faltou): máscara em degradê na base das pessoas, motion blur leve nos objetos, luzes de pincel em
+  Divisão com cor clara onde a luz bate, tratamento individual de cada foto (textura/ambiente) e profundidade (luz,
+  sombra, desfoque). Virou receita + ferramenta do Worker: `KNV.receita.mascaraDegrade(nome,{lado,inicio})` (usa o
+  contorno real dos pixels), `rastro(nome,{angulo,distancia})` (cópias para trás + desfoque de movimento, camada
+  "· rastro" embaixo), `luz([[x,y,raio]],{cor,intensidade,acima})`, `tratarFoto(nome,{ambiente})`,
+  `profundidade(nome,raio)`. Contrato de exemplo: `D:\kanivete_testeslyer_prime\contrato_acab.json` (export2/).
+  **Checklist padrão de toda peça com pessoa/objeto** — mande no contrato de finalização.

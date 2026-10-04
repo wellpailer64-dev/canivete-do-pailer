@@ -54,7 +54,7 @@ def validar(nome, args, camadas):
             if sem_acento(out[k]) not in m: return out, f'"{k}" tem que ser um de {p["enum"]}'
             out[k] = m[sem_acento(out[k])]
     nomes = {sem_acento(c): c for c in camadas}
-    for k in ("camada",):
+    for k in ("camada", "acima"):
         if k in out:
             if sem_acento(out[k]) not in nomes: return out, f'camada "{out[k]}" não existe; use uma de: {", ".join(camadas)}'
             out[k] = nomes[sem_acento(out[k])]

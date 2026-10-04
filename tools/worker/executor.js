@@ -3,7 +3,7 @@
 // com uma mensagem que o modelo entende e corrige). Toda operação entra no histórico (Ctrl+Z desfaz).
 (() => {
     const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-    const todas = () => ieTodas(IE.doc).filter(L => !L.referencia && !/ · (gasto|presa)$/.test(L.nome));
+    const todas = () => ieTodas(IE.doc).filter(L => !L.referencia && !/ · (gasto|presa|rastro)$/.test(L.nome));
     // nome repetido (grupo e texto com o mesmo nome...) vira rótulo único: "s1-arraste [grupo]", "s1-texto2 [texto] #2"
     const tipoDe = L => (L.txt ? 'texto' : L.tipo);
     const rotulos = () => {
@@ -87,6 +87,16 @@
             }
             hist('degradê'); return { camadas: alvos.length };
         },
+        // acabamento de designer: as receitas fazem o histórico
+        mascara_degrade: a => KNV.receita.mascaraDegrade(precisa(a.camada).nome, { lado: a.lado || 'baixo', inicio: a.inicio != null ? (+a.inicio > 1 ? +a.inicio / 100 : +a.inicio) : 0.7 }),
+        rastro_movimento: a => KNV.receita.rastro(precisa(a.camada).nome, { angulo: a.angulo ?? 0, distancia: a.distancia ?? 40 }),
+        luz: a => {
+            const ps = (a.pontos || []).map(p => (Array.isArray(p) ? p : [p.x, p.y, p.raio]));
+            if (!ps.length || ps.some(p => !(p.length >= 2) || p.some(v => !isFinite(+v)))) throw new Error('pontos = lista de [x, y, raio] em pixels do documento');
+            return KNV.receita.luz(ps.map(p => p.map(Number)), { cor: a.cor || '#ffd9a0', intensidade: a.intensidade ?? 70, acima: a.acima ? precisa(a.acima).nome : undefined });
+        },
+        tratar_foto: a => KNV.receita.tratarFoto(precisa(a.camada).nome, { ambiente: a.ambiente || 'neutro' }),
+        profundidade: a => KNV.receita.profundidade(precisa(a.camada).nome, a.raio ?? 6),
         sombra_projetada: async a => { const L = precisa(a.camada); await KNV.receita.sombra([L.nome], SOMBRA[a.intensidade] || SOMBRA.media); hist('sombra'); return { sombra: a.intensidade }; },
         alinhar: a => {
             const Ls = (a.camadas || []).map(precisa), cx = Ls.map(caixa);
@@ -134,6 +144,11 @@
             else if (k === 'tamanho') ok = !!(L && L.txt && Math.abs(L.txt.tam * ieTextoEscala(L.txt) - +valor) < 1.5);
             else if (k === 'efeito') { const alvos = L ? (L.filhos ? ieTodasDe(L.filhos) : [L]) : []; ok = alvos.some(X => X.fx && (X.fx[valor] || []).some(e => e.on)); }
             else if (k === 'acabamento') ok = ieTodas(IE.doc).some(X => X.tipo === 'ajuste' && X.ajChave === 'cameraRaw' && /acabamento/i.test(X.nome));
+            else if (k === 'mascara') ok = !!(L && L.m);
+            else if (k === 'rastro') ok = !!L && ieTodas(IE.doc).some(X => X.nome === L.nome + ' · rastro');
+            else if (k === 'luz') ok = ieTodas(IE.doc).some(X => X.bm === 'SCREEN' && /^luz/i.test(X.nome));
+            else if (k === 'tratada') ok = !!(L && (L.filtrosInt || []).some(f => f.tratarFoto));
+            else if (k === 'profundidade') ok = !!(L && (L.filtrosInt || []).some(f => f.profundidade));
             else if (k === 'exportado') ok = !!window.KNVW._exportou;
             else if (k === 'no_editor') ok = !!window.KNVW._editor;
         } catch (e) { ok = false; }

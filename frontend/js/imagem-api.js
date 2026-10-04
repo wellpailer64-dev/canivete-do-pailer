@@ -6,6 +6,20 @@
 // Camadas por nome (o primeiro que bate) ou por id. Coordenadas em pixels do documento.
 // =========================================================
 
+// camada da receita por nome ou id (erro claro se não existe); ieRecInt = já como objeto inteligente (converte pixel)
+function ieRec(nome) {
+    const L = ieTodas(IE.doc).find(x => x.nome === nome || x.id === nome);
+    if (!L) throw new Error(`camada "${nome}" não existe`);
+    return L;
+}
+function ieRecInt(nome) {
+    const L = ieRec(nome);
+    if (L.c0) return L;
+    if (L.tipo !== 'pixel' || !L.c) throw new Error(`"${L.nome}" não é foto/objeto (grupo ou texto não recebe filtro inteligente)`);
+    KNV.ativar(L.id); IE_CMDS.objetoInteligente(IE.doc);
+    if (!L.c0) throw new Error(`não deu para converter "${L.nome}" em objeto inteligente`);
+    return L;
+}
 const KNV = {
     // ── documento ──
     novo(nome = 'Sem título', w = 1080, h = 1080, fundo = 'branco') {
@@ -793,6 +807,80 @@ const KNV = {
                 L.filtrosInt = [...(L.filtrosInt || []), { cmd: 'f:cameraRaw', titulo: 'Filtro Camera Raw (balanço)', vals: ieCrNorm(wb), on: true }];
                 const o = ieIntPlano(L); L.c = o.c; L.x = o.x; L.y = o.y; ieInvalidar(L);
             });
+        },
+        // ── acabamento de designer (feedback do flyer Prime Fest): sem corte seco, luz, profundidade, foto tratada ──
+        // máscara em degradê: a pessoa some suave para o lado (corte da cintura/base sem linha seca). inicio = fração
+        // da altura (ou largura) onde começa a sumir; soma com a máscara que já existe
+        mascaraDegrade(nome, { lado = 'baixo', inicio = 0.7 } = {}) {
+            const d = IE.doc, L = ieRec(nome), R = ieRCamada(L);
+            const c = ieCanvas(R.w, R.h), x = ieCtx(c);
+            if (L.m && L.m.c) { if (L.m.fundo) { x.fillStyle = '#fff'; x.fillRect(0, 0, R.w, R.h); x.clearRect(L.m.x - R.x, L.m.y - R.y, L.m.c.width, L.m.c.height); } x.drawImage(L.m.c, L.m.x - R.x, L.m.y - R.y); }
+            else if (!L.m || L.m.fundo) { x.fillStyle = '#fff'; x.fillRect(0, 0, R.w, R.h); }
+            const k = ieClamp(+inicio, 0, 0.98);
+            // o degradê vai do contorno real dos pixels (a foto pode terminar antes da caixa da camada)
+            const B = (L.c && ieLimites(L.c, L.x, L.y)) || R, x1 = B.x - R.x, y1 = B.y - R.y, x2 = x1 + B.w, y2 = y1 + B.h;
+            const g = lado === 'baixo' ? x.createLinearGradient(0, y1, 0, y2) : lado === 'cima' ? x.createLinearGradient(0, y2, 0, y1) : lado === 'direita' ? x.createLinearGradient(x1, 0, x2, 0) : x.createLinearGradient(x2, 0, x1, 0);
+            g.addColorStop(0, '#fff'); g.addColorStop(k, '#fff'); g.addColorStop(k + (1 - k) * 0.55, 'rgba(255,255,255,.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+            x.globalCompositeOperation = 'destination-in'; x.fillStyle = g; x.fillRect(0, 0, R.w, R.h);
+            L.m = { c, x: R.x, y: R.y, fundo: 0 }; L.sujoM = true;
+            ieCamadaMudou(L, R); ieAgendar(null, d); ieHist(ieT('Máscara em degradê')); ieUiCamadas();
+            return { lado, inicio: k };
+        },
+        // rastro de movimento: cópia com Desfoque de movimento ATRÁS do objeto (o objeto continua nítido)
+        rastro(nome, { angulo = 0, distancia = 40, op = 80 } = {}) {
+            const d = IE.doc, L = ieRec(nome);
+            if (!L.c) throw new Error(`"${L.nome}" não tem pixels (grupo/texto: use um objeto ou foto)`);
+            // cópias escalonadas para trás (angulo = para onde o objeto vai), cada uma mais fraca, depois Desfoque de movimento
+            const rad = +angulo * Math.PI / 180, ux = Math.cos(rad), uy = -Math.sin(rad), n = 14, D = +distancia;
+            const w = L.c.width, h = L.c.height, mx = Math.ceil(Math.abs(ux) * D), my = Math.ceil(Math.abs(uy) * D);
+            const c = ieCanvas(w + mx * 2, h + my * 2), k = ieCtx(c);
+            for (let i = n; i >= 1; i--) { k.globalAlpha = 0.55 * (1 - (i - 1) / n); k.drawImage(L.c, mx - ux * D * i / n, my - uy * D * i / n); }
+            k.globalAlpha = 1;
+            const def = ieIntDef('f:movimento'), vals = { ang: +angulo, d: Math.max(8, D * 0.9) };
+            const o = ieProcessarCamada({ c, x: L.x - mx, y: L.y - my }, def.proc(vals), def.margem ? def.margem(vals) : D, { w: d.w, h: d.h, sel: null }) || { c, x: L.x - mx, y: L.y - my };
+            const a = ieAchar(d, L.id), velho = a.lista.find(X => X.nome === L.nome + ' · rastro');
+            if (velho) a.lista.splice(a.lista.indexOf(velho), 1);
+            const T = ieNovaCamada(d, { tipo: 'pixel', nome: L.nome + ' · rastro', c: o.c, x: o.x, y: o.y, op: op / 100 });
+            const b = ieAchar(d, L.id); b.lista.splice(b.i, 0, T);
+            ieTudo(d); ieHist(ieT('Rastro de movimento')); ieUiCamadas();
+            return { rastro: T.nome };
+        },
+        // luz pintada: mancha radial macia em Divisão (Screen) numa camada própria "Luz", acima de `acima` (ou abaixo
+        // do acabamento). pontos = [[x, y, raio], ...] no documento; cor clara (a da luz da cena)
+        luz(pontos, { cor = '#ffd9a0', intensidade = 70, acima, nome = 'Luz' } = {}) {
+            const d = IE.doc, ps = [].concat(Array.isArray(pontos[0]) ? pontos : [pontos]);
+            const c = ieCanvas(d.w, d.h), x = ieCtx(c), [r, g, b] = ieHexRgb(cor);
+            for (const [px, py, raio = 300] of ps) {
+                const gr = x.createRadialGradient(px, py, 0, px, py, raio);
+                gr.addColorStop(0, `rgba(${r},${g},${b},${intensidade / 100})`); gr.addColorStop(0.45, `rgba(${r},${g},${b},${intensidade / 250})`); gr.addColorStop(1, `rgba(${r},${g},${b},0)`);
+                x.fillStyle = gr; x.fillRect(px - raio, py - raio, raio * 2, raio * 2);
+            }
+            const L = ieNovaCamada(d, { tipo: 'pixel', nome, c, x: 0, y: 0, bm: 'SCREEN' }); ieAparar(L);
+            const ref = acima ? ieRec(acima) : null, topo = d.camadas[d.camadas.length - 1];
+            if (ref) ieInserirAcima(d, L, ref);
+            else if (topo && topo.tipo === 'ajuste') d.camadas.splice(d.camadas.length - 1, 0, L);
+            else d.camadas.push(L);
+            ieTudo(d); ieHist(ieT('Luz')); ieUiCamadas();
+            return { luz: L.nome, pontos: ps.length };
+        },
+        // tratamento individual de foto (filtro inteligente Camera Raw): textura, nitidez local e cor do ambiente
+        tratarFoto(nome, { ambiente = 'neutro', forca = 1 } = {}) {
+            const L = ieRecInt(nome), R = ieRCamada(L);
+            const P = { neutro: { clar: 12, tex: 12, ct: 8, grao: 8 }, quente: { clar: 12, tex: 12, ct: 10, temp: 12, vib: 10, grao: 8 },
+                frio: { clar: 12, tex: 12, ct: 10, temp: -12, vib: 6, grao: 8 }, noite: { exp: -0.15, ct: 16, clar: 16, tex: 10, temp: -6, vib: 10, vig: -18, grao: 12 },
+                festa: { ct: 14, clar: 14, tex: 10, vib: 18, temp: 6, grao: 10, vig: -10 } }[ambiente];
+            if (!P) throw new Error('ambiente tem que ser neutro, quente, frio, noite ou festa');
+            const v = Object.fromEntries(Object.entries(P).map(([k, n]) => [k, Math.round(n * forca * 100) / 100]));
+            L.filtrosInt = [...(L.filtrosInt || []).filter(f => !f.tratarFoto), { cmd: 'f:cameraRaw', titulo: 'Filtro Camera Raw (tratamento)', vals: ieCrNorm(v), on: true, tratarFoto: true }];
+            ieIntAtualizar(L, R); ieAgendar(null, IE.doc); ieHist(ieT('Tratar foto')); ieUiCamadas();
+            return { ambiente, ...v };
+        },
+        // profundidade: Desfoque gaussiano como filtro inteligente (fundo/objetos de trás); raio em px
+        profundidade(nome, raio = 6) {
+            const L = ieRecInt(nome), R = ieRCamada(L);
+            L.filtrosInt = [...(L.filtrosInt || []).filter(f => !f.profundidade), { cmd: 'f:gaussiano', titulo: 'Desfoque gaussiano (profundidade)', vals: { r: +raio }, on: true, profundidade: true }];
+            ieIntAtualizar(L, R); ieAgendar(null, IE.doc); ieHist(ieT('Profundidade')); ieUiCamadas();
+            return { raio: +raio };
         },
     },
     // ponte: o documento (já salvo em .iknv) vira Comps no Editor Kanivete; {modo: 'slides' | 'inteiro'}

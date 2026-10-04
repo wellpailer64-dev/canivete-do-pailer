@@ -21,11 +21,14 @@ py -3.13 tools/worker/worker.py contrato.json          # app em --agente=9333; O
   `s1-arraste [grupo]`, `s1-arraste [texto]`, `#2`...). Sem decisão criativa: valores claros ("5% maior", "um pouco
   mais quente" ele já interpreta bem).
 - **Escreva uma condição para CADA parte do pedido** — é o que impede "FEITO" falso. Condições: `efeito:N=tipo` (ex. `efeito:titulo=degSob`, `efeito:bola=sombra`), `acabamento`, `visivel:N`,
-  `oculta:N`, `texto:N=valor`, `cor:N=#hex`, `tamanho:N=px`, `opacidade:N=n`, `exportado`, `no_editor`.
+  `oculta:N`, `mascara:N`, `rastro:N`, `luz`, `tratada:N`, `profundidade:N`, `texto:N=valor`, `cor:N=#hex`, `tamanho:N=px`, `opacidade:N=n`, `exportado`, `no_editor`.
 - Exportar e levar para o editor são **agendados**: rodam uma vez, no fim, depois de conferir o resto.
 
 ## Como ele trabalha (tools/worker/)
-- `ferramentas.json` (20, com `degrade` e `titulo_gasto` com cor): listar_camadas, info_camada, mover/posicionar/escalar/girar_camada, opacidade,
+- `ferramentas.json` (25): acabamento de designer = `mascara_degrade` (pessoa some suave embaixo, sem corte seco),
+  `rastro_movimento` (motion blur atrás do objeto; angulo = para onde ele vai), `luz` (manchas em Divisão, pontos
+  [x, y, raio]), `tratar_foto` (Camera Raw por foto: neutro|quente|frio|noite|festa), `profundidade` (gaussiano
+  editável no fundo); e listar_camadas, info_camada, mover/posicionar/escalar/girar_camada, opacidade,
   modo_mesclagem, visibilidade, alterar_texto, estilo_texto, cor_objeto (objeto inteligente), sombra_projetada
   (leve/media/forte), titulo_gasto, acabamento (SOMA ao acabamento atual; zeros ignorados), alinhar, exportar,
   levar_para_editor, gerar_imagem (ainda sem executor).
@@ -40,5 +43,8 @@ py -3.13 tools/worker/worker.py contrato.json          # app em --agente=9333; O
 - VALER_AJUSTES_01: 6 operações, 0 erros, 24 s (esconder, trocar texto, sombra, escala, acabamento, exportar).
 - VALER_AJUSTES_02: grupo × texto confundidos → erro que ensina + 1 cobrança → corrigiu sozinho; 33 s.
 - PRIME_FEST_FINAL (flyer): degradê no grupo do título, sombra em 4 adesivos, acabamento, exportar — 7 operações, 0 erros, 28 s.
+- PRIME_FEST_ACAB_07: máscara degradê nas 2 pessoas, rastro nas 2 bolas, tratar_foto festa, profundidade 6 no muro,
+  luz atrás (acima do painel) e na frente — 10 operações, 0 erros, 22 s. Receitas em `KNV.receita.*` (mascaraDegrade,
+  rastro, luz, tratarFoto, profundidade), também para o Claude usar direto.
 Custo do lado do Claude: escrever o contrato (~250 tokens) + ler a linha de volta (~80).
 Próximo: mais ferramentas (texto novo, cena, gerar, receitas), ferramentas do editor de vídeo, medir jobs maiores.
