@@ -15,43 +15,125 @@ Object.assign(VK_ICO, {
     borracha: '<path d="M8 20h12M4 15l9-9 6 6-8 8H8z"/><path d="M9 10l6 6"/>',
     largura: '<path d="M3 12c4-6 14-6 18 0-4 6-14 6-18 0z"/><path d="M12 7v10"/>',
 });
-Object.assign(VK_OPC, { fidelidade: 4, pincel: 3, perfil: 'lente', bolha: vkPT(4), borracha: vkPT(4) });
+Object.assign(VK_OPC, { fidelidade: 6, pincel: 3, perfil: 'lente', bolha: vkPT(4), borracha: vkPT(4) });
 const VK_PERFIS = { uniforme: null, lente: [[0, 0], [0.5, 1], [1, 0]], afinar: [[0, 1], [1, 0]], afinar_inicio: [[0, 0], [1, 1]], gota: [[0, 0.15], [0.75, 1], [1, 0]],
     bico: [[0, 0.3], [0.2, 1], [1, 0.05]] };
 function vkDsPerfil(p) { if (p == null || p === '' || p === 'uniforme') return null; if (Array.isArray(p)) return p.map(([t, w]) => [Math.max(0, Math.min(1, +t)), Math.max(0, +w)]).sort((a, b) => a[0] - b[0]); const v = VK_PERFIS[p]; if (v === undefined) throw new Error(`perfil "${p}" não existe; há: ${Object.keys(VK_PERFIS).join(', ')} ou [[t, largura], ...]`); return v && vkClone(v); }
 
-// ── polilinha → Bézier: Ramer–Douglas–Peucker + Catmull-Rom (cantos vivos ficam cantos) ──
-function vkDsRdp(P, tol) {
-    if (P.length < 3) return P.slice();
-    const marca = new Uint8Array(P.length); marca[0] = marca[P.length - 1] = 1;
-    const pilha = [[0, P.length - 1]];
-    while (pilha.length) {
-        const [i, j] = pilha.pop(); let dm = 0, k = -1;
-        const [ax, ay] = P[i], [bx, by] = P[j], L = Math.hypot(bx - ax, by - ay);
-        for (let n = i + 1; n < j; n++) {   // reta degenerada (caminho fechado: 1º = último): distância ao ponto
-            const d = L < 1e-6 ? Math.hypot(P[n][0] - ax, P[n][1] - ay) : Math.abs((bx - ax) * (ay - P[n][1]) - (ax - P[n][0]) * (by - ay)) / L;
-            if (d > dm) { dm = d; k = n; } }
-        if (dm > tol && k > 0) { marca[k] = 1; pilha.push([i, k], [k, j]); }
+// ── mão livre → Bézier (como o Lápis do Illustrator): reamostra a trilha em passo uniforme, acha os cantos de verdade,
+// suaviza o tremido (gaussiana, Fidelidade "Suave") e ajusta cúbicas por mínimos quadrados (Schneider 1990: a curva passa
+// PERTO dos pontos, dentro do erro, e não por cada um — é isso que tira o tremido) ──
+const vkV = { sub: (a, b) => [a[0] - b[0], a[1] - b[1]], add: (a, b) => [a[0] + b[0], a[1] + b[1]], mul: (a, s) => [a[0] * s, a[1] * s], dot: (a, b) => a[0] * b[0] + a[1] * b[1],
+    len: a => Math.hypot(a[0], a[1]), unit: a => { const l = Math.hypot(a[0], a[1]) || 1e-12; return [a[0] / l, a[1] / l]; }, dist: (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) };
+function vkDsReamostrar(P, passo) {
+    const out = [[P[0][0], P[0][1]]]; let acc = 0;
+    for (let i = 1; i < P.length; i++) {
+        const [ax, ay] = P[i - 1], [bx, by] = P[i], seg = Math.hypot(bx - ax, by - ay); if (seg < 1e-9) continue;
+        let pos = passo - acc;
+        while (pos <= seg) { out.push([ax + (bx - ax) * pos / seg, ay + (by - ay) * pos / seg]); pos += passo; }
+        acc = seg - (pos - passo);
     }
-    return P.filter((_, i) => marca[i]);
+    const fim = P[P.length - 1];
+    if (vkV.dist(out[out.length - 1], fim) > passo * 0.3) out.push([fim[0], fim[1]]); else out[out.length - 1] = [fim[0], fim[1]];
+    return out;
 }
-function vkDsBezier(pts, fechado, tol) {
-    let P = vkDsRdp(pts, tol);
-    if (fechado && P.length > 2 && Math.hypot(P[0][0] - P.at(-1)[0], P[0][1] - P.at(-1)[1]) < tol * 3) P = P.slice(0, -1);
-    const n = P.length; if (n < 2) return null;
-    const viz = i => fechado ? P[(i + n) % n] : P[Math.max(0, Math.min(n - 1, i))];
-    const out = P.map(p => [p[0], p[1], p[0], p[1], p[0], p[1]]);
-    for (let i = 0; i < n; i++) {
-        if (!fechado && (i === 0 || i === n - 1)) continue;
-        const a = viz(i - 1), b = viz(i + 1), p = P[i];
-        const u = [p[0] - a[0], p[1] - a[1]], v = [b[0] - p[0], b[1] - p[1]], lu = Math.hypot(...u) || 1e-9, lv = Math.hypot(...v) || 1e-9;
-        if ((u[0] * v[0] + u[1] * v[1]) / (lu * lv) < Math.cos(Math.PI * 0.42)) continue;   // virada > 75°: canto vivo
-        const tx = (b[0] - a[0]) / 6, ty = (b[1] - a[1]) / 6, L = Math.hypot(tx, ty) || 1e-9;
-        const li = Math.min(lu / 3, L), lo = Math.min(lv / 3, L);
-        out[i][2] = p[0] - tx / L * li; out[i][3] = p[1] - ty / L * li; out[i][4] = p[0] + tx / L * lo; out[i][5] = p[1] + ty / L * lo;
+function vkDsCantos(R, k, limiar = 70) {   // índices onde a direção vira mais que `limiar` graus (máximo local)
+    const ang = R.map((p, i) => {
+        if (i < k || i >= R.length - k) return 0;
+        const u = vkV.unit(vkV.sub(p, R[i - k])), v = vkV.unit(vkV.sub(R[i + k], p));
+        return Math.acos(Math.max(-1, Math.min(1, vkV.dot(u, v)))) * 180 / Math.PI;
+    });
+    const out = [];
+    for (let i = k; i < R.length - k; i++) if (ang[i] > limiar && ang.slice(Math.max(0, i - k), i + k + 1).every(a => a <= ang[i]) && (!out.length || i - out[out.length - 1] > k)) out.push(i);
+    return out;
+}
+function vkDsSuavizar(R, raio, fechado) {   // gaussiana; pontas fixas (aberto)
+    if (raio < 1 || R.length < 3) return R;
+    const n = R.length, sig = raio / 2, w = [];
+    for (let j = -raio; j <= raio; j++) w.push(Math.exp(-j * j / (2 * sig * sig)));
+    return R.map((p, i) => {
+        if (!fechado && (i === 0 || i === n - 1)) return p;
+        const r = fechado ? raio : Math.min(raio, i, n - 1 - i);
+        let sx = 0, sy = 0, sw = 0;
+        for (let j = -r; j <= r; j++) { const q = R[fechado ? (i + j + n) % n : i + j], ww = w[j + raio]; sx += q[0] * ww; sy += q[1] * ww; sw += ww; }
+        return [sx / sw, sy / sw];
+    });
+}
+function vkDsSchneider(P, erro, t1, t2) {   // → [[p0, c1, c2, p3], ...]
+    const { sub, add, mul, dot, unit, dist } = vkV, e2 = erro * erro, segs = [];
+    const B = (p, u) => { const v = 1 - u; return add(add(mul(p[0], v * v * v), mul(p[1], 3 * v * v * u)), add(mul(p[2], 3 * v * u * u), mul(p[3], u * u * u))); };
+    const B1 = (p, u) => { const v = 1 - u; return add(add(mul(sub(p[1], p[0]), 3 * v * v), mul(sub(p[2], p[1]), 6 * v * u)), mul(sub(p[3], p[2]), 3 * u * u)); };
+    const B2 = (p, u) => add(mul(add(sub(p[2], mul(p[1], 2)), p[0]), 6 * (1 - u)), mul(add(sub(p[3], mul(p[2], 2)), p[1]), 6 * u));
+    const corda = (a, b) => { const u = [0]; for (let i = a + 1; i <= b; i++) u.push(u[u.length - 1] + dist(P[i], P[i - 1])); const L = u[u.length - 1] || 1; return u.map(x => x / L); };
+    const gerar = (a, b, u, ta, tb) => {
+        const p0 = P[a], p3 = P[b]; let c00 = 0, c01 = 0, c11 = 0, x0 = 0, x1 = 0;
+        for (let i = 0; i < u.length; i++) {
+            const t = u[i], v = 1 - t, A0 = mul(ta, 3 * v * v * t), A1 = mul(tb, 3 * v * t * t);
+            c00 += dot(A0, A0); c01 += dot(A0, A1); c11 += dot(A1, A1);
+            const tmp = sub(P[a + i], add(mul(p0, v * v * v + 3 * v * v * t), mul(p3, 3 * v * t * t + t * t * t)));
+            x0 += dot(A0, tmp); x1 += dot(A1, tmp);
+        }
+        const det = c00 * c11 - c01 * c01, L = dist(p0, p3);
+        let al = det ? (x0 * c11 - x1 * c01) / det : 0, ar = det ? (c00 * x1 - c01 * x0) / det : 0;
+        if (al < 1e-6 * L || ar < 1e-6 * L || al > L * 2 || ar > L * 2) al = ar = L / 3;
+        return [p0, add(p0, mul(ta, al)), add(p3, mul(tb, ar)), p3];
+    };
+    const maxErro = (a, b, bz, u) => { let m = 0, k = Math.floor((a + b) / 2); for (let i = a + 1; i < b; i++) { const d = sub(B(bz, u[i - a]), P[i]), q = dot(d, d); if (q >= m) { m = q; k = i; } } return [m, k]; };
+    const newton = (bz, p, u) => { const d = sub(B(bz, u), p), q1 = B1(bz, u), q2 = B2(bz, u), den = dot(q1, q1) + dot(d, q2); return den ? Math.max(0, Math.min(1, u - dot(d, q1) / den)) : u; };
+    const ajustar = (a, b, ta, tb, n = 0) => {
+        if (b - a === 1 || n > 40) { const d = dist(P[a], P[b]) / 3; segs.push([P[a], add(P[a], mul(ta, d)), add(P[b], mul(tb, d)), P[b]]); return; }
+        let u = corda(a, b), bz = gerar(a, b, u, ta, tb), [m, k] = maxErro(a, b, bz, u);
+        if (m < e2) { segs.push(bz); return; }
+        if (m < e2 * 16) for (let it = 0; it < 12; it++) {
+            u = u.map((t, i) => newton(bz, P[a + i], t)); bz = gerar(a, b, u, ta, tb); [m, k] = maxErro(a, b, bz, u);
+            if (m < e2) { segs.push(bz); return; }
+        }
+        k = Math.max(a + 1, Math.min(b - 1, k));
+        const tc = unit(sub(P[k - 1], P[k + 1]));
+        ajustar(a, k, ta, tc, n + 1); ajustar(k, b, mul(tc, -1), tb, n + 1);
+    };
+    ajustar(0, P.length - 1, t1, t2);
+    return segs;
+}
+// trilha da mão → subcaminho. op = {erro (pt: quanto a curva pode se afastar), passo (pt), raio (amostras de suavização), cantos (graus)}
+function vkDsCurva(pts, fechado, op) {
+    const erro = Math.max(0.05, op.erro || 1), passo = Math.max(0.05, op.passo || erro / 2), raio = Math.max(0, Math.round(op.raio || 0));
+    let R = vkDsReamostrar(pts, passo);
+    if (R.length < 2) return null;
+    if (fechado && vkV.dist(R[0], R[R.length - 1]) > passo * 0.5) R.push([R[0][0], R[0][1]]);
+    const segs = [];
+    if (fechado && (op.cantos ?? 150) >= 150) {   // laço à mão: suaviza a volta toda e ajusta em 4 trechos com tangente contínua
+        const L = vkDsSuavizar(R.slice(0, -1), raio, true), n = L.length, m = Math.max(1, Math.min(Math.floor(n / 8), Math.round(erro * 1.5 / passo)));
+        if (n < 8) return null;
+        const tan = i => vkV.unit(vkV.sub(L[(i + m) % n], L[(i - m + n) % n]));
+        const cs = [0, 1, 2, 3].map(q => Math.round(q * n / 4));
+        for (let q = 0; q < 4; q++) {
+            const a = cs[q], b = q < 3 ? cs[q + 1] : n, pd = [];
+            for (let i = a; i <= b; i++) pd.push(L[i % n]);
+            segs.push(...vkDsSchneider(pd, erro, tan(a), vkV.mul(tan(b % n), -1)));
+        }
+    } else {
+        // suaviza primeiro (o tremido some) e SÓ DEPOIS procura cantos: na mão livre só um bico (> 150°) vira canto;
+        // em Simplificar (cantos: 45) os cantos vivos do desenho original continuam
+        const S = vkDsSuavizar(R, raio, false), k = op.janela || 3;
+        const cantos = S.length > 2 * k + 1 ? vkDsCantos(S, k, op.cantos ?? 150) : [];
+        const cortes = [0, ...cantos, S.length - 1];
+        for (let i = 0; i < cortes.length - 1; i++) {
+            const pd = S.slice(cortes[i], cortes[i + 1] + 1); if (pd.length < 2) continue;
+            const m = Math.max(1, Math.min(pd.length - 1, Math.max(3, Math.round(erro * 1.5 / passo))));   // tangente da ponta num trecho maior (sem gancho)
+            segs.push(...vkDsSchneider(pd, erro, vkV.unit(vkV.sub(pd[m], pd[0])), vkV.unit(vkV.sub(pd[pd.length - 1 - m], pd[pd.length - 1]))));
+        }
     }
+    if (!segs.length) return null;
+    const out = [[...segs[0][0], ...segs[0][0], ...segs[0][1]]];
+    for (let i = 0; i < segs.length; i++) {
+        const s = segs[i], prox = segs[i + 1];
+        out.push([...s[3], ...s[2], ...(prox ? prox[1] : s[3])]);
+    }
+    if (fechado && out.length > 2) { const u = out.pop(); out[0][2] = u[2]; out[0][3] = u[3]; }
     return { fechado: !!fechado, pts: out };
 }
+function vkDsBezier(pts, fechado, tol, raio = 0) { return vkDsCurva(pts, fechado, { erro: tol, raio }); }
 // caminho → polilinha com comprimento acumulado [(x, y, s)]
 function vkDsAmostrar(sub, passos = 16, retas = false) {   // retas = divide também os segmentos retos (perfil, Largura)
     const P = sub.pts, out = []; if (!P.length) return out;
@@ -157,11 +239,13 @@ function vkDsTracoEspecial(t) { return !!(t && t.cor && (t.perfil || t.seta_ini 
     const conv = a => { if (a.un === 'pt') return [v => +v, v => +v, v => +v]; const p = VK.doc.pranchetas.find(q => q.id === VK.ativa) || VK.doc.pranchetas[0]; return [v => p.x + vkPT(+v), v => p.y + vkPT(+v), v => vkPT(+v)]; };
     const pontos = a => { const [X, Y] = conv(a); const P = (a.pontos || []).map(q => [X(q[0]), Y(q[1])]); if (P.length < 2) throw new Error('faltam pontos: pontos = [[x, y], ...] (mm da prancheta)'); return P; };
     const camada = () => VK.doc.camadas.find(c => c.id === VK.camadaAtiva && !c.trava) || VK.doc.camadas.filter(c => !c.trava).pop();
-    // lápis/pincel: pontos → caminho suave. fidelidade (mm) = quanto pode se afastar dos pontos; perfil p/ pincel
+    // lápis/pincel: pontos → caminho suave. fidelidade (mm) = quanto a curva pode se afastar dos pontos; suavizar 0-10
+    // (tira o tremido da mão; padrão 3); perfil p/ pincel. A interface manda erro/passo/raio prontos (pt).
     vkRegistrar('lapis', 'lápis', a => {
-        const [, , D] = conv(a), P = pontos(a);
-        const fechar = a.fechar ?? (Math.hypot(P[0][0] - P.at(-1)[0], P[0][1] - P.at(-1)[1]) < D(a.fidelidade ?? 0.3) * 4 && P.length > 4);
-        const sub = vkDsBezier(P, fechar, D(a.fidelidade ?? 0.3)); if (!sub) throw new Error('lápis: traço curto demais');
+        const [, , D] = conv(a), P = pontos(a), erro = a.erro != null ? +a.erro : D(a.fidelidade ?? 0.4);
+        const op = { erro, passo: a.passo != null ? +a.passo : Math.max(erro / 2, D(0.1)), raio: a.raio != null ? +a.raio : Math.round((a.suavizar ?? 3) * 1.5) };
+        const fechar = a.fechar ?? (Math.hypot(P[0][0] - P.at(-1)[0], P[0][1] - P.at(-1)[1]) < Math.max(erro * 4, op.passo * 6) && P.length > 4);
+        const sub = vkDsCurva(P, fechar, op); if (!sub) throw new Error('lápis: traço curto demais');
         const tc = 'traco' in a ? vkCorDe(a.traco) : (VK.traco ? vkClone(VK.traco) : { k: 'cmyk', v: [0, 0, 0, 100] });
         const o = { id: vkId(), tipo: 'caminho', regra: 'nonzero', subs: [sub], preench: 'preench' in a ? vkCorDe(a.preench) : null,
             traco: tc ? { cor: tc, larg: a.espessura != null ? +a.espessura : 1, cap: 'round', junc: 'round', miter: 4, tracejado: [], fase: 0 } : null };   // espessura em pt (como no Illustrator)
@@ -170,12 +254,12 @@ function vkDsTracoEspecial(t) { return !!(t && t.cor && (t.perfil || t.seta_ini 
         const cam = camada(); cam.itens.push(o); VK.sel = [o.id];
         return { id: o.id, pontos: sub.pts.length, fechado: sub.fechado, caixa_mm: vkCaixaMM(o) };
     });
-    // simplificar: menos pontos, mesma forma (tolerância em mm)
+    // simplificar: menos pontos, mesma forma (tolerância em mm); suavizar 0-10 também tira ondulação (Suavizar do Illustrator)
     vkRegistrar('simplificar', 'simplificar caminho', a => {
         const [, , D] = conv(a), tol = D(a.tolerancia ?? 0.25); let antes = 0, depois = 0;
         for (const o of vkTxAlvos(a)) {
             if (o.tipo !== 'caminho') continue;
-            o.subs = o.subs.map(s => { antes += s.pts.length; const pl = vkDsAmostrar(s, 24).map(q => [q[0], q[1]]); const r = pl.length > 2 ? vkDsBezier(pl, s.fechado, tol) : null; const f = r && r.pts.length < s.pts.length ? r : s; depois += f.pts.length; return f; });
+            o.subs = o.subs.map(s => { antes += s.pts.length; const pl = vkDsAmostrar(s, 24, true).map(q => [q[0], q[1]]); const r = pl.length > 2 ? vkDsCurva(s.fechado ? pl.slice(0, -1) : pl, s.fechado, { erro: tol, passo: tol / 2, raio: Math.round((a.suavizar || 0) * 1.5), cantos: 45, janela: 2 }) : null; const f = r && r.pts.length < s.pts.length ? r : s; depois += f.pts.length; return f; });
         }
         return { pontos_antes: antes, pontos_depois: depois };
     });
@@ -183,7 +267,7 @@ function vkDsTracoEspecial(t) { return !!(t && t.cor && (t.perfil || t.seta_ini 
     vkRegistrar('bolha', 'pincel de bolha', async a => {
         const [, , D] = conv(a), P = pontos(a), larg = D(a.espessura ?? 4);
         const cor = 'cor' in a ? vkCorDe(a.cor) : vkClone(VK.traco || VK.preench || { k: 'cmyk', v: [0, 0, 0, 100] });
-        const sub = vkDsBezier(P, false, Math.max(0.2, larg * 0.05)) || { fechado: false, pts: P.map(q => [q[0], q[1], q[0], q[1], q[0], q[1]]) };
+        const sub = vkDsCurva(P, false, { erro: Math.max(0.3, larg * 0.08), raio: 4 }) || { fechado: false, pts: P.map(q => [q[0], q[1], q[0], q[1], q[0], q[1]]) };
         const [forma] = await vkApi().vk_contornar_traco([{ subs: [sub], traco: { larg, cap: 'round', junc: 'round', miter: 4 } }]);
         const cam = camada(), bx = vkSubsBox(forma.subs);
         const toca = cam.itens.filter(o => o.tipo === 'caminho' && !o.trava && o.visivel !== false && !o.traco && vkTxIgual(o.preench, cor) && (() => { const b = vkBox(o); return b[0] <= bx[2] && b[2] >= bx[0] && b[1] <= bx[3] && b[3] >= bx[1]; })());
@@ -245,7 +329,10 @@ async function vkDsUp(A, x, y) {
     if (A.modo === 'largura') { if (A.perfil) { A.alvo.traco = A.antes; await vkCmdUi('alterar', { ids: [A.alvo.id], perfil: A.perfil }); } return; }
     const pts = A.trilha.concat([[x, y]]); if (pts.length < 3) return;
     const z = VK.vista.z;
-    if (A.f === 'lapis' || A.f === 'pincel') await vkCmdUi('lapis', { pontos: pts, fidelidade: VK_OPC.fidelidade / z, ...(A.f === 'pincel' ? { espessura: VK_OPC.pincel, perfil: VK_OPC.perfil } : {}) });
+    // Fidelidade 1 = preciso … 10 = suave (como no Illustrator). Calibrado com mão tremida simulada (vetor_tremido_grade.py):
+    // o que tira o tremido é o erro permitido do ajuste (≈ 6 px no padrão); a gaussiana ajuda pouco
+    const f = VK_OPC.fidelidade;
+    if (A.f === 'lapis' || A.f === 'pincel') await vkCmdUi('lapis', { pontos: pts, erro: (1 + f * 0.9) / z, passo: 1.5 / z, raio: Math.round(f * 1.6), ...(A.f === 'pincel' ? { espessura: VK_OPC.pincel, perfil: VK_OPC.perfil } : {}) });
     if (A.f === 'bolha') await vkCmdUi('bolha', { pontos: pts, espessura: VK_OPC.bolha });
     if (A.f === 'borracha') await vkCmdUi('borracha', { pontos: pts, espessura: VK_OPC.borracha });
 }
@@ -261,8 +348,9 @@ function vkDsSobreposicao(ctx, A) {   // rastro enquanto desenha (px de tela)
 function vkDsOpcoes(f) {
     const campo = (rot, k, v, u, st = 0.5, mn = 0.1) => `<label class="ie-op-campo">${rot} <input type="number" min="${mn}" step="${st}" value="${v}" data-dso="${k}"> ${u}</label>`;
     const perfis = `<label class="ie-op-campo">Perfil <select data-dso="perfil">${Object.keys(VK_PERFIS).map(p => `<option ${VK_OPC.perfil === p ? 'selected' : ''}>${p}</option>`).join('')}</select></label>`;
-    if (f === 'lapis') return campo('Fidelidade', 'fidelidade', VK_OPC.fidelidade, 'px (maior = mais suave)', 1, 1);
-    if (f === 'pincel') return campo('Espessura', 'pincel', vkR(VK_OPC.pincel, 2), 'pt', 0.25) + perfis + campo('Fidelidade', 'fidelidade', VK_OPC.fidelidade, 'px', 1, 1);
+    const fid = `<label class="ie-op-campo">Fidelidade <small>Preciso</small><input type="range" min="1" max="10" step="1" value="${VK_OPC.fidelidade}" data-dso="fidelidade" style="width:90px"><small>Suave</small></label>`;
+    if (f === 'lapis') return fid;
+    if (f === 'pincel') return campo('Espessura', 'pincel', vkR(VK_OPC.pincel, 2), 'pt', 0.25) + perfis + fid;
     if (f === 'bolha') return campo('Tamanho', 'bolha', vkR(vkMM(VK_OPC.bolha), 2), 'mm') + '<span class="ie-op-dica">pinta na cor do traço; junta com as formas da mesma cor que encostar</span>';
     if (f === 'borracha') return campo('Tamanho', 'borracha', vkR(vkMM(VK_OPC.borracha), 2), 'mm') + '<span class="ie-op-dica">apaga das formas selecionadas (ou de todas embaixo)</span>';
     if (f === 'largura') return '<span class="ie-op-dica">arraste num traço: longe da linha = mais grosso naquele ponto; perfis prontos no painel (Traço)</span>';
@@ -271,7 +359,7 @@ function vkDsOpcoes(f) {
 function vkDsOpcoesEventos(el) {
     if (el._vkDs) return; el._vkDs = true;
     el.addEventListener('change', e => { const k = e.target.dataset.dso; if (!k) return; const v = e.target.value;
-        VK_OPC[k] = k === 'perfil' ? v : k === 'bolha' || k === 'borracha' ? vkPT(+v || 1) : k === 'pincel' ? (+v || 1) : Math.max(1, +v || 4); }, true);
+        VK_OPC[k] = k === 'perfil' ? v : k === 'bolha' || k === 'borracha' ? vkPT(+v || 1) : k === 'pincel' ? (+v || 1) : Math.max(1, Math.min(10, +v || 6)); }, true);
 }
 function vkDsPainelTraco(tr) {
     const seta = k => `<select data-dst="${k}" title="${k === 'seta_ini' ? 'seta no início' : 'seta no fim'}">${[['', '—'], ['seta', '➤'], ['triangulo', '▶'], ['circulo', '●'], ['quadrado', '■'], ['barra', '┃']].map(([v, n]) => `<option value="${v}" ${(tr[k] || '') === v ? 'selected' : ''}>${n}</option>`).join('')}</select>`;

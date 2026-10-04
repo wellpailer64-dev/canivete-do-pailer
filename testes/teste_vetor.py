@@ -265,6 +265,13 @@ with sync_playwright() as p:
     onda = [[5 + i * 2, 20 + 8 * math.sin(i / 3)] for i in range(40)]
     r = C("lapis", {"pontos": onda, "espessura": 1.5, "nome": "onda"})
     ok(4 <= r["pontos"] < 25 and not r["fechado"], f"lápis: 40 pontos viram curva suave ({r['pontos']} pontos)")
+    import random; random.seed(7)
+    tremida = [[10 + x / 2, 60 + 8 * math.sin(x / 2 / 40 * 2 * math.pi) + random.uniform(-0.35, 0.35)] for x in range(0, 160)]
+    C("lapis", {"pontos": tremida, "nome": "tremida"})
+    inf = pg.evaluate("""() => { const o = vkTodos().find(x => x.o.nome === 'tremida').o, pl = vkDsAmostrar(o.subs[0], 40); let n = 0, s0 = 0; const cs = [];
+        for (let i = 2; i < pl.length; i++) { const a = pl[i-2], b = pl[i-1], c = pl[i]; cs.push((b[0]-a[0])*(c[1]-b[1]) - (b[1]-a[1])*(c[0]-b[0])); }
+        const lim = Math.max(...cs.map(Math.abs)) * 0.05; for (const c of cs) { if (Math.abs(c) < lim) continue; const s = Math.sign(c); if (s0 && s !== s0) n++; s0 = s; } return [n, o.subs[0].pts.length]; }""")
+    ok(inf[0] <= 4, f"lápis tira o tremido da mão (onda com ruído ±0,35 mm: {inf[0]} inflexões, {inf[1]} pontos)")
     roda = [[60 + 10 * math.cos(i / 20 * 2 * math.pi), 20 + 10 * math.sin(i / 20 * 2 * math.pi)] for i in range(21)]
     r = C("lapis", {"pontos": roda, "nome": "roda"})
     bx = C("info", {"nomes": ["roda"]})[0]["caixa_mm"]
