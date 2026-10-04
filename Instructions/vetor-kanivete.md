@@ -62,7 +62,8 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 `.aknv` abre no KANIVETE por duplo clique (associação HKCU em Functions/projeto.py; roteado em `abrirProjetoExterno`).
 
 - Aparência em grupo (contorno/preenchimento extra no conjunto); prévia de separações e `tinta_em` com efeitos, Aparência, malha, símbolos, máscara de opacidade e padrões; SVG com `<filter>` (sombra, brilho, desfoque), `<pattern>`, `<mask>`, símbolos e malha.
-Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): painel de vínculos; brilho interno no SVG.
+- Vínculos (aba): cada imagem com ppi efetivo, modo, usos e estado (ok / mudou / sem_original / faltando, pela assinatura sha1 do original); `vinculos`, `revincular` (mantém largura e posição), `atualizar_vinculo` (sem alvo: todas as alteradas). `frontend/js/vetor-vinculos.js`.
+Ainda NÃO (pendências): brilho interno no SVG.
 
 ## 2. Modelo (pt = 1/72", y para baixo)
 ```

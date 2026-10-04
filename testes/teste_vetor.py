@@ -529,6 +529,22 @@ with sync_playwright() as p:
        f"exportar separações: só as chapas com tinta ({[os.path.basename(x) for x in seps]})")
     C("separacoes", {"ativo": False})
 
+    print("vínculos")
+    from PIL import Image as _Im
+    v1, v2 = os.path.join(SAI, "vinc_a.png"), os.path.join(SAI, "vinc_b.png")
+    _Im.new("RGB", (600, 400), (200, 30, 30)).save(v1); _Im.new("RGB", (300, 300), (30, 30, 200)).save(v2)
+    C("novo", {"nome": "Vinc", "larg": 100, "alt": 60})
+    im_ = C("imagem", {"arquivo": v1, "x": 5, "y": 5, "larg": 50})
+    vs = C("vinculos")["vinculos"]; ok(len(vs) == 1 and vs[0]["estado"] == "ok" and vs[0]["usos"] == 1, f"vínculos: imagem colocada ok ({vs})")
+    _Im.new("RGB", (600, 400), (30, 200, 30)).save(v1)
+    ok(C("vinculos")["vinculos"][0]["estado"] == "mudou", "vínculos: original editado aparece como mudou")
+    C("atualizar_vinculo"); ok(C("vinculos")["vinculos"][0]["estado"] == "ok", "atualizar_vinculo relê o original")
+    larg0 = C("info", {"id": im_["id"]})[0]["caixa_mm"]["larg"]
+    r_ = C("revincular", {"id": im_["id"], "arquivo": v2}); larg1 = C("info", {"id": im_["id"]})[0]["caixa_mm"]["larg"]
+    ok(r_["w"] == 300 and abs((larg1 or 0) - (larg0 or 1)) < 0.1, f"revincular troca a imagem e mantém a largura ({larg0} → {larg1}, {r_})")
+    vk_ = os.path.join(SAI, "vinc.aknv"); C("salvar", {"caminho": vk_}); pg.evaluate("c => VKN.abrir(c)", vk_); pg.wait_for_timeout(500); os.remove(v2)
+    ok(C("vinculos")["vinculos"][0]["estado"] == "sem_original", "sem o original: fica a cópia incorporada (sem_original)")
+
     print("efeitos e Aparência na separação, Aparência em grupo, SVG")
     C("novo", {"nome": "Ef sep", "larg": 100, "alt": 60})
     r1 = C("retangulo", {"x": 10, "y": 10, "larg": 30, "alt": 20, "preench": "C0 M100 Y0 K0", "traco": "nenhum"})

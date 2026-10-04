@@ -987,7 +987,31 @@ def imagem_info(arq):
     dpi = im.info.get("dpi") or (72, 72)
     return {"success": True, "arquivo": os.path.abspath(arq), "w": im.width, "h": im.height, "modo": im.mode,
             "ppi": round(float(dpi[0] or 72)), "alfa": im.mode in ("RGBA", "LA", "PA") or "transparency" in im.info,
-            "url": _registrar_previa(arq), "nome": os.path.basename(arq)}
+            "url": _registrar_previa(arq), "nome": os.path.basename(arq), "assin": _assinatura(arq)}
+
+
+def _assinatura(f):
+    import hashlib
+    d = hashlib.sha1()
+    with open(f, "rb") as fh:
+        for b in iter(lambda: fh.read(1 << 20), b""):
+            d.update(b)
+    return d.hexdigest()
+
+
+def vinculos_estado(lista):
+    """[{img, arquivo, origem, assin}] → {img: estado}: ok | mudou (o original foi editado depois de colocado: a
+    assinatura não bate) | sem_original (só a cópia incorporada) | faltando (nenhuma das duas)."""
+    out = {}
+    for x in lista or []:
+        a, o = x.get("arquivo"), x.get("origem")
+        tem_a, tem_o = bool(a and os.path.isfile(a)), bool(o and os.path.isfile(o))
+        if not tem_a and not tem_o: out[x["img"]] = "faltando"
+        elif not tem_o: out[x["img"]] = "sem_original"
+        elif x.get("assin"): out[x["img"]] = "ok" if _assinatura(o) == x["assin"] else "mudou"
+        elif tem_a and os.path.abspath(a) != os.path.abspath(o) and _assinatura(a) != _assinatura(o): out[x["img"]] = "mudou"
+        else: out[x["img"]] = "ok"
+    return out
 
 
 def salvar_png(dados_b64, caminho):

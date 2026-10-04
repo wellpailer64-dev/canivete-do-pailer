@@ -3305,6 +3305,10 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.imagem_info(path)
 
+    def vk_vinculos_estado(self, lista):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.vinculos_estado(lista)
+
     def vk_salvar_png(self, dados, path):
         from Functions import vetor_kanivete
         return vetor_kanivete.salvar_png(dados, path)

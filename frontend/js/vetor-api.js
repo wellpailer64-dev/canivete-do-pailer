@@ -127,7 +127,7 @@
     vkRegistrar('imagem', 'colocar imagem', async a => {
         const api = vkApi(); const r = await api.vk_imagem_info(a.arquivo);
         if (!r || !r.success) throw new Error('não abriu a imagem: ' + a.arquivo);
-        const iid = vkId('i'); VK.doc.imagens[iid] = { arquivo: r.arquivo, w: r.w, h: r.h, modo: r.modo, url: r.url, nome: r.nome, alfa: r.alfa };
+        const iid = vkId('i'); VK.doc.imagens[iid] = { arquivo: r.arquivo, origem: r.arquivo, assin: r.assin, w: r.w, h: r.h, modo: r.modo, url: r.url, nome: r.nome, alfa: r.alfa };
         const c = conv(a);
         let s = 72 / (r.ppi || 72);
         if (a.larg) s = c.D(a.larg) / r.w; else if (a.alt) s = c.D(a.alt) / r.h;

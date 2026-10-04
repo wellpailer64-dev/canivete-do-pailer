@@ -58,7 +58,7 @@ function vkMontar() {
             <section class="ie-painel"><header class="ie-painel-cab">Propriedades</header><div class="ie-painel-corpo vk-props" id="vk-props"></div></section>
             <section class="ie-painel vk-p-abas">
                 <header class="ie-painel-cab vk-abas" id="vk-abas">
-                    <button data-a="camadas" class="on">Camadas</button><button data-a="pranchetas">Pranchetas</button><button data-a="amostras">Amostras</button><button data-a="separacoes">Separações</button><button data-a="fechamento">Fechamento</button>
+                    <button data-a="camadas" class="on">Camadas</button><button data-a="pranchetas">Pranchetas</button><button data-a="amostras">Amostras</button><button data-a="separacoes">Separações</button><button data-a="vinculos">Vínculos</button><button data-a="fechamento">Fechamento</button>
                 </header>
                 <div class="ie-painel-corpo vk-aba" id="vk-aba"></div>
             </section>
@@ -142,7 +142,7 @@ function vkUiAtualizar() {
     vkEl('vk-top-info').textContent = `${d.nome}${VK.sujo ? ' •' : ''} — ${d.modoCor.toUpperCase()} · ${d.perfil} · sangria ${vkR(vkMM(d.sangria), 1)} mm`;
     vkEl('vk-status-info').textContent = `${Math.round(VK.vista.z * 72 / 96 * 100)}%  ·  ${VK.sel.length ? VK.sel.length + ' selecionado(s)' : ''}${VK.contorno ? '  ·  CONTORNOS' : ''}`;
     vkProps();
-    ({ camadas: vkAbaCamadas, pranchetas: vkAbaPranchetas, amostras: vkAbaAmostras, separacoes: vkAbaSeparacoes, fechamento: vkAbaFechamento })[VK.aba || 'camadas']();
+    ({ camadas: vkAbaCamadas, pranchetas: vkAbaPranchetas, amostras: vkAbaAmostras, separacoes: vkAbaSeparacoes, vinculos: vkAbaVinculos, fechamento: vkAbaFechamento })[VK.aba || 'camadas']();
 }
 function vkCorSw(c, extra = '') {
     const bg = !c ? 'linear-gradient(to top right, transparent 46%, #e33 47% 53%, transparent 54%), #fff'
