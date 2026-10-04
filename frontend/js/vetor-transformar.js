@@ -25,14 +25,14 @@
         const t = VK.ultimaTransf; if (!t) throw new Error('nenhuma transformação para repetir');
         const vezes = Math.max(1, Math.min(500, +a.vezes || 1)); let ids = a.ids || VK.sel;
         if (!ids.length) throw new Error('nada selecionado');
-        VK._repetindo = true;
+        VK._repetindo = true; const novos = [];
         try {
             for (let k = 0; k < vezes; k++) {
-                if (t.dup) ids = (await VK_CMDS.duplicar.fn({ ids })).ids;
+                if (t.dup) { ids = (await VK_CMDS.duplicar.fn({ ids })).ids; novos.push(...ids); }
                 await VK_CMDS[t.nome].fn({ ...t.args, ids });
             }
         } finally { VK._repetindo = false; }
-        VK.sel = ids; return { repetido: t.nome, copia: t.dup, vezes, ids };
+        VK.sel = ids; return { repetido: t.nome, copia: t.dup, vezes, ids, novos };   // ids = última leva; novos = todas as cópias
     });
     // cada objeto em torno do próprio centro (ou de um canto: ancora 'topo-esq'...): escala %, mover mm, girar °, refletir, aleatório
     vkRegistrar('transformar_cada', 'transformar cada', a => {

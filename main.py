@@ -3194,6 +3194,14 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.texto_geometria(spec)
 
+    def vk_icone(self, nome, estilo="outline"):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.icone_svg(nome, estilo)
+
+    def vk_qr(self, texto, correcao="M"):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.qr_matriz(texto, correcao)
+
     def vk_fonte_glifos(self, fam, estilo="Regular"):
         from Functions import vetor_kanivete
         return vetor_kanivete.fonte_glifos(fam, estilo)

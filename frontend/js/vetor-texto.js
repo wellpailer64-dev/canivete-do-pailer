@@ -6,7 +6,7 @@
 // sobreposição), ep (estilo de parágrafo), anterior/seguinte (ids, encadeado: o texto mora na 1ª caixa = raiz),
 // caixa_alt (pt), trilha:{subs (pt), ini (pt), lado}; doc.estilosTexto = {par:{nome:{...}}, car:{nome:{...}}}.
 const VK_TX_CAR = ['fam', 'estilo', 'tam', 'track', 'desl', 'eh', 'ev', 'maius', 'pos', 'liga', 'frac', 'num', 'preench', 'traco'];
-const VK_TX_PAR = ['alin', 'entrelinha', 'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois'];
+const VK_TX_PAR = ['alin', 'entrelinha', 'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois', 'hifen'];
 VK_FERR.texto_caminho = { nome: 'Texto em caminho (clique num caminho)', tecla: '', cursor: 'text' };
 VK_ICO.texto_caminho = '<path d="M3 17c4-8 8-8 12-4s5 2 6 0"/><path d="M8 4h7M11.5 4v7"/>';
 
@@ -47,6 +47,8 @@ function vkTxArgs(a, trecho) {
     if (a.alin) par.alin = a.alin === 'justificado' ? 'just' : a.alin;
     if (a.entrelinha !== undefined) par.entrelinha = a.entrelinha ? +a.entrelinha : null;
     for (const k of ['recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois']) if (a[k] != null) par[k] = +a[k];
+    const hf = a.hifenizar ?? a.hifen;   // true (pt_BR) | 'en_US'... | false
+    if (hf !== undefined) par.hifen = hf === true || hf === 'sim' ? 'pt_BR' : (hf || null);
     const caixa = {};
     if (a.caixa !== undefined) caixa.caixa = a.caixa ? D(a.caixa) : null;
     if (a.caixa_alt !== undefined) caixa.caixa_alt = a.caixa_alt ? D(a.caixa_alt) : null;
@@ -372,7 +374,9 @@ function vkTxPainel(tx, objs) {
     h += `<div class="vk-sec"><div class="vk-sec-t">Parágrafo</div>
         <div class="ie-segm vk-segm">${[['esq', '⟸', 'à esquerda'], ['centro', '⟺', 'centralizado'], ['dir', '⟹', 'à direita'], ['just', '☰', 'justificado (última à esquerda)'], ['just_tudo', '▤', 'justificar todas as linhas']].map(([a, s, t]) => `<button data-txalin="${a}" title="${t}" class="${(r.alin || 'esq') === a ? 'on' : ''}">${s}</button>`).join('')}</div>
         <div class="vk-grade">${vkNum('Entrel.', r.entrelinha ? vkR(r.entrelinha, 2) : '', 'data-tx="entrelinha" placeholder="auto"', 'pt', 0.5)}${vkNum('Recuo ⇤', r.recuo_esq || 0, 'data-tx="recuo_esq"', 'pt', 1)}${vkNum('Recuo ⇥', r.recuo_dir || 0, 'data-tx="recuo_dir"', 'pt', 1)}
-            ${vkNum('1ª linha', r.recuo_1a || 0, 'data-tx="recuo_1a"', 'pt', 1)}${vkNum('Antes', r.antes || 0, 'data-tx="antes"', 'pt', 1)}${vkNum('Depois', r.depois || 0, 'data-tx="depois"', 'pt', 1)}</div></div>`;
+            ${vkNum('1ª linha', r.recuo_1a || 0, 'data-tx="recuo_1a"', 'pt', 1)}${vkNum('Antes', r.antes || 0, 'data-tx="antes"', 'pt', 1)}${vkNum('Depois', r.depois || 0, 'data-tx="depois"', 'pt', 1)}</div>
+        ${tx.caixa ? `<div class="vk-linha vk-mini"><label class="vk-chk"><input type="checkbox" data-tx="hifenizar" ${r.hifen ? 'checked' : ''}> Hifenizar</label>
+            ${r.hifen ? `<select data-tx="hifen">${[['pt_BR', 'português'], ['en_US', 'inglês'], ['es', 'espanhol'], ['fr', 'francês'], ['de_DE', 'alemão'], ['it_IT', 'italiano']].map(([v, n]) => `<option value="${v}" ${r.hifen === v ? 'selected' : ''}>${n}</option>`).join('')}</select>` : ''}</div>` : ''}</div>`;
     if (objs.length === 1 && tx.caixa) {
         const cor = vkTxCorrente(tx), k = cor.indexOf(tx);
         h += `<div class="vk-sec"><div class="vk-sec-t">Caixa de texto</div>

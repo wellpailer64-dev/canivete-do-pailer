@@ -373,3 +373,90 @@ function vkDsPainelEventos(el) {
         const v = e.target.value; if (k === 'perfil' && v === 'personalizado') return;
         vkCmdUi('alterar', { [k]: k === 'seta_esc' ? +v : (v || null) }); }, true);
 }
+
+// ── formas: setor (pizza/rosca), arco aberto e QR code vetorial ──
+(() => {
+    const conv = a => { if (a.un === 'pt') return [v => +v, v => +v, v => +v]; const ps = VK.doc.pranchetas, p = (a.prancheta != null && (ps.find(q => q.id === a.prancheta || q.nome === a.prancheta) || ps[+a.prancheta - 1])) || ps.find(q => q.id === VK.ativa) || ps[0]; return [v => p.x + vkPT(+v), v => p.y + vkPT(+v), v => vkPT(+v)]; };
+    const camada = () => VK.doc.camadas.find(c => c.id === VK.camadaAtiva && !c.trava) || VK.doc.camadas.filter(c => !c.trava).pop();
+    const cor = (a, k, pad) => k in a ? vkCorDe(a[k]) : pad;
+    const novo = (a, subs, preench, traco) => {
+        const o = { id: vkId(), tipo: 'caminho', regra: 'nonzero', subs, preench, traco: traco ? { cor: traco, larg: a.espessura != null ? +a.espessura : 1, cap: 'butt', junc: 'miter', miter: 4, tracejado: [], fase: 0 } : null };
+        if (a.nome) o.nome = a.nome; camada().itens.push(o); VK.sel = [o.id]; return { id: o.id, tipo: 'caminho', ...(o.nome ? { nome: o.nome } : {}), caixa_mm: vkCaixaMM(o) };
+    };
+    // ângulos em graus, 0 = 3 h, sentido horário (como a tela: y para baixo)
+    const pontoEm = (cx, cy, r, g) => [cx + r * Math.cos(g * Math.PI / 180), cy + r * Math.sin(g * Math.PI / 180)];
+    const arco = (cx, cy, r, de, ate) => { const [x0, y0] = pontoEm(cx, cy, r, de), [x1, y1] = pontoEm(cx, cy, r, ate), out = [];
+        const passos = Math.max(1, Math.ceil(Math.abs(ate - de) / 90)); let px = x0, py = y0;
+        for (let i = 1; i <= passos; i++) { const g = de + (ate - de) * i / passos, [qx, qy] = pontoEm(cx, cy, r, g); out.push(...vkArcoCubicas(px, py, r, r, 0, false, ate > de, qx, qy)); px = qx; py = qy; }
+        return { ini: [x0, y0], segs: out }; };
+    const encadear = (pts, ini, segs) => { pts.push([ini[0], ini[1], ini[0], ini[1], ini[0], ini[1]]); for (const [c1, c2, p] of segs) { const u = pts.at(-1); u[4] = c1[0]; u[5] = c1[1]; pts.push([p[0], p[1], c2[0], c2[1], p[0], p[1]]); } };
+    // setor: cx, cy, raio (mm), de/ate (graus), raio_interno (rosca), vao (mm: separação entre fatias, como num gráfico de pizza explodido)
+    vkRegistrar('setor', 'setor', a => {
+        const [X, Y, D] = conv(a), cx = X(a.cx), cy = Y(a.cy), R = D(a.raio), ri = a.raio_interno ? D(a.raio_interno) : 0;
+        let de = +a.de, ate = +a.ate; if (ate < de) ate += 360;
+        const vao = a.vao ? D(a.vao) / 2 : 0;
+        // vão: as bordas retas andam vao para dentro (paralelas), por isso o ângulo efetivo muda com o raio
+        const dg = r => vao && r > 0 ? Math.asin(Math.min(1, vao / r)) * 180 / Math.PI : 0;
+        const pts = [], ext = arco(cx, cy, R, de + dg(R), ate - dg(R));
+        encadear(pts, ext.ini, ext.segs);
+        if (ri > 0) { const int = arco(cx, cy, ri, ate - dg(ri), de + dg(ri)); pts.push([...int.ini, ...int.ini, ...int.ini]); for (const [c1, c2, p] of int.segs) { const u = pts.at(-1); u[4] = c1[0]; u[5] = c1[1]; pts.push([p[0], p[1], c2[0], c2[1], p[0], p[1]]); } }
+        else { const m = (de + ate) / 2 * Math.PI / 180, d = vao ? vao / Math.sin(Math.max(1e-3, (ate - de) / 2 * Math.PI / 180)) : 0, v = [cx + d * Math.cos(m), cy + d * Math.sin(m)]; pts.push([...v, ...v, ...v]); }
+        return novo(a, [{ fechado: true, pts }], cor(a, 'preench', vkClone(VK.preench)), cor(a, 'traco', null));
+    });
+    vkRegistrar('arco', 'arco', a => {   // arco aberto: cx, cy, raio, de, ate (graus)
+        const [X, Y, D] = conv(a), r = arco(X(a.cx), Y(a.cy), D(a.raio), +a.de, +a.ate < +a.de ? +a.ate + 360 : +a.ate), pts = [];
+        encadear(pts, r.ini, r.segs);
+        return novo(a, [{ fechado: false, pts }], cor(a, 'preench', null), cor(a, 'traco', VK.traco ? vkClone(VK.traco) : { k: 'cmyk', v: [0, 0, 0, 100] }));
+    });
+    // qrcode: conteudo, x, y, tamanho (mm, lado), cor, correcao L|M|Q|H, fundo (cor da margem branca, ou nenhum), margem (módulos)
+    vkRegistrar('qrcode', 'QR code', async a => {
+        const [X, Y, D] = conv(a), q = await vkApi().vk_qr(String(a.conteudo || ''), a.correcao || 'M');
+        if (!q || !q.n) throw new Error('qrcode: não gerou (conteudo vazio?)');
+        const mg = a.margem ?? 0, lado = D(a.tamanho ?? 20), s = lado / (q.n + 2 * mg), x0 = X(a.x ?? 0) + mg * s, y0 = Y(a.y ?? 0) + mg * s, subs = [];
+        const ret = (x, y, w, h) => ({ fechado: true, pts: [[x, y], [x + w, y], [x + w, y + h], [x, y + h]].map(([u, v]) => [u, v, u, v, u, v]) });
+        q.linhas.forEach((l, i) => { let j = 0; while (j < q.n) { if (!l[j]) { j++; continue; } let k = j; while (k < q.n && l[k]) k++; subs.push(ret(x0 + j * s, y0 + i * s, (k - j) * s, s)); j = k; } });
+        // os módulos encostados viram uma forma só (sem filete entre eles no RIP)
+        const r = await vkApi().vk_booleana('unir', subs.map(sb => ({ subs: [sb], regra: 'nonzero' })));
+        const itens = [];
+        const fundo = 'fundo' in a ? vkCorDe(a.fundo) : { k: 'cmyk', v: [0, 0, 0, 0] };
+        if (fundo) itens.push({ id: vkId(), tipo: 'caminho', regra: 'nonzero', subs: [ret(X(a.x ?? 0), Y(a.y ?? 0), lado, lado)], preench: fundo, traco: null });
+        itens.push({ id: vkId(), tipo: 'caminho', regra: 'nonzero', subs: r.subs, preench: 'cor' in a ? vkCorDe(a.cor) : { k: 'cmyk', v: [0, 0, 0, 100] }, traco: null });
+        const g = itens.length > 1 ? { id: vkId(), tipo: 'grupo', itens } : itens[0];
+        g.nome = a.nome || 'QR code'; camada().itens.push(g); VK.sel = [g.id];
+        return { id: g.id, modulos: q.n, versao: q.versao, modulo_mm: vkR(vkMM(s), 3), caixa_mm: vkCaixaMM(g) };
+    });
+})();
+
+// ── ícone: Tabler Icons (MIT), baixado sob demanda. nome (tabler.io/icons), x, y (canto, mm), tamanho (mm, lado), cor,
+// estilo outline (traço, espessura proporcional como no original) | filled (cheio), espessura (pt, opcional) ──
+(() => {
+    const conv = a => { if (a.un === 'pt') return [v => +v, v => +v, v => +v]; const ps = VK.doc.pranchetas, p = (a.prancheta != null && (ps.find(q => q.id === a.prancheta || q.nome === a.prancheta) || ps[+a.prancheta - 1])) || ps.find(q => q.id === VK.ativa) || ps[0]; return [v => p.x + vkPT(+v), v => p.y + vkPT(+v), v => vkPT(+v)]; };
+    // SVG do ícone (viewBox 0 0 24 24) → subs em unidades do ícone
+    function vkIconeSubs(svg) {
+        const doc = new DOMParser().parseFromString(svg, 'image/svg+xml'), subs = [], num = (e, k, p = 0) => parseFloat(e.getAttribute(k) ?? p) || 0;
+        const elipse = (cx, cy, rx, ry) => vkElipseSubs(cx, cy, rx, ry);
+        for (const e of doc.querySelectorAll('path, circle, ellipse, rect, line, polyline, polygon')) {
+            if (e.getAttribute('stroke') === 'none' && e.getAttribute('fill') === 'none') continue;   // a "caixa" invisível do Tabler
+            const t = e.tagName.toLowerCase();
+            if (t === 'path') subs.push(...vkSvgD(e.getAttribute('d') || ''));
+            else if (t === 'circle') subs.push(...elipse(num(e, 'cx'), num(e, 'cy'), num(e, 'r'), num(e, 'r')));
+            else if (t === 'ellipse') subs.push(...elipse(num(e, 'cx'), num(e, 'cy'), num(e, 'rx'), num(e, 'ry')));
+            else if (t === 'rect') subs.push(...vkRetSubs(num(e, 'x'), num(e, 'y'), num(e, 'width'), num(e, 'height'), num(e, 'rx', e.getAttribute('ry') || 0)));
+            else if (t === 'line') subs.push({ fechado: false, pts: [vkPt(num(e, 'x1'), num(e, 'y1')), vkPt(num(e, 'x2'), num(e, 'y2'))] });
+            else { const v = (e.getAttribute('points') || '').trim().split(/[\s,]+/).map(Number); const pts = []; for (let i = 0; i + 1 < v.length; i += 2) pts.push(vkPt(v[i], v[i + 1])); subs.push({ fechado: t === 'polygon', pts }); }
+        }
+        return subs.filter(s => s.pts.length);
+    }
+    vkRegistrar('icone', 'ícone', async a => {
+        const r = await vkApi().vk_icone(String(a.nome || ''), a.estilo || 'outline');
+        if (!r || !r.success) throw new Error((r && r.error) || 'ícone não veio');
+        const [X, Y, D] = conv(a), lado = D(a.tamanho ?? 8), s = lado / 24, x0 = X(a.x ?? 0), y0 = Y(a.y ?? 0);
+        const subs = vkIconeSubs(r.svg).map(sb => ({ fechado: sb.fechado, pts: sb.pts.map(p => [x0 + p[0] * s, y0 + p[1] * s, x0 + p[2] * s, y0 + p[3] * s, x0 + p[4] * s, y0 + p[5] * s]) }));
+        const cor = vkCorDe(a.cor ?? '100K'), cheio = r.estilo === 'filled';
+        const o = { id: vkId(), tipo: 'caminho', regra: 'nonzero', subs, preench: cheio ? cor : null,
+            traco: cheio ? null : { cor, larg: a.espessura != null ? +a.espessura : 2 * s, cap: 'round', junc: 'round', miter: 4, tracejado: [], fase: 0 }, nome: a.nome_obj || ('ícone ' + r.nome) };
+        const cam = VK.doc.camadas.find(c => c.id === VK.camadaAtiva && !c.trava) || VK.doc.camadas.filter(c => !c.trava).pop();
+        cam.itens.push(o); VK.sel = [o.id];
+        return { id: o.id, nome: o.nome, estilo: r.estilo, licenca: r.licenca, caixa_mm: vkCaixaMM(o) };
+    });
+})();

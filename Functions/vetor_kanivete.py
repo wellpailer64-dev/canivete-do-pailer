@@ -268,6 +268,18 @@ def _moldar(F, texto, track_em, feats=None):
 # atributos de CARACTERE (objeto = base; trechos = [{ini, fim, ...}] por cima, o último vence) e de PARÁGRAFO (objeto)
 _CAR = ("fam", "estilo", "tam", "track", "desl", "eh", "ev", "maius", "pos", "liga", "frac", "num", "preench", "traco")
 _PAR = ("recuo_esq", "recuo_dir", "recuo_1a", "antes", "depois")
+_HIFEN = {}
+
+
+def _hifenizador(lingua):
+    """pyphen (dicionários do LibreOffice); None se a língua não existir."""
+    if lingua not in _HIFEN:
+        try:
+            import pyphen
+            _HIFEN[lingua] = pyphen.Pyphen(lang=lingua, left=2, right=3)
+        except Exception:
+            _HIFEN[lingua] = None
+    return _HIFEN[lingua]
 _ESPACOS = ("space", "uni0020", "uni00A0", "nbspace")
 
 
@@ -339,6 +351,12 @@ def _glifos(texto, ini, fim, p, falta):
     return out
 
 
+def _glifo_hifen(g):
+    """glifo '-' com a fonte/corpo/cor do glifo g (hífen da hifenização)."""
+    nome, _cl, av, ox, oy = _moldar(g["F"], "-", 0)[0]
+    return dict(g, nome=nome, adv=av * g["sx"], xo=0, yo=0, esp=False, hif=True)
+
+
 def _desenhar(g, M, partes):
     cn = _Caneta(g["sx"], g["sy"], M); cn._gs = g["F"]["gs"]
     try:
@@ -404,6 +422,8 @@ def texto_geometria(spec):
     lead_fixo = float(spec["entrelinha"]) if spec.get("entrelinha") else None
     par = {k: float(spec.get(k) or 0) for k in _PAR}
     trilha = spec.get("trilha") if isinstance(spec.get("trilha"), dict) else None
+    hif = spec.get("hifen")   # True | "pt_BR" | "en_US"...: hifeniza palavras de 6+ letras na quebra (como o Illustrator)
+    hif = _hifenizador("pt_BR" if hif is True else str(hif)) if hif and caixa else None
     arq0, ind0, _ = fonte_arquivo(runs[0][2]["fam"], runs[0][2]["estilo"]); F0 = _fonte(arq0, ind0)
     tam0 = float(spec.get("tam") or 12); asc0, desc0 = F0["asc"] * tam0 / F0["upem"], -F0["desc"] * tam0 / F0["upem"]
 
@@ -454,12 +474,27 @@ def texto_geometria(spec):
                     acum += g["adv"]
                     if acum > disp + 1e-6 and i > ini and not g["esp"]:
                         q = quebra if quebra and quebra[0] > ini else (i, i)
+                        if hif:   # tenta quebrar a palavra que estourou com hífen (o maior pedaço que cabe)
+                            ws = quebra[1] if quebra and quebra[1] > ini else ini
+                            we = i
+                            while we < len(gl) and not gl[we]["esp"]: we += 1
+                            c0, c1 = gl[ws]["ci"], gl[we - 1]["ci"] + 1
+                            palavra = texto[c0:c1]
+                            # só o trecho de letras ("so.Authoritatively" → "Authoritatively"; "ratings," → "ratings")
+                            m_ = max(re.finditer(r"[^\W\d_]{6,}", palavra), key=lambda m: m.end() - m.start(), default=None)
+                            if m_:
+                                hg = _glifo_hifen(gl[i])
+                                base = sum(x["adv"] for x in gl[ini:ws])
+                                for pos in [m_.start() + q for q in reversed(hif.positions(m_.group()))]:
+                                    k = next((kk for kk in range(ws, we) if gl[kk]["ci"] >= c0 + pos), None)
+                                    if k and k > ws and base + sum(x["adv"] for x in gl[ws:k]) + hg["adv"] <= disp + 1e-6:
+                                        q = (k, k, hg); break
                         break
                     if g["hif"]: quebra = (i + 1, i + 1)   # depois do hífen (ele fica)
                     i += 1
                 if q is None:
                     linhas.append((gl[ini:], True, primeira, gl[ini]["ci"])); break
-                linhas.append((gl[ini:q[0]], False, primeira, gl[ini]["ci"]))
+                linhas.append((gl[ini:q[0]] + ([dict(q[2], ci=gl[q[0] - 1]["ci"])] if len(q) > 2 else []), False, primeira, gl[ini]["ci"]))
                 ini, primeira = q[1], False
                 while ini < len(gl) and gl[ini]["esp"]: ini += 1
                 if ini >= len(gl):
@@ -986,3 +1021,45 @@ def abrir(caminho):
         if im.get("arquivo") and os.path.isfile(im["arquivo"]):
             im["url"] = _registrar_previa(im["arquivo"], im.get("mascara"))
     return r
+
+
+# ─────────────────────────── QR code (vetor) ───────────────────────────
+def qr_matriz(texto, correcao="M", borda=0):
+    """Texto/URL → matriz do QR code ({linhas: [[0/1,...]], n}) para o Vetor desenhar em módulos vetoriais
+    (gráfica: QR em vetor, nunca imagem). correcao: L|M|Q|H."""
+    import qrcode
+    nivel = {"L": qrcode.constants.ERROR_CORRECT_L, "M": qrcode.constants.ERROR_CORRECT_M,
+             "Q": qrcode.constants.ERROR_CORRECT_Q, "H": qrcode.constants.ERROR_CORRECT_H}.get(str(correcao).upper(), qrcode.constants.ERROR_CORRECT_M)
+    q = qrcode.QRCode(error_correction=nivel, border=int(borda))
+    q.add_data(str(texto)); q.make(fit=True)
+    m = q.get_matrix()
+    return {"linhas": [[1 if c else 0 for c in l] for l in m], "n": len(m), "versao": q.version}
+
+
+# ─────────────────────────── ícones (Tabler Icons, MIT, baixados sob demanda) ───────────────────────────
+ICONES_URL = "https://cdn.jsdelivr.net/npm/@tabler/icons@3/icons/{estilo}/{nome}.svg"
+
+
+def icone_svg(nome, estilo="outline"):
+    """SVG de um ícone Tabler (tabler.io/icons, licença MIT): baixa uma vez e guarda em
+    %APPDATA%/CaniveteDoPailer/icones/tabler/<estilo>/<nome>.svg. estilo: outline (traço) | filled (cheio)."""
+    nome = re.sub(r"[^a-z0-9-]", "", str(nome).lower().strip().replace(" ", "-").replace("_", "-"))
+    estilo = "filled" if str(estilo).lower().startswith(("fill", "chei")) else "outline"
+    if not nome:
+        return {"success": False, "error": "nome do ícone vazio"}
+    pasta = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "icones", "tabler", estilo)
+    arq = os.path.join(pasta, nome + ".svg")
+    if not os.path.isfile(arq):
+        import urllib.request, urllib.error
+        try:
+            with urllib.request.urlopen(ICONES_URL.format(estilo=estilo, nome=nome), timeout=15) as r:
+                dados = r.read()
+        except urllib.error.HTTPError as e:
+            outro = "outline" if estilo == "filled" else "filled"
+            return {"success": False, "error": f"ícone '{nome}' ({estilo}) não existe" + (f" — tente estilo {outro} ou veja os nomes em tabler.io/icons" if e.code == 404 else f" (HTTP {e.code})")}
+        except Exception as e:
+            return {"success": False, "error": f"sem internet para baixar o ícone '{nome}': {e}"}
+        os.makedirs(pasta, exist_ok=True)
+        with open(arq, "wb") as f:
+            f.write(dados)
+    return {"success": True, "svg": open(arq, encoding="utf-8").read(), "nome": nome, "estilo": estilo, "licenca": "Tabler Icons (MIT)"}

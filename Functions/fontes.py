@@ -17,13 +17,32 @@ _cache = None
 _lock = threading.Lock()
 
 
+def _pasta_usuario():
+    """Pasta das fontes instaladas "só para mim" (perfil real do usuário, mesmo com LOCALAPPDATA trocado)."""
+    return os.path.join(os.path.expanduser("~"), "AppData", "Local", "Microsoft", "Windows", "Fonts")
+
+
 def _pastas():
     win = os.environ.get("WINDIR", r"C:\Windows")
-    out = [os.path.join(win, "Fonts")]
+    out = [os.path.join(win, "Fonts"), _pasta_usuario()]
     loc = os.environ.get("LOCALAPPDATA")
     if loc:
         out.append(os.path.join(loc, "Microsoft", "Windows", "Fonts"))
-    return [p for p in out if os.path.isdir(p)]
+    try:   # o Windows registra cada fonte do usuário com o caminho (instaladores podem usar outras pastas)
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows NT\CurrentVersion\Fonts") as k:
+            for i in range(winreg.QueryInfoKey(k)[1]):
+                v = winreg.EnumValue(k, i)[1]
+                if isinstance(v, str) and os.path.isabs(v):
+                    out.append(os.path.dirname(v))
+    except Exception:
+        pass
+    vistos, res = set(), []
+    for p in out:
+        n = os.path.normcase(os.path.abspath(p))
+        if n not in vistos and os.path.isdir(p):
+            vistos.add(n); res.append(p)
+    return res
 
 
 def _nomes(dados, off, extra=()):
@@ -200,7 +219,7 @@ def instalar_google(familia):
             arquivos = None
     if not arquivos:
         return {"success": False, "error": f"'{familia}' não encontrada no Google Fonts"}
-    pasta = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "Microsoft", "Windows", "Fonts")
+    pasta = _pasta_usuario()
     os.makedirs(pasta, exist_ok=True)
     feitos = []
     for a in arquivos:

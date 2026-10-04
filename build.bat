@@ -71,6 +71,7 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "soundfile" ^
  --hidden-import "librosa" ^
  --collect-all "yt_dlp_ejs" ^
+ --collect-all "pyphen" ^
  --collect-all "webview" ^
  --collect-all "pythonnet" ^
  --collect-all "clr_loader" ^
@@ -101,6 +102,7 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "Functions.vetor_exportar" ^
  --hidden-import "pikepdf" ^
  --hidden-import "uharfbuzz" ^
+ --hidden-import "qrcode" ^
  --hidden-import "pathops" ^
  --hidden-import "skia" ^
  --hidden-import "zstandard" ^

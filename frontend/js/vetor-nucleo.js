@@ -147,10 +147,34 @@ function vkPoligonoSubs(cx, cy, r, lados, r2 = null, rot = -Math.PI / 2) {
     for (let i = 0; i < n; i++) { const rr = r2 != null && i % 2 ? r2 : r, a = rot + i * 2 * Math.PI / n; pts.push(vkPt(cx + rr * Math.cos(a), cy + rr * Math.sin(a))); }
     return [{ fechado: true, pts }];
 }
-function vkSvgD(d) {   // caminho SVG (M L H V C S Q Z, absoluto ou relativo) → subs — para o Claude escrever formas
-    const t = String(d).match(/[MmLlHhVvCcSsQqZz]|-?(?:\d+\.?\d*|\.\d+)(?:e-?\d+)?/g) || [];
-    const subs = []; let i = 0, cmd = null, x = 0, y = 0, sx = 0, sy = 0, cur = null, uc = null;
-    const n = () => +t[i++];
+// arco SVG (A rx ry rot grande horario x y) → cúbicas [[c1, c2, p], ...] (≤ 90° cada), conversão do SVG 1.1 (F.6.5)
+function vkArcoCubicas(x1, y1, rx, ry, rot, grande, horario, x2, y2) {
+    if (Math.abs(x1 - x2) < 1e-9 && Math.abs(y1 - y2) < 1e-9) return [];
+    rx = Math.abs(rx); ry = Math.abs(ry); if (!rx || !ry) return [[[x1, y1], [x2, y2], [x2, y2]]];
+    const f = rot * Math.PI / 180, cf = Math.cos(f), sf = Math.sin(f);
+    const dx = (x1 - x2) / 2, dy = (y1 - y2) / 2, x1p = cf * dx + sf * dy, y1p = -sf * dx + cf * dy;
+    const L = x1p * x1p / (rx * rx) + y1p * y1p / (ry * ry); if (L > 1) { rx *= Math.sqrt(L); ry *= Math.sqrt(L); }
+    const num = rx * rx * ry * ry - rx * rx * y1p * y1p - ry * ry * x1p * x1p, den = rx * rx * y1p * y1p + ry * ry * x1p * x1p;
+    const co = (grande === horario ? -1 : 1) * Math.sqrt(Math.max(0, num / den));
+    const cxp = co * rx * y1p / ry, cyp = -co * ry * x1p / rx;
+    const cx = cf * cxp - sf * cyp + (x1 + x2) / 2, cy = sf * cxp + cf * cyp + (y1 + y2) / 2;
+    const ang = (ux, uy, vx, vy) => { const a = Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy); return a; };
+    const t1 = ang(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry);
+    let dt = ang((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry);
+    if (!horario && dt > 0) dt -= 2 * Math.PI; else if (horario && dt < 0) dt += 2 * Math.PI;
+    const n = Math.ceil(Math.abs(dt) / (Math.PI / 2) - 1e-9), d = dt / n, k = 4 / 3 * Math.tan(d / 4), out = [];
+    const P = t => { const c = Math.cos(t), s = Math.sin(t); return [cx + rx * c * cf - ry * s * sf, cy + rx * c * sf + ry * s * cf]; };
+    const D = t => { const c = Math.cos(t), s = Math.sin(t); return [-rx * s * cf - ry * c * sf, -rx * s * sf + ry * c * cf]; };
+    for (let i = 0; i < n; i++) {
+        const a = t1 + i * d, b = a + d, pa = P(a), pb = P(b), da = D(a), db = D(b);
+        out.push([[pa[0] + k * da[0], pa[1] + k * da[1]], [pb[0] - k * db[0], pb[1] - k * db[1]], i === n - 1 ? [x2, y2] : pb]);
+    }
+    return out;
+}
+function vkSvgD(d) {   // caminho SVG (M L H V C S Q T A Z, absoluto ou relativo) → subs — para o Claude escrever formas
+    const t = String(d).match(/[MmLlHhVvCcSsQqTtAaZz]|-?(?:\d+\.?\d*|\.\d+)(?:e-?\d+)?/g) || [];
+    const subs = []; let i = 0, cmd = null, x = 0, y = 0, sx = 0, sy = 0, cur = null, uc = null, uq = null;
+    const n = () => { const v = t[i++]; if (/[A-Za-z]/.test(v)) throw new Error(`caminho d: faltou número antes de "${v}" em "${String(d).slice(0, 60)}"`); return +v; };
     while (i < t.length) {
         if (/[A-Za-z]/.test(t[i])) { cmd = t[i++]; if (/[Zz]/.test(cmd)) { if (cur) { cur.fechado = true; const p = cur.pts; if (p.length > 1 && Math.abs(p[0][0] - p.at(-1)[0]) < 1e-6 && Math.abs(p[0][1] - p.at(-1)[1]) < 1e-6) { p[0][2] = p.at(-1)[2]; p[0][3] = p.at(-1)[3]; p.pop(); } } x = sx; y = sy; cur = null; continue; } }
         const rel = cmd === cmd.toLowerCase(), C = cmd.toUpperCase(), ox = rel ? x : 0, oy = rel ? y : 0;
@@ -165,8 +189,18 @@ function vkSvgD(d) {   // caminho SVG (M L H V C S Q Z, absoluto ou relativo) �
             const u = cur.pts.at(-1); u[4] = c1[0]; u[5] = c1[1]; cur.pts.push([x, y, c2[0], c2[1], x, y]); uc = c2;
         } else if (C === 'Q') {
             const q = [n() + ox, n() + oy], px = n() + ox, py = n() + oy, u = cur.pts.at(-1);
-            u[4] = x + 2 / 3 * (q[0] - x); u[5] = y + 2 / 3 * (q[1] - y); cur.pts.push([px, py, px + 2 / 3 * (q[0] - px), py + 2 / 3 * (q[1] - py), px, py]); x = px; y = py; uc = null;
+            u[4] = x + 2 / 3 * (q[0] - x); u[5] = y + 2 / 3 * (q[1] - y); cur.pts.push([px, py, px + 2 / 3 * (q[0] - px), py + 2 / 3 * (q[1] - py), px, py]); x = px; y = py; uc = null; uq = q;
+            continue;
+        } else if (C === 'T') {
+            const q = uq ? [2 * x - uq[0], 2 * y - uq[1]] : [x, y], px = n() + ox, py = n() + oy, u = cur.pts.at(-1);
+            u[4] = x + 2 / 3 * (q[0] - x); u[5] = y + 2 / 3 * (q[1] - y); cur.pts.push([px, py, px + 2 / 3 * (q[0] - px), py + 2 / 3 * (q[1] - py), px, py]); x = px; y = py; uc = null; uq = q;
+            continue;
+        } else if (C === 'A') {
+            const rx = n(), ry = n(), rot = n(), ga = n(), hr = n(), px = n() + ox, py = n() + oy;
+            for (const [c1, c2, p] of vkArcoCubicas(x, y, rx, ry, rot, !!ga, !!hr, px, py)) { const u = cur.pts.at(-1); u[4] = c1[0]; u[5] = c1[1]; cur.pts.push([p[0], p[1], c2[0], c2[1], p[0], p[1]]); }
+            x = px; y = py; uc = null;
         } else i++;
+        uq = null;
     }
     return subs;
 }
@@ -232,7 +266,7 @@ function vkCorDe(s) {   // texto → cor: "#ff0000", "cmyk(0,100,100,0)", "C0 M1
 // ─────────────────────────── texto (geometria do Python) ───────────────────────────
 // campos que mudam a geometria (o spec do Python); estilos já vêm gravados no objeto, encadeamento e trilha em vkTxSpec
 const VK_TX_CAMPOS = ['conteudo', 'fam', 'estilo', 'tam', 'entrelinha', 'track', 'alin', 'caixa', 'caixa_alt', 'desl', 'eh', 'ev', 'maius', 'pos', 'liga', 'frac', 'num',
-    'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois', 'trechos', 'trilha'];
+    'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois', 'hifen', 'trechos', 'trilha'];
 const VK_TX_CAIXA = new Set(['caixa', 'caixa_alt', 'trilha']);   // da própria caixa; o resto vem do texto-raiz (encadeado)
 function vkTxFonte(o, n = 0) {   // texto encadeado: {raiz, ini} — de onde vem o conteúdo desta caixa (null = a anterior ainda calculando)
     const p = o.anterior && vkObj(o.anterior);

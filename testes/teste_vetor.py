@@ -297,6 +297,33 @@ with sync_playwright() as p:
     r = pg.evaluate("([c]) => VKN.exportarPdf(c, {padrao: 'x4'})", [out])
     ok(r["verificado"], f"PDF/X-4 com perfil e setas ({r['problemas']})")
 
+    print("formas e recursos do desafio do flyer (arco, setor, QR, ícone, hifenização, repetir)")
+    C("novo", {"nome": "Formas teste", "larg": 120, "alt": 80})
+    r = C("caminho", {"d": "M10 20 A10 10 0 0 1 30 20 Z", "preench": "C0 M100 Y0 K0", "nome": "meia lua"})
+    ok(abs(r["caixa_mm"]["larg"] - 20) < 0.05 and abs(r["caixa_mm"]["alt"] - 10) < 0.05, f"caminho com arco SVG (A) ({r['caixa_mm']})")
+    r = C("setor", {"cx": 60, "cy": 40, "raio": 20, "de": -90, "ate": 0, "nome": "quarto"})
+    ok(abs(r["caixa_mm"]["larg"] - 20) < 0.05 and abs(r["caixa_mm"]["x"] - 60) < 0.05, f"setor de 90° ({r['caixa_mm']})")
+    r = C("setor", {"cx": 60, "cy": 40, "raio": 20, "raio_interno": 12, "de": 0, "ate": 180, "vao": 2, "nome": "rosca"})
+    ok(r and r["caixa_mm"]["alt"] < 20, f"setor de rosca com vão ({r['caixa_mm']})")
+    r = C("qrcode", {"conteudo": "https://kanivete.app", "x": 90, "y": 5, "tamanho": 20})
+    ok(r["modulos"] >= 21 and abs(r["caixa_mm"]["larg"] - 20) < 0.05, f"QR code vetorial ({r['modulos']} módulos, {r['modulo_mm']} mm)")
+    try:
+        r = C("icone", {"nome": "trophy", "x": 5, "y": 50, "tamanho": 12, "cor": "C78 M0 Y95 K0"})
+        ok(abs(r["caixa_mm"]["larg"] - 10) < 2.5 and r["licenca"].startswith("Tabler"), f"ícone Tabler ({r['caixa_mm']})")
+    except Exception as e:
+        print("  (ícone pulado: sem internet?)", str(e)[:80])
+    t = C("texto", {"conteudo": "Some extraordinarily comprehensive internationalization documentation explains everything", "x": 5, "y": 65,
+                    "caixa": 30, "fonte": "Arial", "tamanho": 8, "alin": "just", "hifen": "en_US", "nome": "hifenizado"})
+    nh = pg.evaluate("() => { const o = vkTodos().find(x => x.o.nome === 'hifenizado').o, g = vkGeo(o); return g.linhas.filter(l => /[a-z]/i.test(o.conteudo[l.fim - 1] || '') && o.conteudo[l.fim] && /[a-z]/i.test(o.conteudo[l.fim])).length; }")
+    ok(nh >= 1, f"hifenização quebra palavra no fim da linha ({nh} linhas hifenizadas)")
+    s = C("retangulo", {"x": 5, "y": 75, "larg": 1, "alt": 3, "preench": "100K", "traco": "nenhum"})
+    c = C("duplicar", {"ids": [s["id"]], "dx": 2})
+    r = C("repetir", {"vezes": 5, "ids": c["ids"]})
+    ok(len(r.get("novos") or []) == 5, f"repetir devolve todas as cópias ({len(r.get('novos') or [])})")
+    out = os.path.join(SAI, "formas_x4.pdf")
+    r = pg.evaluate("([c]) => VKN.exportarPdf(c, {padrao: 'x4'})", [out])
+    ok(r["verificado"], f"PDF/X-4 com setor, QR e ícone ({r['problemas']})")
+
     print("separações e sobreimpressão")
     C("novo", {"nome": "Sep teste", "larg": 100, "alt": 60, "sangria": 3})
     C("retangulo", {"x": 0, "y": 0, "larg": 100, "alt": 60, "preench": "C0 M0 Y100 K0", "traco": "nenhum", "nome": "fundo"})

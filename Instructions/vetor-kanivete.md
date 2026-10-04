@@ -29,6 +29,10 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 | Efeitos vivos: Cantos arredondados (vetorial), Sombra projetada, Brilho externo, Desfoque | acabamento | `efeito` (tipo sombra/brilho/desfoque/cantos; dx, dy, desfoque, raio em mm; cor, opacidade, mesclagem). Sombra/brilho/desfoque saem rasterizados a 300 ppi NA COR DA TINTA (imagem CMYK ou Separation + SMask com a silhueta desfocada) — só PDF/X-4; o fechamento acusa em X-1a |
 | Lápis (N), Pincel (B, com perfil), Pincel de bolha (Shift+B), Borracha (Shift+E), Simplificar | desenho à mão, ilustração, retoque de forma | `vetor-desenho.js`: como o Lápis do Illustrator — reamostra, suaviza (gaussiana), procura cantos DEPOIS de suavizar (só bico > 150° na mão livre) e ajusta cúbicas por mínimos quadrados (Schneider: a curva passa perto dos pontos, dentro do erro → sem tremido); Fidelidade 1 (preciso) a 10 (suave), padrão 6 = erro ≈ 6 px de tela (calibrado com `D:/kanivete_testes/scripts/vetor_tremido*.py`); laço fechado em 4 trechos com tangente contínua; `lapis` (pontos mm, fidelidade mm = erro permitido, suavizar 0-10, fechar, espessura pt, perfil), `simplificar` (tolerancia mm, suavizar), `bolha` (pontos, espessura mm, cor: junta com as formas da mesma cor que encosta), `borracha` (pontos, espessura; selecionados ou todos embaixo) |
 | Setas e perfil de largura no traço, ferramenta Largura (Shift+W) | setas de diagrama, traço caligráfico | `alterar` com `seta_ini`/`seta_fim` (seta, triangulo, circulo, quadrado, barra), `seta_esc` %, `perfil` (uniforme, lente, afinar, afinar_inicio, gota, bico ou [[t, larg]]); viram formas (tela = PDF) |
+| Setor (pizza/rosca, com vão), Arco, `A`/`T` no `d` do caminho | mosaico de fotos em fatias, gráfico, selo | `setor` (cx, cy, raio, de/ate graus — 0 = 3 h, horário —, raio_interno, vao mm), `arco`; `caminho` com `d` SVG completo (M L H V C S Q T A Z) |
+| QR code vetorial | gráfica: QR em vetor, nunca imagem | `qrcode` (conteudo, x, y, tamanho mm, cor, correcao L/M/Q/H, fundo, margem): módulos unidos numa forma só (lib `qrcode`) |
+| Ícones (Tabler Icons, MIT, ~5000) | ícones de serviço/contato sem desenhar à mão | `icone` (nome de tabler.io/icons, x, y, tamanho mm, cor, estilo outline/filled, espessura): baixa uma vez para `%APPDATA%/CaniveteDoPailer/icones` |
+| Hifenizar (Parágrafo) | texto justificado sem "rios" | `hifen`/`hifenizar` (true = pt_BR, 'en_US'...) no `texto`/`alterar`; pyphen (dicionários do LibreOffice), 6+ letras, 2 antes / 3 depois; só o trecho de letras da palavra |
 | Texto em caminho | selo, logo circular | ferramenta Texto em caminho (clique no caminho); `texto_caminho` (`ini` mm, `lado`, `manter_caminho`) |
 | Estilos de parágrafo / caractere, Glifos, juntar textos importados | padronizar, caracteres especiais, editar .ai/PDF | `estilo_texto` (tipo, nome, `de`, `aplicar`; mudar um estilo atualiza quem usa), `estilos_texto`, `glifos`, `inserir_texto` (`codigo`/`texto`, `pos`), `juntar_textos` (linhas → parágrafos; `quebras:'linhas'`) |
 | Alinhar/distribuir, guias inteligentes | precisão | caixa pelos extremos reais da cúbica (não pelas alças); encaixe magenta |
@@ -41,7 +45,7 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 `.aknv` abre no KANIVETE por duplo clique (associação HKCU em Functions/projeto.py; roteado em `abrirProjetoExterno`).
 
 Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): texto dentro de forma (área não retangular),
-hifenização, tabulações, editar a trilha do texto em caminho com a Seleção direta, estilos dentro da caixa de edição (ela é texto puro);
+tabulações, editar a trilha do texto em caminho com a Seleção direta, estilos dentro da caixa de edição (ela é texto puro);
 efeitos que faltam (brilho interno, distorcer/zigue-zague, Aparência em grupo; efeitos na prévia de separações e no SVG); ferramenta de degradê na arte, malha, mesclagem (Blend); símbolos, padrões, recolorir arte, livros Pantone; Image Trace,
 distorção de envelope, máscara de opacidade; painel de vínculos e variáveis; EPS; PDF com texto editável (hoje: curvas).
 
@@ -82,7 +86,7 @@ Unidades de agente: **mm relativos ao canto da prancheta** (`prancheta: nome|id|
 Comandos (`VKN.comandos()`): novo, documento, abrir, importar, salvar, exportar_pdf, exportar_imagem, exportar_svg,
 retangulo, elipse, poligono, estrela, linha, caminho (`d` SVG em mm ou `subs`), texto, imagem, alterar, mover,
 posicionar, redimensionar, girar, refletir, matriz, alinhar, distribuir, organizar, agrupar, desagrupar, mascara,
-soltar_mascara, composto, pathfinder, deslocar (`distancia` mm, `junc`), contornar_traco, repetir, transformar_cada, distribuir_espaco, construtor, pathfinder2, tesoura, faca, juntar, media, separacoes, tinta_em, exportar_separacoes, contornos, empacotar (`pasta`, `pdf`, `fontes`), aparencia, efeito, expandir_aparencia, lapis, simplificar, bolha, borracha, texto_caminho, encadear, desencadear, estilo_texto, estilos_texto, juntar_textos, glifos, inserir_texto, duplicar, apagar, selecionar, mover_para_camada, nova_camada, camada,
+soltar_mascara, composto, pathfinder, deslocar (`distancia` mm, `junc`), contornar_traco, repetir, transformar_cada, distribuir_espaco, construtor, pathfinder2, tesoura, faca, juntar, media, separacoes, tinta_em, exportar_separacoes, contornos, empacotar (`pasta`, `pdf`, `fontes`), setor, arco, qrcode, icone, aparencia, efeito, expandir_aparencia, lapis, simplificar, bolha, borracha, texto_caminho, encadear, desencadear, estilo_texto, estilos_texto, juntar_textos, glifos, inserir_texto, duplicar, apagar, selecionar, mover_para_camada, nova_camada, camada,
 nova_prancheta, prancheta, mover_prancheta, amostra, cores_padrao, definir_subs, converter_cmyk, preto_texto,
 sobreimprimir_preto, tirar_sobre_branco, engrossar_tracos, limpar, mapa, info, ajuda.
 Fonte "Arial Bold" (família + estilo juntos) é entendida. Só `preench` informado = sem traço.
@@ -160,3 +164,18 @@ O que não vira objeto entra no `relatorio` (mostrado ao abrir).
   `vetor_desenho_ui.py` (lápis, pincel, bolha, borracha, Largura, seta pelo painel); `vetor_texto_ui.py` (caixa com altura, + vermelho → encadear, texto em caminho, trecho no painel).
 - 2026-10-04 v1: Worker `VETOR_FLYER_03` (flyer A6 do zero, alinhar, fechamento, PDF/X-4) — 8 operações, 0 erros, 20 s.
   Lições: o modelo manda "Arial Bold" como fonte (agora entendido); exportar_pdf precisa estar nas finais do worker.py.
+
+## 7. Desafio: flyer "webmart" refeito do zero (2026-10-04)
+Referência de agência (Illustrator) refeita só pelos comandos (`D:/kanivete_testes/flyer_webmart/montar.py`, fotos geradas
+pelo FLUX local com semente fixa em `gerar_fotos.py`; `comparar.py` = referência × PDF). Técnicas que fecharam a peça:
+- faixa verde = retângulo ∪ círculo e **Deslocar +9 / −9 mm** (fechamento morfológico: arredonda só os cantos côncavos — a
+  "concordância" do Illustrator); foto do escritório + retângulo em modo **cor** + outro em **multiplicação**, dentro de máscara
+  com a cópia da faixa;
+- mosaico = **setores** com vão sobre disco branco, cada foto mascarada pelo seu setor (`organizar frente` + `mascara`);
+- pílulas = `caminho` com arco + efeito **cantos arredondados** na ponta; listras = duplicar + **repetir (Ctrl+D)**;
+  título de 2 cores = **trecho**; ícones **Tabler**; **QR** vetorial; parágrafo **justificado com hifenização**.
+Limitações achadas → corrigidas na hora: arco `A` no `d` (não existia), QR code, ícones, hifenização, `repetir` só devolvia a
+última cópia (`novos` = todas), fontes do usuário procuradas só por `LOCALAPPDATA` (agora registro HKCU + perfil real), e o
+fechamento pegou fatias passando 1 mm do corte sem chegar na sangria (aviso certo: fatias ajustadas).
+Ainda não: ampliar foto por IA (o gerador vai até 2048 px → 224 ppi na faixa: aviso `resolucao_baixa`), amostra de padrão
+(as listras são cópias), ferramenta de degradê na arte e Blend.
