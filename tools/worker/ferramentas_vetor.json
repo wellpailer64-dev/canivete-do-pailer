@@ -829,7 +829,7 @@
 "type": "function",
 "function": {
 "name": "efeito",
-"description": "Efeito vivo: sombra | brilho | desfoque | cantos. dx, dy, desfoque, raio em mm; opacidade %.",
+"description": "Efeito vivo: sombra | brilho | brilho_interno | desfoque | cantos | zigue | aspero | inflar | torcer. dx, dy, desfoque, raio, tamanho em mm; opacidade %.",
 "parameters": {
 "type": "object",
 "properties": {
@@ -845,8 +845,13 @@
 "enum": [
 "sombra",
 "brilho",
+"brilho_interno",
 "desfoque",
-"cantos"
+"cantos",
+"zigue",
+"aspero",
+"inflar",
+"torcer"
 ]
 },
 "dx": {
@@ -866,6 +871,26 @@
 },
 "opacidade": {
 "type": "number"
+},
+"tamanho": {
+"type": "number",
+"description": "zigue/aspero: tamanho do desvio (mm)"
+},
+"cristas": {
+"type": "number",
+"description": "zigue: cristas por segmento"
+},
+"quantidade": {
+"type": "number",
+"description": "inflar: % (+ infla, − murcha)"
+},
+"graus": {
+"type": "number",
+"description": "torcer: graus"
+},
+"suave": {
+"type": "boolean",
+"description": "zigue/aspero: ondas suaves em vez de pontas"
 }
 },
 "required": [

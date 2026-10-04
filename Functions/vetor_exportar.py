@@ -265,7 +265,7 @@ class _Escritor:
             return pikepdf.Name.DeviceRGB, [int(x) for x in c["v"]]
         return pikepdf.Name.DeviceCMYK, [round(max(0, min(100, x)) * 2.55) for x in self.cmyk_de(c or {"k": "cmyk", "v": [0, 0, 0, 100]})]
 
-    def efeito_raster(self, ef, pinturas, cor=None):
+    def efeito_raster(self, ef, pinturas, cor=None, interno=False):
         """pinturas = [{subs, regra, preench?, traco?}] (pt do documento) → imagem na cor do efeito com a silhueta
         desfocada como SMask (300 ppi). Sombra/brilho: cor do efeito, deslocada; desfoque: cor = a do próprio objeto."""
         import numpy as np, pikepdf, skia
@@ -288,7 +288,7 @@ class _Escritor:
         sup = skia.Surface(W, H); cv = sup.getCanvas(); cv.clear(skia.ColorTRANSPARENT)
         cv.scale(esc, esc); cv.translate(-x0 + dx, -y0 + dy)
         pn = skia.Paint(AntiAlias=True, Color=skia.ColorBLACK)
-        if sig > 0: pn.setMaskFilter(skia.MaskFilter.MakeBlur(skia.kNormal_BlurStyle, sig))
+        if sig > 0 and not interno: pn.setMaskFilter(skia.MaskFilter.MakeBlur(skia.kNormal_BlurStyle, sig))
         for p in pinturas:
             caminho = vk._sk_path(p["subs"], p.get("regra", "nonzero"))
             if p.get("preench"):
@@ -300,6 +300,11 @@ class _Escritor:
                 pn.setStrokeJoin([skia.Paint.kMiter_Join, skia.Paint.kRound_Join, skia.Paint.kBevel_Join][["miter", "round", "bevel"].index(t.get("junc", "miter"))])
                 cv.drawPath(caminho, pn)
         alfa = np.ascontiguousarray(sup.makeImageSnapshot().toarray()[:, :, 3])
+        if interno:   # brilho interno: o lado de fora desfocado, só dentro da forma
+            import cv2
+            fora = 255 - alfa
+            if sig > 0: fora = cv2.GaussianBlur(fora, (0, 0), sig * esc)
+            alfa = np.ascontiguousarray((fora.astype(np.float32) * alfa / 255).astype(np.uint8))
         if not alfa.any(): return []
         cs, comp = self._cs_cor(cor if cor is not None else ef.get("cor") or {"k": "cmyk", "v": [0, 0, 0, 100]})
         cores = np.tile(np.array(comp, dtype=np.uint8), W * H).tobytes()
@@ -318,7 +323,7 @@ class _Escritor:
 
     def objeto(self, o):
         if o.get("visivel") is False: return []
-        efs = [e for e in (o.get("efeitos") or []) if e.get("visivel") is not False and e.get("tipo") in ("sombra", "brilho", "desfoque")]
+        efs = [e for e in (o.get("efeitos") or []) if e.get("visivel") is not False and e.get("tipo") in ("sombra", "brilho", "desfoque", "brilho_interno")]
         if efs and o.get("_silh"):   # efeitos vivos: a tela mandou a silhueta (pinturas em pt do documento)
             out = ["q"] + self.estilo_ops(o)
             for e in efs:
@@ -331,7 +336,10 @@ class _Escritor:
                     if p.get("preench"): out += self.efeito_raster(desf, [dict(p, traco=None)], p["preench"])
                     if p.get("traco") and p["traco"].get("cor"): out += self.efeito_raster(desf, [dict(p, preench=None)], p["traco"]["cor"])
                 return out + ["Q"]
-            return out + self.objeto(dict(o, efeitos=None, op=1, bm="normal")) + ["Q"]   # opacidade/mesclagem já valem no q de fora
+            depois = []
+            for e in efs:
+                if e["tipo"] == "brilho_interno": depois += self.efeito_raster(e, [p for p in o["_silh"] if p.get("preench")], interno=True)
+            return out + self.objeto(dict(o, efeitos=None, op=1, bm="normal")) + depois + ["Q"]   # opacidade/mesclagem já valem no q de fora
         if o.get("_pint") is not None:   # Aparência (vários preenchimentos/traços, cantos arredondados): pinturas prontas da tela
             out = []
             for p in o["_pint"]:

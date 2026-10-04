@@ -418,6 +418,16 @@ with sync_playwright() as p:
     ok(tf_["linhas"] >= 4 and lg_[0] < max(lg_) * 0.8, f"texto dentro da forma: linhas acompanham a elipse ({lg_})")
     C("alterar", {"ids": [tf_["id"]], "tamanho": 14})
     ok(pg.evaluate("id => vkGeo(vkObj(id)).transborda", tf_["id"]), "texto que não cabe na forma acusa sobra (+ vermelho)")
+    C("novo", {"nome": "Distorcer", "larg": 120, "alt": 60})
+    pts_ = {}
+    for tipo_, extra_ in (("zigue", {"tamanho": 2, "cristas": 4}), ("aspero", {"tamanho": 1}), ("inflar", {"quantidade": 60}), ("torcer", {"graus": 60}), ("brilho_interno", {"desfoque": 2})):
+        q_ = C("estrela", {"cx": 15 + len(pts_) * 22, "cy": 30, "raio": 9, "pontas": 5, "preench": "C0 M100 Y0 K0", "traco": "nenhum"})
+        C("efeito", {"ids": [q_["id"]], "tipo": tipo_, **extra_})
+        pts_[tipo_] = pg.evaluate("async id => { const p = await vkApPronto(vkObj(id)); return p[0].subs[0].pts.length; }", q_["id"])
+    ok(pts_["zigue"] > 30 and pts_["aspero"] > 10 and pts_["torcer"] >= 40 and pts_["brilho_interno"] == 10, f"efeitos de distorção vivos mudam a forma; brilho interno não ({pts_})")
+    out_d = os.path.join(SAI, "distorcer.pdf"); r_ = pg.evaluate("([c]) => VKN.exportarPdf(c, {padrao: 'x4'})", [out_d])
+    f_ = pg.evaluate("VKN.fechamento({padrao: 'x1a'})")
+    ok(r_["verificado"] and sum(1 for e in f_["erros"] if e["cod"] == "efeito_transparencia") == 1, f"PDF com distorções; em X-1a só o brilho interno é transparência ({[e['cod'] for e in f_['erros']]})")
     eps = os.path.join(SAI, "teste.eps"); open(eps, "w").write("%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 100 100\n0 0 1 setrgbcolor 10 10 80 80 rectfill\nshowpage\n")
     try:
         r_ = C("abrir", {"caminho": eps}); ok(r_ and not r_.get("cancelado"), "EPS aberto pelo Ghostscript")
