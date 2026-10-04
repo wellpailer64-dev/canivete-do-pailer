@@ -460,3 +460,18 @@ function vkDsPainelEventos(el) {
         return { id: o.id, nome: o.nome, estilo: r.estilo, licenca: r.licenca, caixa_mm: vkCaixaMM(o) };
     });
 })();
+
+// degrade: aplica degradê pela caixa do objeto. tipo linear|radial, cores [..] (espalhadas) ou paradas [{pos %, cor}],
+// angulo (graus, linear; 0 = esquerda→direita), traco (true = no traço)
+vkRegistrar('degrade', 'degradê', a => {
+    const objs = vkTxAlvos(a), ps = a.paradas ? a.paradas.map(p => ({ p: Math.max(0, Math.min(1, +p.pos / 100)), cor: vkCorDe(p.cor) }))
+        : (a.cores || ['0K', '100K']).map((c, i, l) => ({ p: l.length > 1 ? i / (l.length - 1) : 0, cor: vkCorDe(c) }));
+    for (const o of objs) {
+        const b = vkBox(o), cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2, ang = -(+a.angulo || 0) * Math.PI / 180;
+        const L = (Math.abs((b[2] - b[0]) * Math.cos(ang)) + Math.abs((b[3] - b[1]) * Math.sin(ang))) / 2;
+        const g = a.tipo === 'radial' ? { k: 'grad', tipo: 'rad', a: [cx, cy], b: [cx, cy], r: Math.hypot(b[2] - b[0], b[3] - b[1]) / 2, paradas: vkClone(ps) }
+            : { k: 'grad', tipo: 'lin', a: [cx - L * Math.cos(ang), cy - L * Math.sin(ang)], b: [cx + L * Math.cos(ang), cy + L * Math.sin(ang)], paradas: vkClone(ps) };
+        if (a.traco) { if (o.traco) o.traco = { ...o.traco, cor: g }; } else o.preench = g;
+    }
+    return { alterados: objs.length };
+});
