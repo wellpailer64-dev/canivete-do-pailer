@@ -246,7 +246,7 @@ function vkEventos() {
             return;
         }
         if (A.f === 'caneta') { vkCanetaUp(ex, ey); return; }
-        if (A.modo === 'desenho' || A.modo === 'largura') { await vkDsUp(A, ex, ey); vkDesenhar(); return; }
+        if (A.modo === 'desenho' || A.modo === 'largura' || A.modo === 'degrade') { await vkDsUp(A, ex, ey); vkDesenhar(); return; }
         if (A.modo === 'construir' || A.modo === 'faca') { await vkcUp(A, ex, ey); vkDesenhar(); return; }
         if (A.modo === 'texto') {
             const caixa = A.moveu ? Math.abs(ex - A.x) : null, caixa_alt = A.moveu && Math.abs(ey - A.y) * VK.vista.z > 8 ? Math.abs(ey - A.y) : null;   // arrastar = caixa de área (com altura, como no Illustrator)
@@ -495,7 +495,7 @@ function vkTeclas(e) {
     if (k === 'd' && !S) return faz(() => { VK.preench = { k: 'cmyk', v: [0, 0, 0, 0] }; VK.traco = { k: 'cmyk', v: [0, 0, 0, 100] }; vkUiAgendar(); });
     if (k === 'x' && !S) return faz(() => { VK.focoTraco = !VK.focoTraco; vkUiAgendar(); });
     if (k === '/') return faz(() => { if (VK.sel.length) vkCmdUi('alterar', VK.focoTraco ? { traco: null } : { preench: null }); else { if (VK.focoTraco) VK.traco = null; else VK.preench = null; vkUiAgendar(); } });
-    const mapa = { v: 'selecao', a: 'direta', p: 'caneta', t: 'texto', m: 'retangulo', l: 'elipse', '\\': 'linha', i: 'contagotas', h: 'mao', z: 'zoom', c: 'tesoura', n: 'lapis', b: 'pincel' };
+    const mapa = { v: 'selecao', a: 'direta', p: 'caneta', t: 'texto', m: 'retangulo', l: 'elipse', '\\': 'linha', i: 'contagotas', h: 'mao', z: 'zoom', c: 'tesoura', n: 'lapis', b: 'pincel', g: 'degrade' };
     if (!S && !A && mapa[k]) return faz(() => vkFerramenta(mapa[k]));
 }
 function vkStatus(x, y) { const el = document.getElementById('vk-status-pos'); if (el) el.textContent = `X ${vkR(vkMM(x - ((VK.doc.pranchetas.find(p => p.id === VK.ativa) || {}).x || 0)), 1)}  Y ${vkR(vkMM(y - ((VK.doc.pranchetas.find(p => p.id === VK.ativa) || {}).y || 0)), 1)} mm`; }

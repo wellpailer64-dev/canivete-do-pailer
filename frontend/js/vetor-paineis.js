@@ -67,7 +67,7 @@ function vkMontar() {
     <div class="ie-modal" id="vk-modal" hidden></div>
     <div class="ie-pop" id="vk-pop" hidden></div>`;
     // ferramentas
-    const grupos = [['selecao', 'direta'], ['caneta', 'texto', 'texto_caminho'], ['lapis', 'pincel', 'bolha', 'borracha', 'largura'], ['construtor', 'tesoura', 'faca'], ['retangulo', 'elipse', 'poligono', 'estrela', 'linha'], ['contagotas', 'prancheta'], ['mao', 'zoom']];
+    const grupos = [['selecao', 'direta'], ['caneta', 'texto', 'texto_caminho'], ['lapis', 'pincel', 'bolha', 'borracha', 'largura', 'degrade'], ['construtor', 'tesoura', 'faca'], ['retangulo', 'elipse', 'poligono', 'estrela', 'linha'], ['contagotas', 'prancheta'], ['mao', 'zoom']];
     vkEl('vk-ferr').innerHTML = `<div class="ie-ferr-lista">${grupos.map(g => g.map(f => `<button class="ie-ferr-btn" data-f="${f}" title="${VK_FERR[f].nome}${VK_FERR[f].tecla ? ' (' + VK_FERR[f].tecla + ')' : ''}">${vkI(f)}</button>`).join('')).join('<div class="ie-ferr-sep"></div>')}</div>
         <div class="vk-cores-ferr" id="vk-cores-ferr"></div>`;
     vkEl('vk-ferr').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) vkFerramenta(b.dataset.f); });
@@ -87,7 +87,7 @@ const VK_MENUS = [
     ['Editar', [['Desfazer', 'Ctrl+Z', vkDesfazer], ['Refazer', 'Shift+Ctrl+Z', vkRefazer], '-', ['Duplicar', '', () => vkCmdUi('duplicar', { dx: vkPT(5), dy: vkPT(5) })],
         ['Apagar', 'Del', () => vkCmdUi('apagar', {})], ['Selecionar tudo', 'Ctrl+A', () => { VK.sel = vkTodosDaCamada(); vkMudou(); }], '-',
         ['Converter cores para CMYK', '', () => vkCmdUi('converter_cmyk', {})]]],
-    ['Objeto', [['Agrupar', 'Ctrl+G', () => vkCmdUi('agrupar', {})], ['Desagrupar', 'Shift+Ctrl+G', () => vkCmdUi('desagrupar', {})], '-',
+    ['Objeto', [['Mesclar (2 formas)', 'Alt+Ctrl+B', () => vkCmdUi('mesclar', { passos: 6 })], ['Degradê (ferramenta)', 'G', () => vkFerramenta('degrade')], '-', ['Agrupar', 'Ctrl+G', () => vkCmdUi('agrupar', {})], ['Desagrupar', 'Shift+Ctrl+G', () => vkCmdUi('desagrupar', {})], '-',
         ['Trazer para frente', 'Shift+Ctrl+]', () => vkCmdUi('organizar', { modo: 'frente' })], ['Avançar', 'Ctrl+]', () => vkCmdUi('organizar', { modo: 'acima' })],
         ['Recuar', 'Ctrl+[', () => vkCmdUi('organizar', { modo: 'abaixo' })], ['Enviar para trás', 'Shift+Ctrl+[', () => vkCmdUi('organizar', { modo: 'tras' })], '-',
         ['Máscara de corte', 'Ctrl+7', () => vkCmdUi('mascara', {})], ['Soltar máscara', 'Alt+Ctrl+7', () => vkCmdUi('soltar_mascara', {})],

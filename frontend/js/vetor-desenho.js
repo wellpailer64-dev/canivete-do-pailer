@@ -7,6 +7,7 @@ Object.assign(VK_FERR, {
     lapis: { nome: 'Lápis', tecla: 'N', cursor: 'crosshair' }, pincel: { nome: 'Pincel', tecla: 'B', cursor: 'crosshair' },
     bolha: { nome: 'Pincel de bolha', tecla: 'Shift+B', cursor: 'crosshair' }, borracha: { nome: 'Borracha', tecla: 'Shift+E', cursor: 'crosshair' },
     largura: { nome: 'Largura (arraste no traço)', tecla: 'Shift+W', cursor: 'ew-resize' },
+    degrade: { nome: 'Degradê (arraste na arte; Alt = radial)', tecla: 'G', cursor: 'crosshair' },
 });
 Object.assign(VK_ICO, {
     lapis: '<path d="M4 20l1.5-5L16 4.5l3.5 3.5L9 18.5z"/><path d="M14 6.5l3.5 3.5"/>',
@@ -14,6 +15,7 @@ Object.assign(VK_ICO, {
     bolha: '<path d="M5 16c0-4 4-4 6-7s5-4 7-2-1 5-3 7-3 6-6 6-4-1-4-4z"/>',
     borracha: '<path d="M8 20h12M4 15l9-9 6 6-8 8H8z"/><path d="M9 10l6 6"/>',
     largura: '<path d="M3 12c4-6 14-6 18 0-4 6-14 6-18 0z"/><path d="M12 7v10"/>',
+    degrade: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 4v16M12 4v16M16 4v16" stroke-dasharray="2 2"/>',
 });
 Object.assign(VK_OPC, { fidelidade: 6, pincel: 3, perfil: 'lente', bolha: vkPT(4), borracha: vkPT(4) });
 const VK_PERFIS = { uniforme: null, lente: [[0, 0], [0.5, 1], [1, 0]], afinar: [[0, 1], [1, 0]], afinar_inicio: [[0, 0], [1, 1]], gota: [[0, 0.15], [0.75, 1], [1, 0]],
@@ -306,6 +308,11 @@ function vkDsAlterar(a, apl) {
 // ── ferramentas de mouse ──
 function vkDsDown(A, x, y) {
     if (['lapis', 'pincel', 'bolha', 'borracha'].includes(A.f)) { A.modo = 'desenho'; A.trilha = [[x, y]]; return true; }
+    if (A.f === 'degrade') {
+        if (!VK.sel.length) { const o = vkObjEm(x, y); if (o) VK.sel = [o.id]; }
+        if (!VK.sel.length) { vkToast('Selecione o objeto e arraste para fazer o degradê'); return 'nada'; }
+        A.modo = 'degrade'; return true;
+    }
     if (A.f === 'largura') {
         const alvo = vkObjEm(x, y, true);
         if (!alvo || alvo.tipo !== 'caminho' || !alvo.traco) { vkToast('Arraste em cima de um traço'); return 'nada'; }
@@ -326,6 +333,13 @@ function vkDsMove(A, x, y) {
     vkDesenhar(); return true;
 }
 async function vkDsUp(A, x, y) {
+    if (A.modo === 'degrade') {
+        if (Math.hypot(x - A.x, y - A.y) * VK.vista.z < 4) return;
+        const o = vkObj(VK.sel[0]), atual = o && o.preench && o.preench.k === 'grad' ? o.preench : null;
+        const ps = atual ? vkClone(atual.paradas) : [{ p: 0, cor: vkClone((o && o.preench) || { k: 'cmyk', v: [0, 0, 0, 100] }) }, { p: 1, cor: { k: 'cmyk', v: [0, 0, 0, 0] } }];
+        const g = A.alt ? { k: 'grad', tipo: 'rad', a: [A.x, A.y], b: [A.x, A.y], r: Math.hypot(x - A.x, y - A.y), paradas: ps } : { k: 'grad', tipo: 'lin', a: [A.x, A.y], b: [x, y], paradas: ps };
+        await vkCmdUi('alterar', { preench: g }); return;
+    }
     if (A.modo === 'largura') { if (A.perfil) { A.alvo.traco = A.antes; await vkCmdUi('alterar', { ids: [A.alvo.id], perfil: A.perfil }); } return; }
     const pts = A.trilha.concat([[x, y]]); if (pts.length < 3) return;
     const z = VK.vista.z;
@@ -337,6 +351,7 @@ async function vkDsUp(A, x, y) {
     if (A.f === 'borracha') await vkCmdUi('borracha', { pontos: pts, espessura: VK_OPC.borracha });
 }
 function vkDsSobreposicao(ctx, A) {   // rastro enquanto desenha (px de tela)
+    if (A && A.modo === 'degrade' && A.mx != null) { const [x0, y0] = vkTela(A.x, A.y), [x1, y1] = vkTela(A.mx, A.my); ctx.save(); ctx.strokeStyle = '#2f8cff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.strokeRect(x0 - 4, y0 - 4, 8, 8); ctx.beginPath(); ctx.arc(x1, y1, 4, 0, 7); ctx.fill(); ctx.stroke(); ctx.restore(); return; }
     if (!A || A.modo !== 'desenho' || !A.trilha) return;
     const pts = A.trilha.concat(A.mx != null ? [[A.mx, A.my]] : []).map(q => vkTela(q[0], q[1]));
     ctx.save(); ctx.lineCap = ctx.lineJoin = 'round';
