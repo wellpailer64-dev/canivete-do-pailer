@@ -103,28 +103,38 @@ function vkDsCurva(pts, fechado, op) {
     let R = vkDsReamostrar(pts, passo);
     if (R.length < 2) return null;
     if (fechado && vkV.dist(R[0], R[R.length - 1]) > passo * 0.5) R.push([R[0][0], R[0][1]]);
-    const segs = [];
-    if (fechado && (op.cantos ?? 150) >= 150) {   // laço à mão: suaviza a volta toda e ajusta em 4 trechos com tangente contínua
-        const L = vkDsSuavizar(R.slice(0, -1), raio, true), n = L.length, m = Math.max(1, Math.min(Math.floor(n / 8), Math.round(erro * 1.5 / passo)));
+    const segs = [], k = op.janela || 3, rc = op.raio_cantos ?? raio;
+    const ajustaPedaco = pd => { if (pd.length < 2) return; const m = Math.max(1, Math.min(pd.length - 1, Math.max(3, Math.round(erro * 1.5 / passo))));   // tangente da ponta num trecho maior (sem gancho)
+        segs.push(...vkDsSchneider(pd, erro, vkV.unit(vkV.sub(pd[m], pd[0])), vkV.unit(vkV.sub(pd[pd.length - 1 - m], pd[pd.length - 1])))); };
+    if (fechado) {
+        const B = R.slice(0, -1), n = B.length;
         if (n < 8) return null;
-        const tan = i => vkV.unit(vkV.sub(L[(i + m) % n], L[(i - m + n) % n]));
-        const cs = [0, 1, 2, 3].map(q => Math.round(q * n / 4));
-        for (let q = 0; q < 4; q++) {
-            const a = cs[q], b = q < 3 ? cs[q + 1] : n, pd = [];
-            for (let i = a; i <= b; i++) pd.push(L[i % n]);
-            segs.push(...vkDsSchneider(pd, erro, tan(a), vkV.mul(tan(b % n), -1)));
+        let cs = [];   // cantos do laço (com a volta: o começo também pode ser canto)
+        if ((op.cantos ?? 150) < 150 && n > 4 * k) {
+            const S0 = vkDsSuavizar(B, rc, true), ext = [...S0.slice(-k), ...S0, ...S0.slice(0, k)];
+            cs = [...new Set(vkDsCantos(ext, k, op.cantos).map(i => (i - k + n) % n))].sort((x, y) => x - y);
+        }
+        if (!cs.length) {   // laço liso: suaviza a volta toda e ajusta em 4 trechos com tangente contínua
+            const L = vkDsSuavizar(B, raio, true), m = Math.max(1, Math.min(Math.floor(n / 8), Math.round(erro * 1.5 / passo)));
+            const tan = i => vkV.unit(vkV.sub(L[(i + m) % n], L[(i - m + n) % n]));
+            const q4 = [0, 1, 2, 3].map(q => Math.round(q * n / 4));
+            for (let q = 0; q < 4; q++) {
+                const a = q4[q], b = q < 3 ? q4[q + 1] : n, pd = [];
+                for (let i = a; i <= b; i++) pd.push(L[i % n]);
+                segs.push(...vkDsSchneider(pd, erro, tan(a), vkV.mul(tan(b % n), -1)));
+            }
+        } else {   // laço com cantos: começa num canto (a emenda some) e ajusta canto a canto
+            const c0 = cs[0], G = [...B.slice(c0), ...B.slice(0, c0), B[c0]], cc = [...cs.map(i => (i - c0 + n) % n), n];
+            for (let i = 0; i < cc.length - 1; i++) { const pd = G.slice(cc[i], cc[i + 1] + 1); ajustaPedaco(rc === raio ? vkDsSuavizar(pd, raio, false) : vkDsSuavizar(pd, raio, false)); }
         }
     } else {
         // suaviza primeiro (o tremido some) e SÓ DEPOIS procura cantos: na mão livre só um bico (> 150°) vira canto;
-        // em Simplificar (cantos: 45) os cantos vivos do desenho original continuam
-        const S = vkDsSuavizar(R, raio, false), k = op.janela || 3;
-        const cantos = S.length > 2 * k + 1 ? vkDsCantos(S, k, op.cantos ?? 150) : [];
-        const cortes = [0, ...cantos, S.length - 1];
-        for (let i = 0; i < cortes.length - 1; i++) {
-            const pd = S.slice(cortes[i], cortes[i + 1] + 1); if (pd.length < 2) continue;
-            const m = Math.max(1, Math.min(pd.length - 1, Math.max(3, Math.round(erro * 1.5 / passo))));   // tangente da ponta num trecho maior (sem gancho)
-            segs.push(...vkDsSchneider(pd, erro, vkV.unit(vkV.sub(pd[m], pd[0])), vkV.unit(vkV.sub(pd[pd.length - 1 - m], pd[pd.length - 1]))));
-        }
+        // raio_cantos = suavização só para ACHAR os cantos (traçado de imagem: leve); cada trecho entre cantos é suavizado
+        // com o raio todo, cantos parados (lados retos, cantos vivos)
+        const S0 = vkDsSuavizar(R, rc, false);
+        const cantos = S0.length > 2 * k + 1 ? vkDsCantos(S0, k, op.cantos ?? 150) : [];
+        const cortes = [0, ...cantos, R.length - 1];
+        for (let i = 0; i < cortes.length - 1; i++) ajustaPedaco(rc === raio ? S0.slice(cortes[i], cortes[i + 1] + 1) : vkDsSuavizar(R.slice(cortes[i], cortes[i + 1] + 1), raio, false));
     }
     if (!segs.length) return null;
     const out = [[...segs[0][0], ...segs[0][0], ...segs[0][1]]];
@@ -523,4 +533,36 @@ vkRegistrar('mesclar', 'mesclar', a => {
     for (const o of [A, B]) { const ll = vkListaDe(o.id); ll.splice(ll.indexOf(o), 1); }
     l.splice(Math.min(pos, l.length), 0, g); VK.sel = [g.id];
     return { id: g.id, passos: n, reamostrado: !igual };
+});
+
+// vetorizar (Traçado de imagem / Image Trace): imagem colocada (ids) → grupo com uma forma por cor (furos inclusos),
+// curvas ajustadas como o Lápis (cantos vivos ficam). cores (2-32, padrão 6), detalhe (área mínima em px², padrão 12),
+// precisao (px; menor = mais fiel, padrão 1), suavidade (0-3, padrão 1), ignorar_fundo (padrão true), manter_imagem (padrão false = oculta a foto)
+vkRegistrar('vetorizar', 'traçado de imagem', async a => {
+    const ims = vkTxAlvos(a).filter(o => o.tipo === 'imagem'); if (!ims.length) throw new Error('vetorizar: selecione uma imagem colocada');
+    const ids = [];
+    for (const im of ims) {
+        const info = VK.doc.imagens[im.img]; if (!info || !info.arquivo) throw new Error('vetorizar: imagem sem arquivo');
+        const r = await vkApi().vk_vetorizar(info.arquivo, +(a.cores || 6), +(a.detalhe || 12), a.ignorar_fundo !== false);
+        if (!r || !r.success) throw new Error((r && r.error) || 'vetorizar falhou');
+        const m = im.m, px = vkEsc(m) / (r.escala || 1), e = Math.max(0.05, (+a.precisao || 1.5)) * px, suave = a.suavidade != null ? +a.suavidade : 1, cmyk = VK.doc.modoCor !== 'rgb';
+        const conv = cmyk && r.regioes.length ? await vkApi().vk_rgb_para_cmyk(r.regioes.map(x => x.rgb), VK.doc.perfil) : null;
+        const itens = r.regioes.map((rg, i) => {
+            const subs = [];
+            for (const forma of rg.formas) for (const ct of forma) {
+                const pts = ct.map(([x, y]) => vkAp(m, x, y)); if (pts.length < 4) continue;
+                const s = vkDsCurva(pts, true, { erro: e, passo: px / 2, raio: Math.round(8 * suave), raio_cantos: 2, cantos: 55, janela: 5 });   // passo ½ px; a escada de pixels some antes de achar os cantos
+                if (s && s.pts.length > 2) subs.push(s);
+            }
+            return subs.length ? { id: vkId(), tipo: 'caminho', regra: 'evenodd', subs, nome: `cor ${i + 1}`, traco: null,
+                preench: conv ? { k: 'cmyk', v: conv[i].map(v => Math.round(v * 10) / 10) } : { k: 'rgb', v: rg.rgb } } : null;
+        }).filter(Boolean);
+        const g = { id: vkId(), tipo: 'grupo', nome: a.nome || 'Traçado', itens };
+        const l = vkListaDe(im.id); l.splice(l.indexOf(im) + 1, 0, g);
+        if (!a.manter_imagem) im.visivel = false;
+        ids.push(g.id);
+    }
+    VK.sel = ids;
+    const g = vkObj(ids[0]);
+    return { ids, cores: g.itens.length, pontos: g.itens.reduce((s, o) => s + o.subs.reduce((t, sb) => t + sb.pts.length, 0), 0), caixa_mm: vkCaixaMM(g) };
 });

@@ -330,6 +330,15 @@ with sync_playwright() as p:
     g = C("info", {"ids": [r["id"]]})[0]
     meio = pg.evaluate("id => vkObj(id).itens[3].preench.v", r["id"])
     ok(g["itens"] == 7 and r["reamostrado"] and abs(meio[0] - 50) < 1 and abs(meio[1] - 50) < 1, f"mesclar círculo → estrela em 5 passos (cor do meio {meio})")
+    from PIL import Image as _Im, ImageDraw as _Dr, ImageFont as _Ft, ImageFilter as _Fl
+    logo = os.path.join(SAI, "logo_trace.jpg"); im_ = _Im.new("RGB", (800, 500), "white"); d_ = _Dr.Draw(im_)
+    d_.ellipse((60, 60, 360, 360), fill=(220, 30, 40)); d_.ellipse((150, 150, 270, 270), fill="white"); d_.rectangle((420, 80, 740, 240), fill=(20, 90, 200))
+    d_.text((80, 385), "LOGO", font=_Ft.truetype(os.path.join(os.environ.get("WINDIR", "C:/Windows"), "Fonts", "arialbd.ttf"), 90), fill=(30, 30, 30))
+    im_.filter(_Fl.GaussianBlur(1.2)).save(logo, quality=70)
+    li = C("imagem", {"arquivo": logo, "x": 0, "y": 0, "larg": 60})
+    r = C("vetorizar", {"ids": [li["id"]], "cores": 6})
+    subs = pg.evaluate("id => vkObj(id).itens.map(o => o.subs.length)", r["ids"][0])
+    ok(r["cores"] == 3 and sorted(subs) == [1, 2, 6], f"vetorizar logo JPG: 3 cores, anel com furo, LOGO com os furos dos O ({subs})")
     out = os.path.join(SAI, "formas_x4.pdf")
     r = pg.evaluate("([c]) => VKN.exportarPdf(c, {padrao: 'x4'})", [out])
     ok(r["verificado"], f"PDF/X-4 com setor, QR e ícone ({r['problemas']})")

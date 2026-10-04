@@ -1063,3 +1063,70 @@ def icone_svg(nome, estilo="outline"):
         with open(arq, "wb") as f:
             f.write(dados)
     return {"success": True, "svg": open(arq, encoding="utf-8").read(), "nome": nome, "estilo": estilo, "licenca": "Tabler Icons (MIT)"}
+
+
+# ─────────────────────────── Traçado de imagem (Image Trace) ───────────────────────────
+def vetorizar(arquivo, cores=6, area_min=12, ignorar_fundo=True, lado_max=1600):
+    """Imagem (logo/arte) → regiões por cor em contornos de pixel, para o Vetor ajustar curvas.
+    k-means em Lab com `cores` cores; cada cor → contornos externos + furos (RETR_CCOMP); máscara dilatada 1 px (as cores
+    se sobrepõem um pouco: sem filete branco entre elas). area_min em px². ignorar_fundo: pula a cor que domina a borda e é
+    clara (ou transparente). → {w, h, escala, regioes: [{rgb, area, formas: [[contorno externo, furo, ...], ...]}]}
+    (contornos = [[x, y], ...] em px da imagem ORIGINAL; maior área primeiro = vai para baixo)."""
+    import cv2, numpy as np
+    from PIL import Image
+    im = Image.open(arquivo)
+    alfa = None
+    if im.mode in ("RGBA", "LA", "PA") or (im.mode == "P" and "transparency" in im.info):
+        im = im.convert("RGBA"); alfa = np.array(im.getchannel("A"))
+    rgb = np.array(im.convert("RGB"))
+    H0, W0 = rgb.shape[:2]
+    esc = min(1.0, lado_max / max(W0, H0))
+    if esc < 1:
+        rgb = cv2.resize(rgb, (int(W0 * esc), int(H0 * esc)), interpolation=cv2.INTER_AREA)
+        if alfa is not None: alfa = cv2.resize(alfa, (rgb.shape[1], rgb.shape[0]), interpolation=cv2.INTER_AREA)
+    H, W = rgb.shape[:2]
+    rgb = cv2.bilateralFilter(rgb, 7, 40, 7)   # tira ruído/JPEG sem amolecer as bordas
+    lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB).reshape(-1, 3).astype(np.float32)
+    validos = np.ones(H * W, bool) if alfa is None else (alfa.reshape(-1) > 127)
+    k = max(2, min(32, int(cores)))
+    amostra = lab[validos]
+    if len(amostra) > 200000:
+        amostra = amostra[np.random.default_rng(1).choice(len(amostra), 200000, replace=False)]
+    crit = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.5)
+    _, _, centros = cv2.kmeans(amostra, k, None, crit, 3, cv2.KMEANS_PP_CENTERS)
+    d = ((lab[:, None, :] - centros[None, :, :]) ** 2).sum(-1)
+    rot = d.argmin(1).astype(np.int32)
+    rot[~validos] = -1
+    rot = rot.reshape(H, W)
+    cent_rgb = cv2.cvtColor(centros.reshape(1, -1, 3).astype(np.uint8), cv2.COLOR_LAB2RGB).reshape(-1, 3)
+    borda = np.concatenate([rot[0], rot[-1], rot[:, 0], rot[:, -1]])
+    fundo = None
+    if ignorar_fundo:
+        vals, cont = np.unique(borda[borda >= 0], return_counts=True)
+        if len(vals) and cont.max() > len(borda) * 0.5 and cent_rgb[vals[cont.argmax()]].mean() > 200:
+            fundo = int(vals[cont.argmax()])
+    s = 1 / esc
+    regioes = []
+    nucleo = np.ones((3, 3), np.uint8)
+    for c in range(k):
+        if c == fundo: continue
+        m = (rot == c).astype(np.uint8) * 255
+        area = int(m.sum() // 255)
+        if area < area_min: continue
+        m = cv2.morphologyEx(m, cv2.MORPH_OPEN, nucleo)   # tira pontinhos soltos
+        m = cv2.dilate(m, nucleo)                          # sobreposição de 1 px entre cores
+        cs, hier = cv2.findContours(m, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
+        if hier is None: continue
+        hier = hier[0]; formas = []
+        for i, h in enumerate(hier):
+            if h[3] != -1 or cv2.contourArea(cs[i]) < area_min: continue   # só externos (furos vêm como filhos)
+            f = [(cs[i][:, 0, :] * s).round(2).tolist()]
+            j = h[2]
+            while j != -1:
+                if cv2.contourArea(cs[j]) >= area_min: f.append((cs[j][:, 0, :] * s).round(2).tolist())
+                j = hier[j][0]
+            formas.append(f)
+        if formas:
+            regioes.append({"rgb": [int(x) for x in cent_rgb[c]], "area": area, "formas": formas})
+    regioes.sort(key=lambda r: -r["area"])
+    return {"success": True, "w": W0, "h": H0, "escala": esc, "fundo_ignorado": fundo is not None, "regioes": regioes}

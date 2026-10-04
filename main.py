@@ -3198,6 +3198,10 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.icone_svg(nome, estilo)
 
+    def vk_vetorizar(self, arquivo, cores=6, area_min=12, ignorar_fundo=True):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.vetorizar(arquivo, cores, area_min, ignorar_fundo)
+
     def vk_qr(self, texto, correcao="M"):
         from Functions import vetor_kanivete
         return vetor_kanivete.qr_matriz(texto, correcao)
