@@ -11,6 +11,7 @@ VK.apDesl = new Map(); VK.apPend = new Map();
 function vkApEf(o, tipo) { return (o.efeitos || []).find(e => e.tipo === tipo && e.visivel !== false); }
 function vkApTem(o) { return (o.aparencia || []).some(l => l.visivel !== false) || !!vkApEf(o, 'cantos') || (o.tipo === 'caminho' && vkDsTracoEspecial(o.traco)) || vkDistorce(o) || !!vkApEf(o, 'brilho_interno'); }
 const VK_DIST = new Set(['zigue', 'aspero', 'inflar', 'torcer', 'deformar']);
+function vkApGrupo(o) { return !o.clip && (o.aparencia || []).some(l => l.visivel !== false); }
 function vkDistorce(o) { return (o.efeitos || []).some(e => e.visivel !== false && VK_DIST.has(e.tipo)); }
 
 // cantos arredondados (Efeito › Estilizar › Cantos arredondados): só cantos vivos entre segmentos retos
@@ -75,7 +76,7 @@ function vkApBase(o) {
 function vkPinturas(o) {
     const base = vkApBase(o); if (!base) return null;
     const ap = (o.aparencia || []).filter(l => l.visivel !== false);
-    if (!ap.length || o.tipo === 'grupo' || o.tipo === 'imagem') return base;
+    if (!ap.length || o.tipo === 'imagem' || (o.tipo === 'grupo' && o.clip)) return base;   // grupo: as camadas extras valem para o conjunto
     const todos = base.flatMap(b => b.subs), regra = (base[0] && base[0].regra) || 'nonzero', atras = [], frente = [];
     for (const l of ap) {
         let subs = todos, rg = regra;
@@ -111,7 +112,7 @@ function vkApTracar(ctx, p, estilo) {
 // tudo → true; senão false (o desenho normal continua, já com o desfoque ligado)
 function vkApDesenhar(ctx, o) {
     if (VK.contorno) return false;
-    const efs = (o.efeitos || []).filter(e => e.visivel !== false), vet = (o.tipo !== 'grupo' && o.tipo !== 'imagem' && vkApTem(o)) || (o.tipo === 'grupo' && (vkDistorce(o) || !!o.mescla));
+    const efs = (o.efeitos || []).filter(e => e.visivel !== false), vet = (o.tipo !== 'grupo' && o.tipo !== 'imagem' && vkApTem(o)) || (o.tipo === 'grupo' && (vkDistorce(o) || !!o.mescla || vkApGrupo(o)));
     if (!efs.length && !vet) return false;
     const T = ctx.getTransform(), k = Math.hypot(T.a, T.b) || 1;
     const sombras = efs.filter(e => e.tipo === 'sombra' || e.tipo === 'brilho'), desf = efs.find(e => e.tipo === 'desfoque');
@@ -155,7 +156,7 @@ async function vkApDocPy(d) {
     const anda = async l => { for (const o of l) {
         const src = vkObj(o.id);
         if (src) {
-            if ((src.tipo !== 'grupo' && src.tipo !== 'imagem' && vkApTem(src)) || (src.tipo === 'grupo' && (vkDistorce(src) || !!src.mescla))) o._pint = await vkApPronto(src);
+            if ((src.tipo !== 'grupo' && src.tipo !== 'imagem' && vkApTem(src)) || (src.tipo === 'grupo' && (vkDistorce(src) || !!src.mescla || vkApGrupo(src)))) o._pint = await vkApPronto(src);
             if ((src.efeitos || []).some(e => e.visivel !== false && e.tipo !== 'cantos')) o._silh = await vkApPronto(src);
         }
         if (o.itens) await anda(o.itens);
@@ -197,8 +198,8 @@ async function vkApDocPy(d) {
     // aparencia: acao adicionar|alterar|remover|subir|descer|limpar; tipo preench|traco; cor, espessura (pt), opacidade (%),
     // mesclagem, deslocar (mm; + fora, − dentro), atras (padrão true: por baixo da pintura do objeto), visivel, cap, junc, tracejado
     vkRegistrar('aparencia', 'aparência', a => {
-        const objs = vkTxAlvos(a).filter(o => o.tipo === 'caminho' || o.tipo === 'texto');
-        if (!objs.length) throw new Error('aparencia: só caminhos e textos (para grupo use efeito)');
+        const objs = vkTxAlvos(a).filter(o => o.tipo === 'caminho' || o.tipo === 'texto' || (o.tipo === 'grupo' && !o.clip));
+        if (!objs.length) throw new Error('aparencia: caminhos, textos ou grupos');
         for (const o of objs) lista(o, 'aparencia', a.acao || 'adicionar', a, () => /^t/.test(a.tipo || 'traco')
             ? { tipo: 'traco', cor: vkCorDe('100K'), larg: 2, junc: 'round', cap: 'round' } : { tipo: 'preench', cor: vkCorDe('0K') });
         return { aparencia: (objs[0].aparencia || []).map(l => `${l.tipo} ${vkCorTexto(l.cor)}${l.tipo === 'traco' ? ' ' + vkR(l.larg, 2) + ' pt' : ''}${l.desloc ? ' desl ' + vkR(vkMM(l.desloc)) + ' mm' : ''}${l.atras === false ? ' frente' : ' atrás'}`) };
@@ -247,7 +248,7 @@ async function vkApDocPy(d) {
 
 // ─────────────────────────── painel ───────────────────────────
 function vkApPainel(objs) {
-    const o = objs[0], podeAp = objs.every(x => x.tipo === 'caminho' || x.tipo === 'texto');
+    const o = objs[0], podeAp = objs.every(x => x.tipo === 'caminho' || x.tipo === 'texto' || (x.tipo === 'grupo' && !x.clip));
     const L = o.aparencia || [], E = o.efeitos || [];
     let h = '';
     if (podeAp) h += `<div class="vk-sec"><div class="vk-sec-t">Aparência extra</div>

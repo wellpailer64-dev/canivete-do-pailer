@@ -108,6 +108,7 @@
         let caminho = a.caminho || await api().vk_dialogo('salvar', ['SVG (*.svg)'], (VK.doc.nome || 'arte') + '.svg');
         if (!caminho) return { cancelado: true };
         await vkGeosProntas(); await vkCoresProntas();
+        for (const { o } of vkTodos()) if ((o.efeitos || o.aparencia || o.mescla || o.traco) && typeof vkApPronto === 'function') await vkApPronto(o);   // deslocamentos (Python) prontos
         const p = VK.doc.pranchetas.find(q => q.id === VK.ativa) || VK.doc.pranchetas[0];
         const svg = vkSvg(p);
         await api().vk_salvar_png(btoa(unescape(encodeURIComponent(svg))), caminho);
@@ -188,27 +189,67 @@ function vkRenderPrancheta(p, esc, fundo = true, sangria = 0) {
     finally { VK.vista.z = z; VK.contorno = cont; }
     return cv;
 }
-function vkSvg(p) {
-    const e = n => vkR(n, 3), cor = c => (!c ? 'none' : vkCss(c).replace(/^rgb\((\d+),(\d+),(\d+)\)$/, (_, r, g, b) => '#' + [r, g, b].map(x => (+x).toString(16).padStart(2, '0')).join('')));
+function vkSvg(p) {   // SVG da prancheta: as mesmas pinturas da tela (Aparência, distorções, perfil/setas), efeitos em <filter>, padrões, máscaras, símbolos, malha
+    const e = n => vkR(n, 3), cor = c => (!c ? 'none' : String(vkCss(c)).replace(/^rgb\((\d+),(\d+),(\d+)\)$/, (_, r, g, b) => '#' + [r, g, b].map(x => (+x).toString(16).padStart(2, '0')).join('')));
     const d = (subs, m) => subs.map(s => { const P = s.pts.map(q => m ? [...vkAp(m, q[0], q[1]), ...vkAp(m, q[2], q[3]), ...vkAp(m, q[4], q[5])] : q); if (!P.length) return '';
         let t = `M${e(P[0][0])} ${e(P[0][1])}`; const n = s.fechado ? P.length : P.length - 1;
         for (let i = 0; i < n; i++) { const a = P[i], b = P[(i + 1) % P.length]; t += `C${e(a[4])} ${e(a[5])} ${e(b[2])} ${e(b[3])} ${e(b[0])} ${e(b[1])}`; }
         return t + (s.fechado ? 'Z' : ''); }).join('');
     let defs = '', n = 0;
-    const pint = c => { if (!c || c.k !== 'grad') return cor(c); const id = 'g' + (++n);
-        const st = c.paradas.map(q => `<stop offset="${q.p}" stop-color="${cor(q.cor)}"/>`).join('');
+    const pint = c => {
+        if (!c) return 'none';
+        if (c.k === 'pad') {   // amostra de padrão → <pattern>
+            const P = (VK.doc.padroes || {})[c.id]; if (!P) return 'none'; const id = 'pt' + (++n), M = vkPadMatriz(c);
+            defs += `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${e(P.w)}" height="${e(P.h)}" patternTransform="matrix(${M.map(e).join(' ')})">${P.itens.map(obj).join('')}</pattern>`;
+            return `url(#${id})`;
+        }
+        if (c.k !== 'grad') return cor(c);
+        const id = 'g' + (++n), st = c.paradas.map(q => `<stop offset="${q.p}" stop-color="${cor(q.cor)}"/>`).join('');
         defs += c.tipo === 'rad' ? `<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${e(c.a[0])}" cy="${e(c.a[1])}" r="${e(c.r)}">${st}</radialGradient>`
             : `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${e(c.a[0])}" y1="${e(c.a[1])}" x2="${e(c.b[0])}" y2="${e(c.b[1])}">${st}</linearGradient>`;
-        return `url(#${id})`; };
-    const obj = o => {
+        return `url(#${id})`;
+    };
+    const tracoAttr = t => t && t.cor ? ` stroke="${pint(t.cor)}" stroke-width="${e(t.larg ?? 1)}" stroke-linecap="${t.cap || 'butt'}" stroke-linejoin="${t.junc || 'miter'}"${(t.tracejado || []).length ? ` stroke-dasharray="${t.tracejado.map(e).join(' ')}"` : ''}` : '';
+    const pinturaSvg = q => `<path d="${d(q.subs)}" fill="${q.preench ? pint(q.preench) : 'none'}"${q.regra === 'evenodd' ? ' fill-rule="evenodd"' : ''}${tracoAttr(q.traco)}${q.op != null && q.op < 1 ? ` opacity="${q.op}"` : ''}/>`;
+    const filtro = o => {   // sombra / brilho externo / desfoque → <filter> (brilho interno fica de fora do SVG)
+        const efs = (o.efeitos || []).filter(x => x.visivel !== false && ['sombra', 'brilho', 'desfoque'].includes(x.tipo)); if (!efs.length) return '';
+        const id = 'f' + (++n); let corpo = '', camadas = [];
+        efs.forEach((x, i) => {
+            if (x.tipo === 'desfoque') { corpo += `<feGaussianBlur in="SourceGraphic" stdDeviation="${e(x.desfoque || 0)}" result="d${i}"/>`; camadas.push(`d${i}`); return; }
+            corpo += `<feGaussianBlur in="SourceAlpha" stdDeviation="${e(x.desfoque || 0)}" result="b${i}"/><feOffset in="b${i}" dx="${e(x.dx || 0)}" dy="${e(x.dy || 0)}" result="o${i}"/>`
+                + `<feFlood flood-color="${cor(x.cor || { k: 'cmyk', v: [0, 0, 0, 100] })}" flood-opacity="${x.op ?? 0.75}" result="c${i}"/><feComposite in="c${i}" in2="o${i}" operator="in" result="s${i}"/>`;
+            camadas.unshift(`s${i}`);
+        });
+        if (!efs.some(x => x.tipo === 'desfoque')) camadas.push('SourceGraphic');
+        defs += `<filter id="${id}" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">${corpo}<feMerge>${camadas.map(r => `<feMergeNode in="${r}"/>`).join('')}</feMerge></filter>`;
+        return ` filter="url(#${id})"`;
+    };
+    const malha = o => {   // malha de degradê: fatias pequenas (o SVG não tem malha)
+        const N = o.nos, C = o.cores, lerp = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t); let h = '';
+        for (let i = 0; i < N.length - 1; i++) for (let j = 0; j < N[0].length - 1; j++) {
+            const P = (u, v) => lerp(lerp(N[i][j], N[i][j + 1], u), lerp(N[i + 1][j], N[i + 1][j + 1], u), v), K = (u, v) => lerp(lerp(vkMalhaCor(C[i][j]), vkMalhaCor(C[i][j + 1]), u), lerp(vkMalhaCor(C[i + 1][j]), vkMalhaCor(C[i + 1][j + 1]), u), v);
+            const k = 20;
+            for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) { const q = [P(b / k, a / k), P((b + 1) / k, a / k), P((b + 1) / k, (a + 1) / k), P(b / k, (a + 1) / k)], c = cor({ k: 'cmyk', v: K((b + 0.5) / k, (a + 0.5) / k) });
+                h += `<path d="M${q.map(x => `${e(x[0])} ${e(x[1])}`).join('L')}Z" fill="${c}" stroke="${c}" stroke-width="0.15"/>`; }
+        }
+        return h;
+    };
+    function obj(o) {
         if (o.visivel === false) return '';
-        const at = `${o.op != null && o.op < 1 ? ` opacity="${o.op}"` : ''}`;
+        const at = `${o.op != null && o.op < 1 ? ` opacity="${o.op}"` : ''}${filtro(o)}`;
+        if (o.tipo === 'malha') return `<g${at}>${malha(o)}</g>`;
+        if (o.tipo === 'instancia') { const S = (VK.doc.simbolos || {})[o.simbolo]; return S ? `<g transform="matrix(${o.m.map(e).join(' ')})"${at}>${S.itens.map(obj).join('')}</g>` : ''; }
+        if (o.tipo === 'grupo' && o.opmask) { const id = 'm' + (++n); defs += `<mask id="${id}" maskUnits="userSpaceOnUse" x="-1e5" y="-1e5" width="2e5" height="2e5">${obj(o.opmask)}</mask>`;
+            return `<g mask="url(#${id})"${at}>${o.itens.map(obj).join('')}</g>`; }
+        const vivo = typeof vkPinturas === 'function' && ((o.tipo !== 'grupo' && o.tipo !== 'imagem' && vkApTem(o)) || (o.tipo === 'grupo' && (vkDistorce(o) || o.mescla || vkApGrupo(o))));
+        const pin = vivo ? vkPinturas(o) : null;
+        if (pin) return `<g${at}>${pin.map(pinturaSvg).join('')}</g>`;
         if (o.tipo === 'grupo') { if (o.clip) { const id = 'c' + (++n); defs += `<clipPath id="${id}"><path d="${d(o.itens[0].subs)}"/></clipPath>`; return `<g clip-path="url(#${id})"${at}>${o.itens.slice(1).map(obj).join('')}</g>`; } return `<g${at}>${o.itens.map(obj).join('')}</g>`; }
         if (o.tipo === 'imagem') { const im = VK.doc.imagens[o.img] || {}; return `<image transform="matrix(${o.m.map(e).join(' ')})" width="${im.w}" height="${im.h}" href="${im.url || ''}"${at}/>`; }
-        const subs = o.tipo === 'texto' ? (vkGeo(o) || { subs: [] }).subs : o.subs, m = o.tipo === 'texto' ? o.m : null;
-        const t = o.traco && o.traco.cor ? ` stroke="${pint(o.traco.cor)}" stroke-width="${e(o.traco.larg)}" stroke-linecap="${o.traco.cap || 'butt'}" stroke-linejoin="${o.traco.junc || 'miter'}"` : '';
-        return `<path d="${d(subs, m)}" fill="${pint(o.preench)}"${o.regra === 'evenodd' ? ' fill-rule="evenodd"' : ''}${t}${at}/>`;
-    };
+        if (o.tipo === 'texto') { const g = vkGeo(o); if (!g) return ''; const tr = o.traco;
+            return `<g transform="matrix(${o.m.map(e).join(' ')})"${at}>${(g.partes || [{ subs: g.subs }]).map(pa => `<path d="${d(pa.subs)}" fill="${pint('preench' in pa ? pa.preench : o.preench)}"${tracoAttr('traco' in pa ? (pa.traco ? { larg: 1, ...(tr || {}), ...pa.traco } : null) : tr)}/>`).join('')}</g>`; }
+        return `<path d="${d(o.subs)}" fill="${pint(o.preench)}"${o.regra === 'evenodd' ? ' fill-rule="evenodd"' : ''}${tracoAttr(o.traco)}${at}/>`;
+    }
     const corpo = VK.doc.camadas.filter(c => c.visivel !== false).map(c => `<g id="${c.nome.replace(/[^\w-]/g, '_')}">${c.itens.map(obj).join('')}</g>`).join('');
     return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${e(vkMM(p.w))}mm" height="${e(vkMM(p.h))}mm" viewBox="${e(p.x)} ${e(p.y)} ${e(p.w)} ${e(p.h)}"><defs>${defs}</defs>${corpo}</svg>`;
 }

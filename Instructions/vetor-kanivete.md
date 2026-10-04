@@ -61,7 +61,8 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 
 `.aknv` abre no KANIVETE por duplo clique (associação HKCU em Functions/projeto.py; roteado em `abrirProjetoExterno`).
 
-Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): efeitos que faltam (Aparência em grupo; efeitos na prévia de separações e no SVG); painel de vínculos.
+- Aparência em grupo (contorno/preenchimento extra no conjunto); prévia de separações e `tinta_em` com efeitos, Aparência, malha, símbolos, máscara de opacidade e padrões; SVG com `<filter>` (sombra, brilho, desfoque), `<pattern>`, `<mask>`, símbolos e malha.
+Ainda NÃO (pendências, em ordem de valor — levantamento de 2026-10-04 com .ai reais): painel de vínculos; brilho interno no SVG.
 
 ## 2. Modelo (pt = 1/72", y para baixo)
 ```
