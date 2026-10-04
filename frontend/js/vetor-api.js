@@ -272,6 +272,40 @@
         const lista = vkListaDe(objs.at(-1).id); lista.splice(lista.indexOf(objs.at(-1)) + 1, 0, novo); tirar(objs);
         VK.sel = [novo.id]; return res(novo);
     });
+    const formaDe = async o => o.tipo === 'texto'
+        ? { subs: (await vkGeoPronta(o)).subs.map(s => ({ fechado: true, pts: s.pts.map(p => [...vkAp(o.m, p[0], p[1]), ...vkAp(o.m, p[2], p[3]), ...vkAp(o.m, p[4], p[5])]) })), regra: 'nonzero' }
+        : { subs: o.subs, regra: o.regra || 'nonzero' };
+    vkRegistrar('deslocar', 'deslocar caminho', async a => {   // distancia (mm; + fora, − dentro), junc: miter|round|bevel, miter
+        const objs = alvos(a).filter(o => o.tipo === 'caminho' || o.tipo === 'texto'); if (!objs.length) throw new Error('deslocar: selecione formas ou textos');
+        const d = conv(a).D(a.distancia ?? 1);
+        const r = await vkApi().vk_deslocar(await Promise.all(objs.map(formaDe)), d, a.junc || 'miter', a.miter || 4);
+        const ids = [];
+        objs.forEach((o, k) => {   // fora: atrás do original (como no Illustrator); dentro: na frente, senão some sob o preenchimento
+            if (!r[k].subs.length) return;
+            const novo = { id: vkId(), tipo: 'caminho', nome: a.nome || ((o.nome || o.tipo) + ' deslocado'), regra: 'nonzero', subs: r[k].subs,
+                preench: vkClone(o.preench || null), traco: o.traco ? vkClone(o.traco) : null, ...(o.op != null ? { op: o.op } : {}) };
+            if ('preench' in a) novo.preench = vkCorDe(a.preench);
+            const l = vkListaDe(o.id); l.splice(l.indexOf(o) + (d < 0 ? 1 : 0), 0, novo); ids.push(novo.id);
+        });
+        VK.sel = ids; return { ids, distancia_pt: d };
+    });
+    vkRegistrar('contornar_traco', 'contornar traço', async a => {   // traço → forma preenchida (com preenchimento: grupo [preench, traço])
+        const objs = alvos(a).filter(o => (o.tipo === 'caminho' || o.tipo === 'texto') && o.traco && o.traco.cor && o.traco.larg > 0);
+        if (!objs.length) throw new Error('contornar traço: nenhum objeto com traço na seleção');
+        const r = await vkApi().vk_contornar_traco(await Promise.all(objs.map(async o => ({ ...(await formaDe(o)), traco: o.traco }))));
+        const ids = [];
+        objs.forEach((o, k) => {
+            const t = o.traco, sobre = o.sobre && o.sobre.t ? { p: true } : null;
+            const borda = { id: vkId(), tipo: 'caminho', nome: (o.nome || o.tipo) + ' traço', regra: 'nonzero', subs: r[k].subs, preench: vkClone(t.cor), traco: null,
+                ...(o.op != null ? { op: o.op } : {}), ...(o.bm ? { bm: o.bm } : {}), ...(sobre ? { sobre } : {}) };
+            const l = vkListaDe(o.id), pos = l.indexOf(o);
+            if (o.preench) {
+                const fundo = o.tipo === 'texto' ? { ...o, id: vkId(), traco: null } : { ...o, id: vkId(), traco: null, sobre: o.sobre ? { p: !!o.sobre.p } : undefined };
+                const g = { id: vkId(), tipo: 'grupo', nome: o.nome, itens: [fundo, borda] }; l.splice(pos, 1, g); ids.push(g.id);
+            } else { borda.nome = o.nome || borda.nome; l.splice(pos, 1, borda); ids.push(borda.id); }
+        });
+        VK.sel = ids; return { ids };
+    });
     vkRegistrar('contornos', 'criar contornos', async a => {   // texto → curvas (Ctrl+Shift+O)
         const ids = [];
         for (const o of alvos(a)) {
@@ -379,6 +413,7 @@ window.VKN = {
     salvar: c => vkCmd('salvar', { caminho: c }, 'claude'),
     exportarPdf: (c, op) => vkCmd('exportar_pdf', { caminho: c, ...(op || {}) }, 'claude'),
     exportarImagem: (c, op) => vkCmd('exportar_imagem', { caminho: c, ...(op || {}) }, 'claude'),
+    empacotar: (pasta, op) => vkCmd('empacotar', { pasta, ...(op || {}) }, 'claude'),
     log: n => VK.log.slice(-(n || 20)),
     estado: () => ({ aberto: !!VK.doc, caminho: VK.path, sujo: VK.sujo, ferramenta: VK.ferr, selecao: VK.sel.length, relatorio: VK.relatorio }),
 };

@@ -18,18 +18,20 @@ O essencial (o que um designer de impressão usa todo dia), e como ficou aqui:
 | Amostras, cores globais e **especiais (spot/Pantone)**, registro | cor de marca exata na gráfica | `amostras[]`; cor `spot` = Separation no PDF com alternativo CMYK; `[Registro]` = /All |
 | Degradê linear/radial | arte | `{k:'grad'}` → shading tipo 2/3 em DeviceCMYK |
 | Pathfinder (unir, subtrair, interseção, excluir), caminho composto, máscara de corte | construir formas | skia-pathops (Python); Ctrl+8; Ctrl+7 |
+| Deslocar caminho, Contornar traço | faca de adesivo, fio em volta do texto, traço → forma | skia-python (Stroker + PathOps): `deslocar` (+ fora atrás, − dentro na frente; cantos miter/round/bevel), `contornar_traco` (com preenchimento vira grupo [preench, traço]; tracejado e pontas entram) |
 | Texto de ponto / de área, criar contornos | tipografia | HarfBuzz + fontTools: a tela desenha as MESMAS curvas que vão para o PDF |
 | Alinhar/distribuir, guias inteligentes | precisão | caixa pelos extremos reais da cúbica (não pelas alças); encaixe magenta |
 | Colocar imagem (link), resolução efetiva | fotos no layout | `imagem` com `m`; ppi efetivo no painel e no fechamento |
 | Sobreimpressão, separações, perfil de cor (CMYK + ICC) | **impressão profissional** | sobreimprimir por objeto (OP/op/OPM 1); prova de cor pelo perfil de saída (FOGRA39…) na tela |
-| Salvar como PDF/X-1a / PDF/X-4, marcas e sangria, Empacotar | **fechamento de arquivo** | Exportar › PDF para gráfica (abaixo) + aba Fechamento |
+| Salvar como PDF/X-1a / PDF/X-4, marcas e sangria, Empacotar | **fechamento de arquivo** | Exportar › PDF para gráfica (abaixo) + aba Fechamento; Arquivo › Empacotar = `pasta/<nome>/` com .aknv, PDF X-4, Links/, Fontes/, Relatório.txt |
 | Abrir PDF/AI/SVG/EPS | trabalhar com arquivo de cliente | PDF/AI (compatível com PDF), SVG, PPTX (EPS: não) |
 
+`.aknv` abre no KANIVETE por duplo clique (associação HKCU em Functions/projeto.py; roteado em `abrirProjetoExterno`).
+
 Ainda NÃO (pendências, em ordem de valor): múltiplos preenchimentos/traços (Aparência), efeitos vivos (sombra, desfoque),
-deslocar caminho e contornar traço (offset — skia-pathops não tem; usar `skia-python` Stroker), símbolos, Image Trace,
-texto em caminho, estilos de parágrafo/caractere, réguas desenhadas e guias arrastáveis, prévia de sobreimpressão e
-separações (o modelo já tem CMYK por objeto: dá para renderizar uma chapa por canal), Empacotar (pasta com .aknv +
-links + PDF + relatório), associação `.aknv` no Windows (Functions/projeto.py), EPS, PDF com texto editável (hoje: curvas).
+símbolos, Image Trace, texto em caminho, estilos de parágrafo/caractere, réguas desenhadas e guias arrastáveis, prévia
+de sobreimpressão e separações (o modelo já tem CMYK por objeto: dá para renderizar uma chapa por canal), EPS, PDF com
+texto editável (hoje: curvas).
 
 ## 2. Modelo (pt = 1/72", y para baixo)
 ```
@@ -61,7 +63,7 @@ Unidades de agente: **mm relativos ao canto da prancheta** (`prancheta: nome|id|
 Comandos (`VKN.comandos()`): novo, documento, abrir, importar, salvar, exportar_pdf, exportar_imagem, exportar_svg,
 retangulo, elipse, poligono, estrela, linha, caminho (`d` SVG em mm ou `subs`), texto, imagem, alterar, mover,
 posicionar, redimensionar, girar, refletir, matriz, alinhar, distribuir, organizar, agrupar, desagrupar, mascara,
-soltar_mascara, composto, pathfinder, contornos, duplicar, apagar, selecionar, mover_para_camada, nova_camada, camada,
+soltar_mascara, composto, pathfinder, deslocar (`distancia` mm, `junc`), contornar_traco, contornos, empacotar (`pasta`, `pdf`, `fontes`), duplicar, apagar, selecionar, mover_para_camada, nova_camada, camada,
 nova_prancheta, prancheta, mover_prancheta, amostra, cores_padrao, definir_subs, converter_cmyk, preto_texto,
 sobreimprimir_preto, tirar_sobre_branco, engrossar_tracos, limpar, mapa, info, ajuda.
 Fonte "Arial Bold" (família + estilo juntos) é entendida. Só `preench` informado = sem traço.

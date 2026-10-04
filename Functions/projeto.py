@@ -12,13 +12,15 @@ import sys
 EXTENSAO = ".vknv"                      # projeto do editor de vídeo
 EXTENSOES_VIDEO = (".vknv", ".vcnvt")   # .vcnvt = nome antigo (abre; salvar grava um .vknv ao lado)
 EXTENSAO_IMAGEM = ".iknv"               # projeto do editor de imagem (Functions/editor_imagem.py)
+EXTENSAO_VETOR = ".aknv"                # documento do Vetor Kanivete (Functions/vetor_kanivete.py)
 FORMATO = "vknv"
 FORMATOS_ACEITOS = ("vknv", "vcnvt")
 VERSAO = 1
 # tipo do arquivo no Windows (o ProgId antigo do .vcnvt continua valendo para os arquivos velhos)
 _TIPOS = {".vknv": ("CaniveteDoPailer.vknv", "Projeto de vídeo do KANIVETE"),
           ".vcnvt": ("CaniveteDoPailer.vcnvt", "Projeto de vídeo do KANIVETE (antigo)"),
-          ".iknv": ("CaniveteDoPailer.iknv", "Projeto de imagem do KANIVETE")}
+          ".iknv": ("CaniveteDoPailer.iknv", "Projeto de imagem do KANIVETE"),
+          ".aknv": ("CaniveteDoPailer.aknv", "Documento vetorial do KANIVETE")}
 
 
 def eh_projeto_video(path):
@@ -67,7 +69,7 @@ def abrir(path):
 
 def registrar_associacao():
     """
-    Faz o Windows abrir .vknv, .iknv (e os .vcnvt antigos) com o KANIVETE (duplo clique), só para o usuário atual
+    Faz o Windows abrir .vknv, .iknv, .aknv (e os .vcnvt antigos) com o KANIVETE (duplo clique), só para o usuário atual
     (HKCU, sem pedir administrador). Só no executável; é idempotente e silencioso se falhar.
     """
     if not getattr(sys, "frozen", False) or os.name != "nt":
@@ -114,8 +116,8 @@ def _tem_valor(chave):
 
 
 def projeto_na_linha_de_comando(argv=None):
-    """Caminho do projeto (.vknv, .vcnvt ou .iknv) recebido ao abrir o app por duplo clique (ou None)."""
+    """Caminho do projeto (.vknv, .vcnvt, .iknv ou .aknv) recebido ao abrir o app por duplo clique (ou None)."""
     for a in (argv if argv is not None else sys.argv[1:]):
-        if a.lower().endswith(EXTENSOES_VIDEO + (EXTENSAO_IMAGEM,)) and os.path.isfile(a):
+        if a.lower().endswith(EXTENSOES_VIDEO + (EXTENSAO_IMAGEM, EXTENSAO_VETOR)) and os.path.isfile(a):
             return os.path.abspath(a)
     return None

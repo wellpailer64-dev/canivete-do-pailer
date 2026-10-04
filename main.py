@@ -3198,6 +3198,21 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.booleana(op, formas)
 
+    def vk_deslocar(self, formas, dist, junc="miter", miter=4):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.deslocar(formas, dist, junc, miter)
+
+    def vk_contornar_traco(self, formas):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.contornar_traco(formas)
+
+    def vk_empacotar(self, doc, pasta, opcoes=None):
+        from Functions import vetor_kanivete
+        try:
+            return vetor_kanivete.empacotar(doc, pasta, opcoes)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def vk_cores_tela(self, lista, cond="FOGRA39"):
         from Functions import vetor_kanivete
         return vetor_kanivete.cores_tela(lista, cond)

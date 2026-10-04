@@ -59,6 +59,23 @@ with sync_playwright() as p:
     pg.evaluate("vkDesfazer()")
     ok(pg.evaluate("vkTodos().length") == n_antes, "desfazer o duplicar")
 
+    print("deslocar caminho e contornar traço")
+    q = C("retangulo", {"x": 10, "y": 10, "larg": 20, "alt": 10, "preench": "C0 M0 Y100 K0", "traco": "100K", "espessura": 2, "nome": "selo"})
+    d = C("deslocar", {"ids": [q["id"]], "distancia": 2, "junc": "round", "preench": "0K"})
+    cx = pg.evaluate("id => VKN.cmd('info', {ids: [id]})", d["ids"][0])[0]["caixa_mm"]
+    ok(abs(cx["larg"] - 24) < 0.6 and abs(cx["alt"] - 14) < 0.6, f"deslocar +2 mm (24×14 + traço: {cx})")
+    di = C("deslocar", {"ids": [q["id"]], "distancia": -2})
+    cx = pg.evaluate("id => VKN.cmd('info', {ids: [id]})", di["ids"][0])[0]["caixa_mm"]
+    ok(abs(cx["larg"] - 16) < 0.6, f"deslocar −2 mm ({cx})")
+    tr = C("contornar_traco", {"ids": [q["id"]]})
+    o = pg.evaluate("id => vkObj(id)", tr["ids"][0])
+    ok(o["tipo"] == "grupo" and len(o["itens"]) == 2 and o["itens"][1]["traco"] is None and o["itens"][1]["preench"]["v"] == [0, 0, 0, 100],
+       "contornar traço: grupo [preenchimento, traço vira forma 100K]")
+    tr2 = C("contornar_traco", {"ids": [C("linha", {"x1": 6, "y1": 46, "x2": 40, "y2": 46, "traco": "100K", "espessura": 2})["id"]]})
+    o = pg.evaluate("id => vkObj(id)", tr2["ids"][0])
+    ok(o["tipo"] == "caminho" and o["subs"] and o["subs"][0]["fechado"], "linha com traço vira forma fechada")
+    C("apagar", {"ids": [*d["ids"], *di["ids"], *tr["ids"], *tr2["ids"]]})
+
     print("exportação")
     for padrao in ("x4", "x1a"):
         out = os.path.join(SAI, f"cartao_{padrao}.pdf")
@@ -73,6 +90,12 @@ with sync_playwright() as p:
     n = pg.evaluate("vkTodos().length")
     pg.evaluate("c => VKN.abrir(c)", aknv)
     ok(pg.evaluate("vkTodos().length") == n, f"salvar e reabrir .aknv ({n} objetos)")
+    pac = os.path.join(SAI, "pacote")
+    import shutil; shutil.rmtree(pac, ignore_errors=True)
+    r = pg.evaluate("c => VKN.empacotar(c)", pac)
+    arqs = os.listdir(r["pasta"]) if os.path.isdir(r.get("pasta", "")) else []
+    ok({"Relatório.txt", "Fontes"} <= set(arqs) and any(x.endswith(".aknv") for x in arqs) and r["pdf_verificado"],
+       f"empacotar: {arqs} fontes={r['fontes']} pdf={r['pdf_verificado']}")
 
     print("abrir arquivos de fora")
     for arq, minimo in (("cmyk.pdf", 4), ("illustrator.svg", 6), ("apresentacao.pptx", 4)):

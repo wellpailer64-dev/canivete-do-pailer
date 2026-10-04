@@ -73,6 +73,22 @@
         vkToast(`PDF ${padrao.toUpperCase()} pronto: ${r.paginas} página(s)` + (r.verificacao.ok ? ' — verificado ✓' : ' — verificar: ' + r.verificacao.problemas.join('; ')));
         return { caminho: r.path, paginas: r.paginas, verificado: r.verificacao.ok, problemas: r.verificacao.problemas, avisos: r.avisos, info: r.verificacao.info, alertas_fechamento: f.avisos.length };
     });
+    vkRegistrar('empacotar', 'empacotar', async a => {
+        // pasta/<nome>/: <nome>.aknv + Links/ + Fontes/ + <nome>.pdf (padrao, default x4) + Relatório.txt. pdf: false = sem PDF
+        const pasta = a.pasta || await api().vk_dialogo('pasta');
+        if (!pasta) return { cancelado: true };
+        const padrao = a.padrao || VK.padraoPdf || 'x4', f = vkFechamento({ padrao });
+        const nome = (VK.doc.nome || 'Sem titulo').replace(/[<>:"/\\|?*]+/g, '_').trim() || 'Sem titulo';
+        const dest = pasta.replace(/[\\/]+$/, '') + '/' + nome;
+        let pdf = null;
+        if (a.pdf !== false) pdf = await VK_CMDS.exportar_pdf.fn({ padrao, forcar: true, caminho: dest + '/' + nome + '.pdf', ...(a.sangria != null ? { sangria: a.sangria } : {}) });
+        const r = await api().vk_empacotar(vkClone(VK.doc), pasta, { fontes: a.fontes !== false, padrao, pdf, spots: f.info.spots,
+            fechamento: { erros: f.erros.map(x => ({ nivel: 'erro', msg: x.msg })), avisos: f.avisos.map(x => ({ nivel: 'aviso', msg: x.msg })) } });
+        if (!r || !r.success) throw new Error((r && r.error) || 'não empacotou');
+        VK._antes = null;
+        vkToast(`Pacote pronto: ${r.links} imagem(ns), ${r.fontes} fonte(s)${pdf ? ', PDF' : ''}`);
+        return { pasta: r.pasta, aknv: r.aknv, pdf: pdf && pdf.caminho, pdf_verificado: pdf ? pdf.verificado : null, links: r.links, faltando: r.faltando, fontes: r.fontes, fontes_faltando: r.fontes_faltando, erros_fechamento: f.erros.length };
+    });
     vkRegistrar('exportar_imagem', 'exportar imagem', async a => {   // PNG/JPG de cada prancheta, na resolução pedida (ppi)
         let caminho = a.caminho || await api().vk_dialogo('salvar', ['PNG (*.png)', 'JPG (*.jpg)'], (VK.doc.nome || 'arte') + '.png');
         if (!caminho) return { cancelado: true };

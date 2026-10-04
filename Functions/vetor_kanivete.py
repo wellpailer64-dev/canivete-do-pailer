@@ -3,12 +3,12 @@
 Modelo (unidade = pt, 1/72"; y para baixo, como no SVG): ver Instructions/vetor-kanivete.md. Aqui:
 - texto → curvas (HarfBuzz + fontTools): a MESMA geometria que a tela desenha e que vai para o PDF (o que se vê = o
   que imprime; no fechamento o texto sai em curvas, sem depender de fonte na gráfica)
-- operações booleanas do Pathfinder (skia-pathops)
+- operações booleanas do Pathfinder (skia-pathops); Deslocar caminho e Contornar traço (skia-python)
 - cores: CMYK ↔ RGB pelo perfil ICC de saída (prova de cor na tela) e conversão RGB → CMYK
-- .aknv = zip com documento.json + imagens/ (salvar/abrir)
+- .aknv = zip com documento.json + imagens/ (salvar/abrir); Empacotar (pasta com .aknv, Links, Fontes, relatório)
 - imagens colocadas: tamanho, modo (RGB/CMYK), ppi, prévia RGB servida ao painel
 """
-import hashlib, io, json, os, shutil, tempfile, zipfile
+import hashlib, io, json, os, re, shutil, tempfile, time, zipfile
 
 PT_MM = 72 / 25.4
 PASTA_TMP = os.path.join(tempfile.gettempdir(), "vetor_kanivete")
@@ -346,6 +346,111 @@ def booleana(op, formas):
     return {"subs": _de_skia(r)}
 
 
+# ─────────────── Deslocar caminho e Contornar traço (skia-python: Stroker + PathOps) ───────────────
+def _sk_path(subs, regra="nonzero"):
+    import skia
+    p = skia.Path()
+    p.setFillType(skia.PathFillType.kEvenOdd if regra == "evenodd" else skia.PathFillType.kWinding)
+    for sb in subs:
+        pts = sb["pts"]
+        if not pts:
+            continue
+        p.moveTo(pts[0][0], pts[0][1])
+        n = len(pts) if sb.get("fechado") else len(pts) - 1
+        for i in range(n):
+            a, b = pts[i], pts[(i + 1) % len(pts)]
+            if a[4] == a[0] and a[5] == a[1] and b[2] == b[0] and b[3] == b[1]:
+                p.lineTo(b[0], b[1])
+            else:
+                p.cubicTo(a[4], a[5], b[2], b[3], b[0], b[1])
+        if sb.get("fechado"):
+            p.close()
+    return p
+
+
+def _sk_subs(p):
+    """skia.Path → subs (cônicas viram quadráticas e estas viram cúbicas)."""
+    import skia
+    subs, cur = [], None
+    it = skia.Path.Iter(p, False)
+
+    def quad(p0, q, fim):
+        c1 = (p0[0] + 2 / 3 * (q[0] - p0[0]), p0[1] + 2 / 3 * (q[1] - p0[1]))
+        c2 = (fim[0] + 2 / 3 * (q[0] - fim[0]), fim[1] + 2 / 3 * (q[1] - fim[1]))
+        u = cur["pts"][-1]; u[4], u[5] = c1; cur["pts"].append([fim[0], fim[1], c2[0], c2[1], fim[0], fim[1]])
+
+    while True:
+        v, pts = it.next()
+        if v == skia.Path.kDone_Verb:
+            break
+        xy = [(q.x(), q.y()) for q in pts]
+        if v == skia.Path.kMove_Verb:
+            x, y = xy[0]; cur = {"fechado": False, "pts": [[x, y, x, y, x, y]]}; subs.append(cur)
+        elif v == skia.Path.kLine_Verb:
+            x, y = xy[1]; cur["pts"].append([x, y, x, y, x, y])
+        elif v == skia.Path.kQuad_Verb:
+            quad(xy[0], xy[1], xy[2])
+        elif v == skia.Path.kConic_Verb:
+            qs = skia.Path.ConvertConicToQuads(pts[0], pts[1], pts[2], it.conicWeight(), 2)
+            qs = [(q.x(), q.y()) for q in qs]
+            for k in range(0, len(qs) - 2, 2):
+                quad(qs[k], qs[k + 1], qs[k + 2])
+        elif v == skia.Path.kCubic_Verb:
+            u = cur["pts"][-1]; u[4], u[5] = xy[1]; cur["pts"].append([xy[3][0], xy[3][1], xy[2][0], xy[2][1], xy[3][0], xy[3][1]])
+        elif v == skia.Path.kClose_Verb and cur:
+            ps = cur["pts"]
+            if len(ps) > 1 and abs(ps[0][0] - ps[-1][0]) < 1e-4 and abs(ps[0][1] - ps[-1][1]) < 1e-4:
+                ps[0][2], ps[0][3] = ps[-1][2], ps[-1][3]; ps.pop()
+            cur["fechado"] = True
+    return [s for s in subs if len(s["pts"]) > 1]
+
+
+def _sk_pincel(larg, cap="butt", junc="miter", miter=4, tracejado=None, fase=0):
+    import skia
+    pt = skia.Paint(Style=skia.Paint.kStroke_Style, StrokeWidth=float(larg), AntiAlias=True)
+    pt.setStrokeCap({"round": skia.Paint.kRound_Cap, "square": skia.Paint.kSquare_Cap}.get(cap, skia.Paint.kButt_Cap))
+    pt.setStrokeJoin({"round": skia.Paint.kRound_Join, "bevel": skia.Paint.kBevel_Join}.get(junc, skia.Paint.kMiter_Join))
+    pt.setStrokeMiter(float(miter or 4))
+    tr = [float(x) for x in (tracejado or []) if x is not None]
+    if tr and sum(tr) > 0:
+        if len(tr) % 2:
+            tr = tr * 2
+        pt.setPathEffect(skia.DashPathEffect.Make(tr, float(fase or 0)))
+    return pt
+
+
+def deslocar(formas, dist, junc="miter", miter=4):
+    """Deslocar caminho (Illustrator: Objeto > Caminho > Deslocar caminho). dist em pt (+ para fora, − para dentro).
+    formas = [{subs, regra}] → [{subs}] (regra nonzero), uma por forma."""
+    import skia
+    out = []
+    for f in formas:
+        p = _sk_path(f["subs"], f.get("regra", "nonzero"))
+        if abs(dist) < 1e-6:
+            out.append({"subs": _sk_subs(skia.Simplify(p))}); continue
+        borda = skia.Path()
+        _sk_pincel(2 * abs(dist), "butt", junc, miter).getFillPath(p, borda, None, 4.0)
+        r = skia.Op(p, borda, skia.PathOp.kUnion_PathOp if dist > 0 else skia.PathOp.kDifference_PathOp)
+        out.append({"subs": _sk_subs(r) if r is not None else []})
+    return out
+
+
+def contornar_traco(formas):
+    """Contornar traço: o traço vira uma forma preenchida (com terminais, cantos e tracejado).
+    formas = [{subs, traco:{larg,cap,junc,miter,tracejado,fase}}] → [{subs}] (regra nonzero)."""
+    import skia
+    out = []
+    for f in formas:
+        t = f.get("traco") or {}
+        p = _sk_path(f["subs"])
+        borda = skia.Path()
+        _sk_pincel(t.get("larg", 1), t.get("cap", "butt"), t.get("junc", "miter"), t.get("miter", 4),
+                   t.get("tracejado"), t.get("fase", 0)).getFillPath(p, borda, None, 4.0)
+        r = skia.Simplify(borda)
+        out.append({"subs": _sk_subs(r if r is not None else borda)})
+    return out
+
+
 # ─────────────────────────── imagens ───────────────────────────
 def _registrar_previa(arq):
     """URL de exibição: RGB/RGBA servido direto; CMYK/outros → PNG RGB em PASTA_TMP (prova pelo perfil)."""
@@ -409,6 +514,86 @@ def salvar(doc, caminho):
         z.writestr("documento.json", json.dumps(doc, ensure_ascii=False))
     os.replace(tmp, caminho)
     return {"success": True, "path": caminho, "nome": os.path.basename(caminho)}
+
+
+def _fontes_usadas(itens, acc):
+    for o in itens or []:
+        if o.get("tipo") == "texto":
+            acc.add((o.get("fam") or "Arial", o.get("estilo") or "Regular"))
+        _fontes_usadas(o.get("itens"), acc)
+    return acc
+
+
+def empacotar(doc, pasta, opcoes=None):
+    """Empacotar (como no Illustrator): pasta/<nome>/ com <nome>.aknv, Links/ (imagens originais), Fontes/ (opcional)
+    e Relatório.txt. O PDF é gravado antes pelo painel (opcoes.pdf = resultado do exportar_pdf, entra no relatório)."""
+    op = opcoes or {}
+    nome = re.sub(r'[<>:"/\\|?*]+', "_", doc.get("nome") or "Sem titulo").strip() or "Sem titulo"
+    dest = os.path.join(pasta, nome) if not op.get("na_pasta") else pasta
+    os.makedirs(dest, exist_ok=True)
+    doc = json.loads(json.dumps(doc))
+    linhas = [f"KANIVETE — pacote de \"{doc.get('nome')}\"", time.strftime("%d/%m/%Y %H:%M"), ""]
+    # links
+    links, faltam = [], []
+    for iid, im in (doc.get("imagens") or {}).items():
+        arq = im.get("arquivo")
+        if not (arq and os.path.isfile(arq)):
+            faltam.append(im.get("nome") or iid); continue
+        os.makedirs(os.path.join(dest, "Links"), exist_ok=True)
+        base = im.get("nome") or os.path.basename(arq)
+        alvo, n = os.path.join(dest, "Links", base), 1
+        while os.path.exists(alvo) and not _mesmo_arquivo(alvo, arq):
+            b, e = os.path.splitext(base); alvo = os.path.join(dest, "Links", f"{b}_{n}{e}"); n += 1
+        if not os.path.exists(alvo):
+            shutil.copy2(arq, alvo)
+        im["arquivo"] = alvo
+        links.append(f"  {os.path.basename(alvo)} — {im.get('w')}×{im.get('h')} px, {im.get('modo')}")
+    # fontes
+    fontes, sem = [], []
+    for fam, est in sorted(_fontes_usadas([o for c in doc.get("camadas", []) for o in c.get("itens", [])], set())):
+        arq, _, achou = fonte_arquivo(fam, est)
+        if not achou:
+            sem.append(f"{fam} {est}"); continue
+        fontes.append(f"  {fam} {est} — {os.path.basename(arq)}")
+        if op.get("fontes", True):
+            os.makedirs(os.path.join(dest, "Fontes"), exist_ok=True)
+            alvo = os.path.join(dest, "Fontes", os.path.basename(arq))
+            if not os.path.exists(alvo):
+                shutil.copy2(arq, alvo)
+    r = salvar(doc, os.path.join(dest, nome + ".aknv"))
+    ps = doc.get("pranchetas") or []
+    linhas += [f"Documento: {r['nome']}  ·  {len(ps)} prancheta(s)  ·  {doc.get('modoCor', 'cmyk').upper()} {doc.get('perfil', '')}"
+               f"  ·  sangria {round((doc.get('sangria') or 0) * 25.4 / 72, 2)} mm"]
+    linhas += [f"  {p.get('nome')}: {round(p['w'] * 25.4 / 72, 1)} × {round(p['h'] * 25.4 / 72, 1)} mm" for p in ps]
+    linhas += ["", f"Imagens ({len(links)}):"] + (links or ["  —"])
+    if faltam:
+        linhas += ["  FALTANDO: " + ", ".join(faltam)]
+    linhas += ["", f"Fontes ({len(fontes)}){'' if op.get('fontes', True) else ' (não copiadas)'}:"] + (fontes or ["  —"])
+    if sem:
+        linhas += ["  NÃO INSTALADAS (saem em Arial): " + ", ".join(sem)]
+    linhas += ["  Obs.: no PDF os textos já vão em curvas; as fontes servem para editar o .aknv em outro computador."]
+    spots = sorted(set(op.get("spots") or []) - {"All", None})
+    if spots:
+        linhas += ["", "Cores especiais: " + ", ".join(spots)]
+    pdf = op.get("pdf")
+    if pdf:
+        linhas += ["", f"PDF: {os.path.basename(pdf.get('caminho', ''))}  ·  {str(op.get('padrao', 'x4')).upper()}  ·  "
+                   + ("verificado ✓" if pdf.get("verificado") else "verificar: " + "; ".join(pdf.get("problemas") or []))]
+    fc = op.get("fechamento") or {}
+    if fc:
+        linhas += ["", f"Fechamento: {len(fc.get('erros') or [])} erro(s), {len(fc.get('avisos') or [])} alerta(s)"]
+        linhas += [f"  [{x.get('nivel', '')}] {x.get('msg', '')}" for x in (fc.get("erros") or []) + (fc.get("avisos") or [])]
+    with open(os.path.join(dest, "Relatório.txt"), "w", encoding="utf-8") as f:
+        f.write("\n".join(linhas) + "\n")
+    return {"success": True, "pasta": dest, "aknv": r["path"], "links": len(links), "faltando": faltam,
+            "fontes": len(fontes), "fontes_faltando": sem}
+
+
+def _mesmo_arquivo(a, b):
+    try:
+        return os.path.getsize(a) == os.path.getsize(b) and open(a, "rb").read(65536) == open(b, "rb").read(65536)
+    except OSError:
+        return False
 
 
 def abrir_aknv(caminho):

@@ -79,6 +79,7 @@ const VK_MENUS = [
     ['Arquivo', [['Novo...', 'Ctrl+N', () => vkNovoDialogo()], ['Abrir...', 'Ctrl+O', () => vkCmdUi('abrir', {})], ['Colocar (importar)...', 'Shift+Ctrl+P', () => vkCmdUi('importar', {})], '-',
         ['Salvar', 'Ctrl+S', () => vkCmdUi('salvar', {})], ['Salvar como...', 'Shift+Ctrl+S', () => vkCmdUi('salvar', { como: true })], '-',
         ['Exportar PDF para gráfica...', '', () => vkExportarDialogo('pdf')], ['Exportar PNG/JPG...', '', () => vkExportarDialogo('img')], ['Exportar SVG...', '', () => vkCmdUi('exportar_svg', {})], '-',
+        ['Empacotar...', '', () => vkCmdUi('empacotar', {})], '-',
         ['Configurar documento...', '', () => vkDocDialogo()]]],
     ['Editar', [['Desfazer', 'Ctrl+Z', vkDesfazer], ['Refazer', 'Shift+Ctrl+Z', vkRefazer], '-', ['Duplicar', 'Ctrl+D', () => vkCmdUi('duplicar', { dx: vkPT(5), dy: vkPT(5) })],
         ['Apagar', 'Del', () => vkCmdUi('apagar', {})], ['Selecionar tudo', 'Ctrl+A', () => { VK.sel = vkTodosDaCamada(); vkMudou(); }], '-',
@@ -88,6 +89,7 @@ const VK_MENUS = [
         ['Recuar', 'Ctrl+[', () => vkCmdUi('organizar', { modo: 'abaixo' })], ['Enviar para trás', 'Shift+Ctrl+[', () => vkCmdUi('organizar', { modo: 'tras' })], '-',
         ['Máscara de corte', 'Ctrl+7', () => vkCmdUi('mascara', {})], ['Soltar máscara', 'Alt+Ctrl+7', () => vkCmdUi('soltar_mascara', {})],
         ['Caminho composto', 'Ctrl+8', () => vkCmdUi('composto', {})], '-',
+        ['Deslocar caminho...', '', () => vkDeslocarDialogo()], ['Contornar traço', '', () => vkCmdUi('contornar_traco', {})], '-',
         ['Refletir na vertical', '', () => vkCmdUi('refletir', { eixo: 'vertical' })], ['Refletir na horizontal', '', () => vkCmdUi('refletir', { eixo: 'horizontal' })],
         ['Girar 90°', '', () => vkCmdUi('girar', { graus: 90 })], '-', ['Travar', 'Ctrl+2', () => vkCmdUi('alterar', { trava: true })], ['Ocultar', 'Ctrl+3', () => vkCmdUi('alterar', { visivel: false })],
         ['Limpar pontos soltos', '', () => vkCmdUi('limpar', {})]]],
@@ -451,6 +453,17 @@ function vkExportarDialogo(qual = 'pdf') {
                 else await vkCmd('exportar_svg', {});
             } catch (e) { vkToast(e.message); }
         };
+    });
+}
+function vkDeslocarDialogo() {
+    if (!VK.sel.length) return vkToast('Selecione uma forma');
+    vkModal(`<div class="ie-dlg-tit">Deslocar caminho</div><div class="ie-dlg-corpo">
+        <div class="vk-grade">${vkNum('Deslocamento', VK.pref.deslocar ?? 2, 'id="vkdl-d"', 'mm', 0.5)}${vkNum('Limite', 4, 'id="vkdl-m" min="1"', '', 1)}</div>
+        <div class="vk-linha"><span>Cantos</span><select id="vkdl-j"><option value="miter">Pontiagudo</option><option value="round">Arredondado</option><option value="bevel">Chanfrado</option></select></div>
+        <div class="vk-nota">Positivo = para fora (a cópia fica atrás); negativo = para dentro. Útil para contorno de adesivo/faca e fio branco.</div>
+        </div><div class="ie-dlg-rod"><button class="ie-btn" data-x>Cancelar</button><button class="ie-btn ie-btn-primario" id="vkdl-ok">OK</button></div>`, (m, fechar) => {
+        m.querySelector('#vkdl-ok').onclick = () => { const g = id => m.querySelector(id).value; VK.pref.deslocar = +g('#vkdl-d'); fechar();
+            vkCmdUi('deslocar', { un: 'pt', distancia: vkPT(+g('#vkdl-d')), junc: g('#vkdl-j'), miter: +g('#vkdl-m') }); };
     });
 }
 function vkResultadoPdf(r) {
