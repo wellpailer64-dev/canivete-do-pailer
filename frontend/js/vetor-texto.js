@@ -558,3 +558,43 @@ function vkTxDown(e, sx, sy, x, y) {
     return false;
 }
 function vkTxComFaixa(args) { const o = VK.sel.length === 1 && vkObj(VK.sel[0]), fx = o && o.tipo === 'texto' && vkTxFaixaAtiva(o); return fx ? { ...args, faixa: fx } : args; }
+
+// ─────────────────────────── estilos visíveis na caixa de edição (espelho por trás da caixa de digitação) ───────────────────────────
+// A caixa de digitação fica com o texto transparente (só o cursor e a seleção); por trás, um espelho com a MESMA fonte, quebra e
+// rolagem mostra cada trecho na sua cor e o negrito (sombra fina: não muda a largura, o cursor continua alinhado).
+function vkTxEspelhoHtml(r, antes, agora) {
+    const tmp = { conteudo: antes, trechos: vkClone(r.trechos || []) }; vkTxRemap(tmp, antes, agora);
+    const n = agora.length, cortes = new Set([0, n]); (tmp.trechos || []).forEach(t => { cortes.add(Math.max(0, Math.min(n, t.ini))); cortes.add(Math.max(0, Math.min(n, t.fim))); });
+    const cs = [...cortes].sort((a, b) => a - b), esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const legivel = c => { const css = c && c.k !== 'grad' && c.k !== 'pad' ? vkCss(c) : null, m = css && String(css).match(/\d+/g); return m && (0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2]) < 200 ? css : null; };
+    const negrito = e => /bold|black|heavy|semibold|extrabold/i.test(e || '');
+    let h = '';
+    for (let i = 0; i < cs.length - 1; i++) {
+        const a = cs[i], b = cs[i + 1], t = (tmp.trechos || []).find(x => x.ini <= a && x.fim >= b) || {};
+        const cor = legivel(t.preench) || legivel(r.preench) || '#111', claro = t.preench && !legivel(t.preench);
+        const est = [`color:${cor}`, (negrito(t.estilo ?? r.estilo) ? 'text-shadow:.45px 0 0 currentColor,-.45px 0 0 currentColor' : ''), claro ? 'background:rgba(0,0,0,.08)' : '', t.pos ? 'text-decoration:underline dotted' : ''].filter(Boolean).join(';');
+        h += `<span style="${est}">${esc(agora.slice(a, b))}</span>`;
+    }
+    return h + (agora.endsWith('\n') ? ' ' : '');
+}
+const vkTxEditarComEspelho = vkTextoEditar;
+vkTextoEditar = function (o) {
+    vkTxEditarComEspelho(o);
+    const ta = document.getElementById('vk-texto-edit'); if (!ta || ta.hidden) return;
+    const r = vkTxRaiz(o), antes = String(r.conteudo);
+    let esp = document.getElementById('vk-texto-espelho');
+    if (!esp) { esp = document.createElement('div'); esp.id = 'vk-texto-espelho'; esp.className = 'vk-texto-espelho'; ta.parentElement.insertBefore(esp, ta); }
+    const pos = () => { const c = getComputedStyle(ta); Object.assign(esp.style, { left: ta.style.left, top: ta.style.top, width: ta.offsetWidth + 'px', height: ta.offsetHeight + 'px',
+        fontSize: c.fontSize, fontFamily: c.fontFamily, fontWeight: c.fontWeight, lineHeight: c.lineHeight, letterSpacing: c.letterSpacing, padding: c.padding }); esp.scrollTop = ta.scrollTop; };
+    const pinta = () => { esp.innerHTML = vkTxEspelhoHtml(r, antes, ta.value); pos(); };
+    ta.classList.add('vk-texto-edit-rico'); esp.hidden = false; pinta();
+    ta.addEventListener('input', pinta); ta.addEventListener('scroll', () => { esp.scrollTop = ta.scrollTop; });
+    if (window.ResizeObserver) { const ro = new ResizeObserver(pos); ro.observe(ta); esp._ro = ro; }
+    esp._pinta = pinta; esp._ta = ta;
+};
+const vkTxFimComEspelho = vkTextoFim;
+vkTextoFim = function () {
+    const esp = document.getElementById('vk-texto-espelho');
+    if (esp) { esp.hidden = true; esp.innerHTML = ''; if (esp._ro) esp._ro.disconnect(); if (esp._ta) { esp._ta.removeEventListener('input', esp._pinta); esp._ta.classList.remove('vk-texto-edit-rico'); } }
+    return vkTxFimComEspelho();
+};

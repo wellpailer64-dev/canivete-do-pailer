@@ -118,3 +118,9 @@
 .vk-ef { border-top: 1px solid rgba(255,255,255,.06); padding-top: 4px; margin-top: 4px; }
 .vk-ef b { font-weight: 500; flex: 1; }
 .vk-cb { width: 300px; padding: 8px; } .vk-cb-grade { max-height: 260px; overflow-y: auto; margin-top: 6px; }
+
+/* estilos visíveis na edição de texto (vetor-texto.js): espelho por trás, caixa de digitação transparente */
+.vk-texto-espelho { position: absolute; z-index: 5; box-sizing: border-box; white-space: pre-wrap; overflow-wrap: break-word; overflow: hidden; pointer-events: none;
+    background: rgba(255, 255, 255, .96); border: 1px solid #2f8cff; border-radius: 2px; color: #111; }
+.vk-texto-edit.vk-texto-edit-rico { color: transparent; caret-color: #111; background: transparent; }
+.vk-texto-edit.vk-texto-edit-rico::selection { background: rgba(47, 140, 255, .35); color: transparent; }
