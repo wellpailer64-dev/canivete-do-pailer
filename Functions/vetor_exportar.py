@@ -373,6 +373,11 @@ class _Escritor:
             return out + ["Q"]
         if t == "imagem":
             return self.imagem(o)
+        if t == "instancia":   # símbolo: a definição com a matriz da instância
+            S = (self.doc.get("simbolos") or {}).get(o.get("simbolo")) or {}
+            out = ["q"] + self.estilo_ops(o) + [" ".join(_f(x) for x in (o.get("m") or [1, 0, 0, 1, 0, 0])) + " cm"]
+            for f in S.get("itens", []): out += self.objeto(f)
+            return out + ["Q"]
         return []
 
 
@@ -413,6 +418,12 @@ def _bbox_obj(o):
         cx = [c for c in cx if c]
         return (min(c[0] for c in cx), min(c[1] for c in cx), max(c[2] for c in cx), max(c[3] for c in cx)) if cx else None
     m = o.get("m") or [1, 0, 0, 1, 0, 0]
+    if t == "instancia":
+        S = (o.get("_simbolos") or {}).get(o.get("simbolo")) or {}
+        cx = [c for c in (_bbox_obj(f) for f in S.get("itens", [])) if c]
+        if not cx: return None
+        cantos = [_pt(m, (x, y)) for c in cx for x, y in ((c[0], c[1]), (c[2], c[1]), (c[0], c[3]), (c[2], c[3]))]
+        return (min(p[0] for p in cantos), min(p[1] for p in cantos), max(p[0] for p in cantos), max(p[1] for p in cantos))
     if t == "imagem":
         im = o.get("_wh") or (1, 1)
         cantos = [_pt(m, p) for p in ((0, 0), (im[0], 0), (0, im[1]), (im[0], im[1]))]
@@ -466,7 +477,7 @@ def exportar_pdf(doc, caminho, op=None):
             if cam.get("visivel") is False or cam.get("imprimir") is False: continue
             for o in cam.get("itens", []):
                 try:
-                    bb = _bbox_obj({**o, "_wh": (doc.get("imagens", {}).get(o.get("img"), {}) or {}).get("_wh")} if o.get("tipo") == "imagem" else o)
+                    bb = _bbox_obj({**o, "_wh": (doc.get("imagens", {}).get(o.get("img"), {}) or {}).get("_wh")} if o.get("tipo") == "imagem" else {**o, "_simbolos": doc.get("simbolos")} if o.get("tipo") == "instancia" else o)
                 except Exception:
                     bb = None
                 if bb and (bb[2] < x0 or bb[0] > x1 or bb[3] < y0 or bb[1] > y1): continue

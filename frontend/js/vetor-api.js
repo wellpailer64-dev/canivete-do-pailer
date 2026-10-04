@@ -395,6 +395,7 @@ function vkInfo(o) {
     }
     if (o.tipo === 'imagem') { const im = VK.doc.imagens[o.img] || {}; r.arquivo = im.nome; r.ppi = Math.round(72 / vkEsc(o.m)); r.modo = im.modo; }
     if (o.tipo === 'grupo') { r.itens = o.itens.length; if (o.clip) r.mascara = true; }
+    if (o.tipo === 'instancia') r.simbolo = ((VK.doc.simbolos || {})[o.simbolo] || {}).nome;
     if (o.aparencia) r.aparencia = o.aparencia.map(l => `${l.tipo} ${vkCorTexto(l.cor)}${l.tipo === 'traco' ? ' ' + vkR(l.larg ?? 1, 2) + ' pt' : ''}${l.desloc ? ' desl ' + vkR(vkMM(l.desloc)) + ' mm' : ''}`);
     if (o.efeitos) r.efeitos = o.efeitos.map(e => e.tipo + (e.visivel === false ? ' (oculto)' : ''));
     if (o.trava) r.travado = true; if (o.visivel === false) r.oculto = true;

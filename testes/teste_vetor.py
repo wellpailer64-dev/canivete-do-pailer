@@ -375,6 +375,30 @@ with sync_playwright() as p:
     ok(tem_pad and "PANTONE 1505 C" in r["info"]["spots"], f"padrão sai como tiling pattern vetorial, com a cor especial da peça ({r['info']['spots']})")
     ok(r["verificado"] and "TESTE 286 C" in r["info"]["spots"], f"PDF/X-4 com setor, QR, ícone e cor do livro como especial ({r['problemas']}, {r['info']['spots']})")
 
+    print("símbolos e EPS")
+    C("novo", {"nome": "Simbolos", "larg": 100, "alt": 60})
+    e_ = C("estrela", {"cx": 10, "cy": 10, "raio": 5, "pontas": 5, "preench": "C0 M100 Y0 K0", "traco": "nenhum"})
+    r = C("criar_simbolo", {"ids": [e_["id"]], "nome": "Estrela"})
+    for i_, (x_, esc_, ang_) in enumerate(((40, 100, 0), (60, 150, 30), (80, 60, 0))):
+        C("colocar_simbolo", {"nome": "Estrela", "x": x_, "y": 30, "escala": esc_, "angulo": ang_})
+    s_ = C("simbolos")["simbolos"][0]
+    ok(s_["instancias"] == 4, f"símbolo com 4 instâncias ({s_})")
+    larg_antes = C("info", {"ids": [r["instancia"]]})[0]["caixa_mm"]["larg"]
+    nv = C("elipse", {"x": 0, "y": 45, "larg": 20, "alt": 6, "preench": "C100 M0 Y0 K0", "traco": "nenhum"})
+    C("redefinir_simbolo", {"simbolo": "Estrela", "ids": [nv["id"]], "apagar_originais": True})
+    larg_depois = C("info", {"ids": [r["instancia"]]})[0]["caixa_mm"]["larg"]
+    ok(abs(larg_depois - 20) < 0.1 and abs(larg_antes - larg_depois) > 5, f"redefinir o símbolo muda todas as instâncias ({larg_antes} → {larg_depois} mm)")
+    out_s = os.path.join(SAI, "simbolos_x4.pdf")
+    r_ = pg.evaluate("([c]) => VKN.exportarPdf(c, {padrao: 'x4'})", [out_s])
+    ok(r_["verificado"] and "CMYK" in r_["info"]["cores"], f"PDF com instâncias de símbolo ({r_['problemas']})")
+    r_ = C("soltar_simbolo", {"ids": [r["instancia"]]})
+    ok(r_["soltos"] == 1 and C("simbolos")["simbolos"][0]["instancias"] == 3, "soltar símbolo vira grupo comum")
+    eps = os.path.join(SAI, "teste.eps"); open(eps, "w").write("%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 100 100\n0 0 1 setrgbcolor 10 10 80 80 rectfill\nshowpage\n")
+    try:
+        r_ = C("abrir", {"caminho": eps}); ok(r_ and not r_.get("cancelado"), "EPS aberto pelo Ghostscript")
+    except Exception as e_eps:
+        ok("Ghostscript" in str(e_eps), "EPS sem Ghostscript: mensagem clara de como instalar")
+
     print("recuperação (salvamento automático)")
     C("recuperacao", {"acao": "descartar", "todos": True})
     C("novo", {"nome": "Recup A", "larg": 50, "alt": 50}); C("retangulo", {"x": 5, "y": 5, "larg": 10, "alt": 10})

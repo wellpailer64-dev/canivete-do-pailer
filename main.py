@@ -3313,7 +3313,7 @@ class ApiBridge:
         elif modo == "salvar":
             r = _window.create_file_dialog(webview.SAVE_DIALOG, save_filename=nome or "Sem titulo.aknv", file_types=tuple(tipos or ()))
         else:
-            r = _window.create_file_dialog(webview.OPEN_DIALOG, file_types=tuple(tipos or ("Arquivos vetoriais (*.aknv;*.pdf;*.ai;*.svg;*.pptx)", "Todos (*.*)")))
+            r = _window.create_file_dialog(webview.OPEN_DIALOG, file_types=tuple(tipos or ("Arquivos vetoriais (*.aknv;*.pdf;*.ai;*.eps;*.svg;*.pptx)", "Todos (*.*)")))
         if not r:
             return None
         return r if isinstance(r, str) else r[0]

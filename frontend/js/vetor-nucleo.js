@@ -106,6 +106,9 @@ function vkBox(o, comTraco = false) {   // caixa no documento
     } else if (o.tipo === 'imagem') {
         const im = VK.doc.imagens[o.img] || { w: 1, h: 1 };
         for (const [x, y] of [[0, 0], [im.w, 0], [0, im.h], [im.w, im.h]]) { const p = vkAp(o.m, x, y); vkBoxAdd(b, p[0], p[1]); }
+    } else if (o.tipo === 'instancia') {   // símbolo: a caixa da definição levada pela matriz da instância
+        const S = (VK.doc.simbolos || {})[o.simbolo];
+        for (const f of (S ? S.itens : [])) { const c = vkBox(f, comTraco); if (!isFinite(c[0])) continue; for (const [x, y] of [[c[0], c[1]], [c[2], c[1]], [c[0], c[3]], [c[2], c[3]]]) { const p = vkAp(o.m, x, y); vkBoxAdd(b, p[0], p[1]); } }
     }
     return b;
 }
@@ -368,6 +371,9 @@ function vkDesenharObj(ctx, o, cam) {
                 }
             }
         }
+    } else if (o.tipo === 'instancia') {
+        const S = (VK.doc.simbolos || {})[o.simbolo];
+        if (S) { ctx.transform(...o.m); S.itens.forEach(f => vkDesenharObj(ctx, f, cam)); }
     } else if (o.tipo === 'imagem') {
         const im = VK.doc.imagens[o.img];
         ctx.transform(...o.m);
@@ -454,6 +460,7 @@ function vkAcerta(o, x, y, tol) {   // x, y no documento; tol em pt
         if (o.clip && o.itens.length && !c.isPointInPath(vkPath2d(o.itens[0].subs), x, y)) return false;
         return (o.clip ? o.itens.slice(1) : o.itens).some(f => vkAcerta(f, x, y, tol));
     }
+    if (o.tipo === 'instancia') { const S = (VK.doc.simbolos || {})[o.simbolo]; if (!S) return false; const [u, v] = vkAp(vkInv(o.m), x, y), t = tol / vkEsc(o.m); return S.itens.some(f => vkAcerta(f, u, v, t)); }
     if (o.tipo === 'imagem') { const im = VK.doc.imagens[o.img] || { w: 1, h: 1 }; const [u, v] = vkAp(vkInv(o.m), x, y); return u >= 0 && v >= 0 && u <= im.w && v <= im.h; }
     if (o.tipo === 'texto') {
         const g = vkGeo(o), b = vkBox(o);

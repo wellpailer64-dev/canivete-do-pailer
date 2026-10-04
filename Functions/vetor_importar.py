@@ -1404,8 +1404,44 @@ def importar_pptx(caminho):
     return {"success": True, "doc": doc, "relatorio": relatorio}
 
 
+def ghostscript():
+    """gswin64c/gswin32c/gs: PATH, Program Files/gs/*/bin ou %APPDATA%/CaniveteDoPailer/ghostscript (licença AGPL: não vai no app)."""
+    import glob, shutil
+    for n in ("gswin64c", "gswin32c", "gs"):
+        p = shutil.which(n)
+        if p: return p
+    cands = []
+    for raiz in (os.environ.get("ProgramFiles", r"C:\Program Files"), os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+                 os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "ghostscript")):
+        cands += glob.glob(os.path.join(raiz, "gs", "*", "bin", "gswin*c.exe")) + glob.glob(os.path.join(raiz, "bin", "gswin*c.exe"))
+    return sorted(cands)[-1] if cands else None
+
+
+def importar_eps(caminho):
+    """EPS/PS → PDF pelo Ghostscript (EPSCrop: a caixa do desenho) → importador de PDF (cores, especiais, texto)."""
+    import subprocess, tempfile
+    gs = ghostscript()
+    if not gs:
+        return {"success": False, "error": "Para abrir EPS o Vetor usa o Ghostscript (gratuito), que não está instalado. Instale em "
+                "ghostscript.com/releases (Windows 64 bits) e abra de novo — ou peça ao cliente o arquivo em PDF ou .ai compatível com PDF."}
+    pdf = os.path.join(tempfile.gettempdir(), "vetor_kanivete", os.path.splitext(os.path.basename(caminho))[0] + "_eps.pdf")
+    os.makedirs(os.path.dirname(pdf), exist_ok=True)
+    r = subprocess.run([gs, "-dNOPAUSE", "-dBATCH", "-dSAFER", "-dQUIET", "-sDEVICE=pdfwrite", "-dEPSCrop", "-dPDFSETTINGS=/prepress",
+                        "-dAutoRotatePages=/None", "-sColorConversionStrategy=LeaveColorUnchanged", f"-sOutputFile={pdf}", caminho],
+                       capture_output=True, text=True, timeout=180, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if r.returncode != 0 or not os.path.isfile(pdf):
+        return {"success": False, "error": "o Ghostscript não converteu o EPS: " + (r.stderr or r.stdout or "")[-300:]}
+    res = importar_pdf(pdf)
+    if res.get("success"):
+        res["relatorio"] = ["EPS convertido pelo Ghostscript (PostScript → PDF): confira cores especiais e textos"] + (res.get("relatorio") or [])
+        if res.get("doc"): res["doc"]["nome"] = os.path.splitext(os.path.basename(caminho))[0]
+    return res
+
+
 def importar(caminho):
     ext = os.path.splitext(caminho)[1].lower()
+    if ext in (".eps", ".ps", ".epsf"):
+        return importar_eps(caminho)
     if ext in (".pdf", ".ai"):
         return importar_pdf(caminho)
     if ext in (".svg", ".svgz"):
