@@ -82,6 +82,7 @@ Objeto inteligente vetorial no Photo (Arquivo › Enviar ao Photo; editar no Vet
 testes/teste_ponte.py` (rodar antes de release quando mexer na ponte, no objeto inteligente ou no renderizador do Vetor).
 
 ## Cena 3D no Editor (estilo After Effects)
+Tela própria (duplo clique na faixa, como a Comp): `frontend/js/editor-3d-tela.js` (orbitar grava na câmera, vista livre, setas W/E/R).
 Modelos .glb/.obj e primitivas com câmera, luz, sombra e quadros-chave (◆), prévia ao vivo em three.js e ProRes 4444
 para a exportação: `frontend/js/editor-3d.js` + `Functions/cena3d.py`; API `VE3DAPI`. Guia e pendências:
 `Instructions/agente/cena-3d-editor.md`. Foco (desfoque por profundidade), estúdio infinito, neblina e objetos 3D do
