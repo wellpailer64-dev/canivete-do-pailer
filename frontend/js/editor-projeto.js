@@ -1102,7 +1102,20 @@ function veMidiaUsadasPreparar() {
         if (m && m.leve && !m.url) veMidiaPriorizar(m);
     });
 }
+// ordem da fila: urgentes (na timeline) primeiro e, entre eles, o que está mais perto à frente da agulha — abrir um
+// projeto grande (Premiere) e tocar já ganha a prévia leve onde se está, não na ordem em que as mídias entraram
+function veMidiaOrdem() {
+    if (VEPJF.fila.length < 2) return;
+    const ph = VE.playhead || 0, dist = {};
+    for (const c of VE.clips) {
+        const id = veMid(c), x = veEnd(c) < ph ? 1e5 + ph - veEnd(c) : Math.max(0, c.st - ph);
+        if (dist[id] == null || x < dist[id]) dist[id] = x;
+    }
+    const pri = id => { const m = VE.media[id]; return (m && m._urgente ? 0 : 1e7) + Math.min(dist[id] ?? 1e6, 1e6); };
+    VEPJF.fila.sort((a, b) => pri(a) - pri(b));
+}
 function veMidiaProxima() {
+    veMidiaOrdem();
     while (VEPJF.ativos.size < VEPJF.max && VEPJF.fila.length) {
         const id = VEPJF.fila.shift(), m = VE.media[id];
         if (!m || m.removido) continue;
