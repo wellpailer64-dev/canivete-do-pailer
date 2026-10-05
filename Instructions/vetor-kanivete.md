@@ -285,4 +285,5 @@ instante; efeitos, 3D, pincéis e texto saem iguais à tela do Vetor).
   botão **Photo** (abre o .iknv).
 - Teste: `python testes/teste_ponte.py` (9 conferências + sem erro de JS; rodar antes de release quando mexer na ponte,
   no objeto inteligente do Photo ou no renderizador do Vetor). Falta (plano): mockup fotográfico (F3) e recursos
-  comuns (F4: amostras da marca e o gerador no Vetor).
+  comuns (F4) FEITO: `gerar_imagem` no Vetor (Z-Image local, entra como vínculo; Arquivo › Gerar imagem com IA) e
+  `marca_amostras` {marca: marca.json} (amostras nomeadas da marca).

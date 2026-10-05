@@ -145,14 +145,40 @@ ieSalvarIknv = async function (doc, destino) {
     return r;
 };
 
+// ── recursos comuns (F4): gerador de imagem no Vetor e amostras da marca ──
+// gerar_imagem: prompt (inglês fica mais fiel), largura/altura (px, padrão 1024), semente, x/y/larg (mm, onde colocar),
+// ref (caminho de imagem → edição guiada, motor klein). Mesmo pedido = mesma imagem (cache). Entra como imagem vinculada.
+async function vpGerarNoVetor(a = {}) {
+    if (!a.prompt) throw new Error('gerar_imagem: prompt');
+    const api = vkApi(); if (!api || !api.ie_gerar) throw new Error('gerador indisponível');
+    const motor = a.ref ? 'klein' : 'zimage', e = await api.ie_gerador_estado(motor);
+    if (!e.instalado) throw new Error(`gerador ${e.nome_modelo} não instalado: abra o Photo › Arquivo › Gerar imagem com IA (baixa ~${e.tamanho_gb} GB)`);
+    vkCarregando(true, 'Gerando imagem (Z-Image, ~45 s)...');
+    let r; try { r = await api.ie_gerar({ prompt: a.prompt, largura: a.largura || 1024, altura: a.altura || 1024, semente: a.semente ?? -1, refs: a.ref ? [a.ref] : [] }); } finally { vkCarregando(false); }
+    if (!r || !r.success) throw new Error('não gerou: ' + ((r && r.error) || ''));
+    const im = await VK_CMDS.imagem.fn({ arquivo: r.path, x: a.x || 0, y: a.y || 0, ...(a.larg ? { larg: a.larg } : {}), nome: a.nome || ('IA: ' + a.prompt.slice(0, 40)), ...(a.prancheta ? { prancheta: a.prancheta } : {}) });
+    const o = vkObj(im.id); if (o) o.gerada = { prompt: a.prompt, semente: r.semente, w: a.largura || 1024, h: a.altura || 1024 };
+    return { id: im.id, semente: r.semente, segundos: r.segundos, cache: !!r.cache, caminho: r.path };
+}
+// marca_amostras: marca.json (cores {nome: {hex, cmyk}}) → amostras nomeadas do documento ("MARÉ Azul"...)
+async function vpMarcaAmostras(a = {}) {
+    const r = await vkApi().vk_ler_texto(a.marca || a.caminho); if (!r || !r.success) throw new Error('marca_amostras: não li ' + (a.marca || a.caminho));
+    const m = JSON.parse(r.texto), feitos = [];
+    for (const [k, v] of Object.entries(m.cores || {})) { const nome = `${m.nome || 'Marca'} ${k[0].toUpperCase()}${k.slice(1)}`; await VK_CMDS.amostra.fn({ nome, cor: v.cmyk || v.hex }); feitos.push(nome); }
+    return { amostras: feitos };
+}
+
 // ── comandos, menus e atalhos ──
 (() => {
     vkRegistrar('enviar_photo', 'enviar ao Photo (objeto inteligente)', a => { VK._antes = null; return vpEnviarAoPhoto(a || {}); });
     vkRegistrar('devolver_photo', 'salvar e voltar ao Photo', () => { VK._antes = null; return vpDevolver(); });
+    vkRegistrar('gerar_imagem', 'gerar imagem com IA', a => vpGerarNoVetor(a || {}));
+    vkRegistrar('marca_amostras', 'amostras da marca', a => vpMarcaAmostras(a || {}));
     const salvarSemPonte = VK_CMDS.salvar.fn;   // Ctrl+S editando conteúdo do Photo = devolver
     VK_CMDS.salvar.fn = a => (VK.ponte && !(a && a.caminho)) ? (VK._antes = null, vpDevolver()) : salvarSemPonte(a);
     const m = VK_MENUS.find(x => x[0] === 'Arquivo');
-    if (m) m[1].push('-', ['Enviar ao Photo (objeto inteligente)', '', () => vkCmdUi('enviar_photo', {})], ['Enviar ao Photo em documento novo', '', () => vkCmdUi('enviar_photo', { novo: true })]);
+    if (m) m[1].push('-', ['Enviar ao Photo (objeto inteligente)', '', () => vkCmdUi('enviar_photo', {})], ['Enviar ao Photo em documento novo', '', () => vkCmdUi('enviar_photo', { novo: true })],
+        ['Gerar imagem com IA…', '', () => vpGerarDialogo()]);
     Object.assign(IE_CMDS, {
         editarNoVetor: doc => vpEditarNoVetor(doc, ieAtiva(doc)),
         enviarAoVetor: doc => vpEnviarAoVetor(doc).catch(e => ieToast(String(e.message || e))),
@@ -162,3 +188,14 @@ ieSalvarIknv = async function (doc, destino) {
         enviarAoVetor(iknv) { return vpEnviarAoVetor(IE.doc, { iknv }); },
     });
 })();
+function vpGerarDialogo() {
+    vkModal(`<div class="ie-dlg-tit">Gerar imagem com IA (Z-Image-Turbo, local)</div><div class="ie-dlg-corpo">
+        <textarea id="vpg-p" rows="4" style="width:100%" placeholder="Descreva a imagem (em inglês fica mais fiel)"></textarea>
+        <div class="vk-linha"><span>Formato</span><select id="vpg-f"><option value="1024x1024">1024 × 1024</option><option value="832x1216">832 × 1216 (retrato)</option><option value="1216x832">1216 × 832 (paisagem)</option></select>
+        <span>Semente</span><input id="vpg-s" type="number" value="-1" style="width:90px"></div>
+        <div class="vk-nota">~45 s na RTX 3050. Entra como imagem vinculada na prancheta ativa; mesma semente e texto = mesma imagem.</div>
+        </div><div class="ie-dlg-rod"><button class="ie-btn" data-x>Cancelar</button><button class="ie-btn ie-btn-primario" id="vpg-ok">Gerar</button></div>`, (m, fechar) => {
+        m.querySelector('#vpg-ok').onclick = () => { const p = m.querySelector('#vpg-p').value.trim(); if (!p) return; const [w, h] = m.querySelector('#vpg-f').value.split('x').map(Number);
+            const semente = +m.querySelector('#vpg-s').value; fechar(); vkCmdUi('gerar_imagem', { prompt: p, largura: w, altura: h, semente }); };
+    });
+}

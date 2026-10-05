@@ -3239,6 +3239,16 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.vetorizar(arquivo, cores, area_min, ignorar_fundo)
 
+    def vk_ler_texto(self, caminho):
+        """Arquivo de texto (marca.json, CSS, HTML de cena) → {success, texto}; até 4 MB."""
+        try:
+            if os.path.getsize(caminho) > 4_000_000:
+                return {"success": False, "error": "arquivo grande demais"}
+            with open(caminho, encoding="utf-8-sig") as f:
+                return {"success": True, "texto": f.read()}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def vk_ler_csv(self, caminho):
         from Functions import vetor_kanivete
         try:
