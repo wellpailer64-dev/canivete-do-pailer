@@ -27,20 +27,20 @@ window.ieGeradorProgresso = ieGeradorProgresso;
 
 function ieGerLimparBarra() { ieGerJob = null; document.querySelectorAll('.ie-ger-cancelar').forEach(b => b.remove()); ieCarregando(false); }
 
-// garante o gerador instalado (pergunta antes de baixar ~7 GB); true = pronto
-async function ieGeradorPronto() {
+// garante o gerador instalado (pergunta antes de baixar); modelo: 'zimage' (texto → imagem, padrão) | 'klein' (com referência)
+async function ieGeradorPronto(modelo) {
     const api = ieApi();
     if (!api) return false;
-    const e = await api.ie_gerador_estado();
+    const e = await api.ie_gerador_estado(modelo || null);
     if (e.instalado) return true;
     if (!e.baixando) {
         const ok = await appConfirm({
             titulo: ieT('Baixar o gerador de imagens?'),
-            texto: `${ieT('Na primeira vez o Photo Kanivete baixa o FLUX.2 klein (licença Apache 2.0) e o motor stable-diffusion.cpp')}: ~${e.tamanho_gb} GB ${ieT('em')} ${e.pasta}. ${ieT('Roda na placa de vídeo (8 GB bastam), sem internet depois.')}`,
+            texto: `${ieT('Na primeira vez o Photo Kanivete baixa o')} ${e.nome_modelo} ${ieT('(licença Apache 2.0) e o motor stable-diffusion.cpp')}: ~${e.tamanho_gb} GB ${ieT('em')} ${e.pasta}. ${ieT('Roda na placa de vídeo (8 GB bastam), sem internet depois.')}`,
             botoes: [{ rotulo: ieT('Cancelar'), valor: null }, { rotulo: ieT('Baixar'), valor: 1, tipo: 'primario' }],
         });
         if (!ok) return false;
-        const r = await api.ie_gerador_baixar();
+        const r = await api.ie_gerador_baixar(modelo || null);
         if (!r.success) { ieToast(r.error); return false; }
     }
     ieCarregando(ieT('Baixando o gerador...'), 0);
@@ -65,7 +65,7 @@ function ieGerRefPng(qual, doc = IE.doc) {
 // gera e coloca como camada nova; spec = {prompt, largura, altura, semente, refs:[png|path]}; devolve {L, semente} ou null
 async function ieGerarCamada(spec, nome) {
     const api = ieApi();
-    if (!(await ieGeradorPronto())) return null;
+    if (!(await ieGeradorPronto(spec.motor || ((spec.refs || []).length ? 'klein' : 'zimage')))) return null;
     ieCarregando(ieT('Preparando o gerador...'), 1);
     let r;
     try { r = await api.ie_gerar(spec); } finally { ieGerLimparBarra(); }

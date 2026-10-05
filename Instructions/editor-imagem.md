@@ -166,13 +166,27 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   tamanho 768/1024/1536, referência (camada ativa ou documento: edição guiada pelo texto), semente. Entra como camada
   "IA: ..." (guarda prompt e semente em `L.gerada`). Barra com as fases e Cancelar (job na fila: API; já gerando: fecha
   o servidor).
-- Motor: stable-diffusion.cpp `sd-server.exe` build **Vulkan** (30 MB; na RTX 3050 empatou com o CUDA de 1,1 GB) +
-  FLUX.2 klein 4B Q8_0 GGUF (leejet) + Qwen3-4B Q4_K_M (unsloth, lê o prompt) + VAE flux2 (Comfy-Org), tudo sem login,
-  ~7,2 GB em `<app>/modelos_ia/gerador_imagem/` (baixado na 1ª vez, com retomada `.part`). `--offload-to-cpu --fa
-  --vae-tiling` (o VAE inteiro em 1024² pede ~10 GB e falhava). 4 passos, cfg 1, euler.
-- Servidor sobe na 1ª geração (~10 s; na 1ª vez do PC o Vulkan compila shaders, ~40 s a mais), API nativa assíncrona
-  `/sdcpp/v1/img_gen` + consulta do job; fecha sozinho após 5 min parado; preso a um Job do Windows (fecha junto com o
-  app, mesmo se ele cair). Cache em `%LOCALAPPDATA%/CaniveteDoPailer/cache_gerador` (hash de prompt+tamanho+semente+refs).
+- Motor: stable-diffusion.cpp `sd-server.exe` build **Vulkan** (30 MB; na RTX 3050 empatou com o CUDA de 1,1 GB), dois
+  modelos (`MOTORES` em gerador_imagem.py; o servidor carrega um por vez e troca sozinho):
+  - **zimage (padrão, texto → imagem)**: Tongyi-MAI/Z-Image-Turbo 6B em GGUF **Q4_K** (leejet/Z-Image-Turbo-GGUF, 3,9 GB) +
+    Qwen3-4B-Instruct-2507 Q4_K_M (unsloth, lê o prompt) + VAE do FLUX.1 (Comfy-Org/z_image_turbo). 8 passos, cfg 1
+    (Turbo, sem CFG), euler. ~6,7 GB baixados. Por que não Diffusers/BF16: o checkpoint oficial tem 30+ GB e pediria
+    torch+CUDA no app; o sd.cpp já é a stack e suporta o Z-Image oficialmente com `--offload-to-cpu` (pesos na RAM,
+    cada parte sobe à placa só na sua etapa).
+  - **klein (só edição com referência — o Turbo não edita a partir de imagem)**: FLUX.2 klein 4B Q8_0 + Qwen3-4B Q4_K_M
+    + VAE flux2, 4 passos. Baixado só quando a edição guiada é usada (`ie_gerador_estado/baixar(modelo)`).
+  `--offload-to-cpu --fa --vae-tiling` (o VAE inteiro em 1024² pede ~10 GB e falhava).
+- Medição na RTX 3050 8 GB (2026-10-05, mesmos 4 prompts e semente — retrato, corpo inteiro com mãos, três pessoas,
+  produto vidro/metal/plástico; `D:/kanivete_testes/gerador/bench.py`): klein pico 6,7 GB (placa inteira, 1,36 GB são do
+  Windows), 18–20 s/imagem (38 s a 1ª, com carga); **Z-Image pico 5,9 GB, 41–44 s/imagem (61 s a 1ª)**, 4/4 nos dois.
+  Z-Image: pele com poros e textura real, mãos certas, rostos de grupo mais naturais; o klein segue mais ao pé da letra
+  formas de produto ("facetado"). Interface responde em ≤5 ms durante a geração (servidor à parte).
+- Placa: um modelo pesado por vez — o servidor sai 90 s depois da última geração; trocar de modelo fecha o anterior;
+  `ampliar_imagem` chama `gerador_imagem.parar()` e o Worker (`worker.py`/`codigo.py`) fecha o `sd-server.exe` antes do
+  Ollama; o gerador descarrega o Ollama antes de gerar.
+- Servidor sobe na 1ª geração, API nativa assíncrona `/sdcpp/v1/img_gen` + consulta do job; preso a um Job do Windows
+  (fecha junto com o app, mesmo se ele cair). Cache em `%LOCALAPPDATA%/CaniveteDoPailer/cache_gerador` (hash de
+  modelo+prompt+tamanho+semente+refs; `sem_cache` força gerar).
 - Referência vai achatada sobre branco: transparente o modelo lê como preto.
 - Trocar de versão do sd.cpp: `SD_TAG` em gerador_imagem.py (a API do servidor muda entre versões; testar).
 

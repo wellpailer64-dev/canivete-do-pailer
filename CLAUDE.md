@@ -66,7 +66,7 @@ Guia, arquivos e limitações em `Instructions/editor-imagem.md`; código em `fr
 (rodar antes de release quando mexer no editor de imagem, em `psd_tools` ou no `media_server`). Ferramentas com mouse de
 verdade (app em `--agente=9333`): `testes/teste_caneta.py` (Caneta, demarcadores, recuperação, laço magnético) e
 `testes/teste_guias.py` (guias, encaixe, fatias, carrossel), `testes/teste_dissolver.py` (Filtro > Dissolver/Liquify), `testes/teste_galeria.py` (Galeria de filtros), `testes/teste_cameraraw.py` (Camera Raw).
-Gerar imagem com IA (FLUX.2 klein via stable-diffusion.cpp Vulkan, baixado sob demanda; `KNV.gerar`): seção no mesmo guia.
+Gerar imagem com IA (Z-Image-Turbo 6B Q4_K; com referência, FLUX.2 klein — ambos no stable-diffusion.cpp Vulkan, sob demanda; `KNV.gerar`): seção no mesmo guia.
 **Diagramar (carrossel, feed, story): `KNV.cena` — HTML/CSS vira camadas; `py -3.13 tools/knv.py peca.html --formato feed` (carrossel: `<section class="slide">`, `--exportar pasta`)**;
 guia `Instructions/agente/plano-cena.md` (seção "Fluxo barato": biblioteca `D:\kanivete_biblioteca` com recursos/modelos/amostras, `data-cor`, `recurso:`, `--ver`, `--comparar`, `--variacoes`, `KNV.etapa`). Fazer arte pelo app (API `window.KNV`, receitas em etapas .iknv, `rodar.py`, `KNV.mapa()`/`KNV.revisar()`, técnicas):
 `Instructions/agente/design-photo-kanivete.md`.

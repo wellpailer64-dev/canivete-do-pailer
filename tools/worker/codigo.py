@@ -109,7 +109,20 @@ def conferir(conds):
     return falta
 
 
+_GPU_LIVRE = False
+
+
+def liberar_gpu():
+    """Antes do 1º uso do Ollama: fecha o gerador de imagem do Photo (sd-server) se estiver na VRAM — um modelo pesado por vez."""
+    global _GPU_LIVRE
+    if _GPU_LIVRE: return
+    _GPU_LIVRE = True
+    try: subprocess.run(["taskkill", "/F", "/IM", "sd-server.exe"], capture_output=True, timeout=15)
+    except Exception: pass
+
+
 def ollama(msgs, modelo="qwen3:8b", pensar=False):
+    liberar_gpu()
     corpo = {"model": modelo, "stream": False, "messages": msgs, "tools": FERR, "think": pensar, "keep_alive": "10m",
              "options": {"temperature": 0, "num_ctx": 16384}}
     req = urllib.request.Request("http://127.0.0.1:11434/api/chat", data=json.dumps(corpo).encode(), headers={"Content-Type": "application/json"})

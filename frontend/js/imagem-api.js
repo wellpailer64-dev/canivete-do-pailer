@@ -229,7 +229,8 @@ const KNV = {
     // borda sem halo, ~30 s); 'borracha' = Borracha mágica nos cantos + vãos (instantâneo, borda dura; 'cantos' = só o
     // fundo contínuo). ref = nome de camada | 'doc' | caminho → edita a partir dela (descreva a MUDANÇA).
     // x/y/larguraNoDoc posicionam o CONTEÚDO (como colocar). Mesmo prompt+tamanho+semente = mesma imagem (cache em disco):
-    // fixe a semente nas receitas. Devolve info() + {semente, segundos, cache}. ~20 s por 1024² na RTX 3050.
+    // fixe a semente nas receitas. Devolve info() + {semente, segundos, cache}. Sem ref: Z-Image-Turbo (~42 s por 1024² na RTX 3050);
+    // com ref: FLUX.2 klein (~20 s).
     async gerar(prompt, { largura = 1024, altura = 1024, semente = -1, ref, fundo = true, recortar = false, tol = 40,
         nome, acima, x, y, larguraNoDoc, angulo = 0 } = {}) {
         if (acima != null) KNV.ativar(acima);

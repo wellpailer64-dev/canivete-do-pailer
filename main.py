@@ -3041,14 +3041,14 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    # Gerar imagem com IA (Functions/gerador_imagem.py): FLUX.2 klein via stable-diffusion.cpp, baixado sob demanda
-    def ie_gerador_estado(self):
+    # Gerar imagem com IA (Functions/gerador_imagem.py): Z-Image-Turbo (padrão) / FLUX.2 klein (referências) via sd.cpp, sob demanda
+    def ie_gerador_estado(self, modelo=None):
         from Functions import gerador_imagem
-        return gerador_imagem.estado()
+        return gerador_imagem.estado(modelo)
 
-    def ie_gerador_baixar(self):
+    def ie_gerador_baixar(self, modelo=None):
         from Functions import gerador_imagem
-        return gerador_imagem.baixar(lambda d: _js("ieGeradorProgresso", d))
+        return gerador_imagem.baixar(lambda d: _js("ieGeradorProgresso", d), modelo)
 
     def ie_gerar(self, spec):
         from Functions import gerador_imagem

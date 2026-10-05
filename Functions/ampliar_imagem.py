@@ -47,6 +47,11 @@ def instalar(on_progress=lambda d: None):
 def ampliar(arquivo, escala=2, tipo="foto", on_progress=lambda d: None):
     """→ {success, path (PNG), w, h, escala}. escala 2, 3 ou 4; tipo foto | arte."""
     from PIL import Image
+    try:   # placa de vídeo para um modelo pesado por vez: o gerador de imagem sai da VRAM
+        from Functions import gerador_imagem
+        gerador_imagem.parar()
+    except Exception:
+        pass
     if not os.path.isfile(arquivo):
         return {"success": False, "error": f"arquivo não existe: {arquivo}"}
     if not instalado():

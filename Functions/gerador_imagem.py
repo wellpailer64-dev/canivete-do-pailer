@@ -1,14 +1,20 @@
 """
 gerador_imagem.py — Gerar imagem com IA no Photo Kanivete (texto → imagem e edição com imagens de referência).
 
-Motor: stable-diffusion.cpp (sd-server.exe, sem Python/torch) com FLUX.2 [klein] 4B em GGUF (Apache 2.0):
-modelo de difusão Q8_0 (~4,3 GB) + Qwen3-4B Q4_K_M lendo o prompt (~2,5 GB) + VAE do FLUX.2 (~0,3 GB).
-Nada disso vem no build: é baixado na primeira vez (Arquivo > Gerar imagem) para <app>/modelos_ia/gerador_imagem/.
+Motor: stable-diffusion.cpp (sd-server.exe, sem Python/torch), dois modelos em GGUF:
+- "zimage" (PADRÃO, texto → imagem): Tongyi-MAI/Z-Image-Turbo 6B quantizado em Q4_K (leejet/Z-Image-Turbo-GGUF, ~3,9 GB)
+  + Qwen3-4B-Instruct-2507 Q4_K_M lendo o prompt (~2,5 GB) + VAE do FLUX.1 (~0,3 GB). Turbo: 8 passos, cfg 1 (sem CFG).
+  Escolhido no lugar de Diffusers/BF16 porque o app já roda tudo no sd.cpp (o checkpoint oficial tem 30+ GB e pediria
+  torch+CUDA no build); o Q4_K é o "Q4_K_M" do ecossistema GGUF e cabe com folga em 8 GB com --offload-to-cpu.
+- "klein" (edição com imagens de referência, que o Z-Image-Turbo não faz): FLUX.2 [klein] 4B Q8_0 (~4,3 GB) + Qwen3-4B
+  Q4_K_M + VAE do FLUX.2. Só é baixado quando a edição guiada é usada.
+Nada disso vem no build: é baixado sob demanda (Arquivo > Gerar imagem) para <app>/modelos_ia/gerador_imagem/.
 Placa: build Vulkan (30 MB, NVIDIA/AMD/Intel; na RTX 3050 empatou com o CUDA de 1,1 GB: ~20 s por 1024², 4 passos);
 `--offload-to-cpu` + `--vae-tiling` cabem em 8 GB de VRAM (o VAE inteiro em 1024² pede ~10 GB).
 
 O servidor sobe na 1ª geração (carrega o modelo uma vez), atende pela API nativa assíncrona (/sdcpp/v1/img_gen +
-consulta do job) e sai sozinho depois de OCIOSO segundos parado, devolvendo a memória da placa.
+consulta do job) e sai sozinho OCIOSO segundos depois da última geração, devolvendo a memória da placa (trocar de modelo
+também fecha o anterior; Worker/ampliar chamam parar() antes de usar a placa).
 Mesmo pedido (prompt, tamanho, semente, referências) = mesma imagem: guardada em cache no disco, uma receita refeita
 não gera de novo.
 """
@@ -32,19 +38,26 @@ SD_TAG = "master-929-3f8527a"
 _GH = f"https://github.com/leejet/stable-diffusion.cpp/releases/download/{SD_TAG}/"
 _HF = "https://huggingface.co/"
 MOTOR_ZIP = {"vulkan": [_GH + "sd-master-3f8527a-bin-win-vulkan-x64.zip"]}
-MODELOS = [
+MOTORES = {
     # (arquivo, url, bytes aproximados — para a barra de progresso antes do Content-Length)
-    ("flux-2-klein-4b-Q8_0.gguf", _HF + "leejet/FLUX.2-klein-4B-GGUF/resolve/main/flux-2-klein-4b-Q8_0.gguf", 4_300_000_000),
-    ("qwen3-4b-Q4_K_M.gguf", _HF + "unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf", 2_500_000_000),
-    ("flux2_vae.safetensors", _HF + "Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors", 336_213_556),
-]
-OCIOSO = 300          # segundos sem gerar até soltar a placa
-PASSOS = 4            # klein é destilado: 4 passos, guidance 1
+    "zimage": {"nome": "Z-Image-Turbo 6B (Q4_K)", "passos": 8, "cfg": 1.0, "refs": False, "modelos": [
+        ("z_image_turbo-Q4_K.gguf", _HF + "leejet/Z-Image-Turbo-GGUF/resolve/main/z_image_turbo-Q4_K.gguf", 3_860_000_000),
+        ("Qwen3-4B-Instruct-2507-Q4_K_M.gguf", _HF + "unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf", 2_500_000_000),
+        ("flux1_ae.safetensors", _HF + "Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors", 335_304_388)]},
+    "klein": {"nome": "FLUX.2 klein 4B (Q8_0)", "passos": 4, "cfg": 1.0, "refs": True, "modelos": [
+        ("flux-2-klein-4b-Q8_0.gguf", _HF + "leejet/FLUX.2-klein-4B-GGUF/resolve/main/flux-2-klein-4b-Q8_0.gguf", 4_300_000_000),
+        ("qwen3-4b-Q4_K_M.gguf", _HF + "unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf", 2_500_000_000),
+        ("flux2_vae.safetensors", _HF + "Comfy-Org/flux2-dev/resolve/main/split_files/vae/flux2-vae.safetensors", 336_213_556)]},
+}
+PADRAO = "zimage"
+MODELOS = MOTORES[PADRAO]["modelos"]   # compatibilidade
+OCIOSO = 90           # segundos depois da última geração até soltar a placa (gerações seguidas não recarregam)
+PASSOS = MOTORES[PADRAO]["passos"]
 LADO_MAX = 2048
 
 _baixando = threading.Lock()
 _srv_lock = threading.Lock()
-_srv = {"proc": None, "porta": 0, "uso": 0.0, "log": [], "passo": None, "motor": None}
+_srv = {"proc": None, "porta": 0, "uso": 0.0, "log": [], "passo": None, "motor": None, "modelo": None}
 _estado_dl = {"pct": 0, "msg": ""}
 
 
@@ -68,16 +81,22 @@ def _motor():
     return "vulkan"
 
 
-def instalado():
-    return os.path.isfile(_bin(_motor())) and all(os.path.isfile(_modelo(n)) for n, _, _ in MODELOS)
+def _qual(modelo):
+    return modelo if modelo in MOTORES else PADRAO
 
 
-def estado():
+def instalado(modelo=None):
+    return os.path.isfile(_bin(_motor())) and all(os.path.isfile(_modelo(n)) for n, _, _ in MOTORES[_qual(modelo)]["modelos"])
+
+
+def estado(modelo=None):
+    m = _qual(modelo)
     p = _srv["proc"]
     srv = "parado" if not p or p.poll() is not None else ("pronto" if _srv["porta"] and _srv.get("ok") else "carregando")
-    return {"success": True, "instalado": instalado(), "baixando": _baixando.locked(), **_estado_dl,
-            "servidor": srv, "motor": _motor(), "tamanho_gb": round(sum(t for _, _, t in MODELOS) / 1e9 + 0.03, 1),
-            "pasta": pasta()}
+    falta = sum(t for n, _, t in MOTORES[m]["modelos"] if not os.path.isfile(_modelo(n))) + (0 if os.path.isfile(_bin(_motor())) else 30_000_000)
+    return {"success": True, "instalado": instalado(m), "baixando": _baixando.locked(), **_estado_dl,
+            "servidor": srv, "motor": _motor(), "modelo": m, "nome_modelo": MOTORES[m]["nome"], "carregado": _srv.get("modelo"),
+            "modelos": {k: instalado(k) for k in MOTORES}, "tamanho_gb": round(falta / 1e9, 1), "pasta": pasta()}
 
 
 # ───────────────────────── instalação (download com retomada) ─────────────────────────
@@ -102,8 +121,9 @@ def _baixar_arquivo(url, destino, on_bytes):
     os.replace(parte, destino)
 
 
-def baixar(on_progress):
-    """Baixa motor + modelos em segundo plano. on_progress({pct, msg}) / {fim: True} / {erro}."""
+def baixar(on_progress, modelo=None):
+    """Baixa motor + arquivos do modelo (padrão Z-Image) em segundo plano. on_progress({pct, msg}) / {fim: True} / {erro}."""
+    m = _qual(modelo)
     if not _baixando.acquire(blocking=False):
         return {"success": False, "error": "Já está baixando."}
 
@@ -112,7 +132,7 @@ def baixar(on_progress):
             os.makedirs(os.path.join(pasta(), "modelos"), exist_ok=True)
             os.makedirs(os.path.join(pasta(), "bin"), exist_ok=True)
             itens = [(os.path.join(pasta(), "bin", os.path.basename(u)), u, 30_000_000) for u in MOTOR_ZIP[_motor()]]
-            itens += [(_modelo(n), u, t) for n, u, t in MODELOS]
+            itens += [(_modelo(n), u, t) for n, u, t in MOTORES[m]["modelos"]]
             total = sum(t for _, _, t in itens)
             antes = 0
             for destino, url, tam in itens:
@@ -129,7 +149,7 @@ def baixar(on_progress):
                         zf.extractall(os.path.join(pasta(), "bin", _motor()))
                     os.remove(destino)
                 antes += tam
-            if not instalado():
+            if not instalado(m):
                 raise RuntimeError("arquivos incompletos")
             _estado_dl.update(pct=100, msg="Pronto")
             on_progress({"fim": True})
@@ -206,24 +226,27 @@ def _vigiar_ocioso():
         p = _srv["proc"]
         if not p or p.poll() is not None:
             return
-        if not _srv.get("ocupado") and time.time() - _srv["uso"] > OCIOSO:
+        if not _srv.get("ocupado") and time.time() - _srv["uso"] > OCIOSO:   # solta a placa logo depois de gerar
             parar()
             return
 
 
-def _subir(on_progress):
+def _subir(on_progress, modelo=None):
+    m = _qual(modelo)
     with _srv_lock:
         p = _srv["proc"]
-        if p and p.poll() is None and _srv.get("ok"):
+        if p and p.poll() is None and _srv.get("ok") and _srv.get("modelo") == m:
             return
-        if p and p.poll() is None:
-            p.kill()
-        if not instalado():
+        if p and p.poll() is None:   # outro modelo carregado: sai da placa antes
+            p.kill(); p.wait(timeout=20)
+        if not instalado(m):
             raise RuntimeError("Gerador não instalado: baixe em Arquivo > Gerar imagem.")
-        _srv.update(porta=_porta_livre(), ok=False, log=[], passo=None)
+        _srv.update(porta=_porta_livre(), ok=False, log=[], passo=None, modelo=m)
+        M = MOTORES[m]["modelos"]
+        # --offload-to-cpu: pesos na RAM, cada parte (leitor do prompt, transformer, VAE) sobe à placa só na sua etapa
         args = [_bin(_motor()), "--listen-port", str(_srv["porta"]),
-                "--diffusion-model", _modelo(MODELOS[0][0]), "--llm", _modelo(MODELOS[1][0]), "--vae", _modelo(MODELOS[2][0]),
-                "--offload-to-cpu", "--fa", "--vae-tiling", "--steps", str(PASSOS), "--cfg-scale", "1.0"]
+                "--diffusion-model", _modelo(M[0][0]), "--llm", _modelo(M[1][0]), "--vae", _modelo(M[2][0]),
+                "--offload-to-cpu", "--fa", "--vae-tiling", "--steps", str(MOTORES[m]["passos"]), "--cfg-scale", str(MOTORES[m]["cfg"])]
         proc = subprocess.Popen(args, cwd=os.path.dirname(args[0]), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 stdin=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
         _srv["proc"] = proc
@@ -248,7 +271,7 @@ def _subir(on_progress):
 def parar():
     """Fecha o servidor (solta a memória da placa)."""
     p = _srv["proc"]
-    _srv.update(proc=None, ok=False)
+    _srv.update(proc=None, ok=False, modelo=None)
     if p and p.poll() is None:
         p.kill()
     return {"success": True}
@@ -288,8 +311,9 @@ def _liberar_gpu_ollama():
 
 
 def gerar(spec, on_progress=lambda d: None):
-    """spec: {prompt, largura, altura, semente (-1 = aleatória), passos, refs: [caminho|b64...]}.
-    Devolve {success, path, semente, cache} — PNG no cache em disco."""
+    """spec: {prompt, largura, altura, semente (-1 = aleatória), passos, refs: [caminho|b64...], motor: zimage|klein, sem_cache}.
+    Sem motor: Z-Image-Turbo; com referências: FLUX.2 klein (o Turbo não edita a partir de imagem).
+    Devolve {success, path, semente, cache, motor} — PNG no cache em disco."""
     prompt = (spec.get("prompt") or "").strip()
     if not prompt:
         return {"success": False, "error": "Escreva o que gerar."}
@@ -298,19 +322,24 @@ def gerar(spec, on_progress=lambda d: None):
     semente = int(spec.get("semente", -1))
     if semente < 0:
         semente = int.from_bytes(os.urandom(4), "little") & 0x7FFFFFFF
-    passos = max(1, min(50, int(spec.get("passos") or PASSOS)))
     refs = [_b64_de(r) for r in (spec.get("refs") or [])]
-    chave = hashlib.sha1(json.dumps([prompt, w, h, semente, passos, [hashlib.sha1(r.encode()).hexdigest() for r in refs]]).encode()).hexdigest()
+    m = _qual(spec.get("motor") or ("klein" if refs else PADRAO))
+    if refs and not MOTORES[m]["refs"]:
+        m = "klein"
+    if not instalado(m):
+        return {"success": False, "error": f"{MOTORES[m]['nome']} não instalado: baixe em Arquivo > Gerar imagem.", "instalar": m}
+    passos = max(1, min(50, int(spec.get("passos") or MOTORES[m]["passos"])))
+    chave = hashlib.sha1(json.dumps([m, prompt, w, h, semente, passos, [hashlib.sha1(r.encode()).hexdigest() for r in refs]]).encode()).hexdigest()
     os.makedirs(_cache_dir(), exist_ok=True)
     saida = os.path.join(_cache_dir(), chave + ".png")
-    if os.path.isfile(saida):
-        return {"success": True, "path": saida, "semente": semente, "cache": True}
+    if os.path.isfile(saida) and not spec.get("sem_cache"):
+        return {"success": True, "path": saida, "semente": semente, "cache": True, "motor": m}
     try:
         _srv["ocupado"] = True
-        _subir(on_progress)
+        _subir(on_progress, m)
         corpo = {"prompt": prompt, "negative_prompt": "", "width": w, "height": h, "seed": semente, "batch_count": 1,
                  "ref_images": refs, "embed_image_metadata": False, "output_format": "png",
-                 "sample_params": {"sample_method": "euler", "sample_steps": passos, "guidance": {"txt_cfg": 1.0}}}
+                 "sample_params": {"sample_method": "euler", "sample_steps": passos, "guidance": {"txt_cfg": MOTORES[m]["cfg"]}}}
         job = _http("POST", "/sdcpp/v1/img_gen", corpo)
         jid, t0 = job["id"], time.time()
         _srv.update(passo=None, cancelar=None)
@@ -343,7 +372,7 @@ def gerar(spec, on_progress=lambda d: None):
                 os.remove(v)
         except OSError:
             pass
-        return {"success": True, "path": saida, "semente": semente, "segundos": round(time.time() - t0, 1)}
+        return {"success": True, "path": saida, "semente": semente, "segundos": round(time.time() - t0, 1), "motor": m}
     except Exception as e:
         return {"success": False, "error": str(e), "log": _srv["log"][-6:]}
     finally:
@@ -362,7 +391,7 @@ def cancelar(jid):
 
 
 def remover():
-    """Apaga motor e modelos (libera ~7 GB)."""
+    """Apaga motor e modelos (libera ~7–14 GB)."""
     parar()
     shutil.rmtree(pasta(), ignore_errors=True)
     return {"success": True}
