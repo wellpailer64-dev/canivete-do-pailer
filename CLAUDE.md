@@ -103,6 +103,7 @@ Antes de olhar imagem: `tools/medir_ref.py` (mede a referência: textos, formas,
 / `tools/revisor.py` (regras dos feedbacks do usuário: corte seco, contraste, sombra dura, avatar), `tools/olho.py`
 (visão local Gemma 4 E4B: ler/revisar/comparar — pista, não verdade). Fluxo em `Instructions/agente/design-photo-kanivete.md`
 ("Fluxo barato v2"). Cada feedback novo do usuário vira regra no revisor (`KNV.revisarPeca` em imagem-api.js + revisor.py).
+Planos de economia de tokens, ponte Vetor ↔ Photo e nível de campanha: `Instructions/agente/plano-economia-ponte-vetor-photo.md`.
 Operações repetitivas no Photo Kanivete: escrever um contrato e delegar ao Qwen3 8B local (`py -3.13 tools/worker/worker.py contrato.json`),
 que volta numa linha JSON. Contrato, condições de sucesso e ferramentas: `Instructions/agente/worker.md`.
 Infraestrutura braçal (achar no código, troca mecânica, rodar teste, diagnosticar traceback): Code/Debug Worker
