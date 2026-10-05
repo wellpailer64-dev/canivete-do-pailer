@@ -3239,6 +3239,24 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.vetorizar(arquivo, cores, area_min, ignorar_fundo)
 
+    def vk_blender_estado(self):
+        from Functions import blender_render
+        e = blender_render.estado()
+        e["cache"] = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "blender")
+        return e
+
+    def vk_blender_instalar(self):
+        from Functions import blender_render
+        return blender_render.instalar(lambda d: _js("vkBlenderProgresso", d), esperar=True)
+
+    def vk_blender_render(self, cena):
+        from Functions import blender_render
+        try:
+            return blender_render.render(cena, lambda d: _js("vkBlenderProgresso", d))
+        except Exception as e:
+            import traceback
+            return {"success": False, "error": str(e), "log": traceback.format_exc().splitlines()[-4:]}
+
     def vk_ler_texto(self, caminho):
         """Arquivo de texto (marca.json, CSS, HTML de cena) → {success, texto}; até 4 MB."""
         try:

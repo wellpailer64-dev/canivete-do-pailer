@@ -72,6 +72,10 @@ textos): plano em `Instructions/agente/ajuste-premiere.md`.
 Plano, modelo e limitações em `Instructions/agente/plano-comp.md`; código em `frontend/js/editor-comp.js`.
 Plano completo (Fases 1–3 + Propriedades essenciais por faixa).
 
+## Render 3D no Blender
+Objetos 3D do Vetor renderizados fotorrealistas (Cycles, GPU) com rótulo mapeado: comando `render_blender`, guia
+`Instructions/vetor-kanivete.md` §13; Blender 4.5 LTS baixado sob demanda. Teste: `python testes/teste_blender.py`.
+
 ## Ponte Vetor ↔ Photo
 Objeto inteligente vetorial no Photo (Arquivo › Enviar ao Photo; editar no Vetor e Ctrl+S devolve) e vínculo vivo do
 .iknv no Vetor: `frontend/js/ponte-vetor-photo.js`, guia `Instructions/vetor-kanivete.md` §12. Teste: `python

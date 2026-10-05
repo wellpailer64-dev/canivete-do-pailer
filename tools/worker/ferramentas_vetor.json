@@ -1501,5 +1501,31 @@
 ]
 }
 }
+},
+{
+"type": "function",
+"function": {
+"name": "render_blender",
+"description": "Renderiza um objeto 3D do Vetor de forma fotorrealista no Blender (com o rótulo mapeado e sombra) e coloca a imagem no lugar.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "nomes dos objetos 3D"
+},
+"largura": {
+"type": "integer",
+"description": "px, padrão 1600"
+}
+},
+"required": [
+"objetos"
+]
+}
+}
 }
 ]

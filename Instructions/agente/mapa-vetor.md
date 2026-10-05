@@ -26,6 +26,10 @@ sobreimprimir_preto:146  tirar_sobre_branco:155  engrossar_tracos:160  limpar:16
 ## frontend/js/vetor-arquivo.js — funções
 vkCoresProntas:178  vkImagensProntas:185  vkRenderPrancheta:188  vkSvg:199  vkTAC:270  vkPretoRico:271  vkPreto100:272  vkBranco:273  vkBoxArea:274
 vkCores:275  vkFechamento:276  vkRecente:334  vkCarregando:337
+## frontend/js/vetor-blender.js (121 linhas) — comandos
+render_blender:117
+## frontend/js/vetor-blender.js — funções
+vbRot:6  vbRgb:13  vbPng:14  vbArteCanvas:15  vbCena:19  vbRenderizar:85
 ## frontend/js/vetor-cena.js (148 linhas) — comandos
 cena:146
 ## frontend/js/vetor-cena.js — funções
@@ -153,8 +157,8 @@ descartar_recuperacao:1522  ler_csv:1530  juntar_pdfs:1544
 _nomes:12  exportar_ai:17  aknv_anexado:46  exportar_eps:62
 ## main.py — pontes
 vk_baixar_ghostscript:3182  vk_exportar_ai:3186  vk_exportar_eps:3194  vk_fonte_eixos:3202  vk_recarregar:3206  vk_abrir:3219  vk_salvar:3226
-vk_texto_geometria:3230  vk_icone:3234  vk_vetorizar:3238  vk_ler_csv:3242  vk_juntar_pdfs:3249  vk_ampliar:3253  vk_registrar_fontes:3260
-vk_autosalvar:3264  vk_recuperaveis:3268  vk_recuperar:3272  vk_descartar_recuperacao:3276  vk_bibliotecas_cor:3280  vk_ler_biblioteca:3284
-vk_qr:3291  vk_fonte_glifos:3295  vk_booleana:3299  vk_deslocar:3303  vk_contornar_traco:3307  vk_regioes:3311  vk_faca:3315  vk_canais_imagem:3319
-vk_empacotar:3326  vk_cores_tela:3333  vk_rgb_para_cmyk:3337  vk_imagem_info:3341  vk_vinculos_estado:3345  vk_salvar_png:3349  vk_perfis:3353
-vk_exportar_pdf:3357  vk_dialogo:3365
+vk_texto_geometria:3230  vk_icone:3234  vk_vetorizar:3238  vk_blender_estado:3242  vk_blender_instalar:3248  vk_blender_render:3252  vk_ler_texto:3260
+vk_ler_csv:3270  vk_juntar_pdfs:3277  vk_ampliar:3281  vk_registrar_fontes:3288  vk_autosalvar:3292  vk_recuperaveis:3296  vk_recuperar:3300
+vk_descartar_recuperacao:3304  vk_bibliotecas_cor:3308  vk_ler_biblioteca:3312  vk_qr:3319  vk_fonte_glifos:3323  vk_booleana:3327  vk_deslocar:3331
+vk_contornar_traco:3335  vk_regioes:3339  vk_faca:3343  vk_canais_imagem:3347  vk_empacotar:3354  vk_cores_tela:3361  vk_rgb_para_cmyk:3365
+vk_imagem_info:3369  vk_vinculos_estado:3373  vk_salvar_png:3377  vk_perfis:3381  vk_exportar_pdf:3385  vk_dialogo:3393

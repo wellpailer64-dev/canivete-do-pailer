@@ -69,7 +69,7 @@ def checar(caminho):
 def main():
     if len(sys.argv) < 2: raise SystemExit(__doc__)
     seco = "--seco" in sys.argv
-    blocos = ler(sys.argv[1])
+    blocos = ler(next(a for a in sys.argv[1:] if not a.startswith("--")))
     novos, originais, linhas = {}, {}, []
     for alvo, modo, velho, novo in blocos:
         cam = alvo if os.path.isabs(alvo) else os.path.join(RAIZ, alvo)

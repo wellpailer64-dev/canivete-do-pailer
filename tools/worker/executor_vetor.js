@@ -30,6 +30,7 @@
         mala_direta: a => C('mala_direta', a), imagem: a => C('imagem', a), vinculos: () => C('vinculos'),
         girar_3d: a => C('girar_3d', { ...a, ...ids(a) }), extrudar_3d: a => C('extrudar_3d', { ...a, ...ids(a) }), editar_3d: a => C('editar_3d', { ...a, ...ids(a) }),
         mapear_arte: a => C('mapear_arte', { ...a, id3d: achar(a.objeto_3d).id, arte: [].concat(a.arte || []).map(n => achar(n).id) }), retocar_letra: a => C('retocar_letra', { ...a, ...ids(a) }),
+        render_blender: (a, ctx = {}) => C('render_blender', { ...a, ...ids(a), ...(ctx.pasta ? { pasta: ctx.pasta } : {}) }),
         faca_caixa: a => C('faca_caixa', a), grade_perspectiva: a => C('grade_perspectiva', a), perspectiva_caixa: a => C('perspectiva_caixa', a),
         perspectiva_colocar: a => C('perspectiva_colocar', { ...a, ...ids(a) }), criar_pincel: a => C('criar_pincel', { ...a, arte: [].concat(a.arte || []).map(n => achar(n).id) }),
         pincel: a => C('pincel', { ...a, ...ids(a) }), desvio_texto: a => C('desvio_texto', { ...a, ...ids(a) }), colunas: a => C('colunas', { ...a, ...ids(a) }),

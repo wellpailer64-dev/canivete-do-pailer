@@ -287,3 +287,20 @@ instante; efeitos, 3D, pincéis e texto saem iguais à tela do Vetor).
   no objeto inteligente do Photo ou no renderizador do Vetor). Falta (plano): mockup fotográfico (F3) e recursos
   comuns (F4) FEITO: `gerar_imagem` no Vetor (Z-Image local, entra como vínculo; Arquivo › Gerar imagem com IA) e
   `marca_amostras` {marca: marca.json} (amostras nomeadas da marca).
+## 13. Render fotorrealista no Blender (2026-10-05)
+`render_blender` {ids|nomes (objetos 3D), largura px (padrão 1600), amostras (96), fundo (null = transparente),
+substituir (padrão true: oculta o 3D vetorial), colocar, pasta} — Objeto › 3D: Render fotorrealista (Blender).
+- Blender 4.5 LTS portátil (GPL, à parte, ~400 MB) baixado sob demanda para `<app>/modelos_ia/blender/`
+  (`Functions/blender_render.py`); roda sem janela: `blender -b --factory-startup -P Functions/blender_cena.py -- cena.json`.
+- A cena é montada no JS (`vetor-blender.js`) no MESMO espaço do 3D vetorial: vértices no espaço do objeto do Vetor e
+  matriz C·R (R = inclinar/girar/rolar), câmera ortográfica (ou perspectiva) no quadro que o Vetor usa para colocar a
+  imagem (folga para a sombra; `sensor_fit` horizontal). Girar = malha de revolução com UV (u = ângulo, v = altura) e
+  espessura (Solidify por material); rótulo = textura 4096 px montada linha a linha pelo raio de cada altura (igual ao
+  mapeamento vetorial, mas dando a volta de verdade). Extrudar = curva Bezier 2D do próprio caminho (furos automáticos),
+  chanfro para dentro (offset −chanfro); arte nas faces = placa com a imagem (alfa) colada na face.
+- Materiais: papel, fosco, plástico, cerâmica (verniz), metal (tinta sem metal), vidro (transmissão). Luz de estúdio
+  (principal na direção do 3D vetorial + preenchimento + recorte + teto para a sombra de contato), mundo neutro, cor em
+  "Standard" (a cor da marca sai fiel), Cycles na GPU (OptiX > CUDA) com redução de ruído; chão = shadow catcher preto
+  (só a sombra no PNG transparente) e as bordas do alfa esmaecem (sombra sem linha reta).
+- Antes de renderizar: o gerador de imagem e o Ollama saem da placa. RTX 3050: ~25–30 s a 1400 px/96 amostras.
+- Teste: `python testes/teste_blender.py` (rápido, pula sem Blender). Rodar antes de release quando mexer no 3D ou no Blender.
