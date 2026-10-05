@@ -3203,6 +3203,19 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.fonte_eixos(fam, estilo)
 
+    def vk_recarregar(self, prefixo="Functions."):
+        """Modo agente: recarrega os módulos Python (Functions.*) sem reiniciar o app — a ponte importa dentro de cada
+        função, então a próxima chamada já usa o código novo. Servidores filhos (sd-server, gs) não são tocados."""
+        import importlib, sys as _sys
+        feitos, erros = [], []
+        vivos = {"Functions.gerador_imagem"}   # guardam processo filho na GPU: recarregar perderia o controle dele
+        for nome in sorted(n for n in list(_sys.modules) if n.startswith(prefixo) and _sys.modules[n] is not None and (n not in vivos or n == prefixo)):
+            try:
+                importlib.reload(_sys.modules[nome]); feitos.append(nome)
+            except Exception as e:
+                erros.append(f"{nome}: {e}")
+        return {"success": not erros, "recarregados": len(feitos), "erros": erros}
+
     def vk_abrir(self, path):
         from Functions import vetor_kanivete
         try:

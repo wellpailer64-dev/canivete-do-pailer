@@ -1,6 +1,8 @@
 # Planos (2026-10-04): economia de tokens, ponte Vetor ↔ Photo, nível "Herbíssimo"
 
-## 1. Economia de tokens
+## 1. Economia de tokens — FEITO em 2026-10-05: patch.py, recarregar.py, mapa_codigo.py, VKN.curto, VKN.revisar,
+VKN.cena + vk_cena.py + kit/marca.json + modelos de página (capa, assinaturas). Falta: mais modelos de página e o olho
+local (Gemma) como 1ª conferência das prévias.
 Onde o gasto realmente vai (medido nas rodadas IDV/3D): imagens lidas (prévias, prints), scripts longos escritos à mão
 (montar2.py ~330 linhas), retrabalho de edição (heredoc quebrado, assert que não casa), reinício do app a cada mudança em
 Python, e leitura de arquivo grande para achar onde mexer.

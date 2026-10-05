@@ -277,6 +277,8 @@ def _moldar(F, texto, track_em, feats=None):
 
 
 # atributos de CARACTERE (objeto = base; trechos = [{ini, fim, ...}] por cima, o último vence) e de PARÁGRAFO (objeto)
+_PESO_ESTILO = {"thin": 100, "hairline": 100, "extralight": 200, "ultralight": 200, "light": 300, "regular": 400, "normal": 400, "book": 400,
+                "medium": 500, "semibold": 600, "demibold": 600, "bold": 700, "extrabold": 800, "ultrabold": 800, "black": 900, "heavy": 900}
 _CAR = ("fam", "estilo", "tam", "track", "desl", "eh", "ev", "rot", "eixos", "maius", "pos", "liga", "frac", "num", "preench", "traco")
 _PAR = ("recuo_esq", "recuo_dir", "recuo_1a", "antes", "depois")
 _HIFEN = {}
@@ -324,7 +326,13 @@ def _glifos(texto, ini, fim, p, falta):
         falta.add(f"{p['fam']} {p['estilo']}")
     elif achou == "embutida":
         falta.add("~embutida")
-    F = _fonte(arq, ind, p.get("eixos"))
+    eixos = p.get("eixos")
+    if not eixos and "fvar" in _fonte(arq, ind)["tt"]:   # fonte variável sem arquivo por peso: o estilo vira o eixo wght
+        base = str(p.get("estilo") or "Regular").replace("Italic", "").replace("Oblique", "").strip().lower().replace(" ", "") or "regular"
+        w = _PESO_ESTILO.get(base)
+        ax = {a.axisTag: (a.minValue, a.maxValue) for a in _fonte(arq, ind)["tt"]["fvar"].axes}
+        if w and "wght" in ax and w != 400: eixos = {"wght": max(ax["wght"][0], min(ax["wght"][1], w))}
+    F = _fonte(arq, ind, eixos)
     tam = float(p["tam"]); desl = float(p.get("desl") or 0)
     if p.get("pos") == "sup": desl += tam * 0.333; tam *= 0.583
     elif p.get("pos") == "sub": desl -= tam * 0.333; tam *= 0.583

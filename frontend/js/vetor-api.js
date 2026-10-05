@@ -419,8 +419,23 @@ function vkMapa(a = {}) {   // resumo compacto: o agente lê isto em vez de olha
     };
 }
 // ─────────────────────────── window.VKN: porta para o Claude/Worker ───────────────────────────
+// resposta curta para agentes (economiza tokens): só identificadores, caminhos e contagens. VKN.curto = true liga para tudo;
+// ou { curto: true } num comando. Leitura (mapa, info, fechamento...) volta inteira.
+function vkCurto(r) {
+    if (r == null || typeof r !== 'object') return r ?? 'ok';
+    if (Array.isArray(r)) return r.length > 8 ? { n: r.length, primeiros: r.slice(0, 8).map(vkCurto) } : r.map(vkCurto);
+    const out = {};
+    for (const k of ['id', 'ids', 'novos', 'grupo', 'caminho', 'arquivos', 'verificado', 'problemas', 'cancelado', 'erro', 'pincel', 'paineis']) if (r[k] !== undefined) out[k] = r[k];
+    for (const [k, v] of Object.entries(r)) if (!(k in out) && (typeof v === 'number' || typeof v === 'boolean')) out[k] = v;
+    return Object.keys(out).length ? out : 'ok';
+}
 window.VKN = {
-    cmd: (nome, args, origem = 'claude') => vkCmd(nome, args, origem),
+    curto: false,
+    cmd: async (nome, args, origem = 'claude') => {
+        const curto = (args && args.curto) ?? VKN.curto; if (args && 'curto' in args) { args = { ...args }; delete args.curto; }
+        const r = await vkCmd(nome, args, origem);
+        return curto && !(VK_CMDS[nome] && VK_CMDS[nome].leitura) ? vkCurto(r) : r;
+    },
     comandos: () => Object.fromEntries(Object.entries(VK_CMDS).map(([k, v]) => [k, v.desc])),
     mapa: a => vkMapa(a || {}),
     fechamento: o => vkFechamento(o || {}),

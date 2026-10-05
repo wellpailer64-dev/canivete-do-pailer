@@ -614,6 +614,21 @@ with sync_playwright() as p:
     ok(pg.evaluate("id => vkObj(id).itens.some(o => o.nome === '3D chanfro')", e3["id"]), "extrudar com chanfro")
     r4p = C("exportar_pdf", {"caminho": os.path.join(SAI, "r4.pdf"), "forcar": True}); ok(r4p["verificado"] and "CutContour" in r4p["info"]["spots"], f"PDF com faca (CutContour) verificado ({r4p['info']['spots']})")
 
+    print("cena (HTML → objetos), revisor, resposta curta")
+    C("novo", {"nome": "Cena", "larg": 200, "alt": 100, "destino": "tela"})
+    rc = pg.evaluate("""() => VKN.cena(`<div style="position:absolute;inset:0;background:#0e3b4a;padding:20px">
+        <h1 style="font:700 24px Arial;color:#f9f4e8">Título <span style="color:#ec6e48">quente</span></h1>
+        <p style="font:400 9px/13px Arial;color:#f9f4e8;width:200px;margin-top:6px">Texto corrido que quebra em mais de uma linha dentro da caixa, como no navegador.</p>
+        <div style="position:absolute;right:20px;bottom:20px;width:40px;height:40px;border-radius:50%;background:#ec6e48"></div></div>`,
+        {paleta: {'#0e3b4a': 'C100 M55 Y35 K45', '#ec6e48': 'C0 M68 Y72 K0', '#f9f4e8': 'C2 M3 Y10 K0'}})""")
+    ok(rc["objetos"] == 4 and not rc["avisos"], f"cena: fundo, título, parágrafo e círculo ({rc})")
+    tit = pg.evaluate("() => vkTodos().map(x => x.o).find(o => o.tipo === 'texto' && /Título/.test(o.conteudo))")
+    ok(tit and tit["preench"]["k"] == "cmyk" and any(t.get("preench") for t in (tit.get("trechos") or [])), "cena: cor da paleta em CMYK e trecho colorido do <span>")
+    par = pg.evaluate("() => vkTodos().map(x => x.o).find(o => o.tipo === 'texto' && /corrido/.test(o.conteudo))")
+    ok(par and par.get("caixa"), "cena: parágrafo vira texto de área (caixa)")
+    rv = C("revisar"); ok(isinstance(rv.get("itens"), list) and "erros" in rv, f"revisor responde ({rv.get('erros')} erros, {rv.get('avisos')} avisos)")
+    ok(pg.evaluate("VKN.cmd('retangulo', {x: 1, y: 1, larg: 5, alt: 5, curto: true})").keys() == {"id"}, "resposta curta só com o id")
+
     print("efeitos e Aparência na separação, Aparência em grupo, SVG")
     C("novo", {"nome": "Ef sep", "larg": 100, "alt": 60})
     r1 = C("retangulo", {"x": 10, "y": 10, "larg": 30, "alt": 20, "preench": "C0 M100 Y0 K0", "traco": "nenhum"})

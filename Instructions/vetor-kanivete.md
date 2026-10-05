@@ -256,3 +256,16 @@ margem, prefixo, fundo}; 1x = 1 pt → 1 px. Arquivo › Exportar ativos para te
 - Produção (`vetor-producao.js`): `faca_caixa` (abas invertidas: CutContour + Vinco em sobreimpressão na camada Faca,
   devolve os painéis em mm), `pintura_dinamica` {pontos, cor} + ferramenta Pintura dinâmica (K).
 Ainda não: oclusão própria no girar 3D (perfil que se esconde atrás de si), marionete interativa com pinos na tela.
+## 11. Cena, revisor e modo curto (2026-10-05) — economia de tokens
+- `cena` / `VKN.cena(html, {prancheta|nova:{nome,larg,alt}, paleta:{hex: cmyk}, css, limpar})` (`vetor-cena.js`): o
+  navegador diagrama numa área escondida do tamanho da prancheta (1 px CSS = 1 pt) e cada elemento vira objeto nativo —
+  fundo/borda (lados separados viram filetes)/raio/elipse (`data-forma`), degradê linear, box-shadow, opacity, texto
+  editável na mesma linha de base (várias linhas = texto de área; `<span>/<b>/<em>` = trechos), `<img data-arquivo>` com
+  object-fit, `data-icone`, `data-qr`, `data-simbolo="Nome"` (símbolo do documento encaixado na caixa), `data-grupo`,
+  `data-nome`. Reset de CSS com `:where()` (não vence as classes da página). Rodar de novo troca só o que a cena criou.
+- Fonte variável sem arquivo por peso (Inter): o motor converte o estilo (SemiBold, Light...) no eixo `wght` sozinho.
+- `tools/vk_cena.py` + `marca.json` (cores hex+cmyk viram `var(--nome)` e a paleta; fontes `var(--titulo)`/`var(--texto)`).
+  Kit da marca = documento com os símbolos (assinaturas, logotipo, símbolo, versões negativas): `D:/kanivete_biblioteca/marcas/<marca>/`.
+- `revisar` / `VKN.revisar()` (`vetor-revisor.js`): solto, fora, transborda, sobreposto, contraste (WCAG 4,5/3 com a cor
+  real abaixo do texto), margem, pequeno, vazio, prancheta vazia; agrupa ocorrências iguais; erro × aviso.
+- `VKN.curto = true` ou `{curto: true}`: comandos devolvem só id/ids/caminho/contagens.
