@@ -875,6 +875,83 @@ function vePjAudioEm(m, st, trPedida) {
     return true;
 }
 
+// ─────────────────────────── Forçar Full HD (Functions/otimizar.py) ───────────────────────────
+// Vídeos maiores que Full HD viram uma cópia 1080 (lado menor) em "Otimizados FullHD" ao lado do original; no fim,
+// pergunta se troca no projeto (e nos clipes da timeline, com a escala corrigida: 8K a 25% vira 1080 a 100%).
+const VEFHD = { fila: null, pct: -1 };
+const veFhdTam = m => m.id === 0 ? VE.info || {} : m.info || { width: m.w, height: m.h };
+function vePjGrandes(keys) {
+    return keys.filter(k => k.startsWith('m:')).map(k => VE.media[+k.slice(2)]).filter(m => {
+        if (!m || m.removido || m.kind !== 'video' || !m.path || veMediaOffline(m)) return false;
+        const t = veFhdTam(m);
+        return !t.width || Math.min(t.width, t.height) > 1080;   // sem tamanho ainda: o Python confere
+    });
+}
+
+function vePjForcarFullHD() {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.ve_otimizar_fullhd) return;
+    if (VEFHD.fila) { veToast('Forçar Full HD já está convertendo'); return; }
+    const itens = vePjGrandes([...VEPJ.sel]);
+    if (!itens.length) { veToast('Selecione no Projeto vídeos maiores que Full HD'); return; }
+    VEFHD.fila = { n: itens.length, i: 0, feitos: [], erros: [] };
+    VEFHD.pct = -1;
+    veToast(`Forçar Full HD: ${itens.length} ${itens.length === 1 ? 'vídeo' : 'vídeos'}...`);
+    api.ve_otimizar_fullhd(itens.map(m => [m.id, m.path]));
+}
+
+window.veOnOtimizar = async ev => {
+    const q = VEFHD.fila;
+    if (!q) return;
+    if (!ev.done && !ev.fim) {
+        if (ev.pct !== VEFHD.pct && ev.pct % 5 === 0) {
+            VEFHD.pct = ev.pct;
+            veToast(`Forçar Full HD (${q.i + 1}/${q.n}): ${vePjNome(VE.media[ev.id])} ${ev.pct}%`);
+        }
+        return;
+    }
+    if (ev.done) {
+        q.i++;
+        VEFHD.pct = -1;
+        if (ev.success && ev.saida) q.feitos.push(ev); else if (!ev.success) q.erros.push(`${vePjNome(VE.media[ev.id])}: ${ev.error}`);
+        return;
+    }
+    VEFHD.fila = null;
+    if (q.erros.length) veToast(`Forçar Full HD: ${q.erros.slice(0, 2).join(' · ')}`);
+    if (!q.feitos.length) { if (!q.erros.length) veToast(ev.cancelado ? 'Forçar Full HD cancelado' : 'Nenhum vídeo precisava de conversão'); return; }
+    const naTl = q.feitos.filter(r => veMidiaNaTimeline(r.id)).length;
+    const sim = await appConfirm({
+        titulo: 'Forçar Full HD concluído',
+        texto: `${q.feitos.length} ${q.feitos.length === 1 ? 'vídeo otimizado' : 'vídeos otimizados'} na pasta "Otimizados FullHD".` +
+            (naTl ? ` ${naTl} ${naTl === 1 ? 'está' : 'estão'} na timeline.` : '') +
+            ' Substituir no projeto' + (naTl ? ' e na timeline' : '') + ' pelos otimizados? (cortes e posições ficam iguais)',
+        botoes: [{ rotulo: 'Sim', valor: true, tipo: 'primario' }, { rotulo: 'Não', valor: false, tipo: 'secundario' }],
+    });
+    if (!sim) return;
+    q.feitos.forEach(r => veFhdTrocar(VE.media[r.id], r));
+    veRefresh();
+    veToast(`${q.feitos.length} ${q.feitos.length === 1 ? 'vídeo trocado' : 'vídeos trocados'} pelo Full HD`);
+};
+
+// Troca o arquivo e corrige a escala dos clipes (a escala é em % do tamanho da mídia; âncora em px da mídia)
+function veFhdTrocar(m, r) {
+    if (!m) return;
+    const t = veFhdTam(m), k = t.width && r.w ? t.width / r.w : 1;
+    if (Math.abs(k - 1) > 1e-3) {
+        const clips = new Set([...VE.clips, ...(VE.sequences || []).flatMap(s => s.clips || [])]);
+        clips.forEach(c => {
+            if (veMid(c) !== m.id) return;
+            if (c.p) {
+                if (c.p.sc != null) c.p.sc *= k;
+                if (c.p.ax != null) c.p.ax /= k;
+                if (c.p.ay != null) c.p.ay /= k;
+            }
+            if (c.k && c.k.sc) c.k.sc.forEach(x => { x.v *= k; });
+        });
+    }
+    veTrocarArquivo(m, r.saida, true);
+}
+
 // ─────────────────────────── menu do botão direito ───────────────────────────
 function vePjMenu(x, y, doc) {
     veClipMenuFechar();
@@ -897,6 +974,7 @@ function vePjMenu(x, y, doc) {
         ${varias.length > 1 ? `<button class="ve-ctx-item" data-pj="relv" title="Escolha a pasta com as versões novas: cada mídia pega o arquivo de mesmo nome">Substituir ${varias.length} mídias (escolher pasta)...</button>` : ''}
         ${comSom.length ? `<button class="ve-ctx-item" data-pj="ma" title="${veT('Voz com som de estúdio (Sidon + OmniVoice). Gera o _melhorado.wav ao lado do original e troca só o som: a imagem e os cortes ficam iguais')}">${veT('Melhorar áudio')}${comSom.length > 1 ? ` (${comSom.length})` : ''}</button>` : ''}
         ${midiaUm && midiaUm.mel ? veMelMenuItens(midiaUm, 'data-pj', true) : ''}
+        ${vePjGrandes(keys).length ? `<button class="ve-ctx-item" data-pj="fhd" title="Converte para 1080 no lado menor, sem perda visível, na pasta Otimizados FullHD">Forçar Full HD (${vePjGrandes(keys).length})…</button>` : ''}
         ${keys.length ? `<button class="ve-ctx-item" data-pj="dup">Duplicar<kbd>Ctrl+D</kbd></button>
         <button class="ve-ctx-item" data-pj="cut">Recortar<kbd>Ctrl+X</kbd></button>
         <button class="ve-ctx-item" data-pj="copy">Copiar<kbd>Ctrl+C</kbd></button>` : ''}
@@ -918,7 +996,7 @@ function vePjMenu(x, y, doc) {
         if (cor) vePjCor(keys, cor.dataset.cor);
         else if (it) ({ ren: () => vePjRenomear(keys[0]), dup: () => vePjDuplicar(keys), cut: () => vePjCopiar('recortar'),
             copy: () => vePjCopiar('copiar'), paste: vePjColar, bin: vePjNovaPasta, aj: vePjNovoAjuste, cor: vePjNovaCor, imp: vePjImportarDialogo, c3d: () => ve3dNovaUi(),
-            tl: () => veCreateTimeline(), rel: () => vePjRelink(+keys[0].slice(2)), relv: () => vePjSubstituirVarios(varias), ma: () => vePjMelhorarAudio(comSom), mel: () => veMelAlternar(midiaUm), del: () => vePjApagar(keys) })[it.dataset.pj]();
+            tl: () => veCreateTimeline(), rel: () => vePjRelink(+keys[0].slice(2)), relv: () => vePjSubstituirVarios(varias), fhd: () => vePjForcarFullHD(), ma: () => vePjMelhorarAudio(comSom), mel: () => veMelAlternar(midiaUm), del: () => vePjApagar(keys) })[it.dataset.pj]();
         else return;
         veClipMenuFechar();
     });

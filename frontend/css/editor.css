@@ -758,6 +758,7 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-ruler-btn { min-width: 28px; height: 28px; }
 .ve-ruler-btn.active { color: var(--ve-accent); background: rgba(212, 129, 74, .12); }
 .ve-proxy-btn { height: 28px; padding: 0 7px; font-size: 10px; font-weight: 600; letter-spacing: .06em; }
+.ve-fhd-btn { width: auto; padding: 0 6px; font-size: 10px; font-weight: 700; letter-spacing: .04em; }
 .ve-proxy-btn.active { color: var(--ve-accent); background: rgba(212, 129, 74, .12); }
 .ve-res-sel {
     height: 24px;

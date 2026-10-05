@@ -402,6 +402,38 @@ def ve_listar_pasta(path, _nivel=0):
     return {"success": True, "nome": os.path.basename(os.path.normpath(path)), "arquivos": arquivos, "pastas": pastas}
 
 
+_ve_fhd_stop = None
+
+
+def ve_otimizar_fullhd(itens):
+    """Forçar Full HD (painel Projeto): itens = [[id, path]]; um por vez em background. Eventos em
+    veOnOtimizar({id, pct} | {id, done, success, saida, w, h, error, pulado} | {fim: true})."""
+    from Functions import otimizar
+    global _ve_fhd_stop
+    stop = threading.Event()
+    _ve_fhd_stop = stop
+
+    def run():
+        for mid, path in itens or []:
+            if stop.is_set():
+                break
+            try:
+                r = otimizar.converter(path, lambda p, mid=mid: _ve_emit("veOnOtimizar", {"id": mid, "pct": p}), stop)
+            except Exception as e:
+                r = {"success": False, "error": str(e)}
+            _ve_emit("veOnOtimizar", {"id": mid, "done": True, **r})
+        _ve_emit("veOnOtimizar", {"fim": True, "cancelado": stop.is_set()})
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
+def ve_otimizar_cancelar():
+    if _ve_fhd_stop is not None:
+        _ve_fhd_stop.set()
+    return {"success": True}
+
+
 def ve_sincronizar_audio(ref_path, ref_s, ref_e, outro_path, outro_s, outro_e):
     """Sincronizar clipes: atraso do som do outro trecho em relação à referência (Functions/sincronizar.py)."""
     from Functions import sincronizar
@@ -2935,6 +2967,12 @@ class ApiBridge:
 
     def ve_ler_legenda(self, path):
         return ve_ler_legenda(path)
+
+    def ve_otimizar_fullhd(self, itens):
+        return ve_otimizar_fullhd(itens)
+
+    def ve_otimizar_cancelar(self):
+        return ve_otimizar_cancelar()
 
     def ve_sincronizar_audio(self, ref_path, ref_s, ref_e, outro_path, outro_s, outro_e):
         return ve_sincronizar_audio(ref_path, ref_s, ref_e, outro_path, outro_s, outro_e)
