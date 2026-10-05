@@ -402,6 +402,12 @@ def ve_listar_pasta(path, _nivel=0):
     return {"success": True, "nome": os.path.basename(os.path.normpath(path)), "arquivos": arquivos, "pastas": pastas}
 
 
+def ve_sincronizar_audio(ref_path, ref_s, ref_e, outro_path, outro_s, outro_e):
+    """Sincronizar clipes: atraso do som do outro trecho em relação à referência (Functions/sincronizar.py)."""
+    from Functions import sincronizar
+    return sincronizar.atraso(ref_path, ref_s, ref_e, outro_path, outro_s, outro_e)
+
+
 def ve_ler_legenda(path):
     """Legendas (.srt, .vtt, .ass/.ssa, .sbv, .txt) → [{st, en, texto}] (segundos)."""
     from Functions import legendas_formatos
@@ -2929,6 +2935,9 @@ class ApiBridge:
 
     def ve_ler_legenda(self, path):
         return ve_ler_legenda(path)
+
+    def ve_sincronizar_audio(self, ref_path, ref_s, ref_e, outro_path, outro_s, outro_e):
+        return ve_sincronizar_audio(ref_path, ref_s, ref_e, outro_path, outro_s, outro_e)
 
     def ve_salvar_png(self, dados):
         return ve_salvar_png(dados)

@@ -1328,6 +1328,59 @@ function veMoverGrupo(lista, dt, dtr, alt) {
     veToast(`${novos.length} clipes ${alt ? 'duplicados' : 'movidos'}`);
 }
 
+// ── Sincronizar clipes pelo áudio (como o Premiere): duas câmeras gravando a mesma cena ──
+// Selecionados (2 ou mais, um em cima do outro): o de trilha mais baixa fica parado e os outros vão para onde o som
+// deles bate com o dele (Functions/sincronizar.py). Imagem e som vinculados andam juntos; o que estiver embaixo é
+// sobrescrito, como ao arrastar. Precisa sobrar: se algum fosse para antes do zero, todos andam para a frente.
+async function veSincronizarClipes() {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.ve_sincronizar_audio) return;
+    const grupos = [];
+    veSelLista().forEach(c => { if (!grupos.some(g => g.includes(c))) grupos.push([...new Set([c, ...veVinculados(c)])]); });
+    if (grupos.length < 2) { veToast('Selecione 2 clipes ou mais (câmeras diferentes da mesma cena) para sincronizar'); return; }
+    if (grupos.some(g => g.some(veLocked))) { veAvisoBloqueio(); return; }
+    const som = g => g.find(veTemSom);
+    const semSom = grupos.filter(g => !som(g));
+    if (semSom.length) { veToast(`${veNomeClipe(semSom[0][0])}: sem som para sincronizar`); return; }
+    if (grupos.some(g => Math.abs(veVel(som(g)) - 1) > 1e-6)) { veToast('Sincronizar clipes: deixe a velocidade em 100% antes'); return; }
+    const nivel = g => Math.min(...g.map(c => (veOcupaV(c) ? 0 : 1000) + c.tr));
+    grupos.sort((a, b) => nivel(a) - nivel(b));
+    const ref = som(grupos[0]), caminho = c => veMediaOf(c).path;
+    veToast('Sincronizando pelo áudio...');
+    const dts = new Map([[grupos[0], 0]]);
+    for (const g of grupos.slice(1)) {
+        const o = som(g);
+        let r;
+        try { r = await api.ve_sincronizar_audio(caminho(ref), ref.s, ref.e, caminho(o), o.s, o.e); } catch (e) { r = { error: String(e) }; }
+        if (!r || !r.success) { veToast((r && r.error) || 'Não foi possível sincronizar'); return; }
+        if (!r.ok) { veToast(`${veNomeClipe(o)}: o som não bate com o de ${veNomeClipe(ref)} (são da mesma cena?)`); return; }
+        // sem prender no quadro: a diferença (até meio quadro, ~16 ms) virava eco entre os dois sons
+        dts.set(g, ref.st - r.atraso - o.st);
+    }
+    const menor = Math.min(...grupos.flatMap(g => g.map(c => c.st + dts.get(g))));
+    if (menor < -VE_EPS) { const k = Math.ceil(-menor * VE.fps - 1e-6) / VE.fps; grupos.forEach(g => dts.set(g, dts.get(g) + k)); }
+    if (grupos.every(g => Math.abs(dts.get(g)) < veFrame() / 2)) { veToast('Os clipes já estão sincronizados'); return; }
+    vePushHistory();
+    const prim = VE.clips[VE.sel], movidos = grupos.flat(), tiny = veFrame() * 0.5;
+    const novos = movidos.map(c => ({ ...c, st: c.st + dts.get(grupos.find(g => g.includes(c))) }));
+    let base = VE.clips.filter(c => !movidos.includes(c));
+    novos.forEach(nv => {
+        const a = nv.st, b = veEnd(nv), out = [];
+        base.forEach(o => {
+            const en = veEnd(o);
+            if (o.tr !== nv.tr || en <= a + VE_EPS || o.st >= b - VE_EPS || !veConflita(o, nv)) { out.push(o); return; }
+            if (o.st < a && a - o.st > tiny) out.push(veSemTout({ ...o, e: veSrcAt(o, a) }));
+            if (en > b && en - b > tiny) out.push(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }));
+        });
+        base = out;
+    });
+    VE.clips = base.concat(novos);
+    veSelDefinir(novos, novos[movidos.indexOf(prim)]);
+    veRelayout();
+    veAfterEdit(VE.playhead);
+    veToast(grupos.length === 2 ? 'Clipes sincronizados pelo áudio' : `${grupos.length} clipes sincronizados pelo áudio`);
+}
+
 // Retângulo de seleção (arrastar na área vazia): pega o que ele tocar; Shift soma à seleção
 function veMarqueeFim(d) {
     const ta = Math.min(d.ta, d.tb), tb = Math.max(d.ta, d.tb);
@@ -2685,6 +2738,7 @@ function veClipMenu(i, x, y, doc) {
         <button class="ve-ctx-item" data-ctx="pj">Mostrar no projeto</button>
         ${typeof veEhComp === 'function' && veEhComp(veMediaOf(c)) ? '<button class="ve-ctx-item" data-ctx="abrircomp">Abrir Comp<kbd>duplo clique</kbd></button><button class="ve-ctx-item" data-ctx="descomp">Descompactar Comp</button>' : ''}
         <button class="ve-ctx-item" data-ctx="comp">Criar Comp…<kbd>Ctrl+Shift+C</kbd></button>
+        ${veSelLista().includes(c) && new Set(veSelLista().map(o => o.lk || o)).size > 1 ? '<button class="ve-ctx-item" data-ctx="sinc">Sincronizar clipes (pelo áudio)</button>' : ''}
         <button class="ve-ctx-item" data-ctx="off">${veClipOff(c) ? '' : '✓ '}Ativar<kbd>Ctrl+Shift+E</kbd></button>
         ${veIsImage(c) ? '' : `<button class="ve-ctx-item" data-ctx="inv">${veInvertido(c) ? '✓ ' : ''}Inverter clipe (Reverse Speed)</button>`}
         ${typeof veMelMenuItens === 'function' && veTemSom(c) ? veMelMenuItens(veMediaOf(c), 'data-ctx') : ''}
@@ -2706,6 +2760,7 @@ function veClipMenu(i, x, y, doc) {
             }
         } else if (it) {
             // Criar Comp: o clipe clicado já selecionado (com o grupo) não perde a seleção múltipla
+            if (it.dataset.ctx === 'sinc') { veClipMenuFechar(); veSincronizarClipes(); return; }
             if (it.dataset.ctx === 'comp') {
                 if (!veSelLista().includes(VE.clips[i])) veSelDefinir([VE.clips[i]], VE.clips[i]);
                 veClipMenuFechar();
