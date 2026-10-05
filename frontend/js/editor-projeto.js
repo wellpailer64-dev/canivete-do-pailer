@@ -956,6 +956,7 @@ function vePjInit() {
             const m = VE.media[+k.slice(2)];
             if (m && m.kind === 'timeline') { veOpenTimeline(m.sequenceId); return; }
             if (m && m.comp && veCompAbrir(m)) return;   // Comp: abre a timeline dela (editor-comp.js)
+            if (m && typeof ve3dEh === 'function' && ve3dEh(m)) { const c = VE.clips.find(x => veMediaOf(x) === m); if (c) { ve3dTelaAbrir(c); return; } }   // Cena 3D
             if (m && m.kind === 'cor') { veGrCorEditar(m); return; }   // duplo clique troca a cor
             if (m && veMediaOffline(m)) { vePjRelink(m.id); return; }
             if (m && m.kind === 'video') { veSrcOpen(m.id); return; }

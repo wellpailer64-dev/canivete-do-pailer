@@ -217,8 +217,10 @@ function ve3dRuntime(m) {
     return null;
 }
 async function ve3dGarantir(m) { const rt = ve3dRuntime(m); if (rt) return rt; const e = VE3D.rt.get(m.id); const r = await e.prom; if (!r) throw new Error(e.erro || 'cena 3D não montou'); return r; }
-function ve3dAplicar(rt, m, t, W, H) {   // tudo o que anima, no tempo t (s, dentro do clipe), e desenha W×H
-    const { T, cam, key, amb, chao, r } = rt, C = m.c3d, cp = k => ve3dVal(C.camera, k, t), lp = k => ve3dVal(C.luz, k, t), rad = Math.PI / 180;
+// op (tela 3D): cam = câmera própria (o monitor não mexe nela), vista(cam) = vista livre, saida = alvo/distância da
+// câmera da cena, sobre = cena desenhada por cima sem foco (setas do objeto selecionado)
+function ve3dAplicar(rt, m, t, W, H, op = {}) {   // tudo o que anima, no tempo t (s, dentro do clipe), e desenha W×H
+    const { T, key, amb, chao, r } = rt, cam = op.cam || rt.cam, C = m.c3d, cp = k => ve3dVal(C.camera, k, t), lp = k => ve3dVal(C.luz, k, t), rad = Math.PI / 180;
     // distância automática: cabe o conjunto na posição de repouso (p, sem quadros-chave: não fica "respirando" com a
     // animação) — no mínimo ~2,4 de largura e ~1,6 de altura (quadro em pé ou deitado)
     let lx = 1.2, ly = 0.8;
@@ -227,6 +229,8 @@ function ve3dAplicar(rt, m, t, W, H) {   // tudo o que anima, no tempo t (s, den
     const alvo = new T.Vector3(cp('ax'), cp('ay'), cp('az')), az = cp('azimute') * rad, el = cp('elevacao') * rad, d = cp('dist') ?? dAuto;
     cam.position.set(alvo.x + d * Math.cos(el) * Math.sin(az), alvo.y + d * Math.sin(el), alvo.z + d * Math.cos(el) * Math.cos(az));
     cam.fov = cp('fov'); cam.aspect = W / H; cam.lookAt(alvo); cam.updateProjectionMatrix();
+    if (op.saida) Object.assign(op.saida, { alvo: alvo.clone(), d, dAuto });
+    if (op.vista) { op.vista(cam, T); cam.updateProjectionMatrix(); }
     const la = lp('azimute') * rad, le = lp('elevacao') * rad;
     key.position.set(alvo.x + 8 * Math.cos(le) * Math.sin(la), alvo.y + 8 * Math.sin(le), alvo.z + 8 * Math.cos(le) * Math.cos(la)); key.target.position.copy(alvo);
     key.intensity = lp('intensidade'); key.color.set(lp('cor') || '#ffffff'); amb.intensity = lp('ambiente');
@@ -263,10 +267,11 @@ function ve3dAplicar(rt, m, t, W, H) {   // tudo o que anima, no tempo t (s, den
         }
         r.setRenderTarget(f.alvo); r.clear(); r.render(rt.sc, cam); r.setRenderTarget(null);
         const u = f.mat.uniforms;
-        u.tCor.value = f.alvo.texture; u.tProf.value = f.alvo.depthTexture; u.res.value.set(Wi, Hi); u.raio.value = ab * Hi * 0.04;
+        u.tCor.value = f.alvo.texture; u.tProf.value = f.alvo.depthTexture; u.res.value.set(Wi, Hi); u.raio.value = op.vista ? 0 : ab * Hi * 0.04;
         u.foco.value = Math.max(0.05, cp('foco') ?? d); u.perto.value = cam.near; u.longe.value = cam.far;
         r.setClearColor(0x000000, 0); r.clear(); r.render(f.sc, f.cam);
     }
+    if (op.sobre) { r.autoClear = false; r.clearDepth(); r.render(op.sobre, cam); r.autoClear = true; }
     return rt.cv;
 }
 // monitor: quadro da cena do clipe c no instante T (da timeline), na resolução em que aparece
@@ -408,7 +413,7 @@ if (typeof veCompVerificar === 'function') { const _v = veCompVerificar; veCompV
 
 // ── interface: criar, importar modelo, painel de Propriedades (◆ = quadro-chave, como o cronômetro do After Effects:
 // ligado, mexer no valor grava quadro-chave no tempo atual da agulha) ──
-function ve3dPainel() { if (typeof VEPP === 'object') VEPP.chave = ''; if (typeof vePpRender === 'function') vePpRender(); veRenderProps(); }
+function ve3dPainel() { if (typeof VEPP === 'object') VEPP.chave = ''; if (typeof vePpRender === 'function') vePpRender(); veRenderProps(); if (typeof ve3dTelaLado === 'function') ve3dTelaLado(); }
 function ve3dNovaUi() {
     try { ve3dNova({}); veToast(veT('Cena 3D criada — adicione modelos no painel Propriedades')); ve3dPainel(); }
     catch (e) { veToast(e.message || String(e)); }
@@ -420,7 +425,7 @@ async function ve3dImportarUi() {
         veToast(veT('Carregando o modelo 3D...')); await VE3DAPI.modelo({ arquivo: p }); ve3dPainel(); }
     catch (e) { veToast(e.message || String(e)); }
 }
-function ve3dPainelHtml(c) {
+function ve3dPainelHtml(c, so) {   // so (tela 3D): só a parte do objeto selecionado — camera, luz, cenario ou id do modelo
     const m = veMediaOf(c), C = m.c3d, t = Math.max(0, veSrcAt(c, VE.playhead));
     const lin = (quem, o, k, rot, min, max, passo, un = '') => {
         const v = ve3dVal(o, k, t), kf = (o.kf && o.kf[k]) || [], anim = kf.length > 0, aqui = kf.some(x => Math.abs(x[0] - t) < 0.5 / (VE.fps || 30));
@@ -430,29 +435,39 @@ function ve3dPainelHtml(c) {
             <button class="ve-p3d-kf${anim ? ' on' : ''}${aqui ? ' aqui' : ''}" data-p3dkf="${quem}|${k}" title="${veT(anim ? 'Animado: mexer grava quadro-chave aqui. Clique para tirar a animação' : 'Animar com quadros-chave')}">◆</button></div>`;
     };
     const cam = C.camera, luz = C.luz;
+    const um = md => `${lin(md.id, md, 'x', 'X', -4, 4, 0.01)}${lin(md.id, md, 'y', 'Y', -2, 4, 0.01)}${lin(md.id, md, 'z', 'Z', -4, 4, 0.01)}
+        ${lin(md.id, md, 'ry', 'Girar', -360, 360, 1, '°')}${lin(md.id, md, 'rx', 'Inclinar', -180, 180, 1, '°')}${lin(md.id, md, 'esc', 'Escala', 0.05, 4, 0.01, '×')}`;
     const modelos = C.modelos.map(md => `<div class="ve-p3d-mod"><div class="ve-pp-l"><b>${veEsc(md.nome)}</b><span></span><button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="rem:${md.id}" title="${veT('Tirar da cena')}">✕</button></div>
-        ${lin(md.id, md, 'x', 'X', -4, 4, 0.01)}${lin(md.id, md, 'y', 'Y', -2, 4, 0.01)}${lin(md.id, md, 'z', 'Z', -4, 4, 0.01)}
-        ${lin(md.id, md, 'ry', 'Girar', -360, 360, 1, '°')}${lin(md.id, md, 'rx', 'Inclinar', -180, 180, 1, '°')}${lin(md.id, md, 'esc', 'Escala', 0.05, 4, 0.01, '×')}</div>`).join('');
-    return vePpSec(veT('Câmera'), lin('camera', cam, 'azimute', 'Órbita', -180, 180, 1, '°') + lin('camera', cam, 'elevacao', 'Altura', -10, 85, 1, '°') +
+        ${um(md)}</div>`).join('');
+    const S = {};
+    S.camera = vePpSec(veT('Câmera'), lin('camera', cam, 'azimute', 'Órbita', -180, 180, 1, '°') + lin('camera', cam, 'elevacao', 'Altura', -10, 85, 1, '°') +
             lin('camera', cam, 'dist', 'Distância', 0.5, 20, 0.05) + lin('camera', cam, 'fov', 'Lente (fov)', 10, 90, 1, '°') + lin('camera', cam, 'ay', 'Olhar na altura', -1, 3, 0.01) +
             `<small class="ve-pp-dica">${veT('Distância vazia = enquadra sozinho. ◆ anima a propriedade.')}</small>`) +
         vePpSec(veT('Foco'), lin('camera', cam, 'abertura', 'Desfoque', 0, 1, 0.01) + lin('camera', cam, 'foco', 'Distância do foco', 0.2, 20, 0.05) +
-            `<small class="ve-pp-dica">${veT('Desfoque 0 = tudo nítido. Foco vazio = no ponto que a câmera olha. Anime o foco para trocar de objeto.')}</small>`) +
-        vePpSec(veT('Luz'), lin('luz', luz, 'azimute', 'Direção', -180, 180, 1, '°') + lin('luz', luz, 'elevacao', 'Altura', 5, 90, 1, '°') +
+            `<small class="ve-pp-dica">${veT('Desfoque 0 = tudo nítido. Foco vazio = no ponto que a câmera olha. Anime o foco para trocar de objeto.')}</small>`);
+    S.luz = vePpSec(veT('Luz'), lin('luz', luz, 'azimute', 'Direção', -180, 180, 1, '°') + lin('luz', luz, 'elevacao', 'Altura', 5, 90, 1, '°') +
             lin('luz', luz, 'intensidade', 'Intensidade', 0, 8, 0.05) + lin('luz', luz, 'ambiente', 'Ambiente', 0, 3, 0.05) + lin('luz', luz, 'sombra', 'Sombra', 0, 1, 0.01) +
             lin('luz', luz, 'contra', 'Contraluz', 0, 8, 0.05) + lin('luz', luz, 'contato', 'Sombra de contato', 0, 1, 0.01) +
-            `<div class="ve-pp-l"><label>${veT('Cor da luz')}</label><input type="color" data-p3d="luz|cor" value="${veEsc(luz.p.cor || '#ffffff')}"></div>`) +
-        vePpSec(veT('Modelos'), (modelos || `<small class="ve-pp-dica">${veT('Nenhum modelo ainda.')}</small>`) +
+            `<div class="ve-pp-l"><label>${veT('Cor da luz')}</label><input type="color" data-p3d="luz|cor" value="${veEsc(luz.p.cor || '#ffffff')}"></div>`);
+    S.modelos = vePpSec(veT('Modelos'), (modelos || `<small class="ve-pp-dica">${veT('Nenhum modelo ainda.')}</small>`) +
             `<div class="ve-pp-botoes"><button class="ve-btn ve-btn-sm" data-p3dacao="arquivo">${veT('Importar .glb / .obj…')}</button></div>
-            <div class="ve-pp-botoes">${['esfera', 'cubo', 'cilindro', 'toro', 'cone'].map(f => `<button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="${f}">+ ${veT(f)}</button>`).join('')}</div>`) +
-        vePpSec(veT('Cenário'), (() => { const cn = ve3dCenario(C); return `<div class="ve-pp-l"><label>${veT('Estúdio infinito')}</label><input type="checkbox" data-p3dcena="estudio" ${cn.p.estudio ? 'checked' : ''}>
+            <div class="ve-pp-botoes">${['esfera', 'cubo', 'cilindro', 'toro', 'cone'].map(f => `<button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="${f}">+ ${veT(f)}</button>`).join('')}</div>`);
+    S.cenario = vePpSec(veT('Cenário'), (() => { const cn = ve3dCenario(C); return `<div class="ve-pp-l"><label>${veT('Estúdio infinito')}</label><input type="checkbox" data-p3dcena="estudio" ${cn.p.estudio ? 'checked' : ''}>
             <input type="color" data-p3dcena="estudioCor" value="${veEsc(cn.p.estudioCor || '#e9e4dc')}"></div>` +
             lin('cenario', cn, 'neblina', 'Neblina', 0, 1, 0.01) +
-            `<div class="ve-pp-l"><label>${veT('Cor da neblina')}</label><input type="color" data-p3dcena="neblinaCor" value="${veEsc(cn.p.neblinaCor || '#dfe3e8')}"></div>`; })()) +
-        vePpSec(veT('Cena'), `<div class="ve-pp-l"><label>${veT('Sombra no chão')}</label><input type="checkbox" data-p3dcena="chao" ${C.chao !== false ? 'checked' : ''}></div>
+            `<div class="ve-pp-l"><label>${veT('Cor da neblina')}</label><input type="color" data-p3dcena="neblinaCor" value="${veEsc(cn.p.neblinaCor || '#dfe3e8')}"></div>`; })());
+    S.cena = vePpSec(veT('Cena'), `<div class="ve-pp-l"><label>${veT('Sombra no chão')}</label><input type="checkbox" data-p3dcena="chao" ${C.chao !== false ? 'checked' : ''}></div>
             <div class="ve-pp-l"><label>${veT('Fundo')}</label><input type="checkbox" data-p3dcena="transparente" ${C.fundo ? '' : 'checked'}> ${veT('transparente')}
             <input type="color" data-p3dcena="fundo" value="${veEsc(C.fundo || '#202020')}" ${C.fundo ? '' : 'disabled'}></div>
-            <small class="ve-pp-dica">${veT(m.c3dSig === ve3dSig(m) && m.path ? 'Arquivo da exportação em dia.' : 'O arquivo da exportação é refeito sozinho quando você para de mexer.')}</small>`);
+            <small class="ve-pp-dica">${veT(m.c3dSig === ve3dSig(m) && m.path ? 'Arquivo da exportação em dia.' : 'O arquivo da exportação é refeito sozinho quando você para de mexer.')}</small>` +
+            (so ? '' : `<div class="ve-pp-botoes"><button class="ve-btn ve-btn-sm" data-p3dacao="tela">${veT('Abrir a tela 3D')}</button></div>`));
+    if (!so) return S.camera + S.luz + S.modelos + S.cenario + S.cena;
+    if (so === 'camera' || so === 'luz') return S[so];
+    if (so === 'cenario') return S.cenario + S.cena;
+    const md = C.modelos.find(x => x.id === so); if (!md) return S.modelos;
+    return vePpSec(veEsc(md.nome), um(md) + lin(md.id, md, 'rz', 'Rolar', -180, 180, 1, '°') + lin(md.id, md, 'sx', 'Largura', 0.05, 4, 0.01, '×') +
+        lin(md.id, md, 'sy', 'Altura', 0.05, 4, 0.01, '×') + lin(md.id, md, 'sz', 'Profundidade', 0.05, 4, 0.01, '×') + lin(md.id, md, 'contato', 'Sombra de contato', 0, 1, 0.01) +
+        `<div class="ve-pp-botoes"><button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="rem:${md.id}">${veT('Tirar da cena')}</button></div>`);
 }
 function ve3dEvento(el, tipo) {
     const c = VE.clips[VE.sel], m = c && veMediaOf(c); if (!ve3dEh(m)) return;
@@ -469,6 +484,7 @@ function ve3dEvento(el, tipo) {
     }
     if (el.dataset.p3dacao) {
         const a = el.dataset.p3dacao;
+        if (a === 'tela') return ve3dTelaAbrir(c);
         if (a === 'arquivo') return ve3dImportarUi();
         if (a.startsWith('rem:')) { VE3DAPI.remover(a.slice(4), m.id); ve3dPainel(); return; }
         VE3DAPI.modelo({ forma: a, cena: m.id, cor: { esfera: '#ec6e48', cubo: '#0e3b4a', cilindro: '#ebd5a8', toro: '#ec6e48', cone: '#48281a' }[a] }).then(() => ve3dPainel());

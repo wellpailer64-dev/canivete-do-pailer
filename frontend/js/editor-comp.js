@@ -786,4 +786,5 @@ function veCompDuploClique(e) {
     const i = veClipAtTrack(t, veTrackIndex(row), row.kind);
     const m = i >= 0 ? veMediaOf(VE.clips[i]) : null;
     if (veEhComp(m)) { e.preventDefault(); veCompAbrir(m); }
+    else if (typeof ve3dEh === 'function' && ve3dEh(m)) { e.preventDefault(); ve3dTelaAbrir(VE.clips[i]); }   // Cena 3D: tela própria
 }

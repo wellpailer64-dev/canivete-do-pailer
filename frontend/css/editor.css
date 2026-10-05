@@ -2012,3 +2012,25 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-p3d-kf.aqui { text-shadow: 0 0 6px var(--ve-accent, #ff8a3d); }
 .ve-p3d-mod { border-top: 1px solid rgba(255,255,255,.06); padding-top: 6px; margin-top: 6px; display: grid; gap: 6px; }
 .ve-p3d-mod > .ve-pp-l b { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Tela da Cena 3D (editor-3d-tela.js): duplo clique na faixa da cena */
+.ve3t { position: fixed; inset: 0; z-index: 900; border: 0; border-radius: 0; height: auto; display: grid; grid-template-columns: 190px minmax(0, 1fr) 300px; grid-template-rows: 40px minmax(0, 1fr) 54px; background: var(--ve-bg); color: var(--ve-text); }
+.ve3t[hidden] { display: none; }
+.ve3t-topo { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-bottom: 1px solid var(--ve-line); background: var(--ve-panel); }
+.ve3t-topo b { margin-right: auto; font-weight: 600; font-size: 13px; }
+.ve3t-grupo { display: flex; gap: 2px; }
+.ve3t-grupo .on { background: var(--ve-accent, #ff8a3d); color: #111; }
+.ve3t-lista { overflow: auto; padding: 8px; border-right: 1px solid var(--ve-line); background: var(--ve-panel); display: flex; flex-direction: column; gap: 2px; }
+.ve3t-it { all: unset; cursor: pointer; padding: 5px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ve3t-it:hover, .ve3t-it.on { background: var(--ve-panel-2); }
+.ve3t-it.on { color: var(--ve-accent, #ff8a3d); }
+.ve3t-lista hr { border: 0; border-top: 1px solid var(--ve-line); margin: 6px 0; width: 100%; }
+.ve3t-add { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.ve3t-visor { position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #141414; }
+.ve3t-visor canvas { background: repeating-conic-gradient(#2a2a2a 0 25%, #222 0 50%) 0 0 / 16px 16px; touch-action: none; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
+.ve3t-dica { position: absolute; left: 10px; bottom: 8px; font-size: 11px; opacity: .6; pointer-events: none; }
+.ve3t-lado { overflow: auto; border-left: 1px solid var(--ve-line); background: var(--ve-panel); }
+.ve3t-tempo { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-top: 1px solid var(--ve-line); background: var(--ve-panel); }
+.ve3t-regua { position: relative; flex: 1; height: 36px; }
+.ve3t-regua input { position: absolute; left: 0; right: 0; top: 16px; width: 100%; margin: 0; }
+.ve3t-kf { position: absolute; top: 0; transform: translateX(-50%); font-size: 11px; color: var(--ve-accent, #ff8a3d); cursor: pointer; }
+.ve3t-hora { font-variant-numeric: tabular-nums; font-size: 12px; min-width: 96px; }
