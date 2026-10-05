@@ -5458,7 +5458,7 @@ function veOpenExport() {
     // codec, bits e taxa lembrados entre exportações
     try {
         const o = JSON.parse(veLsGet('ve-exp-opcoes') || '{}');
-        ['codec', 'bits', 'taxa'].forEach(k => {
+        ['codec', 'bits', 'taxa', 'blocos'].forEach(k => {
             const b = o[k] && document.querySelector(`#ve-export .ve-pills[data-name="${k}"] .ve-pill[data-v="${o[k]}"]`);
             if (b) b.parentElement.querySelectorAll('.ve-pill').forEach(x => x.classList.toggle('active', x === b));
         });
@@ -5482,7 +5482,8 @@ function veExpOpcoes() {
     const fmt = vePill('format') || 'mp4', codec = ['mp4', 'mov', 'mkv'].includes(fmt) ? vePill('codec') || 'h264' : 'h264';
     const mbps = vePill('taxa') === 'mbps' ? Math.max(1, Math.min(400, +$ve('ve-exp-mbps').value || 16)) : 0;
     // projeto: sem vídeo principal, a saída leva o nome e a pasta dele (exportar_video)
-    return { nome: $ve('ve-exp-nome').value.trim(), codec, bits: +(vePill('bits') || 8), mbps, projeto: VE.projectPath || '' };
+    return { nome: $ve('ve-exp-nome').value.trim(), codec, bits: +(vePill('bits') || 8), mbps, projeto: VE.projectPath || '',
+             blocos: vePill('blocos') === '1' };   // exportação por blocos (video_cutter._exportar_em_blocos)
 }
 
 function veUpdateExportSummary() {
@@ -5502,7 +5503,7 @@ function veUpdateExportSummary() {
     }
     $ve('ve-exp-mbps-box').hidden = vePill('taxa') !== 'mbps';
     $ve('ve-exp-ext').textContent = codec === 'prores' && comCodec ? '.mov' : '.' + fmt;
-    try { veLsSet('ve-exp-opcoes', JSON.stringify({ codec: vePill('codec'), bits: vePill('bits'), taxa: vePill('taxa'), mbps: $ve('ve-exp-mbps').value })); } catch (e) {}
+    try { veLsSet('ve-exp-opcoes', JSON.stringify({ codec: vePill('codec'), bits: vePill('bits'), taxa: vePill('taxa'), mbps: $ve('ve-exp-mbps').value, blocos: vePill('blocos') })); } catch (e) {}
     const f = veExportFaixa(), dur = f ? f.b - f.a : VE.dur;
     const faixa = f ? `<br>Só o trecho <b>In→Out</b>: ${veShort(f.a)} a ${veShort(f.b)}` : '';
     $ve('ve-export').classList.toggle('audio', audio);

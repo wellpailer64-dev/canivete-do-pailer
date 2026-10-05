@@ -991,6 +991,13 @@
                                             <span class="ve-exp-mbps" id="ve-exp-mbps-box"><input type="number" id="ve-exp-mbps" min="1" max="400" step="1" value="16"> Mbps</span>
                                         </div>
                                     </div>
+                                    <div class="ve-field ve-only-video">
+                                        <label>Exportação por blocos</label>
+                                        <div class="ve-pills" data-name="blocos">
+                                            <button class="ve-pill active" data-v="0" title="Exporta a timeline inteira de uma vez">Desligada</button>
+                                            <button class="ve-pill" data-v="1" title="Exporta a timeline em pedaços de ~15 s com só os clipes de cada pedaço e junta no fim, sem recodificar. Tende a ser mais rápida e usar bem menos memória em projetos pesados (vídeos 4K/8K do celular): com poucos vídeos por vez, eles cabem na placa de vídeo. O resultado é o mesmo.">Ligada</button>
+                                        </div>
+                                    </div>
                                     <div class="ve-field">
                                         <label>Qualidade</label>
                                         <div class="ve-pills" data-name="quality">

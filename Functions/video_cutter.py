@@ -727,6 +727,40 @@ def _camada_no_proxy(c):
     c["oy"] /= r
 
 
+def _camada_reduz_na_placa(c):
+    """Clipe bem maior que o tamanho em que aparece (8K do celular num quadro 1080): a placa decodifica e reduz ao
+    tamanho máximo da camada (+10% de folga) antes de baixar o quadro; girar e o resto do grafo trabalham no quadro
+    pequeno. Escala e âncora passam para px do quadro reduzido; os efeitos medem em % da mídia (mw/mh). Antes, o 8K
+    baixava inteiro e o processador girava e reduzia (trecho de 9,5 s: CPU 95 s mesmo decodificando na placa)."""
+    if c["tipo"] != "video" or not c["path"] or "sx" in c["kf"] or "sy" in c["kf"] or c.get("gpu_red"):
+        return
+    maior = max([c["sc"]] + [p[1] for p in c["kf"].get("sc", [])]) * 1.1
+    if maior >= 0.6:
+        return
+    try:
+        info = probe(c["path"])
+    except Exception:
+        return
+    if info.get("vcodec") not in ("h264", "hevc", "vp9", "av1") or info.get("pix_fmt") not in (
+            "yuv420p", "yuvj420p", "yuv420p10le", "nv12", "p010le"):
+        return
+    rot = int(info.get("rotation") or 0) % 360
+    giro = {270: "transpose=clock", 90: "transpose=cclock", 180: "hflip,vflip"}.get(rot)
+    if rot and not giro:
+        return
+    tw, th = max(2, int(round(c["mw"] * maior / 2)) * 2), max(2, int(round(c["mh"] * maior / 2)) * 2)
+    r = c["mw"] / tw
+    gw, gh = (th, tw) if rot in (90, 270) else (tw, th)
+    fmt_g = "p010le" if "10" in str(info.get("pix_fmt")) else "nv12"
+    c["gpu_red"] = (gw, gh, giro, fmt_g)
+    c["sc"] *= r
+    if "sc" in c["kf"]:
+        c["kf"]["sc"] = [(t, v * r, i, bz) for t, v, i, bz in c["kf"]["sc"]]
+    c["mw"], c["mh"] = tw, th
+    c["ox"] /= r
+    c["oy"] /= r
+
+
 def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumbs_n=0, lado=1080):
     """Gera a prévia leve e, na MESMA passada, as miniaturas da timeline (decodificar um 4K HEVC
     várias vezes em paralelo era o que mais atrasava a abertura). Com placa NVIDIA tudo roda na GPU
@@ -2567,7 +2601,7 @@ def _export_usa_fonte(segmentos, audio_segmentos=None, camadas=None, audio_clipe
 def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", resolucao="original",
                    usar_gpu=True, pasta_saida=None, on_progress=None, stop_event=None, sem_audio=False,
                    camadas=None, audio_segmentos=None, duracao=None, audio_clipes=None, legendas=None, quadro=None,
-                   saida=None, previa_h=0, proc_holder=None, opcoes=None, alfa=False, alfa_leve=False):
+                   saida=None, previa_h=0, proc_holder=None, opcoes=None, alfa=False, alfa_leve=False, janela=None):
     """
     Exporta a timeline do editor.
     saida/previa_h  = prévia renderizada (render_cache.py): arquivo fixo, sem som, H.264 leve de decodificar
@@ -2605,6 +2639,16 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         aberto = path   # nome e pasta da saída vêm do que o usuário abriu
     if _eh_imagem(path):
         path = _base_imagem(path)   # timeline que começou por uma imagem: fundo preto no tamanho dela
+    # por blocos só com a base de fundo (sequência noutro tamanho: tudo vira camada). Base com trechos do vídeo
+    # principal: cada trecho é arredondado em quadros desde o zero e um bloco no meio dela saía um quadro deslocado
+    if (janela is None and isinstance(opcoes, dict) and opcoes.get("blocos") and camadas and not saida and not previa_h
+            and not alfa and not FORMATOS_SAIDA.get(str(formato_saida).lower(), {}).get("audio_only")
+            and all(isinstance(s, dict) and s.get("gap") is not None for s in segmentos or [])):
+        return _exportar_em_blocos(dict(
+            path=path, segmentos=segmentos, formato_saida=formato_saida, qualidade=qualidade, resolucao=resolucao,
+            usar_gpu=usar_gpu, sem_audio=sem_audio, camadas=camadas, audio_segmentos=audio_segmentos,
+            duracao=duracao, audio_clipes=audio_clipes, legendas=legendas, quadro=quadro, opcoes=opcoes),
+            aberto, pasta_saida, prog, stop_event)
 
     formato_saida = str(formato_saida).lower()
     cfg = FORMATOS_SAIDA.get(formato_saida, FORMATOS_SAIDA["mp4"])
@@ -2657,6 +2701,13 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     pecas_a = pecas if audio_segmentos is None else _normalizar_segmentos(audio_segmentos, info["duration"])
     lay = _normalizar_camadas(camadas, path)
     _camadas_na_grade(lay, info["fps"])
+    if janela and janela.get("t0"):
+        # bloco da exportação por blocos: a timeline começa no início dele. Camada que já vinha tocando fica com início
+        # negativo e o mesmo tempo interno (animações iguais); o vídeo dela é lido só a partir do bloco ("pula")
+        for c in lay:
+            c["st"] -= janela["t0"]
+            if c["st"] < -1e-6 and c["tipo"] == "video":
+                c["pula"] = -c["st"]
     # Saída menor que o quadro (4K → 1080p) com camadas: compõe direto no tamanho da saída em vez de compor em 4K e
     # reduzir no fim. Posição, escala, quadros-chave e tremida das camadas são em px do quadro e vão na mesma
     # proporção; os efeitos já medem em % da mídia. Medido (teste 4K, 3 PiPs + texto + ajuste, 20 s): 4K e 1080p
@@ -2671,6 +2722,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     if previa:
         for c in lay:
             _camada_no_proxy(c)
+    if (previa or (janela and janela.get("nvdec"))) and _detectar_hw_encoder() == "h264_nvenc":
+        for c in lay:
+            _camada_reduz_na_placa(c)
     # Hard Limiter no Master: vem no fim da lista do mix como {"master": {...}} (editor.js: veExportar)
     master_lim = None
     if audio_clipes is not None:
@@ -2690,6 +2744,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 + [_fim_mix(c) for c in (mix or [])])
     if total < 0.04:
         return {"success": False, "error": "Nada para exportar."}
+    # bloco da exportação por blocos: o progresso é o do pedaço
+    total_prog = janela["quadros"] / max(1.0, float(fps)) if janela else total
 
     def _completar(lista):
         falta = total - sum(_dur_peca(p) for p in lista)
@@ -2755,7 +2811,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                  and info.get("pix_fmt", "") in ("yuv420p", "yuvj420p", "yuv420p10le", "nv12", "p010le")
                  and mesma_proporcao and any(p[0] != "gap" for p in pecas))
     fmt_cuda = "p010le" if bits == 10 else "nv12"
-    nvdec_previa = previa and _detectar_hw_encoder() == "h264_nvenc"
+    # clipes decodificados na placa (NVDEC): prévia renderizada e blocos com poucos vídeos ao mesmo tempo (na exportação
+    # inteira eram 25 leituras 8K abertas juntas: não cabem nos 8 GB da placa)
+    nvdec_previa = (previa or bool(janela and janela.get("nvdec"))) and _detectar_hw_encoder() == "h264_nvenc"
 
     def _montar(turbo):
         """Comando e grafo de filtros. turbo = tudo na placa de vídeo (NVDEC → scale_cuda → NVENC)."""
@@ -2931,11 +2989,14 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 # do arquivo à toa) e só até 1 s depois dele (-t: não decodifica o resto); o corte exato fica no
                 # trim, o que evita flash preto em cortes. Poucas threads por clipe: com 20+ clipes cada
                 # decodificador abria uma por núcleo (1000+ threads, GBs de quadros na RAM) e eles brigavam pela CPU
-                c["ss"] = max(0.0, c["s"] - 3.0)
+                c["ss"] = max(0.0, c["s"] + c.get("pula", 0.0) * c["v"] - 3.0)
                 leitura = c["s"] - c["ss"] + c["fonte"] + 1.0
                 # prévia renderizada com placa NVIDIA: o clipe decodifica na placa (NVDEC; sem ela, o ffmpeg volta
                 # sozinho ao processador). Celular 8K HEVC em pé: trecho de 9,5 s 38 s → 11 s
-                cmd += ["-threads", str(_THREADS_CLIPE)] + (["-hwaccel", "cuda"] if nvdec_previa else []) \
+                gpu_red = c.get("gpu_red")
+                hw = (["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"] + (["-noautorotate"] if gpu_red[2] else [])
+                      if gpu_red else ["-hwaccel", "cuda"] if nvdec_previa else [])
+                cmd += ["-threads", str(_THREADS_CLIPE)] + hw \
                     + (["-ss", _tempo_ffmpeg(c["ss"])] if c["ss"] > 0 else []) \
                     + ["-t", _tempo_ffmpeg(leitura), "-i", c["path"] or path]
             idx = entrada
@@ -3003,9 +3064,16 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 vel = ""
             else:
                 ss = c.get("ss", 0.0)
-                src = (f"[{idx}:v:0]{_marca_hd(c['path'] or path)}trim=start={_tempo_ffmpeg(c['s'] - ss)}:"
+                red_gpu = ""
+                if c.get("gpu_red"):
+                    # reduzido na placa e só então baixado (e girado) no processador
+                    gw, gh, giro, fmt_g = c["gpu_red"]
+                    red_gpu = f"scale_cuda={gw}:{gh}:format={fmt_g}:interp_algo=lanczos,hwdownload,format={fmt_g}," + (f"{giro}," if giro else "")
+                src = (f"[{idx}:v:0]{red_gpu}{_marca_hd(c['path'] or path)}trim=start={_tempo_ffmpeg(max(0.0, c['s'] - ss))}:"
                        f"end={_tempo_ffmpeg(c['s'] - ss + c['fonte'])},")
-                vel = f"setpts=(PTS-STARTPTS)/{c['v']:.6f},"
+                # pulando o começo (bloco): o tempo interno conta do início do clipe, não do 1º quadro lido
+                vel = (f"setpts=(PTS-{c['s'] - ss:.6f}/TB)/{c['v']:.6f}," if c.get("pula")
+                       else f"setpts=(PTS-STARTPTS)/{c['v']:.6f},")
             filtros_clip = efeitos + [f for f in ordem if f]
             fixa = False
             if c["tipo"] == "imagem" and not c.get("seq"):
@@ -3051,8 +3119,13 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                     fim_cadeia = filtros_clip + [de_rgb]
                 cadeia = f"{src}{vel}" + ",".join([f"fps=fps={fps}:start_time=0"] + ([reducao] if reducao else [])
                                                   + [para_rgb] + fim_cadeia)
-            # round: em segundos o deslocamento era truncado (0,233333/TB = 6,99999 → 6) e o último quadro sumia
-            cadeia += f",setpts=PTS-STARTPTS+round({c['st']:.9f}/TB)[l{n}]"
+            if c.get("pula"):
+                # quadros só a partir do bloco (sem refazer o começo); o tempo interno já é o do clipe
+                cadeia = cadeia.replace(f"fps=fps={fps}:start_time=0", f"fps=fps={fps}:start_time={c['pula']:.6f}")
+                cadeia += f",setpts=PTS+round({c['st']:.9f}/TB)[l{n}]"
+            else:
+                # round: em segundos o deslocamento era truncado (0,233333/TB = 6,99999 → 6) e o último quadro sumia
+                cadeia += f",setpts=PTS-STARTPTS+round({c['st']:.9f}/TB)[l{n}]"
             i_cadeia = len(filtros)
             filtros.append(cadeia)
             fim = c["st"] + c["dur"]
@@ -3211,7 +3284,20 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 # quadros já na placa, no formato certo (nv12/p010): converter faria o ffmpeg descer para a RAM
                 i = video_args.index("-pix_fmt")
                 del video_args[i:i + 2]
-        full = prep["base_cmd"] + video_args + cfg["extra"] + [saida]
+        if janela:
+            # só os quadros do bloco (o grafo é o da timeline inteira: tempos das camadas iguais aos da exportação
+            # normal); o contêiner do pedaço vem da extensão (.ts/.mov/.mkv), sem as opções do formato final
+            # sem quadros B: cada quadro com o próprio tempo, sem reordenar. Com eles (NVENC -bf 3) o começo de cada
+            # pedaço saía deslocado e a emenda perdia ou repetia um quadro (medido com um vídeo numerado)
+            va = list(video_args)
+            for op_b in ("-bf", "-b_ref_mode"):
+                while op_b in va:
+                    i = va.index(op_b)
+                    del va[i:i + 2]
+            full = prep["base_cmd"] + va + ["-bf", "0", "-ss", f"{janela['ss']:.6f}", "-frames:v",
+                                            str(janela["quadros"]), "-an", saida]
+        else:
+            full = prep["base_cmd"] + video_args + cfg["extra"] + [saida]
         ultimo_cmd = full
 
         def _hold(p):
@@ -3222,7 +3308,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             with _export_lock:
                 _export_proc = p
 
-        rc, err = _run_progress(full, total, lambda p: prog(p, f"Exportando{' (turbo)' if prep['turbo'] else ''}... {p}%"),
+        rc, err = _run_progress(full, total_prog, lambda p: prog(p, f"Exportando{' (turbo)' if prep['turbo'] else ''}... {p}%"),
                                 stop_event, _hold)
         if proc_holder is not None:
             proc_holder(None)
@@ -3286,3 +3372,178 @@ def _apagar(p):
             os.remove(p)
     except Exception:
         pass
+
+
+# ─────────────────────────── exportação por blocos (opção da tela de exportação) ───────────────────────────
+# A exportação inteira abre a leitura de TODOS os clipes de uma vez (projeto de 2 min com 8K do celular: 25 leituras
+# HEVC 8K, ~19 GB de RAM, tudo no processador). Por blocos, cada pedaço da timeline leva só as camadas que aparecem
+# nele — o grafo e os tempos são os da exportação normal (animações, quadros-chave e textos iguais) — e grava só os
+# quadros dele; com poucos vídeos juntos, eles decodificam na placa. O som sai numa passada só (a mesma mixagem) e os
+# pedaços se juntam sem recodificar.
+_BLOCO_SEG = float(os.environ.get("CANIVETE_BLOCO_SEG") or 15)   # tamanho alvo de cada bloco (s; o teste usa 1)
+_BLOCO_NVDEC_MAX = 4     # vídeos ao mesmo tempo num bloco para decodificar na placa
+
+
+def _spans_camadas(camadas):
+    out = []
+    for c in camadas or []:
+        try:
+            v = max(0.05, min(20.0, float(c.get("v") or 1)))
+            st = max(0.0, float(c["st"]))
+            out.append((st, st + (float(c.get("e", 0)) - float(c.get("s", 0))) / v,
+                        c.get("tipo") not in ("imagem", "ajuste")))
+        except Exception:
+            out.append((0.0, 1e9, True))   # sem conseguir ler: vai em todos os blocos
+    return out
+
+
+def _cortes_blocos(spans, n_quadros, fpsv):
+    """Quadros onde cada bloco começa: perto de cada _BLOCO_SEG, no ponto (±3 s) atravessado por menos vídeos."""
+    cortes, k, passo = [0], 0, max(2, int(round(_BLOCO_SEG * fpsv)))
+    folga = min(int(3 * fpsv), passo // 3)
+    while n_quadros - k > passo * 1.4:
+        alvo, melhor = k + passo, None
+        for qd in range(alvo - folga, alvo + folga + 1, max(1, min(int(fpsv / 6), folga // 3 or 1))):
+            t = qd / fpsv
+            n = sum(1 for a, b, vid in spans if vid and a + 0.05 < t < b - 0.05)
+            chave = (n, abs(qd - alvo))
+            if melhor is None or chave < melhor[0]:
+                melhor = (chave, qd)
+        k = melhor[1]
+        cortes.append(k)
+    return cortes + [n_quadros]
+
+
+def _base_na_janela(segmentos, a, b):
+    """Base do bloco: começa em `a` (o que vem antes sai; o trecho que atravessa `a` começa no meio) e o que passa de
+    `b` vira vazio (não é lido)."""
+    out, t = [], 0.0
+    for s in segmentos or []:
+        try:
+            gap = s.get("gap") is not None
+            d = float(s["gap"]) if gap else float(s.get("end", 0)) - float(s.get("start", 0))
+        except Exception:
+            continue
+        ini, fim = max(t, a), t + d
+        t += d
+        if fim <= a + 1e-6:
+            continue
+        if gap or ini >= b:
+            out.append({"gap": fim - ini})
+        else:
+            out.append(dict(s, start=float(s["start"]) + (ini - (fim - d))))
+    return out
+
+
+def _legendas_na_janela(legendas, a):
+    if not isinstance(legendas, dict) or not legendas.get("itens"):
+        return legendas
+    itens = [dict(l, st=max(0.0, float(l["st"]) - a), en=float(l["en"]) - a) for l in legendas["itens"] if float(l["en"]) > a]
+    return dict(legendas, itens=itens)
+
+
+def _exportar_em_blocos(args, aberto, pasta_saida, prog, stop_event):
+    global _export_proc
+    op = dict(args.get("opcoes") or {})
+    op.pop("blocos", None)
+    fmt = str(args["formato_saida"]).lower()
+    cfg = FORMATOS_SAIDA.get(fmt, FORMATOS_SAIDA["mp4"])
+    codec = str(op.get("codec") or "h264").lower()
+    prores = cfg.get("vcodec") == "h264" and codec == "prores"
+    if prores:
+        cfg = dict(FORMATOS_SAIDA["mov"], vcodec="prores", acodec="pcm_s16le")
+    vcodec = "hevc" if cfg.get("vcodec") == "h264" and codec == "hevc" else cfg.get("vcodec")
+    ext_bloco = ".ts" if vcodec in ("h264", "hevc") else ".mov" if prores else ".mkv"
+    q = _QUALIDADE.get(str(args["qualidade"]).lower(), _QUALIDADE["medium"])
+    saida = _nome_saida(aberto, cfg["ext"], pasta_saida, op.get("nome"))
+    try:
+        info = probe(args["path"])
+    except Exception as e:
+        return {"success": False, "error": f"Não foi possível analisar o vídeo: {e}"}
+    fpsv = float(f'{info["fps"]:.3f}')
+    camadas = args["camadas"]
+    spans = _spans_camadas(camadas)
+    base_dur = 0.0
+    for s in args["segmentos"] or []:
+        try:
+            base_dur += float(s["gap"]) if s.get("gap") is not None else float(s.get("end", 0)) - float(s.get("start", 0))
+        except Exception:
+            pass
+    total = max([base_dur, float(args["duracao"] or 0)] + [b for a, b, _ in spans if b < 1e8])
+    n_quadros = int(round(total * fpsv))
+    if n_quadros < 2:
+        return {"success": False, "error": "Nada para exportar."}
+    cortes = _cortes_blocos(spans, n_quadros, fpsv)
+    nb = len(cortes) - 1
+    pasta = os.path.join(_midia_dir(), "blocos_" + uuid.uuid4().hex[:10])
+    os.makedirs(pasta, exist_ok=True)
+    margem = 2.0 / fpsv
+    partes = []
+    try:
+        for i in range(nb):
+            k0, k1 = cortes[i], cortes[i + 1]
+            a, b = k0 / fpsv, k1 / fpsv
+            sub = [c for c, (ca, cb, _) in zip(camadas, spans) if ca < b + margem and cb > a - margem]
+            n_vid = sum(1 for ca, cb, vid in spans if vid and ca < b + margem and cb > a - margem)
+            parte = os.path.join(pasta, f"b{i:03d}{ext_bloco}")
+            # o bloco começa no próprio zero (t0): sem refazer a timeline desde o início a cada bloco (medido: bloco em
+            # 120 s levava 35 s só de pré-rolagem com 2 PNGs; o 8K longo era decodificado de novo em cada bloco)
+            janela = {"ss": 0.0, "t0": a, "quadros": k1 - k0, "nvdec": n_vid <= _BLOCO_NVDEC_MAX}
+
+            def _p(p, m, i=i):
+                pct = int((i + p / 100) / (nb + 1) * 100)
+                prog(pct, f"Exportando por blocos ({i + 1}/{nb})... {pct}%")
+            kw = dict(sem_audio=True, camadas=sub, audio_segmentos=None, duracao=total - a + 2 / fpsv, audio_clipes=None,
+                      legendas=_legendas_na_janela(args["legendas"], a), quadro=args["quadro"], opcoes=op, saida=parte, janela=janela,
+                      on_progress=_p, stop_event=stop_event)
+            base = _base_na_janela(args["segmentos"], a, b + margem)
+            r = exportar_video(args["path"], base, fmt, args["qualidade"], args["resolucao"], args["usar_gpu"], None, **kw)
+            if not r.get("success") and janela["nvdec"] and not (stop_event is not None and stop_event.is_set()):
+                janela["nvdec"] = False   # placa sem memória para estes vídeos: o mesmo bloco pelo processador
+                r = exportar_video(args["path"], base, fmt, args["qualidade"], args["resolucao"], args["usar_gpu"], None, **kw)
+            if stop_event is not None and stop_event.is_set():
+                return {"success": False, "cancelled": True, "error": "Exportação cancelada."}
+            if not r.get("success"):
+                return {"success": False, "error": f"Bloco {i + 1}/{nb}: " + str(r.get("error") or "falhou")}
+            partes.append((parte, k1 - k0))
+        audio = None
+        if not args["sem_audio"]:
+            prog(int(nb / (nb + 1) * 100), "Exportando o som...")
+            audio = os.path.join(pasta, "som.wav")
+            r = exportar_video(args["path"], args["segmentos"], "wav", args["qualidade"], "original", False, None,
+                               sem_audio=False, camadas=None, audio_segmentos=args["audio_segmentos"], duracao=total,
+                               audio_clipes=args["audio_clipes"], quadro=args["quadro"], saida=audio,
+                               stop_event=stop_event)
+            if stop_event is not None and stop_event.is_set():
+                return {"success": False, "cancelled": True, "error": "Exportação cancelada."}
+            if not r.get("success") or not os.path.isfile(audio):
+                audio = None   # timeline sem som
+        lista = os.path.join(pasta, "lista.txt")
+        prog(99, "Juntando os blocos...")
+        # duração exata de cada pedaço (quadros / fps): o ffmpeg não estima pelo arquivo
+        with open(lista, "w", encoding="utf-8") as f:
+            f.writelines(f"file '{p.replace(chr(92), '/')}'\nduration {n / fpsv:.6f}\n" for p, n in partes)
+        cmd = [ffmpeg_path(), "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", lista]
+        if audio:
+            cmd += ["-i", audio, "-map", "0:v:0", "-map", "1:a:0", "-c:a", cfg["acodec"]]
+            if not cfg["acodec"].startswith("pcm_"):
+                cmd += ["-b:a", q["ab"]]
+        else:
+            cmd += ["-map", "0:v:0"]
+        cmd += ["-c:v", "copy"] + (["-tag:v", "hvc1"] if vcodec == "hevc" and cfg["ext"] in (".mp4", ".mov") else []) \
+            + cfg["extra"] + [saida]
+        p = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, encoding="utf-8",
+                             errors="replace", creationflags=_creationflags())
+        with _export_lock:
+            _export_proc = p
+        _, err = p.communicate()
+        with _export_lock:
+            _export_proc = None
+        if p.returncode != 0 or not os.path.isfile(saida):
+            _apagar(saida)
+            return {"success": False, "error": "Falha ao juntar os blocos: " + "\n".join(_linhas_ffmpeg(err) or [str(p.returncode)])}
+    finally:
+        shutil.rmtree(pasta, ignore_errors=True)
+    prog(100, "Concluído!")
+    return {"success": True, "output_path": saida, "output_folder": os.path.dirname(saida), "duration": round(total, 2),
+            "size": os.path.getsize(saida), "turbo": False, "blocos": nb}

@@ -166,7 +166,7 @@ JS_AJUDA = r"""
       const plano = veExportPlan(true), lim = veMasterLim();
       await window.pywebview.api.video_cutter_export(VE.path, plano.base, 'mp4', 'medium', 'original', false, dest, false,
         plano.camadas, plano.audio, plano.dur, lim ? [...plano.mix, { master: lim }] : plano.mix, veTxExport(plano.faixa),
-        [VE.seqW, VE.seqH], { nome });
+        [VE.seqW, VE.seqH], { nome, blocos: !!window.__teBlocos });
       return plano.dur;
     },
   };
@@ -401,6 +401,7 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
     previa = {k: _img(pg.evaluate("t => __te.quadro(t)", k / fps)) for k in amostra}
     t_prev = time.time() - t0
     arq_nome = f"teste_{nome}_{int(time.time())}"
+    pg.evaluate("b => { window.__teBlocos = b; }", os.environ.get("TESTE_BLOCOS") == "1")
     pg.evaluate("([d, n]) => __te.exportar(d, n)", [saida, arq_nome])
     pg.wait_for_function("window.__teFim", timeout=900000)
     fim = pg.evaluate("window.__teFim")
@@ -486,6 +487,7 @@ def main():
     ap.add_argument("--porta", type=int, default=9333)
     ap.add_argument("--casos", default="")
     ap.add_argument("--4k", dest="k4", action="store_true")
+    ap.add_argument("--blocos", action="store_true", help="exportação por blocos (abra o app com CANIVETE_BLOCO_SEG=1 para vários blocos)")
     ap.add_argument("--sem-abrir", action="store_true", help="usa o app já aberto em modo agente na porta")
     ap.add_argument("--exe", default="", help="testar o exe gerado (ex.: dist/CaniveteDoPailer/CaniveteDoPailer.exe)")
     a = ap.parse_args()
@@ -498,6 +500,9 @@ def main():
                 os.remove(os.path.join(saida, f))
             except OSError:
                 pass
+    if a.blocos:
+        os.environ["TESTE_BLOCOS"] = "1"
+        os.environ.setdefault("CANIVETE_BLOCO_SEG", "1")   # o app aberto pelo teste herda: vários blocos por caso
     print("material...", flush=True)
     gerar_material(mat, a.k4)
     nomes = [n for n in (a.casos.split(",") if a.casos else list(CASOS) + ["autoframe"]) if n]
