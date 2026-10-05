@@ -232,3 +232,27 @@ subtração com a faixa contornada); logotipo = Playfair Bold em curvas, trackin
 alto removido com `definir_subs`); diagramação editorial (número de seção grande, grid, sumário); mockups 3D sobre fotos FLUX
 (mesa com luz lateral; areia com sombra de coqueiro para flat lay). Lições: criar a arte DENTRO da página antes de medir
 (`info` mede pela prancheta que contém o objeto); faixa mapeada ≤ meia volta; sombra de contato sempre.
+
+## 10. Troca de arquivos, ferramentas que faltavam e saída para telas (2026-10-04)
+**Troca com o mercado** (`Functions/vetor_saida.py`, `frontend/js/vetor-saida.js`):
+- `exportar_ai`: PDF compatível com o Illustrator (texto editável, sem marcas, CMYK ou RGB conforme o documento) com o `.aknv`
+  ANEXADO (`vetor_kanivete.aknv`); uma prancheta por arquivo (o Illustrator abre PDF de várias páginas pedindo a página;
+  `separadas:false` junta). O Vetor reabre `.ai/.pdf` próprios pelo anexo = fidelidade total (`aknv_anexado`).
+- `exportar_eps`: PDF da prancheta → Ghostscript `eps2write` (texto em curvas), Ghostscript baixado sob demanda.
+**Saída para telas**: `exportar_ativos` {pasta, alvo pranchetas|selecao|ids/nomes, formatos png@1x/2x/3x, jpg, webp, svg, pdf,
+margem, prefixo, fundo}; 1x = 1 pt → 1 px. Arquivo › Exportar ativos para telas (Alt+Shift+Ctrl+E).
+**Ferramentas novas**:
+- Pincéis (`vetor-pinceis.js`): `criar_pincel` arte|padrao|dispersao (escala, espaco, aleatorio, girar, colorir 'tom'),
+  `pincel` {ids, nome|null} VIVO (vkApBase: editar os pontos refaz), `expandir_pincel`, `pinceis`. Espessura do traço multiplica.
+- Marionete: `marionete` {pinos, destinos} (MLS rígido) em caminhos/grupos.
+- Grade de perspectiva (`vetor-perspectiva.js`): `grade_perspectiva` (1 ou 2 pontos, câmera pinhole; no canto 1 mm = 1 mm),
+  `perspectiva_colocar` {plano esquerdo|direito|chao, u, v, escala}, `perspectiva_retangulo`, `perspectiva_caixa`. Grade na tela
+  (azul/laranja/verde). Exibir › Grade de perspectiva; Objeto › Perspectiva: colocar no plano.
+- 3D: `chanfro` (mm) no extrudar_3d (rampa iluminada; recuo por normal média — cantos côncavos aproximados).
+- Tipografia: `desvio_texto` (Contorno de texto: objetos acima afastam o texto de área; a linha usa todos os vãos, esquerda →
+  direita), `colunas` {n, medianiz} (caixas encadeadas), fontes variáveis (`eixos: {wght, wdth, opsz...}`, `peso`,
+  `fonte_eixos`, Texto › Fonte variável…; no PDF com texto editável a fonte variável sai em curvas, fiel). Ferramenta
+  Largura já existia (Shift+W).
+- Produção (`vetor-producao.js`): `faca_caixa` (abas invertidas: CutContour + Vinco em sobreimpressão na camada Faca,
+  devolve os painéis em mm), `pintura_dinamica` {pontos, cor} + ferramenta Pintura dinâmica (K).
+Ainda não: oclusão própria no girar 3D (perfil que se esconde atrás de si), marionete interativa com pinos na tela.

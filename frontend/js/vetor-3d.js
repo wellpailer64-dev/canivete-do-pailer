@@ -186,8 +186,9 @@ function vk3dMapaGirar(o3, m, P, cena, sp, silh) {
 function vk3dExtrudar(o3) {
     const f = o3.fonte, b = vkBox(f), cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2, esc = Math.max(b[2] - b[0], b[3] - b[1]) || 1;
     const d = o3.profundidade ?? esc * 0.25, cena = vk3dCena(o3, cx, cy, esc), z0 = d / 2, z1 = -d / 2;
+    const bd = Math.min(o3.chanfro || 0, d * 0.45, esc * 0.2), zs = z0 - bd;   // chanfro: a face recua bd e uma rampa liga à lateral
     const P3 = (x, y, z) => cena.R([x - cx, y - cy, z]);
-    const lados = [];
+    const lados = [], recuadas = [];
     for (const s of f.subs) {
         if (!s.fechado || s.pts.length < 2) continue;
         let area = 0; for (let i = 0; i < s.pts.length; i++) { const p = s.pts[i], q = s.pts[(i + 1) % s.pts.length]; area += p[0] * q[1] - q[0] * p[1]; }
@@ -195,16 +196,38 @@ function vk3dExtrudar(o3) {
         for (const seg of vk3dPerfil(s, esc / 60, false)) for (let k = 0; k < seg.length - 1; k++) {
             const a = seg[k].p, c = seg[k + 1].p, dx = c[0] - a[0], dy = c[1] - a[1], n0 = Math.hypot(dx, dy); if (n0 < 1e-6) continue;
             const n = cena.R([sg * -dy / n0, sg * dx / n0, 0]); if (n[2] <= 1e-4) continue;   // face de costas
-            const q = [P3(a[0], a[1], z0), P3(c[0], c[1], z0), P3(c[0], c[1], z1), P3(a[0], a[1], z1)];
+            const q = [P3(a[0], a[1], zs), P3(c[0], c[1], zs), P3(c[0], c[1], z1), P3(a[0], a[1], z1)];
             const lz_ = cena.luz(n), cor = vk3dTom(o3.cor_lado || o3.cor, lz_, 1.1), pp = q.map(cena.proj), longo = n0 > esc * 0.08;
             lados.push({ z: q.reduce((s_, v) => s_ + v[2], 0) / 4, o: { id: vkId(), tipo: 'caminho', regra: 'nonzero', subs: [{ fechado: true, pts: pp.map(p => [p[0], p[1], p[0], p[1], p[0], p[1]]) }],
                 preench: longo ? vk3dDegFace(o3.cor_lado || o3.cor, lz_, pp) : cor, traco: longo ? null : { cor, larg: 0.25, cap: 'butt', junc: 'round', miter: 4, tracejado: [], fase: 0 }, nome: '3D lado' }, seg: [a, c], n2: [sg * -dy / n0, sg * dx / n0] });
         }
     }
+    if (bd > 0) for (const s of f.subs) {   // rampas do chanfro (polígono recuado por normal média de vértice)
+        if (!s.fechado || s.pts.length < 2) continue;
+        let area = 0; for (let i = 0; i < s.pts.length; i++) { const p = s.pts[i], q = s.pts[(i + 1) % s.pts.length]; area += p[0] * q[1] - q[0] * p[1]; }
+        const sg = area > 0 ? -1 : 1, pl = [];
+        for (const seg of vk3dPerfil(s, esc / 60, false)) for (const q of seg) { const l = pl.at(-1); if (!l || Math.hypot(q.p[0] - l[0], q.p[1] - l[1]) > 1e-4) pl.push(q.p); }
+        if (pl.length > 2 && Math.hypot(pl[0][0] - pl.at(-1)[0], pl[0][1] - pl.at(-1)[1]) < 1e-4) pl.pop();
+        const N = pl.length, nrm = i => { const a = pl[i], c = pl[(i + 1) % N], dx = c[0] - a[0], dy = c[1] - a[1], n0 = Math.hypot(dx, dy) || 1; return [sg * -dy / n0, sg * dx / n0]; };
+        const den = pl.map((p, i) => { const n1 = nrm((i - 1 + N) % N), n2 = nrm(i); let m = [n1[0] + n2[0], n1[1] + n2[1]]; const l = Math.hypot(...m) || 1; m = [m[0] / l, m[1] / l];
+            const k = 1 / Math.max(0.5, m[0] * n2[0] + m[1] * n2[1]); return [p[0] - m[0] * bd * k, p[1] - m[1] * bd * k]; });
+        recuadas.push(den);
+        for (let i = 0; i < N; i++) {
+            const a = pl[i], c = pl[(i + 1) % N], ia = den[i], ic = den[(i + 1) % N], n2 = nrm(i);
+            const e1 = [c[0] - a[0], c[1] - a[1], 0], e2 = [ia[0] - a[0], ia[1] - a[1], bd];
+            let n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]; const nl = Math.hypot(...n) || 1; n = n.map(v => v / nl);
+            if (n[0] * n2[0] + n[1] * n2[1] + n[2] < 0) n = n.map(v => -v);
+            const nr = cena.R(n); if (nr[2] <= 1e-4) continue;
+            const q = [P3(a[0], a[1], zs), P3(c[0], c[1], zs), P3(ic[0], ic[1], z0), P3(ia[0], ia[1], z0)], pp = q.map(cena.proj), cor = vk3dTom(o3.cor, cena.luz(nr), 1.05);
+            lados.push({ z: q.reduce((s_, v) => s_ + v[2], 0) / 4 + 1e-3, o: { id: vkId(), tipo: 'caminho', regra: 'nonzero', nome: '3D chanfro', subs: [{ fechado: true, pts: pp.map(p => [p[0], p[1], p[0], p[1], p[0], p[1]]) }],
+                preench: cor, traco: { cor, larg: 0.25, cap: 'butt', junc: 'round', miter: 4, tracejado: [], fase: 0 } }, seg: [a, c], n2 });
+        }
+    }
     lados.sort((p, q) => p.z - q.z);
     const nf = cena.R([0, 0, 1]), frenteVis = nf[2] >= 0, zf = frenteVis ? z0 : z1, nn = frenteVis ? nf : nf.map(x => -x);
     const mapa = (x, y) => cena.proj(P3(x, y, zf));
-    const face = { ...vkClone(f), id: vkId(), nome: '3D face', subs: f.subs.map(s => ({ fechado: s.fechado, pts: vkSubdividir(s, cena.persp ? 4 : 1).pts.map(q => [...mapa(q[0], q[1]), ...mapa(q[2], q[3]), ...mapa(q[4], q[5])]) })),
+    const face = { ...vkClone(f), id: vkId(), nome: '3D face', subs: bd > 0 && frenteVis ? recuadas.map(r => ({ fechado: true, pts: r.map(q => { const m = mapa(q[0], q[1]); return [m[0], m[1], m[0], m[1], m[0], m[1]]; }) }))
+        : f.subs.map(s => ({ fechado: s.fechado, pts: vkSubdividir(s, cena.persp ? 4 : 1).pts.map(q => [...mapa(q[0], q[1]), ...mapa(q[2], q[3]), ...mapa(q[4], q[5])]) })),
         preench: null, traco: null, efeitos: undefined, aparencia: undefined };
     face.preench = vk3dDegFace(o3.cor, cena.luz(nn), face.subs.flatMap(s_ => s_.pts));
     const itens = [];
@@ -260,12 +283,13 @@ function vk3dMapaExtrudar(o3, m, g) {   // face 'frente' (padrão) ou lateral: '
 function vk3dRefazer(g) {   // recalcula os itens do grupo 3D a partir de o.tres_d
     const o3 = g.tres_d; g.itens = o3.tipo === 'girar' ? vk3dGirar(o3) : vk3dExtrudar(o3); VK.malhaCache && VK.malhaCache.clear(); return g;
 }
-const VK_3D_PARAMS = ['volume', 'inclinar', 'girar', 'rolar', 'perspectiva', 'material', 'luz', 'luz_ang', 'luz_alt', 'colunas', 'sombra_chao', 'grao', 'eixo'];
+const VK_3D_PARAMS = ['chanfro', 'volume', 'inclinar', 'girar', 'rolar', 'perspectiva', 'material', 'luz', 'luz_ang', 'luz_alt', 'colunas', 'sombra_chao', 'grao', 'eixo'];
 (() => {
     const ler = (o3, a) => {
         for (const k of VK_3D_PARAMS) if (a[k] !== undefined) o3[k] = a[k];
         if (a.cor !== undefined) o3.cor = vkCorDe(a.cor); if (a.cor_lado !== undefined) o3.cor_lado = a.cor_lado ? vkCorDe(a.cor_lado) : null;
         if (a.profundidade !== undefined) o3.profundidade = a.un === 'pt' ? +a.profundidade : vkPT(+a.profundidade);
+        if (a.chanfro !== undefined) o3.chanfro = a.un === 'pt' ? +a.chanfro : vkPT(+a.chanfro);
     };
     const criar = (tipo, a) => {
         const f = vkTxAlvos(a).find(o => o.tipo === 'caminho'); if (!f) throw new Error(`${tipo === 'girar' ? 'girar_3d' : 'extrudar_3d'}: escolha um caminho (perfil ou forma)`);

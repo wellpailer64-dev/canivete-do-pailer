@@ -30,6 +30,7 @@ function vkTxArgs(a, trecho) {
     if (a.tamanho || a.tam) car.tam = +(a.tamanho || a.tam);
     if (a.track != null) car.track = +a.track;
     for (const [api, k] of [['desl', 'desl'], ['deslocamento_base', 'desl'], ['escala_h', 'eh'], ['eh', 'eh'], ['escala_v', 'ev'], ['ev', 'ev'], ['rot', 'rot'], ['girar_letra', 'rot']]) if (a[api] != null) car[k] = +a[api];
+    if (a.eixos) car.eixos = { ...a.eixos }; if (a.peso != null) car.eixos = { ...(car.eixos || {}), wght: +a.peso }; if (a.largura_fonte != null) car.eixos = { ...(car.eixos || {}), wdth: +a.largura_fonte };
     if (a.maius !== undefined) car.maius = ['alta', 'versalete'].includes(a.maius) ? a.maius : '';
     if (a.caixa_alta != null) car.maius = a.caixa_alta ? 'alta' : '';
     if (a.versalete != null) car.maius = a.versalete ? 'versalete' : '';
@@ -614,4 +615,52 @@ vkTextoFim = function () {
         if (a.cor != null) args.preench = a.cor;
         delete args.ids; vkTxAplicar(o, args); return { id: o.id, faixa: faixa || args.trecho || 'tudo' };
     });
+})();
+
+// Contorno de texto (Objeto › Contorno de texto), colunas (Opções de texto de área) e eixos de fonte variável
+(() => {
+    // desvio_texto: os objetos escolhidos afastam o texto de área que está ABAIXO deles; distancia (mm, padrão 3); ativo false tira
+    vkRegistrar('desvio_texto', 'contorno de texto', a => {
+        const objs = vkTxAlvos(a); if (!objs.length) throw new Error('desvio_texto: escolha os objetos que o texto deve contornar');
+        for (const o of objs) { if (a.ativo === false) delete o.desvio_texto; else o.desvio_texto = { dist: a.un === 'pt' ? +(a.distancia ?? 8.5) : vkPT(+(a.distancia ?? 3)) }; }
+        VK._dv = null; return { objetos: objs.length, ativo: a.ativo !== false };
+    });
+    // colunas: texto de área → n colunas encadeadas (medianiz mm, padrão 5) na mesma largura total
+    vkRegistrar('colunas', 'colunas de texto', async a => {
+        const o = vkTxAlvos(a).find(x => x.tipo === 'texto'); if (!o || !o.caixa) throw new Error('colunas: escolha uma caixa de texto de área');
+        const n = Math.max(2, Math.min(8, +(a.n || a.colunas || 2))), g = a.un === 'pt' ? +(a.medianiz ?? 14) : vkPT(+(a.medianiz ?? 5)), e = vkEsc(o.m) || 1;
+        if (!o.caixa_alt) { const geo = await vkGeoPronta(o); o.caixa_alt = Math.max(o.tam * 3, (geo ? geo.alt : o.tam * 5) / n * 1.15); }
+        const w = (o.caixa - (n - 1) * g / e) / n; if (w < o.tam * 3) throw new Error('colunas: estreitas demais para esse corpo');
+        o.caixa = w; let ult = o;
+        for (let i = 1; i < n; i++) {
+            const [x, y] = vkAp(o.m, i * (w + g / e), 0);
+            await VK_CMDS.encadear.fn({ ids: [ult.id], nova: { x, y }, un: 'pt' });
+            ult = vkTxCorrente(o).at(-1);
+        }
+        return { colunas: n, ids: vkTxCorrente(o).map(x => x.id) };
+    });
+    // fonte_eixos: eixos da fonte variável do texto (ids/nomes ou seleção) ou de fonte/estilo → {eixos: [{tag, nome, min, padrao, max}], instancias}
+    vkRegistrar('fonte_eixos', 'eixos da fonte', async a => {
+        if (a.fonte) { const [f, e] = vkFonteNorm(a.fonte, a.estilo); return await vkApi().vk_fonte_eixos(f, e || a.estilo || 'Regular'); }
+        const o = vkTxAlvos(a).find(x => x.tipo === 'texto'); if (!o) throw new Error('fonte_eixos: escolha um texto ou passe fonte');
+        const r = vkTxRaiz(o); return await vkApi().vk_fonte_eixos(r.fam, r.estilo);
+    }, true);
+})();
+async function vkEixosDialogo() {
+    const o = VK.sel.map(vkObj).find(x => x && x.tipo === 'texto'); if (!o) return vkToast('Selecione um texto');
+    const r = vkTxRaiz(o), info = await vkApi().vk_fonte_eixos(r.fam, r.estilo);
+    if (!info.eixos.length) return vkToast(`${r.fam} não é uma fonte variável`);
+    const at = r.eixos || {};
+    vkModal(`<div class="ie-dlg-tit">Fonte variável — ${vkEsc_(r.fam)}</div><div class="ie-dlg-corpo">${info.eixos.map(e => `<label class="vk-nota" style="display:flex;gap:8px;align-items:center">${vkEsc_(e.nome)}
+        <input type="range" data-ax="${e.tag}" min="${e.min}" max="${e.max}" step="1" value="${at[e.tag] ?? e.padrao}" style="flex:1"><span>${at[e.tag] ?? e.padrao}</span></label>`).join('')}
+        ${info.instancias.length ? `<div class="vk-linha"><span>Instância</span><select id="vkx-inst"><option value="">—</option>${info.instancias.map((i, k) => `<option value="${k}">${vkEsc_(i.nome)}</option>`).join('')}</select></div>` : ''}
+        </div><div class="ie-dlg-rod"><button class="ie-btn" data-x>Fechar</button></div>`, m => {
+        const ap = () => vkCmdUi('alterar', vkTxComFaixa({ eixos: Object.fromEntries([...m.querySelectorAll('[data-ax]')].map(x => [x.dataset.ax, +x.value])) }));
+        m.querySelectorAll('[data-ax]').forEach(x => { x.oninput = () => { x.nextElementSibling.textContent = x.value; }; x.onchange = ap; });
+        const s = m.querySelector('#vkx-inst'); if (s) s.onchange = () => { const i = info.instancias[+s.value]; if (!i) return; m.querySelectorAll('[data-ax]').forEach(x => { if (i.eixos[x.dataset.ax] != null) { x.value = i.eixos[x.dataset.ax]; x.nextElementSibling.textContent = x.value; } }); ap(); };
+    });
+}
+(() => {
+    const t = VK_MENUS.find(x => x[0] === 'Texto'); if (t) t[1].push('-', ['Fonte variável (eixos)…', '', () => vkEixosDialogo()], ['Colunas: 2', '', () => vkCmdUi('colunas', { n: 2 })], ['Colunas: 3', '', () => vkCmdUi('colunas', { n: 3 })]);
+    const o = VK_MENUS.find(x => x[0] === 'Objeto'); if (o) o[1].push('-', ['Contorno de texto: criar (o texto abaixo desvia)', '', () => vkCmdUi('desvio_texto', { distancia: 3 })], ['Contorno de texto: soltar', '', () => vkCmdUi('desvio_texto', { ativo: false })]);
 })();

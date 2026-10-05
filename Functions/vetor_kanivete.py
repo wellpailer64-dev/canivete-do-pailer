@@ -176,7 +176,18 @@ def _fonte_instalada(fam, estilo="Regular"):
     return os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "arial.ttf"), 0, False
 
 
-def _fonte(arq, ind):
+def _fonte(arq, ind, eixos=None):
+    """eixos = {tag: valor} numa fonte variável (wght, wdth, opsz, slnt...): instância nomeada na hora (molde + desenho)."""
+    loc = {k: float(v) for k, v in eixos.items()} if isinstance(eixos, dict) and eixos else None
+    chave = (arq, ind, tuple(sorted(loc.items())) if loc else None)
+    if chave in _FONTES: return _FONTES[chave]
+    if loc:
+        base = _fonte(arq, ind)
+        if "fvar" not in base["tt"]: return base   # fonte estática: ignora os eixos
+        import uharfbuzz as hb
+        font = hb.Font(base["hb"].face); font.scale = (base["upem"], base["upem"]); font.set_variations(loc)
+        _FONTES[chave] = dict(base, hb=font, gs=base["tt"].getGlyphSet(location=loc), loc=loc)
+        return _FONTES[chave]
     if (arq, ind) not in _FONTES:
         import uharfbuzz as hb
         from fontTools.ttLib import TTFont
@@ -190,7 +201,7 @@ def _fonte(arq, ind):
         asc = (os2.sTypoAscender if os2 is not None and os2.sTypoAscender else hhea.ascent)
         desc = (os2.sTypoDescender if os2 is not None and os2.sTypoDescender else hhea.descent)
         cap = getattr(os2, "sCapHeight", 0) if os2 is not None else 0
-        _FONTES[(arq, ind)] = {"tt": tt, "hb": font, "upem": upem, "gs": tt.getGlyphSet(), "ordem": tt.getGlyphOrder(),
+        _FONTES[(arq, ind, None)] = _FONTES[(arq, ind)] = {"tt": tt, "hb": font, "upem": upem, "gs": tt.getGlyphSet(), "ordem": tt.getGlyphOrder(),
                                "asc": asc, "desc": desc, "cap": cap or asc * 0.7}
     return _FONTES[(arq, ind)]
 
@@ -266,7 +277,7 @@ def _moldar(F, texto, track_em, feats=None):
 
 
 # atributos de CARACTERE (objeto = base; trechos = [{ini, fim, ...}] por cima, o último vence) e de PARÁGRAFO (objeto)
-_CAR = ("fam", "estilo", "tam", "track", "desl", "eh", "ev", "rot", "maius", "pos", "liga", "frac", "num", "preench", "traco")
+_CAR = ("fam", "estilo", "tam", "track", "desl", "eh", "ev", "rot", "eixos", "maius", "pos", "liga", "frac", "num", "preench", "traco")
 _PAR = ("recuo_esq", "recuo_dir", "recuo_1a", "antes", "depois")
 _HIFEN = {}
 
@@ -313,7 +324,7 @@ def _glifos(texto, ini, fim, p, falta):
         falta.add(f"{p['fam']} {p['estilo']}")
     elif achou == "embutida":
         falta.add("~embutida")
-    F = _fonte(arq, ind)
+    F = _fonte(arq, ind, p.get("eixos"))
     tam = float(p["tam"]); desl = float(p.get("desl") or 0)
     if p.get("pos") == "sup": desl += tam * 0.333; tam *= 0.583
     elif p.get("pos") == "sub": desl -= tam * 0.333; tam *= 0.583
@@ -522,6 +533,10 @@ def texto_geometria(spec):
     par = {k: float(spec.get(k) or 0) for k in _PAR}
     trilha = spec.get("trilha") if isinstance(spec.get("trilha"), dict) else None
     polis = _poligonos(spec.get("forma")) if spec.get("forma") and caixa else None   # área de texto em forma
+    obst = [(_poligonos(d["subs"]), float(d.get("dist") or 0)) for d in (spec.get("desvios") or [])] if caixa and caixa_alt and not polis else []
+    obst = [(p, d) for p, d in obst if p]
+    if obst:   # contorno de texto: a caixa vira "forma" retangular e os obstáculos abrem vãos
+        polis = [[(0.0, 0.0), (caixa, 0.0), (caixa, caixa_alt), (0.0, caixa_alt)]]
     recuo_f = float(spec.get("forma_recuo") or 0)
     hif = spec.get("hifen")   # True | "pt_BR" | "en_US"...: hifeniza palavras de 6+ letras na quebra (como o Illustrator)
     hif = _hifenizador("pt_BR" if hif is True else str(hif)) if hif and caixa else None
@@ -564,11 +579,20 @@ def texto_geometria(spec):
         linhas = []   # (glifos, última do parágrafo, primeira do parágrafo, 1º caractere, (y, x0, largura) na forma | None)
         lead_f, yf, alto_f, esgotou = (lead_fixo or 1.2 * tam0), None, max((p[1] for P in (polis or []) for p in P), default=0), False
 
+        pend = []   # contorno de texto: vãos que sobraram na mesma linha (o texto passa do lado esquerdo para o direito)
+
         def linha_forma(primeira):   # próxima linha de base que cabe na forma → (y, x0, largura) | None (acabou a forma)
-            nonlocal yf
+            nonlocal yf, pend
+            if pend and not primeira:
+                v = pend.pop(0); return (yf, v[0], v[1] - v[0])
+            pend = []
             yf = (min((p[1] for P in polis for p in P), default=0) + recuo_f + asc0) if yf is None else yf + lead_f + ((par["depois"] + par["antes"]) if primeira else 0)
             while yf + desc0 <= alto_f - recuo_f + 0.01:
-                v = _vao_forma(polis, yf, asc0, desc0, recuo_f, tam0 * 2)
+                if obst:
+                    vs = _vao_desvio(0.0, caixa, obst, yf, asc0, desc0, tam0 * 2)
+                    if vs: pend = vs[1:]; v = vs[0]
+                    else: v = None
+                else: v = _vao_forma(polis, yf, asc0, desc0, recuo_f, tam0 * 2)
                 if v and v[1] - v[0] >= tam0 * 2:
                     return (yf, v[0], v[1] - v[0])
                 yf += lead_f / 2
@@ -678,6 +702,32 @@ def texto_geometria(spec):
         _GEO.clear()
     _GEO[chave] = r
     return r
+
+
+def fonte_eixos(fam, estilo="Regular"):
+    """Eixos de uma fonte variável → [{tag, nome, min, padrao, max}] (vazio = fonte estática) + instâncias nomeadas."""
+    arq, ind, achou = fonte_arquivo(fam, estilo)
+    tt = _fonte(arq, ind)["tt"]
+    if "fvar" not in tt: return {"eixos": [], "instancias": [], "achou": bool(achou)}
+    nome = lambda i: (tt["name"].getDebugName(i) or "") if "name" in tt else ""
+    fv = tt["fvar"]
+    return {"achou": bool(achou), "eixos": [{"tag": a.axisTag, "nome": nome(a.axisNameID) or a.axisTag, "min": a.minValue, "padrao": a.defaultValue, "max": a.maxValue} for a in fv.axes],
+            "instancias": [{"nome": nome(i.subfamilyNameID), "eixos": dict(i.coordinates)} for i in fv.instances]}
+
+
+def _vao_desvio(cx0, cx1, obst, y, asc, desc, minimo):
+    """Contorno de texto: trecho mais largo livre entre cx0..cx1 na linha de base y, tirando os obstáculos [(polígonos, distância)]."""
+    livres = [(cx0, cx1)]
+    for polis, d in obst:
+        for yy in (y - asc * 0.9, y - asc * 0.45, y, y + desc * 0.8):
+            for a, b in [iv for yv in (yy - d, yy, yy + d) for iv in _intervalos(polis, yv)]:
+                a -= d; b += d; nov = []
+                for x0, x1 in livres:
+                    if b <= x0 or a >= x1: nov.append((x0, x1)); continue
+                    if a > x0: nov.append((x0, a))
+                    if b < x1: nov.append((b, x1))
+                livres = nov
+    return sorted(v for v in livres if v[1] - v[0] >= minimo)   # todos os vãos da linha, da esquerda para a direita
 
 
 def fonte_glifos(fam, estilo="Regular", limite=4000):

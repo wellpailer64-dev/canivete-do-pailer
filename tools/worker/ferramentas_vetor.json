@@ -1217,5 +1217,289 @@
 ]
 }
 }
+},
+{
+"type": "function",
+"function": {
+"name": "faca_caixa",
+"description": "Cria a faca (corte e vinco) de uma caixa de abas invertidas; devolve os painéis em mm.",
+"parameters": {
+"type": "object",
+"properties": {
+"larg": {
+"type": "number"
+},
+"alt": {
+"type": "number"
+},
+"prof": {
+"type": "number"
+},
+"x": {
+"type": "number"
+},
+"y": {
+"type": "number"
+}
+},
+"required": [
+"larg",
+"alt",
+"prof"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "grade_perspectiva",
+"description": "Liga a grade de perspectiva de 2 pontos.",
+"parameters": {
+"type": "object",
+"properties": {
+"horizonte": {
+"type": "number",
+"description": "mm do topo"
+},
+"pf1": {
+"type": "number"
+},
+"pf2": {
+"type": "number"
+},
+"solo": {
+"type": "number"
+}
+},
+"required": []
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "perspectiva_caixa",
+"description": "Desenha um bloco/caixa na grade de perspectiva.",
+"parameters": {
+"type": "object",
+"properties": {
+"u": {
+"type": "number"
+},
+"w": {
+"type": "number"
+},
+"larg": {
+"type": "number"
+},
+"prof": {
+"type": "number"
+},
+"alt": {
+"type": "number"
+},
+"cor": {
+"type": "string"
+},
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"larg",
+"prof",
+"alt"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "perspectiva_colocar",
+"description": "Coloca objetos num plano da grade de perspectiva.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+}
+},
+"plano": {
+"type": "string",
+"enum": [
+"esquerdo",
+"direito",
+"chao"
+]
+},
+"u": {
+"type": "number"
+},
+"v": {
+"type": "number"
+},
+"escala": {
+"type": "number"
+}
+},
+"required": [
+"objetos",
+"plano"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "criar_pincel",
+"description": "Transforma objetos em pincel (arte, padrao ou dispersao).",
+"parameters": {
+"type": "object",
+"properties": {
+"arte": {
+"type": "array",
+"items": {
+"type": "string"
+}
+},
+"tipo": {
+"type": "string",
+"enum": [
+"arte",
+"padrao",
+"dispersao"
+]
+},
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"arte",
+"tipo",
+"nome"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "pincel",
+"description": "Aplica um pincel a caminhos.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+}
+},
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"objetos",
+"nome"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "desvio_texto",
+"description": "Faz o texto de área abaixo contornar estes objetos.",
+"parameters": {
+"type": "object",
+"properties": {
+"objetos": {
+"type": "array",
+"items": {
+"type": "string"
+}
+},
+"distancia": {
+"type": "number",
+"description": "mm"
+}
+},
+"required": [
+"objetos"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "colunas",
+"description": "Divide uma caixa de texto em colunas encadeadas.",
+"parameters": {
+"type": "object",
+"properties": {
+"objeto": {
+"type": "string"
+},
+"n": {
+"type": "integer"
+},
+"medianiz": {
+"type": "number"
+}
+},
+"required": [
+"objeto",
+"n"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "exportar_ai",
+"description": "Salva como .ai (um arquivo por prancheta).",
+"parameters": {
+"type": "object",
+"properties": {
+"nome": {
+"type": "string"
+}
+},
+"required": [
+"nome"
+]
+}
+}
+},
+{
+"type": "function",
+"function": {
+"name": "exportar_ativos",
+"description": "Exporta pranchetas em PNG/SVG/WebP em vários tamanhos.",
+"parameters": {
+"type": "object",
+"properties": {
+"formatos": {
+"type": "array",
+"items": {
+"type": "string"
+},
+"description": "ex. png@1x, png@2x, svg"
+}
+},
+"required": [
+"formatos"
+]
+}
+}
 }
 ]

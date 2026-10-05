@@ -3199,6 +3199,10 @@ class ApiBridge:
             import traceback
             return {"success": False, "error": str(e), "trace": traceback.format_exc()[-1200:]}
 
+    def vk_fonte_eixos(self, fam, estilo="Regular"):
+        from Functions import vetor_kanivete
+        return vetor_kanivete.fonte_eixos(fam, estilo)
+
     def vk_abrir(self, path):
         from Functions import vetor_kanivete
         try:

@@ -112,7 +112,7 @@ class _Escritor:
         import pikepdf
         k = id(F)
         if k not in self._fontes:
-            arq, ind = next(key for key, v in vk._FONTES.items() if v is F)
+            arq, ind = next(key[:2] for key, v in vk._FONTES.items() if v is F)
             nome = f"F{len(self._fontes) + 1}"
             obj = self.pdf.make_indirect(pikepdf.Dictionary(Type=pikepdf.Name.Font, Subtype=pikepdf.Name.Type0, Encoding=pikepdf.Name("/Identity-H")))
             self._fontes[k] = {"nome": nome, "obj": obj, "arq": arq, "ind": ind, "F": F, "gids": {}}
@@ -126,6 +126,7 @@ class _Escritor:
         spec = dict(_spec_texto(o), com_glifos=True)
         geo = vk.texto_geometria(spec)
         if not geo.get("glifos"): return None
+        if any(g["F"].get("loc") for g in geo["glifos"]): return None   # fonte variável fora do padrão: vai em curvas (fiel)
         if any((g["cor"][1] is not None) or (g["cor"][0] and g["cor"][0].get("k") in ("grad", "pad")) for g in geo["glifos"]): return None
         if not geo["achou"]: self.avisos.add(f"fonte '{o.get('fam')}' não instalada: saiu em Arial")
         texto = str(spec.get("conteudo") or "")

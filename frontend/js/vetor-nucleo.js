@@ -275,7 +275,7 @@ function vkCorDe(s) {   // texto → cor: "#ff0000", "cmyk(0,100,100,0)", "C0 M1
 // ─────────────────────────── texto (geometria do Python) ───────────────────────────
 // campos que mudam a geometria (o spec do Python); estilos já vêm gravados no objeto, encadeamento e trilha em vkTxSpec
 const VK_TX_CAMPOS = ['conteudo', 'fam', 'estilo', 'tam', 'entrelinha', 'track', 'alin', 'caixa', 'caixa_alt', 'desl', 'eh', 'ev', 'maius', 'pos', 'liga', 'frac', 'num',
-    'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois', 'hifen', 'tabs', 'trechos', 'trilha', 'forma', 'forma_recuo'];
+    'recuo_esq', 'recuo_dir', 'recuo_1a', 'antes', 'depois', 'hifen', 'tabs', 'trechos', 'trilha', 'forma', 'forma_recuo', 'eixos'];
 const VK_TX_CAIXA = new Set(['caixa', 'caixa_alt', 'trilha', 'forma', 'forma_recuo']);   // da própria caixa; o resto vem do texto-raiz (encadeado)
 function vkTxFonte(o, n = 0) {   // texto encadeado: {raiz, ini} — de onde vem o conteúdo desta caixa (null = a anterior ainda calculando)
     const p = o.anterior && vkObj(o.anterior);
@@ -300,7 +300,21 @@ function vkTxSpec(o) {
         if (o.trilha) s.trilha = { ...o.trilha, subs: loc };
         if (o.forma) { s.forma = loc; const b = vkSubsBox(loc); s.caixa = Math.max(1, b[2] - b[0]); s.caixa_alt = Math.max(1, b[3] - b[1]); }
     }
+    if (o.caixa && o.caixa_alt && !o.forma && !o.trilha) { const d = vkTxDesvios(o); if (d.length) s.desvios = d; }
     return s;
+}
+function vkTxDesvios(o) {   // contorno de texto: objetos ACIMA do texto com desvio_texto que tocam a caixa → polígonos locais + distância
+    if (!VK._dv || VK._dv.v !== VK.versaoDoc || VK._dv.doc !== VK.doc) { const t = vkTodos().map(x => x.o); VK._dv = { v: VK.versaoDoc, doc: VK.doc, t, obs: t.filter(x => x.desvio_texto && x.visivel !== false) }; }
+    if (!VK._dv.obs.length) return [];
+    const i0 = VK._dv.t.indexOf(o), iv = vkInv(o.m), e = vkEsc(o.m) || 1, r4 = v => Math.round(v * 1e4) / 1e4, out = [];
+    const cx = [[0, 0], [o.caixa, 0], [o.caixa, o.caixa_alt], [0, o.caixa_alt]].map(([x, y]) => vkAp(o.m, x, y)), bt = [Infinity, Infinity, -Infinity, -Infinity]; cx.forEach(p => vkBoxAdd(bt, p[0], p[1]));
+    for (const x of VK._dv.obs) {
+        if (VK._dv.t.indexOf(x) < i0 || x === o) continue;
+        const b = vkBox(x), d = x.desvio_texto.dist ?? vkPT(3); if (b[2] + d < bt[0] || b[0] - d > bt[2] || b[3] + d < bt[1] || b[1] - d > bt[3]) continue;
+        const subs = x.tipo === 'caminho' && x.subs.some(s => s.fechado) ? x.subs.filter(s => s.fechado) : vkRetSubs(b[0], b[1], b[2] - b[0], b[3] - b[1]);
+        out.push({ subs: subs.map(s => ({ fechado: true, pts: s.pts.map(p => [...vkAp(iv, p[0], p[1]), ...vkAp(iv, p[2], p[3]), ...vkAp(iv, p[4], p[5])].map(r4)) })), dist: r4(d / e) });
+    }
+    return out;
 }
 function vkGeoChave(o) { const s = vkTxSpec(o); return s ? JSON.stringify(s) : null; }
 function vkGeo(o) {   // a mesma geometria do PDF (HarfBuzz + fontTools no Python): o que se vê é o que imprime
@@ -353,7 +367,7 @@ function vkDesenharObj(ctx, o, cam) {
     ctx.save();
     if (o.op != null && o.op < 1) ctx.globalAlpha *= o.op;
     if (o.bm && VK_BM[o.bm] && !VK.contorno) ctx.globalCompositeOperation = VK_BM[o.bm];
-    if ((o.efeitos || o.aparencia || (o.traco && (o.traco.perfil || o.traco.seta_ini || o.traco.seta_fim))) && typeof vkApDesenhar === 'function' && vkApDesenhar(ctx, o)) { ctx.restore(); return; }   // Aparência/efeitos (vetor-aparencia.js)
+    if ((o.efeitos || o.aparencia || o.pincel || (o.traco && (o.traco.perfil || o.traco.seta_ini || o.traco.seta_fim))) && typeof vkApDesenhar === 'function' && vkApDesenhar(ctx, o)) { ctx.restore(); return; }   // Aparência/efeitos (vetor-aparencia.js)
     if (o.tipo === 'grupo' && o.opmask && !VK.contorno && typeof vkOpMaskDesenhar === 'function' && vkOpMaskDesenhar(ctx, o, cam)) { ctx.restore(); return; }
     if (o.tipo === 'grupo') {
         if (o.clip && o.itens.length) { ctx.clip(vkPath2d(o.itens[0].subs), o.itens[0].regra === 'evenodd' ? 'evenodd' : 'nonzero'); o.itens.slice(1).forEach(f => vkDesenharObj(ctx, f, cam)); }
