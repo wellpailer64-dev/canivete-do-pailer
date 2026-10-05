@@ -23,7 +23,15 @@ TRANS_VIDEO = {'AE.AE_Impact_Pop': 'pop', 'AE.ADBE Cross Dissolve New': 'dissolv
                'ADBE Cross Dissolve New': 'dissolve'}
 # efeitos que viram propriedades do clipe (o resto entra no relatório)
 EFEITOS_LIDOS = {'AE.ADBE Motion', 'AE.ADBE Opacity', 'AE.ADBE MPEG.SourceSettings', 'AE.ADBE Ultra Key',
-                 'AE.Impact_Blur_FX', 'AE.ADBE Gaussian Blur 2', 'AE.ADBE Text', 'AE.ADBE Capsule'}
+                 'AE.Impact_Blur_FX', 'AE.ADBE Gaussian Blur 2', 'AE.ADBE Text', 'AE.ADBE Capsule',
+                 'AE.ADBE Lumetri'}
+# Lumetri Color → Luz e Cor (efeito 'lc' do editor, mesmas escalas): (seção, nome do Param) → chave. A seção é o
+# último Param booleano com nome antes dele (os nomes se repetem: Saturation em Color e em Adjustments).
+LUMETRI_LC = {('Color', 'Temperature'): 'temp', ('Color', 'Tint'): 'tint', ('Color', 'Saturation'): 'sat',
+              ('Light', 'Exposure'): 'exp', ('Light', 'Contrast'): 'ct', ('Light', 'Highlights'): 'hi',
+              ('Light', 'Shadows'): 'sh', ('Light', 'Whites'): 'wh', ('Light', 'Blacks'): 'bl',
+              ('Adjustments', 'Faded Film'): 'fade', ('Adjustments', 'Sharpen'): 'sharp',
+              ('Adjustments', 'Vibrance'): 'vib', ('Adjustments', 'Saturation'): 'sat2', ('Vignette', 'Amount'): 'vig'}
 EXT_SEM_PLAYER = {'.aegraphic', '.mogrt', '.aep'}   # Animation Composer / gráficos animados: o editor não toca
 
 
@@ -342,6 +350,80 @@ class _Conversor:
                     return t
         return None
 
+    def _estilo_texto(self, cti, W, H):
+        """Fonte, tamanho e posição do texto do Premiere (AE.ADBE Text). O Source Text é um FlatBuffers sem esquema
+        público: as fontes vêm pelo nome PostScript (Familia-Estilo) e o tamanho é o float logo depois de um 4.0
+        (visto em todos os textos do projeto "Respeite o seu voto"). Cor: não achada no blob (fica branca)."""
+        import base64, re, struct
+        chain = self.g.ref(cti.find('ComponentOwner/Components'))
+        if chain is None:
+            return {}
+        for comp in chain.findall('.//Components/Component'):
+            fx = self.g.ref(comp)
+            if fx is None or fx.findtext('.//MatchName') != 'AE.ADBE Text':
+                continue
+            out, vals = {}, {}
+            for i, pp in enumerate(fx.findall('.//Params/Param')):
+                pr = self.g.ref(pp)
+                if pr is None:
+                    continue
+                if i == 0:
+                    b = b''   # o blob fica em StartKeyframeValue ou, com quadros-chave, dentro de Keyframes
+                    for el in pr.iter():
+                        txt = (el.text or '').strip()
+                        if len(txt) > 40 and el.tag != 'Keyframes':
+                            try:
+                                b = base64.b64decode(txt + '==')
+                                break
+                            except Exception:
+                                pass
+                    nome_t = (fx.findtext('.//InstanceName') or '').strip()
+                    if b:
+                        self._blobs_texto = getattr(self, '_blobs_texto', None) or {}
+                        self._blobs_texto.setdefault(nome_t, b)
+                    else:   # cópia da sequência com o Source Text vazio: o estilo do mesmo texto noutra sequência
+                        b = self._blob_texto(nome_t)
+                    fontes = re.findall(rb'([A-Z][A-Za-z0-9]+)-([A-Za-z]+)\x00', b)
+                    if fontes:
+                        fam = re.sub(r'(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])', ' ', fontes[0][0].decode())
+                        out['fonte'] = fam
+                        out['neg'] = any(s.decode().lower() in ('semibold', 'bold', 'heavy', 'black', 'extrabold') for _, s in fontes)
+                        out['ita'] = any('italic' in s.decode().lower() for _, s in fontes)
+                    for j in range(0, len(b) - 7, 4):
+                        if struct.unpack_from('<f', b, j)[0] == 4.0:
+                            v = struct.unpack_from('<f', b, j + 4)[0]
+                            if 4 <= v <= 1000:
+                                out['tam'] = v
+                                break
+                elif pr.findtext('Name'):
+                    vals.setdefault(pr.findtext('Name'), _param_valor(pr))
+            esc = _num(vals.get('Scale'), 100) / 100
+            if 'tam' in out:
+                out['tam'] = round(out['tam'] * esc, 1)
+            pos = str(vals.get('Position') or '')
+            if ':' in pos:
+                a, b2 = pos.split(':')[:2]
+                out['x'], out['y'] = round(_num(a, .5) * W, 1), round(_num(b2, .5) * H, 1)
+            return out
+        return {}
+
+    def _blob_texto(self, nome):
+        import base64
+        if getattr(self, '_blobs_todos', None) is None:
+            self._blobs_todos = {}
+            for fx in self.g.raiz.iter() if hasattr(self.g, 'raiz') else []:
+                if fx.findtext('MatchName') != 'AE.ADBE Text':
+                    continue
+                pp = fx.findall('.//Params/Param')
+                pr = self.g.ref(pp[0]) if pp else None
+                txt = ((pr.findtext('StartKeyframeValue') if pr is not None else '') or '').strip()
+                if len(txt) > 40:
+                    try:
+                        self._blobs_todos.setdefault((fx.findtext('.//InstanceName') or '').strip(), base64.b64decode(txt + '=='))
+                    except Exception:
+                        pass
+        return self._blobs_todos.get(nome, b'')
+
     def _clipe_sintetico(self, cti, titulo, nome_sub, k, st, fim, W, H):
         """Camada de ajuste → mídia 'ajuste'; gráfico com texto → mídia 'texto' (só o texto; estilo padrão)."""
         dur = round(fim - st, 6)
@@ -359,9 +441,13 @@ class _Conversor:
             tx = {'t': texto, 'fonte': 'Arial', 'tam': 90, 'neg': True, 'ita': False, 'alin': 'center', 'esp': 0, 'ent': 120,
                   'cor': '#ffffff', 'cOn': False, 'cCor': '#000000', 'cLarg': 6, 'fOn': False, 'fCor': '#000000', 'fOp': 60,
                   'fPad': 24, 'fRaio': 12, 'sOn': True, 'sCor': '#000000', 'sOp': 60, 'sDist': 6, 'sBlur': 10, 'sAng': 135}
+            est = self._estilo_texto(cti, W, H)
+            for a in ('fonte', 'tam', 'neg', 'ita'):
+                if a in est:
+                    tx[a] = est[a]
             c = {'tr': k, 'st': round(st, 6), 's': 0, 'e': dur, '_m': m, 'tx': tx,
-                 'p': {'sc': 100, 'x': W / 2, 'y': H * 0.82, 'rot': 0, 'op': 100}}
-            self.rel['convertidos']['Texto (só o texto; fonte e estilo padrão do editor)'] += 1
+                 'p': {'sc': 100, 'x': est.get('x', W / 2), 'y': est.get('y', H * 0.82), 'rot': 0, 'op': 100}}
+            self.rel['convertidos']['Texto (fonte, tamanho e posição; cor branca)' if est else 'Texto (só o texto; fonte e estilo padrão do editor)'] += 1
             return c
         self.rel['ignorados'][f'Gráfico do Premiere sem texto ({titulo or "sem nome"})'] += 1
         return None
@@ -393,6 +479,32 @@ class _Conversor:
                     self.n_fx = getattr(self, 'n_fx', 0) + 1
                     fx_lista.append({'id': f'fpr{self.n_fx}', 't': 'blur', 'on': True, 'v': {'amt': round(min(100, amt), 1)}})
                     self.rel['convertidos']['Desfoque gaussiano'] += 1
+                continue
+            if mn == 'AE.ADBE Lumetri':
+                v, sec, anim = {}, '', False
+                for pp in fx.findall('.//Params/Param'):
+                    pr = self.g.ref(pp)
+                    if pr is None:
+                        continue
+                    nome, val = pr.findtext('Name'), _param_valor(pr)
+                    if str(val) in ('true', 'false') and nome and nome.strip():
+                        sec = nome
+                        continue
+                    ch = LUMETRI_LC.get((sec, nome))
+                    if ch:
+                        v[ch] = _num(val, 0)
+                        anim = anim or bool(_param_keyframes(pr))
+                v['sat'] = v.get('sat', 100) * v.pop('sat2', 100) / 100
+                if 'vig' in v:   # Premiere: -3 (escurece) a +3 (clareia); editor: 0 a 100, só escurece
+                    v['vig'] = max(0.0, min(100.0, -v['vig'] / 3 * 100))
+                padrao = {'sat': 100}
+                v = {a: round(b, 2) for a, b in v.items() if abs(b - padrao.get(a, 0)) > 1e-3}
+                if v:
+                    self.n_fx = getattr(self, 'n_fx', 0) + 1
+                    fx_lista.append({'id': f'fpr{self.n_fx}', 't': 'lc', 'on': True, 'v': v})
+                    self.rel['convertidos']['Lumetri Color → Luz e Cor'] += 1
+                    if anim:
+                        self.rel['ignorados']['Lumetri animado (vem o valor fixo)'] += 1
                 continue
             if mn == 'AE.ADBE Ultra Key':
                 if any(f['t'] == 'key' for f in fx_lista):

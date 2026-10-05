@@ -15,6 +15,19 @@ abrir para escrita o original em `D:\01 - ALL IN CLOUD - HD PAILER\11 - DOIS NEG
   **Falta** trocar pela nossa transição de sobreposição.
 - Ainda não começado: o item 1 (clipes trocados e fora do tempo).
 
+## Rodada 2 (2026-10-05)
+- **Lumetri → Luz e Cor** (42): seção = último Param booleano com nome (Color/Light/Adjustments/Vignette); temp, tint,
+  sat (básica × criativa), exp, ct, hi, sh, wh, bl, fade, sharp, vib e vinheta (-3..+3 → 0..100, só escurece). Curvas,
+  rodas, HSL e LUT/Look ainda não (não usados neste projeto). Lumetri animado: vem o valor fixo (relatório).
+- **Textos**: fonte (nome PostScript no FlatBuffers do Source Text), negrito/itálico, tamanho (float depois de um 4.0)
+  × escala do Transform do texto, posição do Transform. Cópias de sequência com Source Text vazio usam o estilo do
+  mesmo texto. **Falta a cor** (não achada no blob) e o alinhamento.
+- **2º Ultra Key** (351): não é duplicado — o 1º recorta (Pedestal/Soften/Choke), o 2º com a mesma cor e padrão limpa
+  o resto do verde. O editor usa só o 1º.
+- Velocidade já vinha (`v`) e aparece no rótulo do clipe na timeline ("· 41%").
+- Pendentes: VR Glow e VR Chromatic Aberrations (10 cada; o editor não tem esses efeitos), Transform (2), .aegraphic
+  (10) → transição de sobreposição, e o item 1 (precisa do Final Cut Pro XML exportado pelo usuário).
+
 ## Visto pelo usuário
 - ✅ O chroma foi reconhecido como Chroma Key.
 - ❌ Clipes às vezes **trocados**: um clipe aparece no lugar de outro.
