@@ -3255,6 +3255,10 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def ve_c3d_pasta(self, base):
+        from Functions import cena3d
+        return cena3d.pasta_vetor(base)
+
     def ve_3d_url(self, caminho):
         from Functions import cena3d
         return cena3d.url(caminho)

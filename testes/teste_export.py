@@ -160,6 +160,7 @@ JS_AJUDA = r"""
       }
       if (typeof veCompProntas === 'function') await veCompProntas(() => {});
       if (typeof veOvtProntas === 'function') await veOvtProntas(null);
+      if (typeof ve3dProntas === 'function') await ve3dProntas(() => {});
       VE._txPng = null;
       if (VE.clips.some(c => veIsTexto(c) || veEhGrafico(c))) await veTxPngs();
       const plano = veExportPlan(true), lim = veMasterLim();
@@ -190,6 +191,19 @@ CASOS = {
         m.c3d.camera.kf = { azimute: [[0, -20], [3, 40]] };
         const c3 = { tr: 1, st: 0.5, s: 0, e: 3, m: m.id }; c3.p = veDefProps(c3);
         return [clip(0, 0, 0, 4, 'principal'), c3];
+    """, ""),
+    # cena 3D com estúdio infinito, neblina e foco animado (passa de uma esfera para a outra): desfoque por profundidade
+    "3dfoco": (1920, 1080, """
+        const W = 1920, H = 1080, r = VE3DAPI.nova({ dur: 2, st: 0 }), m = VE.media[r.midia];
+        m.c3d.modelos.push({ id: 'a', nome: 'a', fonte: { tipo: 'primitiva', forma: 'esfera', cor: '#ec6e48', material: 'ceramica' },
+            p: { x: -0.8, y: 0, z: 1.2, rx: 0, ry: 0, rz: 0, esc: 0.8 }, kf: {} });
+        m.c3d.modelos.push({ id: 'b', nome: 'b', fonte: { tipo: 'primitiva', forma: 'toro', cor: '#0e3b4a', material: 'metal' },
+            p: { x: 0.9, y: 0.1, z: -1.5, rx: 0, ry: 0, rz: 0, esc: 0.9 }, kf: { ry: [[0, 0], [2, 120, 'linear']] } });
+        Object.assign(m.c3d.camera.p, { abertura: 0.8 }); m.c3d.camera.kf = { foco: [[0, 3.6], [2, 7]] };
+        m.c3d.cenario = { p: { estudio: 1, estudioCor: '#e9e4dc', neblina: 0.15, neblinaCor: '#dfe3e8' }, kf: {} };
+        Object.assign(m.info, { width: W, height: H });   // a cena nasce no tamanho da timeline anterior
+        const c3 = { tr: 0, st: 0, s: 0, e: 2, m: m.id }; c3.p = Object.assign(veDefProps(c3), { sc: 100, x: W / 2, y: H / 2 });
+        return [c3];
     """, ""),
     # cortes na batida exata (fora da grade de quadros): o quadro do corte não pode sair preto
     "grade": (1080, 1920, """

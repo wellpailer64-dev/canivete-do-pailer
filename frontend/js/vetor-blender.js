@@ -114,7 +114,25 @@ async function vbRenderizar(a = {}) {
     return { renders: out };
 }
 window.vkBlenderProgresso = d => { if (d && d.msg) vkCarregando(true, d.msg); };
+// Vetor → Editor (Cena 3D): a mesma descrição do Blender (perfil/forma, chanfro, material, rótulo e artes em PNG) vira um
+// modelo three.js animável numa cena 3D do Editor Kanivete (editor-3d.js, VE3DAPI.doVetor). Sem cena aberta, cria uma.
+async function vbEnviarEditor(a = {}) {
+    const alvos = (a.ids ? a.ids.map(vkObj) : vkTxAlvos(a)).filter(o => o && o.tres_d); if (!alvos.length) throw new Error('enviar_editor_3d: escolha objetos 3D (girar_3d/extrudar_3d)');
+    if (typeof VE3DAPI !== 'object' || typeof VE === 'undefined') throw new Error('enviar_editor_3d: Editor Kanivete indisponível');
+    if (!VE.ready) throw new Error('enviar_editor_3d: abra um vídeo ou crie uma timeline no Editor Kanivete antes');
+    const api = vkApi(), pr = await api.ve_c3d_pasta(typeof vePrPrefs === 'function' ? vePrPrefs().dir : ''), out = [];
+    for (const [i, g] of alvos.entries()) {
+        const base = `${pr.pasta.replace(/\\/g, '/')}/${vkSlug(g.nome || 'objeto3d')}_${g.id}_${Date.now().toString(36)}`, { cena } = await vbCena(g, { amostras: 1 }, base);
+        const r = await VE3DAPI.doVetor({ desc: cena.objetos[0], giro: g.tres_d, nome: g.nome || (g.tres_d.tipo === 'girar' ? 'Vetor: girar' : 'Vetor: extrudar'),
+            x: alvos.length > 1 ? (i - (alvos.length - 1) / 2) * 1.1 : 0 });
+        out.push({ id: g.id, modelo: r.id });
+    }
+    if (a.abrir !== false) document.querySelector('.menu-item[data-tool="video-cutter"]')?.click();
+    return { enviados: out };
+}
+vkRegistrar('enviar_editor_3d', 'objeto 3D → cena 3D do Editor (animar)', a => vbEnviarEditor(a || {}));
 vkRegistrar('render_blender', 'render fotorrealista (Blender)', a => vbRenderizar(a || {}));
 (() => {
-    const o = VK_MENUS.find(x => x[0] === 'Objeto'); if (o) o[1].push(['3D: Render fotorrealista (Blender)', '', () => vkCmdUi('render_blender', {})]);
+    const o = VK_MENUS.find(x => x[0] === 'Objeto'); if (o) o[1].push(['3D: Render fotorrealista (Blender)', '', () => vkCmdUi('render_blender', {})],
+        ['3D: Animar no Editor (Cena 3D)', '', () => vkCmdUi('enviar_editor_3d', {})]);
 })();

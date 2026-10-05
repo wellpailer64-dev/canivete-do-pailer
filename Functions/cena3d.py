@@ -58,6 +58,12 @@ def fim(base, h, sessao, pasta, fps, n, on_progress=lambda p: None):
     return {"success": True, "path": final, "url": media_server.register(final)}
 
 
+def pasta_vetor(base):
+    """Pasta dos rótulos/artes dos objetos 3D que vêm do Vetor (enviar_editor_3d): fica com o cache de render."""
+    p = os.path.join(_pasta(base), "vetor"); os.makedirs(p, exist_ok=True)
+    return {"success": True, "pasta": p}
+
+
 def url(caminho):
     """Modelo 3D (.glb/.gltf/.obj) do disco → URL do servidor local (o three.js carrega por URL)."""
     if not caminho or not os.path.isfile(caminho):

@@ -84,7 +84,9 @@ testes/teste_ponte.py` (rodar antes de release quando mexer na ponte, no objeto 
 ## Cena 3D no Editor (estilo After Effects)
 Modelos .glb/.obj e primitivas com câmera, luz, sombra e quadros-chave (◆), prévia ao vivo em three.js e ProRes 4444
 para a exportação: `frontend/js/editor-3d.js` + `Functions/cena3d.py`; API `VE3DAPI`. Guia e pendências:
-`Instructions/agente/cena-3d-editor.md`. Teste: `python testes/teste_export.py --casos 3d`.
+`Instructions/agente/cena-3d-editor.md`. Foco (desfoque por profundidade), estúdio infinito, neblina e objetos 3D do
+Vetor (Objeto › "3D: Animar no Editor", `enviar_editor_3d`). Testes: `python testes/teste_export.py --casos 3d,3dfoco`
+e `python testes/teste_vetor_editor3d.py`.
 
 ## Editor de Imagem (estilo Photoshop)
 Guia, arquivos e limitações em `Instructions/editor-imagem.md`; código em `frontend/js/imagem-*.js` e
