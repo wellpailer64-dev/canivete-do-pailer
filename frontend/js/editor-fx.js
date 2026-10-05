@@ -37,6 +37,41 @@ const VE_FX = {
             return b;
         },
     },
+    ca: {
+        nome: 'Aberração cromática', cat: 'Estilizar', tag: 'Chromatic',
+        params: [
+            { k: 'r', nome: 'Vermelho', min: -10, max: 10, step: 0.1, def: -2, un: '' },
+            { k: 'g', nome: 'Verde', min: -10, max: 10, step: 0.1, def: 0, un: '' },
+            { k: 'b', nome: 'Azul', min: -10, max: 10, step: 0.1, def: 2, un: '' },
+            { k: 'raio', nome: 'Raio', min: 0, max: 200, step: 1, def: 60, un: '%' },
+        ],
+        neutro: v => !(v.r || v.g || v.b),
+        // como o VR Chromatic Aberrations do Premiere: cada canal ampliado a partir do centro da camada (positivo
+        // abre, negativo fecha; 1 = 0,45 %, medido no render). Mesma conta na exportação (_filtros_fx, "ca").
+        draw(a, v, env) {
+            const { w, h } = env, ss = veFxCaEscalas(v);
+            const b = veFxOther(a, w, h), x = b.ctx, T = veFxCanvas(3, w, h), t = T.ctx;
+            x.clearRect(0, 0, w, h);
+            [['#ff0000', ss[0]], ['#00ff00', ss[1]], ['#0000ff', ss[2]]].forEach(([cor, s]) => {
+                const dw = w * s, dh = h * s, dx = (w - dw) / 2, dy = (h - dh) / 2;
+                t.globalCompositeOperation = 'source-over'; t.clearRect(0, 0, w, h); t.drawImage(a.cv, dx, dy, dw, dh);
+                t.globalCompositeOperation = 'multiply'; t.fillStyle = cor; t.fillRect(0, 0, w, h);
+                t.globalCompositeOperation = 'destination-in'; t.drawImage(a.cv, dx, dy, dw, dh);
+                x.globalCompositeOperation = 'lighter'; x.drawImage(T.cv, 0, 0);
+            });
+            t.globalCompositeOperation = 'source-over'; x.globalCompositeOperation = 'source-over';
+            const R = (v.raio ?? 60) / 100 * Math.min(w, h);
+            if (R > 0) {   // queda radial (bordas sem franja): cheio até meio raio, nada no raio — igual à exportação
+                t.clearRect(0, 0, w, h); t.drawImage(a.cv, 0, 0);
+                const M = veFxCanvas(4, w, h), mx = M.ctx; mx.clearRect(0, 0, w, h); mx.drawImage(b.cv, 0, 0);
+                const gr = mx.createRadialGradient(w / 2, h / 2, R / 2, w / 2, h / 2, R);
+                gr.addColorStop(0, '#000'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+                mx.globalCompositeOperation = 'destination-in'; mx.fillStyle = gr; mx.fillRect(0, 0, w, h); mx.globalCompositeOperation = 'source-over';
+                x.clearRect(0, 0, w, h); x.drawImage(T.cv, 0, 0); x.drawImage(M.cv, 0, 0);
+            }
+            return b;
+        },
+    },
     bc: {
         nome: 'Brilho e contraste', cat: 'Correção de cor', tag: 'Cor',
         params: [
@@ -494,6 +529,8 @@ function veFxCanvas(n, w, h) {
     if (o.cv.width !== w || o.cv.height !== h) { o.cv.width = w; o.cv.height = h; }
     return o;
 }
+// escalas dos canais da aberração cromática, normalizadas pela menor (nenhum canal encolhe: sem borda vazia)
+function veFxCaEscalas(v) { const s = ['r', 'g', 'b'].map(k => 1 + (+v[k] || 0) * 0.0045), mn = Math.min(...s); return s.map(x => x / mn); }
 function veFxOther(a, w, h) { return veFxCanvas(a === VEFX.pool[0] ? 1 : 0, w, h); }
 
 function veFxValues(f) {

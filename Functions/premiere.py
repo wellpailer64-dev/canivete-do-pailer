@@ -24,7 +24,7 @@ TRANS_VIDEO = {'AE.AE_Impact_Pop': 'pop', 'AE.ADBE Cross Dissolve New': 'dissolv
 # efeitos que viram propriedades do clipe (o resto entra no relatório)
 EFEITOS_LIDOS = {'AE.ADBE Motion', 'AE.ADBE Opacity', 'AE.ADBE MPEG.SourceSettings', 'AE.ADBE Ultra Key',
                  'AE.Impact_Blur_FX', 'AE.ADBE Gaussian Blur 2', 'AE.ADBE Text', 'AE.ADBE Capsule',
-                 'AE.ADBE Lumetri'}
+                 'AE.ADBE Lumetri', 'AE.Mettle SkyBox Chromatic Aberrations'}
 # Lumetri Color → Luz e Cor (efeito 'lc' do editor, mesmas escalas): (seção, nome do Param) → chave. A seção é o
 # último Param booleano com nome antes dele (os nomes se repetem: Saturation em Color e em Adjustments).
 LUMETRI_LC = {('Color', 'Temperature'): 'temp', ('Color', 'Tint'): 'tint', ('Color', 'Saturation'): 'sat',
@@ -479,6 +479,19 @@ class _Conversor:
                     self.n_fx = getattr(self, 'n_fx', 0) + 1
                     fx_lista.append({'id': f'fpr{self.n_fx}', 't': 'blur', 'on': True, 'v': {'amt': round(min(100, amt), 1)}})
                     self.rel['convertidos']['Desfoque gaussiano'] += 1
+                continue
+            if mn == 'AE.Mettle SkyBox Chromatic Aberrations':
+                vals = {}
+                for pp in fx.findall('.//Params/Param'):
+                    pr = self.g.ref(pp)
+                    if pr is not None and pr.findtext('Name'):
+                        vals.setdefault(pr.findtext('Name'), _param_valor(pr))
+                v = {k: round(_num(vals.get(f'Aberration ({n})'), 0), 2) for k, n in (('r', 'Red'), ('g', 'Green'), ('b', 'Blue'))}
+                v['raio'] = 60   # Falloff: no render do Premiere as bordas ficam sem franja e o centro com ~1,5 px
+                if any(v.values()):
+                    self.n_fx = getattr(self, 'n_fx', 0) + 1
+                    fx_lista.append({'id': f'fpr{self.n_fx}', 't': 'ca', 'on': True, 'v': v})
+                    self.rel['convertidos']['VR Chromatic Aberrations → Aberração cromática'] += 1
                 continue
             if mn == 'AE.ADBE Lumetri':
                 v, sec, anim = {}, '', False

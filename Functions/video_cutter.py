@@ -2101,6 +2101,29 @@ def _filtros_fx(fx, mw, mh, tag="x"):
             sigma = _num(v.get("amt"), 0, 100) * max(2, min(mw, mh)) / 2000.0
             if sigma >= 0.05:
                 out.append(f"gblur=sigma={min(sigma, 1000):.3f}:steps=3")
+        elif t == "ca":
+            # aberração cromática (frontend/js/editor-fx.js "ca"): cada canal ampliado a partir do centro e
+            # recortado ao tamanho; o alfa fica o original
+            ss = [1 + _num(v.get(k), -10, 10) * 0.0045 for k in ("r", "g", "b")]
+            mn = min(ss)
+            ss = [s / mn for s in ss]
+            W, H = int(mw) // 2 * 2, int(mh) // 2 * 2
+            if max(ss) > 1.0001 and W > 2 and H > 2:
+                r = f"{tag}f{j}c"
+                ramos = []
+                for c, s in zip("rgb", ss):
+                    sw, sh = max(W, int(round(W * s / 2)) * 2), max(H, int(round(H * s / 2)) * 2)
+                    ramos.append(f"[{r}{c}]scale={sw}:{sh}:flags=bicubic,crop={W}:{H},setsar=1,format=gbrap,extractplanes={c}[{r}{c}p]")
+                ca = (f"[{r}i]split=4[{r}r][{r}g][{r}b][{r}a];" + ";".join(ramos) +
+                      f";[{r}a]setsar=1,extractplanes=a[{r}ap];[{r}gp][{r}bp][{r}rp][{r}ap]mergeplanes=0x00102030:gbrap")
+                raio = _num(v.get("raio"), 0, 200) / 100.0
+                if raio <= 0:   # sem queda: a camada toda
+                    out.append(f"scale={W}:{H},setsar=1,format=gbrap[{r}i];" + ca + ",format=rgba")
+                else:   # queda radial (bordas sem franja): cheio até meio raio, nada no raio; máscara pequena ampliada
+                    q = f"255*clip(2-2*hypot(X-W/2\\,Y-H/2)/(min(W\\,H)*{raio:.4f})\\,0\\,1)"
+                    out.append(f"scale={W}:{H},setsar=1,format=gbrap,split=3[{r}i][{r}o][{r}k];" + ca + f"[{r}x];"
+                               f"[{r}k]scale=64:{max(2, round(64 * H / W))},format=gray,geq=lum='{q}',"
+                               f"scale={W}:{H}:flags=bilinear,setsar=1,format=gbrap[{r}m];[{r}o][{r}x][{r}m]maskedmerge,format=rgba")
         elif t == "bc":
             b = 1 + _num(v.get("br"), -100, 100) / 100.0
             c = 1 + _num(v.get("ct"), -100, 100) / 100.0
