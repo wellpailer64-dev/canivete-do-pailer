@@ -221,9 +221,13 @@ function veLcBuildLut(v, N) {
             r = L + (r - L) * sat; g = L + (g - L) * sat; b = L + (b - L) * sat;
         }
         // 6) criativo: filme desbotado (levanta o preto, tira um pouco de cor) e vibração (satura o que tem pouca cor)
-        if (kF) {
-            const m = 1 - 0.18 * kF, a = 0.18 * kF;
-            r = r * m + a; g = g * m + a; b = b * m + a;
+        // filme desbotado e vibração negativa medidos contra o Lumetri (render do Premiere × fonte, "Respeite o seu
+        // voto": desbotado 86 + vibração −100): o preto sobe, o branco desce, os meios escurecem; vibração −100 deixa
+        // ~1/3 da cor (mais nas cores fortes), em vez de apagar o que tem pouca cor
+        if (kF) {   // curva medida com desbotado 86 (VE_LC_FADE), proporcional ao valor
+            const t = kF / 0.858, X = VE_LC_FADE[0], Yf = VE_LC_FADE[1];
+            const cv = x => { x = cl(x); let i = 1; while (i < X.length - 1 && x > X[i]) i++; const y = Yf[i - 1] + (Yf[i] - Yf[i - 1]) * (x - X[i - 1]) / Math.max(1e-6, X[i] - X[i - 1]); return x + t * (y - x); };
+            r = cv(r); g = cv(g); b = cv(b);
             L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
             const f = 1 - 0.2 * kF;
             r = L + (r - L) * f; g = L + (g - L) * f; b = L + (b - L) * f;
@@ -232,7 +236,7 @@ function veLcBuildLut(v, N) {
             const R = cl(r), G = cl(g), B = cl(b);
             const s = Math.max(R, G, B) - Math.min(R, G, B);
             L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-            const f = Math.max(0, 1 + kV * (1 - s) * (kV > 0 ? 1 : 1.2));
+            const f = kV > 0 ? 1 + kV * (1 - s) : Math.max(0, 1 + kV * (0.55 - 0.1 * s));
             r = L + (r - L) * f; g = L + (g - L) * f; b = L + (b - L) * f;
         }
         r = cl(r); g = cl(g); b = cl(b);
@@ -271,6 +275,10 @@ function veLcBuildLut(v, N) {
 }
 
 // Parte de cor dos valores (o que entra na LUT)
+// Filme desbotado do Lumetri com valor 86, medido por quantis (fonte × render do Premiere): preto sobe, meios descem,
+// branco para em ~0,83. Outros valores: a mesma curva, proporcional.
+const VE_LC_FADE = [[0, 0.03, 0.111, 0.199, 0.287, 0.379, 0.459, 0.541, 0.635, 0.954, 1],
+    [0.102, 0.108, 0.137, 0.157, 0.197, 0.254, 0.329, 0.419, 0.597, 0.826, 0.826]];
 const VE_LC_FORA_LUT = new Set(['sharp', 'vig', 'clar']);   // rodam depois da LUT, na imagem
 function veLcColorKey(v) {
     const o = {};
@@ -548,7 +556,7 @@ function veLcDraw(a, v, env) {
     b.ctx.drawImage(cv, 0, 0);
     return b;
 }
-const veLcSharpAmt = v => v.sharp / 100 * 2.5;             // luma_amount do unsharp
+const veLcSharpAmt = v => v.sharp / 100 * 1.0;             // luma_amount do unsharp (100 = Nitidez 100 do Lumetri; era 2,5: escurecia as bordas)
 const veLcVigAngle = v => v.vig / 100 * Math.PI / 2;       // angle do vignette
 const veLcClarAmt = v => (v.clar || 0) / 100 * 1.2;        // k da Clareza (negativo suaviza)
 
