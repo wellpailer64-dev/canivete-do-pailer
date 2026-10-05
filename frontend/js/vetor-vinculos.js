@@ -7,7 +7,7 @@ async function vkVinculos() {
     const api = vkApi(), ims = VK.doc.imagens || {}, usos = vkVincUsos();
     const est = api && api.vk_vinculos_estado ? await api.vk_vinculos_estado(Object.entries(ims).map(([img, im]) => ({ img, arquivo: im.arquivo || null, origem: im.origem || null, assin: im.assin || null }))) : {};
     return Object.entries(ims).filter(([img]) => usos[img]).map(([img, im]) => ({
-        img, nome: im.nome || img, origem: im.origem || null, w: im.w, h: im.h, modo: im.modo, url: im.url,
+        img, nome: im.nome || img, origem: im.origem || null, ...(im.iknv ? { iknv: im.iknv } : {}), w: im.w, h: im.h, modo: im.modo, url: im.url,
         ppi: Math.min(...usos[img].map(o => Math.round(72 / vkEsc(o.m)))), usos: usos[img].length, ids: usos[img].map(o => o.id),
         estado: est[img] || (im.faltando ? 'faltando' : 'sem_original') }));
 }
@@ -59,13 +59,14 @@ function vkAbaVinculos() {
             ${v.url ? `<img src="${v.url}" style="width:34px;height:34px;object-fit:contain;background:#fff;border-radius:3px">` : '<span style="width:34px;text-align:center">✕</span>'}
             <div style="flex:1;min-width:0"><div title="${vkEsc_(v.origem || '')}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${vkEsc_(v.nome)}${v.usos > 1 ? ` <span class="vk-nota">×${v.usos}</span>` : ''}</div>
             <div class="vk-nota" style="${ruim ? 'color:#e5a000' : ''}"><span title="${tt}">${ic}</span> ${v.ppi} ppi · ${vkEsc_(v.modo || '')} · ${v.w}×${v.h}</div></div>
-            <button class="ie-btn" data-vir title="Selecionar">Ir</button><button class="ie-btn" data-vsub title="Substituir (revincular)">Trocar</button>${v.estado === 'mudou' ? '<button class="ie-btn" data-vatu title="Atualizar do original">Atualizar</button>' : ''}</div>`;
+            <button class="ie-btn" data-vir title="Selecionar">Ir</button><button class="ie-btn" data-vsub title="Substituir (revincular)">Trocar</button>${v.iknv ? '<button class="ie-btn" data-vphoto title="Abrir o projeto no Photo; salvar lá atualiza aqui">Photo</button>' : ''}${v.estado === 'mudou' ? '<button class="ie-btn" data-vatu title="Atualizar do original">Atualizar</button>' : ''}</div>`;
     }).join('');
     el.onclick = e => {
         if (e.target.closest('[data-vatu-todos]')) return vkCmdUi('atualizar_vinculo', {});
         const linha = e.target.closest('[data-vimg]'); if (!linha) return; const v = l.find(x => x.img === linha.dataset.vimg); if (!v) return;
         if (e.target.closest('[data-vir]')) { VK.sel = v.ids.slice(); vkDesenhar(); vkUiAgendar(); }
         else if (e.target.closest('[data-vsub]')) vkCmdUi('revincular', { img: v.img });
+        else if (e.target.closest('[data-vphoto]')) { if (typeof switchTool === 'function') switchTool('editor-imagem'); ieAbrirArquivo(v.iknv); }
         else if (e.target.closest('[data-vatu]')) vkCmdUi('atualizar_vinculo', { img: v.img });
     };
 }

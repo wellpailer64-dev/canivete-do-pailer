@@ -389,7 +389,7 @@ async function ieSalvarIknv(doc, destino) {
             camadas: ieIknvSerial(doc.camadas, png), ativa: doc.ativa, selIds: doc.selIds, seq: doc.seq,
             fatias: ieFatiasSpec(doc), cor: IE.cor, luzGlobal: doc.luzGlobal || null,
             alfas: ieIknvSerial(doc.alfas || [], png), notas: doc.notas || [], compsCamadas: doc.compsCamadas || [], guias: doc.guias || [],
-            cena: doc.cena || null,
+            cena: doc.cena || null, ponteVetor: doc.ponteVetor || null,
         };
         ieCompor(doc, ieRDoc(doc));
         const previa = ieTransformarPlano({ c: doc.comp, x: 0, y: 0 }, (k => [k, 0, 0, k, 0, 0])(Math.min(1, 512 / Math.max(doc.w, doc.h)))).c;
@@ -445,7 +445,7 @@ async function ieMontarIknv(r, path) {
         return v;
     };
     doc.camadas = canvas(arvore);
-    doc.alfas = canvas(alfas); doc.notas = d.notas || []; doc.compsCamadas = d.compsCamadas || []; doc.guias = d.guias || []; doc.cena = d.cena || null;
+    doc.alfas = canvas(alfas); doc.notas = d.notas || []; doc.compsCamadas = d.compsCamadas || []; doc.guias = d.guias || []; doc.cena = d.cena || null; if (d.ponteVetor) doc.ponteVetor = d.ponteVetor;
     iePercorrer(doc.camadas, L => { if (L.fx) L.fx = ieFxNorm(L.fx); });
     if (d.luzGlobal) doc.luzGlobal = d.luzGlobal;
     doc.seq = d.seq || 0;

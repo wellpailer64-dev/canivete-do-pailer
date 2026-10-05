@@ -144,15 +144,15 @@ ieVistaTam:749  ieAjustarVista:753  ieZoomEm:762  ieZoomPasso:773  ieTelaDoc:780
 ieDesenharVista:805  ieDesenharNitido:838  ieMipmap:858  ieDesenharSobre:878  ieAtivoVisivel:911  ieSelNova:915  ieSelAplicar:918  ieSelDefinir:945
 ieSelContorno:955  ieSelTudo:984  ieSelNada:989  ieSelInverter:994  ieSelRegiao:1004  ieInserirAcima:1012  ieNomeLivre:1022  ieAtivar:1029
 ieAjustarPt:1053  ieFerrAtual:1054  ieInstalarVista:1059  ieCursor:1127
-## frontend/js/imagem-paineis.js (1295 linhas) — comandos
-if:55  if:95  switch:123  if:373  if:391  if:688  if:707  if:714  if:726  if:732  if:736  if:806  if:831  if:849  if:1184  if:1190  if:1204  if:1241
-if:1281
+## frontend/js/imagem-paineis.js (1296 linhas) — comandos
+if:55  if:95  switch:123  if:373  if:391  if:688  if:707  if:714  if:726  if:732  if:736  if:806  if:831  if:849  if:1185  if:1191  if:1205  if:1242
+if:1282
 ## frontend/js/imagem-paineis.js — funções
 ieIco:49  ieUiFerr:52  ieUiCores:70  ieTrocarCores:75  ieCoresPadrao:76  ieNum:79  ieChk:81  ieSegm:82  ieSelModos:85  ieOpcoesRender:91
 ieOpcoesInstalar:239  ieUiCamadas:293  ieXadrezMiniPadrao:372  ieMiniatura:382  ieMiniaturas:418  ieCamadasInstalar:435  ieAncestral:621
 ieRenomear:628  ieReordenar:646  ieSelDaCamada:665  ieUiProps:682  ieUiPropsPos:781  ieHistRender:788  ieAbasRender:800  ieStatusRender:825
-ieAbasZoom:843  ieStatusMouse:844  ieEscolherCor:856  ieSeletorCor:858  ieDialogo:930  ieCurvaEditor:988  ieBotoesGirar:1029  ieMenusRender:1073
-ieMenuHtml:1107  ieMenuContexto:1118  ieTeclaNome:1149  ieDigitando:1169  ieTecla:1174  ieTeclaSolta:1255  ieCmdPode:1261  ieCmd:1278  ieUiTudo:1294
+ieAbasZoom:843  ieStatusMouse:844  ieEscolherCor:856  ieSeletorCor:858  ieDialogo:930  ieCurvaEditor:988  ieBotoesGirar:1029  ieMenusRender:1074
+ieMenuHtml:1108  ieMenuContexto:1119  ieTeclaNome:1150  ieDigitando:1170  ieTecla:1175  ieTeclaSolta:1256  ieCmdPode:1262  ieCmd:1279  ieUiTudo:1295
 ## frontend/js/imagem-prancheta.js (423 linhas) — comandos
 for:63  for:71  for:127
 ## frontend/js/imagem-prancheta.js — funções

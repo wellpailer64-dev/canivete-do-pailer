@@ -1,0 +1,63 @@
+"""Teste da ponte Vetor <-> Photo (app em --agente=9333). Ponte Vetor ↔ Photo: objeto inteligente vetorial (ida, filtro inteligente, ampliar sem pixelizar, editar no Vetor e
+devolver, salvar/reabrir .iknv) e vínculo vivo Photo → Vetor (mudou → atualizar)."""
+import json, os, sys
+sys.stdout.reconfigure(encoding="utf-8")
+from playwright.sync_api import sync_playwright
+D = r"D:\kanivete_testes\ponte"; os.makedirs(D, exist_ok=True)
+for f in ("arte.iknv", "arte.vinculo.png", "obj.iknv"):
+    try: os.remove(os.path.join(D, f))
+    except OSError: pass
+falhas = []
+def ok(c, m):
+    print(("  ok  " if c else "  FALHOU  ") + m)
+    if not c: falhas.append(m)
+with sync_playwright() as p:
+    pg = next(x for c in p.chromium.connect_over_cdp("http://127.0.0.1:9333").contexts for x in c.pages if "index.html" in x.url)
+    erros = []; pg.on("pageerror", lambda e: erros.append(str(e)))
+    E = lambda js, a=None: pg.evaluate(js, a)
+    E("switchTool('vetor-kanivete')"); pg.wait_for_function("window.VKN"); pg.wait_for_timeout(400)
+    E("VKN.curto = true")
+    C = lambda n, a=None: E("([n, a]) => VKN.cmd(n, a)", [n, a or {}])
+    C("novo", {"nome": "Logo", "larg": 100, "alt": 60})
+    c1 = C("elipse", {"x": 10, "y": 10, "larg": 30, "preench": "C0 M68 Y72 K0", "traco": "nenhum", "nome": "sol"})
+    C("efeito", {"ids": [c1["id"]], "tipo": "sombra", "dx": 1, "dy": 1, "desfoque": 1})
+    t = C("texto", {"conteudo": "maré", "x": 45, "y": 32, "fonte": "Playfair Display", "estilo": "Bold", "tamanho": 30, "preench": "C100 M55 Y35 K45", "nome": "palavra"})
+    g = C("agrupar", {"ids": [c1["id"], t["id"]], "nome": "logo"})
+    print("enviar:", C("enviar_photo", {"ids": [g["id"]], "novo": True}))
+    info = E("() => { const L = ieAtiva(IE.doc); return {tipo: L.tipo, vetor: !!L.vetor, w: L.c0.c.width, h: L.c0.c.height, dpi: IE.doc.dpi, docw: IE.doc.w}; }")
+    ok(info["tipo"] == "inteligente" and info["vetor"], f"Photo recebeu objeto inteligente vetorial ({info})")
+    E("() => KNV.cmd('f:gaussiano', {raio: 2})"); pg.wait_for_timeout(500)
+    ok(E("() => (ieAtiva(IE.doc).filtrosInt || []).length") == 1, "filtro inteligente por cima da arte vetorial")
+    w0 = E("() => ieAtiva(IE.doc).c0.c.width")
+    E("() => KNV.escalar(2.5)"); pg.wait_for_timeout(2500)
+    s = E("() => { const L = ieAtiva(IE.doc); return {c0: L.c0.c.width, tf: Math.hypot(L.tf[0], L.tf[1])}; }")
+    ok(s["c0"] > w0 * 2 and abs(s["tf"] - 1) < 0.05, f"ampliar 2,5×: original rasterizado de novo, nítido ({w0} → {s['c0']} px, tf {s['tf']:.2f})")
+    px0 = E("() => { const L = ieAtiva(IE.doc), d = L.c0.c.getContext('2d').getImageData(Math.round(L.c0.c.width * 0.15), Math.round(L.c0.c.height * 0.5), 1, 1).data; return [...d]; }")
+    E("() => KNV.editarNoVetor()"); pg.wait_for_timeout(800)
+    ok(E("() => !!VK.ponte && VK.doc.nome === 'Logo'"), "Editar conteúdo no Vetor abre o documento da camada (aviso roxo)")
+    C("alterar", {"nomes": ["sol"], "preench": "C100 M0 Y0 K0"})
+    print("devolver:", C("salvar"))
+    pg.wait_for_timeout(1500)
+    px1 = E("() => { const L = ieAtiva(IE.doc), d = L.c0.c.getContext('2d').getImageData(Math.round(L.c0.c.width * 0.15), Math.round(L.c0.c.height * 0.5), 1, 1).data; return [...d]; }")
+    tf1 = E("() => Math.hypot(ieAtiva(IE.doc).tf[0], ieAtiva(IE.doc).tf[1])"); fl = E("() => (ieAtiva(IE.doc).filtrosInt || []).length")
+    ok(px0[0] > 150 and px1[0] < 120 and px1[2] > 150 and fl == 1, f"devolvido: o sol ficou ciano na camada, filtro mantido ({px0[:3]} → {px1[:3]}, tf {tf1:.2f})")
+    ok(E("() => !VK.ponte && VK.doc && VK.doc.nome === 'Logo'") or E("() => !VK.ponte"), "o Vetor volta ao documento anterior")
+    obj = os.path.join(D, "obj.iknv"); E("c => KNV.salvar(c)", obj)
+    E("c => ieAbrirArquivo(c)", obj); pg.wait_for_timeout(2500)
+    ok(E("() => { const L = ieTodas(IE.doc).find(L => L.vetor); return !!L && !!L.vetor.doc.camadas; }"), ".iknv salvo e reaberto mantém o documento do Vetor na camada")
+    # F2: vínculo vivo Photo → Vetor
+    E("() => KNV.novo({nome: 'Arte', largura: 600, altura: 400})")
+    E("() => KNV.preencher ? KNV.preencher('#ec6e48') : null")
+    arte = os.path.join(D, "arte.iknv")
+    r = E("c => KNV.enviarAoVetor(c)", arte); print("vínculo:", r)
+    vs = C("vinculos")["vinculos"] if isinstance(C("vinculos"), dict) else E("VKN.cmd('vinculos', {})")["vinculos"]
+    v = next((x for x in vs if x.get("iknv")), None)
+    ok(v and v["estado"] == "ok", f"Photo → Vetor como vínculo vivo ({v and {k: v[k] for k in ('nome', 'estado', 'iknv')}})")
+    E("switchTool('editor-imagem')"); E("() => KNV.preencher ? KNV.preencher('#0e3b4a') : null"); E("c => KNV.salvar(c)", arte); pg.wait_for_timeout(800)
+    E("switchTool('vetor-kanivete')")
+    v2 = next((x for x in E("VKN.cmd('vinculos', {})")["vinculos"] if x.get("iknv")), None)
+    ok(v2 and v2["estado"] == "mudou", f"salvar no Photo → Vínculos marca 'mudou' ({v2 and v2['estado']})")
+    E("VKN.curto = false")
+    ok(not erros, f"sem erros de JS ({erros[:2]})")
+print(json.dumps({"falhas": falhas}, ensure_ascii=False))
+sys.exit(1 if falhas else 0)

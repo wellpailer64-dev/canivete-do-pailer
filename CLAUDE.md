@@ -72,6 +72,11 @@ textos): plano em `Instructions/agente/ajuste-premiere.md`.
 Plano, modelo e limitações em `Instructions/agente/plano-comp.md`; código em `frontend/js/editor-comp.js`.
 Plano completo (Fases 1–3 + Propriedades essenciais por faixa).
 
+## Ponte Vetor ↔ Photo
+Objeto inteligente vetorial no Photo (Arquivo › Enviar ao Photo; editar no Vetor e Ctrl+S devolve) e vínculo vivo do
+.iknv no Vetor: `frontend/js/ponte-vetor-photo.js`, guia `Instructions/vetor-kanivete.md` §12. Teste: `python
+testes/teste_ponte.py` (rodar antes de release quando mexer na ponte, no objeto inteligente ou no renderizador do Vetor).
+
 ## Editor de Imagem (estilo Photoshop)
 Guia, arquivos e limitações em `Instructions/editor-imagem.md`; código em `frontend/js/imagem-*.js` e
 `Functions/editor_imagem.py` (salvar PSD de ida e volta: só troca o que mudou). Teste: `python testes/teste_imagem.py`

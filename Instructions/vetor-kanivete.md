@@ -269,3 +269,20 @@ Ainda não: oclusão própria no girar 3D (perfil que se esconde atrás de si), 
 - `revisar` / `VKN.revisar()` (`vetor-revisor.js`): solto, fora, transborda, sobreposto, contraste (WCAG 4,5/3 com a cor
   real abaixo do texto), margem, pequeno, vazio, prancheta vazia; agrupa ocorrências iguais; erro × aviso.
 - `VKN.curto = true` ou `{curto: true}`: comandos devolvem só id/ids/caminho/contagens.
+## 12. Ponte Vetor ↔ Photo (2026-10-05) — `frontend/js/ponte-vetor-photo.js`
+Os dois programas rodam na mesma página, então o Photo rasteriza com o PRÓPRIO renderizador do Vetor (troca VK.doc por um
+instante; efeitos, 3D, pincéis e texto saem iguais à tela do Vetor).
+- **Vetor → Photo**: `enviar_photo` {ids | prancheta, novo} (Arquivo › Enviar ao Photo) cria camada **objeto inteligente
+  vetorial**: `L.vetor = {doc (cópia do documento), alvo {ids|prancheta, rect pt com folga p/ efeitos}, res (px/pt)}`,
+  `L.c0` = arte rasterizada, `L.tf` = posição/escala. Ampliar/reduzir muito (qualquer rota — API, Transformar, girar —
+  passa por `ieCamadaMudou`) rasteriza de novo na resolução nova (nunca pixeliza). Filtros inteligentes ficam por cima.
+- **Editar conteúdo no Vetor** (Camada › Objetos inteligentes; `KNV.editarNoVetor()`): abre o documento da camada no
+  Vetor com aviso roxo; **Ctrl+S / `devolver_photo`** devolve à camada (mesma posição, filtros mantidos) e o documento do
+  Vetor que estava aberto volta. Salvar o .iknv guarda o `L.vetor` (reabre editável).
+- **Photo → Vetor (vínculo vivo)**: Camada › Objetos inteligentes › Enviar documento ao Vetor (`KNV.enviarAoVetor(iknv)`):
+  salva o .iknv, grava `<nome>.vinculo.png` (composto) e coloca no Vetor como imagem vinculada no tamanho físico
+  (ppi do Photo) com `im.iknv`; cada salvamento do .iknv reescreve o PNG → Vínculos marca "mudou" (Atualizar) e tem o
+  botão **Photo** (abre o .iknv).
+- Teste: `python testes/teste_ponte.py` (9 conferências + sem erro de JS; rodar antes de release quando mexer na ponte,
+  no objeto inteligente do Photo ou no renderizador do Vetor). Falta (plano): mockup fotográfico (F3) e recursos
+  comuns (F4: amostras da marca e o gerador no Vetor).

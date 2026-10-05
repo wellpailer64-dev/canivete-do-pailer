@@ -30,6 +30,7 @@ with sync_playwright() as p:
     pg.on("pageerror", lambda e: erros.append(str(e)))
     pg.evaluate("switchTool('vetor-kanivete')")
     pg.wait_for_function("window.VKN && document.getElementById('vk-canvas')", timeout=15000)
+    pg.evaluate("VKN.curto = false")   # outro teste pode ter deixado o modo curto ligado
     C = lambda nome, args=None: pg.evaluate("([n, a]) => VKN.cmd(n, a)", [nome, args or {}])
 
     print("cartão 90×50 pelos comandos")

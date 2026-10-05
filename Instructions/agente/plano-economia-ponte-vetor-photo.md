@@ -37,7 +37,7 @@ filtros, Camera Raw, Liquify, galeria de filtros, objetos inteligentes, geraçã
 "morta" (PNG). A infraestrutura já existe: vínculos com assinatura (detecta original alterado), objeto inteligente no
 Photo, a ponte Photo ↔ Editor como modelo.
 
-### Fases
+### Fases — F1 e F2 FEITAS em 2026-10-05 (ponte-vetor-photo.js; guia do Vetor §12; testes/teste_ponte.py)
 - **F1 — Vetor → Photo como objeto inteligente vetorial**: "Editar no Photo" leva a seleção (ou a prancheta) como objeto
   inteligente que guarda o `.aknv`; o Photo rasteriza na resolução que precisar (PDF → fitz), então escalar não perde
   qualidade. Filtros inteligentes (grão, meio-tom, desgaste, Camera Raw) ficam por cima e continuam editáveis. Duplo

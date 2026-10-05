@@ -12,20 +12,24 @@ aparencia:200  efeito:221  expandir_aparencia:232
 vkApEf:11  vkApTem:12  vkApGrupo:14  vkDistorce:15  vkArredondar:18  vkApDesloc:42  vkApDoc:52  vkApBase:54  vkPinturas:76  vkApPronto:91
 vkApRgba:102  vkApTracar:103  vkApDesenhar:113  vkApDocPy:155  vkApPainel:250  vkApPainelEventos:278  vkSubdividir:309  vkRand:326  vkSuave:327
 vkDeformar:348  vkDistSub:355  vkDistorcer:383  vkApBase:395
-## frontend/js/vetor-api.js (435 linhas) — comandos
+## frontend/js/vetor-api.js (450 linhas) — comandos
 ajuda:68  novo:70  documento:76  retangulo:85  elipse:89  poligono:94  estrela:98  linha:102  caminho:106  texto:113  imagem:128  alterar:141
 mover:170  posicionar:171  redimensionar:175  girar:184  refletir:188  matriz:192  alinhar:194  distribuir:208  organizar:218  agrupar:229
 desagrupar:235  mascara:245  soltar_mascara:254  composto:258  pathfinder:263  deslocar:280  contornar_traco:294  contornos:311  duplicar:322
 apagar:332  selecionar:333  mover_para_camada:334  nova_camada:336  camada:337  nova_prancheta:347  prancheta:353  amostra:363  cores_padrao:368
 mapa:373  info:374
 ## frontend/js/vetor-api.js — funções
-vkTodosDaCamada:377  vkPranchetaDe:378  vkCaixaMM:382  vkInfo:387  vkMapa:409
+vkTodosDaCamada:377  vkPranchetaDe:378  vkCaixaMM:382  vkInfo:387  vkMapa:409  vkCurto:424
 ## frontend/js/vetor-arquivo.js (338 linhas) — comandos
 abrir:10  importar:32  salvar:51  exportar_pdf:61  empacotar:83  exportar_imagem:99  exportar_svg:114  converter_cmyk:126  preto_texto:141
 sobreimprimir_preto:146  tirar_sobre_branco:155  engrossar_tracos:160  limpar:165
 ## frontend/js/vetor-arquivo.js — funções
 vkCoresProntas:178  vkImagensProntas:185  vkRenderPrancheta:188  vkSvg:199  vkTAC:270  vkPretoRico:271  vkPreto100:272  vkBranco:273  vkBoxArea:274
 vkCores:275  vkFechamento:276  vkRecente:334  vkCarregando:337
+## frontend/js/vetor-cena.js (148 linhas) — comandos
+cena:146
+## frontend/js/vetor-cena.js — funções
+vkCenaCor:9  vkCenaDegrade:17  vkCena:24  vkCenaTexto:103
 ## frontend/js/vetor-construir.js (262 linhas) — comandos
 construtor:68  pathfinder2:84  tesoura:113  faca:142  juntar:161  media:202
 ## frontend/js/vetor-construir.js — funções
@@ -93,6 +97,10 @@ guia:100  exibir:111
 ## frontend/js/vetor-reguas.js — funções
 vkReguaOrigem:5  vkReguasDesenhar:6  vkGradeDesenhar:40  vkGuiaEm:57  vkReguaDown:62  vkReguaMove:74  vkReguaUp:75  vkReguaSobreposicao:82
 vkEncaixeExtra:89
+## frontend/js/vetor-revisor.js (60 linhas) — comandos
+revisar:58
+## frontend/js/vetor-revisor.js — funções
+vkRevLum:5  vkRevContraste:10  vkRevisar:11
 ## frontend/js/vetor-saida.js (97 linhas) — comandos
 exportar_ai:22  exportar_eps:32  exportar_ativos:42
 ## frontend/js/vetor-saida.js — funções
@@ -120,7 +128,7 @@ vkEixosDialogo:649
 repetir:24  transformar_cada:38  distribuir_espaco:61
 ## frontend/js/vetor-transformar.js — funções
 vkChaveAtiva:89  vkTransformarCadaDialogo:90
-## frontend/js/vetor-vinculos.js (72 linhas) — comandos
+## frontend/js/vetor-vinculos.js (73 linhas) — comandos
 vinculos:29  revincular:31  atualizar_vinculo:37
 ## frontend/js/vetor-vinculos.js — funções
 vkVincUsos:5  vkVinculos:6  vkRevincular:14  vkAbaVinculos:46
@@ -131,16 +139,16 @@ _Ids:19  _doc:28  _pt:33  mmul:38  mpt:44  mescala:48  minv:52  _transformar_sub
 _func_eval:110  _ps_calc:143  _PDF:195  pikepdf_Stream:531  _limpar_clips:536  _fonte_nome:553  _nome_fonte:579  _cff_para_otf:595
 _fontes_embutidas:631  _ai_privado:687  _ai_nativo:712  importar_pdf:739  _num:824  _svg_cor:835  _svg_matriz:856  _arco:874  svg_path:902
 importar_svg:960  importar_pptx:1189  ghostscript:1407  baixar_ghostscript:1423  importar_eps:1456  importar:1477
-## Functions/vetor_kanivete.py (1553 linhas)
+## Functions/vetor_kanivete.py (1561 linhas)
 _pastas_icc:24  perfil_arquivo:30  perfis_disponiveis:41  _transf:48  _cmyk_rgb_ingenuo:65  cores_tela:69  rgb_para_cmyk:82  _estilos:111
-registrar_fontes:123  _fonte_doc:137  fonte_arquivo:147  _fonte_instalada:158  _fonte:179  _Caneta:209  _tem_feat:260  _moldar:270  _hifenizador:285
-_runs:297  _glifos:320  _glifo_hifen:365  _glifo_char:371  _tabs_layout:377  _desenhar:408  _trilha_pontos:427  _trilha_em:451  _poligonos:460
-_intervalos:478  _vao_forma:490  _dentro:510  texto_geometria:514  fonte_eixos:707  _vao_desvio:718  fonte_glifos:733  _para_skia:746  _de_skia:766
-booleana:791  _vazio:810  _pecas:815  regioes:834  faca:858  _sk_path:876  _sk_subs:897  _sk_pincel:934  deslocar:948  contornar_traco:964
-_registrar_previa:981  canais_imagem:1005  imagem_info:1039  _assinatura:1049  vinculos_estado:1058  salvar_png:1073  salvar:1090  _fontes_usadas:1116
-empacotar:1124  _mesmo_arquivo:1191  abrir_aknv:1198  abrir:1222  qr_matriz:1242  icone_svg:1258  vetorizar:1284  _lab_para_cmyk:1356  _str_acb:1369
-_ler_acb:1378  _ler_ase:1407  ler_biblioteca:1442  bibliotecas_cor:1454  _pasta_recuperacao:1471  autosalvar:1477  recuperaveis:1490  recuperar:1505
-descartar_recuperacao:1514  ler_csv:1522  juntar_pdfs:1536
+registrar_fontes:123  _fonte_doc:137  fonte_arquivo:147  _fonte_instalada:158  _fonte:179  _Caneta:209  _tem_feat:260  _moldar:270  _hifenizador:287
+_runs:299  _glifos:322  _glifo_hifen:373  _glifo_char:379  _tabs_layout:385  _desenhar:416  _trilha_pontos:435  _trilha_em:459  _poligonos:468
+_intervalos:486  _vao_forma:498  _dentro:518  texto_geometria:522  fonte_eixos:715  _vao_desvio:726  fonte_glifos:741  _para_skia:754  _de_skia:774
+booleana:799  _vazio:818  _pecas:823  regioes:842  faca:866  _sk_path:884  _sk_subs:905  _sk_pincel:942  deslocar:956  contornar_traco:972
+_registrar_previa:989  canais_imagem:1013  imagem_info:1047  _assinatura:1057  vinculos_estado:1066  salvar_png:1081  salvar:1098  _fontes_usadas:1124
+empacotar:1132  _mesmo_arquivo:1199  abrir_aknv:1206  abrir:1230  qr_matriz:1250  icone_svg:1266  vetorizar:1292  _lab_para_cmyk:1364  _str_acb:1377
+_ler_acb:1386  _ler_ase:1415  ler_biblioteca:1450  bibliotecas_cor:1462  _pasta_recuperacao:1479  autosalvar:1485  recuperaveis:1498  recuperar:1513
+descartar_recuperacao:1522  ler_csv:1530  juntar_pdfs:1544
 ## Functions/vetor_saida.py (89 linhas)
 _nomes:12  exportar_ai:17  aknv_anexado:46  exportar_eps:62
 ## main.py — pontes
