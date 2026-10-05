@@ -3239,6 +3239,26 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.vetorizar(arquivo, cores, area_min, ignorar_fundo)
 
+    # Cena 3D do Editor (frontend/js/editor-3d.js + Functions/cena3d.py): quadros do three.js → .mov ProRes 4444 com alfa
+    def ve_c3d_inicio(self, base, h):
+        from Functions import cena3d
+        return cena3d.inicio(base, h)
+
+    def ve_c3d_lote(self, sessao, pasta):
+        from Functions import cena3d
+        return cena3d.lote(sessao, pasta)
+
+    def ve_c3d_fim(self, base, h, sessao, pasta, fps, n):
+        from Functions import cena3d
+        try:
+            return cena3d.fim(base, h, sessao, pasta, fps, n)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_3d_url(self, caminho):
+        from Functions import cena3d
+        return cena3d.url(caminho)
+
     def vk_blender_estado(self):
         from Functions import blender_render
         e = blender_render.estado()

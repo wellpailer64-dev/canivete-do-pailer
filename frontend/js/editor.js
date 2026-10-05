@@ -3187,6 +3187,10 @@ function veDrawMonitor() {
         const med = veMediaOf(c);
         if (veMediaOffline(med)) {
             src = 'offline';
+        } else if (med && med.c3d && typeof ve3dQuadro === 'function') {
+            // Cena 3D (editor-3d.js): sempre ao vivo no monitor — o mesmo three.js que gera o arquivo da exportação
+            src = ve3dQuadro(c, t, pv * veProps(c).sc / 100) || 'preparando';
+            if (src === 'preparando') parcial = true;
         } else if (med && med.kind === 'video' && !med.url && !med.comp) {
             // sem a prévia ainda: a miniatura dele com "Preparando" (o player ainda tem o arquivo de OUTRO vídeo)
             src = 'preparando';
@@ -3985,6 +3989,7 @@ function veProjectData() {
                 // Comp (editor-comp.js): a timeline dela + o arquivo renderizado e o hash do conteúdo dele
                 if (m.comp) Object.assign(o, { comp: true, sequenceId: m.sequenceId, compSig: m.compSig || null, dur: m.dur,
                                                temSom: !!(m.info && m.info.has_audio), ...(m.ov ? { ov: m.ov, ovDe: m.ovDe } : {}) });
+                if (m.c3d) Object.assign(o, { c3d: m.c3d, c3dSig: m.c3dSig || null, dur: m.dur });   // Cena 3D (editor-3d.js)
                 if (m.kind === 'timeline') o.sequenceId = m.sequenceId;
                 if (m.kind === 'cor') o.fill = m.fill;   // cor sólida (m.cor é a do rótulo)
                 if (m.rvDe != null) Object.assign(o, { rvDe: m.rvDe, rvA: m.rvA, rvB: m.rvB });   // cópia invertida (editor-reverse.js)
@@ -4184,6 +4189,15 @@ function veApplyProject() {
             if (m.rvDe != null) Object.assign(nm, { rvDe: m.rvDe, rvA: m.rvA, rvB: m.rvB });
             VE.media.push(nm);
             ids[m.id] = nm.id;
+            if (m.c3d) {
+                // Cena 3D: a cena vem no projeto; sem o arquivo (cache limpo), o monitor desenha ao vivo e renderiza de novo
+                const dur = m.dur || mediaDur.get(m.id) || 5;
+                Object.assign(nm, { c3d: m.c3d, c3dSig: m.c3dSig || null, dur, cor: m.cor || 'roxo', _aoVivo: true });
+                if (!m.path || estaFaltando(m.path)) Object.assign(nm, { path: null, c3dSig: null,
+                    info: { duration: dur, width: q.w, height: q.h, fps: VE.fps || 30, has_audio: false, alfa: true, provisoria: true } });
+                else veMidiaPreparar(nm, true);
+                return;
+            }
             if (m.comp) {
                 // Comp: o arquivo pode ter saído do cache (limpeza automática) — renderiza de novo (veCompVerificar)
                 const dur = m.dur || mediaDur.get(m.id) || 1;
@@ -5491,6 +5505,7 @@ async function veStartExport() {
     try {
         // Comps que mudaram renderizam antes (editor-comp.js): na exportação elas entram pelo arquivo delas
         if (typeof veCompProntas === 'function') await veCompProntas(msg => { $ve('ve-exp-msg').textContent = msg; });
+        if (typeof ve3dProntas === 'function') await ve3dProntas(msg => { $ve('ve-exp-msg').textContent = msg; });
         // transições de sobreposição: o trecho de cada uma renderizado das trilhas de baixo (editor-ovt.js)
         if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg => { $ve('ve-exp-msg').textContent = msg; });
         if (VE.clips.some(c => veIsTexto(c) || veEhGrafico(c))) await veTxPngs();   // textos e gráficos viram PNG

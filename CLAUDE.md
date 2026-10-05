@@ -81,6 +81,11 @@ Objeto inteligente vetorial no Photo (Arquivo › Enviar ao Photo; editar no Vet
 .iknv no Vetor: `frontend/js/ponte-vetor-photo.js`, guia `Instructions/vetor-kanivete.md` §12. Teste: `python
 testes/teste_ponte.py` (rodar antes de release quando mexer na ponte, no objeto inteligente ou no renderizador do Vetor).
 
+## Cena 3D no Editor (estilo After Effects)
+Modelos .glb/.obj e primitivas com câmera, luz, sombra e quadros-chave (◆), prévia ao vivo em three.js e ProRes 4444
+para a exportação: `frontend/js/editor-3d.js` + `Functions/cena3d.py`; API `VE3DAPI`. Guia e pendências:
+`Instructions/agente/cena-3d-editor.md`. Teste: `python testes/teste_export.py --casos 3d`.
+
 ## Editor de Imagem (estilo Photoshop)
 Guia, arquivos e limitações em `Instructions/editor-imagem.md`; código em `frontend/js/imagem-*.js` e
 `Functions/editor_imagem.py` (salvar PSD de ida e volta: só troca o que mudou). Teste: `python testes/teste_imagem.py`

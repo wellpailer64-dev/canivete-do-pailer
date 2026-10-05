@@ -55,6 +55,8 @@ const VE_CMDS = [
     { id: 'colar-efeitos', grupo: 'clipe', nome: 'Colar efeitos', teclas: ['Ctrl+Alt+V'], fn: () => veCpEfeitosColar(), pode: () => !!VECP.fx && veSel() },
     { id: 'ativar', grupo: 'clipe', nome: 'Ativar', teclas: ['Ctrl+Shift+E'], sep: true, fn: () => veAlternarAtivo(), pode: veSel, marcado: () => !!VE.clips[VE.sel] && !veClipOff(VE.clips[VE.sel]) },
     { id: 'criar-comp', grupo: 'clipe', nome: 'Criar Comp...', teclas: ['Ctrl+Shift+C'], sep: true, fn: () => veCompDialogo(), pode: veSel },
+    { id: 'cena3d-nova', grupo: 'clipe', nome: 'Nova cena 3D', teclas: [], fn: () => ve3dNovaUi(), pode: () => VE.ready },
+    { id: 'cena3d-modelo', grupo: 'clipe', nome: 'Cena 3D: importar modelo (.glb/.obj)...', teclas: [], fn: () => ve3dImportarUi(), pode: () => VE.ready },
     { id: 'descompactar-comp', grupo: 'clipe', nome: 'Descompactar Comp', teclas: [], fn: () => veCompDescompactar(VE.clips[VE.sel]),
       pode: () => !!VE.clips[VE.sel] && veEhComp(veMediaOf(VE.clips[VE.sel])) },
     { id: 'inverter', grupo: 'clipe', nome: 'Inverter clipe (Reverse Speed)', teclas: [], fn: () => veInverterClipes(), pode: veSel, marcado: () => veInvertido(VE.clips[VE.sel]) },

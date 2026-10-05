@@ -2003,3 +2003,12 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-cp-amostras button { width: 20px; height: 20px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.18); cursor: pointer; padding: 0; }
 .ve-cp-amostras button:hover { transform: scale(1.12); }
 .ve-cp-pe { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Cena 3D (editor-3d.js): linha com ◆ de quadro-chave */
+.ve-pp-l.ve-p3d { grid-template-columns: 78px minmax(0, 1fr) 70px 18px; }
+.ve-p3d-kf { all: unset; cursor: pointer; width: 18px; text-align: center; font-size: 11px; color: var(--ve-dim); opacity: .55; }
+.ve-p3d-kf:hover { opacity: 1; }
+.ve-p3d-kf.on { color: var(--ve-accent, #ff8a3d); opacity: 1; }
+.ve-p3d-kf.aqui { text-shadow: 0 0 6px var(--ve-accent, #ff8a3d); }
+.ve-p3d-mod { border-top: 1px solid rgba(255,255,255,.06); padding-top: 6px; margin-top: 6px; display: grid; gap: 6px; }
+.ve-p3d-mod > .ve-pp-l b { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

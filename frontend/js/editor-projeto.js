@@ -904,6 +904,7 @@ function vePjMenu(x, y, doc) {
         <button class="ve-ctx-item" data-pj="tl">Nova timeline<kbd>Ctrl+N</kbd></button>
         <button class="ve-ctx-item" data-pj="aj">Nova camada de ajuste</button>
         <button class="ve-ctx-item" data-pj="cor">Nova cor sólida</button>
+        <button class="ve-ctx-item" data-pj="c3d">Nova cena 3D</button>
         <button class="ve-ctx-item" data-pj="imp">Importar...<kbd>Ctrl+I</kbd></button>
         ${keys.length ? '<div class="ve-ctx-sep"></div><button class="ve-ctx-item perigo" data-pj="del">Apagar<kbd>Delete</kbd></button>' : ''}`;
     doc.body.appendChild(m);
@@ -914,7 +915,7 @@ function vePjMenu(x, y, doc) {
         const cor = e.target.closest('[data-cor]'), it = e.target.closest('[data-pj]');
         if (cor) vePjCor(keys, cor.dataset.cor);
         else if (it) ({ ren: () => vePjRenomear(keys[0]), dup: () => vePjDuplicar(keys), cut: () => vePjCopiar('recortar'),
-            copy: () => vePjCopiar('copiar'), paste: vePjColar, bin: vePjNovaPasta, aj: vePjNovoAjuste, cor: vePjNovaCor, imp: vePjImportarDialogo,
+            copy: () => vePjCopiar('copiar'), paste: vePjColar, bin: vePjNovaPasta, aj: vePjNovoAjuste, cor: vePjNovaCor, imp: vePjImportarDialogo, c3d: () => ve3dNovaUi(),
             tl: () => veCreateTimeline(), rel: () => vePjRelink(+keys[0].slice(2)), relv: () => vePjSubstituirVarios(varias), ma: () => vePjMelhorarAudio(comSom), mel: () => veMelAlternar(midiaUm), del: () => vePjApagar(keys) })[it.dataset.pj]();
         else return;
         veClipMenuFechar();

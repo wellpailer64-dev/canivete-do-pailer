@@ -178,6 +178,19 @@ JS_AJUDA = r"""
 
 # Casos: (nome, W, H, JS que devolve a lista de clipes usando __te.clip / __te.M; JS extra depois de montar)
 CASOS = {
+    # cena 3D (editor-3d.js): esfera de cerâmica quicando, cubo girando, câmera orbitando, sombra no chão, sobre o vídeo —
+    # a prévia (three.js ao vivo) tem que bater com o arquivo (o mesmo three.js quadro a quadro → ProRes 4444)
+    "3d": (1080, 1920, """
+        const { clip } = __te;
+        const r = VE3DAPI.nova({ dur: 3, st: 0.5 }), m = VE.media[r.midia];
+        m.c3d.modelos.push({ id: 'esf', nome: 'esfera', fonte: { tipo: 'primitiva', forma: 'esfera', cor: '#ec6e48', material: 'ceramica' },
+            p: { x: -0.55, y: 0, z: 0, rx: 0, ry: 0, rz: 0, esc: 0.8 }, kf: { y: [[0, 0], [1.5, 0.6], [3, 0]] } });
+        m.c3d.modelos.push({ id: 'cubo', nome: 'cubo', fonte: { tipo: 'primitiva', forma: 'cubo', cor: '#0e3b4a', material: 'fosco' },
+            p: { x: 0.6, y: 0, z: 0, rx: 0, ry: 20, rz: 0, esc: 0.7 }, kf: { ry: [[0, 0], [3, 180, 'linear']] } });
+        m.c3d.camera.kf = { azimute: [[0, -20], [3, 40]] };
+        const c3 = { tr: 1, st: 0.5, s: 0, e: 3, m: m.id }; c3.p = veDefProps(c3);
+        return [clip(0, 0, 0, 4, 'principal'), c3];
+    """, ""),
     # cortes na batida exata (fora da grade de quadros): o quadro do corte não pode sair preto
     "grade": (1080, 1920, """
         const { clip } = __te;

@@ -571,6 +571,11 @@ function vePpHtml(a) {
             vePpSec('Duração', `<div class="ve-pp-l"><label>Duração</label><span></span><span class="ve-prop-num"><input type="number" data-pp="dur" min="0.04" step="0.01"><i>s</i></span></div>`) +
             links([['props', 'Controles de efeito'], ['lc', 'Luz e Cor']]);
     }
+    // Cena 3D (editor-3d.js): câmera, luz, modelos e cena, com quadros-chave (◆)
+    if (typeof ve3dEh === 'function' && ve3dEh(veMediaOf(c))) {
+        return cab(nome, `Cena 3D · ${veEsc(veMediaOf(c).name || '')} · V${c.tr + 1}`) + ve3dPainelHtml(c) +
+            transformar(true, true) + links([['props', 'Controles de efeito'], ['lc', 'Luz e Cor']]);
+    }
     // Comp (editor-comp.js): as Propriedades essenciais dela primeiro (textos e formas de dentro, só nesta faixa)
     if (typeof veEhComp === 'function' && veEhComp(veMediaOf(c))) {
         return cab(nome, `Comp · ${veEsc(vePjNome(veCompBase(veMediaOf(c))))} · V${c.tr + 1}`) + veCompEssHtml(c) +
@@ -764,6 +769,8 @@ function vePpInit() {
     const valor = el => el.type === 'checkbox' ? el.checked
         : (el.type === 'number' || el.type === 'range') ? parseFloat(String(el.value).replace(',', '.')) : el.value;
     box.addEventListener('input', e => {
+        const p3d = e.target.closest('[data-p3d],[data-p3dcena]');   // Cena 3D (editor-3d.js)
+        if (p3d && VE.ready) { ve3dEvento(p3d, 'input'); return; }
         const pce = e.target.closest('[data-pce]');   // Propriedades essenciais da Comp (editor-comp.js)
         if (pce && VE.ready) { veCompEssEvento(pce, 'input'); return; }
         const el = e.target.closest('[data-pp]');
@@ -773,6 +780,8 @@ function vePpInit() {
         vePpDepois(o, false);
     });
     box.addEventListener('change', e => {
+        const p3d = e.target.closest('[data-p3d],[data-p3dcena]');
+        if (p3d && VE.ready) { ve3dEvento(p3d, 'fim'); return; }
         const pce = e.target.closest('[data-pce]');
         if (pce && VE.ready) { veCompEssEvento(pce, 'fim'); return; }
         const el = e.target.closest('[data-pp]');
@@ -781,6 +790,8 @@ function vePpInit() {
         vePpDepois('tudo', true);
     });
     box.addEventListener('click', e => {
+        const p3a = e.target.closest('[data-p3dkf],[data-p3dacao]');
+        if (p3a && VE.ready) { ve3dEvento(p3a, 'clique'); return; }
         const volta = e.target.closest('[data-pce-volta]');
         if (volta && VE.ready) { veCompEssEvento(volta, 'volta'); return; }
         const anc = e.target.closest('[data-ppanc]');
