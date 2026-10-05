@@ -134,7 +134,7 @@ def _cache_cfg():
     except (TypeError, ValueError):
         dias, max_gb = 30, 20.0
     return {"dir": str(c.get("dir") or "").strip(), "lado": lado if lado in (540, 720, 1080) else 1080,
-            "dias": dias, "max_gb": max_gb}
+            "dias": dias, "max_gb": max_gb, "junto": bool(c.get("proxyJunto"))}
 
 
 def _midia_dir():
@@ -636,6 +636,97 @@ def _nome_proxy(lado, alfa=False):
     return "proxy_v2.mp4" if lado == 1080 else f"proxy_v2_{lado}.mp4"
 
 
+def _proxy_junto(path, lado, alfa=False):
+    """Prévia leve na pasta Proxy ao lado do vídeo (Preferências › proxy junto aos vídeos; desligado por padrão)."""
+    pasta, nome = os.path.split(os.path.abspath(path))
+    return os.path.join(pasta, "Proxy", f"{os.path.splitext(nome)[0]}_proxy{lado}" + (".webm" if alfa else ".mp4"))
+
+
+def _arquivo_proxy(path, work, lado, alfa=False):
+    """Onde está (ou vai ficar) a prévia leve: uma já feita — no cache ou na pasta Proxy, mais nova que o vídeo — ou
+    onde a nova vai: Proxy ao lado do vídeo com a opção ligada, senão o cache."""
+    cache = os.path.join(work, _nome_proxy(lado, alfa))
+    junto = _proxy_junto(path, lado, alfa)
+    if os.path.isfile(cache):
+        return cache
+    try:
+        if os.path.isfile(junto) and os.path.getmtime(junto) >= os.path.getmtime(path):
+            return junto
+    except OSError:
+        pass
+    return junto if _cache_cfg()["junto"] else cache
+
+
+def _instalar_proxy(tmp, proxy, work):
+    """Prévia convertida (no cache) vai para o lugar final; a pasta Proxy sem permissão (ou disco fora) fica no cache."""
+    try:
+        if os.path.normcase(os.path.dirname(os.path.abspath(proxy))) != os.path.normcase(os.path.abspath(work)):
+            os.makedirs(os.path.dirname(proxy), exist_ok=True)
+            shutil.move(tmp, proxy)   # outro disco: os.replace não atravessa volumes
+        else:
+            os.replace(tmp, proxy)
+        return proxy
+    except OSError as e:
+        print("[proxy] pasta Proxy indisponível, fica no cache:", e)
+        cache = os.path.join(work, os.path.basename(proxy))
+        _apagar_item(proxy)
+        os.replace(tmp, cache)
+        return cache
+
+
+_proxy_dims = {}
+
+
+def _proxy_pronto(path):
+    """Prévia leve H.264 já feita deste vídeo (qualquer qualidade, a maior primeiro): (arquivo, w, h) ou None."""
+    try:
+        work = _pasta_midia(path)
+        mt = os.path.getmtime(path)
+    except OSError:
+        return None
+    lados = sorted({_cache_cfg()["lado"], 1080, 720, 540}, reverse=True)
+    for lado in lados:
+        for arq in (os.path.join(work, _nome_proxy(lado)), _proxy_junto(path, lado)):
+            try:
+                if not os.path.isfile(arq) or (arq != os.path.join(work, _nome_proxy(lado)) and os.path.getmtime(arq) < mt):
+                    continue
+                chave = (arq, os.path.getmtime(arq))
+                if chave not in _proxy_dims:
+                    i = _probe_ffprobe(arq)
+                    _proxy_dims[chave] = (int(i.get("width") or 0), int(i.get("height") or 0))
+                w, h = _proxy_dims[chave]
+                if w > 1 and h > 1:
+                    return arq, w, h
+            except Exception:
+                continue
+    return None
+
+
+def _camada_no_proxy(c):
+    """Prévia renderizada: o clipe de vídeo pesado (8K/4K do celular) lê a prévia leve dele em vez do original quando
+    ela basta — a camada nunca aparece maior que a prévia leve. Escala e âncora passam para px da prévia; os efeitos
+    medem em % da mídia (mw/mh). A exportação final continua lendo o original."""
+    if c["tipo"] != "video" or not c["path"] or "sx" in c["kf"] or "sy" in c["kf"]:
+        return
+    px = _proxy_pronto(c["path"])
+    if not px:
+        return
+    arq, pw, ph = px
+    r = c["mw"] / pw
+    if r < 1.2 or abs(c["mw"] / c["mh"] - pw / ph) > 0.02:
+        return
+    maior = max([c["sc"]] + [p[1] for p in c["kf"].get("sc", [])])
+    if maior * r > 1.05:
+        return
+    c["path"] = arq
+    c["sc"] *= r
+    if "sc" in c["kf"]:
+        c["kf"]["sc"] = [(t, v * r, i, bz) for t, v, i, bz in c["kf"]["sc"]]
+    c["mw"], c["mh"] = pw, ph
+    c["ox"] /= r
+    c["oy"] /= r
+
+
 def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumbs_n=0, lado=1080):
     """Gera a prévia leve e, na MESMA passada, as miniaturas da timeline (decodificar um 4K HEVC
     várias vezes em paralelo era o que mais atrasava a abertura). Com placa NVIDIA tudo roda na GPU
@@ -817,17 +908,17 @@ def preparar(path, emit, stop_event=None):
             os.utime(pasta)
         except OSError:
             pass
-        proxy = os.path.join(pasta, _nome_proxy(lado, info.get("alfa")))
+        proxy = _arquivo_proxy(path, pasta, lado, info.get("alfa"))
         thumbs = None
         if os.path.isfile(proxy):
             ok, err = True, ""
         else:
-            tmp = f"{proxy}.{os.getpid()}.tmp{os.path.splitext(proxy)[1]}"
+            tmp = os.path.join(pasta, f"{os.path.basename(proxy)}.{os.getpid()}.tmp{os.path.splitext(proxy)[1]}")
             with _VAGAS_PROXY.vaga(os.path.abspath(path), 0):
                 ok, err, thumbs = gerar_proxy(path, info, tmp, lambda p: emit({"stage": "proxy", "pct": p}), stop_event,
                                               thumbs_dir=pasta, thumbs_n=count, lado=lado)
             if ok:
-                os.replace(tmp, proxy)
+                proxy = _instalar_proxy(tmp, proxy, pasta)
             else:
                 _apagar_item(tmp)
         if stop_event is not None and stop_event.is_set():
@@ -967,7 +1058,7 @@ def preparar_midia(path, emit, stop_event=None, prioridade=1, leve=False):
         pass
     lado = _cache_cfg()["lado"]
     direto = _navegador_toca(path, info)
-    proxy = os.path.join(work, _nome_proxy(lado, info.get("alfa")))
+    proxy = _arquivo_proxy(path, work, lado, info.get("alfa"))
     count = int(min(180, max(24, info["duration"] / 2)))
     if leve and not direto and not os.path.isfile(proxy):
         emit({"stage": "info", "needs_proxy": True, "leve": True, **info})
@@ -1005,12 +1096,14 @@ def preparar_midia(path, emit, stop_event=None, prioridade=1, leve=False):
                 _VAGAS_PROXY.priorizar(chave)
             with _trava_proxy(proxy):
                 if not os.path.isfile(proxy):
-                    tmp = f"{proxy}.{os.getpid()}.tmp{os.path.splitext(proxy)[1]}"   # por cópia do app: duas abrindo o mesmo vídeo não se atropelam
+                    # por cópia do app: duas abrindo o mesmo vídeo não se atropelam; converte no cache e só a prévia
+                    # pronta vai para a pasta Proxy (o sync da nuvem não pega o arquivo pela metade)
+                    tmp = os.path.join(work, f"{os.path.basename(proxy)}.{os.getpid()}.tmp{os.path.splitext(proxy)[1]}")
                     with _VAGAS_PROXY.vaga(chave, prioridade):   # 2 conversões por vez (os que tocam direto não esperam)
                         ok, err, thumbs = gerar_proxy(path, info, tmp, lambda p: emit({"stage": "proxy", "pct": p}),
                                                       stop_event, thumbs_dir=work, thumbs_n=count, lado=lado)
                     if ok:
-                        os.replace(tmp, proxy)   # interrompida no meio não vira prévia "pronta" quebrada
+                        proxy = _instalar_proxy(tmp, proxy, work)   # interrompida no meio não vira prévia "pronta" quebrada
                     else:
                         _apagar_item(tmp)
         if stop_event is not None and stop_event.is_set():
@@ -2575,6 +2668,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         W, H = int(round(W * red / 2)) * 2, int(round(H * red / 2)) * 2
         for c in lay:
             _reduzir_camada(c, red)
+    if previa:
+        for c in lay:
+            _camada_no_proxy(c)
     # Hard Limiter no Master: vem no fim da lista do mix como {"master": {...}} (editor.js: veExportar)
     master_lim = None
     if audio_clipes is not None:
@@ -2659,6 +2755,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                  and info.get("pix_fmt", "") in ("yuv420p", "yuvj420p", "yuv420p10le", "nv12", "p010le")
                  and mesma_proporcao and any(p[0] != "gap" for p in pecas))
     fmt_cuda = "p010le" if bits == 10 else "nv12"
+    nvdec_previa = previa and _detectar_hw_encoder() == "h264_nvenc"
 
     def _montar(turbo):
         """Comando e grafo de filtros. turbo = tudo na placa de vídeo (NVDEC → scale_cuda → NVENC)."""
@@ -2836,7 +2933,11 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 # decodificador abria uma por núcleo (1000+ threads, GBs de quadros na RAM) e eles brigavam pela CPU
                 c["ss"] = max(0.0, c["s"] - 3.0)
                 leitura = c["s"] - c["ss"] + c["fonte"] + 1.0
-                cmd += ["-threads", str(_THREADS_CLIPE)] + (["-ss", _tempo_ffmpeg(c["ss"])] if c["ss"] > 0 else [])                     + ["-t", _tempo_ffmpeg(leitura), "-i", c["path"] or path]
+                # prévia renderizada com placa NVIDIA: o clipe decodifica na placa (NVDEC; sem ela, o ffmpeg volta
+                # sozinho ao processador). Celular 8K HEVC em pé: trecho de 9,5 s 38 s → 11 s
+                cmd += ["-threads", str(_THREADS_CLIPE)] + (["-hwaccel", "cuda"] if nvdec_previa else []) \
+                    + (["-ss", _tempo_ffmpeg(c["ss"])] if c["ss"] > 0 else []) \
+                    + ["-t", _tempo_ffmpeg(leitura), "-i", c["path"] or path]
             idx = entrada
             entrada += 1
             kf = c["kf"]

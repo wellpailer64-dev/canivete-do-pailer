@@ -261,7 +261,7 @@ async function vePjImportarArquivo(path, pasta) {
         return true;
     }
     if (EXT_VIDEO.test(path)) {
-        if (path === VE.path) return false;
+        if (path === VE.path) { VEPJ._jaTem = (VEPJ._jaTem || 0) + 1; return false; }   // a mídia principal já está no painel
         veMidiaPreparar(vePjAddMidia({ kind: 'video', path, name: nome }, pasta));
         return true;
     }
@@ -294,9 +294,11 @@ async function vePjImportar(itens, destino = vePjDestino()) {
     }
     veToast('Importando...');
     let n = 0;
+    VEPJ._jaTem = 0;
     for (const it of itens) n += it.pasta ? await vePjImportarPasta(it.path, destino) : (await vePjImportarArquivo(it.path, destino) ? 1 : 0);
     vePjAlterou();
-    veToast(n ? `${n} ${n === 1 ? 'item importado' : 'itens importados'} para o projeto` : 'Nenhum arquivo compatível');
+    veToast(n ? `${n} ${n === 1 ? 'item importado' : 'itens importados'} para o projeto`
+        : VEPJ._jaTem ? 'Este vídeo já está no projeto' : 'Nenhum arquivo compatível');
 }
 
 function vePjImportarDialogo() {
@@ -1175,8 +1177,8 @@ function veOnMidia(ev) {
             VE.fps = ev.fps || VE.fps || 30;
             m.name = m.nome || ev.file_name || m.name;
             delete m.offline; delete m.missing; delete m.lost; delete m.erro;
-            const res = ev.width && ev.height ? `${ev.width}×${ev.height}` : '';
-            $ve('ve-meta').innerHTML = `<b>${veEsc(ev.file_name || vePjNome(m))}</b> · ${res} · ${(+ev.fps || VE.fps).toFixed(2).replace(/\.00$/, '')} fps · ${veHuman(ev.duration)}${ev.has_audio ? '' : ' · sem áudio'}`;
+            if (!ev.file_name) ev.file_name = vePjNome(m);
+            veMeta();
             if (ev.has_audio) veAudioFonte();
         }
         if (m._insertQueue) veVideoQueueTick(m._insertQueue);

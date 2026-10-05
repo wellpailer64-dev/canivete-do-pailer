@@ -2464,8 +2464,15 @@ function veTimelineDropPoint(drop) {
     return { t, tr, row, naTl };
 }
 
+// Mídia principal (id 0): a informação dela fica em VE.info, não em m.info — sem isto, arrastar o mesmo arquivo para
+// a timeline esperava um "info" que nunca vinha (ficava em "Preparando vídeo...")
+function veMidia0Info(m) {
+    if (m && m.id === 0 && !m.info && VE.info && VE.info.duration && !VE.info.offline) { m.info = VE.info; m.dur = VE.info.duration; }
+    return m;
+}
+
 function veVideoMidia(path, pasta) {
-    let m = VE.media.find(x => x.kind === 'video' && x.path === path && !x.removido);
+    let m = veMidia0Info(VE.media.find(x => x.kind === 'video' && x.path === path && !x.removido));
     if (!m) {
         const nome = path.split(/[\\/]/).pop();
         m = vePjAddMidia({ kind: 'video', path, name: nome }, pasta !== undefined ? pasta : (typeof vePjDestino === 'function' ? vePjDestino() : null));
@@ -2539,7 +2546,7 @@ function veAddImage(path, deslocamento = 0) {
 
 function veAddVideo(path, drop = veDropAtual()) {
     if (!VE.ready || !path) return null;
-    let m = VE.media.find(x => x.kind === 'video' && x.path === path && !x.removido);
+    let m = veMidia0Info(VE.media.find(x => x.kind === 'video' && x.path === path && !x.removido));
     const colocar = () => vePjColocar([m.id], drop);
     if (m && m.info && m.info.duration) { colocar(); return m; }
     if (!m) m = veVideoMidia(path);
@@ -5298,8 +5305,8 @@ function veOnPrepare(ev) {
             VE.pps = veFitPps();
             VE.view = 0;
             const res = ev.width && ev.height ? `${ev.width}×${ev.height}` : '';
-            $ve('ve-meta').innerHTML = ev.base_imagem ? `<b>${veEsc(ev.file_name)}</b> · ${res} · imagem`
-                : `<b>${veEsc(ev.file_name)}</b> · ${res} · ${(+ev.fps).toFixed(2).replace(/\.00$/, '')} fps · ${veHuman(ev.duration)}${ev.has_audio ? '' : ' · sem áudio'}`;
+            if (ev.base_imagem) $ve('ve-meta').innerHTML = `<b>${veEsc(ev.file_name)}</b> · ${res} · imagem`;
+            else veMeta();
             veLoading(ev.needs_proxy ? 'Preparando prévia leve (formato não toca direto no app)...' : 'Carregando vídeo...', ev.needs_proxy ? 0 : 60);
             if (ev.has_audio) veAudioFonte();   // áudio conformado para o mixer em tempo real
             veRefresh();
@@ -5610,6 +5617,18 @@ function veApplyMonitor() {
     veRulersDraw();
     // zoom pede outra resolução da prévia
     if (VE.ready && Math.round(VE.seqW * veMonitorScale()) !== v.width) veDrawMonitorSoon();
+    veMeta();
+}
+
+// Cabeçalho: o quadro da TIMELINE (Configurações da sequência); a mídia principal, se tiver outro tamanho, vai junto
+// (antes mostrava só a mídia 0 — 4320×7680 da câmera mesmo com a timeline em 1080×1920)
+function veMeta() {
+    const el = $ve('ve-meta'), ev = VE.info;
+    if (!el || !VE.ready || !ev || ev.offline || ev.base_imagem || !VE.seqW) return;
+    const fps = (+VE.fps || +ev.fps || 30).toFixed(2).replace(/\.00$/, '');
+    const src = ev.width && ev.height && (ev.width !== VE.seqW || ev.height !== VE.seqH) ? ` · mídia ${ev.width}×${ev.height}` : '';
+    const html = `<b>${veEsc(ev.file_name || '')}</b> · timeline ${VE.seqW}×${VE.seqH} · ${fps} fps${src} · ${veHuman(ev.duration)}${ev.has_audio ? '' : ' · sem áudio'}`;
+    if (el.innerHTML !== html) el.innerHTML = html;
 }
 
 function veMonitorFit() { VEM.mz = 1; VEM.mx = VEM.my = 0; veApplyMonitor(); }

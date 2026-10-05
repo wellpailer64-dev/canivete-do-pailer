@@ -23,7 +23,7 @@ const VEPR = {
     hold: 0,
 };
 
-const VE_PR_PREFS_PADRAO = { dir: '', maxGB: 20, dias: 30, altura: 1080, ramGB: 1.5, autoSeg: 3 };
+const VE_PR_PREFS_PADRAO = { dir: '', maxGB: 20, dias: 30, altura: 1080, ramGB: 1.5, autoSeg: 3, proxyJunto: false };
 function vePrPrefs() {
     const p = (typeof PREFS !== 'undefined' && PREFS.cache) || {};
     return { ...VE_PR_PREFS_PADRAO, ...p };
@@ -462,6 +462,23 @@ function vePrefsCacheSalvar(patch) {
     PREFS.cache = { ...vePrPrefs(), ...patch };
     prefsSave();
     vePrAplicarRam();
+    veProxyBtnUi();
+}
+
+// Proxy junto aos vídeos (desligado por padrão: a pasta do cliente pode estar na nuvem e subiria GBs de prévias).
+// Vale para as próximas prévias; as já feitas no cache continuam valendo (não converte de novo).
+function veProxyJuntoToggle() {
+    const on = !vePrPrefs().proxyJunto;
+    vePrefsCacheSalvar({ proxyJunto: on });
+    const el = document.getElementById('pref-proxy-junto');
+    if (el) el.value = on ? '1' : '0';
+    veToast(on ? 'Proxy ligado: as próximas prévias leves vão para a pasta Proxy ao lado dos vídeos'
+        : 'Proxy desligado: as próximas prévias leves vão para o cache');
+}
+
+function veProxyBtnUi() {
+    const b = document.getElementById('ve-proxy-btn');
+    if (b) b.classList.toggle('active', !!vePrPrefs().proxyJunto);
 }
 
 function vePrAplicarRam() {
@@ -484,6 +501,7 @@ function vePrefsCacheRender() {
     if (el('pref-ram-on') && typeof veCache === 'function') el('pref-ram-on').checked = veCache().on;
     if (el('pref-cache-auto')) el('pref-cache-auto').value = String(p.autoSeg);
     if (el('pref-hevc')) el('pref-hevc').value = PREFS.hevcModo === 'direto' ? 'direto' : 'converter';
+    if (el('pref-proxy-junto')) el('pref-proxy-junto').value = p.proxyJunto ? '1' : '0';
     vePrefsCacheInfo();
 }
 
@@ -541,6 +559,7 @@ function vePrefsCacheCampo(campo, valor) {
     if (campo === 'ramGB') vePrefsCacheSalvar({ ramGB: n || 1.5 });
     if (campo === 'autoSeg') { vePrefsCacheSalvar({ autoSeg: Math.max(0, n || 0) }); VEPRA.pausado = false; }
     if (campo === 'hevc') { PREFS.hevcModo = valor === 'direto' ? 'direto' : 'converter'; prefsSave(); }
+    if (campo === 'proxyJunto') vePrefsCacheSalvar({ proxyJunto: valor === '1' });
     if (campo === 'maxGB' || campo === 'dias') vePrManutencao();
 }
 
@@ -558,7 +577,7 @@ function vePrefsCacheLimpar(tudo) {
     });
 }
 
-window.addEventListener('prefs-carregadas', () => { vePrAplicarRam(); vePrManutencao(); veHevcTestar(); });
+window.addEventListener('prefs-carregadas', () => { vePrAplicarRam(); vePrManutencao(); veHevcTestar(); veProxyBtnUi(); });
 
 // H.265 toca direto neste PC? (precisa da extensão HEVC do Windows e de decodificador): toca uma amostra pequena,
 // busca um quadro e confere a imagem. O resultado vai para as preferências (hevcDireto), que o Python lê ao preparar

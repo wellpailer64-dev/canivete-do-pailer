@@ -348,7 +348,7 @@ const I18N_EN = {
     'Importar...': 'Import...', 'Renomear': 'Rename', 'Duplicar': 'Duplicate', 'Recortar': 'Cut', 'Copiar': 'Copy', 'Colar': 'Paste', 'Apagar': 'Delete',
     'Importar arquivos (Ctrl+I) — ou arraste arquivos e pastas do Windows para cá': 'Import files (Ctrl+I) — or drag files and folders from Windows here',
     'Nova pasta (Ctrl+B)': 'New bin (Ctrl+B)', 'Apagar do projeto (Delete)': 'Delete from project (Delete)', 'ainda não entra na timeline': 'not usable in the timeline yet',
-    'Importando...': 'Importing...', 'Nenhum arquivo compatível': 'No compatible files', 'Item duplicado': 'Item duplicated',
+    'Importando...': 'Importing...', 'Nenhum arquivo compatível': 'No compatible files', 'Este vídeo já está no projeto': 'This video is already in the project', 'Item duplicado': 'Item duplicated',
     'Camada de ajuste criada: arraste para a timeline': 'Adjustment layer created: drag it to the timeline',
     'Uma pasta não pode ir para dentro dela mesma': "A bin can't go inside itself",
     'Recortado: Ctrl+V cola na pasta selecionada': 'Cut: Ctrl+V pastes into the selected bin', 'Copiado: Ctrl+V cola na pasta selecionada': 'Copied: Ctrl+V pastes into the selected bin',

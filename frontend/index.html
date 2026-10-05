@@ -598,6 +598,7 @@
                                         <div class="ve-tc" id="ve-tc" ondblclick="veTcEditar()" title="Posição atual · duplo clique para digitar onde ir (ex.: 1:05:12, 130, +2s)">00:00:00:00</div>
                                         <button class="ve-tc-copiar" id="ve-tc-copiar" onclick="veTcCopiar()" title="Copiar o timecode"><svg class="i"><use href="#i-copy"/></svg></button>
                                         <button class="ve-tbtn ve-ruler-btn" id="ve-ruler-btn" onclick="veToggleRulers()" title="Réguas (Ctrl+R)"><svg class="i"><use href="#i-ruler"/></svg></button>
+                                        <button class="ve-tbtn ve-proxy-btn" id="ve-proxy-btn" onclick="veProxyJuntoToggle()" title="Proxy: as prévias leves dos próximos vídeos vão para uma pasta Proxy ao lado deles (levam o projeto junto para outro PC). A exportação sempre usa os originais.">PROXY</button>
                                         <select class="ve-res-sel" id="ve-res-sel" onchange="veSetPreviewRes(this.value)" title="Resolução da reprodução: Half alivia o processamento na prévia (a exportação sai sempre em qualidade máxima)">
                                             <option value="1">Full</option>
                                             <option value="0.5">1/2</option>
@@ -1955,6 +1956,11 @@
                     <select id="pref-hevc" class="modal-input" onchange="vePrefsCacheCampo('hevc', this.value)">
                         <option value="converter">Sempre converter para prévia leve</option>
                         <option value="direto">Tocar direto quando o PC suportar</option>
+                    </select>
+                    <label class="modal-label" for="pref-proxy-junto">Onde guardar as prévias leves (proxy)</label>
+                    <select id="pref-proxy-junto" class="modal-input" onchange="vePrefsCacheCampo('proxyJunto', this.value)">
+                        <option value="0">No cache (padrão)</option>
+                        <option value="1">Pasta Proxy ao lado dos vídeos</option>
                     </select>
                 </div>
                 <p>Vale para os próximos vídeos abertos. A qualidade das prévias também define o tamanho da prévia leve de edição. H.265 direto poupa a conversão, mas os cortes buscam mais devagar.</p>
