@@ -63,3 +63,18 @@ O projeto tem duas camadas:
   3. **Composição no Photo** (luz, sombra de contato, gradação de cor da campanha) — a ponte F3.
 - Foto de moda autoral com modelo real não se substitui de forma honesta; IA serve para direção, mockup e peças menores.
 - Ordem sugerida: ponte F1/F2 → modelos de campanha no Vetor → Blender (render de embalagem) → geração com referência.
+
+## 4. (por último) Editor Kanivete com objetos 3D, como o After Effects — dá: SIM
+O After Effects (2024+) importa GLB/OBJ como camada 3D e renderiza com luz, sombra, ambiente HDRI e profundidade de campo.
+O Editor/Comp é web (canvas) dentro do app: **three.js** (MIT, empacotado local) cobre isso no navegador, com WebGL.
+- **F1 — Camada 3D na Comp**: abrir `.glb/.gltf/.obj` (FBX → GLB via Blender sem interface) como camada; posição, rotação,
+  escala e animação embutida do modelo, tudo com quadros-chave como as outras propriedades.
+- **F2 — Câmera e luzes**: câmera com lente/foco (profundidade de campo), luz ambiente/direcional/pontual/spot com sombra,
+  ambiente HDRI (reflexo realista), quadros-chave em tudo.
+- **F3 — Cenário**: chão que recebe sombra, fundo com foto/vídeo (placa), neblina; integra com as camadas 2D (texto e
+  imagem na frente/atrás pela profundidade).
+- **F4 — Pontes**: Vetor exporta girar_3d/extrudar_3d como GLB (malha + rótulo como textura) → anima no Editor; Blender
+  (Cycles) para o render final pesado quando precisar de fotorrealismo.
+- **Regra de ouro**: o export renderiza quadro a quadro com o MESMO motor da prévia (three.js offscreen) e entra no
+  `testes/teste_export.py` (prévia × exportação), como o resto do Editor.
+- Custo: médio-alto (F1+F2 são o grosso). Depois da ponte Vetor ↔ Photo e do Blender, porque reaproveita os dois.
