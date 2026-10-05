@@ -631,7 +631,9 @@ function veEditPoints(excluir) {
 function veSnapshot() {
     // comps = Comps vivas no Projeto (editor-comp.js): desfazer "Criar Comp" também tira a Comp do painel
     const comps = (VE.media || []).filter(m => m && m.comp && !m.removido).map(m => m.id);
-    return JSON.stringify({ clips: VE.clips, inPt: VE.inPt, outPt: VE.outPt, markers: VE.markers || [], legendas: VE.legendas || [], comps });
+    // c3d = Cenas 3D (editor-3d.js): câmera, luz, modelos e quadros-chave também se desfazem
+    const c3d = {}; (VE.media || []).forEach(m => { if (m && m.c3d && !m.removido) c3d[m.id] = m.c3d; });
+    return JSON.stringify({ clips: VE.clips, inPt: VE.inPt, outPt: VE.outPt, markers: VE.markers || [], legendas: VE.legendas || [], comps, c3d });
 }
 
 function vePushHistory() {
@@ -650,6 +652,7 @@ function veRestore(snap) {
     VE.legendas = d.legendas || [];
     // Comp criada nesta sessão: volta ou sai do Projeto junto com o clipe dela (as do arquivo aberto ficam)
     if (Array.isArray(d.comps)) VE.media.forEach(m => { if (m && m.comp && (m._criada || d.comps.includes(m.id))) m.removido = !d.comps.includes(m.id); });
+    if (d.c3d) for (const [id, c] of Object.entries(d.c3d)) { const m = VE.media[+id]; if (m && m.c3d && JSON.stringify(m.c3d) !== JSON.stringify(c)) { m.c3d = c; if (typeof ve3dMudou === 'function') ve3dMudou(m); } }
     VE.sel = -1;
     VETX.legSel = -1;
     veCacheInvalidate();   // poda o cache RAM e recalcula os trechos renderizados (o do estado anterior volta a valer)

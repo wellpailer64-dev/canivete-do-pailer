@@ -18,11 +18,12 @@ function ve3dTelaMontar() {
         <div class="ve3t-lista" data-3t="lista"></div>
         <div class="ve3t-visor" data-3t="visor"><canvas></canvas><div class="ve3t-dica">${veT('Arrastar: orbitar · Rodinha: distância · Shift/meio: deslocar · Clique: selecionar · W/E/R: mover/girar/escala')}</div></div>
         <div class="ve3t-lado" data-3t="lado"></div>
-        <div class="ve3t-tempo"><button class="ve-btn ve-btn-sm" data-3tplay title="${veT('Espaço')}">▶</button><span class="ve3t-hora" data-3t="hora"></span>
-            <div class="ve3t-regua"><div data-3t="kfs"></div><input type="range" data-3t="regua" min="0" max="1" step="0.001"></div></div>`;
+        <div class="ve3t-tempo"><div class="ve3t-ctl"><button class="ve-btn ve-btn-sm" data-3tplay title="${veT('Espaço')}">▶</button><span class="ve3t-hora" data-3t="hora"></span></div>
+            <div class="ve3t-regua"><input type="range" data-3t="regua" min="0" max="1" step="0.001"></div>
+            <div class="ve3t-faixas" data-3t="faixas"></div></div>`;
     document.body.appendChild(el);
     const q = k => el.querySelector(`[data-3t="${k}"]`);
-    Object.assign(VE3T, { el, lista: q('lista'), visor: q('visor'), lado: q('lado'), hora: q('hora'), regua: q('regua'), kfs: q('kfs'), titulo: q('titulo'), cv: el.querySelector('.ve3t-visor canvas') });
+    Object.assign(VE3T, { el, lista: q('lista'), visor: q('visor'), lado: q('lado'), hora: q('hora'), regua: q('regua'), faixas: q('faixas'), titulo: q('titulo'), cv: el.querySelector('.ve3t-visor canvas') });
     el.addEventListener('click', e => {
         const b = e.target.closest('[data-3tsel],[data-3tadd],[data-3tvista],[data-3tmodo],[data-3tfechar],[data-3tplay],[data-3tkf]'); if (!b) return;
         const d = b.dataset;
@@ -35,7 +36,7 @@ function ve3dTelaMontar() {
         else if (d['3tmodo'] != null) ve3dTelaModo(d['3tmodo']);
         else if (d['3tfechar'] != null) ve3dTelaFechar();
         else if (d['3tplay'] != null) ve3dTelaPlay();
-        else if (d['3tkf'] != null) { ve3dTelaParar(); veSeek(+d['3tkf']); }
+        else if (d['3tkf'] != null) { if (VE3T.kfMoveu) { VE3T.kfMoveu = false; return; } ve3dTelaParar(); veSeek(+d['3tkf']); }
     });
     // propriedades: os mesmos eventos do painel Propriedades (ve3dEvento usa o clipe selecionado)
     const sel = () => { const c = ve3dTelaClipe(); if (c) VE.sel = VE.clips.indexOf(c); return !!c; };
@@ -43,6 +44,7 @@ function ve3dTelaMontar() {
     VE3T.lado.addEventListener('change', e => { const p = e.target.closest('[data-p3d],[data-p3dcena]'); if (p && sel()) ve3dEvento(p, 'fim'); });
     VE3T.lado.addEventListener('click', e => { const p = e.target.closest('[data-p3dkf],[data-p3dacao]'); if (p && sel()) ve3dEvento(p, 'clique'); });
     VE3T.regua.addEventListener('input', () => { ve3dTelaParar(); veSeek(+VE3T.regua.value); });
+    VE3T.faixas.addEventListener('pointerdown', ve3dTelaKfArrastar);
     const cv = VE3T.cv;
     cv.addEventListener('pointerdown', ve3dTelaApertar);
     cv.addEventListener('wheel', ve3dTelaRodinha, { passive: false });
@@ -137,12 +139,41 @@ function ve3dTelaTempo(c) {
     if (document.activeElement !== r) r.value = VE.playhead;
     const t = ve3dTelaT(c); VE3T.hora.textContent = `${t.toFixed(2)} s / ${(fim - c.st).toFixed(2)} s`;
     VE3T.el.querySelector('[data-3tplay]').textContent = VE3T.play ? '❚❚' : '▶';
-    // ◆ do selecionado (câmera inclui o foco) na régua: clique leva a agulha até ele
-    const m = ve3dTelaMidia(), so = VE3T.so, chave = so + '|' + VE3T.dados; if (chave === VE3T.kfsChave) return; VE3T.kfsChave = chave;
-    let o = null; try { o = ve3dObj(m, so); } catch (e) { /* modelo saiu */ }
-    const ts = new Set(); for (const l of Object.values((o && o.kf) || {})) for (const q of l) ts.add(+q[0].toFixed(3));
+    const ag = VE3T.faixas.querySelector('.ve3t-agulha'); if (ag) ag.style.setProperty('--p', ((VE.playhead - c.st) / Math.max(1e-6, fim - c.st)).toFixed(4));
+    // uma faixa por objeto com os ◆ dele (mesmo tempo = um ◆): clique leva a agulha, arrastar muda o tempo
+    const m = ve3dTelaMidia(), C = m.c3d, chave = VE3T.so + '|' + VE3T.dados + '|' + c.st + '|' + fim; if (chave === VE3T.kfsChave) return; VE3T.kfsChave = chave;
     const vel = typeof veVel === 'function' ? veVel(c) : 1;
-    VE3T.kfs.innerHTML = [...ts].map(tk => { const T = c.st + (tk - c.s) / vel, p = (T - c.st) / Math.max(1e-6, fim - c.st); return p < -0.001 || p > 1.001 ? '' : `<span class="ve3t-kf" style="left:calc(8px + (100% - 16px) * ${p.toFixed(4)})" data-3tkf="${T}" title="${tk.toFixed(2)} s">◆</span>`; }).join('');
+    const objs = [['camera', veT('Câmera'), C.camera], ['luz', veT('Luz'), C.luz], ['cenario', veT('Cenário'), ve3dCenario(C)], ...C.modelos.map(md => [md.id, md.nome || md.id, md])];
+    VE3T.faixas.innerHTML = objs.map(([id, nome, o]) => {
+        const ts = new Set(); for (const l of Object.values(o.kf || {})) for (const q of l) ts.add(+(+q[0]).toFixed(3));
+        const marcas = [...ts].map(tk => { const T = c.st + (tk - c.s) / vel, p = (T - c.st) / Math.max(1e-6, fim - c.st);
+            return p < -0.001 || p > 1.001 ? '' : `<span class="ve3t-kf" style="left:calc(8px + (100% - 16px) * ${p.toFixed(4)})" data-3tkf="${T}" data-3tq="${veEsc(id)}" data-3tt="${tk}" title="${tk.toFixed(2)} s">◆</span>`; }).join('');
+        const on = VE3T.so === id ? ' on' : '';
+        return `<button class="ve3t-it${on}" data-3tsel="${veEsc(id)}">${veEsc(nome)}</button><div class="ve3t-trilha${on}">${marcas}</div>`;
+    }).join('') + '<i class="ve3t-agulha"></i>';
+}
+function ve3dTelaKfArrastar(e) {   // arrastar ◆: todas as propriedades do objeto naquele tempo vão juntas
+    const k = e.target.closest('.ve3t-kf'); if (!k || e.button !== 0) return;
+    const c = ve3dTelaClipe(), m = ve3dTelaMidia(); if (!c || !ve3dEh(m)) return;
+    e.preventDefault(); k.setPointerCapture(e.pointerId);
+    const tr = k.parentElement.getBoundingClientRect(), fim = veEnd(c), vel = typeof veVel === 'function' ? veVel(c) : 1, fps = VE.fps || 30, x0 = e.clientX;
+    const tempo = x => { const p = Math.max(0, Math.min(1, (x - tr.left - 8) / Math.max(1, tr.width - 16))); return Math.round((c.s + p * (fim - c.st) * vel) * fps) / fps; };
+    let novo = null;
+    const mover = ev => { if (Math.abs(ev.clientX - x0) < 3 && novo == null) return; novo = tempo(ev.clientX); k.style.left = `calc(8px + (100% - 16px) * ${((novo - c.s) / vel / Math.max(1e-6, fim - c.st)).toFixed(4)})`; };
+    const soltar = () => {
+        k.removeEventListener('pointermove', mover); k.removeEventListener('pointerup', soltar);
+        if (novo == null) return;
+        VE3T.kfMoveu = true; const t0 = +k.dataset['3tt'], o = ve3dObj(m, k.dataset['3tq']), meio = 0.5 / fps;
+        if (Math.abs(novo - t0) < meio) return;
+        vePushHistory();
+        for (const [p, l] of Object.entries(o.kf || {})) {
+            const resto = l.filter(x => Math.abs(x[0] - novo) >= meio || Math.abs(x[0] - t0) < meio);   // o ◆ que chega substitui o que estava lá
+            for (const x of resto) if (Math.abs(x[0] - t0) < meio) x[0] = +novo.toFixed(4);
+            o.kf[p] = resto.sort((a, b) => a[0] - b[0]);
+        }
+        ve3dMudou(m); ve3dTelaLado();
+    };
+    k.addEventListener('pointermove', mover); k.addEventListener('pointerup', soltar);
 }
 function ve3dTelaPlay() { if (VE3T.play) ve3dTelaParar(); else VE3T.play = { t0: performance.now(), p0: VE.playhead }; }
 function ve3dTelaParar() { if (!VE3T.play) return; VE3T.play = null; veSeek(VE.playhead); }

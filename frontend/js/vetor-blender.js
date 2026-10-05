@@ -22,6 +22,7 @@ async function vbCena(g, a, base) {
     const az = (o3.luz_ang ?? -40) * Math.PI / 180, el = (o3.luz_alt ?? 45) * Math.PI / 180;
     cena.luz = { dir: [Math.sin(az) * Math.cos(el), -Math.sin(el), Math.cos(az) * Math.cos(el)], forca: (o3.luz ?? 100) / 100 };
     let pts3 = [];
+    for (const m of o3.mapas || []) await vk3dArteGeos(m.arte);
     if (o3.tipo === 'girar') {
         const P = vk3dLinhas(o3), perfil = P.rows.map(w => [w.r, w.y - P.cy]), ob = { tipo: 'girar', origem: [P.eixo, P.cy], perfil, K: 180, cor: vbRgb(o3.cor), material: o3.material || 'plastico', espessura: esp[o3.material] ?? 1 };
         cena.persp = o3.perspectiva ? P.esc * (6 - 5 * Math.min(1, o3.perspectiva / 100)) : 0; cena.chao_y = P.base - P.cy;
@@ -33,7 +34,7 @@ async function vbCena(g, a, base) {
                 const esc = (m.escala ?? 100) / 100, { cv, b } = vbArteCanvas(m.arte, k * esc), yc = m.y != null ? P.top + m.y : P.cy, acy = (b[1] + b[3]) / 2;
                 const tc = sp + Math.PI / 2 + (m.angulo || 0) * Math.PI / 180, uc = ((1 - tc / (2 * Math.PI)) % 1 + 1) % 1 * W;
                 for (let ty = 0; ty < cv.height; ty++) {
-                    const yObj = yc + ((b[1] + ty / (k * esc)) - acy) * esc, w = vk3dRaioEm(P, yObj), fx = P.rmax / Math.max(1e-6, w.r), larg = cv.width * fx, yt = (yObj - ytop) * k;
+                    const yObj = yc + ((b[1] + ty / (k * esc)) - acy) * esc, w = vk3dRaioEm(P, yObj), fx = P.rmax / Math.max(1e-6, w.r), larg = Math.min(cv.width * fx, Math.max(cv.width, W)) /* volta inteira: no máximo uma volta */, yt = (yObj - ytop) * k;
                     if (yt < -1 || yt > Ht) continue;
                     const y0 = Math.floor(yt);   // linha inteira e sobreposta (2 px): sem meia-transparência entre as linhas
                     for (const off of [0, -W, W]) ctx.drawImage(cv, 0, ty, cv.width, 1, uc - larg / 2 + off, y0, larg, 2);

@@ -138,6 +138,14 @@ function vk3dRaioEm(P, y) {   // raio da parede externa na altura y (o maior dos
     }
     return best || { r: P.rmax, nr: 1, ny: 0 };
 }
+async function vk3dArteGeos(objs) {   // geometria dos textos da arte (vem do Python, assíncrona): sem esperar, o texto sai faltando
+    for (const o of objs || []) {
+        if (o.visivel === false) continue;
+        if (o.tipo === 'texto') await vkGeoPronta(o);
+        else if (o.tipo === 'grupo') await vk3dArteGeos(o.itens);
+        else if (o.tipo === 'instancia') { const S = typeof vkSimbolo === 'function' && vkSimbolo(o.simbolo); if (S) await vk3dArteGeos(S.itens); }
+    }
+}
 function vk3dArteCaminhos(objs, out = [], M = null) {   // arte → caminhos (grupos abertos, instâncias, máscaras viram seus itens)
     for (const o of objs) {
         if (o.visivel === false) continue;

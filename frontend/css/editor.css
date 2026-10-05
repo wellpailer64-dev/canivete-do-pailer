@@ -2013,7 +2013,7 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-p3d-mod { border-top: 1px solid rgba(255,255,255,.06); padding-top: 6px; margin-top: 6px; display: grid; gap: 6px; }
 .ve-p3d-mod > .ve-pp-l b { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Tela da Cena 3D (editor-3d-tela.js): duplo clique na faixa da cena */
-.ve3t { position: fixed; inset: 0; z-index: 900; border: 0; border-radius: 0; height: auto; display: grid; grid-template-columns: 190px minmax(0, 1fr) 300px; grid-template-rows: 40px minmax(0, 1fr) 54px; background: var(--ve-bg); color: var(--ve-text); }
+.ve3t { position: fixed; inset: 0; z-index: 900; border: 0; border-radius: 0; height: auto; display: grid; grid-template-columns: 190px minmax(0, 1fr) 300px; grid-template-rows: 40px minmax(0, 1fr) auto; background: var(--ve-bg); color: var(--ve-text); }
 .ve3t[hidden] { display: none; }
 .ve3t-topo { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-bottom: 1px solid var(--ve-line); background: var(--ve-panel); }
 .ve3t-topo b { margin-right: auto; font-weight: 600; font-size: 13px; }
@@ -2029,8 +2029,14 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve3t-visor canvas { background: repeating-conic-gradient(#2a2a2a 0 25%, #222 0 50%) 0 0 / 16px 16px; touch-action: none; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
 .ve3t-dica { position: absolute; left: 10px; bottom: 8px; font-size: 11px; opacity: .6; pointer-events: none; }
 .ve3t-lado { overflow: auto; border-left: 1px solid var(--ve-line); background: var(--ve-panel); }
-.ve3t-tempo { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 12px; border-top: 1px solid var(--ve-line); background: var(--ve-panel); }
-.ve3t-regua { position: relative; flex: 1; height: 36px; }
-.ve3t-regua input { position: absolute; left: 0; right: 0; top: 16px; width: 100%; margin: 0; }
-.ve3t-kf { position: absolute; top: 0; transform: translateX(-50%); font-size: 11px; color: var(--ve-accent, #ff8a3d); cursor: pointer; }
+.ve3t-tempo { grid-column: 1 / -1; display: grid; grid-template-columns: 190px minmax(0, 1fr); align-items: center; padding: 6px 12px 8px; border-top: 1px solid var(--ve-line); background: var(--ve-panel); max-height: 32vh; overflow: auto; }
+.ve3t-ctl { display: flex; align-items: center; gap: 10px; }
+.ve3t-regua { position: relative; height: 26px; }
+.ve3t-regua input { position: absolute; left: 0; right: 0; top: 6px; width: 100%; margin: 0; }
+.ve3t-faixas { grid-column: 1 / -1; position: relative; display: grid; grid-template-columns: 190px minmax(0, 1fr); row-gap: 2px; }
+.ve3t-faixas .ve3t-it { padding: 2px 8px; }
+.ve3t-trilha { position: relative; height: 20px; border-radius: 3px; background: rgba(255,255,255,.03); }
+.ve3t-trilha.on { background: rgba(255,138,61,.08); }
+.ve3t-kf { position: absolute; top: 2px; transform: translateX(-50%); font-size: 12px; color: var(--ve-accent, #ff8a3d); cursor: ew-resize; touch-action: none; }
+.ve3t-agulha { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--ve-accent, #ff8a3d); pointer-events: none; left: calc(190px + 8px + (100% - 190px - 16px) * var(--p, 0)); }
 .ve3t-hora { font-variant-numeric: tabular-nums; font-size: 12px; min-width: 96px; }
