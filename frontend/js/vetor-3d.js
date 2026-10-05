@@ -142,6 +142,11 @@ function vk3dArteCaminhos(objs, out = [], M = null) {   // arte → caminhos (gr
     for (const o of objs) {
         if (o.visivel === false) continue;
         if (o.tipo === 'grupo') { vk3dArteCaminhos(o.clip ? o.itens.slice(1) : o.itens, out, M); continue; }
+        if (o.tipo === 'instancia') {   // símbolo (logo do kit): a definição na matriz da instância
+            const S = typeof vkSimbolo === 'function' && vkSimbolo(o.simbolo); if (!S) continue;
+            const itens = S.itens.map(f => { const c = vkClone(f); vkTransformar(c, o.m); return c; });
+            vk3dArteCaminhos(itens, out, M); continue;
+        }
         if (o.tipo === 'caminho' && o.subs && o.subs.length) out.push(vkClone(o));
         if (o.tipo === 'texto') {   // texto vira curvas na hora (cada cor de trecho é um caminho)
             const g = vkGeo(o); if (!g) continue;

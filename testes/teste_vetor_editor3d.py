@@ -34,6 +34,7 @@ with sync_playwright() as p:
     C("mapear_arte", {"id3d": cx3["id"], "arte": [t["id"]], "face": "frente"})
     an = C("caminho", {"d": "M180 40 L230 40 L230 90 L180 90 Z M195 55 L195 75 L215 75 L215 55 Z", "preench": "C0 M20 Y90 K0", "traco": "nenhum"})
     an3 = C("extrudar_3d", {"ids": [an["id"]], "profundidade": 12, "nome": "anel"})
+    pg.evaluate("VE3DAPI.nova({ dur: 2, nome: 'teste ponte' })")   # cena própria (selecionada): não mistura com outra aberta
     r = C("enviar_editor_3d", {"ids": [copo["id"], cx3["id"], an3["id"]]})
     ok(len(r["enviados"]) == 3, f"3 objetos enviados ({r})")
     info = pg.evaluate("VE3DAPI.info()")

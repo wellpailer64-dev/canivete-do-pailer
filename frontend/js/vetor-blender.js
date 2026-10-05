@@ -23,7 +23,7 @@ async function vbCena(g, a, base) {
     cena.luz = { dir: [Math.sin(az) * Math.cos(el), -Math.sin(el), Math.cos(az) * Math.cos(el)], forca: (o3.luz ?? 100) / 100 };
     let pts3 = [];
     if (o3.tipo === 'girar') {
-        const P = vk3dLinhas(o3), perfil = P.rows.map(w => [w.r, w.y - P.cy]), ob = { tipo: 'girar', perfil, K: 180, cor: vbRgb(o3.cor), material: o3.material || 'plastico', espessura: esp[o3.material] ?? 1 };
+        const P = vk3dLinhas(o3), perfil = P.rows.map(w => [w.r, w.y - P.cy]), ob = { tipo: 'girar', origem: [P.eixo, P.cy], perfil, K: 180, cor: vbRgb(o3.cor), material: o3.material || 'plastico', espessura: esp[o3.material] ?? 1 };
         cena.persp = o3.perspectiva ? P.esc * (6 - 5 * Math.min(1, o3.perspectiva / 100)) : 0; cena.chao_y = P.base - P.cy;
         if ((o3.mapas || []).length) {   // textura do rótulo no UV (u = ângulo, v = altura)
             const ytop = P.top, H0 = P.base - P.top, W = 4096, k = W / (2 * Math.PI * P.rmax), Ht = Math.min(4096, Math.ceil(H0 * k));
@@ -46,7 +46,7 @@ async function vbCena(g, a, base) {
     } else {
         const f = o3.fonte, b = vkBox(f), cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2, esc0 = Math.max(b[2] - b[0], b[3] - b[1]) || 1, d = o3.profundidade ?? esc0 * 0.25;
         const subs = f.subs.filter(s => s.fechado && s.pts.length > 1).map(s => s.pts.map(q => [q[0] - cx, q[1] - cy, q[2] - cx, q[3] - cy, q[4] - cx, q[5] - cy]));
-        const ob = { tipo: 'extrudar', subs, prof: d, chanfro: Math.min(o3.chanfro || 0, d * 0.45), cor: vbRgb(o3.cor), material: o3.material || 'fosco', decals: [] };
+        const ob = { tipo: 'extrudar', origem: [cx, cy], subs, prof: d, chanfro: Math.min(o3.chanfro || 0, d * 0.45), cor: vbRgb(o3.cor), material: o3.material || 'fosco', decals: [] };
         cena.persp = o3.perspectiva ? esc0 * (6 - 5 * Math.min(1, o3.perspectiva / 100)) : 0; cena.chao_y = b[3] - cy;
         for (const [i, m] of (o3.mapas || []).entries()) {   // arte na face: placa com 4 cantos (espaço do objeto, pt)
             const escA = (m.escala ?? 100) / 100, { cv, b: ab } = vbArteCanvas(m.arte, 6), acx = (ab[0] + ab[2]) / 2, acy = (ab[1] + ab[3]) / 2, face = m.face || 'frente';
@@ -121,6 +121,13 @@ async function vbEnviarEditor(a = {}) {
     if (typeof VE3DAPI !== 'object' || typeof VE === 'undefined') throw new Error('enviar_editor_3d: Editor Kanivete indisponível');
     if (!VE.ready) throw new Error('enviar_editor_3d: abra um vídeo ou crie uma timeline no Editor Kanivete antes');
     const api = vkApi(), pr = await api.ve_c3d_pasta(typeof vePrPrefs === 'function' ? vePrPrefs().dir : ''), out = [];
+    if (a.juntar && alvos.length > 1) {   // um modelo só (copo + tampa): as peças mantêm a posição relativa do documento
+        const partes = [];
+        for (const g of alvos) partes.push((await vbCena(g, { amostras: 1 }, `${pr.pasta.replace(/\\/g, '/')}/${vkSlug(g.nome || 'objeto3d')}_${g.id}_${Date.now().toString(36)}`)).cena.objetos[0]);
+        const r = await VE3DAPI.doVetor({ desc: { tipo: 'grupo', partes }, giro: alvos[0].tres_d, nome: a.nome || alvos[0].nome || 'Vetor 3D' });
+        if (a.abrir !== false) document.querySelector('.menu-item[data-tool="video-cutter"]')?.click();
+        return { enviados: [{ ids: alvos.map(g => g.id), modelo: r.id }] };
+    }
     for (const [i, g] of alvos.entries()) {
         const base = `${pr.pasta.replace(/\\/g, '/')}/${vkSlug(g.nome || 'objeto3d')}_${g.id}_${Date.now().toString(36)}`, { cena } = await vbCena(g, { amostras: 1 }, base);
         const r = await VE3DAPI.doVetor({ desc: cena.objetos[0], giro: g.tres_d, nome: g.nome || (g.tres_d.tipo === 'girar' ? 'Vetor: girar' : 'Vetor: extrudar'),

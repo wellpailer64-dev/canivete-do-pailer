@@ -10,16 +10,16 @@
 const VE3D = { lib: null, rt: new Map(), telas: new WeakMap(), atual: null, falhas: new Map(), espera: [], timer: 0 };
 const VE3D_COR = 'roxo';
 const VE3D_MATERIAIS = {   // os mesmos presets do render no Blender (Functions/blender_cena.py)
-    papel: { roughness: 0.82 }, fosco: { roughness: 0.65 }, plastico: { roughness: 0.32 }, ceramica: { roughness: 0.12, clearcoat: 0.7, clearcoatRoughness: 0.04 },
+    papel: { roughness: 0.6, sheen: 0.35, sheenRoughness: 0.6, clearcoat: 0.12, clearcoatRoughness: 0.45 }, /* papel de copo: acetinado */ fosco: { roughness: 0.65 }, plastico: { roughness: 0.32 }, ceramica: { roughness: 0.12, clearcoat: 0.7, clearcoatRoughness: 0.04 },
     metal: { roughness: 0.22, metalness: 0.35, clearcoat: 1 }, vidro: { roughness: 0.02, transmission: 1, ior: 1.45, thickness: 0.2 },
 };
 const ve3dEh = m => !!(m && m.c3d);
 function ve3dLib() {
     if (!VE3D.lib) VE3D.lib = (async () => {
         const T = await import('three');
-        const [{ GLTFLoader }, { OBJLoader }, { RoomEnvironment }] = await Promise.all([import('three/addons/loaders/GLTFLoader.js'),
-            import('three/addons/loaders/OBJLoader.js'), import('three/addons/environments/RoomEnvironment.js')]);
-        return { T, GLTFLoader, OBJLoader, RoomEnvironment };
+        const [{ GLTFLoader }, { OBJLoader }, { RoomEnvironment }, { toCreasedNormals }] = await Promise.all([import('three/addons/loaders/GLTFLoader.js'),
+            import('three/addons/loaders/OBJLoader.js'), import('three/addons/environments/RoomEnvironment.js'), import('three/addons/utils/BufferGeometryUtils.js')]);
+        return { T, GLTFLoader, OBJLoader, RoomEnvironment, toCreasedNormals };
     })();
     return VE3D.lib;
 }
@@ -46,7 +46,7 @@ function ve3dVal(o, k, t) {   // valor da propriedade no tempo t (quadros-chave 
     return kf.at(-1)[1];
 }
 const ve3dChave = m => JSON.stringify([m.c3d.modelos.map(md => [md.id, md.fonte]), m.c3d.chao !== false]);   // o que exige remontar a cena
-const VE3D_VERSAO = 3;   // subir quando o desenho mudar (foco, neblina, materiais): os .mov do cache ficam velhos
+const VE3D_VERSAO = 5;   // subir quando o desenho mudar (foco, neblina, materiais): os .mov do cache ficam velhos
 const ve3dSig = m => 'c3d.' + vePrHash(JSON.stringify([VE3D_VERSAO, m.c3d, VE.seqW, VE.seqH, VE.fps, +m.dur || 0]));
 
 async function ve3dCarregarModelo(md, L) {
@@ -60,6 +60,7 @@ async function ve3dCarregarModelo(md, L) {
         if (f.forma === 'plano') obj.rotation.x = -Math.PI / 2;
     } else if (f.tipo === 'vetor') {
         obj = await ve3dDoVetor(f.desc, T);
+        obj.updateMatrixWorld(true);
     } else {
         const r = await window.pywebview.api.ve_3d_url(f.path || '');
         if (!r || !r.success) throw new Error(`modelo 3D não encontrado: ${f.path}`);
@@ -76,12 +77,19 @@ async function ve3dCarregarModelo(md, L) {
     const b = new T.Box3().setFromObject(obj), tam = b.getSize(new T.Vector3()), c = b.getCenter(new T.Vector3());
     const s = 1 / Math.max(1e-6, tam.y > 1e-3 ? tam.y : Math.max(tam.x, tam.z));   // 1 de altura (plano: 1 de lado)
     norm.scale.setScalar(s); norm.position.set(-c.x * s, -b.min.y * s, -c.z * s);
-    return { raiz, mixer };
+    // sombra de contato (foto de produto): mancha macia no chão sob o modelo; cresce e esmaece quando ele sobe
+    const pe = Math.max(tam.x, tam.z) * s / 2;
+    return { raiz, mixer, pe };
 }
 // objeto 3D do Vetor (enviar_editor_3d): a mesma descrição do render no Blender (vbCena) — girar = torno com o rótulo em
 // UV (u = ângulo, v = altura), extrudar = forma com chanfro para dentro e as artes coladas nas faces. Espaço do Vetor
 // (x direita, y para baixo, pt) → three (y para cima): (x, -y, z).
 async function ve3dDoVetor(d, T) {
+    if (d.tipo === 'grupo') {   // várias peças (copo + tampa): ficam onde estavam no documento, umas em relação às outras
+        const g = new T.Group(), o0 = d.partes[0].origem || [0, 0];
+        for (const p of d.partes) { const s = await ve3dDoVetor(p, T), o = p.origem || o0; s.position.set(o[0] - o0[0], -(o[1] - o0[1]), 0); g.add(s); }
+        return g;
+    }
     const mat = (cor, extra = {}) => new T.MeshPhysicalMaterial({ color: new T.Color().setRGB(...cor, T.SRGBColorSpace), ...(VE3D_MATERIAIS[d.material] || VE3D_MATERIAIS.plastico), ...extra });
     const tex = async p => { const r = await window.pywebview.api.ve_3d_url(p); if (!r || !r.success) return null; const t = await new T.TextureLoader().loadAsync(r.url); t.colorSpace = T.SRGBColorSpace; t.anisotropy = 8; return t; };
     const g = new T.Group();
@@ -89,7 +97,8 @@ async function ve3dDoVetor(d, T) {
         const perf = d.perfil, K = 160, ytop = Math.min(...perf.map(p => p[1])), ybase = Math.max(...perf.map(p => p[1])), pos = [], uv = [], idx = [];
         for (const [r, y] of perf) for (let j = 0; j <= K; j++) { const t = 2 * Math.PI * j / K; pos.push(r * Math.cos(t), -y, r * Math.sin(t)); uv.push(1 - j / K, 1 - (y - ytop) / Math.max(1e-6, ybase - ytop)); }
         for (let a = 0; a < perf.length - 1; a++) for (let j = 0; j < K; j++) { const p = a * (K + 1) + j, q = (a + 1) * (K + 1) + j; idx.push(p, q, p + 1, p + 1, q, q + 1); }
-        const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+        let geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.setIndex(idx);
+        geo = (await ve3dLib()).toCreasedNormals(geo, 0.6);   // quina (fundo × parede, borda) fica viva; curva fica lisa
         let m = mat(d.cor, { side: T.DoubleSide });
         if (d.rotulo) {   // rótulo por cima da cor base (o PNG só tem tinta onde há arte)
             const t = await tex(d.rotulo);
@@ -128,7 +137,7 @@ async function ve3dMontar(m) {
     const r = new T.WebGLRenderer({ canvas: cv, alpha: true, antialias: true, preserveDrawingBuffer: true });
     r.outputColorSpace = T.SRGBColorSpace; r.toneMapping = T.NeutralToneMapping; r.shadowMap.enabled = true; r.shadowMap.type = T.PCFSoftShadowMap;
     const sc = new T.Scene(), pm = new T.PMREMGenerator(r); sc.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
-    const cam = new T.PerspectiveCamera(32, 16 / 9, 0.01, 500);
+    const cam = new T.PerspectiveCamera(32, 16 / 9, 0.05, 200);
     const key = new T.DirectionalLight(0xffffff, 2.6); key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.radius = 5; key.shadow.bias = -0.0004;
     Object.assign(key.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4, near: 0.1, far: 40 }); sc.add(key, key.target);
     const amb = new T.HemisphereLight(0xffffff, 0x8a8a8a, 0.8); sc.add(amb);
@@ -143,9 +152,22 @@ async function ve3dMontar(m) {
     const estudio = new T.Mesh(gEst, new T.MeshStandardMaterial({ color: 0xe9e4dc, roughness: 0.92, side: T.DoubleSide })); estudio.receiveShadow = true; sc.add(estudio);
     // foco (profundidade de campo): a cena vai para um alvo com profundidade e um passo de desfoque por distância
     const foco = ve3dFocoPasso(T);
-    const objs = [];
-    for (const md of m.c3d.modelos) { const o = await ve3dCarregarModelo(md, L); sc.add(o.raiz); objs.push({ md, ...o }); }
-    return { r, cv, sc, cam, key, amb, chao, estudio, foco, objs, T, chave: ve3dChave(m) };
+    const objs = [], mancha = ve3dMancha(T);
+    for (const md of m.c3d.modelos) {
+        const o = await ve3dCarregarModelo(md, L); sc.add(o.raiz);
+        const ct = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ map: mancha, color: 0x000000, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+        ct.rotation.x = -Math.PI / 2; ct.renderOrder = 1; sc.add(ct);
+        objs.push({ md, ...o, contato: ct });
+    }
+    // contraluz: recorte nas bordas (atrás do objeto, oposta à câmera), sem sombra
+    const contra = new T.DirectionalLight(0xffffff, 0); sc.add(contra, contra.target);
+    return { r, cv, sc, cam, key, amb, chao, estudio, foco, objs, contra, T, chave: ve3dChave(m) };
+}
+function ve3dMancha(T) {   // degradê radial (preto → transparente) da sombra de contato
+    const cv = document.createElement('canvas'); cv.width = cv.height = 256; const x = cv.getContext('2d'), g = x.createRadialGradient(128, 128, 0, 128, 128, 128);
+    [[0, 1], [0.55, 0.96], [0.72, 0.62], [0.86, 0.26], [1, 0]].forEach(([p, a]) => g.addColorStop(p, `rgba(255,255,255,${a})`));
+    x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+    const t = new T.CanvasTexture(cv); t.colorSpace = T.NoColorSpace; return t;
 }
 function ve3dFocoPasso(T) {
     const mat = new T.ShaderMaterial({
@@ -208,6 +230,8 @@ function ve3dAplicar(rt, m, t, W, H) {   // tudo o que anima, no tempo t (s, den
     const la = lp('azimute') * rad, le = lp('elevacao') * rad;
     key.position.set(alvo.x + 8 * Math.cos(le) * Math.sin(la), alvo.y + 8 * Math.sin(le), alvo.z + 8 * Math.cos(le) * Math.cos(la)); key.target.position.copy(alvo);
     key.intensity = lp('intensidade'); key.color.set(lp('cor') || '#ffffff'); amb.intensity = lp('ambiente');
+    const ci = lp('contra') || 0; rt.contra.intensity = ci;
+    if (ci > 0) { rt.contra.position.set(alvo.x - 8 * Math.cos(0.5) * Math.sin(az + 0.5), alvo.y + 8 * Math.sin(0.5), alvo.z - 8 * Math.cos(0.5) * Math.cos(az + 0.5)); rt.contra.target.position.copy(alvo); }
     const cn = ve3dCenario(C), np = k => ve3dVal(cn, k, t), est = (np('estudio') || 0) > 0.5;
     chao.visible = C.chao !== false && !est; chao.material.opacity = lp('sombra');
     rt.estudio.visible = est; rt.estudio.material.color.set(np('estudioCor') || '#e9e4dc'); rt.estudio.rotation.y = az; rt.estudio.position.set(alvo.x, 0, alvo.z);
@@ -217,7 +241,12 @@ function ve3dAplicar(rt, m, t, W, H) {   // tudo o que anima, no tempo t (s, den
     for (const o of rt.objs) {
         const v = k => ve3dVal(o.md, k, t);
         o.raiz.position.set(v('x') || 0, v('y') || 0, v('z') || 0); o.raiz.rotation.set((v('rx') || 0) * rad, (v('ry') || 0) * rad, (v('rz') || 0) * rad);
-        o.raiz.scale.setScalar(v('esc') ?? 1); o.raiz.visible = v('visivel') !== 0;
+        const es = v('esc') ?? 1; o.raiz.scale.set(es * (v('sx') ?? 1), es * (v('sy') ?? 1), es * (v('sz') ?? 1));   // sx/sy/sz: achatar (pedestal = cilindro baixo)
+        o.raiz.visible = v('visivel') !== 0;
+        const ctt = v('contato') ?? lp('contato') ?? 0.55, alt = Math.max(0, v('y') || 0), raio = (o.pe || 0.5) * es * Math.max(v('sx') ?? 1, v('sz') ?? 1);
+        o.contato.visible = o.raiz.visible && C.chao !== false && ctt > 0;
+        o.contato.position.set(v('x') || 0, 0.004, v('z') || 0); o.contato.scale.setScalar(raio * 3.3 * (1 + alt * 1.6));
+        o.contato.material.opacity = ctt / (1 + alt * 3.5) ** 2;
         if (o.mixer) o.mixer.setTime(Math.max(0, t * (o.md.p.velocidade ?? 1)));
     }
     if (C.fundo) r.setClearColor(new T.Color(C.fundo), 1); else r.setClearColor(0x000000, 0);
@@ -411,6 +440,7 @@ function ve3dPainelHtml(c) {
             `<small class="ve-pp-dica">${veT('Desfoque 0 = tudo nítido. Foco vazio = no ponto que a câmera olha. Anime o foco para trocar de objeto.')}</small>`) +
         vePpSec(veT('Luz'), lin('luz', luz, 'azimute', 'Direção', -180, 180, 1, '°') + lin('luz', luz, 'elevacao', 'Altura', 5, 90, 1, '°') +
             lin('luz', luz, 'intensidade', 'Intensidade', 0, 8, 0.05) + lin('luz', luz, 'ambiente', 'Ambiente', 0, 3, 0.05) + lin('luz', luz, 'sombra', 'Sombra', 0, 1, 0.01) +
+            lin('luz', luz, 'contra', 'Contraluz', 0, 8, 0.05) + lin('luz', luz, 'contato', 'Sombra de contato', 0, 1, 0.01) +
             `<div class="ve-pp-l"><label>${veT('Cor da luz')}</label><input type="color" data-p3d="luz|cor" value="${veEsc(luz.p.cor || '#ffffff')}"></div>`) +
         vePpSec(veT('Modelos'), (modelos || `<small class="ve-pp-dica">${veT('Nenhum modelo ainda.')}</small>`) +
             `<div class="ve-pp-botoes"><button class="ve-btn ve-btn-sm" data-p3dacao="arquivo">${veT('Importar .glb / .obj…')}</button></div>
