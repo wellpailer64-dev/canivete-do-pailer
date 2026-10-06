@@ -286,6 +286,7 @@ async function ieSalvar(comoNovo = false) {
     if (!doc || !api) return false;
     ieTextoEncerrar(true);
     if (IE.transf) ieTransfAplicar();
+    if (doc.pai && !comoNovo) return ieConteudoDevolver(doc);   // aba de conteúdo de objeto inteligente: devolve à origem
     // Ctrl+S: projeto (.iknv) aberto salva nele; PSD aberto salva no PSD (ida e volta); o resto pergunta.
     // No diálogo dá para escolher .iknv (projeto do KANIVETE, padrão do documento novo) ou .psd.
     let destino = comoNovo ? null : (/\.iknv$/i.test(doc.path || '') ? doc.path : doc.psdPath);
@@ -378,6 +379,44 @@ async function ieSalvar(comoNovo = false) {
         ieToast(`${ieT('Não salvou')}: ${e.message || e}`);
         return false;
     } finally { ieCarregando(false); }
+}
+
+// ── Editar conteúdo do objeto inteligente (duplo clique na miniatura, como no Photoshop): abre numa aba do tamanho
+// dele; Ctrl+S nessa aba devolve para o documento de origem (pixels + camadas guardadas; escala/rotação e filtros
+// inteligentes do objeto continuam valendo) ──
+function ieConteudoAbrir(doc, L) {
+    if (!doc || !L || L.tipo !== 'inteligente' || !L.c0) return;
+    if (L.vetor && typeof vpEditarNoVetor === 'function') return vpEditarNoVetor(doc, L);
+    const ja = IE.docs.find(d => d.pai && d.pai.docId === doc.id && d.pai.camadaId === L.id);
+    if (ja) { ieMostrarDoc(ja); ieAbasRender?.(); return ja; }
+    const N = ieNovoDoc2((L.nome || ieT('Objeto inteligente')) + '.psb', L.c0.c.width, L.c0.c.height, doc.dpi, 'transp');
+    if (L.conteudo && L.conteudo.length) {   // camadas guardadas: voltam editáveis, no espaço do objeto
+        const dx = -(L.cx0 ?? L.c0.x), dy = -(L.cy0 ?? L.c0.y);
+        N.camadas = L.conteudo.map(X => { const Y = ieDuplicarCamada(N, X); iePercorrer([Y], Z => { if (Z.c || Z.txt || Z.c0) ieMoverCamada(Z, dx, dy); }); return Y; });
+    } else N.camadas = [ieNovaCamada(N, { nome: L.nome || ieT('Camada 1'), c: ieClonar(L.c0.c), x: 0, y: 0, sujoPx: true })];
+    N.ativa = N.camadas[N.camadas.length - 1].id; N.selIds = [N.ativa];
+    N.pai = { docId: doc.id, camadaId: L.id };
+    ieTudo(N); N.sujo = false; ieAbasRender?.();
+    ieToast(ieT('Edite e salve (Ctrl+S): o objeto inteligente atualiza no documento de origem'));
+    return N;
+}
+function ieConteudoDevolver(N) {
+    const pai = IE.docs.find(d => d.id === N.pai.docId), L = pai && ieAchar(pai, N.pai.camadaId)?.L;
+    if (!L) { ieToast(ieT('O documento de origem (ou a camada) não está mais aberto')); return false; }
+    const Rantes = ieRCamada(L), x0 = L.c0.x, y0 = L.c0.y;
+    L.c0 = { c: ieAchatar(N, N.camadas, ieRDoc(N)), x: x0, y: y0 };
+    L.conteudo = N.camadas.map(X => { const Y = ieDuplicarCamada(pai, X); iePercorrer([Y], Z => { if (Z.c || Z.txt || Z.c0) ieMoverCamada(Z, x0, y0); }); return Y; });
+    L.cx0 = x0; L.cy0 = y0;
+    const atual = IE.doc; IE.doc = pai;   // os filtros inteligentes medem pelo documento da camada
+    try {
+        const o = ieIntPlano(L);
+        L.c = o.c; L.x = o.x; L.y = o.y; L.sujoPx = true; L._miniCache = null;
+        ieInvalidar(L); ieAgendar(ieRUniao(Rantes, ieRCamada(L)), pai);
+        ieHist(ieT('Editar conteúdo'), pai); pai.sujo = true;
+    } finally { IE.doc = atual; }
+    N.sujo = false; ieAbasRender?.();
+    ieToast(`${ieT('Objeto inteligente atualizado em')} ${pai.nome}`);
+    return true;
 }
 
 // várias camadas (ou texto/grupo) → um objeto inteligente com a composição delas; as originais ficam em L.conteudo

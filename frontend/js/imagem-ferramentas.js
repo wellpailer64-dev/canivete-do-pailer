@@ -533,6 +533,12 @@ const IE_MOVER = {
                 return;
             }
             const alvo = ieMoverAlvoAuto(doc, L);
+            if (alvo && ev.shiftKey && doc.selIds.includes(alvo.id)) {   // Shift+clique num já selecionado: sai da seleção
+                doc.selIds = doc.selIds.filter(i => i !== alvo.id);
+                doc.ativa = doc.selIds.length ? doc.selIds[doc.selIds.length - 1] : null;
+                ieUiCamadas?.(); ieUiProps?.(); ieDesenharSobre();
+                return;
+            }
             if (alvo && !(doc.selIds.length > 1 && doc.selIds.includes(alvo.id))) ieAtivar(alvo.id, doc, { somar: ev.shiftKey });
             else if (!alvo && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
                 ieLimparCamadas(doc);
