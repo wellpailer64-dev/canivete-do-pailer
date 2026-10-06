@@ -76,7 +76,10 @@ def moldura(r, i, n, fundo):
                   + (f'<div class="mold-cargo">{html.escape(p["cargo"])}</div>' if p.get("cargo") else "") + '</div></div>')
     seta = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg>'
     num = f'<div class="mold-num" data-papel="meta">{i:02d}/{n:02d} {seta if i < n else ""}</div>'
-    rod = f'<div class="mold-rod" data-papel="meta">{html.escape(u)}</div>' if u and not r.get("_sem_rodape", {}).get(i) else ""
+    # objeto no canto de baixo à esquerda (texto-respiro com lado esquerda) cobriria o @: vai para a direita
+    s = r["slides"][i - 1]; dir_ = s.get("esqueleto") == "texto-respiro" and (s.get("asset") or {}).get("lado") == "esquerda" and (s.get("asset") or {}).get("prompt")
+    rod = (f'<div class="mold-rod" data-papel="meta"{" style=&quot;left:auto;right:80px&quot;" if dir_ else ""}>{html.escape(u)}</div>'.replace("&quot;", '"')
+           if u and not r.get("_sem_rodape", {}).get(i) else "")
     return perfil + num + rod
 
 
@@ -107,6 +110,9 @@ def slide(r, s, i, n):
     fz = r.get("formas", True) and s.get("forma", "apoio" if s.get("esqueleto") == "gancho-heroi" else None) == "apoio"
     e, f = s.get("esqueleto", "texto-respiro"), s.get("fundo", "escuro")
     a, lado = s.get("asset"), (s.get("asset") or {}).get("lado", "direita")
+    if r.get("_sem_rodape", {}).get(i) and e in ("texto-respiro", "eco-pessoa"):
+        # o objeto da capa atravessa para o canto esquerdo deste slide: texto à DIREITA e sem outro objeto disputando
+        lado, a = "esquerda", None
     # caixa alta condensada: justo (.95) sem acento; acento maiúsculo (Á, Ê, Ç...) sobe ~.25em → abre para 1.12
     acento = lambda t: re.search("[À-ÖØ-Ý]", t.upper())
     lh = lambda t: f' style="line-height:{1.12 if acento(t) else .95}"'
@@ -186,6 +192,13 @@ def montar_html(r):
     for i, s in enumerate(r["slides"], 1):
         a, b = slide(r, s, i, n); secoes.append(a); soltos.append(b)
     fundos = [s.get("fundo", "escuro") for s in r["slides"]]
+    # destaque no fundo "cor": escuro se a cor da marca é clara/viva, claro (tom da marca) se ela já é escura (verde-oliva)
+    def lum(h):   # luminância relativa (WCAG)
+        f = lambda v: v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+        return sum(f(int(h.lstrip("#")[k:k + 2], 16) / 255) * w for k, w in zip((0, 2, 4), (0.2126, 0.7152, 0.0722)))
+    razao = lambda a, b: (max(lum(a), lum(b)) + 0.05) / (min(lum(a), lum(b)) + 0.05)
+    fundo_cor = misturar(m["primaria"], "#000000", 0.85)
+    dest_cor = max(["#1c1c1e", misturar("#ffffff", m["primaria"], 0.7), "#fff3c4"], key=lambda c: razao(c, fundo_cor))
     for p in r.get("pontes", []):
         k = p["depois"]                       # entre o slide k e o k+1
         if p.get("tipo") == "fita":
@@ -202,7 +215,7 @@ body{{--cor-primaria:{m['primaria']};--cor-fundo:#fff;font-family:'{m['texto']}'
 .escuro{{background:radial-gradient(120% 80% at 70% 10%,#2c2c2f 0%,{m['escuro']} 60%);color:#f1f1f1}}
 .claro{{background:radial-gradient(120% 80% at 30% 0%,#ffffff 0%,{m['claro']} 65%);color:#2b2b2b}}
 .cor{{background:radial-gradient(120% 80% at 50% 0%,color-mix(in srgb,{m['primaria']} 92%,#000) 0%,color-mix(in srgb,{m['primaria']} 78%,#000) 70%);color:#fff}}
-.cor .dest{{color:#1c1c1e}} .cor .k-pilula{{background:#fff;color:color-mix(in srgb,{m['primaria']} 80%,#000)}} .cor .k-seta-mao{{color:#fff}} .cor .k-marca{{--cor-marca:#1c1c1e}} .dest{{font-style:normal;color:var(--cor-primaria)}}
+.cor .dest{{color:{dest_cor}}} .cor .mold-rod{{opacity:1}} .cor .k-pilula{{background:#fff;color:color-mix(in srgb,{m['primaria']} 80%,#000)}} .cor .k-seta-mao{{color:#fff}} .cor .k-marca{{--cor-marca:#1c1c1e}} .dest{{font-style:normal;color:var(--cor-primaria)}}
 .gancho{{font-family:'{m['titulo']}';font-weight:400;text-transform:uppercase;font-size:calc(150px * var(--k,1));line-height:1.04;letter-spacing:-.5px;margin:0}}
 .sub{{font-size:38px;line-height:1.2;margin-top:34px;max-width:620px}}
 .pre{{font-size:30px;opacity:.75;margin-bottom:18px}}
@@ -215,7 +228,7 @@ body{{--cor-primaria:{m['primaria']};--cor-fundo:#fff;font-family:'{m['texto']}'
 .mold-nome{{font-size:20px;font-weight:700;line-height:1.2}} .mold-cargo{{font-size:16px;opacity:.7;line-height:1.2}}
 .mold-num{{position:absolute;right:{M}px;top:66px;font-size:20px;font-weight:700;display:flex;gap:8px;align-items:center}}
 .mold-num svg{{color:var(--cor-primaria)}}
-.mold-rod{{position:absolute;left:{M}px;bottom:56px;font-size:20px;font-weight:700;opacity:.7}}
+.mold-rod{{position:absolute;left:{M}px;bottom:56px;font-size:20px;font-weight:700}}
 .bloco-gancho{{position:absolute;left:{M}px;top:170px;width:880px;z-index:1}}
 .bloco-texto{{position:absolute;top:0;bottom:0;width:640px;display:flex;flex-direction:column;justify-content:center}}
 .eco-v{{top:-40px;font-size:340px;transform:rotate(90deg);transform-origin:0 0;left:{W - 60}px;color:currentColor;opacity:.08}}
