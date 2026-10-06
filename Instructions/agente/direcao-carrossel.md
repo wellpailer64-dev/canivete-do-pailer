@@ -171,5 +171,9 @@ topo: claridade 16, textura 12, contraste 10, vibração 6, grão 12, vinheta �
   inglês com reserva). Comparação no mesmo briefing: Qwen3 8B 12–22 s, texto concreto e limpo (padrão);
   Gemma 3 12B ~2 min, texto mais humano e metáforas melhores, formato bagunçado (candidato a "redator" só da capa e
   das metáforas); Qwen3 30B-A3B ~80 s, repetitivo — não compensa. Roteiro inteiro numa chamada só: copia o exemplo.
-- Pendente: modo híbrido (Gemma na capa/metáforas + Qwen nos itens); slide logo depois do objeto que atravessa fica
+- **Híbrido** (`--etapas --hibrido`, ~65 s): Gemma 3 12B escreve capa, metáforas visuais e virada; Qwen3 8B os itens
+  (o modelo só dá o benefício em 1 palavra, o título "Item = *benefício*" é montado por regra); limpeza por regra:
+  sem emoji, frase cortada no limite, objeto tem que ser nome em inglês (recusa pergunta, pronome, slogan) e sai
+  "inteiro com margem" (sem corte seco). Exemplo: capa "*Sua* culpa no café da manhã te impede?" + caneca lascada.
+- Pendente: slide logo depois do objeto que atravessa fica
   vazio quando o objeto é estreito; estruturas além de "lista" (mito × verdade, antes × depois, história).

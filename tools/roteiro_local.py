@@ -82,34 +82,71 @@ def pedir(modelo, instr, campos):
     except (json.JSONDecodeError, KeyError): return {}
 
 
-def etapas(briefing, itens, modelo, primaria, estilo=None):
+def limpar(t, max_pal=None):
+    """tira emoji/símbolo solto e espaço sobrando; max_pal corta na 1ª frase e no limite de palavras"""
+    t = re.sub(r"[\U0001F000-\U0001FAFF☀-➿️]", "", str(t or "")).strip()
+    t = re.sub(r"\s{2,}", " ", t)
+    if max_pal:
+        t = re.split(r"(?<=[.!?])\s", t)[0]
+        w = t.split()
+        if len(w) > max_pal: t = " ".join(w[:max_pal]).rstrip(",;:") + "…"
+    return t
+
+
+def objeto_bom(t):
+    """nome de objeto em inglês (não frase em português, não slogan 'Breakfast Bliss')"""
+    if not t or re.search(r"[ãõçéêáíóúâ]|\b(de|para|com|não|que)\b", t, re.I) or len(t.split()) > 10: return False
+    if re.search(r"[?!]|\b(you|your|i|we|is|are|be|defines?|defined|makes?|needs?|can|will|should)\b", t, re.I): return False   # frase, não objeto
+    w = t.split()
+    return not (len(w) <= 3 and all(x[:1].isupper() for x in w))
+
+
+def etapas(briefing, itens, modelo, primaria, estilo=None, redator=None):
     """estrutura 'lista' por regra (capa → 1 slide por item → virada) e cada slide numa chamada curta, sem exemplo
-    para copiar; esqueletos, fundos e pontes por regra; prompts de objeto numa chamada própria (em inglês)"""
-    n = len(itens) + 2
-    capa = pedir(modelo, f"Briefing: {briefing}\nSlide 1 de {n} (capa). Escreva um gancho de no máximo 7 palavras que "
-                 "prenda (afirmação forte ou pergunta), com a palavra mais forte entre *asteriscos*, e um sub de 1 frase "
-                 "que prometa o que vem nos próximos slides.", '"gancho", "sub"')
+    para copiar; esqueletos, fundos e pontes por regra; prompts de objeto numa chamada própria (em inglês).
+    Híbrido (redator = ex. gemma3:12b): o redator faz o que pede criatividade (capa, metáforas visuais, virada) e o
+    modelo rápido faz os itens; a limpeza por regra segura o formato do redator (emoji, frase longa, slogan)."""
+    n, red = len(itens) + 2, redator or modelo
+    pedido_capa = (f"Briefing: {briefing}\nSlide 1 de {n} (capa). Escreva um gancho de no máximo 7 palavras que "
+                   "prenda (afirmação forte ou pergunta), com a palavra mais forte entre *asteriscos*, e um sub de 1 frase "
+                   "(até 14 palavras) que prometa o que vem nos próximos slides. Sem emoji.")
+    capa = pedir(red, pedido_capa, '"gancho", "sub"')
+    if len(limpar(capa.get("gancho")).split()) > 8:   # redator passou do limite: 1 chance, depois o modelo rápido
+        capa = pedir(red, pedido_capa + f"\nO anterior tinha {len(capa.get('gancho', '').split())} palavras: no máximo 7.", '"gancho", "sub"')
+        if len(limpar(capa.get("gancho")).split()) > 8: capa = pedir(modelo, pedido_capa, '"gancho", "sub"')
+    capa = {"gancho": limpar(capa.get("gancho")), "sub": limpar(capa.get("sub"), 16)}
     feitos, slides, usadas = [], [], []
     destaque = lambda t: re.findall(r"\*([^*]+)\*", t or "")
     for k, it in enumerate(itens, 1):
         s = pedir(modelo, f"Briefing: {briefing}\nSlide {k + 1} de {n}: item {k} de {len(itens)} = '{it}'.\n"
                   f"Já escritos (não repita frases, estrutura nem ideias): {json.dumps(feitos, ensure_ascii=False)}\n"
                   f"Palavras de destaque já usadas, PROIBIDAS: {usadas or 'nenhuma'}.\n"
-                  "Escreva um titulo de no máximo 5 palavras com o item e um benefício DIFERENTE dos anteriores (ex.: saciedade, "
-                  "energia, praticidade, sabor), com 1 palavra entre *asteriscos*, e corpo com 2 frases curtas (até 24 palavras) "
-                  "com um detalhe concreto desse item (quanto tempo leva, como montar, o que ele resolve); **negrito** em 2 palavras.",
-                  '"titulo", "corpo" (lista de 2 frases)')
+                  "Dê o benefício principal em UMA palavra, DIFERENTE dos anteriores (ex.: saciedade, energia, praticidade, "
+                  "sabor), e corpo com 2 frases curtas (até 16 palavras cada) com um detalhe concreto desse item (quanto tempo "
+                  "leva, como montar, o que ele resolve); **negrito** em 2 palavras.",
+                  '"beneficio" (1 palavra), "corpo" (lista de 2 frases)')
+        bene = limpar(s.get("beneficio") or "").strip("*. ").split()[:2]
+        # título montado por regra: "Item = *benefício*" (o modelo só escolhe a palavra)
+        s["titulo"] = f"{it[:1].upper() + it[1:]} = *{' '.join(bene).lower()}*" if bene else it[:1].upper() + it[1:]
+        s["corpo"] = [limpar(f, 18) for f in ([s["corpo"]] if isinstance(s.get("corpo"), str) else s.get("corpo") or [])][:2]
         usadas += [w.lower() for w in destaque(s.get("titulo"))]
         feitos.append(s); slides.append(s)
-    fim = pedir(modelo, f"Briefing: {briefing}\nÚltimo slide ({n} de {n}): virada. Já escritos: {json.dumps([capa] + feitos, ensure_ascii=False)}\n"
+    fim = pedir(red, f"Briefing: {briefing}\nÚltimo slide ({n} de {n}): virada. Já escritos: {json.dumps([capa] + feitos, ensure_ascii=False)}\n"
                 "Escreva o contraste em DUAS palavras-chave: 'menos' = o que a pessoa deve largar (1–2 palavras) e 'mais' = o "
-                "que ganha (1–2 palavras); e corpo com 1 frase convidando a salvar o post.", '"menos", "mais", "corpo"')
+                "que ganha (1–2 palavras); e corpo com 1 frase (até 18 palavras) convidando a salvar o post. Sem emoji.", '"menos", "mais", "corpo"')
+    fc0 = limpar(fim.get("corpo") if isinstance(fim.get("corpo"), str) else " ".join(fim.get("corpo") or []))
+    frases_f = re.split(r"(?<=[.!?])\s", fc0)       # fica a frase que chama para salvar (senão a 1ª), até 20 palavras
+    fim["corpo"] = limpar(next((f for f in frases_f if re.search(r"salv", f, re.I)), frases_f[0]), 20)
+    for k2 in ("menos", "mais"):                   # 1–2 palavras: "culpa, perfeição" → "culpa"
+        if fim.get(k2): fim[k2] = " ".join(re.split(r"\s*[,;/]\s*|\s+e\s+", limpar(fim[k2]))[0].split()[:2])
     if fim.get("menos") and fim.get("mais"):       # a frase de virada é montada por regra: "Menos X. | Mais *Y*."
         fim["gancho"] = f"Menos {fim['menos'].strip(' .').lower()}. | Mais *{fim['mais'].strip(' .*').lower()}*."
-    vis = pedir(modelo, f"Briefing: {briefing}\nPara cada item, um objeto REAL que represente o item, em inglês, foto de "
-                f"produto: {json.dumps(itens, ensure_ascii=False)}. Mais um objeto-metáfora para a capa e um para o fim.",
+    vis = pedir(red, f"Briefing: {briefing}\nPara cada item, o objeto REAL que mostra o item numa foto de produto: "
+                f"{json.dumps(itens, ensure_ascii=False)}. Para a capa (gancho: '{capa.get('gancho')}') e para o fim "
+                f"(virada: '{fim.get('gancho', '')}'), um objeto-METÁFORA criativo e fotografável (ex.: 'slightly chipped "
+                "ceramic mug' para imperfeição). Tudo em inglês, nome comum do objeto com 2–7 palavras, sem slogan.",
                 '"capa", "itens" (lista em inglês, mesma ordem), "fim"')
-    pt = lambda t: not t or bool(re.search(r"[ãõçéêáíóúâ]|\b(de|para|com|não|que)\b", t, re.I)) or len(t.split()) > 10
+    pt = lambda t: not objeto_bom(t)
     for chave in ("capa", "fim"):
         if pt(vis.get(chave)):    # veio frase em português: pede só o objeto, em inglês
             ideia = capa.get("gancho") if chave == "capa" else fim.get("gancho")
@@ -135,7 +172,7 @@ def etapas(briefing, itens, modelo, primaria, estilo=None):
             m2 = re.match(r".*?\*[^*]+\*", fr[1])
             fr[1] = (m2.group(0) if m2 else " ".join(fr[1].split()[:3])).rstrip(" .") + "."
         fim["gancho"] = " | ".join(fr)
-    obj = lambda t: f"{t}, studio product photo, soft light, isolated" if t else ""
+    obj = lambda t: f"{t}, entire object fully visible with empty margin around it, centered, studio product photo, soft light, isolated" if t else ""   # inteiro: sem corte seco na geração
     foto = lambda t: f"editorial photo of {t}, natural light, shallow depth of field, real scene" if t else ""
     # estilo e sequência de layouts pelo mapa de direção de arte (tools/direcao_mapa.py) — cada tema com a sua cara
     sug = direcao_mapa.sugerir(briefing); est = estilo or sug["estilo"]
@@ -182,10 +219,13 @@ if __name__ == "__main__":
         default=r"D:\kanivete_biblioteca\modelos\carrossel-esqueletos-demo\demo.json")
     ap.add_argument("--etapas", action="store_true", help="lista em microtarefas (precisa de --itens)"); ap.add_argument("--primaria", default="#ff3b22")
     ap.add_argument("--perfil", help="nome;cargo;@usuario"); ap.add_argument("--estilo", help="força o estilo (senão o mapa sugere)")
+    ap.add_argument("--hibrido", action="store_true", help="redator gemma3:12b na capa/metáforas/virada + --modelo nos itens")
+    ap.add_argument("--redator", help="modelo redator do modo híbrido (padrão gemma3:12b)")
     a = ap.parse_args()
     if a.etapas:
         t0 = time.time()
-        r = etapas(a.briefing, [x.strip() for x in a.itens.split(";") if x.strip()], a.modelo, a.primaria, a.estilo)
+        r = etapas(a.briefing, [x.strip() for x in a.itens.split(";") if x.strip()], a.modelo, a.primaria, a.estilo,
+                   a.redator or ("gemma3:12b" if a.hibrido else None))
         print(f"estilo: {r['estilo']} · layouts: {', '.join(s['esqueleto'] for s in r['slides'])}")
         if a.perfil:
             nm, cg, us = (a.perfil.split(";") + ["", "", ""])[:3]
