@@ -3068,7 +3068,8 @@ class ApiBridge:
         """Photo Kanivete: recorte profissional (Functions/recorte_pro.py) — cores sem o fundo misturado + máscara."""
         import hashlib
         pasta = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "cache_recorte")
-        arq = os.path.join(pasta, "pro_" + hashlib.sha1(png_b64.encode()).hexdigest() + ".json")
+        # pro2_: recorte novo (2026-10-06: pessoa → matting, objeto → BEN2, GPU) — o cache do algoritmo antigo não volta
+        arq = os.path.join(pasta, "pro2_" + hashlib.sha1(png_b64.encode()).hexdigest() + ".json")
         try:
             if os.path.exists(arq):
                 with open(arq, encoding="ascii") as f:
@@ -3099,6 +3100,8 @@ class ApiBridge:
 
     def ie_gerar(self, spec):
         from Functions import gerador_imagem
+        # (não pré-carregar o modelo de recorte aqui: com o gerador na placa a próxima geração falhava — a cena gera
+        # tudo primeiro e recorta depois, ieCenaGerarTodas)
         return gerador_imagem.gerar(spec, lambda d: _js("ieGeradorProgresso", d))
 
     def ie_gerador_cancelar(self, job):

@@ -32,7 +32,7 @@ def _alfa_modelo(rgb, modelo_id):
     x = cv2.resize(rgb, (lado, lado), interpolation=cv2.INTER_AREA).astype(np.float32) / 255.0
     x = (x - MEDIA) / DESVIO
     y = s.run(None, {s.get_inputs()[0].name: x.transpose(2, 0, 1)[None].astype(np.float32)})[-1][0, 0]
-    return 1 / (1 + np.exp(-y))
+    return y if 0 <= y.min() and y.max() <= 1 else 1 / (1 + np.exp(-y))   # BEN2 já sai em 0–1; BiRefNet sai em logit
 
 
 def _box(x, r):
@@ -97,16 +97,67 @@ def _primeiro_plano(rgb, a):
     return (F * 255 + 0.5).astype(np.uint8)
 
 
-def recortar(rgb):
-    """rgb (H×W×3 uint8) → (cores H×W×3 sem o fundo misturado, alfa H×W uint8)."""
-    a = _alfa_cheio(rgb, _alfa_modelo(rgb, "birefnet-matting"))
-    a = _miolo_solido(rgb, a, _alfa_modelo(rgb, "birefnet-lite"))
+_FACE = None
+YUNET_URL = "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx"
+
+
+def _yunet():
+    """Detector de rosto YuNet (OpenCV, 230 KB, baixado na 1ª vez) — o Haar via rosto em cozinha e não via mulher real."""
+    global _FACE
+    if _FACE is None:
+        import os, urllib.request
+        from Functions.midia import modelo_path
+        p = modelo_path("u2net", "yunet-2023mar.onnx")
+        if not os.path.exists(p):
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            urllib.request.urlretrieve(YUNET_URL, p + ".tmp"); os.replace(p + ".tmp", p)
+        _FACE = cv2.FaceDetectorYN.create(p, "", (320, 320), 0.75, 0.3, 5000)
+    return _FACE
+
+
+def tem_pessoa(rgb):
+    """Rosto na foto (YuNet, ~15 ms em 640 px)? Decide o caminho do recorte. Sem o detector: trata como objeto."""
+    try:
+        d = _yunet()
+    except Exception as e:
+        print(f"[recorte] sem detector de rosto ({e}); tratando como objeto")
+        return False
+    k = min(1.0, 640 / max(rgb.shape[:2]))
+    img = cv2.resize(rgb, None, fx=k, fy=k, interpolation=cv2.INTER_AREA) if k < 1 else rgb
+    d.setInputSize((img.shape[1], img.shape[0]))
+    _, rostos = d.detect(cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+    lado = min(img.shape[:2])
+    return rostos is not None and any(r[2] >= lado * 0.06 for r in rostos)   # rosto pequeno no fundo não conta
+
+
+def aquecer_para(path):
+    """Depois de gerar: decide pessoa/objeto (20 ms) e deixa o modelo certo carregado (a carga é 7–16 s na placa;
+    a cena pede o recorte logo depois). Falha aqui não importa: o recorte carrega na hora."""
+    try:
+        rgb = np.array(Image.open(path).convert("RGB"))
+        path_m, _ = garantir_modelo("birefnet-matting" if tem_pessoa(rgb) else "ben2")
+        _get_sessao(path_m)
+    except Exception as e:
+        print(f"[recorte] aquecer: {e}")
+
+
+def recortar(rgb, tipo=None):
+    """rgb (H×W×3 uint8) → (cores H×W×3 sem o fundo misturado, alfa H×W uint8).
+    tipo: "pessoa" | "objeto" | None (decide pelo rosto). Comparado em 2026-10-06 (D:/kanivete_testes/recorte2):
+    pessoa → matting sozinho (cabelo: buracos limpos, fios finos; o miolo sólido por um 2º modelo obrigava dois na
+    placa e não mudava o resultado no zoom); objeto → BEN2 sozinho (sólido e limpo; o matting deixava vidro/óleo
+    transparentes e o miolo antigo manchava o gargalo). GPU: pessoa ~6 s (1ª vez +16 s de carga), objeto ~1 s."""
+    tipo = tipo or ("pessoa" if tem_pessoa(rgb) else "objeto")
+    if tipo == "pessoa":
+        a = _alfa_cheio(rgb, _alfa_modelo(rgb, "birefnet-matting"))
+    else:
+        a = _alfa_cheio(rgb, _alfa_modelo(rgb, "ben2"))
     a[a < 0.015] = 0
     a[a > 0.985] = 1
     return _primeiro_plano(rgb, a), (a * 255 + 0.5).astype(np.uint8)
 
 
-def recorte_b64(png_b64):
+def recorte_b64(png_b64, tipo=None):
     """Camada em PNG (base64) → {png: cores descontaminadas (RGBA, alfa original da camada), mascara: alfa do recorte}.
     Onde a camada já era transparente, a máscara continua 0."""
     img = Image.open(io.BytesIO(base64.b64decode(png_b64.split(",", 1)[-1])))
@@ -114,7 +165,7 @@ def recorte_b64(png_b64):
     fundo = Image.new("RGB", img.size, (255, 255, 255))
     fundo.paste(img.convert("RGB"), mask=img.getchannel("A") if alfa0 is not None else None)
     rgb = np.array(fundo)
-    F, a = recortar(rgb)
+    F, a = recortar(rgb, tipo)
     if alfa0 is not None:
         a = np.minimum(a, alfa0)
     out = Image.fromarray(np.dstack([F, alfa0 if alfa0 is not None else np.full(a.shape, 255, np.uint8)]), "RGBA")

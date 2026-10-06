@@ -64,6 +64,18 @@ MODELOS = {
         "md5": "95d7129b7abd6120b571e848f269a8ab",
         "tamanho_mb": 928,
     },
+    # BEN2 (MIT): segmentação rápida e limpa — na GPU ~1 s (BiRefNet Lite ~5 s), objeto sólido sem mancha no vidro.
+    # Usado no recorte de objetos e como "miolo sólido" do recorte de pessoas (2026-10-06, D:/kanivete_testes/recorte2)
+    "ben2": {
+        "nome": "BEN2 (rápido, objetos)",
+        "arquivo": "ben2-base.onnx",
+        "lado": 1024,
+        "mean": (0.485, 0.456, 0.406),
+        "std": (0.229, 0.224, 0.225),
+        "url": "https://huggingface.co/PramaLLC/BEN2/resolve/main/BEN2_Base.onnx",
+        "md5": "a12dafe4080f53e8818726b298bd90bc",
+        "tamanho_mb": 223,
+    },
     # Fallback legado: menor qualidade, mas salva o fluxo se só ele existir.
     "u2net": {
         "nome": "U2Net (legado)",
@@ -102,14 +114,23 @@ def _get_modelo_path(modelo_id=None):
     return _get_modelo(modelo_id)[0]
 
 
+_md5_ok = set()   # (caminho, tamanho, data) já conferidos — refazer o MD5 de 1 GB a cada recorte custava segundos
+
+
 def _verificar_md5(path, esperado):
     if not esperado or not os.path.exists(path):
+        return True
+    chave = (path, os.path.getsize(path), os.path.getmtime(path))
+    if chave in _md5_ok:
         return True
     h = hashlib.md5()
     with open(path, "rb") as f:
         for bloco in iter(lambda: f.read(1024 * 1024), b""):
             h.update(bloco)
-    return h.hexdigest().lower() == esperado.lower()
+    ok = h.hexdigest().lower() == esperado.lower()
+    if ok:
+        _md5_ok.add(chave)
+    return ok
 
 
 def garantir_modelo(modelo_id="isnet", callback_log=None, callback_progresso=None):
@@ -159,12 +180,72 @@ def garantir_modelo(modelo_id="isnet", callback_log=None, callback_progresso=Non
         raise
 
 
+_dispositivo = {"atual": None}   # "gpu" (DirectML) | "cpu" — decidido na primeira sessão; CANIVETE_RECORTE_CPU=1 força CPU
+_gpu_ok = {}                     # modelo → (nível, desligadas) que já rodou na placa: a troca de modelo não repete o teste (~6 s)
+
+
+def dispositivo():
+    return _dispositivo["atual"] or "?"
+
+
+import threading
+_trava_sessao = threading.RLock()   # aquecer (thread) e recortar (chamada) não criam a mesma sessão em dobro
+
+
 def _get_sessao(modelo_path):
-    """Carregar o modelo leva segundos: a sessão é criada uma vez e reaproveitada."""
+    with _trava_sessao:
+        return _get_sessao_(modelo_path)
+
+
+def _get_sessao_(modelo_path):
+    """Carregar o modelo leva segundos: a sessão é criada uma vez e reaproveitada.
+    GPU automática: onnxruntime-directml (qualquer placa DX12) com a otimização de grafo DESLIGADA — ligada, o BiRefNet
+    quebra no DirectML (fusão de operadores). A sessão nova roda uma inferência de teste; se falhar, fica na CPU (e a
+    máquina passa a usar CPU nas próximas). Medido (RTX 3050): BEN2 0,9 s × 14,5 s na CPU; matting 6 s × 21 s."""
     if modelo_path not in _sessoes:   # uma por modelo (o recorte profissional usa dois em seguida)
         import onnxruntime as ort
-        _sessoes[modelo_path] = ort.InferenceSession(modelo_path, providers=["CPUExecutionProvider"])
+        s = None
+        if _dispositivo["atual"] != "cpu" and not os.environ.get("CANIVETE_RECORTE_CPU") and "DmlExecutionProvider" in ort.get_available_providers():
+            # UMA sessão por vez na placa: com o matting aberto, o BEN2 caía de 0,9 s para 5–8 s e o matting de 6 para
+            # 14 s (8 GB transbordam para a memória compartilhada). Trocar de modelo solta o anterior.
+            if _sessoes:
+                import gc
+                _sessoes.clear(); gc.collect()
+            # o que quebra o BiRefNet no DirectML é só a ConstantFolding: nível básico sem ela carrega em ~4 s (sem
+            # otimização nenhuma: ~16 s); se ainda falhar, sem otimização; se falhar de novo, CPU
+            niveis = [(ort.GraphOptimizationLevel.ORT_ENABLE_BASIC, ["ConstantFolding"]), (ort.GraphOptimizationLevel.ORT_DISABLE_ALL, [])]
+            for nivel, desligadas in ([_gpu_ok[modelo_path]] if modelo_path in _gpu_ok else niveis):
+                try:
+                    so = ort.SessionOptions()
+                    so.enable_mem_pattern = False
+                    so.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+                    so.graph_optimization_level = nivel
+                    s = ort.InferenceSession(modelo_path, so, providers=["DmlExecutionProvider", "CPUExecutionProvider"], disabled_optimizers=desligadas)
+                    if modelo_path not in _gpu_ok:
+                        i = s.get_inputs()[0]
+                        lado = i.shape[2] if isinstance(i.shape[2], int) else 320
+                        s.run(None, {i.name: np.random.rand(1, 3, lado, lado).astype(np.float32)})   # teste: falha aqui → próximo
+                        _gpu_ok[modelo_path] = (nivel, desligadas)
+                    _dispositivo["atual"] = "gpu"
+                    break
+                except Exception as e:
+                    print(f"[recorte] GPU ({nivel}) falhou: {type(e).__name__}")
+                    s = None
+            if s is None:
+                print("[recorte] GPU indisponível; usando CPU")
+                _dispositivo["atual"] = "cpu"
+        if s is None:
+            so = ort.SessionOptions()
+            so.intra_op_num_threads = os.cpu_count() or 4
+            s = ort.InferenceSession(modelo_path, so, providers=["CPUExecutionProvider"])
+            _dispositivo["atual"] = _dispositivo["atual"] or "cpu"
+        _sessoes[modelo_path] = s
     return _sessoes[modelo_path]
+
+
+def liberar_sessoes():
+    """Solta a memória (VRAM/RAM) dos modelos de recorte — antes de gerar imagem, que também usa a placa."""
+    _sessoes.clear()
 
 
 def _estimar_cor_fundo(rgb_np, alpha_np):
@@ -275,7 +356,7 @@ def _remover_fundo_onnx(img_pil, modelo_path, cfg=None):
     return resultado
 
 
-def mascara_assunto_b64(png_b64, modelo_id="birefnet-lite"):
+def mascara_assunto_b64(png_b64, modelo_id="ben2"):
     """Photo Kanivete (Remover plano de fundo / Selecionar assunto): recebe a camada em PNG (base64) e devolve a
     máscara do assunto em PNG cinza (base64, branco = fica), no tamanho da camada. Só a máscara: a camada continua
     com os pixels dela (máscara de camada, como o Photoshop faz)."""

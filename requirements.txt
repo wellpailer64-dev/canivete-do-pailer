@@ -20,7 +20,7 @@ librosa>=0.11.0
 pydub>=0.25.1
 webdataset>=1.0.2
 omnivoice @ git+https://github.com/k2-fsa/OmniVoice.git
-onnxruntime==1.24.4
+onnxruntime-directml==1.24.4
 # painel Texto do editor (transcrição com Parakeet ONNX; onnx = comprimir o modelo PT-BR para int8)
 onnx-asr==0.12.0
 onnx==1.22.0
