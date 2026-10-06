@@ -624,6 +624,13 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 .ie-ctb { align-items: center; }
 .ie-ctb-alca { cursor: grab; color: var(--text-3); padding: 2px 5px 2px 3px; letter-spacing: -3px; font-size: 13px; user-select: none; }
 .ie-ctb-alca:active { cursor: grabbing; }
+.ie-ctb-btns { display: flex; gap: 2px; }
+.ie-ctb-ia { display: flex; align-items: center; gap: 4px; margin-left: 4px; padding-left: 6px; border-left: 1px solid var(--ie-linha-2); }
+.ie-ctb-prompt { width: 230px; height: 24px; padding: 0 8px; border: 1px solid var(--ie-linha-2); border-radius: 5px; background: var(--ie-painel); color: var(--text); font: 12px var(--font-ui); outline: none; }
+.ie-ctb-prompt:focus { border-color: var(--accent, #4a8cff); width: 320px; }
+.ie-ctb-modo { height: 24px; border: 1px solid var(--ie-linha-2); border-radius: 5px; background: var(--ie-painel); color: var(--text); font: 12px var(--font-ui); }
+.ie-ctb .ie-ctb-gerar { color: var(--accent, #4a8cff); }
+.ie-ctb .ie-ctb-gerar:disabled { opacity: .6; cursor: default; }
 
 .ie-sel-modos button { padding: 2px 5px; }
 .ie-sel-modos svg { width: 18px; height: 18px; }

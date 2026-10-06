@@ -988,7 +988,16 @@ function ieBarraCtx() {
     if (!b) {
         b = document.createElement('div');
         b.id = 'ie-ctb'; b.className = 'ie-ctb';
+        // os botões mudam com o contexto; a caixa de gerar com IA fica (o texto digitado não se perde)
+        b.innerHTML = `<span class="ie-ctb-alca" title="${ieJanH('Arraste para mover a barra · duplo clique: volta a seguir a camada')}">⋮⋮</span>`
+            + `<span class="ie-ctb-btns"></span>`
+            + `<span class="ie-ctb-ia"><input class="ie-ctb-prompt" type="text" spellcheck="false" placeholder="${ieJanH('Gerar com IA: descreva ou cole um prompt...')}">`
+            + `<select class="ie-ctb-modo" title="${ieJanH('Foto: imagem inteira no formato do documento · Objeto: sem fundo, para compor')}"><option value="foto">${ieJanH('Foto')}</option><option value="objeto">${ieJanH('Objeto')}</option></select>`
+            + `<button class="ie-ctb-gerar" title="${ieJanH('Gerar (Enter) — entra como camada nova acima da ativa quando terminar')}">✦ ${ieJanH('Gerar')}</button></span>`
+            + `<button class="ie-ctb-x" data-cmd="barraCtxDesligar" title="${ieJanH('Esconder até clicar numa camada (desligar de vez: Janela > Barra de tarefas contextual)')}">×</button>`;
         ieEl('ie-vista').appendChild(b);
+        b.querySelector('.ie-ctb-prompt').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') ieBarraCtxGerar(); if (e.key === 'Escape') e.target.blur(); });
+        b.querySelector('.ie-ctb-gerar').addEventListener('click', () => ieBarraCtxGerar());
         b.addEventListener('pointerdown', e => {
             e.stopPropagation();
             const alca = e.target.closest('.ie-ctb-alca');
@@ -1030,7 +1039,7 @@ function ieBarraCtxAtualizar() {
         if (['pixel', 'ajuste', 'grupo'].includes(L.tipo)) itens = itens.filter(i => i[0] !== 'rasterizar');
     }
     const chave = itens.map(i => i[0]).join('|');
-    if (b._chave !== chave) { b._chave = chave; b.innerHTML = `<span class="ie-ctb-alca" title="${ieJanH('Arraste para mover a barra · duplo clique: volta a seguir a camada')}">⋮⋮</span>` + itens.map(([c, r]) => `<button data-cmd="${c}">${ieJanH(r)}</button>`).join('') + `<button class="ie-ctb-x" data-cmd="barraCtxDesligar" title="${ieJanH('Esconder até clicar numa camada (desligar de vez: Janela > Barra de tarefas contextual)')}">×</button>`; }
+    if (b._chave !== chave) { b._chave = chave; b.querySelector('.ie-ctb-btns').innerHTML = itens.map(([c, r]) => `<button data-cmd="${c}">${ieJanH(r)}</button>`).join(''); }
     const v = ieVistaTam(), s = ieDocTela(R.x + R.w / 2, R.y + R.h, doc);
     b.hidden = false;
     const w = b.offsetWidth || 300, fixa = iePref('barraCtxPos', null);
@@ -1046,6 +1055,23 @@ function ieBarraCtxAtualizar() {
     const orig = ieDesenharSobre;
     ieDesenharSobre = function () { orig(); try { ieBarraCtxAtualizar(); } catch (e) { /* sem barra */ } };
 })();
+// gerar pela barra: Foto = no formato do documento (lado maior 1024), Objeto = 1:1 em fundo branco e recortado;
+// pode continuar trabalhando: a camada entra acima da ativa quando terminar
+async function ieBarraCtxGerar() {
+    const b = ieBarraCtx(), inp = b.querySelector('.ie-ctb-prompt'), bt = b.querySelector('.ie-ctb-gerar');
+    const prompt = inp.value.trim(), doc = IE.doc;
+    if (!prompt || !doc || IE._ctbGerando) return;
+    const objeto = b.querySelector('.ie-ctb-modo').value === 'objeto';
+    const k = 1024 / Math.max(doc.w, doc.h);
+    const [w, h] = objeto ? [1024, 1024] : [Math.round(doc.w * k / 16) * 16, Math.round(doc.h * k / 16) * 16];
+    IE._ctbGerando = true; bt.disabled = true; bt.textContent = ieT('Gerando...');
+    try {
+        const r = await KNV.gerar(prompt, { largura: w, altura: h, fundo: objeto, recortar: objeto, nome: 'IA: ' + prompt.slice(0, 40) });
+        if (!objeto && IE.doc === doc) KNV.transformar({ x: 0, y: 0, largura: doc.w });   // a foto cobre o documento
+        ieToast(`${ieT('Imagem gerada')} (${ieT('semente')} ${r.semente}${r.cache ? ', ' + ieT('do cache') : ''})`);
+    } catch (e) { console.error('[gerar pela barra]', e); }
+    finally { IE._ctbGerando = false; bt.disabled = false; bt.textContent = '✦ ' + ieT('Gerar'); }
+}
 IE_CMDS['ajuste:matiz'] = () => ieAjNova('matiz');
 IE_CMDS.barraCtxDesligar = () => { IE._ctbOculta = true; ieBarraCtxAtualizar(); };   // só até o próximo clique numa camada
 
