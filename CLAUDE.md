@@ -101,6 +101,15 @@ Gerar imagem com IA (Z-Image-Turbo 6B Q4_K; com referência, FLUX.2 klein — am
 guia `Instructions/agente/plano-cena.md` (seção "Fluxo barato": biblioteca `D:\kanivete_biblioteca` com recursos/modelos/amostras, `data-cor`, `recurso:`, `--ver`, `--comparar`, `--variacoes`, `KNV.etapa`). Fazer arte pelo app (API `window.KNV`, receitas em etapas .iknv, `rodar.py`, `KNV.mapa()`/`KNV.revisar()`, técnicas):
 `Instructions/agente/design-photo-kanivete.md`.
 
+## Remover fundo (recorte)
+GPU automática (onnxruntime-directml), pessoa → BiRefNet matting / objeto → BEN2 (YuNet decide), uma sessão por vez na
+placa; medições, qualidade e pendências (cena em duas passadas ainda não publicada) em `Instructions/agente/remover-fundo.md`.
+
+## Carrossel com direção de arte
+Roteiro JSON → `tools/esqueleto.py --montar` (10 layouts, 6 estilos, arte-final, auto-ajuste, revisor de direção);
+Jr: `tools/roteiro_local.py --etapas [--hibrido]`; mapa: `tools/direcao_mapa.py`. Guia e pendências:
+`Instructions/agente/direcao-carrossel.md`.
+
 ## Vetor Kanivete (estilo Illustrator, para gráfica)
 Estudo de caso, modelo, API, fechamento e pendências: `Instructions/vetor-kanivete.md`; código `frontend/js/vetor-*.js` +
 `Functions/vetor_*.py`. Abre PDF/AI/SVG/PPTX, salva `.aknv`, exporta PDF/X-4 e X-1a (curvas, CMYK pelo ICC, sangria,
