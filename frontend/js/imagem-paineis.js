@@ -41,6 +41,7 @@ const IE_ICONES = {
     slice: '<path d="M4 20 20 4"/><path d="M14 4h6v6"/><path d="M4 14v6h6"/>',
     raw: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18" opacity=".5"/><circle cx="12" cy="12" r="3.5"/>',
     clip: '<path d="M6 4v9a4 4 0 0 0 4 4h8"/><path d="m15 13 4 4-4 4"/>',
+    elo: '<path d="M10 13a4 4 0 0 0 5.7.3l3-3a4 4 0 0 0-5.7-5.6l-1.5 1.5"/><path d="M14 11a4 4 0 0 0-5.7-.3l-3 3a4 4 0 0 0 5.7 5.6l1.5-1.5"/>',
     fx: '<path d="M6 20c2 0 2.5-2 3-5l1.5-8c.5-2.5 1.5-3 3-3M7 10h7M14 12l6 7M20 12l-6 7"/>',
     smart: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M14 4v6h6"/>',
     adj: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/>',
@@ -370,7 +371,7 @@ function ieUiCamadas() {
             ? `<button class="ie-cam-seta ${X.aberto ? 'aberta' : ''}" data-abrir="${X.id}">${ieIco('chev')}</button>${ieIco('folder', 'ie-cam-pasta')}`
             : X.tipo === 'ajuste' ? `<span class="ie-cam-mini ie-cam-mini-aj ${doc.mascaraAlvo && X.id === doc.ativa ? '' : 'alvo'}" data-alvo="px">${ieIco('adj')}</span>`
             : `<span class="ie-cam-mini-box"><canvas class="ie-cam-mini ${!(doc.mascaraAlvo && X.id === doc.ativa) ? 'alvo' : ''}" data-alvo="px" data-mini="${X.id}" width="40" height="40"></canvas>${X.tipo === 'inteligente' ? `<i class="ie-cam-selo" title="${ieT('Objeto inteligente')}">${ieIco('smart')}</i>` : ''}</span>`;
-        const masc = X.m ? `<canvas class="ie-cam-mini ie-cam-masc ${X.m.desativada ? 'off' : ''} ${doc.mascaraAlvo && X.id === doc.ativa ? 'alvo' : ''}" data-alvo="m" data-mmini="${X.id}" width="40" height="40" title="${ieT('Máscara (Shift+clique: desativar)')}"></canvas>` : '';
+        const masc = X.m ? `<button class="ie-cam-elo ${X.m.solta ? 'off' : ''}" data-elo="${X.id}" title="${ieT(X.m.solta ? 'Máscara solta: move separado da imagem (clique: prender)' : 'Máscara presa à camada: movem juntas (clique: soltar)')}">${ieIco('elo')}</button><canvas class="ie-cam-mini ie-cam-masc ${X.m.desativada ? 'off' : ''} ${doc.mascaraAlvo && X.id === doc.ativa ? 'alvo' : ''}" data-alvo="m" data-mmini="${X.id}" width="40" height="40" title="${ieT('Máscara (Shift+clique: desativar)')}"></canvas>` : '';
         return `<div class="ie-cam ${sel.has(X.id) ? 'sel' : ''} ${X.id === doc.ativa ? 'ativa' : ''} ${X.visivel ? '' : 'oculta'} ${X.clip ? 'clip' : ''}" data-id="${X.id}" draggable="true" style="--nivel:${nivel}">
             <button class="ie-cam-olho ${X.visivel ? 'on' : ''}" data-olho="${X.id}" title="${ieT('Mostrar/ocultar (Alt+clique: só esta)')}">${X.visivel ? ieIco('eye') : ''}</button>
             <span class="ie-cam-recuo"></span>${X.clip ? `<span class="ie-cam-clip">${ieIco('clip')}</span>` : ''}
@@ -524,6 +525,12 @@ function ieCamadasInstalar() {
     lista.addEventListener('click', ev => {
         const doc = IE.doc;
         if (!doc) return;
+        const elo = ev.target.closest('[data-elo]');
+        if (elo) {   // corrente entre a imagem e a máscara
+            const L = ieAchar(doc, +elo.dataset.elo)?.L;
+            if (L && L.m) { L.m.solta = !L.m.solta; ieMudouDoc(doc); ieUiCamadas(); ieHist(ieT(L.m.solta ? 'Soltar máscara' : 'Prender máscara')); }
+            return;
+        }
         const olho = ev.target.closest('[data-olho]');
         if (olho) {
             const L = ieAchar(doc, +olho.dataset.olho)?.L;
@@ -1321,7 +1328,7 @@ function ieTecla(ev) {
         if (IE.transf) { IE.transf.cx += dx; IE.transf.cy += dy; ieTransfPrevia(); ieOpcoesRender(true); return; }
         const alvos = ieAlvosMover(doc);
         const Ra = alvos.reduce((R, X) => ieRUniao(R, ieRCamada(X)), null);
-        alvos.forEach(L => { ieMoverCamada(L, dx, dy); L.movido = true; });
+        alvos.forEach(L => { ieMoverPeloElo(doc, L, dx, dy); L.movido = true; });
         ieAgendar(ieRUniao(Ra, alvos.reduce((R, X) => ieRUniao(R, ieRCamada(X)), null)), doc);
         clearTimeout(IE.empurrarT);
         IE.empurrarT = setTimeout(() => ieHist(ieT('Empurrar')), 400);

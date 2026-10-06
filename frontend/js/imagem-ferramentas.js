@@ -477,6 +477,16 @@ function ieMoverCamada(L, dx, dy) {
     }
 }
 
+// mover respeitando a corrente camada ↔ máscara (como no Photoshop): ligada, andam juntas; desligada (L.m.solta),
+// com a máscara como alvo move só a máscara, senão só a imagem
+function ieMoverPeloElo(doc, L, dx, dy) {
+    const m = L.m;
+    if (!m || !m.solta) { ieMoverCamada(L, dx, dy); return; }
+    if (doc.mascaraAlvo && L.id === doc.ativa) { m.x += dx; m.y += dy; L.sujoM = true; }
+    else { const mx = m.x, my = m.y; ieMoverCamada(L, dx, dy); m.x = mx; m.y = my; }
+    ieInvalidar(L);
+}
+
 function ieDuplicarCamada(doc, L) {
     const s = ieFotoCamadas([L])[0];
     const N = ieRestaurarCamadas([s])[0];
@@ -632,7 +642,7 @@ const IE_MOVER = {
             ieAgendar(ieRUniao(m.R, R), doc);
             return;
         }
-        for (const L of m.alvos) ieMoverCamada(L, ddx, ddy);
+        for (const L of m.alvos) ieMoverPeloElo(doc, L, ddx, ddy);
         const R = m.alvos.reduce((R, X) => ieRUniao(R, ieRCamada(X)), null);
         ieAgendar(ieRUniao(ieRUniao(m.R, R), m.Rult), doc);
         m.Rult = R;

@@ -219,6 +219,10 @@
 /* Alt na divisa entre duas camadas: cursor de máscara de corte (clique prende a de cima na de baixo) */
 #ie-cam-lista.ie-cam-corte, #ie-cam-lista.ie-cam-corte * { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg stroke='%23000' stroke-width='4.5'%3E%3Cpath d='M6 3v9a4 4 0 0 0 4 4h9'/%3E%3Cpath d='m15 12 4 4-4 4'/%3E%3C/g%3E%3Cg stroke='%23fff' stroke-width='2'%3E%3Cpath d='M6 3v9a4 4 0 0 0 4 4h9'/%3E%3Cpath d='m15 12 4 4-4 4'/%3E%3C/g%3E%3C/svg%3E") 6 3, alias !important; }
 .ie-cam-clip .ie-i { width: 13px; height: 13px; }
+.ie-cam-elo { flex: none; width: 14px; height: 22px; margin: 0 1px; padding: 0; border: 0; background: none; color: var(--text-2); cursor: pointer; display: grid; place-items: center; }
+.ie-cam-elo .ie-i { width: 12px; height: 12px; }
+.ie-cam-elo.off { color: transparent; }
+.ie-cam-elo.off:hover { color: var(--text-3); }
 .ie-cam-mini { width: 40px; height: 40px; border: 1px solid var(--ie-linha-2); border-radius: 2px; background: #8f8f8f; flex: none; }
 .ie-cam-mini.alvo { outline: 2px solid var(--text-2); outline-offset: 1px; }
 .ie-cam.sel .ie-cam-mini.alvo { outline-color: var(--ie-acento); }
