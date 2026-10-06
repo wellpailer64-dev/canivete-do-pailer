@@ -370,29 +370,60 @@ function iePintarCobertura(doc, L, cob, R, nome, { cor, opac = 1, borracha = fal
 
 // ─────────────────────────── mover ───────────────────────────
 // camada visível com pixel no ponto (de cima para baixo), para a "Seleção automática"
+// camada sob o clique (Seleção automática): o pixel VISÍVEL da própria camada — alfa × opacidade × preenchimento ×
+// máscara, e dentro da base quando presa por máscara de corte. Sombra/brilho (efeitos) não contam (antes a sombra do
+// Daniel, brilhos e a palavra-eco a 7% roubavam o clique de quem estava embaixo)
+function ieAlfaEm(L, x, y) {
+    const c = L.c;
+    if (!c || x < L.x || y < L.y || x >= L.x + c.width || y >= L.y + c.height) return 0;
+    let a = ieCtx(c).getImageData(Math.floor(x - L.x), Math.floor(y - L.y), 1, 1).data[3] / 255;
+    a *= (L.op ?? 1) * (L.fill ?? 1);
+    const m = L.m;
+    if (a > 0 && m && !m.desativada) {
+        const dentro = m.c && x >= m.x && y >= m.y && x < m.x + m.c.width && y < m.y + m.c.height;
+        a *= dentro ? ieCtx(m.c).getImageData(Math.floor(x - m.x), Math.floor(y - m.y), 1, 1).data[3] / 255 : (m.fundo || 0) / 255;
+    }
+    return a;
+}
 function ieCamadaNoPonto(doc, x, y) {
     const ordem = [];
     const visitar = (lista, visivel) => {
+        let base = null;   // a camada de baixo de uma sequência presa por máscara de corte
         for (const L of lista) {
             const v = visivel && L.visivel;
+            if (!L.clip) base = L;
             if (L.filhos) visitar(L.filhos, v);
-            else if (v && ieRaster0(L)) ordem.push(L);
+            else if (v && ieRaster0(L)) ordem.push({ L, base: L.clip ? base : null });
         }
     };
     visitar(doc.camadas, true);
     for (let i = ordem.length - 1; i >= 0; i--) {
-        const L = ordem[i], r = ieRaster(L);
-        if (!r || x < r.x || y < r.y || x >= r.x + r.c.width || y >= r.y + r.c.height) continue;
-        const a = ieCtx(r.c).getImageData(Math.floor(x - r.x), Math.floor(y - r.y), 1, 1).data[3];
-        if (a > 12) return L;
+        const { L, base } = ordem[i];
+        if (ieAlfaEm(L, x, y) <= 0.08) continue;
+        if (base && base !== L && base.c && ieAlfaEm(base, x, y) <= 0.08) continue;   // fora da base do corte: não aparece
+        return L;
     }
     return null;
 }
 
+// alvo do clique: o pixel visível OU a caixa das linhas de um texto (clicar entre as letras também pega o texto) —
+// o que estiver mais em cima na pilha
+function ieAlvoNoPonto(doc, p) {
+    const a = ieCamadaNoPonto(doc, p.x, p.y), t = typeof ieTextoNoPonto === 'function' ? ieTextoNoPonto(doc, p) : null;
+    if (!t || t === a) return a;
+    if (!a) return t;
+    const ord = ieTodas(doc);
+    return ord.indexOf(t) > ord.indexOf(a) ? t : a;
+}
 // fundo = camada que cobre quase toda a página ou uma fatia (slide do carrossel): clicar nele não o arrasta, começa a
 // seleção por arrasto (mover o fundo: selecione no painel ou Ctrl+arrastar)
 function ieEhFundo(doc, L) {
     if (!L || L.tipo === 'ajuste') return false;
+    // só a BASE da pilha (primeira do slide/grupo), uma camada chamada Fundo, ou travada: foto de página inteira por
+    // cima do fundo é conteúdo e seleciona normalmente (antes não selecionava)
+    const a = ieAchar(doc, L.id);
+    const base = a && a.lista.findIndex(X => X.visivel !== false && X.tipo !== 'ajuste') === a.i;
+    if (!base && !/^(fundo|background|camada de fundo|slide \d+)$/i.test(L.nome || '') && !(L.travas & 4)) return false;
     const R = ieRCamada(L); if (!R) return false;
     const areas = [{ x: 0, y: 0, w: doc.w, h: doc.h }, ...(doc.fatias || [])];
     return areas.some(F => {
@@ -401,9 +432,12 @@ function ieEhFundo(doc, L) {
     });
 }
 // camadas que tocam o retângulo (visíveis, sem trava de posição, que não sejam fundo); grupo aberto conta as filhas
-function ieSelecionarPorCaixa(doc, c, somar) {
+function ieSelecionarPorCaixa(doc, c, somar, alvoClique = null) {
     const R = { x: Math.min(c.x0, c.x1), y: Math.min(c.y0, c.y1), w: Math.abs(c.x1 - c.x0), h: Math.abs(c.y1 - c.y0) };
-    if (R.w < 3 && R.h < 3) { if (!somar) ieLimparCamadas(doc); return; }   // clique simples no vazio/fundo: limpa
+    if (R.w < 3 && R.h < 3) {   // clique simples: no fundo seleciona o fundo (como no Photoshop); no vazio, limpa
+        if (alvoClique) ieAtivar(alvoClique.id, doc, { somar }); else if (!somar) ieLimparCamadas(doc);
+        return;
+    }
     const ids = [];
     iePercorrer(doc.camadas, (L, lista, i, pai) => {
         if (L.tipo === 'grupo' || L.visivel === false || (pai && pai.visivel === false) || L.tipo === 'ajuste' || L.clip) return;
@@ -526,11 +560,11 @@ const IE_MOVER = {
         const auto = IE.op.mover.auto !== ev.ctrlKey;
         let alternar = null;   // Shift+clique num já selecionado: sai da seleção só se NÃO arrastar (Shift+arrastar = linha reta)
         if (auto) {
-            const L = ieCamadaNoPonto(doc, p.x, p.y);
+            const L = ieAlvoNoPonto(doc, p);
             // seleção por arrasto (como no Photoshop): começando no vazio ou num FUNDO que não está selecionado,
             // desenha um retângulo e seleciona as camadas que ele toca (Shift soma). Ctrl+arrastar move o fundo.
             if ((!L || (ieEhFundo(doc, L) && !doc.selIds.includes(L.id))) && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
-                IE.mov = { caixa: { x0: p.x, y0: p.y, x1: p.x, y1: p.y }, somar: ev.shiftKey };
+                IE.mov = { caixa: { x0: p.x, y0: p.y, x1: p.x, y1: p.y }, somar: ev.shiftKey, alvoClique: L || null };   // clique sem arrastar seleciona o fundo
                 return;
             }
             const alvo = ieMoverAlvoAuto(doc, L);
@@ -608,7 +642,7 @@ const IE_MOVER = {
         const m = IE.mov;
         IE.mov = null;
         if (!m) return;
-        if (m.caixa) { ieSelecionarPorCaixa(doc, m.caixa, m.somar); ieDesenharSobre(); return; }
+        if (m.caixa) { ieSelecionarPorCaixa(doc, m.caixa, m.somar, m.alvoClique); ieDesenharSobre(); return; }
         if (m.alternar != null && !m.dx && !m.dy) {   // Shift+clique sem arrastar num já selecionado: sai da seleção
             doc.selIds = doc.selIds.filter(i => i !== m.alternar);
             doc.ativa = doc.selIds.length ? doc.selIds[doc.selIds.length - 1] : null;
