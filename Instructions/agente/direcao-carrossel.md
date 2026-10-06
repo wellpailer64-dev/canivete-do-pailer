@@ -177,3 +177,16 @@ topo: claridade 16, textura 12, contraste 10, vibração 6, grão 12, vinheta �
   "inteiro com margem" (sem corte seco). Exemplo: capa "*Sua* culpa no café da manhã te impede?" + caneca lascada.
 - Pendente: slide logo depois do objeto que atravessa fica
   vazio quando o objeto é estreito; estruturas além de "lista" (mito × verdade, antes × depois, história).
+
+## 10. Como o usuário finalizou o carrossel "Medo de dirigir" (Carlinhos, 2026-10-06)
+Comparação da minha v3 com a versão final dele (camada por camada; prints em `D:\kanivete_testes\carlinhos_medo\comparar`):
+- **Tirou** a estrada amarela contínua dos 10 slides e **escondeu** a arte-final global (textura + Camera Raw).
+- **Ligação entre slides pelo assunto**, não por enfeite: o Daniel do slide 9 sangra para o 8.
+- **Assets do cliente antes de gerar**: personagens 3D da referência (humor: carrinho de mercado, triciclo,
+  fantasminhas = medos) e foto real do carro + moto da escola no fechamento.
+- **Capa**: logo pequeno centralizado no topo, título no alto, assunto no meio, subtítulo de fechamento embaixo
+  (66 px, palavra-chave em amarelo, ▶), triângulo amarelo grande sangrando na borda (seta para arrastar).
+- **Texto onde a imagem está vazia/escura** (slide 5 embaixo); **virada com título menor** (63 px) e centralizado;
+  **fechamento centralizado**; **margem 110–170 px**; sombras de moldura 45% / desfoque 60 / distância 30.
+Aplicar nos esqueletos: sem faixa contínua por padrão, arte-final leve/desligada em peça comercial, margem maior,
+título da virada ~60 px, capa com logo central + seta de arraste. (Regras no revisor: pendente.)
