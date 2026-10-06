@@ -477,7 +477,7 @@ const KNV = {
             if (!L.clip || !L.c || L.visivel === false) return;
             const lista = pai ? pai.filhos : d.camadas;
             let k = lista.indexOf(L) - 1; while (k >= 0 && lista[k].clip) k--;
-            const B = lista[k]; if (!B || !B.c) return;
+            const B = lista[k]; if (!B || !B.c || (B.cena && B.cena.forma)) return;   // foto presa numa forma livre: corte de propósito, não é avatar
             const rb = ieRaster(B), fb = rb && (rb.forma || rb), bb = fb && ieLimites(fb.c); if (!bb) return;
             const ab = ieCtx(fb.c).getImageData(bb.x, bb.y, 2, 2).data[3];   // canto da caixa vazio = base redonda
             if (ab > 40 || Math.abs(bb.w - bb.h) > bb.w * 0.15) return;

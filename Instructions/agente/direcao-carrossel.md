@@ -157,3 +157,19 @@ topo: claridade 16, textura 12, contraste 10, vibração 6, grão 12, vinheta �
     serve?" antes de cada enfeite.
 11. **Geração de imagem lenta** (~45 s cada) → gerar cedo em segundo plano; a cena reaproveita o cache
     (mesmo prompt/semente/tamanho), e as remontagens seguintes levam ~13 s.
+
+## 9. Mapa de direção de arte + estilos + Jr (2026-10-06)
+- **Mapa** (ler antes de decidir, ~700 tokens por seção): `py -3.13 tools/direcao_mapa.py [--tipo layout|estilo|tecnica]`
+  e `--para "briefing"` → estilo sugerido + sequência de layouts. Acrescente ali cada técnica/estilo aprovado.
+- **Estilos** no roteiro (`"estilo"`): impacto, elegante, delicado, tecnologico, rustico, minimalista — fontes (instaladas
+  pelo `--montar`), caixa, paleta, moldura padrão e intensidade da arte-final. Moldura opcional: `"moldura":
+  {"perfil": false, "contador": false, "rodape": true}`.
+- **Layouts novos**: objeto-dominante, texto-destaque, foto-moldura (`moldura_forma`: faixa-topo, faixa-vertical,
+  circulo, quadrado, retangulo, livre = foto presa numa mancha), foto-lateral (surge da borda).
+- **Jr** (`tools/roteiro_local.py --etapas --itens "a;b;c"`): estilo e sequência vêm do mapa; cada slide é uma
+  microtarefa; formato blindado por regra (título "item = *benefício*", virada "Menos X. | Mais *Y*.", objetos em
+  inglês com reserva). Comparação no mesmo briefing: Qwen3 8B 12–22 s, texto concreto e limpo (padrão);
+  Gemma 3 12B ~2 min, texto mais humano e metáforas melhores, formato bagunçado (candidato a "redator" só da capa e
+  das metáforas); Qwen3 30B-A3B ~80 s, repetitivo — não compensa. Roteiro inteiro numa chamada só: copia o exemplo.
+- Pendente: modo híbrido (Gemma na capa/metáforas + Qwen nos itens); slide logo depois do objeto que atravessa fica
+  vazio quando o objeto é estreito; estruturas além de "lista" (mito × verdade, antes × depois, história).

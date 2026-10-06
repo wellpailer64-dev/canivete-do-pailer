@@ -9,6 +9,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
 from esqueleto import ESQUELETOS
+import direcao_mapa
 
 REGRAS = """Você é diretor de arte de carrossel de Instagram. Responda SÓ com um JSON no formato do exemplo.
 Regras:
@@ -81,7 +82,7 @@ def pedir(modelo, instr, campos):
     except (json.JSONDecodeError, KeyError): return {}
 
 
-def etapas(briefing, itens, modelo, primaria):
+def etapas(briefing, itens, modelo, primaria, estilo=None):
     """estrutura 'lista' por regra (capa → 1 slide por item → virada) e cada slide numa chamada curta, sem exemplo
     para copiar; esqueletos, fundos e pontes por regra; prompts de objeto numa chamada própria (em inglês)"""
     n = len(itens) + 2
@@ -101,8 +102,10 @@ def etapas(briefing, itens, modelo, primaria):
         usadas += [w.lower() for w in destaque(s.get("titulo"))]
         feitos.append(s); slides.append(s)
     fim = pedir(modelo, f"Briefing: {briefing}\nÚltimo slide ({n} de {n}): virada. Já escritos: {json.dumps([capa] + feitos, ensure_ascii=False)}\n"
-                "Escreva um gancho de 2 frases curtíssimas em contraste (ex.: 'Menos X. Mais Y.') separadas por ' | ', com "
-                "a palavra da segunda frase entre *asteriscos*, e corpo com 1 frase convidando a salvar o post.", '"gancho", "corpo"')
+                "Escreva o contraste em DUAS palavras-chave: 'menos' = o que a pessoa deve largar (1–2 palavras) e 'mais' = o "
+                "que ganha (1–2 palavras); e corpo com 1 frase convidando a salvar o post.", '"menos", "mais", "corpo"')
+    if fim.get("menos") and fim.get("mais"):       # a frase de virada é montada por regra: "Menos X. | Mais *Y*."
+        fim["gancho"] = f"Menos {fim['menos'].strip(' .').lower()}. | Mais *{fim['mais'].strip(' .*').lower()}*."
     vis = pedir(modelo, f"Briefing: {briefing}\nPara cada item, um objeto REAL que represente o item, em inglês, foto de "
                 f"produto: {json.dumps(itens, ensure_ascii=False)}. Mais um objeto-metáfora para a capa e um para o fim.",
                 '"capa", "itens" (lista em inglês, mesma ordem), "fim"')
@@ -114,11 +117,16 @@ def etapas(briefing, itens, modelo, primaria):
                       "Responda o nome do objeto EM INGLÊS, até 6 palavras, sem verbo.", '"objeto"')
             vis[chave] = v.get("objeto") if not pt(v.get("objeto")) else None
     vis["itens"] = [x if not pt(x) else None for x in (vis.get("itens") or [])]
+    vis["itens"] += [None] * (len(itens) - len(vis["itens"]))
+    for k, it in enumerate(itens):                 # item sem objeto: pede só ele (microtarefa)
+        if not vis["itens"][k]:
+            v = pedir(modelo, f"Nome em inglês (até 5 palavras) do objeto real que mostra '{it}' numa foto de produto.", '"objeto"')
+            vis["itens"][k] = v.get("objeto") if not pt(v.get("objeto")) else None
     boas = [x for x in vis["itens"] if x]          # sem objeto bom para capa/fim: usa os dos itens (regra, não modelo)
     vis["capa"] = vis.get("capa") or (f"breakfast flat lay with {boas[0]}" if boas else "ceramic coffee mug")
     vis["fim"] = vis.get("fim") or (boas[-1] if boas else "ceramic coffee mug")
     for s, it in zip(slides, itens):               # "Pão + ovo *praticidade*" → "Pão + ovo = *praticidade*"
-        t = s.get("titulo") or ""
+        t = re.sub(r"\s*[:=]+\s*[:=]*\s*", " = ", s.get("titulo") or "", count=1).strip(" =")   # "= :" / ":" → " = "
         if t.lower().startswith(it.lower()) and "=" not in t: s["titulo"] = it[:1].upper() + it[1:] + " = " + t[len(it):].strip()
         elif "=" not in t and "*" in t: s["titulo"] = re.sub(r"\s*\*", " = *", t, count=1)   # "Café com leite *sabor*"
     if fim.get("gancho"):   # virada = 2 frases curtas: corta o que vier depois e quebra entre elas
@@ -128,24 +136,39 @@ def etapas(briefing, itens, modelo, primaria):
             fr[1] = (m2.group(0) if m2 else " ".join(fr[1].split()[:3])).rstrip(" .") + "."
         fim["gancho"] = " | ".join(fr)
     obj = lambda t: f"{t}, studio product photo, soft light, isolated" if t else ""
-    ciclo = [("texto-respiro", "claro", "direita"), ("papel", "escuro", None), ("texto-respiro", "escuro", "esquerda")]
-    r = {"marca": {"primaria": primaria}, "slides": [
-        {"esqueleto": "gancho-heroi", "fundo": "claro", "gancho": capa.get("gancho", ""), "sub": capa.get("sub", ""),
-         "asset": {"prompt": obj(vis.get("capa")), "semente": 7, "ponte": True}}]}
+    foto = lambda t: f"editorial photo of {t}, natural light, shallow depth of field, real scene" if t else ""
+    # estilo e sequência de layouts pelo mapa de direção de arte (tools/direcao_mapa.py) — cada tema com a sua cara
+    sug = direcao_mapa.sugerir(briefing); est = estilo or sug["estilo"]
+    capa_l, ciclo, fim_l = direcao_mapa.ESTILOS[est][4]
+    lista = lambda c: [c] if isinstance(c, str) else (c or [])
+    sl0 = {"esqueleto": capa_l, "fundo": "claro", "gancho": capa.get("gancho", ""), "sub": capa.get("sub", "")}
+    if capa_l == "gancho-heroi": sl0["asset"] = {"prompt": obj(vis.get("capa")), "semente": 7, "ponte": True}
+    elif capa_l == "foto-lateral":   # pessoa que representa o briefing (microtarefa)
+        pe = pedir(modelo, f"Briefing: {briefing}\nDescreva EM INGLÊS, em até 18 palavras, a pessoa para um retrato editorial "
+                   "(quem é, idade, roupa, expressão), sem cenário.", '"pessoa"').get("pessoa")
+        sl0.update(orbita=est == "elegante", asset={"prompt": f"editorial portrait of {pe or 'a smiling professional woman in her 30s'}, warm studio light, waist up",
+                                                     "semente": 7, "pele": True})
+    r = {"estilo": est, "marca": {"primaria": primaria}, "slides": [sl0]}
+    fundos_ciclo = ["escuro", "claro"]
     for k, s in enumerate(slides):
-        es, fu, lado = ciclo[k % len(ciclo)]
-        c = s.get("corpo") or []
-        c = [c] if isinstance(c, str) else c
-        sl = {"esqueleto": es, "fundo": fu}
-        if es == "papel": sl.update(gancho=s.get("titulo", ""), corpo=c)
-        else:
-            sl.update(titulo=s.get("titulo", ""), corpo=c)
-            p = (vis.get("itens") or [None] * len(itens))[k] if k < len(vis.get("itens") or []) else None
-            if p: sl["asset"] = {"prompt": obj(p), "semente": 7 + k, "lado": lado}
+        lay = ciclo[k % len(ciclo)]; es, _, forma_m = lay.partition(":")
+        c, t, p = lista(s.get("corpo")), s.get("titulo", ""), (vis.get("itens") or [None] * len(itens))[k]
+        sl = {"esqueleto": es, "fundo": fundos_ciclo[k % 2]}
+        if es in ("papel", "texto-destaque", "foto-moldura", "objeto-dominante"): sl["gancho"] = t
+        else: sl["titulo"] = t
+        if es == "objeto-dominante": sl["sub"] = c[0] if c else ""
+        else: sl["corpo"] = c
+        if es == "foto-moldura": sl.update(moldura_forma=forma_m or "retangulo", asset={"prompt": foto(p), "semente": 7 + k} if p else None)
+        elif es in ("texto-respiro", "objeto-dominante") and p: sl["asset"] = {"prompt": obj(p), "semente": 7 + k, "lado": "esquerda" if k % 2 else "direita"}
+        if sl.get("asset") is None: sl.pop("asset", None)
         r["slides"].append(sl)
-    fc = fim.get("corpo") or []
-    r["slides"].append({"esqueleto": "virada-cta", "fundo": "cor", "gancho": fim.get("gancho", ""), "corpo": [fc] if isinstance(fc, str) else fc,
-                        "cta": "Salve este post", "asset": {"prompt": obj(vis.get("fim")), "semente": 9}})
+    fc = lista(fim.get("corpo"))
+    if fim_l == "virada-cta":
+        r["slides"].append({"esqueleto": "virada-cta", "fundo": "cor", "gancho": fim.get("gancho", ""), "corpo": fc,
+                            "cta": "Salve este post", "asset": {"prompt": obj(vis.get("fim")), "semente": 9}})
+    else:
+        r["slides"].append({"esqueleto": fim_l, "fundo": "claro", "gancho": fim.get("gancho", ""), "sub": fc[0] if fc else "",
+                            "asset": {"prompt": obj(vis.get("fim")), "semente": 9}})
     fundos = [s["fundo"] for s in r["slides"]]
     r["pontes"] = [{"depois": k + 1, "tipo": "rasgo"} for k in range(1, n - 1) if fundos[k] != fundos[k + 1] and fundos[k + 1] != "cor"][:1]
     return r
@@ -158,11 +181,12 @@ if __name__ == "__main__":
     ap.add_argument("--montar", action="store_true"); ap.add_argument("--exportar"); ap.add_argument("--exemplo",
         default=r"D:\kanivete_biblioteca\modelos\carrossel-esqueletos-demo\demo.json")
     ap.add_argument("--etapas", action="store_true", help="lista em microtarefas (precisa de --itens)"); ap.add_argument("--primaria", default="#ff3b22")
-    ap.add_argument("--perfil", help="nome;cargo;@usuario")
+    ap.add_argument("--perfil", help="nome;cargo;@usuario"); ap.add_argument("--estilo", help="força o estilo (senão o mapa sugere)")
     a = ap.parse_args()
     if a.etapas:
         t0 = time.time()
-        r = etapas(a.briefing, [x.strip() for x in a.itens.split(";") if x.strip()], a.modelo, a.primaria)
+        r = etapas(a.briefing, [x.strip() for x in a.itens.split(";") if x.strip()], a.modelo, a.primaria, a.estilo)
+        print(f"estilo: {r['estilo']} · layouts: {', '.join(s['esqueleto'] for s in r['slides'])}")
         if a.perfil:
             nm, cg, us = (a.perfil.split(";") + ["", "", ""])[:3]
             r["perfil"] = {"nome": nm, "cargo": cg}; r["usuario"] = us

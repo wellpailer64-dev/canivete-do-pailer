@@ -34,6 +34,30 @@ ESQUELETOS = {
     "papel": "título no alto + papel rasgado com fita adesiva como caixa do corpo",
     "foto-atmosfera": "foto de fundo inteira escurecida (degradê p/ leitura) + título e corpo embaixo à esquerda",
     "virada-cta": "fechamento: frase grande na cor de destaque + corpo curto + pílula de ação com seta à mão + objeto da série",
+    "objeto-dominante": "objeto ocupa a maior parte do slide, texto pequeno em cima (produto, prova visual)",
+    "texto-destaque": "a frase é a imagem: tipografia enorme, sem foto (afirmação forte, citação, número)",
+    "foto-moldura": "foto de contexto dentro de uma forma (moldura: faixa-topo|faixa-vertical|circulo|quadrado|retangulo|livre) + texto no espaço livre",
+    "foto-lateral": "pessoa/objeto surgindo da borda lateral (cortado pela borda), texto do outro lado",
+}
+# estilos por tema (feedback 2026-10-06: carrossel não sai todo igual): fontes, caixa, paleta, moldura e arte-final
+ESTILOS = {
+    "impacto": {"titulo": "Anton", "texto": "Inter", "caixa": "uppercase", "peso": 400, "lh": (.95, 1.12), "esc": 1.0, "ls": "-.5px",
+                "escuro": "#1c1c1e", "claro": "#ecebe7", "moldura": {"perfil": True, "contador": True, "rodape": True}, "fin": {}},
+    "elegante": {"titulo": "Cormorant Garamond", "texto": "Montserrat", "caixa": "none", "peso": 500, "lh": (.98, 1.04), "esc": .92, "ls": "0",
+                 "escuro": "#1d1915", "claro": "#efe8df", "moldura": {"perfil": False, "contador": False, "rodape": True},
+                 "fin": {"textura": False, "cr": {"clar": 6, "tex": 4, "ct": 4, "grao": 6, "vib": 2, "vig": -12}}},
+    "delicado": {"titulo": "Fraunces", "texto": "Nunito", "caixa": "none", "peso": 400, "lh": (1.0, 1.06), "esc": .86, "ls": "-1px",
+                 "escuro": "#e6d5c8", "tinta_escuro": "#3a3330", "claro": "#f6efe9", "moldura": {"perfil": False, "contador": False, "rodape": True},
+                 "fin": {"textura": False, "cr": {"clar": 4, "tex": 2, "ct": 2, "grao": 4, "vib": 4, "vig": -6}}},
+    "tecnologico": {"titulo": "Space Grotesk", "texto": "Inter", "caixa": "none", "peso": 700, "lh": (.98, 1.05), "esc": .82, "ls": "-3px",
+                    "escuro": "#0b1020", "claro": "#eef2f8", "moldura": {"perfil": False, "contador": True, "rodape": True},
+                    "fin": {"textura": False, "cr": {"clar": 12, "tex": 8, "ct": 10, "grao": 6, "vig": -14}}},
+    "rustico": {"titulo": "Alfa Slab One", "texto": "Karla", "caixa": "uppercase", "peso": 400, "lh": (1.0, 1.12), "esc": .78, "ls": "0",
+                "escuro": "#2a2420", "claro": "#e9dcc6", "moldura": {"perfil": True, "contador": False, "rodape": True},
+                "fin": {"cr": {"clar": 20, "tex": 16, "ct": 12, "grao": 22, "graoT": 40, "vig": -20}}},
+    "minimalista": {"titulo": "Inter", "texto": "Inter", "caixa": "none", "peso": 800, "lh": (.98, 1.04), "esc": .78, "ls": "-4px",
+                    "escuro": "#111111", "claro": "#f5f5f3", "moldura": {"perfil": False, "contador": False, "rodape": False},
+                    "fin": {"textura": False, "brilho": False, "cr": {"clar": 4, "grao": 3, "vig": 0}}},
 }
 
 
@@ -66,7 +90,9 @@ def img(a, nome, estilo, padrao_prop="3:4"):
 
 
 def moldura(r, i, n, fundo):
-    p, u = r.get("perfil"), r.get("usuario", "")
+    # moldura opcional (perfil, contador, rodapé): padrão do estilo, o roteiro manda ("moldura": {"contador": false})
+    mo = {**r["_estilo"]["moldura"], **r.get("moldura", {})}
+    p, u = r.get("perfil") if mo["perfil"] else None, r.get("usuario", "") if mo["rodape"] else ""
     perfil = ""
     if p:
         av = (f'<img id="avatar{i}" data-corte data-semente="{p.get("semente", 7)}" data-pele data-proporcao="1:1" src="{html.escape(p["foto"])}">'
@@ -75,7 +101,7 @@ def moldura(r, i, n, fundo):
                   f'<div class="mold-nome">{html.escape(p["nome"])}</div>'
                   + (f'<div class="mold-cargo">{html.escape(p["cargo"])}</div>' if p.get("cargo") else "") + '</div></div>')
     seta = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg>'
-    num = f'<div class="mold-num" data-papel="meta">{i:02d}/{n:02d} {seta if i < n else ""}</div>'
+    num = f'<div class="mold-num" data-papel="meta">{i:02d}/{n:02d} {seta if i < n else ""}</div>' if mo["contador"] else ""
     # objeto no canto de baixo à esquerda (texto-respiro com lado esquerda) cobriria o @: vai para a direita
     s = r["slides"][i - 1]; dir_ = s.get("esqueleto") == "texto-respiro" and (s.get("asset") or {}).get("lado") == "esquerda" and (s.get("asset") or {}).get("prompt")
     rod = (f'<div class="mold-rod" data-papel="meta"{" style=&quot;left:auto;right:80px&quot;" if dir_ else ""}>{html.escape(u)}</div>'.replace("&quot;", '"')
@@ -92,7 +118,8 @@ def misturar(a, b, t):
 def caixa_asset(e, lado):
     """caixa (x, y, w, h) do objeto no slide, por esqueleto — para órbita e etiquetas acompanharem o objeto"""
     b = {"gancho-heroi": (410, 390, 820, 1000), "texto-respiro": (630, 820, 560, 620),
-         "eco-pessoa": (500, 190, 640, 1160), "virada-cta": (720, 110, 500, 600)}.get(e)
+         "eco-pessoa": (500, 190, 640, 1160), "virada-cta": (720, 110, 500, 600),
+         "objeto-dominante": (90, 330, 900, 1000), "foto-lateral": (440, 120, 900, 1230)}.get(e)
     if not b: return None
     x, y, w, h = b
     return (W - x - w, y, w, h) if lado == "esquerda" else b
@@ -115,7 +142,7 @@ def slide(r, s, i, n):
         lado, a = "esquerda", None
     # caixa alta condensada: justo (.95) sem acento; acento maiúsculo (Á, Ê, Ç...) sobe ~.25em → abre para 1.12
     acento = lambda t: re.search("[À-ÖØ-Ý]", t.upper())
-    lh = lambda t: f' style="line-height:{1.12 if acento(t) else .95}"'
+    lh = lambda t: f' style="line-height:{r["_estilo"]["lh"][1] if acento(t) else r["_estilo"]["lh"][0]}"'
     g = f'<h1 class="gancho"{lh(s["gancho"])}>{inline(s["gancho"])}</h1>' if s.get("gancho") else ""
     sub = f'<p class="sub" data-papel="subtitulo">{inline(s["sub"])}</p>' if s.get("sub") else ""
     solto = ""          # objeto que atravessa a divisa vai solto na tira (por cima dos dois slides)
@@ -159,6 +186,34 @@ def slide(r, s, i, n):
         meio = (f'{sombra_f}{obj}<div class="bloco-cta">{g}{corpo_html(s.get("corpo"))}'
                 f'<div class="cta-linha"><div class="k-pilula" data-papel="cta" data-icone="salvar">{cta}</div>'
                 f'<div class="k-seta-mao seta-cta"></div></div></div>')
+    elif e == "objeto-dominante":     # objeto é a mensagem: grande, centrado embaixo; texto pequeno no alto
+        obj = img(a, f"dom{i}", "position:absolute;left:90px;bottom:-30px;width:900px;height:1000px;object-fit:contain;object-position:50% 100%")
+        meio = f'{obj}<div class="bloco-dom">{g}{sub}</div>'
+    elif e == "texto-destaque":       # a frase é a imagem
+        meio = f'<div class="bloco-destaque">{g}{sub}{corpo_html(s.get("corpo"))}</div>'
+    elif e == "foto-moldura":         # foto de contexto dentro de uma forma; texto no espaço que sobra
+        mf = s.get("moldura_forma", "retangulo")
+        foto = lambda est, extra="": img({**(a or {}), "fundo_inteiro": True, "proporcao": (a or {}).get("proporcao", "4:5")}, f"foto{i}", est + extra) if a else ""
+        caixas = {  # (estilo da foto, estilo do bloco de texto)
+            "faixa-topo": ("position:absolute;left:0;top:0;width:100%;height:560px;object-fit:cover", f"left:{M}px;right:{M}px;top:640px"),
+            "faixa-vertical": ("position:absolute;right:0;top:0;width:330px;height:100%;object-fit:cover", f"left:{M}px;width:560px;top:0;bottom:0;justify-content:center"),
+            "circulo": ("position:absolute;right:70px;top:170px;width:560px;height:560px;object-fit:cover;border-radius:50%", f"left:{M}px;right:{M}px;top:790px"),
+            "quadrado": ("position:absolute;right:{M}px;top:170px;width:520px;height:520px;object-fit:cover;border-radius:22px;box-shadow:0 30px 70px rgba(0,0,0,.35)".replace("{M}", str(M)), f"left:{M}px;right:{M}px;top:760px"),
+            "retangulo": ("position:absolute;right:{M}px;top:150px;width:470px;height:820px;object-fit:cover;border-radius:18px;box-shadow:0 30px 70px rgba(0,0,0,.35)".replace("{M}", str(M)), f"left:{M}px;width:470px;top:0;bottom:0;justify-content:center"),
+        }
+        if mf == "livre":   # forma livre: a mancha é a base e a foto fica presa nela (data-corte = máscara de corte)
+            fl = (f'<div style="position:absolute;right:40px;top:150px;width:620px;height:620px">'
+                  f'{forma("blob", "left:0;top:0;width:620px;height:620px;color:#888", i)}'
+                  f'{foto("position:absolute;left:0;top:0;width:620px;height:620px;object-fit:cover", "").replace("<img ", "<img data-corte ", 1)}</div>')
+            meio = f'{fl}<div class="bloco-moldura" style="left:{M}px;right:{M}px;top:820px">{g}{sub}{corpo_html(s.get("corpo"))}</div>'
+        else:
+            fe, be = caixas.get(mf, caixas["retangulo"])
+            meio = f'{foto(fe)}<div class="bloco-moldura" style="{be}">{g}{sub}{corpo_html(s.get("corpo"))}</div>'
+    elif e == "foto-lateral":         # surge da borda: cortada pela lateral, texto do outro lado
+        lado_css = "right:-300px" if lado == "direita" else "left:-300px"
+        obj = img({**(a or {}), "pode_cortar": "direita esquerda baixo"}, f"lat{i}", f"position:absolute;{lado_css};bottom:0;width:1160px;height:1230px;object-fit:contain;object-position:{'100%' if lado == 'direita' else '0%'} 100%", "3:4")
+        col = "left" if lado == "direita" else "right"
+        meio = f'{obj}<div class="bloco-lateral" style="{col}:{M}px">{g}{sub}{corpo_html(s.get("corpo"))}</div>'
     else: raise SystemExit(f"esqueleto desconhecido: {e} (veja --listar)")
     # camadas de fundo com função (referências 2, direcao-carrossel.md §7), ANTES do conteúdo = atrás dele:
     #   supergráfico (traço grosso de marca, enorme, tom sobre tom, sangrando) → órbita fina em volta da cabeça → objeto
@@ -185,7 +240,9 @@ def slide(r, s, i, n):
 
 
 def montar_html(r):
-    m = {"primaria": "#ff3b22", "escuro": "#1c1c1e", "claro": "#ecebe7", "titulo": "Anton", "texto": "Inter", "mao": "Caveat", **r.get("marca", {})}
+    est = ESTILOS.get(r.get("estilo", "impacto"), ESTILOS["impacto"]); r["_estilo"] = est
+    m = {"primaria": "#ff3b22", "escuro": est["escuro"], "claro": est["claro"], "titulo": est["titulo"], "texto": est["texto"], "mao": "Caveat", **r.get("marca", {})}
+    tf, pw, ls, k0 = est["caixa"], est["peso"], est["ls"], est["esc"]
     n = len(r["slides"]); secoes, soltos = [], []
     # objeto-ponte cobre o canto de baixo do slide seguinte: lá o rodapé sai
     r["_sem_rodape"] = {k + 2: True for k, s in enumerate(r["slides"]) if (s.get("asset") or {}).get("ponte")}
@@ -199,6 +256,14 @@ def montar_html(r):
     razao = lambda a, b: (max(lum(a), lum(b)) + 0.05) / (min(lum(a), lum(b)) + 0.05)
     fundo_cor = misturar(m["primaria"], "#000000", 0.85)
     dest_cor = max(["#1c1c1e", misturar("#ffffff", m["primaria"], 0.7), "#fff3c4"], key=lambda c: razao(c, fundo_cor))
+    # destaque no fundo claro/escuro: a cor da marca, escurecida/clareada até passar de 3,3:1 (título grande)
+    def ate_contraste(base, alvo, para):
+        for t in (0, .15, .3, .45, .6):
+            c = misturar(para, base, t)
+            if razao(c, alvo) >= 3.3: return c
+        return para
+    lado_de = lambda fundo: "#000000" if lum(fundo) > 0.35 else "#ffffff"   # escurece em fundo claro, clareia em fundo escuro
+    dest_claro, dest_escuro = ate_contraste(m["primaria"], m["claro"], lado_de(m["claro"])), ate_contraste(m["primaria"], m["escuro"], lado_de(m["escuro"]))
     for p in r.get("pontes", []):
         k = p["depois"]                       # entre o slide k e o k+1
         if p.get("tipo") == "fita":
@@ -212,14 +277,20 @@ def montar_html(r):
     css = f"""
 body{{--cor-primaria:{m['primaria']};--cor-fundo:#fff;font-family:'{m['texto']}';}}
 .slide{{position:relative;overflow:hidden}}
-.escuro{{background:radial-gradient(120% 80% at 70% 10%,#2c2c2f 0%,{m['escuro']} 60%);color:#f1f1f1}}
+.escuro{{background:radial-gradient(120% 80% at 70% 10%,{misturar('#ffffff', m['escuro'], 0.08)} 0%,{m['escuro']} 60%);color:{est.get('tinta_escuro', '#f1f1f1')}}}
 .claro{{background:radial-gradient(120% 80% at 30% 0%,#ffffff 0%,{m['claro']} 65%);color:#2b2b2b}}
 .cor{{background:radial-gradient(120% 80% at 50% 0%,color-mix(in srgb,{m['primaria']} 92%,#000) 0%,color-mix(in srgb,{m['primaria']} 78%,#000) 70%);color:#fff}}
-.cor .dest{{color:{dest_cor}}} .cor .mold-rod{{opacity:1}} .cor .k-pilula{{background:#fff;color:color-mix(in srgb,{m['primaria']} 80%,#000)}} .cor .k-seta-mao{{color:#fff}} .cor .k-marca{{--cor-marca:#1c1c1e}} .dest{{font-style:normal;color:var(--cor-primaria)}}
-.gancho{{font-family:'{m['titulo']}';font-weight:400;text-transform:uppercase;font-size:calc(150px * var(--k,1));line-height:1.04;letter-spacing:-.5px;margin:0}}
+.cor .dest{{color:{dest_cor}}} .cor .mold-rod{{opacity:1}} .claro .dest{{color:{dest_claro}}} .escuro .dest{{color:{dest_escuro}}} .cor .k-pilula{{background:#fff;color:color-mix(in srgb,{m['primaria']} 80%,#000)}} .cor .k-seta-mao{{color:#fff}} .cor .k-marca{{--cor-marca:#1c1c1e}} .dest{{font-style:normal;color:var(--cor-primaria)}}
+.slide{{--k0:{k0}}}
+.gancho{{font-family:'{m['titulo']}';font-weight:{pw};text-transform:{tf};font-size:calc(150px * var(--k,1) * var(--k0));line-height:1.04;letter-spacing:{ls};margin:0}}
+.bloco-dom{{position:absolute;left:{M}px;right:{M}px;top:150px;text-align:center}} .bloco-dom .gancho{{font-size:calc(92px * var(--k,1) * var(--k0))}} .bloco-dom .sub{{margin:20px auto 0}}
+.bloco-destaque{{position:absolute;left:{M}px;right:{M}px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center}}
+.bloco-destaque .gancho{{font-size:calc(190px * var(--k,1) * var(--k0))}} .bloco-destaque .corpo{{margin-top:44px;max-width:700px}}
+.bloco-moldura{{position:absolute;display:flex;flex-direction:column}} .bloco-moldura .gancho{{font-size:calc(104px * var(--k,1) * var(--k0))}} .bloco-moldura .corpo{{margin-top:52px}}
+.bloco-lateral{{position:absolute;top:0;bottom:0;width:470px;display:flex;flex-direction:column;justify-content:center;z-index:1}} .bloco-lateral .gancho{{font-size:calc(110px * var(--k,1) * var(--k0))}} .bloco-lateral .corpo{{margin-top:52px}}
 .sub{{font-size:38px;line-height:1.2;margin-top:34px;max-width:620px}}
 .pre{{font-size:30px;opacity:.75;margin-bottom:18px}}
-.tit2{{font-family:'{m['titulo']}';font-weight:400;text-transform:uppercase;font-size:calc(84px * var(--k,1));line-height:1;margin:0 0 44px}}
+.tit2{{font-family:'{m['titulo']}';font-weight:{pw};text-transform:{tf};letter-spacing:{ls};font-size:calc(84px * var(--k,1) * var(--k0));line-height:1;margin:0 0 44px}}
 .corpo{{font-size:32px;line-height:1.38}} .corpo p+p{{margin-top:30px}} .corpo b{{font-weight:700}}
 .mold-perfil{{position:absolute;left:{M}px;top:52px;display:flex;align-items:center;gap:14px}}
 .mold-av{{position:relative;width:54px;height:54px;border-radius:50%;background:color-mix(in srgb,var(--cor-primaria) 80%,#000);color:#fff;font-size:26px;font-weight:800;display:flex;align-items:center;justify-content:center}}
@@ -233,16 +304,16 @@ body{{--cor-primaria:{m['primaria']};--cor-fundo:#fff;font-family:'{m['texto']}'
 .bloco-texto{{position:absolute;top:0;bottom:0;width:640px;display:flex;flex-direction:column;justify-content:center}}
 .eco-v{{top:-40px;font-size:340px;transform:rotate(90deg);transform-origin:0 0;left:{W - 60}px;color:currentColor;opacity:.08}}
 .bloco-eco{{position:absolute;top:0;bottom:0;width:430px;display:flex;flex-direction:column;justify-content:center}}
-.bloco-eco .tit2{{font-size:calc(72px * var(--k,1))}}
+.bloco-eco .tit2{{font-size:calc(72px * var(--k,1) * var(--k0))}}
 .bloco-papel-tit{{position:absolute;left:{M}px;right:{M}px;top:170px;text-align:center}}
-.bloco-papel-tit .gancho{{font-size:calc(118px * var(--k,1))}}
+.bloco-papel-tit .gancho{{font-size:calc(118px * var(--k,1) * var(--k0))}}
 .caixa-papel{{position:absolute;left:150px;width:780px;top:620px;padding:80px 70px 110px;color:#2b2b2b}}
 .corpo-papel{{font-size:32px}}
 .veu{{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.15) 0%,rgba(0,0,0,.35) 40%,rgba(0,0,0,.88) 100%)}}
 .bloco-atmos{{position:absolute;left:{M}px;bottom:150px;width:820px;color:#f4f4f4}}
-.bloco-atmos .gancho{{font-size:calc(128px * var(--k,1))}} .bloco-atmos .corpo{{margin-top:36px;max-width:640px}}
+.bloco-atmos .gancho{{font-size:calc(128px * var(--k,1) * var(--k0))}} .bloco-atmos .corpo{{margin-top:36px;max-width:640px}}
 .bloco-cta{{position:absolute;left:{M}px;top:0;bottom:0;width:640px;display:flex;flex-direction:column;justify-content:center;z-index:1}}
-.bloco-cta .gancho{{font-size:calc(132px * var(--k,1));color:var(--cor-primaria)}} .cor .bloco-cta .gancho{{color:#fff}}
+.bloco-cta .gancho{{font-size:calc(132px * var(--k,1) * var(--k0));color:var(--cor-primaria)}} .cor .bloco-cta .gancho{{color:#fff}}
 .bloco-cta .corpo{{margin-top:40px;max-width:600px}}
 .cta-linha{{margin-top:60px}} .k-pilula{{height:72px;font-size:26px;font-weight:700;padding:0 32px}}
 .cta-linha{{display:flex;align-items:center;gap:26px}}
@@ -269,11 +340,16 @@ if __name__ == "__main__":
                "--porta", str(a.porta), "--salvar", os.path.splitext(saida)[0] + ".iknv"]
         if a.exportar: cmd += ["--exportar", a.exportar]
         fin = r.get("acabamento", True)          # finalização: sombra, brilho, eco borrado, textura, Camera Raw
-        if fin:
-            opc = {"cor": r.get("marca", {}).get("primaria", "#ff3b22"), **(fin if isinstance(fin, dict) else {})}
+        if fin:   # padrão do estilo + o que o roteiro pedir
+            opc = {"cor": r.get("marca", {}).get("primaria", "#ff3b22"), **ESTILOS.get(r.get("estilo", "impacto"), ESTILOS["impacto"])["fin"], **(fin if isinstance(fin, dict) else {})}
             js = os.path.splitext(saida)[0] + "_fin.js"
             with open(js, "w", encoding="utf-8") as fh: fh.write(f"return await KNV.receita.arteFinal({json.dumps(opc)});\n")
             cmd += ["--depois", js]
+        # fontes do estilo instaladas antes (a cena não instala: cai em Arial)
+        est = ESTILOS.get(r.get("estilo", "impacto"), ESTILOS["impacto"])
+        fontes = ",".join(dict.fromkeys([r.get("marca", {}).get("titulo", est["titulo"]), r.get("marca", {}).get("texto", est["texto"])]))
+        subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "knv.py"), "--amostras", "Aa", "--fontes", fontes,
+                        "--porta", str(a.porta)], capture_output=True)
         # auto-ajuste sem gastar token: atropelo/margem/respiro num slide → título 10% menor e monta de novo (até 3x)
         rev = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "revisor.py"), "--porta", str(a.porta), "--roteiro", a.roteiro]
         for volta in range(4):
