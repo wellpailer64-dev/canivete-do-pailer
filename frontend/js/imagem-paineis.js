@@ -897,6 +897,8 @@ function ieAbasRender() {
     const salvar = ieEl('ie-btn-salvar'), exp = ieEl('ie-btn-exportar');
     if (salvar) salvar.disabled = !IE.doc;
     if (exp) exp.disabled = !IE.doc;
+    const cam = ieEl('ie-btn-caminho');   // só com o documento salvo em algum lugar
+    if (cam) { cam.disabled = !(IE.doc && IE.doc.path); cam.title = (IE.doc && IE.doc.path ? IE.doc.path : ieT('Documento ainda não salvo')) + ' (Shift+Ctrl+O)'; }
     const ini = ieEl('ie-inicio');
     if (ini) ini.hidden = !!IE.doc;
     if (!IE.doc) ieRecentesRender?.();

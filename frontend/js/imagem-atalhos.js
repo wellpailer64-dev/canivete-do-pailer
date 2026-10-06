@@ -21,7 +21,7 @@ Object.assign(IE_ATALHOS, {
     F2: 'recortar', F3: 'copiar', F4: 'colar', F12: 'reverter', 'Shift+F7': 'selInverter',
     // arquivo e documentos
     'Alt+Ctrl+W': 'fecharTodos', 'Alt+Ctrl+P': 'fecharOutros', 'Ctrl+Tab': 'docProximo', 'Shift+Ctrl+Tab': 'docAnterior',
-    'Alt+Ctrl+S': 'salvarComo', 'Alt+Shift+Ctrl+S': 'exportar', 'Alt+Ctrl+O': 'abrir', 'Alt+Shift+Ctrl+O': 'abrir',
+    'Alt+Ctrl+S': 'salvarComo', 'Alt+Shift+Ctrl+S': 'exportar', 'Alt+Ctrl+O': 'abrir', 'Alt+Shift+Ctrl+O': 'abrir', 'Shift+Ctrl+O': 'abrirCaminho',
     // editar
     'Shift+Ctrl+T': 'transfDeNovo', 'Shift+Backspace': 'preencher', 'Shift+Delete': 'preencher',
     'Alt+Shift+Backspace': 'preencherFrenteTransp', 'Shift+Ctrl+Backspace': 'preencherFundoTransp',

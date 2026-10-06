@@ -795,6 +795,7 @@ function ieAlinhar(a) {
 const IE_CMDS = {
     novo: () => ieNovoDialogo(),
     abrir: () => ieAbrirDialogo(),
+    abrirCaminho: doc => { if (doc && doc.path) ieApi().reveal_file(doc.path); else ieToast(ieT('Documento ainda não salvo')); },   // pasta do documento no Explorer
     colocar: async () => { const r = await ieApi()?.ie_dialogo_abrir(true); if (r && r.success) for (const p of r.paths) await ieColocarArquivo(p); },
     salvar: () => ieSalvar(false),
     salvarComo: () => ieSalvar(true),
