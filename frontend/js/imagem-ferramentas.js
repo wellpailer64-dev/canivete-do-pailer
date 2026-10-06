@@ -633,6 +633,7 @@ const IE_MOVER = {
     },
     dbl(p, ev, doc) {
         const L = (typeof ieTextoNoPonto === 'function' && ieTextoNoPonto(doc, p)) || ieCamadaNoPonto(doc, p.x, p.y);
+        if (L && L.tipo === 'forma' && L.vet) { ieFormaCorEditar(doc, L, ieAncoraNoMouse(ev)); return; }
         if (L && (L.txt || L.texto)) {
             ieEscolherFerr('texto');
             ieTextoEditar(L, false, p);
@@ -1025,6 +1026,20 @@ const IE_FORMA = {
         const a = IE.arr; IE.arr = null;
         if (!a || !a.r) return;
         const o = IE.op.forma, cor = IE.cor[0];
+        // forma básica = CAMADA DE FORMA (vetor): fica nítida ao transformar e o duplo clique troca a cor (como no
+        // Photoshop); rasterizar ou converter em objeto inteligente tira isso
+        if (typeof ieFormaRender === 'function') {
+            const subs = ieFormaBasicaSubs(o, a.r);
+            if (!subs) return;
+            const nomeF = { eli: 'Elipse', tri: 'Triângulo', poli: 'Polígono', linha: 'Linha' }[o.tipo] || 'Retângulo';
+            const L = ieNovaCamada(doc, { tipo: 'forma', nome: ieNomeLivre(doc, ieT(nomeF)), vet: { subs, cor }, sujoPx: true });
+            ieInserirAcima(doc, L, doc.selIds.length ? ieAtiva(doc) : null);
+            ieFormaRender(L, doc);
+            doc.ativa = L.id; doc.selIds = [L.id];
+            ieHist(ieT(nomeF));
+            ieUiCamadas?.();
+            return;
+        }
         let c, x0, y0, nome;
         if (o.tipo === 'linha') {
             const larg = Math.max(1, o.contorno || 4), r = a.r;
@@ -1233,6 +1248,57 @@ const IE_FERR = {
     mao: IE_MAO,
     zoom: IE_ZOOM,
 };
+// subdemarcador da forma básica (pontos com alças de Bézier, o formato da Caneta): retângulo/polígono com cantos
+// arredondados, elipse e linha (faixa da espessura escolhida). r = {x, y, w, h} ou {x1, y1, x2, y2} na linha
+function ieFormaBasicaSubs(o, r) {
+    const K = 0.5523;
+    const poligono = (P, raio) => {
+        if (!raio) return P.map(([x, y]) => ({ x, y }));
+        const out = [], n = P.length;
+        for (let i = 0; i < n; i++) {
+            const a = P[(i - 1 + n) % n], b = P[i], c = P[(i + 1) % n];
+            const la = Math.hypot(a[0] - b[0], a[1] - b[1]), lc = Math.hypot(c[0] - b[0], c[1] - b[1]), rr = Math.min(raio, la / 2, lc / 2);
+            const p1 = [b[0] + (a[0] - b[0]) / la * rr, b[1] + (a[1] - b[1]) / la * rr], p2 = [b[0] + (c[0] - b[0]) / lc * rr, b[1] + (c[1] - b[1]) / lc * rr];
+            out.push({ x: p1[0], y: p1[1], o: [p1[0] + (b[0] - p1[0]) * K, p1[1] + (b[1] - p1[1]) * K] });
+            out.push({ x: p2[0], y: p2[1], i: [p2[0] + (b[0] - p2[0]) * K, p2[1] + (b[1] - p2[1]) * K] });
+        }
+        return out;
+    };
+    let pts;
+    if (o.tipo === 'linha') {
+        const e = Math.max(1, o.contorno || 4) / 2, dx = r.x2 - r.x1, dy = r.y2 - r.y1, L = Math.hypot(dx, dy);
+        if (L < 1) return null;
+        const nx = -dy / L * e, ny = dx / L * e;
+        pts = poligono([[r.x1 + nx, r.y1 + ny], [r.x2 + nx, r.y2 + ny], [r.x2 - nx, r.y2 - ny], [r.x1 - nx, r.y1 - ny]], 0);
+    } else {
+        if (r.w < 1 || r.h < 1) return null;
+        const { x, y, w, h } = r;
+        if (o.tipo === 'eli') {
+            const cx = x + w / 2, cy = y + h / 2, rx = w / 2, ry = h / 2, kx = rx * K, ky = ry * K;
+            pts = [{ x: cx, y: y, i: [cx - kx, y], o: [cx + kx, y] }, { x: x + w, y: cy, i: [x + w, cy - ky], o: [x + w, cy + ky] },
+                { x: cx, y: y + h, i: [cx + kx, y + h], o: [cx - kx, y + h] }, { x, y: cy, i: [x, cy + ky], o: [x, cy - ky] }];
+        } else if (o.tipo === 'tri' || o.tipo === 'poli') {
+            const n = o.tipo === 'tri' ? 3 : Math.max(3, o.lados || 6), U = [];
+            for (let i = 0; i < n; i++) { const t = -Math.PI / 2 + i * 2 * Math.PI / n; U.push([Math.cos(t), Math.sin(t)]); }
+            const xs = U.map(p => p[0]), ys = U.map(p => p[1]), mx = Math.min(...xs), my = Math.min(...ys), sx = w / (Math.max(...xs) - mx), sy = h / (Math.max(...ys) - my);
+            pts = poligono(U.map(([a, b]) => [x + (a - mx) * sx, y + (b - my) * sy]), o.raio || 0);
+        } else pts = poligono([[x, y], [x + w, y], [x + w, y + h], [x, y + h]], o.raio || 0);
+    }
+    return [{ pts, fechado: true, op: 'somar' }];
+}
+// duplo clique numa camada de forma: seletor de cor; muda ao vivo e entra um passo só no histórico
+function ieFormaCorEditar(doc, L, ancora) {
+    if (!L || !L.vet) return;
+    const antes = L.vet.cor;
+    let t = 0;
+    ieSeletorCor(ancora, antes || '#000000', c => {
+        L.vet.cor = c; ieFormaRender(L, doc);
+        clearTimeout(t); t = setTimeout(() => { if (L.vet.cor !== antes) ieHist(ieT('Cor da forma')); }, 600);
+    });
+}
+function ieAncoraNoMouse(ev) {   // âncora para o seletor de cor na posição do clique
+    return { getBoundingClientRect: () => new DOMRect(ev.clientX, ev.clientY, 1, 1) };
+}
 // polígono regular de n lados inscrito na caixa w×h (triângulo: ponta para cima), com cantos arredondados opcionais
 function ieFormaPoligono(x, n, w, h, raio) {
     const pts = [];

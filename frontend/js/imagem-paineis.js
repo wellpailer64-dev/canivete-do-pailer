@@ -607,6 +607,8 @@ function ieCamadasInstalar() {
         const linha = ev.target.closest('.ie-cam');
         const L = linha && ieAchar(doc, +linha.dataset.id)?.L;
         if (L && (L.txt || L.texto) && ev.target.closest('[data-alvo]')) { ieEscolherFerr('texto'); ieTextoEditar(L); return; }
+        // miniatura da camada de forma: seletor de cor
+        if (L && L.tipo === 'forma' && L.vet && ev.target.closest('[data-alvo="px"]')) { ieFormaCorEditar(doc, L, ev.target.closest('[data-alvo="px"]')); return; }
         // miniatura/selo do objeto inteligente: abre o conteúdo numa aba (como no Photoshop)
         if (L && L.tipo === 'inteligente' && ev.target.closest('[data-alvo="px"], .ie-cam-selo')) { ieConteudoAbrir(doc, L); return; }
         // duplo clique no resto da linha (ou no fx): Estilo de camada, como no Photoshop
