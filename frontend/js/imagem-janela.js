@@ -583,6 +583,57 @@ function ieJanTracoAmostra(cv, o) {
     }
     x.globalAlpha = 1;
 }
+function iePincelPopup(ev) {
+    const pop = ieEl('ie-pop'), app = ieEl('ie');
+    if (!pop || !app) return;
+    const alvo = 'pincel', o = IE.op[alvo];
+    const meus = ieJanLista('pinceis'), todos = [...IE_PINCEIS, ...meus.map(p => ({ ...p, meu: true }))];
+    const campo = (k, r, min, max, un) => `<label class="ie-brp-faixa"><span>${ieEsc(ieT(r))}</span><input type="range" data-k="${k}" min="${min}" max="${max}" value="${o[k] ?? 0}"><input type="number" data-n="${k}" min="${min}" max="${max}" value="${o[k] ?? 0}"><em>${un}</em></label>`;
+    const fechar = () => {
+        pop.hidden = true;
+        pop.innerHTML = '';
+        if (pop._pincelFora) document.removeEventListener('pointerdown', pop._pincelFora, true);
+        pop._pincelFora = null;
+    };
+    if (pop._pincelFora) document.removeEventListener('pointerdown', pop._pincelFora, true);
+    pop.onclick = null;
+    pop.innerHTML = `<div class="ie-brp">
+        <canvas class="ie-brp-prev" width="300" height="54"></canvas>
+        ${campo('tam', 'Tamanho', 1, 2500, 'px')}${campo('dureza', 'Hardness', 0, 100, '%')}
+        <div class="ie-brp-tit">${ieEsc(ieT('Pincéis'))}</div>
+        <div class="ie-brp-lista">${todos.map((p, i) => `<button data-i="${i}" title="${ieEsc(ieT(p.nome))}"><canvas width="180" height="34"></canvas><span>${ieEsc(ieT(p.nome))}</span><em>${p.o.tam}px</em></button>`).join('')}</div>
+    </div>`;
+    const atualizar = () => {
+        pop.querySelectorAll('input[data-k]').forEach(i => { if (document.activeElement !== i) i.value = o[i.dataset.k] ?? 0; });
+        pop.querySelectorAll('input[data-n]').forEach(i => { if (document.activeElement !== i) i.value = o[i.dataset.n] ?? 0; });
+        ieJanTracoAmostra(pop.querySelector('.ie-brp-prev'), o);
+        ieOpcoesRender?.();
+        ieDesenharSobre();
+    };
+    const mudar = (k, v) => {
+        o[k] = Math.round(ieClamp(+v || 0, k === 'tam' ? 1 : 0, k === 'tam' ? 2500 : 100));
+        atualizar();
+    };
+    pop.querySelectorAll('input[data-k]').forEach(i => i.addEventListener('input', () => mudar(i.dataset.k, i.value)));
+    pop.querySelectorAll('input[data-n]').forEach(i => {
+        i.addEventListener('change', () => mudar(i.dataset.n, i.value));
+        i.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape') fechar(); });
+    });
+    pop.querySelectorAll('[data-i]').forEach(b => {
+        const p = todos[+b.dataset.i];
+        ieJanTracoAmostra(b.querySelector('canvas'), p.o);
+        b.onclick = () => { Object.assign(o, ieClone(p.o)); atualizar(); ieJanAtualizar?.('ferr'); };
+    });
+    pop.oncontextmenu = e => e.preventDefault();
+    const fora = e => { if (!pop.contains(e.target)) fechar(); };
+    pop._pincelFora = fora;
+    pop.hidden = false;
+    atualizar();
+    const rb = app.getBoundingClientRect(), w = pop.offsetWidth || 320, h = pop.offsetHeight || 420;
+    pop.style.left = ieClamp(ev.clientX - rb.left, 4, Math.max(4, rb.width - w - 4)) + 'px';
+    pop.style.top = ieClamp(ev.clientY - rb.top, 4, Math.max(4, rb.height - h - 4)) + 'px';
+    setTimeout(() => document.addEventListener('pointerdown', fora, true), 0);
+}
 ieJanRegistrar('pinceis', 'Pincéis', ['ferr'], corpo => {
     const meus = ieJanLista('pinceis'), todos = [...IE_PINCEIS, ...meus.map(p => ({ ...p, meu: true }))];
     corpo.innerHTML = `<div class="ie-pn-pinceis">${todos.map((p, i) => `<button data-i="${i}" title="${ieEsc(ieT(p.nome))}${p.meu ? ' — ' + ieT('botão direito: excluir') : ''}"><canvas width="220" height="40"></canvas><span>${ieEsc(ieT(p.nome))} · ${p.o.tam}</span></button>`).join('')}</div>

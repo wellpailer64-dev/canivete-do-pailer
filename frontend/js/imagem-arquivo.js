@@ -266,6 +266,20 @@ async function ieEnviar(url, chave, c) {
 
 function ieMatEhId(m) { return !m || (Math.abs(m[0] - 1) < 1e-9 && Math.abs(m[3] - 1) < 1e-9 && Math.abs(m[1]) < 1e-9 && Math.abs(m[2]) < 1e-9 && Math.abs(m[4]) < 1e-6 && Math.abs(m[5]) < 1e-6); }
 
+async function ieSalvarPdfAchatado(doc, destino) {
+    const api = ieApi();
+    ieCarregando(`${ieT('Gravando o PDF')}...`, 30);
+    try {
+        ieCompor(doc, ieRDoc(doc));
+        const ini = await api.ie_salvar_inicio(null);
+        await ieEnviar(ini.url, 'composto.png', doc.comp);
+        const r = await api.ie_exportar({ sessao: ini.sessao, composto: 'composto.png', destino, qualidade: 92, dpi: doc.dpi });
+        if (!r || !r.success) { ieToast(`${ieT('Não salvou')}: ${(r && r.error) || ''}`); return false; }
+        ieToast(`${ieT('Salvo')}: ${ieNomeArq(destino)}`);
+        return true;
+    } finally { ieCarregando(false); }
+}
+
 async function ieSalvar(comoNovo = false) {
     const doc = IE.doc, api = ieApi();
     if (!doc || !api) return false;
@@ -283,6 +297,7 @@ async function ieSalvar(comoNovo = false) {
         destino = r.path;
     }
     if (/\.iknv$/i.test(destino)) return ieSalvarIknv(doc, destino);
+    if (/\.pdf$/i.test(destino)) return ieSalvarPdfAchatado(doc, destino);
     ieCarregando(`${ieT('Salvando')} ${ieNomeArq(destino)}...`, 5);
     try {
         const ini = await api.ie_salvar_inicio(doc.pyId);
@@ -472,7 +487,7 @@ async function ieExportarDialogo() {
     if (!doc || !api) return;
     const v = await ieDialogo({
         titulo: 'Exportar como', ok: 'Exportar',
-        campos: [{ id: 'fmt', rotulo: 'Formato', tipo: 'select', valor: IE.ultFmt || 'png', opcoes: [['png', 'PNG'], ['jpg', 'JPEG'], ['webp', 'WebP'], ['tif', 'TIFF']] },
+        campos: [{ id: 'fmt', rotulo: 'Formato', tipo: 'select', valor: IE.ultFmt || 'png', opcoes: [['png', 'PNG'], ['jpg', 'JPEG'], ['webp', 'WebP'], ['tif', 'TIFF'], ['pdf', 'PDF']] },
             { id: 'q', rotulo: 'Qualidade (JPEG/WebP)', min: 1, max: 100, valor: IE.ultQ || 92 },
             { id: 'esc', rotulo: 'Escala (%)', tipo: 'numero', min: 1, max: 400, valor: 100 }],
     });

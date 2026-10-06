@@ -207,6 +207,7 @@
 }
 .ie-cam:hover { background: rgba(255, 255, 255, .03); }
 .ie-cam.sel { background: var(--ie-sel); }
+.ie-cam.ativa { box-shadow: inset 3px 0 0 var(--ie-acento); }
 .ie-cam.oculta .ie-cam-nome, .ie-cam.oculta .ie-cam-mini { opacity: .45; }
 .ie-cam.drop-acima { box-shadow: inset 0 2px 0 var(--ie-acento); }
 .ie-cam.drop-abaixo { box-shadow: inset 0 -2px 0 var(--ie-acento); }
@@ -258,6 +259,19 @@
 .ie-menu-sub:hover { background: var(--ie-hover); }
 .ie-menu-sub > .ie-menu { display: none; position: absolute; left: 100%; top: -5px; }
 .ie-menu-sub:hover > .ie-menu { display: block; }
+.ie-brp { width: 320px; padding: 8px; background: var(--ie-painel-2); border: 1px solid var(--ie-linha-2); border-radius: 6px; box-shadow: var(--shadow-pop); display: flex; flex-direction: column; gap: 7px; }
+.ie-brp-prev { width: 100%; height: 54px; border-radius: 4px; }
+.ie-brp-faixa { display: grid; grid-template-columns: 72px minmax(0, 1fr) 58px 18px; gap: 7px; align-items: center; color: var(--text-2); font: 12px var(--font-ui); }
+.ie-brp-faixa input[type=range] { width: 100%; accent-color: var(--ie-acento); }
+.ie-brp-faixa input[type=number] { width: 100%; height: 23px; background: var(--bg-input); color: var(--text); border: 1px solid var(--ie-linha-2); border-radius: 4px; padding: 0 5px; font: inherit; }
+.ie-brp-faixa em { font-style: normal; color: var(--text-3); }
+.ie-brp-tit { padding-top: 2px; color: var(--text-3); font: 600 10.5px var(--font-ui); text-transform: uppercase; letter-spacing: .04em; }
+.ie-brp-lista { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+.ie-brp-lista button { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: center; gap: 6px; min-height: 38px; padding: 3px 5px; border: 1px solid var(--ie-linha); border-radius: 4px; background: transparent; color: var(--text-2); cursor: pointer; font: 11.5px var(--font-ui); text-align: left; }
+.ie-brp-lista button:hover { border-color: var(--ie-acento); background: var(--ie-hover); color: var(--text); }
+.ie-brp-lista canvas { width: 84px; height: 30px; border-radius: 3px; }
+.ie-brp-lista span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ie-brp-lista em { color: var(--text-3); font-style: normal; }
 
 .ie-cp { display: flex; gap: 8px; padding: 10px; background: var(--ie-painel-2); border: 1px solid var(--ie-linha-2); border-radius: 8px; box-shadow: var(--shadow-pop); }
 .ie-cp canvas { border-radius: 3px; cursor: crosshair; }

@@ -87,7 +87,7 @@ function ieTextoLayout(t) {
     const asc = (m0.fontBoundingBoxAscent || t.tam * 0.8) * ((t.escV || 100) / 100);
     const base0 = t.caixa ? t.caixa[1] + asc : 0;
     const out = [];
-    let y = 0;
+    let y = 0, off = 0;
     txt.split(IE_NL).forEach((par, pi) => {
         if (pi) y += P.ed + P.ea;
         let linhas = [par];
@@ -101,7 +101,10 @@ function ieTextoLayout(t) {
             });
             linhas.push(atual);
         }
+        let procura = 0;
         linhas.forEach((s, li) => {
+            const achou = par.indexOf(s, procura);
+            const inicio = achou >= 0 ? achou : procura;
             const w = med(s), ultima = li === linhas.length - 1, ini = P.re + (li ? 0 : P.r1);
             let al = P.al, just = 0, wl = w;
             if (al.startsWith('justify')) al = !ultima || al === 'justify-all' ? 'justify' : al.slice(8);
@@ -112,9 +115,11 @@ function ieTextoLayout(t) {
                 const n = s.split(' ').length - 1;
                 if (al === 'justify' && n > 0 && b - a > w) { just = (b - a - w) / n; wl = b - a; }
             } else lx = al === 'center' ? -w / 2 + (ini - P.rd) / 2 : al === 'right' ? -w - P.rd : ini;
-            out.push({ s, x: lx, y: base0 + y, w, wl, just });
+            out.push({ s, x: lx, y: base0 + y, w, wl, just, idx: off + inicio });
+            procura = inicio + s.length + (linhas.length > 1 && li < linhas.length - 1 ? 1 : 0);
             y += adv;
         });
+        off += par.length + 1;
     });
     return out;
 }
@@ -223,7 +228,53 @@ async function ieTextoDoPsd(L, silencioso = false) {
 // ─────────────────────────── edição na tela ───────────────────────────
 IE.edTexto = null;   // {L, nova, antes}
 
-async function ieTextoEditar(L, nova = false) {
+function ieTextoIndiceNoPonto(L, p) {
+    const t = L && L.txt;
+    if (!t || !p) return null;
+    const q = ieMatPt(ieMatInv(t.m || IE_ID), p.x, p.y);
+    const linhas = ieTextoLayout(t);
+    if (!linhas.length) return 0;
+    const raw = String(t.s || '');
+    const sh = (t.escH || 100) / 100;
+    const x = ieMedir(t);
+    let melhor = linhas[0], melhorDist = Infinity;
+    for (const l of linhas) {
+        const d = Math.abs(q.y - l.y);
+        if (d < melhorDist) { melhor = l; melhorDist = d; }
+    }
+    const base = Math.min(raw.length, melhor.idx || 0);
+    const sx = (q.x - melhor.x) / sh;
+    if (sx <= 0 || !melhor.s) return base;
+    let pos = melhor.s.length, melhorErro = Infinity;
+    for (let i = 0; i <= melhor.s.length; i++) {
+        const w = x.measureText(melhor.s.slice(0, i)).width;
+        const erro = Math.abs(sx - w);
+        if (erro < melhorErro) { melhorErro = erro; pos = i; }
+    }
+    return ieClamp(base + pos, 0, raw.length);
+}
+
+function ieTextoNoPonto(doc, p) {
+    if (!doc || !p) return null;
+    const ordem = [];
+    const visitar = (lista, visivel) => {
+        for (const L of lista) {
+            const v = visivel && L.visivel;
+            if (L.filhos) visitar(L.filhos, v);
+            else if (v && L.txt) ordem.push(L);
+        }
+    };
+    visitar(doc.camadas, true);
+    for (let i = ordem.length - 1; i >= 0; i--) {
+        const L = ordem[i], t = L.txt, q = ieMatPt(ieMatInv(t.m || IE_ID), p.x, p.y);
+        const B = ieTextoCaixaLocal(t);
+        const tol = Math.max(2, t.tam * 0.08);
+        if (q.x >= B.x - tol && q.y >= B.y - tol && q.x <= B.x + B.w + tol && q.y <= B.y + B.h + tol) return L;
+    }
+    return null;
+}
+
+async function ieTextoEditar(L, nova = false, ponto = null) {
     const doc = IE.doc;
     if (!L) return;
     if (!L.txt) {
@@ -242,8 +293,13 @@ async function ieTextoEditar(L, nova = false) {
     const ta = ieEl('ie-texto-edit');
     ta.value = L.txt.s || '';
     ta.hidden = false;
+    const caret = ponto ? ieTextoIndiceNoPonto(L, ponto) : null;
     ieTextoPosicionar();
-    setTimeout(() => { ta.focus(); if (!nova) ta.select(); }, 0);
+    setTimeout(() => {
+        ta.focus();
+        if (caret != null) ta.setSelectionRange(caret, caret);
+        else if (!nova) ta.select();
+    }, 0);
     ieOpcoesRender?.();
 }
 
@@ -380,8 +436,8 @@ const IE_TEXTO = {
             return;
         }
         // clicou num texto? edita
-        const alvo = ieCamadaNoPonto(doc, p.x, p.y);
-        if (alvo && (alvo.txt || alvo.texto)) { ieTextoEditar(alvo); return; }
+        const alvo = ieTextoNoPonto(doc, p) || ieCamadaNoPonto(doc, p.x, p.y);
+        if (alvo && (alvo.txt || alvo.texto)) { ieTextoEditar(alvo, false, p); return; }
         IE.arr = { p0: { x: Math.round(p.x), y: Math.round(p.y) }, op: 'nova' };
     },
     move(p, ev) {

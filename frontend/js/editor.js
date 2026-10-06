@@ -4847,7 +4847,7 @@ function veRender() {
         const outra = veMid(c);
         const picos = veMelLigado(med) && med._aMel.peaks ? med._aMel.peaks : outra ? (med.peaks || []) : VE.peaks, np = picos.length, durP = outra ? veDurMidia(c) : VE.srcDur;
         if (np && veTemSom(c)) {
-            const mid = ay + ah / 2, amp = ah / 2 - 3, gl = veDb(c.g);
+            const base = ay + ah - 3, amp = Math.max(1, ah - 6), gl = veDb(c.g);
             const xa = Math.max(cx, 0), xb = Math.min(cx + cw, W);
             for (let x = xa; x < xb; x += 2) {
                 const sa = srcAt(x), sb = srcAt(x + 2);
@@ -4857,7 +4857,7 @@ function veRender() {
                 pk *= gl;
                 ctx.fillStyle = pk > 1 ? '#f87171' : (cor || '#43c58f');     // vermelho = estourando
                 const h = Math.max(1, Math.min(1, pk) * amp);
-                ctx.fillRect(x, mid - h, 1.4, h * 2);
+                ctx.fillRect(x, base - h, 1.4, h);
             }
             if (c.g && cw > 60 && ah >= 14) {
                 ctx.font = '600 10px Cascadia Mono, Consolas, monospace';

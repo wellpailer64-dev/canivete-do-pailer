@@ -389,6 +389,13 @@ function ieCamadaNoPonto(doc, x, y) {
     return null;
 }
 
+function ieMoverAlvoAuto(doc, L) {
+    IE.op.mover.alvo = IE.op.mover.alvo || 'camada';
+    if (!L || IE.op.mover.alvo !== 'grupo') return L;
+    const a = ieAchar(doc, L.id);
+    return a?.pai || L;
+}
+
 function ieAlvosMover(doc) {
     const sel = ieSelecionadas(doc);
     const out = new Set();
@@ -491,7 +498,12 @@ const IE_MOVER = {
         const auto = IE.op.mover.auto !== ev.ctrlKey;
         if (auto) {
             const L = ieCamadaNoPonto(doc, p.x, p.y);
-            if (L && !(doc.selIds.length > 1 && doc.selIds.includes(L.id))) ieAtivar(L.id, doc, { somar: ev.shiftKey });
+            const alvo = ieMoverAlvoAuto(doc, L);
+            if (alvo && !(doc.selIds.length > 1 && doc.selIds.includes(alvo.id))) ieAtivar(alvo.id, doc, { somar: ev.shiftKey });
+            else if (!alvo && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+                ieLimparCamadas(doc);
+                return;
+            }
         }
         let alvos = ieAlvosMover(doc);
         if (!alvos.length) return;
@@ -575,6 +587,13 @@ const IE_MOVER = {
             m.alvos.forEach(L => { if (L.c && !L.c0) L.sujoPx = L.sujoPx || false; L.movido = true; });
             ieHist(ieT(m.dup ? 'Duplicar e mover' : 'Mover'));
             ieUiCamadas?.();
+        }
+    },
+    dbl(p, ev, doc) {
+        const L = (typeof ieTextoNoPonto === 'function' && ieTextoNoPonto(doc, p)) || ieCamadaNoPonto(doc, p.x, p.y);
+        if (L && (L.txt || L.texto)) {
+            ieEscolherFerr('texto');
+            ieTextoEditar(L, false, p);
         }
     },
     sobre(ctx, doc) {
@@ -745,6 +764,24 @@ const iePintor = (tipo, nome, tecla, icone) => ({
     down(p, ev, doc) { ieTracoIniciar(p, ev, doc, tipo); },
     move(p) { if (IE_TRACO) ieTracoPara(p); },
     up() { ieTracoFim(); },
+    ...(tipo === 'pincel' ? {
+        rightDown(p, ev) {
+            IE._pincelAjuste = null;
+            if (ev.shiftKey) {
+                IE._pincelAjuste = { x0: ev.clientX, tam0: IE.op.pincel.tam };
+                return;
+            }
+            if (typeof iePincelPopup === 'function') iePincelPopup(ev);
+        },
+        rightMove(p, ev) {
+            const a = IE._pincelAjuste;
+            if (!a) return;
+            IE.op.pincel.tam = Math.round(ieClamp(a.tam0 + ev.clientX - a.x0, 1, 2500));
+            ieOpcoesRender?.();
+            ieDesenharSobre();
+        },
+        rightUp() { IE._pincelAjuste = null; },
+    } : {}),
     sobre(ctx, doc) {
         ieCursorPincel(ctx, doc, IE.op[tipo].tam);
         if (tipo === 'carimbo' && IE.carimboFonte && IE.mouse) {

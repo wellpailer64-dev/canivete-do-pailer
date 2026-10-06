@@ -122,7 +122,10 @@ function ieOpcoesRender(soValores) {
     let h = `<span class="ie-op-ico">${ieIco(f.icone)}</span>`;
     switch (IE.ferr) {
         case 'mover':
-            h += ieChk('Seleção automática', 'auto', 'mover') + ieChk('Mostrar controles de transformação', 'controles', 'mover') +
+            IE.op.mover.alvo = IE.op.mover.alvo || 'camada';
+            h += ieChk('Seleção automática', 'auto', 'mover') +
+                `<span class="ie-op-dica">${ieT('Selecionar')}</span>` + ieSegm('alvo', 'mover', [['camada', 'Camada'], ['grupo', 'Grupo']]) +
+                ieChk('Mostrar controles de transformação', 'controles', 'mover') +
                 `<i class="ie-op-sep"></i><span class="ie-op-dica">${ieT('Alinhar')}</span>` +
                 [['alinE', 'esq'], ['alinCH', 'ch'], ['alinD', 'dir'], ['alinT', 'topo'], ['alinCV', 'cv'], ['alinB', 'base']]
                     .map(([i, a]) => `<button class="ie-ico-btn" onclick="ieAlinhar('${a}')" title="${ieT('Alinhar')}">${ieIco(i)}</button>`).join('') +
@@ -290,10 +293,34 @@ function ieOpcoesInstalar() {
 // ─────────────────────────── painel de camadas ───────────────────────────
 const IE_TRAVA = { transp: 1, pixels: 2, pos: 4, tudo: 0x80000000 };
 
+function ieCamadaAbrirPais(doc, id) {
+    if (!doc || id == null) return;
+    const busca = (lista, pais) => {
+        for (const L of lista) {
+            if (L.id === id) {
+                pais.forEach(P => { if (P.filhos) P.aberto = true; });
+                return true;
+            }
+            if (L.filhos && busca(L.filhos, [...pais, L])) return true;
+        }
+        return false;
+    };
+    busca(doc.camadas, []);
+}
+
+function ieCamadaRolarAte(lista, id) {
+    if (!lista || id == null) return;
+    requestAnimationFrame(() => {
+        lista.querySelector(`.ie-cam[data-id="${id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+}
+
 function ieUiCamadas() {
     const doc = IE.doc, lista = ieEl('ie-cam-lista'), topo = ieEl('ie-cam-topo'), rod = ieEl('ie-cam-rodape');
     if (!lista) return;
     if (!doc) { lista.innerHTML = ''; topo.innerHTML = ''; rod.innerHTML = ''; ieUiProps(); return; }
+    const revelar = doc._revelarCamada;
+    if (revelar != null) ieCamadaAbrirPais(doc, revelar);
     const L = ieAtiva(doc);
     // topo: mesclagem, opacidade, travas, preenchimento
     const bm = L ? L.bm : 'NORMAL';
@@ -335,7 +362,7 @@ function ieUiCamadas() {
             : X.tipo === 'ajuste' ? `<span class="ie-cam-mini ie-cam-mini-aj ${doc.mascaraAlvo && X.id === doc.ativa ? '' : 'alvo'}" data-alvo="px">${ieIco('adj')}</span>`
             : `<span class="ie-cam-mini-box"><canvas class="ie-cam-mini ${!(doc.mascaraAlvo && X.id === doc.ativa) ? 'alvo' : ''}" data-alvo="px" data-mini="${X.id}" width="40" height="40"></canvas>${X.tipo === 'inteligente' ? `<i class="ie-cam-selo" title="${ieT('Objeto inteligente')}">${ieIco('smart')}</i>` : ''}</span>`;
         const masc = X.m ? `<canvas class="ie-cam-mini ie-cam-masc ${X.m.desativada ? 'off' : ''} ${doc.mascaraAlvo && X.id === doc.ativa ? 'alvo' : ''}" data-alvo="m" data-mmini="${X.id}" width="40" height="40" title="${ieT('Máscara (Shift+clique: desativar)')}"></canvas>` : '';
-        return `<div class="ie-cam ${sel.has(X.id) ? 'sel' : ''} ${X.visivel ? '' : 'oculta'} ${X.clip ? 'clip' : ''}" data-id="${X.id}" draggable="true" style="--nivel:${nivel}">
+        return `<div class="ie-cam ${sel.has(X.id) ? 'sel' : ''} ${X.id === doc.ativa ? 'ativa' : ''} ${X.visivel ? '' : 'oculta'} ${X.clip ? 'clip' : ''}" data-id="${X.id}" draggable="true" style="--nivel:${nivel}">
             <button class="ie-cam-olho ${X.visivel ? 'on' : ''}" data-olho="${X.id}" title="${ieT('Mostrar/ocultar (Alt+clique: só esta)')}">${X.visivel ? ieIco('eye') : ''}</button>
             <span class="ie-cam-recuo"></span>${X.clip ? `<span class="ie-cam-clip">${ieIco('clip')}</span>` : ''}
             ${miniatura}${masc}
@@ -363,6 +390,10 @@ function ieUiCamadas() {
     const fn = topo.querySelector('[data-fnome]');
     if (fn) { fn.addEventListener('input', () => { F.nome = fn.value; clearTimeout(IE._fnT); IE._fnT = setTimeout(() => { ieUiCamadas(); const n = ieEl('ie-cam-topo').querySelector('[data-fnome]'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 200); }); fn.addEventListener('keydown', e => e.stopPropagation()); }
     if (filtra && !linhas.length) lista.innerHTML = `<div class="ie-vazio">${ieT('Nenhuma camada passa no filtro')}</div>`;
+    if (revelar != null) {
+        ieCamadaRolarAte(lista, revelar);
+        doc._revelarCamada = null;
+    }
     ieMiniaturas(true);
     ieUiProps();
 }

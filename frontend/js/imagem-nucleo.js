@@ -18,7 +18,7 @@ const IE = {
     docs: [], doc: null, ferr: 'mover', cor: ['#000000', '#ffffff'], temps: [], seqDoc: 0,
     fontes: null, estilos: null, area: null,   // área de transferência interna {c, x, y, nome}
     op: {
-        mover: { auto: true, controles: true },
+        mover: { auto: true, alvo: 'camada', controles: true },
         letreiro: { forma: 'ret', suav: 0 },
         laco: { modo: 'livre', suav: 0 },
         varinha: { tol: 32, contiguo: true, todas: false },
@@ -1041,8 +1041,21 @@ function ieAtivar(id, doc = IE.doc, { somar = false, faixa = false } = {}) {
     } else { doc.ativa = id; doc.selIds = [id]; }
     const L = ieAtiva(doc);
     doc.mascaraAlvo = !!(L && L.m && doc.mascaraAlvo && doc.selIds.length === 1);
+    doc._revelarCamada = doc.ativa;
     ieUiCamadas?.();
     ieDesenharSobre();   // caixa de controles da ferramenta Mover
+}
+
+function ieLimparCamadas(doc = IE.doc) {
+    if (!doc || (doc.ativa == null && !doc.selIds.length && !doc.mascaraAlvo)) return false;
+    ieTextoEncerrar?.(true);
+    doc.ativa = null;
+    doc.selIds = [];
+    doc.mascaraAlvo = false;
+    ieUiCamadas?.();
+    ieOpcoesRender?.();
+    ieDesenharSobre();
+    return true;
 }
 
 // ─────────────────────────── eventos da vista ───────────────────────────
@@ -1069,6 +1082,18 @@ function ieInstalarVista() {
     sobre.addEventListener('pointerdown', ev => {
         const doc = IE.doc;
         if (!doc) return;
+        const f0 = ieFerrAtual();
+        if (ev.button === 2 && f0?.rightDown) {
+            ev.preventDefault();
+            IE._ctxBloqueado = true;
+            ieEl('ie')?.focus({ preventScroll: true });
+            sobre.setPointerCapture(ev.pointerId);
+            IE.ponteiro = { id: ev.pointerId, f: f0, ini: ieTelaDoc(ev), direito: true };
+            IE._ajCache = null;
+            try { f0.rightDown(ieAjustarPt(ieTelaDoc(ev), f0), ev, doc); } catch (e) { console.error('[editor de imagem]', e); IE.ponteiro = null; }
+            ieCursor(ev);
+            return;
+        }
         if (ev.button === 1 || (ev.button === 0 && IE.espaco)) { IE.ferrTemp = 'mao'; }
         else if (ev.button !== 0) return;
         ev.preventDefault();
@@ -1088,7 +1113,8 @@ function ieInstalarVista() {
         ieStatusMouse?.(p);
         if (IE.ponteiro && IE.ponteiro.id === ev.pointerId) {
             const evs = ev.getCoalescedEvents ? ev.getCoalescedEvents() : [ev];
-            try { for (const e of (evs.length ? evs : [ev])) IE.ponteiro.f?.move?.(ieAjustarPt(ieTelaDoc(e), IE.ponteiro.f), e, doc); } catch (e) { console.error('[editor de imagem]', e); }
+            const acao = IE.ponteiro.direito && IE.ponteiro.f?.rightMove ? IE.ponteiro.f.rightMove : IE.ponteiro.f?.move;
+            try { for (const e of (evs.length ? evs : [ev])) acao?.call(IE.ponteiro.f, ieAjustarPt(ieTelaDoc(e), IE.ponteiro.f), e, doc); } catch (e) { console.error('[editor de imagem]', e); }
         } else ieFerrAtual()?.hover?.(p, ev, doc);
         ieCursor(ev);
         if (ieFerrAtual()?.cursorPincel) ieDesenharSobre();
@@ -1097,8 +1123,10 @@ function ieInstalarVista() {
         const doc = IE.doc;
         if (!IE.ponteiro || IE.ponteiro.id !== ev.pointerId) return;
         const f = IE.ponteiro.f;
+        const direito = IE.ponteiro.direito;
         IE.ponteiro = null;
-        try { f?.up?.(ieAjustarPt(ieTelaDoc(ev), f), ev, doc); } catch (e) { console.error('[editor de imagem]', e); }
+        const acao = direito && f?.rightUp ? f.rightUp : f?.up;
+        try { acao?.call(f, ieAjustarPt(ieTelaDoc(ev), f), ev, doc); } catch (e) { console.error('[editor de imagem]', e); }
         if (IE.ferrTemp === 'mao' && !IE.espaco) IE.ferrTemp = null;
         ieCursor(ev);
     };
@@ -1121,7 +1149,11 @@ function ieInstalarVista() {
             ieDesenharVista(); ieDesenharSobre();
         }
     }, { passive: false });
-    sobre.addEventListener('contextmenu', ev => { ev.preventDefault(); ieMenuContexto?.(ev); });
+    sobre.addEventListener('contextmenu', ev => {
+        ev.preventDefault();
+        if (IE._ctxBloqueado) { IE._ctxBloqueado = false; return; }
+        ieMenuContexto?.(ev);
+    });
 }
 
 function ieCursor(ev) {

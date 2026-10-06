@@ -3160,17 +3160,18 @@ class ApiBridge:
         if not _window:
             return {"success": False}
         tipos = {"iknv": "Projeto de imagem do KANIVETE (*.iknv)", "psd": "Photoshop (*.psd)",
-                 "psb": "Photoshop grande (*.psb)", "png": "PNG (*.png)",
+                 "psb": "Photoshop grande (*.psb)", "pdf": "PDF (*.pdf)", "png": "PNG (*.png)",
                  "jpg": "JPEG (*.jpg)", "webp": "WebP (*.webp)", "tif": "TIFF (*.tif)"}
         ext = ext if ext in tipos else "psd"
-        # projeto (.iknv) ou PSD: os dois tipos no diálogo; vale a extensão que o nome tiver
-        extras = (tipos["psd"],) if ext == "iknv" else (tipos["iknv"],) if ext in ("psd", "psb") else ()
+        # projeto (.iknv), PSD, PSB e PDF achatado aparecem juntos no Salvar como; vale a extensão escolhida no nome.
+        salvaveis = ("iknv", "psd", "psb", "pdf")
+        extras = tuple(tipos[k] for k in salvaveis if k != ext) if ext in salvaveis else ()
         r = _window.create_file_dialog(_file_dialog_kind("SAVE", webview.SAVE_DIALOG), directory=pasta or "",
                                        save_filename=f"{nome}.{ext}", file_types=(tipos[ext],) + extras + ("Todos os arquivos (*.*)",))
         if not r:
             return {"success": False, "cancelled": True}
         path = r[0] if isinstance(r, (list, tuple)) else r
-        aceitas = ("." + ext,) + ((".iknv", ".psd", ".psb") if ext in ("iknv", "psd", "psb") else ()) + ((".jpeg",) if ext == "jpg" else ())
+        aceitas = ("." + ext,) + ((".iknv", ".psd", ".psb", ".pdf") if ext in salvaveis else ()) + ((".jpeg",) if ext == "jpg" else ())
         if not path.lower().endswith(aceitas):
             path += "." + ext
         return {"success": True, "path": path}

@@ -1531,6 +1531,11 @@ def _gravar_imagem(im, destino, q, dpi):
             im.save(destino, "WEBP", quality=q)
         elif fmt in (".tif", ".tiff"):
             im.save(destino, "TIFF", compression="tiff_lzw", dpi=(dpi, dpi))
+        elif fmt == ".pdf":
+            im = im.convert("RGBA")
+            fundo = Image.new("RGB", im.size, (255, 255, 255))
+            fundo.paste(im, mask=im.split()[3])
+            fundo.save(destino, "PDF", resolution=dpi)
         elif fmt == ".gif":
             im.save(destino, "GIF")
         else:
