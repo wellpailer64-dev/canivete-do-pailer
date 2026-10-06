@@ -434,7 +434,7 @@ const KNV = {
     // ── revisor da peça (tools/revisor.py): os feedbacks do usuário viram regras. Cada achado = {regra, camada, problema,
     // dica}. Regras: corte (corte seco pelo KNV.revisar), contraste (texto × o que está atrás das letras, WCAG),
     // sombra (sombra projetada dura), avatar (camada presa num círculo: devolve o recorte para o rosto ser medido fora)
-    async revisarPeca({ corte = true, minimo = 60 } = {}) {
+    async revisarPeca({ corte = true, minimo = 60, roteiro = null } = {}) {
         const d = IE.doc, out = [], lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
         const razao = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
         const folhas = [];
@@ -449,7 +449,7 @@ const KNV = {
             out.push({ regra: 'corte', camada: r.camada, problema: `${r.problema} de ${r.de} a ${r.ate}`, dica: 'caixa na proporção da foto (sem cover cortando a lateral), mascara_degrade, ou esconder atrás de um elemento' });
         // 2) contraste do texto com o que está atrás das letras (10º percentil: o pior trecho conta)
         for (const { L, vis } of folhas) {
-            if (!vis || !L.txt || !L.c || (L.op ?? 1) < 0.3) continue;
+            if (!vis || !L.txt || !L.c || (L.op ?? 1) < 0.3 || (L.cena && L.cena.livre === 'decor')) continue;
             const r = ieRaster(L); if (!r) continue;
             const f = r.forma || r, b = ieLimites(f.c); if (!b) continue;
             const R = { x: Math.max(0, f.x + b.x), y: Math.max(0, f.y + b.y) }; R.w = Math.min(d.w, f.x + b.x + b.w) - R.x; R.h = Math.min(d.h, f.y + b.y + b.h) - R.y;
@@ -486,7 +486,97 @@ const KNV = {
             k2.fillStyle = '#808080'; k2.fillRect(0, 0, Rr.w, Rr.h); k2.drawImage(fl.c, fl.x - Rr.x, fl.y - Rr.y);
             avatares.push({ camada: L.nome, circulo: { x: C.x - Rr.x, y: C.y - Rr.y, d: C.w }, png: c.toDataURL('image/png').split(',')[1] });
         });
+        for (const a of window.KNV.revisarDirecao({ roteiro })) out.push(a);
         return { achados: out, avatares };
+    },
+
+    // ── revisor de DIREÇÃO (feedback 2026-10-06: carrossel de outro agente saiu genérico, "landing page"): por slide
+    // (fatias da cena; sem fatias = a página). Regras: hierarquia (gancho ≥ 2× o corpo), gancho (≤ 8 palavras),
+    // texto (corpo ≤ 40 palavras), respiro (texto ocupando > 38% do slide), vetor (desenho SVG solto tapando espaço),
+    // asset (slide sem foto/objeto gerado: sem humanização), ponte (carrossel sem nada cruzando a divisa entre slides),
+    // roteiro (frase do roteiro que não entrou: roteiro = [[frases do slide 1], [frases do slide 2], ...]).
+    // Papel do texto: data-papel no HTML, senão h1/h2/p (ieCenaPapel).
+    revisarDirecao({ roteiro = null } = {}) {
+        const d = IE.doc, out = [], lado = Math.min(d.w, d.h, ...(d.fatias || []).map(f => Math.min(f.w, f.h)));
+        // slides = fatias da altura toda (as da cena se chamam 01, 02...; fatiadas à mão podem não ter nome)
+        const fat = (d.fatias || []).filter(f => f.y === 0 && f.h === d.h && f.w < d.w).sort((a, b) => a.x - b.x)
+            .map((f, i) => ({ ...f, nome: f.nome || String(i + 1).padStart(2, '0') }));
+        const slides = fat.length > 1 ? fat : [{ x: 0, y: 0, w: d.w, h: d.h, nome: 'página' }];
+        const itens = [];
+        iePercorrer(d.camadas, (L, l, i, pai) => {
+            if (L.filhos || L.visivel === false || (pai && pai.visivel === false) || !L.c || L.tipo === 'ajuste' || (L.op ?? 1) < 0.25) return;
+            const r = ieRaster(L); if (!r) return;
+            const f = r.forma || r, b = ieLimites(f.c); if (!b) return;
+            itens.push({ L, R: { x: f.x + b.x, y: f.y + b.y, w: b.w, h: b.h } });
+        });
+        const inter = (R, S) => Math.max(0, Math.min(R.x + R.w, S.x + S.w) - Math.max(R.x, S.x)) * Math.max(0, Math.min(R.y + R.h, S.y + S.h) - Math.max(R.y, S.y));
+        const palavras = s => (String(s || '').match(/[\p{L}\p{N}]+/gu) || []).length;
+        const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        const semAsset = [];
+        slides.forEach((S, si) => {
+            const nome = slides.length > 1 ? `slide ${S.nome}` : 'página', A = S.w * S.h;
+            const doSlide = itens.filter(o => inter(o.R, S) > o.R.w * o.R.h * 0.5);
+            const textos = doSlide.filter(o => o.L.txt && o.L.txt.s).map(o => ({ ...o, tam: o.L.txt.tam * ieTextoEscala(o.L.txt) * 1080 / lado, papel: o.L.cena && o.L.cena.papel }));
+            const leitura = textos.filter(t => t.papel !== 'meta' && t.papel !== 'cta');
+            // hierarquia: gancho/título bem maior que o corpo
+            if (leitura.length >= 2) {
+                // papel declarado (data-papel/h1) manda; senão: o maior é o título e o corpo é o maior abaixo de 60% dele
+                const ganchos = leitura.filter(t => t.papel === 'gancho'), top = Math.max(...(ganchos.length ? ganchos : leitura).map(t => t.tam));
+                const corpo = leitura.filter(t => ganchos.length ? t.papel !== 'gancho' && t.papel !== 'subtitulo' : t.tam < top * 0.6);
+                const base = corpo.length ? Math.max(...corpo.map(t => t.tam)) : Math.min(...leitura.map(t => t.tam));
+                if (base && top >= base * 1.3 && top / base < 2) out.push({ regra: 'hierarquia', camada: nome, problema: `título só ${(top / base).toFixed(1)}× o corpo (${Math.round(top)} × ${Math.round(base)}px)`, dica: 'gancho ≥ 2× o corpo, ideal 3–4× (ex.: 96–140px × 34–42px no 1080); menos níveis, mais contraste de peso' });
+            }
+            // leitura limpa (feedback 2026-10-06: "palavras em cima de outras atrapalhando, tem que ter margem e respiro"):
+            // texto sobre texto (pixels das letras se tocando), texto fora da margem de 5% e corpo colado no título
+            const firmes = leitura.filter(t => !(t.L.cena && t.L.cena.livre)), m = Math.round(lado * 0.05);
+            const decor = itens.filter(o => o.L.txt && o.L.cena && o.L.cena.livre === 'decor' && inter(o.R, S) > 0);   // fita por cima de texto também conta
+            const pares = []; firmes.forEach((x, i) => { firmes.slice(i + 1).forEach(y => pares.push([x, y])); decor.forEach(y => pares.push([x, y])); });
+            for (const [A1, B1] of pares) {
+                const I = { x: Math.max(A1.R.x, B1.R.x), y: Math.max(A1.R.y, B1.R.y) };
+                I.w = Math.min(A1.R.x + A1.R.w, B1.R.x + B1.R.w) - I.x; I.h = Math.min(A1.R.y + A1.R.h, B1.R.y + B1.R.h) - I.y;
+                if (I.w < 2 || I.h < 2) continue;
+                const pix = o => { const r = ieRaster(o.L), f = r.forma || r; return ieCtx(f.c).getImageData(I.x - f.x, I.y - f.y, I.w, I.h).data; };
+                const pa = pix(A1), pb = pix(B1); let n = 0;
+                for (let q = 3; q < pa.length; q += 8) if (pa[q] > 90 && pb[q] > 90) n++;
+                if (n > 12) out.push({ regra: 'atropelo', camada: `${A1.L.nome} × ${B1.L.nome}`, problema: `letras uma em cima da outra (${nome})`, dica: 'mover/encolher um dos blocos; texto só cruza texto se for palavra-eco clarinha atrás (k-eco)' });
+            }
+            for (const t of firmes) { const dist = Math.min(t.R.x - S.x, t.R.y - S.y, S.x + S.w - t.R.x - t.R.w, S.y + S.h - t.R.y - t.R.h);
+                if (dist < m) out.push({ regra: 'margem', camada: t.L.nome, problema: `texto a ${Math.round(dist)}px da borda do ${nome} (margem ${m})`, dica: 'tudo que se lê fica ≥ 5% para dentro; só fita/eco/objeto sangram' }); }
+            const tits = firmes.filter(t => t.papel === 'gancho'), corp = firmes.filter(t => t.papel === 'corpo');
+            for (const c of corp) for (const g of tits) {
+                if (c.R.x > g.R.x + g.R.w || g.R.x > c.R.x + c.R.w || c.R.y < g.R.y) continue;
+                const vao = c.R.y - (g.R.y + g.R.h);
+                if (vao >= 0 && vao < g.tam * 0.35) { out.push({ regra: 'respiro', camada: `${g.L.nome} → ${c.L.nome}`, problema: `corpo a ${Math.round(vao)}px do título (mín. ~${Math.round(g.tam * 0.35)})`, dica: 'separe os níveis: o vão título→corpo é maior que o vão entre parágrafos' }); break; }
+            }
+            for (const t of textos) if (t.papel === 'gancho' && palavras(t.L.txt.s) > 8)
+                out.push({ regra: 'gancho', camada: t.L.nome, problema: `gancho com ${palavras(t.L.txt.s)} palavras`, dica: 'até 6–8 palavras; o resto vai para o subtítulo' });
+            const nc = textos.filter(t => t.papel === 'corpo').reduce((s, t) => s + palavras(t.L.txt.s), 0);
+            if (nc > 40) out.push({ regra: 'texto', camada: nome, problema: `${nc} palavras de corpo`, dica: 'até ~40 por slide: corte, divida em dois slides ou vire lista curta' });
+            // respiro: área dos blocos de texto (caixa de cada camada) no slide
+            const at = textos.reduce((s, t) => s + inter(t.R, S), 0) / A;
+            if (at > 0.38) out.push({ regra: 'respiro', camada: nome, problema: `texto ocupa ${Math.round(at * 100)}% do slide`, dica: 'menos texto ou letra menor no corpo; deixe ≥ 60% para imagem e vazio' });
+            // vetor solto tapando espaço
+            const soltos = doSlide.filter(o => o.L.cena && o.L.cena.svg === 'livre' && o.R.w * o.R.h > A * 0.015);
+            if (soltos.length) out.push({ regra: 'vetor', camada: soltos.map(o => o.L.nome).join(', '), problema: `${soltos.length} desenho(s) SVG solto(s) no ${nome}`, dica: 'trocar por objeto/pessoa gerado (gerar: / recurso:) interagindo com o texto; SVG só em componente (k-*) ou com data-proposito' });
+            // asset: foto ou objeto (inteligente, normal, de tamanho) no slide
+            const asset = doSlide.some(o => o.L.tipo === 'inteligente' && (!o.L.bm || o.L.bm === 'NORMAL' || o.L.bm === 'PASS') && inter(o.R, S) > A * 0.04);
+            if (!asset) semAsset.push(S.nome);
+            // roteiro
+            const fr = roteiro && roteiro[si];
+            if (fr) {   // por palavras (a marcação vira camada própria e muda a ordem das camadas)
+                const tem = new Map(); for (const w of norm(textos.map(t => t.L.txt.s).join(' ')).split(' ')) tem.set(w, (tem.get(w) || 0) + 1);
+                const falta = s => { const c = new Map(tem); return norm(s).split(' ').some(w => w && !(c.get(w) > 0 && c.set(w, c.get(w) - 1))); };
+                for (const s of [].concat(fr)) if (s && falta(s)) out.push({ regra: 'roteiro', camada: nome, problema: `faltou: "${String(s).slice(0, 60)}"`, dica: 'o texto do roteiro entra inteiro (pode quebrar linha, não reescrever)' }); }
+        });
+        if (semAsset.length && (slides.length === 1 || semAsset.length > slides.length / 3))
+            out.push({ regra: 'asset', camada: semAsset.join(', '), problema: `${semAsset.length} de ${slides.length} sem foto/objeto`, dica: 'pessoa ou objeto gerado (gerar:, data-fundo="branco", data-pele) num lugar que converse com o texto, sem cobrir a leitura' });
+        // ponte: algo atravessando a divisa entre slides vizinhos (fundo inteiro não conta)
+        if (slides.length > 1) {
+            const cruza = itens.some(({ R }) => R.w < d.w * 0.9 && slides.slice(0, -1).some((S, i) => { const x = slides[i + 1].x;
+                return slides[i + 1].y === S.y && R.x < x - S.w * 0.03 && R.x + R.w > x + S.w * 0.03; }));
+            if (!cruza) out.push({ regra: 'ponte', camada: 'carrossel', problema: 'nada cruza a divisa entre slides', dica: 'um objeto, seta, linha ou foto atravessando a divisa puxa o arraste (pelo menos 1–2 pontes)' });
+        }
+        return out;
     },
 
     // ── revisor de design: o que um diretor de arte apontaria antes de entregar ──

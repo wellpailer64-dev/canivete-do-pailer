@@ -4,11 +4,13 @@ devolve UMA linha JSON. Regras (cada feedback novo vira uma regra aqui ou em KNV
   contraste texto ilegível sobre o que está atrás das letras (WCAG, pior 10%)
   sombra    sombra projetada dura (pouco desfoque para a força)
   avatar    rosto no círculo: queixo/cabeça cortados ou rosto grande demais (OpenCV, aqui)
+  direção   (KNV.revisarDirecao, por slide) hierarquia, gancho, texto, respiro, vetor, asset, ponte, roteiro
 
-uso: py -3.13 tools/revisor.py [peca.iknv] [--porta 9333] [--sem-corte]
+uso: py -3.13 tools/revisor.py [peca.iknv] [--porta 9333] [--sem-corte] [--roteiro roteiro.json]
+     roteiro.json = [["frases do slide 1"...], ...] ou {"slides": [{"gancho": "...", "sub": "...", "corpo": "..."}, ...]}
      (sem documento: revisa o que está aberto no app de teste)
 → {"problemas": 2, "itens": ["contraste · s1-legal: contraste 2.1 (mín. 4.5) em 11px → mancha escura ...", ...]}"""
-import argparse, base64, json, os, sys
+import argparse, base64, json, os, re, sys
 sys.stdout.reconfigure(encoding="utf-8")
 import cv2, numpy as np
 
@@ -40,8 +42,19 @@ def avatar(a):
     return ", ".join(pr) or None
 
 
-def revisar(pg, corte=True):
-    r = pg.evaluate("o => window.KNV.revisarPeca(o)", {"corte": corte})
+def ler_roteiro(caminho):
+    """lista de frases por slide (aceita a lista pronta ou {"slides": [{campo: texto}]})"""
+    if not caminho: return None
+    with open(caminho, encoding="utf-8") as f: r = json.load(f)
+    if isinstance(r, dict):   # roteiro do tools/esqueleto.py: só os textos, sem a marcação (*x*, **x**, [x](marca))
+        limpa = lambda t: re.sub(r"\*+([^*]+)\*+", r"\1", re.sub(r"\[([^\]]+)\]\([a-z]+\)", r"\1", t))
+        r = [[limpa(t) for k in ("pre", "gancho", "titulo", "sub", "corpo", "cta") for t in ([s[k]] if isinstance(s.get(k), str) else s.get(k) or [])]
+             for s in r.get("slides", [])]
+    return r
+
+
+def revisar(pg, corte=True, roteiro=None):
+    r = pg.evaluate("o => window.KNV.revisarPeca(o)", {"corte": corte, "roteiro": roteiro})
     itens = [f'{a["regra"]} · {a["camada"]}: {a["problema"]} → {a["dica"]}' for a in r["achados"]]
     for a in r["avatares"]:
         p = avatar(a)
@@ -53,7 +66,7 @@ def revisar(pg, corte=True):
 if __name__ == "__main__":
     from playwright.sync_api import sync_playwright
     ap = argparse.ArgumentParser(); ap.add_argument("doc", nargs="?"); ap.add_argument("--porta", type=int, default=9333)
-    ap.add_argument("--sem-corte", action="store_true")
+    ap.add_argument("--sem-corte", action="store_true"); ap.add_argument("--roteiro")
     a = ap.parse_args()
     with sync_playwright() as p:
         b = p.chromium.connect_over_cdp(f"http://127.0.0.1:{a.porta}")
@@ -61,4 +74,4 @@ if __name__ == "__main__":
         if a.doc:
             pg.evaluate("""async d => { KNV.automacao(true, {padrao: 'primario'}); await KNV.fecharTudo(); await KNV.abrir(d); KNV.automacao(false);
                 if (!document.querySelector('#page-editor-imagem.active')) switchTool('editor-imagem'); }""", os.path.abspath(a.doc).replace("\\", "/"))
-        print(json.dumps(revisar(pg, not a.sem_corte), ensure_ascii=False))
+        print(json.dumps(revisar(pg, not a.sem_corte, ler_roteiro(a.roteiro)), ensure_ascii=False))

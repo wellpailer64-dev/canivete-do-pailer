@@ -117,7 +117,22 @@ function ieCenaComponentesCss() {
         :where(.k-rodape){display:flex;flex-direction:column;gap:18px}
         :where(.k-rodape-linha){display:flex;align-items:center;gap:34px;font-size:26px;font-weight:500;line-height:1}
         :where(.k-rodape-linha>span){display:flex;align-items:center;gap:12px}
-        :where(.k-legal){margin:0;font-size:11px;line-height:1.45;opacity:.8;max-width:720px}`;
+        :where(.k-legal){margin:0;font-size:11px;line-height:1.45;opacity:.8;max-width:720px}
+        :where(.k-marca){position:relative;display:inline-block;--cor-marca:${P}}
+        :where(.k-marca) > svg{position:absolute;overflow:visible;pointer-events:none}
+        :where(.k-marca[data-marca="tarja"]){background:color-mix(in srgb,var(--cor-marca) 82%,#000);color:var(--cor-tarja-texto,#fff);padding:0 .22em;margin:0 .05em;transform:rotate(-2deg)}
+        :where(.k-marca[data-marca="selecao"]){border:2px solid var(--cor-marca);padding:0 .18em;margin:0 .1em;background:color-mix(in srgb,var(--cor-marca) 12%,transparent)}
+        :where(.k-alca){position:absolute;width:10px;height:10px;background:#fff;border:2px solid var(--cor-marca)}
+        :where(.k-seta-mao){position:absolute;width:150px;height:110px;color:${P}}
+        :where(.k-seta-mao) svg{width:100%;height:100%;overflow:visible}
+        :where(.k-fita){position:absolute;white-space:nowrap;background:#f3efe6;color:${P};font-size:22px;font-weight:600;line-height:1;padding:12px 0;border-top:4px solid ${P};border-bottom:4px solid ${P};box-shadow:0 14px 44px rgba(0,0,0,.24)}
+        :where(.k-rasgo){position:absolute}
+        :where(.k-rasgo) > svg,:where(.k-papel) > svg.k-papel-forma{position:absolute;left:-60px;top:-60px;overflow:visible}
+        :where(.k-papel[data-rasgado]){background:none;box-shadow:none}
+        :where(.k-papel[data-rasgado] > :not(svg),.k-rasgo > :not(svg)){position:relative}
+        :where(.k-fita-adesiva){position:absolute;left:33%;top:-30px;width:34%;height:62px;background:rgba(228,220,196,.88);transform:rotate(-3deg);box-shadow:0 3px 8px rgba(0,0,0,.18)}
+        :where(.k-eco){position:absolute;font-size:380px;font-weight:900;line-height:.8;letter-spacing:-.04em;white-space:nowrap;opacity:.07;z-index:-1}
+        :where(.k-luz){position:absolute;width:900px;height:900px;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,${P} 55%,transparent),transparent);z-index:-1}`;
 }
 // ícones dos componentes (SVG de verdade: viram camada). cor: --cor-ok / --cor-primaria / a do texto
 const IE_CENA_ICONES = {
@@ -187,6 +202,50 @@ function ieCenaComponentes(raiz, S) {
         if (el.querySelector('.k-papel-amassado')) continue;
         el.insertAdjacentHTML('afterbegin', `<img class="k-papel-amassado" id="${el.id || 'papel'}-amassado" data-livre data-semente="7" data-recortar="nao" data-proporcao="4:5" data-lado="1024" src="gerar:crumpled and flattened white paper sheet texture, soft wrinkles and folds, top view, even lighting, full frame, no text" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;mix-blend-mode:multiply;opacity:${el.dataset.amassado || '.3'}">`);
     }
+    // ── marcações à mão e papel (referências aprovadas 2026-10-06, Instructions/agente/direcao-carrossel.md §2) ──
+    // <span class="k-marca" data-marca="circulo|sublinhado|risco|tarja|selecao">palavra</span> (cor: --cor-marca)
+    for (const el of raiz.querySelectorAll('.k-marca')) {
+        if (el.querySelector(':scope > svg, :scope > .k-alca')) continue;
+        const tipo = el.dataset.marca || 'circulo', sorte = ieCenaSorte(el.textContent + tipo);
+        el.dataset.juntos = '';
+        if (tipo === 'selecao') { for (const [x, y] of [[0, 0], [1, 0], [0, 1], [1, 1]]) el.insertAdjacentHTML('beforeend', `<span class="k-alca" data-livre style="left:calc(${x * 100}% - 6px);top:calc(${y * 100}% - 6px)"></span>`); continue; }
+        if (tipo === 'tarja') continue;
+        const caixa = { circulo: 'left:-12%;top:-30%;width:124%;height:160%', sublinhado: 'left:-3%;top:88%;width:106%;height:.32em', risco: 'left:-4%;top:30%;width:108%;height:55%' }[tipo];
+        if (!caixa) continue;
+        el.insertAdjacentHTML('beforeend', `<svg data-livre viewBox="0 0 200 100" preserveAspectRatio="none" style="${caixa}"><path d="${ieCenaTracoMao(tipo, sorte)}" fill="none" stroke="var(--cor-marca)" stroke-width="${el.dataset.espessura || 4}" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/></svg>`);
+    }
+    // <div class="k-seta-mao" data-forma="curva|laco"> seta desenhada à mão (gire/espelhe com transform)
+    for (const el of raiz.querySelectorAll('.k-seta-mao')) {
+        if (el.querySelector('svg')) continue;
+        const laco = el.dataset.forma === 'laco', esp = el.dataset.espessura || 4;
+        const corpo = laco ? 'M8 80 C30 30 70 20 78 48 C84 70 54 72 58 50 C62 28 100 22 138 40' : 'M8 92 C20 40 70 14 136 26';
+        const ponta = laco ? 'M118 26 L139 40 L116 50' : 'M114 12 L138 26 L116 42';
+        el.innerHTML = `<svg viewBox="0 0 150 110" fill="none" stroke="currentColor" stroke-width="${esp}" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"><path d="${corpo}"/><path d="${ponta}"/></svg>`;
+        el.dataset.livre = '';
+    }
+    // <div class="k-fita" style="left/top/transform:rotate(...)">Salve esse post</div>: fita de isolamento com o texto
+    // repetido (data-repetir="12"); costuma atravessar a divisa entre slides (ponte)
+    for (const el of raiz.querySelectorAll('.k-fita')) {
+        if (el.querySelector('.k-fita-ast')) continue;
+        const t = el.textContent.trim() || 'Salve esse post', n = +el.dataset.repetir || 12;
+        el.textContent = Array.from({ length: n }, () => t).join('   ✱   ') + '   ✱';   // um texto só = uma camada
+        el.dataset.livre = ''; el.dataset.juntos = '';
+    }
+    // <div class="k-rasgo" data-lado="esquerda|direita|cima|baixo" data-cor="#f2efe9" style="...">: área de papel com a
+    // borda rasgada (fibra branca + sombra) — troca o fundo de um slide para o outro; k-papel data-rasgado="baixo cima"
+    // rasga o próprio papel; k-papel data-fita = fita adesiva prendendo em cima
+    for (const el of raiz.querySelectorAll('.k-rasgo, .k-papel[data-rasgado]')) {
+        if (el.querySelector(':scope > svg.k-papel-forma')) continue;
+        const r = el.getBoundingClientRect(), w = Math.max(10, Math.round(r.width) || 1000), h = Math.max(10, Math.round(r.height) || 1000);
+        const lados = String(el.dataset.lado || el.dataset.rasgado || 'direita').split(/[\s,]+/), cor = el.dataset.cor || (el.classList.contains('k-papel') ? '#f7f6f2' : '#f2efe9');
+        const f = d => ieCenaRasgo(w, h, lados, d, ieCenaSorte((el.id || '') + w + 'x' + h));   // mesma semente: as 3 camadas seguem o mesmo rasgo
+        // sombra macia (desfoque no próprio SVG; a folga de 60px deixa o desfoque caber) + fibra branca + papel
+        const somb = el.classList.contains('k-papel') ? `<filter id="ksb" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="16"/></filter><path d="${f(9)}" fill="rgba(0,0,0,.45)" filter="url(#ksb)" transform="translate(0 22)"/>` : '';
+        el.insertAdjacentHTML('afterbegin', `<svg class="k-papel-forma" data-livre viewBox="-60 -60 ${w + 120} ${h + 120}" style="width:${w + 120}px;height:${h + 120}px">${somb}<path d="${f(0)}" fill="rgba(0,0,0,.28)" transform="translate(0 5)"/><path d="${f(2)}" fill="#ffffff"/><path d="${f(9)}" fill="${cor}"/></svg>`);
+        el.dataset.livre = '';
+    }
+    for (const el of raiz.querySelectorAll('.k-papel[data-fita]')) if (!el.querySelector('.k-fita-adesiva')) el.insertAdjacentHTML('beforeend', `<span class="k-fita-adesiva" id="${el.id || 'papel'}-fita" data-livre></span>`);
+    for (const el of raiz.querySelectorAll('.k-eco, .k-luz')) el.dataset.livre = '';
     // k-rodape data-site="www.site.com.br" data-insta="@seuinsta": linha com ícones + o texto legal (o conteúdo do elemento)
     for (const el of raiz.querySelectorAll('.k-rodape[data-site], .k-rodape[data-insta]')) {
         if (el.querySelector('.k-rodape-linha')) continue;
@@ -209,6 +268,52 @@ function ieCenaComponentes(raiz, S) {
         li.style.listStyle = 'none';
         if (!lista.classList.contains('k-lista')) { li.style.display = 'flex'; li.style.gap = '0.5em'; lista.style.paddingLeft = lista.style.paddingLeft || '0'; }
     }
+}
+// sorteio repetível (a mesma palavra sai com o mesmo traço a cada montagem)
+function ieCenaSorte(txt) {
+    let a = [...String(txt)].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619), 2166136261) >>> 0;
+    return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+// traço à mão na caixa 200×100 (esticada sobre a palavra): círculo que passa do ponto de partida, sublinhado em duas
+// passadas, risco em zigue-zague
+function ieCenaTracoMao(tipo, s) {
+    const j = (v, a) => v + (s() - 0.5) * a;
+    if (tipo === 'circulo') {   // poucos pontos + raio variando em onda suave (feedback: traço tremido → curva lisa)
+        const a0 = -2.4 + s() * 0.6, fase = s() * 6, pts = [];
+        for (let t = 0; t <= Math.PI * 2 + 0.6; t += 0.45) { const k = 1 + 0.035 * Math.sin(t * 1.3 + fase) + t * 0.012; pts.push([100 + Math.cos(a0 + t) * 96 * k, 50 + Math.sin(a0 + t) * 44 * k]); }
+        return ieCenaSuave(pts);
+    }
+    if (tipo === 'sublinhado') return ieCenaSuave([[2, j(40, 8)], [100, j(62, 10)], [198, j(32, 8)]]) + ' ' + ieCenaSuave([[18, j(80, 8)], [104, j(90, 6)], [186, j(64, 8)]]);
+    const pts = [[0, j(60, 8)]];   // risco: zigue-zague com as viradas arredondadas
+    for (let x = 14; x <= 200; x += 16) pts.push([j(x, 3), j(pts.length % 2 ? 18 : 82, 8)]);
+    return ieCenaSuave(pts);
+}
+// curva lisa passando pelos pontos (Catmull-Rom → Bézier cúbica)
+function ieCenaSuave(p) {
+    const f = v => v.toFixed(1); let d = `M${f(p[0][0])} ${f(p[0][1])}`;
+    for (let i = 0; i < p.length - 1; i++) {
+        const a = p[i - 1] || p[i], b = p[i], c = p[i + 1], e = p[i + 2] || c;
+        d += ` C${f(b[0] + (c[0] - a[0]) / 6)} ${f(b[1] + (c[1] - a[1]) / 6)} ${f(c[0] - (e[0] - b[0]) / 6)} ${f(c[1] - (e[1] - b[1]) / 6)} ${f(c[0])} ${f(c[1])}`;
+    }
+    return d;
+}
+// contorno de um retângulo w×h com os lados pedidos rasgados (dentes irregulares + um rasgo maior de vez em quando);
+// d = recuo extra (camadas de fibra/sombra)
+function ieCenaRasgo(w, h, lados, d, s) {
+    const dente = () => { const a = s(), b = s(), c = s(); return 4 + a * 12 + (b < 0.08 ? 14 : 0) + d * (0.6 + c * 0.8); };
+    const borda = (de, ate, fixo, eixo, sinal) => {
+        const pts = [], L = Math.abs(ate - de), n = Math.max(2, Math.round(L / 14));
+        for (let i = 0; i <= n; i++) { const p = de + (ate - de) * i / n, o = fixo + sinal * dente(); pts.push(eixo === 'x' ? [p, o] : [o, p]); }
+        return pts;
+    };
+    const tem = l => lados.includes(l);
+    const pts = [
+        ...(tem('cima') ? borda(0, w, 0, 'x', 1) : [[0, 0], [w, 0]]),
+        ...(tem('direita') ? borda(0, h, w, 'y', -1) : [[w, 0], [w, h]]),
+        ...(tem('baixo') ? borda(w, 0, h, 'x', -1) : [[w, h], [0, h]]),
+        ...(tem('esquerda') ? borda(h, 0, 0, 'y', 1) : [[0, h], [0, 0]]),
+    ];
+    return 'M' + pts.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' L') + 'Z';
 }
 // kit de marca: variáveis CSS que toda cena enxerga (var(--cor-primaria), var(--fonte-titulo)...), guardadas no app
 function ieCenaMarcaCss() {
@@ -566,7 +671,17 @@ async function ieCenaSvgCamada(el, cs, ctx, h) {
     const c = await ieCenaSvgCanvas(svg, Math.ceil(r.w + r.x - x0), Math.ceil(r.h + r.y - y0));
     const P = ieCenaPlano(c, x0, y0, h.M);
     const L = ieCenaCamada(ctx, h, ':svg', { nome: el.dataset.nome || el.id || 'Ícone', c: P.c, x: P.x, y: P.y });
+    L.cena.svg = el.closest('[class*="k-"], [data-proposito]') ? 'comp' : 'livre';   // livre = desenho solto (o revisor de direção desconfia)
     return L;
+}
+// papel do texto na hierarquia (revisor de direção): data-papel="gancho|subtitulo|corpo|cta|meta" no elemento ou num pai;
+// sem ele, pela tag/componente (h1 = gancho, h2/h3 = subtítulo, p/li = corpo, pílula = cta, número/rodapé/perfil = meta)
+function ieCenaPapel(el) {
+    const p = el.closest('[data-papel]'); if (p) return p.dataset.papel;
+    if (el.closest('.k-pilula')) return 'cta';
+    if (el.closest('.k-num, .k-arraste, .k-rodape, .k-perfil')) return 'meta';
+    const t = el.closest('h1, h2, h3, h4, p, li, blockquote');
+    return !t ? null : t.tagName === 'H1' ? 'gancho' : /^H[234]$/.test(t.tagName) ? 'subtitulo' : 'corpo';
 }
 
 // ─────────────────────────── imagens: object-fit, máscara do corte, gerar e recortar ───────────────────────────
@@ -823,6 +938,8 @@ function ieCenaCaixaAlta(s, cs) { return cs.textTransform === 'capitalize' ? s.r
 function ieCenaTextoCamada(ctx, h, sufixo, el, cs, tx, a, linhas) {
     if (h.M) tx.m = ieMatMul(h.M, tx.m);
     const L = ieCenaCamada(ctx, h, sufixo, { tipo: 'texto', nome: (el.dataset.nome || el.id || tx.s.split(IE_NL)[0]).slice(0, 30), txt: tx });
+    const papel = ieCenaPapel(el); if (papel) L.cena.papel = papel;
+    if (el.closest('[data-livre]')) L.cena.livre = el.closest('.k-fita, .k-eco') ? 'decor' : true;   // fita, eco, rodapé: fora das regras de margem/atropelo
     if (a < 1) L.op = a;
     ieCenaFxSombras(L, ieCenaSombras(cs.textShadow));
     const sw = parseFloat(cs.webkitTextStrokeWidth);
