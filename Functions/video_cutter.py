@@ -2221,6 +2221,15 @@ def _filtros_fx(fx, mw, mh, tag="x"):
     Rodam no tamanho original da mídia, antes de escala/posição/rotação/opacidade (como no Premiere).
     tag = prefixo único para rótulos internos do grafo."""
     out = []
+    crop_rect = None
+    for cf in fx or []:
+        if str(cf.get("t")) != "crop" or cf.get("on") is False:
+            continue
+        cv = cf.get("v") or {}
+        l, tp, r, bt = (_num(cv.get(k), 0, 99.5) / 100.0 for k in ("l", "t", "r", "b"))
+        cx, cy = mw * l, mh * tp
+        crop_rect = (cx, cy, max(1.0, mw * (1.0 - r) - cx), max(1.0, mh * (1.0 - bt) - cy))
+        break
     for j, f in enumerate(fx or []):
         t, v = str(f.get("t")), f.get("v") or {}
         if t == "blur":
@@ -2313,11 +2322,18 @@ def _filtros_fx(fx, mw, mh, tag="x"):
                        f"[{r}c][{r}k]alphamerge,format=rgba")
         elif t == "rounded":
             # cantos arredondados (veFxRaio): alfa × máscara com borda suavizada de 1 px, como o roundRect da prévia
-            R = _num(v.get("raio"), 0, 100) / 100.0 * min(mw, mh) / 2.0
+            cx, cy, cw, ch = crop_rect or (0.0, 0.0, mw, mh)
+            R = _num(v.get("raio"), 0, 100) / 100.0 * min(cw, ch) / 2.0
             if R >= 0.5:
                 r = f"{tag}f{j}"
-                dx = f"max(0,max({R:.3f}-X-0.5,X+0.5-W+{R:.3f}))"
-                dy = f"max(0,max({R:.3f}-Y-0.5,Y+0.5-H+{R:.3f}))"
+                if crop_rect is None:
+                    dx = f"max(0,max({R:.3f}-X-0.5,X+0.5-W+{R:.3f}))"
+                    dy = f"max(0,max({R:.3f}-Y-0.5,Y+0.5-H+{R:.3f}))"
+                else:
+                    x = f"(X-{cx:.3f})"
+                    y = f"(Y-{cy:.3f})"
+                    dx = f"max(0,max({R:.3f}-{x}-0.5,{x}+0.5-{cw:.3f}+{R:.3f}))"
+                    dy = f"max(0,max({R:.3f}-{y}-0.5,{y}+0.5-{ch:.3f}+{R:.3f}))"
                 out.append(f"format=rgba,split[{r}a][{r}b];[{r}b]alphaextract,"
                            f"geq=lum='p(X,Y)*clip({R + 0.5:.3f}-hypot({dx},{dy}),0,1)'[{r}m];"
                            f"[{r}a][{r}m]alphamerge,format=rgba")

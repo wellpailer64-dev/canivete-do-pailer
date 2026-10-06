@@ -199,13 +199,13 @@ const VE_FX = {
         params: [{ k: 'raio', nome: 'Arredondamento', min: 0, max: 100, step: 0.5, def: 15, un: '%' }],
         neutro: v => !(v.raio > 0),
         draw(a, v, env) {
-            const { w, h } = env, r = veFxRaio(v, w, h);
+            const { w, h } = env, cr = veFxCropRect(env.c, w, h), r = veFxRaio(v, cr.w, cr.h);
             if (r < 0.5) return a;
             const x = a.ctx;
             x.save();
             x.globalCompositeOperation = 'destination-in';
             x.beginPath();
-            x.roundRect(0, 0, w, h, r);
+            x.roundRect(cr.x, cr.y, cr.w, cr.h, Math.min(r, cr.w / 2, cr.h / 2));
             x.fill();
             x.restore();
             return a;
@@ -352,6 +352,17 @@ const veCaExport = c => veCaAtivas(c).map(f => ({ t: f.t, v: veFxValues(f) }));
 
 // ── Cantos arredondados: raio em px do quadro w×h (a exportação faz a mesma conta: _filtros_fx) ──
 function veFxRaio(v, w, h) { return Math.max(0, Math.min(100, v.raio || 0)) / 100 * Math.min(w, h) / 2; }
+function veFxCropRect(c, w, h) {
+    const f = ((c && c.fx) || []).find(x => x && x.on !== false && x.t === 'crop');
+    if (!f) return { x: 0, y: 0, w, h };
+    const v = veFxValues(f);
+    const l = Math.max(0, Math.min(99.5, v.l || 0));
+    const t = Math.max(0, Math.min(99.5, v.t || 0));
+    const r = Math.max(0, Math.min(99.5, v.r || 0));
+    const b = Math.max(0, Math.min(99.5, v.b || 0));
+    const x = w * l / 100, y = h * t / 100;
+    return { x, y, w: Math.max(1, w * (1 - r / 100) - x), h: Math.max(1, h * (1 - b / 100) - y) };
+}
 
 // ── Básico 3D ──
 // Quadro centrado na origem, girado primeiro em X (inclinar: o topo afasta com ângulo positivo) e depois em Y
@@ -602,7 +613,7 @@ function veFxRender(c, src, sz, alvo) {
     let a = veFxCanvas(0, w, h);
     a.ctx.clearRect(0, 0, w, h);
     a.ctx.drawImage(src, 0, 0, w, h);
-    const env = { w, h, q, mw: sz.w, mh: sz.h };
+    const env = { c, w, h, q, mw: sz.w, mh: sz.h };
     fx.forEach(f => { a = VE_FX[f.t].draw(a, veFxValues(f), env); });
     return a.cv;
 }

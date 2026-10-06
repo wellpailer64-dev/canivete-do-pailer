@@ -112,8 +112,8 @@ Object.assign(VE_TR, {
 // Transição de áudio (a do Ctrl+Shift+D): ganho seno/cosseno — soma de potência constante no crossfade
 const VE_TR_AUD = { cp: { nome: 'Potência constante', tag: 'Constant Power' } };
 
-// Clipes de imagem que dão para transição (áudio e camada de ajuste não); de áudio: os que têm som
-const veTransPode = c => !!c && !veIsAudio(c) && !veIsAdj(c);
+// Clipes visuais que dão para transição; camada de ajuste também conta, pois a opacidade dela pode entrar/sair.
+const veTransPode = c => !!c && !veIsAudio(c);
 const veAudPode = c => !!c && veOcupaA(c) && veTemSom(c);
 const veVizAntes = (c, aud) => VE.clips.find(o => o !== c && o.tr === c.tr && (aud ? veAudPode : veTransPode)(o) && Math.abs(veEnd(o) - c.st) < 1e-3);
 const veVizDepois = (c, aud) => VE.clips.find(o => o !== c && o.tr === c.tr && (aud ? veAudPode : veTransPode)(o) && Math.abs(o.st - veEnd(c)) < 1e-3);
@@ -127,7 +127,17 @@ function veTransJanela(c, lado, aud) {
     const tr = c && c[veTrCampo(lado, aud)];
     if (!tr || !(aud ? VE_TR_AUD : VE_TR)[tr.t] || !(aud ? veAudPode : veTransPode)(c)) return null;
     let d = Math.max(veFrame(), Math.min(tr.d || VE_TR_DUR, veLen(c)));
-    if (lado === 'out') return { t: tr.t, tr, A: c, B: null, ws: veEnd(c) - d, we: veEnd(c), c, lado, aud };
+    if (lado === 'out') {
+        const B = veVizDepois(c, aud), cut = veEnd(c);
+        if (!B) return { t: tr.t, tr, A: c, B: null, ws: cut - d, we: cut, c, lado, aud };
+        const hA = veSobra(c, 'fim'), hB = veSobra(B, 'ini');
+        const semSobra = aud && hA + hB < d;
+        d = Math.min(d, veLen(B), semSobra ? Infinity : hA + hB);
+        if (d < veFrame() * 0.99) return null;
+        const lo = Math.max(cut - hB, cut - d), hi = Math.min(cut, cut + hA - d);
+        const ws = semSobra ? cut - d / 2 : Math.min(Math.max(cut - d / 2, lo), hi), we = ws + d;
+        return { t: tr.t, tr, A: c, B, ws, we, aFim: Math.min(we, cut + hA), bIni: Math.max(ws, cut - hB), c, lado, aud };
+    }
     const A = veVizAntes(c, aud);
     if (!A) return { t: tr.t, tr, A: null, B: c, ws: c.st, we: c.st + d, c, lado, aud };
     const cut = c.st, hA = veSobra(A, 'fim'), hB = veSobra(c, 'ini');
@@ -141,13 +151,20 @@ function veTransJanela(c, lado, aud) {
     return { t: tr.t, tr, A, B: c, ws, we, aFim: Math.min(we, cut + hA), bIni: Math.max(ws, cut - hB), c, lado, aud };
 }
 
+function veTransEntradaDuplicada(c, aud) {
+    const A = veVizAntes(c, aud);
+    if (!A || !A[veTrCampo('out', aud)]) return false;
+    const j = veTransJanela(A, 'out', aud);
+    return !!(j && j.B === c);
+}
+
 // Transições de vídeo (comAudio: também as de áudio, para desenhar e clicar na timeline)
 function veTransLista(comAudio) {
     const out = [];
     VE.clips.forEach(c => {
-        if (c.tin) { const j = veTransJanela(c, 'in'); if (j) out.push(j); }
+        if (c.tin && !veTransEntradaDuplicada(c)) { const j = veTransJanela(c, 'in'); if (j) out.push(j); }
         if (c.tout) { const j = veTransJanela(c, 'out'); if (j) out.push(j); }
-        if (comAudio && c.atin) { const j = veTransJanela(c, 'in', true); if (j) out.push(j); }
+        if (comAudio && c.atin && !veTransEntradaDuplicada(c, true)) { const j = veTransJanela(c, 'in', true); if (j) out.push(j); }
         if (comAudio && c.atout) { const j = veTransJanela(c, 'out', true); if (j) out.push(j); }
     });
     return out;
@@ -295,7 +312,7 @@ function veTransVirtuais() {
 // ── adicionar / remover / duração ──
 function veTransAdd(c, lado, t, aud) {
     if (!(aud ? veAudPode : veTransPode)(c)) {
-        veToast(aud ? 'Esse clipe não tem som' : 'Transições de vídeo não se aplicam a áudio nem a camada de ajuste');
+        veToast(aud ? 'Esse clipe não tem som' : 'Transições de vídeo não se aplicam a áudio');
         return;
     }
     if (veLocked(c)) { veAvisoBloqueio(); return; }
@@ -578,7 +595,7 @@ function veTransAlvo(x, y, doc) {
     const r = $ve('ve-tl-wrap').getBoundingClientRect(), t = VE.view + (x - r.left) / VE.pps;
     if (t - c.st <= veEnd(c) - t) return { c, lado: 'in' };
     const n = veVizDepois(c);
-    return n ? { c: n, lado: 'in' } : { c, lado: 'out' };
+    return n ? (c.tout ? { c, lado: 'out' } : { c: n, lado: 'in' }) : { c, lado: 'out' };
 }
 
 // Mostra na timeline onde a transição vai ficar enquanto arrasta

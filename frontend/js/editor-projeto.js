@@ -1057,9 +1057,11 @@ function vePjInit() {
         const row = e.target.closest('[data-k]');
         if (!row) return;
         if (!VEPJ.sel.has(row.dataset.k)) { VEPJ.sel = new Set([row.dataset.k]); VEPJ.foco = row.dataset.k; }
-        e.dataTransfer.setData('text/x-ve-projeto', JSON.stringify([...VEPJ.sel]));
+        VE._pjDrag = [...VEPJ.sel];
+        e.dataTransfer.setData('text/x-ve-projeto', JSON.stringify(VE._pjDrag));
         e.dataTransfer.effectAllowed = 'copyMove';
     });
+    lista.addEventListener('dragend', () => { VE._pjDrag = null; VE._srcDrag = null; veDropGhostClear(); });
     lista.addEventListener('dragover', e => {
         if (![...e.dataTransfer.types].includes('text/x-ve-projeto')) return;
         e.preventDefault();
@@ -1122,14 +1124,23 @@ function vePjInit() {
     const alvo = el => {
         el.addEventListener('dragover', e => {
             const tipos = [...e.dataTransfer.types];
-            if (tipos.includes('text/x-ve-projeto') || tipos.includes('text/x-ve-source')) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }
+            if (tipos.includes('text/x-ve-projeto') || tipos.includes('text/x-ve-source')) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                if (el.id === 've-tl-wrap') veDropGhostUpdate(e);
+            }
+        });
+        el.addEventListener('dragleave', e => {
+            if (el.id === 've-tl-wrap' && !el.contains(e.relatedTarget)) veDropGhostClear();
         });
         el.addEventListener('drop', e => {
+            veDropGhostClear();
             const src = e.dataTransfer.getData('text/x-ve-source');
             if (src) {
                 e.preventDefault();
                 e.stopPropagation();
                 veSrcDrop(JSON.parse(src), { x: e.clientX, y: e.clientY, doc: el.ownerDocument });
+                VE._srcDrag = null;
                 return;
             }
             const dados = e.dataTransfer.getData('text/x-ve-projeto');
@@ -1143,6 +1154,8 @@ function vePjInit() {
                 vePjMidia().filter(m => d.has(m.pasta)).forEach(m => ids.push(m.id));
             });
             vePjColocar(ids, { x: e.clientX, y: e.clientY });
+            veSrcClose();
+            VE._pjDrag = null;
         });
     };
     alvo($ve('ve-tl-wrap'));
@@ -1323,7 +1336,7 @@ function veSrcOpen(id) {
         md.id = 've-source';
         md.hidden = true;
         md.innerHTML = `<div class="ve-modal-box ve-src-box" tabindex="0">
-            <div class="ve-modal-head"><span id="ve-src-title">Source</span><button class="ve-icon-btn" data-src="fechar" title="Fechar (Esc)"><svg class="i"><use href="#i-x"/></svg></button></div>
+            <div class="ve-modal-head ve-src-head"><div><span id="ve-src-title">Source</span><small id="ve-src-sub"></small></div><button class="ve-icon-btn" data-src="fechar" title="Fechar (Esc)"><svg class="i"><use href="#i-x"/></svg></button></div>
             <div class="ve-modal-body ve-src-body">
                 <div class="ve-src-screen"><video id="ve-src-video" preload="auto" playsinline></video><div class="ve-src-wait" id="ve-src-wait">Preparando prévia...</div></div>
                 <div class="ve-src-range"><span id="ve-src-cur">0:00.00</span><input type="range" id="ve-src-seek" min="0" max="1000" value="0"><span id="ve-src-dur">0:00.00</span></div>
@@ -1345,6 +1358,7 @@ function veSrcOpen(id) {
         </div>`;
         $ve('ve').appendChild(md);
         VESRC.video = md.querySelector('#ve-src-video');
+        md.addEventListener('pointerdown', e => { if (!e.target.closest('.ve-src-box')) veSrcClose(); });
         md.addEventListener('click', veSrcClick);
         md.addEventListener('keydown', veSrcKey);
         md.querySelector('#ve-src-seek').addEventListener('input', e => {
@@ -1352,9 +1366,13 @@ function veSrcOpen(id) {
         });
         // imagem e áudio / só a imagem / só o áudio (como os ícones embaixo do monitor Source do Premiere)
         md.querySelectorAll('.ve-src-drag').forEach(b => b.addEventListener('dragstart', e => {
-            e.dataTransfer.setData('text/x-ve-source', JSON.stringify({ ...veSrcPayload(), parte: b.dataset.parte }));
+            const p = { ...veSrcPayload(), parte: b.dataset.parte };
+            VE._srcDrag = p;
+            e.dataTransfer.setData('text/x-ve-source', JSON.stringify(p));
             e.dataTransfer.effectAllowed = 'copy';
+            setTimeout(() => veSrcClose(), 0);
         }));
+        md.querySelectorAll('.ve-src-drag').forEach(b => b.addEventListener('dragend', () => { VE._srcDrag = null; veDropGhostClear(); }));
         VESRC.video.addEventListener('timeupdate', veSrcRender);
         VESRC.video.addEventListener('loadedmetadata', veSrcRender);
         VESRC.video.addEventListener('play', veSrcRender);
@@ -1366,6 +1384,8 @@ function veSrcOpen(id) {
     VESRC.inPt = m.srcIn ?? null;
     VESRC.outPt = m.srcOut ?? null;
     md.querySelector('#ve-src-title').textContent = vePjNome(m);
+    const sub = md.querySelector('#ve-src-sub');
+    if (sub) sub.textContent = [m.info?.width && m.info?.height ? `${m.info.width}×${m.info.height}` : '', veShort((m.info && m.info.duration) || m.dur || 0)].filter(Boolean).join(' · ');
     md.hidden = false;
     veSrcLoad();
     md.querySelector('.ve-src-box').focus();
@@ -1383,7 +1403,7 @@ function veSrcLoad() {
 function veSrcClose() {
     const md = $ve('ve-source');
     if (!md) return;
-    VESRC.video.pause();
+    VESRC.video?.pause();
     md.hidden = true;
 }
 
@@ -1402,7 +1422,7 @@ function veSrcDrop(p, drop) {
     if (!m || m.kind !== 'video') return;
     const antes = VE.clips.length;
     vePjColocar([m.id], { ...(drop || {}), srcIn: p.srcIn, srcOut: p.srcOut, parte: p.parte });
-    if (VE.clips.length > antes) veSrcClose();   // entrou na timeline: o Source fecha sozinho
+    if (drop || VE.clips.length > antes) veSrcClose();   // arrastou para a timeline: o Source fecha sozinho
 }
 
 function veSrcTogglePlay() {
@@ -1431,6 +1451,118 @@ function veSrcKey(e) {
     if (e.key === ' ') { e.preventDefault(); e.stopPropagation(); veSrcTogglePlay(); return; }
     if (e.key.toLowerCase() === 'i') { e.preventDefault(); e.stopPropagation(); veSrcClick({ target: { closest: () => ({ dataset: { src: 'in' } }) } }); return; }
     if (e.key.toLowerCase() === 'o') { e.preventDefault(); e.stopPropagation(); veSrcClick({ target: { closest: () => ({ dataset: { src: 'out' } }) } }); }
+}
+
+// ─────────────────────────── fantasma de drop na timeline ───────────────────────────
+function veDropGhostClear() {
+    if (!VE.dropGhost) return;
+    VE.dropGhost = null;
+    veDraw();
+}
+
+function veDropGhostLer(dt, tipo, fallback) {
+    try {
+        const s = dt && dt.getData && dt.getData(tipo);
+        return s ? JSON.parse(s) : fallback;
+    } catch (e) { return fallback; }
+}
+
+function veDropGhostMidias(keys) {
+    const ids = [];
+    (keys || []).forEach(k => {
+        if (String(k).startsWith('m:')) ids.push(+String(k).slice(2));
+        else if (String(k).startsWith('b:')) {
+            const d = vePjDescendentes(String(k).slice(2));
+            vePjMidia().filter(m => d.has(m.pasta)).forEach(m => ids.push(m.id));
+        }
+    });
+    return [...new Set(ids)].map(id => VE.media[id]).filter(m => m && !m.removido && ['video', 'audio', 'image', 'ajuste', 'cor'].includes(m.kind));
+}
+
+function veDropGhostItem(m, src) {
+    let dur = VE_IMG_DUR, parte = src && src.parte || '';
+    if (m.kind === 'video') {
+        const mdur = (m.id === 0 ? VE.srcDur : m.info?.duration) || m.dur || 0;
+        const a = Number.isFinite(src && src.srcIn) ? src.srcIn : 0;
+        const b = Number.isFinite(src && src.srcOut) ? src.srcOut : mdur;
+        dur = Math.max(veFrame(), Math.min(mdur || b, b) - Math.max(0, a));
+    } else if (m.kind === 'audio') dur = Math.max(veFrame(), m.dur || m.info?.duration || 1);
+    const temSom = m.kind === 'audio' || (m.kind === 'video' && (m.id === 0 ? !!(VE.info && VE.info.has_audio) : !!(m.info && m.info.has_audio)));
+    return { m: m.id, kind: m.kind, nome: vePjNome(m), dur, parte, temSom, cor: m.cor || '' };
+}
+
+function veDropGhostItens(e) {
+    const tipos = [...(e.dataTransfer?.types || [])];
+    if (tipos.includes('text/x-ve-source')) {
+        const p = veDropGhostLer(e.dataTransfer, 'text/x-ve-source', VE._srcDrag);
+        const m = p && VE.media[p.id];
+        return m ? [veDropGhostItem(m, p)] : [];
+    }
+    if (!tipos.includes('text/x-ve-projeto')) return [];
+    const keys = veDropGhostLer(e.dataTransfer, 'text/x-ve-projeto', VE._pjDrag || []);
+    return veDropGhostMidias(keys).slice(0, 12).map(m => veDropGhostItem(m, null));
+}
+
+function veDropGhostUpdate(e) {
+    if (!VE.ready) return veDropGhostClear();
+    const wrapEl = $ve('ve-tl-wrap'), wrap = wrapEl.getBoundingClientRect();
+    const x = e.clientX - wrap.left, y = e.clientY - wrap.top;
+    const row = veRowAt(y), itens = veDropGhostItens(e);
+    if (!row || row.kind === 'l' || !itens.length) return veDropGhostClear();
+    VE.dropGhost = {
+        t: veSnapFrame(Math.max(0, VE.view + x / VE.pps)),
+        tr: veTrackIndex(row),
+        rowKind: row.kind,
+        itens,
+    };
+    veDraw();
+}
+
+function veTimelineDropGhost(ctx, rows, X, W) {
+    const g = VE.dropGhost;
+    if (!g || !g.itens || !g.itens.length) return;
+    const rowOf = id => rows.find(r => r.id === id);
+    let st = g.t;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, VE_RULER, W, veCanvasHeight() - VE_RULER); ctx.clip();
+    const linhaX = Math.round(X(g.t)) + 0.5;
+    ctx.strokeStyle = 'rgba(235,238,245,.70)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(linhaX, VE_RULER); ctx.lineTo(linhaX, veCanvasHeight()); ctx.stroke();
+    const bloco = (row, x1, x2, cor, txt, audio) => {
+        if (!row) return;
+        const y = row.y + 4, h = row.h - 8, w = Math.max(6, x2 - x1 - 2), x = x1 + 1;
+        if (x + w < -2 || x > W + 2 || h < 8) return;
+        ctx.save();
+        ctx.globalAlpha = .74;
+        veRoundRect(ctx, x, y, w, h, 4);
+        ctx.fillStyle = audio ? 'rgba(67,197,143,.28)' : 'rgba(212,129,74,.28)';
+        ctx.fill();
+        ctx.strokeStyle = cor || (audio ? '#43c58f' : '#D4814A');
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        veRoundRect(ctx, x, y, w, h, 4); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = cor || (audio ? '#43c58f' : '#D4814A');
+        ctx.fillRect(x, y, w, Math.min(12, h));
+        if (w > 42 && h > 18) {
+            ctx.fillStyle = audio ? '#d8ffe9' : '#fff0df';
+            ctx.font = '600 10.5px Segoe UI';
+            ctx.fillText(txt, x + 7, y + Math.min(h - 5, 24));
+        }
+        ctx.restore();
+    };
+    g.itens.forEach((it, idx) => {
+        const len = Math.max(veFrame(), it.dur || 1), x1 = X(st), x2 = X(st + len), tr = Math.max(0, g.tr || 0);
+        const label = `${idx ? '' : veShort(st) + ' · '}${it.nome || veT('Mídia')} · ${veShort(len)}`;
+        const video = it.kind !== 'audio' && it.parte !== 'a';
+        const audio = (it.kind === 'audio' || (it.kind === 'video' && it.temSom && it.parte !== 'v'));
+        if (video) bloco(rowOf('V' + (tr + 1)), x1, x2, it.cor, label, false);
+        if (audio) bloco(rowOf('A' + (tr + 1)), x1, x2, it.cor, label, true);
+        st += len;
+    });
+    ctx.restore();
 }
 
 function veSrcRender() {

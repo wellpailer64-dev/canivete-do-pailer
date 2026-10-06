@@ -131,13 +131,74 @@ async function veSbInserir(k, drop) {
     vePjAlterou();
 }
 
-// Shift+1: o som selecionado no painel, na agulha
-function veSbAplicarSelecionado() {
+function veSbKeySelecionada() {
     const d = VESB.dados;
     let k = null;
     (d && d.categorias || []).forEach((c, ci) => c.sons.forEach((s, si) => { if (s.arq === VESB.sel) k = `${ci}:${si}`; }));
+    return k;
+}
+
+async function veSbMidia(k) {
+    const s = veSbSom(k);
+    if (!s) return null;
+    let m = VE.media.find(x => x && !x.removido && x.kind === 'audio' && x.path === s.path);
+    if (m) return m;
+    let b = (VE.bins || []).find(b => b.nome === 'Soundboard' && !b.pai);
+    if (!b) b = vePjNovoBin('Soundboard');
+    const n = VE.media.length;
+    if (!await vePjImportarArquivo(s.path, b.id) || VE.media.length === n) return null;
+    m = VE.media[VE.media.length - 1];
+    m.nome = s.nome;
+    return m;
+}
+
+function veSbTrilhaLivre(st, dur, novo, reservados = []) {
+    const a = Math.max(0, st), b = a + dur;
+    const livre = k => !veTrkLocked(k) && veTrackFree(k, a, b, novo) &&
+        !reservados.some(o => o.tr === k && o.st < b - VE_EPS && veEnd(o) > a + VE_EPS);
+    const usadas = VE.clips.filter(veOcupaA).map(c => c.tr), ultima = usadas.length ? Math.max(...usadas) : -1;
+    let tr = veTrackIndexes().find(k => k > ultima && livre(k));
+    if (tr == null) tr = veTrackIndexes().find(livre);
+    if (tr == null) { tr = Math.max(0, ultima + 1, veTrackCount()); veEnsureTrackIndex(tr); }
+    return livre(tr) ? tr : -1;
+}
+
+async function veSbAplicarNasBordas(k) {
+    const alvos = (typeof veSelLista === 'function' ? veSelLista() : []).filter(c => VE.clips.includes(c));
+    if (!alvos.length) return false;
+    const m = await veSbMidia(k);
+    if (!m) { veToast('Não foi possível abrir esse som'); return true; }
+    const dur = m.dur || 0;
+    if (!(dur > 0)) { veToast('Som sem duração válida'); return true; }
+    const meio = dur / 2, novo = { m: m.id };
+    const clips = [];
+    alvos.forEach(c => {
+        [c.st - meio, veEnd(c) - meio].forEach(st0 => {
+            const st = veSnapFrame(Math.max(0, st0));
+            const tr = veSbTrilhaLivre(st, dur, novo, clips);
+            if (tr < 0) return;
+            clips.push({ tr, st, s: 0, e: dur, m: m.id, ...(m.cor ? { cor: m.cor } : {}) });
+        });
+    });
+    if (!clips.length) { veToast('Não há trilha de áudio livre nesses pontos'); return true; }
+    vePushHistory();
+    VE.clips.push(...clips);
+    VE.sel = VE.clips.indexOf(clips[clips.length - 1]);
+    veRelayout();
+    veAfterEdit(VE.playhead);
+    const maxTr = Math.max(...clips.map(c => c.tr));
+    const linha = VE_TRACKS.find(x => x.id === 'A' + (maxTr + 1));
+    if (linha && linha.h < 40) { linha.h = 48; veBuildHeads(); veLsSet('ve-track-h', JSON.stringify(VE_TRACKS.map(t => t.h))); veDraw(); }
+    vePjAlterou();
+    veToast(`${clips.length} efeitos sonoros adicionados nas bordas`);
+    return true;
+}
+
+// Shift+1: com clipes selecionados, põe o som no início e no fim deles; sem seleção, põe na agulha.
+function veSbAplicarSelecionado() {
+    const k = veSbKeySelecionada();
     if (!k) { veToast('Selecione um som no Soundboard (um clique) para aplicar com Shift+1'); return; }
-    Promise.resolve(veSbInserir(k)).then(() => veClique());   // o tic confirma que entrou na timeline
+    Promise.resolve(veSbAplicarNasBordas(k)).then(feito => (feito ? true : veSbInserir(k))).then(() => veClique());   // o tic confirma que entrou na timeline
 }
 
 function veSbBaixar() {

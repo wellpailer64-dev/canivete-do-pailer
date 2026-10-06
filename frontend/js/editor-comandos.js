@@ -7,7 +7,8 @@
 // =========================================================
 
 const veSel = () => VE.sel >= 0 || (typeof veSelLista === 'function' && veSelLista().length > 0) ||
-    (typeof VETX !== 'undefined' && VETX.legSel >= 0 && (VE.legendas || [])[VETX.legSel]);
+    (typeof VETX !== 'undefined' && VETX.legSel >= 0 && (VE.legendas || [])[VETX.legSel]) ||
+    (typeof veTransSelecionada === 'function' && !!veTransSelecionada());
 
 // grupo = menu onde aparece (sem menu: só atalho). sempre = funciona sem projeto aberto.
 // pode() = habilitado; marcado() = ✓ no menu. sep = linha antes do item no menu.

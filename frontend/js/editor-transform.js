@@ -50,6 +50,59 @@ function veTfClipeEm(pt, filtro) {
 
 // Alças do selecionado: 8 pontos (mídia) + a âncora
 const VE_TF_PONTOS = [[0, 0, 'nw'], [0.5, 0, 'n'], [1, 0, 'ne'], [1, 0.5, 'e'], [1, 1, 'se'], [0.5, 1, 's'], [0, 1, 'sw'], [0, 0.5, 'w']];
+const veTfClamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+function veTfCropBase(c) {
+    const f = (c.fx || []).find(x => x.t === 'crop' && x.on !== false);
+    return { l: 0, t: 0, r: 0, b: 0, ...(f && f.v || {}) };
+}
+
+function veTfCropAtual(c) {
+    const f = (c.fx || []).find(x => x.t === 'crop' && x.on !== false);
+    return { l: 0, t: 0, r: 0, b: 0, ...(f && f.v || {}) };
+}
+
+function veTfCropRect(c, sz) {
+    const v = veTfCropAtual(c);
+    const l = veTfClamp(+v.l || 0, 0, 99.5), r = veTfClamp(+v.r || 0, 0, 99.5);
+    const t = veTfClamp(+v.t || 0, 0, 99.5), b = veTfClamp(+v.b || 0, 0, 99.5);
+    const x1 = sz.w * l / 100, y1 = sz.h * t / 100;
+    return {
+        x1, y1,
+        x2: Math.max(x1 + 1, sz.w * (1 - r / 100)),
+        y2: Math.max(y1 + 1, sz.h * (1 - b / 100)),
+    };
+}
+
+function veTfPontoLocal(c, sz, u, v) {
+    const R = veTfCropRect(c, sz);
+    return { x: R.x1 + (R.x2 - R.x1) * u, y: R.y1 + (R.y2 - R.y1) * v };
+}
+
+function veTfCropFx(c) {
+    let f = (c.fx || []).find(x => x.t === 'crop');
+    if (!f) {
+        f = { id: typeof veFxNewId === 'function' ? veFxNewId() : 'crop' + Date.now().toString(36), t: 'crop', on: true, v: { l: 0, t: 0, r: 0, b: 0 } };
+        c.fx = [...(c.fx || []), f];
+    } else {
+        f.on = true;
+        f.v = { l: 0, t: 0, r: 0, b: 0, ...(f.v || {}) };
+    }
+    return f;
+}
+
+function veTfCropPorAlca(c, d, pt, sz) {
+    const loc = veTfLocal(c, d.p0, pt.x, pt.y, sz);
+    const dx = (loc.x - d.loc0.x) / Math.max(1, sz.w) * 100;
+    const dy = (loc.y - d.loc0.y) / Math.max(1, sz.h) * 100;
+    const v = { ...d.crop0 };
+    const folga = 0.5;   // evita inverter a imagem por crop de 100%
+    if (d.u === 0) v.l = veTfClamp(d.crop0.l + dx, 0, 100 - d.crop0.r - folga);
+    else if (d.u === 1) v.r = veTfClamp(d.crop0.r - dx, 0, 100 - d.crop0.l - folga);
+    if (d.v === 0) v.t = veTfClamp(d.crop0.t + dy, 0, 100 - d.crop0.b - folga);
+    else if (d.v === 1) v.b = veTfClamp(d.crop0.b - dy, 0, 100 - d.crop0.t - folga);
+    return Object.fromEntries(Object.entries(v).map(([k, n]) => [k, Math.round(n * 10) / 10]));
+}
 
 // O que está sob o ponteiro no selecionado: {tipo: 'anc' | 'alca' | 'giro', ...} ou null
 function veTfAlvo(pt, q) {
@@ -58,14 +111,14 @@ function veTfAlvo(pt, q) {
     const p = veProps(c), sz = veMediaSize(c), px = 1 / q.s;   // 1 px de tela em px do quadro
     if (Math.hypot(pt.x - p.x, pt.y - p.y) <= 9 * px) return { tipo: 'anc' };
     for (const [u, v, nome] of VE_TF_PONTOS) {
-        const a = veTfQuadro(c, p, u * sz.w, v * sz.h, sz);
+        const m = veTfPontoLocal(c, sz, u, v), a = veTfQuadro(c, p, m.x, m.y, sz);
         if (Math.abs(pt.x - a.x) <= (VE_TF_ALCA + 3) * px && Math.abs(pt.y - a.y) <= (VE_TF_ALCA + 3) * px) return { tipo: 'alca', u, v, nome };
     }
     // girar: perto de um canto, do lado de fora da caixa
     const l = veTfLocal(c, p, pt.x, pt.y, sz), k = p.sc / 100;
-    const fora = l.x < 0 || l.y < 0 || l.x > sz.w || l.y > sz.h;
+    const R = veTfCropRect(c, sz), fora = l.x < R.x1 || l.y < R.y1 || l.x > R.x2 || l.y > R.y2;
     if (fora) for (const [u, v] of [[0, 0], [1, 0], [1, 1], [0, 1]]) {
-        const a = veTfQuadro(c, p, u * sz.w, v * sz.h, sz);
+        const m = veTfPontoLocal(c, sz, u, v), a = veTfQuadro(c, p, m.x, m.y, sz);
         if (Math.hypot(pt.x - a.x, pt.y - a.y) <= VE_TF_GIRO * px && k > 0) return { tipo: 'giro' };
     }
     return null;
@@ -89,7 +142,10 @@ function veTfDesenhar(ctx, cv, pv) {
     if (!veTfVisivel(c) || (VEPP.edit && VEPP.edit.c === c)) return;
     const p = veProps(c), sz = veMediaSize(c);
     const q = veTxQuadroTela(), tela = pv / q.s;   // px do canvas por px de tela
-    const P = (u, v) => { const a = veTfQuadro(c, p, u * sz.w, v * sz.h, sz); return [a.x * pv, a.y * pv]; };
+    const P = (u, v) => {
+        const m = veTfPontoLocal(c, sz, u, v), a = veTfQuadro(c, p, m.x, m.y, sz);
+        return [a.x * pv, a.y * pv];
+    };
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.lineWidth = 1.5 * tela;
@@ -154,7 +210,11 @@ function veTfIniciar() {
         if (VE.playing) veStop();
         if (i !== VE.sel || VETX.legSel >= 0) { VE.sel = i; VETX.legSel = -1; veRefresh(); }
         const c = VE.clips[i], p = veProps(c);
+        const sz = veMediaSize(c);
+        const crop = alvo.tipo === 'alca' && e.altKey && !veIsAdj(c);
+        const alca0 = alvo.tipo === 'alca' ? veTfPontoLocal(c, sz, alvo.u, alvo.v) : null;
         VETF.drag = { ...alvo, i, x0: e.clientX, y0: e.clientY, pt0: pt, p0: { ...p }, hist: false, ativo: false, fm0: c.fm ? { ...c.fm } : null,
+                      crop, crop0: crop ? veTfCropBase(c) : null, loc0: crop ? alca0 : null, alca0,
                       clonar: e.altKey && alvo.tipo === 'mover', id: e.pointerId };
         scr.setPointerCapture(e.pointerId);
     }, true);
@@ -215,10 +275,15 @@ function veTfIniciar() {
             if (p0.ax != null || p0.ay != null) c.p = { ...veStaticProps(c), ax, ay };
             veApplyProps(c, { x: Math.round(m.x * 10) / 10, y: Math.round(m.y * 10) / 10 });
             VEPP.chave = '';
+        } else if (d.tipo === 'alca' && d.crop) {
+            const f = veTfCropFx(c);
+            f.v = { ...f.v, ...veTfCropPorAlca(c, d, pt, sz) };
+            VEPP.chave = '';
         } else if (d.tipo === 'alca') {
             // escala uniforme a partir da âncora: projeção do ponteiro na direção da alça
             const [ax, ay] = veAnc(c, p0, sz);
-            const hx = d.u * sz.w - ax, hy = d.v * sz.h - ay, n2 = hx * hx + hy * hy;
+            const hp = d.alca0 || { x: d.u * sz.w, y: d.v * sz.h };
+            const hx = hp.x - ax, hy = hp.y - ay, n2 = hx * hx + hy * hy;
             if (n2 < 1) return;
             const l = veTfLocal(c, { ...p0, sc: 100 }, pt.x, pt.y, sz);
             const sc = Math.max(1, Math.min(2000, ((l.x - ax) * hx + (l.y - ay) * hy) / n2 * 100));

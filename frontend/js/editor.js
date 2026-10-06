@@ -1170,8 +1170,8 @@ function veDeleteClip(i, ripple) {
 }
 
 function veDeleteSelected(ripple) {
+    if (veTransApagar()) return;
     if (VE.sel < 0 && VE.gapSel && veFecharEspaco()) return;   // espaço vazio selecionado (editor-lacunas.js)
-    if (VE.sel < 0 && veTransApagar()) return;
     if (veSelLista().length > 1) { veApagarVarios(veSelLista(), ripple); return; }
     if (VE.sel < 0 && VETX.legSel >= 0 && VE.legendas[VETX.legSel]) {
         vePushHistory();
@@ -4904,6 +4904,7 @@ function veRender() {
             ctx.fillText(txt, Math.max(2, x1) + 5, ty - 6);
         }
     });
+    if (typeof veTimelineDropGhost === 'function') veTimelineDropGhost(ctx, rows, X, W);
     veTransDesenhar(ctx, rows);
     if (typeof veTxaDesenharTl === 'function') veTxaDesenharTl(ctx, rows, X);   // entrada/saída do texto animado
     if (typeof veKlDesenhar === 'function') veKlDesenhar(ctx, rows, X, W);
