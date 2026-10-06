@@ -131,7 +131,11 @@ function ieCenaComponentesCss() {
         :where(.k-papel[data-rasgado]){background:none;box-shadow:none}
         :where(.k-papel[data-rasgado] > :not(svg),.k-rasgo > :not(svg)){position:relative}
         :where(.k-fita-adesiva){position:absolute;left:33%;top:-30px;width:34%;height:62px;background:rgba(228,220,196,.88);transform:rotate(-3deg);box-shadow:0 3px 8px rgba(0,0,0,.18)}
-        :where(.k-eco){position:absolute;font-size:380px;font-weight:900;line-height:.8;letter-spacing:-.04em;white-space:nowrap;opacity:.07;z-index:-1}
+        :where(.k-eco){position:absolute;font-size:380px;font-weight:900;line-height:1;letter-spacing:-.04em;white-space:nowrap;opacity:.07;z-index:-1}
+        :where(.k-forma){position:absolute;color:${P};z-index:0}
+        :where(.k-forma) svg{display:block;overflow:visible}
+        :where(.k-etiqueta){position:absolute;background:color-mix(in srgb,${P} 82%,#000);color:${F};font-size:26px;font-weight:700;line-height:1;padding:12px 20px;border-radius:12px;transform:rotate(-4deg);box-shadow:0 12px 30px rgba(0,0,0,.25);white-space:nowrap}
+        :where(.k-etiqueta-rabo){position:absolute;bottom:-12px;width:24px;height:24px;background:color-mix(in srgb,${P} 82%,#000);transform:rotate(45deg);border-radius:3px}
         :where(.k-luz){position:absolute;width:900px;height:900px;border-radius:50%;background:radial-gradient(closest-side,color-mix(in srgb,${P} 55%,transparent),transparent);z-index:-1}`;
 }
 // ícones dos componentes (SVG de verdade: viram camada). cor: --cor-ok / --cor-primaria / a do texto
@@ -246,6 +250,44 @@ function ieCenaComponentes(raiz, S) {
     }
     for (const el of raiz.querySelectorAll('.k-papel[data-fita]')) if (!el.querySelector('.k-fita-adesiva')) el.insertAdjacentHTML('beforeend', `<span class="k-fita-adesiva" id="${el.id || 'papel'}-fita" data-livre></span>`);
     for (const el of raiz.querySelectorAll('.k-eco, .k-luz')) el.dataset.livre = '';
+    // <div class="k-forma" data-forma="blob|anel|onda|traco" data-semente="3" data-espessura="40" style="left;top;width;height;color">
+    // forma básica deformada da IDV (mancha, anel torto, traço grosso de caneta em curva), curva lisa e repetível
+    for (const el of raiz.querySelectorAll('.k-forma')) {
+        if (el.querySelector('svg')) continue;
+        const r = el.getBoundingClientRect(), w = Math.max(20, Math.round(r.width) || 400), h = Math.max(20, Math.round(r.height) || 400);
+        const tipo = el.dataset.forma || 'blob', s = ieCenaSorte((el.dataset.semente || '') + tipo + w + 'x' + h);
+        const esp = +el.dataset.espessura || Math.round(Math.min(w, h) * 0.08), cheio = tipo === 'blob';
+        const ofs = cheio ? 0 : esp / 2, rx = w / 2 - ofs, ry = h / 2 - ofs;
+        let d;
+        if (tipo === 'supergrafico') {   // traço grosso arredondado de marca, enorme, saindo da borda (referência LeadFlux)
+            const pts = [[w * (0.05 + s() * 0.1), h * (0.95 + s() * 0.1)], [w * (0.2 + s() * 0.1), h * (0.25 + s() * 0.1)], [w * (0.5 + s() * 0.1), h * (0.08 + s() * 0.08)],
+                [w * (0.72 + s() * 0.08), h * (0.45 + s() * 0.15)], [w * (0.98 + s() * 0.1), h * (0.3 + s() * 0.15)]];
+            d = ieCenaSuave(pts);
+        } else if (tipo === 'orbita') {   // arco fino em volta da cabeça, com pontinhos nas pontas (referência Tainara)
+            const a0 = 2.4 + s() * 0.5, a1 = a0 + 4.2 + s() * 0.6, pts = [];
+            for (let t = a0; t <= a1 + 0.001; t += (a1 - a0) / 10) pts.push([w / 2 + Math.cos(t) * rx, h / 2 + Math.sin(t) * ry]);
+            d = ieCenaSuave(pts);
+            const p0 = pts[0], p1 = pts[pts.length - 1], r0 = Math.max(4, esp * 2.5);
+            el.dataset.pontos = `<circle cx="${p0[0].toFixed(1)}" cy="${p0[1].toFixed(1)}" r="${r0}" fill="currentColor"/><circle cx="${p1[0].toFixed(1)}" cy="${p1[1].toFixed(1)}" r="${r0}" fill="currentColor"/>`;
+        } else if (tipo === 'blob' || tipo === 'anel') {
+            const n = tipo === 'blob' ? 8 : 11, a0 = s() * 6.28, pts = [];
+            for (let i = 0; i < n; i++) { const t = a0 + i * 6.283 / n, k = tipo === 'blob' ? 0.72 + s() * 0.28 : 0.88 + s() * 0.12; pts.push([w / 2 + Math.cos(t) * rx * k, h / 2 + Math.sin(t) * ry * k]); }
+            d = ieCenaSuaveFechado(pts);
+        } else if (tipo === 'onda') {
+            const pts = []; for (let i = 0; i <= 5; i++) pts.push([ofs + (w - 2 * ofs) * i / 5, h / 2 + (i % 2 ? -1 : 1) * (ry * (0.55 + s() * 0.45))]);
+            d = ieCenaSuave(pts);
+        } else d = ieCenaSuave([[ofs, h * (0.6 + s() * 0.3)], [w * (0.45 + s() * 0.1), h * (0.1 + s() * 0.2)], [w - ofs, h * (0.5 + s() * 0.3)]]);
+        el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width:${w}px;height:${h}px"><path d="${d}" fill="${cheio ? 'currentColor' : 'none'}" stroke="${cheio ? 'none' : 'currentColor'}" stroke-width="${esp}" stroke-linecap="round" stroke-linejoin="round"/>${el.dataset.pontos || ''}</svg>`;
+        delete el.dataset.pontos;
+        el.dataset.livre = '';
+    }
+    // <div class="k-etiqueta" data-rabo="baixo-esq|baixo-dir" style="left;top">tendências</div>: chip com rabinho apontando
+    // para a pessoa/objeto (referência laranja) — rótulo com função, não enfeite
+    for (const el of raiz.querySelectorAll('.k-etiqueta')) {
+        if (el.querySelector('.k-etiqueta-rabo')) continue;
+        el.insertAdjacentHTML('beforeend', `<span class="k-etiqueta-rabo" data-livre style="${/dir/.test(el.dataset.rabo || '') ? 'right:22px' : 'left:22px'}"></span>`);
+        el.dataset.juntos = ''; el.dataset.papel = el.dataset.papel || 'etiqueta';
+    }
     // k-rodape data-site="www.site.com.br" data-insta="@seuinsta": linha com ícones + o texto legal (o conteúdo do elemento)
     for (const el of raiz.querySelectorAll('.k-rodape[data-site], .k-rodape[data-insta]')) {
         if (el.querySelector('.k-rodape-linha')) continue;
@@ -296,6 +338,15 @@ function ieCenaSuave(p) {
         d += ` C${f(b[0] + (c[0] - a[0]) / 6)} ${f(b[1] + (c[1] - a[1]) / 6)} ${f(c[0] - (e[0] - b[0]) / 6)} ${f(c[1] - (e[1] - b[1]) / 6)} ${f(c[0])} ${f(c[1])}`;
     }
     return d;
+}
+function ieCenaSuaveFechado(p) {
+    const f = v => v.toFixed(1), n = p.length, q = i => p[(i + n) % n];
+    let d = `M${f(p[0][0])} ${f(p[0][1])}`;
+    for (let i = 0; i < n; i++) {
+        const a = q(i - 1), b = q(i), c = q(i + 1), e = q(i + 2);
+        d += ` C${f(b[0] + (c[0] - a[0]) / 6)} ${f(b[1] + (c[1] - a[1]) / 6)} ${f(c[0] - (e[0] - b[0]) / 6)} ${f(c[1] - (e[1] - b[1]) / 6)} ${f(c[0])} ${f(c[1])}`;
+    }
+    return d + 'Z';
 }
 // contorno de um retângulo w×h com os lados pedidos rasgados (dentes irregulares + um rasgo maior de vez em quando);
 // d = recuo extra (camadas de fibra/sombra)
@@ -671,7 +722,9 @@ async function ieCenaSvgCamada(el, cs, ctx, h) {
     const c = await ieCenaSvgCanvas(svg, Math.ceil(r.w + r.x - x0), Math.ceil(r.h + r.y - y0));
     const P = ieCenaPlano(c, x0, y0, h.M);
     const L = ieCenaCamada(ctx, h, ':svg', { nome: el.dataset.nome || el.id || 'Ícone', c: P.c, x: P.x, y: P.y });
-    L.cena.svg = el.closest('[class*="k-"], [data-proposito]') ? 'comp' : 'livre';   // livre = desenho solto (o revisor de direção desconfia)
+    L.cena.svg = el.closest('[class*="k-"], [data-proposito]') ? 'comp' : 'livre';
+    // supergráfico/órbita = fundo (tom sobre tom, pode passar atrás do texto; o contraste é que manda)
+    if (el.closest('.k-forma, .k-seta-mao')) L.cena.forma = el.closest('.k-forma[data-forma="supergrafico"], .k-forma[data-forma="orbita"]') ? 'fundo' : el.closest('.k-forma') ? 'forma' : 'seta';   // enfeite: não pode passar por cima de texto (revisor)   // livre = desenho solto (o revisor de direção desconfia)
     return L;
 }
 // papel do texto na hierarquia (revisor de direção): data-papel="gancho|subtitulo|corpo|cta|meta" no elemento ou num pai;
@@ -939,7 +992,7 @@ function ieCenaTextoCamada(ctx, h, sufixo, el, cs, tx, a, linhas) {
     if (h.M) tx.m = ieMatMul(h.M, tx.m);
     const L = ieCenaCamada(ctx, h, sufixo, { tipo: 'texto', nome: (el.dataset.nome || el.id || tx.s.split(IE_NL)[0]).slice(0, 30), txt: tx });
     const papel = ieCenaPapel(el); if (papel) L.cena.papel = papel;
-    if (el.closest('[data-livre]')) L.cena.livre = el.closest('.k-fita, .k-eco') ? 'decor' : true;   // fita, eco, rodapé: fora das regras de margem/atropelo
+    if (el.closest('[data-livre]')) L.cena.livre = el.closest('.k-eco') ? 'eco' : el.closest('.k-fita') ? 'decor' : true;   // fita, eco, rodapé: fora das regras de margem/atropelo
     if (a < 1) L.op = a;
     ieCenaFxSombras(L, ieCenaSombras(cs.textShadow));
     const sw = parseFloat(cs.webkitTextStrokeWidth);

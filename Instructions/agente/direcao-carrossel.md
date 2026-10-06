@@ -107,3 +107,53 @@ Depois do revisor limpo: acabamento por receita (`KNV.receita.acabamento`, `text
 - Revisor: além das regras do §4, `atropelo` (letras de um texto sobre outro), `margem` (texto a < 5% da borda),
   `respiro` (corpo colado no título: vão < 35% do tamanho do título). Feedback do usuário 2026-10-06: "cuidado com
   palavras em cima de outras atrapalhando leitura, tem que ter margem, respiro, espaçamento, respeitar hierarquias".
+
+## 7. Formas e efeitos COM PROPÓSITO (referências 2, 2026-10-06: LeadFlux, Tainara Conte, Xile, agência laranja)
+Regra de ouro: cada elemento responde "para que serve?". Sem resposta → não entra. Nunca o mesmo enfeite em todo slide.
+| Técnica | Como foi feita | Para que serve | Quando usar | Ordem das camadas | Efeitos |
+|---|---|---|---|---|---|
+| Supergráfico de marca (LeadFlux) | traços grossos (≈10% do lado) e arredondados vindos do LOGO, enormes, saindo da página | identidade + preencher fundo vazio sem disputar | fundo liso com pessoa/objeto recortado; marca com símbolo de traço | fundo → supergráfico → pessoa → texto | tom sobre tom (16–22% da cor sobre o fundo); sem sombra |
+| Órbita fina (Tainara) | arco de 1–3px em volta da cabeça, com pontinho nas pontas, passa ATRÁS da pessoa | emoldurar o rosto, elegância, guiar o olho | retrato premium (estética, moda, saúde) | fundo → brilho → órbita → pessoa | 50–60% de opacidade, cor dourada/da marca, + bokeh/brilho suave |
+| Letra serifada gigante cortada (Tainara) | pedaço da palavra (bot, mor) enorme, cortado pela borda, entre slides | ritmo e ligação entre slides, tipografia como imagem | slide só de texto ao lado de slide com foto | fundo → letra → texto | cor clara/branca, 100% ou baixa opacidade |
+| Luz vazando / flare (Xile) | brilho grande da cor da marca atrás e nas bordas, bokeh | profundidade, drama, foco no assunto | fundo escuro, tema intenso | fundo → luz (Tela/Clarear) → objeto → texto | desfoque grande, modo Tela 50–70% |
+| Objeto narrativo (Xile) | vidro quebrado = "flop", dinheiro, fita "Biggest Lies", adesivos de rede no rosto | conta a ideia sem texto | quando o tema tem metáfora visual | atrás E na frente do assunto (profundidade) | desfoque de movimento nos que estão na frente, sombra |
+| Etiqueta apontando (laranja) | chip arredondado com rabinho, levemente torto, encostado na pessoa | rotular o que a pessoa representa | palavras-chave do tema (tendências, novidades) | por cima da pessoa, perto do ombro/mão | sombra suave, cor da marca |
+| Palavra gigante com a pessoa na frente (laranja) | palavra branca enorme, pessoa recortada e o notebook POR CIMA de parte das letras | profundidade e destaque do tema | slide de conceito | fundo → palavra → pessoa → objeto da mão | nenhum; contraste de escala faz tudo |
+| Mancha de apoio (demo aprovado) | blob da cor da marca atrás/abaixo do objeto, encostado nele | contraste e "assentar" o objeto | objeto claro em fundo claro (monitor bege) | fundo → mancha → objeto | 90% de opacidade |
+
+No `tools/esqueleto.py` (por slide): `"forma": "apoio"`, `"supergrafico": true`, `"orbita": true`,
+`"etiquetas": [...]`; ligação: `"pontes": [{"depois": k, "tipo": "traco"}]`. O revisor reprova forma solta (sem
+apoiar objeto nem atravessar a divisa) e fita/forma/etiqueta por cima de texto. Supergráfico e órbita contam como
+fundo (podem passar atrás do texto; quem manda é o contraste).
+Pendente: supergráfico desenhado a partir do símbolo do logo (marca.json/kit .aknv) em vez da curva genérica;
+letra serifada gigante entre slides como opção do esqueleto; vidro/objeto narrativo na frente com desfoque.
+
+### Arte-final (`KNV.receita.arteFinal`, ligada por padrão no `--montar`)
+Ordem, de baixo para cima: (1) sombra macia nos recortados (efeito de camada); (2) "Brilho · <objeto>" logo
+ABAIXO do objeto: degradê radial da cor da marca em modo Tela 60% (= pincel macio + mesclagem); (3) palavra-eco →
+objeto inteligente com Desfoque de movimento no sentido da palavra (filtro inteligente, com folga para o borrão);
+(4) "Textura suave": cinza 50% + ruído mono + Texturizador tela, Sobrepor 35%; (5) "Finalização (Camera Raw)" no
+topo: claridade 16, textura 12, contraste 10, vibração 6, grão 12, vinheta −14. `"acabamento": {"brilho": false,
+"cr": {...}}` no roteiro ajusta; `false` desliga.
+
+## 8. Dificuldades desta rodada e o que resolve (qualidade + custo)
+1. **Escape em Python inline** (`\1` virou caractere, heredoc esperando stdin) → 5 chamadas perdidas. Regra: editar
+   SÓ com `tools/patch.py` a partir de arquivo escrito com Write; nada de `py - <<EOF` com regex.
+2. **Prévia pequena engana** (achei que o monitor não atravessava). Regra: conferir posição pela caixa da camada
+   (`ieRaster`/`ieLimites`, `KNV.mapa`) e `--ver x,y,w,h` no trecho, não pela tira inteira reduzida.
+3. **A cena não recorta o slide** (`overflow:hidden` não vale): elemento que sangra para a ESQUERDA invade o slide
+   anterior. Regra: sangrar só para direita/baixo (o slide seguinte cobre) ou ir solto como ponte de propósito.
+4. **`color-mix`/`var()` dentro de SVG viram preto** → cor calculada no gerador (`misturar`).
+5. **CSS de componente perdendo para regra mais forte** (`> :not(svg)` vence `:where`) → todo seletor de componente
+   dentro de `:where(...)`.
+6. **Título com acento encostando na linha de cima** (Anton, entrelinha .92) → entrelinha automática pelo acento.
+7. **Posições fixas no esqueleto colidem quando o texto cresce** → auto-ajuste no `--montar` (revisor acusa
+   atropelo/margem → título 10% menor no slide, até 3x) sem gastar token.
+8. **Falso positivo do revisor** (hastes retas de letra como "corte seco", hierarquia sem `<h1>`) → calibrar cada
+   regra nova nas peças aprovadas da biblioteca antes de confiar.
+9. **Nome repetido** (`receita.finalizar` já existia e escondeu o novo) → `tools/mapa_codigo.py --busca` antes de
+   batizar função.
+10. **Gosto** (formas em todo slide, sem função) → regra de propósito (§7) + revisor `forma`; perguntar "para que
+    serve?" antes de cada enfeite.
+11. **Geração de imagem lenta** (~45 s cada) → gerar cedo em segundo plano; a cena reaproveita o cache
+    (mesmo prompt/semente/tamanho), e as remontagens seguintes levam ~13 s.

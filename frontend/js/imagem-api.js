@@ -444,7 +444,7 @@ const KNV = {
         // só foto/objeto recortado (original com transparência): caixa, painel e textura retos são de propósito
         const recortada = L => { const c = L.c0 && L.c0.c; if (!c) return false; const w = Math.min(64, c.width), h = Math.min(64, c.height), t = ieCanvas(w, h); ieCtx(t).drawImage(c, 0, 0, w, h);
             const p = ieCtx(t).getImageData(0, 0, w, h).data; let n = 0; for (let i = 3; i < p.length; i += 4) if (p[i] < 20) n++; return n > w * h * 0.05; };
-        const ignorar = folhas.filter(o => !recortada(o.L)).map(o => o.L.nome);
+        const ignorar = folhas.filter(o => !recortada(o.L) || (o.L.cena && (o.L.cena.livre || o.L.cena.forma))).map(o => o.L.nome);   // decoração (eco, forma) tem borda reta de propósito
         if (corte) for (const r of window.KNV.revisar({ minimo, ignorar }).filter(r => /corte seco/.test(r.problema)))
             out.push({ regra: 'corte', camada: r.camada, problema: `${r.problema} de ${r.de} a ${r.ate}`, dica: 'caixa na proporção da foto (sem cover cortando a lateral), mascara_degrade, ou esconder atrás de um elemento' });
         // 2) contraste do texto com o que está atrás das letras (10º percentil: o pior trecho conta)
@@ -517,7 +517,7 @@ const KNV = {
             const nome = slides.length > 1 ? `slide ${S.nome}` : 'página', A = S.w * S.h;
             const doSlide = itens.filter(o => inter(o.R, S) > o.R.w * o.R.h * 0.5);
             const textos = doSlide.filter(o => o.L.txt && o.L.txt.s).map(o => ({ ...o, tam: o.L.txt.tam * ieTextoEscala(o.L.txt) * 1080 / lado, papel: o.L.cena && o.L.cena.papel }));
-            const leitura = textos.filter(t => t.papel !== 'meta' && t.papel !== 'cta');
+            const leitura = textos.filter(t => t.papel !== 'meta' && t.papel !== 'cta' && t.papel !== 'etiqueta');
             // hierarquia: gancho/título bem maior que o corpo
             if (leitura.length >= 2) {
                 // papel declarado (data-papel/h1) manda; senão: o maior é o título e o corpo é o maior abaixo de 60% dele
@@ -528,8 +528,8 @@ const KNV = {
             }
             // leitura limpa (feedback 2026-10-06: "palavras em cima de outras atrapalhando, tem que ter margem e respiro"):
             // texto sobre texto (pixels das letras se tocando), texto fora da margem de 5% e corpo colado no título
-            const firmes = leitura.filter(t => !(t.L.cena && t.L.cena.livre)), m = Math.round(lado * 0.05);
-            const decor = itens.filter(o => o.L.txt && o.L.cena && o.L.cena.livre === 'decor' && inter(o.R, S) > 0);   // fita por cima de texto também conta
+            const firmes = textos.filter(t => t.papel !== 'meta' && !(t.L.cena && t.L.cena.livre)), m = Math.round(lado * 0.05);   // cta e etiqueta também não podem atropelar
+            const decor = itens.filter(o => o.L.cena && (o.L.txt && o.L.cena.livre === 'decor' || (o.L.cena.forma && o.L.cena.forma !== 'fundo')) && inter(o.R, S) > 0);   // fita e formas por cima de texto também contam (supergráfico/órbita de fundo: só contraste)   // fita por cima de texto também conta
             const pares = []; firmes.forEach((x, i) => { firmes.slice(i + 1).forEach(y => pares.push([x, y])); decor.forEach(y => pares.push([x, y])); });
             for (const [A1, B1] of pares) {
                 const I = { x: Math.max(A1.R.x, B1.R.x), y: Math.max(A1.R.y, B1.R.y) };
@@ -555,6 +555,12 @@ const KNV = {
             // respiro: área dos blocos de texto (caixa de cada camada) no slide
             const at = textos.reduce((s, t) => s + inter(t.R, S), 0) / A;
             if (at > 0.38) out.push({ regra: 'respiro', camada: nome, problema: `texto ocupa ${Math.round(at * 100)}% do slide`, dica: 'menos texto ou letra menor no corpo; deixe ≥ 60% para imagem e vazio' });
+            // forma da IDV sem função: não encosta em objeto/foto nem atravessa a divisa (apoio ou ligação)
+            const fotos = doSlide.filter(o => o.L.tipo === 'inteligente');
+            for (const o of doSlide.filter(o => o.L.cena && (o.L.cena.forma === 'forma' || o.L.cena.forma === 'fundo'))) {
+                const cruza = o.R.x < S.x - 20 || o.R.x + o.R.w > S.x + S.w + 20, apoia = fotos.some(f => inter(o.R, f.R) > o.R.w * o.R.h * 0.08);
+                if (!cruza && !apoia) out.push({ regra: 'forma', camada: o.L.nome, problema: `forma solta no ${nome} (sem apoiar objeto nem ligar slides)`, dica: 'forma só com função: apoio atrás/abaixo do objeto, traço atravessando a divisa, ou tirar' });
+            }
             // vetor solto tapando espaço
             const soltos = doSlide.filter(o => o.L.cena && o.L.cena.svg === 'livre' && o.R.w * o.R.h > A * 0.015);
             if (soltos.length) out.push({ regra: 'vetor', camada: soltos.map(o => o.L.nome).join(', '), problema: `${soltos.length} desenho(s) SVG solto(s) no ${nome}`, dica: 'trocar por objeto/pessoa gerado (gerar: / recurso:) interagindo com o texto; SVG só em componente (k-*) ou com data-proposito' });
@@ -946,6 +952,58 @@ const KNV = {
                 KNV.ativar(d.camadas[d.camadas.length - 1].id);
                 await KNV.ajuste('cameraRaw', vals, { nome: 'Acabamento (Camera Raw)' });
             }, { chave: JSON.stringify(vals) });
+        },
+        // ── finalização (feedback 2026-10-06: "a camada final acima de tudo deixa com cara de finalizado") ──
+        // sombra macia na humanização/objeto recortado, brilho suave da cor da marca atrás dele (Tela), palavra-eco com
+        // desfoque de movimento (filtro inteligente), textura suave (ruído + tela em Sobrepor) e Camera Raw no topo.
+        // opc: {cor, sombra, brilho, eco, textura, cr: {...vals}} — false desliga a parte. Cada parte é etapa (repetível).
+        async arteFinal(opc = {}) {
+            const d = IE.doc, lado = Math.min(d.w, d.h, ...(d.fatias || []).map(f => Math.min(f.w, f.h))), cor = opc.cor || '#ff3b22', out = {};
+            const recortado = L => {
+                if (L.tipo !== 'inteligente' || !L.c0 || L.visivel === false || (L.bm && L.bm !== 'NORMAL' && L.bm !== 'PASS')) return false;
+                const c = L.c0.c, w = Math.min(64, c.width), h = Math.min(64, c.height), t = ieCanvas(w, h); ieCtx(t).drawImage(c, 0, 0, w, h);
+                const p = ieCtx(t).getImageData(0, 0, w, h).data; let n = 0; for (let i = 3; i < p.length; i += 4) if (p[i] < 20) n++;
+                return n > w * h * 0.05 && !/^Brilho · /.test(L.nome);
+            };
+            const objs = () => ieTodas(d).filter(recortado);
+            if (opc.sombra !== false) out.sombra = await KNV.etapa('fin:sombra', async () => {
+                for (const L of objs()) { if (L.fx && (L.fx.sombra || []).length) continue;
+                    ieCenaFxSombras(L, ieCenaSombras(`0 ${Math.round(lado * 0.03)}px ${Math.round(lado * 0.08)}px rgba(0,0,0,.45)`)); L.fxMudou = true; ieInvalidar(L); }
+            }, { chave: String(lado) });
+            if (opc.brilho !== false) out.brilho = await KNV.etapa('fin:brilho', async () => {
+                for (const L of objs()) {
+                    const r = ieRaster(L), f = r && (r.forma || r), b = f && ieLimites(f.c); if (!b) continue;
+                    const R = { x: f.x + b.x, y: f.y + b.y, w: b.w, h: b.h }, raio = Math.max(R.w, R.h) * 0.62, cx = R.x + R.w / 2, cy = R.y + R.h * 0.38;
+                    const X = Math.round(cx - raio), Y = Math.round(cy - raio), c = ieCanvas(Math.round(raio * 2), Math.round(raio * 2)), x = ieCtx(c);
+                    const g = x.createRadialGradient(raio, raio, 0, raio, raio, raio), [cr, cg, cb] = ieHexRgb(cor);
+                    g.addColorStop(0, `rgba(${cr},${cg},${cb},.85)`); g.addColorStop(0.45, `rgba(${cr},${cg},${cb},.35)`); g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+                    x.fillStyle = g; x.fillRect(0, 0, c.width, c.height);
+                    const G = ieNovaCamada(d, { tipo: 'pixel', nome: 'Brilho · ' + L.nome, c, x: X, y: Y }); G.bm = 'SCREEN'; G.op = 0.6;
+                    const a = ieAchar(d, L.id); a.lista.splice(a.i, 0, G);
+                }
+            }, { chave: cor });
+            if (opc.eco !== false) out.eco = await KNV.etapa('fin:eco', async () => {
+                for (const L of ieTodas(d).filter(L => L.cena && L.cena.livre === 'eco' && L.tipo === 'texto')) {
+                    KNV.ativar(L.id); ieRasterizar(L, d); KNV.objetoInteligente();   // texto → pixels → objeto inteligente (o desfoque fica editável)
+                    const dist = Math.round(lado * 0.04), pad = Math.round(dist * 1.5), o = L.c0;   // folga: o borrão não termina em linha reta
+                    const c = ieCanvas(o.c.width + 2 * pad, o.c.height + 2 * pad); ieCtx(c).drawImage(o.c, pad, pad);
+                    L.c0 = { c, x: o.x - pad, y: o.y - pad }; L.c = ieClonar(c); L.x = o.x - pad; L.y = o.y - pad; L.sujoPx = true; ieInvalidar(L);
+                    await KNV.cmd('f:movimento', { ang: o.c.height > o.c.width ? 90 : 0, d: dist });   // no sentido da palavra (eco vertical = 90°)
+                }
+            });
+            if (opc.textura !== false) out.textura = await KNV.etapa('fin:textura', async () => {
+                const c = ieCanvas(d.w, d.h), x = ieCtx(c); x.fillStyle = '#808080'; x.fillRect(0, 0, d.w, d.h);
+                const T = ieNovaCamada(d, { tipo: 'pixel', nome: 'Textura suave', c, x: 0, y: 0 }); d.camadas.push(T); KNV.ativar(T.id);
+                await KNV.cmd('f:ruido', { q: 7, mono: true });
+                await KNV.cmd('f:galeria', { pilha: [{ f: 'texturizador', v: { tex: 'tela', esc: 110, rel: 12, luz: 'cimaEsq' } }] });
+                KNV.modo('OVERLAY', 35);
+            });
+            if (opc.cr !== false) out.cr = await KNV.etapa('fin:cr', async () => {
+                KNV.ativar(d.camadas[d.camadas.length - 1].id);
+                await KNV.ajuste('cameraRaw', { clar: 16, tex: 12, ct: 10, grao: 12, graoT: 30, vib: 6, vig: -14, ...(opc.cr || {}) }, { nome: 'Finalização (Camera Raw)' });
+            }, { chave: JSON.stringify(opc.cr || {}) });
+            ieTudo(d); ieUiCamadas();
+            return out;
         },
         // balanço de branco automático numa foto (objeto inteligente): Camera Raw como filtro inteligente
         async balancoAuto(nome) {
