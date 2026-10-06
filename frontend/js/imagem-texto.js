@@ -70,6 +70,64 @@ function ieMedir(t) {
     ieTxFonte(ieMedidor, t);
     return ieMedidor;
 }
+// ── trechos: estilos diferentes dentro da mesma caixa (peso, fonte, cor, sublinhado), como no Photoshop ──
+// t.trechos = [{a, b, ...chaves de IE_TX_TRECHO}] sobre os índices de t.s; o que não está num trecho usa o estilo da caixa
+const IE_TX_TRECHO = ['fam', 'estilo', 'gdi', 'peso', 'neg', 'ital', 'ps', 'css', 'negFalso', 'itaFalso', 'cor', 'sublinhado', 'tachado'];
+const IE_TX_FONTE_K = ['fam', 'estilo', 'gdi', 'peso', 'neg', 'ital', 'ps', 'css', 'negFalso', 'itaFalso'];
+function ieTxTemTrechos(t) { return !!(t && t.trechos && t.trechos.length); }
+function ieTxEstiloEm(t, i) { let st = t; for (const r of t.trechos || []) if (i >= r.a && i < r.b) st = { ...st, ...r }; return st; }
+// pedaços de s (que começa no índice i0 do texto) com estilo constante: [{s, t, i}]
+function ieTxSegmentos(t, s, i0) {
+    if (!ieTxTemTrechos(t)) return [{ s, t, i: i0 }];
+    const cortes = new Set([0, s.length]);
+    for (const r of t.trechos) for (const v of [r.a, r.b]) if (v > i0 && v < i0 + s.length) cortes.add(v - i0);
+    const c = [...cortes].sort((x, y) => x - y), out = [];
+    for (let k = 0; k < c.length - 1; k++) out.push({ s: s.slice(c[k], c[k + 1]), t: ieTxEstiloEm(t, i0 + c[k]), i: i0 + c[k] });
+    return out;
+}
+function ieTxLargura(t, s, i0) {
+    const sh = (t.escH || 100) / 100;
+    if (!ieTxTemTrechos(t)) return ieMedir(t).measureText(s).width * sh;
+    let w = 0; for (const g of ieTxSegmentos(t, s, i0)) w += ieMedir(g.t).measureText(g.s).width * sh;
+    return w;
+}
+// por caractere → trechos (sem as chaves iguais às da caixa; vizinhos iguais juntos)
+function ieTxPorCaractere(t, n = String(t.s || '').length) {
+    const arr = Array.from({ length: n }, () => ({}));
+    for (const r of t.trechos || []) for (let i = Math.max(0, r.a); i < Math.min(n, r.b); i++) for (const k of IE_TX_TRECHO) if (r[k] !== undefined) arr[i][k] = r[k];
+    return arr;
+}
+function ieTxCompactar(t, arr) {
+    const out = [];
+    const limpo = o => { const d = {}; for (const k of IE_TX_TRECHO) if (o[k] !== undefined && o[k] !== t[k] && !(o[k] === false && !t[k])) d[k] = o[k]; return d; };
+    arr.forEach((o, i) => {
+        const d = limpo(o), j = JSON.stringify(d), u = out[out.length - 1];
+        if (j === '{}') return;
+        if (u && u.b === i && u._j === j) u.b = i + 1; else out.push({ a: i, b: i + 1, ...d, _j: j });
+    });
+    out.forEach(r => delete r._j);
+    t.trechos = out.length ? out : undefined;
+}
+function ieTxTrechoAplicar(t, a, b, sobre) {
+    const arr = ieTxPorCaractere(t);
+    for (let i = a; i < b; i++) Object.assign(arr[i], sobre);
+    ieTxCompactar(t, arr);
+}
+// o texto mudou (digitação): os trechos acompanham; o que entrou herda o estilo do caractere antes
+function ieTxTrechosEditar(t, sAntes, sDepois) {
+    if (!ieTxTemTrechos(t) || sAntes === sDepois) return;
+    let p = 0; while (p < sAntes.length && p < sDepois.length && sAntes[p] === sDepois[p]) p++;
+    let q = 0; while (q < sAntes.length - p && q < sDepois.length - p && sAntes[sAntes.length - 1 - q] === sDepois[sDepois.length - 1 - q]) q++;
+    const arr = ieTxPorCaractere(t, sAntes.length), herda = arr[p - 1] || arr[sAntes.length - q] || {};
+    const novo = [...arr.slice(0, p), ...Array.from({ length: sDepois.length - p - q }, () => ({ ...herda })), ...arr.slice(sAntes.length - q)];
+    ieTxCompactar(t, novo);
+}
+// mudou o estilo da caixa inteira: os trechos param de sobrescrever essas chaves
+function ieTxTrechosSoltar(t, chaves) {
+    if (!ieTxTemTrechos(t)) return;
+    const arr = ieTxPorCaractere(t); arr.forEach(o => chaves.forEach(k => delete o[k])); ieTxCompactar(t, arr);
+}
+
 // parágrafo: alinhamento (left/center/right/justify-left/-center/-right/-all; 'justify' antigo = justify-left), recuos e espaços
 function ieTxPar(t) {
     let al = t.alin || 'left';
@@ -82,7 +140,7 @@ function ieTextoLayout(t) {
     const x = ieMedir(t), sh = (t.escH || 100) / 100;
     const adv = t.ent > 0 ? t.ent : t.tam * 1.2;
     const txt = t.caixaAlta ? String(t.s || '').toUpperCase() : String(t.s || '');
-    const P = ieTxPar(t), med = s => x.measureText(s).width * sh;
+    const P = ieTxPar(t), med = (s, i0 = 0) => (ieTxTemTrechos(t) ? ieTxLargura(t, s, i0) : x.measureText(s).width * sh);
     const m0 = x.measureText('Hg');
     const asc = (m0.fontBoundingBoxAscent || t.tam * 0.8) * ((t.escV || 100) / 100);
     const base0 = t.caixa ? t.caixa[1] + asc : 0;
@@ -93,11 +151,12 @@ function ieTextoLayout(t) {
         let linhas = [par];
         if (t.caixa) {
             linhas = [];
-            let atual = '';
+            let atual = '', ini = 0, pos = 0;   // ini/pos: índice no parágrafo (os trechos medem pelo índice)
             par.split(' ').forEach(p => {
                 const tenta = atual ? atual + ' ' + p : p;
                 const larg = t.caixa[2] - t.caixa[0] - P.re - P.rd - (linhas.length ? 0 : P.r1);
-                if (atual && med(tenta) > larg) { linhas.push(atual); atual = p; } else atual = tenta;
+                if (atual && med(tenta, off + ini) > larg) { linhas.push(atual); atual = p; ini = pos; } else { if (!atual) ini = pos; atual = tenta; }
+                pos += p.length + 1;
             });
             linhas.push(atual);
         }
@@ -105,7 +164,7 @@ function ieTextoLayout(t) {
         linhas.forEach((s, li) => {
             const achou = par.indexOf(s, procura);
             const inicio = achou >= 0 ? achou : procura;
-            const w = med(s), ultima = li === linhas.length - 1, ini = P.re + (li ? 0 : P.r1);
+            const w = med(s, off + inicio), ultima = li === linhas.length - 1, ini = P.re + (li ? 0 : P.r1);
             let al = P.al, just = 0, wl = w;
             if (al.startsWith('justify')) al = !ultima || al === 'justify-all' ? 'justify' : al.slice(8);
             let lx;
@@ -160,6 +219,20 @@ function ieTextoRender(L) {
         x.save();
         x.translate(l.x, l.y - sobe);
         x.scale(sh, sv);   // escala horizontal/vertical do painel Caractere
+        if (ieTxTemTrechos(t)) {   // trechos: troca fonte/cor no meio da linha (justificado: o que sobra vai nos espaços)
+            let px = 0;
+            const e = Math.max(1, tam * 0.06);
+            for (const g of ieTxSegmentos(t, l.s, l.idx)) {
+                ieTxFonte(x, g.t); x.fillStyle = g.t.cor || '#000';
+                const x0 = px;
+                if (!l.just) { x.fillText(g.s, px, 0); px += x.measureText(g.s).width; }
+                else g.s.split(' ').forEach((p, k, todas) => { x.fillText(p, px, 0); px += x.measureText(p).width; if (k < todas.length - 1) px += x.measureText(' ').width + l.just / sh; });
+                if (g.t.sublinhado) x.fillRect(x0, tam * 0.12, px - x0, e);
+                if (g.t.tachado) x.fillRect(x0, -tam * 0.3, px - x0, e);
+            }
+            x.restore();
+            continue;
+        }
         if (!l.just) x.fillText(l.s, 0, 0);
         else {   // justificado: palavra por palavra, com o espaço que sobra dividido entre elas
             let px = 0;
@@ -369,6 +442,7 @@ function ieTextoInstalar() {
     ta.addEventListener('input', () => {
         const ed = IE.edTexto;
         if (!ed) return;
+        ieTxTrechosEditar(ed.L.txt, ed.L.txt.s || '', ta.value);
         ed.L.txt.s = ta.value;
         ieTextoPosicionar();
         ieTextoAoVivo(ed.L);
@@ -393,10 +467,34 @@ function ieTextoEstilo(mud) {
     const ed = IE.edTexto;
     const alvos = ed ? [ed.L] : ieSelecionadas(doc).filter(L => L.txt || L.texto);
     if (!alvos.length) return;
+    // editando com PARTE do texto selecionada: fonte/peso/cor/sublinhado valem só para o trecho (como no Photoshop)
+    const ta = ieEl('ie-texto-edit'), sa = ed && ta ? ta.selectionStart : 0, sb = ed && ta ? ta.selectionEnd : 0;
+    const chavesTr = ['fam', 'estilo', 'cor', 'sublinhado', 'tachado', 'negFalso', 'itaFalso'];
+    if (ed && sb > sa && !(sa === 0 && sb === String(ed.L.txt.s || '').length) && Object.keys(mud).every(k => chavesTr.includes(k))) {
+        (async () => {
+            const t = ed.L.txt, base = ieTxEstiloEm(t, sa), sobre = {};
+            if (mud.fam !== undefined || mud.estilo !== undefined) {
+                const tmp = { ...base, tam: t.tam };
+                ieAplicarEstiloFonte(tmp, mud.fam ?? base.fam, ieEstiloDe(mud.fam ?? base.fam, mud.estilo ?? base.estilo));
+                tmp.negFalso = tmp.itaFalso = false;
+                await ieGarantirFonte(tmp);
+                for (const k of IE_TX_FONTE_K) sobre[k] = tmp[k];
+            }
+            for (const k of ['cor', 'sublinhado', 'tachado']) if (mud[k] !== undefined) sobre[k] = mud[k];
+            if (mud.negFalso !== undefined) { sobre.negFalso = mud.negFalso; sobre.neg = mud.negFalso || base.neg; }
+            if (mud.itaFalso !== undefined) { sobre.itaFalso = mud.itaFalso; sobre.ital = mud.itaFalso || base.ital; }
+            ieTxTrechoAplicar(t, sa, sb, sobre);
+            ieTextoPosicionar(); ieTextoAoVivo(ed.L);
+            ta.focus(); ta.setSelectionRange(sa, sb);
+        })();
+        return;
+    }
     (async () => {
         for (const L of alvos) {
             if (!L.txt) { L.txt = await ieTextoDoPsd(L); if (!L.txt) continue; }
             const t = L.txt;
+            // a caixa inteira mudou: os trechos param de sobrescrever o que mudou
+            ieTxTrechosSoltar(t, [...(mud.fam !== undefined || mud.estilo !== undefined ? IE_TX_FONTE_K : []), ...['cor', 'sublinhado', 'tachado'].filter(k => mud[k] !== undefined)]);
             if (mud.fam !== undefined || mud.estilo !== undefined) t.fonteMudou = true;
             if (mud.fam !== undefined || mud.estilo !== undefined) {
                 ieAplicarEstiloFonte(t, mud.fam ?? t.fam, ieEstiloDe(mud.fam ?? t.fam, mud.estilo ?? t.estilo));

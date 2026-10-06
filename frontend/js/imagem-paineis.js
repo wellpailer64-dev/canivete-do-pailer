@@ -22,6 +22,11 @@ const IE_ICONES = {
     bucket: '<path d="m19 11-8-8-8.5 8.5a2 2 0 0 0 0 2.8l5.2 5.2a2 2 0 0 0 2.8 0z"/><path d="M5 2l3 3M2.5 13h15M21 16s2 2.4 2 3.5a2 2 0 0 1-4 0c0-1.1 2-3.5 2-3.5z"/>',
     type: '<path d="M4 7V4h16v3M9 20h6M12 4v16"/>',
     shape: '<rect x="3" y="11" width="10" height="10" rx="1.5"/><circle cx="16" cy="8" r="5"/>',
+    fRet: '<rect x="3.5" y="5.5" width="17" height="13" rx="1.5"/>',
+    fEli: '<ellipse cx="12" cy="12" rx="8.5" ry="6.5"/>',
+    fTri: '<path d="M12 4 21 19H3z"/>',
+    fPoli: '<path d="M12 3.5 19.4 8v8L12 20.5 4.6 16V8z"/>',
+    fLinha: '<path d="M4 20 20 4"/>',
     hand: '<path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.4l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/>',
     zoom: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8M10.5 7.5v6M7.5 10.5h6"/>',
     eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
@@ -224,9 +229,11 @@ function ieOpcoesRender(soValores) {
             }
             break;
         }
-        case 'forma':
-            h += ieSegm('tipo', 'forma', [['ret', 'Retângulo'], ['eli', 'Elipse'], ['linha', 'Linha'], ...(IE.op.forma.custom ? [['custom', 'Personalizada']] : [])]) +
-                (IE.op.forma.tipo === 'linha' ? ieNum('Espessura', 'contorno', 'forma', 1, 500, 1, ' px') : ieNum('Cantos', 'raio', 'forma', 0, 2000, 1, ' px')) +
+        case 'forma': case 'formaEli': case 'formaTri': case 'formaPoli': case 'formaLinha':
+            // o tipo vem da ferramenta escolhida no grupo da barra (Retângulo, Elipse, Triângulo, Polígono, Linha)
+            h += (IE.op.forma.tipo === 'linha' ? ieNum('Espessura', 'contorno', 'forma', 1, 500, 1, ' px')
+                : IE.op.forma.tipo === 'poli' ? ieNum('Lados', 'lados', 'forma', 3, 40, 1, '') + ieNum('Cantos', 'raio', 'forma', 0, 2000, 1, ' px')
+                : IE.op.forma.tipo === 'eli' ? '' : ieNum('Cantos', 'raio', 'forma', 0, 2000, 1, ' px')) +
                 `<span class="ie-op-dica">${ieT('Usa a cor de frente · Shift: proporcional')}</span>`;
             break;
         case 'mao': case 'zoom':
@@ -354,6 +361,8 @@ function ieUiCamadas() {
     };
     visitar(doc.camadas, 0);
     const sel = new Set(doc.selIds.length ? doc.selIds : [doc.ativa]);
+    // as miniaturas já desenhadas são reaproveitadas nas linhas novas (recriar 136 <canvas> custava ~250 ms por clique)
+    const minisVelhas = new Map([...lista.querySelectorAll('canvas[data-mini], canvas[data-mmini]')].map(c => [(c.dataset.mini ? 'p' + c.dataset.mini : 'm' + c.dataset.mmini), c]));
     lista.innerHTML = linhas.map(({ X, nivel }) => {
         const tipoIco = X.tipo === 'texto' ? '<b class="ie-cam-t">T</b>' : X.tipo === 'inteligente' ? '' :
             X.tipo === 'ajuste' ? ieIco('adj', 'ie-cam-tipo') : X.tipo === 'forma' || X.tipo === 'preenchimento' ? ieIco('shape', 'ie-cam-tipo') : '';
@@ -376,6 +385,10 @@ function ieUiCamadas() {
             ${X.filtrosInt.map((f, i) => `<div class="ie-cam-fxi" data-fii="${i}" title="${ieT('Duplo clique: editar')}"><button class="ie-cam-olho ${f.on ? 'on' : ''}" data-fiolho="${i}">${f.on ? ieIco('eye') : ''}</button><span>${ieEsc(ieT(f.titulo || f.cmd))}</span><button class="ie-cam-fidel" data-fidel="${i}" title="${ieT('Excluir filtro inteligente')}">×</button></div>`).join('')}
         </div>` : '');
     }).join('') || `<div class="ie-vazio">${ieT('Sem camadas')}</div>`;
+    if (minisVelhas.size) lista.querySelectorAll('canvas[data-mini], canvas[data-mmini]').forEach(c => {
+        const v = minisVelhas.get(c.dataset.mini ? 'p' + c.dataset.mini : 'm' + c.dataset.mmini);
+        if (v) { v.className = c.className; c.replaceWith(v); }   // classe nova (alvo/off), bitmap e versão antigos
+    });
     rod.innerHTML = `
         <button class="ie-ico-btn" data-fxmenu title="${ieT('Adicionar um estilo de camada')}">${ieIco('fx')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('mascara')" title="${ieT('Adicionar máscara de camada')}">${ieIco('mask')}</button>
@@ -410,7 +423,22 @@ function ieXadrezMiniPadrao(ctx, q) {
     return ctx.createPattern(ieXadrezMini, 'repeat');
 }
 
+// miniatura com cache NA CAMADA (o painel recria os <canvas> a cada redesenho: o cache no elemento se perdia e as
+// 136 miniaturas do carrossel eram refeitas a cada clique — ieLimites varria todos os pixels: ~500 ms por seleção)
 function ieMiniatura(cv, L, mascara) {
+    const dpr = window.devicePixelRatio || 1, tam = Math.round((cv.clientWidth || 40) * dpr);
+    const fonte = mascara ? L.m && L.m.c : L.c, chave = `${L._v}|${tam}|${mascara ? 'm' : 'p'}`, k = mascara ? '_mmCache' : '_miniCache';
+    const C = L[k];
+    if (C && C.chave === chave && C.fonte === fonte) {
+        if (cv.width !== tam) { cv.width = tam; cv.height = tam; }
+        const x = ieCtx(cv); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, tam, tam); x.drawImage(C.c, 0, 0);
+        return;
+    }
+    ieMiniaturaDesenhar(cv, L, mascara);
+    const c = ieCanvas(cv.width, cv.height); ieCtx(c).drawImage(cv, 0, 0);
+    L[k] = { chave, fonte, c };
+}
+function ieMiniaturaDesenhar(cv, L, mascara) {
     const dpr = window.devicePixelRatio || 1, css = cv.clientWidth || 40;
     const tam = Math.round(css * dpr);
     if (cv.width !== tam) { cv.width = tam; cv.height = tam; }
@@ -1153,7 +1181,8 @@ function ieMenuContexto(ev, painelCamadas) {
     const pop = ieEl('ie-pop'), rb = ieEl('ie').getBoundingClientRect();
     const itens = [...(painelCamadas ? [['Opções de mesclagem...', 'opcoesMescla'], '-'] : []),['Duplicar camada', 'duplicar'], ['Excluir camada', 'excluirCamada'], '-', ['Mesclar para baixo', 'mesclarBaixo'], ['Rasterizar camada', 'rasterizar'],
         ['Criar máscara de corte', 'corte'], ['Adicionar máscara', 'mascara'], '-', ['Selecionar pixels', 'selCamada'], ['Transformação livre', 'transformar'],
-        ...(painelCamadas ? ['-', ['Copiar estilo de camada', 'copiarEstilo'], ['Colar estilo de camada', 'colarEstilo'], ['Limpar estilo de camada', 'limparEstilo']] : [])];
+        ...(painelCamadas ? ['-', ['Converter em objeto inteligente', 'objetoInteligente'], ...(ieAtiva(doc)?.conteudo ? [['Converter em camadas', 'converterEmCamadas']] : []),
+            '-', ['Copiar estilo de camada', 'copiarEstilo'], ['Colar estilo de camada', 'colarEstilo'], ['Limpar estilo de camada', 'limparEstilo']] : [])];
     if (doc.sel) itens.unshift(['Desmarcar', 'selNada'], ['Inverter seleção', 'selInverter'], ['Camada via cópia', 'duplicar'], '-');
     pop.innerHTML = ieMenuHtml(itens);
     pop.hidden = false;
@@ -1260,7 +1289,7 @@ function ieTecla(ev) {
             // Shift+tecla alterna variantes (letreiro ret/elipse, laço livre/poligonal, degradê/balde, formas)
             if (ev.shiftKey) {
                 if (k === 'M') { IE.op.letreiro.forma = IE.op.letreiro.forma === 'ret' ? 'eli' : 'ret'; ieEscolherFerr('letreiro'); return; }
-                if (k === 'U') { const t = ['ret', 'eli', 'linha']; IE.op.forma.tipo = t[(t.indexOf(IE.op.forma.tipo) + 1) % 3]; ieEscolherFerr('forma'); return; }
+                if (k === 'U') { const t = IE_FORMAS_GRUPO; ieEscolherFerr(t[(t.indexOf(IE.ferr) + 1) % t.length]); return; }
                 if (k === 'G') { ieEscolherFerr(IE.ferr === 'degrade' ? 'balde' : 'degrade'); return; }
                 if (k === 'C') { ieEscolherFerr(IE.ferr === 'corte' ? 'fatia' : 'corte'); return; }
             }

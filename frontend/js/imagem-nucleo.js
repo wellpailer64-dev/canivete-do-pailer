@@ -32,7 +32,7 @@ const IE = {
         borrachaMagica: { tol: 32, contiguo: true, todas: false, opac: 100, suave: true },
         borrachaFundo: { tam: 80, tol: 40, limites: 'contiguo', amostra: 'continuo', proteger: false },
         texto: { fonte: 'Arial', gdi: 'Arial', peso: 400, ital: false, tam: 72, alin: 'left', esp: 0, ent: 0 },
-        forma: { tipo: 'ret', raio: 0, contorno: 0 },
+        forma: { tipo: 'ret', raio: 0, contorno: 0, lados: 6 },
         mao: {}, zoom: {},
     },
 };

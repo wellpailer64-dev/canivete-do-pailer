@@ -40,6 +40,7 @@ async function ieCena(html, o = {}) {
         await document.fonts.ready;
         await new Promise(r => requestAnimationFrame(r));
         ctx.rr = raiz.getBoundingClientRect();
+        await ieCenaGerarTodas(raiz, ctx);   // precisa do layout (ctx.rr) para o tamanho de cada geração
         IE._cenaMontando = true;
         const itens = await ieCenaVisitar(raiz, ctx, { chave: '', caminho: '', M: null, raiz: true });
         for (const L of ieTodasDe(itens)) { ieCenaMarcar(L); ctx.n++; }
@@ -132,6 +133,7 @@ function ieCenaComponentesCss() {
         :where(.k-papel[data-rasgado] > :not(svg),.k-rasgo > :not(svg)){position:relative}
         :where(.k-fita-adesiva){position:absolute;left:33%;top:-30px;width:34%;height:62px;background:rgba(228,220,196,.88);transform:rotate(-3deg);box-shadow:0 3px 8px rgba(0,0,0,.18)}
         :where(.k-eco){position:absolute;font-size:380px;font-weight:900;line-height:1;letter-spacing:-.04em;white-space:nowrap;opacity:.07;z-index:-1}
+        :where(.k-sombra-chao){position:absolute;border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.6),rgba(0,0,0,.28) 45%,rgba(0,0,0,0));mix-blend-mode:multiply}
         :where(.k-forma){position:absolute;color:${P};z-index:0}
         :where(.k-forma) svg{display:block;overflow:visible}
         :where(.k-etiqueta){position:absolute;background:color-mix(in srgb,${P} 82%,#000);color:${F};font-size:26px;font-weight:700;line-height:1;padding:12px 20px;border-radius:12px;transform:rotate(-4deg);box-shadow:0 12px 30px rgba(0,0,0,.25);white-space:nowrap}
@@ -249,7 +251,7 @@ function ieCenaComponentes(raiz, S) {
         el.dataset.livre = '';
     }
     for (const el of raiz.querySelectorAll('.k-papel[data-fita]')) if (!el.querySelector('.k-fita-adesiva')) el.insertAdjacentHTML('beforeend', `<span class="k-fita-adesiva" id="${el.id || 'papel'}-fita" data-livre></span>`);
-    for (const el of raiz.querySelectorAll('.k-eco, .k-luz')) el.dataset.livre = '';
+    for (const el of raiz.querySelectorAll('.k-eco, .k-luz, .k-sombra-chao')) el.dataset.livre = '';
     // <div class="k-forma" data-forma="blob|anel|onda|traco" data-semente="3" data-espessura="40" style="left;top;width;height;color">
     // forma básica deformada da IDV (mancha, anel torto, traço grosso de caneta em curva), curva lisa e repetível
     for (const el of raiz.querySelectorAll('.k-forma')) {
@@ -565,6 +567,7 @@ async function ieCenaVisitar(el, ctx, h) {
             const nos = [...el.childNodes];
             const soTexto = cs.display !== 'inline' && nos.every(n => n.nodeType === 3 || n.nodeType === 8 || n.tagName === 'BR') && nos.some(n => n.nodeType === 3 && n.data.trim());
             if (soTexto) { const L = ieCenaTextoBloco(el, cs, nos, ctx, me); if (L) itens.push(L); }
+            else if (cs.display !== 'inline' && ieCenaRicoOk(el, cs)) { const L = ieCenaTextoBloco(el, cs, ieCenaTextosDe(el), ctx, me, true); if (L) itens.push(L); }
             else {
                 const ordem = nos.map((n, i) => ({ n, i, z: ieCenaZ(n) })).sort((a, b) => a.z - b.z || a.i - b.i);
                 let ie = 0;
@@ -743,6 +746,61 @@ function ieCenaConteudo(el, cs, ctx) {
     const e = n('borderLeftWidth') + n('paddingLeft'), t = n('borderTopWidth') + n('paddingTop');
     return { x: r.x + e, y: r.y + t, w: r.w - e - n('borderRightWidth') - n('paddingRight'), h: r.h - t - n('borderBottomWidth') - n('paddingBottom'), r };
 }
+// tamanho/prompt/chave da imagem gerada (o mesmo para a passada de geração e para a montagem)
+function ieCenaGerarSpec(el, cs, B, ctx) {
+    const k = el._knv;
+    // tamanho gerado: data-proporcao manda; object-fit contain (objeto inteiro na caixa) = quadrado; senão a da caixa.
+    // (antes a caixa sempre mandava: caixa retrato gerava OUTRA imagem e perdia a folha de contato do cache)
+    const pr = el.dataset.proporcao ? String(el.dataset.proporcao).split(/[:x/]/).map(Number) : null;
+    const contem = /contain|scale-down/.test(cs.objectFit || '');
+    const [aw, ah] = pr && pr[0] && pr[1] ? pr : contem ? [1, 1] : [B.w, B.h];
+    const lado = +el.dataset.lado || 1024, kk = lado / Math.max(aw, ah);
+    const gw = Math.max(256, Math.round(aw * kk / 64) * 64), gh = Math.max(256, Math.round(ah * kk / 64) * 64);
+    const semente = el.dataset.semente != null ? +el.dataset.semente : -1;
+    // data-inteiro: pede o assunto inteiro no quadro (ombros, cabeça, pés) com folga em volta
+    const prompt = k.gerar + (el.hasAttribute('data-inteiro') ? ', the entire subject fully inside the frame with empty margin around it, both shoulders and the whole head visible, nothing cut off at the edges' : '') + (el.dataset.fundo === 'branco' ? IE_GER_FUNDO : '');
+    // data-ref="arquivo.png": gera com imagem de referência (FLUX.2 klein) — personagem/estilo do cliente (ex.: mascote)
+    const ref = el.dataset.ref ? ieCenaCaminho(el.dataset.ref, ctx && ctx.o && ctx.o.base) : null;
+    return { prompt, gw, gh, semente, ref, chave: `gerar:${prompt}|${gw}x${gh}|${semente}${ref ? '|ref:' + ref : ''}` };
+}
+
+// DUAS PASSADAS (2026-10-06): gerador e recorte não cabem juntos na placa de 8 GB (a geração seguinte falhava com
+// "no results" e o recorte disputava memória). 1) gera todas as imagens com o gerador quente; 2) solta o gerador;
+// 3) recorta tudo AGRUPADO por tipo (objetos com o BEN2 carregado uma vez, depois pessoas com o matting). A montagem
+// das camadas só lê os caches (IE._cenaImgs).
+async function ieCenaGerarTodas(raiz, ctx) {
+    IE._cenaImgs = IE._cenaImgs || new Map();
+    ctx.pre = ctx.pre || new Map();
+    const itens = [];
+    for (const el of raiz.querySelectorAll('img')) {
+        const k = el._knv; if (!k || !k.gerar) continue;
+        const cs = getComputedStyle(el); if (cs.display === 'none') continue;
+        const B = ieCenaConteudo(el, cs, ctx); if (B.w < 1 || B.h < 1) continue;
+        itens.push({ el, k, s: ieCenaGerarSpec(el, cs, B, ctx) });
+    }
+    let gerou = false;
+    for (const it of itens) {
+        const { s } = it;
+        if (ctx.pre.has(s.chave) || (s.semente >= 0 && IE._cenaImgs.has(s.chave))) continue;
+        if (!(await ieGeradorPronto())) return;
+        const r = await ieApi().ie_gerar({ prompt: s.prompt, largura: s.gw, altura: s.gh, semente: s.semente, refs: s.ref ? [s.ref] : [] });
+        if (!r || !r.success) continue;   // a montagem tenta de novo e avisa
+        if (!r.cache) gerou = true;
+        const c = await ieCenaImagem(r.path);
+        ctx.pre.set(s.chave, { c, gerada: { prompt: s.prompt, semente: r.semente, w: s.gw, h: s.gh } });
+        if (s.semente >= 0) IE._cenaImgs.set(s.chave, c);
+    }
+    if (gerou && ieApi().ie_gerador_parar) { try { await ieApi().ie_gerador_parar(); } catch (e) { /* segue */ } }
+    // recortes agrupados: objetos primeiro, pessoas depois (uma troca de modelo na placa, não uma por imagem)
+    const pessoa = it => it.el.dataset.pele != null || /\b(woman|man|girl|boy|person|people|portrait|model|smiling)\b/i.test(it.k.gerar);
+    const fila = itens.filter(it => { const rec = it.el.dataset.recortar || (it.el.dataset.fundo === 'branco' ? 'ia' : ''); return rec === 'ia'; })
+        .sort((a, b) => pessoa(a) - pessoa(b));
+    for (const it of fila) {
+        const pre = ctx.pre.get(it.s.chave), c = (pre && pre.c) || (it.s.semente >= 0 && IE._cenaImgs.get(it.s.chave));
+        if (c) await ieCenaRecortar(c, 'ia', 'gerar:' + it.k.gerar + '|' + c.width + 'x' + c.height);
+    }
+}
+
 async function ieCenaImg(el, cs, ctx, h) {
     const k = el._knv;
     if (!k || k.falta) return null;
@@ -751,23 +809,15 @@ async function ieCenaImg(el, cs, ctx, h) {
     let c = k.c, nome = el.dataset.nome || el.id || el.getAttribute('alt') || (k.path ? ieNomeArq(k.path) : 'Imagem');
     let gerada = null;
     if (k.gerar) {
-        // tamanho gerado: data-proporcao manda; object-fit contain (objeto inteiro na caixa) = quadrado; senão a da caixa.
-        // (antes a caixa sempre mandava: caixa retrato gerava OUTRA imagem e perdia a folha de contato do cache)
-        const pr = el.dataset.proporcao ? String(el.dataset.proporcao).split(/[:x/]/).map(Number) : null;
-        const contem = /contain|scale-down/.test(cs.objectFit || '');
-        const [aw, ah] = pr && pr[0] && pr[1] ? pr : contem ? [1, 1] : [B.w, B.h];
-        const lado = +el.dataset.lado || 1024, kk = lado / Math.max(aw, ah);
-        const gw = Math.max(256, Math.round(aw * kk / 64) * 64), gh = Math.max(256, Math.round(ah * kk / 64) * 64);
-        const semente = el.dataset.semente != null ? +el.dataset.semente : -1;
+        const { prompt, gw, gh, semente, chave, ref } = ieCenaGerarSpec(el, cs, B, ctx);
         if (semente < 0) ctx.avisos.push(`gerar sem data-semente (${k.gerar.slice(0, 40)}): fixe a semente para refazer igual e do cache`);
-        // data-inteiro: pede o assunto inteiro no quadro (ombros, cabeça, pés) com folga em volta
-        const prompt = k.gerar + (el.hasAttribute('data-inteiro') ? ', the entire subject fully inside the frame with empty margin around it, both shoulders and the whole head visible, nothing cut off at the edges' : '') + (el.dataset.fundo === 'branco' ? IE_GER_FUNDO : '');
-        const chave = `gerar:${prompt}|${gw}x${gh}|${semente}`;
         IE._cenaImgs = IE._cenaImgs || new Map();
-        if (semente >= 0 && IE._cenaImgs.has(chave)) c = IE._cenaImgs.get(chave);
+        const pre = ctx.pre && ctx.pre.get(chave);   // já gerada na 1ª passada (ieCenaGerarTodas)
+        if (pre) { c = pre.c; gerada = pre.gerada; }
+        else if (semente >= 0 && IE._cenaImgs.has(chave)) c = IE._cenaImgs.get(chave);
         else {
             if (!(await ieGeradorPronto())) { ctx.avisos.push('gerador de imagem não instalado'); return null; }
-            const r = await ieApi().ie_gerar({ prompt, largura: gw, altura: gh, semente, refs: [] });
+            const r = await ieApi().ie_gerar({ prompt, largura: gw, altura: gh, semente, refs: ref ? [ref] : [] });
             if (!r || !r.success) { ctx.avisos.push(`não gerou: ${k.gerar.slice(0, 40)} (${(r && r.error) || ''})`); return null; }
             c = await ieCenaImagem(r.path);
             if (semente >= 0) IE._cenaImgs.set(chave, c);
@@ -966,11 +1016,17 @@ function ieCenaLinhas(nos, cs, ctx) {
                 linhas.push(cur); forcada = false;
             }
             if (cur.x == null && !/\s/.test(ch)) cur.x = x;
-            cur.s += /\s/.test(ch) && !pre ? ' ' : ch;
+            const add = /\s/.test(ch) && !pre ? ' ' : ch;
+            cur.s += add;
+            (cur.src = cur.src || []).push(...Array(add.length).fill(n));   // de qual nó veio cada caractere (trechos)
             cur.dir = Math.max(cur.dir, q.right - ctx.rr.left);
         }
     }
-    for (const l of linhas) { l.s = l.s.replace(/\s+$/, '').replace(/^\s+/, ''); if (l.x == null) l.x = l.dir; }
+    for (const l of linhas) {
+        const ini = l.s.length - l.s.replace(/^\s+/, '').length, fim = l.s.length - l.s.replace(/\s+$/, '').length;
+        l.s = l.s.slice(ini, l.s.length - fim); l.src = (l.src || []).slice(ini, (l.src || []).length - fim);
+        if (l.x == null) l.x = l.dir;
+    }
     return linhas.filter(l => l.s);
 }
 function ieCenaTx(el, cs) {
@@ -1002,11 +1058,43 @@ function ieCenaTextoCamada(ctx, h, sufixo, el, cs, tx, a, linhas) {
     ctx.blocos.push({ L, el, tam: tx.tam, linhas: linhas.map(l => ({ x: l.x, y: l.top, w: l.dir - l.x, h: l.h })), asc });
     return L;
 }
+// parágrafo com <b>/<em>/<span> simples dentro (mesmo tamanho, sem fundo, sem posição): UMA camada com trechos
+// (peso/cor/sublinhado diferentes na mesma caixa) em vez de uma camada por pedaço
+function ieCenaRicoOk(el, cs) {
+    let algum = false, filho = false;
+    const ok = n => {
+        if (n.nodeType === 3) { if (n.data.trim()) algum = true; return true; }
+        if (n.nodeType === 8) return true;
+        if (n.nodeType !== 1) return false;
+        if (n.tagName === 'BR') return true;
+        const c = getComputedStyle(n);
+        if (c.display !== 'inline' || c.position !== 'static' || (c.transform && c.transform !== 'none') || c.fontSize !== cs.fontSize) return false;
+        if (ieCenaCor(c.backgroundColor).a > 0 || /url|gradient/.test(c.backgroundImage) || parseFloat(c.borderBottomWidth) > 0 || parseFloat(c.paddingLeft) > 0) return false;
+        if (n.dataset.nome || n.id || /\bk-/.test(n.className || '')) return false;
+        filho = true;
+        return [...n.childNodes].every(ok);
+    };
+    return [...el.childNodes].every(ok) && algum && filho;
+}
+function ieCenaTextosDe(el) {   // nós de texto (e <br>) na ordem, descendo nos inline
+    const out = [], andar = n => { for (const c of n.childNodes) { if (c.nodeType === 3 || (c.nodeType === 1 && c.tagName === 'BR')) out.push(c); else if (c.nodeType === 1) andar(c); } };
+    andar(el); return out;
+}
+function ieCenaTrechoEstilo(e, cache) {
+    if (cache.has(e)) return cache.get(e);
+    const f = e._knvFonte || {}, c = getComputedStyle(e), r = { cor: ieCenaCor(c.color).hex, sublinhado: /underline/.test(c.textDecorationLine), tachado: /line-through/.test(c.textDecorationLine) };
+    for (const k of IE_TX_FONTE_K) if (f[k] !== undefined) r[k] = f[k];
+    cache.set(e, r); return r;
+}
 // elemento só com texto: uma camada. Quebra natural → texto de caixa (reflui ao editar); sem → texto de ponto
-function ieCenaTextoBloco(el, cs, nos, ctx, h) {
+function ieCenaTextoBloco(el, cs, nos, ctx, h, rico = false) {
     const linhas = ieCenaLinhas(nos, cs, ctx);
     if (!linhas.length) return null;
     const { tx, a } = ieCenaTx(el, cs);
+    if (rico && !el._knvFonte) {   // o texto todo está nos filhos: a fonte da caixa vem do 1º pedaço
+        const e0 = linhas[0].src && linhas[0].src[0] && linhas[0].src[0].parentElement;
+        if (e0 && e0._knvFonte) Object.assign(tx, e0._knvFonte);
+    }
     const B = ieCenaConteudo(el, cs, ctx);
     const asc = ieMedir(tx).measureText('Hg').fontBoundingBoxAscent || tx.tam * 0.8;
     const base1 = linhas[0].top + asc;
@@ -1027,6 +1115,18 @@ function ieCenaTextoBloco(el, cs, nos, ctx, h) {
         tx.s = juntar(true);
         const ax = tx.alin === 'center' ? B.x + B.w / 2 : tx.alin === 'right' ? B.x + B.w : B.x;
         tx.m = [1, 0, 0, 1, ax, base1];
+    }
+    if (rico) {   // trechos pelo nó de origem de cada caractere (separador de linha herda o caractere antes)
+        const cache = new Map(), por = [];
+        linhas.forEach((l, i) => { if (i) por.push(por[por.length - 1] || {}); for (const n of l.src) por.push(ieCenaTrechoEstilo(n.parentElement || el, cache)); });
+        if (por.length === tx.s.length) ieTxCompactar(tx, por.map(o => ({ ...o })));
+        if (ieTxTemTrechos(tx) && tx.caixa) {   // com trechos as larguras mudam: confere a quebra de novo
+            const app = ieTextoLayout(tx).map(l => l.s.trim()), dom = linhas.map(l => (tx.caixaAlta ? l.s.toUpperCase() : ieCenaCaixaAlta(l.s, cs)));
+            if (app.join('|') !== dom.join('|') && !tx.s.includes(IE_NL)) {
+                const tr = tx.trechos; tx.s = juntar(true); tx.trechos = tr;
+                const d = B.w * 0.08; tx.caixa = [tx.caixa[0], 0, tx.caixa[2] + d, tx.caixa[3]];
+            }
+        }
     }
     if (el.scrollWidth > el.clientWidth + 1 && cs.overflowX === 'visible' && el.clientWidth) ctx.avisos.push(`texto estoura a largura da caixa: "${tx.s.slice(0, 30)}"`);
     return ieCenaTextoCamada(ctx, h, ':t', el, cs, tx, a, linhas);

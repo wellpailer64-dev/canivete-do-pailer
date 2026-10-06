@@ -245,7 +245,11 @@ def _get_sessao_(modelo_path):
 
 def liberar_sessoes():
     """Solta a memória (VRAM/RAM) dos modelos de recorte — antes de gerar imagem, que também usa a placa."""
-    _sessoes.clear()
+    if _sessoes:
+        import gc
+        with _trava_sessao:
+            _sessoes.clear()
+        gc.collect()
 
 
 def _estimar_cor_fundo(rgb_np, alpha_np):

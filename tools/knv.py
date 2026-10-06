@@ -68,7 +68,10 @@ def recarga_js():
                 j = i
                 while j < len(src) and not re.match(r"\}\)?;?\s*$", src[j]): j += 1
                 bloco = "\n".join(src[i:j + 1])
-                if t: bloco = f"if (typeof {t.group(1)} !== 'undefined') Object.assign({t.group(1)}, ({bloco[len(t.group(0)) - 1:].rstrip().rstrip(';')})); else window.{t.group(1)} = ({bloco[len(t.group(0)) - 1:].rstrip().rstrip(';')});"   # tabela nova: cria
+                # tabela existente: só as entradas com valor (texto: null em IE_FERR é preenchido por outro arquivo —
+                # copiar o null apagava a ferramenta Texto da barra); tabela nova: cria
+                if t: bloco = (f"if (typeof {t.group(1)} !== 'undefined') Object.entries(({bloco[len(t.group(0)) - 1:].rstrip().rstrip(';')}))"
+                               f".forEach(([k, v]) => {{ if (v != null) {t.group(1)}[k] = v; }}); else window.{t.group(1)} = ({bloco[len(t.group(0)) - 1:].rstrip().rstrip(';')});")
                 partes.append(bloco); i = j + 1
             else: i += 1
     api = open(os.path.join(JS, "imagem-api.js"), encoding="utf-8").read().replace("const KNV =", "var KNV =")

@@ -159,7 +159,8 @@ function ieColocarCanvas(c, nome, x, y) {
     if (k < 1) { const t = ieTransformarPlano({ c, x: 0, y: 0 }, [k, 0, 0, k, 0, 0]); c = t.c; }
     if (x === undefined) { x = Math.round((doc.w - c.width) / 2); y = Math.round((doc.h - c.height) / 2); }
     const L = ieNovaCamada(doc, { nome: nome || ieNomeLivre(doc, ieT('Camada')), c, x, y, sujoPx: true });
-    ieInserirAcima(doc, L, ieAtiva(doc));
+    // acima da camada SELECIONADA; nada selecionado → acima de todas (a "ativa" antiga não conta)
+    ieInserirAcima(doc, L, doc.selIds.length ? ieAtiva(doc) : null);
     ieCamadaMudou(L);
     ieHist(ieT('Colocar'));
     ieUiCamadas();
@@ -379,6 +380,28 @@ async function ieSalvar(comoNovo = false) {
     } finally { ieCarregando(false); }
 }
 
+// várias camadas (ou texto/grupo) → um objeto inteligente com a composição delas; as originais ficam em L.conteudo
+function ieObjetoDeCamadas(doc, sel) {
+    if (!sel.length) { ieToast(ieT('Selecione uma ou mais camadas')); return; }
+    const ids = new Set(sel.map(L => L.id)), ordem = [];
+    iePercorrer(doc.camadas, (L, lista, i, pai) => {   // de baixo para cima; filha de grupo selecionado vai junto com ele
+        let p = pai, dentro = false; while (p) { if (ids.has(p.id)) { dentro = true; break; } p = ieAchar(doc, p.id)?.pai; }
+        if (ids.has(L.id) && !dentro) ordem.push(L);
+    });
+    const R = ordem.reduce((R, L) => ieRUniao(R, ieRCamada(L)), null);
+    if (!R || R.w < 1 || R.h < 1) { ieToast(ieT('As camadas estão vazias')); return; }
+    const c = ieAchatar(doc, ordem, R);
+    const N = ieNovaCamada(doc, { tipo: 'inteligente', nome: ordem.length > 1 ? ieT('Objeto inteligente') : ordem[0].nome, c, x: R.x, y: R.y,
+        c0: { c, x: R.x, y: R.y }, tf: [...IE_ID], tfBase: [...IE_ID], sujoPx: true });
+    N.conteudo = ordem; N.cx0 = R.x; N.cy0 = R.y;
+    const topo = ieAchar(doc, ordem[ordem.length - 1].id);
+    topo.lista.splice(topo.i + 1, 0, N);
+    for (const L of ordem) { const a = ieAchar(doc, L.id); if (a) a.lista.splice(a.i, 1); }
+    doc.selIds = [N.id]; doc.ativa = N.id;
+    ieInvalidar(N); ieTudo(doc); ieHist(ieT('Converter em objeto inteligente')); ieUiCamadas();
+    return N;
+}
+
 // ─────────────────────────── projeto do editor (.iknv) ───────────────────────────
 // documento.json = a árvore de camadas inteira (tudo menos os caches "_"), com cada canvas trocado por {$png: chave};
 // os pixels vão como PNG (cada canvas uma vez). Ver Functions/editor_imagem.py (salvar_iknv / _abrir_iknv).
@@ -548,6 +571,12 @@ async function ieCopiar(mesclado, recortar) {
     try { IE.areaSeq = (await ieApi()?.ve_area_seq())?.seq; } catch (e) { IE.areaSeq = null; }
     if (recortar) await ieLimpar();
 }
+// colar com o mouse sobre a tela: o centro do que entra vai para onde está o mouse
+function ieColarNoMouse(doc, w, h, noLugar) {
+    const m = IE.mouse;
+    if (noLugar || !m || !doc) return null;
+    return { x: Math.round(m.x - w / 2), y: Math.round(m.y - h / 2) };
+}
 async function ieColar(noLugar) {
     const doc = IE.doc, api = ieApi();
     let seq = null;
@@ -556,7 +585,8 @@ async function ieColar(noLugar) {
         if (!doc) { const d = ieNovoDoc2(ieT('Colado'), IE.area.c.width, IE.area.c.height, 72, 'transp'); ieColocarCanvas(ieClonar(IE.area.c), ieT('Camada'), 0, 0); return d; }
         const a = IE.area;
         const visivel = ieRInter({ x: a.x, y: a.y, w: a.c.width, h: a.c.height }, ieRDoc(doc));
-        const x = noLugar || visivel ? a.x : Math.round((doc.w - a.c.width) / 2), y = noLugar || visivel ? a.y : Math.round((doc.h - a.c.height) / 2);
+        const pm = ieColarNoMouse(doc, a.c.width, a.c.height, noLugar);
+        const x = pm ? pm.x : noLugar || visivel ? a.x : Math.round((doc.w - a.c.width) / 2), y = pm ? pm.y : noLugar || visivel ? a.y : Math.round((doc.h - a.c.height) / 2);
         ieColocarCanvas(ieClonar(a.c), ieNomeLivre(doc, ieT('Camada')), x, y);
         return;
     }
@@ -567,7 +597,8 @@ async function ieColar(noLugar) {
         const c = await ieImagemDeUrl(r.url);
         api.ie_soltar_memoria([r.token]);
         if (!doc) { ieNovoDoc2(ieT('Colado'), c.width, c.height, 72, 'transp'); ieColocarCanvas(c, ieT('Camada'), 0, 0); return; }
-        ieColocarCanvas(c, ieNomeLivre(doc, ieT('Camada')));
+        const pm = ieColarNoMouse(doc, c.width, c.height, noLugar);
+        if (pm) ieColocarCanvas(c, ieNomeLivre(doc, ieT('Camada')), pm.x, pm.y); else ieColocarCanvas(c, ieNomeLivre(doc, ieT('Camada')));
     }
 }
 
@@ -916,6 +947,10 @@ const IE_CMDS = {
     // original; escalar/girar depois sempre parte dele (diminuir e aumentar de novo não perde nitidez) e Ctrl+J faz
     // cópias que usam o mesmo original
     objetoInteligente: doc => {
+        const sel = ieSelecionadas(doc);
+        // várias camadas, ou texto/grupo/forma/objeto: como no Photoshop, viram UM objeto inteligente que guarda as
+        // originais dentro (Converter em camadas devolve)
+        if (sel.length > 1 || (sel[0] && sel[0].tipo !== 'pixel')) return ieObjetoDeCamadas(doc, sel);
         const L = ieAtiva(doc);
         if (!L || !L.c || L.tipo !== 'pixel') { ieToast(ieT('Selecione uma camada de pixels para converter')); return; }
         const Rantes = ieRCamada(L);
@@ -931,6 +966,21 @@ const IE_CMDS = {
         Object.assign(L, { tipo: 'inteligente', c: n, x: L.x + b.x, y: L.y + b.y, tf: [...IE_ID], tfBase: [...IE_ID], sujoPx: true });
         L.c0 = { c: n, x: L.x, y: L.y };
         ieInvalidar(L); ieCamadaMudou(L, Rantes); ieHist(ieT('Converter em objeto inteligente')); ieUiCamadas();
+    },
+    converterEmCamadas: doc => {
+        const L = ieAtiva(doc);
+        if (!L || !L.conteudo) { ieToast(ieT('Este objeto inteligente não guarda camadas')); return; }
+        const t = L.tf || IE_ID;
+        if (Math.abs(t[0] - 1) > 1e-3 || Math.abs(t[3] - 1) > 1e-3 || Math.abs(t[1]) > 1e-3 || Math.abs(t[2]) > 1e-3) {
+            ieToast(ieT('Objeto transformado (escala/rotação): desfaça a transformação antes de converter em camadas')); return;
+        }
+        const dx = Math.round(t[4] + (L.c0.x - (L.cx0 ?? L.c0.x))), dy = Math.round(t[5] + (L.c0.y - (L.cy0 ?? L.c0.y)));
+        const a = ieAchar(doc, L.id);
+        if (dx || dy) for (const X of L.conteudo) iePercorrer([X], Y => { if (Y.c || Y.txt || Y.texto) ieMoverCamada(Y, dx, dy); });
+        a.lista.splice(a.i, 1, ...L.conteudo);
+        doc.selIds = L.conteudo.map(X => X.id); doc.ativa = L.conteudo[L.conteudo.length - 1].id;
+        L.conteudo.forEach(X => iePercorrer([X], Y => ieInvalidar(Y)));
+        ieTudo(doc); ieHist(ieT('Converter em camadas')); ieUiCamadas();
     },
     removerFundo: doc => ieRemoverFundo(doc),
     selAssunto: doc => ieSelAssunto(doc),

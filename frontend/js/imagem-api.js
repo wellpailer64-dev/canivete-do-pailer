@@ -965,7 +965,8 @@ const KNV = {
                 const p = ieCtx(t).getImageData(0, 0, w, h).data; let n = 0; for (let i = 3; i < p.length; i += 4) if (p[i] < 20) n++;
                 return n > w * h * 0.05 && !/^Brilho · /.test(L.nome);
             };
-            const objs = () => ieTodas(d).filter(recortado);
+            const sem = new Set(opc.sem || []);   // camadas que não ganham sombra/brilho (ex.: logo)
+            const objs = () => ieTodas(d).filter(L => recortado(L) && !sem.has(L.nome));
             if (opc.sombra !== false) out.sombra = await KNV.etapa('fin:sombra', async () => {
                 for (const L of objs()) { if (L.fx && (L.fx.sombra || []).length) continue;
                     ieCenaFxSombras(L, ieCenaSombras(`0 ${Math.round(lado * 0.03)}px ${Math.round(lado * 0.08)}px rgba(0,0,0,.45)`)); L.fxMudou = true; ieInvalidar(L); }

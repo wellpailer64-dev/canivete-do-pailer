@@ -319,6 +319,11 @@ def gerar(spec, on_progress=lambda d: None):
         return {"success": False, "error": "Escreva o que gerar."}
     w, h = _lado(spec.get("largura")), _lado(spec.get("altura"))
     _liberar_gpu_ollama()
+    try:   # modelos de recorte na placa (DirectML) deixam o sd.cpp sem memória: "generate_image returned no results"
+        from Functions.removerfundo import liberar_sessoes
+        liberar_sessoes()
+    except Exception:
+        pass
     semente = int(spec.get("semente", -1))
     if semente < 0:
         semente = int.from_bytes(os.urandom(4), "little") & 0x7FFFFFFF

@@ -389,6 +389,33 @@ function ieCamadaNoPonto(doc, x, y) {
     return null;
 }
 
+// fundo = camada que cobre quase toda a página ou uma fatia (slide do carrossel): clicar nele não o arrasta, começa a
+// seleção por arrasto (mover o fundo: selecione no painel ou Ctrl+arrastar)
+function ieEhFundo(doc, L) {
+    if (!L || L.tipo === 'ajuste') return false;
+    const R = ieRCamada(L); if (!R) return false;
+    const areas = [{ x: 0, y: 0, w: doc.w, h: doc.h }, ...(doc.fatias || [])];
+    return areas.some(F => {
+        const ix = Math.max(0, Math.min(R.x + R.w, F.x + F.w) - Math.max(R.x, F.x)), iy = Math.max(0, Math.min(R.y + R.h, F.y + F.h) - Math.max(R.y, F.y));
+        return ix * iy >= F.w * F.h * 0.85;
+    });
+}
+// camadas que tocam o retângulo (visíveis, sem trava de posição, que não sejam fundo); grupo aberto conta as filhas
+function ieSelecionarPorCaixa(doc, c, somar) {
+    const R = { x: Math.min(c.x0, c.x1), y: Math.min(c.y0, c.y1), w: Math.abs(c.x1 - c.x0), h: Math.abs(c.y1 - c.y0) };
+    if (R.w < 3 && R.h < 3) { if (!somar) ieLimparCamadas(doc); return; }   // clique simples no vazio/fundo: limpa
+    const ids = [];
+    iePercorrer(doc.camadas, (L, lista, i, pai) => {
+        if (L.tipo === 'grupo' || L.visivel === false || (pai && pai.visivel === false) || L.tipo === 'ajuste' || L.clip) return;
+        if (ieEhFundo(doc, L) || (L.travas & 4)) return;
+        const B = ieRCamada(L); if (!B) return;
+        if (B.x < R.x + R.w && R.x < B.x + B.w && B.y < R.y + R.h && R.y < B.y + B.h) ids.push(L.id);
+    });
+    doc.selIds = somar ? [...new Set([...doc.selIds, ...ids])] : ids;
+    if (ids.length) doc.ativa = ids[ids.length - 1];
+    ieUiCamadas?.(); ieUiProps?.();
+}
+
 function ieMoverAlvoAuto(doc, L) {
     IE.op.mover.alvo = IE.op.mover.alvo || 'camada';
     if (!L || IE.op.mover.alvo !== 'grupo') return L;
@@ -490,6 +517,7 @@ const IE_MOVER = {
             ieTransfIniciar();
             if (IE.transf) {
                 const t = IE.transf;
+                t.doMover = true;   // veio das alças do Mover: clicar longe aplica e volta ao Mover
                 t.arr = { h: alca, p0: p, s: { cx: t.cx, cy: t.cy, sx: t.sx, sy: t.sy, rot: t.rot } };
                 IE.mov = { transf: true };
                 return;
@@ -498,6 +526,12 @@ const IE_MOVER = {
         const auto = IE.op.mover.auto !== ev.ctrlKey;
         if (auto) {
             const L = ieCamadaNoPonto(doc, p.x, p.y);
+            // seleção por arrasto (como no Photoshop): começando no vazio ou num FUNDO que não está selecionado,
+            // desenha um retângulo e seleciona as camadas que ele toca (Shift soma). Ctrl+arrastar move o fundo.
+            if ((!L || (ieEhFundo(doc, L) && !doc.selIds.includes(L.id))) && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+                IE.mov = { caixa: { x0: p.x, y0: p.y, x1: p.x, y1: p.y }, somar: ev.shiftKey };
+                return;
+            }
             const alvo = ieMoverAlvoAuto(doc, L);
             if (alvo && !(doc.selIds.length > 1 && doc.selIds.includes(alvo.id))) ieAtivar(alvo.id, doc, { somar: ev.shiftKey });
             else if (!alvo && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
@@ -536,6 +570,7 @@ const IE_MOVER = {
     move(p, ev, doc) {
         const m = IE.mov;
         if (!m) return;
+        if (m.caixa) { m.caixa.x1 = p.x; m.caixa.y1 = p.y; ieDesenharSobre(); return; }
         if (m.transf) { IE_TRANSF.move(p, ev, doc); return; }
         let dx = Math.round(p.x - m.p0.x), dy = Math.round(p.y - m.p0.y);
         if (ev.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
@@ -571,6 +606,7 @@ const IE_MOVER = {
         const m = IE.mov;
         IE.mov = null;
         if (!m) return;
+        if (m.caixa) { ieSelecionarPorCaixa(doc, m.caixa, m.somar); ieDesenharSobre(); return; }
         if (m.transf) { IE_TRANSF.up(p, ev, doc); return; }
         if (m.flut) {
             doc._selDx = doc._selDy = 0;
@@ -597,6 +633,13 @@ const IE_MOVER = {
         }
     },
     sobre(ctx, doc) {
+        const cx = IE.mov && IE.mov.caixa;
+        if (cx) {   // retângulo da seleção por arrasto
+            const a = ieDocTela(Math.min(cx.x0, cx.x1), Math.min(cx.y0, cx.y1), doc), w = Math.abs(cx.x1 - cx.x0) * doc.zoom, h = Math.abs(cx.y1 - cx.y0) * doc.zoom;
+            ctx.save(); ctx.fillStyle = 'rgba(74,163,255,.12)'; ctx.fillRect(a.x, a.y, w, h);
+            ctx.strokeStyle = '#4aa3ff'; ctx.setLineDash([5, 4]); ctx.lineWidth = 1; ctx.strokeRect(Math.round(a.x) + 0.5, Math.round(a.y) + 0.5, Math.round(w), Math.round(h)); ctx.restore();
+            return;
+        }
         if (!IE.op.mover.controles || IE.transf || IE.mov || IE.semExtras) return;
         const R = ieCaixaAlvos(doc);
         if (!R) return;
@@ -991,10 +1034,11 @@ const IE_FORMA = {
             x.fillStyle = cor;
             x.beginPath();
             if (o.tipo === 'eli') x.ellipse(r.w / 2, r.h / 2, r.w / 2, r.h / 2, 0, 0, Math.PI * 2);
+            else if (o.tipo === 'tri' || o.tipo === 'poli') ieFormaPoligono(x, o.tipo === 'tri' ? 3 : (o.lados || 6), r.w, r.h, o.raio || 0);
             else if (o.raio > 0 && x.roundRect) x.roundRect(0, 0, r.w, r.h, Math.min(o.raio, r.w / 2, r.h / 2));
             else x.rect(0, 0, r.w, r.h);
             x.fill();
-            x0 = r.x; y0 = r.y; nome = o.tipo === 'eli' ? 'Elipse' : 'Retângulo';
+            x0 = r.x; y0 = r.y; nome = { eli: 'Elipse', tri: 'Triângulo', poli: 'Polígono' }[o.tipo] || 'Retângulo';
         }
         const L = ieNovaCamada(doc, { nome: ieNomeLivre(doc, ieT(nome)), c, x: x0, y: y0, sujoPx: true });
         ieInserirAcima(doc, L, ieAtiva(doc));
@@ -1013,7 +1057,8 @@ const IE_FORMA = {
             ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
         } else {
             const s = ieDocTela(a.r.x, a.r.y, doc), w = a.r.w * doc.zoom, h = a.r.h * doc.zoom;
-            if (IE.op.forma.tipo === 'eli') ctx.ellipse(s.x + w / 2, s.y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+            if (IE.op.forma.tipo === 'tri' || IE.op.forma.tipo === 'poli') { ctx.save(); ctx.translate(s.x, s.y); ieFormaPoligono(ctx, IE.op.forma.tipo === 'tri' ? 3 : (IE.op.forma.lados || 6), w, h, 0); ctx.restore(); }
+            else if (IE.op.forma.tipo === 'eli') ctx.ellipse(s.x + w / 2, s.y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
             else ctx.rect(s.x + 0.5, s.y + 0.5, w, h);
         }
         ctx.stroke();
@@ -1182,6 +1227,25 @@ const IE_FERR = {
     mao: IE_MAO,
     zoom: IE_ZOOM,
 };
+// polígono regular de n lados inscrito na caixa w×h (triângulo: ponta para cima), com cantos arredondados opcionais
+function ieFormaPoligono(x, n, w, h, raio) {
+    const pts = [];
+    for (let i = 0; i < n; i++) { const t = -Math.PI / 2 + i * 2 * Math.PI / n; pts.push([Math.cos(t), Math.sin(t)]); }
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]), x0 = Math.min(...xs), y0 = Math.min(...ys), sx = w / (Math.max(...xs) - x0), sy = h / (Math.max(...ys) - y0);
+    const P = pts.map(([a, b]) => [(a - x0) * sx, (b - y0) * sy]);
+    if (!raio) { x.moveTo(...P[0]); P.slice(1).forEach(p => x.lineTo(...p)); x.closePath(); return; }
+    const m = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    x.moveTo(...m(P[n - 1], P[0]));
+    for (let i = 0; i < n; i++) x.arcTo(P[i][0], P[i][1], P[(i + 1) % n][0], P[(i + 1) % n][1], raio);
+    x.closePath();
+}
+// grupo de formas da barra (como no Photoshop): cada uma é a ferramenta Forma com o tipo escolhido
+const IE_FORMAS_GRUPO = ['forma', 'formaEli', 'formaTri', 'formaPoli', 'formaLinha'];
+IE_FERR.forma = { ...IE_FORMA, nome: 'Retângulo', icone: 'fRet', ativar() { IE.op.forma.tipo = 'ret'; } };
+IE_FERR.formaEli = { ...IE_FORMA, nome: 'Elipse', icone: 'fEli', ativar() { IE.op.forma.tipo = 'eli'; } };
+IE_FERR.formaTri = { ...IE_FORMA, nome: 'Triângulo', icone: 'fTri', ativar() { IE.op.forma.tipo = 'tri'; } };
+IE_FERR.formaPoli = { ...IE_FORMA, nome: 'Polígono', icone: 'fPoli', ativar() { IE.op.forma.tipo = 'poli'; } };
+IE_FERR.formaLinha = { ...IE_FORMA, nome: 'Linha', icone: 'fLinha', ativar() { IE.op.forma.tipo = 'linha'; } };
 // Laço poligonal: a mesma ferramenta, clicando os pontos (duplo clique, Enter ou clicar no início fecha)
 const IE_LACO_POLI = { ...IE_LACO, nome: 'Laço poligonal', icone: 'lassoPoli', poligonal: true, cursor: ev => ieCursorSel('laco', ev) };
 IE_FERR.lacoPoli = IE_LACO_POLI;
@@ -1413,13 +1477,20 @@ function ieTransfAlca(t, p, doc) {
     if (q.x >= r.x && q.x <= r.x + r.w && q.y >= r.y && q.y <= r.y + r.h) return 'dentro';
     // perto dos cantos por fora = girar
     for (const n of ['tl', 'tr', 'br', 'bl']) if (Math.hypot(k[n].x - p.x, k[n].y - p.y) <= tol * 4) return 'girar';
-    return 'girar';
+    return t.doMover ? 'fora' : 'girar';   // Ctrl+T: fora gira (Photoshop); pelas alças do Mover: fora confirma
 }
 
 const IE_TRANSF = {
     down(p, ev, doc) {
         const t = IE.transf;
         const h = IE.ferr === 'girar' ? 'girar' : ieTransfAlca(t, p, doc);   // ferramenta Girar: arrastar em qualquer lugar gira
+        if (h === 'fora') {   // aplica e o clique segue para o Mover (seleciona o objeto clicado ou começa a seleção por arrasto)
+            ieTransfAplicar();
+            const m = IE_FERR.mover;
+            if (IE.ponteiro) IE.ponteiro.f = m;
+            m.down(p, ev, doc);
+            return;
+        }
         t.arr = { h, p0: p, s: { cx: t.cx, cy: t.cy, sx: t.sx, sy: t.sy, rot: t.rot } };
     },
     move(p, ev, doc) {
