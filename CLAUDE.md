@@ -108,7 +108,7 @@ placa; medições, qualidade e pendências (cena em duas passadas ainda não pub
 ## Carrossel com direção de arte
 Roteiro JSON → `tools/esqueleto.py --montar` (10 layouts, 6 estilos, arte-final, auto-ajuste, revisor de direção);
 Jr: `tools/roteiro_local.py --etapas [--hibrido]`; mapa: `tools/direcao_mapa.py`. Guia e pendências:
-`Instructions/agente/direcao-carrossel.md`.
+`Instructions/agente/direcao-carrossel.md`. Briefing de carrossel: responder como diretor de arte no formato de `Instructions/agente/diretor-de-arte.md`.
 
 ## Vetor Kanivete (estilo Illustrator, para gráfica)
 Estudo de caso, modelo, API, fechamento e pendências: `Instructions/vetor-kanivete.md`; código `frontend/js/vetor-*.js` +
