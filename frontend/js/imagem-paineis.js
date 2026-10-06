@@ -528,13 +528,24 @@ function ieCamadasInstalar() {
         if (olho) {
             const L = ieAchar(doc, +olho.dataset.olho)?.L;
             if (!L) return;
+            // mostrar/ocultar NÃO muda o desenho de nenhuma camada: só recompõe (antes ieTudo invalidava as 139 camadas do
+            // carrossel — refazia efeitos e filtros de todas: 4,5 s por clique). Grupos acima guardam a composição das
+            // filhas: esses sim são invalidados.
+            const grupos = X => { let a = ieAchar(doc, X.id)?.pai; while (a) { ieInvalidar(a); a = ieAchar(doc, a.id)?.pai; } };
+            let R = null;
             if (ev.altKey) {   // só esta
                 const outras = ieTodas(doc).filter(X => X !== L && !ieAncestral(doc, X, L) && !ieAncestral(doc, L, X));
                 const algum = outras.some(X => X.visivel);
-                outras.forEach(X => (X.visivel = !algum));
+                outras.forEach(X => { if (X.visivel !== !algum) { X.visivel = !algum; grupos(X); if (X.tipo === 'grupo') ieInvalidar(X); } });
                 L.visivel = true;
-            } else L.visivel = !L.visivel;
-            ieTudo(doc);
+            } else {
+                L.visivel = !L.visivel;
+                R = L.tipo === 'ajuste' ? null : ieRCamada(L);   // camada de ajuste muda tudo abaixo: compõe a tela inteira
+            }
+            grupos(L); if (L.tipo === 'grupo') ieInvalidar(L);
+            ieAgendar(R, doc);
+            ieMudouDoc(doc);
+            ieUiCamadas();
             ieHist(ieT(L.visivel ? 'Mostrar camada' : 'Ocultar camada'));
             return;
         }
