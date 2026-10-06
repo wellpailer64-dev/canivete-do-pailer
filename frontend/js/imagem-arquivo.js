@@ -73,7 +73,7 @@ async function ieAbrirArquivo(path) {
         const montar = (nos) => nos.map(no => {
             const L = ieNovaCamada(doc, {
                 tipo: no.tipo, nome: no.nome, visivel: no.visivel, op: no.op, fill: no.fill ?? 1, bm: no.bm || 'NORMAL', clip: !!no.clip,
-                travas: no.travas || 0, ref: no.ref ?? null, kind: no.kind || null, aberto: no.aberto, x: no.x || 0, y: no.y || 0,
+                travas: no.travas || 0, ref: no.ref ?? null, refNome: no.ref != null ? (no.nome ?? null) : null, kind: no.kind || null, aberto: no.aberto, x: no.x || 0, y: no.y || 0,
                 fx: ieFxNorm(no.fx) || null, ajuste: no.ajuste || null, texto: no.texto || null, fxOculto: !!no.fx_oculto,
             });
             for (const k of IE_MESCLA_CHAVES) if (no[k] !== undefined) L[k] = no[k];
@@ -281,7 +281,7 @@ async function ieSalvarPdfAchatado(doc, destino) {
     } finally { ieCarregando(false); }
 }
 
-async function ieSalvar(comoNovo = false) {
+async function ieSalvar(comoNovo = false, destinoForcado = null, refeito = false) {
     const doc = IE.doc, api = ieApi();
     if (!doc || !api) return false;
     ieTextoEncerrar(true);
@@ -289,7 +289,7 @@ async function ieSalvar(comoNovo = false) {
     if (doc.pai && !comoNovo) return ieConteudoDevolver(doc);   // aba de conteúdo de objeto inteligente: devolve à origem
     // Ctrl+S: projeto (.iknv) aberto salva nele; PSD aberto salva no PSD (ida e volta); o resto pergunta.
     // No diálogo dá para escolher .iknv (projeto do KANIVETE, padrão do documento novo) ou .psd.
-    let destino = comoNovo ? null : (/\.iknv$/i.test(doc.path || '') ? doc.path : doc.psdPath);
+    let destino = destinoForcado || (comoNovo ? null : (/\.iknv$/i.test(doc.path || '') ? doc.path : doc.psdPath));
     const grande = doc.w > 30000 || doc.h > 30000 || doc.psb;
     if (!destino) {
         const pasta = doc.path ? doc.path.replace(/[\\/][^\\/]*$/, '') : '';
@@ -307,7 +307,7 @@ async function ieSalvar(comoNovo = false) {
         const envios = [];
         let n = 0;
         const no = L => {
-            const s = { uid: L.uid, ref: ida ? L.ref : null, tipo: L.tipo, nome: L.nome, visivel: L.visivel, op: L.op, fill: L.fill, bm: L.bm, clip: !!L.clip, aberto: L.aberto !== false };
+            const s = { uid: L.uid, ref: ida ? L.ref : null, ref_nome: ida && L.ref != null ? (L.refNome ?? null) : null, tipo: L.tipo, nome: L.nome, visivel: L.visivel, op: L.op, fill: L.fill, bm: L.bm, clip: !!L.clip, aberto: L.aberto !== false };
             if (L.tipo === 'grupo') { s.filhos = L.filhos.map(no); if (L.prancheta && L.pranchetaMudou) s.prancheta = L.prancheta; }
             // efeitos: só vão quando mudaram no editor (ou camada nova); o Python troca só os 4 que o editor conhece
             else if (L.fxMudou || ((!ida || L.ref == null) && L.fx && ieTemFx(L.fx))) { s.fx = ieFxNorm(L.fx) || {}; s.fx_oculto = !!L.fxOculto; }
@@ -353,13 +353,21 @@ async function ieSalvar(comoNovo = false) {
             fatias: ieFatiasSpec(doc), fatias_mudou: JSON.stringify(ieFatiasSpec(doc)) !== doc.fatiasOrig, luz: doc.luzGlobal || null,
             guias: doc.guias || [], guias_mudou: JSON.stringify(doc.guias || []) !== (doc.guiasOrig || '[]') };
         const r = await api.ie_salvar(spec);
+        if (r && r.refaz && !refeito) {   // referências do arquivo desencontradas: esquece todas e grava tudo de novo
+            iePercorrer(doc.camadas, L => { L.ref = null; L.refNome = null; });
+            ieToast(ieT('Camadas do PSD desencontradas: gravando o arquivo inteiro de novo (nenhuma camada se perde)'));
+            ieCarregando(false);
+            return ieSalvar(false, destino, true);
+        }
         if (!r || !r.success) { ieToast(`${ieT('Não salvou')}: ${(r && r.error) || ''}`); return false; }
         // o arquivo salvo vira a origem
         doc.pyId = r.doc;
         doc.psdPath = destino; doc.path = destino;
         doc.nome = ieNomeArq(destino).replace(/\.(psd|psb)$/i, '');
         iePercorrer(doc.camadas, L => {
-            if (r.refs && r.refs[L.uid] !== undefined && r.refs[L.uid] !== null) L.ref = r.refs[L.uid];
+            // referências novas conferidas pelo Python; sem elas (não conferiram), o próximo salvamento grava tudo
+            if (!r.refs) { L.ref = null; L.refNome = null; }
+            else if (r.refs[L.uid] !== undefined && r.refs[L.uid] !== null) { L.ref = r.refs[L.uid]; L.refNome = L.nome; }
             L.sujoPx = false; L.sujoM = false; L.rasterizar = false; L.movido = false; L.pranchetaMudou = false; L.fxMudou = false; L.mesclaMudou = false;
             if (L.tf) L.tfBase = [...L.tf];
             if (L.textoNovo != null && L.texto) { L.texto.texto = L.textoNovo; }

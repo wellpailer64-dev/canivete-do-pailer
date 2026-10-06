@@ -1315,6 +1315,25 @@ def salvar(spec):
     if ida:
         psd = PSDImage.open(doc["path"])
         todas = _todas(psd)
+        # referências conferidas ANTES de gravar (2026-10-06: referência desencontrada gravou os pixels de uma camada
+        # na outra — "cena5" com o texto de outro slide): a camada reaproveitada do arquivo tem que ser a MESMA do
+        # último salvamento (mesmo nome, posição existente, sem duas camadas no mesmo ref). Senão o editor grava tudo.
+        usadas, ruins = set(), []
+
+        def conferir(nos):
+            for no in nos:
+                r = no.get("ref")
+                if r is not None:
+                    o = todas[r] if isinstance(r, int) and 0 <= r < len(todas) else None
+                    esperado = no.get("ref_nome") or no.get("nome")
+                    if o is None or r in usadas or (esperado and o.name != esperado):
+                        ruins.append(no.get("nome"))
+                    usadas.add(r)
+                conferir(no.get("filhos") or [])
+        conferir(spec.get("camadas") or [])
+        if ruins:
+            return {"success": False, "refaz": True,
+                    "error": f"referências desencontradas em {len(ruins)} camada(s) (ex.: {', '.join(map(str, ruins[:3]))}); gravando tudo de novo"}
         hdr = psd._record.header
         W0, H0 = hdr.width, hdr.height
         mudou_tela = (W0, H0) != (W, H)
@@ -1488,6 +1507,27 @@ def salvar(spec):
     try:
         with open(tmp, "wb") as f:
             psd._record.write(f)
+        # CONFERE O ARQUIVO GRAVADO antes de trocar o do usuário (2026-10-06: um PSD voltou com pixels de uma camada
+        # em outra): relê e compara cada camada com o que foi montado (nome, caixa). Não bateu → o original fica intacto
+        # e o editor grava tudo de novo do zero.
+        try:
+            lidas = _todas(PSDImage.open(tmp))
+            montadas = _todas(psd)
+            ruins = []
+            if len(lidas) != len(montadas):
+                ruins.append(f"{len(lidas)} camadas lidas × {len(montadas)} montadas")
+            else:
+                for lida, mont in zip(lidas, montadas):
+                    if lida.name != mont.name or (not mont.is_group() and tuple(lida.bbox) != tuple(mont.bbox)):
+                        ruins.append(f"{mont.name}: lida {lida.name} {tuple(lida.bbox)} × montada {tuple(mont.bbox)}")
+        except Exception as e:
+            ruins = [f"não consegui reler ({e})"]
+        if ruins:
+            os.remove(tmp)
+            logging.warning("PSD conferido com erro, original preservado: %s", ruins[:5])
+            if ida:
+                return {"success": False, "refaz": True, "error": f"o PSD gravado não conferiu ({ruins[0]}); gravando tudo de novo"}
+            return {"success": False, "error": f"o PSD gravado não conferiu ({ruins[0]}); o arquivo original não foi alterado"}
         os.replace(tmp, destino)
     except Exception as e:
         try:
@@ -1496,10 +1536,20 @@ def salvar(spec):
             pass
         return {"success": False, "error": f"não consegui gravar: {e}"}
 
-    # o arquivo salvo vira a origem: referências novas
+    # o arquivo salvo vira a origem: referências novas — conferidas RELENDO o arquivo gravado (a ordem em memória e a
+    # do arquivo podem divergir); não batendo, nenhuma volta e o próximo salvamento grava tudo
     novas = _todas(psd)
     pos = {id(l): i for i, l in enumerate(novas)}
     refs = {str(no.get("uid")): pos.get(id(ob)) for no, ob in ordem if no.get("uid") is not None}
+    try:
+        lidas = _todas(PSDImage.open(destino))
+        nome_em = {str(no.get("uid")): ob.name for no, ob in ordem if no.get("uid") is not None}
+        if len(lidas) != len(novas) or any(i is None or i >= len(lidas) or lidas[i].name != nome_em.get(u) for u, i in refs.items()):
+            refs = None
+            avisos.append("referências do PSD não conferiram depois de gravar: o próximo salvamento grava todas as camadas")
+    except Exception as e:
+        refs = None
+        avisos.append(f"não consegui conferir o PSD gravado ({e}): o próximo salvamento grava todas as camadas")
     novo_id = spec.get("doc") or uuid.uuid4().hex[:12]
     _DOCS[novo_id] = {"path": os.path.abspath(destino), "mtime": os.stat(destino).st_mtime_ns, "rgb": True,
                       "tokens": (doc or {}).get("tokens", [])}
