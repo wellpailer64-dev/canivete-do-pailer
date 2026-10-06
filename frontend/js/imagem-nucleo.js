@@ -705,14 +705,53 @@ function ieQuadroPedir() {
 function ieQuadro() {
     ieQuadroPedido = false;
     const doc = IE.doc;
+    let R = null;
     if (doc && doc._sujo) {
-        const R = doc._sujo;
+        R = doc._sujo;
         doc._sujo = null;
         try { ieCompor(doc, R); } catch (e) { console.error('[editor de imagem] compor', e); }
         ieMiniaturas?.();   // miniaturas acompanham a pintura (só as camadas que mudaram, com atraso)
     }
-    ieDesenharVista();
+    // só um pedaço mudou e a vista é a mesma: redesenha só esse pedaço da tela (arrastar em tempo real num documento
+    // grande: antes cada quadro reduzia a composição inteira — 15 MP no carrossel — e ficava em ~30 fps)
+    if (R && doc && ieVistaParcialOk(doc, R)) { ieDesenharVistaParcial(doc, R); ieVistaFinal(); }
+    else ieDesenharVista();
     ieDesenharSobre();
+}
+function ieVistaEstado(doc) {
+    const c = ieEl('ie-canvas');
+    return c && doc ? `${doc.id}|${doc.zoom}|${doc.px}|${doc.py}|${c.width}x${c.height}|${doc._verAchatado ? 1 : 0}` : '';
+}
+function ieVistaParcialOk(doc, R) {
+    return IE._vistaEst && IE._vistaEst === ieVistaEstado(doc) && R.w * R.h < doc.w * doc.h * 0.4 && !doc.camadas.some(L => L.prancheta);
+}
+function ieDesenharVistaParcial(doc, R) {
+    const c = ieEl('ie-canvas'), ctx = ieCtx(c), dpr = window.devicePixelRatio || 1, s = doc.zoom * dpr;
+    const dx = Math.round(doc.px * dpr), dy = Math.round(doc.py * dpr), dw = Math.round(doc.w * s), dh = Math.round(doc.h * s), kx = dw / doc.w, ky = dh / doc.h;
+    let x0 = Math.floor(dx + (R.x - 2) * kx), y0 = Math.floor(dy + (R.y - 2) * ky), x1 = Math.ceil(dx + (R.x + R.w + 2) * kx), y1 = Math.ceil(dy + (R.y + R.h + 2) * ky);
+    x0 = Math.max(x0, dx, 0); y0 = Math.max(y0, dy, 0); x1 = Math.min(x1, dx + dw, c.width); y1 = Math.min(y1, dy + dh, c.height);
+    if (x1 <= x0 || y1 <= y0) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+    ctx.clearRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);   // fundo branco + xadrez (origem no canto do documento, como a vista inteira)
+    ctx.fillStyle = '#fff'; ctx.fillRect(x0 / dpr, y0 / dpr, (x1 - x0) / dpr, (y1 - y0) / dpr);
+    ctx.translate(doc.px, doc.py); ctx.fillStyle = ieXadrezPadrao(ctx); ctx.fillRect(x0 / dpr - doc.px, y0 / dpr - doc.py, (x1 - x0) / dpr, (y1 - y0) / dpr);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const fonte = doc._verAchatado && doc.achatadoC ? doc.achatadoC : doc.comp;
+    ctx.imageSmoothingEnabled = !(Math.abs(s - 1) < 1e-3 || s >= 3 || (s > 1 && Math.abs(s - Math.round(s)) < 1e-3));
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(fonte, (x0 - dx) / kx, (y0 - dy) / ky, (x1 - x0) / kx, (y1 - y0) / ky, x0, y0, x1 - x0, y1 - y0);
+    ctx.restore();
+}
+// parou de mexer: redesenha a vista inteira na qualidade máxima (redução em etapas, sem emendas)
+function ieVistaFinal() {
+    clearTimeout(IE._vistaT);
+    IE._vistaT = setTimeout(() => {
+        if (IE.mov || IE._zAnim || performance.now() - (IE._interagindo || 0) < 140) return ieVistaFinal();
+        IE._vistaEst = null; IE._interagindo = 0; ieDesenharVista(); ieDesenharSobre();
+    }, 180);
 }
 // mudou tudo (abrir, desfazer, mudar estrutura): compõe inteiro e redesenha painéis
 function ieTudo(doc = IE.doc) {
@@ -773,9 +812,26 @@ function ieZoomEm(z, sx, sy, doc = IE.doc) {   // sx, sy = ponto da tela que fic
 function ieZoomPasso(dir, sx, sy) {
     const doc = IE.doc;
     if (!doc) return;
-    const z = ieZoomTela(doc);
+    const z = (IE._zAnim && IE._zAnim.doc === doc ? IE._zAnim.alvo : doc.zoom) * ieDpr();   // clique seguido: parte do alvo
     const prox = dir > 0 ? IE_ZOOMS.find(v => v > z * 1.001) : [...IE_ZOOMS].reverse().find(v => v < z / 1.001);
-    if (prox) ieZoomReal(prox, sx, sy);
+    if (prox) ieZoomSuave(prox / ieDpr(), sx, sy);
+}
+// zoom suave: anima até o alvo em escala logarítmica (~150 ms); pedidos no meio (roda do mouse) só mudam o alvo
+function ieZoomSuave(z, sx, sy, doc = IE.doc) {
+    if (!doc) return;
+    const andando = IE._zAnim && IE._zAnim.doc === doc;
+    IE._zAnim = { doc, alvo: ieClamp(z, 0.01, 32), sx, sy };
+    if (andando) return;
+    const passo = () => {
+        const A = IE._zAnim;
+        if (!A || A.doc !== IE.doc) { IE._zAnim = null; return; }
+        const lz = Math.log(A.doc.zoom), la = Math.log(A.alvo);
+        const nz = Math.abs(la - lz) < 0.003 ? A.alvo : Math.exp(lz + (la - lz) * 0.38);
+        IE._interagindo = performance.now();
+        ieZoomEm(nz, A.sx, A.sy, A.doc);
+        if (nz === A.alvo) { IE._zAnim = null; ieVistaFinal(); } else requestAnimationFrame(passo);
+    };
+    requestAnimationFrame(passo);
 }
 function ieTelaDoc(ev, doc = IE.doc) {
     const r = ieEl('ie-canvas').getBoundingClientRect();
@@ -830,6 +886,7 @@ function ieDesenharVista() {
     }
     const fonte = doc._verAchatado && doc.achatadoC ? doc.achatadoC : doc.comp;
     ieDesenharNitido(ctx, fonte, doc, dpr);
+    IE._vistaEst = ieVistaEstado(doc);
 }
 
 // a imagem na tela em pixels da tela (origem alinhada ao pixel): 1:1 sem reamostrar; ampliar por número inteiro ou
@@ -849,10 +906,13 @@ function ieDesenharNitido(ctx, fonte, doc, dpr) {
         ctx.restore();
         return;
     }
+    // zoom/rolagem em andamento: qualidade rápida (e a redução guardada mais perto); parou → ieVistaFinal refaz em alta
+    const rapido = performance.now() - (IE._interagindo || 0) < 140;
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(ieMipmap(fonte, doc, s), dx, dy, dw, dh);
+    ctx.imageSmoothingQuality = rapido ? 'low' : 'high';
+    ctx.drawImage(rapido && s < 0.5 ? ieMipmap(fonte, doc, s * 2) : ieMipmap(fonte, doc, s), dx, dy, dw, dh);
     ctx.restore();
+    if (rapido) ieVistaFinal();
 }
 // reduções pela metade da composição, guardadas até ela mudar (doc._compV)
 function ieMipmap(fonte, doc, s) {
@@ -1141,8 +1201,10 @@ function ieInstalarVista() {
         const p = ieTelaDoc(ev);
         if (ev.ctrlKey || ev.altKey) {
             const f = Math.exp(-ev.deltaY * (ev.deltaMode ? 0.05 : 0.0018));
-            ieZoomEm(doc.zoom * f, p.sx, p.sy);
+            const base = IE._zAnim && IE._zAnim.doc === doc ? IE._zAnim.alvo : doc.zoom;
+            ieZoomSuave(base * f, p.sx, p.sy);   // roda anima até o alvo (sem degraus)
         } else {
+            IE._interagindo = performance.now();
             const k = ev.deltaMode ? 30 : 1;
             if (ev.shiftKey) doc.px -= (ev.deltaY || ev.deltaX) * k;
             else { doc.px -= ev.deltaX * k; doc.py -= ev.deltaY * k; }

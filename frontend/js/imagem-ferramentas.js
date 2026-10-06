@@ -524,6 +524,7 @@ const IE_MOVER = {
             }
         }
         const auto = IE.op.mover.auto !== ev.ctrlKey;
+        let alternar = null;   // Shift+clique num já selecionado: sai da seleção só se NÃO arrastar (Shift+arrastar = linha reta)
         if (auto) {
             const L = ieCamadaNoPonto(doc, p.x, p.y);
             // seleção por arrasto (como no Photoshop): começando no vazio ou num FUNDO que não está selecionado,
@@ -533,13 +534,8 @@ const IE_MOVER = {
                 return;
             }
             const alvo = ieMoverAlvoAuto(doc, L);
-            if (alvo && ev.shiftKey && doc.selIds.includes(alvo.id)) {   // Shift+clique num já selecionado: sai da seleção
-                doc.selIds = doc.selIds.filter(i => i !== alvo.id);
-                doc.ativa = doc.selIds.length ? doc.selIds[doc.selIds.length - 1] : null;
-                ieUiCamadas?.(); ieUiProps?.(); ieDesenharSobre();
-                return;
-            }
-            if (alvo && !(doc.selIds.length > 1 && doc.selIds.includes(alvo.id))) ieAtivar(alvo.id, doc, { somar: ev.shiftKey });
+            if (alvo && ev.shiftKey && doc.selIds.includes(alvo.id)) alternar = alvo.id;
+            else if (alvo && !(doc.selIds.length > 1 && doc.selIds.includes(alvo.id))) ieAtivar(alvo.id, doc, { somar: ev.shiftKey });
             else if (!alvo && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
                 ieLimparCamadas(doc);
                 return;
@@ -559,7 +555,7 @@ const IE_MOVER = {
         }
         const L = ieAtiva(doc);
         const flutuar = doc.sel && alvos.length === 1 && L && L.tipo === 'pixel' && L.c && !doc.mascaraAlvo;
-        IE.mov = { p0: p, dx: 0, dy: 0, alvos, R: alvos.reduce((R, X) => ieRUniao(R, ieRCamada(X)), null), dup: ev.altKey, B: ieCaixaAlvos(doc) };
+        IE.mov = { p0: p, dx: 0, dy: 0, alvos, R: alvos.reduce((R, X) => ieRUniao(R, ieRCamada(X)), null), dup: ev.altKey, B: ieCaixaAlvos(doc), alternar };
         if (flutuar) {
             ieGravavel(L);
             const R = ieRPlano(L);
@@ -613,6 +609,12 @@ const IE_MOVER = {
         IE.mov = null;
         if (!m) return;
         if (m.caixa) { ieSelecionarPorCaixa(doc, m.caixa, m.somar); ieDesenharSobre(); return; }
+        if (m.alternar != null && !m.dx && !m.dy) {   // Shift+clique sem arrastar num já selecionado: sai da seleção
+            doc.selIds = doc.selIds.filter(i => i !== m.alternar);
+            doc.ativa = doc.selIds.length ? doc.selIds[doc.selIds.length - 1] : null;
+            ieUiCamadas?.(); ieUiProps?.(); ieDesenharSobre();
+            return;
+        }
         if (m.transf) { IE_TRANSF.up(p, ev, doc); return; }
         if (m.flut) {
             doc._selDx = doc._selDy = 0;
@@ -1207,7 +1209,7 @@ const IE_ZOOM = {
         const z = IE.zm; if (!z) return;
         const d = p.sx - z.sx;
         if (Math.abs(d) > 3) z.mov = true;
-        if (z.mov) ieZoomEm(z.z0 * Math.exp(d / 150), z.sx, z.sy);
+        if (z.mov) { IE._interagindo = performance.now(); ieZoomEm(z.z0 * Math.exp(d / 150), z.sx, z.sy); }
     },
     up(p, ev, doc) {
         const z = IE.zm; IE.zm = null;
