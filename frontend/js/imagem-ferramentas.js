@@ -850,24 +850,24 @@ const iePintor = (tipo, nome, tecla, icone) => ({
     down(p, ev, doc) { ieTracoIniciar(p, ev, doc, tipo); },
     move(p) { if (IE_TRACO) ieTracoPara(p); },
     up() { ieTracoFim(); },
-    ...(tipo === 'pincel' ? {
-        rightDown(p, ev) {
-            IE._pincelAjuste = null;
-            if (ev.shiftKey) {
-                IE._pincelAjuste = { x0: ev.clientX, tam0: IE.op.pincel.tam };
-                return;
-            }
-            if (typeof iePincelPopup === 'function') iePincelPopup(ev);
-        },
-        rightMove(p, ev) {
-            const a = IE._pincelAjuste;
-            if (!a) return;
-            IE.op.pincel.tam = Math.round(ieClamp(a.tam0 + ev.clientX - a.x0, 1, 2500));
-            ieOpcoesRender?.();
-            ieDesenharSobre();
-        },
-        rightUp() { IE._pincelAjuste = null; },
-    } : {}),
+    // Alt + botão direito arrastando para os lados: tamanho (como no Photoshop); o círculo fica parado onde clicou
+    rightDown(p, ev) {
+        IE._pincelAjuste = null;
+        if (ev.altKey) {
+            IE._pincelAjuste = { x0: ev.clientX, tam0: IE.op[tipo].tam, p0: IE.mouse || p };
+            return;
+        }
+        if (tipo === 'pincel' && typeof iePincelPopup === 'function') iePincelPopup(ev);
+    },
+    rightMove(p, ev) {
+        const a = IE._pincelAjuste;
+        if (!a) return;
+        IE.mouse = a.p0;
+        IE.op[tipo].tam = Math.round(ieClamp(a.tam0 + (ev.clientX - a.x0) / (IE.doc?.zoom || 1), 1, 2500));
+        ieOpcoesRender?.();
+        ieDesenharSobre();
+    },
+    rightUp() { IE._pincelAjuste = null; },
     sobre(ctx, doc) {
         ieCursorPincel(ctx, doc, IE.op[tipo].tam);
         if (tipo === 'carimbo' && IE.carimboFonte && IE.mouse) {

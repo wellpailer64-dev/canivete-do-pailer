@@ -1142,6 +1142,8 @@ function ieInstalarVista() {
     sobre.addEventListener('pointerdown', ev => {
         const doc = IE.doc;
         if (!doc) return;
+        // Alt + botão direito no pincel: ajuste de tamanho, não o conta-gotas temporário do Alt
+        if (ev.button === 2 && ev.altKey && IE.ferrTemp === 'contagotas' && IE_FERR[IE.ferr]?.rightDown) IE.ferrTemp = null;
         const f0 = ieFerrAtual();
         if (ev.button === 2 && f0?.rightDown) {
             ev.preventDefault();
