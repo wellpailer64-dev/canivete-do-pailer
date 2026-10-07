@@ -8,7 +8,8 @@
 // =========================================================
 const SK = { proj: null, caminho: null, sujo: false, sel: null, faixaSel: null, z: 60, x0: 0, y0: 0, ph: 0, tocando: false,
     picos: {}, hist: [], futuro: [], arr: null, encaixe: true, el: {}, ctx: null, t0: 0 };
-const SK_H = 84, SK_REGUA = 26, SK_CORES = ['#ffd166', '#ff8c42', '#ef5f2b', '#ffb45c', '#e9c46a', '#f4a261'];
+let SK_H = 84;   // altura da faixa (a vista de espectro aumenta)
+const SK_REGUA = 26, SK_CORES = ['#ffd166', '#ff8c42', '#ef5f2b', '#ffb45c', '#e9c46a', '#f4a261'];
 const skEl = id => document.getElementById(id);
 const skApi = () => window.pywebview && window.pywebview.api;
 const skId = p => p + Math.random().toString(36).slice(2, 8);
@@ -226,7 +227,8 @@ function skDesenhar() {
             x.beginPath(); x.roundRect(cx + 0.5, y + 3.5, Math.max(2, cw - 1), SK_H - 7, 5); x.fill(); x.stroke();
             // forma de onda
             const info = SK.picos[c.arq];
-            if (info) {
+            if (SK.verEsp && typeof skDesenharEsp === 'function') skDesenharEsp(x, c, cx, cw, y, W);
+            else if (info) {
                 const meio = y + SK_H / 2 + 6, alt = (SK_H - 26) / 2 * c.vol, a = Math.max(0, -cx), b = Math.min(cw, W - cx);
                 x.fillStyle = f.cor; x.beginPath();
                 for (let px = a; px < b; px++) {
@@ -315,6 +317,10 @@ function skEventos() {
         if (!SK.proj) return;
         cv.setPointerCapture(e.pointerId);
         const [px, py] = pos(e), a = skAlvo(px, py);
+        if (SK.verEsp && e.ctrlKey && a.c) {   // vista de espectro: Ctrl+arrastar marca área (tempo × frequência)
+            SK.sel = a.c.id; SK.faixaSel = a.f.id; SK.int = null;
+            SK.arr = { modo: 'rect', c: a.c, y: SK_REGUA + a.i * SK_H - SK.y0, px, py }; SK.rect = null; skUi(); return;
+        }
         if (a.regua || !a.c || e.shiftKey) {   // régua = arrastar a agulha; vazio (ou Shift) = agulha no clique, arrastando vira intervalo
             if (a.f) SK.faixaSel = a.f.id; SK.sel = null; SK.int = null; skIr(a.t);
             SK.arr = { modo: 'agulha', regua: !!a.regua, x: px, t0: a.t, i0: Math.max(0, Math.min(SK.proj.faixas.length - 1, a.i ?? 0)) }; skUi(); return;
@@ -340,6 +346,11 @@ function skEventos() {
         const [px, py] = pos(e);
         if (!SK.arr) { const a = SK.proj && skAlvo(px, py); cv.style.cursor = !a || !a.c ? 'default' : a.parte === 'meio' ? 'grab' : a.parte.startsWith('fade') ? 'crosshair' : 'ew-resize'; return; }
         const A = SK.arr, dt = (px - (A.x ?? px)) / SK.z;
+        if (A.modo === 'rect') {
+            const c = A.c, ft = p => Math.max(c.de, Math.min(c.de + c.dur, c.de + (SK.x0 + p / SK.z - c.ini)));
+            const [t0, t1] = [ft(A.px), ft(px)].sort((p, q) => p - q), [f0, f1] = [skEspHz(A.y, A.py), skEspHz(A.y, py)].sort((p, q) => p - q);
+            SK.rect = { id: c.id, t0, t1, f0, f1 }; skDesenhar(); return;
+        }
         if (A.modo === 'agulha' && !A.regua && Math.abs(px - A.x) > 4) A.modo = 'int';
         if (A.modo === 'agulha') { skIr(SK.x0 + px / SK.z); return; }
         if (A.modo === 'int') {
@@ -379,6 +390,7 @@ function skEventos() {
     const solta = () => {
         const A = SK.arr; SK.arr = null; if (!A || A.modo === 'agulha') return;
         if (A.modo === 'int') { if (SK.int && SK.int.b - SK.int.a < 0.01) SK.int = null; else if (SK.int) skIr(SK.int.a); skUi(); return; }
+        if (A.modo === 'rect') { if (SK.rect && SK.rect.t1 - SK.rect.t0 < 0.01) SK.rect = null; skUi(); return; }
         if (A.moveu) skMudou(A.modo); else SK._antes = null;
     };
     cv.addEventListener('pointerup', solta); cv.addEventListener('pointercancel', solta);
@@ -406,6 +418,7 @@ function skEventos() {
         if (C && k === 'v') return faz(() => skColar());
         if (k === 'escape') return faz(() => { SK.int = null; skUi(); skDesenhar(); });
         if (k === 'v') return faz(() => { SK.verCurva = !SK.verCurva; skUi(); skDesenhar(); });
+        if (k === 'e' && !C) return faz(() => skVerEspectro());
         if (C && k === 'i') return faz(() => skImportarDialogo());
         if (k === 's' || (C && k === 'k')) return faz(() => skCortar());
         if (k === 'delete' || k === 'backspace') return faz(() => SK.int ? skIntApagar(e.shiftKey) : skApagar());
@@ -465,7 +478,7 @@ async function skEfeito(id, efeito, op = {}) {
     skAntes();
     for (const f of SK.proj.faixas) for (const x of f.clipes) if (x.arq === arq) { x.orig = x.orig || arq; x.arq = r.saida; x.efeitos = [...(x.efeitos || []), efeito]; }
     skMudou(efeito);
-    skToast(efeito === 'limpar' ? 'Ruído limpo' : 'Voz melhorada');
+    skToast({ limpar: 'Ruído limpo', melhorar: 'Voz melhorada', reparar: 'Área reparada' }[efeito] || 'Pronto');
     return r.saida;
 }
 function skOriginal(id) {

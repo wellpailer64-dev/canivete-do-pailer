@@ -328,7 +328,8 @@ def _loudnorm_medir(entradas, fc, rot, alvo, tp, timeout=3600):
 
 def exportar(proj, caminho, op=None):
     """op: {formato mp3|wav|aac|m4a|ogg|flac|opus, kbps, sr, lufs (ex. -14; None = sem), tp (-1), faixas (ids; None = todas),
-    ini/fim (s: só um trecho)}."""
+    ini/fim (s: só um trecho), meta {titulo, artista, album, ano, genero, comentario} (ID3/tags), capitulos [{t, nome}]
+    (marcadores viram capítulos no mp3/m4a/ogg/flac/opus)}."""
     op = op or {}
     fmt = (op.get("formato") or os.path.splitext(caminho)[1].lstrip(".") or "mp3").lower()
     if fmt not in FORMATOS:
@@ -355,7 +356,26 @@ def exportar(proj, caminho, op=None):
     script = os.path.join(tempfile.mkdtemp(prefix="sk_"), "fc.txt")
     open(script, "w", encoding="utf-8").write(fc)
     canais = ["-ac", "1"] if op.get("mono") else []
-    cmd = [ffmpeg(), "-y", "-hide_banner", "-nostdin", *entradas, "-/filter_complex", script, "-map", rot, "-ar", str(sr), *canais, *codec, caminho]
+    meta, extra = [], []
+    md = op.get("meta") or {}
+    for k, ff in (("titulo", "title"), ("artista", "artist"), ("album", "album"), ("ano", "date"), ("genero", "genre"), ("comentario", "comment")):
+        if md.get(k):
+            meta += ["-metadata", f"{ff}={md[k]}"]
+    caps = sorted((c for c in (op.get("capitulos") or []) if a <= float(c["t"]) < b), key=lambda c: float(c["t"]))
+    if caps and fmt != "wav":
+        esc = lambda s: "".join("\\" + ch if ch in "=;#\\\n" else ch for ch in str(s))
+        txt = ";FFMETADATA1\n"
+        for i, c in enumerate(caps):
+            ini_ms = int(round((float(c["t"]) - a) * 1000))
+            fim_ms = int(round(((float(caps[i + 1]["t"]) if i + 1 < len(caps) else b) - a) * 1000))
+            txt += f"[CHAPTER]\nTIMEBASE=1/1000\nSTART={ini_ms}\nEND={fim_ms}\ntitle={esc(c.get('nome') or f'Capítulo {i + 1}')}\n"
+        mf = os.path.join(os.path.dirname(script), "meta.txt")
+        open(mf, "w", encoding="utf-8").write(txt)
+        n = len(entradas) // 2
+        extra = ["-f", "ffmetadata", "-i", mf]
+        meta += ["-map_chapters", str(n)]
+    cmd = [ffmpeg(), "-y", "-hide_banner", "-nostdin", *entradas, *extra, "-/filter_complex", script, "-map", rot, "-ar", str(sr), *canais, *codec,
+           *meta, *(["-id3v2_version", "3"] if fmt == "mp3" else []), caminho]
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=7200, creationflags=NO_WINDOW)
     if r.returncode != 0 or not os.path.isfile(caminho):
         return {"success": False, "error": (r.stderr or "")[-600:]}

@@ -244,6 +244,7 @@
     "sk_auto",
     "sk_gravar",
     "sk_ir",
+    "sk_espectro",
     "sk_salvar",
     "sk_abrir",
     "sk_exportar",
@@ -1108,6 +1109,13 @@
     "sound_kanivete"
    ]
   },
+  "sk_espectro": {
+   "args": "arq, t0, t1, cols=1200, rows=256",
+   "modulos": [
+    "media_server",
+    "sk_espectro"
+   ]
+  },
   "sk_salvar": {
    "args": "proj, caminho",
    "modulos": [
@@ -1135,6 +1143,7 @@
   "sk_processar": {
    "args": "arq, efeito, op=None",
    "modulos": [
+    "sk_espectro",
     "sound_kanivete"
    ]
   },
@@ -2186,6 +2195,7 @@
   "Functions/removerfundo.py": "removerfundo.py",
   "Functions/render_cache.py": "Cache de render em disco do Pocket Editor (como os \"Preview Files\" do Premiere)",
   "Functions/sincronizar.py": "Sincronizar clipes pelo áudio (como o \"Sincronizar › Áudio\" do Premiere): duas câmeras gravando a mesma cena",
+  "Functions/sk_espectro.py": "Sound Kanivete — espectrograma, reparo espectral e separação voz/instrumental",
   "Functions/sk_gravar.py": "Sound Kanivete — gravar do microfone (ou interface de áudio) direto num WAV 24 bits",
   "Functions/snapshot_logger.py": "snapshot_logger.py — Backup/restauração para o Organizador de Vídeos",
   "Functions/sound_kanivete.py": "Sound Kanivete (Sk) — editor de áudio multipista do KANIVETE (frontend/js/som-*.js)",

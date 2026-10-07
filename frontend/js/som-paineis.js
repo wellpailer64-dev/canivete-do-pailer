@@ -37,6 +37,7 @@ function skMontar() {
                 <span class="sk-sep"></span>
                 <button class="ie-btn" onclick="skCortar()" title="Cortar na agulha (S)">✂ Cortar</button>
                 <button class="ie-btn" onclick="skMarcador()" title="Marcador (M)">◆</button>
+                <button class="ie-btn" id="sk-esp-bt" onclick="skVerEspectro()" title="Vista de espectro (E): Ctrl+arrastar marca área para reparar">▤</button>
                 <button class="ie-btn" id="sk-curva-bt" onclick="SK.verCurva = !SK.verCurva; skUi(); skDesenhar()" title="Curva de volume (V)">〰</button>
                 <label class="sk-chk"><input type="checkbox" id="sk-encaixe" checked onchange="SK.encaixe = this.checked"> Encaixar</label>
                 <button class="ie-btn" onclick="skEnquadrar()" title="Ver tudo (Ctrl+0)">⤢</button>
@@ -202,7 +203,15 @@ function skUiClipe(el) {
         <button class="ie-btn ie-btn-mini" id="sk-melhorar" ${ocup ? 'disabled' : ''} title="Sidon + OmniVoice: voz de estúdio (leva alguns minutos)">Melhorar voz (IA)</button>
         ${c.orig ? '<button class="ie-btn ie-btn-mini" id="sk-orig">Voltar ao original</button>' : ''}</div>
         ${c.efeitos ? `<div class="sk-p-info">Aplicado: ${c.efeitos.join(', ')}</div>` : ''}
-        <div class="sk-p-info">Vira um arquivo novo ao lado do original e vale para todos os clipes dessa gravação.</div></div>`;
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" id="sk-separar" ${ocup ? 'disabled' : ''} title="Hybrid Demucs (baixa ~335 MB na primeira vez; leva um tempo no processador)">Separar voz e instrumental</button></div>
+        <div class="sk-p-info">Vira um arquivo novo ao lado do original e vale para todos os clipes dessa gravação.</div></div>
+        <div class="sk-grupo"><div class="sk-p-tit">Reparo espectral</div>
+        ${SK.rect && SK.rect.id === c.id ? `<div class="sk-p-info notranslate">${SK.rect.t0.toFixed(2)}–${SK.rect.t1.toFixed(2)} s · ${Math.round(SK.rect.f0)}–${Math.round(SK.rect.f1)} Hz</div>
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" id="sk-rep-p" ${ocup ? 'disabled' : ''}>Preencher com a vizinhança</button><button class="ie-btn ie-btn-mini" id="sk-rep-a" ${ocup ? 'disabled' : ''}>Atenuar (-30 dB)</button></div>`
+        : `<div class="sk-p-info">${SK.verEsp ? 'Ctrl+arrastar no espectro do clipe marca a área (tosse, bipe, celular).' : 'Ligue a vista de espectro (▤ ou E) e marque a área com Ctrl+arrastar.'}</div>`}</div>`;
+    el.querySelector('#sk-separar').onclick = () => skSeparar(c.id).catch(e => skToast(e.message));
+    const rp = el.querySelector('#sk-rep-p'); if (rp) rp.onclick = () => skReparar(c.id, { modo: 'preencher' }).catch(e => skToast(e.message));
+    const ra = el.querySelector('#sk-rep-a'); if (ra) ra.onclick = () => skReparar(c.id, { modo: 'atenuar' }).catch(e => skToast(e.message));
     const q = el.querySelector('#sk-q-limpo');
     q.oninput = () => { SK.qLimpo = +q.value; el.querySelector('#sk-q-txt').textContent = q.value + '%'; };
     el.querySelector('#sk-limpar').onclick = () => skEfeito(c.id, 'limpar', { quantidade: SK.qLimpo || 80 }).catch(e => skToast(e.message));
@@ -364,6 +373,7 @@ function skUi() {
     const play = skEl('sk-play'); if (play) { play.textContent = SK.tocando ? '■' : '▶'; play.classList.toggle('on', SK.tocando); }
     skEl('sk-rec')?.classList.toggle('on', !!SK.grav);
     skEl('sk-curva-bt')?.classList.toggle('on', !!SK.verCurva);
+    skEl('sk-esp-bt')?.classList.toggle('on', !!SK.verEsp);
     if (!SK.proj && !ini.dataset.recup) { ini.dataset.recup = '1'; skUiRecuperar().finally(() => { delete ini.dataset.recup; }); }
     skEl('sk-info').textContent = SK.proj ? `${SK.proj.nome}${SK.sujo ? ' •' : ''}` : '';
     skUiTempo(); skUiFaixas(); skUiProps();

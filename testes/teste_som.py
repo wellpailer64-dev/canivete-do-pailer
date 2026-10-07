@@ -288,6 +288,38 @@ with sync_playwright() as p:
     r = pg.evaluate("""async () => { SKN.ir(0); await skTocar(); await new Promise(r => setTimeout(r, 1200)); const b = SK.bus[SK.proj.faixas[0].id];
         const m = skMedirAgora(); skParar(); return { dyn: !!b.dyn, ir: !!b.conv.buffer, pico: m.L.pico }; }""")
     ok(r["dyn"] and r["ir"] and r["pico"] > -40, "prévia com a cadeia inteira (gate/de-esser no AudioWorklet, reverb com a IR da exportação)", str(r))
+    # ── rodada E: vista de espectro, reparo espectral (Ctrl+arrastar), separar voz/instrumental (--ia) ──
+    subprocess.run([FF, "-v", "error", "-y", "-f", "lavfi", "-i", "anoisesrc=d=6:c=pink:a=0.2", "-f", "lavfi", "-i", "sine=f=3000:d=6,volume=0.6",
+                    "-filter_complex", "[1]volume='between(t,2,3)':eval=frame[b];[0][b]amix=inputs=2:normalize=0", "-ac", "2", D + "bipe.wav"], check=True)
+    pg.evaluate("SKN.novo('vazio', 'Espectro')")
+    bid = pg.evaluate(f"async () => (await SKN.importar(['{D}bipe.wav']))[0]")
+    pg.evaluate("skEnquadrar(); SKN.espectro(true)")
+    pg.wait_for_function("(() => { const e = Object.values(SK.esp)[0]; return e && e.img && e.img.naturalWidth > 100; })()", timeout=15000)
+    ok(pg.evaluate("SK_H") == 170, "vista de espectro: faixas mais altas e espectrograma do trecho visível")
+    pos = pg.evaluate("""() => { const r = document.getElementById('sk-tl').getBoundingClientRect(), y = SK_REGUA - SK.y0;
+        const X = t => r.left + (t - SK.x0) * SK.z; return [X(1.95), r.top + skEspY(y, 3500), X(3.05), r.top + skEspY(y, 2600)]; }""")
+    pg.keyboard.down("Control"); pg.mouse.move(pos[0], pos[1]); pg.mouse.down(); pg.mouse.move(pos[2], pos[3], steps=6); pg.mouse.up(); pg.keyboard.up("Control")
+    rc = pg.evaluate("SK.rect")
+    ok(rc and abs(rc["t0"] - 1.95) < 0.05 and abs(rc["t1"] - 3.05) < 0.05 and 2400 < rc["f0"] < 2800 and 3200 < rc["f1"] < 3800, "Ctrl+arrastar marca a área (tempo × frequência)", str(rc))
+    pg.click("#sk-rep-p")
+    pg.wait_for_function("(id) => /_rep/.test(skClipe(id)[0].arq)", arg=bid, timeout=60000)
+    rep = pg.evaluate("(id) => skClipe(id)[0].arq", bid)
+    def banda(a):
+        o = subprocess.run([FF, "-hide_banner", "-i", a, "-af", "atrim=2.2:2.8,bandpass=f=3000:w=200,volumedetect", "-f", "null", "-"], capture_output=True, text=True).stderr
+        return float(re.findall(r"max_volume: (-?[\d.]+) dB", o)[-1])
+    ok(banda(D + "bipe.wav") - banda(rep) > 15 and abs(pico("4:5", rep) - pico("4:5", D + "bipe.wav")) < 0.5, "reparo espectral tira o bipe e não mexe no resto",
+       f"bipe {banda(D + 'bipe.wav')} → {banda(rep)} dB")
+    pg.evaluate("SKN.espectro(false)")
+    if "--ia" in sys.argv and os.path.isfile(D + "fala.wav"):
+        subprocess.run([FF, "-v", "error", "-y", "-i", D + "fala.wav", "-f", "lavfi", "-i", "sine=f=220:d=8,volume=0.3", "-f", "lavfi", "-i", "sine=f=330:d=8,volume=0.2",
+                        "-filter_complex", "[0]apad=pad_dur=8,atrim=0:8[v];[v][1][2]amix=inputs=3:normalize=0", "-ac", "2", D + "musica_voz.wav"], check=True)
+        pg.evaluate("SKN.novo('vazio', 'Separar')")
+        sid = pg.evaluate(f"async () => (await SKN.importar(['{D}musica_voz.wav']))[0]")
+        sp = pg.evaluate("async (id) => await SKN.separar(id)", sid)
+        dv = dur_lufs(sp["voz"])[0]
+        fim_fala = dur_lufs(D + "fala.wav")[0]
+        ok(abs(dv - 8) < 0.05 and pico(f"{fim_fala + 0.5}:7.5", sp["voz"]) < pico(f"{fim_fala + 0.5}:7.5", sp["instrumental"]) - 15,
+           "separar: voz e instrumental alinhados, a voz some onde só há música", str(sp))
     if "--longo" in sys.argv:
         lg = D + "longo_2h.mp3"
         if not os.path.isfile(lg):
@@ -305,6 +337,7 @@ with sync_playwright() as p:
         if v.get("vozes"):
             vid = pg.evaluate("async (v) => await SKN.voz(v, 'Teste do Sound Kanivete.', {ini: 1})", v["vozes"][0]["id"])
             ok(bool(vid) and any(f["nome"] == "Voz IA" for f in pg.evaluate("SKN.estado()")["faixas"]), "voz por IA entra na faixa Voz IA")
+        c0 = pg.evaluate(f"async () => {{ SKN.novo('vazio', 'IA'); return (await SKN.importar(['{D}voz.wav']))[0]; }}")
         m = pg.evaluate("async (id) => await SKN.melhorar(id)", c0)
         ok(os.path.isfile(m), "melhorar voz (IA) gera arquivo", m)
     ok(not js_erros, "sem erros de JavaScript", "; ".join(js_erros[:3]))

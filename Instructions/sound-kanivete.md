@@ -121,6 +121,18 @@ Sound Kanivete" no topo de cada página. SKN: `transcrever(idioma)`, `texto()`, 
   medidores do Monitor ficam depois do limitador.
 - Cuidado: `skIr(t)` é mover a agulha — o carregador da IR é `skIrRev` (a colisão quebrou a navegação na 1ª versão).
 
+## Espectro, reparo espectral, separar voz (rodada E, 2026-10-07)
+- `som-espectro.js` + `Functions/sk_espectro.py`. ▤ no transporte (ou E): faixas com 170 px e espectrograma do trecho
+  visível (`sk_espectro` → PNG, frequência log 40 Hz–22 kHz, pedido 250 ms depois que a vista para; cache `sk_esp`).
+- **Reparo espectral**: Ctrl+arrastar no espectro marca tempo × frequência (`SK.rect`); painel Clipe → "Preencher com
+  a vizinhança" (magnitude interpolada entre os quadros de antes e depois, fase original) ou "Atenuar (-30 dB)". Só o
+  trecho é processado (STFT 2048/512); o resto do arquivo é copiado; sai `<nome>_rep<hash>.wav` (float 32).
+- **Separar voz e instrumental**: Hybrid Demucs do torchaudio (`HDEMUCS_HIGH_MUSDB_PLUS`, pesos MIT, 335 MB baixados
+  para `modelos_ia/demucs` na 1ª vez), trechos de 10 s com 1 s de transição, CPU (~0,7 s por segundo de áudio). O clipe
+  vira a voz e uma faixa "Instrumental" alinhada entra logo abaixo.
+- Metadados e capítulos na exportação (`op.meta`, `op.capitulos`; mp3 com ID3v2.3) — base da rodada F.
+- SKN: `espectro(ligar)`, `areaEspectral(id, t0, t1, f0, f1)`, `reparar(id, {modo})`, `separar(id)`.
+
 ## Pendências
 Teste intermitente: 1ª rodada do teste_som.py logo depois de abrir o app já falhou 2× em "crossfade" (o clipe recém-
 importado sumiu do projeto antes do alterarClipe); as linhas DEBUG-A/B no teste mostram o estado se repetir.

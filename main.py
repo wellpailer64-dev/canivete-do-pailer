@@ -3337,6 +3337,14 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def sk_espectro(self, arq, t0, t1, cols=1200, rows=256):
+        """Espectrograma (PNG, frequência log 40 Hz → 22 kHz de baixo para cima) do trecho [t0, t1] do arquivo."""
+        from Functions import media_server, sk_espectro
+        try:
+            return {"success": True, "url": media_server.register(sk_espectro.espectro(arq, t0, t1, cols, rows)), "fmin": sk_espectro.FMIN, "fmax": 22050}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def sk_salvar(self, proj, caminho):
         from Functions import sound_kanivete
         return sound_kanivete.salvar(proj, caminho)
@@ -3369,6 +3377,13 @@ class ApiBridge:
                 saida = sound_kanivete.limpar_ruido(arq, op.get("quantidade", 80), log, progresso)
             elif efeito == "melhorar":
                 saida = sound_kanivete.melhorar_voz(arq, log, progresso)
+            elif efeito == "reparar":
+                from Functions import sk_espectro
+                saida = sk_espectro.reparar(arq, op["t0"], op["t1"], op["f0"], op["f1"], op.get("modo", "preencher"), op.get("db", -30), progresso)
+            elif efeito == "separar":
+                from Functions import sk_espectro
+                saida, inst = sk_espectro.separar(arq, progresso)
+                return {"saida": saida, "instrumental": inst, "origem": arq, "efeito": efeito}
             else:
                 raise RuntimeError(f"efeito desconhecido: {efeito}")
             return {"saida": saida, "origem": arq, "efeito": efeito}
