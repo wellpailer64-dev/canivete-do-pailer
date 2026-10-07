@@ -112,6 +112,11 @@
 - custo desta 1ª vez: alto (descobrir API, transcrição inteira que caiu, detector refeito 3×). Próxima: ~1/3 seguindo esta seção.
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-10-07 técnica pedida pelo usuário: TROCA DE FOCO ENTRE QUEM FALA = 2 FAIXAS DE VÍDEO IGUAIS empilhadas (V1 pessoa A,
+  V2 pessoa B, cada uma com o enquadramento da sua pessoa), cortadas nos mesmos pontos; em cada trecho fica ativa só a
+  faixa de quem está em foco, a outra DESATIVADA (Ctrl+Shift+E = `c.off = true`). Só em vídeo com troca de foco.
+  PADRÃO DE LEGENDA do usuário: sem caixa, sem contorno, sombra projetada opacidade 100, NUNCA MAIÚSCULAS (destaque da
+  palavra na cor da marca pode). Os cortes da Oficina Produtiva ficaram como estão (pediu para não mexer).
 - 2026-10-07 cortes Oficina Produtiva: "o entrevistador não apareceu em nenhum momento" → REGRA: corte de entrevista
   ABRE com a pergunta do entrevistador (enquadrado nele) que originou o assunto, e corta para a resposta; pode reordenar
   trechos para a pergunta casar com a resposta (corte 3: pergunta 5:35 → 70% → 3 horas → pilares). Pergunta sem
