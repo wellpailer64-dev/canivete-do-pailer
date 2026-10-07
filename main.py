@@ -1012,11 +1012,27 @@ def ve_win_place(titulo, x, y, w, h, maximizada=False):
     return True
 
 
-def ve_project_save(path, dados, salvar_como=False):
+def ve_project_save(path, dados, salvar_como=False, formato=None):
     """Salva o projeto .vknv. Sem caminho (ou 'salvar como'), pergunta onde salvar.
-    Projeto antigo (.vcnvt): grava um .vknv com o mesmo nome ao lado (o antigo fica como estava)."""
+    Projeto antigo (.vcnvt): grava um .vknv com o mesmo nome ao lado (o antigo fica como estava).
+    No 'salvar como' dá para escolher "Premiere Pro (XML)" (ou formato='xml', direto): grava um XML do Final Cut Pro 7
+    que o Premiere importa (Functions/premiere_xml.py); o projeto continua sendo o .vknv de antes."""
     from Functions import projeto
     try:
+        if str(path or "").lower().endswith(".xml") and not salvar_como:   # caminho já escolhido (agente/testes)
+            return _ve_salvar_xml(path, dados)
+        if formato == "xml":
+            if not _window:
+                return {"success": False}
+            nome = os.path.splitext(os.path.basename(path))[0] if path else "Meu projeto"
+            r = _window.create_file_dialog(
+                _file_dialog_kind("SAVE", webview.SAVE_DIALOG),
+                directory=os.path.dirname(path) if path else "", save_filename=nome + ".xml",
+                file_types=("Projeto do Premiere Pro em XML (*.xml)",),
+            )
+            if not r:
+                return {"success": False, "cancelled": True}
+            return _ve_salvar_xml(r[0] if isinstance(r, (list, tuple)) else r, dados)
         if not path or salvar_como:
             if not _window:
                 return {"success": False}
@@ -1033,15 +1049,23 @@ def ve_project_save(path, dados, salvar_como=False):
             r = _window.create_file_dialog(
                 _file_dialog_kind("SAVE", webview.SAVE_DIALOG),
                 directory=pasta, save_filename=sugestao,
-                file_types=("Projeto de vídeo do KANIVETE (*.vknv)",),
+                file_types=("Projeto de vídeo do KANIVETE (*.vknv)", "Projeto do Premiere Pro em XML (*.xml)"),
             )
             if not r:
                 return {"success": False, "cancelled": True}
             path = r[0] if isinstance(r, (list, tuple)) else r
+            if str(path).lower().endswith(".xml"):
+                return _ve_salvar_xml(path, dados)
         final = projeto.salvar(path, dados)
         return {"success": True, "path": final, "name": os.path.basename(final)}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+def _ve_salvar_xml(path, dados):
+    from Functions import premiere_xml
+    final, relatorio = premiere_xml.exportar(path, dados)
+    return {"success": True, "xml": True, "path": final, "name": os.path.basename(final), "relatorio": relatorio}
 
 
 def ve_project_open(path=None):
@@ -3567,8 +3591,8 @@ class ApiBridge:
     def prefs_save(self, dados):
         return prefs_save(dados)
 
-    def ve_project_save(self, path, dados, salvar_como=False):
-        return ve_project_save(path, dados, salvar_como)
+    def ve_project_save(self, path, dados, salvar_como=False, formato=None):
+        return ve_project_save(path, dados, salvar_como, formato)
 
     def ve_project_open(self, path=None):
         return ve_project_open(path)

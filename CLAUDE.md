@@ -65,6 +65,8 @@ do .vknv; abre sem caminho (Ctrl+S grava um .vknv ao lado). Vêm cortes, trilhas
 (aproximado); o resto vai para o relatório. Teste: `python testes/teste_premiere.py "<projeto.prproj>"`
 (use uma CÓPIA do projeto do usuário, ex. `D:\kanivete_testes\premiere\`).
 Mapa do formato, mapeamento, limitações e pendências: `Instructions/importar-premiere.md`.
+Volta para o Premiere: XML do FCP7 (`Functions/premiere_xml.py`, Arquivo › Exportar para o Premiere; teste
+`testes/teste_premiere_xml.py`).
 **AJUSTE PREMIERE** (próxima rodada: clipes trocados/fora do tempo, camadas de ajuste, transições de sobreposição,
 textos): plano em `Instructions/agente/ajuste-premiere.md`.
 

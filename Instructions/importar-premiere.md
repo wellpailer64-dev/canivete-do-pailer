@@ -67,7 +67,7 @@ Feito em 2026-10-02 e testado com um projeto do Premiere 2025 (Version 45): 7 se
   clipe, legendas (DataTrack) e marcadores de clipe.
 - Chroma Key aproximado: o Ultra Key e o Keylight do editor são modelos diferentes, então a borda sai mais dura.
 - A escala considera que o clipe NÃO usa "Ajustar ao tamanho do quadro" do Premiere (`ScaleToFramePolicy` ainda não é lido).
-- Só ida: não salvamos de volta em `.prproj`.
+- Não gravamos `.prproj`; a volta é pelo XML (seção abaixo).
 
 ## Pendências (ordem sugerida)
 Plano detalhado da próxima rodada, com o que o usuário viu: **AJUSTE PREMIERE**, em `Instructions/agente/ajuste-premiere.md`.
@@ -83,3 +83,21 @@ Plano detalhado da próxima rodada, com o que o usuário viu: **AJUSTE PREMIERE*
 a duração da timeline contra `MZ.OutPoint`, os quadros-chave dentro do clipe e a mídia encontrada.
 Para olhar a estrutura: descompacte (`gzip`) e procure o objeto pelo ObjectID/ObjectUID; os scripts usados na
 exploração estão em `D:\kanivete_testes\premiere\x\`.
+
+## Exportar para o Premiere (XML do Final Cut Pro 7)
+Código: `Functions/premiere_xml.py` (`exportar`), `main.py` (`ve_project_save(..., formato='xml')`, `_ve_salvar_xml`),
+`frontend/js/editor.js` (`veSaveProject(true, 'xml')`, `vePremiereXmlRelatorio`). Teste: `py -3.13 testes/teste_premiere_xml.py
+["<projeto.vknv>"]` (sem projeto = caso sintético com valores conferidos).
+- Usuário: Arquivo › "Exportar para o Premiere (XML)..." ou Salvar como › tipo "Projeto do Premiere Pro em XML". No Premiere:
+  Arquivo › Importar. Volta: salvar no Premiere e abrir o `.prproj` no Kanivete. O projeto aberto continua sendo o .vknv.
+- Caminho `.xml` passado direto em `ve_project_save` exporta sem diálogo (agente/testes).
+- O `.vknv` agora guarda `fps`, `w`, `h` (do editor) para o XML; sem eles: 30 fps, 1920×1080.
+- Vão: todas as timelines (aninhadas e Comps = clipe de sequência), cortes, faixas (oculta/muda/travada), vínculos,
+  velocidade (Time Remap, negativa = reverse), clipe desligado, ganho (Audio Levels, até +12 dB), Basic Motion
+  (escala, rotação, centro) e Opacidade com quadros-chave (lineares), Cross Dissolve / Cross Fade (+3dB), marcadores.
+- Conferido no Premiere (2026-10-06): o centro do Basic Motion é fração do tamanho ORIGINAL da mídia,
+  (x − L/2)/Lmídia, (y − A/2)/Amídia; sem Basic Motion o Premiere encolhe o vertical 1080×1920 (sempre gravar);
+  vídeo de celular com rotação 90° troca largura/altura.
+- Não vão (relatório): efeitos do editor, textos, ajuste, cor, forma, desenho, legendas, Cena 3D, outras transições.
+- Convenções adotadas (a CONFERIR no Premiere, que não está nesta máquina): in/out e `<when>` em quadros da mídia já com a
+  velocidade; rotação no mesmo sentido; transição de entrada `start-black`, saída `end-black`.

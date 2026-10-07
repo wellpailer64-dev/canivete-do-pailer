@@ -4077,15 +4077,18 @@ function veProjectData() {
         markers: VE.markers || [],
         playhead: VE.playhead,
         view: { pps: VE.pps, x: VE.view },
+        fps: VE.fps, w: VE.seqW, h: VE.seqH,   // para o XML do Premiere (Functions/premiere_xml.py)
         salvo_em: new Date().toISOString(),
     };
 }
 
-function veSaveProject(comoNovo) {
+function veSaveProject(comoNovo, formato) {
     if (!VE.ready) { veToast('Abra um vídeo antes de salvar'); return Promise.resolve(false); }
     const chaveAntiga = typeof vePrChave === 'function' ? vePrChave() : null;
-    return window.pywebview.api.ve_project_save(VE.projectPath, JSON.stringify(veProjectData()), !!comoNovo).then(r => {
+    return window.pywebview.api.ve_project_save(VE.projectPath, JSON.stringify(veProjectData()), !!comoNovo, formato || null).then(r => {
         if (!r || !r.success) { if (r && r.error) veToast('Não foi possível salvar: ' + r.error); return false; }
+        // XML do Premiere: só uma cópia para lá; o projeto aberto continua sendo o .vknv (e "não salvo", se era)
+        if (r.xml) { vePremiereXmlRelatorio(r.name, r.relatorio || {}); return true; }
         const convertido = /\.vcnvt$/i.test(VE.projectPath || '') && /\.vknv$/i.test(r.path);
         VE.projectPath = r.path;
         if (convertido) setTimeout(() => veToast(veT('Projeto convertido para .vknv (o .vcnvt antigo continua na pasta)')), 1600);
@@ -4403,6 +4406,25 @@ function veApplyProject() {
 }
 
 // Relatório da importação do Premiere (Functions/premiere.py): sequências, o que ficou de fora e mídia faltando
+function vePremiereXmlRelatorio(nome, r) {
+    const linhas = [];
+    linhas.push(`${veT('Sequências')}: ${(r.sequencias || []).map(s => `${s.nome} (${s.clipes})`).join(', ')}`);
+    linhas.push('', veT('No Premiere: Arquivo › Importar e escolha este .xml.'));
+    if ((r.aproximados || []).length) {
+        linhas.push('', veT('Vai aproximado:'));
+        r.aproximados.forEach(i => linhas.push(`• ${i.o_que}: ${i.qtd}`));
+    }
+    if ((r.ignorados || []).length) {
+        linhas.push('', veT('Não vai (o XML do Premiere não leva):'));
+        r.ignorados.slice(0, 14).forEach(i => linhas.push(`• ${i.o_que}: ${i.qtd}`));
+        if (r.ignorados.length > 14) linhas.push(`• … ${r.ignorados.length - 14} ${veT('outros')}`);
+    }
+    linhas.push('', veT('Para voltar ao Kanivete, abra o .prproj salvo no Premiere.'));
+    if (typeof appConfirm === 'function') appConfirm({ titulo: `${veT('Exportado para o Premiere')}: ${nome}`, texto: linhas.join('\n'),
+        botoes: [{ rotulo: 'OK', valor: true, tipo: 'primario' }] });
+    else veToast(veT('Exportado para o Premiere') + ': ' + nome);
+}
+
 function vePremiereRelatorio(nome, r) {
     const linhas = [];
     const seqs = (r.sequencias || []).map(s => `${s.nome} (${s.clipes})`).join(', ');
