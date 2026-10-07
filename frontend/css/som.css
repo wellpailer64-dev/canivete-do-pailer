@@ -1,7 +1,7 @@
 /* Sound Kanivete (som.js) — reaproveita o visual do Photo (classes ie-*); aqui só o que é dele */
 .sk-page { padding: 0; }
 .content-area:has(#page-sound-kanivete.active) { padding: 10px; overflow: hidden; }
-.sk { display: grid; grid-template-rows: auto var(--sk-cima, 300px) 6px minmax(0, 1fr) 24px; height: 100%; background: var(--ie-fundo, #141110); position: relative; }
+.sk { display: grid; grid-template-rows: auto minmax(0, 1fr) 24px; height: 100%; background: var(--ie-fundo, #141110); position: relative; }
 .sk .ie-top { gap: 10px; }
 .sk-tbar { display: flex; align-items: center; gap: 6px; margin-left: 12px; }
 .sk-sep { width: 1px; height: 20px; background: var(--ie-linha, #2c2520); margin: 0 4px; }
@@ -104,3 +104,30 @@
 .sk-geq label { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 9.5px; color: var(--text-3); }
 .sk-geq input { writing-mode: vertical-lr; direction: rtl; width: 16px; height: 86px; accent-color: #ffd166; }
 .sk-geq small { font-size: 9px; }
+
+/* painéis móveis (som-dock.js): colunas à esquerda e à direita; no centro o Monitor, a divisória e a timeline */
+.sk-meio { display: flex; min-height: 0; min-width: 0; }
+.sk-dock { flex: none; overflow: hidden; }
+.sk-dock.vazia { width: 0; }
+.sk-centro { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-rows: var(--sk-cima, 230px) 6px minmax(0, 1fr); }
+.sk-centro .sk-monitor { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; min-height: 0; background: #17120f; }
+.sk-pnl .sk-pn-corpo { flex: 1; }
+.sk-pnl .ie-painel-cab { text-transform: none; letter-spacing: 0; font-size: 12px; }
+.sk-menu { position: relative; }
+.sk-menu-pop { position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; min-width: 190px; background: #1f1915; border: 1px solid #3a3029; border-radius: 8px; padding: 4px; box-shadow: 0 8px 24px #0008; display: flex; flex-direction: column; }
+.sk-menu-pop[hidden] { display: none; }
+.sk-menu-pop button { text-align: left; background: none; border: 0; color: var(--text-2); padding: 6px 10px 6px 26px; border-radius: 5px; cursor: pointer; font: 12px var(--font-ui); position: relative; }
+.sk-menu-pop button:hover { background: #2a221d; color: var(--text); }
+.sk-menu-pop button.on::before { content: '✓'; position: absolute; left: 9px; color: #ffd166; }
+.sk-menu-pop hr { border: 0; border-top: 1px solid #3a3029; margin: 4px 0; }
+/* Texto para Voz */
+.sk-vozes { display: flex; flex-direction: column; gap: 4px; max-height: 190px; overflow-y: auto; }
+.sk-voz { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 5px 6px; border: 1px solid transparent; border-radius: 7px; cursor: pointer; }
+.sk-voz:hover { background: #221b16; }
+.sk-voz.on { border-color: #ffd166; background: #2a2008; }
+.sk-voz-av { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #3a2a1d; color: #ffd166; font-weight: 700; }
+.sk-voz-n { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sk-voz-n small { display: block; color: var(--text-3); font-size: 10.5px; }
+.sk-pnl select, .sk-pnl input[type=number] { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.sk-pnl .sk-exp label > select { width: 100%; }
+.sk-pnl .sk-p-l > select { grid-column: 2 / 4; }

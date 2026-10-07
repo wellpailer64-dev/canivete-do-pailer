@@ -133,9 +133,22 @@ Sound Kanivete" no topo de cada página. SKN: `transcrever(idioma)`, `texto()`, 
 - Metadados e capítulos na exportação (`op.meta`, `op.capitulos`; mp3 com ID3v2.3) — base da rodada F.
 - SKN: `espectro(ligar)`, `areaEspectral(id, t0, t1, f0, f1)`, `reparar(id, {modo})`, `separar(id)`.
 
+## Painéis móveis e Texto para Voz (2026-10-07, pedido do usuário)
+- `som-dock.js`: o mesmo mecanismo do Photo/Vetor. Cada ferramenta é um painel (Mídia, Sons, Texto para Voz, Gravar,
+  Clipe, Faixa, Transcrição, Exportar) em colunas à esquerda/direita do centro (Monitor em cima, divisória, timeline).
+  Arrastar o título empilha, cria coluna (bordas) ou solta sobre o centro; duplo clique recolhe; × fecha; botão
+  "Painéis ▾" no cabeçalho reabre e redefine. Layout em `iePref('sk_paineis')`. Renderização: `SK_DOCK_REND[id](el)`
+  com o corpo `#sk-p-<id>`; `skUiEsq()`/`skUiProps()` redesenham os grupos; `skDockMostrar(id)` abre e desdobra
+  (`skAba(lado, id)` ficou como atalho). Gravar não abre mais o microfone sozinho: "Testar nível" liga o medidor.
+- **Texto para Voz** (antes "Voz IA", OmniVoice): vozes em lista com ▶ da referência (`sk_vozes` → `ref_url`), texto
+  com contagem e duração estimada (Ctrl+Enter gera), um clipe por parágrafo, números por extenso, idioma, velocidade,
+  expressão (guidance), pausa entre frases, qualidade (passos 16/32/64), fala limpa, faixa de destino (Texto para
+  Voz, nova ou existente) e posição (agulha ou fim da faixa); histórico da sessão para inserir de novo. Opções
+  lembradas em localStorage `sk-tts`. `skGerarTts()`; `skVoz(voz, texto, {faixa, ini, op})` repassa as opções.
+- Teste: o teste agora espera a ponte do pywebview (`pywebview.api.sk_info`) — a "falha intermitente" da 1ª rodada era
+  o teste importando antes de a API existir.
+
 ## Pendências
-Teste intermitente: 1ª rodada do teste_som.py logo depois de abrir o app já falhou 2× em "crossfade" (o clipe recém-
-importado sumiu do projeto antes do alterarClipe); as linhas DEBUG-A/B no teste mostram o estado se repetir.
 Rodadas seguintes do plano profissional:
 E espectrograma e reparo espectral, separar voz da música; F editar pelo texto (apagar palavras/vícios), stems, ID3/capítulos, modelos salvos.
 Separar voz da música (precisa de um modelo de separação; o UVR/Roformer foi testado no anti-noise), curva de volume

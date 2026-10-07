@@ -487,10 +487,10 @@ function skOriginal(id) {
     for (const f of SK.proj.faixas) for (const x of f.clipes) if (x.arq === atual && x.orig) { x.arq = x.orig; delete x.orig; delete x.efeitos; }
     skMudou('original');
 }
-async function skVoz(vozId, texto, { faixa = null, ini = null } = {}) {
-    const r = await skTarefa(() => skApi().sk_voz(vozId, texto, {}));
+async function skVoz(vozId, texto, { faixa = null, ini = null, op = null } = {}) {
+    const r = await skTarefa(() => skApi().sk_voz(vozId, texto, op || {}));
     if (!r.saida) throw new Error('a voz não foi gerada');
-    let f = SK.proj.faixas.find(x => x.id === faixa) || SK.proj.faixas.find(x => /voz ia/i.test(x.nome)) || skNovaFaixa('Voz IA');
+    let f = SK.proj.faixas.find(x => x.id === faixa) || SK.proj.faixas.find(x => /texto para voz|voz ia/i.test(x.nome)) || skNovaFaixa('Texto para Voz');
     const ids = await skImportar([r.saida], { faixa: f.id, ini: ini ?? SK.ph });
     return ids[0];
 }
@@ -518,7 +518,7 @@ async function skTranscrever(idioma = 'pt', faixas = null) {
     if (!SK.proj) throw new Error('abra um projeto');
     const r = await skTarefa(() => skApi().sk_transcrever(SK.proj, idioma, faixas));
     SK.texto = { palavras: r.palavras, idioma };
-    SK.painel = 'texto'; skUiProps();
+    skDockMostrar('texto');
     return r.palavras.length;
 }
 

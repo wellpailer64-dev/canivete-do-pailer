@@ -50,7 +50,7 @@ with sync_playwright() as p:
     pg = b.contexts[0].pages[0]
     js_erros = []
     pg.on("pageerror", lambda e: js_erros.append(str(e)))
-    pg.wait_for_function("typeof switchTool === 'function' && window.SKN", timeout=90000)
+    pg.wait_for_function("typeof switchTool === 'function' && window.SKN && !!window.pywebview?.api?.sk_info", timeout=90000)   # a ponte do pywebview chega depois da página
     pg.evaluate("switchTool('sound-kanivete'); document.getElementById('app-update-banner')?.remove(); SK.proj = null; skParar(); skUi()")
     pg.wait_for_timeout(400)
     ok(pg.evaluate("!document.getElementById('sk-inicio').hidden"), "tela inicial do Sound Kanivete")
@@ -113,7 +113,7 @@ with sync_playwright() as p:
         ok(n >= 3 and "teste" in txt.lower(), "transcrever a mixagem (palavras com tempo)", txt)
         leg = pg.evaluate("SKN.legendas()")
         ok(leg and leg[0]["st"] >= 0 and leg[-1]["en"] > leg[0]["st"], "legendas agrupadas em linhas", str(leg)[:120])
-        pg.click("#sk-props .sk-texto span[data-i='1']")
+        pg.click("#sk-p-texto .sk-texto span[data-i='1']")
         ok(abs(pg.evaluate("SKN.estado().agulha") - pg.evaluate("SK.texto.palavras[1][0]")) < 0.01, "clicar na palavra leva a agulha")
     sb = pg.evaluate("async () => await skApi().ve_sb_estado()")
     if sb.get("instalado"):
@@ -159,10 +159,8 @@ with sync_playwright() as p:
     ok(med and med["M"] > -40 and med["f"] > -30, "medidores: LUFS do master e pico da faixa", str(med))
     pg.evaluate("SKN.novo('vazio', 'Cross')")
     a = pg.evaluate(f"async () => (await SKN.importar(['{D}voz.wav'], {{ini: 0}}))[0]")
-    if not pg.evaluate("(a) => !!skClipe(a)[0]", a): print("DEBUG-A", a, pg.evaluate("JSON.stringify(SKN.estado())"))
     pg.evaluate("(a) => SKN.alterarClipe(a, {dur: 4})", a)
     b2 = pg.evaluate(f"async () => (await SKN.importar(['{D}voz.wav'], {{ini: 3}}))[0]")
-    if not pg.evaluate("(a) => !!skClipe(a)[0]", b2): print("DEBUG-B", b2, pg.evaluate("JSON.stringify(SKN.estado())"))
     pg.evaluate("(b) => SKN.alterarClipe(b, {dur: 4, de: 3})", b2)   # mesma fase da onda: crossfade linear mantém o nível
     arq = pg.evaluate(f"async () => (await SKN.exportar('{D}cross.wav', {{formato: 'wav'}})).caminho")
     def pico(trecho, a=arq):
@@ -179,19 +177,30 @@ with sync_playwright() as p:
     ok(max(abs(x) for x in fim) < 400, "micro-fade no fim do corte (sem estalo)", str(fim))
     pg.evaluate("SK.sel = SKN.estado().faixas[0].clipes[0].id; skUi()")
     for aba, alvo in (("faixa", "data-fx"), ("exportar", "ske-f"), ("texto", "sk-transc"), ("clipe", "data-p=\"ini\"")):
-        pg.click(f"#sk .sk-abas [data-aba={aba}]")
-        ok(alvo in pg.inner_html("#sk-props"), f"painel da direita: aba {aba}")
-    pg.click("#sk .sk-abas [data-aba=midia]")
+        pg.evaluate(f"skDockMostrar('{aba}')")
+        ok(alvo in pg.inner_html(f"#sk-p-{aba}"), f"painel {aba}")
+    pg.evaluate("skDockMostrar('midia')")
     n0 = len(pg.evaluate("SKN.estado().faixas[0].clipes"))
-    pg.click("#sk-esq [data-por]")
+    pg.click("#sk-p-midia [data-por]")
     pg.wait_for_function(f"SKN.estado().faixas[0].clipes.length > {n0}", timeout=5000)
     ok(True, "Mídia: + insere o áudio na agulha")
-    h0 = pg.evaluate("document.querySelector('#sk .sk-cima').getBoundingClientRect().height")
+    h0 = pg.evaluate("document.querySelector('#sk .sk-monitor').getBoundingClientRect().height")
     bx = pg.evaluate("(() => { const r = document.getElementById('sk-div').getBoundingClientRect(); return [r.left + r.width / 2, r.top + 3]; })()")
     pg.mouse.move(*bx); pg.mouse.down(); pg.mouse.move(bx[0], bx[1] + 60, steps=5); pg.mouse.up()
-    h1 = pg.evaluate("document.querySelector('#sk .sk-cima').getBoundingClientRect().height")
+    h1 = pg.evaluate("document.querySelector('#sk .sk-monitor').getBoundingClientRect().height")
     ok(abs(h1 - h0 - 60) < 3, "divisória arrasta e redimensiona os painéis", f"{h0} → {h1}")
     pg.mouse.move(bx[0], bx[1] + 60); pg.mouse.down(); pg.mouse.move(*bx, steps=5); pg.mouse.up()
+    # painéis móveis: arrastar o título do Texto para Voz para cima da timeline (solto) e de volta para a coluna da esquerda
+    pg.evaluate("skDockMostrar('tts')")
+    cab = pg.evaluate("(() => { const r = SK_DOCK.el.tts.querySelector('.ie-painel-cab').getBoundingClientRect(); return [r.left + 40, r.top + r.height / 2]; })()")
+    alvo = pg.evaluate("(() => { const r = document.getElementById('sk-tl-wrap').getBoundingClientRect(); return [r.left + r.width / 2, r.top + 80]; })()")
+    pg.mouse.move(*cab); pg.mouse.down(); pg.mouse.move(*alvo, steps=10); pg.mouse.up()
+    solto = pg.evaluate("!!SK_DOCK.lay.soltos.tts && SK_DOCK.el.tts.classList.contains('solto')")
+    cab = pg.evaluate("(() => { const r = SK_DOCK.el.tts.querySelector('.ie-painel-cab').getBoundingClientRect(); return [r.left + 40, r.top + r.height / 2]; })()")
+    col = pg.evaluate("(() => { const r = document.querySelector('#sk-dock-esq .ie-dock-col').getBoundingClientRect(); return [r.left + r.width / 2, r.top + 10]; })()")
+    pg.mouse.move(*cab); pg.mouse.down(); pg.mouse.move(*col, steps=10); pg.mouse.up()
+    ok(solto and pg.evaluate("SK_DOCK.lay.esq[0][0] === 'tts' && !SK_DOCK.lay.soltos.tts"), "painéis: arrastar solta sobre a timeline e encaixa de volta na coluna", str(pg.evaluate("SK_DOCK.lay.esq")))
+    pg.evaluate("skDockRedefinir()")
     # ── rodada B: gravar do microfone, salvamento automático e recuperação, arquivo longo (--longo) ──
     ent = pg.evaluate("async () => await SKN.entradas()")
     if ent.get("dispositivos"):

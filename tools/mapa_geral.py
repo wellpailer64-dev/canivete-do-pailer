@@ -38,7 +38,7 @@ FERR = {
                        "guias": ["vetor-kanivete.md", "agente/mapa-vetor.md", "agente/plano-economia-ponte-vetor-photo.md"],
                        "testes": ["teste_vetor", "teste_pranchetas", "teste_fonte", "teste_illustrator", "teste_vetor_paineis", "teste_ponte", "teste_blender"],
                        "auto": "window.VKN (VKN.cmd(nome, args) = os comandos abaixo; VKN.mapa(), VKN.fechamento(), VKN.cena); Worker: executor_vetor.js"},
-    "sound-kanivete": {"front": ["som.js", "som-motor.js", "som-paineis.js", "som-gravar.js", "som.css"], "back": ["sound_kanivete", "sk_gravar"], "api": ["sk_"], "guias": ["sound-kanivete.md"], "testes": ["teste_som"],
+    "sound-kanivete": {"front": ["som.js", "som-motor.js", "som-paineis.js", "som-gravar.js", "som-dock.js", "som-espectro.js", "som.css"], "back": ["sound_kanivete", "sk_gravar", "sk_espectro"], "api": ["sk_"], "guias": ["sound-kanivete.md"], "testes": ["teste_som"],
                        "auto": "window.SKN (som.js): novo, importar, cortar, alterarClipe, exportar, estado..."},
     "compressor-video": {"back": ["compressor_video"], "api": ["compressor_video", "compressor_"], "guias": []},
     "video-converter": {"back": ["videoconverter"], "api": ["video_conver", "converter_video"], "guias": ["video-converter.md"]},

@@ -3428,7 +3428,9 @@ class ApiBridge:
         from Functions.omnivoice_tool import status
         try:
             s = status()
-            return {"success": True, "instalado": bool(s.get("installed")), "vozes": [{"id": v.get("id"), "nome": v.get("name")} for v in s.get("voices") or []]}
+            from Functions import media_server
+            ref = lambda v: media_server.register(v["reference_audio"]) if v.get("reference_audio") and os.path.isfile(v["reference_audio"]) else None
+            return {"success": True, "instalado": bool(s.get("installed")), "vozes": [{"id": v.get("id"), "nome": v.get("name"), "dur": v.get("duration"), "ref_url": ref(v)} for v in s.get("voices") or []]}
         except Exception as e:
             return {"success": False, "error": str(e)}
 

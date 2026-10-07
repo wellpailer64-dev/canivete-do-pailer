@@ -5,14 +5,13 @@
 // placa ainda). Aba Gravar aberta = entrada aberta só medindo o nível.
 // =========================================================
 SK.grav = null; SK.mon = null;
-SK_ABAS_ESQ.push(['gravar', 'Gravar']);
 
 async function skMonitorarEntrada(ligar) {
     if (SK.grav) return;
     clearInterval(SK.monTimer); SK.monTimer = 0;
     if (!ligar) { if (SK.mon) { SK.mon = null; await skApi().sk_gravar('parar'); } return; }
     const r = await skApi().sk_gravar('iniciar', SK.micDev ?? null, null, 48000, SK.micCan || 1);
-    if (!r.success) { SK.mon = { erro: r.error }; skUiEsq(); return; }
+    if (!r.success) { SK.mon = { erro: r.error }; skDockRender(['gravar']); return; }
     SK.mon = { pico: -120 };
     SK.monTimer = setInterval(skLerEntrada, 100);
 }
@@ -27,7 +26,7 @@ async function skLerEntrada() {
 function skUiGravar(el) {
     if (!SK.mics) {
         el.innerHTML = '<div class="sk-p-info">Procurando entradas…</div>';
-        skApi().sk_gravar('dispositivos').then(r => { SK.mics = r.success ? r : { dispositivos: [], erro: r.error }; if (SK.abaEsq === 'gravar') skUiEsq(); });
+        skApi().sk_gravar('dispositivos').then(r => { SK.mics = r.success ? r : { dispositivos: [], erro: r.error }; skDockRender(['gravar']); });
         return;
     }
     try { if (SK.micDev == null) SK.micDev = JSON.parse(localStorage.getItem('sk-mic') ?? 'null'); } catch (e) { /* sem storage */ }
@@ -35,12 +34,13 @@ function skUiGravar(el) {
     el.innerHTML = `<label class="sk-p-l2">Entrada <select id="sk-mic" class="notranslate"><option value="">Padrão do Windows</option>${ds.map(d => `<option value="${d.id}"${d.id === SK.micDev ? ' selected' : ''}>${skEsc(d.nome)} (${skEsc(d.api.replace('Windows ', ''))})</option>`).join('')}</select></label>
         <label class="sk-p-l2">Canais <select id="sk-mic-can"><option value="1">Mono</option><option value="2"${SK.micCan === 2 ? ' selected' : ''}>Estéreo</option></select></label>
         <div class="sk-mic"><div class="sk-mic-nivel" id="sk-mic-nivel"></div></div><div class="sk-p-info notranslate" id="sk-mic-txt">${SK.mon?.erro ? skEsc(SK.mon.erro) : '–'}</div>
-        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini sk-rec-btn${SK.grav ? ' on' : ''}" id="sk-gravar">${SK.grav ? '■ Parar gravação' : '● Gravar'}</button></div>
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini sk-rec-btn${SK.grav ? ' on' : ''}" id="sk-gravar">${SK.grav ? '■ Parar gravação' : '● Gravar'}</button>
+        <button class="ie-btn ie-btn-mini${SK.mon ? ' on' : ''}" id="sk-mic-testar" ${SK.grav ? 'disabled' : ''}>${SK.mon ? 'Parar teste' : 'Testar nível'}</button></div>
         <div class="sk-p-info">Grava na faixa escolhida a partir da agulha (R grava/para); as outras faixas tocam junto. O arquivo (WAV 24 bits) fica ao lado do projeto e é escrito direto no disco: se o app fechar, o que foi gravado fica.</div>`;
-    el.querySelector('#sk-mic').onchange = e => { SK.micDev = e.target.value === '' ? null : +e.target.value; try { localStorage.setItem('sk-mic', JSON.stringify(SK.micDev)); } catch (er) { /* sem storage */ } skMonitorarEntrada(true); };
-    el.querySelector('#sk-mic-can').onchange = e => { SK.micCan = +e.target.value; skMonitorarEntrada(true); };
+    el.querySelector('#sk-mic').onchange = e => { SK.micDev = e.target.value === '' ? null : +e.target.value; try { localStorage.setItem('sk-mic', JSON.stringify(SK.micDev)); } catch (er) { /* sem storage */ } if (SK.mon) skMonitorarEntrada(true); };
+    el.querySelector('#sk-mic-can').onchange = e => { SK.micCan = +e.target.value; if (SK.mon) skMonitorarEntrada(true); };
+    el.querySelector('#sk-mic-testar').onclick = () => skMonitorarEntrada(!SK.mon).then(() => skDockRender(['gravar']));
     el.querySelector('#sk-gravar').onclick = () => (SK.grav ? skGravarParar() : skGravar()).catch(e => skToast(e.message));
-    if (!SK.mon && !SK.grav) skMonitorarEntrada(true);
 }
 async function skGravar({ caminho = null } = {}) {
     if (SK.grav) return;
@@ -58,7 +58,7 @@ async function skGravar({ caminho = null } = {}) {
     SK.grav = { ini: SK.ph, faixa: f.id, caminho, seg: 0, pico: -120 };
     SK.monTimer = setInterval(skLerEntrada, 100);
     skTocar();   // as outras faixas tocam junto e a agulha anda
-    skUi(); skUiEsq();
+    skUi();
     return caminho;
 }
 async function skGravarParar() {
@@ -70,7 +70,6 @@ async function skGravarParar() {
         SK.ph = g.ini;
         const ids = await skImportar([r.caminho], { faixa: g.faixa, ini: g.ini });
         skToast(`Gravado: ${skTempo(r.dur)}`);
-        if (SK.abaEsq === 'gravar') { skUiEsq(); skMonitorarEntrada(true); }
         return ids[0];
     }
     skUi(); return null;

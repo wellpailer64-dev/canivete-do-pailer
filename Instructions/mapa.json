@@ -228,6 +228,8 @@
    "nome": "Sound Kanivete",
    "grupo": "Áudio",
    "front": [
+    "som-dock.js",
+    "som-espectro.js",
     "som-gravar.js",
     "som-motor.js",
     "som-paineis.js",
@@ -236,7 +238,8 @@
    ],
    "back": [
     "Functions/sound_kanivete.py",
-    "Functions/sk_gravar.py"
+    "Functions/sk_gravar.py",
+    "Functions/sk_espectro.py"
    ],
    "api": [
     "sk_info",
@@ -1173,6 +1176,7 @@
   "sk_vozes": {
    "args": "",
    "modulos": [
+    "media_server",
     "omnivoice_tool"
    ]
   },
