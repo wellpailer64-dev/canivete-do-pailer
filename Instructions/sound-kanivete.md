@@ -145,6 +145,10 @@ Sound Kanivete" no topo de cada página. SKN: `transcrever(idioma)`, `texto()`, 
   expressão (guidance), pausa entre frases, qualidade (passos 16/32/64), fala limpa, faixa de destino (Texto para
   Voz, nova ou existente) e posição (agulha ou fim da faixa); histórico da sessão para inserir de novo. Opções
   lembradas em localStorage `sk-tts`. `skGerarTts()`; `skVoz(voz, texto, {faixa, ini, op})` repassa as opções.
+- Vozes no próprio painel: **+ Nova voz** (nome, referência = clipe escolhido na timeline (até 30 s) ou arquivo,
+  texto da referência opcional — em branco o OmniVoice transcreve —, limpar a referência) → `sk_voz_criar`
+  (`skCriarVoz`); **×** em cada voz exclui com confirmação no próprio botão ("Excluir?", 2º clique) → `sk_voz_apagar`
+  (`skApagarVoz`). As vozes são as mesmas da ferramenta Geração de Voz (banco do OmniVoice). Testes usam a voz Fran.
 - Teste: o teste agora espera a ponte do pywebview (`pywebview.api.sk_info`) — a "falha intermitente" da 1ª rodada era
   o teste importando antes de a API existir.
 

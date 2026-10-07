@@ -128,6 +128,10 @@
 .sk-voz-av { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #3a2a1d; color: #ffd166; font-weight: 700; }
 .sk-voz-n { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sk-voz-n small { display: block; color: var(--text-3); font-size: 10.5px; }
+.sk-voz-bts { display: flex; gap: 4px; }
+.sk-voz-x { opacity: .55; }
+.sk-voz:hover .sk-voz-x { opacity: 1; }
+.sk-voz-x.confirma { opacity: 1; background: #ff3b30; border-color: #ff3b30; color: #fff; }
 .sk-pnl select, .sk-pnl input[type=number] { min-width: 0; max-width: 100%; box-sizing: border-box; }
 .sk-pnl .sk-exp label > select { width: 100%; }
 .sk-pnl .sk-p-l > select { grid-column: 2 / 4; }

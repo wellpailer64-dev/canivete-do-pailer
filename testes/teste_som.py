@@ -344,11 +344,21 @@ with sync_playwright() as p:
     if "--ia" in sys.argv:
         v = pg.evaluate("async () => await SKN.vozes()")
         if v.get("vozes"):
-            vid = pg.evaluate("async (v) => await SKN.voz(v, 'Teste do Sound Kanivete.', {ini: 1})", v["vozes"][0]["id"])
+            # voz dos testes: Fran (pedido do usuário)
+            vid = pg.evaluate("async (v) => await SKN.voz(v, 'Teste do Sound Kanivete.', {ini: 1})", next((x["id"] for x in v["vozes"] if x["nome"].strip().lower() == "fran"), v["vozes"][0]["id"]))
             ok(bool(vid) and any(f["nome"] == "Voz IA" for f in pg.evaluate("SKN.estado()")["faixas"]), "voz por IA entra na faixa Voz IA")
         c0 = pg.evaluate(f"async () => {{ SKN.novo('vazio', 'IA'); return (await SKN.importar(['{D}voz.wav']))[0]; }}")
         m = pg.evaluate("async (id) => await SKN.melhorar(id)", c0)
         ok(os.path.isfile(m), "melhorar voz (IA) gera arquivo", m)
+        # criar voz a partir do clipe escolhido e excluir (dois cliques) pelo painel Texto para Voz
+        pg.evaluate(f"async () => {{ SKN.novo('vazio', 'Vozes'); const [id] = await SKN.importar('{D}fala.wav'); SK.sel = id; skUi(); skDockMostrar('tts'); }}")
+        pg.wait_for_selector("#skv-nova", timeout=30000)
+        pg.click("#skv-nova"); pg.fill("#skv-n-nome", "Teste Sk"); pg.click("#skv-n-ok")
+        pg.wait_for_function("SK.vozes && SK.vozes.vozes && SK.vozes.vozes.some(v => v.nome === 'Teste Sk')", timeout=600000)
+        vid = pg.evaluate("SK.vozes.vozes.find(v => v.nome === 'Teste Sk').id")
+        pg.click(f"#sk-p-tts [data-apagar='{vid}']"); pg.click(f"#sk-p-tts [data-apagar='{vid}']")
+        pg.wait_for_function("(id) => SK.vozes && SK.vozes.vozes && !SK.vozes.vozes.some(v => v.id === id)", arg=vid, timeout=30000)
+        ok(pg.evaluate("SK.vozes.vozes.some(v => /^fran$/i.test(v.nome.trim()))"), "Texto para Voz: criar voz do clipe e excluir no painel (as outras ficam)")
     ok(not js_erros, "sem erros de JavaScript", "; ".join(js_erros[:3]))
 print("RESULTADO:", "REPROVADO" if erros else "PASSOU")
 sys.exit(1 if erros else 0)

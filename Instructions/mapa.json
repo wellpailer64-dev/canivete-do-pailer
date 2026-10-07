@@ -258,6 +258,8 @@
     "sk_silencios",
     "sk_pasta_padrao",
     "sk_vozes",
+    "sk_voz_criar",
+    "sk_voz_apagar",
     "sk_voz",
     "sk_dialogo"
    ],
@@ -1177,6 +1179,19 @@
    "args": "",
    "modulos": [
     "media_server",
+    "omnivoice_tool"
+   ]
+  },
+  "sk_voz_criar": {
+   "args": "nome, arq, op=None",
+   "modulos": [
+    "midia",
+    "omnivoice_tool"
+   ]
+  },
+  "sk_voz_apagar": {
+   "args": "voz_id",
+   "modulos": [
     "omnivoice_tool"
    ]
   },

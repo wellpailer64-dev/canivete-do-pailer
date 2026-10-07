@@ -3434,6 +3434,37 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def sk_voz_criar(self, nome, arq, op=None):
+        """Voz nova do OmniVoice a partir de um arquivo (ou do trecho de/dur dele: o clipe escolhido no Sk). Sem
+        ref_text, o OmniVoice transcreve a referência sozinho. Fim em skProgresso({voz})."""
+        from Functions.omnivoice_tool import create_voice
+        op = op or {}
+
+        def trabalho(log, progresso):
+            fonte, pasta = arq, None
+            if op.get("dur"):
+                import subprocess
+                from Functions.midia import ffmpeg, NO_WINDOW
+                pasta = tempfile.mkdtemp(prefix="sk_voz_")
+                fonte = os.path.join(pasta, "referencia.wav")
+                subprocess.run([ffmpeg(), "-y", "-v", "error", "-ss", f"{float(op.get('de') or 0):.3f}", "-t", f"{min(30.0, float(op['dur'])):.3f}", "-i", arq,
+                                "-vn", "-ac", "1", "-ar", "24000", fonte], capture_output=True, timeout=120, creationflags=NO_WINDOW)
+            try:
+                r = create_voice(nome, fonte, op.get("ref_text") or "", {"reference_treatment": op.get("tratar", True)}, callback_log=log, callback_progresso=progresso)
+            finally:
+                if pasta:
+                    shutil.rmtree(pasta, ignore_errors=True)
+            return {"voz": r.get("voice"), "efeito": "criar_voz"}
+        _tarefa("skProgresso", trabalho)
+        return {"success": True}
+
+    def sk_voz_apagar(self, voz_id):
+        from Functions.omnivoice_tool import delete_voice
+        try:
+            return delete_voice(voz_id)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def sk_voz(self, voz_id, texto, op=None):
         """Fala por IA (OmniVoice) com uma voz salva; o .wav volta em skProgresso({saida}) e entra na timeline."""
         from Functions.omnivoice_tool import synthesize

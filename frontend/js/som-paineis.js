@@ -170,8 +170,9 @@ async function skUiTts(el) {
         <div class="sk-grupo"><div class="sk-p-tit">Voz</div>
             <div class="sk-vozes notranslate">${r.vozes.map(v => `<div class="sk-voz${v.id === o.voz ? ' on' : ''}" data-voz="${skEsc(v.id)}"><span class="sk-voz-av">${skEsc((v.nome || '?').trim()[0] || '?').toUpperCase()}</span>
                 <span class="sk-voz-n">${skEsc(v.nome)}<small>${v.dur ? v.dur.toFixed(0) + ' s de referência' : 'voz salva'}</small></span>
-                ${v.ref_url ? `<button class="ie-btn ie-btn-mini" data-amostra="${skEsc(v.ref_url)}" title="Ouvir a referência">▶</button>` : ''}</div>`).join('')}</div>
-            <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" onclick="switchTool('omnivoice')">Nova voz…</button><button class="ie-btn ie-btn-mini" onclick="SK.vozes=null;delete skEl('sk-p-tts').dataset.v;skDockRender(['tts'])">Atualizar</button></div></div>
+                <span class="sk-voz-bts">${v.ref_url ? `<button class="ie-btn ie-btn-mini" data-amostra="${skEsc(v.ref_url)}" title="Ouvir a referência">▶</button>` : ''}<button class="ie-btn ie-btn-mini sk-voz-x" data-apagar="${skEsc(v.id)}" title="Excluir esta voz">×</button></span></div>`).join('')}</div>
+            <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" id="skv-nova">${SK.ttsNova ? 'Fechar' : '+ Nova voz'}</button><button class="ie-btn ie-btn-mini" onclick="SK.vozes=null;delete skEl('sk-p-tts').dataset.v;skDockRender(['tts'])">Atualizar</button><button class="ie-btn ie-btn-mini" onclick="switchTool('omnivoice')" title="Ferramenta completa de vozes">Gerenciar…</button></div>
+            ${SK.ttsNova ? skUiNovaVoz() : ''}</div>
         <div class="sk-grupo"><div class="sk-p-tit">Texto</div>
             <textarea id="skv-txt" class="sk-txt" rows="7" placeholder="Escreva o que a voz vai falar. Linha em branco separa parágrafos (cada um vira um clipe).">${skEsc(o.texto || '')}</textarea>
             <div class="sk-p-info notranslate" id="skv-resumo"></div>
@@ -201,11 +202,52 @@ async function skUiTts(el) {
     el.onchange = el.oninput;
     el.onclick = e => {
         const am = e.target.closest('[data-amostra]'); if (am) { e.stopPropagation(); skOuvir(am.dataset.amostra); return; }
+        const ap = e.target.closest('[data-apagar]');
+        if (ap) {   // dois cliques: o 1º pede confirmação no próprio botão (sem janela)
+            e.stopPropagation();
+            if (!ap.classList.contains('confirma')) { ap.classList.add('confirma'); ap.textContent = 'Excluir?'; setTimeout(() => { if (ap.isConnected) { ap.classList.remove('confirma'); ap.textContent = '×'; } }, 3000); return; }
+            skApagarVoz(ap.dataset.apagar).catch(er => skToast(er.message)); return;
+        }
+        if (e.target.id === 'skv-nova') { SK.ttsNova = !SK.ttsNova; delete el.dataset.v; skUiTts(el); return; }
+        if (e.target.id === 'skv-n-arq') { skApi().sk_dialogo('abrir', ['Áudio e vídeo (*.mp3;*.wav;*.m4a;*.aac;*.ogg;*.opus;*.flac;*.mp4;*.mov;*.mkv)', 'Todos (*.*)']).then(c => { if (c) { SK.ttsNovaArq = c; const s = el.querySelector('#skv-n-fonte'); if (s) s.textContent = c.split(/[\\/]/).pop(); } }); return; }
+        if (e.target.id === 'skv-n-ok') { skCriarVoz({ nome: el.querySelector('#skv-n-nome').value, refText: el.querySelector('#skv-n-txt').value, tratar: el.querySelector('#skv-n-tratar').checked }).catch(er => skToast(er.message)); return; }
         const v = e.target.closest('[data-voz]'); if (v) { o.voz = v.dataset.voz; skTtsGuardar(); el.querySelectorAll('.sk-voz').forEach(x => x.classList.toggle('on', x === v)); return; }
         const ou = e.target.closest('[data-ouvir]'); if (ou) { skOuvir(ou.dataset.ouvir); return; }
         const p = e.target.closest('[data-por]'); if (p) { if (!SK.proj) skNovo('narracao'); skImportar([p.dataset.por], { ini: SK.ph }); return; }
         if (e.target.id === 'skv-ok') skGerarTts().catch(er => skToast(er.message));
     };
+}
+function skUiNovaVoz() {   // formulário de voz nova dentro do painel
+    const [c] = SK.sel ? skClipe(SK.sel) : [null];
+    const fonte = SK.ttsNovaArq ? SK.ttsNovaArq.split(/[\\/]/).pop() : c ? `clipe "${c.nome}" (${Math.min(30, c.dur).toFixed(1)} s)` : 'nenhuma — escolha um clipe na timeline ou um arquivo';
+    return `<div class="sk-grupo sk-nova-voz"><div class="sk-p-tit">Nova voz</div>
+        <input class="sk-busca" id="skv-n-nome" placeholder="Nome da voz" value="">
+        <div class="sk-p-info">Referência: <b class="notranslate" id="skv-n-fonte">${skEsc(fonte)}</b></div>
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" id="skv-n-arq">Escolher arquivo…</button>${SK.ttsNovaArq ? '<button class="ie-btn ie-btn-mini" onclick="SK.ttsNovaArq=null;delete skEl(\'sk-p-tts\').dataset.v;skDockRender([\'tts\'])">Usar o clipe escolhido</button>' : ''}</div>
+        <textarea class="sk-txt" id="skv-n-txt" rows="2" placeholder="O que a pessoa fala na referência (opcional: em branco, transcreve sozinho)"></textarea>
+        <label class="sk-chk"><input type="checkbox" id="skv-n-tratar" checked> Limpar a referência antes (ruído, volume)</label>
+        <div class="sk-p-info">Melhor com 10–20 s de fala limpa, uma pessoa só, sem música.</div>
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini ie-btn-primario" id="skv-n-ok" ${SK.tarefa ? 'disabled' : ''}>Criar voz</button></div></div>`;
+}
+async function skCriarVoz({ nome, refText = '', tratar = true, arq = null, de = null, dur = null } = {}) {
+    nome = (nome || '').trim(); if (!nome) throw new Error('dê um nome para a voz');
+    let op = { ref_text: refText, tratar };
+    if (!arq) {
+        if (SK.ttsNovaArq) arq = SK.ttsNovaArq;
+        else { const [c] = SK.sel ? skClipe(SK.sel) : [null]; if (!c) throw new Error('escolha um clipe na timeline ou um arquivo'); arq = c.arq; op = { ...op, de: c.de, dur: Math.min(30, c.dur) }; }
+    } else if (dur) op = { ...op, de: de || 0, dur };
+    const r = await skTarefa(() => skApi().sk_voz_criar(nome, arq, op));
+    SK.vozes = null; SK.ttsNova = false; SK.ttsNovaArq = null; if (r.voz) skTtsOp().voz = r.voz.id; skTtsGuardar();
+    delete skEl('sk-p-tts')?.dataset.v; skDockRender(['tts']);
+    skToast(`Voz criada: ${nome}`);
+    return r.voz;
+}
+async function skApagarVoz(id) {
+    const r = await skApi().sk_voz_apagar(id);
+    if (!r || !r.success) throw new Error((r && r.error) || 'não excluiu');
+    if (skTtsOp().voz === id) SK.tts.voz = null;
+    SK.vozes = null; delete skEl('sk-p-tts')?.dataset.v; skDockRender(['tts']);
+    return true;
 }
 function skTtsPartes(texto, paragrafos) { const t = (texto || '').trim(); if (!t) return []; return paragrafos ? t.split(/\n\s*\n/).map(x => x.trim()).filter(Boolean) : [t]; }
 function skTtsResumo(el) {
