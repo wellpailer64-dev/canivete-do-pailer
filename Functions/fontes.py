@@ -110,12 +110,22 @@ def _uma_fonte(dados, off):
     fam1, est2 = nm.get(1), nm.get(2) or "Regular"
     if not fam1 or fam1.startswith("@"):
         return []
-    peso, ita = 400, "italic" in est2.lower()
+    peso, ita, asc = 400, "italic" in est2.lower(), None
     if b"OS/2" in tabs:
         pos = tabs[b"OS/2"][0]
         peso = struct.unpack_from(">H", dados, pos + 4)[0] or 400
         sel = struct.unpack_from(">H", dados, pos + 62)[0]
         ita = bool(sel & 1 or sel & 0x200)
+        # ascendente tipográfico (sTypoAscender ÷ unitsPerEm): é com ele que o Photoshop põe a 1ª linha de um texto
+        # de parágrafo abaixo do topo da caixa (medido 2026-10-06: Times 0,693 × tamanho; o do navegador dá 0,891)
+        try:
+            if b"head" in tabs:
+                upm = struct.unpack_from(">H", dados, tabs[b"head"][0] + 18)[0]
+                typo = struct.unpack_from(">h", dados, pos + 68)[0]
+                if upm and typo > 0:
+                    asc = round(typo / upm, 4)
+        except struct.error:
+            pass
     um = {
         "familia": nm.get(16) or fam1, "estilo": nm.get(17) or est2,
         "gdi": fam1, "gdi_negrito": "bold" in est2.lower(), "gdi_italico": "italic" in est2.lower(),
@@ -123,6 +133,8 @@ def _uma_fonte(dados, off):
         # nome PostScript (é por ele que o PSD guarda a fonte de cada texto: Montserrat-Bold, ArialMT...)
         "ps": nm.get(6) or "", "completo": nm.get(4) or "",
     }
+    if asc:
+        um["asc"] = asc
     if not var or not var[1]:
         return [um]
     # fonte variável (quase todas as do Google Fonts hoje): cada instância nomeada (Thin...Black) vira um estilo;
@@ -169,7 +181,7 @@ def listar():
                 for f in _ler(os.path.join(pasta, nome)):
                     lista = fams.setdefault(f["familia"], [])
                     if not any(e["estilo"] == f["estilo"] for e in lista):
-                        lista.append({k: f[k] for k in ("estilo", "peso", "italico", "gdi", "gdi_negrito", "gdi_italico", "ps", "completo", "arquivo", "indice", "var") if k in f})
+                        lista.append({k: f[k] for k in ("estilo", "peso", "italico", "gdi", "gdi_negrito", "gdi_italico", "ps", "completo", "arquivo", "indice", "var", "asc") if k in f})
         for lista in fams.values():
             lista.sort(key=lambda e: (e["italico"], e["peso"]))
         _cache = dict(sorted(fams.items(), key=lambda kv: kv[0].lower()))

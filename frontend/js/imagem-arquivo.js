@@ -324,6 +324,13 @@ async function ieSalvar(comoNovo = false, destinoForcado = null, refeito = false
                     if (!ieMatEhId(rel)) s.tf = rel;
                 }
                 if (ida && L.ref != null && L.textoNovo != null) { s.texto_novo = L.textoNovo; s.texto_estilo = L.textoEstilo || null; }
+                // texto criado no editor: o Python monta uma camada de texto do Photoshop (continua editável lá)
+                if (L.tipo === 'texto' && L.txt && (!ida || L.ref == null) && !L.rasterizar) {
+                    const t = L.txt;
+                    s.texto_ps = { s: t.s, m: t.m || IE_ID, caixa: t.caixa || null, ps: t.ps || '',
+                        trechos: (t.trechos || []).map(r => ({ a: r.a, b: r.b, ps: r.ps, cor: r.cor, negFalso: r.negFalso, itaFalso: r.itaFalso, sublinhado: r.sublinhado, tachado: r.tachado })),
+                        ...Object.fromEntries(IE_TX_CHAVES.filter(k => t[k] !== undefined).map(k => [k, t[k]])) };
+                }
             }
             if (L.m) {
                 const m = { x: L.m.x, y: L.m.y, fundo: L.m.fundo || 0, desativada: !!L.m.desativada };

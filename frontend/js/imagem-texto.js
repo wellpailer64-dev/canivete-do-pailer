@@ -143,7 +143,11 @@ function ieTextoLayout(t) {
     const P = ieTxPar(t), med = (s, i0 = 0) => (ieTxTemTrechos(t) ? ieTxLargura(t, s, i0) : x.measureText(s).width * sh);
     const m0 = x.measureText('Hg');
     const asc = (m0.fontBoundingBoxAscent || t.tam * 0.8) * ((t.escV || 100) / 100);
-    const base0 = t.caixa ? t.caixa[1] + asc : 0;
+    // caixa de parágrafo: a 1ª linha de base fica no ascendente TIPOGRÁFICO da fonte (OS/2 sTypoAscender, lido em
+    // Functions/fontes.py), como no Photoshop; o do navegador (hhea) descia o texto ~10 px a 48 px em Times
+    const est = t.caixa ? ieEstiloDe(t.fam, t.estilo) : null;
+    const ascCaixa = est && est.asc ? est.asc * t.tam * ((t.escV || 100) / 100) : asc;
+    const base0 = t.caixa ? t.caixa[1] + ascCaixa : 0;
     const out = [];
     let y = 0, off = 0;
     txt.split(IE_NL).forEach((par, pi) => {

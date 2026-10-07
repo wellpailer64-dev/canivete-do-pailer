@@ -144,7 +144,14 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   (texto, objeto inteligente, forma, efeitos e ajustes continuam editáveis no Photoshop). Mover/transformar texto,
   objeto inteligente e forma atualiza a matriz/caminhos (não rasteriza). Texto editado continua texto (conteúdo e
   estilo do começo: fonte, tamanho, cor, espaçamento, entrelinha, alinhamento). Pintar troca só os pixels.
-- Camada nova (inclusive texto criado no editor) vai como camada de pixels. Documento que não veio de PSD RGB é montado do zero.
+- Camada nova vai como camada de pixels, MENOS texto criado no editor: vira camada de texto do Photoshop (editável lá)
+  — `_texto_novo` em editor_imagem.py clona um molde gerado pelo próprio Photoshop (`Functions/psd_texto_modelo.py`,
+  ponto e parágrafo) e troca texto, fonte/estilo (inclusive trechos com outra cor/fonte = runs), matriz e caixa; os
+  pixels são os do editor até alguém editar no Photoshop. Documento que não veio de PSD RGB é montado do zero.
+- Regras do EngineData que DERRUBAM o Photoshop ao abrir (2026-10-06): fonte nova tem de entrar nas DUAS listas
+  (`ResourceDict` e `DocumentResources` → FontSet, o índice vale para as duas) e o `Txt ` termina em nulo.
+- Caixa de parágrafo: a 1ª linha de base fica em topo + sTypoAscender (OS/2, `asc` em Functions/fontes.py) × tamanho,
+  como no Photoshop (o ascendente do navegador descia ~10 px a 48 px).
 - A composição feita pela página vira a imagem achatada do arquivo.
 - Efeitos editados no editor (`L.fxMudou`) ou de camada nova: o Python reescreve só Sombra projetada, Brilho externo,
   Traçado e Sobreposição de cor no `lfx2` (os outros efeitos ficam; efeito tirado fica desligado; `lrFX` sai).
@@ -220,7 +227,7 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   Alt+Ctrl+; trava, Nova guia, Novo layout de guias), lidas e gravadas no PSD (recurso 1032).
 - Caractere/Parágrafo completos (escala H/V, deslocamento, kerning, versalete, sobrescrito/subscrito, sublinhado,
   tachado, 7 alinhamentos, recuos, espaço antes/depois, hifenizar só grava no PSD), gravados no EngineData do texto
-  do PSD; texto novo continua indo para o PSD como pixels.
+  do PSD; texto novo vai como texto editável (ver Salvar).
 - Camadas: filtro por tipo e por nome. Propriedades sem camada = Documento (tela, réguas e grades, guias, ações rápidas).
 
 ## Tela
@@ -228,6 +235,9 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   Windows); `ieDesenharNitido` desenha 1:1 sem reamostrar, amplia inteiro sem suavizar e reduz em etapas (ieMipmap).
 
 ## Teste
+`py -3.13 testes/teste_psd_texto.py [--photoshop]`: texto novo → camada de texto no PSD (ponto, parágrafo, trechos,
+girado), conferido no psd-tools e, com `--photoshop`, aberto, lido e editado no Photoshop (COM; avisar o usuário antes:
+se o PSD estiver errado o Photoshop fecha com erro). Molde regerável com `tools/ps_modelo_texto.py`.
 `python testes/teste_imagem.py` (abre o app em `--agente=9333`; `--psd <arquivo>` para um PSD real): mover, pincel,
 seleção+apagar, máscara, Ctrl+T, texto, desfazer/refazer, balde, degradê, varinha, laço, forma, carimbo, filtros,
 mesclar, agrupar, tamanho/girar/cortar, fatias, estilo de camada, alça da ferramenta Mover, miniaturas, fonte

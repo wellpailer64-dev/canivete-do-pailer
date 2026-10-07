@@ -250,7 +250,10 @@ def main():
                 r.carimbo = px(F, 250, 200);
                 // filtro desfoque e ajuste inverter (direto, sem diálogo)
                 const Rb = ieProcessarCamada(F, c => ieDesfocar(c, 4), 12, d); r.desfoque = [Rb.c.width > F.c.width];
-                await IE_AJUSTES.inverter(); r.inverter = px(F, 50, 40);
+                // a camada é de forma: o ajuste pergunta "Rasterizar a camada?" (como o Photoshop); responde Rasterizar
+                KNV.automacao(true, {respostas: {'Rasterizar a camada?': 'Rasterizar'}});
+                try { await IE_AJUSTES.inverter(); } finally { KNV.automacao(false); }
+                r.inverter = px(ieAtiva(d), 50, 40);
                 // mesclar para baixo, agrupar, desagrupar
                 const nAntes = ieTodas(d).length; await IE_CMDS.mesclarBaixo(d); r.mesclar = [nAntes, ieTodas(d).length];
                 IE_CMDS.novaCamada(d); IE_CMDS.agrupar(d); r.agrupar = ieAtiva(d).tipo; IE_CMDS.desagrupar(d); r.desagrupar = ieTodas(d).filter(L => L.tipo === 'grupo').length;

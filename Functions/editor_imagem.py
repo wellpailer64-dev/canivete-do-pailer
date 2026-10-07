@@ -1239,7 +1239,7 @@ def _trocar_texto(layer, texto, estilo=None):
     t = layer.tagged_blocks.get_data(Tag.TYPE_TOOL_OBJECT_SETTING)
     td = t.text_data
     novo = texto.replace(chr(13) + chr(10), chr(10)).replace(chr(10), chr(13))
-    td[b"Txt "] = String(novo)
+    td[b"Txt "] = String(novo + chr(0))   # o Photoshop grava o texto terminado em nulo
     raiz = td[b"EngineData"].value
     edd = raiz["EngineDict"]
     n = len(novo) + 1   # o EngineData conta a quebra final
@@ -1249,7 +1249,24 @@ def _trocar_texto(layer, texto, estilo=None):
         _ed_set(r, "RunArray", E.List([r["RunArray"][0]]))
         _ed_set(r, "RunLengthArray", E.List([E.Integer(n)]))
     if estilo:
-        sd = edd["StyleRun"]["RunArray"][0]["StyleSheet"]["StyleSheetData"]
+        _estilo_caractere(raiz, edd["StyleRun"]["RunArray"][0]["StyleSheet"]["StyleSheetData"], estilo)
+        props = edd["ParagraphRun"]["RunArray"][0]["ParagraphSheet"]["Properties"]
+        if estilo.get("alin"):
+            _ed_set(props, "Justification", E.Integer({"left": 0, "right": 1, "center": 2, "justify": 3, "justify-left": 3,
+                                                       "justify-right": 4, "justify-center": 5, "justify-all": 6}.get(estilo["alin"], 0)))
+        for k, chave in (("recuoEsq", "StartIndent"), ("recuoDir", "EndIndent"), ("recuo1", "FirstLineIndent"),
+                         ("espAntes", "SpaceBefore"), ("espDepois", "SpaceAfter")):
+            if k in estilo:
+                _ed_set(props, chave, E.Float(float(estilo[k] or 0)))
+        if "hifen" in estilo:
+            _ed_set(props, "AutoHyphenate", E.Bool(bool(estilo["hifen"])))
+    return True
+
+
+def _estilo_caractere(raiz, sd, estilo):
+    """Painel Caractere do editor → StyleSheetData de um trecho do EngineData (fonte, tamanho, cor, espaçamento...)."""
+    from psd_tools.psd import engine_data as E
+    if True:
         if estilo.get("tam"):
             _ed_set(sd, "FontSize", E.Float(float(estilo["tam"])))
         if estilo.get("cor"):
@@ -1265,10 +1282,13 @@ def _trocar_texto(layer, texto, estilo=None):
             _ed_set(sd, "AutoLeading", E.Bool(True))
         ps = estilo.get("ps")
         if ps:
-            fs = raiz["ResourceDict"]["FontSet"]
-            nomes = [str(getattr(f["Name"], "value", f["Name"])).strip("'\"()") for f in fs]
+            # o EngineData tem DUAS listas de fontes (ResourceDict e DocumentResources) e o índice da fonte vale para as
+            # duas: fonte nova só numa delas derruba o Photoshop ao abrir (2026-10-06)
+            listas = [raiz[s]["FontSet"] for s in ("ResourceDict", "DocumentResources") if s in raiz and "FontSet" in raiz[s]]
+            nomes = [str(getattr(f["Name"], "value", f["Name"])).strip("'\"()") for f in listas[0]]
             if ps not in nomes:
-                fs.append(_ed_dict([("Name", E.String(ps)), ("Script", E.Integer(0)), ("FontType", E.Integer(1)), ("Synthetic", E.Integer(0))]))
+                for fs in listas:
+                    fs.append(_ed_dict([("Name", E.String(ps)), ("Script", E.Integer(0)), ("FontType", E.Integer(1)), ("Synthetic", E.Integer(0))]))
                 nomes.append(ps)
             _ed_set(sd, "Font", E.Integer(nomes.index(ps)))
         # resto do painel Caractere
@@ -1285,16 +1305,85 @@ def _trocar_texto(layer, texto, estilo=None):
                 _ed_set(sd, chave, conv(estilo[k]))
         if "caixaAlta" in estilo or "versalete" in estilo:
             _ed_set(sd, "FontCaps", E.Integer(2 if estilo.get("caixaAlta") else 1 if estilo.get("versalete") else 0))
-        props = edd["ParagraphRun"]["RunArray"][0]["ParagraphSheet"]["Properties"]
-        if estilo.get("alin"):
-            _ed_set(props, "Justification", E.Integer({"left": 0, "right": 1, "center": 2, "justify": 3, "justify-left": 3,
-                                                       "justify-right": 4, "justify-center": 5, "justify-all": 6}.get(estilo["alin"], 0)))
-        for k, chave in (("recuoEsq", "StartIndent"), ("recuoDir", "EndIndent"), ("recuo1", "FirstLineIndent"),
-                         ("espAntes", "SpaceBefore"), ("espDepois", "SpaceAfter")):
-            if k in estilo:
-                _ed_set(props, chave, E.Float(float(estilo[k] or 0)))
-        if "hifen" in estilo:
-            _ed_set(props, "AutoHyphenate", E.Bool(bool(estilo["hifen"])))
+
+
+_TX_CARACTERE = ("ps", "tam", "cor", "esp", "ent", "escH", "escV", "desloc", "negFalso", "itaFalso", "pos", "sublinhado",
+                 "tachado", "kern", "caixaAlta", "versalete")
+_TX_PARAGRAFO = ("alin", "recuoEsq", "recuoDir", "recuo1", "espAntes", "espDepois", "hifen")
+
+
+def _texto_novo(ob, tx):
+    """Texto criado no editor → camada de texto do Photoshop: clona o molde (psd_texto_modelo, gerado pelo Photoshop)
+    e troca texto, estilo (com os trechos de estilo diferente), matriz e caixa de parágrafo. Os pixels da camada são
+    os desenhados pelo editor; o Photoshop mostra esses até alguém editar o texto (aí redesenha com a fonte dele)."""
+    import copy
+    from psd_tools.constants import Tag
+    from psd_tools.psd import engine_data as E
+    from psd_tools.psd.descriptor import Double
+    from psd_tools.psd.tagged_blocks import TaggedBlock, TypeToolObjectSetting
+    from Functions import psd_texto_modelo as modelo
+    s = str(tx.get("s") or "")
+    caixa = tx.get("caixa")
+    t = TypeToolObjectSetting.frombytes(modelo.PARAGRAFO if caixa else modelo.PONTO)
+    m = [float(v) for v in (tx.get("m") or [1, 0, 0, 1, 0, 0])]
+    t.transform = tuple(m)
+    ob.tagged_blocks[Tag.TYPE_TOOL_OBJECT_SETTING] = TaggedBlock(key=Tag.TYPE_TOOL_OBJECT_SETTING, data=t)
+    estilo = {k: tx[k] for k in _TX_CARACTERE + _TX_PARAGRAFO if k in tx and tx[k] is not None}
+    estilo.setdefault("ent", 0)
+    _trocar_texto(ob, s, estilo)
+    raiz = t.text_data[b"EngineData"].value
+    edd = raiz["EngineDict"]
+    # trechos (estilos diferentes na mesma caixa): uma run de estilo por pedaço, cada uma a partir da do começo
+    trechos = [r for r in tx.get("trechos") or [] if r.get("b", 0) > r.get("a", 0)]
+    if trechos:
+        n = len(s.replace(chr(13) + chr(10), chr(10))) + 1
+        for r in trechos:   # trecho até o fim do texto leva junto a quebra final (como o Photoshop grava)
+            if int(r["b"]) >= n - 1:
+                r["b"] = n
+        cortes = sorted({0, n} | {max(0, min(n, int(v))) for r in trechos for v in (r["a"], r["b"])})
+        base = edd["StyleRun"]["RunArray"][0]
+        runs, lens = [], []
+        for a, b in zip(cortes, cortes[1:]):
+            if b <= a:
+                continue
+            sobre = {}
+            for r in trechos:
+                if r["a"] <= a < r["b"]:
+                    sobre.update({k: v for k, v in r.items() if k in _TX_CARACTERE})
+            run = copy.deepcopy(base)
+            if sobre:
+                _estilo_caractere(raiz, run["StyleSheet"]["StyleSheetData"], sobre)
+            runs.append(run)
+            lens.append(E.Integer(b - a))
+        _ed_set(edd["StyleRun"], "RunArray", E.List(runs))
+        _ed_set(edd["StyleRun"], "RunLengthArray", E.List(lens))
+    td = t.text_data
+
+    def caixa_desc(chave, l, tp, r, b):
+        d = td.get(chave)
+        if d is None:
+            return
+        for k, v in ((b"Left", l), (b"Top ", tp), (b"Rght", r), (b"Btom", b)):
+            if k in d:
+                d[k] = type(d[k])(unit=d[k].unit, value=v) if hasattr(d[k], "unit") else Double(v)
+
+    if caixa:
+        l, tp, r, b = (float(v) for v in caixa)
+        foto = edd["Rendered"]["Shapes"]["Children"][0]["Cookie"]["Photoshop"]
+        _ed_set(foto, "BoxBounds", E.List([E.Float(v) for v in (l, tp, r, b)]))
+        caixa_desc(b"bounds", l, tp, r, b)
+    # caixa da tinta no espaço do texto (a dos pixels do editor, desfeita a matriz)
+    a, b_, c, d, e, f = m
+    det = a * d - b_ * c
+    if abs(det) > 1e-9:
+        x0, y0, x1, y1 = ob.left, ob.top, ob.right, ob.bottom
+        pts = []
+        for X, Y in ((x0, y0), (x1, y0), (x0, y1), (x1, y1)):
+            X, Y = X - e, Y - f
+            pts.append(((d * X - c * Y) / det, (-b_ * X + a * Y) / det))
+        caixa_desc(b"boundingBox", min(p[0] for p in pts), min(p[1] for p in pts), max(p[0] for p in pts), max(p[1] for p in pts))
+        if not caixa:
+            caixa_desc(b"bounds", min(p[0] for p in pts), min(p[1] for p in pts), max(p[0] for p in pts), max(p[1] for p in pts))
     return True
 
 
@@ -1407,6 +1496,15 @@ def salvar(spec):
                     if im is None:
                         im = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
                     ob = _nova_pixel(pai, im, no.get("nome") or "Camada", no.get("x", 0), no.get("y", 0))
+                    if orig is None and no.get("texto_ps"):   # texto criado no editor: vai como texto editável
+                        try:
+                            _texto_novo(ob, no["texto_ps"])
+                        except Exception as e:
+                            logging.debug("texto novo %s: %s", no.get("nome"), e)
+                            from psd_tools.constants import Tag
+                            if Tag.TYPE_TOOL_OBJECT_SETTING in ob.tagged_blocks:
+                                del ob.tagged_blocks[Tag.TYPE_TOOL_OBJECT_SETTING]
+                            avisos.append(f"{no.get('nome')}: texto salvo como pixels ({e})")
                     if orig is not None:   # rasterizada: leva efeitos, configurações e a máscara da original
                         for chave, bloco in list(orig.tagged_blocks.items()):
                             if str(chave).split(".")[-1] not in _TAGS_CONTEUDO:
