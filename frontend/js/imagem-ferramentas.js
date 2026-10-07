@@ -29,17 +29,27 @@ function iePonta(tam, dureza, forma = 'redondo', ang = 0, red = 100) {
         x.fillStyle = '#fff';
         x.beginPath(); x.arc(m, m, r, 0, Math.PI * 2); x.fill();
     } else {
-        const g = x.createRadialGradient(m, m, 0, m, m, r);
-        const h = ieClamp(dureza / 100, 0, 0.99);
-        g.addColorStop(0, 'rgba(255,255,255,1)');
-        g.addColorStop(h, 'rgba(255,255,255,1)');
-        // queda suave (parecida com a do Photoshop)
-        for (let i = 1; i <= 6; i++) {
-            const t = i / 6;
-            g.addColorStop(h + (1 - h) * t, `rgba(255,255,255,${Math.pow(1 - t, 2) * (1 - t * 0.2)})`);
+        // ponta macia calculada pixel a pixel: núcleo cheio até a dureza e queda em COSSENO até a borda (lisa no centro e
+        // na borda). A queda antiga ((1-u)², em gradiente) tinha um bico no centro: com dureza baixa os carimbos somavam
+        // os bicos e o traço virava um colar de bolinhas (ondulação 18/255 medida em 2026-10-07) e saía fino demais.
+        x.setTransform(1, 0, 0, 1, 0, 0);
+        const img = x.createImageData(lado, lado), d = img.data;
+        const h = ieClamp(dureza / 100, 0, 0.99), a = ang * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), ry = Math.max(0.05, red / 100);
+        const N = lado > 240 ? 1 : lado > 80 ? 2 : 3;   // amostras por pixel (borda sem serrilhado; ponta grande já é macia)
+        for (let j = 0; j < lado; j++) for (let i = 0; i < lado; i++) {
+            let soma = 0;
+            for (let sj = 0; sj < N; sj++) for (let si = 0; si < N; si++) {
+                const px = i + (si + 0.5) / N - m, py = j + (sj + 0.5) / N - m;
+                const qx = px * ca - py * sa, qy = (px * sa + py * ca) / ry;   // gira e achata como a ponta
+                const t = Math.hypot(qx, qy) / r;
+                if (t >= 1) continue;
+                soma += t <= h ? 1 : 0.5 * (1 + Math.cos(Math.PI * (t - h) / (1 - h)));
+            }
+            const k = (j * lado + i) * 4;
+            d[k] = d[k + 1] = d[k + 2] = 255;
+            d[k + 3] = Math.round(soma / (N * N) * 255);
         }
-        x.fillStyle = g;
-        x.fillRect(0, 0, c.width, c.height);
+        x.putImageData(img, 0, 0);
     }
     if (forma === 'giz' && tam > 3) {   // giz: textura de grãos (sempre a mesma para o mesmo tamanho)
         x.setTransform(1, 0, 0, 1, 0, 0);
@@ -218,8 +228,9 @@ function ieTracoAplicar(t, D, doc) {
         ctx.drawImage(tmp, 0, 0, P.w, P.h, lx, ly, P.w, P.h);
     }
     ctx.restore();
-    ieInvalidar(L);
-    ieAgendar(L.fx || L.m ? ieRUniao(D, ieRCamada(L)) : D, doc);
+    // só a região mexida (cache da camada atualizado no lugar); com efeitos a camada inteira, como antes
+    if (ieRasterRegiao(L, D)) ieAgendar(D, doc);
+    else { ieInvalidar(L); ieAgendar(L.fx || L.m ? ieRUniao(D, ieRCamada(L)) : D, doc); }
 }
 
 function ieTracoFim() {

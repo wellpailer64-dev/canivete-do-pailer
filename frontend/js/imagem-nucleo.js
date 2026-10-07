@@ -442,6 +442,40 @@ function ieRaster(L) {
     return (L._raster = { c: r.c, x: src.x - r.mg, y: src.y - r.mg, src: src.c, ext: r.ext, acima: r.acima, forma: { c: base, x: src.x, y: src.y } });
 }
 
+// Atualiza só a região D (px do documento) do cache da camada (máscara e preenchimento, SEM efeitos) em vez de jogá-lo
+// fora: pintar na máscara de uma camada grande refazia a camada inteira a cada movimento do pincel (2026-10-07: num
+// 8640×1440 eram travadas de 120–150 ms por movimento). Devolve false quando não dá (sem cache, com efeitos, canvas da
+// camada trocado/crescido, transformação em prévia) — aí quem chama invalida a camada inteira como antes.
+function ieRasterRegiao(L, D) {
+    const r = L._raster;
+    if (!r || !L.c || r.src !== L.c || L._tfPrev || (r.ext && r.ext.length) || (r.acima && r.acima.length)) return false;
+    if (!L.fxOculto && ieTemFx(L.fx)) return false;
+    const R = ieRInter(ieRInt(D), { x: L.x, y: L.y, w: L.c.width, h: L.c.height });
+    if (R) {
+        const mask = L.m && !L.m.desativada ? L.m : null;
+        const t = ieTemp(31, R.w, R.h), tx = ieCtx(t);
+        tx.save(); tx.setTransform(1, 0, 0, 1, 0, 0); tx.globalAlpha = 1; tx.globalCompositeOperation = 'source-over';
+        tx.clearRect(0, 0, R.w, R.h);
+        tx.drawImage(L.c, R.x - L.x, R.y - L.y, R.w, R.h, 0, 0, R.w, R.h);
+        if (mask) { tx.globalCompositeOperation = 'destination-in'; tx.drawImage(ieMascaraRegiao(mask, R), 0, 0); }
+        tx.restore();
+        const lx = R.x - r.x, ly = R.y - r.y;
+        if (r.forma && r.forma.c && r.forma.c !== L.c) {
+            const fx = ieCtx(r.forma.c);
+            fx.save(); fx.setTransform(1, 0, 0, 1, 0, 0); fx.globalAlpha = 1; fx.globalCompositeOperation = 'source-over';
+            fx.clearRect(R.x - r.forma.x, R.y - r.forma.y, R.w, R.h); fx.drawImage(t, 0, 0, R.w, R.h, R.x - r.forma.x, R.y - r.forma.y, R.w, R.h);
+            fx.restore();
+        }
+        const cx = ieCtx(r.c);
+        cx.save(); cx.setTransform(1, 0, 0, 1, 0, 0); cx.globalCompositeOperation = 'source-over';
+        cx.clearRect(lx, ly, R.w, R.h); cx.globalAlpha = L.fill ?? 1; cx.drawImage(t, 0, 0, R.w, R.h, lx, ly, R.w, R.h);
+        cx.restore();
+    }
+    L._v = (L._v || 0) + 1;
+    L._thumbV = -1;
+    return true;
+}
+
 // a camada inteira achatada (sombra, conteúdo e o resto), para miniatura e seleção
 function ieRasterTudo(L) {
     const r = ieRaster(L);

@@ -480,6 +480,9 @@ function ieMiniaturas(ja) {
     const fazer = () => {
         const doc = IE.doc;
         if (!doc) return;
+        // durante a pincelada a miniatura espera (como o Photoshop): ela lê os pixels da camada inteira (ieLimites) e,
+        // num documento grande, isso travava o pincel a cada atualização (2026-10-07); ieTracoFim pede de novo
+        if (typeof IE_TRACO !== 'undefined' && IE_TRACO) { ieMiniTimer = setTimeout(fazer, 250); return; }
         document.querySelectorAll('#ie-cam-lista canvas[data-mini]').forEach(cv => {
             const L = ieAchar(doc, +cv.dataset.mini)?.L;
             if (L && (cv._v !== L._v || cv._c !== L.c)) { cv._v = L._v; cv._c = L.c; ieMiniatura(cv, L, false); }
@@ -956,11 +959,20 @@ function ieStatusMouse(p) {
     if (!doc || !pos) return;
     const dentro = p.x >= 0 && p.y >= 0 && p.x < doc.w && p.y < doc.h;
     pos.textContent = dentro ? `X ${Math.floor(p.x)}  Y ${Math.floor(p.y)}` : '';
-    if (dentro && cor) {
-        const d = ieCtx(doc.comp).getImageData(Math.floor(p.x), Math.floor(p.y), 1, 1).data;
+    // cor sob o mouse: ler 1 pixel da composição (canvas na placa de vídeo) força o navegador a terminar o desenho e
+    // trazer de volta — a cada movimento, com o pincel pintando, travava (2026-10-07: 2 s de leituras num arraste no
+    // 8640×1440). Agora só lê quando o mouse para um instante, e nunca durante a pincelada.
+    clearTimeout(ieStatusCorTimer);
+    if (!(dentro && cor)) { if (cor) cor.innerHTML = ''; return; }
+    if (typeof IE_TRACO !== 'undefined' && IE_TRACO) return;
+    const x = Math.floor(p.x), y = Math.floor(p.y);
+    ieStatusCorTimer = setTimeout(() => {
+        if (IE.doc !== doc || (typeof IE_TRACO !== 'undefined' && IE_TRACO)) return;
+        const d = ieCtx(doc.comp).getImageData(x, y, 1, 1).data;
         cor.innerHTML = d[3] ? `<i style="background:rgb(${d[0]},${d[1]},${d[2]})"></i>${ieRgbHex(d[0], d[1], d[2])}` : '';
-    } else if (cor) cor.innerHTML = '';
+    }, 120);
 }
+let ieStatusCorTimer = 0;
 
 // ─────────────────────────── seletor de cor ───────────────────────────
 function ieEscolherCor(i, el) { ieSeletorCor(el, IE.cor[i], c => { IE.cor[i] = c; ieUiCores(); }); }

@@ -268,6 +268,17 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 - Zoom em pixels da tela (100% = 1 pixel da imagem por pixel da tela, como no Photoshop, mesmo com a escala do
   Windows); `ieDesenharNitido` desenha 1:1 sem reamostrar, amplia inteiro sem suavizar e reduz em etapas (ieMipmap).
 
+## Pincel (rodada de 2026-10-07)
+- Ponta macia (`iePonta`) calculada pixel a pixel: núcleo cheio até a dureza e queda em COSSENO até a borda (3×3
+  amostras por pixel; 2×2/1×1 em pontas grandes). A queda antiga ((1-u)² em gradiente) tinha bico no centro: com dureza
+  baixa os carimbos somavam os bicos (colar de bolinhas, ondulação 18/255) e o traço saía fino (metade do brilho a 23 px
+  num pincel de 100; agora 33 px, perto do Photoshop).
+- Pintar não joga fora o cache da camada: `ieRasterRegiao` refaz só a região mexida (camada × máscara × preenchimento;
+  com efeitos, a camada inteira como antes). Miniatura do painel espera a pincelada acabar (ela lê a camada inteira).
+- Barra de status: a cor sob o mouse só é lida quando o mouse para (120 ms) e nunca durante a pincelada — ler 1 pixel da
+  composição (canvas na placa de vídeo) força o navegador a sincronizar e travava cada movimento num documento grande.
+- Resultado no 8640×1440 pintando máscara: tarefas longas 8,2 s → 0,2–0,4 s por arraste. Teste `testes/teste_pincel.py`.
+
 ## Teste
 `py -3.13 testes/teste_psd_pre.py [--photoshop]`: preenchimento novo (cor cheio/com máscara e degradês) → camada de preenchimento;
 com `--photoshop` lê tipo/cor lá, compara a imagem e troca a cor de um preenchimento feito no Photoshop (ida e volta).
