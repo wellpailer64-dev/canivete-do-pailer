@@ -89,7 +89,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - **Interface**: `som-gravar.js`, `som-motor.js`, `som-paineis.js`, `som.js`, `som.css`
 - **Python**: `Functions/sound_kanivete.py`, `Functions/sk_gravar.py`
 - **Automação (agente/Jr)**: window.SKN (som.js): novo, importar, cortar, alterarClipe, exportar, estado...
-- **API** (`pywebview.api.*`, 16): `sk_info(path)`, `sk_trecho(arq, k, sr=48000)`, `sk_auto(acao, proj=None, caminho=None, pid=None)`, `sk_gravar(acao, dispositivo=None, caminho=None, sr=48000, canais=1)`, `sk_salvar(proj, caminho)`, `sk_abrir(caminho)`, `sk_exportar(proj, caminho, op=None)`, `sk_medir(proj, op=None)`, `sk_processar(arq, efeito, op=None)`, `sk_transcrever(proj, idioma="pt", faixas=None)`, `sk_lufs(arq, de=0, dur=None)`, `sk_silencios(arq, de=0, dur=None, limiar=-40, minimo=0.6)`, `sk_pasta_padrao()`, `sk_vozes()`, `sk_voz(voz_id, texto, op=None)`, `sk_dialogo(modo, tipos=None, nome="")`
+- **API** (`pywebview.api.*`, 17): `sk_info(path)`, `sk_trecho(arq, k, sr=48000)`, `sk_auto(acao, proj=None, caminho=None, pid=None)`, `sk_gravar(acao, dispositivo=None, caminho=None, sr=48000, canais=1)`, `sk_ir(tamanho=1.2)`, `sk_salvar(proj, caminho)`, `sk_abrir(caminho)`, `sk_exportar(proj, caminho, op=None)`, `sk_medir(proj, op=None)`, `sk_processar(arq, efeito, op=None)`, `sk_transcrever(proj, idioma="pt", faixas=None)`, `sk_lufs(arq, de=0, dur=None)`, `sk_silencios(arq, de=0, dur=None, limiar=-40, minimo=0.6)`, `sk_pasta_padrao()`, `sk_vozes()`, `sk_voz(voz_id, texto, op=None)`, `sk_dialogo(modo, tipos=None, nome="")`
 - **Testes**: `testes/teste_som.py`
 - **Guias**: `Instructions/sound-kanivete.md`
 

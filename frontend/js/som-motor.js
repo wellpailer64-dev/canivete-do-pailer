@@ -16,31 +16,83 @@ function skCtx() {
 }
 function skMaster() {
     const ctx = SK.ctx, m = SK.master = {};
-    m.ent = ctx.createGain(); m.ent.connect(ctx.destination);
-    const sp = ctx.createChannelSplitter(2); m.ent.connect(sp);
+    // soma das faixas → volume do master → limitador → saída (medidores depois do limitador = o que sai no arquivo)
+    m.ent = ctx.createGain(); m.vol = ctx.createGain(); m.lim = ctx.createDynamicsCompressor(); m.out = ctx.createGain();
+    m.ent.connect(m.vol); m.vol.connect(m.lim); m.lim.connect(m.out); m.out.connect(ctx.destination);
+    const sp = ctx.createChannelSplitter(2); m.out.connect(sp);
     m.L = ctx.createAnalyser(); m.R = ctx.createAnalyser(); m.L.fftSize = m.R.fftSize = 2048;
     sp.connect(m.L, 0); sp.connect(m.R, 1);
     // ponderação K (BS.1770): passa-alta ~38 Hz + prateleira +4 dB em 1,5 kHz → janela de ~0,34 s = LUFS momentâneo
     const hp = ctx.createBiquadFilter(), hs = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 38; hp.Q.value = 0.5;
     hs.type = 'highshelf'; hs.frequency.value = 1500; hs.gain.value = 4;
-    const sk = ctx.createChannelSplitter(2); m.ent.connect(hp); hp.connect(hs); hs.connect(sk);
+    const sk = ctx.createChannelSplitter(2); m.out.connect(hp); hp.connect(hs); hs.connect(sk);
     m.kL = ctx.createAnalyser(); m.kR = ctx.createAnalyser(); m.kL.fftSize = m.kR.fftSize = 16384;
     sk.connect(m.kL, 0); sk.connect(m.kR, 1);
     m.buf = new Float32Array(16384);
+    // gate e de-esser rodam num AudioWorklet (aproximam o agate/sidechaincompress da exportação)
+    SK.dynPronto = ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([SK_DYN_JS], { type: 'application/javascript' }))).then(() => { SK.dynOk = true; }).catch(() => {});
+    skMasterAplicar();
+}
+function skMasterAplicar() {
+    const m = SK.master; if (!m) return;
+    const ms = (SK.proj && SK.proj.master) || {}, lim = ms.lim || {};
+    m.vol.gain.value = ms.vol ?? 1;
+    if (lim.ativo) { m.lim.threshold.value = lim.teto ?? -1; m.lim.knee.value = 0; m.lim.ratio.value = 20; m.lim.attack.value = 0.003; m.lim.release.value = 0.05; }
+    else { m.lim.threshold.value = 0; m.lim.ratio.value = 1; m.lim.knee.value = 0; }
+}
+const SK_DYN_JS = `class SkDyn extends AudioWorkletProcessor {
+    static get parameterDescriptors() { return [{ name: 'gate', defaultValue: 0 }, { name: 'gLim', defaultValue: 0.003 }, { name: 'deess', defaultValue: 0 }, { name: 'dQ', defaultValue: 0.5 }]; }
+    constructor() { super(); this.env = 0; this.g = 1; this.hp = [0, 0]; this.px = [0, 0]; this.de = 0; }
+    process(inp, out, P) {
+        const i = inp[0], o = out[0]; if (!i || !i.length) return true;
+        const n = i[0].length, sr = sampleRate, gate = P.gate[0] > 0.5, lim = P.gLim[0], de = P.deess[0] > 0.5, q = P.dQ[0];
+        const aAt = Math.exp(-1 / (0.005 * sr)), aRe = Math.exp(-1 / (0.1 * sr)), dAt = Math.exp(-1 / (0.001 * sr)), dRe = Math.exp(-1 / (0.06 * sr)), c = Math.exp(-2 * Math.PI * 5000 / sr);
+        for (let s = 0; s < n; s++) {
+            let m = 0, h = 0;
+            for (let ch = 0; ch < i.length; ch++) { const x = i[ch][s]; if (Math.abs(x) > m) m = Math.abs(x); const y = c * (this.hp[ch] + x - this.px[ch]); this.hp[ch] = y; this.px[ch] = x; if (Math.abs(y) > h) h = Math.abs(y); }
+            let g = 1;
+            if (gate) { this.env = m > this.env ? m : this.env * aRe; const alvo = this.env < lim ? 0.03 : 1; this.g = alvo > this.g ? alvo + (this.g - alvo) * aAt : alvo + (this.g - alvo) * aRe; g *= this.g; }
+            if (de) { this.de = h > this.de ? h + (this.de - h) * dAt : h + (this.de - h) * dRe; if (this.de > 0.05) g *= Math.pow(0.05 / this.de, q); }
+            for (let ch = 0; ch < o.length; ch++) o[ch][s] = (i[ch] || i[0])[s] * g;
+        }
+        return true;
+    }
+}
+registerProcessor('sk-dyn', SkDyn);`;
+const SK_GEQ = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+SK.irs = {};
+function skIrRev(tamanho) {   // IR do reverb gerada no Python (a mesma da exportação)
+    const k = (+tamanho || 1.2).toFixed(1);
+    return SK.irs[k] || (SK.irs[k] = skApi().sk_ir(+k).then(r => fetch(r.url)).then(r => r.arrayBuffer()).then(b => skCtx().decodeAudioData(b)));
 }
 function skBus(f) {
     const ctx = skCtx(); let b = SK.bus[f.id];
     if (!b) {
-        const ent = ctx.createGain(), gr = ctx.createBiquadFilter(), me = ctx.createBiquadFilter(), ag = ctx.createBiquadFilter(), comp = ctx.createDynamicsCompressor(), ganho = ctx.createGain(), vol = ctx.createGain(), an = ctx.createAnalyser();
-        gr.type = 'lowshelf'; gr.frequency.value = 120; me.type = 'peaking'; me.frequency.value = 2500; me.Q.value = 0.7; ag.type = 'highshelf'; ag.frequency.value = 8000;
-        an.fftSize = 2048;
-        ent.connect(gr); gr.connect(me); me.connect(ag); ag.connect(comp); comp.connect(ganho); ganho.connect(vol); vol.connect(SK.master.ent); vol.connect(an);
-        b = SK.bus[f.id] = { ent, gr, me, ag, comp, ganho, vol, an };
+        const N = t => ctx[t]();
+        b = { ent: N('createGain'), hpf: N('createBiquadFilter'), gr: N('createBiquadFilter'), me: N('createBiquadFilter'), ag: N('createBiquadFilter'),
+            geq: SK_GEQ.map(() => N('createBiquadFilter')), comp: N('createDynamicsCompressor'), ganho: N('createGain'), seco: N('createGain'), conv: N('createConvolver'),
+            molhado: N('createGain'), vol: N('createGain'), an: N('createAnalyser') };
+        b.hpf.type = 'highpass'; b.hpf.Q.value = 0.7071;
+        b.gr.type = 'lowshelf'; b.gr.frequency.value = 120; b.me.type = 'peaking'; b.me.frequency.value = 2500; b.me.Q.value = 0.7; b.ag.type = 'highshelf'; b.ag.frequency.value = 8000;
+        b.geq.forEach((q, i) => { q.type = 'peaking'; q.frequency.value = SK_GEQ[i]; q.Q.value = 1.414; });
+        b.conv.normalize = false; b.an.fftSize = 2048;
+        b.ent.connect(b.hpf); let ant = b.hpf;
+        if (SK.dynOk) { b.dyn = new AudioWorkletNode(ctx, 'sk-dyn', { outputChannelCount: [2] }); ant.connect(b.dyn); ant = b.dyn; }
+        for (const n of [b.gr, b.me, b.ag, ...b.geq, b.comp, b.ganho]) { ant.connect(n); ant = n; }
+        b.ganho.connect(b.seco); b.ganho.connect(b.conv); b.conv.connect(b.molhado); b.seco.connect(b.vol); b.molhado.connect(b.vol);
+        b.vol.connect(SK.master.ent); b.vol.connect(b.an);
+        SK.bus[f.id] = b;
     }
-    const fx = f.fx || SK_PRESETS_FX.nenhum, eq = fx.eq || {}, c = fx.comp || {};
+    const fx = f.fx || {}, eq = fx.eq || {}, c = fx.comp || {}, h = fx.hpf || {}, g = fx.gate || {}, d = fx.deess || {}, geq = fx.geq || {}, rv = fx.rev || {};
+    b.hpf.frequency.value = h.ativo ? (h.freq || 80) : 1;
+    if (b.dyn) { const P = b.dyn.parameters; P.get('gate').value = g.ativo ? 1 : 0; P.get('gLim').value = Math.pow(10, (g.limiar ?? -50) / 20); P.get('deess').value = d.ativo ? 1 : 0; P.get('dQ').value = d.quant ?? 0.5; }
     b.gr.gain.value = eq.grave || 0; b.me.gain.value = eq.medio || 0; b.ag.gain.value = eq.agudo || 0;
+    b.geq.forEach((q, i) => { q.gain.value = geq.ativo ? (geq.bandas || [])[i] || 0 : 0; });
     if (c.ativo) { b.comp.threshold.value = c.limiar ?? -20; b.comp.ratio.value = c.razao ?? 3; b.comp.attack.value = 0.01; b.comp.release.value = 0.15; b.ganho.gain.value = Math.pow(10, (c.ganho || 0) / 20); }
     else { b.comp.threshold.value = 0; b.comp.ratio.value = 1; b.ganho.gain.value = 1; }
+    const mix = rv.ativo ? (rv.mix ?? 0.25) : 0;
+    b.seco.gain.value = 1 - mix; b.molhado.gain.value = mix;
+    if (mix > 0 && b.irK !== (rv.tamanho ?? 1.2)) { const k = b.irK = rv.tamanho ?? 1.2; skIrRev(k).then(buf => { if (b.irK === k) b.conv.buffer = buf; }).catch(() => {}); }
     return b;
 }
 function skVolFaixa(f, solo) { return f.mudo || (solo && !f.solo) ? 0 : f.vol; }
@@ -138,6 +190,8 @@ async function skTocar() {
     if (SK.ph >= skFim() && !SK.grav) SK.ph = 0;
     SK.tocando = true; skUi();
     // espera os primeiros trechos (até 2 s) para não começar mudo
+    await SK.dynPronto;
+    skMasterAplicar(); for (const f of SK.proj.faixas) skBus(f);
     await Promise.race([Promise.all(skPedacosNaJanela(SK.ph, SK_ANTES).map(p => skPedaco(p.c.arq, p.k).p)), new Promise(r => setTimeout(r, 2000))]);
     if (!SK.tocando) return;
     SK.t0 = ctx.currentTime + 0.03 - SK.ph;

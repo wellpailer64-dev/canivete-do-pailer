@@ -3329,6 +3329,14 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def sk_ir(self, tamanho=1.2):
+        """IR do reverb (a mesma da exportação) → URL para o ConvolverNode."""
+        from Functions import media_server, sound_kanivete
+        try:
+            return {"success": True, "url": media_server.register(sound_kanivete.ir_reverb(tamanho))}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def sk_salvar(self, proj, caminho):
         from Functions import sound_kanivete
         return sound_kanivete.salvar(proj, caminho)

@@ -159,8 +159,10 @@ with sync_playwright() as p:
     ok(med and med["M"] > -40 and med["f"] > -30, "medidores: LUFS do master e pico da faixa", str(med))
     pg.evaluate("SKN.novo('vazio', 'Cross')")
     a = pg.evaluate(f"async () => (await SKN.importar(['{D}voz.wav'], {{ini: 0}}))[0]")
+    if not pg.evaluate("(a) => !!skClipe(a)[0]", a): print("DEBUG-A", a, pg.evaluate("JSON.stringify(SKN.estado())"))
     pg.evaluate("(a) => SKN.alterarClipe(a, {dur: 4})", a)
     b2 = pg.evaluate(f"async () => (await SKN.importar(['{D}voz.wav'], {{ini: 3}}))[0]")
+    if not pg.evaluate("(a) => !!skClipe(a)[0]", b2): print("DEBUG-B", b2, pg.evaluate("JSON.stringify(SKN.estado())"))
     pg.evaluate("(b) => SKN.alterarClipe(b, {dur: 4, de: 3})", b2)   # mesma fase da onda: crossfade linear mantém o nível
     arq = pg.evaluate(f"async () => (await SKN.exportar('{D}cross.wav', {{formato: 'wav'}})).caminho")
     def pico(trecho, a=arq):
@@ -257,6 +259,35 @@ with sync_playwright() as p:
     tc = pg.evaluate("SKN.estado().faixas[1].clipes[0]")
     em = lambda t: pg.evaluate("([id, t]) => skCurvaEm(skClipe(id)[0], t)", [tc["id"], t])
     ok(n >= 2 and abs(em(0.5) - 0.251) < 0.01 and em(1.9) > 0.9, "ducking: trilha a -12 dB sob a voz e volta na pausa", f"{n} falas, 0,5 s → {em(0.5):.3f}, 1,9 s → {em(1.9):.3f}")
+    # ── rodada D: limitador no master e cadeia por faixa (passa-alta, gate, EQ gráfico, de-esser, reverb) ──
+    subprocess.run([FF, "-v", "error", "-y", "-i", D + "pausas.wav", "-f", "lavfi", "-i", "anoisesrc=d=3.5:c=white:a=0.004", "-filter_complex",
+                    "[0][1]amix=inputs=2:normalize=0:duration=first", D + "gate.wav"], check=True)
+    pg.evaluate("SKN.novo('vazio', 'Master')")
+    lid = pg.evaluate(f"async () => (await SKN.importar(['{D}voz.wav']))[0]")
+    pg.evaluate("(id) => SKN.alterarClipe(id, {vol: 16})", lid)
+    arq = pg.evaluate(f"async () => (await SKN.exportar('{D}lim.wav', {{formato: 'wav'}})).caminho")
+    pk = pico("0:12", arq)
+    pg.evaluate("SK.proj.master.lim.ativo = false")
+    pk0 = pico("0:12", pg.evaluate(f"async () => (await SKN.exportar('{D}lim0.wav', {{formato: 'wav'}})).caminho"))
+    ok(-1.3 < pk <= -0.8 and pk0 > -0.5, "limitador do master segura o pico no teto (-1 dB)", f"com {pk} dB, sem {pk0} dB")
+    def fx_export(fx, nome, arq_in):
+        pg.evaluate("SKN.novo('vazio', 'Fx')")
+        pg.evaluate(f"async () => await SKN.importar(['{arq_in}'])")
+        pg.evaluate("(fx) => SKN.fxFaixa(SK.proj.faixas[0].id, fx)", fx)
+        return pg.evaluate(f"async () => (await SKN.exportar('{D}{nome}.wav', {{formato: 'wav'}})).caminho")
+    sem = fx_export("nenhum", "fx0", D + "gate.wav")
+    gt = fx_export({"gate": {"ativo": True, "limiar": -40}}, "fx_gate", D + "gate.wav")
+    ok(pico("1.4:2.2", sem) - pico("1.4:2.2", gt) > 15, "gate tira o ruído de fundo na pausa", f"{pico('1.4:2.2', sem)} → {pico('1.4:2.2', gt)} dB")
+    rv = fx_export({"rev": {"ativo": True, "mix": 0.4, "tamanho": 1.2}}, "fx_rev", D + "pausas.wav")
+    sem2 = fx_export("nenhum", "fx0b", D + "pausas.wav")
+    ok(pico("1.05:1.4", rv) - pico("1.05:1.4", sem2) > 15, "reverb deixa cauda depois da fala", f"{pico('1.05:1.4', sem2)} → {pico('1.05:1.4', rv)} dB")
+    _, l0 = dur_lufs(fx_export("nenhum", "fx0c", D + "ruido.mp3"))
+    _, lh = dur_lufs(fx_export({"hpf": {"ativo": True, "freq": 300}, "geq": {"ativo": True, "bandas": [0, 0, 0, 0, 0, 0, 0, 0, -12, -12]}, "deess": {"ativo": True, "quant": 0.8}}, "fx_hpf", D + "ruido.mp3"))
+    ok(l0 - lh > 1.5, "passa-alta, EQ gráfico e de-esser mudam a exportação", f"{l0} → {lh} LUFS")
+    pg.evaluate("(fx) => SKN.fxFaixa(SK.proj.faixas[0].id, fx)", {"hpf": {"ativo": True}, "gate": {"ativo": True, "limiar": -60}, "deess": {"ativo": True}, "geq": {"ativo": True, "bandas": [3, 0, 0, 0, 0, 0, 0, 0, 0, -3]}, "rev": {"ativo": True, "mix": 0.3}})
+    r = pg.evaluate("""async () => { SKN.ir(0); await skTocar(); await new Promise(r => setTimeout(r, 1200)); const b = SK.bus[SK.proj.faixas[0].id];
+        const m = skMedirAgora(); skParar(); return { dyn: !!b.dyn, ir: !!b.conv.buffer, pico: m.L.pico }; }""")
+    ok(r["dyn"] and r["ir"] and r["pico"] > -40, "prévia com a cadeia inteira (gate/de-esser no AudioWorklet, reverb com a IR da exportação)", str(r))
     if "--longo" in sys.argv:
         lg = D + "longo_2h.mp3"
         if not os.path.isfile(lg):

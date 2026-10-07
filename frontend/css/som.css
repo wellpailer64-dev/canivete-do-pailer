@@ -98,3 +98,9 @@
 .sk-recup .ie-recente { flex: 1; }
 .sk-pn .ie-btn.on, .sk-transp .ie-btn.on { background: #ffd16633; border-color: #ffd166; color: #ffd166; }
 .sk-transp .sk-rec.on { background: #ff3b30; color: #fff; border-color: #ff3b30; }
+/* cadeia de efeitos e master (rodada D) */
+.sk-liga { font-weight: 600; color: var(--text); }
+.sk-geq { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; }
+.sk-geq label { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 9.5px; color: var(--text-3); }
+.sk-geq input { writing-mode: vertical-lr; direction: rtl; width: 16px; height: 86px; accent-color: #ffd166; }
+.sk-geq small { font-size: 9px; }

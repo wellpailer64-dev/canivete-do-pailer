@@ -107,9 +107,24 @@ Sound Kanivete" no topo de cada página. SKN: `transcrever(idioma)`, `texto()`, 
 - SKN: `intervalo(a, b, faixas)` (null desmarca), `apagarIntervalo(puxar)`, `copiar()`, `colar(t)`, `recortar()`,
   `curva(id, pts|null)`, `ducking(faixa, {db, fontes, ataque, soltura})`; `estado()` traz `curva` e `intervalo`.
 
+## Master e cadeia de efeitos por faixa (rodada D, 2026-10-07)
+- **Faixa** (`f.fx`): passa-alta → gate → EQ 3 bandas → EQ gráfico 10 bandas (31 Hz–16 kHz, 1 oitava) → de-esser →
+  compressor → reverb (seco/molhado). Presets: Voz de podcast, Locução de rádio, Trilha sob a voz, Ambiente de estúdio,
+  Sem efeitos (`SK_PRESETS_FX`; `skFxCompleto` completa projetos antigos que só tinham eq/comp).
+- Exportação (`_filtros_faixa`): highpass, agate (peak, range -30 dB, 5/100 ms), equalizer, sidechaincompress com a
+  chave passa-alta 5 kHz (de-esser: razão 1/(1-quant)), acompressor, e o reverb com `afir` usando a **mesma IR** da
+  prévia (`ir_reverb(tamanho)`: ruído estéreo com semente fixa, energia 1, cache `sk_ir`; `sk_ir` → ConvolverNode).
+- Prévia: biquads + DynamicsCompressor + ConvolverNode; gate e de-esser num AudioWorklet (`SK_DYN_JS`) que aproxima
+  o agate/sidechaincompress (não é idêntico; o resto é igual).
+- **Master** (`proj.master = {vol, lim: {ativo, teto}}`, aba Exportar): volume e limitador (projeto novo já vem com
+  teto -1 dB). Exportação: `alimiter` (level=0, latency=1: duração exata); prévia: DynamicsCompressor rápido; os
+  medidores do Monitor ficam depois do limitador.
+- Cuidado: `skIr(t)` é mover a agulha — o carregador da IR é `skIrRev` (a colisão quebrou a navegação na 1ª versão).
+
 ## Pendências
+Teste intermitente: 1ª rodada do teste_som.py logo depois de abrir o app já falhou 2× em "crossfade" (o clipe recém-
+importado sumiu do projeto antes do alterarClipe); as linhas DEBUG-A/B no teste mostram o estado se repetir.
 Rodadas seguintes do plano profissional:
-D master com limitador (-1 dBTP) e cadeia de efeitos por faixa (passa-alta, gate, de-esser, EQ gráfico, reverb);
 E espectrograma e reparo espectral, separar voz da música; F editar pelo texto (apagar palavras/vícios), stems, ID3/capítulos, modelos salvos.
 Separar voz da música (precisa de um modelo de separação; o UVR/Roformer foi testado no anti-noise), curva de volume
 desenhada na timeline (o .sknv e a exportação já aceitam `curva`), Editor → Sk (editar o áudio de um vídeo aqui).

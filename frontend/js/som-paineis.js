@@ -211,32 +211,67 @@ function skUiClipe(el) {
     el.querySelector('#sk-igualar').onclick = () => skIgualar(SK.sel, +el.querySelector('#sk-alvo').value).catch(e => skToast(e.message));
     el.querySelector('#sk-silencio').onclick = () => skCortarSilencios(SK.sel).then(n => skToast(n ? `${n} pausa(s) cortada(s)` : 'Nenhuma pausa longa')).catch(e => skToast(e.message));
 }
+function skFxCompleto(fx) {   // preenche as chaves que faltam (projetos antigos só tinham eq/comp)
+    const base = JSON.parse(JSON.stringify(SK_PRESETS_FX.nenhum));
+    for (const k in base) base[k] = Object.assign(base[k], (fx || {})[k] || {});
+    base.geq.bandas = (base.geq.bandas || []).concat(Array(10).fill(0)).slice(0, 10);
+    return base;
+}
 function skUiFaixa(el) {
     const f = SK.proj.faixas.find(x => x.id === SK.faixaSel) || SK.proj.faixas[0];
     if (!f) { el.innerHTML = '<div class="sk-p-info">Sem faixas.</div>'; return; }
-    const fx = f.fx || JSON.parse(JSON.stringify(SK_PRESETS_FX.nenhum)), eq = fx.eq, c = fx.comp;
-    const sl = (r, k, v, min, max, passo, uni) => `<label class="sk-p-l">${r}<input type="range" min="${min}" max="${max}" step="${passo}" value="${v}" data-fx="${k}"><small>${(+v).toFixed(k === 'comp.razao' ? 1 : 0)}${uni}</small></label>`;
+    const fx = skFxCompleto(f.fx);
+    const sl = (r, k, v, min, max, passo, uni, casas = 0) => `<label class="sk-p-l">${r}<input type="range" min="${min}" max="${max}" step="${passo}" value="${v}" data-fx="${k}" data-uni="${uni}" data-casas="${casas}"><small>${(+v).toFixed(casas)}${uni}</small></label>`;
+    const liga = (k, r) => `<label class="sk-chk sk-liga"><input type="checkbox" data-fx="${k}.ativo" ${fx[k].ativo ? 'checked' : ''}> ${r}</label>`;
+    const rot = n => n >= 1000 ? n / 1000 + 'k' : n;
     el.innerHTML = `<div class="sk-p-nome notranslate" style="color:${f.cor}">${skEsc(f.nome)}</div>
         <div class="sk-p-info">${f.clipes.length} clipe(s) · volume ${skDb(f.vol)} dB${f.mudo ? ' · muda' : ''}${f.solo ? ' · solo' : ''}</div>
-        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" data-preset="voz">Voz de podcast</button><button class="ie-btn ie-btn-mini" data-preset="nenhum">Sem efeitos</button></div>
-        <div class="sk-grupo"><div class="sk-p-tit">Equalizador</div>${sl('Grave', 'eq.grave', eq.grave, -12, 12, 0.5, ' dB')}${sl('Médio', 'eq.medio', eq.medio, -12, 12, 0.5, ' dB')}${sl('Agudo', 'eq.agudo', eq.agudo, -12, 12, 0.5, ' dB')}</div>
-        <div class="sk-grupo"><div class="sk-p-tit">Compressor</div><label class="sk-chk"><input type="checkbox" data-fx="comp.ativo" ${c.ativo ? 'checked' : ''}> Ligado</label>
-        ${sl('Limiar', 'comp.limiar', c.limiar, -50, 0, 1, ' dB')}${sl('Razão', 'comp.razao', c.razao, 1, 12, 0.5, ':1')}${sl('Ganho', 'comp.ganho', c.ganho, 0, 18, 0.5, ' dB')}</div>
+        <div class="sk-p-acoes">${Object.entries(SK_PRESETS_NOMES).map(([k, n]) => `<button class="ie-btn ie-btn-mini" data-preset="${k}">${n}</button>`).join('')}</div>
+        <div class="sk-p-info">Cadeia na ordem: passa-alta → gate → EQ → EQ gráfico → de-esser → compressor → reverb.</div>
+        <div class="sk-grupo">${liga('hpf', 'Passa-alta')}${sl('Corte', 'hpf.freq', fx.hpf.freq, 20, 300, 5, ' Hz')}</div>
+        <div class="sk-grupo">${liga('gate', 'Gate (corta o fundo entre as falas)')}${sl('Limiar', 'gate.limiar', fx.gate.limiar, -80, -20, 1, ' dB')}</div>
+        <div class="sk-grupo"><div class="sk-p-tit">Equalizador</div>${sl('Grave', 'eq.grave', fx.eq.grave, -12, 12, 0.5, ' dB', 1)}${sl('Médio', 'eq.medio', fx.eq.medio, -12, 12, 0.5, ' dB', 1)}${sl('Agudo', 'eq.agudo', fx.eq.agudo, -12, 12, 0.5, ' dB', 1)}</div>
+        <div class="sk-grupo">${liga('geq', 'EQ gráfico (10 bandas)')}<div class="sk-geq">${SK_GEQ.map((q, i) => `<label><input type="range" min="-12" max="12" step="0.5" value="${fx.geq.bandas[i]}" data-fx="geq.bandas.${i}" data-uni="" data-casas="1" orient="vertical"><small>${(+fx.geq.bandas[i]).toFixed(1)}</small><span>${rot(q)}</span></label>`).join('')}</div></div>
+        <div class="sk-grupo">${liga('deess', 'De-esser (suaviza o "s")')}${sl('Quanto', 'deess.quant', fx.deess.quant, 0.1, 0.9, 0.05, '', 2)}</div>
+        <div class="sk-grupo"><div class="sk-p-tit">Compressor</div><label class="sk-chk"><input type="checkbox" data-fx="comp.ativo" ${fx.comp.ativo ? 'checked' : ''}> Ligado</label>
+        ${sl('Limiar', 'comp.limiar', fx.comp.limiar, -50, 0, 1, ' dB')}${sl('Razão', 'comp.razao', fx.comp.razao, 1, 12, 0.5, ':1', 1)}${sl('Ganho', 'comp.ganho', fx.comp.ganho, 0, 18, 0.5, ' dB', 1)}</div>
+        <div class="sk-grupo">${liga('rev', 'Reverb')}<label class="sk-p-l">Ambiente<select data-fx="rev.tamanho">${[[0.6, 'Sala pequena'], [1.2, 'Estúdio'], [2.5, 'Salão'], [4, 'Igreja']].map(([v, n]) => `<option value="${v}"${+fx.rev.tamanho === v ? ' selected' : ''}>${n}</option>`).join('')}</select><small></small></label>
+        ${sl('Mistura', 'rev.mix', fx.rev.mix, 0, 0.6, 0.01, '', 2)}</div>
         <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" data-igualar-faixa="${f.id}">Igualar volume dos clipes (-16 LUFS)</button></div>
         <div class="sk-grupo"><div class="sk-p-tit">Abaixar sob a voz (ducking)</div>
         <div class="sk-p-acoes"><select id="sk-duck-db"><option value="-6">-6 dB</option><option value="-12" selected>-12 dB</option><option value="-18">-18 dB</option><option value="-24">-24 dB</option></select>
         <button class="ie-btn ie-btn-mini" data-duck="1">Abaixar quando as outras faixas falam</button>${f.clipes.some(c => c.curva) ? '<button class="ie-btn ie-btn-mini" data-duck="0">Tirar</button>' : ''}</div>
         <div class="sk-p-info">Escreve a curva de volume dos clipes desta faixa (dá para ajustar depois com 〰).</div></div>`;
-    el.oninput = e => { const k = e.target.dataset.fx; if (!k) return; const [g, p] = k.split('.'); f.fx = f.fx || JSON.parse(JSON.stringify(SK_PRESETS_FX.nenhum));
-        f.fx[g][p] = e.target.type === 'checkbox' ? e.target.checked : +e.target.value; if (e.target.nextElementSibling) e.target.nextElementSibling.textContent = (+e.target.value).toFixed(p === 'razao' ? 1 : 0) + (p === 'razao' ? ':1' : ' dB');
-        if (SK.bus[f.id]) skBus(f); SK.sujo = true; };
-    el.onchange = e => { if (e.target.dataset.fx) { skAntes(); skMudou('efeito da faixa'); } };
-    el.onclick = e => { const p = e.target.dataset.preset; if (p) { skAntes(); f.fx = JSON.parse(JSON.stringify(SK_PRESETS_FX[p])); if (SK.bus[f.id]) skBus(f); skMudou('preset'); }
+    el.oninput = e => {
+        const k = e.target.dataset.fx; if (!k) return;
+        const [g, p, i] = k.split('.'); f.fx = skFxCompleto(f.fx);
+        const v = e.target.type === 'checkbox' ? e.target.checked : +e.target.value;
+        if (i != null) f.fx[g][p][+i] = v; else f.fx[g][p] = v;
+        const s = e.target.nextElementSibling; if (s && e.target.type === 'range') s.textContent = (+v).toFixed(+e.target.dataset.casas) + e.target.dataset.uni;
+        if (SK.bus[f.id]) skBus(f); SK.sujo = true;
+    };
+    el.onchange = e => { if (e.target.dataset.fx) { if (e.target.tagName === 'SELECT') el.oninput(e); skAntes(); skMudou('efeito da faixa'); } };
+    el.onclick = e => { const p = e.target.dataset.preset; if (p) { skAntes(); f.fx = skFxCompleto(SK_PRESETS_FX[p]); if (SK.bus[f.id]) skBus(f); skMudou('preset'); }
         const ig = e.target.dataset.igualarFaixa; if (ig) skIgualar(f.clipes.map(c => c.id), -16).then(n => skToast(`${n} clipe(s) igualado(s)`));
         const dk = e.target.dataset.duck;
         if (dk === '1') skDucking(f.id, { db: +el.querySelector('#sk-duck-db').value }).then(n => skToast(`${n} trecho(s) de fala: trilha abaixada`)).catch(er => skToast(er.message));
         if (dk === '0') { skAntes(); for (const c of f.clipes) delete c.curva; skMudou('tirar ducking'); } };
 }
+function skUiMaster() {
+    const ms = SK.proj.master || {}, lim = ms.lim || {};
+    return `<div class="sk-grupo sk-master"><div class="sk-p-tit">Master (tudo que sai)</div>
+        <label class="sk-p-l">Volume<input type="range" min="0" max="2" step="0.01" value="${ms.vol ?? 1}" data-m="vol"><small>${skDb(ms.vol ?? 1)} dB</small></label>
+        <label class="sk-chk"><input type="checkbox" data-m="lim.ativo" ${lim.ativo ? 'checked' : ''}> Limitador (nada passa do teto)</label>
+        <label class="sk-p-l">Teto<input type="range" min="-6" max="0" step="0.1" value="${lim.teto ?? -1}" data-m="lim.teto"><small>${(lim.teto ?? -1).toFixed(1)} dB</small></label></div>`;
+}
+document.addEventListener('input', e => {
+    const k = e.target.dataset && e.target.dataset.m; if (!k || !SK.proj || !e.target.closest('#sk')) return;
+    const ms = SK.proj.master = SK.proj.master || { vol: 1, lim: { ativo: false, teto: -1 } }; ms.lim = ms.lim || {};
+    const v = e.target.type === 'checkbox' ? e.target.checked : +e.target.value;
+    if (k === 'vol') ms.vol = v; else ms.lim[k.split('.')[1]] = v;
+    const s = e.target.nextElementSibling; if (s && e.target.type === 'range') s.textContent = k === 'vol' ? skDb(v) + ' dB' : v.toFixed(1) + ' dB';
+    skMasterAplicar(); SK.sujo = true;
+});
 function skUiTexto(el) {
     const P = SK.texto && SK.texto.palavras;
     el.onclick = el.oninput = el.onchange = null;
@@ -260,6 +295,7 @@ function skUiExportar(el) {
         <label>Volume final ${sel('ske-l', [['', 'Como está'], ['-14', '-14 LUFS (redes, streaming)'], ['-16', '-16 LUFS (podcast)'], ['-23', '-23 LUFS (TV)']], op.l)}</label>
         <label>Faixas ${sel('ske-fx', [['', 'Mixagem de todas'], ...SK.proj.faixas.map(f => [f.id, `Só "${skEsc(f.nome)}"`])], op.fx)}</label></div>
         <div class="sk-p-acoes"><button class="ie-btn ie-btn-primario" id="ske-ok">Exportar…</button><button class="ie-btn ie-btn-mini" onclick="skEnviarEditor().catch(e => skToast(e.message))">→ Editor de vídeo</button></div>
+        ${skUiMaster()}
         <div class="sk-grupo"><div class="sk-p-tit">Medir</div><div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" onclick="skMedirLufs()">Medir volume da mixagem (LUFS)</button></div><div class="sk-p-info" id="sk-lufs"></div></div>`;
     el.onchange = () => { const g = s => el.querySelector(s).value; SK.expOp = { f: g('#ske-f'), k: g('#ske-k'), l: g('#ske-l'), fx: g('#ske-fx') }; };
     el.querySelector('#ske-ok').onclick = async () => {

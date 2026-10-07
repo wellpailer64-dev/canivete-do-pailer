@@ -26,8 +26,8 @@ function skDesfazer() { if (!SK.hist.length) return; SK.futuro.push(skSnap()); S
 function skRefazer() { if (!SK.futuro.length) return; SK.hist.push(skSnap()); SK.proj = JSON.parse(SK.futuro.pop()); skParar(); skUi(); skDesenhar(); }
 const SK_MODELOS = { vazio: ['Faixa 1'], podcast: ['Voz 1', 'Voz 2', 'Trilha', 'Efeitos'], narracao: ['Narração', 'Trilha'], musica: ['Voz', 'Instrumental', 'Backing'], limpar: ['Gravação'] };
 function skNovo(modelo = 'vazio', nome = 'Sem título') {
-    SK.proj = { id: skId('p'), nome, faixas: (SK_MODELOS[modelo] || [modelo]).map((n, i) => ({ id: skId('f'), nome: n, vol: 1, mudo: false, solo: false, cor: SK_CORES[i % SK_CORES.length], clipes: [] })), marcadores: [] };
-    SK.caminho = null; SK.sujo = false; SK.hist = []; SK.futuro = []; SK.sel = null; SK.faixaSel = SK.proj.faixas[0].id; SK.ph = 0; SK.x0 = 0; SK.y0 = 0;
+    SK.proj = { id: skId('p'), nome, master: { vol: 1, lim: { ativo: true, teto: -1 } }, faixas: (SK_MODELOS[modelo] || [modelo]).map((n, i) => ({ id: skId('f'), nome: n, vol: 1, mudo: false, solo: false, cor: SK_CORES[i % SK_CORES.length], clipes: [] })), marcadores: [] };
+    skMasterAplicar(); SK.caminho = null; SK.sujo = false; SK.hist = []; SK.futuro = []; SK.sel = null; SK.faixaSel = SK.proj.faixas[0].id; SK.ph = 0; SK.x0 = 0; SK.y0 = 0;
     skParar(); skUi(); skDesenhar();
 }
 
@@ -550,7 +550,17 @@ async function skCortarSilencios(id = SK.sel, { limiar = -40, minimo = 0.6, marg
     return sil.length;
 }
 // EQ e compressor por faixa: tocam no WebAudio (barramento da faixa) e saem iguais na exportação (sound_kanivete._filtros_faixa)
-const SK_PRESETS_FX = { voz: { eq: { grave: -3, medio: 2, agudo: 3 }, comp: { ativo: true, limiar: -20, razao: 3, ganho: 3 } }, nenhum: { eq: { grave: 0, medio: 0, agudo: 0 }, comp: { ativo: false, limiar: -20, razao: 3, ganho: 0 } } };
+const SK_FX_NADA = { hpf: { ativo: false, freq: 80 }, gate: { ativo: false, limiar: -50 }, eq: { grave: 0, medio: 0, agudo: 0 },
+    geq: { ativo: false, bandas: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }, deess: { ativo: false, quant: 0.5 }, comp: { ativo: false, limiar: -20, razao: 3, ganho: 0 }, rev: { ativo: false, tamanho: 1.2, mix: 0.2 } };
+const skFxCom = m => { const b = JSON.parse(JSON.stringify(SK_FX_NADA)); for (const k in m) Object.assign(b[k], m[k]); return b; };
+const SK_PRESETS_FX = {
+    voz: skFxCom({ hpf: { ativo: true, freq: 80 }, eq: { grave: -3, medio: 2, agudo: 3 }, deess: { ativo: true, quant: 0.4 }, comp: { ativo: true, limiar: -20, razao: 3, ganho: 3 } }),
+    radio: skFxCom({ hpf: { ativo: true, freq: 120 }, gate: { ativo: true, limiar: -48 }, eq: { grave: 2, medio: 3, agudo: 2 }, deess: { ativo: true, quant: 0.5 }, comp: { ativo: true, limiar: -26, razao: 5, ganho: 6 } }),
+    trilha: skFxCom({ hpf: { ativo: true, freq: 40 }, geq: { ativo: true, bandas: [1, 1, 0, -1, -2, -3, -2, 0, 1, 1] } }),
+    sala: skFxCom({ rev: { ativo: true, tamanho: 1.2, mix: 0.2 } }),
+    nenhum: skFxCom({}),
+};
+const SK_PRESETS_NOMES = { voz: 'Voz de podcast', radio: 'Locução de rádio', trilha: 'Trilha sob a voz', sala: 'Ambiente de estúdio', nenhum: 'Sem efeitos' };
 // Ponte com o Editor de vídeo: a mixagem vai como áudio para a timeline do Editor (sem projeto aberto, abre um com ele)
 async function skEnviarEditor(destino = null) {
     if (!SK.proj) return;
@@ -565,6 +575,6 @@ async function skEnviarEditor(destino = null) {
 Object.assign(window.SKN, {
     igualar: (ids, alvo = -16) => skIgualar(ids, alvo),
     cortarSilencios: (id, op) => skCortarSilencios(id, op),
-    fxFaixa: (id, fx) => { const f = SK.proj.faixas.find(x => x.id === id || x.nome === id); skAntes(); f.fx = typeof fx === 'string' ? JSON.parse(JSON.stringify(SK_PRESETS_FX[fx])) : fx; if (SK.bus[f.id]) skBus(f); skMudou('fx'); return f.fx; },
+    fxFaixa: (id, fx) => { const f = SK.proj.faixas.find(x => x.id === id || x.nome === id); skAntes(); f.fx = skFxCompleto(typeof fx === 'string' ? SK_PRESETS_FX[fx] : fx); if (SK.bus[f.id]) skBus(f); skMudou('fx'); return f.fx; },
     enviarEditor: caminho => skEnviarEditor(caminho),
 });

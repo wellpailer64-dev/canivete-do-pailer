@@ -285,15 +285,35 @@ def _montar(proj, sr=48000, faixas_ids=None):
             continue
         k = len(saidas)
         junta = f"{''.join(rot)}amix=inputs={len(rot)}:normalize=0:dropout_transition=0," if len(rot) > 1 else rot[0]
-        fx = ",".join(_filtros_faixa(f))   # EQ e compressor da faixa (os mesmos da prévia no WebAudio)
-        filtros.append(f"{junta}{fx + ',' if fx else ''}volume={float(f.get('vol', 1)):.5f}[f{k}]")
+        fx = ",".join(_filtros_faixa(f)).replace("[dsa]", f"[dsa{k}]").replace("[dsk]", f"[dsk{k}]").replace("[dsk2]", f"[dsk2{k}]")   # cadeia da faixa (a mesma da prévia)
+        rv = ((f.get("fx") or {}).get("rev") or {})
+        if rv.get("ativo") and float(rv.get("mix", 0)) > 0.001:   # reverb: seco + molhado (afir com a IR da prévia)
+            ir = ir_reverb(rv.get("tamanho", 1.2))
+            if ir not in idx:
+                idx[ir] = len(entradas) // 2
+                entradas += ["-i", ir]
+            m = float(rv["mix"])
+            filtros.append(f"{junta}{fx + ',' if fx else ''}asplit=2[rd{k}][rw{k}]")
+            filtros.append(f"[{idx[ir]}:a]aresample={sr}[ir{k}]")
+            filtros.append(f"[rw{k}][ir{k}]afir=irnorm=-1:dry=1:wet=1[rv{k}]")
+            filtros.append(f"[rd{k}][rv{k}]amix=inputs=2:weights='{1 - m:.4f} {m:.4f}':normalize=0:duration=first,volume={float(f.get('vol', 1)):.5f}[f{k}]")
+        else:
+            filtros.append(f"{junta}{fx + ',' if fx else ''}volume={float(f.get('vol', 1)):.5f}[f{k}]")
         saidas.append(f"[f{k}]")
     if not saidas:
         return None
     # base de silêncio do tamanho do projeto como 1ª entrada: a mixagem começa no 0 (sem ela começava no 1º clipe e o
     # silêncio do início sumia — saía 0,5 s mais curta) e termina no fim do último clipe
     filtros.append(f"anullsrc=r={sr}:cl=stereo,atrim=duration={fim:.4f}[base]")
-    filtros.append(f"[base]{''.join(saidas)}amix=inputs={len(saidas) + 1}:normalize=0:dropout_transition=0:duration=first[mix]")
+    # master: volume e limitador (teto em dBFS; o da prévia é o DynamicsCompressor do som-motor.js)
+    ms = proj.get("master") or {}
+    mf = []
+    if abs(float(ms.get("vol", 1)) - 1) > 1e-4:
+        mf.append(f"volume={float(ms['vol']):.5f}")
+    lim = ms.get("lim") or {}
+    if lim.get("ativo"):
+        mf.append(f"alimiter=limit={max(0.0625, 10 ** (float(lim.get('teto', -1)) / 20)):.5f}:attack=5:release=50:level=0:latency=1")
+    filtros.append(f"[base]{''.join(saidas)}amix=inputs={len(saidas) + 1}:normalize=0:dropout_transition=0:duration=first{',' + ','.join(mf) if mf else ''}[mix]")
     return entradas, ";".join(filtros), "[mix]", fim
 
 
@@ -422,15 +442,60 @@ def silencios(arq, de=0.0, dur=None, limiar_db=-40, min_s=0.6):
     return {"success": True, "silencios": out}
 
 
-def _filtros_faixa(f):
-    """EQ (grave 120 Hz, médio 2,5 kHz, agudo 8 kHz, em dB) e compressor da faixa → filtros do ffmpeg."""
+GEQ_FREQS = (31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000)   # EQ gráfico de 10 bandas (1 oitava cada)
+
+
+def ir_reverb(tamanho=1.2, sr=48000):
+    """Resposta ao impulso do reverb (ruído estéreo com queda de 60 dB em `tamanho` s, semente fixa, energia 1 por
+    canal) em WAV float32 — a mesma para a prévia (ConvolverNode) e a exportação (afir)."""
+    import struct
+    import numpy as np
+    tamanho = round(max(0.2, min(6.0, float(tamanho))), 1)
+    arq = os.path.join(os.path.dirname(_cache_dir()), "sk_ir", f"rev_{tamanho:.1f}_{sr}.wav")
+    if os.path.isfile(arq):
+        return arq
+    os.makedirs(os.path.dirname(arq), exist_ok=True)
+    n, pre = int(tamanho * sr), int(0.012 * sr)
+    t = np.arange(n) / sr
+    canais = []
+    for semente in (11, 23):
+        x = np.random.default_rng(semente).standard_normal(n) * np.exp(-6.91 * t / tamanho)
+        x[:pre] = 0
+        canais.append(x / np.sqrt((x ** 2).sum()))
+    dados = np.stack(canais, 1).astype("<f4").tobytes()
+    cab = b"RIFF" + struct.pack("<I", 36 + len(dados)) + b"WAVEfmt " + struct.pack("<IHHIIHH", 16, 3, 2, sr, sr * 8, 8, 32) + b"data" + struct.pack("<I", len(dados))
+    tmp = arq + ".tmp"
+    open(tmp, "wb").write(cab + dados)
+    os.replace(tmp, arq)
+    return arq
+
+
+def _filtros_faixa(f, ir=None):
+    """Cadeia da faixa → filtros do ffmpeg, na ordem da prévia (som-motor.js): passa-alta → gate → EQ (grave 120 Hz,
+    médio 2,5 kHz, agudo 8 kHz) → EQ gráfico → de-esser → compressor. O reverb fica em _reverb_faixa (precisa da IR).
+    Gate e de-esser na prévia são aproximados (AudioWorklet); aqui agate e sidechaincompress com os mesmos tempos."""
     fx = f.get("fx") or {}
     out = []
+    h = fx.get("hpf") or {}
+    if h.get("ativo"):
+        out.append(f"highpass=f={float(h.get('freq', 80)):.1f}")
+    g = fx.get("gate") or {}
+    if g.get("ativo"):
+        out.append(f"agate=threshold={10 ** (float(g.get('limiar', -50)) / 20):.6f}:range=0.03:ratio=20:attack=5:release=100:detection=peak")
     eq = fx.get("eq") or {}
     for chave, freq, tipo in (("grave", 120, "lowshelf"), ("medio", 2500, "equalizer"), ("agudo", 8000, "highshelf")):
         g = float(eq.get(chave) or 0)
         if abs(g) > 0.05:
             out.append(f"{tipo}=f={freq}:g={g:.2f}" + (":t=q:w=1" if tipo == "equalizer" else ""))
+    geq = fx.get("geq") or {}
+    if geq.get("ativo"):
+        for freq, gd in zip(GEQ_FREQS, geq.get("bandas") or []):
+            if abs(float(gd)) > 0.05:
+                out.append(f"equalizer=f={freq}:t=o:w=1:g={float(gd):.2f}")
+    d = fx.get("deess") or {}
+    if d.get("ativo"):
+        r = 1 / max(0.05, 1 - float(d.get("quant", 0.5)))   # ganho = (limiar/nível)^quant ⇔ razão 1/(1-quant)
+        out.append(f"asplit=2[dsa][dsk];[dsk]highpass=f=5000:p=1[dsk2];[dsa][dsk2]sidechaincompress=threshold=0.05:ratio={r:.3f}:attack=1:release=60:detection=peak:knee=1")
     c = fx.get("comp") or {}
     if c.get("ativo"):
         lim = 10 ** (float(c.get("limiar", -18)) / 20)

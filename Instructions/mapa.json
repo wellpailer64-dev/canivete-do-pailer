@@ -243,6 +243,7 @@
     "sk_trecho",
     "sk_auto",
     "sk_gravar",
+    "sk_ir",
     "sk_salvar",
     "sk_abrir",
     "sk_exportar",
@@ -1098,6 +1099,13 @@
    "args": "acao, dispositivo=None, caminho=None, sr=48000, canais=1",
    "modulos": [
     "sk_gravar as g"
+   ]
+  },
+  "sk_ir": {
+   "args": "tamanho=1.2",
+   "modulos": [
+    "media_server",
+    "sound_kanivete"
    ]
   },
   "sk_salvar": {
