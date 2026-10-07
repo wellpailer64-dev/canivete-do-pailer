@@ -21,7 +21,6 @@ import io
 import logging
 import math
 import os
-import time
 import uuid
 import warnings
 
@@ -910,7 +909,7 @@ def _ler_prancheta(layer):
 def _gravar_prancheta(layer, p):
     """Atualiza retângulo e fundo da prancheta (artb) que o editor mudou."""
     from psd_tools.constants import Tag
-    from psd_tools.psd.descriptor import Double, Descriptor
+    from psd_tools.psd.descriptor import Double
     for t in (Tag.ARTBOARD_DATA1, Tag.ARTBOARD_DATA2, Tag.ARTBOARD_DATA3):
         d = layer.tagged_blocks.get_data(t)
         if d is None:
@@ -1089,7 +1088,6 @@ def _trocar_pixels(layer, im, x, y):
 
 def _mascara(layer, m, arquivos):
     """Aplica o estado da máscara vindo da página: None = sem máscara; {key?, x, y, fundo, desativada}."""
-    from psd_tools.constants import ChannelID
     tem = layer.has_mask()
     if m is None:
         if tem:
@@ -1472,7 +1470,6 @@ def _forma_nova(ob, vet, W, H):
     (vmsk), como o Photoshop grava (conferido com uma forma feita nele: os blocos de cor saem iguais byte a byte).
     Os pixels da camada são os desenhados pelo editor. Pontos: (y/A, x/L) do documento; i = alça de chegada, o = de saída."""
     from psd_tools.constants import Tag
-    from psd_tools.psd.descriptor import Descriptor, DescriptorBlock, Double
     from psd_tools.psd.tagged_blocks import TaggedBlock
     from psd_tools.psd import vector as V
     soco = _soco(vet.get("cor"))

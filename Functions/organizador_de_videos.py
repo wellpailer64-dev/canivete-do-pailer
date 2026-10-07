@@ -876,23 +876,6 @@ def _detectar_profissional(path, pasta_raiz):
     return None
 
 
-def _tem_sufixo_copia(nome_sem_ext):
-    """
-    Retorna True APENAS se o nome claramente indica uma cópia do SO.
-    MUITO conservador — só padrões que o sistema operacional cria automaticamente.
-    NÃO inclui _1, _2 — câmeras Canon/Sony usam isso para clipes sequenciais.
-    """
-    n = nome_sem_ext.strip()
-    if re.search(r'\(\d+\)$', n):           # IMG_1234(1) — macOS/iOS
-        return True
-    if re.search(r'\s+\(\d+\)$', n):        # IMG_1234 (2) — Windows
-        return True
-    if re.search(r'[-_\s]+(c[oó]pia|copy|copia|dup|duplicate|backup)\s*(\d*)$',
-                 n, re.IGNORECASE):          # arquivo - Copia, arquivo - Copy
-        return True
-    return False
-
-
 def _nome_base_canonico(nome_sem_ext):
     """
     Remove sufixos de cópia do SO para obter o nome base.

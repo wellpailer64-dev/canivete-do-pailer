@@ -1221,6 +1221,7 @@ function veMidiaProxima() {
 // Ao soltá-lo na timeline ela já está pronta ou adiantada, em vez de começar do zero.
 function veMidiaFundo() {
     if (typeof VE === 'undefined' || !window.pywebview) return;
+    if (!document.body.classList.contains('ve-focus') || document.hidden) return;   // preparo por trás só com o Editor na tela
     if (VEPJF.fundo != null) {   // outro projeto aberto no meio, mídia apagada ou já pronta: libera
         const f = VE.media && VE.media[VEPJF.fundo];
         if (!f || f.removido || f.url) VEPJF.fundo = null;

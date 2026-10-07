@@ -70,19 +70,6 @@ def _alfa_cheio(rgb, aq, eps=1e-5):
     return np.clip(a, 0, 1)
 
 
-def _miolo_solido(rgb, a, seg):
-    H, W = rgb.shape[:2]
-    s = cv2.resize(seg.astype(np.float32), (W, H), interpolation=cv2.INTER_LINEAR)
-    k = max(2, round(max(H, W) / 512))
-    nucleo = cv2.erode((s > 0.9).astype(np.uint8), np.ones((2 * k + 1, 2 * k + 1), np.uint8)).astype(np.float32)
-    nucleo = cv2.GaussianBlur(nucleo, (0, 0), k * 0.6)
-    fundo = a < 0.02
-    B = np.median(rgb[fundo], axis=0).astype(np.float32) if fundo.sum() > 100 else np.array([255, 255, 255], np.float32)
-    dist = np.linalg.norm(rgb.astype(np.float32) - B, axis=2) / 255.0
-    longe = np.clip((dist - 0.12) / 0.18, 0, 1)
-    return np.maximum(a, nucleo * longe)
-
-
 def _fb(img, F, B, a, r):
     ba = cv2.blur(a, (r, r))
     bF = cv2.blur(F * a[..., None], (r, r)) / (ba[..., None] + 1e-5)
@@ -128,17 +115,6 @@ def tem_pessoa(rgb):
     _, rostos = d.detect(cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
     lado = min(img.shape[:2])
     return rostos is not None and any(r[2] >= lado * 0.06 for r in rostos)   # rosto pequeno no fundo não conta
-
-
-def aquecer_para(path):
-    """Depois de gerar: decide pessoa/objeto (20 ms) e deixa o modelo certo carregado (a carga é 7–16 s na placa;
-    a cena pede o recorte logo depois). Falha aqui não importa: o recorte carrega na hora."""
-    try:
-        rgb = np.array(Image.open(path).convert("RGB"))
-        path_m, _ = garantir_modelo("birefnet-matting" if tem_pessoa(rgb) else "ben2")
-        _get_sessao(path_m)
-    except Exception as e:
-        print(f"[recorte] aquecer: {e}")
 
 
 def recortar(rgb, tipo=None):

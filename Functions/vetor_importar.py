@@ -49,12 +49,6 @@ def mescala(m):
     return math.sqrt(abs(m[0] * m[3] - m[1] * m[2])) or 1
 
 
-def minv(m):
-    a, b, c, d, e, f = m
-    det = a * d - b * c or 1e-12
-    return [d / det, -b / det, -c / det, a / det, (c * f - d * e) / det, (b * e - a * f) / det]
-
-
 def _transformar_subs(subs, m):
     for sb in subs:
         for p in sb["pts"]:

@@ -100,7 +100,7 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "Functions.vetor_kanivete" ^
  --hidden-import "Functions.vetor_importar" ^
  --hidden-import "Functions.vetor_exportar" ^
- --hidden-import "Functions.vetor_fonte" --hidden-import "Functions.ponte_illustrator" --hidden-import "win32com" --hidden-import "win32com.client" --hidden-import "pythoncom" --hidden-import "pywintypes" --hidden-import "win32gui" --hidden-import "win32con" ^
+ --hidden-import "Functions.vetor_fonte" --hidden-import "Functions.ponte_illustrator" --hidden-import "Functions.memoria" --hidden-import "win32com" --hidden-import "win32com.client" --hidden-import "pythoncom" --hidden-import "pywintypes" --hidden-import "win32gui" --hidden-import "win32con" ^
  --hidden-import "pikepdf" ^
  --hidden-import "uharfbuzz" ^
  --hidden-import "qrcode" ^

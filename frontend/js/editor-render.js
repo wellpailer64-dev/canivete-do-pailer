@@ -322,6 +322,9 @@ function vePrAutoTick() {
     if (VE.playing || VEPRA.tocava) VEPRA.mexeu = agora;   // o fim do play conta como mexer
     VEPRA.tocava = !!VE.playing;
     if (!VE.ready) return;
+    // Editor fora da tela (Photo, Vetor, outra ferramenta) ou janela minimizada: não renderiza prévia por trás —
+    // disputava CPU/GPU com o trabalho da hora; volta sozinho quando o Editor reaparece
+    if (!document.body.classList.contains('ve-focus') || document.hidden) { if (VEPRA.ativo && (VEPR.atual || VEPR.fila.length)) vePrAutoParar(); return; }
     const espera = +vePrPrefs().autoSeg;
     if (VEPRA.ativo && (VEPR.atual || VEPR.fila.length)) {
         if (VE.playing || VE.exportRunning || !espera) { vePrAutoParar(); return; }

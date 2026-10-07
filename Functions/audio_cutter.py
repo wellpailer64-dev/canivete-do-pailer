@@ -11,12 +11,6 @@ from Functions import media_server
 from Functions.convertermp3 import FORMATOS_ENTRADA, FORMATOS_SAIDA, _normalizar_saida, ffmpeg_path
 
 
-def _project_root():
-    if hasattr(sys, "_MEIPASS"):
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-
 def _preview_dir():
     # Pasta temporária do sistema: a pasta do app pode ser somente-leitura e, no .exe,
     # a interface não enxerga frontend/ ao lado do executável. Servido via media_server.

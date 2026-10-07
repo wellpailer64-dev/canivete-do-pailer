@@ -9,7 +9,6 @@ import sys
 import re
 import json
 import subprocess
-import threading
 import time
 
 # Extensões de vídeo suportadas
@@ -24,14 +23,6 @@ EXTENSOES_VIDEO = {
 QUALIDADE_PADRAO = 23
 
 _ENCODERS_CACHE = None
-
-
-def resource_path(filename):
-    if hasattr(sys, "_MEIPASS"):
-        return os.path.join(sys._MEIPASS, filename)
-    # __file__ está em Functions/ — sobe um nível para a raiz do projeto
-    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base, filename)
 
 
 def get_ffmpeg():
@@ -276,11 +267,6 @@ def _encoders_disponiveis():
         "h264_amf": "h264_amf" in txt,
     }
     return _ENCODERS_CACHE
-
-
-def detectar_encoders_disponiveis():
-    """Retorna dict com encoders de CPU/GPU disponíveis no ffmpeg local."""
-    return dict(_encoders_disponiveis())
 
 
 def _escolher_encoder(usar_gpu=False):

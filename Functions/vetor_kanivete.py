@@ -822,7 +822,6 @@ def _vazio(p):
 
 def _pecas(p):
     """Caminho → peças separadas (cada contorno externo com os seus furos), pela regra nonzero do resultado."""
-    import pathops
     subs = _de_skia(p)
     if len(subs) <= 1:
         return [subs] if subs else []

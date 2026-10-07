@@ -19,7 +19,6 @@ Dependências:
 import os
 import sys
 import datetime
-import re
 
 FORMATOS_SUPORTADOS = {
     ".ogg", ".opus", ".mp3", ".wav", ".m4a", ".aac", ".wma", ".flac",

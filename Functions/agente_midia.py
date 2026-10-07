@@ -291,7 +291,9 @@ def _clip():
         base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "modelos_ia", "clip")
         _CLIP["m"] = CLIPModel.from_pretrained(base, local_files_only=True).eval()
         _CLIP["p"] = CLIPProcessor.from_pretrained(base, local_files_only=True)
-    return _CLIP
+    from Functions import memoria
+    memoria.usado("CLIP (agente)", _CLIP.clear)
+    return dict(_CLIP)   # cópia: liberar no meio do uso não tira o modelo de quem está usando
 
 
 def cenas(imagens):

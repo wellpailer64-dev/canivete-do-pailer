@@ -292,49 +292,6 @@ def destino_seguro(pasta, nome):
     return destino
 
 
-# =========================
-# 🔗 SCORE DE SIMILARIDADE
-# =========================
-def score_similaridade(img_a, img_b):
-    ph_a, dh_a = img_a['hashes']
-    ph_b, dh_b = img_b['hashes']
-    nome_ok    = img_a['base'] == img_b['base']
-    hist_score = comparar_hist(img_a['hist'], img_b['hist'])
-
-    # Alta confiança: nome + histograma
-    if nome_ok and hist_score > 0.75:
-        return 1.0
-
-    # Crop com proporção diferente
-    if nome_ok and proporcoes_diferentes(img_a['size'], img_b['size']):
-        maior = img_a if img_a['area'] >= img_b['area'] else img_b
-        menor = img_b if maior is img_a else img_a
-        try:
-            dist = sliding_window_match(
-                Image.open(maior['path']).convert("RGB"),
-                Image.open(menor['path']).convert("RGB"),
-            )
-            if dist <= 14:
-                return 0.92
-        except Exception:
-            pass
-
-    dist_ph    = abs(ph_a - ph_b)
-    dist_dh    = abs(dh_a - dh_b)
-    score_hash = max(0, 1 - dist_ph / 64) * .6 + max(0, 1 - dist_dh / 64) * .4
-
-    score_regioes = 1.0 if regioes_batem(
-        img_a['regioes'], img_b['regioes'], TOLERANCIA_HASH
-    ) else 0.0
-
-    return (
-        score_hash                    * 0.35 +
-        hist_score                    * 0.30 +
-        score_regioes                 * 0.25 +
-        (1.0 if nome_ok else 0.0)     * 0.10
-    )
-
-
 def md5_arquivo(path):
     h = hashlib.md5()
     with open(path, "rb") as f:

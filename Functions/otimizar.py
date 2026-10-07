@@ -5,9 +5,8 @@ tempos de quadro do original (-fps_mode passthrough: os cortes da timeline caem 
 Com placa NVIDIA: decodifica e reduz na placa (8K → 1080 sem passar o quadro grande pela RAM).
 """
 import os
-import subprocess
 
-from Functions.video_cutter import ffmpeg_path, probe, _creationflags, _detectar_hw_encoder, _run_progress
+from Functions.video_cutter import ffmpeg_path, probe, _detectar_hw_encoder, _run_progress
 
 PASTA = "Otimizados FullHD"
 LADO = 1080

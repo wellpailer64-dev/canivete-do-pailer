@@ -170,6 +170,11 @@ def extrair_frames(path_video, n_frames=5, ffmpeg_bin=None):
 _clip_model   = None
 _clip_processor = None
 
+def _soltar_clip():
+    global _clip_model, _clip_processor
+    _clip_model = _clip_processor = None
+
+
 def _carregar_clip(callback_log=None):
     global _clip_model, _clip_processor
 
@@ -224,6 +229,9 @@ def detectar_cena(frames, callback_log=None):
 
     if not _carregar_clip(callback_log=callback_log):
         return None
+    modelo_clip, proc_clip = _clip_model, _clip_processor   # locais: o vigia de memória pode soltar o global
+    from Functions import memoria
+    memoria.usado("CLIP (cenas)", _soltar_clip)
 
     try:
         import torch
@@ -234,7 +242,7 @@ def detectar_cena(frames, callback_log=None):
         scores_total = np.zeros(len(textos))
 
         for frame in frames:
-            inputs = _clip_processor(
+            inputs = proc_clip(
                 text=textos,
                 images=frame,
                 return_tensors="pt",
@@ -243,7 +251,7 @@ def detectar_cena(frames, callback_log=None):
             )
 
             with torch.no_grad():
-                outputs = _clip_model(**inputs)
+                outputs = modelo_clip(**inputs)
                 logits  = outputs.logits_per_image[0]
                 probs   = logits.softmax(dim=0).numpy()
                 scores_total += probs

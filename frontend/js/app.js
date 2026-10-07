@@ -803,10 +803,6 @@ function playExecute() {
 }
 
 // FAQ Toggle
-function toggleFaq(element) {
-    element.classList.toggle('active');
-}
-
 console.log("App JS carregando...");
 
 // Global error handler
@@ -3032,19 +3028,6 @@ function generateCSV() {
 let gdriveAnalyzed = false;
 let gdriveTotalBytes = 0;
 
-function checkGdriveConfig() {
-    window.pywebview.api.gdrive_check().then(result => {
-        const statusDiv = document.getElementById('gdrive-status');
-        if (result.success) {
-            statusDiv.innerHTML = result.configured 
-                ? '<span class="txt-ok">Configurado</span>'
-                : '<span>Ao analisar o primeiro link, o Google vai pedir sua autorização no navegador.</span>';
-        } else {
-            statusDiv.innerHTML = '<span class="txt-err">Erro: ' + _escHtml(result.error) + '</span>';
-        }
-    });
-}
-
 function _gdriveStatus(html) {
     const el = document.getElementById('gdrive-status');
     if (el) el.innerHTML = html;
@@ -3235,15 +3218,6 @@ function updateGdriveProgress(data) {
 }
 
 // Função para copiar log
-function copyLog(tool) {
-    const logEl = document.getElementById(`log-${tool}`);
-    if (logEl) {
-        navigator.clipboard.writeText(logEl.textContent).then(() => {
-            showMessage(tool, 'Log copiado para a área de transferência!', 'success');
-        });
-    }
-}
-
 // =========================
 // Utilitários
 // =========================
@@ -3254,10 +3228,6 @@ function showMessage(tool, message, type) {
 }
 
 // Função para abrir pasta no Explorer
-function openFolder(path) {
-    window.pywebview.api.open_folder(path);
-}
-
 // =========================
 // Inicialização
 // =========================

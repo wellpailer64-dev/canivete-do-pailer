@@ -14,15 +14,13 @@ import os
 import re
 import shutil
 import subprocess
-import sys
-import tempfile
 import time
 import unicodedata
 import uuid
 from pathlib import Path
 from typing import Any, Callable
 
-from Functions.midia import NO_WINDOW, app_dir, ffmpeg, ffprobe, nome_livre, probe
+from Functions.midia import NO_WINDOW, app_dir, ffmpeg, nome_livre, probe
 
 MODEL_ID = "k2-fsa/OmniVoice"
 MAX_NUM_STEP = 32
@@ -405,6 +403,8 @@ def _load_model_inprocess(hf_home: str, callback_log: LogFn = None,
         start = time.perf_counter()
         _MODEL_CACHE[key] = OmniVoice.from_pretrained(MODEL_ID, device_map=resolved_device, dtype=resolved_dtype)
         _log(callback_log, f"Modelo carregado em {time.perf_counter() - start:.1f}s.")
+    from Functions import memoria
+    memoria.usado("OmniVoice", _MODEL_CACHE.clear, memoria.GPU)
     return _MODEL_CACHE[key]
 
 

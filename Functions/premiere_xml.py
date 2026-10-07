@@ -13,7 +13,6 @@ Convenções do xmeml (Apple, "Final Cut Pro XML Interchange Format"):
   MÍDIA original (como o Premiere lê; conferido com logo PNG menor que o quadro).
 - Quadros-chave: <when> no mesmo tempo do in/out (tempo da mídia, com a velocidade).
 """
-import math
 import os
 import uuid
 from urllib.parse import quote

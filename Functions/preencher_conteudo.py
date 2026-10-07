@@ -85,6 +85,8 @@ def _sess():
             so = ort.SessionOptions()
             so.intra_op_num_threads = os.cpu_count() or 4
             _sessao["s"] = ort.InferenceSession(garantir_modelo(), so, providers=["CPUExecutionProvider"])
+        from Functions import memoria
+        memoria.usado("preencher (LaMa)", liberar)   # parado 5 min: sai da memória
         return _sessao["s"]
 
 

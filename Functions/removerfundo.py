@@ -9,7 +9,6 @@ Resultado: PNG com fundo transparente salvo em /sem_fundo
 
 import hashlib
 import os
-import sys
 import urllib.request
 import numpy as np
 from PIL import Image, ImageOps, ImageFilter
@@ -108,10 +107,6 @@ def _get_modelo(modelo_id=None):
         if os.path.exists(path):
             return path, cfg
     return path, cfg
-
-
-def _get_modelo_path(modelo_id=None):
-    return _get_modelo(modelo_id)[0]
 
 
 _md5_ok = set()   # (caminho, tamanho, data) já conferidos — refazer o MD5 de 1 GB a cada recorte custava segundos
@@ -240,6 +235,8 @@ def _get_sessao_(modelo_path):
             s = ort.InferenceSession(modelo_path, so, providers=["CPUExecutionProvider"])
             _dispositivo["atual"] = _dispositivo["atual"] or "cpu"
         _sessoes[modelo_path] = s
+    from Functions import memoria
+    memoria.usado("remover fundo", liberar_sessoes, memoria.GPU)   # VRAM: parado 3 min, sai
     return _sessoes[modelo_path]
 
 
@@ -422,71 +419,6 @@ def remover_fundo_arquivo(path, pasta_saida, callback_log=None, modelo_id="isnet
 
 
 # =========================
-# 📁 REMOVER FUNDO DE PASTA
-# =========================
-def remover_fundo_pasta(pasta, callback_progresso=None, callback_log=None, modelo_id="isnet"):
-    pasta_saida = os.path.join(pasta, "sem_fundo")
-    
-    arquivos = [
-        os.path.join(pasta, f) for f in os.listdir(pasta)
-        if os.path.isfile(os.path.join(pasta, f))
-        and os.path.splitext(f)[1].lower() in FORMATOS_SUPORTADOS
-    ]
-
-    total       = len(arquivos)
-    processados = 0
-    falhas      = 0
-
-    if total == 0:
-        if callback_log:
-            callback_log("Nenhuma imagem encontrada na pasta.")
-        if callback_progresso:
-            callback_progresso(100, "Concluido (vazio)")
-        return {"total": 0, "processados": 0, "falhas": 0}
-
-    os.makedirs(pasta_saida, exist_ok=True)
-
-    for i, path in enumerate(arquivos):
-        sucesso = remover_fundo_arquivo(path, pasta_saida, callback_log=callback_log, modelo_id=modelo_id)
-        if sucesso: processados += 1
-        else:       falhas      += 1
-
-        if callback_progresso:
-            callback_progresso(int((i + 1) / total * 100), f"Processando... {i+1}/{total}")
-
-    if callback_progresso:
-        callback_progresso(100, "Concluido")
-
-    return {"total": total, "processados": processados, "falhas": falhas}
-
-
-# =========================
-# 📄 REMOVER FUNDO DE LISTA
-# =========================
-def remover_fundo_arquivos(lista_paths, callback_progresso=None, callback_log=None, modelo_id="isnet"):
-    if not lista_paths:
-        return {"total": 0, "processados": 0, "falhas": 0}
-
-    pasta_saida = os.path.join(os.path.dirname(lista_paths[0]), "sem_fundo")
-    total       = len(lista_paths)
-    processados = 0
-    falhas      = 0
-
-    for i, path in enumerate(lista_paths):
-        sucesso = remover_fundo_arquivo(path, pasta_saida, callback_log=callback_log, modelo_id=modelo_id)
-        if sucesso: processados += 1
-        else:       falhas      += 1
-
-        if callback_progresso:
-            callback_progresso(int((i + 1) / total * 100), f"Processando... {i+1}/{total}")
-
-    if callback_progresso:
-        callback_progresso(100, "Concluido")
-
-    return {"total": total, "processados": processados, "falhas": falhas}
-
-
-# =========================
 # 🖼️ MODO PREVIEW (sem salvar em disco)
 # =========================
 def _img_para_b64(img_pil, max_px=1100, fmt="PNG"):
@@ -507,7 +439,6 @@ def _img_para_b64(img_pil, max_px=1100, fmt="PNG"):
 
 def processar_imagem_preview(path, callback_log=None, modelo_id="isnet"):
     """Processa sem salvar. Retorna dict com previews b64 e resultado PIL full-res."""
-    import base64
     ext = os.path.splitext(path)[1].lower()
     if ext not in FORMATOS_SUPORTADOS:
         if callback_log:

@@ -437,18 +437,6 @@ def baixar_imagens_zip(imagens, destino_zip, callback=None, referer_url=""):
     }
 
 
-def salvar_texto_txt(titulo: str, url: str, texto: str, destino_txt: str):
-    destino_txt = os.path.abspath(destino_txt)
-    os.makedirs(os.path.dirname(destino_txt), exist_ok=True)
-    with open(destino_txt, "w", encoding="utf-8") as f:
-        f.write(f"TITULO: {titulo}\n")
-        f.write(f"URL: {url}\n")
-        f.write("=" * 80 + "\n\n")
-        f.write((texto or "").strip())
-        f.write("\n")
-    return destino_txt
-
-
 def baixar_video_mp4(video_url: str, destino_dir: str, callback=None):
     from Functions.videodownloader import baixar_video_mp4 as _baixar_video_mp4_unificado
     return _baixar_video_mp4_unificado(video_url, destino_dir, callback=callback)

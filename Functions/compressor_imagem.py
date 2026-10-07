@@ -1,6 +1,5 @@
 import os
 import shutil
-import numpy as np
 from PIL import Image, ImageOps, ImageSequence
 
 try:
@@ -232,76 +231,6 @@ def _finalizar_candidato(path, saida, candidatos):
     finally:
         _cleanup_paths([p for p in candidatos if p != path])
     return True, None
-
-
-def _comprimir_imagem_otimizado_legacy(entrada, saida, force_fullhd=False):
-    ext = os.path.splitext(entrada)[1].lower()
-    tam_in = os.path.getsize(entrada)
-
-    try:
-        if ext == ".gif":
-            # GIF: apenas otimizar sem reducir cores
-            ok = _salvar_gif_otimizado(entrada, saida, colors=256, frame_step=1, scale_ratio=1.0, force_fullhd=force_fullhd)
-            if not ok:
-                return False, "GIF sem frames"
-            if os.path.exists(saida) and os.path.getsize(saida) > 0:
-                return True, None
-            return False, "Falha ao salvar GIF"
-
-        img = _abrir_imagem(entrada)
-        img.load()
-        modo = img.mode
-
-        if ext in {".jpg", ".jpeg"}:
-            # JPEG: qualidade alta (85) primeiro, sem subsampling para melhor qualidade
-            rgb = img.convert("RGB")
-            img.close()
-            rgb.save(saida, format="JPEG", quality=85, optimize=True, subsampling=0)
-            if os.path.exists(saida) and os.path.getsize(saida) > 0:
-                return True, None
-            return False, "Falha ao salvar JPEG"
-
-        if ext == ".png":
-            # PNG: sempre lossless - apenas compressão máxima, sem reducir cores
-            if modo in ("RGB", "L", "RGBX", "LA"):
-                img.save(saida, format="PNG", optimize=True, compress_level=9)
-                img.close()
-            else:
-                # RGBA: preservar transparência, apenas compressão
-                img.save(saida, format="PNG", optimize=True, compress_level=9)
-            if os.path.exists(saida) and os.path.getsize(saida) > 0:
-                return True, None
-            return False, "Falha ao salvar PNG"
-
-        if ext == ".webp":
-            # WebP: lossless (quality=100) para máxima qualidade
-            try:
-                img.save(saida, format="WEBP", quality=100, method=6, lossless=True)
-            except TypeError:
-                img.save(saida, format="WEBP", quality=100, method=6)
-            if os.path.exists(saida) and os.path.getsize(saida) > 0:
-                return True, None
-            return False, "Falha ao salvar WebP"
-
-        if ext in {".bmp", ".tif", ".tiff", ".heic", ".heif", ".cr2"}:
-            # Converter para JPEG qualidade alta
-            rgb = img.convert("RGB")
-            img.close()
-            rgb.save(saida, format="JPEG", quality=85, optimize=True, subsampling=0)
-            if os.path.exists(saida) and os.path.getsize(saida) > 0:
-                return True, None
-            return False, "Falha ao converter para JPEG"
-
-        img.close()
-        return False, "Formato nao suportado"
-
-    except Exception as e:
-        if os.path.exists(saida):
-            try:
-                os.remove(saida)
-            except:
-                pass
-        return False, str(e)
 
 
 def _comprimir_imagem_multicandidatos(entrada, saida, force_fullhd=False):

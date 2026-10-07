@@ -31,8 +31,6 @@ function vpRetDe(vdoc, alvo) {   // região atual do alvo no documento do Vetor
         const p = vdoc.pranchetas.find(q => q.id === alvo.prancheta) || vdoc.pranchetas[0]; return { x: p.x, y: p.y, w: p.w, h: p.h };
     } finally { VK.doc = antes; }
 }
-const vpRes = L => Math.hypot(L.tf[0], L.tf[1]) * L.vetor.res;   // px do documento do Photo por pt, como a camada está agora
-
 // re-rasterizar: c0 nasce na resolução de agora (escala 1 no tf) — chamado depois de ampliar e ao devolver do Vetor
 async function vpRerasterizar(L, doc = IE.doc, mudouRet = null) {
     if (!L || !L.vetor || L._vpOcupado) return; L._vpOcupado = true;

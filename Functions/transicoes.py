@@ -15,7 +15,6 @@ passa quadro a quadro por aqui e vira um H.264 quase sem perda que a exportaçã
 
 import math
 import os
-import shutil
 import subprocess
 import threading
 import time

@@ -131,6 +131,8 @@ def _carregar(chave):
             vad = onnx_asr.load_vad("silero", _pasta_modelos())
             m = onnx_asr.load_model(MODELOS[chave]["tipo"], _pasta(chave), quantization="int8")
             _cache[chave] = m.with_vad(vad, **VAD_OPCOES).with_timestamps()
+        from Functions import memoria
+        memoria.usado("legendas (ASR)", _cache.clear)
         return _cache[chave]
 
 

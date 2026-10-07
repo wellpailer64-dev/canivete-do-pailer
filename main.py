@@ -10,7 +10,7 @@ import atexit
 import shutil
 import tempfile
 import hashlib
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 # =========================
 webview = None
@@ -74,7 +74,13 @@ def _registrar_erro(nome, exc):
     from datetime import datetime
     try:
         from Functions.midia import logs_dir
-        with open(os.path.join(logs_dir(), "erros.log"), "a", encoding="utf-8") as f:
+        arq = os.path.join(logs_dir(), "erros.log")
+        if os.path.isfile(arq) and os.path.getsize(arq) > 2_000_000:   # teto: fica a metade mais nova (crescia para sempre)
+            with open(arq, "rb") as f:
+                f.seek(-1_000_000, 2); resto = f.read()
+            with open(arq, "wb") as f:
+                f.write(resto)
+        with open(arq, "a", encoding="utf-8") as f:
             f.write(f"\n[{datetime.now():%Y-%m-%d %H:%M:%S}] {nome}: {exc}\n{traceback.format_exc()}")
     except Exception:
         pass
@@ -1872,7 +1878,7 @@ def web_scraper(url, tipo, destino):
 
 def web_scraper_csv(url):
     from Functions.webscraper import analisar_pagina
-    from Functions.cerebro_local import gerar_csv_com_cerebro, carregar_cerebro_md, get_cerebro_md_path
+    from Functions.cerebro_local import gerar_csv_com_cerebro, get_cerebro_md_path
     import re
 
     def run():
@@ -2521,23 +2527,6 @@ def _format_size(bytes_val):
             return f"{bytes_val:.2f} {unit}"
         bytes_val /= 1024
     return f"{bytes_val:.2f} PB"
-
-
-def _video_quality_to_crf(qualidade):
-    """Converte preset do frontend para CRF numérico."""
-    q = str(qualidade).strip().lower()
-    tabela = {
-        "ultra": 18,
-        "high": 21,
-        "medium": 23,
-        "low": 28,
-    }
-    if q in tabela:
-        return tabela[q]
-    try:
-        return int(q)
-    except Exception:
-        return 23
 
 
 _img_clip_model = None

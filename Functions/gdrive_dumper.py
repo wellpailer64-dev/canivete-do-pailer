@@ -63,11 +63,6 @@ def parse_link(link: str):
     return None, None
 
 
-def extract_folder_id(link: str):
-    """Compatibilidade: retorna apenas o ID (pasta ou arquivo)."""
-    return parse_link(link)[1]
-
-
 def _no_window():
     return subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
@@ -122,28 +117,6 @@ def _logs_dir():
         d = os.path.join(os.path.expanduser("~"), "CaniveteDoPailer_logs")
         os.makedirs(d, exist_ok=True)
     return d
-
-
-def verificar_rclone():
-    """Retorna (ok: bool, versao: str)"""
-    try:
-        r = subprocess.run([_rclone_exe(), "version"], capture_output=True, text=True, timeout=5,
-                           creationflags=_no_window())
-        if r.returncode == 0:
-            return True, r.stdout.split("\n")[0]
-    except Exception:
-        pass
-    return False, ""
-
-
-def verificar_gdrive_configurado():
-    """Verifica se o remote gdrive já está configurado."""
-    try:
-        r = subprocess.run([_rclone_exe(), "listremotes"], capture_output=True, text=True, timeout=5,
-                           creationflags=_no_window())
-        return "gdrive:" in r.stdout
-    except Exception:
-        return False
 
 
 # Credencial OAuth própria (projeto "canivete-do-pailer" no Google Cloud). O client_id padrão

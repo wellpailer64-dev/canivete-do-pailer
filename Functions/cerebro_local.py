@@ -3,8 +3,6 @@ import re
 import csv
 import json
 import shutil
-import traceback
-import time
 
 _MODEL_ID = "google/flan-t5-base"
 
@@ -67,11 +65,6 @@ def get_cerebro_md_path():
     return None
 
 
-def cerebro_existe():
-    p = get_cerebro_md_path()
-    return p is not None and os.path.exists(p)
-
-
 def carregar_cerebro_md():
     p = get_cerebro_md_path()
     if not p or not os.path.exists(p):
@@ -95,17 +88,6 @@ def salvar_cerebro_md(origem_path: str):
     return destino
 
 
-def remover_cerebro_md():
-    p = get_cerebro_md_path()
-    if p and os.path.exists(p):
-        os.remove(p)
-        active_file = os.path.join(get_cerebros_md_dir(), ".active")
-        if os.path.exists(active_file):
-            os.remove(active_file)
-        return True
-    return False
-
-
 def get_model_dir():
     p = os.path.join(get_cerebro_dir(), "flan_t5_base")
     os.makedirs(p, exist_ok=True)
@@ -114,13 +96,6 @@ def get_model_dir():
 
 def _get_model_dir_legacy():
     return os.path.join(get_cerebro_dir(), "flan_t5_small")
-
-
-def checar_modelo_cerebro():
-    p = get_model_dir()
-    if os.path.exists(os.path.join(p, "config.json")) and os.path.exists(os.path.join(p, "tokenizer_config.json")):
-        return True
-    return _achar_snapshot_modelo(p) is not None
 
 
 def _achar_snapshot_modelo(base_dir):
@@ -134,88 +109,13 @@ def _achar_snapshot_modelo(base_dir):
     return None
 
 
-def instalar_modelo_cerebro(callback_log=None, callback_progresso=None):
-    try:
-        from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-    except Exception as e:
-        if callback_log:
-            callback_log(f"Erro ao importar transformers: {e}")
-        return False
-
-    model_dir = get_model_dir()
-    if callback_log:
-        callback_log("Baixando modelo local (FLAN-T5 Base ~1GB)...")
-    if callback_progresso:
-        callback_progresso(-1, "Baixando modelo de IA local...")
-
-    # remove versão antiga leve para evitar conflitos
-    legacy = _get_model_dir_legacy()
-    try:
-        if os.path.isdir(legacy):
-            shutil.rmtree(legacy, ignore_errors=True)
-    except Exception:
-        pass
-
-    def _download_transformers():
-        tok = AutoTokenizer.from_pretrained(_MODEL_ID, cache_dir=model_dir)
-        mdl = AutoModelForSeq2SeqLM.from_pretrained(_MODEL_ID, cache_dir=model_dir)
-        tok.save_pretrained(model_dir)
-        mdl.save_pretrained(model_dir)
-
-    # 1) Tentativa padrão (transformers)
-    try:
-        if callback_log:
-            callback_log("Tentativa 1/2: download padrão via transformers...")
-        _download_transformers()
-        if callback_log:
-            callback_log("Modelo Cérebro pronto!")
-        if callback_progresso:
-            callback_progresso(100, "Modelo Cérebro pronto")
-        return True
-    except Exception as e1:
-        if callback_log:
-            callback_log(f"Falha tentativa 1: {e1}")
-
-    # 2) Fallback robusto via huggingface_hub snapshot_download
-    try:
-        if callback_log:
-            callback_log("Tentativa 2/2: fallback via huggingface_hub (snapshot_download)...")
-
-        from huggingface_hub import snapshot_download
-        snap_dir = snapshot_download(
-            repo_id=_MODEL_ID,
-            local_dir=model_dir,
-            local_dir_use_symlinks=False,
-            resume_download=True,
-            max_workers=4,
-        )
-
-        for nome in ["config.json", "tokenizer_config.json"]:
-            origem = os.path.join(snap_dir, nome)
-            destino = os.path.join(model_dir, nome)
-            if os.path.exists(origem) and not os.path.exists(destino):
-                shutil.copy2(origem, destino)
-
-        _download_transformers()
-
-        if callback_log:
-            callback_log("Modelo Cérebro pronto! (fallback)")
-        if callback_progresso:
-            callback_progresso(100, "Modelo Cérebro pronto")
-        return True
-    except Exception as e2:
-        if callback_log:
-            callback_log(f"Falha tentativa 2: {e2}")
-            callback_log("Diagnóstico resumido:")
-            callback_log("- Verifique conexão com huggingface.co")
-            callback_log("- Verifique firewall/proxy/antivírus")
-            callback_log("- Apague modelos_ia/cerebro/flan_t5_base e tente novamente")
-            callback_log(traceback.format_exc()[-1200:])
-        return False
-
-
 _TOK = None
 _MODEL = None
+
+
+def _soltar_cerebro():
+    global _TOK, _MODEL
+    _TOK = _MODEL = None
 
 
 def _get_model_objs():
@@ -253,6 +153,8 @@ def _get_model_objs():
         low_cpu_mem_usage=False # Desativa meta tensors que causam o erro item()
     )
     
+    from Functions import memoria
+    memoria.usado("cérebro local", _soltar_cerebro)
     return _TOK, _MODEL
 
 
@@ -359,11 +261,6 @@ def _normalizar_por_regras(data_dict, header, titulo, url, cerebro_md):
                 data["category"] = ""
 
     return data
-
-
-def _find_first(pattern, text, flags=0):
-    m = re.search(pattern, text or "", flags)
-    return m.group(1).strip() if m else ""
 
 
 def _normalizar_linha(s: str):

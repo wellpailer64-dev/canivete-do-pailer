@@ -23,10 +23,6 @@ _TIPOS = {".vknv": ("CaniveteDoPailer.vknv", "Projeto de vídeo do KANIVETE"),
           ".aknv": ("CaniveteDoPailer.aknv", "Documento vetorial do KANIVETE")}
 
 
-def eh_projeto_video(path):
-    return str(path or "").lower().endswith(EXTENSOES_VIDEO)
-
-
 def com_extensao(path):
     """Caminho com .vknv (um .vcnvt antigo vira .vknv com o mesmo nome, ao lado)."""
     base, ext = os.path.splitext(path)
