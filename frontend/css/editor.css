@@ -2057,22 +2057,33 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve3t-agulha { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--ve-accent, #ff8a3d); pointer-events: none; left: calc(190px + 8px + (100% - 190px - 16px) * var(--p, 0)); }
 .ve3t-hora { font-variant-numeric: tabular-nums; font-size: 12px; min-width: 96px; }
 
-/* Fila de render (editor-fila.js), como o Adobe Media Encoder */
+/* Exportar com fila de render (editor-fila.js), como o Adobe Media Encoder: configurações | fila */
 #ve-fila-btn .ve-fila-cont:not(:empty) { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--ve-accent); color: #1a0d02; font: 700 10.5px var(--ve-ui); display: inline-grid; place-items: center; }
 #ve-fila-btn.rodando { border-color: var(--ve-accent); }
-.ve-fila-box { width: min(760px, 94vw); }
-.ve-fila-topo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.ve-fila-msg { color: var(--ve-faint); font-size: 11.5px; }
-.ve-fila-lista { display: flex; flex-direction: column; gap: 6px; max-height: 52vh; overflow-y: auto; }
-.ve-fila-item { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--ve-line); border-radius: 5px; background: var(--ve-bg); }
-.ve-fila-item.rodando { border-color: var(--ve-accent); }
+.ve-modal-box.ve-exp-com-fila { width: min(1120px, calc(100% - 32px)); }
+.ve-exp-grade { display: grid; grid-template-columns: minmax(340px, 480px) minmax(0, 1fr); min-height: 0; }
+.ve-exp-grade > #ve-export-form { border-right: 1px solid var(--ve-line); overflow: auto; }
+#ve-export.editando-item #ve-export-form { box-shadow: inset 3px 0 0 var(--ve-accent); }
+.ve-fila-col { display: flex; flex-direction: column; gap: 10px; padding: 14px; min-width: 0; min-height: 360px; }
+.ve-fila-cab { display: flex; align-items: center; gap: 10px; }
+.ve-fila-cab b { font-size: 13px; }
+.ve-fila-msg { flex: 1; color: var(--ve-faint); font-size: 11.5px; }
+.ve-fila-lista { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; overflow-y: auto; }
+.ve-fila-item { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--ve-line); border-radius: 5px; background: var(--ve-bg); cursor: pointer; }
+.ve-fila-item:hover { border-color: var(--ve-line-2); }
+.ve-fila-item.sel { border-color: var(--ve-accent); box-shadow: 0 0 0 1px var(--ve-accent) inset; }
+.ve-fila-item.rodando { border-color: var(--ve-accent); cursor: default; }
 .ve-fila-item.pronto .ve-fila-est { color: #7fd17f; } .ve-fila-item.erro .ve-fila-est { color: #ff6b6b; }
 .ve-fila-n { color: var(--ve-faint); font: 12px var(--ve-mono); text-align: center; }
-.ve-fila-info { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ve-fila-info { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .ve-fila-info b { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ve-fila-info small { color: var(--ve-faint); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-fila-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.ve-fila-tags i { font-style: normal; font-size: 10.5px; padding: 1px 6px; border-radius: 3px; background: var(--ve-panel-2); color: var(--ve-dim); border: 1px solid var(--ve-line); }
 .ve-fila-barra { height: 4px; border-radius: 2px; background: var(--ve-line); overflow: hidden; }
 .ve-fila-barra i { display: block; height: 100%; background: var(--ve-accent); transition: width .3s; }
 .ve-fila-est { font-size: 11.5px; color: var(--ve-dim); white-space: nowrap; }
 .ve-fila-acoes { display: flex; gap: 4px; }
 .ve-fila-vazia, .ve-fila-dica { color: var(--ve-faint); font-size: 12px; line-height: 1.5; }
+.ve-fila-esp { flex: 1; }
+@media (max-width: 860px) { .ve-exp-grade { grid-template-columns: 1fr; } .ve-exp-grade > #ve-export-form { border-right: 0; border-bottom: 1px solid var(--ve-line); } }

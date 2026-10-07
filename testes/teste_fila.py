@@ -72,19 +72,29 @@ def main():
             # segunda timeline: só os 3 primeiros segundos
             pg.evaluate("""() => { const c = JSON.parse(JSON.stringify(VE.clips[0])); veCreateTimeline({ name: 'Fila B' });
                 c.st = 0; c.s = 0; c.e = 3; VE.clips = [c]; veRelayout(); veAfterEdit(0); veSeqSalvarAtiva(); }""")
-            pg.evaluate("s => { veOpenExport(); VE.dest = s; }", SAIDA)
-            pg.wait_for_selector("#ve-export-foot .ve-btn:not(.ve-btn-primary):not(.ve-btn-ghost)", timeout=5000)
-            ok("Adicionar à fila" in pg.inner_text("#ve-export-foot"), "janela Exportar tem 'Adicionar à fila'")
-            pg.evaluate("veCloseExport()")
-            n = pg.evaluate("async () => await VEFILA_API.todas()")
+            pg.evaluate("s => { veOpenExport(); VE.dest = s; $ve('ve-dest-label').textContent = s; }", SAIDA)
+            ok(pg.evaluate("!!$ve('ve-fila-col') && !$ve('ve-export').hidden"), "Exportar e fila no mesmo painel")
+            ok("Adicionar à fila" in pg.inner_text("#ve-export-foot") and "Renderizar" in pg.inner_text("#ve-export-foot"), "rodapé com Adicionar à fila e ▶ Renderizar")
+            pg.click("#ve-fila-col .ve-fila-cab button")   # Todas as timelines
+            pg.wait_for_function("VEFILA_API.itens().length === 2", timeout=60000)
             itens = pg.evaluate("VEFILA_API.itens()")
-            ok(n == 2 and len(itens) == 2, "adicionar todas as timelines", str([(i["nome"], round(i["dur"], 1)) for i in itens]))
-            pg.evaluate("veFilaAbrir(); VEFILA_API.iniciar()")
+            ok([i["cfg"]["nome"] for i in itens] == ["Timeline 1", "Fila B"], "todas as timelines entram com o nome de cada uma", str([i["cfg"]["nome"] for i in itens]))
+            # configurações por item: escolhe o 2º e muda a resolução para 720p (o 1º continua Original)
+            pg.click("#ve-fila-lista [data-fila='%d'] .ve-fila-info" % itens[1]["id"])
+            ok(pg.evaluate("$ve('ve-exp-nome').value") == "Fila B", "clicar no item carrega as configurações dele no formulário")
+            pg.select_option("#ve-res", "720")
+            itens = pg.evaluate("VEFILA_API.itens()")
+            ok(itens[1]["cfg"]["res"] == "720" and itens[0]["cfg"]["res"] == "original", "mudar o formulário vale só para o item escolhido", str([i["cfg"]["res"] for i in itens]))
+            ok("720p" in pg.inner_text("#ve-fila-lista [data-fila='%d']" % itens[1]["id"]), "etiquetas do item mostram as configurações")
+            pg.click("#ve-export-foot .ve-btn-primary")   # ▶ Renderizar fila
             pg.wait_for_function("VEFILA_API.itens().every(i => i.estado === 'pronto' || i.estado === 'erro') && !VEFILA.rodando", timeout=300000)
             itens = pg.evaluate("VEFILA_API.itens()")
-            ok(all(i["estado"] == "pronto" for i in itens), "fila rodou os dois, um depois do outro", str([(i["nome"], i["estado"], i.get("erro")) for i in itens]))
-            ds = sorted(round(dur(i["saida"]), 1) for i in itens if i.get("saida"))
-            ok(ds == [3.0, 6.0], "arquivos com a duração de cada timeline", str(ds))
+            ok(all(i["estado"] == "pronto" for i in itens), "▶ renderizou a fila em ordem", str([(i["cfg"]["nome"], i["estado"], i.get("erro")) for i in itens]))
+            ds = [round(dur(i["saida"]), 1) for i in itens]
+            ok(ds == [6.0, 3.0], "duração de cada timeline", str(ds))
+            from Functions.midia import ffprobe
+            larg = [subprocess.run([ffprobe(), "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", i["saida"]], capture_output=True, text=True).stdout.strip() for i in itens]
+            ok(larg == ["1080,1920", "720,1280"], "cada arquivo com a sua resolução", str(larg))
             ok(pg.evaluate("$ve('ve-fila-btn').querySelector('.ve-fila-cont').textContent") == "", "contador da fila zera no fim")
             pg.screenshot(path=BASE + "fila.png")
     finally:

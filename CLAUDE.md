@@ -54,9 +54,10 @@ quadros, quadro preto só na exportação, diferença de imagem > 10, duração 
 pares em `%TEMP%/canivete_teste_export/saida`. Rodar antes de release quando mexer em exportação, camadas, efeitos,
 transições, cor ou AutoFrame. Caso novo para bug novo: acrescente em `CASOS` e confira que reprova sem a correção.
 
-Fila de render (como o Media Encoder): `frontend/js/editor-fila.js` — botão Fila no cabeçalho, "Adicionar à fila" na
-janela Exportar, "Adicionar todas as timelines"; cada item congela o plano da timeline ao entrar; roda um por vez
-enquanto se edita. API `VEFILA_API`. Teste: `py -3.13 testes/teste_fila.py` (abre app próprio na porta 9334).
+Exportar com fila de render (como o Media Encoder), num painel só: `frontend/js/editor-fila.js` — configurações à
+esquerda, fila à direita (cada item congela a timeline ao entrar e tem as SUAS configurações: clicar no item carrega no
+formulário e o que mudar vale para ele), "Adicionar à fila", "Todas as timelines", ▶ Renderizar fila em ordem enquanto
+se edita. Botão Fila no cabeçalho abre o mesmo painel. API `VEFILA_API`. Teste: `py -3.13 testes/teste_fila.py` (porta 9334).
 
 Teste de 4K (estresse: material pesado, camadas, 10-bit, export, memória): plano e resultados em
 `Instructions/agente/teste-4k.md` — rodada 1 feita (2026-10-01), pendências no fim do arquivo.
