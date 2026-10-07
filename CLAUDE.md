@@ -10,6 +10,11 @@
   `.iknv` = editor de imagem (zip com documento.json + PNGs; `Functions/editor_imagem.py`). Associação no Windows
   (HKCU) em `Functions/projeto.py`; duplo clique roteado por `abrirProjetoExterno` (frontend/js/app.js).
 
+## Mapa geral (comece por aqui)
+`Instructions/MAPA.md` (ferramentas → arquivos, API, comandos VKN/KNV, testes, guias, pontes, onde ficam dados e
+caches); versão do Jr: `Instructions/mapa.json`. Achar algo: `py -3.13 tools/mapa_geral.py --busca termo`; depois de
+criar ferramenta, comando ou teste: `py -3.13 tools/mapa_geral.py` (regenera os dois).
+
 ## Trabalhar barato (economia de tokens — usar SEMPRE)
 - Editar código: `py -3.13 tools/patch.py mudancas.patch` (blocos `@@ arquivo` / `<<<` velho `===` novo `>>>`; confere âncora
   única, tudo ou nada, checa sintaxe e desfaz se quebrar). Nada de heredoc com Python inline para editar.

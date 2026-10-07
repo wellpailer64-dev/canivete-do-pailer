@@ -1,0 +1,2096 @@
+{
+ "ferramentas": [
+  {
+   "id": "video-cutter",
+   "nome": "Editor Kanivete",
+   "grupo": "Vídeo",
+   "front": [
+    "editor-3d-tela.js",
+    "editor-3d.js",
+    "editor-audio.js",
+    "editor-autoframe-cliente.js",
+    "editor-autoframe.js",
+    "editor-colar-externo.js",
+    "editor-comandos.js",
+    "editor-comp.js",
+    "editor-copiar.js",
+    "editor-dock.js",
+    "editor-ferramentas.js",
+    "editor-fx.js",
+    "editor-grafico.js",
+    "editor-guias.js",
+    "editor-keyframes.js",
+    "editor-lacunas.js",
+    "editor-lc.js",
+    "editor-marcadores.js",
+    "editor-medidor.js",
+    "editor-ovt.js",
+    "editor-projeto.js",
+    "editor-props.js",
+    "editor-psd.js",
+    "editor-render.js",
+    "editor-reverse.js",
+    "editor-scopes.js",
+    "editor-soundboard.js",
+    "editor-texto.js",
+    "editor-trans.js",
+    "editor-transform.js",
+    "editor-txanim.js",
+    "editor.js",
+    "editor.css"
+   ],
+   "back": [
+    "Functions/video_cutter.py",
+    "Functions/render_cache.py",
+    "Functions/autoframe.py",
+    "Functions/autoframe_modelos.py",
+    "Functions/transicoes.py",
+    "Functions/premiere.py",
+    "Functions/premiere_xml.py",
+    "Functions/cena3d.py",
+    "Functions/blender_cena.py",
+    "Functions/legendas.py",
+    "Functions/legendas_formatos.py",
+    "Functions/agente_midia.py",
+    "Functions/anti_noise.py",
+    "Functions/soundboard.py",
+    "Functions/psd_import.py",
+    "Functions/projeto.py",
+    "Functions/sincronizar.py",
+    "Functions/otimizar.py",
+    "Functions/media_server.py"
+   ],
+   "api": [
+    "audio_cutter_prepare",
+    "audio_cutter_export",
+    "ve_texto_modelos",
+    "ve_transcrever",
+    "ve_transcrever_cancelar",
+    "ve_salvar_legenda",
+    "ve_fontes",
+    "ve_preparar_midia",
+    "ve_area_transferencia",
+    "ve_area_seq",
+    "ve_inverter_midia",
+    "ve_priorizar_midia",
+    "ve_importar_dialogo",
+    "ve_listar_pasta",
+    "ve_ler_legenda",
+    "ve_otimizar_fullhd",
+    "ve_otimizar_cancelar",
+    "ve_sincronizar_audio",
+    "ve_salvar_png",
+    "ve_txa_lista",
+    "anti_noise_preparar",
+    "ve_sb_estado",
+    "ve_sb_baixar",
+    "ve_sb_abrir_pasta",
+    "ve_render_listar",
+    "ve_render_trecho",
+    "ve_render_cancelar",
+    "ve_comp_render",
+    "ve_comp_cancelar",
+    "ve_ovt_render",
+    "ve_psd_importar",
+    "ve_c3d_inicio",
+    "ve_c3d_lote",
+    "ve_c3d_fim",
+    "ve_c3d_pasta",
+    "ve_3d_url",
+    "ve_render_tocar",
+    "ve_render_mover",
+    "ve_render_limpar",
+    "ve_render_manutencao",
+    "ve_render_info",
+    "ve_win_rect",
+    "ve_win_hit",
+    "ve_win_alpha",
+    "ve_win_prepare",
+    "ve_win_place",
+    "ve_layout_load",
+    "ve_layout_save",
+    "ve_agente_midia",
+    "ve_agente_porta",
+    "ve_project_save",
+    "ve_project_open",
+    "af_analisar",
+    "af_recomendar",
+    "af_planejar",
+    "af_escolher",
+    "afm_listar",
+    "afm_salvar",
+    "afm_apagar",
+    "afm_usou",
+    "afm_escolher",
+    "ve_autosave",
+    "ve_autosave_lista",
+    "ve_project_thumb"
+   ],
+   "testes": [
+    "teste_export",
+    "teste_play",
+    "teste_premiere",
+    "teste_premiere_xml",
+    "teste_vetor_editor3d"
+   ],
+   "guias": [
+    "Instructions/editor-video.md",
+    "Instructions/agente/guia-edicao.md",
+    "Instructions/agente/plano-comp.md",
+    "Instructions/agente/cena-3d-editor.md",
+    "Instructions/agente/direcao-de-arte.md",
+    "Instructions/importar-premiere.md",
+    "Instructions/agente/ajuste-premiere.md",
+    "Instructions/agente/teste-4k.md",
+    "Instructions/agente/mapa-editor.md"
+   ],
+   "automacao": "estado em VE (VE.clips, VE.media, veSeek...), Cena 3D: window.VE3DAPI; Worker: executor_editor.js"
+  },
+  {
+   "id": "compressor-video",
+   "nome": "Comprimir Vídeo",
+   "grupo": "Vídeo",
+   "front": [],
+   "back": [
+    "Functions/compressor_video.py"
+   ],
+   "api": [
+    "compressor_imagem",
+    "compressor_imagem_file",
+    "compressor_video",
+    "compressor_video_file"
+   ],
+   "testes": [],
+   "guias": [],
+   "automacao": ""
+  },
+  {
+   "id": "video-converter",
+   "nome": "Converter Vídeo",
+   "grupo": "Vídeo",
+   "front": [],
+   "back": [
+    "Functions/videoconverter.py"
+   ],
+   "api": [
+    "video_converter",
+    "video_converter_file"
+   ],
+   "testes": [],
+   "guias": [
+    "Instructions/video-converter.md"
+   ],
+   "automacao": ""
+  },
+  {
+   "id": "video-downloader",
+   "nome": "Baixar Vídeo",
+   "grupo": "Vídeo",
+   "front": [],
+   "back": [
+    "Functions/videodownloader.py"
+   ],
+   "api": [
+    "video_cutter_prepare",
+    "video_cutter_export",
+    "video_cutter_audio_fonte",
+    "video_cutter_add_audio",
+    "video_cutter_add_media",
+    "video_cutter_cancel_export",
+    "video_downloader_info",
+    "video_downloader"
+   ],
+   "testes": [],
+   "guias": [
+    "Instructions/video-downloader.md"
+   ],
+   "automacao": ""
+  },
+  {
+   "id": "organizador-videos",
+   "nome": "Logger Pro",
+   "grupo": "Vídeo",
+   "front": [],
+   "back": [
+    "Functions/organizador_de_videos.py",
+    "Functions/snapshot_logger.py"
+   ],
+   "api": [
+    "escanear_cameras_videos",
+    "organizador_videos"
+   ],
+   "testes": [],
+   "guias": [],
+   "automacao": ""
+  },
+  {
+   "id": "converter-audio",
+   "nome": "Converter Áudio",
+   "grupo": "Áudio",
+   "front": [],
+   "back": [
+    "Functions/convertermp3.py",
+    "Functions/audio_cutter.py"
+   ],
+   "api": [
+    "converter_audio",
+    "converter_audio_file",
+    "converter_imagem",
+    "converter_imagem_file"
+   ],
+   "testes": [],
+   "guias": [],
+   "automacao": ""
+  },
+  {
+   "id": "transcrever-audio",
+   "nome": "Transcrever",
+   "grupo": "Áudio",
+   "front": [],
+   "back": [
+    "Functions/transcreveraudio.py",
+    "Functions/transcrever_cena.py"
+   ],
+   "api": [
+    "transcrever_audio",
+    "transcrever_audio_file",
+    "transcrever_salvar_txt",
+    "transcrever_cena"
+   ],
+   "testes": [],
+   "guias": [
+    "Instructions/transcrever-audio.md"
+   ],
+   "automacao": ""
+  },
+  {
+   "id": "melhorar-audio",
+   "nome": "Melhorar Áudio",
+   "grupo": "Áudio",
+   "front": [],
+   "back": [
+    "Functions/melhorar_audio.py",
+    "Functions/melhorar_audio_runner.py"
+   ],
+   "api": [
+    "melhorar_audio",
+    "melhorar_audio_midia"
+   ],
+   "testes": [],
+   "guias": [
+    "Instructions/melhorar-audio.md"
+   ],
+   "automacao": ""
+  },
+  {
+   "id": "omnivoice",
+   "nome": "Geração de Voz",
+   "grupo": "Áudio",
+   "front": [],
+   "back": [
+    "Functions/omnivoice_tool.py",
+    "Functions/omnivoice_runner.py"
+   ],
+   "api": [
+    "omnivoice_status",
+    "omnivoice_download",
+    "omnivoice_create_voice",
+    "omnivoice_update_voice",
+    "omnivoice_delete_voice",
+    "omnivoice_synthesize",
+    "omnivoice_save_output"
+   ],
+   "testes": [],
+   "guias": [],
+   "automacao": ""
+  },
+  {
+   "id": "editor-imagem",
+   "nome": "Photo Kanivete",
+   "grupo": "Imagem",
+   "front": [
+    "imagem-ajustes.js",
+    "imagem-api.js",
+    "imagem-arquivo.js",
+    "imagem-atalhos.js",
+    "imagem-cameraraw.js",
+    "imagem-caneta.js",
+    "imagem-cena.js",
+    "imagem-dissolver.js",
+    "imagem-dock.js",
+    "imagem-estilo.js",
+    "imagem-fatias.js",
+    "imagem-ferramentas.js",
+    "imagem-filtros.js",
+    "imagem-fx.js",
+    "imagem-galeria.js",
+    "imagem-gerador.js",
+    "imagem-guias.js",
+    "imagem-janela.js",
+    "imagem-nucleo.js",
+    "imagem-paineis.js",
+    "imagem-prancheta.js",
+    "imagem-recuperar.js",
+    "imagem-texto.js",
+    "ponte-kanivete.js",
+    "imagem.css"
+   ],
+   "back": [
+    "Functions/editor_imagem.py",
+    "Functions/gerador_imagem.py",
+    "Functions/preencher_conteudo.py",
+    "Functions/ceu.py",
+    "Functions/recorte_pro.py",
+    "Functions/ampliar_imagem.py",
+    "Functions/fontes.py",
+    "Functions/psd_texto_modelo.py",
+    "Functions/psd_so_modelo.py",
+    "Functions/amostras.py",
+    "Functions/recuperar.py"
+   ],
+   "api": [
+    "ie_curar",
+    "ie_preencher_ia",
+    "ie_ceu_mascara",
+    "ie_ceu_cor",
+    "ie_preencher_conteudo",
+    "ie_instalar_fonte",
+    "ie_abrir",
+    "ie_liberar",
+    "ie_mascara_assunto",
+    "ie_recorte_pro",
+    "ie_gerador_estado",
+    "ie_gerador_baixar",
+    "ie_gerar",
+    "ie_gerador_cancelar",
+    "ie_gerador_parar",
+    "ie_gerador_remover",
+    "ie_fechar",
+    "ie_salvar_inicio",
+    "ie_salvar",
+    "ie_salvar_iknv",
+    "ie_exportar",
+    "ie_exportar_fatias",
+    "ie_dialogo_abrir",
+    "ie_dialogo_salvar",
+    "ie_colar_windows",
+    "ie_soltar_memoria",
+    "ie_existe",
+    "ie_prefs",
+    "ie_amostras",
+    "ie_fonte_url"
+   ],
+   "testes": [
+    "teste_barra",
+    "teste_cameraraw",
+    "teste_caneta",
+    "teste_ceu",
+    "teste_conteudo",
+    "teste_corte_alt",
+    "teste_dissolver",
+    "teste_editar",
+    "teste_filtros",
+    "teste_galeria",
+    "teste_generativo",
+    "teste_guias",
+    "teste_imagem",
+    "teste_laco",
+    "teste_pincel",
+    "teste_psd_deg_app",
+    "teste_psd_forma",
+    "teste_psd_pre",
+    "teste_psd_refs",
+    "teste_psd_so",
+    "teste_psd_texto"
+   ],
+   "guias": [
+    "Instructions/editor-imagem.md",
+    "Instructions/agente/design-photo-kanivete.md",
+    "Instructions/agente/plano-cena.md",
+    "Instructions/agente/direcao-carrossel.md",
+    "Instructions/agente/diretor-de-arte.md",
+    "Instructions/agente/mapa-imagem.md"
+   ],
+   "automacao": "window.KNV (imagem-api.js); diagramar: KNV.cena / tools/knv.py; Worker: executor.js"
+  },
+  {
+   "id": "vetor-kanivete",
+   "nome": "Vetor Kanivete",
+   "grupo": "Imagem",
+   "front": [
+    "ponte-vetor-photo.js",
+    "vetor-3d.js",
+    "vetor-aparencia.js",
+    "vetor-api.js",
+    "vetor-arquivo.js",
+    "vetor-blender.js",
+    "vetor-cena.js",
+    "vetor-construir.js",
+    "vetor-cores.js",
+    "vetor-desenho.js",
+    "vetor-dock.js",
+    "vetor-ferramentas.js",
+    "vetor-fonte.js",
+    "vetor-malha.js",
+    "vetor-novo.js",
+    "vetor-nucleo.js",
+    "vetor-padroes.js",
+    "vetor-paineis.js",
+    "vetor-perspectiva.js",
+    "vetor-pinceis.js",
+    "vetor-pranchetas.js",
+    "vetor-producao.js",
+    "vetor-recuperar.js",
+    "vetor-reguas.js",
+    "vetor-revisor.js",
+    "vetor-saida.js",
+    "vetor-separacoes.js",
+    "vetor-simbolos.js",
+    "vetor-texto.js",
+    "vetor-transformar.js",
+    "vetor-vinculos.js",
+    "vetor.css"
+   ],
+   "back": [
+    "Functions/vetor_kanivete.py",
+    "Functions/vetor_importar.py",
+    "Functions/vetor_exportar.py",
+    "Functions/vetor_saida.py",
+    "Functions/vetor_fonte.py",
+    "Functions/ponte_illustrator.py",
+    "Functions/blender_render.py"
+   ],
+   "api": [
+    "vk_baixar_ghostscript",
+    "vk_exportar_ai",
+    "vk_illustrator_disponivel",
+    "vk_exportar_ai_nativo",
+    "vk_exportar_eps",
+    "vk_fonte_eixos",
+    "vk_recarregar",
+    "vk_abrir",
+    "vk_salvar",
+    "vk_texto_geometria",
+    "vk_icone",
+    "vk_vetorizar",
+    "vk_blender_estado",
+    "vk_blender_instalar",
+    "vk_blender_render",
+    "vk_ler_texto",
+    "vk_ler_csv",
+    "vk_juntar_pdfs",
+    "vk_ampliar",
+    "vk_registrar_fontes",
+    "vk_autosalvar",
+    "vk_recuperaveis",
+    "vk_recuperar",
+    "vk_descartar_recuperacao",
+    "vk_bibliotecas_cor",
+    "vk_ler_biblioteca",
+    "vk_qr",
+    "vk_fonte_glifos",
+    "vk_exportar_fonte",
+    "vk_booleana",
+    "vk_deslocar",
+    "vk_contornar_traco",
+    "vk_regioes",
+    "vk_faca",
+    "vk_canais_imagem",
+    "vk_empacotar",
+    "vk_cores_tela",
+    "vk_rgb_para_cmyk",
+    "vk_imagem_info",
+    "vk_vinculos_estado",
+    "vk_salvar_png",
+    "vk_perfis",
+    "vk_exportar_pdf",
+    "vk_dialogo"
+   ],
+   "testes": [
+    "teste_blender",
+    "teste_fonte",
+    "teste_illustrator",
+    "teste_ponte",
+    "teste_pranchetas",
+    "teste_vetor",
+    "teste_vetor_paineis"
+   ],
+   "guias": [
+    "Instructions/vetor-kanivete.md",
+    "Instructions/agente/mapa-vetor.md",
+    "Instructions/agente/plano-economia-ponte-vetor-photo.md"
+   ],
+   "automacao": "window.VKN (VKN.cmd(nome, args) = os comandos abaixo; VKN.mapa(), VKN.fechamento(), VKN.cena); Worker: executor_vetor.js"
+  },
+  {
+   "id": "converter-imagem",
+   "nome": "Converter Imagem",
+   "grupo": "Imagem",
+   "front": [],
+   "back": [
+    "Functions/converterimagem.py"
+   ],
+   "api": [],
+   "testes": [],
+   "guias": [],
+   "automacao": ""
+  },
+  {
+   "id": "compressor-imagem",
+   "nome": "Comprimir Imagem",
+   "grupo": "Imagem",
+   "front": [],
+   "back": [
+    "Functions/compressor_imagem.py"
+   ],
+   "api": [],
+   "testes": [],
+   "guias": [
+    "Instructions/compressor-imagem.md"
+   ],
+   "automacao": ""
+  },
+  {
+   "id": "remover-fundo",
+   "nome": "Remover Fundo",
+   "grupo": "Imagem",
+   "front": [],
+   "back": [
+    "Functions/removerfundo.py",
+    "Functions/recorte_pro.py"
+   ],
+   "api": [
+    "remover_fundo",
+    "remover_fundo_file",
+    "remover_fundo_salvar"
+   ],
+   "testes": [],
+   "guias": [
+    "Instructions/remover-fundo.md",
+    "Instructions/agente/remover-fundo.md"
+   ],
+   "automacao": ""
+  },
+  {
+   "id": "organizador-imagens",
+   "nome": "Organizar Imagens",
+   "grupo": "Imagem",
+   "front": [],
+   "back": [
+    "Functions/organizador_de_imagens.py"
+   ],
+   "api": [
+    "organizador_imagens"
+   ],
+   "testes": [],
+   "guias": [
+    "Instructions/organizador-imagens.md"
+   ],
+   "automacao": ""
+  },
+  {
+   "id": "favicon",
+   "nome": "Gerar Favicon",
+   "grupo": "Imagem",
+   "front": [],
+   "back": [
+    "Functions/faviconconverter.py"
+   ],
+   "api": [
+    "favicon_generator"
+   ],
+   "testes": [],
+   "guias": [
+    "Instructions/favicon-generator.md"
+   ],
+   "automacao": ""
+  },
+  {
+   "id": "gdrive-dumper",
+   "nome": "GDrive Dumper",
+   "grupo": "Web",
+   "front": [],
+   "back": [
+    "Functions/gdrive_dumper.py"
+   ],
+   "api": [
+    "gdrive_check",
+    "gdrive_analyze",
+    "gdrive_dump",
+    "gdrive_pause",
+    "gdrive_resume",
+    "gdrive_cancel"
+   ],
+   "testes": [],
+   "guias": [
+    "Instructions/gdrive-dumper.md"
+   ],
+   "automacao": ""
+  },
+  {
+   "id": "web-scraper",
+   "nome": "Web Scraper",
+   "grupo": "Web",
+   "front": [],
+   "back": [
+    "Functions/webscraper.py",
+    "Functions/cerebro_local.py"
+   ],
+   "api": [
+    "web_scraper_analyze",
+    "web_scraper_download",
+    "web_scraper",
+    "web_scraper_csv",
+    "cerebro_load",
+    "cerebro_save",
+    "cerebro_exists",
+    "cerebro_remove",
+    "cerebro_select_file"
+   ],
+   "testes": [],
+   "guias": [
+    "Instructions/webscraper.md",
+    "Instructions/cerebro.md"
+   ],
+   "automacao": ""
+  }
+ ],
+ "api_geral": [
+  "select_folder",
+  "select_file",
+  "select_image",
+  "open_folder",
+  "reveal_file",
+  "open_file",
+  "select_video_file",
+  "prefs_load",
+  "prefs_save",
+  "check_update",
+  "apply_update",
+  "sair_app",
+  "toggle_fullscreen",
+  "janela_cmd",
+  "janela_propria",
+  "janela_ativar",
+  "on_webview_ready",
+  "on_new_window_request"
+ ],
+ "api": {
+  "select_folder": {
+   "args": "tool",
+   "modulos": []
+  },
+  "select_file": {
+   "args": "tool",
+   "modulos": []
+  },
+  "select_image": {
+   "args": "tool",
+   "modulos": []
+  },
+  "open_folder": {
+   "args": "path",
+   "modulos": []
+  },
+  "converter_audio": {
+   "args": "folder_path, output_format",
+   "modulos": []
+  },
+  "converter_audio_file": {
+   "args": "file_path, output_format",
+   "modulos": []
+  },
+  "audio_cutter_prepare": {
+   "args": "file_path",
+   "modulos": []
+  },
+  "audio_cutter_export": {
+   "args": "file_path, cuts, output_format=\"mp3\", tracks=None, main_offset=0",
+   "modulos": []
+  },
+  "video_cutter_prepare": {
+   "args": "file_path",
+   "modulos": []
+  },
+  "video_cutter_export": {
+   "args": "file_path, segments, output_format=\"mp4\", qualidade=\"medium\", resolucao=\"original\", usar_gpu=True, pasta_saida=None, sem_audio=False, camadas=None, audio_segments=None, duracao=None, audio_clipes=None, legendas=None, quadro=None, opcoes=None",
+   "modulos": []
+  },
+  "ve_texto_modelos": {
+   "args": "",
+   "modulos": []
+  },
+  "ve_transcrever": {
+   "args": "clipes, total, idioma=\"pt\"",
+   "modulos": []
+  },
+  "ve_transcrever_cancelar": {
+   "args": "",
+   "modulos": []
+  },
+  "ve_salvar_legenda": {
+   "args": "itens, formato=\"srt\", nome=\"legendas\", pasta=\"\"",
+   "modulos": []
+  },
+  "ve_fontes": {
+   "args": "",
+   "modulos": []
+  },
+  "ie_curar": {
+   "args": "regiao, mascara, dx, dy, difusao=0",
+   "modulos": [
+    "recuperar"
+   ]
+  },
+  "ie_preencher_ia": {
+   "args": "regiao, mascara, expandir=None",
+   "modulos": [
+    "preencher_conteudo"
+   ]
+  },
+  "ie_ceu_mascara": {
+   "args": "foto, deslocar=0, esmaecer=0",
+   "modulos": [
+    "ceu"
+   ]
+  },
+  "ie_ceu_cor": {
+   "args": "ceu_png",
+   "modulos": [
+    "ceu"
+   ]
+  },
+  "ie_preencher_conteudo": {
+   "args": "regiao, mascara, raio=6",
+   "modulos": [
+    "recuperar"
+   ]
+  },
+  "ie_instalar_fonte": {
+   "args": "familia",
+   "modulos": [
+    "fontes"
+   ]
+  },
+  "ve_preparar_midia": {
+   "args": "path, mid, urgente=False, leve=False, fundo=False",
+   "modulos": []
+  },
+  "ve_area_transferencia": {
+   "args": "projeto=\"\"",
+   "modulos": [
+    "area_transferencia"
+   ]
+  },
+  "ve_area_seq": {
+   "args": "",
+   "modulos": [
+    "area_transferencia"
+   ]
+  },
+  "ve_inverter_midia": {
+   "args": "path, a, b, job",
+   "modulos": []
+  },
+  "ve_priorizar_midia": {
+   "args": "path",
+   "modulos": [
+    "video_cutter"
+   ]
+  },
+  "ve_importar_dialogo": {
+   "args": "",
+   "modulos": []
+  },
+  "ve_listar_pasta": {
+   "args": "path",
+   "modulos": []
+  },
+  "ve_ler_legenda": {
+   "args": "path",
+   "modulos": []
+  },
+  "ve_otimizar_fullhd": {
+   "args": "itens",
+   "modulos": []
+  },
+  "ve_otimizar_cancelar": {
+   "args": "",
+   "modulos": []
+  },
+  "ve_sincronizar_audio": {
+   "args": "ref_path, ref_s, ref_e, outro_path, outro_s, outro_e",
+   "modulos": []
+  },
+  "ve_salvar_png": {
+   "args": "dados",
+   "modulos": []
+  },
+  "ve_txa_lista": {
+   "args": "entradas",
+   "modulos": []
+  },
+  "video_cutter_audio_fonte": {
+   "args": "",
+   "modulos": []
+  },
+  "video_cutter_add_audio": {
+   "args": "path",
+   "modulos": []
+  },
+  "anti_noise_preparar": {
+   "args": "path",
+   "modulos": []
+  },
+  "video_cutter_add_media": {
+   "args": "path",
+   "modulos": []
+  },
+  "ve_sb_estado": {
+   "args": "",
+   "modulos": [
+    "soundboard"
+   ]
+  },
+  "ve_sb_baixar": {
+   "args": "",
+   "modulos": [
+    "soundboard"
+   ]
+  },
+  "ve_sb_abrir_pasta": {
+   "args": "",
+   "modulos": [
+    "soundboard"
+   ]
+  },
+  "ve_render_listar": {
+   "args": "base, chave",
+   "modulos": []
+  },
+  "ve_render_trecho": {
+   "args": "base, chave, h, job",
+   "modulos": []
+  },
+  "ve_render_cancelar": {
+   "args": "",
+   "modulos": []
+  },
+  "ve_comp_render": {
+   "args": "base, h, job",
+   "modulos": []
+  },
+  "ve_comp_cancelar": {
+   "args": "",
+   "modulos": []
+  },
+  "ve_ovt_render": {
+   "args": "base, h, job",
+   "modulos": []
+  },
+  "ve_psd_importar": {
+   "args": "path",
+   "modulos": []
+  },
+  "ie_abrir": {
+   "args": "path",
+   "modulos": [
+    "editor_imagem"
+   ]
+  },
+  "ie_liberar": {
+   "args": "doc",
+   "modulos": [
+    "editor_imagem"
+   ]
+  },
+  "ie_mascara_assunto": {
+   "args": "png_b64, modelo=\"birefnet-lite\"",
+   "modulos": [
+    "removerfundo"
+   ]
+  },
+  "ie_recorte_pro": {
+   "args": "png_b64",
+   "modulos": [
+    "recorte_pro"
+   ]
+  },
+  "ie_gerador_estado": {
+   "args": "modelo=None",
+   "modulos": [
+    "gerador_imagem"
+   ]
+  },
+  "ie_gerador_baixar": {
+   "args": "modelo=None",
+   "modulos": [
+    "gerador_imagem"
+   ]
+  },
+  "ie_gerar": {
+   "args": "spec",
+   "modulos": [
+    "gerador_imagem"
+   ]
+  },
+  "ie_gerador_cancelar": {
+   "args": "job",
+   "modulos": [
+    "gerador_imagem"
+   ]
+  },
+  "ie_gerador_parar": {
+   "args": "",
+   "modulos": [
+    "gerador_imagem"
+   ]
+  },
+  "ie_gerador_remover": {
+   "args": "",
+   "modulos": [
+    "gerador_imagem"
+   ]
+  },
+  "ie_fechar": {
+   "args": "doc",
+   "modulos": [
+    "editor_imagem"
+   ]
+  },
+  "ie_salvar_inicio": {
+   "args": "doc",
+   "modulos": [
+    "editor_imagem"
+   ]
+  },
+  "ie_salvar": {
+   "args": "spec",
+   "modulos": [
+    "editor_imagem"
+   ]
+  },
+  "ie_salvar_iknv": {
+   "args": "spec",
+   "modulos": [
+    "editor_imagem"
+   ]
+  },
+  "ie_exportar": {
+   "args": "spec",
+   "modulos": [
+    "editor_imagem"
+   ]
+  },
+  "ie_exportar_fatias": {
+   "args": "spec",
+   "modulos": [
+    "editor_imagem"
+   ]
+  },
+  "ie_dialogo_abrir": {
+   "args": "multiplos=True",
+   "modulos": []
+  },
+  "ie_dialogo_salvar": {
+   "args": "nome, ext=\"psd\", pasta=\"\"",
+   "modulos": []
+  },
+  "ie_colar_windows": {
+   "args": "",
+   "modulos": [
+    "editor_imagem"
+   ]
+  },
+  "ie_soltar_memoria": {
+   "args": "tokens",
+   "modulos": [
+    "media_server"
+   ]
+  },
+  "ie_existe": {
+   "args": "path",
+   "modulos": []
+  },
+  "ie_prefs": {
+   "args": "dados=None",
+   "modulos": []
+  },
+  "ie_amostras": {
+   "args": "origem=\"photoshop\"",
+   "modulos": [
+    "amostras"
+   ]
+  },
+  "vk_baixar_ghostscript": {
+   "args": "",
+   "modulos": [
+    "vetor_importar"
+   ]
+  },
+  "vk_exportar_ai": {
+   "args": "doc_py, doc_salvar, path, opcoes",
+   "modulos": [
+    "vetor_saida"
+   ]
+  },
+  "vk_illustrator_disponivel": {
+   "args": "",
+   "modulos": [
+    "ponte_illustrator"
+   ]
+  },
+  "vk_exportar_ai_nativo": {
+   "args": "doc_py, path, opcoes=None",
+   "modulos": [
+    "ponte_illustrator"
+   ]
+  },
+  "vk_exportar_eps": {
+   "args": "doc_py, path, opcoes",
+   "modulos": [
+    "vetor_saida"
+   ]
+  },
+  "vk_fonte_eixos": {
+   "args": "fam, estilo=\"Regular\"",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_recarregar": {
+   "args": "prefixo=\"Functions.\"",
+   "modulos": []
+  },
+  "vk_abrir": {
+   "args": "path",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_salvar": {
+   "args": "doc, path",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_texto_geometria": {
+   "args": "spec",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_icone": {
+   "args": "nome, estilo=\"outline\"",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_vetorizar": {
+   "args": "arquivo, cores=6, area_min=12, ignorar_fundo=True",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "ve_c3d_inicio": {
+   "args": "base, h",
+   "modulos": [
+    "cena3d"
+   ]
+  },
+  "ve_c3d_lote": {
+   "args": "sessao, pasta",
+   "modulos": [
+    "cena3d"
+   ]
+  },
+  "ve_c3d_fim": {
+   "args": "base, h, sessao, pasta, fps, n",
+   "modulos": [
+    "cena3d"
+   ]
+  },
+  "ve_c3d_pasta": {
+   "args": "base",
+   "modulos": [
+    "cena3d"
+   ]
+  },
+  "ve_3d_url": {
+   "args": "caminho",
+   "modulos": [
+    "cena3d"
+   ]
+  },
+  "vk_blender_estado": {
+   "args": "",
+   "modulos": [
+    "blender_render"
+   ]
+  },
+  "vk_blender_instalar": {
+   "args": "",
+   "modulos": [
+    "blender_render"
+   ]
+  },
+  "vk_blender_render": {
+   "args": "cena",
+   "modulos": [
+    "blender_render"
+   ]
+  },
+  "vk_ler_texto": {
+   "args": "caminho",
+   "modulos": []
+  },
+  "vk_ler_csv": {
+   "args": "caminho",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_juntar_pdfs": {
+   "args": "lista, saida, padrao=\"x4\"",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_ampliar": {
+   "args": "arquivo, escala=2, tipo=\"foto\"",
+   "modulos": [
+    "ampliar_imagem"
+   ]
+  },
+  "vk_registrar_fontes": {
+   "args": "lista",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_autosalvar": {
+   "args": "doc, meta=None",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_recuperaveis": {
+   "args": "",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_recuperar": {
+   "args": "uid",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_descartar_recuperacao": {
+   "args": "uid",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_bibliotecas_cor": {
+   "args": "",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_ler_biblioteca": {
+   "args": "arquivo, cond=\"FOGRA39\"",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_qr": {
+   "args": "texto, correcao=\"M\"",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_fonte_glifos": {
+   "args": "fam, estilo=\"Regular\"",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_exportar_fonte": {
+   "args": "spec",
+   "modulos": [
+    "vetor_fonte"
+   ]
+  },
+  "vk_booleana": {
+   "args": "op, formas",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_deslocar": {
+   "args": "formas, dist, junc=\"miter\", miter=4",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_contornar_traco": {
+   "args": "formas",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_regioes": {
+   "args": "formas",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_faca": {
+   "args": "formas, linha",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_canais_imagem": {
+   "args": "path, mascara=None, cond=\"FOGRA39\"",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_empacotar": {
+   "args": "doc, pasta, opcoes=None",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_cores_tela": {
+   "args": "lista, cond=\"FOGRA39\"",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_rgb_para_cmyk": {
+   "args": "lista, cond=\"FOGRA39\"",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_imagem_info": {
+   "args": "path",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_vinculos_estado": {
+   "args": "lista",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_salvar_png": {
+   "args": "dados, path",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_perfis": {
+   "args": "",
+   "modulos": [
+    "vetor_kanivete"
+   ]
+  },
+  "vk_exportar_pdf": {
+   "args": "doc, path, opcoes",
+   "modulos": [
+    "vetor_exportar"
+   ]
+  },
+  "vk_dialogo": {
+   "args": "modo, tipos=None, nome=\"\"",
+   "modulos": []
+  },
+  "ie_fonte_url": {
+   "args": "arquivo",
+   "modulos": [
+    "fontes",
+    "media_server"
+   ]
+  },
+  "ve_render_tocar": {
+   "args": "base, chave, hashes",
+   "modulos": []
+  },
+  "ve_render_mover": {
+   "args": "base, chave_antiga, chave_nova",
+   "modulos": []
+  },
+  "ve_render_limpar": {
+   "args": "base, chave=None",
+   "modulos": []
+  },
+  "ve_render_manutencao": {
+   "args": "base, max_gb=20, dias=30",
+   "modulos": []
+  },
+  "ve_render_info": {
+   "args": "base, chave=None",
+   "modulos": []
+  },
+  "video_cutter_cancel_export": {
+   "args": "",
+   "modulos": []
+  },
+  "reveal_file": {
+   "args": "path",
+   "modulos": []
+  },
+  "open_file": {
+   "args": "path",
+   "modulos": []
+  },
+  "select_video_file": {
+   "args": "tool",
+   "modulos": []
+  },
+  "ve_win_rect": {
+   "args": "titulo",
+   "modulos": []
+  },
+  "ve_win_hit": {
+   "args": "titulos, excluir=None",
+   "modulos": []
+  },
+  "ve_win_alpha": {
+   "args": "titulo, opacidade=1.0",
+   "modulos": []
+  },
+  "ve_win_prepare": {
+   "args": "titulo",
+   "modulos": []
+  },
+  "ve_win_place": {
+   "args": "titulo, x, y, w, h, maximizada=False",
+   "modulos": []
+  },
+  "ve_layout_load": {
+   "args": "",
+   "modulos": []
+  },
+  "ve_layout_save": {
+   "args": "dados",
+   "modulos": []
+  },
+  "ve_agente_midia": {
+   "args": "cmd, args=None",
+   "modulos": []
+  },
+  "ve_agente_porta": {
+   "args": "",
+   "modulos": []
+  },
+  "prefs_load": {
+   "args": "",
+   "modulos": []
+  },
+  "prefs_save": {
+   "args": "dados",
+   "modulos": []
+  },
+  "ve_project_save": {
+   "args": "path, dados, salvar_como=False, formato=None",
+   "modulos": []
+  },
+  "ve_project_open": {
+   "args": "path=None",
+   "modulos": []
+  },
+  "af_analisar": {
+   "args": "musica, itens",
+   "modulos": []
+  },
+  "af_recomendar": {
+   "args": "musica, paths, dur_alvo=None, inicio_modo=\"inicio\", manual=None",
+   "modulos": []
+  },
+  "af_planejar": {
+   "args": "musica, paths, modelo, dur_alvo=None, ordem=\"inteligente\", semente=0, inicio_modo=\"inicio\", manual=None, telas=True, cobrir=None, reserva=None",
+   "modulos": []
+  },
+  "af_escolher": {
+   "args": "tipo",
+   "modulos": []
+  },
+  "afm_listar": {
+   "args": "",
+   "modulos": [
+    "autoframe_modelos"
+   ]
+  },
+  "afm_salvar": {
+   "args": "modelo",
+   "modulos": [
+    "autoframe_modelos"
+   ]
+  },
+  "afm_apagar": {
+   "args": "mid",
+   "modulos": [
+    "autoframe_modelos"
+   ]
+  },
+  "afm_usou": {
+   "args": "mid, musica_i",
+   "modulos": [
+    "autoframe_modelos"
+   ]
+  },
+  "afm_escolher": {
+   "args": "tipo",
+   "modulos": [
+    "media_server"
+   ]
+  },
+  "ve_autosave": {
+   "args": "chave, nome, dados",
+   "modulos": []
+  },
+  "ve_autosave_lista": {
+   "args": "",
+   "modulos": []
+  },
+  "ve_project_thumb": {
+   "args": "path",
+   "modulos": []
+  },
+  "converter_imagem": {
+   "args": "folder_path, output_format",
+   "modulos": []
+  },
+  "converter_imagem_file": {
+   "args": "file_path, output_format",
+   "modulos": []
+  },
+  "video_converter": {
+   "args": "folder_path, output_format",
+   "modulos": []
+  },
+  "video_converter_file": {
+   "args": "file_path, output_format",
+   "modulos": []
+  },
+  "compressor_imagem": {
+   "args": "folder_path, force_fullhd=False",
+   "modulos": []
+  },
+  "compressor_imagem_file": {
+   "args": "file_path, force_fullhd=False",
+   "modulos": []
+  },
+  "compressor_video": {
+   "args": "folder_path, mode=\"copy\", gpu=\"cpu\", qualidade=\"equilibrada\"",
+   "modulos": []
+  },
+  "compressor_video_file": {
+   "args": "file_path, mode=\"copy\", gpu=\"cpu\", qualidade=\"equilibrada\"",
+   "modulos": []
+  },
+  "video_downloader_info": {
+   "args": "url",
+   "modulos": []
+  },
+  "video_downloader": {
+   "args": "url, destino=\"\", formato=\"mp4\", qualidade=\"compativel\"",
+   "modulos": []
+  },
+  "favicon_generator": {
+   "args": "image_path, site_name, theme_color",
+   "modulos": []
+  },
+  "remover_fundo": {
+   "args": "folder_path, modelo=\"isnet\"",
+   "modulos": []
+  },
+  "remover_fundo_file": {
+   "args": "file_path, modelo=\"isnet\"",
+   "modulos": []
+  },
+  "remover_fundo_salvar": {
+   "args": "indices, pasta_destino",
+   "modulos": []
+  },
+  "organizador_imagens": {
+   "args": "folder_path, modo=\"completa\"",
+   "modulos": []
+  },
+  "escanear_cameras_videos": {
+   "args": "folder_path",
+   "modulos": []
+  },
+  "organizador_videos": {
+   "args": "folder_path, operadores=None, nome_projeto_premiere=None",
+   "modulos": []
+  },
+  "transcrever_audio": {
+   "args": "folder_path, model, language",
+   "modulos": []
+  },
+  "transcrever_audio_file": {
+   "args": "file_path, model, language",
+   "modulos": []
+  },
+  "transcrever_salvar_txt": {
+   "args": "texto, pasta_origem",
+   "modulos": []
+  },
+  "transcrever_cena": {
+   "args": "folder_path",
+   "modulos": []
+  },
+  "melhorar_audio": {
+   "args": "caminho",
+   "modulos": []
+  },
+  "melhorar_audio_midia": {
+   "args": "caminho, mid",
+   "modulos": []
+  },
+  "omnivoice_status": {
+   "args": "",
+   "modulos": []
+  },
+  "omnivoice_download": {
+   "args": "",
+   "modulos": []
+  },
+  "omnivoice_create_voice": {
+   "args": "name, audio_path, ref_text=\"\", options=None",
+   "modulos": []
+  },
+  "omnivoice_update_voice": {
+   "args": "voice_id, name, ref_text",
+   "modulos": []
+  },
+  "omnivoice_delete_voice": {
+   "args": "voice_id",
+   "modulos": []
+  },
+  "omnivoice_synthesize": {
+   "args": "voice_id, text, options=None",
+   "modulos": []
+  },
+  "omnivoice_save_output": {
+   "args": "path",
+   "modulos": []
+  },
+  "web_scraper_analyze": {
+   "args": "url",
+   "modulos": []
+  },
+  "web_scraper_download": {
+   "args": "url, mode, destino",
+   "modulos": []
+  },
+  "web_scraper": {
+   "args": "url, tipo, destino",
+   "modulos": []
+  },
+  "web_scraper_csv": {
+   "args": "url",
+   "modulos": []
+  },
+  "cerebro_load": {
+   "args": "",
+   "modulos": []
+  },
+  "cerebro_save": {
+   "args": "content",
+   "modulos": []
+  },
+  "cerebro_exists": {
+   "args": "",
+   "modulos": []
+  },
+  "cerebro_remove": {
+   "args": "",
+   "modulos": []
+  },
+  "cerebro_select_file": {
+   "args": "",
+   "modulos": []
+  },
+  "gdrive_check": {
+   "args": "",
+   "modulos": []
+  },
+  "gdrive_analyze": {
+   "args": "url",
+   "modulos": []
+  },
+  "gdrive_dump": {
+   "args": "url, destino, perfil=\"rapida\"",
+   "modulos": []
+  },
+  "check_update": {
+   "args": "",
+   "modulos": []
+  },
+  "apply_update": {
+   "args": "",
+   "modulos": []
+  },
+  "gdrive_pause": {
+   "args": "",
+   "modulos": []
+  },
+  "gdrive_resume": {
+   "args": "",
+   "modulos": []
+  },
+  "gdrive_cancel": {
+   "args": "",
+   "modulos": []
+  },
+  "sair_app": {
+   "args": "",
+   "modulos": []
+  },
+  "toggle_fullscreen": {
+   "args": "",
+   "modulos": []
+  },
+  "janela_cmd": {
+   "args": "acao",
+   "modulos": []
+  },
+  "janela_propria": {
+   "args": "",
+   "modulos": []
+  },
+  "janela_ativar": {
+   "args": "",
+   "modulos": []
+  },
+  "on_webview_ready": {
+   "args": "sender, args",
+   "modulos": []
+  },
+  "on_new_window_request": {
+   "args": "sender, args",
+   "modulos": []
+  }
+ },
+ "vkn": {
+  "girar_3d": "3D girar",
+  "extrudar_3d": "3D extrudar",
+  "editar_3d": "editar 3D",
+  "mapear_arte": "mapear arte no 3D",
+  "limpar_mapas": "tirar artes mapeadas",
+  "expandir_3d": "expandir 3D",
+  "aparencia": "aparência",
+  "efeito": "efeito",
+  "expandir_aparencia": "expandir aparência",
+  "ajuda": "ajuda",
+  "novo": "novo documento",
+  "documento": "propriedades do documento",
+  "retangulo": "retângulo",
+  "elipse": "elipse",
+  "poligono": "polígono",
+  "estrela": "estrela",
+  "linha": "linha",
+  "caminho": "caminho",
+  "texto": "texto",
+  "imagem": "colocar imagem",
+  "alterar": "alterar",
+  "mover": "mover",
+  "posicionar": "posicionar",
+  "redimensionar": "redimensionar",
+  "girar": "girar",
+  "refletir": "refletir",
+  "matriz": "transformar",
+  "alinhar": "alinhar",
+  "distribuir": "distribuir",
+  "organizar": "organizar",
+  "agrupar": "agrupar",
+  "desagrupar": "desagrupar",
+  "mascara": "criar máscara de corte",
+  "soltar_mascara": "soltar máscara",
+  "composto": "criar caminho composto",
+  "pathfinder": "Pathfinder",
+  "deslocar": "deslocar caminho",
+  "contornar_traco": "contornar traço",
+  "contornos": "criar contornos",
+  "duplicar": "duplicar",
+  "apagar": "apagar",
+  "selecionar": "selecionar",
+  "mover_para_camada": "mover para camada",
+  "nova_camada": "nova camada",
+  "camada": "alterar camada",
+  "nova_prancheta": "nova prancheta",
+  "prancheta": "alterar prancheta",
+  "amostra": "nova amostra",
+  "cores_padrao": "cor de preenchimento/traço atual",
+  "mapa": "mapa",
+  "info": "info",
+  "abrir": "abrir",
+  "importar": "colocar arquivo",
+  "salvar": "salvar",
+  "exportar_pdf": "exportar PDF",
+  "empacotar": "empacotar",
+  "exportar_imagem": "exportar imagem",
+  "exportar_svg": "exportar SVG",
+  "converter_cmyk": "converter cores para CMYK",
+  "preto_texto": "textos pretos em 100K",
+  "sobreimprimir_preto": "sobreimprimir preto 100K",
+  "tirar_sobre_branco": "tirar sobreimpressão do branco",
+  "engrossar_tracos": "traços finos → 0,25 pt",
+  "limpar": "limpar pontos soltos e vazios",
+  "enviar_editor_3d": "objeto 3D → cena 3D do Editor (animar)",
+  "render_blender": "render fotorrealista (Blender)",
+  "cena": "cena (HTML → objetos)",
+  "construtor": "construtor de formas",
+  "pathfinder2": "Pathfinder",
+  "tesoura": "tesoura",
+  "faca": "faca",
+  "juntar": "juntar",
+  "media": "média",
+  "bibliotecas_cor": "bibliotecas de cor",
+  "cores_biblioteca": "cores da biblioteca",
+  "cor_biblioteca": "cor da biblioteca",
+  "cores_arte": "cores da arte",
+  "recolorir": "recolorir arte",
+  "lapis": "lápis",
+  "simplificar": "simplificar caminho",
+  "bolha": "pincel de bolha",
+  "borracha": "borracha",
+  "setor": "setor",
+  "arco": "arco",
+  "qrcode": "QR code",
+  "icone": "ícone",
+  "degrade": "degradê",
+  "mesclar": "mesclar",
+  "mescla": "opções da mesclagem",
+  "expandir_mescla": "expandir mesclagem",
+  "vetorizar": "traçado de imagem",
+  "ampliar_imagem": "ampliar imagem (IA)",
+  "definir_subs": "editar pontos",
+  "mover_prancheta": "mover prancheta",
+  "fonte_modelo": "modelo de fonte",
+  "exportar_fonte": "exportar fonte",
+  "criar_malha": "criar malha",
+  "malha_no": "nó da malha",
+  "criar_padrao": "criar padrão",
+  "padrao": "aplicar padrão",
+  "grade_perspectiva": "grade de perspectiva",
+  "perspectiva_colocar": "colocar na perspectiva",
+  "perspectiva_retangulo": "retângulo em perspectiva",
+  "perspectiva_caixa": "caixa em perspectiva",
+  "criar_pincel": "criar pincel",
+  "pincel": "aplicar pincel",
+  "pinceis": "pincéis",
+  "expandir_pincel": "expandir pincel",
+  "marionete": "distorção de marionete",
+  "organizar_pranchetas": "reorganizar pranchetas",
+  "duplicar_prancheta": "duplicar prancheta",
+  "ordem_prancheta": "ordem da prancheta",
+  "prancheta_caixa": "tamanho da prancheta",
+  "faca_caixa": "faca de caixa",
+  "pintura_dinamica": "pintura dinâmica",
+  "recuperacao": "recuperação",
+  "guia": "guia",
+  "exibir": "exibir",
+  "revisar": "revisar (diretor de arte)",
+  "exportar_ai": "salvar como .ai",
+  "exportar_eps": "exportar EPS",
+  "exportar_ativos": "exportar ativos para telas",
+  "separacoes": "visualização de separações",
+  "tinta_em": "tinta no ponto",
+  "exportar_separacoes": "exportar separações",
+  "criar_simbolo": "criar símbolo",
+  "colocar_simbolo": "colocar símbolo",
+  "redefinir_simbolo": "redefinir símbolo",
+  "soltar_simbolo": "soltar símbolo",
+  "simbolos": "símbolos",
+  "mascara_opacidade": "máscara de opacidade",
+  "soltar_mascara_opacidade": "soltar máscara de opacidade",
+  "mala_direta": "mala direta",
+  "texto_caminho": "texto em caminho",
+  "texto_em_forma": "texto em forma",
+  "encadear": "encadear textos",
+  "desencadear": "remover encadeamento",
+  "estilo_texto": "estilo de texto",
+  "estilos_texto": "estilos de texto",
+  "juntar_textos": "juntar textos",
+  "glifos": "glifos da fonte",
+  "inserir_texto": "inserir texto",
+  "retocar_letra": "retocar letra",
+  "desvio_texto": "contorno de texto",
+  "colunas": "colunas de texto",
+  "fonte_eixos": "eixos da fonte",
+  "repetir": "repetir transformação",
+  "transformar_cada": "transformar cada",
+  "distribuir_espaco": "distribuir espaçamento",
+  "vinculos": "vínculos",
+  "revincular": "substituir imagem",
+  "atualizar_vinculo": "atualizar vínculo"
+ },
+ "knv": [
+  "novo",
+  "doc",
+  "camadas",
+  "ativar",
+  "info",
+  "renomear",
+  "cmd",
+  "nova",
+  "colocar",
+  "transformar",
+  "girar",
+  "escalar",
+  "caixa",
+  "alinhar",
+  "encostar",
+  "caixaGrupo",
+  "mover",
+  "moverPara",
+  "modo",
+  "ajuste",
+  "objetoInteligente",
+  "atenuar",
+  "colarDentro",
+  "substituirTexto",
+  "preenchimentoGenerativo",
+  "expansaoGenerativa",
+  "variacaoGenerativa",
+  "substituirCeu",
+  "preencherConteudo",
+  "preenchimento",
+  "preenchimentoDegrade",
+  "duplicar",
+  "removerFundo",
+  "borrachaMagica",
+  "gerar",
+  "selecionar",
+  "selecionarPoligono",
+  "preencher",
+  "degrade",
+  "pincel",
+  "lote",
+  "definirPadrao",
+  "salvar",
+  "abrir",
+  "fecharDoc",
+  "fecharTudo",
+  "texto",
+  "efeito",
+  "formas",
+  "revisarPeca",
+  "revisarDirecao",
+  "revisar",
+  "mapa",
+  "layoutGuias",
+  "novaGuia",
+  "guias",
+  "limparGuias",
+  "guiasDaForma",
+  "fatiasDasGuias",
+  "ajustar",
+  "cena",
+  "cenaFonte",
+  "exportar",
+  "marca",
+  "instalarFonte",
+  "fontes",
+  "ver",
+  "variacoes",
+  "etapa",
+  "referencia",
+  "comparar",
+  "receita",
+  "levarParaEditor",
+  "exportarRapido",
+  "recursosNovos",
+  "png",
+  "cor",
+  "dialogos",
+  "automacao",
+  "dialogo",
+  "responder"
+ ],
+ "ve3d": [
+  "nova",
+  "modelo",
+  "definir",
+  "kf",
+  "doVetor",
+  "limparKf",
+  "cena",
+  "remover",
+  "info",
+  "renderizar",
+  "quadro"
+ ],
+ "tools": {
+  "tools/worker/arquiteto.py": "Arquiteto Local B: opcao local para planejar tarefas do Canivete sem substituir o Claude",
+  "tools/worker/arquiteto_ui.py": "Interface local do Arquiteto B",
+  "tools/worker/codigo.py": "Code Worker / Debug Worker: o Qwen3 8B local faz o trabalho braçal de infraestrutura (buscar, ler, trocar trecho,",
+  "tools/worker/entrevista.py": "Entrevista do assistente local (Canivete Worker): mesmos pedidos para cada modelo do Ollama, mede acerto de",
+  "tools/worker/worker.py": "Canivete Worker: executa um contrato de tarefa (Task Contract) no Photo Kanivete com um modelo local (Ollama),",
+  "tools/direcao_mapa.py": "Mapa de direção de arte (para o Claude, o Worker e o roteiro_local): layouts, estilos e técnicas em linhas curtas —",
+  "tools/esqueleto.py": "Roteiro (JSON curto) → carrossel diagramado (HTML do KNV.cena) pelos ESQUELETOS aprovados. O agente só escreve o",
+  "tools/gerar_marca.py": "Gera a marca KANIVETE: letras próprias desenhadas aqui (geometria nossa, sem ler fonte nenhuma), no espírito",
+  "tools/knv.py": "Monta uma peça do Photo Kanivete a partir de HTML/CSS (KNV.cena) no app aberto em modo agente e confere",
+  "tools/mapa_codigo.py": "Mapa do código (para o agente achar onde mexer sem abrir arquivo grande): comandos registrados, funções de topo e",
+  "tools/mapa_geral.py": "Mapa geral do KANIVETE — gera Instructions/MAPA.md (pessoas, Claude) e Instructions/mapa.json (Jr / Worker local)",
+  "tools/medir_ref.py": "Medidor de referência: lê uma imagem de referência (print de carrossel/flyer) SEM o Claude olhar e devolve as medidas",
+  "tools/montar_soundboard.py": "Monta o pack \"vanilla\" do Soundboard do Pocket Editor (não roda no app; só para gerar o zip do release)",
+  "tools/olho.py": "Olho local: um modelo de visão no Ollama (gemma4:e4b) olha as imagens no lugar do Claude e devolve TEXTO curto",
+  "tools/patch.py": "Aplica trocas de texto descritas num arquivo .patch simples — sem escapar aspas/barras, tudo ou nada, com conferência",
+  "tools/ps_modelo_deg.py": "Gera no Photoshop camadas de preenchimento de DEGRADÊ (linear 3 cores 30°, radial com transparência): molde do GdFl",
+  "tools/ps_modelo_forma.py": "Gera no Photoshop um PSD com camadas de forma (retângulo, elipse e um demarcador com furo): molde de vmsk/SoCo",
+  "tools/ps_modelo_pre.py": "Gera no Photoshop camadas de preenchimento de cor sólida (sem seleção e com seleção → máscara): molde",
+  "tools/ps_modelo_so.py": "Gera no Photoshop um PSD com um PNG colocado como objeto inteligente incorporado (escalado e girado): molde do SoLd",
+  "tools/ps_modelo_texto.py": "Gera no Photoshop (COM + JSX) um PSD com uma camada de texto de ponto e uma de parágrafo: molde do TySh",
+  "tools/recarregar.py": "Modo agente: aplica código novo no app aberto SEM reiniciar",
+  "tools/revisor.py": "Revisor da peça do Photo Kanivete: confere, sem o Claude olhar, as regras que vieram dos feedbacks do usuário e",
+  "tools/roteiro_local.py": "Briefing → roteiro JSON do tools/esqueleto.py pelo modelo LOCAL (Ollama; o Jr). O modelo só escreve o roteiro curto;",
+  "tools/vk_cena.py": "Diagramar uma prancheta do Vetor Kanivete com HTML/CSS (VKN.cena) usando o sistema da marca"
+ },
+ "guias": {
+  "Instructions/agente/ajuste-premiere.md": "AJUSTE PREMIERE: plano para a próxima sessão",
+  "Instructions/agente/arquiteto-local.md": "Arquiteto Local B",
+  "Instructions/agente/cena-3d-editor.md": "Cena 3D no Editor Kanivete (estilo After Effects)",
+  "Instructions/agente/design-photo-kanivete.md": "Fazer arte no Photo Kanivete pela API (guia para IAs)",
+  "Instructions/agente/direcao-carrossel.md": "Direção de arte de carrossel (para IAs) — o que separa peça boa de \"landing page genérica\"",
+  "Instructions/agente/direcao-de-arte.md": "Direção de arte e motion para o AutoFrame e as edições do Pocket Editor",
+  "Instructions/agente/diretor-de-arte.md": "Diretor de arte de carrossel (padrão de resposta + o que o Jr executa por comando)",
+  "Instructions/agente/guia-edicao.md": "GUIA-EDICAO :: Pocket Editor (Canivete do Pailer) — para agentes de IA",
+  "Instructions/agente/mapa-editor.md": "Mapa do código — editor (gerado por tools/mapa_codigo.py; nome:linha)",
+  "Instructions/agente/mapa-imagem.md": "Mapa do código — imagem (gerado por tools/mapa_codigo.py; nome:linha)",
+  "Instructions/agente/mapa-vetor.md": "Mapa do código — vetor (gerado por tools/mapa_codigo.py; nome:linha)",
+  "Instructions/agente/plano-cena.md": "Plano CENA — diagramar no Photo Kanivete escrevendo HTML/CSS (para IAs)",
+  "Instructions/agente/plano-comp.md": "Plano: Comp (composição estilo After Effects) no Pocket Editor",
+  "Instructions/agente/plano-economia-ponte-vetor-photo.md": "Planos (2026-10-04): economia de tokens, ponte Vetor ↔ Photo, nível \"Herbíssimo\"",
+  "Instructions/agente/remover-fundo.md": "Remover fundo (recorte) — velocidade × qualidade (2026-10-06)",
+  "Instructions/agente/teste-4k.md": "Teste de 4K (estresse do Editor de Vídeo)",
+  "Instructions/agente/worker.md": "Canivete Worker — o assistente local (para o Claude delegar operações)",
+  "Instructions/build.md": "Guia de Build (Geração do Executável)",
+  "Instructions/cerebro.md": "Cérebro Local",
+  "Instructions/compressor-imagem.md": "Compressor de Imagem",
+  "Instructions/editor-imagem.md": "Editor de Imagem (estilo Photoshop)",
+  "Instructions/editor-video.md": "Pocket Editor — Editor de Vídeo",
+  "Instructions/favicon-generator.md": "Favicon Generator",
+  "Instructions/gdrive-dumper.md": "GDrive Dumper — Documentação de Correções",
+  "Instructions/howtoeditapp.md": "Guia de Desenvolvimento: Fluxo de Comunicação e Edição",
+  "Instructions/importar-premiere.md": "Importar projeto do Premiere (.prproj) no Editor Kanivete",
+  "Instructions/melhorar-audio.md": "Melhorar Áudio",
+  "Instructions/modo-agente.md": "Modo agente (depuração remota)",
+  "Instructions/organizador-imagens.md": "Organizador de Imagens",
+  "Instructions/remover-fundo.md": "Remover Fundo",
+  "Instructions/transcrever-audio.md": "Transcrever Áudio",
+  "Instructions/vetor-kanivete.md": "Vetor Kanivete (estilo Illustrator) — estudo de caso, modelo, API e fechamento",
+  "Instructions/video-converter.md": "Video Converter (GIF <-> Video)",
+  "Instructions/video-downloader.md": "Video Downloader - Padrão de Implementação",
+  "Instructions/webscraper.md": "Web Scraper"
+ },
+ "modulos": {
+  "Functions/agente_midia.py": "agente_midia.py — ferramentas para um agente (Claude) entender as mídias de um projeto sem assistir/ouvir tudo",
+  "Functions/amostras.py": "Amostras de cor (painel Amostras do Editor de Imagem): lê as do Photoshop instalado (Swatches.psp, com os grupos)",
+  "Functions/ampliar_imagem.py": "Ampliar foto por IA (super-resolução): Real-ESRGAN ncnn Vulkan (BSD-3, xinntao/Real-ESRGAN), GPU via Vulkan",
+  "Functions/anti_noise.py": "Anti Noise (efeito de áudio do Editor Kanivete): tira o ruído de fundo com o DeepFilterNet3 (rede neural)",
+  "Functions/area_transferencia.py": "area_transferencia.py — o que foi copiado no Windows, para o Ctrl+V da timeline do Pocket Editor",
+  "Functions/audio_cutter.py": "Editor simples de audio com cortes multiponto via ffmpeg",
+  "Functions/autoframe.py": "AutoFrame — vídeos no ritmo da música a partir de uma pasta de fotos e vídeos (no espírito dos modelos do CapCut)",
+  "Functions/autoframe_modelos.py": "autoframe_modelos.py — modelos de cliente do AutoFrame (aba \"AutoFrame Customizado\")",
+  "Functions/blender_cena.py": "Roda DENTRO do Blender (blender -b -P blender_cena.py -- cena.json): monta a cena dos objetos 3D do Vetor Kanivete e",
+  "Functions/blender_render.py": "blender_render.py — render fotorrealista dos objetos 3D do Vetor Kanivete (girar_3d / extrudar_3d) no Blender (Cycles)",
+  "Functions/cena3d.py": "cena3d.py — Cena 3D do Editor Kanivete (frontend/js/editor-3d.js): a página renderiza cada quadro com three.js (o MESMO",
+  "Functions/cerebro_local.py": "Retorna o caminho do cérebro ativo salvo",
+  "Functions/ceu.py": "Substituição de céu (Photo Kanivete: Editar › Substituição de céu, como o Photoshop) — a máscara do céu",
+  "Functions/compressor_imagem.py": "EXIF (data, câmera, GPS) e perfil de cor ICC para manter na imagem comprimida",
+  "Functions/compressor_video.py": "compressor_video.py — Compressor de Vídeo para o Canivete do Pailer",
+  "Functions/converterimagem.py": "converterimagem.py",
+  "Functions/convertermp3.py": "Conversor de áudio (e extração de áudio de vídeos) via ffmpeg",
+  "Functions/editor_imagem.py": "Editor de Imagem (frontend/js/imagem-*.js): abrir e salvar PSD/PSB e imagens comuns",
+  "Functions/faviconconverter.py": "faviconconverter.py",
+  "Functions/fontes.py": "fontes.py — famílias de fonte instaladas no Windows e os estilos de cada uma (Light, Regular, Semibold,",
+  "Functions/gdrive_dumper.py": "gdrive_dumper.py — Módulo do GDRIVE DUMPER para o Canivete do Pailer",
+  "Functions/gerador_imagem.py": "gerador_imagem.py — Gerar imagem com IA no Photo Kanivete (texto → imagem e edição com imagens de referência)",
+  "Functions/instancia_unica.py": "instancia_unica.py — Uma cópia só do app aberta",
+  "Functions/legendas.py": "legendas.py — transcrição da timeline do Pocket Editor (painel Texto: Transcrever / Criar legendas)",
+  "Functions/legendas_formatos.py": "SRT e VTT: blocos separados por linha em branco, com uma linha \"início --> fim\"",
+  "Functions/media_server.py": "media_server.py — Servidor HTTP local (127.0.0.1) para a interface reproduzir mídia",
+  "Functions/melhorar_audio.py": "Ferramenta Melhorar Áudio (como o Adobe Podcast Enhance): aceita áudio ou vídeo, um arquivo ou uma pasta",
+  "Functions/melhorar_audio_runner.py": "Melhorar áudio (estilo Adobe Podcast) — o trabalho pesado, em duas etapas:",
+  "Functions/memoria.py": "Modelos de IA carregados sob demanda saem da memória quando ficam parados",
+  "Functions/midia.py": "midia.py — utilidades compartilhadas de mídia (caminhos do app, ffmpeg/ffprobe, progresso)",
+  "Functions/omnivoice_runner.py": "Runner isolado para operacoes pesadas do OmniVoice",
+  "Functions/omnivoice_tool.py": "Ferramenta OmniVoice: geração e sintese de voz sob demanda",
+  "Functions/organizador_de_imagens.py": "limparduplicadas.py",
+  "Functions/organizador_de_videos.py": "organizador_de_videos.py",
+  "Functions/otimizar.py": "Forçar Full HD (painel Projeto): vídeo maior que Full HD (2K, 4K, 8K, em pé ou deitado) vira uma cópia com o lado",
+  "Functions/ponte_illustrator.py": "Ponte com o Adobe Illustrator instalado (COM + ExtendScript) — .ai NATIVO, com todas as pranchetas",
+  "Functions/preencher_conteudo.py": "Preenchimento sensível ao conteúdo (Photo Kanivete: Editar › Preenchimento sensível ao conteúdo, como o Photoshop)",
+  "Functions/premiere.py": "Importar projeto do Premiere Pro (.prproj) no Editor Kanivete. Só LEITURA: o .prproj nunca é alterado",
+  "Functions/premiere_xml.py": "Exportar o projeto do Editor Kanivete (.vknv) como XML do Final Cut Pro 7 (xmeml v4), que o Premiere Pro abre",
+  "Functions/projeto.py": "projeto.py — Projetos do KANIVETE: .vknv = editor de vídeo (Pocket Editor), .iknv = editor de imagem",
+  "Functions/psd_import.py": "Importar PSD/PSB no editor com as camadas separadas (como o \"Composição — manter tamanhos das camadas\" do After",
+  "Functions/psd_so_modelo.py": "Moldes de objeto inteligente incorporado do Photoshop (PlLd + SoLd da camada e o lnk2 global com o arquivo),",
+  "Functions/psd_texto_modelo.py": "Moldes de camada de texto do Photoshop (bloco TySh), gerados pelo Photoshop 2026 (Arial 48 px de ponto e 36 px de",
+  "Functions/recorte_pro.py": "recorte_pro.py — Recorte profissional (Photo Kanivete: Remover plano de fundo; KNV.gerar recortar)",
+  "Functions/recuperar.py": "recuperar.py — o miolo das ferramentas de recuperação do Photo Kanivete (como as do Photoshop):",
+  "Functions/removerfundo.py": "removerfundo.py",
+  "Functions/render_cache.py": "Cache de render em disco do Pocket Editor (como os \"Preview Files\" do Premiere)",
+  "Functions/sincronizar.py": "Sincronizar clipes pelo áudio (como o \"Sincronizar › Áudio\" do Premiere): duas câmeras gravando a mesma cena",
+  "Functions/snapshot_logger.py": "snapshot_logger.py — Backup/restauração para o Organizador de Vídeos",
+  "Functions/soundboard.py": "soundboard.py — pack de efeitos sonoros do painel Soundboard do Pocket Editor",
+  "Functions/transcrever_cena.py": "transcrever_cena.py",
+  "Functions/transcreveraudio.py": "transcreveraudio.py",
+  "Functions/transicoes.py": "Transições de sobreposição do editor (estilo Mister Horse / Motion Bro): uma camada de ajuste por cima do corte que",
+  "Functions/updater.py": "updater.py — Atualização automática via GitHub Releases",
+  "Functions/vetor_exportar.py": "Vetor Kanivete: PDF para gráfica (fechamento de arquivo) — escrito à mão (content stream + pikepdf)",
+  "Functions/vetor_fonte.py": "Criar fonte própria no Vetor Kanivete: glifos desenhados em pranchetas → OpenType (.otf, contornos CFF cúbicos)",
+  "Functions/vetor_importar.py": "Vetor Kanivete: abrir PDF, AI, SVG e PowerPoint como documento vetorial editável (modelo em Instructions/vetor-kanivete.md)",
+  "Functions/vetor_kanivete.py": "Vetor Kanivete (estilo Illustrator): o lado Python do editor vetorial (frontend/js/vetor-*.js)",
+  "Functions/vetor_saida.py": "Vetor Kanivete — saídas para o mercado",
+  "Functions/video_cutter.py": "video_cutter.py — Motor do Pocket Editor (editor de vídeo do Canivete do Pailer)",
+  "Functions/videoconverter.py": "videoconverter.py — converte vídeos entre formatos, vídeo→GIF/MP3 e GIF→vídeo",
+  "Functions/videodownloader.py": "Traduz os erros mais comuns do yt-dlp para o usuário",
+  "Functions/webscraper.py": ""
+ },
+ "testes": {
+  "teste_barra": "Barra de tarefas contextual: alça move e lembra, Selecionar assunto / Remover fundo, × esconde só até o próximo clique",
+  "teste_blender": "Teste do render fotorrealista (Vetor 3D → Blender), app em --agente=9333. Rápido (400 px, 24 amostras): copo (girar) com",
+  "teste_cameraraw": "Filtro Camera Raw em janela própria (app em --agente=9333; não mexa no mouse durante). Arrasta uma barra com o",
+  "teste_caneta": "Caneta, demarcadores, recuperação e laço magnético com mouse de verdade no app de teste (9333)",
+  "teste_ceu": "Editar › Substituição de céu do Photo Kanivete (SkySeg) — app em --agente=9333",
+  "teste_conteudo": "Editar › Preenchimento sensível ao conteúdo do Photo Kanivete (LaMa) — app em --agente=9333",
+  "teste_corte_alt": "Máscara de corte com Alt + clique na divisa entre duas camadas (como no Photoshop), com mouse de verdade no app de",
+  "teste_dissolver": "Filtro > Dissolver (Liquify) com mouse de verdade (app em --agente=9333; não mexa no mouse durante)",
+  "teste_editar": "Editar › Atenuar, Colar especial (dentro/fora) e Localizar e substituir texto do Photo Kanivete (app em --agente=9333)",
+  "teste_export": "teste_export.py — Confere a exportação do editor contra a prévia, quadro a quadro, e reprova se divergir",
+  "teste_filtros": "Aplica cada filtro do menu Filtro (valores padrão) numa foto e mede; confere que mudou a imagem e não deu erro",
+  "teste_fonte": "Criar fonte própria no Vetor Kanivete (Texto › Criar fonte) — app em --agente=9333",
+  "teste_galeria": "Filtro > Galeria de filtros (app em --agente=9333). Abre a janela, espera as miniaturas, troca de filtro, empilha",
+  "teste_generativo": "Preenchimento generativo e Expansão generativa do Photo Kanivete (FLUX.2 klein local) — app em --agente=9333",
+  "teste_guias": "Teste das guias/fatias como no Photoshop, com mouse de verdade no app de teste (9333)",
+  "teste_illustrator": "Compatibilidade Vetor Kanivete ↔ Adobe Illustrator (Functions/ponte_illustrator.py) — app em --agente=9333 e o",
+  "teste_imagem": "Teste do Editor de Imagem (frontend/js/imagem-*.js + Functions/editor_imagem.py) no app de verdade",
+  "teste_laco": "Laço: Shift soma, Alt subtrai, Shift+Alt cruza; o mesmo no magnético; Ctrl+clique na miniatura seleciona a camada",
+  "teste_pincel": "Pincel do Photo Kanivete: traço macio liso e pintura fluida em documento grande (app em --agente=9333)",
+  "teste_play": "teste_play.py — Mede o play do Pocket Editor no app de verdade (modo agente) e reprova se engasgar",
+  "teste_ponte": "Teste da ponte Vetor <-> Photo (app em --agente=9333). Ponte Vetor ↔ Photo: objeto inteligente vetorial (ida, filtro inteligente, ampliar sem pixeliza",
+  "teste_pranchetas": "Pranchetas do Vetor Kanivete como no Illustrator — app em --agente=9333",
+  "teste_premiere": "Confere a importação de um projeto do Premiere (Functions/premiere.py) contra o próprio XML do .prproj",
+  "teste_premiere_xml": "Teste da exportação para o Premiere (XML do Final Cut Pro 7): Functions/premiere_xml.py",
+  "teste_psd_deg_app": "Uso: py -3.13 testes/teste_psd_deg_app.py [--photoshop] (app em --agente=9333)",
+  "teste_psd_forma": "Forma criada no Photo Kanivete → camada de forma EDITÁVEL no PSD (Functions/editor_imagem._forma_nova)",
+  "teste_psd_pre": "Camada de preenchimento de cor sólida do Photo Kanivete → camada de preenchimento no PSD (editor_imagem._preenchimento)",
+  "teste_psd_refs": "PSD salvo por cima (ida e volta) não pode trocar pixels entre camadas (2026-10-06: o carrossel do cliente voltou com",
+  "teste_psd_so": "Objeto inteligente criado no Photo Kanivete → objeto inteligente INCORPORADO no PSD (Functions/editor_imagem._so_novo)",
+  "teste_psd_texto": "Texto criado no Photo Kanivete → camada de texto EDITÁVEL no PSD (Functions/editor_imagem._texto_novo)",
+  "teste_vetor": "Teste do Vetor Kanivete pela API real (app em --agente=9333): monta um cartão de visita pelos comandos (window.VKN),",
+  "teste_vetor_editor3d": "Teste da ponte Vetor → Editor (Cena 3D), app em --agente=9333: copo (girar) com rótulo coral, caixa (extrudar com",
+  "teste_vetor_paineis": "Painéis móveis do Vetor Kanivete (vetor-dock.js, o mecanismo do Photo) — app em --agente=9333, mouse de verdade"
+ }
+}

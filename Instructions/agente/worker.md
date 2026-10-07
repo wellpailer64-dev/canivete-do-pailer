@@ -117,3 +117,7 @@ não mexe em .git, dist, build, `_credenciais.py`, nem fora de `arquivos`.
   diagnosticar traceback. NÃO para: arquitetura, bug de evento/estado, mudança grande.
 - Primeiros jobs (2026-10-04): troca com constante 10 s (errada sem condições) → 65 s certa com reserva; debug de nome
   indefinido 11 s, causa e correção certas (0.95).
+
+## Mapa do app
+Para se localizar (que ferramenta, que comando, que arquivo, que teste): `Instructions/mapa.json` (compacto) ou
+`py -3.13 tools/mapa_geral.py --busca termo`.
