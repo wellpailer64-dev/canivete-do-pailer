@@ -212,6 +212,15 @@ const KNV = {
         if (L && nome) { L.nome = nome; L._nomeAuto = false; ieUiCamadas(); }
         return KNV.info();
     },
+    // camada de preenchimento de DEGRADÊ: cores = [[pos 0..1, '#hex'], ...] (ou ['#a', '#b']), ops = [[pos, %], ...];
+    // estilo linear|radial|angulo|refletido|diamante, ang (°, 90 = de baixo para cima), escala (%), inverter, alinhar
+    async preenchimentoDegrade(cores, { ops, estilo = 'linear', ang = 90, escala = 100, inverter = false, alinhar = true, nome } = {}) {
+        const cs = (cores || []).map((c, i, a) => Array.isArray(c) ? [+c[0], c[1]] : [a.length > 1 ? i / (a.length - 1) : 0, c]);
+        const pre = { ...iePreDegPadrao(), estilo, ang, escala, inverter, alinhar, grad: { cores: cs.length ? cs : iePreDegPadrao().grad.cores, ops: ops || [[0, 100], [1, 100]] } };
+        const L = await iePreNovo(IE.doc, null, pre);
+        if (L && nome) { L.nome = nome; L._nomeAuto = false; ieUiCamadas(); }
+        return KNV.info();
+    },
     async duplicar(nome) { await ieCmd('duplicar'); return nome ? KNV.renomear(nome) : KNV.info(); },
     // Remover plano de fundo (IA): máscara do assunto; aplicar = true deixa os pixels já recortados
     // (recorte profissional: matting + filtro guiado + cores sem o fundo misturado, ~30 s; rapido = só a máscara lite, ~5 s)

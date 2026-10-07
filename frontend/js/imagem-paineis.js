@@ -811,6 +811,19 @@ function ieUiProps() {
             (a ? `<div class="ie-prop-nota">${ieT('Mostrado aqui e mantido no arquivo; os valores se editam no Photoshop.')}</div>` :
                 `<div class="ie-prop-nota ie-aviso">${ieT('Este ajuste fica no arquivo, mas o editor ainda não mostra o efeito dele.')}</div>`);
     }
+    if (L.tipo === 'preenchimento' && L.pre) {   // camada de preenchimento: cor ou degradê, editáveis aqui
+        const p = L.pre;
+        h += `<div class="ie-prop-tit ie-prop-sub">${ieT(p.tipo === 'degrade' ? 'Preenchimento de degradê' : 'Preenchimento de cor')}</div>`;
+        if (p.tipo === 'degrade') {
+            const est = [['linear', 'Linear'], ['radial', 'Radial'], ['angulo', 'Angular'], ['refletido', 'Refletido'], ['diamante', 'Diamante']];
+            h += `<div class="ie-prop-grade"><span>${ieT('Degradê')}</span><button class="ie-ls-grad" data-pre-grad title="${ieT('Editar degradê')}"></button></div>
+                <div class="ie-prop-grade ie-prop-pre"><span>${ieT('Estilo')}</span><select data-pre="estilo">${est.map(([v, n]) => `<option value="${v}" ${p.estilo === v ? 'selected' : ''}>${ieT(n)}</option>`).join('')}</select></div>
+                <div class="ie-prop-grade ie-prop-pre"><span>${ieT('Ângulo')}</span><input type="number" data-pre="ang" value="${Math.round(p.ang ?? 90)}" min="-180" max="180"></div>
+                <div class="ie-prop-grade ie-prop-pre"><span>${ieT('Escala')} %</span><input type="number" data-pre="escala" value="${Math.round(p.escala ?? 100)}" min="10" max="1000"></div>
+                <label class="ie-op-chk"><input type="checkbox" data-pre="inverter" ${p.inverter ? 'checked' : ''}> ${ieT('Inverter')}</label>
+                <label class="ie-op-chk"><input type="checkbox" data-pre="alinhar" ${p.alinhar !== false ? 'checked' : ''}> ${ieT('Alinhar com a camada')}</label>`;
+        } else h += `<div class="ie-prop-grade"><span>${ieT('Cor')}</span><button class="ie-cor" data-pre-cor style="background:${p.cor}"></button></div>`;
+    }
     if (L.tipo === 'inteligente' || L.tipo === 'forma' || L.tipo === 'preenchimento') {
         h += `<div class="ie-prop-nota">${ieT('Mover e transformar mantêm a camada editável no Photoshop. Pintar pede para rasterizar.')}</div>
             <div class="ie-prop-acoes"><button class="ie-btn ie-btn-mini" onclick="ieCmd('rasterizar')">${ieT('Rasterizar camada')}</button></div>`;
@@ -826,6 +839,19 @@ function ieUiProps() {
         h += `<div class="ie-prop-acoes"><button class="ie-btn ie-btn-mini" onclick="ieEstiloCamada()">fx ${ieT('Adicionar efeito...')}</button></div>`;
     box.innerHTML = h;
     box.querySelector('[data-ppelo]')?.addEventListener('click', () => { IE.propElo = IE.propElo === false; ieUiProps(); });
+    if (L.tipo === 'preenchimento' && L.pre) {   // controles do preenchimento (redesenha ao vivo; um passo no histórico)
+        let t = 0;
+        const mudou = () => { iePreRender(L, doc); clearTimeout(t); t = setTimeout(() => ieHist(ieT('Preenchimento')), 600); };
+        const g = box.querySelector('[data-pre-grad]');
+        if (g) { ieLsGradDesenhar(g, L.pre.grad); g.addEventListener('click', () => ieLsGradEditor(g, L.pre, 'grad', mudou)); }
+        box.querySelector('[data-pre-cor]')?.addEventListener('click', ev => iePreCorEditar(doc, L, ev.target));
+        box.querySelectorAll('[data-pre]').forEach(el => el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', () => {
+            const k = el.dataset.pre;
+            L.pre[k] = el.type === 'checkbox' ? el.checked : el.tagName === 'SELECT' ? el.value : (+el.value || 0);
+            mudou();
+        }));
+        box.querySelectorAll('input[data-pre]').forEach(i => i.addEventListener('keydown', e => e.stopPropagation()));
+    }
     ieTextoPropsInstalar(box);
     box.querySelectorAll('input[data-pp]').forEach(inp => inp.addEventListener('change', () => {
         const v = Math.round(+inp.value || 0), R2 = ieCaixaCamada(L);
@@ -1136,7 +1162,7 @@ const IE_MENUS = [
         ['Tamanho da imagem...', 'tamImagem', 'Alt+Ctrl+I'], ['Tamanho da tela...', 'tamTela', 'Alt+Ctrl+C'],
         ['Rotação da imagem', [['180°', 'img:g180'], ['90° horário', 'img:g90h'], ['90° anti-horário', 'img:g90a'], '-', ['Inverter tela na horizontal', 'img:fh'], ['Inverter tela na vertical', 'img:fv']]], '-',
         ['Cortar na seleção', 'cortarSel'], ['Aparar transparência', 'aparar']]],
-    ['Camada', [['Nova camada', 'novaCamada', 'Shift+Ctrl+N'], ['Nova camada de preenchimento', [['Cor sólida...', 'preenchimentoCor']]], ['Duplicar camada', 'duplicar', 'Ctrl+J'], ['Camada via recorte', 'viaRecorte', 'Shift+Ctrl+J'], ['Excluir camada', 'excluirCamada'], '-',
+    ['Camada', [['Nova camada', 'novaCamada', 'Shift+Ctrl+N'], ['Nova camada de preenchimento', [['Cor sólida...', 'preenchimentoCor'], ['Degradê...', 'preenchimentoDeg']]], ['Duplicar camada', 'duplicar', 'Ctrl+J'], ['Camada via recorte', 'viaRecorte', 'Shift+Ctrl+J'], ['Excluir camada', 'excluirCamada'], '-',
         ['Máscara de camada', [['Revelar tudo', 'mascara'], ['Ocultar tudo', 'mascaraOcultar'], ['Revelar seleção', 'mascaraSel'], ['Ocultar seleção', 'mascaraSelOcultar'], '-',
             ['Inverter máscara', 'mascaraInverter'], ['Desativar/ativar', 'mascaraDesativar'], ['Aplicar', 'mascaraAplicar'], ['Excluir', 'mascaraExcluir']]],
         ['Objetos inteligentes', [['Converter em objeto inteligente', 'objetoInteligente'], ['Editar conteúdo no Vetor', 'editarNoVetor'], ['Rasterizar', 'rasterizar'], '-',

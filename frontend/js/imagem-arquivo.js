@@ -344,8 +344,8 @@ async function ieSalvar(comoNovo = false, destinoForcado = null, refeito = false
                         trechos: (t.trechos || []).map(r => ({ a: r.a, b: r.b, ps: r.ps, cor: r.cor, negFalso: r.negFalso, itaFalso: r.itaFalso, sublinhado: r.sublinhado, tachado: r.tachado })),
                         ...Object.fromEntries(IE_TX_CHAVES.filter(k => t[k] !== undefined).map(k => [k, t[k]])) };
                 }
-                // camada de preenchimento de cor sólida (nova ou do PSD): o Python grava/atualiza o SoCo
-                if (L.tipo === 'preenchimento' && L.pre && !L.rasterizar) s.pre_ps = { cor: L.pre.cor };
+                // camada de preenchimento (cor ou degradê; nova ou do PSD): o Python grava/atualiza o SoCo/GdFl
+                if (L.tipo === 'preenchimento' && L.pre && !L.rasterizar) s.pre_ps = JSON.parse(JSON.stringify(L.pre));
                 // objeto inteligente criado no editor: vai o ORIGINAL (L.c0) incorporado + os 4 cantos da transformação
                 if (L.tipo === 'inteligente' && L.c0 && L.c0.c && (!ida || L.ref == null) && !L.rasterizar) {
                     const M = L.tf || IE_ID, { x, y } = L.c0, w = L.c0.c.width, h = L.c0.c.height;
@@ -1029,6 +1029,10 @@ const IE_CMDS = {
     // Converter em objeto inteligente (como no Photoshop): os pixels de agora (com a máscara aplicada dentro) viram o
     // original; escalar/girar depois sempre parte dele (diminuir e aumentar de novo não perde nitidez) e Ctrl+J faz
     // cópias que usam o mesmo original
+    preenchimentoDeg: async doc => {   // Camada › Nova camada de preenchimento › Degradê: cria e abre o editor de degradê
+        const L = await iePreNovo(doc, null, iePreDegPadrao());
+        if (L && !window._knvAuto) iePreCorEditar(doc, L);
+    },
     preenchimentoCor: async doc => {   // Camada › Nova camada de preenchimento › Cor sólida: cria e abre o seletor de cor
         const L = await iePreNovo(doc, IE.cor[0]);
         if (L && !window._knvAuto) iePreCorEditar(doc, L, { getBoundingClientRect: () => new DOMRect(window.innerWidth / 2, window.innerHeight / 3, 1, 1) });

@@ -390,6 +390,10 @@ def _abrir_psd(path, doc, on_progress):
                 cor_pre = _cor_soco(layer)
                 if cor_pre:
                     no["pre"] = {"tipo": "cor", "cor": "#%02x%02x%02x" % cor_pre}
+            elif k == "gradientfill":   # degradê editável no editor (painel Propriedades)
+                pre = _grad_pre(layer)
+                if pre:
+                    no["pre"] = pre
             im, x0, y0 = pixels(layer)
             if im is not None:
                 no.update({"x": int(x0), "y": int(y0), "w": im.size[0], "h": im.size[1],
@@ -490,7 +494,9 @@ def _grad_ler(g):
         cores = [[float(_v(c, b"Lctn", 0)) / 4096, _hex(c.get(b"Clr "))] for c in g.get(b"Clrs", [])]
         ops = [[float(_v(t, b"Lctn", 0)) / 4096, float(_v(t, b"Opct", 100))] for t in g.get(b"Trns", [])]
         if cores:
-            return {"cores": cores, "ops": ops or [[0, 100], [1, 100]], "nome": str(_v(g, b"Nm  ", "")).strip("\x00")}
+            # suavidade (Intr: 4096 = 100%, o padrão do Photoshop): o editor desenha linear (= 0%); guardada para voltar igual
+            return {"cores": cores, "ops": ops or [[0, 100], [1, 100]], "nome": str(_v(g, b"Nm  ", "")).strip("\x00"),
+                    "suave": round(float(_v(g, b"Intr", 4096)) / 40.96, 2)}
     except Exception:
         pass
     return {"cores": [[0, "#000000"], [1, "#ffffff"]], "ops": [[0, 100], [1, 100]]}
@@ -609,7 +615,9 @@ def _grad_desc(g):
     d = D.Descriptor(classID=b"Grdn")
     d[b"Nm  "] = D.String(str(g.get("nome") or "Personalizado"))
     d[b"GrdF"] = D.Enumerated(typeID=b"GrdF", enum=b"CstS")
-    d[b"Intr"] = D.Double(4096.0)
+    # suavidade: degradê feito no editor vai com 0% (mistura linear, que é como o editor desenha; com os 100% padrão do
+    # Photoshop as cores entre as paradas saem bem diferentes); vindo do PSD, a suavidade dele volta igual
+    d[b"Intr"] = D.Double(round(float(g.get("suave") or 0) * 40.96, 2))
     cores = []
     for pos, cor in g.get("cores") or [[0, "#000000"], [1, "#ffffff"]]:
         c = D.Descriptor(classID=b"Clrt")
@@ -1399,14 +1407,64 @@ def _soco(cor):
     return soco
 
 
-def _preenchimento(ob, cor):
-    """Camada de preenchimento de cor sólida (nova do editor ou do PSD com a cor trocada): SoCo + a marca de que os pixels
-    são cache, como o Photoshop grava (molde: tools/ps_modelo_pre.py). A máscara vai pelo caminho normal das máscaras."""
+_GRAD_TIPOS = {"linear": b"Lnr ", "radial": b"Rdl ", "angulo": b"Angl", "refletido": b"Rflc", "diamante": b"Dmnd"}
+
+
+def _gdfl(pre):
+    """Bloco de preenchimento de degradê (GdFl) como o Photoshop 2026 grava (molde: tools/ps_modelo_deg.py), com o
+    degradê no mesmo formato da Sobreposição de degradê (_grad_desc) e os campos do diálogo (escala, inverter, alinhar)."""
+    import psd_tools.psd.descriptor as D
+    from psd_tools.psd.descriptor import Unit
+    d = D.DescriptorBlock(version=16, classID=b"null", name="\x00")
+    d[b"gradientsInterpolationMethod"] = D.Enumerated(typeID=b"gradientInterpolationMethodType", enum=b"Gcls")
+    d[b"Angl"] = D.UnitFloat(unit=Unit.Angle, value=float(pre.get("ang") if pre.get("ang") is not None else 90))
+    d[b"Type"] = D.Enumerated(typeID=b"GrdT", enum=_GRAD_TIPOS.get(pre.get("estilo"), b"Lnr "))
+    d[b"Grad"] = _grad_desc(pre.get("grad") or {})
+    d[b"Rvrs"] = D.Bool(bool(pre.get("inverter")))
+    d[b"Dthr"] = D.Bool(False)
+    d[b"Algn"] = D.Bool(pre.get("alinhar", True) is not False)
+    d[b"Scl "] = D.UnitFloat(unit=Unit.Percent, value=float(pre.get("escala") or 100))
+    of = D.Descriptor(classID=b"Pnt ")
+    of[b"Hrzn"] = D.UnitFloat(unit=Unit.Percent, value=float(pre.get("ofx") or 0))
+    of[b"Vrtc"] = D.UnitFloat(unit=Unit.Percent, value=float(pre.get("ofy") or 0))
+    d[b"Ofst"] = of
+    return d
+
+
+def _preenchimento(ob, pre):
+    """Camada de preenchimento (nova do editor ou do PSD com cor/degradê trocado): SoCo (cor sólida) ou GdFl (degradê) +
+    a marca de que os pixels são cache, como o Photoshop grava (moldes: tools/ps_modelo_pre.py e ps_modelo_deg.py).
+    pre = L.pre do editor ({tipo: 'cor', cor} | {tipo: 'degrade', grad, estilo, ang, ...}) ou só a cor (texto).
+    A máscara vai pelo caminho normal das máscaras."""
     from psd_tools.constants import Tag
     from psd_tools.psd.tagged_blocks import TaggedBlock
-    ob.tagged_blocks[Tag.SOLID_COLOR_SHEET_SETTING] = TaggedBlock(key=Tag.SOLID_COLOR_SHEET_SETTING, data=_soco(cor))
+    if not isinstance(pre, dict):
+        pre = {"tipo": "cor", "cor": pre}
+    if pre.get("tipo") == "degrade":
+        novo, velho, dado = Tag.GRADIENT_FILL_SETTING, Tag.SOLID_COLOR_SHEET_SETTING, _gdfl(pre)
+    else:
+        novo, velho, dado = Tag.SOLID_COLOR_SHEET_SETTING, Tag.GRADIENT_FILL_SETTING, _soco(pre.get("cor"))
+    if velho in ob.tagged_blocks:
+        del ob.tagged_blocks[velho]
+    ob.tagged_blocks[novo] = TaggedBlock(key=novo, data=dado)
     ob._record.flags.pixel_data_irrelevant = True
     return True
+
+
+def _grad_pre(layer):
+    """Preenchimento de degradê do PSD (GdFl) → L.pre do editor. None se não der."""
+    from psd_tools.constants import Tag
+    try:
+        d = layer.tagged_blocks.get_data(Tag.GRADIENT_FILL_SETTING)
+        tipos = {v.decode(): k for k, v in _GRAD_TIPOS.items()}
+        of = d.get(b"Ofst")
+        return {"tipo": "degrade", "grad": _grad_ler(d.get(b"Grad")), "estilo": tipos.get(_enum(d, b"Type"), "linear"),
+                "ang": float(_v(d, b"Angl", 90)), "escala": float(_v(d, b"Scl ", 100)), "inverter": bool(_v(d, b"Rvrs", False)),
+                "alinhar": bool(_v(d, b"Algn", True)), "ofx": float(_v(of, b"Hrzn", 0)) if of is not None else 0.0,
+                "ofy": float(_v(of, b"Vrtc", 0)) if of is not None else 0.0}
+    except Exception as e:
+        logging.debug("degradê do preenchimento %s: %s", getattr(layer, "name", "?"), e)
+        return None
 
 
 def _forma_nova(ob, vet, W, H):
@@ -1632,9 +1690,9 @@ def salvar(spec):
                         if not _transformar_vivo(orig, no["tf"], W, H, W0, H0):
                             ob = None
                             avisos.append(f"{no.get('nome')}: virou pixels (não deu para mover sem rasterizar)")
-                    if ob is not None and no.get("pre_ps") and orig.kind == "solidcolorfill":
-                        try:   # cor trocada no editor (os pixels novos vão abaixo, pelo _trocar_pixels)
-                            _preenchimento(orig, no["pre_ps"].get("cor"))
+                    if ob is not None and no.get("pre_ps") and orig.kind in ("solidcolorfill", "gradientfill"):
+                        try:   # cor/degradê trocado no editor (os pixels novos vão abaixo, pelo _trocar_pixels)
+                            _preenchimento(orig, no["pre_ps"])
                         except Exception as e:
                             avisos.append(f"{no.get('nome')}: cor do preenchimento não salva ({e})")
                     if ob is not None and no.get("texto_novo") is not None and orig.kind == "type":
@@ -1682,7 +1740,7 @@ def salvar(spec):
                             avisos.append(f"{no.get('nome')}: objeto inteligente salvo como pixels ({e})")
                     if orig is None and no.get("pre_ps"):   # preenchimento criado no editor: camada de preenchimento
                         try:
-                            _preenchimento(ob, no["pre_ps"].get("cor"))
+                            _preenchimento(ob, no["pre_ps"])
                         except Exception as e:
                             logging.debug("preenchimento novo %s: %s", no.get("nome"), e)
                             avisos.append(f"{no.get('nome')}: preenchimento salvo como pixels ({e})")

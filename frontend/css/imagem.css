@@ -61,7 +61,7 @@
 .ie-op-dica { color: var(--text-3); font-size: 11.5px; }
 .ie-op-campo { display: inline-flex; align-items: center; gap: 5px; color: var(--text-2); }
 .ie-opcoes input[type=number], .ie-opcoes input[type=text], .ie-opcoes select, .ie-op-fonte,
-.ie-cam-topo select, .ie-cam-topo input, .ie-dlg input[type=number], .ie-dlg input[type=text], .ie-dlg select, .ie-prop-pos input {
+.ie-cam-topo select, .ie-cam-topo input, .ie-dlg input[type=number], .ie-dlg input[type=text], .ie-dlg select, .ie-prop-pos input, .ie-prop-pre input, .ie-prop-pre select {
     height: 24px; background: var(--bg-input); color: var(--text); border: 1px solid var(--ie-linha-2); border-radius: 4px; padding: 0 6px; font: inherit; outline: none;
 }
 .ie-opcoes input:focus, .ie-opcoes select:focus, .ie-dlg input:focus, .ie-dlg select:focus, .ie-cam-topo select:focus, .ie-cam-topo input:focus { border-color: var(--primary-line); }
@@ -185,6 +185,7 @@
 .ie-prop-pos { grid-template-columns: 1fr 1fr; }
 .ie-prop-pos label { display: flex; align-items: center; gap: 6px; }
 .ie-prop-pos input { width: 100%; min-width: 0; }
+.ie-prop-pre input, .ie-prop-pre select { width: 100%; min-width: 0; }
 .ie-prop-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
 .ie-prop-nota { color: var(--text-3); font-size: 11.5px; line-height: 1.45; margin: 4px 0; }
 .ie-aviso { color: var(--warn); }

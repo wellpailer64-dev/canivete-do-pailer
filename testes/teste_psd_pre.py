@@ -21,6 +21,13 @@ if hasattr(sys.stdout, "reconfigure"):
 W, H = 1000, 600
 erros = []
 CASOS = [("Fundo azul", "#1e78dc", None), ("Faixa laranja", "#e6a700", (600, 100, 900, 500))]
+# degradês (L.pre do editor): o desenho é conferido pelo teste do app; aqui, o que vai e volta do arquivo
+DEGRADES = [
+    ("Degradê linear", {"tipo": "degrade", "grad": {"cores": [[0, "#1e78dc"], [0.5, "#fac828"], [1, "#dc1e1e"]], "ops": [[0, 100], [1, 100]]},
+                        "estilo": "linear", "ang": 30, "escala": 100, "inverter": False, "alinhar": True, "ofx": 0, "ofy": 0}),
+    ("Degradê radial", {"tipo": "degrade", "grad": {"cores": [[0, "#ffffff"], [1, "#28a05a"]], "ops": [[0, 100], [1, 0]]},
+                        "estilo": "radial", "ang": 90, "escala": 80, "inverter": True, "alinhar": False, "ofx": 10, "ofy": -5}),
+]
 
 
 def falha(msg):
@@ -50,6 +57,10 @@ def montar(destino):
             esperado.paste(rgb, rect)
         else:
             esperado.paste(rgb, (0, 0, W, H))
+    for nome, pre in DEGRADES:   # pixels de mentira: o Photoshop redesenha a partir do GdFl
+        ob = ei._nova_pixel(psd, Image.new("RGBA", (W, H), (128, 128, 128, 255)), nome, 0, 0)
+        ob.visible = False
+        ei._preenchimento(ob, pre)
     ei._gravar_achatado(psd, esperado.convert("RGBA"), W, H, novo=True)
     psd.save(destino)
     return esperado
@@ -66,6 +77,19 @@ def conferir_psd_tools(path):
         if cor_de(l) != cor:
             falha(f"{nome}: cor {cor_de(l)}")
         print(f"  ✓ {nome}: camada de preenchimento {cor}" + (" com máscara" if rect else ""))
+    for nome, pre in DEGRADES:
+        l = por_nome.get(nome)
+        if l is None or l.kind != "gradientfill":
+            falha(f"{nome}: não é preenchimento de degradê ({l.kind if l else 'sumiu'})")
+            continue
+        lido = ei._grad_pre(l)
+        lido["grad"].pop("nome", None)
+        if lido["grad"].pop("suave", 0) != 0:
+            falha(f"{nome}: suavidade do degradê feito no editor deveria ir 0%")
+        if lido != pre:
+            falha(f"{nome}: voltou diferente {lido}")
+        else:
+            print(f"  ✓ {nome}: preenchimento de degradê, volta igual (estilo, ângulo, escala, inverter, alinhar, deslocamento, paradas)")
 
 
 def ps():
@@ -79,9 +103,21 @@ LER = r'''
 function info(l) {
   var r = new ActionReference(); r.putIdentifier(charIDToTypeID("Lyr "), l.id); var d = executeActionGet(r);
   if (!d.hasKey(stringIDToTypeID("adjustment"))) return l.name + "|pixels";
-  var a = d.getList(stringIDToTypeID("adjustment")), tipo = typeIDToStringID(a.getObjectType(0)), c = a.getObjectValue(0).getObjectValue(charIDToTypeID("Clr "));
+  var a = d.getList(stringIDToTypeID("adjustment")), tipo = typeIDToStringID(a.getObjectType(0)), o = a.getObjectValue(0);
   function h(v) { var s = Math.round(v).toString(16); return s.length < 2 ? "0" + s : s; }
-  return l.name + "|" + tipo + "|#" + h(c.getDouble(charIDToTypeID("Rd  "))) + h(c.getDouble(charIDToTypeID("Grn "))) + h(c.getDouble(charIDToTypeID("Bl  ")));
+  function hc(c) { return "#" + h(c.getDouble(charIDToTypeID("Rd  "))) + h(c.getDouble(charIDToTypeID("Grn "))) + h(c.getDouble(charIDToTypeID("Bl  "))); }
+  if (tipo == "gradientLayer") {
+    var g = o.getObjectValue(charIDToTypeID("Grad")), cs = g.getList(charIDToTypeID("Clrs")), ts = g.getList(charIDToTypeID("Trns")), cores = [], ops = [];
+    for (var i = 0; i < cs.count; i++) { var s = cs.getObjectValue(i); cores.push(Math.round(s.getInteger(charIDToTypeID("Lctn")) / 40.96) + "%" + hc(s.getObjectValue(charIDToTypeID("Clr ")))); }
+    for (var i = 0; i < ts.count; i++) { var t = ts.getObjectValue(i); ops.push(Math.round(t.getInteger(charIDToTypeID("Lctn")) / 40.96) + "%=" + Math.round(t.getUnitDoubleValue(charIDToTypeID("Opct")))); }
+    var k = function (id) { return o.hasKey(charIDToTypeID(id)) ? o : null; };
+    return l.name + "|" + tipo + "|" + typeIDToStringID(o.getEnumerationValue(charIDToTypeID("Type"))) + " " + Math.round(o.getUnitDoubleValue(charIDToTypeID("Angl"))) + "°" +
+      // campo no valor padrão o Photoshop não lista: ausente = padrão (escala 100, sem inverter, alinhado)
+      " esc=" + (o.hasKey(charIDToTypeID("Scl ")) ? Math.round(o.getUnitDoubleValue(charIDToTypeID("Scl "))) : 100) +
+      " inv=" + (o.hasKey(charIDToTypeID("Rvrs")) ? o.getBoolean(charIDToTypeID("Rvrs")) : false) +
+      " alin=" + (o.hasKey(charIDToTypeID("Algn")) ? o.getBoolean(charIDToTypeID("Algn")) : true) + " | " + cores.join(",") + " | " + ops.join(",");
+  }
+  return l.name + "|" + tipo + "|" + hc(o.getObjectValue(charIDToTypeID("Clr ")));
 }'''
 
 
@@ -93,10 +129,17 @@ var d = app.open(new File("%s")), out = [];
 try { for (var i = 0; i < d.artLayers.length; i++) out.push(info(d.artLayers[i])); d.saveAs(new File("%s"), new PNGSaveOptions(), true); }
 finally { d.close(SaveOptions.DONOTSAVECHANGES); } out.join("\n");''' % (path.replace("\\", "/"), png)))
     lidas = {ln.split("|")[0]: ln.split("|")[1:] for ln in r.splitlines()}
-    print("  Photoshop leu:", lidas)
+    print("  Photoshop leu:")
+    for n, v in lidas.items():
+        print("    ", n, v)
     for nome, cor, _ in CASOS:
         if lidas.get(nome) != ["solidColorLayer", cor]:
             falha(f"Photoshop: {nome} = {lidas.get(nome)}")
+    esperados = {"Degradê linear": ["gradientLayer", "linear 30° esc=100 inv=false alin=true ", " 0%#1e78dc,50%#fac828,100%#dc1e1e ", " 0%=100,100%=100"],
+                 "Degradê radial": ["gradientLayer", "radial 90° esc=80 inv=true alin=false ", " 0%#ffffff,100%#28a05a ", " 0%=100,100%=0"]}
+    for nome, esp in esperados.items():
+        if lidas.get(nome) != esp:
+            falha(f"Photoshop: {nome} = {lidas.get(nome)} (esperado {esp})")
     feito = np.asarray(Image.open(png).convert("RGB")).astype(int)
     dif = float(np.abs(feito - np.asarray(esperado).astype(int)).mean())
     print(f"  Photoshop: diferença média da imagem {dif:.3f}")

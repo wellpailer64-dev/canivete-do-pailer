@@ -166,7 +166,9 @@ function ieFxDegrade(W, H, B, g, estilo, angGraus, escala = 100, inverter = fals
     const c = ieFxCv(W, H), x = ieCtx(c);
     const cx = B.x + B.w / 2 + ofx / 100 * B.w, cy = B.y + B.h / 2 + ofy / 100 * B.h;
     const a = angGraus * Math.PI / 180, ux = Math.cos(a), uy = -Math.sin(a);
-    const meio = (Math.abs(B.w * ux) + Math.abs(B.h * uy)) / 2 * escala / 100 || 1;
+    // meio comprimento = metade da corda da caixa pelo centro na direção do ângulo (o menor entre L/|cos| e A/|sen|),
+    // como o Photoshop (medido 2026-10-07: linear 30° num 600×400 = 346,4; em 0° e 90° dá o mesmo que antes)
+    const meio = Math.min(Math.abs(ux) > 1e-6 ? B.w / Math.abs(ux) : Infinity, Math.abs(uy) > 1e-6 ? B.h / Math.abs(uy) : Infinity) / 2 * escala / 100 || 1;
     let cores = g.cores.map(([p, cor]) => [inverter ? 1 - p : p, cor]).sort((p, q) => p[0] - q[0]);
     let ops = (g.ops || [[0, 100], [1, 100]]).map(([p, o]) => [inverter ? 1 - p : p, o]).sort((p, q) => p[0] - q[0]);
     const amostra = t => {   // cor (rgba) no ponto t (0..1), juntando paradas de cor e de opacidade
@@ -178,7 +180,9 @@ function ieFxDegrade(W, H, B, g, estilo, angGraus, escala = 100, inverter = fals
     const pontos = [...new Set([...cores.map(p => p[0]), ...ops.map(p => p[0]), 0, 0.25, 0.5, 0.75, 1])].sort((p, q) => p - q);
     const comParadas = (gr, f = t => t) => { for (const t of pontos) gr.addColorStop(f(t), amostra(t)); return gr; };
     if (estilo === 'radial') {
-        const r = Math.max(B.w, B.h) / 2 * escala / 100 || 1;
+        // raio = metade do lado MENOR, como o Photoshop (medido nele em 2026-10-07: preenchimento e Sobreposição de
+        // degradê radial num 600×400 ficam com raio 200; antes o editor usava o lado maior)
+        const r = Math.min(B.w, B.h) / 2 * escala / 100 || 1;
         x.fillStyle = comParadas(x.createRadialGradient(cx, cy, 0, cx, cy, r));
     } else if (estilo === 'angulo') {
         const gr = x.createConicGradient(-a, cx, cy);
@@ -190,7 +194,7 @@ function ieFxDegrade(W, H, B, g, estilo, angGraus, escala = 100, inverter = fals
     } else if (estilo === 'diamante') {
         const img = x.createImageData(W, H), d = img.data, tab = [];
         for (let i = 0; i <= 255; i++) { const s = amostra(i / 255).match(/[\d.]+/g).map(Number); tab.push(s); }
-        const vx = -uy, vy = ux, r = Math.max(B.w, B.h) / 2 * escala / 100 || 1;
+        const vx = -uy, vy = ux, r = Math.max(B.w, B.h) / 2 * escala / 100 || 1;   // diamante: lado MAIOR (medido no Photoshop)
         for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
             const px = i + 0.5 - cx, py = j + 0.5 - cy;
             const t = Math.min(1, (Math.abs(px * ux + py * uy) + Math.abs(px * vx + py * vy)) / r);

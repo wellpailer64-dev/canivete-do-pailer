@@ -1343,30 +1343,47 @@ function ieFormaCorEditar(doc, L, ancora) {
         clearTimeout(t); t = setTimeout(() => { if (L.vet.cor !== antes) ieHist(ieT('Cor da forma')); }, 600);
     });
 }
-// ── camada de preenchimento de cor sólida (Camada › Nova camada de preenchimento › Cor sólida, como no Photoshop) ──
-// L.tipo = 'preenchimento', L.pre = {tipo: 'cor', cor}: cobre o documento inteiro (a máscara recorta); com seleção ativa
-// nasce com a máscara da seleção; duplo clique na miniatura troca a cor. Vai para o PSD como camada de preenchimento.
+// ── camada de preenchimento (Camada › Nova camada de preenchimento › Cor sólida / Degradê, como no Photoshop) ──
+// L.tipo = 'preenchimento', L.pre = {tipo: 'cor', cor} | {tipo: 'degrade', grad: {cores, ops}, estilo, ang, escala,
+// inverter, alinhar, ofx, ofy} (os campos da Sobreposição de degradê). Cobre o documento inteiro (a máscara recorta);
+// com seleção ativa nasce com a máscara da seleção; duplo clique na miniatura edita; painel Propriedades mostra tudo.
+// Degradê "alinhado com a camada" usa a caixa da máscara (a da seleção); sem máscara, o documento.
+// Vai para o PSD como camada de preenchimento (SoCo / GdFl).
+function iePreCaixa(L, doc) {
+    if (L.pre.alinhar !== false && L.m && L.m.c && !L.m.fundo) return { x: L.m.x, y: L.m.y, w: L.m.c.width, h: L.m.c.height };
+    return { x: 0, y: 0, w: doc.w, h: doc.h };
+}
 function iePreRender(L, doc = IE.doc) {
     if (!L || !L.pre) return;
-    const R0 = ieRCamada(L);
-    const c = ieCanvas(doc.w, doc.h), x = ieCtx(c);
-    x.fillStyle = L.pre.cor || '#000000'; x.fillRect(0, 0, doc.w, doc.h);
+    const R0 = ieRCamada(L), p = L.pre;
+    let c;
+    if (p.tipo === 'degrade') c = ieFxDegrade(doc.w, doc.h, iePreCaixa(L, doc), p.grad || IE_GRAD_PADRAO(), p.estilo || 'linear', p.ang ?? 90, p.escala ?? 100, !!p.inverter, p.ofx || 0, p.ofy || 0);
+    else { c = ieCanvas(doc.w, doc.h); const x = ieCtx(c); x.fillStyle = p.cor || '#000000'; x.fillRect(0, 0, doc.w, doc.h); }
     L.c = c; L.x = 0; L.y = 0; L.sujoPx = true;
     ieInvalidar(L); ieCamadaMudou(L, R0);
 }
-async function iePreNovo(doc, cor) {
+// degradê novo: da cor de frente para a de fundo, linear 90°, como o Photoshop
+function iePreDegPadrao() { return { tipo: 'degrade', grad: { cores: [[0, IE.cor[0]], [1, IE.cor[1]]], ops: [[0, 100], [1, 100]] }, estilo: 'linear', ang: 90, escala: 100, inverter: false, alinhar: true, ofx: 0, ofy: 0 }; }
+async function iePreNovo(doc, cor, pre) {
     if (!doc) return null;
-    const L = ieNovaCamada(doc, { tipo: 'preenchimento', nome: ieNomeLivre(doc, ieT('Preenchimento de cor')), pre: { tipo: 'cor', cor: cor || IE.cor[0] }, sujoPx: true });
+    pre = pre || { tipo: 'cor', cor: cor || IE.cor[0] };
+    const L = ieNovaCamada(doc, { tipo: 'preenchimento', nome: ieNomeLivre(doc, ieT(pre.tipo === 'degrade' ? 'Preenchimento de degradê' : 'Preenchimento de cor')), pre, sujoPx: true });
     ieInserirAcima(doc, L, doc.selIds.length ? ieAtiva(doc) : null);
     iePreRender(L, doc);
     doc.ativa = L.id; doc.selIds = [L.id];
-    if (doc.sel && doc === IE.doc) { await ieCmd('mascaraSel'); doc.mascaraAlvo = false; }   // como no Photoshop
+    if (doc.sel && doc === IE.doc) { await ieCmd('mascaraSel'); doc.mascaraAlvo = false; if (pre.tipo === 'degrade') iePreRender(L, doc); }   // como no Photoshop
     ieHist(ieT('Camada de preenchimento'));
     ieUiCamadas?.();
     return L;
 }
 function iePreCorEditar(doc, L, ancora) {
     if (!L || !L.pre) return;
+    if (L.pre.tipo === 'degrade') {   // degradê: o editor de paradas (o mesmo do Estilo de camada) no painel Propriedades
+        ieUiProps?.();
+        const sw = document.querySelector('[data-pre-grad]');
+        if (sw) sw.click();
+        return;
+    }
     const antes = L.pre.cor;
     let t = 0;
     ieSeletorCor(ancora, antes || '#000000', c => {

@@ -42,7 +42,8 @@ Armadilhas: na página existe a `const KNV` original; depois da recarga use `win
   — `colocar` cria OBJETO INTELIGENTE (como o Photoshop, desde 2026-10-07): transformar/girar sem perda, filtro vira
   filtro inteligente e vai para o PSD como objeto inteligente. Pintar/preencher direto nele pede "Rasterizar a camada?"
   (com a automação ligada vira erro): pinte numa camada nova acima, ou `ieCmd('rasterizar')` antes.
-- Fundo/faixa de cor: `preenchimento(cor, {nome})` (camada de preenchimento; com seleção ativa vira máscara) em vez de
+- Fundo/faixa de cor: `preenchimento(cor, {nome})` ou `preenchimentoDegrade(['#a', '#b'], {estilo, ang, nome})` (camada de
+  preenchimento; com seleção ativa vira máscara) em vez de
   pintar/preencher pixels — fica editável no Photoshop.
   (canto do conteúdo), `girar(ang,{escala,centro})` / `escalar(k)` (em volta do centro; texto continua editável),
   `mover(dx,dy)`, `alinhar({a,h,v,dentro,folga})` (à página ou a outra camada; `dentro:false` encosta por fora),
