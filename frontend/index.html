@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="css/editor.css">
     <link rel="stylesheet" href="css/imagem.css">
     <link rel="stylesheet" href="css/vetor.css">
+    <link rel="stylesheet" href="css/som.css">
     <link rel="icon" href="identidade/icone.ico">
 </head>
 <body>
@@ -140,6 +141,9 @@
                 </button>
 
                 <div class="menu-group">Áudio</div>
+                <button class="menu-item" data-tool="sound-kanivete" onclick="switchTool('sound-kanivete')">
+                    <span class="icon"><span class="app-logo al-sk">Sk</span></span><span class="label">Sound Kanivete</span>
+                </button>
                 <button class="menu-item" data-tool="converter-audio" onclick="switchTool('converter-audio')">
                     <span class="icon"><svg class="i"><use href="#i-music"/></svg></span><span class="label">Converter Áudio</span>
                 </button>
@@ -223,6 +227,10 @@
                         <button class="hd-card hd-vk" onclick="switchTool('vetor-kanivete')">
                             <img src="img/home/vetor.webp" alt="" decoding="async">
                             <span class="hd-rodape"><span class="app-logo al-vk">Vk</span><span class="hd-txt"><b>Vetor Kanivete</b><small>Identidade visual e arte para gráfica</small></span></span>
+                        </button>
+                        <button class="hd-card hd-sk" onclick="switchTool('sound-kanivete')">
+                            <img src="img/home/som.webp" alt="" decoding="async">
+                            <span class="hd-rodape"><span class="app-logo al-sk">Sk</span><span class="hd-txt"><b>Sound Kanivete</b><small>Áudio em faixas, limpeza, voz e volume certo</small></span></span>
                         </button>
                     </div>
 
@@ -1113,6 +1121,11 @@
                         <div class="ie-modal" id="ie-modal" hidden></div>
                         <div class="ie-pop" id="ie-pop" hidden></div>
                     </div>
+                </div>
+
+                <!-- Sound Kanivete (editor de áudio multipista): som.js, css/som.css, Functions/sound_kanivete.py -->
+                <div class="tool-page ve-page ie-page sk-page" id="page-sound-kanivete">
+                    <div class="ie sk" id="sk" tabindex="-1"></div>
                 </div>
 
                 <!-- Vetor Kanivete (estilo Illustrator): vetor-*.js, css/vetor.css, Functions/vetor_*.py -->
@@ -2096,6 +2109,7 @@
     <script src="js/vetor-novo.js"></script>
     <script src="js/vetor-fonte.js"></script>
     <script src="js/vetor-dock.js"></script>
+    <script src="js/som.js"></script>
     <script src="js/vetor-reguas.js"></script>
     <script src="js/vetor-texto.js"></script>
     <script src="js/vetor-aparencia.js"></script>

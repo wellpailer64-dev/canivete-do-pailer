@@ -1664,7 +1664,7 @@ html.barra-propria .app-container { height: calc(100vh - 26px); }
 
 
 /* ── home: as 3 ferramentas principais fixas no topo; imagem de fundo e, embaixo à esquerda, o mini logo na cor dela ── */
-.home-destaque { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 6px 0 18px; }
+.home-destaque { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 6px 0 18px; }
 .hd-card { position: relative; display: block; aspect-ratio: 16 / 9; padding: 0; border: 1px solid var(--border, rgba(255,255,255,.08)); border-radius: 14px;
     overflow: hidden; background: #0d0a08; cursor: pointer; text-align: left; color: #fff; isolation: isolate;
     transition: transform .25s var(--ease, ease), border-color .25s, box-shadow .25s; }

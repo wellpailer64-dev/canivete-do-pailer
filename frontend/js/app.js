@@ -578,6 +578,8 @@ function onArquivosSoltos(itens) {
     if (proj && tool !== 'video-cutter') { switchTool('video-cutter'); setTimeout(() => veOpenProject(proj.path), 60); return; }
     const projImg = itens.find(i => !i.pasta && /\.iknv$/i.test(i.path));
     if (projImg && tool !== 'editor-imagem') { abrirProjetoExterno(projImg.path); return; }
+    const projSom = itens.find(i => !i.pasta && /\.sknv$/i.test(i.path));
+    if (projSom && tool !== 'sound-kanivete') { abrirProjetoExterno(projSom.path); return; }
     const projVet = itens.find(i => !i.pasta && /\.aknv$/i.test(i.path));
     if (projVet && tool !== 'vetor-kanivete') { abrirProjetoExterno(projVet.path); return; }
     if (tool === 'home') return homeSugerir(itens);
@@ -587,6 +589,11 @@ function onArquivosSoltos(itens) {
 // Projeto aberto por fora (duplo clique no Explorer ou outra cópia do app): cada extensão no seu editor
 // .vknv (e o antigo .vcnvt) = editor de vídeo; .iknv = editor de imagem; .aknv = Vetor Kanivete
 function abrirProjetoExterno(path) {
+    if (/\.sknv$/i.test(path || '')) {
+        switchTool('sound-kanivete');
+        setTimeout(() => skAbrir(path).catch(e => toast(e.message, 'erro')), 80);
+        return;
+    }
     if (/\.aknv$/i.test(path || '')) {
         switchTool('vetor-kanivete');
         setTimeout(() => vkCmd('abrir', { caminho: path }, 'ui').catch(e => vkToast(e.message)), 60);
@@ -609,6 +616,11 @@ function _entregarItens(tool, itens) {
     if (tool === 'video-cutter') {
         veDropFiles(itens);   // vídeo abre o projeto; imagens viram camadas na timeline
         return;
+    }
+    if (tool === 'sound-kanivete') {   // áudios soltos na timeline do Sound Kanivete; .sknv abre o projeto
+        const proj = itens.find(i => /\.sknv$/i.test(i.path));
+        if (proj) return skAbrir(proj.path).catch(e => toast(e.message, 'erro'));
+        return skImportar(itens.filter(i => !i.pasta).map(i => i.path));
     }
     if (tool === 'audio-cutter') {
         if (item.pasta) return toast('Solte um arquivo de áudio.', 'erro');

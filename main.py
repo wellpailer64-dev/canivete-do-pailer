@@ -3285,6 +3285,55 @@ class ApiBridge:
             import traceback
             return {"success": False, "error": str(e), "trace": traceback.format_exc()[-1200:]}
 
+    # ── Sound Kanivete (Functions/sound_kanivete.py) ──
+    def sk_info(self, path):
+        from Functions import sound_kanivete
+        try:
+            return sound_kanivete.info(path)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def sk_salvar(self, proj, caminho):
+        from Functions import sound_kanivete
+        return sound_kanivete.salvar(proj, caminho)
+
+    def sk_abrir(self, caminho):
+        from Functions import sound_kanivete
+        return sound_kanivete.abrir(caminho)
+
+    def sk_exportar(self, proj, caminho, op=None):
+        from Functions import sound_kanivete
+        try:
+            return sound_kanivete.exportar(proj, caminho, op or {})
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def sk_medir(self, proj, op=None):
+        from Functions import sound_kanivete
+        try:
+            return sound_kanivete.medir_lufs(proj, op or {})
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def sk_dialogo(self, modo, tipos=None, nome=""):
+        """abrir | abrir_varios | salvar (tipos: filtros do pywebview, só letras/espaços na descrição)."""
+        if not _window:
+            return None
+        import webview
+        tipos = tuple(tipos or ("Todos (*.*)",))
+        try:
+            if modo == "salvar":
+                r = _window.create_file_dialog(webview.SAVE_DIALOG, save_filename=nome or "Sem titulo.sknv", file_types=tipos)
+            else:
+                r = _window.create_file_dialog(webview.OPEN_DIALOG, allow_multiple=modo == "abrir_varios", file_types=tipos)
+        except ValueError:
+            r = _window.create_file_dialog(webview.SAVE_DIALOG if modo == "salvar" else webview.OPEN_DIALOG, allow_multiple=modo == "abrir_varios")
+        if not r:
+            return None
+        if modo == "abrir_varios":
+            return list(r)
+        return r if isinstance(r, str) else r[0]
+
     def vk_illustrator_disponivel(self):
         from Functions import ponte_illustrator
         return ponte_illustrator.disponivel()

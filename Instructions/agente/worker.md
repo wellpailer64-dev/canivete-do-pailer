@@ -121,3 +121,8 @@ não mexe em .git, dist, build, `_credenciais.py`, nem fora de `arquivos`.
 ## Mapa do app
 Para se localizar (que ferramenta, que comando, que arquivo, que teste): `Instructions/mapa.json` (compacto) ou
 `py -3.13 tools/mapa_geral.py --busca termo`.
+
+## Cuidado: modo debug com testes que passam (2026-10-07)
+Pedir "rode os testes e diga o que falhou" no modo debug fez o Jr inventar causa e função (`processar_som`, que não
+existe) em 11 s, com os testes passando. Para rodar teste e saber o resultado, rode o teste direto; o debug é para
+traceback/log de verdade.

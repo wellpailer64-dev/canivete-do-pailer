@@ -110,6 +110,10 @@ Gerar imagem com IA (Z-Image-Turbo 6B Q4_K; com referência, FLUX.2 klein — am
 guia `Instructions/agente/plano-cena.md` (seção "Fluxo barato": biblioteca `D:\kanivete_biblioteca` com recursos/modelos/amostras, `data-cor`, `recurso:`, `--ver`, `--comparar`, `--variacoes`, `KNV.etapa`). Fazer arte pelo app (API `window.KNV`, receitas em etapas .iknv, `rodar.py`, `KNV.mapa()`/`KNV.revisar()`, técnicas):
 `Instructions/agente/design-photo-kanivete.md`.
 
+## Sound Kanivete (áudio multipista)
+Timeline de áudio, fades, LUFS, projeto `.sknv`, API `window.SKN`: `Instructions/sound-kanivete.md`; código `frontend/js/som.js` +
+`Functions/sound_kanivete.py`. Teste: `python testes/teste_som.py`.
+
 ## Remover fundo (recorte)
 GPU automática (onnxruntime-directml), pessoa → BiRefNet matting / objeto → BEN2 (YuNet decide), uma sessão por vez na
 placa; medições, qualidade e pendências (cena em duas passadas ainda não publicada) em `Instructions/agente/remover-fundo.md`.

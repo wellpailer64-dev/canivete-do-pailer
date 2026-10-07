@@ -85,6 +85,14 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - **API** (`pywebview.api.*`, 2): `escanear_cameras_videos(folder_path)`, `organizador_videos(folder_path, operadores=None, nome_projeto_premiere=None)`
 
 ### Áudio
+#### Sound Kanivete — `switchTool('sound-kanivete')`
+- **Interface**: `som.js`, `som.css`
+- **Python**: `Functions/sound_kanivete.py`
+- **Automação (agente/Jr)**: window.SKN (som.js): novo, importar, cortar, alterarClipe, exportar, estado...
+- **API** (`pywebview.api.*`, 6): `sk_info(path)`, `sk_salvar(proj, caminho)`, `sk_abrir(caminho)`, `sk_exportar(proj, caminho, op=None)`, `sk_medir(proj, op=None)`, `sk_dialogo(modo, tipos=None, nome="")`
+- **Testes**: `testes/teste_som.py`
+- **Guias**: `Instructions/sound-kanivete.md`
+
 #### Converter Áudio — `switchTool('converter-audio')`
 - **Python**: `Functions/convertermp3.py`, `Functions/audio_cutter.py`
 - **API** (`pywebview.api.*`, 4): `converter_audio(folder_path, output_format)`, `converter_audio_file(file_path, output_format)`, `converter_imagem(folder_path, output_format)`, `converter_imagem_file(file_path, output_format)`
@@ -246,6 +254,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/modo-agente.md` — Modo agente (depuração remota)
 - `Instructions/organizador-imagens.md` — Organizador de Imagens
 - `Instructions/remover-fundo.md` — Remover Fundo
+- `Instructions/sound-kanivete.md` — Sound Kanivete (Sk) — editor de áudio multipista
 - `Instructions/transcrever-audio.md` — Transcrever Áudio
 - `Instructions/vetor-kanivete.md` — Vetor Kanivete (estilo Illustrator) — estudo de caso, modelo, API e fechamento
 - `Instructions/video-converter.md` — Video Converter (GIF <-> Video)
@@ -302,6 +311,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/render_cache.py` — Cache de render em disco do Pocket Editor (como os "Preview Files" do Premiere)
 - `Functions/sincronizar.py` — Sincronizar clipes pelo áudio (como o "Sincronizar › Áudio" do Premiere): duas câmeras gravando a mesma cena
 - `Functions/snapshot_logger.py` — snapshot_logger.py — Backup/restauração para o Organizador de Vídeos
+- `Functions/sound_kanivete.py` — Sound Kanivete (Sk) — editor de áudio multipista do KANIVETE (frontend/js/som-*.js)
 - `Functions/soundboard.py` — soundboard.py — pack de efeitos sonoros do painel Soundboard do Pocket Editor
 - `Functions/transcrever_cena.py` — transcrever_cena.py
 - `Functions/transcreveraudio.py` — transcreveraudio.py
@@ -348,6 +358,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_psd_refs.py` — PSD salvo por cima (ida e volta) não pode trocar pixels entre camadas (2026-10-06: o carrossel do cliente voltou com
 - `testes/teste_psd_so.py` — Objeto inteligente criado no Photo Kanivete → objeto inteligente INCORPORADO no PSD (Functions/editor_imagem._so_novo)
 - `testes/teste_psd_texto.py` — Texto criado no Photo Kanivete → camada de texto EDITÁVEL no PSD (Functions/editor_imagem._texto_novo)
+- `testes/teste_som.py` — Sound Kanivete (som.js + Functions/sound_kanivete.py) — app em --agente=9333, mouse de verdade
 - `testes/teste_vetor.py` — Teste do Vetor Kanivete pela API real (app em --agente=9333): monta um cartão de visita pelos comandos (window.VKN),
 - `testes/teste_vetor_editor3d.py` — Teste da ponte Vetor → Editor (Cena 3D), app em --agente=9333: copo (girar) com rótulo coral, caixa (extrudar com
 - `testes/teste_vetor_paineis.py` — Painéis móveis do Vetor Kanivete (vetor-dock.js, o mecanismo do Photo) — app em --agente=9333, mouse de verdade

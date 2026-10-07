@@ -1,0 +1,41 @@
+/* Sound Kanivete (som.js) — reaproveita o visual do Photo (classes ie-*); aqui só o que é dele */
+.sk-page { padding: 0; }
+.content-area:has(#page-sound-kanivete.active) { padding: 10px; overflow: hidden; }
+.sk { display: grid; grid-template-rows: auto minmax(0, 1fr) 24px; height: 100%; background: var(--ie-fundo, #141110); position: relative; }
+.sk .ie-top { gap: 10px; }
+.sk-tbar { display: flex; align-items: center; gap: 6px; margin-left: 12px; }
+.sk-sep { width: 1px; height: 20px; background: var(--ie-linha, #2c2520); margin: 0 4px; }
+.sk-play { min-width: 34px; font-size: 13px; }
+.sk-tempo { font: 600 13px/1 ui-monospace, Consolas, monospace; color: #ffd166; min-width: 74px; text-align: center; }
+.sk-chk { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); }
+.sk-corpo { display: grid; grid-template-columns: 190px minmax(0, 1fr) 260px; min-height: 0; }
+.sk-faixas { background: #1a1512; border-right: 1px solid #2c2520; overflow: hidden; position: relative; }
+.sk-f-topo { border-bottom: 1px solid #2c2520; background: #1f1915; }
+.sk-f-lista { will-change: transform; }
+.sk-f { box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 6px 8px 6px 12px; border-bottom: 1px solid #2b231e; border-left: 3px solid var(--cor); cursor: pointer; }
+.sk-f.sel { background: #221b16; }
+.sk-f-nome { background: none; border: 1px solid transparent; color: var(--text); font: 600 12px var(--font-ui); padding: 2px 4px; border-radius: 4px; width: 100%; box-sizing: border-box; }
+.sk-f-nome:focus { border-color: #4a3b31; background: #120f0d; outline: none; }
+.sk-f-bts { display: flex; gap: 4px; }
+.sk-f-bts button { width: 24px; height: 20px; border: 1px solid #3a3029; background: #201a16; color: var(--text-2); border-radius: 4px; font: 600 11px var(--font-ui); cursor: pointer; padding: 0; }
+.sk-f-bts button.on { background: var(--cor); color: #1a120c; border-color: var(--cor); }
+.sk-f-vol { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-3); }
+.sk-f-vol input { flex: 1; min-width: 0; accent-color: var(--cor); }
+.sk-f-vol span { min-width: 46px; text-align: right; }
+.sk-tl-wrap { position: relative; min-width: 0; min-height: 0; }
+.sk-tl-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.sk-modelos { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
+.sk-props { background: #1a1512; border-left: 1px solid #2c2520; padding: 12px; overflow-y: auto; font-size: 12px; color: var(--text-2); display: flex; flex-direction: column; gap: 8px; }
+.sk-p-tit { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+.sk-p-nome { color: var(--text); font-weight: 600; word-break: break-all; }
+.sk-p-l { display: grid; grid-template-columns: 1fr 86px 26px; align-items: center; gap: 6px; }
+.sk-p-l input[type=number] { width: 100%; box-sizing: border-box; background: #120f0d; color: var(--text); border: 1px solid #3a3029; border-radius: 4px; padding: 3px 5px; }
+.sk-p-l input[type=range] { accent-color: #ffd166; }
+.sk-p-acoes { display: flex; flex-wrap: wrap; gap: 6px; }
+.sk-p-info { color: var(--text-3); line-height: 1.4; }
+.sk-status { display: flex; justify-content: space-between; }
+.sk-exp { display: flex; flex-direction: column; gap: 10px; min-width: 340px; }
+.sk-exp label { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 8px; }
+.sk .ie-inicio { position: absolute; inset: 0; }
+.al-sk { --al: #ffd166; --al-fundo: #2a2008; }   /* Sound Kanivete: dourado */
+.hd-sk { --al: #ffd166; }

@@ -1,0 +1,99 @@
+"""Sound Kanivete (som.js + Functions/sound_kanivete.py) — app em --agente=9333, mouse de verdade.
+
+    py -3.13 testes/teste_som.py
+
+Gera áudios de teste (ffmpeg), monta um podcast pela SKN (importar, cortar, fades, marcador), confere a forma de onda,
+a reprodução (agulha anda no tempo), mover/aparar com o mouse e desfazer, salvar/abrir .sknv, exportar com duração
+exata e no volume pedido (LUFS medido de novo no arquivo). Saída em D:/kanivete_testes/sound. Sai com 1 se reprovar.
+"""
+import os
+import re
+import subprocess
+import sys
+import time
+
+from playwright.sync_api import sync_playwright
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from Functions.midia import ffmpeg  # noqa: E402
+
+D = "D:/kanivete_testes/sound/"
+os.makedirs(D, exist_ok=True)
+FF = ffmpeg()
+subprocess.run([FF, "-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=220:duration=12,volume=0.6", D + "voz.wav"], check=True)
+subprocess.run([FF, "-v", "error", "-y", "-f", "lavfi", "-i", "anoisesrc=d=8:c=pink:a=0.3", "-ac", "2", D + "ruido.mp3"], check=True)
+erros = []
+
+
+def ok(c, nome, det=""):
+    print(("  ok    " if c else "  FALHOU ") + nome + (f" ({det})" if det else ""))
+    if not c:
+        erros.append(nome)
+
+
+def dur_lufs(arq):
+    o = subprocess.run([FF, "-hide_banner", "-i", arq, "-af", "ebur128", "-f", "null", "-"], capture_output=True, text=True).stderr
+    t = re.findall(r"time=(\d+):(\d+):([\d.]+)", o)[-1]
+    i = re.findall(r"I:\s+(-?[\d.]+) LUFS", o)[-1]
+    return int(t[0]) * 3600 + int(t[1]) * 60 + float(t[2]), float(i)
+
+
+with sync_playwright() as p:
+    b = None
+    for _ in range(120):
+        try:
+            b = p.chromium.connect_over_cdp("http://127.0.0.1:9333"); break
+        except Exception:
+            time.sleep(1)
+    pg = b.contexts[0].pages[0]
+    js_erros = []
+    pg.on("pageerror", lambda e: js_erros.append(str(e)))
+    pg.wait_for_function("typeof switchTool === 'function' && window.SKN", timeout=90000)
+    pg.evaluate("switchTool('sound-kanivete'); document.getElementById('app-update-banner')?.remove()")
+    pg.wait_for_timeout(400)
+    ok(pg.evaluate("!document.getElementById('sk-inicio').hidden"), "tela inicial do Sound Kanivete")
+    pg.evaluate("SKN.novo('podcast', 'Teste Sk')")
+    e = pg.evaluate("""async () => { const a = await SKN.importar('%svoz.wav'); const f = SKN.estado().faixas[2].id;
+        const b = await SKN.importar('%sruido.mp3', {faixa: f, ini: 1}); SKN.alterarClipe(b[0], {vol: 0.5, fade_in: 1.5, fade_out: 2});
+        SKN.cortar(6, a); SKN.marcador(3, 'Intro'); return SKN.estado(); }""" % (D, D))
+    v = e["faixas"][0]["clipes"]
+    ok(len(v) == 2 and v[1]["ini"] == 6 and v[1]["de"] == 6 and e["fim"] == 12, "importar e cortar na agulha (2 clipes, o 2º continua do 6 s)", str(v))
+    ok(pg.evaluate("Object.values(SK.picos).every(p => p.d.length > 500)"), "forma de onda carregada (picos)")
+    pg.evaluate("SKN.ir(0); SKN.tocar()"); pg.wait_for_timeout(1500)
+    ag = pg.evaluate("SKN.estado().agulha"); pg.evaluate("SKN.parar()")
+    ok(1.2 < ag < 1.9, "tocando: a agulha anda no tempo", f"{ag} s depois de 1,5 s")
+    # mouse: arrastar o clipe da trilha e aparar a borda direita; desfazer
+    pos = pg.evaluate("""() => { const cv = document.getElementById('sk-tl'), r = cv.getBoundingClientRect(), c = SKN.estado().faixas[2].clipes[0];
+        const X = t => r.left + (t - SK.x0) * SK.z, y = r.top + SK_REGUA + 2 * SK_H + SK_H / 2 - SK.y0; return { meio: [X(c.ini + c.dur / 2), y + 20], dir: [X(c.ini + c.dur), y + 20], z: SK.z }; }""")
+    pg.evaluate("SK.encaixe = false")
+    pg.mouse.move(*pos["meio"]); pg.mouse.down(); pg.mouse.move(pos["meio"][0] + pos["z"] * 2, pos["meio"][1], steps=8); pg.mouse.up()
+    c = pg.evaluate("SKN.estado().faixas[2].clipes[0]")
+    ok(abs(c["ini"] - 3) < 0.05, "arrastar move o clipe 2 s", str(c["ini"]))
+    pos = pg.evaluate("""() => { const cv = document.getElementById('sk-tl'), r = cv.getBoundingClientRect(), c = SKN.estado().faixas[2].clipes[0];
+        return [r.left + (c.ini + c.dur - SK.x0) * SK.z - 1, r.top + SK_REGUA + 2 * SK_H + SK_H / 2 - SK.y0 + 20]; }""")
+    pg.mouse.move(*pos); pg.mouse.down(); pg.mouse.move(pos[0] - pos_z if (pos_z := pg.evaluate("SK.z") * 3) else pos[0], pos[1], steps=8); pg.mouse.up()
+    c = pg.evaluate("SKN.estado().faixas[2].clipes[0]")
+    ok(abs(c["dur"] - 5) < 0.06, "borda direita apara 3 s (8 → 5)", str(c["dur"]))
+    pg.evaluate("SKN.desfazer(); SKN.desfazer()")
+    c = pg.evaluate("SKN.estado().faixas[2].clipes[0]")
+    ok(abs(c["ini"] - 1) < 0.01 and abs(c["dur"] - 8) < 0.01, "Ctrl+Z desfaz o aparo e o arraste", str(c))
+    pg.screenshot(path=D + "teste_som.png")
+    # salvar / abrir
+    pg.evaluate(f"async () => await SKN.salvar('{D}teste.sknv')")
+    pg.evaluate("SKN.novo('vazio')")
+    pg.evaluate(f"async () => await SKN.abrir('{D}teste.sknv')")
+    e2 = pg.evaluate("SKN.estado()")
+    ok(len(e2["faixas"]) == 4 and len(e2["faixas"][0]["clipes"]) == 2 and e2["faixas"][2]["clipes"][0]["fade_out"] == 2, "salvar e abrir o .sknv", e2["nome"])
+    # exportar
+    r = pg.evaluate(f"async () => await SKN.exportar('{D}teste_export.mp3', {{lufs: -16}})")
+    d, i = dur_lufs(r["caminho"])
+    ok(abs(d - 12) < 0.1, "exportação com a duração do projeto", f"{d:.2f} s")
+    ok(abs(i - -16) < 1.0, "exportação no volume pedido (-16 LUFS)", f"{i} LUFS")
+    r = pg.evaluate(f"async () => await SKN.exportar('{D}so_trilha.wav', {{formato: 'wav', faixas: ['{e2['faixas'][2]['id']}']}})")
+    d, _ = dur_lufs(r["caminho"])
+    ok(abs(d - 9) < 0.1, "exportar só uma faixa (termina no fim dela: 1 + 8 s)", f"{d:.2f} s")
+    ok(not js_erros, "sem erros de JavaScript", "; ".join(js_erros[:3]))
+print("RESULTADO:", "REPROVADO" if erros else "PASSOU")
+sys.exit(1 if erros else 0)
