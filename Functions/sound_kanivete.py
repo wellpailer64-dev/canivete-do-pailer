@@ -195,7 +195,8 @@ def exportar(proj, caminho, op=None):
     codec = [x.replace("{br}", str(int(op.get("kbps") or 192))) for x in FORMATOS[fmt]]
     script = os.path.join(tempfile.mkdtemp(prefix="sk_"), "fc.txt")
     open(script, "w", encoding="utf-8").write(fc)
-    cmd = [ffmpeg(), "-y", "-hide_banner", "-nostdin", *entradas, "-/filter_complex", script, "-map", rot, "-ar", str(sr), *codec, caminho]
+    canais = ["-ac", "1"] if op.get("mono") else []
+    cmd = [ffmpeg(), "-y", "-hide_banner", "-nostdin", *entradas, "-/filter_complex", script, "-map", rot, "-ar", str(sr), *canais, *codec, caminho]
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=7200, creationflags=NO_WINDOW)
     if r.returncode != 0 or not os.path.isfile(caminho):
         return {"success": False, "error": (r.stderr or "")[-600:]}

@@ -240,6 +240,10 @@
     "sk_abrir",
     "sk_exportar",
     "sk_medir",
+    "sk_processar",
+    "sk_transcrever",
+    "sk_vozes",
+    "sk_voz",
     "sk_dialogo"
    ],
    "testes": [
@@ -1089,6 +1093,31 @@
    "args": "proj, op=None",
    "modulos": [
     "sound_kanivete"
+   ]
+  },
+  "sk_processar": {
+   "args": "arq, efeito, op=None",
+   "modulos": [
+    "sound_kanivete"
+   ]
+  },
+  "sk_transcrever": {
+   "args": "proj, idioma=\"pt\", faixas=None",
+   "modulos": [
+    "legendas",
+    "sound_kanivete"
+   ]
+  },
+  "sk_vozes": {
+   "args": "",
+   "modulos": [
+    "omnivoice_tool"
+   ]
+  },
+  "sk_voz": {
+   "args": "voz_id, texto, op=None",
+   "modulos": [
+    "omnivoice_tool"
    ]
   },
   "sk_dialogo": {

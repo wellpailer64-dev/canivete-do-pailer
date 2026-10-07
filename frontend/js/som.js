@@ -335,6 +335,8 @@ function skMontar() {
             <button class="ie-btn" onclick="skImportarDialogo()" title="Importar áudio (Ctrl+I)">+ Áudio</button>
             <button class="ie-btn" onclick="skNovaFaixa()" title="Nova faixa">+ Faixa</button>
             <button class="ie-btn" onclick="skVozDialogo()" title="Gerar fala com uma voz salva (OmniVoice)">🎙 Voz IA</button>
+            <button class="ie-btn" onclick="skSonsDialogo()" title="Sons prontos (CC0) na agulha">🔊 Sons</button>
+            <button class="ie-btn" onclick="if (SK.proj) { SK.painel = SK.painel === 'texto' ? 'props' : 'texto'; skUiProps(); }" title="Transcrever e legendas">📝 Texto</button>
             <span class="sk-sep"></span>
             <button class="ie-btn sk-play" id="sk-play" onclick="SK.tocando ? skParar() : skTocar()" title="Tocar/parar (Espaço)">▶</button>
             <span class="sk-tempo" id="sk-tempo">0:00.00</span>
@@ -549,4 +551,70 @@ Object.assign(window.SKN, {
     original: id => skOriginal(id),
     vozes: () => skApi().sk_vozes(),
     voz: (vozId, texto, op) => skVoz(vozId, texto, op),
+});
+
+
+// ─────────────────────────── fase 3: texto (transcrição), sons (soundboard) ───────────────────────────
+SK.texto = null; SK.painel = 'props';
+function skLinhas(palavras, max = 42, maxS = 3.5) {   // palavras → linhas de legenda {st, en, texto}
+    const out = []; let cur = null;
+    for (const [a, b, w] of palavras) {
+        if (!cur || (cur.texto + ' ' + w).length > max || b - cur.st > maxS || /[.!?]$/.test(cur.texto)) { if (cur) out.push(cur); cur = { st: a, en: b, texto: w }; }
+        else { cur.texto += ' ' + w; cur.en = b; }
+    }
+    if (cur) out.push(cur);
+    return out;
+}
+async function skTranscrever(idioma = 'pt', faixas = null) {
+    if (!SK.proj) throw new Error('abra um projeto');
+    const r = await skTarefa(() => skApi().sk_transcrever(SK.proj, idioma, faixas));
+    SK.texto = { palavras: r.palavras, idioma };
+    SK.painel = 'texto'; skUiProps();
+    return r.palavras.length;
+}
+function skUiTexto() {
+    const el = skEl('sk-props'); if (!el) return false;
+    if (SK.painel !== 'texto') return false;
+    const P = SK.texto && SK.texto.palavras;
+    el.innerHTML = `<div class="sk-p-tit">Texto <button class="ie-btn ie-btn-mini" style="float:right" onclick="SK.painel='props';skUiProps()">×</button></div>
+        <div class="sk-p-acoes"><select id="sk-idioma"><option value="pt">Português</option><option value="multi">Outros idiomas</option></select>
+        <button class="ie-btn ie-btn-mini" id="sk-transc" ${SK.tarefa ? 'disabled' : ''}>${P ? 'Transcrever de novo' : 'Transcrever'}</button></div>
+        ${P ? `<div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" data-leg="srt">Salvar SRT</button><button class="ie-btn ie-btn-mini" data-leg="txt">Salvar TXT</button><button class="ie-btn ie-btn-mini" data-leg="vtt">VTT</button></div>
+        <div class="sk-texto notranslate">${P.map(([a, , w], i) => `<span data-t="${a}" data-i="${i}">${w.replace(/</g, '&lt;')}</span>`).join(' ')}</div>
+        <div class="sk-p-info">Clique numa palavra para levar a agulha até ela.</div>` : '<div class="sk-p-info">Transcreve a mixagem (faixas mudas ficam de fora). A primeira vez baixa o modelo de fala.</div>'}`;
+    el.querySelector('#sk-transc').onclick = () => skTranscrever(el.querySelector('#sk-idioma').value).catch(e => skToast(e.message));
+    el.querySelectorAll('[data-leg]').forEach(b => b.onclick = () => skApi().ve_salvar_legenda(skLinhas(P), b.dataset.leg, SK.proj.nome || 'audio'));
+    el.querySelector('.sk-texto')?.addEventListener('click', e => { const s = e.target.closest('[data-t]'); if (s) skIr(+s.dataset.t); });
+    return true;
+}
+(function () {   // o painel da direita mostra o texto quando pedido
+    const props = skUiProps;
+    skUiProps = function () { if (!skUiTexto()) props(); };
+})();
+async function skSonsDialogo() {
+    const r = await skApi().ve_sb_estado();
+    if (!r || !r.instalado) {
+        if (!confirm('O pack de sons (CC0, ~10 MB) ainda não foi baixado. Baixar agora?')) return;
+        await skApi().ve_sb_baixar(); skToast('Baixando os sons… abra de novo em alguns segundos'); return;
+    }
+    const sons = (r.categorias || []).flatMap(c => (c.sons || []).map(s => ({ ...s, categoria: c.nome || c.titulo || c.id || 'Sons', nome: s.nome || s.titulo || String(s.arq || '').split('/').pop() })));
+    const m = document.createElement('div'); m.className = 'ie-modal';
+    const cats = [...new Set(sons.map(s => s.categoria || s.cat || 'Sons'))];
+    m.innerHTML = `<div class="ie-dlg sk-sons"><div class="ie-dlg-tit">Sons (CC0)</div><div class="ie-dlg-corpo"><input id="sks-busca" placeholder="Buscar..." style="width:100%;box-sizing:border-box">
+        <div class="sk-sons-lista notranslate">${cats.map(c => `<div class="sk-p-tit">${c}</div>${sons.filter(s => (s.categoria || s.cat || 'Sons') === c).map(s => `<div class="sk-som" data-nome="${(s.nome || '').toLowerCase()}"><button data-ouvir="${s.url}">▶</button><span>${s.nome}</span><button data-por="${s.path || s.caminho}">Inserir</button></div>`).join('')}`).join('')}</div>
+        </div><div class="ie-dlg-rod"><button class="ie-btn" data-x>Fechar</button></div></div>`;
+    skEl('sk').appendChild(m);
+    const audio = new Audio();
+    m.onclick = async e => {
+        if (e.target === m || e.target.closest('[data-x]')) { audio.pause(); m.remove(); return; }
+        const o = e.target.closest('[data-ouvir]'); if (o) { audio.src = o.dataset.ouvir; audio.play(); return; }
+        const p = e.target.closest('[data-por]');
+        if (p) { if (!SK.proj) skNovo(); const f = SK.proj.faixas.find(x => /efeito|sons/i.test(x.nome)) || skNovaFaixa('Efeitos'); await skImportar([p.dataset.por], { faixa: f.id, ini: SK.ph }); }
+    };
+    m.querySelector('#sks-busca').oninput = e => { const q = e.target.value.toLowerCase(); m.querySelectorAll('.sk-som').forEach(s => { s.hidden = q && !s.dataset.nome.includes(q); }); };
+}
+Object.assign(window.SKN, {
+    transcrever: (idioma = 'pt', faixas = null) => skTranscrever(idioma, faixas),
+    texto: () => SK.texto && SK.texto.palavras.map(p => p[2]).join(' '),
+    legendas: () => SK.texto ? skLinhas(SK.texto.palavras) : [],
 });

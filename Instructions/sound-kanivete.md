@@ -38,6 +38,14 @@ uma voz salva da Geração de Voz (OmniVoice), entra na agulha na faixa "Voz IA"
 `skProgresso`, barra de status); um processo por vez. SKN: `limpar(id, %)`, `melhorar(id)`, `original(id)`, `vozes()`,
 `voz(vozId, texto, {faixa, ini})`. Teste: `teste_som.py` (limpar) e `--ia` (voz e melhorar).
 
+## Texto, sons e atalhos (fase 3, 2026-10-07)
+**📝 Texto**: transcreve a mixagem (faixas mudas fora) — `sk_transcrever` exporta 16 kHz mono e usa
+`legendas.transcrever_wav` (o mesmo reconhecimento das legendas do Editor, com o dicionário de nomes); palavras
+clicáveis levam a agulha; Salvar SRT/TXT/VTT (`skLinhas`: até 42 caracteres / 3,5 s por linha, quebra no ponto final;
+grava pelo `ve_salvar_legenda`). **🔊 Sons**: o soundboard CC0 do Editor (`ve_sb_estado`; baixa no 1º uso) com prévia,
+busca e Inserir na agulha (faixa "Efeitos"). **Atalhos**: Converter Áudio, Transcrever, Melhorar Áudio e Geração de Voz
+continuam (lote de arquivos, criar vozes), agrupados sob o Sk na barra lateral (`menu-sub`) e com o aviso "Também no
+Sound Kanivete" no topo de cada página. SKN: `transcrever(idioma)`, `texto()`, `legendas()`.
+
 ## Próximas fases
-3. Transcrever, soundboard e as
-ferramentas antigas como atalhos para o Sk. 4. Normalizar por clipe, compressor/EQ, cortar silêncios, ponte com o Editor.
+4. Normalizar por clipe, compressor/EQ, cortar silêncios, ponte com o Editor.

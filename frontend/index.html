@@ -144,16 +144,16 @@
                 <button class="menu-item" data-tool="sound-kanivete" onclick="switchTool('sound-kanivete')">
                     <span class="icon"><span class="app-logo al-sk">Sk</span></span><span class="label">Sound Kanivete</span>
                 </button>
-                <button class="menu-item" data-tool="converter-audio" onclick="switchTool('converter-audio')">
+                <button class="menu-item menu-sub" data-tool="converter-audio" onclick="switchTool('converter-audio')">
                     <span class="icon"><svg class="i"><use href="#i-music"/></svg></span><span class="label">Converter Áudio</span>
                 </button>
-                <button class="menu-item" data-tool="transcrever-audio" onclick="switchTool('transcrever-audio')">
+                <button class="menu-item menu-sub" data-tool="transcrever-audio" onclick="switchTool('transcrever-audio')">
                     <span class="icon"><svg class="i"><use href="#i-captions"/></svg></span><span class="label">Transcrever</span>
                 </button>
-                <button class="menu-item" data-tool="melhorar-audio" onclick="switchTool('melhorar-audio')">
+                <button class="menu-item menu-sub" data-tool="melhorar-audio" onclick="switchTool('melhorar-audio')">
                     <span class="icon"><svg class="i"><use href="#i-wand"/></svg></span><span class="label">Melhorar Áudio</span>
                 </button>
-                <button class="menu-item" data-tool="omnivoice" onclick="switchTool('omnivoice')">
+                <button class="menu-item menu-sub" data-tool="omnivoice" onclick="switchTool('omnivoice')">
                     <span class="icon"><svg class="i"><use href="#i-sparkles"/></svg></span><span class="label">Geração de Voz</span>
                 </button>
 
@@ -341,6 +341,7 @@
 
                 <!-- Converter Áudio -->
                 <div class="tool-page" id="page-converter-audio" data-drop="ambos">
+                    <div class="sk-atalho"><span class="app-logo al-sk">Sk</span><span>Também no <b>Sound Kanivete</b>: edite em faixas, limpe ruído, gere voz, transcreva e exporte no volume certo.</span><button class="btn-secondary" onclick="switchTool('sound-kanivete')">Abrir o Sk</button></div>
                     <div class="tool-head">
                         <div class="tool-icon"><svg class="i"><use href="#i-music"/></svg></div>
                         <div><h2>Converter Áudio</h2><p>Converte entre formatos e extrai o áudio de vídeos. O original é mantido.</p></div>
@@ -387,6 +388,7 @@
 
                 <!-- Melhorar Áudio -->
                 <div class="tool-page" id="page-melhorar-audio" data-drop="ambos">
+                    <div class="sk-atalho"><span class="app-logo al-sk">Sk</span><span>Também no <b>Sound Kanivete</b>: edite em faixas, limpe ruído, gere voz, transcreva e exporte no volume certo.</span><button class="btn-secondary" onclick="switchTool('sound-kanivete')">Abrir o Sk</button></div>
                     <div class="tool-head">
                         <div class="tool-icon"><svg class="i"><use href="#i-wand"/></svg></div>
                         <div><h2>Melhorar Áudio</h2><p>Deixa a voz com som de estúdio, como o Adobe Podcast. Em vídeo, só o som é trocado. O original é mantido.</p></div>
@@ -1490,6 +1492,7 @@
 
                 <!-- Transcrever -->
                 <div class="tool-page" id="page-transcrever-audio" data-drop="ambos">
+                    <div class="sk-atalho"><span class="app-logo al-sk">Sk</span><span>Também no <b>Sound Kanivete</b>: edite em faixas, limpe ruído, gere voz, transcreva e exporte no volume certo.</span><button class="btn-secondary" onclick="switchTool('sound-kanivete')">Abrir o Sk</button></div>
                     <div class="tool-head">
                         <div class="tool-icon"><svg class="i"><use href="#i-captions"/></svg></div>
                         <div><h2>Transcrever</h2><p>Transforma fala em texto com o Whisper, direto no seu PC. Também gera legenda <b>.srt</b> para Premiere e CapCut.</p></div>
@@ -1541,6 +1544,7 @@
 
                 <!-- OmniVoice -->
                 <div class="tool-page" id="page-omnivoice" data-drop="arquivo">
+                    <div class="sk-atalho"><span class="app-logo al-sk">Sk</span><span>Também no <b>Sound Kanivete</b>: edite em faixas, limpe ruído, gere voz, transcreva e exporte no volume certo.</span><button class="btn-secondary" onclick="switchTool('sound-kanivete')">Abrir o Sk</button></div>
                     <div class="tool-head">
                         <div class="tool-icon"><svg class="i"><use href="#i-sparkles"/></svg></div>
                         <div><h2>Geração de Voz</h2><p>Cria vozes salvas com uma amostra curta e sintetiza texto com o OmniVoice local.</p></div>

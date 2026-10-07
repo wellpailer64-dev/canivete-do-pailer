@@ -103,6 +103,25 @@ with sync_playwright() as p:
        "limpar ruído: arquivo novo ao lado, vale para os clipes da gravação", s)
     pg.evaluate("(id) => SKN.original(id)", c0)
     ok(pg.evaluate("(id) => skClipe(id)[0].arq", c0).endswith("voz.wav"), "voltar ao original")
+    # fase 3: transcrever (fala gerada pelo OmniVoice no --ia: "Teste do Sound Kanivete."), sons, atalhos
+    fala = D + "fala.wav"
+    if os.path.isfile(fala):
+        pg.evaluate("SKN.novo('vazio', 'Texto')")
+        pg.evaluate(f"async () => await SKN.importar('{fala}')")
+        n = pg.evaluate("async () => await SKN.transcrever('pt')")
+        txt = pg.evaluate("SKN.texto()") or ""
+        ok(n >= 3 and "teste" in txt.lower(), "transcrever a mixagem (palavras com tempo)", txt)
+        leg = pg.evaluate("SKN.legendas()")
+        ok(leg and leg[0]["st"] >= 0 and leg[-1]["en"] > leg[0]["st"], "legendas agrupadas em linhas", str(leg)[:120])
+        pg.click("#sk-props .sk-texto span[data-i='1']")
+        ok(abs(pg.evaluate("SKN.estado().agulha") - pg.evaluate("SK.texto.palavras[1][0]")) < 0.01, "clicar na palavra leva a agulha")
+    sb = pg.evaluate("async () => await skApi().ve_sb_estado()")
+    if sb.get("instalado"):
+        som = next(s for c in sb["categorias"] for s in c["sons"])
+        ids = pg.evaluate("async (p) => await SKN.importar(p, {ini: 0.5})", som["path"])
+        ok(len(ids) == 1, "som do soundboard entra na timeline", som.get("nome") or som["arq"])
+    ok(pg.evaluate("document.querySelectorAll('.sk-atalho').length") == 4 and pg.evaluate("document.querySelectorAll('.menu-item.menu-sub').length") == 4,
+       "as 4 ferramentas de áudio viraram atalhos agrupados sob o Sk")
     if "--ia" in sys.argv:
         v = pg.evaluate("async () => await SKN.vozes()")
         if v.get("vozes"):

@@ -248,14 +248,34 @@ def transcrever(clipes, total, idioma="pt", on_prog=None, stop=None):
     prog(0, "Preparando o áudio da timeline...")
     wav = os.path.join(vc._work_dir(), "transcricao.wav")
     _audio_da_timeline(clipes, float(total), wav)
+    r = _reconhecer(wav, total, chave, prog, stop)
+    vc._apagar(wav)
+    if r is None:
+        return {"success": False, "cancelled": True}
+    return {"success": True, "palavras": r, "idioma": idioma, "segundos": round(time.time() - t0, 1)}
+
+
+def _reconhecer(wav, total, chave, prog, stop=None):
+    """WAV 16 kHz mono → palavras [início, fim, texto] corrigidas pelo dicionário; None se cancelado."""
     prog(2, "Carregando o modelo...")
     modelo = _carregar(chave)
     palavras, total = [], max(0.1, float(total))
     for seg in modelo.recognize(wav):
         if stop is not None and stop.is_set():
-            return {"success": False, "cancelled": True}
+            return None
         palavras.extend(_palavras(seg))
         prog(min(99, 3 + int(seg.end / total * 96)), "Transcrevendo...")
-    vc._apagar(wav)
-    palavras = corrigir(palavras)   # dicionário de nomes (dicionario_fala.json)
-    return {"success": True, "palavras": palavras, "idioma": idioma, "segundos": round(time.time() - t0, 1)}
+    return corrigir(palavras)   # dicionário de nomes (dicionario_fala.json)
+
+
+def transcrever_wav(wav, total, idioma="pt", on_prog=None, stop=None):
+    """Transcreve um WAV 16 kHz mono já pronto (o Sound Kanivete manda a mixagem dele)."""
+    prog = on_prog or (lambda p, m: None)
+    t0 = time.time()
+    chave = "pt" if idioma == "pt" else "multi"
+    if not modelo_pronto(chave):
+        preparar_modelo(chave, lambda p, m: prog(p, m), stop)
+    r = _reconhecer(wav, total, chave, prog, stop)
+    if r is None:
+        return {"success": False, "cancelled": True}
+    return {"success": True, "palavras": r, "idioma": idioma, "segundos": round(time.time() - t0, 1)}

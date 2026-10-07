@@ -3331,6 +3331,26 @@ class ApiBridge:
         _tarefa("skProgresso", trabalho)
         return {"success": True}
 
+    def sk_transcrever(self, proj, idioma="pt", faixas=None):
+        """Mixagem (ou só as faixas pedidas) em 16 kHz mono → reconhecimento de fala (o mesmo das legendas do Editor).
+        Palavras [início, fim, texto] voltam em skProgresso({palavras})."""
+        from Functions import legendas, sound_kanivete
+
+        def trabalho(log, progresso):
+            pasta = tempfile.mkdtemp(prefix="sk_texto_")
+            wav = os.path.join(pasta, "mix.wav")
+            progresso(1, "Preparando o áudio")
+            r = sound_kanivete.exportar(proj, wav, {"formato": "wav", "sr": 16000, "mono": True, "faixas": faixas})
+            if not r.get("success"):
+                raise RuntimeError(r.get("error") or "não preparou o áudio")
+            t = legendas.transcrever_wav(wav, r["dur"], idioma, lambda p, m: progresso(p, m))
+            shutil.rmtree(pasta, ignore_errors=True)
+            if not t.get("success"):
+                raise RuntimeError("transcrição cancelada")
+            return {"palavras": t["palavras"], "efeito": "transcrever", "segundos": t["segundos"]}
+        _tarefa("skProgresso", trabalho)
+        return {"success": True}
+
     def sk_vozes(self):
         from Functions.omnivoice_tool import status
         try:
