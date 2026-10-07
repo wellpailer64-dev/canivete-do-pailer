@@ -331,6 +331,10 @@ async function ieSalvar(comoNovo = false, destinoForcado = null, refeito = false
                         trechos: (t.trechos || []).map(r => ({ a: r.a, b: r.b, ps: r.ps, cor: r.cor, negFalso: r.negFalso, itaFalso: r.itaFalso, sublinhado: r.sublinhado, tachado: r.tachado })),
                         ...Object.fromEntries(IE_TX_CHAVES.filter(k => t[k] !== undefined).map(k => [k, t[k]])) };
                 }
+                // forma criada no editor: o Python monta uma camada de forma do Photoshop (cor sólida + máscara vetorial)
+                if (L.tipo === 'forma' && L.vet && (!ida || L.ref == null) && !L.rasterizar)
+                    s.forma_ps = { cor: L.vet.cor, subs: (L.vet.subs || []).map(sb => ({ fechado: sb.fechado !== false, op: sb.op || 'somar',
+                        pts: sb.pts.map(q => ({ x: q.x, y: q.y, i: q.i || null, o: q.o || null })) })) };
             }
             if (L.m) {
                 const m = { x: L.m.x, y: L.m.y, fundo: L.m.fundo || 0, desativada: !!L.m.desativada };

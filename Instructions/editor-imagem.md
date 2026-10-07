@@ -144,10 +144,18 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   (texto, objeto inteligente, forma, efeitos e ajustes continuam editáveis no Photoshop). Mover/transformar texto,
   objeto inteligente e forma atualiza a matriz/caminhos (não rasteriza). Texto editado continua texto (conteúdo e
   estilo do começo: fonte, tamanho, cor, espaçamento, entrelinha, alinhamento). Pintar troca só os pixels.
-- Camada nova vai como camada de pixels, MENOS texto criado no editor: vira camada de texto do Photoshop (editável lá)
+- Camada nova vai como camada de pixels, MENOS texto e forma criados no editor. Texto vira camada de texto do Photoshop (editável lá)
   — `_texto_novo` em editor_imagem.py clona um molde gerado pelo próprio Photoshop (`Functions/psd_texto_modelo.py`,
   ponto e parágrafo) e troca texto, fonte/estilo (inclusive trechos com outra cor/fonte = runs), matriz e caixa; os
-  pixels são os do editor até alguém editar no Photoshop. Documento que não veio de PSD RGB é montado do zero.
+  pixels são os do editor até alguém editar no Photoshop. Forma (`L.vet`, ferramenta Forma e Caneta em modo Forma):
+  `_forma_nova` grava como o Photoshop — cor sólida (SoCo, igual byte a byte) + máscara vetorial (vmsk: pontos em
+  (y/A, x/L), alças i/o, operação excluir 0 / somar 1 / subtrair 2 / interseção 3, aberto/fechado) + a marca
+  `pixel_data_irrelevant` (sem ela o psd-tools lê preenchimento, não forma). Conferido no Photoshop redesenhando cada
+  forma a partir do vetor (retângulo arredondado, elipse, triângulo, hexágono, linha, furo, interseção, exclusão).
+  Documento que não veio de PSD RGB é montado do zero.
+- PSD novo de documento TRANSPARENTE (`_gravar_achatado`): 4 canais no cabeçalho e contagem de camadas negativa, como o
+  Photoshop. Com 3 canais ele toma o documento por opaco e, ao redesenhar uma forma que é a camada mais de baixo,
+  enche o retângulo de todas as camadas (2026-10-07).
 - Regras do EngineData que DERRUBAM o Photoshop ao abrir (2026-10-06): fonte nova tem de entrar nas DUAS listas
   (`ResourceDict` e `DocumentResources` → FontSet, o índice vale para as duas) e o `Txt ` termina em nulo.
 - Caixa de parágrafo: a 1ª linha de base fica em topo + sTypoAscender (OS/2, `asc` em Functions/fontes.py) × tamanho,
@@ -235,6 +243,8 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   Windows); `ieDesenharNitido` desenha 1:1 sem reamostrar, amplia inteiro sem suavizar e reduz em etapas (ieMipmap).
 
 ## Teste
+`py -3.13 testes/teste_psd_forma.py [--photoshop] [--sem-fundo]`: forma nova → camada de forma (6 casos de
+geometria/operação); com `--photoshop` redesenha no Photoshop e compara com o desenho esperado. Molde: `tools/ps_modelo_forma.py`.
 `py -3.13 testes/teste_psd_texto.py [--photoshop]`: texto novo → camada de texto no PSD (ponto, parágrafo, trechos,
 girado), conferido no psd-tools e, com `--photoshop`, aberto, lido e editado no Photoshop (COM; avisar o usuário antes:
 se o PSD estiver errado o Photoshop fecha com erro). Molde regerável com `tools/ps_modelo_texto.py`.

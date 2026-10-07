@@ -1307,6 +1307,53 @@ def _estilo_caractere(raiz, sd, estilo):
             _ed_set(sd, "FontCaps", E.Integer(2 if estilo.get("caixaAlta") else 1 if estilo.get("versalete") else 0))
 
 
+_OP_DEMARCADOR = {"excluir": 0, "somar": 1, "subtrair": 2, "inter": 3}   # operação do subdemarcador no PSD
+
+
+def _forma_nova(ob, vet, W, H):
+    """Forma criada no editor (L.vet = {subs, cor}) → camada de forma do Photoshop: cor sólida (SoCo) + máscara vetorial
+    (vmsk), como o Photoshop grava (conferido com uma forma feita nele: os blocos de cor saem iguais byte a byte).
+    Os pixels da camada são os desenhados pelo editor. Pontos: (y/A, x/L) do documento; i = alça de chegada, o = de saída."""
+    from psd_tools.constants import Tag
+    from psd_tools.psd.descriptor import Descriptor, DescriptorBlock, Double
+    from psd_tools.psd.tagged_blocks import TaggedBlock
+    from psd_tools.psd import vector as V
+    c = str(vet.get("cor") or "#000000").lstrip("#")
+    if len(c) == 3:
+        c = "".join(ch * 2 for ch in c)
+    rgb = [int(c[k:k + 2], 16) for k in (0, 2, 4)]
+    cor = Descriptor(classID=b"RGBC", name="\x00")
+    for k, v in zip((b"Rd  ", b"Grn ", b"Bl  "), rgb):
+        cor[k] = Double(float(v))
+    soco = DescriptorBlock(version=16, classID=b"null", name="\x00")
+    soco[b"Clr "] = cor
+
+    def pt(xy):
+        return (float(xy[1]) / H, float(xy[0]) / W)
+
+    itens = [V.PathFillRule(), V.InitialFillRule(value=0)]
+    for idx, s in enumerate(q for q in vet.get("subs") or [] if len(q.get("pts") or []) > 1):
+        fechado = s.get("fechado", True) is not False
+        nos = []
+        for p in s["pts"]:
+            a = (p["x"], p["y"])
+            i, o = p.get("i") or a, p.get("o") or a
+            # alças alinhadas (ponto suave) = nó ligado, como o Photoshop marca; senão, canto
+            ligado = p.get("i") and p.get("o") and abs((i[0] - a[0]) * (o[1] - a[1]) - (i[1] - a[1]) * (o[0] - a[0])) < 1e-3 * (
+                1 + math.hypot(i[0] - a[0], i[1] - a[1]) * math.hypot(o[0] - a[0], o[1] - a[1]))
+            cls = (V.ClosedKnotLinked if ligado else V.ClosedKnotUnlinked) if fechado else (V.OpenKnotLinked if ligado else V.OpenKnotUnlinked)
+            nos.append(cls(preceding=pt(i), anchor=pt(a), leaving=pt(o)))
+        sub = (V.ClosedPath if fechado else V.OpenPath)(items=nos, operation=_OP_DEMARCADOR.get(s.get("op") or "somar", 1), index=idx)
+        itens.append(sub)
+    if len(itens) == 2:
+        raise ValueError("forma sem demarcador")
+    vm = V.VectorMaskSetting(version=3, flags=0, path=V.Path(items=itens))
+    ob.tagged_blocks[Tag.SOLID_COLOR_SHEET_SETTING] = TaggedBlock(key=Tag.SOLID_COLOR_SHEET_SETTING, data=soco)
+    ob.tagged_blocks[Tag.VECTOR_MASK_SETTING1] = TaggedBlock(key=Tag.VECTOR_MASK_SETTING1, data=vm)
+    ob._record.flags.pixel_data_irrelevant = True   # como o Photoshop marca: os pixels são cache, quem manda é o vetor
+    return True
+
+
 _TX_CARACTERE = ("ps", "tam", "cor", "esp", "ent", "escH", "escV", "desloc", "negFalso", "itaFalso", "pos", "sublinhado",
                  "tachado", "kern", "caixaAlta", "versalete")
 _TX_PARAGRAFO = ("alin", "recuoEsq", "recuoDir", "recuo1", "espAntes", "espDepois", "hifen")
@@ -1385,6 +1432,25 @@ def _texto_novo(ob, tx):
         if not caixa:
             caixa_desc(b"bounds", min(p[0] for p in pts), min(p[1] for p in pts), max(p[0] for p in pts), max(p[1] for p in pts))
     return True
+
+
+def _gravar_achatado(psd, comp, W, H, novo=False):
+    """Imagem achatada (prévia do arquivo) = a composição feita pela página. PSD novo de documento transparente vai
+    como o Photoshop grava: 4 canais no cabeçalho e contagem de camadas negativa (a transparência do achatado no 1º
+    canal extra). Com 3 canais o Photoshop toma o documento por opaco e, ao redesenhar uma forma que é a camada mais
+    de baixo, enche o retângulo de todas as camadas (2026-10-07)."""
+    from psd_tools.api import numpy_io
+    if comp is None or comp.size != (W, H):
+        comp = Image.new("RGBA", (W, H), (255, 255, 255, 255))
+    arr = np.asarray(comp.convert("RGBA")).astype(np.float32) / 255
+    cor, alfa = arr[:, :, :3], arr[:, :, 3:4]
+    hdr = psd._record.header
+    if novo and float(alfa.min()) < 0.999 and hdr.channels == 3:
+        hdr.channels = 4
+        psd._merged_alpha = True
+    fundo_branco = cor * alfa + (1 - alfa)   # sem transparência no achatado: sobre branco, como o Photoshop
+    usar_alfa = hdr.channels > 3
+    psd._record.image_data.set_data(numpy_io.encode_image_data(psd, cor if usar_alfa else fundo_branco, alfa), hdr)
 
 
 def salvar(spec):
@@ -1505,6 +1571,16 @@ def salvar(spec):
                             if Tag.TYPE_TOOL_OBJECT_SETTING in ob.tagged_blocks:
                                 del ob.tagged_blocks[Tag.TYPE_TOOL_OBJECT_SETTING]
                             avisos.append(f"{no.get('nome')}: texto salvo como pixels ({e})")
+                    if orig is None and no.get("forma_ps"):   # forma criada no editor: vai como camada de forma
+                        try:
+                            _forma_nova(ob, no["forma_ps"], W, H)
+                        except Exception as e:
+                            logging.debug("forma nova %s: %s", no.get("nome"), e)
+                            from psd_tools.constants import Tag
+                            for t_ in (Tag.SOLID_COLOR_SHEET_SETTING, Tag.VECTOR_MASK_SETTING1):
+                                if t_ in ob.tagged_blocks:
+                                    del ob.tagged_blocks[t_]
+                            avisos.append(f"{no.get('nome')}: forma salva como pixels ({e})")
                     if orig is not None:   # rasterizada: leva efeitos, configurações e a máscara da original
                         for chave, bloco in list(orig.tagged_blocks.items()):
                             if str(chave).split(".")[-1] not in _TAGS_CONTEUDO:
@@ -1556,16 +1632,7 @@ def salvar(spec):
     psd.extend(raiz)
 
     # imagem achatada (prévia do arquivo): a composição feita pela página
-    comp = _img(arquivos, spec.get("composto"))
-    if comp is None or comp.size != (W, H):
-        comp = Image.new("RGBA", (W, H), (255, 255, 255, 255))
-    arr = np.asarray(comp).astype(np.float32) / 255
-    cor, alfa = arr[:, :, :3], arr[:, :, 3:4]
-    fundo_branco = cor * alfa + (1 - alfa)   # sem transparência no achatado: sobre branco, como o Photoshop
-    from psd_tools.api import numpy_io
-    hdr = psd._record.header
-    usar_alfa = hdr.channels > 3
-    psd._record.image_data.set_data(numpy_io.encode_image_data(psd, cor if usar_alfa else fundo_branco, alfa), hdr)
+    _gravar_achatado(psd, _img(arquivos, spec.get("composto")), W, H, novo=not ida)
     if spec.get("luz"):   # luz global (ângulo e altitude usados pelos efeitos com "Usar luz global")
         try:
             from psd_tools.constants import Resource
