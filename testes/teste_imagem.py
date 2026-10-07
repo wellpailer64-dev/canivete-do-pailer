@@ -217,6 +217,8 @@ def main():
                 J("(async () => { const L = ieTodas(IE.doc).find(L => L.texto && L.ref != null); ieEscolherFerr('texto'); await ieTextoEditar(L); document.getElementById('ie-texto-edit').value = 'TEXTO EDITADO'; document.getElementById('ie-texto-edit').dispatchEvent(new Event('input')); ieTextoEncerrar(true); })()")
                 time.sleep(0.5)
             # 9. outras ferramentas e comandos (num documento novo, para não mexer no que vai ser salvo)
+            # automação: pergunta inesperada (appConfirm) faz o passo falhar dizendo o que perguntou, em vez de travar
+            J("KNV.automacao(true, {padrao: 'erro'})")
             extra = J("""async () => {
                 const doc0 = IE.doc;
                 const d = ieNovoDoc2('extra', 400, 300, 72, 'branco');
@@ -244,16 +246,16 @@ def main():
                 IE.cor[0] = '#00ff00'; IE.op.forma.tipo = 'ret';
                 IE.arr = {p0: {x: 20, y: 20}, r: {x: 20, y: 20, w: 60, h: 40}}; IE_FERR.forma.up({}, {}, d);
                 const F = ieAtiva(d); r.forma = [F.nome, F.c.width, F.c.height, px(F, 50, 40)];
+                // a Forma cria camada de forma (vetor, como no Photoshop): pintar/carimbar/ajustar pede rasterizar antes
+                // (sem isso abria "Rasterizar a camada?" e a caixa ficava na frente dos arrastes seguintes)
+                ieRasterizar(F, d);
                 // carimbo: copia a forma para outro lugar
                 ieAtivar(F.id, d); IE.carimboFonte = {x: 50, y: 40}; IE.carimboOff = null; IE.op.carimbo.tam = 20; IE.op.carimbo.alinhado = false;
                 ieTracoIniciar({x: 250, y: 200}, {}, d, 'carimbo'); ieTracoFim();
                 r.carimbo = px(F, 250, 200);
                 // filtro desfoque e ajuste inverter (direto, sem diálogo)
                 const Rb = ieProcessarCamada(F, c => ieDesfocar(c, 4), 12, d); r.desfoque = [Rb.c.width > F.c.width];
-                // a camada é de forma: o ajuste pergunta "Rasterizar a camada?" (como o Photoshop); responde Rasterizar
-                KNV.automacao(true, {respostas: {'Rasterizar a camada?': 'Rasterizar'}});
-                try { await IE_AJUSTES.inverter(); } finally { KNV.automacao(false); }
-                r.inverter = px(ieAtiva(d), 50, 40);
+                await IE_AJUSTES.inverter(); r.inverter = px(F, 50, 40);
                 // mesclar para baixo, agrupar, desagrupar
                 const nAntes = ieTodas(d).length; await IE_CMDS.mesclarBaixo(d); r.mesclar = [nAntes, ieTodas(d).length];
                 IE_CMDS.novaCamada(d); IE_CMDS.agrupar(d); r.agrupar = ieAtiva(d).tipo; IE_CMDS.desagrupar(d); r.desagrupar = ieTodas(d).filter(L => L.tipo === 'grupo').length;
@@ -268,6 +270,7 @@ def main():
                 ieMostrarDoc(doc0);
                 return r;
             }""")
+            J("KNV.automacao(false)")
             print("  extras:", extra)
             ok(extra["balde"][:3] == [255, 0, 0], "balde")
             ok(extra["degrade"][0] < 20 and 100 < extra["degrade"][1] < 160 and extra["degrade"][2] > 235, f"degradê {extra['degrade']}")
@@ -338,7 +341,9 @@ def main():
                 textos = [l.text for l in ls if l.kind == "type"]
                 ok(any("TEXTO EDITADO" in t for t in textos), "texto do Photoshop trocado e ainda é camada de texto")
             ok(any(l.has_mask() for l in ls), "máscara salva")
-            ok(any(l.name.startswith("Olá") for l in ls), "camada de texto nova salva")
+            novos = [l for l in ls if l.name.startswith("Olá")]
+            ok(novos and novos[0].kind == "type" and "Olá Canivete" in str(novos[0].text),
+               f"texto criado no editor salvo como TEXTO editável ({[(l.kind, str(getattr(l, 'text', ''))[:20]) for l in novos]})")
             from Functions import editor_imagem as ei, psd_import as pi
             fs = ei._ler_fatias(sp)
             ok(len(fs) == 2 and fs[0]["nome"] == "topo", f"fatias no PSD salvo ({fs})")
