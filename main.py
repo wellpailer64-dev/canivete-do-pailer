@@ -3453,6 +3453,13 @@ class ApiBridge:
         from Functions import vetor_kanivete
         return vetor_kanivete.fonte_glifos(fam, estilo)
 
+    def vk_exportar_fonte(self, spec):
+        from Functions import vetor_fonte
+        try:
+            return vetor_fonte.exportar(spec)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def vk_booleana(self, op, formas):
         from Functions import vetor_kanivete
         return vetor_kanivete.booleana(op, formas)

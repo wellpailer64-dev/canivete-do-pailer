@@ -325,4 +325,15 @@ duplicar, Ctrl+D como no Illustrator, tela de início com modelos.
   `.content-area:has(#page-vetor-kanivete.active)` em vetor.css.
 - Teste `testes/teste_pranchetas.py [--debug]` (comandos + mouse de verdade; app em --agente=9333). A 1ª rodada logo
   depois de recarregar a página pode perder o mouse; rode de novo.
+- **Criar fonte própria** (`vetor-fonte.js` + `Functions/vetor_fonte.py`, estilo Fontself): Texto › Criar fonte: modelo de
+  glifos (`fonte_modelo` {caracteres, altura mm, largura mm, familia}: documento novo, uma prancheta por caractere com o
+  NOME = o caractere, 8 por linha, camada "Métricas" travada e sem imprimir com base/altura-x/versal/ascendente/
+  descendente). Prancheta = caixa do glifo: altura = 1 em (1000 un.), base a 80% (asc 800, desc −200, versal 700,
+  x 500), largura = avanço (alças da ferramenta Prancheta). Texto › Criar fonte: exportar .otf (`exportar_fonte`
+  {familia, estilo, caminho, instalar}): pinturas pela Aparência (`vkApPronto`), branco por cima RECORTA (furo), traço é
+  contornado, texto vira contorno; no Python união/diferença no skia-pathops + simplify(fix_winding, anti-horário) →
+  CFF pelo fontTools FontBuilder (espaço = 250 se não desenhado, .notdef caixa). Registra a fonte no documento
+  (`doc.fontes` + `vk_registrar_fontes`: já vale nos textos e no empacotar) e, se pedido, instala para o usuário
+  (pasta de fontes do perfil + HKCU + AddFontResource + WM_FONTCHANGE). Teste `testes/teste_fonte.py` (sem instalar).
+  Falta: kerning/pares, ligaduras, linhas de métricas acompanharem a prancheta redimensionada, TTF/variável.
 - Pendente (já falhava antes): `teste_vetor.py` "cena: cor da paleta em CMYK e trecho colorido do <span>".
