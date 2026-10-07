@@ -18,10 +18,22 @@ function vkSvgObjs(objs, r) {   // SVG só com os objetos (troca as camadas por 
 (() => {
     const api = () => vkApi();
     const prIds = a => a.pranchetas ? [].concat(a.pranchetas).map(n => (VK.doc.pranchetas.find(p => p.id === n || p.nome === n) || VK.doc.pranchetas[+n - 1] || {}).id).filter(Boolean) : null;
-    // exportar_ai: caminho (.ai), pranchetas (nomes/ids; padrão todas), separadas (padrão true: um .ai por prancheta)
+    // exportar_ai: caminho (.ai), modo 'auto' (padrão: nativo se o Illustrator estiver instalado) | 'illustrator' | 'pdf';
+    // abrir (nativo: deixa aberto no Illustrator). Nativo (Functions/ponte_illustrator.py): o Illustrator monta e salva o
+    // .ai com TODAS as pranchetas, camadas, texto editável, Pantone, degradês e símbolos. Modo pdf: .ai compatível (PDF +
+    // .aknv anexado) com pranchetas (nomes/ids) e separadas (padrão true: um .ai por prancheta — o Illustrator só abre a
+    // 1ª página de um PDF como vetor)
     vkRegistrar('exportar_ai', 'salvar como .ai', async a => {
         const caminho = a.caminho || await api().vk_dialogo('salvar', ['Illustrator (*.ai)'], (VK.doc.nome || 'arte') + '.ai');
         if (!caminho) return { cancelado: true };
+        const modo = a.modo || 'auto';
+        if (modo === 'illustrator' || (modo === 'auto' && await api().vk_illustrator_disponivel())) {
+            await vkGeosProntas(); vkCarregando(true, 'Montando o .ai no Illustrator...');
+            let r; try { r = await api().vk_exportar_ai_nativo(await vkDocPy(), caminho, { abrir: !!a.abrir }); } finally { vkCarregando(false); }
+            VK._antes = null; if (!r || !r.success) throw new Error((r && r.error) || 'o Illustrator não gerou o .ai');
+            vkToast(`.ai nativo: ${r.pranchetas} prancheta(s), ${r.camadas} camada(s)${r.incorporados_pdf ? ` — ${r.incorporados_pdf} objeto(s) com efeito foram como arte incorporada` : ''}`);
+            return { arquivos: [r.arquivo], nativo: true, pranchetas: r.pranchetas, camadas: r.camadas, nativos: r.nativos, incorporados_pdf: r.incorporados_pdf, avisos: r.avisos };
+        }
         await vkGeosProntas(); vkCarregando(true, 'Gerando .ai...');
         let r; try { r = await api().vk_exportar_ai(await vkDocPy(), vkClone(VK.doc), caminho, { pranchetas: prIds(a), separadas: a.separadas !== false, perfil: VK.doc.perfil, titulo: VK.doc.nome, padrao: VK.doc.destino === 'tela' ? 'rgb' : 'cmyk' }); }
         finally { vkCarregando(false); }
@@ -91,6 +103,15 @@ function vkAtivosDialogo() {
 (() => {
     const m = VK_MENUS.find(x => x[0] === 'Arquivo'); if (!m) return;
     const i = m[1].findIndex(x => Array.isArray(x) && /SVG/i.test(x[0]));
-    m[1].splice(i >= 0 ? i + 1 : m[1].length, 0, ['Salvar como .ai (Illustrator)…', '', () => vkCmdUi('exportar_ai', {})], ['Exportar EPS…', '', () => vkCmdUi('exportar_eps', {})],
+    m[1].splice(i >= 0 ? i + 1 : m[1].length, 0, ['Salvar como .ai (Illustrator)…', '', () => vkCmdUi('exportar_ai', {})],
+        ['Abrir no Illustrator', '', () => vkAbrirNoIllustrator()], ['Exportar EPS…', '', () => vkCmdUi('exportar_eps', {})],
         ['Exportar ativos para telas…', 'Alt+Shift+Ctrl+E', () => vkAtivosDialogo()]);
 })();
+// Arquivo › Abrir no Illustrator: .ai nativo ao lado do documento (ou na pasta temporária) e deixa aberto lá
+async function vkAbrirNoIllustrator() {
+    if (!VK.doc) return;
+    if (!(await vkApi().vk_illustrator_disponivel())) return vkToast('Illustrator não encontrado neste computador');
+    const base = VK.path ? VK.path.replace(/\.[^.\/]+$/, '') : null;
+    const caminho = base ? base + '.ai' : await vkApi().vk_dialogo('salvar', ['Illustrator (*.ai)'], (VK.doc.nome || 'arte') + '.ai');
+    if (caminho) await vkCmdUi('exportar_ai', { caminho, modo: 'illustrator', abrir: true });
+}

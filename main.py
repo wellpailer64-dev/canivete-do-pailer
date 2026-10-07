@@ -3296,6 +3296,18 @@ class ApiBridge:
             import traceback
             return {"success": False, "error": str(e), "trace": traceback.format_exc()[-1200:]}
 
+    def vk_illustrator_disponivel(self):
+        from Functions import ponte_illustrator
+        return ponte_illustrator.disponivel()
+
+    def vk_exportar_ai_nativo(self, doc_py, path, opcoes=None):
+        from Functions import ponte_illustrator
+        try:
+            return ponte_illustrator.exportar(doc_py, path, opcoes or {})
+        except Exception as e:
+            import traceback
+            return {"success": False, "error": str(e), "trace": traceback.format_exc()[-1200:]}
+
     def vk_exportar_eps(self, doc_py, path, opcoes):
         from Functions import vetor_saida
         try:

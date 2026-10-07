@@ -430,8 +430,10 @@ class _PDF:
                 elif op == "gs":
                     eg = ((res or {}).get("/ExtGState") or {}).get(o[0])
                     if eg is not None:
-                        if "/ca" in eg: gs["ca"] = float(eg["/ca"])
-                        if "/CA" in eg: gs["CA"] = float(eg["/CA"])
+                        # dentro de um Form (grupo de transparência) a opacidade de fora multiplica a de dentro: o Illustrator
+                        # grava "objeto 50%" como /GS(ca 0,5) + Do de um form que zera para 1 lá dentro
+                        if "/ca" in eg: gs["ca"] = float(eg["/ca"]) * gs.get("ca_fora", 1)
+                        if "/CA" in eg: gs["CA"] = float(eg["/CA"]) * gs.get("CA_fora", 1)
                         if "/BM" in eg:
                             b = eg["/BM"]; b = b[0] if isinstance(b, pikepdf.Array) else b
                             gs["bm"] = bm_map.get(str(b), "normal")
@@ -455,6 +457,8 @@ class _PDF:
                     if st == "/Form":
                         sv = dict(gs)
                         gs["ctm"] = mmul([float(v) for v in xo.get("/Matrix", [1, 0, 0, 1, 0, 0])], gs["ctm"])
+                        if "/Group" in xo:   # grupo de transparência: a opacidade de fora vale para o grupo inteiro
+                            gs["ca_fora"], gs["CA_fora"] = gs["ca"], gs["CA"]
                         self._stream(xo, xo.get("/Resources", res), gs, prof + 1)
                         gs = sv
                     elif st == "/Image":
@@ -490,7 +494,7 @@ class _PDF:
                     if op in ("'", '"'):
                         tlm = mmul([1, 0, 0, 1, 0, -tl], tlm); tm = tlm
                     x, y = mpt(mmul(tm, gs["ctm"]), 0, 0)
-                    self.textos.append((x, y, gs["fill"], gs["op"]))
+                    self.textos.append((x, y, gs["fill"], gs["op"], self.camada_pilha[-1]))
             except Exception as e:
                 self.rel["erros"].append(f"{op}: {str(e)[:80]}")
 
@@ -709,6 +713,45 @@ def _ai_privado(pdf, limite=16 << 20):
         return None
 
 
+def _ai_pranchetas(pdf):
+    """Posições das pranchetas do .ai nativo (ArtboardArray: PositionPoint1 = canto de cima à esquerda, 2 = de baixo à
+    direita, y para cima) → [(x, y, w, h)] em pt do Vetor (y para baixo), na ordem das páginas; None se não achar."""
+    d = _ai_privado(pdf)
+    if not d:
+        return None
+    num = rb"(-?[\d.]+(?:e-?\d+)?)"
+    sep = rb"\s*(?:%_)?\s*"
+    pts = re.findall(num + rb" " + num + rb" /RealPointRelToROrigin" + sep + rb"\(PositionPoint2\) ," + sep + num + rb" " + num + rb" /RealPointRelToROrigin" + sep + rb"\(PositionPoint1\)", d)
+    out = []
+    for x2, y2, x1, y1 in pts:
+        x1, y1, x2, y2 = float(x1), float(y1), float(x2), float(y2)
+        out.append((x1, -y1, abs(x2 - x1), abs(y1 - y2)))
+    return out or None
+
+
+def _ordem_camadas(pdf, doc):
+    """Camadas na ordem do Illustrator (/OCProperties /D /Order: de cima para baixo) — a ordem em que aparecem no conteúdo
+    não serve (um texto pode puxar a camada de cima para antes)."""
+    try:
+        oc = pdf.Root.get("/OCProperties")
+        nomes = []
+
+        def anda(a):
+            for x in a:
+                if isinstance(x, pikepdf.Array):
+                    anda(x)
+                elif isinstance(x, pikepdf.Dictionary) and "/Name" in x:
+                    nomes.append(str(x["/Name"]))
+        import pikepdf
+        anda(oc["/D"]["/Order"])
+    except Exception:
+        return
+    if not nomes:
+        return
+    pos = {n: i for i, n in enumerate(reversed(nomes))}   # 0 = a de baixo
+    doc["camadas"].sort(key=lambda c: pos.get(c["nome"], -1))
+
+
 def _ai_nativo(pdf, doc, rel, ids):
     """Do .ai nativo: nomes das pranchetas e das cores especiais (viram amostras, como no painel do Illustrator)."""
     d = _ai_privado(pdf)
@@ -750,12 +793,16 @@ def importar_pdf(caminho):
     embutidas = _fontes_embutidas(fz, doc, rel)
     x_ab = 0
     faltando = set()
+    pos_ai = _ai_pranchetas(pdf)   # .ai nativo: cada página no lugar da prancheta no Illustrator (embaixo, ao lado...)
+    if pos_ai and len(pos_ai) != len(pdf.pages):
+        pos_ai = None
     for i, page in enumerate(pdf.pages):
         caixa = [float(v) for v in (page.obj.get("/TrimBox") or page.obj.get("/CropBox") or page.obj.get("/MediaBox"))]
         x0, y0, x1, y1 = min(caixa[0], caixa[2]), min(caixa[1], caixa[3]), max(caixa[0], caixa[2]), max(caixa[1], caixa[3])
         w, h = x1 - x0, y1 - y0
-        doc["pranchetas"].append({"id": ids("p"), "nome": f"Prancheta {i + 1}", "x": x_ab, "y": 0, "w": round(w, 3), "h": round(h, 3)})
-        F = [1, 0, 0, -1, x_ab - x0, y1]
+        X, Y = (pos_ai[i][0], pos_ai[i][1]) if pos_ai else (x_ab, 0)
+        doc["pranchetas"].append({"id": ids("p"), "nome": f"Prancheta {i + 1}", "x": round(X, 3), "y": round(Y, 3), "w": round(w, 3), "h": round(h, 3)})
+        F = [1, 0, 0, -1, X - x0, Y + y1]
         rot = int(page.obj.get("/Rotate", 0)) % 360
         if rot:
             rel["pagina_girada"] += 1
@@ -776,10 +823,12 @@ def importar_pdf(caminho):
                     p = fitz.Point(ox, oy) * inv
                     X, Y = mpt(F, p.x, p.y)
                     dx, dy = ln.get("dir", (1, 0))
-                    cor = None
-                    if leitor.textos:
+                    cor, cam = None, txt_cam
+                    if leitor.textos:   # o operador de texto mais perto dá a cor e a CAMADA (antes todo texto ia para a 1ª)
                         cand = min(leitor.textos, key=lambda q: (q[0] - X) ** 2 + (q[1] - Y) ** 2)
-                        if (cand[0] - X) ** 2 + (cand[1] - Y) ** 2 < (sp["size"] * 3) ** 2: cor = cand[2]
+                        if (cand[0] - X) ** 2 + (cand[1] - Y) ** 2 < (sp["size"] * 3) ** 2:
+                            cor = cand[2]
+                            if len(cand) > 4 and cand[4]: cam = leitor._camada(cand[4])
                     if not cor:
                         c = sp.get("color", 0); cor = {"k": "rgb", "v": [(c >> 16) & 255, (c >> 8) & 255, c & 255]}
                         if cor["v"] == [0, 0, 0]: cor = {"k": "cmyk", "v": [0, 0, 0, 100]}
@@ -787,12 +836,13 @@ def importar_pdf(caminho):
                     if not ok: faltando.add(sp.get("font"))
                     ang = math.atan2(dy, dx)
                     cs, sn = math.cos(ang), math.sin(ang)
-                    txt_cam.append({"id": ids(), "tipo": "texto", "conteudo": t, "fam": fam, "estilo": estilo, "tam": round(sp["size"], 3),
+                    cam.append({"id": ids(), "tipo": "texto", "conteudo": t, "fam": fam, "estilo": estilo, "tam": round(sp["size"], 3),
                                     "entrelinha": None, "track": 0, "alin": "esq", "caixa": None,
                                     "m": [round(cs, 6), round(sn, 6), round(-sn, 6), round(cs, 6), round(X, 3), round(Y, 3)],
                                     "preench": cor, "traco": None, **({"fonte_original": sp.get("font")} if not ok else {})})
         x_ab += w + GAP
     _ai_nativo(pdf, doc, rel, ids)
+    _ordem_camadas(pdf, doc)
     for c in doc["camadas"]:
         c["itens"] = _limpar_clips(c["itens"])
     doc["camadas"] = [c for c in doc["camadas"] if c["itens"]] or [{"id": ids("c"), "nome": "Camada 1", "visivel": True, "trava": False, "itens": []}]
@@ -810,6 +860,13 @@ def importar_pdf(caminho):
     for k, txt in nomes.items():
         if rel[k]: relatorio.append(f"{rel[k]}× {txt}")
     if rel["erros"]: relatorio.append(f"{len(rel['erros'])} operações não lidas (ex.: {rel['erros'][0]})")
+    if caminho.lower().endswith(".ai") and not texto_ai:   # Illustrator aberto: texto de área/trechos nativos no lugar das linhas do PDF
+        try:
+            from Functions import ponte_illustrator
+            if ponte_illustrator.aberto():
+                ponte_illustrator.aplicar_textos(doc, caminho, relatorio)
+        except Exception as e:
+            relatorio.append(f"Textos pelo Illustrator: {str(e)[:120]}")
     return {"success": True, "doc": doc, "relatorio": relatorio}
 
 

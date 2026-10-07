@@ -572,7 +572,7 @@ with sync_playwright() as p:
     print(".ai, .eps, ativos, pincéis, perspectiva, marionete, contorno de texto, colunas, fonte variável, faca, pintura dinâmica, chanfro")
     C("novo", {"nome": "Rodada 4", "larg": 300, "alt": 200, "pranchetas": 2})
     C("texto", {"conteudo": "Maré", "x": 10, "y": 30, "fonte": "Arial", "estilo": "Bold", "tamanho": 30, "preench": "C100 M55 Y35 K45", "nome": "tt"})
-    ai_ = C("exportar_ai", {"caminho": os.path.join(SAI, "r4.ai")})["arquivos"]
+    ai_ = C("exportar_ai", {"caminho": os.path.join(SAI, "r4.ai"), "modo": "pdf"})["arquivos"]
     ok(len(ai_) == 2 and all(os.path.isfile(x) for x in ai_), f".ai: um arquivo por prancheta ({[os.path.basename(x) for x in ai_]})")
     n0 = pg.evaluate("vkTodos().length"); r_ = C("abrir", {"caminho": ai_[0]})
     ok(pg.evaluate("vkTodos().length") == n0 and "fidelidade" in str(r_.get("relatorio")), ".ai do Vetor reabre pelo .aknv anexado (fidelidade total)")

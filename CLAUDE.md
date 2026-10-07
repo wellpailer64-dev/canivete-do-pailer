@@ -122,6 +122,8 @@ ler o documento com `VKN.mapa()`, conferir com `VKN.fechamento()`. Worker: `"app
 (rodar antes de release quando mexer no Vetor).
 Pranchetas (ordem 4 por linha/vertical, duplicar, Alt+arrastar, alças), Novo documento com modelos e Criar fonte (.otf de
 glifos em pranchetas): §14 do guia; `testes/teste_pranchetas.py`, `testes/teste_fonte.py`.
+Illustrator ida e volta (.ai NATIVO montado no Illustrator instalado; volta com pranchetas/camadas/texto de área): §15,
+`Functions/ponte_illustrator.py`, `testes/teste_illustrator.py`.
 
 ## Build local
 - `build.bat` apaga `dist/` inteiro, onde ficam os modelos do usuário (`modelos_ia/`, `models/`, ~8 GB).

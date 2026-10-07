@@ -337,3 +337,28 @@ duplicar, Ctrl+D como no Illustrator, tela de início com modelos.
   (pasta de fontes do perfil + HKCU + AddFontResource + WM_FONTCHANGE). Teste `testes/teste_fonte.py` (sem instalar).
   Falta: kerning/pares, ligaduras, linhas de métricas acompanharem a prancheta redimensionada, TTF/variável.
 - Pendente (já falhava antes): `teste_vetor.py` "cena: cor da paleta em CMYK e trecho colorido do <span>".
+
+## 15. Compatibilidade com o Illustrator — ida e volta (2026-10-07)
+Pedido: "passar tudo sem quebrar nada, abrir normalmente nos 2". Testado no Illustrator 30.8 por COM/ExtendScript.
+**Achados**: o .ai "compatível" (PDF + .aknv anexado) abre no Illustrator só com a 1ª PÁGINA como vetor — pedir todas
+(`pageRangeToOpen`) importa cada página como IMAGEM; as camadas viravam "Layer 1"; o texto chegava uma letra por objeto
+(PDF glifo a glifo). O Illustrator descarta o anexo ao salvar (não há risco de reabrir versão velha).
+**Ida — `.ai` nativo** (`Functions/ponte_illustrator.py`, `exportar_ai` modo auto = nativo se o Illustrator estiver
+instalado; `modo:'pdf'` = o antigo; Arquivo › Abrir no Illustrator): o Vetor manda o `vkDocPy()` e um JSX monta o
+documento no próprio Illustrator e salva (compatível com PDF): pranchetas (nome/posição/tamanho), camadas (nome, ordem,
+visível, travada, imprime), caminhos e compostos (par-ímpar), CMYK/RGB/Pantone (tinta), degradê linear/radial (origem,
+ângulo, comprimento), traço (pontas, cantos, tracejado), opacidade, mesclagem, sobreimpressão, grupos e máscaras, texto de
+ponto e de ÁREA editável (fonte pelo nome PostScript, corpo, entrelinha, tracking, alinhamento, trechos), imagens
+incorporadas, símbolos (definição + instâncias). O que não tem par (efeitos vivos, Aparência, malha, padrão, texto em
+caminho/encadeado, 3D, pincel) vai como PDF vetorial daquele objeto incorporado no lugar. Dados em ASCII (`\uXXXX`):
+o `DoJavaScriptFile` lê o .jsx na página de código do sistema; a resposta pelo COM também volta escapada.
+**Volta** (`vetor_importar.py`): pranchetas na posição do Illustrator (`ArtboardArray` → PositionPoint1/2 dos dados
+privados; antes enfileirava), camadas na ordem de `/OCProperties/D/Order` (antes a ordem de aparição), texto na camada
+do operador mais próximo (antes ia tudo para a 1ª), opacidade de objeto gravada como `/GS ca + Do` de form multiplica a de
+dentro (o círculo 50% voltava opaco). Com o Illustrator ABERTO (não abre sozinho: `aberto()`), os textos vêm dele
+(`aplicar_textos`): texto de área inteiro com parágrafos, trechos (fonte/cor/corpo/tracking), alinhamento e entrelinha,
+substituindo as linhas do PDF dentro da caixa de cada texto nativo.
+Fora do Illustrator a ida usa `pywin32` (requirements + hiddenimports). Teste `testes/teste_illustrator.py` (pula sem o
+Illustrator; IDV de 5 pranchetas ida e .ai criado no Illustrator volta, compara PNG prancheta a prancheta, diferença ≤ 3,3).
+Pendente: símbolos na volta viram grupos; efeitos vivos na ida vão como arte incorporada (não editáveis como efeito);
+texto em caminho na volta fica o do PDF.

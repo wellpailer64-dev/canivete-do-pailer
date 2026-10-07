@@ -132,15 +132,42 @@ class _Escritor:
         texto = str(spec.get("conteudo") or "")
         m = o.get("m") or [1, 0, 0, 1, 0, 0]
         out, cor_atual = ["q"] + self.estilo_ops(o) + [" ".join(_f(x) for x in m) + " cm"], None
+        # letras da mesma linha (mesma fonte, tamanho, cor e base) num BT só com TJ e os ajustes de posição: o Illustrator
+        # abre como UMA linha de texto editável (glifo a glifo ele criava um texto por letra)
+        run = None
+
+        def fecha():
+            if run:
+                partes = []
+                for hx, aj in run["it"]:
+                    if abs(aj) > 0.5:
+                        partes.append(_f(round(aj, 2)))
+                    partes.append(f"<{hx}>")
+                out.append(f"BT /{run['fo']['nome']} 1 Tf {' '.join(_f(x) for x in run['T'])} Tm [{' '.join(partes)}] TJ ET")
         for g in geo["glifos"]:
             F = g["F"]; fo = self._fonte_pdf(F)
             gid = F["tt"].getGlyphID(g["nome"])
             ch = g.get("uni") or (texto[g["ci"]] if g["ci"] < len(texto) else "")   # hífen da hifenização = "-"
             fo["gids"].setdefault(gid, ch)
             cor = g["cor"][0] or pr
-            if cor != cor_atual: out.append(self.cor_op(cor)); cor_atual = cor
+            if cor != cor_atual:
+                fecha(); run = None
+                out.append(self.cor_op(cor)); cor_atual = cor
             T = mmul([F["upem"] * g["sx"], 0, 0, -F["upem"] * g["sy"], 0, 0], g["M"])
-            out.append(f"BT /{fo['nome']} 1 Tf {' '.join(_f(x) for x in T)} Tm <{gid:04X}> Tj ET")
+            try:
+                adv = F["tt"]["hmtx"][g["nome"]][0] / F["upem"]
+            except Exception:
+                adv = 0
+            if run and run["fo"] is fo and all(abs(T[i] - run["T"][i]) < 1e-6 for i in range(4)):
+                a, b, c, d = run["T"][:4]; det = a * d - b * c
+                dx, dy = T[4] - run["T"][4], T[5] - run["T"][5]
+                tx, ty = (dx * d - dy * c) / det, (-dx * b + dy * a) / det
+                if abs(ty) < 1e-3 and tx > run["x"] - 2:
+                    run["it"].append((f"{gid:04X}", -(tx - run["x"]) * 1000)); run["x"] = tx + adv
+                    continue
+            fecha()
+            run = {"fo": fo, "T": T, "it": [(f"{gid:04X}", 0)], "x": adv}
+        fecha()
         return out + ["Q"]
 
     def finalizar_fontes(self):
