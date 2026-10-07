@@ -93,7 +93,8 @@ async function skUiRecuperar() {
     const el = skEl('sk-recuperar'); if (!el || SK.proj || !skApi()) return;
     const r = await skApi().sk_auto('lista').catch(() => null);
     const l = (r && r.itens) || [];
-    el.innerHTML = l.length ? `<div class="ie-recentes-tit">Recuperar (salvo automaticamente)</div>${l.slice(0, 5).map(a => `<div class="sk-recup"><button class="ie-recente notranslate" data-recup="${skEsc(a.id)}">${skEsc(a.nome || 'Sem título')} · ${new Date(a.quando * 1000).toLocaleString()}</button><button class="ie-btn ie-btn-mini" data-descarta="${skEsc(a.id)}" title="Descartar">×</button></div>`).join('')}` : '';
+    const box = skEl('sk-recuperar-box'); if (box) box.hidden = !l.length;
+    el.innerHTML = l.slice(0, 6).map(a => `<span class="sk-recup"><button class="sk-start-auto-item notranslate" data-recup="${skEsc(a.id)}"><svg class="i"><use href="#i-save"/></svg>${skEsc(a.nome || 'Sem título')} <span>${new Date(a.quando * 1000).toLocaleString()}</span></button><button class="ie-dock-btn" data-descarta="${skEsc(a.id)}" title="Descartar">×</button></span>`).join('');
     el.onclick = async e => {
         const d = e.target.closest('[data-descarta]'); if (d) { await skApi().sk_auto('apagar', null, null, d.dataset.descarta); skUiRecuperar(); return; }
         const b = e.target.closest('[data-recup]'); if (b) await skRecuperar(b.dataset.recup);

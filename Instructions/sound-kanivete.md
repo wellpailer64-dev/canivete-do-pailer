@@ -176,6 +176,13 @@ Sound Kanivete" no topo de cada página. SKN: `transcrever(idioma)`, `texto()`, 
   "★" em Começar com). SKN: `selecionarPalavras`, `apagarPalavras`, `tirarVicios`, `exportarStems`, `salvarModelo`,
   `novoDoModelo`, `modelos`, `tts`, `conversa(roteiro)`, `personagens`, `darVoz`, `bancoVozes`, `desenharVoz`.
 
+## Tela inicial (padrão do Editor Kanivete)
+`#sk-inicio.sk-start` abaixo do cabeçalho (`--sk-top`): cartão com imagem (img/home/som.webp, mesma máscara e
+degradê do lobby do Editor), "Comece seu áudio", **Novo projeto** (`skNovoProjeto` → projeto vazio aberto direto),
+Importar / Gravar (projeto novo + painel Gravar) / Abrir; "Começar com um modelo" em cartões (+ modelos ★ do usuário);
+"Projetos recentes" em cartões (`skUiRecentes`, localStorage `sk-recentes` = [{path, quando}]; Limpar lista);
+"Recuperar (salvo automaticamente)" discreto embaixo, só quando há cópia.
+
 ## Atalhos e navegação (iguais ao Editor de vídeo onde existem)
 Espaço tocar/parar · S ou E cortar na agulha (selecionado; sem seleção, todas as faixas) · D ou Del apagar (clipe ou
 intervalo; Shift+Del apaga e puxa) · Q apaga do corte anterior até a agulha e W da agulha até o próximo corte, em todas as

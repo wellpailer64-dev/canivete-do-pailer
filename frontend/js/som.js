@@ -92,7 +92,7 @@ async function skAbrir(caminho) {
     skRecente(caminho); skParar(); skUi(); skEnquadrar();
     return true;
 }
-function skRecente(c) { try { const l = JSON.parse(localStorage.getItem('sk-recentes') || '[]').filter(x => x !== c); l.unshift(c); localStorage.setItem('sk-recentes', JSON.stringify(l.slice(0, 8))); } catch (e) { /* sem storage */ } }
+function skRecente(c) { try { const l = JSON.parse(localStorage.getItem('sk-recentes') || '[]').filter(x => (x.path || x) !== c); l.unshift({ path: c, quando: Date.now() }); localStorage.setItem('sk-recentes', JSON.stringify(l.slice(0, 12))); } catch (e) { /* sem storage */ } }
 
 // ── edição ──
 function skCortar(t = SK.ph, ids = null) {   // corta os clipes sob a agulha (os selecionados, ou todos)

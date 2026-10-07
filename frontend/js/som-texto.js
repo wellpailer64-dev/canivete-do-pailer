@@ -145,7 +145,8 @@ function skUiModelosInicio() {
     box.querySelectorAll('.sk-modelo-u').forEach(b => b.remove());
     for (const n of Object.keys(skModelosUsuario())) {
         const s = document.createElement('span'); s.className = 'sk-modelo-u';
-        s.innerHTML = `<button class="ie-btn notranslate" data-mu="${skEsc(n)}">★ ${skEsc(n)}</button><button class="ie-dock-btn" data-mu-x="${skEsc(n)}" title="Apagar modelo">×</button>`;
+        const m = skModelosUsuario()[n];
+        s.innerHTML = `<button class="sk-start-modelo notranslate" data-mu="${skEsc(n)}"><b>★ ${skEsc(n)}</b><small>${skEsc((m.faixas || []).map(f => f.nome).join(', '))}</small></button><button class="ie-dock-btn" data-mu-x="${skEsc(n)}" title="Apagar modelo">×</button>`;
         box.appendChild(s);
     }
     box.onclick = e => { const a = e.target.closest('[data-mu]'), x = e.target.closest('[data-mu-x]'); if (x) skApagarModelo(x.dataset.muX); else if (a) skNovoDoModelo(a.dataset.mu); };

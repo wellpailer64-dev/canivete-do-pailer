@@ -5,6 +5,23 @@
 // Núcleo em som.js, reprodução em som-motor.js.
 // =========================================================
 SK.midia = [];
+const SK_INICIO_MODELOS = [['podcast', 'Podcast', '2 vozes, trilha e efeitos'], ['narracao', 'Narração', 'voz e trilha'], ['musica', 'Música com voz', 'voz, instrumental e backing'],
+    ['limpar', 'Limpar gravação', 'uma faixa para tratar'], ['vazio', 'Projeto vazio', 'uma faixa']];
+function skNovoProjeto() { skNovo('vazio', 'Sem título'); }
+function skRecentesLista() {   // [{path, quando}] (as versões antigas guardavam só o caminho)
+    let l = []; try { l = JSON.parse(localStorage.getItem('sk-recentes') || '[]'); } catch (e) { /* sem storage */ }
+    return l.map(x => typeof x === 'string' ? { path: x, quando: null } : x).filter(x => x && x.path);
+}
+function skRecentesLimpar() { try { localStorage.removeItem('sk-recentes'); } catch (e) { /* sem storage */ } skUiRecentes(); }
+function skUiRecentes() {
+    const box = skEl('sk-recentes'); if (!box) return;
+    const l = skRecentesLista();
+    if (!l.length) { box.innerHTML = '<div class="sk-start-empty">Nenhum projeto recente ainda. Crie um projeto ou abra um .sknv para ele aparecer aqui.</div>'; return; }
+    box.innerHTML = l.map((p, i) => { const partes = p.path.split(/[\\/]/), nome = partes.pop().replace(/\.sknv$/i, '');
+        return `<button class="sk-start-card notranslate" data-rec="${i}" title="${skEsc(p.path)}"><span class="sk-start-thumb"><svg class="i"><use href="#i-music"/></svg></span>
+            <span class="sk-start-info"><b class="sk-start-name">${skEsc(nome)}</b><span class="sk-start-path">${skEsc(partes.join('\\'))}</span><span class="sk-start-date">${p.quando ? new Date(p.quando).toLocaleString() : ''}</span></span></button>`; }).join('');
+    box.onclick = e => { const b = e.target.closest('[data-rec]'); if (b) skAbrir(skRecentesLista()[+b.dataset.rec].path).catch(er => skToast(er.message)); };
+}
 const skEsc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
 function skMontar() {
@@ -57,16 +74,35 @@ function skMontar() {
         <aside class="ie-paineis sk-dock" id="sk-dock-dir"></aside>
     </div>
     <footer class="ie-status sk-status"><span>Espaço tocar · S/E cortar · D apagar · Q/W aparar até a agulha · ←/→ agulha (Shift = 1 s) · ↑/↓ cortes · Ctrl+roda zoom · roda na régua ou barra = ir e voltar · Alt+arrastar copia</span><span id="sk-status-info"></span></footer>
-    <div class="ie-inicio" id="sk-inicio"><div class="ie-inicio-box">
-        <span class="app-logo al-sk app-logo-grande">Sk</span><h2>Sound Kanivete</h2>
-        <p>Edite áudio em várias faixas: cortar, juntar, fades, volume, limpar ruído, texto para voz, transcrever e exportar no volume certo.</p>
-        <div class="ie-inicio-acoes"><button class="ie-btn ie-btn-primario" onclick="skImportarDialogo()">Importar áudio…</button><button class="ie-btn" onclick="skAbrir().catch(e => skToast(e.message))">Abrir projeto…</button></div>
-        <div class="ie-recentes-tit">Começar com</div>
-        <div class="sk-modelos">${[['podcast', 'Podcast (2 vozes)'], ['narracao', 'Narração com trilha'], ['musica', 'Música com voz'], ['limpar', 'Limpar gravação'], ['vazio', 'Projeto vazio']].map(([k, n]) => `<button class="ie-btn" onclick="skNovo('${k}')">${n}</button>`).join('')}</div>
-        <div class="ie-recentes" id="sk-recuperar"></div>
-        <div class="ie-recentes" id="sk-recentes"></div>
-    </div></div>`;
+    <section class="sk-start" id="sk-inicio"><div class="sk-start-inner">
+        <div class="sk-start-hero">
+            <img class="sk-start-hero-bg" src="img/home/som.webp" alt="" aria-hidden="true" onload="this.classList.add('pronto')">
+            <div class="sk-start-hero-txt">
+                <span class="app-logo al-sk app-logo-grande">Sk</span>
+                <h2>Comece seu áudio</h2>
+                <p>Crie um projeto, importe gravações, grave do microfone ou gere vozes com o Texto para Voz. Corte, limpe, mixe e exporte no volume certo.</p>
+            </div>
+            <div class="sk-start-actions">
+                <button class="sk-sbtn sk-sbtn-pri sk-sbtn-lg" id="sk-novo" onclick="skNovoProjeto()"><svg class="i"><use href="#i-file"/></svg> Novo projeto</button>
+                <div class="sk-start-mais">
+                    <button class="sk-sbtn" onclick="skImportarDialogo()" title="Importar áudio ou vídeo (Ctrl+I)"><svg class="i"><use href="#i-upload"/></svg> Importar</button>
+                    <button class="sk-sbtn" onclick="skNovo('limpar', 'Gravação'); skDockMostrar('gravar')" title="Projeto novo com o painel Gravar aberto"><svg class="i"><use href="#i-volume"/></svg> Gravar</button>
+                    <button class="sk-sbtn" onclick="skAbrir().catch(e => skToast(e.message))"><svg class="i"><use href="#i-folder"/></svg> Abrir</button>
+                </div>
+            </div>
+        </div>
+        <div class="sk-start-section">
+            <div class="sk-start-head"><h3>Começar com um modelo</h3></div>
+            <div class="sk-start-modelos sk-modelos">${SK_INICIO_MODELOS.map(([k, n, d]) => `<button class="sk-start-modelo" onclick="skNovo('${k}', '${n}')"><b>${n}</b><small>${d}</small></button>`).join('')}</div>
+        </div>
+        <div class="sk-start-section">
+            <div class="sk-start-head"><h3>Projetos recentes</h3><button class="sk-sbtn sk-sbtn-sm sk-sbtn-ghost" onclick="skRecentesLimpar()">Limpar lista</button></div>
+            <div class="sk-start-grid" id="sk-recentes"></div>
+        </div>
+        <details class="sk-start-auto" id="sk-recuperar-box" hidden><summary><svg class="i"><use href="#i-save"/></svg> Recuperar (salvo automaticamente)</summary><div class="sk-start-auto-lista" id="sk-recuperar"></div></details>
+    </div></section>`;
     try { const h = +localStorage.getItem('sk-cima'); if (h > 120) raiz.style.setProperty('--sk-cima', h + 'px'); } catch (e) { /* sem storage */ }
+    raiz.style.setProperty('--sk-top', (raiz.querySelector('.ie-top').offsetHeight || 46) + 'px');   // a tela inicial começa abaixo do cabeçalho (como no Editor)
     const bt = skEl('sk-bt-pn'), pop = skEl('sk-menu-pn');
     bt.onclick = e => { e.stopPropagation(); pop.hidden = !pop.hidden; };
     pop.onclick = e => { const b = e.target.closest('[data-pn]'); if (!b) return; if (b.dataset.pn === '__redefinir') skDockRedefinir(); else skDockAlternar(b.dataset.pn); };
@@ -327,8 +363,7 @@ function skUi() {
     skEl('sk-info').textContent = SK.proj ? `${SK.proj.nome}${SK.sujo ? ' •' : ''}` : '';
     skUiTempo(); skUiFaixas(); skUiProps(); if (!SK.tocando) skUiMonitor();
     skUiEsq();
-    let l = []; try { l = JSON.parse(localStorage.getItem('sk-recentes') || '[]'); } catch (e) { /* sem storage */ }
-    const rc = skEl('sk-recentes'); if (rc) rc.innerHTML = l.length ? `<div class="ie-recentes-tit">Recentes</div>${l.map(c => `<button class="ie-recente notranslate" onclick="skAbrir(${skEsc(JSON.stringify(c))}).catch(e => skToast(e.message))">${skEsc(c.split(/[\\/]/).pop())}</button>`).join('')}` : '';
+    if (!SK.proj) skUiRecentes();
 }
 (function () {   // eventos delegados das faixas e do clipe; montar ao abrir a página
     document.addEventListener('input', e => {

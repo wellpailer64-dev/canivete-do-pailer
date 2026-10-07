@@ -181,3 +181,53 @@
 .sk-modelo-u { display: inline-flex; align-items: center; gap: 2px; }
 .sk-pnl .sk-exp label { grid-template-columns: 110px minmax(0, 1fr); }
 .sk-pnl .sk-exp label.sk-chk { display: flex; }
+
+/* tela inicial no padrão do Editor Kanivete (cartão com imagem, Novo projeto, modelos, recentes, recuperar) */
+.sk-start { position: absolute; inset: var(--sk-top, 46px) 0 0 0; z-index: 8; display: grid; place-items: start center; padding: 6vh 28px 28px; overflow: auto; background: var(--bg-0, #121212); }
+.sk-start[hidden] { display: none; }
+.sk-start-inner { width: min(980px, 100%); display: flex; flex-direction: column; gap: 22px; }
+.sk-start-hero { position: relative; overflow: hidden; isolation: isolate; display: flex; align-items: flex-end; gap: 28px; min-height: 300px; padding: 24px 28px; border: 1px solid var(--line, #2a2a2a); border-radius: 6px; background: #0b0b0c; }
+.sk-start-hero-bg { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; object-position: 50% 35%; opacity: 0; filter: saturate(.6) contrast(1.05); transition: opacity 1s ease;
+    -webkit-mask-image: linear-gradient(0deg, rgba(0,0,0,.2) 0%, #000 60%); mask-image: linear-gradient(0deg, rgba(0,0,0,.2) 0%, #000 60%); }
+.sk-start-hero-bg.pronto { opacity: .45; }
+.sk-start-hero::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(0deg, rgba(11,11,12,.92) 0%, rgba(11,11,12,.5) 45%, rgba(11,11,12,.2) 100%); }
+.sk-start-hero-txt { flex: 1; min-width: 0; }
+.sk-start-hero-txt .app-logo-grande { margin: 0 0 12px; }
+.sk-start-hero h2 { margin: 0 0 6px; font-size: 24px; font-weight: 650; color: var(--text); }
+.sk-start-hero p { margin: 0; max-width: 440px; font-size: 12.5px; line-height: 1.55; color: rgba(235, 235, 235, .62); }
+.sk-start-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; flex: 0 0 auto; }
+.sk-start-mais { display: flex; gap: 6px; }
+.sk-sbtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 5px; border: 1px solid var(--line-2, #333); background: #1a1a1a; color: var(--text); font: 600 12.5px var(--font-ui); cursor: pointer; }
+.sk-sbtn:hover { background: #222; border-color: var(--line-3, #444); }
+.sk-sbtn .i { width: 15px; height: 15px; }
+.sk-start-mais .sk-sbtn { height: 28px; padding: 0 10px; font-size: 12px; background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.1); backdrop-filter: blur(6px); }
+.sk-start-mais .sk-sbtn:hover { background: rgba(255,255,255,.1); }
+.sk-sbtn-pri { background: #D4814A; border-color: #D4814A; color: #1a0d02; }
+.sk-sbtn-pri:hover { background: #e08f58; border-color: #e08f58; }
+.sk-sbtn-lg { height: 40px; padding: 0 22px; font-size: 14px; }
+.sk-sbtn-sm { height: 26px; padding: 0 10px; font-size: 11.5px; } .sk-sbtn-ghost { background: transparent; }
+.sk-start-section { border: 1px solid var(--line, #2a2a2a); border-radius: 5px; background: rgba(14,14,14,.82); backdrop-filter: blur(8px); overflow: hidden; }
+.sk-start-head { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line, #2a2a2a); }
+.sk-start-head h3 { margin: 0; flex: 1; font-size: 13px; color: var(--text); }
+.sk-start-modelos { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; padding: 12px; margin: 0; }
+.sk-start-modelo { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left; padding: 12px; border-radius: 5px; border: 1px solid var(--line-2, #333); background: var(--bg-0, #121212); color: var(--text); cursor: pointer; font: 12px var(--font-ui); width: 100%; }
+.sk-start-modelo:hover { border-color: #ffd166; background: var(--bg-3, #222); }
+.sk-start-modelo b { font-size: 12.5px; } .sk-start-modelo small { color: var(--text-3); font-size: 11px; }
+.sk-start-modelos .sk-modelo-u { position: relative; display: block; } .sk-start-modelos .sk-modelo-u .ie-dock-btn { position: absolute; top: 4px; right: 4px; }
+.sk-start-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; padding: 12px; }
+.sk-start-empty { color: var(--text-3); font-size: 12px; line-height: 1.5; padding: 10px 2px; }
+.sk-start-card { display: grid; grid-template-rows: 84px auto; min-width: 0; padding: 0; overflow: hidden; border: 1px solid var(--line-2, #333); border-radius: 4px; background: var(--bg-0, #121212); color: var(--text); text-align: left; cursor: pointer; }
+.sk-start-card:hover { border-color: #ffd166; background: var(--bg-3, #222); }
+.sk-start-thumb { display: grid; place-items: center; background: linear-gradient(135deg, #2a2008, #141110); color: #ffd166; border-bottom: 1px solid var(--line, #2a2a2a); }
+.sk-start-thumb .i { width: 30px; height: 30px; opacity: .8; }
+.sk-start-info { min-width: 0; padding: 9px 10px 10px; display: flex; flex-direction: column; }
+.sk-start-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.sk-start-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3); font-size: 10.5px; margin-top: 3px; }
+.sk-start-date { color: var(--text-2); font-size: 10.5px; margin-top: 7px; }
+.sk-start-auto { align-self: center; width: min(560px, 100%); font-size: 11.5px; color: var(--text-3); }
+.sk-start-auto[hidden] { display: none; }
+.sk-start-auto summary { cursor: pointer; display: flex; align-items: center; gap: 6px; justify-content: center; }
+.sk-start-auto summary .i { width: 13px; height: 13px; }
+.sk-start-auto-lista { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; justify-content: center; }
+.sk-start-auto-item { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-radius: 5px; border: 1px solid var(--line-2, #333); background: var(--bg-3, #222); color: var(--text); cursor: pointer; font: 12px var(--font-ui); }
+.sk-start-auto-item:hover { border-color: #ffd166; } .sk-start-auto-item span { color: var(--text-3); font-size: 11px; } .sk-start-auto-item .i { width: 14px; height: 14px; color: #ffd166; }
