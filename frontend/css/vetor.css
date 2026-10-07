@@ -3,6 +3,8 @@
    Reaproveita o visual do Photo Kanivete (classes ie-*); aqui só o que é próprio.
    ========================================================= */
 .vk-page { padding: 0; }
+/* ocupa a área toda, como o Photo e o Editor (eles ligam body.ve-focus; aqui pelo :has) */
+.content-area:has(#page-vetor-kanivete.active) { padding: 10px; overflow: hidden; }
 .vk { --vk-mesa: #3b3b3b; }
 .vk .vk-corpo { grid-template-columns: 46px minmax(0, 1fr) 300px; }
 .vk .ie-centro { grid-template-rows: minmax(0, 1fr) 24px; }
@@ -124,3 +126,36 @@
     background: rgba(255, 255, 255, .96); border: 1px solid #2f8cff; border-radius: 2px; color: #111; }
 .vk-texto-edit.vk-texto-edit-rico { color: transparent; caret-color: #111; background: transparent; }
 .vk-texto-edit.vk-texto-edit-rico::selection { background: rgba(47, 140, 255, .35); color: transparent; }
+
+/* Novo documento (vetor-novo.js), como o do Illustrator */
+.vk-dlg.vk-novo-dlg { width: min(1180px, 94vw); height: min(760px, 90vh); max-width: none; padding: 0; display: flex; }
+.vk-novo { display: flex; flex-direction: column; width: 100%; min-height: 0; }
+.vk-novo-topo { display: flex; align-items: center; gap: 24px; padding: 14px 20px; border-bottom: 1px solid var(--border, #2a2a2a); }
+.vk-novo-topo b { font-size: 15px; }
+.vk-novo-topo nav { display: flex; gap: 4px; flex-wrap: wrap; }
+.vk-novo-topo nav button { background: none; border: 0; color: var(--text-2, #aaa); padding: 6px 10px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 12.5px; }
+.vk-novo-topo nav button:hover { color: var(--text-1, #eee); background: rgba(255,255,255,.05); }
+.vk-novo-topo nav button.on { color: var(--text-1, #fff); box-shadow: inset 0 -2px 0 var(--accent, #e8833a); border-radius: 0; }
+.vk-novo-corpo { display: grid; grid-template-columns: minmax(0, 1fr) 300px; min-height: 0; flex: 1; }
+.vk-novo-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; padding: 18px 20px; overflow-y: auto; align-content: start; }
+.vk-novo-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 8px 10px; background: rgba(255,255,255,.03);
+    border: 1px solid transparent; border-radius: 8px; color: var(--text-1, #ddd); cursor: pointer; font: inherit; }
+.vk-novo-card:hover { background: rgba(255,255,255,.06); }
+.vk-novo-card.on { border-color: var(--accent, #e8833a); background: rgba(232,131,58,.08); }
+.vk-novo-thumb { position: relative; width: 64px; height: 64px; display: grid; place-items: center; color: var(--text-2, #aaa); font-size: 26px; }
+.vk-novo-thumb i { display: block; background: #f4f4f4; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+.vk-novo-thumb b { position: absolute; right: 2px; bottom: 2px; font-size: 10px; background: var(--accent, #e8833a); color: #fff; border-radius: 8px; padding: 0 5px; line-height: 15px; }
+.vk-novo-nome { font-size: 12px; text-align: center; line-height: 1.25; }
+.vk-novo-card small { font-size: 11px; color: var(--text-3, #888); }
+.vk-novo-det { border-left: 1px solid var(--border, #2a2a2a); padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.vk-novo-tit { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3, #888); }
+.vk-novo-det label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--text-2, #aaa); min-width: 0; flex: 1; }
+.vk-novo-det input, .vk-novo-det select { width: 100%; box-sizing: border-box; }
+.vk-novo-2 { display: flex; gap: 8px; align-items: flex-end; }
+.vk-novo-2 > span { font-size: 11.5px; color: var(--text-2, #aaa); margin-right: auto; align-self: center; }
+.vk-novo-2 .ie-btn.on { border-color: var(--accent, #e8833a); color: var(--accent, #e8833a); }
+.vk-novo-acoes { margin-top: auto; display: flex; gap: 8px; align-items: center; }
+.vk-novo-acoes > span { flex: 1; }
+.vk-rapido { width: min(760px, 80vw); margin: 18px auto 0; }
+.vk-rapido-lista { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 8px; }
+.vk-rapido .vk-novo-card { padding: 10px 4px 8px; }

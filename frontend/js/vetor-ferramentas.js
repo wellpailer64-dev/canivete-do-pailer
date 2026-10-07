@@ -136,11 +136,7 @@ function vkEventos() {
             else if (o) { VK.preench = o.preench ? vkClone(o.preench) : null; VK.traco = o.traco ? vkClone(o.traco.cor) : null; vkUiAgendar(); }
             return;
         }
-        if (f === 'prancheta') {
-            const p = VK.doc.pranchetas.slice().reverse().find(q => x >= q.x && x <= q.x + q.w && y >= q.y && y <= q.y + q.h);
-            if (p) { VK.ativa = p.id; VKA.modo = 'prancheta'; VKA.p = p; VKA.px = p.x; VKA.py = p.y; vkUiAgendar(); vkDesenhar(); } else VKA = null;
-            return;
-        }
+        if (f === 'prancheta') { vkPrDown(VKA, x, y, sx, sy); return; }   // vetor-pranchetas.js: alças, mover, Alt = duplicar, vazio = nova
         if (f === 'texto') {
             const o = vkObjEm(x, y, true);
             if (o && o.tipo === 'texto') { VKA = null; VK.sel = [o.id]; vkTextoEditar(o); return; }
@@ -166,6 +162,7 @@ function vkEventos() {
         if (VKA.modo === 'largura' || VKA.modo === 'malha_no') { VKA.mx = x; VKA.my = y; VKA.moveu = VKA.moveu || Math.hypot(sx - VKA.sx, sy - VKA.sy) > 3; vkDsMove(VKA, x, y); return; }
         if (VKA.trilha) { vkcMove(VKA, x, y); vkDesenhar(); return; }
         if (!VKA.moveu) return;
+        if (VKA.modo && VKA.modo.startsWith('pr_')) { vkDesenhar(); return; }
         let dx = x - VKA.x, dy = y - VKA.y;
         if (VKA.modo === 'mover') {
             if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
@@ -241,10 +238,7 @@ function vkEventos() {
             }
             vkUiAgendar(); vkDesenhar(); return;
         }
-        if (A.modo === 'prancheta') {
-            if (A.moveu) await vkCmdUi('mover_prancheta', { prancheta: A.p.id, dx: ex - A.x, dy: ey - A.y });
-            return;
-        }
+        if (A.modo && A.modo.startsWith('pr_')) { await vkPrUp(A); return; }
         if (A.f === 'caneta') { vkCanetaUp(ex, ey); return; }
         if (A.modo === 'desenho' || A.modo === 'largura' || A.modo === 'degrade' || A.modo === 'malha_no') { await vkDsUp(A, ex, ey); vkDesenhar(); return; }
         if (A.modo === 'construir' || A.modo === 'faca') { await vkcUp(A, ex, ey); vkDesenhar(); return; }

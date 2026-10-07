@@ -304,3 +304,25 @@ substituir (padrão true: oculta o 3D vetorial), colocar, pasta} — Objeto › 
   (só a sombra no PNG transparente) e as bordas do alfa esmaecem (sombra sem linha reta).
 - Antes de renderizar: o gerador de imagem e o Ollama saem da placa. RTX 3050: ~25–30 s a 1400 px/96 amostras.
 - Teste: `python testes/teste_blender.py` (rápido, pula sem Blender). Rodar antes de release quando mexer no 3D ou no Blender.
+
+## 14. Pranchetas para identidade visual e Novo documento (2026-10-07)
+Pedido do usuário: IDV completa no Vetor, pranchetas em ordem (uma abaixo da outra ou 4 por linha descendo), mover,
+duplicar, Ctrl+D como no Illustrator, tela de início com modelos.
+- `vetor-pranchetas.js`: `doc.layoutPr = {modo: grade|vertical|horizontal|livre, colunas, espaco (pt)}`; documento novo
+  em grade de 4 (`vkDocVazio` embrulhado; `novo` aceita `layout_pr`). Arte da prancheta = objetos do topo com o CENTRO
+  nela (fundo com sangria vai junto; antes `mover_prancheta` só levava o que estava inteiro dentro).
+  Comandos: `organizar_pranchetas` {modo, colunas, espaco mm, com_arte} (Objeto › Pranchetas: Reorganizar todas…, grava
+  a ordem), `duplicar_prancheta` {prancheta, nome, x/y} (cópia logo depois na lista, com a arte; na ordem automática a
+  grade se refaz), `ordem_prancheta` {prancheta, posicao | direcao acima/abaixo} (▲▼ no painel; quem vira a 1ª assume o
+  canto), `prancheta_caixa` {x, y, larg, alt}. `nova_prancheta` sem x/y entra no próximo lugar da ordem.
+  Ferramenta Prancheta (Shift+O): alças (Shift = proporção), arrastar move com a arte, **Alt+arrastar duplica**, arrastar
+  no vazio cria. Ctrl+D (repetir transformação, também depois de Alt+arrastar) e a ferramenta Largura (Shift+W) já existiam.
+- `vetor-novo.js`: Novo documento (Ctrl+N) em janela grande como a do Illustrator — categorias Impressão, Papelaria,
+  Redes sociais, Tela, Grande formato, Identidade visual (manual 16:9 ×12, A4 paisagem ×12, construção de logo, papelaria,
+  apresentação, ícones) e Salvos (localStorage `vk-modelos`); detalhes: nome, largura/altura em mm|cm|pol|px (px = 0,75 pt),
+  orientação, pranchetas + ordem, sangria, CMYK/RGB + perfil; volta o último ajuste. Tela inicial com "Começar rápido".
+- Layout: o Vetor não ocupava a área toda (o Photo e o Editor ligam `body.ve-focus`); agora
+  `.content-area:has(#page-vetor-kanivete.active)` em vetor.css.
+- Teste `testes/teste_pranchetas.py [--debug]` (comandos + mouse de verdade; app em --agente=9333). A 1ª rodada logo
+  depois de recarregar a página pode perder o mouse; rode de novo.
+- Pendente (já falhava antes): `teste_vetor.py` "cena: cor da paleta em CMYK e trecho colorido do <span>".

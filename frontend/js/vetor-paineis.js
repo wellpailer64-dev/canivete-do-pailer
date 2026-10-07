@@ -361,13 +361,17 @@ function vkAbaCamadas() {
 function vkAbaPranchetas() {
     const el = vkEl('vk-aba'), d = VK.doc;
     el.innerHTML = `<div class="vk-cam-lista">${d.pranchetas.map((p, i) => `<div class="vk-cam${p.id === VK.ativa ? ' ativa' : ''}" data-p="${p.id}"><small>${i + 1}</small><span class="vk-cam-nome">${vkEsc_(p.nome)}</span><small>${vkR(vkMM(p.w), 1)} × ${vkR(vkMM(p.h), 1)} mm</small></div>`).join('')}</div>
-        <div class="vk-linha"><select id="vk-pr-preset">${Object.keys(VK_PRESETS).map(k => `<option>${k}</option>`).join('')}</select><button class="ie-btn ie-btn-mini" data-nova>+ Prancheta</button><button class="ie-btn ie-btn-mini" data-ren>Renomear</button><button class="ie-btn ie-btn-mini" data-apaga>Apagar</button></div>`;
+        <div class="vk-linha"><select id="vk-pr-preset">${Object.keys(VK_PRESETS).map(k => `<option>${k}</option>`).join('')}</select><button class="ie-btn ie-btn-mini" data-nova>+ Prancheta</button><button class="ie-btn ie-btn-mini" data-ren>Renomear</button><button class="ie-btn ie-btn-mini" data-apaga>Apagar</button></div>
+        <div class="vk-linha"><button class="ie-btn ie-btn-mini" data-sobe title="Subir na ordem">▲</button><button class="ie-btn ie-btn-mini" data-desce title="Descer na ordem">▼</button><button class="ie-btn ie-btn-mini" data-dup>Duplicar</button><button class="ie-btn ie-btn-mini" data-reorg>Reorganizar…</button></div>`;
     el.onclick = e => {
         const t = e.target, lp = t.closest('[data-p]');
         if (lp) { VK.ativa = lp.dataset.p; vkEnquadrar(); return; }
         if (t.dataset.nova != null) return vkCmdUi('nova_prancheta', { preset: vkEl('vk-pr-preset').value }).then(() => vkEnquadrar());
         if (t.dataset.ren != null) { const p = d.pranchetas.find(q => q.id === VK.ativa); const n = prompt('Nome da prancheta', p.nome); if (n) vkCmdUi('prancheta', { prancheta: p.id, novo_nome: n }); }
         if (t.dataset.apaga != null) vkCmdUi('prancheta', { prancheta: VK.ativa, apagar: true });
+        if (t.dataset.sobe != null || t.dataset.desce != null) vkCmdUi('ordem_prancheta', { prancheta: VK.ativa, direcao: t.dataset.sobe != null ? 'acima' : 'abaixo' });
+        if (t.dataset.dup != null) vkCmdUi('duplicar_prancheta', { prancheta: VK.ativa }).then(() => vkEnquadrar());
+        if (t.dataset.reorg != null) vkPrDialogo();
     };
 }
 function vkAbaAmostras() {
