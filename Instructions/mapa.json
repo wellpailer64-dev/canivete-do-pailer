@@ -242,6 +242,9 @@
     "sk_medir",
     "sk_processar",
     "sk_transcrever",
+    "sk_lufs",
+    "sk_silencios",
+    "sk_pasta_padrao",
     "sk_vozes",
     "sk_voz",
     "sk_dialogo"
@@ -1107,6 +1110,22 @@
     "legendas",
     "sound_kanivete"
    ]
+  },
+  "sk_lufs": {
+   "args": "arq, de=0, dur=None",
+   "modulos": [
+    "sound_kanivete"
+   ]
+  },
+  "sk_silencios": {
+   "args": "arq, de=0, dur=None, limiar=-40, minimo=0.6",
+   "modulos": [
+    "sound_kanivete"
+   ]
+  },
+  "sk_pasta_padrao": {
+   "args": "",
+   "modulos": []
   },
   "sk_vozes": {
    "args": "",

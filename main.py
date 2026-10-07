@@ -3351,6 +3351,20 @@ class ApiBridge:
         _tarefa("skProgresso", trabalho)
         return {"success": True}
 
+    def sk_lufs(self, arq, de=0, dur=None):
+        from Functions import sound_kanivete
+        return sound_kanivete.lufs_trecho(arq, de, dur)
+
+    def sk_silencios(self, arq, de=0, dur=None, limiar=-40, minimo=0.6):
+        from Functions import sound_kanivete
+        return sound_kanivete.silencios(arq, de, dur, limiar, minimo)
+
+    def sk_pasta_padrao(self):
+        """Documentos/Sound Kanivete (mixagens para o Editor quando o projeto ainda não foi salvo)."""
+        p = os.path.join(os.path.expanduser("~"), "Documents", "Sound Kanivete")
+        os.makedirs(p, exist_ok=True)
+        return p
+
     def sk_vozes(self):
         from Functions.omnivoice_tool import status
         try:

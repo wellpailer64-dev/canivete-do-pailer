@@ -28,7 +28,8 @@
 .sk-props { background: #1a1512; border-left: 1px solid #2c2520; padding: 12px; overflow-y: auto; font-size: 12px; color: var(--text-2); display: flex; flex-direction: column; gap: 8px; }
 .sk-p-tit { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
 .sk-p-nome { color: var(--text); font-weight: 600; word-break: break-all; }
-.sk-p-l { display: grid; grid-template-columns: 1fr 86px 26px; align-items: center; gap: 6px; }
+.sk-p-l { display: grid; grid-template-columns: 1fr 86px 44px; align-items: center; gap: 6px; }
+.sk-p-l small { white-space: nowrap; }
 .sk-p-l input[type=number] { width: 100%; box-sizing: border-box; background: #120f0d; color: var(--text); border: 1px solid #3a3029; border-radius: 4px; padding: 3px 5px; }
 .sk-p-l input[type=range] { accent-color: #ffd166; }
 .sk-p-acoes { display: flex; flex-wrap: wrap; gap: 6px; }

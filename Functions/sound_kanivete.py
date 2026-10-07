@@ -147,7 +147,8 @@ def _montar(proj, sr=48000, faixas_ids=None):
             continue
         k = len(saidas)
         junta = f"{''.join(rot)}amix=inputs={len(rot)}:normalize=0:dropout_transition=0," if len(rot) > 1 else rot[0]
-        filtros.append(f"{junta}volume={float(f.get('vol', 1)):.5f}[f{k}]")
+        fx = ",".join(_filtros_faixa(f))   # EQ e compressor da faixa (os mesmos da prévia no WebAudio)
+        filtros.append(f"{junta}{fx + ',' if fx else ''}volume={float(f.get('vol', 1)):.5f}[f{k}]")
         saidas.append(f"[f{k}]")
     if not saidas:
         return None
@@ -252,3 +253,48 @@ def melhorar_voz(arq, log=print, prog=lambda *a: None):
     """Melhorar Áudio (Sidon + OmniVoice): só o som, no mesmo tempo do original, em arquivo novo ao lado."""
     from Functions.melhorar_audio import melhorar_arquivo
     return melhorar_arquivo(arq, log, lambda v, m=None: prog(v * 100 if v >= 0 else -1, m), so_audio=True)
+
+
+# ─────────────────────────── fase 4: medir/igualar, silêncios, efeitos de faixa ───────────────────────────
+def lufs_trecho(arq, de=0.0, dur=None):
+    """Loudness integrada (LUFS) de um trecho do arquivo — para igualar o volume dos clipes sem gerar arquivo."""
+    import re
+    cmd = [ffmpeg(), "-hide_banner", "-nostdin", "-ss", f"{float(de):.3f}"] + (["-t", f"{float(dur):.3f}"] if dur else []) + ["-i", arq, "-vn", "-af", "ebur128", "-f", "null", "-"]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800, creationflags=NO_WINDOW)
+    m = re.findall(r"I:\s+(-?[\d.]+) LUFS", r.stderr or "")
+    if not m:
+        return {"success": False, "error": "não mediu"}
+    v = float(m[-1])
+    return {"success": True, "lufs": v if v > -70 else None}
+
+
+def silencios(arq, de=0.0, dur=None, limiar_db=-40, min_s=0.6):
+    """Trechos de silêncio [início, fim] (relativos ao começo do trecho) com pelo menos `min_s` segundos."""
+    import re
+    cmd = [ffmpeg(), "-hide_banner", "-nostdin", "-ss", f"{float(de):.3f}"] + (["-t", f"{float(dur):.3f}"] if dur else []) + \
+          ["-i", arq, "-vn", "-af", f"silencedetect=noise={float(limiar_db)}dB:d={float(min_s)}", "-f", "null", "-"]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800, creationflags=NO_WINDOW)
+    ini = [float(x) for x in re.findall(r"silence_start: (-?[\d.]+)", r.stderr or "")]
+    fim = [float(x) for x in re.findall(r"silence_end: ([\d.]+)", r.stderr or "")]
+    total = float(dur) if dur else _ffprobe_dur(arq)[0]
+    out = []
+    for i, a in enumerate(ini):
+        b = fim[i] if i < len(fim) else total
+        out.append([round(max(0.0, a), 3), round(min(total, b), 3)])
+    return {"success": True, "silencios": out}
+
+
+def _filtros_faixa(f):
+    """EQ (grave 120 Hz, médio 2,5 kHz, agudo 8 kHz, em dB) e compressor da faixa → filtros do ffmpeg."""
+    fx = f.get("fx") or {}
+    out = []
+    eq = fx.get("eq") or {}
+    for chave, freq, tipo in (("grave", 120, "lowshelf"), ("medio", 2500, "equalizer"), ("agudo", 8000, "highshelf")):
+        g = float(eq.get(chave) or 0)
+        if abs(g) > 0.05:
+            out.append(f"{tipo}=f={freq}:g={g:.2f}" + (":t=q:w=1" if tipo == "equalizer" else ""))
+    c = fx.get("comp") or {}
+    if c.get("ativo"):
+        lim = 10 ** (float(c.get("limiar", -18)) / 20)
+        out.append(f"acompressor=threshold={lim:.5f}:ratio={float(c.get('razao', 3)):.2f}:attack=10:release=150:makeup={10 ** (float(c.get('ganho', 0)) / 20):.4f}")
+    return out

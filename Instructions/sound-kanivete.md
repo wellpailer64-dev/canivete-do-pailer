@@ -47,5 +47,20 @@ busca e Inserir na agulha (faixa "Efeitos"). **Atalhos**: Converter Áudio, Tran
 continuam (lote de arquivos, criar vozes), agrupados sob o Sk na barra lateral (`menu-sub`) e com o aviso "Também no
 Sound Kanivete" no topo de cada página. SKN: `transcrever(idioma)`, `texto()`, `legendas()`.
 
-## Próximas fases
-4. Normalizar por clipe, compressor/EQ, cortar silêncios, ponte com o Editor.
+## Volume, pausas, efeitos de faixa e Editor (fase 4, 2026-10-07)
+- **Igualar volume** (clipe ou todos da faixa): mede o LUFS do trecho (`sk_lufs` → `lufs_trecho`, ebur128) e muda só
+  o ganho do clipe (sem arquivo novo), alvo -16 (voz/podcast), -14 (redes) ou -20 (fundo); teto +24 dB.
+- **Cortar silêncios**: `silencedetect` no trecho (limiar -40 dB, pausa ≥ 0,6 s), corta deixando 0,12 s de respiro em
+  cada ponta e puxa o resto da faixa para trás (fecha o buraco).
+- **EQ de 3 bandas e compressor por faixa** (`f.fx = {eq: {grave, medio, agudo} dB, comp: {ativo, limiar, razao, ganho}}`):
+  tocam no WebAudio (barramento da faixa: lowshelf 120 Hz → peaking 2,5 kHz → highshelf 8 kHz → DynamicsCompressor) e
+  saem iguais na exportação (`_filtros_faixa`: lowshelf/equalizer/highshelf + acompressor). Preset "Voz de podcast".
+  Painel: com a faixa escolhida e nenhum clipe selecionado.
+- **→ Editor**: exporta a mixagem em WAV (ao lado do .sknv; sem projeto salvo, em Documentos/Sound Kanivete — sem
+  janela) e solta no Editor de vídeo (`veDropFiles`: entra numa trilha livre; sem projeto, abre um com ele).
+- SKN: `igualar(ids, alvo)`, `cortarSilencios(id, {limiar, minimo, margem})`, `fxFaixa(id, 'voz'|'nenhum'|{...})`,
+  `enviarEditor(caminho)`.
+
+## Pendências
+Separar voz da música (precisa de um modelo de separação; o UVR/Roformer foi testado no anti-noise), curva de volume
+desenhada na timeline (o .sknv e a exportação já aceitam `curva`), Editor → Sk (editar o áudio de um vídeo aqui).

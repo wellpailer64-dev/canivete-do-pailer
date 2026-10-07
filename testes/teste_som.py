@@ -122,6 +122,30 @@ with sync_playwright() as p:
         ok(len(ids) == 1, "som do soundboard entra na timeline", som.get("nome") or som["arq"])
     ok(pg.evaluate("document.querySelectorAll('.sk-atalho').length") == 4 and pg.evaluate("document.querySelectorAll('.menu-item.menu-sub').length") == 4,
        "as 4 ferramentas de áudio viraram atalhos agrupados sob o Sk")
+    # fase 4: igualar volume, cortar silêncios, EQ/compressor da faixa, ponte com o Editor
+    subprocess.run([FF, "-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=330:duration=4,volume=0.12", D + "baixo.wav"], check=True)
+    subprocess.run([FF, "-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=330:duration=1,volume=0.5", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=mono:d=1.5",
+                    "-f", "lavfi", "-i", "sine=frequency=330:duration=1,volume=0.5", "-filter_complex", "[0][1][2]concat=n=3:v=0:a=1", D + "pausas.wav"], check=True)
+    pg.evaluate("SKN.novo('vazio', 'Fase 4')")
+    ids = pg.evaluate(f"async () => await SKN.importar(['{D}baixo.wav'])")
+    pg.evaluate("async (ids) => await SKN.igualar(ids, -16)", ids)
+    d, i = dur_lufs(pg.evaluate(f"async () => (await SKN.exportar('{D}igualado.wav', {{formato: 'wav'}})).caminho"))
+    ok(abs(i - -16) < 1.0, "igualar volume do clipe a -16 LUFS (só o ganho)", f"{i} LUFS, vol {pg.evaluate('SKN.estado().faixas[0].clipes[0].vol'):.2f}")
+    pg.evaluate("SKN.novo('vazio', 'Pausas')")
+    ids = pg.evaluate(f"async () => await SKN.importar(['{D}pausas.wav'])")
+    n = pg.evaluate("async (id) => await SKN.cortarSilencios(id, {minimo: 0.5})", ids[0])
+    cl = pg.evaluate("SKN.estado().faixas[0].clipes")
+    ok(n == 1 and len(cl) == 2 and abs(sum(c["dur"] for c in cl) - (3.5 - 1.5 + 0.24)) < 0.1 and abs(cl[1]["ini"] - (cl[0]["ini"] + cl[0]["dur"])) < 0.01,
+       "cortar silêncios: 2 pedaços colados, a pausa de 1,5 s sai (fica o respiro)", str([(c["ini"], c["dur"]) for c in cl]))
+    f0 = pg.evaluate("SKN.estado().faixas[0].id")
+    pg.evaluate("(id) => SKN.fxFaixa(id, 'voz')", f0)
+    _, i_fx = dur_lufs(pg.evaluate(f"async () => (await SKN.exportar('{D}fx_voz.wav', {{formato: 'wav'}})).caminho"))
+    pg.evaluate("(id) => SKN.fxFaixa(id, 'nenhum')", f0)
+    _, i_0 = dur_lufs(pg.evaluate(f"async () => (await SKN.exportar('{D}fx_nada.wav', {{formato: 'wav'}})).caminho"))
+    ok(abs(i_fx - i_0) > 0.5, "EQ e compressor da faixa mudam a exportação", f"{i_0} → {i_fx} LUFS")
+    c = pg.evaluate("async () => { await SKN.enviarEditor('D:/kanivete_testes/sound/para_editor.wav'); await new Promise(r => setTimeout(r, 4000)); return { ok: VE.ready, aud: (VE.clips || []).length + (VE.audios || VE.audioClips || []).length }; }")
+    ok(c["ok"], "mixagem enviada ao Editor de vídeo (abre/entra na timeline)", str(c))
+    pg.evaluate("switchTool('sound-kanivete')")
     if "--ia" in sys.argv:
         v = pg.evaluate("async () => await SKN.vozes()")
         if v.get("vozes"):

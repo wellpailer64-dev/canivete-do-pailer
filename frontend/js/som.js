@@ -348,6 +348,7 @@ function skMontar() {
         <div class="ie-top-spacer"></div>
         <span class="ie-top-info notranslate" id="sk-info"></span>
         <button class="ie-btn" onclick="skAbrir().catch(e => skToast(e.message))">Abrir</button>
+        <button class="ie-btn" onclick="skEnviarEditor().catch(e => skToast(e.message))" title="A mixagem vai como áudio para a timeline do Editor de vídeo">→ Editor</button>
         <button class="ie-btn" onclick="skExportarDialogo()" title="Exportar (Ctrl+E)">Exportar</button>
         <button class="ie-btn ie-btn-primario" onclick="skSalvar().catch(e => skToast(e.message))" title="Salvar .sknv (Ctrl+S)">Salvar</button>
     </header>
@@ -617,4 +618,117 @@ Object.assign(window.SKN, {
     transcrever: (idioma = 'pt', faixas = null) => skTranscrever(idioma, faixas),
     texto: () => SK.texto && SK.texto.palavras.map(p => p[2]).join(' '),
     legendas: () => SK.texto ? skLinhas(SK.texto.palavras) : [],
+});
+
+
+// ─────────────────────────── fase 4: igualar volume, cortar silêncios, EQ/compressor, ponte com o Editor ───────────────────────────
+// Igualar: mede o LUFS do trecho do clipe e ajusta só o ganho (c.vol), sem gerar arquivo.
+async function skIgualar(ids, alvo = -16) {
+    ids = [].concat(ids || SK.sel || []); if (!ids.length) throw new Error('escolha um clipe');
+    skAntes(); let n = 0;
+    for (const id of ids) {
+        const [c] = skClipe(id); if (!c) continue;
+        const r = await skApi().sk_lufs(c.arq, c.de, c.dur);
+        if (!r.success || r.lufs == null) continue;
+        c.vol = Math.min(16, Math.pow(10, (alvo - r.lufs) / 20));   // teto +24 dB (mais que isso só levanta ruído) c.lufs_alvo = alvo; n++;
+    }
+    if (n) skMudou('igualar'); else SK._antes = null;
+    return n;
+}
+// Cortar silêncios: corta as pausas maiores que `minimo` (deixa `margem` de respiro) e puxa o resto da faixa para trás.
+async function skCortarSilencios(id = SK.sel, { limiar = -40, minimo = 0.6, margem = 0.12 } = {}) {
+    const [c, f] = skClipe(id); if (!c) throw new Error('escolha um clipe');
+    const r = await skApi().sk_silencios(c.arq, c.de, c.dur, limiar, minimo);
+    const sil = (r.silencios || []).map(([a, b]) => [a + (a > 0.01 ? margem : 0), b - (b < c.dur - 0.01 ? margem : 0)]).filter(([a, b]) => b - a > 0.05);
+    if (!sil.length) return 0;
+    skAntes();
+    const pedacos = []; let t = 0;
+    for (const [a, b] of sil) { if (a > t + 0.02) pedacos.push([t, a]); t = b; }
+    if (t < c.dur - 0.02) pedacos.push([t, c.dur]);
+    const tirado = c.dur - pedacos.reduce((s, [a, b]) => s + (b - a), 0), fimOrig = c.ini + c.dur;
+    f.clipes.splice(f.clipes.indexOf(c), 1);
+    let pos = c.ini;
+    for (const [a, b] of pedacos) { f.clipes.push({ ...c, id: skId('c'), ini: pos, de: c.de + a, dur: b - a, fade_in: 0.01, fade_out: 0.01 }); pos += b - a; }
+    for (const x of f.clipes) if (x.ini >= fimOrig - 0.001) x.ini -= tirado;   // fecha o buraco na faixa
+    SK.sel = null; skMudou('cortar silêncios');
+    return sil.length;
+}
+// EQ e compressor por faixa: tocam no WebAudio (barramento da faixa) e saem iguais na exportação (sound_kanivete._filtros_faixa)
+const SK_PRESETS_FX = { voz: { eq: { grave: -3, medio: 2, agudo: 3 }, comp: { ativo: true, limiar: -20, razao: 3, ganho: 3 } }, nenhum: { eq: { grave: 0, medio: 0, agudo: 0 }, comp: { ativo: false, limiar: -20, razao: 3, ganho: 0 } } };
+SK.bus = {};
+function skBus(f) {
+    const ctx = skCtx(); let b = SK.bus[f.id];
+    if (!b) {
+        const ent = ctx.createGain(), gr = ctx.createBiquadFilter(), me = ctx.createBiquadFilter(), ag = ctx.createBiquadFilter(), comp = ctx.createDynamicsCompressor(), ganho = ctx.createGain();
+        gr.type = 'lowshelf'; gr.frequency.value = 120; me.type = 'peaking'; me.frequency.value = 2500; me.Q.value = 0.7; ag.type = 'highshelf'; ag.frequency.value = 8000;
+        ent.connect(gr); gr.connect(me); me.connect(ag); ag.connect(comp); comp.connect(ganho); ganho.connect(ctx.destination);
+        b = SK.bus[f.id] = { ent, gr, me, ag, comp, ganho };
+    }
+    const fx = f.fx || SK_PRESETS_FX.nenhum, eq = fx.eq || {}, c = fx.comp || {};
+    b.gr.gain.value = eq.grave || 0; b.me.gain.value = eq.medio || 0; b.ag.gain.value = eq.agudo || 0;
+    if (c.ativo) { b.comp.threshold.value = c.limiar ?? -20; b.comp.ratio.value = c.razao ?? 3; b.comp.attack.value = 0.01; b.comp.release.value = 0.15; b.ganho.gain.value = Math.pow(10, (c.ganho || 0) / 20); }
+    else { b.comp.threshold.value = 0; b.comp.ratio.value = 1; b.ganho.gain.value = 1; }
+    return b;
+}
+(function () {   // os clipes passam a tocar pelo barramento da faixa deles
+    const no = skNo;
+    skNo = function (c) {
+        const n = no(c); if (!n) return n;
+        const f = SK.proj.faixas.find(x => x.clipes.includes(c)); if (!f) return n;
+        const b = skBus(f);
+        if (n.bus !== b) { try { n.g.disconnect(); } catch (e) { /* novo */ } n.g.connect(b.ent); n.bus = b; }
+        return n;
+    };
+})();
+function skUiFaixaFx(f) {
+    const fx = f.fx || JSON.parse(JSON.stringify(SK_PRESETS_FX.nenhum)), eq = fx.eq, c = fx.comp;
+    const sl = (r, k, v, min, max, passo, uni) => `<label class="sk-p-l">${r}<input type="range" min="${min}" max="${max}" step="${passo}" value="${v}" data-fx="${k}"><small>${(+v).toFixed(k.startsWith('comp.razao') ? 1 : 0)}${uni}</small></label>`;
+    return `<div class="sk-p-tit">Faixa: <span class="notranslate">${f.nome}</span></div>
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" data-preset="voz">Voz de podcast</button><button class="ie-btn ie-btn-mini" data-preset="nenhum">Sem efeitos</button></div>
+        <div class="sk-p-tit">Equalizador</div>${sl('Grave', 'eq.grave', eq.grave, -12, 12, 0.5, ' dB')}${sl('Médio', 'eq.medio', eq.medio, -12, 12, 0.5, ' dB')}${sl('Agudo', 'eq.agudo', eq.agudo, -12, 12, 0.5, ' dB')}
+        <div class="sk-p-tit">Compressor</div><label class="sk-chk"><input type="checkbox" data-fx="comp.ativo" ${c.ativo ? 'checked' : ''}> Ligado</label>
+        ${sl('Limiar', 'comp.limiar', c.limiar, -50, 0, 1, ' dB')}${sl('Razão', 'comp.razao', c.razao, 1, 12, 0.5, ':1')}${sl('Ganho', 'comp.ganho', c.ganho, 0, 18, 0.5, ' dB')}
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" data-igualar-faixa="${f.id}">Igualar volume dos clipes (-16 LUFS)</button></div>`;
+}
+(function () {   // painel: clipe ganha Igualar/Cortar silêncios; sem clipe e com faixa escolhida, os efeitos da faixa
+    const props = skUiProps;
+    skUiProps = function () {
+        props();
+        const el = skEl('sk-props'); if (!el || SK.painel === 'texto' || !SK.proj) return;
+        if (SK.sel) {
+            const box = document.createElement('div');
+            box.innerHTML = `<div class="sk-p-tit">Volume e pausas</div><div class="sk-p-acoes">
+                <select id="sk-alvo"><option value="-16">-16 LUFS (voz/podcast)</option><option value="-14">-14 LUFS (redes)</option><option value="-20">-20 LUFS (fundo)</option></select>
+                <button class="ie-btn ie-btn-mini" id="sk-igualar">Igualar volume</button><button class="ie-btn ie-btn-mini" id="sk-silencio">Cortar silêncios</button></div>`;
+            el.appendChild(box);
+            box.querySelector('#sk-igualar').onclick = () => skIgualar(SK.sel, +box.querySelector('#sk-alvo').value).catch(e => skToast(e.message));
+            box.querySelector('#sk-silencio').onclick = () => skCortarSilencios(SK.sel).then(n => skToast(n ? `${n} pausa(s) cortada(s)` : 'Nenhuma pausa longa')).catch(e => skToast(e.message));
+            return;
+        }
+        const f = SK.proj.faixas.find(x => x.id === SK.faixaSel); if (!f) return;
+        const box = document.createElement('div'); box.className = 'sk-fx'; box.innerHTML = skUiFaixaFx(f); el.appendChild(box);
+        box.oninput = e => { const k = e.target.dataset.fx; if (!k) return; const [g, p] = k.split('.'); f.fx = f.fx || JSON.parse(JSON.stringify(SK_PRESETS_FX.nenhum));
+            f.fx[g][p] = e.target.type === 'checkbox' ? e.target.checked : +e.target.value; if (e.target.nextElementSibling) e.target.nextElementSibling.textContent = (+e.target.value).toFixed(p === 'razao' ? 1 : 0) + (p === 'razao' ? ':1' : ' dB');
+            if (SK.bus[f.id]) skBus(f); SK.sujo = true; };
+        box.onchange = () => { skAntes(); skMudou('efeito da faixa'); };
+        box.onclick = e => { const p = e.target.dataset.preset; if (p) { skAntes(); f.fx = JSON.parse(JSON.stringify(SK_PRESETS_FX[p])); if (SK.bus[f.id]) skBus(f); skMudou('preset'); }
+            const ig = e.target.dataset.igualarFaixa; if (ig) skIgualar(f.clipes.map(c => c.id), -16).then(n => skToast(`${n} clipe(s) igualado(s)`)); };
+    };
+})();
+// Ponte com o Editor de vídeo: a mixagem vai como áudio para a timeline do Editor (sem projeto aberto, abre um com ele)
+async function skEnviarEditor(destino = null) {
+    if (!SK.proj) return;
+    // ao lado do projeto; sem projeto salvo, em Documentos/Sound Kanivete (sem janela de salvar)
+    const pasta = SK.caminho ? SK.caminho.replace(/[\\/][^\\/]*$/, '') : await skApi().sk_pasta_padrao();
+    destino = destino || `${pasta}/${(SK.proj.nome || 'audio').replace(/[\\/:*?"<>|]/g, '_')}_mix.wav`;
+    const r = await SKN.exportar(destino, { formato: 'wav' });
+    switchTool('video-cutter');
+    setTimeout(() => veDropFiles([{ path: r.caminho, pasta: false }]), 150);
+    return r.caminho;
+}
+Object.assign(window.SKN, {
+    igualar: (ids, alvo = -16) => skIgualar(ids, alvo),
+    cortarSilencios: (id, op) => skCortarSilencios(id, op),
+    fxFaixa: (id, fx) => { const f = SK.proj.faixas.find(x => x.id === id || x.nome === id); skAntes(); f.fx = typeof fx === 'string' ? JSON.parse(JSON.stringify(SK_PRESETS_FX[fx])) : fx; if (SK.bus[f.id]) skBus(f); skMudou('fx'); return f.fx; },
+    enviarEditor: caminho => skEnviarEditor(caminho),
 });
