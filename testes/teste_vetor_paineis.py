@@ -48,7 +48,7 @@ with sync_playwright() as p:
     pg.wait_for_function("typeof switchTool === 'function'", timeout=90000)
     pg.evaluate("switchTool('vetor-kanivete')")
     pg.wait_for_function("window.VKN && typeof VK_DOCK !== 'undefined' && VK_DOCK.prefsOk", timeout=60000)
-    pg.evaluate("vkDockRedefinir()")
+    pg.evaluate("vkDockRedefinir(); document.getElementById('app-update-banner')?.remove()")   # o aviso de versão nova cobre o canto
     pg.evaluate("VKN.cmd('novo', {larg: 100, alt: 100, pranchetas: 2})")
     pg.evaluate("() => { VK.doc.camadas[0].nome = 'Fundo'; VKN.cmd('nova_camada', {nome: 'Texto'}); }"); pg.wait_for_timeout(400)
     corpos = pg.evaluate("() => ['camadas', 'pranchetas', 'amostras'].map(id => document.getElementById('vk-aba-' + id).innerHTML.length)")
