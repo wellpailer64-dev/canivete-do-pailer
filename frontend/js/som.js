@@ -26,7 +26,7 @@ function skDesfazer() { if (!SK.hist.length) return; SK.futuro.push(skSnap()); S
 function skRefazer() { if (!SK.futuro.length) return; SK.hist.push(skSnap()); SK.proj = JSON.parse(SK.futuro.pop()); skParar(); skUi(); skDesenhar(); }
 const SK_MODELOS = { vazio: ['Faixa 1'], podcast: ['Voz 1', 'Voz 2', 'Trilha', 'Efeitos'], narracao: ['Narração', 'Trilha'], musica: ['Voz', 'Instrumental', 'Backing'], limpar: ['Gravação'] };
 function skNovo(modelo = 'vazio', nome = 'Sem título') {
-    SK.proj = { nome, faixas: (SK_MODELOS[modelo] || [modelo]).map((n, i) => ({ id: skId('f'), nome: n, vol: 1, mudo: false, solo: false, cor: SK_CORES[i % SK_CORES.length], clipes: [] })), marcadores: [] };
+    SK.proj = { id: skId('p'), nome, faixas: (SK_MODELOS[modelo] || [modelo]).map((n, i) => ({ id: skId('f'), nome: n, vol: 1, mudo: false, solo: false, cor: SK_CORES[i % SK_CORES.length], clipes: [] })), marcadores: [] };
     SK.caminho = null; SK.sujo = false; SK.hist = []; SK.futuro = []; SK.sel = null; SK.faixaSel = SK.proj.faixas[0].id; SK.ph = 0; SK.x0 = 0; SK.y0 = 0;
     skParar(); skUi(); skDesenhar();
 }
@@ -75,6 +75,7 @@ async function skSalvar(como = false) {
     if (!r.success) throw new Error(r.error);
     SK.caminho = r.caminho; SK.sujo = false; SK.proj.nome = r.caminho.split(/[\\/]/).pop().replace(/\.sknv$/i, '');
     skRecente(r.caminho); skUi(); skToast('Projeto salvo');
+    if (SK.proj.id) skApi().sk_auto('apagar', null, null, SK.proj.id);   // salvo de verdade: a cópia automática sai
     return r.caminho;
 }
 async function skAbrir(caminho) {
@@ -83,6 +84,7 @@ async function skAbrir(caminho) {
     const r = await skApi().sk_abrir(caminho);
     if (!r.success) throw new Error(r.error);
     SK.proj = r.proj; SK.caminho = r.caminho; SK.sujo = false; SK.hist = []; SK.futuro = []; SK.sel = null; SK.ph = 0;
+    SK.proj.id = SK.proj.id || skId('p');
     SK.faixaSel = SK.proj.faixas[0]?.id;
     for (const f of SK.proj.faixas) for (const c of f.clipes) { try { await skCarregarPicos(c.arq); } catch (e) { /* faltando */ } }
     if (r.faltando.length) skToast(`${r.faltando.length} arquivo(s) não encontrado(s)`);
@@ -160,6 +162,7 @@ function skDesenhar() {
             x.globalAlpha = 1;
         }
     });
+    if (typeof skDesenharGrav === 'function') skDesenharGrav(x, X, Y, H);
     // marcadores e agulha
     for (const m of SK.proj.marcadores) { const mx = Math.round(X(m.t)) + 0.5; x.strokeStyle = '#ffd166'; x.beginPath(); x.moveTo(mx, 0); x.lineTo(mx, H); x.stroke(); x.fillStyle = '#ffd166'; x.fillText(m.nome, mx + 3, SK_REGUA - 3); }
     const hx = Math.round(X(SK.ph)) + 0.5;
@@ -261,6 +264,7 @@ function skEventos() {
         if (k === 's' || (C && k === 'k')) return faz(() => skCortar());
         if (k === 'delete' || k === 'backspace') return faz(() => skApagar());
         if (k === 'm') return faz(() => skMarcador());
+        if (k === 'r' && !C) return faz(() => (SK.grav ? skGravarParar() : skGravar()).catch(er => skToast(er.message)));
         if (k === 'home') return faz(() => skIr(0));
         if (k === 'end') return faz(() => skIr(skFim()));
         if (k === '+' || k === '=') return faz(() => { SK.z *= 1.25; skDesenhar(); });

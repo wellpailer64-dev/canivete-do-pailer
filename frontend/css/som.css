@@ -87,3 +87,12 @@
 .sk-pn .sk-exp label { grid-template-columns: 90px minmax(0, 1fr); }
 .sk-pn .sk-texto { max-height: none; }
 .sk .ie-inicio { z-index: 5; }
+/* gravar (som-gravar.js) */
+.sk-rec { color: #ff5a4f; }
+.sk-rec.on, .sk-rec-btn.on { background: #ff3b30; color: #fff; border-color: #ff3b30; animation: sk-pisca 1s infinite; }
+@keyframes sk-pisca { 50% { opacity: .65; } }
+.sk-mic { height: 10px; background: #120f0d; border: 1px solid #3a3029; border-radius: 5px; overflow: hidden; }
+.sk-mic-nivel { height: 100%; width: 0; background: linear-gradient(90deg, #6fcf7f, #ffd166 80%, #ff3b30); transition: width .08s linear; }
+.sk-mic-nivel.alto { box-shadow: 0 0 0 1px #ff3b30 inset; }
+.sk-recup { display: flex; gap: 6px; align-items: center; }
+.sk-recup .ie-recente { flex: 1; }

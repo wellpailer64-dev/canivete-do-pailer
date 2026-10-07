@@ -135,7 +135,7 @@ function skCalar(rampa = 0.012) {   // solta o que está tocando com uma descida
 async function skTocar() {
     if (!SK.proj || SK.tocando) return;
     const ctx = skCtx(); ctx.resume();
-    if (SK.ph >= skFim()) SK.ph = 0;
+    if (SK.ph >= skFim() && !SK.grav) SK.ph = 0;
     SK.tocando = true; skUi();
     // espera os primeiros trechos (até 2 s) para não começar mudo
     await Promise.race([Promise.all(skPedacosNaJanela(SK.ph, SK_ANTES).map(p => skPedaco(p.c.arq, p.k).p)), new Promise(r => setTimeout(r, 2000))]);
@@ -146,13 +146,14 @@ async function skTocar() {
     const passo = () => {
         if (!SK.tocando) return;
         SK.ph = Math.max(0, ctx.currentTime - SK.t0 - (ctx.outputLatency || 0));
-        if (SK.ph >= skFim() + 0.2) { skParar(); return; }
+        if (SK.ph >= skFim() + 0.2 && !SK.grav) { skParar(); return; }
         skSeguir(); skDesenhar(); skUiTempo(); skMedirAgora(); skUiMonitor?.();
         SK.raf = requestAnimationFrame(passo);
     };
     SK.raf = requestAnimationFrame(passo);
 }
 function skParar() {
+    if (SK.grav) { skGravarParar(); return; }   // parar durante a gravação fecha a gravação
     SK.tocando = false; cancelAnimationFrame(SK.raf); clearInterval(SK.mt.timer);
     skCalar();
     SK.med = null;

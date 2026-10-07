@@ -80,8 +80,20 @@ Sound Kanivete" no topo de cada página. SKN: `transcrever(idioma)`, `texto()`, 
 - Medidores: `skMedirAgora()` → `SK.med` {L, R, M (LUFS momentâneo, ponderação K aprox.), I (integrado, portas -70/-10),
   faixas{id: {pico, rms}}}.
 
+## Gravar, salvamento automático, arquivos longos (rodada B, 2026-10-07)
+- **Gravar** (`som-gravar.js` + `Functions/sk_gravar.py`, API `sk_gravar(acao)`): sounddevice/PortAudio, WAV 24 bits
+  escrito direto no disco (o `wave` reescreve o cabeçalho a cada bloco: queda do app deixa o arquivo válido). Botão ● no
+  transporte ou R: grava na faixa escolhida a partir da agulha, as outras faixas tocam junto, clipe vermelho cresce na
+  timeline; ao parar o arquivo entra como clipe. Aba Gravar: escolher entrada (lembrada em `sk-mic`), mono/estéreo,
+  medidor de nível (a entrada fica aberta só medindo enquanto a aba está aberta). Ainda sem compensar a latência da placa.
+- **Salvamento automático**: a cada minuto com mudanças, em `%APPDATA%/CaniveteDoPailer/sk_auto/<id>.sknv`
+  (`sk_auto(acao)`); a tela inicial lista "Recuperar" (com × para descartar); salvar de verdade apaga a cópia.
+- **Arquivos longos**: picos lidos em blocos de 60 s; 2 h de mp3 importam em ~3 s e tocam do meio em ~0,4 s
+  (`teste_som.py --longo`).
+- SKN: `gravar({caminho})`, `pararGravacao()`, `entradas()`, `autoSalvar()`, `recuperaveis()`, `recuperar(id)`.
+
 ## Pendências
-Rodadas seguintes do plano profissional: B gravar do microfone, salvamento automático/recuperação, teste com 1–2 h;
+Rodadas seguintes do plano profissional:
 C seleção de intervalo entre faixas (apagar/silenciar/recortar com ripple), curva de volume desenhada, ducking;
 D master com limitador (-1 dBTP) e cadeia de efeitos por faixa (passa-alta, gate, de-esser, EQ gráfico, reverb);
 E espectrograma e reparo espectral, separar voz da música; F editar pelo texto (apagar palavras/vícios), stems, ID3/capítulos, modelos salvos.

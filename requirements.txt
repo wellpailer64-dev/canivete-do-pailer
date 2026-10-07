@@ -39,6 +39,7 @@ psd-tools==1.23.0
 pikepdf==10.13.0.post1
 # ponte com o Illustrator instalado (COM): .ai nativo com todas as pranchetas (Functions/ponte_illustrator.py)
 pywin32==311
+sounddevice==0.5.5
 python-pptx==1.0.2
 fonttools==4.65.0
 uharfbuzz==0.56.2

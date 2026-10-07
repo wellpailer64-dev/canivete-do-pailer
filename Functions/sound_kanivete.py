@@ -51,14 +51,23 @@ def picos(path):
     if os.path.isfile(arq):
         return open(arq, "rb").read()
     import numpy as np
-    r = subprocess.run([ffmpeg(), "-v", "error", "-i", path, "-vn", "-ac", "1", "-ar", "8000", "-f", "s16le", "-"], capture_output=True, timeout=1800, creationflags=NO_WINDOW)
-    a = np.frombuffer(r.stdout, dtype=np.int16)
+    # lido em blocos de 60 s (gravações de horas não sobem tudo para a memória)
     n = 8000 // PICOS_POR_S
-    if a.size < n:
-        out = bytes([0])
-    else:
-        a = np.abs(a[: a.size // n * n].astype(np.int32)).reshape(-1, n).max(axis=1)
-        out = np.clip(np.sqrt(a / 32768.0) * 255, 0, 255).astype(np.uint8).tobytes()   # raiz: o quieto ainda aparece
+    pr = subprocess.Popen([ffmpeg(), "-v", "error", "-i", path, "-vn", "-ac", "1", "-ar", "8000", "-f", "s16le", "-"], stdout=subprocess.PIPE,
+                          stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)
+    partes, resto = [], b""
+    while True:
+        b = pr.stdout.read(8000 * 2 * 60)
+        if not b:
+            break
+        b = resto + b
+        k = len(b) // (2 * n) * (2 * n)
+        resto = b[k:]
+        if k:
+            a = np.abs(np.frombuffer(b[:k], dtype=np.int16).astype(np.int32)).reshape(-1, n).max(axis=1)
+            partes.append(np.clip(np.sqrt(a / 32768.0) * 255, 0, 255).astype(np.uint8))   # raiz: o quieto ainda aparece
+    pr.wait()
+    out = np.concatenate(partes).tobytes() if partes else bytes([0])
     open(arq, "wb").write(out)
     return out
 
@@ -129,6 +138,51 @@ def salvar(proj, caminho):
         json.dump(dict(proj, versao=1), f, ensure_ascii=False, indent=1)
     os.replace(tmp, caminho)
     return {"success": True, "caminho": caminho}
+
+
+def _auto_dir():
+    base = os.environ.get("APPDATA") or os.path.expanduser("~")
+    d = os.path.join(base, "CaniveteDoPailer", "sk_auto")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def auto_salvar(proj, caminho=None):
+    """Cópia de segurança do projeto (a cada minuto com mudanças); some quando o projeto é salvo de verdade."""
+    import time
+    pid = "".join(ch for ch in str(proj.get("id") or "sem_id") if ch.isalnum() or ch in "_-")
+    arq = os.path.join(_auto_dir(), pid + EXT)
+    tmp = arq + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump({"proj": proj, "caminho": caminho, "quando": time.time()}, f, ensure_ascii=False)
+    os.replace(tmp, arq)
+    return {"success": True, "arq": arq}
+
+
+def auto_lista():
+    out = []
+    for n in os.listdir(_auto_dir()):
+        if not n.endswith(EXT):
+            continue
+        p = os.path.join(_auto_dir(), n)
+        try:
+            j = json.load(open(p, encoding="utf-8"))
+            out.append({"id": n[:-len(EXT)], "nome": j["proj"].get("nome"), "caminho": j.get("caminho"), "quando": j.get("quando")})
+        except Exception:
+            continue
+    return sorted(out, key=lambda x: -(x["quando"] or 0))
+
+
+def auto_ler(pid):
+    return json.load(open(os.path.join(_auto_dir(), pid + EXT), encoding="utf-8"))
+
+
+def auto_apagar(pid):
+    try:
+        os.remove(os.path.join(_auto_dir(), pid + EXT))
+    except OSError:
+        pass
+    return {"success": True}
 
 
 def abrir(caminho):

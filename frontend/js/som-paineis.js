@@ -32,6 +32,7 @@ function skMontar() {
                 <button class="ie-btn" onclick="skIr(0)" title="Início (Home)">⏮</button>
                 <button class="ie-btn sk-play" id="sk-play" onclick="SK.tocando ? skParar() : skTocar()" title="Tocar/parar (Espaço)">▶</button>
                 <button class="ie-btn" onclick="skIr(skFim())" title="Fim (End)">⏭</button>
+                <button class="ie-btn sk-rec" id="sk-rec" onclick="(SK.grav ? skGravarParar() : skGravar()).catch(e => skToast(e.message))" title="Gravar do microfone na faixa escolhida, a partir da agulha (R)">●</button>
                 <span class="sk-tempo" id="sk-tempo">0:00.00</span>
                 <span class="sk-sep"></span>
                 <button class="ie-btn" onclick="skCortar()" title="Cortar na agulha (S)">✂ Cortar</button>
@@ -56,6 +57,7 @@ function skMontar() {
         <div class="ie-inicio-acoes"><button class="ie-btn ie-btn-primario" onclick="skImportarDialogo()">Importar áudio…</button><button class="ie-btn" onclick="skAbrir().catch(e => skToast(e.message))">Abrir projeto…</button></div>
         <div class="ie-recentes-tit">Começar com</div>
         <div class="sk-modelos">${[['podcast', 'Podcast (2 vozes)'], ['narracao', 'Narração com trilha'], ['musica', 'Música com voz'], ['limpar', 'Limpar gravação'], ['vazio', 'Projeto vazio']].map(([k, n]) => `<button class="ie-btn" onclick="skNovo('${k}')">${n}</button>`).join('')}</div>
+        <div class="ie-recentes" id="sk-recuperar"></div>
         <div class="ie-recentes" id="sk-recentes"></div>
     </div></div>`;
     try { const h = +localStorage.getItem('sk-cima'); if (h > 120) raiz.style.setProperty('--sk-cima', h + 'px'); } catch (e) { /* sem storage */ }
@@ -65,7 +67,7 @@ function skMontar() {
     skUi(); skUiEsq();
 }
 function skAba(lado, aba) {
-    if (lado === 'esq') { SK.abaEsq = aba; skUiEsq(); } else { SK.painel = aba; skUiProps(); }
+    if (lado === 'esq') { SK.abaEsq = aba; if (aba !== 'gravar') skMonitorarEntrada(false); skUiEsq(); } else { SK.painel = aba; skUiProps(); }
 }
 function skMarcarAbas() {
     document.querySelectorAll('#sk .sk-abas').forEach(n => { const at = n.dataset.lado === 'esq' ? SK.abaEsq : SK.painel; n.querySelectorAll('[data-aba]').forEach(b => b.classList.toggle('on', b.dataset.aba === at)); });
@@ -101,6 +103,7 @@ function skUiEsq() {
     skMarcarAbas();
     if (SK.abaEsq === 'midia') return skUiMidia(el);
     if (SK.abaEsq === 'sons') return skUiSons(el);
+    if (SK.abaEsq === 'gravar') return skUiGravar(el);
     return skUiVoz(el);
 }
 function skUiMidia(el) {
@@ -300,6 +303,8 @@ function skUi() {
     const ini = skEl('sk-inicio'); if (!ini) return;
     ini.hidden = !!SK.proj;
     const play = skEl('sk-play'); if (play) { play.textContent = SK.tocando ? '■' : '▶'; play.classList.toggle('on', SK.tocando); }
+    skEl('sk-rec')?.classList.toggle('on', !!SK.grav);
+    if (!SK.proj && !ini.dataset.recup) { ini.dataset.recup = '1'; skUiRecuperar().finally(() => { delete ini.dataset.recup; }); }
     skEl('sk-info').textContent = SK.proj ? `${SK.proj.nome}${SK.sujo ? ' •' : ''}` : '';
     skUiTempo(); skUiFaixas(); skUiProps();
     if (SK.abaEsq === 'midia') skUiEsq();
@@ -325,6 +330,6 @@ function skUi() {
         if (b.dataset.f && !e.target.closest('input')) { SK.faixaSel = b.dataset.f; SK.sel = null; skUiFaixas(); skUiProps(); skDesenhar(); }
     });
     const pg = () => skEl('page-sound-kanivete');
-    const ver = () => { if (pg()?.classList.contains('active')) { skMontar(); skDesenhar(); skUiMonitor(); } else if (SK.tocando) skParar(); };
+    const ver = () => { if (pg()?.classList.contains('active')) { skMontar(); skDesenhar(); skUiMonitor(); if (SK.abaEsq === 'gravar') skUiEsq(); } else { if (SK.tocando || SK.grav) skParar(); skMonitorarEntrada(false); } };
     document.addEventListener('DOMContentLoaded', () => { const p = pg(); if (p) new MutationObserver(ver).observe(p, { attributes: true, attributeFilter: ['class'] }); ver(); });
 })();

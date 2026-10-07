@@ -86,10 +86,10 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 
 ### Áudio
 #### Sound Kanivete — `switchTool('sound-kanivete')`
-- **Interface**: `som-motor.js`, `som-paineis.js`, `som.js`, `som.css`
-- **Python**: `Functions/sound_kanivete.py`
+- **Interface**: `som-gravar.js`, `som-motor.js`, `som-paineis.js`, `som.js`, `som.css`
+- **Python**: `Functions/sound_kanivete.py`, `Functions/sk_gravar.py`
 - **Automação (agente/Jr)**: window.SKN (som.js): novo, importar, cortar, alterarClipe, exportar, estado...
-- **API** (`pywebview.api.*`, 14): `sk_info(path)`, `sk_trecho(arq, k, sr=48000)`, `sk_salvar(proj, caminho)`, `sk_abrir(caminho)`, `sk_exportar(proj, caminho, op=None)`, `sk_medir(proj, op=None)`, `sk_processar(arq, efeito, op=None)`, `sk_transcrever(proj, idioma="pt", faixas=None)`, `sk_lufs(arq, de=0, dur=None)`, `sk_silencios(arq, de=0, dur=None, limiar=-40, minimo=0.6)`, `sk_pasta_padrao()`, `sk_vozes()`, `sk_voz(voz_id, texto, op=None)`, `sk_dialogo(modo, tipos=None, nome="")`
+- **API** (`pywebview.api.*`, 16): `sk_info(path)`, `sk_trecho(arq, k, sr=48000)`, `sk_auto(acao, proj=None, caminho=None, pid=None)`, `sk_gravar(acao, dispositivo=None, caminho=None, sr=48000, canais=1)`, `sk_salvar(proj, caminho)`, `sk_abrir(caminho)`, `sk_exportar(proj, caminho, op=None)`, `sk_medir(proj, op=None)`, `sk_processar(arq, efeito, op=None)`, `sk_transcrever(proj, idioma="pt", faixas=None)`, `sk_lufs(arq, de=0, dur=None)`, `sk_silencios(arq, de=0, dur=None, limiar=-40, minimo=0.6)`, `sk_pasta_padrao()`, `sk_vozes()`, `sk_voz(voz_id, texto, op=None)`, `sk_dialogo(modo, tipos=None, nome="")`
 - **Testes**: `testes/teste_som.py`
 - **Guias**: `Instructions/sound-kanivete.md`
 
@@ -310,6 +310,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/removerfundo.py` — removerfundo.py
 - `Functions/render_cache.py` — Cache de render em disco do Pocket Editor (como os "Preview Files" do Premiere)
 - `Functions/sincronizar.py` — Sincronizar clipes pelo áudio (como o "Sincronizar › Áudio" do Premiere): duas câmeras gravando a mesma cena
+- `Functions/sk_gravar.py` — Sound Kanivete — gravar do microfone (ou interface de áudio) direto num WAV 24 bits
 - `Functions/snapshot_logger.py` — snapshot_logger.py — Backup/restauração para o Organizador de Vídeos
 - `Functions/sound_kanivete.py` — Sound Kanivete (Sk) — editor de áudio multipista do KANIVETE (frontend/js/som-*.js)
 - `Functions/soundboard.py` — soundboard.py — pack de efeitos sonoros do painel Soundboard do Pocket Editor

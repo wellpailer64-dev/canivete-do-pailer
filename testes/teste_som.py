@@ -190,6 +190,47 @@ with sync_playwright() as p:
     h1 = pg.evaluate("document.querySelector('#sk .sk-cima').getBoundingClientRect().height")
     ok(abs(h1 - h0 - 60) < 3, "divisória arrasta e redimensiona os painéis", f"{h0} → {h1}")
     pg.mouse.move(bx[0], bx[1] + 60); pg.mouse.down(); pg.mouse.move(*bx, steps=5); pg.mouse.up()
+    # ── rodada B: gravar do microfone, salvamento automático e recuperação, arquivo longo (--longo) ──
+    ent = pg.evaluate("async () => await SKN.entradas()")
+    if ent.get("dispositivos"):
+        g = D + "grav_teste.wav"
+        pg.evaluate("SKN.novo('vazio', 'Gravar')")
+        pg.evaluate("async (g) => await SKN.gravar({caminho: g})", g)
+        pg.wait_for_timeout(2000)
+        ag = pg.evaluate("SK.ph")
+        gid = pg.evaluate("async () => await SKN.pararGravacao()")
+        cl = pg.evaluate("SKN.estado().faixas[0].clipes")
+        import wave
+        with wave.open(g) as w:
+            bits = w.getsampwidth() * 8
+        ok(gid and len(cl) == 1 and cl[0]["ini"] == 0 and 1.6 < cl[0]["dur"] < 2.6 and bits == 24 and 1.6 < ag < 2.6,
+           "gravar do microfone: WAV 24 bits entra na faixa a partir da agulha, a agulha anda", f"{cl} {bits} bits, agulha {ag:.2f}")
+        os.remove(g)
+    else:
+        print("  (sem entrada de áudio: gravação não testada)")
+    pg.evaluate("SKN.novo('vazio', 'Recuperar')")
+    pg.evaluate(f"async () => await SKN.importar(['{D}voz.wav'], {{ini: 1.5}})")
+    pid = pg.evaluate("async () => { await SKN.autoSalvar(); return SK.proj.id; }")
+    ok(pid in [x["id"] for x in pg.evaluate("async () => await SKN.recuperaveis()")], "salvamento automático grava a cópia")
+    pg.evaluate("SKN.novo('vazio')")
+    pg.evaluate("async (p) => await SKN.recuperar(p)", pid)
+    e3 = pg.evaluate("SKN.estado()")
+    ok(e3["nome"] == "Recuperar" and e3["faixas"][0]["clipes"][0]["ini"] == 1.5, "recuperar o projeto salvo automaticamente")
+    pg.evaluate(f"async () => await SKN.salvar('{D}recuperado.sknv')")
+    pg.wait_for_timeout(300)
+    ok(pid not in [x["id"] for x in pg.evaluate("async () => await SKN.recuperaveis()")], "salvar de verdade apaga a cópia automática")
+    if "--longo" in sys.argv:
+        lg = D + "longo_2h.mp3"
+        if not os.path.isfile(lg):
+            subprocess.run([FF, "-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=330:duration=7200,volume=4", "-ac", "1", "-b:a", "48k", lg], check=True)
+        pg.evaluate("SKN.novo('vazio', 'Longo')")
+        t = time.time(); pg.evaluate(f"async () => await SKN.importar(['{lg}'])"); t_imp = time.time() - t
+        ok(abs(pg.evaluate("SKN.estado().fim") - 7200) < 1, "arquivo de 2 h importado (forma de onda)", f"{t_imp:.1f} s")
+        t_som = pg.evaluate("""async () => { SKN.ir(6900); const t = performance.now(); await skTocar(); return await new Promise(res => {
+            const olha = () => { const m = skMedirAgora(); if (m && m.L.pico > -30) return res((performance.now() - t) / 1000); if (performance.now() - t > 5000) return res(-1); requestAnimationFrame(olha); }; olha(); }); }""")
+        pg.wait_for_timeout(3000)
+        buf = pg.evaluate("SK.mt.buf.size"); pg.evaluate("skParar()")
+        ok(0 < t_som < 1.5 and buf <= 48, "tocar no meio de 2 h: som em menos de 1,5 s, poucos trechos na memória", f"{t_som:.2f} s, {buf} trechos")
     if "--ia" in sys.argv:
         v = pg.evaluate("async () => await SKN.vozes()")
         if v.get("vozes"):

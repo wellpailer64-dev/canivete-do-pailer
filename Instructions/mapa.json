@@ -228,17 +228,21 @@
    "nome": "Sound Kanivete",
    "grupo": "Áudio",
    "front": [
+    "som-gravar.js",
     "som-motor.js",
     "som-paineis.js",
     "som.js",
     "som.css"
    ],
    "back": [
-    "Functions/sound_kanivete.py"
+    "Functions/sound_kanivete.py",
+    "Functions/sk_gravar.py"
    ],
    "api": [
     "sk_info",
     "sk_trecho",
+    "sk_auto",
+    "sk_gravar",
     "sk_salvar",
     "sk_abrir",
     "sk_exportar",
@@ -1082,6 +1086,18 @@
    "modulos": [
     "media_server",
     "sound_kanivete"
+   ]
+  },
+  "sk_auto": {
+   "args": "acao, proj=None, caminho=None, pid=None",
+   "modulos": [
+    "sound_kanivete as s"
+   ]
+  },
+  "sk_gravar": {
+   "args": "acao, dispositivo=None, caminho=None, sr=48000, canais=1",
+   "modulos": [
+    "sk_gravar as g"
    ]
   },
   "sk_salvar": {
@@ -2162,6 +2178,7 @@
   "Functions/removerfundo.py": "removerfundo.py",
   "Functions/render_cache.py": "Cache de render em disco do Pocket Editor (como os \"Preview Files\" do Premiere)",
   "Functions/sincronizar.py": "Sincronizar clipes pelo áudio (como o \"Sincronizar › Áudio\" do Premiere): duas câmeras gravando a mesma cena",
+  "Functions/sk_gravar.py": "Sound Kanivete — gravar do microfone (ou interface de áudio) direto num WAV 24 bits",
   "Functions/snapshot_logger.py": "snapshot_logger.py — Backup/restauração para o Organizador de Vídeos",
   "Functions/sound_kanivete.py": "Sound Kanivete (Sk) — editor de áudio multipista do KANIVETE (frontend/js/som-*.js)",
   "Functions/soundboard.py": "soundboard.py — pack de efeitos sonoros do painel Soundboard do Pocket Editor",

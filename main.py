@@ -3301,6 +3301,34 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def sk_auto(self, acao, proj=None, caminho=None, pid=None):
+        """Salvamento automático do Sk: acao salvar|lista|ler|apagar (Functions/sound_kanivete.auto_*)."""
+        from Functions import sound_kanivete as s
+        try:
+            if acao == "salvar":
+                return s.auto_salvar(proj, caminho)
+            if acao == "lista":
+                return {"success": True, "itens": s.auto_lista()}
+            if acao == "ler":
+                return dict(s.auto_ler(pid), success=True)
+            return s.auto_apagar(pid)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def sk_gravar(self, acao, dispositivo=None, caminho=None, sr=48000, canais=1):
+        """Microfone (Functions/sk_gravar.py): acao dispositivos|iniciar|estado|parar."""
+        from Functions import sk_gravar as g
+        try:
+            if acao == "dispositivos":
+                return g.dispositivos()
+            if acao == "iniciar":
+                return g.iniciar(dispositivo, caminho, sr, canais)
+            if acao == "estado":
+                return g.estado()
+            return g.parar()
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def sk_salvar(self, proj, caminho):
         from Functions import sound_kanivete
         return sound_kanivete.salvar(proj, caminho)
