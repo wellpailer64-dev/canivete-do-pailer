@@ -268,6 +268,18 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 - Zoom em pixels da tela (100% = 1 pixel da imagem por pixel da tela, como no Photoshop, mesmo com a escala do
   Windows); `ieDesenharNitido` desenha 1:1 sem reamostrar, amplia inteiro sem suavizar e reduz em etapas (ieMipmap).
 
+## Menu Editar: Atenuar, Colar especial, Localizar e substituir (2026-10-07; código no fim de imagem-atalhos.js)
+- **Atenuar** (Shift+Ctrl+F, `KNV.atenuar(op, modo)`): logo depois de filtro/ajuste (com janela, Ctrl+F, Inverter/
+  Dessaturar) ou pincelada (pincel, borracha, carimbo; camada ou máscara) — `ieAtenuavel` guarda antes/depois e o
+  passo do histórico; mistura (1-k)·antes + k·(depois no modo) em pré-multiplicado ('lighter'), certo também no alfa.
+  Vale só enquanto o histórico estiver naquele passo (outra ação ou desfazer invalida).
+- **Colar especial › Colar dentro** (Alt+Shift+Ctrl+V) / **Colar fora** (`KNV.colarDentro({fora})`): cola centrado na
+  seleção, máscara da seleção (ou invertida), corrente solta (`L.m.solta`), desmarca.
+- **Localizar e substituir texto** (`KNV.substituirTexto(busca, troca, {todas, maiusc, palavra})`): todas as camadas
+  ou a ativa; trechos de estilo acompanham (`ieTxTrechosEditar` por troca); texto do PSD vira texto editado
+  (`textoNovo`, continua texto no Photoshop); texto do PSD com estilos misturados/sem fonte não é tocado (aviso).
+- Teste `testes/teste_editar.py` (app em --agente=9333).
+
 ## Pincel (rodada de 2026-10-07)
 - Ponta macia (`iePonta`) calculada pixel a pixel: núcleo cheio até a dureza e queda em COSSENO até a borda (3×3
   amostras por pixel; 2×2/1×1 em pontas grandes). A queda antiga ((1-u)² em gradiente) tinha bico no centro: com dureza

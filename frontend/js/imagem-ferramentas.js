@@ -242,7 +242,9 @@ function ieTracoFim() {
     if (!t.sujo) return;
     if (t.alvo === 'm') t.L.sujoM = true; else t.L.sujoPx = true;
     ieCamadaMudou(t.L, t.Rantes);
-    ieHist(ieT({ pincel: 'Pincel', borracha: 'Borracha', carimbo: 'Carimbo' }[t.tipo]));
+    const nome = { pincel: 'Pincel', borracha: 'Borracha', carimbo: 'Carimbo' }[t.tipo];
+    ieHist(ieT(nome));
+    if (typeof ieAtenuavel === 'function') ieAtenuavel(t.L, t.alvo, t.base, nome, doc);   // Editar › Atenuar
 }
 
 function ieCursorPincel(ctx, doc, tam) {

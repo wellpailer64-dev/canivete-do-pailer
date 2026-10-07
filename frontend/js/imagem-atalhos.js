@@ -532,3 +532,163 @@ function ieAtalhosDialogo() {
     box.querySelector('[data-r="1"]').onclick = fim;
     setTimeout(() => inp.focus(), 0);
 }
+
+// ─────────────────────────── Editar › Atenuar (Shift+Ctrl+F), como no Photoshop ───────────────────────────
+// Logo depois de um filtro, ajuste ou pincelada (pincel, borracha, carimbo — na camada ou na máscara): mistura o
+// "antes" e o "depois" com opacidade e modo de mesclagem. IE.atenuar = {doc, L, alvo, titulo, antes, depois, fundo,
+// histI}; só vale enquanto o histórico estiver no passo daquela operação (qualquer outra coisa depois invalida).
+const IE_ATENUAR_MODOS = [['source-over', 'Normal'], ['darken', 'Escurecer'], ['multiply', 'Multiplicação'], ['color-burn', 'Superexposição de cores'],
+    ['lighten', 'Clarear'], ['screen', 'Tela'], ['color-dodge', 'Subexposição de cores'], ['overlay', 'Sobrepor'], ['soft-light', 'Luz suave'],
+    ['hard-light', 'Luz direta'], ['difference', 'Diferença'], ['exclusion', 'Exclusão'], ['hue', 'Matiz'], ['saturation', 'Saturação'], ['color', 'Cor'],
+    ['luminosity', 'Luminosidade']];
+function ieAtenuavel(L, alvo, antes, titulo, doc = IE.doc) {
+    const o = alvo === 'm' ? L && L.m : L;
+    if (!doc || !o || !o.c) { IE.atenuar = null; return; }
+    IE.atenuar = { doc, L, alvo, titulo, antes: antes && antes.c ? { c: antes.c, x: antes.x, y: antes.y } : null,
+        depois: { c: ieClonar(o.c), x: o.x, y: o.y }, fundo: alvo === 'm' ? (L.m.fundo || 0) : 0, histI: doc.hist.i };
+}
+// plano {c, x, y} levado para o retângulo R (fora dele vale o "fundo" da máscara)
+function ieAtenuarPlano(p, R, fundo) {
+    const c = ieCanvas(R.w, R.h), x = ieCtx(c);
+    if (fundo) { x.fillStyle = '#fff'; x.globalAlpha = fundo / 255; x.fillRect(0, 0, R.w, R.h); x.globalAlpha = 1; if (p) x.clearRect(p.x - R.x, p.y - R.y, p.c.width, p.c.height); }
+    if (p) x.drawImage(p.c, p.x - R.x, p.y - R.y);
+    return c;
+}
+function ieAtenuarCompor(a, k, modo) {
+    const R = ieRInt(ieRUniao(ieRPlano(a.depois), a.antes ? ieRPlano(a.antes) : null));
+    const A = ieAtenuarPlano(a.antes, R, a.fundo);
+    let B = ieAtenuarPlano(a.depois, R, a.fundo);
+    if (modo && modo !== 'source-over') {   // o "depois" no modo escolhido, sobre o "antes"
+        const M = ieClonar(A), mx = ieCtx(M);
+        mx.globalCompositeOperation = modo; mx.drawImage(B, 0, 0);
+        B = M;
+    }
+    // (1-k)·antes + k·depois, somando em pré-multiplicado ('lighter'): mistura certa também no alfa (borracha atenuada)
+    const c = ieCanvas(R.w, R.h), x = ieCtx(c);
+    x.globalAlpha = 1 - k; x.drawImage(A, 0, 0);
+    x.globalCompositeOperation = 'lighter'; x.globalAlpha = k; x.drawImage(B, 0, 0);
+    return { c, x: R.x, y: R.y };
+}
+async function ieAtenuar(doc, vals) {
+    const a = IE.atenuar;
+    if (!doc || !a || a.doc !== doc || doc.hist.i !== a.histI || ieAtiva(doc) !== a.L) {
+        ieToast(ieT('Nada para atenuar: use logo depois de um filtro, ajuste ou pincelada')); return false;
+    }
+    const L = a.L, Rantes = ieRCamada(L);
+    const por = r => {
+        const o = a.alvo === 'm' ? L.m : L;
+        o.c = r.c; o.x = r.x; o.y = r.y;
+        if (a.alvo === 'm') L.sujoM = true; else L.sujoPx = true;
+        ieInvalidar(L); ieCamadaMudou(L, Rantes);
+    };
+    const original = () => ({ c: ieClonar(a.depois.c), x: a.depois.x, y: a.depois.y });
+    const v = vals || await ieDialogo({
+        titulo: `${ieT('Atenuar')}: ${ieT(a.titulo)}`,
+        campos: [{ id: 'op', rotulo: 'Opacidade (%)', min: 0, max: 100, valor: 100 }, { id: 'modo', rotulo: 'Modo', tipo: 'select', opcoes: IE_ATENUAR_MODOS, valor: 'source-over' }],
+        previa: p => por(p ? ieAtenuarCompor(a, p.op / 100, p.modo) : original()),
+    });
+    if (!v) { por(original()); return false; }
+    por(ieAtenuarCompor(a, ieClamp((v.op ?? 100) / 100, 0, 1), v.modo || 'source-over'));
+    ieHist(ieT('Atenuar') + ' ' + ieT(a.titulo));
+    IE.atenuar = null;
+    return true;
+}
+
+// ─────────────────────────── Editar › Colar especial › Colar dentro / Colar fora ───────────────────────────
+// Como o Photoshop: cola o que está na área de transferência numa camada nova, centrada na seleção, com a máscara da
+// seleção (dentro) ou da seleção invertida (fora), com a corrente solta (mover a camada mexe só na imagem) e desmarca.
+async function ieColarDentro(doc, fora = false) {
+    if (!doc || !doc.sel) { ieToast(ieT('Faça uma seleção antes: ela vira a máscara do que for colado')); return false; }
+    const B = { ...doc.sel.bbox }, antes = ieTodas(doc).length;
+    await ieColar(true);
+    const L = ieAtiva(doc);
+    if (ieTodas(doc).length === antes || !L || !L.c) return false;
+    const dx = Math.round(B.x + B.w / 2 - (L.x + L.c.width / 2)), dy = Math.round(B.y + B.h / 2 - (L.y + L.c.height / 2));
+    if (dx || dy) ieMoverCamada(L, dx, dy);
+    await ieMascaraNova(doc, !fora, true);
+    if (L.m) L.m.solta = true;
+    doc.mascaraAlvo = false;
+    ieSelNada();
+    ieInvalidar(L); ieTudo(doc);
+    ieHist(ieT(fora ? 'Colar fora' : 'Colar dentro'));
+    ieUiCamadas?.();
+    return true;
+}
+
+// ─────────────────────────── Editar › Localizar e substituir texto ───────────────────────────
+// Troca em todas as camadas de texto (ou só na ativa), como o Photoshop: texto do editor guarda os trechos de estilo;
+// texto vindo do PSD vira texto editado (continua camada de texto no Photoshop, via textoNovo). Texto do PSD com
+// estilos misturados ou sem a fonte instalada não é tocado (viraria um estilo só) — a lista volta no aviso.
+function ieLsRegex(busca, { maiusc = false, palavra = false } = {}) {
+    const esc = String(busca).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(palavra ? `(?<![\\p{L}\\p{N}_])${esc}(?![\\p{L}\\p{N}_])` : esc, 'gu' + (maiusc ? '' : 'i'));
+}
+async function ieSubstituirTexto(doc, busca, troca, { todas = true, maiusc = false, palavra = false } = {}) {
+    if (!doc || !busca) return { trocas: 0, camadas: 0, puladas: [] };
+    const re = ieLsRegex(busca, { maiusc, palavra });
+    const ativa = ieAtiva(doc);
+    const alvo = ieTodas(doc).filter(L => L.tipo === 'texto' && (L.txt || L.texto) && (todas || L === ativa));
+    let trocas = 0, camadas = 0;
+    const puladas = [];
+    for (const L of alvo) {
+        let t = L.txt, convertido = false;
+        if (!t) {   // texto do PSD ainda não editado
+            const s0 = String(L.texto?.texto ?? '');
+            re.lastIndex = 0;
+            if (!re.test(s0)) continue;
+            t = await ieTextoDoPsd(L, true);
+            if (!t || t.misto || t.semFonte) { puladas.push(L.nome); continue; }
+            L._rasterAntes = { c: L.c, x: L.x, y: L.y };
+            L.txt = t; convertido = true;
+        }
+        const antes = String(t.s ?? '');
+        re.lastIndex = 0;
+        const achados = [...antes.matchAll(re)];
+        if (!achados.length) { if (convertido) delete L.txt; continue; }
+        let cur = antes, desloc = 0;
+        for (const m of achados) {   // uma troca por vez: os trechos de estilo acompanham cada uma
+            const i = m.index + desloc, prox = cur.slice(0, i) + troca + cur.slice(i + m[0].length);
+            ieTxTrechosEditar(t, cur, prox);
+            cur = prox; desloc += troca.length - m[0].length;
+        }
+        t.s = cur; trocas += achados.length; camadas++;
+        if (L.ref != null && L.texto) { L.textoNovo = t.s; L.textoEstilo = ieEstiloMudado(t); delete L.c0; }
+        if (L._nomeAuto) L.nome = String(t.s).split(IE_NL)[0].slice(0, 40) || ieT('Texto');
+        const R0 = ieRCamada(L);
+        ieTextoRender(L);
+        ieAgendar(ieRUniao(R0, ieRCamada(L)), doc);
+    }
+    if (trocas) { ieHist(ieT('Localizar e substituir texto'), doc); ieUiCamadas?.(); }
+    return { trocas, camadas, puladas };
+}
+async function ieLocalizarTextoDialogo(doc) {
+    if (!doc) return;
+    if (!ieTodas(doc).some(L => L.tipo === 'texto')) { ieToast(ieT('Nenhuma camada de texto no documento')); return; }
+    const v = await ieDialogo({
+        titulo: 'Localizar e substituir texto', ok: 'Alterar tudo',
+        campos: [{ id: 'busca', rotulo: 'Localizar', tipo: 'texto', valor: IE._lsBusca || '' }, { id: 'troca', rotulo: 'Alterar para', tipo: 'texto', valor: IE._lsTroca || '' },
+            { id: 'todas', rotulo: 'Pesquisar todas as camadas', tipo: 'check', valor: true }, { id: 'maiusc', rotulo: 'Diferenciar maiúsculas de minúsculas', tipo: 'check', valor: false },
+            { id: 'palavra', rotulo: 'Somente palavra inteira', tipo: 'check', valor: false }],
+    });
+    if (!v || !v.busca) return;
+    IE._lsBusca = v.busca; IE._lsTroca = v.troca;
+    const r = await ieSubstituirTexto(doc, v.busca, v.troca || '', v);
+    ieToast(r.trocas ? `${r.trocas} ${ieT(r.trocas > 1 ? 'ocorrências alteradas em' : 'ocorrência alterada em')} ${r.camadas} ${ieT(r.camadas > 1 ? 'camadas' : 'camada')}`
+        : ieT('Nenhuma ocorrência encontrada'));
+    if (r.puladas.length) setTimeout(() => ieToast(`${ieT('Não alterado (estilos misturados ou fonte ausente, edite no Photoshop)')}: ${r.puladas.slice(0, 4).join(', ')}`), 2200);
+}
+
+Object.assign(IE_CMDS, {
+    atenuar: doc => ieAtenuar(doc),
+    colarDentro: doc => ieColarDentro(doc, false),
+    colarFora: doc => ieColarDentro(doc, true),
+    localizarTexto: doc => ieLocalizarTextoDialogo(doc),
+});
+Object.assign(IE_ATALHOS, { 'Shift+Ctrl+F': 'atenuar', 'Alt+Shift+Ctrl+V': 'colarDentro' });
+(function () {
+    const edt = IE_MENUS.find(m => m[0] === 'Editar')[1];
+    const depois = (cmd, ...itens) => { const i = edt.findIndex(it => Array.isArray(it) && it[1] === cmd); edt.splice(i + 1, 0, ...itens); };
+    depois('refazer', '-', ['Atenuar...', 'atenuar', 'Shift+Ctrl+F']);
+    depois('colarLugar', ['Colar especial', [['Colar dentro', 'colarDentro', 'Alt+Shift+Ctrl+V'], ['Colar fora', 'colarFora']]]);
+    depois('tracar', '-', ['Localizar e substituir texto...', 'localizarTexto']);
+})();

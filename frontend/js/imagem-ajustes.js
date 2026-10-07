@@ -455,10 +455,12 @@ async function ieAplicarComDialogo(def) {
     if (!vals) { ieCamadaMudou(L, Rantes); return; }
     const r = fazer(vals);
     ieGravavel(L);
+    const antes = { c: L.c, x: L.x, y: L.y };   // para o Editar › Atenuar
     L.c = r.c; L.x = r.x; L.y = r.y;
     L.sujoPx = true;
     ieCamadaMudou(L, Rantes);
     ieHist(ieT(titulo));
+    if (typeof ieAtenuavel === 'function') ieAtenuavel(L, 'c', antes, titulo, doc);
     IE.ultimoFiltro = { titulo, ajuste, proc, margem, vals, cmd: IE._cmdAtual };   // Filtro > Último filtro (Ctrl+F)
 }
 
@@ -476,9 +478,11 @@ async function ieRepetirFiltro() {
     const Rantes = ieRCamada(L);
     const r = ieProcessarCamada(L, u.proc ? u.proc(u.vals) : iePorPixel(u.ajuste(u.vals)), u.margem ? u.margem(u.vals) : 0, doc);
     ieGravavel(L);
+    const antes = { c: L.c, x: L.x, y: L.y };
     L.c = r.c; L.x = r.x; L.y = r.y; L.sujoPx = true;
     ieCamadaMudou(L, Rantes);
     ieHist(ieT(u.titulo));
+    if (typeof ieAtenuavel === 'function') ieAtenuavel(L, 'c', antes, u.titulo, doc);
 }
 
 const IE_AJUSTES = {
@@ -569,9 +573,11 @@ async function ieAplicarDireto(nome, ajuste) {
     const Rantes = ieRCamada(L);
     const r = ieProcessarCamada(L, iePorPixel(ajuste), 0, doc);
     ieGravavel(L);
+    const antes = { c: L.c, x: L.x, y: L.y };
     L.c = r.c; L.x = r.x; L.y = r.y; L.sujoPx = true;
     ieCamadaMudou(L, Rantes);
     ieHist(ieT(nome));
+    if (typeof ieAtenuavel === 'function') ieAtenuavel(L, 'c', antes, nome, doc);
 }
 
 // ─────────────────────────── filtros ───────────────────────────
