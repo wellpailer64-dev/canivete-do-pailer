@@ -22,7 +22,7 @@ function vkMontar() {
     raiz.dataset.ok = '1';
     raiz.innerHTML = `
     <header class="ie-top">
-        <div class="ie-brand"><span class="ie-brand-mark"><svg class="i"><use href="#i-sparkles"/></svg></span> Vetor Kanivete</div>
+        <div class="ie-brand"><span class="app-logo al-vk app-logo-marca">Vk</span> Vetor Kanivete</div>
         <nav class="ie-mbar" id="vk-mbar"></nav>
         <div class="ie-top-spacer"></div>
         <span class="ie-top-info" id="vk-top-info"></span>
@@ -39,7 +39,7 @@ function vkMontar() {
                 <textarea id="vk-texto-edit" class="vk-texto-edit" spellcheck="false" hidden></textarea>
                 <div class="ie-inicio" id="vk-inicio">
                     <div class="ie-inicio-box">
-                        <div class="ie-inicio-ico"><svg class="i"><use href="#i-sparkles"/></svg></div>
+                        <span class="app-logo al-vk app-logo-grande">Vk</span>
                         <h2>Vetor Kanivete</h2>
                         <p>Vetores para impressão: abra PDF, AI, SVG ou PowerPoint, ou comece do zero. Fecha o arquivo em PDF/X para a gráfica.</p>
                         <div class="ie-inicio-acoes">

@@ -83,7 +83,7 @@
     <!-- Splash -->
     <div id="splash-overlay">
         <img src="identidade/splash.png" alt="">
-        <div class="splash-title" aria-label="KANIVETE"><svg class="wordmark wordmark-duo" viewBox="0 -30 5270 1060" aria-hidden="true"><use href="#i-kanivete"/></svg></div>
+        <div class="splash-title" aria-label="KANIVETE"><!-- KNV se abre em KANIVETE: letras do #i-kanivete separadas (app.css, splash) --><svg class="splash-wm" viewBox="0 -30 5270 1060" aria-hidden="true"><g class="wl wl-k wl-knv" style="--dx:1580px"><path d="M0 1000Q40 952 40 840V525H382L524 840L582 968Q605 986 636 1000H374Q341 952 341 840L235 604V840Q235 952 275 1000Z"/><path d="M0 0H275Q235 48 235 160V420L465 0H555L319 430L341 475H40V160Q40 48 0 0Z"/></g><g class="wl wl-a wl-novo" style="--i:0"><path d="M1075 640 1048 525H1249L1322 840L1346 946Q1365 979 1398 1000H1118Q1121 952 1121 840L1089 702H895L865 840Q865 952 869 1000H707Q741 979 759 944L852 525H934L909 640Z"/><path d="M928 0H1128L1238 475H1037L990 273L946 475H864L949 92Z"/></g><g class="wl wl-n wl-knv" style="--dx:812px"><path d="M1494 0H1723L1913 475H1718L1616 220V475H1534V160Q1534 48 1494 0Z"/><path d="M1738 525H1933L2035 780V525H2117V985L2123 1000H1928Z"/><path d="M2157 0Q2117 48 2117 160V475H2035V160Q2035 48 1995 0Z"/><path d="M1494 1000Q1534 952 1534 840V525H1616V840Q1616 952 1656 1000Z"/></g><g class="wl wl-i wl-novo" style="--i:1"><path d="M2307 0H2582Q2542 48 2542 160V475H2347V160Q2347 48 2307 0Z"/><path d="M2307 1000Q2347 952 2347 840V525H2542V840Q2542 952 2582 1000Z"/></g><g class="wl wl-v wl-knv" style="--dx:355px"><path d="M2928 1000 2840 525H3041L3068 673L3095 525H3177L3110 898L3128 1000Z"/><path d="M2704 0H2984Q2974 48 2974 160L3032 475H2831L2755 63Q2738 24 2704 0Z"/><path d="M3313 0Q3279 24 3261 63L3244 160L3187 475H3105L3162 160Q3162 48 3151 0Z"/></g><g class="wl wl-e wl-novo" style="--i:2"><path d="M3494 0H3932V250L3888 82H3735Q3729 116 3729 160V392H3834V330L3866 392V470H3729V475H3534V160Q3534 48 3494 0Z"/><path d="M3494 1000Q3534 952 3534 840V525H3729V840Q3729 883 3735 916H3902L3940 790V1000Z"/></g><g class="wl wl-t wl-novo" style="--i:3"><path d="M4120 0H4644V250L4594 86H4480V475H4284V86H4170L4120 250Z"/><path d="M4244 1000Q4284 952 4284 840V525H4480V840Q4480 952 4520 1000Z"/></g><g class="wl wl-e2 wl-novo" style="--i:4"><path d="M4802 0H5240V250L5196 82H5043Q5037 116 5037 160V392H5142V330L5174 392V470H5037V475H4842V160Q4842 48 4802 0Z"/><path d="M4802 1000Q4842 952 4842 840V525H5037V840Q5037 883 5043 916H5210L5248 790V1000Z"/></g></svg></div>
         <div class="splash-bar"></div>
     </div>
 
@@ -124,7 +124,7 @@
 
                 <div class="menu-group">Vídeo</div>
                 <button class="menu-item" data-tool="video-cutter" onclick="switchTool('video-cutter')">
-                    <span class="icon"><svg class="i"><use href="#i-film"/></svg></span><span class="label">Editor Kanivete</span>
+                    <span class="icon"><span class="app-logo al-ek">Ek</span></span><span class="label">Editor Kanivete</span>
                 </button>
                 <button class="menu-item" data-tool="compressor-video" onclick="switchTool('compressor-video')">
                     <span class="icon"><svg class="i"><use href="#i-shrink"/></svg></span><span class="label">Comprimir Vídeo</span>
@@ -155,10 +155,10 @@
 
                 <div class="menu-group">Imagem</div>
                 <button class="menu-item" data-tool="editor-imagem" onclick="switchTool('editor-imagem')">
-                    <span class="icon"><svg class="i"><use href="#i-layers"/></svg></span><span class="label">Photo Kanivete</span>
+                    <span class="icon"><span class="app-logo al-pk">Pk</span></span><span class="label">Photo Kanivete</span>
                 </button>
                 <button class="menu-item" data-tool="vetor-kanivete" onclick="switchTool('vetor-kanivete')">
-                    <span class="icon"><svg class="i"><use href="#i-sparkles"/></svg></span><span class="label">Vetor Kanivete</span>
+                    <span class="icon"><span class="app-logo al-vk">Vk</span></span><span class="label">Vetor Kanivete</span>
                 </button>
                 <button class="menu-item" data-tool="converter-imagem" onclick="switchTool('converter-imagem')">
                     <span class="icon"><svg class="i"><use href="#i-image"/></svg></span><span class="label">Converter Imagem</span>
@@ -233,7 +233,7 @@
                             <h4>Vídeo</h4>
                             <div class="home-grid">
                                 <button class="home-card" onclick="switchTool('video-cutter')">
-                                    <span class="hc-media"><img src="img/tools/video-cutter.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-film"/></svg></span></span>
+                                    <span class="hc-media"><img src="img/tools/video-cutter.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico hc-app"><span class="app-logo al-ek">Ek</span></span></span>
                                     <b>Editor Kanivete</b><small>Vídeo e áudio: cortes, camadas e exportação (MP4, MP3...)</small>
                                 </button>
                                 <button class="home-card" onclick="switchTool('compressor-video')">
@@ -521,7 +521,7 @@
                 <div class="tool-page ve-page" id="page-video-cutter">
                     <div class="ve" id="ve">
                         <header class="ve-top">
-                            <div class="ve-brand"><span class="ve-brand-mark"><svg class="i"><use href="#i-play"/></svg></span> Editor Kanivete</div>
+                            <div class="ve-brand"><span class="app-logo al-ek app-logo-marca">Ek</span> Editor Kanivete</div>
                             <!-- Arquivo · Editar · Clipe · Sequência · Marcadores · Exibir · Janela · Ajuda (editor-comandos.js) -->
                             <nav class="ve-mbar" id="ve-mbar"></nav>
                             <span class="ve-proj" id="ve-proj" hidden></span>
@@ -536,6 +536,7 @@
                                 <div class="ve-start-hero">
                                     <video class="ve-start-hero-bg" id="ve-start-bg" src="video/editor-lobby.webm" muted loop playsinline preload="auto" aria-hidden="true" tabindex="-1"></video>
                                     <div class="ve-start-hero-txt">
+                                        <span class="app-logo al-ek app-logo-grande">Ek</span>
                                         <h2>Comece sua edição</h2>
                                         <p>Crie um projeto, corte rápido sem salvar ou deixe o AutoFrame montar no ritmo da música.</p>
                                     </div>
@@ -1043,7 +1044,7 @@
                 <div class="tool-page ve-page ie-page" id="page-editor-imagem">
                     <div class="ie" id="ie" tabindex="-1">
                         <header class="ie-top">
-                            <div class="ie-brand"><span class="ie-brand-mark"><svg class="i"><use href="#i-layers"/></svg></span> Photo Kanivete</div>
+                            <div class="ie-brand"><span class="app-logo al-pk app-logo-marca">Pk</span> Photo Kanivete</div>
                             <nav class="ie-mbar" id="ie-mbar"></nav>
                             <div class="ie-top-spacer"></div>
                             <span class="ie-top-info" id="ie-top-info"></span>
@@ -1063,7 +1064,7 @@
                                     <textarea id="ie-texto-edit" class="ie-texto-edit" spellcheck="false" hidden></textarea>
                                     <div class="ie-inicio" id="ie-inicio">
                                         <div class="ie-inicio-box">
-                                            <div class="ie-inicio-ico"><svg class="i"><use href="#i-layers"/></svg></div>
+                                            <span class="app-logo al-pk app-logo-grande">Pk</span>
                                             <h2>Photo Kanivete</h2>
                                             <p>Abra um PSD com as camadas, uma foto ou comece do zero. Arraste o arquivo para cá.</p>
                                             <div class="ie-inicio-acoes">

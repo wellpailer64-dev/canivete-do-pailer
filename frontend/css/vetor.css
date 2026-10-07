@@ -9,10 +9,9 @@
 .vk .vk-corpo { grid-template-columns: 46px var(--vk-esq-w, 0px) minmax(0, 1fr) var(--vk-dir-w, 300px); }   /* colunas de painéis: vetor-dock.js */
 .vk .ie-painel.solto { position: absolute; z-index: 30; resize: both; overflow: hidden; display: flex; flex-direction: column; }
 .vk .ie-centro { grid-template-rows: minmax(0, 1fr) 24px; }
-.vk .vk-paineis { flex-direction: column !important; overflow: hidden; }
-.vk .vk-paineis > .ie-painel { min-height: 0; display: flex; flex-direction: column; }
-.vk .vk-paineis > .ie-painel:first-child { flex: 1 1 55%; }
-.vk .vk-paineis > .vk-p-abas { flex: 1 1 45%; border-top: 1px solid var(--ie-linha); }
+/* painéis em colunas (vetor-dock.js): as colunas lado a lado, os painéis empilhados em cada uma */
+.vk .vk-paineis { flex-direction: row !important; overflow: hidden; }
+.vk .ie-dock-col > .ie-painel { min-height: 0; display: flex; flex-direction: column; }
 .vk .ie-painel-corpo { overflow-y: auto; padding: 8px 10px; }
 .vk-vista { position: relative; overflow: hidden; background: var(--vk-mesa); }
 .vk-vista canvas { position: absolute; inset: 0; display: block; touch-action: none; }

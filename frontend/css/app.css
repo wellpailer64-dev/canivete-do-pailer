@@ -1637,3 +1637,27 @@ html.barra-propria .app-container { height: calc(100vh - 26px); }
 .tb-fechar::after { content: '×'; font-size: 9px; }
 .tb-max::after { content: '+'; }
 .tb-min::after { content: '−'; }
+
+
+/* ── splash: KNV → KANIVETE, tudo branco. Letras em <g class="wl">: K, N e V partem juntos do centro (--dx) e abrem;
+      A, I, E, T, E surgem nos vãos, um atrás do outro (--i) ── */
+.splash-title { color: #fff; }
+.splash-wm { display: block; height: 34px; width: auto; aspect-ratio: 5270 / 1060; fill: #fff; overflow: visible; }
+.splash-wm .wl-knv { animation: wl-abre .8s cubic-bezier(.75, 0, .2, 1) 1.05s both; }
+.splash-wm .wl-novo { transform-box: fill-box; transform-origin: center; animation: wl-surge .5s cubic-bezier(.2, .8, .2, 1) calc(1.5s + var(--i) * .07s) both;   /* depois que K, N e V abriram: antes o A aparecia ao lado do KNV */ }
+@keyframes wl-abre { from { transform: translateX(var(--dx)); } to { transform: none; } }
+@keyframes wl-surge { from { opacity: 0; transform: scale(.35); } to { opacity: 1; transform: none; } }
+
+/* ── mini logos das ferramentas (como Ps/Pr/Ae da Adobe): quadrado arredondado escuro, borda e letras no tom laranja ── */
+.app-logo { --al: #ff8c42; --al-fundo: #2b1408; display: inline-grid; place-items: center; flex: none; box-sizing: border-box;
+    width: 19px; height: 19px; border-radius: 22%; background: var(--al-fundo); box-shadow: inset 0 0 0 1.2px var(--al);
+    color: var(--al); font: 700 9.5px/1 var(--font-ui); letter-spacing: -.02em; }
+.al-ek { --al: #ff8c42; --al-fundo: #2b1408; }   /* Editor Kanivete: laranja vivo */
+.al-pk { --al: #ffb45c; --al-fundo: #2a1b08; }   /* Photo Kanivete: âmbar */
+.al-vk { --al: #ef5f2b; --al-fundo: #2b0e06; }   /* Vetor Kanivete: laranja queimado */
+.app-logo-marca { width: 22px; height: 22px; font-size: 11px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px var(--al); }
+.app-logo-grande { width: 56px; height: 56px; font-size: 26px; border-radius: 12px; box-shadow: inset 0 0 0 2.5px var(--al); margin: 0 auto 14px; }
+.tab .tab-ico .app-logo { width: 16px; height: 16px; font-size: 8px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--al); }
+.hc-ico.hc-app { background: none !important; border: 0 !important; padding: 0; }
+.hc-ico .app-logo { width: 34px; height: 34px; font-size: 15px; border-radius: 8px; box-shadow: inset 0 0 0 1.8px var(--al); }
+.ve-start-hero-txt .app-logo-grande { margin: 0 0 12px; }
