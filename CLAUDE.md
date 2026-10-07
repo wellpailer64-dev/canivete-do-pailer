@@ -111,8 +111,8 @@ guia `Instructions/agente/plano-cena.md` (seção "Fluxo barato": biblioteca `D:
 `Instructions/agente/design-photo-kanivete.md`.
 
 ## Sound Kanivete (áudio multipista)
-Timeline de áudio, fades, LUFS, projeto `.sknv`, API `window.SKN`: `Instructions/sound-kanivete.md`; código `frontend/js/som.js` +
-`Functions/sound_kanivete.py`. Teste: `python testes/teste_som.py`.
+Timeline de áudio, fades, LUFS, projeto `.sknv`, API `window.SKN`: `Instructions/sound-kanivete.md`; código `frontend/js/som.js` (núcleo),
+`som-motor.js` (reprodução em trechos), `som-paineis.js` (painéis) + `Functions/sound_kanivete.py`. Teste: `python testes/teste_som.py`.
 
 ## Remover fundo (recorte)
 GPU automática (onnxruntime-directml), pessoa → BiRefNet matting / objeto → BEN2 (YuNet decide), uma sessão por vez na

@@ -1,14 +1,14 @@
 /* Sound Kanivete (som.js) — reaproveita o visual do Photo (classes ie-*); aqui só o que é dele */
 .sk-page { padding: 0; }
 .content-area:has(#page-sound-kanivete.active) { padding: 10px; overflow: hidden; }
-.sk { display: grid; grid-template-rows: auto minmax(0, 1fr) 24px; height: 100%; background: var(--ie-fundo, #141110); position: relative; }
+.sk { display: grid; grid-template-rows: auto var(--sk-cima, 300px) 6px minmax(0, 1fr) 24px; height: 100%; background: var(--ie-fundo, #141110); position: relative; }
 .sk .ie-top { gap: 10px; }
 .sk-tbar { display: flex; align-items: center; gap: 6px; margin-left: 12px; }
 .sk-sep { width: 1px; height: 20px; background: var(--ie-linha, #2c2520); margin: 0 4px; }
 .sk-play { min-width: 34px; font-size: 13px; }
 .sk-tempo { font: 600 13px/1 ui-monospace, Consolas, monospace; color: #ffd166; min-width: 74px; text-align: center; }
 .sk-chk { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); }
-.sk-corpo { display: grid; grid-template-columns: 190px minmax(0, 1fr) 260px; min-height: 0; }
+.sk-corpo { display: grid; grid-template-columns: 190px minmax(0, 1fr); min-height: 0; border-top: 1px solid #2c2520; }
 .sk-faixas { background: #1a1512; border-right: 1px solid #2c2520; overflow: hidden; position: relative; }
 .sk-f-topo { border-bottom: 1px solid #2c2520; background: #1f1915; }
 .sk-f-lista { will-change: transform; }
@@ -25,7 +25,7 @@
 .sk-tl-wrap { position: relative; min-width: 0; min-height: 0; }
 .sk-tl-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .sk-modelos { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
-.sk-props { background: #1a1512; border-left: 1px solid #2c2520; padding: 12px; overflow-y: auto; font-size: 12px; color: var(--text-2); display: flex; flex-direction: column; gap: 8px; }
+
 .sk-p-tit { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
 .sk-p-nome { color: var(--text); font-weight: 600; word-break: break-all; }
 .sk-p-l { display: grid; grid-template-columns: 1fr 86px 44px; align-items: center; gap: 6px; }
@@ -55,3 +55,35 @@
 .sk-atalho .app-logo { width: 22px; height: 22px; font-size: 11px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px var(--al); }
 .sk-atalho button { margin-left: auto; }
 .sk-props select, .sk select { background: #120f0d; color: var(--text); border: 1px solid #3a3029; border-radius: 4px; padding: 3px 6px; font: 12px var(--font-ui); }
+
+/* painéis (som-paineis.js): três colunas em cima, divisória, timeline embaixo */
+.sk-cima { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr) minmax(260px, 330px); gap: 8px; padding: 8px; min-height: 0; }
+.sk-pn { background: #1a1512; border: 1px solid #2c2520; border-radius: 10px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.sk-abas { display: flex; gap: 2px; padding: 6px 6px 0; border-bottom: 1px solid #2c2520; background: #1f1915; flex: none; }
+.sk-abas button { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--text-3); font: 600 11.5px var(--font-ui); padding: 6px 10px 7px; cursor: pointer; border-radius: 6px 6px 0 0; }
+.sk-abas button:hover { color: var(--text); background: #261f1a; }
+.sk-abas button.on { color: #ffd166; border-bottom-color: #ffd166; background: #221b16; }
+.sk-pn-corpo { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 12px; font-size: 12px; color: var(--text-2); display: flex; flex-direction: column; gap: 8px; }
+.sk-grupo { display: flex; flex-direction: column; gap: 6px; padding: 8px; border: 1px solid #2a221d; border-radius: 8px; background: #17120f; }
+.sk-monitor { padding: 8px 10px; gap: 8px; }
+.sk-transp { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; flex: none; }
+.sk-transp .sk-tempo { font-size: 22px; min-width: 120px; letter-spacing: .02em; }
+.sk-play.on { background: #ffd166; color: #1a120c; border-color: #ffd166; }
+#sk-medidor { flex: 1; min-height: 60px; width: 100%; display: block; border-radius: 8px; }
+.sk-loud { display: flex; justify-content: center; gap: 18px; font-size: 11.5px; color: var(--text-3); flex: none; }
+.sk-loud b { color: var(--text); font: 600 13px ui-monospace, Consolas, monospace; }
+.sk-loud b.sk-ruim { color: #ff3b30; }
+.sk-div { cursor: row-resize; background: linear-gradient(#0000 2px, #3a3029 2px, #3a3029 4px, #0000 4px); }
+.sk-div:hover { background: linear-gradient(#0000 2px, #ffd166 2px, #ffd166 4px, #0000 4px); }
+.sk-lista { display: flex; flex-direction: column; gap: 3px; }
+.sk-item { display: grid; grid-template-columns: 26px minmax(0, 1fr) 26px; align-items: center; gap: 6px; padding: 4px; border-radius: 6px; cursor: grab; }
+.sk-item:hover { background: #241d18; }
+.sk-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.sk-item small { display: block; color: var(--text-3); font-size: 10.5px; }
+.sk-item button { border: 1px solid #3a3029; background: #201a16; color: var(--text); border-radius: 4px; height: 22px; padding: 0; cursor: pointer; font-size: 11px; }
+.sk-busca, .sk-txt { width: 100%; box-sizing: border-box; background: #120f0d; color: var(--text); border: 1px solid #3a3029; border-radius: 6px; padding: 6px 8px; font: 12px var(--font-ui); resize: vertical; }
+.sk-p-l2 { display: grid; grid-template-columns: 50px 1fr; align-items: center; gap: 6px; }
+.sk-pn .sk-exp { min-width: 0; gap: 8px; }
+.sk-pn .sk-exp label { grid-template-columns: 90px minmax(0, 1fr); }
+.sk-pn .sk-texto { max-height: none; }
+.sk .ie-inicio { z-index: 5; }

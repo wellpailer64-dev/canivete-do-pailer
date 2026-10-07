@@ -14,6 +14,7 @@ import json
 import os
 import subprocess
 import tempfile
+import threading
 
 from Functions.midia import NO_WINDOW, ffmpeg
 
@@ -62,6 +63,52 @@ def picos(path):
     return out
 
 
+def _pcm_dir():
+    d = os.path.join(os.path.dirname(_cache_dir()), "sk_pcm")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+_podado = [0.0]
+
+
+def _podar_pcm(limite=1.5e9):
+    """Cache de trechos com teto (~1,5 GB): apaga os usados há mais tempo. No máximo uma vez por minuto."""
+    import time
+    if time.time() - _podado[0] < 60:
+        return
+    _podado[0] = time.time()
+    d = _pcm_dir()
+    arqs = sorted((os.path.join(d, n) for n in os.listdir(d)), key=os.path.getatime)
+    total = sum(os.path.getsize(p) for p in arqs)
+    for p in arqs:
+        if total <= limite:
+            break
+        try:
+            total -= os.path.getsize(p)
+            os.remove(p)
+        except OSError:
+            pass
+
+
+def trecho(arq, k, sr=48000, seg=10):
+    """Trecho k (seg segundos) do áudio como PCM cru s16le estéreo em sr — a prévia (som-motor.js) agenda esses
+    pedaços no WebAudio com precisão de amostra, sem carregar o arquivo inteiro (serve para gravações de horas).
+    Cache em %LOCALAPPDATA%/CaniveteDoPailer/sk_pcm."""
+    st = os.stat(arq)
+    chave = hashlib.sha1(f"{os.path.abspath(arq)}|{st.st_size}|{st.st_mtime}|{sr}|{seg}".encode()).hexdigest()[:16]
+    out = os.path.join(_pcm_dir(), f"{chave}_{int(k)}.pcm")
+    if not os.path.isfile(out):
+        tmp = out + f".{os.getpid()}.{threading.get_ident()}.tmp"
+        subprocess.run([ffmpeg(), "-y", "-hide_banner", "-nostdin", "-v", "error", "-ss", f"{int(k) * seg}", "-t", f"{seg}", "-i", arq,
+                        "-vn", "-af", _ESTEREO(arq), "-ar", str(int(sr)), "-f", "s16le", tmp], capture_output=True, timeout=120, creationflags=NO_WINDOW)
+        if not os.path.isfile(tmp):
+            raise RuntimeError("não leu o trecho")
+        os.replace(tmp, out)
+        _podar_pcm()
+    return out
+
+
 def info(path):
     if not path or not os.path.isfile(path):
         return {"success": False, "error": f"arquivo não encontrado: {path}"}
@@ -93,10 +140,49 @@ def abrir(caminho):
     return {"success": True, "proj": proj, "caminho": caminho, "faltando": faltando}
 
 
-def _filtro_clipe(c, i, sr):
-    """atrim do trecho → volume (com curva) → fades → adelay até o início na timeline."""
+_CANAIS = {}
+
+
+def _canais(arq):
+    k = (arq, os.path.getmtime(arq) if os.path.isfile(arq) else 0)
+    if k not in _CANAIS:
+        _CANAIS[k] = _ffprobe_dur(arq)[1]
+    return _CANAIS[k]
+
+
+def _ESTEREO(arq):
+    """Filtro para estéreo: mono é copiado nos dois canais (o aformat/-ac 2 abririam com -3 dB)."""
+    return "pan=stereo|c0=c0|c1=c0" if _canais(arq) == 1 else "aformat=channel_layouts=stereo"
+
+
+MICRO_FADE = 0.005   # 5 ms em toda borda de clipe: corte sem estalo (a prévia, som-motor.js, faz igual)
+
+
+def fades_efetivos(c, clipes):
+    """(fade_in, fade_out) que valem de fato: o pedido, no mínimo o micro-fade, e crossfade automático onde o clipe
+    se sobrepõe a outro da mesma faixa (o que começa depois entra enquanto o de antes sai). Igual a skFades (JS)."""
+    ini, dur = float(c["ini"]), max(0.01, float(c["dur"]))
+    fi, fo = float(c.get("fade_in", 0) or 0), float(c.get("fade_out", 0) or 0)
+    for o in clipes:
+        if o is c:
+            continue
+        oi, of = float(o["ini"]), float(o["ini"]) + float(o["dur"])
+        if oi < ini < of:
+            fi = max(fi, min(of, ini + dur) - ini)
+        if ini < oi < ini + dur < of:
+            fo = max(fo, ini + dur - oi)
+    fi, fo = max(fi, MICRO_FADE), max(fo, MICRO_FADE)
+    if fi + fo > dur:
+        k = dur / (fi + fo)
+        fi, fo = fi * k, fo * k
+    return fi, fo
+
+
+def _filtro_clipe(c, i, sr, clipes=()):
+    """atrim do trecho → volume (com curva) → fades (+ micro-fade e crossfade) → adelay até o início na timeline."""
     de, dur = max(0.0, float(c.get("de", 0))), max(0.01, float(c["dur"]))
-    f = [f"atrim=start={de:.4f}:duration={dur:.4f}", "asetpts=PTS-STARTPTS", f"aresample={sr}", "aformat=channel_layouts=stereo"]
+    # mono vira estéreo copiando o canal (o aformat abriria com -3 dB e a exportação sairia mais baixa que a prévia)
+    f = [f"atrim=start={de:.4f}:duration={dur:.4f}", "asetpts=PTS-STARTPTS", f"aresample={sr}", _ESTEREO(c["arq"])]
     curva = c.get("curva") or []   # [[t no clipe, vol linear], ...] — envelope de volume
     if len(curva) >= 2:
         pts = sorted(curva)
@@ -111,11 +197,9 @@ def _filtro_clipe(c, i, sr):
     v = float(c.get("vol", 1))
     if abs(v - 1) > 1e-4:
         f.append(f"volume={v:.5f}")
-    fi, fo = float(c.get("fade_in", 0) or 0), float(c.get("fade_out", 0) or 0)
-    if fi > 0:
-        f.append(f"afade=t=in:st=0:d={min(fi, dur):.4f}")
-    if fo > 0:
-        f.append(f"afade=t=out:st={max(0, dur - fo):.4f}:d={min(fo, dur):.4f}")
+    fi, fo = fades_efetivos(c, clipes or [c])
+    f.append(f"afade=t=in:st=0:d={min(fi, dur):.4f}")
+    f.append(f"afade=t=out:st={max(0, dur - fo):.4f}:d={min(fo, dur):.4f}")
     ms = int(round(float(c["ini"]) * 1000))
     if ms > 0:
         f.append(f"adelay={ms}|{ms}")
@@ -140,7 +224,7 @@ def _montar(proj, sr=48000, faixas_ids=None):
                 idx[c["arq"]] = len(entradas) // 2   # entradas = ["-i", arq, "-i", arq...]
                 entradas += ["-i", c["arq"]]
             n = len(filtros)
-            filtros.append(f"[{idx[c['arq']]}:a]{_filtro_clipe(c, n, sr)}[c{n}]")
+            filtros.append(f"[{idx[c['arq']]}:a]{_filtro_clipe(c, n, sr, f.get('clipes', []))}[c{n}]")
             rot.append(f"[c{n}]")
             fim = max(fim, float(c["ini"]) + float(c["dur"]))
         if not rot:
@@ -259,7 +343,7 @@ def melhorar_voz(arq, log=print, prog=lambda *a: None):
 def lufs_trecho(arq, de=0.0, dur=None):
     """Loudness integrada (LUFS) de um trecho do arquivo — para igualar o volume dos clipes sem gerar arquivo."""
     import re
-    cmd = [ffmpeg(), "-hide_banner", "-nostdin", "-ss", f"{float(de):.3f}"] + (["-t", f"{float(dur):.3f}"] if dur else []) + ["-i", arq, "-vn", "-af", "ebur128", "-f", "null", "-"]
+    cmd = [ffmpeg(), "-hide_banner", "-nostdin", "-ss", f"{float(de):.3f}"] + (["-t", f"{float(dur):.3f}"] if dur else []) + ["-i", arq, "-vn", "-af", _ESTEREO(arq) + ",ebur128", "-f", "null", "-"]   # medido como entra na mixagem
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800, creationflags=NO_WINDOW)
     m = re.findall(r"I:\s+(-?[\d.]+) LUFS", r.stderr or "")
     if not m:

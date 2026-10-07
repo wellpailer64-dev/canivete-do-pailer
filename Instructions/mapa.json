@@ -228,6 +228,8 @@
    "nome": "Sound Kanivete",
    "grupo": "Áudio",
    "front": [
+    "som-motor.js",
+    "som-paineis.js",
     "som.js",
     "som.css"
    ],
@@ -236,6 +238,7 @@
    ],
    "api": [
     "sk_info",
+    "sk_trecho",
     "sk_salvar",
     "sk_abrir",
     "sk_exportar",
@@ -1071,6 +1074,13 @@
   "sk_info": {
    "args": "path",
    "modulos": [
+    "sound_kanivete"
+   ]
+  },
+  "sk_trecho": {
+   "args": "arq, k, sr=48000",
+   "modulos": [
+    "media_server",
     "sound_kanivete"
    ]
   },

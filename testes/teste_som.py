@@ -146,6 +146,50 @@ with sync_playwright() as p:
     c = pg.evaluate("async () => { await SKN.enviarEditor('D:/kanivete_testes/sound/para_editor.wav'); await new Promise(r => setTimeout(r, 4000)); return { ok: VE.ready, aud: (VE.clips || []).length + (VE.audios || VE.audioClips || []).length }; }")
     ok(c["ok"], "mixagem enviada ao Editor de vídeo (abre/entra na timeline)", str(c))
     pg.evaluate("switchTool('sound-kanivete')")
+    # ── fase A: motor em trechos (precisão), medidores, micro-fade/crossfade na exportação, painéis ──
+    subprocess.run([FF, "-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=3,adelay=2000,volume=0.5", D + "bip2s.wav"], check=True)
+    pg.evaluate("SKN.novo('vazio', 'Motor')")
+    pg.evaluate(f"async () => await SKN.importar(['{D}bip2s.wav'])")
+    t_som = pg.evaluate("""async () => { SKN.ir(1.5); await skTocar(); return await new Promise(res => { const ini = performance.now();
+        const olha = () => { const m = skMedirAgora(); if (m && m.L.pico > -30) return res(SK.ph); if (performance.now() - ini > 4000) return res(-1); requestAnimationFrame(olha); }; olha(); }); }""")
+    pg.wait_for_timeout(500)
+    med = pg.evaluate("(m => m && {M: m.M, f: Object.values(m.faixas)[0].pico})(skMedirAgora())")
+    pg.evaluate("skParar()")
+    ok(abs(t_som - 2.0) < 0.09, "o som sai quando a agulha passa pelo ponto certo (trechos agendados)", f"bip em 2,0 s ouvido com agulha em {t_som:.3f}")
+    ok(med and med["M"] > -40 and med["f"] > -30, "medidores: LUFS do master e pico da faixa", str(med))
+    pg.evaluate("SKN.novo('vazio', 'Cross')")
+    a = pg.evaluate(f"async () => (await SKN.importar(['{D}voz.wav'], {{ini: 0}}))[0]")
+    pg.evaluate("(a) => SKN.alterarClipe(a, {dur: 4})", a)
+    b2 = pg.evaluate(f"async () => (await SKN.importar(['{D}voz.wav'], {{ini: 3}}))[0]")
+    pg.evaluate("(b) => SKN.alterarClipe(b, {dur: 4, de: 3})", b2)   # mesma fase da onda: crossfade linear mantém o nível
+    arq = pg.evaluate(f"async () => (await SKN.exportar('{D}cross.wav', {{formato: 'wav'}})).caminho")
+    def pico(trecho, a=arq):
+        o = subprocess.run([FF, "-hide_banner", "-i", a, "-af", f"atrim={trecho},volumedetect", "-f", "null", "-"], capture_output=True, text=True).stderr
+        return float(re.findall(r"max_volume: (-?[\d.]+) dB", o)[-1])
+    mx, ref, orig = pico("3.1:3.9"), pico("0.5:2.5"), pico("0.5:2.5", D + "voz.wav")
+    ok(abs(mx - ref) < 1, "crossfade automático na sobreposição (sem somar o volume)", f"sobreposição {mx} dB, fora dela {ref} dB (somando seria +6)")
+    ok(abs(ref - orig) < 0.3, "áudio mono exporta no mesmo volume do original", f"{ref} × {orig} dB")
+    pg.evaluate("(a) => SKN.alterarClipe(a, {dur: 2.0013, fade_in: 0, fade_out: 0})", a); pg.evaluate("(b) => SKN.apagar(b)", b2)
+    arq = pg.evaluate(f"async () => (await SKN.exportar('{D}micro.wav', {{formato: 'wav'}})).caminho")
+    import wave, struct
+    with wave.open(arq) as w:
+        n = w.getnframes(); w.setpos(n - 3); fim = struct.unpack("<6h", w.readframes(3))
+    ok(max(abs(x) for x in fim) < 400, "micro-fade no fim do corte (sem estalo)", str(fim))
+    pg.evaluate("SK.sel = SKN.estado().faixas[0].clipes[0].id; skUi()")
+    for aba, alvo in (("faixa", "data-fx"), ("exportar", "ske-f"), ("texto", "sk-transc"), ("clipe", "data-p=\"ini\"")):
+        pg.click(f"#sk .sk-abas [data-aba={aba}]")
+        ok(alvo in pg.inner_html("#sk-props"), f"painel da direita: aba {aba}")
+    pg.click("#sk .sk-abas [data-aba=midia]")
+    n0 = len(pg.evaluate("SKN.estado().faixas[0].clipes"))
+    pg.click("#sk-esq [data-por]")
+    pg.wait_for_function(f"SKN.estado().faixas[0].clipes.length > {n0}", timeout=5000)
+    ok(True, "Mídia: + insere o áudio na agulha")
+    h0 = pg.evaluate("document.querySelector('#sk .sk-cima').getBoundingClientRect().height")
+    bx = pg.evaluate("(() => { const r = document.getElementById('sk-div').getBoundingClientRect(); return [r.left + r.width / 2, r.top + 3]; })()")
+    pg.mouse.move(*bx); pg.mouse.down(); pg.mouse.move(bx[0], bx[1] + 60, steps=5); pg.mouse.up()
+    h1 = pg.evaluate("document.querySelector('#sk .sk-cima').getBoundingClientRect().height")
+    ok(abs(h1 - h0 - 60) < 3, "divisória arrasta e redimensiona os painéis", f"{h0} → {h1}")
+    pg.mouse.move(bx[0], bx[1] + 60); pg.mouse.down(); pg.mouse.move(*bx, steps=5); pg.mouse.up()
     if "--ia" in sys.argv:
         v = pg.evaluate("async () => await SKN.vozes()")
         if v.get("vozes"):

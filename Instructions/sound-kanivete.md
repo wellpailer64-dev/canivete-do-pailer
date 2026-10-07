@@ -1,7 +1,8 @@
 # Sound Kanivete (Sk) — editor de áudio multipista
 
 Junta as ferramentas de áudio num editor só (logo **Sk**, dourado), como o Editor/Photo/Vetor.
-Código: `frontend/js/som.js` + `frontend/css/som.css` (interface, timeline em canvas, reprodução, `window.SKN`) e
+Código: `frontend/js/som.js` (núcleo: projeto, edição, timeline em canvas, efeitos, `window.SKN`), `som-motor.js`
+(reprodução e medidores), `som-paineis.js` (interface em painéis) + `frontend/css/som.css` e
 `Functions/sound_kanivete.py` (picos, .sknv, exportar, LUFS); API `sk_*` no `main.py`. Teste: `testes/teste_som.py`.
 
 ## Projeto `.sknv`
@@ -61,6 +62,28 @@ Sound Kanivete" no topo de cada página. SKN: `transcrever(idioma)`, `texto()`, 
 - SKN: `igualar(ids, alvo)`, `cortarSilencios(id, {limiar, minimo, margem})`, `fxFaixa(id, 'voz'|'nenhum'|{...})`,
   `enviarEditor(caminho)`.
 
+## Painéis e motor profissional (rodada A, 2026-10-07)
+- **Layout**: em cima três colunas — esquerda com abas Mídia (áudios do projeto; ▶ ouvir, + na agulha, arrastar para a
+  timeline), Sons (soundboard CC0 com busca) e Voz IA; centro o Monitor (transporte, tempo grande, medidores por faixa e
+  master L/R com luz de clipe, LUFS agora/integrado/pico); direita Clipe / Faixa / Texto / Exportar (tudo no painel, sem
+  janela). Divisória arrastável (`--sk-cima`, lembrada em localStorage `sk-cima`) e a timeline embaixo. Clicar num clipe
+  abre a aba Clipe; clicar na faixa, a aba Faixa. Ctrl+E abre a aba Exportar.
+- **Motor** (`som-motor.js`): cada áudio é lido em trechos de 10 s de PCM s16le estéreo (`sk_trecho` →
+  `sound_kanivete.trecho`, cache em `%LOCALAPPDATA%/CaniveteDoPailer/sk_pcm`, teto ~1,5 GB) e agendado no WebAudio
+  (`AudioBufferSource.start(quando)`, 1,5 s de antecedência, busca 6 s à frente, ~48 trechos em memória). Agulha e
+  cortes caem na amostra; serve para gravações longas. Mudou o projeto tocando → reagenda (`skMotorMudou`) com descida
+  de 12 ms (sem estalo).
+- **Micro-fade de 5 ms** em toda borda de clipe e **crossfade automático** onde dois clipes da mesma faixa se
+  sobrepõem — `skFades` (JS) = `fades_efetivos` (Python), iguais na prévia e na exportação.
+- **Mono**: vira estéreo copiando o canal (`_ESTEREO`); antes a exportação, o PCM da prévia e a medição do Igualar
+  abriam com -3 dB.
+- Medidores: `skMedirAgora()` → `SK.med` {L, R, M (LUFS momentâneo, ponderação K aprox.), I (integrado, portas -70/-10),
+  faixas{id: {pico, rms}}}.
+
 ## Pendências
+Rodadas seguintes do plano profissional: B gravar do microfone, salvamento automático/recuperação, teste com 1–2 h;
+C seleção de intervalo entre faixas (apagar/silenciar/recortar com ripple), curva de volume desenhada, ducking;
+D master com limitador (-1 dBTP) e cadeia de efeitos por faixa (passa-alta, gate, de-esser, EQ gráfico, reverb);
+E espectrograma e reparo espectral, separar voz da música; F editar pelo texto (apagar palavras/vícios), stems, ID3/capítulos, modelos salvos.
 Separar voz da música (precisa de um modelo de separação; o UVR/Roformer foi testado no anti-noise), curva de volume
 desenhada na timeline (o .sknv e a exportação já aceitam `curva`), Editor → Sk (editar o áudio de um vídeo aqui).

@@ -3293,6 +3293,14 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def sk_trecho(self, arq, k, sr=48000):
+        """Trecho de 10 s em PCM s16le estéreo (prévia com precisão de amostra; som-motor.js)."""
+        from Functions import media_server, sound_kanivete
+        try:
+            return {"success": True, "url": media_server.register(sound_kanivete.trecho(arq, k, sr))}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def sk_salvar(self, proj, caminho):
         from Functions import sound_kanivete
         return sound_kanivete.salvar(proj, caminho)
