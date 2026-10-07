@@ -47,6 +47,9 @@ Armadilhas: na página existe a `const KNV` original; depois da recarga use `win
   Foto dentro de uma área: `selecionar(...)` + `colarDentro()` (máscara da seleção, corrente solta).
   Tirar objeto/pessoa/fio/logo da foto: selecionar + `preencherConteudo()` (LaMa local; camada nova por padrão).
   Trocar o céu: `substituirCeu({ceu: 'por'})` (IA) ou `{ceu: 'arquivo', caminho}` — grupo editável com céu + luz.
+  Foto horizontal para story/feed: `expansaoGenerativa({formato: 'story'})` (a IA completa o que falta, ~40 s).
+  Pôr um objeto na foto: selecionar a área + `preenchimentoGenerativo('a red hot air balloon')` (prompt em inglês);
+  não gostou: `variacaoGenerativa()`.
 - Fundo/faixa de cor: `preenchimento(cor, {nome})` ou `preenchimentoDegrade(['#a', '#b'], {estilo, ang, nome})` (camada de
   preenchimento; com seleção ativa vira máscara) em vez de
   pintar/preencher pixels — fica editável no Photoshop.

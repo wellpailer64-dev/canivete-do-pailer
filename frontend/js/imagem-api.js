@@ -214,6 +214,13 @@ const KNV = {
     async substituirTexto(busca, troca, { todas = true, maiusc = false, palavra = false } = {}) { return ieSubstituirTexto(IE.doc, busca, troca, { todas, maiusc, palavra }); },
     // Editar › Preenchimento sensível ao conteúdo (LaMa): tira o que está na seleção ativa e reconstrói pelo entorno.
     // amostra 'atual' | 'todas'; saida 'nova' (camada nova, padrão) | 'atual'; expandir (px, 0 = automático)
+    // Editar › Preenchimento generativo (FLUX.2 klein local): gera na seleção ativa o que o texto pedir (vazio = tira o
+    // que está lá, pelo LaMa); camada nova "Generativo" com variações — variacaoGenerativa() gera outra
+    async preenchimentoGenerativo(prompt = '', { semente = -1 } = {}) { const ok = await iePreenchimentoGenerativo(IE.doc, prompt, { semente }); if (!ok) throw new Error('preenchimento generativo não feito (sem seleção ou o gerador falhou)'); return KNV.info(); },
+    // Imagem › Expansão generativa: formato 'story' | 'feed' | 'quadrado' | 'paisagem' | 'margem' (margem %) | 'px'
+    // (largura, altura); ancora 'c' | 't' | 'b' | 'l' | 'r'; prompt opcional — a tela cresce e a IA completa o que falta
+    async expansaoGenerativa(opts = {}) { const ok = await ieExpansaoGenerativa(IE.doc, opts); if (!ok) throw new Error('expansão generativa não feita'); return KNV.info(); },
+    async variacaoGenerativa() { const ok = await ieGenOutra(IE.doc, ieAtiva(IE.doc)); if (!ok) throw new Error('a camada ativa não é generativa'); return KNV.info(); },
     // Editar › Substituição de céu: ceu = 'arquivo' (com caminho) ou 'azul' | 'por' | 'dramatico' | 'rosado' | 'noite' (IA);
     // a seleção ativa, se houver, é a área do céu; cria o grupo "Substituição de céu" (céu objeto inteligente + luz)
     async substituirCeu(opts = {}) { const ok = await ieSubstituirCeu(IE.doc, opts); if (!ok) throw new Error('substituição de céu não feita (sem céu?)'); return KNV.info(); },

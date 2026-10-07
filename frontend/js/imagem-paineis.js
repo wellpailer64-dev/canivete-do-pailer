@@ -827,6 +827,13 @@ function ieUiProps() {
                 <label class="ie-op-chk"><input type="checkbox" data-pre="alinhar" ${p.alinhar !== false ? 'checked' : ''}> ${ieT('Alinhar com a camada')}</label>`;
         } else h += `<div class="ie-prop-grade"><span>${ieT('Cor')}</span><button class="ie-cor" data-pre-cor style="background:${p.cor}"></button></div>`;
     }
+    if (L.generativo) {   // camada do preenchimento/expansão generativa: as variações (como no Photoshop)
+        const G = L.generativo, n = G.variacoes.length;
+        h += `<div class="ie-prop-tit ie-prop-sub">${ieT('Generativo')}</div><div class="ie-prop-nota">${ieEsc(G.prompt || '')}</div>
+            <div class="ie-prop-acoes"><button class="ie-btn ie-btn-mini" data-gen="-1" ${G.atual <= 0 ? 'disabled' : ''}>◀</button>
+            <span>${ieT('Variação')} ${G.atual + 1}/${n}</span><button class="ie-btn ie-btn-mini" data-gen="1" ${G.atual >= n - 1 ? 'disabled' : ''}>▶</button>
+            <button class="ie-btn ie-btn-mini" data-gen-outra>${ieT('Gerar outra')}</button></div>`;
+    }
     if (L.tipo === 'inteligente' || L.tipo === 'forma' || L.tipo === 'preenchimento') {
         h += `<div class="ie-prop-nota">${ieT('Mover e transformar mantêm a camada editável no Photoshop. Pintar pede para rasterizar.')}</div>
             <div class="ie-prop-acoes"><button class="ie-btn ie-btn-mini" onclick="ieCmd('rasterizar')">${ieT('Rasterizar camada')}</button></div>`;
@@ -842,6 +849,10 @@ function ieUiProps() {
         h += `<div class="ie-prop-acoes"><button class="ie-btn ie-btn-mini" onclick="ieEstiloCamada()">fx ${ieT('Adicionar efeito...')}</button></div>`;
     box.innerHTML = h;
     box.querySelector('[data-ppelo]')?.addEventListener('click', () => { IE.propElo = IE.propElo === false; ieUiProps(); });
+    if (L.generativo) {
+        box.querySelectorAll('[data-gen]').forEach(b => b.addEventListener('click', () => ieGenVariacao(doc, L, L.generativo.atual + (+b.dataset.gen))));
+        box.querySelector('[data-gen-outra]')?.addEventListener('click', () => ieGenOutra(doc, L));
+    }
     if (L.tipo === 'preenchimento' && L.pre) {   // controles do preenchimento (redesenha ao vivo; um passo no histórico)
         let t = 0;
         const mudou = () => { iePreRender(L, doc); clearTimeout(t); t = setTimeout(() => ieHist(ieT('Preenchimento')), 600); };

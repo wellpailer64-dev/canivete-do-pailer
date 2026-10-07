@@ -882,3 +882,180 @@ Object.assign(IE_CMDS, { substituirCeu: doc => ieSubstituirCeuDialogo(doc) });
     const i = edt.findIndex(it => Array.isArray(it) && it[0] === 'Transformar');
     edt.splice(i + 1, 0, '-', ['Substituição de céu...', 'substituirCeu']);
 })();
+
+// ─────────────────────────── Preenchimento generativo e Expansão generativa (FLUX.2 klein local) ───────────────────────────
+// Como o Photoshop (Firefly, inpainting/outpainting): gera SÓ dentro de uma área, guiado pelo entorno (imagem inicial +
+// máscara no sd-server, força 1) e pela própria foto como referência (klein). Sem texto, o preenchimento remove pelo
+// conteúdo (LaMa) — o klein com a foto de referência redesenhava o objeto que era para sair (testado 2026-10-07).
+// Resultado numa camada nova com L.generativo = {prompt, R, area, variacoes: [{c, semente}], atual}: "Gerar outra" e
+// ◀ ▶ no painel Propriedades (as variações do Photoshop). Geração em ~1 MP (múltiplos de 16) e ampliada para a área.
+const IE_GEN_COMPL = ', seamless, matching the lighting, perspective, colors and style of the photo, photorealistic';
+const IE_GEN_EXPANDIR = 'continue the scene naturally beyond the borders, same place, same lighting, wide photo';
+function ieGenTamanho(w, h, mp = 0.85e6) {   // ~0,85 MP: com a referência junto, 1 MP no story (768×1360) estourava 8 GB
+    const k = Math.sqrt(mp / (w * h));
+    return [ieClamp(Math.round(w * k / 16) * 16, 256, 2048), ieClamp(Math.round(h * k / 16) * 16, 256, 2048)];
+}
+// desfoca a área de R repetindo a borda do quadro (o blur comum puxa a borda para transparente e deixava frestas no canto)
+function ieGenBorrar(area, R, raio, w = R.w, h = R.h) {
+    const P = Math.ceil(raio * 3) + 2, sx = w / R.w, sy = h / R.h;
+    const pad = ieCanvas(w + 2 * P, h + 2 * P), px = ieCtx(pad);
+    const d = (x, y, ww, hh, X, Y, WW, HH) => px.drawImage(area, R.x + x, R.y + y, ww, hh, X, Y, WW, HH);
+    d(0, 0, R.w, R.h, P, P, w, h);
+    d(0, 0, R.w, 1, P, 0, w, P); d(0, R.h - 1, R.w, 1, P, P + h, w, P);
+    d(0, 0, 1, R.h, 0, P, P, h); d(R.w - 1, 0, 1, R.h, P + w, P, P, h);
+    d(0, 0, 1, 1, 0, 0, P, P); d(R.w - 1, 0, 1, 1, P + w, 0, P, P); d(0, R.h - 1, 1, 1, 0, P + h, P, P); d(R.w - 1, R.h - 1, 1, 1, P + w, P + h, P, P);
+    const c = ieCanvas(w, h), cx = ieCtx(c);
+    cx.filter = `blur(${raio}px)`; cx.drawImage(pad, -P, -P);
+    return c;
+}
+// gera dentro de `area` (canvas do tamanho do documento, alfa = onde gerar) olhando o retângulo R da composição visível
+// refR: o pedaço da composição que serve de referência (na expansão, só a foto antiga: com as faixas lisas da tela nova
+// na referência o klein copiava as faixas)
+async function ieGerarArea(doc, R, area, prompt, semente = -1, refR = R) {
+    const api = ieApi();
+    if (!(await ieGeradorPronto('klein'))) return null;
+    ieCompor(doc, ieRDoc(doc));
+    const [gw, gh] = ieGenTamanho(R.w, R.h);
+    // contexto: a composição de R; transparente (tela nova da expansão) vira a cor média, para a referência não ter buraco
+    const ctx = ieCanvas(R.w, R.h), cx = ieCtx(ctx);
+    cx.drawImage(doc.comp, -R.x, -R.y);
+    const pequeno = ieCanvas(1, 1), px = ieCtx(pequeno); px.drawImage(ctx, 0, 0, 1, 1);
+    const m1 = px.getImageData(0, 0, 1, 1).data, a1 = m1[3] / 255 || 1;
+    const init = ieCanvas(gw, gh), ix = ieCtx(init);
+    ix.fillStyle = `rgb(${Math.round(m1[0] / a1)},${Math.round(m1[1] / a1)},${Math.round(m1[2] / a1)})`; ix.fillRect(0, 0, gw, gh);
+    ix.imageSmoothingQuality = 'high'; ix.drawImage(ctx, 0, 0, gw, gh);
+    // máscara (branco = gerar), um pouco folgada para costurar
+    const msk = ieCanvas(gw, gh), mx = ieCtx(msk);
+    mx.fillStyle = '#000'; mx.fillRect(0, 0, gw, gh);
+    const mb = ieGenBorrar(area, R, 4, gw, gh);
+    for (let i = 0; i < 3; i++) mx.drawImage(mb, 0, 0);
+    const initPng = init.toDataURL('image/png');
+    // referência pequena (~0,25 MP): só passa estilo/cores; do tamanho da geração ela dobrava a memória e falhava
+    const kr = Math.min(1, Math.sqrt(0.25e6 / (refR.w * refR.h))), ref = ieCanvas(Math.max(64, Math.round(refR.w * kr / 16) * 16), Math.max(64, Math.round(refR.h * kr / 16) * 16));
+    ieCtx(ref).drawImage(doc.comp, refR.x, refR.y, refR.w, refR.h, 0, 0, ref.width, ref.height);
+    const r = await (async () => { try { return await api.ie_gerar({ prompt, largura: gw, altura: gh, semente, refs: [ref.toDataURL('image/png')], init: initPng, mascara: msk.toDataURL('image/png'), motor: 'klein' }); } finally { ieGerLimparBarra?.(); } })();
+    if (!r || !r.success) {
+        if (r && /cancel/i.test(r.error || '')) ieToast(ieT('Geração cancelada'));
+        else ieToast(`${ieT('Não gerou')}: ${(r && r.error) || ''}`);
+        return null;
+    }
+    const out = await ieCanvasDeArquivo(r.path);
+    // de volta ao tamanho de R, só dentro da área (borda suave)
+    const c = ieCanvas(R.w, R.h), x = ieCtx(c);
+    x.imageSmoothingQuality = 'high'; x.drawImage(out, 0, 0, R.w, R.h);
+    const a = ieGenBorrar(area, R, 3);
+    x.globalCompositeOperation = 'destination-in'; x.drawImage(a, 0, 0);
+    return { c, semente: r.semente };
+}
+function ieGenCamada(doc, g, info, nome) {
+    const L = ieNovaCamada(doc, { nome: ieNomeLivre(doc, ieT(nome)), c: g.c, x: info.R.x, y: info.R.y, sujoPx: true });
+    L.generativo = { ...info, variacoes: [{ c: g.c, semente: g.semente }], atual: 0 };
+    const a = ieAtiva(doc);
+    ieInserirAcima(doc, L, a || null);
+    ieAtivar(L.id, doc);
+    ieCamadaMudou(L);
+    return L;
+}
+async function iePreenchimentoGenerativo(doc, prompt = '', { semente = -1 } = {}) {
+    if (!doc || !doc.sel) { ieToast(ieT('Selecione onde gerar: a seleção é preenchida com o que você escrever')); return false; }
+    prompt = String(prompt || '').trim();
+    if (!prompt) return iePreencherConteudo(doc, { amostra: 'todas', saida: 'nova' });   // sem texto: tira o que está lá
+    const b = doc.sel.bbox, mg = Math.max(64, Math.round(Math.max(b.w, b.h) * 0.6));
+    const R = ieRInter(ieRInt({ x: b.x - mg, y: b.y - mg, w: b.w + 2 * mg, h: b.h + 2 * mg }), ieRDoc(doc));
+    if (!R) return false;
+    const area = ieClonar(doc.sel.c);
+    const g = await ieGerarArea(doc, R, area, prompt + IE_GEN_COMPL, semente);
+    if (!g) return false;
+    ieGenCamada(doc, g, { prompt, R, area, texto: prompt + IE_GEN_COMPL }, 'Generativo');
+    ieHist(ieT('Preenchimento generativo'));
+    ieUiCamadas?.();
+    return true;
+}
+// formato: 'story' | 'feed' | 'quadrado' | 'paisagem' | 'margem' (margem %, em volta) | largura/altura (px)
+async function ieExpansaoGenerativa(doc, { formato = 'story', largura, altura, margem = 20, ancora = 'c', prompt = '', semente = -1 } = {}) {
+    if (!doc) return false;
+    const W0 = doc.w, H0 = doc.h, prop = { story: 9 / 16, feed: 4 / 5, quadrado: 1, paisagem: 16 / 9 }[formato];
+    let W = W0, H = H0;
+    if (prop) { if (W0 / H0 > prop) H = Math.round(W0 / prop); else W = Math.round(H0 * prop); }
+    else if (formato === 'margem') { W = Math.round(W0 * (1 + 2 * margem / 100)); H = Math.round(H0 * (1 + 2 * margem / 100)); }
+    else { W = Math.max(W0, Math.round(largura || W0)); H = Math.max(H0, Math.round(altura || H0)); }
+    if (W === W0 && H === H0) { ieToast(ieT('O documento já tem esse formato: nada para expandir')); return false; }
+    if (!(await ieGeradorPronto('klein'))) return false;
+    const fx = ancora.includes('l') ? 0 : ancora.includes('r') ? 1 : 0.5, fy = ancora.includes('t') ? 0 : ancora.includes('b') ? 1 : 0.5;
+    const ox = Math.round((W - W0) * fx), oy = Math.round((H - H0) * fy);
+    ieRedimTela(doc, -ox, -oy, W, H, false);
+    // área nova = fora do retângulo antigo, entrando ~24 px nos lados que cresceram (costura)
+    const s = Math.round(Math.min(24, W0 / 20, H0 / 20));
+    const area = ieCanvas(W, H), ax = ieCtx(area);
+    ax.fillStyle = '#fff'; ax.fillRect(0, 0, W, H);
+    const l = ox > 0 ? s : 0, t = oy > 0 ? s : 0, r = W - W0 - ox > 0 ? s : 0, bb = H - H0 - oy > 0 ? s : 0;
+    ax.clearRect(ox + l, oy + t, W0 - l - r, H0 - t - bb);
+    const R = { x: 0, y: 0, w: W, h: H };
+    const texto = (String(prompt || '').trim() ? String(prompt).trim() + ', ' : '') + IE_GEN_EXPANDIR + IE_GEN_COMPL;
+    const refR = { x: ox, y: oy, w: W0, h: H0 };
+    const g = await ieGerarArea(doc, R, area, texto, semente, refR);
+    if (!g) { ieHist(ieT('Tamanho da tela')); return false; }
+    ieGenCamada(doc, g, { prompt: String(prompt || '').trim() || ieT('(expansão)'), R, area, texto, refR }, 'Expansão generativa');
+    ieHist(ieT('Expansão generativa'));
+    ieUiCamadas?.();
+    return true;
+}
+// outra variação da mesma camada generativa (o mesmo pedido, outra semente)
+async function ieGenOutra(doc, L) {
+    const G = L && L.generativo;
+    if (!G) return false;
+    const g = await ieGerarArea(doc, G.R, G.area, G.texto, -1, G.refR || G.R);
+    if (!g) return false;
+    G.variacoes.push({ c: g.c, semente: g.semente });
+    return ieGenVariacao(doc, L, G.variacoes.length - 1);
+}
+function ieGenVariacao(doc, L, i) {
+    const G = L && L.generativo;
+    if (!G || !G.variacoes[i]) return false;
+    const R0 = ieRCamada(L);
+    G.atual = i;
+    L.c = G.variacoes[i].c; L.x = G.R.x; L.y = G.R.y; L.sujoPx = true;
+    ieInvalidar(L); ieCamadaMudou(L, R0);
+    ieHist(ieT('Variação') + ` ${i + 1}`);
+    ieUiProps?.(); ieUiCamadas?.();
+    return true;
+}
+async function iePreenchimentoGenerativoDialogo(doc) {
+    if (!doc || !doc.sel) { ieToast(ieT('Selecione onde gerar: a seleção é preenchida com o que você escrever')); return; }
+    const v = await ieDialogo({
+        titulo: 'Preenchimento generativo', ok: 'Gerar',
+        campos: [{ id: 'prompt', rotulo: 'O que gerar na seleção', tipo: 'area', linhas: 3, dica: 'ex.: um balão de ar quente; vazio = tirar o que está lá', valor: IE._genPrompt || '' },
+            { id: 'n', tipo: 'nota', rotulo: 'IA no próprio computador (FLUX.2 klein), ~40 s. Depois: "Gerar outra" no painel Propriedades.' }],
+    });
+    if (!v) return;
+    IE._genPrompt = v.prompt;
+    await iePreenchimentoGenerativo(doc, v.prompt);
+}
+async function ieExpansaoGenerativaDialogo(doc) {
+    if (!doc) return;
+    const v = await ieDialogo({
+        titulo: 'Expansão generativa', ok: 'Expandir',
+        campos: [{ id: 'formato', rotulo: 'Formato', tipo: 'select', valor: 'story', opcoes: [['story', 'Story 9:16'], ['feed', 'Feed 4:5'], ['quadrado', 'Quadrado 1:1'],
+            ['paisagem', 'Paisagem 16:9'], ['margem', 'Margem em volta'], ['px', 'Tamanho (px)']] },
+            { id: 'margem', rotulo: 'Margem em volta (%)', tipo: 'numero', min: 1, max: 100, valor: 20 },
+            { id: 'largura', rotulo: 'Largura (px)', tipo: 'numero', min: 1, max: 8000, valor: doc.w },
+            { id: 'altura', rotulo: 'Altura (px)', tipo: 'numero', min: 1, max: 8000, valor: doc.h },
+            { id: 'ancora', rotulo: 'A foto fica', tipo: 'select', valor: 'c', opcoes: [['c', 'No centro'], ['t', 'Em cima'], ['b', 'Embaixo'], ['l', 'À esquerda'], ['r', 'À direita']] },
+            { id: 'prompt', rotulo: 'Descrever o que aparece (opcional)', tipo: 'texto', valor: '' },
+            { id: 'n', tipo: 'nota', rotulo: 'A tela cresce e a IA (FLUX.2 klein, no computador) completa o que falta, ~40 s.' }],
+    });
+    if (v) await ieExpansaoGenerativa(doc, v);
+}
+Object.assign(IE_CMDS, {
+    preenchGenerativo: doc => iePreenchimentoGenerativoDialogo(doc),
+    expansaoGenerativa: doc => ieExpansaoGenerativaDialogo(doc),
+    genOutra: doc => ieGenOutra(doc, ieAtiva(doc)),
+});
+(function () {
+    const edt = IE_MENUS.find(m => m[0] === 'Editar')[1];
+    const i = edt.findIndex(it => Array.isArray(it) && it[1] === 'preencherConteudo');
+    edt.splice(i + 1, 0, ['Preenchimento generativo...', 'preenchGenerativo']);
+    const img = IE_MENUS.find(m => m[0] === 'Imagem')[1];
+    const j = img.findIndex(it => Array.isArray(it) && it[1] === 'tamTela');
+    img.splice(j + 1, 0, ['Expansão generativa...', 'expansaoGenerativa']);
+})();

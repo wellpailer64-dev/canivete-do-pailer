@@ -297,6 +297,18 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   "Iluminação do primeiro plano" (preenchimento cor da base do céu novo, modo Cor, op = luz × 0,5, máscara invertida)
   + "Céu" (objeto inteligente cobrindo a largura e o céu até a base da área, máscara = céu); vai assim para o PSD.
   Céu de arquivo ou gerado pela IA local (5 modelos de prompt, Z-Image ~40 s). Teste `testes/teste_ceu.py [--ia]`.
+- **Preenchimento generativo** (Editar, abaixo do sensível ao conteúdo; `KNV.preenchimentoGenerativo(prompt)`) e
+  **Expansão generativa** (Imagem, abaixo de Tamanho da tela; `KNV.expansaoGenerativa({formato: 'story'|'feed'|
+  'quadrado'|'paisagem'|'margem'|'px', margem, largura, altura, ancora: 'c'|'t'|'b'|'l'|'r', prompt})`), como o
+  Firefly do Photoshop (inpainting/outpainting): FLUX.2 klein local no sd-server com `init_image` + `mask_image`
+  (branco = gerar) e `strength` 1 (`gerador_imagem.gerar` aceita `init`, `mascara`, `forca`; sempre klein), ~40 s na
+  placa de 8 GB. `ieGerarArea`: recorte com folga em volta da seleção (60% do lado; a expansão usa a tela toda), gera em
+  ~0,85 MP (1 MP + referência no story estourava: "generate_image returned no results"), referência pequena (~0,25 MP)
+  só da foto — na expansão, SÓ a parte antiga (com as faixas lisas da tela nova na referência o klein copiava as faixas);
+  máscara e alfa desfocados repetindo a borda (`ieGenBorrar`; o blur comum deixava fresta transparente no canto).
+  Resultado numa camada nova com `L.generativo` (variações: ◀ ▶ e "Gerar outra" no painel Propriedades,
+  `KNV.variacaoGenerativa()`). Sem texto o preenchimento vai pelo LaMa: o klein redesenhava o objeto que era para sair.
+  Teste `testes/teste_generativo.py` (D:/kanivete_testes/ceu/carro.jpg; reprova faixa lisa na expansão).
 
 ## Pincel (rodada de 2026-10-07)
 - Ponta macia (`iePonta`) calculada pixel a pixel: núcleo cheio até a dureza e queda em COSSENO até a borda (3×3

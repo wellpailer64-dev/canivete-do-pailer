@@ -311,8 +311,10 @@ def _liberar_gpu_ollama():
 
 
 def gerar(spec, on_progress=lambda d: None):
-    """spec: {prompt, largura, altura, semente (-1 = aleatória), passos, refs: [caminho|b64...], motor: zimage|klein, sem_cache}.
-    Sem motor: Z-Image-Turbo; com referências: FLUX.2 klein (o Turbo não edita a partir de imagem).
+    """spec: {prompt, largura, altura, semente (-1 = aleatória), passos, refs: [caminho|b64...], motor: zimage|klein, sem_cache,
+    init, mascara, forca}. Sem motor: Z-Image-Turbo; com referências: FLUX.2 klein (o Turbo não edita a partir de imagem).
+    init + mascara (PNG/b64, branco = gerar) = PREENCHIMENTO GENERATIVO / EXPANSÃO (inpaint/outpaint, como o Photoshop):
+    o sd-server gera só dentro da máscara (força 1 = do zero, guiado pelo entorno e pelas referências) — sempre no klein.
     Devolve {success, path, semente, cache, motor} — PNG no cache em disco."""
     prompt = (spec.get("prompt") or "").strip()
     if not prompt:
@@ -328,13 +330,19 @@ def gerar(spec, on_progress=lambda d: None):
     if semente < 0:
         semente = int.from_bytes(os.urandom(4), "little") & 0x7FFFFFFF
     refs = [_b64_de(r) for r in (spec.get("refs") or [])]
-    m = _qual(spec.get("motor") or ("klein" if refs else PADRAO))
+    init = _b64_de(spec["init"]) if spec.get("init") else None
+    mascara = _b64_de(spec["mascara"]) if spec.get("mascara") else None
+    forca = float(spec.get("forca") or 1.0)
+    m = _qual(spec.get("motor") or ("klein" if refs or init else PADRAO))
+    if init and m != "klein":
+        m = "klein"
     if refs and not MOTORES[m]["refs"]:
         m = "klein"
     if not instalado(m):
         return {"success": False, "error": f"{MOTORES[m]['nome']} não instalado: baixe em Arquivo > Gerar imagem.", "instalar": m}
     passos = max(1, min(50, int(spec.get("passos") or MOTORES[m]["passos"])))
-    chave = hashlib.sha1(json.dumps([m, prompt, w, h, semente, passos, [hashlib.sha1(r.encode()).hexdigest() for r in refs]]).encode()).hexdigest()
+    sha = lambda s: hashlib.sha1(s.encode()).hexdigest() if s else None
+    chave = hashlib.sha1(json.dumps([m, prompt, w, h, semente, passos, [sha(r) for r in refs]] + ([sha(init), sha(mascara), forca] if init else [])).encode()).hexdigest()
     os.makedirs(_cache_dir(), exist_ok=True)
     saida = os.path.join(_cache_dir(), chave + ".png")
     if os.path.isfile(saida) and not spec.get("sem_cache"):
@@ -345,6 +353,10 @@ def gerar(spec, on_progress=lambda d: None):
         corpo = {"prompt": prompt, "negative_prompt": "", "width": w, "height": h, "seed": semente, "batch_count": 1,
                  "ref_images": refs, "embed_image_metadata": False, "output_format": "png",
                  "sample_params": {"sample_method": "euler", "sample_steps": passos, "guidance": {"txt_cfg": MOTORES[m]["cfg"]}}}
+        if init:
+            corpo.update(init_image=init, strength=forca)
+            if mascara:
+                corpo["mask_image"] = mascara
         job = _http("POST", "/sdcpp/v1/img_gen", corpo)
         jid, t0 = job["id"], time.time()
         _srv.update(passo=None, cancelar=None)
