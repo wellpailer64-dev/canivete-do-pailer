@@ -78,6 +78,7 @@ async function ieAbrirArquivo(path) {
             });
             for (const k of IE_MESCLA_CHAVES) if (no[k] !== undefined) L[k] = no[k];
             if (no.prancheta) L.prancheta = { ...no.prancheta };
+            if (no.pre) L.pre = { ...no.pre };   // camada de preenchimento de cor sólida: a cor fica editável
             if (no.tipo === 'grupo') L.filhos = montar(no.filhos || []);
             if (no.url) pend.push({ url: no.url, fim: c => { L.c = c; if (['texto', 'inteligente', 'forma', 'preenchimento'].includes(L.tipo)) { L.c0 = { c, x: L.x, y: L.y }; L.tf = [...IE_ID]; L.tfBase = [...IE_ID]; } } });
             else if (['texto', 'inteligente', 'forma', 'preenchimento'].includes(L.tipo)) { L.tf = [...IE_ID]; L.tfBase = [...IE_ID]; }
@@ -343,6 +344,8 @@ async function ieSalvar(comoNovo = false, destinoForcado = null, refeito = false
                         trechos: (t.trechos || []).map(r => ({ a: r.a, b: r.b, ps: r.ps, cor: r.cor, negFalso: r.negFalso, itaFalso: r.itaFalso, sublinhado: r.sublinhado, tachado: r.tachado })),
                         ...Object.fromEntries(IE_TX_CHAVES.filter(k => t[k] !== undefined).map(k => [k, t[k]])) };
                 }
+                // camada de preenchimento de cor sólida (nova ou do PSD): o Python grava/atualiza o SoCo
+                if (L.tipo === 'preenchimento' && L.pre && !L.rasterizar) s.pre_ps = { cor: L.pre.cor };
                 // objeto inteligente criado no editor: vai o ORIGINAL (L.c0) incorporado + os 4 cantos da transformação
                 if (L.tipo === 'inteligente' && L.c0 && L.c0.c && (!ida || L.ref == null) && !L.rasterizar) {
                     const M = L.tf || IE_ID, { x, y } = L.c0, w = L.c0.c.width, h = L.c0.c.height;
@@ -1026,6 +1029,10 @@ const IE_CMDS = {
     // Converter em objeto inteligente (como no Photoshop): os pixels de agora (com a máscara aplicada dentro) viram o
     // original; escalar/girar depois sempre parte dele (diminuir e aumentar de novo não perde nitidez) e Ctrl+J faz
     // cópias que usam o mesmo original
+    preenchimentoCor: async doc => {   // Camada › Nova camada de preenchimento › Cor sólida: cria e abre o seletor de cor
+        const L = await iePreNovo(doc, IE.cor[0]);
+        if (L && !window._knvAuto) iePreCorEditar(doc, L, { getBoundingClientRect: () => new DOMRect(window.innerWidth / 2, window.innerHeight / 3, 1, 1) });
+    },
     objetoInteligente: doc => {
         const sel = ieSelecionadas(doc);
         // várias camadas, ou texto/grupo/forma/objeto: como no Photoshop, viram UM objeto inteligente que guarda as

@@ -334,13 +334,9 @@ def _abrir_psd(path, doc, on_progress):
         if im is not None and im.size[0] and im.size[1]:
             return im.convert("RGBA"), layer.left, layer.top
         if layer.kind == "solidcolorfill":
-            try:
-                d = layer.data
-                c = d.get(b"Clr ")
-                rgb = tuple(int(round(float(getattr(c.get(x), "value", c.get(x))))) for x in (b"Rd  ", b"Grn ", b"Bl  "))
+            rgb = _cor_soco(layer)
+            if rgb:
                 return Image.new("RGBA", (psd.width, psd.height), rgb + (255,)), 0, 0
-            except Exception:
-                pass
         try:
             im = layer.composite(force=True)
             if im is not None:
@@ -390,6 +386,10 @@ def _abrir_psd(path, doc, on_progress):
             no["tipo"] = {"type": "texto", "smartobject": "inteligente", "shape": "forma",
                           "solidcolorfill": "preenchimento", "gradientfill": "preenchimento",
                           "patternfill": "preenchimento"}.get(k, "pixel")
+            if k == "solidcolorfill":   # a cor fica editável no editor (duplo clique na miniatura)
+                cor_pre = _cor_soco(layer)
+                if cor_pre:
+                    no["pre"] = {"tipo": "cor", "cor": "#%02x%02x%02x" % cor_pre}
             im, x0, y0 = pixels(layer)
             if im is not None:
                 no.update({"x": int(x0), "y": int(y0), "w": im.size[0], "h": im.size[1],
@@ -1372,6 +1372,43 @@ def _so_novo(psd, ob, so, png):
 _OP_DEMARCADOR = {"excluir": 0, "somar": 1, "subtrair": 2, "inter": 3}   # operação do subdemarcador no PSD
 
 
+def _cor_soco(layer):
+    """Cor (r, g, b) de uma camada de preenchimento de cor sólida, lida do bloco SoCo (o layer.data do psd-tools já é a
+    cor RGBC, sem o Clr em volta — ler .data.get(b"Clr ") dava None). None se não der."""
+    from psd_tools.constants import Tag
+    try:
+        c = layer.tagged_blocks.get_data(Tag.SOLID_COLOR_SHEET_SETTING)[b"Clr "]
+        return tuple(max(0, min(255, int(round(float(getattr(c[k], "value", c[k])))))) for k in (b"Rd  ", b"Grn ", b"Bl  "))
+    except Exception as e:
+        logging.debug("cor do preenchimento %s: %s", getattr(layer, "name", "?"), e)
+        return None
+
+
+def _soco(cor):
+    """Bloco de cor sólida (SoCo) como o Photoshop grava (igual byte a byte ao de uma camada feita nele)."""
+    from psd_tools.psd.descriptor import Descriptor, DescriptorBlock, Double
+    c = str(cor or "#000000").lstrip("#")
+    if len(c) == 3:
+        c = "".join(ch * 2 for ch in c)
+    rgb = [int(c[k:k + 2], 16) for k in (0, 2, 4)]
+    clr = Descriptor(classID=b"RGBC", name="\x00")
+    for k, v in zip((b"Rd  ", b"Grn ", b"Bl  "), rgb):
+        clr[k] = Double(float(v))
+    soco = DescriptorBlock(version=16, classID=b"null", name="\x00")
+    soco[b"Clr "] = clr
+    return soco
+
+
+def _preenchimento(ob, cor):
+    """Camada de preenchimento de cor sólida (nova do editor ou do PSD com a cor trocada): SoCo + a marca de que os pixels
+    são cache, como o Photoshop grava (molde: tools/ps_modelo_pre.py). A máscara vai pelo caminho normal das máscaras."""
+    from psd_tools.constants import Tag
+    from psd_tools.psd.tagged_blocks import TaggedBlock
+    ob.tagged_blocks[Tag.SOLID_COLOR_SHEET_SETTING] = TaggedBlock(key=Tag.SOLID_COLOR_SHEET_SETTING, data=_soco(cor))
+    ob._record.flags.pixel_data_irrelevant = True
+    return True
+
+
 def _forma_nova(ob, vet, W, H):
     """Forma criada no editor (L.vet = {subs, cor}) → camada de forma do Photoshop: cor sólida (SoCo) + máscara vetorial
     (vmsk), como o Photoshop grava (conferido com uma forma feita nele: os blocos de cor saem iguais byte a byte).
@@ -1380,15 +1417,7 @@ def _forma_nova(ob, vet, W, H):
     from psd_tools.psd.descriptor import Descriptor, DescriptorBlock, Double
     from psd_tools.psd.tagged_blocks import TaggedBlock
     from psd_tools.psd import vector as V
-    c = str(vet.get("cor") or "#000000").lstrip("#")
-    if len(c) == 3:
-        c = "".join(ch * 2 for ch in c)
-    rgb = [int(c[k:k + 2], 16) for k in (0, 2, 4)]
-    cor = Descriptor(classID=b"RGBC", name="\x00")
-    for k, v in zip((b"Rd  ", b"Grn ", b"Bl  "), rgb):
-        cor[k] = Double(float(v))
-    soco = DescriptorBlock(version=16, classID=b"null", name="\x00")
-    soco[b"Clr "] = cor
+    soco = _soco(vet.get("cor"))
 
     def pt(xy):
         return (float(xy[1]) / H, float(xy[0]) / W)
@@ -1603,6 +1632,11 @@ def salvar(spec):
                         if not _transformar_vivo(orig, no["tf"], W, H, W0, H0):
                             ob = None
                             avisos.append(f"{no.get('nome')}: virou pixels (não deu para mover sem rasterizar)")
+                    if ob is not None and no.get("pre_ps") and orig.kind == "solidcolorfill":
+                        try:   # cor trocada no editor (os pixels novos vão abaixo, pelo _trocar_pixels)
+                            _preenchimento(orig, no["pre_ps"].get("cor"))
+                        except Exception as e:
+                            avisos.append(f"{no.get('nome')}: cor do preenchimento não salva ({e})")
                     if ob is not None and no.get("texto_novo") is not None and orig.kind == "type":
                         try:
                             _trocar_texto(orig, no["texto_novo"], no.get("texto_estilo"))
@@ -1646,6 +1680,12 @@ def salvar(spec):
                                 if t_ in ob.tagged_blocks:
                                     del ob.tagged_blocks[t_]
                             avisos.append(f"{no.get('nome')}: objeto inteligente salvo como pixels ({e})")
+                    if orig is None and no.get("pre_ps"):   # preenchimento criado no editor: camada de preenchimento
+                        try:
+                            _preenchimento(ob, no["pre_ps"].get("cor"))
+                        except Exception as e:
+                            logging.debug("preenchimento novo %s: %s", no.get("nome"), e)
+                            avisos.append(f"{no.get('nome')}: preenchimento salvo como pixels ({e})")
                     if orig is None and no.get("forma_ps"):   # forma criada no editor: vai como camada de forma
                         try:
                             _forma_nova(ob, no["forma_ps"], W, H)

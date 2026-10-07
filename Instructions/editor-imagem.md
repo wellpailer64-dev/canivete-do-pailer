@@ -144,7 +144,7 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   (texto, objeto inteligente, forma, efeitos e ajustes continuam editáveis no Photoshop). Mover/transformar texto,
   objeto inteligente e forma atualiza a matriz/caminhos (não rasteriza). Texto editado continua texto (conteúdo e
   estilo do começo: fonte, tamanho, cor, espaçamento, entrelinha, alinhamento). Pintar troca só os pixels.
-- Camada nova vai como camada de pixels, MENOS texto, forma e objeto inteligente criados no editor. Texto vira camada de texto do Photoshop (editável lá)
+- Camada nova vai como camada de pixels, MENOS texto, forma, objeto inteligente e preenchimento criados no editor. Texto vira camada de texto do Photoshop (editável lá)
   — `_texto_novo` em editor_imagem.py clona um molde gerado pelo próprio Photoshop (`Functions/psd_texto_modelo.py`,
   ponto e parágrafo) e troca texto, fonte/estilo (inclusive trechos com outra cor/fonte = runs), matriz e caixa; os
   pixels são os do editor até alguém editar no Photoshop. Forma (`L.vet`, ferramenta Forma e Caneta em modo Forma):
@@ -157,6 +157,12 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   SoLd na camada, item no lnk2 global) e troca uuid, os 4 cantos (`L.tf` aplicado aos cantos de `L.c0`), o tamanho e o
   PNG original incorporado (vai como a página mandou, sem recodificar). Filtros inteligentes do editor NÃO vão (aviso):
   o objeto vai com o original e a camada já mostra os filtros. Objeto com camadas (`L.conteudo`) vai achatado.
+- Camada › Nova camada de preenchimento › Cor sólida (`IE_CMDS.preenchimentoCor`, `KNV.preenchimento(cor, {nome})`):
+  `L.pre = {tipo: 'cor', cor}`, cobre o documento (`iePreRender`; refeita no Tamanho da tela), com seleção ativa nasce com
+  a máscara dela; duplo clique na miniatura troca a cor. Preenchimento de cor sólida vindo de PSD também abre com `L.pre`
+  (cor editável; na ida e volta o SoCo é trocado). PSD: `_preenchimento` = SoCo + `pixel_data_irrelevant`, como o
+  Photoshop (molde `tools/ps_modelo_pre.py`). Cor lida com `_cor_soco` (o `layer.data` do psd-tools já é o RGBC).
+  Degradê e padrão ainda não se criam no editor.
 - Arquivo › Colocar, arrastar arquivo para o documento, `KNV.colocar` e imagem gerada por IA criam OBJETO INTELIGENTE
   (`ieColocarCanvas(..., inteligente=true)`): o original inteiro em `L.c0` e a redução para caber na matriz. Colar
   (Ctrl+V) continua camada de pixels, como no Photoshop.
@@ -227,7 +233,7 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 - `TÍTULO PRINCIPAL BENTO E RONALD.psd` (portfólio) abre com diferença média 5,6 contra o achatado (sombra dos
   textos); já era assim antes desta rodada.
 - Ajustes sem desenho: Pesquisa de cores (LUT). Cor seletiva, Equilíbrio de cores, Vibratilidade e Filtro de fotos são aproximados.
-- Não há criação de camada de ajuste nova, estilos de camada novos, máscara vetorial, pincel de recuperação.
+- Camada de ajuste nova continua só no .iknv (não vai para o PSD). Preenchimento novo só de cor sólida (degradê/padrão não).
 - Texto com estilos misturados vira um estilo só quando editado.
 - Fidelidade medida contra o achatado do Photoshop nos 43 PSDs do portfólio: média < 1/255 na maioria, pior caso ~4/255.
 
@@ -253,6 +259,8 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   Windows); `ieDesenharNitido` desenha 1:1 sem reamostrar, amplia inteiro sem suavizar e reduz em etapas (ieMipmap).
 
 ## Teste
+`py -3.13 testes/teste_psd_pre.py [--photoshop]`: preenchimento novo (cheio e com máscara) → camada de preenchimento;
+com `--photoshop` lê tipo/cor lá, compara a imagem e troca a cor de um preenchimento feito no Photoshop (ida e volta).
 `py -3.13 testes/teste_psd_so.py [--photoshop]`: objeto inteligente novo (parado, 50%, girado) → objeto inteligente
 incorporado; com `--photoshop` abre o conteúdo, reduz a 50% e volta (sem perda = vem do original) e regrava um PSD com
 objeto feito no Photoshop. Molde: `tools/ps_modelo_so.py`.

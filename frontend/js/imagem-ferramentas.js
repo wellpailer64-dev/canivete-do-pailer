@@ -1230,6 +1230,7 @@ function ieRedimTela(doc, x, y, w, h, apagar) {
         L.movido = true;
     });
     doc.w = Math.round(w); doc.h = Math.round(h);
+    iePercorrer(doc.camadas, L => { if (L.pre) iePreRender(L, doc); });   // preenchimento cobre a tela nova
     ieFatiasTransformar?.(doc, [1, 0, 0, 1, -x, -y]);
     doc.comp = ieCanvas(doc.w, doc.h);
     doc.sel = null;
@@ -1340,6 +1341,37 @@ function ieFormaCorEditar(doc, L, ancora) {
     ieSeletorCor(ancora, antes || '#000000', c => {
         L.vet.cor = c; ieFormaRender(L, doc);
         clearTimeout(t); t = setTimeout(() => { if (L.vet.cor !== antes) ieHist(ieT('Cor da forma')); }, 600);
+    });
+}
+// ── camada de preenchimento de cor sólida (Camada › Nova camada de preenchimento › Cor sólida, como no Photoshop) ──
+// L.tipo = 'preenchimento', L.pre = {tipo: 'cor', cor}: cobre o documento inteiro (a máscara recorta); com seleção ativa
+// nasce com a máscara da seleção; duplo clique na miniatura troca a cor. Vai para o PSD como camada de preenchimento.
+function iePreRender(L, doc = IE.doc) {
+    if (!L || !L.pre) return;
+    const R0 = ieRCamada(L);
+    const c = ieCanvas(doc.w, doc.h), x = ieCtx(c);
+    x.fillStyle = L.pre.cor || '#000000'; x.fillRect(0, 0, doc.w, doc.h);
+    L.c = c; L.x = 0; L.y = 0; L.sujoPx = true;
+    ieInvalidar(L); ieCamadaMudou(L, R0);
+}
+async function iePreNovo(doc, cor) {
+    if (!doc) return null;
+    const L = ieNovaCamada(doc, { tipo: 'preenchimento', nome: ieNomeLivre(doc, ieT('Preenchimento de cor')), pre: { tipo: 'cor', cor: cor || IE.cor[0] }, sujoPx: true });
+    ieInserirAcima(doc, L, doc.selIds.length ? ieAtiva(doc) : null);
+    iePreRender(L, doc);
+    doc.ativa = L.id; doc.selIds = [L.id];
+    if (doc.sel && doc === IE.doc) { await ieCmd('mascaraSel'); doc.mascaraAlvo = false; }   // como no Photoshop
+    ieHist(ieT('Camada de preenchimento'));
+    ieUiCamadas?.();
+    return L;
+}
+function iePreCorEditar(doc, L, ancora) {
+    if (!L || !L.pre) return;
+    const antes = L.pre.cor;
+    let t = 0;
+    ieSeletorCor(ancora, antes || '#000000', c => {
+        L.pre.cor = c; iePreRender(L, doc);
+        clearTimeout(t); t = setTimeout(() => { if (L.pre.cor !== antes) ieHist(ieT('Cor do preenchimento')); }, 600);
     });
 }
 function ieAncoraNoMouse(ev) {   // âncora para o seletor de cor na posição do clique

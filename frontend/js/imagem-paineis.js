@@ -627,6 +627,7 @@ function ieCamadasInstalar() {
         if (L && (L.txt || L.texto) && ev.target.closest('[data-alvo]')) { ieEscolherFerr('texto'); ieTextoEditar(L); return; }
         // miniatura da camada de forma: seletor de cor
         if (L && L.tipo === 'forma' && L.vet && ev.target.closest('[data-alvo="px"]')) { ieFormaCorEditar(doc, L, ev.target.closest('[data-alvo="px"]')); return; }
+        if (L && L.tipo === 'preenchimento' && L.pre && ev.target.closest('[data-alvo="px"]')) { iePreCorEditar(doc, L, ev.target.closest('[data-alvo="px"]')); return; }
         // miniatura/selo do objeto inteligente: abre o conteúdo numa aba (como no Photoshop)
         if (L && L.tipo === 'inteligente' && ev.target.closest('[data-alvo="px"], .ie-cam-selo')) { ieConteudoAbrir(doc, L); return; }
         // duplo clique no resto da linha (ou no fx): Estilo de camada, como no Photoshop
@@ -1135,7 +1136,7 @@ const IE_MENUS = [
         ['Tamanho da imagem...', 'tamImagem', 'Alt+Ctrl+I'], ['Tamanho da tela...', 'tamTela', 'Alt+Ctrl+C'],
         ['Rotação da imagem', [['180°', 'img:g180'], ['90° horário', 'img:g90h'], ['90° anti-horário', 'img:g90a'], '-', ['Inverter tela na horizontal', 'img:fh'], ['Inverter tela na vertical', 'img:fv']]], '-',
         ['Cortar na seleção', 'cortarSel'], ['Aparar transparência', 'aparar']]],
-    ['Camada', [['Nova camada', 'novaCamada', 'Shift+Ctrl+N'], ['Duplicar camada', 'duplicar', 'Ctrl+J'], ['Camada via recorte', 'viaRecorte', 'Shift+Ctrl+J'], ['Excluir camada', 'excluirCamada'], '-',
+    ['Camada', [['Nova camada', 'novaCamada', 'Shift+Ctrl+N'], ['Nova camada de preenchimento', [['Cor sólida...', 'preenchimentoCor']]], ['Duplicar camada', 'duplicar', 'Ctrl+J'], ['Camada via recorte', 'viaRecorte', 'Shift+Ctrl+J'], ['Excluir camada', 'excluirCamada'], '-',
         ['Máscara de camada', [['Revelar tudo', 'mascara'], ['Ocultar tudo', 'mascaraOcultar'], ['Revelar seleção', 'mascaraSel'], ['Ocultar seleção', 'mascaraSelOcultar'], '-',
             ['Inverter máscara', 'mascaraInverter'], ['Desativar/ativar', 'mascaraDesativar'], ['Aplicar', 'mascaraAplicar'], ['Excluir', 'mascaraExcluir']]],
         ['Objetos inteligentes', [['Converter em objeto inteligente', 'objetoInteligente'], ['Editar conteúdo no Vetor', 'editarNoVetor'], ['Rasterizar', 'rasterizar'], '-',

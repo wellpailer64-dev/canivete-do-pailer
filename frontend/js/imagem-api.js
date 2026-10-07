@@ -205,6 +205,13 @@ const KNV = {
         return KNV.info();
     },
     objetoInteligente() { IE_CMDS.objetoInteligente(IE.doc); return KNV.info(); },
+    // camada de preenchimento de cor sólida acima da ativa (com seleção ativa, nasce com a máscara dela); vai para o PSD
+    // como camada de preenchimento (cor editável no Photoshop)
+    async preenchimento(cor = '#000000', { nome } = {}) {
+        const L = await iePreNovo(IE.doc, cor);
+        if (L && nome) { L.nome = nome; L._nomeAuto = false; ieUiCamadas(); }
+        return KNV.info();
+    },
     async duplicar(nome) { await ieCmd('duplicar'); return nome ? KNV.renomear(nome) : KNV.info(); },
     // Remover plano de fundo (IA): máscara do assunto; aplicar = true deixa os pixels já recortados
     // (recorte profissional: matting + filtro guiado + cores sem o fundo misturado, ~30 s; rapido = só a máscara lite, ~5 s)
