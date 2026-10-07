@@ -91,7 +91,31 @@
   - preferir a mesma família de whoosh no vídeo inteiro (coerência) ; vozes (inglês) só se pedirem
 - conferir no fim: `VE.clips.filter(c => VE.media[c.m]?.pasta === (VE.bins||[]).find(b => b.nome==='Soundboard')?.id)`
 
+## 8 CORTES DE ENTREVISTA (vídeo longo → reels 9:16 de um convidado) — feito 2026-10-07 (Alessandro/Minasparts)
+- ACHAR O TRECHO PRIMEIRO, barato: folha de contato 1 quadro/min (`ffmpeg -vf fps=1/60,scale=240:-1,tile=8x7`, 1 imagem)
+  → transcrever SÓ o trecho (`ffmpeg -ss A -t D` → wav 16k mono → `legendas.transcrever_wav`, somar A aos tempos).
+  NUNCA `agente_midia transcrever` no vídeo inteiro (55 min caiu: exit 139, e é caro). 7 min = 94 s.
+- escolher 2–4 assuntos com começo/meio/fim (dica prática, número, frase de efeito); pode juntar trechos distantes
+  quando fecham a ideia (ex.: abertura 1:58 + fecho 7:17). Plano: `tools/agente/cortes_entrevista_plano.py`
+  (bordas pela energia da voz, legendas com dicionário de erros: auxília→oficina, temparo/tem paro→Tempário,
+  Boscha cervice→Bosch Service, multipax→multimarcas).
+- ENQUADRAR NO FALANTE: horizontal 1920×1080 em 1080×1920 = sc 177,78 (k), p.x = 540 − (cx − 960)·k (limitar a
+  [1080 − 960k, 960k]); fechado sc 215 com p.y = 730 − (cy − 540)·k (limitar a [1920 − 540k, 540k]). Alternar
+  aberto/fechado em fim de frase a cada 3–7 s = "corte de câmera" de reels. Rostos: `tools/agente/falante.py`
+  (YuNet). ATENÇÃO: o "movimento de boca" errou o lado (barba/cabeça do outro) — quando o trecho é só do convidado,
+  FIXAR o lado dele conferindo 3–5 quadros (Read 1 tira); usar boca só onde há diálogo de verdade.
+- simular o recorte em PIL antes de montar (1 tira com 5 quadros) e só depois mexer no app.
+- montar: `tools/agente/cortes_entrevista_montar.py` (timeline nova por corte; `veAgente` é ASSÍNCRONO: await).
+  B-roll: 2 batidas da música por plano (`batidas`), música entra 1 batida antes do fim da fala com fade, −4 dB;
+  imagem de fechamento 6 batidas com dissolve. Legenda Oficina Produtiva: SF Pro Display negrito MAIÚSC, branca,
+  contorno/sombra #0a141a, destaque da palavra #e88213, entrada pop, max 16 × 2 linhas, py 14.
+- custo desta 1ª vez: alto (descobrir API, transcrição inteira que caiu, detector refeito 3×). Próxima: ~1/3 seguindo esta seção.
+
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-10-07 Oficina Produtiva (Alessandro Barbosa, entrevista Minasparts/Tempário): 3 cortes 46/57/85 s montados,
+  aguardando nota. Usuário pediu: legenda dinâmica na IDV (cores e8213/2d5770/0a141a/ebebeb, SF Pro + Bestigia),
+  câmera em quem fala, B-roll com música antes do fechamento ("01.png" da pasta de identidade). Corte livre de duração:
+  "o foco é o corte fazer sentido".
 - 2026-10-01 V3 MÉDIA (Portugal, ~1:25, mistura V1+V2+inédito: saunas IMG_0010): "amei". pedido: versões do mesmo
   imóvel NÃO podem começar igual (parecia a V1) → abrir de fora (fachada c/ zoom lento → vista da cidade) com a 1ª frase
   em off (só som, x:'a') e cortar para ela no 2º trecho; GC entra quando ela aparece. final: flores → vista c/ logo
