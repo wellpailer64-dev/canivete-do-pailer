@@ -360,5 +360,12 @@ dentro (o círculo 50% voltava opaco). Com o Illustrator ABERTO (não abre sozin
 substituindo as linhas do PDF dentro da caixa de cada texto nativo.
 Fora do Illustrator a ida usa `pywin32` (requirements + hiddenimports). Teste `testes/teste_illustrator.py` (pula sem o
 Illustrator; IDV de 5 pranchetas ida e .ai criado no Illustrator volta, compara PNG prancheta a prancheta, diferença ≤ 3,3).
-Pendente: símbolos na volta viram grupos; efeitos vivos na ida vão como arte incorporada (não editáveis como efeito);
-texto em caminho na volta fica o do PDF.
+Rodada 2 (mesmo dia): **símbolos na volta** — form XObject desenhado 2+ vezes que pinta com as próprias cores
+(`_contar_forms`) vira símbolo do Vetor (definição no espaço do form + instâncias com a matriz; form sem cor própria herda
+a cor de fora a cada uso e fica inline). **Texto em caminho na volta** (Illustrator aberto): caminho com alças + início
+(`startTValue` → comprimento, `_comprimento_ate`) viram `trilha`. **Sombra projetada viva na ida** (`applyEffect` "Adobe
+Drop Shadow", só sombra preta; desfoque/brilhos/cor seguem incorporados — o Gaussian Blur por XML não bateu o raio).
+ExtendScript agrupa ternário encadeado PELA ESQUERDA (`a ? b : c ? d : e` dava errado): nos JSX, `if` ou parênteses.
+Tradutor da interface (i18n.js) trocava "Título" por "Title" no HTML da cena: `translate="no"`/`.notranslate` agora
+ficam de fora (vetor-cena, imagem-cena). Comparação com os 22 .ai reais: todos iguais ou melhores (1ª abertura logo após
+recarregar a página às vezes captura antes das cores: rode de novo só o arquivo).

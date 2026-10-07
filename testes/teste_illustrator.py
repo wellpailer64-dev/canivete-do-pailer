@@ -45,7 +45,7 @@ AI = win32com.client.Dispatch("Illustrator.Application")
 LER = r"""
 (function () {
   function js(v) { if (v === null || v === undefined) return 'null'; if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-    if (typeof v === 'string') { var s = ''; for (var c = 0; c < v.length; c++) { var cc = v.charCodeAt(c); s += cc === 34 ? String.fromCharCode(92, 34) : cc === 92 ? String.fromCharCode(92, 92) : cc < 32 ? ' ' : cc > 126 ? String.fromCharCode(92) + 'u' + ('000' + cc.toString(16)).slice(-4) : v.charAt(c); } return '"' + s + '"'; }
+    if (typeof v === 'string') { var s = ''; for (var c = 0; c < v.length; c++) { var cc = v.charCodeAt(c), ch = v.charAt(c); if (cc === 34) ch = String.fromCharCode(92, 34); else if (cc === 92) ch = String.fromCharCode(92, 92); else if (cc === 13 || cc === 10) ch = String.fromCharCode(92) + 'n'; else if (cc < 32) ch = ' '; else if (cc > 126) ch = String.fromCharCode(92) + 'u' + ('000' + cc.toString(16)).slice(-4); s += ch; } return '"' + s + '"'; }   /* sem ternário encadeado: o ExtendScript agrupa pela esquerda */
     if (v instanceof Array) { var a = []; for (var i = 0; i < v.length; i++) a.push(js(v[i])); return '[' + a.join(',') + ']'; }
     var o = []; for (var k in v) o.push(js(k) + ':' + js(v[k])); return '{' + o.join(',') + '}'; }
   app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS; app.coordinateSystem = CoordinateSystem.DOCUMENTCOORDINATESYSTEM;
@@ -107,6 +107,8 @@ t2.paragraphs[2].characterAttributes.fillColor = spc;
 var t3 = L2.textFrames.pointText([250, -520]); t3.contents = 'Siga @auroracafe';
 t3.textRange.characterAttributes.size = 28; t3.textRange.paragraphAttributes.justification = Justification.CENTER;
 t3.textRange.characterAttributes.fillColor = cmyk(0, 60, 100, 0);
+var cc = L2.pathItems.ellipse(-400, 330, 140, 140); var tp = L2.textFrames.pathText(cc); tp.contents = 'TEXTO NO CAMINHO';
+tp.textRange.characterAttributes.size = 16; tp.textRange.characterAttributes.fillColor = cmyk(0, 0, 0, 100);
 var so = new IllustratorSaveOptions(); so.pdfCompatible = true;
 d.saveAs(new File('%SAI%/ai_original.ai'), so);
 for (var i = 0; i < d.artboards.length; i++) { d.artboards.setActiveArtboardIndex(i); var o = new ExportOptionsPNG24(); o.artBoardClipping = true; o.transparency = false;
@@ -191,6 +193,9 @@ with sync_playwright() as p:
     ok(tipos == ["AREATEXT", "POINTTEXT", "POINTTEXT"] and any(c == "MARÉ" for _, c in L["tx"]), "textos editáveis: 2 de ponto + 1 de área, acento certo", str(L["tx"]))
     ok("PANTONE 1505 C" in L["spots"] and L["n"]["degrades"] >= 1 and L["n"]["cortes"] >= 1 and L["n"]["simbolos"] >= 1 and L["n"]["compostos"] >= 1,
        "Pantone, degradê, máscara, símbolo e caminho composto nativos", str(L["n"]))
+    sb = json.loads(AI.DoJavaScript("(function(){ app.userInteractionLevel = UserInteractionLevel.DONTDISPLAYALERTS; var d = app.open(new File(" + json.dumps(ai_) + ")), n = 0;"
+                                     " for (var i = 0; i < d.pathItems.length; i++) if (d.pathItems[i].name === 'cartao') n++; d.close(SaveOptions.DONOTSAVECHANGES); return '{\"cartao\":' + n + '}'; })()"))
+    ok(sb["cartao"] == 1 and r.get("incorporados_pdf") == 0, "cartão com sombra vai como caminho nativo com Sombra projetada viva (nada incorporado)", f"{sb}, incorporados {r.get('incorporados_pdf')}")
     d = comparar(SAI, 5, SAI + "/ida_vetor.pdf")
     ok(max(d) < 6, "aparência igual no Illustrator e no Vetor (diferença média por prancheta)", str(d))
 
@@ -205,8 +210,12 @@ with sync_playwright() as p:
     ok(info["pr"] == [["Marca", 0, 0, 500, 300], ["Papelaria", 540, 0, 500, 300], ["Redes", 0, 340, 500, 300]], "pranchetas no lugar do Illustrator (a 3ª embaixo)", str(info["pr"]))
     ok(info["cam"] == ["Fundo", "Logo", "Textos"], "camadas na ordem do Illustrator", str(info["cam"]))
     area = [t for t in info["tx"] if t[1]]
-    ok(len(info["tx"]) == 3 and len(area) == 1 and area[0][0].count("\n") == 2 and area[0][2] >= 2, "textos: 3, o de área inteiro com parágrafos e trechos, sem duplicata", str(info["tx"]))
+    ok(len(info["tx"]) == 4 and len(area) == 1 and area[0][0].count("\n") == 2 and area[0][2] >= 2, "textos: 4 (com o do caminho), o de área inteiro com parágrafos e trechos, sem duplicata", str(info["tx"]))
     ok("PANTONE 286 C" in info["spots"], "cor especial vira amostra", str(info["spots"]))
+    sim = pg.evaluate("() => ({ defs: Object.keys(VK.doc.simbolos || {}).length, inst: vkTodos().filter(x => x.o.tipo === 'instancia').length })")
+    ok(sim["defs"] >= 1 and sim["inst"] >= 2, "símbolo do Illustrator volta como símbolo (definição + instâncias)", str(sim))
+    tc = pg.evaluate("() => vkTodos().map(x => x.o).filter(o => o.tipo === 'texto' && o.trilha).map(o => [o.conteudo, o.subs.length, Math.round(o.trilha.ini)])")
+    ok(len(tc) == 1 and tc[0][0] == "TEXTO NO CAMINHO", "texto em caminho volta editável no caminho", str(tc))
     C("exportar_pdf", {"caminho": V + "/volta_vetor.pdf", "forcar": True, "padrao": "cmyk", "marcas": False})
     d = comparar(V, 3, V + "/volta_vetor.pdf")
     ok(max(d) < 6, "aparência igual (Illustrator × Vetor)", str(d))

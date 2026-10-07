@@ -31,6 +31,7 @@ async function vkCena(a) {
     if (a.limpar !== false) for (const c of VK.doc.camadas) c.itens = c.itens.filter(o => o.cena !== p.id);
     const W = p.w, H = p.h, pal = Object.fromEntries(Object.entries(a.paleta || {}).map(([k, v]) => [k.toLowerCase(), v]));
     const host = document.createElement('div');
+    host.setAttribute('translate', 'no');   // o tradutor da interface trocava "Título" por "Title" no texto do usuário
     host.style.cssText = `position:fixed;left:-${W + 50000}px;top:0;width:${W}px;height:${H}px;overflow:hidden;pointer-events:none;`;
     host.innerHTML = `<style>:where(#vkc, #vkc *){box-sizing:border-box;margin:0;padding:0}#vkc{position:relative;width:${W}px;height:${H}px;overflow:hidden;font-family:Inter,Arial,sans-serif;font-size:10px;line-height:1.3;color:#000}${a.css || ''}</style><div id="vkc">${a.html}</div>`;
     document.body.appendChild(host);

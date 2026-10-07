@@ -72,8 +72,25 @@ def _cor_ok(c):
     return c is None or (isinstance(c, dict) and c.get("k") in ("cmyk", "rgb", "spot", "reg"))
 
 
+def _sombra_preta(e):
+    c = e.get("cor") or {"k": "cmyk", "v": [0, 0, 0, 100]}
+    if c.get("k") == "cmyk":
+        return c["v"][3] >= 70 and max(c["v"][:3]) <= 30
+    if c.get("k") == "rgb":
+        return max(c["v"]) <= 60
+    return False
+
+
+def _sombras(o):
+    """efeitos que viram Sombra projetada VIVA no Illustrator (só sombras pretas; o resto vai incorporado)."""
+    efs = [e for e in (o.get("efeitos") or []) if e.get("visivel") is not False]
+    if efs and all(e.get("tipo") == "sombra" and _sombra_preta(e) for e in efs):
+        return efs
+    return None
+
+
 def _nativo(o, simbolos):
-    if o.get("_pint") is not None or o.get("_silh") is not None or o.get("efeitos") or o.get("aparencia") or o.get("pincel") or o.get("mescla"):
+    if o.get("_pint") is not None or (o.get("efeitos") and not _sombras(o)) or o.get("aparencia") or o.get("pincel") or o.get("mescla"):
         return False
     t = o.get("tipo")
     if t == "caminho":
@@ -140,6 +157,9 @@ class _Montador:
         t, base = o.get("tipo"), {"nome": o.get("nome") or "", "op": o.get("op"), "bm": _BM.get(o.get("bm") or ""), "oculto": o.get("visivel") is False,
                                    "trava": bool(o.get("trava")), "sobre": o.get("sobre") or {}}
         self.cont["nativos"] += 1
+        sb = _sombras(o)
+        if sb:
+            base["sombras"] = [{"dx": e.get("dx", 4), "dy": e.get("dy", 4), "desf": e.get("desfoque", 3), "op": e.get("op", 0.75)} for e in sb]
         if t == "caminho":
             return dict(base, t="caminho", subs=o["subs"], par=o.get("regra") == "evenodd", preench=o.get("preench"), traco=o.get("traco"))
         if t == "grupo":
@@ -215,7 +235,7 @@ _JSX = r"""
   function js(v) {
     if (v === null || v === undefined) return 'null';
     if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-    if (typeof v === 'string') { var s = ''; for (var c = 0; c < v.length; c++) { var cc = v.charCodeAt(c); s += cc === 34 ? String.fromCharCode(92, 34) : cc === 92 ? String.fromCharCode(92, 92) : cc < 32 ? ' ' : cc > 126 ? String.fromCharCode(92) + 'u' + ('000' + cc.toString(16)).slice(-4) : v.charAt(c); } return '"' + s + '"'; }
+    if (typeof v === 'string') { var s = ''; for (var c = 0; c < v.length; c++) { var cc = v.charCodeAt(c), ch = v.charAt(c); if (cc === 34) ch = String.fromCharCode(92, 34); else if (cc === 92) ch = String.fromCharCode(92, 92); else if (cc === 13 || cc === 10) ch = String.fromCharCode(92) + 'n'; else if (cc < 32) ch = ' '; else if (cc > 126) ch = String.fromCharCode(92) + 'u' + ('000' + cc.toString(16)).slice(-4); s += ch; } return '"' + s + '"'; }   /* sem ternário encadeado: o ExtendScript agrupa pela esquerda */
     if (v instanceof Array) { var a = []; for (var i = 0; i < v.length; i++) a.push(js(v[i])); return '[' + a.join(',') + ']'; }
     var o = []; for (var k in v) o.push(js(k) + ':' + js(v[k])); return '{' + o.join(',') + '}';
   }
@@ -333,6 +353,9 @@ _JSX = r"""
       it = par.placedItems.add(); it.file = new File(o.arq); it.position = [o.x, -o.y];
       try { it.embed(); it = par.pageItems[0]; } catch (e) { avisos.push('PDF incorporado ficou vinculado'); }
     }
+    if (it && o.sombras) for (var k = 0; k < o.sombras.length; k++) { var S = o.sombras[k];   // Efeito > Estilizar > Sombra projetada (viva)
+      try { it.applyEffect('<LiveEffect name="Adobe Drop Shadow"><Dict data="R horz ' + S.dx + ' R vert ' + S.dy + ' R blur ' + S.desf + ' R opac ' + S.op + ' I mode 1 I csrc 0 B usePSLBlur 1 R dark 0 I blnd 1 B pair 1 "/></LiveEffect>'); }
+      catch (e) { avisos.push('sombra: ' + e); } }
     if (it) { comum(it, o); if (o.oculto) it.hidden = true; }
     return it;
   }
@@ -429,7 +452,7 @@ _JSX_LER = r"""
   function js(v) {
     if (v === null || v === undefined) return 'null';
     if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-    if (typeof v === 'string') { var s = ''; for (var c = 0; c < v.length; c++) { var cc = v.charCodeAt(c); s += cc === 34 ? String.fromCharCode(92, 34) : cc === 92 ? String.fromCharCode(92, 92) : cc === 13 ? String.fromCharCode(92) + 'n' : cc < 32 ? ' ' : cc > 126 ? String.fromCharCode(92) + 'u' + ('000' + cc.toString(16)).slice(-4) : v.charAt(c); } return '"' + s + '"'; }
+    if (typeof v === 'string') { var s = ''; for (var c = 0; c < v.length; c++) { var cc = v.charCodeAt(c), ch = v.charAt(c); if (cc === 34) ch = String.fromCharCode(92, 34); else if (cc === 92) ch = String.fromCharCode(92, 92); else if (cc === 13 || cc === 10) ch = String.fromCharCode(92) + 'n'; else if (cc < 32) ch = ' '; else if (cc > 126) ch = String.fromCharCode(92) + 'u' + ('000' + cc.toString(16)).slice(-4); s += ch; } return '"' + s + '"'; }   /* sem ternário encadeado: o ExtendScript agrupa pela esquerda */
     if (v instanceof Array) { var a = []; for (var i = 0; i < v.length; i++) a.push(js(v[i])); return '[' + a.join(',') + ']'; }
     var o = []; for (var k in v) o.push(js(k) + ':' + js(v[k])); return '{' + o.join(',') + '}';
   }
@@ -455,22 +478,45 @@ _JSX_LER = r"""
   var J = { 'Justification.CENTER': 'centro', 'Justification.RIGHT': 'dir', 'Justification.FULLJUSTIFYLASTLINELEFT': 'just', 'Justification.FULLJUSTIFY': 'just_tudo' };
   for (var i = 0; i < d.textFrames.length; i++) {
     var tf = d.textFrames[i], kind = String(tf.kind);
-    if (kind === 'TextType.PATHTEXT') { out.textos.push({ tipo: 'caminho', bounds: tf.geometricBounds }); continue; }   // texto em caminho: fica o do PDF
     var n = tf.characters.length, trechos = [], ini = 0, atual = null;
     for (var c = 0; c < n; c++) { var a = attrs(tf.characters[c]); if (!atual) { atual = a; continue; } if (!igual(a, atual)) { atual.ini = ini; atual.fim = c; trechos.push(atual); atual = a; ini = c; } }
     if (atual) { atual.ini = ini; atual.fim = n; trechos.push(atual); }
     var p0 = tf.paragraphs.length ? tf.paragraphs[0] : tf.textRange, ca = tf.textRange.characterAttributes, M = tf.matrix;
-    var r = { camada: tf.layer.name, tipo: kind === 'TextType.AREATEXT' ? 'area' : 'ponto', conteudo: tf.contents, oculto: tf.hidden,
+    var r = { camada: tf.layer.name, tipo: kind === 'TextType.AREATEXT' ? 'area' : (kind === 'TextType.PATHTEXT' ? 'caminho' : 'ponto'),   /* ExtendScript agrupa ternário encadeado pela esquerda: parênteses */ conteudo: tf.contents, oculto: tf.hidden,
               alin: J[String(p0.paragraphAttributes.justification)] || 'esq', entrelinha: ca.autoLeading ? null : ca.leading, trechos: trechos,
               mat: [M.mValueA, M.mValueB, M.mValueC, M.mValueD], anchor: null, nome: tf.name, bounds: tf.geometricBounds };
     if (kind === 'TextType.POINTTEXT') r.anchor = tf.anchor;   // área não tem âncora (erro 9544)
     if (r.tipo === 'area') { var g = tf.textPath.geometricBounds; r.box = g; }
+    if (r.tipo === 'caminho') {   // texto em caminho: o caminho (âncoras e alças) e onde o texto começa (t = segmento + fração)
+      var pp = tf.textPath.pathPoints, pts = [];
+      for (var k = 0; k < pp.length; k++) { var q = pp[k]; pts.push([q.anchor[0], q.anchor[1], q.leftDirection[0], q.leftDirection[1], q.rightDirection[0], q.rightDirection[1]]); }
+      r.pts = pts; r.fechado = tf.textPath.closed; try { r.t0 = tf.startTValue; } catch (e) { r.t0 = 0; }
+    }
     out.textos.push(r);
   }
   d.close(SaveOptions.DONOTSAVECHANGES);
   return js(out);
 })();
 """
+
+
+def _comprimento_ate(pts, fechado, t0):
+    """comprimento (pt) do caminho até o parâmetro t0 do Illustrator (parte inteira = segmento, fração = dentro dele)."""
+    n = len(pts) if fechado else len(pts) - 1
+    seg, fr = int(t0), t0 - int(t0)
+    total = 0.0
+    for i in range(min(seg + 1, n)):
+        a, b = pts[i], pts[(i + 1) % len(pts)]
+        P = [(a[0], a[1]), (a[4], a[5]), (b[2], b[3]), (b[0], b[1])]
+        ate = fr if i == seg else 1.0
+        passos = 48
+        ant = P[0]
+        for k in range(1, passos + 1):
+            u = ate * k / passos; v = 1 - u
+            x = v ** 3 * P[0][0] + 3 * v * v * u * P[1][0] + 3 * v * u * u * P[2][0] + u ** 3 * P[3][0]
+            y = v ** 3 * P[0][1] + 3 * v * v * u * P[1][1] + 3 * v * u * u * P[2][1] + u ** 3 * P[3][1]
+            total += math.hypot(x - ant[0], y - ant[1]); ant = (x, y)
+    return total
 
 
 def aplicar_textos(doc, caminho, relatorio):
@@ -499,12 +545,19 @@ def aplicar_textos(doc, caminho, relatorio):
             continue
         X = lambda x, off=off: x + off[0]
         Y = lambda y, off=off: -y + off[1]
-        caixas.append((X(b[0]) - 2, Y(b[1]) - 2, X(b[2]) + 2, Y(b[3]) + 2, t["tipo"] == "caminho"))
-        if t["tipo"] == "caminho" or not t.get("trechos"):
+        caixas.append((X(b[0]) - 2, Y(b[1]) - 2, X(b[2]) + 2, Y(b[3]) + 2, False))
+        if not t.get("trechos"):
             continue
         tr0 = t["trechos"][0]
         A, B, C, D = t["mat"]
-        if t["tipo"] == "area":
+        trilha = None
+        if t["tipo"] == "caminho":
+            if not t.get("pts"):
+                continue
+            pts = [[X(q[0]), Y(q[1]), X(q[2]), Y(q[3]), X(q[4]), Y(q[5])] for q in t["pts"]]
+            trilha = {"subs": [{"fechado": bool(t.get("fechado")), "pts": pts}], "ini": _comprimento_ate(pts, bool(t.get("fechado")), float(t.get("t0") or 0))}
+            e = f = 0; caixa = caixa_alt = None
+        elif t["tipo"] == "area":
             bx = t.get("box") or t["bounds"]; e, f = X(bx[0]), Y(bx[1]); caixa, caixa_alt = bx[2] - bx[0], bx[1] - bx[3]
         else:
             e, f = X(t["anchor"][0]), Y(t["anchor"][1]); caixa = caixa_alt = None
@@ -520,6 +573,8 @@ def aplicar_textos(doc, caminho, relatorio):
              "m": [round(A, 6), round(-B, 6), round(-C, 6), round(D, 6), round(e, 3), round(f, 3)], "preench": tr0.get("cor") or {"k": "cmyk", "v": [0, 0, 0, 100]}, "traco": None}
         if caixa_alt:
             o["caixa_alt"] = round(caixa_alt, 3)
+        if trilha:   # como o comando texto_caminho do Vetor: o caminho em pt do documento, m identidade
+            o["subs"], o["trilha"], o["m"] = trilha["subs"], {"ini": round(trilha["ini"], 3), "lado": False}, [1, 0, 0, 1, 0, 0]
         if trechos:
             o["trechos"] = trechos
         if t.get("nome"):

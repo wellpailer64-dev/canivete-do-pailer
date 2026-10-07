@@ -196,6 +196,7 @@ class _PDF:
     def __init__(self, pdf, doc, ids, rel):
         self.pdf, self.doc, self.ids, self.rel = pdf, doc, ids, rel
         self.camadas = {}
+        self.usos, self.simbolos_ids = {}, {}   # forms desenhados 2+ vezes viram símbolos (importar_pdf preenche)
         self.textos = []   # (x, y, cor) de cada operador de mostrar texto
         self.cmyk = 0
 
@@ -454,7 +455,19 @@ class _PDF:
                     xo = ((res or {}).get("/XObject") or {}).get(o[0])
                     if xo is None: continue
                     st = str(xo.get("/Subtype"))
-                    if st == "/Form":
+                    if st == "/Form" and not gs.get("em_simbolo") and self.usos.get(xo.objgen, 0) >= 2 and xo.objgen != (0, 0):
+                        # form desenhado 2+ vezes = símbolo do Illustrator: uma definição (no espaço do form) + instâncias
+                        k = xo.objgen; sid = self.simbolos_ids.get(k)
+                        if not sid:
+                            sid = self.ids("s"); self.simbolos_ids[k] = sid
+                            g2 = dict(gs, ctm=[1, 0, 0, 1, 0, 0], cont=[], raiz=False, clip=None, em_simbolo=True, ca=1, CA=1, ca_fora=1, CA_fora=1)
+                            self._stream(xo, xo.get("/Resources", res), g2, prof + 1)
+                            self.doc.setdefault("simbolos", {})[sid] = {"nome": f"Símbolo {len(self.simbolos_ids)}", "itens": g2["cont"]}
+                        mi = mmul([float(v) for v in xo.get("/Matrix", [1, 0, 0, 1, 0, 0])], gs["ctm"])
+                        inst = {"id": self.ids(), "tipo": "instancia", "simbolo": sid, "m": [round(v, 5) for v in mi]}
+                        if gs["ca"] < 1: inst["op"] = round(gs["ca"], 3)
+                        gs["cont"].append(inst); self.rel["simbolos"] += 1
+                    elif st == "/Form":
                         sv = dict(gs)
                         gs["ctm"] = mmul([float(v) for v in xo.get("/Matrix", [1, 0, 0, 1, 0, 0])], gs["ctm"])
                         if "/Group" in xo:   # grupo de transparência: a opacidade de fora vale para o grupo inteiro
@@ -713,6 +726,38 @@ def _ai_privado(pdf, limite=16 << 20):
         return None
 
 
+def _contar_forms(pdf):
+    """Quantas vezes cada Form XObject é desenhado (páginas e forms dentro de forms): 2+ = símbolo."""
+    import pikepdf
+    usos, vistos, cor_propria = Counter(), set(), {}
+
+    def anda(alvo, res, prof):
+        if prof > 6 or res is None:
+            return
+        try:
+            ops = pikepdf.parse_content_stream(alvo)
+        except Exception:
+            return
+        for operandos, op in ops:
+            if str(op) != "Do" or not operandos:
+                continue
+            xo = (res.get("/XObject") or {}).get(operandos[0])
+            if xo is None or str(xo.get("/Subtype")) != "/Form":
+                continue
+            if xo.objgen not in cor_propria:   # símbolo só se o form pinta com as próprias cores (senão herda a cor de fora a cada uso)
+                try:
+                    cor_propria[xo.objgen] = any(str(o2) in ("k", "K", "rg", "RG", "g", "G", "sc", "scn", "SC", "SCN", "sh") for _, o2 in pikepdf.parse_content_stream(xo))
+                except Exception:
+                    cor_propria[xo.objgen] = False
+            if cor_propria[xo.objgen]:
+                usos[xo.objgen] += 1
+            if xo.objgen not in vistos:
+                vistos.add(xo.objgen); anda(xo, xo.get("/Resources", res), prof + 1)
+    for pg in pdf.pages:
+        anda(pg.obj, pg.obj.get("/Resources"), 0)
+    return usos
+
+
 def _ai_pranchetas(pdf):
     """Posições das pranchetas do .ai nativo (ArtboardArray: PositionPoint1 = canto de cima à esquerda, 2 = de baixo à
     direita, y para cima) → [(x, y, w, h)] em pt do Vetor (y para baixo), na ordem das páginas; None se não achar."""
@@ -790,6 +835,7 @@ def importar_pdf(caminho):
         return {"success": False, "error": f"não abriu como PDF: {e}" + (" — salve o .ai com 'Criar arquivo compatível com PDF'" if caminho.lower().endswith(".ai") else "")}
     fz = fitz.open(caminho, filetype="pdf")
     leitor = _PDF(pdf, doc, ids, rel)
+    leitor.usos, leitor.simbolos_ids = _contar_forms(pdf), {}
     embutidas = _fontes_embutidas(fz, doc, rel)
     x_ab = 0
     faltando = set()
@@ -855,7 +901,7 @@ def importar_pdf(caminho):
     if embutidas: relatorio.append("Fontes não instaladas, usadas as EMBUTIDAS no arquivo (só as letras do original; para editar à vontade, instale): "
                                    + ", ".join(f"{e['fam']} {e['estilo']}" for e in embutidas))
     nomes = {"sombreamento": "degradês de malha/forma livre (só os lineares e radiais viram degradê)", "padrao": "padrões (pattern) viraram cinza 30%",
-             "mascara_suave": "máscaras de opacidade (ignoradas)", "devn": "cores DeviceN convertidas", "pagina_girada": "páginas giradas (abrem sem a rotação)",
+             "mascara_suave": "máscaras de opacidade (ignoradas)", "simbolos": "instâncias de símbolo (viraram símbolos do Vetor)", "devn": "cores DeviceN convertidas", "pagina_girada": "páginas giradas (abrem sem a rotação)",
              "cmyk_com_alfa": "imagens CMYK com transparência (viraram RGB)", "fonte_sem_cmap": "fontes embutidas sem tabela de caracteres (trocadas por Arial)"}
     for k, txt in nomes.items():
         if rel[k]: relatorio.append(f"{rel[k]}× {txt}")

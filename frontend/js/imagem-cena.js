@@ -29,6 +29,7 @@ async function ieCena(html, o = {}) {
     } else if (doc.w !== sw * Math.max(1, nSlides) || doc.h !== sh) avisos.push(`documento é ${doc.w}x${doc.h}, a cena pede ${sw * Math.max(1, nSlides)}x${sh}${nSlides ? ` (${nSlides} slides)` : ''}: monte com novo: true`);
     const W = doc.w, H = doc.h;
     const host = document.createElement('div');
+    host.setAttribute('translate', 'no');   // o tradutor da interface não mexe no texto do usuário
     host.style.cssText = `position:fixed;left:${-W - 40000}px;top:0;width:${W}px;height:${H}px;overflow:hidden;pointer-events:none;`;
     document.body.appendChild(host);
     const ctx = { doc, W, H, o, avisos, chaves: new Map(), blocos: [], mantidas: [], n: 0, slide: nSlides ? { w: sw, h: sh, n: nSlides } : null };
