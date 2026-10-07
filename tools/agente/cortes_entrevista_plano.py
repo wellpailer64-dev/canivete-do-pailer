@@ -28,10 +28,10 @@ def voz(t):
 
 
 # trechos: (primeira palavra, última palavra) pelo início (s da fonte)
-CORTES = [
-    ("Corte 1 - Administrar tempo", [(118.28, 141.90), (439.26, 450.23)]),
-    ("Corte 2 - Hora-homem e preço", [(179.08, 224.76)]),
-    ("Corte 3 - As 3 horas e produtividade", [(283.56, 318.03), (340.04, 367.16), (398.47, 408.95)]),
+CORTES = [   # (primeira palavra, última palavra, lado do rosto: 0 = Alessandro à esquerda, 1 = Luciano à direita)
+    ("Corte 1 - Administrar tempo", [(110.20, 112.76, 1), (113.64, 141.90, 0), (439.26, 450.23, 0)]),
+    ("Corte 2 - Hora-homem e preço", [(162.81, 166.73, 1), (172.33, 177.77, 1), (179.08, 224.76, 0)]),
+    ("Corte 3 - As 3 horas e produtividade", [(335.00, 338.92, 1), (340.04, 367.16, 0), (283.56, 318.03, 0), (398.47, 408.95, 0)]),
 ]
 FIXP = {}
 FIX = {"auxílio": "oficina", "auxília": "oficina", "temparo": "Tempário", "tempária": "Tempário", "tempário": "Tempário", "tempar.": "Tempário.",
@@ -83,9 +83,13 @@ def main():
     for nome, trechos in CORTES:
         clips, legs, t = [], [], 0.0
         ws = None
-        for a_ini, a_fim in trechos:
+        e_ant = None
+        for a_ini, a_fim, L in trechos:
             ws = palavras_de(a_ini, a_fim)
             s, e = bordas(ws)
+            if e_ant is not None and e_ant[0] <= s < e_ant[1]:
+                s = e_ant[1]   # trecho seguido do anterior na fonte: não repete o som
+            e_ant = (s - 30, e)
             ws = [w for w in PAL if s <= w[0] < e]
             am = falante.analisar(VIDEO, s, e)
             # falante dominante do trecho: o lado (esq/dir) com mais boca mexendo somada
@@ -93,7 +97,6 @@ def main():
             for x in am:
                 for r in x["rostos"]:
                     lado[int(r["cx"] >= 960)] += r["mov"]
-            L = 0   # os trechos escolhidos são falas do Alessandro, que está à esquerda em toda a entrevista (conferido nos quadros)
             # pontos de troca de enquadramento: pausas entre palavras (> 0.25 s) com pelo menos 3.5 s desde a última
             pausas, ult = [s], s
             for i in range(len(ws) - 1):
@@ -111,6 +114,8 @@ def main():
                               "sc": 177.78 if len(clips) % 2 == 0 else 215.0})
             for a, b, w in corrigir([list(w) for w in ws]):
                 legs.append([round(t + a - s, 3), round(t + b - s, 3), w])
+            if L == 1 and legs and not re.search(r"[.?!,]$", legs[-1][2]):
+                legs[-1][2] += "?"   # pergunta do entrevistador
             t += e - s
         plano["cortes"].append({"nome": nome, "clips": clips, "palavras": legs, "fala_fim": round(t, 3)})
         print(nome, f"{t:.1f} s", len(clips), "planos;", " ".join(w for _, _, w in legs)[:300], flush=True)

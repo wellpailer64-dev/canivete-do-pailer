@@ -112,6 +112,10 @@
 - custo desta 1ª vez: alto (descobrir API, transcrição inteira que caiu, detector refeito 3×). Próxima: ~1/3 seguindo esta seção.
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-10-07 cortes Oficina Produtiva: "o entrevistador não apareceu em nenhum momento" → REGRA: corte de entrevista
+  ABRE com a pergunta do entrevistador (enquadrado nele) que originou o assunto, e corta para a resposta; pode reordenar
+  trechos para a pergunta casar com a resposta (corte 3: pergunta 5:35 → 70% → 3 horas → pilares). Pergunta sem
+  pontuação na transcrição ganha "?". CORTES no plano agora têm lado do rosto por trecho (0 esq, 1 dir).
 - 2026-10-07 Oficina Produtiva (Alessandro Barbosa, entrevista Minasparts/Tempário): 3 cortes 46/57/85 s montados,
   aguardando nota. Usuário pediu: legenda dinâmica na IDV (cores e8213/2d5770/0a141a/ebebeb, SF Pro + Bestigia),
   câmera em quem fala, B-roll com música antes do fechamento ("01.png" da pasta de identidade). Corte livre de duração:

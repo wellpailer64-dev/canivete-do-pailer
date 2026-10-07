@@ -26,8 +26,9 @@ def pos(c):
 
 JS = """async ({nome, clips, palavras, estilo, broll, fim, mus}) => {
     const r = {};
-    await veAgente('Timeline nova: ' + nome, () => { veCreateTimeline({ name: nome }); });
-    await veAgente(nome + ': falas do Alessandro com enquadramento nele', () => {
+    await veAgente('Abrindo ' + nome, () => { const sq = (VE.sequences || []).find(s => s.name === nome); if (sq) { if (sq.id !== VE.activeSequence) veOpenTimeline(sq.id); } else veCreateTimeline({ name: nome }); });
+    if (typeof vePushHistory === 'function') vePushHistory();   // Ctrl+Z volta a versão anterior do corte
+    await veAgente(nome + ': pergunta do Luciano + falas do Alessandro, câmera em quem fala', () => {
         VE.clips = clips.map(c => ({ tr: 0, st: c.st, s: c.s, e: c.e, m: 19, p: c.p }));
         let t = fim;
         broll.forEach((b, i) => { const c = { tr: 0, st: t, s: b.s, e: b.s + b.d, m: 19, x: 'v', p: { sc: 177.78, x: 540 + b.dx, y: 960, rot: 0, op: 100 } };
