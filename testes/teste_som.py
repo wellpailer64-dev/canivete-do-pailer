@@ -319,6 +319,88 @@ with sync_playwright() as p:
     ok(banda(D + "bipe.wav") - banda(rep) > 15 and abs(pico("4:5", rep) - pico("4:5", D + "bipe.wav")) < 0.5, "reparo espectral tira o bipe e não mexe no resto",
        f"bipe {banda(D + 'bipe.wav')} → {banda(rep)} dB")
     pg.evaluate("SKN.espectro(false)")
+    # ── layout livre: áreas horizontais (cima, meio, baixo) ──
+    pg.evaluate("skDockRedefinir(); skDockMostrar('midia')")
+    def arrasta(pid, alvo_js):
+        cab = pg.evaluate(f"(() => {{ const r = SK_DOCK.el['{pid}'].querySelector('.ie-painel-cab').getBoundingClientRect(); return [r.left + 40, r.top + r.height / 2]; }})()")
+        xy = pg.evaluate(alvo_js)
+        pg.mouse.move(*cab); pg.mouse.down(); pg.mouse.move(*xy, steps=12); pg.mouse.up()
+    arrasta("midia", "(() => { const r = document.querySelector('#sk .sk-corpo').getBoundingClientRect(); return [r.left + r.width / 2, r.bottom - 20]; })()")
+    ok("midia" in pg.evaluate("SK_DOCK.lay.baixo"), "painel encaixa embaixo da timeline (ao lado do Texto para Voz)", str(pg.evaluate("SK_DOCK.lay.baixo")))
+    arrasta("midia", "(() => { const r = document.getElementById('sk-div').getBoundingClientRect(); return [r.left + r.width / 2, r.top + 3]; })()")
+    ok(pg.evaluate("SK_DOCK.lay.meio") == ["midia"], "painel encaixa no meio (entre o Monitor e a timeline)", str(pg.evaluate("SK_DOCK.lay.meio")))
+    arrasta("midia", "(() => { const r = document.querySelector('#sk .sk-monitor').getBoundingClientRect(); return [r.left + r.width / 2, r.top + 10]; })()")
+    ok(pg.evaluate("SK_DOCK.lay.cima") == ["midia"], "painel encaixa em cima do Monitor", str(pg.evaluate("SK_DOCK.lay.cima")))
+    pg.evaluate("skDockRedefinir()")
+    # ── Texto para Voz: duas colunas e Conversa (sem gerar) ──
+    pg.evaluate("SKN.novo('vazio', 'Conversa UI'); skDockMostrar('tts'); SK.tts = null; skTtsOp().modo = 'conversa'; skTtsRedesenhar()")
+    pg.wait_for_selector("#sk-p-tts .sk-falas", timeout=30000)
+    cols = pg.evaluate("getComputedStyle(document.querySelector('#sk-p-tts .sk-tts')).gridTemplateColumns.split(' ').length")
+    ok(cols == 2, "Texto para Voz largo: duas colunas (texto/conversa | vozes e ajustes)", str(cols))
+    n = pg.evaluate("skRoteiro('Ana: Oi, tudo bem?\\nBeto: Tudo ótimo!\\nAna: Que bom.'); skTtsRedesenhar(); skTtsOp().falas.length")
+    pg.wait_for_function("document.querySelectorAll('#sk-p-tts .sk-fala').length === 3")
+    pg.click("#sk-p-tts [data-fala='2']"); pg.keyboard.press("End"); pg.keyboard.press("Enter")
+    pg.wait_for_function("skTtsOp().falas.length === 4")
+    quem = pg.evaluate("skTtsOp().falas.map(f => skPers(f.p).nome)")
+    ok(n == 3 and quem == ["Ana", "Beto", "Ana", "Beto"] and pg.evaluate("skTtsOp().pers.length") == 2, "Conversa: roteiro vira personagens e falas; Enter cria a próxima fala do outro personagem", str(quem))
+    pg.evaluate("SK.tts.falas.pop(); skTtsGuardar()")
+    # ── editar pelo texto (palavras com tempo) e tirar vícios ──
+    pg.evaluate("SKN.novo('vazio', 'Texto')")
+    pg.evaluate(f"async () => await SKN.importar(['{D}voz.wav'])")
+    pg.evaluate("SK.texto = SK.proj.texto = { idioma: 'pt', palavras: [[0, 0.5, 'Olá'], [0.6, 0.9, 'hum'], [1.0, 1.5, 'tudo'], [2.0, 2.6, 'certo']] }; skDockMostrar('texto')")
+    r = pg.evaluate("SKN.tirarVicios()")
+    e5 = pg.evaluate("({fim: SKN.estado().fim, pal: SK.texto.palavras.map(p => p[2] + '@' + p[0].toFixed(2))})")
+    ok(r["n"] == 1 and abs(e5["fim"] - 11.6) < 0.02 and e5["pal"][1].startswith("tudo@0.60"), "tirar vícios corta o áudio e puxa o texto", str(e5))
+    d = pg.evaluate("SKN.apagarPalavras(1, 1)")
+    ok(pg.evaluate("SK.texto.palavras.map(p => p[2]).join(' ')") == "Olá certo" and abs(pg.evaluate("SKN.estado().fim") - (11.6 - d)) < 0.02, "apagar palavras corta o áudio em todas as faixas", f"{d:.2f} s")
+    pg.evaluate("SKN.desfazer()")
+    ok(pg.evaluate("SK.texto.palavras.length") == 3, "desfazer volta o texto junto com o áudio")
+    # ── stems, ID3 e capítulos, modelos ──
+    pg.evaluate("SKN.novo('podcast', 'Stems')")
+    pg.evaluate(f"async () => {{ await SKN.importar(['{D}voz.wav'], {{faixa: SK.proj.faixas[0].id, ini: 0}}); await SKN.importar(['{D}ruido.mp3'], {{faixa: SK.proj.faixas[2].id, ini: 2}}); SKN.marcador(0, 'Abertura'); SKN.marcador(5, 'Papo'); }}")
+    st = pg.evaluate(f"async () => await SKN.exportarStems('{D}stems.wav')")
+    durs = [round(dur_lufs(a)[0], 2) for a in st["arquivos"]]
+    ok(len(durs) == 2 and all(abs(x - 12) < 0.05 for x in durs), "stems: um arquivo por faixa, todos do tamanho do projeto", str(durs))
+    pg.evaluate("SK.proj.meta = { titulo: 'Episódio 1', artista: 'Pailer' }")
+    arq = pg.evaluate(f"async () => (await SKN.exportar('{D}id3.mp3', skOpExport({{ f: 'mp3', k: '192', caps: true }}))).caminho")
+    from Functions.midia import ffprobe
+    pr = subprocess.run([ffprobe(), "-v", "error", "-show_chapters", "-show_entries", "format_tags=title,artist", "-of", "compact", arq], capture_output=True, text=True, encoding="utf-8").stdout
+    ok(pr.count("chapter|") == 2 and "Episódio 1" in pr and "Pailer" in pr, "ID3 (título, artista) e capítulos dos marcadores no mp3", pr.replace("\n", " ")[:160])
+    pg.evaluate("SKN.fxFaixa(SK.proj.faixas[0].id, 'voz'); SKN.salvarModelo('Meu podcast teste')")
+    m = pg.evaluate("SKN.novoDoModelo('Meu podcast teste')")
+    ok([f["nome"] for f in m["faixas"]] == ["Voz 1", "Voz 2", "Trilha", "Efeitos"] and pg.evaluate("SK.proj.faixas[0].fx.hpf.ativo") and not any(f["clipes"] for f in m["faixas"]),
+       "modelo salvo: faixas e efeitos sem os áudios", str([f["nome"] for f in m["faixas"]]))
+    pg.evaluate("skApagarModelo('Meu podcast teste')")
+    # ── atalhos como no Editor (E corta, D apaga, Q/W aparam com ripple) e navegação (setas, ↑/↓, barra, roda na régua) ──
+    pg.evaluate("SKN.novo('podcast', 'Atalhos')")
+    pg.evaluate(f"async () => {{ await SKN.importar(['{D}voz.wav'], {{faixa: SK.proj.faixas[0].id, ini: 0}}); await SKN.importar(['{D}ruido.mp3'], {{faixa: SK.proj.faixas[2].id, ini: 0}}); SK.sel = null; skUi(); }}")
+    tecla = lambda k: (pg.evaluate("document.activeElement && document.activeElement.blur()"), pg.keyboard.press(k))
+    pg.evaluate("SKN.ir(4)"); tecla("e")
+    ok(len(pg.evaluate("SKN.estado().faixas[0].clipes")) == 2 and len(pg.evaluate("SKN.estado().faixas[2].clipes")) == 2, "E corta na agulha (sem seleção: todas as faixas)")
+    tecla("w")   # apaga da agulha (4) até o próximo corte (8, fim do ruído) em todas as faixas
+    e6 = pg.evaluate("SKN.estado()")
+    ok(abs(e6["fim"] - 8) < 0.01 and abs(e6["agulha"] - 4) < 0.01, "W apara da agulha até o próximo corte e puxa o resto", f"fim {e6['fim']}")
+    pg.evaluate("SKN.ir(6)"); tecla("q")   # apaga do corte anterior (4) até a agulha (6)
+    e6 = pg.evaluate("SKN.estado()")
+    ok(abs(e6["fim"] - 6) < 0.01 and abs(e6["agulha"] - 4) < 0.01, "Q apara do corte anterior até a agulha e puxa o resto", f"fim {e6['fim']}, agulha {e6['agulha']}")
+    pg.evaluate("SK.sel = SKN.estado().faixas[2].clipes[0].id; skUi()"); n0 = len(pg.evaluate("SKN.estado().faixas[2].clipes")); tecla("d")
+    ok(len(pg.evaluate("SKN.estado().faixas[2].clipes")) == n0 - 1, "D apaga o clipe escolhido")
+    pg.evaluate("SKN.ir(1)"); tecla("ArrowRight"); a1 = pg.evaluate("SK.ph"); tecla("Shift+ArrowRight"); a2 = pg.evaluate("SK.ph"); tecla("ArrowLeft"); a3 = pg.evaluate("SK.ph")
+    ok(abs(a1 - (1 + 1 / 30)) < 1e-3 and abs(a2 - a1 - 1) < 1e-3 and abs(a3 - (a2 - 1 / 30)) < 1e-3, "←/→ andam um quadro, Shift+→ um segundo", f"{a1:.3f} {a2:.3f} {a3:.3f}")
+    tecla("ArrowDown"); b1 = pg.evaluate("SK.ph"); tecla("ArrowUp"); b2 = pg.evaluate("SK.ph")
+    ok(abs(b1 - 4) < 0.01 and abs(b2 - 0) < 0.01, "↓/↑ pulam para o próximo/anterior corte", f"{b1} {b2}")
+    pg.evaluate("SK.z = 200; SK.x0 = 0; skDesenhar()")   # zoom: a vista mostra ~5 s
+    bx = pg.evaluate("(() => { const cv = document.getElementById('sk-tl'), r = cv.getBoundingClientRect(), b = SK._barra; return [r.left + b.x + b.w / 2, r.bottom - 6, r.width]; })()")
+    pg.mouse.move(bx[0], bx[1]); pg.mouse.down(); pg.mouse.move(bx[0] + bx[2] * 0.3, bx[1], steps=6); pg.mouse.up()
+    x_ida = pg.evaluate("SK.x0")
+    pg.mouse.move(bx[0] + bx[2] * 0.3, bx[1]); pg.mouse.down(); pg.mouse.move(bx[0], bx[1], steps=6); pg.mouse.up()
+    x_volta = pg.evaluate("SK.x0")
+    ok(x_ida > 0.5 and x_volta < 0.05, "barra de rolagem: ir e voltar na timeline", f"x0 {x_ida:.2f} → {x_volta:.2f}")
+    rg = pg.evaluate("(() => { const r = document.getElementById('sk-tl').getBoundingClientRect(); return [r.left + r.width / 2, r.top + 10]; })()")
+    pg.mouse.move(*rg); pg.mouse.wheel(0, 300); x1 = pg.evaluate("SK.x0"); pg.mouse.wheel(0, -600); x2 = pg.evaluate("SK.x0")
+    ok(x1 > 0.5 and x2 == 0, "roda do mouse na régua anda para os lados (e não passa do começo)", f"{x1:.2f} → {x2}")
+    pg.evaluate("SK.x0 = 9999; skLimitarX()")
+    ok(pg.evaluate("SK.x0") < pg.evaluate("SKN.estado().fim") + 5, "a vista não some para depois do fim do projeto")
     if "--ia" in sys.argv and os.path.isfile(D + "fala.wav"):
         subprocess.run([FF, "-v", "error", "-y", "-i", D + "fala.wav", "-f", "lavfi", "-i", "sine=f=220:d=8,volume=0.3", "-f", "lavfi", "-i", "sine=f=330:d=8,volume=0.2",
                         "-filter_complex", "[0]apad=pad_dur=8,atrim=0:8[v];[v][1][2]amix=inputs=3:normalize=0", "-ac", "2", D + "musica_voz.wav"], check=True)
@@ -346,7 +428,7 @@ with sync_playwright() as p:
         if v.get("vozes"):
             # voz dos testes: Fran (pedido do usuário)
             vid = pg.evaluate("async (v) => await SKN.voz(v, 'Teste do Sound Kanivete.', {ini: 1})", next((x["id"] for x in v["vozes"] if x["nome"].strip().lower() == "fran"), v["vozes"][0]["id"]))
-            ok(bool(vid) and any(f["nome"] == "Voz IA" for f in pg.evaluate("SKN.estado()")["faixas"]), "voz por IA entra na faixa Voz IA")
+            ok(bool(vid) and any(f["nome"] == "Texto para Voz" for f in pg.evaluate("SKN.estado()")["faixas"]), "texto para voz entra na faixa Texto para Voz")
         c0 = pg.evaluate(f"async () => {{ SKN.novo('vazio', 'IA'); return (await SKN.importar(['{D}voz.wav']))[0]; }}")
         m = pg.evaluate("async (id) => await SKN.melhorar(id)", c0)
         ok(os.path.isfile(m), "melhorar voz (IA) gera arquivo", m)
@@ -359,6 +441,16 @@ with sync_playwright() as p:
         pg.click(f"#sk-p-tts [data-apagar='{vid}']"); pg.click(f"#sk-p-tts [data-apagar='{vid}']")
         pg.wait_for_function("(id) => SK.vozes && SK.vozes.vozes && !SK.vozes.vozes.some(v => v.id === id)", arg=vid, timeout=30000)
         ok(pg.evaluate("SK.vozes.vozes.some(v => /^fran$/i.test(v.nome.trim()))"), "Texto para Voz: criar voz do clipe e excluir no painel (as outras ficam)")
+        # banco de vozes (baixar + adicionar) e Conversa: Fran + Marcos, cada um na sua faixa
+        pg.evaluate("async () => { const r = await skTarefa(() => skApi().sk_banco('baixar')); SK.banco = r.banco; }")
+        if not pg.evaluate("async () => (await skApi().sk_vozes()).vozes.some(v => v.nome === 'Marcos')"):
+            pg.evaluate("async () => { await skTarefa(() => skApi().sk_banco('adicionar', 'marcos')); }")
+        pg.evaluate("SKN.novo('vazio', 'Conversa')")
+        rot = "Fran: Bom dia! Hoje vamos falar sobre o Sound Kanivete.\nMarcos: Ótimo, eu estava curioso.\nFran: Então vamos começar."
+        pg.evaluate("""async (rot) => { SK.vozes = await skApi().sk_vozes(); const o = skTtsOp(); o.pers = []; o.falas = []; o.modo = 'conversa'; skRoteiro(rot);
+            await SKN.darVoz('Fran', SK.vozes.vozes.find(v => /^fran$/i.test(v.nome.trim())).id); await SKN.darVoz('Marcos', 'Marcos'); return await skGerarConversa(); }""", rot)
+        cv = {f["nome"]: len(f["clipes"]) for f in pg.evaluate("SKN.estado()")["faixas"] if f["clipes"]}
+        ok(cv == {"Fran": 2, "Marcos": 1}, "Conversa: cada personagem na sua faixa, falas em ordem", str(cv))
     ok(not js_erros, "sem erros de JavaScript", "; ".join(js_erros[:3]))
 print("RESULTADO:", "REPROVADO" if erros else "PASSOU")
 sys.exit(1 if erros else 0)

@@ -195,6 +195,25 @@ def action_create_prompt(payload: dict[str, Any]) -> dict[str, Any]:
     return {"success": True, "prompt_path": str(prompt_path)}
 
 
+def action_design(payload: dict[str, Any]) -> dict[str, Any]:
+    """Voz desenhada (sem referência): instruct = "female, young adult, moderate pitch"...; semente fixa = mesma voz."""
+    import soundfile as sf
+    import torch
+
+    _configure_hf(payload["hf_home"])
+    model = _load_model(payload)
+    output_path = Path(payload["output_path"])
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    _emit("progress", "Desenhando a voz...", percent=-1)
+    torch.manual_seed(int(payload.get("seed") or 0))
+    audio = model.generate(text=payload["text"], language=payload.get("language") or "pt", instruct=payload["instruct"],
+                           num_step=int(payload.get("num_step") or 32), guidance_scale=float(payload.get("guidance_scale") or 2.0),
+                           denoise=True, postprocess_output=True)[0]
+    sf.write(str(output_path), audio, int(getattr(model, "sampling_rate", 24000) or 24000))
+    _emit("progress", "Voz desenhada.", percent=100)
+    return {"success": True, "output_path": str(output_path)}
+
+
 def action_synthesize(payload: dict[str, Any]) -> dict[str, Any]:
     import soundfile as sf
     from omnivoice import VoiceClonePrompt
@@ -226,6 +245,7 @@ def main() -> int:
         "download": action_download,
         "create_prompt": action_create_prompt,
         "synthesize": action_synthesize,
+        "design": action_design,
     }
     try:
         if action not in actions:

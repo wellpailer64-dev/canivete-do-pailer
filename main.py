@@ -3458,6 +3458,33 @@ class ApiBridge:
         _tarefa("skProgresso", trabalho)
         return {"success": True}
 
+    def sk_banco(self, acao="estado", vid=None):
+        """Banco de vozes desenhadas (Functions/sk_banco_vozes.py): estado | baixar | adicionar (os dois últimos em
+        thread, fim em skProgresso)."""
+        from Functions import sk_banco_vozes as b
+        try:
+            if acao == "estado":
+                return b.estado()
+            if acao == "baixar":
+                _tarefa("skProgresso", lambda log, prog: {"banco": b.baixar(prog), "efeito": "banco"})
+            elif acao == "adicionar":
+                _tarefa("skProgresso", lambda log, prog: {"voz": b.adicionar(vid, log, prog).get("voice"), "efeito": "banco_add"})
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def sk_voz_desenhar(self, instruct, seed=0, texto=None):
+        """Amostra de voz DESENHADA (gênero/idade/tom, sem referência) → skProgresso({saida, texto, seed})."""
+        from Functions import omnivoice_tool as o
+
+        def trabalho(log, progresso):
+            pasta = os.path.join(o._tmp_dir(), "desenho")
+            saida = os.path.join(pasta, f"desenho_{int(seed)}_{abs(hash(instruct)) % 10 ** 6}.wav")
+            o.design_reference(instruct, saida, int(seed), texto or o.TEXTO_DESENHO, "pt", log, progresso)
+            return {"saida": saida, "texto": texto or o.TEXTO_DESENHO, "seed": int(seed), "efeito": "desenho"}
+        _tarefa("skProgresso", trabalho)
+        return {"success": True}
+
     def sk_voz_apagar(self, voz_id):
         from Functions.omnivoice_tool import delete_voice
         try:

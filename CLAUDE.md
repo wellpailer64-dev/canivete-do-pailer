@@ -112,7 +112,8 @@ guia `Instructions/agente/plano-cena.md` (seção "Fluxo barato": biblioteca `D:
 
 ## Sound Kanivete (áudio multipista)
 Timeline de áudio, fades, LUFS, projeto `.sknv`, API `window.SKN`: `Instructions/sound-kanivete.md`; código `frontend/js/som.js` (núcleo),
-`som-motor.js` (reprodução em trechos), `som-paineis.js` (painéis), `som-gravar.js` (microfone, autosave), `som-dock.js` (painéis móveis), `som-espectro.js` (espectro, reparo, separar) +
+`som-motor.js` (reprodução em trechos), `som-paineis.js` (painéis), `som-gravar.js` (microfone, autosave), `som-dock.js` (painéis móveis), `som-espectro.js` (espectro, reparo, separar), `som-tts.js` (Texto para Voz,
+Conversa, banco de vozes), `som-texto.js` (editar pelo texto, stems, ID3, modelos) +
 `Functions/sound_kanivete.py`, `sk_gravar.py`. Teste: `python testes/teste_som.py`.
 
 ## Remover fundo (recorte)

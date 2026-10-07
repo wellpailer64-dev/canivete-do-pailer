@@ -152,8 +152,41 @@ Sound Kanivete" no topo de cada página. SKN: `transcrever(idioma)`, `texto()`, 
 - Teste: o teste agora espera a ponte do pywebview (`pywebview.api.sk_info`) — a "falha intermitente" da 1ª rodada era
   o teste importando antes de a API existir.
 
+## Layout livre, Texto para Voz em duas colunas, Conversa, banco de vozes, rodada F (2026-10-07)
+- **Áreas horizontais** no centro (`som-dock.js`, `SK_DOCK_H`): `cima` (acima do Monitor), `meio` (entre o Monitor e a
+  timeline) e `baixo` (sob a timeline); painéis lado a lado, altura pela borda (`altH`). Arrastar o título para a faixa
+  de cima do Monitor, para a divisória Monitor/timeline ou para o pé da timeline encaixa. Padrão: Texto para Voz embaixo.
+- **Texto para Voz** (`som-tts.js`): largo (≥ 600 px, container query) = duas colunas — esquerda: Uma voz (texto,
+  um clipe por parágrafo, faixa/posição) ou **Conversa**; direita: Minhas vozes | Banco | Desenhar + ajustes de fala.
+  **Conversa**: personagens (nome, cor, voz — escolha o personagem e clique numa voz), falas em ordem (clique no nome
+  passa para o próximo personagem; Enter cria a próxima fala do outro; Backspace em fala vazia apaga; ↑ sobe), "Colar
+  roteiro" no formato `Nome: texto`, pausa entre falas; gera cada personagem na própria faixa (`skGerarConversa`).
+- **Banco de vozes** (`Functions/sk_banco_vozes.py`, `sk_banco`): 18 vozes brasileiras DESENHADAS pelo OmniVoice
+  (voice design: gênero, idade, tom, sussurro + semente; ninguém clonado), conferidas pela transcrição (≥ 85%), pacote
+  `vozes-v1.zip` (5 MB) no release pré-lançamento `vozes-v1` → `<app>/vozes_banco/`; Adicionar cria o prompt (~15 s).
+  Gerar de novo: `py -3.13 tools/montar_banco_vozes.py <pasta>` (suba `VERSAO`).
+- **Desenhar**: gênero/idade/tom/sussurro → amostra com semente aleatória (`sk_voz_desenhar` →
+  `omnivoice_tool.design_reference`, ação `design` no `omnivoice_runner.py`) → ouvir, "Gerar outra", nomear e salvar.
+- Fontes reais com licença livre achadas (não automatizadas, download pede conta): Jeff 1.0 e Cadu 1.0 (CC0, Mozilla
+  Data Collective, vozes masculinas). Kokoro tem vozes pt-BR (Apache) mas qualidade "C".
+- **Rodada F** (`som-texto.js`): Transcrição editável (clique escolhe palavra, Shift estende, Apagar corta em todas as
+  faixas e fecha o buraco; Tirar vícios com lista editável; o texto vive em `SK.proj.texto`, desfazer volta junto);
+  Exportar com **stems** (um arquivo por faixa, 0 → fim do projeto), **ID3** (título, artista, álbum, ano, gênero,
+  comentário em `proj.meta`) e **capítulos** dos marcadores; **modelos** salvos (faixas, efeitos, master, artista/álbum;
+  "★" em Começar com). SKN: `selecionarPalavras`, `apagarPalavras`, `tirarVicios`, `exportarStems`, `salvarModelo`,
+  `novoDoModelo`, `modelos`, `tts`, `conversa(roteiro)`, `personagens`, `darVoz`, `bancoVozes`, `desenharVoz`.
+
+## Atalhos e navegação (iguais ao Editor de vídeo onde existem)
+Espaço tocar/parar · S ou E cortar na agulha (selecionado; sem seleção, todas as faixas) · D ou Del apagar (clipe ou
+intervalo; Shift+Del apaga e puxa) · Q apaga do corte anterior até a agulha e W da agulha até o próximo corte, em todas as
+faixas, puxando o resto (`skAparar`) · ←/→ um quadro (1/30 s), Shift = 1 s · ↑/↓ corte/marcador anterior/próximo · Home/End
+· M marcador · R gravar · V curva · Shift+E vista de espectro (antes era E) · Ctrl+Z/Y, Ctrl+C/X/V, Ctrl+D, Ctrl+S, Ctrl+E,
+Ctrl+I, Ctrl+0 ver tudo, Ctrl+roda zoom. Navegação: barra de rolagem embaixo da timeline (arrastar o polegar; clicar fora
+pula), roda do mouse sobre a régua ou a barra anda para os lados (Shift+roda também), a vista não passa do fim do
+projeto (`skLimitarX`) e o teclado traz a agulha para a vista (`skMostrarAgulha`).
+
 ## Pendências
 Rodadas seguintes do plano profissional:
-E espectrograma e reparo espectral, separar voz da música; F editar pelo texto (apagar palavras/vícios), stems, ID3/capítulos, modelos salvos.
+Plano profissional A–F concluído. Próximos: compensar a latência da placa ao gravar; prévia idêntica do gate/de-esser; banco v2 com mais vozes (e as CC0 Jeff/Cadu se o usuário baixar).
 Separar voz da música (precisa de um modelo de separação; o UVR/Roformer foi testado no anti-noise), curva de volume
 desenhada na timeline (o .sknv e a exportação já aceitam `curva`), Editor → Sk (editar o áudio de um vídeo aqui).

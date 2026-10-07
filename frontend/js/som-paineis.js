@@ -27,6 +27,7 @@ function skMontar() {
     <div class="sk-meio">
         <aside class="ie-paineis ie-paineis-esq sk-dock" id="sk-dock-esq"></aside>
         <div class="sk-centro" id="sk-centro">
+            <div class="sk-dockh" id="sk-dock-cima" hidden></div>
             <section class="sk-monitor">
                 <div class="sk-transp">
                     <button class="ie-btn" onclick="skIr(0)" title="Início (Home)">⏮</button>
@@ -37,7 +38,7 @@ function skMontar() {
                     <span class="sk-sep"></span>
                     <button class="ie-btn" onclick="skCortar()" title="Cortar na agulha (S)">✂ Cortar</button>
                     <button class="ie-btn" onclick="skMarcador()" title="Marcador (M)">◆</button>
-                    <button class="ie-btn" id="sk-esp-bt" onclick="skVerEspectro()" title="Vista de espectro (E): Ctrl+arrastar marca área para reparar">▤</button>
+                    <button class="ie-btn" id="sk-esp-bt" onclick="skVerEspectro()" title="Vista de espectro (Shift+E): Ctrl+arrastar marca área para reparar">▤</button>
                     <button class="ie-btn" id="sk-curva-bt" onclick="SK.verCurva = !SK.verCurva; skUi(); skDesenhar()" title="Curva de volume (V)">〰</button>
                     <label class="sk-chk"><input type="checkbox" id="sk-encaixe" checked onchange="SK.encaixe = this.checked"> Encaixar</label>
                     <button class="ie-btn" onclick="skEnquadrar()" title="Ver tudo (Ctrl+0)">⤢</button>
@@ -46,14 +47,16 @@ function skMontar() {
                 <div class="sk-loud notranslate" id="sk-loud"></div>
             </section>
             <div class="sk-div" id="sk-div" title="Arraste para dar mais espaço à timeline ou ao Monitor"></div>
+            <div class="sk-dockh" id="sk-dock-meio" hidden></div>
             <div class="sk-corpo">
                 <div class="sk-faixas notranslate" id="sk-faixas"></div>
                 <div class="sk-tl-wrap" id="sk-tl-wrap"><canvas id="sk-tl"></canvas></div>
             </div>
+            <div class="sk-dockh" id="sk-dock-baixo" hidden></div>
         </div>
         <aside class="ie-paineis sk-dock" id="sk-dock-dir"></aside>
     </div>
-    <footer class="ie-status sk-status"><span>Espaço tocar · S cortar · Alt+arrastar copia · cantos de cima = fades · Ctrl+roda zoom · arraste da Mídia/Sons para a timeline · arraste o título de um painel para mudá-lo de lugar</span><span id="sk-status-info"></span></footer>
+    <footer class="ie-status sk-status"><span>Espaço tocar · S/E cortar · D apagar · Q/W aparar até a agulha · ←/→ agulha (Shift = 1 s) · ↑/↓ cortes · Ctrl+roda zoom · roda na régua ou barra = ir e voltar · Alt+arrastar copia</span><span id="sk-status-info"></span></footer>
     <div class="ie-inicio" id="sk-inicio"><div class="ie-inicio-box">
         <span class="app-logo al-sk app-logo-grande">Sk</span><h2>Sound Kanivete</h2>
         <p>Edite áudio em várias faixas: cortar, juntar, fades, volume, limpar ruído, texto para voz, transcrever e exportar no volume certo.</p>
@@ -71,7 +74,7 @@ function skMontar() {
     skDivisoria(); skSoltarNaTimeline(); skEventos();
     new ResizeObserver(() => skUiMonitor()).observe(skEl('sk-medidor'));
     skDockInstalar();
-    skUi();
+    skUi(); skUiModelosInicio();
 }
 // compatível com o tempo das abas: skAba('dir', 'exportar') abre o painel
 function skAba(lado, aba) { skDockMostrar(aba === 'voz' ? 'tts' : aba); }
@@ -146,135 +149,7 @@ async function skUiSons(el) {
     skListaEventos(el, /efeito|sons/i);
 }
 
-// ── Texto para Voz (OmniVoice) ──
-const SK_TTS_PADRAO = { idioma: 'pt', speed: 1, qualidade: 'normal', guidance_scale: 2, pause_seconds: 0.18, normalize_text: true, denoise: true, paragrafos: true, destino: 'voz', onde: 'agulha' };
-const SK_TTS_PASSOS = { rapido: 16, normal: 32, maximo: 64 };
-function skTtsOp() { if (!SK.tts) { let s = {}; try { s = JSON.parse(localStorage.getItem('sk-tts') || '{}'); } catch (e) { /* sem storage */ } SK.tts = Object.assign({}, SK_TTS_PADRAO, s); } return SK.tts; }
-function skTtsGuardar() { try { localStorage.setItem('sk-tts', JSON.stringify({ ...SK.tts, texto: undefined })); } catch (e) { /* sem storage */ } }
-async function skUiTts(el) {
-    if (!SK.vozes) { el.innerHTML = '<div class="sk-p-info">Carregando vozes…</div>'; SK.vozes = await skApi().sk_vozes().catch(() => ({ success: false })); }
-    const r = SK.vozes, o = skTtsOp();
-    if (!r.success || !r.instalado || !r.vozes.length) {
-        el.onclick = el.oninput = el.onchange = null;
-        el.innerHTML = `<div class="sk-p-info">Nenhuma voz salva ainda. Crie uma em Geração de Voz (OmniVoice): grave ou importe 10–20 s de referência.</div>
-            <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" onclick="switchTool('omnivoice')">Abrir Geração de Voz</button><button class="ie-btn ie-btn-mini" onclick="SK.vozes=null;skDockRender(['tts'])">Atualizar</button></div>`;
-        return;
-    }
-    if (el.querySelector('#skv-txt') && el.dataset.v === String(r.vozes.length)) { skTtsResumo(el); return; }   // já montado: não perde o que está sendo digitado
-    el.dataset.v = String(r.vozes.length);
-    if (!o.voz || !r.vozes.some(v => v.id === o.voz)) o.voz = r.vozes[0].id;
-    const sel = (k, ops) => `<select data-tts="${k}">${ops.map(([v, n]) => `<option value="${v}"${String(o[k]) === String(v) ? ' selected' : ''}>${n}</option>`).join('')}</select>`;
-    const sl = (r, k, min, max, passo, fmt) => `<label class="sk-p-l">${r}<input type="range" min="${min}" max="${max}" step="${passo}" value="${o[k]}" data-tts="${k}"><small data-v="${k}">${fmt(o[k])}</small></label>`;
-    const faixas = SK.proj ? SK.proj.faixas : [];
-    el.innerHTML = `
-        <div class="sk-grupo"><div class="sk-p-tit">Voz</div>
-            <div class="sk-vozes notranslate">${r.vozes.map(v => `<div class="sk-voz${v.id === o.voz ? ' on' : ''}" data-voz="${skEsc(v.id)}"><span class="sk-voz-av">${skEsc((v.nome || '?').trim()[0] || '?').toUpperCase()}</span>
-                <span class="sk-voz-n">${skEsc(v.nome)}<small>${v.dur ? v.dur.toFixed(0) + ' s de referência' : 'voz salva'}</small></span>
-                <span class="sk-voz-bts">${v.ref_url ? `<button class="ie-btn ie-btn-mini" data-amostra="${skEsc(v.ref_url)}" title="Ouvir a referência">▶</button>` : ''}<button class="ie-btn ie-btn-mini sk-voz-x" data-apagar="${skEsc(v.id)}" title="Excluir esta voz">×</button></span></div>`).join('')}</div>
-            <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" id="skv-nova">${SK.ttsNova ? 'Fechar' : '+ Nova voz'}</button><button class="ie-btn ie-btn-mini" onclick="SK.vozes=null;delete skEl('sk-p-tts').dataset.v;skDockRender(['tts'])">Atualizar</button><button class="ie-btn ie-btn-mini" onclick="switchTool('omnivoice')" title="Ferramenta completa de vozes">Gerenciar…</button></div>
-            ${SK.ttsNova ? skUiNovaVoz() : ''}</div>
-        <div class="sk-grupo"><div class="sk-p-tit">Texto</div>
-            <textarea id="skv-txt" class="sk-txt" rows="7" placeholder="Escreva o que a voz vai falar. Linha em branco separa parágrafos (cada um vira um clipe).">${skEsc(o.texto || '')}</textarea>
-            <div class="sk-p-info notranslate" id="skv-resumo"></div>
-            <label class="sk-chk"><input type="checkbox" data-tts="paragrafos" ${o.paragrafos ? 'checked' : ''}> Um clipe por parágrafo (fácil de ajustar depois)</label>
-            <label class="sk-chk"><input type="checkbox" data-tts="normalize_text" ${o.normalize_text ? 'checked' : ''}> Números e siglas por extenso</label></div>
-        <div class="sk-grupo"><div class="sk-p-tit">Fala</div>
-            <label class="sk-p-l">Idioma${sel('idioma', [['pt', 'Português'], ['en', 'Inglês'], ['es', 'Espanhol'], ['fr', 'Francês'], ['it', 'Italiano'], ['de', 'Alemão']])}<small></small></label>
-            ${sl('Velocidade', 'speed', 0.5, 2, 0.05, v => (+v).toFixed(2) + '×')}
-            ${sl('Expressão', 'guidance_scale', 1, 4, 0.1, v => (+v).toFixed(1))}
-            ${sl('Pausa entre frases', 'pause_seconds', 0, 1, 0.02, v => (+v).toFixed(2) + ' s')}
-            <label class="sk-p-l">Qualidade${sel('qualidade', [['rapido', 'Rápida'], ['normal', 'Normal'], ['maximo', 'Máxima (mais lenta)']])}<small></small></label>
-            <label class="sk-chk"><input type="checkbox" data-tts="denoise" ${o.denoise ? 'checked' : ''}> Fala limpa (tira o ruído da referência)</label></div>
-        <div class="sk-grupo"><div class="sk-p-tit">Onde entra</div>
-            <label class="sk-p-l">Faixa${sel('destino', [['voz', 'Faixa "Texto para Voz"'], ['nova', 'Faixa nova'], ...faixas.map(f => [f.id, skEsc(f.nome)])])}<small></small></label>
-            <label class="sk-p-l">Posição${sel('onde', [['agulha', 'Na agulha'], ['fim', 'Depois do último clipe da faixa']])}<small></small></label></div>
-        <div class="sk-p-acoes"><button class="ie-btn ie-btn-primario" id="skv-ok" ${SK.tarefa ? 'disabled' : ''}>Gerar fala</button></div>
-        ${(SK.ttsFeitos || []).length ? `<div class="sk-grupo"><div class="sk-p-tit">Geradas nesta sessão</div><div class="sk-lista notranslate">${SK.ttsFeitos.slice(-8).reverse().map(g => skArrastavel(`<button data-ouvir="${skEsc(g.url)}">▶</button><span>${skEsc(g.texto.slice(0, 40))}<small>${skEsc(g.voz)} · ${skTempo(g.dur)}</small></span><button data-por="${skEsc(g.arq)}" title="Inserir de novo na agulha">+</button>`, g.arq)).join('')}</div></div>` : ''}`;
-    skTtsResumo(el);
-    el.oninput = e => {
-        const t = e.target;
-        if (t.id === 'skv-txt') { o.texto = t.value; skTtsResumo(el); return; }
-        const k = t.dataset.tts; if (!k) return;
-        o[k] = t.type === 'checkbox' ? t.checked : t.type === 'range' ? +t.value : t.value;
-        const s = el.querySelector(`[data-v="${k}"]`); if (s) s.textContent = k === 'speed' ? o[k].toFixed(2) + '×' : k === 'pause_seconds' ? o[k].toFixed(2) + ' s' : o[k].toFixed(1);
-        skTtsGuardar(); skTtsResumo(el);
-    };
-    el.onchange = el.oninput;
-    el.onclick = e => {
-        const am = e.target.closest('[data-amostra]'); if (am) { e.stopPropagation(); skOuvir(am.dataset.amostra); return; }
-        const ap = e.target.closest('[data-apagar]');
-        if (ap) {   // dois cliques: o 1º pede confirmação no próprio botão (sem janela)
-            e.stopPropagation();
-            if (!ap.classList.contains('confirma')) { ap.classList.add('confirma'); ap.textContent = 'Excluir?'; setTimeout(() => { if (ap.isConnected) { ap.classList.remove('confirma'); ap.textContent = '×'; } }, 3000); return; }
-            skApagarVoz(ap.dataset.apagar).catch(er => skToast(er.message)); return;
-        }
-        if (e.target.id === 'skv-nova') { SK.ttsNova = !SK.ttsNova; delete el.dataset.v; skUiTts(el); return; }
-        if (e.target.id === 'skv-n-arq') { skApi().sk_dialogo('abrir', ['Áudio e vídeo (*.mp3;*.wav;*.m4a;*.aac;*.ogg;*.opus;*.flac;*.mp4;*.mov;*.mkv)', 'Todos (*.*)']).then(c => { if (c) { SK.ttsNovaArq = c; const s = el.querySelector('#skv-n-fonte'); if (s) s.textContent = c.split(/[\\/]/).pop(); } }); return; }
-        if (e.target.id === 'skv-n-ok') { skCriarVoz({ nome: el.querySelector('#skv-n-nome').value, refText: el.querySelector('#skv-n-txt').value, tratar: el.querySelector('#skv-n-tratar').checked }).catch(er => skToast(er.message)); return; }
-        const v = e.target.closest('[data-voz]'); if (v) { o.voz = v.dataset.voz; skTtsGuardar(); el.querySelectorAll('.sk-voz').forEach(x => x.classList.toggle('on', x === v)); return; }
-        const ou = e.target.closest('[data-ouvir]'); if (ou) { skOuvir(ou.dataset.ouvir); return; }
-        const p = e.target.closest('[data-por]'); if (p) { if (!SK.proj) skNovo('narracao'); skImportar([p.dataset.por], { ini: SK.ph }); return; }
-        if (e.target.id === 'skv-ok') skGerarTts().catch(er => skToast(er.message));
-    };
-}
-function skUiNovaVoz() {   // formulário de voz nova dentro do painel
-    const [c] = SK.sel ? skClipe(SK.sel) : [null];
-    const fonte = SK.ttsNovaArq ? SK.ttsNovaArq.split(/[\\/]/).pop() : c ? `clipe "${c.nome}" (${Math.min(30, c.dur).toFixed(1)} s)` : 'nenhuma — escolha um clipe na timeline ou um arquivo';
-    return `<div class="sk-grupo sk-nova-voz"><div class="sk-p-tit">Nova voz</div>
-        <input class="sk-busca" id="skv-n-nome" placeholder="Nome da voz" value="">
-        <div class="sk-p-info">Referência: <b class="notranslate" id="skv-n-fonte">${skEsc(fonte)}</b></div>
-        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" id="skv-n-arq">Escolher arquivo…</button>${SK.ttsNovaArq ? '<button class="ie-btn ie-btn-mini" onclick="SK.ttsNovaArq=null;delete skEl(\'sk-p-tts\').dataset.v;skDockRender([\'tts\'])">Usar o clipe escolhido</button>' : ''}</div>
-        <textarea class="sk-txt" id="skv-n-txt" rows="2" placeholder="O que a pessoa fala na referência (opcional: em branco, transcreve sozinho)"></textarea>
-        <label class="sk-chk"><input type="checkbox" id="skv-n-tratar" checked> Limpar a referência antes (ruído, volume)</label>
-        <div class="sk-p-info">Melhor com 10–20 s de fala limpa, uma pessoa só, sem música.</div>
-        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini ie-btn-primario" id="skv-n-ok" ${SK.tarefa ? 'disabled' : ''}>Criar voz</button></div></div>`;
-}
-async function skCriarVoz({ nome, refText = '', tratar = true, arq = null, de = null, dur = null } = {}) {
-    nome = (nome || '').trim(); if (!nome) throw new Error('dê um nome para a voz');
-    let op = { ref_text: refText, tratar };
-    if (!arq) {
-        if (SK.ttsNovaArq) arq = SK.ttsNovaArq;
-        else { const [c] = SK.sel ? skClipe(SK.sel) : [null]; if (!c) throw new Error('escolha um clipe na timeline ou um arquivo'); arq = c.arq; op = { ...op, de: c.de, dur: Math.min(30, c.dur) }; }
-    } else if (dur) op = { ...op, de: de || 0, dur };
-    const r = await skTarefa(() => skApi().sk_voz_criar(nome, arq, op));
-    SK.vozes = null; SK.ttsNova = false; SK.ttsNovaArq = null; if (r.voz) skTtsOp().voz = r.voz.id; skTtsGuardar();
-    delete skEl('sk-p-tts')?.dataset.v; skDockRender(['tts']);
-    skToast(`Voz criada: ${nome}`);
-    return r.voz;
-}
-async function skApagarVoz(id) {
-    const r = await skApi().sk_voz_apagar(id);
-    if (!r || !r.success) throw new Error((r && r.error) || 'não excluiu');
-    if (skTtsOp().voz === id) SK.tts.voz = null;
-    SK.vozes = null; delete skEl('sk-p-tts')?.dataset.v; skDockRender(['tts']);
-    return true;
-}
-function skTtsPartes(texto, paragrafos) { const t = (texto || '').trim(); if (!t) return []; return paragrafos ? t.split(/\n\s*\n/).map(x => x.trim()).filter(Boolean) : [t]; }
-function skTtsResumo(el) {
-    const o = skTtsOp(), r = el.querySelector('#skv-resumo'); if (!r) return;
-    const t = (o.texto || '').trim(), pal = t ? t.split(/\s+/).length : 0, partes = skTtsPartes(t, o.paragrafos).length;
-    r.textContent = t ? `${t.length} caracteres · ${pal} palavras · ~${skTempo(pal / 2.6 / (o.speed || 1))} de fala${partes > 1 ? ` · ${partes} clipes` : ''}` : 'Ctrl+Enter gera.';
-    const ta = el.querySelector('#skv-txt'); if (ta && !ta.dataset.k) { ta.dataset.k = '1'; ta.addEventListener('keydown', e => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); skGerarTts().catch(er => skToast(er.message)); } }); }
-}
-async function skGerarTts() {
-    const o = skTtsOp(), partes = skTtsPartes(o.texto, o.paragrafos);
-    if (!partes.length) throw new Error('escreva o texto');
-    if (!SK.proj) skNovo('narracao');
-    let f = o.destino === 'voz' ? (SK.proj.faixas.find(x => /texto para voz|voz ia/i.test(x.nome)) || skNovaFaixa('Texto para Voz'))
-        : o.destino === 'nova' ? skNovaFaixa('Texto para Voz') : (SK.proj.faixas.find(x => x.id === o.destino) || skNovaFaixa('Texto para Voz'));
-    const nomeVoz = (SK.vozes.vozes.find(v => v.id === o.voz) || {}).nome || 'voz';
-    let t = o.onde === 'fim' ? f.clipes.reduce((m, c) => Math.max(m, c.ini + c.dur), 0) : SK.ph;
-    const ids = [];
-    for (const [i, txt] of partes.entries()) {
-        skEl('sk-status-info').textContent = partes.length > 1 ? `Texto para Voz: parte ${i + 1} de ${partes.length}…` : 'Texto para Voz…';
-        const id = await skVoz(o.voz, txt, { faixa: f.id, ini: t, op: { language: o.idioma, speed: o.speed, guidance_scale: o.guidance_scale, pause_seconds: o.pause_seconds, num_step: SK_TTS_PASSOS[o.qualidade] || 32, normalize_text: o.normalize_text, denoise: o.denoise } });
-        const [c] = skClipe(id);
-        if (c) { t = c.ini + c.dur + (partes.length > 1 ? 0.35 : 0); SK.ttsFeitos = [...(SK.ttsFeitos || []), { arq: c.arq, url: SK.picos[c.arq]?.url, dur: c.dur, texto: txt, voz: nomeVoz }]; }
-        ids.push(id);
-    }
-    SK.ph = t; skUi(); delete skEl('sk-p-tts')?.dataset.v; skDockRender(['tts']);
-    return ids;
-}
+// Texto para Voz: som-tts.js
 
 // ── Clipe, Faixa, Transcrição, Exportar ──
 function skUiIntervalo() {
@@ -390,42 +265,7 @@ document.addEventListener('input', e => {
     const s = e.target.nextElementSibling; if (s && e.target.type === 'range') s.textContent = k === 'vol' ? skDb(v) + ' dB' : v.toFixed(1) + ' dB';
     skMasterAplicar(); SK.sujo = true;
 });
-function skUiTexto(el) {
-    const P = SK.texto && SK.texto.palavras;
-    el.onclick = el.oninput = el.onchange = null;
-    el.innerHTML = `<div class="sk-p-acoes"><select id="sk-idioma"><option value="pt">Português</option><option value="multi">Outros idiomas</option></select>
-        <button class="ie-btn ie-btn-mini" id="sk-transc" ${SK.tarefa ? 'disabled' : ''}>${P ? 'Transcrever de novo' : 'Transcrever'}</button></div>
-        ${P ? `<div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" data-leg="srt">Salvar SRT</button><button class="ie-btn ie-btn-mini" data-leg="txt">Salvar TXT</button><button class="ie-btn ie-btn-mini" data-leg="vtt">VTT</button></div>
-        <div class="sk-texto notranslate">${P.map(([a, , w], i) => `<span data-t="${a}" data-i="${i}">${skEsc(w)}</span>`).join(' ')}</div>
-        <div class="sk-p-info">Clique numa palavra para levar a agulha até ela.</div>` : '<div class="sk-p-info">Transcreve a mixagem (faixas mudas ficam de fora). A primeira vez baixa o modelo de fala.</div>'}`;
-    el.querySelector('#sk-transc').onclick = () => skTranscrever(el.querySelector('#sk-idioma').value).catch(e => skToast(e.message));
-    el.querySelectorAll('[data-leg]').forEach(b => b.onclick = () => skApi().ve_salvar_legenda(skLinhas(P), b.dataset.leg, SK.proj.nome || 'audio'));
-    el.querySelector('.sk-texto')?.addEventListener('click', e => { const s = e.target.closest('[data-t]'); if (s) skIr(+s.dataset.t); });
-}
-function skUiExportar(el) {
-    el.onclick = el.oninput = el.onchange = null;
-    const op = SK.expOp || (SK.expOp = { f: 'mp3', k: '192', l: '', fx: '' });
-    const sel = (id, opcoes, v) => `<select id="${id}">${opcoes.map(([a, b]) => `<option value="${a}"${String(a) === String(v) ? ' selected' : ''}>${b}</option>`).join('')}</select>`;
-    el.innerHTML = `<div class="sk-p-nome notranslate">${skEsc(SK.proj.nome)}</div><div class="sk-p-info">${SK.proj.faixas.length} faixa(s) · ${skTempo(skFim())}</div>
-        <div class="sk-grupo sk-exp">
-        <label>Formato ${sel('ske-f', ['mp3', 'wav', 'm4a', 'ogg', 'flac', 'opus'].map(f => [f, f]), op.f)}</label>
-        <label>Qualidade ${sel('ske-k', [['320', '320 kbps'], ['192', '192 kbps'], ['128', '128 kbps']], op.k)}</label>
-        <label>Volume final ${sel('ske-l', [['', 'Como está'], ['-14', '-14 LUFS (redes, streaming)'], ['-16', '-16 LUFS (podcast)'], ['-23', '-23 LUFS (TV)']], op.l)}</label>
-        <label>Faixas ${sel('ske-fx', [['', 'Mixagem de todas'], ...SK.proj.faixas.map(f => [f.id, `Só "${skEsc(f.nome)}"`])], op.fx)}</label></div>
-        <div class="sk-p-acoes"><button class="ie-btn ie-btn-primario" id="ske-ok">Exportar…</button><button class="ie-btn ie-btn-mini" onclick="skEnviarEditor().catch(e => skToast(e.message))">→ Editor de vídeo</button></div>
-        ${skUiMaster()}
-        <div class="sk-grupo"><div class="sk-p-tit">Medir</div><div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" onclick="skMedirLufs()">Medir volume da mixagem (LUFS)</button></div><div class="sk-p-info" id="sk-lufs"></div></div>`;
-    el.onchange = () => { const g = s => el.querySelector(s).value; SK.expOp = { f: g('#ske-f'), k: g('#ske-k'), l: g('#ske-l'), fx: g('#ske-fx') }; };
-    el.querySelector('#ske-ok').onclick = async () => {
-        const o = SK.expOp;
-        const c = await skApi().sk_dialogo('salvar', [`Áudio (*.${o.f})`], `${SK.proj.nome || 'audio'}.${o.f}`);
-        if (!c) return;
-        skEl('sk-status-info').textContent = 'Exportando…';
-        const r = await SKN.exportar(c, { formato: o.f, kbps: +o.k, lufs: o.l === '' ? null : +o.l, faixas: o.fx ? [o.fx] : null }).catch(e => ({ success: false, error: e.message }));
-        skEl('sk-status-info').textContent = '';
-        skToast(r.success ? `Exportado: ${r.caminho.split(/[\\/]/).pop()}` : r.error);
-    };
-}
+// Transcrição e Exportar: som-texto.js
 function skExportarDialogo() { if (SK.proj) skAba('dir', 'exportar'); }
 async function skMedirLufs() { const el = skEl('sk-lufs'); if (!el) return; el.textContent = 'Medindo...'; const r = await skApi().sk_medir(SK.proj); el.textContent = r.success ? `${r.lufs.toFixed(1)} LUFS · pico ${r.pico.toFixed(1)} dBTP` : r.error; }
 async function skImportarDialogo() {
@@ -485,7 +325,7 @@ function skUi() {
     skEl('sk-esp-bt')?.classList.toggle('on', !!SK.verEsp);
     if (!SK.proj && !ini.dataset.recup) { ini.dataset.recup = '1'; skUiRecuperar().finally(() => { delete ini.dataset.recup; }); }
     skEl('sk-info').textContent = SK.proj ? `${SK.proj.nome}${SK.sujo ? ' •' : ''}` : '';
-    skUiTempo(); skUiFaixas(); skUiProps();
+    skUiTempo(); skUiFaixas(); skUiProps(); if (!SK.tocando) skUiMonitor();
     skUiEsq();
     let l = []; try { l = JSON.parse(localStorage.getItem('sk-recentes') || '[]'); } catch (e) { /* sem storage */ }
     const rc = skEl('sk-recentes'); if (rc) rc.innerHTML = l.length ? `<div class="ie-recentes-tit">Recentes</div>${l.map(c => `<button class="ie-recente notranslate" onclick="skAbrir(${skEsc(JSON.stringify(c))}).catch(e => skToast(e.message))">${skEsc(c.split(/[\\/]/).pop())}</button>`).join('')}` : '';

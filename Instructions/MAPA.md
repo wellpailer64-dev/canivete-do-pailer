@@ -86,10 +86,10 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 
 ### Áudio
 #### Sound Kanivete — `switchTool('sound-kanivete')`
-- **Interface**: `som-dock.js`, `som-espectro.js`, `som-gravar.js`, `som-motor.js`, `som-paineis.js`, `som.js`, `som.css`
-- **Python**: `Functions/sound_kanivete.py`, `Functions/sk_gravar.py`, `Functions/sk_espectro.py`
+- **Interface**: `som-dock.js`, `som-espectro.js`, `som-gravar.js`, `som-motor.js`, `som-paineis.js`, `som-texto.js`, `som-tts.js`, `som.js`, `som.css`
+- **Python**: `Functions/sound_kanivete.py`, `Functions/sk_gravar.py`, `Functions/sk_espectro.py`, `Functions/sk_banco_vozes.py`
 - **Automação (agente/Jr)**: window.SKN (som.js): novo, importar, cortar, alterarClipe, exportar, estado...
-- **API** (`pywebview.api.*`, 20): `sk_info(path)`, `sk_trecho(arq, k, sr=48000)`, `sk_auto(acao, proj=None, caminho=None, pid=None)`, `sk_gravar(acao, dispositivo=None, caminho=None, sr=48000, canais=1)`, `sk_ir(tamanho=1.2)`, `sk_espectro(arq, t0, t1, cols=1200, rows=256)`, `sk_salvar(proj, caminho)`, `sk_abrir(caminho)`, `sk_exportar(proj, caminho, op=None)`, `sk_medir(proj, op=None)`, `sk_processar(arq, efeito, op=None)`, `sk_transcrever(proj, idioma="pt", faixas=None)`, `sk_lufs(arq, de=0, dur=None)`, `sk_silencios(arq, de=0, dur=None, limiar=-40, minimo=0.6)`, `sk_pasta_padrao()`, `sk_vozes()`, `sk_voz_criar(nome, arq, op=None)`, `sk_voz_apagar(voz_id)`, `sk_voz(voz_id, texto, op=None)`, `sk_dialogo(modo, tipos=None, nome="")`
+- **API** (`pywebview.api.*`, 22): `sk_info(path)`, `sk_trecho(arq, k, sr=48000)`, `sk_auto(acao, proj=None, caminho=None, pid=None)`, `sk_gravar(acao, dispositivo=None, caminho=None, sr=48000, canais=1)`, `sk_ir(tamanho=1.2)`, `sk_espectro(arq, t0, t1, cols=1200, rows=256)`, `sk_salvar(proj, caminho)`, `sk_abrir(caminho)`, `sk_exportar(proj, caminho, op=None)`, `sk_medir(proj, op=None)`, `sk_processar(arq, efeito, op=None)`, `sk_transcrever(proj, idioma="pt", faixas=None)`, `sk_lufs(arq, de=0, dur=None)`, `sk_silencios(arq, de=0, dur=None, limiar=-40, minimo=0.6)`, `sk_pasta_padrao()`, `sk_vozes()`, `sk_voz_criar(nome, arq, op=None)`, `sk_banco(acao="estado", vid=None)`, `sk_voz_desenhar(instruct, seed=0, texto=None)`, `sk_voz_apagar(voz_id)`, `sk_voz(voz_id, texto, op=None)`, `sk_dialogo(modo, tipos=None, nome="")`
 - **Testes**: `testes/teste_som.py`
 - **Guias**: `Instructions/sound-kanivete.md`
 
@@ -210,6 +210,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/mapa_codigo.py` — Mapa do código (para o agente achar onde mexer sem abrir arquivo grande): comandos registrados, funções de topo e
 - `tools/mapa_geral.py` — Mapa geral do KANIVETE — gera Instructions/MAPA.md (pessoas, Claude) e Instructions/mapa.json (Jr / Worker local)
 - `tools/medir_ref.py` — Medidor de referência: lê uma imagem de referência (print de carrossel/flyer) SEM o Claude olhar e devolve as medidas
+- `tools/montar_banco_vozes.py` — Monta o pacote do banco de vozes (Functions/sk_banco_vozes.py) — não roda no app; só para gerar o zip do release
 - `tools/montar_soundboard.py` — Monta o pack "vanilla" do Soundboard do Pocket Editor (não roda no app; só para gerar o zip do release)
 - `tools/olho.py` — Olho local: um modelo de visão no Ollama (gemma4:e4b) olha as imagens no lugar do Claude e devolve TEXTO curto
 - `tools/patch.py` — Aplica trocas de texto descritas num arquivo .patch simples — sem escapar aspas/barras, tudo ou nada, com conferência
@@ -310,6 +311,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/removerfundo.py` — removerfundo.py
 - `Functions/render_cache.py` — Cache de render em disco do Pocket Editor (como os "Preview Files" do Premiere)
 - `Functions/sincronizar.py` — Sincronizar clipes pelo áudio (como o "Sincronizar › Áudio" do Premiere): duas câmeras gravando a mesma cena
+- `Functions/sk_banco_vozes.py` — Banco de vozes do Texto para Voz (Sound Kanivete)
 - `Functions/sk_espectro.py` — Sound Kanivete — espectrograma, reparo espectral e separação voz/instrumental
 - `Functions/sk_gravar.py` — Sound Kanivete — gravar do microfone (ou interface de áudio) direto num WAV 24 bits
 - `Functions/snapshot_logger.py` — snapshot_logger.py — Backup/restauração para o Organizador de Vídeos

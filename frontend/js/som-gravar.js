@@ -102,7 +102,7 @@ async function skUiRecuperar() {
 async function skRecuperar(pid) {
     const r = await skApi().sk_auto('ler', null, null, pid);
     if (!r.success) throw new Error(r.error);
-    SK.proj = r.proj; SK.caminho = r.caminho || null; SK.sujo = true; SK.hist = []; SK.futuro = []; SK.sel = null; SK.ph = 0;
+    SK.proj = r.proj; SK.caminho = r.caminho || null; SK.sujo = true; SK.hist = []; SK.futuro = []; SK.sel = null; SK.ph = 0; SK.texto = SK.proj.texto || null;
     SK.faixaSel = SK.proj.faixas[0]?.id;
     for (const f of SK.proj.faixas) for (const c of f.clipes) { try { await skCarregarPicos(c.arq); } catch (e) { /* faltando */ } }
     skParar(); skUi(); skEnquadrar();

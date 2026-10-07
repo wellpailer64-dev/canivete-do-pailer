@@ -703,6 +703,34 @@ def _repair_reference_if_needed(item: dict[str, Any], hf_home: str,
     return True
 
 
+TEXTO_DESENHO = ("Olá! Esta é uma amostra da minha voz. Eu posso narrar vídeos, apresentar um podcast "
+                 "e ler qualquer texto com calma e clareza.")
+
+
+def design_reference(instruct: str, output_path: str, seed: int = 0, text: str = TEXTO_DESENHO, language: str = "pt",
+                     callback_log: LogFn = None, callback_progresso: ProgressFn = None) -> str:
+    """Gera a amostra de uma voz DESENHADA (sem pessoa de referência): instruct com gênero, idade, tom, sussurro
+    (ex.: "female, young adult, moderate pitch"). A mesma semente dá a mesma voz."""
+    hf_home = _ensure_model_available()
+    engine = _select_engine()
+    if engine["kind"] == "missing":
+        raise RuntimeError("OmniVoice nao esta instalado neste computador.")
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    if engine["kind"] == "inprocess":
+        import soundfile as sf
+        import torch
+        model = _load_model_inprocess(hf_home, callback_log)
+        torch.manual_seed(int(seed))
+        _progress(callback_progresso, -1, "Desenhando a voz...")
+        audio = model.generate(text=text, language=language, instruct=instruct, num_step=32, guidance_scale=2.0,
+                               denoise=True, postprocess_output=True)[0]
+        sf.write(output_path, audio, int(getattr(model, "sampling_rate", 24000) or 24000))
+    else:
+        _run_external("design", {"hf_home": hf_home, "model": MODEL_ID, "instruct": instruct, "seed": int(seed), "text": text,
+                                 "language": language, "output_path": output_path}, callback_log, callback_progresso)
+    return output_path
+
+
 def delete_voice(voice_id: str) -> dict[str, Any]:
     voices = _load_db()
     item = next((v for v in voices if v.get("id") == voice_id), None)

@@ -23,13 +23,13 @@ function skClipe(id) { for (const f of SK.proj.faixas) { const c = f.clipes.find
 function skSnap() { return JSON.stringify(SK.proj); }
 function skMudou(rotulo) { if (SK._antes != null) { SK.hist.push(SK._antes); if (SK.hist.length > 120) SK.hist.shift(); SK.futuro = []; } SK._antes = null; SK.sujo = true; skUi(); skDesenhar(); skMotorMudou(); }
 function skAntes() { if (SK._antes == null) SK._antes = skSnap(); }
-function skDesfazer() { if (!SK.hist.length) return; SK.futuro.push(skSnap()); SK.proj = JSON.parse(SK.hist.pop()); SK.sel = null; skParar(); skUi(); skDesenhar(); }
-function skRefazer() { if (!SK.futuro.length) return; SK.hist.push(skSnap()); SK.proj = JSON.parse(SK.futuro.pop()); skParar(); skUi(); skDesenhar(); }
+function skDesfazer() { if (!SK.hist.length) return; SK.futuro.push(skSnap()); SK.proj = JSON.parse(SK.hist.pop()); SK.texto = SK.proj.texto || null; SK.sel = null; skParar(); skUi(); skDesenhar(); }
+function skRefazer() { if (!SK.futuro.length) return; SK.hist.push(skSnap()); SK.proj = JSON.parse(SK.futuro.pop()); SK.texto = SK.proj.texto || null; skParar(); skUi(); skDesenhar(); }
 const SK_MODELOS = { vazio: ['Faixa 1'], podcast: ['Voz 1', 'Voz 2', 'Trilha', 'Efeitos'], narracao: ['Narração', 'Trilha'], musica: ['Voz', 'Instrumental', 'Backing'], limpar: ['Gravação'] };
 function skNovo(modelo = 'vazio', nome = 'Sem título') {
     SK.proj = { id: skId('p'), nome, master: { vol: 1, lim: { ativo: true, teto: -1 } }, faixas: (SK_MODELOS[modelo] || [modelo]).map((n, i) => ({ id: skId('f'), nome: n, vol: 1, mudo: false, solo: false, cor: SK_CORES[i % SK_CORES.length], clipes: [] })), marcadores: [] };
     skMasterAplicar(); SK.caminho = null; SK.sujo = false; SK.hist = []; SK.futuro = []; SK.sel = null; SK.faixaSel = SK.proj.faixas[0].id; SK.ph = 0; SK.x0 = 0; SK.y0 = 0;
-    skParar(); skUi(); skDesenhar();
+    SK.texto = null; SK.texSel = null; skParar(); skUi(); skDesenhar();
 }
 
 // ── arquivos ──
@@ -84,7 +84,7 @@ async function skAbrir(caminho) {
     if (!caminho) return false;
     const r = await skApi().sk_abrir(caminho);
     if (!r.success) throw new Error(r.error);
-    SK.proj = r.proj; SK.caminho = r.caminho; SK.sujo = false; SK.hist = []; SK.futuro = []; SK.sel = null; SK.ph = 0;
+    SK.proj = r.proj; SK.caminho = r.caminho; SK.sujo = false; SK.hist = []; SK.futuro = []; SK.sel = null; SK.ph = 0; SK.texto = SK.proj.texto || null;
     SK.proj.id = SK.proj.id || skId('p');
     SK.faixaSel = SK.proj.faixas[0]?.id;
     for (const f of SK.proj.faixas) for (const c of f.clipes) { try { await skCarregarPicos(c.arq); } catch (e) { /* faltando */ } }
@@ -273,6 +273,40 @@ function skDesenhar() {
     const hx = Math.round(X(SK.ph)) + 0.5;
     x.strokeStyle = '#ff6a2c'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(hx, 0); x.lineTo(hx, H); x.stroke();
     x.fillStyle = '#ff6a2c'; x.beginPath(); x.moveTo(hx - 6, 0); x.lineTo(hx + 6, 0); x.lineTo(hx, 8); x.fill();
+    // barra de rolagem horizontal (arrastar = ir e voltar na timeline)
+    const b = skBarra(W, H); SK._barra = b;
+    x.fillStyle = '#0d0a09cc'; x.fillRect(0, H - SK_BARRA, W, SK_BARRA);
+    x.fillStyle = SK.arr && SK.arr.modo === 'barra' ? '#ffd166' : '#5a4a3e'; x.beginPath(); x.roundRect(b.x + 1, H - SK_BARRA + 2, Math.max(16, b.w - 2), SK_BARRA - 4, 4); x.fill();
+    const ax = skBarraX(SK.ph, W, b); x.fillStyle = '#ff6a2c'; x.fillRect(ax - 1, H - SK_BARRA + 1, 2, SK_BARRA - 2);
+}
+// ── navegação: barra de rolagem, limites, pontos de edição ──
+const SK_BARRA = 12;
+function skTotal(W) { return Math.max(skFim() + 5, SK.x0 + W / SK.z, 10); }
+function skBarra(W) { const tot = skTotal(W), vis = W / SK.z; return { tot, x: SK.x0 / tot * W, w: Math.min(W, vis / tot * W) }; }
+function skBarraX(t, W, b) { return t / b.tot * W; }
+function skLimitarX() { const cv = skEl('sk-tl'); const W = cv ? cv.clientWidth : 1000; SK.x0 = Math.max(0, Math.min(SK.x0, Math.max(0, skFim() + 5 - W / SK.z * 0.5))); }
+function skPontosEdicao() {
+    const p = new Set([0]);
+    for (const f of SK.proj?.faixas || []) for (const c of f.clipes) { p.add(+c.ini.toFixed(4)); p.add(+(c.ini + c.dur).toFixed(4)); }
+    for (const m of SK.proj?.marcadores || []) p.add(+m.t.toFixed(4));
+    return [...p].sort((a, b) => a - b);
+}
+function skMostrarAgulha() {   // agulha fora da vista: traz para a vista (ir e voltar com o teclado)
+    const cv = skEl('sk-tl'); if (!cv) return;
+    const vis = cv.clientWidth / SK.z;
+    if (SK.ph < SK.x0 || SK.ph > SK.x0 + vis * 0.95) SK.x0 = Math.max(0, SK.ph - vis * 0.3);
+}
+// Q / W (como no Editor de vídeo): apaga do corte anterior até a agulha / da agulha até o próximo corte, em todas as
+// faixas, e puxa o resto (ripple)
+function skAparar(lado) {
+    if (!SK.proj) return 0;
+    const p = skPontosEdicao().filter(x => !SK.proj.marcadores.some(m => Math.abs(m.t - x) < 1e-4) || x === 0), t = SK.ph;
+    const a = lado === 'inicio' ? [...p].reverse().find(x => x < t - 0.005) : t, b = lado === 'inicio' ? t : p.find(x => x > t + 0.005);
+    if (a == null || b == null) { skToast(lado === 'inicio' ? 'Nada antes da agulha' : 'Nada depois da agulha'); return 0; }
+    SK.int = { a, b, faixas: SK.proj.faixas.map(f => f.id) };
+    skIntApagar(true);
+    SK.ph = a; skMostrarAgulha(); skDesenhar(); skUiTempo();
+    return b - a;
 }
 function skEnquadrar() { const cv = skEl('sk-tl'); if (!cv || !SK.proj) return; const f = Math.max(10, skFim()); SK.z = Math.max(2, (cv.clientWidth - 40) / f); SK.x0 = 0; skDesenhar(); }
 
@@ -317,6 +351,11 @@ function skEventos() {
         if (!SK.proj) return;
         cv.setPointerCapture(e.pointerId);
         const [px, py] = pos(e), a = skAlvo(px, py);
+        if (py > cv.clientHeight - SK_BARRA) {   // barra de rolagem: arrasta a vista; clique fora do polegar pula para lá
+            const b = SK._barra || skBarra(cv.clientWidth);
+            if (px < b.x || px > b.x + b.w) SK.x0 = Math.max(0, (px - b.w / 2) / cv.clientWidth * b.tot);
+            SK.arr = { modo: 'barra', x: px, x0: SK.x0, tot: (SK._barra || b).tot }; skDesenhar(); return;
+        }
         if (SK.verEsp && e.ctrlKey && a.c) {   // vista de espectro: Ctrl+arrastar marca área (tempo × frequência)
             SK.sel = a.c.id; SK.faixaSel = a.f.id; SK.int = null;
             SK.arr = { modo: 'rect', c: a.c, y: SK_REGUA + a.i * SK_H - SK.y0, px, py }; SK.rect = null; skUi(); return;
@@ -346,6 +385,7 @@ function skEventos() {
         const [px, py] = pos(e);
         if (!SK.arr) { const a = SK.proj && skAlvo(px, py); cv.style.cursor = !a || !a.c ? 'default' : a.parte === 'meio' ? 'grab' : a.parte.startsWith('fade') ? 'crosshair' : 'ew-resize'; return; }
         const A = SK.arr, dt = (px - (A.x ?? px)) / SK.z;
+        if (A.modo === 'barra') { SK.x0 = Math.max(0, A.x0 + (px - A.x) / cv.clientWidth * A.tot); skLimitarX(); skDesenhar(); return; }
         if (A.modo === 'rect') {
             const c = A.c, ft = p => Math.max(c.de, Math.min(c.de + c.dur, c.de + (SK.x0 + p / SK.z - c.ini)));
             const [t0, t1] = [ft(A.px), ft(px)].sort((p, q) => p - q), [f0, f1] = [skEspHz(A.y, A.py), skEspHz(A.y, py)].sort((p, q) => p - q);
@@ -391,15 +431,16 @@ function skEventos() {
         const A = SK.arr; SK.arr = null; if (!A || A.modo === 'agulha') return;
         if (A.modo === 'int') { if (SK.int && SK.int.b - SK.int.a < 0.01) SK.int = null; else if (SK.int) skIr(SK.int.a); skUi(); return; }
         if (A.modo === 'rect') { if (SK.rect && SK.rect.t1 - SK.rect.t0 < 0.01) SK.rect = null; skUi(); return; }
+        if (A.modo === 'barra') { skDesenhar(); return; }
         if (A.moveu) skMudou(A.modo); else SK._antes = null;
     };
     cv.addEventListener('pointerup', solta); cv.addEventListener('pointercancel', solta);
     cv.addEventListener('wheel', e => {
         e.preventDefault();
         if (e.ctrlKey) { const [px] = pos(e), t = SK.x0 + px / SK.z; SK.z = Math.max(1, Math.min(4000, SK.z * (e.deltaY < 0 ? 1.2 : 1 / 1.2))); SK.x0 = Math.max(0, t - px / SK.z); }
-        else if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) SK.x0 = Math.max(0, SK.x0 + (e.deltaX || e.deltaY) / SK.z);
+        else if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY) || pos(e)[1] < SK_REGUA || pos(e)[1] > cv.clientHeight - SK_BARRA) SK.x0 = Math.max(0, SK.x0 + (e.deltaX || e.deltaY) / SK.z);   // roda na régua/barra = ir e voltar
         else { SK.y0 = Math.max(0, Math.min(Math.max(0, SK.proj.faixas.length * SK_H - cv.clientHeight + SK_REGUA + 20), SK.y0 + e.deltaY)); skUiFaixas(); }
-        skDesenhar();
+        skLimitarX(); skDesenhar();
     }, { passive: false });
     new ResizeObserver(() => skDesenhar()).observe(cv);
     document.addEventListener('keydown', e => {
@@ -418,14 +459,20 @@ function skEventos() {
         if (C && k === 'v') return faz(() => skColar());
         if (k === 'escape') return faz(() => { SK.int = null; skUi(); skDesenhar(); });
         if (k === 'v') return faz(() => { SK.verCurva = !SK.verCurva; skUi(); skDesenhar(); });
-        if (k === 'e' && !C) return faz(() => skVerEspectro());
+        if (k === 'e' && e.shiftKey && !C) return faz(() => skVerEspectro());   // Shift+E: vista de espectro
+        if (k === 'e' && !C) return faz(() => skCortar());                      // E: cortar na agulha (como no Editor)
+        if (k === 'd' && !C) return faz(() => SK.int ? skIntApagar(false) : skApagar());   // D: apagar (como no Editor)
+        if (k === 'q' && !C) return faz(() => skAparar('inicio'));             // Q: aparar início até a agulha
+        if (k === 'w' && !C) return faz(() => skAparar('fim'));                // W: aparar fim até a agulha
+        if (k === 'arrowleft' || k === 'arrowright') return faz(() => { skIr(Math.max(0, SK.ph + (k === 'arrowright' ? 1 : -1) * (e.shiftKey ? 1 : 1 / 30))); skMostrarAgulha(); skDesenhar(); });
+        if (k === 'arrowup' || k === 'arrowdown') return faz(() => { const p = skPontosEdicao(), t = k === 'arrowup' ? [...p].reverse().find(x => x < SK.ph - 0.005) : p.find(x => x > SK.ph + 0.005); if (t != null) { skIr(t); skMostrarAgulha(); skDesenhar(); } });
         if (C && k === 'i') return faz(() => skImportarDialogo());
         if (k === 's' || (C && k === 'k')) return faz(() => skCortar());
         if (k === 'delete' || k === 'backspace') return faz(() => SK.int ? skIntApagar(e.shiftKey) : skApagar());
         if (k === 'm') return faz(() => skMarcador());
         if (k === 'r' && !C) return faz(() => (SK.grav ? skGravarParar() : skGravar()).catch(er => skToast(er.message)));
-        if (k === 'home') return faz(() => skIr(0));
-        if (k === 'end') return faz(() => skIr(skFim()));
+        if (k === 'home') return faz(() => { skIr(0); skMostrarAgulha(); skDesenhar(); });
+        if (k === 'end') return faz(() => { skIr(skFim()); skMostrarAgulha(); skDesenhar(); });
         if (k === '+' || k === '=') return faz(() => { SK.z *= 1.25; skDesenhar(); });
         if (k === '-') return faz(() => { SK.z /= 1.25; skDesenhar(); });
         if (k === '0' && C) return faz(skEnquadrar);
@@ -517,7 +564,7 @@ function skLinhas(palavras, max = 42, maxS = 3.5) {   // palavras → linhas de 
 async function skTranscrever(idioma = 'pt', faixas = null) {
     if (!SK.proj) throw new Error('abra um projeto');
     const r = await skTarefa(() => skApi().sk_transcrever(SK.proj, idioma, faixas));
-    SK.texto = { palavras: r.palavras, idioma };
+    SK.texto = SK.proj.texto = { palavras: r.palavras, idioma };   // no projeto: desfazer e salvar levam o texto junto
     skDockMostrar('texto');
     return r.palavras.length;
 }

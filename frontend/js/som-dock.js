@@ -3,16 +3,19 @@
 // classes visuais. Cada ferramenta é um painel: Mídia, Sons, Texto para Voz, Gravar, Clipe, Faixa, Transcrição,
 // Exportar. Colunas à esquerda e à direita do Monitor + timeline; cada coluna, uma pilha. Arrastar o título: em
 // cima/embaixo de outro = empilha; borda esquerda/direita de uma coluna = coluna nova; perto da borda do centro = coluna
-// nova colada; sobre o centro = janela solta. Duplo clique recolhe; × fecha (botão Painéis reabre); divisórias mudam
-// altura e largura. Layout em iePref('sk_paineis') (%APPDATA%, como o do Photo e do Vetor).
+// nova colada; faixa de cima do Monitor, a divisória Monitor/timeline e o pé da timeline = áreas horizontais (cima, meio,
+// baixo: painéis lado a lado, altura pela borda); sobre o centro = janela solta. Duplo clique recolhe; × fecha (botão
+// Painéis reabre); divisórias mudam altura e largura. Layout em iePref('sk_paineis') (%APPDATA%, como o do Photo e do Vetor).
 // Os painéis renderizam pelas funções skUi*(el) (som-paineis.js, som-gravar.js), cada uma no corpo do seu painel.
 // =========================================================
 const SK_DOCK_PAINEIS = { midia: 'Mídia', sons: 'Sons', tts: 'Texto para Voz', gravar: 'Gravar', clipe: 'Clipe', faixa: 'Faixa', texto: 'Transcrição', exportar: 'Exportar' };
 const SK_DOCK_REND = { midia: el => skUiMidia(el), sons: el => skUiSons(el), tts: el => skUiTts(el), gravar: el => skUiGravar(el),
     clipe: el => skUiClipe(el), faixa: el => skUiFaixa(el), texto: el => skUiTexto(el), exportar: el => skUiExportar(el) };
 const SK_DOCK_PRECISA_PROJ = ['clipe', 'faixa', 'texto', 'exportar'];
-const SK_DOCK_PADRAO = { esq: [['midia', 'sons', 'tts']], dir: [['clipe', 'faixa'], ['exportar', 'gravar']], largEsq: [290], largDir: [300, 290],
-    soltos: {}, fechados: ['texto'], recolhidos: ['sons', 'tts', 'gravar'], alturas: {} };
+const SK_DOCK_H = ['cima', 'meio', 'baixo'];   // áreas horizontais no centro
+const SK_DOCK_PADRAO = { esq: [['midia', 'sons']], dir: [['clipe', 'faixa'], ['exportar', 'gravar']], largEsq: [290], largDir: [300, 290],
+    cima: [], meio: [], baixo: ['tts'], altH: { cima: 220, meio: 240, baixo: 330 },
+    soltos: {}, fechados: ['texto'], recolhidos: ['sons', 'gravar'], alturas: {} };
 const SK_DOCK = { lay: null, arr: null, el: {} };
 const SK_DOCK_LARG = 290;
 const skClampD = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -24,10 +27,12 @@ function skDockNormalizar(l) {
         (l[lado] || []).forEach((c, i) => { const ids = (c || []).filter(id => SK_DOCK_PAINEIS[id]); if (ids.length) { out.push(ids); outL.push(skClampD(+larg[i] || SK_DOCK_LARG, 200, 560)); } });
         l[lado] = out; l[lk] = outL;
     }
+    for (const h of SK_DOCK_H) l[h] = (l[h] || []).filter(id => SK_DOCK_PAINEIS[id]);
+    l.altH = Object.assign({ cima: 220, meio: 240, baixo: 330 }, l.altH || {});
     l.soltos = Object.fromEntries(Object.entries(l.soltos || {}).filter(([id]) => SK_DOCK_PAINEIS[id]));
     l.fechados = (l.fechados || []).filter(id => SK_DOCK_PAINEIS[id]);
     l.recolhidos = (l.recolhidos || []).filter(id => SK_DOCK_PAINEIS[id]);
-    const todos = new Set([...l.esq.flat(), ...l.dir.flat(), ...Object.keys(l.soltos), ...l.fechados]);
+    const todos = new Set([...l.esq.flat(), ...l.dir.flat(), ...SK_DOCK_H.flatMap(h => l[h]), ...Object.keys(l.soltos), ...l.fechados]);
     for (const id of Object.keys(SK_DOCK_PAINEIS)) if (!todos.has(id)) l.fechados.push(id);
     return l;
 }
@@ -101,6 +106,19 @@ function skDockAplicar(gravar = true) {
         });
         box.classList.toggle('vazia', !l[lado].length);
     }
+    for (const h of SK_DOCK_H) {   // áreas horizontais: painéis lado a lado
+        const box = skEl('sk-dock-' + h); if (!box) continue;
+        box.innerHTML = ''; box.hidden = !l[h].length;
+        box.style.height = l.altH[h] + 'px';
+        l[h].forEach((id, i) => {
+            const p = skDockPainel(id);
+            p.classList.remove('solto', 'ultimo'); p.style.left = p.style.top = p.style.width = p.style.height = '';
+            if (i) box.appendChild(Object.assign(document.createElement('div'), { className: 'sk-dockh-sep' }));
+            box.appendChild(p);
+        });
+        const al = Object.assign(document.createElement('div'), { className: 'sk-dockh-alt sk-dockh-alt-' + (h === 'cima' ? 'baixo' : 'cima'), title: 'Arrastar: altura da área' });
+        box.appendChild(al); skDockAlturaH(al, h);
+    }
     for (const [id, r] of Object.entries(l.soltos)) {
         const p = skDockPainel(id);
         p.classList.add('solto'); raiz.appendChild(p);
@@ -127,6 +145,14 @@ function skDockBorda(b, lado, ci) {
         b.onpointerup = () => { b.onpointermove = null; skDockGravar(); skDesenhar(); skUiMonitor(); };
     });
 }
+function skDockAlturaH(al, h) {
+    al.addEventListener('pointerdown', ev => {
+        ev.preventDefault(); al.setPointerCapture(ev.pointerId);
+        const y0 = ev.clientY, h0 = SK_DOCK.lay.altH[h], box = al.parentNode, sinal = h === 'cima' ? 1 : -1;
+        al.onpointermove = e => { SK_DOCK.lay.altH[h] = skClampD(Math.round(h0 + sinal * (e.clientY - y0)), 90, 700); box.style.height = SK_DOCK.lay.altH[h] + 'px'; skDesenhar(); };
+        al.onpointerup = () => { al.onpointermove = null; skDockGravar(); skDesenhar(); skUiMonitor(); };
+    });
+}
 function skDockDivisoria(d) {
     d.addEventListener('pointerdown', ev => {
         ev.preventDefault(); d.setPointerCapture(ev.pointerId);
@@ -145,6 +171,7 @@ function skDockTirar(id) {
         for (const c of l[lado]) { const k = c.indexOf(id); if (k >= 0) c.splice(k, 1); }
         for (let i = l[lado].length - 1; i >= 0; i--) if (!l[lado][i].length) { l[lado].splice(i, 1); l[lk].splice(i, 1); }
     }
+    for (const h of SK_DOCK_H) l[h] = l[h].filter(x => x !== id);
     delete l.soltos[id];
     l.fechados = l.fechados.filter(x => x !== id);
 }
@@ -177,6 +204,14 @@ function skDockArrIni(ev, id) {
 function skDockAlvo(ev) {
     const l = SK_DOCK.lay, x = ev.clientX, y = ev.clientY, BORDA = 30;
     const centro = skEl('sk-centro').getBoundingClientRect();
+    for (const h of SK_DOCK_H) {   // dentro de uma área horizontal com painéis: entra antes/depois pelo x
+        const box = skEl('sk-dock-' + h); if (!box || box.hidden) continue;
+        const r = box.getBoundingClientRect(); if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+        const ids = l[h].filter(id => id !== SK_DOCK.arr.id);
+        let i = ids.length; for (let k = 0; k < ids.length; k++) { const pr = skDockPainel(ids[k]).getBoundingClientRect(); if (x < pr.left + pr.width / 2) { i = k; break; } }
+        const xx = !ids.length ? r.left : i < ids.length ? skDockPainel(ids[i]).getBoundingClientRect().left : skDockPainel(ids[ids.length - 1]).getBoundingClientRect().right;
+        return { area: h, i, marca: { left: xx - 2, top: r.top, width: 4, height: r.height } };
+    }
     for (const lado of ['esq', 'dir']) {
         for (const col of skDockLado(lado).querySelectorAll('.ie-dock-col')) {
             const r = col.getBoundingClientRect(), ci = +col.dataset.col;
@@ -189,6 +224,13 @@ function skDockAlvo(ev) {
             const yy = !ids.length ? r.top : i < ids.length ? skDockPainel(ids[i]).getBoundingClientRect().top : skDockPainel(ids[ids.length - 1]).getBoundingClientRect().bottom;
             return { lado, col: ci, i, marca: { left: r.left, top: yy - 2, width: r.width, height: 4 } };
         }
+    }
+    if (y >= centro.top && y <= centro.bottom && x > centro.left + 48 && x < centro.right - 48) {   // faixas de encaixe no centro
+        const mon = skEl('sk-centro').querySelector('.sk-monitor').getBoundingClientRect(), dv = skEl('sk-div').getBoundingClientRect(), tl = skEl('sk-centro').querySelector('.sk-corpo').getBoundingClientRect();
+        const faixa = (h, top) => ({ area: h, i: l[h].length, marca: { left: centro.left, top, width: centro.width, height: 4 } });
+        if (y <= mon.top + 36) return faixa('cima', mon.top);
+        if (Math.abs(y - (dv.top + dv.height / 2)) <= 28) return faixa('meio', dv.top);
+        if (y >= tl.bottom - 48) return faixa('baixo', tl.bottom - 4);
     }
     if (y >= centro.top && y <= centro.bottom) {
         if (x >= centro.left && x <= centro.left + 48) return { lado: 'esq', nova: l.esq.length, marca: { left: centro.left, top: centro.top, width: 4, height: centro.height } };
@@ -221,7 +263,8 @@ function skDockArrFim(ev) {
     const destinoCol = alvo && alvo.col !== undefined ? l[alvo.lado][alvo.col] : null;
     const largura = Math.round(Math.max(220, Math.min(400, a.w)));
     skDockTirar(a.id);
-    if (alvo && destinoCol) {
+    if (alvo && alvo.area) l[alvo.area].splice(Math.min(alvo.i, l[alvo.area].length), 0, a.id);
+    else if (alvo && destinoCol) {
         if (l[alvo.lado].indexOf(destinoCol) >= 0) destinoCol.splice(Math.min(alvo.i, destinoCol.length), 0, a.id);
         else { l[alvo.lado].push([a.id]); l[alvo.lado === 'esq' ? 'largEsq' : 'largDir'].push(largura); }
     } else if (alvo) {
