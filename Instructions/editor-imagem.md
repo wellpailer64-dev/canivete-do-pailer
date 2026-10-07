@@ -144,7 +144,7 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   (texto, objeto inteligente, forma, efeitos e ajustes continuam editáveis no Photoshop). Mover/transformar texto,
   objeto inteligente e forma atualiza a matriz/caminhos (não rasteriza). Texto editado continua texto (conteúdo e
   estilo do começo: fonte, tamanho, cor, espaçamento, entrelinha, alinhamento). Pintar troca só os pixels.
-- Camada nova vai como camada de pixels, MENOS texto e forma criados no editor. Texto vira camada de texto do Photoshop (editável lá)
+- Camada nova vai como camada de pixels, MENOS texto, forma e objeto inteligente criados no editor. Texto vira camada de texto do Photoshop (editável lá)
   — `_texto_novo` em editor_imagem.py clona um molde gerado pelo próprio Photoshop (`Functions/psd_texto_modelo.py`,
   ponto e parágrafo) e troca texto, fonte/estilo (inclusive trechos com outra cor/fonte = runs), matriz e caixa; os
   pixels são os do editor até alguém editar no Photoshop. Forma (`L.vet`, ferramenta Forma e Caneta em modo Forma):
@@ -153,6 +153,16 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   `pixel_data_irrelevant` (sem ela o psd-tools lê preenchimento, não forma). Conferido no Photoshop redesenhando cada
   forma a partir do vetor (retângulo arredondado, elipse, triângulo, hexágono, linha, furo, interseção, exclusão).
   Documento que não veio de PSD RGB é montado do zero.
+- Objeto inteligente (`L.c0` + `L.tf`): `_so_novo` clona o molde do Photoshop (`Functions/psd_so_modelo.py`: PlLd +
+  SoLd na camada, item no lnk2 global) e troca uuid, os 4 cantos (`L.tf` aplicado aos cantos de `L.c0`), o tamanho e o
+  PNG original incorporado (vai como a página mandou, sem recodificar). Filtros inteligentes do editor NÃO vão (aviso):
+  o objeto vai com o original e a camada já mostra os filtros. Objeto com camadas (`L.conteudo`) vai achatado.
+- Arquivo › Colocar, arrastar arquivo para o documento, `KNV.colocar` e imagem gerada por IA criam OBJETO INTELIGENTE
+  (`ieColocarCanvas(..., inteligente=true)`): o original inteiro em `L.c0` e a redução para caber na matriz. Colar
+  (Ctrl+V) continua camada de pixels, como no Photoshop.
+- Arquivos incorporados SEMPRE na versão 7 (`_incorporados_v7`, em todo salvamento): o Photoshop 2026 grava a 8, com um
+  descritor no fim (contentID) que o psd-tools lê e não escreve → item curto e o Photoshop recusa o PSD inteiro
+  ("as opções de abertura estão incorretas"). Valia também para a ida e volta de PSD com objeto inteligente (2026-10-07).
 - PSD novo de documento TRANSPARENTE (`_gravar_achatado`): 4 canais no cabeçalho e contagem de camadas negativa, como o
   Photoshop. Com 3 canais ele toma o documento por opaco e, ao redesenhar uma forma que é a camada mais de baixo,
   enche o retângulo de todas as camadas (2026-10-07).
@@ -243,6 +253,9 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   Windows); `ieDesenharNitido` desenha 1:1 sem reamostrar, amplia inteiro sem suavizar e reduz em etapas (ieMipmap).
 
 ## Teste
+`py -3.13 testes/teste_psd_so.py [--photoshop]`: objeto inteligente novo (parado, 50%, girado) → objeto inteligente
+incorporado; com `--photoshop` abre o conteúdo, reduz a 50% e volta (sem perda = vem do original) e regrava um PSD com
+objeto feito no Photoshop. Molde: `tools/ps_modelo_so.py`.
 `py -3.13 testes/teste_psd_forma.py [--photoshop] [--sem-fundo]`: forma nova → camada de forma (6 casos de
 geometria/operação); com `--photoshop` redesenha no Photoshop e compara com o desenho esperado. Molde: `tools/ps_modelo_forma.py`.
 `py -3.13 testes/teste_psd_texto.py [--photoshop]`: texto novo → camada de texto no PSD (ponto, parágrafo, trechos,

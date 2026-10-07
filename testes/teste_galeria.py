@@ -20,7 +20,9 @@ with sync_playwright() as p:
     erros = []; pg.on("pageerror", lambda e: erros.append(str(e)))
     pg.wait_for_function("typeof ieGalJanela === 'function' && typeof KNV === 'object'", timeout=60000)
     novo = """async () => { KNV.automacao(true, {padrao: 'primario'}); await KNV.fecharTudo(); KNV.novo('galeria', 900, 1200);
-        await KNV.colocar('%s', {nome: 'Foto', x: 0, y: 0, largura: 900}); KNV.automacao(false); }""" % FOTO
+        await KNV.colocar('%s', {nome: 'Foto', x: 0, y: 0, largura: 900});
+        ieRasterizar(ieAtiva(IE.doc));   // Colocar cria objeto inteligente (2026-10-07); aqui o teste é na camada de pixels
+        KNV.automacao(false); }""" % FOTO
     pg.add_style_tag(content='.update-banner{display:none!important}')   # o aviso de versão cobre o canto
     pg.evaluate(novo)
     assin = "(c => { const d = ieCtx(c).getImageData(0, 0, c.width, c.height).data; let s = 0; for (let i = 0; i < d.length; i += 997) s = (s * 31 + d[i]) >>> 0; return s; })"

@@ -1307,6 +1307,68 @@ def _estilo_caractere(raiz, sd, estilo):
             _ed_set(sd, "FontCaps", E.Integer(2 if estilo.get("caixaAlta") else 1 if estilo.get("versalete") else 0))
 
 
+def _incorporados_v7(psd):
+    """Arquivos incorporados dos objetos inteligentes (lnk2/lnkD/lnk3) gravados na versão 7. O Photoshop 2026 grava a 8,
+    que tem um descritor a mais no fim (contentID) que o psd-tools lê mas NÃO escreve: o item sai curto e o Photoshop
+    recusa o PSD inteiro ("as opções de abertura estão incorretas", 2026-10-07). A 7 não tem esse campo e o Photoshop
+    abre normalmente; o contentID (só para Bibliotecas) se perde."""
+    from psd_tools.constants import Tag
+    blocos = psd._record.layer_and_mask_information.tagged_blocks
+    if not blocos:
+        return
+    for nome in ("LINKED_LAYER1", "LINKED_LAYER2", "LINKED_LAYER3"):
+        tag = getattr(Tag, nome, None)
+        if tag is not None and tag in blocos:
+            for item in blocos.get_data(tag):
+                if getattr(item, "version", 0) > 7:
+                    item.version = 7
+
+
+def _so_novo(psd, ob, so, png):
+    """Objeto inteligente criado no editor → objeto inteligente incorporado do Photoshop: clona o molde
+    (psd_so_modelo, gerado colocando um PNG no Photoshop) e troca uuid, os 4 cantos (sup. esq., sup. dir., inf. dir.,
+    inf. esq., em pixels do documento), o tamanho do conteúdo e o PNG incorporado (o original, L.c0, sem transformação).
+    O arquivo vai no bloco global lnk2, ligado à camada pelo uuid. Os pixels da camada são os desenhados pelo editor."""
+    from psd_tools.constants import Tag
+    from psd_tools.psd.descriptor import Double, String
+    from psd_tools.psd.linked_layer import LinkedLayers
+    from psd_tools.psd.tagged_blocks import PlacedLayerData, SmartObjectLayerData, TaggedBlock, TaggedBlocks
+    from Functions import psd_so_modelo as modelo
+    if not png:
+        raise ValueError("sem o conteúdo original")
+    cantos = [float(v) for v in so["cantos"]]
+    if len(cantos) != 8:
+        raise ValueError("cantos inválidos")
+    u = str(uuid.uuid4())
+    pl = PlacedLayerData.frombytes(modelo.PLLD)
+    pl.uuid = u.encode()
+    pl.transform = tuple(cantos)
+    sd = SmartObjectLayerData.frombytes(modelo.SOLD)
+    d = sd.data
+    d[b"Idnt"] = String(u + "\x00")
+    d[b"placed"] = String(str(uuid.uuid4()) + "\x00")
+    for chave in (b"Trnf", b"nonAffineTransform"):
+        for i, v in enumerate(cantos):
+            d[chave][i] = Double(v)
+    d[b"Sz  "][b"Wdth"] = Double(float(so["w"]))
+    d[b"Sz  "][b"Hght"] = Double(float(so["h"]))
+    ob.tagged_blocks[Tag.PLACED_LAYER2] = TaggedBlock(key=Tag.PLACED_LAYER2, data=pl)
+    ob.tagged_blocks[Tag.SMART_OBJECT_LAYER_DATA1] = TaggedBlock(key=Tag.SMART_OBJECT_LAYER_DATA1, data=sd)
+    item = LinkedLayers.frombytes(modelo.LNK2)[0]
+    item.uuid = u
+    nome = "".join(ch for ch in str(so.get("nome") or "Objeto") if ch not in '<>:"/\\|?*').strip()[:60] or "Objeto"
+    item.filename = nome + ".png\x00"
+    item.data = png
+    lm = psd._record.layer_and_mask_information
+    if lm.tagged_blocks is None:
+        lm.tagged_blocks = TaggedBlocks()
+    if Tag.LINKED_LAYER2 in lm.tagged_blocks:
+        lm.tagged_blocks.get_data(Tag.LINKED_LAYER2).append(item)
+    else:
+        lm.tagged_blocks[Tag.LINKED_LAYER2] = TaggedBlock(key=Tag.LINKED_LAYER2, data=LinkedLayers([item]))
+    return True
+
+
 _OP_DEMARCADOR = {"excluir": 0, "somar": 1, "subtrair": 2, "inter": 3}   # operação do subdemarcador no PSD
 
 
@@ -1571,6 +1633,19 @@ def salvar(spec):
                             if Tag.TYPE_TOOL_OBJECT_SETTING in ob.tagged_blocks:
                                 del ob.tagged_blocks[Tag.TYPE_TOOL_OBJECT_SETTING]
                             avisos.append(f"{no.get('nome')}: texto salvo como pixels ({e})")
+                    if orig is None and no.get("so_ps"):   # objeto inteligente criado no editor: vai como objeto inteligente
+                        try:
+                            _so_novo(psd, ob, no["so_ps"], arquivos.get(no["so_ps"].get("chave")))
+                            if no["so_ps"].get("filtros"):
+                                avisos.append(f"{no.get('nome')}: filtros inteligentes do editor não vão para o PSD "
+                                              "(o objeto inteligente vai com o original; a imagem da camada já tem os filtros)")
+                        except Exception as e:
+                            logging.debug("objeto inteligente novo %s: %s", no.get("nome"), e)
+                            from psd_tools.constants import Tag
+                            for t_ in (Tag.PLACED_LAYER2, Tag.SMART_OBJECT_LAYER_DATA1):
+                                if t_ in ob.tagged_blocks:
+                                    del ob.tagged_blocks[t_]
+                            avisos.append(f"{no.get('nome')}: objeto inteligente salvo como pixels ({e})")
                     if orig is None and no.get("forma_ps"):   # forma criada no editor: vai como camada de forma
                         try:
                             _forma_nova(ob, no["forma_ps"], W, H)
@@ -1668,6 +1743,7 @@ def salvar(spec):
     except Exception:
         pass
 
+    _incorporados_v7(psd)
     tmp = destino + ".salvando"
     try:
         with open(tmp, "wb") as f:

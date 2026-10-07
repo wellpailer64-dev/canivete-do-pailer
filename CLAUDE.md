@@ -93,9 +93,9 @@ e `python testes/teste_vetor_editor3d.py`.
 
 ## Editor de Imagem (estilo Photoshop)
 Guia, arquivos e limitações em `Instructions/editor-imagem.md`; código em `frontend/js/imagem-*.js` e
-`Functions/editor_imagem.py` (salvar PSD de ida e volta: só troca o que mudou; grava num temporário, relê e só troca o arquivo se cada camada conferir — `testes/teste_psd_refs.py`). Texto e forma criados no Photo vão
-para o PSD editáveis (texto: molde do Photoshop em `Functions/psd_texto_modelo.py`; forma: cor sólida + máscara vetorial;
-`testes/teste_psd_texto.py` e `testes/teste_psd_forma.py`, com `--photoshop` para conferir no Photoshop). Teste: `python testes/teste_imagem.py`
+`Functions/editor_imagem.py` (salvar PSD de ida e volta: só troca o que mudou; grava num temporário, relê e só troca o arquivo se cada camada conferir — `testes/teste_psd_refs.py`). Texto, forma e objeto inteligente criados
+no Photo vão para o PSD editáveis (moldes do Photoshop em `Functions/psd_texto_modelo.py` e `psd_so_modelo.py`; forma =
+cor sólida + máscara vetorial; incorporados sempre na versão 7; `testes/teste_psd_{texto,forma,so}.py`, `--photoshop` confere lá). Teste: `python testes/teste_imagem.py`
 (rodar antes de release quando mexer no editor de imagem, em `psd_tools` ou no `media_server`). Ferramentas com mouse de
 verdade (app em `--agente=9333`): `testes/teste_caneta.py` (Caneta, demarcadores, recuperação, laço magnético) e
 `testes/teste_guias.py` (guias, encaixe, fatias, carrossel), `testes/teste_dissolver.py` (Filtro > Dissolver/Liquify), `testes/teste_galeria.py` (Galeria de filtros), `testes/teste_cameraraw.py` (Camera Raw).

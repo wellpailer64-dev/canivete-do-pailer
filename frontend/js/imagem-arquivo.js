@@ -149,16 +149,28 @@ async function ieColocarArquivo(path) {
         else if (r.camadas && r.camadas[0] && r.camadas[0].url) c = await ieImagemDeUrl(r.camadas[0].url);
         api.ie_fechar(r.doc);
         if (!c) return;
-        ieColocarCanvas(c, r.nome || ieNomeArq(path));
+        ieColocarCanvas(c, r.nome || ieNomeArq(path), undefined, undefined, true);   // arquivo colocado = objeto inteligente
     } finally { ieCarregando(false); }
 }
-function ieColocarCanvas(c, nome, x, y) {
+// inteligente = arquivo colocado (Colocar, arrastar, KNV.colocar, imagem gerada): vira OBJETO INTELIGENTE, como no
+// Photoshop — o original fica inteiro em L.c0 e a redução para caber vai na matriz (sem perda; vai assim para o PSD).
+// Colar (Ctrl+V) continua camada de pixels, como no Photoshop.
+function ieColocarCanvas(c, nome, x, y, inteligente = false) {
     const doc = IE.doc;
     let k = 1;
     if (x === undefined && (c.width > doc.w || c.height > doc.h)) k = Math.min(doc.w / c.width, doc.h / c.height);
-    if (k < 1) { const t = ieTransformarPlano({ c, x: 0, y: 0 }, [k, 0, 0, k, 0, 0]); c = t.c; }
-    if (x === undefined) { x = Math.round((doc.w - c.width) / 2); y = Math.round((doc.h - c.height) / 2); }
-    const L = ieNovaCamada(doc, { nome: nome || ieNomeLivre(doc, ieT('Camada')), c, x, y, sujoPx: true });
+    let L;
+    if (inteligente) {
+        if (x === undefined) { x = Math.round((doc.w - c.width * k) / 2); y = Math.round((doc.h - c.height * k) / 2); }
+        const tf = [k, 0, 0, k, x - k * x, y - k * y];   // escala em torno do canto (x, y)
+        const r = k < 1 ? ieTransformarPlano({ c, x, y }, tf) : { c, x, y };
+        L = ieNovaCamada(doc, { tipo: 'inteligente', nome: nome || ieNomeLivre(doc, ieT('Camada')), c: r.c, x: r.x, y: r.y,
+            c0: { c, x, y }, tf, tfBase: [...IE_ID], sujoPx: true });
+    } else {
+        if (k < 1) { const t = ieTransformarPlano({ c, x: 0, y: 0 }, [k, 0, 0, k, 0, 0]); c = t.c; }
+        if (x === undefined) { x = Math.round((doc.w - c.width) / 2); y = Math.round((doc.h - c.height) / 2); }
+        L = ieNovaCamada(doc, { nome: nome || ieNomeLivre(doc, ieT('Camada')), c, x, y, sujoPx: true });
+    }
     // acima da camada SELECIONADA; nada selecionado → acima de todas (a "ativa" antiga não conta)
     ieInserirAcima(doc, L, doc.selIds.length ? ieAtiva(doc) : null);
     ieCamadaMudou(L);
@@ -331,6 +343,14 @@ async function ieSalvar(comoNovo = false, destinoForcado = null, refeito = false
                         trechos: (t.trechos || []).map(r => ({ a: r.a, b: r.b, ps: r.ps, cor: r.cor, negFalso: r.negFalso, itaFalso: r.itaFalso, sublinhado: r.sublinhado, tachado: r.tachado })),
                         ...Object.fromEntries(IE_TX_CHAVES.filter(k => t[k] !== undefined).map(k => [k, t[k]])) };
                 }
+                // objeto inteligente criado no editor: vai o ORIGINAL (L.c0) incorporado + os 4 cantos da transformação
+                if (L.tipo === 'inteligente' && L.c0 && L.c0.c && (!ida || L.ref == null) && !L.rasterizar) {
+                    const M = L.tf || IE_ID, { x, y } = L.c0, w = L.c0.c.width, h = L.c0.c.height;
+                    const cantos = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]].flatMap(([a, b]) => { const q = ieMatPt(M, a, b); return [q.x, q.y]; });
+                    const k = 'o' + (++n) + '.png';
+                    s.so_ps = { chave: k, w, h, cantos, nome: L.nome, filtros: !L.filtrosOff && (L.filtrosInt || []).some(f => f.on) };
+                    envios.push({ k, L, plano: 'c0' });
+                }
                 // forma criada no editor: o Python monta uma camada de forma do Photoshop (cor sólida + máscara vetorial)
                 if (L.tipo === 'forma' && L.vet && (!ida || L.ref == null) && !L.rasterizar)
                     s.forma_ps = { cor: L.vet.cor, subs: (L.vet.subs || []).map(sb => ({ fechado: sb.fechado !== false, op: sb.op || 'somar',
@@ -351,6 +371,7 @@ async function ieSalvar(comoNovo = false, destinoForcado = null, refeito = false
         await iePool(envios, 4, async e => {
             let c = e.c;
             if (!c && e.plano === 'c') c = e.L.c;
+            if (!c && e.plano === 'c0') c = e.L.c0.c;   // conteúdo original do objeto inteligente
             if (!c && e.plano === 'm') {
                 // máscara sem pixels (revelar/ocultar tudo): 1×1 com a cor de fundo
                 c = e.L.m.c ? ieAlfaParaCinza(e.L.m.c) : (() => { const t = ieCanvas(1, 1), x = ieCtx(t); x.fillStyle = e.L.m.fundo ? '#fff' : '#000'; x.fillRect(0, 0, 1, 1); return t; })();

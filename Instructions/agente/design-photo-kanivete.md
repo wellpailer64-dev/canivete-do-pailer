@@ -39,6 +39,9 @@ Armadilhas: na página existe a `const KNV` original; depois da recarga use `win
   'Rabiscos'); `protegidas: [{nome, caixa:[x,y,w,h], de:'Mulher'}]` = nada acima de `de` cobrindo o rosto. O `rodar.py`
   lê essas opções de `revisao.json` na pasta da arte.
 - Colocar e transformar: `colocar(path,{nome,x,y,largura,angulo,acima})`, `transformar({x,y,largura,angulo,espelhar})`
+  — `colocar` cria OBJETO INTELIGENTE (como o Photoshop, desde 2026-10-07): transformar/girar sem perda, filtro vira
+  filtro inteligente e vai para o PSD como objeto inteligente. Pintar/preencher direto nele pede "Rasterizar a camada?"
+  (com a automação ligada vira erro): pinte numa camada nova acima, ou `ieCmd('rasterizar')` antes.
   (canto do conteúdo), `girar(ang,{escala,centro})` / `escalar(k)` (em volta do centro; texto continua editável),
   `mover(dx,dy)`, `alinhar({a,h,v,dentro,folga})` (à página ou a outra camada; `dentro:false` encosta por fora),
   `moverPara(ref)` (ordem na pilha), `modo(bm,op)`, `duplicar(nome)`, `objetoInteligente()`.
