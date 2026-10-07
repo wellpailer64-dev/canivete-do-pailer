@@ -51,7 +51,7 @@ with sync_playwright() as p:
     js_erros = []
     pg.on("pageerror", lambda e: js_erros.append(str(e)))
     pg.wait_for_function("typeof switchTool === 'function' && window.SKN", timeout=90000)
-    pg.evaluate("switchTool('sound-kanivete'); document.getElementById('app-update-banner')?.remove()")
+    pg.evaluate("switchTool('sound-kanivete'); document.getElementById('app-update-banner')?.remove(); SK.proj = null; skParar(); skUi()")
     pg.wait_for_timeout(400)
     ok(pg.evaluate("!document.getElementById('sk-inicio').hidden"), "tela inicial do Sound Kanivete")
     pg.evaluate("SKN.novo('podcast', 'Teste Sk')")
@@ -60,7 +60,7 @@ with sync_playwright() as p:
         SKN.cortar(6, a); SKN.marcador(3, 'Intro'); return SKN.estado(); }""" % (D, D))
     v = e["faixas"][0]["clipes"]
     ok(len(v) == 2 and v[1]["ini"] == 6 and v[1]["de"] == 6 and e["fim"] == 12, "importar e cortar na agulha (2 clipes, o 2º continua do 6 s)", str(v))
-    ok(pg.evaluate("Object.values(SK.picos).every(p => p.d.length > 500)"), "forma de onda carregada (picos)")
+    ok(pg.evaluate("['voz.wav', 'ruido.mp3'].every(n => Object.values(SK.picos).some(p => p.nome === n && p.d.length > 700))"), "forma de onda carregada (picos)")
     pg.evaluate("SKN.ir(0); SKN.tocar()"); pg.wait_for_timeout(1500)
     ag = pg.evaluate("SKN.estado().agulha"); pg.evaluate("SKN.parar()")
     ok(1.2 < ag < 1.9, "tocando: a agulha anda no tempo", f"{ag} s depois de 1,5 s")
@@ -94,6 +94,22 @@ with sync_playwright() as p:
     r = pg.evaluate(f"async () => await SKN.exportar('{D}so_trilha.wav', {{formato: 'wav', faixas: ['{e2['faixas'][2]['id']}']}})")
     d, _ = dur_lufs(r["caminho"])
     ok(abs(d - 9) < 0.1, "exportar só uma faixa (termina no fim dela: 1 + 8 s)", f"{d:.2f} s")
+    # fase 2: limpar ruído (rápido); com --ia também voz (OmniVoice) e Melhorar voz (minutos)
+    pg.set_default_timeout(1800000)
+    c0 = e2["faixas"][0]["clipes"][0]["id"]
+    s = pg.evaluate("async (id) => await SKN.limpar(id, 90)", c0)
+    cl = pg.evaluate("(id) => skClipe(id)[0]", c0)
+    ok(s.endswith("_limpo90.wav") and os.path.isfile(s) and cl["orig"].endswith("voz.wav") and all(c["arq"] == s for c in pg.evaluate("() => SK.proj.faixas[0].clipes")),
+       "limpar ruído: arquivo novo ao lado, vale para os clipes da gravação", s)
+    pg.evaluate("(id) => SKN.original(id)", c0)
+    ok(pg.evaluate("(id) => skClipe(id)[0].arq", c0).endswith("voz.wav"), "voltar ao original")
+    if "--ia" in sys.argv:
+        v = pg.evaluate("async () => await SKN.vozes()")
+        if v.get("vozes"):
+            vid = pg.evaluate("async (v) => await SKN.voz(v, 'Teste do Sound Kanivete.', {ini: 1})", v["vozes"][0]["id"])
+            ok(bool(vid) and any(f["nome"] == "Voz IA" for f in pg.evaluate("SKN.estado()")["faixas"]), "voz por IA entra na faixa Voz IA")
+        m = pg.evaluate("async (id) => await SKN.melhorar(id)", c0)
+        ok(os.path.isfile(m), "melhorar voz (IA) gera arquivo", m)
     ok(not js_erros, "sem erros de JavaScript", "; ".join(js_erros[:3]))
 print("RESULTADO:", "REPROVADO" if erros else "PASSOU")
 sys.exit(1 if erros else 0)

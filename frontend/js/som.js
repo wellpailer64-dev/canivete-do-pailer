@@ -334,6 +334,7 @@ function skMontar() {
         <div class="sk-tbar">
             <button class="ie-btn" onclick="skImportarDialogo()" title="Importar áudio (Ctrl+I)">+ Áudio</button>
             <button class="ie-btn" onclick="skNovaFaixa()" title="Nova faixa">+ Faixa</button>
+            <button class="ie-btn" onclick="skVozDialogo()" title="Gerar fala com uma voz salva (OmniVoice)">🎙 Voz IA</button>
             <span class="sk-sep"></span>
             <button class="ie-btn sk-play" id="sk-play" onclick="SK.tocando ? skParar() : skTocar()" title="Tocar/parar (Espaço)">▶</button>
             <span class="sk-tempo" id="sk-tempo">0:00.00</span>
@@ -470,3 +471,82 @@ window.SKN = {
     estado: () => SK.proj && ({ nome: SK.proj.nome, caminho: SK.caminho, fim: +skFim().toFixed(3), agulha: +SK.ph.toFixed(3), sel: SK.sel,
         faixas: SK.proj.faixas.map(f => ({ id: f.id, nome: f.nome, vol: f.vol, mudo: f.mudo, solo: f.solo, clipes: f.clipes.map(c => ({ id: c.id, nome: c.nome, ini: +c.ini.toFixed(3), dur: +c.dur.toFixed(3), de: +c.de.toFixed(3), vol: c.vol, fade_in: c.fade_in, fade_out: c.fade_out })) })) }),
 };
+
+
+// ─────────────────────────── fase 2: limpar, melhorar, voz por IA ───────────────────────────
+// O efeito roda no Python (thread) e grava um arquivo novo ao lado do original; ao terminar, todos os clipes daquela
+// gravação passam a usar o arquivo novo (c.orig guarda o anterior: "Voltar ao original").
+SK.tarefa = null;
+function skProgresso(d) {
+    const st = skEl('sk-status-info');
+    if (d.percent != null && st) st.textContent = `${d.status || 'Processando'}… ${Math.round(d.percent)}%`;
+    if (!d.complete) return;
+    if (st) st.textContent = d.error ? `Erro: ${d.error}` : '';
+    const t = SK.tarefa; SK.tarefa = null;
+    if (t) d.error ? t.rej(new Error(d.error)) : t.res(d);
+}
+function skTarefa(chamada) {
+    if (SK.tarefa) return Promise.reject(new Error('já tem um processo rodando; espere terminar'));
+    return new Promise((res, rej) => { SK.tarefa = { res, rej }; chamada().then(r => { if (!r || !r.success) { SK.tarefa = null; rej(new Error((r && r.error) || 'falhou')); } }); });
+}
+async function skEfeito(id, efeito, op = {}) {
+    const [c] = skClipe(id || SK.sel); if (!c) throw new Error('escolha um clipe');
+    const arq = c.arq;
+    const r = await skTarefa(() => skApi().sk_processar(arq, efeito, op));
+    await skCarregarPicos(r.saida);
+    skAntes();
+    for (const f of SK.proj.faixas) for (const x of f.clipes) if (x.arq === arq) { x.orig = x.orig || arq; x.arq = r.saida; x.efeitos = [...(x.efeitos || []), efeito]; }
+    skMudou(efeito);
+    skToast(efeito === 'limpar' ? 'Ruído limpo' : 'Voz melhorada');
+    return r.saida;
+}
+function skOriginal(id) {
+    const [c] = skClipe(id || SK.sel); if (!c || !c.orig) return;
+    const atual = c.arq; skAntes();
+    for (const f of SK.proj.faixas) for (const x of f.clipes) if (x.arq === atual && x.orig) { x.arq = x.orig; delete x.orig; delete x.efeitos; }
+    skMudou('original');
+}
+async function skVoz(vozId, texto, { faixa = null, ini = null } = {}) {
+    const r = await skTarefa(() => skApi().sk_voz(vozId, texto, {}));
+    if (!r.saida) throw new Error('a voz não foi gerada');
+    let f = SK.proj.faixas.find(x => x.id === faixa) || SK.proj.faixas.find(x => /voz ia/i.test(x.nome)) || skNovaFaixa('Voz IA');
+    const ids = await skImportar([r.saida], { faixa: f.id, ini: ini ?? SK.ph });
+    return ids[0];
+}
+function skUiEfeitos(c) {
+    const el = skEl('sk-efeitos'); if (!el) return;
+    const ocup = !!SK.tarefa;
+    el.innerHTML = `<div class="sk-p-tit">Efeitos</div>
+        <label class="sk-p-l">Limpar ruído<input type="range" min="10" max="100" step="5" value="${SK.qLimpo || 80}" id="sk-q-limpo"><small id="sk-q-txt">${SK.qLimpo || 80}%</small></label>
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" id="sk-limpar" ${ocup ? 'disabled' : ''}>Limpar ruído</button>
+        <button class="ie-btn ie-btn-mini" id="sk-melhorar" ${ocup ? 'disabled' : ''} title="Sidon + OmniVoice: voz de estúdio (leva alguns minutos)">Melhorar voz (IA)</button>
+        ${c.orig ? '<button class="ie-btn ie-btn-mini" id="sk-orig">Voltar ao original</button>' : ''}</div>
+        ${c.efeitos ? `<div class="sk-p-info">Aplicado: ${c.efeitos.join(', ')}</div>` : ''}
+        <div class="sk-p-info">O resultado vira um arquivo novo ao lado do original e vale para todos os clipes dessa gravação.</div>`;
+    const q = el.querySelector('#sk-q-limpo');
+    q.oninput = () => { SK.qLimpo = +q.value; el.querySelector('#sk-q-txt').textContent = q.value + '%'; };
+    el.querySelector('#sk-limpar').onclick = () => skEfeito(c.id, 'limpar', { quantidade: SK.qLimpo || 80 }).catch(e => skToast(e.message));
+    el.querySelector('#sk-melhorar').onclick = () => skEfeito(c.id, 'melhorar').catch(e => skToast(e.message));
+    const o = el.querySelector('#sk-orig'); if (o) o.onclick = () => skOriginal(c.id);
+}
+async function skVozDialogo() {
+    if (!SK.proj) skNovo('narracao');
+    const r = await skApi().sk_vozes();
+    if (!r.success || !r.instalado || !r.vozes.length) { skToast('Crie uma voz em Geração de Voz (OmniVoice) primeiro'); return; }
+    const m = document.createElement('div'); m.className = 'ie-modal';
+    m.innerHTML = `<div class="ie-dlg"><div class="ie-dlg-tit">Voz por IA (OmniVoice)</div><div class="ie-dlg-corpo sk-exp">
+        <label>Voz <select id="skv-voz" class="notranslate">${r.vozes.map(v => `<option value="${v.id}">${v.nome}</option>`).join('')}</select></label>
+        <textarea id="skv-txt" rows="5" placeholder="Texto que a voz vai falar" style="width:100%;box-sizing:border-box"></textarea>
+        <div class="sk-p-info">A fala entra na agulha, na faixa "Voz IA".</div>
+        </div><div class="ie-dlg-rod"><button class="ie-btn" data-x>Cancelar</button><button class="ie-btn ie-btn-primario" id="skv-ok">Gerar fala</button></div></div>`;
+    skEl('sk').appendChild(m);
+    m.onclick = e => { if (e.target === m || e.target.closest('[data-x]')) m.remove(); };
+    m.querySelector('#skv-ok').onclick = () => { const v = m.querySelector('#skv-voz').value, t = m.querySelector('#skv-txt').value.trim(); if (!t) return; m.remove(); skVoz(v, t).catch(e => skToast(e.message)); };
+}
+Object.assign(window.SKN, {
+    limpar: (id, quantidade = 80) => skEfeito(id, 'limpar', { quantidade }),
+    melhorar: id => skEfeito(id, 'melhorar'),
+    original: id => skOriginal(id),
+    vozes: () => skApi().sk_vozes(),
+    voz: (vozId, texto, op) => skVoz(vozId, texto, op),
+});

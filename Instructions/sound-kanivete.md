@@ -29,6 +29,15 @@ só uma faixa ou tudo.
 `mover(id, ini, faixa)`, `cortar(t, ids)`, `apagar(id)`, `marcador(t, nome)`, `ir/tocar/parar`, `desfazer/refazer`,
 `salvar(caminho)`, `abrir(caminho)`, `exportar(caminho, {formato, kbps, lufs, faixas, ini, fim})`, `medir()`, `estado()`.
 
+## Efeitos e voz (fase 2, 2026-10-07)
+Painel do clipe › Efeitos: **Limpar ruído** (DeepFilterNet3, `anti_noise.limpo`, misturado ao original na % escolhida;
+~3 s por 12 s de áudio) e **Melhorar voz (IA)** (`melhorar_audio.melhorar_arquivo`, Sidon + OmniVoice, minutos). O
+resultado é um arquivo NOVO ao lado do original (`_limpo90.wav`, `_melhorado.wav`; nunca no cache, que se limpa sozinho)
+e vale para todos os clipes daquela gravação; `c.orig` guarda o anterior (Voltar ao original). **🎙 Voz IA**: fala com
+uma voz salva da Geração de Voz (OmniVoice), entra na agulha na faixa "Voz IA" (~50 s). Roda em thread (`_tarefa` →
+`skProgresso`, barra de status); um processo por vez. SKN: `limpar(id, %)`, `melhorar(id)`, `original(id)`, `vozes()`,
+`voz(vozId, texto, {faixa, ini})`. Teste: `teste_som.py` (limpar) e `--ia` (voz e melhorar).
+
 ## Próximas fases
-2. Limpar (anti-noise DeepFilterNet, Melhorar Áudio) e Voz (OmniVoice) dentro do Sk. 3. Transcrever, soundboard e as
+3. Transcrever, soundboard e as
 ferramentas antigas como atalhos para o Sk. 4. Normalizar por clipe, compressor/EQ, cortar silêncios, ponte com o Editor.

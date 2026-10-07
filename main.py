@@ -3315,6 +3315,40 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def sk_processar(self, arq, efeito, op=None):
+        """Efeito que gera arquivo novo (limpar | melhorar): roda em thread; progresso e fim em skProgresso(dados)."""
+        from Functions import sound_kanivete
+        op = op or {}
+
+        def trabalho(log, progresso):
+            if efeito == "limpar":
+                saida = sound_kanivete.limpar_ruido(arq, op.get("quantidade", 80), log, progresso)
+            elif efeito == "melhorar":
+                saida = sound_kanivete.melhorar_voz(arq, log, progresso)
+            else:
+                raise RuntimeError(f"efeito desconhecido: {efeito}")
+            return {"saida": saida, "origem": arq, "efeito": efeito}
+        _tarefa("skProgresso", trabalho)
+        return {"success": True}
+
+    def sk_vozes(self):
+        from Functions.omnivoice_tool import status
+        try:
+            s = status()
+            return {"success": True, "instalado": bool(s.get("installed")), "vozes": [{"id": v.get("id"), "nome": v.get("name")} for v in s.get("voices") or []]}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def sk_voz(self, voz_id, texto, op=None):
+        """Fala por IA (OmniVoice) com uma voz salva; o .wav volta em skProgresso({saida}) e entra na timeline."""
+        from Functions.omnivoice_tool import synthesize
+
+        def trabalho(log, progresso):
+            r = synthesize(voz_id, texto, op or {}, callback_log=log, callback_progresso=progresso)
+            return {"saida": r.get("output_path") or r.get("path"), "efeito": "voz"}
+        _tarefa("skProgresso", trabalho)
+        return {"success": True}
+
     def sk_dialogo(self, modo, tipos=None, nome=""):
         """abrir | abrir_varios | salvar (tipos: filtros do pywebview, só letras/espaços na descrição)."""
         if not _window:

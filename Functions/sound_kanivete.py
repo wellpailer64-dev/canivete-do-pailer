@@ -212,3 +212,42 @@ def medir_lufs(proj, op=None):
     if not med:
         return {"success": False, "error": "o ffmpeg não mediu"}
     return {"success": True, "lufs": float(med["input_i"]), "pico": float(med["input_tp"]), "lra": float(med["input_lra"])}
+
+
+# ─────────────────────────── efeitos que geram arquivo novo (fase 2) ───────────────────────────
+def _saida_ao_lado(arq, sufixo, ext=".wav"):
+    """<nome><sufixo>.wav ao lado do original (não no cache, que se limpa sozinho); sem permissão, em Documentos.
+    Nome fixo: refazer o mesmo efeito na mesma gravação sobrescreve (não acumula cópias "(2)")."""
+    base = os.path.splitext(os.path.basename(arq))[0]
+    pasta = os.path.dirname(os.path.abspath(arq))
+    if not os.access(pasta, os.W_OK):
+        pasta = os.path.join(os.path.expanduser("~"), "Documents", "Sound Kanivete")
+        os.makedirs(pasta, exist_ok=True)
+    return os.path.join(pasta, base + sufixo + ext)
+
+
+def limpar_ruido(arq, quantidade=80, log=print, prog=lambda *a: None):
+    """Anti-noise (DeepFilterNet3): som limpo misturado ao original na `quantidade` (%), em arquivo novo."""
+    from Functions import anti_noise
+    q = max(0, min(100, int(quantidade)))
+    prog(10, "Limpando o ruído (DeepFilterNet)…")
+    limpo = anti_noise.limpo(arq)
+    saida = _saida_ao_lado(arq, f"_limpo{q}")
+    prog(80, "Gravando…")
+    if q >= 100:
+        cmd = [ffmpeg(), "-y", "-v", "error", "-i", limpo, "-c:a", "pcm_s16le", saida]
+    else:
+        a = q / 100
+        cmd = [ffmpeg(), "-y", "-v", "error", "-i", arq, "-i", limpo, "-filter_complex",
+               f"[0:a]aresample=48000,aformat=channel_layouts=stereo,volume={1 - a:.4f}[o];[1:a]aresample=48000,aformat=channel_layouts=stereo,volume={a:.4f}[l];"
+               f"[o][l]amix=inputs=2:normalize=0:duration=first[s]", "-map", "[s]", "-c:a", "pcm_s16le", saida]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, creationflags=NO_WINDOW)
+    if r.returncode != 0:
+        raise RuntimeError("não gravou o som limpo: " + (r.stderr or "")[-300:])
+    return saida
+
+
+def melhorar_voz(arq, log=print, prog=lambda *a: None):
+    """Melhorar Áudio (Sidon + OmniVoice): só o som, no mesmo tempo do original, em arquivo novo ao lado."""
+    from Functions.melhorar_audio import melhorar_arquivo
+    return melhorar_arquivo(arq, log, lambda v, m=None: prog(v * 100 if v >= 0 else -1, m), so_audio=True)
