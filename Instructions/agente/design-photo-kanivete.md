@@ -45,6 +45,7 @@ Armadilhas: na página existe a `const KNV` original; depois da recarga use `win
 - Trocar nome/preço/data numa base: `substituirTexto('Julho', 'Agosto', {palavra: true})` (todas as camadas de texto,
   inclusive as do PSD — continuam texto no Photoshop). Filtro forte demais: `atenuar(40)` logo depois.
   Foto dentro de uma área: `selecionar(...)` + `colarDentro()` (máscara da seleção, corrente solta).
+  Tirar objeto/pessoa/fio/logo da foto: selecionar + `preencherConteudo()` (LaMa local; camada nova por padrão).
 - Fundo/faixa de cor: `preenchimento(cor, {nome})` ou `preenchimentoDegrade(['#a', '#b'], {estilo, ang, nome})` (camada de
   preenchimento; com seleção ativa vira máscara) em vez de
   pintar/preencher pixels — fica editável no Photoshop.

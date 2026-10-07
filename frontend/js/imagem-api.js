@@ -212,6 +212,9 @@ const KNV = {
     async colarDentro({ fora = false } = {}) { const ok = await ieColarDentro(IE.doc, fora); if (!ok) throw new Error('sem seleção ou nada para colar'); return KNV.info(); },
     // Editar › Localizar e substituir texto: em todas as camadas de texto (ou só na ativa); {trocas, camadas, puladas}
     async substituirTexto(busca, troca, { todas = true, maiusc = false, palavra = false } = {}) { return ieSubstituirTexto(IE.doc, busca, troca, { todas, maiusc, palavra }); },
+    // Editar › Preenchimento sensível ao conteúdo (LaMa): tira o que está na seleção ativa e reconstrói pelo entorno.
+    // amostra 'atual' | 'todas'; saida 'nova' (camada nova, padrão) | 'atual'; expandir (px, 0 = automático)
+    async preencherConteudo({ amostra, saida = 'nova', expandir = 0 } = {}) { const ok = await iePreencherConteudo(IE.doc, { amostra, saida, expandir }); if (!ok) throw new Error('preenchimento sensível ao conteúdo não feito (sem seleção?)'); return KNV.info(); },
     // camada de preenchimento de cor sólida acima da ativa (com seleção ativa, nasce com a máscara dela); vai para o PSD
     // como camada de preenchimento (cor editável no Photoshop)
     async preenchimento(cor = '#000000', { nome } = {}) {

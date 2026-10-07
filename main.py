@@ -2947,6 +2947,17 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def ie_preencher_ia(self, regiao, mascara, expandir=None):
+        """Editar › Preenchimento sensível ao conteúdo (Functions/preencher_conteudo.py, LaMa): trecho + máscara →
+        trecho preenchido + a área usada. Baixa o modelo na primeira vez; o progresso vai para ieConteudoProgresso."""
+        from Functions import preencher_conteudo
+        try:
+            prog = lambda p, msg: _js("ieConteudoProgresso", {"p": p, "msg": msg})
+            preencher_conteudo.garantir_modelo(prog)
+            return preencher_conteudo.preencher_b64(regiao, mascara, expandir, prog)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def ie_preencher_conteudo(self, regiao, mascara, raio=6):
         """Pincel de recuperação para manchas / Remendo sensível ao conteúdo: reconstrói pela vizinhança."""
         from Functions import recuperar

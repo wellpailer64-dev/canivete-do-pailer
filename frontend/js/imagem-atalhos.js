@@ -692,3 +692,84 @@ Object.assign(IE_ATALHOS, { 'Shift+Ctrl+F': 'atenuar', 'Alt+Shift+Ctrl+V': 'cola
     depois('colarLugar', ['Colar especial', [['Colar dentro', 'colarDentro', 'Alt+Shift+Ctrl+V'], ['Colar fora', 'colarFora']]]);
     depois('tracar', '-', ['Localizar e substituir texto...', 'localizarTexto']);
 })();
+
+// ─────────────────────────── Editar › Preenchimento sensível ao conteúdo (LaMa, Functions/preencher_conteudo.py) ───────────────────────────
+// Como o Photoshop: a seleção é preenchida pelo que está em volta. Amostra = camada atual ou todas as camadas; saída =
+// camada nova (padrão, não destrutiva) ou a própria camada (aí vale o Atenuar). O Python expande a área alguns pixels
+// (sem isso a borda do objeto vaza) e devolve o trecho preenchido + a área usada. Primeira vez: baixa o modelo (~200 MB).
+window.ieConteudoProgresso = d => { if (IE._conteudoAtivo) ieCarregando(ieT(d && d.msg || 'Preenchendo pelo conteúdo...'), d && d.p); };
+function ieCinzaParaAlfa(img) {   // PNG em tons de cinza → canvas branco com alfa = cinza
+    const c = ieCanvas(img.width, img.height), x = ieCtx(c);
+    x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+    for (let i = 0; i < p.length; i += 4) { p[i + 3] = p[i]; p[i] = p[i + 1] = p[i + 2] = 255; }
+    x.putImageData(d, 0, 0);
+    return c;
+}
+async function iePreencherConteudo(doc, { amostra, saida = 'nova', expandir = 0 } = {}) {
+    if (!doc || !doc.sel) { ieToast(ieT('Selecione o que quer tirar: a seleção é preenchida pelo que está em volta')); return false; }
+    const api = ieApi(), L = ieAtiva(doc);
+    if (!api) return false;
+    amostra = amostra || (L && L.c && L.tipo === 'pixel' ? 'atual' : 'todas');
+    if (saida === 'atual' && !(await iePodePintar(L, 'preencher pelo conteúdo'))) return false;
+    if (amostra === 'atual' && (!L || !L.c)) { ieToast(ieT('A camada está vazia: use "Todas as camadas"')); return false; }
+    const b = doc.sel.bbox, mg = Math.max(64, Math.round(Math.max(b.w, b.h) * 0.8));
+    const R = ieRInter(ieRInt({ x: b.x - mg, y: b.y - mg, w: b.w + 2 * mg, h: b.h + 2 * mg }), ieRDoc(doc));
+    if (!R) return false;
+    const reg = ieCanvas(R.w, R.h), rx = ieCtx(reg);
+    if (amostra === 'todas') { ieCompor(doc, ieRDoc(doc)); rx.drawImage(doc.comp, -R.x, -R.y); }
+    else rx.drawImage(L.c, L.x - R.x, L.y - R.y);
+    const m = ieCanvas(R.w, R.h); ieCtx(m).drawImage(doc.sel.c, -R.x, -R.y);
+    IE._conteudoAtivo = true;
+    ieCarregando(ieT('Preenchendo pelo conteúdo...'), 5);
+    let r;
+    try { r = await api.ie_preencher_ia(reg.toDataURL('image/png'), m.toDataURL('image/png'), expandir || null); }
+    finally { IE._conteudoAtivo = false; ieCarregando(false); }
+    if (!r || !r.success) { ieToast(`${ieT('Não preencheu')}: ${(r && r.error) || ''}`); return false; }
+    const carregar = async b64 => { const im = new Image(); im.src = 'data:image/png;base64,' + b64; await im.decode(); return im; };
+    const im = await carregar(r.png), area = ieCinzaParaAlfa(await carregar(r.alfa));
+    // só a área preenchida (expandida + borda suave)
+    const so = ieCanvas(R.w, R.h), sx = ieCtx(so);
+    sx.drawImage(im, 0, 0); sx.globalCompositeOperation = 'destination-in'; sx.drawImage(area, 0, 0);
+    const nome = 'Preenchimento sensível ao conteúdo';
+    if (saida === 'nova') {
+        const N = ieNovaCamada(doc, { nome: ieNomeLivre(doc, ieT('Preenchimento de conteúdo')), c: so, x: R.x, y: R.y, sujoPx: true });
+        ieInserirAcima(doc, N, L || null);
+        ieAtivar(N.id, doc);
+        ieCamadaMudou(N);
+        ieHist(ieT(nome));
+    } else {
+        const Rantes = ieRCamada(L), antes = L.c ? { c: ieClonar(L.c), x: L.x, y: L.y } : null;
+        ieGravavel(L); ieCrescer(L, R, 0);
+        const x = ieCtx(L.c);
+        x.save(); x.setTransform(1, 0, 0, 1, 0, 0);
+        // camada × (1 − área) + preenchido × área, em pré-multiplicado
+        x.globalCompositeOperation = 'destination-out'; x.drawImage(area, R.x - L.x, R.y - L.y);
+        x.globalCompositeOperation = 'lighter'; x.drawImage(so, R.x - L.x, R.y - L.y);
+        x.restore();
+        L.sujoPx = true;
+        ieInvalidar(L); ieCamadaMudou(L, ieRUniao(Rantes, R));
+        ieHist(ieT(nome));
+        if (typeof ieAtenuavel === 'function') ieAtenuavel(L, 'c', antes, nome, doc);
+    }
+    ieUiCamadas?.();
+    return true;
+}
+async function iePreencherConteudoDialogo(doc) {
+    if (!doc || !doc.sel) { ieToast(ieT('Selecione o que quer tirar: a seleção é preenchida pelo que está em volta')); return; }
+    const L = ieAtiva(doc);
+    const v = await ieDialogo({
+        titulo: 'Preenchimento sensível ao conteúdo', ok: 'Preencher',
+        campos: [{ id: 'amostra', rotulo: 'Amostra', tipo: 'select', opcoes: [['atual', 'Camada atual'], ['todas', 'Todas as camadas']], valor: L && L.c && L.tipo === 'pixel' ? 'atual' : 'todas' },
+            { id: 'saida', rotulo: 'Saída', tipo: 'select', opcoes: [['nova', 'Nova camada'], ['atual', 'Camada atual']], valor: 'nova' },
+            { id: 'expandir', rotulo: 'Expandir a seleção (px, 0 = automático)', tipo: 'numero', min: 0, max: 200, valor: 0 },
+            { id: 'n', tipo: 'nota', rotulo: 'IA no próprio computador (LaMa). Na primeira vez baixa o modelo (~200 MB).' }],
+    });
+    if (v) await iePreencherConteudo(doc, v);
+}
+Object.assign(IE_CMDS, { preencherConteudo: doc => iePreencherConteudoDialogo(doc) });
+(function () {
+    const edt = IE_MENUS.find(m => m[0] === 'Editar')[1];
+    const i = edt.findIndex(it => Array.isArray(it) && it[1] === 'preencher');
+    edt.splice(i + 1, 0, ['Preenchimento sensível ao conteúdo...', 'preencherConteudo']);
+})();

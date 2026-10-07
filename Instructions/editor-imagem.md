@@ -279,6 +279,14 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   ou a ativa; trechos de estilo acompanham (`ieTxTrechosEditar` por troca); texto do PSD vira texto editado
   (`textoNovo`, continua texto no Photoshop); texto do PSD com estilos misturados/sem fonte não é tocado (aviso).
 - Teste `testes/teste_editar.py` (app em --agente=9333).
+- **Preenchimento sensível ao conteúdo** (Editar, logo abaixo de Preencher; `KNV.preencherConteudo({amostra, saida,
+  expandir})`): LaMa (big-lama, Apache-2.0, ONNX da Carve 512×512, `modelos_ia/lama/lama_fp32.onnx` baixado na 1ª vez
+  com MD5) em `Functions/preencher_conteudo.py`, API `ie_preencher_ia` (progresso em `ieConteudoProgresso`). Roda na
+  CPU (~2 s por região; 1ª vez ~12 s carregando): no DirectML a parte de Fourier falha. A área é EXPANDIDA (auto ≈ 0,4%
+  do lado + 2 px): sem isso a borda do objeto vaza e o LaMa reconstrói o objeto (fantasma). Regiões distantes uma por
+  vez, com entorno; até 512 px na resolução original, acima disso reduz e amplia (mais macio). Amostra camada atual ou
+  todas; saída camada nova (padrão) ou a atual (vale o Atenuar). O pincel de recuperação para manchas continua no
+  `cv2.inpaint` (instantâneo). Teste `testes/teste_conteudo.py` (usa D:/kanivete_testes/lama).
 
 ## Pincel (rodada de 2026-10-07)
 - Ponta macia (`iePonta`) calculada pixel a pixel: núcleo cheio até a dureza e queda em COSSENO até a borda (3×3
