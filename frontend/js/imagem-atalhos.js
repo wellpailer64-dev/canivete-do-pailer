@@ -911,7 +911,8 @@ function ieGenBorrar(area, R, raio, w = R.w, h = R.h) {
 // gera dentro de `area` (canvas do tamanho do documento, alfa = onde gerar) olhando o retângulo R da composição visível
 // refR: o pedaço da composição que serve de referência (na expansão, só a foto antiga: com as faixas lisas da tela nova
 // na referência o klein copiava as faixas)
-async function ieGerarArea(doc, R, area, prompt, semente = -1, refR = R) {
+// alfa: recorte final (canvas do documento) quando difere da máscara — a expansão usa um degradê na costura
+async function ieGerarArea(doc, R, area, prompt, semente = -1, refR = R, alfa = null) {
     const api = ieApi();
     if (!(await ieGeradorPronto('klein'))) return null;
     ieCompor(doc, ieRDoc(doc));
@@ -943,7 +944,7 @@ async function ieGerarArea(doc, R, area, prompt, semente = -1, refR = R) {
     // de volta ao tamanho de R, só dentro da área (borda suave)
     const c = ieCanvas(R.w, R.h), x = ieCtx(c);
     x.imageSmoothingQuality = 'high'; x.drawImage(out, 0, 0, R.w, R.h);
-    const a = ieGenBorrar(area, R, 3);
+    const a = alfa ? (() => { const c2 = ieCanvas(R.w, R.h); ieCtx(c2).drawImage(alfa, -R.x, -R.y); return c2; })() : ieGenBorrar(area, R, 3);
     x.globalCompositeOperation = 'destination-in'; x.drawImage(a, 0, 0);
     return { c, semente: r.semente };
 }
@@ -984,18 +985,28 @@ async function ieExpansaoGenerativa(doc, { formato = 'story', largura, altura, m
     const fx = ancora.includes('l') ? 0 : ancora.includes('r') ? 1 : 0.5, fy = ancora.includes('t') ? 0 : ancora.includes('b') ? 1 : 0.5;
     const ox = Math.round((W - W0) * fx), oy = Math.round((H - H0) * fy);
     ieRedimTela(doc, -ox, -oy, W, H, false);
-    // área nova = fora do retângulo antigo, entrando ~24 px nos lados que cresceram (costura)
-    const s = Math.round(Math.min(24, W0 / 20, H0 / 20));
+    // área nova = fora do retângulo antigo, entrando uma faixa curta (~2% do lado menor, 16–40 px) nos lados que cresceram;
+    // o recorte final passa da foto à geração num degradê nela. Faixa larga (6%) deixava manga/corpo meio transparente
+    // (a IA redesenha a faixa diferente da foto e o degradê mostra as duas)
+    const s = Math.round(ieClamp(Math.min(W0, H0) * 0.02, 16, 40));
     const area = ieCanvas(W, H), ax = ieCtx(area);
     ax.fillStyle = '#fff'; ax.fillRect(0, 0, W, H);
     const l = ox > 0 ? s : 0, t = oy > 0 ? s : 0, r = W - W0 - ox > 0 ? s : 0, bb = H - H0 - oy > 0 ? s : 0;
     ax.clearRect(ox + l, oy + t, W0 - l - r, H0 - t - bb);
+    const alfa = ieCanvas(W, H), fx2 = ieCtx(alfa);
+    fx2.fillStyle = '#fff'; fx2.fillRect(0, 0, W, H); fx2.clearRect(ox, oy, W0, H0);
+    fx2.globalCompositeOperation = 'lighten';
+    const rampa = (x0, y0, x1, y1, rx, ry, rw, rh) => { const g = fx2.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)'); fx2.fillStyle = g; fx2.fillRect(rx, ry, rw, rh); };
+    if (l) rampa(ox, 0, ox + s, 0, ox, oy, s, H0);
+    if (r) rampa(ox + W0, 0, ox + W0 - s, 0, ox + W0 - s, oy, s, H0);
+    if (t) rampa(0, oy, 0, oy + s, ox, oy, W0, s);
+    if (bb) rampa(0, oy + H0, 0, oy + H0 - s, ox, oy + H0 - s, W0, s);
     const R = { x: 0, y: 0, w: W, h: H };
     const texto = (String(prompt || '').trim() ? String(prompt).trim() + ', ' : '') + IE_GEN_EXPANDIR + IE_GEN_COMPL;
     const refR = { x: ox, y: oy, w: W0, h: H0 };
-    const g = await ieGerarArea(doc, R, area, texto, semente, refR);
+    const g = await ieGerarArea(doc, R, area, texto, semente, refR, alfa);
     if (!g) { ieHist(ieT('Tamanho da tela')); return false; }
-    ieGenCamada(doc, g, { prompt: String(prompt || '').trim() || ieT('(expansão)'), R, area, texto, refR }, 'Expansão generativa');
+    ieGenCamada(doc, g, { prompt: String(prompt || '').trim() || ieT('(expansão)'), R, area, texto, refR, alfa }, 'Expansão generativa');
     ieHist(ieT('Expansão generativa'));
     ieUiCamadas?.();
     return true;
@@ -1004,7 +1015,7 @@ async function ieExpansaoGenerativa(doc, { formato = 'story', largura, altura, m
 async function ieGenOutra(doc, L) {
     const G = L && L.generativo;
     if (!G) return false;
-    const g = await ieGerarArea(doc, G.R, G.area, G.texto, -1, G.refR || G.R);
+    const g = await ieGerarArea(doc, G.R, G.area, G.texto, -1, G.refR || G.R, G.alfa || null);
     if (!g) return false;
     G.variacoes.push({ c: g.c, semente: g.semente });
     return ieGenVariacao(doc, L, G.variacoes.length - 1);
@@ -1024,7 +1035,7 @@ async function iePreenchimentoGenerativoDialogo(doc) {
     if (!doc || !doc.sel) { ieToast(ieT('Selecione onde gerar: a seleção é preenchida com o que você escrever')); return; }
     const v = await ieDialogo({
         titulo: 'Preenchimento generativo', ok: 'Gerar',
-        campos: [{ id: 'prompt', rotulo: 'O que gerar na seleção', tipo: 'area', linhas: 3, dica: 'ex.: um balão de ar quente; vazio = tirar o que está lá', valor: IE._genPrompt || '' },
+        campos: [{ id: 'prompt', rotulo: 'O que gerar na seleção', tipo: 'area', linhas: 3, dica: 'ex.: um balão de ar quente; vazio = tirar o que está lá (espinha, mancha, fio: deixe vazio)', valor: IE._genPrompt || '' },
             { id: 'n', tipo: 'nota', rotulo: 'IA no próprio computador (FLUX.2 klein), ~40 s. Depois: "Gerar outra" no painel Propriedades.' }],
     });
     if (!v) return;

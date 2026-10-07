@@ -296,6 +296,7 @@ const KNV = {
     // seleção retangular/elíptica: modo 'nova' | 'somar' | 'subtrair'; suavizar = raio (px)
     selecionar(x, y, w, h, { elipse = false, modo = 'nova', suavizar = 0 } = {}) {
         const doc = IE.doc;
+        modo = { adicionar: 'somar', add: 'somar', tirar: 'subtrair', cruzar: 'cruzar', inter: 'cruzar' }[modo] || modo;   // sinônimos (antes viravam 'nova' calados)
         ieSelAplicar(doc, k => { k.fillStyle = '#fff'; k.beginPath(); if (elipse) k.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); else k.rect(x, y, w, h); k.fill(); },
             modo, { t: elipse ? 'eli' : 'ret', x, y, w, h }, suavizar);
         return !!doc.sel;

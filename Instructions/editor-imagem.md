@@ -309,6 +309,10 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   Resultado numa camada nova com `L.generativo` (variações: ◀ ▶ e "Gerar outra" no painel Propriedades,
   `KNV.variacaoGenerativa()`). Sem texto o preenchimento vai pelo LaMa: o klein redesenhava o objeto que era para sair.
   Teste `testes/teste_generativo.py` (D:/kanivete_testes/ceu/carro.jpg; reprova faixa lisa na expansão).
+  Em pessoas (2026-10-07, D:/kanivete_testes/humanos): espinha/mancha de pele = SEM texto (LaMa, ~3 s, pele natural);
+  com texto ("clear skin") o klein faz mancha lisa de cor diferente. Corpo cortado → expansão SEM texto continua roupa
+  e corpo bem; pedir o que não cabe ("jeans e tênis" num quadro que não chega aos pés) encolhe o tronco e dá degrau.
+  Costura da expansão: faixa curta (2%, 16–40 px) com degradê; faixa larga (6%) deixava manga meio transparente.
 
 ## Pincel (rodada de 2026-10-07)
 - Ponta macia (`iePonta`) calculada pixel a pixel: núcleo cheio até a dureza e queda em COSSENO até a borda (3×3
