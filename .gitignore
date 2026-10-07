@@ -69,3 +69,6 @@ Functions/_credenciais.py
 
 # fonte de referência da marca (uso pessoal; não vai pro git)
 lumiare.zip
+
+# banco de vozes do Texto para Voz (baixado do release vozes-vN)
+vozes_banco/
