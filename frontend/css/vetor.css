@@ -6,7 +6,8 @@
 /* ocupa a área toda, como o Photo e o Editor (eles ligam body.ve-focus; aqui pelo :has) */
 .content-area:has(#page-vetor-kanivete.active) { padding: 10px; overflow: hidden; }
 .vk { --vk-mesa: #3b3b3b; }
-.vk .vk-corpo { grid-template-columns: 46px minmax(0, 1fr) 300px; }
+.vk .vk-corpo { grid-template-columns: 46px var(--vk-esq-w, 0px) minmax(0, 1fr) var(--vk-dir-w, 300px); }   /* colunas de painéis: vetor-dock.js */
+.vk .ie-painel.solto { position: absolute; z-index: 30; resize: both; overflow: hidden; display: flex; flex-direction: column; }
 .vk .ie-centro { grid-template-rows: minmax(0, 1fr) 24px; }
 .vk .vk-paineis { flex-direction: column !important; overflow: hidden; }
 .vk .vk-paineis > .ie-painel { min-height: 0; display: flex; flex-direction: column; }

@@ -47,7 +47,7 @@ function vkAbaVinculos() {
     const el = vkEl('vk-aba'), chave = VK.versaoDoc + '|' + Object.keys(VK.doc.imagens || {}).length;
     if (!VK._vinc || VK._vinc.chave !== chave) {
         VK._vinc = { chave, lista: null };
-        vkVinculos().then(l => { if (VK._vinc && VK._vinc.chave === chave) { VK._vinc.lista = l; if (VK.aba === 'vinculos') vkAbaVinculos(); } }).catch(e => vkToast(e.message));
+        vkVinculos().then(l => { if (VK._vinc && VK._vinc.chave === chave) { VK._vinc.lista = l; if (typeof vkDockRenderUm === 'function' && VK_DOCK.lay) vkDockRenderUm('vinculos'); else if (VK.aba === 'vinculos') vkAbaVinculos(); } }).catch(e => vkToast(e.message));
     }
     const l = VK._vinc.lista;
     if (!l) { el.innerHTML = '<div class="vk-nota">Lendo imagens…</div>'; return; }

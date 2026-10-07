@@ -369,3 +369,13 @@ ExtendScript agrupa ternário encadeado PELA ESQUERDA (`a ? b : c ? d : e` dava 
 Tradutor da interface (i18n.js) trocava "Título" por "Title" no HTML da cena: `translate="no"`/`.notranslate` agora
 ficam de fora (vetor-cena, imagem-cena). Comparação com os 22 .ai reais: todos iguais ou melhores (1ª abertura logo após
 recarregar a página às vezes captura antes das cores: rode de novo só o arquivo).
+
+## 16. Painéis móveis (2026-10-07)
+`frontend/js/vetor-dock.js`: o mecanismo do Photo (imagem-dock.js) adaptado ao Vetor, mesmas classes `ie-dock-*`. As abas
+viraram painéis (Propriedades, Camadas, Pranchetas, Amostras, Separações, Vínculos, Fechamento): arrastar o título
+empilha / cria coluna (dos dois lados do desenho) / solta como janela; duplo clique recolhe; × fecha; menu Janela reabre
+e "Redefinir painéis"; layout em `iePref('vk_paineis')` — grava só DEPOIS de `iePrefsCarregar` (o iePrefGravar salva o
+arquivo inteiro e apagaria as preferências do Photo). As funções `vkAba*` continuam iguais: `vkEl('vk-aba')` devolve o
+corpo do painel da vez (`VK._abaEl`, `vkDockRenderUm`); `VK.aba = 'x'` (botão Fechamento, Alt+Shift+Ctrl+Y) abre o painel.
+O tradutor da interface (i18n.js) não toca em `I18N_PULAR` (nomes de camada/prancheta/objeto, `translate="no"`,
+`.notranslate`) — "Fundo"/"Texto" viravam "Background"/"Text". Teste `testes/teste_vetor_paineis.py` (mouse de verdade).

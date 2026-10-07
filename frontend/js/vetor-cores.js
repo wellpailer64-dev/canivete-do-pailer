@@ -48,7 +48,7 @@
 
 // ── janela: escolher biblioteca, buscar, clicar = vira amostra (e aplica na seleção) ──
 async function vkCoresJanela(ancora) {
-    const pop = vkEl('vk-pop'), rr = vkEl('vk').getBoundingClientRect(), rb = (ancora || vkEl('vk-aba')).getBoundingClientRect();
+    const pop = vkEl('vk-pop'), rr = vkEl('vk').getBoundingClientRect(), rb = (ancora || vkEl('vk-aba') || vkEl('vk-paineis')).getBoundingClientRect();
     const info = await vkApi().vk_bibliotecas_cor(), L = info.bibliotecas;
     let atual = null;
     const grade = (cs, q) => cs.filter(c => !q || c.nome.toLowerCase().includes(q.toLowerCase())).slice(0, 600)

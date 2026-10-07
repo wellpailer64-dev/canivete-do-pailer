@@ -14,7 +14,7 @@ const VK_ICO = {
     zoom: '<circle cx="10" cy="10" r="6"/><path d="M15 15l5 5"/>',
 };
 const vkI = n => `<svg class="ie-i" viewBox="0 0 24 24">${VK_ICO[n] || ''}</svg>`;
-const vkEl = id => document.getElementById(id);
+const vkEl = id => (id === 'vk-aba' && VK._abaEl) || document.getElementById(id);   // vk-aba = corpo do painel que está renderizando (vetor-dock.js)
 const vkEsc_ = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 function vkMontar() {
@@ -71,7 +71,7 @@ function vkMontar() {
     vkEl('vk-ferr').innerHTML = `<div class="ie-ferr-lista">${grupos.map(g => g.map(f => `<button class="ie-ferr-btn" data-f="${f}" title="${VK_FERR[f].nome}${VK_FERR[f].tecla ? ' (' + VK_FERR[f].tecla + ')' : ''}">${vkI(f)}</button>`).join('')).join('<div class="ie-ferr-sep"></div>')}</div>
         <div class="vk-cores-ferr" id="vk-cores-ferr"></div>`;
     vkEl('vk-ferr').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (b) vkFerramenta(b.dataset.f); });
-    vkEl('vk-abas').addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (!b) return; VK.aba = b.dataset.a; vkUiAtualizar(); });
+    vkEl('vk-abas')?.addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (!b) return; VK.aba = b.dataset.a; vkUiAtualizar(); });
     vkMenus();
     vkEventos();
     vkRecentesUi();
@@ -135,14 +135,15 @@ function vkUiAtualizar() {
     if (!vkEl('vk')) return;
     vkEl('vk-inicio').hidden = !!VK.doc;
     vkEl('vk-ferr').querySelectorAll('[data-f]').forEach(b => b.classList.toggle('on', b.dataset.f === VK.ferr));
-    vkEl('vk-abas').querySelectorAll('[data-a]').forEach(b => b.classList.toggle('on', b.dataset.a === (VK.aba || 'camadas')));
+    vkEl('vk-abas')?.querySelectorAll('[data-a]').forEach(b => b.classList.toggle('on', b.dataset.a === (VK.aba || 'camadas')));
     vkCoresFerr(); vkOpcoes();
-    if (!VK.doc) { vkEl('vk-props').innerHTML = ''; vkEl('vk-aba').innerHTML = ''; vkEl('vk-top-info').textContent = ''; return; }
+    if (!VK.doc) { vkEl('vk-props').innerHTML = ''; if (typeof vkDockLimpar === 'function' && VK_DOCK.lay) vkDockLimpar(); else vkEl('vk-aba').innerHTML = ''; vkEl('vk-top-info').textContent = ''; return; }
     const d = VK.doc;
     vkEl('vk-top-info').textContent = `${d.nome}${VK.sujo ? ' •' : ''} — ${d.modoCor.toUpperCase()} · ${d.perfil} · sangria ${vkR(vkMM(d.sangria), 1)} mm`;
     vkEl('vk-status-info').textContent = `${Math.round(VK.vista.z * 72 / 96 * 100)}%  ·  ${VK.sel.length ? VK.sel.length + ' selecionado(s)' : ''}${VK.contorno ? '  ·  CONTORNOS' : ''}`;
     vkProps();
-    ({ camadas: vkAbaCamadas, pranchetas: vkAbaPranchetas, amostras: vkAbaAmostras, separacoes: vkAbaSeparacoes, vinculos: vkAbaVinculos, fechamento: vkAbaFechamento })[VK.aba || 'camadas']();
+    if (typeof vkDockRender === 'function' && VK_DOCK.lay) vkDockRender();   // painéis móveis: cada um no seu corpo
+    else ({ camadas: vkAbaCamadas, pranchetas: vkAbaPranchetas, amostras: vkAbaAmostras, separacoes: vkAbaSeparacoes, vinculos: vkAbaVinculos, fechamento: vkAbaFechamento })[VK.aba || 'camadas']();
 }
 function vkCorSw(c, extra = '') {
     const bg = !c ? 'linear-gradient(to top right, transparent 46%, #e33 47% 53%, transparent 54%), #fff'
@@ -329,7 +330,7 @@ function vkAbaCamadas() {
     const linha = (o, n) => {
         const sel = VK.sel.includes(o.id) ? ' on' : '';
         const nome = o.nome || (o.tipo === 'texto' ? o.conteudo.slice(0, 28) : o.tipo === 'grupo' ? (o.clip ? '<Máscara de corte>' : '<Grupo>') : o.tipo === 'imagem' ? '<Imagem>' : '<Caminho>');
-        let h = `<div class="vk-cam-o${sel}" data-o="${o.id}" style="padding-left:${14 + n * 12}px"><button class="vk-olho" data-vis="${o.id}">${o.visivel === false ? '○' : '●'}</button><span>${vkEsc_(nome)}</span>${o.trava ? '<b class="vk-trava" data-trv="' + o.id + '">🔒</b>' : ''}</div>`;
+        let h = `<div class="vk-cam-o${sel}" data-o="${o.id}" style="padding-left:${14 + n * 12}px"><button class="vk-olho" data-vis="${o.id}">${o.visivel === false ? '○' : '●'}</button><span${o.nome || o.tipo === 'texto' ? ' class="notranslate"' : ''}>${vkEsc_(nome)}</span>${o.trava ? '<b class="vk-trava" data-trv="' + o.id + '">🔒</b>' : ''}</div>`;
         if (o.tipo === 'grupo' && VK.abertos && VK.abertos.has(o.id)) h += [...o.itens].reverse().map(f => linha(f, n + 1)).join('');
         return h;
     };

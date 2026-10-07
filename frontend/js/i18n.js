@@ -895,11 +895,13 @@ function i18nT(s) {
     return s === lim ? en : s.replace(lim, en);
 }
 
+// o que é do usuário não se traduz: "Fundo"/"Texto" como nome de camada viravam "Background"/"Text"
+const I18N_PULAR = '[translate="no"], .notranslate, .vk-cam-nome, .ie-cam-nome';
 function i18nNode(n) {
     if (n.nodeType === 3) {
         const p = n.parentNode;
         if (p && (p.nodeName === 'SCRIPT' || p.nodeName === 'STYLE' || p.nodeName === 'TEXTAREA')) return;
-        if (p && p.closest && p.closest('[translate="no"], .notranslate')) return;   // conteúdo do usuário (cena do Vetor/Photo)
+        if (p && p.closest && p.closest(I18N_PULAR)) return;   // conteúdo do usuário (cena, nomes de camada/prancheta/objeto)
         const st = n.__i18n;
         if (st && n.data === st.en) return;           // já traduzido por nós
         const pt = n.data;
@@ -911,7 +913,7 @@ function i18nNode(n) {
         return;
     }
     if (n.nodeType !== 1) return;
-    if (n.getAttribute && (n.getAttribute('translate') === 'no' || (n.classList && n.classList.contains('notranslate')))) return;
+    if (n.matches && n.matches(I18N_PULAR)) return;
     i18nAttrs(n);
     if (n.nodeName === 'SCRIPT' || n.nodeName === 'STYLE' || n.nodeName === 'svg') return;
     for (let c = n.firstChild; c; c = c.nextSibling) i18nNode(c);
