@@ -1661,3 +1661,21 @@ html.barra-propria .app-container { height: calc(100vh - 26px); }
 .hc-ico.hc-app { background: none !important; border: 0 !important; padding: 0; }
 .hc-ico .app-logo { width: 34px; height: 34px; font-size: 15px; border-radius: 8px; box-shadow: inset 0 0 0 1.8px var(--al); }
 .ve-start-hero-txt .app-logo-grande { margin: 0 0 12px; }
+
+
+/* ── home: as 3 ferramentas principais fixas no topo; imagem de fundo e, embaixo à esquerda, o mini logo na cor dela ── */
+.home-destaque { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 6px 0 18px; }
+.hd-card { position: relative; display: block; aspect-ratio: 16 / 9; padding: 0; border: 1px solid var(--border, rgba(255,255,255,.08)); border-radius: 14px;
+    overflow: hidden; background: #0d0a08; cursor: pointer; text-align: left; color: #fff; isolation: isolate;
+    transition: transform .25s var(--ease, ease), border-color .25s, box-shadow .25s; }
+.hd-card img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; transition: transform .6s var(--ease, ease); }
+.hd-card::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,.55) 68%, rgba(0,0,0,.88)); }
+.hd-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--al) 60%, transparent); box-shadow: 0 10px 30px -12px color-mix(in srgb, var(--al) 55%, transparent); }
+.hd-card:hover img { transform: scale(1.04); }
+.hd-ek { --al: #ff8c42; } .hd-pk { --al: #ffb45c; } .hd-vk { --al: #ef5f2b; }
+.hd-rodape { position: absolute; left: 14px; bottom: 12px; right: 14px; display: flex; align-items: center; gap: 10px; }
+.hd-rodape .app-logo { width: 34px; height: 34px; font-size: 15px; border-radius: 8px; box-shadow: inset 0 0 0 1.8px var(--al); }
+.hd-txt { display: flex; flex-direction: column; min-width: 0; }
+.hd-txt b { font-size: 14px; font-weight: 650; }
+.hd-txt small { font-size: 11.5px; color: rgba(255,255,255,.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 900px) { .home-destaque { grid-template-columns: 1fr; } }

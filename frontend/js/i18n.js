@@ -20,6 +20,8 @@ const I18N_EN = {
     'A troca vale na hora e fica salva para as próximas vezes.': 'The change applies right away and is remembered next time.',
     'O que vamos fazer': 'What are we doing', 'hoje?': 'today?',
     'Vídeo, áudio e imagem direto no seu PC. Solte um arquivo abaixo e o Kanivete sugere a ferramenta certa.': 'Video, audio and images right on your PC. Drop a file below and Kanivete suggests the right tool.',
+    'Vídeo, áudio, camadas, Comp e 3D': 'Video, audio, layers, Comp and 3D', 'Fotos, PSD, retoque e IA local': 'Photos, PSD, retouching and local AI',
+    'Identidade visual e arte para gráfica': 'Brand identity and print-ready art',
     'Nada vai para a nuvem': 'Nothing goes to the cloud', 'Solte qualquer arquivo ou pasta': 'Drop any file or folder',
     'Vídeo, áudio, imagem, PDF ou uma pasta inteira': 'Video, audio, image, PDF or a whole folder',
     'Ferramentas': 'Tools', 'Recentes': 'Recent', 'Nova versão': 'New version', 'Atualizar agora': 'Update now',
