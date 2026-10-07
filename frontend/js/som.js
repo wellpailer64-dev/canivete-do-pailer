@@ -99,11 +99,99 @@ function skCortar(t = SK.ph, ids = null) {   // corta os clipes sob a agulha (os
     for (const f of SK.proj.faixas) for (const c of [...f.clipes]) {
         if ((ids && !ids.includes(c.id)) || (!ids && SK.sel && c.id !== SK.sel)) continue;
         if (t <= c.ini + 0.01 || t >= c.ini + c.dur - 0.01) continue;
-        const d = t - c.ini, b = { ...c, id: skId('c'), ini: t, de: c.de + d, dur: c.dur - d, fade_in: 0 };
-        c.dur = d; c.fade_out = 0; f.clipes.push(b); n++;
+        if (skPartir(f, c, t)) n++;
     }
     if (n) skMudou('cortar'); else SK._antes = null;
     return n;
+}
+// ── curva de volume do clipe: c.curva = [[t no clipe (s), vol linear], ...] (a exportação já aplica) ──
+function skCurvaEm(c, t) {
+    const p = c.curva; if (!p || p.length < 2) return 1;
+    if (t <= p[0][0]) return p[0][1];
+    for (let i = 1; i < p.length; i++) if (t <= p[i][0]) { const [a, va] = p[i - 1], [b, vb] = p[i]; return b > a ? va + (vb - va) * (t - a) / (b - a) : vb; }
+    return p[p.length - 1][1];
+}
+function skCurvaTrecho(c, a, b) {   // pedaço [a, b] da curva, com tempos a partir de 0
+    if (!c.curva || c.curva.length < 2) return c.curva;
+    return [[0, skCurvaEm(c, a)], ...c.curva.filter(p => p[0] > a && p[0] < b).map(([t, v]) => [t - a, v]), [b - a, skCurvaEm(c, b)]];
+}
+function skPartir(f, c, t) {   // corta o clipe c no tempo t da timeline → pedaço da direita (ou null)
+    if (t <= c.ini + 0.001 || t >= c.ini + c.dur - 0.001) return null;
+    const d = t - c.ini, b = { ...c, id: skId('c'), ini: t, de: c.de + d, dur: c.dur - d, fade_in: 0 };
+    if (c.curva) { b.curva = skCurvaTrecho(c, d, c.dur); c.curva = skCurvaTrecho(c, 0, d); }
+    c.dur = d; c.fade_out = 0; f.clipes.push(b);
+    return b;
+}
+// ── intervalo: seleção de tempo em uma ou várias faixas (arrastar no vazio ou Shift+arrastar) ──
+SK.int = null; SK.area = null;
+function skIntFaixas() { return SK.proj.faixas.filter(f => SK.int.faixas.includes(f.id)); }
+function skIntDentro(f, a, b) {   // parte nas bordas e devolve os clipes que ficaram dentro de [a, b]
+    for (const c of [...f.clipes]) skPartir(f, c, a);
+    for (const c of [...f.clipes]) skPartir(f, c, b);
+    return f.clipes.filter(c => c.ini >= a - 0.001 && c.ini + c.dur <= b + 0.001);
+}
+function skIntApagar(puxar = false) {   // sem puxar fica silêncio; puxar fecha o buraco nas faixas do intervalo
+    const I = SK.int; if (!I || I.b - I.a < 0.005) return 0;
+    skAntes(); let n = 0;
+    for (const f of skIntFaixas()) {
+        for (const c of skIntDentro(f, I.a, I.b)) { f.clipes.splice(f.clipes.indexOf(c), 1); n++; }
+        if (puxar) for (const c of f.clipes) if (c.ini >= I.b - 0.001) c.ini -= I.b - I.a;
+    }
+    if (puxar) { SK.int = null; SK.ph = I.a; }
+    SK.sel = null; skMudou(puxar ? 'apagar e puxar' : 'apagar intervalo');
+    return n;
+}
+function skIntCopiar() {
+    const I = SK.int;
+    if (!I) { const [c] = SK.sel ? skClipe(SK.sel) : [null]; if (!c) return 0; SK.area = { dur: c.dur, faixas: [{ i: SK.proj.faixas.findIndex(f => f.clipes.includes(c)), clipes: [{ ...c, ini: 0 }] }] }; return 1; }
+    const copia = JSON.parse(skSnap()), faixas = [];
+    copia.faixas.forEach((f, i) => { if (I.faixas.includes(f.id)) faixas.push({ i, clipes: skIntDentro(f, I.a, I.b).map(c => ({ ...c, ini: c.ini - I.a })) }); });
+    SK.area = { dur: I.b - I.a, faixas };
+    return faixas.reduce((s, f) => s + f.clipes.length, 0);
+}
+function skColar(t = SK.ph) {   // a primeira faixa copiada cai na faixa escolhida; as outras abaixo dela
+    const A = SK.area; if (!A || !SK.proj) return 0;
+    skAntes(); let n = 0;
+    const base = Math.max(0, SK.proj.faixas.findIndex(f => f.id === SK.faixaSel)), i0 = A.faixas[0]?.i || 0;
+    for (const fa of A.faixas) {
+        const f = SK.proj.faixas[base + fa.i - i0] || skNovaFaixa(null, false);
+        for (const c of fa.clipes) { const d = { ...JSON.parse(JSON.stringify(c)), id: skId('c'), ini: c.ini + t }; f.clipes.push(d); n++; SK.sel = d.id; }
+    }
+    SK.ph = t + A.dur; skMudou('colar');
+    return n;
+}
+function skIntRecortar() {   // o projeto fica só com o intervalo (todas as faixas), que vai para o começo
+    const I = SK.int; if (!I || I.b - I.a < 0.005) return;
+    skAntes();
+    for (const f of SK.proj.faixas) { f.clipes = skIntDentro(f, I.a, I.b); for (const c of f.clipes) c.ini -= I.a; }
+    SK.proj.marcadores = SK.proj.marcadores.filter(m => m.t >= I.a && m.t <= I.b).map(m => ({ ...m, t: m.t - I.a }));
+    SK.int = { a: 0, b: I.b - I.a, faixas: I.faixas }; SK.ph = 0; SK.sel = null; skMudou('recortar');
+}
+// ── ducking: abaixa uma faixa (trilha) enquanto as outras falam, escrevendo a curva de volume dos clipes dela ──
+async function skDucking(faixa, { db = -12, fontes = null, ataque = 0.25, soltura = 0.5, juntar = 0.8, limiar = -35 } = {}) {
+    const alvo = SK.proj.faixas.find(f => f.id === faixa || f.nome === faixa); if (!alvo) throw new Error('faixa não encontrada');
+    const fs = SK.proj.faixas.filter(f => f !== alvo && !f.mudo && (!fontes || fontes.includes(f.id) || fontes.includes(f.nome)));
+    let falas = [];
+    for (const f of fs) for (const c of f.clipes) {
+        const r = await skApi().sk_silencios(c.arq, c.de, c.dur, limiar, 0.3);
+        let t = 0;
+        for (const [a, b] of r.silencios || []) { if (a > t + 0.05) falas.push([c.ini + t, c.ini + a]); t = b; }
+        if (t < c.dur - 0.05) falas.push([c.ini + t, c.ini + c.dur]);
+    }
+    falas.sort((x, y) => x[0] - y[0]);
+    const junto = []; for (const s of falas) { const u = junto[junto.length - 1]; if (u && s[0] - u[1] < juntar) u[1] = Math.max(u[1], s[1]); else junto.push([...s]); }
+    const g = Math.pow(10, db / 20);
+    skAntes();
+    for (const c of alvo.clipes) {
+        const env = t => { let v = 1; for (const [a, b] of junto) { const s = a - c.ini, e = b - c.ini;
+            const w = t < s - ataque || t > e + soltura ? 1 : t < s ? 1 + (g - 1) * (t - (s - ataque)) / ataque : t <= e ? g : g + (1 - g) * (t - e) / soltura; v = Math.min(v, w); } return v; };
+        const ts = new Set([0, c.dur]);
+        for (const [a, b] of junto) for (const t of [a - ataque, a, b, b + soltura]) { const x = t - c.ini; if (x > 0 && x < c.dur) ts.add(+x.toFixed(4)); }
+        const pts = [...ts].sort((x, y) => x - y).map(t => [t, +env(t).toFixed(4)]);
+        if (pts.some(p => p[1] < 0.999)) c.curva = pts; else delete c.curva;
+    }
+    skMudou('ducking');
+    return junto.length;
 }
 function skApagar(id = SK.sel) { const [c, f] = skClipe(id); if (!c) return; skAntes(); f.clipes.splice(f.clipes.indexOf(c), 1); SK.sel = null; skMudou('apagar'); }
 function skDuplicar(id = SK.sel) { const [c, f] = skClipe(id); if (!c) return; skAntes(); const d = { ...c, id: skId('c'), ini: c.ini + c.dur }; f.clipes.push(d); SK.sel = d.id; skMudou('duplicar'); }
@@ -147,6 +235,7 @@ function skDesenhar() {
                     const tt = c.ini + px / SK.z; let g = 1;
                     if (c.fade_in > 0 && tt - c.ini < c.fade_in) g = (tt - c.ini) / c.fade_in;
                     if (c.fade_out > 0 && c.ini + c.dur - tt < c.fade_out) g = Math.min(g, (c.ini + c.dur - tt) / c.fade_out);
+                    if (c.curva) g *= Math.min(2, skCurvaEm(c, tt - c.ini));
                     const h = Math.max(0.5, m / 255 * alt * g);
                     x.rect(cx + px, meio - h, 1, h * 2);
                 }
@@ -163,6 +252,20 @@ function skDesenhar() {
         }
     });
     if (typeof skDesenharGrav === 'function') skDesenharGrav(x, X, Y, H);
+    // curvas de volume (com 〰 ligado) e intervalo selecionado
+    if (SK.verCurva) SK.proj.faixas.forEach((f, i) => { const y = Y(i); for (const c of f.clipes) {
+        const cx = X(c.ini), cw = c.dur * SK.z; if (cx > W || cx + cw < 0) continue;
+        const pts = c.curva && c.curva.length >= 2 ? c.curva : [[0, 1], [c.dur, 1]];
+        x.strokeStyle = '#ffd166'; x.lineWidth = 1.5; x.beginPath(); pts.forEach(([t, v], k) => x[k ? 'lineTo' : 'moveTo'](cx + t * SK.z, skCurvaY(y, v))); x.stroke();
+        if (c.id === SK.sel) { x.fillStyle = '#ffd166'; for (const [t, v] of pts) x.fillRect(cx + t * SK.z - 3.5, skCurvaY(y, v) - 3.5, 7, 7); }
+    } });
+    if (SK.int) {
+        const a = X(SK.int.a), b = X(SK.int.b);
+        x.fillStyle = '#ffd16624'; x.strokeStyle = '#ffd166aa'; x.lineWidth = 1;
+        SK.proj.faixas.forEach((f, i) => { if (SK.int.faixas.includes(f.id)) x.fillRect(a, Y(i), b - a, SK_H); });
+        x.fillStyle = '#ffd16655'; x.fillRect(a, 0, b - a, SK_REGUA);
+        for (const px of [a, b]) { x.beginPath(); x.moveTo(Math.round(px) + 0.5, 0); x.lineTo(Math.round(px) + 0.5, H); x.stroke(); }
+    }
     // marcadores e agulha
     for (const m of SK.proj.marcadores) { const mx = Math.round(X(m.t)) + 0.5; x.strokeStyle = '#ffd166'; x.beginPath(); x.moveTo(mx, 0); x.lineTo(mx, H); x.stroke(); x.fillStyle = '#ffd166'; x.fillText(m.nome, mx + 3, SK_REGUA - 3); }
     const hx = Math.round(X(SK.ph)) + 0.5;
@@ -172,6 +275,8 @@ function skDesenhar() {
 function skEnquadrar() { const cv = skEl('sk-tl'); if (!cv || !SK.proj) return; const f = Math.max(10, skFim()); SK.z = Math.max(2, (cv.clientWidth - 40) / f); SK.x0 = 0; skDesenhar(); }
 
 // ── mouse na timeline ──
+const skCurvaY = (y, v) => y + SK_H - 6 - (SK_H - 26) * Math.min(2, v) / 2;   // vol 0 embaixo, 1 no meio, 2 em cima
+const skCurvaV = (y, py) => (y + SK_H - 6 - py) / (SK_H - 26) * 2;
 function skAlvo(px, py) {
     const t = SK.x0 + px / SK.z, i = Math.floor((py - SK_REGUA + SK.y0) / SK_H), f = SK.proj.faixas[i];
     if (py < SK_REGUA) return { regua: true, t };
@@ -179,6 +284,12 @@ function skAlvo(px, py) {
     for (const c of [...f.clipes].reverse()) {
         const cx = (c.ini - SK.x0) * SK.z, cw = c.dur * SK.z, y = SK_REGUA + i * SK_H - SK.y0;
         if (px < cx - 4 || px > cx + cw + 4) continue;
+        if (SK.verCurva && px >= cx && px <= cx + cw) {   // curva: ponto existente ou linha (cria ponto)
+            const pts = c.curva && c.curva.length >= 2 ? c.curva : [[0, 1], [c.dur, 1]];
+            const k = pts.findIndex(([pt, v]) => Math.abs(px - (cx + pt * SK.z)) < 6 && Math.abs(py - skCurvaY(y, v)) < 6);
+            if (k >= 0 && c.id === SK.sel) return { c, f, t, i, parte: 'curvaPt', k };
+            if (Math.abs(py - skCurvaY(y, skCurvaEm(c, t - c.ini))) < 6) return { c, f, t, i, parte: 'curvaNovo' };
+        }
         if (c.id === SK.sel && py < y + 24) {
             if (Math.abs(px - (cx + c.fade_in * SK.z)) < 7) return { c, f, t, i, parte: 'fade_in' };
             if (Math.abs(px - (cx + cw - c.fade_out * SK.z)) < 7) return { c, f, t, i, parte: 'fade_out' };
@@ -204,10 +315,22 @@ function skEventos() {
         if (!SK.proj) return;
         cv.setPointerCapture(e.pointerId);
         const [px, py] = pos(e), a = skAlvo(px, py);
-        if (a.regua || !a.c) { if (a.f) SK.faixaSel = a.f.id; SK.sel = null; skIr(a.t); SK.arr = { modo: 'agulha' }; skUi(); return; }
+        if (a.regua || !a.c || e.shiftKey) {   // régua = arrastar a agulha; vazio (ou Shift) = agulha no clique, arrastando vira intervalo
+            if (a.f) SK.faixaSel = a.f.id; SK.sel = null; SK.int = null; skIr(a.t);
+            SK.arr = { modo: 'agulha', regua: !!a.regua, x: px, t0: a.t, i0: Math.max(0, Math.min(SK.proj.faixas.length - 1, a.i ?? 0)) }; skUi(); return;
+        }
+        if (a.parte === 'curvaNovo' || a.parte === 'curvaPt') {
+            SK.sel = a.c.id; SK.faixaSel = a.f.id; skAntes();
+            const c = a.c; if (!c.curva || c.curva.length < 2) c.curva = [[0, 1], [c.dur, 1]];
+            let k = a.k;
+            if (a.parte === 'curvaPt' && e.altKey) { if (c.curva.length > 2) c.curva.splice(k, 1); skMudou('curva'); return; }   // Alt+clique apaga o ponto
+            if (a.parte === 'curvaNovo') { const t = a.t - c.ini; c.curva.push([t, skCurvaEm(c, t)]); c.curva.sort((p, q) => p[0] - q[0]); k = c.curva.findIndex(p => p[0] === t); }
+            SK.arr = { modo: 'curva', c, k, i: a.i, moveu: a.parte === 'curvaNovo' }; skUi(); skDesenhar(); return;
+        }
         SK.sel = a.c.id; SK.faixaSel = a.f.id;
         skAntes();
-        SK.arr = { modo: a.parte, c: a.c, f: a.f, x: px, y: py, ini: a.c.ini, de: a.c.de, dur: a.c.dur, fi: a.c.fade_in, fo: a.c.fade_out, moveu: false };
+        SK.int = null;
+        SK.arr = { modo: a.parte, c: a.c, f: a.f, x: px, y: py, ini: a.c.ini, de: a.c.de, dur: a.c.dur, fi: a.c.fade_in, fo: a.c.fade_out, curva: a.c.curva && a.c.curva.map(p => [...p]), moveu: false };
         if (e.altKey && a.parte === 'meio') {   // Alt+arrastar = cópia
             const d = { ...a.c, id: skId('c') }; a.f.clipes.push(d); SK.arr.c = d; SK.sel = d.id;
         }
@@ -217,7 +340,20 @@ function skEventos() {
         const [px, py] = pos(e);
         if (!SK.arr) { const a = SK.proj && skAlvo(px, py); cv.style.cursor = !a || !a.c ? 'default' : a.parte === 'meio' ? 'grab' : a.parte.startsWith('fade') ? 'crosshair' : 'ew-resize'; return; }
         const A = SK.arr, dt = (px - (A.x ?? px)) / SK.z;
+        if (A.modo === 'agulha' && !A.regua && Math.abs(px - A.x) > 4) A.modo = 'int';
         if (A.modo === 'agulha') { skIr(SK.x0 + px / SK.z); return; }
+        if (A.modo === 'int') {
+            const t = skEncaixar(Math.max(0, SK.x0 + px / SK.z)), i = Math.max(0, Math.min(SK.proj.faixas.length - 1, Math.floor((py - SK_REGUA + SK.y0) / SK_H)));
+            const [i0, i1] = [Math.min(A.i0, i), Math.max(A.i0, i)];
+            SK.int = { a: Math.min(A.t0, t), b: Math.max(A.t0, t), faixas: SK.proj.faixas.slice(i0, i1 + 1).map(f => f.id) };
+            skDesenhar(); return;
+        }
+        if (A.modo === 'curva') {
+            const c = A.c, P = c.curva, y = SK_REGUA + A.i * SK_H - SK.y0;
+            const ant = A.k > 0 ? P[A.k - 1][0] + 0.001 : 0, prox = A.k < P.length - 1 ? P[A.k + 1][0] - 0.001 : c.dur;
+            P[A.k] = [A.k === 0 ? 0 : A.k === P.length - 1 ? c.dur : Math.max(ant, Math.min(prox, SK.x0 + px / SK.z - c.ini)), Math.max(0, Math.min(2, skCurvaV(y, py)))];
+            A.moveu = true; skDesenhar(); return;
+        }
         A.moveu = true;
         const c = A.c;
         if (A.modo === 'meio') {
@@ -232,6 +368,7 @@ function skEventos() {
             let ini = skEncaixar(Math.max(A.ini - A.de, A.ini + dt), c.id); ini = Math.min(ini, A.ini + A.dur - 0.05);
             c.de = A.de + (ini - A.ini); c.dur = A.dur - (ini - A.ini); c.ini = ini;
             if (c.de < 0) { c.dur += c.de; c.ini -= c.de; c.de = 0; }
+            if (A.curva) c.curva = A.curva.map(([t, v]) => [t - (c.de - A.de), v]);   // a curva fica presa ao som
         } else if (A.modo === 'dir') {
             const max = (SK.picos[c.arq]?.dur ?? Infinity) - c.de;
             c.dur = Math.max(0.05, Math.min(max, skEncaixar(A.ini + A.dur + dt, c.id) - c.ini));
@@ -239,7 +376,11 @@ function skEventos() {
         else if (A.modo === 'fade_out') c.fade_out = Math.max(0, Math.min(c.dur - c.fade_in, A.fo - dt));
         skDesenhar(); skUiProps();
     });
-    const solta = () => { const A = SK.arr; SK.arr = null; if (!A || A.modo === 'agulha') return; if (A.moveu) skMudou(A.modo); else SK._antes = null; };
+    const solta = () => {
+        const A = SK.arr; SK.arr = null; if (!A || A.modo === 'agulha') return;
+        if (A.modo === 'int') { if (SK.int && SK.int.b - SK.int.a < 0.01) SK.int = null; else if (SK.int) skIr(SK.int.a); skUi(); return; }
+        if (A.moveu) skMudou(A.modo); else SK._antes = null;
+    };
     cv.addEventListener('pointerup', solta); cv.addEventListener('pointercancel', solta);
     cv.addEventListener('wheel', e => {
         e.preventDefault();
@@ -260,9 +401,14 @@ function skEventos() {
         if (C && k === 's') return faz(() => skSalvar(e.shiftKey).catch(er => skToast(er.message)));
         if (C && k === 'e') return faz(() => skExportarDialogo());
         if (C && k === 'd') return faz(() => skDuplicar());
+        if (C && k === 'c') return faz(() => skIntCopiar());
+        if (C && k === 'x') return faz(() => { if (skIntCopiar()) SK.int ? skIntApagar(false) : skApagar(); });
+        if (C && k === 'v') return faz(() => skColar());
+        if (k === 'escape') return faz(() => { SK.int = null; skUi(); skDesenhar(); });
+        if (k === 'v') return faz(() => { SK.verCurva = !SK.verCurva; skUi(); skDesenhar(); });
         if (C && k === 'i') return faz(() => skImportarDialogo());
         if (k === 's' || (C && k === 'k')) return faz(() => skCortar());
-        if (k === 'delete' || k === 'backspace') return faz(() => skApagar());
+        if (k === 'delete' || k === 'backspace') return faz(() => SK.int ? skIntApagar(e.shiftKey) : skApagar());
         if (k === 'm') return faz(() => skMarcador());
         if (k === 'r' && !C) return faz(() => (SK.grav ? skGravarParar() : skGravar()).catch(er => skToast(er.message)));
         if (k === 'home') return faz(() => skIr(0));
@@ -291,7 +437,7 @@ window.SKN = {
     exportar: async (caminho, op = {}) => { const r = await skApi().sk_exportar(SK.proj, caminho, op); if (!r || !r.success) throw new Error((r && r.error) || 'não exportou'); return r; },
     medir: () => skApi().sk_medir(SK.proj),
     estado: () => SK.proj && ({ nome: SK.proj.nome, caminho: SK.caminho, fim: +skFim().toFixed(3), agulha: +SK.ph.toFixed(3), sel: SK.sel,
-        faixas: SK.proj.faixas.map(f => ({ id: f.id, nome: f.nome, vol: f.vol, mudo: f.mudo, solo: f.solo, clipes: f.clipes.map(c => ({ id: c.id, nome: c.nome, ini: +c.ini.toFixed(3), dur: +c.dur.toFixed(3), de: +c.de.toFixed(3), vol: c.vol, fade_in: c.fade_in, fade_out: c.fade_out })) })) }),
+        faixas: SK.proj.faixas.map(f => ({ id: f.id, nome: f.nome, vol: f.vol, mudo: f.mudo, solo: f.solo, clipes: f.clipes.map(c => ({ id: c.id, nome: c.nome, ini: +c.ini.toFixed(3), dur: +c.dur.toFixed(3), de: +c.de.toFixed(3), vol: c.vol, fade_in: c.fade_in, fade_out: c.fade_out, ...(c.curva ? { curva: c.curva } : {}) })) })), intervalo: SK.int }),
 };
 
 
@@ -398,7 +544,7 @@ async function skCortarSilencios(id = SK.sel, { limiar = -40, minimo = 0.6, marg
     const tirado = c.dur - pedacos.reduce((s, [a, b]) => s + (b - a), 0), fimOrig = c.ini + c.dur;
     f.clipes.splice(f.clipes.indexOf(c), 1);
     let pos = c.ini;
-    for (const [a, b] of pedacos) { f.clipes.push({ ...c, id: skId('c'), ini: pos, de: c.de + a, dur: b - a, fade_in: 0.01, fade_out: 0.01 }); pos += b - a; }
+    for (const [a, b] of pedacos) { f.clipes.push({ ...c, id: skId('c'), ini: pos, de: c.de + a, dur: b - a, fade_in: 0.01, fade_out: 0.01, curva: skCurvaTrecho(c, a, b) }); pos += b - a; }
     for (const x of f.clipes) if (x.ini >= fimOrig - 0.001) x.ini -= tirado;   // fecha o buraco na faixa
     SK.sel = null; skMudou('cortar silêncios');
     return sil.length;

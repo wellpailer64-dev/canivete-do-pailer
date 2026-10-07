@@ -58,7 +58,7 @@ function skFades(c, f) {
     if (fi + fo > dur) { const k = dur / (fi + fo); fi *= k; fo *= k; }
     return [fi, fo];
 }
-function skGanho(c, fi, fo, t) { const d = t - c.ini; return c.vol * Math.max(0, Math.min(1, d / fi, (c.dur - d) / fo)); }
+function skGanho(c, fi, fo, t) { const d = t - c.ini; return c.vol * Math.max(0, Math.min(1, d / fi, (c.dur - d) / fo)) * skCurvaEm(c, d); }
 
 // ── trechos de PCM (cache em memória com descarte dos menos usados) ──
 function skPedaco(arq, k) {
@@ -117,7 +117,7 @@ function skAgendar() {
         const [fi, fo] = skFades(p.c, p.f), t0 = quando - SK.t0, t1 = t0 + dur;
         if (pulo > 0) { g.gain.setValueAtTime(0, quando); g.gain.linearRampToValueAtTime(skGanho(p.c, fi, fo, t0 + 0.01), quando + 0.01); }   // entrou no meio: sobe em 10 ms
         else g.gain.setValueAtTime(skGanho(p.c, fi, fo, t0), quando);
-        for (const t of [p.c.ini + fi, p.c.ini + p.c.dur - fo, t1].filter(t => t > t0 + (pulo > 0 ? 0.01 : 0) && t <= t1 + 1e-9).sort((x, y) => x - y))
+        for (const t of [p.c.ini + fi, p.c.ini + p.c.dur - fo, ...(p.c.curva || []).map(q => p.c.ini + q[0]), t1].filter(t => t > t0 + (pulo > 0 ? 0.01 : 0) && t <= t1 + 1e-9).sort((x, y) => x - y))
             g.gain.linearRampToValueAtTime(skGanho(p.c, fi, fo, t), SK.t0 + t);
         src.start(quando, off, dur);
         const fonte = { src, g }; SK.mt.fontes.push(fonte);

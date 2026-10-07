@@ -37,6 +37,7 @@ function skMontar() {
                 <span class="sk-sep"></span>
                 <button class="ie-btn" onclick="skCortar()" title="Cortar na agulha (S)">✂ Cortar</button>
                 <button class="ie-btn" onclick="skMarcador()" title="Marcador (M)">◆</button>
+                <button class="ie-btn" id="sk-curva-bt" onclick="SK.verCurva = !SK.verCurva; skUi(); skDesenhar()" title="Curva de volume (V)">〰</button>
                 <label class="sk-chk"><input type="checkbox" id="sk-encaixe" checked onchange="SK.encaixe = this.checked"> Encaixar</label>
                 <button class="ie-btn" onclick="skEnquadrar()" title="Ver tudo (Ctrl+0)">⤢</button>
             </div>
@@ -159,15 +160,28 @@ async function skUiVoz(el) {
 // ── painel da direita ──
 function skUiProps() {
     const el = skEl('sk-props'); if (!el) return;
-    if (SK._ultSel !== SK.sel && (SK.painel === 'clipe' || SK.painel === 'faixa')) SK.painel = SK.sel ? 'clipe' : 'faixa';
-    SK._ultSel = SK.sel;
+    const marca = (SK.sel || '') + '|' + (SK.int ? 'i' : '');
+    if (SK._ultSel !== marca && (SK.painel === 'clipe' || SK.painel === 'faixa')) SK.painel = SK.sel || SK.int ? 'clipe' : 'faixa';
+    SK._ultSel = marca;
     skMarcarAbas();
     if (!SK.proj) { el.innerHTML = ''; return; }
     ({ clipe: skUiClipe, faixa: skUiFaixa, texto: skUiTexto, exportar: skUiExportar })[SK.painel]?.(el);
 }
+function skUiIntervalo() {
+    const I = SK.int; if (!I) return '';
+    return `<div class="sk-grupo sk-int"><div class="sk-p-tit">Intervalo</div>
+        <div class="sk-p-info notranslate">${skTempo(I.a)} → ${skTempo(I.b)} (${(I.b - I.a).toFixed(2)} s) · ${I.faixas.length} faixa(s)</div>
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" onclick="skIntApagar(false)" title="Del">Apagar (fica silêncio)</button>
+        <button class="ie-btn ie-btn-mini" onclick="skIntApagar(true)" title="Shift+Del">Apagar e puxar</button>
+        <button class="ie-btn ie-btn-mini" onclick="skIntCopiar() && skToast('Copiado')" title="Ctrl+C">Copiar</button>
+        <button class="ie-btn ie-btn-mini" onclick="skColar()" title="Ctrl+V (na agulha, faixa escolhida)">Colar</button>
+        <button class="ie-btn ie-btn-mini" onclick="skIntRecortar()" title="O projeto fica só com o intervalo">Recortar ao intervalo</button>
+        <button class="ie-btn ie-btn-mini" onclick="SK.int = null; skUi(); skDesenhar()" title="Esc">Desmarcar</button></div></div>`;
+}
 function skUiClipe(el) {
     el.onclick = el.oninput = el.onchange = null;
     const [c] = SK.sel ? skClipe(SK.sel) : [null];
+    if (!c && SK.int) { el.innerHTML = skUiIntervalo() + '<div class="sk-p-info">Arraste no vazio de uma faixa (ou Shift+arrastar sobre os clipes) para marcar um intervalo; descendo, ele pega mais faixas.</div>'; return; }
     if (!c) { el.innerHTML = `<div class="sk-p-info">Clique num clipe na timeline para editar volume, fades, limpar ruído, igualar volume e cortar pausas.</div>`; return; }
     const num = (r, k, v, passo, uni) => `<label class="sk-p-l">${r}<input type="number" step="${passo}" value="${(+v).toFixed(2)}" data-p="${k}"><small>${uni}</small></label>`;
     const ocup = !!SK.tarefa;
@@ -175,7 +189,9 @@ function skUiClipe(el) {
         <div class="sk-grupo"><div class="sk-p-tit">Tempo</div>${num('Começa em', 'ini', c.ini, 0.01, 's')}${num('Duração', 'dur', c.dur, 0.01, 's')}${num('Desde', 'de', c.de, 0.01, 's')}</div>
         <div class="sk-grupo"><div class="sk-p-tit">Volume e fades</div>
         <label class="sk-p-l">Volume<input type="range" min="0" max="3" step="0.01" value="${c.vol}" data-p="vol"><small>${skDb(c.vol)} dB</small></label>
-        ${num('Fade de entrada', 'fade_in', c.fade_in, 0.05, 's')}${num('Fade de saída', 'fade_out', c.fade_out, 0.05, 's')}</div>
+        ${num('Fade de entrada', 'fade_in', c.fade_in, 0.05, 's')}${num('Fade de saída', 'fade_out', c.fade_out, 0.05, 's')}
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini${SK.verCurva ? ' on' : ''}" onclick="SK.verCurva = !SK.verCurva; skUi(); skDesenhar()" title="V: clique na linha cria ponto, arraste move, Alt+clique apaga">〰 Curva de volume</button>
+        ${c.curva ? `<button class="ie-btn ie-btn-mini" onclick="SKN.curva('${c.id}', null)">Tirar curva</button>` : ''}</div></div>
         <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" onclick="skCortar()">Cortar na agulha</button><button class="ie-btn ie-btn-mini" onclick="skDuplicar()">Duplicar</button><button class="ie-btn ie-btn-mini" onclick="skApagar()">Apagar</button></div>
         <div class="sk-grupo"><div class="sk-p-tit">Volume e pausas</div><div class="sk-p-acoes">
             <select id="sk-alvo"><option value="-16">-16 LUFS (voz/podcast)</option><option value="-14">-14 LUFS (redes)</option><option value="-20">-20 LUFS (fundo)</option></select>
@@ -206,13 +222,20 @@ function skUiFaixa(el) {
         <div class="sk-grupo"><div class="sk-p-tit">Equalizador</div>${sl('Grave', 'eq.grave', eq.grave, -12, 12, 0.5, ' dB')}${sl('Médio', 'eq.medio', eq.medio, -12, 12, 0.5, ' dB')}${sl('Agudo', 'eq.agudo', eq.agudo, -12, 12, 0.5, ' dB')}</div>
         <div class="sk-grupo"><div class="sk-p-tit">Compressor</div><label class="sk-chk"><input type="checkbox" data-fx="comp.ativo" ${c.ativo ? 'checked' : ''}> Ligado</label>
         ${sl('Limiar', 'comp.limiar', c.limiar, -50, 0, 1, ' dB')}${sl('Razão', 'comp.razao', c.razao, 1, 12, 0.5, ':1')}${sl('Ganho', 'comp.ganho', c.ganho, 0, 18, 0.5, ' dB')}</div>
-        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" data-igualar-faixa="${f.id}">Igualar volume dos clipes (-16 LUFS)</button></div>`;
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" data-igualar-faixa="${f.id}">Igualar volume dos clipes (-16 LUFS)</button></div>
+        <div class="sk-grupo"><div class="sk-p-tit">Abaixar sob a voz (ducking)</div>
+        <div class="sk-p-acoes"><select id="sk-duck-db"><option value="-6">-6 dB</option><option value="-12" selected>-12 dB</option><option value="-18">-18 dB</option><option value="-24">-24 dB</option></select>
+        <button class="ie-btn ie-btn-mini" data-duck="1">Abaixar quando as outras faixas falam</button>${f.clipes.some(c => c.curva) ? '<button class="ie-btn ie-btn-mini" data-duck="0">Tirar</button>' : ''}</div>
+        <div class="sk-p-info">Escreve a curva de volume dos clipes desta faixa (dá para ajustar depois com 〰).</div></div>`;
     el.oninput = e => { const k = e.target.dataset.fx; if (!k) return; const [g, p] = k.split('.'); f.fx = f.fx || JSON.parse(JSON.stringify(SK_PRESETS_FX.nenhum));
         f.fx[g][p] = e.target.type === 'checkbox' ? e.target.checked : +e.target.value; if (e.target.nextElementSibling) e.target.nextElementSibling.textContent = (+e.target.value).toFixed(p === 'razao' ? 1 : 0) + (p === 'razao' ? ':1' : ' dB');
         if (SK.bus[f.id]) skBus(f); SK.sujo = true; };
     el.onchange = e => { if (e.target.dataset.fx) { skAntes(); skMudou('efeito da faixa'); } };
     el.onclick = e => { const p = e.target.dataset.preset; if (p) { skAntes(); f.fx = JSON.parse(JSON.stringify(SK_PRESETS_FX[p])); if (SK.bus[f.id]) skBus(f); skMudou('preset'); }
-        const ig = e.target.dataset.igualarFaixa; if (ig) skIgualar(f.clipes.map(c => c.id), -16).then(n => skToast(`${n} clipe(s) igualado(s)`)); };
+        const ig = e.target.dataset.igualarFaixa; if (ig) skIgualar(f.clipes.map(c => c.id), -16).then(n => skToast(`${n} clipe(s) igualado(s)`));
+        const dk = e.target.dataset.duck;
+        if (dk === '1') skDucking(f.id, { db: +el.querySelector('#sk-duck-db').value }).then(n => skToast(`${n} trecho(s) de fala: trilha abaixada`)).catch(er => skToast(er.message));
+        if (dk === '0') { skAntes(); for (const c of f.clipes) delete c.curva; skMudou('tirar ducking'); } };
 }
 function skUiTexto(el) {
     const P = SK.texto && SK.texto.palavras;
@@ -304,6 +327,7 @@ function skUi() {
     ini.hidden = !!SK.proj;
     const play = skEl('sk-play'); if (play) { play.textContent = SK.tocando ? '■' : '▶'; play.classList.toggle('on', SK.tocando); }
     skEl('sk-rec')?.classList.toggle('on', !!SK.grav);
+    skEl('sk-curva-bt')?.classList.toggle('on', !!SK.verCurva);
     if (!SK.proj && !ini.dataset.recup) { ini.dataset.recup = '1'; skUiRecuperar().finally(() => { delete ini.dataset.recup; }); }
     skEl('sk-info').textContent = SK.proj ? `${SK.proj.nome}${SK.sujo ? ' •' : ''}` : '';
     skUiTempo(); skUiFaixas(); skUiProps();

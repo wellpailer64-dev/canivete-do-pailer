@@ -109,6 +109,15 @@ async function skRecuperar(pid) {
     skParar(); skUi(); skEnquadrar();
     return true;
 }
+Object.assign(window.SKN, {   // rodada C (núcleo em som.js): intervalo, copiar/colar, recortar, curva, ducking
+    intervalo: (a, b, faixas = null) => { SK.int = a == null ? null : { a: Math.min(a, b), b: Math.max(a, b), faixas: (faixas || SK.proj.faixas.map(f => f.id)).map(x => (SK.proj.faixas.find(f => f.id === x || f.nome === x) || {}).id).filter(Boolean) }; skUi(); skDesenhar(); return SK.int; },
+    apagarIntervalo: (puxar = false) => skIntApagar(puxar),
+    copiar: () => skIntCopiar(),
+    colar: t => skColar(t ?? SK.ph),
+    recortar: () => skIntRecortar(),
+    curva: (id, pts) => { const [c] = skClipe(id); skAntes(); if (pts && pts.length >= 2) c.curva = pts.map(p => [+p[0], +p[1]]).sort((x, y) => x[0] - y[0]); else delete c.curva; skMudou('curva'); return c.curva || null; },
+    ducking: (faixa, op) => skDucking(faixa, op || {}),
+});
 Object.assign(window.SKN, {
     gravar: op => skGravar(op || {}),
     pararGravacao: () => skGravarParar(),

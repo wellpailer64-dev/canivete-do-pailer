@@ -96,3 +96,5 @@
 .sk-mic-nivel.alto { box-shadow: 0 0 0 1px #ff3b30 inset; }
 .sk-recup { display: flex; gap: 6px; align-items: center; }
 .sk-recup .ie-recente { flex: 1; }
+.sk-pn .ie-btn.on, .sk-transp .ie-btn.on { background: #ffd16633; border-color: #ffd166; color: #ffd166; }
+.sk-transp .sk-rec.on { background: #ff3b30; color: #fff; border-color: #ff3b30; }

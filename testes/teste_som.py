@@ -219,6 +219,44 @@ with sync_playwright() as p:
     pg.evaluate(f"async () => await SKN.salvar('{D}recuperado.sknv')")
     pg.wait_for_timeout(300)
     ok(pid not in [x["id"] for x in pg.evaluate("async () => await SKN.recuperaveis()")], "salvar de verdade apaga a cópia automática")
+    # ── rodada C: intervalo entre faixas (apagar e puxar, copiar/colar, recortar), curva de volume, ducking ──
+    pg.evaluate("SKN.novo('podcast', 'Intervalo')")
+    pg.evaluate(f"async () => {{ await SKN.importar(['{D}voz.wav'], {{faixa: SK.proj.faixas[0].id, ini: 0}}); await SKN.importar(['{D}ruido.mp3'], {{faixa: SK.proj.faixas[1].id, ini: 0}}); }}")
+    pg.evaluate("SKN.intervalo(2, 4, [SK.proj.faixas[0].id, SK.proj.faixas[1].id])")
+    pg.evaluate("SKN.apagarIntervalo(true)")
+    e4 = pg.evaluate("SKN.estado()")
+    f0 = sorted((c["ini"], c["dur"], c["de"]) for c in e4["faixas"][0]["clipes"]); f1 = sorted((c["ini"], c["dur"], c["de"]) for c in e4["faixas"][1]["clipes"])
+    ok(f0 == [(0, 2, 0), (2, 8, 4)] and f1 == [(0, 2, 0), (2, 4, 4)], "apagar intervalo e puxar (2 faixas)", f"{f0} {f1}")
+    pg.evaluate("SKN.intervalo(0, 1, [SK.proj.faixas[0].id]); SKN.copiar(); SK.faixaSel = SK.proj.faixas[2].id; SKN.colar(20)")
+    c2 = pg.evaluate("SKN.estado().faixas[2].clipes")
+    ok(len(c2) == 1 and c2[0]["ini"] == 20 and abs(c2[0]["dur"] - 1) < 1e-6, "copiar o intervalo e colar na agulha em outra faixa", str(c2))
+    pg.evaluate("SKN.intervalo(1, 3); SKN.recortar()")
+    ok(abs(pg.evaluate("SKN.estado().fim") - 2) < 1e-6, "recortar o projeto ao intervalo", str(pg.evaluate("SKN.estado().fim")))
+    pg.evaluate("SKN.desfazer(); SKN.desfazer(); SKN.desfazer()")
+    # mouse: Shift+arrastar sobre os clipes marca intervalo pegando 2 faixas
+    pos = pg.evaluate("""() => { const r = document.getElementById('sk-tl').getBoundingClientRect(); const X = t => r.left + (t - SK.x0) * SK.z, Y = i => r.top + SK_REGUA + i * SK_H + SK_H / 2 - SK.y0;
+        return [X(3), Y(0), X(5), Y(1)]; }""")
+    pg.keyboard.down("Shift"); pg.mouse.move(pos[0], pos[1]); pg.mouse.down(); pg.mouse.move(pos[2], pos[3], steps=6); pg.mouse.up(); pg.keyboard.up("Shift")
+    it = pg.evaluate("SKN.estado().intervalo")
+    ok(it and abs(it["a"] - 3) < 0.1 and abs(it["b"] - 5) < 0.1 and len(it["faixas"]) == 2, "Shift+arrastar marca intervalo em 2 faixas", str(it))
+    pg.evaluate("SKN.intervalo(null)")
+    # curva de volume: corta em -inf no meio e volta; exportação segue a curva; cortar o clipe mantém a curva presa ao som
+    pg.evaluate("SKN.novo('vazio', 'Curva')")
+    cid = pg.evaluate(f"async () => (await SKN.importar(['{D}voz.wav']))[0]")
+    pg.evaluate("(id) => SKN.curva(id, [[0, 1], [2, 1], [3, 0.05], [5, 0.05], [6, 1], [12, 1]])", cid)
+    arq = pg.evaluate(f"async () => (await SKN.exportar('{D}curva.wav', {{formato: 'wav'}})).caminho")
+    alto, baixo = pico("0.5:1.5", arq), pico("3.3:4.7", arq)
+    ok(alto - baixo > 20, "curva de volume na exportação", f"{alto} dB → {baixo} dB")
+    pg.evaluate("SKN.cortar(4)")
+    cs = sorted(pg.evaluate("SKN.estado().faixas[0].clipes"), key=lambda c: c["ini"])
+    ok(len(cs) == 2 and cs[1]["curva"][0] == [0, 0.05] and abs(cs[0]["curva"][-1][0] - 4) < 1e-6, "cortar divide a curva junto", str([c.get("curva") for c in cs]))
+    # ducking: a trilha abaixa onde a voz fala
+    pg.evaluate("SKN.novo('narracao', 'Ducking')")
+    pg.evaluate(f"async () => {{ await SKN.importar(['{D}pausas.wav'], {{faixa: SK.proj.faixas[0].id, ini: 0}}); await SKN.importar(['{D}ruido.mp3'], {{faixa: SK.proj.faixas[1].id, ini: 0}}); }}")
+    n = pg.evaluate("async () => await SKN.ducking(SK.proj.faixas[1].id, {db: -12})")
+    tc = pg.evaluate("SKN.estado().faixas[1].clipes[0]")
+    em = lambda t: pg.evaluate("([id, t]) => skCurvaEm(skClipe(id)[0], t)", [tc["id"], t])
+    ok(n >= 2 and abs(em(0.5) - 0.251) < 0.01 and em(1.9) > 0.9, "ducking: trilha a -12 dB sob a voz e volta na pausa", f"{n} falas, 0,5 s → {em(0.5):.3f}, 1,9 s → {em(1.9):.3f}")
     if "--longo" in sys.argv:
         lg = D + "longo_2h.mp3"
         if not os.path.isfile(lg):

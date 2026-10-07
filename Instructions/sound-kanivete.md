@@ -92,9 +92,23 @@ Sound Kanivete" no topo de cada página. SKN: `transcrever(idioma)`, `texto()`, 
   (`teste_som.py --longo`).
 - SKN: `gravar({caminho})`, `pararGravacao()`, `entradas()`, `autoSalvar()`, `recuperaveis()`, `recuperar(id)`.
 
+## Intervalo, curva de volume, ducking (rodada C, 2026-10-07)
+- **Intervalo** (`SK.int = {a, b, faixas}`): arrastar no vazio de uma faixa (ou Shift+arrastar sobre clipes) marca o
+  tempo; descendo pega mais faixas. Del apaga (fica silêncio), Shift+Del apaga e puxa (ripple nas faixas do intervalo),
+  Ctrl+C/Ctrl+X/Ctrl+V copiam/recortam/colam (cola na agulha, a 1ª faixa copiada cai na faixa escolhida), "Recortar ao
+  intervalo" deixa o projeto só com ele; Esc desmarca. Sem intervalo, Ctrl+C copia o clipe escolhido. Na régua continua
+  arrastando a agulha. Base: `skPartir(f, c, t)` (corta um clipe levando a curva junto) e `skIntDentro`.
+- **Curva de volume** (`c.curva = [[t no clipe, vol]]`, 0–2): 〰 no transporte ou V mostra a linha em todos os clipes;
+  clicar na linha cria ponto, arrastar move, Alt+clique apaga (pontos aparecem no clipe escolhido). A forma de onda
+  acompanha; a prévia agenda as rampas nos pontos e a exportação já aplicava (`volume=...:eval=frame`). Cortar,
+  aparar a esquerda e cortar silêncios mantêm a curva presa ao som (`skCurvaTrecho`).
+- **Ducking** (aba Faixa da trilha): mede onde as outras faixas falam (`sk_silencios`, limiar -35 dB, junta pausas
+  < 0,8 s) e escreve a curva dos clipes da trilha (-6 a -24 dB, desce 0,25 s antes, volta em 0,5 s). "Tirar" apaga.
+- SKN: `intervalo(a, b, faixas)` (null desmarca), `apagarIntervalo(puxar)`, `copiar()`, `colar(t)`, `recortar()`,
+  `curva(id, pts|null)`, `ducking(faixa, {db, fontes, ataque, soltura})`; `estado()` traz `curva` e `intervalo`.
+
 ## Pendências
 Rodadas seguintes do plano profissional:
-C seleção de intervalo entre faixas (apagar/silenciar/recortar com ripple), curva de volume desenhada, ducking;
 D master com limitador (-1 dBTP) e cadeia de efeitos por faixa (passa-alta, gate, de-esser, EQ gráfico, reverb);
 E espectrograma e reparo espectral, separar voz da música; F editar pelo texto (apagar palavras/vícios), stems, ID3/capítulos, modelos salvos.
 Separar voz da música (precisa de um modelo de separação; o UVR/Roformer foi testado no anti-noise), curva de volume
