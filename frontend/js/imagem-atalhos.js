@@ -773,3 +773,112 @@ Object.assign(IE_CMDS, { preencherConteudo: doc => iePreencherConteudoDialogo(do
     const i = edt.findIndex(it => Array.isArray(it) && it[1] === 'preencher');
     edt.splice(i + 1, 0, ['Preenchimento sensível ao conteúdo...', 'preencherConteudo']);
 })();
+
+// ─────────────────────────── Editar › Substituição de céu (Functions/ceu.py, SkySeg) ───────────────────────────
+// Como o Photoshop: acha o céu da foto (composição visível) e cria o grupo "Substituição de céu" acima da camada ativa:
+// "Iluminação do primeiro plano" (cor do céu novo em modo Cor, máscara = o que não é céu) e "Céu" (objeto inteligente,
+// cobre o céu até a linha do horizonte, máscara = céu). Tudo editável depois (mover/escalar o céu sem perda, pintar a
+// máscara). Com uma seleção ativa, ela vira a área do céu (quando o modelo não acha: céu cercado de parede, por ex.).
+// Céu de um arquivo ou gerado pela IA local (ieGeradorPronto/ie_gerar).
+const IE_CEUS_IA = [['azul', 'Azul com nuvens', 'wide landscape photo of a clear blue sky with soft white cumulus clouds, bright daylight, no ground, no buildings, high detail'],
+    ['por', 'Pôr do sol', 'wide landscape photo of a golden sunset sky, warm orange and pink clouds near the horizon, no ground, no buildings, high detail'],
+    ['dramatico', 'Nuvens dramáticas', 'wide landscape photo of a dramatic sky with dark storm clouds and sun rays breaking through, no ground, high detail'],
+    ['rosado', 'Fim de tarde rosado', 'wide landscape photo of a soft pastel pink and lilac evening sky with thin clouds, no ground, high detail'],
+    ['noite', 'Noite estrelada', 'wide landscape photo of a clear night sky full of stars and the milky way, deep blue, no ground, high detail']];
+async function ieCanvasDeArquivo(path) {
+    const api = ieApi(), r = await api.ie_abrir(path);
+    if (!r || !r.success) throw new Error((r && r.error) || 'não abriu ' + path);
+    try {
+        const url = r.achatado || (r.camadas && r.camadas[0] && r.camadas[0].url);
+        return url ? await ieImagemDeUrl(url) : null;
+    } finally { api.ie_fechar(r.doc); }
+}
+async function ieCeuGerado(chave) {
+    const api = ieApi(), p = IE_CEUS_IA.find(c => c[0] === chave);
+    if (!p || !(await ieGeradorPronto('zimage'))) return null;
+    ieCarregando(ieT('Gerando o céu com IA...'), 1);
+    let r;
+    try { r = await api.ie_gerar({ prompt: p[2], largura: 1344, altura: 768, semente: -1, refs: [] }); } finally { ieGerLimparBarra?.(); ieCarregando(false); }
+    if (!r || !r.success) { ieToast(`${ieT('Não gerou')}: ${(r && r.error) || ''}`); return null; }
+    return ieCanvasDeArquivo(r.path);
+}
+async function ieSubstituirCeu(doc, { ceu = 'arquivo', caminho = null, escala = 100, deslocar = 0, esmaecer = 4, luz = 40, inverter = false } = {}) {
+    const api = ieApi();
+    if (!doc || !api) return false;
+    // 1. a área do céu: seleção ativa ou o modelo
+    let area = null, B = null;
+    if (doc.sel) {
+        area = ieCanvas(doc.w, doc.h);
+        const x = ieCtx(area);
+        if (esmaecer > 0) x.filter = `blur(${esmaecer / 2}px)`;
+        x.drawImage(doc.sel.c, 0, 0);
+        B = { ...doc.sel.bbox };
+    } else {
+        ieCompor(doc, ieRDoc(doc));
+        IE._conteudoAtivo = true;
+        ieCarregando(ieT('Procurando o céu...'), 10);
+        let r;
+        try { r = await api.ie_ceu_mascara(doc.comp.toDataURL('image/png'), deslocar, esmaecer); }
+        finally { IE._conteudoAtivo = false; ieCarregando(false); }
+        if (!r || !r.success) { ieToast(ieT((r && r.error) || 'Não encontrei o céu')); return false; }
+        const im = new Image(); im.src = 'data:image/png;base64,' + r.png; await im.decode();
+        area = ieCinzaParaAlfa(im);
+        B = { x: r.caixa[0], y: r.caixa[1], w: r.caixa[2], h: r.caixa[3] };
+    }
+    // 2. o céu novo
+    let ceuC = null;
+    if (ceu === 'arquivo') {
+        let p = caminho;
+        if (!p) { const d = await api.ie_dialogo_abrir(false); if (!d || !d.success || !d.paths || !d.paths.length) return false; p = d.paths[0]; }
+        ceuC = await ieCanvasDeArquivo(p);
+    } else ceuC = await ieCeuGerado(ceu);
+    if (!ceuC) return false;
+    // 3. encaixe: cobre a largura do documento e o céu até o fim da área (o horizonte do céu novo na base dela)
+    const fundoCeu = B.y + B.h, sw = ceuC.width, sh = ceuC.height;
+    const k = Math.max(doc.w / sw, fundoCeu / sh) * Math.max(0.1, escala / 100);
+    const x0 = (doc.w - sw * k) / 2, y0 = Math.min(0, fundoCeu - sh * k);
+    const tf = inverter ? [-k, 0, 0, k, x0 + sw * k, y0] : [k, 0, 0, k, x0, y0];
+    const pl = ieTransformarPlano({ c: ceuC, x: 0, y: 0 }, tf);
+    const Lceu = ieNovaCamada(doc, { tipo: 'inteligente', nome: ieT('Céu'), c: pl.c, x: pl.x, y: pl.y, c0: { c: ceuC, x: 0, y: 0 }, tf, tfBase: [...IE_ID], sujoPx: true });
+    Lceu.m = { c: area, x: 0, y: 0, fundo: 0 };
+    // 4. a luz do céu novo no primeiro plano: cor da base do céu, modo Cor, máscara = o que não é céu
+    let cor = '#808080';
+    try { const r = await api.ie_ceu_cor(ceuC.toDataURL('image/png')); if (r && r.success) cor = r.cor; } catch (e) { /* fica cinza */ }
+    const inv = ieCanvas(doc.w, doc.h), ix = ieCtx(inv);
+    ix.fillStyle = '#fff'; ix.fillRect(0, 0, doc.w, doc.h); ix.globalCompositeOperation = 'destination-out'; ix.drawImage(area, 0, 0);
+    const Lluz = ieNovaCamada(doc, { tipo: 'preenchimento', nome: ieT('Iluminação do primeiro plano'), pre: { tipo: 'cor', cor }, sujoPx: true });
+    iePreRender(Lluz, doc);
+    Lluz.m = { c: inv, x: 0, y: 0, fundo: 0 };
+    Lluz.bm = 'COLOR'; Lluz.op = ieClamp(luz / 100, 0, 1) * 0.5;
+    // 5. o grupo, acima da camada ativa
+    const G = ieNovaCamada(doc, { tipo: 'grupo', nome: ieT('Substituição de céu'), filhos: [Lluz, Lceu], aberto: true });
+    const a = ieAtiva(doc), ref = a ? ieAchar(doc, a.id) : null;
+    if (ref) ref.lista.splice(ref.i + 1, 0, G); else doc.camadas.push(G);
+    doc.ativa = Lceu.id; doc.selIds = [Lceu.id];
+    if (doc.sel) ieSelNada();
+    [Lceu, Lluz, G].forEach(ieInvalidar);
+    ieTudo(doc);
+    ieHist(ieT('Substituição de céu'));
+    ieUiCamadas?.();
+    return true;
+}
+async function ieSubstituirCeuDialogo(doc) {
+    if (!doc) return;
+    const v = await ieDialogo({
+        titulo: 'Substituição de céu', ok: 'OK',
+        campos: [{ id: 'ceu', rotulo: 'Céu', tipo: 'select', opcoes: [['arquivo', 'Foto do computador...'], ...IE_CEUS_IA.map(c => [c[0], 'IA: ' + c[1]])], valor: 'arquivo' },
+            { id: 'deslocar', rotulo: 'Deslocar borda (px)', min: -60, max: 60, valor: 0 },
+            { id: 'esmaecer', rotulo: 'Esmaecer borda (px)', min: 0, max: 60, valor: 4 },
+            { id: 'escala', rotulo: 'Escala do céu (%)', min: 50, max: 300, valor: 100 },
+            { id: 'luz', rotulo: 'Iluminação do primeiro plano (%)', min: 0, max: 100, valor: 40 },
+            { id: 'inverter', rotulo: 'Inverter o céu', tipo: 'check', valor: false },
+            { id: 'n', tipo: 'nota', rotulo: doc.sel ? 'A seleção ativa vira a área do céu.' : 'O céu é achado por IA no próprio computador (na primeira vez baixa o modelo, ~170 MB). Se não achar, selecione o céu e use de novo.' }],
+    });
+    if (v) await ieSubstituirCeu(doc, v);
+}
+Object.assign(IE_CMDS, { substituirCeu: doc => ieSubstituirCeuDialogo(doc) });
+(function () {
+    const edt = IE_MENUS.find(m => m[0] === 'Editar')[1];
+    const i = edt.findIndex(it => Array.isArray(it) && it[0] === 'Transformar');
+    edt.splice(i + 1, 0, '-', ['Substituição de céu...', 'substituirCeu']);
+})();

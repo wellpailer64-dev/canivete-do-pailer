@@ -214,6 +214,9 @@ const KNV = {
     async substituirTexto(busca, troca, { todas = true, maiusc = false, palavra = false } = {}) { return ieSubstituirTexto(IE.doc, busca, troca, { todas, maiusc, palavra }); },
     // Editar › Preenchimento sensível ao conteúdo (LaMa): tira o que está na seleção ativa e reconstrói pelo entorno.
     // amostra 'atual' | 'todas'; saida 'nova' (camada nova, padrão) | 'atual'; expandir (px, 0 = automático)
+    // Editar › Substituição de céu: ceu = 'arquivo' (com caminho) ou 'azul' | 'por' | 'dramatico' | 'rosado' | 'noite' (IA);
+    // a seleção ativa, se houver, é a área do céu; cria o grupo "Substituição de céu" (céu objeto inteligente + luz)
+    async substituirCeu(opts = {}) { const ok = await ieSubstituirCeu(IE.doc, opts); if (!ok) throw new Error('substituição de céu não feita (sem céu?)'); return KNV.info(); },
     async preencherConteudo({ amostra, saida = 'nova', expandir = 0 } = {}) { const ok = await iePreencherConteudo(IE.doc, { amostra, saida, expandir }); if (!ok) throw new Error('preenchimento sensível ao conteúdo não feito (sem seleção?)'); return KNV.info(); },
     // camada de preenchimento de cor sólida acima da ativa (com seleção ativa, nasce com a máscara dela); vai para o PSD
     // como camada de preenchimento (cor editável no Photoshop)

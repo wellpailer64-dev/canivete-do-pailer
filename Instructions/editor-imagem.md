@@ -287,6 +287,16 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   vez, com entorno; até 512 px na resolução original, acima disso reduz e amplia (mais macio). Amostra camada atual ou
   todas; saída camada nova (padrão) ou a atual (vale o Atenuar). O pincel de recuperação para manchas continua no
   `cv2.inpaint` (instantâneo). Teste `testes/teste_conteudo.py` (usa D:/kanivete_testes/lama).
+- **Substituição de céu** (Editar, depois de Transformar; `KNV.substituirCeu({ceu: 'arquivo'|'azul'|'por'|'dramatico'|
+  'rosado'|'noite', caminho, escala, deslocar, esmaecer, luz, inverter})`): máscara pelo SkySeg (U2Net, MIT,
+  `modelos_ia/ceu/skyseg.onnx` baixado na 1ª vez, CPU ~1 s) em `Functions/ceu.py` (`ie_ceu_mascara`, `ie_ceu_cor`),
+  entrada RGB e saída SEM normalizar min/máx (normalizado inventava céu). Refino `_refinar`: na faixa de dúvida
+  (0,1 < p < 0,6) decide pela cor (k-means Lab do céu certo × não-céu certo), fecha buracos que não encostam na base,
+  filtro guiado fino — pega o azul entre galhos e as nuvens baixas sem levar o carro branco nem reflexo do para-brisa.
+  Seleção ativa = área do céu (quando o modelo não acha: céu cercado de parede). Saída: grupo "Substituição de céu" =
+  "Iluminação do primeiro plano" (preenchimento cor da base do céu novo, modo Cor, op = luz × 0,5, máscara invertida)
+  + "Céu" (objeto inteligente cobrindo a largura e o céu até a base da área, máscara = céu); vai assim para o PSD.
+  Céu de arquivo ou gerado pela IA local (5 modelos de prompt, Z-Image ~40 s). Teste `testes/teste_ceu.py [--ia]`.
 
 ## Pincel (rodada de 2026-10-07)
 - Ponta macia (`iePonta`) calculada pixel a pixel: núcleo cheio até a dureza e queda em COSSENO até a borda (3×3

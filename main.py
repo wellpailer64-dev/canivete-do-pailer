@@ -2958,6 +2958,25 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def ie_ceu_mascara(self, foto, deslocar=0, esmaecer=0):
+        """Editar › Substituição de céu (Functions/ceu.py, SkySeg): foto → máscara do céu + caixa + cor; baixa o modelo
+        na primeira vez (progresso em ieConteudoProgresso)."""
+        from Functions import ceu
+        try:
+            prog = lambda p, msg: _js("ieConteudoProgresso", {"p": p, "msg": msg})
+            ceu.garantir_modelo(prog)
+            return ceu.mascara_b64(foto, deslocar, esmaecer, prog)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ie_ceu_cor(self, ceu_png):
+        """Cor da parte de baixo do céu novo (a luz que ele joga no primeiro plano)."""
+        from Functions import ceu
+        try:
+            return {"success": True, "cor": ceu.cor_horizonte_b64(ceu_png)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def ie_preencher_conteudo(self, regiao, mascara, raio=6):
         """Pincel de recuperação para manchas / Remendo sensível ao conteúdo: reconstrói pela vizinhança."""
         from Functions import recuperar
