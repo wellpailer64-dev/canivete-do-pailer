@@ -50,6 +50,8 @@ Armadilhas: na página existe a `const KNV` original; depois da recarga use `win
   Foto horizontal para story/feed: `expansaoGenerativa({formato: 'story'})` (a IA completa o que falta, ~40 s).
   Pôr um objeto na foto: selecionar a área + `preenchimentoGenerativo('a red hot air balloon')` (prompt em inglês);
   não gostou: `variacaoGenerativa()`. Pele/espinha: `preenchimentoGenerativo('')` (LaMa). Continuar corpo: expansão sem texto.
+  Trocar roupa: `selecionarPoligono(roupa)` + `preenchimentoGenerativo('red leather jacket over a black t-shirt')`.
+  Tirar objeto do cenário: seleção com a SOMBRA junto + `preenchimentoGenerativo('')`.
 - Fundo/faixa de cor: `preenchimento(cor, {nome})` ou `preenchimentoDegrade(['#a', '#b'], {estilo, ang, nome})` (camada de
   preenchimento; com seleção ativa vira máscara) em vez de
   pintar/preencher pixels — fica editável no Photoshop.

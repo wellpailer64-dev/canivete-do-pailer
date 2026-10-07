@@ -911,8 +911,46 @@ function ieGenBorrar(area, R, raio, w = R.w, h = R.h) {
 // gera dentro de `area` (canvas do tamanho do documento, alfa = onde gerar) olhando o retângulo R da composição visível
 // refR: o pedaço da composição que serve de referência (na expansão, só a foto antiga: com as faixas lisas da tela nova
 // na referência o klein copiava as faixas)
+// casa a cor da geração com a foto: a diferença foto − geração medida FORA da área (grade de ~64 células), espalhada
+// para dentro (Jacobi) e somada em baixa frequência. O klein desvia o tom alguns pontos e aparecia o retângulo da
+// seleção (carro tirado da estrada, 2026-10-07)
+function ieGenCasarCor(g, orig, a) {
+    const w = g.width, h = g.height, cs = Math.max(8, Math.round(Math.max(w, h) / 64)), cw = Math.ceil(w / cs), ch = Math.ceil(h / cs);
+    const G = ieCtx(g).getImageData(0, 0, w, h), O = ieCtx(orig).getImageData(0, 0, w, h).data, A = ieCtx(a).getImageData(0, 0, w, h).data, gd = G.data;
+    const soma = new Float32Array(cw * ch * 3), n = new Float32Array(cw * ch);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        if (A[i + 3] > 8 || O[i + 3] < 250) continue;
+        const c = ((y / cs) | 0) * cw + ((x / cs) | 0);
+        soma[c * 3] += O[i] - gd[i]; soma[c * 3 + 1] += O[i + 1] - gd[i + 1]; soma[c * 3 + 2] += O[i + 2] - gd[i + 2]; n[c]++;
+    }
+    const d = new Float32Array(cw * ch * 3), fixo = new Uint8Array(cw * ch);
+    let algum = false;
+    for (let c = 0; c < cw * ch; c++) if (n[c] >= cs * cs * 0.2) { fixo[c] = 1; algum = true; for (let k = 0; k < 3; k++) d[c * 3 + k] = soma[c * 3 + k] / n[c]; }
+    if (!algum) return;
+    for (let it = 0; it < 400; it++) for (let y = 0; y < ch; y++) for (let x = 0; x < cw; x++) {
+        const c = y * cw + x;
+        if (fixo[c]) continue;
+        let m = 0; const v = [0, 0, 0];
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const X = x + dx, Y = y + dy; if (X < 0 || Y < 0 || X >= cw || Y >= ch) continue; const q = Y * cw + X; v[0] += d[q * 3]; v[1] += d[q * 3 + 1]; v[2] += d[q * 3 + 2]; m++; }
+        for (let k = 0; k < 3; k++) d[c * 3 + k] = v[k] / m;
+    }
+    for (let y = 0; y < h; y++) {
+        const fy = ieClamp(y / cs - 0.5, 0, ch - 1), y0 = fy | 0, y1 = Math.min(ch - 1, y0 + 1), ty = fy - y0;
+        for (let x = 0; x < w; x++) {
+            const i = (y * w + x) * 4;
+            if (A[i + 3] === 0) continue;
+            const fx = ieClamp(x / cs - 0.5, 0, cw - 1), x0 = fx | 0, x1 = Math.min(cw - 1, x0 + 1), tx = fx - x0;
+            for (let k = 0; k < 3; k++) {
+                const v = (d[(y0 * cw + x0) * 3 + k] * (1 - tx) + d[(y0 * cw + x1) * 3 + k] * tx) * (1 - ty) + (d[(y1 * cw + x0) * 3 + k] * (1 - tx) + d[(y1 * cw + x1) * 3 + k] * tx) * ty;
+                gd[i + k] = gd[i + k] + v;
+            }
+        }
+    }
+    ieCtx(g).putImageData(G, 0, 0);
+}
 // alfa: recorte final (canvas do documento) quando difere da máscara — a expansão usa um degradê na costura
-async function ieGerarArea(doc, R, area, prompt, semente = -1, refR = R, alfa = null) {
+async function ieGerarArea(doc, R, area, prompt, semente = -1, refR = R, alfa = null, forca = 1) {
     const api = ieApi();
     if (!(await ieGeradorPronto('klein'))) return null;
     ieCompor(doc, ieRDoc(doc));
@@ -934,7 +972,7 @@ async function ieGerarArea(doc, R, area, prompt, semente = -1, refR = R, alfa = 
     // referência pequena (~0,25 MP): só passa estilo/cores; do tamanho da geração ela dobrava a memória e falhava
     const kr = Math.min(1, Math.sqrt(0.25e6 / (refR.w * refR.h))), ref = ieCanvas(Math.max(64, Math.round(refR.w * kr / 16) * 16), Math.max(64, Math.round(refR.h * kr / 16) * 16));
     ieCtx(ref).drawImage(doc.comp, refR.x, refR.y, refR.w, refR.h, 0, 0, ref.width, ref.height);
-    const r = await (async () => { try { return await api.ie_gerar({ prompt, largura: gw, altura: gh, semente, refs: [ref.toDataURL('image/png')], init: initPng, mascara: msk.toDataURL('image/png'), motor: 'klein' }); } finally { ieGerLimparBarra?.(); } })();
+    const r = await (async () => { try { return await api.ie_gerar({ prompt, largura: gw, altura: gh, semente, refs: [ref.toDataURL('image/png')], init: initPng, mascara: msk.toDataURL('image/png'), forca, motor: 'klein' }); } finally { ieGerLimparBarra?.(); } })();
     if (!r || !r.success) {
         if (r && /cancel/i.test(r.error || '')) ieToast(ieT('Geração cancelada'));
         else ieToast(`${ieT('Não gerou')}: ${(r && r.error) || ''}`);
@@ -945,6 +983,7 @@ async function ieGerarArea(doc, R, area, prompt, semente = -1, refR = R, alfa = 
     const c = ieCanvas(R.w, R.h), x = ieCtx(c);
     x.imageSmoothingQuality = 'high'; x.drawImage(out, 0, 0, R.w, R.h);
     const a = alfa ? (() => { const c2 = ieCanvas(R.w, R.h); ieCtx(c2).drawImage(alfa, -R.x, -R.y); return c2; })() : ieGenBorrar(area, R, 3);
+    ieGenCasarCor(c, ctx, a);
     x.globalCompositeOperation = 'destination-in'; x.drawImage(a, 0, 0);
     return { c, semente: r.semente };
 }

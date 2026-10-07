@@ -313,6 +313,12 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   com texto ("clear skin") o klein faz mancha lisa de cor diferente. Corpo cortado → expansão SEM texto continua roupa
   e corpo bem; pedir o que não cabe ("jeans e tênis" num quadro que não chega aos pés) encolhe o tronco e dá degrau.
   Costura da expansão: faixa curta (2%, 16–40 px) com degradê; faixa larga (6%) deixava manga meio transparente.
+  Troca de roupa (selecionar a roupa em polígono + "red leather biker jacket over a black t-shirt"): excelente, rosto e
+  fundo intactos. Tirar objeto do cenário = SEM texto (LaMa) e a seleção PEGANDO A SOMBRA (carro na estrada: sem a
+  sombra fica mancha escura; com ela, estrada limpa). Com texto ("empty sidewalk") o klein redesenha os pedestres
+  (a referência os contém). Híbrido testado (LaMa e depois klein com força 0,5–0,7, parâmetro `forca` de
+  `ieGerarArea`): melhora pouco os pedestres, deixa névoa no carro — não publicado. `ieGenCasarCor`: casa a cor da
+  geração com a foto (diferença medida fora da área numa grade, espalhada para dentro) — some o retângulo da seleção.
 
 ## Pincel (rodada de 2026-10-07)
 - Ponta macia (`iePonta`) calculada pixel a pixel: núcleo cheio até a dureza e queda em COSSENO até a borda (3×3
