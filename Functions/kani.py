@@ -235,6 +235,9 @@ Regras:
 - Sobre o KANIVETE, afirme só o que está na AJUDA abaixo (traduzindo para a linguagem de quem usa). Se a ajuda não cobre,
   diga que não tem certeza e sugira onde procurar no app. Não invente menus nem botões.
 - Para outras tarefas (textos, ideias, roteiros, contas, dúvidas gerais) ajude normalmente.
+- Quando entregar um texto PRONTO para a pessoa usar (legenda, post, e-mail, mensagem, roteiro, título), coloque só esse
+  texto dentro de um bloco ```texto … ``` sem **negrito** nem markdown dentro (emojis e hashtags podem); comentários e
+  explicações ficam fora do bloco. Código vai em ```linguagem … ```.
 - Só quando a resposta ensina a usar uma ferramenta do app, ponha no fim [[abrir:ID]] (uma vez) com o ID desta lista:
   {ids}. Em conversa geral (quem criou, ideias, textos) não ponha.
 A pessoa está agora em: {ferramenta or 'tela inicial'}.
@@ -294,6 +297,32 @@ def conversar(cid, mensagens, ferramenta, on_evento):
             _cancelar.discard(cid)
             _srv["ocupado"] = False
             _srv["uso"] = time.time()
+    threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
+VOZ = "fran"          # voz da Kani ao ler em voz alta (OmniVoice; a 1ª salva se não houver)
+_falas = {}           # texto → arquivo já sintetizado (não refaz a mesma fala)
+
+
+def falar(texto, on_evento, chave):
+    """Lê o texto com a voz da Kani (OmniVoice, 4 passos: rápido). on_evento({chave, url} | {chave, erro})."""
+    def run():
+        try:
+            from Functions import media_server
+            from Functions.omnivoice_tool import list_voices, synthesize
+            arq = _falas.get(texto)
+            if not (arq and os.path.isfile(arq)):
+                vozes = list_voices()
+                if not vozes:
+                    raise RuntimeError("nenhuma voz salva (crie uma em Geração de Voz)")
+                v = next((x for x in vozes if (x.get("name") or "").strip().lower() == VOZ), vozes[0])
+                r = synthesize(v["id"], texto, {"num_step": 4, "language": "pt", "speed": 1.05})
+                arq = r.get("output_path")
+                _falas[texto] = arq
+            on_evento({"chave": chave, "url": media_server.register(arq)})
+        except Exception as e:
+            on_evento({"chave": chave, "erro": str(e)})
     threading.Thread(target=run, daemon=True).start()
     return {"success": True}
 

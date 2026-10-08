@@ -33,6 +33,12 @@ function kaniMd(txt) {
     const abrir = [];
     txt = String(txt || '').replace(/\[\[abrir:([a-z0-9-]+)\]\]/gi, (_, id) => { if (kaniNomeFerramenta(id) && !abrir.includes(id)) abrir.push(id); return ''; });
     const inl = s => kaniEsc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>');
+    const blocos = [];
+    txt = txt.replace(/```([a-zA-Z0-9_+-]*)[ \t]*\n?([\s\S]*?)(```|$)/g, (_, ling, corpo) => {   // aberto ainda (gerando) também vira caixa
+        const lg = (ling || '').toLowerCase();
+        blocos.push({ ling: lg, corpo: kaniSemMd(corpo.replace(/\n+$/, ''), lg) });
+        return `\n@@KANIBLOCO${blocos.length - 1}@@\n`;
+    });
     const linhas = txt.replace(/\r/g, '').split('\n'), out = [];
     let lista = null;
     const fecha = () => { if (lista) { out.push(`</${lista}>`); lista = null; } };
@@ -40,6 +46,9 @@ function kaniMd(txt) {
         let m;
         if ((m = l.match(/^\s*[-*•]\s+(.*)/))) { if (lista !== 'ul') { fecha(); out.push('<ul>'); lista = 'ul'; } out.push(`<li>${inl(m[1])}</li>`); }
         else if ((m = l.match(/^\s*\d+[.)]\s+(.*)/))) { if (lista !== 'ol') { fecha(); out.push('<ol>'); lista = 'ol'; } out.push(`<li>${inl(m[1])}</li>`); }
+        else if ((m = l.match(/^@@KANIBLOCO(\d+)@@$/))) { fecha(); const b = blocos[+m[1]], txtb = ['texto', 'text', 'txt', ''].includes(b.ling);
+            out.push(`<div class="kani-saida${txtb ? '' : ' codigo'}">${txtb ? '' : `<span class="kani-saida-ling">${kaniEsc(b.ling)}</span>`}<button class="kani-copiar-saida" data-copiar-bloco="${m[1]}" title="Copiar só este texto">Copiar</button><pre>${kaniEsc(b.corpo)}</pre></div>`); }
+        else if (/^\s*(-{3,}|\*{3,})\s*$/.test(l)) { fecha(); out.push('<hr>'); }
         else if ((m = l.match(/^#{1,4}\s+(.*)/))) { fecha(); out.push(`<h4>${inl(m[1])}</h4>`); }
         else if (!l.trim()) { fecha(); }
         else { fecha(); out.push(`<p>${inl(l)}</p>`); }
@@ -48,6 +57,47 @@ function kaniMd(txt) {
     if (abrir.length) out.push(`<div class="kani-abrir">${abrir.map(id => `<button data-abrir="${id}">Abrir ${kaniEsc(kaniNomeFerramenta(id))} →</button>`).join('')}</div>`);
     return out.join('');
 }
+
+// ── copiar / ouvir ──
+function kaniLimpo(txt) { return String(txt || '').replace(/\[\[abrir:[a-z0-9-]+\]\]/gi, '').trim(); }
+function kaniSemMd(c, ling) { return ['texto', 'text', 'txt', ''].includes(ling) ? c.replace(/\*\*(.+?)\*\*/g, '$1').replace(/__(.+?)__/g, '$1') : c; }   // texto pronto sai limpo para colar
+function kaniBlocosDe(txt) { const out = []; String(txt || '').replace(/```([a-zA-Z0-9_+-]*)[ \t]*\n?([\s\S]*?)(```|$)/g, (_, l, c) => { out.push(kaniSemMd(c.replace(/\n+$/, ''), (l || '').toLowerCase())); return ''; }); return out; }
+function kaniParaFala(txt) {   // o que a voz lê: sem formatação, emojis, hashtags, links e blocos de código
+    return kaniLimpo(txt).replace(/```(texto|text|txt)?[ \t]*\n?([\s\S]*?)(```|$)/g, (_, l, c) => (l !== undefined || !/[{};=<>]/.test(c)) ? c : ' ')
+        .replace(/https?:\/\/\S+/g, ' ').replace(/#(\w+)/g, ' ').replace(/[*_`>|~]/g, '').replace(/^\s*[-•]\s+/gm, '').replace(/^#+\s*/gm, '')
+        .replace(/\p{Extended_Pictographic}|\uFE0F|\u200D/gu, '').replace(/^-{3,}$/gm, '').replace(/\n{2,}/g, '. ').replace(/\s+/g, ' ').replace(/([.!?:;])(\s*\.)+/g, '$1').trim().slice(0, 1500);
+}
+function kaniAcoes(m, i) {
+    if (!m.content || (KANI.gerando && KANI.gerando.conv === KANI.conversa && KANI.gerando.i === i)) return '';
+    const v = KANI.voz && KANI.voz.i === i && KANI.voz.conv === KANI.conversa ? KANI.voz.estado : '';
+    return `<div class="kani-acoes"><button data-copiar-msg="${i}" title="Copiar a resposta"><svg class="i"><use href="#i-copy"/></svg> Copiar</button>
+        <button data-ouvir-msg="${i}" class="${v}" title="${v === 'tocando' ? 'Parar' : 'Ouvir com a voz da Kani'}">${v === 'carregando' ? '<span class="kani-gira"></span> Preparando a voz…' : v === 'tocando' ? '■ Parar' : '<svg class="i"><use href="#i-volume"/></svg> Ouvir'}</button></div>`;
+}
+async function kaniCopiar(texto, botao) {
+    try { await navigator.clipboard.writeText(texto); } catch (e) { const ta = document.createElement('textarea'); ta.value = texto; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+    if (botao) { const h = botao.innerHTML; botao.textContent = 'Copiado ✓'; botao.classList.add('ok'); setTimeout(() => { botao.innerHTML = h; botao.classList.remove('ok'); }, 1400); }
+}
+function kaniOuvir(i) {
+    const c = KANI.conversa, m = c.msgs[i];
+    if (KANI.voz && KANI.voz.i === i && KANI.voz.conv === c) {   // clicou de novo: para
+        if (KANI.audio) KANI.audio.pause();
+        KANI.voz = null; kaniRender(); return;
+    }
+    if (KANI.audio) KANI.audio.pause();
+    const chave = 'v' + Date.now().toString(36);
+    KANI.voz = { i, conv: c, chave, estado: 'carregando' };
+    kaniRender();
+    kaniApi().kani_falar(kaniParaFala(m.content), chave);
+}
+window.kaniVoz = function (d) {
+    const v = KANI.voz; if (!v || v.chave !== d.chave) return;
+    if (d.erro) { KANI.voz = null; if (typeof toast === 'function') toast('Não consegui ler: ' + d.erro); kaniRender(); return; }
+    KANI.audio = KANI.audio || new Audio();
+    KANI.audio.src = d.url;
+    KANI.audio.onended = () => { if (KANI.voz === v) { KANI.voz = null; kaniRender(); } };
+    KANI.audio.play().catch(() => {});
+    v.estado = 'tocando'; kaniRender();
+};
 
 // ── interface ──
 function kaniMontar() {
@@ -76,6 +126,10 @@ function kaniMontar() {
         const s = e.target.closest('[data-sug]'); if (s) { txt.value = s.dataset.sug; kaniEnviar(); return; }
         const h = e.target.closest('[data-conv]'); if (h) { const c = kaniConversas().find(x => x.id === h.dataset.conv); if (c) { KANI.conversa = c; g.querySelector('#kani-hist').hidden = true; kaniRender(); } return; }
         if (e.target.closest('#kani-baixar')) kaniBaixar();
+        const cm = e.target.closest('[data-copiar-msg]'); if (cm) { kaniCopiar(kaniLimpo(KANI.conversa.msgs[+cm.dataset.copiarMsg].content), cm); return; }
+        const om = e.target.closest('[data-ouvir-msg]'); if (om) { kaniOuvir(+om.dataset.ouvirMsg); return; }
+        const cb = e.target.closest('[data-copiar-bloco]');
+        if (cb) { const i = +cb.closest('.kani-msg').dataset.i, k = +cb.dataset.copiarBloco; kaniCopiar(kaniBlocosDe(KANI.conversa.msgs[i].content)[k] || '', cb); return; }
     });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && KANI.aberto && !e.defaultPrevented && document.activeElement && g.contains(document.activeElement)) kaniFechar(); });
 }
@@ -103,7 +157,7 @@ function kaniRender() {
         return;
     }
     corpo.innerHTML = c.msgs.map((m, i) => m.role === 'user' ? `<div class="kani-msg eu">${kaniEsc(m.content)}</div>`
-        : `<div class="kani-msg ela" data-i="${i}">${m.content ? kaniMd(m.content) : '<span class="kani-pensando"><i></i><i></i><i></i></span>'}${m.erro ? `<div class="kani-erro">${kaniEsc(m.erro)}</div>` : ''}</div>`).join('');
+        : `<div class="kani-msg ela" data-i="${i}">${m.content ? kaniMd(m.content) : '<span class="kani-pensando"><i></i><i></i><i></i></span>'}${m.erro ? `<div class="kani-erro">${kaniEsc(m.erro)}</div>` : ''}${kaniAcoes(m, i)}</div>`).join('');
     corpo.scrollTop = corpo.scrollHeight;
     const env = document.getElementById('kani-enviar');
     env.classList.toggle('parar', !!KANI.gerando);

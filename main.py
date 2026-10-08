@@ -3312,6 +3312,11 @@ class ApiBridge:
         from Functions import kani
         return kani.cancelar(cid)
 
+    def kani_falar(self, texto, chave=""):
+        """Lê a resposta com a voz da Kani (Fran, OmniVoice 4 passos); o áudio volta em kaniVoz({chave, url})."""
+        from Functions import kani
+        return kani.falar(texto, lambda d: _js("kaniVoz", d), chave)
+
     def sk_trecho(self, arq, k, sr=48000):
         """Trecho de 10 s em PCM s16le estéreo (prévia com precisão de amostra; som-motor.js)."""
         from Functions import media_server, sound_kanivete

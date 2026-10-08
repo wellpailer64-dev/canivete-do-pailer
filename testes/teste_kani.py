@@ -65,6 +65,23 @@ def main():
             if botoes:
                 pg.click(f"#kani [data-abrir='{botoes[0]}']")
                 ok(pg.evaluate(f"document.getElementById('page-{botoes[0]}')?.classList.contains('active')"), "o botão abre a ferramenta")
+            # texto pronto sai numa caixinha com Copiar só dela; cada resposta tem Copiar e Ouvir
+            pg.evaluate("switchTool('home'); kaniAbrir(); kaniNova()")
+            caixa = pg.locator("#kani-txt")
+            caixa.fill("Escreve uma legenda curta de Instagram para o Dia do Instrutor de autoescola.")
+            caixa.press("Enter")
+            pg.wait_for_function("!KANI_API.gerando() && KANI_API.conversa().msgs.length === 2", timeout=240000)
+            ok(pg.evaluate("!!document.querySelector('#kani .kani-saida [data-copiar-bloco]')"), "texto pronto numa caixinha com Copiar", pg.evaluate("KANI_API.conversa().msgs[1].content")[:200])
+            ok(pg.evaluate("!!document.querySelector('#kani [data-copiar-msg]') && !!document.querySelector('#kani [data-ouvir-msg]')"), "botões Copiar e Ouvir na resposta")
+            t = time.time()
+            pg.click("#kani [data-ouvir-msg]")
+            try:
+                pg.wait_for_function("document.querySelector('#kani [data-ouvir-msg]')?.classList.contains('tocando')", timeout=120000)
+                ok(True, "Ouvir lê com a voz", f"{time.time() - t:.1f} s")
+            except Exception:
+                ok(False, "Ouvir lê com a voz", pg.inner_text("#kani-corpo")[-200:])
+            pg.screenshot(path=BASE + "kani_saida.png")
+            pg.click("#kani [data-ouvir-msg]")
             # dentro do Editor, pela barra lateral: a Kani sabe onde a pessoa está
             pg.evaluate("kaniFechar(); switchTool('video-cutter')")
             pg.click("#menu-kani")
