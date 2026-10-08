@@ -953,7 +953,7 @@ function veSeqConfigAbrir() {
         `<option value="custom">${veT('Personalizado')}</option></optgroup>`;
     md.querySelector('#ve-sq-w').value = VE.seqW;
     md.querySelector('#ve-sq-h').value = VE.seqH;
-    md.querySelector('#ve-sq-fps').innerHTML = `${String(+(VE.fps || 30).toFixed(3)).replace('.', ',')} qps <small>(a do vídeo)</small>`;
+    md.querySelector('#ve-sq-fps').innerHTML = `${String(+(VE.fps || 30).toFixed(3)).replace('.', ',')} qps <small>(${veT('padrão, pelo 1º vídeo')})</small>`;
     md.hidden = false;
     veSeqConfigPrevia();
     md.querySelector('#ve-sq-preset').focus();
@@ -5360,6 +5360,19 @@ function veLoading(text, pct) {
     $ve('ve-loading-fill').style.width = (pct || 0) + '%';
 }
 
+// Taxa da timeline CRAVADA (Functions/video_cutter.py: taxa_timeline): 23,976/29,97/59,94 só de câmera constante; o
+// resto (celular com taxa variável, 59,18...) vai para 24/25/30/50/60. Avisa quando a média do vídeo era outra — vale
+// também para timelines antigas, que abriam na média do arquivo
+function veFpsTimeline(ev) {
+    const fps = +(ev.fps_timeline || ev.fps || 30);
+    if (ev.fps && Math.abs(ev.fps - fps) > 0.01 && !ev.leve && VE._fpsAvisado !== (ev.path || ev.file_name)) {
+        VE._fpsAvisado = ev.path || ev.file_name;
+        veToast(veT('Timeline em') + ` ${String(+fps.toFixed(3)).replace('.', ',')} qps ` +
+            veT('(taxa padrão; o vídeo tem') + ` ${String(+(+ev.fps).toFixed(2)).replace('.', ',')} qps ` + veT('variável)'));
+    }
+    return fps;
+}
+
 function veOnPrepare(ev) {
     if (typeof ev === 'string') { try { ev = JSON.parse(ev); } catch (e) { return; } }
     if (ev.path && ev.path !== VE.path && ev.stage === 'info') return;
@@ -5367,7 +5380,7 @@ function veOnPrepare(ev) {
         case 'info': {
             VE.info = ev;
             VE.srcDur = ev.duration;
-            VE.fps = ev.fps || 30;
+            VE.fps = veFpsTimeline(ev);
             // base: timeline aberta por uma imagem — a mídia 0 é um vídeo preto mudo no tamanho dela (fundo), que
             // não aparece no painel Projeto nem entra na timeline; a imagem vira um clipe comum de 5 s em V1
             VE.media = [{ id: 0, kind: 'video', path: VE.path, name: ev.file_name, base: !!ev.base_imagem }];
@@ -5648,7 +5661,7 @@ function veOnExport(ev) {
         box.className = 've-exp-result ok';
         const mb = ev.size ? (ev.size / 1048576).toFixed(1) + ' MB' : '';
         box.innerHTML = `<b>${veEsc(ev.output_path.split(/[\\/]/).pop())}</b><br>` +
-            `<span class="ve-exp-sub">${veHuman(ev.duration)} · ${mb}${ev.turbo ? ' · ⚡ ' + veT('turbo (tudo na placa de vídeo)') : ''}</span>` +
+            `<span class="ve-exp-sub">${veHuman(ev.duration)} · ${mb}${ev.turbo ? ' · ⚡ ' + veT('turbo (tudo na placa de vídeo)') : ev.placa ? ' · ⚡ ' + veT('montado na placa de vídeo') : ''}</span>` +
             (ev.aviso_gpu ? `<br><span class="ve-exp-sub ve-exp-aviso">⚠ ${veEsc(ev.aviso_gpu)}</span>` : '') +
             '<div class="ve-exp-actions">' +
             '<button class="ve-btn ve-btn-primary ve-btn-sm" onclick="window.pywebview.api.open_file(VE.lastOutput)"><svg class="i"><use href="#i-play"/></svg> Assistir</button>' +

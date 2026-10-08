@@ -70,6 +70,7 @@ _NAVEGADOR_ACODECS = {"aac", "mp3", "opus", "vorbis", "flac"}
 _NAVEGADOR_CONTAINERS = {".mp4", ".m4v", ".mov", ".webm"}
 
 _hw_encoder_cache = None
+_ultimo_motivo_placa = [""]   # por que a última exportação não foi (ou não terminou) na placa (export_placa)
 _hw_motivo = ""   # por que a placa NVIDIA não grava (ex.: driver antigo para o ffmpeg); vazio = sem problema conhecido
 _export_proc = None
 _export_procs = set()   # ffmpegs dos blocos em paralelo (_exportar_em_blocos)
@@ -338,6 +339,28 @@ def _hevc_direto(info):
     return bool(lados) and min(lados) <= _cache_cfg()["lado"]
 
 
+# Taxa da timeline CRAVADA (decisão do usuário, 2026-10-08): nunca a média de um vídeo de celular (59,18; 59,24...).
+_TAXAS_NTSC = (24000 / 1001, 30000 / 1001, 60000 / 1001)
+_TAXAS_INTEIRAS = (24.0, 25.0, 30.0, 50.0, 60.0)
+
+
+def taxa_timeline(media, nominal=0.0):
+    """Taxa padrão da timeline a partir do 1º vídeo: 23,976 / 29,97 / 59,94 só quando a fonte é CONSTANTE nessa taxa
+    (câmera: média colada na NTSC, ±0,05%); qualquer outra (celular com taxa variável: 59,18 → 60; ~29,6 → 30) vai para
+    a inteira mais próxima entre 24, 25, 30, 50 e 60. Os vídeos de fonte se adaptam a ela (filtro fps), nunca o contrário."""
+    try:
+        media = float(media or 0)
+        nominal = float(nominal or 0)
+    except (TypeError, ValueError):
+        return 30.0
+    if media <= 0:
+        media = nominal if nominal > 0 else 30.0
+    for n in _TAXAS_NTSC:
+        if abs(media - n) / n <= 0.0005:
+            return n
+    return min(_TAXAS_INTEIRAS, key=lambda t: abs(t - media))
+
+
 def _fps(txt):
     try:
         num, den = str(txt).split("/")
@@ -430,9 +453,12 @@ def _fps_fonte(path):
 def probe(path):
     """Análise completa do vídeo com um único ffprobe (ou ffmpeg, se o ffprobe faltar)."""
     try:
-        return _probe_ffprobe(path)
+        r = _probe_ffprobe(path)
     except (FileNotFoundError, json.JSONDecodeError, OSError):
-        return _probe_ffmpeg(path)
+        r = _probe_ffmpeg(path)
+    # fps = média da fonte (o que o arquivo tem); fps_timeline = a taxa cravada que a timeline e a exportação usam
+    r["fps_timeline"] = taxa_timeline(r.get("fps"), r.get("fps_nominal"))
+    return r
 
 
 def _probe_ffprobe(path):
@@ -482,6 +508,7 @@ def _probe_ffprobe(path):
         "width": w,
         "height": h,
         "fps": fps if 1 <= fps <= 240 else 30.0,
+        "fps_nominal": _fps((v or {}).get("r_frame_rate")),
         "vcodec": (v or {}).get("codec_name", ""),
         "pix_fmt": (v or {}).get("pix_fmt", ""),
         "alfa": _tem_alfa((v or {}).get("pix_fmt"), (v or {}).get("tags")),
@@ -2793,6 +2820,27 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         aberto = path   # nome e pasta da saída vêm do que o usuário abriu
     if _eh_imagem(path):
         path = _base_imagem(path)   # timeline que começou por uma imagem: fundo preto no tamanho dela
+    # Modo placa (Functions/export_placa.py): a timeline inteira montada na placa de vídeo (Vulkan + libplacebo), como
+    # o Premiere. O que ele ainda não sabe fazer (motivo) ou uma falha na placa seguem pela CPU, abaixo
+    if (janela is None and camadas and not saida and not previa_h and not alfa and usar_gpu
+            and not (isinstance(opcoes, dict) and opcoes.get("blocos"))
+            and not FORMATOS_SAIDA.get(str(formato_saida).lower(), {}).get("audio_only")):
+        from Functions import export_placa
+        args_placa = dict(path=path, segmentos=segmentos, formato_saida=formato_saida, qualidade=qualidade,
+                          resolucao=resolucao, usar_gpu=usar_gpu, sem_audio=sem_audio, camadas=camadas,
+                          audio_segmentos=audio_segmentos, duracao=duracao, audio_clipes=audio_clipes, legendas=legendas,
+                          quadro=quadro, opcoes=opcoes)
+        try:
+            r = export_placa.exportar(args_placa, aberto, pasta_saida, prog, stop_event, proc_holder)
+        except Exception as e:
+            r = {"success": False, "error": f"placa: {e}"}
+        if r is not None and (r.get("success") or r.get("cancelled")):
+            return r
+        if r is not None:
+            prog(0, "A placa não conseguiu; exportando pela CPU...")
+            _ultimo_motivo_placa[0] = r.get("error") or ""
+        else:
+            _ultimo_motivo_placa[0] = args_placa.get("_motivo") or ""
     # por blocos só com a base de fundo (sequência noutro tamanho: tudo vira camada). Base com trechos do vídeo
     # principal: cada trecho é arredondado em quadros desde o zero e um bloco no meio dela saía um quadro deslocado
     if (janela is None and isinstance(opcoes, dict) and opcoes.get("blocos") and camadas and not saida and not previa_h
@@ -2831,6 +2879,8 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     fundo = "black@0" if alfa else "black"
 
     info = probe(path)
+    # a timeline (e a saída) roda na taxa CRAVADA, não na média do arquivo base (taxa_timeline)
+    info = {**info, "fps": info.get("fps_timeline") or taxa_timeline(info.get("fps"))}
     audio_only = bool(cfg.get("audio_only")) or not info["has_video"]
     # som de clipes soltos na mixagem (projeto sem vídeo principal: a base é o fundo preto mudo) também conta
     som_solto = any(isinstance(c, (list, tuple)) and len(c) > 4 and c[4] for c in audio_clipes or [])
@@ -3708,7 +3758,7 @@ def _exportar_em_blocos(args, aberto, pasta_saida, prog, stop_event):
         info = probe(args["path"])
     except Exception as e:
         return {"success": False, "error": f"Não foi possível analisar o vídeo: {e}"}
-    fpsv = float(f'{info["fps"]:.3f}')
+    fpsv = float(f'{(info.get("fps_timeline") or taxa_timeline(info["fps"])):.3f}')
     camadas = args["camadas"]
     spans = _spans_camadas(camadas)
     base_dur = 0.0

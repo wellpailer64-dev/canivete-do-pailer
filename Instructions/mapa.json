@@ -2253,6 +2253,7 @@
   "Functions/converterimagem.py": "converterimagem.py",
   "Functions/convertermp3.py": "Conversor de áudio (e extração de áudio de vídeos) via ffmpeg",
   "Functions/editor_imagem.py": "Editor de Imagem (frontend/js/imagem-*.js): abrir e salvar PSD/PSB e imagens comuns",
+  "Functions/export_placa.py": "Exportação na placa de vídeo (\"modo placa\", Kanivete Encoder rodada 3): a timeline inteira montada na GPU, como o",
   "Functions/faviconconverter.py": "faviconconverter.py",
   "Functions/fontes.py": "fontes.py — famílias de fonte instaladas no Windows e os estilos de cada uma (Light, Regular, Semibold,",
   "Functions/gdrive_dumper.py": "gdrive_dumper.py — Módulo do GDRIVE DUMPER para o Canivete do Pailer",

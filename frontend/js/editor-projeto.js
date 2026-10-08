@@ -1294,7 +1294,7 @@ function veOnMidia(ev) {
         if (m.id === 0) {
             VE.info = ev;
             VE.srcDur = ev.duration;
-            VE.fps = ev.fps || VE.fps || 30;
+            VE.fps = typeof veFpsTimeline === 'function' ? veFpsTimeline(ev) : (ev.fps_timeline || ev.fps || VE.fps || 30);
             m.name = m.nome || ev.file_name || m.name;
             delete m.offline; delete m.missing; delete m.lost; delete m.erro;
             if (!ev.file_name) ev.file_name = vePjNome(m);

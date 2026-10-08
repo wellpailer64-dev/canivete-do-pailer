@@ -61,6 +61,10 @@ se edita. Botão Fila no cabeçalho abre o mesmo painel. API `VEFILA_API`. Teste
 
 **Kanivete Encoder (Ke)**: janela própria do export feita (`editor-encoder.js`: logo Ke, solta, minimiza, lembra posição).
 Export otimizado (rodada 1, 2026-10-08: reels reais de 3,6× → 1,26× a duração; bancada em `D:/kanivete_testes/encoder`); medições e pendências em `Instructions/agente/plano-kanivete-encoder.md`.
+**Modo placa** (rodada 3): a timeline montada inteira na GPU (Vulkan + libplacebo) — `Functions/export_placa.py`, chamado
+pelo `exportar_video` com a placa ligada; o que não suporta (`motivo()`) ou falha cai na CPU. Depoimentos de 98 s: 264 s → 96 s.
+Testar: `py -3.13 testes/teste_export.py --placa`. Armadilhas (disable_linear, settb, `ot`) no plano §8.
+**Taxa da timeline CRAVADA** (`video_cutter.taxa_timeline`, `probe()["fps_timeline"]`): nunca a média de vídeo de celular.
 
 Atributos de vários clipes (como no Premiere): `frontend/js/editor-atributos.js` — botão direito → "Remover atributos…"
 (efeitos de vídeo/áudio, movimento, opacidade, mesclagem, volume, transições, com caixinhas; vale para a seleção) e ajuste

@@ -39,6 +39,16 @@ CMP_W, CMP_H = 270, 480      # tamanho da comparação (os dois lados reduzidos 
 VERSAO_MATERIAL = 1
 
 
+def conferir_taxa():
+    """Regra da taxa cravada (video_cutter.taxa_timeline): nunca a média de celular."""
+    from Functions.video_cutter import taxa_timeline
+    casos = [(59.238, 59, 60), (59.18, 59, 60), (59.63, 59.94, 60), (59.94, 59.94, 60000 / 1001),
+             (29.97, 29.97, 30000 / 1001), (29.6, 30, 30), (30, 30, 30), (25, 25, 25), (23.976, 23.976, 24000 / 1001),
+             (24, 24, 24), (50, 50, 50)]
+    erros = [(m, n, taxa_timeline(m, n), e) for m, n, e in casos if abs(taxa_timeline(m, n) - e) > 1e-6]
+    return erros
+
+
 def _ff():
     from Functions.convertermp3 import ffmpeg_path
     return ffmpeg_path()
@@ -86,6 +96,13 @@ def gerar_material(pasta, com_4k):
         cv2.rectangle(logo, (20, 20), (480, 280), (40, 120, 230, 255), -1)
         cv2.putText(logo, "LOGO", (90, 190), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 255, 255, 255), 8)
         cv2.imwrite(vid("logo.png"), logo)
+    if not os.path.isfile(vid("sinc.mp4")):
+        # taxa quebrada de celular (59,238 qps, a média do 01.mp4 do Carlinhos) com flash branco + bipe de 1 kHz juntos
+        # em 1, 2 e 3 s: a timeline roda na taxa cravada (60) e o som tem de continuar colado no flash (caso "sinc")
+        _roda([ff, "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=0x202020:s=1080x1920:r=8726000/147303:d=4,"
+               r"drawbox=c=white:t=fill:enable='lt(mod(t\,1)\,0.05)*gte(t\,0.9)'",
+               "-f", "lavfi", "-i", r"aevalsrc='0.8*sin(2*PI*1000*t)*lt(mod(t\,1)\,0.05)*gte(t\,0.9)':s=48000:d=4",
+               "-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "30", "-c:a", "aac", "-b:a", "192k", "-shortest", vid("sinc.mp4")])
     if not os.path.isfile(vid("musica.wav")):
         _roda([ff, "-v", "error", "-y", "-f", "lavfi", "-i",
                "aevalsrc='0.8*sin(2*PI*60*t)*exp(-12*mod(t,0.5))+0.25*sin(2*PI*440*t)*exp(-30*mod(t+0.25,0.5))"
@@ -164,7 +181,7 @@ JS_AJUDA = r"""
       VE._txPng = null;
       if (VE.clips.some(c => veIsTexto(c) || veEhGrafico(c))) await veTxPngs();
       const plano = veExportPlan(true), lim = veMasterLim();
-      await window.pywebview.api.video_cutter_export(VE.path, plano.base, 'mp4', 'medium', 'original', false, dest, false,
+      await window.pywebview.api.video_cutter_export(VE.path, plano.base, 'mp4', 'medium', 'original', !!window.__tePlaca, dest, false,
         plano.camadas, plano.audio, plano.dur, lim ? [...plano.mix, { master: lim }] : plano.mix, veTxExport(plano.faixa),
         [VE.seqW, VE.seqH], { nome, blocos: !!window.__teBlocos });
       return plano.dur;
@@ -204,6 +221,11 @@ CASOS = {
         Object.assign(m.info, { width: W, height: H });   // a cena nasce no tamanho da timeline anterior
         const c3 = { tr: 0, st: 0, s: 0, e: 2, m: m.id }; c3.p = Object.assign(veDefProps(c3), { sc: 100, x: W / 2, y: H / 2 });
         return [c3];
+    """, ""),
+    # taxa quebrada (59,238) numa timeline de taxa cravada: o vídeo se adapta e o som continua sincronizado (flash × bipe)
+    "sinc": (1080, 1920, """
+        const { clip } = __te;
+        return [clip(0, 0, 0, 4, 'sinc.mp4', { p: { sc: 100, x: 540, y: 960, rot: 0, op: 100 } })];
     """, ""),
     # cortes na batida exata (fora da grade de quadros): o quadro do corte não pode sair preto
     "grade": (1080, 1920, """
@@ -374,6 +396,19 @@ def _dur_audio(arq):
             return None
 
 
+def _bipes(arq):
+    """Instantes (s) em que o som passa de silêncio para bipe."""
+    r = subprocess.run([_ff(), "-v", "error", "-i", arq, "-vn", "-ac", "1", "-ar", "48000", "-f", "s16le", "-"],
+                       capture_output=True)
+    a = np.abs(np.frombuffer(r.stdout, np.int16).astype(np.float32)) / 32768
+    if not len(a):
+        return []
+    janela = 48   # 1 ms
+    env = a[: len(a) // janela * janela].reshape(-1, janela).max(axis=1)
+    on = env > 0.2
+    return [i / 1000 for i in range(1, len(on)) if on[i] and not on[max(0, i - 30):i].any()]
+
+
 def _img(data_url):
     b = base64.b64decode(data_url.split(",", 1)[1])
     img = cv2.imdecode(np.frombuffer(b, np.uint8), cv2.IMREAD_COLOR)
@@ -402,6 +437,7 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
     t_prev = time.time() - t0
     arq_nome = f"teste_{nome}_{int(time.time())}"
     pg.evaluate("b => { window.__teBlocos = b; }", os.environ.get("TESTE_BLOCOS") == "1")
+    pg.evaluate("b => { window.__tePlaca = b; }", os.environ.get("TESTE_PLACA") == "1")
     pg.evaluate("([d, n]) => __te.exportar(d, n)", [saida, arq_nome])
     pg.wait_for_function("window.__teFim", timeout=900000)
     fim = pg.evaluate("window.__teFim")
@@ -413,6 +449,8 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
         return res
     arq = fim["output_path"]
     inf = _info(arq)
+    if os.environ.get("TESTE_PLACA") == "1":
+        res["msgs"].append("montado na placa (modo placa)" if fim.get("placa") else "pela CPU (fora do modo placa)")
     # contagem e quadros pretos: todos os quadros pelo ffmpeg; comparação de imagem: pelo navegador
     todos = _decodificar(arq, int(inf["width"]), int(inf["height"]))
     pg.evaluate("u => __te.abrirArquivo(u)", srv.url + os.path.basename(arq))
@@ -436,9 +474,10 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
     if ruins_pretos:
         res["ok"] = False
         res["msgs"].append(f"quadros pretos só na exportação: {ruins_pretos[:12]}")
-    # 3. diferença de imagem nos quadros da amostra
+    # 3. diferença de imagem nos quadros da amostra (no "sinc" não: o flash começa no meio de um quadro da fonte e a
+    # prévia/exportação escolhem lados diferentes da borda — regra antiga, o caso confere só a sincronia)
     difs = []
-    for k in amostra:
+    for k in ([] if nome == "sinc" else amostra):
         if k < len(todos):
             pega(k)
             difs.append((float(np.abs(previa[k].astype(np.int16) - ex[k].astype(np.int16)).mean()), k))
@@ -461,6 +500,18 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
         if da is not None and abs(da - dur) > 0.15:
             res["ok"] = False
             res["msgs"].append(f"som com {da:.2f} s, vídeo com {dur:.2f} s")
+    # 5. sincronia (caso sinc): o início de cada flash no vídeo e de cada bipe no som, no arquivo exportado
+    if nome == "sinc":
+        flashes = [k / fps for k, f in enumerate(todos) if f.mean() > 128 and (k == 0 or todos[k - 1].mean() <= 128)]
+        bipes = _bipes(arq)
+        desvios = [min((abs(b - f) for b in bipes), default=9.0) for f in flashes]
+        res["msgs"].append(f"fps {fps:g} · flashes {[round(f, 3) for f in flashes]} · bipes {[round(b, 3) for b in bipes]}")
+        if len(flashes) != 3 or len(bipes) != 3 or max(desvios, default=9.0) > 1.0 / fps + 0.004:
+            res["ok"] = False
+            res["msgs"].append(f"som fora de sincronia: desvio {max(desvios, default=9.0) * 1000:.0f} ms (máx. 1 quadro)")
+    if nome == "sinc" and abs(fps - round(fps)) > 1e-6 and abs(fps * 1.001 - round(fps * 1.001)) > 1e-3:
+        res["ok"] = False
+        res["msgs"].append(f"timeline em {fps:g} qps: a taxa tem de ser a padrão (cravada), não a média de um vídeo")
     res["n"] = len(amostra)
     return res
 
@@ -489,6 +540,7 @@ def main():
     ap.add_argument("--4k", dest="k4", action="store_true")
     ap.add_argument("--blocos", action="store_true", help="exportação por blocos (abra o app com CANIVETE_BLOCO_SEG=1 para vários blocos)")
     ap.add_argument("--sem-abrir", action="store_true", help="usa o app já aberto em modo agente na porta")
+    ap.add_argument("--placa", action="store_true", help="exporta com a placa de vídeo ligada (modo placa: Functions/export_placa.py)")
     ap.add_argument("--exe", default="", help="testar o exe gerado (ex.: dist/CaniveteDoPailer/CaniveteDoPailer.exe)")
     a = ap.parse_args()
     base = os.path.join(os.environ.get("TEMP") or os.path.expanduser("~"), "canivete_teste_export")
@@ -500,9 +552,13 @@ def main():
                 os.remove(os.path.join(saida, f))
             except OSError:
                 pass
+    if a.placa:
+        os.environ["TESTE_PLACA"] = "1"
     if a.blocos:
         os.environ["TESTE_BLOCOS"] = "1"
         os.environ.setdefault("CANIVETE_BLOCO_SEG", "1")   # o app aberto pelo teste herda: vários blocos por caso
+    erros_taxa = conferir_taxa()
+    print("· taxa cravada: " + ("OK" if not erros_taxa else f"ERRO {erros_taxa}"), flush=True)
     print("material...", flush=True)
     gerar_material(mat, a.k4)
     nomes = [n for n in (a.casos.split(",") if a.casos else list(CASOS) + ["autoframe"]) if n]
@@ -549,7 +605,7 @@ def main():
                 time.sleep(1)
                 pg.evaluate("p => veOpenPath(p)", principal)
                 pg.wait_for_function("VE.ready && VE.clips.length > 0 && $ve('ve-loading').hidden", timeout=120000)
-            faltam = [f for f in ["b.mp4", "c.mp4", "logo.png"] + [f"foto{i + 1}.jpg" for i in range(8)] + (["k.mp4"] if "4k" in nomes else [])
+            faltam = [f for f in ["b.mp4", "c.mp4", "logo.png", "sinc.mp4"] + [f"foto{i + 1}.jpg" for i in range(8)] + (["k.mp4"] if "4k" in nomes else [])
                       if not pg.evaluate("n => VE.media.some(m => m && (m.path || '').replace(/\\\\/g, '/').endsWith('/' + n))", f)]
             if faltam:
                 pg.evaluate("async (l) => { await vePjImportar(l.map(p => ({path: p}))); }", [os.path.join(mat, f) for f in faltam])
@@ -575,7 +631,7 @@ def main():
     finally:
         if app:
             subprocess.run(["taskkill", "/PID", str(app.pid), "/T", "/F"], capture_output=True)
-    falhou = [r["caso"] for r in resultados if not r["ok"]]
+    falhou = [r["caso"] for r in resultados if not r["ok"]] + (["taxa cravada"] if erros_taxa else [])
     print(f"\n{len(resultados) - len(falhou)}/{len(resultados)} casos OK" + (f" · reprovados: {', '.join(falhou)}" if falhou else ""))
     if falhou:
         print(f"quadros com problema (prévia | exportação) em {saida}")

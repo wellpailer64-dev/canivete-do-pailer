@@ -117,3 +117,31 @@ _FullHD, `medir_r2.py` export INTEIRO velho(HEAD)×novo com partes removidas, `g
      quadro (t, n): escala/posição com quadro-chave + PNGs + LUT + shader no mesmo passo, sem cadeia de overlays.
      Opacidade por entrada não aparece nas opções (`-h filter=libplacebo`): resolver no shader ou no alfa do PNG.
   3. 4K: reduzir 4K→1080 dentro do libplacebo (o quadro nunca desce): deve ser o maior ganho nos brutos de celular.
+
+## 8. Rodada 3 (2026-10-08) — MODO PLACA (`Functions/export_placa.py`) e taxa cravada
+**Modo placa**: a timeline inteira montada na GPU (Vulkan): vídeos decodificados na placa (girados pelo `libplacebo
+rotate` — o `transpose_vulkan` falhava em celular e ignora o recorte), compostos por UM libplacebo com várias entradas
+(lotes de 24) com posição/escala/âncora/quadros-chave/Pulsar/Tremer/Dobrar (sx/sy) em expressão por quadro; trilha base
+emendada com `concat` na placa (o concat conta os quadros que cada trecho realmente gera — 76 para 76,98: só emendando
+igual à CPU os quadros batem); imagens (textos/logos/sequências) preparadas na CPU pequenas e enviadas; sombra como outra
+entrada; Luz e Cor (clipe ou camada de ajuste) = `libplacebo lut=… lut_type=2` + shader mpv (Clareza com desfoque em ¼,
+Vinheta, Nitidez); fade de opacidade em vídeo = só esse clipe desce/sobe. Encoder = o mesmo da CPU; som pela mesma
+mixagem (wav) + junção `-c:v copy`. Chamado por `exportar_video` (placa ligada, sem blocos/prévia/alfa); `motivo()`
+diz o que ainda não vai (mesclagem, rotação, legendas, efeitos fora do Luz e Cor em vídeo, 10 bits/ProRes, saída
+reduzida, vídeo com alfa) e erro na placa cai na CPU (`_ultimo_motivo_placa`). Depurar: `CANIVETE_PLACA_DEBUG=1`
+(grava o grafo em placa_grafo_*.txt na pasta de mídia); desligar: `CANIVETE_PLACA=0`.
+Armadilhas medidas (não desfazer):
+- `disable_linear=1` na composição: em luz linear um branco a 50% sobre preto dava Y 176 (CPU 126) — fades claros.
+- `settb=AVTB` antes dos setpts: a base de tempo do PNG (1/25) arredondava o início e o 1º quadro saía preto.
+- expressões com `ot` (tempo da SAÍDA), não `t` (o do libplacebo é o da entrada: a transição Empurrar saía fora).
+- cada camada entra ¼ de quadro antes; mesma regra de quadro da CPU (setpts do corte + fps + início na grade; base:
+  STARTPTS + concat).
+Resultados (Depoimentos V2 inteiro, 98,8 s, Full HD, com som): CPU 264 s (2,7×) → placa 96 s (0,97×); 38,7 dB contra a
+CPU, 68 de 5926 quadros < 35 dB (bordas de animação de texto). teste_export `--placa`: todos os casos que vão pela placa
+passam (grade, curva, kfmuitos, sobreposição, velocidade, autoframe, sinc).
+**Taxa cravada** (decisão do usuário): `video_cutter.taxa_timeline` — 23,976/29,97/59,94 só de fonte constante NTSC;
+o resto vai para 24/25/30/50/60 (celular 59,18 → 60). `probe()` devolve `fps_timeline`; exportação (CPU, blocos, placa)
+e editor (`veFpsTimeline`, avisa ao abrir) usam ela. teste_export: `conferir_taxa` + caso `sinc` (59,238 com flash e bipe:
+som colado no quadro).
+Pendências: legendas e mesclagem na placa; prévia renderizada (render auto) pela placa; 4K reduzido direto no libplacebo
+(saída reduzida); o +1,5 de Y da LUT; blocos com GOP fechado.
