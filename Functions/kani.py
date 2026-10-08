@@ -322,8 +322,25 @@ def _tenta(f):
         pass
 
 
+# como a voz deve dizer nomes do app e siglas (o OmniVoice lê "Photo" em inglês e inventa "Kanivete")
+PRONUNCIA = [
+    (r"\bPhoto\b", "Fôto"), (r"\bSound\b", "Sáund"), (r"\bKanivete\b", "Canivete"), (r"\bKANIVETE\b", "Canivete"),
+    (r"\bKani\b", "Cáni"), (r"\bEncoder\b", "Encôder"), (r"\bPremiere\b", "Premiér"), (r"\bPhotoshop\b", "Fotochóp"),
+    (r"\bIllustrator\b", "Ilustreitor"), (r"\bCtrl\b", "Control"), (r"\bShift\b", "Chift"), (r"\bDelete\b", "Delíte"),
+    (r"\bPNG\b", "pê ene gê"), (r"\bJPE?G\b", "jota pê gê"), (r"\bPSD\b", "pê esse dê"), (r"\bPDF\b", "pê dê éfe"),
+    (r"\bMP4\b", "eme pê quatro"), (r"\bMP3\b", "eme pê três"), (r"\bWAV\b", "uêivi"), (r"\bSVG\b", "esse vê gê"),
+    (r"\bIA\b", "I A"), (r"\bGPU\b", "gê pê u"), (r"\b4K\b", "quatro cá"), (r"\s\+\s", " mais "), (r"\s/\s", " ou "),
+]
+
+
+def para_voz(texto):
+    for a, b in PRONUNCIA:
+        texto = re.sub(a, b, texto)
+    return texto
+
+
 def falar(texto, on_evento, chave):
-    """Lê o texto com a voz da Kani (OmniVoice, 7 passos: rápido sem errar palavras). on_evento({chave, url} | {chave, erro})."""
+    """Lê o texto com a voz da Kani (OmniVoice, 12 passos + pronúncia dos nomes do app). on_evento({chave, url} | {chave, erro})."""
     def run():
         try:
             from Functions import media_server
@@ -334,7 +351,7 @@ def falar(texto, on_evento, chave):
                 if not vozes:
                     raise RuntimeError("nenhuma voz salva (crie uma em Geração de Voz)")
                 v = next((x for x in vozes if (x.get("name") or "").strip().lower() == VOZ), vozes[0])
-                r = synthesize(v["id"], texto, {"num_step": 7, "language": "pt", "speed": 1.05})
+                r = synthesize(v["id"], para_voz(texto), {"num_step": 12, "language": "pt", "speed": 1.0, "normalize_text": True})
                 arq = r.get("output_path")
                 _falas[texto] = arq
             on_evento({"chave": chave, "url": media_server.register(arq)})
