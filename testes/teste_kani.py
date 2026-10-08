@@ -50,10 +50,10 @@ def main():
             pg.wait_for_timeout(500)
             ok(pg.is_visible("#kani-bolinha"), "bolinha 'Pergunte à Kani' na Home")
             ok(pg.evaluate("[...document.querySelectorAll('.menu-group')].some(g => g.textContent.trim() === 'IA') && !!document.getElementById('menu-kani')"), "IA › Kani na barra lateral")
-            pg.click("#kani-bolinha")
+            pg.screenshot(path=BASE + "kani_home.png"); pg.click("#kani-bolinha")
             pg.wait_for_function("KANI_API.estado() && KANI_API.estado().pronto", timeout=30000)
             ok(pg.is_visible("#kani") and not pg.is_visible("#kani-bolinha"), "a bolinha abre a gaveta (e some enquanto ela está aberta)")
-            ok("Início" in pg.inner_text("#kani-corpo") and pg.evaluate("document.querySelectorAll('#kani [data-sug]').length") >= 3, "boas-vindas com a ferramenta atual e sugestões")
+            pg.screenshot(path=BASE + "kani_boas.png"); ok("Início" in pg.inner_text("#kani-corpo") and pg.evaluate("document.querySelectorAll('#kani [data-sug]').length") >= 3, "boas-vindas com a ferramenta atual e sugestões")
             t = time.time()
             pg.click("#kani [data-sug]:nth-child(2)")   # "Como tiro o fundo de uma foto?"
             pg.wait_for_function("!KANI_API.gerando() && KANI_API.conversa().msgs.length === 2", timeout=240000)

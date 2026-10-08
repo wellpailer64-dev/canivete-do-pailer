@@ -133,7 +133,7 @@ Chat local tipo ChatGPT (Qwen3 8B): bolinha na Home + IA › Kani na barra later
 (`frontend/js/kani.js`, `css/kani.css`, `Functions/kani.py`). Motor: Ollama com qwen3:8b se houver; senão llama.cpp Vulkan
 + Qwen3-8B-Q4_K_M.gguf (~5 GB) baixados sob demanda em `modelos_ia/kani`. Ajuda do app: `frontend/ajuda/kani_kb.json`
 (trechos dos guias, busca BM25) — regenerar com `py -3.13 tools/kani_kb.py` ao mudar guias/ferramentas. Nome em
-`kani.NOME`. Avatar `frontend/identidade/kani.webp` (originais em `D:/kanivete_biblioteca/marcas/kani`). Ouvir: voz Fran
+`kani.NOME`. Avatar `frontend/identidade/kani.webp` (original `D:/kanivete_biblioteca/marcas/kani/kani_oficial.png`, inteira com cantos arredondados como o logo). Ouvir: voz Fran
 (OmniVoice 7 passos) mantida carregada enquanto o chat está aberto (`omnivoice_tool.manter_carregado`/`descarregar`,
 runner `serve`), ~3 s por leitura. Teste: `py -3.13 testes/teste_kani.py` (porta 9334).
 
