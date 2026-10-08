@@ -145,3 +145,16 @@ e editor (`veFpsTimeline`, avisa ao abrir) usam ela. teste_export: `conferir_tax
 som colado no quadro).
 Pendências: legendas e mesclagem na placa; prévia renderizada (render auto) pela placa; 4K reduzido direto no libplacebo
 (saída reduzida); o +1,5 de Y da LUT; blocos com GOP fechado.
+
+## 9. Janela do Encoder profissional (2026-10-08)
+Pedido do usuário: Ctrl+M = fila + abrir a janela; Ctrl+Shift+M = fila sem abrir, com aviso; som ao entrar na fila e ao
+concluir cada render; visual profissional, miniatura leve do quadro em render e uso de placa/RAM/CPU ao vivo.
+- `veKeFilaAtalho(abrir)` (editor-encoder.js): monta o formulário escondido (sem piscar), põe na fila com o nome da
+  timeline e inicia a fila; som `veKeSom('fila')` (WebAudio, 2 toques); concluído = `playConcluido` a cada render.
+- Miniatura: 2ª saída do próprio ffmpeg (split → fps=1 → 240 px → JPEG com -update), na CPU, no turbo (hwdownload só
+  desse quadro) e no modo placa; fora em prévia, blocos, Comp e wav.
+- Monitor: `encoder_monitor.estado()` — um nvidia-smi `-lms 1000` e a CPU numa thread de 1 s (cpu_percent(None) chamado
+  de vários lugares dava 0), param 15 s depois da última pergunta.
+- Visual: configurações em controles segmentados compactos; "Renderizando agora" (miniatura, barra, tempo, ×, selo
+  Montado na placa / Turbo / Processador); 5 medidores. Teste: `D:/kanivete_testes/scripts/teste_ke_atalhos.py` + teste_fila.
+- Pendente: textos antigos da fila sem tradução ("Fila de render", "Pausar depois deste"...).

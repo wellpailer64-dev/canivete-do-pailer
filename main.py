@@ -3026,6 +3026,11 @@ class ApiBridge:
     def ve_otimizar_cancelar(self):
         return ve_otimizar_cancelar()
 
+    def ve_encoder_estado(self):
+        """Kanivete Encoder: CPU, RAM, placa e o quadro em render agora (Functions/encoder_monitor.py)."""
+        from Functions import encoder_monitor
+        return encoder_monitor.estado()
+
     def ve_sincronizar_audio(self, ref_path, ref_s, ref_e, outro_path, outro_s, outro_e):
         return ve_sincronizar_audio(ref_path, ref_s, ref_e, outro_path, outro_s, outro_e)
 

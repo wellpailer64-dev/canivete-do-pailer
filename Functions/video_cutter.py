@@ -71,6 +71,25 @@ _NAVEGADOR_CONTAINERS = {".mp4", ".m4v", ".mov", ".webm"}
 
 _hw_encoder_cache = None
 _ultimo_motivo_placa = [""]   # por que a última exportação não foi (ou não terminou) na placa (export_placa)
+
+
+def arquivo_miniatura():
+    """Quadro que está sendo exportado agora (Kanivete Encoder): JPEG pequeno, sobrescrito ~1×/s pelo próprio ffmpeg."""
+    return os.path.join(_midia_dir(), "ke_quadro.jpg")
+
+
+def saida_miniatura(rotulo, placa=False):
+    """(filtros, rótulo do vídeo, args da 2ª saída): divide o vídeo final e grava 1 quadro por segundo, pequeno, num
+    JPEG que é sobrescrito (-update). Custo desprezível; a janela do Encoder mostra ele."""
+    arq = arquivo_miniatura()
+    try:
+        os.remove(arq)
+    except OSError:
+        pass
+    # placa=True (turbo, quadros na memória da placa): só 1 quadro por segundo desce para virar o JPEG
+    desce = "hwdownload,format=pix_fmts=nv12|p010le," if placa else ""
+    filtros = [f"{rotulo}split[kesai][kemin]", f"[kemin]fps=1,{desce}scale=-2:240:flags=bilinear,format=yuvj420p[kethumb]"]
+    return filtros, "[kesai]", ["-map", "[kethumb]", "-f", "image2", "-update", "1", "-q:v", "7", arq]
 _hw_motivo = ""   # por que a placa NVIDIA não grava (ex.: driver antigo para o ffmpeg); vazio = sem problema conhecido
 _export_proc = None
 _export_procs = set()   # ffmpegs dos blocos em paralelo (_exportar_em_blocos)
@@ -2960,6 +2979,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     simples = not lay and audio_segmentos is None and mix is None
     if not simples or janela:   # bloco sem nada: o vazio completa até a duração (preto)
         pecas, pecas_a = _completar(pecas), _completar(pecas_a)
+    saida_pedida = saida   # prévia/Comp/bloco/wav do som: o chamador escolhe o arquivo (sem miniatura do Encoder)
     saida = saida or _nome_saida(aberto, cfg["ext"], pasta_saida, op.get("nome"))
     # o ffmpeg grava num temporário ao lado (nome.part.mp4) e só no fim ele vira o arquivo: falha, cancelamento ou
     # app fechado no meio nunca deixam um vídeo pela metade com o nome final (nem apagam um anterior de mesmo nome)
@@ -3514,8 +3534,16 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
 
     prep = {"scripts": [], "ass": []}
 
+    # miniatura do quadro em render (janela do Encoder): só na exportação normal, com o quadro na RAM
+    com_miniatura = not (previa or janela or alfa or audio_only or saida_pedida)
+    prep_min = {"args": []}
+
     def _preparar(tb):
         cmd, filtros, vf, ass, args_cor = _montar(tb)
+        prep_min["args"] = []
+        if com_miniatura:
+            fm, vf, prep_min["args"] = saida_miniatura(vf, placa=tb)
+            filtros += fm
         script = os.path.join(_work_dir(), f"filtro_{uuid.uuid4().hex[:8]}.txt")
         with open(script, "w", encoding="utf-8") as f:
             f.write(";\n".join(filtros))
@@ -3563,7 +3591,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             full = prep["base_cmd"] + va + ["-bf", "0", "-ss", f"{janela['ss']:.6f}", "-frames:v",
                                             str(janela["quadros"]), "-an", saida]
         else:
-            full = prep["base_cmd"] + video_args + cfg["extra"] + [saida]
+            full = prep["base_cmd"] + video_args + cfg["extra"] + [saida] + prep_min["args"]
         ultimo_cmd = full
 
         def _hold(p):

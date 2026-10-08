@@ -92,7 +92,8 @@ async function veFilaProximo() {
     if (!it || VEFILA.pausar) {
         VEFILA.rodando = false; VEFILA.atual = null; VE.exportRunning = false;
         document.querySelector('.menu-item[data-tool="video-cutter"]')?.classList.remove('rodando');
-        if (!it && VEFILA.itens.some(x => x.estado === 'pronto')) { veToast('Fila de render concluída'); if (typeof playConcluido === 'function') playConcluido(); }
+        // o som de concluído toca a cada render pronto (editor-encoder.js); aqui só o aviso do fim da fila
+        if (!it && VEFILA.itens.some(x => x.estado === 'pronto')) veToast('Fila de render concluída');
         veFilaRender();
         return;
     }

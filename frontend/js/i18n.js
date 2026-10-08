@@ -588,6 +588,14 @@ const I18N_EN = {
     'Selecione a ponta de um clipe com som (ou o clipe) e aperte Ctrl+Shift+D / Ctrl+Shift+9': 'Select the edge of a clip with sound (or the clip) and press Ctrl+Shift+D / Ctrl+Shift+9',
     'Selecione a ponta de um clipe (ou o clipe) e aperte Ctrl+D': 'Select the edge of a clip (or the clip) and press Ctrl+D',
     'Sem mídia sobrando para a transição': 'Not enough extra media for the transition',
+    // Kanivete Encoder (editor-encoder.js): renderizando agora, monitor, atalhos da fila; taxa cravada; modo placa
+    'Nada renderizando': 'Nothing rendering', 'Pronto para renderizar': 'Ready to render', 'Renderizando agora': 'Rendering now',
+    'Último render': 'Last render', 'Placa': 'GPU', 'Memória da placa': 'GPU memory', 'falta': 'left', 'tempo real': 'real time',
+    'feito em': 'done in', 'Montado na placa': 'Built on the GPU', 'Sem placa NVIDIA: só CPU e RAM': 'No NVIDIA GPU: CPU and RAM only',
+    'Na fila do Kanivete Encoder': 'Queued in Kanivete Encoder', 'esperando': 'waiting',
+    'Pôr na fila e abrir o Kanivete Encoder': 'Queue and open Kanivete Encoder', 'Pôr na fila do Kanivete Encoder (sem abrir)': 'Queue in Kanivete Encoder (without opening)',
+    'Timeline em': 'Timeline at', '(taxa padrão; o vídeo tem': '(standard rate; the video has', 'variável)': 'variable)',
+    'padrão, pelo 1º vídeo': 'standard, from the 1st video', 'montado na placa de vídeo': 'built on the GPU',
     'Clique marca como a do Ctrl+D · arraste até o corte entre dois clipes (ou o início/fim de um clipe) · duplo clique põe na entrada do clipe selecionado':
         'Click to set it as the Ctrl+D transition · drag onto the cut between two clips (or the start/end of a clip) · double-click adds it to the start of the selected clip',
     'Clique numa transição para usá-la no Ctrl+D; clique na ponta de um clipe e aperte Ctrl+D (vídeo) ou Ctrl+Shift+D / Ctrl+Shift+9 (áudio: Potência constante)':

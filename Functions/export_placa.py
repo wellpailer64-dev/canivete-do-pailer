@@ -548,7 +548,10 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
     temp = None
     try:
         g, final = montar(lay, W, H, fps, total, pasta, args["segmentos"], args["path"], info)
-        g.filtros.append(f"{final}hwdownload,format=yuv420p[vout]")
+        g.filtros.append(f"{final}hwdownload,format=yuv420p[vbaixo]")
+        fm, rot_v, args_min = vc.saida_miniatura("[vbaixo]")   # a miniatura do quadro em render (janela do Encoder)
+        g.filtros += fm
+        g.filtros.append(f"{rot_v}null[vout]")
         grafo = os.path.join(pasta, "grafo.txt")
         with open(grafo, "w", encoding="utf-8") as f:
             f.write(";\n".join(g.filtros))
@@ -557,7 +560,7 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
         enc = vc._args_video(dict(cfg, vcodec=vcodec), q, args["usar_gpu"], bits, float(op.get("mbps") or 0))
         cor = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
         cmd = g.cmd + ["-/filter_complex", grafo, "-map", "[vout]", "-t", vc._tempo_ffmpeg(total), *enc, *cor,
-                       "-an", video]
+                       "-an", video] + args_min
         if t_som:
             t_som.start()
         prog(0, "Exportando na placa de vídeo...")
