@@ -23,8 +23,9 @@ def _tamanho_saida(w, h):
     return max(2, int(round(w * k / 2)) * 2), max(2, int(round(h * k / 2)) * 2)
 
 
-def converter(path, on_pct=None, stop_event=None):
-    """{success, saida, w, h, reuso?} | {success: False, error} | {success: True, pulado: motivo}."""
+def converter(path, on_pct=None, stop_event=None, on_motor=None):
+    """{success, saida, w, h, reuso?} | {success: False, error} | {success: True, pulado: motivo}.
+    on_motor("GPU" | "CPU") avisa por onde cada tentativa converte (barra do painel Projeto)."""
     try:
         info = probe(path)
     except Exception as e:
@@ -58,13 +59,17 @@ def converter(path, on_pct=None, stop_event=None):
     if _detectar_hw_encoder() == "h264_nvenc" and info.get("vcodec") in ("h264", "hevc", "vp9", "av1"):
         sw, sh = (th, tw) if rot in (90, 270) else (tw, th)   # a placa reduz o quadro antes de girar
         vf = f"scale_cuda={sw}:{sh}:format=nv12:interp_algo=lanczos,hwdownload,format=nv12" + (f",{giro}" if giro else "")
-        tentativas.append([ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-noautorotate",
+        # rotação zerada na ENTRADA (não só -noautorotate): o ffmpeg novo copia a matriz de rotação do original para a
+        # saída e o quadro, já girado pelo transpose, girava de novo no player (vídeo de cabeça para baixo, 2026-10-08)
+        tentativas.append([ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-display_rotation:v:0", "0",
                            "-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-i", path, "-map", "0:v:0",
                            "-vf", vf] + nv + cor + comum)
     tentativas.append([ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-i", path,
                        "-map", "0:v:0", "-vf", f"scale={tw}:{th}:flags=lanczos"] + cpu + cor + comum)
     err = ""
     for cmd in tentativas:
+        if on_motor:
+            on_motor("GPU" if "h264_nvenc" in cmd else "CPU")
         rc, err = _run_progress(cmd, info["duration"], on_pct or (lambda p: None), stop_event)
         if stop_event is not None and stop_event.is_set():
             break

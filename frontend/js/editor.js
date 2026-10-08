@@ -5623,6 +5623,7 @@ function veCancelExport() {
 
 function veOnExport(ev) {
     if (typeof ev === 'string') { try { ev = JSON.parse(ev); } catch (e) { return; } }
+    if (ev.aviso_gpu && !ev.done) veToast(ev.aviso_gpu);   // driver NVIDIA antigo: exportando pela CPU
     if (!ev.done) {
         const p = ev.pct || 0;
         $ve('ve-exp-fill').style.width = p + '%';
@@ -5648,6 +5649,7 @@ function veOnExport(ev) {
         const mb = ev.size ? (ev.size / 1048576).toFixed(1) + ' MB' : '';
         box.innerHTML = `<b>${veEsc(ev.output_path.split(/[\\/]/).pop())}</b><br>` +
             `<span class="ve-exp-sub">${veHuman(ev.duration)} · ${mb}${ev.turbo ? ' · ⚡ ' + veT('turbo (tudo na placa de vídeo)') : ''}</span>` +
+            (ev.aviso_gpu ? `<br><span class="ve-exp-sub ve-exp-aviso">⚠ ${veEsc(ev.aviso_gpu)}</span>` : '') +
             '<div class="ve-exp-actions">' +
             '<button class="ve-btn ve-btn-primary ve-btn-sm" onclick="window.pywebview.api.open_file(VE.lastOutput)"><svg class="i"><use href="#i-play"/></svg> Assistir</button>' +
             '<button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.reveal_file(VE.lastOutput)"><svg class="i"><use href="#i-folder"/></svg> Mostrar na pasta</button></div>';

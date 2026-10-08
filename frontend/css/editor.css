@@ -1480,6 +1480,20 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-pj-fim { height: 40px; }
 .ve-pj-rodape { display: flex; align-items: center; gap: 2px; padding: 4px 8px; border-top: 1px solid var(--ve-line); }
 .ve-pj-sep { width: 1px; height: 16px; margin: 0 4px; background: var(--ve-line); }
+/* Forçar Full HD: progresso da conversão acima do rodapé do Projeto */
+.ve-pj-fhd { padding: 6px 10px 7px; border-top: 1px solid var(--ve-line); font-size: 11px; color: var(--ve-dim); }
+.ve-pj-fhd[hidden] { display: none; }
+.ve-pj-fhd-linha { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; min-width: 0; }
+.ve-pj-fhd-txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ve-text); }
+.ve-pj-fhd-motor { font-family: var(--ve-mono); font-size: 10px; padding: 1px 5px; border-radius: 3px; border: 1px solid var(--ve-line); }
+.ve-pj-fhd-motor.gpu { color: #76b900; border-color: #76b90066; }
+.ve-pj-fhd-motor.cpu { color: #f0a640; border-color: #f0a64066; }
+.ve-pj-fhd-pct { font-family: var(--ve-mono); white-space: nowrap; }
+.ve-pj-fhd-x { width: 18px; height: 18px; font-size: 14px; line-height: 1; padding: 0; }
+.ve-pj-fhd-trilho { height: 4px; border-radius: 2px; background: var(--ve-bg); overflow: hidden; }
+.ve-pj-fhd-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--ve-accent), var(--ve-accent-2)); transition: width .3s; }
+.ve-pj-fhd-aviso, .ve-exp-aviso { color: #f0a640; }
+.ve-pj-fhd-aviso { margin-top: 5px; line-height: 1.4; }
 .ve-pj-modo.on { background: var(--ve-panel-2); color: var(--ve-accent); }
 .ve-pj-tam { width: 72px; margin-left: 4px; accent-color: var(--ve-accent); display: none; }
 .ve-pj.grade .ve-pj-tam { display: block; }

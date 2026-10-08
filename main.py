@@ -413,8 +413,9 @@ _ve_fhd_stop = None
 
 def ve_otimizar_fullhd(itens):
     """Forçar Full HD (painel Projeto): itens = [[id, path]]; um por vez em background. Eventos em
-    veOnOtimizar({id, pct} | {id, done, success, saida, w, h, error, pulado} | {fim: true})."""
+    veOnOtimizar({id, pct} | {id, motor, aviso} | {id, done, success, saida, w, h, error, pulado} | {fim: true})."""
     from Functions import otimizar
+    from Functions.video_cutter import motivo_sem_gpu
     global _ve_fhd_stop
     stop = threading.Event()
     _ve_fhd_stop = stop
@@ -424,7 +425,10 @@ def ve_otimizar_fullhd(itens):
             if stop.is_set():
                 break
             try:
-                r = otimizar.converter(path, lambda p, mid=mid: _ve_emit("veOnOtimizar", {"id": mid, "pct": p}), stop)
+                r = otimizar.converter(
+                    path, lambda p, mid=mid: _ve_emit("veOnOtimizar", {"id": mid, "pct": p}), stop,
+                    lambda m, mid=mid: _ve_emit("veOnOtimizar", {"id": mid, "motor": m,
+                                                                 "aviso": motivo_sem_gpu() if m == "CPU" else ""}))
             except Exception as e:
                 r = {"success": False, "error": str(e)}
             _ve_emit("veOnOtimizar", {"id": mid, "done": True, **r})
@@ -599,13 +603,18 @@ def video_cutter_export(file_path, segments, output_format="mp4", qualidade="med
                         opcoes=None):
     """Exporta a timeline (base + camadas por cima); progresso em veOnExport(evento). quadro = [w, h] da sequência.
     opcoes = {nome, codec, bits, mbps} (diálogo de exportação)."""
-    from Functions.video_cutter import exportar_video
+    from Functions.video_cutter import exportar_video, motivo_sem_gpu
     global _ve_export_stop
     stop = threading.Event()
     _ve_export_stop = stop
 
     def run():
+        aviso = ""
         try:
+            # placa NVIDIA que não grava (driver antigo): avisa em vez de cair para a CPU calado
+            aviso = motivo_sem_gpu() if usar_gpu else ""
+            if aviso:
+                _ve_emit("veOnExport", {"pct": 0, "message": aviso, "aviso_gpu": aviso})
             r = exportar_video(
                 file_path, segments, output_format, qualidade, resolucao, bool(usar_gpu),
                 pasta_saida or None,
@@ -620,7 +629,7 @@ def video_cutter_export(file_path, segments, output_format="mp4", qualidade="med
                 quadro=quadro,
                 opcoes=opcoes,
             )
-            _ve_emit("veOnExport", {"done": True, **r})
+            _ve_emit("veOnExport", {"done": True, **r, "aviso_gpu": aviso})
         except Exception as e:
             _ve_emit("veOnExport", {"done": True, "success": False, "error": str(e)})
 

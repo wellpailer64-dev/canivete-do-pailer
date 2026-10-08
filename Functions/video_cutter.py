@@ -70,6 +70,7 @@ _NAVEGADOR_ACODECS = {"aac", "mp3", "opus", "vorbis", "flac"}
 _NAVEGADOR_CONTAINERS = {".mp4", ".m4v", ".mov", ".webm"}
 
 _hw_encoder_cache = None
+_hw_motivo = ""   # por que a placa NVIDIA não grava (ex.: driver antigo para o ffmpeg); vazio = sem problema conhecido
 _export_proc = None
 _export_procs = set()   # ffmpegs dos blocos em paralelo (_exportar_em_blocos)
 _export_lock = threading.Lock()
@@ -824,7 +825,8 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
         giro = {270: "transpose=clock", 90: "transpose=cclock", 180: "hflip,vflip"}.get(rot)
         if not giro:
             return None
-        return [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-noautorotate",
+        # rotação zerada na entrada: com -noautorotate a matriz do original ia para a prévia e girava de novo
+        return [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-display_rotation:v:0", "0",
                 "-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-i", path,
                 "-filter_complex", f"[0:v:0]scale_cuda={_PROXY_ESCALA}:format=yuv420p,hwdownload,format=yuv420p,{giro}"
                 + (",split[p][b]" + th_filtro if th_saida else "[p]"),
@@ -1272,11 +1274,13 @@ def inverter_midia(path, a, b, on_pct=None, stop_event=None):
 def _detectar_hw_encoder(codec="h264", bits=8):
     """Testa uma vez os encoders de GPU do codec (h264/hevc; hevc 10 bits testa em p010).
     Retorna 'h264_nvenc' | 'h264_qsv' | 'h264_amf' | 'hevc_*' | None."""
-    global _hw_encoder_cache
+    global _hw_encoder_cache, _hw_motivo
     if not isinstance(_hw_encoder_cache, dict):
         _hw_encoder_cache = {}
     chave = f"{codec}{bits}"
-    if chave in _hw_encoder_cache:
+    # driver velho: refaz o teste a cada minuto (depois de atualizar o driver a placa volta sem reiniciar o app)
+    if chave in _hw_encoder_cache and not (_hw_motivo and not _hw_encoder_cache[chave]
+                                           and time.time() - _hw_encoder_cache.get(chave + "_t", 0) > 60):
         return _hw_encoder_cache[chave] or None
     achado, incerto = "", False
     px = ["-pix_fmt", "p010le"] if bits == 10 else []
@@ -1285,12 +1289,21 @@ def _detectar_hw_encoder(codec="h264", bits=8):
             r = subprocess.run(
                 [ffmpeg_path(), "-v", "error", "-f", "lavfi", "-i", "color=c=black:s=320x240:d=0.2",
                  *px, "-c:v", enc, "-f", "null", "-"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, errors="replace",
                 timeout=30, creationflags=_creationflags(),
             )
             if r.returncode == 0:
                 achado = enc
+                if enc.endswith("_nvenc"):
+                    _hw_motivo = ""
                 break
+            if enc.endswith("_nvenc"):
+                # placa NVIDIA presente, mas o driver é mais velho que o exigido pelo ffmpeg (2026-10: ffmpeg pedia
+                # 610+ e o usuário tinha 591 → exportava tudo pela CPU sem avisar)
+                m = re.search(r"minimum required Nvidia driver for nvenc is ([\d.]+)", r.stderr or "")
+                if m or "nvenc API version" in (r.stderr or ""):
+                    _hw_motivo = ("Driver NVIDIA antigo: a placa de vídeo não está sendo usada. Atualize o driver"
+                                  + (f" para {m.group(1)} ou mais novo" if m else "") + " (NVIDIA App ou nvidia.com).")
         except subprocess.TimeoutExpired:
             incerto = True   # máquina ocupada (outra exportação): não conclui que não há placa
         except Exception:
@@ -1299,7 +1312,14 @@ def _detectar_hw_encoder(codec="h264", bits=8):
     # (antes a sessão inteira exportava pela CPU depois de uma detecção com o computador carregado)
     if achado or not incerto:
         _hw_encoder_cache[chave] = achado
+        _hw_encoder_cache[chave + "_t"] = time.time()
     return achado or None
+
+
+def motivo_sem_gpu():
+    """Texto para o usuário quando a placa NVIDIA existe mas não pode gravar (vazio se não há problema conhecido)."""
+    _detectar_hw_encoder()
+    return _hw_motivo
 
 
 def _args_video(cfg, q, usar_gpu, bits=8, mbps=0):
@@ -3137,7 +3157,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 # prévia renderizada com placa NVIDIA: o clipe decodifica na placa (NVDEC; sem ela, o ffmpeg volta
                 # sozinho ao processador). Celular 8K HEVC em pé: trecho de 9,5 s 38 s → 11 s
                 gpu_red = c.get("gpu_red")
-                hw = (["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"] + (["-noautorotate"] if gpu_red[2] else [])
+                hw = (["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"] + (["-display_rotation:v:0", "0"] if gpu_red[2] else [])
                       if gpu_red else ["-hwaccel", "cuda"] if nvdec_previa else [])
                 cmd += ["-threads", str(_THREADS_CLIPE)] + hw \
                     + (["-ss", _tempo_ffmpeg(c["ss"])] if c["ss"] > 0 else []) \

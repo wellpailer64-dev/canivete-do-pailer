@@ -894,29 +894,57 @@ function vePjForcarFullHD() {
     if (VEFHD.fila) { veToast('Forçar Full HD já está convertendo'); return; }
     const itens = vePjGrandes([...VEPJ.sel]);
     if (!itens.length) { veToast('Selecione no Projeto vídeos maiores que Full HD'); return; }
-    VEFHD.fila = { n: itens.length, i: 0, feitos: [], erros: [] };
+    VEFHD.fila = { n: itens.length, i: 0, feitos: [], erros: [], t0: Date.now(), id: itens[0].id, motor: '' };
     VEFHD.pct = -1;
     veToast(`Forçar Full HD: ${itens.length} ${itens.length === 1 ? 'vídeo' : 'vídeos'}...`);
+    vePjFhdBarra();
     api.ve_otimizar_fullhd(itens.map(m => [m.id, m.path]));
+}
+
+// Barra acima do rodapé do Projeto: vídeo atual, GPU/CPU, % do total e tempo que falta (pelo ritmo até agora)
+function vePjFhdBarra() {
+    const q = VEFHD.fila, box = $ve('ve-pj-fhd');
+    if (!box) return;
+    box.hidden = !q;
+    if (!q) return;
+    const pct = Math.max(0, VEFHD.pct);
+    const total = Math.min(100, (q.i + pct / 100) / q.n * 100);
+    const m = VE.media[q.id];
+    $ve('ve-pj-fhd-txt').textContent = `Full HD ${Math.min(q.i + 1, q.n)}/${q.n} · ${m ? vePjNome(m) : ''}`;
+    $ve('ve-pj-fhd-txt').title = $ve('ve-pj-fhd-txt').textContent;
+    const mo = $ve('ve-pj-fhd-motor');
+    mo.textContent = q.motor; mo.hidden = !q.motor; mo.className = 've-pj-fhd-motor ' + q.motor.toLowerCase();
+    mo.title = q.motor === 'GPU' ? 'Convertendo na placa de vídeo' : 'Convertendo no processador (mais lento)';
+    const passado = (Date.now() - q.t0) / 1000;
+    $ve('ve-pj-fhd-pct').textContent = `${Math.floor(total)}%` + (total > 2 ? ` · falta ~${veHuman(passado / total * (100 - total))}` : '');
+    $ve('ve-pj-fhd-fill').style.width = total.toFixed(1) + '%';
+    const av = $ve('ve-pj-fhd-aviso');
+    av.textContent = q.aviso || ''; av.hidden = !q.aviso;
+}
+
+function vePjFhdCancelar() {
+    const api = window.pywebview && window.pywebview.api;
+    if (VEFHD.fila && api && api.ve_otimizar_cancelar) { api.ve_otimizar_cancelar(); $ve('ve-pj-fhd-txt').textContent = 'Cancelando...'; }
 }
 
 window.veOnOtimizar = async ev => {
     const q = VEFHD.fila;
     if (!q) return;
     if (!ev.done && !ev.fim) {
-        if (ev.pct !== VEFHD.pct && ev.pct % 5 === 0) {
-            VEFHD.pct = ev.pct;
-            veToast(`Forçar Full HD (${q.i + 1}/${q.n}): ${vePjNome(VE.media[ev.id])} ${ev.pct}%`);
-        }
+        if (ev.motor) { q.id = ev.id; q.motor = ev.motor; q.aviso = ev.aviso || ''; VEFHD.pct = 0; }
+        else if (ev.pct !== VEFHD.pct) { q.id = ev.id; VEFHD.pct = ev.pct; }
+        vePjFhdBarra();
         return;
     }
     if (ev.done) {
         q.i++;
         VEFHD.pct = -1;
         if (ev.success && ev.saida) q.feitos.push(ev); else if (!ev.success) q.erros.push(`${vePjNome(VE.media[ev.id])}: ${ev.error}`);
+        vePjFhdBarra();
         return;
     }
     VEFHD.fila = null;
+    vePjFhdBarra();
     if (q.erros.length) veToast(`Forçar Full HD: ${q.erros.slice(0, 2).join(' · ')}`);
     if (!q.feitos.length) { if (!q.erros.length) veToast(ev.cancelado ? 'Forçar Full HD cancelado' : 'Nenhum vídeo precisava de conversão'); return; }
     const naTl = q.feitos.filter(r => veMidiaNaTimeline(r.id)).length;
