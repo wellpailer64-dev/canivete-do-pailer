@@ -7,7 +7,8 @@
 // =========================================================
 
 function ieCenaFormatos() {
-    return { quadrado: [1080, 1080], feed: [1080, 1350], retrato: [1080, 1440], story: [1080, 1920], paisagem: [1920, 1080], a4: [2480, 3508] };
+    return { quadrado: [1080, 1080], feed: [1080, 1350], retrato: [1080, 1440], story: [1080, 1920], paisagem: [1920, 1080], a4: [2480, 3508],
+        a5: [1748, 2480], folheto14x21: [2000, 3002] };
 }
 
 async function ieCena(html, o = {}) {

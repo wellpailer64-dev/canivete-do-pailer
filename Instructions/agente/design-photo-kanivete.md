@@ -215,3 +215,27 @@ Peça: `D:\kanivete_testes\carrossel_vereador\` (carrossel.html, depois.js, cont
 6. Prévia só no fim. Quando uma ferramenta do app não responder, rastrear os eventos antes de tentar de novo.
 Recarregar o app de teste sem reabrir: CDP `Network.setCacheDisabled` + `Page.reload {ignoreCache: true}` (o WebView2
 guarda os .js em cache; `page.reload()` simples pode manter a versão velha).
+
+## Técnicas do Pinterest (2026-10-08): referência que vira técnica anotada
+1. `py -3.13 tools/refs.py "busca 1" "busca 2" --tema "<peça, cores, o que destacar>" --pasta D:/kanivete_biblioteca/refs/<peça>
+   --porta <app>` — Pinterest headless, folhas numeradas, paleta medida e nota + técnicas da Kani (gemma4) por referência
+   em `refs.json`; o Claude olha só `top.jpg` (~6 min, quase sem token). Não usar o navegador do usuário para isso.
+2. Antes de inventar, ler `D:/kanivete_biblioteca/tecnicas/tecnicas.json` (campo `quando`): técnica já anotada = receita pronta.
+3. Técnica NOVA usada numa peça → ficha `<id>.md` (pilha, valores, cuidados) + `<id>_ref.jpg` + resultado + receita em
+   `tecnicas/receitas/`, e uma linha no `tecnicas.json`. Primeiras: `bloco-virada-de-lote`, `fundo-pista-feixes`.
+4. Revisão da Kani numa peça com logos do cliente: passar o que é intocável (logos) para ela não comentar.
+
+## Fluxo com direção (2026-10-08, depois de "poluído, amador, genérico" no flyer Festa da Amizade) — vale sobre o resto
+Gabarito: `D:/kanivete_biblioteca/gabarito_pailer.json` (29 PSDs do usuário medidos: ~6 palavras, margem 13,5%, herói
+1,66× o 2º texto, só Sombra/Sobreposição de cor, poluição ~10,5% de bordas). Erro que levou a isso: copiar ingredientes
+das referências (dourado, brilho, fonte) sem as relações (hierarquia, proporção, respiro, unidade).
+1. **Briefing de 3 linhas aprovado pelo usuário**: mensagem principal, ordem de importância, tom. Não decidir sozinho
+   (no flyer ele manteve o evento como herói e o lote como secundário, contra a opinião da Kani e de terceiros).
+2. **Estrutura sem acabamento**: logos reais + blocos de texto, 2–3 miniaturas mudando só a hierarquia (KNV.cena em
+   escala baixa, sem gerar fundo); o usuário escolhe UMA.
+3. **Imagem com significado** (pessoa, o objeto do tema), não decoração; destaque pela cor de uma palavra-chave.
+4. **Acabamento do usuário no fim**: carimbo visível + Camera Raw (contraste +11, realces +11, pretos −4, textura 17,
+   claridade 39, vibratilidade 13, nitidez 39, grão 30) + Multiplicar atrás do herói.
+5. `KNV.revisarGabarito()` (também no `revisarPeca`/`tools/revisor.py`) antes de mostrar; a Kani só confere coisas
+   objetivas, nunca nota de gosto (VLMs não avaliam estética: AesEval-Bench, ICLR 2026).
+6. Ficha em `D:/kanivete_biblioteca/tecnicas` só com status aprovado pelo usuário.

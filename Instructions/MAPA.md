@@ -161,8 +161,8 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - **API** (`pywebview.api.*`, 9): `web_scraper_analyze(url)`, `web_scraper_download(url, mode, destino)`, `web_scraper(url, tipo, destino)`, `web_scraper_csv(url)`, `cerebro_load()`, `cerebro_save(content)`, `cerebro_exists()`, `cerebro_remove()`, `cerebro_select_file()`
 - **Guias**: `Instructions/webscraper.md`, `Instructions/cerebro.md`
 
-### API geral (app, janela, preferências, arquivos) — 22 métodos
-`select_folder(tool)`, `select_file(tool)`, `select_image(tool)`, `open_folder(path)`, `kani_estado()`, `kani_baixar()`, `kani_enviar(cid, mensagens, ferramenta="")`, `kani_parar(cid)`, `reveal_file(path)`, `open_file(path)`, `select_video_file(tool)`, `prefs_load()`, `prefs_save(dados)`, `check_update()`, `apply_update()`, `sair_app()`, `toggle_fullscreen()`, `janela_cmd(acao)`, `janela_propria()`, `janela_ativar()`, `on_webview_ready(sender, args)`, `on_new_window_request(sender, args)`
+### API geral (app, janela, preferências, arquivos) — 24 métodos
+`select_folder(tool)`, `select_file(tool)`, `select_image(tool)`, `open_folder(path)`, `kani_estado()`, `kani_baixar()`, `kani_enviar(cid, mensagens, ferramenta="")`, `kani_parar(cid)`, `kani_voz(ligar=True)`, `kani_falar(texto, chave="")`, `reveal_file(path)`, `open_file(path)`, `select_video_file(tool)`, `prefs_load()`, `prefs_save(dados)`, `check_update()`, `apply_update()`, `sair_app()`, `toggle_fullscreen()`, `janela_cmd(acao)`, `janela_propria()`, `janela_ativar()`, `on_webview_ready(sender, args)`, `on_new_window_request(sender, args)`
 
 ## 6. Vetor Kanivete — comandos `VKN.cmd(nome, args)` (154; a interface, o Claude e o Jr usam os mesmos)
 - `vetor-3d.js`: `girar_3d` (3D girar), `extrudar_3d` (3D extrudar), `editar_3d` (editar 3D), `mapear_arte` (mapear arte no 3D), `limpar_mapas` (tirar artes mapeadas), `expandir_3d` (expandir 3D)
@@ -192,8 +192,8 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `vetor-transformar.js`: `repetir` (repetir transformação), `transformar_cada` (transformar cada), `distribuir_espaco` (distribuir espaçamento)
 - `vetor-vinculos.js`: `vinculos` (vínculos), `revincular` (substituir imagem), `atualizar_vinculo` (atualizar vínculo)
 
-## 7. Photo Kanivete — `window.KNV` (81 métodos; detalhes em `frontend/js/imagem-api.js`)
-`novo`, `doc`, `camadas`, `ativar`, `info`, `renomear`, `cmd`, `nova`, `colocar`, `transformar`, `girar`, `escalar`, `caixa`, `alinhar`, `encostar`, `caixaGrupo`, `mover`, `moverPara`, `modo`, `ajuste`, `objetoInteligente`, `atenuar`, `colarDentro`, `substituirTexto`, `preenchimentoGenerativo`, `expansaoGenerativa`, `variacaoGenerativa`, `substituirCeu`, `preencherConteudo`, `preenchimento`, `preenchimentoDegrade`, `duplicar`, `removerFundo`, `borrachaMagica`, `gerar`, `selecionar`, `selecionarPoligono`, `preencher`, `degrade`, `pincel`, `lote`, `definirPadrao`, `salvar`, `abrir`, `fecharDoc`, `fecharTudo`, `texto`, `efeito`, `formas`, `revisarPeca`, `revisarDirecao`, `revisar`, `mapa`, `layoutGuias`, `novaGuia`, `guias`, `limparGuias`, `guiasDaForma`, `fatiasDasGuias`, `ajustar`, `cena`, `cenaFonte`, `exportar`, `marca`, `instalarFonte`, `fontes`, `ver`, `variacoes`, `etapa`, `referencia`, `comparar`, `receita`, `levarParaEditor`, `exportarRapido`, `recursosNovos`, `png`, `cor`, `dialogos`, `automacao`, `dialogo`, `responder`
+## 7. Photo Kanivete — `window.KNV` (82 métodos; detalhes em `frontend/js/imagem-api.js`)
+`novo`, `doc`, `camadas`, `ativar`, `info`, `renomear`, `cmd`, `nova`, `colocar`, `transformar`, `girar`, `escalar`, `caixa`, `alinhar`, `encostar`, `caixaGrupo`, `mover`, `moverPara`, `modo`, `ajuste`, `objetoInteligente`, `atenuar`, `colarDentro`, `substituirTexto`, `preenchimentoGenerativo`, `expansaoGenerativa`, `variacaoGenerativa`, `substituirCeu`, `preencherConteudo`, `preenchimento`, `preenchimentoDegrade`, `duplicar`, `removerFundo`, `borrachaMagica`, `gerar`, `selecionar`, `selecionarPoligono`, `preencher`, `degrade`, `pincel`, `lote`, `definirPadrao`, `salvar`, `abrir`, `fecharDoc`, `fecharTudo`, `texto`, `efeito`, `formas`, `revisarPeca`, `revisarGabarito`, `revisarDirecao`, `revisar`, `mapa`, `layoutGuias`, `novaGuia`, `guias`, `limparGuias`, `guiasDaForma`, `fatiasDasGuias`, `ajustar`, `cena`, `cenaFonte`, `exportar`, `marca`, `instalarFonte`, `fontes`, `ver`, `variacoes`, `etapa`, `referencia`, `comparar`, `receita`, `levarParaEditor`, `exportarRapido`, `recursosNovos`, `png`, `cor`, `dialogos`, `automacao`, `dialogo`, `responder`
 
 **Editor — Cena 3D `window.VE3DAPI`** (11): `nova`, `modelo`, `definir`, `kf`, `doVetor`, `limparKf`, `cena`, `remover`, `info`, `renderizar`, `quadro`
 
@@ -221,6 +221,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/ps_modelo_so.py` — Gera no Photoshop um PSD com um PNG colocado como objeto inteligente incorporado (escalado e girado): molde do SoLd
 - `tools/ps_modelo_texto.py` — Gera no Photoshop (COM + JSX) um PSD com uma camada de texto de ponto e uma de parágrafo: molde do TySh
 - `tools/recarregar.py` — Modo agente: aplica código novo no app aberto SEM reiniciar
+- `tools/refs.py` — Referências do Pinterest numa chamada: busca (navegador headless, sem login), baixa, monta folhas de contato,
 - `tools/revisor.py` — Revisor da peça do Photo Kanivete: confere, sem o Claude olhar, as regras que vieram dos feedbacks do usuário e
 - `tools/roteiro_local.py` — Briefing → roteiro JSON do tools/esqueleto.py pelo modelo LOCAL (Ollama; o Jr). O modelo só escreve o roteiro curto;
 - `tools/vk_cena.py` — Diagramar uma prancheta do Vetor Kanivete com HTML/CSS (VKN.cena) usando o sistema da marca
@@ -240,7 +241,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/plano-cena.md` — Plano CENA — diagramar no Photo Kanivete escrevendo HTML/CSS (para IAs)
 - `Instructions/agente/plano-comp.md` — Plano: Comp (composição estilo After Effects) no Pocket Editor
 - `Instructions/agente/plano-economia-ponte-vetor-photo.md` — Planos (2026-10-04): economia de tokens, ponte Vetor ↔ Photo, nível "Herbíssimo"
-- `Instructions/agente/plano-kanivete-encoder.md` — Kanivete Encoder (Ke) — plano (PENDENTE, combinado em 2026-10-07 para a sessão seguinte)
+- `Instructions/agente/plano-kanivete-encoder.md` — Kanivete Encoder (Ke) — plano (rodada 1 de otimização FEITA em 2026-10-08; pendências no fim)
 - `Instructions/agente/remover-fundo.md` — Remover fundo (recorte) — velocidade × qualidade (2026-10-06)
 - `Instructions/agente/teste-4k.md` — Teste de 4K (estresse do Editor de Vídeo)
 - `Instructions/agente/worker.md` — Canivete Worker — o assistente local (para o Claude delegar operações)

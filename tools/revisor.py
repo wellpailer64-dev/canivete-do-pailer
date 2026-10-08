@@ -5,6 +5,8 @@ devolve UMA linha JSON. Regras (cada feedback novo vira uma regra aqui ou em KNV
   sombra    sombra projetada dura (pouco desfoque para a força)
   avatar    rosto no círculo: queixo/cabeça cortados ou rosto grande demais (OpenCV, aqui)
   direção   (KNV.revisarDirecao, por slide) hierarquia, gancho, texto, respiro, vetor, asset, ponte, roteiro
+  gabarito  (KNV.revisarGabarito) números das peças do usuário (D:/kanivete_biblioteca/gabarito_pailer.json): margem
+            ≥ 12%, título ≥ 1,5× o 2º texto, sem brilho/chanfro/degradê em texto, ≤ 3 fontes, ≤ 35 palavras, bordas ≤ 13%
 
 uso: py -3.13 tools/revisor.py [peca.iknv] [--porta 9333] [--sem-corte] [--roteiro roteiro.json]
      roteiro.json = [["frases do slide 1"...], ...] ou {"slides": [{"gancho": "...", "sub": "...", "corpo": "..."}, ...]}

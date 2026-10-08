@@ -720,6 +720,8 @@
   "kani_baixar",
   "kani_enviar",
   "kani_parar",
+  "kani_voz",
+  "kani_falar",
   "reveal_file",
   "open_file",
   "select_video_file",
@@ -1122,6 +1124,18 @@
   },
   "kani_parar": {
    "args": "cid",
+   "modulos": [
+    "kani"
+   ]
+  },
+  "kani_voz": {
+   "args": "ligar=True",
+   "modulos": [
+    "kani"
+   ]
+  },
+  "kani_falar": {
+   "args": "texto, chave=\"\"",
    "modulos": [
     "kani"
    ]
@@ -2106,6 +2120,7 @@
   "efeito",
   "formas",
   "revisarPeca",
+  "revisarGabarito",
   "revisarDirecao",
   "revisar",
   "mapa",
@@ -2175,6 +2190,7 @@
   "tools/ps_modelo_so.py": "Gera no Photoshop um PSD com um PNG colocado como objeto inteligente incorporado (escalado e girado): molde do SoLd",
   "tools/ps_modelo_texto.py": "Gera no Photoshop (COM + JSX) um PSD com uma camada de texto de ponto e uma de parágrafo: molde do TySh",
   "tools/recarregar.py": "Modo agente: aplica código novo no app aberto SEM reiniciar",
+  "tools/refs.py": "Referências do Pinterest numa chamada: busca (navegador headless, sem login), baixa, monta folhas de contato,",
   "tools/revisor.py": "Revisor da peça do Photo Kanivete: confere, sem o Claude olhar, as regras que vieram dos feedbacks do usuário e",
   "tools/roteiro_local.py": "Briefing → roteiro JSON do tools/esqueleto.py pelo modelo LOCAL (Ollama; o Jr). O modelo só escreve o roteiro curto;",
   "tools/vk_cena.py": "Diagramar uma prancheta do Vetor Kanivete com HTML/CSS (VKN.cena) usando o sistema da marca"
@@ -2194,7 +2210,7 @@
   "Instructions/agente/plano-cena.md": "Plano CENA — diagramar no Photo Kanivete escrevendo HTML/CSS (para IAs)",
   "Instructions/agente/plano-comp.md": "Plano: Comp (composição estilo After Effects) no Pocket Editor",
   "Instructions/agente/plano-economia-ponte-vetor-photo.md": "Planos (2026-10-04): economia de tokens, ponte Vetor ↔ Photo, nível \"Herbíssimo\"",
-  "Instructions/agente/plano-kanivete-encoder.md": "Kanivete Encoder (Ke) — plano (PENDENTE, combinado em 2026-10-07 para a sessão seguinte)",
+  "Instructions/agente/plano-kanivete-encoder.md": "Kanivete Encoder (Ke) — plano (rodada 1 de otimização FEITA em 2026-10-08; pendências no fim)",
   "Instructions/agente/remover-fundo.md": "Remover fundo (recorte) — velocidade × qualidade (2026-10-06)",
   "Instructions/agente/teste-4k.md": "Teste de 4K (estresse do Editor de Vídeo)",
   "Instructions/agente/worker.md": "Canivete Worker — o assistente local (para o Claude delegar operações)",

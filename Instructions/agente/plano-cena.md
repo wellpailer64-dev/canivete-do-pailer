@@ -158,3 +158,8 @@ recortados + .json com prompt/semente), `modelos/` (peças aprovadas, para ESTUD
   multiplicação; `.k-rodape data-site data-insta` = linha de site/redes + o conteúdo como texto legal. Exemplo:
   `D:\kanivete_testes\carrossel_vereador\carrossel_kit.html` (o carrossel vereador em ~1/3 do HTML).
 - Sombras: `box-shadow` com `0` sem `px` agora é lido certo (antes deslocava os números e zerava o desfoque).
+- 2026-10-08 (flyer Festa da Amizade, 3 caminhos): formatos `a5` e `folheto14x21` (2000×3002); `knv.py` com `--formato`
+  e sem `--de` agora sempre cria documento novo (antes remontava a cena aberta POR CIMA de outra peça). Armadilhas: camada
+  que ganhou efeito no `--depois` vira "mexida" e não muda mais pelo HTML (use `--refazer`, que tira o efeito); `KNV.etapa`
+  com o mesmo corpo pula mesmo depois do `--refazer` — reaplique os efeitos direto. `transform: rotate` gira cada
+  elemento em volta do próprio centro: bloco de linhas giradas desalinha.

@@ -42,6 +42,7 @@ ap.add_argument("--biblioteca", default=os.environ.get("KANIVETE_BIBLIOTECA", r"
 ap.add_argument("--revisar", action="store_true", help="revisor (tools/revisor.py): corte, contraste, sombra dura, avatar");
 ap.add_argument("--guardar-modelo"); ap.add_argument("--nota", default=""); ap.add_argument("--listar", action="store_true")
 a = ap.parse_args()
+if a.formato and not a.de and a.html != "-": a.novo = True   # sem --de, montar com formato é peça nova (não remonta a cena aberta)
 BIB = os.path.abspath(a.biblioteca)
 ESTILOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fontes_estilos.json")
 if a.exportar: os.makedirs(a.exportar, exist_ok=True)   # a pasta de exportação pode não existir

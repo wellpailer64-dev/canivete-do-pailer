@@ -524,7 +524,51 @@ const KNV = {
             avatares.push({ camada: L.nome, circulo: { x: C.x - Rr.x, y: C.y - Rr.y, d: C.w }, png: c.toDataURL('image/png').split(',')[1] });
         });
         for (const a of window.KNV.revisarDirecao({ roteiro })) out.push(a);
+        for (const a of window.KNV.revisarGabarito()) out.push(a);
         return { achados: out, avatares };
+    },
+
+    // ── gabarito do Pailer (D:/kanivete_biblioteca/gabarito_pailer.json, 29 PSDs da agência medidos em 2026-10-08; feedback
+    // do flyer Festa da Amizade: "poluído, amador, genérico"). Regras: margem (texto a < 12% do lado menor da borda;
+    // ele usa 13,5%), hierarquia (maior texto < 1,5× o 2º, quando nenhuma imagem/logo é o herói), efeito (brilho externo,
+    // chanfro ou degradê em texto: ele só usa Sombra e Sobreposição de cor), fontes (> 3 famílias), poluição (densidade de
+    // bordas da peça > 13%; ele ~10,5%) e texto (> 35 palavras: o resto vai para a legenda).
+    revisarGabarito({ margem = 12, hierarquia = 1.5, bordas = 13, palavras = 35, fontes = 3 } = {}) {
+        const d = IE.doc, out = [], lado = Math.min(d.w, d.h);
+        const txt = [], img = [];
+        iePercorrer(d.camadas, (L, l, i, pai) => {
+            if (L.filhos || L.visivel === false || (pai && pai.visivel === false) || (L.op ?? 1) < 0.3 || (L.cena && L.cena.livre)) return;
+            let b; try { b = window.KNV.caixa(L.id); } catch (e) { return; }
+            if (!b || b.w < 2 || b.h < 2) return;
+            if (L.txt) txt.push({ L, b, tam: L.txt.tam * ieTextoEscala(L.txt) });
+            else if (b.w * b.h < 0.6 * d.w * d.h) img.push({ L, b });
+        });
+        for (const { L, b } of txt) {
+            const m = Math.min(b.x, b.y, d.w - b.x - b.w, d.h - b.y - b.h) / lado * 100;
+            if (m < margem) out.push({ regra: 'gabarito', camada: L.nome, problema: `margem ${m.toFixed(1)}% do lado menor (gabarito ≥ ${margem}%)`, dica: 'trazer o bloco para dentro; menos texto em vez de texto menor' });
+            const ruins = ['brilho', 'chanfro', 'degSob'].filter(k => (L.fx?.[k] || []).some(e => e.on !== false));
+            if (ruins.length && !L.fxOculto) out.push({ regra: 'gabarito', camada: L.nome, problema: `efeito ${ruins.join(', ')} em texto`, dica: 'só Sombra projetada macia ou Sobreposição de cor; destaque pela COR de uma palavra-chave' });
+        }
+        const tams = txt.map(t => t.tam).sort((a, b) => b - a), maxTxt = Math.max(0, ...txt.map(t => t.b.w * t.b.h));
+        const heroiImg = img.some(o => o.b.w * o.b.h > 2 * maxTxt);
+        if (!heroiImg && tams.length > 1 && tams[0] / tams[1] < hierarquia)
+            out.push({ regra: 'gabarito', camada: txt.find(t => t.tam === tams[0]).L.nome, problema: `título só ${(tams[0] / tams[1]).toFixed(2)}× o 2º texto (gabarito ≥ ${hierarquia}×; ele usa ~1,66×)`, dica: 'um herói só: aumentar o principal e reduzir/agrupar o resto' });
+        const fams = new Set(txt.map(t => (t.L.txt.fam || '').toLowerCase()).filter(Boolean));
+        if (fams.size > fontes) out.push({ regra: 'gabarito', camada: '(peça)', problema: `${fams.size} famílias de fonte (gabarito ≤ ${fontes})`, dica: 'uma família com pesos diferentes + no máximo uma de apoio' });
+        const np = txt.reduce((s, t) => s + String(t.L.txt.s || '').split(/\s+/).filter(Boolean).length, 0);
+        if (np > palavras) out.push({ regra: 'gabarito', camada: '(peça)', problema: `${np} palavras (gabarito: ~6 num post; flyer só o essencial)`, dica: 'cortar o que não decide a ação; agrupar data/hora/local num bloco só' });
+        ieCompor(d);
+        const W = 300, H = Math.round(300 * d.h / d.w), c = ieCanvas(W, H), k = ieCtx(c); k.imageSmoothingQuality = 'high'; k.drawImage(d.comp, 0, 0, W, H);
+        const p = k.getImageData(0, 0, W, H).data, g = new Float32Array(W * H);
+        for (let i = 0; i < W * H; i++) g[i] = 0.299 * p[i * 4] + 0.587 * p[i * 4 + 1] + 0.114 * p[i * 4 + 2];
+        let n = 0;
+        for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+            const i = y * W + x, v = 8 * g[i] - g[i - 1] - g[i + 1] - g[i - W] - g[i + W] - g[i - W - 1] - g[i - W + 1] - g[i + W - 1] - g[i + W + 1];
+            if (v > 40) n++;   // igual ao FIND_EDGES do PIL (o negativo é cortado em 0), que mediu o gabarito
+        }
+        const dens = n / ((W - 2) * (H - 2)) * 100;
+        if (dens > bordas) out.push({ regra: 'gabarito', camada: '(peça)', problema: `poluição visual: ${dens.toFixed(1)}% de bordas (gabarito ~10,5%, máx. ${bordas}%)`, dica: 'tirar decoração (arabesco, fumaça, feixes), fundo mais calmo atrás do texto, menos elementos' });
+        return out;
     },
 
     // ── revisor de DIREÇÃO (feedback 2026-10-06: carrossel de outro agente saiu genérico, "landing page"): por slide
