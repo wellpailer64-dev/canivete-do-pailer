@@ -2555,6 +2555,17 @@ def _ca_exprs(ca, tv):
     return {"sc": junta(sc, "*"), "rot": junta(rot, "+"), "dx": junta(dx, "+"), "dy": junta(dy, "+")}
 
 
+def _ca_pulso_max(ca):
+    """Maior fator de escala das animações constantes (só Pulsar mexe na escala): 1 + tam de cada pulso."""
+    k = 1.0
+    for f in ca or []:
+        if f.get("t") == "ca_pul":
+            v = f.get("v") or {}
+            if _num(v.get("vel"), 0, 30) > 0:
+                k *= 1 + _num(v.get("tam"), 0, 300) / 100
+    return k
+
+
 _alfa_cache = {}
 
 
@@ -3178,20 +3189,28 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             # imagem parada: os efeitos rodam antes, uma vez, no tamanho da mídia (a redução vem depois deles). Logo
             # girando com zoom: o rotate girava o PNG inteiro (1557 px, 8,9% na tela) a cada quadro, ~11 ms/quadro
             img_fixa = c["tipo"] == "imagem" and not c.get("seq")
-            if (c["tipo"] == "video" and not c["fx"] or img_fixa) and "sc" in kf and not sx and not sy and not ca["sc"]:
-                maior = max(p[1] for p in kf["sc"])
+            # com Pulsar (Animação → Constante) também: reduz ao maior tamanho que a camada chega a ter (escala × pico
+            # do pulso). Logo de 1817 px a 11,5% pulsando era redimensionado inteiro a cada quadro: 31 s a cada 30 s de
+            # vídeo (mais que os 13 cortes juntos; projeto Depoimentos do Carlinhos, 2026-10-08)
+            pulso = _ca_pulso_max(c.get("ca"))
+            if (c["tipo"] == "video" and not c["fx"] or img_fixa) and ("sc" in kf or pulso > 1) and not sx and not sy \
+                    and (not ca["sc"] or pulso > 1):
+                maior = (max(p[1] for p in kf["sc"]) if "sc" in kf else c["sc"]) * pulso
                 if maior < 0.95:
                     pre_red = max(0.01, maior)
             if "sc" in kf or sx or sy or ca["sc"]:
                 e = _expr_kf(kf["sc"], "t") if "sc" in kf else f"{c['sc']:.5f}"
-                if pre_red:
+                # imagem parada já reduzida: o tamanho final sai das dimensões da MÍDIA (mw/mh), não da cópia reduzida
+                # (arredondada a par: 224 px no lugar de 225,7 deixava o logo 0,7% menor e 1–2 px fora do lugar)
+                base_w, base_h = ("@BW@", "@BH@") if (pre_red and img_fixa) else ("iw", "ih")   # ver o recorte, abaixo
+                if pre_red and not img_fixa:
                     e = f"({e})/{pre_red:.6f}"
                 if ca["sc"]:
                     e = f"({e})*{ca['sc']}"
                 ew = f"({e})*({sx})" if sx else e
                 eh = f"({e})*({sy})" if sy else e
                 # tamanho sempre par: com metade inteira o centro não "treme" meio pixel a cada quadro do zoom
-                escala = (f"scale=w='max(2,2*trunc(iw*({ew})/2))':h='max(2,2*trunc(ih*({eh})/2))'"
+                escala = (f"scale=w='max(2,2*trunc({base_w}*({ew})/2))':h='max(2,2*trunc({base_h}*({eh})/2))'"
                           f":eval=frame:flags=bicubic")
             else:
                 k = c["sc"]
@@ -3255,6 +3274,12 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 # quadro vizinho conforme a leitura começasse — e um bloco (que começa a ler no meio do clipe) não
                 # batia com a exportação inteira
                 vel = f"setpts=(PTS-{c['s'] - ss:.6f}/TB)/{c['v']:.6f},"
+            if escala and "@BW@" in escala:
+                # tamanho da mídia que chega ao scale: o recorte à parte visível, se houve, senão a mídia inteira
+                bw, bh = (recorte[0].split("=")[1].split(":")[:2]) if recorte else (c["mw"], c["mh"])
+                nova = escala.replace("@BW@", str(bw)).replace("@BH@", str(bh))
+                ordem = [nova if f is escala else f for f in ordem]
+                escala = nova
             filtros_clip = efeitos + [f for f in ordem if f]
             fixa = False
             if c["tipo"] == "imagem" and not c.get("seq"):
