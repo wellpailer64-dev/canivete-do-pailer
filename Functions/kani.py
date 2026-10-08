@@ -111,6 +111,7 @@ def _subir():
         p = _srv["proc"]
         if p and p.poll() is None and _srv["ok"]:
             return
+        _liberar_gpu_ollama()   # um modelo grande por vez na placa: o Ollama (Jr, olho) sai da VRAM antes
         porta = _porta_livre()
         args = [_exe(), "-m", _gguf(), "--host", "127.0.0.1", "--port", str(porta), "-c", str(CTX), "-ngl", "99", "--jinja", "-np", "1"]
         p = subprocess.Popen(args, cwd=os.path.dirname(_exe()), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
