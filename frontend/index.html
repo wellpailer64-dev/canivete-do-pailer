@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="css/imagem.css">
     <link rel="stylesheet" href="css/vetor.css">
     <link rel="stylesheet" href="css/som.css">
+    <link rel="stylesheet" href="css/kani.css">
     <link rel="icon" href="identidade/icone.ico">
 </head>
 <body>
@@ -186,6 +187,10 @@
                 </button>
                 <button class="menu-item" data-tool="web-scraper" onclick="switchTool('web-scraper')">
                     <span class="icon"><svg class="i"><use href="#i-scan"/></svg></span><span class="label">Web Scraper</span>
+                </button>
+                <div class="menu-group">IA</div>
+                <button class="menu-item menu-kani" id="menu-kani" onclick="kaniAbrir()" title="Kani — assistente do KANIVETE (pergunte como usar o app)">
+                    <span class="icon"><span class="kani-av kani-av-mini">K</span></span><span class="label">Kani</span>
                 </button>
             </nav>
 
@@ -2045,6 +2050,7 @@
     <script src="js/agente.js"></script>   <!-- modo agente: registro de avisos/erros e veAgente (antes de tudo) -->
     <script src="js/i18n.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/kani.js"></script>
     <script src="js/editor.js"></script>
     <script src="js/editor-fx.js"></script>
     <script src="js/editor-reverse.js"></script>

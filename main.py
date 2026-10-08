@@ -3295,6 +3295,23 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    # ── Kani: assistente de conversa (Functions/kani.py, frontend/js/kani.js) ──
+    def kani_estado(self):
+        from Functions import kani
+        return kani.estado()
+
+    def kani_baixar(self):
+        from Functions import kani
+        return kani.baixar(lambda d: _js("kaniProgresso", d))
+
+    def kani_enviar(self, cid, mensagens, ferramenta=""):
+        from Functions import kani
+        return kani.conversar(cid, mensagens, ferramenta, lambda d: _js("kaniEvento", d))
+
+    def kani_parar(self, cid):
+        from Functions import kani
+        return kani.cancelar(cid)
+
     def sk_trecho(self, arq, k, sr=48000):
         """Trecho de 10 s em PCM s16le estéreo (prévia com precisão de amostra; som-motor.js)."""
         from Functions import media_server, sound_kanivete

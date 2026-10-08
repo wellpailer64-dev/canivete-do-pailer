@@ -128,6 +128,13 @@ Timeline de áudio, fades, LUFS, projeto `.sknv`, API `window.SKN`: `Instruction
 Conversa, banco de vozes), `som-texto.js` (editar pelo texto, stems, ID3, modelos) +
 `Functions/sound_kanivete.py`, `sk_gravar.py`. Teste: `python testes/teste_som.py`.
 
+## Kani (assistente de conversa)
+Chat local tipo ChatGPT (Qwen3 8B): bolinha na Home + IA › Kani na barra lateral, gaveta à direita de qualquer ferramenta
+(`frontend/js/kani.js`, `css/kani.css`, `Functions/kani.py`). Motor: Ollama com qwen3:8b se houver; senão llama.cpp Vulkan
++ Qwen3-8B-Q4_K_M.gguf (~5 GB) baixados sob demanda em `modelos_ia/kani`. Ajuda do app: `frontend/ajuda/kani_kb.json`
+(trechos dos guias, busca BM25) — regenerar com `py -3.13 tools/kani_kb.py` ao mudar guias/ferramentas. Nome em
+`kani.NOME`. Teste: `py -3.13 testes/teste_kani.py` (porta 9334).
+
 ## Remover fundo (recorte)
 GPU automática (onnxruntime-directml), pessoa → BiRefNet matting / objeto → BEN2 (YuNet decide), uma sessão por vez na
 placa; medições, qualidade e pendências (cena em duas passadas ainda não publicada) em `Instructions/agente/remover-fundo.md`.

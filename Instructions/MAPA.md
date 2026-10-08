@@ -161,8 +161,8 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - **API** (`pywebview.api.*`, 9): `web_scraper_analyze(url)`, `web_scraper_download(url, mode, destino)`, `web_scraper(url, tipo, destino)`, `web_scraper_csv(url)`, `cerebro_load()`, `cerebro_save(content)`, `cerebro_exists()`, `cerebro_remove()`, `cerebro_select_file()`
 - **Guias**: `Instructions/webscraper.md`, `Instructions/cerebro.md`
 
-### API geral (app, janela, preferências, arquivos) — 18 métodos
-`select_folder(tool)`, `select_file(tool)`, `select_image(tool)`, `open_folder(path)`, `reveal_file(path)`, `open_file(path)`, `select_video_file(tool)`, `prefs_load()`, `prefs_save(dados)`, `check_update()`, `apply_update()`, `sair_app()`, `toggle_fullscreen()`, `janela_cmd(acao)`, `janela_propria()`, `janela_ativar()`, `on_webview_ready(sender, args)`, `on_new_window_request(sender, args)`
+### API geral (app, janela, preferências, arquivos) — 22 métodos
+`select_folder(tool)`, `select_file(tool)`, `select_image(tool)`, `open_folder(path)`, `kani_estado()`, `kani_baixar()`, `kani_enviar(cid, mensagens, ferramenta="")`, `kani_parar(cid)`, `reveal_file(path)`, `open_file(path)`, `select_video_file(tool)`, `prefs_load()`, `prefs_save(dados)`, `check_update()`, `apply_update()`, `sair_app()`, `toggle_fullscreen()`, `janela_cmd(acao)`, `janela_propria()`, `janela_ativar()`, `on_webview_ready(sender, args)`, `on_new_window_request(sender, args)`
 
 ## 6. Vetor Kanivete — comandos `VKN.cmd(nome, args)` (154; a interface, o Claude e o Jr usam os mesmos)
 - `vetor-3d.js`: `girar_3d` (3D girar), `extrudar_3d` (3D extrudar), `editar_3d` (editar 3D), `mapear_arte` (mapear arte no 3D), `limpar_mapas` (tirar artes mapeadas), `expandir_3d` (expandir 3D)
@@ -206,6 +206,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/direcao_mapa.py` — Mapa de direção de arte (para o Claude, o Worker e o roteiro_local): layouts, estilos e técnicas em linhas curtas —
 - `tools/esqueleto.py` — Roteiro (JSON curto) → carrossel diagramado (HTML do KNV.cena) pelos ESQUELETOS aprovados. O agente só escreve o
 - `tools/gerar_marca.py` — Gera a marca KANIVETE: letras próprias desenhadas aqui (geometria nossa, sem ler fonte nenhuma), no espírito
+- `tools/kani_kb.py` — Base de ajuda da Kani (assistente do KANIVETE): junta os guias das ferramentas (Instructions/*.md) e o mapa geral
 - `tools/knv.py` — Monta uma peça do Photo Kanivete a partir de HTML/CSS (KNV.cena) no app aberto em modo agente e confere
 - `tools/mapa_codigo.py` — Mapa do código (para o agente achar onde mexer sem abrir arquivo grande): comandos registrados, funções de topo e
 - `tools/mapa_geral.py` — Mapa geral do KANIVETE — gera Instructions/MAPA.md (pessoas, Claude) e Instructions/mapa.json (Jr / Worker local)
@@ -287,6 +288,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/gdrive_dumper.py` — gdrive_dumper.py — Módulo do GDRIVE DUMPER para o Canivete do Pailer
 - `Functions/gerador_imagem.py` — gerador_imagem.py — Gerar imagem com IA no Photo Kanivete (texto → imagem e edição com imagens de referência)
 - `Functions/instancia_unica.py` — instancia_unica.py — Uma cópia só do app aberta
+- `Functions/kani.py` — Kani — assistente de conversa do KANIVETE (tipo ChatGPT, local e offline), para tarefas do dia a dia e,
 - `Functions/legendas.py` — legendas.py — transcrição da timeline do Pocket Editor (painel Texto: Transcrever / Criar legendas)
 - `Functions/legendas_formatos.py` — SRT e VTT: blocos separados por linha em branco, com uma linha "início --> fim"
 - `Functions/media_server.py` — media_server.py — Servidor HTTP local (127.0.0.1) para a interface reproduzir mídia
@@ -352,6 +354,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_guias.py` — Teste das guias/fatias como no Photoshop, com mouse de verdade no app de teste (9333)
 - `testes/teste_illustrator.py` — Compatibilidade Vetor Kanivete ↔ Adobe Illustrator (Functions/ponte_illustrator.py) — app em --agente=9333 e o
 - `testes/teste_imagem.py` — Teste do Editor de Imagem (frontend/js/imagem-*.js + Functions/editor_imagem.py) no app de verdade
+- `testes/teste_kani.py` — Kani (assistente) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila) e confere: bolinha na Home,
 - `testes/teste_laco.py` — Laço: Shift soma, Alt subtrai, Shift+Alt cruza; o mesmo no magnético; Ctrl+clique na miniatura seleciona a camada
 - `testes/teste_pincel.py` — Pincel do Photo Kanivete: traço macio liso e pintura fluida em documento grande (app em --agente=9333)
 - `testes/teste_play.py` — teste_play.py — Mede o play do Pocket Editor no app de verdade (modo agente) e reprova se engasgar
