@@ -158,3 +158,19 @@ concluir cada render; visual profissional, miniatura leve do quadro em render e 
 - Visual: configurações em controles segmentados compactos; "Renderizando agora" (miniatura, barra, tempo, ×, selo
   Montado na placa / Turbo / Processador); 5 medidores. Teste: `D:/kanivete_testes/scripts/teste_ke_atalhos.py` + teste_fila.
 - Pendente: textos antigos da fila sem tradução ("Fila de render", "Pausar depois deste"...).
+
+## 10. Diagnóstico do usuário (2026-10-08 noite) e painel Desempenho
+- "Processor" com a placa ligada: a timeline tinha 1 texto com mesclagem Multiplicar → motivo() mandava tudo para a CPU.
+  Agora Multiplicar vai na placa (`_multiplicar`: fundo × camada sobre BRANCO via blend_vulkan em RGB; a máscara cobre a
+  timeline toda — dividir/recortar um ramo acumulava quadros). teste_export caso `multiplicar` (--placa = 4,9; CPU 4,7).
+- Fade em clipe: a descida usava `nv12|yuv420p` e o ffmpeg escolhia errado → formato exato.
+- **Pendente principal — memória da placa**: o ffmpeg abre todas as entradas no início e os filtros empurram os quadros
+  para a frente; camadas que só entram mais tarde (textos em tela cheia, cortes) ficam na fila do libplacebo ocupando
+  a placa (1→7,6 GB na timeline atual do Carlinhos: falha e cai na CPU; na CPU é a mesma coisa na RAM, 9–12 GB).
+  Solução: montar em PEDAÇOS de tempo (cada um abre só o que aparece nele; serve também para o 4K bruto). Cuidado com a
+  base de trechos do vídeo principal: a contagem de quadros de cada trecho depende da fonte (emendar como a CPU).
+  Ler Full HD H.264 na CPU foi testado: 13% mais lento e não resolveu (desfeito).
+- Ctrl+M: "Overlay transitions 2/2" (preparo) parecia fila parada; Renderizar no meio duplicava a timeline. Agora o
+  preparo conta (`VEFILA.preparando`) e Renderizar durante ele só agenda o início.
+- Painel Desempenho (`editor-desempenho.js`): CPU/RAM/placa/VRAM/encoder ao vivo, encaixável; vertical, horizontal ou
+  mínimo pelo formato do encaixe. Teste: D:/kanivete_testes/scripts/teste_desempenho.py.

@@ -315,6 +315,15 @@ CASOS = {
         });
         return out;
     """, ""),
+    # só Multiplicar (o modo que o modo placa faz na GPU: fundo × camada sobre branco): logo com transparência e uma foto
+    # com opacidade animada sobre o vídeo — com --placa tem de ir pela placa e bater com a prévia
+    "multiplicar": (1080, 1920, """
+        const { clip } = __te;
+        const logo = clip(1, 0.3, 0, 2.4, 'logo.png', { bm: 'multiply', p: { sc: 120, x: 540, y: 700, rot: 0, op: 100 } });
+        const foto = clip(2, 0.8, 0, 1.8, 'foto5.jpg', { bm: 'multiply', p: { sc: 40, x: 540, y: 1300, rot: 0, op: 100 } });
+        foto.k = { op: [{ t: 0, v: 0, i: 'lin' }, { t: 0.6, v: 100, i: 'lin' }] };
+        return [clip(0, 0, 0, 3, 'b.mp4'), logo, foto];
+    """, ""),
     # sombra projetada: efeito numa imagem girada e com escala, logo com transparência e sombra do texto em ângulo
     "sombra": (1080, 1920, """
         const { clip } = __te, W = 1080, H = 1920, id = () => veFxNewId();

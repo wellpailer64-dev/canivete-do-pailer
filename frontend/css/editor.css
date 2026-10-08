@@ -2201,3 +2201,35 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ke-med.alto .ke-med-b i { background: #ff6b6b; }
 .ke-med.sem { opacity: .45; }
 @media (max-width: 980px) { .ke-monitor { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+
+/* Painel Desempenho (editor-desempenho.js): CPU, RAM, placa ao vivo; vertical, horizontal ou mínimo conforme o encaixe */
+.ve-desemp-p { min-width: 0; min-height: 0; }
+.ve-desemp { height: 100%; display: flex; gap: 6px; padding: 8px; box-sizing: border-box; overflow: hidden; background: #111214;
+    font-family: var(--ve-ui); }
+.ve-desemp.vert { flex-direction: column; }
+.ve-desemp.horiz { flex-direction: row; align-items: stretch; }
+.ve-des-m { flex: 1 1 0; min-width: 0; min-height: 0; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto 1fr;
+    column-gap: 6px; align-content: center; padding: 6px 8px; border: 1px solid #24272a; border-radius: 6px; background: #17181a; }
+.ve-des-n { grid-column: 1 / 3; font: 700 9.5px var(--ve-ui); letter-spacing: .09em; color: #6f747b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ve-des-v { font: 600 13px var(--ve-mono); color: #e6e8eb; white-space: nowrap; }
+.ve-des-s { font: 10.5px var(--ve-mono); color: #6f747b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; align-self: end; padding-bottom: 1px; }
+.ve-des-b { grid-column: 1 / 3; height: 3px; margin-top: 5px; border-radius: 2px; background: #24272a; overflow: hidden; align-self: start; }
+.ve-des-b i { display: block; height: 100%; width: 0; background: #6aa9ff; transition: width .6s; }
+.ve-des-m[data-k="gpu"] .ve-des-b i, .ve-des-m[data-k="vram"] .ve-des-b i, .ve-des-m[data-k="enc"] .ve-des-b i { background: #76b900; }
+.ve-des-m.alto .ve-des-b i { background: #ff6b6b; }
+.ve-des-m.alto .ve-des-v { color: #ff8f8f; }
+.ve-des-m.sem { opacity: .4; }
+/* estreito na vertical (ao lado dos medidores de áudio): só sigla, número e barra */
+.ve-desemp.vert.mini { padding: 4px; gap: 4px; }
+.ve-desemp.vert.mini .ve-des-m { padding: 4px; grid-template-columns: 1fr; }
+.ve-desemp.vert.mini .ve-des-n { grid-column: 1; font-size: 8.5px; letter-spacing: .04em; text-align: center; }
+.ve-desemp.vert.mini .ve-des-v { font-size: 10.5px; text-align: center; }
+.ve-desemp.vert.mini .ve-des-s { display: none; }
+.ve-desemp.vert.mini .ve-des-b { grid-column: 1; }
+/* faixa baixa na horizontal: uma linha por medidor (sigla · número · barra) */
+.ve-desemp.horiz.mini { padding: 3px 6px; gap: 6px; }
+.ve-desemp.horiz.mini .ve-des-m { grid-template-columns: auto auto 1fr; grid-template-rows: 1fr; align-items: center; padding: 2px 8px; }
+.ve-desemp.horiz.mini .ve-des-n { grid-column: auto; }
+.ve-desemp.horiz.mini .ve-des-s { display: none; }
+.ve-desemp.horiz.mini .ve-des-b { grid-column: auto; margin: 0; align-self: center; min-width: 20px; }

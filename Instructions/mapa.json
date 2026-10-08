@@ -15,6 +15,7 @@
     "editor-comandos.js",
     "editor-comp.js",
     "editor-copiar.js",
+    "editor-desempenho.js",
     "editor-dock.js",
     "editor-encoder.js",
     "editor-ferramentas.js",
@@ -81,6 +82,7 @@
     "ve_ler_legenda",
     "ve_otimizar_fullhd",
     "ve_otimizar_cancelar",
+    "ve_encoder_estado",
     "ve_sincronizar_audio",
     "ve_salvar_png",
     "ve_txa_lista",
@@ -879,6 +881,12 @@
   "ve_otimizar_cancelar": {
    "args": "",
    "modulos": []
+  },
+  "ve_encoder_estado": {
+   "args": "",
+   "modulos": [
+    "encoder_monitor"
+   ]
   },
   "ve_sincronizar_audio": {
    "args": "ref_path, ref_s, ref_e, outro_path, outro_s, outro_e",
@@ -2253,6 +2261,7 @@
   "Functions/converterimagem.py": "converterimagem.py",
   "Functions/convertermp3.py": "Conversor de áudio (e extração de áudio de vídeos) via ffmpeg",
   "Functions/editor_imagem.py": "Editor de Imagem (frontend/js/imagem-*.js): abrir e salvar PSD/PSB e imagens comuns",
+  "Functions/encoder_monitor.py": "Monitor do Kanivete Encoder: CPU, RAM e placa de vídeo (NVIDIA: uso, encoder, decoder, memória) em tempo real e o",
   "Functions/export_placa.py": "Exportação na placa de vídeo (\"modo placa\", Kanivete Encoder rodada 3): a timeline inteira montada na GPU, como o",
   "Functions/faviconconverter.py": "faviconconverter.py",
   "Functions/fontes.py": "fontes.py — famílias de fonte instaladas no Windows e os estilos de cada uma (Light, Regular, Semibold,",

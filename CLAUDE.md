@@ -63,7 +63,7 @@ se edita. Botão Fila no cabeçalho abre o mesmo painel. API `VEFILA_API`. Teste
 Atalhos: Ctrl+M = pôr na fila + abrir; Ctrl+Shift+M = pôr na fila sem abrir (aviso, som, barrinha; a fila começa
 sozinha); marcador anterior = Alt+Shift+M. Janela: "Renderizando agora" com miniatura do quadro (o ffmpeg grava
 `ke_quadro.jpg` 1×/s: `video_cutter.saida_miniatura`), velocidade, selo placa/CPU e monitor ao vivo de CPU/RAM/placa
-(`Functions/encoder_monitor.py`, API `ve_encoder_estado`).
+(`Functions/encoder_monitor.py`, API `ve_encoder_estado`). Painel Desempenho no editor (o mesmo monitor, encaixável): `frontend/js/editor-desempenho.js`.
 Export otimizado (rodada 1, 2026-10-08: reels reais de 3,6× → 1,26× a duração; bancada em `D:/kanivete_testes/encoder`); medições e pendências em `Instructions/agente/plano-kanivete-encoder.md`.
 **Modo placa** (rodada 3): a timeline montada inteira na GPU (Vulkan + libplacebo) — `Functions/export_placa.py`, chamado
 pelo `exportar_video` com a placa ligada; o que não suporta (`motivo()`) ou falha cai na CPU. Depoimentos de 98 s: 264 s → 96 s.

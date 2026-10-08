@@ -40,7 +40,7 @@ function vedDefault() {
             { t: 's', d: 'row', z: [0.028, 0.94, 0.032], c: [
                 { t: 'g', p: ['ferramentas'], a: 'ferramentas' },
                 { t: 'g', p: ['timeline'], a: 'timeline' },
-                { t: 'g', p: ['medidores'], a: 'medidores' },
+                { t: 'g', p: ['medidores', 'desempenho'], a: 'medidores' },
             ] },
         ],
     };
@@ -237,6 +237,12 @@ function vedApply(d) {
             st.novos = st.novos.filter(id => id !== 'medidores');
             break;
         }
+    }
+    // Desempenho (CPU/RAM/placa ao vivo, editor-desempenho.js): aba junto dos Medidores de áudio, sem roubar a aba ativa
+    if (st.novos.includes('desempenho')) {
+        const gs = [st.root, ...st.floats.map(f => f.root)].flatMap(r => vedGroups(r));
+        const g = gs.find(g => g.p.includes('medidores')) || gs.find(g => g.p.includes('keys'));
+        if (g) { g.p.push('desempenho'); st.novos = st.novos.filter(id => id !== 'desempenho'); }
     }
     st.novos.forEach(id => vedAddTab(id, true));
     vedRender();

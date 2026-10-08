@@ -45,9 +45,18 @@ function veFilaNomeTimeline(id = VE.activeSequence) {
 }
 async function veFilaAdicionarAtual(nome = null, cfg = null) {
     if (!VE.ready) return null;
+    VEFILA.preparando = (VEFILA.preparando || 0) + 1;   // transições/Comps/3D/textos viram arquivo antes de entrar
+    try { return await veFilaAdicionarAgora(nome, cfg); }
+    finally {
+        VEFILA.preparando--;
+        // Renderizar clicado durante o preparo: começa agora (antes duplicava a timeline na fila)
+        if (!VEFILA.preparando && VEFILA.iniciarDepois) { VEFILA.iniciarDepois = false; veFilaIniciar().catch(e => veToast(e.message)); }
+    }
+}
+async function veFilaAdicionarAgora(nome, cfg) {
     if (veOfflineMedias().length) { veToast('Relinque ou apague as mídias offline antes de exportar'); return null; }
     const msg = m => { const el = $ve('ve-fila-msg'); if (el) el.textContent = m || ''; };
-    msg('Preparando ' + veFilaNomeTimeline() + '…');
+    msg('Preparando ' + veFilaNomeTimeline() + '… (o render começa sozinho)');
     if (typeof veCompProntas === 'function') await veCompProntas(msg);
     if (typeof ve3dProntas === 'function') await ve3dProntas(msg);
     if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg);
@@ -80,6 +89,7 @@ async function veFilaAdicionarTodas() {   // cada timeline do projeto com as con
 // ── execução ──
 async function veFilaIniciar() {
     if (VEFILA.rodando) return;
+    if (VEFILA.preparando) { VEFILA.iniciarDepois = true; veToast('Preparando a timeline: o render começa assim que ela entrar na fila'); return; }
     if (VE.exportRunning) { veToast('Espere a exportação atual terminar'); return; }
     if (!VEFILA.itens.some(x => x.estado === 'espera')) { if (!(await veFilaAdicionarAtual())) return; }   // fila vazia: a timeline aberta
     if (VEFILA.sel != null) veFilaSelecionar(null);   // o formulário volta às configurações livres

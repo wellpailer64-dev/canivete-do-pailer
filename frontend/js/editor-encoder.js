@@ -93,12 +93,13 @@ async function veKeFilaAtalho(abrir) {
         if (!abrir && !veKeEl().hidden) { veKeGravar(); veKeEl().hidden = true; }   // na mesma tarefa: a janela não pisca
     }
     if (VEFILA.sel != null) veFilaSelecionar(null);       // as configurações livres, não as de um item
+    if (!abrir) veToast(veT('Preparando para a fila') + '…');
     const id = await veFilaAdicionarAtual(veFilaNomeTimeline());
     if (!id) return null;
     veKeSom('fila');
     const it = VEFILA.itens.find(x => x.id === id), esp = VEFILA.itens.filter(x => x.estado === 'espera').length;
     veToast(`${veT('Na fila do Kanivete Encoder')}: ${it ? it.cfg.nome : ''}` + (VEFILA.rodando ? ` · ${esp} ${veT('esperando')}` : ''));
-    if (!VEFILA.rodando) veFilaIniciar().catch(e => veToast(e.message));
+    if (!VEFILA.rodando) { if (VEFILA.preparando) VEFILA.iniciarDepois = true; else veFilaIniciar().catch(e => veToast(e.message)); }
     if (!abrir && veKeEl().hidden) { VEKE.min = true; veKeMini(); }
     return id;
 }

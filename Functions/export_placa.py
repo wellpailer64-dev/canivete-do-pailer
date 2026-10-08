@@ -33,6 +33,15 @@ _GIRO = {90: 270, 270: 90, 180: 180}
 _CODECS_VK = ("h264", "hevc", "av1")
 
 
+def _ler_na_placa(info):
+    """Decodificar na placa: o que ela lê (H.264/HEVC/AV1 em 4:2:0); o resto é lido na CPU e sobe."""
+    if info.get("vcodec") not in _CODECS_VK:
+        return False
+    if info.get("pix_fmt", "") not in ("yuv420p", "yuvj420p", "nv12", "yuv420p10le", "p010le"):
+        return False
+    return True   # (ler Full HD H.264 na CPU deixou 13% mais lento e não resolveu a memória: o que enche é a fila adiantada)
+
+
 def disponivel():
     """A placa faz Vulkan + libplacebo com este ffmpeg? (testado uma vez por sessão)."""
     global _vk
@@ -82,6 +91,8 @@ def memoria_estimada(segmentos, lay, path):
             except Exception:
                 infos[p] = {}
         i = infos[p]
+        if not _ler_na_placa(i):
+            continue   # lido na CPU: na placa só o quadro que aparece
         bpp = 3.0 if "10" in str(i.get("pix_fmt", "")) else 1.5
         total += (i.get("width") or 1920) * (i.get("height") or 1080) * bpp * 20
     return total
@@ -106,8 +117,8 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
     if not lay:
         return "sem camadas"
     for c in lay:
-        if c.get("bm"):
-            return "modo de mesclagem"
+        if c.get("bm") and (c["bm"] != "multiply" or vc._sombra_camada(c)):
+            return "modo de mesclagem (fora o Multiplicar)"
         if c["rot"] or "rot" in c["kf"]:
             return "rotação"
         if any(f.get("t") == "ca_rot" for f in c.get("ca") or []):
@@ -210,7 +221,7 @@ def _tam(c, bw, bh, kx, tl):
 # grade/velocidade). Um quarto de quadro não muda a escolha de quadro nem o fim (trim em fim − ½ quadro).
 def _entrada_video(g, c, info, pasta, n_cam):
     """Clipe lido na placa (ou na CPU e enviado uma vez); tempos idênticos aos do exportador de CPU."""
-    vk = info.get("vcodec") in _CODECS_VK and info.get("pix_fmt", "") in ("yuv420p", "yuvj420p", "nv12", "yuv420p10le", "p010le")
+    vk = _ler_na_placa(info)
     ss = max(0.0, c["s"] - 3.0)
     fq = vc._fps_fonte(c["path"])
     if fq and ss > 0 and not c.get("base"):
@@ -238,7 +249,10 @@ def _entrada_video(g, c, info, pasta, n_cam):
         # fade de um clipe: só ele desce para receber a transparência (sendcmd no tempo da timeline) e sobe de volta
         a = (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@vop{n_cam}", c["st"])
              if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
-        opac = f"hwdownload,format=pix_fmts=nv12|yuv420p,scale=in_color_matrix=bt709,format=rgba,{a},hwupload,"
+        # formato EXATO na placa: o que passou pelo libplacebo (giro/redução/Luz e Cor) ou subiu da CPU é yuv420p; direto
+        # do decodificador é nv12 (com "nv12|yuv420p" o ffmpeg escolhia errado e a exportação falhava)
+        baixo = "yuv420p" if (giro or efeito or not vk) else "nv12"
+        opac = f"hwdownload,format={baixo},scale=in_color_matrix=bt709,format=rgba,{a},hwupload,"
     r = g.rotulo("v")
     g.filtros.append(f"[{k}:v:0]{vc._marca_hd(c['path'])}trim=start={vc._tempo_ffmpeg(c['s'] - ss)}:"
                      f"end={vc._tempo_ffmpeg(c['s'] - ss + c['fonte'])},"
@@ -320,7 +334,7 @@ def _arvore(vals, padrao):
     return rec(0, max(vals) if vals else 0)
 
 
-def _compor(g, fundo, itens):
+def _compor(g, fundo, itens, fmt="yuv420p"):
     """Um libplacebo: o fundo (entrada 0, tela inteira) + cada item no seu lugar. Devolve o rótulo da saída."""
     if not itens:
         return fundo
@@ -331,10 +345,26 @@ def _compor(g, fundo, itens):
     # disable_linear: mistura (opacidade, bordas do texto) e redimensiona nos valores de cor como a CPU (overlay/scale).
     # Em luz linear um branco a 50% sobre preto saía Y 176 em vez de 126: fades claros demais, fim sem escurecer
     g.filtros.append(f"{fundo}{''.join(rot for rot, _ in itens)}libplacebo=inputs={len(itens) + 1}:w={g.W}:h={g.H}:"
-                     f"fps={g.fps:.3f}:format=yuv420p:disable_linear=1:"
+                     f"fps={g.fps:.3f}:format={fmt}:disable_linear=1:"
                      f"pos_x='{_arvore(px, '0')}':pos_y='{_arvore(py, '0')}':"
                      f"pos_w='{_arvore(pw, 'ow')}':pos_h='{_arvore(ph, 'oh')}'[{r}]")
     return f"[{r}]"
+
+
+def _multiplicar(g, atual, c, n, info, pasta):
+    """Mesclagem Multiplicar como a CPU (RGB): fundo × (camada sobre BRANCO) — onde a camada é transparente o branco não
+    muda nada; com alfa a, dá fundo·(1−a) + fundo·camada·a, a conta do blend+maskedmerge do exportador. Só no trecho da
+    camada, tudo na placa (blend_vulkan multiplica em RGB; medido: branco × (128,192,64) = (127,191,63))."""
+    # sem dividir o vídeo: a máscara (camada sobre branco) cobre a timeline toda e é branca fora do trecho da camada —
+    # multiplicar por branco não muda nada. (Dividir e recortar um ramo acumulava quadros na placa: memória esgotada)
+    itens = _entrada_video(g, c, info, pasta, n) if c["tipo"] == "video" else _entrada_imagem(g, c, n)
+    k = g.entrada(["-f", "lavfi", "-i", f"color=white:s={g.W}x{g.H}:r={g.fps:.3f}:d={g.total:.6f}"])
+    w, b = g.rotulo("w"), g.rotulo("m")
+    g.filtros.append(f"[{k}:v:0]format=rgba,hwupload[{w}]")
+    mascara = _compor(g, f"[{w}]", itens, fmt="rgba")
+    g.filtros.append(f"{atual}libplacebo=format=rgba:disable_linear=1[{b}r]")
+    g.filtros.append(f"[{b}r]{mascara}blend_vulkan=all_mode=multiply,libplacebo=format=yuv420p:disable_linear=1[{b}]")
+    return f"[{b}]"
 
 
 def _shader_lc(sig, k, nit, vig, W, H):
@@ -429,7 +459,7 @@ def _base(g, segmentos, path, info):
         g.filtros.append(f"[{k}:v:0]format=yuv420p,hwupload[fundo]")
         return "[fundo]"
     rot = int(info.get("rotation") or 0) % 360
-    vk = info.get("vcodec") in _CODECS_VK
+    vk = _ler_na_placa(info)
     mw, mh = info["width"], info["height"]
     kf = min(g.W / mw, g.H / mh) if mw and mh else 1.0
     w, h = max(2, int(mw * kf) // 2 * 2), max(2, int(mh * kf) // 2 * 2)
@@ -468,9 +498,14 @@ def montar(lay, W, H, fps, total, pasta, segmentos=None, path=None, info=None):
             pendentes = []
             atual = _ajuste(g, atual, c, pasta)
             continue
+        if c["tipo"] == "video" and c["path"] not in infos:
+            infos[c["path"]] = vc.probe(c["path"])
+        if c.get("bm"):   # Multiplicar: o que está embaixo é composto antes, e a camada multiplica o resultado
+            atual = _compor(g, atual, pendentes)
+            pendentes = []
+            atual = _multiplicar(g, atual, c, n, infos.get(c["path"]), pasta)
+            continue
         if c["tipo"] == "video":
-            if c["path"] not in infos:
-                infos[c["path"]] = vc.probe(c["path"])
             pendentes += _entrada_video(g, c, infos[c["path"]], pasta, n)
         else:
             pendentes += _entrada_imagem(g, c, n)
