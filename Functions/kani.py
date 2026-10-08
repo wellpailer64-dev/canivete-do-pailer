@@ -351,7 +351,7 @@ def falar(texto, on_evento, chave):
                 if not vozes:
                     raise RuntimeError("nenhuma voz salva (crie uma em Geração de Voz)")
                 v = next((x for x in vozes if (x.get("name") or "").strip().lower() == VOZ), vozes[0])
-                r = synthesize(v["id"], para_voz(texto), {"num_step": 12, "language": "pt", "speed": 1.0, "normalize_text": True})
+                r = synthesize(v["id"], para_voz(texto), {"num_step": 12, "language": "pt", "speed": 1.0, "normalize_text": True, "respiro": True})
                 arq = r.get("output_path")
                 _falas[texto] = arq
             on_evento({"chave": chave, "url": media_server.register(arq)})

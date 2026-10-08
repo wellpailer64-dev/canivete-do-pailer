@@ -147,6 +147,31 @@ def _split_text(text: str, max_chars: int = 220) -> list[str]:
     return [p if p[-1] in ".!?" else p + "." for p in parts]
 
 
+def _pedacos(text: str, options: dict[str, Any]) -> tuple[list[str], list[float]]:
+    """Trechos para sintetizar e a pausa depois de cada um. Com options["respiro"], cada frase e cada vírgula vira um
+    trecho e a pausa respeita a pontuação (respiro de leitura: menos engasgo e palavra comida nas frases longas)."""
+    base = float(options.get("pause_seconds") or 0.18)
+    max_chars = int(options.get("max_chunk_chars") or 220)
+    if not options.get("respiro"):
+        chunks = _split_text(text, max_chars)
+        return chunks, [base] * len(chunks)
+    virgula, ponto = float(options.get("pausa_virgula") or 0.16), float(options.get("pausa_ponto") or 0.38)
+    pecas: list[str] = []
+    for frase in _split_text(text, max_chars):
+        for f in re.split(r"(?<=[.!?…:;])\s+", frase):
+            buf = ""
+            for parte in re.split(r"(?<=,)\s+", f.strip()):
+                buf = (buf + " " + parte).strip()
+                if len(buf) >= 28 or not buf.endswith(","):   # vírgula muito perto (ex.: "Depois,") fica junto
+                    pecas.append(buf)
+                    buf = ""
+            if buf:
+                pecas.append(buf)
+    pecas = [p for p in pecas if re.search(r"\w", p)]
+    pausas = [virgula if p.endswith(",") else ponto * 0.75 if p[-1] in ":;" else ponto for p in pecas]
+    return pecas, pausas
+
+
 def _target_duration(text: str, speed: float) -> float:
     spoken_chars = max(8, len(re.sub(r"\s+", "", text)))
     return max(1.4, min(28.0, spoken_chars / 12.5 / max(speed, 0.5) * 1.12 + 0.25))
@@ -842,7 +867,7 @@ def _generate_stable_audio_inprocess(model: Any, prompt: Any, text: str,
     import numpy as np
 
     speed = float(options.get("speed") or 1.0)
-    chunks = _split_text(text, int(options.get("max_chunk_chars") or 220))
+    chunks, pausas = _pedacos(text, options)
     if not chunks:
         raise RuntimeError("Texto vazio para sintetizar.")
 
@@ -872,11 +897,10 @@ def _generate_stable_audio_inprocess(model: Any, prompt: Any, text: str,
         audios.append(model.generate(**kwargs)[0])
 
     sample_rate = int(getattr(model, "sampling_rate", 24000) or 24000)
-    pause = np.zeros(int(sample_rate * float(options.get("pause_seconds") or 0.18)), dtype=audios[0].dtype)
     merged = []
     for idx, audio in enumerate(audios):
         if idx:
-            merged.append(pause)
+            merged.append(np.zeros(int(sample_rate * pausas[idx - 1]), dtype=audio.dtype))
         merged.append(audio)
     return np.concatenate(merged), len(chunks), sample_rate
 
