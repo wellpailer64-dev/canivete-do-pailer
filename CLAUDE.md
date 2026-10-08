@@ -60,7 +60,7 @@ formulário e o que mudar vale para ele), "Adicionar à fila", "Todas as timelin
 se edita. Botão Fila no cabeçalho abre o mesmo painel. API `VEFILA_API`. Teste: `py -3.13 testes/teste_fila.py` (porta 9334).
 
 **Kanivete Encoder (Ke)**: janela própria do export feita (`editor-encoder.js`: logo Ke, solta, minimiza, lembra posição).
-**PENDENTE**: exportar mais rápido mantendo a qualidade — plano em `Instructions/agente/plano-kanivete-encoder.md`.
+Export otimizado (rodada 1, 2026-10-08: reels reais de 3,6× → 1,26× a duração; bancada em `D:/kanivete_testes/encoder`); medições e pendências em `Instructions/agente/plano-kanivete-encoder.md`.
 
 Atributos de vários clipes (como no Premiere): `frontend/js/editor-atributos.js` — botão direito → "Remover atributos…"
 (efeitos de vídeo/áudio, movimento, opacidade, mesclagem, volume, transições, com caixinhas; vale para a seleção) e ajuste
