@@ -38,10 +38,8 @@ _lock = threading.Lock()
 
 # ─────────────────────────── cache em disco ───────────────────────────
 def _pasta_cache():
-    base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA") or os.path.expanduser("~")
-    p = os.path.join(base, "CaniveteDoPailer", "autoframe_cache")
-    os.makedirs(p, exist_ok=True)
-    return p
+    from Functions.midia import pasta_cache
+    return pasta_cache("autoframe_cache")
 
 
 def _chave(path, tipo):

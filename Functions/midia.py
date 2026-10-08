@@ -10,6 +10,23 @@ import subprocess
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
+def pasta_cache(nome):
+    """Pasta de cache <nome> dentro da pasta escolhida nas Preferências (Cache e Disco → pasta), em "Canivete Cache";
+    sem pasta escolhida (ou disco desconectado), %LOCALAPPDATA%/CaniveteDoPailer. Assim nenhum cache enche o C: quando
+    o usuário apontou o cache para outro disco."""
+    base = ""
+    try:
+        from Functions.video_cutter import _cache_cfg
+        base = _cache_cfg()["dir"]
+    except Exception:
+        base = ""
+    raiz = os.path.join(base, "Canivete Cache") if base and os.path.isdir(base) else \
+        os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "CaniveteDoPailer")
+    d = os.path.join(raiz, nome)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
 def app_dir():
     """Pasta do app: ao lado do .exe (PyInstaller) ou raiz do projeto."""
     if getattr(sys, "frozen", False):

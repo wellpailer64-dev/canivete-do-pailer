@@ -74,7 +74,8 @@ def _modelo(nome):
 
 
 def _cache_dir():
-    return os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "cache_gerador")
+    from Functions.midia import pasta_cache
+    return pasta_cache("cache_gerador")
 
 
 def _motor():

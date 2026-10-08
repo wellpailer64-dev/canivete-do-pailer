@@ -3086,8 +3086,9 @@ class ApiBridge:
         """Photo Kanivete: máscara do assunto (Remover plano de fundo / Selecionar assunto) em PNG base64."""
         import hashlib
         from Functions.removerfundo import mascara_assunto_b64
+        from Functions.midia import pasta_cache
         # mesma imagem + mesmo modelo = mesma máscara: guarda em disco (refazer uma arte não roda a IA de novo)
-        pasta = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "cache_recorte")
+        pasta = pasta_cache("cache_recorte")
         arq = os.path.join(pasta, hashlib.sha1(f"{modelo}|{png_b64}".encode()).hexdigest() + ".txt")
         try:
             if os.path.exists(arq):
@@ -3110,7 +3111,8 @@ class ApiBridge:
     def ie_recorte_pro(self, png_b64):
         """Photo Kanivete: recorte profissional (Functions/recorte_pro.py) — cores sem o fundo misturado + máscara."""
         import hashlib
-        pasta = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "cache_recorte")
+        from Functions.midia import pasta_cache
+        pasta = pasta_cache("cache_recorte")
         # pro2_: recorte novo (2026-10-06: pessoa → matting, objeto → BEN2, GPU) — o cache do algoritmo antigo não volta
         arq = os.path.join(pasta, "pro2_" + hashlib.sha1(png_b64.encode()).hexdigest() + ".json")
         try:

@@ -1,7 +1,7 @@
 """Sound Kanivete — espectrograma, reparo espectral e separação voz/instrumental.
 
 espectro(): imagem (PNG) do trecho [t0, t1] do arquivo, frequência em escala log (40 Hz → sr/2, de baixo para cima),
-lida em fluxo (só as janelas que viram coluna), cache em %LOCALAPPDATA%/CaniveteDoPailer/sk_esp.
+lida em fluxo (só as janelas que viram coluna), cache em pasta_cache("sk_esp") (pasta de cache das Preferências).
 reparar(): STFT só no trecho mexido; "preencher" troca a magnitude da área marcada (tempo × frequência) pela
 interpolação entre o que vem antes e depois (tira tosse, bipe, celular); "atenuar" baixa a área. O resto do arquivo
 é copiado sem mexer. Gera um arquivo novo ao lado (o clipe passa a usá-lo, como Limpar ruído).
@@ -19,10 +19,8 @@ FMIN = 40.0
 
 
 def _cache(nome):
-    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-    d = os.path.join(base, "CaniveteDoPailer", nome)
-    os.makedirs(d, exist_ok=True)
-    return d
+    from Functions.midia import pasta_cache
+    return pasta_cache(nome)
 
 
 def _ler(arq, sr, canais, de=0.0, dur=None):

@@ -5,7 +5,7 @@ fade_in, fade_out, nome}]}], marcadores: [{t, nome}]} — tempos em segundos; `i
 `de` = de onde começa no arquivo, `vol` linear (1 = 0 dB). Os áudios ficam onde estão (o projeto guarda o caminho).
 
 info(): URL local (media_server) + duração + picos para a forma de onda (100 por segundo, 0–255, base64), em cache
-(%LOCALAPPDATA%/CaniveteDoPailer/sk_picos). exportar(): ffmpeg monta a mixagem (atrim + volume + fades + adelay por
+(pasta_cache("sk_picos"): a pasta de cache das Preferências, senão %LOCALAPPDATA%). exportar(): ffmpeg monta a mixagem (atrim + volume + fades + adelay por
 clipe, volume da faixa, amix) e, se pedido, normaliza em LUFS (loudnorm, 2 passadas).
 """
 import base64
@@ -25,10 +25,8 @@ FORMATOS = {"mp3": ["-c:a", "libmp3lame", "-b:a", "{br}k"], "wav": ["-c:a", "pcm
 
 
 def _cache_dir():
-    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
-    d = os.path.join(base, "CaniveteDoPailer", "sk_picos")
-    os.makedirs(d, exist_ok=True)
-    return d
+    from Functions.midia import pasta_cache
+    return pasta_cache("sk_picos")
 
 
 def _ffprobe_dur(path):
@@ -73,9 +71,8 @@ def picos(path):
 
 
 def _pcm_dir():
-    d = os.path.join(os.path.dirname(_cache_dir()), "sk_pcm")
-    os.makedirs(d, exist_ok=True)
-    return d
+    from Functions.midia import pasta_cache
+    return pasta_cache("sk_pcm")
 
 
 _podado = [0.0]
@@ -103,7 +100,7 @@ def _podar_pcm(limite=1.5e9):
 def trecho(arq, k, sr=48000, seg=10):
     """Trecho k (seg segundos) do áudio como PCM cru s16le estéreo em sr — a prévia (som-motor.js) agenda esses
     pedaços no WebAudio com precisão de amostra, sem carregar o arquivo inteiro (serve para gravações de horas).
-    Cache em %LOCALAPPDATA%/CaniveteDoPailer/sk_pcm."""
+    Cache em pasta_cache("sk_pcm") (a pasta de cache das Preferências)."""
     st = os.stat(arq)
     chave = hashlib.sha1(f"{os.path.abspath(arq)}|{st.st_size}|{st.st_mtime}|{sr}|{seg}".encode()).hexdigest()[:16]
     out = os.path.join(_pcm_dir(), f"{chave}_{int(k)}.pcm")
@@ -471,7 +468,8 @@ def ir_reverb(tamanho=1.2, sr=48000):
     import struct
     import numpy as np
     tamanho = round(max(0.2, min(6.0, float(tamanho))), 1)
-    arq = os.path.join(os.path.dirname(_cache_dir()), "sk_ir", f"rev_{tamanho:.1f}_{sr}.wav")
+    from Functions.midia import pasta_cache
+    arq = os.path.join(pasta_cache("sk_ir"), f"rev_{tamanho:.1f}_{sr}.wav")
     if os.path.isfile(arq):
         return arq
     os.makedirs(os.path.dirname(arq), exist_ok=True)
