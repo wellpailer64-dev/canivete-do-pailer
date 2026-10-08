@@ -59,6 +59,10 @@ esquerda, fila à direita (cada item congela a timeline ao entrar e tem as SUAS 
 formulário e o que mudar vale para ele), "Adicionar à fila", "Todas as timelines", ▶ Renderizar fila em ordem enquanto
 se edita. Botão Fila no cabeçalho abre o mesmo painel. API `VEFILA_API`. Teste: `py -3.13 testes/teste_fila.py` (porta 9334).
 
+Atributos de vários clipes (como no Premiere): `frontend/js/editor-atributos.js` — botão direito → "Remover atributos…"
+(efeitos de vídeo/áudio, movimento, opacidade, mesclagem, volume, transições, com caixinhas; vale para a seleção) e ajuste
+em grupo (mexer num efeito com vários selecionados leva o valor ao mesmo efeito de todos). Teste: `testes/teste_atributos.py`.
+
 Teste de 4K (estresse: material pesado, camadas, 10-bit, export, memória): plano e resultados em
 `Instructions/agente/teste-4k.md` — rodada 1 feita (2026-10-01), pendências no fim do arquivo.
 

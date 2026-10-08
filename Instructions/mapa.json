@@ -7,6 +7,7 @@
    "front": [
     "editor-3d-tela.js",
     "editor-3d.js",
+    "editor-atributos.js",
     "editor-audio.js",
     "editor-autoframe-cliente.js",
     "editor-autoframe.js",
@@ -961,12 +962,14 @@
   "ie_mascara_assunto": {
    "args": "png_b64, modelo=\"birefnet-lite\"",
    "modulos": [
+    "midia",
     "removerfundo"
    ]
   },
   "ie_recorte_pro": {
    "args": "png_b64",
    "modulos": [
+    "midia",
     "recorte_pro"
    ]
   },
@@ -2254,6 +2257,7 @@
   "Functions/webscraper.py": ""
  },
  "testes": {
+  "teste_atributos": "Remover atributos e ajuste em grupo (editor-atributos.js) — abre um app próprio (porta 9334, dados em",
   "teste_barra": "Barra de tarefas contextual: alça move e lembra, Selecionar assunto / Remover fundo, × esconde só até o próximo clique",
   "teste_blender": "Teste do render fotorrealista (Vetor 3D → Blender), app em --agente=9333. Rápido (400 px, 24 amostras): copo (girar) com",
   "teste_cameraraw": "Filtro Camera Raw em janela própria (app em --agente=9333; não mexa no mouse durante). Arrasta uma barra com o",

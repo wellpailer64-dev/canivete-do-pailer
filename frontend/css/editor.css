@@ -2087,3 +2087,13 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-fila-vazia, .ve-fila-dica { color: var(--ve-faint); font-size: 12px; line-height: 1.5; }
 .ve-fila-esp { flex: 1; }
 @media (max-width: 860px) { .ve-exp-grade { grid-template-columns: 1fr; } .ve-exp-grade > #ve-export-form { border-right: 0; border-bottom: 1px solid var(--ve-line); } }
+
+/* Remover atributos (editor-atributos.js), como no Premiere */
+.ve-atr-box { width: min(440px, calc(100% - 32px)); }
+.ve-atr-info { color: var(--ve-dim); font-size: 12px; }
+.ve-atr-lista { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; }
+.ve-atr-grupo { margin-top: 8px; padding-bottom: 3px; border-bottom: 1px solid var(--ve-line); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--ve-faint); }
+.ve-atr-grupo label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.ve-atr-item { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 5px 4px 5px 14px; border-radius: 4px; cursor: pointer; font-size: 12.5px; }
+.ve-atr-item:hover { background: var(--ve-panel-2); }
+.ve-atr-item small { color: var(--ve-faint); font-size: 11px; }
