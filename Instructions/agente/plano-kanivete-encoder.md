@@ -4,11 +4,12 @@ Pedido do usuário: o export é o que impede de trabalhar com vídeos grandes no
 Objetivo: **exportar mais rápido mantendo a qualidade**, e o painel virar uma ferramenta com identidade própria.
 Decisão já tomada: **não** reaproveitar as prévias renderizadas no export (pode afetar o desempenho/qualidade) — fica como está.
 
-## 1. Identidade e janela
-- Nome **Kanivete Encoder (Ke)**, loginho `app-logo al-ke` no cabeçalho do painel (cor na paleta laranja, como Ek/Pk/Vk/Sk).
-- Hoje: Exportar + fila num painel só (`frontend/js/editor-fila.js`, modal `#ve-export`).
-- Virar **janela solta**: mover livremente (arrastar pelo cabeçalho), **minimizar** (vira uma barrinha com o progresso
-  da fila) e **fechar** sem parar a fila. Lembrar posição/tamanho. Atalho continua Ctrl+M.
+## 1. Identidade e janela — FEITO (2026-10-07)
+`frontend/js/editor-encoder.js`: logo **Ke** (`.al-ke`, coral #ff7056), título "Kanivete Encoder"; janela solta sobre
+o editor (sem escurecer nem bloquear: dá para editar com ela aberta), arrasta pelo cabeçalho, redimensiona pelo canto,
+— minimiza para uma barrinha no centro de baixo com "item · N de M · %" (clique restaura; duplo clique no
+cabeçalho também minimiza), × fecha sem parar a fila; posição/tamanho em localStorage `ve-ke-janela`. API `VEKE_API`.
+Teste: `testes/teste_fila.py` (parte da janela no fim).
 
 ## 2. Medir antes de mexer (base de comparação)
 - Projetos de teste reais: vídeo longo de celular (10–30 min, H.264/HEVC 1080p/4K), entrevista com cortes + legenda +

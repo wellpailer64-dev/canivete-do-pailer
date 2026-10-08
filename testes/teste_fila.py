@@ -96,6 +96,23 @@ def main():
             larg = [subprocess.run([ffprobe(), "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", i["saida"]], capture_output=True, text=True).stdout.strip() for i in itens]
             ok(larg == ["1080,1920", "720,1280"], "cada arquivo com a sua resolução", str(larg))
             ok(pg.evaluate("$ve('ve-fila-btn').querySelector('.ve-fila-cont').textContent") == "", "contador da fila zera no fim")
+            # Kanivete Encoder: janela solta (arrasta, minimiza, restaura, lembra a posição) sem escurecer o editor
+            ok("Kanivete Encoder" in pg.inner_text("#ve-export .ve-modal-head") and pg.evaluate("!!document.querySelector('#ve-export .app-logo.al-ke')"), "janela Kanivete Encoder com o logo Ke")
+            ok(pg.evaluate("getComputedStyle($ve('ve-export')).pointerEvents") == "none", "não bloqueia o editor por trás (dá para editar com ela aberta)")
+            h = pg.evaluate("(() => { const r = document.querySelector('#ve-export .ve-modal-head').getBoundingClientRect(); return [r.left + 160, r.top + r.height / 2]; })()")
+            x0 = pg.evaluate("document.querySelector('#ve-export .ve-modal-box').offsetLeft")
+            pg.mouse.move(*h); pg.mouse.down(); pg.mouse.move(h[0] - 120, h[1] + 40, steps=8); pg.mouse.up()
+            x1 = pg.evaluate("document.querySelector('#ve-export .ve-modal-box').offsetLeft")
+            ok(abs((x0 - x1) - 120) < 3, "arrasta pelo cabeçalho", f"{x0} → {x1}")
+            pg.evaluate("document.getElementById('app-update-banner')?.remove()")
+            pg.click("#ve-export [data-ke='min']")
+            ok(pg.evaluate("$ve('ve-export').hidden && !$ve('ve-ke-mini').hidden"), "minimizar vira a barrinha Ke")
+            pg.click("#ve-ke-mini")
+            ok(pg.evaluate("!$ve('ve-export').hidden && $ve('ve-ke-mini').hidden"), "clicar na barrinha restaura")
+            ok(abs(pg.evaluate("document.querySelector('#ve-export .ve-modal-box').offsetLeft") - x1) < 3, "volta no mesmo lugar")
+            pg.click("#ve-export [data-ke='fechar']")
+            pg.evaluate("veOpenExport()")
+            ok(abs(pg.evaluate("document.querySelector('#ve-export .ve-modal-box').offsetLeft") - x1) < 3, "reabrir lembra a posição")
             pg.screenshot(path=BASE + "fila.png")
     finally:
         app.terminate()

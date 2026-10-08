@@ -16,6 +16,7 @@
     "editor-comp.js",
     "editor-copiar.js",
     "editor-dock.js",
+    "editor-encoder.js",
     "editor-ferramentas.js",
     "editor-fila.js",
     "editor-fx.js",

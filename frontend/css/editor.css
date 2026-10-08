@@ -2097,3 +2097,26 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-atr-item { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 5px 4px 5px 14px; border-radius: 4px; cursor: pointer; font-size: 12.5px; }
 .ve-atr-item:hover { background: var(--ve-panel-2); }
 .ve-atr-item small { color: var(--ve-faint); font-size: 11px; }
+
+/* Kanivete Encoder (editor-encoder.js): janela solta, sem escurecer o editor; minimizar vira barrinha */
+#ve-export.ve-ke { background: transparent; backdrop-filter: none; pointer-events: none; display: block; padding: 0; }
+#ve-export.ve-ke[hidden] { display: none; }
+#ve-export.ve-ke .ve-modal-box { pointer-events: auto; position: absolute; display: flex; flex-direction: column; resize: both; overflow: hidden;
+    min-width: 520px; min-height: 360px; max-width: calc(100% - 8px); max-height: calc(100% - 8px); box-shadow: 0 18px 60px rgba(0,0,0,.65), 0 0 0 1px rgba(255,112,86,.18); }
+#ve-export.ve-ke .ve-modal-head { cursor: grab; user-select: none; gap: 10px; }
+#ve-export.ve-ke .ve-modal-head.arrastando { cursor: grabbing; }
+.ve-ke-tit { display: flex; align-items: center; gap: 8px; }
+.ve-ke-bts { display: flex; gap: 2px; }
+.ve-ke-bts .ve-icon-btn { font-weight: 700; }
+#ve-export.ve-ke .ve-exp-grade { flex: 1; min-height: 0; }
+#ve-export.ve-ke .ve-exp-grade > #ve-export-form { overflow: auto; }
+#ve-export.ve-ke .ve-modal-foot { flex: none; }
+.ve-ke-mini { position: absolute; left: 50%; transform: translateX(-50%); bottom: 14px; z-index: 25; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px 0 8px;
+    border-radius: 8px; border: 1px solid var(--ve-line-2); background: var(--ve-panel); color: var(--ve-text); font: 600 12px var(--ve-ui); cursor: pointer;
+    box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+.ve-ke-mini[hidden] { display: none; }
+.ve-ke-mini:hover { border-color: #ff7056; }
+.ve-ke-mini .app-logo { width: 22px; height: 22px; font-size: 10.5px; border-radius: 5px; box-shadow: inset 0 0 0 1.4px var(--al); }
+.ve-ke-mini-barra { width: 90px; height: 4px; border-radius: 2px; background: var(--ve-line); overflow: hidden; display: none; }
+.ve-ke-mini.rodando .ve-ke-mini-barra { display: block; }
+.ve-ke-mini-barra i { display: block; height: 100%; width: 0; background: #ff7056; transition: width .3s; }
