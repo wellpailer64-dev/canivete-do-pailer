@@ -178,6 +178,10 @@ Painéis móveis do Vetor (mecanismo do Photo): §16, `frontend/js/vetor-dock.js
 ## ffmpeg
 - O ffmpeg baixado é recente (7+): `-filter_complex_script` não existe mais; use `-/filter_complex`
   (ver `_opcao_filtro_script` em `Functions/video_cutter.py`).
+- Versão FIXA: série estável **n8.1** do BtbN (`first_run.py`, campo `versao` + `modelos_ia/ffmpeg.exe.versao`; quem
+  tem outra baixa de novo uma vez). Não voltar para a diária ("master") nem subir para a 9.0 sem conferir o driver
+  NVIDIA mínimo do NVENC (`grep -a "610.00" ffmpeg.exe`): a diária de 2026-09 e a 9.0 exigem 610+ e quem tinha driver
+  mais antigo perdeu a placa. A 8.1 tem Vulkan, libplacebo, overlay/scale_vulkan, h264_vulkan e NVENC.
 
 ## Canivete Worker (assistente local)
 Antes de olhar imagem: `tools/medir_ref.py` (mede a referência: textos, formas, paleta → rascunho HTML), `knv.py --revisar`

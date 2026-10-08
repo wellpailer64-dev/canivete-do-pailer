@@ -19,7 +19,7 @@ else:
     BASE_DIR = os.getcwd()
 
 INSTALLED_MARKER = os.path.join(BASE_DIR, "models", ".installed")
-MARKER_VERSION = "v3-isnet-deno"
+MARKER_VERSION = "v4-ffmpeg-n8.1"
 
 # ── Lista de downloads ──────────────────────────────────────────────────────
 DOWNLOADS = [
@@ -72,11 +72,13 @@ DOWNLOADS = [
         "dest": "modelos_ia/cerebro/flan_t5_base",
     },
     {
+        # Série estável 8.1 (só recebe correções), não a compilação diária ("master"): a diária de 2026-09 passou a
+        # exigir driver NVIDIA 610+ e quem tinha driver mais antigo perdeu a placa de vídeo no export sem aviso; a 9.0
+        # também já exige 610. "versao" troca o ffmpeg de quem tem outra (instalações antigas baixam de novo uma vez).
         "label": "Baixando FFmpeg",
         "type": "url",
-        "github_latest": "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest",
-        "asset_pattern": "*win64-gpl.zip",
-        "asset_exclude": ["*shared*", "*7.1.zip", "*8.1.zip"],
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-gpl-8.1.zip",
+        "versao": "n8.1",
         "dest": "modelos_ia/ffmpeg.zip",
         "extract": ["modelos_ia/ffmpeg.exe", "modelos_ia/ffprobe.exe"],
     },
@@ -121,6 +123,8 @@ def _item_existe(item: dict) -> bool:
         if "extract" in item:
             # O que importa é o arquivo extraído, não o zip intermediário
             alvos = item["extract"] if isinstance(item["extract"], list) else [item["extract"]]
+            if item.get("versao") and _versao_instalada(item) != item["versao"]:
+                return False
             return all(os.path.exists(_abs(a)) for a in alvos)
         else:
             return os.path.exists(_abs(item["dest"]))
@@ -133,6 +137,20 @@ def _item_existe(item: dict) -> bool:
         return importlib.util.find_spec(item["module"]) is not None
 
     return False
+
+
+def _arquivo_versao(item: dict) -> str:
+    """Ao lado do 1º arquivo extraído: qual versão está instalada (ex.: modelos_ia/ffmpeg.exe.versao)."""
+    alvos = item["extract"] if isinstance(item["extract"], list) else [item["extract"]]
+    return _abs(alvos[0]) + ".versao"
+
+
+def _versao_instalada(item: dict) -> str:
+    try:
+        with open(_arquivo_versao(item), encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
 
 
 def precisa_instalar() -> bool:
@@ -314,6 +332,9 @@ def _run_item(item: dict, on_progress=None, on_label=None,
             for alvo in alvos:
                 extract_dest = _abs(alvo)
                 _extract_from_zip(zip_path, extract_dest, os.path.basename(extract_dest))
+            if item.get("versao"):
+                with open(_arquivo_versao(item), "w", encoding="utf-8") as f:
+                    f.write(item["versao"])
             try:
                 os.remove(zip_path)
             except Exception:

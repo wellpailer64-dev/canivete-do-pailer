@@ -110,3 +110,10 @@ _FullHD, `medir_r2.py` export INTEIRO velho(HEAD)×novo com partes removidas, `g
   ajustes: lookahead, AQ, tune hq); se perder, Vulkan → `hwmap` cuda → NVENC e medir se a cópia fica na placa.
   (b) LUT no libplacebo × lut3d (3 s): mesma faixa (Y 16–231), U/V −0,3, mas Y médio +1,5 nível (141,7 → 143,2):
   não é faixa nem matriz; conferir interpolação/dithering (`dithering`, `extra_opts`) até zerar o deslocamento.
+- Ordem da rodada 3 (notas da sessão de pesquisa, conferidas no ffmpeg N-126905):
+  1. **Fixar a versão do ffmpeg** em `first_run.py` ANTES de publicar o modo placa (a compilação diária + driver 610+
+     já derrubou o NVENC aqui); o modo placa cai para a CPU se o Vulkan falhar (Vulkan roda em AMD/Intel também).
+  2. `libplacebo` com `inputs=N` compõe várias entradas num passo só, com `pos_x/pos_y/pos_w/pos_h` em EXPRESSÃO por
+     quadro (t, n): escala/posição com quadro-chave + PNGs + LUT + shader no mesmo passo, sem cadeia de overlays.
+     Opacidade por entrada não aparece nas opções (`-h filter=libplacebo`): resolver no shader ou no alfa do PNG.
+  3. 4K: reduzir 4K→1080 dentro do libplacebo (o quadro nunca desce): deve ser o maior ganho nos brutos de celular.
