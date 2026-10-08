@@ -70,12 +70,12 @@ function kaniParaFala(txt) {   // o que a voz lê: sem formatação, emojis, has
 function kaniAcoes(m, i) {
     if (!m.content || (KANI.gerando && KANI.gerando.conv === KANI.conversa && KANI.gerando.i === i)) return '';
     const v = KANI.voz && KANI.voz.i === i && KANI.voz.conv === KANI.conversa ? KANI.voz.estado : '';
-    return `<div class="kani-acoes"><button data-copiar-msg="${i}" title="Copiar a resposta"><svg class="i"><use href="#i-copy"/></svg> Copiar</button>
-        <button data-ouvir-msg="${i}" class="${v}" title="${v === 'tocando' ? 'Parar' : 'Ouvir com a voz da Kani'}">${v === 'carregando' ? '<span class="kani-gira"></span> Preparando a voz…' : v === 'tocando' ? '■ Parar' : '<svg class="i"><use href="#i-volume"/></svg> Ouvir'}</button></div>`;
+    return `<div class="kani-acoes"><button data-copiar-msg="${i}" title="Copiar a resposta"><svg class="i"><use href="#i-copy"/></svg></button>
+        <button data-ouvir-msg="${i}" class="${v}" title="${v === 'tocando' ? 'Parar' : v === 'carregando' ? 'Preparando a voz…' : 'Ouvir com a voz da Kani'}">${v === 'carregando' ? '<span class="kani-gira"></span>' : v === 'tocando' ? '■' : '<svg class="i"><use href="#i-volume"/></svg>'}</button></div>`;
 }
 async function kaniCopiar(texto, botao) {
     try { await navigator.clipboard.writeText(texto); } catch (e) { const ta = document.createElement('textarea'); ta.value = texto; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
-    if (botao) { const h = botao.innerHTML; botao.textContent = 'Copiado ✓'; botao.classList.add('ok'); setTimeout(() => { botao.innerHTML = h; botao.classList.remove('ok'); }, 1400); }
+    if (botao) { const h = botao.innerHTML; botao.textContent = botao.dataset.copiarMsg !== undefined ? '✓' : 'Copiado ✓'; botao.classList.add('ok'); setTimeout(() => { botao.innerHTML = h; botao.classList.remove('ok'); }, 1400); }
 }
 function kaniOuvir(i) {
     const c = KANI.conversa, m = c.msgs[i];
@@ -172,10 +172,16 @@ async function kaniAbrir() {
     document.getElementById('kani').hidden = false;
     document.body.classList.add('kani-aberta');
     kaniRender();
+    kaniApi()?.kani_voz?.(true);   // carrega a voz já: o Ouvir sai rápido; fechar o chat solta a memória
     await kaniAtualizarEstado();
     setTimeout(() => document.getElementById('kani-txt')?.focus(), 50);
 }
-function kaniFechar() { KANI.aberto = false; const g = document.getElementById('kani'); if (g) g.hidden = true; document.body.classList.remove('kani-aberta'); }
+function kaniFechar() {
+    if (KANI.aberto) kaniApi()?.kani_voz?.(false);
+    if (KANI.audio) KANI.audio.pause();
+    KANI.voz = null;
+    KANI.aberto = false; const g = document.getElementById('kani'); if (g) g.hidden = true; document.body.classList.remove('kani-aberta');
+}
 async function kaniBaixar() {
     KANI.baixando = true; KANI.pct = 0; KANI.msg = 'Começando…'; kaniRender();
     const r = await kaniApi().kani_baixar();

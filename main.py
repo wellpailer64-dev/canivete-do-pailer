@@ -3312,8 +3312,13 @@ class ApiBridge:
         from Functions import kani
         return kani.cancelar(cid)
 
+    def kani_voz(self, ligar=True):
+        """Abre o chat: carrega a voz da Kani e deixa pronta; fecha: tira da memória."""
+        from Functions import kani
+        return kani.voz_ligar(bool(ligar))
+
     def kani_falar(self, texto, chave=""):
-        """Lê a resposta com a voz da Kani (Fran, OmniVoice 4 passos); o áudio volta em kaniVoz({chave, url})."""
+        """Lê a resposta com a voz da Kani (Fran, OmniVoice 7 passos); o áudio volta em kaniVoz({chave, url})."""
         from Functions import kani
         return kani.falar(texto, lambda d: _js("kaniVoz", d), chave)
 

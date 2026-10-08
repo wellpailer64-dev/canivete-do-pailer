@@ -234,7 +234,45 @@ def action_synthesize(payload: dict[str, Any]) -> dict[str, Any]:
     return {"success": True, "output_path": str(output_path), "seconds": seconds, "chunks": chunks}
 
 
+def serve(hf_home: str, model_id: str) -> int:
+    """Modelo carregado uma vez: lê pedidos JSON por linha no stdin e responde {"kind": "result", ...} no stdout.
+    Fecha com {"action": "sair"} ou quando o stdin acaba (o app fechou)."""
+    import soundfile as sf
+    from omnivoice import VoiceClonePrompt
+
+    for s in (sys.stdin, sys.stdout):
+        if hasattr(s, "reconfigure"):
+            s.reconfigure(encoding="utf-8")
+    _configure_hf(hf_home)
+    model = _load_model({"model": model_id})
+    prompts: dict[str, Any] = {}
+    _emit("pronto")
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        req: dict[str, Any] = {}
+        try:
+            req = json.loads(line)
+            if req.get("action") == "sair":
+                break
+            p = req["prompt_path"]
+            if p not in prompts:
+                prompts[p] = VoiceClonePrompt.load(p)
+            start = time.perf_counter()
+            audio, chunks, sample_rate = _generate_stable_audio(model, prompts[p], req["text"], req.get("options") or {})
+            Path(req["output_path"]).parent.mkdir(parents=True, exist_ok=True)
+            sf.write(req["output_path"], audio, sample_rate)
+            _emit("result", id=req.get("id"), success=True, output_path=req["output_path"],
+                  seconds=time.perf_counter() - start, chunks=chunks)
+        except Exception as exc:
+            _emit("result", str(exc), id=req.get("id"), success=False, error=str(exc))
+    return 0
+
+
 def main() -> int:
+    if len(sys.argv) == 4 and sys.argv[1] == "serve":
+        return serve(sys.argv[2], sys.argv[3])
     if len(sys.argv) != 4:
         print("Uso: omnivoice_runner.py <acao> <payload.json> <resultado.json>", file=sys.stderr)
         return 2

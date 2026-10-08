@@ -305,8 +305,25 @@ VOZ = "fran"          # voz da Kani ao ler em voz alta (OmniVoice; a 1ª salva s
 _falas = {}           # texto → arquivo já sintetizado (não refaz a mesma fala)
 
 
+def voz_ligar(ligar):
+    """Chat aberto: deixa a voz carregada (a 1ª leitura já sai rápida); fechado: libera a memória."""
+    from Functions import omnivoice_tool as ov
+    if ligar:
+        threading.Thread(target=lambda: _tenta(ov.manter_carregado), daemon=True).start()
+    else:
+        ov.descarregar()
+    return {"success": True}
+
+
+def _tenta(f):
+    try:
+        f()
+    except Exception:
+        pass
+
+
 def falar(texto, on_evento, chave):
-    """Lê o texto com a voz da Kani (OmniVoice, 4 passos: rápido). on_evento({chave, url} | {chave, erro})."""
+    """Lê o texto com a voz da Kani (OmniVoice, 7 passos: rápido sem errar palavras). on_evento({chave, url} | {chave, erro})."""
     def run():
         try:
             from Functions import media_server
@@ -317,7 +334,7 @@ def falar(texto, on_evento, chave):
                 if not vozes:
                     raise RuntimeError("nenhuma voz salva (crie uma em Geração de Voz)")
                 v = next((x for x in vozes if (x.get("name") or "").strip().lower() == VOZ), vozes[0])
-                r = synthesize(v["id"], texto, {"num_step": 4, "language": "pt", "speed": 1.05})
+                r = synthesize(v["id"], texto, {"num_step": 7, "language": "pt", "speed": 1.05})
                 arq = r.get("output_path")
                 _falas[texto] = arq
             on_evento({"chave": chave, "url": media_server.register(arq)})

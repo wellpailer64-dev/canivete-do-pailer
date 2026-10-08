@@ -1,9 +1,10 @@
 /* Kani — assistente do KANIVETE (kani.js): gaveta à direita, bolinha na Home, item na seção IA da barra lateral */
 .kani-av { display: inline-grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 50%;
-    background: radial-gradient(circle at 30% 30%, #ffb45c, #ff7a2f 60%, #c2410c); color: #1a0d02; font: 800 15px/1 var(--font-ui);
+    background: url(../identidade/kani.webp) center/cover, radial-gradient(circle at 30% 30%, #ffb45c, #ff7a2f 60%, #c2410c); color: transparent; font: 800 0/1 var(--font-ui); overflow: hidden;
     box-shadow: 0 0 0 2px rgba(255, 140, 66, .25); }
 .kani-av-mini { width: 18px; height: 18px; font-size: 10px; box-shadow: none; }
-.kani-av-g { width: 56px; height: 56px; font-size: 24px; margin-bottom: 6px; }
+.kani-av-g { width: 112px; height: 112px; margin-bottom: 8px; box-shadow: 0 0 0 3px rgba(255, 140, 66, .35), 0 8px 24px rgba(0, 0, 0, .45); }
+.kani-acoes > button { padding: 5px 8px; min-width: 30px; justify-content: center; }
 .menu-kani .label { font-weight: 600; }
 
 /* bolinha na Home: canto de baixo, pulsando de leve */
@@ -17,7 +18,7 @@ body:has(#page-home.active) .kani-bolinha { display: flex; }
 body.kani-aberta .kani-bolinha { display: none !important; }
 
 /* gaveta */
-.kani { position: fixed; top: 0; right: 0; bottom: 0; z-index: 900; width: min(440px, 100vw); display: flex; flex-direction: column;
+.kani { position: fixed; top: 0; right: 0; bottom: 0; z-index: 900; width: min(560px, 100vw); display: flex; flex-direction: column;
     background: #141110; border-left: 1px solid #2c2520; box-shadow: -18px 0 50px rgba(0, 0, 0, .55); color: var(--text); font-family: var(--font-ui); }
 .kani[hidden] { display: none; }
 .kani-cab { display: flex; align-items: center; gap: 10px; padding: 12px 12px 12px 14px; border-bottom: 1px solid #2c2520; background: #1a1512; }
@@ -68,7 +69,7 @@ body.kani-aberta .kani-bolinha { display: none !important; }
 .kani-enviar.parar { background: #3a2f28; color: var(--text); }
 .kani-enviar .i { width: 16px; height: 16px; }
 /* com a Kani aberta, o aviso de atualização vai para o lado da gaveta (não cobre o campo de digitar) */
-body.kani-aberta .update-banner { right: calc(min(440px, 100vw) + 16px) !important; }
+body.kani-aberta .update-banner { right: calc(min(560px, 100vw) + 16px) !important; }
 
 /* saída pronta (```texto```) e código: caixa mais escura com Copiar só dela */
 .kani-saida { position: relative; margin: 6px 0 10px; border: 1px solid #2f2621; border-radius: 9px; background: #0c0a09; }

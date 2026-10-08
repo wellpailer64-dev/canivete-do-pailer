@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 import time
 import unicodedata
 import uuid
@@ -369,6 +370,77 @@ def _run_external(action: str, payload: dict[str, Any], callback_log: LogFn = No
     if code != 0 or not result.get("success"):
         raise RuntimeError(result.get("error") or f"OmniVoice terminou com codigo {code}.")
     return result
+
+
+# ── modelo mantido carregado (a Kani liga ao abrir o chat e desliga ao fechar) ──
+_serv_lock = threading.RLock()
+_serv: dict[str, Any] = {"proc": None}
+
+
+def _servidor_vivo():
+    p = _serv["proc"]
+    return p if p is not None and p.poll() is None else None
+
+
+def manter_carregado() -> dict[str, Any]:
+    """Carrega o modelo e deixa na memória: as sínteses seguintes não pagam o carregamento (~10 s)."""
+    engine = _select_engine()
+    if engine["kind"] == "missing":
+        return {"success": False, "error": "OmniVoice nao instalado"}
+    hf_home = _ensure_model_available()
+    if engine["kind"] == "inprocess":
+        _load_model_inprocess(hf_home)
+        return {"success": True}
+    with _serv_lock:
+        if _servidor_vivo():
+            return {"success": True}
+        proc = subprocess.Popen([engine["python"], "-u", _runner_path(), "serve", hf_home, MODEL_ID],
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                text=True, encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
+        _serv["proc"] = proc
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            if '"kind": "pronto"' in line:
+                return {"success": True}
+        _serv["proc"] = None
+        return {"success": False, "error": "o OmniVoice fechou ao carregar"}
+
+
+def descarregar() -> dict[str, Any]:
+    """Tira o modelo da memória (fecha o processo mantido ou limpa o cache embutido)."""
+    p, _serv["proc"] = _serv["proc"], None
+    if p is not None and p.poll() is None:
+        try:
+            p.stdin.write('{"action": "sair"}\n')
+            p.stdin.flush()
+            p.wait(timeout=5)
+        except Exception:
+            p.kill()
+    if _MODEL_CACHE:
+        _MODEL_CACHE.clear()
+        try:
+            import torch
+            torch.cuda.empty_cache()
+        except Exception:
+            pass
+    return {"success": True}
+
+
+def _sintetizar_no_servidor(proc, payload: dict[str, Any]) -> dict[str, Any]:
+    with _serv_lock:
+        req = dict(payload, id=uuid.uuid4().hex)
+        proc.stdin.write(json.dumps(req, ensure_ascii=False) + "\n")
+        proc.stdin.flush()
+        for line in proc.stdout:
+            try:
+                evt = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if evt.get("kind") == "result" and evt.get("id") == req["id"]:
+                if not evt.get("success"):
+                    raise RuntimeError(evt.get("error") or "falha na síntese")
+                return evt
+        raise RuntimeError("o OmniVoice mantido fechou")
 
 
 def _choose_device(requested: str | None, torch: Any) -> str:
@@ -859,7 +931,15 @@ def synthesize(voice_id: str, text: str, options: dict[str, Any] | None = None,
         sf.write(output_path, audio, sample_rate)
         seconds = time.perf_counter() - start
     else:
-        result = _run_external("synthesize", payload, callback_log, callback_progresso)
+        proc = _servidor_vivo()
+        result = None
+        if proc is not None:
+            try:
+                result = _sintetizar_no_servidor(proc, payload)
+            except Exception as e:
+                _log(callback_log, f"OmniVoice mantido falhou ({e}); rodando avulso.")
+        if result is None:
+            result = _run_external("synthesize", payload, callback_log, callback_progresso)
         seconds = float(result.get("seconds") or 0.0)
         chunks = int(result.get("chunks") or 1)
 
