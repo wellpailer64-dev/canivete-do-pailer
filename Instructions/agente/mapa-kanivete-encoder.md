@@ -76,7 +76,12 @@ arquivo .part → renomeado no fim · miniatura ke_quadro.jpg 1×/s (saida_minia
 | **placa, Full HD** | **96–98 s (0,97–0,99×)** | 38,8 dB contra a CPU |
 | placa, partida | ~2,7 s até o 1º quadro (0,5 s de preparo no Python) | NVENC e miniatura não pesam |
 
-Testado e DESCARTADO, com o motivo: juntar cortes num fluxo (perde paralelismo, 24,8 → 35,6 s); 4:2:0 até a camada
+Onde vai o tempo na placa (trecho de 15 s mais denso, `medir_velocidade.py`): tudo 17,3–18,4 s · só vídeos 11,3 s ·
+sem textos/logo 15,9 s · camada de ajuste ~5 s = dividir a montagem ~1,0 + LUT ~1,5 + Clareza/Nitidez ~2,3 (custo por
+passada: a placa espera cada etapa — ela fica ociosa, 10–60%). Dois exports ao mesmo tempo (`medir_paralelo.py`):
+rendimento 1,24× (não 2×) com o dobro de memória.
+
+Testado e DESCARTADO, com o motivo: LUT + Clareza numa passada só (gancho OUTPUT; ganho ~3%, dentro do ruído, e 40,5 dB × 44 dB); juntar cortes num fluxo (perde paralelismo, 24,8 → 35,6 s); 4:2:0 até a camada
 de ajuste (sem ganho); Clareza reduzida na CPU (o caro são as conversões); blocos com NVDEC no 4K (6×); ler Full HD
 H.264 na CPU no modo placa (13% mais lento); texto subindo uma vez só para a placa (memória igual, 4,9 GB).
 ATENÇÃO ao medir um trecho: `_base_na_janela` devolve a base INTEIRA (o resto vira vazio) e a duração continua a da
