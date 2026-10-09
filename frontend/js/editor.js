@@ -98,7 +98,11 @@ function veTrkAfx(tr) {
     const s = (tr >= 0 && VE_TRK.a[tr]) || {};
     const lim = typeof veMasterLim === 'function' && VE.master && VE.master.lim && VE.master.lim.on !== false;
     const g = veMixDb(s.vol) + (lim ? 0 : veMasterDb());
-    return { t: 'trk', v: { g: +Math.max(-200, g).toFixed(2), p: +(+s.pan || 0).toFixed(1), tr } };
+    const v = { g: +Math.max(-200, g).toFixed(2), p: +(+s.pan || 0).toFixed(1), tr };
+    // rack de efeitos da trilha (Mixer): vai junto; a prévia e a exportação somam os clipes da trilha antes deles
+    const bus = s.fx && s.fx.length && typeof veAfxExport === 'function' ? veAfxExport({ afx: s.fx }) : [];
+    if (bus.length) v.bus = bus;
+    return { t: 'trk', v };
 }
 
 // Estado de cada trilha (como os botões do cabeçalho no Premiere): v[k] = trilha Vk+1, a[k] = Ak+1.

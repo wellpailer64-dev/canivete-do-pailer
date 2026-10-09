@@ -63,7 +63,10 @@ function veMixColuna(k) {
             <button data-mk="${k}" data-mbt="solo" title="${veT('Solo')}">S</button></div>`;
     const marcas = VE_MIX_MARCAS.map(d => `<i style="bottom:${veMixU(d) * 100}%">${d}</i>`).join('') + '<i style="bottom:0">-∞</i>';
     const med = VE_MIX_MED.map(d => `<i style="bottom:${(1 - d / VE_MED_MIN) * 100}%">${d}</i>`).join('');
-    return `<div class="ve-mix-col${mestre ? ' mestre' : ''}" data-mcol="${k}">
+    // rack de efeitos (5 espaços, como no Premiere): a trilha soma os clipes e passa por eles antes do fader
+    const rack = `<div class="ve-mix-rack">${mestre ? '<small>' + veT('Master: só o Hard Limiter (LIM, nos Medidores)') + '</small>'
+        : Array.from({ length: VE_MIX_SLOTS }, (_, i) => `<button class="ve-mix-slot" data-mk="${k}" data-slot="${i}"></button>`).join('')}</div>`;
+    return `<div class="ve-mix-col${mestre ? ' mestre' : ''}" data-mcol="${k}">${rack}
         <div class="ve-mix-topo">${pan}</div>${ms}
         <div class="ve-mix-corpo">
             <div class="ve-mix-esc">${marcas}</div>
@@ -81,10 +84,20 @@ function veMixUi() {
     if (!el || !VE_TRK) return;
     const n = VE_TRK.a.length;
     if (el._n !== n || !el.firstChild) {
-        el.innerHTML = `<div class="ve-mix-cols">${Array.from({ length: n }, (_, k) => veMixColuna(k)).join('')}</div>${veMixColuna(-1)}`;
+        el.innerHTML = `<button class="ve-mix-rackbt" title="${veT('Mostrar/ocultar os efeitos das trilhas')}">fx</button>`
+            + `<div class="ve-mix-cols">${Array.from({ length: n }, (_, k) => veMixColuna(k)).join('')}</div>${veMixColuna(-1)}`;
         el._n = n;
         if (!el._ligado) veMixLigar(el);
     }
+    el.classList.toggle('rack', veMixRackAberto());
+    el.querySelectorAll('.ve-mix-slot').forEach(b => {
+        const f = ((VE_TRK.a[+b.dataset.mk] || {}).fx || [])[+b.dataset.slot], d = f && VE_AFX[f.t];
+        b.textContent = d ? d.nome : '';
+        b.title = d ? `${d.nome}${f.on === false ? ' · ' + veT('desligado') : ''} · ${veT('clique para ajustar')}` : veT('Escolher efeito');
+        b.classList.toggle('cheio', !!d);
+        b.classList.toggle('off', !!d && f.on === false);
+        b.classList.toggle('semsom', !!d && !!d.pr && !d.som);
+    });
     el.querySelectorAll('[data-mcol]').forEach(col => {
         const k = +col.dataset.mcol, st = k < 0 ? (VE.master || {}) : (VE_TRK.a[k] || {});
         col.querySelector('.ve-mix-botao').style.bottom = `calc(${veMixU(st.vol) * 100}% - 9px)`;
@@ -136,6 +149,9 @@ function veMixLigar(el) {
         if (veMixPor(+(f || p).dataset.mk, f ? 'vol' : 'pan', 0)) veMixMudou();
     });
     el.addEventListener('click', e => {
+        if (e.target.closest('.ve-mix-rackbt')) { veMixRackAberto(!veMixRackAberto()); veMixUi(); return; }
+        const sl = e.target.closest('.ve-mix-slot');
+        if (sl) { veMixSlot(sl, +sl.dataset.mk, +sl.dataset.slot); return; }
         const b = e.target.closest('[data-mbt]');
         if (b) { veTrackToggle('a', +b.dataset.mk, b.dataset.mbt); return; }
         const v = e.target.closest('[data-campo]');
@@ -222,3 +238,115 @@ window.VEMIX_API = {
                      master: (VE.master && VE.master.vol) || 0 }),
     u: veMixU, db: veMixDbDe,
 };
+
+// ── rack de efeitos da trilha ──
+const VE_MIX_SLOTS = 5;
+function veMixRackAberto(v) {
+    try {
+        if (v !== undefined) localStorage.setItem('ve-mix-rack', v ? '1' : '0');
+        return localStorage.getItem('ve-mix-rack') === '1';
+    } catch (e) { return !!v; }
+}
+function veMixPop(ancora, html) {
+    const doc = ancora.ownerDocument;
+    doc.querySelectorAll('.ve-mix-pop').forEach(p => p.remove());
+    const pop = doc.createElement('div');
+    pop.className = 've-mix-pop';
+    pop.innerHTML = html;
+    doc.body.appendChild(pop);
+    const r = ancora.getBoundingClientRect(), W = doc.documentElement.clientWidth, H = doc.documentElement.clientHeight;
+    pop.style.left = Math.max(4, Math.min(r.left, W - pop.offsetWidth - 4)) + 'px';
+    pop.style.top = Math.max(4, Math.min(r.bottom + 2, H - pop.offsetHeight - 4)) + 'px';
+    const fora = e => { if (!pop.contains(e.target)) { pop.remove(); doc.removeEventListener('pointerdown', fora, true); } };
+    setTimeout(() => doc.addEventListener('pointerdown', fora, true), 0);
+    return pop;
+}
+// espaço vazio: menu de efeitos por categoria (os do Premiere e os do Kanivete); cheio: os controles do efeito
+function veMixSlot(sl, k, i) {
+    const fx = (VE_TRK.a[k] || {}).fx || [];
+    if (fx[i]) { veMixEditor(sl, k, i); return; }
+    const cats = {};
+    Object.entries(VE_AFX).forEach(([t, d]) => { if (t !== 'antinoise') (cats[d.cat] = cats[d.cat] || []).push([t, d]); });
+    const html = `<input class="ve-mix-busca" placeholder="${veT('Buscar efeito')}">`
+        + `<div class="ve-mix-lista">${Object.entries(cats).sort().map(([c, l]) => `<div class="ve-mix-cat">${c.replace('Áudio · ', '')}</div>`
+            + l.map(([t, d]) => `<div class="ve-mix-ef${d.pr && !d.som ? ' semsom' : ''}" data-t="${t}" title="${d.tag || ''}">${d.nome}</div>`).join('')).join('')}</div>`;
+    const pop = veMixPop(sl, html), busca = pop.querySelector('.ve-mix-busca');
+    busca.focus();
+    busca.addEventListener('input', () => {
+        const q = busca.value.trim().toLowerCase();
+        pop.querySelectorAll('.ve-mix-ef').forEach(x => { x.hidden = !!q && !x.textContent.toLowerCase().includes(q); });
+    });
+    busca.addEventListener('keydown', e => e.stopPropagation());
+    pop.addEventListener('click', e => {
+        const it = e.target.closest('.ve-mix-ef');
+        if (!it) return;
+        const t = it.dataset.t, v = {};
+        VE_AFX[t].params.forEach(p => { v[p.k] = p.def; });
+        const st = veTrackState('a', k);
+        st.fx = [...(st.fx || []), { id: veFxNewId(), t, on: true, v }].slice(0, VE_MIX_SLOTS);
+        pop.remove();
+        veMixMudou();
+        veToast(`${VE_AFX[t].nome} ${veT('na trilha')} A${k + 1}`);
+    });
+}
+function veMixEditor(sl, k, i) {
+    const st = veTrackState('a', k), f = st.fx[i], d = VE_AFX[f.t];
+    const ps = d.params.filter(p => !p.oculto && p.tipo !== 'cor');
+    const linha = p => p.tipo === 'bool'
+        ? `<label class="ve-mix-ed-bool"><input type="checkbox" data-k="${p.k}"> ${p.nome}</label>`
+        : `<div class="ve-mix-ed-p"><span>${p.nome}</span><input type="range" min="${p.min}" max="${p.max}" step="${p.step}" data-k="${p.k}">`
+          + `<input type="text" data-k="${p.k}" data-num="1"><i>${p.un || ''}</i></div>`;
+    const html = `<div class="ve-mix-ed-topo"><b>${d.nome}</b> <small>A${k + 1}</small>`
+        + `<label><input type="checkbox" data-on="1" ${f.on === false ? '' : 'checked'}> ${veT('ligado')}</label>`
+        + `<button data-acao="esq" title="${veT('Antes')}">◀</button><button data-acao="dir" title="${veT('Depois')}">▶</button>`
+        + `<button data-acao="del" title="${veT('Remover')}">✕</button></div>`
+        + (d.pr && !d.som ? `<div class="ve-mix-aviso">${veT('Sem prévia no Kanivete: os valores vão e voltam intactos para o Premiere.')}</div>` : '')
+        + `<div class="ve-mix-ed-params">${ps.map(linha).join('')}</div>`;
+    const pop = veMixPop(sl, html);
+    const pintar = () => {
+        const v = veAfxValues(st.fx[i]);
+        ps.forEach(p => pop.querySelectorAll(`[data-k="${p.k}"]`).forEach(inp => {
+            if (inp.type === 'checkbox') { inp.checked = !!v[p.k]; return; }
+            if (inp.ownerDocument.activeElement === inp) return;
+            inp.value = inp.dataset.num ? (p.vis ? p.vis(v[p.k]) : veFxFmt(p, v[p.k])) : v[p.k];
+        }));
+    };
+    pintar();
+    const por = (kk, val) => {
+        const p = d.params.find(x => x.k === kk);
+        if (p.tipo === 'bool') val = val ? 1 : 0; else val = Math.min(p.max, Math.max(p.min, val));
+        st.fx = st.fx.map((x, j) => j === i ? { ...x, v: { ...x.v, [kk]: val } } : x);
+        pintar();
+        veMixAgendarSom();
+    };
+    pop.addEventListener('input', e => {
+        const inp = e.target;
+        if (inp.dataset.on) { st.fx = st.fx.map((x, j) => j === i ? { ...x, on: inp.checked } : x); veMixMudou(); return; }
+        if (!inp.dataset.k || inp.dataset.num) return;
+        por(inp.dataset.k, inp.type === 'checkbox' ? inp.checked : parseFloat(inp.value));
+    });
+    pop.addEventListener('change', e => {
+        const inp = e.target;
+        if (!inp.dataset.num) return;
+        const p = d.params.find(x => x.k === inp.dataset.k), txt = String(inp.value).trim().replace(',', '.');
+        let val = /^-?(∞|inf)/i.test(txt) ? (p.inv ? 0 : p.min) : parseFloat(txt);
+        if (!isFinite(val)) { pintar(); return; }
+        if (p.inv) val = p.inv(val);
+        por(p.k, val);
+    });
+    pop.addEventListener('keydown', e => e.stopPropagation());
+    pop.addEventListener('click', e => {
+        const a = e.target.closest('[data-acao]');
+        if (!a) return;
+        const fx = [...st.fx];
+        if (a.dataset.acao === 'del') fx.splice(i, 1);
+        else {
+            const j = a.dataset.acao === 'esq' ? i - 1 : i + 1;
+            if (j < 0 || j >= fx.length) return;
+            [fx[i], fx[j]] = [fx[j], fx[i]];
+        }
+        if (fx.length) st.fx = fx; else delete st.fx;
+        pop.remove();
+        veMixMudou();
+    });
+}

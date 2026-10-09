@@ -643,7 +643,9 @@ function veFxExport(c) {
 }
 
 function veAfxExport(c) {
-    return veAfxActive(c).map(f => ({ t: f.t, v: veAfxValues(f) }));
+    // efeitos do Premiere (editor-afx-pr.js): vão com os valores 0..1; o Hard Limiter vira o 'limiter' do Kanivete
+    return veAfxActive(c).map(f => ({ t: f.t, v: veAfxValues(f) }))
+        .map(f => f.t.startsWith('pr_') && typeof veAprParaKanivete === 'function' ? veAprParaKanivete(f) : f);
 }
 
 // ── aplicar / editar ──
@@ -815,7 +817,7 @@ function veRenderFxControls() {
                     <button data-fa="del" title="Remover efeito">✕</button>
                 </div>
                 <div class="ve-fxe-body">${d.painel ? `
-                    <button class="ve-btn ve-btn-sm ve-fxe-open" data-fa="open">Editar no painel ${d.nome}</button>` : d.params.map(p => p.tipo === 'cor' ? `
+                    <button class="ve-btn ve-btn-sm ve-fxe-open" data-fa="open">Editar no painel ${d.nome}</button>` : d.params.filter(p => !p.oculto).map(p => p.tipo === 'cor' ? `
                     <div class="ve-prop ve-prop-cor">
                         <label>${p.nome}</label>
                         <input type="color" data-fk="${p.k}">
@@ -825,7 +827,7 @@ function veRenderFxControls() {
                     <div class="ve-prop">
                         <label>${p.nome}</label>
                         <input type="range" min="${p.min}" max="${p.max}" step="${p.step}" data-fk="${p.k}">
-                        <span class="ve-prop-num"><input type="number" min="${p.min}" max="${p.max}" step="${p.step}" data-fk="${p.k}"><i>${p.un}</i></span>
+                        <span class="ve-prop-num"><input type="${p.vis ? 'text' : 'number'}" ${p.vis ? '' : `min="${p.min}" max="${p.max}" step="${p.step}"`} data-fk="${p.k}"><i>${p.un}</i></span>
                     </div>`).join('')}
                 </div></div>`;
         }).join('');
@@ -847,7 +849,10 @@ function veRenderFxControls() {
         const v = veAfxValues(f);
         d.params.forEach(p => el.querySelectorAll(`[data-fk="${p.k}"]`).forEach(inp => {
             if (p.tipo === 'bool') inp.checked = !!v[p.k];
-            else if (inp.ownerDocument.activeElement !== inp) inp.value = veFxFmt(p, v[p.k]);
+            else if (inp.ownerDocument.activeElement !== inp) {
+                // efeito do Premiere: o slider anda em 0..1 (o controle dele) e o número mostra Hz/dB/ms
+                inp.value = p.vis ? (inp.type === 'range' ? v[p.k] : p.vis(v[p.k])) : veFxFmt(p, v[p.k]);
+            }
         }));
     });
     if (typeof veCpSelPintar === 'function') veCpSelPintar();   // efeitos escolhidos para copiar (editor-copiar.js)
@@ -976,8 +981,14 @@ function veFxInit() {
         const el = e.target.closest('[data-fk]');
         if (!el) return;
         if (!VE._fxEdit) { vePushHistory(); VE._fxEdit = true; }
-        const val = el.type === 'checkbox' ? el.checked : el.type === 'color' ? el.value : parseFloat(String(el.value).replace(',', '.'));
+        let val = el.type === 'checkbox' ? el.checked : el.type === 'color' ? el.value : parseFloat(String(el.value).replace(',', '.'));
         const a = el.closest('[data-afx]');
+        if (a && el.type === 'text') {
+            // número na unidade real (efeito do Premiere): volta para 0..1 pela régua; "-inf" = mínimo
+            const c = VE.clips[VE.sel], f = c && c.afx && c.afx.find(x => x.id === a.dataset.afx);
+            const p = f && VE_AFX[f.t] && VE_AFX[f.t].params.find(x => x.k === el.dataset.fk);
+            if (p && p.inv) { if (/^-?(∞|inf)/i.test(String(el.value).trim())) val = 0; else if (isFinite(val)) val = p.inv(val); else return; }
+        }
         if (a) veAfxSetParam(a.dataset.afx, el.dataset.fk, val);
         else veFxSetParam(el.closest('[data-fx]').dataset.fx, el.dataset.fk, val);
         if (el.type === 'checkbox') { VE._fxEdit = false; veDrawMonitor(); if (veMixAtivo()) veAudioEditou(); }

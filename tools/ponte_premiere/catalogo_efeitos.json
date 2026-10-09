@@ -1,0 +1,5449 @@
+{
+ "Automatic Click Remover": {
+  "i": 2,
+  "nome": "Automatic Click Remover",
+  "match": "433322b0-d25a-4cfa-a4f1-4a1ab2d7615b",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Threshold",
+    "valor": 0.2929292917251587,
+    "kfs": 0
+   },
+   {
+    "nome": "Complexity",
+    "valor": 0.1515151560306549,
+    "kfs": 0
+   },
+   {
+    "nome": "IsProcessing",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Reset",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "DeHummer": {
+  "i": 2,
+  "nome": "DeHummer",
+  "match": "25f78adc-442b-4221-8a59-d19d3bf14687",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Harmonic Base Frequency",
+    "valor": 0.0020020019728690386,
+    "kfs": 0
+   },
+   {
+    "nome": "Harmonic Base Q",
+    "valor": 0.010101010091602802,
+    "kfs": 0
+   },
+   {
+    "nome": "Harmonic Base Gain",
+    "valor": 0.23529411852359772,
+    "kfs": 0
+   },
+   {
+    "nome": "Harmonic Slope",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Output Hum Only",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Num Harmonics",
+    "valor": 1,
+    "kfs": 0
+   }
+  ]
+ },
+ "Parametric Equalizer": {
+  "i": 2,
+  "nome": "Parametric Equalizer",
+  "match": "8edcd326-33de-4a4d-985b-f1bf48ed1427",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Low Shelf Frequency",
+    "valor": 0.0008340283529832959,
+    "kfs": 0
+   },
+   {
+    "nome": "Low Shelf Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "High Shelf Frequency",
+    "valor": 0.7497915029525757,
+    "kfs": 0
+   },
+   {
+    "nome": "High Shelf Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 1 Center Frequency",
+    "valor": 0.0012510425876826048,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 1 Q",
+    "valor": 0.00019998999778181314,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 1 Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 1 Enable",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 2 Center Frequency",
+    "valor": 0.007506255060434341,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 2 Q",
+    "valor": 0.00019998999778181314,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 2 Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 2 Enable",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 3 Center Frequency",
+    "valor": 0.03252710774540901,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 3 Q",
+    "valor": 0.00019998999778181314,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 3 Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 3 Enable",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 4 Center Frequency",
+    "valor": 0.1326105147600174,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 4 Q",
+    "valor": 0.00019998999778181314,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 4 Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 4 Enable",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 5 Center Frequency",
+    "valor": 0.5329441428184509,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 5 Q",
+    "valor": 0.00019998999778181314,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 5 Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 5 Enable",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "ConstantQ",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Low Shelf Filter Order",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "High Shelf Filter Order",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Ultra-Quiet Mode",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Low Shelf Enable",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "High Shelf Enable",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Original Sample Rate",
+    "valor": 0.25,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 1 Bandwidth",
+    "valor": 0.002499990165233612,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 2 Bandwidth",
+    "valor": 0.009999990463256836,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 3 Bandwidth",
+    "valor": 0.03999999165534973,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 4 Bandwidth",
+    "valor": 0.15999998152256012,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 5 Bandwidth",
+    "valor": 0.6399999856948853,
+    "kfs": 0
+   },
+   {
+    "nome": "High-Pass Filter Enable",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "High-Pass Cutoff Frequency",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "High-Pass Slope",
+    "valor": 0.4000000059604645,
+    "kfs": 0
+   },
+   {
+    "nome": "Low-Pass Filter Enable",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Low-Pass Cutoff Frequency",
+    "valor": 0.8331943154335022,
+    "kfs": 0
+   },
+   {
+    "nome": "Low-Pass Slope",
+    "valor": 0.4000000059604645,
+    "kfs": 0
+   },
+   {
+    "nome": "Bypass",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "LowGraphRange",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Adaptive Noise Reduction": {
+  "i": 2,
+  "nome": "Adaptive Noise Reduction",
+  "match": "f83ad984-04c6-4474-b8c0-e31d98875cfe",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Reduce Noise By",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Noisiness",
+    "valor": 0.30000001192092896,
+    "kfs": 0
+   },
+   {
+    "nome": "Fine Tune Noise Floor",
+    "valor": 0.6000000238418579,
+    "kfs": 0
+   },
+   {
+    "nome": "Signal Threshold",
+    "valor": 0.5625,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectral Decay Rate",
+    "valor": 0.16438356041908264,
+    "kfs": 0
+   },
+   {
+    "nome": "Broadband Preservation",
+    "valor": 0.20000000298023224,
+    "kfs": 0
+   },
+   {
+    "nome": "FFT Size",
+    "valor": 0.0078125,
+    "kfs": 0
+   },
+   {
+    "nome": "High Quality Mode (slower)",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Is Processing",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Binauralizer - Ambisonics": {
+  "erro": "No audio filter found for the given display name and channel layout 'Binauralizer - Ambisonics'"
+ },
+ "Panner - Ambisonics": {
+  "erro": "No audio filter found for the given display name and channel layout 'Panner - Ambisonics'"
+ },
+ "Analog Delay": {
+  "i": 2,
+  "nome": "Analog Delay",
+  "match": "c4ad21d8-9748-4d79-b4a3-d88ab7e4be34",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Dry Out",
+    "valor": 0.699999988079071,
+    "kfs": 0
+   },
+   {
+    "nome": "Wet Out",
+    "valor": 0.30000001192092896,
+    "kfs": 0
+   },
+   {
+    "nome": "Delay",
+    "valor": 0.023779723793268204,
+    "kfs": 0
+   },
+   {
+    "nome": "Feedback",
+    "valor": 0.10000000149011612,
+    "kfs": 0
+   },
+   {
+    "nome": "Trash",
+    "valor": 0.25,
+    "kfs": 0
+   },
+   {
+    "nome": "Spread",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Mode",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Channel Mixer": {
+  "i": 2,
+  "nome": "Channel Mixer",
+  "match": "c5ca9e29-df07-42a6-8800-ba80324e5cbc",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Channel Count",
+    "valor": 0.25,
+    "kfs": 0
+   },
+   {
+    "nome": "L to L",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "R to L",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "3 to L",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "4 to L",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "5 to L",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "6 to L",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "7 to L",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "8 to L",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "L to R",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "R to R",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "3 to R",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "4 to R",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "5 to R",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "6 to R",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "7 to R",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "8 to R",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "L to 3",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "R to 3",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "3 to 3",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "4 to 3",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "5 to 3",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "6 to 3",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "7 to 3",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "8 to 3",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "L to 4",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "R to 4",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "3 to 4",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "4 to 4",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "5 to 4",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "6 to 4",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "7 to 4",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "8 to 4",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "L to 5",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "R to 5",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "3 to 5",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "4 to 5",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "5 to 5",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "6 to 5",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "7 to 5",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "8 to 5",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "L to 6",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "R to 6",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "3 to 6",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "4 to 6",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "5 to 6",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "6 to 6",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "7 to 6",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "8 to 6",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "L to 7",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "R to 7",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "3 to 7",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "4 to 7",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "5 to 7",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "6 to 7",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "7 to 7",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "8 to 7",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "L to 8",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "R to 8",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "3 to 8",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "4 to 8",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "5 to 8",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "6 to 8",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "7 to 8",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "8 to 8",
+    "valor": 1,
+    "kfs": 0
+   }
+  ]
+ },
+ "Chorus/Flanger": {
+  "i": 2,
+  "nome": "Chorus/Flanger",
+  "match": "1ffc7dd8-df1b-475b-bff6-f5240aa6a097",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Speed",
+    "valor": 0.19191919267177582,
+    "kfs": 0
+   },
+   {
+    "nome": "Width",
+    "valor": 0.6499999761581421,
+    "kfs": 0
+   },
+   {
+    "nome": "Intensity",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Transience",
+    "valor": 0.20000000298023224,
+    "kfs": 0
+   },
+   {
+    "nome": "Mode",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Convolution Reverb": {
+  "i": 2,
+  "nome": "Convolution Reverb",
+  "match": "99c2e75f-0bdb-48d8-8b51-2bac2e26b2cf",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Mix",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Room Size",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Damping LF",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "Damping HF",
+    "valor": 0.699999988079071,
+    "kfs": 0
+   },
+   {
+    "nome": "Pre-Delay",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Width",
+    "valor": 0.3333333432674408,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain",
+    "valor": 0.4166666567325592,
+    "kfs": 0
+   },
+   {
+    "nome": "Impulse",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "DeEsser": {
+  "i": 2,
+  "nome": "DeEsser",
+  "match": "ffbe710f-cd69-4139-ad26-65603616d9d4",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Threshold",
+    "valor": 0.625,
+    "kfs": 0
+   },
+   {
+    "nome": "Attack",
+    "valor": 0.1998399794101715,
+    "kfs": 0
+   },
+   {
+    "nome": "Release",
+    "valor": 0.18367347121238708,
+    "kfs": 0
+   },
+   {
+    "nome": "Center Frequency",
+    "valor": 0.3913043439388275,
+    "kfs": 0
+   },
+   {
+    "nome": "Bandwidth",
+    "valor": 0.3918918967247009,
+    "kfs": 0
+   },
+   {
+    "nome": "Output Sibilance Only",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Mode",
+    "valor": 1,
+    "kfs": 0
+   }
+  ]
+ },
+ "Distortion": {
+  "i": 2,
+  "nome": "Distortion",
+  "match": "9b66ab13-4d1b-469a-88c6-b807fcf1df16",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Positive Smoothing",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Negative Smoothing",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Time Smoothing",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "dB Range",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "Symmetric",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Linear Scale",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Post-Filter DC Offset",
+    "valor": 1,
+    "kfs": 0
+   }
+  ]
+ },
+ "Dynamics Processing": {
+  "i": 2,
+  "nome": "Dynamics Processing",
+  "match": "f76dad9c-77da-477a-9939-eefefc5c23bd",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Level Detector - Attack Time",
+    "valor": 0.0020000000949949026,
+    "kfs": 0
+   },
+   {
+    "nome": "Level Detector - Release Time",
+    "valor": 0.05000000074505806,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain Processor - Attack Time",
+    "valor": 0.04800000041723251,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain Processor - Release Time",
+    "valor": 0.05000000074505806,
+    "kfs": 0
+   },
+   {
+    "nome": "Lookahead Time",
+    "valor": 0.006000000052154064,
+    "kfs": 0
+   },
+   {
+    "nome": "Input Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Output Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Low Cutoff",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "High Cutoff",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Lock Filter",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Number of X/Y Pairs",
+    "valor": 0.4285714328289032,
+    "kfs": 0
+   },
+   {
+    "nome": "Link Channels",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Peak/RMS",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Envelope Only",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spline Curves",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Noise Gating (if expanding more than 50:1)",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Current Tab",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Location1",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Value1",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Location2",
+    "valor": 0.800000011920929,
+    "kfs": 0
+   },
+   {
+    "nome": "Value2",
+    "valor": 0.800000011920929,
+    "kfs": 0
+   },
+   {
+    "nome": "Location3",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Value3",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Location4",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Value4",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Location5",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Value5",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Location6",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Value6",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Location7",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Value7",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Make-Up Gain",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "FFT Filter": {
+  "i": 2,
+  "nome": "FFT Filter",
+  "match": "4f327230-f04c-4c34-9ea5-a998b4459221",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Splines",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "FFT Size",
+    "valor": 0.06158357858657837,
+    "kfs": 0
+   },
+   {
+    "nome": "Window Type",
+    "valor": 0.375,
+    "kfs": 0
+   },
+   {
+    "nome": "Lock",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Scale",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Frequency Start",
+    "valor": 0.0008340283529832959,
+    "kfs": 0
+   },
+   {
+    "nome": "Frequency End",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain Start",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain End",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Number of X/Y pairs",
+    "valor": 0.015625,
+    "kfs": 0
+   },
+   {
+    "nome": "X 1",
+    "valor": 0.0008333333535119891,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 1",
+    "valor": 0.75,
+    "kfs": 0
+   },
+   {
+    "nome": "X 2",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 2",
+    "valor": 0.75,
+    "kfs": 0
+   },
+   {
+    "nome": "X 3",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 3",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 4",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 4",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 5",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 5",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 6",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 6",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 7",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 7",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 8",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 8",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 9",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 9",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 10",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 10",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 11",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 11",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 12",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 12",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 13",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 13",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 14",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 14",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 15",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 15",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 16",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 16",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 17",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 17",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 18",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 18",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 19",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 19",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 20",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 20",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 21",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 21",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 22",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 22",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 23",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 23",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 24",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 24",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 25",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 25",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 26",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 26",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 27",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 27",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 28",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 28",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 29",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 29",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 30",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 30",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 31",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 31",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 32",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 32",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 33",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 33",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 34",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 34",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 35",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 35",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 36",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 36",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 37",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 37",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 38",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 38",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 39",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 39",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 40",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 40",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 41",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 41",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 42",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 42",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 43",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 43",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 44",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 44",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 45",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 45",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 46",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 46",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 47",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 47",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 48",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 48",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 49",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 49",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 50",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 50",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 51",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 51",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 52",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 52",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 53",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 53",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 54",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 54",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 55",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 55",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 56",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 56",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 57",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 57",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 58",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 58",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 59",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 59",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 60",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 60",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 61",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 61",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 62",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 62",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 63",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 63",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 64",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 64",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 65",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 65",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 66",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 66",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 67",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 67",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 68",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 68",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 69",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 69",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 70",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 70",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 71",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 71",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 72",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 72",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 73",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 73",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 74",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 74",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 75",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 75",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 76",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 76",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 77",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 77",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 78",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 78",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 79",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 79",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 80",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 80",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 81",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 81",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 82",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 82",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 83",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 83",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 84",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 84",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 85",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 85",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 86",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 86",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 87",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 87",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 88",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 88",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 89",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 89",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 90",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 90",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 91",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 91",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 92",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 92",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 93",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 93",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 94",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 94",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 95",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 95",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 96",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 96",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 97",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 97",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 98",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 98",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 99",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 99",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 100",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 100",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 101",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 101",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 102",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 102",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 103",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 103",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 104",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 104",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 105",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 105",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 106",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 106",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 107",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 107",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 108",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 108",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 109",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 109",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 110",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 110",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 111",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 111",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 112",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 112",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 113",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 113",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 114",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 114",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 115",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 115",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 116",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 116",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 117",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 117",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 118",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 118",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 119",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 119",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 120",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 120",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 121",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 121",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 122",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 122",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 123",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 123",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 124",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 124",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 125",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 125",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 126",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 126",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 127",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 127",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "X 128",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Y 128",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Flanger": {
+  "i": 2,
+  "nome": "Flanger",
+  "match": "d30b6731-3e00-4a11-9650-e816f58a9d12",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Initial Delay Time",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Final Delay Time",
+    "valor": 0.20799998939037323,
+    "kfs": 0
+   },
+   {
+    "nome": "Stereo Phasing",
+    "valor": 0.07777778059244156,
+    "kfs": 0
+   },
+   {
+    "nome": "Modulation Rate (Frequency)",
+    "valor": 0.003850064007565379,
+    "kfs": 0
+   },
+   {
+    "nome": "Mix",
+    "valor": 0.4000000059604645,
+    "kfs": 0
+   },
+   {
+    "nome": "Feedback",
+    "valor": 0.6000000238418579,
+    "kfs": 0
+   },
+   {
+    "nome": "Inverted Mode",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Special Effects Mode",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Sinusoidal Mode",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Modulation Rate (Beats)",
+    "valor": 0.0042937519028782845,
+    "kfs": 0
+   }
+  ]
+ },
+ "Graphic Equalizer (10 Bands)": {
+  "i": 2,
+  "nome": "Graphic Equalizer (10 Bands)",
+  "match": "3792d46f-5036-4be6-ab5a-177622246a5d",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Accuracy",
+    "valor": 0.12099730968475342,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Range",
+    "valor": 0.39240506291389465,
+    "kfs": 0
+   },
+   {
+    "nome": "Reset",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 1",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 2",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 3",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 4",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 5",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 6",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 7",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 8",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 9",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 10",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Is Processing",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Graphic Equalizer (20 Bands)": {
+  "i": 2,
+  "nome": "Graphic Equalizer (20 Bands)",
+  "match": "0e133ef5-2371-48db-9b72-b4c441460391",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Accuracy",
+    "valor": 0.12099730968475342,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Range",
+    "valor": 0.39240506291389465,
+    "kfs": 0
+   },
+   {
+    "nome": "Reset",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 1",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 2",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 3",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 4",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 5",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 6",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 7",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 8",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 9",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 10",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 11",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 12",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 13",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 14",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 15",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 16",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 17",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 18",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 19",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 20",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Is Processing",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Graphic Equalizer (30 Bands)": {
+  "i": 2,
+  "nome": "Graphic Equalizer (30 Bands)",
+  "match": "c6ba8ed5-e0d5-4ed9-a209-08adec9b18a9",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Accuracy",
+    "valor": 0.12099730968475342,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Range",
+    "valor": 0.39240506291389465,
+    "kfs": 0
+   },
+   {
+    "nome": "Reset",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 1",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 2",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 3",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 4",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 5",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 6",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 7",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 8",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 9",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 10",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 11",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 12",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 13",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 14",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 15",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 16",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 17",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 18",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 19",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 20",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 21",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 22",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 23",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 24",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 25",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 26",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 27",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 28",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 29",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 30",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Is Processing",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "GuitarSuite": {
+  "i": 2,
+  "nome": "GuitarSuite",
+  "match": "c23a8acb-affc-4ff4-9ca6-2b560b340a56",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Comp Amount",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Filter Freq",
+    "valor": 0.049049049615859985,
+    "kfs": 0
+   },
+   {
+    "nome": "Filter Resonance",
+    "valor": 0.20000000298023224,
+    "kfs": 0
+   },
+   {
+    "nome": "Dist Amount",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Mix",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Bypass Compressor",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Bypass Filter",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Bypass Distortion",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Bypass Box Modeler",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Filter",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Dist Type",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Filter Type",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Box Model",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Hard Limiter": {
+  "i": 2,
+  "nome": "Hard Limiter",
+  "match": "e0b23f05-f1a7-4ef7-9b50-7ec3e3002058",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Maximum Amplitude",
+    "valor": 0.9990000128746033,
+    "kfs": 0
+   },
+   {
+    "nome": "Input Boost",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "Look-Ahead Time",
+    "valor": 0.13333334028720856,
+    "kfs": 0
+   },
+   {
+    "nome": "Release Time",
+    "valor": 0.375,
+    "kfs": 0
+   },
+   {
+    "nome": "Link Channels",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Decay to Ceiling",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Limit True Peak",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Loudness Meter": {
+  "i": 2,
+  "nome": "Loudness Meter",
+  "match": "43f746b7-b34e-402b-8fb4-479cf3466264",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Target Level",
+    "valor": 0.4333333373069763,
+    "kfs": 0
+   },
+   {
+    "nome": "Maximum True Peak",
+    "valor": 0.7333333492279053,
+    "kfs": 0
+   },
+   {
+    "nome": "Scale",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Unit",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Low Below Level",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Reset on Playback",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Show Input Meter",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Show Short-Term Meter",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Show Integrated Meter",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Show Momentary Meter",
+    "valor": 1,
+    "kfs": 0
+   }
+  ]
+ },
+ "Mastering": {
+  "i": 2,
+  "nome": "Mastering",
+  "match": "094e8ed0-1fcc-4bec-ac4a-b358c4ce1f27",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 1 Freq",
+    "valor": 0.0005005004932172596,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 2 Freq",
+    "valor": 0.03803803771734238,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 3 Freq",
+    "valor": 0.5995995998382568,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 1 Gain",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 2 Gain",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 3 Gain",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 1 Q",
+    "valor": 0.49152544140815735,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 2 Q",
+    "valor": 0.06779661029577255,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 3 Q",
+    "valor": 0.49152544140815735,
+    "kfs": 0
+   },
+   {
+    "nome": "Reverb Amount",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Widener Width",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Exciter Amount",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Loudness Maximizer Amount",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Output Gain",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 1 Enable",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 2 Enable",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "EQ Band 3 Enable",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Exciter Mode",
+    "valor": 1,
+    "kfs": 0
+   }
+  ]
+ },
+ "Balance": {
+  "i": 2,
+  "nome": "Balance",
+  "match": "Internal Audio Balance",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Balance",
+    "valor": 0.5,
+    "kfs": 0
+   }
+  ]
+ },
+ "Bandpass": {
+  "i": 2,
+  "nome": "Bandpass",
+  "match": "Internal Bandpass",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Cutoff",
+    "valor": 0.25,
+    "kfs": 0
+   },
+   {
+    "nome": "Q",
+    "valor": 0.5,
+    "kfs": 0
+   }
+  ]
+ },
+ "Simple Notch Filter": {
+  "i": 2,
+  "nome": "Simple Notch Filter",
+  "match": "Internal Bandreject",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Cutoff",
+    "valor": 0.25,
+    "kfs": 0
+   },
+   {
+    "nome": "Q",
+    "valor": 0.5,
+    "kfs": 0
+   }
+  ]
+ },
+ "Bass": {
+  "i": 2,
+  "nome": "Bass",
+  "match": "Internal Bass",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Boost",
+    "valor": 0.5,
+    "kfs": 0
+   }
+  ]
+ },
+ "Delay": {
+  "i": 2,
+  "nome": "Delay",
+  "match": "Internal Delay",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Delay",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Feedback",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Mix",
+    "valor": 0.5,
+    "kfs": 0
+   }
+  ]
+ },
+ "Multitap Delay": {
+  "i": 2,
+  "nome": "Multitap Delay",
+  "match": "Internal MultitapDelay",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Delay 1",
+    "valor": 0.25,
+    "kfs": 0
+   },
+   {
+    "nome": "Feedback 1",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Level 1",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Delay 2",
+    "valor": 0.4000000059604645,
+    "kfs": 0
+   },
+   {
+    "nome": "Feedback 2",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Level 2",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Delay 3",
+    "valor": 0.6000000238418579,
+    "kfs": 0
+   },
+   {
+    "nome": "Feedback 3",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Level 3",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Delay 4",
+    "valor": 0.75,
+    "kfs": 0
+   },
+   {
+    "nome": "Feedback 4",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Level 4",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Mix",
+    "valor": 0.5,
+    "kfs": 0
+   }
+  ]
+ },
+ "Highpass": {
+  "i": 2,
+  "nome": "Highpass",
+  "match": "Internal Highpass",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Cutoff",
+    "valor": 0.25,
+    "kfs": 0
+   }
+  ]
+ },
+ "Invert": {
+  "i": 2,
+  "nome": "Invert",
+  "match": "Internal Invert",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   }
+  ]
+ },
+ "Lowpass": {
+  "i": 2,
+  "nome": "Lowpass",
+  "match": "Internal Lowpass",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Cutoff",
+    "valor": 0.25,
+    "kfs": 0
+   }
+  ]
+ },
+ "Mute": {
+  "i": 2,
+  "nome": "Mute",
+  "match": "Internal Mute",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Mute All",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Mute Left",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Mute Right",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Simple Parametric EQ": {
+  "i": 2,
+  "nome": "Simple Parametric EQ",
+  "match": "Internal Parameteric EQ",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Center",
+    "valor": 0.25,
+    "kfs": 0
+   },
+   {
+    "nome": "Q",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Boost",
+    "valor": 0.5,
+    "kfs": 0
+   }
+  ]
+ },
+ "Swap Channels": {
+  "i": 2,
+  "nome": "Swap Channels",
+  "match": "Internal Audio Swap Channels",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   }
+  ]
+ },
+ "Fill Left with Right": {
+  "i": 2,
+  "nome": "Fill Left with Right",
+  "match": "Internal Audio Fill Left",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   }
+  ]
+ },
+ "Fill Right with Left": {
+  "i": 2,
+  "nome": "Fill Right with Left",
+  "match": "Internal Audio Fill Right",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   }
+  ]
+ },
+ "Treble": {
+  "i": 2,
+  "nome": "Treble",
+  "match": "Internal Treble",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Boost",
+    "valor": 0.5,
+    "kfs": 0
+   }
+  ]
+ },
+ "Volume": {
+  "i": 2,
+  "nome": "Volume",
+  "match": "Internal Volume",
+  "params": [
+   {
+    "nome": "Mute",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Level",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   }
+  ]
+ },
+ "Channel Volume": {
+  "i": 2,
+  "nome": "Channel Volume",
+  "match": "Internal Channel Volume",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Left",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "Right",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.17782793939113617,
+    "kfs": 0
+   }
+  ]
+ },
+ "Multiband Compressor": {
+  "i": 2,
+  "nome": "Multiband Compressor",
+  "match": "3981e750-c8ae-40a2-889f-41a01c7efa03",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Output Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Threshold 1",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Threshold 2",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Threshold 3",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Threshold 4",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Ratio 1",
+    "valor": 0.03448275849223137,
+    "kfs": 0
+   },
+   {
+    "nome": "Ratio 2",
+    "valor": 0.03448275849223137,
+    "kfs": 0
+   },
+   {
+    "nome": "Ratio 3",
+    "valor": 0.03448275849223137,
+    "kfs": 0
+   },
+   {
+    "nome": "Ratio 4",
+    "valor": 0.03448275849223137,
+    "kfs": 0
+   },
+   {
+    "nome": "Attack 1",
+    "valor": 0.019999999552965164,
+    "kfs": 0
+   },
+   {
+    "nome": "Attack 2",
+    "valor": 0.019999999552965164,
+    "kfs": 0
+   },
+   {
+    "nome": "Attack 3",
+    "valor": 0.019999999552965164,
+    "kfs": 0
+   },
+   {
+    "nome": "Attack 4",
+    "valor": 0.019999999552965164,
+    "kfs": 0
+   },
+   {
+    "nome": "Release 1",
+    "valor": 0.019999999552965164,
+    "kfs": 0
+   },
+   {
+    "nome": "Release 2",
+    "valor": 0.019999999552965164,
+    "kfs": 0
+   },
+   {
+    "nome": "Release 3",
+    "valor": 0.019999999552965164,
+    "kfs": 0
+   },
+   {
+    "nome": "Release 4",
+    "valor": 0.019999999552965164,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain 1",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain 2",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain 3",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain 4",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Global spectrum",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Input spectrum",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Link band controls",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Bypass 1",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Bypass 2",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Bypass 3",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Bypass 4",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Solo 1",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Solo 2",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Solo 3",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Solo 4",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "CrossOver Q",
+    "valor": -0.025641025975346565,
+    "kfs": 0
+   },
+   {
+    "nome": "Cutoff 1",
+    "valor": 0.005005004815757275,
+    "kfs": 0
+   },
+   {
+    "nome": "Cutoff 2",
+    "valor": 0.09909909963607788,
+    "kfs": 0
+   },
+   {
+    "nome": "Cutoff 3",
+    "valor": 0.49949949979782104,
+    "kfs": 0
+   },
+   {
+    "nome": "Band 1 Bypass",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Band 2 Bypass",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Band 3 Bypass",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Band 4 Bypass",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Band 1 Mute",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Band 2 Mute",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Band 3 Mute",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Band 4 Mute",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Type",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Number of Bands",
+    "valor": -0.3333333432674408,
+    "kfs": 0
+   },
+   {
+    "nome": "Buffer Size",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "LMAX: Threshold",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "LMAX: Margin",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "LMAX Ratio",
+    "valor": -0.0416666679084301,
+    "kfs": 0
+   },
+   {
+    "nome": "LMAX: Attack",
+    "valor": 0.75,
+    "kfs": 0
+   },
+   {
+    "nome": "LMAX: Release",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "LMAX: Bypass",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "LMAX: Enable Histogram",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "LMAX: Enable Gain Reduction Meter",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "LMAX: Show Gain Reduction Meter Peak Hold",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "LMAX: Intersample Clip Detect",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "LMAX: Mode",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "LMAX: Gain Reduction Meter Peak Hold Time",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Show Peak Hold",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Flip Channel Phase",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Type",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Window Size",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Overlap",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "WindowType",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Peak Hold Time",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Show Peak Hold",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Flip Channel Phase",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Type",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Window Size",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Overlap",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "WindowType",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Peak Hold Time",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Show Peak Hold",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Flip Channel Phase",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Type",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Window Size",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Overlap",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "WindowType",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Peak Hold Time",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Show Peak Hold",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Flip Channel Phase",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Type",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Window Size",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Overlap",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "WindowType",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Peak Hold Time",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Show Peak Hold",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Flip Channel Phase",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Spectrum Type",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Window Size",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Overlap",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "WindowType",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Peak Hold Time",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Level Meter Enable",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Level Meter Show Peak Hold",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Level Meter Detect Inter-Sample Peaks",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Level Meter Type",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Level Meter Scale Type",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Level Meter K-System Scale Type",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Level Meter Source",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Level Meter RMS Time",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Level Meter Peak Hold Time",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Level Meter Readout Type",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Notch Filter": {
+  "i": 2,
+  "nome": "Notch Filter",
+  "match": "ee38cdc5-5914-4a75-b7dd-73a265e55c31",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Frequency 1",
+    "valor": 0.0024792184121906757,
+    "kfs": 0
+   },
+   {
+    "nome": "Frequency 2",
+    "valor": 0.007479322608560324,
+    "kfs": 0
+   },
+   {
+    "nome": "Frequency 3",
+    "valor": 0.012479426339268684,
+    "kfs": 0
+   },
+   {
+    "nome": "Frequency 4",
+    "valor": 0.017479531466960907,
+    "kfs": 0
+   },
+   {
+    "nome": "Frequency 5",
+    "valor": 0.02247963473200798,
+    "kfs": 0
+   },
+   {
+    "nome": "Frequency 6",
+    "valor": 0.027479739859700203,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain 1",
+    "valor": 0.3697916567325592,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain 2",
+    "valor": 0.40625,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain 3",
+    "valor": 0.4375,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain 4",
+    "valor": 0.4583333432674408,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain 5",
+    "valor": 0.484375,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain 6",
+    "valor": 0.4895833432674408,
+    "kfs": 0
+   },
+   {
+    "nome": "Enable 1",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Enable 2",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Enable 3",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Enable 4",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Enable 5",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Enable 6",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Fixed Gain",
+    "valor": 0.34375,
+    "kfs": 0
+   },
+   {
+    "nome": "DTMF Lower Attenuation",
+    "valor": 0.65625,
+    "kfs": 0
+   },
+   {
+    "nome": "DTMF Upper Attenuation",
+    "valor": 0.65625,
+    "kfs": 0
+   },
+   {
+    "nome": "Notch Width",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Amplify All",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "DTMF Lower",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "DTMF Upper",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Ultra Quiet",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Original Sample Rate",
+    "valor": 0.25,
+    "kfs": 0
+   },
+   {
+    "nome": "Horizontal Range Start",
+    "valor": 0.0008125169551931322,
+    "kfs": 0
+   },
+   {
+    "nome": "Horizontal Range End",
+    "valor": 1,
+    "kfs": 0
+   }
+  ]
+ },
+ "Dynamics": {
+  "i": 2,
+  "nome": "Dynamics",
+  "match": "1eee85a7-3087-439e-906d-dc6204330e25",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "AutoGate Enabled",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "AutoGate Threshold",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "AutoGate Attack",
+    "valor": 0.09090909361839294,
+    "kfs": 0
+   },
+   {
+    "nome": "AutoGate Release",
+    "valor": 0.1111111119389534,
+    "kfs": 0
+   },
+   {
+    "nome": "AutoGate Hold",
+    "valor": 0.009009008295834064,
+    "kfs": 0
+   },
+   {
+    "nome": "Compressor Enabled",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Compressor Threshold",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "Compressor Ratio",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Compressor Attack",
+    "valor": 0.09090909361839294,
+    "kfs": 0
+   },
+   {
+    "nome": "Compressor Release",
+    "valor": 0.08163265138864517,
+    "kfs": 0
+   },
+   {
+    "nome": "Compressor MakeUp Gain",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Expander Enabled",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Expander Threshold",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "Expander Ratio",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Limiter Enabled",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Limiter Threshold",
+    "valor": 0.9833333492279053,
+    "kfs": 0
+   },
+   {
+    "nome": "Limiter Release",
+    "valor": 0.08163265138864517,
+    "kfs": 0
+   }
+  ]
+ },
+ "Phaser": {
+  "i": 2,
+  "nome": "Phaser",
+  "match": "d7ca44f4-7ac1-4243-a79e-59e283b71cca",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain",
+    "valor": 0.75,
+    "kfs": 0
+   },
+   {
+    "nome": "Mix",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Feedback",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Phase Difference",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Upper Freq",
+    "valor": 0.6996996998786926,
+    "kfs": 0
+   },
+   {
+    "nome": "Intensity",
+    "valor": 0.949999988079071,
+    "kfs": 0
+   },
+   {
+    "nome": "Depth",
+    "valor": 0.699999988079071,
+    "kfs": 0
+   },
+   {
+    "nome": "Mod Rate",
+    "valor": 0.05000000074505806,
+    "kfs": 0
+   },
+   {
+    "nome": "Stages",
+    "valor": 0.20000000298023224,
+    "kfs": 0
+   }
+  ]
+ },
+ "Pitch Shifter": {
+  "i": 2,
+  "nome": "Pitch Shifter",
+  "match": "164b4e8a-7105-406b-b23b-1ef2cc4d8957",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Transpose Ratio",
+    "valor": 0.3333333432674408,
+    "kfs": 0
+   },
+   {
+    "nome": "Precision",
+    "valor": 0.1666666716337204,
+    "kfs": 0
+   },
+   {
+    "nome": "Frequency",
+    "valor": 0.03030303120613098,
+    "kfs": 0
+   },
+   {
+    "nome": "Overlapping",
+    "valor": 0.20000000298023224,
+    "kfs": 0
+   },
+   {
+    "nome": "Use Default Setting",
+    "valor": 0.25,
+    "kfs": 0
+   },
+   {
+    "nome": "Use Positive Cents",
+    "valor": 0.75,
+    "kfs": 0
+   }
+  ]
+ },
+ "Scientific Filter": {
+  "i": 2,
+  "nome": "Scientific Filter",
+  "match": "4d0a6193-2769-4497-a28e-30e42d1bc376",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Filter Type",
+    "valor": 0.3333333432674408,
+    "kfs": 0
+   },
+   {
+    "nome": "Filter Mode",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Order Value",
+    "valor": 0.1515151560306549,
+    "kfs": 0
+   },
+   {
+    "nome": "Order Mode Enabled",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Stop Attn",
+    "valor": 0.0520833320915699,
+    "kfs": 0
+   },
+   {
+    "nome": "Param6",
+    "valor": 0.027562499046325684,
+    "kfs": 0
+   },
+   {
+    "nome": "Param7",
+    "valor": 0.03674999997019768,
+    "kfs": 0
+   },
+   {
+    "nome": "Param8",
+    "valor": 0.04593750089406967,
+    "kfs": 0
+   },
+   {
+    "nome": "Param9",
+    "valor": 0.05512499809265137,
+    "kfs": 0
+   },
+   {
+    "nome": "Pass Ripple",
+    "valor": 0.02500000037252903,
+    "kfs": 0
+   },
+   {
+    "nome": "Actual Ripple",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain",
+    "valor": 0.5099999904632568,
+    "kfs": 0
+   },
+   {
+    "nome": "Original Sample Rate",
+    "valor": 0.25,
+    "kfs": 0
+   }
+  ]
+ },
+ "Single-band Compressor": {
+  "i": 2,
+  "nome": "Single-band Compressor",
+  "match": "2da3e2bc-5005-481c-bbeb-7689d3169edf",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Threshold",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Ratio",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Attack",
+    "valor": 0.019999999552965164,
+    "kfs": 0
+   },
+   {
+    "nome": "Release",
+    "valor": 0.019999999552965164,
+    "kfs": 0
+   },
+   {
+    "nome": "Auto Makeup Gain",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Tube-modeled Compressor": {
+  "i": 2,
+  "nome": "Tube-modeled Compressor",
+  "match": "f527fd12-24bf-411f-a46e-5b997cec32d4",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Threshold",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Ratio",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Attack",
+    "valor": 0.019999999552965164,
+    "kfs": 0
+   },
+   {
+    "nome": "Release",
+    "valor": 0.019999999552965164,
+    "kfs": 0
+   },
+   {
+    "nome": "Auto Makeup Gain",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Stereo Expander": {
+  "i": 2,
+  "nome": "Stereo Expander",
+  "match": "fe767733-0969-46cf-bf45-fbf3d58ec46a",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Center Channel Pan",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Stereo Expander",
+    "valor": 0.3333333432674408,
+    "kfs": 0
+   }
+  ]
+ },
+ "Studio Reverb": {
+  "i": 2,
+  "nome": "Studio Reverb",
+  "match": "7ea99d31-ca8f-454f-acd7-81a258efb336",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Low Frequency Cut",
+    "valor": 0.21608039736747742,
+    "kfs": 0
+   },
+   {
+    "nome": "High Frequency Cut",
+    "valor": 0.6896896958351135,
+    "kfs": 0
+   },
+   {
+    "nome": "Room Size",
+    "valor": 0.6969696879386902,
+    "kfs": 0
+   },
+   {
+    "nome": "Width",
+    "valor": 0.25,
+    "kfs": 0
+   },
+   {
+    "nome": "Diffusion",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Damping",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Decay",
+    "valor": 0.23469388484954834,
+    "kfs": 0
+   },
+   {
+    "nome": "Early Reflections",
+    "valor": 0.5199999809265137,
+    "kfs": 0
+   },
+   {
+    "nome": "Early Reflections Delay",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Dry Output Level",
+    "valor": 0.75,
+    "kfs": 0
+   },
+   {
+    "nome": "Wet Output Level",
+    "valor": 0.25,
+    "kfs": 0
+   },
+   {
+    "nome": "Is Processing",
+    "valor": 0.2512562870979309,
+    "kfs": 0
+   },
+   {
+    "nome": "Number of Channels",
+    "valor": 0.0625,
+    "kfs": 0
+   }
+  ]
+ },
+ "Surround Reverb": {
+  "i": 2,
+  "nome": "Surround Reverb",
+  "match": "6e496ba0-3dbc-4c41-a272-7071daff0d95",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Center Input Gain",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "LFE Input Gain",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Room Size",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Damping LF",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "Damping HF",
+    "valor": 0.699999988079071,
+    "kfs": 0
+   },
+   {
+    "nome": "Pre-Delay",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Front Width",
+    "valor": 0.3333333432674408,
+    "kfs": 0
+   },
+   {
+    "nome": "Surround Width",
+    "valor": 0.3333333432674408,
+    "kfs": 0
+   },
+   {
+    "nome": "Center Wet Level",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Left Right Balance",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Front Back Balance",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Mix",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Gain",
+    "valor": 0.4166666567325592,
+    "kfs": 0
+   },
+   {
+    "nome": "Impulse",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Vocal Enhancer": {
+  "i": 2,
+  "nome": "Vocal Enhancer",
+  "match": "82882adc-18cb-475b-b237-597576a5e707",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Mode",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "DeNoise": {
+  "i": 2,
+  "nome": "DeNoise",
+  "match": "c6762838-e451-4d22-9c90-b0eaa734605a",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Amount",
+    "valor": 0.4000000059604645,
+    "kfs": 0
+   },
+   {
+    "nome": "Make-Up Gain",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Auto Gain",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Shelve Type",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Output Difference Signal",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "DeReverb": {
+  "i": 2,
+  "nome": "DeReverb",
+  "match": "aeb0b5ea-5024-4f02-8097-81f8fd7aba92",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Amount",
+    "valor": 0.4000000059604645,
+    "kfs": 0
+   },
+   {
+    "nome": "Make-Up Gain",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Auto Gain",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Shelve Type",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Output Difference Signal",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Amplify": {
+  "i": 2,
+  "nome": "Amplify",
+  "match": "f14fee7d-fe5f-4202-b790-f53209e56411",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Channel Count",
+    "valor": 0.0625,
+    "kfs": 0
+   },
+   {
+    "nome": "Link Sliders",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Left",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "Right",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   },
+   {
+    "nome": "Link Keyframes",
+    "valor": 0,
+    "kfs": 0
+   }
+  ]
+ },
+ "Loudness Radar": {
+  "i": 2,
+  "nome": "Loudness Radar",
+  "match": "3:24e81ecf 935d4253 26f4e4c3 3a945a38",
+  "params": [
+   {
+    "nome": "Bypass",
+    "valor": false,
+    "kfs": 0
+   },
+   {
+    "nome": "Target Loudness",
+    "valor": 0.4000000059604645,
+    "kfs": 0
+   },
+   {
+    "nome": "Radar Speed",
+    "valor": 0.125,
+    "kfs": 0
+   },
+   {
+    "nome": "Radar Resolution",
+    "valor": 0.4000000059604645,
+    "kfs": 0
+   },
+   {
+    "nome": "Momentary Range",
+    "valor": 1,
+    "kfs": 0
+   },
+   {
+    "nome": "Low Level Below",
+    "valor": 0.5,
+    "kfs": 0
+   },
+   {
+    "nome": "Loudness Unit",
+    "valor": 0.3333333432674408,
+    "kfs": 0
+   },
+   {
+    "nome": "Loudness Standard",
+    "valor": 0,
+    "kfs": 0
+   },
+   {
+    "nome": "Peak Indicator",
+    "valor": 0.6666666865348816,
+    "kfs": 0
+   }
+  ]
+ }
+}

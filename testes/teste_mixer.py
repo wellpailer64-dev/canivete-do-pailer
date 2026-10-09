@@ -39,7 +39,8 @@ else:
 with tempfile.TemporaryDirectory() as tmp:
     path, rx = premiere_xml.exportar(os.path.join(tmp, "volta.xml"), dados)
     x = open(path, encoding="utf-8").read()
-faixas = re.findall(r"<track[^>]*>.*?</track>", x[x.find("<audio>"):], re.S)
+# áudio estéreo: 2 trilhas explodidas por trilha do Kanivete (canal 1 e 2) — confere a do canal 1 de cada uma
+faixas = re.findall(r"<track[^>]*>.*?</track>", x[x.find("<audio>"):], re.S)[::2]
 if len(sys.argv) <= 1:
     def niveis(t):
         return [round(20 * math.log10(float(v)), 2) for v in re.findall(r"<value>([\d.]+)</value>", t)]

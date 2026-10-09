@@ -2290,3 +2290,36 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-mix-nome { margin-top: 4px; display: flex; gap: 8px; justify-content: center; white-space: nowrap; overflow: hidden; color: var(--ve-text); }
 .ve-mix-nome span { color: #8a8a92; }
 .ve-mix-col.off .ve-mix-med { opacity: .45; }
+/* rack de efeitos das trilhas (Mixer) */
+.ve-mixer { position: relative; }
+.ve-mix-rackbt { position: absolute; left: 2px; top: 2px; z-index: 2; height: 16px; padding: 0 5px; font: 600 9px/14px inherit;
+    color: #8a8a92; background: #232327; border: 1px solid #3a3a40; border-radius: 3px; cursor: pointer; }
+.ve-mixer.rack .ve-mix-rackbt { color: #e3a77c; border-color: #D4814A; }
+.ve-mix-rack { display: none; flex-direction: column; gap: 1px; margin: 12px 0 6px; padding: 3px; background: #a9a9ad; border-radius: 4px; flex: 0 0 auto; }
+.ve-mixer.rack .ve-mix-rack { display: flex; }
+.ve-mix-col.mestre .ve-mix-rack { background: none; padding: 0; }
+.ve-mix-rack small { color: #8a8a92; font-size: 9px; text-align: center; }
+.ve-mix-slot { height: 18px; border: 0; border-bottom: 1px solid #8e8e93; background: #b9b9bd; color: #1b1b1e; font: 500 10px/18px inherit;
+    text-align: left; padding: 0 16px 0 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; position: relative; }
+.ve-mix-slot::after { content: '▾'; position: absolute; right: 4px; top: 0; color: #55555a; }
+.ve-mix-slot:hover { background: #cfcfd3; }
+.ve-mix-slot.cheio { background: #e4e4e7; font-weight: 600; }
+.ve-mix-slot.off { color: #8a8a92; text-decoration: line-through; }
+.ve-mix-slot.semsom { font-style: italic; }
+.ve-mix-pop { position: fixed; z-index: 9999; min-width: 230px; max-width: 320px; max-height: 70vh; overflow: auto; padding: 6px;
+    background: #f4f4f5; color: #1b1b1e; border-radius: 6px; box-shadow: 0 8px 28px rgba(0, 0, 0, .5); font-size: 12px; }
+.ve-mix-busca { width: 100%; box-sizing: border-box; margin-bottom: 4px; padding: 4px 6px; border: 1px solid #c4c4c8; border-radius: 4px; }
+.ve-mix-cat { margin: 6px 4px 2px; font-size: 10px; font-weight: 700; color: #6b6b72; text-transform: uppercase; letter-spacing: .03em; }
+.ve-mix-ef { padding: 3px 10px; border-radius: 3px; cursor: pointer; }
+.ve-mix-ef:hover { background: #e2e2e6; }
+.ve-mix-ef.semsom { color: #6b6b72; font-style: italic; }
+.ve-mix-ed-topo { display: flex; align-items: center; gap: 6px; padding-bottom: 6px; border-bottom: 1px solid #d4d4d8; margin-bottom: 6px; }
+.ve-mix-ed-topo b { flex: 1; }
+.ve-mix-ed-topo button { border: 0; background: #e2e2e6; border-radius: 3px; padding: 1px 6px; cursor: pointer; }
+.ve-mix-aviso { font-size: 11px; color: #8a5a2b; margin-bottom: 6px; }
+.ve-mix-ed-p { display: grid; grid-template-columns: 1fr; margin-bottom: 6px; }
+.ve-mix-ed-p span { font-size: 11px; color: #44444a; }
+.ve-mix-ed-p input[type=range] { width: 100%; }
+.ve-mix-ed-p input[type=text] { width: 70px; justify-self: end; margin-top: -2px; padding: 1px 4px; border: 1px solid #c4c4c8; border-radius: 3px; text-align: right; }
+.ve-mix-ed-p i { justify-self: end; font-size: 10px; color: #6b6b72; font-style: normal; }
+.ve-mix-ed-bool { display: block; margin-bottom: 4px; }

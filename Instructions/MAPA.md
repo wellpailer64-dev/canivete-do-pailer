@@ -59,7 +59,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 
 ### Vídeo
 #### Editor Kanivete — `switchTool('video-cutter')`
-- **Interface**: `editor-3d-tela.js`, `editor-3d.js`, `editor-atributos.js`, `editor-audio.js`, `editor-autoframe-cliente.js`, `editor-autoframe.js`, `editor-colar-externo.js`, `editor-comandos.js`, `editor-comp.js`, `editor-copiar.js`, `editor-desempenho.js`, `editor-dock.js`, `editor-encoder.js`, `editor-ferramentas.js`, `editor-fila.js`, `editor-fx.js`, `editor-grafico.js`, `editor-guias.js`, `editor-keyframes.js`, `editor-lacunas.js`, `editor-lc.js`, `editor-marcadores.js`, `editor-medidor.js`, `editor-ovt.js`, `editor-projeto.js`, `editor-props.js`, `editor-psd.js`, `editor-render.js`, `editor-reverse.js`, `editor-scopes.js`, `editor-soundboard.js`, `editor-texto.js`, `editor-trans.js`, `editor-transform.js`, `editor-txanim.js`, `editor.js`, `editor.css`
+- **Interface**: `editor-3d-tela.js`, `editor-3d.js`, `editor-afx-pr.js`, `editor-atributos.js`, `editor-audio.js`, `editor-autoframe-cliente.js`, `editor-autoframe.js`, `editor-colar-externo.js`, `editor-comandos.js`, `editor-comp.js`, `editor-copiar.js`, `editor-desempenho.js`, `editor-dock.js`, `editor-encoder.js`, `editor-ferramentas.js`, `editor-fila.js`, `editor-fx.js`, `editor-grafico.js`, `editor-guias.js`, `editor-keyframes.js`, `editor-lacunas.js`, `editor-lc.js`, `editor-marcadores.js`, `editor-medidor.js`, `editor-mixer.js`, `editor-ovt.js`, `editor-projeto.js`, `editor-props.js`, `editor-psd.js`, `editor-render.js`, `editor-reverse.js`, `editor-scopes.js`, `editor-soundboard.js`, `editor-texto.js`, `editor-trans.js`, `editor-transform.js`, `editor-txanim.js`, `editor.js`, `editor.css`
 - **Python**: `Functions/video_cutter.py`, `Functions/render_cache.py`, `Functions/autoframe.py`, `Functions/autoframe_modelos.py`, `Functions/transicoes.py`, `Functions/premiere.py`, `Functions/premiere_xml.py`, `Functions/cena3d.py`, `Functions/blender_cena.py`, `Functions/legendas.py`, `Functions/legendas_formatos.py`, `Functions/agente_midia.py`, `Functions/anti_noise.py`, `Functions/soundboard.py`, `Functions/psd_import.py`, `Functions/projeto.py`, `Functions/sincronizar.py`, `Functions/otimizar.py`, `Functions/media_server.py`
 - **Automação (agente/Jr)**: estado em VE (VE.clips, VE.media, veSeek...), Cena 3D: window.VE3DAPI; Worker: executor_editor.js
 - **API** (`pywebview.api.*`, 65): `audio_cutter_prepare(file_path)`, `audio_cutter_export(file_path, cuts, output_format="mp3", tracks=None, main_offset=0)`, `ve_texto_modelos()`, `ve_transcrever(clipes, total, idioma="pt")`, `ve_transcrever_cancelar()`, `ve_salvar_legenda(itens, formato="srt", nome="legendas", pasta="")`, `ve_fontes()`, `ve_preparar_midia(path, mid, urgente=False, leve=False, fundo=False)`, `ve_area_transferencia(projeto="")`, `ve_area_seq()`, `ve_inverter_midia(path, a, b, job)`, `ve_priorizar_midia(path)`, `ve_importar_dialogo()`, `ve_listar_pasta(path)`, `ve_ler_legenda(path)`, `ve_otimizar_fullhd(itens)`, `ve_otimizar_cancelar()`, `ve_encoder_estado()`, `ve_sincronizar_audio(ref_path, ref_s, ref_e, outro_path, outro_s, outro_e)`, `ve_salvar_png(dados)`, `ve_txa_lista(entradas)`, `anti_noise_preparar(path)`, `ve_sb_estado()`, `ve_sb_baixar()`, `ve_sb_abrir_pasta()`, `ve_render_listar(base, chave)`, `ve_render_trecho(base, chave, h, job)`, `ve_render_cancelar()`, `ve_comp_render(base, h, job)`, `ve_comp_cancelar()`, `ve_ovt_render(base, h, job)`, `ve_psd_importar(path)`, `ve_c3d_inicio(base, h)`, `ve_c3d_lote(sessao, pasta)`, `ve_c3d_fim(base, h, sessao, pasta, fps, n)`, `ve_c3d_pasta(base)`, `ve_3d_url(caminho)`, `ve_render_tocar(base, chave, hashes)`, `ve_render_mover(base, chave_antiga, chave_nova)`, `ve_render_limpar(base, chave=None)`, `ve_render_manutencao(base, max_gb=20, dias=30)`, `ve_render_info(base, chave=None)`, `ve_win_rect(titulo)`, `ve_win_hit(titulos, excluir=None)`, `ve_win_alpha(titulo, opacidade=1.0)`, `ve_win_prepare(titulo)`, `ve_win_place(titulo, x, y, w, h, maximizada=False)`, `ve_layout_load()`, `ve_layout_save(dados)`, `ve_agente_midia(cmd, args=None)`, `ve_agente_porta()`, `ve_project_save(path, dados, salvar_como=False, formato=None)`, `ve_project_open(path=None)`, `af_analisar(musica, itens)`, `af_recomendar(musica, paths, dur_alvo=None, inicio_modo="inicio", manual=None)`, `af_planejar(musica, paths, modelo, dur_alvo=None, ordem="inteligente", semente=0, inicio_modo="inicio", manual=None, telas=True, cobrir=None, reserva=None)`, `af_escolher(tipo)`, `afm_listar()`, `afm_salvar(modelo)`, `afm_apagar(mid)`, `afm_usou(mid, musica_i)`, `afm_escolher(tipo)`, `ve_autosave(chave, nome, dados)`, `ve_autosave_lista()`, `ve_project_thumb(path)`
@@ -104,7 +104,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 
 #### Melhorar Áudio — `switchTool('melhorar-audio')`
 - **Python**: `Functions/melhorar_audio.py`, `Functions/melhorar_audio_runner.py`
-- **API** (`pywebview.api.*`, 2): `melhorar_audio(caminho)`, `melhorar_audio_midia(caminho, mid)`
+- **API** (`pywebview.api.*`, 3): `melhorar_audio(caminho)`, `melhorar_audio_midia(caminho, mid)`, `melhorar_audio_cancelar()`
 - **Guias**: `Instructions/melhorar-audio.md`
 
 #### Geração de Voz — `switchTool('omnivoice')`
@@ -216,6 +216,8 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/montar_soundboard.py` — Monta o pack "vanilla" do Soundboard do Pocket Editor (não roda no app; só para gerar o zip do release)
 - `tools/olho.py` — Olho local: um modelo de visão no Ollama (gemma4:e4b) olha as imagens no lugar do Claude e devolve TEXTO curto
 - `tools/patch.py` — Aplica trocas de texto descritas num arquivo .patch simples — sem escapar aspas/barras, tudo ou nada, com conferência
+- `tools/ponte_premiere.py` — Ponte Kanivete ↔ Premiere Pro: servidor local que conversa com o plugin UXP "Kanivete Ponte
+- `tools/premiere_audio_dados.py` — Gera frontend/dados/premiere_audio.json: os efeitos de áudio do Premiere (catálogo lido pelo plugin Kanivete Ponte)
 - `tools/ps_modelo_deg.py` — Gera no Photoshop camadas de preenchimento de DEGRADÊ (linear 3 cores 30°, radial com transparência): molde do GdFl
 - `tools/ps_modelo_forma.py` — Gera no Photoshop um PSD com camadas de forma (retângulo, elipse e um demarcador com furo): molde de vmsk/SoCo
 - `tools/ps_modelo_pre.py` — Gera no Photoshop camadas de preenchimento de cor sólida (sem seleção e com seleção → máscara): molde
@@ -225,6 +227,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/refs.py` — Referências do Pinterest numa chamada: busca (navegador headless, sem login), baixa, monta folhas de contato,
 - `tools/revisor.py` — Revisor da peça do Photo Kanivete: confere, sem o Claude olhar, as regras que vieram dos feedbacks do usuário e
 - `tools/roteiro_local.py` — Briefing → roteiro JSON do tools/esqueleto.py pelo modelo LOCAL (Ollama; o Jr). O modelo só escreve o roteiro curto;
+- `tools/tripa.py` — tripa.py — a timeline inteira numa "tripa" de quadrinhos para o agente LER a montagem barato (ideia do Pailer)
 - `tools/vk_cena.py` — Diagramar uma prancheta do Vetor Kanivete com HTML/CSS (VKN.cena) usando o sistema da marca
 
 ## 9. Guias (`Instructions/`)
@@ -244,6 +247,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/plano-comp.md` — Plano: Comp (composição estilo After Effects) no Pocket Editor
 - `Instructions/agente/plano-economia-ponte-vetor-photo.md` — Planos (2026-10-04): economia de tokens, ponte Vetor ↔ Photo, nível "Herbíssimo"
 - `Instructions/agente/plano-kanivete-encoder.md` — Kanivete Encoder (Ke) — plano (rodada 1 de otimização FEITA em 2026-10-08; pendências no fim)
+- `Instructions/agente/ponte-premiere.md` — Ponte Kanivete ↔ Premiere Pro (plugin UXP "Kanivete Ponte")
 - `Instructions/agente/remover-fundo.md` — Remover fundo (recorte) — velocidade × qualidade (2026-10-06)
 - `Instructions/agente/teste-4k.md` — Teste de 4K (estresse do Editor de Vídeo)
 - `Instructions/agente/worker.md` — Canivete Worker — o assistente local (para o Claude delegar operações)
@@ -286,6 +290,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/converterimagem.py` — converterimagem.py
 - `Functions/convertermp3.py` — Conversor de áudio (e extração de áudio de vídeos) via ffmpeg
 - `Functions/editor_imagem.py` — Editor de Imagem (frontend/js/imagem-*.js): abrir e salvar PSD/PSB e imagens comuns
+- `Functions/efeitos_pr.py` — Efeitos de áudio do Premiere no Kanivete (frontend/dados/premiere_audio.json, gerado por tools/premiere_audio_dados.py)
 - `Functions/encoder_monitor.py` — Monitor do Kanivete Encoder: CPU, RAM e placa de vídeo (NVIDIA: uso, encoder, decoder, memória) em tempo real e o
 - `Functions/export_placa.py` — Exportação na placa de vídeo ("modo placa", Kanivete Encoder rodada 3): a timeline inteira montada na GPU, como o
 - `Functions/faviconconverter.py` — faviconconverter.py
@@ -362,6 +367,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_imagem.py` — Teste do Editor de Imagem (frontend/js/imagem-*.js + Functions/editor_imagem.py) no app de verdade
 - `testes/teste_kani.py` — Kani (assistente) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila) e confere: bolinha na Home,
 - `testes/teste_laco.py` — Laço: Shift soma, Alt subtrai, Shift+Alt cruza; o mesmo no magnético; Ctrl+clique na miniatura seleciona a camada
+- `testes/teste_mixer.py` — Mixer de trilhas de áudio (editor-mixer.js): Premiere → Kanivete → XML do Premiere e a conta do som na exportação
 - `testes/teste_pincel.py` — Pincel do Photo Kanivete: traço macio liso e pintura fluida em documento grande (app em --agente=9333)
 - `testes/teste_play.py` — teste_play.py — Mede o play do Pocket Editor no app de verdade (modo agente) e reprova se engasgar
 - `testes/teste_ponte.py` — Teste da ponte Vetor <-> Photo (app em --agente=9333). Ponte Vetor ↔ Photo: objeto inteligente vetorial (ida, filtro inteligente, ampliar sem pixeliza

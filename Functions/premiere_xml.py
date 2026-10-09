@@ -96,6 +96,7 @@ class _Exportador:
         self._emitidas = set()
         self._n_clip = 0
         self._n_master = 0
+        self._masters = {}
 
     # ── mídia ──
     def info(self, path):
@@ -180,11 +181,14 @@ class _Exportador:
         clips = [c for c in s.get("clips") or [] if c.get("tr", 0) >= 0]
         n_tr = max([c.get("tr", 0) + 1 for c in clips] + [len(trilhas.get("v") or []), len(trilhas.get("a") or []), 1])
         faixas_v = [[] for _ in range(n_tr)]
-        faixas_a = [[] for _ in range(n_tr)]
+        faixas_a = [[] for _ in range(n_tr * 2)]   # cada trilha de áudio = 2 trilhas explodidas (canal 1 e 2)
         grupos = {}
         for c in sorted(clips, key=lambda c: float(c.get("st") or 0)):
             for item in self.itens_do_clipe(c, w, h):
-                (faixas_v if item["tipo"] == "video" else faixas_a)[c["tr"]].append(item)
+                if item["tipo"] == "video":
+                    faixas_v[c["tr"]].append(item)
+                else:
+                    faixas_a[c["tr"] * 2 + item["canal"] - 1].append(item)
                 grupos.setdefault(item["grupo"], []).append(item)
         # vínculos: posição (1-based) de cada clipe na faixa
         for faixas, tipo in ((faixas_v, "video"), (faixas_a, "audio")):
@@ -209,16 +213,18 @@ class _Exportador:
         props_a = [((trilhas.get("a") or [])[ti] if ti < len(trilhas.get("a") or []) else {}) or {} for ti in range(n_tr)]
         solo = any(p.get("solo") for p in props_a)
         master_db = float((s.get("master") or {}).get("vol") or 0)
-        for ti, faixa in enumerate(faixas_a):
+        for xi, faixa in enumerate(faixas_a):
+            ti = xi // 2
             prop = dict(props_a[ti])
             if solo and not prop.get("solo"):
                 prop["mute"] = True
             extra = float(prop.get("vol") or 0) + master_db
             if extra and faixa:
-                self.rel.aprox("Volume da trilha / do Mix (somado no Audio Levels de cada clipe)")
+                if xi % 2 == 0:
+                    self.rel.aprox("Volume da trilha / do Mix (somado no Audio Levels de cada clipe)")
                 for it in faixa:
                     it["g_extra"] = extra
-            partes.append(self.faixa_xml(faixa, grupos, prop, "mute"))
+            partes.append(self.faixa_xml(faixa, grupos, prop, "mute", explodida=xi % 2))
         partes.append("</audio></media>")
         partes.append(f"<timecode>{r}<string>00:00:00:00</string><frame>0</frame>"
                       "<displayformat>NDF</displayformat></timecode>")
@@ -245,13 +251,15 @@ class _Exportador:
         partes.append("</sequence>")
         return "".join(partes)
 
-    def faixa_xml(self, faixa, grupos, prop, chave_off):
-        pan = float(prop.get("pan") or 0) if chave_off == "mute" else 0.0
-        if pan:   # Balance da trilha como o Premiere grava no próprio XML dele (0..1, 0,5 = centro)
-            b = f"{max(0.0, min(1.0, (pan / 100 + 1) / 2)):.6g}"
+    def faixa_xml(self, faixa, grupos, prop, chave_off, explodida=None):
+        if explodida is not None:
+            # trilha de áudio estéreo como o Premiere grava: par de trilhas explodidas (premiereTrackType sem os
+            # índices faz ele DESCARTAR a trilha na importação). O Panner ele ignora ao importar: o pan da trilha vai
+            # também como efeito Balance em cada clipe (efeitos_audio)
+            b = f"{max(0.0, min(1.0, (float(prop.get('pan') or 0) / 100 + 1) / 2)):.6g}"
             partes = [f'<track PannerCurrentValue="{b}" PannerIsInverted="true" '
                       f'PannerStartKeyframe="-91445760000000000,{b},0,0,0,0,0,0" PannerName="Balance" '
-                      'premiereTrackType="Stereo">']
+                      f'currentExplodedTrackIndex="{explodida}" totalExplodedTrackCount="2" premiereTrackType="Stereo">']
         else:
             partes = ["<track>"]
         for it in faixa:
@@ -300,12 +308,17 @@ class _Exportador:
             if f.get("on") is not False:
                 self.rel.fora(f"Efeito {_FX_NOMES.get(f.get('t'), f.get('t'))}")
         grupo = ("lk", c["lk"]) if c.get("lk") else ("c", id(c))
+        # som estéreo: dois clipitems (canal 1 e 2) em duas trilhas "explodidas", como o Premiere grava; com um só,
+        # ele importa o clipe MONO (só o canal 1)
+        estereo = bool(aninhada) or kind == "timeline" or int((self.info(m.get("path")).get("audio") or {}).get("channels") or 2) >= 2
         itens = []
         for tipo in tipos:
-            self._n_clip += 1
-            itens.append({"id": f"clipitem-{self._n_clip}", "tipo": tipo, "c": c, "m": m, "aninhada": aninhada,
-                          "start": start, "end": end, "grupo": grupo, "w": w, "h": h,
-                          "transicoes": self.transicoes(c, tipo, start, end)})
+            for canal in ((1, 2) if tipo == "audio" and estereo else (1,)):
+                self._n_clip += 1
+                itens.append({"id": f"clipitem-{self._n_clip}", "tipo": tipo, "c": c, "m": m, "aninhada": aninhada,
+                              "start": start, "end": end, "grupo": grupo, "w": w, "h": h, "canal": canal,
+                              "estereo": tipo == "audio" and estereo,
+                              "transicoes": self.transicoes(c, tipo, start, end)})
         return itens
 
     def transicoes(self, c, tipo, start, end):
@@ -355,8 +368,11 @@ class _Exportador:
                 dur_midia = _q((self.info(m.get("path")).get("duracao") or e) / abs(v), mfps)
             dur_midia = max(dur_midia, fim)
         nome = m.get("nome") or m.get("name") or os.path.basename(m.get("path") or "") or "Clipe"
-        self._n_master += 1
-        partes = [f'<clipitem id="{it["id"]}">', f"<masterclipid>masterclip-{self._n_master}</masterclipid>",
+        if id(c) not in self._masters:   # um masterclip por clipe (vídeo e os dois canais do som), como o Premiere
+            self._n_master += 1
+            self._masters[id(c)] = self._n_master
+        canal_tag = ' premiereChannelType="stereo"' if it.get("estereo") else ""
+        partes = [f'<clipitem id="{it["id"]}"{canal_tag}>', f"<masterclipid>masterclip-{self._masters[id(c)]}</masterclipid>",
                   f"<name>{escape(str(nome))}</name>",
                   f"<enabled>{'FALSE' if c.get('off') else 'TRUE'}</enabled>",
                   f"<duration>{dur_midia}</duration>", _rate_xml(mfps),
@@ -366,7 +382,7 @@ class _Exportador:
         else:
             partes.append(self.file_xml(m, e))
         if tipo == "audio":
-            partes.append("<sourcetrack><mediatype>audio</mediatype><trackindex>1</trackindex></sourcetrack>")
+            partes.append(f"<sourcetrack><mediatype>audio</mediatype><trackindex>{it.get('canal', 1)}</trackindex></sourcetrack>")
         if abs(v - 1) > 1e-6:
             partes.append(self.filtro_velocidade(v, tipo))
         if tipo == "video":
@@ -491,6 +507,85 @@ def _interp(ks, t, padrao):
     return float(ks[-1]["v"])
 
 
+def _kanivete_para_premiere(f):
+    """Efeito de áudio próprio do Kanivete → (nome no Premiere, {índice: valor 0..1}) aproximado, ou None."""
+    import math
+    t, v = f.get("t"), f.get("v") or {}
+    num = lambda k, d: float(v.get(k, d)) if isinstance(v.get(k, d), (int, float)) else d  # noqa: E731
+    if t == "limiter":   # Hard Limiter: réguas medidas no Premiere (tools/premiere_audio_dados.py)
+        return "Hard Limiter", {1: num("ceil", -1) / 100 + 1, 2: (num("boost", 0) + 100) / 150,
+                                3: num("look", 3) / 52.5, 4: num("rel", 80) / 266.7, 5: 1 if num("link", 1) else 0}
+    if t == "eq":
+        out = []
+        if num("lo", 0):
+            out.append(("Bass", {1: 0.5 + num("lo", 0) / 48}))
+        if num("hi", 0):
+            out.append(("Treble", {1: 0.5 + num("hi", 0) / 48}))
+        if num("mid", 0):
+            out.append(("Simple Parametric EQ", {1: math.sqrt((1000 - 20) / 23980), 3: 0.5 + num("mid", 0) / 48}))
+        return out or None
+    if t == "denoise":
+        return "DeNoise", {1: num("amt", 35) / 100}
+    if t == "dereverb":
+        return "DeReverb", {1: num("amt", 40) / 100}
+    return None
+
+
+def efeitos_audio(dados, rel=None):
+    """Efeitos de áudio para o plugin Kanivete Ponte aplicar no Premiere depois de importar o XML (o XML do Final Cut
+    não leva os efeitos de áudio do Premiere): {sequência: [{"t": trilha 0.., "ini": s, "efeitos": [{"nome", "valores":
+    {índice: 0..1}}]}]}. O rack da trilha (Mixer) vai no fim de cada clipe da trilha: a API do Premiere não alcança o
+    rack (filtros e EQ soam iguais; compressor e reverb, quase)."""
+    from Functions import efeitos_pr
+    seqs = dados.get("sequences") or [{"name": "Sequência", "clips": dados.get("clips") or [], "trilhas": dados.get("trilhas")}]
+    out = {}
+
+    def converte(lista, onde):
+        res = []
+        for f in lista or []:
+            if f.get("on") is False:
+                continue
+            item = efeitos_pr.por_tipo(f.get("t") or "")
+            if item:
+                _, e = item
+                vals = {int(k[1:]): x for k, x in (f.get("v") or {}).items() if k.startswith("p") and k[1:].isdigit()}
+                res.append({"nome": e["nome"], "valores": vals})
+                continue
+            k = _kanivete_para_premiere(f)
+            if k:
+                for nome, vals in (k if isinstance(k, list) else [k]):
+                    res.append({"nome": nome, "valores": vals})
+                if rel:
+                    rel.aprox(f"Efeito do Kanivete '{f.get('t')}' como efeito do Premiere ({onde})")
+            elif rel and f.get("t") not in ("antinoise",):
+                rel.fora(f"Efeito de áudio '{f.get('t')}' ({onde})")
+        return res
+
+    for s in seqs:
+        trilhas_a = ((s.get("trilhas") or {}).get("a")) or []
+        rack = {k: converte((t or {}).get("fx"), "rack da trilha") for k, t in enumerate(trilhas_a)}
+        # pan da trilha (Mixer): o Premiere ignora o Panner da <track> ao importar → Balance no fim de cada clipe
+        # (mesma régua: medida no Premiere, diferença 0,0 dB)
+        for k, t in enumerate(trilhas_a):
+            pan = float((t or {}).get("pan") or 0)
+            if pan:
+                rack[k] = rack.get(k, []) + [{"nome": "Balance", "valores": {1: max(0.0, min(1.0, (pan / 100 + 1) / 2))}}]
+                if rel:
+                    rel.aprox("Pan da trilha (vai como efeito Balance em cada clipe da trilha no Premiere)")
+        itens = []
+        for c in s.get("clips") or []:
+            if c.get("x") == "v":
+                continue
+            ef = converte(c.get("afx"), "clipe") + rack.get(c.get("tr", 0), [])
+            if ef:
+                itens.append({"t": int(c.get("tr", 0)), "ini": round(float(c.get("st") or 0), 4), "efeitos": ef})
+        if any(rack.values()) and rel:
+            rel.aprox("Rack de efeitos da trilha (vai em cada clipe da trilha no Premiere)")
+        if itens:
+            out[s.get("name") or "Sequência"] = itens
+    return out
+
+
 def exportar(path, dados, probe=None):
     """Grava o XML (escrita atômica) e devolve o relatório {sequencias, ignorados, aproximados}."""
     if isinstance(dados, str):
@@ -506,6 +601,15 @@ def exportar(path, dados, probe=None):
     with open(tmp, "w", encoding="utf-8") as f:
         f.write(texto)
     os.replace(tmp, path)
+    # efeitos de áudio ao lado: o plugin Kanivete Ponte aplica no Premiere (tools/ponte_premiere.py importar)
+    import json
+    ef = efeitos_audio(dados, ex.rel)
+    lado = base + ".kanivete-efeitos.json"
+    if ef:
+        with open(lado, "w", encoding="utf-8") as f:
+            json.dump({"xml": path, "sequencias": ef}, f, ensure_ascii=False, indent=1)
+    elif os.path.exists(lado):
+        os.remove(lado)
     return path, {
         "sequencias": [{"nome": s.get("name") or "Sequência", "clipes": len(s.get("clips") or [])}
                        for s in ex.seqs.values()],

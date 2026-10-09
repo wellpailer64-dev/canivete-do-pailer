@@ -288,10 +288,16 @@ function veAudioFxTap(F, quadro, k) {
     const x = veAudioAmostra(F, quadro);
     return x ? [x[0] * k, x[1] * k] : [0, 0];
 }
-function veAudioFxProcess(l, r, fx, tap) {
+// st = estado do clipe para os efeitos do Premiere ('pr_*', editor-afx-pr.js): filtros, delay e compressor lembram
+// das amostras anteriores; sem st (trechos fora de ordem) eles ficam de fora
+function veAudioFxProcess(l, r, fx, tap, st) {
     if (!fx || !fx.length) return [l, r];
-    for (const f of fx) {
-        const v = f.v || {};
+    for (let j = 0; j < fx.length; j++) {
+        const f = fx[j], v = f.v || {};
+        if (f.t.startsWith('pr_')) {
+            if (typeof veAprProcessar === 'function') [l, r] = veAprProcessar(f, j, l, r, st);
+            continue;
+        }
         if (f.t === 'denoise') {
             const amt = Math.max(0, Math.min(1, (v.amt || 0) / 100));
             const thr = veAudioFxDb(v.floor || -50);
@@ -320,6 +326,7 @@ function veAudioFxProcess(l, r, fx, tap) {
             r = r * (1 - wet * 0.20) + wet * (a[1] * 0.40 + b[1] * 0.25 + c[1] * 0.16);
         } else if (f.t === 'trk') {
             // volume e balanço da trilha (Mixer de trilhas): pan > 0 abaixa o L, < 0 abaixa o R
+            if (v.bus) continue;   // trilha com rack: fader e pan vão no barramento (veBusMixar)
             const k = veAudioFxDb(v.g || 0), p = (v.p || 0) / 100;
             l *= k * (p > 0 ? 1 - p : 1);
             r *= k * (p < 0 ? 1 + p : 1);
@@ -382,14 +389,17 @@ function veAudioMixar(t, n) {
 
 // Mixa n quadros de saída a partir do instante t da timeline (avançando `taxa` s da timeline por s de som)
 function veAudioMixarBruto(t, n) {
-    const L = new Float32Array(n), R = new Float32Array(n), passo = VEAU.taxa / VE_AU_SR;
+    const L = new Float32Array(n), R = new Float32Array(n), passo = VEAU.taxa / VE_AU_SR, busses = {};
     for (const cl of VEAU.clipes) {
         const [st, s0, e0, g, id, v, tom, fi, fo, fx] = cl;
         const F = veAudioFonteClipe(id, fx), fimC = st + (e0 - s0) / v, tFim = t + n * passo;
         if (!F || fimC <= t || st >= tFim) continue;
-        if (fx.some(f => f.t === 'limiter')) { veAudioMixarLim(cl, F, t, n, passo, L, R); continue; }
+        // trilha com rack de efeitos (Mixer): o clipe vai para o barramento dela; efeitos, fader e pan vêm na soma
+        const [DL, DR] = veBusDestino(fx, busses, n, L, R);
+        if (fx.some(f => f.t === 'limiter')) { veAudioMixarLim(cl, F, t, n, passo, DL, DR); continue; }
         const P = veMixPico(fx);
         const i0 = Math.max(0, Math.ceil((st - t) / passo)), i1 = Math.min(n, Math.ceil((fimC - t) / passo));
+        const PS = veAprEstado(cl, fx, t + i0 * passo, passo);
         const k0 = g / 32768, a0 = s0 * VE_AU_SR, durC = fimC - st, fade = fi > 0 || fo > 0;
         if (v === 1 || !tom) {
             // normal, ou velocidade que muda o tom junto (como fita mais rápida)
@@ -398,11 +408,12 @@ function veAudioMixarBruto(t, n) {
                 const x = veAudioAmostra(F, frame);
                 if (!x) continue;                                   // bloco ainda não lido: silêncio (raro, há previsão)
                 const k = fade ? k0 * veAudioFade(t + i * passo - st, durC, fi, fo) : k0;
-                const y = veAudioFxProcess(x[0] * k, x[1] * k, fx, d => veAudioFxTap(F, frame - d * v * VE_AU_SR, k));
-                L[i] += y[0];
-                R[i] += y[1];
+                const y = veAudioFxProcess(x[0] * k, x[1] * k, fx, d => veAudioFxTap(F, frame - d * v * VE_AU_SR, k), PS);
+                DL[i] += y[0];
+                DR[i] += y[1];
                 if (P) { const a = Math.abs(y[0]), b = Math.abs(y[1]); if (a > P[0]) P[0] = a; if (b > P[1]) P[1] = b; }
             }
+            if (PS) cl._pr.t = t + i1 * passo;
             continue;
         }
         for (let i = i0; i < i1; i++) {
@@ -418,19 +429,57 @@ function veAudioMixarBruto(t, n) {
                 l += x[0] * w; r += x[1] * w;
             }
             const k = fade ? k0 * veAudioFade(t + i * passo - st, durC, fi, fo) : k0;
-            const y = veAudioFxProcess(l * k, r * k, fx, null);
-            L[i] += y[0];
-            R[i] += y[1];
+            const y = veAudioFxProcess(l * k, r * k, fx, null, PS);
+            DL[i] += y[0];
+            DR[i] += y[1];
             if (P) { const a = Math.abs(y[0]), b = Math.abs(y[1]); if (a > P[0]) P[0] = a; if (b > P[1]) P[1] = b; }
         }
+        if (PS) cl._pr.t = t + i1 * passo;
     }
+    veBusMixar(busses, t, n, passo, L, R);
     return { l: L, r: R };
+}
+
+// ── barramento das trilhas com rack de efeitos (Mixer de trilhas: editor-mixer.js) ──
+// Ordem do Premiere: efeitos do clipe → efeitos da trilha (na SOMA dos clipes dela) → fader → pan.
+// O 'trk' do clipe vem com bus (a lista de efeitos da trilha): ele não aplica fader/pan no clipe (veAudioFxProcess).
+function veBusDestino(fx, busses, n, L, R) {
+    const f = fx.find(x => x.t === 'trk');
+    if (!f || !f.v.bus) return [L, R];
+    const tr = f.v.tr;
+    return busses[tr] ? [busses[tr].l, busses[tr].r] : (busses[tr] = { l: new Float32Array(n), r: new Float32Array(n), v: f.v }, [busses[tr].l, busses[tr].r]);
+}
+function veBusMixar(busses, t, n, passo, L, R) {
+    const VEAUb = VEAU.bus || (VEAU.bus = {});
+    for (const tr in busses) {
+        const B = busses[tr], fx = B.v.bus, g = Math.pow(10, (B.v.g || 0) / 20), p = (B.v.p || 0) / 100;
+        const gl = g * (p > 0 ? 1 - p : 1), gr = g * (p < 0 ? 1 + p : 1);
+        // estado dos efeitos da trilha: continua se este pedaço começa onde o anterior terminou
+        let E = VEAUb[tr];
+        if (!E || E.fx !== JSON.stringify(fx) || Math.abs(E.t - t) > passo * 2) E = VEAUb[tr] = { t, st: {}, fx: JSON.stringify(fx) };
+        const P = VEAU.pk ? (VEAU.pk[tr] || (VEAU.pk[tr] = [0, 0])) : null;
+        for (let i = 0; i < n; i++) {
+            const y = veAudioFxProcess(B.l[i], B.r[i], fx, null, E.st);
+            const l = y[0] * gl, r = y[1] * gr;
+            L[i] += l; R[i] += r;
+            if (P) { const a = Math.abs(l), b = Math.abs(r); if (a > P[0]) P[0] = a; if (b > P[1]) P[1] = b; }
+        }
+        E.t = t + n * passo;
+    }
+}
+
+// Estado dos efeitos do Premiere do clipe (guardado no próprio item de VEAU.clipes, que vive até a próxima edição).
+// Continua de onde parou se o pedaço começa onde o anterior terminou; num salto (busca, outro pedaço) recomeça.
+function veAprEstado(cl, fx, t0, passo) {
+    if (!fx.some(f => f.t.startsWith('pr_'))) return null;
+    if (!cl._pr || Math.abs(cl._pr.t - t0) > passo * 2) cl._pr = { t: t0, st: {} };
+    return cl._pr.st;
 }
 
 // Pico [L, R] da trilha do clipe neste pedaço (medidores do Mixer de trilhas: editor-mixer.js)
 function veMixPico(fx) {
     const pk = VEAU.pk, f = pk && fx.find(x => x.t === 'trk');
-    if (!f || !(f.v.tr >= 0)) return null;
+    if (!f || !(f.v.tr >= 0) || f.v.bus) return null;   // com rack: o medidor lê a saída do barramento
     return pk[f.v.tr] || (pk[f.v.tr] = [0, 0]);
 }
 
@@ -529,7 +578,7 @@ function veAudioMixarLim(cl, F, t, n, passo, L, R) {
         if (!x) return [0, 0];
         if (!pre.length || u < 0 || tau >= fimC) return x;
         const frame = s0 * VE_AU_SR + u * v * VE_AU_SR;
-        return veAudioFxProcess(x[0], x[1], pre, d => veAudioFxTap(F, frame - d * v * VE_AU_SR, cl[3] / 32768));
+        return veAudioFxProcess(x[0], x[1], pre, d => veAudioFxTap(F, frame - d * v * VE_AU_SR, cl[3] / 32768), cl._prPre || (cl._prPre = {}));
     };
     const tau0 = t + i0 * passo;
     let S = VEAU.lims.get(cl);
@@ -548,7 +597,7 @@ function veAudioMixarLim(cl, F, t, n, passo, L, R) {
         let y = S.lim.passo(x[0], x[1]);
         S.tIn += passo;
         const u = t + i * passo - st;
-        if (pos.length) y = veAudioFxProcess(y[0], y[1], pos, null);
+        if (pos.length) y = veAudioFxProcess(y[0], y[1], pos, null, cl._prPos || (cl._prPos = {}));
         const kf = fade ? veAudioFade(u, durC, fi, fo) : 1;
         L[i] += y[0] * kf;
         R[i] += y[1] * kf;

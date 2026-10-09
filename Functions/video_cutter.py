@@ -1779,9 +1779,16 @@ def _normalizar_afx(efeitos):
             mix = _afx_lim(v.get("mix"), 0.0, 60.0, 18.0)
             if mix > 0:
                 out.append((t, {"mix": mix, "size": _afx_lim(v.get("size"), 0.0, 100.0, 45.0)}))
+        elif t.startswith("pr_"):   # efeito do Premiere com valores 0..1 (Functions/efeitos_pr.py; editor-afx-pr.js)
+            from Functions import efeitos_pr
+            if efeitos_pr.por_tipo(t) and efeitos_pr.filtros(t, v):
+                out.append((t, dict(v)))
         elif t == "trk":   # volume (dB) e pan (−100..100) da trilha: Mixer de trilhas (editor.js: veTrkAfx)
             g, p = _afx_lim(v.get("g"), -200.0, 15.0, 0.0), _afx_lim(v.get("p"), -100.0, 100.0, 0.0)
-            if abs(g) > 0.005 or abs(p) > 0.05:
+            bus = _normalizar_afx(v.get("bus")) if isinstance(v.get("bus"), list) else []
+            if bus:   # trilha com rack: o clipe vai para o barramento dela (_grafo_mix); fader e pan depois dos efeitos
+                out.append((t, {"g": g, "p": p, "tr": int(_afx_num(v.get("tr"), 0)), "bus": bus}))
+            elif abs(g) > 0.005 or abs(p) > 0.05:
                 out.append((t, {"g": g, "p": p}))
         elif t == "eq":
             vals = {k: _afx_lim(v.get(k), -12.0, 12.0, 0.0) for k in ("lo", "mid", "hi")}
@@ -1806,7 +1813,12 @@ def _filtros_afx(efeitos):
             decays = [wet * 0.55, wet * 0.35, wet * 0.22]
             fs.append("aecho=0.90:1.0:" + "|".join(f"{d:.1f}" for d in atrasos)
                       + ":" + "|".join(f"{d:.4f}" for d in decays))
+        elif t.startswith("pr_"):
+            from Functions import efeitos_pr
+            fs += efeitos_pr.filtros(t, v)
         elif t == "trk":   # a mesma conta da prévia (editor-audio.js): pan > 0 abaixa o L, < 0 abaixa o R
+            if v.get("bus") and not v.get("no_bus"):
+                continue   # vai no barramento da trilha (_grafo_mix)
             if abs(v["g"]) > 0.005:
                 fs.append(f"volume={v['g']:.2f}dB")
             p = v["p"] / 100.0
@@ -2002,8 +2014,22 @@ def _grafo_mix(clipes, total, entradas, rotulo):
         f.append(f"[{nomes[k]}]atrim=start={s0:.5f}:end={e0:.5f},asetpts=PTS-STARTPTS"
                  f"{_filtro_velocidade(vel, tom)}{vol}{efeitos}{fades}{corta},"
                  f"adelay={int(round(st * 48000))}S:all=1[{rotulo}m{k}]")
-    n = len(clipes)
-    f.append("".join(f"[{rotulo}m{k}]" for k in range(n))
+    # barramentos: trilhas com rack de efeitos (Mixer) somam os clipes delas, passam pelos efeitos da trilha e só
+    # então pelo fader e pan — a ordem do Premiere (editor-audio.js: veBusMixar faz o mesmo na prévia)
+    saidas, grupos = [], {}
+    for k, c in enumerate(clipes):
+        trk = next((v for t, v in (c[9] if len(c) > 9 else []) if t == "trk" and v.get("bus")), None)
+        if trk is None:
+            saidas.append(f"[{rotulo}m{k}]")
+        else:
+            grupos.setdefault(trk["tr"], [trk, []])[1].append(f"[{rotulo}m{k}]")
+    for tr, (trk, ks) in sorted(grupos.items()):
+        fx = _filtros_afx(trk["bus"]) + _filtros_afx([("trk", {**trk, "no_bus": True})])
+        soma = (f"amix=inputs={len(ks)}:normalize=0:duration=longest:dropout_transition=0" if len(ks) > 1 else "anull")
+        f.append("".join(ks) + soma + ("," + ",".join(fx) if fx else "") + f"[{rotulo}b{tr}]")
+        saidas.append(f"[{rotulo}b{tr}]")
+    n = len(saidas)
+    f.append("".join(saidas)
              + f"amix=inputs={n}:normalize=0:duration=longest:dropout_transition=0,"
              + f"apad=whole_dur={total:.4f},atrim=0:{total:.4f}[{rotulo}]")
     return f

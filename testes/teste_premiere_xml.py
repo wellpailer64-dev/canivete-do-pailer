@@ -82,7 +82,9 @@ def esperado(dados):
             if c.get("tr", 0) < 0:
                 continue
             for it in ex.itens_do_clipe(c, 1920, 1080):
-                itens.append((it["tipo"], c["tr"] + 1, it["start"], it["end"]))
+                # áudio estéreo: duas trilhas explodidas por trilha (canal 1 e 2), como o Premiere grava
+                faixa = c["tr"] + 1 if it["tipo"] == "video" else c["tr"] * 2 + it.get("canal", 1)
+                itens.append((it["tipo"], faixa, it["start"], it["end"]))
         out[s.get("name") or "Sequência"] = sorted(itens)
     return out
 

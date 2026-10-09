@@ -78,7 +78,10 @@ efeito): pan, M/S (S também no cabeçalho da trilha), fader −∞..+15 dB na e
 Estado em `VE_TRK.a[k]` {vol, pan, mute, solo} e `VE.master.vol`; som pelo efeito interno `trk` (editor.js `veTrkAfx`,
 prévia `veAudioFxProcess`, export `_filtros_afx`); Mix depois do Hard Limiter do Master (`veMasterLim().fim`). Premiere
 ida e volta (`premiere.py _mixer_trilha`, `premiere_xml.py`). API `VEMIX_API`. Teste: `py -3.13 testes/teste_mixer.py`.
-Falta (etapa 2): rack de efeitos por trilha (5 espaços, processado na SOMA da trilha) e automação (Read/Write).
+Rack de efeitos por trilha (5 espaços, na SOMA da trilha) e os 53 efeitos de áudio do Premiere (`editor-afx-pr.js`,
+`Functions/efeitos_pr.py`, valores 0..1 do Premiere = ida e volta sem perda; 20 com som calibrado no Premiere).
+**Ponte com o Premiere instalado (plugin UXP "Kanivete Ponte", `tools/ponte_premiere.py`): `Instructions/agente/ponte-premiere.md`**
+— testes SÓ na cópia em D:\kanivete_testes (o projeto ativo do Premiere é o do Pailer).
 
 Atributos de vários clipes (como no Premiere): `frontend/js/editor-atributos.js` — botão direito → "Remover atributos…"
 (efeitos de vídeo/áudio, movimento, opacidade, mesclagem, volume, transições, com caixinhas; vale para a seleção) e ajuste

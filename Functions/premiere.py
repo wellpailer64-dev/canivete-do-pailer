@@ -318,6 +318,9 @@ class _Conversor:
                     self.rel['ignorados']['Automação de pan da trilha (Mixer)'] += 1
         if (at.findtext('Solo') or '').strip() == '1':
             o['solo'] = True
+        fx = self._efeitos_audio(at.find('ComponentOwner/Components'))   # rack de efeitos da trilha (Mixer)
+        if fx:
+            o['fx'] = fx
         return {k: v for k, v in o.items() if v not in (0, 0.0)}
 
     def _clipe(self, item, tipo, k, W, H):
@@ -383,7 +386,47 @@ class _Conversor:
             return None
         if tipo == 'v':
             self._efeitos(cti, c, m, W, H, ent)
+        else:
+            afx = self._efeitos_audio(cti.find('ComponentOwner/Components'))
+            if afx:
+                c['afx'] = afx
         return c
+
+    def _efeitos_audio(self, owner):
+        """Efeitos de áudio de uma cadeia (clipe ou trilha): cada AudioFilterComponent vira {"t": "pr_<nome>", "v":
+        {"p0": 0..1, ...}} — os valores como o Premiere guarda (Functions/efeitos_pr.py, editor-afx-pr.js)."""
+        from Functions import efeitos_pr
+        chain = self.g.ref(owner) if owner is not None else None
+        if chain is None:
+            return []
+        dados = efeitos_pr.dados()
+        out = []
+        for comp in chain.findall('.//Components/Component'):
+            o = self.g.ref(comp)
+            if o is None or o.tag != 'AudioFilterComponent':
+                continue
+            match = (o.findtext('FilterMatchName') or '').strip()
+            e = dados.get(match)
+            if e is None:
+                self.rel['ignorados'][f'Efeito de áudio de terceiros ({match[:40]})'] += 1
+                continue
+            v, kf = {}, False
+            for i, p in enumerate(o.findall('.//Params/Param')):
+                pr = self.g.ref(p)
+                if pr is None:
+                    continue
+                txt = (_param_valor(pr) or '').strip().lower()
+                if not txt:   # o Premiere não grava o valor que está no padrão
+                    d = e['p'][i]['d'] if i < len(e['p']) else 0
+                    v[f'p{i}'] = int(d) if isinstance(d, bool) else d
+                    continue
+                v[f'p{i}'] = 1 if txt == 'true' else 0 if txt == 'false' else round(_num(txt, 0.0), 9)
+                kf = kf or bool(_param_keyframes(pr))
+            if kf:
+                self.rel['ignorados'][f'Quadros-chave em {e["nome"]} (fica o valor do começo)'] += 1
+            out.append({'id': f'pr{len(out)}_{self.lk_n}_{id(o) % 100000}', 't': efeitos_pr.tipo_de(e['nome']), 'on': True, 'v': v})
+            self.rel['convertidos'][f'Efeito de áudio: {e["nome"]}' + ('' if e.get('som') else ' (sem prévia no Kanivete)')] += 1
+        return out
 
     def _midia_fixa(self, kind, nome):
         chave = f'::{kind}'
