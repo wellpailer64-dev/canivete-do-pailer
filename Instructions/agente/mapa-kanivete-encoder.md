@@ -42,6 +42,11 @@ arquivo .part → renomeado no fim · miniatura ke_quadro.jpg 1×/s (saida_minia
 | `first_run.py` | ffmpeg FIXO na série 8.1 (campo `versao`) |
 
 ## 3. Regras que valem para tudo
+- **Cópias Full HD automáticas** (`otimizar.usar_otimizados`, no começo do `exportar_video`): camada de vídeo com cópia
+  em "Otimizados FullHD" (mais nova que o original) e que aparece em até 1080 no lado menor é lida da cópia, com escala,
+  quadros-chave e âncora ajustados. Fora da prévia renderizada e das Comps.
+- **Motivo do processador**: quando a montagem não vai na placa, o Python manda "Processador · motivo" no início; o
+  Encoder guarda (`it.motivoCpu`) e mostra no selo.
 - **Taxa cravada**: `taxa_timeline(média, nominal)`. 23,976/29,97/59,94 só de fonte constante; o resto vai para
   24/25/30/50/60 (celular 59,18 → 60). `probe()["fps_timeline"]`; o editor usa `veFpsTimeline`.
 - **Escolha de quadro igual em todos os caminhos**: camada = `setpts=(PTS-(s-ss)/TB)/v` → `fps` com `start_time=0` →
@@ -73,6 +78,8 @@ arquivo .part → renomeado no fim · miniatura ke_quadro.jpg 1×/s (saida_minia
 | CPU, 4K bruto, sem placa (driver velho) | 6+ min, cancelado | começo do dia |
 | CPU, Full HD + NVENC | 375 s (3,8×) | export do usuário |
 | CPU, Full HD (com a correção do logo) | 264 s (2,7×) | referência |
+| 4K bruto pela CPU | 518,6 s (5,25×) | RAM 9,1 GB |
+| **4K bruto com cópias Full HD automáticas + placa** | **107,6 s (1,09×)** | RAM 1,6 GB; `otimizar.usar_otimizados` |
 | **placa, Full HD** | **96–98 s (0,97–0,99×)** | 38,8 dB contra a CPU |
 | placa, partida | ~2,7 s até o 1º quadro (0,5 s de preparo no Python) | NVENC e miniatura não pesam |
 
@@ -114,7 +121,8 @@ Corte também a base (só os segmentos até T).
 5. Textos antigos da fila sem tradução ("Fila de render", "Pausar depois deste"…).
 
 ## 8. Referência para um motor próprio: VapourSynth (lido em 2026-10-08, r81, commit 744afbd)
-Código em `D:\kanivete_testesefapoursynth` (clone raso, só leitura; LGPL-2.1: usar como biblioteca sim,
+Código em `D:\kanivete_testes
+efapoursynth` (clone raso, só leitura; LGPL-2.1: usar como biblioteca sim,
 copiar código para o app não). Por que importa: é o "chef com comanda" que o ffmpeg CLI não é.
 - Pede cada quadro sob demanda, com vários em andamento ao mesmo tempo (thread pool) e cache por nó.
 - **r80/r81 (2026): GPU em Vulkan 1.4 no núcleo.** Quadros moram na placa (`GPUUpload`/`GPUDownload` só nas bordas);

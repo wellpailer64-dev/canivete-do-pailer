@@ -83,3 +83,51 @@ def converter(path, on_pct=None, stop_event=None, on_motor=None):
     if stop_event is not None and stop_event.is_set():
         return {"success": False, "cancelled": True, "error": "cancelado"}
     return {"success": False, "error": (err or "").strip().splitlines()[-1] if err else "falha na conversão"}
+
+
+def usar_otimizados(camadas):
+    """Exportação: vídeo de camada com a cópia Full HD já feita (pasta "Otimizados FullHD", mais nova que o original) e
+    que aparece em até 1080 no lado menor passa a ser lido da cópia — na saída é a mesma imagem e o 4K do celular não
+    pesa (no modo placa, 34 leituras 4K não cabiam nos 8 GB). Escala, quadros-chave e âncora acompanham (como no
+    Forçar Full HD: 4K a 50% vira Full HD a 100%). Devolve (camadas, quantas trocou)."""
+    import copy
+    from Functions.video_cutter import _ca_pulso_max
+    out, n, infos = [], 0, {}
+    for c in camadas or []:
+        p = c.get("path") if isinstance(c, dict) else None
+        if not p or c.get("tipo") in ("imagem", "ajuste") or not os.path.isfile(p):
+            out.append(c)
+            continue
+        d = destino(p)
+        try:
+            ok = os.path.isfile(d) and os.path.getmtime(d) >= os.path.getmtime(p)
+        except OSError:
+            ok = False
+        if ok:
+            for q in (p, d):
+                if q not in infos:
+                    try:
+                        infos[q] = probe(q)
+                    except Exception:
+                        infos[q] = {}
+            mw, mh = float(c.get("mw") or 0), float(c.get("mh") or 0)
+            fw, fh = infos[d].get("width") or 0, infos[d].get("height") or 0
+            sc = [float(c.get("sc", 100))] + [float(q[1]) for q in (c.get("kf") or {}).get("sc", []) if len(q) > 1]
+            maior = max(sc) / 100.0 * _ca_pulso_max(c.get("ca"))
+            # mesma proporção (o mesmo vídeo) e nunca maior na tela que a cópia: senão perderia definição
+            ok = (mw > fw > 0 and mh > 0 and fh > 0 and abs(mw / mh - fw / fh) < 0.01 and min(mw, mh) * maior <= min(fw, fh) * 1.001)
+        if not ok:
+            out.append(c)
+            continue
+        k = mw / fw
+        c = copy.deepcopy(c)
+        c["path"], c["mw"], c["mh"] = d, fw, fh
+        c["sc"] = float(c.get("sc", 100)) * k
+        if (c.get("kf") or {}).get("sc"):
+            c["kf"]["sc"] = [[q[0], float(q[1]) * k, *q[2:]] for q in c["kf"]["sc"]]
+        for e in ("ox", "oy"):
+            if c.get(e):
+                c[e] = float(c[e]) / k
+        out.append(c)
+        n += 1
+    return out, n

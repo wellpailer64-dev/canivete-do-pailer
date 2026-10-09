@@ -2820,6 +2820,13 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     """
     global _export_proc
     prog = on_progress or (lambda p, m: None)
+    # vídeos 4K com a cópia Full HD já feita (Forçar Full HD) e que aparecem em até 1080: lidos da cópia (mesma imagem
+    # na saída, sem o peso do 4K; no modo placa o 4K não cabia na memória). Prévia renderizada e Comp ficam como estão
+    if camadas and not previa_h and not alfa and janela is None:
+        from Functions import otimizar
+        camadas, n_fhd = otimizar.usar_otimizados(camadas)
+        if n_fhd:
+            prog(0, f"Usando {n_fhd} vídeo(s) Full HD já otimizado(s) no lugar do 4K")
     if path and not os.path.isfile(path) and not _export_usa_fonte(segmentos, audio_segmentos, camadas, audio_clipes, sem_audio):
         path = ""
     if not path:
@@ -2855,11 +2862,19 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             r = {"success": False, "error": f"placa: {e}"}
         if r is not None and (r.get("success") or r.get("cancelled")):
             return r
+        # "Processador · motivo": o Encoder mostra por que a montagem não foi na placa (antes era preciso investigar)
         if r is not None:
-            prog(0, "A placa não conseguiu; exportando pela CPU...")
             _ultimo_motivo_placa[0] = r.get("error") or ""
+            prog(0, "Processador · a placa não conseguiu (" + (("memória da placa cheia" if "MEMORY" in _ultimo_motivo_placa[0]
+                                                               or "allocate" in _ultimo_motivo_placa[0] else "erro na placa")) + ")")
         else:
             _ultimo_motivo_placa[0] = args_placa.get("_motivo") or ""
+            if _ultimo_motivo_placa[0]:
+                prog(0, "Processador · " + _ultimo_motivo_placa[0])
+    elif (janela is None and camadas and not saida and not previa_h and not alfa
+          and not FORMATOS_SAIDA.get(str(formato_saida).lower(), {}).get("audio_only")):
+        prog(0, "Processador · " + ("exportação por blocos ligada" if isinstance(opcoes, dict) and opcoes.get("blocos")
+                                    else "placa de vídeo desligada na exportação"))
     # por blocos só com a base de fundo (sequência noutro tamanho: tudo vira camada). Base com trechos do vídeo
     # principal: cada trecho é arredondado em quadros desde o zero e um bloco no meio dela saía um quadro deslocado
     if (janela is None and isinstance(opcoes, dict) and opcoes.get("blocos") and camadas and not saida and not previa_h

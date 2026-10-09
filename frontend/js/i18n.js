@@ -590,7 +590,7 @@ const I18N_EN = {
     'Sem mídia sobrando para a transição': 'Not enough extra media for the transition',
     // Kanivete Encoder (editor-encoder.js): renderizando agora, monitor, atalhos da fila; taxa cravada; modo placa
     'Nada renderizando': 'Nothing rendering', 'Pronto para renderizar': 'Ready to render', 'Renderizando agora': 'Rendering now',
-    'Preparando para a fila': 'Preparing for the queue', 'Memória RAM': 'RAM', 'Placa de vídeo': 'Graphics card',
+    'Preparando para a fila': 'Preparing for the queue', 'Montado no processador porque': 'Built on the CPU because', 'Memória RAM': 'RAM', 'Placa de vídeo': 'Graphics card',
     'Encoder da placa (gravação de vídeo)': 'GPU encoder (video encoding)',
     'Último render': 'Last render', 'Placa': 'GPU', 'Memória da placa': 'GPU memory', 'falta': 'left', 'tempo real': 'real time',
     'feito em': 'done in', 'Montado na placa': 'Built on the GPU', 'Sem placa NVIDIA: só CPU e RAM': 'No NVIDIA GPU: CPU and RAM only',

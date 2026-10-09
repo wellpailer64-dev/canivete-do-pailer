@@ -173,10 +173,11 @@ function veKeAgora() {
     }
     $ve('ke-agora-tempo').textContent = tempo;
     $ve('ke-agora-vel').textContent = vel;
-    const m = String((ult && ult.msg) || ''), modo = $ve('ke-modo');
-    const placa = /placa/i.test(m) && !/não conseguiu/i.test(m), turbo = /turbo/i.test(m);
-    modo.hidden = !m;
-    modo.textContent = placa ? veT('Montado na placa') : turbo ? 'Turbo' : veT('Processador');
+    const m = String((ult && ult.msg) || ''), modo = $ve('ke-modo'), motivo = ult && ult.motivoCpu;
+    const placa = !motivo && /placa/i.test(m), turbo = !motivo && /turbo/i.test(m);
+    modo.hidden = !m && !motivo;
+    modo.textContent = placa ? veT('Montado na placa') : turbo ? 'Turbo' : veT('Processador') + (motivo ? ` · ${motivo}` : '');
+    modo.title = motivo ? `${veT('Montado no processador porque')}: ${motivo}` : '';
     modo.className = 'ke-modo ' + (placa || turbo ? 'gpu' : 'cpu');
 }
 async function veKeMonitorTick() {
@@ -216,7 +217,10 @@ function veKeMonitorLigar() {
     const ev = veFilaEvento;
     veFilaEvento = function (e) {
         const it = VEFILA.atual;
-        if (it && !e.done && e.message) it.msg = e.message;
+        if (it && !e.done && e.message) {
+            if (/^Processador · /.test(e.message)) it.motivoCpu = e.message.slice(14);   // por que não foi na placa
+            else it.msg = e.message;
+        }
         if (it && e.done) { VEKE_MON.ultimo = it; if (e.success && typeof playConcluido === 'function') playConcluido(); }
         const r = ev(e);
         veKeAgora();

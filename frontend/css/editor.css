@@ -2182,7 +2182,8 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ke-agora.rodando .ke-agora-rot::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--ke);
     animation: ke-pulso 1.2s ease-in-out infinite; vertical-align: 1px; }
 @keyframes ke-pulso { 50% { opacity: .25; } }
-.ke-modo { font: 650 10px var(--ve-ui); padding: 2px 7px; border-radius: 10px; border: 1px solid #2c2f33; color: #9aa0a8; }
+.ke-modo { font: 650 10px var(--ve-ui); padding: 2px 7px; border-radius: 10px; border: 1px solid #2c2f33; color: #9aa0a8;
+    max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ke-modo[hidden] { display: none; }
 .ke-modo.gpu { color: #9be564; border-color: rgba(118, 185, 0, .45); background: rgba(118, 185, 0, .08); }
 .ke-modo.cpu { color: #f0b35a; border-color: rgba(240, 166, 64, .4); background: rgba(240, 166, 64, .07); }
