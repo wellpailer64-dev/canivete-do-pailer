@@ -109,6 +109,8 @@ async function veFilaProximo() {
     }
     VEFILA.atual = it; it.estado = 'rodando'; it.pct = 0; it.t0 = Date.now();
     VE.exportRunning = true;
+    // prévia renderizada (automática ou In→Out) parada: dividia a placa e a CPU com a exportação (memória estourava)
+    if (typeof vePrAutoParar === 'function' && typeof VEPR !== 'undefined' && (VEPR.atual || VEPR.fila.length)) vePrAutoParar();
     document.querySelector('.menu-item[data-tool="video-cutter"]')?.classList.add('rodando');
     veFilaRender();
     try { await window.pywebview.api.video_cutter_export(...veFilaArgs(it)); }

@@ -78,6 +78,23 @@ def memoria_placa():
     return _vram
 
 
+def memoria_em_uso():
+    """Memória da placa já ocupada agora (o editor com vídeos abertos, outro programa), em bytes; 0 se não der para ler."""
+    try:
+        r = subprocess.run(["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
+                           capture_output=True, text=True, timeout=10, creationflags=vc._creationflags())
+        return int(float(r.stdout.split()[0])) * 2**20 if r.returncode == 0 and r.stdout.strip() else 0
+    except Exception:
+        return 0
+
+
+def cabe_na_placa(segmentos, lay, path):
+    """A exportação cabe na memória livre? Estimativa × 2 (medido 2026-10-08: estimou 2,0 GB e usou 3,8 GB além do que
+    já estava ocupado — a fila adiantada de quadros) + o que já está em uso ≤ 92% da placa. Sem caber: vai direto pela
+    CPU em vez de tentar e estourar no meio (antes: falhava com o editor usando a placa ao mesmo tempo)."""
+    return memoria_estimada(segmentos, lay, path) * 2 + memoria_em_uso() <= 0.92 * memoria_placa()
+
+
 def memoria_estimada(segmentos, lay, path):
     """Memória dos decodificadores abertos ao mesmo tempo (cada corte é uma leitura): ~20 quadros de referência por
     leitura, no tamanho decodificado. 34 cortes 4K HEVC (Depoimentos do Carlinhos) passavam dos 8 GB e a placa falhava."""
@@ -294,10 +311,10 @@ def _entrada_imagem(g, c, n_cam):
         cadeia = (f"[{k}:v:0]{PARA_RGB_IMG}," + ",".join(efeitos + recorte + [f"scale={tw}:{th}:flags=lanczos",
                                                                              f"loop=loop={n_q - 1}:size=1:start=0",
                                                                              "settb=AVTB", f"setpts=N/({g.fps:.3f}*TB)"]))
+    fim = min(g.total, c["st"] + c["dur"])
     if not _opaca(c):
         cadeia += "," + (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@pop{n_cam}")
                          if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
-    fim = min(g.total, c["st"] + c["dur"])
     # base de tempo em µs: a do PNG (1/25 s) arredondava o início para múltiplos de 0,04 s e o 1º quadro sumia (preto)
     cadeia += f",format=rgba,settb=AVTB,setpts=PTS-STARTPTS+round({c['st'] - g.fd / 4:.9f}/TB),trim=end={fim - g.fd / 2:.6f}"
     tl = f"(ot-{c['st']:.6f})"   # ot = tempo do quadro de SAÍDA (o t do libplacebo é o da entrada)
@@ -541,8 +558,8 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
     m = m or motivo(args["segmentos"], lay, args.get("legendas"), cfg, vcodec, bits, bool(alvo_h and min(W, H) > alvo_h))
     if m is None and not disponivel():
         m = "placa sem Vulkan/libplacebo"
-    if m is None and memoria_estimada(args["segmentos"], lay, args["path"]) > 0.7 * memoria_placa():
-        m = "vídeos grandes demais para a memória da placa de uma vez (Forçar Full HD resolve)"
+    if m is None and not cabe_na_placa(args["segmentos"], lay, args["path"]):
+        m = "memória livre da placa insuficiente (4K bruto: Forçar Full HD resolve; ou feche o que usa a placa)"
     if m:
         args["_motivo"] = m
         return None
