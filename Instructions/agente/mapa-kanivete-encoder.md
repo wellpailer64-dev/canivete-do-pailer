@@ -112,6 +112,11 @@ Corte também a base (só os segmentos até T).
 - Medir em trechos curtos e com o PC livre: o export do usuário ou o app aberto distorcem tudo.
 
 ## 7. Pendências (por ordem)
+0. **PRÓXIMO (combinado 2026-10-08): frear a fila adiantada de quadros.** Com as cópias Full HD a memória da placa
+   cresce de 4,8 → 7,0 GB ao longo do export (`D:/kanivete_testes/encoder/medir_pico_fhd.py`: export 5,6 GB +
+   app 1,4 = 6,9 de 8); no app do usuário estourou em 21% e a conferência (×2,6 agora) manda para a CPU quando o app
+   ocupa mais. Investigar num trecho curto (~30 min) de onde vem o crescimento (entradas que começam tarde sendo lidas
+   cedo? fila do filtro/decodificador?) e frear; meta: uso estável → a timeline cabe sempre na placa.
 1. Memória da placa: a timeline atual do Carlinhos usa 4,9 de 8 GB e passa com o PC livre; com o editor usando a
    placa ao mesmo tempo (prévia/render auto) estourou. Opções: pausar o render auto durante o export; e, para projetos
    maiores/4K bruto, montar em pedaços de tempo (a partida custa só ~2,7 s por pedaço: viável).
