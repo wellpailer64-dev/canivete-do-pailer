@@ -500,7 +500,7 @@ function ieMoverPeloElo(doc, L, dx, dy) {
     ieInvalidar(L);
 }
 
-function ieDuplicarCamada(doc, L) {
+function ieDuplicarCamada(doc, L, manterNome = false) {
     const s = ieFotoCamadas([L])[0];
     const N = ieRestaurarCamadas([s])[0];
     const renova = X => {
@@ -511,12 +511,14 @@ function ieDuplicarCamada(doc, L) {
         if (X.tipo !== 'pixel' && X.tipo !== 'grupo' && X.tipo !== 'ajuste') {
             // cópia de texto/objeto inteligente do PSD: vira pixels (o original continua vivo). Objeto inteligente
             // criado no editor continua objeto inteligente, com o MESMO original (como as instâncias do Photoshop)
-            if (!X.txt && !(X.tipo === 'inteligente' && X.c0 && !doPsd)) { X.tipo = 'pixel'; delete X.c0; delete X.tf; delete X.texto; }
+            const textoEditor = !doPsd && X.tipo === 'texto' && (X.txt || X.texto);
+            const formaEditor = !doPsd && X.tipo === 'forma' && (X.vet || X.kind === 'shape');
+            if (!textoEditor && !formaEditor && !X.txt && !(X.tipo === 'inteligente' && X.c0 && !doPsd)) { X.tipo = 'pixel'; delete X.c0; delete X.tf; delete X.texto; }
         }
         if (X.filhos) X.filhos.forEach(renova);
     };
     renova(N);
-    N.nome = L.nome + ' ' + ieT('cópia');
+    N.nome = manterNome ? L.nome : L.nome + ' ' + ieT('cópia');
     return N;
 }
 
@@ -1495,6 +1497,60 @@ function ieTransformarPlano(o, M, fundo = 0) {
     return { c, x: x1, y: y1 };
 }
 
+function ieQuadMap(R, q, x, y) {
+    const u = R.w ? (x - R.x) / R.w : 0, v = R.h ? (y - R.y) / R.h : 0;
+    const a = (1 - u) * (1 - v), b = u * (1 - v), c = u * v, d = (1 - u) * v;
+    return { x: q.tl.x * a + q.tr.x * b + q.br.x * c + q.bl.x * d, y: q.tl.y * a + q.tr.y * b + q.br.y * c + q.bl.y * d };
+}
+function ieTriImg(x, img, A, B, C, a, b, c, ox, oy) {
+    const den = a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y);
+    if (Math.abs(den) < 1e-6) return;
+    const m0 = (A.x * (b.y - c.y) + B.x * (c.y - a.y) + C.x * (a.y - b.y)) / den;
+    const m1 = (A.y * (b.y - c.y) + B.y * (c.y - a.y) + C.y * (a.y - b.y)) / den;
+    const m2 = (A.x * (c.x - b.x) + B.x * (a.x - c.x) + C.x * (b.x - a.x)) / den;
+    const m3 = (A.y * (c.x - b.x) + B.y * (a.x - c.x) + C.y * (b.x - a.x)) / den;
+    const m4 = (A.x * (b.x * c.y - c.x * b.y) + B.x * (c.x * a.y - a.x * c.y) + C.x * (a.x * b.y - b.x * a.y)) / den;
+    const m5 = (A.y * (b.x * c.y - c.x * b.y) + B.y * (c.x * a.y - a.x * c.y) + C.y * (a.x * b.y - b.x * a.y)) / den;
+    x.save();
+    x.beginPath();
+    x.moveTo(A.x - ox, A.y - oy); x.lineTo(B.x - ox, B.y - oy); x.lineTo(C.x - ox, C.y - oy); x.closePath();
+    x.clip();
+    x.setTransform(m0, m1, m2, m3, m4 - ox, m5 - oy);
+    x.drawImage(img, 0, 0);
+    x.restore();
+}
+function ieTransformarPlanoQuad(o, t, fundo = 0) {
+    if (!o || !o.c || !t || !t.quad) return null;
+    const w = o.c.width, h = o.c.height, R = t.R0, q = t.quad;
+    const pts = [ieQuadMap(R, q, o.x, o.y), ieQuadMap(R, q, o.x + w, o.y), ieQuadMap(R, q, o.x + w, o.y + h), ieQuadMap(R, q, o.x, o.y + h)];
+    const x1 = Math.floor(Math.min(...pts.map(p => p.x))), y1 = Math.floor(Math.min(...pts.map(p => p.y)));
+    const x2 = Math.ceil(Math.max(...pts.map(p => p.x))), y2 = Math.ceil(Math.max(...pts.map(p => p.y)));
+    if (x2 - x1 > 30000 || y2 - y1 > 30000) return null;
+    const out = ieCanvas(x2 - x1, y2 - y1), x = ieCtx(out);
+    if (fundo) { x.fillStyle = '#fff'; x.globalAlpha = fundo / 255; x.fillRect(0, 0, out.width, out.height); x.globalAlpha = 1; }
+    x.imageSmoothingEnabled = true;
+    x.imageSmoothingQuality = 'high';
+    const n = ieClamp(Math.ceil(Math.max(w, h) / 90), 4, 48);
+    for (let iy = 0; iy < n; iy++) for (let ix = 0; ix < n; ix++) {
+        const sx0 = ix / n * w, sy0 = iy / n * h, sx1 = (ix + 1) / n * w, sy1 = (iy + 1) / n * h;
+        const d00 = ieQuadMap(R, q, o.x + sx0, o.y + sy0), d10 = ieQuadMap(R, q, o.x + sx1, o.y + sy0);
+        const d11 = ieQuadMap(R, q, o.x + sx1, o.y + sy1), d01 = ieQuadMap(R, q, o.x + sx0, o.y + sy1);
+        const s00 = { x: sx0, y: sy0 }, s10 = { x: sx1, y: sy0 }, s11 = { x: sx1, y: sy1 }, s01 = { x: sx0, y: sy1 };
+        ieTriImg(x, o.c, d00, d10, d11, s00, s10, s11, x1, y1);
+        ieTriImg(x, o.c, d00, d11, d01, s00, s11, s01, x1, y1);
+    }
+    return { c: out, x: x1, y: y1 };
+}
+function ieQuadAfim(t, eps = 1) {
+    if (!t || !t.quad || !t.R0 || !t.R0.w || !t.R0.h) return null;
+    const r = t.R0, q = t.quad;
+    const a = (q.tr.x - q.tl.x) / r.w, b = (q.tr.y - q.tl.y) / r.w;
+    const c = (q.bl.x - q.tl.x) / r.h, d = (q.bl.y - q.tl.y) / r.h;
+    const e = q.tl.x - a * r.x - c * r.y, f = q.tl.y - b * r.x - d * r.y;
+    const br = ieMatPt([a, b, c, d, e, f], r.x + r.w, r.y + r.h);
+    return Math.hypot(br.x - q.br.x, br.y - q.br.y) <= eps ? [a, b, c, d, e, f] : null;
+}
+
 // ─────────────────────────── Transformação livre (Ctrl+T) ───────────────────────────
 // estado: centro (cx, cy), escala (sx, sy), rotação (rad) aplicados à caixa original R0
 function ieTransfMat(t) {
@@ -1555,13 +1611,14 @@ function ieTransfDeMat(t, M) {
 function ieTransfPrevia() {
     const t = IE.transf, doc = IE.doc;
     if (!t) return;
-    const M = ieTransfMat(t);
+    const Mq = ieQuadAfim(t), M = Mq || ieTransfMat(t);
     let R = null;
     for (const o of t.orig) {
         const L = o.L;
         R = ieRUniao(R, o.Rantes);
         const txt = L.tipo === 'texto' && (L.txt || L._txtVetor);
-        if (txt) {   // texto: redesenhado com a fonte na escala nova (nítido), não esticado
+        if (t.quad && !Mq) L._tfPrev = ieTransformarPlanoQuad({ c: o.c, x: o.x, y: o.y }, t);
+        else if (txt) {   // texto: redesenhado com a fonte na escala nova (nítido), não esticado
             const tmp = { txt: { ...txt, m: ieMatMul(M, txt.m || IE_ID) } };
             ieTextoRender(tmp);
             L._tfPrev = tmp.c ? { c: tmp.c, x: tmp.x, y: tmp.y } : null;
@@ -1581,28 +1638,32 @@ function ieTransfAplicar() {
     if (!t) return;
     IE.transf = null;
     doc._esconderSel = false;
-    const M = ieTransfMat(t);
-    const ident = Math.abs(M[0] - 1) < 1e-9 && Math.abs(M[3] - 1) < 1e-9 && !M[1] && !M[2] && !M[4] && !M[5];
+    const Mq = ieQuadAfim(t), M = Mq || ieTransfMat(t);
+    const ident = !t.quad && Math.abs(M[0] - 1) < 1e-9 && Math.abs(M[3] - 1) < 1e-9 && !M[1] && !M[2] && !M[4] && !M[5];
     let R = t.Rult;
     for (const o of t.orig) {
         const L = o.L;
         const prev = L._tfPrev;
         L._tfPrev = null;
         if (ident) continue;
-        if (L.tf) L.tf = ieMatMul(M, o.tf || IE_ID);
+        if (t.quad && !Mq) {
+            if (L.tipo !== 'pixel') L.rasterizar = true;
+            delete L.c0; delete L.tf; delete L.tfBase; delete L.txt; delete L.texto; delete L._txtVetor; delete L.vet; delete L.pre;
+            L.tipo = 'pixel';
+        } else if (L.tf) L.tf = ieMatMul(M, o.tf || IE_ID);
         if (prev) { L.c = prev.c; L.x = prev.x; L.y = prev.y; }
-        if (!L.txt && L._txtVetor) { L.txt = L._txtVetor; delete L.c0; }   // a partir daqui a tela mostra o texto desenhado aqui
+        if ((!t.quad || Mq) && !L.txt && L._txtVetor) { L.txt = L._txtVetor; delete L.c0; }   // a partir daqui a tela mostra o texto desenhado aqui
         delete L._txtVetor;
-        if (L.txt) L.txt.m = ieMatMul(M, L.txt.m || IE_ID);
-        if (L.vet) {   // camada de forma: transforma os pontos e redesenha (fica nítida, como vetor)
+        if ((!t.quad || Mq) && L.txt) L.txt.m = ieMatMul(M, L.txt.m || IE_ID);
+        if ((!t.quad || Mq) && L.vet) {   // camada de forma: transforma os pontos e redesenha (fica nítida, como vetor)
             const T = (x, y) => { const q = ieMatPt(M, x, y); return [q.x, q.y]; };
             for (const s of L.vet.subs) for (const q of s.pts) { [q.x, q.y] = T(q.x, q.y); if (q.i) q.i = T(...q.i); if (q.o) q.o = T(...q.o); }
             ieFormaRender(L, doc);
         }
         if (L.m && L.m.c) {
-            const n = ieTransformarPlano(L.m, M, L.m.fundo || 0);
+            const n = t.quad && !Mq ? ieTransformarPlanoQuad(L.m, t, L.m.fundo || 0) : ieTransformarPlano(L.m, M, L.m.fundo || 0);
             if (n) { L.m = { ...L.m, ...n }; L.sujoM = true; }
-        } else if (L.m) { const p = ieMatPt(M, L.m.x, L.m.y); L.m = { ...L.m, x: Math.round(p.x), y: Math.round(p.y) }; }
+        } else if (L.m) { const p = t.quad && !Mq ? ieQuadMap(t.R0, t.quad, L.m.x, L.m.y) : ieMatPt(M, L.m.x, L.m.y); L.m = { ...L.m, x: Math.round(p.x), y: Math.round(p.y) }; }
         L.sujoPx = true;
         L.movido = true;
         ieInvalidar(L);
@@ -1627,11 +1688,65 @@ function ieTransfCancelar() {
 }
 
 function ieTransfCantos(t) {
+    if (t.quad) {
+        const q = t.quad, meio = (a, b) => ({ x: (q[a].x + q[b].x) / 2, y: (q[a].y + q[b].y) / 2 });
+        return { tl: q.tl, t: meio('tl', 'tr'), tr: q.tr, r: meio('tr', 'br'), br: q.br, b: meio('br', 'bl'), bl: q.bl, l: meio('bl', 'tl') };
+    }
     const M = ieTransfMat(t), r = t.R0;
     return {
         tl: ieMatPt(M, r.x, r.y), t: ieMatPt(M, r.x + r.w / 2, r.y), tr: ieMatPt(M, r.x + r.w, r.y), r: ieMatPt(M, r.x + r.w, r.y + r.h / 2),
         br: ieMatPt(M, r.x + r.w, r.y + r.h), b: ieMatPt(M, r.x + r.w / 2, r.y + r.h), bl: ieMatPt(M, r.x, r.y + r.h), l: ieMatPt(M, r.x, r.y + r.h / 2),
     };
+}
+function ieTransfQuadAtual(t) {
+    const k = ieTransfCantos({ ...t, quad: null });
+    return { tl: { ...k.tl }, tr: { ...k.tr }, br: { ...k.br }, bl: { ...k.bl } };
+}
+function ieTransfAtivarQuad(t, modo = 'distorcer') {
+    if (!t.quad) t.quad = ieTransfQuadAtual(t);
+    t.modo = modo;
+}
+function ieQuadMover(q, dx, dy) {
+    for (const k of ['tl', 'tr', 'br', 'bl']) { q[k].x += dx; q[k].y += dy; }
+}
+function ieQuadRot(q, cx, cy, ang) {
+    const c = Math.cos(ang), s = Math.sin(ang);
+    for (const k of ['tl', 'tr', 'br', 'bl']) {
+        const x = q[k].x - cx, y = q[k].y - cy;
+        q[k] = { x: cx + x * c - y * s, y: cy + x * s + y * c };
+    }
+}
+function ieTransfQuadArrastar(t, a, p) {
+    const q = Object.fromEntries(Object.entries(a.s.quad || ieTransfQuadAtual(t)).map(([k, v]) => [k, { ...v }]));
+    const mid = (A, B) => ({ x: (q[A].x + q[B].x) / 2, y: (q[A].y + q[B].y) / 2 });
+    const d = (P0 = a.p0) => ({ x: p.x - P0.x, y: p.y - P0.y });
+    const add = (k, dx, dy) => { q[k].x += dx; q[k].y += dy; };
+    if (t.modo === 'inclinar') {
+        const D = d();
+        if (a.h === 't') { add('tl', D.x, 0); add('tr', D.x, 0); }
+        else if (a.h === 'b') { add('bl', D.x, 0); add('br', D.x, 0); }
+        else if (a.h === 'l') { add('tl', 0, D.y); add('bl', 0, D.y); }
+        else if (a.h === 'r') { add('tr', 0, D.y); add('br', 0, D.y); }
+        else {
+            const horiz = Math.abs(D.x) >= Math.abs(D.y);
+            add(a.h, horiz ? D.x : 0, horiz ? 0 : D.y);
+        }
+    } else if (t.modo === 'perspectiva' && ['tl', 'tr', 'br', 'bl'].includes(a.h)) {
+        const D = d();
+        const top = ['tl', 'tr'].includes(a.h), left = ['tl', 'bl'].includes(a.h);
+        if (Math.abs(D.x) >= Math.abs(D.y)) { add(top ? 'tl' : 'bl', left ? D.x : -D.x, 0); add(top ? 'tr' : 'br', left ? -D.x : D.x, 0); }
+        else { add(left ? 'tl' : 'tr', 0, top ? D.y : -D.y); add(left ? 'bl' : 'br', 0, top ? -D.y : D.y); }
+    } else if (['tl', 'tr', 'br', 'bl'].includes(a.h)) q[a.h] = { x: p.x, y: p.y };
+    else {
+        const lados = { t: ['tl', 'tr'], r: ['tr', 'br'], b: ['br', 'bl'], l: ['bl', 'tl'] }[a.h];
+        if (lados) {
+            const m = mid(lados[0], lados[1]), D = d(m);
+            lados.forEach(k => add(k, D.x, D.y));
+        }
+    }
+    t.quad = q;
+    t.cx = (q.tl.x + q.tr.x + q.br.x + q.bl.x) / 4;
+    t.cy = (q.tl.y + q.tr.y + q.br.y + q.bl.y) / 4;
 }
 function ieTransfSobre(ctx, doc) {
     const t = IE.transf;
@@ -1652,6 +1767,17 @@ function ieTransfSobre(ctx, doc) {
 function ieTransfAlca(t, p, doc) {
     const k = ieTransfCantos(t), tol = 8 / doc.zoom;
     for (const n of ['tl', 'tr', 'br', 'bl', 't', 'r', 'b', 'l']) if (Math.hypot(k[n].x - p.x, k[n].y - p.y) <= tol) return n;
+    if (t.quad) {
+        const cs = [k.tl, k.tr, k.br, k.bl];
+        let dentro = false;
+        for (let i = 0, j = cs.length - 1; i < cs.length; j = i++) {
+            const a = cs[i], b = cs[j];
+            if (((a.y > p.y) !== (b.y > p.y)) && p.x < (b.x - a.x) * (p.y - a.y) / ((b.y - a.y) || 1e-9) + a.x) dentro = !dentro;
+        }
+        if (dentro) return 'dentro';
+        for (const n of ['tl', 'tr', 'br', 'bl']) if (Math.hypot(k[n].x - p.x, k[n].y - p.y) <= tol * 4) return 'girar';
+        return t.doMover ? 'fora' : 'girar';
+    }
     // dentro da caixa (em coordenadas locais)
     const Mi = ieMatInv(ieTransfMat(t)), q = ieMatPt(Mi, p.x, p.y), r = t.R0;
     if (q.x >= r.x && q.x <= r.x + r.w && q.y >= r.y && q.y <= r.y + r.h) return 'dentro';
@@ -1663,7 +1789,7 @@ function ieTransfAlca(t, p, doc) {
 const IE_TRANSF = {
     down(p, ev, doc) {
         const t = IE.transf;
-        const h = IE.ferr === 'girar' ? 'girar' : ieTransfAlca(t, p, doc);   // ferramenta Girar: arrastar em qualquer lugar gira
+        const h = IE.ferr === 'girar' || t.modo === 'girar' ? 'girar' : ieTransfAlca(t, p, doc);   // ferramenta Girar: arrastar em qualquer lugar gira
         if (h === 'fora') {   // aplica e o clique segue para o Mover (seleciona o objeto clicado ou começa a seleção por arrasto)
             ieTransfAplicar();
             const m = IE_FERR.mover;
@@ -1671,19 +1797,31 @@ const IE_TRANSF = {
             m.down(p, ev, doc);
             return;
         }
-        t.arr = { h, p0: p, s: { cx: t.cx, cy: t.cy, sx: t.sx, sy: t.sy, rot: t.rot } };
+        t.arr = { h, p0: p, s: { cx: t.cx, cy: t.cy, sx: t.sx, sy: t.sy, rot: t.rot, quad: t.quad && Object.fromEntries(Object.entries(t.quad).map(([k, v]) => [k, { ...v }])) } };
     },
     move(p, ev, doc) {
         const t = IE.transf, a = t && t.arr;
         if (!a) return;
         const s = a.s;
-        if (a.h === 'dentro') { t.cx = s.cx + p.x - a.p0.x; t.cy = s.cy + p.y - a.p0.y; }
+        if (a.h === 'dentro') {
+            if (t.quad) { t.quad = Object.fromEntries(Object.entries(s.quad).map(([k, v]) => [k, { x: v.x + p.x - a.p0.x, y: v.y + p.y - a.p0.y }])); }
+            t.cx = s.cx + p.x - a.p0.x; t.cy = s.cy + p.y - a.p0.y;
+        }
         else if (a.h === 'girar') {
             const a0 = Math.atan2(a.p0.y - s.cy, a.p0.x - s.cx), a1 = Math.atan2(p.y - s.cy, p.x - s.cx);
             let r = s.rot + a1 - a0;
             if (ev.shiftKey) r = Math.round(r / (Math.PI / 12)) * (Math.PI / 12);
-            t.rot = r;
+            if (t.quad) { t.quad = Object.fromEntries(Object.entries(s.quad).map(([k, v]) => [k, { ...v }])); ieQuadRot(t.quad, s.cx, s.cy, r - s.rot); }
+            else t.rot = r;
         } else {
+            if (ev.ctrlKey || ['distorcer', 'perspectiva', 'inclinar'].includes(t.modo)) {
+                ieTransfAtivarQuad(t, ev.ctrlKey ? 'distorcer' : t.modo);
+                if (!a.s.quad) a.s.quad = Object.fromEntries(Object.entries(t.quad).map(([k, v]) => [k, { ...v }]));
+                ieTransfQuadArrastar(t, a, p);
+                ieTransfPrevia();
+                ieOpcoesRender?.(true);
+                return;
+            }
             // escala: em coordenadas locais (sem rotação), âncora no lado oposto (Alt = no centro)
             const cos = Math.cos(s.rot), sin = Math.sin(s.rot);
             const loc = q => ({ x: (q.x - s.cx) * cos + (q.y - s.cy) * sin, y: -(q.x - s.cx) * sin + (q.y - s.cy) * cos });
@@ -1729,9 +1867,36 @@ const IE_TRANSF = {
         if (IE.ferr === 'girar') return IE_CURSOR_GIRAR;
         if (h === 'dentro') return 'move';
         if (h === 'girar') return IE_CURSOR_GIRAR;
+        if (ev?.ctrlKey || ['distorcer', 'perspectiva', 'inclinar'].includes(t.modo)) return 'crosshair';
         return ['tl', 'br'].includes(h) ? 'nwse-resize' : ['tr', 'bl'].includes(h) ? 'nesw-resize' : ['t', 'b'].includes(h) ? 'ns-resize' : 'ew-resize';
     },
 };
+
+function ieTransfModo(modo) {
+    if (!IE.doc) return;
+    if (!IE.transf) ieTransfIniciar();
+    const t = IE.transf;
+    if (!t) return;
+    t.modo = modo || 'livre';
+    if (['distorcer', 'perspectiva', 'inclinar'].includes(t.modo)) ieTransfAtivarQuad(t, t.modo);
+    ieOpcoesRender?.(true);
+    ieDesenharSobre();
+}
+function ieTransfMenuContexto(ev) {
+    ieMenuContextoItens(ev, [
+        ['Transformação livre', 'tf:livre', '', !IE.transf?.modo || IE.transf?.modo === 'livre'],
+        '-',
+        ['Escala', 'tf:escala', '', IE.transf?.modo === 'escala'],
+        ['Girar', 'tf:girar', '', IE.transf?.modo === 'girar'],
+        ['Inclinar', 'tf:inclinar', '', IE.transf?.modo === 'inclinar'],
+        ['Distorcer', 'tf:distorcer', 'Ctrl + alça', IE.transf?.modo === 'distorcer'],
+        ['Perspectiva', 'tf:perspectiva', '', IE.transf?.modo === 'perspectiva'],
+        '-',
+        ['Girar 180°', 'g180'], ['Girar 90° horário', 'g90h'], ['Girar 90° anti-horário', 'g90a'],
+        '-',
+        ['Inverter horizontal', 'fh'], ['Inverter vertical', 'fv'],
+    ]);
+}
 
 // girar as camadas selecionadas um ângulo exato (°, + = horário), em volta do centro — prévia na Transformação livre
 function ieGirarAngulo(graus) {
@@ -1739,7 +1904,8 @@ function ieGirarAngulo(graus) {
     if (!IE.transf) ieTransfIniciar();
     const t = IE.transf;
     if (!t) return;
-    t.rot += graus * Math.PI / 180;
+    if (t.quad) ieQuadRot(t.quad, t.cx, t.cy, graus * Math.PI / 180);
+    else t.rot += graus * Math.PI / 180;
     ieTransfPrevia(); ieOpcoesRender?.(true); ieDesenharSobre();
 }
 
@@ -1747,6 +1913,7 @@ function ieGirarAngulo(graus) {
 function ieTransfRapida(tipo) {
     const doc = IE.doc;
     if (!doc) return;
+    if (IE.transf) ieTransfAplicar();
     const R = ieSelecionadas(doc).reduce((R, L) => ieRUniao(R, L.tipo === 'grupo' ? ieRCamada(L) : (L.c ? ieRPlano(L) : null)), null);
     if (!R) return;
     const cx = R.x + R.w / 2, cy = R.y + R.h / 2;

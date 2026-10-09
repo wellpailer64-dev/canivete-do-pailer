@@ -1177,7 +1177,8 @@ const IE_MENUS = [
         ['Colar no lugar', 'colarLugar', 'Shift+Ctrl+V'], ['Limpar', 'limpar', 'Delete'], '-',
         ['Preencher...', 'preencher', 'Shift+F5'], ['Traçar...', 'tracar', ''], '-',
         ['Transformação livre', 'transformar', 'Ctrl+T'],
-        ['Transformar', [['Girar 180°', 'g180'], ['Girar 90° horário', 'g90h'], ['Girar 90° anti-horário', 'g90a'], '-', ['Inverter horizontal', 'fh'], ['Inverter vertical', 'fv']]]]],
+        ['Transformar', [['Escala', 'tf:escala'], ['Girar', 'tf:girar'], ['Inclinar', 'tf:inclinar'], ['Distorcer', 'tf:distorcer'], ['Perspectiva', 'tf:perspectiva'], '-',
+            ['Girar 180°', 'g180'], ['Girar 90° horário', 'g90h'], ['Girar 90° anti-horário', 'g90a'], '-', ['Inverter horizontal', 'fh'], ['Inverter vertical', 'fv']]]]],
     ['Imagem', [['Ajustes', [['Brilho/Contraste...', 'aj:brilho'], ['Níveis...', 'aj:niveis', 'Ctrl+L'], ['Curvas...', 'aj:curvas', 'Ctrl+M'], ['Exposição...', 'aj:exposicao'], '-',
         ['Vibratilidade...', 'aj:vibratilidade'], ['Matiz/Saturação...', 'aj:matiz', 'Ctrl+U'], ['Equilíbrio de cores...', 'aj:equilibrio', 'Ctrl+B'],
         ['Preto e branco...', 'aj:pb', 'Alt+Shift+Ctrl+B'], ['Filtro de fotos...', 'aj:filtroFoto'], '-',
@@ -1407,6 +1408,7 @@ function ieCmdPode(c) {
     if (c === 'exportarFatias' || c === 'fatiasExcluir') return !!(doc.fatias && doc.fatias.length);
     if (c === 'cortarSel' || c === 'selExpandir' || c === 'selContrair' || c === 'selSuavizar' || c === 'mascaraSel' || c === 'mascaraSelOcultar' || c === 'selNada' || c === 'selInverter') return !!doc.sel;
     if (c === 'rasterizar') return !!(L && ieRaster0(L) && L.tipo !== 'pixel');
+    if (c.startsWith('tf:')) return !!L;
     return true;
 }
 
@@ -1417,12 +1419,13 @@ async function ieCmd(c) {
         IE._cmdAtual = c;
         try { return await (c.startsWith('aj:') ? IE_AJUSTES[c.slice(3)] : IE_FILTROS[c.slice(2)])?.(); } finally { IE._cmdAtual = null; }
     }
+    if (c.startsWith('tf:')) return ieTransfModo(c.slice(3));
     if (c.startsWith('img:')) return ieGirarImagem(c.slice(4));
     if (['g180', 'g90h', 'g90a', 'fh', 'fv'].includes(c)) return ieTransfRapida(c);
     const fn = IE_CMDS[c];
     if (!fn) return;
     if (!doc && !['novo', 'abrir', 'colar'].includes(c)) return;
-    if (IE.transf && !['transformar'].includes(c)) ieTransfAplicar();
+    if (IE.transf && !['transformar'].includes(c) && !c.startsWith('tf:')) ieTransfAplicar();
     try { await fn(doc); } catch (e) { console.error('[editor de imagem] comando', c, e); ieToast(`${ieT('Erro')}: ${e.message || e}`); }
 }
 

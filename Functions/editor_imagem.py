@@ -289,6 +289,7 @@ def _abrir_imagem(path, doc):
 
 def _abrir_psd(path, doc, on_progress):
     from psd_tools import PSDImage
+    from psd_tools.constants import Tag
     from Functions import psd_import as pi
     psd = PSDImage.open(path)
     modo = str(psd.color_mode).split(".")[-1]
@@ -309,6 +310,62 @@ def _abrir_psd(path, doc, on_progress):
     indice = {id(l): i for i, l in enumerate(todas)}
     total = max(1, len(todas))
     feitos = [0]
+    links_cache = {}
+
+    def links_do(p):
+        k = id(p)
+        if k in links_cache:
+            return links_cache[k]
+        out = {}
+        try:
+            blocos = p._record.layer_and_mask_information.tagged_blocks
+            for nome in ("LINKED_LAYER1", "LINKED_LAYER2", "LINKED_LAYER3", "LINKED_LAYER_EXTERNAL"):
+                tag = getattr(Tag, nome, None)
+                if tag is not None and tag in blocos:
+                    for item in blocos.get_data(tag):
+                        u = (getattr(item, "uuid", "") or "").strip("\x00")
+                        if u:
+                            out[u] = item
+        except Exception:
+            pass
+        links_cache[k] = out
+        return out
+
+    def so_uuid(layer):
+        try:
+            for nome in ("SMART_OBJECT_LAYER_DATA1", "SMART_OBJECT_LAYER_DATA2"):
+                tag = getattr(Tag, nome, None)
+                if tag is not None and tag in layer.tagged_blocks:
+                    desc = layer.tagged_blocks.get_data(tag).data
+                    u = desc.get(b"Idnt")
+                    if u is not None:
+                        return str(getattr(u, "value", u)).strip("\x00")
+        except Exception:
+            return None
+        return None
+
+    def so_transform(layer):
+        try:
+            for nome in ("SMART_OBJECT_LAYER_DATA1", "SMART_OBJECT_LAYER_DATA2"):
+                tag = getattr(Tag, nome, None)
+                if tag is not None and tag in layer.tagged_blocks:
+                    desc = layer.tagged_blocks.get_data(tag).data
+                    sz, tr = desc.get(b"Sz  "), desc.get(b"Trnf")
+                    if sz is None or tr is None:
+                        continue
+                    w = float(sz.get(b"Wdth", 0)); h = float(sz.get(b"Hght", 0))
+                    vals = [float(getattr(v, "value", v)) for v in tr]
+                    if w <= 0 or h <= 0 or len(vals) != 8:
+                        continue
+                    x0, y0, x1, y1, x2, y2, x3, y3 = vals
+                    a, b = (x1 - x0) / w, (y1 - y0) / w
+                    c, d = (x3 - x0) / h, (y3 - y0) / h
+                    if abs((x0 + a * w + c * h) - x2) > 1 or abs((y0 + b * w + d * h) - y2) > 1:
+                        return None, w, h
+                    return [a, b, c, d, x0, y0], w, h
+        except Exception:
+            return None, 0, 0
+        return None, 0, 0
 
     def mascara(layer, no):
         try:
@@ -324,7 +381,7 @@ def _abrir_psd(path, doc, on_progress):
         except Exception as e:
             avisos.append(f"{layer.name}: máscara não lida ({e})")
 
-    def pixels(layer):
+    def pixels(layer, raiz):
         im = None
         try:
             im = layer.topil()
@@ -335,7 +392,7 @@ def _abrir_psd(path, doc, on_progress):
         if layer.kind == "solidcolorfill":
             rgb = _cor_soco(layer)
             if rgb:
-                return Image.new("RGBA", (psd.width, psd.height), rgb + (255,)), 0, 0
+                return Image.new("RGBA", (raiz.width, raiz.height), rgb + (255,)), 0, 0
         try:
             im = layer.composite(force=True)
             if im is not None:
@@ -345,14 +402,50 @@ def _abrir_psd(path, doc, on_progress):
             pass
         return None, 0, 0
 
-    def nivel(grupo):
+    def smart_conteudo(layer, raiz):
+        u = so_uuid(layer)
+        item = links_do(raiz).get(u or "")
+        dados = getattr(item, "data", None)
+        if dados is None:
+            try:
+                dados = layer.smart_object.data
+            except Exception:
+                dados = None
+        if not dados:
+            return None
+        dados = bytes(dados)
+        if dados[:4] != b"8BPS":
+            return None
+        # Evita abrir objetos fotográficos pesados sem necessidade; textos/peças pequenas como o "Titulo.psb" entram editáveis.
+        if len(dados) > 8 * 1024 * 1024:
+            return {"aviso": "grande", "bytes": len(dados)}
+        try:
+            interno = PSDImage.open(io.BytesIO(dados))
+            comp = interno.topil()
+            if comp is None:
+                comp = interno.composite(force=True)
+            if comp is None:
+                return None
+            tf, sw, sh = so_transform(layer)
+            inner_indice = {id(l): i for i, l in enumerate(_todas(interno))}
+            return {
+                "url": _servir(doc, _png(comp.convert("RGBA")), "smartobject.png"),
+                "w": int(interno.width), "h": int(interno.height), "tf": tf, "sw": sw, "sh": sh,
+                "camadas": nivel(interno, interno, inner_indice, interno=True),
+            }
+        except Exception as e:
+            logging.debug("smart object %s: %s", layer.name, e, exc_info=True)
+            return {"aviso": str(e)}
+
+    def nivel(grupo, raiz=psd, indice_local=indice, interno=False):
         out = []
         for layer in grupo:
-            feitos[0] += 1
-            if on_progress:
+            if not interno:
+                feitos[0] += 1
+            if on_progress and not interno:
                 on_progress(min(99, int(feitos[0] * 100 / total)), layer.name)
             k = layer.kind
-            no = {"ref": indice.get(id(layer)), "nome": layer.name, "visivel": bool(layer.visible),
+            no = {"ref": None if interno else indice_local.get(id(layer)), "nome": layer.name, "visivel": bool(layer.visible),
                   "op": round(layer.opacity / 255, 4), "fill": round(layer.fill_opacity / 255, 4),
                   "bm": _bm_key(layer), "clip": bool(layer.clipping), "kind": k}
             no.update(_ler_mescla(layer))
@@ -367,7 +460,7 @@ def _abrir_psd(path, doc, on_progress):
                 no["aberto"] = bool(getattr(layer, "open_folder", True))
                 if k == "artboard":
                     no["prancheta"] = _ler_prancheta(layer)
-                no["filhos"] = nivel(layer)
+                no["filhos"] = nivel(layer, raiz, indice_local, interno)
                 mascara(layer, no)
                 out.append(no)
                 continue
@@ -393,12 +486,20 @@ def _abrir_psd(path, doc, on_progress):
                 pre = _grad_pre(layer)
                 if pre:
                     no["pre"] = pre
-            im, x0, y0 = pixels(layer)
+            im, x0, y0 = pixels(layer, raiz)
             if im is not None:
                 no.update({"x": int(x0), "y": int(y0), "w": im.size[0], "h": im.size[1],
                            "url": _servir(doc, _png(im), "camada.png")})
             else:
                 no.update({"x": 0, "y": 0, "w": 0, "h": 0})
+            if k == "smartobject":
+                so = smart_conteudo(layer, raiz)
+                if so and so.get("camadas"):
+                    no["so"] = {kk: vv for kk, vv in so.items() if kk != "aviso"}
+                elif so and so.get("aviso") == "grande":
+                    avisos.append(f"{layer.name}: objeto inteligente interno grande ({so['bytes'] // (1024 * 1024)} MB); abre como prévia")
+                elif so and so.get("aviso"):
+                    avisos.append(f"{layer.name}: conteúdo do objeto inteligente não lido ({so['aviso']})")
             mascara(layer, no)
             try:
                 if layer.has_vector_mask() and k not in ("shape", "solidcolorfill", "gradientfill", "patternfill"):

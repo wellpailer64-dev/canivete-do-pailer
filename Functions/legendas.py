@@ -255,16 +255,63 @@ def transcrever(clipes, total, idioma="pt", on_prog=None, stop=None):
     return {"success": True, "palavras": r, "idioma": idioma, "segundos": round(time.time() - t0, 1)}
 
 
+PEDACO_S = 300   # áudio longo é lido e reconhecido em pedaços (o arquivo inteiro de uma vez estourava a memória)
+
+
+def _pedacos(wav, pedaco=None):
+    """WAV 16 kHz mono → (início_s, float32) de ~pedaco s, um por vez. Cada corte cai no trecho mais silencioso
+    dos últimos 4 s do pedaço (não parte palavra no meio)."""
+    import wave
+    import numpy as np
+    pedaco = pedaco or PEDACO_S
+    with wave.open(wav, "rb") as w:
+        sr, larg, canais, n = w.getframerate(), w.getsampwidth(), w.getnchannels(), w.getnframes()
+        tipo = {1: np.uint8, 2: np.int16, 4: np.int32}[larg]
+        pos, resto = 0, np.zeros(0, np.float32)
+        while pos < n or len(resto):
+            ler = max(0, min(n - pos, int(pedaco * sr) - len(resto)))
+            a = np.frombuffer(w.readframes(ler), tipo).astype(np.float32)
+            pos += ler
+            if canais > 1:
+                a = a.reshape(-1, canais).mean(axis=1)
+            a = (a - 128) / 128 if larg == 1 else a / float(2 ** (8 * larg - 1))
+            x = np.concatenate([resto, a])
+            ini_s = (pos - len(x)) / sr
+            if pos >= n:
+                yield ini_s, x
+                return
+            jan = int(0.01 * sr)
+            cauda = x[-int(4 * sr):]
+            e = (cauda[: len(cauda) // jan * jan].reshape(-1, jan) ** 2).mean(axis=1)
+            corte = len(x) - len(cauda) + int(e.argmin()) * jan + jan // 2
+            resto = x[corte:].copy()
+            yield ini_s, x[:corte]
+
+
+def segmentos(wav, chave, stop=None):
+    """Segmentos do reconhecimento com tempo absoluto no WAV, pedaço por pedaço (memória constante).
+    Devolve (segmento, fim_do_pedaço_s); para no stop."""
+    import gc
+    modelo = _carregar(chave)
+    for ini, x in _pedacos(wav):
+        for seg in modelo.recognize(x, sample_rate=16000):
+            if stop is not None and stop.is_set():
+                return
+            seg.start, seg.end = seg.start + ini, seg.end + ini
+            yield seg, ini + len(x) / 16000
+        del x
+        gc.collect()
+
+
 def _reconhecer(wav, total, chave, prog, stop=None):
     """WAV 16 kHz mono → palavras [início, fim, texto] corrigidas pelo dicionário; None se cancelado."""
     prog(2, "Carregando o modelo...")
-    modelo = _carregar(chave)
     palavras, total = [], max(0.1, float(total))
-    for seg in modelo.recognize(wav):
-        if stop is not None and stop.is_set():
-            return None
+    for seg, _ in segmentos(wav, chave, stop):
         palavras.extend(_palavras(seg))
         prog(min(99, 3 + int(seg.end / total * 96)), "Transcrevendo...")
+    if stop is not None and stop.is_set():
+        return None
     return corrigir(palavras)   # dicionário de nomes (dicionario_fala.json)
 
 

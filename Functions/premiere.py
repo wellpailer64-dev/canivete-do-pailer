@@ -281,6 +281,12 @@ class _Conversor:
         if clip is None or fim <= st:
             return None
         cl = clip.find('Clip')
+        if cl is None:   # RemixClip (áudio remixado no Premiere): lê o clipe original de dentro dele
+            orig = self.g.ref(clip.find('OriginalChildClip'))
+            cl = orig.find('Clip') if orig is not None and orig.find('Clip') is not None else clip.find('.//Clip')
+        if cl is None:
+            self.rel['ignorados'][f'Clipe de tipo desconhecido ({clip.tag})'] += 1
+            return None
         ent = _seg(cl.findtext('InPoint') or 0)
         sai = _seg(cl.findtext('OutPoint') or 0)
         vel = _num(cl.findtext('PlaybackSpeed'), 1.0) or 1.0

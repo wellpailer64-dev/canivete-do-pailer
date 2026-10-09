@@ -3361,3 +3361,13 @@ window.addEventListener('pywebviewready', () => {
 
 window.onArquivosSoltos = onArquivosSoltos;
 window.setSelecao = setSelecao;
+
+// Splash: depois de sumir (animação splash-dismiss) sai da tela de vez. Antes ficava invisível por cima de tudo, a
+// tela inteira, com a barrinha animando para sempre (o navegador seguia compondo essa camada a cada quadro).
+(() => {
+    const s = document.getElementById('splash-overlay');
+    if (!s) return;
+    const tirar = () => { s.style.display = 'none'; };
+    s.addEventListener('animationend', e => { if (e.animationName === 'splash-dismiss') tirar(); });
+    setTimeout(tirar, 6000);   // garantia, se o evento não vier
+})();

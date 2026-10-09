@@ -299,6 +299,8 @@ def manutencao_midia():
     guardadas = []
     for nome in os.listdir(raiz):
         p = os.path.join(raiz, nome)
+        if os.path.normcase(os.path.abspath(p)) in _EM_USO:
+            continue   # mídia do trabalho aberto: nem por idade, nem por tamanho
         try:
             idade, tam = agora - os.path.getmtime(p), _tamanho(p)
         except OSError:
@@ -311,6 +313,11 @@ def manutencao_midia():
     for idade, tam, p in sorted(guardadas, reverse=True):   # mais antigas primeiro
         if total <= cfg["max_gb"] * 1024 ** 3:
             break
+        # usada nas últimas 24 h = do projeto aberto: nunca sai pelo tamanho. Antes, num projeto maior que o limite,
+        # a limpeza (que roda ao abrir vídeo e depois de cada render) apagava a pasta de um vídeo no meio da conversão
+        # ("Error opening output files") e as prévias do próprio projeto, que eram refeitas a cada abertura.
+        if idade < 24 * 3600:
+            continue
         _apagar_item(p)
         total -= tam
     return {"success": True, "total": total}
@@ -330,10 +337,21 @@ def limpar_midia():
     return liberado
 
 
+# Cache "em uso" (como o Media Cache do Premiere): toda pasta/arquivo de cache de mídia aberta nesta sessão fica aqui e
+# a limpeza automática NUNCA apaga o que está em uso — o limite de tamanho só leva o que não pertence ao trabalho aberto.
+# Sobrevive à recarga do módulo (modo agente).
+_EM_USO = globals().get("_EM_USO", set())
+
+
+def _em_uso(caminho):
+    _EM_USO.add(os.path.normcase(os.path.abspath(caminho)))
+    return caminho
+
+
 def _pasta_midia(path):
     """Pasta de cache do vídeo (arquivo+data). Uma prévia antiga do %TEMP% vem junto (não converte de novo)."""
     nome = "m_" + hashlib.md5(f"{os.path.abspath(path)}|{os.path.getmtime(path)}".encode()).hexdigest()[:12]
-    work = os.path.join(_midia_dir(), nome)
+    work = _em_uso(os.path.join(_midia_dir(), nome))
     velha = os.path.join(_RAIZ_TEMP, nome)
     if not os.path.isdir(work) and os.path.isdir(velha):
         try:
@@ -588,11 +606,13 @@ def _navegador_toca(path, info):
     return True
 
 
-def _run_progress(cmd, total, on_pct, stop_event=None, proc_holder=None):
-    """Roda ffmpeg com -progress pipe:1 e chama on_pct(0-100). Retorna (rc, stderr_tail)."""
+def _run_progress(cmd, total, on_pct, stop_event=None, proc_holder=None, baixa=False):
+    """Roda ffmpeg com -progress pipe:1 e chama on_pct(0-100). Retorna (rc, stderr_tail).
+    baixa = prioridade abaixo do normal (trabalho de fundo, como as prévias: usa a CPU que sobrar sem travar o app)."""
+    fl = _creationflags() | (getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0) if baixa else 0)
     proc = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        text=True, encoding="utf-8", errors="replace", creationflags=_creationflags(),
+        text=True, encoding="utf-8", errors="replace", creationflags=fl,
     )
     if proc_holder is not None:
         proc_holder(proc)
@@ -628,6 +648,11 @@ def _run_progress(cmd, total, on_pct, stop_event=None, proc_holder=None):
 
 # ─────────────────────────── pré-visualização ───────────────────────────
 
+# miniaturas: no máximo 4 ffmpeg ao mesmo tempo no app INTEIRO (antes eram até 8 por vídeo, e importar dezenas de
+# vídeos de uma vez abria 16+ processos e travava a CPU), em prioridade baixa
+_THUMB_SEM = threading.Semaphore(4)
+
+
 def gerar_thumbs(path, duration, outdir, count):
     """Gera miniaturas em paralelo (seek rápido por keyframe). Retorna [{t, url}]."""
     if duration <= 0 or count <= 0:
@@ -638,26 +663,28 @@ def gerar_thumbs(path, duration, outdir, count):
     def _um(i_t):
         i, t = i_t
         out = os.path.join(outdir, f"th_{i:04d}.jpg")
-        try:
-            subprocess.run(
-                [ffmpeg_path(), "-y", "-v", "error", "-skip_frame", "nokey", "-ss", f"{t:.3f}", "-i", path,
-                 "-frames:v", "1", "-vf", "scale=-2:96", "-q:v", "6", out],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                timeout=30, creationflags=_creationflags(),
-            )
-        except Exception:
-            pass
-        if not os.path.exists(out):
-            # fallback sem skip_frame (alguns codecs não suportam)
+        fl = _creationflags() | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)
+        with _THUMB_SEM:
             try:
                 subprocess.run(
-                    [ffmpeg_path(), "-y", "-v", "error", "-ss", f"{t:.3f}", "-i", path,
+                    [ffmpeg_path(), "-y", "-v", "error", "-skip_frame", "nokey", "-ss", f"{t:.3f}", "-i", path,
                      "-frames:v", "1", "-vf", "scale=-2:96", "-q:v", "6", out],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                    timeout=30, creationflags=_creationflags(),
+                    timeout=30, creationflags=fl,
                 )
             except Exception:
                 pass
+            if not os.path.exists(out):
+                # fallback sem skip_frame (alguns codecs não suportam)
+                try:
+                    subprocess.run(
+                        [ffmpeg_path(), "-y", "-v", "error", "-ss", f"{t:.3f}", "-i", path,
+                         "-frames:v", "1", "-vf", "scale=-2:96", "-q:v", "6", out],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        timeout=30, creationflags=fl,
+                    )
+                except Exception:
+                    pass
         if os.path.exists(out):
             return {"t": round(t, 3), "url": media_server.register(out), "arq": out}
         return None
@@ -856,6 +883,15 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
                 + (",split[p][b]" + th_filtro if th_saida else "[p]"),
                 "-map", "[p]", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "fastdecode", "-crf", "25"] + comum
 
+    def _cpu_nvenc():
+        # a placa não decodifica (H.264 10-bit/4:2:2 de câmera, MXF): o processador decodifica e reduz, a placa
+        # codifica (medido, MXF 1080p59 4:2:2 10-bit: CPU 105 s → 78 s por 20 s de vídeo)
+        return [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-i", path,
+                "-filter_complex", f"[0:v:0]scale={_PROXY_ESCALA}:flags=fast_bilinear,format=yuv420p"
+                + (",split[p][b]" + th_filtro if th_saida else "[p]"),
+                "-map", "[p]", "-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "24", "-b:v", "0",
+                "-bf", "0"] + comum
+
     def _cuda():
         return [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1",
                 "-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-i", path,
@@ -894,14 +930,18 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
     if info.get("alfa"):
         tentativas = [_alfa]
     else:
-        tentativas = ([_cuda_girado] if rotacionado else [_cuda]) if gpu else []
+        pf = str(info.get("pix_fmt") or "")
+        # NVDEC (até a série 40) não lê H.264 10-bit nem 4:2:2/4:4:4: tentar a placa só gastava a primeira passada
+        sem_nvdec = info.get("vcodec") == "h264" and ("10" in pf or "422" in pf or "444" in pf)
+        tentativas = [] if not gpu else [_cpu_nvenc] if sem_nvdec else (
+            [_cuda_girado] if rotacionado else [_cuda]) + [_cpu_nvenc]
         tentativas.append(_cpu)
     rc, err = 1, ""
     for fazer in tentativas:
         cmd = fazer()
         if cmd is None:
             continue
-        rc, err = _run_progress(cmd, dur, on_pct, stop_event)
+        rc, err = _run_progress(cmd, dur, on_pct, stop_event, baixa=True)
         if rc == 0 or (stop_event is not None and stop_event.is_set()):
             break
     ok = rc == 0 and os.path.exists(out)
@@ -1205,9 +1245,20 @@ def preparar_midia(path, emit, stop_event=None, prioridade=1, leve=False):
                     # por cópia do app: duas abrindo o mesmo vídeo não se atropelam; converte no cache e só a prévia
                     # pronta vai para a pasta Proxy (o sync da nuvem não pega o arquivo pela metade)
                     tmp = os.path.join(work, f"{os.path.basename(proxy)}.{os.getpid()}.tmp{os.path.splitext(proxy)[1]}")
-                    with _VAGAS_PROXY.vaga(chave, prioridade):   # 2 conversões por vez (os que tocam direto não esperam)
-                        ok, err, thumbs = gerar_proxy(path, info, tmp, lambda p: emit({"stage": "proxy", "pct": p}),
-                                                      stop_event, thumbs_dir=work, thumbs_n=count, lado=lado)
+                    # falha passageira (pasta do cache sumiu no meio, disco ocupado, nuvem segurando o arquivo):
+                    # tenta de novo até 2 vezes com pausa; arquivo que sumiu ou pedido cancelado não insiste
+                    for tentativa, pausa in enumerate((0, 2, 5)):
+                        if pausa:
+                            if (stop_event is not None and stop_event.wait(pausa)) or not os.path.isfile(path):
+                                break
+                            _apagar_item(tmp)
+                            os.makedirs(work, exist_ok=True)
+                            emit({"stage": "proxy", "pct": 0, "tentativa": tentativa + 1})
+                        with _VAGAS_PROXY.vaga(chave, prioridade):   # 2 conversões por vez (os que tocam direto não esperam)
+                            ok, err, thumbs = gerar_proxy(path, info, tmp, lambda p: emit({"stage": "proxy", "pct": p}),
+                                                          stop_event, thumbs_dir=work, thumbs_n=count, lado=lado)
+                        if ok or (stop_event is not None and stop_event.is_set()):
+                            break
                     if ok:
                         proxy = _instalar_proxy(tmp, proxy, work)   # interrompida no meio não vira prévia "pronta" quebrada
                     else:
@@ -1985,7 +2036,7 @@ def adicionar_audio(path):
     if not info["has_audio"] or info["duration"] <= 0:
         return {"success": False, "error": "Este arquivo não tem som."}
     chave = hashlib.md5(f"{os.path.abspath(path)}|{os.path.getmtime(path)}".encode()).hexdigest()[:14]
-    pcm = os.path.join(_midia_dir(), f"aud_{chave}.pcm")   # guardado com as prévias (não se perde no %TEMP%)
+    pcm = _em_uso(os.path.join(_midia_dir(), f"aud_{chave}.pcm"))   # guardado com as prévias (não se perde no %TEMP%)
     tmp = f"{pcm}.{os.getpid()}.{threading.get_ident()}.tmp"   # único: duas leituras juntas não se atropelam
     if not os.path.isfile(pcm):
         r = subprocess.run([ffmpeg_path(), "-y", "-v", "error", "-i", path, "-map", "0:a:0", "-vn", "-ac", "2",

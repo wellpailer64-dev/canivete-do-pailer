@@ -7,6 +7,7 @@
 // =========================================================
 
 const VEMK = { drag: null, cursor: false };
+var VE_MK_H = 10;   // altura da faixa dos marcadores no topo da régua (os números da régua descem quando há marcador)
 
 // ── chip do In/Out (barra da timeline): só aparece com entrada ou saída marcada ──
 function veIoChip() {
@@ -28,12 +29,22 @@ function veMkAt(x, y) {
     let achou = null;
     VE.markers.forEach((m, i) => {
         const t = +m.t || 0, d = +m.d || 0, x0 = X(t), x1 = X(t + d);
-        if (d > 0 && Math.abs(x - x1) <= 5 && y >= 3) { achou = { i, modo: 'fim' }; return; }
+        // só a faixa de cima da régua (VE_MK_H) é do marcador; o resto da régua fica para a agulha
+        if (y > VE_MK_H + 1) return;
+        if (d > 0 && Math.abs(x - x1) <= 5) { achou = { i, modo: 'fim' }; return; }
         if (achou && achou.modo === 'fim') return;
-        if (Math.abs(x - x0) <= 6 && y <= 21) achou = { i, modo: 'mover' };
-        else if (!achou && d > 0 && x > x0 && x < x1 && y >= 3 && y <= 19) achou = { i, modo: 'mover' };
+        if (Math.abs(x - x0) <= 6) achou = { i, modo: 'mover' };
+        else if (!achou && d > 0 && x > x0 && x < x1) achou = { i, modo: 'mover' };
     });
     return achou;
+}
+
+// texto legível sobre a cor do marcador (preto nas cores claras, branco nas escuras)
+function veMkTxtCor(cor) {
+    const h = String(cor || '').replace('#', '');
+    if (!/^[0-9a-f]{6}$/i.test(h)) return '#fff';
+    const [r, g, b] = [0, 2, 4].map(k => parseInt(h.slice(k, k + 2), 16) / 255);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.55 ? '#111' : '#fff';
 }
 
 // ── desenho (chamado por veDrawMarkers em editor.js) ──
@@ -47,35 +58,41 @@ function veMkDesenhar(ctx, X, W, H) {
         if (x2 < -12 || x > W + 12) return;
         const cor = m.cor || veMarkerColor(i);
         // linha nas trilhas (início e, com duração, o fim)
-        ctx.strokeStyle = veRgba(cor, 0.28);
+        ctx.strokeStyle = veRgba(cor, 0.55);
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(x, VE_RULER); ctx.lineTo(x, H);
         if (d > 0) { ctx.moveTo(x2, VE_RULER); ctx.lineTo(x2, H); }
         ctx.stroke();
         if (d > 0) {
-            // corpo do marcador na régua, com o nome ao longo dele
-            ctx.fillStyle = veRgba(cor, 0.30);
-            ctx.fillRect(x, 4, x2 - x, 14);
+            // corpo do marcador na régua: barra cheia na cor dele (o nome vai por cima, com contraste)
             ctx.fillStyle = cor;
-            ctx.fillRect(x, 4, x2 - x, 2);
-            ctx.fillRect(x2 - 2, 4, 2, 14);   // ponta que arrasta
-            ctx.fillStyle = veRgba(cor, 0.07);
+            ctx.fillRect(x, 0, x2 - x, VE_MK_H);
+            ctx.fillStyle = 'rgba(0,0,0,0.35)';
+            ctx.fillRect(x2 - 3, 0, 3, VE_MK_H);   // ponta que arrasta
+            ctx.fillStyle = veRgba(cor, 0.10);
             ctx.fillRect(x, VE_RULER, x2 - x, H - VE_RULER);
         }
         ctx.fillStyle = cor;
         ctx.beginPath();
-        ctx.moveTo(x - 5, 4); ctx.lineTo(x + 5, 4); ctx.lineTo(x + 5, 13); ctx.lineTo(x, 20); ctx.lineTo(x - 5, 13);
+        ctx.moveTo(x - 5, 0); ctx.lineTo(x + 5, 0); ctx.lineTo(x + 5, 8); ctx.lineTo(x, VE_MK_H + 2); ctx.lineTo(x - 5, 8);
         ctx.closePath();
         ctx.fill();
         if (m.nome) {
-            ctx.font = '600 10px Segoe UI';
+            ctx.font = '700 10px Segoe UI';
+            const larg = ctx.measureText(m.nome).width;
+            // com duração: o nome acompanha a tela (fica visível enquanto o trecho estiver à vista)
+            const x0 = d > 0 ? Math.max(x + 8, Math.min(8, x2 - 10 - larg)) : x + 8;
             const lim = d > 0 ? x2 - 5 : W - 4;
-            if (lim - (x + 8) > 12) {
+            if (lim - x0 > 12) {
                 ctx.save();
-                ctx.beginPath(); ctx.rect(x + 7, 0, lim - (x + 7), VE_RULER); ctx.clip();
-                ctx.fillStyle = d > 0 ? '#fff' : veRgba(cor, 0.9);
-                ctx.fillText(m.nome, x + 8, 15);
+                ctx.beginPath(); ctx.rect(x0 - 4, 0, lim - x0 + 4, VE_MK_H); ctx.clip();
+                if (!(d > 0)) {   // sem duração: etiqueta preenchida na cor do marcador
+                    ctx.fillStyle = cor;
+                    ctx.fillRect(x + 4, 0, larg + 9, VE_MK_H);
+                }
+                ctx.fillStyle = veMkTxtCor(cor);
+                ctx.fillText(m.nome, x0, 8.5);
                 ctx.restore();
             }
         }

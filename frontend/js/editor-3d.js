@@ -289,7 +289,8 @@ function ve3dQuadro(c, T, alvo) {
 // ── mídia, clipe, render do arquivo (exportação) ──
 function ve3dMidias() { return VE.media.filter(m => m && !m.removido && ve3dEh(m)); }
 function ve3dNova(op = {}) {
-    if (!VE.ready) throw new Error('abra um vídeo ou crie uma timeline antes');
+    if (!VE.ready && typeof veCriarProjetoVazio === 'function') veCriarProjetoVazio({ quieto: true });
+    if (!VE.ready) throw new Error('crie um projeto ou uma timeline antes');
     const dur = +(op.dur || 5), st = op.st ?? VE.playhead, nome = op.nome || veT('Cena 3D');
     vePushHistory();
     const m = { id: VE.media.length, kind: 'video', c3d: op.cena || ve3dPadrao(), name: nome, cor: VE3D_COR, path: null, dur, _criada: true, _aoVivo: true,

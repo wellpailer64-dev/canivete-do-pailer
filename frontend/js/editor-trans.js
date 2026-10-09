@@ -217,7 +217,21 @@ function veTransPedacos(j, papel) {
 
 // Clipes com as transições aplicadas: os envolvidos viram cópias (só a imagem; o som fica numa cópia à parte,
 // no lugar de sempre) estendidas pela mídia que sobra e com quadros-chave da animação. c._o = clipe original.
+// Guardado: o resultado só muda quando os clipes mudam (cópia a fundo de cada clipe com transição custava ~5 ms
+// por desenho). Confere os MESMOS objetos (desfazer/refazer troca os objetos: as cópias guardam c._o) e o conteúdo.
+const VETRVM = { refs: null, imp: '', res: null };
 function veTransVirtuais() {
+    const clips = VE.clips;
+    if (VETRVM.res && VETRVM.refs && VETRVM.refs.length === clips.length && clips.every((c, i) => c === VETRVM.refs[i])) {
+        const imp = vePrHash(JSON.stringify([clips, VE.seqW, VE.seqH, VE.fps]));
+        if (imp === VETRVM.imp) return VETRVM.res;
+        VETRVM.imp = imp;
+    } else VETRVM.imp = vePrHash(JSON.stringify([clips, VE.seqW, VE.seqH, VE.fps]));
+    VETRVM.refs = clips.slice();
+    VETRVM.res = veTransVirtuaisCalc();
+    return VETRVM.res;
+}
+function veTransVirtuaisCalc() {
     const lista = veTransLista();
     if (!lista.length) return VE.clips;
     const mapa = new Map(), W = VE.seqW, H = VE.seqH, passo = veFrame();

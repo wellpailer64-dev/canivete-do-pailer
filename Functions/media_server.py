@@ -14,12 +14,15 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote
 
-_registry = {}
-_memoria = {}    # token -> (bytes, tipo): arquivos que só existem na memória (camadas do Editor de Imagem)
-_envios = {}     # sessão -> {chave: bytes}: o que a página manda por POST /u/<sessão>/<chave> (salvar PSD)
-_lock = threading.Lock()
-_server = None
-_port = 0
+# Recarregar o módulo (modo agente: vk_recarregar / tools/aplicar.py --py) NÃO pode zerar o registro: o servidor
+# continua no ar e todas as prévias, áudios e miniaturas já abertos no app passariam a dar erro ("o player não
+# conseguiu abrir este vídeo"). Por isso o estado é reaproveitado se já existir.
+_registry = globals().get("_registry", {})
+_memoria = globals().get("_memoria", {})    # token -> (bytes, tipo): arquivos que só existem na memória (camadas do Editor de Imagem)
+_envios = globals().get("_envios", {})      # sessão -> {chave: bytes}: o que a página manda por POST /u/<sessão>/<chave> (salvar PSD)
+_lock = globals().get("_lock") or threading.Lock()
+_server = globals().get("_server")
+_port = globals().get("_port", 0)
 
 mimetypes.add_type("video/mp4", ".m4v")
 mimetypes.add_type("video/webm", ".webm")

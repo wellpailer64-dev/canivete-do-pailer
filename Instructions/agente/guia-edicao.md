@@ -94,7 +94,8 @@
 ## 8 CORTES DE ENTREVISTA (vídeo longo → reels 9:16 de um convidado) — feito 2026-10-07 (Alessandro/Minasparts)
 - ACHAR O TRECHO PRIMEIRO, barato: folha de contato 1 quadro/min (`ffmpeg -vf fps=1/60,scale=240:-1,tile=8x7`, 1 imagem)
   → transcrever SÓ o trecho (`ffmpeg -ss A -t D` → wav 16k mono → `legendas.transcrever_wav`, somar A aos tempos).
-  NUNCA `agente_midia transcrever` no vídeo inteiro (55 min caiu: exit 139, e é caro). 7 min = 94 s.
+  (2026-10-08: o reconhecimento agora vai em pedaços de 5 min, `legendas.PEDACO_S`, memória constante; 20 min ≈ 90 s.
+  Muitos clipes: transcrever um por um com cache, ex. D:/kanivete_testes/scripts/edgar_transcrever.py.) 7 min = 94 s.
 - escolher 2–4 assuntos com começo/meio/fim (dica prática, número, frase de efeito); pode juntar trechos distantes
   quando fecham a ideia (ex.: abertura 1:58 + fecho 7:17). Plano: `tools/agente/cortes_entrevista_plano.py`
   (bordas pela energia da voz, legendas com dicionário de erros: auxília→oficina, temparo/tem paro→Tempário,

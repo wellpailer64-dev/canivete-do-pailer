@@ -148,7 +148,7 @@ function vePjCardMidia(m) {
     const ativa = m.kind === 'timeline' && m.sequenceId === VE.activeSequence;
     const lost = veMediaOffline(m);
     return `<div class="ve-pj-card${VEPJ.sel.has(k) ? ' sel' : ''}${ativa ? ' atual' : ''}${m.kind === 'video' && m.id && !m.url ? ' fraco' : ''}${lost ? ' lost' : ''}" data-k="${k}" data-kind="${m.kind}" draggable="true" title="${veEsc((m.path || vePjNome(m)) + (inf.info ? '\n' + inf.info : ''))}">
-        <div class="ve-pj-capa">${m.kind === 'cor' ? `<div class="ve-pj-swatch" style="background:${veEsc(m.fill || '#000')}"></div>` : lost ? `<div class="ve-pj-lost">${veT('MÍDIA OFFLINE')}</div>` : capa ? `<img src="${veEsc(capa)}" alt="" draggable="false">${m.kind === 'timeline' ? `<svg class="i ve-pj-capa-ic"><use href="#${ic}"/></svg>` : ''}` : `<svg class="i"><use href="#${ic}"/></svg>`}
+        <div class="ve-pj-capa">${m.kind === 'cor' ? `<div class="ve-pj-swatch" style="background:${veEsc(m.fill || '#000')}"></div>` : lost ? `<div class="ve-pj-lost">${veT('MÍDIA OFFLINE')}</div>` : capa ? `<img src="${veEsc(capa)}" alt="" draggable="false" crossorigin="anonymous">${m.kind === 'timeline' ? `<svg class="i ve-pj-capa-ic"><use href="#${ic}"/></svg>` : ''}` : `<svg class="i"><use href="#${ic}"/></svg>`}
             ${inf.dur ? `<span class="ve-pj-dur">${veTC(inf.dur).slice(0, 11)}</span>` : ''}</div>
         <div class="ve-pj-rotulo"><span class="ve-pj-cor"${cor ? ` style="background:${cor}"` : ''}></span><svg class="i"><use href="#${ic}"/></svg><span class="ve-pj-nome">${veEsc(vePjNome(m))}</span></div>${veMelSelo(m)}
         <div class="ve-pj-sub">${veT(tipo)}${inf.info ? ' · ' + veEsc(inf.info) : ''}</div></div>`;
@@ -216,7 +216,7 @@ function vePjRender() {
     const total = vePjMidia().length + (VE.bins || []).length;
     $ve('ve-pj-conta').textContent = VEPJ.sel.size ? `${VEPJ.sel.size} de ${total} selecionado(s)` : `${total} ${total === 1 ? 'item' : 'itens'}`;
     $ve('ve-pj-proj').textContent = VE.projectPath ? VE.projectPath.split(/[\\/]/).pop() : (VE.ready ? veT('Projeto não salvo') : '');
-    if (!VE.ready) { box.innerHTML = `<div class="ve-clips-empty">${veT('Abra um vídeo para começar. Depois arraste para cá imagens, áudios, legendas (.srt, .vtt, .ass, .sbv, .txt), outros vídeos e pastas inteiras.')}</div>`; return; }
+    if (!VE.ready) { box.innerHTML = `<div class="ve-clips-empty">${veT('Crie um projeto ou importe mídia. Pastas, camadas de ajuste e cores sólidas podem nascer antes de qualquer vídeo.')}</div>`; return; }
     const q = VEPJ.busca.trim().toLowerCase();
     if (q) {
         const achados = vePjMidia().filter(m => vePjNome(m).toLowerCase().includes(q));
@@ -286,11 +286,8 @@ async function vePjImportarPasta(path, pai) {
 // itens = [{path, pasta: bool}]; destino = pasta do projeto (ou raiz)
 async function vePjImportar(itens, destino = vePjDestino()) {
     if (!VE.ready) {
-        // o primeiro vídeo abre e o resto entra no painel quando ele abrir (editor.js: veAbrirComResto)
-        if (await veAbrirComResto(itens)) return;
-        const psd = itens.find(i => !i.pasta && typeof VE_EXT_PSD !== 'undefined' && VE_EXT_PSD.test(i.path));
-        if (psd) vePsdAbrir(psd.path); else veToast('Abra um vídeo primeiro');
-        return;
+        if (typeof veCriarProjetoVazio === 'function') veCriarProjetoVazio({ quieto: true });
+        if (!VE.ready) { veToast('Crie um projeto primeiro'); return; }
     }
     veToast('Importando...');
     let n = 0;
@@ -302,7 +299,8 @@ async function vePjImportar(itens, destino = vePjDestino()) {
 }
 
 function vePjImportarDialogo() {
-    if (!VE.ready) { veOpenFile(); return; }
+    if (!VE.ready && typeof veCriarProjetoVazio === 'function') veCriarProjetoVazio({ quieto: true });
+    if (!VE.ready) return;
     window.pywebview.api.ve_importar_dialogo().then(r => {
         if (r && r.success) vePjImportar(r.paths.map(path => ({ path, pasta: false })));
     });
@@ -318,6 +316,7 @@ function vePjDestino() {
 }
 
 function vePjNovaPasta() {
+    if (!VE.ready && typeof veCriarProjetoVazio === 'function') veCriarProjetoVazio({ quieto: true });
     if (!VE.ready) return;
     const b = vePjNovoBin(veT('Nova pasta'), vePjDestino());
     const pai = vePjBin(b.pai);
@@ -329,6 +328,7 @@ function vePjNovaPasta() {
 }
 
 function vePjNovoAjuste() {
+    if (!VE.ready && typeof veCriarProjetoVazio === 'function') veCriarProjetoVazio({ quieto: true });
     if (!VE.ready) return;
     const n = vePjMidia().filter(m => m.kind === 'ajuste').length + 1;
     const m = vePjAddMidia({ kind: 'ajuste', name: 'Camada de ajuste', nome: n > 1 ? `${veT('Camada de ajuste')} ${n}` : undefined }, vePjDestino());
@@ -366,7 +366,7 @@ function vePjRenomear(k) {
         } else vePjRender();
     };
     inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') fim(true); if (e.key === 'Escape') fim(false); });
-    inp.addEventListener('blur', () => fim(true));
+    inp.addEventListener('blur', () => setTimeout(() => fim(true), 0));
 }
 
 function vePjCopiaMidia(m, pasta) {
@@ -1372,12 +1372,22 @@ function veOnMidia(ev) {
     } else if (ev.stage === 'thumbs') {
         m.thumbs = (ev.thumbs || []).sort((a, b) => a.t - b.t).map(tb => {
             const img = new Image();
+            img.crossOrigin = 'anonymous';   // desenhada no monitor enquanto a prévia não fica pronta: sem isso "contamina" o canvas e o WebGL (Luz e Cor) recusa
             img.onload = veDraw;
             img.src = tb.url;
             return { t: tb.t, url: tb.url, img };
         });
         if (m.id === 0) VE.thumbs = m.thumbs;
     } else if (ev.stage === 'error') {
+        // falha passageira (disco ocupado, pasta de cache recriada, ffmpeg interrompido): tenta de novo sozinho, até 2
+        // vezes, antes de mostrar o erro. Arquivo que não existe / sem vídeo não adianta repetir.
+        const definitivo = /não encontrado|sem vídeo|duração inválida|não foi possível analisar/i.test(ev.error || '');
+        if (m.id && !definitivo && (m._tentativas || 0) < 2) {
+            m._tentativas = (m._tentativas || 0) + 1;
+            setTimeout(() => { if (!m.removido && !m.url) veMidiaPreparar(m, veMidiaNaTimeline(m.id)); }, 3000 * m._tentativas);
+            vePjRenderLogo();
+            return;
+        }
         m.erro = ev.error || 'erro';
         if (m.id === 0) { m.offline = true; veLoading(null); $ve('ve-export-btn').disabled = true; }
         if (m._insertQueue) {
@@ -1388,11 +1398,23 @@ function veOnMidia(ev) {
         }
         veToast(`${vePjNome(m)}: ${m.erro}`);
     }
-    vePjRender();
-    veDraw();
-    veDrawMonitorSoon();
+    vePjRenderLogo();
 }
 window.veOnMidia = veOnMidia;
+
+// Avisos das mídias em preparo chegam várias vezes por segundo (3 mídias de uma vez, cada uma com progresso,
+// miniaturas, áudio...): refazer o painel Projeto inteiro e a timeline a cada um fazia o painel piscar e tomava a CPU.
+// Junta tudo e redesenha no máximo a cada 0,4 s.
+let VEPJ_RENDER_T = null;
+function vePjRenderLogo() {
+    if (VEPJ_RENDER_T) return;
+    VEPJ_RENDER_T = setTimeout(() => {
+        VEPJ_RENDER_T = null;
+        vePjRender();
+        veDraw();
+        veDrawMonitorSoon();
+    }, 400);
+}
 
 // ─────────────────────────── Source monitor (duplo clique no Project) ───────────────────────────
 const VESRC = { id: null, video: null, inPt: null, outPt: null };

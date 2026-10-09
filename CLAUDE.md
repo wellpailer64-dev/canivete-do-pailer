@@ -19,8 +19,10 @@ criar ferramenta, comando ou teste: `py -3.13 tools/mapa_geral.py` (regenera os 
 - Editar código: `py -3.13 tools/patch.py mudancas.patch` (blocos `@@ arquivo` / `<<<` velho `===` novo `>>>`; confere âncora
   única, tudo ou nada, checa sintaxe e desfaz se quebrar). Nada de heredoc com Python inline para editar.
 - Achar onde mexer: `py -3.13 tools/mapa_codigo.py vetor|imagem|editor --busca termo` (comandos/funções:linha) antes de grep/ler arquivo.
-- Aplicar mudança no app aberto: `py -3.13 tools/recarregar.py [--py] [--ferramenta editor-imagem]` (JS e Functions/*.py
-  sem reiniciar; só mudança em main.py pede reinício).
+- Aplicar mudança no app aberto, SEM recarregar (projeto, janelas soltas e Ctrl+Z ficam): `py -3.13 tools/aplicar.py
+  frontend/js/x.js [y.css] [--py] [--porta 9222]` — rodar depois de CADA mudança no app do usuário. Troca as funções;
+  constante que já existe não muda (avisa: aí só reabrindo). `tools/recarregar.py` recarrega a página inteira: só no app
+  de teste (recusa com projeto aberto). Python (--py) e main.py: só rodando pelo código ou no próximo build.
 - Testes: o Jr roda (`tools/worker/codigo.py` com `testes: ["teste:vetor"]`) e devolve só o que falhou.
 - Vetor: `VKN.curto = true` (respostas só com id/caminho), `VKN.revisar()` antes de abrir qualquer imagem, e páginas em
   HTML/CSS com `VKN.cena` / `py -3.13 tools/vk_cena.py pagina.html --marca marca.json --prancheta X [--nova 320x180] --png p.png --revisar`.

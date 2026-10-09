@@ -3600,7 +3600,9 @@ class ApiBridge:
         função, então a próxima chamada já usa o código novo. Servidores filhos (sd-server, gs) não são tocados."""
         import importlib, sys as _sys
         feitos, erros = [], []
-        vivos = {"Functions.gerador_imagem"}   # guardam processo filho na GPU: recarregar perderia o controle dele
+        # gerador_imagem guarda processo filho na GPU; media_server guarda o registro das mídias abertas (recarregar
+        # deixava todas as prévias do projeto aberto sem endereço)
+        vivos = {"Functions.gerador_imagem", "Functions.media_server"}
         for nome in sorted(n for n in list(_sys.modules) if n.startswith(prefixo) and _sys.modules[n] is not None and (n not in vivos or n == prefixo)):
             try:
                 importlib.reload(_sys.modules[nome]); feitos.append(nome)

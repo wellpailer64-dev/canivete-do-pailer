@@ -82,6 +82,12 @@ async function ieAbrirArquivo(path) {
             if (no.tipo === 'grupo') L.filhos = montar(no.filhos || []);
             if (no.url) pend.push({ url: no.url, fim: c => { L.c = c; if (['texto', 'inteligente', 'forma', 'preenchimento'].includes(L.tipo)) { L.c0 = { c, x: L.x, y: L.y }; L.tf = [...IE_ID]; L.tfBase = [...IE_ID]; } } });
             else if (['texto', 'inteligente', 'forma', 'preenchimento'].includes(L.tipo)) { L.tf = [...IE_ID]; L.tfBase = [...IE_ID]; }
+            if (no.so && no.so.url) {
+                if (no.so.tf) { L.tf = [...no.so.tf]; L.tfBase = [...no.so.tf]; }
+                L.cx0 = 0; L.cy0 = 0;
+                if (no.so.camadas) L.conteudo = montar(no.so.camadas || []);
+                pend.push({ url: no.so.url, fim: c => { L.c0 = { c, x: 0, y: 0 }; } });
+            }
             if (no.mascara) {
                 const m = no.mascara;
                 L.m = { c: null, x: m.x, y: m.y, fundo: m.fundo || 0, desativada: !!m.desativada };
@@ -435,7 +441,7 @@ function ieConteudoAbrir(doc, L) {
     const N = ieNovoDoc2((L.nome || ieT('Objeto inteligente')) + '.psb', L.c0.c.width, L.c0.c.height, doc.dpi, 'transp');
     if (L.conteudo && L.conteudo.length) {   // camadas guardadas: voltam editáveis, no espaço do objeto
         const dx = -(L.cx0 ?? L.c0.x), dy = -(L.cy0 ?? L.c0.y);
-        N.camadas = L.conteudo.map(X => { const Y = ieDuplicarCamada(N, X); iePercorrer([Y], Z => { if (Z.c || Z.txt || Z.c0) ieMoverCamada(Z, dx, dy); }); return Y; });
+        N.camadas = L.conteudo.map(X => { const Y = ieDuplicarCamada(N, X, true); iePercorrer([Y], Z => { if (Z.c || Z.txt || Z.c0) ieMoverCamada(Z, dx, dy); }); return Y; });
     } else N.camadas = [ieNovaCamada(N, { nome: L.nome || ieT('Camada 1'), c: ieClonar(L.c0.c), x: 0, y: 0, sujoPx: true })];
     N.ativa = N.camadas[N.camadas.length - 1].id; N.selIds = [N.ativa];
     N.pai = { docId: doc.id, camadaId: L.id };
@@ -448,7 +454,7 @@ function ieConteudoDevolver(N) {
     if (!L) { ieToast(ieT('O documento de origem (ou a camada) não está mais aberto')); return false; }
     const Rantes = ieRCamada(L), x0 = L.c0.x, y0 = L.c0.y;
     L.c0 = { c: ieAchatar(N, N.camadas, ieRDoc(N)), x: x0, y: y0 };
-    L.conteudo = N.camadas.map(X => { const Y = ieDuplicarCamada(pai, X); iePercorrer([Y], Z => { if (Z.c || Z.txt || Z.c0) ieMoverCamada(Z, x0, y0); }); return Y; });
+    L.conteudo = N.camadas.map(X => { const Y = ieDuplicarCamada(pai, X, true); iePercorrer([Y], Z => { if (Z.c || Z.txt || Z.c0) ieMoverCamada(Z, x0, y0); }); return Y; });
     L.cx0 = x0; L.cy0 = y0;
     const atual = IE.doc; IE.doc = pai;   // os filtros inteligentes medem pelo documento da camada
     try {

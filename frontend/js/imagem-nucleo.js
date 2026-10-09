@@ -1250,6 +1250,7 @@ function ieInstalarVista() {
     sobre.addEventListener('contextmenu', ev => {
         ev.preventDefault();
         if (IE._ctxBloqueado) { IE._ctxBloqueado = false; return; }
+        if (IE.transf && typeof ieTransfMenuContexto === 'function') return ieTransfMenuContexto(ev);
         ieMenuContexto?.(ev);
     });
 }

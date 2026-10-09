@@ -252,7 +252,7 @@ def transcrever(path, idioma="pt", limpo=False):
             return {"erro": (r.stderr or "falha ao ler o áudio").strip().splitlines()[-1] if r.stderr else "sem áudio"}
         palavras = []
         try:
-            for seg in legendas._carregar(chave).recognize(wav):
+            for seg, _ in legendas.segmentos(wav, chave):
                 palavras.extend(legendas._palavras(seg))
         finally:
             try:

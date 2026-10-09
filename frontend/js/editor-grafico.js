@@ -240,6 +240,7 @@ function veGrEscolherCor(inicial, pronto, doc = document, { titulo = 'Cor sólid
 
 const veGrDocProjeto = () => { const el = $ve('ve-pj-lista'); return (el && el.ownerDocument) || document; };
 function vePjNovaCor() {
+    if (!VE.ready && typeof veCriarProjetoVazio === 'function') veCriarProjetoVazio({ quieto: true });
     if (!VE.ready) return;
     veGrEscolherCor('#F97316', fill => {
         const n = vePjMidia().filter(m => m.kind === 'cor').length + 1;

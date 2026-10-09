@@ -14,8 +14,8 @@ const veSel = () => VE.sel >= 0 || (typeof veSelLista === 'function' && veSelLis
 // pode() = habilitado; marcado() = ✓ no menu. sep = linha antes do item no menu.
 const VE_CMDS = [
     // ── Arquivo ──
-    { id: 'novo-projeto', grupo: 'arquivo', nome: 'Novo projeto', teclas: ['Ctrl+Alt+N'], sempre: true, fn: () => { if (veConfirmDiscard()) veCloseProject(); } },
-    { id: 'nova-timeline', grupo: 'arquivo', nome: 'Nova timeline', teclas: ['Ctrl+N'], sempre: true, fn: () => (VE.ready ? veCreateTimeline() : veToast('Abra um projeto antes de criar uma timeline')) },
+    { id: 'novo-projeto', grupo: 'arquivo', nome: 'Novo projeto', teclas: ['Ctrl+Alt+N'], sempre: true, fn: () => veNovoProjeto() },
+    { id: 'nova-timeline', grupo: 'arquivo', nome: 'Nova timeline', teclas: ['Ctrl+N'], sempre: true, fn: () => (VE.ready ? veCreateTimeline() : veCriarProjetoVazio({ quieto: false })) },
     { id: 'novo-ajuste', grupo: 'arquivo', nome: 'Nova camada de ajuste', teclas: [], fn: () => veAddAdjust(), pode: () => !(VE.info && VE.info.audio_only) },
     { id: 'abrir', grupo: 'arquivo', nome: 'Abrir projeto ou vídeo...', teclas: ['Ctrl+O'], sempre: true, sep: true, fn: () => veOpenFile() },
     { id: 'fechar', grupo: 'arquivo', nome: 'Fechar projeto', teclas: ['Ctrl+Shift+W'], fn: () => { if (veConfirmDiscard()) veCloseProject(); } },

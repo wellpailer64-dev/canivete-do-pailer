@@ -203,6 +203,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/worker/codigo.py` — Code Worker / Debug Worker: o Qwen3 8B local faz o trabalho braçal de infraestrutura (buscar, ler, trocar trecho,
 - `tools/worker/entrevista.py` — Entrevista do assistente local (Canivete Worker): mesmos pedidos para cada modelo do Ollama, mede acerto de
 - `tools/worker/worker.py` — Canivete Worker: executa um contrato de tarefa (Task Contract) no Photo Kanivete com um modelo local (Ollama),
+- `tools/aplicar.py` — Aplica mudanças no app ABERTO sem recarregar a página (o projeto, as janelas soltas e o Ctrl+Z continuam)
 - `tools/direcao_mapa.py` — Mapa de direção de arte (para o Claude, o Worker e o roteiro_local): layouts, estilos e técnicas em linhas curtas —
 - `tools/esqueleto.py` — Roteiro (JSON curto) → carrossel diagramado (HTML do KNV.cena) pelos ESQUELETOS aprovados. O agente só escreve o
 - `tools/gerar_marca.py` — Gera a marca KANIVETE: letras próprias desenhadas aqui (geometria nossa, sem ler fonte nenhuma), no espírito
@@ -342,6 +343,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_atributos.py` — Remover atributos e ajuste em grupo (editor-atributos.js) — abre um app próprio (porta 9334, dados em
 - `testes/teste_barra.py` — Barra de tarefas contextual: alça move e lembra, Selecionar assunto / Remover fundo, × esconde só até o próximo clique
 - `testes/teste_blender.py` — Teste do render fotorrealista (Vetor 3D → Blender), app em --agente=9333. Rápido (400 px, 24 amostras): copo (girar) com
+- `testes/teste_cache_midia.py` — teste_cache_midia.py — A limpeza do cache de mídia (video_cutter.manutencao_midia) nunca apaga o que está em uso
 - `testes/teste_cameraraw.py` — Filtro Camera Raw em janela própria (app em --agente=9333; não mexa no mouse durante). Arrasta uma barra com o
 - `testes/teste_caneta.py` — Caneta, demarcadores, recuperação e laço magnético com mouse de verdade no app de teste (9333)
 - `testes/teste_ceu.py` — Editar › Substituição de céu do Photo Kanivete (SkySeg) — app em --agente=9333

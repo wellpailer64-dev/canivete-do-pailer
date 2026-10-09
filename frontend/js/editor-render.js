@@ -93,11 +93,26 @@ function vePrSig(a, b, visuais) {
     return vePrHash(JSON.stringify(partes));
 }
 
+// Impressão digital barata (~0,1 ms) de tudo que entra nos segmentos e nas assinaturas. vePrConferir marca "sujo" a
+// cada pedido de redesenho do monitor (até a agulha andando): sem isso os segmentos eram refeitos a cada desenho
+// (13 ms com 165 clipes, 26 ms o desenho da timeline). Agora só recalcula se algo mudou de fato.
+function vePrImpressao() {
+    const med = [...new Set(VE.clips.map(c => { const m = veMediaOf(c); return m ? m.id : -1; }))].map(id => {
+        const m = VE.media[id];
+        return m ? [id, m.path || m.url || '', veMediaOffline(m), !!(m.comp && (m._aoVivo || !m.url))] : id;
+    });
+    return vePrHash(JSON.stringify([VE.clips, med, VE.legendas || [], VE.legEstilo || null, VE.seqW, VE.seqH, VE.fps,
+        +VE.dur.toFixed(4), vePrPrefs().altura, VE.path || '']));
+}
+
 function vePrSegmentos() {
     if (!VE.ready) return [];
     vePrCarregar();
     if (!VEPR.sujo && VEPR.segsSeq === VE.activeSequence) return VEPR.segs;
     VEPR.sujo = false;
+    const imp = vePrImpressao();
+    if (VEPR.segsSeq === VE.activeSequence && VEPR.segsImp === imp && VEPR.segs) return VEPR.segs;
+    VEPR.segsImp = imp;
     VEPR.segsSeq = VE.activeSequence;
     const eps = veFrame() / 2;
     const visuais = veTransVirtuais().filter(c => !veIsAudio(c) && !veOculto(c));
@@ -234,7 +249,8 @@ function veOnRender(ev) {
     if (!ev.done) {
         s.pct = ev.pct || 0;
         vePrStatus();
-        if (VE.ready && !VE.playing) veDraw();
+        // progresso só pinta a barrinha verde: no máximo 2 vezes por segundo (cada aviso redesenhava a timeline)
+        if (VE.ready && !VE.playing && !VEPR.pintarT) VEPR.pintarT = setTimeout(() => { VEPR.pintarT = null; if (!VE.playing) veDraw(); }, 500);
         return;
     }
     VEPR.atual = null;
@@ -492,6 +508,25 @@ function vePrAplicarRam() {
     if (typeof veCacheUpdateUi === 'function') veCacheUpdateUi();
 }
 
+// Opções do cache de quadros na RAM: de 512 MB até a RAM do PC menos 2 GB (para não tomar a memória toda).
+// Acima de 3 GB avisa: os quadros guardados (ImageBitmap) também ocupam a memória da placa de vídeo.
+const VE_RAM_OPCOES = [0.5, 1, 1.5, 2, 3, 4, 6, 8, 10, 12, 16, 20, 24, 32, 48, 64, 96, 128];
+let VE_RAM_TOTAL_GB = 0;
+async function vePrefsRamOpcoes(sel, atual) {
+    if (!sel) return;
+    if (!VE_RAM_TOTAL_GB) {
+        try { const r = await window.pywebview.api.ve_encoder_estado(); VE_RAM_TOTAL_GB = (r && r.ram_total || 0) / 1024 ** 3; } catch (e) {}
+    }
+    const teto = VE_RAM_TOTAL_GB ? Math.max(0.5, Math.floor(VE_RAM_TOTAL_GB - 2)) : 3;
+    const vals = VE_RAM_OPCOES.filter(v => v <= teto);
+    if (!vals.includes(teto)) vals.push(teto);
+    if (atual && !vals.includes(atual) && atual <= teto) vals.push(atual);
+    vals.sort((a, b) => a - b);
+    sel.innerHTML = vals.map(v => `<option value="${v}">${v < 1 ? Math.round(v * 1024) + ' MB' : String(v).replace('.', ',') + ' GB'}`
+        + `${v === teto ? ' (máximo: RAM − 2 GB)' : ''}${v > 3 ? ' · usa memória da placa' : ''}</option>`).join('');
+    sel.value = String(Math.min(atual || 1.5, teto));
+}
+
 function vePrefsCacheRender() {
     const p = vePrPrefs();
     const el = id => document.getElementById(id);
@@ -500,7 +535,7 @@ function vePrefsCacheRender() {
     el('pref-cache-max').value = p.maxGB;
     el('pref-cache-dias').value = String(p.dias);
     el('pref-cache-alt').value = String(p.altura);
-    el('pref-cache-ram').value = String(p.ramGB);
+    vePrefsRamOpcoes(el('pref-cache-ram'), +p.ramGB);
     if (el('pref-ram-on') && typeof veCache === 'function') el('pref-ram-on').checked = veCache().on;
     if (el('pref-cache-auto')) el('pref-cache-auto').value = String(p.autoSeg);
     if (el('pref-hevc')) el('pref-hevc').value = PREFS.hevcModo === 'direto' ? 'direto' : 'converter';
@@ -559,7 +594,7 @@ function vePrefsCacheCampo(campo, valor) {
     if (campo === 'maxGB') vePrefsCacheSalvar({ maxGB: Math.max(1, Math.min(4096, n || 20)) });
     if (campo === 'dias') vePrefsCacheSalvar({ dias: n || 30 });
     if (campo === 'altura') { vePrefsCacheSalvar({ altura: n || 1080 }); VEPR.sujo = true; if (VE.ready) veDraw(); }
-    if (campo === 'ramGB') vePrefsCacheSalvar({ ramGB: n || 1.5 });
+    if (campo === 'ramGB') vePrefsCacheSalvar({ ramGB: Math.max(0.5, Math.min(n || 1.5, VE_RAM_TOTAL_GB ? VE_RAM_TOTAL_GB - 2 : 3)) });
     if (campo === 'autoSeg') { vePrefsCacheSalvar({ autoSeg: Math.max(0, n || 0) }); VEPRA.pausado = false; }
     if (campo === 'hevc') { PREFS.hevcModo = valor === 'direto' ? 'direto' : 'converter'; prefsSave(); }
     if (campo === 'proxyJunto') vePrefsCacheSalvar({ proxyJunto: valor === '1' });

@@ -19,7 +19,7 @@ const VE = {
     markers: [],        // marcadores da timeline ativa [{t, cor, nome, d?, desc?}] (editor-marcadores.js)
     playhead: 0,        // tempo da sequência
     cur: -1,            // clipe que o player está mostrando (-1 = espaço vazio)
-    media: [],          // [0] = vídeo aberto; imagens adicionadas depois
+    media: [],          // [0] = vídeo/base oculta do projeto; imagens, timelines e outros itens vêm depois
     sequences: [],      // timelines do projeto (cada uma guarda seus próprios clipes/trilhas/legendas)
     activeSequence: null,
     openSequences: [],
@@ -809,6 +809,43 @@ function veEnsureSequence() {
     VE.sequences = [seq];
     veSeqCriarMidia(seq, null);
     veOpenTimelineTab(id);
+}
+
+function veCriarProjetoVazio(opts = {}) {
+    if (VE.ready) return true;
+    const w = Math.max(16, Math.round((opts.w || VE.seqW || 1920) / 2) * 2);
+    const h = Math.max(16, Math.round((opts.h || VE.seqH || 1080) / 2) * 2);
+    const fps = +(opts.fps || VE.fps || 30);
+    veResetEditorVazio({ mostrarInicio: false, quickEdit: false });
+    VE.seqW = w;
+    VE.seqH = h;
+    VE.fps = fps;
+    VE.ready = true;
+    VE.startScreenDismissed = true;
+    VE.info = { duration: 0, fps, width: w, height: h, has_audio: false, file_name: veT('Projeto vazio'), projeto_vazio: true };
+    VE.media = [{ id: 0, kind: 'video', name: veT('Projeto vazio'), base: true, info: VE.info, dur: 0 }];
+    VE.bins = [];
+    VEPJ.sel.clear();
+    VEPJ.foco = null;
+    if (typeof VEPJF !== 'undefined') VEPJF.fila = [];
+    $ve('ve-empty').hidden = true;
+    $ve('ve-loading').hidden = true;
+    $ve('ve-proxy-badge').hidden = true;
+    $ve('ve-export-btn').disabled = true;
+    $ve('ve-meta').innerHTML = `<b>${veEsc(veT('Projeto vazio'))}</b> · timeline ${w}×${h} · ${String(fps).replace('.', ',')} fps`;
+    veBuildHeads();
+    veEnsureSequence();
+    VE.pps = veFitPps();
+    VE.view = 0;
+    VE.dirty = !!opts.dirty;
+    veUpdateUndo();
+    veUpdateTitle();
+    veSeqTabsRender();
+    vePjRender();
+    veRefresh();
+    veOnboardingRender();
+    if (!opts.quieto) veToast(veT('Projeto vazio criado'));
+    return true;
 }
 
 function veCreateTimeline(opts = {}) {
@@ -2426,6 +2463,7 @@ function veMediaSize(c) {
 
 // ── adicionar imagem ──
 function vePickImage() {
+    if (!VE.ready && typeof veCriarProjetoVazio === 'function') veCriarProjetoVazio({ quieto: true });
     if (!VE.ready) return;
     window.pywebview.api.select_image('video-cutter').then(r => { if (r && r.success) veAddImage(r.path); });
 }
@@ -4747,13 +4785,15 @@ function veRender() {
         ctx.fillRect(x, VE_RULER - 6, 1, 5);
     }
     ctx.font = '10.5px Cascadia Mono, Consolas, monospace';
+    // com marcadores, a faixa de cima é deles (editor-marcadores.js): os números descem para a metade de baixo
+    const comMk = (VE.markers || []).length > 0, topoMk = comMk ? (window.VE_MK_H ?? 10) + 2 : 6;
     for (let t = Math.floor(t0 / major) * major; t <= t1; t += major) {
         const x = Math.round(X(t)) + 0.5;
         ctx.fillStyle = '#555';
-        ctx.fillRect(x, 6, 1, VE_RULER - 7);
+        ctx.fillRect(x, topoMk, 1, VE_RULER - topoMk - 1);
         ctx.fillStyle = '#9a9a9a';
         const label = major < 1 ? veTC(t).slice(3) : veTC(t).slice(0, 8).replace(/^00:/, '');
-        ctx.fillText(label, x + 4, 15);
+        ctx.fillText(label, x + 4, comMk ? 23 : 15);
     }
     veCacheDraw(ctx, X, W);
 
@@ -5298,7 +5338,7 @@ function veEscolherArquivoEditor(quickEdit) {
 }
 
 function veOpenFile() { veEscolherArquivoEditor(false); }
-function veNovoProjeto() { veEscolherArquivoEditor(false); }
+function veNovoProjeto() { if (VE.exportRunning || !veConfirmDiscard()) return; veCriarProjetoVazio({ quieto: false }); }
 function veQuickEdit() {
     if (VE.exportRunning || !veConfirmDiscard()) return;
     veResetEditorVazio({ quickEdit: true, mostrarInicio: false });
@@ -5444,6 +5484,7 @@ function veOnPrepare(ev) {
         case 'thumbs':
             VE.thumbs = (ev.thumbs || []).sort((a, b) => a.t - b.t).map(tb => {
                 const img = new Image();
+                img.crossOrigin = 'anonymous';   // ver veDrawPreparando: imagem sem CORS contamina o canvas e quebra os efeitos WebGL
                 img.onload = veDraw;
                 img.src = tb.url;
                 return { t: tb.t, url: tb.url, img };

@@ -6,10 +6,18 @@ import argparse, json, sys
 from playwright.sync_api import sync_playwright
 
 ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=9333); ap.add_argument("--py", action="store_true")
-ap.add_argument("--ferramenta", default="vetor-kanivete"); a = ap.parse_args()
+ap.add_argument("--ferramenta", default="vetor-kanivete")
+ap.add_argument("--forcar", action="store_true", help="recarrega mesmo com projeto aberto no editor de vídeo (perde o que não foi salvo)")
+a = ap.parse_args()
 with sync_playwright() as p:
     b = p.chromium.connect_over_cdp(f"http://127.0.0.1:{a.porta}")
     pg = next(x for c in b.contexts for x in c.pages if "index.html" in x.url)
+    # recarregar a página FECHA o projeto do editor de vídeo (o que não foi salvo some): no app do usuário, não
+    # olha TODAS as janelas (a timeline/painéis soltos são outras páginas index.html, sem o projeto)
+    aberto = next((r for c in b.contexts for x in c.pages if "index.html" in x.url for r in [x.evaluate(
+        "() => typeof VE === 'object' && VE.ready ? (VE.projectPath || 'sem nome') : null")] if r), None)
+    if aberto and not a.forcar:
+        sys.exit(f"recusado: projeto aberto no editor ({aberto}); recarregar fecha o projeto. Use --forcar só no app de teste.")
     py = pg.evaluate("() => window.pywebview && pywebview.api.vk_recarregar ? pywebview.api.vk_recarregar() : null") if a.py else None
     cdp = pg.context.new_cdp_session(pg); cdp.send("Network.setCacheDisabled", {"cacheDisabled": True}); cdp.send("Page.reload", {"ignoreCache": True})
     pg.wait_for_function("typeof switchTool === 'function' && window.pywebview && pywebview.api", timeout=30000)

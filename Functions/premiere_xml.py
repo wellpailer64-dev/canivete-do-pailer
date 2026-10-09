@@ -215,6 +215,19 @@ class _Exportador:
             fim = ini + _q(mk.get("d"), self.fps) if mk.get("d") else -1
             partes.append(f"<marker><comment>{escape(str(mk.get('desc') or ''))}</comment>"
                           f"<name>{escape(str(mk.get('nome') or ''))}</name><in>{ini}</in><out>{fim}</out></marker>")
+        # o que não vira clipe no XML (camada de ajuste, texto, cor, forma...) vira MARCADOR no mesmo trecho, com os
+        # efeitos na descrição: no Premiere fica marcado onde refazer (ex.: a "escuta" escura do Arco do Edgar)
+        for c in s.get("clips") or []:
+            m = self.media.get(c.get("m", 0)) or {}
+            if m.get("kind") not in _SEM_XML or c.get("off"):
+                continue
+            ini = _q(c.get("st"), self.fps)
+            fim = ini + max(1, _q((float(c.get("e") or 0) - float(c.get("s") or 0)) / float(c.get("v") or 1), self.fps))
+            fx = "; ".join(f"{_FX_NOMES.get(f.get('t'), f.get('t'))} " + ", ".join(f"{k}={v}" for k, v in (f.get("v") or {}).items() if v not in (0, None, ""))
+                           for f in c.get("fx") or [] if f.get("on", True))
+            nome = m.get("nome") or m.get("name") or _SEM_XML[m["kind"]]
+            partes.append(f"<marker><comment>{escape(fx or _SEM_XML[m['kind']])}</comment>"
+                          f"<name>{escape(str(nome))}</name><in>{ini}</in><out>{fim}</out></marker>")
         if s.get("legendas"):
             self.rel.fora("Legendas da timeline (exporte em Arquivo › Exportar legendas e importe o .srt)")
         partes.append("</sequence>")
