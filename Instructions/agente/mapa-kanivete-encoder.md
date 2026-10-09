@@ -112,3 +112,21 @@ Corte também a base (só os segmentos até T).
 3. Na placa: legendas, outros modos de mesclagem, rotação de camada, prévia renderizada.
 4. +1,5 de Y na LUT do libplacebo; blocos com GOP fechado; base de trechos no export por blocos.
 5. Textos antigos da fila sem tradução ("Fila de render", "Pausar depois deste"…).
+
+## 8. Referência para um motor próprio: VapourSynth (lido em 2026-10-08, r81, commit 744afbd)
+Código em `D:\kanivete_testesefapoursynth` (clone raso, só leitura; LGPL-2.1: usar como biblioteca sim,
+copiar código para o app não). Por que importa: é o "chef com comanda" que o ffmpeg CLI não é.
+- Pede cada quadro sob demanda, com vários em andamento ao mesmo tempo (thread pool) e cache por nó.
+- **r80/r81 (2026): GPU em Vulkan 1.4 no núcleo.** Quadros moram na placa (`GPUUpload`/`GPUDownload` só nas bordas);
+  orçamento de VRAM (⅔ do disponível) com despejo e freio de pedidos ("maior que a VRAM termina, só mais devagar");
+  trabalho adiantado limitado a ¼ do orçamento. É a solução exata do nosso problema de memória (§7).
+- Filtros de placa prontos ainda são poucos: redimensionar, BoxBlur, PlaneStats e os de ordem/propriedades.
+  Composição com posição, LUT 3D, Clareza e mesclagem seriam **nossos** filtros: plugin nativo (C/C++, DLL), com o GLSL
+  compilado em tempo de execução (`compileGPUShader`; `sdk/gpu_invert_driver_example.cpp` = um filtro de pixel em
+  poucas linhas). Python só monta o grafo; filtro de placa em Python não existe.
+- Leitura de vídeo: não vem no núcleo. Os plugins (BestSource, L-SMASH, ffms2) decodificam na CPU (4K HEVC pesa).
+  A ponte CUDA (`sdk/gpu_cuda_invert_example.cu`) "ainda não rodou em placa NVIDIA" — muito novo.
+- Saída: `vspipe` manda os quadros (y4m/mkv) para o ffmpeg com NVENC; o quadro desce da placa uma vez por quadro.
+- Veredito (2026-10-08): promissor para um motor próprio, mas imaturo para nós agora (GPU de 1 mês, decodificação na
+  CPU, plugin nativo a compilar). Rever quando a decodificação na placa e a ponte CUDA amadurecerem; o primeiro teste
+  seria a nossa timeline com um filtro de composição simples, medindo × o modo placa.
