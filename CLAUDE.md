@@ -59,7 +59,8 @@ esquerda, fila à direita (cada item congela a timeline ao entrar e tem as SUAS 
 formulário e o que mudar vale para ele), "Adicionar à fila", "Todas as timelines", ▶ Renderizar fila em ordem enquanto
 se edita. Botão Fila no cabeçalho abre o mesmo painel. API `VEFILA_API`. Teste: `py -3.13 testes/teste_fila.py` (porta 9334).
 
-**Kanivete Encoder (Ke)**: janela própria do export feita (`editor-encoder.js`: logo Ke, solta, minimiza, lembra posição).
+**Kanivete Encoder (Ke) — comece pelo mapa `Instructions/agente/mapa-kanivete-encoder.md`** (caminho do export,
+arquivos, armadilhas medidas, resultados, testes, pendências). Janela própria do export feita (`editor-encoder.js`: logo Ke, solta, minimiza, lembra posição).
 Atalhos: Ctrl+M = pôr na fila + abrir; Ctrl+Shift+M = pôr na fila sem abrir (aviso, som, barrinha; a fila começa
 sozinha); marcador anterior = Alt+Shift+M. Janela: "Renderizando agora" com miniatura do quadro (o ffmpeg grava
 `ke_quadro.jpg` 1×/s: `video_cutter.saida_miniatura`), velocidade, selo placa/CPU e monitor ao vivo de CPU/RAM/placa

@@ -2214,6 +2214,7 @@
   "Instructions/agente/guia-edicao.md": "GUIA-EDICAO :: Pocket Editor (Canivete do Pailer) — para agentes de IA",
   "Instructions/agente/mapa-editor.md": "Mapa do código — editor (gerado por tools/mapa_codigo.py; nome:linha)",
   "Instructions/agente/mapa-imagem.md": "Mapa do código — imagem (gerado por tools/mapa_codigo.py; nome:linha)",
+  "Instructions/agente/mapa-kanivete-encoder.md": "Mapa do Kanivete Encoder (Ke)",
   "Instructions/agente/mapa-vetor.md": "Mapa do código — vetor (gerado por tools/mapa_codigo.py; nome:linha)",
   "Instructions/agente/plano-cena.md": "Plano CENA — diagramar no Photo Kanivete escrevendo HTML/CSS (para IAs)",
   "Instructions/agente/plano-comp.md": "Plano: Comp (composição estilo After Effects) no Pocket Editor",
