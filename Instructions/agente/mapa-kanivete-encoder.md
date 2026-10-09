@@ -80,6 +80,7 @@ arquivo .part → renomeado no fim · miniatura ke_quadro.jpg 1×/s (saida_minia
 | CPU, Full HD (com a correção do logo) | 264 s (2,7×) | referência |
 | 4K bruto pela CPU | 518,6 s (5,25×) | RAM 9,1 GB |
 | **4K bruto com cópias Full HD automáticas + placa** | **107,6 s (1,09×)** | RAM 1,6 GB; `otimizar.usar_otimizados` |
+| idem, pico da placa com o app aberto | 118 s | export 5,6 GB (estimativa 2,3) + 1,4 GB do app = 6,9 de 8 GB; cresce de 4,8 → 7,0 GB ao longo do export (fila adiantada); conferência agora ×2,6 |
 | **placa, Full HD** | **96–98 s (0,97–0,99×)** | 38,8 dB contra a CPU |
 | placa, partida | ~2,7 s até o 1º quadro (0,5 s de preparo no Python) | NVENC e miniatura não pesam |
 

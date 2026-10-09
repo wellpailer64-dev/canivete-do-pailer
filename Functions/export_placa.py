@@ -89,10 +89,11 @@ def memoria_em_uso():
 
 
 def cabe_na_placa(segmentos, lay, path):
-    """A exportação cabe na memória livre? Estimativa × 2 (medido 2026-10-08: estimou 2,0 GB e usou 3,8 GB além do que
-    já estava ocupado — a fila adiantada de quadros) + o que já está em uso ≤ 92% da placa. Sem caber: vai direto pela
-    CPU em vez de tentar e estourar no meio (antes: falhava com o editor usando a placa ao mesmo tempo)."""
-    return memoria_estimada(segmentos, lay, path) * 2 + memoria_em_uso() <= 0.92 * memoria_placa()
+    """A exportação cabe na memória livre? Estimativa × 2,6 (medido 2026-10-08: 2,0 → 3,8 GB e, com as cópias Full HD
+    automáticas, 2,3 → 5,6 GB além do que já estava ocupado — a fila adiantada de quadros cresce durante o export) + o
+    que já está em uso ≤ 92% da placa. Sem caber: vai direto pela CPU em vez de estourar no meio e recomeçar (com ×2, o
+    app ocupando ~2 GB passou na conferência e estourou em 21%, perdendo ~90 s)."""
+    return memoria_estimada(segmentos, lay, path) * 2.6 + memoria_em_uso() <= 0.92 * memoria_placa()
 
 
 def memoria_estimada(segmentos, lay, path):
