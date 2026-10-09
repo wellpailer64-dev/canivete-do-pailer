@@ -73,6 +73,13 @@ pelo `exportar_video` com a placa ligada; o que não suporta (`motivo()`) ou fal
 Testar: `py -3.13 testes/teste_export.py --placa`. Armadilhas (disable_linear, settb, `ot`) no plano §8.
 **Taxa da timeline CRAVADA** (`video_cutter.taxa_timeline`, `probe()["fps_timeline"]`): nunca a média de vídeo de celular.
 
+Mixer de trilhas de áudio (Audio Track Mixer do Premiere): `frontend/js/editor-mixer.js` (aba junto dos Controles de
+efeito): pan, M/S (S também no cabeçalho da trilha), fader −∞..+15 dB na escala do Premiere, medidor L/R por trilha e o Mix.
+Estado em `VE_TRK.a[k]` {vol, pan, mute, solo} e `VE.master.vol`; som pelo efeito interno `trk` (editor.js `veTrkAfx`,
+prévia `veAudioFxProcess`, export `_filtros_afx`); Mix depois do Hard Limiter do Master (`veMasterLim().fim`). Premiere
+ida e volta (`premiere.py _mixer_trilha`, `premiere_xml.py`). API `VEMIX_API`. Teste: `py -3.13 testes/teste_mixer.py`.
+Falta (etapa 2): rack de efeitos por trilha (5 espaços, processado na SOMA da trilha) e automação (Read/Write).
+
 Atributos de vários clipes (como no Premiere): `frontend/js/editor-atributos.js` — botão direito → "Remover atributos…"
 (efeitos de vídeo/áudio, movimento, opacidade, mesclagem, volume, transições, com caixinhas; vale para a seleção) e ajuste
 em grupo (mexer num efeito com vários selecionados leva o valor ao mesmo efeito de todos). Teste: `testes/teste_atributos.py`.

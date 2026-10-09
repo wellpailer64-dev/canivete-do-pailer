@@ -204,9 +204,21 @@ class _Exportador:
             partes.append(self.faixa_xml(faixa, grupos, prop or {}, "hide"))
         partes.append("</video><audio><numOutputChannels>2</numOutputChannels><format><samplecharacteristics>"
                       "<depth>16</depth><samplerate>48000</samplerate></samplecharacteristics></format>")
+        # Mixer de trilhas (editor-mixer.js): o XML não tem o fader da trilha nem o do Mix — o volume deles vai somado
+        # no Audio Levels de cada clipe (o som fica igual); pan no Panner da trilha; trilha calada pelo solo = desligada
+        props_a = [((trilhas.get("a") or [])[ti] if ti < len(trilhas.get("a") or []) else {}) or {} for ti in range(n_tr)]
+        solo = any(p.get("solo") for p in props_a)
+        master_db = float((s.get("master") or {}).get("vol") or 0)
         for ti, faixa in enumerate(faixas_a):
-            prop = (trilhas.get("a") or [])[ti] if ti < len(trilhas.get("a") or []) else {}
-            partes.append(self.faixa_xml(faixa, grupos, prop or {}, "mute"))
+            prop = dict(props_a[ti])
+            if solo and not prop.get("solo"):
+                prop["mute"] = True
+            extra = float(prop.get("vol") or 0) + master_db
+            if extra and faixa:
+                self.rel.aprox("Volume da trilha / do Mix (somado no Audio Levels de cada clipe)")
+                for it in faixa:
+                    it["g_extra"] = extra
+            partes.append(self.faixa_xml(faixa, grupos, prop, "mute"))
         partes.append("</audio></media>")
         partes.append(f"<timecode>{r}<string>00:00:00:00</string><frame>0</frame>"
                       "<displayformat>NDF</displayformat></timecode>")
@@ -234,7 +246,14 @@ class _Exportador:
         return "".join(partes)
 
     def faixa_xml(self, faixa, grupos, prop, chave_off):
-        partes = ["<track>"]
+        pan = float(prop.get("pan") or 0) if chave_off == "mute" else 0.0
+        if pan:   # Balance da trilha como o Premiere grava no próprio XML dele (0..1, 0,5 = centro)
+            b = f"{max(0.0, min(1.0, (pan / 100 + 1) / 2)):.6g}"
+            partes = [f'<track PannerCurrentValue="{b}" PannerIsInverted="true" '
+                      f'PannerStartKeyframe="-91445760000000000,{b},0,0,0,0,0,0" PannerName="Balance" '
+                      'premiereTrackType="Stereo">']
+        else:
+            partes = ["<track>"]
         for it in faixa:
             partes.append(self.clipitem_xml(it, grupos))
             partes.extend(it["transicoes"])
@@ -352,8 +371,8 @@ class _Exportador:
             partes.append(self.filtro_velocidade(v, tipo))
         if tipo == "video":
             partes.extend(self.filtros_video(c, m, it, mfps))
-        elif c.get("g"):
-            ganho = 10 ** (float(c["g"]) / 20)
+        elif c.get("g") or it.get("g_extra"):
+            ganho = 10 ** ((float(c.get("g") or 0) + float(it.get("g_extra") or 0)) / 20)
             if ganho > 3.98107:
                 self.rel.aprox("Ganho acima de +12 dB (limitado a +12)")
                 ganho = 3.98107

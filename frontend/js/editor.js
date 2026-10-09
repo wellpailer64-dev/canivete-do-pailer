@@ -80,13 +80,26 @@ function veMixClipes() {
         .filter(c => !veIsImage(c) && !veMudo(c) && c.e - c.s > 0.005 && veTemSom(c))
         .map(c => {
             const f = fd.get(c) || c;
-            const afx = typeof veAfxExport === 'function' ? veAfxExport(c) : [];
+            // volume e pan da trilha (Mixer de trilhas) por último: depois dos efeitos do clipe, como no Premiere
+            const afx = [...(typeof veAfxExport === 'function' ? veAfxExport(c) : []), veTrkAfx(c.tr)];
             return [+f.st.toFixed(5), +f.s.toFixed(5), +f.e.toFixed(5), +(c.g || 0).toFixed(2), veMid(c),
                     +veVel(c).toFixed(4), c.tom === false ? 0 : 1, +(f.fi || 0).toFixed(4), +(f.fo || 0).toFixed(4), afx];
         })
         .sort((a, b) => a[0] - b[0]);
 }
 function veMixAtivo() { return veAudioPronto(); }
+
+// Volume (dB; ≤ VE_MIX_MIN = −∞) e pan (−100..100) da trilha de áudio + o volume do Master sem limitador (com ele,
+// o Master entra depois do limitador: veMasterLim().fim). tr vai junto para os medidores do mixer.
+const VE_MIX_MIN = -96;
+const veMixDb = v => v == null ? 0 : v <= VE_MIX_MIN ? -200 : +v;
+function veMasterDb() { return veMixDb(VE.master && VE.master.vol); }
+function veTrkAfx(tr) {
+    const s = (tr >= 0 && VE_TRK.a[tr]) || {};
+    const lim = typeof veMasterLim === 'function' && VE.master && VE.master.lim && VE.master.lim.on !== false;
+    const g = veMixDb(s.vol) + (lim ? 0 : veMasterDb());
+    return { t: 'trk', v: { g: +Math.max(-200, g).toFixed(2), p: +(+s.pan || 0).toFixed(1), tr } };
+}
 
 // Estado de cada trilha (como os botões do cabeçalho no Premiere): v[k] = trilha Vk+1, a[k] = Ak+1.
 // hide = olho (não aparece na prévia nem na exportação), lock = cadeado (clipes não podem ser editados),
@@ -133,7 +146,9 @@ function veEnsureTracks(count, opts = {}) {
 }
 function veEnsureTrackIndex(k, opts) { return k >= 0 && veEnsureTracks(k + 1, opts); }
 const veTrkHidden = tr => tr >= 0 && !!(VE_TRK.v[tr] && VE_TRK.v[tr].hide);
-const veTrkMuted = tr => tr >= 0 && !!(VE_TRK.a[tr] && VE_TRK.a[tr].mute);
+// Mixer de trilhas (editor-mixer.js): solo em alguma trilha cala as outras (como o "MutedBySolo" do Premiere)
+const veTrkSolo = () => VE_TRK.a.some(t => t && t.solo);
+const veTrkMuted = tr => tr >= 0 && !!(VE_TRK.a[tr] && (VE_TRK.a[tr].mute || (!VE_TRK.a[tr].solo && veTrkSolo())));
 // Clipe desativado (Ctrl+Shift+E, como o "Ativar" do Premiere): fica no lugar, apagado na timeline, mas não aparece
 // na prévia nem na exportação e não tem som. Os clipes estendidos das transições levam o original em _o.
 const veClipOff = c => !!(c && (c.off || (c._o && c._o.off)));
@@ -771,6 +786,7 @@ function veSeqAplicar(seq, opts = {}) {
     VE.legEstilo = vePlain(seq.legEstilo || null, null);
     VE.legGravar = seq.legGravar !== false;
     VE.master = vePlain(seq.master || null, null);
+    if (typeof veMixUi === 'function') veMixUi();   // fader do Mix desta sequência
     if (typeof veMedMasterUi === 'function') veMedMasterUi();
     if (typeof VETX !== 'undefined') {
         VETX.palavras = vePlain(seq.texto && seq.texto.palavras, []);
@@ -4430,7 +4446,7 @@ function veApplyProject() {
             playhead: s.playhead || 0,
             view: s.view || { pps: 0, x: 0 },
             w: s.w, h: s.h,
-            master: s.master && s.master.lim ? s.master : null,
+            master: s.master && (s.master.lim || s.master.vol) ? s.master : null,   // limitador e volume do Mix (editor-mixer.js)
             ...(s.comp ? { comp: true, dur: +s.dur || 0 } : {}),
         };
     });
@@ -4577,14 +4593,17 @@ function veBuildHeads() {
         const extra = tr.kind === 'v'
             ? bt('hide', st.hide, st.hide ? 'Mostrar trilha' : 'Ocultar trilha (não aparece na prévia nem na exportação)',
                 `<svg class="i"><use href="#i-${st.hide ? 'eye-off' : 'eye'}"/></svg>`)
-            : bt('mute', st.mute, st.mute ? 'Ativar som da trilha' : 'Silenciar trilha', 'M');
+            : bt('mute', st.mute, st.mute ? 'Ativar som da trilha' : 'Silenciar trilha', 'M')
+              + bt('solo', st.solo, st.solo ? 'Tirar o solo' : 'Solo: ouvir só esta trilha (e as outras em solo)', 'S');
+        const off = tr.kind === 'v' ? st.hide : veTrkMuted(k);
         return `
-        <div class="ve-head ve-head-${tr.kind}${tr.main ? ' main' : ''}${st.lock ? ' locked' : ''}${st.hide || st.mute ? ' off' : ''}" data-tr="${i}" style="height:${tr.h}px">
+        <div class="ve-head ve-head-${tr.kind}${tr.main ? ' main' : ''}${st.lock ? ' locked' : ''}${off ? ' off' : ''}" data-tr="${i}" style="height:${tr.h}px">
             <div class="ve-head-row">${lock}<b>${tr.id}</b>${extra}</div>
             ${tr.main && tr.h >= 40 ? `<span>${tr.kind === 'v' ? 'Vídeo' : 'Áudio'}</span>` : ''}
             <i class="ve-head-grip" data-grip="${i}" title="Arraste para aumentar ou diminuir a trilha"></i>
         </div>` + (typeof veKlHeadsHtml === 'function' ? veKlHeadsHtml(tr) : '');
     }).join('');
+    if (typeof veMixUi === 'function') veMixUi();   // o Mixer de trilhas acompanha as trilhas e os M/S
 }
 
 // Ativar/desativar os clipes selecionados (Ctrl+Shift+E). Algum ativo na seleção: desativa todos; senão, ativa
@@ -4612,12 +4631,21 @@ function veTrackToggle(kind, k, act) {
     const nome = `${kind === 'v' ? 'V' : 'A'}${k + 1}`;
     veToast({ lock: st.lock ? `${nome} bloqueada` : `${nome} desbloqueada`,
               hide: st.hide ? `${nome} oculta` : `${nome} visível`,
-              mute: st.mute ? `${nome} sem som` : `${nome} com som` }[act]);
+              mute: st.mute ? `${nome} sem som` : `${nome} com som`,
+              solo: st.solo ? `${nome} em solo` : `${nome} sem solo` }[act]);
     if (act === 'hide') veCacheInvalidate();
     veBuildHeads();
     if (act === 'hide' && VE.ready) veSyncPlayer(true);   // o clipe de baixo pode passar a ser o que toca
-    if (act === 'mute') veApplyAudioGain();
+    if (act === 'mute' || act === 'solo') veMixMudou();
     veRefresh();
+}
+
+// Algo do mixer de trilhas mudou (volume, pan, M, S, Master): o som que ainda não tocou é refeito na hora
+function veMixMudou() {
+    if (!VE.dirty) { VE.dirty = true; veUpdateTitle(); }
+    veApplyAudioGain();
+    if (veMixAtivo()) veAudioEditou();
+    if (typeof veMixUi === 'function') veMixUi();
 }
 
 function veSyncHeads() {

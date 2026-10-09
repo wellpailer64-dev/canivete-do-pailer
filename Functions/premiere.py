@@ -11,6 +11,7 @@ sequências; o relatório diz o que não veio (efeitos de plugin, gráficos, mí
 O formato não é documentado pela Adobe: testado com projeto do Premiere 2025 (Version 45).
 """
 import gzip
+import math
 import os
 import xml.etree.ElementTree as ET
 from collections import Counter
@@ -246,13 +247,19 @@ class _Conversor:
         grupos, w, h, fps = self._info_seq(seq)
         sid = self.seq_ids[seq.attrib.get('ObjectUID')]
         clipes, itens = [], {}
+        mixer, master = [], None
         for tipo, grupo in (('v', grupos.get('VideoTrackGroup')), ('a', grupos.get('AudioTrackGroup'))):
             if grupo is None:
                 continue
+            if tipo == 'a':
+                mt = self.g.ref(grupo.find('MasterTrack'))
+                master = self._mixer_trilha(mt.find('AudioTrack') if mt is not None else None)
             for k, tr in enumerate(grupo.findall('TrackGroup/Tracks/Track')):
                 trilha = self.g.ref(tr)
                 if trilha is None:
                     continue
+                if tipo == 'a':
+                    mixer.append(self._mixer_trilha(trilha.find('AudioTrack')))
                 for ti in trilha.findall('.//ClipItems/TrackItems/TrackItem'):
                     item = self.g.ref(ti)
                     c = self._clipe(item, tipo, k, w, h) if item is not None else None
@@ -267,8 +274,51 @@ class _Conversor:
         # vídeo com som do mesmo arquivo, mesmos tempos e vinculado: um clipe só (como o editor cria)
         nome = seq.findtext('Name') or 'Sequência'
         self.rel['seqs'].append((nome, len(clipes)))
-        return {'id': sid, 'name': nome, 'clips': clipes, 'trilhas': None, 'w': w, 'h': h, 'markers': self._marcadores(seq),
-                'legendas': [], 'inPt': None, 'outPt': None, 'playhead': 0, 'view': {'pps': 0, 'x': 0}, '_fps': fps}
+        # Mixer de trilhas de áudio: volume/pan/M/S de cada trilha e o volume do Mix (Master) — editor-mixer.js
+        trilhas = None
+        if any(mixer):
+            n = len(mixer)
+            trilhas = {'v': [{} for _ in range(n)], 'a': mixer}
+            self.rel['convertidos']['Mixer de trilhas (volume/pan/mudo/solo)'] += sum(1 for m in mixer if m)
+        out = {'id': sid, 'name': nome, 'clips': clipes, 'trilhas': trilhas, 'w': w, 'h': h, 'markers': self._marcadores(seq),
+               'legendas': [], 'inPt': None, 'outPt': None, 'playhead': 0, 'view': {'pps': 0, 'x': 0}, '_fps': fps}
+        if master and master.get('vol'):
+            out['master'] = {'vol': master['vol']}
+            self.rel['convertidos']['Volume do Mix (Master)'] += 1
+        return out
+
+    def _mixer_trilha(self, at):
+        """Volume (dB), pan (−100..100), mudo e solo de uma trilha de áudio, como no Mixer de trilhas do Premiere:
+        o AudioFader da cadeia da trilha (Volume em ganho linear, Mute) e o Panner (Balance 0..1, 0,5 = centro).
+        Automação (quadros-chave do volume/pan da trilha) não vem: fica o valor do começo."""
+        o = {}
+        if at is None:
+            return o
+        chain = self.g.ref(at.find('ComponentOwner/Components'))
+        for comp in (chain.findall('.//Components/Component') if chain is not None else []):
+            fader = self.g.ref(comp)
+            if fader is None or fader.tag != 'AudioFader':
+                continue
+            for p in fader.findall('.//Params/Param'):
+                pr = self.g.ref(p)
+                nome = pr.findtext('Name') if pr is not None else None
+                if nome == 'Volume' and _param_valor(pr):
+                    lin = _num(_param_valor(pr), 1.0)
+                    o['vol'] = round(20 * math.log10(lin), 2) if lin > 1.6e-5 else -96
+                    if _param_keyframes(pr):
+                        self.rel['ignorados']['Automação de volume da trilha (Mixer)'] += 1
+                elif nome == 'Mute' and _param_valor(pr).strip().lower() == 'true':
+                    o['mute'] = True
+        pan = self.g.ref(at.find('Panner'))
+        for p in (pan.findall('.//Params/Param') if pan is not None else []):
+            pr = self.g.ref(p)
+            if pr is not None and pr.findtext('Name') == 'Balance' and _param_valor(pr):
+                o['pan'] = round((_num(_param_valor(pr), 0.5) * 2 - 1) * 100, 1)
+                if _param_keyframes(pr):
+                    self.rel['ignorados']['Automação de pan da trilha (Mixer)'] += 1
+        if (at.findtext('Solo') or '').strip() == '1':
+            o['solo'] = True
+        return {k: v for k, v in o.items() if v not in (0, 0.0)}
 
     def _clipe(self, item, tipo, k, W, H):
         cti = item.find('ClipTrackItem')

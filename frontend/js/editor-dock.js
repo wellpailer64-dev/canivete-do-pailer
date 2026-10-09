@@ -33,7 +33,7 @@ function vedDefault() {
             { t: 's', d: 'row', z: [0.77, 0.23], c: [
                 { t: 'g', p: ['monitor'], a: 'monitor' },
                 { t: 's', d: 'col', z: [0.6, 0.4], c: [
-                    { t: 'g', p: ['pp', 'props', 'lc', 'texto', 'projeto'], a: 'pp' },
+                    { t: 'g', p: ['pp', 'props', 'lc', 'texto', 'projeto', 'mixer'], a: 'pp' },
                     { t: 'g', p: ['fx', 'trans', 'sb', 'keys'], a: 'fx' },
                 ] },
             ] },
@@ -243,6 +243,12 @@ function vedApply(d) {
         const gs = [st.root, ...st.floats.map(f => f.root)].flatMap(r => vedGroups(r));
         const g = gs.find(g => g.p.includes('medidores')) || gs.find(g => g.p.includes('keys'));
         if (g) { g.p.push('desempenho'); st.novos = st.novos.filter(id => id !== 'desempenho'); }
+    }
+    // Mixer de trilhas de áudio (editor-mixer.js): aba junto dos Controles de efeito, como no Premiere, sem roubar a ativa
+    if (st.novos.includes('mixer')) {
+        const gs = [st.root, ...st.floats.map(f => f.root)].flatMap(r => vedGroups(r));
+        const g = gs.find(g => g.p.includes('pp')) || gs.find(g => g.p.includes('fx'));
+        if (g) { g.p.push('mixer'); st.novos = st.novos.filter(id => id !== 'mixer'); }
     }
     st.novos.forEach(id => vedAddTab(id, true));
     vedRender();

@@ -1779,6 +1779,10 @@ def _normalizar_afx(efeitos):
             mix = _afx_lim(v.get("mix"), 0.0, 60.0, 18.0)
             if mix > 0:
                 out.append((t, {"mix": mix, "size": _afx_lim(v.get("size"), 0.0, 100.0, 45.0)}))
+        elif t == "trk":   # volume (dB) e pan (−100..100) da trilha: Mixer de trilhas (editor.js: veTrkAfx)
+            g, p = _afx_lim(v.get("g"), -200.0, 15.0, 0.0), _afx_lim(v.get("p"), -100.0, 100.0, 0.0)
+            if abs(g) > 0.005 or abs(p) > 0.05:
+                out.append((t, {"g": g, "p": p}))
         elif t == "eq":
             vals = {k: _afx_lim(v.get(k), -12.0, 12.0, 0.0) for k in ("lo", "mid", "hi")}
             if any(abs(x) > 0.01 for x in vals.values()):
@@ -1802,6 +1806,12 @@ def _filtros_afx(efeitos):
             decays = [wet * 0.55, wet * 0.35, wet * 0.22]
             fs.append("aecho=0.90:1.0:" + "|".join(f"{d:.1f}" for d in atrasos)
                       + ":" + "|".join(f"{d:.4f}" for d in decays))
+        elif t == "trk":   # a mesma conta da prévia (editor-audio.js): pan > 0 abaixa o L, < 0 abaixa o R
+            if abs(v["g"]) > 0.005:
+                fs.append(f"volume={v['g']:.2f}dB")
+            p = v["p"] / 100.0
+            if abs(p) > 0.0005:
+                fs.append(f"pan=stereo|c0={1 - max(0.0, p):.5f}*c0|c1={1 + min(0.0, p):.5f}*c1")
         elif t == "eq":
             for freq, width, gain in ((120, 2.0, v["lo"]), (1000, 1.0, v["mid"]), (6500, 2.0, v["hi"])):
                 if abs(gain) > 0.01:
@@ -1930,7 +1940,7 @@ def _entrada_audio(arq, path):
     return ["-i", path if arq is None else arq]
 
 
-def _limitar_master(mix, path, tem_audio_fonte, total, lim, work):
+def _limitar_master(mix, path, tem_audio_fonte, total, lim, work, fim=0.0):
     """Hard Limiter no Master (a soma de todas as trilhas, como no Mixer de trilhas do Premiere): o ffmpeg soma o mix
     (o mesmo _grafo_mix da exportação), a soma passa pelo _hard_limiter e volta como um PCM só."""
     import numpy as np
@@ -1953,6 +1963,8 @@ def _limitar_master(mix, path, tem_audio_fonte, total, lim, work):
                            + (r.stderr.decode("utf-8", "replace").strip().splitlines() or ["?"])[-1])
     x = np.frombuffer(r.stdout[:len(r.stdout) // 8 * 8], dtype=np.float32).reshape(-1, 2)
     y = _hard_limiter(x, **lim)
+    if fim:   # volume do Master: depois do limitador, como no Premiere (editor-audio.js: veMasterLim().fim)
+        y = (y * 10.0 ** (fim / 20.0)).astype(np.float32)
     raw = os.path.join(work, f"master_{uuid.uuid4().hex[:10]}.f32")
     y.tofile(raw)
     return [(0.0, 0.0, len(y) / AUDIO_SR, 0.0, raw, 1.0, True, 0.0, 0.0, [])]
@@ -3017,11 +3029,12 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         for c in lay:
             _camada_reduz_na_placa(c)
     # Hard Limiter no Master: vem no fim da lista do mix como {"master": {...}} (editor.js: veExportar)
-    master_lim = None
+    master_lim, master_fim = None, 0.0
     if audio_clipes is not None:
         for c in audio_clipes:
             if isinstance(c, dict) and isinstance(c.get("master"), dict):
                 master_lim = (_normalizar_afx([{"t": "limiter", "v": c["master"]}]) or [(None, None)])[0][1]
+                master_fim = _afx_lim(c["master"].get("fim"), -200.0, 15.0, 0.0)
         audio_clipes = [c for c in audio_clipes if not isinstance(c, dict)]
     mix = _normalizar_mix(audio_clipes, info["duration"]) if audio_clipes is not None else None
     segs = [p for p in pecas if p[0] != "gap"]
@@ -3061,7 +3074,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         mix = _pre_limitar(mix, path, info["has_audio"], _work_dir())
     if mix and not sem_audio and master_lim:
         prog(0, "Aplicando Hard Limiter no Master...")
-        mix = _limitar_master(mix, path, info["has_audio"], total, master_lim, _work_dir())
+        mix = _limitar_master(mix, path, info["has_audio"], total, master_lim, _work_dir(), master_fim)
     # áudios soltos na timeline dão som ao vídeo mesmo que o vídeo aberto não tenha
     extras = sorted({c[4] for c in (mix or []) if c[4]})
     if mix is not None and not info["has_audio"]:

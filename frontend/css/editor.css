@@ -2248,3 +2248,45 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-desemp.horiz.mini .ve-des-n { grid-column: auto; }
 .ve-desemp.horiz.mini .ve-des-s { display: none; }
 .ve-desemp.horiz.mini .ve-des-b { grid-column: auto; margin: 0; align-self: center; min-width: 20px; }
+/* ── Mixer de trilhas de áudio (editor-mixer.js) ── */
+.ve-mixer-p { min-width: 0; min-height: 0; }
+.ve-mixer { height: 100%; display: flex; background: #1b1b1e; color: var(--ve-dim); font-size: 11px; user-select: none;
+    box-sizing: border-box; overflow: hidden; }
+.ve-mix-cols { display: flex; flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; }
+.ve-mix-col { flex: 0 0 132px; display: flex; flex-direction: column; align-items: stretch; padding: 8px 6px 4px;
+    border-right: 1px solid #2c2c30; box-sizing: border-box; min-height: 0; }
+.ve-mix-col.mestre { border-left: 1px solid #3a3a40; border-right: 0; background: #1f1f23; }
+.ve-mix-topo { height: 74px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; flex: 0 0 auto; }
+.ve-mix-pan { position: relative; width: 44px; height: 44px; cursor: ns-resize; touch-action: none; }
+.ve-mix-pan svg { width: 44px; height: 44px; display: block; }
+.ve-mix-pan circle { fill: none; stroke: #c9c9cf; stroke-width: 2; }
+.ve-mix-agulha { stroke: #c9c9cf; stroke-width: 2.4; stroke-linecap: round; }
+.ve-mix-lr { position: absolute; left: -14px; right: -14px; bottom: -2px; display: flex; justify-content: space-between; pointer-events: none; }
+.ve-mix-lr i { font-style: normal; color: #4f8ff7; font-size: 11px; }
+.ve-mix-pv, .ve-mix-vv { color: #4f8ff7; font-weight: 500; text-align: center; cursor: text; min-height: 15px; display: block; }
+.ve-mix-pv input, .ve-mix-vv input { width: 56px; background: #0f0f11; color: var(--ve-text); border: 1px solid #4f8ff7;
+    border-radius: 3px; font: inherit; text-align: center; padding: 0; }
+.ve-mix-ms { display: flex; justify-content: center; gap: 8px; height: 24px; margin: 4px 0 6px; flex: 0 0 auto; }
+.ve-mix-ms button { width: 22px; height: 20px; padding: 0; border-radius: 3px; border: 1px solid transparent; background: none;
+    color: #8a8a92; font: 600 11px/1 inherit; cursor: pointer; }
+.ve-mix-ms button:hover { color: var(--ve-text); }
+.ve-mix-ms [data-mbt="mute"].on { background: #5ad6a0; color: #10241b; }
+.ve-mix-ms [data-mbt="mute"].solo-off { border-color: #5ad6a0; color: #5ad6a0; }
+.ve-mix-ms [data-mbt="solo"].on { background: #e8c11c; color: #2a2205; }
+.ve-mix-corpo { flex: 1; min-height: 120px; display: flex; gap: 4px; position: relative; padding: 8px 0; }
+.ve-mix-esc { position: relative; width: 22px; flex: 0 0 22px; }
+.ve-mix-esc i { position: absolute; right: 0; transform: translateY(50%); font-style: normal; font-size: 9px; color: #8a8a92; line-height: 1; }
+.ve-mix-esc-med i { left: 0; right: auto; }
+.ve-mix-fader { position: relative; width: 22px; flex: 0 0 22px; cursor: ns-resize; touch-action: none; }
+.ve-mix-trilho { position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: #3a3a40; border-radius: 1px; }
+.ve-mix-botao { position: absolute; left: 2px; width: 18px; height: 18px; border: 2px solid #d9d9de; border-radius: 4px;
+    box-sizing: border-box; background: #232327; }
+.ve-mix-botao::after { content: ''; position: absolute; left: 3px; right: 3px; top: 6px; height: 2px; background: #d9d9de; }
+.ve-mix-fader:hover .ve-mix-botao { border-color: #fff; }
+.ve-mix-med { display: flex; gap: 2px; width: 22px; flex: 0 0 22px; }
+.ve-mix-med span { position: relative; flex: 1; background: linear-gradient(to top, #16a34a 0%, #22c55e 80%, #eab308 80.1%, #facc15 95%, #ef4444 95.1%, #dc2626 100%); }
+.ve-mix-med s { position: absolute; left: 0; right: 0; top: 0; height: 100%; background: #0b0b0d; text-decoration: none; }
+.ve-mix-vv { margin-top: 4px; }
+.ve-mix-nome { margin-top: 4px; display: flex; gap: 8px; justify-content: center; white-space: nowrap; overflow: hidden; color: var(--ve-text); }
+.ve-mix-nome span { color: #8a8a92; }
+.ve-mix-col.off .ve-mix-med { opacity: .45; }

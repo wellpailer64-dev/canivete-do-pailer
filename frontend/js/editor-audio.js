@@ -318,6 +318,11 @@ function veAudioFxProcess(l, r, fx, tap) {
             const a = tap(0.030 + sz * 0.050), b = tap(0.070 + sz * 0.090), c = tap(0.120 + sz * 0.150);
             l = l * (1 - wet * 0.20) + wet * (a[0] * 0.40 + b[0] * 0.25 + c[0] * 0.16);
             r = r * (1 - wet * 0.20) + wet * (a[1] * 0.40 + b[1] * 0.25 + c[1] * 0.16);
+        } else if (f.t === 'trk') {
+            // volume e balanço da trilha (Mixer de trilhas): pan > 0 abaixa o L, < 0 abaixa o R
+            const k = veAudioFxDb(v.g || 0), p = (v.p || 0) / 100;
+            l *= k * (p > 0 ? 1 - p : 1);
+            r *= k * (p < 0 ? 1 + p : 1);
         } else if (f.t === 'eq') {
             const gl = veAudioFxDb(v.lo || 0), gm = veAudioFxDb(v.mid || 0), gh = veAudioFxDb(v.hi || 0);
             if (tap) {
@@ -350,9 +355,12 @@ const VE_AU_HANN = (() => {
 // ── mixagem ──
 // Hard Limiter no Master (a soma de todas as trilhas, como no Mixer de trilhas do Premiere): a soma é mixada
 // L amostras à frente e passa pelo mesmo VeLimitador; num salto ele recomeça 0,5 s antes (estado certo no ponto).
+// fim = volume do Master (dB), que no Premiere vem depois dos efeitos dele (o limitador)
 function veMasterLim() {
     const m = VE.master && VE.master.lim;
-    return m && m.on !== false ? m.v : null;
+    if (!(m && m.on !== false)) return null;
+    const d = typeof veMasterDb === 'function' ? veMasterDb() : 0;
+    return d ? { ...m.v, fim: d } : m.v;
 }
 function veAudioMixar(t, n) {
     const mv = veMasterLim();
@@ -366,8 +374,8 @@ function veAudioMixar(t, n) {
         lim.gmin = 1;
         S = VEAU.mlim = { lim, chave, t };
     }
-    const m = veAudioMixarBruto(t + S.lim.L * passo, n);
-    for (let k = 0; k < n; k++) { const y = S.lim.passo(m.l[k], m.r[k]); m.l[k] = y[0]; m.r[k] = y[1]; }
+    const m = veAudioMixarBruto(t + S.lim.L * passo, n), kf = mv.fim ? Math.pow(10, mv.fim / 20) : 1;
+    for (let k = 0; k < n; k++) { const y = S.lim.passo(m.l[k], m.r[k]); m.l[k] = y[0] * kf; m.r[k] = y[1] * kf; }
     S.t = t + n * passo;
     return m;
 }
@@ -380,6 +388,7 @@ function veAudioMixarBruto(t, n) {
         const F = veAudioFonteClipe(id, fx), fimC = st + (e0 - s0) / v, tFim = t + n * passo;
         if (!F || fimC <= t || st >= tFim) continue;
         if (fx.some(f => f.t === 'limiter')) { veAudioMixarLim(cl, F, t, n, passo, L, R); continue; }
+        const P = veMixPico(fx);
         const i0 = Math.max(0, Math.ceil((st - t) / passo)), i1 = Math.min(n, Math.ceil((fimC - t) / passo));
         const k0 = g / 32768, a0 = s0 * VE_AU_SR, durC = fimC - st, fade = fi > 0 || fo > 0;
         if (v === 1 || !tom) {
@@ -392,6 +401,7 @@ function veAudioMixarBruto(t, n) {
                 const y = veAudioFxProcess(x[0] * k, x[1] * k, fx, d => veAudioFxTap(F, frame - d * v * VE_AU_SR, k));
                 L[i] += y[0];
                 R[i] += y[1];
+                if (P) { const a = Math.abs(y[0]), b = Math.abs(y[1]); if (a > P[0]) P[0] = a; if (b > P[1]) P[1] = b; }
             }
             continue;
         }
@@ -411,9 +421,17 @@ function veAudioMixarBruto(t, n) {
             const y = veAudioFxProcess(l * k, r * k, fx, null);
             L[i] += y[0];
             R[i] += y[1];
+            if (P) { const a = Math.abs(y[0]), b = Math.abs(y[1]); if (a > P[0]) P[0] = a; if (b > P[1]) P[1] = b; }
         }
     }
     return { l: L, r: R };
+}
+
+// Pico [L, R] da trilha do clipe neste pedaço (medidores do Mixer de trilhas: editor-mixer.js)
+function veMixPico(fx) {
+    const pk = VEAU.pk, f = pk && fx.find(x => x.t === 'trk');
+    if (!f || !(f.v.tr >= 0)) return null;
+    return pk[f.v.tr] || (pk[f.v.tr] = [0, 0]);
 }
 
 // ── Hard Limiter (o do Premiere/Audition, de verdade) ──
@@ -503,7 +521,7 @@ function veAudioMixarLim(cl, F, t, n, passo, L, R) {
     const [st, s0, e0, , , v, , fi, fo, fx] = cl;
     const k = fx.findIndex(f => f.t === 'limiter'), lv = fx[k].v || {};
     const pre = fx.slice(0, k), pos = fx.slice(k + 1).filter(f => f.t !== 'limiter');
-    const fimC = st + (e0 - s0) / v, durC = fimC - st, fade = fi > 0 || fo > 0;
+    const fimC = st + (e0 - s0) / v, durC = fimC - st, fade = fi > 0 || fo > 0, P = veMixPico(fx);
     const i0 = Math.max(0, Math.ceil((st - t) / passo)), i1 = Math.min(n, Math.ceil((fimC - t) / passo));
     const entrada = tau => {
         const u = tau - st;
@@ -534,6 +552,7 @@ function veAudioMixarLim(cl, F, t, n, passo, L, R) {
         const kf = fade ? veAudioFade(u, durC, fi, fo) : 1;
         L[i] += y[0] * kf;
         R[i] += y[1] * kf;
+        if (P) { const a = Math.abs(y[0] * kf), b = Math.abs(y[1] * kf); if (a > P[0]) P[0] = a; if (b > P[1]) P[1] = b; }
     }
 }
 
@@ -543,9 +562,12 @@ function veAudioAlimentar() {
     const alvo = VE_AU_ADIANTE * VE_AU_SR;
     let guarda = 64;
     while (VEAU.escritos - VEAU.lidos < alvo && guarda-- > 0) {
+        VEAU.pk = {};
         const m = veAudioMixar(VEAU.wt, VE_AU_CHUNK);
         VEAU.node.port.postMessage({ t: 'dados', l: m.l, r: m.r }, [m.l.buffer, m.r.buffer]);
         VEAU.escritos += VE_AU_CHUNK;
+        if (typeof veMixPicos === 'function') veMixPicos(VEAU.escritos, VEAU.pk);   // medidores por trilha
+        VEAU.pk = null;
         // redução do limitador do Master neste pedaço: o medidor mostra quando ele for ouvido (editor-medidor.js)
         if (VEAU.mlim && typeof veMedReducao === 'function') {
             veMedReducao(VEAU.escritos, VEAU.mlim.lim.gmin);
@@ -571,7 +593,7 @@ async function veAudioTocar(t) {
     VEAU.tocando = true;
     VEAU.taxa = VE.rate;
     VEAU.clipes = veAudioClipes();
-    VEAU.chave = JSON.stringify(VEAU.clipes);
+    VEAU.chave = JSON.stringify([VEAU.clipes, veMasterLim()]);
     VEAU.lims.clear();
     VEAU.mlim = null;
     if (typeof VEMED !== 'undefined') { VEMED.fila.length = 0; VEMED.gr.length = 0; }   // medidor: fila do som anterior
@@ -599,7 +621,7 @@ function veAudioParar() {
 
 // A timeline mudou: tocando, o que ainda não tocou é mixado de novo (sem parar o som)
 function veAudioEditou() {
-    const cl = veAudioClipes(), chave = JSON.stringify(cl);
+    const cl = veAudioClipes(), chave = JSON.stringify([cl, veMasterLim()]);
     if (chave === VEAU.chave) return;
     VEAU.clipes = cl;
     VEAU.chave = chave;

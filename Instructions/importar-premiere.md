@@ -59,6 +59,8 @@ Feito em 2026-10-02 e testado com um projeto do Premiere 2025 (Version 45): 7 se
 | Graphic com `AE.ADBE Text` | mídia `texto`, `tx.t` = `InstanceName` (estilo padrão) |
 | `.aegraphic` / `.mogrt` | fica de fora (relatório) |
 | Mídia principal (id 0) | o vídeo mais usado na timeline ativa |
+| Audio Track Mixer: `AudioClipTrack/AudioTrack` → cadeia (`Components`) → `AudioFader` (Param "Volume" = ganho linear, "Mute" = true) e `Panner` (`StereoToStereoPanProcessor`, Param "Balance" 0..1, 0,5 = centro, 0 = −100 L); `<Solo>1</Solo>` no AudioTrack (as outras ganham `MutedBySolo`) | `trilhas.a[k]` = {vol dB, pan −100..100, mute, solo} (editor-mixer.js) |
+| Mix (Master): `AudioTrackGroup/MasterTrack` → `AudioMixTrack` → AudioFader "Volume" | `seq.master.vol` (dB) |
 
 ## Limitações (entram no relatório)
 - Não vêm: camadas de ajuste, gráficos e textos (Essential Graphics, MOGRT), Lumetri, Transform, Mirror, Tint e
@@ -99,5 +101,9 @@ Código: `Functions/premiere_xml.py` (`exportar`), `main.py` (`ve_project_save(.
   (x − L/2)/Lmídia, (y − A/2)/Amídia; sem Basic Motion o Premiere encolhe o vertical 1080×1920 (sempre gravar);
   vídeo de celular com rotação 90° troca largura/altura.
 - Não vão (relatório): efeitos do editor, textos, ajuste, cor, forma, desenho, legendas, Cena 3D, outras transições.
+- Mixer de trilhas: o FCP7 XML não tem fader de trilha nem do Mix → volume da trilha + Mix vão SOMADOS no Audio Levels de
+  cada clipe (som igual; aproximado no relatório); pan vai no Panner da `<track>` (atributos `PannerCurrentValue`... do
+  próprio XML do Premiere — A CONFERIR com um XML exportado pelo Premiere); trilha calada pelo solo vai desligada.
+  Teste: `py -3.13 testes/teste_mixer.py` (cópia em `D:\kanivete_testes\premiere\mixer\mixer.prproj`).
 - Convenções adotadas (a CONFERIR no Premiere, que não está nesta máquina): in/out e `<when>` em quadros da mídia já com a
   velocidade; rotação no mesmo sentido; transição de entrada `start-black`, saída `end-black`.
