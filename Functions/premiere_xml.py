@@ -564,6 +564,7 @@ def efeitos_audio(dados, rel=None):
     for s in seqs:
         trilhas_a = ((s.get("trilhas") or {}).get("a")) or []
         rack = {k: converte((t or {}).get("fx"), "rack da trilha") for k, t in enumerate(trilhas_a)}
+        tem_rack = any(rack.values())
         # pan da trilha (Mixer): o Premiere ignora o Panner da <track> ao importar → Balance no fim de cada clipe
         # (mesma régua: medida no Premiere, diferença 0,0 dB)
         for k, t in enumerate(trilhas_a):
@@ -579,7 +580,7 @@ def efeitos_audio(dados, rel=None):
             ef = converte(c.get("afx"), "clipe") + rack.get(c.get("tr", 0), [])
             if ef:
                 itens.append({"t": int(c.get("tr", 0)), "ini": round(float(c.get("st") or 0), 4), "efeitos": ef})
-        if any(rack.values()) and rel:
+        if tem_rack and rel:
             rel.aprox("Rack de efeitos da trilha (vai em cada clipe da trilha no Premiere)")
         if itens:
             out[s.get("name") or "Sequência"] = itens

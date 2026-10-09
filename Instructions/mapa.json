@@ -119,6 +119,7 @@
     "ve_agente_midia",
     "ve_agente_porta",
     "ve_project_save",
+    "ve_premiere_ponte",
     "ve_project_open",
     "af_analisar",
     "af_recomendar",
@@ -1647,6 +1648,10 @@
    "args": "path, dados, salvar_como=False, formato=None",
    "modulos": []
   },
+  "ve_premiere_ponte": {
+   "args": "acao, dados=None",
+   "modulos": []
+  },
   "ve_project_open": {
    "args": "path=None",
    "modulos": []
@@ -2200,7 +2205,7 @@
   "tools/montar_soundboard.py": "Monta o pack \"vanilla\" do Soundboard do Pocket Editor (não roda no app; só para gerar o zip do release)",
   "tools/olho.py": "Olho local: um modelo de visão no Ollama (gemma4:e4b) olha as imagens no lugar do Claude e devolve TEXTO curto",
   "tools/patch.py": "Aplica trocas de texto descritas num arquivo .patch simples — sem escapar aspas/barras, tudo ou nada, com conferência",
-  "tools/ponte_premiere.py": "Ponte Kanivete ↔ Premiere Pro: servidor local que conversa com o plugin UXP \"Kanivete Ponte",
+  "tools/ponte_premiere.py": "Linha de comando da ponte com o Premiere (o código fica em Functions/ponte_premiere.py, que vai no executável)",
   "tools/premiere_audio_dados.py": "Gera frontend/dados/premiere_audio.json: os efeitos de áudio do Premiere (catálogo lido pelo plugin Kanivete Ponte)",
   "tools/ps_modelo_deg.py": "Gera no Photoshop camadas de preenchimento de DEGRADÊ (linear 3 cores 30°, radial com transparência): molde do GdFl",
   "tools/ps_modelo_forma.py": "Gera no Photoshop um PSD com camadas de forma (retângulo, elipse e um demarcador com furo): molde de vmsk/SoCo",
@@ -2296,6 +2301,7 @@
   "Functions/organizador_de_videos.py": "organizador_de_videos.py",
   "Functions/otimizar.py": "Forçar Full HD (painel Projeto): vídeo maior que Full HD (2K, 4K, 8K, em pé ou deitado) vira uma cópia com o lado",
   "Functions/ponte_illustrator.py": "Ponte com o Adobe Illustrator instalado (COM + ExtendScript) — .ai NATIVO, com todas as pranchetas",
+  "Functions/ponte_premiere.py": "Ponte Kanivete ↔ Premiere Pro: conversa com o plugin UXP \"Kanivete Ponte\" (guia: Instructions/agente/ponte-premiere.md)",
   "Functions/preencher_conteudo.py": "Preenchimento sensível ao conteúdo (Photo Kanivete: Editar › Preenchimento sensível ao conteúdo, como o Photoshop)",
   "Functions/premiere.py": "Importar projeto do Premiere Pro (.prproj) no Editor Kanivete. Só LEITURA: o .prproj nunca é alterado",
   "Functions/premiere_xml.py": "Exportar o projeto do Editor Kanivete (.vknv) como XML do Final Cut Pro 7 (xmeml v4), que o Premiere Pro abre",

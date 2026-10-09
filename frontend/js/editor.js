@@ -4174,6 +4174,32 @@ function veSaveProject(comoNovo, formato) {
     });
 }
 
+// Arquivo › Enviar ao Premiere aberto: o plugin "Kanivete Ponte" (Functions/ponte_premiere.py) importa o XML no projeto
+// ABERTO no Premiere e aplica os efeitos de áudio de cada clipe (o XML não leva). Pergunta o projeto antes.
+async function veEnviarPremiere() {
+    if (!VE.ready) { veToast('Abra um projeto antes'); return; }
+    const api = window.pywebview.api;
+    veToast(veT('Procurando o Premiere...'));
+    const info = await api.ve_premiere_ponte('info');
+    if (!info || !info.success) {
+        await appConfirm({ titulo: veT('Premiere não encontrado'), botoes: [{ rotulo: 'OK', valor: true, tipo: 'primario' }],
+            texto: veT('Abra o Premiere com o projeto de destino e o painel Window › UXP Plugins › Kanivete Ponte (instalado pelo UXP Developer Tools).')
+                + (info && info.error ? '\n\n' + info.error : '') });
+        return;
+    }
+    const ok = await appConfirm({ titulo: veT('Enviar ao Premiere'), texto: `${veT('Importar as timelines no projeto aberto no Premiere')}:\n\n${info.projeto}\n\n${veT('Cada timeline entra como uma sequência nova; nada do projeto é apagado.')}`,
+        botoes: [{ rotulo: veT('Cancelar'), valor: false }, { rotulo: veT('Enviar'), valor: true, tipo: 'primario' }] });
+    if (!ok) return;
+    veToast(veT('Enviando ao Premiere...'));
+    const r = await api.ve_premiere_ponte('enviar', JSON.stringify(veProjectData()));
+    if (!r || !r.success) { veToast(veT('Não foi possível enviar ao Premiere') + ': ' + ((r && r.error) || '?')); return; }
+    const falhas = r.falhas || [];
+    if (r.relatorio) vePremiereXmlRelatorio(info.projeto, { ...r.relatorio, aproximados: [...(r.relatorio.aproximados || []),
+        ...(r.aplicados ? [{ o_que: veT('Efeitos de áudio aplicados no Premiere'), qtd: r.aplicados }] : [])],
+        ignorados: [...(r.relatorio.ignorados || []), ...falhas.map(f => ({ o_que: f, qtd: 1 }))] }, true);
+    veToast(`${veT('No Premiere')}: ${(r.novas || []).join(', ') || '?'} · ${r.aplicados || 0} ${veT('efeitos de áudio')}${falhas.length ? ` · ${falhas.length} ${veT('falhas')}` : ''}`);
+}
+
 function veResetEditorVazio(opts = {}) {
     const quickEdit = !!opts.quickEdit;
     const mostrarInicio = opts.mostrarInicio !== false;
@@ -4478,10 +4504,10 @@ function veApplyProject() {
 }
 
 // Relatório da importação do Premiere (Functions/premiere.py): sequências, o que ficou de fora e mídia faltando
-function vePremiereXmlRelatorio(nome, r) {
+function vePremiereXmlRelatorio(nome, r, enviado) {
     const linhas = [];
     linhas.push(`${veT('Sequências')}: ${(r.sequencias || []).map(s => `${s.nome} (${s.clipes})`).join(', ')}`);
-    linhas.push('', veT('No Premiere: Arquivo › Importar e escolha este .xml.'));
+    linhas.push('', enviado ? veT('Importado no projeto aberto do Premiere (sequências novas).') : veT('No Premiere: Arquivo › Importar e escolha este .xml.'));
     if ((r.aproximados || []).length) {
         linhas.push('', veT('Vai aproximado:'));
         r.aproximados.forEach(i => linhas.push(`• ${i.o_que}: ${i.qtd}`));

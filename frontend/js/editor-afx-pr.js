@@ -117,8 +117,8 @@ const veAprInterp = (pts, x) => {
 };
 const VE_APR_QBASS = [[-24, 0.71], [-12, 1.0], [0, 1.4], [12, 2.0], [24, 2.0]];
 const VE_APR_QTREB = [[-24, 0.3], [-12, 0.3], [0, 0.4], [12, 0.5], [24, 0.71]];
-const VE_APR_ATK = [[0, 0.01], [0.1, 0.35], [0.5, 12.4], [1, 94.6]];      // ms do acompressor (Functions/efeitos_pr.py)
-const VE_APR_REL = [[0, 3], [0.1, 292], [0.5, 916], [1, 1622]];
+const VE_APR_ATK = [[0, 0.01], [0.1, 0.125], [0.5, 0.442], [1, 1.025]];      // ms do acompressor (Functions/efeitos_pr.py)
+const VE_APR_REL = [[0, 0.5], [0.1, 40.4], [0.5, 156.1], [1, 1185.3]];
 const veAprInterpLog = (pts, x) => Math.exp(veAprInterp(pts.map(([a, b]) => [a, Math.log(Math.max(b, 1e-6))]), x));
 
 // monta o processador do efeito (coeficientes calculados uma vez; estado zerado)

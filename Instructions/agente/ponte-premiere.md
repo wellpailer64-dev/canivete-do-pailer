@@ -52,8 +52,11 @@ Volume (Internal Volume) "Level": 0,1778 = 0 dB (1,0 = +15 dB).
   exportação: barramento no `_grafo_mix`). Limitador dentro do rack ainda não toca.
 
 ## Volta Kanivete → Premiere (feito 2026-10-09)
-`premiere_xml.exportar` grava o XML + `<nome>.kanivete-efeitos.json`; `py -3.13 tools/ponte_premiere.py importar x.xml`
-faz o plugin importar o XML no projeto ABERTO do Premiere e aplicar os efeitos clipe a clipe (acha pelo início, ±0,05 s).
+No app: **Arquivo › Enviar ao Premiere aberto (com efeitos de áudio)…** (editor.js `veEnviarPremiere`, API
+`ve_premiere_ponte`): pergunta ao plugin o projeto aberto, CONFIRMA com o nome dele, grava o XML numa pasta temporária e o
+plugin importa + aplica os efeitos. Código da ponte em `Functions/ponte_premiere.py` (vai no exe); `tools/ponte_premiere.py`
+é só a linha de comando (`importar x.xml`). `premiere_xml.exportar` grava o XML + `<nome>.kanivete-efeitos.json`; o plugin
+acha cada clipe pelo início (±0,05 s).
 - O XML do próprio Premiere (`ProjectConverter.exportAsFinalCutProXML`, testado) NÃO leva: volume da trilha/Mix,
   efeitos de áudio (só traduz os que o Final Cut tem, ex. Highpass → "High Pass Filter" em Hz). O Panner da `<track>`
   ele grava mas IGNORA ao importar → o pan vai como efeito Balance em cada clipe (mesma régua); o volume da trilha + Mix
@@ -64,7 +67,8 @@ faz o plugin importar o XML no projeto ABERTO do Premiere e aplicar os efeitos c
 - Teste real: 9 efeitos aplicados sem falha, valores idênticos; som do trecho A2 Premiere × Kanivete: 0,02 dB.
 
 ## Pendências
-1. Compressor: ataque/release extremos; calibrar os 33 sem som (Parametric EQ, reverbs, DeNoise, DeEsser...).
+1. Calibrar os 33 sem som (Parametric EQ, reverbs, DeNoise, DeEsser...). Compressor: tabela de ataque/release do
+   acompressor ajustada em conjunto (média 1,2 dB, pior 3,9 dB); para igualar de vez, só um compressor próprio no estilo
+   do Audition (detector diferente do acompressor).
 2. Rack no Master; limitador dentro do rack da trilha; automação (keyframes) de efeitos e do fader.
-3. Botão no app (Arquivo › Enviar ao Premiere) chamando o `importar` pelo plugin; hoje é pela linha de comando.
 4. Rack da trilha de volta como rack (só via .prproj).

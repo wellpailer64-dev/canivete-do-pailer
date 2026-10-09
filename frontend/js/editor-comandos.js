@@ -22,6 +22,7 @@ const VE_CMDS = [
     { id: 'salvar', grupo: 'arquivo', nome: 'Salvar', teclas: ['Ctrl+S'], sempre: true, sep: true, fn: () => veSaveProject(false) },
     { id: 'salvar-como', grupo: 'arquivo', nome: 'Salvar como...', teclas: ['Ctrl+Shift+S'], sempre: true, fn: () => veSaveProject(true) },
     { id: 'exportar-premiere', grupo: 'arquivo', nome: 'Exportar para o Premiere (XML)...', teclas: [], fn: () => veSaveProject(true, 'xml') },
+    { id: 'enviar-premiere', grupo: 'arquivo', nome: 'Enviar ao Premiere aberto (com efeitos de áudio)...', teclas: [], fn: () => veEnviarPremiere() },
     { id: 'importar', grupo: 'arquivo', nome: 'Importar...', teclas: ['Ctrl+I'], sempre: true, sep: true, fn: () => vePjImportarDialogo() },
     { id: 'importar-timeline', grupo: 'arquivo', nome: 'Importar na timeline...', teclas: [], fn: () => veImportTimelineFile() },
     { id: 'imagem', grupo: 'arquivo', nome: 'Adicionar imagem na timeline...', teclas: [], fn: () => vePickImage() },

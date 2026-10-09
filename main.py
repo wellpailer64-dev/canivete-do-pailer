@@ -1077,6 +1077,38 @@ def ve_project_save(path, dados, salvar_como=False, formato=None):
         return {"success": False, "error": str(e)}
 
 
+def ve_premiere_ponte(acao, dados=None):
+    """Ponte com o Premiere aberto (plugin UXP "Kanivete Ponte", Functions/ponte_premiere.py).
+    acao 'info': {success, projeto, caminho} do projeto aberto no Premiere (ou o erro: plugin fechado).
+    acao 'enviar': grava o XML (+ efeitos de áudio) numa pasta temporária; o plugin importa no projeto ABERTO do Premiere
+    e aplica os efeitos clipe a clipe. O Editor pergunta o projeto antes (veEnviarPremiere)."""
+    import re
+    import time
+    from Functions import ponte_premiere, premiere_xml
+    try:
+        if acao == "info":
+            r = ponte_premiere.enviar("info", espera=6)
+            if not r.get("ok"):
+                return {"success": False, "error": r.get("erro") or "o plugin não respondeu"}
+            res = r.get("resultado") or {}
+            if not res.get("projeto"):
+                return {"success": False, "error": "nenhum projeto aberto no Premiere"}
+            return {"success": True, "projeto": res.get("projeto"), "caminho": res.get("caminho")}
+        if acao == "enviar":
+            d = json.loads(dados) if isinstance(dados, str) else dados
+            nome = re.sub(r'[<>:"/\\|?*]+', "_", (d.get("sequences") or [{}])[0].get("name") or "Kanivete").strip() or "Kanivete"
+            pasta = os.path.join(tempfile.gettempdir(), "kanivete_premiere", time.strftime("%Y%m%d_%H%M%S"))
+            os.makedirs(pasta, exist_ok=True)
+            xml, relatorio = premiere_xml.exportar(os.path.join(pasta, nome + ".xml"), d)
+            r = ponte_premiere.importar(xml)
+            if not r.get("ok"):
+                return {"success": False, "error": r.get("erro") or "o Premiere não importou", "relatorio": relatorio}
+            return {"success": True, "relatorio": relatorio, **(r.get("resultado") or {})}
+        return {"success": False, "error": "ação desconhecida"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def _ve_salvar_xml(path, dados):
     from Functions import premiere_xml
     final, relatorio = premiere_xml.exportar(path, dados)
@@ -3919,6 +3951,9 @@ class ApiBridge:
 
     def ve_project_save(self, path, dados, salvar_como=False, formato=None):
         return ve_project_save(path, dados, salvar_como, formato)
+
+    def ve_premiere_ponte(self, acao, dados=None):
+        return ve_premiere_ponte(acao, dados)
 
     def ve_project_open(self, path=None):
         return ve_project_open(path)

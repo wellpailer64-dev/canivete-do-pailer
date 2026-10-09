@@ -116,9 +116,9 @@ def _interp(pontos, x):
 Q_BASS = [(-24, 0.71), (-12, 1.0), (0, 1.4), (12, 2.0), (24, 2.0)]
 Q_TREBLE = [(-24, 0.3), (-12, 0.3), (0, 0.4), (12, 0.5), (24, 0.71)]
 # Single-band Compressor → acompressor do ffmpeg: ataque/release que mais se aproximam do Premiere (v normalizado → ms
-# do acompressor, que mede diferente do Audition; erro 0,3–1,4 dB nos degraus)
-ATK_FF = [(0, 0.01), (0.1, 0.35), (0.5, 12.4), (1, 94.6)]
-REL_FF = [(0, 3.0), (0.1, 292), (0.5, 916), (1, 1622)]
+# do acompressor, que mede diferente do Audition; ajuste conjunto nos 22 renders: erro médio 1,2 dB, pior 3,9 dB)
+ATK_FF = [(0, 0.01), (0.1, 0.125), (0.5, 0.442), (1, 1.025)]
+REL_FF = [(0, 0.5), (0.1, 40.4), (0.5, 156.1), (1, 1185.3)]
 
 
 def _interp_log(pontos, x):
