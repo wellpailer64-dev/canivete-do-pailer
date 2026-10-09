@@ -139,6 +139,7 @@ function veAtrGrupo(lista, id, k, val, campo) {   // campo: 'fx' | 'afx'
         b.onclick = e => { e.stopPropagation(); veClipMenuFechar(); veAtrDialogo(alvos); };
         const ref = m.querySelector('[data-ctx="off"]');
         m.insertBefore(b, ref || m.querySelector('[data-ctx="del"]'));
+        veCtxPosicionar(m, x, y, doc);   // o menu cresceu: reposiciona para não cortar embaixo
     };
 })();
 window.VEATR_API = { lista: () => veAtrLista(veSelLista()), remover: chaves => veAtrRemover(veSelLista(), chaves), dialogo: () => veAtrDialogo() };

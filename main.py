@@ -1991,9 +1991,10 @@ def transcrever_salvar_txt(texto, pasta_origem):
 # Tools: Melhorar áudio (Sidon + OmniVoice, como o Adobe Podcast)
 # ========================================
 def melhorar_audio(caminho):
-    from Functions.melhorar_audio import melhorar
+    from Functions.melhorar_audio import melhorar, recomecar
 
     def trabalho(log, progresso):
+        recomecar()
         r = melhorar(caminho, log, progresso)
         n, falhas = len(r["feitos"]), r["falhas"]
         resumo = (f"{n} arquivo(s) melhorado(s) em {r['segundos']:.0f}s" if n != 1
@@ -2013,13 +2014,19 @@ def melhorar_audio(caminho):
 def melhorar_audio_midia(caminho, mid):
     """Pocket Editor: gera só o som melhorado ("<nome>_melhorado.wav", no tempo do vídeo); o editor troca o áudio
     da mídia por ele e a imagem e os cortes ficam como estão."""
-    from Functions.melhorar_audio import melhorar_arquivo
+    from Functions.melhorar_audio import melhorar_arquivo, recomecar
 
     def trabalho(log, progresso):
+        recomecar()
         saida = melhorar_arquivo(caminho, log, lambda v, m=None: progresso(v * 100 if v >= 0 else -1, m), so_audio=True)
         return {"saida": saida, "mid": mid, "origem": caminho}
 
     return _tarefa("veMelhorarAudioProgresso", trabalho)
+
+
+def melhorar_audio_cancelar():
+    from Functions.melhorar_audio import cancelar
+    return cancelar()
 
 
 # ========================================
@@ -4040,6 +4047,9 @@ class ApiBridge:
 
     def melhorar_audio_midia(self, caminho, mid):
         return melhorar_audio_midia(caminho, mid)
+
+    def melhorar_audio_cancelar(self):
+        return melhorar_audio_cancelar()
 
     def omnivoice_status(self):
         return omnivoice_status()

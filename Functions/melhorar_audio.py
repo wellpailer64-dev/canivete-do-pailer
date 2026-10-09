@@ -14,6 +14,7 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -25,6 +26,34 @@ EXT_VIDEO = (".mp4", ".mov", ".mkv", ".avi", ".webm", ".m4v", ".mts", ".mxf")
 SUFIXO = "_melhorado"
 MASTER = "highpass=f=70,loudnorm=I=-16:TP=-1.5:LRA=11"
 _MOTOR: dict = {}
+_PARAR = threading.Event()
+_PROC: dict = {}
+
+
+class Cancelado(RuntimeError):
+    pass
+
+
+def cancelar():
+    """Botão Parar: marca o pedido e derruba o processo externo (com os filhos) na hora; dentro do app, para no
+    próximo aviso de progresso."""
+    _PARAR.set()
+    p = _PROC.get("p")
+    if p and p.poll() is None:
+        try:
+            subprocess.run(["taskkill", "/PID", str(p.pid), "/T", "/F"], capture_output=True, creationflags=NO_WINDOW)
+        except Exception:
+            p.kill()
+    return {"success": True}
+
+
+def recomecar():
+    _PARAR.clear()
+
+
+def _conferir():
+    if _PARAR.is_set():
+        raise Cancelado("Cancelado")
 
 
 def _base():
@@ -74,8 +103,10 @@ def _rodar_externo(py, payload, log, progresso):
     pp, rp = os.path.join(tmp, f"{tok}.payload.json"), os.path.join(tmp, f"{tok}.result.json")
     Path(pp).write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    _conferir()
     proc = subprocess.Popen([py, _runner(), pp, rp], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                             encoding="utf-8", errors="replace", creationflags=NO_WINDOW, env=env)
+    _PROC["p"] = proc
     for linha in proc.stdout:
         linha = linha.strip()
         if not linha:
@@ -89,12 +120,14 @@ def _rodar_externo(py, payload, log, progresso):
         else:
             log(ev.get("message") or linha)
     code = proc.wait()
+    _PROC.pop("p", None)
     r = json.loads(Path(rp).read_text(encoding="utf-8")) if os.path.exists(rp) else {}
     for p in (pp, rp):
         try:
             os.remove(p)
         except OSError:
             pass
+    _conferir()
     if code != 0 or not r.get("success"):
         raise RuntimeError(r.get("error") or f"O processamento terminou com código {code}.")
     return r
@@ -152,6 +185,7 @@ def melhorar_arquivo(path, log, progresso, frac=(0.0, 1.0), so_audio=False, prev
     a0, a1 = frac
 
     def prog(p, msg=None):
+        _conferir()
         progresso(a0 + (a1 - a0) * max(0.0, p) if p >= 0 else -1, msg)
 
     info = probe(path)
@@ -244,6 +278,8 @@ def melhorar(caminho, log, progresso):
             feitos.append(melhorar_arquivo(p, log, lambda v, m=None: progresso(v * 100 if v >= 0 else -1, m),
                                            (i / len(lista), (i + 1) / len(lista)), previas=previas))
             log(f"✓ {os.path.basename(feitos[-1])}")
+        except Cancelado:
+            raise
         except Exception as e:
             falhas.append(os.path.basename(p))
             log(f"✗ {os.path.basename(p)}: {e}")

@@ -664,9 +664,7 @@ function veKlMenu(x, y, doc, temSel) {
         (VEKL.clip ? item('colar', 'Colar na agulha', 'Ctrl+V') : '') +
         (temSel ? item('dup', 'Duplicar na agulha') + '<div class="ve-ctx-sep"></div>' + item('del', 'Apagar', 'Del', 'perigo') : '');
     doc.body.appendChild(m);
-    const w = doc.defaultView, r = m.getBoundingClientRect();
-    m.style.left = Math.max(6, Math.min(x, w.innerWidth - r.width - 6)) + 'px';
-    m.style.top = Math.max(6, Math.min(y, w.innerHeight - r.height - 6)) + 'px';
+    veCtxPosicionar(m, x, y, doc);
     m.addEventListener('click', e => {
         const it = e.target.closest('[data-kl]');
         if (!it) return;

@@ -2744,10 +2744,7 @@ function veClipMenu(i, x, y, doc) {
         ${typeof veMelMenuItens === 'function' && veTemSom(c) ? veMelMenuItens(veMediaOf(c), 'data-ctx') : ''}
         <button class="ve-ctx-item perigo" data-ctx="del">Apagar clipe<kbd>D</kbd></button>`;
     doc.body.appendChild(m);
-    // dentro da janela
-    const w = doc.defaultView, r = m.getBoundingClientRect();
-    m.style.left = Math.max(6, Math.min(x, w.innerWidth - r.width - 6)) + 'px';
-    m.style.top = Math.max(6, Math.min(y, w.innerHeight - r.height - 6)) + 'px';
+    veCtxPosicionar(m, x, y, doc);
     m.addEventListener('click', e => {
         const cor = e.target.closest('[data-cor]'), it = e.target.closest('[data-ctx]');
         if (cor) {
@@ -2779,6 +2776,8 @@ function veClipMenu(i, x, y, doc) {
             else if (it.dataset.ctx === 'pj') veMostrarNoProjeto(VE.clips[i]);
             else if (it.dataset.ctx === 'ma') vePjMelhorarAudio([VE.clips[i].m || 0]);
             else if (it.dataset.ctx === 'mel') veMelAlternar(veMediaOf(VE.clips[i]));
+            else if (it.dataset.ctx === 'mastop') veMaParar([VE.clips[i].m || 0]);
+            else if (it.dataset.ctx === 'melrm') veMelDescartar(veMediaOf(VE.clips[i]));
         } else return;
         veClipMenuFechar();
     });
@@ -2789,8 +2788,23 @@ function veClipMenu(i, x, y, doc) {
 }
 function veClipMenuFechar() { if (VE._ctx) { VE._ctx.fechar(); VE._ctx = null; } }
 
+// menu inteiro dentro da janela, como o do Windows: não cabe embaixo do mouse → abre para cima; maior que a
+// janela → rola por dentro (nunca corta a parte de baixo)
+function veCtxPosicionar(m, x, y, doc) {
+    const w = doc.defaultView, mg = 6;
+    m.style.maxHeight = (w.innerHeight - mg * 2) + 'px';
+    m.style.overflowY = 'auto';
+    // offsetWidth/Height: o tamanho real (a animação de abrir encolhe o getBoundingClientRect)
+    const r = { width: m.offsetWidth, height: m.offsetHeight };
+    let top = y + r.height + mg > w.innerHeight ? y - r.height : y;
+    top = Math.max(mg, Math.min(top, w.innerHeight - r.height - mg));
+    m.style.left = Math.max(mg, Math.min(x, w.innerWidth - r.width - mg)) + 'px';
+    m.style.top = top + 'px';
+}
+
 // ── camada de ajuste ──
 function veAddAdjust() {
+    if (!VE.ready && typeof veCriarProjetoVazio === 'function') veCriarProjetoVazio({ quieto: true });
     if (!VE.ready) return;
     if (VE.info && VE.info.audio_only) { veToast('Camada de ajuste precisa de um vídeo'); return; }
     let m = VE.media.find(x => x.kind === 'ajuste');

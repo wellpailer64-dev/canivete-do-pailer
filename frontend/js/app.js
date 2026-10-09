@@ -948,10 +948,20 @@ function runMelhorarAudio() {
     if (!path) return;
     maFechar();
     uiIniciar('melhorar-audio');
+    _el('ma-parar').hidden = false;
+    _el('ma-parar').disabled = false;
     window.pywebview.api.melhorar_audio(path);
 }
 
+function maParar() {
+    _el('ma-parar').disabled = true;
+    _el('status-melhorar-audio').textContent = 'Parando...';
+    window.pywebview.api.melhorar_audio_cancelar();
+}
+
 function updateMelhorarAudioProgress(data) {
+    if (data.complete) _el('ma-parar').hidden = true;
+    if (data.complete && data.error === 'Cancelado') data = { ...data, error: 'Cancelado — nada foi alterado' };
     uiAtualizar('melhorar-audio', data);
     if (data.complete && !data.error && (data.previas || []).length) maMostrar(data.previas);
 }

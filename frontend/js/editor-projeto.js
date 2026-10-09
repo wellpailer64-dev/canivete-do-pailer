@@ -603,7 +603,7 @@ function vePjSubstituirVarios(ids) {
 // ── Melhorar áudio (botão direito no Projeto ou no clipe): Sidon + OmniVoice no fundo, uma mídia por vez. Gera só o
 // som ("<nome>_melhorado.wav", no tempo do vídeo) e a mídia passa a tocar e exportar esse som no lugar do dela:
 // a imagem e os cortes não mudam. O original fica guardado: a chave "Áudio melhorado" volta a ele (m.melOff). ──
-const VEMA = { fila: [], atual: null, path: '', pct: -1, anim: 0 };
+const VEMA = { fila: [], atual: null, path: '', pct: -1, anim: 0, t0: 0, tUlt: 0, etapa: '', parando: false };
 
 function vePjMelhorarAudio(ids) {
     const api = window.pywebview && window.pywebview.api;
@@ -618,23 +618,58 @@ function veMaProximo() {
     while (VEMA.atual == null && VEMA.fila.length) {
         const id = VEMA.fila.shift(), m = VE.media[id];
         if (!m || m.removido || !m.path) continue;
-        Object.assign(VEMA, { atual: id, path: m.path, pct: -1 });
+        Object.assign(VEMA, { atual: id, path: m.path, pct: -1, t0: Date.now(), tUlt: Date.now(), etapa: '', parando: false });
         window.pywebview.api.melhorar_audio_midia(m.path, id);
     }
+}
+
+// Parar: tira da fila ou derruba o processo que está rodando (o original fica como estava)
+function veMaParar(ids) {
+    let parou = false;
+    ids.forEach(id => {
+        const n = VEMA.fila.indexOf(id);
+        if (n >= 0) { VEMA.fila.splice(n, 1); parou = true; }
+        if (VEMA.atual === id && !VEMA.parando) {
+            VEMA.parando = true;
+            window.pywebview.api.melhorar_audio_cancelar();
+            parou = true;
+        }
+    });
+    if (parou) veToast(veT('Parando a melhoria do áudio — o som original continua'));
+    veMaAtualizar(true);
+}
+
+// descarta o som melhorado: volta ao original (o .wav fica no disco; "Melhorar áudio" faz de novo)
+function veMelDescartar(m) {
+    if (!m || !m.mel) return;
+    const orig = m._aOrig;
+    ['mel', 'melOff', '_aMel'].forEach(k => delete m[k]);
+    if (orig) veAudioRegistrar(m.id, orig.url, orig.quadros);
+    vePjAlterou();
+    if (!VE.dirty) { VE.dirty = true; veUpdateTitle(); }
+    vePjRender();
+    veDraw();
+    veToast(`${vePjNome(m)}: ${veT('voltou ao áudio original')}`);
 }
 
 // a mídia está melhorando agora ({pct}) ou na fila ({fila: n})? (outro projeto aberto no meio: o id não vale)
 function veMaEstado(id) {
     const m = VE.media[id];
     if (!m) return null;
-    if (VEMA.atual === id && m.path === VEMA.path) return { pct: VEMA.pct };
+    if (VEMA.atual === id && m.path === VEMA.path) return { pct: VEMA.pct, atual: true };
     const n = VEMA.fila.indexOf(id);
     return n >= 0 ? { fila: n + 1 } : null;
 }
 
 function veMaRotulo(e) {
     if (e.rot) return e.rot;   // outro processo no fundo (Anti Noise: editor-audio.js)
-    return e.fila ? `${veT('Melhorando')} · ${veT('na fila')}` : `${veT('Melhorando')}${e.pct >= 0 ? ` ${Math.round(e.pct)}%` : '…'}`;
+    if (e.fila) return `${veT('Melhorando')} · ${veT('na fila')}`;
+    if (VEMA.parando) return `${veT('Parando')}…`;
+    // relógio andando + etapa: dá para ver se está indo; sem notícia há 2 min = provável travada
+    const agora = Date.now(), seg = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+    const quieto = (agora - VEMA.tUlt) / 1000;
+    const etapa = quieto > 120 ? `${veT('sem resposta há')} ${seg(quieto)}` : VEMA.etapa.replace(/\.+$/, '');
+    return `${veT('Melhorando')}${e.pct >= 0 ? ` ${Math.round(e.pct)}%` : '…'} · ${seg((agora - VEMA.t0) / 1000)}${etapa ? ` · ${etapa}` : ''}`;
 }
 
 // por cima da faixa de áudio: escurece a onda, listras andando, barra de progresso e o rótulo
@@ -667,14 +702,13 @@ function veMaDesenhar(ctx, x, y, w, h, e) {
 // timeline animada e selos do painel Projeto enquanto houver algo melhorando
 function veMaAtualizar(redesenharPainel) {
     const ativo = VEMA.atual != null || VEMA.fila.length > 0;
-    if (ativo && !VEMA.anim) VEMA.anim = setInterval(veDraw, 120);
+    if (ativo && !VEMA.anim) VEMA.anim = setInterval(() => { veDraw(); if (Date.now() % 1000 < 120) veMaAtualizar(false); }, 120);
     if (!ativo && VEMA.anim) { clearInterval(VEMA.anim); VEMA.anim = 0; }
-    veDraw();
-    if (redesenharPainel) { vePjRender(); return; }
+    if (redesenharPainel) { veDraw(); vePjRender(); return; }
     const lista = $ve('ve-pj-lista');
     if (lista) lista.querySelectorAll('[data-enh]').forEach(el => {
         const e = veMaEstado(+el.dataset.enh);
-        if (e) el.textContent = veMaRotulo(e);
+        if (e && el.firstChild) el.firstChild.textContent = veMaRotulo(e);
     });
 }
 
@@ -683,11 +717,16 @@ function veMelhorarAudioProgresso(d) {
     const nome = m ? vePjNome(m) : '';
     if (!d.complete) {
         if (d.percent != null && d.percent >= 0) VEMA.pct = d.percent;
+        if (d.status) VEMA.etapa = d.status;
+        VEMA.tUlt = Date.now();
         veMaAtualizar(false);
         return;
     }
     VEMA.atual = null;
-    if (d.error) veToast(`${nome}: ${veT('não foi possível melhorar o áudio')} — ${d.error}`);
+    const parado = VEMA.parando;
+    VEMA.parando = false;
+    if (parado) veToast(`${nome}: ${veT('melhoria cancelada — o áudio original continua')}`);
+    else if (d.error) veToast(`${nome}: ${veT('não foi possível melhorar o áudio')} — ${d.error}`);
     else if (d.saida && m && m.path === VEMA.path) {   // outro projeto aberto no meio: não troca nada
         m.mel = d.saida;
         delete m.melOff;
@@ -754,15 +793,19 @@ function veMelAlternar(m) {
 // selo no painel Projeto: "Melhorando 42%" enquanto processa; depois, a chave do som melhorado
 function veMelSelo(m) {
     const e = veMaEstado(m.id);
-    if (e) return `<span class="ve-pj-enh${e.fila ? ' fila' : ''}" data-enh="${m.id}">${veMaRotulo(e)}</span>`;
+    if (e) return `<span class="ve-pj-enh${e.fila ? ' fila' : ''}" data-enh="${m.id}"><i>${veMaRotulo(e)}</i><b data-mastop title="${veT('Parar a melhoria')}">✕</b></span>`;
     if (!m.mel) return '';
     return `<span class="ve-pj-mel${m.melOff ? ' off' : ''}" data-mel title="${veT(m.melOff ? 'Tocando o áudio original: clique para usar o melhorado' : 'Tocando o áudio melhorado: clique para ouvir o original')}">${veT(m.melOff ? 'Original' : 'Melhorado')}</span>`;
 }
 
 function veMelMenuItens(m, attr, soChave) {
     if (!m || !['video', 'audio'].includes(m.kind) || !m.path || veMediaOffline(m)) return '';
-    const chave = m.mel ? `<button class="ve-ctx-item" ${attr}="mel">${m.melOff ? '' : '✓ '}${veT('Áudio melhorado')}</button>` : '';
-    return soChave ? chave : `<div class="ve-ctx-sep"></div><button class="ve-ctx-item" ${attr}="ma">${veT('Melhorar áudio')}</button>${chave}`;
+    const chave = m.mel ? `<button class="ve-ctx-item" ${attr}="mel">${m.melOff ? '' : '✓ '}${veT('Áudio melhorado')}</button>`
+        + `<button class="ve-ctx-item" ${attr}="melrm" title="${veT('Volta ao som original do arquivo (o _melhorado.wav fica no disco)')}">${veT('Descartar áudio melhorado')}</button>` : '';
+    if (soChave) return chave;
+    const acao = veMaEstado(m.id) ? `<button class="ve-ctx-item perigo" ${attr}="mastop">■ ${veT('Parar melhoria do áudio')}</button>`
+        : `<button class="ve-ctx-item" ${attr}="ma">${veT('Melhorar áudio')}</button>`;
+    return `<div class="ve-ctx-sep"></div>${acao}${chave}`;
 }
 
 // ── Mostrar no projeto (botão direito no clipe da timeline, como o Reveal in Project do Premiere) ──
@@ -1000,6 +1043,7 @@ function vePjMenu(x, y, doc) {
         ${um ? '<button class="ve-ctx-item" data-pj="ren">Renomear<kbd>F2</kbd></button>' : ''}
         ${podeRelink ? `<button class="ve-ctx-item${veMediaOffline(midiaUm) ? ' offline' : ''}" data-pj="rel" title="${veMediaOffline(midiaUm) ? '' : 'Troca o arquivo e mantém os clipes na timeline com os mesmos cortes e posições'}">${veMediaOffline(midiaUm) ? 'Relincar mídia...' : 'Substituir mídia...'}</button>` : ''}
         ${varias.length > 1 ? `<button class="ve-ctx-item" data-pj="relv" title="Escolha a pasta com as versões novas: cada mídia pega o arquivo de mesmo nome">Substituir ${varias.length} mídias (escolher pasta)...</button>` : ''}
+        ${comSom.some(id => veMaEstado(id)) ? `<button class="ve-ctx-item perigo" data-pj="mastop">■ ${veT('Parar melhoria do áudio')}</button>` : ''}
         ${comSom.length ? `<button class="ve-ctx-item" data-pj="ma" title="${veT('Voz com som de estúdio (Sidon + OmniVoice). Gera o _melhorado.wav ao lado do original e troca só o som: a imagem e os cortes ficam iguais')}">${veT('Melhorar áudio')}${comSom.length > 1 ? ` (${comSom.length})` : ''}</button>` : ''}
         ${midiaUm && midiaUm.mel ? veMelMenuItens(midiaUm, 'data-pj', true) : ''}
         ${vePjGrandes(keys).length ? `<button class="ve-ctx-item" data-pj="fhd" title="Converte para 1080 no lado menor, sem perda visível, na pasta Otimizados FullHD">Forçar Full HD (${vePjGrandes(keys).length})…</button>` : ''}
@@ -1016,15 +1060,13 @@ function vePjMenu(x, y, doc) {
         <button class="ve-ctx-item" data-pj="imp">Importar...<kbd>Ctrl+I</kbd></button>
         ${keys.length ? '<div class="ve-ctx-sep"></div><button class="ve-ctx-item perigo" data-pj="del">Apagar<kbd>Delete</kbd></button>' : ''}`;
     doc.body.appendChild(m);
-    const w = doc.defaultView, r = m.getBoundingClientRect();
-    m.style.left = Math.max(6, Math.min(x, w.innerWidth - r.width - 6)) + 'px';
-    m.style.top = Math.max(6, Math.min(y, w.innerHeight - r.height - 6)) + 'px';
+    veCtxPosicionar(m, x, y, doc);
     m.addEventListener('click', e => {
         const cor = e.target.closest('[data-cor]'), it = e.target.closest('[data-pj]');
         if (cor) vePjCor(keys, cor.dataset.cor);
         else if (it) ({ ren: () => vePjRenomear(keys[0]), dup: () => vePjDuplicar(keys), cut: () => vePjCopiar('recortar'),
             copy: () => vePjCopiar('copiar'), paste: vePjColar, bin: vePjNovaPasta, aj: vePjNovoAjuste, cor: vePjNovaCor, imp: vePjImportarDialogo, c3d: () => ve3dNovaUi(),
-            tl: () => veCreateTimeline(), rel: () => vePjRelink(+keys[0].slice(2)), relv: () => vePjSubstituirVarios(varias), fhd: () => vePjForcarFullHD(), ma: () => vePjMelhorarAudio(comSom), mel: () => veMelAlternar(midiaUm), del: () => vePjApagar(keys) })[it.dataset.pj]();
+            tl: () => veCreateTimeline(), rel: () => vePjRelink(+keys[0].slice(2)), relv: () => vePjSubstituirVarios(varias), fhd: () => vePjForcarFullHD(), ma: () => vePjMelhorarAudio(comSom), mastop: () => veMaParar(comSom), mel: () => veMelAlternar(midiaUm), melrm: () => veMelDescartar(midiaUm), del: () => vePjApagar(keys) })[it.dataset.pj]();
         else return;
         veClipMenuFechar();
     });
@@ -1044,6 +1086,7 @@ function vePjInit() {
         const ir = e.target.closest('[data-ir]');
         if (ir) { vePjAbrirPasta(ir.dataset.ir); return; }
         const row = e.target.closest('[data-k]');
+        if (row && e.target.closest('[data-mastop]')) { veMaParar([+row.dataset.k.slice(2)]); return; }
         if (row && e.target.closest('[data-mel]')) { veMelAlternar(VE.media[+row.dataset.k.slice(2)]); return; }
         if (e.target.closest('[data-seta]')) { const b = vePjBin(row.dataset.k.slice(2)); b.aberta = !b.aberta; vePjRender(); return; }
         if (!row || row.dataset.k === 'raiz') { VEPJ.sel.clear(); VEPJ.foco = null; vePjRender(); return; }
@@ -1387,7 +1430,9 @@ function veSrcOpen(id) {
         </div>`;
         $ve('ve').appendChild(md);
         VESRC.video = md.querySelector('#ve-src-video');
-        md.addEventListener('pointerdown', e => { if (!e.target.closest('.ve-src-box')) veSrcClose(); });
+        // janela solta: arrasta pelo título, redimensiona pelo canto e não fecha ao clicar fora (dá para mexer atrás)
+        md.classList.add('ve-src-solta');
+        veSrcJanela(md.querySelector('.ve-src-box'));
         md.addEventListener('click', veSrcClick);
         md.addEventListener('keydown', veSrcKey);
         md.querySelector('#ve-src-seek').addEventListener('input', e => {
@@ -1399,7 +1444,6 @@ function veSrcOpen(id) {
             VE._srcDrag = p;
             e.dataTransfer.setData('text/x-ve-source', JSON.stringify(p));
             e.dataTransfer.effectAllowed = 'copy';
-            setTimeout(() => veSrcClose(), 0);
         }));
         md.querySelectorAll('.ve-src-drag').forEach(b => b.addEventListener('dragend', () => { VE._srcDrag = null; veDropGhostClear(); }));
         VESRC.video.addEventListener('timeupdate', veSrcRender);
@@ -1416,8 +1460,47 @@ function veSrcOpen(id) {
     const sub = md.querySelector('#ve-src-sub');
     if (sub) sub.textContent = [m.info?.width && m.info?.height ? `${m.info.width}×${m.info.height}` : '', veShort((m.info && m.info.duration) || m.dur || 0)].filter(Boolean).join(' · ');
     md.hidden = false;
+    veSrcEncaixar(md.querySelector('.ve-src-box'));
     veSrcLoad();
     md.querySelector('.ve-src-box').focus();
+}
+
+// posição e tamanho da janela Source: lembrados entre aberturas (só conveniência; sem localStorage, abre no meio)
+function veSrcGeo(g) {
+    try {
+        if (g) localStorage.setItem('ve-src-geo', JSON.stringify(g));
+        else return JSON.parse(localStorage.getItem('ve-src-geo') || 'null');
+    } catch (_) { return null; }
+}
+
+function veSrcEncaixar(box) {
+    const area = $ve('ve').getBoundingClientRect(), g = veSrcGeo() || {};
+    const w = Math.min(area.width - 16, Math.max(360, g.w || Math.min(900, area.width * 0.6)));
+    const h = Math.min(area.height - 16, Math.max(280, g.h || Math.min(640, area.height * 0.7)));
+    const x = g.x != null ? g.x : (area.width - w) / 2, y = g.y != null ? g.y : (area.height - h) / 2;
+    Object.assign(box.style, {
+        width: w + 'px', height: h + 'px',
+        left: Math.max(0, Math.min(x, area.width - w)) + 'px', top: Math.max(0, Math.min(y, area.height - 40)) + 'px',
+    });
+}
+
+function veSrcJanela(box) {
+    const salvar = () => veSrcGeo({ x: box.offsetLeft, y: box.offsetTop, w: box.offsetWidth, h: box.offsetHeight });
+    box.querySelector('.ve-src-head').addEventListener('pointerdown', e => {
+        if (e.button !== 0 || e.target.closest('button')) return;
+        e.preventDefault();
+        const area = $ve('ve').getBoundingClientRect(), x0 = e.clientX - box.offsetLeft, y0 = e.clientY - box.offsetTop;
+        const mover = ev => {
+            box.style.left = Math.max(40 - box.offsetWidth, Math.min(area.width - 40, ev.clientX - x0)) + 'px';
+            box.style.top = Math.max(0, Math.min(area.height - 40, ev.clientY - y0)) + 'px';
+        };
+        const soltar = () => { removeEventListener('pointermove', mover); removeEventListener('pointerup', soltar); salvar(); };
+        addEventListener('pointermove', mover);
+        addEventListener('pointerup', soltar);
+    });
+    // redimensionar: o canto do CSS (resize: both); guarda ao terminar
+    let t = 0;
+    new ResizeObserver(() => { if (!box.closest('[hidden]')) { clearTimeout(t); t = setTimeout(salvar, 300); } }).observe(box);
 }
 
 function veSrcLoad() {

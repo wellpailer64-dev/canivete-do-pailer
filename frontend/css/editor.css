@@ -523,6 +523,16 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
     background: linear-gradient(180deg, #191919, #101010);
 }
 .ve-src-head { min-height: 46px; }
+/* Source solta: sem fundo escuro e sem bloquear o editor atrás */
+#ve-source.ve-src-solta { background: transparent; display: block; pointer-events: none; }
+#ve-source.ve-src-solta[hidden] { display: none; }
+#ve-source.ve-src-solta .ve-src-box {
+    position: absolute; pointer-events: auto; resize: both; max-width: none; max-height: none;
+    min-width: 360px; min-height: 280px; box-shadow: 0 18px 48px rgba(0,0,0,.6);
+}
+#ve-source.ve-src-solta .ve-src-head { cursor: move; }
+#ve-source.ve-src-solta .ve-src-body { grid-template-rows: minmax(100px, 1fr) auto auto; }
+#ve-source.ve-src-solta .ve-src-screen { aspect-ratio: auto; max-height: none; min-height: 100px; }
 .ve-src-head > div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .ve-src-head span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ve-src-head small { color: var(--ve-faint); font: 11px var(--ve-mono); }
@@ -1466,6 +1476,10 @@ html.ve-float-html body { background: var(--bg-0); }
     background-size: 17px 17px; animation: ve-pj-enh 0.8s linear infinite;
 }
 .ve-pj-enh.fila { color: var(--ve-dim); background: var(--ve-panel-2); animation: none; }
+.ve-pj-enh { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
+.ve-pj-enh i { font-style: normal; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-pj-enh b { cursor: pointer; padding: 0 3px; border-radius: 3px; opacity: .75; }
+.ve-pj-enh b:hover { opacity: 1; background: rgba(255,255,255,.15); }
 @keyframes ve-pj-enh { to { background-position: 17px 0; } }
 .ve-pj-mel { cursor: pointer; color: #4ade80; background: rgba(74,222,128,.12); box-shadow: inset 0 0 0 1px rgba(74,222,128,.35); }
 .ve-pj-mel.off { color: var(--ve-dim); background: transparent; box-shadow: inset 0 0 0 1px var(--ve-line-2); }
