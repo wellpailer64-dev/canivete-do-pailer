@@ -189,7 +189,7 @@ Painéis móveis do Vetor (mecanismo do Photo): §16, `frontend/js/vetor-dock.js
 ## Gerar efeito sonoro por texto (IA local)
 Caixa "Gerar efeito (IA)" no topo do Soundboard (`frontend/js/editor-sfx-gerar.js`) → `Functions/gerador_sfx.py`: EzAudio XL
 (MIT) + encoder flan-t5-xl (Apache 2.0) convertidos para ONNX 16 bits, rodando no onnxruntime-DirectML (sem torch, sem login).
-Modelo (~4 GB) baixado no 1º uso do release `sfx-v1` (pré-lançamento; manifesto com SHA-256, t5.pesos em 2 partes).
+Modelo (~4 GB) baixado no 1º uso do release `sfx-v1` (pré-lançamento; manifesto com SHA-256; os .pesos grandes em pedaços de 200 MB, juntados no download — upload de arquivo grande cai na conexão do Pailer).
 Texto do leitor no PROCESSADOR, gerador/decodificador na placa (recriar sessão DirectML com outra aberta derruba o
 processo). 50 passos (padrão; o Pailer achou "muito melhor" que 25) ≈ 35 s por 10 s numa RTX 3050, pico +4,7 GB.
 A Kani reescreve o pedido POR BAIXO (`melhorar_pedido`, `SISTEMA_PEDIDO`) no formato que o EzAudio gera melhor
