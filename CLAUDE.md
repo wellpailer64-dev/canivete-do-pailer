@@ -71,6 +71,9 @@ Export otimizado (rodada 1, 2026-10-08: reels reais de 3,6× → 1,26× a duraç
 **Modo placa** (rodada 3): a timeline montada inteira na GPU (Vulkan + libplacebo) — `Functions/export_placa.py`, chamado
 pelo `exportar_video` com a placa ligada; o que não suporta (`motivo()`) ou falha cai na CPU. Depoimentos de 98 s: 264 s → 96 s.
 Testar: `py -3.13 testes/teste_export.py --placa`. Armadilhas (disable_linear, settb, `ot`) no plano §8.
+Rodada 4 (plano §11): Chroma Key, Aberração, Desfoque e opacidade de ajuste em shader do libplacebo; o resto desce só
+naquela camada (híbrido); sem caber na placa, exporta em blocos. iPhone HLG + Dolby Vision lido como a prévia (`_marca_cor`).
+Respeite o seu voto: 892 s → 205 s. Blocos no teste: `CANIVETE_PLACA_BLOCOS=1 CANIVETE_BLOCO_SEG=1 ... --placa`.
 **Taxa da timeline CRAVADA** (`video_cutter.taxa_timeline`, `probe()["fps_timeline"]`): nunca a média de vídeo de celular.
 
 Mixer de trilhas de áudio (Audio Track Mixer do Premiere): `frontend/js/editor-mixer.js` (aba junto dos Controles de
