@@ -610,6 +610,12 @@ def _navegador_toca(path, info):
         return False
     if info["has_audio"] and info["acodec"] not in _NAVEGADOR_ACODECS:
         return False
+    # Quadro-chave espaçado (> 1 s: vídeo de banco de imagens, baixado, exportado): pular e arrastar a agulha decodificam
+    # centenas de quadros (180 × 18 ms por pulo, 2026-10-10) — edita pela prévia leve (quadro-chave a cada 0,5 s), como
+    # o "Optimized Media" do DaVinci. A prévia é gerada uma vez e reaproveitada.
+    from Functions import otimizar
+    if otimizar.gop_longo(path):
+        return False
     return True
 
 
@@ -2485,6 +2491,17 @@ def _mascara_vinheta(w, h, ang):
     return p
 
 
+def _key_params(v):
+    """Valores do Chroma Key (editor-fx.js "key") já limitados — os mesmos para o exportador de CPU e o shader do modo
+    placa (export_placa._shader_key)."""
+    ar, ag, ab = (_num(v.get(k), -2, 2) for k in ("ar", "ag", "ab"))
+    cb, cw = _num(v.get("cb"), 0, 0.99), _num(v.get("cw"), 0.01, 1, 1)
+    return {"ar": ar, "ag": ag, "ab": ab, "dk": _num(v.get("dk"), 0.05, 1, 0.5), "ganho": _num(v.get("ganho"), 0, 2, 1),
+            "cb": cb, "cw": max(cw, cb + 0.01), "eq": _num(v.get("eq"), 0, 1, 0.5), "spill": _num(v.get("spill"), 0, 1, 1),
+            "azul": bool(v.get("azul")), "choke": int(round(_num(v.get("choke"), -10, 10))),
+            "suave": _num(v.get("suave"), 0, 20)}
+
+
 def _filtros_fx(fx, mw, mh, tag="x"):
     """Efeitos do clipe (mesma ordem e mesmas contas da prévia do editor, em frontend/js/editor-fx.js).
     Rodam no tamanho original da mídia, antes de escala/posição/rotação/opacidade (como no Premiere).
@@ -2540,18 +2557,15 @@ def _filtros_fx(fx, mw, mh, tag="x"):
             # Chroma Key por diferença de cor (mesmas contas da prévia: veKeyDraw em editor-fx.js)
             if tag.startswith("a"):
                 continue   # não vale em camada de ajuste
-            ar, ag, ab = (_num(v.get(k), -2, 2) for k in ("ar", "ag", "ab"))
-            dk, ganho = _num(v.get("dk"), 0.05, 1, 0.5), _num(v.get("ganho"), 0, 2, 1)
-            cb, cw = _num(v.get("cb"), 0, 0.99), _num(v.get("cw"), 0.01, 1, 1)
-            cw = max(cw, cb + 0.01)
-            eq, spill = _num(v.get("eq"), 0, 1, 0.5), _num(v.get("spill"), 0, 1, 1)
-            choke, suave = int(round(_num(v.get("choke"), -10, 10))), _num(v.get("suave"), 0, 20)
+            kp = _key_params(v)
+            ar, ag, ab, dk, ganho = kp["ar"], kp["ag"], kp["ab"], kp["dk"], kp["ganho"]
+            cb, cw, eq, spill, choke, suave = kp["cb"], kp["cw"], kp["eq"], kp["spill"], kp["choke"], kp["suave"]
             a = f"clip(((1-{ganho:.5f}*(1-2*val/255)/{dk:.5f})-{cb:.5f})/{cw - cb:.5f},0,1)*255"
             cadeia = [f"colorchannelmixer=ar={ar:.5f}:ag={ag:.5f}:ab={ab:.5f}:aa=0.5",
                       # o alfa bruto sai do vídeo opaco; a imagem com transparência própria multiplica depois
                       f"lutrgb=a='{a}'"]
             if spill > 0.001:
-                azul = 1 if v.get("azul") else 0
+                azul = 1 if kp["azul"] else 0
                 cadeia.append(f"despill=type={azul}:mix={eq:.5f}:expand=0:red=0:green={-spill if not azul else 0:.4f}"
                               f":blue={-spill if azul else 0:.4f}:brightness=0:alpha=0")
             if choke or suave >= 0.05:

@@ -347,6 +347,37 @@ CASOS = {
             v: { cor: '#00b140', ganho: 100, bal: 50, preto: 0, branco: 100, encolher: 2, suave: 3, spill: 100, matte: 0 } }] });
         return [clip(0, 0, 0, 3, 'b.mp4'), k];
     """, ""),
+    # como o Respeite o seu voto: chroma key só (shader na placa), chroma key + Luz e Cor (desce para a CPU) e camada de
+    # ajuste com Aberração + Desfoque e opacidade animada (some no fim) — com --placa, tudo no modo placa
+    "chroma2": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const key = () => ({ id: id(), t: 'key', on: true,
+            v: { cor: '#00b140', ganho: 100, bal: 50, preto: 0, branco: 100, encolher: 1, suave: 2, spill: 100, matte: 0 } });
+        const k1 = clip(1, 0, 0, 2, 'verde.mp4', { fx: [key()] });
+        const k2 = clip(1, 2, 0, 2, 'verde.mp4', { fx: [key(), { id: id(), t: 'lc', on: true, v: Object.assign(veLcDefaults(), { ct: 30, sat: 140 }) }] });
+        let aj = VE.media.find(x => x.kind === 'ajuste');
+        if (!aj) { aj = { id: VE.media.length, kind: 'ajuste', name: 'Camada de ajuste' }; VE.media.push(aj); }
+        const adj = { tr: 2, st: 0.5, s: 0, e: 3, m: aj.id, fx: [{ id: id(), t: 'ca', on: true, v: { r: -4, g: 0, b: 4, raio: 0 } },
+            { id: id(), t: 'blur', on: true, v: { amt: 10 } }] };
+        adj.p = veDefProps(adj);
+        adj.k = { op: [{ t: 0, v: 100 }, { t: 2, v: 100 }, { t: 3, v: 0 }] };
+        return [clip(0, 0, 0, 4, 'b.mp4'), k1, k2, adj];
+    """, ""),
+    # aberração cromática (shader na placa: export_placa._shader_ca): camada de ajuste com Aberração + Luz e Cor na
+    # timeline toda e outra com Raio (queda radial) num trecho; e num clipe de vídeo
+    "aberracao": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        let aj = VE.media.find(x => x.kind === 'ajuste');
+        if (!aj) { aj = { id: VE.media.length, kind: 'ajuste', name: 'Camada de ajuste' }; VE.media.push(aj); }
+        const a1 = { tr: 2, st: 0, s: 0, e: 4, m: aj.id, fx: [{ id: id(), t: 'ca', on: true, v: { r: -4, g: 0, b: 4, raio: 0 } },
+            { id: id(), t: 'lc', on: true, v: Object.assign(veLcDefaults(), { ct: 20 }) }] };
+        a1.p = veDefProps(a1);
+        const a2 = { tr: 3, st: 1, s: 0, e: 2, m: aj.id, fx: [{ id: id(), t: 'ca', on: true, v: { r: -8, g: 2, b: 8, raio: 60 } }] };
+        a2.p = veDefProps(a2);
+        const pip = clip(1, 0.5, 0, 3, 'c.mp4', { p: { sc: 40, x: 540, y: 600, rot: 0, op: 100 },
+            fx: [{ id: id(), t: 'ca', on: true, v: { r: 5, g: 0, b: -5, raio: 0 } }] });
+        return [clip(0, 0, 0, 4, 'b.mp4'), pip, a1, a2];
+    """, ""),
     # sobreposições: zoom para dentro, giro, lente e flare
     "sobreposicao": (1080, 1920, """
         const { clip } = __te;

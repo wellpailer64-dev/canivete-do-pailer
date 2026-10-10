@@ -108,7 +108,8 @@ def main():
             ok(m["url"] and m["url"] != url0, "URL nova: o player recarrega o arquivo novo", f"{url0} → {m['url']}")
             pg.wait_for_function("VE.media[0].url && veVideo().readyState >= 2", timeout=60000)
             depois = pg.evaluate(PULO)
-            ok(depois < antes, "pular para um ponto ficou mais rápido", f"{antes} → {depois} ms (mediana)")
+            # a cópia antiga já edita pela prévia leve (video_cutter._navegador_toca: quadro-chave espaçado); a refeita direto
+            ok(antes < 80 and depois < 80, "pular para um ponto é rápido antes (prévia leve) e depois (cópia nova)", f"{antes} → {depois} ms (mediana)")
             pg.evaluate("veSeek(12.5)"); pg.wait_for_timeout(1200)
             dif = pg.evaluate("Math.abs(veVideo().currentTime - 12.5)")
             ok(dif < 0.05, "o player mostra o ponto pedido no arquivo novo", f"{dif:.3f} s")

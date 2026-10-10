@@ -174,3 +174,29 @@ concluir cada render; visual profissional, miniatura leve do quadro em render e 
   preparo conta (`VEFILA.preparando`) e Renderizar durante ele só agenda o início.
 - Painel Desempenho (`editor-desempenho.js`): CPU/RAM/placa/VRAM/encoder ao vivo, encaixável; vertical, horizontal ou
   mínimo pelo formato do encaixe. Teste: D:/kanivete_testes/scripts/teste_desempenho.py.
+
+## 11. Rodada 4 (2026-10-10) — efeitos na placa e exportação em blocos (Respeite o seu voto)
+Projeto real: 2 min 41 s, 1920×1080 29,97, 117 camadas de vídeo (FX30 HEVC 10 bits, iPhone HLG com Dolby Vision),
+72 Chroma Key, 16 camadas de ajuste (Luz e Cor com LUT, Aberração, Desfoque, opacidade animada). CPU: **892 s (5,5×)**.
+Modo placa: **205 s (1,27×)**, CPU ~10%; diferença média para a exportação de CPU 3,1/255 (pior 5,4 em 320 quadros).
+- **Shaders no libplacebo** (`export_placa.py`): Chroma Key (`_shader_key`: alfa, encolher/expandir, suavizar, despill;
+  `upscaler=nearest`), Aberração (`_shader_ca`), Desfoque (`_shader_blur`, passadas H/V, amostra de k em k acima de
+  64), opacidade de camada de ajuste por quadro (`_shader_opacidade`: tabela indexada pelo `frame` do shader, que
+  começa em 1 no 1º quadro que o filtro recebe). Ordem dos efeitos = a da lista (`_passos_lc`).
+- **Híbrido** (`_FX_HIBRIDO`): o que ainda não tem shader (Brilho/Contraste, Chroma Key junto com outro efeito) desce só
+  naquela camada/trecho, passa pelos MESMOS filtros da CPU (`vc._filtros_fx`) e sobe.
+- **Em blocos** (`_blocos`, `_no_bloco`): sem caber na memória da placa (e base só de vazios), blocos de ~12 s nos
+  cortes, um após o outro, emenda sem recodificar. Camada que já vinha tocando: `pula`. Forçar no teste:
+  `CANIVETE_PLACA_BLOCOS=1 CANIVETE_BLOCO_SEG=1 teste_export.py --placa`.
+- Armadilhas medidas:
+  - No hook MAIN a cor vem em ponto flutuante **sem trava** (o verde BT.709 tem R −0,06): `clamp` antes de qualquer conta.
+  - `trim` decide pelo **fim** do quadro: trecho de camada de ajuste = `ini + ¼ quadro` a `fim + ¼ quadro`.
+  - Camada que toca a borda do bloco por fração de quadro (camadas a 30 qps numa saída de 29,97) entra sem quadros e
+    trava o `blend` da vinheta (movie em loop): só entra o que cobre ≥ ½ quadro; ajuste sem quadros é ignorado.
+  - `hwdownload` de vídeo 10 bits pede **p010**, não nv12 (`_fmt_decodificado`).
+  - **iPhone HLG + Dolby Vision**: o libplacebo aplica o Dolby Vision sozinho (tone mapping, −25 níveis, acinzentado).
+    A prévia e a CPU tratam como vídeo comum: `sidedata=delete DOVI_METADATA` + `setparams` primárias/curva 709 (`_marca_cor`).
+  - A ida e volta RGB da CPU (swscale) erra até 14 níveis em material com muito detalhe; a placa 1,9 (a conta exata do BT.709).
+- Testes novos em `teste_export.py`: `chroma2` (key só, key + Luz e Cor, ajuste com Aberração + Desfoque e opacidade
+  animada) e `aberracao`. Bancada: `D:/kanivete_testes/keyplaca` (`bloco.py N` monta um bloco do Respeite por script).
+- Pendências: abrir o 1º bloco ainda leva ~10 s; Brilho/Contraste e efeitos de clipe combinados com o key ainda descem.

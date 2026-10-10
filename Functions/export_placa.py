@@ -15,6 +15,7 @@ O que ainda não roda na placa (mesclagem, rotação, opacidade animada em VÍDE
 principal, 10 bits, ProRes, saída reduzida) devolve motivo() ≠ None e a exportação segue pela CPU como sempre; erro na
 placa também cai na CPU (video_cutter.exportar_video). Medições e pendências: Instructions/agente/plano-kanivete-encoder.md §7–8.
 """
+import copy
 import math
 import os
 import shutil
@@ -40,6 +41,27 @@ def _ler_na_placa(info):
     if info.get("pix_fmt", "") not in ("yuv420p", "yuvj420p", "nv12", "yuv420p10le", "p010le"):
         return False
     return True   # (ler Full HD H.264 na CPU deixou 13% mais lento e não resolveu a memória: o que enche é a fila adiantada)
+
+
+def _marca_cor(path, info):
+    """Marca de cor do clipe para o libplacebo: a de HD sem marca (vc._marca_hd) e, em vídeo HDR de celular (HLG/PQ,
+    BT.2020 — iPhone), a mesma leitura da prévia e do exportador de CPU: a matriz da fonte (BT.2020) e a curva/cores
+    tratadas como vídeo comum, sem tone mapping. O iPhone grava também metadados Dolby Vision (perfil 8.4) que o
+    libplacebo aplica sozinho (tone mapping, mesmo com a marca trocada): saem os DOVI_METADATA. Sem isso o clipe saía
+    ~25 níveis mais escuro e acinzentado que a prévia (Respeite o seu voto, 2026-10-10; com: 128/135/143 = a CPU)."""
+    m = vc._marca_hd(path)
+    if m:
+        return m
+    if (str((info or {}).get("color_transfer") or "") in ("arib-std-b67", "smpte2084")
+            or str((info or {}).get("color_primaries") or "") == "bt2020"):
+        return "sidedata=mode=delete:type=DOVI_METADATA,setparams=color_primaries=bt709:color_trc=bt709,"
+    return ""
+
+
+def _fmt_decodificado(info):
+    """Formato do quadro que sai do decodificador Vulkan (o que o hwdownload tem de pedir): p010 nos de 10 bits (HEVC
+    da FX30), nv12 nos de 8. Pedir nv12 de um vídeo 10 bits falhava ("Invalid output format nv12 for hwframe download")."""
+    return "p010le" if "10" in str(info.get("pix_fmt", "")) else "nv12"
 
 
 def disponivel():
@@ -125,7 +147,86 @@ def memoria_estimada(segmentos, lay, path):
 
 
 def _lc_ok(fx):
-    return all(f.get("t") == "lc" or f.get("on") is False for f in fx or [])
+    """Todos os efeitos ativos rodam em shader na placa (_passos_lc): Luz e Cor, Aberração cromática e Desfoque."""
+    return all(f.get("t") in ("lc", "ca", "blur") or f.get("on") is False for f in fx or [])
+
+
+# Efeitos que a placa ainda não faz em shader mas o exportador de CPU faz com filtros do ffmpeg: no modo placa o quadro
+# DAQUELA camada (ou o trecho da camada de ajuste) desce, passa pelos MESMOS filtros (vc._filtros_fx, mesma ordem e contas)
+# e sobe — leitura, redução, montagem das outras camadas e encoder continuam na placa. Respeite o seu voto (72 Chroma Key,
+# ajustes com Desfoque e Aberração): ia inteiro pela CPU, 6× a duração (2026-10-10).
+_FX_HIBRIDO = ("key", "lc", "blur", "bc", "ca")
+
+
+def _fx_hibrido(fx):
+    """Tem efeito fora do Luz e Cor e todos estão entre os que descem e voltam (_FX_HIBRIDO)."""
+    ativos = [f for f in fx or [] if f.get("on") is not False]
+    return bool(ativos) and not _lc_ok(fx) and all(f.get("t") in _FX_HIBRIDO for f in ativos)
+
+
+def _key_so(fx):
+    """Só um Chroma Key ativo no clipe: o recorte roda inteiro num shader da placa (_shader_key)."""
+    ativos = [f for f in fx or [] if f.get("on") is not False]
+    return len(ativos) == 1 and ativos[0].get("t") == "key"
+
+
+def _shader_key(v):
+    """Chroma Key em passadas de shader do libplacebo (formato mpv), as contas do exportador de CPU (vc._filtros_fx "key"):
+    alfa = rampa da diferença de cor (colorchannelmixer + lutrgb, com o valor intermediário em 8 bits como lá), encolher/
+    expandir = mínimo/máximo 3×3 repetido (erosion/dilation), suavizar = gaussiano no alfa, e o despill do ffmpeg no
+    verde/azul. Roda no RGB da mídia (MAIN, sem luz linear); a saída RGBA leva o alfa direto (não pré-multiplicado).
+    No MAIN a cor vem em ponto flutuante SEM trava: o verde da tela tem vermelho −0,06 (BT.709) e o alfa caía de 42 para
+    28 — travada em 0..1 como a conversão da CPU/prévia (medido 2026-10-10)."""
+    p = vc._key_params(v)
+    partes = [f"//!HOOK MAIN\n//!BIND HOOKED\n//!SAVE K0\n//!COMPONENTS 1\n//!DESC chroma alfa\nvec4 hook() {{\n"
+              f"    vec3 c = clamp(HOOKED_tex(HOOKED_pos).rgb, 0.0, 1.0);\n"
+              f"    float v = clamp({p['ar']:.5f} * c.r + {p['ag']:.5f} * c.g + {p['ab']:.5f} * c.b + 0.5, 0.0, 1.0);\n"
+              f"    v = floor(v * 255.0 + 0.5) / 255.0;\n"
+              f"    float a = clamp(((1.0 - {p['ganho']:.5f} * (1.0 - 2.0 * v) / {p['dk']:.5f}) - {p['cb']:.5f}) / "
+              f"{p['cw'] - p['cb']:.5f}, 0.0, 1.0);\n"
+              f"    return vec4(floor(a * 255.0 + 0.5) / 255.0, 0.0, 0.0, 0.0);\n}}\n"]
+    n = 0
+    viz = [(dx, dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if dx or dy]
+    for _ in range(abs(p["choke"])):
+        op = "min" if p["choke"] > 0 else "max"
+        corpo = "\n".join(f"    a = {op}(a, K{n}_texOff(vec2({dx}.0, {dy}.0)).x);" for dx, dy in viz)
+        partes.append(f"//!HOOK MAIN\n//!BIND K{n}\n//!SAVE K{n + 1}\n//!COMPONENTS 1\n//!DESC chroma encolher\n"
+                      f"vec4 hook() {{\n    float a = K{n}_texOff(vec2(0.0)).x;\n{corpo}\n    return vec4(a, 0.0, 0.0, 0.0);\n}}\n")
+        n += 1
+    s = p["suave"]
+    if s >= 0.05:
+        r = max(1, min(64, int(math.ceil(3 * s))))
+        pesos = [math.exp(-(i * i) / (2 * s * s)) for i in range(r + 1)]
+        tot = pesos[0] + 2 * sum(pesos[1:])
+        pesos = [w / tot for w in pesos]
+        for dx, dy in ((1, 0), (0, 1)):
+            soma = "\n".join(f"    a += {pesos[i]:.8f} * (K{n}_texOff(vec2({dx * i}.0, {dy * i}.0)).x + "
+                             f"K{n}_texOff(vec2({-dx * i}.0, {-dy * i}.0)).x);" for i in range(1, r + 1))
+            partes.append(f"//!HOOK MAIN\n//!BIND K{n}\n//!SAVE K{n + 1}\n//!COMPONENTS 1\n//!DESC chroma suavizar\n"
+                          f"vec4 hook() {{\n    float a = {pesos[0]:.8f} * K{n}_texOff(vec2(0.0)).x;\n{soma}\n"
+                          f"    return vec4(a, 0.0, 0.0, 0.0);\n}}\n")
+            n += 1
+    desp = ""
+    if p["spill"] > 0.001:
+        # despill do ffmpeg (type, mix = Equilíbrio, expand 0, escala −spill no canal da tela)
+        m = p["eq"]
+        if p["azul"]:
+            desp = (f"    float sm = max(c.b - (c.r * {m:.5f} + c.g * {1 - m:.5f}), 0.0);\n"
+                    f"    c.b = max(c.b - {p['spill']:.5f} * sm, 0.0);\n")
+        else:
+            desp = (f"    float sm = max(c.g - (c.r * {m:.5f} + c.b * {1 - m:.5f}), 0.0);\n"
+                    f"    c.g = max(c.g - {p['spill']:.5f} * sm, 0.0);\n")
+    partes.append(f"//!HOOK MAIN\n//!BIND HOOKED\n//!BIND K{n}\n//!DESC chroma saida\nvec4 hook() {{\n"
+                  f"    vec4 c = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n{desp}    c.a = K{n}_tex(HOOKED_pos).x;\n    return c;\n}}\n")
+    return "\n".join(partes)
+
+
+def _mtx(info):
+    """Matriz YUV↔RGB das camadas — a mesma regra do exportador de CPU (exportar_video: mtx)."""
+    cs = str((info or {}).get("color_space") or "").lower()
+    w, h = (info or {}).get("width") or 1920, (info or {}).get("height") or 1080
+    return ("bt2020" if cs.startswith("bt2020") else "bt601" if cs in ("bt470bg", "smpte170m")
+            else "bt709" if cs == "bt709" or min(w, h) >= 720 else "bt601")
 
 
 def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False):
@@ -156,11 +257,16 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
         if any(f.get("t") == "ca_rot" for f in c.get("ca") or []):
             return "Girar constante"
         if c["tipo"] == "ajuste":
-            if not _lc_ok(c["fx"]) or c["op"] < 0.999 or "op" in c["kf"]:
-                return "camada de ajuste com efeito/opacidade fora do Luz e Cor"
+            if not _lc_ok(c["fx"]) and not _fx_hibrido(c["fx"]):
+                return "camada de ajuste com efeito fora do Luz e Cor"
+            if (not _opaca(c) and _fx_hibrido(c["fx"])
+                    and any(e.startswith(vc._NIT_NO_YUV) for e in vc._filtros_fx(c["fx"], 64, 64, "m"))):
+                return "camada de ajuste com Nitidez e opacidade"
         elif c["tipo"] == "video":
-            if not _lc_ok(c["fx"]):
+            if not _lc_ok(c["fx"]) and not _fx_hibrido(c["fx"]):
                 return "vídeo com efeito fora do Luz e Cor"
+            if _fx_hibrido(c["fx"]) and any(e.startswith(vc._NIT_NO_YUV) for e in vc._filtros_fx(c["fx"], c["mw"], c["mh"], "m")):
+                return "Nitidez do Luz e Cor junto com outro efeito no vídeo"
             if vc._clipe_tem_alfa(c["path"]):
                 return "vídeo com transparência"
     return None
@@ -200,6 +306,22 @@ def _passos_lc(g, fx, mw, mh, pasta, tag):
     mw/mh = tamanho em que o efeito mede (a mídia, num clipe; o quadro, na camada de ajuste)."""
     passos = []
     for j, f in enumerate(fx or []):
+        if f.get("on") is not False and f.get("t") == "blur":
+            sh = _shader_blur((f.get("v") or {}).get("amt"), mw, mh)
+            if sh:
+                arq = os.path.join(pasta, f"blur_{tag}_{j}.glsl")
+                with open(arq, "w", encoding="utf-8") as fh:
+                    fh.write(sh)
+                passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format=yuv420p:disable_linear=1")
+            continue
+        if f.get("on") is not False and f.get("t") == "ca":
+            sh = _shader_ca(f.get("v") or {}, mw, mh)
+            if sh:
+                arq = os.path.join(pasta, f"ca_{tag}_{j}.glsl")
+                with open(arq, "w", encoding="utf-8") as fh:
+                    fh.write(sh)
+                passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format=yuv420p:disable_linear=1")
+            continue
         if f.get("on") is False or f.get("t") != "lc":
             continue
         v = f.get("v") or {}
@@ -215,6 +337,62 @@ def _passos_lc(g, fx, mw, mh, pasta, tag):
                 fh.write(sh)
             passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format=yuv420p")
     return passos
+
+
+def _shader_blur(amt, W, H):
+    """Desfoque gaussiano (editor-fx.js "blur"; o mesmo σ do exportador de CPU: 100% = 5% do lado menor) em duas
+    passadas (horizontal e vertical) no RGB. Até 64 amostras por lado; σ maior amostra de k em k pixels (a leitura
+    bilinear da textura cobre o meio). None se não desfoca."""
+    sig = vc._num(amt, 0, 100) * max(2, min(W, H)) / 2000.0
+    if sig < 0.05:
+        return None
+    r = max(1, int(math.ceil(3 * sig)))
+    passo = max(1, int(math.ceil(r / 64)))
+    n = int(math.ceil(r / passo))
+    pesos = [math.exp(-((i * passo) ** 2) / (2 * sig * sig)) for i in range(n + 1)]
+    tot = pesos[0] + 2 * sum(pesos[1:])
+    pesos = [p / tot for p in pesos]
+    partes = []
+    for dx, dy, nome in ((1, 0, "horizontal"), (0, 1, "vertical")):
+        soma = "\n".join(f"    s += {pesos[i]:.8f} * (clamp(HOOKED_texOff(vec2({dx * i * passo}.0, {dy * i * passo}.0)), 0.0, 1.0) + "
+                         f"clamp(HOOKED_texOff(vec2({-dx * i * passo}.0, {-dy * i * passo}.0)), 0.0, 1.0));"
+                         for i in range(1, n + 1))
+        partes.append(f"//!HOOK MAIN\n//!BIND HOOKED\n//!DESC desfoque {nome}\nvec4 hook() {{\n"
+                      f"    vec4 s = {pesos[0]:.8f} * clamp(HOOKED_texOff(vec2(0.0)), 0.0, 1.0);\n{soma}\n    return s;\n}}\n")
+    return "\n".join(partes)
+
+
+def _shader_opacidade(c, ini, fim, fps):
+    """Alfa da camada de ajuste por quadro do trecho [ini, fim) (o contador `frame` do shader começa em 1 no primeiro
+    quadro que o libplacebo recebe): tabela com a opacidade de cada quadro (quadros-chave como _valor_kf) — a saída
+    RGBA é composta por cima do original, como o overlay da CPU."""
+    n = max(1, int(round((fim - ini) * fps)) + 2)
+    if "op" in c["kf"]:
+        vals = [max(0.0, min(1.0, vc._valor_kf(c["kf"]["op"], ini - c["st"] + i / fps))) for i in range(n)]
+    else:
+        vals = [max(0.0, min(1.0, c["op"]))] * n
+    tab = ",".join(f"{v:.4f}" for v in vals)
+    return (f"//!HOOK MAIN\n//!BIND HOOKED\n//!DESC opacidade\nconst float OP[{n}] = float[]({tab});\nvec4 hook() {{\n"
+            f"    vec4 c = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n    c.a = OP[clamp(frame - 1, 0, {n - 1})];\n    return c;\n}}\n")
+
+
+def _shader_ca(v, W, H):
+    """Aberração cromática (editor-fx.js "ca") como o exportador de CPU: cada canal ampliado a partir do centro (escalas
+    normalizadas pela menor) e, com Raio, misturado ao original por uma queda radial (cheio até meio raio, nada no raio).
+    A cor lida é travada em 0..1 (no MAIN ela vem sem trava, ver _shader_key). None se não muda nada."""
+    ss = [1 + vc._num(v.get(k), -10, 10) * 0.0045 for k in ("r", "g", "b")]
+    mn = min(ss)
+    ss = [s / mn for s in ss]
+    if max(ss) <= 1.0001:
+        return None
+    raio = vc._num(v.get("raio"), 0, 200) / 100.0
+    leitura = "\n".join(f"    ca.{c} = clamp(HOOKED_tex(0.5 + (HOOKED_pos - 0.5) / {s:.6f}).{c}, 0.0, 1.0);"
+                        for c, s in zip("rgb", ss))
+    queda = (f"    float m = clamp(2.0 - 2.0 * length((HOOKED_pos - 0.5) * vec2({W:.1f}, {H:.1f})) / {min(W, H) * raio:.3f}, 0.0, 1.0);\n"
+             if raio > 0 else "    float m = 1.0;\n")
+    return (f"//!HOOK MAIN\n//!BIND HOOKED\n//!DESC aberracao cromatica\nvec4 hook() {{\n"
+            f"    vec4 o = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n    vec3 ca;\n{leitura}\n{queda}"
+            f"    o.rgb = mix(o.rgb, ca, m);\n    return o;\n}}\n")
 
 
 def _expr(c, prop, fixo, tl):
@@ -254,7 +432,11 @@ def _tam(c, bw, bh, kx, tl):
 def _entrada_video(g, c, info, pasta, n_cam):
     """Clipe lido na placa (ou na CPU e enviado uma vez); tempos idênticos aos do exportador de CPU."""
     vk = _ler_na_placa(info)
-    ss = max(0.0, c["s"] - 3.0)
+    # bloco (exportação em blocos): a camada que já vinha tocando é lida só a partir do início do bloco ("pula", em s
+    # da timeline); o tempo interno dela (quadros-chave, opacidade) continua contando do início verdadeiro (st < 0)
+    pula = c.get("pula", 0.0)
+    s0 = c["s"] + pula * c["v"]
+    ss = max(0.0, s0 - 3.0)
     fq = vc._fps_fonte(c["path"])
     if fq and ss > 0 and not c.get("base"):
         ss = math.floor(ss * fq + 1e-6) / fq
@@ -267,7 +449,10 @@ def _entrada_video(g, c, info, pasta, n_cam):
     # 4K de celular usado a 50%: reduzido logo depois de ler, no mesmo passo do giro, ao maior tamanho que a camada
     # chega a ter — os quadros na fila viram 1080 (34 leituras 4K com quadros 4K na fila estouravam os 8 GB da placa)
     k_max = max([c["sc"]] + [p[1] for p in c["kf"].get("sc", [])]) * vc._ca_pulso_max(c.get("ca"))
-    red = min(1.0, k_max * 1.02) if k_max < 0.9 else 1.0
+    key_gpu = _key_so(c["fx"])
+    hib = _fx_hibrido(c["fx"]) and not key_gpu
+    # efeitos que descem para a CPU medem em px da mídia (encolher/suavizar do Chroma Key): sem reduzir antes deles
+    red = min(1.0, k_max * 1.02) if k_max < 0.9 and not hib and not key_gpu else 1.0
     rw, rh = max(2, int(round(c["mw"] * red / 2)) * 2), max(2, int(round(c["mh"] * red / 2)) * 2)
     giro = ""
     if vk and (rot in _GIRO or red < 1):
@@ -275,22 +460,43 @@ def _entrada_video(g, c, info, pasta, n_cam):
                 + (f"w={rw}:h={rh}:" if red < 1 else "") + "format=yuv420p:disable_linear=1,")
     sobe = ("" if vk else (f"scale={rw}:{rh}:flags=bicubic," if red < 1 else "") + "format=yuv420p,hwupload,")
     # os efeitos medem em % da mídia: no quadro reduzido, as medidas do quadro reduzido
-    efeito = "".join(p + "," for p in _passos_lc(g, c["fx"], rw, rh, pasta, f"v{n_cam}"))
+    efeito = "" if hib or key_gpu else "".join(p + "," for p in _passos_lc(g, c["fx"], rw, rh, pasta, f"v{n_cam}"))
     opac = ""
-    if not _opaca(c):
+    if key_gpu:
+        # recorte inteiro na placa (shader); a saída já é RGBA. Opacidade: só esta camada desce para recebê-la
+        arq = os.path.join(pasta, f"key_v{n_cam}.glsl")
+        with open(arq, "w", encoding="utf-8") as fh:
+            fh.write(_shader_key(next(f for f in c["fx"] if f.get("on") is not False).get("v") or {}))
+        # upscaler=nearest: a cor (4:2:0) ampliada como o swscale do exportador de CPU (pico de diferença 53 → 28 na borda)
+        efeito = f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format=rgba:disable_linear=1:upscaler=nearest,"
+        if not _opaca(c):
+            a = (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@vop{n_cam}", c["st"])
+                 if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
+            opac = f"hwdownload,format=rgba,{a},hwupload,"
+    elif hib:
+        # desce, os mesmos filtros do exportador de CPU no tamanho da mídia (com a opacidade, se houver) e sobe com o alfa
+        a = ""
+        if not _opaca(c):
+            a = "," + (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@vop{n_cam}", c["st"])
+                       if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
+        baixo = "yuv420p" if (giro or not vk) else _fmt_decodificado(info)
+        fx_cpu = ",".join(vc._filtros_fx(c["fx"], c["mw"], c["mh"], f"h{n_cam}"))
+        opac = (f"hwdownload,format={baixo},scale=in_color_matrix={_mtx(info)},format=rgba,{fx_cpu}{a},"
+                f"format=rgba,hwupload,")
+    elif not _opaca(c):
         # fade de um clipe: só ele desce para receber a transparência (sendcmd no tempo da timeline) e sobe de volta
         a = (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@vop{n_cam}", c["st"])
              if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
         # formato EXATO na placa: o que passou pelo libplacebo (giro/redução/Luz e Cor) ou subiu da CPU é yuv420p; direto
         # do decodificador é nv12 (com "nv12|yuv420p" o ffmpeg escolhia errado e a exportação falhava)
-        baixo = "yuv420p" if (giro or efeito or not vk) else "nv12"
+        baixo = "yuv420p" if (giro or efeito or not vk) else _fmt_decodificado(info)
         opac = f"hwdownload,format={baixo},scale=in_color_matrix=bt709,format=rgba,{a},hwupload,"
     r = g.rotulo("v")
-    g.filtros.append(f"[{k}:v:0]{vc._marca_hd(c['path'])}trim=start={vc._tempo_ffmpeg(c['s'] - ss)}:"
+    g.filtros.append(f"[{k}:v:0]{_marca_cor(c['path'], info)}trim=start={vc._tempo_ffmpeg(s0 - ss)}:"
                      f"end={vc._tempo_ffmpeg(c['s'] - ss + c['fonte'])},"
-                     + ("setpts=PTS-STARTPTS," if c.get("base") else f"setpts=(PTS-{c['s'] - ss:.6f}/TB)/{c['v']:.6f},")
+                     + ("setpts=PTS-STARTPTS," if c.get("base") else f"setpts=(PTS-{s0 - ss:.6f}/TB)/{c['v']:.6f},")
                      + f"fps=fps={g.fps:.3f}:start_time=0,tpad=stop_mode=clone:stop_duration={vc._tempo_ffmpeg(g.fd)},"
-                     f"settb=AVTB,setpts=PTS-STARTPTS+round({c['st'] - g.fd / 4:.9f}/TB),"
+                     f"settb=AVTB,setpts=PTS-STARTPTS+round({c['st'] + pula - g.fd / 4:.9f}/TB),"
                      f"trim=end={min(g.total, c['st'] + c['dur']) - g.fd / 2:.6f},{sobe}{giro}{efeito}{opac}null[{r}]")
     tl = f"(ot-{c['st']:.6f})"   # ot = tempo do quadro de SAÍDA (o t do libplacebo é o da entrada)
     kx = _escala(c, tl)
@@ -460,20 +666,51 @@ def _shader_lc(sig, k, nit, vig, W, H):
     return "\n".join(partes)
 
 
-def _ajuste(g, entrada, c, pasta):
+def _ajuste(g, entrada, c, pasta, mtx="bt709"):
     """Camada de ajuste (Luz e Cor) no trecho dela: o composto de baixo passa pela LUT e pelo shader e volta por cima
-    só enquanto a camada existe (uma entrada do libplacebo aparece só enquanto tem quadros)."""
-    passos = _passos_lc(g, c["fx"], g.W, g.H, pasta, f"a{g.rot}")
+    só enquanto a camada existe (uma entrada do libplacebo aparece só enquanto tem quadros). Com Desfoque/Aberração/
+    Brilho (_fx_hibrido) o trecho desce e passa pelos filtros do exportador de CPU (RGB, a Nitidez depois de voltar a YUV).
+    Com opacidade (fixa ou animada) o trecho também desce: os efeitos e o alfa da opacidade (sendcmd no tempo da timeline,
+    o trim não zera o tempo) em RGBA, e o libplacebo o mistura por cima do composto como faz o overlay da CPU."""
+    opaco = _opaca(c)
+    if not opaco and c["op"] <= 0.001 and "op" not in c["kf"]:
+        return entrada
+    if _fx_hibrido(c["fx"]):
+        efs = vc._filtros_fx(c["fx"], g.W, g.H, f"a{g.rot}")
+        nit = ",".join(e[len(vc._NIT_NO_YUV):] for e in efs if e.startswith(vc._NIT_NO_YUV))
+        efs = [e for e in efs if not e.startswith(vc._NIT_NO_YUV)]
+        desce = f"hwdownload,format=yuv420p,scale=in_color_matrix={mtx},format=rgba"
+        if not (efs or nit):
+            passos = []
+        elif opaco:
+            passos = [desce + "," + ",".join(efs) + f",scale=out_color_matrix={mtx}:out_range=tv,format=yuv420p"
+                      + (f",{nit}" if nit else "") + ",hwupload"]
+        else:
+            a = (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@aop{g.rot}", c["st"])
+                 if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
+            passos = [desce + "," + ",".join(efs + [a]) + ",format=rgba,hwupload"]
+    else:
+        passos = _passos_lc(g, c["fx"], g.W, g.H, pasta, f"a{g.rot}")
     if not passos:
         return entrada
     ini, fim = max(0.0, c["st"]), min(g.total, c["st"] + c["dur"])
-    if ini <= g.fd / 2 and fim >= g.total - g.fd / 2:
+    if fim - ini < g.fd / 2:   # nenhum quadro da saída: um ramo vazio travava filtros que esperam quadro (blend da vinheta)
+        return entrada
+    if not opaco and not _fx_hibrido(c["fx"]):
+        # opacidade na placa: o alfa de cada quadro num shader e o trecho composto por cima do original
+        arq = os.path.join(pasta, f"op_a{g.rot}.glsl")
+        with open(arq, "w", encoding="utf-8") as fh:
+            fh.write(_shader_opacidade(c, ini, fim, g.fps))
+        passos = passos + [f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format=rgba:disable_linear=1"]
+    if opaco and ini <= g.fd / 2 and fim >= g.total - g.fd / 2:
         r = g.rotulo("a")
         g.filtros.append(f"{entrada}{','.join(passos)}[{r}]")
         return f"[{r}]"
     a, b = g.rotulo("a"), g.rotulo("a")
     g.filtros.append(f"{entrada}split[{a}][{b}x]")
-    g.filtros.append(f"[{b}x]trim=start={ini - g.fd / 2:.6f}:end={fim - g.fd / 2:.6f},{','.join(passos)}[{b}]")
+    # o trim decide pelo FIM de cada quadro (fica se termina depois do start e até o end): ±¼ de quadro pega do quadro que
+    # começa em ini ao que termina em fim. Com ini − ½ quadro a camada entrava e saía um quadro antes (medido 2026-10-10)
+    g.filtros.append(f"[{b}x]trim=start={ini + g.fd / 4:.6f}:end={fim + g.fd / 4:.6f},{','.join(passos)}[{b}]")
     return _compor(g, f"[{a}]", [(f"[{b}]", ("0", "0", "ow", "oh"))])
 
 
@@ -510,7 +747,7 @@ def _base(g, segmentos, path, info):
                           + ["-t", vc._tempo_ffmpeg(p[1] - ss + 1.0), "-i", path])
             giro = f"rotate={_GIRO[rot]}:" if rot in _GIRO and vk else ""
             sobe = "" if vk else "format=yuv420p,hwupload,"
-            g.filtros.append(f"[{k}:v:0]{vc._marca_hd(path)}trim=start={vc._tempo_ffmpeg(p[0] - ss)}:"
+            g.filtros.append(f"[{k}:v:0]{_marca_cor(path, info)}trim=start={vc._tempo_ffmpeg(p[0] - ss)}:"
                              f"end={vc._tempo_ffmpeg(p[1] - ss)},setpts=PTS-STARTPTS,{sobe}"
                              f"libplacebo={giro}w={g.W}:h={g.H}:pos_w={w}:pos_h={h}:format=yuv420p:disable_linear=1,"
                              f"setsar=1,fps=fps={g.fps:.3f}:start_time=0[{r}]")
@@ -528,7 +765,7 @@ def montar(lay, W, H, fps, total, pasta, segmentos=None, path=None, info=None):
         if c["tipo"] == "ajuste":
             atual = _compor(g, atual, pendentes)
             pendentes = []
-            atual = _ajuste(g, atual, c, pasta)
+            atual = _ajuste(g, atual, c, pasta, _mtx(info))
             continue
         if c["tipo"] == "video" and c["path"] not in infos:
             infos[c["path"]] = vc.probe(c["path"])
@@ -549,6 +786,41 @@ def montar(lay, W, H, fps, total, pasta, segmentos=None, path=None, info=None):
 
 
 # ─────────────────────────────── exportação ───────────────────────────────
+
+# Exportação em blocos na placa: timeline com muitos vídeos (Respeite o seu voto: 117 camadas, FX30 4K) não cabe com
+# todas as leituras abertas — o ffmpeg abre todas as entradas no começo (80 s parado em 0% e memória estourada). Como o
+# Premiere/Resolve, que só leem o que toca agora: a timeline é cortada em blocos (nos cortes, vc._cortes_blocos), cada
+# bloco leva só as camadas que aparecem nele, os blocos rodam um após o outro (a placa é uma só) e são emendados sem
+# recodificar. Só com a trilha base de vazios (a mesma condição do exportador de CPU por blocos).
+_BLOCO_PLACA_S = float(os.environ.get("CANIVETE_BLOCO_SEG") or 12)   # o teste força blocos de 1 s
+
+
+def _no_bloco(c, a):
+    """Cópia da camada com a timeline começando em `a` (as funções de entrada mudam a camada: âncora do recorte)."""
+    c = copy.deepcopy(c)
+    c["st"] -= a
+    if c["st"] < -1e-6 and c["tipo"] == "video":
+        c["pula"] = -c["st"]
+    return c
+
+
+def _blocos(lay, total, fps, path):
+    """[(início, fim, quadros, camadas do bloco)] ou None se algum bloco ainda não couber na memória da placa."""
+    n_q = int(round(total * fps))
+    spans = [(c["st"], c["st"] + c["dur"], c["tipo"] == "video") for c in lay]
+    cortes = vc._cortes_blocos(spans, n_q, fps, _BLOCO_PLACA_S)
+    out = []
+    for k0, k1 in zip(cortes, cortes[1:]):
+        a, b = k0 / fps, k1 / fps
+        # só o que cobre ao menos meio quadro do bloco: camadas fora da grade da saída (30 qps numa saída de 29,97)
+        # tocavam a borda por uma fração de quadro e entravam sem nenhum quadro — a vinheta da camada de ajuste
+        # (movie em loop + blend) ficava esperando para sempre (Respeite, bloco 1: travado em 3%, 2026-10-10)
+        meio = 0.5 / fps
+        sub = [_no_bloco(c, a) for c in lay if c["st"] < b - meio and c["st"] + c["dur"] > a + meio]
+        if not cabe_na_placa(None, sub, path):
+            return None
+        out.append((a, b, k1 - k0, sub))
+    return out
 
 def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
     """Exporta a timeline na placa. None = não é para a placa (motivo em args['_motivo']); senão o resultado de
@@ -573,7 +845,9 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
     m = m or motivo(args["segmentos"], lay, args.get("legendas"), cfg, vcodec, bits, bool(alvo_h and min(W, H) > alvo_h))
     if m is None and not disponivel():
         m = "placa sem Vulkan/libplacebo"
-    if m is None and not cabe_na_placa(args["segmentos"], lay, args["path"]):
+    # CANIVETE_PLACA_BLOCOS=1: em blocos mesmo cabendo (teste_export --placa-blocos confere as emendas)
+    grande = m is None and (os.environ.get("CANIVETE_PLACA_BLOCOS") == "1" or not cabe_na_placa(args["segmentos"], lay, args["path"]))
+    if grande and not all(isinstance(s, dict) and s.get("gap") is not None for s in args["segmentos"] or []):
         m = "memória livre da placa insuficiente (4K bruto: Forçar Full HD resolve; ou feche o que usa a placa)"
     if m:
         args["_motivo"] = m
@@ -584,6 +858,10 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
                    for s in args["segmentos"] or [])
     total = max([base_dur, float(args["duracao"] or 0)] + [b for a, b, _ in spans if b < 1e8])
     if total * fps < 2:
+        return None
+    blocos = _blocos(lay, total, fps, args["path"]) if grande else None
+    if grande and not blocos:
+        args["_motivo"] = "memória livre da placa insuficiente mesmo em blocos (feche o que usa a placa)"
         return None
     q = vc._QUALIDADE.get(str(args["qualidade"]).lower(), vc._QUALIDADE["medium"])
     saida = vc._nome_saida(aberto, cfg["ext"], pasta_saida, op.get("nome"))
@@ -613,8 +891,12 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
                                          proc_holder=_holder)
     t_som = threading.Thread(target=_som, daemon=True) if audio else None
     temp = None
-    try:
-        g, final = montar(lay, W, H, fps, total, pasta, args["segmentos"], args["path"], info)
+    enc = vc._args_video(dict(cfg, vcodec=vcodec), q, args["usar_gpu"], bits, float(op.get("mbps") or 0))
+    cor = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
+
+    def _render(lay_r, total_r, segs_r, arq, feitos):
+        """Monta e codifica [0, total_r] (a timeline inteira ou um bloco) em arq. None = deu certo; senão o erro."""
+        g, final = montar(lay_r, W, H, fps, total_r, pasta, segs_r, args["path"], info)
         g.filtros.append(f"{final}hwdownload,format=yuv420p[vbaixo]")
         fm, rot_v, args_min = vc.saida_miniatura("[vbaixo]")   # a miniatura do quadro em render (janela do Encoder)
         g.filtros += fm
@@ -624,17 +906,13 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
             f.write(";\n".join(g.filtros))
         if os.environ.get("CANIVETE_PLACA_DEBUG") == "1":   # guarda o grafo e o comando para depurar
             shutil.copy(grafo, os.path.join(vc._midia_dir(), f"placa_grafo_{uuid.uuid4().hex[:6]}.txt"))
-        enc = vc._args_video(dict(cfg, vcodec=vcodec), q, args["usar_gpu"], bits, float(op.get("mbps") or 0))
-        cor = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
-        cmd = g.cmd + ["-/filter_complex", grafo, "-map", "[vout]", "-t", vc._tempo_ffmpeg(total), *enc, *cor,
-                       "-an", video] + args_min
-        if t_som:
-            t_som.start()
-        prog(0, "Exportando na placa de vídeo...")
-        rc, err = vc._run_progress(cmd, total, lambda p: (video_pct.__setitem__(0, p), _progresso()), stop_event, _holder)
+        cmd = g.cmd + ["-/filter_complex", grafo, "-map", "[vout]", "-t", vc._tempo_ffmpeg(total_r), *enc, *cor,
+                       "-an", arq] + args_min
+        rc, err = vc._run_progress(cmd, total_r, lambda p: (video_pct.__setitem__(0, (feitos + p / 100 * total_r) / total * 100),
+                                                           _progresso()), stop_event, _holder)
         if stop_event is not None and stop_event.is_set():
             return {"success": False, "cancelled": True, "error": "Exportação cancelada."}
-        if rc != 0 or not os.path.isfile(video):
+        if rc != 0 or not os.path.isfile(arq):
             log = os.path.join(vc._midia_dir(), f"placa_falhou_{uuid.uuid4().hex[:6]}.txt")
             try:
                 with open(log, "w", encoding="utf-8") as f:
@@ -642,6 +920,35 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
             except OSError:
                 log = ""
             return {"success": False, "error": "placa: " + "\n".join(vc._linhas_ffmpeg(err) or [str(rc)]), "log": log}
+        return None
+
+    try:
+        if t_som:
+            t_som.start()
+        prog(0, "Exportando na placa de vídeo" + (f" ({len(blocos)} blocos)..." if blocos else "..."))
+        if not blocos:
+            r = _render(lay, total, args["segmentos"], video, 0.0)
+            if r:
+                return r
+        else:
+            ext_b = ".ts" if vcodec in ("h264", "hevc") else ".mkv"
+            partes = []
+            for i, (a, b, n_b, sub) in enumerate(blocos):
+                parte = os.path.join(pasta, f"b{i:03d}{ext_b}")
+                r = _render(sub, n_b / fps, [{"gap": n_b / fps}], parte, a)
+                if r:
+                    if not r.get("cancelled"):
+                        r["error"] = f"bloco {i + 1}/{len(blocos)} ({a:.1f}–{b:.1f} s) " + r["error"]
+                    return r
+                partes.append((parte, n_b))
+            lista = os.path.join(pasta, "lista.txt")
+            with open(lista, "w", encoding="utf-8") as f:   # duração exata de cada pedaço (quadros / fps)
+                f.writelines(f"file '{p.replace(chr(92), '/')}'\nduration {n / fps:.6f}\n" for p, n in partes)
+            r = subprocess.run([vc.ffmpeg_path(), "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", lista,
+                                "-c", "copy", video], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                               creationflags=vc._creationflags())
+            if r.returncode != 0 or not os.path.isfile(video):
+                return {"success": False, "error": "placa (juntar blocos): " + "\n".join(vc._linhas_ffmpeg(r.stderr) or [str(r.returncode)])}
         if t_som:
             t_som.join()
             r = res_som.get("r") or {}
@@ -674,4 +981,4 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
         shutil.rmtree(pasta, ignore_errors=True)
     prog(100, "Concluído!")
     return {"success": True, "output_path": saida, "output_folder": os.path.dirname(saida), "duration": round(total, 2),
-            "size": os.path.getsize(saida), "turbo": False, "placa": True}
+            "size": os.path.getsize(saida), "turbo": False, "placa": True, "blocos": len(blocos) if blocos else 0}
