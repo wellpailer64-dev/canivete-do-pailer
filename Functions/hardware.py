@@ -172,6 +172,16 @@ def placa():
     return p[0] if p else None
 
 
+def cpus():
+    """Processadores lógicos que o app pode usar — no lugar de os.cpu_count() (no teste, o do PC simulado)."""
+    return detectar()["threads"]
+
+
+def threads_ia():
+    """Threads de uma sessão de IA no processador (onnxruntime intra_op): deixa folga para a tela no PC leve."""
+    return plano()["threads_ia"]
+
+
 # ── modo escolhido pela pessoa ────────────────────────────────────────────────
 def modo():
     try:
@@ -218,7 +228,8 @@ def plano():
         "threads_trabalho": max(1, {"leve": th // 2, "medio": th - 2, "forte": th - 1}[ef]),
         "threads_ia": max(1, {"leve": max(1, hw["nucleos"] - 1), "medio": hw["nucleos"], "forte": th}[ef]),
         # memória
-        "cache_editor_mb": int(min(1536, max(256, hw["ram_gb"] * {"leve": 32, "medio": 48, "forte": 64}[ef]))),
+        # cache de quadros do editor (padrão da opção "Cache de quadros na RAM"; a menor opção da tela é 512 MB)
+        "cache_editor_mb": int(min(1536, max(512, hw["ram_gb"] * {"leve": 32, "medio": 48, "forte": 64}[ef]))),
         "soltar_modelo_s": {"leve": 60, "medio": 180, "forte": 300}[ef],
         "uma_ia_por_vez": ef != "forte" or vram < 10,
         # placa
@@ -230,6 +241,8 @@ def plano():
         "export_na_placa": dedicada and vram >= 4,           # modo placa (Vulkan) do Kanivete Encoder
         # editor
         "previa": {"leve": "metade", "medio": "inteira", "forte": "inteira"}[ef],
+        # altura das prévias renderizadas e da prévia leve de edição (padrão de "Qualidade das prévias")
+        "previa_altura": 720 if ef == "leve" else 1080,
     }
 
 

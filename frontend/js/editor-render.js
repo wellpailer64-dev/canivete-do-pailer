@@ -475,7 +475,36 @@ function vePrManutencao() {
 function prefsAba(nome) {
     document.querySelectorAll('#modal-prefs [data-prefs-aba]').forEach(b => b.classList.toggle('active', b.dataset.prefsAba === nome));
     document.querySelectorAll('#modal-prefs [data-prefs-painel]').forEach(p => { p.hidden = p.dataset.prefsPainel !== nome; });
-    if (nome === 'cache') vePrefsCacheRender();
+    if (nome === 'cache') { prefsHwRender(); vePrefsCacheRender(); }
+}
+
+// ── Este computador (núcleo de hardware: Functions/hardware.py) ──
+const PREFS_HW_NIVEL = { leve: 'PC leve', medio: 'PC intermediário', forte: 'PC forte' };
+async function prefsHwRender() {
+    const el = document.getElementById('pref-hw'), sel = document.getElementById('pref-hw-modo'), api = vePrApi();
+    if (!el || !api || !api.hardware_estado) return;
+    try {
+        const r = await api.hardware_estado();
+        if (!r || !r.success) return;
+        const h = r.hardware, p = r.plano, pl = h.placas && h.placas[0];
+        const placa = pl ? `${pl.nome} (${pl.integrada ? 'integrada' : String(pl.vram_gb).replace('.', ',') + ' GB'})` : 'sem placa de vídeo';
+        el.innerHTML = `<b>${veEscHw(PREFS_HW_NIVEL[p.nivel] || p.nivel)}</b>${p.efetivo !== p.nivel ? ` · ajustado como ${veEscHw(PREFS_HW_NIVEL[p.efetivo])}` : ''}<br>`
+            + `${veEscHw(h.cpu || 'Processador')} · ${h.threads} threads · ${String(h.ram_gb).replace('.', ',')} GB de RAM<br>${veEscHw(placa)}`
+            + `<br><span>IA ${p.ia_na_placa ? 'na placa de vídeo' : 'no processador'} · exportação ${p.export_na_placa ? 'montada na placa' : 'pelo processador'}`
+            + ` · prévias até ${p.previa_altura}p</span>`;
+        if (sel) sel.value = p.modo;
+    } catch (e) { /* sem o núcleo */ }
+}
+function veEscHw(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+async function prefsHwModo(m) {
+    const api = vePrApi();
+    if (!api || !api.hardware_definir_modo) return;
+    const r = await api.hardware_definir_modo(m);
+    if (!r || !r.success) return;
+    if (typeof veAplicarPlanoHw === 'function') await veAplicarPlanoHw();
+    prefsHwRender();
+    vePrefsCacheRender();
+    if (typeof veToast === 'function') veToast({ automatico: 'Desempenho automático: ajustado a este PC', economia: 'Modo Economia: o app usa menos o PC', maximo: 'Modo Máximo: o app usa mais o PC' }[m]);
 }
 
 function vePrefsCacheSalvar(patch) {

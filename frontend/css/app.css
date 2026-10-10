@@ -1394,6 +1394,13 @@ button:disabled { opacity: .4; cursor: not-allowed; }
     padding: 8px 12px; border-radius: var(--r-sm); background: var(--bg-input); border: 1px solid var(--line-2);
     font: 12px var(--mono); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.pref-hw {
+    padding: 10px 12px; border-radius: var(--r-sm); background: var(--bg-input); border: 1px solid var(--line-2);
+    font-size: 12.5px; line-height: 1.6; color: var(--text-2); margin-bottom: 10px;
+}
+.pref-hw b { color: var(--text-1, inherit); font-size: 13px; }
+.pref-hw span { color: var(--text-3, var(--text-2)); font-size: 12px; }
+#pref-hw-modo { padding: 7px 10px; }
 .pref-cache-btns { display: flex; flex-wrap: wrap; gap: 8px; }
 .pref-cache-btns .btn-secondary { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 7px 12px; }
 .pref-cache-grid { display: grid; grid-template-columns: 1fr minmax(140px, 180px); align-items: center; gap: 10px 14px; }

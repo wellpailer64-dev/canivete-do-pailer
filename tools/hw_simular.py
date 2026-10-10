@@ -9,6 +9,7 @@
   Só o app sofre: os programas abertos do usuário não são apertados.
 - Placa "integrada"/"nenhuma": esconde a NVIDIA do CUDA/NVENC (CUDA_VISIBLE_DEVICES=-1) e do Vulkan do llama.cpp/
   stable-diffusion (GGML_VK_VISIBLE_DEVICES). --sem-gpu-tela desliga também a placa da tela (WebView2), pior que uma integrada.
+- --limpo: pastas de dados novas (como app recém-instalado: sem preferências salvas), em D:/kanivete_testes/tmp.
 - Com `-- comando`: roda o comando (ex.: um teste) com o app aberto e fecha tudo no fim; sem ele, espera Enter.
 Mede e imprime o pico de memória da árvore. Dados/temporários do app de teste em D:/kanivete_testes (nunca no C:).
 """
@@ -75,14 +76,20 @@ def main():
     perfil = a[0] if a and not a[0].startswith("-") else "leve"
     porta = int(a[a.index("--porta") + 1]) if "--porta" in a else 9340
     s = dict(hardware.SIMULADOS[perfil])
-    env = dict(os.environ, CANIVETE_HW_SIMULAR=perfil, APPDATA=BASE + "appdata", TEMP=BASE + "tmp", TMP=BASE + "tmp",
-               LOCALAPPDATA=BASE + "localappdata", CANIVETE_HW_PORTA=str(porta))
+    base = BASE
+    if "--limpo" in a:
+        import tempfile
+        os.makedirs(BASE + "tmp", exist_ok=True)
+        base = tempfile.mkdtemp(prefix="hw_limpo_", dir=BASE + "tmp").replace("\\", "/") + "/"
+    env = dict(os.environ, CANIVETE_HW_SIMULAR=perfil, APPDATA=base + "appdata", TEMP=BASE + "tmp", TMP=BASE + "tmp",
+               LOCALAPPDATA=base + "localappdata", CANIVETE_HW_PORTA=str(porta))
     if s.get("placa") in ("integrada", "nenhuma"):
         env.update(CUDA_VISIBLE_DEVICES="-1", GGML_VK_VISIBLE_DEVICES="")
     if "--sem-gpu-tela" in a:
         env["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = "--disable-gpu"
-    for d in ("appdata", "tmp", "localappdata"):
-        os.makedirs(BASE + d, exist_ok=True)
+    for d in ("appdata", "localappdata"):
+        os.makedirs(base + d, exist_ok=True)
+    os.makedirs(BASE + "tmp", exist_ok=True)
     teto = int(s["ram_gb"] * 0.70 * 2**30)
     job = criar_job(min(s["threads"], os.cpu_count()), teto)
     app = subprocess.Popen([sys.executable, os.path.join(RAIZ, "main.py"), f"--agente={porta}"], cwd=RAIZ, env=env,

@@ -1963,6 +1963,17 @@
             </div>
             <div class="prefs-painel" data-prefs-painel="cache" hidden>
                 <div class="modal-field">
+                    <label class="modal-label">Este computador</label>
+                    <div class="pref-hw" id="pref-hw">Identificando…</div>
+                    <label class="modal-label" for="pref-hw-modo">Modo de desempenho</label>
+                    <select id="pref-hw-modo" class="modal-input" onchange="prefsHwModo(this.value)">
+                        <option value="automatico">Automático (ajusta a este PC)</option>
+                        <option value="economia">Economia (usa menos o PC: notebook na bateria, outros programas abertos)</option>
+                        <option value="maximo">Máximo (usa mais o PC)</option>
+                    </select>
+                    <p>O KANIVETE identifica o processador, a memória e a placa de vídeo e ajusta sozinho quanto cada ferramenta usa: núcleos, cache, qualidade das prévias e se a IA roda na placa. As opções abaixo, se você mudar, valem mais que o automático.</p>
+                </div>
+                <div class="modal-field">
                     <label class="modal-label">Pasta do cache em disco (prévias renderizadas)</label>
                     <div class="pref-cache-dir" id="pref-cache-dir">Padrão (pasta do app)</div>
                     <div class="pref-cache-btns">

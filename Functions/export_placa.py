@@ -64,10 +64,18 @@ _vram = None
 
 
 def memoria_placa():
-    """Memória da placa em bytes (NVIDIA pelo nvidia-smi; sem como saber: 4 GB, o comum das placas de entrada)."""
+    """Memória da placa em bytes: NVIDIA pelo nvidia-smi; as outras pelo núcleo de hardware (registro do Windows, a
+    memória dedicada de verdade); sem como saber: 4 GB, o comum das placas de entrada."""
     global _vram
     if _vram is None:
         _vram = 4 * 2**30
+        try:
+            from Functions import hardware
+            p = hardware.placa()
+            if p and not p["integrada"] and p["vram_gb"] > 0:
+                _vram = int(p["vram_gb"] * 2**30)
+        except Exception:
+            pass
         try:
             r = subprocess.run(["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
                                capture_output=True, text=True, timeout=10, creationflags=vc._creationflags())
@@ -124,6 +132,12 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
     """Por que esta timeline ainda não vai pela placa (texto curto), ou None se vai."""
     if os.environ.get("CANIVETE_PLACA") == "0":
         return "desligado (CANIVETE_PLACA=0)"
+    try:
+        from Functions import hardware
+        if not hardware.plano()["export_na_placa"]:   # integrada ou dedicada < 4 GB: a montagem na GPU não compensa
+            return "placa integrada ou pequena"
+    except Exception:
+        pass
     if alfa:
         return "fundo transparente"
     if vcodec not in ("h264", "hevc") or bits != 8:

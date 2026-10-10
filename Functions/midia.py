@@ -7,6 +7,13 @@ import sys
 import json
 import subprocess
 
+
+def _hw_cpus():
+    """Processadores lógicos pelo núcleo de hardware (Functions/hardware.py; no teste, o PC simulado)."""
+    from Functions import hardware
+    return hardware.cpus()
+
+
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 
 
@@ -146,4 +153,4 @@ def nome_livre(caminho):
 
 def workers(maximo=4):
     """Nº de tarefas paralelas razoável para a máquina."""
-    return max(1, min(maximo, (os.cpu_count() or 2) // 2))
+    return max(1, min(maximo, _hw_cpus() // 2))

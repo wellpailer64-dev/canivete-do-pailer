@@ -369,6 +369,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_galeria.py` — Filtro > Galeria de filtros (app em --agente=9333). Abre a janela, espera as miniaturas, troca de filtro, empilha
 - `testes/teste_generativo.py` — Preenchimento generativo e Expansão generativa do Photo Kanivete (FLUX.2 klein local) — app em --agente=9333
 - `testes/teste_guias.py` — Teste das guias/fatias como no Photoshop, com mouse de verdade no app de teste (9333)
+- `testes/teste_hardware.py` — Núcleo de hardware (Functions/hardware.py): o PC lido, o plano de cada nível, o modo, o balanceador de memória e,
 - `testes/teste_illustrator.py` — Compatibilidade Vetor Kanivete ↔ Adobe Illustrator (Functions/ponte_illustrator.py) — app em --agente=9333 e o
 - `testes/teste_imagem.py` — Teste do Editor de Imagem (frontend/js/imagem-*.js + Functions/editor_imagem.py) no app de verdade
 - `testes/teste_kani.py` — Kani (assistente) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila) e confere: bolinha na Home,

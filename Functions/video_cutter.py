@@ -29,6 +29,13 @@ from concurrent.futures import ThreadPoolExecutor
 from Functions.audio_cutter import ffmpeg_path, ffprobe_path, _creationflags
 from Functions import media_server
 
+
+def _hw_cpus():
+    """Processadores lógicos pelo núcleo de hardware (Functions/hardware.py; no teste, o PC simulado)."""
+    from Functions import hardware
+    return hardware.cpus()
+
+
 FORMATOS_ENTRADA = {
     ".mp4", ".mov", ".mkv", ".avi", ".webm", ".flv", ".wmv",
     ".m4v", ".ts", ".mts", ".m2ts", ".3gp", ".ogv", ".mpg", ".mpeg",
@@ -689,7 +696,7 @@ def gerar_thumbs(path, duration, outdir, count):
             return {"t": round(t, 3), "url": media_server.register(out), "arq": out}
         return None
 
-    with ThreadPoolExecutor(max_workers=min(8, (os.cpu_count() or 4))) as ex:
+    with ThreadPoolExecutor(max_workers=min(8, _hw_cpus())) as ex:
         res = list(ex.map(_um, enumerate(tempos)))
     return [r for r in res if r]
 
@@ -3841,7 +3848,7 @@ def _blocos_paralelos():
         n = int(os.environ.get("CANIVETE_BLOCOS_PAR") or 0)
     except ValueError:
         n = 0
-    return n if n > 0 else max(2, min(4, (os.cpu_count() or 4) // 4))
+    return n if n > 0 else max(2, min(4, _hw_cpus() // 4))
 
 
 def _base_na_janela(segmentos, a, b):

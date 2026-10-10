@@ -297,6 +297,45 @@ function veLsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 const VE_CACHE_MAX_BYTES = Math.min(1.5, Math.max(0.5, (navigator.deviceMemory || 8) / 4)) * 1024 * 1024 * 1024;
 const VE_CACHE_MARGEM = 5;   // s: clipes até aqui antes/depois da agulha entram na assinatura (transições)
 
+// Núcleo de hardware (Functions/hardware.py): o cache da prévia segue o plano do PC (8 GB com integrada: 256 MB — a
+// integrada usa a RAM do PC; 32 GB: 1,5 GB) e, com a tela SEM placa (WebView2 desenhando no processador), a prévia
+// começa em 1/2 (medido no PC leve simulado: travadas de ~900 ms → ~300 ms). Com integrada a 1/2 não muda nada: fica Full.
+// A escolha da pessoa (barra do Programa) sempre vale mais.
+const VEHW = { plano: null, telaSemPlaca: null };
+function veTelaSemPlaca() {
+    if (VEHW.telaSemPlaca === null) {
+        try {
+            const gl = document.createElement('canvas').getContext('webgl');
+            const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+            const r = gl ? String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) : '';
+            VEHW.telaSemPlaca = !gl || /swiftshader|basic render|llvmpipe|software/i.test(r);
+        } catch (e) { VEHW.telaSemPlaca = false; }
+    }
+    return VEHW.telaSemPlaca;
+}
+async function veAplicarPlanoHw() {
+    try {
+        const api = window.pywebview && window.pywebview.api;
+        const r = api && api.hardware_estado ? await api.hardware_estado() : null;
+        if (!r || !r.success) return;
+        VEHW.plano = r.plano;
+        // o plano vira o PADRÃO das opções de Preferências › Desempenho; o que a pessoa escolheu lá continua valendo
+        if (typeof VE_PR_PREFS_PADRAO === 'object') {
+            VE_PR_PREFS_PADRAO.ramGB = r.plano.cache_editor_mb / 1024;
+            VE_PR_PREFS_PADRAO.altura = r.plano.previa_altura;
+        }
+        if (typeof vePrAplicarRam === 'function') vePrAplicarRam();
+        else veCache().maxBytes = r.plano.cache_editor_mb * 1024 * 1024;
+    } catch (e) { /* sem o núcleo: fica o padrão */ }
+    if (veLsGet('ve.previewRes') === null && veTelaSemPlaca() && VEM.res === 1) {
+        VEM.res = 0.5;
+        const sel = $ve('ve-res-sel');
+        if (sel) sel.value = '0.5';
+        veCacheClear(true);
+        veDrawMonitorSoon();
+    }
+}
+
 function veCache() {
     if (!VE.cache) {
         VE.cache = {
@@ -6496,6 +6535,8 @@ function veInitEvents() {
     });
     veInitMonitorZoom();
     if (typeof veInitMedidor === 'function') veInitMedidor();
+    if (window.pywebview && window.pywebview.api) veAplicarPlanoHw();
+    else window.addEventListener('pywebviewready', veAplicarPlanoHw, { once: true });
     document.addEventListener('keydown', veOnKey);
     document.addEventListener('keyup', e => { if (e.key === 'Alt' && veIsActive()) e.preventDefault(); });
     // Botões não ficam com foco (senão o Espaço "clica" neles em vez de dar play)

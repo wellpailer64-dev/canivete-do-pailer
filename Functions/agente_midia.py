@@ -28,6 +28,13 @@ from concurrent.futures import ThreadPoolExecutor
 from Functions.audio_cutter import ffmpeg_path
 from Functions import video_cutter as vc
 
+
+def _hw_cpus():
+    """Processadores lógicos pelo núcleo de hardware (Functions/hardware.py; no teste, o PC simulado)."""
+    from Functions import hardware
+    return hardware.cpus()
+
+
 _BAIXA = 0x00004000 | 0x08000000   # BELOW_NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW
 EXT_VIDEO = {".mp4", ".mov", ".m4v", ".mkv", ".avi", ".webm", ".mts", ".m2ts", ".3gp", ".wmv", ".mxf"}
 EXT_AUDIO = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".wma"}
@@ -150,7 +157,7 @@ def folha(fontes, quadros=5, por_folha=8, altura=170, nao_usados_em=None):
         base = _chave(_assinatura(v["path"]), altura)
         v["quadros"] = [os.path.join(pasta, f"q_{base}_{j}.jpg") for j in range(quadros)]
         pedidos += [(v["path"], t, altura, q) for t, q in zip(v["tempos"], v["quadros"])]
-    with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 4)) as ex:
+    with ThreadPoolExecutor(max_workers=min(8, _hw_cpus())) as ex:
         list(ex.map(lambda a: _quadro(*a), pedidos))
     rot_l, pad = 230, 6
     f_nome, f_info = _fonte(15), _fonte(13)
@@ -193,7 +200,7 @@ def storyboard(path, passo=1.5, inicio=0.0, fim=0.0, colunas=8, altura=200):
         t += max(0.2, passo)
     pasta, base = _pasta(), _chave(_assinatura(path), altura)
     quadros = [os.path.join(pasta, f"s_{base}_{int(t * 100)}.jpg") for t in tempos]
-    with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 4)) as ex:
+    with ThreadPoolExecutor(max_workers=min(8, _hw_cpus())) as ex:
         list(ex.map(lambda a: _quadro(path, a[0], altura, a[1]), zip(tempos, quadros)))
     imgs = [Image.open(q) if os.path.isfile(q) else None for q in quadros]
     larg = max((im.width for im in imgs if im), default=altura)

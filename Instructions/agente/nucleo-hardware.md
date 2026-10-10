@@ -47,16 +47,29 @@ Correções, que valem para todo PC:
 Perfil de CPU do play: `D:/kanivete_testes/scripts/hw_perfil_play.py projeto.vknv porta [s]`. Depois das correções, ~90% do tempo
 é trabalho nativo (decodificar e compor vídeo).
 
+## Fase 2 (2026-10-10): os módulos seguem o plano
+- **Threads:** `hardware.cpus()` substitui o `os.cpu_count()` em agente_midia, midia, organizador_de_videos, transicoes e
+  video_cutter (pools e blocos paralelos). As sessões onnx do céu, do preencher e do remover fundo usam `hardware.threads_ia()`.
+  No PC forte, os números são os mesmos de antes.
+- **Memória (`memoria.py`):** o limite de "modelo parado" é multiplicado pelo plano (leve 60 s, médio 180 s, forte igual).
+  Em qualquer PC, com a RAM livre abaixo de 10% (ou 1,2 GB), o que está parado há 20 s sai na hora.
+- **Export:** `export_placa.memoria_placa()` lê do núcleo a memória de placas que não são NVIDIA. Placa integrada ou dedicada
+  menor que 4 GB não usa o modo placa (`motivo()` = "placa integrada ou pequena").
+- **Editor:** o plano vira o PADRÃO de Preferências › Desempenho. O que a pessoa escolheu continua valendo.
+  - Cache de quadros na RAM: leve 512 MB, médio 768 MB, forte 1,5 GB.
+  - Qualidade das prévias: 720p no leve. Isso também define a prévia leve de edição.
+  - Prévia 1/2 só com a tela sem placa (`veTelaSemPlaca`, pelo renderer do WebGL).
+- **Preferências › Desempenho › "Este computador":** mostra o nível, o processador, a RAM, a placa e o plano, e tem o modo
+  Automático/Economia/Máximo (`prefsHwRender`/`prefsHwModo` em editor-render.js).
+- `tools/hw_simular.py --limpo`: pastas de dados novas, como um app recém-instalado (sem preferências salvas).
+- **Resultado no PC leve recém-instalado** (depo.vknv): **3 travadas** (dentro do limite; antes de tudo eram 16), buscas 28 → 17 e
+  esperas 23 → 13. O custo é uma vez só: 31 s para preparar as prévias de 720p na 1ª abertura.
+- Teste: `py -3.13 testes/teste_hardware.py [--app]`. São 12 verificações do núcleo e do plano, mais o editor no PC leve com e sem placa na tela.
+
 ## Pendências (em ordem)
-1. **Ligar o plano nos módulos** (fase 2). Hoje são ~15 lugares que adivinham sozinhos:
-   - `os.cpu_count()` em midia, render_cache, transicoes, video_cutter, agente_midia, organizador, ceu, preencher_conteudo e removerfundo;
-   - `memoria_placa()` do export_placa, que chuta 4 GB fora da NVIDIA;
-   - `VE_CACHE_MAX_BYTES` (navigator.deviceMemory);
-   - limites fixos do `memoria.py` (`soltar_modelo_s`);
-   - IA na placa: remover fundo, gerador_sfx, omnivoice e melhorar_audio (`ia_na_placa`, `uma_ia_por_vez`).
-2. **Prévia automática.** Ir para 1/2 só quando a tela estiver sem placa: no JS, o renderer do WebGL com SwiftShader/"Basic Render".
-   Com integrada, a 1/2 não muda nada (medido).
-3. **PC leve com integrada.** Buscas e esperas ainda passam do limite (2 decks decodificando 1080p59 em 4 threads).
-   Próximo teste: cópia de edição leve (proxy 720p) gerada sozinha no nível leve.
-4. **Preferências › Desempenho:** mostrar o PC detectado e o modo (automático, economia, máximo).
-5. Medir no leve: exportar (`teste_export.py --sem-abrir --porta`), Photo, Kani e remover fundo no processador.
+1. **IA numa placa integrada:** remover fundo (DirectML), gerador_sfx, OmniVoice e melhorar áudio ainda escolhem sozinhos.
+   Medir integrada × processador antes de decidir (sem integrada aqui: precisa de um PC de amigo ou de uma máquina emprestada)
+   e respeitar `ia_na_placa`/`uma_ia_por_vez`.
+2. **Kani no PC leve:** o 4B Q5 usa ~3,5 GB. Com 8 GB e o editor aberto, medir e ver se um Qwen3.5 menor compensa no nível leve.
+3. **Medir no leve:** exportar (`teste_export.py --sem-abrir --porta`), o Photo com PSD grande e o remover fundo no processador.
+4. **Validar num PC real fraco** (notebook de amigo): o simulador aperta CPU e memória, mas não reproduz uma integrada de verdade.

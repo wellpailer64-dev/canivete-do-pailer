@@ -29,6 +29,13 @@ import os, sys, re, shutil, json, subprocess
 import concurrent.futures as cf
 from datetime import datetime
 
+
+def _hw_cpus():
+    """Processadores lógicos pelo núcleo de hardware (Functions/hardware.py; no teste, o PC simulado)."""
+    from Functions import hardware
+    return hardware.cpus()
+
+
 def _run_quiet(cmd, **kwargs):
     """Executa subprocessos sem abrir janelas de console no Windows."""
     if sys.platform == "win32":
@@ -1072,7 +1079,7 @@ def escanear_cameras(pasta, callback_log=None, callback_progresso=None, metadata
         callback_log("🔍 Identificando câmeras pelos metadados...")
 
     if metadata_workers is None:
-        metadata_workers = min(6, max(2, (os.cpu_count() or 4) // 2))
+        metadata_workers = min(6, max(2, _hw_cpus() // 2))
     metadata_workers = max(1, min(int(metadata_workers), total))
 
     if exiftool_bin:
@@ -1282,7 +1289,7 @@ def organizar_videos(pasta, nome_projeto=None, callback_progresso=None, callback
     arquivos_info = []
     desconhecidos_debug = []
     if metadata_workers is None:
-        metadata_workers = min(6, max(2, (os.cpu_count() or 4) // 2))
+        metadata_workers = min(6, max(2, _hw_cpus() // 2))
     metadata_workers = max(1, int(metadata_workers))
     metadata_workers = min(metadata_workers, max(1, total))
 

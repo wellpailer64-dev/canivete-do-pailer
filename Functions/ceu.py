@@ -15,6 +15,13 @@ import urllib.request
 import cv2
 import numpy as np
 
+
+def _hw_threads_ia():
+    """Threads de IA no processador pelo núcleo de hardware (Functions/hardware.py)."""
+    from Functions import hardware
+    return hardware.threads_ia()
+
+
 MODELO = {
     "arquivo": "skyseg.onnx",
     "url": "https://huggingface.co/JianyuanWang/skyseg/resolve/main/skyseg.onnx",
@@ -71,7 +78,7 @@ def _sess():
         if _sessao["s"] is None:
             import onnxruntime as ort
             so = ort.SessionOptions()
-            so.intra_op_num_threads = os.cpu_count() or 4
+            so.intra_op_num_threads = _hw_threads_ia()
             _sessao["s"] = ort.InferenceSession(garantir_modelo(), so, providers=["CPUExecutionProvider"])
         from Functions import memoria
         memoria.usado("ceu (SkySeg)", liberar)   # parado 5 min: sai da memória

@@ -13,6 +13,13 @@ import urllib.request
 import numpy as np
 from PIL import Image, ImageOps, ImageFilter
 
+
+def _hw_threads_ia():
+    """Threads de IA no processador pelo núcleo de hardware (Functions/hardware.py)."""
+    from Functions import hardware
+    return hardware.threads_ia()
+
+
 try:
     from pillow_heif import register_heif_opener
     register_heif_opener()
@@ -231,7 +238,7 @@ def _get_sessao_(modelo_path):
                 _dispositivo["atual"] = "cpu"
         if s is None:
             so = ort.SessionOptions()
-            so.intra_op_num_threads = os.cpu_count() or 4
+            so.intra_op_num_threads = _hw_threads_ia()
             s = ort.InferenceSession(modelo_path, so, providers=["CPUExecutionProvider"])
             _dispositivo["atual"] = _dispositivo["atual"] or "cpu"
         _sessoes[modelo_path] = s

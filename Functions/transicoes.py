@@ -23,6 +23,13 @@ from concurrent.futures import ThreadPoolExecutor
 import cv2
 import numpy as np
 
+
+def _hw_cpus():
+    """Processadores lógicos pelo núcleo de hardware (Functions/hardware.py; no teste, o PC simulado)."""
+    from Functions import hardware
+    return hardware.cpus()
+
+
 NB = 24          # faixas do glitch
 K_MAX = 16
 _TAU_OURO = 2.399963229728653   # ângulo de ouro (amostras do desfoque em disco)
@@ -462,7 +469,7 @@ def render(base, h, job):
                                  stdin=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=sem_janela)
         tam = W * H * 3
         try:
-            with ThreadPoolExecutor(max_workers=max(1, min(4, (os.cpu_count() or 2) - 1))) as pool:
+            with ThreadPoolExecutor(max_workers=max(1, min(4, _hw_cpus() - 1))) as pool:
                 # só os quadros do trecho: o render das trilhas de baixo pode trazer um quadro a mais no fim (vazio)
                 total = max(1, int(round(dur * fps)))
                 fila, i = [], 0
