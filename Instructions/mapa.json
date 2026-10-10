@@ -85,6 +85,7 @@
     "ve_ler_legenda",
     "ve_otimizar_fullhd",
     "ve_otimizar_cancelar",
+    "ve_copias_antigas",
     "ve_encoder_estado",
     "ve_sincronizar_audio",
     "ve_salvar_png",
@@ -891,6 +892,10 @@
   },
   "ve_otimizar_cancelar": {
    "args": "",
+   "modulos": []
+  },
+  "ve_copias_antigas": {
+   "args": "paths",
    "modulos": []
   },
   "hardware_estado": {
@@ -2391,6 +2396,7 @@
   "teste_caneta": "Caneta, demarcadores, recuperação e laço magnético com mouse de verdade no app de teste (9333)",
   "teste_ceu": "Editar › Substituição de céu do Photo Kanivete (SkySeg) — app em --agente=9333",
   "teste_conteudo": "Editar › Preenchimento sensível ao conteúdo do Photo Kanivete (LaMa) — app em --agente=9333",
+  "teste_copias_edicao": "Cópias de edição (Functions/otimizar.py): quadro-chave a cada ~0,25 s e refazer as antigas pelo editor",
   "teste_corte_alt": "Máscara de corte com Alt + clique na divisa entre duas camadas (como no Photoshop), com mouse de verdade no app de",
   "teste_dissolver": "Filtro > Dissolver (Liquify) com mouse de verdade (app em --agente=9333; não mexa no mouse durante)",
   "teste_editar": "Editar › Atenuar, Colar especial (dentro/fora) e Localizar e substituir texto do Photo Kanivete (app em --agente=9333)",

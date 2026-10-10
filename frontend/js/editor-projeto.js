@@ -990,6 +990,13 @@ window.veOnOtimizar = async ev => {
     }
     VEFHD.fila = null;
     vePjFhdBarra();
+    if (q.refazer) {   // cópias refeitas no formato de edição: troca sem perguntar (a pessoa já pediu)
+        q.feitos.forEach(r => veFhdTrocar(VE.media[r.id], r));
+        if (q.feitos.length) veRefresh();
+        veToast(q.erros.length ? `Cópias de edição: ${q.erros.slice(0, 2).join(' · ')}`
+            : `${q.feitos.length} ${q.feitos.length === 1 ? 'cópia refeita' : 'cópias refeitas'}: editar e arrastar a agulha ficou mais rápido`);
+        return;
+    }
     if (q.erros.length) veToast(`Forçar Full HD: ${q.erros.slice(0, 2).join(' · ')}`);
     if (!q.feitos.length) { if (!q.erros.length) veToast(ev.cancelado ? 'Forçar Full HD cancelado' : 'Nenhum vídeo precisava de conversão'); return; }
     const naTl = q.feitos.filter(r => veMidiaNaTimeline(r.id)).length;
@@ -1005,6 +1012,34 @@ window.veOnOtimizar = async ev => {
     veRefresh();
     veToast(`${q.feitos.length} ${q.feitos.length === 1 ? 'vídeo trocado' : 'vídeos trocados'} pelo Full HD`);
 };
+
+// Cópias Full HD feitas antes de 2026-10-10 têm quadro-chave a cada 4–8 s: pular e arrastar a agulha nelas é ~10× mais
+// lento (Functions/otimizar.py). Ao abrir o projeto, oferece refazer em segundo plano — uma vez por projeto; "Agora não"
+// fica lembrado. No fim a troca é automática (veOnOtimizar, q.refazer) e a URL nova faz o player recarregar.
+async function vePjVerCopiasAntigas() {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.ve_copias_antigas || VEFHD.fila || !VE.projectPath) return;
+    const chave = 've.copiasAntigas.nao:' + VE.projectPath;
+    if (veLsGet(chave) === '1') return;
+    const midias = VE.media.filter(m => m && !m.removido && m.kind === 'video' && m.path && !veMediaOffline(m) && /[\\/]Otimizados FullHD[\\/]/i.test(m.path));
+    if (!midias.length) return;
+    const r = await api.ve_copias_antigas(midias.map(m => m.path));
+    const itens = ((r && r.itens) || []).map(x => [midias.find(m => m.path === x.path), x.original]).filter(([m]) => m);
+    if (!itens.length || VEFHD.fila) return;
+    const sim = await appConfirm({
+        titulo: 'Cópias de edição mais rápidas',
+        texto: `${itens.length} ${itens.length === 1 ? 'vídeo deste projeto usa uma cópia Full HD' : 'vídeos deste projeto usam cópias Full HD'} no formato antigo, ` +
+            'mais lento para editar (arrastar a agulha e pular ficam até 10× mais lentos). Refazer agora em segundo plano? ' +
+            'As cópias ficam ~40% maiores; os cortes e as posições não mudam.',
+        botoes: [{ rotulo: 'Refazer', valor: true, tipo: 'primario' }, { rotulo: 'Agora não', valor: false, tipo: 'secundario' }],
+    });
+    if (!sim) { veLsSet(chave, '1'); return; }
+    if (VEFHD.fila) return;
+    VEFHD.fila = { n: itens.length, i: 0, feitos: [], erros: [], t0: Date.now(), id: itens[0][0].id, motor: '', refazer: true };
+    VEFHD.pct = -1;
+    vePjFhdBarra();
+    api.ve_otimizar_fullhd(itens.map(([m, original]) => [m.id, original]));
+}
 
 // Troca o arquivo e corrige a escala dos clipes (a escala é em % do tamanho da mídia; âncora em px da mídia)
 function veFhdTrocar(m, r) {

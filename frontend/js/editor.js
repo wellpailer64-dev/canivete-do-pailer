@@ -4396,6 +4396,7 @@ function veApplyProject() {
     const { data: d, path, name, missing, premiere } = VE._pendingProject;
     VE._pendingProject = null;
     VE.projectPath = path;
+    if (typeof vePjVerCopiasAntigas === 'function') setTimeout(vePjVerCopiasAntigas, 4000);   // cópias Full HD antigas (editor-projeto.js)
     // cópia do salvamento automático: Ctrl+S volta a salvar no projeto de origem (ou pergunta, se não havia)
     if (d._autosave) {
         VE.projectPath = d._autosave.origem || null;

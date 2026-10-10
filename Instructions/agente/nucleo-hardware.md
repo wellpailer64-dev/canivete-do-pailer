@@ -187,11 +187,44 @@ Medido com `tools/hw_simular.py leve --sem-app -- comando`, que roda um script P
 **Teste de play:** `teste_play.py` agora pega os players depois do `veSeek(ini)`. Uma busca parada pode trocar o player, e os ouvintes
 ficariam no player velho.
 
+## Fase 9 (2026-10-10): cópias de edição com quadro-chave curto (a causa do arraste lento)
+- **O protótipo WebCodecs não ajudou sozinho.** Ele está em `D:/kanivete_testes/webcodecs`: `wc_proto2.js` e `medir_wc.py`,
+  com decodificador contínuo, cache de quadros e de bytes. Deu ~280 ms por passo, empatado com o `<video>` (262 ms).
+- **Causa:** as cópias "Otimizados FullHD" tinham quadro-chave a cada 4–8 s, o padrão do codificador. Para mostrar um quadro
+  qualquer, qualquer decodificador refaz centenas de quadros. O HEVC do celular tem um por segundo.
+  As prévias leves (0,5 s) e as renderizadas (10 quadros) já eram curtas.
+- **Medido no `<video>` do app** (`D:/kanivete_testes/webcodecs/medir_gop.py`, 60 s de um clipe do depo):
+
+  | Formato | Pulo | Vai e vem | Tamanho |
+  |---|---|---|---|
+  | GOP longo (antigo) | 180 ms | 75 ms | 102 MB |
+  | **GOP 0,25 s, sem B** | **18 ms** | **17 ms** | 143 MB |
+  | GOP 0,5 s | 30 ms | 28 ms | 142 MB |
+  | GOP 0,25 s com quadros B | 27 ms | 24 ms | 144 MB |
+
+- **No projeto real**, num espelho em `D:/kanivete_testes/depo_rapido`, gerado por `scripts/espelho_depo_rapido.py`, sem tocar
+  nos arquivos do cliente. Sem prévias renderizadas nos dois, para ser justo:
+  - arraste numa direção: 76 → 36 ms por movimento, travadas 14 → 5;
+  - vai e vem: 71 → 37 ms, travadas 40 → 17;
+  - no PC leve, igual: ~34 ms e 2–3 travadas.
+- **Feito:**
+  - `otimizar.py`: quadro-chave a cada `GOP_S` = 0,25 s, `-bf 0` (NVENC e x264).
+  - `gop_longo()` marca a cópia antiga, que deixa de ser reaproveitada e é refeita.
+  - `original_de()` acha o original a partir da cópia, e `copias_antigas()` lista as antigas.
+  - `_trocar()` tenta de novo se o arquivo estiver aberto e, se não der, grava como `_r.mp4`.
+  - `media_server.register`: arquivo regravado (data ou tamanho mudaram) ganha token novo, a URL muda e o player recarrega.
+  - Editor (`vePjVerCopiasAntigas`, editor-projeto.js): ao abrir um projeto com cópias antigas, pergunta uma vez se quer
+    refazer em segundo plano. "Agora não" fica lembrado por projeto. No fim, a troca é automática.
+  - Teste: `py -3.13 testes/teste_copias_edicao.py` (porta 9395, tudo em `D:/kanivete_testes/copias_edicao`). Pulo 98 → 24 ms.
+- **Cuidado:** o depo.vknv aponta para os vídeos REAIS do cliente. O app de teste mostra a pergunta de refazer. Nunca clicar
+  "Refazer" nele; usar o espelho.
+
 ## Pendências (em ordem)
 1. **IA numa placa integrada:** remover fundo (DirectML), gerador_sfx, OmniVoice e melhorar áudio ainda escolhem sozinhos.
    Medir integrada × processador antes de decidir (sem integrada aqui: precisa de um PC de amigo ou de uma máquina emprestada)
    e respeitar `ia_na_placa`/`uma_ia_por_vez`.
 2. **Kani no leve:** a 1ª palavra ainda leva ~36 s sem placa. Medir numa integrada de verdade (Vulkan), que deve ser bem mais rápida.
 3. ~~Medir no leve: exportar, o Photo com PSD grande e o remover fundo~~ (feito nas fases 3 e 4).
-4. **Arraste da agulha cruzando vídeos:** servidor de quadros nativo (ver Fase 8). Antes, medir o protótipo num trecho curto.
+4. **Arraste da agulha:** o grosso foi resolvido pelas cópias de edição (fase 9). Ainda sobra o custo de trocar entre
+   muitos trechos de prévia renderizada. Servidor de quadros nativo só se isso ainda incomodar.
 5. **Validar num PC real fraco** (notebook de amigo): o simulador aperta CPU e memória, mas não reproduz uma integrada de verdade.

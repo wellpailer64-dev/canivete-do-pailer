@@ -18,6 +18,7 @@ from urllib.parse import quote
 # continua no ar e todas as prévias, áudios e miniaturas já abertos no app passariam a dar erro ("o player não
 # conseguiu abrir este vídeo"). Por isso o estado é reaproveitado se já existir.
 _registry = globals().get("_registry", {})
+_versoes = globals().get("_versoes", {})   # caminho → (token, (mtime, tamanho)) da versão registrada
 _memoria = globals().get("_memoria", {})    # token -> (bytes, tipo): arquivos que só existem na memória (camadas do Editor de Imagem)
 _envios = globals().get("_envios", {})      # sessão -> {chave: bytes}: o que a página manda por POST /u/<sessão>/<chave> (salvar PSD)
 _lock = globals().get("_lock") or threading.Lock()
@@ -164,17 +165,24 @@ def _ensure_server():
 
 
 def register(path):
-    """Registra um arquivo e devolve a URL http://127.0.0.1:porta/m/<token>/<nome>."""
+    """Registra um arquivo e devolve a URL http://127.0.0.1:porta/m/<token>/<nome>.
+    Arquivo regravado no mesmo lugar (data ou tamanho mudaram) ganha token novo: a URL muda e o player do editor
+    recarrega em vez de misturar pedaços guardados do arquivo antigo (ex.: cópia Full HD refeita)."""
     _ensure_server()
     path = os.path.abspath(path)
+    try:
+        st = os.stat(path)
+        versao = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        versao = None
     with _lock:
-        for tok, p in _registry.items():
-            if p == path:
-                token = tok
-                break
+        v = _versoes.get(path)
+        if v and v[1] == versao and _registry.get(v[0]) == path:
+            token = v[0]
         else:
             token = secrets.token_urlsafe(12)
             _registry[token] = path
+            _versoes[path] = (token, versao)
     nome = quote(os.path.basename(path))
     return f"http://127.0.0.1:{_port}/m/{token}/{nome}"
 

@@ -438,6 +438,13 @@ def ve_otimizar_fullhd(itens):
     return {"success": True}
 
 
+def ve_copias_antigas(paths):
+    """Cópias Full HD do projeto no formato antigo (quadro-chave espaçado, lentas para editar) e o original de cada uma
+    (Functions/otimizar.py): o editor oferece refazer em segundo plano."""
+    from Functions import otimizar
+    return {"success": True, "itens": otimizar.copias_antigas(paths)}
+
+
 def ve_otimizar_cancelar():
     if _ve_fhd_stop is not None:
         _ve_fhd_stop.set()
@@ -3064,6 +3071,9 @@ class ApiBridge:
 
     def ve_otimizar_cancelar(self):
         return ve_otimizar_cancelar()
+
+    def ve_copias_antigas(self, paths):
+        return ve_copias_antigas(paths)
 
     def hardware_estado(self):
         """Núcleo de hardware: o PC (CPU, RAM, placas de qualquer marca), o nível e o plano (Functions/hardware.py)."""
