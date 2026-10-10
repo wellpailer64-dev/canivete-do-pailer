@@ -109,6 +109,26 @@ Medido com `tools/hw_simular.py leve --sem-app -- comando`, que roda um script P
   - O custo está espalhado pela montagem (60 entradas, 30 sobreposições, cor). Num notebook Intel, o ganho seguinte é
     o Quick Sync (h264_qsv, que o app já detecta) na gravação. Medir num PC real.
 
+## Fase 5 (2026-10-10): play — o vídeo correndo atrás do som
+- O teste de play passava do limite de buscas e esperas até no PC forte. O grampo `D:/kanivete_testes/scripts/hw_buscas.py`
+  anota quem pede cada busca e mostrou o motivo:
+  - o `veSeguirAudio` buscava o player da tela "para onde o som está agora";
+  - a busca leva ~0,3 s e o som segue andando, então o player chegava atrasado de novo;
+  - isso virava ciclo de busca, espera, busca (12 buscas e 15 esperas em 20 s, todas no player da tela).
+- Correção (`VEAV` em editor.js):
+  - mira onde o som VAI estar: a latência é medida pelo evento `playing` de cada busca (média móvel, 0,05–0,8 s);
+  - não busca enquanto o player está carregando (`readyState < 3`) nem nos 250 ms depois de uma busca.
+- Resultado no depo (os dois passam em todos os limites):
+
+  | PC | Buscas a cada 10 s | Esperas a cada 10 s |
+  |---|---|---|
+  | Forte | 17–19 → 10–14 | 12–15 → 6–10 |
+  | Leve recém-instalado | → 10–14 | → 6–10 |
+
+- **Sincronia de imagem × som**, medida com `hw_sinc.py`, que compara com a função antiga trocada na página:
+  - quadros fora de ±40 ms: 5–7% → 2–5%;
+  - 90% dos quadros: até 33 ms → até 26 ms.
+
 ## Pendências (em ordem)
 1. **IA numa placa integrada:** remover fundo (DirectML), gerador_sfx, OmniVoice e melhorar áudio ainda escolhem sozinhos.
    Medir integrada × processador antes de decidir (sem integrada aqui: precisa de um PC de amigo ou de uma máquina emprestada)

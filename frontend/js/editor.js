@@ -2058,7 +2058,17 @@ function veSeguirAudio() {
     // (diferença medida em tempo da timeline: num clipe acelerado a fonte anda mais rápido)
     const vel = veVel(c), alvo = veSrcAt(c, VE.playhead) + VE_AV_ADIANTA * vel;
     const d = (v.currentTime - alvo) / vel;
-    if (Math.abs(d) > 0.1) { try { v.currentTime = alvo; } catch (e) { /* carregando */ } return; }
+    // Busca: o player leva ~0,2–0,4 s para voltar a andar e o som não espera — buscar para "onde o som está agora"
+    // chegava atrasado de novo e virava ciclo (depo.vknv: 12 buscas e 15 esperas em 20 s no player da tela, 2026-10-10).
+    // Agora mira onde o som VAI estar (latência medida nas últimas buscas) e não empilha busca enquanto o player
+    // ainda carrega a anterior (readyState < 3) ou logo depois dela.
+    if (v.readyState < 3 || performance.now() - VEAV.busca < 250) return;
+    if (Math.abs(d) > 0.1) {
+        const t0 = VEAV.busca = performance.now();
+        v.addEventListener('playing', () => { VEAV.lat = Math.max(0.05, Math.min(0.8, VEAV.lat * 0.6 + (performance.now() - t0) / 1000 * 0.4)); }, { once: true });
+        try { v.currentTime = alvo + VEAV.lat * veTaxa(c); } catch (e) { /* carregando */ }
+        return;
+    }
     let r = v.playbackRate;
     const base = veTaxa(c);
     if (Math.abs(d) > 0.02) r = Math.min(16, base * (d > 0 ? 0.92 : 1.08));
@@ -2067,6 +2077,7 @@ function veSeguirAudio() {
 }
 
 const VE_AV_ADIANTA = 0.025;
+const VEAV = { busca: 0, lat: 0.25 };   // última busca de correção (ms) e quanto o player leva para voltar a andar (s)
 
 function veMonitorDue() {
     const f = Math.floor(VE.playhead * (VE.fps || 30) + 1e-6);
