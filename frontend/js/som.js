@@ -230,7 +230,10 @@ function skDesenhar() {
             if (SK.verEsp && typeof skDesenharEsp === 'function') skDesenharEsp(x, c, cx, cw, y, W);
             else if (info) {
                 const meio = y + SK_H / 2 + 6, alt = (SK_H - 26) / 2 * c.vol, a = Math.max(0, -cx), b = Math.min(cw, W - cx);
+                // um contorno só (envelope de cima e de baixo) em vez de um retângulo de 1 px por coluna: o processo gráfico
+                // rasteriza uma forma, não milhares (redesenho com 6 faixas de áudio longo: ~360 ms antes)
                 x.fillStyle = f.cor; x.beginPath();
+                const hs = [];
                 for (let px = a; px < b; px++) {
                     const t0 = c.de + px / SK.z, t1 = c.de + (px + 1) / SK.z;
                     let m = 0; for (let k = Math.floor(t0 * info.pps), k1 = Math.max(k + 1, Math.ceil(t1 * info.pps)); k < k1 && k < info.d.length; k++) m = Math.max(m, info.d[k]);
@@ -238,10 +241,14 @@ function skDesenhar() {
                     if (c.fade_in > 0 && tt - c.ini < c.fade_in) g = (tt - c.ini) / c.fade_in;
                     if (c.fade_out > 0 && c.ini + c.dur - tt < c.fade_out) g = Math.min(g, (c.ini + c.dur - tt) / c.fade_out);
                     if (c.curva) g *= Math.min(2, skCurvaEm(c, tt - c.ini));
-                    const h = Math.max(0.5, m / 255 * alt * g);
-                    x.rect(cx + px, meio - h, 1, h * 2);
+                    hs.push(Math.max(0.5, m / 255 * alt * g));
                 }
-                x.fill();
+                if (hs.length) {
+                    x.moveTo(cx + a, meio - hs[0]);
+                    for (let q = 0; q < hs.length; q++) { x.lineTo(cx + a + q, meio - hs[q]); x.lineTo(cx + a + q + 1, meio - hs[q]); }
+                    for (let q = hs.length - 1; q >= 0; q--) { x.lineTo(cx + a + q + 1, meio + hs[q]); x.lineTo(cx + a + q, meio + hs[q]); }
+                    x.closePath(); x.fill();
+                }
             }
             // fades (linhas) e alças
             x.strokeStyle = '#fff8'; x.lineWidth = 1;
@@ -270,6 +277,31 @@ function skDesenhar() {
     }
     // marcadores e agulha
     for (const m of SK.proj.marcadores) { const mx = Math.round(X(m.t)) + 0.5; x.strokeStyle = '#ffd166'; x.beginPath(); x.moveTo(mx, 0); x.lineTo(mx, H); x.stroke(); x.fillStyle = '#ffd166'; x.fillText(m.nome, mx + 3, SK_REGUA - 3); }
+    // tudo acima fica guardado: no play só a agulha anda (skDesenharPlay cola a imagem e desenha a agulha por cima)
+    if (cv.width > 0 && cv.height > 0) {   // escondida (0 × 0): não guarda nada
+        if (!SK.tlBase || SK.tlBase.cv.width !== cv.width || SK.tlBase.cv.height !== cv.height) SK.tlBase = { cv: new OffscreenCanvas(cv.width, cv.height) };
+        const bx = SK.tlBase.cv.getContext('2d'); bx.clearRect(0, 0, cv.width, cv.height); bx.drawImage(cv, 0, 0);
+        SK.tlBase.chave = skTlChave(cv, dpr);
+    } else SK.tlBase = null;
+    skDesenharAgulha(x, W, H, X);
+}
+// Play: a linha do tempo inteira (ondas ponto a ponto, milhares de retângulos por faixa) era redesenhada a cada quadro e o
+// processo gráfico da WebView ficava em 100% de um núcleo: a tela caía de 30 para 8 quadros/s com 2 faixas (2026-10-10).
+// Agora o fundo é o guardado pelo último skDesenhar (qualquer edição redesenha tudo e guarda de novo) e só a agulha muda.
+// O tamanho vem dos atributos do canvas (ler clientWidth a cada quadro forçaria o layout da página).
+function skTlChave(cv, dpr) { return [cv.width, cv.height, dpr, SK.x0, SK.z, SK.y0].join('|'); }
+function skDesenharPlay() {
+    const cv = skEl('sk-tl'), dpr = window.devicePixelRatio || 1;
+    if (cv && !cv._obsTam) {   // painel redimensionado no meio do play: a imagem guardada não serve mais
+        cv._obsTam = new ((cv.ownerDocument.defaultView || window).ResizeObserver)(() => { SK.tlBase = null; });
+        cv._obsTam.observe(cv);
+    }
+    if (!cv || !SK.proj || SK.grav || !SK.tlBase || SK.tlBase.chave !== skTlChave(cv, dpr)) return skDesenhar();
+    const x = cv.getContext('2d'), W = cv.width / dpr, H = cv.height / dpr;
+    x.setTransform(1, 0, 0, 1, 0, 0); x.drawImage(SK.tlBase.cv, 0, 0); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    skDesenharAgulha(x, W, H, t => (t - SK.x0) * SK.z);
+}
+function skDesenharAgulha(x, W, H, X) {
     const hx = Math.round(X(SK.ph)) + 0.5;
     x.strokeStyle = '#ff6a2c'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(hx, 0); x.lineTo(hx, H); x.stroke();
     x.fillStyle = '#ff6a2c'; x.beginPath(); x.moveTo(hx - 6, 0); x.lineTo(hx + 6, 0); x.lineTo(hx, 8); x.fill();

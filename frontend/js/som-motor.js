@@ -201,7 +201,7 @@ async function skTocar() {
         if (!SK.tocando) return;
         SK.ph = Math.max(0, ctx.currentTime - SK.t0 - (ctx.outputLatency || 0));
         if (SK.ph >= skFim() + 0.2 && !SK.grav) { skParar(); return; }
-        skSeguir(); skDesenhar(); skUiTempo(); skMedirAgora(); skUiMonitor?.();
+        skSeguir(); skDesenharPlay(); skUiTempo(); skMedirAgora(); skUiMonitor?.();
         SK.raf = requestAnimationFrame(passo);
     };
     SK.raf = requestAnimationFrame(passo);
@@ -214,7 +214,7 @@ function skParar() {
     skUi?.(); skDesenhar?.(); if (typeof skUiMonitor === 'function') skUiMonitor();
 }
 function skMotorMudou() { if (SK.tocando) { skCalar(); skAgendar(); } }   // projeto mudou tocando: reagenda daqui em diante
-function skSeguir() { const cv = skEl('sk-tl'); if (!cv) return; const x = (SK.ph - SK.x0) * SK.z, w = cv.clientWidth; if (x > w * 0.9 || x < 0) SK.x0 = Math.max(0, SK.ph - w * 0.1 / SK.z); }
+function skSeguir() { const cv = skEl('sk-tl'); if (!cv) return; const x = (SK.ph - SK.x0) * SK.z, w = cv.width / (window.devicePixelRatio || 1); if (x > w * 0.9 || x < 0) SK.x0 = Math.max(0, SK.ph - w * 0.1 / SK.z); }
 function skIr(t) {
     SK.ph = Math.max(0, t);
     if (SK.tocando) { SK.t0 = SK.ctx.currentTime + 0.02 - SK.ph; skCalar(); skAgendar(); }

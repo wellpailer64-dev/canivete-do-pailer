@@ -147,6 +147,18 @@ Medido com `tools/hw_simular.py leve --sem-app -- comando`, que roda um script P
     Veja `D:/kanivete_testes/hw/malha_cmp_z4.png` (antiga à esquerda).
 - `testes/teste_vetor.py` PASSOU: 159 ok, sem erro de JS.
 
+## Fase 7 (2026-10-10): Sound Kanivete — a tela caía para 8 quadros/s no play
+- Medido com `D:/kanivete_testes/scripts/hw_som.py` (N faixas com áudio longo, travadas acima de 100 ms em 20 s de play).
+  Com 2 faixas: 152 travadas no PC forte, e a tela caía de 30 para 8 quadros/s.
+- O JS estava 93% parado. O culpado era o **processo gráfico da WebView, em 100% de um núcleo**: `skDesenhar` refazia a linha
+  do tempo inteira a cada quadro, com a onda em um retângulo de 1 px por coluna (milhares por faixa).
+- **Correção:**
+  - `skDesenharPlay` (som.js) cola a imagem guardada pelo último `skDesenhar` e desenha só a agulha e a barra.
+  - Uma edição redesenha tudo. A imagem guardada é invalidada ao virar a página (`x0`), pelo zoom e pelo ResizeObserver do canvas.
+  - A onda virou um contorno só (envelope de cima e de baixo): a imagem saiu idêntica pixel a pixel na fala real (`hw_som_onda.py`).
+  - `skSeguir` lê o tamanho pelos atributos do canvas, sem forçar layout.
+- **Resultado com 6 faixas:** 0 travadas no forte e no leve, com metade da CPU. `testes/teste_som.py` PASSOU (74 ok).
+
 ## Pendências (em ordem)
 1. **IA numa placa integrada:** remover fundo (DirectML), gerador_sfx, OmniVoice e melhorar áudio ainda escolhem sozinhos.
    Medir integrada × processador antes de decidir (sem integrada aqui: precisa de um PC de amigo ou de uma máquina emprestada)
