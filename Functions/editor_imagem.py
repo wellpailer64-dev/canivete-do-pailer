@@ -74,6 +74,10 @@ def liberar(doc_id):
     if d:
         media_server.unregister_bytes(d.get("tokens"))
         d["tokens"] = []
+    # o psd_tools deixa ciclos de referência: sem a coleta, ~260 MB do PSD de 284 MB (3000×3928, 9 camadas) ficavam na
+    # RAM até a próxima faxina do Python (medido 2026-10-10: em uso 0,36 → 0,10 GB) — pesa no PC de 8 GB
+    import gc
+    gc.collect()
     return {"success": True}
 
 

@@ -96,10 +96,23 @@ Medido com `tools/hw_simular.py leve --sem-app -- comando`, que roda um script P
   - **Inventa:** disse que gera música pela Geração de Voz e que manda direto para o TikTok, e falou de "HTML/CSS/JS" com o usuário.
   - Por isso foi descartado (honestidade vem primeiro, kani-motor.md).
 
+## Fase 4 (2026-10-10): Photo, partida e o resto da exportação no PC leve
+- **Photo, PSD real de 284 MB** (3000×3928, 9 camadas; cópia em `D:/kanivete_testes/hw/psd/carrossel.psd`): abre em ~9–11 s nos dois PCs.
+  - No leve, a memória reservada da árvore chega a 4,7 GB de 5,6. Desse total, a GPU process da WebView tem 1,9 GB reservados
+    (0,45 GB em uso) e o Python 1,4 GB.
+  - O psd_tools deixa ciclos de referência: `editor_imagem.liberar` agora roda `gc.collect()`, e o Python em uso cai de 0,36 para 0,10 GB.
+  - Medir: `D:/kanivete_testes/scripts/hw_photo_psd.py porta arquivo.psd`.
+- **Partida no leve:** o app fica parado (~0% de CPU) desde 5 s depois de abrir. Não há tarefa de fundo pesando (`hw_partida.py`).
+- **Exportar pela CPU, o que sobra** (`hw_capturar_cmd.py` + `hw_ablacao.py`, 15 s do depo no leve):
+  - Os filtros sozinhos, sem gravar, levam 36 s.
+  - Nenhum dos suspeitos pesa: a base em yuv444p, a escala animada parada em 1,0 e a ida e volta a RGBA da opacidade fixa ficaram todos com menos de 2%.
+  - O custo está espalhado pela montagem (60 entradas, 30 sobreposições, cor). Num notebook Intel, o ganho seguinte é
+    o Quick Sync (h264_qsv, que o app já detecta) na gravação. Medir num PC real.
+
 ## Pendências (em ordem)
 1. **IA numa placa integrada:** remover fundo (DirectML), gerador_sfx, OmniVoice e melhorar áudio ainda escolhem sozinhos.
    Medir integrada × processador antes de decidir (sem integrada aqui: precisa de um PC de amigo ou de uma máquina emprestada)
    e respeitar `ia_na_placa`/`uma_ia_por_vez`.
 2. **Kani no leve:** a 1ª palavra ainda leva ~36 s sem placa. Medir numa integrada de verdade (Vulkan), que deve ser bem mais rápida.
-3. **Medir no leve:** exportar (`teste_export.py --sem-abrir --porta`), o Photo com PSD grande e o remover fundo no processador.
+3. ~~Medir no leve: exportar, o Photo com PSD grande e o remover fundo~~ (feito nas fases 3 e 4).
 4. **Validar num PC real fraco** (notebook de amigo): o simulador aperta CPU e memória, mas não reproduz uma integrada de verdade.
