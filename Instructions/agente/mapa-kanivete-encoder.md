@@ -118,8 +118,14 @@ Corte também a base (só os segmentos até T).
    ocupa mais. Investigar num trecho curto (~30 min) de onde vem o crescimento (entradas que começam tarde sendo lidas
    cedo? fila do filtro/decodificador?) e frear; meta: uso estável → a timeline cabe sempre na placa.
 1. Memória da placa: a timeline atual do Carlinhos usa 4,9 de 8 GB e passa com o PC livre; com o editor usando a
-   placa ao mesmo tempo (prévia/render auto) estourou. Opções: pausar o render auto durante o export; e, para projetos
-   maiores/4K bruto, montar em pedaços de tempo (a partida custa só ~2,7 s por pedaço: viável).
+   placa ao mesmo tempo (prévia/render auto) estourou. Opção que falta: pausar o render auto durante o export.
+   (Montar em pedaços de tempo: FEITO 2026-10-10, exportação em blocos — plano §11.)
+1b. **Da rodada 4 (2026-10-10, Respeite o seu voto; plano §11):**
+   - Abertura do 1º bloco leva ~10 s (todas as leituras do bloco abrem juntas): medir e abrir só o que toca no começo.
+   - Brilho/Contraste e Chroma Key junto com outro efeito no mesmo clipe (ex.: key + Luz e Cor, 3 clipes no Respeite)
+     ainda descem para a CPU (híbrido): fazer o Brilho/Contraste em shader e encadear key + Luz e Cor na placa.
+   - Blocos rodam um após o outro: medir se 2 ao mesmo tempo compensa quando sobra memória na placa.
+   - Imagens com efeito (texto com Aberração, etc.) ainda preparadas na CPU.
 2. Velocidade: a placa está em ~1× a duração; medir onde vai o tempo (imagens preparadas na CPU quadro a quadro,
    número de passadas do libplacebo) antes de mexer.
 3. Na placa: legendas, outros modos de mesclagem, rotação de camada, prévia renderizada.
