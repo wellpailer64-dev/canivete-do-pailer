@@ -239,6 +239,10 @@ def _get_sessao_(modelo_path):
         if s is None:
             so = ort.SessionOptions()
             so.intra_op_num_threads = _hw_threads_ia()
+            # sem a "reserva" de memória do onnxruntime: o matting caiu de 8,8 para 6,4 GB de pico, na mesma velocidade
+            # (2026-10-10, 4 threads: 29,8 × 30,5 s) — o PC de 8 GB não começa a paginar por causa da reserva
+            so.enable_cpu_mem_arena = False
+            so.enable_mem_pattern = False
             s = ort.InferenceSession(modelo_path, so, providers=["CPUExecutionProvider"])
             _dispositivo["atual"] = _dispositivo["atual"] or "cpu"
         _sessoes[modelo_path] = s

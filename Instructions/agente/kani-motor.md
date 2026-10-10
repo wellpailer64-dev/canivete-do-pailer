@@ -135,3 +135,9 @@ Antes de trocar: corrigir a caixinha no prompt/gaveta e medir no llama.cpp (o mo
 - `qwen3.5:4b` oficial do Ollama: efeito sonoro 12/12, caixinha 15/15. Ele é quem atende o `gerador_sfx` para quem tem Ollama.
 - Medições: `D:/kanivete_testes/scripts/kani_caixinha.py` (modelo `llama` = llama-server na porta 8099).
   Troca no PC do amigo (9B → 4B): `kani_troca.py` APROVADO. `testes/teste_kani.py` PASSOU (14/14, com a checagem da caixinha falsa).
+
+### Qwen3.5 2B para o PC leve? Não (2026-10-10)
+- 2B Q5 no processador de 4 threads: 10,6 tok/s contra 4,7 do 4B, e 1,7 GB.
+- Bancada: efeito sonoro 12/12 e JSON 5/6. Mas inventou recurso: música pela Geração de Voz e envio direto para o TikTok.
+  Também falou de "HTML/CSS/JS" e só pôs o `[[abrir]]` em 8 de 15.
+- Ficou o 4B em todo PC. No leve, o ganho veio de aquecer o motor e do lote 128: `Instructions/agente/nucleo-hardware.md`, Fase 3.

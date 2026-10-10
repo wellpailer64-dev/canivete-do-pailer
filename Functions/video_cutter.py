@@ -1466,14 +1466,31 @@ def _args_video(cfg, q, usar_gpu, bits=8, mbps=0):
         a = ["-c:v", enc, "-quality", "quality"]
         a += (["-rc", "vbr_peak"] + taxa) if taxa else ["-rc", "cqp", "-qp_i", str(q["cq"]), "-qp_p", str(q["cq"] + 2)]
         return a + ["-pix_fmt", "p010le" if bits == 10 else "yuv420p"] + tag
+    preset, dcrf = _preset_cpu(q["preset"])
     if hevc:
         # x265: CRF ~2-3 acima do x264 dá a mesma qualidade com ~40% menos bits
-        a = ["-c:v", "libx265", "-preset", q["preset"], "-x265-params", "log-level=error"]
-        a += taxa if taxa else ["-crf", str(q["crf"] + 3)]
+        a = ["-c:v", "libx265", "-preset", preset, "-x265-params", "log-level=error"]
+        a += taxa if taxa else ["-crf", str(q["crf"] + 3 + dcrf)]
         return a + ["-pix_fmt", "yuv420p10le" if bits == 10 else "yuv420p"] + tag
-    a = ["-c:v", "libx264", "-preset", q["preset"], "-profile:v", "high"]
-    a += taxa if taxa else ["-crf", str(q["crf"])]
+    a = ["-c:v", "libx264", "-preset", preset, "-profile:v", "high"]
+    a += taxa if taxa else ["-crf", str(q["crf"] + dcrf)]
     return a + ["-pix_fmt", "yuv420p"]
+
+
+_PRESETS = ("ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow")
+
+
+def _preset_cpu(preset):
+    """Preset do x264/x265 pelo plano do PC (núcleo de hardware): no PC leve/médio, mais rápido que o da qualidade e CRF 1
+    abaixo (mesma qualidade, arquivo ~4% maior; 2,7× mais rápido no leve). Devolve (preset, ajuste do CRF)."""
+    try:
+        from Functions import hardware
+        alvo = hardware.plano().get("export_cpu_preset")
+    except Exception:
+        alvo = None
+    if alvo in _PRESETS and preset in _PRESETS and _PRESETS.index(alvo) < _PRESETS.index(preset):
+        return alvo, -1
+    return preset, 0
 
 
 def _args_cor(info, altura):

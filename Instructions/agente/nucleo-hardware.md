@@ -66,10 +66,40 @@ Perfil de CPU do play: `D:/kanivete_testes/scripts/hw_perfil_play.py projeto.vkn
   esperas 23 → 13. O custo é uma vez só: 31 s para preparar as prévias de 720p na 1ª abertura.
 - Teste: `py -3.13 testes/teste_hardware.py [--app]`. São 12 verificações do núcleo e do plano, mais o editor no PC leve com e sem placa na tela.
 
+## Fase 3 (2026-10-10): exportar, recortar e Kani no PC leve
+Medido com `tools/hw_simular.py leve --sem-app -- comando`, que roda um script Python dentro da simulação, sem abrir o app.
+
+**Exportar** (`D:/kanivete_testes/encoder/bench.py DEPO_ATUAL`, depoimento de 98 s):
+- No forte: 101 s.
+- No leve: 669 s. O gargalo era o x264 `medium`. Num trecho de 20 s, decodificar leva 8 s; o medium crf18, 35 s; o veryfast crf17, 13 s.
+  A qualidade foi a mesma (SSIM 0,949 e PSNR 32,5 nos três) e o arquivo saiu +4%.
+- Agora `plano()["export_cpu_preset"]` (leve veryfast, médio faster) é aplicado por `video_cutter._preset_cpu`, com o CRF 1 abaixo.
+- Resultado no leve: **669 → 522 s** (−22%). Os efeitos e a cor também pesam no processador.
+
+**Remover fundo no processador**, com 4 threads: isnet 2 s, birefnet-lite 7 s, BEN2 18 s.
+- O **BiRefNet-matting estourava o PC de 8 GB**: tinha 8,8 GB de pico, ou 6,4 GB sem a arena do onnxruntime.
+  - As sessões na CPU agora ficam sem arena (`enable_cpu_mem_arena=False`), na mesma velocidade.
+  - `recorte_pro.cabe_matting()` decide: com menos de 15 GB de RAM e sem placa dedicada de 6 GB ou mais, a pessoa sai pelo BEN2.
+- Resultado: o recorte de pessoa no leve passou a sair em 21 s, com pico de 4,2 GB.
+
+**Kani no leve** (4B Q5, 4 threads, sem placa):
+- Escreve a 4,7 tok/s e lê a 31 tok/s. O sistema tem ~2.500 tokens (~2.000 deles fixos).
+- **Bug corrigido:** a fase 2 encurtou o "modelo parado" para 60 s, e o vigia derrubava o llama-server no meio da resposta.
+  Agora `kani._parar_ocioso` só desliga parado de verdade e `_marcar_uso` marca cada uso.
+- **Aquecer:** abrir a gaveta (`kani_voz(true)` → `kani.aquecer`) sobe o motor e lê a parte fixa enquanto a pessoa digita.
+- **Lote 128 sem placa (`-ub 128`):** o Qwen3.5 é híbrido, e o llama.cpp guarda o marcador um lote antes do fim.
+  Com lote menor, ele relê ~900 tokens em vez de ~1.400.
+- Resultado: **1ª palavra 102 s → 36 s.**
+- No leve a voz não fica carregada com a gaveta aberta. Ela carrega só no Ouvir.
+- Qwen3.5 **2B** testado como Kani do leve:
+  - É 2,3× mais rápido, com 10,6 tok/s, e usa 1,7 GB.
+  - **Inventa:** disse que gera música pela Geração de Voz e que manda direto para o TikTok, e falou de "HTML/CSS/JS" com o usuário.
+  - Por isso foi descartado (honestidade vem primeiro, kani-motor.md).
+
 ## Pendências (em ordem)
 1. **IA numa placa integrada:** remover fundo (DirectML), gerador_sfx, OmniVoice e melhorar áudio ainda escolhem sozinhos.
    Medir integrada × processador antes de decidir (sem integrada aqui: precisa de um PC de amigo ou de uma máquina emprestada)
    e respeitar `ia_na_placa`/`uma_ia_por_vez`.
-2. **Kani no PC leve:** o 4B Q5 usa ~3,5 GB. Com 8 GB e o editor aberto, medir e ver se um Qwen3.5 menor compensa no nível leve.
+2. **Kani no leve:** a 1ª palavra ainda leva ~36 s sem placa. Medir numa integrada de verdade (Vulkan), que deve ser bem mais rápida.
 3. **Medir no leve:** exportar (`teste_export.py --sem-abrir --porta`), o Photo com PSD grande e o remover fundo no processador.
 4. **Validar num PC real fraco** (notebook de amigo): o simulador aperta CPU e memória, mas não reproduz uma integrada de verdade.

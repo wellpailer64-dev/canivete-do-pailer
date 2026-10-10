@@ -9,6 +9,7 @@
   Só o app sofre: os programas abertos do usuário não são apertados.
 - Placa "integrada"/"nenhuma": esconde a NVIDIA do CUDA/NVENC (CUDA_VISIBLE_DEVICES=-1) e do Vulkan do llama.cpp/
   stable-diffusion (GGML_VK_VISIBLE_DEVICES). --sem-gpu-tela desliga também a placa da tela (WebView2), pior que uma integrada.
+- --sem-app: não abre o app; roda o próprio `-- comando` dentro da simulação (ex.: um bench de exportação em Python).
 - --limpo: pastas de dados novas (como app recém-instalado: sem preferências salvas), em D:/kanivete_testes/tmp.
 - Com `-- comando`: roda o comando (ex.: um teste) com o app aberto e fecha tudo no fim; sem ele, espera Enter.
 Mede e imprime o pico de memória da árvore. Dados/temporários do app de teste em D:/kanivete_testes (nunca no C:).
@@ -92,6 +93,19 @@ def main():
     os.makedirs(BASE + "tmp", exist_ok=True)
     teto = int(s["ram_gb"] * 0.70 * 2**30)
     job = criar_job(min(s["threads"], os.cpu_count()), teto)
+    if "--sem-app" in a:
+        t0 = time.time()
+        proc = subprocess.Popen(cmd, env=env, creationflags=0x4)
+        h = k32.OpenProcess(0x1FFFFF, False, proc.pid)
+        if not k32.AssignProcessToJobObject(job, h):
+            raise OSError(ctypes.get_last_error(), "AssignProcessToJobObject")
+        import psutil
+        psutil.Process(proc.pid).resume()
+        rc = proc.wait()
+        print(json.dumps({"perfil": perfil, "segundos": round(time.time() - t0, 1), "pico_memoria_gb": round(pico(job), 2),
+                          "teto_gb": round(teto / 2**30, 1)}), flush=True)
+        k32.CloseHandle(job)
+        sys.exit(rc)
     app = subprocess.Popen([sys.executable, os.path.join(RAIZ, "main.py"), f"--agente={porta}"], cwd=RAIZ, env=env,
                            creationflags=0x4)   # CREATE_SUSPENDED: entra no job antes de rodar qualquer coisa
     h = k32.OpenProcess(0x1FFFFF, False, app.pid)

@@ -222,5 +222,37 @@
    "tipo": "SIM",
    "r": "Para tirar o fundo de uma imagem no Kanivete, use a ferramenta **Remover Fundo**. Ela usa IA para recortar automaticamente o objeto da imagem, preservando o fundo transparente.\n\n1. Abra o app e vá até a seção **Imagem** na barra lateral esquerda.\n2. Clique em **Remover Fundo**.\n3. Arraste a sua imagem (JPG, PNG, WEBP ou HEIC) para a área indicada.\n4. O app processará a imagem e mostrará o resultado recortado.\n5. Revisar o resultado antes de salvar.\n6. Clique em Salvar para baixar o arquivo com o fundo removido.\n\n```texto\n[Coloque aqui o nome do arquivo ou descrição da imagem]\n```\n\nAqui está:\n```texto\n[Coloque aqui o nome do arquivo ou descrição da imagem]\n```\n\n[[abrir:remover-fundo]]"
   }
+ ],
+ "hf.co/unsloth/Qwen3.5-2B-GGUF:Q5_K_M": [
+  {
+   "p": "Como eu faço uma live no YouTube pelo Kanivete?",
+   "tipo": "NAO",
+   "r": "Você não consegue criar uma \"Live\" (transmissão ao vivo) nativa diretamente no **Editor Kanivete** ou em qualquer um dos seus módulos de vídeo dentro do app.\n\nO Kanivete é um editor de criação de conteúdo estático (vídeo e imagem) rodando localmente no seu PC. Ele não possui funcionalidades de streaming, conexão com servidores externos (como Twitch, YouTube Live ou Google Stream) ou gravações ao vivo.\n\nPara fazer uma Live no YouTube, você precisará de ferramentas externas dedicadas a gravação ao vivo. Aqui estão as opções que o Kanivete pode ajudar a preparar o conteúdo:\n\n1.  **Gravar o Vídeo com o Editor Kanivete:**\n    *   Abra o **Editor Kanivete**.\n    *   Crie um novo projeto.\n    *   Grave o vídeo ou o áudio que você deseja transmitir (pode adicionar músicas, textos ou efeitos sonoros locais).\n    *   Exporte o arquivo quando terminar.\n\n2.  **Preparar o Arquivo para o YouTube:**\n    *   Use o **Converter Vídeo** do Kanivete.\n    *   Se o vídeo for uma Live, o formato ideal é geralmente **WebM** ou **MP4** com codecs otimizados para streaming.\n    *   O Kanivete pode converter o vídeo da gravação para WebM, mantendo a qualidade e a resolução original.\n\n3.  **Gerar o Link de Transmissão:**\n    *   O Kanivete **não gera** o link de transmissão.\n    *   Você precisa usar um serviço de streaming externo (como *OBS Studio*, *Streamlabs*, *Xsplit* ou *VLC Player*) para enviar o arquivo que o Kanivete criou para o YouTube.\n\n**Resumo:** O Kanivete é ótimo para criar o conteúdo (o vídeo em si), mas não cria a transmissão ao vivo. Para isso, combine o Kanivete com um software de gravação de live instalado no seu computador."
+  },
+  {
+   "p": "Onde fica o editor de planilhas do Kanivete?",
+   "tipo": "NAO",
+   "r": "O Kanivete não possui um editor de planilhas. As ferramentas são:\n- Vídeo: Editor Kanivete, Comprimir Vídeo, Converter Vídeo, Baixar Vídeo, Logger Pro\n- Áudio: Sound Kanivete, Converter Áudio, Transcrever, Melhorar Áudio, Geração de Voz\n- Imagem: Photo Kanivete, Vetor Kanivete, Converter Imagem, Comprimir Imagem, Remover Fundo, Organizar Imagens, Gerar Favicon\n- Web: GDrive Dumper, Web Scraper\n- IA: Kani\n\nSe você precisa de planilhas, sugiro usar o **Excel** ou **Google Sheets** que já vem instalado na sua máquina."
+  },
+  {
+   "p": "Como eu convido meu cliente pra editar o projeto comigo online, em tempo real, no Kanivete?",
+   "tipo": "NAO",
+   "r": "Você não consegue convidar seu cliente para editar o projeto no Kanivete diretamente pelo navegador, pois o Kanivete é um aplicativo para **computadores locais** que roda apenas no seu PC. Não há um botão de \"convidar online\" ou \"fórum\" dentro da tela inicial.\n\nAqui está como funciona a solução para fazer isso acontecer:\n\n1.  **Criar o Projeto Localmente:** Você abre o Kanivete no seu computador e cria o projeto e faz os cortes/edições. Tudo fica salvo na pasta do seu computador.\n2.  **Escolher o Método de Compartilhamento:**\n    *   **Método A (Melhor qualidade):** Salve o projeto como um arquivo **ZIP** na pasta do seu computador, envie o arquivo ZIP para o cliente e abra o Kanivete junto com ele no mesmo computador dele. Ele verá tudo exato.\n    *   **Método B (Conectividade):** Se ambos os computadores já estão conectados à **mesma rede Wi-Fi**, você pode usar o **Kanivete Encoder** (dentro do Editor Kanivete) para **conversar arquivos diretamente** entre os dois PCs. O cliente pode abrir o Kanivete no seu PC e enviar o projeto para você (ou vice-versa) via rede local.\n    *   **Método C (Edição Remota via Web):** O Kanivete não tem uma versão web para editar projetos complexos. No entanto, se o cliente tiver o Kanivete instalado em outro PC e estiver na mesma rede, ele pode usar o **Editor Kanivete** (ou o **Canvas** do Kanivete) para ver a timeline, fazer cortes rápidos e enviar os arquivos editados de volta para você.\n\n**Resumo:** Não há um link \"Convidar Cliente\". O processo é: você edita no PC 1 -> Salva como ZIP ou envia via rede Wi-Fi -> Cliente edita no PC 2 (ou usa o Kanivete online se tiver acesso)."
+  },
+  {
+   "p": "Como eu gero uma música inteira com IA no Kanivete?",
+   "tipo": "NAO",
+   "r": "Para gerar uma música inteira com IA no Kanivete, você deve utilizar a ferramenta **Geração de Voz**.\n\nAqui está o passo a passo:\n\n1.  Abra o Kanivete e vá até a seção **Áudio**.\n2.  Clique no botão **Geração de Voz**.\n3.  Arraste um arquivo de áudio de referência curto (o seu exemplo de 8 segundos) para a janela do programa.\n4.  O Kanivete usará esse áudio para criar vozes salvas com a qualidade de 8 segundos.\n5.  Clique em **Salvar** para criar a voz.\n6.  Arraste o arquivo de texto (nome do script) para a janela do programa.\n7.  Clique em **Transcrever** para gerar o áudio final.\n\n[[abrir:transcrever-audio]]"
+  },
+  {
+   "p": "Como eu transformo um texto em voz no Kanivete?",
+   "tipo": "SIM",
+   "r": "Como você quer transformar um texto em voz no Kanivete, siga estes passos simples:\n\n1.  Clique no botão **\"Geração de Voz\"** na barra lateral esquerda.\n2.  Clique em **\"Nova voz\"** e arraste um arquivo de áudio para selecionar uma voz já salva (ou uma amostra curta de fala).\n3.  Na aba de configuração, escreva o texto que deseja converter.\n4.  Escolha a qualidade de fala (ex: \"Fala limpa\", \"Estúdio\") e a velocidade desejada.\n5.  Clique em **\"Gerar\"** ou **\"Transcrever\"**.\n\nO Kanivete usará o OmniVoice para gerar a fala baseada na sua voz ou no texto escrito.\n\n[[abrir:omnivoice]]"
+  },
+  {
+   "p": "Como eu tiro o fundo de uma imagem no Kanivete?",
+   "tipo": "SIM",
+   "r": "Para tirar o fundo de uma imagem no Kanivete, você deve seguir estes passos:\n\n1.  **Arraste a imagem**: Clique e arraste a foto que deseja processar para a área de trabalho do Kanivete.\n2.  **Selecionar a ferramenta**: Procure na barra lateral pela seção **Imagem** e clique em **Remover Fundo**.\n3.  **Escolher o modelo**: A ferramenta abrirá opções para escolher o tipo de recorte (ex: automático, manual, etc.). Clique em \"Adicionar à fila\" ou no botão de renderizar.\n4.  **Revisar e salvar**: O Kanivete processará a imagem. Feche a janela de revisão e clique em **Salvar** para baixar o novo arquivo livre de fundo.\n\n[[abrir:remover-fundo]]"
+  }
  ]
 }

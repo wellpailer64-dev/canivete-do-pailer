@@ -239,6 +239,9 @@ def plano():
         "vram_livre_ia_gb": round(max(0.0, vram - 1.5), 1),   # 1,5 GB ficam para a tela e a prévia
         "ia_na_placa": dedicada and vram >= 4,
         "export_na_placa": dedicada and vram >= 4,           # modo placa (Vulkan) do Kanivete Encoder
+        # exportar pelo processador (x264/x265): preset mais rápido no PC leve/médio, com CRF 1 abaixo para a mesma
+        # qualidade (medido 2026-10-10, 4 threads: medium crf18 35 s × veryfast crf17 13 s, SSIM igual, tamanho +4%)
+        "export_cpu_preset": {"leve": "veryfast", "medio": "faster", "forte": None}[ef],
         # editor
         "previa": {"leve": "metade", "medio": "inteira", "forte": "inteira"}[ef],
         # altura das prévias renderizadas e da prévia leve de edição (padrão de "Qualidade das prévias")

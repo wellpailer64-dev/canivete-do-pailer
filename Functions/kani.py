@@ -152,6 +152,12 @@ def _subir():
         _liberar_gpu_ollama()   # um modelo grande por vez na placa: o Ollama (Jr, olho) sai da VRAM antes
         porta = _porta_livre()
         args = [_exe(), "-m", _gguf(), "--host", "127.0.0.1", "--port", str(porta), "-c", str(CTX), "-ngl", "99", "--jinja", "-np", "1"]
+        # sem placa dedicada: lote de 128 (padrão 512). O Qwen3.5 é híbrido e o llama.cpp só guarda o "marcador" da leitura
+        # um lote antes do fim: com lote menor a pergunta seguinte relê ~900 tokens em vez de ~1.400 (medido 2026-10-10,
+        # PC leve simulado: 1ª palavra 48 → 36 s depois de aquecer). Na placa o lote grande lê mais rápido.
+        ub = os.environ.get("CANIVETE_KANI_UB") or ("" if _ia_na_placa() else "128")
+        if ub:
+            args += ["-ub", ub]
         p = subprocess.Popen(args, cwd=os.path.dirname(_exe()), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                              stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
         _amarrar(p)
@@ -170,11 +176,24 @@ def _subir():
         if not _srv["ok"]:
             raise RuntimeError("o motor da IA não respondeu")
         threading.Thread(target=_vigiar, daemon=True).start()
+    _marcar_uso()
+
+
+def _marcar_uso():
+    """Avisa o vigia de memória (memoria.py) que a Kani está em uso. No PC leve o limite cai para 60 s e a leitura do
+    sistema sem placa passa disso: o vigia não pode derrubar o motor no meio de uma resposta (_parar_ocioso confere)."""
     try:
         from Functions import memoria
-        memoria.usado("kani", parar, OCIOSO)
+        memoria.usado("kani", _parar_ocioso, OCIOSO)
     except Exception:
         pass
+
+
+def _parar_ocioso():
+    if _srv.get("ocupado") or time.time() - _srv.get("uso", 0) < 30:
+        _marcar_uso()   # ainda respondendo (ou acabou agora): volta para a fila do vigia
+        return
+    parar()
 
 
 def _vigiar():
@@ -351,6 +370,8 @@ def conversar(cid, mensagens, ferramenta, on_evento):
             _cancelar.discard(cid)
             _srv["ocupado"] = False
             _srv["uso"] = time.time()
+            if _srv.get("proc"):
+                _marcar_uso()
     threading.Thread(target=run, daemon=True).start()
     return {"success": True}
 
@@ -360,13 +381,56 @@ _falas = {}           # texto → arquivo já sintetizado (não refaz a mesma fa
 
 
 def voz_ligar(ligar):
-    """Chat aberto: deixa a voz carregada (a 1ª leitura já sai rápida); fechado: libera a memória."""
+    """Chat aberto: aquece o motor (aquecer) e deixa a voz carregada (a 1ª leitura já sai rápida); fechado: libera a
+    memória. No PC leve (núcleo de hardware) a voz NÃO fica carregada: carrega só no Ouvir — vários GB a menos na RAM de 8 GB."""
     from Functions import omnivoice_tool as ov
     if ligar:
-        threading.Thread(target=lambda: _tenta(ov.manter_carregado), daemon=True).start()
+        threading.Thread(target=aquecer, daemon=True).start()
+        if not _pc_leve():
+            threading.Thread(target=lambda: _tenta(ov.manter_carregado), daemon=True).start()
     else:
         ov.descarregar()
     return {"success": True}
+
+
+def _ia_na_placa():
+    try:
+        from Functions import hardware
+        return hardware.plano()["ia_na_placa"]
+    except Exception:
+        return True
+
+
+def _pc_leve():
+    try:
+        from Functions import hardware
+        return hardware.plano()["efetivo"] == "leve"
+    except Exception:
+        return False
+
+
+def aquecer(ferramenta=None):
+    """Gaveta aberta: sobe o llama.cpp e manda ele LER a parte fixa do sistema (regras, barra, ferramentas: ~2.000 dos
+    ~2.500 tokens) enquanto a pessoa digita. O llama-server guarda essa leitura (cache do prompt, um slot só) e a 1ª
+    pergunta paga só os trechos e a pergunta. Sem placa (4 threads) a leitura fixa custava ~65 s antes da 1ª palavra.
+    Só com o motor e o modelo já baixados; no Ollama não faz nada (ele já fica carregado)."""
+    try:
+        if _ollama_tem() or not (os.path.isfile(_exe()) and os.path.isfile(_gguf())) or _srv.get("ocupado"):
+            return
+        _subir()
+        _srv["ocupado"] = True
+        corpo = {"messages": [{"role": "system", "content": _sistema("", ferramenta)}, {"role": "user", "content": "oi"}],
+                 "max_tokens": 1, "temperature": 0, "chat_template_kwargs": {"enable_thinking": False}}
+        req = urllib.request.Request(f"http://127.0.0.1:{_srv['porta']}/v1/chat/completions", data=json.dumps(corpo).encode(),
+                                     headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=600).read()
+    except Exception as e:
+        print(f"[kani] aquecer: {e}")
+    finally:
+        if _srv.get("ocupado") and _srv.get("proc"):
+            _srv["ocupado"] = False
+            _srv["uso"] = time.time()
+            _marcar_uso()
 
 
 def _tenta(f):

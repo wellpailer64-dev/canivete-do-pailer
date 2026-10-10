@@ -117,6 +117,18 @@ def tem_pessoa(rgb):
     return rostos is not None and any(r[2] >= lado * 0.06 for r in rostos)   # rosto pequeno no fundo não conta
 
 
+def cabe_matting():
+    """O BiRefNet-matting (1024² fixo) pede ~6,4 GB de RAM no processador (medido 2026-10-10; com a reserva padrão do
+    onnxruntime, 8,8 GB) — num PC de 8 GB ele estourava. Vai se a placa dedicada tiver ≥ 6 GB ou o PC ≥ 15 GB de RAM;
+    senão a pessoa sai pelo BEN2 (cabelo menos fino, mas cabe: ~18 s no processador de 4 threads)."""
+    try:
+        from Functions import hardware
+        hw, p = hardware.detectar(), hardware.placa()
+        return hw["ram_gb"] >= 15 or bool(p and not p["integrada"] and p["vram_gb"] >= 6)
+    except Exception:
+        return True
+
+
 def recortar(rgb, tipo=None):
     """rgb (H×W×3 uint8) → (cores H×W×3 sem o fundo misturado, alfa H×W uint8).
     tipo: "pessoa" | "objeto" | None (decide pelo rosto). Comparado em 2026-10-06 (D:/kanivete_testes/recorte2):
@@ -124,6 +136,9 @@ def recortar(rgb, tipo=None):
     placa e não mudava o resultado no zoom); objeto → BEN2 sozinho (sólido e limpo; o matting deixava vidro/óleo
     transparentes e o miolo antigo manchava o gargalo). GPU: pessoa ~6 s (1ª vez +16 s de carga), objeto ~1 s."""
     tipo = tipo or ("pessoa" if tem_pessoa(rgb) else "objeto")
+    if tipo == "pessoa" and not cabe_matting():
+        print("[recorte] PC com pouca memória: pessoa pelo BEN2 (o matting pede ~6,5 GB)")
+        tipo = "objeto"
     if tipo == "pessoa":
         a = _alfa_cheio(rgb, _alfa_modelo(rgb, "birefnet-matting"))
     else:
