@@ -138,7 +138,7 @@ const VE_FX = {
             { k: 'matte', nome: 'Mostrar matte (só na prévia)', tipo: 'bool', def: 0 },
         ],
         neutro: () => false,
-        draw: (a, v, env) => veKeyDraw(a, v, env),
+        draw: (a, v, env) => veKeyDrawGL(a, v, env) || veKeyDraw(a, v, env),
         exportar: v => {
             const k = veKeyCalc(v), e = k.eq, c = 1 - e;
             // coeficientes do colorchannelmixer para o alfa (aa = 0,5 com o alfa de entrada 255 = constante)
@@ -526,6 +526,186 @@ function veKeyDraw(a, v, env) {
     out.ctx.drawImage(mask, 0, 0);
     out.ctx.globalCompositeOperation = 'source-over';
     return out;
+}
+
+// ── Chroma Key na placa de vídeo (WebGL2) ──
+// Os mesmos passos e as mesmas contas do veKeyDraw (que fica como reserva sem WebGL2), mas por shader: no processador,
+// "Encolher" (veKeyMorf) e a leitura do quadro (getImageData) comiam 3,3 de 4,5 s de play num trecho com chroma key
+// (Respeite o seu voto, 2026-10-10). Linhas das texturas = linhas da imagem (0 = topo); só a saída final desvira.
+// Suavizar = gaussiano de verdade com sigma = px (como o gblur da exportação; o CSS blur do processador era aproximado).
+const VE_KEY_VS = `#version 300 es
+in vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }`;
+const VE_KEY_FS_MATTE = `#version 300 es
+precision highp float;
+uniform sampler2D src; uniform sampler2D lut; uniform bool azul; uniform float eq, amt;
+out vec4 o;
+void main() {
+    vec4 c = texelFetch(src, ivec2(gl_FragCoord.xy), 0) * 255.0;
+    float ceq = 1.0 - eq;
+    float bruto = azul ? 0.5 * eq * c.r + 0.5 * ceq * c.g - 0.5 * c.b + 127.5 : 0.5 * eq * c.r - 0.5 * c.g + 0.5 * ceq * c.b + 127.5;
+    float l = texelFetch(lut, ivec2(int(clamp(floor(bruto + 0.5), 0.0, 255.0)), 0), 0).r * 255.0;
+    float al = c.a == 0.0 ? 0.0 : floor(l * c.a / 255.0 + 0.5);
+    vec3 rgb = c.rgb;
+    if (amt > 0.0) {
+        if (azul) { float s = c.b - (c.r * eq + c.g * ceq); if (s > 0.0) rgb.b = c.b - amt * s; }
+        else { float s = c.g - (c.r * eq + c.b * ceq); if (s > 0.0) rgb.g = c.g - amt * s; }
+    }
+    o = vec4(rgb, al) / 255.0;
+}`;
+// mínimo (encolher) / máximo (expandir) 3×1 no alfa, na direção dir; as cores passam iguais
+const VE_KEY_FS_MORF = `#version 300 es
+precision highp float;
+uniform sampler2D src; uniform ivec2 dir; uniform bool minimo; uniform ivec2 tam;
+out vec4 o;
+void main() {
+    ivec2 q = ivec2(gl_FragCoord.xy);
+    vec4 c = texelFetch(src, q, 0);
+    float a = texelFetch(src, clamp(q - dir, ivec2(0), tam - 1), 0).a, b = texelFetch(src, clamp(q + dir, ivec2(0), tam - 1), 0).a;
+    o = vec4(c.rgb, minimo ? min(c.a, min(a, b)) : max(c.a, max(a, b)));
+}`;
+// gaussiano separável só no alfa (as bordas repetem o último pixel)
+const VE_KEY_FS_BLUR = `#version 300 es
+precision highp float;
+uniform sampler2D src; uniform ivec2 dir; uniform float sig; uniform int R; uniform ivec2 tam;
+out vec4 o;
+void main() {
+    ivec2 q = ivec2(gl_FragCoord.xy);
+    vec4 c = texelFetch(src, q, 0);
+    float s = 0.0, wt = 0.0;
+    for (int i = -R; i <= R; i++) {
+        float g = exp(-float(i * i) / (2.0 * sig * sig));
+        s += g * texelFetch(src, clamp(q + dir * i, ivec2(0), tam - 1), 0).a; wt += g;
+    }
+    o = vec4(c.rgb, s / wt);
+}`;
+// saída no canvas (desvira: linha 0 da textura = topo da imagem); matte = branco no preto
+const VE_KEY_FS_OUT = `#version 300 es
+precision highp float;
+uniform sampler2D src; uniform bool matte; uniform ivec2 tam;
+out vec4 o;
+void main() {
+    ivec2 q = ivec2(gl_FragCoord.xy); q.y = tam.y - 1 - q.y;
+    vec4 c = texelFetch(src, q, 0);
+    o = matte ? vec4(vec3(c.a), 1.0) : c;
+}`;
+const VEKEYGL = { gl: null, falhou: false };
+function veKeyGl() {
+    if (VEKEYGL.gl || VEKEYGL.falhou) return VEKEYGL.gl;
+    try {
+        const cv = document.createElement('canvas');
+        const gl = cv.getContext('webgl2', { premultipliedAlpha: false, preserveDrawingBuffer: true, antialias: false, alpha: true });
+        if (!gl) throw new Error('sem WebGL2');
+        const sh = (t, s) => { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; };
+        const vs = sh(gl.VERTEX_SHADER, VE_KEY_VS);
+        const prog = (fs, nomes) => {
+            const pr = gl.createProgram();
+            gl.attachShader(pr, vs); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs));
+            gl.bindAttribLocation(pr, 0, 'p'); gl.linkProgram(pr);
+            if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
+            const u = {}; nomes.forEach(n => { u[n] = gl.getUniformLocation(pr, n); });
+            return { pr, u };
+        };
+        const tex = () => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); return t; };
+        const buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        Object.assign(VEKEYGL, {
+            cv, gl, w: 0, h: 0, lutKey: '',
+            P: { matte: prog(VE_KEY_FS_MATTE, ['src', 'lut', 'azul', 'eq', 'amt']), morf: prog(VE_KEY_FS_MORF, ['src', 'dir', 'minimo', 'tam']),
+                 blur: prog(VE_KEY_FS_BLUR, ['src', 'dir', 'sig', 'R', 'tam']), out: prog(VE_KEY_FS_OUT, ['src', 'matte', 'tam']) },
+            src: tex(), lut: tex(), T: [tex(), tex()], F: [gl.createFramebuffer(), gl.createFramebuffer()],
+        });
+        return gl;
+    } catch (e) {
+        console.warn('[chroma key] sem placa (WebGL2), fica no processador:', e && e.message);
+        VEKEYGL.falhou = true;
+        return null;
+    }
+}
+// null = não deu na placa (o chamador usa veKeyDraw no processador)
+function veKeyDrawGL(a, v, env) {
+    if (VEKEY.forcarCPU) return null;
+    const gl = veKeyGl();
+    if (!gl) return null;
+    const G = VEKEYGL, k = veKeyCalc(v), { w, h } = env;
+    try {
+        if (G.w !== w || G.h !== h) {
+            G.cv.width = w; G.cv.height = h; G.w = w; G.h = h;
+            G.T.forEach((t, i) => {
+                gl.bindTexture(gl.TEXTURE_2D, t);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+                gl.bindFramebuffer(gl.FRAMEBUFFER, G.F[i]);
+                gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+            });
+        }
+        gl.viewport(0, 0, w, h);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);   // cores "retas", como o getImageData do processador
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, G.src);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, a.cv);
+        const lk = Array.from(k.lut).join(',');
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, G.lut);
+        if (G.lutKey !== lk) {
+            gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 256, 1, 0, gl.RED, gl.UNSIGNED_BYTE, k.lut);
+            G.lutKey = lk;
+        }
+        let atual = 0;
+        const passo = (prog, ler, ajustar) => {   // desenha numa das texturas T (a outra é a leitura)
+            gl.bindFramebuffer(gl.FRAMEBUFFER, G.F[atual]);
+            gl.useProgram(prog.pr);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, ler);
+            gl.uniform1i(prog.u.src, 0);
+            ajustar(prog.u);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            const feito = G.T[atual];
+            atual = 1 - atual;
+            return feito;
+        };
+        // 1) matte + reflexo
+        let t = passo(G.P.matte, G.src, u => { gl.uniform1i(u.lut, 1); gl.uniform1i(u.azul, k.azul ? 1 : 0); gl.uniform1f(u.eq, k.eq); gl.uniform1f(u.amt, k.spill); });
+        // 2) encolher / expandir: n vezes, horizontal e vertical
+        const ch = Math.round(k.choke * env.q);
+        for (let i = 0; i < Math.abs(ch); i++) {
+            for (const dir of [[1, 0], [0, 1]]) {
+                t = passo(G.P.morf, t, u => { gl.uniform2i(u.dir, dir[0], dir[1]); gl.uniform1i(u.minimo, ch > 0 ? 1 : 0); gl.uniform2i(u.tam, w, h); });
+            }
+        }
+        // 3) suavizar a borda
+        const sp = k.suave * env.q;
+        if (sp >= 0.05) {
+            const R = Math.min(64, Math.ceil(sp * 3));
+            for (const dir of [[1, 0], [0, 1]]) {
+                t = passo(G.P.blur, t, u => { gl.uniform2i(u.dir, dir[0], dir[1]); gl.uniform1f(u.sig, sp); gl.uniform1i(u.R, R); gl.uniform2i(u.tam, w, h); });
+            }
+        }
+        // 4) no canvas da placa e de lá para o canvas do efeito
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.useProgram(G.P.out.pr);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, t);
+        gl.uniform1i(G.P.out.u.src, 0);
+        gl.uniform1i(G.P.out.u.matte, v.matte ? 1 : 0);
+        gl.uniform2i(G.P.out.u.tam, w, h);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        const out = veFxOther(a, w, h);
+        out.ctx.globalCompositeOperation = 'source-over';
+        out.ctx.clearRect(0, 0, w, h);
+        out.ctx.drawImage(G.cv, 0, 0);
+        return out;
+    } catch (e) {
+        console.warn('[chroma key] erro na placa, volta ao processador:', e && e.message);
+        VEKEYGL.falhou = true;
+        return null;
+    }
 }
 
 const VEFX = { pool: [], collapsed: new Set(), key: '', drag: null };

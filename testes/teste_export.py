@@ -72,6 +72,10 @@ def gerar_material(pasta, com_4k):
     if not os.path.isfile(vid("b.mp4")):
         _roda([ff, "-v", "error", "-y", "-f", "lavfi", "-i", "mandelbrot=s=1080x1920:r=30,trim=duration=5", "-f", "lavfi",
                "-i", "sine=f=660:d=5", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15", "-c:a", "aac", "-shortest", vid("b.mp4")])
+    if not os.path.isfile(vid("verde.mp4")):   # tela verde com um objeto colorido se mexendo (chroma key)
+        _roda([ff, "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=0x00b140:s=1080x1920:r=30:d=5", "-f", "lavfi",
+               "-i", "testsrc=s=480x480:r=30:d=5", "-filter_complex", "[0][1]overlay=x='300+150*sin(2*t)':y=720:shortest=1",
+               "-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", "15", vid("verde.mp4")])
     if not os.path.isfile(vid("c.mp4")):   # horizontal, para o PiP
         _roda([ff, "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=s=1920x1080:r=30:d=5", "-c:v", "libx264",
                "-pix_fmt", "yuv420p", "-g", "15", vid("c.mp4")])
@@ -335,6 +339,13 @@ CASOS = {
         const tx = { tr: 3, st: 0, s: 0, e: 2, m: tm.id, tx: { ...VE_TX_PADRAO, t: 'SOMBRA', tam: 140, sOn: true, sCor: '#102030', sOp: 80, sDist: 14, sBlur: 12, sAng: 60 } };
         tx.p = Object.assign(veDefProps(tx), { sc: 100, x: W / 2, y: 300 });
         return [clip(0, 0, 0, 2, 'b.mp4'), f, logo, tx];
+    """, ""),
+    # chroma key (na prévia roda na placa, WebGL2: editor-fx.js veKeyDrawGL; na exportação, ffmpeg): encolher e suavizar
+    "chroma": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const k = clip(1, 0, 0, 3, 'verde.mp4', { fx: [{ id: id(), t: 'key', on: true,
+            v: { cor: '#00b140', ganho: 100, bal: 50, preto: 0, branco: 100, encolher: 2, suave: 3, spill: 100, matte: 0 } }] });
+        return [clip(0, 0, 0, 3, 'b.mp4'), k];
     """, ""),
     # sobreposições: zoom para dentro, giro, lente e flare
     "sobreposicao": (1080, 1920, """
@@ -614,7 +625,7 @@ def main():
                 time.sleep(1)
                 pg.evaluate("p => veOpenPath(p)", principal)
                 pg.wait_for_function("VE.ready && VE.clips.length > 0 && $ve('ve-loading').hidden", timeout=120000)
-            faltam = [f for f in ["b.mp4", "c.mp4", "logo.png", "sinc.mp4"] + [f"foto{i + 1}.jpg" for i in range(8)] + (["k.mp4"] if "4k" in nomes else [])
+            faltam = [f for f in ["b.mp4", "c.mp4", "verde.mp4", "logo.png", "sinc.mp4"] + [f"foto{i + 1}.jpg" for i in range(8)] + (["k.mp4"] if "4k" in nomes else [])
                       if not pg.evaluate("n => VE.media.some(m => m && (m.path || '').replace(/\\\\/g, '/').endsWith('/' + n))", f)]
             if faltam:
                 pg.evaluate("async (l) => { await vePjImportar(l.map(p => ({path: p}))); }", [os.path.join(mat, f) for f in faltam])
