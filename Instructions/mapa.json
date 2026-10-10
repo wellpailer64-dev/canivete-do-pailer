@@ -37,6 +37,7 @@
     "editor-render.js",
     "editor-reverse.js",
     "editor-scopes.js",
+    "editor-sfx-gerar.js",
     "editor-soundboard.js",
     "editor-texto.js",
     "editor-trans.js",
@@ -91,6 +92,10 @@
     "anti_noise_preparar",
     "ve_sb_estado",
     "ve_sb_baixar",
+    "ve_sfx_estado",
+    "ve_sfx_baixar",
+    "ve_sfx_gerar",
+    "ve_sfx_liberar",
     "ve_sb_abrir_pasta",
     "ve_render_listar",
     "ve_render_trecho",
@@ -930,6 +935,30 @@
    "args": "",
    "modulos": [
     "soundboard"
+   ]
+  },
+  "ve_sfx_estado": {
+   "args": "",
+   "modulos": [
+    "gerador_sfx"
+   ]
+  },
+  "ve_sfx_baixar": {
+   "args": "",
+   "modulos": [
+    "gerador_sfx"
+   ]
+  },
+  "ve_sfx_gerar": {
+   "args": "texto, segundos=5",
+   "modulos": [
+    "gerador_sfx"
+   ]
+  },
+  "ve_sfx_liberar": {
+   "args": "",
+   "modulos": [
+    "gerador_sfx"
    ]
   },
   "ve_sb_abrir_pasta": {
@@ -2286,6 +2315,7 @@
   "Functions/fontes.py": "fontes.py — famílias de fonte instaladas no Windows e os estilos de cada uma (Light, Regular, Semibold,",
   "Functions/gdrive_dumper.py": "gdrive_dumper.py — Módulo do GDRIVE DUMPER para o Canivete do Pailer",
   "Functions/gerador_imagem.py": "gerador_imagem.py — Gerar imagem com IA no Photo Kanivete (texto → imagem e edição com imagens de referência)",
+  "Functions/gerador_sfx.py": "Gerar efeitos sonoros por texto (EzAudio XL, licença MIT; OpenSound/EzAudio) — local, sem torch, sem login",
   "Functions/instancia_unica.py": "instancia_unica.py — Uma cópia só do app aberta",
   "Functions/kani.py": "Kani — assistente de conversa do KANIVETE (tipo ChatGPT, local e offline), para tarefas do dia a dia e,",
   "Functions/legendas.py": "legendas.py — transcrição da timeline do Pocket Editor (painel Texto: Transcrever / Criar legendas)",
@@ -2370,6 +2400,7 @@
   "teste_psd_refs": "PSD salvo por cima (ida e volta) não pode trocar pixels entre camadas (2026-10-06: o carrossel do cliente voltou com",
   "teste_psd_so": "Objeto inteligente criado no Photo Kanivete → objeto inteligente INCORPORADO no PSD (Functions/editor_imagem._so_novo)",
   "teste_psd_texto": "Texto criado no Photo Kanivete → camada de texto EDITÁVEL no PSD (Functions/editor_imagem._texto_novo)",
+  "teste_sfx": "Gerador de efeitos sonoros (Functions/gerador_sfx.py): agendador DDIM igual ao do diffusers e uma geração curta",
   "teste_som": "Sound Kanivete (som.js + Functions/sound_kanivete.py) — app em --agente=9333, mouse de verdade",
   "teste_vetor": "Teste do Vetor Kanivete pela API real (app em --agente=9333): monta um cartão de visita pelos comandos (window.VKN),",
   "teste_vetor_editor3d": "Teste da ponte Vetor → Editor (Cena 3D), app em --agente=9333: copo (girar) com rótulo coral, caixa (extrudar com",

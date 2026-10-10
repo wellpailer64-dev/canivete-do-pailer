@@ -186,6 +186,15 @@ Painéis móveis do Vetor (mecanismo do Photo): §16, `frontend/js/vetor-dock.js
   `_internal/`, `version.txt` e `LEIA-ME.txt` para `dist/CaniveteDoPailer/`.
 - Push na `main` dispara o release automático (GitHub Actions + updater dos amigos).
 
+## Gerar efeito sonoro por texto (IA local)
+Caixa "Gerar efeito (IA)" no topo do Soundboard (`frontend/js/editor-sfx-gerar.js`) → `Functions/gerador_sfx.py`: EzAudio XL
+(MIT) + encoder flan-t5-xl (Apache 2.0) convertidos para ONNX 16 bits, rodando no onnxruntime-DirectML (sem torch, sem login).
+Modelo (~4 GB) baixado no 1º uso do release `sfx-v1` (pré-lançamento; manifesto com SHA-256, t5.pesos em 2 partes).
+Texto do leitor no PROCESSADOR, gerador/decodificador na placa (recriar sessão DirectML com outra aberta derruba o
+processo). 50 passos (padrão; o Pailer achou "muito melhor" que 25) ≈ 35 s por 10 s numa RTX 3050, pico +4,7 GB.
+Pedido em PT traduzido pelo Ollama (modelo do Kani, keep_alive 0) se houver. Conversão: `D:\kanivete_testes\sfx\ez`
+(exportar.py, enxugar.py, consertar.py). Teste: `py -3.13 testes/teste_sfx.py [pasta]`.
+
 ## Soundboard (pack de sons do editor)
 - Não vai no build: o painel baixa `soundboard-vN.zip` do release `soundboard-vN` (pré-release, para não virar
   o "latest" do updater) e instala em `<app>/soundboard/`. Só sons CC0 (Kenney, Freesound filtrado por CC0).

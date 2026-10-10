@@ -3100,6 +3100,24 @@ class ApiBridge:
         from Functions import soundboard
         return soundboard.baixar(lambda d: _ve_emit("veSbProgresso", d))
 
+    # Gerar efeito sonoro por texto (EzAudio em ONNX, Functions/gerador_sfx.py; modelo baixado no 1º uso)
+    def ve_sfx_estado(self):
+        from Functions import gerador_sfx
+        return gerador_sfx.estado()
+
+    def ve_sfx_baixar(self):
+        from Functions import gerador_sfx
+        return gerador_sfx.baixar(lambda d: _ve_emit("veSfxBaixarProgresso", d))
+
+    def ve_sfx_gerar(self, texto, segundos=5):
+        from Functions import gerador_sfx
+        return gerador_sfx.gerar_arquivo(texto, segundos, lambda d: _ve_emit("veSfxProgresso", d))
+
+    def ve_sfx_liberar(self):
+        from Functions import gerador_sfx
+        gerador_sfx.liberar()
+        return {"success": True}
+
     def ve_sb_abrir_pasta(self):
         from Functions import soundboard
         _abrir_pasta(soundboard.pasta())

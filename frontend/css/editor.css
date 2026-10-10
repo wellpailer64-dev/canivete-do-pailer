@@ -2323,3 +2323,20 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-mix-ed-p input[type=text] { width: 70px; justify-self: end; margin-top: -2px; padding: 1px 4px; border: 1px solid #c4c4c8; border-radius: 3px; text-align: right; }
 .ve-mix-ed-p i { justify-self: end; font-size: 10px; color: #6b6b72; font-style: normal; }
 .ve-mix-ed-bool { display: block; margin-bottom: 4px; }
+/* Gerar efeito sonoro por texto (editor-sfx-gerar.js) */
+.ve-sfx { padding: 6px 8px 0; }
+.ve-sfx-caixa { border: 1px solid var(--ve-line); border-radius: 6px; background: rgba(212, 129, 74, .06); }
+.ve-sfx-caixa > summary { cursor: pointer; padding: 6px 8px; font-size: 12px; font-weight: 600; color: var(--ve-text); }
+.ve-sfx-corpo { display: flex; flex-direction: column; gap: 6px; padding: 0 8px 8px; }
+.ve-sfx-corpo small { color: var(--ve-dim); font-size: 11px; }
+.ve-sfx-corpo input[type=text] { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 4px; border: 1px solid var(--ve-line-2);
+    background: var(--ve-panel-2); color: var(--ve-text); font: inherit; font-size: 12px; }
+.ve-sfx-linha { display: flex; gap: 6px; align-items: center; }
+.ve-sfx-linha select { flex: 0 0 auto; background: var(--ve-panel-2); color: var(--ve-text); border: 1px solid var(--ve-line-2); border-radius: 4px; padding: 3px; }
+.ve-sfx-linha button { flex: 1; }
+.ve-sfx-barra { height: 4px; border-radius: 2px; background: var(--ve-panel-2); overflow: hidden; }
+.ve-sfx-barra i { display: block; height: 100%; background: #D4814A; transition: width .2s; }
+.ve-sfx-msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ve-sfx-ex { display: flex; flex-wrap: wrap; gap: 4px; }
+.ve-sfx-ex button { border: 1px solid var(--ve-line-2); background: none; color: var(--ve-dim); border-radius: 10px; padding: 1px 8px; font-size: 10px; cursor: pointer; }
+.ve-sfx-ex button:hover { color: var(--ve-text); border-color: #D4814A; }
