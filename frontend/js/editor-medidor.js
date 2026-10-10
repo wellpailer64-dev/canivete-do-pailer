@@ -83,15 +83,29 @@ function veMedQuadro() {
 
 function veMedDesenhar() {
     const cv = $ve('ve-med-cv');
-    if (!cv || !cv.offsetParent) return;
+    const tm = veTam(cv, veMedAgendar);   // sem ler clientWidth/offsetParent a cada quadro (refazia o layout: 18% do play)
+    if (!cv || !tm.w || !tm.h) return;
     const dpr = (cv.ownerDocument.defaultView || window).devicePixelRatio || 1;
-    const W = Math.max(1, Math.round(cv.clientWidth * dpr)), H = Math.max(1, Math.round(cv.clientHeight * dpr));
+    const W = Math.max(1, Math.round(tm.w * dpr)), H = Math.max(1, Math.round(tm.h * dpr));
     if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
     const x = cv.getContext('2d');
+    const w = W / dpr, h = H / dpr, desenha = w >= h * 1.4 ? veMedHorizontal : veMedVertical;
+    // fundo (escala, números, L/R, trilhos) só muda com o tamanho: desenhado uma vez numa imagem guardada; a cada
+    // quadro só cola a imagem e desenha as barras (antes ~20 textos + gradiente novo por quadro: 10% do play)
+    const chave = `${W}x${H}:${dpr}:${desenha.name}:${veMasterLim() ? 1 : 0}`;
+    if (VEMED.fundoChave !== chave || VEMED.fundoX !== x) {
+        const f = cv.ownerDocument.createElement('canvas');
+        f.width = W; f.height = H;
+        const fx = f.getContext('2d');
+        fx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        desenha(fx, w, h, true);
+        VEMED.fundo = f; VEMED.fundoChave = chave; VEMED.fundoX = x; VEMED.grad = null;
+    }
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    x.clearRect(0, 0, W, H);
+    x.drawImage(VEMED.fundo, 0, 0);
     x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const w = W / dpr, h = H / dpr;
-    x.clearRect(0, 0, w, h);
-    if (w >= h * 1.4) veMedHorizontal(x, w, h); else veMedVertical(x, w, h);
+    desenha(x, w, h, false);
 }
 
 // cor da barra: verde até −12, amarelo até −3, vermelho acima
@@ -106,12 +120,32 @@ function veMedGradiente(x, x0, y0, x1, y1) {
     return g;
 }
 
-function veMedVertical(x, w, h) {
+// fundo = true: só a parte fixa (vai para a imagem guardada); false: só o que se mexe (barras, picos, luzes)
+function veMedVertical(x, w, h, fundo) {
     const topo = 14, base = 14, esc = w >= 44 ? 22 : 0;
     const hb = Math.max(10, h - topo - base), largura = Math.max(4, Math.min(14, (w - esc - 8) / 2));
     const x0 = esc + Math.max(2, (w - esc - largura * 2 - 3) / 2), xs = [x0, x0 + largura + 3];
     const yDe = db => topo + hb * (1 - (db - VE_MED_MIN) / -VE_MED_MIN);
-    const grad = veMedGradiente(x, 0, topo + hb, 0, topo);
+    if (!fundo) {
+        const grad = VEMED.grad || (VEMED.grad = veMedGradiente(x, 0, topo + hb, 0, topo));
+        for (let c = 0; c < 2; c++) {
+            const xb = xs[c], y = yDe(VEMED.nivel[c]);
+            if (VEMED.nivel[c] > VE_MED_MIN) { x.fillStyle = grad; x.fillRect(xb, y, largura, topo + hb - y); }
+            if (VEMED.pico[c] > VE_MED_MIN) {
+                x.fillStyle = VEMED.pico[c] > -3 ? '#f87171' : VEMED.pico[c] > -12 ? '#fde047' : '#86efac';
+                x.fillRect(xb, Math.round(yDe(VEMED.pico[c])), largura, 2);
+            }
+            // luz de estouro (apagada fica no fundo)
+            if (VEMED.clip[c]) { x.fillStyle = '#ef4444'; x.shadowColor = '#ef4444'; x.shadowBlur = 8; x.fillRect(xb, 2, largura, 8); x.shadowBlur = 0; }
+        }
+        // Hard Limiter no Master: barra laranja de cima para baixo = quanto ele está abaixando agora
+        if (veMasterLim() && VEMED.reducao > 0.05) {
+            const xg = xs[1] + largura + 3, lg = Math.max(3, Math.min(6, largura / 2));
+            x.fillStyle = '#D4814A';
+            x.fillRect(xg, topo, lg, Math.min(hb, hb * VEMED.reducao / -VE_MED_MIN));
+        }
+        return;
+    }
     x.font = '9px ui-monospace, Consolas, monospace';
     x.textBaseline = 'middle';
     // escala
@@ -130,16 +164,8 @@ function veMedVertical(x, w, h) {
         const xb = xs[c];
         x.fillStyle = '#0d0d0f';
         x.fillRect(xb, topo, largura, hb);
-        const y = yDe(VEMED.nivel[c]);
-        if (VEMED.nivel[c] > VE_MED_MIN) { x.fillStyle = grad; x.fillRect(xb, y, largura, topo + hb - y); }
-        if (VEMED.pico[c] > VE_MED_MIN) {
-            x.fillStyle = VEMED.pico[c] > -3 ? '#f87171' : VEMED.pico[c] > -12 ? '#fde047' : '#86efac';
-            x.fillRect(xb, Math.round(yDe(VEMED.pico[c])), largura, 2);
-        }
-        // luz de estouro
-        x.fillStyle = VEMED.clip[c] ? '#ef4444' : '#2a1414';
+        x.fillStyle = '#2a1414';   // luz de estouro apagada
         x.fillRect(xb, 2, largura, 8);
-        if (VEMED.clip[c]) { x.shadowColor = '#ef4444'; x.shadowBlur = 8; x.fillRect(xb, 2, largura, 8); x.shadowBlur = 0; }
         x.fillStyle = 'rgba(255,255,255,.55)';
         x.textAlign = 'center';
         x.fillText(c ? 'R' : 'L', xb + largura / 2, h - base / 2);
@@ -149,24 +175,30 @@ function veMedVertical(x, w, h) {
         x.textAlign = 'right';
         x.fillText('dB', esc - 3, h - base / 2);
     }
-    // Hard Limiter no Master: barra laranja de cima para baixo = quanto ele está abaixando agora
-    if (veMasterLim()) {
-        const xg = xs[1] + largura + 3, lg = Math.max(3, Math.min(6, largura / 2));
+    if (veMasterLim()) {   // trilho da barra do Hard Limiter
         x.fillStyle = '#1c130a';
-        x.fillRect(xg, topo, lg, hb);
-        if (VEMED.reducao > 0.05) {
-            x.fillStyle = '#D4814A';
-            x.fillRect(xg, topo, lg, Math.min(hb, hb * VEMED.reducao / -VE_MED_MIN));
-        }
+        x.fillRect(xs[1] + largura + 3, topo, Math.max(3, Math.min(6, largura / 2)), hb);
     }
 }
 
-function veMedHorizontal(x, w, h) {
+function veMedHorizontal(x, w, h, fundo) {
     const esq = 14, dir = 14, esc = h >= 40 ? 12 : 0;
     const wb = Math.max(10, w - esq - dir), altura = Math.max(4, Math.min(12, (h - esc - 6) / 2));
     const ys = [2, 2 + altura + 3];
     const xDe = db => esq + wb * ((db - VE_MED_MIN) / -VE_MED_MIN);
-    const grad = veMedGradiente(x, esq, 0, esq + wb, 0);
+    if (!fundo) {
+        const grad = VEMED.grad || (VEMED.grad = veMedGradiente(x, esq, 0, esq + wb, 0));
+        for (let c = 0; c < 2; c++) {
+            const yb = ys[c], xx = xDe(VEMED.nivel[c]);
+            if (VEMED.nivel[c] > VE_MED_MIN) { x.fillStyle = grad; x.fillRect(esq, yb, xx - esq, altura); }
+            if (VEMED.pico[c] > VE_MED_MIN) {
+                x.fillStyle = VEMED.pico[c] > -3 ? '#f87171' : VEMED.pico[c] > -12 ? '#fde047' : '#86efac';
+                x.fillRect(Math.round(xDe(VEMED.pico[c])) - 1, yb, 2, altura);
+            }
+            if (VEMED.clip[c]) { x.fillStyle = '#ef4444'; x.fillRect(w - dir + 3, yb, 8, altura); }
+        }
+        return;
+    }
     x.font = '9px ui-monospace, Consolas, monospace';
     x.textBaseline = 'middle';
     const passoDb = wb > 500 ? 3 : wb > 260 ? 6 : 12;
@@ -180,13 +212,7 @@ function veMedHorizontal(x, w, h) {
         const yb = ys[c];
         x.fillStyle = '#0d0d0f';
         x.fillRect(esq, yb, wb, altura);
-        const xx = xDe(VEMED.nivel[c]);
-        if (VEMED.nivel[c] > VE_MED_MIN) { x.fillStyle = grad; x.fillRect(esq, yb, xx - esq, altura); }
-        if (VEMED.pico[c] > VE_MED_MIN) {
-            x.fillStyle = VEMED.pico[c] > -3 ? '#f87171' : VEMED.pico[c] > -12 ? '#fde047' : '#86efac';
-            x.fillRect(Math.round(xDe(VEMED.pico[c])) - 1, yb, 2, altura);
-        }
-        x.fillStyle = VEMED.clip[c] ? '#ef4444' : '#2a1414';
+        x.fillStyle = '#2a1414';   // luz de estouro apagada
         x.fillRect(w - dir + 3, yb, 8, altura);
         x.fillStyle = 'rgba(255,255,255,.55)';
         x.textAlign = 'center';

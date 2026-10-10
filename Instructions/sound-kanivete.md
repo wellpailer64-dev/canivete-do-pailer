@@ -193,6 +193,14 @@ pula), roda do mouse sobre a régua ou a barra anda para os lados (Shift+roda ta
 projeto (`skLimitarX`) e o teclado traz a agulha para a vista (`skMostrarAgulha`).
 
 ## Pendências
+**REMIX DE MÚSICA (pedido do Pailer, 2026-10-09)** — esticar/encurtar uma trilha arrastando a ponta do clipe, como o
+"Remix" do Premiere (Editor e Sk). Base já provada: loop sem emenda do repique (D:\kanivete_testes\scripts\loop_ritmo.py:
+envelope de ataques → período do tempo por autocorrelação; testar células de 1–4 compassos comparando o desenho dos
+ataques suavizado ~10 ms no começo × depois do fim; corte num ataque, crossfade 15 ms potência constante; conferir
+salto de amplitude na emenda < p99 do áudio). Falta: (1) motor `Functions/remix.py` p/ música inteira — pontos de
+salto por semelhança (cromas + timbre por batida), caminho até a duração pedida preservando começo e FINAL real;
+(2) testar com a trilha da Luz e a do show (ouvir antes de construir a UI); (3) timeline: modo Remix no clipe de
+música, arrastar a ponta refaz o arquivo e mostra ondinha em cada emenda.
 Rodadas seguintes do plano profissional:
 Plano profissional A–F concluído. Próximos: compensar a latência da placa ao gravar; prévia idêntica do gate/de-esser; banco v2 com mais vozes (e as CC0 Jeff/Cadu se o usuário baixar).
 Separar voz da música (precisa de um modelo de separação; o UVR/Roformer foi testado no anti-noise), curva de volume

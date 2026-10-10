@@ -879,7 +879,9 @@ function vePjColocar(ids, drop) {
             t = st + veLen(clip); colocados++;
         } else if (m.kind === 'audio') {
             const trA = row && row.kind === 'a' ? veTrackIndex(row) : -1;
-            if (vePjAudioEm(m, st, trA)) { t = st + m.dur; colocados++; }
+            const s0 = Number.isFinite(drop && drop.srcIn) ? Math.max(0, Math.min(m.dur, drop.srcIn)) : 0;   // trecho do Source
+            const e0 = Number.isFinite(drop && drop.srcOut) ? Math.max(s0 + veFrame(), Math.min(m.dur, drop.srcOut)) : m.dur;
+            if (vePjAudioEm(m, st, trA, s0, e0)) { t = st + (e0 - s0); colocados++; }
         } else if (m.kind === 'legenda') {
             if ((VE.legendas || []).length && !veConfirmarTroca()) return;
             vePushHistory();
@@ -894,8 +896,8 @@ function vePjColocar(ids, drop) {
 }
 
 // Áudio do projeto em st: na trilha pedida se estiver livre; senão, abaixo da última trilha de áudio usada
-function vePjAudioEm(m, st, trPedida) {
-    const b = st + m.dur, novo = { m: m.id };
+function vePjAudioEm(m, st, trPedida, s0 = 0, e0 = m.dur) {
+    const b = st + (e0 - s0), novo = { m: m.id };
     const livre = k => !veTrkLocked(k) && veTrackFree(k, st, b, novo);
     let tr = trPedida >= 0 && livre(trPedida) ? trPedida : -1;
     if (tr < 0) {
@@ -906,7 +908,7 @@ function vePjAudioEm(m, st, trPedida) {
     }
     if (tr == null || tr < 0 || !livre(tr)) { veToast('Não há trilha de áudio livre nesse ponto'); return false; }
     vePushHistory();
-    const clip = { tr, st, s: 0, e: m.dur, m: m.id };
+    const clip = { tr, st, s: s0, e: e0, m: m.id };
     if (m.cor) clip.cor = m.cor;
     VE.clips.push(clip);
     VE.sel = VE.clips.indexOf(clip);
@@ -1110,7 +1112,7 @@ function vePjInit() {
             if (m && typeof ve3dEh === 'function' && ve3dEh(m)) { const c = VE.clips.find(x => veMediaOf(x) === m); if (c) { ve3dTelaAbrir(c); return; } }   // Cena 3D
             if (m && m.kind === 'cor') { veGrCorEditar(m); return; }   // duplo clique troca a cor
             if (m && veMediaOffline(m)) { vePjRelink(m.id); return; }
-            if (m && m.kind === 'video') { veSrcOpen(m.id); return; }
+            if (m && (m.kind === 'video' || m.kind === 'audio')) { veSrcOpen(m.id); return; }   // áudio: forma de onda
         }
         if (e.target.closest('.ve-pj-nome')) { vePjRenomear(k); return; }
         if (k.startsWith('b:') && row.classList.contains('ve-pj-card')) { vePjAbrirPasta(k.slice(2)); return; }
@@ -1421,7 +1423,7 @@ const VESRC = { id: null, video: null, inPt: null, outPt: null };
 
 function veSrcOpen(id) {
     const m = VE.media[id];
-    if (!m || m.kind !== 'video') return;
+    if (!m || (m.kind !== 'video' && m.kind !== 'audio')) return;
     if (veMediaOffline(m)) { vePjRelink(id); return; }
     let md = $ve('ve-source');
     if (!md) {
@@ -1432,7 +1434,7 @@ function veSrcOpen(id) {
         md.innerHTML = `<div class="ve-modal-box ve-src-box" tabindex="0">
             <div class="ve-modal-head ve-src-head"><div><span id="ve-src-title">Source</span><small id="ve-src-sub"></small></div><button class="ve-icon-btn" data-src="fechar" title="Fechar (Esc)"><svg class="i"><use href="#i-x"/></svg></button></div>
             <div class="ve-modal-body ve-src-body">
-                <div class="ve-src-screen"><video id="ve-src-video" preload="auto" playsinline></video><div class="ve-src-wait" id="ve-src-wait">Preparando prévia...</div></div>
+                <div class="ve-src-screen"><video id="ve-src-video" preload="auto" playsinline></video><canvas id="ve-src-onda" title="Clique para levar a agulha até aqui"></canvas><div class="ve-src-wait" id="ve-src-wait">Preparando prévia...</div></div>
                 <div class="ve-src-range"><span id="ve-src-cur">0:00.00</span><input type="range" id="ve-src-seek" min="0" max="1000" value="0"><span id="ve-src-dur">0:00.00</span></div>
                 <div class="ve-src-marks"><span>In <b class="ve-src-mark" id="ve-src-in">--:--</b></span><span>Out <b class="ve-src-mark" id="ve-src-out">--:--</b></span><span id="ve-src-len"></span></div>
             </div>
@@ -1474,7 +1476,26 @@ function veSrcOpen(id) {
         VESRC.video.addEventListener('pause', veSrcRender);
         VESRC.video.addEventListener('ended', veSrcRender);
         VESRC.video.addEventListener('click', veSrcTogglePlay);
+        // forma de onda (áudio): clique leva a agulha; arrastar percorre
+        const onda = md.querySelector('#ve-src-onda');
+        const irPara = e => {
+            const r = onda.getBoundingClientRect(), dur = veSrcDur();
+            if (dur) VESRC.video.currentTime = Math.max(0, Math.min(dur, (e.clientX - r.left) / r.width * dur));
+            veSrcRender();
+        };
+        onda.addEventListener('pointerdown', e => {
+            irPara(e); onda.setPointerCapture(e.pointerId);
+            const mover = ev => irPara(ev), soltar = () => { onda.removeEventListener('pointermove', mover); onda.removeEventListener('pointerup', soltar); };
+            onda.addEventListener('pointermove', mover); onda.addEventListener('pointerup', soltar);
+        });
+        new ResizeObserver(() => veSrcRender()).observe(onda);
+        // clicou fora da janela (timeline, monitor...): o teclado volta para a timeline (Espaço toca a timeline)
+        md.ownerDocument.addEventListener('pointerdown', e => {
+            const box = md.querySelector('.ve-src-box'), ativo = md.ownerDocument.activeElement;
+            if (box && !box.contains(e.target) && ativo && box.contains(ativo)) ativo.blur();
+        }, true);
     }
+    md.classList.toggle('ve-src-audio', m.kind === 'audio');
     VESRC.id = id;
     VESRC.inPt = m.srcIn ?? null;
     VESRC.outPt = m.srcOut ?? null;
@@ -1528,10 +1549,54 @@ function veSrcJanela(box) {
 function veSrcLoad() {
     const m = VE.media[VESRC.id], v = VESRC.video, wait = $ve('ve-src-wait');
     if (!m || !v) return;
+    if (m.kind === 'audio') {
+        // o m.url do áudio é o .pcm cru do motor da timeline (o <video> não toca): o Source pede a URL do arquivo
+        // original (WAV/MP3...) ao Sound Kanivete, uma vez por mídia
+        if (!m.urlOrig) {
+            wait.hidden = false;
+            const api = window.pywebview && window.pywebview.api;
+            if (api && api.sk_info && !m._urlPedida) {
+                m._urlPedida = true;
+                api.sk_info(m.path).then(r => {
+                    m._urlPedida = false;
+                    if (r && r.success) { m.urlOrig = r.url; if (VESRC.id === m.id) veSrcLoad(); }
+                    else veToast(`${vePjNome(m)}: ${(r && r.error) || 'não deu para tocar'}`);
+                }).catch(() => { m._urlPedida = false; });
+            }
+            veSrcRender();
+            return;
+        }
+        wait.hidden = true;
+        if (v.getAttribute('src') !== m.urlOrig) { v.src = m.urlOrig; v.load(); }
+        veSrcRender();
+        return;
+    }
     wait.hidden = !!m.url;
     if (m.url && v.getAttribute('src') !== m.url) { v.src = m.url; v.load(); }
-    if (!m.url && m.id) veVideoPrepararSePrecisa(m);
+    if (!m.url && m.id && m.kind === 'video') veVideoPrepararSePrecisa(m);
     veSrcRender();
+}
+
+// Forma de onda do áudio no Source: o trecho In→Out aceso, o resto apagado, a agulha em branco
+function veSrcOnda() {
+    const md = $ve('ve-source'), cv = md && md.querySelector('#ve-src-onda'), m = VE.media[VESRC.id];
+    if (!cv || !m || m.kind !== 'audio') return;
+    const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    const W = Math.max(1, Math.round(r.width * dpr)), H = Math.max(1, Math.round(r.height * dpr));
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    const ctx = cv.getContext('2d'), pk = m.peaks || [], dur = veSrcDur(), p = veSrcPayload();
+    ctx.fillStyle = '#0b0b0d'; ctx.fillRect(0, 0, W, H);
+    const xa = dur ? p.srcIn / dur * W : 0, xb = dur ? p.srcOut / dur * W : W, meio = H / 2;
+    ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(xa, 0, Math.max(1, xb - xa), H);
+    for (let x = 0; x < W; x++) {
+        const a = pk.length ? pk[Math.min(pk.length - 1, Math.floor(x / W * pk.length))] || 0 : 0;
+        const h = Math.max(1, a * (H * 0.92));
+        ctx.fillStyle = x >= xa && x <= xb ? '#4ade80' : '#2b4a36';
+        ctx.fillRect(x, meio - h / 2, 1, h);
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(0, meio, W, 1);
+    const xp = dur ? (VESRC.video.currentTime || 0) / dur * W : 0;
+    ctx.fillStyle = '#fff'; ctx.fillRect(Math.round(xp), 0, Math.max(1, Math.round(dpr)), H);
 }
 
 function veSrcClose() {
@@ -1553,7 +1618,7 @@ function veSrcPayload() {
 
 function veSrcDrop(p, drop) {
     const m = VE.media[p.id];
-    if (!m || m.kind !== 'video') return;
+    if (!m || (m.kind !== 'video' && m.kind !== 'audio')) return;
     const antes = VE.clips.length;
     vePjColocar([m.id], { ...(drop || {}), srcIn: p.srcIn, srcOut: p.srcOut, parte: p.parte });
     if (drop || VE.clips.length > antes) veSrcClose();   // arrastou para a timeline: o Source fecha sozinho
@@ -1717,7 +1782,8 @@ function veSrcRender() {
     const play = md.querySelector('#ve-src-play');
     if (play) play.textContent = VESRC.video.paused ? '▶' : '❚❚';
     const m = VE.media[VESRC.id], wait = md.querySelector('#ve-src-wait');
-    if (wait) wait.hidden = !!(m && m.url);
+    if (wait) wait.hidden = !!(m && (m.kind === 'audio' ? m.urlOrig : m.url));
+    if (m && m.kind === 'audio') veSrcOnda();
 }
 
 // Arquivos do Windows soltos em cima do painel: vão para o projeto (na pasta sob o cursor), não para a timeline

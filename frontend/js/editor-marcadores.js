@@ -1,12 +1,12 @@
 // =========================================================
 // Pocket Editor — marcadores com duração (como no Premiere) e o chip de In/Out da barra da timeline
 // Marcador: {t, cor, nome, d (duração s, opcional), desc (descrição, opcional)}. M cria/troca a cor na agulha.
-// Na régua: clique leva a agulha até ele, arrastar move, duplo clique abre o diálogo (nome, duração, descrição,
+// Na régua: clique SELECIONA (alças nas pontas; não move a agulha), arrastar move, duplo clique abre o diálogo (nome, duração, descrição,
 // cor). Com duração, o marcador vira uma barra na régua com o nome ao longo dela, e a ponta direita arrasta
 // para mudar o tamanho.
 // =========================================================
 
-const VEMK = { drag: null, cursor: false };
+const VEMK = { drag: null, cursor: false, sel: null };   // sel = o marcador selecionado (objeto): mostra as alças
 var VE_MK_H = 10;   // altura da faixa dos marcadores no topo da régua (os números da régua descem quando há marcador)
 
 // ── chip do In/Out (barra da timeline): só aparece com entrada ou saída marcada ──
@@ -30,9 +30,11 @@ function veMkAt(x, y) {
     VE.markers.forEach((m, i) => {
         const t = +m.t || 0, d = +m.d || 0, x0 = X(t), x1 = X(t + d);
         // só a faixa de cima da régua (VE_MK_H) é do marcador; o resto da régua fica para a agulha
-        if (y > VE_MK_H + 1) return;
-        if (d > 0 && Math.abs(x - x1) <= 5) { achou = { i, modo: 'fim' }; return; }
-        if (achou && achou.modo === 'fim') return;
+        if (y > VE_MK_H + 3) return;
+        const sel = VEMK.sel === m;   // selecionado: as alças das duas pontas mudam o tamanho
+        if (d > 0 && Math.abs(x - x1) <= (sel ? 7 : 5)) { achou = { i, modo: 'fim' }; return; }
+        if (sel && d > 0 && Math.abs(x - x0) <= 7) { achou = { i, modo: 'ini' }; return; }
+        if (achou && (achou.modo === 'fim' || achou.modo === 'ini')) return;
         if (Math.abs(x - x0) <= 6) achou = { i, modo: 'mover' };
         else if (!achou && d > 0 && x > x0 && x < x1) achou = { i, modo: 'mover' };
     });
@@ -56,9 +58,9 @@ function veMkDesenhar(ctx, X, W, H) {
         const t = +m.t || 0, d = +m.d || 0;
         const x = Math.round(X(t)) + 0.5, x2 = Math.round(X(t + d)) + 0.5;
         if (x2 < -12 || x > W + 12) return;
-        const cor = m.cor || veMarkerColor(i);
-        // linha nas trilhas (início e, com duração, o fim)
-        ctx.strokeStyle = veRgba(cor, 0.55);
+        const cor = m.cor || veMarkerColor(i), sel = VEMK.sel === m;
+        // linha nas trilhas (início e, com duração, o fim) — sutil, para não confundir com a agulha
+        ctx.strokeStyle = veRgba(cor, sel ? 0.45 : 0.22);
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(x, VE_RULER); ctx.lineTo(x, H);
@@ -70,8 +72,10 @@ function veMkDesenhar(ctx, X, W, H) {
             ctx.fillRect(x, 0, x2 - x, VE_MK_H);
             ctx.fillStyle = 'rgba(0,0,0,0.35)';
             ctx.fillRect(x2 - 3, 0, 3, VE_MK_H);   // ponta que arrasta
-            ctx.fillStyle = veRgba(cor, 0.10);
-            ctx.fillRect(x, VE_RULER, x2 - x, H - VE_RULER);
+            if (sel) {   // só o selecionado tinge as trilhas (os atos cobrem a timeline toda: tingir todos pesava)
+                ctx.fillStyle = veRgba(cor, 0.06);
+                ctx.fillRect(x, VE_RULER, x2 - x, H - VE_RULER);
+            }
         }
         ctx.fillStyle = cor;
         ctx.beginPath();
@@ -95,6 +99,16 @@ function veMkDesenhar(ctx, X, W, H) {
                 ctx.fillText(m.nome, x0, 8.5);
                 ctx.restore();
             }
+        }
+        if (sel) {   // selecionado: contorno e alças brancas nas pontas (arrastar muda o começo/o fim)
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+            if (d > 0) ctx.strokeRect(x, 0.5, x2 - x, VE_MK_H);
+            const alca = ax => {
+                ctx.fillStyle = '#fff'; ctx.strokeStyle = '#111';
+                ctx.beginPath(); ctx.roundRect(ax - 3.5, -1, 7, VE_MK_H + 5, 2); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#111'; ctx.fillRect(ax - 0.5, 2, 1, VE_MK_H - 1);
+            };
+            if (d > 0) { alca(x); alca(x2); } else alca(x);
         }
     });
     ctx.restore();
@@ -200,7 +214,7 @@ function veMkIniciar() {
         if (!VE.ready || e.button !== 0 || VE.tool === 'hand') return;
         const { x, y } = veTimeFromEvent(e);
         const hit = veMkAt(x, y);
-        if (!hit) return;
+        if (!hit) { if (VEMK.sel) { VEMK.sel = null; veDraw(); } return; }   // clicou fora: tira a seleção
         e.stopImmediatePropagation();
         e.preventDefault();
         if (VE.playing) veStop();
@@ -217,8 +231,9 @@ function veMkIniciar() {
             const hit = y <= VE_RULER ? veMkAt(x, y) : null;
             if (hit) {
                 const m = VE.markers[hit.i];
-                wrap.style.cursor = hit.modo === 'fim' ? 'ew-resize' : 'pointer';
-                const dica = [m.nome, m.desc, veT(hit.modo === 'fim' ? 'Arraste a ponta para mudar a duração' : 'Duplo clique: editar · arraste para mover')].filter(Boolean).join('\n');
+                wrap.style.cursor = hit.modo === 'fim' || hit.modo === 'ini' ? 'ew-resize' : 'pointer';
+                const dica = [m.nome, m.desc, veT(hit.modo === 'fim' || hit.modo === 'ini' ? 'Arraste a alça para mudar a duração'
+                    : 'Clique: seleciona (alças nas pontas) · arraste: move · duplo clique: editar')].filter(Boolean).join('\n');
                 if (wrap.title !== dica) wrap.title = dica;
                 VEMK.cursor = true;
             } else if (VEMK.cursor) {
@@ -240,6 +255,11 @@ function veMkIniciar() {
             const fim = agulha(veSnapFrame(d.t0 + d.d0 + dx));
             const dur = Math.max(veFrame(), Math.min(fim, veNavDur()) - d.t0);
             d.m.d = Math.round(dur * 1e4) / 1e4;
+        } else if (d.modo === 'ini') {   // alça do começo: o fim fica onde está
+            const fimM = d.t0 + d.d0;
+            const t = Math.max(0, Math.min(fimM - veFrame(), agulha(veSnapFrame(d.t0 + dx))));
+            d.m.t = Math.round(t * 1e4) / 1e4;
+            d.m.d = Math.round((fimM - t) * 1e4) / 1e4;
         } else {
             const t = Math.max(0, Math.min(veNavDur() - (+d.m.d || 0), agulha(veSnapFrame(d.t0 + dx))));
             d.m.t = Math.round(t * 1e4) / 1e4;
@@ -252,8 +272,9 @@ function veMkIniciar() {
         if (!d) return;
         VEMK.drag = null;
         e.stopImmediatePropagation();
-        if (d.ativo) { VE.markers.sort((a, b) => a.t - b.t); veDraw(); return; }
-        veSeek(+d.m.t || 0);   // clique: leva a agulha até o marcador
+        if (d.ativo) { VE.markers.sort((a, b) => a.t - b.t); VEMK.sel = d.m; veDraw(); return; }
+        VEMK.sel = VEMK.sel === d.m ? null : d.m;   // clique: seleciona (sem mover a agulha); de novo: solta
+        veDraw();
     };
     wrap.addEventListener('pointerup', fim, true);
     wrap.addEventListener('pointercancel', fim, true);

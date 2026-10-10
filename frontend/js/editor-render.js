@@ -232,6 +232,7 @@ async function vePrProximo() {
     vePrStatus();
     try {
         const job = await vePrJob(s);
+        job.leve = !!VEPRA.ativo;   // render automático (segundo plano): metade dos núcleos, prioridade ociosa
         if (VEPR.atual && VEPR.atual.cancelado) { VEPR.atual = null; vePrFimLote(null); return; }
         const r = await vePrApi().ve_render_trecho(vePrPrefs().dir, VEPR.chave || vePrChave(), s.sig, job);
         if (!r || !r.success) throw new Error((r && r.error) || 'falhou');

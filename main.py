@@ -3065,6 +3065,19 @@ class ApiBridge:
     def ve_otimizar_cancelar(self):
         return ve_otimizar_cancelar()
 
+    def hardware_estado(self):
+        """Núcleo de hardware: o PC (CPU, RAM, placas de qualquer marca), o nível e o plano (Functions/hardware.py)."""
+        from Functions import hardware
+        return hardware.estado()
+
+    def hardware_definir_modo(self, modo):
+        """Preferências › Desempenho: automatico | economia | maximo."""
+        from Functions import hardware
+        try:
+            return {"success": True, "plano": hardware.definir_modo(modo)}
+        except ValueError as e:
+            return {"success": False, "error": str(e)}
+
     def ve_encoder_estado(self):
         """Kanivete Encoder: CPU, RAM, placa e o quadro em render agora (Functions/encoder_monitor.py)."""
         from Functions import encoder_monitor

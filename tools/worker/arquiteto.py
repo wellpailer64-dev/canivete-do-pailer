@@ -37,7 +37,7 @@ MODELOS_ARQUITETO = [
 PERFIS_MODELO = {
     "rapido": ["qwen3:8b", "gemma4:e4b"],
     "equilibrado": ["hf.co/unsloth/Qwen3-14B-GGUF:IQ3_XXS", "gemma4:e4b", "qwen3:8b"],
-    "forte": ["qwen3:14b", "hf.co/unsloth/Qwen3-14B-GGUF:IQ3_XXS", "gemma4:e4b", "qwen3:8b"],
+    "forte": ["hf.co/unsloth/Qwen3-14B-GGUF:IQ3_XXS", "gemma4:e4b", "qwen3:8b"],   # qwen3:14b cheio apagado (2026-10-09)
 }
 MODELO_WORKER = "qwen3:8b"
 RESERVA_WORKER = "gemma4:e4b"

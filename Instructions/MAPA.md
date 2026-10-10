@@ -161,8 +161,8 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - **API** (`pywebview.api.*`, 9): `web_scraper_analyze(url)`, `web_scraper_download(url, mode, destino)`, `web_scraper(url, tipo, destino)`, `web_scraper_csv(url)`, `cerebro_load()`, `cerebro_save(content)`, `cerebro_exists()`, `cerebro_remove()`, `cerebro_select_file()`
 - **Guias**: `Instructions/webscraper.md`, `Instructions/cerebro.md`
 
-### API geral (app, janela, preferências, arquivos) — 24 métodos
-`select_folder(tool)`, `select_file(tool)`, `select_image(tool)`, `open_folder(path)`, `kani_estado()`, `kani_baixar()`, `kani_enviar(cid, mensagens, ferramenta="")`, `kani_parar(cid)`, `kani_voz(ligar=True)`, `kani_falar(texto, chave="")`, `reveal_file(path)`, `open_file(path)`, `select_video_file(tool)`, `prefs_load()`, `prefs_save(dados)`, `check_update()`, `apply_update()`, `sair_app()`, `toggle_fullscreen()`, `janela_cmd(acao)`, `janela_propria()`, `janela_ativar()`, `on_webview_ready(sender, args)`, `on_new_window_request(sender, args)`
+### API geral (app, janela, preferências, arquivos) — 26 métodos
+`select_folder(tool)`, `select_file(tool)`, `select_image(tool)`, `open_folder(path)`, `hardware_estado()`, `hardware_definir_modo(modo)`, `kani_estado()`, `kani_baixar()`, `kani_enviar(cid, mensagens, ferramenta="")`, `kani_parar(cid)`, `kani_voz(ligar=True)`, `kani_falar(texto, chave="")`, `reveal_file(path)`, `open_file(path)`, `select_video_file(tool)`, `prefs_load()`, `prefs_save(dados)`, `check_update()`, `apply_update()`, `sair_app()`, `toggle_fullscreen()`, `janela_cmd(acao)`, `janela_propria()`, `janela_ativar()`, `on_webview_ready(sender, args)`, `on_new_window_request(sender, args)`
 
 ## 6. Vetor Kanivete — comandos `VKN.cmd(nome, args)` (154; a interface, o Claude e o Jr usam os mesmos)
 - `vetor-3d.js`: `girar_3d` (3D girar), `extrudar_3d` (3D extrudar), `editar_3d` (editar 3D), `mapear_arte` (mapear arte no 3D), `limpar_mapas` (tirar artes mapeadas), `expandir_3d` (expandir 3D)
@@ -207,6 +207,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/direcao_mapa.py` — Mapa de direção de arte (para o Claude, o Worker e o roteiro_local): layouts, estilos e técnicas em linhas curtas —
 - `tools/esqueleto.py` — Roteiro (JSON curto) → carrossel diagramado (HTML do KNV.cena) pelos ESQUELETOS aprovados. O agente só escreve o
 - `tools/gerar_marca.py` — Gera a marca KANIVETE: letras próprias desenhadas aqui (geometria nossa, sem ler fonte nenhuma), no espírito
+- `tools/hw_simular.py` — Abre o app de teste como se fosse outro PC (núcleo de hardware: Functions/hardware.py)
 - `tools/kani_kb.py` — Base de ajuda da Kani (assistente do KANIVETE): junta os guias das ferramentas (Instructions/*.md) e o mapa geral
 - `tools/knv.py` — Monta uma peça do Photo Kanivete a partir de HTML/CSS (KNV.cena) no app aberto em modo agente e confere
 - `tools/mapa_codigo.py` — Mapa do código (para o agente achar onde mexer sem abrir arquivo grande): comandos registrados, funções de topo e
@@ -239,10 +240,12 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/direcao-de-arte.md` — Direção de arte e motion para o AutoFrame e as edições do Pocket Editor
 - `Instructions/agente/diretor-de-arte.md` — Diretor de arte de carrossel (padrão de resposta + o que o Jr executa por comando)
 - `Instructions/agente/guia-edicao.md` — GUIA-EDICAO :: Pocket Editor (Canivete do Pailer) — para agentes de IA
+- `Instructions/agente/kani-motor.md` — Motor da Kani: bancada de modelos e escolha (2026-10-10)
 - `Instructions/agente/mapa-editor.md` — Mapa do código — editor (gerado por tools/mapa_codigo.py; nome:linha)
 - `Instructions/agente/mapa-imagem.md` — Mapa do código — imagem (gerado por tools/mapa_codigo.py; nome:linha)
 - `Instructions/agente/mapa-kanivete-encoder.md` — Mapa do Kanivete Encoder (Ke)
 - `Instructions/agente/mapa-vetor.md` — Mapa do código — vetor (gerado por tools/mapa_codigo.py; nome:linha)
+- `Instructions/agente/nucleo-hardware.md` — Núcleo de hardware: o app se ajustar a cada PC (2026-10-10)
 - `Instructions/agente/plano-cena.md` — Plano CENA — diagramar no Photo Kanivete escrevendo HTML/CSS (para IAs)
 - `Instructions/agente/plano-comp.md` — Plano: Comp (composição estilo After Effects) no Pocket Editor
 - `Instructions/agente/plano-economia-ponte-vetor-photo.md` — Planos (2026-10-04): economia de tokens, ponte Vetor ↔ Photo, nível "Herbíssimo"
@@ -298,6 +301,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/gdrive_dumper.py` — gdrive_dumper.py — Módulo do GDRIVE DUMPER para o Canivete do Pailer
 - `Functions/gerador_imagem.py` — gerador_imagem.py — Gerar imagem com IA no Photo Kanivete (texto → imagem e edição com imagens de referência)
 - `Functions/gerador_sfx.py` — Gerar efeitos sonoros por texto (EzAudio XL, licença MIT; OpenSound/EzAudio) — local, sem torch, sem login
+- `Functions/hardware.py` — Núcleo de hardware do KANIVETE: identifica o PC uma vez e diz a cada parte do app quanto ela pode usar
 - `Functions/instancia_unica.py` — instancia_unica.py — Uma cópia só do app aberta
 - `Functions/kani.py` — Kani — assistente de conversa do KANIVETE (tipo ChatGPT, local e offline), para tarefas do dia a dia e,
 - `Functions/legendas.py` — legendas.py — transcrição da timeline do Pocket Editor (painel Texto: Transcrever / Criar legendas)

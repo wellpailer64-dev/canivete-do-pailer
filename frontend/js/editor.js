@@ -52,7 +52,7 @@ const VE = {
     lastOutput: null,
 };
 
-const VE_RULER = 28;
+const VE_RULER = 40;   // régua da timeline mais alta: fácil de acertar o clique (= .ve-head-ruler no CSS)
 const VE_MAX_PPS = 3000;   // zoom máximo: ~100 px por quadro a 30 fps
 const VE_TRACK_MIN = 22, VE_TRACK_MAX = 220;
 const VE_MIN_TRACKS = 4;
@@ -1092,6 +1092,7 @@ function veLegMover(l, d) {
 // as que estavam inteiras dentro do trecho saem; as que cruzam a borda ficam só com a parte de fora
 function veLegRipple(a, b) {
     const d = b - a;
+    veMkRipple(a, b);
     if (!(d > 0) || !(VE.legendas || []).length) return;
     VE.legendas = VE.legendas.flatMap(l => {
         if (l.en <= a + VE_EPS) return [l];
@@ -1103,6 +1104,19 @@ function veLegRipple(a, b) {
         return [{ ...l, st: a, en: +(l.en - d).toFixed(3), pt }];
     });
     VETX.legSel = -1;
+}
+
+// Marcadores acompanham o ripple como as legendas: os de depois voltam junto; os de dentro do trecho tirado vão
+// para o corte; marcador com duração (faixa de ato) encolhe o que foi tirado de dentro dela
+function veMkRipple(a, b) {
+    const d = b - a;
+    if (!(d > 0) || !(VE.markers || []).length) return;
+    const novo = x => (x <= a + VE_EPS ? x : x >= b - VE_EPS ? x - d : a);   // tempo antigo → tempo depois do corte
+    VE.markers.forEach(m => {
+        const t = novo(m.t), f = novo(m.t + (m.d || 0));
+        m.t = +t.toFixed(3);
+        if (m.d) m.d = +Math.max(0, f - t).toFixed(3);
+    });
 }
 
 function veLegSelecionar(i) {
@@ -1601,12 +1615,24 @@ function veDuplicarAcima() {
 function veTrocarTrilha(dir) {
     const c = VE.clips[VE.sel];
     if (!c) { veToast('Selecione um clipe na timeline'); return; }
+    if (veSelLista().length > 1) { veMoverSelecao(0, dir); return; }   // vários selecionados: todos juntos
     if (veLocked(c)) { veAvisoBloqueio(); return; }
     // no vídeo "cima" é V2, V3...; no áudio solto, "cima" é em direção ao A1 (como aparece na tela)
     const tr = c.tr + (veIsAudio(c) ? -dir : dir);
     if (tr < 0) return;
     veEnsureTrackIndex(tr);
     veMoveClip(VE.sel, tr, c.st);
+}
+
+// Alt+←/→ (Alt+Shift: 5 quadros) e Alt+↑/↓ com vários clipes: a seleção inteira anda junto (como no Premiere).
+// dt em segundos; dir = trilha (+1 cima). No tempo, os vinculados (vídeo+áudio) vão junto.
+function veMoverSelecao(dt, dir) {
+    let lista = veSelLista();
+    if (!lista.length) { veToast('Selecione um clipe na timeline'); return; }
+    if (dt && VE.vinculo && typeof veVinculados === 'function') lista = [...new Set(lista.flatMap(c => [c, ...veVinculados(c)]))];
+    const prim = VE.clips[VE.sel] || lista[0];
+    const dtr = dir ? (veIsAudio(prim) ? -dir : dir) : 0;
+    veMoverGrupo(lista, dt, dtr, false);
 }
 
 // ── Ímã (como o do Premiere) ──
@@ -3064,7 +3090,7 @@ function veMonitorScale() {
     const res = VEM.res || 1;   // Full / 1/2 (barra do Programa): 1/2 = um quarto dos pixels para compor
     const cap = Math.min(1, 1920 / Math.max(VE.seqW, VE.seqH));
     const scr = $ve('ve-screen');
-    if (!scr || !scr.clientWidth) return cap * res;
+    if (!scr || !veTamTela(scr).w) return cap * res;
     const dpr = scr.ownerDocument.defaultView.devicePixelRatio || 1;
     const tela = veFitScale() * VEM.mz * dpr;
     return Math.min(cap, Math.max(0.125, Math.ceil(tela * 8) / 8)) * res;
@@ -4723,6 +4749,68 @@ function veRowAt(y) {
 // ─────────────────────────── desenho ───────────────────────────
 
 let veDrawQueued = false;
+// ─────────────────────────── trechos repetidos (como os "Duplicate Frame Markers" do Premiere) ───────────────────────────
+// O mesmo pedaço de uma mídia usado em mais de um clipe da timeline ganha uma faixa colorida no rodapé, na mesma cor
+// em todos os clipes que o repetem (uma cor por mídia). Exibir › Marcar trechos repetidos liga/desliga.
+const VEDUP = { on: veLsGet('ve.dup') !== '0', chave: '', cache: new Map() };
+const VE_DUP_CORES = ['#ef4444', '#f59e0b', '#22c55e', '#06b6d4', '#a855f7', '#ec4899', '#eab308', '#14b8a6', '#f97316', '#8b5cf6'];
+function veDuplicados() {
+    const chave = VE.activeSequence + ':' + VE.clips.length + ':' + VE.clips.reduce((h, c) => h + (c.m || 0) * 7 + c.s * 13 + c.e * 17 + c.st, 0).toFixed(3);
+    if (VEDUP.chave === chave) return VEDUP.cache;
+    const grupos = new Map(), out = new Map();
+    VE.clips.forEach(c => {
+        const m = veMediaOf(c);
+        if (!m || m.kind !== 'video' || veIsAudio(c) || veIsAdj(c) || veIsTexto(c)) return;
+        (grupos.get(c.m || 0) || grupos.set(c.m || 0, []).get(c.m || 0)).push(c);
+    });
+    let k = 0;
+    for (const lista of grupos.values()) {
+        if (lista.length < 2) continue;
+        let achou = false;
+        const cor = VE_DUP_CORES[k % VE_DUP_CORES.length];
+        for (let i = 0; i < lista.length; i++) for (let j = i + 1; j < lista.length; j++) {
+            const p = lista[i], q = lista[j], a = Math.max(p.s, q.s), b = Math.min(p.e, q.e);
+            if (b - a < 0.1) continue;
+            achou = true;
+            for (const c of [p, q]) (out.get(c) || out.set(c, []).get(c)).push({ a, b, cor });
+        }
+        if (achou) k++;
+    }
+    VEDUP.chave = chave; VEDUP.cache = out;
+    return out;
+}
+function veDupDesenhar(ctx, c, st, cx, cw, vy, vh, X) {
+    const lista = veDuplicados().get(c);
+    if (!lista) return;
+    const v = veVel(c) || 1;
+    for (const d of lista) {
+        const a = Math.max(X(st + (d.a - c.s) / v), cx), b = Math.min(X(st + (d.b - c.s) / v), cx + cw);
+        if (b - a < 1) continue;
+        ctx.fillStyle = d.cor;
+        ctx.fillRect(a, vy + vh - 4, b - a, 4);
+    }
+}
+// Lista para conferir (agente/Kani): [{midia, clipes: [índices], segundos}]
+function veDupResumo() {
+    const por = new Map();
+    for (const [c, lista] of veDuplicados()) {
+        const m = veMediaOf(c), k = c.m || 0;
+        const r = por.get(k) || por.set(k, { midia: m.nome || m.name, clipes: [], segundos: 0 }).get(k);
+        r.clipes.push(VE.clips.indexOf(c));
+        r.segundos += lista.reduce((s, d) => s + d.b - d.a, 0);
+    }
+    return [...por.values()].map(r => ({ ...r, segundos: Math.round(r.segundos * 10) / 10 }));
+}
+function veDupAlternar() {
+    VEDUP.on = !VEDUP.on;
+    veLsSet('ve.dup', VEDUP.on ? '1' : '0');
+    if (VEDUP.on) {
+        const n = veDupResumo().length;
+        veToast(n ? `${n} mídia(s) com trechos repetidos na timeline` : 'Nenhum trecho repetido na timeline');
+    }
+    veDraw();
+}
+
 function veDraw() {
     if (veDrawQueued) return;
     veDrawQueued = true;
@@ -4744,6 +4832,27 @@ function vePlaybackTimelineDue() {
 
 // requestAnimationFrame da janela onde o elemento está (painel solto: a janela dele segue desenhando
 // mesmo com a principal escondida atrás de outra); janela minimizada cai na principal
+// Tamanho (clientWidth/Height) de um elemento SEM forçar o navegador a refazer o layout: lido uma vez e depois atualizado
+// por ResizeObserver. O play lia clientWidth/offsetParent a cada quadro (monitor e medidor de áudio) e cada leitura,
+// com a página "suja" do quadro anterior, recalculava o layout inteiro: o medidor sozinho comia 18% do play (2026-10-10).
+// aoMudar (só na 1ª chamada): redesenha quando o painel muda de tamanho / aparece / some (0 × 0 = escondido).
+const VE_TAM = new WeakMap();
+function veTam(el, aoMudar) {
+    if (!el) return { w: 0, h: 0 };
+    let t = VE_TAM.get(el);
+    if (!t) {
+        t = { w: el.clientWidth, h: el.clientHeight };
+        VE_TAM.set(el, t);
+        new ((el.ownerDocument.defaultView || window).ResizeObserver)(() => {
+            const w = el.clientWidth, h = el.clientHeight;
+            if (w === t.w && h === t.h) return;
+            t.w = w; t.h = h;
+            if (aoMudar) aoMudar();
+        }).observe(el);
+    }
+    return t;
+}
+
 function veRaf(el, cb) {
     const w = el && el.ownerDocument.defaultView;
     return (w && !w.document.hidden ? w : window).requestAnimationFrame(cb);
@@ -4851,7 +4960,7 @@ function veRender() {
         ctx.fillRect(x, topoMk, 1, VE_RULER - topoMk - 1);
         ctx.fillStyle = '#9a9a9a';
         const label = major < 1 ? veTC(t).slice(3) : veTC(t).slice(0, 8).replace(/^00:/, '');
-        ctx.fillText(label, x + 4, comMk ? 23 : 15);
+        ctx.fillText(label, x + 4, comMk ? VE_RULER - 6 : VE_RULER - 14);
     }
     veCacheDraw(ctx, X, W);
 
@@ -4921,6 +5030,7 @@ function veRender() {
         ctx.fillStyle = cor ? veRgba(cor, 0.2) : adj ? 'rgba(20,184,166,0.12)' : txt ? 'rgba(219,39,119,0.15)' : img ? 'rgba(168,85,247,0.15)' : 'rgba(91,110,225,0.18)';
         ctx.fillRect(cx, vy, cw, vh);
         if (veLocked(c)) veListras(ctx, cx, vy, cw, vh);
+        if (VEDUP.on && !ghost && !adj && !txt && !img) veDupDesenhar(ctx, c, st, cx, cw, vy, vh, X);
         ctx.fillStyle = cor || (adj ? '#14b8a6' : txt ? '#db2777' : img ? '#a855f7' : '#5b6ee1');
         ctx.fillRect(cx, vy, cw, Math.min(14, vh));
         if (cw > 50 && vh >= 12) {
@@ -5129,7 +5239,7 @@ function veRender() {
     // agulha
     const px = Math.round(X(VE.playhead)) + 0.5;
     if (px >= -8 && px <= W + 8) {
-        ctx.fillStyle = '#D4814A';
+        ctx.fillStyle = '#ffffff';   // agulha branca: não se confunde com a linha de um marcador
         ctx.fillRect(px - 0.5, VE_RULER - 2, 1.5, H);
         ctx.beginPath();
         ctx.moveTo(px - 6, 2); ctx.lineTo(px + 6, 2); ctx.lineTo(px + 6, 14); ctx.lineTo(px, 20); ctx.lineTo(px - 6, 14);
@@ -5796,10 +5906,11 @@ const VEM = { mz: 1, mx: 0, my: 0, pan: null, panned: false,
     rulers: veLsGet('ve.rulers') !== '0', res: veLsGet('ve.previewRes') === '0.5' ? 0.5 : 1 };
 
 // px de tela por px do quadro no modo Fit
+function veTamTela(scr) { return veTam(scr, () => { if (VE.ready) veDrawMonitorSoon(); }); }
 function veFitScale() {
-    const scr = $ve('ve-screen');
-    if (!scr.clientWidth || !VE.seqW) return 1;
-    return Math.min(scr.clientWidth / VE.seqW, scr.clientHeight / VE.seqH);
+    const t = veTamTela($ve('ve-screen'));
+    if (!t.w || !VE.seqW) return 1;
+    return Math.min(t.w / VE.seqW, t.h / VE.seqH);
 }
 
 function veClampMonitorPan() {

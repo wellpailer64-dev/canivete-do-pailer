@@ -133,7 +133,7 @@ def renderizar(base, chave, h, job, on_progress):
     def _hold(p):
         global _proc
         _proc = p
-        _prioridade_baixa(p)
+        _prioridade_baixa(p, leve=bool(job.get("leve")))
 
     try:
         r = exportar_video(
@@ -231,14 +231,21 @@ def cancelar_comp():
     return {"success": True}
 
 
-def _prioridade_baixa(p):
-    """Render de prévia em segundo plano: cede a CPU ao editor (play e prévia em tempo real)."""
+def _prioridade_baixa(p, leve=True):
+    """Render de prévia em segundo plano: cede a CPU ao editor (play e prévia em tempo real).
+    leve (render automático, Comp): prioridade ociosa e só a metade de cima dos núcleos — o resto do PC fica livre
+    para trabalhar em outra coisa sem travar; o render pedido na hora (Enter) usa a máquina toda (abaixo do normal)."""
     try:
         if os.name == "nt":
             import ctypes
-            ctypes.windll.kernel32.SetPriorityClass(int(p._handle), 0x00004000)   # BELOW_NORMAL_PRIORITY_CLASS
+            k32 = ctypes.windll.kernel32
+            k32.SetPriorityClass(int(p._handle), 0x00000040 if leve else 0x00004000)   # IDLE / BELOW_NORMAL
+            n = os.cpu_count() or 4
+            if leve and n >= 4:
+                metade = max(2, n // 2)
+                k32.SetProcessAffinityMask(int(p._handle), ctypes.c_size_t(((1 << metade) - 1) << (n - metade)))
         else:
-            os.setpriority(os.PRIO_PROCESS, p.pid, 10)
+            os.setpriority(os.PRIO_PROCESS, p.pid, 19 if leve else 10)
     except Exception:
         pass
 

@@ -112,7 +112,34 @@
   contorno/sombra #0a141a, destaque da palavra #e88213, entrada pop, max 16 × 2 linhas, py 14.
 - custo desta 1ª vez: alto (descobrir API, transcrição inteira que caiu, detector refeito 3×). Próxima: ~1/3 seguindo esta seção.
 
+## LER A MONTAGEM (tripa)
+`py -3.13 tools/tripa.py "<timeline>"` (app em modo agente) → 1 PNG por 8 min: cada linha = 1 min, quadrinho a cada
+2 s do que está por cima, risco vermelho em cada corte, escuro onde há camada de ajuste, T = texto, faixas (fala,
+cobertura, texto, ajuste, som) e a fala transcrita embaixo. 1ª vez ~4 min (extrai os quadros); depois ~3 s (cache).
+Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lugar de prints do monitor).
+
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-10-09 DOCUMENTÁRIO (Linha 4/SIIM, v4→v6; roteiro D:\kanivete_testes\edgar\ROTEIRO_v4_reuniao_gil.md). regras:
+  · revelação em camadas: o personagem não aparece antes da hora (massa sonora = rua/metrô SEM ele); revela por
+    detalhe → rosto de frente (GC) → mais perto; a pergunta (cartela) vem ANTES do 1º plano dele; a resposta começa
+    em off sobre apoio e corta para ele em sincronia.
+  · B-roll casa com o ASSUNTO e com o MOMENTO do arco: nada de música/instrumento enquanto se fala de porta e
+    imprevisibilidade (Gênese); "ferramenta sensorial" → estrutura do metrô, caixa de som, personagem escutando
+    (não rua); "deficiência visual" → personagem andando com apoio; "cuidar das pessoas" → passageiros no dia a dia
+    (não o show: spoiler); nome citado na fala → imagem dela no instante da palavra.
+  · exemplos/onomatopeias do entrevistado ("birom, birom", "toca, toca") → corta para 3–8 s do que ele narra e volta.
+  · fala que prepara a cena-chave antes dela (ex.: "só toca com a porta aberta" → o ciclo da porta).
+  · massa sonora: takes curtos com som próprio + um ambiente contínuo ligando todos + efeitos que definem cada quadro.
+  · transição entre atos precisa de respiro: drone/fachada + a música da cena seguinte entrando baixa (J-cut).
+  · música: UMA música inteira por momento (nunca duas cortadas ao meio); no clímax pode parar numa frase e entrar a
+    reflexão final com a massa sonora na troca; créditos com a trilha da estação (Luz).
+  · show: só imagens do dia do show (roupa da cantora igual); apoio = público olhando/filmando/aplaudindo, músicos na
+    entrada dos instrumentos, passageiros; montagem pronta do usuário (coral subindo) entra intacta + escuro que se
+    revela na 1ª escada.
+  · ordem cronológica dentro de cada ato; na volta, só impressões positivas ("missão cumprida"), nunca falhas.
+  · sem vídeo vertical em documentário 16:9; sem repetir imagem (Exibir › Marcar trechos repetidos = 0).
+  · ajustes manuais do usuário na timeline são sagrados: versão nova = duplicar a dele e editar por cima (scripts
+    montagem_pailer_v6.py), nunca regerar do zero; conferir sobreposições na mesma trilha (som misturado).
 - 2026-10-07 técnica pedida pelo usuário: TROCA DE FOCO ENTRE QUEM FALA = 2 FAIXAS DE VÍDEO IGUAIS empilhadas (V1 pessoa A,
   V2 pessoa B, cada uma com o enquadramento da sua pessoa), cortadas nos mesmos pontos; em cada trecho fica ativa só a
   faixa de quem está em foco, a outra DESATIVADA (Ctrl+Shift+E = `c.off = true`). Só em vídeo com troca de foco.
