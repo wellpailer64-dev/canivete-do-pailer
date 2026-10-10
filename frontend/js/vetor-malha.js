@@ -9,30 +9,65 @@ function vkMalhaCor(c) { if (!c) return [0, 0, 0, 0]; if (c.k === 'cmyk') return
     if (c.k === 'rgb') { const [r, g, b] = c.v.map(x => x / 255), k = 1 - Math.max(r, g, b); return k >= 1 ? [0, 0, 0, 100] : [(1 - r - k) / (1 - k) * 100, (1 - g - k) / (1 - k) * 100, (1 - b - k) / (1 - k) * 100, k * 100]; }
     return [0, 0, 0, 100]; }
 VK.malhaCache = new Map();
-function vkMalhaDesenhar(ctx, o) {   // desenhada num canvas à parte na resolução da tela (cache por malha + zoom), fatias de ~3 px
-    const T = ctx.getTransform(), k = Math.hypot(T.a, T.b) || 1, b = vkBox(o), W = Math.ceil((b[2] - b[0]) * k) + 2, H = Math.ceil((b[3] - b[1]) * k) + 2;
-    if (W < 1 || H < 1 || W * H > 5e7) return;
-    const chave = JSON.stringify([o.nos, o.cores, Math.round(k * 100), VK.corTela.size]);
+// Teto de pixels da imagem da malha na tela. A malha é cor suave (sem borda nítida por dentro): acima disso ela é pintada
+// menor e ampliada na tela, sem diferença visível — antes, no zoom 4× de uma IDV com malhas grandes, a imagem chegava a
+// dezenas de milhões de pixels em fatias de 3 px e o 1º redesenho levava 26 s (2026-10-10). O PDF continua vetorial.
+const VK_MALHA_MAX_PX = 2e6;
+function vkMalhaRgb(c) {   // cor de tela de um nó (prova de cor do perfil: vkCmykCss) → [r, g, b]
+    const m = /(\d+)\D+(\d+)\D+(\d+)/.exec(vkCss({ k: 'cmyk', v: vkMalhaCor(c).map(x => Math.round(x * 2) / 2) }) || '');
+    return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0];
+}
+// Pinta a malha ponto a ponto: para cada pixel, acha (u, v) dentro da célula (inversa bilinear, Í. Quílez) e mistura as
+// cores dos 4 nós. Antes eram fatias de ~3 px (fill + stroke cada): numa IDV com 7 malhas 3D (8.580 células) o 1º redesenho
+// depois de um zoom 4× levava 21–26 s; agora a conta é por pixel da imagem (≤ VK_MALHA_MAX_PX). A prova de cor vale nos nós.
+function vkMalhaRaster(o, kr, b, W, H) {
+    const img = new ImageData(W, H), d = img.data, N = o.nos, R = o.cores.map(l => l.map(vkMalhaRgb));
+    const X = p => (p[0] - b[0]) * kr + 1, Y = p => (p[1] - b[1]) * kr + 1, cr = (ax, ay, bx, by) => ax * by - ay * bx;
+    for (let i = 0; i < N.length - 1; i++) for (let j = 0; j < N[0].length - 1; j++) {
+        const ax = X(N[i][j]), ay = Y(N[i][j]), bx = X(N[i][j + 1]), by = Y(N[i][j + 1]);
+        const cx = X(N[i + 1][j + 1]), cy = Y(N[i + 1][j + 1]), dx = X(N[i + 1][j]), dy = Y(N[i + 1][j]);
+        const ex = bx - ax, ey = by - ay, fx = dx - ax, fy = dy - ay, gx = ax - bx + cx - dx, gy = ay - by + cy - dy;
+        const k2 = cr(gx, gy, fx, fy), c00 = R[i][j], c01 = R[i][j + 1], c10 = R[i + 1][j], c11 = R[i + 1][j + 1];
+        const x0 = Math.max(0, Math.floor(Math.min(ax, bx, cx, dx))), x1 = Math.min(W - 1, Math.ceil(Math.max(ax, bx, cx, dx)));
+        const y0 = Math.max(0, Math.floor(Math.min(ay, by, cy, dy))), y1 = Math.min(H - 1, Math.ceil(Math.max(ay, by, cy, dy)));
+        for (let py = y0; py <= y1; py++) for (let px = x0; px <= x1; px++) {
+            const hx = px + 0.5 - ax, hy = py + 0.5 - ay;
+            const k1 = cr(ex, ey, fx, fy) + cr(hx, hy, gx, gy), k0 = cr(hx, hy, ex, ey);
+            let u, v;
+            if (Math.abs(k2) < 1e-9) { if (Math.abs(k1) < 1e-12) continue; v = -k0 / k1; }
+            else { let w = k1 * k1 - 4 * k0 * k2; if (w < 0) continue; w = Math.sqrt(w); v = (-k1 - w) / (2 * k2); if (v < -0.01 || v > 1.01) v = (-k1 + w) / (2 * k2); }
+            const dX = ex + gx * v, dY = ey + gy * v, porX = Math.abs(dX) >= Math.abs(dY);
+            if (Math.abs(porX ? dX : dY) < 1e-12) continue;
+            u = porX ? (hx - fx * v) / dX : (hy - fy * v) / dY;
+            if (u < -0.01 || u > 1.01 || v < -0.01 || v > 1.01) continue;
+            u = Math.min(1, Math.max(0, u)); v = Math.min(1, Math.max(0, v));
+            const a = (1 - u) * (1 - v), bb = u * (1 - v), cc = u * v, dd = (1 - u) * v, q = (py * W + px) * 4;
+            d[q] = c00[0] * a + c01[0] * bb + c11[0] * cc + c10[0] * dd;
+            d[q + 1] = c00[1] * a + c01[1] * bb + c11[1] * cc + c10[1] * dd;
+            d[q + 2] = c00[2] * a + c01[2] * bb + c11[2] * cc + c10[2] * dd;
+            d[q + 3] = 255;
+        }
+    }
+    return img;
+}
+function vkMalhaDesenhar(ctx, o) {   // desenhada numa imagem à parte (cache por malha + escala), pixel a pixel
+    const T = ctx.getTransform(), k = Math.hypot(T.a, T.b) || 1, b = vkBox(o);
+    const Wt = Math.ceil((b[2] - b[0]) * k) + 2, Ht = Math.ceil((b[3] - b[1]) * k) + 2;   // tamanho na tela
+    if (Wt < 1 || Ht < 1) return;
+    const kr = Wt * Ht > VK_MALHA_MAX_PX ? k * Math.sqrt(VK_MALHA_MAX_PX / (Wt * Ht)) : k;   // escala em que é pintada
+    const W = Math.ceil((b[2] - b[0]) * kr) + 2, H = Math.ceil((b[3] - b[1]) * kr) + 2;
+    const chave = JSON.stringify([o.nos, o.cores, Math.round(kr * 100), VK.corTela.size]);
     let cv = VK.malhaCache.get(o.id);
     if (!cv || cv._chave !== chave) {
-        cv = new OffscreenCanvas(W, H); cv._chave = chave; const c = cv.getContext('2d'); c.setTransform(k, 0, 0, k, -b[0] * k + 1, -b[1] * k + 1);
-        const N = o.nos, C = o.cores, lerp = (a, bb, t) => a.map((v, i) => v + (bb[i] - v) * t);
-        for (let i = 0; i < N.length - 1; i++) for (let j = 0; j < N[0].length - 1; j++) {
-            const p00 = N[i][j], p01 = N[i][j + 1], p10 = N[i + 1][j], p11 = N[i + 1][j + 1];
-            const c00 = vkMalhaCor(C[i][j]), c01 = vkMalhaCor(C[i][j + 1]), c10 = vkMalhaCor(C[i + 1][j]), c11 = vkMalhaCor(C[i + 1][j + 1]);
-            const lado = Math.max(Math.hypot(p01[0] - p00[0], p01[1] - p00[1]), Math.hypot(p10[0] - p00[0], p10[1] - p00[1]), Math.hypot(p11[0] - p10[0], p11[1] - p10[1])) * k;
-            const n = Math.max(o.auto3d ? 1 : 6, Math.min(80, Math.ceil(lado / 3)));
-            const P = (u, v) => lerp(lerp(p00, p01, u), lerp(p10, p11, u), v), K = (u, v) => lerp(lerp(c00, c01, u), lerp(c10, c11, u), v);
-            for (let a = 0; a < n; a++) for (let bb = 0; bb < n; bb++) {
-                const u0 = bb / n, u1 = (bb + 1) / n, v0 = a / n, v1 = (a + 1) / n, q = [P(u0, v0), P(u1, v0), P(u1, v1), P(u0, v1)];
-                const css = vkCss({ k: 'cmyk', v: K((u0 + u1) / 2, (v0 + v1) / 2).map(x => Math.round(x * 2) / 2) });
-                c.beginPath(); c.moveTo(...q[0]); c.lineTo(...q[1]); c.lineTo(...q[2]); c.lineTo(...q[3]); c.closePath();
-                c.fillStyle = css; c.strokeStyle = css; c.lineWidth = 0.8 / k; c.fill(); c.stroke();   // traço da mesma cor: sem fresta
-            }
-        }
+        cv = new OffscreenCanvas(W, H); cv._chave = chave;
+        cv.getContext('2d').putImageData(vkMalhaRaster(o, kr, b, W, H), 0, 0);
         VK.malhaCache.set(o.id, cv);
     }
-    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(cv, Math.round(T.a * b[0] + T.c * b[1] + T.e) - 1, Math.round(T.b * b[0] + T.d * b[1] + T.f) - 1); ctx.restore();
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const x0 = Math.round(T.a * b[0] + T.c * b[1] + T.e) - 1, y0 = Math.round(T.b * b[0] + T.d * b[1] + T.f) - 1;
+    if (kr === k) ctx.drawImage(cv, x0, y0);
+    else { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(cv, x0, y0, W * k / kr, H * k / kr); }
+    ctx.restore();
 }
 // caixa e clique
 const vkBoxSemMalha = vkBox;

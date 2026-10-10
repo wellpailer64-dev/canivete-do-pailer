@@ -129,6 +129,24 @@ Medido com `tools/hw_simular.py leve --sem-app -- comando`, que roda um script P
   - quadros fora de ±40 ms: 5–7% → 2–5%;
   - 90% dos quadros: até 33 ms → até 26 ms.
 
+## Fase 6 (2026-10-10): Vetor — zoom numa malha de degradê congelava
+- `D:/kanivete_testes/idv/idv_v2.aknv` (21 MB) tem 7 malhas 3D com 8.580 células. Medido com `hw_vetor.py` e `hw_vetor_perfil.py`:
+  - o redesenho normal leva 5 ms;
+  - o **1º redesenho depois de um zoom 4× levava 20–26 s** no PC forte e 29 s no leve.
+- A causa estava em `vkMalhaDesenhar`: fatias de ~3 px da tela, cada uma com fill + stroke e conversão CMYK. No zoom isso virava
+  centenas de milhares de polígonos.
+- **Correção** (`vetor-malha.js`):
+  - `vkMalhaRaster` pinta pixel a pixel. A inversa bilinear acha (u, v) na célula e mistura as cores dos 4 nós, que já vêm com a prova de cor.
+  - O teto é `VK_MALHA_MAX_PX` = 2 MP. Acima disso, pinta menor e amplia na tela.
+  - O PDF continua vetorial (ShadingType 6).
+- **Resultado:**
+  - malha sozinha: 41 → 3 ms ajustada e 352 → 10 ms no zoom 4×;
+  - tela inteira: 2,2 s → 46 ms e 20 s → 0,3 s;
+  - PC leve: o pior redesenho caiu de 29 s para 14 ms.
+  - De quebra, sumiram defeitos da versão antiga: chuvisco no brilho, listras na borda e um risco preto entre células 3D.
+    Veja `D:/kanivete_testes/hw/malha_cmp_z4.png` (antiga à esquerda).
+- `testes/teste_vetor.py` PASSOU: 159 ok, sem erro de JS.
+
 ## Pendências (em ordem)
 1. **IA numa placa integrada:** remover fundo (DirectML), gerador_sfx, OmniVoice e melhorar áudio ainda escolhem sozinhos.
    Medir integrada × processador antes de decidir (sem integrada aqui: precisa de um PC de amigo ou de uma máquina emprestada)
