@@ -192,7 +192,10 @@ Caixa "Gerar efeito (IA)" no topo do Soundboard (`frontend/js/editor-sfx-gerar.j
 Modelo (~4 GB) baixado no 1º uso do release `sfx-v1` (pré-lançamento; manifesto com SHA-256, t5.pesos em 2 partes).
 Texto do leitor no PROCESSADOR, gerador/decodificador na placa (recriar sessão DirectML com outra aberta derruba o
 processo). 50 passos (padrão; o Pailer achou "muito melhor" que 25) ≈ 35 s por 10 s numa RTX 3050, pico +4,7 GB.
-Pedido em PT traduzido pelo Ollama (modelo do Kani, keep_alive 0) se houver. Conversão: `D:\kanivete_testes\sfx\ez`
+A Kani reescreve o pedido POR BAIXO (`melhorar_pedido`, `SISTEMA_PEDIDO`) no formato que o EzAudio gera melhor
+(boas práticas do artigo: legenda descritiva em inglês estilo AudioCaps, ordem dos eventos, sem jargão, sem fala/música,
+objetos nunca "groan"), sem fugir do pedido; Ollama (think false, keep_alive 0) ou llama.cpp da Kani (parado depois),
+sempre saindo da placa antes da geração. Conversão: `D:\kanivete_testes\sfx\ez`
 (exportar.py, enxugar.py, consertar.py). Teste: `py -3.13 testes/teste_sfx.py [pasta]`.
 
 ## Soundboard (pack de sons do editor)

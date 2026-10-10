@@ -1,7 +1,8 @@
 // =========================================================
 // Pocket Editor — Gerar efeito sonoro por texto (IA local): caixa no topo do painel Soundboard.
 // Motor: Functions/gerador_sfx.py (EzAudio XL em ONNX, DirectML, sem login; modelo ≈ 4 GB baixado no 1º uso do
-// release sfx-v1). O pedido em português é traduzido pelo Kani (Ollama), se houver; sem ele, vale escrever em inglês.
+// release sfx-v1). A Kani reescreve o pedido POR BAIXO no formato que o modelo gera melhor (inglês, estilo AudioCaps:
+// gerador_sfx.melhorar_pedido); quem pediu não vê. Sem a Kani, o pedido vai como veio (em inglês funciona melhor).
 // O efeito pronto entra no Projeto (pasta "Efeitos gerados") e na timeline, na agulha, na primeira trilha livre.
 // =========================================================
 const VESFX = { estado: null, baixando: null, gerando: null, ultimo: null };
@@ -45,7 +46,7 @@ function veSfxRender() {
             <button class="ve-btn ve-btn-sm ve-btn-primary" data-sfx="gerar" ${g ? 'disabled' : ''}>${g ? veT('Gerando...') : veT('Gerar')}</button>
         </div>
         ${g ? `<div class="ve-sfx-barra"><i style="width:${g.pct || 0}%"></i></div><small class="ve-sfx-msg">${g.msg || ''}</small>` : ''}
-        ${!g && VESFX.ultimo ? `<small class="ve-sfx-msg" title="${veT('Pedido usado no modelo')}">✓ ${VESFX.ultimo.nome} · “${VESFX.ultimo.texto_en}”</small>` : ''}
+        ${!g && VESFX.ultimo ? `<small class="ve-sfx-msg">✓ ${veT('Pronto')}: ${VESFX.ultimo.pedido}</small>` : ''}
         ${!g ? `<div class="ve-sfx-ex">${VESFX_EXEMPLOS.map(t => `<button data-sfx-ex="${t}">${t}</button>`).join('')}</div>` : ''}`;
 }
 
@@ -94,7 +95,7 @@ async function veSfxProgresso(d) {
     }
     const pedido = VESFX.gerando || {};
     VESFX.gerando = null;
-    VESFX.ultimo = { nome: d.nome, texto_en: d.texto_en };
+    VESFX.ultimo = { nome: d.nome, pedido: pedido.texto || d.nome };
     veSfxRender();
     await veSfxInserir(d.path, pedido.texto || d.nome);
 }

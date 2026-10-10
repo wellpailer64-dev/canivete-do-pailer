@@ -288,31 +288,83 @@ def baixar(on_progress):
     return {"success": True}
 
 
-def traduzir(texto):
-    """Pedido em português → inglês (o modelo foi treinado em inglês). Usa o Ollama com o modelo do Kani, se houver, e
-    manda ele sair da placa logo depois (keep_alive 0) para não disputar memória com o gerador. Sem Ollama: como veio."""
+# Boas práticas do EzAudio (artigo arXiv 2409.10819 + exemplos oficiais da demonstração): o modelo foi treinado com
+# LEGENDAS DESCRITIVAS em inglês no estilo AudioCaps ("footsteps crunch on the forest floor as crickets chirp"), escritas
+# por IA a partir do áudio; listas de palavras-chave saem PIORES; dizer a ORDEM dos eventos ajuda; é feito para sons
+# naturais e efeitos (não fala nem música). A Kani reescreve o pedido nesse formato, sem fugir do que foi pedido.
+SISTEMA_PEDIDO = """You are a sound designer who writes prompts for EzAudio, a text-to-audio model trained on AudioCaps-style captions
+(natural one-sentence English descriptions of what is heard). Rewrite the user's request (often in Portuguese) into ONE caption.
+Rules:
+- Keep exactly what was asked: the same sound sources, actions, mood and intensity. Use ONLY the sound sources in the
+  request: never add other objects, machines, animals or people.
+  You may add only acoustic detail that the request implies (material, distance, speed, loudness). Never invent weather,
+  places, surfaces or extra objects that the request does not suggest.
+- Describe physical sources and actions as they are heard, e.g. "a heavy wooden door creaks open slowly".
+  Objects never "groan", "moan", "scream" or "cry" (that turns into a voice): use creak, squeak, rattle, hiss, rumble.
+- Turn editing jargon into what is actually heard: whoosh/swoosh/transition -> "a quick swoosh of air passing by";
+  riser -> "a rising tone that builds in intensity"; impact/hit/boom -> "a deep heavy thud with a short rumble";
+  pop/click/notification -> name the object that makes it ("a soft click of a button", "a small bell dings once").
+- Several events: put them in order with "as", "while", "followed by", "then".
+- No intelligible speech, lyrics or music. Voices only as "people talking indistinctly", "a crowd murmurs", "a man laughs".
+- Fit the length: {seg} seconds. Short (1-3 s): a single event. Long (6-10 s): continuous or repeating sound, ambience.
+- 8 to 25 words, lowercase, present tense, no quotes, no lists, no technical words (cinematic, high quality, 4k, sfx, loop).
+Answer with the caption only.
+
+Examples:
+porta rangendo -> a wooden door creaks open slowly on old hinges
+whoosh rápido de transição -> a quick swoosh of air passes by from left to right
+chuva forte no telhado -> heavy rain pours steadily on a metal roof
+cafeteria movimentada -> people talking indistinctly in a busy cafe as cups and plates clink
+explosão distante -> a distant explosion booms followed by a low rumble fading away
+digitação -> fingers type quickly on a mechanical keyboard with clicking keys"""
+
+
+def _limpa_resposta(out, original):
+    out = re.sub(r"<think>.*?</think>", "", out or "", flags=re.S).strip()
+    linhas = [l.strip().strip('"').strip("'").strip() for l in out.splitlines() if l.strip()]
+    if not linhas:
+        return original
+    r = re.sub(r"^(caption|prompt)\s*:\s*", "", linhas[0], flags=re.I).strip()
+    return r if 3 <= len(r.split()) <= 45 else original
+
+
+def melhorar_pedido(texto, segundos=5):
+    """Pedido do usuário → legenda no formato que o EzAudio gera melhor (inglês, estilo AudioCaps), pela Kani: Ollama
+    (keep_alive 0) ou o motor próprio dela (llama.cpp, parado logo depois). Os dois SAEM DA PLACA antes da geração.
+    Sem Kani: o pedido vai como veio (em inglês funciona melhor)."""
     t = (texto or "").strip()
     if not t:
         return t
+    msgs = [{"role": "system", "content": SISTEMA_PEDIDO.replace("{seg}", str(int(round(float(segundos or 5)))))},
+            {"role": "user", "content": t + " /no_think"}]
     try:
         from Functions import kani
-        if not kani._ollama_tem():
-            return t
-        corpo = json.dumps({"model": kani.OLLAMA_MODELO, "stream": False, "keep_alive": 0, "options": {"temperature": 0},
-                            "prompt": "/no_think Translate this sound-effect description to concise English for an audio "
-                                      "generation model. If it is already English, return it unchanged. Answer with the "
-                                      "English text only.\n\n" + t}).encode("utf-8")
-        req = urllib.request.Request(kani.OLLAMA + "/api/generate", data=corpo, headers={"Content-Type": "application/json"})
-        with urllib.request.urlopen(req, timeout=120) as r:
-            out = json.loads(r.read().decode("utf-8")).get("response", "")
-        out = re.sub(r"<think>.*?</think>", "", out, flags=re.S).strip().strip('"').strip()
-        return out.splitlines()[0].strip() if out else t
+        if kani._ollama_tem():
+            corpo = {"model": kani.OLLAMA_MODELO, "stream": False, "keep_alive": 0, "messages": msgs, "think": False,
+                     "options": {"temperature": 0, "num_predict": 160}}   # sem "think": o Qwen3 gasta tudo pensando
+            req = urllib.request.Request(kani.OLLAMA + "/api/chat", data=json.dumps(corpo).encode("utf-8"),
+                                         headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=180) as r:
+                return _limpa_resposta(json.loads(r.read().decode("utf-8")).get("message", {}).get("content", ""), t)
+        if os.path.exists(kani._exe()) and os.path.exists(kani._gguf()):
+            kani._subir()
+            try:
+                corpo = {"messages": msgs, "temperature": 0, "max_tokens": 160, "stream": False,
+                         "chat_template_kwargs": {"enable_thinking": False}}
+                req = urllib.request.Request(f"http://127.0.0.1:{kani._srv['porta']}/v1/chat/completions",
+                                             data=json.dumps(corpo).encode("utf-8"), headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=180) as r:
+                    out = json.loads(r.read().decode("utf-8"))["choices"][0]["message"]["content"]
+                return _limpa_resposta(out, t)
+            finally:
+                kani.parar()   # solta a placa para o gerador
     except Exception:
-        return t
+        pass
+    return t
 
 
 def gerar_arquivo(texto, segundos, on_progress, passos=None, semente=None, traduzir_pedido=True):
-    """Em segundo plano: traduz (se der), gera e grava o WAV em efeitos_gerados/. on_progress({pct, msg}) /
+    """Em segundo plano: a Kani melhora o pedido (por baixo), gera e grava o WAV em efeitos_gerados/. on_progress({pct, msg}) /
     {fim: True, path, nome, texto_en, medidas} / {erro}."""
     if not _gerando.acquire(blocking=False):
         return {"success": False, "error": "Já está gerando um efeito."}
@@ -323,8 +375,8 @@ def gerar_arquivo(texto, segundos, on_progress, passos=None, semente=None, tradu
     def run():
         try:
             on_progress({"pct": 0, "msg": "Entendendo o pedido..."})
-            en = traduzir(texto) if traduzir_pedido else texto
             seg = max(1.0, min(10.0, float(segundos or 5)))
+            en = melhorar_pedido(texto, seg) if traduzir_pedido else texto
             r = gerar(en, segundos=seg, passos=int(passos or PASSOS_PADRAO), semente=semente,
                       progresso=lambda f, rot: on_progress({"pct": int(f * 100), "msg": rot}))
             slug = re.sub(r"[^a-z0-9]+", "_", (texto or "efeito").lower())[:40].strip("_") or "efeito"
