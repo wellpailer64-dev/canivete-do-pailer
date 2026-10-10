@@ -1,5 +1,5 @@
 // =========================================================
-// Kani — assistente de conversa do KANIVETE (local, Qwen3.5 9B; Functions/kani.py). Gaveta à direita, aberta de
+// Kani — assistente de conversa do KANIVETE (local, Qwen3.5 4B; Functions/kani.py). Gaveta à direita, aberta de
 // qualquer ferramenta: pela bolinha da Home ou pelo item "Kani" na seção IA da barra lateral. Sabe em que ferramenta a
 // pessoa está e responde com a ajuda do app (frontend/ajuda/kani_kb.json); [[abrir:id]] na resposta vira botão.
 // Primeira vez sem IA: oferece baixar (motor + modelo, ~5 GB) com progresso. Conversas em localStorage 'kani-conversas'.
@@ -28,8 +28,17 @@ function kaniFerramentaAtual() {
 }
 function kaniNomeFerramenta(id) { const b = document.querySelector(`.menu-item[data-tool="${id}"] .label`); return b ? b.textContent.trim() : null; }
 
+// resposta que ensina a usar o app (tem [[abrir:id]]) não tem texto para copiar: o Qwen3.5 4B às vezes inventa uma caixinha
+// ```texto no fim ("Seu fundo foi removido!") — some daqui, do Copiar e da voz
+function kaniSemCaixaFalsa(txt) {
+    txt = String(txt || '');
+    const temAbrir = [...txt.matchAll(/\[\[(?:abrir:)?([a-z0-9-]+)\]\]/gi)].some(m => kaniNomeFerramenta(m[1]));   // só ferramenta que existe ("editor-video" inventado não conta)
+    return temAbrir ? txt.replace(/```(texto|text|txt)[ \t]*\n?[\s\S]*?(```|$)/gi, '').replace(/\n{3,}/g, '\n\n') : txt;
+}
+
 // ── markdown simples (negrito, código, listas, títulos) + [[abrir:id]] ──
 function kaniMd(txt) {
+    txt = kaniSemCaixaFalsa(txt);
     const abrir = [];
     // o Qwen3.5 às vezes esquece o "abrir:" e escreve [[remover-fundo]]: vale também, se for uma ferramenta do app
     txt = String(txt || '').replace(/\[\[(abrir:)?([a-z0-9-]+)\]\]/gi, (m, a, id) => { if (!kaniNomeFerramenta(id)) return a ? '' : m; if (!abrir.includes(id)) abrir.push(id); return ''; });
@@ -60,9 +69,9 @@ function kaniMd(txt) {
 }
 
 // ── copiar / ouvir ──
-function kaniLimpo(txt) { return String(txt || '').replace(/\[\[(abrir:)?([a-z0-9-]+)\]\]/gi, (m, a, id) => (a || kaniNomeFerramenta(id) ? '' : m)).trim(); }
+function kaniLimpo(txt) { return kaniSemCaixaFalsa(txt).replace(/\[\[(abrir:)?([a-z0-9-]+)\]\]/gi, (m, a, id) => (a || kaniNomeFerramenta(id) ? '' : m)).trim(); }
 function kaniSemMd(c, ling) { return ['texto', 'text', 'txt', ''].includes(ling) ? c.replace(/\*\*(.+?)\*\*/g, '$1').replace(/__(.+?)__/g, '$1') : c; }   // texto pronto sai limpo para colar
-function kaniBlocosDe(txt) { const out = []; String(txt || '').replace(/```([a-zA-Z0-9_+-]*)[ \t]*\n?([\s\S]*?)(```|$)/g, (_, l, c) => { out.push(kaniSemMd(c.replace(/\n+$/, ''), (l || '').toLowerCase())); return ''; }); return out; }
+function kaniBlocosDe(txt) { const out = []; kaniSemCaixaFalsa(txt).replace(/```([a-zA-Z0-9_+-]*)[ \t]*\n?([\s\S]*?)(```|$)/g, (_, l, c) => { out.push(kaniSemMd(c.replace(/\n+$/, ''), (l || '').toLowerCase())); return ''; }); return out; }
 function kaniParaFala(txt) {   // o que a voz lê: sem formatação, emojis, hashtags, links e blocos de código
     return kaniLimpo(txt).replace(/```(texto|text|txt)?[ \t]*\n?([\s\S]*?)(```|$)/g, (_, l, c) => (l !== undefined || !/[{};=<>]/.test(c)) ? c : ' ')
         .replace(/https?:\/\/\S+/g, ' ').replace(/#(\w+)/g, ' ').replace(/[*_`>|~]/g, '').replace(/^\s*[-•]\s+/gm, '').replace(/^#+\s*/gm, '')

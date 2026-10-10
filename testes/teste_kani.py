@@ -73,6 +73,10 @@ def main():
             pg.wait_for_function("!KANI_API.gerando() && KANI_API.conversa().msgs.length === 2", timeout=240000)
             ok(pg.evaluate("!!document.querySelector('#kani .kani-saida [data-copiar-bloco]')"), "texto pronto numa caixinha com Copiar", pg.evaluate("KANI_API.conversa().msgs[1].content")[:200])
             ok(pg.evaluate("!!document.querySelector('#kani [data-copiar-msg]') && !!document.querySelector('#kani [data-ouvir-msg]')"), "botões Copiar e Ouvir na resposta")
+            falsa = pg.evaluate("""() => { const tem = s => kaniMd(s).includes('kani-saida');
+                return [tem('1. Clique em Salvar.\\n\\n```texto\\nSeu fundo foi removido! 🎨\\n```\\n\\n[[abrir:remover-fundo]]'),
+                        tem('Aqui vai:\\n```texto\\nHoje a fila anda rápido!\\n```\\n[[abrir:editor-video]]'), kaniBlocosDe('x\\n```texto\\nfalsa\\n```\\n[[remover-fundo]]').length]; }""")
+            ok(falsa == [False, True, 0], "caixinha inventada em resposta com [[abrir]] some (Qwen3.5 4B); texto pronto continua", str(falsa))
             t = time.time()
             pg.click("#kani [data-ouvir-msg]")
             try:

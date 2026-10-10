@@ -151,9 +151,9 @@ Conversa, banco de vozes), `som-texto.js` (editar pelo texto, stems, ID3, modelo
 `Functions/sound_kanivete.py`, `sk_gravar.py`. Teste: `python testes/teste_som.py`.
 
 ## Kani (assistente de conversa)
-Chat local tipo ChatGPT (Qwen3.5 9B; bancada de modelos e escolha em `Instructions/agente/kani-motor.md`): bolinha na Home + IA › Kani na barra lateral, gaveta à direita de qualquer ferramenta
-(`frontend/js/kani.js`, `css/kani.css`, `Functions/kani.py`). Motor: Ollama com qwen3.5:9b (ou qwen3:8b) se houver; senão llama.cpp Vulkan
-+ Qwen3.5-9B-Q4_K_M.gguf (~5,7 GB) baixados sob demanda em `modelos_ia/kani`. Ajuda do app: `frontend/ajuda/kani_kb.json`
+Chat local tipo ChatGPT (Qwen3.5 4B Q5_K_M; bancada de modelos e escolha em `Instructions/agente/kani-motor.md`): bolinha na Home + IA › Kani na barra lateral, gaveta à direita de qualquer ferramenta
+(`frontend/js/kani.js`, `css/kani.css`, `Functions/kani.py`). Motor: Ollama com qwen3.5:4b (ou 9b/qwen3:8b) se houver; senão llama.cpp Vulkan
++ Qwen3.5-4B-Q5_K_M.gguf (~3,1 GB) baixados sob demanda em `modelos_ia/kani`. Ajuda do app: `frontend/ajuda/kani_kb.json`
 (trechos dos guias, busca BM25) — regenerar com `py -3.13 tools/kani_kb.py` ao mudar guias/ferramentas. Nome em
 `kani.NOME`. Avatar `frontend/identidade/kani.webp` (original `D:/kanivete_biblioteca/marcas/kani/kani_oficial.png`, inteira com cantos arredondados como o logo). Ouvir: voz Fran
 (OmniVoice 12 passos + `kani.PRONUNCIA` para nomes do app e siglas) mantida carregada enquanto o chat está aberto (`omnivoice_tool.manter_carregado`/`descarregar`,

@@ -15,8 +15,12 @@ SISTEMA = ("Você é o Canivete Worker, o assistente que opera o Photo Kanivete 
            "Camadas do documento: " + ", ".join(PROVA["camadas"]) + ". Use exatamente esses nomes.")
 
 
-def chamar(modelo, pedido):
-    corpo = {"model": modelo, "stream": False, "messages": [{"role": "system", "content": SISTEMA}, {"role": "user", "content": pedido}],
+LEITURA = ("listar_camadas", "info_camada")
+VOLTAS = int(os.environ.get("ENTREVISTA_VOLTAS", "0"))   # >0: como o worker.py, devolve a leitura e deixa o modelo seguir
+
+
+def chamar(modelo, pedido, extra=()):
+    corpo = {"model": modelo, "stream": False, "messages": [{"role": "system", "content": SISTEMA}, {"role": "user", "content": pedido}, *extra],
              "tools": FERR, "options": {"temperature": 0, "num_ctx": 4096}, "keep_alive": "10m"}
     if modelo.startswith(("qwen3", "gemma4")): corpo["think"] = False   # sem raciocínio: o worker só executa
     req = urllib.request.Request(URL, data=json.dumps(corpo).encode(), headers={"Content-Type": "application/json"})
@@ -77,6 +81,16 @@ for m in modelos:
             r, dt = chamar(m, caso["pedido"])
             msg = r.get("message", {})
             calls = [{"name": c["function"]["name"], "args": c["function"].get("arguments") or {}} for c in msg.get("tool_calls") or []]
+            extra, lidas = [], []
+            for _ in range(VOLTAS):   # só leu camadas: responde a leitura (como o executor) e pede de novo
+                if not calls or any(c["name"] not in LEITURA for c in calls): break
+                extra += [{"role": "assistant", "content": msg.get("content", ""), "tool_calls": msg.get("tool_calls")}]
+                extra += [{"role": "tool", "content": json.dumps({"camadas": PROVA["camadas"]}, ensure_ascii=False)} for _c in calls]
+                lidas += calls
+                r, dt2 = chamar(m, caso["pedido"], extra); dt += dt2
+                msg = r.get("message", {})
+                calls = [{"name": c["function"]["name"], "args": c["function"].get("arguments") or {}} for c in msg.get("tool_calls") or []]
+            if lidas and not calls: calls = lidas   # só leu e parou: conta a leitura (vale nos casos de "leitura")
             for c in calls:
                 if isinstance(c["args"], str):
                     try: c["args"] = json.loads(c["args"])

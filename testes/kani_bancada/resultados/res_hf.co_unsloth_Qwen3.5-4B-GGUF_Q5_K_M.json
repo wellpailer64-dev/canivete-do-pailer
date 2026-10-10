@@ -1,0 +1,389 @@
+{
+ "modelo": "hf.co/unsloth/Qwen3.5-4B-GGUF:Q5_K_M",
+ "ajuda": [
+  {
+   "pergunta": "Como eu exporto um vídeo no editor?",
+   "resposta": "No **Editor Kanivete**, para exportar seu vídeo, siga este passo a passo simples:\n\n1.  No canto superior direito da tela do Editor, clique no botão **Exportar** (ou use o atalho **Ctrl+M**).\n2.  Isso abrirá o **Kanivete Encoder**.\n3.  Nas configurações à esquerda, escolha a resolução e o formato de saída que deseja.\n4.  Na área de fila de renderização à direita, clique em **Adicionar à fila** para incluir o seu vídeo.\n5.  Após adicionar, clique no botão ▶ **Renderizar** para iniciar a criação do arquivo final.\n\n[[abrir:editor-kanivete]]",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 19.31,
+    "primeira_s": 16.14,
+    "tokens": 151,
+    "tok_s": 47.6,
+    "carga_s": 3.98
+   }
+  },
+  {
+   "pergunta": "Quem criou o Kanivete?",
+   "resposta": "O Kanivete foi criado por Wellington Pailer.",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 2.74,
+    "primeira_s": 2.5,
+    "tokens": 12,
+    "tok_s": 51.1,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "Como removo o fundo de uma foto?",
+   "resposta": "Para remover o fundo de uma foto no KANIVETE:\n\n1. Abra o app e vá até a seção **Imagem**.\n2. Clique em **Remover Fundo**.\n3. Arraste a sua imagem (JPG, PNG, WEBP ou HEIC) para a área indicada ou selecione-a pelo nome.\n4. Aguarde o processamento da IA e revise o resultado.\n5. Clique em salvar.\n\n[[abrir:remover-fundo]]",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 3.61,
+    "primeira_s": 1.49,
+    "tokens": 103,
+    "tok_s": 48.6,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "Consigo abrir um projeto do Premiere no Kanivete?",
+   "resposta": "Sim, você pode abrir projetos do Premiere no Editor Kanivete. Para fazer isso, basta arrastar o arquivo `.prproj` para dentro da área de trabalho do editor ou usar o menu **Arquivo > Abrir**.\n\nAo abrir, o Kanivete converterá o projeto automaticamente. Ele entrará como \"Não salvo\" e, ao salvar, sugerirá um novo arquivo com a extensão `.vknv` (o novo formato do Kanivete). Um relatório aparecerá mostrando o que foi convertido com sucesso, o que veio aproximadamente e quais elementos (como textos, efeitos complexos ou plugins) não foram importados.\n\nPara voltar a trabalhar no Premiere Pro com o mesmo projeto reformulado no Kanivete, você pode usar a função **Exportar para o Premiere (XML)**. Isso gera um arquivo XML que, ao ser importado no Premiere, recria a estrutura do projeto Kanivete para você continuar editando lá.\n\nSe quiser iniciar esse processo de importação agora, acesse o Editor:\n[[abrir:video-cutter]]",
+   "pontos": 0.5,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [
+    ""
+   ],
+   "medidas": {
+    "total_s": 5.81,
+    "primeira_s": 1.17,
+    "tokens": 223,
+    "tok_s": 48.1,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "Como faço legenda automática do que as pessoas falam no vídeo?",
+   "resposta": "Para criar legendas automáticas do que as pessoas falam no seu vídeo, use a ferramenta **Transcrever** do Sound Kanivete. Ela usa a inteligência artificial do Whisper para transformar a fala em texto e gerar legendas no formato .srt (comprido de Premiere e CapCut).\n\nSiga estes passos:\n\n1.  Abra o **Sound Kanivete**.\n2.  Arraste o seu vídeo (ou áudios) para a área de trabalho.\n3.  O app processará e gerará um arquivo de texto com o que foi dito.\n4.  Você pode baixar o arquivo de texto ou gerar diretamente a legenda `.srt` para usar no vídeo.\n\n[[abrir:transcrever-audio]]",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 4.49,
+    "primeira_s": 1.18,
+    "tokens": 158,
+    "tok_s": 47.7,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "O Kanivete precisa de internet pra funcionar?",
+   "resposta": "Não, o Kanivete **não precisa de internet** para funcionar.\n\nTudo roda localmente no computador da pessoa. Os arquivos são processados no próprio disco, e as ferramentas de IA (como transcrição, remoção de fundo e geração de voz) usam modelos que já vêm instalados no sistema ou são baixados automaticamente pela primeira vez, mas o processo continua funcionando offline após a instalação inicial.\n\nSe precisar de ajuda para abrir alguma ferramenta específica, é só me dizer! [[abrir:video-cutter]]",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 3.6,
+    "primeira_s": 1.31,
+    "tokens": 109,
+    "tok_s": 47.5,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "Como eu mando o vídeo direto pro TikTok pelo Kanivete, sem sair do app?",
+   "resposta": "Para enviar o vídeo para o TikTok diretamente pelo Kanivete sem sair do app, você precisa usar a ferramenta de **Baixar Vídeo**, pois o próprio Editor Kanivete foca na edição e não tem um botão nativo de \"publicar\" em redes sociais.\n\nAqui está o passo a passo:\n\n1.  Abra a seção **Baixar Vídeo** na barra lateral esquerda.\n2.  Cole o link do vídeo do TikTok que você quer postar (ou de outro site) na área de arrastar ou colar.\n3.  Clique em **Baixar** para salvar o vídeo no seu computador.\n4.  Vá até a pasta onde o vídeo foi salvo.\n5.  Abra o aplicativo do **TikTok**, vá para o seu perfil, clique em **Criar** e faça o upload do vídeo que você acabou de baixar.\n6.  Configure a legenda, a música e publique.\n\n[[abrir:video-downloader]]",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 6.0,
+    "primeira_s": 1.58,
+    "tokens": 209,
+    "tok_s": 47.3,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "Escreva uma legenda curta e animada para um reels de academia.",
+   "resposta": "```texto\nPulsa no ritmo, quebra a barreira! 💪🔥\n```\n\nAqui está uma legenda curta e animada para um Reels de academia, focada em energia e motivação:\n\n```texto\nPulsa no ritmo, quebra a barreira! 💪🔥\n```\n\nSe precisar de variações ou um texto para outro tipo de vídeo (como um tutorial ou post de nutrição), é só pedir!",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 3.47,
+    "primeira_s": 1.39,
+    "tokens": 100,
+    "tok_s": 48.2,
+    "carga_s": 0.0
+   }
+  }
+ ],
+ "vram_gb": 3.46,
+ "tamanho_gb": 3.46,
+ "sfx": [
+  {
+   "pedido": "porta de madeira rangendo",
+   "seg": 4,
+   "saida": "a heavy wooden door creaks slowly on old hinges",
+   "bruto": "a heavy wooden door creaks slowly on old hinges",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.76,
+    "primeira_s": 0.53,
+    "tokens": 12,
+    "tok_s": 52.4,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "whoosh rápido de transição",
+   "seg": 2,
+   "saida": "a quick swoosh of air passes by from left to right",
+   "bruto": "a quick swoosh of air passes by from left to right",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.69,
+    "primeira_s": 0.45,
+    "tokens": 13,
+    "tok_s": 52.1,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "cafeteria cheia de gente",
+   "seg": 10,
+   "saida": "people talk indistinctly in a busy cafe as cups and plates clink",
+   "bruto": "people talk indistinctly in a busy cafe as cups and plates clink",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.78,
+    "primeira_s": 0.45,
+    "tokens": 17,
+    "tok_s": 51.0,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "som de notificação de celular",
+   "seg": 2,
+   "saida": "a soft chime of a phone notification rings once",
+   "bruto": "a soft chime of a phone notification rings once",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.64,
+    "primeira_s": 0.43,
+    "tokens": 11,
+    "tok_s": 52.6,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "riser de tensão pra antes da virada",
+   "seg": 6,
+   "saida": "a rising tone builds in intensity before the turn",
+   "bruto": "a rising tone builds in intensity before the turn",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.63,
+    "primeira_s": 0.44,
+    "tokens": 10,
+    "tok_s": 52.4,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "cachorro latindo longe e carro passando",
+   "seg": 8,
+   "saida": "a dog barks faintly in the distance while a car passes by",
+   "bruto": "a dog barks faintly in the distance while a car passes by",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.73,
+    "primeira_s": 0.44,
+    "tokens": 15,
+    "tok_s": 51.4,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "impacto pesado tipo trailer de filme",
+   "seg": 3,
+   "saida": "a heavy thud hits with a deep rumble that fades slowly",
+   "bruto": "a heavy thud hits with a deep rumble that fades slowly",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.69,
+    "primeira_s": 0.42,
+    "tokens": 14,
+    "tok_s": 51.7,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "vidro quebrando",
+   "seg": 3,
+   "saida": "a glass shatters loudly with a sharp crack and a quick rumble",
+   "bruto": "a glass shatters loudly with a sharp crack and a quick rumble",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.44,
+    "primeira_s": 0.15,
+    "tokens": 15,
+    "tok_s": 52.0,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "chuva fraca na janela à noite",
+   "seg": 10,
+   "saida": "light rain taps softly on the glass window at night",
+   "bruto": "light rain taps softly on the glass window at night",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.63,
+    "primeira_s": 0.43,
+    "tokens": 11,
+    "tok_s": 52.6,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "passos rápidos numa escada de madeira",
+   "seg": 5,
+   "saida": "fingers type quickly on a mechanical keyboard with clicking keys",
+   "bruto": "fingers type quickly on a mechanical keyboard with clicking keys",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.68,
+    "primeira_s": 0.44,
+    "tokens": 12,
+    "tok_s": 51.5,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "multidão aplaudindo num estádio",
+   "seg": 8,
+   "saida": "a crowd applauds loudly in a stadium",
+   "bruto": "a crowd applauds loudly in a stadium",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.62,
+    "primeira_s": 0.45,
+    "tokens": 9,
+    "tok_s": 53.4,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "teclado digitando rápido",
+   "seg": 5,
+   "saida": "fingers type quickly on a mechanical keyboard with clicking keys",
+   "bruto": "fingers type quickly on a mechanical keyboard with clicking keys",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.67,
+    "primeira_s": 0.44,
+    "tokens": 12,
+    "tok_s": 52.1,
+    "carga_s": 0.0
+   }
+  }
+ ],
+ "json": [
+  {
+   "pedido": "Extraia os dados do pedido e responda SÓ com JSON no formato {\"cliente\": texto, ",
+   "resposta": "{\"cliente\": \"Padaria Sol\", \"valor\": 1250.5, \"data\": \"2026-03-03\", \"itens\": [\"2 banners\", \"1 adesivo de vitrine\"]}",
+   "falhas": [],
+   "medidas": {
+    "total_s": 1.22,
+    "primeira_s": 0.2,
+    "tokens": 51,
+    "tok_s": 49.7,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "Transforme o pedido em comandos do editor. Ações permitidas: cortar(t), mover(cl",
+   "resposta": "{\"comandos\": [{\"acao\": \"t\", \"args\": {\"duracao\": 12}}, {\"acao\": \"volume\", \"args\": {\"trilha\": \"A2\", \"db\": -6}}, {\"acao\": \"texto\", \"args\": {\"duracao\": 3, \"conteudo\": \"Promoção\"}}]",
+   "falhas": [
+    "JSON inválido"
+   ],
+   "medidas": {
+    "total_s": 1.62,
+    "primeira_s": 0.18,
+    "tokens": 71,
+    "tok_s": 49.3,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "Classifique cada comentário como positivo, negativo ou neutro. Responda SÓ com J",
+   "resposta": "{\"rotulos\": [\"positivo\", \"negativo\", \"neutro\", \"negativo\", \"positivo\"]}",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.68,
+    "primeira_s": 0.16,
+    "tokens": 26,
+    "tok_s": 50.4,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "Some os valores e responda SÓ com JSON {\"total\": número, \"maior\": texto}.\nCâmera",
+   "resposta": "{\"total\": 4089.9, \"maior\": \"Câmera 3200\"}",
+   "falhas": [
+    "total errado"
+   ],
+   "medidas": {
+    "total_s": 0.66,
+    "primeira_s": 0.14,
+    "tokens": 26,
+    "tok_s": 50.5,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "Responda SÓ com JSON {\"ok\": booleano, \"motivo\": texto}: a resolução 1080x1920 é ",
+   "resposta": "{\"ok\": true, \"motivo\": \"Sim, a resolução 1080x1920 é vertical (proporção 9:16), pois a altura (1920) é maior que a largura (1080).\"}",
+   "falhas": [],
+   "medidas": {
+    "total_s": 1.35,
+    "primeira_s": 0.16,
+    "tokens": 59,
+    "tok_s": 49.9,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "Separe nome e sobrenome de cada pessoa e responda SÓ com JSON {\"pessoas\": [{\"nom",
+   "resposta": "{\"pessoas\": [{\"nome\": \"Ana\", \"sobrenome\": \"Lúcia Ferreira\"}, {\"nome\": \"Carlos\", \"sobrenome\": \"Eduardo de Souza\"}, {\"nome\": \"Bia\", \"sobrenome\": \"Lima\"}]}",
+   "falhas": [],
+   "medidas": {
+    "total_s": 1.34,
+    "primeira_s": 0.17,
+    "tokens": 58,
+    "tok_s": 49.7,
+    "carga_s": 0.0
+   }
+  }
+ ],
+ "resumo": {
+  "ajuda_pontos": 9.4,
+  "sfx_ok": 12,
+  "sfx_total": 12,
+  "json_ok": 4,
+  "json_total": 6,
+  "tok_s": 50.4,
+  "primeira_s": 0.44,
+  "carga_s": 3.98,
+  "vram_gb": 3.46,
+  "tempo_total_min": 1.1
+ }
+}

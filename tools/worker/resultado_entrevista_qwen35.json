@@ -1,0 +1,670 @@
+{
+ "qwen3.5:9b": {
+  "acerto": 92.5,
+  "por_categoria": {
+   "simples": 90,
+   "numero": 94,
+   "estilo": 100,
+   "acabamento": 83,
+   "alinhar": 100,
+   "multi": 80,
+   "leitura": 100,
+   "nada": 100
+  },
+  "tempo_medio_s": 2.09,
+  "tok_s": 30.8,
+  "vram_mb": 7615,
+  "casos": [
+   {
+    "cat": "simples",
+    "pedido": "esconde o logo",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "visibilidade",
+      "args": {
+       "camada": "logo",
+       "visivel": false
+      }
+     }
+    ],
+    "s": 1.43
+   },
+   {
+    "cat": "simples",
+    "pedido": "mostra a assinatura de novo",
+    "nota": 0.0,
+    "motivo": "ferramentas ['info_camada'] (esperado ['visibilidade'])",
+    "chamadas": [
+     {
+      "name": "info_camada",
+      "args": {
+       "camada": "assinatura"
+      }
+     }
+    ],
+    "s": 1.56
+   },
+   {
+    "cat": "simples",
+    "pedido": "troca o título para PROMOÇÃO DE VERÃO",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "alterar_texto",
+      "args": {
+       "camada": "titulo",
+       "texto": "PROMOÇÃO DE VERÃO"
+      }
+     }
+    ],
+    "s": 2.17
+   },
+   {
+    "cat": "simples",
+    "pedido": "deixa o card em multiplicação",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "modo_mesclagem",
+      "args": {
+       "camada": "card",
+       "modo": "multiplicacao"
+      }
+     }
+    ],
+    "s": 2.0
+   },
+   {
+    "cat": "simples",
+    "pedido": "opacidade do fundo em 40%",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "opacidade",
+      "args": {
+       "camada": "fundo",
+       "valor": 40
+      }
+     }
+    ],
+    "s": 1.94
+   },
+   {
+    "cat": "simples",
+    "pedido": "gira a foto 15 graus",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "girar_camada",
+      "args": {
+       "camada": "foto",
+       "graus": 15
+      }
+     }
+    ],
+    "s": 1.99
+   },
+   {
+    "cat": "simples",
+    "pedido": "exporta tudo",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "exportar",
+      "args": {
+       "o_que": "tudo"
+      }
+     }
+    ],
+    "s": 1.48
+   },
+   {
+    "cat": "simples",
+    "pedido": "exporta só o que está selecionado",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "exportar",
+      "args": {
+       "o_que": "selecionadas"
+      }
+     }
+    ],
+    "s": 1.53
+   },
+   {
+    "cat": "simples",
+    "pedido": "leva pro editor pra eu animar, um vídeo por slide",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "levar_para_editor",
+      "args": {
+       "modo": "slides"
+      }
+     }
+    ],
+    "s": 1.53
+   },
+   {
+    "cat": "simples",
+    "pedido": "manda a tira inteira pro editor de vídeo",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "levar_para_editor",
+      "args": {
+       "modo": "inteiro"
+      }
+     }
+    ],
+    "s": 1.55
+   },
+   {
+    "cat": "numero",
+    "pedido": "deixa o logo um pouco menor",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "escalar_camada",
+      "args": {
+       "camada": "logo",
+       "escala": 0.9
+      }
+     }
+    ],
+    "s": 2.05
+   },
+   {
+    "cat": "numero",
+    "pedido": "logo bem maior",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "escalar_camada",
+      "args": {
+       "camada": "logo",
+       "escala": 1.5
+      }
+     }
+    ],
+    "s": 2.01
+   },
+   {
+    "cat": "numero",
+    "pedido": "dobra o tamanho da foto",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "escalar_camada",
+      "args": {
+       "camada": "foto",
+       "escala": 2
+      }
+     }
+    ],
+    "s": 1.96
+   },
+   {
+    "cat": "numero",
+    "pedido": "sobe o título uns 20 pixels",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "mover_camada",
+      "args": {
+       "camada": "titulo",
+       "dx": 0,
+       "dy": -20
+      }
+     }
+    ],
+    "s": 2.35
+   },
+   {
+    "cat": "numero",
+    "pedido": "joga o botão 50px pra direita",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "mover_camada",
+      "args": {
+       "camada": "botao",
+       "dx": 50,
+       "dy": 0
+      }
+     }
+    ],
+    "s": 2.33
+   },
+   {
+    "cat": "numero",
+    "pedido": "coloca o logo em 40, 40",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "posicionar_camada",
+      "args": {
+       "camada": "logo",
+       "x": 40,
+       "y": 40
+      }
+     }
+    ],
+    "s": 2.28
+   },
+   {
+    "cat": "numero",
+    "pedido": "deixa o card meio transparente",
+    "nota": 0.5,
+    "motivo": "opacidade.valor=80 (esperado [35, 65])",
+    "chamadas": [
+     {
+      "name": "opacidade",
+      "args": {
+       "camada": "card",
+       "valor": 80
+      }
+     }
+    ],
+    "s": 1.91
+   },
+   {
+    "cat": "numero",
+    "pedido": "gira a foto pro outro lado, uns 5 graus anti-horário",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "girar_camada",
+      "args": {
+       "camada": "foto",
+       "graus": -5
+      }
+     }
+    ],
+    "s": 2.13
+   },
+   {
+    "cat": "estilo",
+    "pedido": "título em vermelho #e30613",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "estilo_texto",
+      "args": {
+       "camada": "titulo",
+       "cor": "#e30613"
+      }
+     }
+    ],
+    "s": 2.18
+   },
+   {
+    "cat": "estilo",
+    "pedido": "subtítulo com 48 px",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "estilo_texto",
+      "args": {
+       "camada": "subtitulo",
+       "tamanho": 48
+      }
+     }
+    ],
+    "s": 2.11
+   },
+   {
+    "cat": "estilo",
+    "pedido": "muda a fonte do título pra Bebas Neue",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "estilo_texto",
+      "args": {
+       "camada": "titulo",
+       "fonte": "Bebas Neue"
+      }
+     }
+    ],
+    "s": 2.18
+   },
+   {
+    "cat": "estilo",
+    "pedido": "pinta a foto de verde #46c33f",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "cor_objeto",
+      "args": {
+       "camada": "foto",
+       "cor": "#46c33f"
+      }
+     }
+    ],
+    "s": 2.13
+   },
+   {
+    "cat": "estilo",
+    "pedido": "põe uma sombra forte no card",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "sombra_projetada",
+      "args": {
+       "camada": "card",
+       "intensidade": "forte"
+      }
+     }
+    ],
+    "s": 2.05
+   },
+   {
+    "cat": "estilo",
+    "pedido": "sombra leve no botão",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "sombra_projetada",
+      "args": {
+       "camada": "botao",
+       "intensidade": "leve"
+      }
+     }
+    ],
+    "s": 2.13
+   },
+   {
+    "cat": "estilo",
+    "pedido": "deixa o título com cara de gasto, grunge",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "titulo_gasto",
+      "args": {
+       "camadas": [
+        "titulo"
+       ],
+       "cor": "#000000"
+      }
+     }
+    ],
+    "s": 2.31
+   },
+   {
+    "cat": "estilo",
+    "pedido": "aplica efeito gasto no título e no subtítulo",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "titulo_gasto",
+      "args": {
+       "camadas": [
+        "titulo",
+        "subtitulo"
+       ],
+       "cor": "#000000"
+      }
+     }
+    ],
+    "s": 2.44
+   },
+   {
+    "cat": "acabamento",
+    "pedido": "dá um acabamento com mais claridade e um pouco de grão",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "acabamento",
+      "args": {
+       "claridade": 8,
+       "granulacao": 5
+      }
+     }
+    ],
+    "s": 2.22
+   },
+   {
+    "cat": "acabamento",
+    "pedido": "esquenta a imagem toda",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "acabamento",
+      "args": {
+       "temperatura": 8
+      }
+     }
+    ],
+    "s": 1.65
+   },
+   {
+    "cat": "acabamento",
+    "pedido": "deixa as cores de tudo mais vivas",
+    "nota": 0.5,
+    "motivo": "acabamento.vibracao=100 (esperado [10, 90])",
+    "chamadas": [
+     {
+      "name": "acabamento",
+      "args": {
+       "vibracao": 100
+      }
+     }
+    ],
+    "s": 1.71
+   },
+   {
+    "cat": "alinhar",
+    "pedido": "alinha o título e o subtítulo pela esquerda",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "alinhar",
+      "args": {
+       "camadas": [
+        "titulo",
+        "subtitulo"
+       ],
+       "modo": "esquerda"
+      }
+     }
+    ],
+    "s": 2.36
+   },
+   {
+    "cat": "alinhar",
+    "pedido": "centraliza o botão e o card na horizontal",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "alinhar",
+      "args": {
+       "camadas": [
+        "botao",
+        "card"
+       ],
+       "modo": "centro_horizontal"
+      }
+     }
+    ],
+    "s": 2.31
+   },
+   {
+    "cat": "multi",
+    "pedido": "esconde a assinatura e exporta tudo",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "visibilidade",
+      "args": {
+       "camada": "assinatura",
+       "visivel": false
+      }
+     },
+     {
+      "name": "exportar",
+      "args": {
+       "o_que": "tudo"
+      }
+     }
+    ],
+    "s": 3.01
+   },
+   {
+    "cat": "multi",
+    "pedido": "troca o subtítulo para 'Só hoje' e deixa ele branco",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "alterar_texto",
+      "args": {
+       "camada": "subtitulo",
+       "texto": "Só hoje"
+      }
+     },
+     {
+      "name": "estilo_texto",
+      "args": {
+       "camada": "subtitulo",
+       "cor": "#FFFFFF"
+      }
+     }
+    ],
+    "s": 3.6
+   },
+   {
+    "cat": "multi",
+    "pedido": "logo 10% menor e com opacidade 80",
+    "nota": 0.0,
+    "motivo": "ferramentas ['escalar_camada'] (esperado ['escalar_camada', 'opacidade'])",
+    "chamadas": [
+     {
+      "name": "escalar_camada",
+      "args": {
+       "camada": "logo",
+       "escala": 0.9
+      }
+     }
+    ],
+    "s": 2.19
+   },
+   {
+    "cat": "multi",
+    "pedido": "gira o logo 10 graus e sobe ele 30px",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "girar_camada",
+      "args": {
+       "camada": "logo",
+       "graus": 10
+      }
+     },
+     {
+      "name": "mover_camada",
+      "args": {
+       "camada": "logo",
+       "dx": 0,
+       "dy": -30
+      }
+     }
+    ],
+    "s": 3.83
+   },
+   {
+    "cat": "multi",
+    "pedido": "gera uma foto de uma mulher correndo na praia ao pôr do sol, formato 4:5",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "gerar_imagem",
+      "args": {
+       "prompt": "woman running on beach at sunset",
+       "proporcao": "4:5"
+      }
+     }
+    ],
+    "s": 2.44
+   },
+   {
+    "cat": "leitura",
+    "pedido": "qual fonte está no título?",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "info_camada",
+      "args": {
+       "camada": "titulo"
+      }
+     }
+    ],
+    "s": 1.55
+   },
+   {
+    "cat": "leitura",
+    "pedido": "onde está o logo?",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [
+     {
+      "name": "info_camada",
+      "args": {
+       "camada": "logo"
+      }
+     }
+    ],
+    "s": 1.5
+   },
+   {
+    "cat": "nada",
+    "pedido": "valeu, ficou ótimo!",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [],
+    "s": 1.23
+   },
+   {
+    "cat": "nada",
+    "pedido": "o que você acha do layout? tá elegante?",
+    "nota": 1.0,
+    "motivo": "",
+    "chamadas": [],
+    "s": 2.46
+   }
+  ]
+ }
+}

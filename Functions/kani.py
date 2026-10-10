@@ -1,13 +1,13 @@
 """Kani — assistente de conversa do KANIVETE (tipo ChatGPT, local e offline), para tarefas do dia a dia e,
 principalmente, dúvidas de como usar o app.
 
-Modelo: Qwen3.5 9B (desde 2026-10-10; antes Qwen3 8B). Escolhido numa bancada com 6 modelos na RTX 3050 — mesma velocidade
-e memória do Qwen3 8B, muito mais honesto (não inventa botão que o app não tem): Instructions/agente/kani-motor.md.
+Modelo: Qwen3.5 4B Q5_K_M (desde 2026-10-10; antes Qwen3.5 9B e Qwen3 8B). Bancada na RTX 3050: mesma nota do 9B na ajuda,
+honesto (não inventa botão), ~50 tok/s e ~2 GB a menos na placa: Instructions/agente/kani-motor.md (Fases 2 e 3).
 Motor, nesta ordem:
-  1. Ollama já instalado e rodando com o qwen3.5:9b (ou, se só houver ele, o qwen3:8b antigo) — não baixa nada;
-  2. llama.cpp (llama-server, build Vulkan, ~33 MB: NVIDIA/AMD/Intel) + Qwen3.5-9B-Q4_K_M.gguf (unsloth, Apache 2.0, ~5,7 GB),
-     baixados sob demanda na 1ª conversa para <app>/modelos_ia/kani/ (nada no C:, nada instalado no Windows). O GGUF do
-     Qwen3 8B antigo é apagado depois que o novo chega.
+  1. Ollama já instalado e rodando com o qwen3.5:4b (ou, se só houver ele, o 9B/8B anteriores) — não baixa nada;
+  2. llama.cpp (llama-server, build Vulkan, ~33 MB: NVIDIA/AMD/Intel) + Qwen3.5-4B-Q5_K_M.gguf (unsloth, Apache 2.0, ~3,1 GB),
+     baixados sob demanda na 1ª conversa para <app>/modelos_ia/kani/ (nada no C:, nada instalado no Windows). Os GGUF
+     anteriores (GGUF_ANTIGOS) são apagados depois que o novo chega.
 O servidor do llama.cpp sobe quando precisa, fica preso ao app (fecha junto) e sai da placa depois de OCIOSO s parado.
 Ajuda do app: frontend/ajuda/kani_kb.json (tools/kani_kb.py) — trechos dos guias; os mais parecidos com a pergunta
 (BM25 simples) entram no prompt, para responder sem inventar menus.
@@ -29,12 +29,12 @@ from Functions.midia import NO_WINDOW, app_dir
 NOME = "Kani"
 LLAMA_TAG = "b11483"
 LLAMA_ZIP = f"https://github.com/ggml-org/llama.cpp/releases/download/{LLAMA_TAG}/llama-{LLAMA_TAG}-bin-win-vulkan-x64.zip"
-GGUF = "Qwen3.5-9B-Q4_K_M.gguf"
-GGUF_URL = "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/" + GGUF
-GGUF_ANTIGOS = ("Qwen3-8B-Q4_K_M.gguf",)   # modelos anteriores da Kani: apagados quando o novo chega
-TAM = {"zip": 33_404_507, "gguf": 5_680_522_464}
+GGUF = "Qwen3.5-4B-Q5_K_M.gguf"
+GGUF_URL = "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/" + GGUF
+GGUF_ANTIGOS = ("Qwen3.5-9B-Q4_K_M.gguf", "Qwen3-8B-Q4_K_M.gguf")   # modelos anteriores da Kani: apagados quando o novo chega
+TAM = {"zip": 33_404_507, "gguf": 3_143_656_608}
 OLLAMA = "http://127.0.0.1:11434"
-OLLAMA_MODELOS = ("qwen3.5:9b", "qwen3:8b")   # o 1º que o Ollama tiver (o 8B só para quem ainda não baixou o novo)
+OLLAMA_MODELOS = ("qwen3.5:4b", "qwen3.5:9b", "qwen3:8b")   # o 1º que o Ollama tiver (os anteriores só para quem ainda não baixou o novo)
 OLLAMA_MODELO = OLLAMA_MODELOS[0]             # atualizado por _ollama_tem() com o que estiver instalado
 OCIOSO = 300          # s parado até soltar a placa
 CTX = 8192
@@ -113,7 +113,7 @@ def baixar(on_progress):
             for destino, url, tam in itens:
                 pronto = os.path.isfile(_exe()) if destino.endswith(".zip") else os.path.isfile(destino)
                 if not pronto:
-                    nome = "o motor" if destino.endswith(".zip") else "o modelo Qwen3.5 9B"
+                    nome = "o motor" if destino.endswith(".zip") else "o modelo Qwen3.5 4B"
 
                     def prog(feito, tot, nome=nome, antes=antes):
                         on_progress({"pct": min(99, int((antes + feito) * 100 / total)), "msg": f"Baixando {nome}: {feito / 1e9:.2f} / {max(tot, feito) / 1e9:.2f} GB"})
@@ -189,7 +189,7 @@ def _vigiar():
 
 
 def _apagar_antigos():
-    """O modelo anterior não serve mais: libera os ~5 GB (tenta de novo se o Windows ainda segura o arquivo)."""
+    """Os modelos anteriores não servem mais: libera os ~5 GB (tenta de novo se o Windows ainda segura o arquivo)."""
     for a in GGUF_ANTIGOS:
         c = os.path.join(pasta(), a)
         for _ in range(10):
