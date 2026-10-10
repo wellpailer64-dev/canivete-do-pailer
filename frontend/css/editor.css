@@ -898,6 +898,9 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-dgroup {
     display: flex; flex-direction: column; min-width: 140px; min-height: 90px;
     background: var(--ve-panel); border: 1px solid var(--ve-line); border-radius: 4px; overflow: hidden;
+    /* cada painel é independente: o que muda num (timecode, medidor, prévias animadas) não repinta os outros. No play do
+       depo.vknv: pintura −58%, camadas −56% (2026-10-10). Menus e janelinhas vão para o body, fora do painel. */
+    contain: content;
 }
 .ve-dgroup.has-timeline { min-height: 150px; min-width: 320px; }
 .ve-dgroup.has-monitor { min-width: 240px; min-height: 160px; }
