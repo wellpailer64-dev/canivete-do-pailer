@@ -1,0 +1,429 @@
+{
+ "modelo": "deepseek-r1:8b",
+ "ajuda": [
+  {
+   "pergunta": "Como eu exporto um vídeo no editor?",
+   "resposta": "Para exportar um vídeo no Editor Kanivete, siga estes passos:\n\n1. Abra o Editor Kanivete e carregue seu projeto.\n2. Clique no botão **Exportar** no canto superior direito da tela (ou atalho **Ctrl + M**).\n3. O **Kanivete Encoder** será aberto. Defina as configurações de saída (formato, qualidade, codec, etc.) na seção à esquerda.\n4. Adicione os clips ou pastas à fila de renderização no lado direito.\n5. Clique no botão **▶ Renderizar** para iniciar a exportação.\n6. Espere o processo terminar. O vídeo pronto estará disponível após a conclusão.\n\n[[abrir:video-cutter]]",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 24.27,
+    "primeira_s": 19.04,
+    "tokens": 598,
+    "tok_s": 32.8,
+    "carga_s": 3.41
+   }
+  },
+  {
+   "pergunta": "Quem criou o Kanivete?",
+   "resposta": "O Kanivete foi criado por Wellington Pailer.",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 7.85,
+    "primeira_s": 7.45,
+    "tokens": 196,
+    "tok_s": 32.3,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "Como removo o fundo de uma foto?",
+   "resposta": "Para remover o fundo de uma foto, siga estes passos:\n\n1. **Abra o Kanivete** e vá até a tela inicial.\n2. **Clique no botão \"Remover Fundo\"** na barra de ferramentas à esquerda (abaixo da seção de Imagem).\n3. **Arraste a imagem** diretamente sobre a área indicada no app, ou selecione-a usando o seletor de arquivos.\n4. **Espere o processamento** e revise os resultados antes de salvar.\n\n[[abrir:remover-fundo]]",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 13.08,
+    "primeira_s": 9.26,
+    "tokens": 426,
+    "tok_s": 33.7,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "Consigo abrir um projeto do Premiere no Kanivete?",
+   "resposta": "Sim, você consegue abrir um projeto do Premiere no Editor Kanivete.  \n\n**Como fazer:**  \n1. Arraste o arquivo `.prproj` diretamente sobre a área do editor.  \n2. Ou use o menu **Arquivo > Abrir** e selecione o projeto.  \n\n**O que acontece:**  \n- O Kanivete converte o projeto automaticamente.  \n- O arquivo original `.prproj` não é modificado.  \n- O projeto é salvo como `.vknv` na mesma pasta, com o mesmo nome.  \n\n**Limitações:**  \n- Alguns efeitos do Premiere (como Lumetri ou efeitos de plugins) não são compatíveis.  \n- Formatações como crop, escala não proporcional ou ganho de volume não são transferidas.  \n\nCaso precise exportar o projeto de volta para o Premiere, use o recurso **Exportar para o Premiere (XML)**.",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 18.49,
+    "primeira_s": 12.26,
+    "tokens": 572,
+    "tok_s": 32.5,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "Como faço legenda automática do que as pessoas falam no vídeo?",
+   "resposta": "Para criar legendas automáticas do que as pessoas falam no Editor Kanivete, siga estes passos:\n\n1. Abra o Editor Kanivete no app Kanivete.\n2. Arraste seu vídeo para a área de trabalho.\n3. Clique no painel \"Texto\" no lado esquerdo.\n4. Selecione a ferramenta \"Transcrever e Criar legendas\".\n5. O app usará o Whisper para transformar a fala em texto.\n6. Ajuste a legenda usando o controle de linha (42 caracteres por linha, 2 linhas máximo).",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 17.36,
+    "primeira_s": 12.95,
+    "tokens": 472,
+    "tok_s": 29.9,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "O Kanivete precisa de internet pra funcionar?",
+   "resposta": "Não, o Kanivete não precisa de internet para funcionar. Todas as ferramentas e recursos funcionam diretamente no seu computador, utilizando o hardware local como processamento. Isso significa que você pode usar o Editor Kanivete, Comprimir Vídeo, Converter Vídeo, Sound Kanivete e todas as outras funcionalidades sem necessidade de conexão com a internet ou serviços online.",
+   "pontos": 0.5,
+   "faltou": [],
+   "proibido": [
+    "precisa (sim )?de internet para (tudo|funcionar)"
+   ],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 16.72,
+    "primeira_s": 13.8,
+    "tokens": 463,
+    "tok_s": 30.2,
+    "carga_s": 0.01
+   }
+  },
+  {
+   "pergunta": "Como eu mando o vídeo direto pro TikTok pelo Kanivete, sem sair do app?",
+   "resposta": "```texto\nPara compartilhar um vídeo diretamente do Kanivete para o TikTok, você precisa seguir estes passos:\n\n1. Abra o Editor Kanivete\n2. Crie o projeto e finalize a edição\n3. Exporte o vídeo usando o botão Exportar (Ctrl+M)\n4. Selecione a opção de exportar para o formato MP4 padrão\n5. Use o software oficial do TikTok para fazer upload do vídeo\n\nSe você quiser um vídeo otimizado para o TikTok:\n- Use a ferramenta Comprimir Vídeo do Kanivete\n- Escolha o formato H.265 com qualidade máxima\n- Exporte para o formato MP4\n- O vídeo ficará mais leve com qualidade preservada\n```\n\n[[abrir:video-cutter]]",
+   "pontos": 0,
+   "faltou": [
+    "n[aã]o (tenho certeza|encontrei|h[aá]|existe|tem|d[aá])|n[aã]o.*(op[cç][aã]o|recurso|fun[cç][aã]o)"
+   ],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 16.29,
+    "primeira_s": 10.33,
+    "tokens": 441,
+    "tok_s": 30.0,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "Escreva uma legenda curta e animada para um reels de academia.",
+   "resposta": "Vou ajudar! Você pode usar a ferramenta **Transcrever** do app para gerar a legenda automaticamente. Ela transforma sua fala em texto usando o Whisper e já sincroniza com o vídeo. Se quiser animações, pode editar no **Editor Kanivete**: adicione uma camada de texto e ajuste a animação com o botão \"Animar\" (como o Photoshop).  \n\n[[abrir:transcrever-audio]]",
+   "pontos": 0,
+   "faltou": [
+    "```texto"
+   ],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 17.85,
+    "primeira_s": 14.57,
+    "tokens": 522,
+    "tok_s": 31.7,
+    "carga_s": 0.0
+   }
+  }
+ ],
+ "vram_gb": 5.23,
+ "tamanho_gb": 5.23,
+ "sfx": [
+  {
+   "pedido": "porta de madeira rangendo",
+   "seg": 4,
+   "saida": "",
+   "bruto": "",
+   "falhas": [
+    "vazio",
+    "0 palavras"
+   ],
+   "medidas": {
+    "total_s": 5.1,
+    "primeira_s": 0,
+    "tokens": 160,
+    "tok_s": 35.5,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "whoosh rápido de transição",
+   "seg": 2,
+   "saida": "",
+   "bruto": "",
+   "falhas": [
+    "vazio",
+    "0 palavras"
+   ],
+   "medidas": {
+    "total_s": 4.78,
+    "primeira_s": 0,
+    "tokens": 160,
+    "tok_s": 35.2,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "cafeteria cheia de gente",
+   "seg": 10,
+   "saida": "",
+   "bruto": "",
+   "falhas": [
+    "vazio",
+    "0 palavras"
+   ],
+   "medidas": {
+    "total_s": 4.76,
+    "primeira_s": 0,
+    "tokens": 160,
+    "tok_s": 35.4,
+    "carga_s": 0.01
+   }
+  },
+  {
+   "pedido": "som de notificação de celular",
+   "seg": 2,
+   "saida": "",
+   "bruto": "",
+   "falhas": [
+    "vazio",
+    "0 palavras"
+   ],
+   "medidas": {
+    "total_s": 4.7,
+    "primeira_s": 0,
+    "tokens": 160,
+    "tok_s": 35.4,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "riser de tensão pra antes da virada",
+   "seg": 6,
+   "saida": "",
+   "bruto": "",
+   "falhas": [
+    "vazio",
+    "0 palavras"
+   ],
+   "medidas": {
+    "total_s": 4.8,
+    "primeira_s": 0,
+    "tokens": 160,
+    "tok_s": 35.2,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "cachorro latindo longe e carro passando",
+   "seg": 8,
+   "saida": "",
+   "bruto": "",
+   "falhas": [
+    "vazio",
+    "0 palavras"
+   ],
+   "medidas": {
+    "total_s": 4.78,
+    "primeira_s": 0,
+    "tokens": 160,
+    "tok_s": 35.4,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "impacto pesado tipo trailer de filme",
+   "seg": 3,
+   "saida": "",
+   "bruto": "",
+   "falhas": [
+    "vazio",
+    "0 palavras"
+   ],
+   "medidas": {
+    "total_s": 4.78,
+    "primeira_s": 0,
+    "tokens": 160,
+    "tok_s": 35.4,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "vidro quebrando",
+   "seg": 3,
+   "saida": "",
+   "bruto": "",
+   "falhas": [
+    "vazio",
+    "0 palavras"
+   ],
+   "medidas": {
+    "total_s": 6.37,
+    "primeira_s": 0,
+    "tokens": 160,
+    "tok_s": 35.4,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "chuva fraca na janela à noite",
+   "seg": 10,
+   "saida": "",
+   "bruto": "",
+   "falhas": [
+    "vazio",
+    "0 palavras"
+   ],
+   "medidas": {
+    "total_s": 7.2,
+    "primeira_s": 0,
+    "tokens": 160,
+    "tok_s": 34.8,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "passos rápidos numa escada de madeira",
+   "seg": 5,
+   "saida": "",
+   "bruto": "",
+   "falhas": [
+    "vazio",
+    "0 palavras"
+   ],
+   "medidas": {
+    "total_s": 4.8,
+    "primeira_s": 0,
+    "tokens": 160,
+    "tok_s": 35.2,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "multidão aplaudindo num estádio",
+   "seg": 8,
+   "saida": "",
+   "bruto": "",
+   "falhas": [
+    "vazio",
+    "0 palavras"
+   ],
+   "medidas": {
+    "total_s": 7.29,
+    "primeira_s": 0,
+    "tokens": 160,
+    "tok_s": 34.6,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "teclado digitando rápido",
+   "seg": 5,
+   "saida": "",
+   "bruto": "",
+   "falhas": [
+    "vazio",
+    "0 palavras"
+   ],
+   "medidas": {
+    "total_s": 4.67,
+    "primeira_s": 0,
+    "tokens": 160,
+    "tok_s": 35.2,
+    "carga_s": 0.0
+   }
+  }
+ ],
+ "json": [
+  {
+   "pedido": "Extraia os dados do pedido e responda SÓ com JSON no formato {\"cliente\": texto, ",
+   "resposta": "```json\n{\"cliente\": \"Padaria Sol\", \"valor\": 1250.50, \"data\": \"2026-03-03\", \"itens\": [\"2 banners\", \"1 adesivo de vitrine\"]}\n```",
+   "falhas": [],
+   "medidas": {
+    "total_s": 13.28,
+    "primeira_s": 11.63,
+    "tokens": 468,
+    "tok_s": 35.7,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "Transforme o pedido em comandos do editor. Ações permitidas: cortar(t), mover(cl",
+   "resposta": "",
+   "falhas": [
+    "JSON inválido"
+   ],
+   "medidas": {
+    "total_s": 14.21,
+    "primeira_s": 0,
+    "tokens": 500,
+    "tok_s": 35.6,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "Classifique cada comentário como positivo, negativo ou neutro. Responda SÓ com J",
+   "resposta": "{\"rotulos\": [\"positivo\", \"negativo\", \"neutro\", \"negativo\", \"positivo\"]}",
+   "falhas": [],
+   "medidas": {
+    "total_s": 9.64,
+    "primeira_s": 8.91,
+    "tokens": 341,
+    "tok_s": 35.9,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "Some os valores e responda SÓ com JSON {\"total\": número, \"maior\": texto}.\nCâmera",
+   "resposta": "{\"total\": 5400.4, \"maior\": \"Câmera\"}",
+   "falhas": [],
+   "medidas": {
+    "total_s": 14.04,
+    "primeira_s": 13.42,
+    "tokens": 497,
+    "tok_s": 35.7,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "Responda SÓ com JSON {\"ok\": booleano, \"motivo\": texto}: a resolução 1080x1920 é ",
+   "resposta": "{\"ok\": true, \"motivo\": \"a resolução 1080x1920 é vertical (9:16)\"}",
+   "falhas": [],
+   "medidas": {
+    "total_s": 8.05,
+    "primeira_s": 7.07,
+    "tokens": 285,
+    "tok_s": 35.8,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "Separe nome e sobrenome de cada pessoa e responda SÓ com JSON {\"pessoas\": [{\"nom",
+   "resposta": "",
+   "falhas": [
+    "JSON inválido"
+   ],
+   "medidas": {
+    "total_s": 14.12,
+    "primeira_s": 0,
+    "tokens": 500,
+    "tok_s": 35.7,
+    "carga_s": 0.0
+   }
+  }
+ ],
+ "resumo": {
+  "ajuda_pontos": 6.9,
+  "sfx_ok": 0,
+  "sfx_total": 12,
+  "json_ok": 4,
+  "json_total": 6,
+  "tok_s": 34.2,
+  "primeira_s": 0,
+  "carga_s": 3.41,
+  "vram_gb": 5.23,
+  "tempo_total_min": 4.5
+ }
+}

@@ -1,5 +1,5 @@
 // =========================================================
-// Kani — assistente de conversa do KANIVETE (local, Qwen3 8B; Functions/kani.py). Gaveta à direita, aberta de
+// Kani — assistente de conversa do KANIVETE (local, Qwen3.5 9B; Functions/kani.py). Gaveta à direita, aberta de
 // qualquer ferramenta: pela bolinha da Home ou pelo item "Kani" na seção IA da barra lateral. Sabe em que ferramenta a
 // pessoa está e responde com a ajuda do app (frontend/ajuda/kani_kb.json); [[abrir:id]] na resposta vira botão.
 // Primeira vez sem IA: oferece baixar (motor + modelo, ~5 GB) com progresso. Conversas em localStorage 'kani-conversas'.
@@ -31,7 +31,8 @@ function kaniNomeFerramenta(id) { const b = document.querySelector(`.menu-item[d
 // ── markdown simples (negrito, código, listas, títulos) + [[abrir:id]] ──
 function kaniMd(txt) {
     const abrir = [];
-    txt = String(txt || '').replace(/\[\[abrir:([a-z0-9-]+)\]\]/gi, (_, id) => { if (kaniNomeFerramenta(id) && !abrir.includes(id)) abrir.push(id); return ''; });
+    // o Qwen3.5 às vezes esquece o "abrir:" e escreve [[remover-fundo]]: vale também, se for uma ferramenta do app
+    txt = String(txt || '').replace(/\[\[(abrir:)?([a-z0-9-]+)\]\]/gi, (m, a, id) => { if (!kaniNomeFerramenta(id)) return a ? '' : m; if (!abrir.includes(id)) abrir.push(id); return ''; });
     const inl = s => kaniEsc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>');
     const blocos = [];
     txt = txt.replace(/```([a-zA-Z0-9_+-]*)[ \t]*\n?([\s\S]*?)(```|$)/g, (_, ling, corpo) => {   // aberto ainda (gerando) também vira caixa
@@ -59,7 +60,7 @@ function kaniMd(txt) {
 }
 
 // ── copiar / ouvir ──
-function kaniLimpo(txt) { return String(txt || '').replace(/\[\[abrir:[a-z0-9-]+\]\]/gi, '').trim(); }
+function kaniLimpo(txt) { return String(txt || '').replace(/\[\[(abrir:)?([a-z0-9-]+)\]\]/gi, (m, a, id) => (a || kaniNomeFerramenta(id) ? '' : m)).trim(); }
 function kaniSemMd(c, ling) { return ['texto', 'text', 'txt', ''].includes(ling) ? c.replace(/\*\*(.+?)\*\*/g, '$1').replace(/__(.+?)__/g, '$1') : c; }   // texto pronto sai limpo para colar
 function kaniBlocosDe(txt) { const out = []; String(txt || '').replace(/```([a-zA-Z0-9_+-]*)[ \t]*\n?([\s\S]*?)(```|$)/g, (_, l, c) => { out.push(kaniSemMd(c.replace(/\n+$/, ''), (l || '').toLowerCase())); return ''; }); return out; }
 function kaniParaFala(txt) {   // o que a voz lê: sem formatação, emojis, hashtags, links e blocos de código
@@ -164,7 +165,21 @@ function kaniRender() {
     env.innerHTML = KANI.gerando ? '<svg class="i"><use href="#i-x"/></svg>' : '<svg class="i"><use href="#i-arrow-up"/></svg>';
     env.title = KANI.gerando ? 'Parar' : 'Enviar';
 }
-async function kaniAtualizarEstado() { const api = kaniApi(); if (!api || !api.kani_estado) return; KANI.estado = await api.kani_estado().catch(() => null); kaniRender(); }
+async function kaniAtualizarEstado() {
+    const api = kaniApi(); if (!api || !api.kani_estado) return;
+    KANI.estado = await api.kani_estado().catch(() => null);
+    kaniTrocarModelo();
+    kaniRender();
+}
+// Modelo novo da Kani (quem tinha o anterior): baixa sozinho, por baixo, e ela segue respondendo com o anterior até ele
+// chegar; o Python apaga o anterior no fim. Vale também sem abrir a gaveta (checagem 30 s depois de abrir o app).
+function kaniTrocarModelo() {
+    const e = KANI.estado;
+    if (!e || !e.atualizar || e.baixando || KANI.trocando || KANI.trocaFalhou || KANI.baixando) return;
+    KANI.trocando = true;
+    kaniApi().kani_baixar().then(r => { if (!r || !r.success) KANI.trocando = false; }).catch(() => { KANI.trocando = false; });
+}
+setTimeout(() => { if (!KANI.estado) kaniAtualizarEstado(); }, 30000);
 async function kaniAbrir() {
     kaniMontar();
     if (!KANI.conversa) kaniNova();
@@ -188,6 +203,12 @@ async function kaniBaixar() {
     if (!r || !r.success) { KANI.baixando = false; KANI.msg = (r && r.error) || 'falhou'; kaniRender(); }
 }
 window.kaniProgresso = function (d) {
+    if (KANI.trocando && (d.erro || d.fim)) {   // troca por baixo: sem barra; erro só no console (tenta de novo na próxima vez que o app abrir)
+        KANI.trocando = false;
+        if (d.fim && typeof toast === 'function') toast('A Kani foi atualizada para um modelo mais esperto.');
+        if (d.erro) { KANI.trocaFalhou = true; console.warn("[Kani] troca de modelo:", d.erro); }
+        kaniAtualizarEstado(); return;
+    }
     if (d.erro) { KANI.baixando = false; KANI.msg = d.erro; if (typeof toast === 'function') toast(d.erro); kaniAtualizarEstado(); return; }
     if (d.fim) { KANI.baixando = false; kaniAtualizarEstado(); return; }
     KANI.pct = d.pct; KANI.msg = d.msg;

@@ -1,10 +1,13 @@
 """Kani — assistente de conversa do KANIVETE (tipo ChatGPT, local e offline), para tarefas do dia a dia e,
 principalmente, dúvidas de como usar o app.
 
-Modelo: Qwen3 8B. Motor, nesta ordem:
-  1. Ollama já instalado e rodando com o qwen3:8b (o caso do computador de desenvolvimento) — não baixa nada;
-  2. llama.cpp (llama-server, build Vulkan, ~31 MB: NVIDIA/AMD/Intel) + Qwen3-8B-Q4_K_M.gguf oficial da Qwen (~5,0 GB),
-     baixados sob demanda na 1ª conversa para <app>/modelos_ia/kani/ (nada no C:, nada instalado no Windows).
+Modelo: Qwen3.5 9B (desde 2026-10-10; antes Qwen3 8B). Escolhido numa bancada com 6 modelos na RTX 3050 — mesma velocidade
+e memória do Qwen3 8B, muito mais honesto (não inventa botão que o app não tem): Instructions/agente/kani-motor.md.
+Motor, nesta ordem:
+  1. Ollama já instalado e rodando com o qwen3.5:9b (ou, se só houver ele, o qwen3:8b antigo) — não baixa nada;
+  2. llama.cpp (llama-server, build Vulkan, ~33 MB: NVIDIA/AMD/Intel) + Qwen3.5-9B-Q4_K_M.gguf (unsloth, Apache 2.0, ~5,7 GB),
+     baixados sob demanda na 1ª conversa para <app>/modelos_ia/kani/ (nada no C:, nada instalado no Windows). O GGUF do
+     Qwen3 8B antigo é apagado depois que o novo chega.
 O servidor do llama.cpp sobe quando precisa, fica preso ao app (fecha junto) e sai da placa depois de OCIOSO s parado.
 Ajuda do app: frontend/ajuda/kani_kb.json (tools/kani_kb.py) — trechos dos guias; os mais parecidos com a pergunta
 (BM25 simples) entram no prompt, para responder sem inventar menus.
@@ -13,6 +16,7 @@ import json
 import math
 import os
 import re
+import shutil
 import subprocess
 import threading
 import time
@@ -25,11 +29,13 @@ from Functions.midia import NO_WINDOW, app_dir
 NOME = "Kani"
 LLAMA_TAG = "b11483"
 LLAMA_ZIP = f"https://github.com/ggml-org/llama.cpp/releases/download/{LLAMA_TAG}/llama-{LLAMA_TAG}-bin-win-vulkan-x64.zip"
-GGUF = "Qwen3-8B-Q4_K_M.gguf"
-GGUF_URL = "https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/main/" + GGUF
-TAM = {"zip": 33_000_000, "gguf": 5_027_783_488}
+GGUF = "Qwen3.5-9B-Q4_K_M.gguf"
+GGUF_URL = "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/" + GGUF
+GGUF_ANTIGOS = ("Qwen3-8B-Q4_K_M.gguf",)   # modelos anteriores da Kani: apagados quando o novo chega
+TAM = {"zip": 33_404_507, "gguf": 5_680_522_464}
 OLLAMA = "http://127.0.0.1:11434"
-OLLAMA_MODELO = "qwen3:8b"
+OLLAMA_MODELOS = ("qwen3.5:9b", "qwen3:8b")   # o 1º que o Ollama tiver (o 8B só para quem ainda não baixou o novo)
+OLLAMA_MODELO = OLLAMA_MODELOS[0]             # atualizado por _ollama_tem() com o que estiver instalado
 OCIOSO = 300          # s parado até soltar a placa
 CTX = 8192
 
@@ -48,25 +54,45 @@ def _exe():
     return os.path.join(pasta(), "bin", "llama-server.exe")
 
 
-def _gguf():
+def _gguf_novo():
     return os.path.join(pasta(), GGUF)
 
 
+def _gguf_antigo():
+    """Modelo anterior ainda no disco (quem baixou a Kani antes da troca), ou None."""
+    return next((c for c in (os.path.join(pasta(), a) for a in GGUF_ANTIGOS) if os.path.isfile(c)), None)
+
+
+def _gguf():
+    """O modelo que o motor carrega: o atual; enquanto ele não chega, o anterior (a Kani segue funcionando na troca)."""
+    novo = _gguf_novo()
+    return novo if os.path.isfile(novo) else (_gguf_antigo() or novo)
+
+
 def _ollama_tem():
-    """True se o Ollama está rodando com o qwen3:8b."""
+    """True se o Ollama está rodando com um dos modelos da Kani (OLLAMA_MODELOS, nessa preferência); o escolhido fica
+    em OLLAMA_MODELO."""
+    global OLLAMA_MODELO
     try:
         with urllib.request.urlopen(OLLAMA + "/api/tags", timeout=1.5) as r:
             nomes = [m.get("name", "") for m in json.loads(r.read()).get("models", [])]
-        return any(n == OLLAMA_MODELO or n.startswith(OLLAMA_MODELO + "-") for n in nomes)
+        for alvo in OLLAMA_MODELOS:
+            if any(n == alvo or n.startswith(alvo + "-") for n in nomes):
+                OLLAMA_MODELO = alvo
+                return True
+        return False
     except Exception:
         return False
 
 
 def estado():
+    """atualizar=True: quem tem o modelo anterior e não o atual — a interface baixa o novo sozinha, por baixo, e a Kani
+    segue no anterior até ele chegar (baixar() apaga o anterior no fim)."""
     llama = os.path.isfile(_exe()) and os.path.isfile(_gguf())
     motor = "ollama" if _ollama_tem() else ("llama" if llama else None)
+    falta = (0 if os.path.isfile(_exe()) else TAM["zip"]) + (0 if os.path.isfile(_gguf_novo()) else TAM["gguf"])
     return {"success": True, "nome": NOME, "pronto": bool(motor), "motor": motor, "baixando": _baixando.locked(),
-            "tamanho_gb": round((TAM["zip"] + TAM["gguf"]) / 1e9, 1)}
+            "atualizar": motor == "llama" and not os.path.isfile(_gguf_novo()), "tamanho_gb": round(falta / 1e9, 1)}
 
 
 def baixar(on_progress):
@@ -78,12 +104,16 @@ def baixar(on_progress):
     def run():
         try:
             os.makedirs(os.path.join(pasta(), "bin"), exist_ok=True)
-            itens = [(os.path.join(pasta(), "llama.zip"), LLAMA_ZIP, TAM["zip"]), (_gguf(), GGUF_URL, TAM["gguf"])]
+            if not os.path.isfile(_gguf_novo()) and _gguf_antigo() and shutil.disk_usage(pasta()).free < TAM["gguf"] + 1_000_000_000:
+                parar()   # sem espaço para os dois: o anterior sai antes (a Kani fica parada até o novo chegar)
+                time.sleep(1)
+                _apagar_antigos()
+            itens = [(os.path.join(pasta(), "llama.zip"), LLAMA_ZIP, TAM["zip"]), (_gguf_novo(), GGUF_URL, TAM["gguf"])]
             total, antes = sum(t for *_, t in itens), 0
             for destino, url, tam in itens:
                 pronto = os.path.isfile(_exe()) if destino.endswith(".zip") else os.path.isfile(destino)
                 if not pronto:
-                    nome = "o motor" if destino.endswith(".zip") else "o modelo Qwen3 8B"
+                    nome = "o motor" if destino.endswith(".zip") else "o modelo Qwen3.5 9B"
 
                     def prog(feito, tot, nome=nome, antes=antes):
                         on_progress({"pct": min(99, int((antes + feito) * 100 / total)), "msg": f"Baixando {nome}: {feito / 1e9:.2f} / {max(tot, feito) / 1e9:.2f} GB"})
@@ -93,8 +123,16 @@ def baixar(on_progress):
                         zf.extractall(os.path.join(pasta(), "bin"))
                     os.remove(destino)
                 antes += tam
-            if not (os.path.isfile(_exe()) and os.path.isfile(_gguf())):
+            if not (os.path.isfile(_exe()) and os.path.isfile(_gguf_novo())):
                 raise RuntimeError("arquivos incompletos")
+            if _gguf_antigo():   # o motor pode estar com o anterior aberto: espera a resposta da vez, desliga e apaga
+                for _ in range(240):
+                    if not _srv.get("ocupado"):
+                        break
+                    time.sleep(0.5)
+                parar()
+                time.sleep(1)
+                _apagar_antigos()
             on_progress({"fim": True})
         except Exception as e:
             on_progress({"erro": f"Não foi possível baixar a {NOME}: {e}"})
@@ -148,6 +186,19 @@ def _vigiar():
         if not _srv.get("ocupado") and time.time() - _srv["uso"] > OCIOSO:
             parar()
             return
+
+
+def _apagar_antigos():
+    """O modelo anterior não serve mais: libera os ~5 GB (tenta de novo se o Windows ainda segura o arquivo)."""
+    for a in GGUF_ANTIGOS:
+        c = os.path.join(pasta(), a)
+        for _ in range(10):
+            try:
+                if os.path.isfile(c):
+                    os.remove(c)
+                break
+            except OSError:
+                time.sleep(1)
 
 
 def parar():
@@ -237,9 +288,12 @@ Regras:
 - Para outras tarefas (textos, ideias, roteiros, contas, dúvidas gerais) ajude normalmente.
 - Quando entregar um texto PRONTO para a pessoa usar (legenda, post, e-mail, mensagem, roteiro, título), coloque só esse
   texto dentro de um bloco ```texto … ``` sem **negrito** nem markdown dentro (emojis e hashtags podem); comentários e
-  explicações ficam fora do bloco. Código vai em ```linguagem … ```.
-- Só quando a resposta ensina a usar uma ferramenta do app, ponha no fim [[abrir:ID]] (uma vez) com o ID desta lista:
-  {ids}. Em conversa geral (quem criou, ideias, textos) não ponha.
+  explicações ficam fora do bloco. SEMPRE com o bloco, mesmo quando a resposta é só o texto — é dele que sai o botão Copiar.
+  Só o formato (o assunto é outro): pedido "aviso de fila na padaria" → "Aqui vai:\n```texto\nHoje a fila anda rápido, prometo! 🥖\n```".
+  Código vai em ```linguagem … ```.
+- Quando a resposta ensina a usar uma ferramenta do app, termine SEMPRE com o marcador [[abrir:ID]] (uma vez, exatamente
+  nesse formato, com "abrir:"), usando o ID desta lista: {ids}. Ex.: "...e clique em Salvar. [[abrir:remover-fundo]]".
+  Em conversa geral (quem criou, ideias, textos) não ponha.
 A pessoa está agora em: {ferramenta or 'tela inicial'}.
 
 AJUDA DO KANIVETE (trechos dos guias):

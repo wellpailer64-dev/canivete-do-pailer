@@ -1,5 +1,5 @@
 """Kani (assistente) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila) e confere: bolinha na Home,
-item IA › Kani na barra lateral, gaveta, pergunta real respondida pelo Qwen3 8B (Ollama ou llama.cpp baixado), botão
+item IA › Kani na barra lateral, gaveta, pergunta real respondida pelo Qwen3.5 9B (Ollama ou llama.cpp baixado), botão
 "Abrir <ferramenta>" e contexto da ferramenta aberta. Precisa da IA já disponível (Ollama com qwen3:8b ou o download).
 
     py -3.13 testes/teste_kani.py
@@ -88,6 +88,15 @@ def main():
             pg.evaluate("kaniNova()")
             ok("Editor Kanivete" in pg.inner_text("#kani-corpo"), "abre de qualquer ferramenta e sabe qual está aberta")
             pg.screenshot(path=BASE + "kani.png")
+            # modelo novo para quem tem o anterior (estado.atualizar): a tela pede o download sozinha, uma vez; erro não vira laço
+            # (a troca em si — segue no anterior, baixa, apaga, usa o novo — é conferida no Python: D:/kanivete_testes/scripts/kani_troca.py)
+            troca = pg.evaluate("""() => { const api = kaniApi(), orig = api.kani_baixar; let n = 0;
+                api.kani_baixar = () => { n++; return Promise.resolve({ success: true }); };
+                KANI.estado = { pronto: true, motor: 'llama', atualizar: true, baixando: false }; KANI.trocando = false; KANI.trocaFalhou = false;
+                kaniTrocarModelo(); kaniTrocarModelo(); const a = n;
+                KANI.estado = { pronto: true, motor: 'llama', atualizar: true }; window.kaniProgresso({ erro: 'teste' });
+                kaniTrocarModelo(); api.kani_baixar = orig; return [a, n]; }""")
+            ok(troca == [1, 1], "modelo novo: baixa sozinho por baixo, uma vez, sem laço se falhar", str(troca))
     finally:
         app.terminate()
     print("RESULTADO:", "REPROVADO" if erros else "PASSOU")

@@ -1,0 +1,130 @@
+{
+ "qwen3:8b": [
+  {
+   "p": "Como eu faço uma live no YouTube pelo Kanivete?",
+   "tipo": "NAO",
+   "r": "Você não pode fazer uma live no YouTube diretamente com o Kanivete. O Kanivete é uma ferramenta de edição e processamento de arquivos, não uma plataforma de streaming. Para fazer uma live no YouTube, você precisa usar o aplicativo oficial do YouTube Live ou outros softwares de streaming. Se quiser gravar sua live e depois editá-la, pode usar o Editor Kanivete para editar o vídeo gravado."
+  },
+  {
+   "p": "Onde fica o editor de planilhas do Kanivete?",
+   "tipo": "NAO",
+   "r": "O Kanivete não possui um editor de planilhas. Se precisar trabalhar com planilhas, você pode usar o Microsoft Excel, Google Sheets ou outros softwares de planilha disponíveis no Windows. Se quiser ajuda com algo relacionado a planilhas ou a outros tipos de arquivos, é só dizer!"
+  },
+  {
+   "p": "Como eu convido meu cliente pra editar o projeto comigo online, em tempo real, no Kanivete?",
+   "tipo": "NAO",
+   "r": "Você pode convidar seu cliente para editar o projeto com você online, em tempo real, no Kanivete, seguindo estes passos:\n\n1. Abra o projeto no Kanivete.\n2. Clique no botão **Compartilhar** (geralmente está no canto superior direito).\n3. Selecione a opção **Convidar para editar**.\n4. Insira o e-mail do seu cliente ou o link de compartilhamento.\n5. Envie o convite.\n\nSeu cliente receberá uma notificação e poderá acessar o projeto diretamente no seu navegador, editando em tempo real com você. [[abrir:video-cutter]]"
+  },
+  {
+   "p": "Como eu gero uma música inteira com IA no Kanivete?",
+   "tipo": "NAO",
+   "r": "No momento, o Kanivete não tem uma ferramenta específica para gerar uma música inteira com IA. Porém, você pode usar a **Geração de Voz** para sintetizar textos em voz, o que pode ser usado como base para criar uma música ou narrativa. Se você quiser, posso te ajudar a escrever um roteiro ou texto que possa ser convertido em voz.\n\nSe você está interessado em criar uma música com IA, sugiro que explore outros recursos do app, como o **Sound Kanivete**, que permite editar, melhorar e misturar áudios. Para criar uma música completa com IA, talvez precise de uma ferramenta externa ou de um modelo de IA dedicado à composição musical. \n\nSe quiser, posso te ajudar a planejar o processo ou criar um roteiro para usar com a Geração de Voz. Deseja isso?"
+  },
+  {
+   "p": "Como eu transformo um texto em voz no Kanivete?",
+   "tipo": "SIM",
+   "r": "Para transformar um texto em voz no Kanivete, siga esses passos:\n\n1. Abra o **Sound Kanivete**.  \n2. No centro da tela, clique em **\"Texto para Voz\"** (ou use o atalho **Ctrl+Enter** para gerar diretamente).  \n3. Cole ou escreva o texto que deseja transformar em voz.  \n4. Escolha uma voz do banco de vozes (ou crie uma nova voz se quiser).  \n5. Ajuste as opções, como velocidade, tom e qualidade.  \n6. Clique em **\"Gerar\"** para criar a voz.  \n7. A voz será adicionada como uma faixa no editor.  \n\nSe quiser, você pode salvar o modelo ou exportar a voz como arquivo.  \n\n[[abrir:sound-kanivete]]"
+  },
+  {
+   "p": "Como eu tiro o fundo de uma imagem no Kanivete?",
+   "tipo": "SIM",
+   "r": "Para tirar o fundo de uma imagem no Kanivete, use a ferramenta **Remover Fundo**. Siga estes passos:\n\n1. Abra o Kanivete e vá para a seção **Imagem**.\n2. Clique em **Remover Fundo**.\n3. Arraste a imagem ou a pasta com as imagens que deseja processar para a área de trabalho.\n4. A IA vai analisar a imagem e remover o fundo automaticamente.\n5. Revise o resultado antes de salvar.\n6. Salve a imagem com o fundo removido.\n\n[[abrir:remover-fundo]]"
+  }
+ ],
+ "qwen3.5:9b": [
+  {
+   "p": "Como eu faço uma live no YouTube pelo Kanivete?",
+   "tipo": "NAO",
+   "r": "Até o momento, não há uma ferramenta específica chamada \"Transmissora\" ou \"Live\" listada nos módulos do KANIVETE que permita iniciar uma transmissão ao vivo diretamente para o YouTube. O app foca na edição de vídeo, conversão, compressão e manipulação de mídia (vídeo, áudio, imagem, vetor) rodando localmente.\n\nSe você já gravou a sua live ou tem um arquivo de vídeo pronto, pode usar o **Editor Kanivete** para editar o conteúdo, cortar partes ruins e adicionar efeitos. Depois, use o **Baixar Vídeo** (se for necessário baixar algo do YouTube como referência) ou simplesmente envie o arquivo editado para o YouTube pela interface normal deles.\n\nSe você estava pensando em gravar a tela durante uma live:\n1.  Você pode usar o próprio Windows para capturar a tela e salvar o vídeo.\n2.  Depois, abra o arquivo salvo no **Editor Kanivete** para editar e finalizar.\n\nGostaria de saber como usar o Editor Kanivete para editar um vídeo que você já tem pronto?\n\n[[abrir:video-cutter]]"
+  },
+  {
+   "p": "Onde fica o editor de planilhas do Kanivete?",
+   "tipo": "NAO",
+   "r": "Olá! Sou a Kani, assistente do **KANIVETE**.\n\nNo momento, não há uma ferramenta chamada \"Editor de Planilhas\" na barra lateral esquerda nem no menu principal do aplicativo. As seções disponíveis são: Vídeo, Áudio, Imagem, Web e IA (eu).\n\nVocê pode estar procurando por alguma das seguintes ferramentas que já temos para organizar dados ou textos?\n*   **Logger Pro:** Para organizar cartões de câmera e criar projetos de edição.\n*   **Transcrever:** Para transformar fala em texto (.srt) com o Whisper.\n*   **Organizar Imagens:** Para separar arquivos e renomeá-los automaticamente.\n\nSe você precisa realizar uma tarefa específica que não está listada aqui, posso ajudar a criar roteiros, textos ou resolver contas matemáticas para você.\n\nPara mais informações sobre como usar as ferramentas existentes, você pode acessar o guia diretamente no app."
+  },
+  {
+   "p": "Como eu convido meu cliente pra editar o projeto comigo online, em tempo real, no Kanivete?",
+   "tipo": "NAO",
+   "r": "Atualmente, o **KANIVETE** é um aplicativo que roda apenas no seu computador e não possui uma funcionalidade nativa para convite de outros usuários ou edição online em tempo real (como faz o Zoom ou o Figma).\n\nVocê pode usar as ferramentas internas do app para preparar materiais para enviar ao cliente:\n*   **Editor Kanivete:** Para criar e editar vídeos, áudio e 3D.\n*   **Photo Kanivete:** Para editar fotos e arquivos PSD.\n*   **Vetor Kanivete:** Para criar gráficos vetoriais.\n*   **Sound Kanivete:** Para editar faixas de áudio.\n\nSe você precisa colaborar com alguém, sugiro enviar o arquivo final exportado ou usar uma ferramenta de vídeo chamada \"Baixar Vídeo\" para entregar o resultado pronto.\n\nPara saber mais sobre como exportar projetos ou usar as ferramentas específicas, verifique a área de ajuda dentro do app."
+  },
+  {
+   "p": "Como eu gero uma música inteira com IA no Kanivete?",
+   "tipo": "NAO",
+   "r": "Atualmente, o **Sound Kanivete** foca em editar áudios existentes, melhorar a qualidade da voz, transcrever, converter formatos e gerar vozes (texto para fala) usando o OmniVoice.\n\nPara criar uma **música inteira** com IA (geração musical do zero), essa função específica ainda não está disponível na lista de ferramentas que rodam no seu computador.\n\nVocê pode usar as outras opções de áudio disponíveis agora:\n*   **Melhorar Áudio:** Para deixar sua voz ou gravações com som de estúdio.\n*   **Geração de Voz:** Para criar falas, narrativas ou letras cantadas (se o modelo suportar) transformando texto em áudio.\n*   **Sound Kanivete:** Para organizar, cortar e misturar faixas que você já tem.\n\nSe precisar de ajuda para editar uma faixa existente ou melhorar uma gravação sua, posso te guiar nos passos!"
+  },
+  {
+   "p": "Como eu transformo um texto em voz no Kanivete?",
+   "tipo": "SIM",
+   "r": "Para transformar um texto em voz no KANIVETE, siga estes passos:\n\n1.  Abra o aplicativo e clique na seção **Áudio** na barra lateral esquerda.\n2.  Selecione a ferramenta **Sound Kanivete**.\n3.  No painel que abrirá, vá até a área de **Texto para Voz**.\n4.  Você pode digitar seu texto diretamente ou colar um roteiro pronto.\n5.  Escolha uma voz do banco (existem vozes brasileiras desenhadas por IA) ou crie uma nova voz usando sua própria referência.\n6.  Clique no botão de **geração** (ícone de play ▶) ao lado do parágrafo desejado para ouvir e salvar a fala na timeline.\n\nSe precisar de mais detalhes sobre como criar vozes personalizadas ou usar o modo de \"Conversa\" com múltiplos personagens, é só pedir!\n\n[[abrir:sound-kanivete]]"
+  },
+  {
+   "p": "Como eu tiro o fundo de uma imagem no Kanivete?",
+   "tipo": "SIM",
+   "r": "Para tirar o fundo de uma imagem no KANIVETE, siga estes passos:\n\n1.  Abra o app e clique na ferramenta **Remover Fundo** (está na barra lateral esquerda, sob a seção \"Imagem\").\n2.  Arraste sua imagem para a área de trabalho do app ou arraste-a diretamente da pasta do seu computador.\n3.  Aguarde um instante enquanto a IA analisa e recorta o fundo automaticamente.\n4.  Você poderá revisar o resultado antes de salvar. Se o fundo não ficar perfeito, tente usar uma imagem com fundo branco ou de alto contraste para melhor resultado.\n5.  Quando estiver satisfeito, clique em salvar na pasta desejada.\n\n[[abrir:remover-fundo]]"
+  }
+ ],
+ "hf.co/unsloth/Qwen3-14B-GGUF:IQ3_XXS": [
+  {
+   "p": "Como eu faço uma live no YouTube pelo Kanivete?",
+   "tipo": "NAO",
+   "r": "O Kanivete não tem uma função específica para fazer lives no YouTube diretamente. Porém, você pode gravar sua live com o Editor Kanivete ou com outra ferramenta de áudio/vídeo e depois editar, comprimir ou converter o vídeo para o YouTube.\n\nSe quiser gravar sua live com áudio e vídeo, use o Editor Kanivete e grave em tempo real. Após a gravação, você pode exportar o vídeo e usá-lo no YouTube.\n\nSe quiser gravar somente áudio (como uma live de voz), use o Sound Kanivete para gravar e depois exportar o áudio.\n\nSe quiser gravar uma live com áudio e vídeo, use o Editor Kanivete [[abrir:video-cutter]]."
+  },
+  {
+   "p": "Onde fica o editor de planilhas do Kanivete?",
+   "tipo": "NAO",
+   "r": "O Kanivete não tem um editor de planilhas (como Excel ou Google Sheets). Ele é focado em vídeo, áudio, imagem, vetor e ferramentas de conversão e compressão. Se você precisa editar planilhas, talvez você possa usar outro programa, como o Microsoft Excel, Google Sheets ou LibreOffice.\n\nSe quiser, posso te ajudar a encontrar alternativas ou a usar outras ferramentas do Kanivete para trabalhar com arquivos relacionados a planilhas, se for possível."
+  },
+  {
+   "p": "Como eu convido meu cliente pra editar o projeto comigo online, em tempo real, no Kanivete?",
+   "tipo": "NAO",
+   "r": "No Kanivete, não há suporte para edição online em tempo real com clientes. O app é local e não tem opção de compartilhamento de tela ou edição colaborativa em tempo real. \n\nSe quiser, posso te ajudar a:\n\n- Criar um projeto e exportar para compartilhar com o cliente (por e-mail, drive ou outro método).\n- Compartilhar arquivos de áudio, vídeo, imagem ou PDF com o cliente (por e-mail, drive ou outro método).\n\nVocê prefere um dos métodos?"
+  },
+  {
+   "p": "Como eu gero uma música inteira com IA no Kanivete?",
+   "tipo": "NAO",
+   "r": "O Kanivete não tem uma ferramenta específica para gerar músicas inteiras com IA. Porém, você pode usar as ferramentas existentes de forma criativa para criar uma música. Aqui está como você pode começar:\n\n1. Use a **Geração de Voz** para criar uma voz com base em uma amostra curta de voz.\n2. Use o **Sound Kanivete** para editar e melhorar o áudio gerado.\n3. Use a **Editor Kanivete** para gravar e editar áudios, incluindo sons de fundo e efeitos.\n\nSe você quiser gerar uma música inteira com IA, talvez precise de outra ferramenta ou software especializado. Você pode me dizer mais sobre o que você precisa e eu posso ajudar a encontrar a melhor forma."
+  },
+  {
+   "p": "Como eu transformo um texto em voz no Kanivete?",
+   "tipo": "SIM",
+   "r": "Para transformar um texto em voz no Kanivete, siga os passos abaixo:\n\n1. Abra o **Sound Kanivete**.\n2. Vá até a seção **Texto para Voz**.\n3. Insira o texto que deseja transformar em voz.\n4. Escolha uma voz (você pode usar uma voz já gravada ou criar uma nova).\n5. Ajuste as opções de **idioma**, **velocidade**, **expressão**, **pausa entre frases**, e **qualidade**.\n6. Clique em **Gerar** (Ctrl+Enter) para criar o áudio.\n\nSe quiser criar uma voz nova baseada em uma referência, use a opção **+ Nova voz** e carregue um áudio de referência.\n\n[[abrir:omnivoice]]"
+  },
+  {
+   "p": "Como eu tiro o fundo de uma imagem no Kanivete?",
+   "tipo": "SIM",
+   "r": "Para tirar o fundo de uma imagem no Kanivete, siga estes passos:\n\n1. Abra o **Remover Fundo** na barra lateral.\n2. Arraste a imagem que você deseja editar para a área de trabalho.\n3. O Kanivete vai aplicar a remoção de fundo automaticamente.\n4. Revise o resultado e, se estiver satisfeito, salve a imagem.\n\n[[abrir:remover-fundo]]"
+  }
+ ],
+ "llama3.1:8b": [
+  {
+   "p": "Como eu faço uma live no YouTube pelo Kanivete?",
+   "tipo": "NAO",
+   "r": "Você pode criar uma live no YouTube pelo Kanivete, usando a ferramenta \"Baixar Vídeo\" para baixar o vídeo da live do YouTube e, em seguida, editá-lo no Editor Kanivete."
+  },
+  {
+   "p": "Onde fica o editor de planilhas do Kanivete?",
+   "tipo": "NAO",
+   "r": "O Kanivete não tem um editor de planilhas. Ele oferece ferramentas de edição de vídeo, áudio e imagem, mas não planilhas."
+  },
+  {
+   "p": "Como eu convido meu cliente pra editar o projeto comigo online, em tempo real, no Kanivete?",
+   "tipo": "NAO",
+   "r": "Para convidar seu cliente a editar o projeto com você online, no Kanivete, você pode seguir esses passos:\n\n1. **Abra o Projeto**: Abra o projeto que você deseja trabalhar com o seu cliente no Kanivete.\n2. **Compartilhe o Código de Conexão**: Clique no ícone da engrenagem na parte superior direita da tela e selecione **Preferências**. Em seguida, clique em **Conexão** e selecione **Compartilhar Código**. Isso irá gerar um código de conexão único para o seu projeto.\n3. **Compartilhe com o Cliente**: Compartilhe o código de conexão com o seu cliente via e-mail, mensagem ou qualquer outro meio de comunicação. Certifique-se de que o código seja único para o projeto em questão.\n4. **Conecte o Cliente**: Peça ao cliente para abrir o Kanivete e digitar o código de conexão no campo de conexão. O cliente pode editar o projeto em tempo real, juntamente com você.\n\nAlém disso, também é possível compartilhar o projeto com o cliente diretamente a partir do Kanivete. Para fazer isso, você pode seguir os passos abaixo:\n\n1. **Abra o Projeto**: Abra o projeto que você deseja compartilhar com o seu cliente no Kanivete.\n2. **Clique em \"Compartilhar\"**: Clique no ícone da engrenagem na parte superior direita da tela e selecione **Compartilhar**.\n3. **Selecione \"Conexão Online\"**: Selecione a opção **Conexão Online** e, em seguida, clique em **Compartilhar**.\n4. **Compartilhe com o Cliente**: Compartilhe o link de conexão com o cliente via e-mail, mensagem ou qualquer outro meio de comunicação.\n\nEssa opção permite que o cliente edite o projeto em tempo real, juntamente com você, sem a necessidade de compartilhar o código de conexão."
+  },
+  {
+   "p": "Como eu gero uma música inteira com IA no Kanivete?",
+   "tipo": "NAO",
+   "r": "No Kanivete, você pode gerar uma música inteira com IA usando a ferramenta \"Omnivoice\" (também conhecida como Geração de Voz). Aqui estão os passos:\n\n1. Abra o Kanivete e vá para a seção \"Áudio\" na barra lateral à esquerda.\n2. Clique na ferramenta \"Omnivoice\" (ou \"Geração de Voz\").\n3. Clique em \"Nova voz\" e arraste um arquivo de áudio que contenha uma amostra de voz curta (até 8 segundos úteis).\n4. A IA do Omnivoice criará uma \"voz\" baseada na amostra de áudio que você inseriu.\n5. Em seguida, você pode criar uma música inteira usando a ferramenta \"Omnivoice\". Para fazer isso, siga os passos abaixo:\n\t* Clique em \"Criar música\" (ou algo semelhante).\n\t* Selecione a \"voz\" que você criou anteriormente.\n\t* Defina a duração da música (por exemplo, 3 minutos ou 5 minutos).\n\t* Selecione o ritmo e a estrutura da música (por exemplo, 4/4, 3/4, etc.).\n\t* Clique em \"Gerar música\".\n6. A IA do Omnivoice criará uma música inteira com a \"voz\" que você selecionou. Você pode ouvir a música e ajustar os parâmetros se necessário.\n\nLembre-se de que a qualidade da música gerada depende da qualidade da amostra de áudio que você inseriu e da precisão da IA do Omnivoice. Além disso, a ferramenta \"Omnivoice\" pode não ser perfeita e pode produzir resultados inconsistentes.\n\nSe você tiver alguma dúvida ou precisar de mais ajuda, sinta-se à vontade para perguntar!\n\n**[[abrir:omnivoice]]**"
+  },
+  {
+   "p": "Como eu transformo um texto em voz no Kanivete?",
+   "tipo": "SIM",
+   "r": "```texto\nSelecione a ferramenta \"Texto para Voz\" no painel de áudio. Em seguida, coloque o texto que deseja transformar em voz no campo de texto. Você pode ajustar as opções de fala, como velocidade, qualidade e idioma. Ao clicar em \"Gerar\", o Kanivete transformará o texto em voz e você poderá ouvir e ajustar o resultado.\n```"
+  },
+  {
+   "p": "Como eu tiro o fundo de uma imagem no Kanivete?",
+   "tipo": "SIM",
+   "r": "Para remover o fundo de uma imagem no Kanivete, você segue os passos abaixo:\n\n1. Vá para a seção \"Imagem\" na barra lateral à esquerda.\n2. Clique no botão \"Remover Fundo\".\n3. Arraste a imagem desejada para a área de trabalho.\n4. O Kanivete automaticamente irá detectar e remover o fundo da imagem.\n5. Você pode revisar o resultado antes de salvar.\n\nLembre-se de que o Kanivete usa IA para remover o fundo, então o resultado pode variar dependendo da complexidade do fundo e da qualidade da imagem.\n\n[[abrir:remover-fundo]]"
+  }
+ ]
+}

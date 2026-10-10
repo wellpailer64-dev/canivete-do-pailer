@@ -1,0 +1,392 @@
+{
+ "modelo": "gemma4:e4b",
+ "ajuda": [
+  {
+   "pergunta": "Como eu exporto um vídeo no editor?",
+   "resposta": "Para exportar um vídeo no Editor Kanivete, siga estes passos:\n\n1.  Verifique se está tudo como você deseja na sua edição.\n2.  Clique no botão **Exportar** no canto superior direito da tela, ou use o atalho **Ctrl+M**.\n3.  Isso abrirá o Kanivete Encoder. Lá, você verá as configurações à esquerda e a fila de render à direita.\n4.  Adicione o que você quer renderizar à fila, clicando em \"Adicionar à fila\".\n5.  Por fim, clique em **▶ Renderizar** para começar o processo.\n\n[[abrir:video-cutter]]",
+   "pontos": 0.5,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [
+    "",
+    ""
+   ],
+   "medidas": {
+    "total_s": 57.28,
+    "primeira_s": 55.13,
+    "tokens": 142,
+    "tok_s": 66.0,
+    "carga_s": 46.1
+   }
+  },
+  {
+   "pergunta": "Quem criou o Kanivete?",
+   "resposta": "O KANIVETE foi criado por Wellington Pailer.",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 2.38,
+    "primeira_s": 2.23,
+    "tokens": 14,
+    "tok_s": 90.1,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "Como removo o fundo de uma foto?",
+   "resposta": "Para remover o fundo de uma foto, você deve usar a ferramenta Remover Fundo.\n\nBasta arrastar a imagem ou a pasta de imagens para a área dessa ferramenta. O sistema fará um recorte automático com inteligência artificial, e você poderá revisar o resultado antes de salvar. [[abrir:remover-fundo]]",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 2.25,
+    "primeira_s": 1.29,
+    "tokens": 68,
+    "tok_s": 71.0,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "Consigo abrir um projeto do Premiere no Kanivete?",
+   "resposta": "Sim, você consegue abrir um projeto do Premiere no Kanivete.\n\nPara fazer isso, você pode ir em Arquivo > Abrir, ou usar o atalho Ctrl+O, ou simplesmente arrastar o arquivo do projeto do Premiere para a área de trabalho do Editor Kanivete. [[abrir:video-cutter]]",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 1.72,
+    "primeira_s": 0.68,
+    "tokens": 68,
+    "tok_s": 65.3,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "Como faço legenda automática do que as pessoas falam no vídeo?",
+   "resposta": "Para fazer a legenda automática do que as pessoas falam no vídeo, você deve usar a ferramenta de Transcrição.\n\nBasta arrastar o vídeo ou uma pasta contendo os vídeos para a área de trabalho do app. A ferramenta vai transformar a fala em texto, e você poderá gerar a legenda no formato desejado. [[abrir:transcrever-audio]]",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 2.48,
+    "primeira_s": 1.19,
+    "tokens": 75,
+    "tok_s": 58.1,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "O Kanivete precisa de internet pra funcionar?",
+   "resposta": "Não, o KANIVETE roda tudo no seu computador, sem precisar de internet. [[abrir:IA]]",
+   "pontos": 1.0,
+   "faltou": [],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 1.21,
+    "primeira_s": 0.87,
+    "tokens": 25,
+    "tok_s": 74.4,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "Como eu mando o vídeo direto pro TikTok pelo Kanivete, sem sair do app?",
+   "resposta": "Para enviar seu vídeo diretamente para o TikTok sem sair do aplicativo, você precisa usar a ferramenta de **Baixar Vídeo**.\n\nSiga estes passos:\n\n1.  Vá para a barra lateral esquerda e selecione **Baixar Vídeo**.\n2.  Na área principal, você pode colar o link do vídeo do TikTok ou arrastar o vídeo para lá.\n3.  Após o download, o vídeo estará salvo no seu computador e pronto para você usar ou compartilhar como desejar.\n\n[[abrir:video-downloader]]",
+   "pontos": 0,
+   "faltou": [
+    "n[aã]o (tenho certeza|encontrei|h[aá]|existe|tem|d[aá])|n[aã]o.*(op[cç][aã]o|recurso|fun[cç][aã]o)"
+   ],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 2.9,
+    "primeira_s": 1.18,
+    "tokens": 112,
+    "tok_s": 65.0,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pergunta": "Escreva uma legenda curta e animada para um reels de academia.",
+   "resposta": "Aqui estão algumas opções de legendas curtas e animadas para o seu Reels de academia:\n\nOpção 1 (Foco em energia):\n🔥 Energia lá no teto! 💪 Treino feito, meta batida. Quem mais tá na pegada hoje? 🚀 #academia #treino #vidasaudavel\n\nOpção 2 (Foco em superação):\nMais um dia de suor e evolução! 📈 Cada repetição conta. Não pare, siga em frente! 💥 #fitness #workout #força\n\nOpção 3 (Mais divertida):\nDesafio aceito! 🥵 Quem disse que treinar não pode ser divertido? Vem com a gente! 😂🏋️‍♀️ #gymlife #treinador #motivacao\n\nEspero que uma dessas combine com o clima do seu vídeo!",
+   "pontos": 0,
+   "faltou": [
+    "```texto"
+   ],
+   "proibido": [],
+   "tecnico": [],
+   "medidas": {
+    "total_s": 4.37,
+    "primeira_s": 1.0,
+    "tokens": 173,
+    "tok_s": 51.4,
+    "carga_s": 0.01
+   }
+  }
+ ],
+ "vram_gb": 0.25,
+ "tamanho_gb": 0.25,
+ "sfx": [
+  {
+   "pedido": "porta de madeira rangendo",
+   "seg": 4,
+   "saida": "a heavy wooden door creaks open slowly on old hinges",
+   "bruto": "a heavy wooden door creaks open slowly on old hinges",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.54,
+    "primeira_s": 0.39,
+    "tokens": 12,
+    "tok_s": 82.1,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "whoosh rápido de transição",
+   "seg": 2,
+   "saida": "a quick swoosh of air passes by from left to right",
+   "bruto": "a quick swoosh of air passes by from left to right",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.45,
+    "primeira_s": 0.34,
+    "tokens": 13,
+    "tok_s": 113.5,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "cafeteria cheia de gente",
+   "seg": 10,
+   "saida": "people talking indistinctly in a busy cafe as cups and plates clink around",
+   "bruto": "people talking indistinctly in a busy cafe as cups and plates clink around",
+   "falhas": [],
+   "medidas": {
+    "total_s": 2.09,
+    "primeira_s": 1.91,
+    "tokens": 16,
+    "tok_s": 88.0,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "som de notificação de celular",
+   "seg": 2,
+   "saida": "a small electronic chime sounds once from a nearby phone",
+   "bruto": "a small electronic chime sounds once from a nearby phone",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.56,
+    "primeira_s": 0.32,
+    "tokens": 11,
+    "tok_s": 45.2,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "riser de tensão pra antes da virada",
+   "seg": 6,
+   "saida": "a rising tone builds in intensity leading up to a sudden impact",
+   "bruto": "a rising tone builds in intensity leading up to a sudden impact",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.52,
+    "primeira_s": 0.34,
+    "tokens": 13,
+    "tok_s": 72.1,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "cachorro latindo longe e carro passando",
+   "seg": 8,
+   "saida": "a dog barks faintly in the distance as a car drives by quickly",
+   "bruto": "a dog barks faintly in the distance as a car drives by quickly",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.64,
+    "primeira_s": 0.33,
+    "tokens": 15,
+    "tok_s": 48.4,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "impacto pesado tipo trailer de filme",
+   "seg": 3,
+   "saida": "a deep heavy thud with a short rumble echoes loudly",
+   "bruto": "a deep heavy thud with a short rumble echoes loudly",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.49,
+    "primeira_s": 0.31,
+    "tokens": 12,
+    "tok_s": 66.6,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "vidro quebrando",
+   "seg": 3,
+   "saida": "a pane of glass shatters loudly into many pieces",
+   "bruto": "a pane of glass shatters loudly into many pieces",
+   "falhas": [],
+   "medidas": {
+    "total_s": 2.12,
+    "primeira_s": 1.81,
+    "tokens": 11,
+    "tok_s": 35.9,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "chuva fraca na janela à noite",
+   "seg": 10,
+   "saida": "light rain taps softly against a window pane at night",
+   "bruto": "light rain taps softly against a window pane at night",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.55,
+    "primeira_s": 0.34,
+    "tokens": 11,
+    "tok_s": 53.4,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "passos rápidos numa escada de madeira",
+   "seg": 5,
+   "saida": "quick footsteps rapidly ascend wooden stairs with a rhythmic thud",
+   "bruto": "quick footsteps rapidly ascend wooden stairs with a rhythmic thud",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.56,
+    "primeira_s": 0.32,
+    "tokens": 12,
+    "tok_s": 50.3,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "multidão aplaudindo num estádio",
+   "seg": 8,
+   "saida": "a large crowd applauds loudly in a stadium with rhythmic clapping sounds",
+   "bruto": "a large crowd applauds loudly in a stadium with rhythmic clapping sounds",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.66,
+    "primeira_s": 0.38,
+    "tokens": 14,
+    "tok_s": 50.6,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "teclado digitando rápido",
+   "seg": 5,
+   "saida": "fingers type quickly on a mechanical keyboard with rapid clicking sounds",
+   "bruto": "fingers type quickly on a mechanical keyboard with rapid clicking sounds",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.49,
+    "primeira_s": 0.31,
+    "tokens": 13,
+    "tok_s": 73.4,
+    "carga_s": 0.0
+   }
+  }
+ ],
+ "json": [
+  {
+   "pedido": "Extraia os dados do pedido e responda SÓ com JSON no formato {\"cliente\": texto, ",
+   "resposta": "```json\n{\n  \"cliente\": \"Padaria Sol\",\n  \"valor\": 1250.50,\n  \"data\": \"2026-03-03\",\n  \"itens\": [\n    \"2 banners\",\n    \"1 adesivo de vitrine\"\n  ]\n}\n```",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.77,
+    "primeira_s": 0.12,
+    "tokens": 75,
+    "tok_s": 115.7,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "Transforme o pedido em comandos do editor. Ações permitidas: cortar(t), mover(cl",
+   "resposta": "```json\n{\n  \"comandos\": [\n    {\n      \"acao\": \"cortar\",\n      \"args\": {\n        \"tempo\": \"12s\"\n      }\n    },\n    {\n      \"acao\": \"volume\",\n      \"args\": {\n        \"trilha\": \"A2\",\n        \"db\": -6\n      }\n    },\n    {\n      \"acao\": \"texto\",\n      \"args\": {\n        \"conteudo\": \"Promoção\",\n        \"tempo\": \"3s\"\n      }\n    }\n  ]\n}\n```",
+   "falhas": [],
+   "medidas": {
+    "total_s": 1.33,
+    "primeira_s": 0.11,
+    "tokens": 135,
+    "tok_s": 110.4,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "Classifique cada comentário como positivo, negativo ou neutro. Responda SÓ com J",
+   "resposta": "```json\n{\"rotulos\": [\"positivo\", \"negativo\", \"neutro\", \"negativo\", \"positivo\"]}\n```",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.39,
+    "primeira_s": 0.12,
+    "tokens": 28,
+    "tok_s": 102.2,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "Some os valores e responda SÓ com JSON {\"total\": número, \"maior\": texto}.\nCâmera",
+   "resposta": "```json\n{\n\"total\": 5499.4,\n\"maior\": \"Câmera\"\n}\n```",
+   "falhas": [
+    "total errado"
+   ],
+   "medidas": {
+    "total_s": 0.47,
+    "primeira_s": 0.09,
+    "tokens": 31,
+    "tok_s": 82.4,
+    "carga_s": 0.0
+   }
+  },
+  {
+   "pedido": "Responda SÓ com JSON {\"ok\": booleano, \"motivo\": texto}: a resolução 1080x1920 é ",
+   "resposta": "```json\n{\n  \"ok\": true,\n  \"motivo\": \"A resolução 1080x1920 tem 1080 pixels na largura e 1920 pixels na altura. A proporção é 1080/1920, que simplifica para 9/16, caracterizando um formato vertical (retrato).\"\n}\n```",
+   "falhas": [],
+   "medidas": {
+    "total_s": 1.15,
+    "primeira_s": 0.09,
+    "tokens": 87,
+    "tok_s": 81.8,
+    "carga_s": 0.01
+   }
+  },
+  {
+   "pedido": "Separe nome e sobrenome de cada pessoa e responda SÓ com JSON {\"pessoas\": [{\"nom",
+   "resposta": "```json\n{\n\"pessoas\": [\n{\n\"nome\": \"Ana Lúcia\",\n\"sobrenome\": \"Ferreira\"\n},\n{\n\"nome\": \"Carlos Eduardo\",\n\"sobrenome\": \"de Souza\"\n},\n{\n\"nome\": \"Bia\",\n\"sobrenome\": \"Lima\"\n}\n]\n}\n```",
+   "falhas": [],
+   "medidas": {
+    "total_s": 0.92,
+    "primeira_s": 0.11,
+    "tokens": 84,
+    "tok_s": 103.1,
+    "carga_s": 0.0
+   }
+  }
+ ],
+ "resumo": {
+  "ajuda_pontos": 6.9,
+  "sfx_ok": 12,
+  "sfx_total": 12,
+  "json_ok": 5,
+  "json_total": 6,
+  "tok_s": 73.7,
+  "primeira_s": 0.34,
+  "carga_s": 46.1,
+  "vram_gb": 0.25,
+  "tempo_total_min": 1.5
+ }
+}
