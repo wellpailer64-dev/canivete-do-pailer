@@ -159,10 +159,39 @@ Medido com `tools/hw_simular.py leve --sem-app -- comando`, que roda um script P
   - `skSeguir` lê o tamanho pelos atributos do canvas, sem forçar layout.
 - **Resultado com 6 faixas:** 0 travadas no forte e no leve, com metade da CPU. `testes/teste_som.py` PASSOU (74 ok).
 
+## Fase 8 (2026-10-10): primeiro play e arraste da agulha
+**Feito: contenção de CSS nos painéis** (`.ve-dgroup { contain: content }`, editor.css).
+- Esconder painel por painel no play (`hw_paineis_custo.py`) mostrou Soundboard, Desempenho e Transições sendo repintados a cada quadro.
+- Com a contenção, a pintura caiu de 11,3 para 5,7 ms por quadro e as camadas de 8,1 para 4,5 ms.
+- O play passa 3/3 de novo, e o arraste cruzando vídeos caiu de 132 para 89 ms por movimento.
+- Os menus e as janelinhas do editor vão para o `body` ou para o `.ve`, fora dos painéis: conferido no código e em foto do clique direito.
+
+**Medido e DESCARTADO** (sem ganho que valesse a complexidade; não repetir sem ideia nova):
+- *Aquecer os efeitos ao abrir o projeto* (rodar `veFxRender` numa imagem 64×36): o 1º play foi de 9/14/11 travadas para 6/1/10,
+  que é variação demais para concluir.
+  O efeito de cor é barato depois de pronto: 1,6 ms no tamanho do monitor e 3 ms em Full HD.
+  O que difere no 1º play é que ainda não existe quadro guardado no cache de RAM e os vídeos estão sendo lidos pela 1ª vez.
+- *Juntar os movimentos do arraste* (`rAF`) e *desenhar o monitor só no `seeked`*: nenhuma mudança medida.
+- *Garagem de players* (pool por mídia, LRU pelo núcleo de hardware) no deck da tela e nos players das prévias renderizadas:
+  - no deck da tela, as recargas no vai e vem caíram de 19 para 3;
+  - nas prévias renderizadas, de 64 para 46, porque cada trecho é um arquivo e o vai e vem passa por mais trechos do que cabem;
+  - resultado: −11% no tempo por movimento no PC forte e nada no leve. Desfeita.
+
+**Diagnóstico do arraste** (`hw_scrub.py`, `hw_rastro.py`):
+- dentro de um vídeo só, 35 ms por movimento e 2 travadas;
+- cruzando vídeos, 89 ms. Cada troca de arquivo faz o navegador recarregar o vídeo, e os dados passam pela thread principal da página
+  (`ResponseBodyLoader`, ~6,8 de 8 s).
+- A solução de fato é a dos editores profissionais: **decodificar fora do navegador** (um servidor de quadros nativo, ffmpeg ou Media
+  Foundation, que entrega quadros prontos ao monitor durante o arraste). É um projeto de arquitetura, não um ajuste.
+
+**Teste de play:** `teste_play.py` agora pega os players depois do `veSeek(ini)`. Uma busca parada pode trocar o player, e os ouvintes
+ficariam no player velho.
+
 ## Pendências (em ordem)
 1. **IA numa placa integrada:** remover fundo (DirectML), gerador_sfx, OmniVoice e melhorar áudio ainda escolhem sozinhos.
    Medir integrada × processador antes de decidir (sem integrada aqui: precisa de um PC de amigo ou de uma máquina emprestada)
    e respeitar `ia_na_placa`/`uma_ia_por_vez`.
 2. **Kani no leve:** a 1ª palavra ainda leva ~36 s sem placa. Medir numa integrada de verdade (Vulkan), que deve ser bem mais rápida.
 3. ~~Medir no leve: exportar, o Photo com PSD grande e o remover fundo~~ (feito nas fases 3 e 4).
-4. **Validar num PC real fraco** (notebook de amigo): o simulador aperta CPU e memória, mas não reproduz uma integrada de verdade.
+4. **Arraste da agulha cruzando vídeos:** servidor de quadros nativo (ver Fase 8). Antes, medir o protótipo num trecho curto.
+5. **Validar num PC real fraco** (notebook de amigo): o simulador aperta CPU e memória, mas não reproduz uma integrada de verdade.

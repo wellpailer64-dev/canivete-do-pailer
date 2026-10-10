@@ -26,11 +26,13 @@ LIMITES = {
 
 MEDIR = """async ([seg, ini]) => {
   const log = {buscas: 0, esperas: 0, voltas: [], travadas: [], trocas: 0};
+  veSeek(ini);   // antes de pegar os players: parado, a busca pode trocar o player da tela pela garagem (editor.js)
+  await new Promise(r => setTimeout(r, 300));
   const A = veDeckA(), B = veDeckB();
   const ouvir = (x, ev, k) => { const f = () => log[k]++; x.addEventListener(ev, f); return () => x.removeEventListener(ev, f); };
   const soltar = [ouvir(A, 'seeking', 'buscas'), ouvir(B, 'seeking', 'buscas'), ouvir(A, 'waiting', 'esperas'), ouvir(B, 'waiting', 'esperas')];
   const q0 = [A.getVideoPlaybackQuality(), B.getVideoPlaybackQuality()];
-  veSeek(ini); vePlay();
+  vePlay();
   let ant = VE.playhead, antT = performance.now();
   const t0 = antT;
   await new Promise(fim => { (function f() {
