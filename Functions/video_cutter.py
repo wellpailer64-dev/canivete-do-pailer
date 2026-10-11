@@ -1210,7 +1210,172 @@ def _guardar_thumbs(work, tipo, thumbs):
     return [{"t": x["t"], "url": x["url"]} for x in thumbs]
 
 
-def preparar_midia(path, emit, stop_event=None, prioridade=1, leve=False):
+# ── Prévia PARCIAL (2026-10-11): vídeo longo de que a timeline usa pouco (o curta do Gil: 9 h de material, 26% usado)
+# ganha primeiro uma prévia só dos trechos usados (+3 s de folga), no tempo certo do arquivo, com o resto em preto —
+# dá para editar bem antes; depois a completa é feita no fundo (prioridade baixa) e entra no lugar sozinha.
+PARCIAL_FOLGA, PARCIAL_MAX, PARCIAL_MIN_DUR = 3.0, 0.6, 120.0
+
+
+def _trechos_proxy(trechos, dur, fps):
+    """Trechos usados [[a, b]] (s da fonte) → intervalos com folga, unidos (vão < 2 folgas some) e em quadros inteiros."""
+    rs = []
+    for t in trechos or []:
+        try:
+            a, b = float(t[0]), float(t[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        if b > a:
+            rs.append((max(0.0, a - PARCIAL_FOLGA), min(dur, b + PARCIAL_FOLGA)))
+    rs.sort()
+    out = []
+    for a, b in rs:
+        if out and a <= out[-1][1] + 2 * PARCIAL_FOLGA:
+            out[-1] = (out[-1][0], max(out[-1][1], b))
+        else:
+            out.append((a, b))
+    q = lambda t: round(t * fps) / fps
+    return [(q(a), min(dur, q(b))) for a, b in out if q(b) - q(a) > 1.5 / fps]
+
+
+def _gerar_proxy_parcial(path, info, out, faixas, on_pct, stop_event, lado):
+    """Prévia do arquivo inteiro com só `faixas` decodificadas do original; o resto é quadro escuro (custa quase nada).
+    Cada pedaço vira um .ts com os mesmos parâmetros e o arquivo final é a junção sem recodificar. (ok, erro)."""
+    fps, dur = float(info["fps"]), float(info["duration"])
+    taxa = f"{fps:.6f}"
+    gop = max(1, int(round(fps / 2)))
+    gpu = _detectar_hw_encoder() == "h264_nvenc"
+    pf = str(info.get("pix_fmt") or "")
+    cuda = gpu and not _tem_rotacao(info) and not (info.get("vcodec") == "h264" and ("10" in pf or "422" in pf or "444" in pf))
+    venc = (["-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "28", "-b:v", "0", "-bf", "0"] if gpu else
+            ["-c:v", "libx264", "-preset", "ultrafast", "-tune", "fastdecode", "-crf", "28"])
+    som = bool(info.get("has_audio"))
+    asaida = (["-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2"] if som else ["-an"])
+    pedacos, cur = [], 0.0
+    for a, b in faixas:
+        if a > cur + 0.5 / fps:
+            pedacos.append((cur, a, False))
+        pedacos.append((a, b, True))
+        cur = b
+    if cur < dur - 0.5 / fps:
+        pedacos.append((cur, dur, False))
+    pasta = out + ".partes"
+    shutil.rmtree(pasta, ignore_errors=True)
+    os.makedirs(pasta, exist_ok=True)
+    usado_total = sum(b - a for a, b, u in pedacos if u) or 1.0
+    feito, partes, W, H = 0.0, [], None, None
+    try:
+        # primeiro os usados (o tamanho do quadro da prévia sai do 1º), depois os escuros com o mesmo tamanho
+        for k in sorted(range(len(pedacos)), key=lambda k: not pedacos[k][2]):
+            a, b, usado = pedacos[k]
+            n = max(1, int(round((b - a) * fps)))
+            arq = os.path.join(pasta, f"p{k:04d}.ts")
+            if usado:
+                vf = (f"[0:v:0]scale_cuda={_proxy_escala(lado)}:format=yuv420p,hwdownload,format=yuv420p,fps={taxa}[p]" if cuda else
+                      f"[0:v:0]scale={_proxy_escala(lado)}:flags=fast_bilinear,format=yuv420p,fps={taxa}[p]")
+                af = f";[0:a:0]aresample=48000,apad,atrim=0:{n / fps:.6f}[s]" if som else ""
+                cmd = ([ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1"]
+                       + (["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"] if cuda else [])
+                       + ["-ss", f"{a:.6f}", "-i", path, "-t", f"{(n + 2) / fps:.6f}", "-filter_complex", vf + af,
+                          "-map", "[p]"] + (["-map", "[s]"] if som else []) + ["-frames:v", str(n), "-g", str(gop)] + venc + asaida
+                       + ["-metadata:s:v:0", "rotate=0", "-f", "mpegts", arq])
+                rc, err = _run_progress(cmd, n / fps, lambda p, f0=feito, d=b - a: on_pct(min(99, (f0 + p / 100 * d) / usado_total * 100)),
+                                        stop_event, baixa=True)
+                if rc != 0 and cuda:   # a placa não leu este arquivo: o pedaço sai pelo processador
+                    cuda = False
+                    vf = f"[0:v:0]scale={_proxy_escala(lado)}:flags=fast_bilinear,format=yuv420p,fps={taxa}[p]"
+                    cmd = [x for x in cmd if x not in ("-hwaccel", "cuda", "-hwaccel_output_format")]
+                    cmd[cmd.index("-filter_complex") + 1] = vf + af
+                    rc, err = _run_progress(cmd, n / fps, lambda p: None, stop_event, baixa=True)
+                if rc != 0 or not os.path.isfile(arq):
+                    return False, err
+                feito += b - a
+                if W is None:
+                    i = _probe_ffprobe(arq)
+                    W, H = int(i.get("width") or 0), int(i.get("height") or 0)
+            else:
+                cmd = ([ffmpeg_path(), "-y", "-v", "error", "-f", "lavfi", "-i", f"color=c=0x141414:s={W}x{H}:r={taxa}"]
+                       + (["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"] if som else [])
+                       + ["-map", "0:v"] + (["-map", "1:a"] if som else []) + ["-frames:v", str(n), "-t", f"{n / fps:.6f}",
+                          "-pix_fmt", "yuv420p", "-g", str(gop)] + venc + asaida + ["-f", "mpegts", arq])
+                r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", creationflags=_creationflags())
+                if r.returncode != 0:
+                    return False, r.stderr
+            if stop_event is not None and stop_event.is_set():
+                return False, "cancelado"
+            partes.append((k, arq))
+        lista = os.path.join(pasta, "lista.txt")
+        with open(lista, "w", encoding="utf-8") as f:
+            f.writelines(f"file '{arq.replace(chr(92), '/')}'\n" for _, arq in sorted(partes))
+        r = subprocess.run([ffmpeg_path(), "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", lista, "-c", "copy",
+                            "-movflags", "+faststart", "-f", "mp4", out],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", creationflags=_creationflags())
+        return r.returncode == 0 and os.path.isfile(out), r.stderr
+    finally:
+        shutil.rmtree(pasta, ignore_errors=True)
+
+
+def _nome_parcial(lado):
+    return f"proxy_v3_{lado}.parcial.mp4"
+
+
+def _proxy_parcial(path, info, work, lado, trechos, chave, prioridade, emit, stop_event):
+    """Prévia parcial pronta (feita agora ou já existente cobrindo os trechos) ou None quando não compensa."""
+    dur, fps = float(info["duration"]), float(info.get("fps") or 30)
+    if info.get("alfa") or dur < PARCIAL_MIN_DUR or not trechos or fps <= 0:
+        return None
+    faixas = _trechos_proxy(trechos, dur, fps)
+    if not faixas or sum(b - a for a, b in faixas) > PARCIAL_MAX * dur:
+        return None
+    arq, meta = os.path.join(work, _nome_parcial(lado)), os.path.join(work, _nome_parcial(lado) + ".json")
+    try:
+        feitas = json.load(open(meta, encoding="utf-8"))["faixas"] if os.path.isfile(arq) else []
+    except Exception:
+        feitas = []
+    cobre = lambda a, b: any(fa <= a + 0.5 / fps and fb >= b - 0.5 / fps for fa, fb in feitas)
+    if feitas and all(cobre(a, b) for a, b in faixas):
+        return arq
+    # refaz juntando o que já tinha (um clipe novo do mesmo vídeo não perde os trechos de antes)
+    faixas = _trechos_proxy([list(x) for x in feitas] + [[a + PARCIAL_FOLGA, b - PARCIAL_FOLGA] for a, b in faixas], dur, fps)
+    tmp = os.path.join(work, f"{_nome_parcial(lado)}.{os.getpid()}.tmp.mp4")
+    with _VAGAS_PROXY.vaga(chave, prioridade):
+        ok, err = _gerar_proxy_parcial(path, info, tmp, faixas, lambda p: emit({"stage": "proxy", "pct": p}), stop_event, lado)
+    if not ok:
+        _apagar_item(tmp)
+        print("[proxy parcial] não deu, segue a completa:", (err or "")[-300:])
+        return None
+    try:
+        _apagar_item(arq)
+        os.replace(tmp, arq)
+    except OSError:   # a parcial antiga ainda aberta no player: usa a nova com outro nome
+        arq = tmp
+    with open(meta, "w", encoding="utf-8") as f:
+        json.dump({"faixas": faixas}, f)
+    return arq
+
+
+def _completar_proxy(path, info, work, proxy, lado, chave, emit, count):
+    """No fundo (prioridade baixa, uma por vez com vaga para o urgente): a prévia completa; pronta, troca a parcial."""
+    def run():
+        try:
+            with _trava_proxy(proxy):
+                if os.path.isfile(proxy):
+                    return
+                tmp = os.path.join(work, f"{os.path.basename(proxy)}.{os.getpid()}.tmp.mp4")
+                with _VAGAS_PROXY.vaga(chave + "|completa", 2):
+                    ok, err, _ = gerar_proxy(path, info, tmp, lambda p: None, None, thumbs_dir=None, thumbs_n=0, lado=lado)
+                if not ok:
+                    _apagar_item(tmp)
+                    return
+                final = _instalar_proxy(tmp, proxy, work)
+            emit({"stage": "video", "url": media_server.register(final), "proxy": True})
+            for n in (_nome_parcial(lado), _nome_parcial(lado) + ".json"):
+                _apagar_item(os.path.join(work, n))   # aberta no player: fica e sai na próxima limpeza
+        except Exception as e:
+            print("[proxy completa]", e)
+    threading.Thread(target=run, name="proxy-completa", daemon=True).start()
+
+
+def preparar_midia(path, emit, stop_event=None, prioridade=1, leve=False, trechos=None):
     """
     Outro vídeo do projeto (além do aberto): mesma preparação, sem limpar a sessão nem mexer no áudio da fonte
     principal. Cada vídeo tem o seu áudio conformado (como os .cfa do Premiere; adicionar_audio) e a sua prévia.
@@ -1270,6 +1435,20 @@ def preparar_midia(path, emit, stop_event=None, prioridade=1, leve=False):
         emit({"stage": "thumbs", "thumbs": th})
     else:
         ok, err, thumbs = True, "", None
+        # vídeo longo e pouco usado: prévia só dos trechos agora, a completa depois no fundo
+        parcial = _proxy_parcial(path, info, work, lado, trechos, chave, prioridade, emit, stop_event) \
+            if not os.path.isfile(proxy) else None
+        if parcial and not (stop_event is not None and stop_event.is_set()):
+            emit({"stage": "video", "url": media_server.register(parcial), "proxy": True, "parcial": True})
+            th = _thumbs_guardadas(work, lado) or _thumbs_guardadas(work, "fonte")
+            if th is None:
+                with _VAGAS_EXTRAS.vaga(chave + "|thumbs", prioridade):
+                    th = _guardar_thumbs(work, "fonte", gerar_thumbs(path, info["duration"], work, count))
+            emit({"stage": "thumbs", "thumbs": th})
+            ta.join()
+            emit({"stage": "done"})
+            _completar_proxy(path, info, work, proxy, lado, chave, emit, count)
+            return
         if not os.path.isfile(proxy):
             # o mesmo vídeo pedido de novo (estava fazendo a prévia no fundo e foi para a timeline): espera a
             # conversão que já anda — passando-a na frente — em vez de converter duas vezes ao mesmo tempo

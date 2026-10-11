@@ -290,7 +290,7 @@ def video_cutter_prepare(file_path):
     return {"success": True}
 
 
-def ve_preparar_midia(path, mid, urgente=False, leve=False, fundo=False):
+def ve_preparar_midia(path, mid, urgente=False, leve=False, fundo=False, trechos=None):
     """Outro vídeo do projeto (painel Projeto → timeline): prepara em background; eventos em veOnMidia({id, ...}).
     urgente = está na timeline: a prévia dele sai antes das dos vídeos que só estão no painel.
     leve = só no painel: dados e miniaturas; a prévia leve fica para quando ele for usado.
@@ -301,7 +301,8 @@ def ve_preparar_midia(path, mid, urgente=False, leve=False, fundo=False):
     def run():
         try:
             preparar_midia(path, lambda ev: _ve_emit("veOnMidia", {"id": mid, **ev}),
-                           prioridade=0 if urgente else 2 if fundo else 1, leve=bool(leve) and not urgente and not fundo)
+                           prioridade=0 if urgente else 2 if fundo else 1, leve=bool(leve) and not urgente and not fundo,
+                           trechos=trechos)
         except Exception as e:
             _ve_emit("veOnMidia", {"id": mid, "stage": "error", "error": str(e)})
 
@@ -3034,8 +3035,8 @@ class ApiBridge:
         from Functions import fontes
         return fontes.instalar_google(familia)
 
-    def ve_preparar_midia(self, path, mid, urgente=False, leve=False, fundo=False):
-        return ve_preparar_midia(path, mid, urgente, leve, fundo)
+    def ve_preparar_midia(self, path, mid, urgente=False, leve=False, fundo=False, trechos=None):
+        return ve_preparar_midia(path, mid, urgente, leve, fundo, trechos)
 
     def ve_area_transferencia(self, projeto=""):
         """Ctrl+V na timeline: o que foi copiado no Windows (arquivos, imagem ou texto)."""

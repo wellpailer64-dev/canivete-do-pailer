@@ -1322,8 +1322,15 @@ function veMidiaProxima() {
         const id = VEPJF.fila.shift(), m = VE.media[id];
         if (!m || m.removido) continue;
         VEPJF.ativos.add(id);
-        window.pywebview.api.ve_preparar_midia(m.path, id, !!m._urgente, !m._urgente);
+        window.pywebview.api.ve_preparar_midia(m.path, id, !!m._urgente, !m._urgente, false, m._urgente ? veMidiaTrechos(id) : null);
     }
+}
+// Trechos (s da fonte) que as timelines usam deste vídeo: a prévia sai primeiro só deles (prévia parcial no Python)
+function veMidiaTrechos(id) {
+    const out = [], ver = clips => (clips || []).forEach(c => { if (veMid(c) === id && c.e > c.s) out.push([+c.s.toFixed(3), +c.e.toFixed(3)]); });
+    ver(VE.clips);
+    (VE.sequences || []).forEach(s => { if (s.id !== VE.activeSequence) ver(s.clips); });
+    return out.length ? out : null;
 }
 // Prévia no fundo: com nada urgente andando e sem tocar, o próximo vídeo só do painel (sem prévia ainda) já ganha a
 // prévia leve — um por vez e com prioridade baixa no Python (sempre sobra vaga para o que for para a timeline).
