@@ -415,6 +415,7 @@ function veCacheSig(f) {
         if (veIsAudio(c) || t < c.st - VE_CACHE_MARGEM || t >= veEnd(c) + VE_CACHE_MARGEM) return;
         const m = veMediaOf(c);
         partes.push(c, veOculto(c), m && (m.url || m.path || ''), veMediaOffline(m), !!(m && m._aoVivo));   // Comp ao vivo: quadro guardado não vale
+        if (typeof veRotoSig === 'function' && c.fx) partes.push(veRotoSig(c, t));   // Pincel Roto: versão da máscara do quadro
     });
     const li = typeof veTxLegendaEm === 'function' ? veTxLegendaEm(t) : -1;
     if (li >= 0) partes.push(VE.legendas[li], VE.legEstilo, VE.legGravar);
@@ -3871,6 +3872,11 @@ function veExportPlanClips() {
             const sz = png ? { w: png.w, h: png.h } : veMediaSize(c);
             // texto animado: lista de quadros (editor-txanim.js), recortada no trecho exportado
             const seq = png && png.seq ? png.seq : null, sq = seq ? Math.max(0, c.s - (c._o || c).s) : 0;
+            // Pincel Roto (editor-roto.js): a mídia vira o vídeo transparente do trecho recortado (começa em ro.a)
+            const ro = pk && pk.roto;
+            if (ro) return { _c: c, tipo: 'video', path: ro.path, seq: null, st: c.st, s: c.s - ro.a, e: c.e - ro.a, sc: p.sc, x: p.x, y: p.y, rot: p.rot, op: p.op, kf,
+                             fx: veFxExport(c).filter(f => f.t !== 'roto'), fxk: veFxKfExport(c), ca: veCaExport(c), mw: sz.w, mh: sz.h, v: veVel(c), bm: veBmAtivo(c) ? c.bm : null,
+                             ox: veMediaSize(c).w / 2 - veAnc(c, p)[0], oy: veMediaSize(c).h / 2 - veAnc(c, p)[1] };
             return { _c: c, tipo: veIsAdj(c) ? 'ajuste' : veIsImage(c) ? 'imagem' : 'video', path: png ? png.path : veIsImage(c) || veMid(c) ? m.path || null : null,
                      seq, st: c.st, s: seq ? sq : veIsImage(c) ? 0 : c.s, e: seq ? sq + veLen(c) : veIsImage(c) ? veLen(c) : c.e,
                      sc: p.sc / f, x: p.x, y: p.y, rot: p.rot, op: p.op, kf,

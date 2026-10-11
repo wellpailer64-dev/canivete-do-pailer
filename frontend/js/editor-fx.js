@@ -955,7 +955,7 @@ function veFxAction(id, act) {
     if (!c || !c.fx) return;
     const j = c.fx.findIndex(f => f.id === id);
     if (j < 0) return;
-    if (act === 'open') { vedShow(VE_FX[c.fx[j].t].painel); return; }
+    if (act === 'open') { const d = VE_FX[c.fx[j].t]; if (d.abrir) d.abrir(c, c.fx[j]); else vedShow(d.painel); return; }
     if (act === 'gotas') { veKeyGotas(id); return; }
     if (act === 'fold') {
         VEFX.collapsed.has(id) ? VEFX.collapsed.delete(id) : VEFX.collapsed.add(id);
@@ -1033,7 +1033,7 @@ function veRenderFxControls() {
                     <button data-fa="reset" title="Restaurar valores">↺</button>
                     <button data-fa="del" title="Remover efeito">✕</button>
                 </div>
-                <div class="ve-fxe-body">${d.painel ? `
+                <div class="ve-fxe-body">${d.botao ? `<button class="ve-btn ve-btn-sm ve-fxe-open" data-fa="open">${veT(d.botao)}</button>` : ''}${d.painel ? `
                     <button class="ve-btn ve-btn-sm ve-fxe-open" data-fa="open">Editar no painel ${d.nome}</button>` : d.params.filter(p => !p.oculto).map(p => p.tipo === 'cor' ? `
                     <div class="ve-prop ve-prop-cor">
                         <label>${p.nome}</label>

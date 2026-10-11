@@ -3726,6 +3726,43 @@ class ApiBridge:
         from Functions import cena3d
         return cena3d.pasta_vetor(base)
 
+    # Pincel Roto do Editor (frontend/js/editor-roto.js + Functions/pincel_roto.py): SAM 2.1 de vídeo, em segundo plano
+    def ve_roto_abrir(self, base, rid, video, a, b):
+        from Functions import pincel_roto
+        try:
+            return pincel_roto.abrir(base, rid, video, float(a), float(b))
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_roto_estado(self, rid):
+        from Functions import pincel_roto
+        return pincel_roto.estado(rid)
+
+    def ve_roto_base(self, rid, quadro, pontos):
+        from Functions import pincel_roto
+        try:
+            return pincel_roto.definir_base(rid, quadro, pontos)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_roto_refinar(self, rid, params):
+        from Functions import pincel_roto
+        try:
+            return pincel_roto.refinar(rid, params)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_roto_cancelar(self, rid):
+        from Functions import pincel_roto
+        return pincel_roto.cancelar(rid)
+
+    def ve_roto_video(self, rid):
+        from Functions import pincel_roto
+        try:
+            return pincel_roto.video_alfa(rid)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def ve_3d_url(self, caminho):
         from Functions import cena3d
         return cena3d.url(caminho)

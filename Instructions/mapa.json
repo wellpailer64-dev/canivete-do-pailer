@@ -37,6 +37,7 @@
     "editor-psd.js",
     "editor-render.js",
     "editor-reverse.js",
+    "editor-roto.js",
     "editor-scopes.js",
     "editor-sfx-gerar.js",
     "editor-soundboard.js",
@@ -110,6 +111,12 @@
     "ve_c3d_lote",
     "ve_c3d_fim",
     "ve_c3d_pasta",
+    "ve_roto_abrir",
+    "ve_roto_estado",
+    "ve_roto_base",
+    "ve_roto_refinar",
+    "ve_roto_cancelar",
+    "ve_roto_video",
     "ve_3d_url",
     "ve_render_tocar",
     "ve_render_mover",
@@ -1412,6 +1419,42 @@
     "cena3d"
    ]
   },
+  "ve_roto_abrir": {
+   "args": "base, rid, video, a, b",
+   "modulos": [
+    "pincel_roto"
+   ]
+  },
+  "ve_roto_estado": {
+   "args": "rid",
+   "modulos": [
+    "pincel_roto"
+   ]
+  },
+  "ve_roto_base": {
+   "args": "rid, quadro, pontos",
+   "modulos": [
+    "pincel_roto"
+   ]
+  },
+  "ve_roto_refinar": {
+   "args": "rid, params",
+   "modulos": [
+    "pincel_roto"
+   ]
+  },
+  "ve_roto_cancelar": {
+   "args": "rid",
+   "modulos": [
+    "pincel_roto"
+   ]
+  },
+  "ve_roto_video": {
+   "args": "rid",
+   "modulos": [
+    "pincel_roto"
+   ]
+  },
   "ve_3d_url": {
    "args": "caminho",
    "modulos": [
@@ -2284,6 +2327,7 @@
   "Instructions/agente/mapa-kanivete-encoder.md": "Mapa do Kanivete Encoder (Ke)",
   "Instructions/agente/mapa-vetor.md": "Mapa do código — vetor (gerado por tools/mapa_codigo.py; nome:linha)",
   "Instructions/agente/nucleo-hardware.md": "Núcleo de hardware: o app se ajustar a cada PC (2026-10-10)",
+  "Instructions/agente/pincel-roto.md": "Pincel Roto e Refinar borda (Roto Brush do After Effects no Editor Kanivete)",
   "Instructions/agente/plano-cena.md": "Plano CENA — diagramar no Photo Kanivete escrevendo HTML/CSS (para IAs)",
   "Instructions/agente/plano-comp.md": "Plano: Comp (composição estilo After Effects) no Pocket Editor",
   "Instructions/agente/plano-economia-ponte-vetor-photo.md": "Planos (2026-10-04): economia de tokens, ponte Vetor ↔ Photo, nível \"Herbíssimo\"",
@@ -2355,6 +2399,7 @@
   "Functions/organizador_de_imagens.py": "limparduplicadas.py",
   "Functions/organizador_de_videos.py": "organizador_de_videos.py",
   "Functions/otimizar.py": "Forçar Full HD (painel Projeto): vídeo maior que Full HD (2K, 4K, 8K, em pé ou deitado) vira uma cópia com o lado",
+  "Functions/pincel_roto.py": "pincel_roto.py — Pincel Roto do Editor Kanivete (o Roto Brush do After Effects): recorta uma pessoa/objeto do vídeo a",
   "Functions/ponte_illustrator.py": "Ponte com o Adobe Illustrator instalado (COM + ExtendScript) — .ai NATIVO, com todas as pranchetas",
   "Functions/ponte_premiere.py": "Ponte Kanivete ↔ Premiere Pro: conversa com o plugin UXP \"Kanivete Ponte\" (guia: Instructions/agente/ponte-premiere.md)",
   "Functions/preencher_conteudo.py": "Preenchimento sensível ao conteúdo (Photo Kanivete: Editar › Preenchimento sensível ao conteúdo, como o Photoshop)",
@@ -2428,6 +2473,7 @@
   "teste_psd_refs": "PSD salvo por cima (ida e volta) não pode trocar pixels entre camadas (2026-10-06: o carrossel do cliente voltou com",
   "teste_psd_so": "Objeto inteligente criado no Photo Kanivete → objeto inteligente INCORPORADO no PSD (Functions/editor_imagem._so_novo)",
   "teste_psd_texto": "Texto criado no Photo Kanivete → camada de texto EDITÁVEL no PSD (Functions/editor_imagem._texto_novo)",
+  "teste_roto": "Pincel Roto (editor-roto.js + Functions/pincel_roto.py) no app de verdade: vídeo de entrevista na V1, texto animado",
   "teste_sfx": "Gerador de efeitos sonoros (Functions/gerador_sfx.py): agendador DDIM igual ao do diffusers e uma geração curta",
   "teste_som": "Sound Kanivete (som.js + Functions/sound_kanivete.py) — app em --agente=9333, mouse de verdade",
   "teste_vetor": "Teste do Vetor Kanivete pela API real (app em --agente=9333): monta um cartão de visita pelos comandos (window.VKN),",

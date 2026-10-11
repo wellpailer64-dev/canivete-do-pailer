@@ -788,4 +788,5 @@ function veCompDuploClique(e) {
     const m = i >= 0 ? veMediaOf(VE.clips[i]) : null;
     if (veEhComp(m)) { e.preventDefault(); veCompAbrir(m); }
     else if (typeof ve3dEh === 'function' && ve3dEh(m)) { e.preventDefault(); ve3dTelaAbrir(VE.clips[i]); }   // Cena 3D: tela própria
+    else if (typeof veRotoFx === 'function' && veRotoFx(VE.clips[i])) { e.preventDefault(); veRotoTelaAbrir(VE.clips[i]); }   // Pincel Roto
 }

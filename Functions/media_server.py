@@ -12,7 +12,7 @@ import re
 import secrets
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 # Recarregar o módulo (modo agente: vk_recarregar / tools/aplicar.py --py) NÃO pode zerar o registro: o servidor
 # continua no ar e todas as prévias, áudios e miniaturas já abertos no app passariam a dar erro ("o player não
@@ -42,7 +42,13 @@ class _Handler(BaseHTTPRequestHandler):
         if not m:
             return None
         with _lock:
-            return _registry.get(m.group(1))
+            p = _registry.get(m.group(1))
+        if p and os.path.isdir(p):   # pasta registrada (register_pasta): o nome do arquivo vem depois do token
+            nome = unquote(self.path[m.end():].split("?", 1)[0])
+            if not nome or "/" in nome or "\\" in nome or nome.startswith("."):
+                return None
+            return os.path.join(p, nome)
+        return p
 
     def do_OPTIONS(self):
         self.send_response(204)
@@ -185,6 +191,22 @@ def register(path):
             _versoes[path] = (token, versao)
     nome = quote(os.path.basename(path))
     return f"http://127.0.0.1:{_port}/m/{token}/{nome}"
+
+
+def register_pasta(pasta):
+    """Registra uma PASTA: URL base http://127.0.0.1:porta/m/<token>/ + nome do arquivo (ex.: as centenas de máscaras do
+    Pincel Roto, sem um registro por arquivo). Só arquivos direto na pasta (sem subpasta, sem ..)."""
+    _ensure_server()
+    pasta = os.path.abspath(pasta)
+    with _lock:
+        v = _versoes.get(pasta)
+        if v and _registry.get(v[0]) == pasta:
+            token = v[0]
+        else:
+            token = secrets.token_urlsafe(12)
+            _registry[token] = pasta
+            _versoes[pasta] = (token, None)
+    return f"http://127.0.0.1:{_port}/m/{token}/"
 
 
 def unregister_prefix(folder):

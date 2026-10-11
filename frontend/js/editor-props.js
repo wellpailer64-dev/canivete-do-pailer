@@ -192,13 +192,15 @@ async function veTxPngs(filtro, clips = VE.clips, guardar = true) {
         if (r && r.success) mapa.set(c, { path: r.path, f, w: d.cv.width, h: d.cv.height });
     }
     await veGrafPngs(mapa, filtro, clips);   // cor sólida, formas e desenhos (editor-grafico.js)
+    // Pincel Roto: o clipe recortado vira o vídeo transparente do trecho (editor-roto.js)
+    if (typeof veRotoPreparar === 'function') await veRotoPreparar(mapa, filtro, clips);
     // camadas com máscara, fosco, camada mãe, efeito animado... viram vídeo desenhado quadro a quadro (editor-motion.js)
     if (typeof veMoAssar === 'function') await veMoAssar(mapa, filtro, clips);
     if (guardar) VE._txPng = mapa;
     return mapa;
 }
 // A exportação precisa preparar este clipe antes (PNG do texto/gráfico ou camada desenhada do motion)?
-const veTxPrecisa = c => veIsTexto(c) || veEhGrafico(c) || (typeof veMoTem === 'function' && veMoTem(c));
+const veTxPrecisa = c => veIsTexto(c) || veEhGrafico(c) || (typeof veMoTem === 'function' && veMoTem(c)) || (typeof veRotoFx === 'function' && !!veRotoFx(c));
 
 // ─────────────────────────── ferramenta Texto (T) ───────────────────────────
 function veTxMidia() {

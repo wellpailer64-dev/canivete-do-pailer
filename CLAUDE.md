@@ -118,6 +118,12 @@ Granulação, Rampa, Preenchimento, Contorno, Desfoque direcional/radial, Eco. E
 pelo desenhista da prévia). Guia, API `VEMO_API`, armadilhas e pendências: `Instructions/agente/plano-motion.md`.
 Testes: `py -3.13 testes/teste_motion.py` e `py -3.13 testes/teste_export.py --casos motion,fxmotion,curvas --folha`.
 
+## Pincel Roto (Roto Brush do After Effects)
+Recorte de pessoa/objeto no vídeo pintando num quadro-base (verde soma, Alt tira) que propaga para os dois lados; correção
+= novo quadro-base; Refinar borda nos Controles de efeito. SAM 2.1 Tiny de vídeo em ONNX (Apache-2.0, 182 MB, 1º uso),
+DirectML, 0,56 s/quadro. `frontend/js/editor-roto.js` + `Functions/pincel_roto.py`; exporta como ProRes 4444 com alfa.
+Guia, medições e pendências: `Instructions/agente/pincel-roto.md`. Teste: `py -3.13 testes/teste_roto.py [--dur 15]`.
+
 ## Comp (estilo After Effects)
 Plano, modelo e limitações em `Instructions/agente/plano-comp.md`; código em `frontend/js/editor-comp.js`.
 Plano completo (Fases 1–3 + Propriedades essenciais por faixa).
