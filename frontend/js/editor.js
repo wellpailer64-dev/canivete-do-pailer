@@ -1352,7 +1352,14 @@ const veVinculados = c => c.lk ? VE.clips.filter(o => o.lk === c.lk) : [c];
 let veLkN = 0;
 const veNovoLk = () => Date.now().toString(36) + (veLkN++).toString(36);
 // Pedaços de um clipe cortado: a transição de entrada (c.tin) fica no da esquerda e a de saída no da direita
-const veSemTin = c => { delete c.tin; delete c.atin; return c; };
+// Pedaço novo de um corte: cópia PRÓPRIA de tudo que é objeto (propriedades, efeitos, quadros-chave, máscaras, texto...)
+// — o { ...c } dividia esses objetos entre os dois pedaços e mexer num mudava o outro. Campos internos (_o, _txPng...)
+// continuam sendo referências.
+const veClipIndep = c => {
+    Object.keys(c).forEach(k => { const v = c[k]; if (k[0] !== '_' && v && typeof v === 'object') c[k] = JSON.parse(JSON.stringify(v)); });
+    return c;
+};
+const veSemTin = c => { delete c.tin; delete c.atin; return veClipIndep(c); };
 const veSemTout = c => { delete c.tout; delete c.atout; return c; };
 // Um corte gera um par novo: os pedaços da direita ganham um vínculo próprio (o mesmo para imagem e som)
 function veLkMapa() {

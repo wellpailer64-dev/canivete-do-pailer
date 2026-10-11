@@ -99,6 +99,17 @@ def main():
             n_v1 = pg.evaluate("VE.clips.filter(c => c.tr === 0 && !veIsAudio(c)).length")
             n_v2 = pg.evaluate("VE.clips.filter(c => c.tr === 1).length")
             ok(n_v1 == 2 and n_v2 == 1, "Ctrl+K corta só as trilhas-alvo", f"V1 {n_v1} pedaços, V2 {n_v2}")
+            # os dois pedaços do corte são independentes: escala e efeito num não mudam o outro
+            indep = pg.evaluate("""() => {
+                const [e, d] = VE.clips.filter(c => c.tr === 0 && !veIsAudio(c)).sort((a, b) => a.st - b.st);
+                const h0 = VE.history.length;
+                VE.sel = VE.clips.indexOf(e); vePushHistory(); veApplyProps(e, { sc: 150 }); veFxAdd(VE.sel, 'blur');
+                const r = { dEsc: veProps(d).sc, dFx: (d.fx || []).length, eEsc: veProps(e).sc, eFx: (e.fx || []).length };
+                while (VE.history.length > h0) veUndo();
+                VE.sel = -1; veRefresh(); return r;
+            }""")
+            ok(indep["eEsc"] == 150 and indep["eFx"] == 1 and indep["dEsc"] != 150 and indep["dFx"] == 0,
+               "pedaços do corte são independentes (escala e efeito)", str(indep))
             # ↓ a partir de 0: vai para o corte da V1 (2 s), não para o fim da V2
             pg.evaluate("veSeek(0)"); pg.keyboard.press("ArrowDown")
             ok(abs(pg.evaluate("VE.playhead") - 2) < 0.05, "↓ pula para o corte das trilhas-alvo", f"agulha {pg.evaluate('VE.playhead'):.2f}")
