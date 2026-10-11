@@ -53,11 +53,11 @@ def _rodar(args, erro):
 
 def limpo(path):
     """Caminho do .wav limpo de `path` (vídeo ou áudio), feito uma vez por arquivo+data."""
-    from Functions.video_cutter import _midia_dir
+    from Functions.video_cutter import _item_midia
     if not os.path.isfile(path):
         raise RuntimeError("Arquivo não encontrado.")
     chave = hashlib.md5(f"{os.path.abspath(path)}|{os.path.getmtime(path)}|{VERSAO}".encode()).hexdigest()[:14]
-    saida = os.path.join(_midia_dir(), f"an_{chave}.wav")
+    saida = _item_midia(f"an_{chave}.wav")   # na pasta do projeto, com as prévias
     with _trava:
         if os.path.isfile(saida):
             try:

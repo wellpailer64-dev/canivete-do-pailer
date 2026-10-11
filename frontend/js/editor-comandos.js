@@ -82,6 +82,7 @@ const VE_CMDS = [
     { id: 'ima', grupo: 'sequencia', nome: 'Ímã (encaixar)', teclas: ['N'], sep: true, fn: () => veToggleSnap(), marcado: () => VE.snap },
     { id: 'render-inout', grupo: 'sequencia', sep: true, nome: 'Renderizar prévia (In a Out)', teclas: ['Enter'], fn: () => vePrRenderizar() },
     { id: 'render-cancelar', grupo: 'sequencia', nome: 'Cancelar render da prévia', teclas: [], fn: () => vePrCancelar(), pode: () => !!(VEPR.atual || VEPR.fila.length) },
+    { id: 'converter-previas', grupo: 'sequencia', nome: 'Converter prévias antigas (mais leves)', teclas: [], fn: () => veConverterPrevias(), pode: () => VE.ready },
     { id: 'render-apagar', grupo: 'sequencia', nome: 'Apagar arquivos de render do projeto', teclas: [], fn: () => vePrApagarProjeto(), pode: () => VEPR.files.size > 0 },
     { id: 'restaurar', grupo: 'sequencia', nome: 'Voltar ao vídeo original', teclas: [], sep: true, fn: () => veResetEdits() },
 

@@ -631,6 +631,22 @@ function vePrefsCacheCampo(campo, valor) {
     if (campo === 'maxGB' || campo === 'dias') vePrManutencao();
 }
 
+// Conversor: as prévias antigas (1080, formato v2) dos vídeos do projeto aberto viram o formato leve, no fundo
+// (Functions/video_cutter.converter_previas); a mídia troca sozinha quando cada uma fica pronta
+function veConverterPrevias() {
+    const api = vePrApi();
+    if (!api || !api.ve_converter_previas || !VE.ready) { veToast(veT('Abra o projeto no Editor primeiro')); return; }
+    const itens = (VE.media || []).filter(m => m && m.kind === 'video' && m.path && !m.removido && !veMediaOffline(m)).map(m => [m.id, m.path]);
+    api.ve_converter_previas(itens).then(r => {
+        if (!r || !r.success) { veToast((r && r.error) || veT('Não foi possível converter')); return; }
+        veToast(r.total ? `${veT('Convertendo')} ${r.total} ${veT('prévias antigas no fundo')}…` : veT('Nenhuma prévia antiga neste projeto'));
+    });
+}
+window.veOnConversor = ev => {
+    if (ev.fim) { veToast(`${veT('Prévias convertidas')}: ${ev.feitos}/${ev.total}` + (ev.liberado ? ` · ${veCacheBytesTxt(ev.liberado)} ${veT('liberados')}` : '')); return; }
+    if (ev.feitos % 5 === 0) veToast(`${veT('Convertendo prévias')} ${ev.feitos + 1}/${ev.total} · ${ev.nome}`);
+};
+
 function vePrefsCacheLimpar(tudo) {
     const api = vePrApi();
     if (!api) return;

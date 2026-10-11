@@ -5795,7 +5795,10 @@ function veImportTimelineFile() {
 
 function veOpenPath(path) {
     if (!path || VE.exportRunning || !veIsActive()) return;
-    if (!VE._pendingProject) { VE.projectPath = null; VE.dirty = false; }
+    if (!VE._pendingProject) {
+        VE.projectPath = null; VE.dirty = false;
+        try { window.pywebview.api.ve_cache_projeto(''); } catch (e) { /* app antigo */ }   // prévias: pasta "Sem projeto"
+    }
     if (VE.quickEditPending) { VE.quickEdit = true; VE.quickEditPending = false; }
     VE.startScreenDismissed = true;
     veStop();

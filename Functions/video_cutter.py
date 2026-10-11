@@ -302,10 +302,15 @@ def manutencao_midia():
         pass
     cfg = _cache_cfg()
     raiz = _midia_dir()
+    try:
+        _limpar_sobras_conversao(raiz)
+    except Exception:
+        pass
     agora = time.time()
     guardadas = []
-    for nome in os.listdir(raiz):
-        p = os.path.join(raiz, nome)
+    for p in _itens_cache_midia(raiz):
+        if os.path.basename(p).startswith(PREFIXO_PROJETO):
+            continue
         if os.path.normcase(os.path.abspath(p)) in _EM_USO:
             continue   # mídia do trabalho aberto: nem por idade, nem por tamanho
         try:
@@ -328,7 +333,79 @@ def manutencao_midia():
             continue
         _apagar_item(p)
         total -= tam
+    for d in os.listdir(raiz):   # pasta de projeto que ficou vazia
+        q = os.path.join(raiz, d)
+        if d.startswith(PREFIXO_PROJETO) and os.path.isdir(q) and not os.listdir(q):
+            try:
+                os.rmdir(q)
+            except OSError:
+                pass
     return {"success": True, "total": total}
+
+
+# ── Conversor: prévias antigas (v2, 1080, cq 24) → formato leve (v3, qualidade das Preferências) ──
+_CONV = globals().get("_CONV", {"rodando": False, "parar": False})
+
+
+def converter_previas(itens, emit):
+    """itens = [[id, caminho], ...] (vídeos do projeto aberto). No fundo, um por vez com prioridade baixa (vaga sempre
+    livre para o que for urgente): faz a v3, troca a mídia na página (veOnMidia 'video') e apaga a v2."""
+    if _CONV["rodando"]:
+        return {"success": False, "error": "Já está convertendo."}
+    lado = _cache_cfg()["lado"]
+    fila = []
+    for mid, path in itens or []:
+        try:
+            if not path or not os.path.isfile(path):
+                continue
+            work = _pasta_midia(path)
+        except OSError:
+            continue
+        fs = os.listdir(work)
+        if any(f.startswith("proxy_v2") and f.endswith(".mp4") and ".tmp." not in f for f in fs) and f"proxy_v3_{lado}.mp4" not in fs:
+            fila.append((mid, path, work))
+    if not fila:
+        return {"success": True, "total": 0}
+    _CONV.update(rodando=True, parar=False)
+
+    def run():
+        feitos, liberado = 0, 0
+        try:
+            for mid, path, work in fila:
+                if _CONV["parar"]:
+                    break
+                emit("veOnConversor", {"feitos": feitos, "total": len(fila), "nome": os.path.basename(path)})
+                try:
+                    info = probe(path)
+                    final = os.path.join(work, f"proxy_v3_{lado}.mp4")
+                    tmp = os.path.join(work, f"proxy_v3_{lado}.mp4.{os.getpid()}.tmp.mp4")
+                    with _trava_proxy(final):
+                        with _VAGAS_PROXY.vaga(os.path.abspath(path) + "|conv", 2):
+                            ok, err, _ = gerar_proxy(path, info, tmp, lambda p: None, None, lado=lado)
+                        if not ok:
+                            _apagar_item(tmp)
+                            continue
+                        os.replace(tmp, final)
+                    emit("veOnMidia", {"id": mid, "stage": "video", "url": media_server.register(final), "proxy": True})
+                    for f in os.listdir(work):
+                        if f.startswith("proxy_v2"):
+                            q = os.path.join(work, f)
+                            t = os.path.getsize(q)
+                            if _apagar_item(q) is not False and not os.path.exists(q):
+                                liberado += t
+                    feitos += 1
+                except Exception as e:
+                    print("[conversor]", path, e)
+        finally:
+            _CONV["rodando"] = False
+            emit("veOnConversor", {"feitos": feitos, "total": len(fila), "fim": True, "liberado": liberado})
+    threading.Thread(target=run, name="conversor-previas", daemon=True).start()
+    return {"success": True, "total": len(fila)}
+
+
+def converter_parar():
+    _CONV["parar"] = True
+    return {"success": True}
 
 
 def limpar_midia():
@@ -356,10 +433,85 @@ def _em_uso(caminho):
     return caminho
 
 
+# ── Cache de mídia organizado por PROJETO (2026-10-11): <Canivete Media Cache>/Projeto - <nome>/m_…, aud_…, an_…
+# O mesmo vídeo em dois projetos fica uma vez só (na pasta onde já estava); o que estava solto na raiz (formato antigo)
+# vai para a pasta do projeto aberto quando ele é usado. Projeto não salvo: "Projeto - Sem projeto".
+_PROJ_CACHE = globals().get("_PROJ_CACHE", {"nome": None})
+PREFIXO_PROJETO = "Projeto - "
+
+
+def projeto_cache(caminho):
+    """O projeto aberto (caminho do .vknv, ou vazio = sem projeto): decide a pasta das prévias novas."""
+    n = os.path.splitext(os.path.basename(str(caminho or "")))[0]
+    n = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", n).strip(" .")[:60]
+    _PROJ_CACHE["nome"] = n or None
+    return {"success": True, "pasta": _PROJ_CACHE["nome"] or "Sem projeto"}
+
+
+def _item_midia(nome):
+    """Caminho de um item do cache de mídia (pasta m_… ou arquivo aud_/an_…): onde já existe, senão na pasta do projeto."""
+    raiz = _midia_dir()
+    destino = os.path.join(raiz, PREFIXO_PROJETO + (_PROJ_CACHE["nome"] or "Sem projeto"))
+    alvo = os.path.join(destino, nome)
+    if os.path.exists(alvo):
+        return alvo
+    try:
+        for d in os.listdir(raiz):
+            if d.startswith(PREFIXO_PROJETO) and os.path.exists(os.path.join(raiz, d, nome)):
+                return os.path.join(raiz, d, nome)
+    except OSError:
+        pass
+    os.makedirs(destino, exist_ok=True)
+    solto = os.path.join(raiz, nome)
+    if os.path.exists(solto):
+        try:
+            os.replace(solto, alvo)   # mesmo disco: só muda de pasta
+            return alvo
+        except OSError:
+            return solto              # aberto agora por outra cópia do app: fica onde está
+    return alvo
+
+
+def _itens_cache_midia(raiz):
+    """Tudo o que está no cache de mídia (soltos na raiz e dentro das pastas de projeto)."""
+    out = []
+    for nome in os.listdir(raiz):
+        p = os.path.join(raiz, nome)
+        if nome.startswith(PREFIXO_PROJETO) and os.path.isdir(p):
+            out += [os.path.join(p, x) for x in os.listdir(p)]
+        else:
+            out.append(p)
+    return out
+
+
+def _limpar_sobras_conversao(raiz):
+    """Conversão interrompida (app fechado no meio, queda de energia): o .tmp com o número do processo que já não existe
+    sai; pasta de pedaços da prévia parcial e pastas de trabalho da exportação na placa/blocos com mais de 6 h também.
+    Prévia v2 (1080, antiga) que já tem a v3 ao lado (conversor) sai."""
+    agora = time.time()
+    for p in _itens_cache_midia(raiz):
+        nome = os.path.basename(p)
+        try:
+            if os.path.isdir(p) and nome.startswith("m_"):
+                fs = os.listdir(p)
+                for f in fs:
+                    m = re.search(r"\.(\d+)\.tmp\.", f)
+                    if (m and not _pid_vivo(int(m.group(1)))) or (f.endswith(".partes") and agora - os.path.getmtime(os.path.join(p, f)) > 6 * 3600):
+                        _apagar_item(os.path.join(p, f))
+                if any(f.startswith("proxy_v3_") and ".tmp." not in f and not f.endswith((".json", ".partes")) and "parcial" not in f for f in fs):
+                    for f in fs:
+                        if f.startswith("proxy_v2"):
+                            _apagar_item(os.path.join(p, f))
+            elif re.match(r"(placa_|blocos_)", nome) and agora - os.path.getmtime(p) > 6 * 3600:
+                _apagar_item(p)
+        except OSError:
+            continue
+
+
 def _pasta_midia(path):
     """Pasta de cache do vídeo (arquivo+data). Uma prévia antiga do %TEMP% vem junto (não converte de novo)."""
     nome = "m_" + hashlib.md5(f"{os.path.abspath(path)}|{os.path.getmtime(path)}".encode()).hexdigest()[:12]
-    work = _em_uso(os.path.join(_midia_dir(), nome))
+    work = _em_uso(_item_midia(nome))
     velha = os.path.join(_RAIZ_TEMP, nome)
     if not os.path.isdir(work) and os.path.isdir(velha):
         try:
@@ -2391,7 +2543,7 @@ def adicionar_audio(path):
     if not info["has_audio"] or info["duration"] <= 0:
         return {"success": False, "error": "Este arquivo não tem som."}
     chave = hashlib.md5(f"{os.path.abspath(path)}|{os.path.getmtime(path)}".encode()).hexdigest()[:14]
-    pcm = _em_uso(os.path.join(_midia_dir(), f"aud_{chave}.pcm"))   # guardado com as prévias (não se perde no %TEMP%)
+    pcm = _em_uso(_item_midia(f"aud_{chave}.pcm"))   # guardado com as prévias, na pasta do projeto
     tmp = f"{pcm}.{os.getpid()}.{threading.get_ident()}.tmp"   # único: duas leituras juntas não se atropelam
     if not os.path.isfile(pcm):
         r = subprocess.run([ffmpeg_path(), "-y", "-v", "error", "-i", path, "-map", "0:a:0", "-vn", "-ac", "2",

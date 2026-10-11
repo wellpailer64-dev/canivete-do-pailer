@@ -4037,13 +4037,33 @@ class ApiBridge:
         return prefs_save(dados)
 
     def ve_project_save(self, path, dados, salvar_como=False, formato=None):
-        return ve_project_save(path, dados, salvar_como, formato)
+        r = ve_project_save(path, dados, salvar_como, formato)
+        if isinstance(r, dict) and r.get("success") and r.get("path") and not r.get("xml"):
+            from Functions import video_cutter
+            video_cutter.projeto_cache(r["path"])   # prévias novas na pasta deste projeto
+        return r
+
+    def ve_cache_projeto(self, caminho=""):
+        from Functions import video_cutter
+        return video_cutter.projeto_cache(caminho)
+
+    def ve_converter_previas(self, itens):
+        from Functions import video_cutter
+        return video_cutter.converter_previas(itens, _ve_emit)
+
+    def ve_converter_parar(self):
+        from Functions import video_cutter
+        return video_cutter.converter_parar()
 
     def ve_premiere_ponte(self, acao, dados=None):
         return ve_premiere_ponte(acao, dados)
 
     def ve_project_open(self, path=None):
-        return ve_project_open(path)
+        r = ve_project_open(path)
+        if isinstance(r, dict) and r.get("success") and r.get("path"):
+            from Functions import video_cutter
+            video_cutter.projeto_cache(r["path"])   # as prévias deste projeto vão para a pasta dele no cache
+        return r
 
     def af_analisar(self, musica, itens):
         return af_analisar(musica, itens)
