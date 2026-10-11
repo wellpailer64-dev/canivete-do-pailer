@@ -18,8 +18,12 @@ veFilaAdicionarAtual (editor-fila.js) ── "congela" a timeline:
         ▼  pywebview: video_cutter_export (main.py) → eventos veOnExport (progresso, fim)
 exportar_video (Functions/video_cutter.py)
   ├─ modo PLACA → Functions/export_placa.py (exportar)      — padrão com "Usar placa de vídeo" ligado
-  │     motivo() recusa (mesclagem ≠ Multiplicar, rotação, legendas, 10 bits/ProRes, saída reduzida, vídeo com
-  │     alfa, memória estimada > 70% da placa) ou falha → segue pela CPU abaixo (_ultimo_motivo_placa)
+  │     motivo() recusa (mesclagem ≠ Multiplicar, legendas, 10 bits/ProRes, saída reduzida, rotação em ajuste/
+  │     com mesclagem/Dobrar/Chroma na placa, memória que nem em blocos de 1,5 s cabe) ou falha → segue pela CPU
+  │     abaixo (_ultimo_motivo_placa). Rodada 5 (2026-10-11): imagem/texto girado (textura gira na CPU), vídeo
+  │     girado (híbrido: desce, gira, sobe), vídeo transparente (camada desenhada/Comp/3D: _entrada_video_alfa),
+  │     desfoque animado (gblur + sendcmd), Brilho/Preenchimento/Inverter/Cortar/Luma/Cantos/Básico 3D no híbrido,
+  │     blocos adaptativos (12 → 6 → 3 → 1,5 s) e as texturas RGBA na conta da memória
   ├─ por BLOCOS (_exportar_em_blocos) — opção do usuário; só com a base vazia
   ├─ TURBO — timeline só de cortes com NVENC: NVDEC → scale_cuda → NVENC
   └─ CPU — grafo do ffmpeg (_montar): base (trechos + vazios) + camadas por overlay + camada de ajuste em RGB
@@ -128,7 +132,7 @@ Corte também a base (só os segmentos até T).
    - Imagens com efeito (texto com Aberração, etc.) ainda preparadas na CPU.
 2. Velocidade: a placa está em ~1× a duração; medir onde vai o tempo (imagens preparadas na CPU quadro a quadro,
    número de passadas do libplacebo) antes de mexer.
-3. Na placa: legendas, outros modos de mesclagem, rotação de camada, prévia renderizada.
+3. Na placa: legendas, outros modos de mesclagem, prévia renderizada. (Rotação de camada: feita na rodada 5.)
 4. +1,5 de Y na LUT do libplacebo; blocos com GOP fechado; base de trechos no export por blocos.
 5. Textos antigos da fila sem tradução ("Fila de render", "Pausar depois deste"…).
 

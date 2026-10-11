@@ -3522,8 +3522,12 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 e = _expr_kf(kf["sc"], "t") if "sc" in kf else f"{c['sc']:.5f}"
                 # imagem parada já reduzida: o tamanho final sai das dimensões da MÍDIA (mw/mh), não da cópia reduzida
                 # (arredondada a par: 224 px no lugar de 225,7 deixava o logo 0,7% menor e 1–2 px fora do lugar)
-                base_w, base_h = ("@BW@", "@BH@") if (pre_red and img_fixa) else ("iw", "ih")   # ver o recorte, abaixo
-                if pre_red and not img_fixa:
+                # girada (o giro vem ANTES da escala animada): o quadro que chega é o da diagonal — a escala vale sobre
+                # ele (iw/ih), como na prévia; com a medida da mídia (@BW@) o conteúdo encolhia 1/√2 (máscaras de teatro
+                # da propaganda KANIVETE menores que no monitor, 2026-10-11)
+                gira = "rot" in kf or ca["rot"] or abs(c["rot"]) > 1e-6
+                base_w, base_h = ("@BW@", "@BH@") if (pre_red and img_fixa and not gira) else ("iw", "ih")   # ver o recorte, abaixo
+                if pre_red and (not img_fixa or gira):
                     e = f"({e})/{pre_red:.6f}"
                 if ca["sc"]:
                     e = f"({e})*{ca['sc']}"

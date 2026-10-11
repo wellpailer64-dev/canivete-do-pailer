@@ -165,7 +165,8 @@ def _lc_ok(fx):
 # e sobe — leitura, redução, montagem das outras camadas e encoder continuam na placa. Respeite o seu voto (72 Chroma Key,
 # ajustes com Desfoque e Aberração): ia inteiro pela CPU, 6× a duração (2026-10-10).
 # Motion (editor-motion.js): Preenchimento, Inverter e o Brilho da camada de ajuste também têm filtro do ffmpeg
-_FX_HIBRIDO = ("key", "lc", "blur", "bc", "ca", "mo_fill", "mo_inv", "mo_glow")
+# Cortar, Luma Key, Cantos arredondados e Básico 3D (transições Dividir/Chicote viram esses efeitos) também
+_FX_HIBRIDO = ("key", "lc", "blur", "bc", "ca", "mo_fill", "mo_inv", "mo_glow", "crop", "luma", "rounded", "b3d")
 
 
 def _fx_hibrido(fx):
@@ -262,9 +263,10 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
     for c in lay:
         if c.get("bm") and (c["bm"] != "multiply" or vc._sombra_camada(c)):
             return "modo de mesclagem (fora o Multiplicar)"
-        # imagem/texto girado: a textura gira na CPU antes de subir (_entrada_imagem); vídeo girado ainda não
+        # girado: imagem/texto gira na CPU antes de subir (_entrada_imagem); vídeo desce, gira na CPU e sobe (híbrido)
         gira = c["rot"] or "rot" in c["kf"] or any(f.get("t") == "ca_rot" for f in c.get("ca") or [])
-        if gira and (c["tipo"] != "imagem" or c.get("bm") or "sx" in c["kf"] or "sy" in c["kf"]):
+        if gira and (c["tipo"] == "ajuste" or c.get("bm") or "sx" in c["kf"] or "sy" in c["kf"]
+                     or (c["tipo"] == "video" and (_key_so(c["fx"]) or vc._clipe_tem_alfa(c["path"])))):
             return "rotação"
         if c["tipo"] == "ajuste":
             if not _lc_ok(c["fx"]) and not _fx_hibrido(c["fx"]):
@@ -467,7 +469,10 @@ def _entrada_video(g, c, info, pasta, n_cam):
     # chega a ter — os quadros na fila viram 1080 (34 leituras 4K com quadros 4K na fila estouravam os 8 GB da placa)
     k_max = max([c["sc"]] + [p[1] for p in c["kf"].get("sc", [])]) * vc._ca_pulso_max(c.get("ca"))
     key_gpu = _key_so(c["fx"])
-    hib = _fx_hibrido(c["fx"]) and not key_gpu
+    # vídeo girado: o quadro desce e gira na CPU (como no exportador: quadro do tamanho da diagonal quando o giro anima)
+    car = vc._ca_exprs(c.get("ca"), f"(t-{c['st']:.6f})")["rot"]
+    gira_v = bool(c["rot"] % 360) or "rot" in c["kf"] or bool(car)
+    hib = (_fx_hibrido(c["fx"]) or gira_v) and not key_gpu
     # efeitos que descem para a CPU medem em px da mídia (encolher/suavizar do Chroma Key): sem reduzir antes deles
     red = min(1.0, k_max * 1.02) if k_max < 0.9 and not hib and not key_gpu else 1.0
     rw, rh = max(2, int(round(c["mw"] * red / 2)) * 2), max(2, int(round(c["mh"] * red / 2)) * 2)
@@ -498,8 +503,26 @@ def _entrada_video(g, c, info, pasta, n_cam):
                        if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
         baixo = "yuv420p" if (giro or not vk) else _fmt_decodificado(info)
         fx_cpu = ",".join(vc._filtros_fx(c["fx"], c["mw"], c["mh"], f"h{n_cam}"))
-        opac = (f"hwdownload,format={baixo},scale=in_color_matrix={_mtx(info)},format=rgba,{fx_cpu}{a},"
-                f"format=rgba,hwupload,")
+        gir = ""
+        if gira_v:
+            # tempo aqui = o da timeline (setpts com o início da camada; num bloco, st < 0 e o tempo começa no bloco):
+            # o giro conta do início da camada, t − st nos dois casos
+            tv = f"(t-{c['st']:.6f})"
+            if "rot" in c["kf"] or car:
+                e = vc._expr_kf(c["kf"]["rot"], tv) if "rot" in c["kf"] else f"{c['rot']:.5f}"
+                D = int(math.ceil(math.hypot(c["mw"], c["mh"]))) + 2
+                D += D % 2
+                gir = f"rotate=a='(({e}){'+' + car if car else ''})*PI/180':c=black@0:ow={D}:oh={D},"
+                c["_giro_tam"] = (D, D)
+            else:
+                rad = math.radians(c["rot"])
+                RW = int(math.ceil(c["mw"] * abs(math.cos(rad)) + c["mh"] * abs(math.sin(rad)))) + 2
+                RH = int(math.ceil(c["mw"] * abs(math.sin(rad)) + c["mh"] * abs(math.cos(rad)))) + 2
+                RW, RH = RW + RW % 2, RH + RH % 2
+                gir = f"rotate={rad:.6f}:c=black@0:ow={RW}:oh={RH},"
+                c["_giro_tam"] = (RW, RH)
+        opac = (f"hwdownload,format={baixo},scale=in_color_matrix={_mtx(info)},format=rgba,"
+                + (f"{fx_cpu}," if fx_cpu else "") + f"{gir}{a.lstrip(',') + ',' if a else ''}format=rgba,hwupload,")
     elif not _opaca(c):
         # fade de um clipe: só ele desce para receber a transparência (sendcmd no tempo da timeline) e sobe de volta
         a = (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@vop{n_cam}", c["st"])
@@ -517,6 +540,10 @@ def _entrada_video(g, c, info, pasta, n_cam):
                      f"trim=end={min(g.total, c['st'] + c['dur']) - g.fd / 2:.6f},{sobe}{giro}{efeito}{opac}null[{r}]")
     tl = f"(ot-{c['st']:.6f})"   # ot = tempo do quadro de SAÍDA (o t do libplacebo é o da entrada)
     kx = _escala(c, tl)
+    if c.get("_giro_tam"):   # girado na CPU: o quadro que sobe é o da caixa girada; o centro gira em volta da âncora
+        RW, RH = c["_giro_tam"]
+        ang = f"({_expr(c, 'rot', c['rot'], tl)})" + (f"+{vc._ca_exprs(c.get('ca'), tl)['rot']}" if car else "")
+        return [(f"[{r}]", _posicao(c, kx, f"({RW}*({kx}))", f"({RH}*({kx}))", tl, ang=ang))]
     return [(f"[{r}]", _posicao(c, kx, *_tam(c, c["mw"], c["mh"], kx, tl), tl))]
 
 
@@ -885,22 +912,31 @@ def _no_bloco(c, a):
 
 
 def _blocos(lay, total, fps, path):
-    """[(início, fim, quadros, camadas do bloco)] ou None se algum bloco ainda não couber na memória da placa."""
+    """[(início, fim, quadros, camadas do bloco)] ou None se algum bloco ainda não couber na memória da placa.
+    Blocos adaptativos: se algum não cabe no tamanho padrão, tenta blocos menores (metade, até ~1,5 s) — a propaganda
+    KANIVETE tinha 70 camadas (21 vídeos transparentes) nos primeiros 12 s e caía inteira na CPU (2026-10-11)."""
     n_q = int(round(total * fps))
     spans = [(c["st"], c["st"] + c["dur"], c["tipo"] == "video") for c in lay]
-    cortes = vc._cortes_blocos(spans, n_q, fps, _BLOCO_PLACA_S)
-    out = []
-    for k0, k1 in zip(cortes, cortes[1:]):
-        a, b = k0 / fps, k1 / fps
-        # só o que cobre ao menos meio quadro do bloco: camadas fora da grade da saída (30 qps numa saída de 29,97)
-        # tocavam a borda por uma fração de quadro e entravam sem nenhum quadro — a vinheta da camada de ajuste
-        # (movie em loop + blend) ficava esperando para sempre (Respeite, bloco 1: travado em 3%, 2026-10-10)
-        meio = 0.5 / fps
-        sub = [_no_bloco(c, a) for c in lay if c["st"] < b - meio and c["st"] + c["dur"] > a + meio]
-        if not cabe_na_placa(None, sub, path):
+    alvo = _BLOCO_PLACA_S
+    while True:
+        cortes = vc._cortes_blocos(spans, n_q, fps, alvo)
+        out = []
+        for k0, k1 in zip(cortes, cortes[1:]):
+            a, b = k0 / fps, k1 / fps
+            # só o que cobre ao menos meio quadro do bloco: camadas fora da grade da saída (30 qps numa saída de 29,97)
+            # tocavam a borda por uma fração de quadro e entravam sem nenhum quadro — a vinheta da camada de ajuste
+            # (movie em loop + blend) ficava esperando para sempre (Respeite, bloco 1: travado em 3%, 2026-10-10)
+            meio = 0.5 / fps
+            sub = [_no_bloco(c, a) for c in lay if c["st"] < b - meio and c["st"] + c["dur"] > a + meio]
+            if not cabe_na_placa(None, sub, path):
+                out = None
+                break
+            out.append((a, b, k1 - k0, sub))
+        if out is not None:
+            return out
+        if alvo <= 1.5:
             return None
-        out.append((a, b, k1 - k0, sub))
-    return out
+        alvo = max(1.5, alvo / 2)
 
 def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
     """Exporta a timeline na placa. None = não é para a placa (motivo em args['_motivo']); senão o resultado de

@@ -536,7 +536,15 @@ CASOS = {
         t.p = Object.assign(veDefProps(t), { sc: 100, x: 200, y: 1200, rot: -90 });
         const d = clip(4, 0, 0, 2.5, 'logo.png', { p: { sc: 40, x: 760, y: 1100, rot: 0, op: 100 }, fx: [{ id: id(), t: 'ca_rot', on: true, v: { vel: 0.4, esq: 0 } }] });
         const e = clip(5, 0, 0, 2.5, 'logo.png', { p: { sc: 45, x: 600, y: 1550, rot: -15, op: 100 }, fx: [{ id: id(), t: 'sombra', on: true, v: { cor: '#000000', op: 70, ang: 135, dist: 20, tam: 18 } }] });
-        return [fundo, a, b, t, d, e];
+        // gira e cresce ao mesmo tempo (as máscaras de teatro da propaganda): na placa saía √2 maior
+        const f = clip(6, 0, 0, 2.5, 'foto5.jpg', { p: { sc: 25, x: 300, y: 1650, rot: 18, op: 100 } });
+        f.fx = [{ id: 'fbl', t: 'blur', on: true, v: { amt: 0 } }];
+        f.k = { sc: [{ t: 0, v: 0, i: 'back' }, { t: 0.4, v: 25, i: 'lin' }], rot: [{ t: 0, v: -40, i: 'back' }, { t: 0.4, v: 18, i: 'lin' }],
+                'fx.fbl.amt': [{ t: 2.0, v: 0, i: 'in' }, { t: 2.4, v: 60, i: 'lin' }] };
+        // vídeo girando (na placa: desce, gira na CPU e sobe)
+        const v = clip(7, 0, 0, 2.5, 'c.mp4', { x: 'v', p: { sc: 22, x: 820, y: 260, rot: 0, op: 100 } });
+        v.k = { rot: [{ t: 0, v: 0, i: 'lin' }, { t: 2.5, v: 50, i: 'lin' }] };
+        return [fundo, a, b, t, d, e, f, v];
     """, ""),
     # 4K: base 4K + PiP (só com --4k)
     "4k": (2160, 3840, """

@@ -71,6 +71,17 @@ Gramática de motion que o Pailer aprovou:
 - No teste de exportação, o vídeo de fundo tem meio quadro de folga entre prévia e arquivo: o caso motion usa foto parada
   e a conferência por região (30×30) compara com o quadro exato do ffmpeg.
 
+## Exportação rápida (2026-10-11)
+- Desfoque animado (o "entra desfocando" de quase todo texto) NÃO vira camada desenhada: `gblur` + `sendcmd` com
+  `sigma` E `sigmaV` (só sigma deixava o vertical preso no inicial: texto desfocado o filme todo) e pré-multiplicado
+  (sem a borda escura do preto transparente). Na propaganda: 68 → 24 camadas desenhadas.
+- PNG da camada desenhada e da Cena 3D por `veCanvasPng` (toDataURL síncrono): o `toBlob` era adiado ~1 s por quadro
+  pelo WebView. Preparação da propaganda do zero: 1.002 s → 69 s.
+- Modo placa aceita tudo o que o motion usa (ver mapa-kanivete-encoder.md, rodada 5).
+- Corrigido no exportador de CPU: imagem que gira E muda de escala saía 1/√2 menor (a escala valia sobre a medida
+  da mídia, não sobre o quadro girado). A "prévia renderizada" usa esse exportador: ao medir, desligar
+  (`vePrSegEm = () => null`) para ver a prévia ao vivo.
+
 ## Pendências
 - Vídeo com máscara/mãe na exportação é lido pelo navegador (H.264/VP9 ok; HEVC/ProRes não abrem: cai na cópia de edição).
 - Transição do editor numa camada desenhada não entra no desenho (a camada desenhada sai do clipe original).
