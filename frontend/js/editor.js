@@ -4387,7 +4387,9 @@ async function veEnviarPremiere() {
                 + (info && info.error ? '\n\n' + info.error : '') });
         return;
     }
-    const ok = await appConfirm({ titulo: veT('Enviar ao Premiere'), texto: `${veT('Importar as timelines no projeto aberto no Premiere')}:\n\n${info.projeto}\n\n${veT('Cada timeline entra como uma sequência nova; nada do projeto é apagado.')}`,
+    const temAjuste = (VE.media || []).some(m => m && m.kind === 'ajuste' && !m.removido);
+    const ok = await appConfirm({ titulo: veT('Enviar ao Premiere'), texto: `${veT('Importar as timelines no projeto aberto no Premiere')}:\n\n${info.projeto}\n\n${veT('Cada timeline entra como uma sequência nova; nada do projeto é apagado.')}`
+            + (temAjuste ? '\n\n' + veT('Com camadas de ajuste: o Premiere salva, fecha e reabre o projeto para elas virarem camadas de ajuste de verdade (uma cópia do projeto fica ao lado, .antes-ajuste).') : ''),
         botoes: [{ rotulo: veT('Cancelar'), valor: false }, { rotulo: veT('Enviar'), valor: true, tipo: 'primario' }] });
     if (!ok) return;
     veToast(veT('Enviando ao Premiere...'));
@@ -4397,7 +4399,9 @@ async function veEnviarPremiere() {
     if (r.relatorio) vePremiereXmlRelatorio(info.projeto, { ...r.relatorio, aproximados: [...(r.relatorio.aproximados || []),
         ...(r.aplicados ? [{ o_que: veT('Efeitos de áudio aplicados no Premiere'), qtd: r.aplicados }] : [])],
         ignorados: [...(r.relatorio.ignorados || []), ...falhas.map(f => ({ o_que: f, qtd: 1 }))] }, true);
-    veToast(`${veT('No Premiere')}: ${(r.novas || []).join(', ') || '?'} · ${r.aplicados || 0} ${veT('efeitos de áudio')}${falhas.length ? ` · ${falhas.length} ${veT('falhas')}` : ''}`);
+    veToast(`${veT('No Premiere')}: ${(r.novas || []).join(', ') || '?'} · ${r.aplicados || 0} ${veT('efeitos de áudio')}`
+        + (r.ajustes ? ` · ${r.ajustes} ${veT('camadas de ajuste')}` : '') + (r.ajustes_erro ? ` · ${veT('camadas de ajuste')}: ${r.ajustes_erro}` : '')
+        + (falhas.length ? ` · ${falhas.length} ${veT('falhas')}` : ''));
 }
 
 function veResetEditorVazio(opts = {}) {

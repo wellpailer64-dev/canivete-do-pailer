@@ -323,6 +323,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/ponte_premiere.py` — Ponte Kanivete ↔ Premiere Pro: conversa com o plugin UXP "Kanivete Ponte" (guia: Instructions/agente/ponte-premiere.md)
 - `Functions/preencher_conteudo.py` — Preenchimento sensível ao conteúdo (Photo Kanivete: Editar › Preenchimento sensível ao conteúdo, como o Photoshop)
 - `Functions/premiere.py` — Importar projeto do Premiere Pro (.prproj) no Editor Kanivete. Só LEITURA: o .prproj nunca é alterado
+- `Functions/premiere_ajuste.py` — Camadas de ajuste depois de importar um XML no Premiere
 - `Functions/premiere_xml.py` — Exportar o projeto do Editor Kanivete (.vknv) como XML do Final Cut Pro 7 (xmeml v4), que o Premiere Pro abre
 - `Functions/projeto.py` — projeto.py — Projetos do KANIVETE: .vknv = editor de vídeo (Pocket Editor), .iknv = editor de imagem
 - `Functions/psd_import.py` — Importar PSD/PSB no editor com as camadas separadas (como o "Composição — manter tamanhos das camadas" do After

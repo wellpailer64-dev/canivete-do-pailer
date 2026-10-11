@@ -184,6 +184,32 @@ return log;
 """
 
 
+def marcar_ajustes_no_aberto(espera=300):
+    """Camadas de ajuste depois de importar o XML: o projeto ABERTO no Premiere é salvo e fechado, o .prproj recebe as
+    marcas de camada de ajuste (premiere_ajuste; cópia .antes-ajuste ao lado) e o Premiere o reabre. Sem isso elas
+    ficam como vídeo preto (é assim até com o XML do próprio Premiere). Devolve {ok, mestres, clipes} | {ok: False, erro}."""
+    import os
+    from Functions import premiere_ajuste
+    r = enviar("js", {"codigo": "const p = await ppro.Project.getActiveProject(); if (!p) return null; await p.save(); "
+                                "const caminho = p.path; const o = new ppro.CloseProjectOptions(); "
+                                "try { o.setPromptIfDirty(false); } catch (e) {} await p.close(o); return caminho;"}, espera=espera)
+    caminho = (r.get("resultado") or "") if r.get("ok") else ""
+    if not caminho:
+        return {"ok": False, "erro": r.get("erro") or "o Premiere não fechou o projeto"}
+    if caminho.startswith("\\\\?\\"):
+        caminho = caminho[4:]
+    try:
+        n = premiere_ajuste.marcar(caminho)
+    except Exception as e:
+        n = {"erro": str(e)}
+    partes = caminho.replace("/", "\\").split("\\")
+    r2 = enviar("js", {"codigo": f"const p = await ppro.Project.open({json.dumps(partes)}.join(String.fromCharCode(92))); "
+                                 "return p ? p.name : null;"}, espera=espera)
+    if not r2.get("ok") or not r2.get("resultado"):
+        return {"ok": False, "erro": "marquei as camadas, mas o Premiere não reabriu o projeto: abra " + caminho, **n}
+    return {"ok": "erro" not in n, **n}
+
+
 def importar(xml, so_teste=False, espera=600):
     """Importa no Premiere o XML exportado pelo Kanivete (Arquivo › Exportar para o Premiere) e aplica os efeitos de
     áudio do .kanivete-efeitos.json ao lado. so_teste: recusa se o projeto ativo não for de D:/kanivete_testes."""

@@ -72,3 +72,18 @@ acha cada clipe pelo início (±0,05 s).
    do Audition (detector diferente do acompressor).
 2. Rack no Master; limitador dentro do rack da trilha; automação (keyframes) de efeitos e do fader.
 4. Rack da trilha de volta como rack (só via .prproj).
+
+## Camadas de ajuste e Luz e Cor no XML (feito 2026-10-11)
+- O XML (FCP7) NÃO tem camada de ajuste: o XML que o próprio Premiere exporta leva a camada como Slug "Black Video" com
+  os efeitos, e ao importar ela vira VÍDEO PRETO. No .prproj a camada de ajuste é esse mesmo Black Video com duas marcas:
+  `<IsAdjustmentLayer>true` no MasterClip e `<AdjustmentLayer>true` em cada VideoClip (fonte → VideoMediaSource → Media).
+- Exportador (`premiere_xml`): camada de ajuste vai como Slug chamado `NOME_AJUSTE` ("Camada de ajuste (Kanivete)"),
+  com opacidade e o Luz e Cor como **Lumetri Color** (`filtro_lumetri`, parameterids do Premiere; o Premiere importa os
+  valores — medido: temp/sat/exp/contraste/realces/vinheta idênticos). Luz e Cor de clipe comum também vai como Lumetri.
+  Rodas de cor, curvas, matiz e clareza ficam no relatório.
+- `Functions/premiere_ajuste.marcar(prproj)` põe as marcas no .prproj FECHADO (procura a mídia pelo título; backup
+  `.antes-ajuste`). `ponte_premiere.marcar_ajustes_no_aberto()`: salva, fecha, marca e reabre o projeto ativo — o
+  "Enviar ao Premiere" chama sozinho quando o XML tem camada de ajuste (a confirmação avisa).
+- Testes em `D:\kanivete_testes\premiere\ajuste\` (`teste_ponta.py`: Kanivete → XML → projeto novo → marcar → ler o Lumetri).
+- `ProjectConverter.exportAsFinalCutProXML(seq, caminhoComBarraInvertida)` (com "/" ele junta o caminho duas vezes) e
+  mostra 1 aviso "Translation Report" que segura o plugin até clicar OK.

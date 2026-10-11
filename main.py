@@ -1111,7 +1111,13 @@ def ve_premiere_ponte(acao, dados=None):
             r = ponte_premiere.importar(xml)
             if not r.get("ok"):
                 return {"success": False, "error": r.get("erro") or "o Premiere não importou", "relatorio": relatorio}
-            return {"success": True, "relatorio": relatorio, **(r.get("resultado") or {})}
+            extra = {}
+            with open(xml, encoding="utf-8") as f:
+                tem_ajuste = premiere_xml.NOME_AJUSTE in f.read()
+            if tem_ajuste:   # XML não tem camada de ajuste: salva, fecha, marca no .prproj e reabre (premiere_ajuste)
+                a = ponte_premiere.marcar_ajustes_no_aberto()
+                extra = {"ajustes": a.get("clipes", 0)} if a.get("ok") else {"ajustes_erro": a.get("erro")}
+            return {"success": True, "relatorio": relatorio, **(r.get("resultado") or {}), **extra}
         return {"success": False, "error": "ação desconhecida"}
     except Exception as e:
         return {"success": False, "error": str(e)}

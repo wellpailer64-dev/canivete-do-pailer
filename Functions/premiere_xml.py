@@ -19,8 +19,21 @@ from urllib.parse import quote
 from xml.sax.saxutils import escape
 
 _EXT_SO_AUDIO = (".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".wma", ".aif", ".aiff")
-_SEM_XML = {"texto": "Textos", "ajuste": "Camadas de ajuste", "cor": "Cores sólidas", "forma": "Formas",
+_SEM_XML = {"texto": "Textos", "cor": "Cores sólidas", "forma": "Formas",
             "pincel": "Desenhos", "legenda": "Legendas"}
+# Camada de ajuste: o XML não tem esse tipo (nem o do próprio Premiere: ele grava um "Black Video"/Slug com os efeitos
+# e, ao importar, vira vídeo preto). Vai como Slug com este nome; depois de importar, premiere_ajuste.marcar() põe no
+# .prproj as marcas que fazem dele camada de ajuste de verdade (Kanivete Ponte faz isso sozinha).
+NOME_AJUSTE = "Camada de ajuste (Kanivete)"
+# Luz e Cor → Lumetri Color (mesmas escalas; o importador premiere.py faz o caminho inverso): parameterid do Premiere
+_LUMETRI = [  # (id, nome, chave do Luz e Cor, padrão)
+    (3, " ", None, True), (5, "Input LUT", None, None), (7, "Temperature", "temp", 0), (8, "Tint", "tint", 0),
+    (20, "Saturation", "sat", 100), (11, "Exposure", "exp", 0), (12, "Contrast", "ct", 0), (13, "Highlights", "hi", 0),
+    (14, "Shadows", "sh", 0), (15, "Whites", "wh", 0), (16, "Blacks", "bl", 0), (23, " ", None, True),
+    (26, "Intensity", None, 100), (28, "Faded Film", "fade", 0), (29, "Sharpen", "sharp", 0), (30, "Vibrance", "vib", 0),
+    (31, "Saturation", None, 100), (33, "Tint Balance", None, 0), (50, " ", None, True), (51, "Amount", "vig", 0),
+    (52, "Midpoint", None, 50), (53, "Roundness", None, 0), (54, "Feather", None, 50)]
+_LC_SEM_LUMETRI = ("cv", "cw", "hc", "ls", "lm", "lh", "lo", "hue", "clar")
 _FX_NOMES = {"key": "Chroma Key", "lc": "Luz e Cor", "blur": "Desfoque"}
 
 
@@ -283,7 +296,7 @@ class _Exportador:
             self.rel.fora("Cenas 3D (renderize e importe o vídeo)")
             return []
         aninhada = m.get("sequenceId") if m.get("sequenceId") in self.seqs else None
-        if not aninhada and not m.get("path"):
+        if not aninhada and not m.get("path") and kind != "ajuste":
             self.rel.fora("Clipes sem arquivo")
             return []
         v = float(c.get("v") or 1)
@@ -294,7 +307,7 @@ class _Exportador:
         tipos = []
         if not so_audio and c.get("x") != "a":
             tipos.append("video")
-        if kind != "image" and c.get("x") != "v":
+        if kind not in ("image", "ajuste") and c.get("x") != "v":
             tem_som = True
             if aninhada:
                 tem_som = any(self.media.get(x.get("m", 0), {}).get("kind") in ("video", "audio")
@@ -305,12 +318,12 @@ class _Exportador:
             if tem_som:
                 tipos.append("audio")
         for f in c.get("fx") or []:
-            if f.get("on") is not False:
+            if f.get("on") is not False and f.get("t") != "lc":   # Luz e Cor vai como Lumetri Color
                 self.rel.fora(f"Efeito {_FX_NOMES.get(f.get('t'), f.get('t'))}")
         grupo = ("lk", c["lk"]) if c.get("lk") else ("c", id(c))
         # som estéreo: dois clipitems (canal 1 e 2) em duas trilhas "explodidas", como o Premiere grava; com um só,
         # ele importa o clipe MONO (só o canal 1)
-        estereo = bool(aninhada) or kind == "timeline" or int((self.info(m.get("path")).get("audio") or {}).get("channels") or 2) >= 2
+        estereo = bool(aninhada) or kind == "timeline" or (kind != "ajuste" and int((self.info(m.get("path")).get("audio") or {}).get("channels") or 2) >= 2)
         itens = []
         for tipo in tipos:
             for canal in ((1, 2) if tipo == "audio" and estereo else (1,)):
@@ -356,7 +369,10 @@ class _Exportador:
         v = float(c.get("v") or 1)
         mfps = self.fps if it["aninhada"] else self.mfps(m)
         s, e = float(c.get("s") or 0), float(c.get("e") or 0)
-        if m.get("kind") == "image":
+        if m.get("kind") == "ajuste":   # Slug: "infinito" (12 h, como o Premiere grava)
+            ini, fim = 0, it["end"] - it["start"]
+            dur_midia = max(fim, _q(12 * 3600, mfps))
+        elif m.get("kind") == "image":
             ini, fim = 0, it["end"] - it["start"]
             dur_midia = fim
         else:
@@ -367,7 +383,7 @@ class _Exportador:
             else:
                 dur_midia = _q((self.info(m.get("path")).get("duracao") or e) / abs(v), mfps)
             dur_midia = max(dur_midia, fim)
-        nome = m.get("nome") or m.get("name") or os.path.basename(m.get("path") or "") or "Clipe"
+        nome = NOME_AJUSTE if m.get("kind") == "ajuste" else m.get("nome") or m.get("name") or os.path.basename(m.get("path") or "") or "Clipe"
         # um masterclip por MÍDIA (como o Premiere grava): os clipes da timeline apontam para o item do painel; com um
         # por clipe, o painel do Premiere enchia de itens repetidos (246 no Arco do Edgar)
         mestre = self.master_id(("s", it["aninhada"]) if it["aninhada"] else ("m", m.get("id", id(m))))
@@ -379,6 +395,8 @@ class _Exportador:
                   f"<start>{it['start']}</start><end>{it['end']}</end><in>{ini}</in><out>{fim}</out>"]
         if it["aninhada"]:
             partes.append(self.sequencia_xml(it["aninhada"]))
+        elif m.get("kind") == "ajuste":
+            partes.append(self.file_ajuste_xml())
         else:
             partes.append(self.file_xml(m, e))
         if tipo == "audio":
@@ -386,7 +404,15 @@ class _Exportador:
         if abs(v - 1) > 1e-6:
             partes.append(self.filtro_velocidade(v, tipo))
         if tipo == "video":
-            partes.extend(self.filtros_video(c, m, it, mfps))
+            if m.get("kind") != "ajuste":
+                partes.extend(self.filtros_video(c, m, it, mfps))
+            elif (c.get("p") or {}).get("op") not in (None, 100):
+                partes.append("<filter><effect><name>Opacity</name><effectid>opacity</effectid><effectcategory>motion"
+                              "</effectcategory><effecttype>motion</effecttype><mediatype>video</mediatype>"
+                              "<parameter authoringApp=\"PremierePro\"><parameterid>opacity</parameterid><name>opacity"
+                              f"</name><valuemin>0</valuemin><valuemax>100</valuemax><value>{float(c['p']['op']):.4f}"
+                              "</value></parameter></effect></filter>")
+            partes.extend(self.filtro_lumetri(f) for f in c.get("fx") or [] if f.get("t") == "lc" and f.get("on") is not False)
         elif c.get("g") or it.get("g_extra"):
             ganho = 10 ** ((float(c.get("g") or 0) + float(it.get("g_extra") or 0)) / 20)
             if ganho > 3.98107:
@@ -404,6 +430,42 @@ class _Exportador:
                               f"<trackindex>{o.get('trackindex', 1)}</trackindex>"
                               f"<clipindex>{o.get('clipindex', 1)}</clipindex></link>")
         partes.append("</clipitem>")
+        return "".join(partes)
+
+    def file_ajuste_xml(self):
+        """O "arquivo" das camadas de ajuste: um Slug (como o Premiere grava) com o nome que premiere_ajuste procura."""
+        if "ajuste" in self._file_ids:
+            return f'<file id="{self._file_ids["ajuste"]}"/>'
+        fid = f"file-{len(self._file_ids) + 1}"
+        self._file_ids["ajuste"] = fid
+        r = _rate_xml(self.fps)
+        w, h = int(self.d.get("w") or 1920), int(self.d.get("h") or 1080)
+        return (f'<file id="{fid}"><name>{NOME_AJUSTE}</name><mediaSource>Slug</mediaSource>{r}'
+                f"<timecode>{r}<string>00:00:00:00</string><frame>0</frame><displayformat>NDF</displayformat></timecode>"
+                f"<media><video><samplecharacteristics>{r}<width>{w}</width><height>{h}</height>"
+                "<anamorphic>FALSE</anamorphic><pixelaspectratio>square</pixelaspectratio>"
+                "<fielddominance>none</fielddominance></samplecharacteristics></video></media></file>")
+
+    def filtro_lumetri(self, f):
+        """Luz e Cor → Lumetri Color (o Premiere importa os valores do XML; testado 2026-10-11)."""
+        v = f.get("v") or {}
+        if any(v.get(k) not in (None, 0, {}, [], "") for k in _LC_SEM_LUMETRI):
+            self.rel.aprox("Luz e Cor: rodas de cor, curvas, matiz e clareza não vão para o Lumetri")
+        partes = ["<filter><effect><name>Lumetri Color</name><effectid>Lumetri</effectid><effecttype>filter</effecttype>"
+                  "<mediatype>video</mediatype><pproBypass>false</pproBypass>"]
+        for pid, nome, ch, padrao in _LUMETRI:
+            if padrao is True:
+                val = "-91445760000000000,true,0,0,0,0,0,0"
+            elif padrao is None:
+                val = "0,0,0,0,0,0,0,0"
+            else:
+                x = float(v.get(ch, padrao)) if ch else float(padrao)
+                if ch == "vig":   # editor: 0 a 100 (só escurece); Premiere: -3 (escurece) a +3
+                    x = -x / 100 * 3
+                val = f"-91445760000000000,{x:.6g},0,0,0,0,0,0"
+            partes.append(f'<parameter authoringApp="PremierePro"><parameterid>{pid}</parameterid><name>{nome}</name>'
+                          f"<value>{val}</value></parameter>")
+        partes.append("</effect></filter>")
         return "".join(partes)
 
     def filtro_velocidade(self, v, tipo):
@@ -489,6 +551,15 @@ class _Exportador:
     def master_xml(self, m):
         """Item do painel (masterclip) de uma mídia, para ela ir na pasta certa — inclusive a que nenhuma timeline usa."""
         path, kind = m.get("path"), m.get("kind")
+        if kind == "ajuste":   # item da camada de ajuste no painel (um só para todas, como no Premiere)
+            mid = self.master_id(("m", m.get("id", id(m))))
+            r, dur = _rate_xml(self.fps), _q(12 * 3600, self.fps)
+            self._n_clip += 1
+            return (f'<clip id="masterclip-{mid}"><masterclipid>masterclip-{mid}</masterclipid><ismasterclip>TRUE'
+                    f"</ismasterclip><duration>{dur}</duration>{r}<name>{NOME_AJUSTE}</name><media><video><track>"
+                    f'<clipitem id="clipitem-{self._n_clip}"><masterclipid>masterclip-{mid}</masterclipid>'
+                    f"<name>{NOME_AJUSTE}</name><duration>{dur}</duration>{r}<in>0</in><out>{dur}</out>"
+                    f"{self.file_ajuste_xml()}</clipitem></track></video></media></clip>")
         if kind not in ("video", "audio", "image") or not path or m.get("c3d"):
             return ""
         mid = self.master_id(("m", m.get("id", id(m))))
