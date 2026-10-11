@@ -34,7 +34,7 @@ function veFilaArgs(it) {   // monta os argumentos do video_cutter_export com o 
     const codec = ['mp4', 'mov', 'mkv'].includes(fmt) ? c.pills.codec || 'h264' : 'h264';
     const mbps = c.pills.taxa === 'mbps' ? Math.max(1, Math.min(400, +c.mbps || 16)) : 0;
     const opc = { nome: c.nome, codec, bits: +(c.pills.bits || 8), mbps, projeto: P.projeto, blocos: c.pills.blocos === '1' };
-    return [c.noAudio ? P.fonteSem : P.fonteCom, P.base, fmt, c.pills.quality || 'medium', c.res, c.gpu, c.dest, c.noAudio,
+    return [c.noAudio ? P.fonteSem : P.fonteCom, P.base, fmt, c.pills.quality || 'high', c.res, c.gpu, c.dest, c.noAudio,
             P.camadas, P.audio, P.dur, P.mix, P.leg, P.quadro, opc];
 }
 

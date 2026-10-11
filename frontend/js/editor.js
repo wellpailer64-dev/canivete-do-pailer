@@ -5967,6 +5967,8 @@ function veOpenExport() {
     const pastaProj = VE.projectPath ? VE.projectPath.replace(/[\\/][^\\/]*$/, '') : null;
     VE.dest = pastaProj;
     $ve('ve-dest-label').textContent = pastaProj || veT('Mesma pasta do vídeo original');
+    // qualidade: abre sempre em Máxima (pedido do Pailer, 2026-10-11); dá para mudar só nesta exportação
+    document.querySelectorAll('#ve-export .ve-pills[data-name="quality"] .ve-pill').forEach(x => x.classList.toggle('active', x.dataset.v === 'high'));
     // codec, bits e taxa lembrados entre exportações
     try {
         const o = JSON.parse(veLsGet('ve-exp-opcoes') || '{}');
@@ -6090,7 +6092,7 @@ async function veStartExport() {
         const plano = veExportPlan(true), master = veMasterLim();
         const mix = master ? [...plano.mix, { master }] : plano.mix;
         await window.pywebview.api.video_cutter_export(
-            veFonteParaPlano({ ...plano, mix }, !noAudio), plano.base, vePill('format') || 'mp4', vePill('quality') || 'medium',
+            veFonteParaPlano({ ...plano, mix }, !noAudio), plano.base, vePill('format') || 'mp4', vePill('quality') || 'high',
             $ve('ve-res').value, $ve('ve-gpu').checked, VE.dest, noAudio,
             plano.camadas, plano.audio, plano.dur, mix,
             veTxExport(plano.faixa), [VE.seqW, VE.seqH],
