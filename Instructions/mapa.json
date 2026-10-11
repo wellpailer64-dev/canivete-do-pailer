@@ -8,6 +8,7 @@
     "editor-3d-tela.js",
     "editor-3d.js",
     "editor-afx-pr.js",
+    "editor-atividade.js",
     "editor-atributos.js",
     "editor-audio.js",
     "editor-autoframe-cliente.js",
@@ -136,6 +137,9 @@
     "ve_agente_midia",
     "ve_agente_porta",
     "ve_project_save",
+    "ve_cache_projeto",
+    "ve_converter_previas",
+    "ve_converter_parar",
     "ve_premiere_ponte",
     "ve_project_open",
     "af_analisar",
@@ -860,7 +864,7 @@
    ]
   },
   "ve_preparar_midia": {
-   "args": "path, mid, urgente=False, leve=False, fundo=False",
+   "args": "path, mid, urgente=False, leve=False, fundo=False, trechos=None",
    "modulos": []
   },
   "ve_area_transferencia": {
@@ -1747,7 +1751,27 @@
   },
   "ve_project_save": {
    "args": "path, dados, salvar_como=False, formato=None",
-   "modulos": []
+   "modulos": [
+    "video_cutter"
+   ]
+  },
+  "ve_cache_projeto": {
+   "args": "caminho=\"\"",
+   "modulos": [
+    "video_cutter"
+   ]
+  },
+  "ve_converter_previas": {
+   "args": "itens",
+   "modulos": [
+    "video_cutter"
+   ]
+  },
+  "ve_converter_parar": {
+   "args": "",
+   "modulos": [
+    "video_cutter"
+   ]
   },
   "ve_premiere_ponte": {
    "args": "acao, dados=None",
@@ -1755,7 +1779,9 @@
   },
   "ve_project_open": {
    "args": "path=None",
-   "modulos": []
+   "modulos": [
+    "video_cutter"
+   ]
   },
   "af_analisar": {
    "args": "musica, itens",

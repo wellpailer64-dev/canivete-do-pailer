@@ -2390,3 +2390,31 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .vero-tempo { display: grid; grid-template-columns: auto 110px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--ve-line); background: var(--ve-panel); }
 .vero-hora { font-variant-numeric: tabular-nums; font-size: 12px; }
 .vero-regua { width: 100%; height: 26px; cursor: pointer; touch-action: none; }
+
+/* ── Atividade em segundo plano (editor-atividade.js): bolinha no cabeçalho + lista ao vivo ── */
+.ve-atv { position: relative; display: flex; align-items: center; margin-right: 6px; }
+.ve-atv-btn { position: relative; width: 26px; height: 26px; border: 0; border-radius: 50%; background: transparent; cursor: pointer; display: grid; place-items: center; }
+.ve-atv-btn:hover { background: var(--ve-panel-2); }
+.ve-atv-anel { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ve-line-2); }
+.ve-atv-btn.girando .ve-atv-anel { border-color: var(--ve-line-2); border-top-color: var(--ve-accent); animation: ve-atv-gira 0.9s linear infinite; }
+.ve-atv-btn.erro .ve-atv-anel { border-color: #d9534f; }
+.ve-atv-n { position: absolute; right: -4px; top: -3px; min-width: 14px; padding: 0 3px; border-radius: 7px; background: var(--ve-accent); color: #fff; font: 600 9px/14px var(--ve-ui); }
+.ve-atv-n:empty { display: none; }
+@keyframes ve-atv-gira { to { transform: rotate(360deg); } }
+.ve-atv-pop { position: absolute; top: 32px; right: 0; z-index: 3000; width: 380px; max-height: 60vh; display: flex; flex-direction: column;
+    background: var(--ve-panel); border: 1px solid var(--ve-line-2); border-radius: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); }
+.ve-atv-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--ve-line); font: 12px var(--ve-ui); color: var(--ve-text); }
+.ve-atv-cab .ve-btn { padding: 2px 8px; font-size: 11px; }
+.ve-atv-lista { overflow: auto; padding: 4px 0; }
+.ve-atv-item { display: flex; gap: 8px; padding: 6px 12px; cursor: pointer; font: 12px var(--ve-ui); color: var(--ve-text); }
+.ve-atv-item:hover { background: var(--ve-panel-2); }
+.ve-atv-marca { width: 14px; flex: none; display: grid; place-items: center; color: var(--ve-dim); }
+.ve-atv-item.pronto .ve-atv-marca, .ve-atv-item.painel .ve-atv-marca { color: #4caf50; }
+.ve-atv-item.erro .ve-atv-marca { color: #d9534f; font-weight: 700; }
+.ve-atv-gira { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--ve-line-2); border-top-color: var(--ve-accent); animation: ve-atv-gira 0.9s linear infinite; }
+.ve-atv-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ve-atv-txt b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-atv-txt small { color: var(--ve-dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-atv-barra { height: 3px; border-radius: 2px; background: var(--ve-line); overflow: hidden; }
+.ve-atv-barra span { display: block; height: 100%; background: var(--ve-accent); transition: width .25s; }
+.ve-atv-vazio { padding: 16px 12px; color: var(--ve-dim); font: 12px var(--ve-ui); }

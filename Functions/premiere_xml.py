@@ -368,11 +368,11 @@ class _Exportador:
                 dur_midia = _q((self.info(m.get("path")).get("duracao") or e) / abs(v), mfps)
             dur_midia = max(dur_midia, fim)
         nome = m.get("nome") or m.get("name") or os.path.basename(m.get("path") or "") or "Clipe"
-        if id(c) not in self._masters:   # um masterclip por clipe (vídeo e os dois canais do som), como o Premiere
-            self._n_master += 1
-            self._masters[id(c)] = self._n_master
+        # um masterclip por MÍDIA (como o Premiere grava): os clipes da timeline apontam para o item do painel; com um
+        # por clipe, o painel do Premiere enchia de itens repetidos (246 no Arco do Edgar)
+        mestre = self.master_id(("s", it["aninhada"]) if it["aninhada"] else ("m", m.get("id", id(m))))
         canal_tag = ' premiereChannelType="stereo"' if it.get("estereo") else ""
-        partes = [f'<clipitem id="{it["id"]}"{canal_tag}>', f"<masterclipid>masterclip-{self._masters[id(c)]}</masterclipid>",
+        partes = [f'<clipitem id="{it["id"]}"{canal_tag}>', f"<masterclipid>masterclip-{mestre}</masterclipid>",
                   f"<name>{escape(str(nome))}</name>",
                   f"<enabled>{'FALSE' if c.get('off') else 'TRUE'}</enabled>",
                   f"<duration>{dur_midia}</duration>", _rate_xml(mfps),
@@ -480,16 +480,78 @@ class _Exportador:
                          + param("opacity", "opacity", 0, 100, p["op"], k.get("op")) + "</effect></filter>")
         return saida
 
+    def master_id(self, chave):
+        if chave not in self._masters:
+            self._n_master += 1
+            self._masters[chave] = self._n_master
+        return self._masters[chave]
+
+    def master_xml(self, m):
+        """Item do painel (masterclip) de uma mídia, para ela ir na pasta certa — inclusive a que nenhuma timeline usa."""
+        path, kind = m.get("path"), m.get("kind")
+        if kind not in ("video", "audio", "image") or not path or m.get("c3d"):
+            return ""
+        mid = self.master_id(("m", m.get("id", id(m))))
+        i = self.info(path)
+        mfps = self.mfps(m)
+        dur = max(1, _q(i.get("duracao") or 5, mfps))
+        nome = escape(str(m.get("nome") or m.get("name") or os.path.basename(path)))
+        r = _rate_xml(mfps)
+        so_audio = kind == "audio" or str(path).lower().endswith(_EXT_SO_AUDIO)
+        corpo = []
+        if not so_audio:
+            self._n_clip += 1
+            corpo.append(f'<video><track><clipitem id="clipitem-{self._n_clip}"><masterclipid>masterclip-{mid}'
+                         f"</masterclipid><name>{nome}</name><duration>{dur}</duration>{r}<in>0</in><out>{dur}</out>"
+                         f"{self.file_xml(m, dur / mfps)}</clipitem></track></video>")
+        if kind != "image" and (so_audio or i.get("audio") or not i):
+            ch = min(2, int((i.get("audio") or {}).get("channels") or 2))
+            faixas = []
+            for canal in range(1, ch + 1):
+                self._n_clip += 1
+                faixas.append(f'<track><clipitem id="clipitem-{self._n_clip}"><masterclipid>masterclip-{mid}'
+                              f"</masterclipid><name>{nome}</name><duration>{dur}</duration>{r}<in>0</in><out>{dur}</out>"
+                              f"{self.file_xml(m, dur / mfps)}<sourcetrack><mediatype>audio</mediatype>"
+                              f"<trackindex>{canal}</trackindex></sourcetrack></clipitem></track>")
+            corpo.append(f"<audio>{''.join(faixas)}</audio>")
+        return (f'<clip id="masterclip-{mid}"><masterclipid>masterclip-{mid}</masterclipid><ismasterclip>TRUE'
+                f"</ismasterclip><duration>{dur}</duration>{r}<name>{nome}</name><media>{''.join(corpo)}</media></clip>")
+
     # ── documento ──
     def xml(self, nome):
+        """Pastas do painel viram <bin> (com as subpastas), cada mídia vai como item na sua pasta e cada timeline
+        na pasta dela. Timeline vazia não vai (o Premiere abria justo ela, com a tela vazia)."""
+        bins = {b["id"]: b for b in self.d.get("bins") or [] if b.get("id")}
+        pasta_seq = {}
+        for m in self.media.values():
+            if m.get("kind") == "timeline" and m.get("sequenceId") in self.seqs:
+                pasta_seq.setdefault(m["sequenceId"], m.get("pasta"))
         ativa = self.d.get("activeSequence")
         ordem = ([ativa] if ativa in self.seqs else []) + [s for s in self.seqs if s != ativa]
-        corpo = []
-        for sid in ordem:
-            if sid not in self._emitidas:
-                corpo.append(self.sequencia_xml(sid))
+        vazias = {sid for sid in ordem if not [c for c in self.seqs[sid].get("clips") or [] if c.get("tr", 0) >= 0]}
+        if vazias:
+            self.rel.fora(f"Timelines vazias ({len(vazias)})", len(vazias))
+
+        def onde(p):
+            return p if p in bins else None
+
+        def filhos(pai):
+            partes = [self.bin_xml(b, filhos) for b in sorted((b for b in bins.values() if onde(b.get("pai")) == pai),
+                                                              key=lambda b: str(b.get("nome") or ""))]
+            for sid in ordem:
+                if sid not in vazias and onde(pasta_seq.get(sid)) == pai:
+                    partes.append(self.sequencia_xml(sid))
+            for m in self.media.values():
+                if m.get("id") != 0 and onde(m.get("pasta")) == pai:
+                    partes.append(self.master_xml(m))
+            return "".join(partes)
+
+        corpo = filhos(None)
         return ('<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE xmeml>\n<xmeml version="4"><project>'
-                f"<name>{escape(nome)}</name><children>{''.join(corpo)}</children></project></xmeml>\n")
+                f"<name>{escape(nome)}</name><children>{corpo}</children></project></xmeml>\n")
+
+    def bin_xml(self, b, filhos):
+        return f"<bin><name>{escape(str(b.get('nome') or 'Pasta'))}</name><children>{filhos(b['id'])}</children></bin>"
 
 
 def _interp(ks, t, padrao):

@@ -1369,6 +1369,7 @@ function veMidiaPriorizar(m) {
 // Eventos da preparação de um vídeo do projeto (Functions/video_cutter.py: preparar_midia)
 function veOnMidia(ev) {
     const m = VE.media[ev.id];
+    if (typeof veAtvEvento === 'function') veAtvEvento(ev);   // bolinha de atividade do cabeçalho (editor-atividade.js)
     // a vaga libera quando o vídeo já foi lido (info): as conversões pesadas têm fila própria no Python
     const livre = ev.stage === 'info' || ev.stage === 'video' || ev.stage === 'done' || ev.stage === 'error';
     if (livre && VEPJF.ativos.delete(ev.id)) veMidiaProxima();

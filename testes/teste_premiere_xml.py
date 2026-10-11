@@ -203,6 +203,8 @@ def main():
     print("relatório:", json.dumps(rel, ensure_ascii=False))
     raiz, seqs, ids = ler_xml(path)
     for nome, itens in esperado(dados).items():
+        if not itens and nome not in seqs:   # timeline vazia não vai para o XML
+            continue
         if seqs.get(nome) != itens:
             got = seqs.get(nome) or []
             falha(f"{nome}: {len(got)} itens no XML, {len(itens)} esperados"

@@ -508,10 +508,36 @@ def _limpar_sobras_conversao(raiz):
             continue
 
 
+def _chave_midia(path, n):
+    """Chave do cache de um arquivo: nome + tamanho + data, SEM a pasta — mover/reorganizar as pastas do disco não
+    perde as prévias (antes era caminho+data: reorganizar o Arco do Edgar refez 180 prévias). Devolve (nova, antiga)."""
+    st = os.stat(path)
+    nova = hashlib.md5(f"{os.path.basename(path).lower()}|{st.st_size}|{st.st_mtime}".encode()).hexdigest()[:n]
+    antiga = hashlib.md5(f"{os.path.abspath(path)}|{st.st_mtime}".encode()).hexdigest()[:n]
+    return nova, antiga
+
+
+def _item_migrado(nome, antigo):
+    """_item_midia(nome); se só existe o item com a chave antiga (caminho), ele passa a ter o nome novo."""
+    alvo = _item_midia(nome)
+    if not os.path.exists(alvo) and antigo != nome:
+        velho = _item_midia(antigo)
+        if os.path.exists(velho):
+            try:
+                os.rename(velho, os.path.join(os.path.dirname(velho), nome))
+                return os.path.join(os.path.dirname(velho), nome)
+            except OSError:
+                return velho   # em uso agora por outra cópia do app: usa onde está
+    return alvo
+
+
 def _pasta_midia(path):
-    """Pasta de cache do vídeo (arquivo+data). Uma prévia antiga do %TEMP% vem junto (não converte de novo)."""
-    nome = "m_" + hashlib.md5(f"{os.path.abspath(path)}|{os.path.getmtime(path)}".encode()).hexdigest()[:12]
-    work = _em_uso(_item_midia(nome))
+    """Pasta de cache do vídeo (nome+tamanho+data). Uma prévia antiga do %TEMP% vem junto (não converte de novo)."""
+    nova, antiga = _chave_midia(path, 12)
+    nome = "m_" + nova
+    work = _em_uso(_item_migrado(nome, "m_" + antiga))
+    if not os.path.isdir(work):   # %TEMP% antigo usava a chave pelo caminho
+        nome = "m_" + antiga if os.path.isdir(os.path.join(_RAIZ_TEMP, "m_" + antiga)) else nome
     velha = os.path.join(_RAIZ_TEMP, nome)
     if not os.path.isdir(work) and os.path.isdir(velha):
         try:
@@ -2542,8 +2568,8 @@ def adicionar_audio(path):
         return {"success": False, "error": f"Não foi possível analisar o áudio: {e}"}
     if not info["has_audio"] or info["duration"] <= 0:
         return {"success": False, "error": "Este arquivo não tem som."}
-    chave = hashlib.md5(f"{os.path.abspath(path)}|{os.path.getmtime(path)}".encode()).hexdigest()[:14]
-    pcm = _em_uso(_item_midia(f"aud_{chave}.pcm"))   # guardado com as prévias, na pasta do projeto
+    chave, antiga = _chave_midia(path, 14)
+    pcm = _em_uso(_item_migrado(f"aud_{chave}.pcm", f"aud_{antiga}.pcm"))   # guardado com as prévias, na pasta do projeto
     tmp = f"{pcm}.{os.getpid()}.{threading.get_ident()}.tmp"   # único: duas leituras juntas não se atropelam
     if not os.path.isfile(pcm):
         r = subprocess.run([ffmpeg_path(), "-y", "-v", "error", "-i", path, "-map", "0:a:0", "-vn", "-ac", "2",
