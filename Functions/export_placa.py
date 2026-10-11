@@ -143,6 +143,15 @@ def memoria_estimada(segmentos, lay, path):
             continue   # lido na CPU: na placa só o quadro que aparece
         bpp = 3.0 if "10" in str(i.get("pix_fmt", "")) else 1.5
         total += (i.get("width") or 1920) * (i.get("height") or 1080) * bpp * 20
+    # o que sobe da CPU em RGBA (camada desenhada do motion, Comp, imagens e textos): a textura e a fila de quadros de cada
+    # entrada do libplacebo. A propaganda KANIVETE (24 vídeos transparentes do quadro inteiro + 65 imagens) passava na
+    # conferência só com os decodificadores e estourava a memória da placa (2026-10-11)
+    for c in lay:
+        if c["tipo"] == "video" and vc._clipe_tem_alfa(c["path"]):
+            total += c["mw"] * c["mh"] * 4 * 12
+        elif c["tipo"] == "imagem":
+            k = min(1.0, max([c["sc"]] + [p[1] for p in c["kf"].get("sc", [])]))
+            total += c["mw"] * c["mh"] * k * k * 4 * 6
     return total
 
 
@@ -155,7 +164,8 @@ def _lc_ok(fx):
 # DAQUELA camada (ou o trecho da camada de ajuste) desce, passa pelos MESMOS filtros (vc._filtros_fx, mesma ordem e contas)
 # e sobe — leitura, redução, montagem das outras camadas e encoder continuam na placa. Respeite o seu voto (72 Chroma Key,
 # ajustes com Desfoque e Aberração): ia inteiro pela CPU, 6× a duração (2026-10-10).
-_FX_HIBRIDO = ("key", "lc", "blur", "bc", "ca")
+# Motion (editor-motion.js): Preenchimento, Inverter e o Brilho da camada de ajuste também têm filtro do ffmpeg
+_FX_HIBRIDO = ("key", "lc", "blur", "bc", "ca", "mo_fill", "mo_inv", "mo_glow")
 
 
 def _fx_hibrido(fx):
@@ -252,10 +262,10 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
     for c in lay:
         if c.get("bm") and (c["bm"] != "multiply" or vc._sombra_camada(c)):
             return "modo de mesclagem (fora o Multiplicar)"
-        if c["rot"] or "rot" in c["kf"]:
+        # imagem/texto girado: a textura gira na CPU antes de subir (_entrada_imagem); vídeo girado ainda não
+        gira = c["rot"] or "rot" in c["kf"] or any(f.get("t") == "ca_rot" for f in c.get("ca") or [])
+        if gira and (c["tipo"] != "imagem" or c.get("bm") or "sx" in c["kf"] or "sy" in c["kf"]):
             return "rotação"
-        if any(f.get("t") == "ca_rot" for f in c.get("ca") or []):
-            return "Girar constante"
         if c["tipo"] == "ajuste":
             if not _lc_ok(c["fx"]) and not _fx_hibrido(c["fx"]):
                 return "camada de ajuste com efeito fora do Luz e Cor"
@@ -263,12 +273,14 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
                     and any(e.startswith(vc._NIT_NO_YUV) for e in vc._filtros_fx(c["fx"], 64, 64, "m"))):
                 return "camada de ajuste com Nitidez e opacidade"
         elif c["tipo"] == "video":
+            if vc._clipe_tem_alfa(c["path"]):
+                continue   # vídeo com transparência (camada desenhada, Comp): lido e tratado na CPU, sobe em RGBA
+            if c.get("fxk"):
+                return "vídeo com efeito animado"
             if not _lc_ok(c["fx"]) and not _fx_hibrido(c["fx"]):
                 return "vídeo com efeito fora do Luz e Cor"
             if _fx_hibrido(c["fx"]) and any(e.startswith(vc._NIT_NO_YUV) for e in vc._filtros_fx(c["fx"], c["mw"], c["mh"], "m")):
                 return "Nitidez do Luz e Cor junto com outro efeito no vídeo"
-            if vc._clipe_tem_alfa(c["path"]):
-                return "vídeo com transparência"
     return None
 
 
@@ -399,10 +411,15 @@ def _expr(c, prop, fixo, tl):
     return vc._expr_kf(c["kf"][prop], tl) if prop in c["kf"] else f"{fixo:.6f}"
 
 
-def _posicao(c, k, wv, hv, tl, dx=0.0, dy=0.0):
-    """pos_x/pos_y/pos_w/pos_h (canto, em px do quadro) — as contas do overlay do exportador (sem rotação)."""
+def _posicao(c, k, wv, hv, tl, dx=0.0, dy=0.0, ang=None):
+    """pos_x/pos_y/pos_w/pos_h (canto, em px do quadro) — as contas do overlay do exportador. ang = rotação da camada
+    (graus, expressão em tl): o centro gira em volta do ponto de ancoragem, como no exportador de CPU."""
     px, py = _expr(c, "x", c["x"], tl), _expr(c, "y", c["y"], tl)
-    if abs(c["ox"]) > 0.01 or abs(c["oy"]) > 0.01:
+    if (abs(c["ox"]) > 0.01 or abs(c["oy"]) > 0.01) and ang:
+        a = f"(({ang})*PI/180)"
+        px = f"({px})+({k})*({c['ox']:.3f}*cos({a})-{c['oy']:.3f}*sin({a}))"
+        py = f"({py})+({k})*({c['ox']:.3f}*sin({a})+{c['oy']:.3f}*cos({a}))"
+    elif abs(c["ox"]) > 0.01 or abs(c["oy"]) > 0.01:
         px, py = f"({px})+({k})*{c['ox']:.3f}", f"({py})+({k})*{c['oy']:.3f}"
     ca = vc._ca_exprs(c.get("ca"), tl)
     if ca["dx"]:
@@ -503,14 +520,48 @@ def _entrada_video(g, c, info, pasta, n_cam):
     return [(f"[{r}]", _posicao(c, kx, *_tam(c, c["mw"], c["mh"], kx, tl), tl))]
 
 
+def _entrada_video_alfa(g, c, n_cam):
+    """Vídeo com transparência (a camada desenhada do motion, Comp em ProRes 4444): lido na CPU com o alfa, nos MESMOS
+    tempos do exportador de CPU (trim a partir do corte, fps na grade, início arredondado ao quadro), efeitos e opacidade
+    na CPU (vc._filtros_fx, a mesma conta) e enviado em RGBA. Antes, um só destes derrubava a exportação inteira para a
+    CPU ("vídeo com transparência"): a propaganda KANIVETE tinha 24."""
+    pula = c.get("pula", 0.0)
+    s0 = c["s"] + pula * c["v"]
+    ss = max(0.0, s0 - 3.0)
+    leitura = c["s"] - ss + c["fonte"] + 1.0
+    k = g.entrada(["-threads", "2"] + (["-ss", vc._tempo_ffmpeg(ss)] if ss > 0 else []) + ["-t", vc._tempo_ffmpeg(leitura), "-i", c["path"]])
+    ids_anim = {f.get("id") for f in c.get("fxk") or [] if f.get("id")}
+    fx_anim = vc._fx_animados(c.get("fxk"), c["mw"], c["mh"], c["dur"], g.fps, f"tbl{n_cam}")
+    fx_cpu = vc._filtros_fx([f for f in c["fx"] if not (fx_anim and f.get("id") in ids_anim)], c["mw"], c["mh"], f"t{n_cam}")
+    passos = ["format=rgba"] + [e[len(vc._NIT_NO_YUV):] if e.startswith(vc._NIT_NO_YUV) else e for e in fx_cpu] + ([fx_anim] if fx_anim else [])
+    opac = ""
+    if not _opaca(c):
+        opac = "," + (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@top{n_cam}", c["st"])
+                      if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
+    r = g.rotulo("t")
+    g.filtros.append(f"[{k}:v:0]trim=start={vc._tempo_ffmpeg(s0 - ss)}:end={vc._tempo_ffmpeg(c['s'] - ss + c['fonte'])},"
+                     f"setpts=(PTS-{s0 - ss:.6f}/TB)/{c['v']:.6f},"
+                     f"fps=fps={g.fps:.3f}:start_time=0,tpad=stop_mode=clone:stop_duration={vc._tempo_ffmpeg(g.fd)},"
+                     + ",".join(passos)
+                     + f",settb=AVTB,setpts=PTS-STARTPTS+round({c['st'] + pula - g.fd / 4:.9f}/TB),"
+                     f"trim=end={min(g.total, c['st'] + c['dur']) - g.fd / 2:.6f}{opac},format=rgba,hwupload[{r}]")
+    tl = f"(ot-{c['st']:.6f})"
+    kx = _escala(c, tl)
+    return [(f"[{r}]", _posicao(c, kx, *_tam(c, c["mw"], c["mh"], kx, tl), tl))]
+
+
 def _entrada_imagem(g, c, n_cam):
     """Imagem (PNG parado ou sequência de texto animado) preparada na CPU como no exportador e enviada pequena.
     Devolve [(rótulo, posição)] — a sombra projetada, se houver, vem antes (por baixo)."""
     seq = c.get("seq")
-    efeitos = [e for e in vc._filtros_fx(c["fx"], c["mw"], c["mh"], f"p{n_cam}") if not e.startswith(vc._NIT_NO_YUV)]
+    # efeito com parâmetro animado (Desfoque: gblur + sendcmd, vc._fx_animados) roda a cada quadro, depois do loop
+    ids_anim = {f.get("id") for f in c.get("fxk") or [] if f.get("id")}
+    tem_anim = any((f.get("p") or {}) for f in c.get("fxk") or [])
+    efeitos = [e for e in vc._filtros_fx([f for f in c["fx"] if not (tem_anim and f.get("id") in ids_anim)], c["mw"], c["mh"], f"p{n_cam}")
+               if not e.startswith(vc._NIT_NO_YUV)]
     bw, bh = c["mw"], c["mh"]
     recorte = []
-    if not seq and not any(f.get("t") in ("blur", "b3d") and f.get("on") is not False for f in c["fx"]):
+    if not seq and not tem_anim and not any(f.get("t") in ("blur", "b3d") and f.get("on") is not False for f in c["fx"]):
         bb = vc._bbox_alfa(c["path"])
         if bb and abs(bb[4] - c["mw"]) <= 1 and abs(bb[5] - c["mh"]) <= 1:
             x0, y0, bw, bh, Wi, Hi = bb
@@ -522,16 +573,40 @@ def _entrada_imagem(g, c, n_cam):
     red = min(1.0, maior * 1.02)
     tw, th = max(2, round(bw * red)), max(2, round(bh * red))
     n_q = int(math.ceil(c["dur"] * g.fps)) + 1
+    # o desfoque animado mede em px da mídia: na textura reduzida, o sigma encolhe junto
+    fx_anim = vc._fx_animados(c.get("fxk"), c["mw"] * red, c["mh"] * red, c["dur"], g.fps, f"pbl{n_cam}") if tem_anim else None
+    # rotação (a placa só posiciona): fixa = a textura girada uma vez; animada = girada a cada quadro num quadro do
+    # tamanho da diagonal (como o exportador de CPU). RW×RH = tamanho da textura girada; ang = o ângulo para a âncora
+    car_t, car_tl = vc._ca_exprs(c.get("ca"), "t")["rot"], vc._ca_exprs(c.get("ca"), tl_img := f"(ot-{c['st']:.6f})")["rot"]
+    giro_fixo = giro_anim = None
+    RW, RH, ang = tw, th, None
+    if "rot" in c["kf"] or car_t:
+        e = vc._expr_kf(c["kf"]["rot"], "t") if "rot" in c["kf"] else f"{c['rot']:.5f}"
+        D = int(math.ceil(math.hypot(tw, th))) + 2
+        D += D % 2
+        giro_anim = f"rotate=a='(({e}){'+' + car_t if car_t else ''})*PI/180':c=black@0:ow={D}:oh={D}"
+        RW = RH = D
+        ang = f"({_expr(c, 'rot', c['rot'], tl_img)}){'+' + car_tl if car_tl else ''}"
+    elif abs(c["rot"] % 360) > 1e-4:
+        rad = math.radians(c["rot"])
+        RW = int(math.ceil(tw * abs(math.cos(rad)) + th * abs(math.sin(rad)))) + 2
+        RH = int(math.ceil(tw * abs(math.sin(rad)) + th * abs(math.cos(rad)))) + 2
+        RW, RH = RW + RW % 2, RH + RH % 2
+        giro_fixo = f"rotate={rad:.6f}:c=black@0:ow={RW}:oh={RH}"
+        ang = f"{c['rot']:.6f}"
+    depois = ([fx_anim] if fx_anim else []) + ([giro_anim] if giro_anim else [])
     if seq:
         k = g.entrada(["-f", "concat", "-safe", "0", "-i", seq])
         cadeia = (f"[{k}:v:0]trim=start={vc._tempo_ffmpeg(c['s'])}:end={vc._tempo_ffmpeg(c['s'] + c['fonte'])},"
-                  f"setpts=PTS-STARTPTS,{PARA_RGB_IMG}," + ",".join(efeitos + [f"scale={tw}:{th}:flags=lanczos",
-                                                                           f"fps=fps={g.fps:.3f}:start_time=0"]))
+                  f"setpts=PTS-STARTPTS,{PARA_RGB_IMG}," + ",".join(efeitos + [f"scale={tw}:{th}:flags=lanczos"]
+                                                                  + ([giro_fixo] if giro_fixo else [])
+                                                                  + [f"fps=fps={g.fps:.3f}:start_time=0"] + depois))
     else:
         k = g.entrada(["-i", c["path"]])
-        cadeia = (f"[{k}:v:0]{PARA_RGB_IMG}," + ",".join(efeitos + recorte + [f"scale={tw}:{th}:flags=lanczos",
-                                                                             f"loop=loop={n_q - 1}:size=1:start=0",
-                                                                             "settb=AVTB", f"setpts=N/({g.fps:.3f}*TB)"]))
+        cadeia = (f"[{k}:v:0]{PARA_RGB_IMG}," + ",".join(efeitos + recorte + [f"scale={tw}:{th}:flags=lanczos"]
+                                                          + ([giro_fixo] if giro_fixo else [])
+                                                          + [f"loop=loop={n_q - 1}:size=1:start=0",
+                                                             "settb=AVTB", f"setpts=N/({g.fps:.3f}*TB)"] + depois))
     fim = min(g.total, c["st"] + c["dur"])
     if not _opaca(c):
         cadeia += "," + (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@pop{n_cam}")
@@ -540,12 +615,15 @@ def _entrada_imagem(g, c, n_cam):
     cadeia += f",format=rgba,settb=AVTB,setpts=PTS-STARTPTS+round({c['st'] - g.fd / 4:.9f}/TB),trim=end={fim - g.fd / 2:.6f}"
     tl = f"(ot-{c['st']:.6f})"   # ot = tempo do quadro de SAÍDA (o t do libplacebo é o da entrada)
     kx = _escala(c, tl)
-    wv, hv = _tam(c, bw, bh, kx, tl)
+    if ang is not None:   # textura girada: o tamanho na tela é o dela (em px da mídia = textura ÷ redução) × escala
+        wv, hv = f"({RW / red:.5f}*({kx}))", f"({RH / red:.5f}*({kx}))"
+    else:
+        wv, hv = _tam(c, bw, bh, kx, tl)
     sombra = vc._sombra_camada(c)
     r = g.rotulo("i")
     if not sombra:
         g.filtros.append(f"{cadeia},hwupload[{r}]")
-        return [(f"[{r}]", _posicao(c, kx, wv, hv, tl))]
+        return [(f"[{r}]", _posicao(c, kx, wv, hv, tl, ang=ang))]
     # sombra: a transparência da imagem na cor da sombra, desfocada (em px da textura: desvio × redução) e posta por
     # baixo, deslocada — como _sombra_camada no exportador
     R, G, B, op, dx, dy, sig = sombra
@@ -558,8 +636,8 @@ def _entrada_imagem(g, c, n_cam):
                      + (f",format=gbrap,gblur=sigma={sig_t:.3f}:planes=8,format=rgba" if sig_t >= 0.3 else "")
                      + f",hwupload[{rs}]")
     esc = f"(({kx})/{red:.6f})"
-    wsv, hsv = f"(({tw}+{2 * m})*{esc})", f"(({th}+{2 * m})*{esc})"
-    return [(f"[{rs}]", _posicao(c, kx, wsv, hsv, tl, dx, dy)), (f"[{r}]", _posicao(c, kx, wv, hv, tl))]
+    wsv, hsv = f"(({RW}+{2 * m})*{esc})", f"(({RH}+{2 * m})*{esc})"
+    return [(f"[{rs}]", _posicao(c, kx, wsv, hsv, tl, dx, dy, ang=ang)), (f"[{r}]", _posicao(c, kx, wv, hv, tl, ang=ang))]
 
 
 def _arvore(vals, padrao):
@@ -774,7 +852,9 @@ def montar(lay, W, H, fps, total, pasta, segmentos=None, path=None, info=None):
             pendentes = []
             atual = _multiplicar(g, atual, c, n, infos.get(c["path"]), pasta)
             continue
-        if c["tipo"] == "video":
+        if c["tipo"] == "video" and vc._clipe_tem_alfa(c["path"]):
+            pendentes += _entrada_video_alfa(g, c, n)
+        elif c["tipo"] == "video":
             pendentes += _entrada_video(g, c, infos[c["path"]], pasta, n)
         else:
             pendentes += _entrada_imagem(g, c, n)

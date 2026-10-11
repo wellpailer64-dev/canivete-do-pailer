@@ -57,7 +57,7 @@ const VE_MO_FM = {
 };
 const veMoClamp = (v, a, b) => Math.max(a, Math.min(b, v));
 // versão do desenhista: entra no hash da camada desenhada (mudou o desenho, o cache antigo não serve)
-const VE_MO_VERSAO = 'v6';
+const VE_MO_VERSAO = 'v7';
 
 // ─────────────────────────── camadas: uid, nulo, procura ───────────────────────────
 function veMoUid(c) {
@@ -505,7 +505,14 @@ function veMoDesenhar(ctx, cv, c, src, pv, t, itens) {
 function veMoTem(c) {
     if (!c || veIsAudio(c) || veMoEhNulo(c)) return false;
     if (veMoPrecisa(c)) return true;
-    if (c.k && Object.keys(c.k).some(k => veMoChave(k) && veKfOn(c, k))) return true;
+    // parâmetro animado: os que a exportação faz sozinha (animaFF, ex. Desfoque) não precisam de camada desenhada
+    const soFF = k => {
+        const q = veMoChave(k);
+        if (!q || q.tipo !== 'fx' || veIsAdj(c)) return false;
+        const f = (c.fx || []).find(x => x.id === q.id), d = f && VE_FX[f.t];
+        return !!(d && d.animaFF && d.animaFF.includes(q.prop));
+    };
+    if (c.k && Object.keys(c.k).some(k => veMoChave(k) && veKfOn(c, k) && !soFF(k))) return true;
     // efeito só de desenho; numa camada de ajuste, os que o ffmpeg faz (ajusteFF) seguem pela exportação normal
     return (c.fx || []).some(f => f.on !== false && VE_FX[f.t] && VE_FX[f.t].soDesenho && !(veIsAdj(c) && VE_FX[f.t].ajusteFF));
 }
@@ -640,7 +647,7 @@ async function veMoAssarSig(c, lista, como, aviso, sig, W, H, fps) {
                     veDesenharItens(ctx, cv, itens, 1, T);
                 } finally { VE.playhead = ph; }
             });
-            const b = await new Promise(res => cv.toBlob(res, 'image/png'));
+            const b = veCanvasPng(cv);
             const rr = await fetch(ini.url + `q${String(i).padStart(5, '0')}.png`, { method: 'POST', body: b, headers: { 'Content-Type': 'image/png' } });
             if (!rr.ok && rr.status !== 204) throw new Error(`envio do quadro ${i}: HTTP ${rr.status}`);
             if (i % 24 === 23) await api.ve_c3d_lote(ini.sessao, ini.pasta);

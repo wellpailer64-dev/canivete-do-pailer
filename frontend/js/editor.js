@@ -3328,6 +3328,15 @@ function veDrawPreparando(ctx, w, h, m, srcT) {
     ctx.restore();
 }
 
+// PNG do canvas já pronto para enviar (Uint8Array), SÍNCRONO: o toBlob (assíncrono) era adiado pelo WebView para ~1 s
+// por quadro quando a janela não estava em primeiro plano — a camada desenhada da propaganda levava 1.002 s em vez de
+// ~40 (medido 2026-10-11: toDataURL 29 ms + 4 ms de conversão; toBlob 1.025 ms)
+function veCanvasPng(cv) {
+    const u = cv.toDataURL('image/png'), bin = atob(u.slice(u.indexOf(',') + 1)), arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr;
+}
+
 // Desenha as camadas (de baixo para cima) no ctx já em coordenadas do quadro (escala pv). itens = [{c, src}]:
 // src = imagem/vídeo/canvas, 'ajuste', 'offline', 'preparando' (vídeo sem prévia ainda) ou 'comp' (Comp sem nada
 // para mostrar ainda)
@@ -3865,7 +3874,7 @@ function veExportPlanClips() {
             return { _c: c, tipo: veIsAdj(c) ? 'ajuste' : veIsImage(c) ? 'imagem' : 'video', path: png ? png.path : veIsImage(c) || veMid(c) ? m.path || null : null,
                      seq, st: c.st, s: seq ? sq : veIsImage(c) ? 0 : c.s, e: seq ? sq + veLen(c) : veIsImage(c) ? veLen(c) : c.e,
                      sc: p.sc / f, x: p.x, y: p.y, rot: p.rot, op: p.op, kf,
-                     fx: veFxExport(c), ca: veCaExport(c), mw: sz.w, mh: sz.h, v: veVel(c), bm: veBmAtivo(c) ? c.bm : null,
+                     fx: veFxExport(c), fxk: veFxKfExport(c), ca: veCaExport(c), mw: sz.w, mh: sz.h, v: veVel(c), bm: veBmAtivo(c) ? c.bm : null,
                      ox: (veMediaSize(c).w / 2 - veAnc(c, p)[0]) * f, oy: (veMediaSize(c).h / 2 - veAnc(c, p)[1]) * f };
         })
         // transição de sobreposição: a camada vira o trecho já renderizado (editor-ovt.js)

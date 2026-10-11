@@ -1738,6 +1738,37 @@ def _valor_kf(pts, t):
     return pts[-1][1]
 
 
+def _fx_animados(fxk, mw, mh, dur, fps, nome):
+    """Parâmetros de efeito animados (editor-fx.js veFxKfExport) que o ffmpeg faz sozinho: hoje o Desfoque gaussiano.
+    O gblur recebe o sigma de cada quadro por sendcmd (mesma conta da prévia: 100% = sigma de 5% do lado menor).
+    Devolve o filtro (ou None). O tempo conta do início da camada, como a opacidade animada."""
+    for f in fxk or []:
+        if f.get("t") != "blur" or not (f.get("p") or {}).get("amt"):
+            continue
+        pts = []
+        for q in f["p"]["amt"]:
+            try:
+                pts.append((float(q[0]), float(q[1]), str(q[2]) if len(q) > 2 else "lin", _curva_kf(q) if len(q) > 3 else None))
+            except Exception:
+                continue
+        if not pts:
+            continue
+        pts.sort(key=lambda p: p[0])
+        base = max(2, min(mw, mh)) / 2000.0
+        sig = lambda t: min(1000.0, max(0.0, _valor_kf(pts, t)) * base)
+        arq = os.path.join(_work_dir(), f"bl_{uuid.uuid4().hex[:8]}.txt")
+        fps = float(fps)
+        # sigma E sigmaV: o gblur copia o vertical do horizontal só na largada — mudando só "sigma" por comando, o
+        # vertical ficava preso no valor inicial e o texto continuava desfocado (propaganda KANIVETE, 2026-10-11)
+        with open(arq, "w", encoding="ascii") as fh:
+            fh.write("\n".join(f"{max(0.0, (i - 0.5) / fps):.5f} gblur@{nome} sigma {sig(i / fps):.4f}, gblur@{nome} sigmaV {sig(i / fps):.4f};"
+                               for i in range(int(dur * fps) + 2)) + "\n")
+        # pré-multiplicado (como o canvas): sem isso o preto dos pixels transparentes escurece a borda do desfoque
+        return (f"format=rgba,premultiply=inplace=1,sendcmd=f={_caminho_filtro(arq)},"
+                f"gblur@{nome}=sigma={sig(0):.4f}:sigmaV={sig(0):.4f}:steps=3,unpremultiply=inplace=1")
+    return None
+
+
 def _opacidade_animada(pts, dur, fps, nome, inicio=0.0):
     """Opacidade com quadros-chave: um valor por quadro mandado por sendcmd ao colorchannelmixer.
     (O geq fazia a mesma conta pixel a pixel e deixava a exportação ~3x mais lenta.)"""
@@ -2558,7 +2589,9 @@ def _filtros_fx(fx, mw, mh, tag="x"):
             # desfoque em % do lado menor da mídia: 100% = sigma de 5% do lado menor
             sigma = _num(v.get("amt"), 0, 100) * max(2, min(mw, mh)) / 2000.0
             if sigma >= 0.05:
-                out.append(f"gblur=sigma={min(sigma, 1000):.3f}:steps=3")
+                # pré-multiplicado (como o canvas da prévia): numa camada com transparência (texto, logo), o preto dos
+                # pixels transparentes entrava no desfoque e deixava a borda escura (medido: branco virava cinza 119)
+                out.append(f"format=rgba,premultiply=inplace=1,gblur=sigma={min(sigma, 1000):.3f}:steps=3,unpremultiply=inplace=1")
         elif t == "ca":
             # aberração cromática (frontend/js/editor-fx.js "ca"): cada canal ampliado a partir do centro e
             # recortado ao tamanho; o alfa fica o original
@@ -2872,6 +2905,8 @@ def _normalizar_camadas(camadas, path_video):
                 "op": max(0.0, min(100.0, float(c.get("op", 100)))) / 100.0,
                 "kf": _normalizar_kf(c.get("kf")),
                 "fx": [f for f in (c.get("fx") or []) if isinstance(f, dict)],
+                # parâmetros de efeito animados que o ffmpeg faz (editor-fx.js veFxKfExport): {id, t, v, p}
+                "fxk": [f for f in (c.get("fxk") or []) if isinstance(f, dict)],
                 "mw": _num(c.get("mw"), 2, 20000, 1920), "mh": _num(c.get("mh"), 2, 20000, 1080),
                 # ponto de ancoragem: do ponto até o centro da mídia, em px da mídia (0 = âncora no centro)
                 "ox": _num(c.get("ox"), -1e5, 1e5, 0), "oy": _num(c.get("oy"), -1e5, 1e5, 0),
@@ -2902,6 +2937,8 @@ def _camadas_na_grade(lay, fps):
         d = a - c["st"]
         c["s"] = max(0.0, c["s"] + d * c["v"])
         c["kf"] = {k: [(t - d, v, i, bz) for t, v, i, bz in pts] for k, pts in c["kf"].items()}
+        for f in c.get("fxk") or []:
+            f["p"] = {k: [[q[0] - d] + list(q[1:]) for q in pts] for k, pts in (f.get("p") or {}).items()}
         c["st"], c["dur"] = a, b - a
         c["fonte"] = c["dur"] * c["v"]
 
@@ -3519,13 +3556,19 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             # escala animada vai por último (tamanho muda a cada quadro; o resto trabalha em tamanho fixo)
             escala_animada = "sc" in kf or sx or sy or ca["sc"]
             ordem = [giro, opac, escala] if escala_animada else [escala, giro, opac]
-            efeitos = _filtros_fx(c["fx"], c["mw"], c["mh"], f"l{n}")
+            # efeito com parâmetro animado (Desfoque): sai dos fixos e roda quadro a quadro, antes da escala (px da mídia)
+            fxk = c.get("fxk") or []
+            ids_anim = {f.get("id") for f in fxk if f.get("id")}
+            fx_anim = _fx_animados(fxk, c["mw"], c["mh"], c["dur"], fps, f"bl{n}")
+            if fx_anim:
+                ordem.insert(0, fx_anim)
+            efeitos = _filtros_fx([f for f in c["fx"] if not (fx_anim and f.get("id") in ids_anim)], c["mw"], c["mh"], f"l{n}")
             # imagem parada com muito transparente em volta (texto, logo): recortada à parte visível depois dos efeitos
             # (que rodam no tamanho da mídia) e antes do resto; o centro da camada anda junto pela âncora (ox/oy:
             # do ponto de ancoragem até o centro, em px da mídia). Desfoque e Básico 3D podem levar o alfa para fora
             # do recorte: com eles, não recorta
             recorte = []
-            if c["tipo"] == "imagem" and not c.get("seq") and not any(
+            if c["tipo"] == "imagem" and not c.get("seq") and not fx_anim and not any(
                     f.get("t") in ("blur", "b3d") and f.get("on") is not False for f in c["fx"]):
                 bb = _bbox_alfa(c["path"])
                 if bb and abs(bb[4] - c["mw"]) <= 1 and abs(bb[5] - c["mh"]) <= 1:
@@ -3569,7 +3612,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 # imagem parada: efeitos, escala, giro e opacidade fixos são aplicados uma vez no único quadro
                 # (ex.: LUT num PNG grande antes de reduzir); só o que anima com o tempo roda a cada quadro
                 animados = [f for f, anima in ((escala, escala_animada), (giro, "rot" in kf or ca["rot"]),
-                                                (opac, "op" in kf)) if f and anima]
+                                                (opac, "op" in kf), (fx_anim, True)) if f and anima]
                 k = 0
                 while k < len(filtros_clip) and filtros_clip[k] not in animados:
                     k += 1

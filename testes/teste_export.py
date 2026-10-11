@@ -39,6 +39,32 @@ CMP_W, CMP_H = 270, 480      # tamanho da comparação (os dois lados reduzidos 
 VERSAO_MATERIAL = 1
 
 
+def conferir_desfoque_animado():
+    """Desfoque animado (gblur + sendcmd, vc._fx_animados): depois de a animação chegar a 0 a imagem volta a ser a
+    original nos DOIS eixos. Mudando só 'sigma', o vertical ficava preso no inicial (texto desfocado o tempo todo) e a
+    comparação em miniatura não via. Devolve a lista de erros."""
+    from PIL import Image, ImageDraw, ImageFont
+    from Functions import video_cutter as vc
+    pasta = os.path.join(os.environ.get("TEMP") or ".", "canivete_teste_export")
+    os.makedirs(pasta, exist_ok=True)
+    png = os.path.join(pasta, "desf_texto.png")
+    im = Image.new("RGBA", (400, 160), (0, 0, 0, 0))
+    ImageDraw.Draw(im).text((20, 10), "Teste", font=ImageFont.truetype("arial.ttf", 120), fill=(255, 255, 255, 255))
+    im.save(png)
+    f = vc._fx_animados([{"id": "x", "t": "blur", "p": {"amt": [[0, 100, "lin"], [0.3, 0, "lin"]]}}], 400, 160, 1.0, 30, "tx")
+    out = os.path.join(pasta, "desf_q.png")
+    subprocess.run([_ff(), "-v", "error", "-y", "-loop", "1", "-t", "1", "-i", png, "-vf",
+                    f"setpts=N/(30*TB),{f},format=rgba", "-ss", "0.8", "-frames:v", "1", out], check=True)
+    a = np.asarray(Image.open(png).convert("L"), np.float32)
+    b = np.asarray(Image.open(out).convert("L"), np.float32)
+    nit = lambda x, ax: float(np.abs(np.diff(x, axis=ax)).mean())
+    erros = []
+    for ax, nome in ((1, "horizontal"), (0, "vertical")):
+        if nit(b, ax) < nit(a, ax) * 0.9:
+            erros.append(f"desfoque animado preso no eixo {nome} ({nit(b, ax):.2f} contra {nit(a, ax):.2f} do original)")
+    return erros
+
+
 def conferir_taxa():
     """Regra da taxa cravada (video_cutter.taxa_timeline): nunca a média de celular."""
     from Functions.video_cutter import taxa_timeline
@@ -173,10 +199,10 @@ JS_AJUDA = r"""
       return c.toDataURL('image/jpeg', 0.95);
     },
     async exportar(dest, nome) {
-      window.__teFim = null;
+      window.__teFim = null; window.__teCpu = '';
       if (!window.__teHook) {
         const orig = window.veOnExport;
-        window.veOnExport = ev => { let e = ev; if (typeof e === 'string') { try { e = JSON.parse(e); } catch (x) {} } if (e && e.done) window.__teFim = e; try { orig(ev); } catch (x) {} };
+        window.veOnExport = ev => { let e = ev; if (typeof e === 'string') { try { e = JSON.parse(e); } catch (x) {} } if (e && e.done) window.__teFim = e; if (e && !e.done && /^Processador/.test(e.message || '')) window.__teCpu = e.message; try { orig(ev); } catch (x) {} };
         window.__teHook = true;
       }
       if (typeof veCompProntas === 'function') await veCompProntas(() => {});
@@ -481,6 +507,37 @@ CASOS = {
         adj.p = veDefProps(adj);
         return [fundo, a, b, adj];
     """, ""),
+    # desfoque animado (entrada e saída, como nas propagandas): vai pelo gblur + sendcmd, sem camada desenhada
+    "desfoqueanim": (1080, 1920, """
+        const { clip } = __te, a = veFxNewId(), b = veFxNewId();
+        const fundo = clip(0, 0, 0, 2.5, 'foto2.jpg', { p: { sc: 160, x: 540, y: 960, rot: 0, op: 100 } });
+        const logo = clip(1, 0.2, 0, 2.2, 'logo.png', { p: { sc: 70, x: 540, y: 700, rot: 0, op: 100 }, fx: [{ id: a, t: 'blur', on: true, v: { amt: 0 } }] });
+        logo.k = { ['fx.' + a + '.amt']: [{ t: 0, v: 60, i: 'out' }, { t: 0.4, v: 0, i: 'lin' }, { t: 1.8, v: 0, i: 'in' }, { t: 2.2, v: 80, i: 'lin' }],
+                   op: [{ t: 0, v: 0, i: 'out' }, { t: 0.4, v: 100, i: 'lin' }] };
+        const tm = veTxMidia();
+        const tx = { tr: 2, st: 0.5, s: 0, e: 1.8, m: tm.id, tx: { ...VE_TX_PADRAO, t: 'Desfoque', tam: 150, alin: 'center', cor: '#ffffff' },
+                     fx: [{ id: b, t: 'blur', on: true, v: { amt: 0 } }] };
+        tx.p = Object.assign(veDefProps(tx), { sc: 100, x: 540, y: 1250 });
+        tx.k = { ['fx.' + b + '.amt']: [{ t: 0, v: 100, i: [0.16, 1, 0.3, 1] }, { t: 0.35, v: 0, i: 'lin' }], y: [{ t: 0, v: 1300, i: 'out' }, { t: 0.35, v: 1250, i: 'lin' }] };
+        return [fundo, logo, tx];
+    """, """
+        if (VE.clips.some(c => veMoTem(c))) throw new Error('desfoque animado não devia virar camada desenhada');
+    """),
+    # imagens e textos girados (na placa: a textura gira na CPU e a placa só posiciona): fixo com âncora no canto,
+    # animado, texto na vertical, Girar constante e girado com sombra
+    "girar": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const fundo = clip(0, 0, 0, 2.5, 'foto2.jpg', { p: { sc: 160, x: 540, y: 960, rot: 0, op: 100 } });
+        const a = clip(1, 0, 0, 2.5, 'logo.png', { p: { sc: 50, x: 300, y: 400, rot: 25, op: 100, ax: 0, ay: 0 } });
+        const b = clip(2, 0, 0, 2.5, 'logo.png', { p: { sc: 45, x: 760, y: 500, rot: 0, op: 100 } });
+        b.k = { rot: [{ t: 0, v: -40, i: 'out' }, { t: 2, v: 200, i: 'lin' }] };
+        const tm = veTxMidia();
+        const t = { tr: 3, st: 0, s: 0, e: 2.5, m: tm.id, tx: { ...VE_TX_PADRAO, t: 'Vertical', tam: 140, alin: 'center', cor: '#ffffff' } };
+        t.p = Object.assign(veDefProps(t), { sc: 100, x: 200, y: 1200, rot: -90 });
+        const d = clip(4, 0, 0, 2.5, 'logo.png', { p: { sc: 40, x: 760, y: 1100, rot: 0, op: 100 }, fx: [{ id: id(), t: 'ca_rot', on: true, v: { vel: 0.4, esq: 0 } }] });
+        const e = clip(5, 0, 0, 2.5, 'logo.png', { p: { sc: 45, x: 600, y: 1550, rot: -15, op: 100 }, fx: [{ id: id(), t: 'sombra', on: true, v: { cor: '#000000', op: 70, ang: 135, dist: 20, tam: 18 } }] });
+        return [fundo, a, b, t, d, e];
+    """, ""),
     # 4K: base 4K + PiP (só com --4k)
     "4k": (2160, 3840, """
         const { clip } = __te;
@@ -589,7 +646,7 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
     arq = fim["output_path"]
     inf = _info(arq)
     if os.environ.get("TESTE_PLACA") == "1":
-        res["msgs"].append("montado na placa (modo placa)" if fim.get("placa") else "pela CPU (fora do modo placa)")
+        res["msgs"].append("montado na placa (modo placa)" if fim.get("placa") else "pela CPU (fora do modo placa) — " + (pg.evaluate("window.__teCpu || ''") or "?"))
     # contagem e quadros pretos: todos os quadros pelo ffmpeg; comparação de imagem: pelo navegador
     todos = _decodificar(arq, int(inf["width"]), int(inf["height"]))
     pg.evaluate("u => __te.abrirArquivo(u)", srv.url + os.path.basename(arq))
@@ -620,7 +677,7 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
         if k < len(todos):
             pega(k)
             difs.append((float(np.abs(previa[k].astype(np.int16) - ex[k].astype(np.int16)).mean()), k))
-    if nome in ("motion", "curvas", "fxmotion", "bloom", "invfill"):
+    if nome in ("motion", "curvas", "fxmotion", "bloom", "invfill", "desfoqueanim", "girar"):
         # motion: detalhes finos (anel, borda de máscara) quase não mexem na média: confere a pior região 30×30.
         # Contra o quadro exato do ffmpeg (o navegador, buscando no meio do quadro, às vezes entrega o vizinho: um
         # objeto rápido anda 30 px por quadro)
@@ -717,8 +774,8 @@ def main():
     if a.blocos:
         os.environ["TESTE_BLOCOS"] = "1"
         os.environ.setdefault("CANIVETE_BLOCO_SEG", "1")   # o app aberto pelo teste herda: vários blocos por caso
-    erros_taxa = conferir_taxa()
-    print("· taxa cravada: " + ("OK" if not erros_taxa else f"ERRO {erros_taxa}"), flush=True)
+    erros_taxa = conferir_taxa() + conferir_desfoque_animado()
+    print("· taxa cravada e desfoque animado: " + ("OK" if not erros_taxa else f"ERRO {erros_taxa}"), flush=True)
     print("material...", flush=True)
     gerar_material(mat, a.k4)
     nomes = [n for n in (a.casos.split(",") if a.casos else list(CASOS) + ["autoframe"]) if n]

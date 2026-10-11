@@ -11,6 +11,7 @@ const VE_KEY_PADRAO = '#00b140';   // verde de chroma key (Chroma Key, mais abai
 const VE_FX = {
     blur: {
         nome: 'Desfoque gaussiano', cat: 'Desfoque e nitidez', tag: 'Blur',
+        animaFF: ['amt'],   // animado vai pela exportação normal (gblur + sendcmd), sem camada desenhada (editor-motion.js)
         params: [{ k: 'amt', nome: 'Desfoque', min: 0, max: 100, step: 0.5, def: 20, un: '%' }],
         neutro: v => !(v.amt > 0),
         // 100% = sigma de 5% do lado menor da mídia; bordas repetidas (não escurecem, igual ao ffmpeg gblur)
@@ -837,8 +838,25 @@ function veSombraAplicar(ctx, s, k) {
 function veFxExport(c) {
     return veFxActive(c).filter(f => !VE_FX[f.t].constante && !VE_FX[f.t].ovt).map(f => {
         const d = VE_FX[f.t], v = veFxValues(f);
-        return { t: f.t, v: d.exportar ? d.exportar(v) : v };
+        return { id: f.id, t: f.t, v: d.exportar ? d.exportar(v) : v };
     });
+}
+
+// Parâmetros de efeito animados que a exportação faz sozinha (animaFF): [{id, t, p: {param: [[t, v, interp, bezier]]}}]
+// com o tempo contado do início da camada (video_cutter._fx_animados)
+function veFxKfExport(c) {
+    const out = [];
+    ((c && c.fx) || []).forEach(f => {
+        const d = VE_FX[f.t];
+        if (f.on === false || !d || !d.animaFF) return;
+        const p = {};
+        d.animaFF.forEach(k => {
+            const ks = c.k && c.k[`fx.${f.id}.${k}`];
+            if (ks && ks.length) p[k] = ks.map(q => [(q.t - c.s) / veVel(c), q.v, q.i || 'lin', veKfCurve(q)]);
+        });
+        if (Object.keys(p).length) out.push({ id: f.id, t: f.t, v: veFxValues(f), p });
+    });
+    return out;
 }
 
 function veAfxExport(c) {

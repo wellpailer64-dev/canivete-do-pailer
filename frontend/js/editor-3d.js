@@ -327,7 +327,7 @@ async function ve3dRenderizar(m) {
             const rt = await ve3dGarantir(m), W = VE.seqW, H = VE.seqH, fps = VE.fps || 30, n = Math.max(1, Math.round((+m.dur || 1) * fps));
             for (let i = 0; i < n; i++) {
                 ve3dAplicar(rt, m, i / fps, W, H);
-                const b = await new Promise(res => rt.cv.toBlob(res, 'image/png'));
+                const b = veCanvasPng(rt.cv);   // síncrono: o toBlob era adiado ~1 s por quadro fora de primeiro plano
                 const rr = await fetch(ini.url + `q${String(i).padStart(5, '0')}.png`, { method: 'POST', body: b, headers: { 'Content-Type': 'image/png' } });
                 if (!rr.ok && rr.status !== 204) throw new Error(`envio do quadro ${i}: HTTP ${rr.status}`);
                 if (i % 24 === 23) await api.ve_c3d_lote(ini.sessao, ini.pasta);
