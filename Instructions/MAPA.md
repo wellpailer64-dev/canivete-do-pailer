@@ -330,6 +330,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/psd_texto_modelo.py` — Moldes de camada de texto do Photoshop (bloco TySh), gerados pelo Photoshop 2026 (Arial 48 px de ponto e 36 px de
 - `Functions/recorte_pro.py` — recorte_pro.py — Recorte profissional (Photo Kanivete: Remover plano de fundo; KNV.gerar recortar)
 - `Functions/recuperar.py` — recuperar.py — o miolo das ferramentas de recuperação do Photo Kanivete (como as do Photoshop):
+- `Functions/remix.py` — remix.py — Remix de música (o "Remix" do Premiere): esticar ou encurtar uma trilha para a duração pedida,
 - `Functions/removerfundo.py` — removerfundo.py
 - `Functions/render_cache.py` — Cache de render em disco do Pocket Editor (como os "Preview Files" do Premiere)
 - `Functions/sincronizar.py` — Sincronizar clipes pelo áudio (como o "Sincronizar › Áudio" do Premiere): duas câmeras gravando a mesma cena

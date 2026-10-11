@@ -201,6 +201,12 @@ salto de amplitude na emenda < p99 do áudio). Falta: (1) motor `Functions/remix
 salto por semelhança (cromas + timbre por batida), caminho até a duração pedida preservando começo e FINAL real;
 (2) testar com a trilha da Luz e a do show (ouvir antes de construir a UI); (3) timeline: modo Remix no clipe de
 música, arrastar a ponta refaz o arquivo e mostra ondinha em cada emenda.
+**2026-10-11: motor feito** — `Functions/remix.py` (`remixar(arq, alvo, saida, cache)`): batidas/compassos pelo librosa,
+retrato por compasso (cromas + MFCC + energia), salto para frente (encurtar, 1 ou 2 saltos) ou laço para trás repetido
+(esticar), preservando começo e final; emenda no começo do compasso com crossfade de 40 ms. Medido em 2 músicas
+(D:/kanivete_testes/remix, `medir.py`): 60/90/300 s chegam a ±1 s do pedido, ritmo na emenda com desvio de 23 ms (1
+quadro de análise), volume na emenda −1…+3 dB (o laço longo da 2ª música: −7 dB). Análise ~15 s na 1ª vez, depois <1 s.
+FALTA: o Pailer ouvir os .wav; depois a UI (item 3).
 Rodadas seguintes do plano profissional:
 Plano profissional A–F concluído. Próximos: compensar a latência da placa ao gravar; prévia idêntica do gate/de-esser; banco v2 com mais vozes (e as CC0 Jeff/Cadu se o usuário baixar).
 Separar voz da música (precisa de um modelo de separação; o UVR/Roformer foi testado no anti-noise), curva de volume
