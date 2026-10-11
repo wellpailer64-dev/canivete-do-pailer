@@ -12,7 +12,8 @@
 
 const VE_GRAF = new Set(['cor', 'forma', 'pincel']);
 const veEhGrafico = c => { const m = c && veMediaOf(c); return !!m && VE_GRAF.has(m.kind); };
-const VE_FORMAS = { ret: 'Retângulo', eli: 'Elipse', tri: 'Triângulo', lin: 'Linha' };
+const VE_FORMAS = { ret: 'Retângulo', eli: 'Elipse', tri: 'Triângulo', lin: 'Linha', est: 'Estrela', pol: 'Polígono' };
+const VE_FORMAS_ICO = { ret: '▭', eli: '◯', tri: '△', lin: '╱', est: '☆', pol: '⬠' };
 const VEGR = {
     cache: new WeakMap(),
     pincel: { cor: '#ffffff', tam: 24, dur: 80, op: 100 },
@@ -45,15 +46,117 @@ function veGrCanvas(w, h) {
     return cv;
 }
 
+// Contorno da forma como polilinha fechada (px da forma), começando em cima e no sentido horário (como no AE):
+// é o que o Aparar caminho e o tracejado percorrem
+function veGrPontos(fm, w, h, i) {
+    const out = [], n = Math.max(3, Math.round(+fm.pontas || 5)), rx = Math.max(0.5, w / 2 - i), ry = Math.max(0.5, h / 2 - i), cx = w / 2, cy = h / 2;
+    if (fm.t === 'eli') {
+        for (let k = 0; k < 160; k++) { const a = -Math.PI / 2 + k * 2 * Math.PI / 160; out.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]); }
+    } else if (fm.t === 'tri') out.push([w / 2, i], [w - i, h - i], [i, h - i]);
+    else if (fm.t === 'est' || fm.t === 'pol') {
+        const est = fm.t === 'est', q = est ? 2 * n : n, ri = Math.max(0.01, Math.min(1, (fm.raioInt == null ? 45 : +fm.raioInt) / 100));
+        for (let k = 0; k < q; k++) { const a = -Math.PI / 2 + k * 2 * Math.PI / q, r = est && k % 2 ? ri : 1; out.push([cx + rx * r * Math.cos(a), cy + ry * r * Math.sin(a)]); }
+    } else {
+        // retângulo (com cantos arredondados), começando no meio do lado de cima
+        const x0 = i, y0 = i, x1 = w - i, y1 = h - i, r = Math.min((x1 - x0) / 2, (y1 - y0) / 2, Math.min(w, h) / 2 * Math.max(0, Math.min(100, +fm.raio || 0)) / 100);
+        const arco = (ax, ay, a0) => { for (let k = 0; k <= 12; k++) { const a = a0 + k * Math.PI / 24; out.push([ax + r * Math.cos(a), ay + r * Math.sin(a)]); } };
+        out.push([(x0 + x1) / 2, y0]);
+        if (r > 0.01) { arco(x1 - r, y0 + r, -Math.PI / 2); arco(x1 - r, y1 - r, 0); arco(x0 + r, y1 - r, Math.PI / 2); arco(x0 + r, y0 + r, Math.PI); }
+        else out.push([x1, y0], [x1, y1], [x0, y1], [x0, y0]);
+    }
+    return out;
+}
+
+// Aparar caminho (Trim Paths): {a, b} em frações do comprimento (com o deslocamento), null = inteiro
+function veGrAparar(fm) {
+    const ini = Math.max(0, Math.min(100, fm.apIni == null ? 0 : +fm.apIni)) / 100, fim = Math.max(0, Math.min(100, fm.apFim == null ? 100 : +fm.apFim)) / 100;
+    if (ini <= 1e-4 && fim >= 1 - 1e-4) return null;
+    const d = (+fm.apDesl || 0) / 360;
+    return { a: Math.min(ini, fim) + d, b: Math.max(ini, fim) + d, vazio: Math.abs(fim - ini) < 1e-4 };
+}
+
+// Trecho [a, b] (frações, podem passar de 1) da polilinha (fechada: dá a volta)
+function veGrTrecho(pts, fech, a, b) {
+    const P = fech ? [...pts, pts[0]] : pts, L = [0];
+    for (let k = 1; k < P.length; k++) L.push(L[k - 1] + Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]));
+    const tot = L[L.length - 1];
+    if (tot <= 0) return [];
+    const em = s => {
+        s = fech ? ((s % tot) + tot) % tot : Math.max(0, Math.min(tot, s));
+        let k = 1;
+        while (k < L.length - 1 && L[k] < s) k++;
+        const u = (s - L[k - 1]) / Math.max(1e-9, L[k] - L[k - 1]);
+        return [P[k - 1][0] + (P[k][0] - P[k - 1][0]) * u, P[k - 1][1] + (P[k][1] - P[k - 1][1]) * u, k];
+    };
+    let s0 = a * tot, s1 = b * tot;
+    if (!fech) { s0 = Math.max(0, Math.min(tot, s0)); s1 = Math.max(0, Math.min(tot, s1)); }
+    if (s1 - s0 >= tot - 1e-6) return fech ? P.slice(0, -1).concat([P[0]]) : P.slice();
+    const out = [], passo = tot / 2000;
+    // amostra os vértices no caminho (mantém as quinas) e as pontas exatas
+    const ini = em(s0);
+    out.push([ini[0], ini[1]]);
+    let s = s0;
+    while (s < s1 - 1e-6) {
+        const pos = fech ? ((s % tot) + tot) % tot : s;
+        let k = 1;
+        while (k < L.length - 1 && L[k] <= pos + 1e-9) k++;
+        const prox = s + Math.max(passo, L[k] - pos);
+        s = Math.min(s1, prox);
+        const p = em(s);
+        out.push([p[0], p[1]]);
+    }
+    return out;
+}
+
+function veGrPoli(x, pts, fech) {
+    if (!pts.length) return;
+    x.moveTo(pts[0][0], pts[0][1]);
+    for (let k = 1; k < pts.length; k++) x.lineTo(pts[k][0], pts[k][1]);
+    if (fech) x.closePath();
+}
+
 function veGrForma(x, fm) {
     const { w, h } = fm, b = fm.cOn ? Math.max(0, +fm.cLarg || 0) : 0, i = b / 2;
+    const ap = veGrAparar(fm), tr = (+fm.tLen || 0) > 0, pOn = fm.pOn !== false;
+    if (ap || tr || fm.t === 'est' || fm.t === 'pol') {
+        // Aparar caminho, tracejado, estrela e polígono: o contorno percorrido como polilinha
+        if (ap && ap.vazio) return;
+        const tracejar = () => { if (tr) { x.setLineDash([Math.max(0.1, +fm.tLen), Math.max(0, +fm.tVao || 0)]); x.lineDashOffset = -(+fm.tDesl || 0); } };
+        x.save();
+        x.lineJoin = 'round';
+        x.lineCap = fm.pontaR ? 'round' : 'butt';
+        if (fm.t === 'lin') {
+            // linha: o traço no meio da faixa, com a espessura dela
+            const m = fm.pontaR ? h / 2 : 0, P = [[m, h / 2], [Math.max(m, w - m), h / 2]];
+            x.strokeStyle = fm.cor;
+            x.lineWidth = h;
+            tracejar();
+            x.beginPath();
+            veGrPoli(x, ap ? veGrTrecho(P, false, ap.a, ap.b) : P, false);
+            x.stroke();
+            x.restore();
+            return;
+        }
+        const P = veGrPontos(fm, w, h, i), T = ap ? veGrTrecho(P, true, ap.a, ap.b) : P;
+        if (pOn) { x.beginPath(); veGrPoli(x, T, true); x.fillStyle = fm.cor; x.fill(); }
+        if (b > 0) {
+            x.lineWidth = b;
+            x.strokeStyle = fm.cCor;
+            tracejar();
+            x.beginPath();
+            veGrPoli(x, T, !ap);
+            x.stroke();
+        }
+        x.restore();
+        return;
+    }
     x.beginPath();
     if (fm.t === 'eli') x.ellipse(w / 2, h / 2, Math.max(0.5, w / 2 - i), Math.max(0.5, h / 2 - i), 0, 0, Math.PI * 2);
     else if (fm.t === 'tri') { x.moveTo(w / 2, i); x.lineTo(w - i, h - i); x.lineTo(i, h - i); x.closePath(); }
     else if (fm.t === 'lin') x.rect(0, 0, w, h);
     else x.roundRect(i, i, Math.max(0.5, w - b), Math.max(0.5, h - b), Math.min(w, h) / 2 * Math.max(0, Math.min(100, +fm.raio || 0)) / 100);
     x.fillStyle = fm.cor;
-    x.fill();
+    if (pOn || fm.t === 'lin') x.fill();
     if (b > 0 && fm.t !== 'lin') {
         x.lineWidth = b;
         x.lineJoin = 'round';
@@ -98,11 +201,13 @@ function veGrafDesenho(c) {
         return g.cv;
     }
     if (m.kind === 'forma') {
-        const k = JSON.stringify(c.fm);
+        // propriedades animadas da forma (aparar caminho, tracejado...: 'fm.*', editor-motion.js) no instante da agulha
+        const fm = typeof veMoFormaEm === 'function' ? veMoFormaEm(c) : c.fm;
+        const k = JSON.stringify(fm);
         let g = VEGR.cache.get(o);
         if (!g || g.k !== k) {
             const cv = veGrCanvas(sz.w, sz.h);
-            veGrForma(cv.getContext('2d'), { ...c.fm, w: cv.width, h: cv.height });
+            veGrForma(cv.getContext('2d'), { ...fm, w: cv.width, h: cv.height });
             g = { k, cv };
             VEGR.cache.set(o, g);
         }
@@ -408,7 +513,7 @@ function veGrOpcoesRender(box) {
         <small>${veT('Shift+arrastar: tamanho')}</small>
         <button class="ve-btn ve-btn-sm ve-btn-ghost" data-gracao="nova" title="${veT('O próximo traço começa uma camada de desenho nova')}">${veT('Nova camada')}</button>` : `
         <span class="ve-gr-tit">${veT('Forma')}</span>
-        <span class="ve-gr-tipos">${Object.entries(VE_FORMAS).map(([t, n]) => `<button class="${F.t === t ? 'on' : ''}" data-grt="${t}" title="${veT(n)}">${{ ret: '▭', eli: '◯', tri: '△', lin: '╱' }[t]}</button>`).join('')}</span>
+        <span class="ve-gr-tipos">${Object.entries(VE_FORMAS).map(([t, n]) => `<button class="${F.t === t ? 'on' : ''}" data-grt="${t}" title="${veT(n)}">${VE_FORMAS_ICO[t]}</button>`).join('')}</span>
         <label>${veT('Preenchimento')}<input type="color" data-gr="f.cor" value="${F.cor}"></label>
         <label><input type="checkbox" data-gr="f.cOn"${F.cOn ? ' checked' : ''}>${veT('Contorno')}<input type="color" data-gr="f.cCor" value="${F.cCor}"></label>
         ${faixa('f.cLarg', 'Espessura', 1, 80, F.cLarg, 'px')}

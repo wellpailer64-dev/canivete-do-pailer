@@ -724,11 +724,16 @@ function veFxCanvas(n, w, h) {
 function veFxCaEscalas(v) { const s = ['r', 'g', 'b'].map(k => 1 + (+v[k] || 0) * 0.0045), mn = Math.min(...s); return s.map(x => x / mn); }
 function veFxOther(a, w, h) { return veFxCanvas(a === VEFX.pool[0] ? 1 : 0, w, h); }
 
-function veFxValues(f) {
+// c (opcional): os parâmetros animados do clipe (quadros-chave 'fx.<id>.<parâmetro>', editor-motion.js) no instante T
+function veFxValues(f, c, T) {
     const d = VE_FX[f.t], v = {};
     d.params.forEach(p => {
         if (p.tipo === 'cor') v[p.k] = f.v && /^#[0-9a-f]{6}$/i.test(f.v[p.k]) ? f.v[p.k] : p.def;
         else v[p.k] = f.v && isFinite(f.v[p.k]) ? +f.v[p.k] : p.def;
+        if (c && c.k && p.tipo !== 'cor' && p.tipo !== 'bool') {
+            const ks = c.k[`fx.${f.id}.${p.k}`];
+            if (ks && ks.length) v[p.k] = veKfValue(ks, veSrcAt(c, T == null ? VE.playhead : T));
+        }
     });
     (d.extra || []).forEach(k => { v[k] = f.v && f.v[k] != null ? f.v[k] : {}; });
     return v;
@@ -744,8 +749,8 @@ function veAfxValues(f) {
 }
 
 // Efeitos que mudam a imagem (ligados, conhecidos e fora do valor neutro)
-function veFxActive(c) {
-    return ((c && c.fx) || []).filter(f => f.on !== false && VE_FX[f.t] && !VE_FX[f.t].neutro(veFxValues(f)));
+function veFxActive(c, T) {
+    return ((c && c.fx) || []).filter(f => f.on !== false && VE_FX[f.t] && !VE_FX[f.t].neutro(veFxValues(f, c, T)));
 }
 function veHasFx(c) { return !!(c && c.fx && c.fx.length); }
 function veAfxActive(c) {
@@ -777,15 +782,15 @@ const veBmAtivo = c => !!(c && c.bm && c.bm !== 'normal' && VE_BM_MAPA[c.bm]);
 const veBmGco = c => (veBmAtivo(c) ? VE_BM_MAPA[c.bm][2] : null);
 
 // Clipe de vídeo "puro": ocupa o quadro todo, sem efeitos (vai direto na base da exportação)
-function veIsPlain(c) { return veIsDefaultProps(c) && !veFxActive(c).length && !veBmAtivo(c); }
+function veIsPlain(c) { return veIsDefaultProps(c) && !veFxActive(c).length && !veBmAtivo(c) && !(typeof veMoTem === 'function' && veMoTem(c)); }
 // vídeo com transparência (.mov ProRes 4444/PNG, WebM com alfa): não cobre o que está embaixo
 function veTemAlfa(c) { const m = veMediaOf(c); return !!(m && m.info && m.info.alfa); }
 
 // Prévia: aplica os efeitos na mídia e devolve o que desenhar no lugar dela.
 // alvo = pixels do monitor por pixel da mídia: os efeitos rodam só na resolução em que a mídia aparece
 // (em degraus de 1/8, para não recriar os canvases a cada quadro de uma escala animada)
-function veFxRender(c, src, sz, alvo) {
-    const fx = veFxActive(c).filter(f => !VE_FX[f.t].constante && !VE_FX[f.t].ovt && !VE_FX[f.t].aoDesenhar);
+function veFxRender(c, src, sz, alvo, T) {
+    const fx = veFxActive(c, T).filter(f => !VE_FX[f.t].constante && !VE_FX[f.t].ovt && !VE_FX[f.t].aoDesenhar);
     if (!fx.length) return src;
     let q = Math.min(1, 1920 / Math.max(sz.w, sz.h));
     if (alvo > 0) q = Math.min(q, Math.max(0.125, Math.ceil(alvo * 8) / 8));
@@ -793,15 +798,29 @@ function veFxRender(c, src, sz, alvo) {
     let a = veFxCanvas(0, w, h);
     a.ctx.clearRect(0, 0, w, h);
     a.ctx.drawImage(src, 0, 0, w, h);
-    const env = { c, w, h, q, mw: sz.w, mh: sz.h };
-    fx.forEach(f => { a = VE_FX[f.t].draw(a, veFxValues(f), env); });
+    const env = { c, w, h, q, mw: sz.w, mh: sz.h, T: T == null ? VE.playhead : T };
+    // efeitos que vazam da camada (brilho, contorno, desfoques do motion: margem(v, env) em px da mídia): o canvas
+    // cresce em volta antes deles; quem desenha usa cv._mais (px da mídia de cada lado)
+    let mais = 0;
+    fx.forEach(f => {
+        const d = VE_FX[f.t], v = veFxValues(f, c, T), m = d.margem ? Math.ceil(Math.max(0, d.margem(v, env)) * q) : 0;
+        if (m > 0) {
+            const g = veFxOther(a, env.w + 2 * m, env.h + 2 * m);
+            g.ctx.setTransform(1, 0, 0, 1, 0, 0);
+            g.ctx.clearRect(0, 0, g.cv.width, g.cv.height);
+            g.ctx.drawImage(a.cv, m, m);
+            a = g; env.w += 2 * m; env.h += 2 * m; mais += m;
+        }
+        a = d.draw(a, v, env);
+    });
+    a.cv._mais = mais / q;
     return a.cv;
 }
 
 // Sombra projetada ativa do clipe: {cor, op, ang, dist, tam} ou null (desenhada com a camada)
-function veSombraDe(c) {
-    const f = veFxActive(c).find(f => f.t === 'sombra');
-    return f ? veFxValues(f) : null;
+function veSombraDe(c, T) {
+    const f = veFxActive(c, T).find(f => f.t === 'sombra');
+    return f ? veFxValues(f, c, T) : null;
 }
 // Liga o shadow* do canvas para a próxima camada. k = pixels do canvas por pixel do quadro (o shadow* não segue a
 // transformação do contexto). Desvio do desfoque = tamanho / 2 (shadowBlur = 2 × desvio, pela especificação).
@@ -976,7 +995,7 @@ function veRenderFxControls() {
     const fx = (c && c.fx) || [], afx = (c && c.afx) || [];
     const kfx = fx.map(f => 'v' + f.id + f.t + (f.on !== false) + VEFX.collapsed.has(f.id)).join(',');
     const kafx = afx.map(f => 'a' + f.id + f.t + (f.on !== false) + VEFX.collapsed.has(f.id)).join(',');
-    const key = VE.sel + '|' + kfx + '|' + kafx;
+    const key = VE.sel + '|' + kfx + '|' + kafx + '|' + (c && typeof veMoPainelChave === 'function' ? veMoPainelChave(c) : '');
     if (key !== VEFX.key) {
         VEFX.key = key;
         const render = (lista, defs, tipo, titulo) => !lista.length ? '' :
@@ -1005,18 +1024,21 @@ function veRenderFxControls() {
                     </div>` : p.tipo === 'bool' ? `
                     <label class="ve-prop-bool"><input type="checkbox" data-fk="${p.k}"> ${p.nome}</label>` : `
                     <div class="ve-prop">
-                        <label>${p.nome}</label>
+                        <label>${tipo === 'v' && typeof veMoSwHtml === 'function' ? veMoSwHtml(`fx.${f.id}.${p.k}`) : ''}${p.nome}</label>
                         <input type="range" min="${p.min}" max="${p.max}" step="${p.step}" data-fk="${p.k}">
                         <span class="ve-prop-num"><input type="${p.vis ? 'text' : 'number'}" ${p.vis ? '' : `min="${p.min}" max="${p.max}" step="${p.step}"`} data-fk="${p.k}"><i>${p.un}</i></span>
                     </div>`).join('')}
                 </div></div>`;
         }).join('');
-        box.innerHTML = render(fx, VE_FX, 'v', 'Efeitos de vídeo') + render(afx, VE_AFX, 'a', 'Efeitos de áudio');
+        // camada mãe, fosco de trilha, desfoque de movimento e máscaras (editor-motion.js) vêm antes dos efeitos
+        const mo = c && typeof veMoPainelHtml === 'function' ? veMoPainelHtml(c) : '';
+        box.innerHTML = mo + render(fx, VE_FX, 'v', 'Efeitos de vídeo') + render(afx, VE_AFX, 'a', 'Efeitos de áudio');
     }
+    if (c && typeof veMoPainelValores === 'function') veMoPainelValores(box, c);
     fx.forEach(f => {
         const d = VE_FX[f.t], el = box.querySelector(`[data-fx="${f.id}"]`);
         if (!d || !el) return;
-        const v = veFxValues(f);
+        const v = veFxValues(f, c);
         d.params.forEach(p => el.querySelectorAll(`[data-fk="${p.k}"]`).forEach(inp => {
             if (p.tipo === 'bool') inp.checked = !!v[p.k];
             else if (p.tipo === 'cor') { if (inp.ownerDocument.activeElement !== inp) inp.value = v[p.k]; }
@@ -1046,9 +1068,12 @@ function veFxSetParam(id, k, val) {
     if (p.tipo === 'cor') { if (!/^#[0-9a-f]{6}$/i.test(val)) return; }
     else if (p.tipo === 'bool') val = val ? 1 : 0;
     else { if (!isFinite(val)) return; val = Math.min(Math.max(val, p.min), p.max); }
-    veFxEdit(id, x => { x.v[k] = val; return x; });
+    // parâmetro animado (cronômetro ligado): vira/atualiza o quadro-chave na agulha (editor-motion.js)
+    if (p.tipo !== 'cor' && p.tipo !== 'bool' && veKfOn(c, `fx.${id}.${k}`)) veApplyProps(c, { [`fx.${id}.${k}`]: val });
+    else veFxEdit(id, x => { x.v[k] = val; return x; });
     veRenderFxControls();
     veDrawMonitorSoon();
+    if (veHasKf(c)) veDraw();
 }
 
 function veAfxSetParam(id, k, val) {

@@ -183,7 +183,7 @@ JS_AJUDA = r"""
       if (typeof veOvtProntas === 'function') await veOvtProntas(null);
       if (typeof ve3dProntas === 'function') await ve3dProntas(() => {});
       VE._txPng = null;
-      if (VE.clips.some(c => veIsTexto(c) || veEhGrafico(c))) await veTxPngs();
+      if (VE.clips.some(veTxPrecisa)) await veTxPngs();   // textos/gráficos em PNG; camadas do motion desenhadas
       const plano = veExportPlan(true), lim = veMasterLim();
       await window.pywebview.api.video_cutter_export(VE.path, plano.base, 'mp4', 'medium', 'original', !!window.__tePlaca, dest, false,
         plano.camadas, plano.audio, plano.dur, lim ? [...plano.mix, { master: lim }] : plano.mix, veTxExport(plano.faixa),
@@ -393,6 +393,94 @@ CASOS = {
         const { clip } = __te;
         return [clip(0, 0, 0, 3, 'principal', { v: 2 }), clip(0, 1.5, 0, 1, 'b.mp4', { v: 0.5 })];
     """, ""),
+    # motion (editor-motion.js): nulo girando com uma filha em órbita e desfoque de movimento, foto com máscara elíptica
+    # animada (abre) e desfoque animado, texto recortado por uma faixa que passa (fosco alfa; a faixa não aparece),
+    # anel com aparar caminho animado e tracejado — tudo vira camada desenhada na exportação
+    "motion": (1080, 1920, """
+        const { clip } = __te, W = 1080, H = 1920, fid = veFxNewId(), fm = veGrMidia('forma', 'Forma');
+        let mn = VE.media.find(x => x && x.kind === 'nulo');
+        if (!mn) { mn = { id: VE.media.length, kind: 'nulo', name: 'Nulo' }; VE.media.push(mn); }
+        const nulo = { tr: 1, st: 0, s: 0, e: 4, m: mn.id, uid: 'Lnulo', p: { sc: 100, x: W / 2, y: H / 2, rot: 0, op: 100, ax: 0, ay: 0 } };
+        nulo.k = { rot: [{ t: 0, v: 0, i: 'lin' }, { t: 4, v: 540, i: 'lin' }] };
+        const sq = { tr: 2, st: 0, s: 0, e: 4, m: fm.id, uid: 'Lsq', pai: 'Lnulo', mb: 1,
+            fm: { t: 'ret', w: 220, h: 220, cor: '#F97316', cOn: false, cCor: '#ffffff', cLarg: 8, raio: 20 }, p: { sc: 100, x: 380, y: 0, rot: 0, op: 100 } };
+        const foto = clip(3, 0.3, 0, 3.4, 'foto1.jpg', { uid: 'Lfoto', p: { sc: 55, x: W / 2, y: 1450, rot: 0, op: 100 },
+            fx: [{ id: fid, t: 'blur', on: true, v: { amt: 0 } }],
+            mk: [{ id: 'mk1', nome: 'M1', modo: 'add', inv: false, on: true, fech: true, pts: VEMO_API.pontosEli(700, 500, 200, 200), pena: 40, op: 100, exp: 0 }] });
+        foto.k = { ['fx.' + fid + '.amt']: [{ t: 0, v: 40, i: 'lin' }, { t: 1.5, v: 0, i: 'ease' }],
+                   'mk.mk1.cam': [{ t: 0, v: VEMO_API.pontosEli(700, 500, 200, 200), i: 'lin' }, { t: 2, v: VEMO_API.pontosEli(-200, -300, 2000, 1800), i: 'ease' }] };
+        const tm = veTxMidia();
+        const tx = { tr: 4, st: 0.5, s: 0, e: 3, m: tm.id, uid: 'Ltx', mt: { modo: 'alfa', uid: 'Lfaixa' },
+            tx: { ...VE_TX_PADRAO, t: 'KANIVETE', tam: 170, alin: 'center', cor: '#ffffff' } };
+        tx.p = Object.assign(veDefProps(tx), { sc: 100, x: W / 2, y: 520 });
+        const faixa = { tr: 5, st: 0.5, s: 0, e: 3, m: fm.id, uid: 'Lfaixa',
+            fm: { t: 'ret', w: 320, h: 300, cor: '#ffffff', cOn: false, cCor: '#ffffff', cLarg: 8, raio: 0 }, p: { sc: 100, x: 150, y: 520, rot: 0, op: 100 } };
+        faixa.k = { x: [{ t: 0, v: 150, i: 'lin' }, { t: 3, v: 930, i: 'lin' }] };
+        const anel = { tr: 6, st: 0, s: 0, e: 4, m: fm.id, uid: 'Lanel',
+            fm: { t: 'eli', w: 620, h: 620, cor: '#ffffff', pOn: false, cOn: true, cCor: '#7dd3fc', cLarg: 16, raio: 0, tLen: 40, tVao: 22, pontaR: true },
+            p: { sc: 100, x: W / 2, y: H / 2, rot: 0, op: 100 } };
+        anel.k = { 'fm.apFim': [{ t: 0, v: 0, i: 'lin' }, { t: 2.5, v: 100, i: 'ease' }] };
+        // fundo parado: a conferência por região mede só as camadas do motion (o vídeo de fundo tem meio quadro de folga)
+        const fundo = clip(0, 0, 0, 4, 'foto2.jpg', { p: { sc: 160, x: W / 2, y: H / 2, rot: 0, op: 100 } });
+        return [fundo, nulo, sq, foto, tx, faixa, anel];
+    """, ""),
+    # curvas de motion nos quadros-chave (sem camada desenhada: vão como expressão do ffmpeg): escala "passar e voltar",
+    # X elástico, Y quicando
+    "curvas": (1080, 1920, """
+        const { clip } = __te;
+        const a = clip(1, 0, 0, 3, 'logo.png', { p: { sc: 60, x: 540, y: 500, rot: 0, op: 100 } });
+        a.k = { sc: [{ t: 0, v: 10, i: 'back' }, { t: 0.8, v: 80, i: 'lin' }] };
+        const b = clip(2, 0, 0, 3, 'logo.png', { p: { sc: 40, x: 200, y: 1000, rot: 0, op: 100 } });
+        b.k = { x: [{ t: 0.2, v: 200, i: 'elas' }, { t: 2, v: 880, i: 'lin' }] };
+        const q = clip(3, 0, 0, 3, 'logo.png', { p: { sc: 40, x: 540, y: 1300, rot: 0, op: 100 } });
+        q.k = { y: [{ t: 0, v: 1150, i: 'quica' }, { t: 1.5, v: 1700, i: 'lin' }] };
+        const fundo = clip(0, 0, 0, 3, 'foto2.jpg', { p: { sc: 160, x: 540, y: 960, rot: 0, op: 100 } });
+        return [fundo, a, b, q];
+    """, ""),
+    # efeitos do motion (editor-motion.js, só desenho): preenchimento, rampa, glow, granulação, desfoques direcional e
+    # radial, contorno e eco (rastro de uma forma que cruza a tela)
+    "fxmotion": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId(), fm = veGrMidia('forma', 'Forma');
+        const fundo = clip(0, 0, 0, 3, 'foto2.jpg', { p: { sc: 160, x: 540, y: 960, rot: 0, op: 100 } });
+        const logo = (tr, x, y, fx) => clip(tr, 0, 0, 3, 'logo.png', { p: { sc: 45, x, y, rot: 0, op: 100 }, fx });
+        const a = logo(1, 280, 250, [{ id: id(), t: 'mo_fill', on: true, v: { cor: '#D4814A', op: 100 } }]);
+        const b = logo(2, 800, 250, [{ id: id(), t: 'mo_rampa', on: true, v: { c1: '#ffffff', c2: '#D4814A', rad: 0, x1: 0, y1: 50, x2: 100, y2: 50, mix: 0 } }]);
+        const gid = id(), c = logo(3, 280, 600, [{ id: gid, t: 'mo_glow', on: true, v: { lim: 20, raio: 40, int: 150, usaCor: 1, cor: '#ffd400' } }]);
+        c.k = { ['fx.' + gid + '.int']: [{ t: 0, v: 0, i: 'lin' }, { t: 2, v: 250, i: 'ease' }] };
+        const d = logo(4, 800, 600, [{ id: id(), t: 'mo_grao', on: true, v: { amt: 60, tam: 2, cor: 0, anim: 1 } }]);
+        const e = logo(5, 280, 950, [{ id: id(), t: 'mo_dir', on: true, v: { ang: 0, comp: 120 } }]);
+        const f = logo(6, 800, 950, [{ id: id(), t: 'mo_zoom', on: true, v: { amt: 30, cx: 50, cy: 50 } }]);
+        const g = logo(7, 540, 1300, [{ id: id(), t: 'mo_contorno', on: true, v: { cor: '#ffffff', larg: 14, op: 100 } }]);
+        const h = { tr: 8, st: 0, s: 0, e: 3, m: fm.id, fm: { t: 'est', w: 220, h: 220, cor: '#ffd400', cOn: false, cCor: '#fff', cLarg: 8, raio: 0, pontas: 5, raioInt: 45 },
+            p: { sc: 100, x: 100, y: 1650, rot: 0, op: 100 }, fx: [{ id: id(), t: 'mo_eco', on: true, v: { n: 6, dt: 0.05, dec: 55, frente: 0 } }] };
+        h.k = { x: [{ t: 0, v: 100, i: 'lin' }, { t: 3, v: 980, i: 'lin' }], rot: [{ t: 0, v: 0, i: 'lin' }, { t: 3, v: 360, i: 'lin' }] };
+        return [fundo, a, b, c, d, e, f, g, h];
+    """, ""),
+    # acabamento global: camada de ajuste com Brilho (mo_glow pelo ffmpeg, colorido e com intensidade > 100%) e
+    # aberração cromática leve no quadro inteiro, sobre foto + logo
+    "bloom": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const fundo = clip(0, 0, 0, 2, 'foto3.jpg', { p: { sc: 160, x: 540, y: 960, rot: 0, op: 100 } });
+        const logo = clip(1, 0, 0, 2, 'logo.png', { p: { sc: 80, x: 540, y: 900, rot: 0, op: 100 } });
+        let aj = VE.media.find(x => x.kind === 'ajuste');
+        if (!aj) { aj = { id: VE.media.length, kind: 'ajuste', name: 'Camada de ajuste' }; VE.media.push(aj); }
+        const adj = { tr: 2, st: 0, s: 0, e: 2, m: aj.id, fx: [{ id: id(), t: 'mo_glow', on: true, v: { lim: 55, raio: 30, int: 140, usaCor: 1, cor: '#ffb070' } },
+                                                           { id: id(), t: 'ca', on: true, v: { r: -1, g: 0, b: 1, raio: 0 } }] };
+        adj.p = veDefProps(adj);
+        return [fundo, logo, adj];
+    """, ""),
+    # Inverter e Preenchimento pelo ffmpeg (sem camada desenhada): num logo e numa camada de ajuste com mistura
+    "invfill": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const fundo = clip(0, 0, 0, 2, 'foto4.jpg', { p: { sc: 160, x: 540, y: 960, rot: 0, op: 100 } });
+        const a = clip(1, 0, 0, 2, 'logo.png', { p: { sc: 60, x: 300, y: 500, rot: 0, op: 100 }, fx: [{ id: id(), t: 'mo_fill', on: true, v: { cor: '#22c55e', op: 70 } }] });
+        const b = clip(2, 0, 0, 2, 'logo.png', { p: { sc: 60, x: 780, y: 500, rot: 0, op: 100 }, fx: [{ id: id(), t: 'mo_inv', on: true, v: { mix: 0 } }] });
+        let aj = VE.media.find(x => x.kind === 'ajuste');
+        if (!aj) { aj = { id: VE.media.length, kind: 'ajuste', name: 'Camada de ajuste' }; VE.media.push(aj); }
+        const adj = { tr: 3, st: 1, s: 0, e: 1, m: aj.id, fx: [{ id: id(), t: 'mo_inv', on: true, v: { mix: 30 } }] };
+        adj.p = veDefProps(adj);
+        return [fundo, a, b, adj];
+    """, ""),
     # 4K: base 4K + PiP (só com --4k)
     "4k": (2160, 3840, """
         const { clip } = __te;
@@ -532,6 +620,18 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
         if k < len(todos):
             pega(k)
             difs.append((float(np.abs(previa[k].astype(np.int16) - ex[k].astype(np.int16)).mean()), k))
+    if nome in ("motion", "curvas", "fxmotion", "bloom", "invfill"):
+        # motion: detalhes finos (anel, borda de máscara) quase não mexem na média: confere a pior região 30×30.
+        # Contra o quadro exato do ffmpeg (o navegador, buscando no meio do quadro, às vezes entrega o vizinho: um
+        # objeto rápido anda 30 px por quadro)
+        for k in ([k for k in amostra if k < len(todos)]):
+            d = np.abs(previa[k].astype(np.int16) - todos[k].astype(np.int16)).mean(axis=2)
+            loc = max(float(d[y:y + 30, x:x + 30].mean()) for y in range(0, CMP_H - 29, 15) for x in range(0, CMP_W - 29, 15))
+            if loc > 40:
+                res["ok"] = False
+                res["msgs"].append(f"região diferente da prévia no quadro {k} ({loc:.0f})")
+                cv2.imwrite(os.path.join(saida, f"{nome}_regiao_q{k}.png"), cv2.cvtColor(np.hstack([previa[k], todos[k]]), cv2.COLOR_RGB2BGR))
+                break
     difs.sort(reverse=True)
     pior = difs[0] if difs else (0.0, -1)
     res["pior"] = pior
@@ -545,6 +645,12 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
                            + ", ".join(f"q{k}={d:.0f}" for d, k in ruins[:8]))
     elif avisos:
         res["msgs"].append(f"aviso: {len(avisos)} quadro(s) entre {LIMITE_AVISO:g} e {LIMITE_RUIM:g} (pior q{avisos[0][1]}={avisos[0][0]:.1f})")
+    # --folha: prévia em cima, exportação embaixo, 8 quadros da amostra lado a lado (para olhar sem abrir o app)
+    if os.environ.get("TESTE_FOLHA") == "1" and ex:
+        ks = sorted(ex)[:: max(1, len(ex) // 8)][:8]
+        folha = np.vstack([np.hstack([previa[k] for k in ks]), np.hstack([ex[k] for k in ks])])
+        cv2.imwrite(os.path.join(saida, f"{nome}_folha.png"), cv2.cvtColor(folha, cv2.COLOR_RGB2BGR))
+        res["msgs"].append(f"folha: {os.path.join(saida, nome + '_folha.png')} (quadros {ks})")
     # 4. som
     if info.get("temSom"):
         da = _dur_audio(arq)
@@ -593,7 +699,10 @@ def main():
     ap.add_argument("--sem-abrir", action="store_true", help="usa o app já aberto em modo agente na porta")
     ap.add_argument("--placa", action="store_true", help="exporta com a placa de vídeo ligada (modo placa: Functions/export_placa.py)")
     ap.add_argument("--exe", default="", help="testar o exe gerado (ex.: dist/CaniveteDoPailer/CaniveteDoPailer.exe)")
+    ap.add_argument("--folha", action="store_true", help="grava <caso>_folha.png com 8 quadros (prévia em cima, exportação embaixo)")
     a = ap.parse_args()
+    if a.folha:
+        os.environ["TESTE_FOLHA"] = "1"
     base = os.path.join(os.environ.get("TEMP") or os.path.expanduser("~"), "canivete_teste_export")
     mat, saida = os.path.join(base, f"material{VERSAO_MATERIAL}"), os.path.join(base, "saida")
     os.makedirs(saida, exist_ok=True)

@@ -434,6 +434,12 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
 body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-select: none; }
 
 .ve-tl-wrap { position: relative; min-width: 0; overflow: hidden; cursor: default; }
+/* barra de rolagem vertical da timeline (editor.js veVBarSync): fina e discreta, acende ao passar o mouse */
+.ve-vbar { position: absolute; z-index: 6; width: 9px; border-radius: 5px; cursor: default; opacity: .5; transition: opacity .15s, background .15s; }
+.ve-vbar[hidden] { display: none; }
+.ve-vbar:hover, .ve-vbar.ativa { opacity: 1; background: rgba(255, 255, 255, .05); }
+.ve-vbar i { display: block; width: 5px; margin-left: 2px; border-radius: 3px; background: rgba(255, 255, 255, .32); transition: width .15s, margin .15s, background .15s; }
+.ve-vbar:hover i, .ve-vbar.ativa i { width: 7px; margin-left: 1px; background: rgba(212, 129, 74, .85); }
 .ve-tl-wrap.tool-razor { cursor: crosshair; }
 .ve-tl-wrap.tool-fwd { cursor: e-resize; }
 /* Pincel e Forma (editor-grafico.js): cursor no monitor e a caixa de opções no canto dele */

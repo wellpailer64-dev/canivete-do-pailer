@@ -26,7 +26,11 @@ const VEKL = {
     chave: '',
 };
 
-const veKlGrupo = g => VE_KL_GRUPOS.find(x => x.g === g);
+// grupos fixos (Movimento) e os das propriedades do motion ('fx.', 'mk.', 'fm.': editor-motion.js)
+const veKlGrupo = g => VE_KL_GRUPOS.find(x => x.g === g) || (typeof veMoGrupo === 'function' ? veMoGrupo(g) : null);
+const veKlTodos = c => VE_KL_GRUPOS.concat(typeof veMoGruposDe === 'function' && c ? veMoGruposDe(c) : []);
+// valor da propriedade na agulha (Movimento: veProps; motion: veMoValor)
+const veKlLer = (c, k) => k in VE_KF_NAMES ? veProps(c)[k] : typeof veMoValor === 'function' ? veMoValor(c, k) : 0;
 
 // Clipe cujas faixas aparecem (o selecionado, se tiver imagem) ou null
 function veKlClip() {
@@ -50,11 +54,11 @@ const veKlTemSel = () => VEKL.sel.length > 0 && !!veKlDono() && VEKL.selClip ===
 
 // Todos os grupos com ◆ no instante t (fonte) do clipe
 function veKlSelNoTempo(c, t) {
-    return VE_KL_GRUPOS.filter(G => G.keys.some(k => veKfOn(c, k) && veKfIndex(c.k[k], t) >= 0)).map(G => ({ g: G.g, t }));
+    return veKlTodos(c).filter(G => G.keys.some(k => veKfOn(c, k) && veKfIndex(c.k[k], t) >= 0)).map(G => ({ g: G.g, t }));
 }
 
 function veKlRows(c) {
-    return VE_KL_GRUPOS.filter(x => VEKL.grupos.has(x.g)).map(x => ({ id: 'K' + x.g, kind: 'k', g: x.g, h: VE_KL_H, tr: c.tr }));
+    return veKlTodos(c).filter(x => VEKL.grupos.has(x.g)).map(x => ({ id: 'K' + x.g, kind: 'k', g: x.g, h: VE_KL_H, tr: c.tr }));
 }
 
 function veKlAltura() { const c = veKlClip(); return c ? veKlRows(c).length * VE_KL_H : 0; }
@@ -93,7 +97,7 @@ function veKlHeadsHtml(tr) {
     if (!c || tr.kind !== 'v' || tr.id !== 'V' + (c.tr + 1)) return '';
     return veKlRows(c).map(r => {
         const G = veKlGrupo(r.g), anim = veKlAnimado(c, r.g);
-        const vals = G.keys.map(k => `<span class="ve-kl-val" data-klv="${k}" data-klg="${r.g}" title="Arraste para mudar · clique para digitar (Shift: 10x · Ctrl: fino)"></span>`).join('');
+        const vals = G.lista ? '' : G.keys.map(k => `<span class="ve-kl-val" data-klv="${k}" data-klg="${r.g}" title="Arraste para mudar · clique para digitar (Shift: 10x · Ctrl: fino)"></span>`).join('');
         return `
         <div class="ve-head ve-head-k${anim ? ' anim' : ''}" data-klg="${r.g}" style="height:${VE_KL_H}px">
             <div class="ve-kl-row">
@@ -118,13 +122,14 @@ function veKlFmt(v, G) {
 function veKlValores(c) {
     const box = $ve('ve-heads-rows');
     if (!box) return;
-    const p = veProps(c), tl = veKfTime(c), dentro = veInClip(c);
+    const tl = veKfTime(c), dentro = veInClip(c);
     box.querySelectorAll('.ve-head-k').forEach(h => {
         const g = h.dataset.klg, G = veKlGrupo(g);
+        if (!G) return;
         h.classList.toggle('anim', veKlAnimado(c, g));
         h.querySelectorAll('.ve-kl-val').forEach(el => {
             if (el.querySelector('input')) return;
-            const txt = veKlFmt(p[el.dataset.klv], G);
+            const txt = veKlFmt(veKlLer(c, el.dataset.klv), G);
             if (el.textContent !== txt) el.textContent = txt;
         });
         const naAgulha = dentro && G.keys.some(k => veKfOn(c, k) && veKfIndex(c.k[k], tl) >= 0);
@@ -149,6 +154,7 @@ function veKlDepois(leve) {
 function veKlCronometro(g) {
     const c = veKlClip();
     if (!veKlPodeEditar(c)) return;
+    if (!VE_KL_GRUPOS.some(x => x.g === g)) { veMoCronometro(c, g); return; }   // propriedade do motion (editor-motion.js)
     const G = veKlGrupo(g), p = veProps(c);
     vePushHistory();
     if (veKlAnimado(c, g)) {
@@ -173,7 +179,8 @@ function veKlPorTirar(g) {
     const c = veKlClip();
     if (!veKlPodeEditar(c)) return;
     if (!veInClip(c)) { veToast('Leve a agulha para dentro do clipe'); return; }
-    const G = veKlGrupo(g), p = veProps(c), t = veKfTime(c);
+    const G = veKlGrupo(g), p = { ...veProps(c) }, t = veKfTime(c);
+    G.keys.forEach(k => { if (!(k in p)) p[k] = veKlLer(c, k); });   // propriedades do motion
     const tem = G.keys.some(k => veKfOn(c, k) && veKfIndex(c.k[k], t) >= 0);
     vePushHistory();
     const k2 = { ...(c.k || {}) }, fixos = {};
@@ -185,9 +192,16 @@ function veKlPorTirar(g) {
         if (ks.length) k2[k] = ks; else { delete k2[k]; fixos[k] = p[k]; }
     });
     c.k = k2;
-    if (Object.keys(fixos).length) c.p = { ...veStaticProps(c), ...fixos };
+    veKlFixar(c, fixos);
     if (!veHasKf(c)) delete c.k;
     veKlDepois();
+}
+
+// Propriedades que ficaram sem quadro-chave guardam o valor fixo: as do Movimento em c.p, as do motion no lugar delas
+function veKlFixar(c, fixos) {
+    const mov = {};
+    Object.entries(fixos).forEach(([k, v]) => { if (k in VE_KF_NAMES || k === 'sx' || k === 'sy') mov[k] = v; else if (typeof veMoFixo === 'function') veMoFixo(c, k, v); });
+    if (Object.keys(mov).length) c.p = { ...veStaticProps(c), ...mov };
 }
 
 function veKlPular(g, dir) {
@@ -203,7 +217,8 @@ function veKlPular(g, dir) {
 
 // Valor digitado/arrastado no cabeçalho (na agulha: com animação vira ◆, sem ela muda fixo)
 function veKlValor(c, k, v) {
-    const lim = { sc: [0, 2000], op: [0, 100] }[k];
+    const G = !(k in VE_KF_NAMES) && typeof veMoGrupo === 'function' ? veMoGrupo(k) : null;
+    const lim = G ? [G.min, G.max] : { sc: [0, 2000], op: [0, 100] }[k];
     if (lim) v = Math.min(lim[1], Math.max(lim[0], v));
     veApplyProps(c, { [k]: Math.round(v * 100) / 100 });
 }
@@ -212,7 +227,8 @@ function veKlValor(c, k, v) {
 function veKlApagar() {
     const c = veKlAlvo();
     if (!VEKL.sel.length || !veKlPodeEditar(c)) return;
-    const p = veProps(c);
+    const p = { ...veProps(c) };
+    VEKL.sel.forEach(s => (veKlGrupo(s.g) || { keys: [] }).keys.forEach(k => { if (!(k in p)) p[k] = veKlLer(c, k); }));
     vePushHistory();
     const k2 = { ...(c.k || {}) }, fixos = {};
     VEKL.sel.forEach(s => veKlGrupo(s.g).keys.forEach(k => {
@@ -221,7 +237,7 @@ function veKlApagar() {
         if (!k2[k].length) { delete k2[k]; fixos[k] = p[k]; }
     }));
     c.k = k2;
-    if (Object.keys(fixos).length) c.p = { ...veStaticProps(c), ...fixos };
+    veKlFixar(c, fixos);
     if (!veHasKf(c)) delete c.k;
     const n = VEKL.sel.length;
     VEKL.sel = [];
@@ -275,7 +291,7 @@ function veKlColar() {
         const ks = (k2[key] || []).filter(x => Math.abs(x.t - t) >= tol).map(x => ({ ...x }));
         ks.push({ ...q, t });
         k2[key] = ks.sort((a, b) => a.t - b.t);
-        const G = VE_KL_GRUPOS.find(x => x.keys.includes(key));
+        const G = VE_KL_GRUPOS.find(x => x.keys.includes(key)) || veKlGrupo(key);
         if (G && !sel.some(s => s.g === G.g && Math.abs(s.t - t) < tol)) sel.push({ g: G.g, t });
         if (G) VEKL.grupos.add(G.g);
     });
@@ -319,7 +335,7 @@ function veKlEasy(modo = 'ambos') {
     let alvos = veKlTemSel() ? VEKL.sel.slice() : [];
     if (!alvos.length) {
         const t = veKfTime(c);
-        VE_KL_GRUPOS.forEach(G => { if (G.keys.some(k => veKfOn(c, k) && veKfIndex(c.k[k], t) >= 0)) alvos.push({ g: G.g, t }); });
+        veKlTodos(c).forEach(G => { if (G.keys.some(k => veKfOn(c, k) && veKfIndex(c.k[k], t) >= 0)) alvos.push({ g: G.g, t }); });
     }
     if (!alvos.length) { veToast('Selecione quadros-chave nas faixas (P, S, R, T) ou leve a agulha até um'); return; }
     if (!veKlPodeEditar(c)) return;
@@ -588,7 +604,7 @@ function veKlIniciar() {
         if (!c) return;
         e.preventDefault();
         const k = el.dataset.klv, G = veKlGrupo(el.dataset.klg);
-        const v0 = veProps(c)[k], x0 = e.clientX, win = el.ownerDocument.defaultView;
+        const v0 = veKlLer(c, k), x0 = e.clientX, win = el.ownerDocument.defaultView;
         let ativo = false;
         const move = ev => {
             const dx = ev.clientX - x0;
@@ -622,7 +638,7 @@ function veKlDigitar(el, c, k, G) {
     const inp = el.ownerDocument.createElement('input');
     inp.type = 'text';
     inp.className = 've-kl-input';
-    inp.value = String(Math.round(veProps(c)[k] * 100) / 100).replace('.', ',');
+    inp.value = String(Math.round(veKlLer(c, k) * 100) / 100).replace('.', ',');
     el.textContent = '';
     el.appendChild(inp);
     inp.focus();
@@ -633,7 +649,7 @@ function veKlDigitar(el, c, k, G) {
         feito = true;
         const v = parseFloat(String(inp.value).replace(',', '.'));
         inp.remove();
-        if (salvar && isFinite(v) && Math.abs(v - veProps(c)[k]) > 1e-6) {
+        if (salvar && isFinite(v) && Math.abs(v - veKlLer(c, k)) > 1e-6) {
             if (!veKlPodeEditar(c)) return;
             vePushHistory();
             veKlValor(c, k, v);
@@ -660,6 +676,7 @@ function veKlMenu(x, y, doc, temSel) {
         (temSel ? item('easy', 'Easy Ease', 'F9') + item('easyin', 'Easy Ease de entrada', 'Shift+F9') + item('easyout', 'Easy Ease de saída', 'Ctrl+Shift+F9') +
             '<div class="ve-ctx-sub">Interpolação</div>' +
             item('lin', 'Linear') + item('ease', 'Suave (Easy Ease)') + item('in', 'Acelerar') + item('out', 'Frear') + item('hold', 'Parar (degrau)') +
+            item('back', 'Passar e voltar (overshoot)') + item('elas', 'Elástico') + item('quica', 'Quicar') +
             '<div class="ve-ctx-sep"></div>' + item('copiar', 'Copiar', 'Ctrl+C') : '') +
         (VEKL.clip ? item('colar', 'Colar na agulha', 'Ctrl+V') : '') +
         (temSel ? item('dup', 'Duplicar na agulha') + '<div class="ve-ctx-sep"></div>' + item('del', 'Apagar', 'Del', 'perigo') : '');
@@ -673,7 +690,7 @@ function veKlMenu(x, y, doc, temSel) {
         if (a === 'easy') veKlEasy('ambos');
         else if (a === 'easyin') veKlEasy('in');
         else if (a === 'easyout') veKlEasy('out');
-        else if (['lin', 'ease', 'in', 'out', 'hold'].includes(a)) veKlInterp(a);
+        else if (['lin', 'ease', 'in', 'out', 'hold', 'back', 'elas', 'quica'].includes(a)) veKlInterp(a);
         else if (a === 'copiar') veKlCopiar();
         else if (a === 'colar') veKlColar();
         else if (a === 'dup') { const salvo = VEKL.clip; if (veKlCopiar()) veKlColar(); VEKL.clip = salvo; }
@@ -710,7 +727,7 @@ function veKlTecla(e) {
     e.preventDefault();
     if (letra[1] === 'U') {
         // U: todas as propriedades animadas (de novo: fecha)
-        const anim = VE_KL_GRUPOS.filter(x => veKlAnimado(c, x.g)).map(x => x.g);
+        const anim = veKlTodos(c).filter(x => veKlAnimado(c, x.g)).map(x => x.g);
         if (!anim.length) { veToast('Este clipe não tem quadros-chave (P, S, R ou T abrem uma propriedade)'); return true; }
         const iguais = anim.length === VEKL.grupos.size && anim.every(g => VEKL.grupos.has(g));
         VEKL.grupos = new Set(iguais ? [] : anim);

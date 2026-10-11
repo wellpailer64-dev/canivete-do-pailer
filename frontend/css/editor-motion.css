@@ -1,0 +1,28 @@
+/* Motion (editor-motion.js): camada mãe, fosco, desfoque de movimento, máscaras e cronômetro dos parâmetros */
+.ve-mo { display: flex; flex-direction: column; gap: 7px; }
+.ve-mo-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ve-dim); }
+.ve-mo-linha > label:first-child { min-width: 92px; }
+.ve-mo-linha select { flex: 1; min-width: 0; height: 22px; border: 1px solid var(--ve-line-2); border-radius: 3px;
+    background: var(--ve-bg); color: var(--ve-text); font: 11.5px var(--ve-ui); }
+.ve-mo-linha select:disabled { opacity: .45; }
+.ve-mo-botoes { gap: 4px; }
+.ve-mo-mk .ve-fxe-head select { height: 20px; max-width: 96px; border: 1px solid var(--ve-line-2); border-radius: 3px;
+    background: var(--ve-bg); color: var(--ve-text); font: 11px var(--ve-ui); }
+.ve-mo-mk.sel { border-color: #ffd400; box-shadow: inset 0 0 0 1px #ffd40066; }
+.ve-mo-inv { display: flex; align-items: center; gap: 3px; font-size: 11px; color: var(--ve-dim); cursor: pointer; }
+.ve-mo-cam small { color: var(--ve-faint); font-size: 10.5px; }
+.ve-mo-kfb { display: inline-flex; align-items: center; gap: 1px; margin-right: 4px; vertical-align: middle; }
+.ve-mo-sw, .ve-mo-kf {
+    display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 3px;
+    background: transparent; color: var(--ve-faint); cursor: pointer;
+}
+.ve-mo-sw:hover, .ve-mo-kf:hover { background: var(--ve-panel-2); color: var(--ve-text); }
+.ve-mo-sw svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+.ve-mo-sw.on { color: var(--ve-accent); }
+.ve-mo-kf { opacity: .4; }
+.ve-mo-sw.on + .ve-mo-kf { opacity: 1; }
+.ve-mo-kf i { width: 7px; height: 7px; transform: rotate(45deg); border: 1.5px solid currentColor; border-radius: 1px; }
+.ve-mo-kf.on { color: var(--ve-accent); }
+.ve-mo-kf.on i { background: currentColor; }
+#ve-screen.tool-mascara { cursor: crosshair; }
+.ve-mo-opcoes small { max-width: 360px; }

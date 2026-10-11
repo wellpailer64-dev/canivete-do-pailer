@@ -4,7 +4,7 @@ motor da prévia) e manda os PNGs em lotes pela caixa de envio do media_server; 
 o ffmpeg monta um .mov ProRes 4444 com alfa em <cache de render>/Cenas3D/<hash>.mov (hash do conteúdo da cena: serve a
 qualquer projeto e desfazer reaproveita, como as Comps). Lote em disco: 300 quadros 1080p não ficam na memória.
 """
-import os, shutil
+import os, shutil, time
 
 from Functions import media_server, render_cache
 from Functions.midia import rodar_ffmpeg
@@ -54,7 +54,15 @@ def fim(base, h, sessao, pasta, fps, n, on_progress=lambda p: None):
     shutil.rmtree(pasta, ignore_errors=True)
     if not ok:
         return {"success": False, "error": "o ffmpeg não montou o vídeo da cena 3D: " + " | ".join((erros or [])[-3:])}
-    os.replace(parte, final)
+    # o antivírus/indexador às vezes segura o arquivo recém-gravado por um instante: tenta de novo
+    for n in range(30):
+        try:
+            os.replace(parte, final)
+            break
+        except PermissionError:
+            if n == 29:
+                raise
+            time.sleep(0.25)
     return {"success": True, "path": final, "url": media_server.register(final)}
 
 

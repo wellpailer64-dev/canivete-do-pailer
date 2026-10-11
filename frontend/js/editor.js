@@ -2313,13 +2313,13 @@ function veDeckCarregar(x, mid, tag) {
 }
 const veDeckTag = x => (x === VEDK.b ? 'b' : null);
 // Clipe sem vídeo da fonte (sem som, duração livre): imagem, texto (editor-props.js) ou camada de ajuste
-function veIsImage(c) { const m = veMediaOf(c); return !!m && ['image', 'ajuste', 'texto', 'cor', 'forma', 'pincel'].includes(m.kind); }
+function veIsImage(c) { const m = veMediaOf(c); return !!m && ['image', 'ajuste', 'texto', 'cor', 'forma', 'pincel', 'nulo'].includes(m.kind); }
 // Camada de ajuste (como no Premiere): clipe transparente cujos efeitos valem para tudo o que está nas trilhas de
 // baixo durante o trecho dele; a opacidade dosa a força do efeito. Sem escala/posição/rotação.
 function veIsAdj(c) { const m = veMediaOf(c); return !!m && m.kind === 'ajuste'; }
 function veNomeClipe(c) {
     const k = veMediaOf(c) && veMediaOf(c).kind;
-    return veIsAudio(c) ? 'Áudio' : veIsAdj(c) ? ((typeof veOvtNome === 'function' && veOvtNome(c)) || 'Ajuste') : veIsTexto(c) ? 'Texto' : k === 'cor' ? 'Cor sólida' : k === 'forma' ? 'Forma' : k === 'pincel' ? 'Desenho' : veIsImage(c) ? 'Imagem' : 'Clipe';
+    return veIsAudio(c) ? 'Áudio' : veIsAdj(c) ? ((typeof veOvtNome === 'function' && veOvtNome(c)) || 'Ajuste') : veIsTexto(c) ? 'Texto' : k === 'cor' ? 'Cor sólida' : k === 'forma' ? 'Forma' : k === 'pincel' ? 'Desenho' : k === 'nulo' ? 'Nulo' : veIsImage(c) ? 'Imagem' : 'Clipe';
 }
 // Áudio solto na timeline (MP3, WAV...): só a linha A da trilha, sem imagem.
 // c.x = 'a': só o áudio de um vídeo (separado da imagem); c.x = 'v': só a imagem de um vídeo (sem som).
@@ -2369,9 +2369,22 @@ function veProps(c, T = VE.playhead) {
 // b = [x1, y1, x2, y2] (as duas alças; x = tempo, y = valor, de 0 a 1 no trecho).
 const VE_KF_PROPS = ['sc', 'x', 'y', 'rot', 'op'];
 const VE_KF_NAMES = { sc: 'Escala', x: 'Posição X', y: 'Posição Y', rot: 'Rotação', op: 'Opacidade' };
-const VE_KF_INTERP = { lin: 'Linear', ease: 'Suave', in: 'Acelerar', out: 'Frear', hold: 'Parar' };
+const VE_KF_INTERP = { lin: 'Linear', ease: 'Suave', in: 'Acelerar', out: 'Frear', hold: 'Parar', back: 'Passar e voltar', elas: 'Elástico', quica: 'Quicar' };
 // 'ease' = smoothstep (compatível com projetos antigos): é exatamente a Bézier (1/3, 0, 2/3, 1)
-const VE_KF_BEZ = { lin: [1 / 3, 1 / 3, 2 / 3, 2 / 3], ease: [1 / 3, 0, 2 / 3, 1], in: [0.42, 0, 1, 1], out: [0, 0, 0.58, 1] };
+// 'back' = sai rápido, passa ~10% do alvo e volta (overshoot, o "pop" do motion); é uma Bézier comum com a alça acima de 1
+const VE_KF_BEZ = { lin: [1 / 3, 1 / 3, 2 / 3, 2 / 3], ease: [1 / 3, 0, 2 / 3, 1], in: [0.42, 0, 1, 1], out: [0, 0, 0.58, 1], back: [0.34, 1.56, 0.64, 1] };
+// 'elas' (Elástico) e 'quica' (Quicar): oscilam/quicam até parar no valor (easings.net); a exportação faz a mesma conta
+// (video_cutter._ease_especial)
+const VE_KF_ESPECIAL = {
+    elas: u => u <= 0 ? 0 : u >= 1 ? 1 : Math.pow(2, -10 * u) * Math.sin((u * 10 - 0.75) * (2 * Math.PI / 3)) + 1,
+    quica: u => {
+        const n1 = 7.5625, d1 = 2.75;
+        if (u < 1 / d1) return n1 * u * u;
+        if (u < 2 / d1) return n1 * (u -= 1.5 / d1) * u + 0.75;
+        if (u < 2.5 / d1) return n1 * (u -= 2.25 / d1) * u + 0.9375;
+        return n1 * (u -= 2.625 / d1) * u + 0.984375;
+    },
+};
 
 function veKfCurve(q) { return q.i === 'bez' && Array.isArray(q.b) ? q.b : VE_KF_BEZ[q.i] || null; }
 
@@ -2396,6 +2409,7 @@ function veBezY(bz, u) {
 
 function veKfEase(q, u) {
     if (q.i === 'hold') return 0;
+    if (VE_KF_ESPECIAL[q.i]) return VE_KF_ESPECIAL[q.i](u);
     if (!q.i || q.i === 'lin') return u;
     const bz = veKfCurve(q);
     return bz ? veBezY(bz, u) : u;
@@ -2407,12 +2421,15 @@ function veKfValue(ks, t) {
     if (t >= ks[n].t) return ks[n].v;
     let j = 0;
     while (j < n - 1 && t >= ks[j + 1].t) j++;
-    const a = ks[j], b = ks[j + 1];
-    return a.v + (b.v - a.v) * veKfEase(a, (t - a.t) / (b.t - a.t));
+    const a = ks[j], b = ks[j + 1], u = veKfEase(a, (t - a.t) / (b.t - a.t));
+    // caminho de máscara (editor-motion.js): lista de números, ponto a ponto (mesma quantidade de vértices)
+    if (Array.isArray(a.v)) return Array.isArray(b.v) && a.v.length === b.v.length ? a.v.map((x, n) => x + (b.v[n] - x) * u) : (u < 1 ? a.v : b.v);
+    return a.v + (b.v - a.v) * u;
 }
 
 function veKfOn(c, k) { return !!(c && c.k && c.k[k] && c.k[k].length); }
-function veHasKf(c) { return !!c && (VE_KF_PROPS.some(k => veKfOn(c, k)) || veKfOn(c, 'sx') || veKfOn(c, 'sy')); }
+// qualquer propriedade animada: Movimento e as do motion (efeito 'fx.', máscara 'mk.', forma 'fm.': editor-motion.js)
+function veHasKf(c) { return !!(c && c.k) && Object.keys(c.k).some(k => veKfOn(c, k)); }
 
 // Tempo da fonte na agulha, preso ao trecho do clipe
 function veKfTime(c) {
@@ -2484,7 +2501,7 @@ function veKfAddRemove(k) {
 // Tempos (da sequência) dos quadros-chave do clipe dentro do trecho visível; k = uma propriedade ou todas
 function veKfSeqTimes(c, k) {
     const set = new Set();
-    (k ? [k] : VE_KF_PROPS).forEach(p => {
+    (k ? [k] : Object.keys(c.k || {})).forEach(p => {
         if (veKfOn(c, p)) c.k[p].forEach(q => { if (q.t >= c.s - 1e-4 && q.t <= c.e + 1e-4) set.add(Math.round(veTlAt(c, q.t) * 1e4) / 1e4); });
     });
     return [...set].sort((a, b) => a - b);
@@ -2508,7 +2525,7 @@ function veKfSetInterp(i, bz, silencioso) {
     const tl = veKfTime(c);
     if (!silencioso) vePushHistory();
     const k2 = { ...c.k };
-    VE_KF_PROPS.forEach(k => {
+    Object.keys(k2).forEach(k => {
         const j = veKfIndex(k2[k], tl);
         if (j < 0) return;
         k2[k] = k2[k].map(q => ({ ...q }));
@@ -2524,7 +2541,7 @@ function veKfSetInterp(i, bz, silencioso) {
 // Move os quadros-chave do instante t0 (fonte) para t1 (arrastar o ◆ na timeline)
 function veKfMove(c, t0, t1) {
     const k2 = { ...c.k };
-    VE_KF_PROPS.forEach(k => {
+    Object.keys(k2).forEach(k => {
         const ks = k2[k];
         const j = veKfIndex(ks, t0);
         if (j < 0) return;
@@ -2547,6 +2564,7 @@ function veIsDefaultProps(c) {
 function veMediaSize(c) {
     const m = veMediaOf(c);
     if (m && m.kind === 'image') return { w: m.w || 1, h: m.h || 1 };
+    if (m && m.kind === 'nulo') return { w: 100, h: 100 };   // Nulo (editor-motion.js): 100×100, âncora no canto como no AE
     if (m && m.kind === 'texto') return veTxTamanho(c);
     if (m && VE_GRAF.has(m.kind)) return veGrafTamanho(c);   // cor sólida, forma, desenho (editor-grafico.js)
     if (m && m.kind === 'video' && m.id && m.info && m.info.width) return { w: m.info.width, h: m.info.height };
@@ -3313,9 +3331,12 @@ function veDrawPreparando(ctx, w, h, m, srcT) {
 // Desenha as camadas (de baixo para cima) no ctx já em coordenadas do quadro (escala pv). itens = [{c, src}]:
 // src = imagem/vídeo/canvas, 'ajuste', 'offline', 'preparando' (vídeo sem prévia ainda) ou 'comp' (Comp sem nada
 // para mostrar ainda)
-function veDesenharItens(ctx, cv, itens, pv, t) {
+// semFoscos: desenha também as camadas usadas como fosco de trilha (o motion desenha o fosco por aqui)
+function veDesenharItens(ctx, cv, itens, pv, t, semFoscos) {
+    const foscos = !semFoscos && typeof veMoFoscos === 'function' ? veMoFoscos() : null;   // editor-motion.js
     itens.forEach(({ c, src }) => {
-            if (!src) return;
+            if (!src || src === 'nulo') return;   // nulo: só controla as filhas (editor-motion.js)
+            if (foscos && c.uid && foscos.has(c.uid)) return;   // camada usada como fosco de trilha não aparece (como no AE)
             if (src === 'ajuste') { veAdjDraw(ctx, cv, c, pv, t); return; }
             if (src === 'comp') { veCompDesenharPendente(ctx, VE.seqW, VE.seqH, veMediaOf(c)); return; }
             if (src === 'preparando') {
@@ -3329,13 +3350,15 @@ function veDesenharItens(ctx, cv, itens, pv, t) {
                 ctx.restore();
                 return;
             }
+            // máscaras, fosco de trilha, camada mãe, desfoque de movimento (editor-motion.js)
+            if (typeof veMoPrecisa === 'function' && veMoPrecisa(c)) { veMoDesenhar(ctx, cv, c, src, pv, t, itens); return; }
             const p = veCaAplicar(c, veProps(c), t), sz = veMediaSize(c);   // + Rotação/Tremer/Pulsar em loop
             // texto animado vem com margem em volta (letras que saem da caixa): desenha maior, mesmo centro
             const pd = src && src._pad || 0, szd = pd ? { w: sz.w + 2 * pd, h: sz.h + 2 * pd } : sz;
-            if (src !== 'offline') src = veFxRender(c, src, szd, pv * p.sc / 100);   // efeitos rodam antes do movimento (como no Premiere)
+            if (src !== 'offline') src = veFxRender(c, src, szd, pv * p.sc / 100, t);   // efeitos rodam antes do movimento (como no Premiere)
             ctx.save();
             ctx.globalAlpha = Math.max(0, Math.min(1, p.op / 100));
-            if (src !== 'offline' && typeof veSombraDe === 'function') veSombraAplicar(ctx, veSombraDe(c), pv);   // Sombra projetada
+            if (src !== 'offline' && typeof veSombraDe === 'function') veSombraAplicar(ctx, veSombraDe(c, t), pv);   // Sombra projetada
             const gco = src !== 'offline' && veBmGco(c);   // modo de mesclagem (Tela, Multiplicação...)
             if (gco) ctx.globalCompositeOperation = gco;
             ctx.translate(p.x, p.y);
@@ -3346,7 +3369,10 @@ function veDesenharItens(ctx, cv, itens, pv, t) {
             if (src === 'offline') {
                 ctx.translate(-ax, -ay);
                 veDrawOfflineMedia(ctx, sz.w, sz.h, vePjNome(veMediaOf(c)));
-            } else ctx.drawImage(src, -ax - pd, -ay - pd, szd.w, szd.h);
+            } else {
+                const mm = src._mais || 0;   // margem que os efeitos abriram em volta (brilho, contorno...)
+                ctx.drawImage(src, -ax - pd - mm, -ay - pd - mm, szd.w + 2 * mm, szd.h + 2 * mm);
+            }
             ctx.restore();
         });
 }
@@ -3422,7 +3448,8 @@ function veDrawMonitor() {
             src = veGrafDesenho(c);   // cor sólida, forma, desenho do pincel (editor-grafico.js)
         } else if (veIsImage(c)) {
             const m = veMediaOf(c);
-            if (m.img && m.img.complete && m.w) src = m.img;
+            if (m.kind === 'nulo') src = 'nulo';   // não desenha nada (editor-motion.js)
+            else if (m.img && m.img.complete && m.w) src = m.img;
         } else if (i === VE.cur && t >= VE.clips[i].st - VE_EPS && t < veEnd(VE.clips[i]) - VE_EPS) {
             // o player ativo (dá o som e o relógio); se ele estiver buscando, vale o quadro que a reserva
             // deixou esperando (vePreloadNext)
@@ -3809,16 +3836,24 @@ function veExportPlanClips() {
     const audio = veFlattenWith(isVid, c => veMudo(c));
     // camadas: imagens e vídeos transformados; um vídeo "normal" acima de alguma camada também
     // precisa entrar (senão a camada apareceria por cima dele)
-    const overlays = VE.clips.filter(c => !veIsAudio(c) && !veOculto(c) && (veIsImage(c) || !liso(c)));
+    // nulo e camada usada como fosco de trilha não saem (o fosco já vai dentro da camada desenhada: editor-motion.js)
+    const fora = typeof veMoFora === 'function' ? veMoFora : () => false;
+    const overlays = VE.clips.filter(c => !veIsAudio(c) && !veOculto(c) && !fora(c) && (veIsImage(c) || !liso(c)));
     const cobre = c => isVid(c) && liso(c) &&
         overlays.some(o => o.tr < c.tr && o.st < veEnd(c) - VE_EPS && veEnd(o) > c.st + VE_EPS);
     const camadas = VE.clips
         .filter(c => overlays.includes(c) || cobre(c))
         .sort((a, b) => a.tr - b.tr || (a._z || 0) - (b._z || 0) || a.st - b.st)
         .map(c => {
-            const p = veStaticProps(c), m = veMediaOf(c);
+            const p = veStaticProps(c), m = veMediaOf(c), pk = VE._txPng && VE._txPng.get(c._o || c);
+            // camada desenhada pelo motion (máscara, fosco, camada mãe, efeito animado...): vídeo do quadro inteiro, pronto
+            if (pk && pk.mov) {
+                const o = c._o || c, s = Math.max(0, (c.s - o.s) / veVel(c));
+                return { _c: c, tipo: 'video', path: pk.mov, seq: null, st: c.st, s, e: s + veLen(c), sc: 100, x: VE.seqW / 2, y: VE.seqH / 2,
+                         rot: 0, op: 100, kf: {}, fx: [], ca: [], mw: VE.seqW, mh: VE.seqH, v: 1, bm: veBmAtivo(c) ? c.bm : null, ox: 0, oy: 0 };
+            }
             // texto: PNG desenhado f vezes maior (nítido na maior escala dele); a escala desconta isso
-            const png = veIsTexto(c) || veEhGrafico(c) ? (VE._txPng && VE._txPng.get(c._o || c)) : null, f = png ? png.f : 1;
+            const png = veIsTexto(c) || veEhGrafico(c) ? pk : null, f = png ? png.f : 1;
             // quadros-chave em tempo da camada (0 = início do clipe na timeline)
             const kf = {};
             VE_KF_PROPS.forEach(k => { if (veKfOn(c, k)) kf[k] = c.k[k].map(q => [(q.t - c.s) / veVel(c), k === 'sc' ? q.v / f : q.v, q.i || 'lin', veKfCurve(q)]); });
@@ -4191,7 +4226,7 @@ function veProjectData() {
     return {
         app: 'KANIVETE',
         video: VE.path,
-        media: VE.media.filter(m => m.id && !m.removido && ['image', 'ajuste', 'audio', 'texto', 'legenda', 'video', 'timeline', 'cor', 'forma', 'pincel'].includes(m.kind)
+        media: VE.media.filter(m => m.id && !m.removido && ['image', 'ajuste', 'audio', 'texto', 'legenda', 'video', 'timeline', 'cor', 'forma', 'pincel', 'nulo'].includes(m.kind)
                 && (m.ovDe == null || veMidiaNaTimeline(m.id)))   // variação de Comp que nenhuma faixa usa não vai
             .map(m => {
                 const o = { id: m.id, kind: m.kind, name: m.name, pasta: m.pasta || null, cor: m.cor, nome: m.nome };
@@ -4461,8 +4496,8 @@ function veApplyProject() {
             } else veMidiaPreparar(nm, mediaDur.has(m.id));   // os da timeline primeiro
             return;
         }
-        if (m.kind === 'ajuste' || m.kind === 'texto' || m.kind === 'forma' || m.kind === 'pincel' || m.kind === 'cor') {
-            const nm = { id: VE.media.length, kind: m.kind, name: m.name || { texto: 'Texto', forma: 'Forma', pincel: 'Desenho', cor: 'Cor sólida' }[m.kind] || 'Camada de ajuste', ...org };
+        if (m.kind === 'ajuste' || m.kind === 'texto' || m.kind === 'forma' || m.kind === 'pincel' || m.kind === 'cor' || m.kind === 'nulo') {
+            const nm = { id: VE.media.length, kind: m.kind, name: m.name || { texto: 'Texto', forma: 'Forma', pincel: 'Desenho', cor: 'Cor sólida', nulo: 'Nulo' }[m.kind] || 'Camada de ajuste', ...org };
             if (m.kind === 'cor') nm.fill = m.fill || '#000000';
             VE.media.push(nm);
             ids[m.id] = nm.id;
@@ -4760,6 +4795,58 @@ function veSyncHeads() {
     if (box) box.style.transform = `translateY(${-VE.vs}px)`;
     const f = $ve('ve-head-folga'), h = veFolgaTopo() + 'px';
     if (f && f.style.height !== h) f.style.height = h;
+    veVBarSync();
+}
+
+// Barra de rolagem vertical discreta na direita da timeline: só aparece quando as trilhas não cabem. Arrastar o
+// cursor rola; clicar no trilho leva o cursor até lá; roda do mouse em cima dela também rola. Fica FORA da área da
+// timeline (no pai dela), para não disputar o clique com clipes e quadros-chave.
+function veVBarSync() {
+    const wrap = $ve('ve-tl-wrap');
+    if (!wrap || !wrap.parentElement) return;
+    const pai = wrap.parentElement, doc = wrap.ownerDocument;
+    let bar = pai.querySelector(':scope > .ve-vbar');
+    if (!bar) {
+        if (doc.defaultView.getComputedStyle(pai).position === 'static') pai.style.position = 'relative';
+        bar = doc.createElement('div');
+        bar.className = 've-vbar';
+        bar.innerHTML = '<i></i>';
+        pai.appendChild(bar);
+        bar.addEventListener('pointerdown', veVBarPointer);
+        bar.addEventListener('wheel', e => { e.preventDefault(); VE.vs += e.deltaY; veDraw(); }, { passive: false });
+    }
+    const vis = Math.max(1, veCanvasHeight() - VE_RULER), tot = veTracksHeight(), max = Math.max(0, tot - vis);
+    const some = max < 1 || !VE.ready;
+    if (bar.hidden !== some) bar.hidden = some;
+    if (some) return;
+    bar.style.left = (wrap.offsetLeft + wrap.clientWidth - 11) + 'px';
+    bar.style.top = (wrap.offsetTop + VE_RULER + 2) + 'px';
+    bar.style.height = Math.max(20, vis - 4) + 'px';
+    const H = Math.max(20, vis - 4), th = Math.max(26, H * vis / tot), y = (H - th) * Math.min(1, Math.max(0, VE.vs / max));
+    const i = bar.firstChild;
+    i.style.height = th + 'px';
+    i.style.transform = `translateY(${y}px)`;
+}
+
+function veVBarPointer(e) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const bar = e.currentTarget, i = bar.firstChild, win = bar.ownerDocument.defaultView;
+    const vis = Math.max(1, veCanvasHeight() - VE_RULER), tot = veTracksHeight(), max = Math.max(0, tot - vis);
+    const H = bar.clientHeight, th = i.offsetHeight, curso = Math.max(1, H - th);
+    const r = bar.getBoundingClientRect();
+    if (e.target !== i) {   // clique no trilho: o cursor centraliza no ponto
+        VE.vs = (e.clientY - r.top - th / 2) / curso * max;
+        veClampVScroll();
+        veDraw();
+    }
+    const y0 = e.clientY, vs0 = VE.vs;
+    bar.classList.add('ativa');
+    const move = ev => { VE.vs = vs0 + (ev.clientY - y0) / curso * max; veClampVScroll(); veDraw(); };
+    const up = () => { win.removeEventListener('pointermove', move); win.removeEventListener('pointerup', up); bar.classList.remove('ativa'); };
+    win.addEventListener('pointermove', move);
+    win.addEventListener('pointerup', up);
 }
 
 // Espaço entre a linha LEG e a trilha de vídeo mais alta (como no Premiere): com poucas trilhas, as de vídeo
@@ -5518,7 +5605,9 @@ function veSetTool(tool) {
     wrap.classList.toggle('tool-bwd', tool === 'bwd');
     $ve('ve-screen').classList.toggle('tool-pincel', tool === 'pincel');
     $ve('ve-screen').classList.toggle('tool-forma', tool === 'forma');
+    $ve('ve-screen').classList.toggle('tool-mascara', tool === 'mascara' || tool === 'caneta');
     if (typeof veGrOpcoes === 'function') veGrOpcoes();   // opções do Pincel / Forma no monitor
+    if (typeof veMoOpcoes === 'function') veMoOpcoes();   // opções da Máscara / Caneta (editor-motion.js)
     $ve('ve-screen').classList.toggle('tool-texto', tool === 'texto');
     if (tool !== 'texto') veTxEditarFim();
     veDraw();
@@ -5884,7 +5973,7 @@ async function veStartExport() {
         if (typeof ve3dProntas === 'function') await ve3dProntas(msg => { $ve('ve-exp-msg').textContent = msg; });
         // transições de sobreposição: o trecho de cada uma renderizado das trilhas de baixo (editor-ovt.js)
         if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg => { $ve('ve-exp-msg').textContent = msg; });
-        if (VE.clips.some(c => veIsTexto(c) || veEhGrafico(c))) await veTxPngs();   // textos e gráficos viram PNG
+        if (VE.clips.some(veTxPrecisa)) await veTxPngs();   // textos e gráficos viram PNG; camadas do motion, vídeo
         const plano = veExportPlan(true), master = veMasterLim();
         const mix = master ? [...plano.mix, { master }] : plano.mix;
         await window.pywebview.api.video_cutter_export(
@@ -6573,6 +6662,7 @@ function veOnKey(e) {
     if (!$ve('ve-master').hidden) return;
     if (VEAT.aberto) return;               // janela Atalhos do teclado aberta (ela grava as teclas)
     // P/S/R/T/U com clipe selecionado, Delete/Ctrl+C/Ctrl+V com quadros-chave selecionados (editor-keyframes.js)
+    if (typeof veMoTecla === 'function' && veMoTecla(e)) return;   // Enter/Esc da Caneta (editor-motion.js)
     if (typeof veKlTecla === 'function' && veKlTecla(e)) return;
     // as teclas de cada ação (padrão ou as do usuário) ficam em editor-comandos.js
     veExecTecla(e);

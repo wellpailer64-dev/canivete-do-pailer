@@ -1640,6 +1640,30 @@ def _bez_y(bz, u):
 
 
 _KF_AMOSTRAS = 24   # curva vira trechos retos no ffmpeg (a expressão não tem laço para resolver a Bézier)
+_KF_AMOSTRAS_ESP = 60   # elástico/quicar oscilam: mais trechos
+
+
+def _ease_especial(ia, u):
+    """Elástico ('elas') e Quicar ('quica') — iguais a VE_KF_ESPECIAL da prévia (editor.js). None = não é especial."""
+    if ia == "elas":
+        if u <= 0:
+            return 0.0
+        if u >= 1:
+            return 1.0
+        return 2 ** (-10 * u) * math.sin((u * 10 - 0.75) * (2 * math.pi / 3)) + 1
+    if ia == "quica":
+        n1, d1 = 7.5625, 2.75
+        if u < 1 / d1:
+            return n1 * u * u
+        if u < 2 / d1:
+            u -= 1.5 / d1
+            return n1 * u * u + 0.75
+        if u < 2.5 / d1:
+            u -= 2.25 / d1
+            return n1 * u * u + 0.9375
+        u -= 2.625 / d1
+        return n1 * u * u + 0.984375
+    return None
 
 
 def _expr_kf(pts, tv):
@@ -1656,6 +1680,13 @@ def _expr_kf(pts, tv):
         d = tb - ta
         if d < 1e-6 or ia == "hold" or abs(vb - va) < 1e-9:
             trechos.append((ta, f(va)))
+        elif ia in ("elas", "quica"):
+            n = _KF_AMOSTRAS_ESP
+            ys = [_ease_especial(ia, i / n) for i in range(n + 1)]
+            for i in range(n):
+                t0, t1 = ta + d * i / n, ta + d * (i + 1) / n
+                v0, v1 = va + (vb - va) * ys[i], va + (vb - va) * ys[i + 1]
+                trechos.append((t0, f"({f(v0)}+{f(v1 - v0)}*({tv}-{t0:.5f})/{t1 - t0:.5f})"))
         elif ia in ("lin", "ease") or bz is None:
             u = f"clip(({tv}-{ta:.4f})/{d:.4f},0,1)"
             curva = f"{u}*{u}*(3-2*{u})" if ia == "ease" else u
@@ -1693,6 +1724,11 @@ def _valor_kf(pts, t):
         if d < 1e-6 or ia == "hold" or abs(vb - va) < 1e-9:
             return va
         u = min(1.0, max(0.0, (t - ta) / d))
+        if ia in ("elas", "quica"):
+            n = _KF_AMOSTRAS_ESP
+            i = min(n - 1, int(u * n))
+            y0, y1 = _ease_especial(ia, i / n), _ease_especial(ia, (i + 1) / n)
+            return va + (vb - va) * (y0 + (y1 - y0) * (u * n - i))
         if ia in ("lin", "ease") or bz is None:
             return va + (vb - va) * (u * u * (3 - 2 * u) if ia == "ease" else u)
         n = _KF_AMOSTRAS
@@ -2576,6 +2612,40 @@ def _filtros_fx(fx, mw, mh, tag="x"):
                     cadeia.append(f"gblur=sigma={suave:.3f}:planes=8")
                 cadeia.append("format=rgba")
             out.append(",".join(cadeia))
+        elif t == "mo_fill":
+            # Preenchimento (editor-motion.js "mo_fill"): a cor por cima, na opacidade, só onde a camada existe (alfa fica)
+            cor = str(v.get("cor") or "#D4814A")
+            o = _num(v.get("op"), 0, 100) / 100.0
+            if o > 0.001 and re.match(r"^#[0-9a-fA-F]{6}$", cor):
+                cr, cg, cb = (int(cor[i:i + 2], 16) for i in (1, 3, 5))
+                out.append(f"format=rgba,lutrgb=r='val*{1 - o:.5f}+{cr * o:.4f}':g='val*{1 - o:.5f}+{cg * o:.4f}':b='val*{1 - o:.5f}+{cb * o:.4f}'")
+        elif t == "mo_inv":
+            # Inverter (editor-motion.js "mo_inv"): 255 − cor, o alfa fica; mistura = quanto do original volta
+            m = _num(v.get("mix"), 0, 100) / 100.0
+            if m < 0.999:
+                e = f"(255-val)*{1 - m:.5f}+val*{m:.5f}"
+                out.append(f"format=rgba,lutrgb=r='{e}':g='{e}':b='{e}'")
+        elif t == "mo_glow" and tag.startswith("a"):
+            # Brilho (editor-motion.js "mo_glow") numa camada de ajuste: o que passa do limite (canal a canal), desfocado
+            # (sigma = raio/2) e somado ao quadro — a mesma conta da prévia
+            lim = _num(v.get("lim"), 0, 100) / 100.0 * 255
+            raio, inten = _num(v.get("raio"), 0, 500), _num(v.get("int"), 0, 400) / 100.0
+            if raio > 0.01 and inten > 0.001:
+                r = f"{tag}f{j}g"
+                k = 255.0 / max(1.0, 255.0 - lim)
+                ex = f"clip((val-{lim:.3f})*{k:.5f},0,255)"
+                cadeia = f"lutrgb=r='{ex}':g='{ex}':b='{ex}'"
+                cor = str(v.get("cor") or "#ffffff")
+                if v.get("usaCor") and re.match(r"^#[0-9a-fA-F]{6}$", cor):
+                    cr, cg, cb = (int(cor[i:i + 2], 16) / 255.0 for i in (1, 3, 5))
+                    w3 = (0.2126, 0.7152, 0.0722)
+                    cadeia += ",colorchannelmixer=" + ":".join(f"{a}{b}={c * wv:.5f}" for a, c in (("r", cr), ("g", cg), ("b", cb))
+                                                                for b, wv in zip("rgb", w3))
+                cadeia += f",gblur=sigma={raio / 2.0:.3f}:steps=3"
+                if abs(inten - 1) > 1e-3:
+                    cadeia += f",colorchannelmixer=rr={inten:.4f}:gg={inten:.4f}:bb={inten:.4f}"
+                out.append(f"format=gbrp,split[{r}a][{r}b];[{r}b]{cadeia},format=gbrp[{r}c];"
+                           f"[{r}a][{r}c]blend=all_mode=addition,format=rgba")
         elif t == "crop":
             l, tp, r, bt = (_num(v.get(k), 0, 100) / 100.0 for k in ("l", "t", "r", "b"))
             # a área cortada fica transparente (a camada de baixo aparece), sem mudar o tamanho

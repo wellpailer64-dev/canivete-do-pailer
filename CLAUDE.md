@@ -111,6 +111,13 @@ Volta para o Premiere: XML do FCP7 (`Functions/premiere_xml.py`, Arquivo › Exp
 **AJUSTE PREMIERE** (próxima rodada: clipes trocados/fora do tempo, camadas de ajuste, transições de sobreposição,
 textos): plano em `Instructions/agente/ajuste-premiere.md`.
 
+## Motion (recursos do After Effects no Editor)
+Máscaras (ferramentas Máscara/Caneta), fosco de trilha, camada mãe + Nulo, desfoque de movimento, cronômetro em qualquer
+parâmetro de efeito/máscara/forma, aparar caminho/tracejado/estrela, curvas Passar e voltar/Elástico/Quicar, efeitos Brilho,
+Granulação, Rampa, Preenchimento, Contorno, Desfoque direcional/radial, Eco. Exporta como "camada desenhada" (ProRes 4444
+pelo desenhista da prévia). Guia, API `VEMO_API`, armadilhas e pendências: `Instructions/agente/plano-motion.md`.
+Testes: `py -3.13 testes/teste_motion.py` e `py -3.13 testes/teste_export.py --casos motion,fxmotion,curvas --folha`.
+
 ## Comp (estilo After Effects)
 Plano, modelo e limitações em `Instructions/agente/plano-comp.md`; código em `frontend/js/editor-comp.js`.
 Plano completo (Fases 1–3 + Propriedades essenciais por faixa).

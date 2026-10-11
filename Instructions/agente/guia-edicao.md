@@ -119,6 +119,10 @@ cobertura, texto, ajuste, som) e a fala transcrita embaixo. 1ª vez ~4 min (extr
 Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lugar de prints do monitor).
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-10-10 MOTION / PROPAGANDA (ref. Pinterest → propaganda KANIVETE, "FICOU PERFEITO"): receita inteira em
+  Instructions/agente/plano-motion.md § "Receita validada". Notas do Pailer: OmniVoice lê palavra com cara de inglês
+  em inglês ("finalize" → "finalaize": usar palavra 100% PT, ex. "finaliza"); faltou trilha energética (ele manda a
+  dele); quer glow + aberração leve de acabamento e a vinheta do app (frontend/audio/splash.wav) no fim, depois da voz.
 - 2026-10-09 DOCUMENTÁRIO (Linha 4/SIIM, v4→v6; roteiro D:\kanivete_testes\edgar\ROTEIRO_v4_reuniao_gil.md). regras:
   · revelação em camadas: o personagem não aparece antes da hora (massa sonora = rua/metrô SEM ele); revela por
     detalhe → rosto de frente (GC) → mais perto; a pergunta (cartela) vem ANTES do 1º plano dele; a resposta começa

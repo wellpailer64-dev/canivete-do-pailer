@@ -60,7 +60,7 @@ async function veFilaAdicionarAgora(nome, cfg) {
     if (typeof veCompProntas === 'function') await veCompProntas(msg);
     if (typeof ve3dProntas === 'function') await ve3dProntas(msg);
     if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg);
-    if (VE.clips.some(c => veIsTexto(c) || veEhGrafico(c))) await veTxPngs();
+    if (VE.clips.some(veTxPrecisa)) await veTxPngs();
     const plano = veExportPlan(true), master = veMasterLim(), mix = master ? [...plano.mix, { master }] : plano.mix;
     const c = cfg ? JSON.parse(JSON.stringify(cfg)) : veFilaCfgLer();
     c.nome = nome || c.nome || veFilaNomeTimeline();

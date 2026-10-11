@@ -38,11 +38,29 @@ function veTfVisivel(c, t = VE.playhead) {
 }
 
 // Objeto de cima sob o ponto do quadro (-1 = nenhum); filtro opcional
+// Camada mãe (editor-motion.js): as contas da transformação acontecem no espaço da mãe. Ponto do quadro → espaço da
+// mãe, espaço da mãe → quadro, e quantos px da mãe valem 1 px do quadro
+function veTfPaiPt(c, pt) {
+    if (!c || !c.pai || typeof veMoPaiMatriz !== 'function') return pt;
+    const q = veMoPaiMatriz(c, VE.playhead).inverse().transformPoint({ x: pt.x, y: pt.y });
+    return { x: q.x, y: q.y };
+}
+function veTfPaiQuadro(c, pt) {
+    if (!c || !c.pai || typeof veMoPaiMatriz !== 'function') return pt;
+    const q = veMoPaiMatriz(c, VE.playhead).transformPoint({ x: pt.x, y: pt.y });
+    return { x: q.x, y: q.y };
+}
+function veTfPaiEscala(c) {
+    if (!c || !c.pai || typeof veMoPaiMatriz !== 'function') return 1;
+    const m = veMoPaiMatriz(c, VE.playhead);
+    return Math.max(1e-6, Math.hypot(m.a, m.b));
+}
+
 function veTfClipeEm(pt, filtro) {
     const vis = VE.clips.map((c, i) => ({ c, i })).filter(({ c }) => veTfVisivel(c) && (!filtro || filtro(c)))
         .sort((a, b) => b.c.tr - a.c.tr);
     for (const { c, i } of vis) {
-        const sz = veMediaSize(c), l = veTfLocal(c, veProps(c), pt.x, pt.y, sz);
+        const q = veTfPaiPt(c, pt), sz = veMediaSize(c), l = veTfLocal(c, veProps(c), q.x, q.y, sz);
         if (l.x >= 0 && l.y >= 0 && l.x <= sz.w && l.y <= sz.h) return i;
     }
     return -1;
@@ -108,7 +126,8 @@ function veTfCropPorAlca(c, d, pt, sz) {
 function veTfAlvo(pt, q) {
     const c = VE.clips[VE.sel];
     if (!veTfVisivel(c) || veLocked(c)) return null;
-    const p = veProps(c), sz = veMediaSize(c), px = 1 / q.s;   // 1 px de tela em px do quadro
+    pt = veTfPaiPt(c, pt);
+    const p = veProps(c), sz = veMediaSize(c), px = 1 / q.s / veTfPaiEscala(c);   // 1 px de tela em px do quadro (da mãe)
     if (Math.hypot(pt.x - p.x, pt.y - p.y) <= 9 * px) return { tipo: 'anc' };
     for (const [u, v, nome] of VE_TF_PONTOS) {
         const m = veTfPontoLocal(c, sz, u, v), a = veTfQuadro(c, p, m.x, m.y, sz);
@@ -138,12 +157,13 @@ function veTfCursor(alvo, c) {
 // ── desenho: caixa, alças e ponto de ancoragem do selecionado (em px do canvas) ──
 function veTfDesenhar(ctx, cv, pv) {
     if (typeof veScCaptura === 'function') veScCaptura(cv);   // escopos: o quadro antes das alças
+    if (typeof veMoOverlay === 'function') veMoOverlay(ctx, pv);   // máscaras e caneta (editor-motion.js)
     const c = VE.clips[VE.sel];
     if (!veTfVisivel(c) || (VEPP.edit && VEPP.edit.c === c)) return;
     const p = veProps(c), sz = veMediaSize(c);
     const q = veTxQuadroTela(), tela = pv / q.s;   // px do canvas por px de tela
     const P = (u, v) => {
-        const m = veTfPontoLocal(c, sz, u, v), a = veTfQuadro(c, p, m.x, m.y, sz);
+        const m = veTfPontoLocal(c, sz, u, v), a = veTfPaiQuadro(c, veTfQuadro(c, p, m.x, m.y, sz));
         return [a.x * pv, a.y * pv];
     };
     ctx.save();
@@ -163,7 +183,7 @@ function veTfDesenhar(ctx, cv, pv) {
             ctx.strokeRect(x - h, y - h, h * 2, h * 2);
         });
         // ponto de ancoragem: círculo com cruz (como no Premiere)
-        const ax = p.x * pv, ay = p.y * pv, r = 7 * tela;
+        const pa = veTfPaiQuadro(c, p), ax = pa.x * pv, ay = pa.y * pv, r = 7 * tela;
         ctx.lineWidth = 3 * tela;
         ctx.strokeStyle = 'rgba(0,0,0,0.6)';
         ctx.beginPath(); ctx.arc(ax, ay, r, 0, Math.PI * 2); ctx.moveTo(ax - r * 1.6, ay); ctx.lineTo(ax + r * 1.6, ay); ctx.moveTo(ax, ay - r * 1.6); ctx.lineTo(ax, ay + r * 1.6); ctx.stroke();
@@ -213,7 +233,7 @@ function veTfIniciar() {
         const sz = veMediaSize(c);
         const crop = alvo.tipo === 'alca' && e.altKey && !veIsAdj(c);
         const alca0 = alvo.tipo === 'alca' ? veTfPontoLocal(c, sz, alvo.u, alvo.v) : null;
-        VETF.drag = { ...alvo, i, x0: e.clientX, y0: e.clientY, pt0: pt, p0: { ...p }, hist: false, ativo: false, fm0: c.fm ? { ...c.fm } : null,
+        VETF.drag = { ...alvo, i, x0: e.clientX, y0: e.clientY, pt0: veTfPaiPt(c, pt), p0: { ...p }, hist: false, ativo: false, fm0: c.fm ? { ...c.fm } : null,
                       crop, crop0: crop ? veTfCropBase(c) : null, loc0: crop ? alca0 : null, alca0,
                       clonar: e.altKey && alvo.tipo === 'mover', id: e.pointerId };
         scr.setPointerCapture(e.pointerId);
@@ -255,11 +275,12 @@ function veTfIniciar() {
         const c = VE.clips[d.i];
         if (!c) return;
         if (!d.hist) { vePushHistory(); d.hist = true; }
-        const q = veTxQuadroTela(), pt = { x: (e.clientX - q.x0) / q.s, y: (e.clientY - q.y0) / q.s };
+        const q = veTxQuadroTela(), pt = veTfPaiPt(c, { x: (e.clientX - q.x0) / q.s, y: (e.clientY - q.y0) / q.s });
         const p0 = d.p0, sz = veMediaSize(c);
         if (d.tipo === 'mover') {
-            // encaixa nas guias e nas bordas/centro do quadro (editor-guias.js); Ctrl segurado: livre
-            const s = veGuiasEncaixarCamada(c, p0, Math.round(p0.x + pt.x - d.pt0.x), Math.round(p0.y + pt.y - d.pt0.y), q.s, e.ctrlKey);
+            // encaixa nas guias e nas bordas/centro do quadro (editor-guias.js); Ctrl segurado: livre. Com camada mãe: livre
+            const nx = Math.round((p0.x + pt.x - d.pt0.x) * 10) / 10, ny = Math.round((p0.y + pt.y - d.pt0.y) * 10) / 10;
+            const s = c.pai ? { x: nx, y: ny } : veGuiasEncaixarCamada(c, p0, Math.round(p0.x + pt.x - d.pt0.x), Math.round(p0.y + pt.y - d.pt0.y), q.s, e.ctrlKey);
             veApplyProps(c, s);
             veGuiasRedesenhar();
         } else if (d.tipo === 'alca' && e.shiftKey && d.fm0 && c.fm) {

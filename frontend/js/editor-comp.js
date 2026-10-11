@@ -396,6 +396,7 @@ function veCompEstatica(seq, vistos = new Set()) {
     return (seq.clips || []).every(c => {
         const m = VE.media[c.m || 0];
         if (!m) return false;
+        if (typeof veMoTem === 'function' && veMoTem(c)) return false;   // motion (máscara, fosco, mãe...): muda no tempo
         if (veEhComp(m)) return veCompEstatica(veCompSeqDe(m), vistos) && !veHasKf(c) && !c.tin && !c.tout;
         if (!['image', 'texto', 'cor', 'forma', 'pincel', 'ajuste'].includes(m.kind)) return false;
         if (veHasKf(c) || c.tin || c.tout || c.txa || m.seq) return false;
@@ -408,7 +409,7 @@ async function veCompJob(seq) {
     const imgs = seq.clips.map(c => VE.media[c.m || 0]).filter(m => m && m.kind === 'image' && !veMediaOffline(m));
     for (let k = 0; k < 50 && imgs.some(m => !m.w); k++) await new Promise(r => setTimeout(r, 100));
     // textos, formas e cores sólidas viram PNG (o mesmo desenho da prévia), sem mexer no VE._txPng da exportação
-    const mapa = seq.clips.some(c => veIsTexto(c) || veEhGrafico(c)) ? await veTxPngs(null, seq.clips, false) : new Map();
+    const mapa = seq.clips.some(veTxPrecisa) ? await veTxPngs(null, seq.clips, false) : new Map();
     return veCompComo(seq, () => {
         const ant = VE._txPng;
         VE._txPng = mapa;
