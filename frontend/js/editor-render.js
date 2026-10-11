@@ -23,7 +23,7 @@ const VEPR = {
     hold: 0,
 };
 
-const VE_PR_PREFS_PADRAO = { dir: '', maxGB: 20, dias: 30, altura: 1080, ramGB: 1.5, autoSeg: 3, proxyJunto: false };
+const VE_PR_PREFS_PADRAO = { dir: '', maxGB: 20, dias: 30, altura: 720, ramGB: 1.5, autoSeg: 3, proxyJunto: false };
 function vePrPrefs() {
     const p = (typeof PREFS !== 'undefined' && PREFS.cache) || {};
     return { ...VE_PR_PREFS_PADRAO, ...p };

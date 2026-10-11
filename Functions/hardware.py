@@ -245,7 +245,7 @@ def plano():
         # editor
         "previa": {"leve": "metade", "medio": "inteira", "forte": "inteira"}[ef],
         # altura das prévias renderizadas e da prévia leve de edição (padrão de "Qualidade das prévias")
-        "previa_altura": 720 if ef == "leve" else 1080,
+        "previa_altura": 540 if ef == "leve" else 720,   # 720 (2026-10-11): 4x menor que 1080, igual no monitor
     }
 
 

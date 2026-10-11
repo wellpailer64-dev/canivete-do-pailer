@@ -154,10 +154,10 @@ def _prefs():
 
 def _cache_cfg():
     c = _prefs().get("cache") or {}
-    try:
-        lado = int(c.get("altura") or 1080)
+    try:   # padrão 720 (2026-10-11): 4x menor e ~1/3 mais rápida que a de 1080 sem diferença visível no monitor
+        lado = int(c.get("altura") or 720)
     except (TypeError, ValueError):
-        lado = 1080
+        lado = 720
     try:
         dias, max_gb = int(c.get("dias") or 30), float(c.get("maxGB") or 20)
     except (TypeError, ValueError):
@@ -749,7 +749,22 @@ def _nome_proxy(lado, alfa=False):
     # com transparência: WebM VP9 com alfa (o H.264 não tem alfa; o que era transparente ficava preto)
     if alfa:
         return "proxy_alfa_v1.webm" if lado == 1080 else f"proxy_alfa_v1_{lado}.webm"
-    return "proxy_v2.mp4" if lado == 1080 else f"proxy_v2_{lado}.mp4"
+    # v3 (2026-10-11): mais comprimida (cq 28 em vez de 24) — 720p: 8 MB em vez de 35 MB por 20 s de MXF 1080p59
+    return f"proxy_v3_{lado}.mp4"
+
+
+def _proxy_existente(work, lado, alfa=False):
+    """Uma prévia já feita na pasta do vídeo (a da qualidade pedida primeiro; senão qualquer outra que exista — mudar a
+    qualidade ou a versão da prévia não obriga a converter de novo o que já está pronto)."""
+    if alfa:
+        nomes = [_nome_proxy(l, True) for l in (lado, 720, 1080, 540)]
+    else:
+        nomes = [f"proxy_v3_{l}.mp4" for l in (lado, 720, 1080, 540)] + ["proxy_v2.mp4", "proxy_v2_720.mp4", "proxy_v2_540.mp4"]
+    for n in dict.fromkeys(nomes):
+        p = os.path.join(work, n)
+        if os.path.isfile(p):
+            return p
+    return None
 
 
 def _proxy_junto(path, lado, alfa=False):
@@ -763,8 +778,9 @@ def _arquivo_proxy(path, work, lado, alfa=False):
     onde a nova vai: Proxy ao lado do vídeo com a opção ligada, senão o cache."""
     cache = os.path.join(work, _nome_proxy(lado, alfa))
     junto = _proxy_junto(path, lado, alfa)
-    if os.path.isfile(cache):
-        return cache
+    feita = _proxy_existente(work, lado, alfa)
+    if feita:
+        return feita
     try:
         if os.path.isfile(junto) and os.path.getmtime(junto) >= os.path.getmtime(path):
             return junto
@@ -802,9 +818,10 @@ def _proxy_pronto(path):
         return None
     lados = sorted({_cache_cfg()["lado"], 1080, 720, 540}, reverse=True)
     for lado in lados:
-        for arq in (os.path.join(work, _nome_proxy(lado)), _proxy_junto(path, lado)):
+        no_cache = [os.path.join(work, _nome_proxy(lado)), os.path.join(work, "proxy_v2.mp4" if lado == 1080 else f"proxy_v2_{lado}.mp4")]
+        for arq in no_cache + [_proxy_junto(path, lado)]:
             try:
-                if not os.path.isfile(arq) or (arq != os.path.join(work, _nome_proxy(lado)) and os.path.getmtime(arq) < mt):
+                if not os.path.isfile(arq) or (arq not in no_cache and os.path.getmtime(arq) < mt):
                     continue
                 chave = (arq, os.path.getmtime(arq))
                 if chave not in _proxy_dims:
@@ -899,7 +916,7 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
         return [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-i", path,
                 "-filter_complex", f"[0:v:0]scale={_PROXY_ESCALA}:flags=fast_bilinear,format=yuv420p"
                 + (",split[p][b]" + th_filtro if th_saida else "[p]"),
-                "-map", "[p]", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "fastdecode", "-crf", "25"] + comum
+                "-map", "[p]", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "fastdecode", "-crf", "28"] + comum
 
     def _cpu_nvenc():
         # a placa não decodifica (H.264 10-bit/4:2:2 de câmera, MXF): o processador decodifica e reduz, a placa
@@ -907,7 +924,7 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
         return [ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1", "-i", path,
                 "-filter_complex", f"[0:v:0]scale={_PROXY_ESCALA}:flags=fast_bilinear,format=yuv420p"
                 + (",split[p][b]" + th_filtro if th_saida else "[p]"),
-                "-map", "[p]", "-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "24", "-b:v", "0",
+                "-map", "[p]", "-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "28", "-b:v", "0",
                 "-bf", "0"] + comum
 
     def _cuda():
@@ -915,7 +932,7 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
                 "-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-i", path,
                 "-filter_complex", f"[0:v:0]scale_cuda={_PROXY_ESCALA}:format=yuv420p,hwdownload,format=yuv420p"
                 + (",split[p][b]" + th_filtro if th_saida else "[p]"),
-                "-map", "[p]", "-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "24", "-b:v", "0",
+                "-map", "[p]", "-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "28", "-b:v", "0",
                 "-bf", "0"] + comum
 
     def _cuda_girado():
@@ -930,7 +947,7 @@ def gerar_proxy(path, info, out, on_pct, stop_event=None, thumbs_dir=None, thumb
                 "-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-i", path,
                 "-filter_complex", f"[0:v:0]scale_cuda={_PROXY_ESCALA}:format=yuv420p,hwdownload,format=yuv420p,{giro}"
                 + (",split[p][b]" + th_filtro if th_saida else "[p]"),
-                "-map", "[p]", "-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "24", "-b:v", "0",
+                "-map", "[p]", "-c:v", "h264_nvenc", "-preset", "p1", "-rc", "vbr", "-cq", "28", "-b:v", "0",
                 "-bf", "0"] + comum
 
     def _alfa():
