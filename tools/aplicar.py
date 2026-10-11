@@ -2,8 +2,11 @@
 
   py -3.13 tools/aplicar.py frontend/js/editor-marcadores.js [mais.js ...] [frontend/css/x.css] [--py] [--porta 9222]
 
-JS: cada função de nível de topo (`function nome(` / `async function nome(` na coluna 0, até o `}` na coluna 0) é
-redefinida na página principal — a próxima chamada já usa o código novo. Constante NOVA de nível de topo
+JS: cada função de nível de topo (`function nome(` / `async function nome(` na coluna 0, até o `}` na coluna 0) QUE
+MUDOU (em relação à última aplicada ou ao git) é redefinida na página principal — a próxima chamada já usa o código novo.
+Função "envolvida" por outro arquivo (`nome = function` dentro de um bloco de outro .js, ex.: veOpenExport pelo Encoder
+e pela fila) NÃO é trocada: trocar apagava o envoltório (2026-10-11: o export abriu sem o Kanivete Encoder) — avisa
+(só reabrindo o app). Constante NOVA de nível de topo
 (`const X = ...;`) é criada; constante que JÁ EXISTE não é tocada (guarda estado: VE, VEMK...) — se o valor dela
 mudou, avisa (aí só reabrindo o app). Redesenha o editor no fim.
 CSS: troca o <link> do arquivo por um com ?v=hora (só o estilo recarrega).
@@ -43,6 +46,18 @@ def blocos(src):
             continue
         i += 1
     return out
+
+
+def envolvidas(exceto):
+    """Funções reatribuídas por OUTROS arquivos (o padrão de envoltório: `const a = nome; nome = function ...`)."""
+    nomes = {}
+    pasta = os.path.join(RAIZ, "frontend", "js")
+    for f in os.listdir(pasta):
+        if not f.endswith(".js") or os.path.join(pasta, f) == exceto:
+            continue
+        for m in re.finditer(r"^\s+(?:window\.)?([\w$]+)\s*=\s*(?:async\s+)?function\b", open(os.path.join(pasta, f), encoding="utf-8").read(), re.M):
+            nomes.setdefault(m.group(1), f)
+    return nomes
 
 
 def base(rel):
@@ -101,7 +116,15 @@ with sync_playwright() as p:
             faltam = so - {b[1] for b in novo}
             if faltam:
                 print(f"{rel}: não achei {', '.join(sorted(faltam))}")
-        r = pg.evaluate(JS, {"fns": [[n, x] for t, n, x in novo if t == "f"], "consts": [[n, x] for t, n, x in novo if t == "c"]})
+        # só as funções que mudaram; as envolvidas por outro arquivo ficam (avisa)
+        env = envolvidas(caminho)
+        mudaram = [(n, x) for t, n, x in novo if t == "f" and velho.get(("f", n)) != x]
+        pular = [(n, env[n]) for n, _ in mudaram if n in env]
+        fns = [[n, x] for n, x in mudaram if n not in env]
+        r = pg.evaluate(JS, {"fns": fns, "consts": [[n, x] for t, n, x in novo if t == "c"]})
+        if pular:
+            print(f"{rel}: ATENÇÃO, mudou mas é envolvida por outro arquivo (só reabrindo o app): "
+                  + ", ".join(f"{n} ({f})" for n, f in pular))
         mudou = [n for n in r["mantidas"] if velho.get(("c", n)) not in (None, next(x for t, k, x in novo if t == "c" and k == n))]
         print(f"{rel}: {r['funcoes']} funções" + (f", novas: {', '.join(r['novas'])}" if r["novas"] else "")
               + (f" | ERROS: {r['erros']}" if r["erros"] else "")
