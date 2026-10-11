@@ -320,10 +320,11 @@ def manutencao_midia():
     for idade, tam, p in sorted(guardadas, reverse=True):   # mais antigas primeiro
         if total <= cfg["max_gb"] * 1024 ** 3:
             break
-        # usada nas últimas 24 h = do projeto aberto: nunca sai pelo tamanho. Antes, num projeto maior que o limite,
-        # a limpeza (que roda ao abrir vídeo e depois de cada render) apagava a pasta de um vídeo no meio da conversão
-        # ("Error opening output files") e as prévias do próprio projeto, que eram refeitas a cada abertura.
-        if idade < 24 * 3600:
+        # usada nos últimos 3 dias: nunca sai pelo tamanho. Antes (24 h), abrir OUTRO projeto apagava as prévias do
+        # projeto de ontem (curta do Gil, 2026-10-11: 32 GB de prévias num limite de 40 GB → 73 refeitas, a maioria
+        # MXF 4:2:2 que só o processador decodifica). Também antes, num projeto maior que o limite, a pasta de um
+        # vídeo sumia no meio da conversão ("Error opening output files").
+        if idade < 3 * 86400:
             continue
         _apagar_item(p)
         total -= tam
@@ -366,6 +367,10 @@ def _pasta_midia(path):
         except Exception:
             shutil.rmtree(work, ignore_errors=True)
     os.makedirs(work, exist_ok=True)
+    try:   # marca o USO (a limpeza conta a idade pelo último uso, não pela criação da pasta)
+        os.utime(work, None)
+    except OSError:
+        pass
     return work
 
 
