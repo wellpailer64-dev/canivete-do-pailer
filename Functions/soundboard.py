@@ -19,6 +19,50 @@ URL_PACK = (f"https://github.com/wellpailer64-dev/canivete-do-pailer/releases/do
             f"soundboard-v{VERSAO}/soundboard-v{VERSAO}.zip")
 
 _baixando = threading.Lock()
+_picos = {"rodando": False}
+PICOS_N = 48   # barrinhas da forma de onda de cada card
+
+
+def _picos_arq():
+    return os.path.join(pasta(), "picos.json")
+
+
+def _picos_de(p):
+    """Forma de onda de um som: PICOS_N picos 0..100 (o mais alto do som = 100)."""
+    import subprocess
+    import numpy as np
+    from Functions.midia import ffmpeg, NO_WINDOW
+    r = subprocess.run([ffmpeg(), "-v", "error", "-i", p, "-ac", "1", "-ar", "4000", "-f", "f32le", "-"],
+                       capture_output=True, creationflags=NO_WINDOW)
+    x = np.abs(np.frombuffer(r.stdout, np.float32))
+    if not len(x):
+        return [0] * PICOS_N
+    k = max(1, len(x) // PICOS_N)
+    pk = np.array([x[i * k:(i + 1) * k].max() if i * k < len(x) else 0 for i in range(PICOS_N)])
+    return [int(v) for v in np.round(pk / (pk.max() + 1e-9) * 100)]
+
+
+def _picos_cache():
+    try:
+        with open(_picos_arq(), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def _picos_gerar(faltam):
+    """Calcula em segundo plano as formas de onda que faltam e guarda em picos.json (uma vez por pack)."""
+    try:
+        cache = _picos_cache()
+        for arq, p in faltam:
+            try:
+                cache[arq] = _picos_de(p)
+            except Exception:
+                cache[arq] = [0] * PICOS_N
+        with open(_picos_arq(), "w", encoding="utf-8") as f:
+            json.dump(cache, f)
+    finally:
+        _picos["rodando"] = False
 
 
 def pasta():
@@ -40,14 +84,20 @@ def estado():
     if not cat:
         return {"success": True, "instalado": False, "baixando": _baixando.locked()}
     base = pasta()
+    picos, faltam = _picos_cache(), []
     for c in cat.get("categorias", []):
         sons = []
         for s in c.get("sons", []):
             p = os.path.join(base, *s["arq"].split("/"))
             if os.path.isfile(p):
-                sons.append({**s, "path": p, "url": media_server.register(p)})
+                sons.append({**s, "path": p, "url": media_server.register(p), "pk": picos.get(s["arq"])})
+                if s["arq"] not in picos:
+                    faltam.append((s["arq"], p))
         c["sons"] = sons
-    return {"success": True, "instalado": True, "versao": cat.get("versao", 0),
+    if faltam and not _picos["rodando"]:   # formas de onda: na 1ª vez, em segundo plano (o painel pede de novo)
+        _picos["rodando"] = True
+        threading.Thread(target=_picos_gerar, args=(faltam,), daemon=True).start()
+    return {"success": True, "instalado": True, "versao": cat.get("versao", 0), "picos_faltam": bool(faltam),
             "desatualizado": cat.get("versao", 0) < VERSAO, "categorias": cat.get("categorias", [])}
 
 

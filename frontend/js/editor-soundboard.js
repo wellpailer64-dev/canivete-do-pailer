@@ -24,7 +24,15 @@ function veSbCarregar() {
         VESB.dados = r || { instalado: false };
         if (r && r.baixando && !VESB.baixando) VESB.baixando = { pct: 0, msg: 'Baixando sons...' };
         veSbRender();
+        if (r && r.picos_faltam) setTimeout(veSbCarregar, 2500);   // formas de onda sendo calculadas (1ª vez)
     }).finally(() => { VESB.pedindo = false; });
+}
+
+// forma de onda do card (picos 0..100), espelhada no meio, como na timeline
+function veSbOnda(pk) {
+    if (!pk || !pk.length) return '<svg class="ve-sb-onda vazia" viewBox="0 0 48 20" preserveAspectRatio="none"><path d="M0 10 H48"/></svg>';
+    const n = pk.length, d = pk.map((v, i) => { const h = Math.max(0.6, v / 100 * 9.5); return `M${(i * 48 / n + 0.12).toFixed(2)} ${(10 - h).toFixed(2)}h${(48 / n * 0.72).toFixed(2)}v${(2 * h).toFixed(2)}h-${(48 / n * 0.72).toFixed(2)}z`; }).join('');
+    return `<svg class="ve-sb-onda" viewBox="0 0 48 20" preserveAspectRatio="none"><path d="${d}"/></svg>`;
 }
 
 function veSbSom(k) {
@@ -68,8 +76,8 @@ function veSbRender() {
             itens.map(([s, si]) => `<div class="ve-sb-som${VESB.sel === s.arq ? ' sel' : ''}" draggable="true" data-k="${ci}:${si}" data-c="${c.id}"
                 title="${veEsc(s.nome)} · ${veSbDur(s.dur)}&#10;Original: ${veEsc(s.orig)}&#10;${veEsc(s.fonte)} · ${veEsc(s.licenca)}&#10;Clique: seleciona · Shift+1 ou duplo clique: aplica na agulha · ou arraste para a timeline">
                 <i class="ve-sb-prog"></i>
-                <button class="ve-sb-fav${favs.has(s.arq) ? ' on' : ''}" data-fav title="Favorito">★</button>
-                <span>${veEsc(s.nome)}</span><small>${veSbDur(s.dur)}</small></div>`).join('') + '</div>';
+                <div class="ve-sb-l1"><button class="ve-sb-fav${favs.has(s.arq) ? ' on' : ''}" data-fav title="Favorito">★</button>
+                <span>${veEsc(s.nome)}</span><small>${veSbDur(s.dur)}</small></div>${veSbOnda(s.pk)}</div>`).join('') + '</div>';
     });
     const aviso = d.desatualizado ? '<div class="ve-sb-aviso"><span>Há sons novos no pack.</span><button class="ve-btn ve-btn-sm" id="ve-sb-baixar">Atualizar</button></div>' : '';
     lista.innerHTML = aviso + (html || `<div class="ve-sb-vazio">${VESB.cat === 'fav' && !q ? 'Marque sons com ★ para achar rápido aqui' : 'Nenhum som encontrado'}</div>`);
