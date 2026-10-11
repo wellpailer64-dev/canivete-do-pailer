@@ -1305,13 +1305,13 @@ function ieIniciar() {
     }
     const fechar = window.fecharAba;
     if (typeof fechar === 'function') {
-        window.fecharAba = async function (tool, ev) {
+        window.fecharAba = async function (tool, ev, ...resto) {   // resto: o "rápido" do Ctrl+W (app.js)
             if (tool === 'editor-imagem' && IE.docs.some(d => d.sujo)) {
                 ev?.stopPropagation();
                 if (!ieAtivoVisivel()) switchTool('editor-imagem');
                 if (!(await ieFecharTodos())) return;
             }
-            return fechar(tool, ev);
+            return fechar(tool, ev, ...resto);
         };
         fecharAba = window.fecharAba;
     }

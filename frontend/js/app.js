@@ -500,7 +500,8 @@ document.addEventListener('keydown', e => {
     appSair();
 }, true);
 
-async function fecharAba(tool, ev) {
+// rapido (Ctrl+W): sem a pergunta "Fechar?"; só pergunta se há algo para salvar (Editor com alteração)
+async function fecharAba(tool, ev, rapido) {
     ev?.stopPropagation();
     const { nome } = _menuInfo(tool);
     const rodando = _abaRodando(tool);
@@ -517,12 +518,12 @@ async function fecharAba(tool, ev) {
             });
             if (!r) return;
             if (r === 'salvar' && !(await veSaveProject())) return;
-        } else {
+        } else if (!rapido) {
             const r = await appConfirm({ titulo: 'Fechar o Editor Kanivete?', texto: 'O projeto aberto será fechado.', botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Fechar', valor: 1, tipo: 'primario' }] });
             if (!r) return;
         }
         veCloseProject();
-    } else {
+    } else if (!rapido) {
         const r = await appConfirm({
             titulo: `Fechar ${nome}?`,
             texto: rodando ? 'Há um processo em andamento nesta ferramenta. Ele continua rodando mesmo com a aba fechada; reabra pelo menu para acompanhar.'
@@ -544,6 +545,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const menu = document.querySelector('.menu');
     if (menu) new MutationObserver(renderTabs).observe(menu, { subtree: true, attributes: true, attributeFilter: ['class'] });
 });
+
+// Ctrl+W: fecha a ferramenta aberta e vai para a próxima aba (a última fechada volta para a Home). No Photo Kanivete
+// com documento aberto, o Ctrl+W é dele (fecha o documento, como no Photoshop); sem documento, fecha a ferramenta.
+document.addEventListener('keydown', e => {
+    if (e.code !== 'KeyW' || !e.ctrlKey || e.shiftKey || e.altKey || e.metaKey || e.repeat) return;
+    const tool = (document.querySelector('.tool-page.active')?.id || '').replace(/^page-/, '');
+    if (!tool || tool === 'home') return;
+    if (tool === 'editor-imagem' && typeof IE !== 'undefined' && (IE.docs || []).length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    fecharAba(tool, null, true);
+}, true);
 
 // ── Arrastar e soltar (o Python entrega os caminhos reais em onArquivosSoltos) ──
 const EXT_VIDEO = /\.(mp4|mov|mxf|mkv|avi|webm|flv|f4v|wmv|asf|m4v|ts|mts|m2ts|3gp|ogv|mpg|mpeg|m2v|r3d|braw|ari|arx)$/i;
