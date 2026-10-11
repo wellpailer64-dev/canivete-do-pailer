@@ -86,6 +86,14 @@ Rack de efeitos por trilha (5 espaços, na SOMA da trilha) e os 53 efeitos de á
 **Ponte com o Premiere instalado (plugin UXP "Kanivete Ponte", `tools/ponte_premiere.py`): `Instructions/agente/ponte-premiere.md`**
 — testes SÓ na cópia em D:\kanivete_testes (o projeto ativo do Premiere é o do Pailer).
 
+Timeline como a do Premiere (2026-10-11): ímã, seleção vinculada, marcador e chave inglesa (Configurações da timeline) no
+topo da coluna das trilhas; **alvo de trilha** (rótulo V1/A1 azul = alvo; clique tira, Shift+clique todas do tipo; `semAlvo`
+em `VE_TRK`): Ctrl+K corta só as trilhas-alvo (Ctrl+Shift+K todas), ↑/↓ e Q/W usam os cortes delas, colar vai para a
+trilha-alvo mais baixa, Alt+D seleciona o clipe na agulha. **Caneta** (P sem clipe selecionado; com clipe, P abre a Posição
+como no After): linha de opacidade (`c.k.op`) e de VOLUME (`c.k.vol` em dB, linear em dB: prévia `veAudioVk`, exportação
+`_expr_vol_kf`) no clipe — `frontend/js/editor-caneta.js`. Menu de efeitos do Mixer em categorias do Premiere com
+submenu (`VE_MIX_CATS`). Teste: `py -3.13 testes/teste_timeline_pr.py` (porta 9337).
+
 Atributos de vários clipes (como no Premiere): `frontend/js/editor-atributos.js` — botão direito → "Remover atributos…"
 (efeitos de vídeo/áudio, movimento, opacidade, mesclagem, volume, transições, com caixinhas; vale para a seleção) e ajuste
 em grupo (mexer num efeito com vários selecionados leva o valor ao mesmo efeito de todos). Teste: `testes/teste_atributos.py`.

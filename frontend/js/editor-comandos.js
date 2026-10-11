@@ -73,7 +73,9 @@ const VE_CMDS = [
 
     // ── Sequência ──
     { id: 'seq-config', grupo: 'sequencia', nome: 'Configurações da sequência...', teclas: [], fn: () => veSeqConfigAbrir() },
-    { id: 'cortar-tudo', grupo: 'sequencia', sep: true, nome: 'Cortar todas as trilhas na agulha', teclas: ['Ctrl+K', 'S', "'"], fn: () => veSplitAtPlayhead() },
+    { id: 'cortar-tudo', grupo: 'sequencia', sep: true, nome: 'Cortar na agulha (trilhas-alvo)', teclas: ['Ctrl+K', 'S', "'"], fn: () => veSplitAtPlayhead() },
+    { id: 'cortar-todas', grupo: 'sequencia', nome: 'Cortar todas as trilhas na agulha', teclas: ['Ctrl+Shift+K'], fn: () => veSplitAtPlayhead(true) },
+    { id: 'sel-agulha', grupo: 'sequencia', nome: 'Selecionar clipe na agulha (trilhas-alvo)', teclas: ['Alt+D'], fn: () => veSelNaAgulha() },
     { id: 'extrair', grupo: 'sequencia', nome: 'Remover trecho In→Out', teclas: ['X'], fn: () => veExtractInOut(), pode: () => VE.inPt != null && VE.outPt != null },
     { id: 'trans-video', grupo: 'sequencia', nome: 'Aplicar transição de vídeo padrão', teclas: ['Ctrl+D'], sep: true, fn: () => veTransPadrao(false) },
     { id: 'trans-audio', grupo: 'sequencia', nome: 'Aplicar transição de áudio padrão', teclas: ['Ctrl+Shift+D', 'Ctrl+Shift+9'], fn: () => veTransPadrao(true) },
@@ -134,6 +136,7 @@ const VE_CMDS = [
     // ── só atalho: ferramentas ──
     { id: 'ferr-selecao', grupo: 'ferramentas', nome: 'Ferramenta Seleção', teclas: ['V'], fn: () => veSetTool('select') },
     { id: 'ferr-lamina', grupo: 'ferramentas', nome: 'Ferramenta Lâmina', teclas: ['C'], fn: () => veSetTool('razor') },
+    { id: 'ferr-caneta', grupo: 'ferramentas', nome: 'Ferramenta Caneta', teclas: ['P'], fn: () => { veSetTool('caneta'); veToast(veT('Caneta (P): clique na linha amarela do clipe para criar um ponto · Alt+clique apaga · no monitor, desenha máscara')); } },
     { id: 'ferr-mao', grupo: 'ferramentas', nome: 'Ferramenta Mão', teclas: ['H'], fn: () => veSetTool('hand') },
     { id: 'ferr-zoom', grupo: 'ferramentas', nome: 'Ferramenta Zoom', teclas: ['Z'], fn: () => veSetTool('zoom') },
     { id: 'ferr-velocidade', grupo: 'ferramentas', nome: 'Ferramenta Velocidade', teclas: ['R'], fn: () => { veSetTool('rate'); veToast('Velocidade (R): arraste a borda de um clipe'); } },

@@ -261,20 +261,58 @@ function veMixPop(ancora, html) {
     setTimeout(() => doc.addEventListener('pointerdown', fora, true), 0);
     return pop;
 }
-// espaço vazio: menu de efeitos por categoria (os do Premiere e os do Kanivete); cheio: os controles do efeito
+// Categorias do menu de efeitos (as mesmas do Audio Track Mixer do Premiere, nesta ordem); os efeitos do Kanivete
+// entram na categoria equivalente
+const VE_MIX_CATS = [
+    ['Amplitude and Compression', 'Amplitude e compressão', /Amplitude/],
+    ['Delay and Echo', 'Atraso e eco', /Atraso|Delay/],
+    ['Filter and EQ', 'Filtro e EQ', /EQ|Filtro/],
+    ['Modulation', 'Modulação', /Modula/],
+    ['Noise Reduction/Restoration', 'Redução de ruído/Restauração', /Restaura|Ruído|Noise/],
+    ['Reverb', 'Reverberação', /Espaço|Reverb/],
+    ['Special', 'Especial', null],
+    ['Stereo Imagery', 'Imagem estéreo', /Estéreo|Stereo/],
+    ['Time and Pitch', 'Tempo e tom', /Tempo|Pitch/],
+];
+function veMixCatDe(d) {
+    const c = (d.cat || '').replace(/^Áudio · (Premiere · )?/, '');
+    const i = VE_MIX_CATS.findIndex(([pr, , re]) => c === pr || (re && re.test(c)));
+    return i < 0 ? 6 : i;   // sem equivalente: Especial
+}
+// espaço vazio: menu de efeitos em categorias com submenu (como o do Premiere); cheio: os controles do efeito
 function veMixSlot(sl, k, i) {
     const fx = (VE_TRK.a[k] || {}).fx || [];
     if (fx[i]) { veMixEditor(sl, k, i); return; }
-    const cats = {};
-    Object.entries(VE_AFX).forEach(([t, d]) => { if (t !== 'antinoise') (cats[d.cat] = cats[d.cat] || []).push([t, d]); });
+    const cats = VE_MIX_CATS.map(() => []);
+    Object.entries(VE_AFX).forEach(([t, d]) => { if (t !== 'antinoise' && t !== 'trk') cats[veMixCatDe(d)].push([t, d]); });
+    cats.forEach(l => l.sort((a, b) => a[1].nome.localeCompare(b[1].nome)));
+    const ef = ([t, d]) => `<div class="ve-mix-ef${d.pr && !d.som ? ' semsom' : ''}" data-t="${t}" title="${d.pr && !d.som ? veT('Sem prévia no Kanivete: vai e volta intacto para o Premiere') : d.tag || ''}">${d.nome}</div>`;
     const html = `<input class="ve-mix-busca" placeholder="${veT('Buscar efeito')}">`
-        + `<div class="ve-mix-lista">${Object.entries(cats).sort().map(([c, l]) => `<div class="ve-mix-cat">${c.replace('Áudio · ', '')}</div>`
-            + l.map(([t, d]) => `<div class="ve-mix-ef${d.pr && !d.som ? ' semsom' : ''}" data-t="${t}" title="${d.tag || ''}">${d.nome}</div>`).join('')).join('')}</div>`;
-    const pop = veMixPop(sl, html), busca = pop.querySelector('.ve-mix-busca');
+        + `<div class="ve-mix-menu"><div class="ve-mix-nenhum" data-nenhum="1">${veT('Nenhum')}</div><hr>`
+        + VE_MIX_CATS.map(([, nome], j) => cats[j].length ? `<div class="ve-mix-catit" data-c="${j}">${veT(nome)}<i>›</i></div>` : '').join('')
+        + `</div><div class="ve-mix-lista" hidden>${cats.flat().map(ef).join('')}</div>`;
+    const pop = veMixPop(sl, html), busca = pop.querySelector('.ve-mix-busca'), menu = pop.querySelector('.ve-mix-menu'), lista = pop.querySelector('.ve-mix-lista');
+    let sub = null;
+    const abrirSub = it => {
+        if (sub && sub.dataset.c === it.dataset.c) return;
+        if (sub) sub.remove();
+        menu.querySelectorAll('.ve-mix-catit').forEach(x => x.classList.toggle('on', x === it));
+        sub = pop.ownerDocument.createElement('div');
+        sub.className = 've-mix-pop ve-mix-sub'; sub.dataset.c = it.dataset.c;
+        sub.innerHTML = cats[+it.dataset.c].map(ef).join('');
+        pop.appendChild(sub);   // filho do menu: clicar nele não conta como "fora"
+        const r = it.getBoundingClientRect(), W = pop.ownerDocument.documentElement.clientWidth, H = pop.ownerDocument.documentElement.clientHeight;
+        const esq = r.right + sub.offsetWidth + 4 > W;
+        sub.style.left = (esq ? Math.max(4, r.left - sub.offsetWidth - 2) : r.right + 2) + 'px';
+        sub.style.top = Math.max(4, Math.min(r.top - 6, H - sub.offsetHeight - 4)) + 'px';
+    };
+    menu.addEventListener('pointerover', e => { const it = e.target.closest('.ve-mix-catit'); if (it) abrirSub(it); });
+    menu.addEventListener('click', e => { const it = e.target.closest('.ve-mix-catit'); if (it) abrirSub(it); if (e.target.closest('[data-nenhum]')) pop.remove(); });
     busca.focus();
-    busca.addEventListener('input', () => {
+    busca.addEventListener('input', () => {   // buscando: lista única filtrada (sem submenu)
         const q = busca.value.trim().toLowerCase();
-        pop.querySelectorAll('.ve-mix-ef').forEach(x => { x.hidden = !!q && !x.textContent.toLowerCase().includes(q); });
+        menu.hidden = !!q; lista.hidden = !q; if (sub && q) { sub.remove(); sub = null; }
+        lista.querySelectorAll('.ve-mix-ef').forEach(x => { x.hidden = !!q && !x.textContent.toLowerCase().includes(q); });
     });
     busca.addEventListener('keydown', e => e.stopPropagation());
     pop.addEventListener('click', e => {

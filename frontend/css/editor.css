@@ -408,7 +408,9 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
 
 .ve-tl-body { display: grid; grid-template-columns: 100px minmax(0, 1fr); flex: 1; min-height: 0; }
 .ve-tl-heads { background: var(--ve-panel-2); border-right: 1px solid var(--ve-line); display: flex; flex-direction: column; min-height: 0; }
-.ve-head-ruler { height: 40px; flex-shrink: 0; border-bottom: 1px solid var(--ve-line); }
+.ve-head-ruler { height: 40px; flex-shrink: 0; border-bottom: 1px solid var(--ve-line); display: flex; align-items: center; justify-content: center; gap: 1px; padding: 0 2px; }
+.ve-head-ruler .ve-seg-btn { width: 22px; height: 22px; padding: 0; display: grid; place-items: center; }
+.ve-head-ruler .ve-seg-btn .i { width: 14px; height: 14px; }
 .ve-heads-clip { flex: 1; min-height: 0; overflow: hidden; }
 .ve-head {
     position: relative;
@@ -1252,6 +1254,10 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-hb .i { width: 13px; height: 13px; }
 .ve-hb:hover { background: var(--ve-panel); color: var(--ve-text); }
 .ve-hb[data-hact="lock"].on { color: var(--ve-accent); }
+/* alvo da trilha (Track Targeting do Premiere): o rótulo V1/A1 aceso em azul = os atalhos agem nela */
+.ve-hb.ve-alvo { width: auto; min-width: 24px; flex: 1; height: 18px; font: 700 11px var(--ve-mono); color: var(--ve-faint); border-color: rgba(255,255,255,.08); }
+.ve-hb.ve-alvo.on { background: #1f5fbf; border-color: #2f74de; color: #fff; }
+.ve-hb.ve-alvo.on:hover { background: #2a6fd6; color: #fff; }
 .ve-hb[data-hact="hide"].on { color: #fbbf24; }
 .ve-hb[data-hact="mute"].on { background: #3a2a10; border-color: #fbbf24; color: #fbbf24; }
 .ve-head.off b { opacity: .45; }
@@ -2325,6 +2331,12 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
     background: #f4f4f5; color: #1b1b1e; border-radius: 6px; box-shadow: 0 8px 28px rgba(0, 0, 0, .5); font-size: 12px; }
 .ve-mix-busca { width: 100%; box-sizing: border-box; margin-bottom: 4px; padding: 4px 6px; border: 1px solid #c4c4c8; border-radius: 4px; }
 .ve-mix-cat { margin: 6px 4px 2px; font-size: 10px; font-weight: 700; color: #6b6b72; text-transform: uppercase; letter-spacing: .03em; }
+/* menu de efeitos do mixer como o do Premiere: Nenhum, categorias com › e submenu ao lado */
+.ve-mix-menu hr { border: 0; border-top: 1px solid #d4d4d8; margin: 4px 2px; }
+.ve-mix-nenhum, .ve-mix-catit { display: flex; align-items: center; padding: 4px 10px; border-radius: 3px; cursor: pointer; white-space: nowrap; }
+.ve-mix-catit i { margin-left: auto; padding-left: 16px; font-style: normal; color: #6b6b72; }
+.ve-mix-nenhum:hover, .ve-mix-catit:hover, .ve-mix-catit.on { background: #e2e2e6; }
+.ve-mix-sub { position: fixed; min-width: 200px; max-height: 60vh; }
 .ve-mix-ef { padding: 3px 10px; border-radius: 3px; cursor: pointer; }
 .ve-mix-ef:hover { background: #e2e2e6; }
 .ve-mix-ef.semsom { color: #6b6b72; font-style: italic; }

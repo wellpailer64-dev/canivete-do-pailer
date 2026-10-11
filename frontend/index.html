@@ -912,8 +912,6 @@
                         <section class="ve-panel ve-timeline" data-panel="timeline" data-title="Timeline">
                             <div class="ve-tl-toolbar">
                                 <div class="ve-seq-tabs" id="ve-seq-tabs"></div>
-                                <button class="ve-seg-btn ve-snap active" id="ve-vinculo" onclick="veToggleVinculo()" title="Seleção vinculada: ligada, clicar no vídeo ou no áudio seleciona os dois; desligada, só a parte clicada"><svg class="i"><use href="#i-link"/></svg></button>
-                                <button class="ve-seg-btn ve-snap active" id="ve-snap" onclick="veToggleSnap()" title="Ímã: encaixar na agulha e nos cortes (N)"><svg class="i"><use href="#i-magnet"/></svg></button>
                                 <div class="ve-io-chip" id="ve-io-chip" hidden>
                                     <span class="ve-io-txt" id="ve-io-txt" title="Entrada e saída marcadas (I / O) · clique vai até a entrada"></span>
                                     <button onclick="veExtractInOut()" title="Remover o trecho In→Out e fechar o espaço (X)"><svg class="i"><use href="#i-scissors"/></svg></button>
@@ -928,7 +926,13 @@
                             </div>
                             <div class="ve-tl-body" id="ve-tl-body">
                                 <div class="ve-tl-heads">
-                                    <div class="ve-head-ruler"></div>
+                                    <div class="ve-head-ruler">
+                                        <!-- ferramentas da timeline no topo da coluna das trilhas (como no Premiere) -->
+                                        <button class="ve-seg-btn ve-snap active" id="ve-snap" onclick="veToggleSnap()" title="Ímã: encaixar na agulha e nos cortes (N)"><svg class="i"><use href="#i-magnet"/></svg></button>
+                                        <button class="ve-seg-btn ve-snap active" id="ve-vinculo" onclick="veToggleVinculo()" title="Seleção vinculada: ligada, clicar no vídeo ou no áudio seleciona os dois; desligada, só a parte clicada"><svg class="i"><use href="#i-link"/></svg></button>
+                                        <button class="ve-seg-btn ve-snap active" onclick="veAddMarker()" title="Adicionar marcador (M)"><svg class="i" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
+                                        <button class="ve-seg-btn ve-snap active" id="ve-tl-config" onclick="veTlConfigMenu(this)" title="Configurações da timeline"><svg class="i"><use href="#i-gear"/></svg></button>
+                                    </div>
                                     <div class="ve-heads-clip"><div class="ve-heads-rows" id="ve-heads-rows"></div></div>
                                 </div>
                                 <div class="ve-tl-wrap" id="ve-tl-wrap">
@@ -2104,6 +2108,7 @@
     <script src="js/editor-3d.js"></script>
     <script src="js/editor-3d-tela.js"></script>
     <script src="js/editor-roto.js"></script>
+    <script src="js/editor-caneta.js"></script>
     <script src="js/editor-soundboard.js"></script>
     <script src="js/editor-ferramentas.js"></script>
     <script src="js/editor-dock.js"></script>

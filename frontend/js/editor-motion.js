@@ -1404,7 +1404,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ferramentas Máscara e Caneta, no grupo da Forma (painel Ferramentas)
     if (typeof VE_FERR !== 'undefined') {
         const g = VE_FERR.find(x => x.some(f => f.id === 'forma'));
-        if (g && !g.some(f => f.id === 'mascara')) g.push({ id: 'mascara', ic: 'i-mask', nome: 'Máscara (retângulo, elipse)', tecla: '' }, { id: 'caneta', ic: 'i-pen', nome: 'Caneta (máscara livre)', tecla: '' });
+        if (g && !g.some(f => f.id === 'mascara')) g.push({ id: 'mascara', ic: 'i-mask', nome: 'Máscara (retângulo, elipse)', tecla: '' }, { id: 'caneta', ic: 'i-pen', nome: 'Caneta (máscara no monitor · volume/opacidade na timeline)', tecla: 'P' });
         if (typeof veFerrRender === 'function') veFerrRender();
     }
 });

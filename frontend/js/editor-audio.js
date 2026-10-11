@@ -189,9 +189,9 @@ function veAudioPrever(t) {
 // Clipes com som, prontos para o mixer: [início, entrada, saída, ganho linear, id da fonte, velocidade, manter tom,
 // fade de entrada (s), fade de saída (s), efeitos de áudio]
 function veAudioClipes() {
-    return veMixClipes().map(([st, s0, e0, g, id, v, tom, fi, fo, afx]) => {
+    return veMixClipes().map(([st, s0, e0, g, id, v, tom, fi, fo, afx, vk]) => {
         if (afx && afx.some(f => f.t === 'antinoise')) veAnGarantir(id);
-        return [st, s0, e0, Math.pow(10, g / 20), id, v || 1, tom !== 0, fi || 0, fo || 0, afx || []];
+        return [st, s0, e0, Math.pow(10, g / 20), id, v || 1, tom !== 0, fi || 0, fo || 0, afx || [], vk || null];
     });
 }
 
@@ -259,11 +259,21 @@ function veAnPeso(amt) {
 
 // Ganho do fade no instante u (s desde o início do clipe na timeline): Potência constante = seno / cosseno
 // (o mesmo do afade curve=qsin do ffmpeg na exportação)
-function veAudioFade(u, dur, fi, fo) {
+function veAudioFade(u, dur, fi, fo, vk) {
     let g = 1;
+    if (vk) g *= veAudioVk(vk, u);
     if (fi > 0 && u < fi) g *= Math.sin(Math.PI / 2 * Math.max(0, u) / fi);
     if (fo > 0 && u > dur - fo) g *= Math.sin(Math.PI / 2 * Math.max(0, dur - u) / fo);
     return g;
+}
+
+// Volume animado pela Caneta (editor-caneta.js): pontos [u, dB], linear em dB entre eles (o mesmo da exportação)
+function veAudioVk(vk, u) {
+    let db;
+    if (u <= vk[0][0]) db = vk[0][1];
+    else if (u >= vk[vk.length - 1][0]) db = vk[vk.length - 1][1];
+    else { let j = 0; while (vk[j + 1][0] < u) j++; const a = vk[j], b = vk[j + 1]; db = a[1] + (b[1] - a[1]) * (u - a[0]) / Math.max(1e-9, b[0] - a[0]); }
+    return db <= -96 ? 0 : Math.pow(10, db / 20);
 }
 
 // Amostra (esquerda, direita) da fonte F no quadro fracionário f, ou null se o bloco ainda não chegou
@@ -391,7 +401,7 @@ function veAudioMixar(t, n) {
 function veAudioMixarBruto(t, n) {
     const L = new Float32Array(n), R = new Float32Array(n), passo = VEAU.taxa / VE_AU_SR, busses = {};
     for (const cl of VEAU.clipes) {
-        const [st, s0, e0, g, id, v, tom, fi, fo, fx] = cl;
+        const [st, s0, e0, g, id, v, tom, fi, fo, fx, vk] = cl;
         const F = veAudioFonteClipe(id, fx), fimC = st + (e0 - s0) / v, tFim = t + n * passo;
         if (!F || fimC <= t || st >= tFim) continue;
         // trilha com rack de efeitos (Mixer): o clipe vai para o barramento dela; efeitos, fader e pan vêm na soma
@@ -400,14 +410,14 @@ function veAudioMixarBruto(t, n) {
         const P = veMixPico(fx);
         const i0 = Math.max(0, Math.ceil((st - t) / passo)), i1 = Math.min(n, Math.ceil((fimC - t) / passo));
         const PS = veAprEstado(cl, fx, t + i0 * passo, passo);
-        const k0 = g / 32768, a0 = s0 * VE_AU_SR, durC = fimC - st, fade = fi > 0 || fo > 0;
+        const k0 = g / 32768, a0 = s0 * VE_AU_SR, durC = fimC - st, fade = fi > 0 || fo > 0 || !!vk;
         if (v === 1 || !tom) {
             // normal, ou velocidade que muda o tom junto (como fita mais rápida)
             for (let i = i0; i < i1; i++) {
                 const frame = a0 + (t + i * passo - st) * v * VE_AU_SR;
                 const x = veAudioAmostra(F, frame);
                 if (!x) continue;                                   // bloco ainda não lido: silêncio (raro, há previsão)
-                const k = fade ? k0 * veAudioFade(t + i * passo - st, durC, fi, fo) : k0;
+                const k = fade ? k0 * veAudioFade(t + i * passo - st, durC, fi, fo, vk) : k0;
                 const y = veAudioFxProcess(x[0] * k, x[1] * k, fx, d => veAudioFxTap(F, frame - d * v * VE_AU_SR, k), PS);
                 DL[i] += y[0];
                 DR[i] += y[1];
@@ -428,7 +438,7 @@ function veAudioMixarBruto(t, n) {
                 const w = VE_AU_HANN[Math.min(VE_AU_HANN.length - 1, Math.floor(o))];
                 l += x[0] * w; r += x[1] * w;
             }
-            const k = fade ? k0 * veAudioFade(t + i * passo - st, durC, fi, fo) : k0;
+            const k = fade ? k0 * veAudioFade(t + i * passo - st, durC, fi, fo, vk) : k0;
             const y = veAudioFxProcess(l * k, r * k, fx, null, PS);
             DL[i] += y[0];
             DR[i] += y[1];
@@ -567,10 +577,10 @@ function veAudioFonteEm(F, cl, u) {
 // depois → fades (a mesma ordem da exportação). O limitador de cada clipe continua de um pedaço para o outro; num
 // salto (play em outro ponto, edição) ele recomeça ~1 s antes, para chegar no ponto já no estado certo.
 function veAudioMixarLim(cl, F, t, n, passo, L, R) {
-    const [st, s0, e0, , , v, , fi, fo, fx] = cl;
+    const [st, s0, e0, , , v, , fi, fo, fx, vk] = cl;
     const k = fx.findIndex(f => f.t === 'limiter'), lv = fx[k].v || {};
     const pre = fx.slice(0, k), pos = fx.slice(k + 1).filter(f => f.t !== 'limiter');
-    const fimC = st + (e0 - s0) / v, durC = fimC - st, fade = fi > 0 || fo > 0, P = veMixPico(fx);
+    const fimC = st + (e0 - s0) / v, durC = fimC - st, fade = fi > 0 || fo > 0 || !!vk, P = veMixPico(fx);
     const i0 = Math.max(0, Math.ceil((st - t) / passo)), i1 = Math.min(n, Math.ceil((fimC - t) / passo));
     const entrada = tau => {
         const u = tau - st;
@@ -598,7 +608,7 @@ function veAudioMixarLim(cl, F, t, n, passo, L, R) {
         S.tIn += passo;
         const u = t + i * passo - st;
         if (pos.length) y = veAudioFxProcess(y[0], y[1], pos, null, cl._prPos || (cl._prPos = {}));
-        const kf = fade ? veAudioFade(u, durC, fi, fo) : 1;
+        const kf = fade ? veAudioFade(u, durC, fi, fo, vk) : 1;
         L[i] += y[0] * kf;
         R[i] += y[1] * kf;
         if (P) { const a = Math.abs(y[0] * kf), b = Math.abs(y[1] * kf); if (a > P[0]) P[0] = a; if (b > P[1]) P[1] = b; }

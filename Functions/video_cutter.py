@@ -1803,6 +1803,8 @@ def _normalizar_mix(clipes, dur_fonte):
             fi = max(0.0, float(c[7])) if len(c) > 7 and c[7] else 0.0   # fades (Potência constante), em s da timeline
             fo = max(0.0, float(c[8])) if len(c) > 8 and c[8] else 0.0
             afx = _normalizar_afx(c[9] if len(c) > 9 else None)
+            # volume animado pela Caneta (editor-caneta.js): [[s desde o início do clipe, dB], ...]
+            vk = [[float(u), float(d)] for u, d in c[10]][:500] if len(c) > 10 and c[10] else None
         except Exception:
             continue
         if arq is not None and not os.path.isfile(str(arq)):
@@ -1811,7 +1813,7 @@ def _normalizar_mix(clipes, dur_fonte):
         if arq is None and dur_fonte:
             e0 = min(float(dur_fonte), e0)
         if st >= 0 and e0 - s0 > 0.005:
-            out.append((st, s0, e0, max(-60.0, min(30.0, g)), arq, vel, tom, fi, fo, afx))
+            out.append((st, s0, e0, max(-60.0, min(30.0, g)), arq, vel, tom, fi, fo, afx) + ((vk,) if vk else ()))
     return out
 
 
@@ -1979,7 +1981,7 @@ def _pre_limitar(mix, path, tem_audio_fonte, work):
     import numpy as np
     out = []
     for c in mix:
-        st, s0, e0, g, arq, vel, tom, fi, fo, afx = c
+        st, s0, e0, g, arq, vel, tom, fi, fo, afx, *resto = c
         k = next((j for j, (t, _) in enumerate(afx) if t == "limiter"), None)
         if k is None or (arq is None and not tem_audio_fonte):
             out.append(c)
@@ -2006,7 +2008,7 @@ def _pre_limitar(mix, path, tem_audio_fonte, work):
         y = _hard_limiter(x, **lim)
         raw = os.path.join(work, f"lim_{uuid.uuid4().hex[:10]}.f32")
         y.tofile(raw)
-        out.append((st, 0.0, len(y) / AUDIO_SR, 0.0, raw, 1.0, True, fi, fo, pos))
+        out.append((st, 0.0, len(y) / AUDIO_SR, 0.0, raw, 1.0, True, fi, fo, pos, *resto))
     return out
 
 
@@ -2017,7 +2019,7 @@ def _pre_antinoise(mix, path, tem_audio_fonte, work):
     from Functions import anti_noise
     out = []
     for c in mix:
-        st, s0, e0, g, arq, vel, tom, fi, fo, afx = c
+        st, s0, e0, g, arq, vel, tom, fi, fo, afx, *resto = c
         an = next((v for t, v in afx if t == "antinoise"), None)
         if an is None or (arq is None and not tem_audio_fonte):
             out.append(c)
@@ -2038,7 +2040,7 @@ def _pre_antinoise(mix, path, tem_audio_fonte, work):
         if r.returncode != 0 or not os.path.isfile(wav):
             raise RuntimeError("Anti Noise: não foi possível misturar o som limpo: "
                                + (r.stderr.decode("utf-8", "replace").strip().splitlines() or ["?"])[-1])
-        out.append((st, 0.0, e0 - s0, g, wav, vel, tom, fi, fo, [f for f in afx if f[0] != "antinoise"]))
+        out.append((st, 0.0, e0 - s0, g, wav, vel, tom, fi, fo, [f for f in afx if f[0] != "antinoise"], *resto))
     return out
 
 
@@ -2079,6 +2081,19 @@ def _limitar_master(mix, path, tem_audio_fonte, total, lim, work, fim=0.0):
     return [(0.0, 0.0, len(y) / AUDIO_SR, 0.0, raw, 1.0, True, 0.0, 0.0, [])]
 
 
+def _expr_vol_kf(vk):
+    """Pontos [u, dB] → expressão do ffmpeg (ganho linear no tempo t do clipe): constante antes do 1º e depois do
+    último, linear em dB entre eles; −96 dB ou menos = silêncio."""
+    pts = sorted((float(u), max(-200.0, float(d))) for u, d in vk)
+    db = f"{pts[-1][1]:.4f}"
+    for (u0, d0), (u1, d1) in reversed(list(zip(pts, pts[1:]))):
+        if u1 - u0 < 1e-6:
+            continue
+        db = f"if(lt(t\\,{u1:.4f})\\,{d0:.4f}+({d1 - d0:.4f})*(t-{u0:.4f})/{u1 - u0:.4f}\\,{db})"
+    db = f"if(lt(t\\,{pts[0][0]:.4f})\\,{pts[0][1]:.4f}\\,{db})"
+    return f"if(lte({db}\\,-96)\\,0\\,pow(10\\,({db})/20))"
+
+
 def _grafo_mix(clipes, total, entradas, rotulo):
     """Filtros que somam os clipes (st, s, e, ganho, arquivo) e terminam em [rotulo] com a duração exata `total`.
     entradas = {arquivo: "[i:a:0]"} (arquivo None = vídeo aberto). Um decodificador por arquivo (asplit),
@@ -2098,6 +2113,10 @@ def _grafo_mix(clipes, total, entradas, rotulo):
     for k, (st, s0, e0, g, _, vel, tom, *fd) in enumerate(clipes):
         fi, fo, afx = (fd + [0.0, 0.0, []])[:3]
         vol = f",volume={g:.2f}dB" if g else ""
+        # volume animado pela Caneta (editor-caneta.js): [[s desde o início do clipe, dB]], linear em dB (como a prévia)
+        vk = fd[3] if len(fd) > 3 and fd[3] else None
+        if vk:
+            vol += f",volume='{_expr_vol_kf(vk)}':eval=frame"
         audio_fx = _filtros_afx(afx)
         efeitos = ("," + ",".join(audio_fx)) if audio_fx else ""
         # fades de Potência constante (seno/cosseno = curve=qsin), no tempo da timeline (depois da velocidade)

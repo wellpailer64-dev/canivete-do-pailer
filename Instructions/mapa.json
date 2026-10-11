@@ -12,6 +12,7 @@
     "editor-audio.js",
     "editor-autoframe-cliente.js",
     "editor-autoframe.js",
+    "editor-caneta.js",
     "editor-colar-externo.js",
     "editor-comandos.js",
     "editor-comp.js",
@@ -2476,6 +2477,7 @@
   "teste_roto": "Pincel Roto (editor-roto.js + Functions/pincel_roto.py) no app de verdade: vídeo de entrevista na V1, texto animado",
   "teste_sfx": "Gerador de efeitos sonoros (Functions/gerador_sfx.py): agendador DDIM igual ao do diffusers e uma geração curta",
   "teste_som": "Sound Kanivete (som.js + Functions/sound_kanivete.py) — app em --agente=9333, mouse de verdade",
+  "teste_timeline_pr": "Timeline como a do Premiere (2026-10-11): ferramentas no topo da coluna das trilhas, alvo de trilha (Track Targeting),",
   "teste_vetor": "Teste do Vetor Kanivete pela API real (app em --agente=9333): monta um cartão de visita pelos comandos (window.VKN),",
   "teste_vetor_editor3d": "Teste da ponte Vetor → Editor (Cena 3D), app em --agente=9333: copo (girar) com rótulo coral, caixa (extrudar com",
   "teste_vetor_paineis": "Painéis móveis do Vetor Kanivete (vetor-dock.js, o mecanismo do Photo) — app em --agente=9333, mouse de verdade"
