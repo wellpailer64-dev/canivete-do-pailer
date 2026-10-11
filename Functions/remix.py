@@ -185,6 +185,32 @@ def montar(arq, caminho, saida):
     return {"dur": len(y) / SR, "emendas": emendas}
 
 
+def remix_cache(base, arq, alvo):
+    """Para o Editor: análise e remix guardados em <cache de render>/Remix (o mesmo pedido não refaz nada)."""
+    import hashlib
+    from Functions import render_cache, media_server
+    if not arq or not os.path.isfile(arq):
+        return {"success": False, "error": "música não encontrada"}
+    pasta = os.path.join(render_cache._raiz(base), "Remix")
+    os.makedirs(pasta, exist_ok=True)
+    st = os.stat(arq)
+    h = hashlib.sha1(f"{os.path.abspath(arq)}|{st.st_size}|{st.st_mtime_ns}".encode()).hexdigest()[:12]
+    saida = os.path.join(pasta, f"{h}_{float(alvo):.2f}.wav")
+    meta = saida + ".json"
+    if os.path.isfile(saida) and os.path.isfile(meta):
+        try:
+            r = json.load(open(meta, encoding="utf-8"))
+            return dict(r, success=True, path=saida, url=media_server.register(saida))
+        except Exception:
+            pass
+    try:
+        r = remixar(arq, alvo, saida, os.path.join(pasta, h + ".analise.json"))
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    json.dump({k: r[k] for k in ("dur", "emendas", "sim", "tempo", "metro")}, open(meta, "w", encoding="utf-8"))
+    return dict(r, url=media_server.register(saida))
+
+
 def remixar(arq, alvo, saida, cache=None):
     """Música → remix com ~alvo segundos. Devolve {success, path, dur, emendas, sim, tempo}."""
     an = None

@@ -3726,6 +3726,14 @@ class ApiBridge:
         from Functions import cena3d
         return cena3d.pasta_vetor(base)
 
+    # Remix de música (frontend/js/editor-remix.js + Functions/remix.py): esticar/encurtar pela semelhança dos compassos
+    def ve_remix(self, base, arquivo, alvo):
+        from Functions import remix
+        try:
+            return remix.remix_cache(base, arquivo, float(alvo))
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     # Pincel Roto do Editor (frontend/js/editor-roto.js + Functions/pincel_roto.py): SAM 2.1 de vídeo, em segundo plano
     def ve_roto_abrir(self, base, rid, video, a, b):
         from Functions import pincel_roto

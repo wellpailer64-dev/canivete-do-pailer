@@ -70,6 +70,9 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "torchaudio" ^
  --hidden-import "soundfile" ^
  --hidden-import "librosa" ^
+ --collect-all "librosa" ^
+ --hidden-import "Functions.remix" ^
+ --hidden-import "Functions.pincel_roto" ^
  --collect-all "yt_dlp_ejs" ^
  --collect-all "pyphen" ^
  --collect-all "webview" ^

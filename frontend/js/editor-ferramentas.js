@@ -7,7 +7,8 @@
 
 const VE_FERR = [
     [{ id: 'select', ic: 'i-pointer', nome: 'Seleção', tecla: 'V' }],
-    [{ id: 'rate', ic: 'i-rate', nome: 'Velocidade (Rate Stretch)', tecla: 'R' }],
+    [{ id: 'rate', ic: 'i-rate', nome: 'Velocidade (Rate Stretch)', tecla: 'R' },
+     { id: 'remix', ic: 'i-music', nome: 'Remix (estica/encurta a música)', tecla: 'Shift+R' }],
     [{ id: 'razor', ic: 'i-scissors', nome: 'Lâmina', tecla: 'C' }],
     [{ id: 'hand', ic: 'i-hand', nome: 'Mão', tecla: 'H' }, { id: 'zoom', ic: 'i-zoom', nome: 'Zoom', tecla: 'Z' }],
     [{ id: 'texto', ic: 'i-type', nome: 'Texto', tecla: 'T' }],

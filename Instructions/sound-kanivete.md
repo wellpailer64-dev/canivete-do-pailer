@@ -206,7 +206,11 @@ retrato por compasso (cromas + MFCC + energia), salto para frente (encurtar, 1 o
 (esticar), preservando começo e final; emenda no começo do compasso com crossfade de 40 ms. Medido em 2 músicas
 (D:/kanivete_testes/remix, `medir.py`): 60/90/300 s chegam a ±1 s do pedido, ritmo na emenda com desvio de 23 ms (1
 quadro de análise), volume na emenda −1…+3 dB (o laço longo da 2ª música: −7 dB). Análise ~15 s na 1ª vez, depois <1 s.
-FALTA: o Pailer ouvir os .wav; depois a UI (item 3).
+O Pailer ouviu e aprovou ("ficou ótimo"). **UI feita (2026-10-11)**: ferramenta Remix no Editor (Shift+R, grupo da
+Velocidade; `frontend/js/editor-remix.js`): arrastar a ponta direita de uma música → `ve_remix` (`remix.remix_cache`,
+cache em <cache de render>/Remix) → o clipe usa a música remixada (mídia oculta `rmxDe`/`rmxAlvo`/`rmxEm`), emendas em
+zigue-zague no clipe; Clipe › "Remix: voltar à música original"; projeto sem o arquivo refaz igual. Teste:
+`py -3.13 testes/teste_remix.py` (porta 9338). Falta: Remix no Sound Kanivete (Sk) e pela ponta esquerda.
 Rodadas seguintes do plano profissional:
 Plano profissional A–F concluído. Próximos: compensar a latência da placa ao gravar; prévia idêntica do gate/de-esser; banco v2 com mais vozes (e as CC0 Jeff/Cadu se o usuário baixar).
 Separar voz da música (precisa de um modelo de separação; o UVR/Roformer foi testado no anti-noise), curva de volume

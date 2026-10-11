@@ -4290,6 +4290,7 @@ function veProjectData() {
             .map(m => {
                 const o = { id: m.id, kind: m.kind, name: m.name, pasta: m.pasta || null, cor: m.cor, nome: m.nome };
                 if (m.kind === 'audio') Object.assign(o, { path: m.path, dur: m.dur });
+                if (m.rmxDe != null) Object.assign(o, { rmxDe: m.rmxDe, rmxAlvo: m.rmxAlvo, rmxEm: m.rmxEm || [] });   // Remix (editor-remix.js)
                 if (m.kind === 'image') Object.assign(o, { path: m.path, w: m.w, h: m.h });
                 if (m.kind === 'legenda') Object.assign(o, { path: m.path, itens: m.itens });
                 if (m.kind === 'video') o.path = m.path;
@@ -4565,6 +4566,7 @@ function veApplyProject() {
         if (m.kind === 'audio') {
             const nm = { id: VE.media.length, kind: 'audio', path: m.path, name: m.name, dur: m.dur || 0, peaks: [], ...org };
             if (m.rvDe != null) Object.assign(nm, { rvDe: m.rvDe, rvA: m.rvA, rvB: m.rvB });
+            if (m.rmxDe != null) Object.assign(nm, { rmxDe: m.rmxDe, rmxAlvo: m.rmxAlvo, rmxEm: m.rmxEm || [] });   // Remix
             VE.media.push(nm);
             ids[m.id] = nm.id;
             if (estaFaltando(m.path)) {
@@ -4602,6 +4604,13 @@ function veApplyProject() {
         nm.rvDe = ids[nm.rvDe];
         if (nm.rvDe == null) delete nm.rvDe;
         else if (nm.missing) veRvRestaurar(nm);
+    });
+    // músicas do Remix (editor-remix.js): idem (o remix é refeito igual a partir da original)
+    VE.media.forEach(nm => {
+        if (!nm || nm.rmxDe == null) return;
+        nm.rmxDe = ids[nm.rmxDe];
+        if (nm.rmxDe == null) delete nm.rmxDe;
+        else if (nm.missing && typeof veRmxRestaurar === 'function') veRmxRestaurar(nm);
     });
     const mapClips = lista => (lista || [])
         .filter(c => !c.m || ids[c.m] != null)
@@ -5338,6 +5347,7 @@ function veRender() {
         const enh = (typeof veMaEstado === 'function' ? veMaEstado(c.m || 0) : null) || (typeof veAnEstado === 'function' ? veAnEstado(c) : null);
         if (enh && !ghost) veMaDesenhar(ctx, cx, ay, cw, ah, enh);
         if (!ghost && typeof veCnDesenhar === 'function') veCnDesenhar(ctx, c, 'a', cx, ay, cw, ah, st);   // linha de volume
+        if (!ghost && typeof veRmxEmendas === 'function') veRmxEmendas(ctx, c, cx, ay, cw, ah, st);   // ondinhas do Remix
         ctx.restore();
         ctx.globalAlpha = 1;
 
@@ -5428,6 +5438,7 @@ function veRender() {
     }
 
     veDrawMarkers(ctx, X, W, H);
+    if (typeof veRmxDesenharArraste === 'function') veRmxDesenharArraste(ctx);   // Remix: duração nova enquanto arrasta
     if (typeof veIoChip === 'function') veIoChip();
 
     // ímã: enquanto arrasta (agulha, camada ou borda) e grudou, uma linha com triângulos no ponto
@@ -6365,6 +6376,7 @@ function veInitEvents() {
         if (row && row.kind === 'l') { veLegPointer(e, x, t); return; }
         VETX.legSel = -1;
         if (VE.tool === 'rate' && e.button === 0) { veRatePointer(e, x, row); return; }
+        if (VE.tool === 'remix' && e.button === 0) { veRmxPointer(e, x, row); return; }   // editor-remix.js
         if ((VE.tool === 'fwd' || VE.tool === 'bwd') && e.button === 0 && row) {
             // Selecionar faixa para a frente/trás (editor-lacunas.js): pega o grupo e já pode arrastar
             const c = veFaixaSelecionar(e, t, row), lista = veSelLista();

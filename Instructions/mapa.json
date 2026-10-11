@@ -36,6 +36,7 @@
     "editor-projeto.js",
     "editor-props.js",
     "editor-psd.js",
+    "editor-remix.js",
     "editor-render.js",
     "editor-reverse.js",
     "editor-roto.js",
@@ -112,6 +113,7 @@
     "ve_c3d_lote",
     "ve_c3d_fim",
     "ve_c3d_pasta",
+    "ve_remix",
     "ve_roto_abrir",
     "ve_roto_estado",
     "ve_roto_base",
@@ -1420,6 +1422,12 @@
     "cena3d"
    ]
   },
+  "ve_remix": {
+   "args": "base, arquivo, alvo",
+   "modulos": [
+    "remix"
+   ]
+  },
   "ve_roto_abrir": {
    "args": "base, rid, video, a, b",
    "modulos": [
@@ -2475,6 +2483,7 @@
   "teste_psd_refs": "PSD salvo por cima (ida e volta) não pode trocar pixels entre camadas (2026-10-06: o carrossel do cliente voltou com",
   "teste_psd_so": "Objeto inteligente criado no Photo Kanivete → objeto inteligente INCORPORADO no PSD (Functions/editor_imagem._so_novo)",
   "teste_psd_texto": "Texto criado no Photo Kanivete → camada de texto EDITÁVEL no PSD (Functions/editor_imagem._texto_novo)",
+  "teste_remix": "Remix de música na timeline (editor-remix.js + Functions/remix.py), com mouse de verdade: põe uma música de 3:46",
   "teste_roto": "Pincel Roto (editor-roto.js + Functions/pincel_roto.py) no app de verdade: vídeo de entrevista na V1, texto animado",
   "teste_sfx": "Gerador de efeitos sonoros (Functions/gerador_sfx.py): agendador DDIM igual ao do diffusers e uma geração curta",
   "teste_som": "Sound Kanivete (som.js + Functions/sound_kanivete.py) — app em --agente=9333, mouse de verdade",

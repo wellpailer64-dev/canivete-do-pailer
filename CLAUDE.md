@@ -93,6 +93,9 @@ trilha-alvo mais baixa, Alt+D seleciona o clipe na agulha. **Caneta** (P sem cli
 como no After): linha de opacidade (`c.k.op`) e de VOLUME (`c.k.vol` em dB, linear em dB: prévia `veAudioVk`, exportação
 `_expr_vol_kf`) no clipe — `frontend/js/editor-caneta.js`. Menu de efeitos do Mixer em categorias do Premiere com
 submenu (`VE_MIX_CATS`). Teste: `py -3.13 testes/teste_timeline_pr.py` (porta 9337).
+**Remix de música** (Remix tool do Premiere): ferramenta Remix (Shift+R) — arrastar a ponta direita da música estica/encurta
+a música inteira (começo e final de verdade, saltos entre compassos parecidos): `frontend/js/editor-remix.js` +
+`Functions/remix.py` (librosa); guia em `Instructions/sound-kanivete.md` › Pendências › REMIX. Teste: `testes/teste_remix.py`.
 
 Atributos de vários clipes (como no Premiere): `frontend/js/editor-atributos.js` — botão direito → "Remover atributos…"
 (efeitos de vídeo/áudio, movimento, opacidade, mesclagem, volume, transições, com caixinhas; vale para a seleção) e ajuste
