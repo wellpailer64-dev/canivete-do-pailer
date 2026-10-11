@@ -5659,6 +5659,10 @@ function veRenderClips() {
     $ve('ve-sum-final').textContent = veHuman(VE.dur);
     $ve('ve-sum-cut').textContent = veHuman(Math.max(0, VE.srcDur - VE.dur));
 
+    // painel Clipes fechado: não remonta a lista (num projeto de 250 clipes custava ~16 ms a cada edição, 2026-10-11);
+    // quando o painel aparece (o tamanho deixa de ser 0), monta
+    if (!veTam(box, () => { if (VE._clipsSujo && box.clientWidth) veRenderClips(); }).w) { VE._clipsSujo = true; return; }
+    VE._clipsSujo = false;
     if (!VE.clips.length) {
         box.innerHTML = '<div class="ve-clips-empty">Timeline vazia.<br>Arraste mídias do painel Projeto para montar a edição.</div>';
         return;
