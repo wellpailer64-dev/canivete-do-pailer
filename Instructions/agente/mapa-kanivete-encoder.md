@@ -132,7 +132,11 @@ Corte também a base (só os segmentos até T).
    - Imagens com efeito (texto com Aberração, etc.) ainda preparadas na CPU.
 2. Velocidade: a placa está em ~1× a duração; medir onde vai o tempo (imagens preparadas na CPU quadro a quadro,
    número de passadas do libplacebo) antes de mexer.
-3. Na placa: legendas, outros modos de mesclagem, prévia renderizada. (Rotação de camada: feita na rodada 5.)
+3. Na placa: outros modos de mesclagem, prévia renderizada. (Rotação de camada: feita na rodada 5. Legendas: feitas
+   2026-10-11 — a placa monta e o libass desenha o mesmo .ass no quadro que desce para o codificador; em bloco, o relógio
+   desloca com setpts; caso `legendas` no teste_export.)
+4. Investigar: caso `motion` em blocos forçados de 1 s (`CANIVETE_PLACA_BLOCOS=1 CANIVETE_BLOCO_SEG=1 --placa`) caiu
+   para a CPU com "erro na placa" (2026-10-11; no modo normal vai na placa).
 4. +1,5 de Y na LUT do libplacebo; blocos com GOP fechado; base de trechos no export por blocos.
 5. Textos antigos da fila sem tradução ("Fila de render", "Pausar depois deste"…).
 

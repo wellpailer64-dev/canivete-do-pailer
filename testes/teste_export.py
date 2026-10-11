@@ -263,6 +263,15 @@ CASOS = {
         return [clip(0, 0, 0, 1.013, 'principal'), clip(0, 1.013, 0, 0.984, 'foto1.jpg'),
                 clip(0, 1.997, 0.5, 1.513, 'b.mp4'), clip(0, 3.01, 0, 0.99, 'foto2.jpg')];
     """, ""),
+    # legendas sobre camadas (na placa: o libass desenha no quadro que desce da placa; antes a timeline inteira ia
+    # para a CPU por causa delas)
+    "legendas": (1080, 1920, """
+        const { clip } = __te;
+        return [clip(0, 0, 0, 3, 'principal'), clip(1, 0.5, 0, 2, 'logo.png', { p: { sc: 60, x: 540, y: 600, rot: 0, op: 100 } })];
+    """, """
+        VE.legendas = [{ st: 0.2, en: 1.4, texto: 'Olá, meu nome é Caroline' }, { st: 1.4, en: 2.9, texto: 'sou médica veterinária' }];
+        VE.legGravar = true; veRefresh();
+    """),
     # camadas: PiP com escala/posição animadas e giro, logo com transparência e opacidade animada, texto
     "camadas": (1080, 1920, """
         const { clip } = __te, W = 1080, H = 1920;

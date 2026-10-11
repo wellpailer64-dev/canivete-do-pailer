@@ -256,8 +256,7 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
         return f"formato {vcodec} {bits} bits"
     if reduz:
         return "saída reduzida"
-    if legendas and legendas.get("itens"):
-        return "legendas"
+    # legendas: a placa monta e o libass desenha no quadro que desce para o codificador (_render, 2026-10-11)
     if not lay:
         return "sem camadas"
     for c in lay:
@@ -1009,11 +1008,18 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
     temp = None
     enc = vc._args_video(dict(cfg, vcodec=vcodec), q, args["usar_gpu"], bits, float(op.get("mbps") or 0))
     cor = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
+    # legendas (o mesmo .ass da exportação pela CPU): desenhadas pelo libass no quadro já montado, ao descer da placa
+    leg = args.get("legendas")
+    ass = vc._gerar_ass(leg["itens"], leg.get("estilo") or {}, W, H) if leg and leg.get("itens") else None
 
     def _render(lay_r, total_r, segs_r, arq, feitos):
         """Monta e codifica [0, total_r] (a timeline inteira ou um bloco) em arq. None = deu certo; senão o erro."""
         g, final = montar(lay_r, W, H, fps, total_r, pasta, segs_r, args["path"], info)
-        g.filtros.append(f"{final}hwdownload,format=yuv420p[vbaixo]")
+        sub = ""
+        if ass:   # num bloco o relógio começa em `feitos`: as legendas usam o tempo da timeline
+            sub = (f",setpts=PTS+{feitos:.6f}/TB,subtitles=filename={vc._caminho_filtro(ass)},setpts=PTS-{feitos:.6f}/TB"
+                   if feitos > 1e-6 else f",subtitles=filename={vc._caminho_filtro(ass)}")
+        g.filtros.append(f"{final}hwdownload,format=yuv420p{sub}[vbaixo]")
         fm, rot_v, args_min = vc.saida_miniatura("[vbaixo]")   # a miniatura do quadro em render (janela do Encoder)
         g.filtros += fm
         g.filtros.append(f"{rot_v}null[vout]")
