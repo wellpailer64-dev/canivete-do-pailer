@@ -54,7 +54,7 @@ async function veFilaAdicionarAtual(nome = null, cfg = null) {
     }
 }
 async function veFilaAdicionarAgora(nome, cfg) {
-    if (veOfflineMedias().length) { veToast('Relinque ou apague as mídias offline antes de exportar'); return null; }
+    { const off = veOfflineNaTimeline(); if (off.length) { veAvisoOffline(off); return null; } }
     const msg = m => { const el = $ve('ve-fila-msg'); if (el) el.textContent = m || ''; };
     msg('Preparando ' + veFilaNomeTimeline() + '… (o render começa sozinho)');
     if (typeof veCompProntas === 'function') await veCompProntas(msg);

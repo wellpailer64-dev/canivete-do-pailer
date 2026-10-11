@@ -2313,6 +2313,28 @@ function vePathNome(path, fallback = 'Mídia offline') {
 }
 function veMediaOffline(m) { return !!(m && (m.offline || m.missing || m.lost)); }
 function veOfflineMedias() { return (VE.media || []).filter(m => m && !m.removido && !m._rvGerando && veMediaOffline(m)); }
+// Offline que a timeline aberta USA (direto ou dentro de uma Comp): só essas impedem exportar. Mídia offline esquecida no
+// painel Projeto, sem uso, não trava mais o export (como no Premiere).
+function veOfflineNaTimeline() {
+    const usadas = new Set(), vistas = new Set();
+    const varrer = clips => (clips || []).forEach(c => {
+        const id = c.m || 0;
+        if (usadas.has(id)) return;
+        usadas.add(id);
+        const m = VE.media[id];
+        if (m && m.comp && m.sequenceId && !vistas.has(m.sequenceId)) {
+            vistas.add(m.sequenceId);
+            const s = (VE.sequences || []).find(x => x.id === m.sequenceId);
+            if (s && s.id !== VE.activeSequence) varrer(s.clips);
+        }
+    });
+    varrer(VE.clips);
+    return veOfflineMedias().filter(m => usadas.has(m.id));
+}
+function veAvisoOffline(lista) {
+    const nomes = lista.slice(0, 3).map(m => m.name || m.nome || '?').join(', ') + (lista.length > 3 ? ` +${lista.length - 3}` : '');
+    veToast(`${veT('Mídia offline na timeline')} (${nomes}): ${veT('relinque ou tire da timeline antes de exportar')}`);
+}
 function veProjetoSeqs(d) {
     return Array.isArray(d && d.sequences) && d.sequences.length ? d.sequences : [{
         clips: (d && d.clips) || [],
@@ -5912,7 +5934,7 @@ function vePill(name) {
 
 function veOpenExport() {
     if (!VE.ready) return;
-    if (veOfflineMedias().length) { veToast('Relinque ou apague as mídias offline antes de exportar'); return; }
+    { const off = veOfflineNaTimeline(); if (off.length) { veAvisoOffline(off); return; } }
     veStop();
     const sel = $ve('ve-res');
     const W = VE.seqW || VE.info.width || 0, H = VE.seqH || VE.info.height || 0;
