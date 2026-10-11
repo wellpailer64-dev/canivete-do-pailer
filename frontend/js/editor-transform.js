@@ -61,9 +61,37 @@ function veTfClipeEm(pt, filtro) {
         .sort((a, b) => b.c.tr - a.c.tr);
     for (const { c, i } of vis) {
         const q = veTfPaiPt(c, pt), sz = veMediaSize(c), l = veTfLocal(c, veProps(c), q.x, q.y, sz);
-        if (l.x >= 0 && l.y >= 0 && l.x <= sz.w && l.y <= sz.h) return i;
+        // parte transparente (recorte do Pincel Roto, PNG sem fundo) não pega o clique: passa para a camada de baixo
+        if (l.x >= 0 && l.y >= 0 && l.x <= sz.w && l.y <= sz.h && !veTfTransparente(c, l.x, l.y, sz)) return i;
     }
     return -1;
+}
+
+// O ponto (pixels da mídia) é transparente nesta camada? Pincel Roto: a máscara do quadro na agulha; imagem: o canal
+// alfa do PNG. Sem como saber (ainda carregando, imagem de outra origem), conta como opaco (comportamento antigo).
+const VETF_AMOSTRA = { cv: null, x: null };
+function veTfAlfaEm(img, u, v) {
+    try {
+        if (!VETF_AMOSTRA.cv) { VETF_AMOSTRA.cv = document.createElement('canvas'); VETF_AMOSTRA.cv.width = VETF_AMOSTRA.cv.height = 1; VETF_AMOSTRA.x = VETF_AMOSTRA.cv.getContext('2d', { willReadFrequently: true }); }
+        const x = VETF_AMOSTRA.x, w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        if (!w || !h) return 255;
+        x.clearRect(0, 0, 1, 1);
+        x.drawImage(img, -Math.floor(u * w), -Math.floor(v * h));
+        return x.getImageData(0, 0, 1, 1).data[3];
+    } catch (e) { return 255; }
+}
+function veTfTransparente(c, lx, ly, sz) {
+    const u = lx / Math.max(1, sz.w), v = ly / Math.max(1, sz.h);
+    if (typeof veRotoFx === 'function' && veRotoFx(c)) {
+        const f = veRotoFx(c), st = f.v && f.v.rd && VERO.st[f.v.rd.rid];
+        if (!st) return false;
+        const i = veRotoQuadro(st, c);
+        const img = i >= 0 && st.ver[i] ? veRotoImg(st, i, true) : null;
+        return !!img && veTfAlfaEm(img, u, v) < 128;
+    }
+    const m = veMediaOf(c);
+    if (veIsImage(c) && m && m.img && m.img.complete && /\.(png|webp|gif)(\?|$)/i.test(m.path || m.img.src || '')) return veTfAlfaEm(m.img, u, v) < 32;
+    return false;
 }
 
 // Alças do selecionado: 8 pontos (mídia) + a âncora
