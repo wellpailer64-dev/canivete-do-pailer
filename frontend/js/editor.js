@@ -3480,7 +3480,10 @@ function veDrawMonitor() {
     const cw = Math.round(VE.seqW * pv), ch = Math.round(VE.seqH * pv);
     // trecho renderizado em disco (editor-render.js): toca o arquivo em vez de compor. Perto do fim, se o
     // seguinte não estiver renderizado, as camadas voltam a acompanhar a agulha (abaixo) para não travar no corte.
-    const pr = typeof vePrSegEm === 'function' ? vePrSegEm(VE.playhead) : null;
+    // PROXY desligado (editor-proxy.js), parado: monta com o quadro do original — nem o trecho renderizado em disco nem
+    // o quadro guardado na RAM (os dois foram feitos com as prévias leves)
+    const semProxy = typeof veProxyLigado === 'function' && !veProxyLigado() && !VE.playing;
+    const pr = !semProxy && typeof vePrSegEm === 'function' ? vePrSegEm(VE.playhead) : null;
     if (!pr && typeof vePrForaDoTrecho === 'function') vePrForaDoTrecho();
     const prPerto = pr && VE.playing && pr.b - VE.playhead < 0.7 && !vePrSegEm(pr.b + 1e-4);
     if (pr && !prPerto && vePrDesenhar(pr, ctx, cv, pv, cw, ch)) { veParkExtras(0, false, true); return; }
@@ -3498,8 +3501,6 @@ function veDrawMonitor() {
     // parado: o quadro guardado basta. Tocando, os players das camadas e das transições continuam
     // acompanhando a agulha (abaixo) — senão, no fim do trecho guardado, todos teriam de buscar de uma vez
     // e a imagem travava.
-    // PROXY desligado (editor-proxy.js): parado, monta com o quadro do original e não guarda no cache das prévias
-    const semProxy = typeof veProxyLigado === 'function' && !veProxyLigado() && !VE.playing;
     if (cachedSrc && !VE.playing && !semProxy) { usarCache(); return; }
     const t = VE.playhead, v = veVideo();
     // transição na agulha (editor-trans.js): os clipes envolvidos vêm estendidos e animados;
