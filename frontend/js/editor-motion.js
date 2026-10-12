@@ -1187,7 +1187,8 @@ Object.assign(VE_FX, {
                  { k: 'raio', nome: 'Raio', min: 0, max: 500, step: 0.5, def: 30, un: 'px' },
                  { k: 'int', nome: 'Intensidade', min: 0, max: 400, step: 1, def: 100, un: '%' },
                  { k: 'usaCor', nome: 'Brilho colorido', tipo: 'bool', def: 0 },
-                 { k: 'cor', nome: 'Cor do brilho', tipo: 'cor', def: '#D4814A', gotas: false }],
+                 { k: 'cor', nome: 'Cor do brilho', tipo: 'cor', def: '#D4814A', gotas: false },
+                 { k: 'soma', nome: 'Somar luz (estoura os claros)', tipo: 'bool', def: 0 }],
         neutro: v => !(v.int > 0) || !(v.raio > 0),
         draw(a, v, env) {
             const w = a.cv.width, h = a.cv.height, B = veMoFxTela(1, w, h), bx = B.ctx, lim = v.lim / 100 * 255;
@@ -1209,7 +1210,8 @@ Object.assign(VE_FX, {
             cx.filter = `blur(${Math.max(0.1, v.raio * env.q / 2).toFixed(2)}px)`; cx.drawImage(B.cv, 0, 0); cx.filter = 'none';
             const o = veFxOther(a, w, h);
             o.ctx.setTransform(1, 0, 0, 1, 0, 0); o.ctx.clearRect(0, 0, w, h); o.ctx.drawImage(a.cv, 0, 0);
-            o.ctx.globalCompositeOperation = 'lighter';
+            // Tela (padrão): os claros chegam ao branco sem cortar; Somar luz = o modo antigo (estourava). Exportação: glow_passadas
+            o.ctx.globalCompositeOperation = v.soma ? 'lighter' : 'screen';
             for (let k = v.int / 100; k > 0.001; k -= 1) { o.ctx.globalAlpha = Math.min(1, k); o.ctx.drawImage(C.cv, 0, 0); }
             o.ctx.globalAlpha = 1; o.ctx.globalCompositeOperation = 'source-over';
             return o;

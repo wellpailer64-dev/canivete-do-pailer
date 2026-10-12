@@ -224,17 +224,21 @@ def _base_imagem(path):
     return _base_preta(info.get("width") or 1920, info.get("height") or 1080)
 
 
-def _base_preta(w, h):
-    """Vídeo preto mudo de 1 s w×h (par), reaproveitado por tamanho: fundo da timeline sem vídeo principal."""
+def _base_preta(w, h, fps=30.0):
+    """Vídeo preto mudo de 1 s w×h (par) na taxa da timeline, reaproveitado por tamanho e taxa: fundo da timeline sem
+    vídeo principal. A taxa da exportação sai dele — era sempre 30: exportar SEM ÁUDIO (ou um projeto montado só pelo
+    painel Projeto) numa timeline de 59,94 gravava 30 qps (2026-10-12)."""
     w, h = max(16, int(w)), max(16, int(h))
     w, h = w + (w % 2), h + (h % 2)
+    fps = taxa_timeline(fps)
+    r = f"{int(round(fps * 1001))}/1001" if fps in _TAXAS_NTSC else f"{int(fps)}"
     pasta = os.path.join(tempfile.gettempdir(), "canivete_editor_bases")
     os.makedirs(pasta, exist_ok=True)
-    saida = os.path.join(pasta, f"base_{w}x{h}.mp4")
+    saida = os.path.join(pasta, f"base_{w}x{h}" + ("" if r == "30" else f"_{r.replace('/', '_')}") + ".mp4")
     if not os.path.isfile(saida):
         tmp = saida + ".tmp.mp4"
         r = subprocess.run([ffmpeg_path(), "-y", "-hide_banner", "-loglevel", "error",
-                            "-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r=30:d=1",
+                            "-f", "lavfi", "-i", f"color=c=black:s={w}x{h}:r={r}:d=1",
                             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", tmp],
                            capture_output=True, text=True, encoding="utf-8", errors="replace",
                            timeout=60, creationflags=_creationflags())
@@ -1820,6 +1824,15 @@ def motivo_sem_gpu():
     return _hw_motivo
 
 
+def glow_passadas(inten):
+    """Opacidade de cada passada do Brilho (editor-motion.js "mo_glow" desenha o brilho k vezes: 1, 1, ..., resto)."""
+    out, k = [], float(inten)
+    while k > 0.001:
+        out.append(min(1.0, k))
+        k -= 1
+    return out
+
+
 def _args_video(cfg, q, usar_gpu, bits=8, mbps=0):
     """Argumentos do encoder de vídeo.
     Qualidade constante (padrão): CRF/CQ pelo preset de qualidade — o tamanho do arquivo acompanha a cena.
@@ -3082,10 +3095,14 @@ def _filtros_fx(fx, mw, mh, tag="x"):
                     cadeia += ",colorchannelmixer=" + ":".join(f"{a}{b}={c * wv:.5f}" for a, c in (("r", cr), ("g", cg), ("b", cb))
                                                                 for b, wv in zip("rgb", w3))
                 cadeia += f",gblur=sigma={raio / 2.0:.3f}:steps=3"
-                if abs(inten - 1) > 1e-3:
-                    cadeia += f",colorchannelmixer=rr={inten:.4f}:gg={inten:.4f}:bb={inten:.4f}"
+                if v.get("soma"):   # Somar luz (o modo antigo): estoura os claros
+                    if abs(inten - 1) > 1e-3:
+                        cadeia += f",colorchannelmixer=rr={inten:.4f}:gg={inten:.4f}:bb={inten:.4f}"
+                    mist = "all_mode=addition"
+                else:               # Tela, uma vez por passada da prévia (glow_passadas)
+                    mist = "all_expr='255-(255-A)" + "".join(f"*(1-{a:.5f}*B/255)" for a in glow_passadas(inten)) + "'"
                 out.append(f"format=gbrp,split[{r}a][{r}b];[{r}b]{cadeia},format=gbrp[{r}c];"
-                           f"[{r}a][{r}c]blend=all_mode=addition,format=rgba")
+                           f"[{r}a][{r}c]blend={mist},format=rgba")
         elif t == "crop":
             l, tp, r, bt = (_num(v.get(k), 0, 100) / 100.0 for k in ("l", "t", "r", "b"))
             # a área cortada fica transparente (a camada de baixo aparece), sem mudar o tamanho
@@ -3475,7 +3492,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         # a saída leva o nome e a pasta do projeto
         try:
             w, h = (int(quadro[0]), int(quadro[1])) if quadro else (1920, 1080)
-            path = _base_preta(w, h)
+            path = _base_preta(w, h, (opcoes or {}).get("fps") or 30)   # na taxa da timeline (VE.fps)
         except Exception as e:
             return {"success": False, "error": f"Não foi possível preparar o fundo da exportação: {e}"}
         projeto = str((opcoes or {}).get("projeto") or "")

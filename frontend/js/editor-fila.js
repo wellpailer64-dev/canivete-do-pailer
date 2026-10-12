@@ -33,7 +33,8 @@ function veFilaArgs(it) {   // monta os argumentos do video_cutter_export com o 
     const c = it.cfg, P = it.plano, fmt = c.pills.format || 'mp4';
     const codec = ['mp4', 'mov', 'mkv'].includes(fmt) ? c.pills.codec || 'h264' : 'h264';
     const mbps = c.pills.taxa === 'mbps' ? Math.max(1, Math.min(400, +c.mbps || 16)) : 0;
-    const opc = { nome: c.nome, codec, bits: +(c.pills.bits || 8), mbps, projeto: P.projeto, blocos: c.pills.blocos === '1' };
+    const opc = { nome: c.nome, codec, bits: +(c.pills.bits || 8), mbps, projeto: P.projeto, blocos: c.pills.blocos === '1',
+                  fps: P.fps || VE.fps || 30 };   // taxa da timeline congelada (fundo preto sem o vídeo principal)
     return [c.noAudio ? P.fonteSem : P.fonteCom, P.base, fmt, c.pills.quality || 'high', c.res, c.gpu, c.dest, c.noAudio,
             P.camadas, P.audio, P.dur, P.mix, P.leg, P.quadro, opc];
 }
@@ -67,7 +68,7 @@ async function veFilaAdicionarAgora(nome, cfg) {
     c.nome = nome || c.nome || veFilaNomeTimeline();
     const it = { id: ++VEFILA.seq, timeline: veFilaNomeTimeline(), dur: plano.dur, estado: 'espera', pct: 0, cfg: c,
         plano: { fonteCom: veFonteParaPlano({ ...plano, mix }, true), fonteSem: veFonteParaPlano({ ...plano, mix }, false), base: plano.base,
-                 camadas: plano.camadas, audio: plano.audio, dur: plano.dur, mix, leg: veTxExport(plano.faixa), quadro: [VE.seqW, VE.seqH], projeto: VE.projectPath || '' } };
+                 camadas: plano.camadas, audio: plano.audio, dur: plano.dur, mix, leg: veTxExport(plano.faixa), quadro: [VE.seqW, VE.seqH], projeto: VE.projectPath || '', fps: VE.fps || 30 } };
     VEFILA.itens.push(it);
     msg('');
     veFilaRender();

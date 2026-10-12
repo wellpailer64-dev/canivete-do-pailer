@@ -19,6 +19,7 @@ import copy
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -63,6 +64,14 @@ def _fmt_decodificado(info):
     """Formato do quadro que sai do decodificador Vulkan (o que o hwdownload tem de pedir): p010 nos de 10 bits (HEVC
     da FX30), nv12 nos de 8. Pedir nv12 de um vídeo 10 bits falhava ("Invalid output format nv12 for hwframe download")."""
     return "p010le" if "10" in str(info.get("pix_fmt", "")) else "nv12"
+
+
+# Precisão na placa (rodada 7): cada passada do libplacebo grava o quadro no formato pedido. Tudo em yuv420p (8 bits)
+# arredondava a cada passo (camada → composição → LUT → Luz e Cor → Aberração → Brilho: 5 vezes) e o 10 bits da FX30 virava
+# 8 bits ANTES da coloração: no escuro, degraus e manchas em bloco que o encoder ainda piorava. Agora a camada sai em
+# 10 bits, a composição e os efeitos em 16 bits 4:4:4, e só a saída volta a 8 bits com pontilhado (blue noise).
+_FMT_CAM = "p010le"
+_FMT_MEIO = "yuv444p16le"
 
 
 def disponivel():
@@ -144,6 +153,7 @@ def memoria_estimada(segmentos, lay, path):
             continue   # lido na CPU: na placa só o quadro que aparece
         bpp = 3.0 if "10" in str(i.get("pix_fmt", "")) else 1.5
         total += (i.get("width") or 1920) * (i.get("height") or 1080) * bpp * 20
+        total += 1920 * 1080 * 3 * 6   # a fila de quadros da camada já reduzida, em 10 bits (_FMT_CAM)
     # o que sobe da CPU em RGBA (camada desenhada do motion, Comp, imagens e textos): a textura e a fila de quadros de cada
     # entrada do libplacebo. A propaganda KANIVETE (24 vídeos transparentes do quadro inteiro + 65 imagens) passava na
     # conferência só com os decodificadores e estourava a memória da placa (2026-10-11)
@@ -157,8 +167,9 @@ def memoria_estimada(segmentos, lay, path):
 
 
 def _lc_ok(fx):
-    """Todos os efeitos ativos rodam em shader na placa (_passos_lc): Luz e Cor, Aberração cromática e Desfoque."""
-    return all(f.get("t") in ("lc", "ca", "blur") or f.get("on") is False for f in fx or [])
+    """Todos os efeitos ativos rodam em shader na placa (_passos_lc): Luz e Cor, Aberração cromática, Desfoque e o
+    Brilho da camada de ajuste."""
+    return all(f.get("t") in ("lc", "ca", "blur", "mo_glow") or f.get("on") is False for f in fx or [])
 
 
 # Efeitos que a placa ainda não faz em shader mas o exportador de CPU faz com filtros do ffmpeg: no modo placa o quadro
@@ -253,7 +264,8 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
         pass
     if alfa:
         return "fundo transparente"
-    if vcodec not in ("h264", "hevc") or bits != 8:
+    # H.265 10 bits também: a cadeia já é 10/16 bits (_FMT_CAM/_FMT_MEIO) e a saída desce em p010
+    if vcodec not in ("h264", "hevc") or bits not in (8, 10) or (bits == 10 and vcodec != "hevc"):
         return f"formato {vcodec} {bits} bits"
     if reduz:
         return "saída reduzida"
@@ -315,9 +327,10 @@ def _opaca(c):
     return c["op"] >= 0.999
 
 
-def _passos_lc(g, fx, mw, mh, pasta, tag):
+def _passos_lc(g, fx, mw, mh, pasta, tag, fmt=_FMT_MEIO):
     """Luz e Cor (uma ou mais instâncias) como passadas do libplacebo: LUT e o shader de Clareza/Vinheta/Nitidez.
-    mw/mh = tamanho em que o efeito mede (a mídia, num clipe; o quadro, na camada de ajuste)."""
+    mw/mh = tamanho em que o efeito mede (a mídia, num clipe; o quadro, na camada de ajuste). fmt = formato de cada
+    passada (_FMT_CAM num clipe, _FMT_MEIO na camada de ajuste)."""
     passos = []
     for j, f in enumerate(fx or []):
         if f.get("on") is not False and f.get("t") == "blur":
@@ -326,7 +339,16 @@ def _passos_lc(g, fx, mw, mh, pasta, tag):
                 arq = os.path.join(pasta, f"blur_{tag}_{j}.glsl")
                 with open(arq, "w", encoding="utf-8") as fh:
                     fh.write(sh)
-                passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format=yuv420p:disable_linear=1")
+                passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={fmt}:disable_linear=1")
+            continue
+        if f.get("on") is not False and f.get("t") == "mo_glow":
+            # só na camada de ajuste (num clipe o Brilho vira camada desenhada; o exportador de CPU também ignora)
+            sh = _shader_glow(f.get("v") or {}) if tag.startswith("a") else None
+            if sh:
+                arq = os.path.join(pasta, f"glow_{tag}_{j}.glsl")
+                with open(arq, "w", encoding="utf-8") as fh:
+                    fh.write(sh)
+                passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={fmt}:disable_linear=1")
             continue
         if f.get("on") is not False and f.get("t") == "ca":
             sh = _shader_ca(f.get("v") or {}, mw, mh)
@@ -334,7 +356,7 @@ def _passos_lc(g, fx, mw, mh, pasta, tag):
                 arq = os.path.join(pasta, f"ca_{tag}_{j}.glsl")
                 with open(arq, "w", encoding="utf-8") as fh:
                     fh.write(sh)
-                passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format=yuv420p:disable_linear=1")
+                passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={fmt}:disable_linear=1")
             continue
         if f.get("on") is False or f.get("t") != "lc":
             continue
@@ -342,14 +364,14 @@ def _passos_lc(g, fx, mw, mh, pasta, tag):
         if v.get("lut"):
             cube = vc._lut_cube(v.get("n"), v["lut"])
             if cube:
-                passos.append(f"libplacebo=lut={vc._caminho_filtro(cube)}:lut_type=2:format=yuv420p")
+                passos.append(f"libplacebo=lut={vc._caminho_filtro(cube)}:lut_type=2:format={fmt}")
         sh = _shader_lc(vc._num(v.get("clar_s"), 0, 0.2) * min(mw, mh), vc._num(v.get("clar"), -2, 2),
                         vc._num(v.get("sharp"), 0, 5), vc._num(v.get("vig"), 0, 1.5708), mw, mh)
         if sh:
             arq = os.path.join(pasta, f"lc_{tag}_{j}.glsl")
             with open(arq, "w", encoding="utf-8") as fh:
                 fh.write(sh)
-            passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format=yuv420p")
+            passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={fmt}")
     return passos
 
 
@@ -373,6 +395,50 @@ def _shader_blur(amt, W, H):
                          for i in range(1, n + 1))
         partes.append(f"//!HOOK MAIN\n//!BIND HOOKED\n//!DESC desfoque {nome}\nvec4 hook() {{\n"
                       f"    vec4 s = {pesos[0]:.8f} * clamp(HOOKED_texOff(vec2(0.0)), 0.0, 1.0);\n{soma}\n    return s;\n}}\n")
+    return "\n".join(partes)
+
+
+def _shader_glow(v):
+    """Brilho (editor-motion.js "mo_glow") da camada de ajuste com as contas do exportador de CPU (video_cutter._filtros_fx):
+    o que passa do limite (canal a canal, esticado para 0..1), com cor = cor × luma, desfoque gaussiano σ = raio/2 em
+    duas passadas e soma × intensidade por cima do quadro. Quatro passadas do libplacebo; o brilho fica na textura
+    BRILHO (//!SAVE) e o MAIN só muda na soma. Antes descia o quadro inteiro para a CPU (20 min em blocos: 1h40)."""
+    lim = vc._num(v.get("lim"), 0, 100) / 100.0
+    raio, inten = vc._num(v.get("raio"), 0, 500), vc._num(v.get("int"), 0, 400) / 100.0
+    if raio <= 0.01 or inten <= 0.001:
+        return None
+    k = 1.0 / max(1.0 / 255.0, 1.0 - lim)
+    cor = str(v.get("cor") or "#ffffff")
+    if v.get("usaCor") and re.match(r"^#[0-9a-fA-F]{6}$", cor):
+        cr, cg, cb = (int(cor[i:i + 2], 16) / 255.0 for i in (1, 3, 5))
+        tinge = (f"    float y = dot(b, vec3(0.2126, 0.7152, 0.0722));\n"
+                 f"    b = clamp(vec3({cr:.5f}, {cg:.5f}, {cb:.5f}) * y, 0.0, 1.0);\n")
+    else:
+        tinge = ""
+    sig = raio / 2.0
+    r = max(1, int(math.ceil(3 * sig)))
+    passo = max(1, int(math.ceil(r / 64)))
+    n = int(math.ceil(r / passo))
+    pesos = [math.exp(-((i * passo) ** 2) / (2 * sig * sig)) for i in range(n + 1)]
+    tot = pesos[0] + 2 * sum(pesos[1:])
+    pesos = [p / tot for p in pesos]
+    partes = [f"//!HOOK MAIN\n//!BIND HOOKED\n//!SAVE BRILHO\n//!COMPONENTS 4\n//!DESC brilho: limite\nvec4 hook() {{\n"
+              f"    vec3 b = clamp((clamp(HOOKED_tex(HOOKED_pos).rgb, 0.0, 1.0) - {lim:.6f}) * {k:.6f}, 0.0, 1.0);\n"
+              f"{tinge}    return vec4(b, 1.0);\n}}\n"]
+    for dx, dy, nome in ((1, 0, "horizontal"), (0, 1, "vertical")):
+        soma = "\n".join(f"    s += {pesos[i]:.8f} * (BRILHO_texOff(vec2({dx * i * passo}.0, {dy * i * passo}.0)).rgb + "
+                         f"BRILHO_texOff(vec2({-dx * i * passo}.0, {-dy * i * passo}.0)).rgb);"
+                         for i in range(1, n + 1))
+        partes.append(f"//!HOOK MAIN\n//!BIND BRILHO\n//!SAVE BRILHO\n//!COMPONENTS 4\n//!DESC brilho: desfoque {nome}\n"
+                      f"vec4 hook() {{\n    vec3 s = {pesos[0]:.8f} * BRILHO_texOff(vec2(0.0)).rgb;\n{soma}\n"
+                      f"    return vec4(s, 1.0);\n}}\n")
+    if v.get("soma"):   # Somar luz (o modo antigo): estoura os claros
+        mistura = f"    o.rgb = clamp(o.rgb + g * {inten:.6f}, 0.0, 1.0);\n"
+    else:               # Tela: 1 − (1 − x)·Π(1 − a·g), uma vez por passada da prévia — os claros chegam ao branco sem cortar
+        mistura = "".join(f"    o.rgb = 1.0 - (1.0 - o.rgb) * (1.0 - {a:.6f} * g);\n" for a in vc.glow_passadas(inten))
+    partes.append(f"//!HOOK MAIN\n//!BIND HOOKED\n//!BIND BRILHO\n//!DESC brilho: mistura\nvec4 hook() {{\n"
+                  f"    vec4 o = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n"
+                  f"    vec3 g = clamp(BRILHO_tex(HOOKED_pos).rgb, 0.0, 1.0);\n{mistura}    return o;\n}}\n")
     return "\n".join(partes)
 
 
@@ -493,10 +559,10 @@ def _entrada_video(g, c, info, pasta, n_cam):
     giro = ""
     if vk and (rot in _GIRO or red < 1):
         giro = ("libplacebo=" + (f"rotate={_GIRO[rot]}:" if rot in _GIRO else "")
-                + (f"w={rw}:h={rh}:" if red < 1 else "") + "format=yuv420p:disable_linear=1,")
+                + (f"w={rw}:h={rh}:" if red < 1 else "") + f"format={_FMT_CAM}:disable_linear=1,")
     sobe = ("" if vk else (f"scale={rw}:{rh}:flags=bicubic," if red < 1 else "") + "format=yuv420p,hwupload,")
     # os efeitos medem em % da mídia: no quadro reduzido, as medidas do quadro reduzido
-    efeito = "" if hib or key_gpu else "".join(p + "," for p in _passos_lc(g, c["fx"], rw, rh, pasta, f"v{n_cam}"))
+    efeito = "" if hib or key_gpu else "".join(p + "," for p in _passos_lc(g, c["fx"], rw, rh, pasta, f"v{n_cam}", _FMT_CAM))
     opac = ""
     if key_gpu:
         # recorte inteiro na placa (shader); a saída já é RGBA. Opacidade: só esta camada desce para recebê-la
@@ -515,7 +581,7 @@ def _entrada_video(g, c, info, pasta, n_cam):
         if not _opaca(c):
             a = "," + (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@vop{n_cam}", c["st"])
                        if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
-        baixo = "yuv420p" if (giro or not vk) else _fmt_decodificado(info)
+        baixo = _FMT_CAM if giro else "yuv420p" if not vk else _fmt_decodificado(info)
         fx_cpu = ",".join(vc._filtros_fx(c["fx"], c["mw"], c["mh"], f"h{n_cam}"))
         gir = ""
         if gira_v:
@@ -541,9 +607,9 @@ def _entrada_video(g, c, info, pasta, n_cam):
         # fade de um clipe: só ele desce para receber a transparência (sendcmd no tempo da timeline) e sobe de volta
         a = (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@vop{n_cam}", c["st"])
              if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
-        # formato EXATO na placa: o que passou pelo libplacebo (giro/redução/Luz e Cor) ou subiu da CPU é yuv420p; direto
-        # do decodificador é nv12 (com "nv12|yuv420p" o ffmpeg escolhia errado e a exportação falhava)
-        baixo = "yuv420p" if (giro or efeito or not vk) else _fmt_decodificado(info)
+        # formato EXATO na placa: o que passou pelo libplacebo (giro/redução/Luz e Cor) é _FMT_CAM, o que subiu da CPU é
+        # yuv420p; direto do decodificador é nv12/p010 (com "nv12|yuv420p" o ffmpeg escolhia errado e a exportação falhava)
+        baixo = _FMT_CAM if (giro or efeito) else "yuv420p" if not vk else _fmt_decodificado(info)
         opac = f"hwdownload,format={baixo},scale=in_color_matrix=bt709,format=rgba,{a},hwupload,"
     r = g.rotulo("v")
     g.filtros.append(f"[{k}:v:0]{_marca_cor(c['path'], info)}trim=start={vc._tempo_ffmpeg(s0 - ss)}:"
@@ -691,7 +757,7 @@ def _arvore(vals, padrao):
     return rec(0, max(vals) if vals else 0)
 
 
-def _compor(g, fundo, itens, fmt="yuv420p"):
+def _compor(g, fundo, itens, fmt=_FMT_MEIO):
     """Um libplacebo: o fundo (entrada 0, tela inteira) + cada item no seu lugar. Devolve o rótulo da saída."""
     if not itens:
         return fundo
@@ -720,7 +786,7 @@ def _multiplicar(g, atual, c, n, info, pasta):
     g.filtros.append(f"[{k}:v:0]format=rgba,hwupload[{w}]")
     mascara = _compor(g, f"[{w}]", itens, fmt="rgba")
     g.filtros.append(f"{atual}libplacebo=format=rgba:disable_linear=1[{b}r]")
-    g.filtros.append(f"[{b}r]{mascara}blend_vulkan=all_mode=multiply,libplacebo=format=yuv420p:disable_linear=1[{b}]")
+    g.filtros.append(f"[{b}r]{mascara}blend_vulkan=all_mode=multiply,libplacebo=format={_FMT_MEIO}:disable_linear=1[{b}]")
     return f"[{b}]"
 
 
@@ -798,7 +864,10 @@ def _ajuste(g, entrada, c, pasta, mtx="bt709"):
         efs = vc._filtros_fx(c["fx"], g.W, g.H, f"a{g.rot}")
         nit = ",".join(e[len(vc._NIT_NO_YUV):] for e in efs if e.startswith(vc._NIT_NO_YUV))
         efs = [e for e in efs if not e.startswith(vc._NIT_NO_YUV)]
-        desce = f"hwdownload,format=yuv420p,scale=in_color_matrix={mtx},format=rgba"
+        # o que chega pode ser a base (_FMT_CAM), a composição (_FMT_MEIO) ou outro ajuste que subiu da CPU: um passo
+        # do libplacebo deixa o formato exato para o hwdownload
+        desce = (f"libplacebo=format={_FMT_MEIO}:disable_linear=1,hwdownload,format={_FMT_MEIO},"
+                 f"scale=in_color_matrix={mtx},format=rgba")
         if not (efs or nit):
             passos = []
         elif opaco:
@@ -855,7 +924,7 @@ def _base(g, segmentos, path, info):
     for i, p in enumerate(pecas):
         r = g.rotulo("b")
         if p[0] == "gap":
-            g.filtros.append(f"color=c=black:s={g.W}x{g.H}:r={g.fps:.3f}:d={vc._tempo_ffmpeg(p[1])},format=yuv420p,"
+            g.filtros.append(f"color=c=black:s={g.W}x{g.H}:r={g.fps:.3f}:d={vc._tempo_ffmpeg(p[1])},format={_FMT_CAM},"
                              f"hwupload,setsar=1[{r}]")
         else:
             ss = max(0.0, p[0] - _PREROLL)
@@ -868,7 +937,7 @@ def _base(g, segmentos, path, info):
             sobe = "" if vk else "format=yuv420p,hwupload,"
             g.filtros.append(f"[{k}:v:0]{_marca_cor(path, info)}trim=start={vc._tempo_ffmpeg(p[0] - ss)}:"
                              f"end={vc._tempo_ffmpeg(p[1] - ss)},setpts=PTS-STARTPTS,{sobe}"
-                             f"libplacebo={giro}w={g.W}:h={g.H}:pos_w={w}:pos_h={h}:format=yuv420p:disable_linear=1,"
+                             f"libplacebo={giro}w={g.W}:h={g.H}:pos_w={w}:pos_h={h}:format={_FMT_CAM}:disable_linear=1,"
                              f"setsar=1,fps=fps={g.fps:.3f}:start_time=0[{r}]")
         partes.append(f"[{r}]")
     g.filtros.append(f"{''.join(partes)}concat=n={len(partes)}:v=1:a=0[fundo]")
@@ -1066,7 +1135,10 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
         if ass:   # num bloco o relógio começa em `feitos`: as legendas usam o tempo da timeline
             sub = (f",setpts=PTS+{feitos:.6f}/TB,subtitles=filename={vc._caminho_filtro(ass)},setpts=PTS-{feitos:.6f}/TB"
                    if feitos > 1e-6 else f",subtitles=filename={vc._caminho_filtro(ass)}")
-        g.filtros.append(f"{final}hwdownload,format=yuv420p{sub}[vbaixo]")
+        # a saída volta a 8 bits (ou 10, no H.265 10 bits) num passo só, com pontilhado (o último filtro pode deixar
+        # 16 bits, RGBA ou yuv420p); o libass desenha as legendas em yuv420p10le, não em p010
+        fim = ("p010le", ",format=yuv420p10le") if bits == 10 else ("yuv420p", "")
+        g.filtros.append(f"{final}libplacebo=format={fim[0]}:disable_linear=1,hwdownload,format={fim[0]}{fim[1]}{sub}[vbaixo]")
         fm, rot_v, args_min = vc.saida_miniatura("[vbaixo]")   # a miniatura do quadro em render (janela do Encoder)
         g.filtros += fm
         g.filtros.append(f"{rot_v}null[vout]")

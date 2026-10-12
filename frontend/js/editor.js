@@ -6021,8 +6021,9 @@ function veExpOpcoes() {
     const fmt = vePill('format') || 'mp4', codec = ['mp4', 'mov', 'mkv'].includes(fmt) ? vePill('codec') || 'h264' : 'h264';
     const mbps = vePill('taxa') === 'mbps' ? Math.max(1, Math.min(400, +$ve('ve-exp-mbps').value || 16)) : 0;
     // projeto: sem vídeo principal, a saída leva o nome e a pasta dele (exportar_video)
+    // fps: a taxa da timeline, para o fundo preto quando a exportação não usa o vídeo principal (sem áudio: saía 30 qps)
     return { nome: $ve('ve-exp-nome').value.trim(), codec, bits: +(vePill('bits') || 8), mbps, projeto: VE.projectPath || '',
-             blocos: vePill('blocos') === '1' };   // exportação por blocos (video_cutter._exportar_em_blocos)
+             blocos: vePill('blocos') === '1', fps: VE.fps || 30 };   // exportação por blocos (video_cutter._exportar_em_blocos)
 }
 
 function veUpdateExportSummary() {

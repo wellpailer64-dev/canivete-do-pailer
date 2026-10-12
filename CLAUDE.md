@@ -76,6 +76,8 @@ Rodada 4 (plano §11): Chroma Key, Aberração, Desfoque e opacidade de ajuste e
 naquela camada (híbrido); sem caber na placa, exporta em blocos. iPhone HLG + Dolby Vision lido como a prévia (`_marca_cor`).
 Respeite o seu voto: 892 s → 205 s. Blocos no teste: `CANIVETE_PLACA_BLOCOS=1 CANIVETE_BLOCO_SEG=1 ... --placa`.
 **Taxa da timeline CRAVADA** (`video_cutter.taxa_timeline`, `probe()["fps_timeline"]`): nunca a média de vídeo de celular.
+Rodada 7 (qualidade, 2026-10-12, plano "Rodada 7"): placa em 10/16 bits por dentro (escuro sem blocos), Brilho em Tela
+(claros sem estourar), H.265 10 bits pela placa, "sem áudio" na taxa da timeline. Bancada: `D:/kanivete_testes/qualidade`.
 
 Mixer de trilhas de áudio (Audio Track Mixer do Premiere): `frontend/js/editor-mixer.js` (aba junto dos Controles de
 efeito): pan, M/S (S também no cabeçalho da trilha), fader −∞..+15 dB na escala do Premiere, medidor L/R por trilha e o Mix.

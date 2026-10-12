@@ -74,6 +74,9 @@ arquivo .part → renomeado no fim · miniatura ke_quadro.jpg 1×/s (saida_minia
 | 4K bruto | 34 leituras HEVC 4K passam dos 8 GB | reduzir logo depois de ler (mesmo passo do giro); acima de 70% da placa estimado → CPU |
 | 1º quadro de cada camada | às vezes não aparecia (arredondamento) | camada entra ¼ de quadro antes |
 | app aberto usando a placa | export pela placa estoura a memória | margem de 30% na estimativa; medir sempre com o PC livre |
+| cadeia em 8 bits (rodada 7) | escuro em manchas/blocos; o 10 bits da FX30 virava 8 antes da cor | camada `p010le` (`_FMT_CAM`), composição e efeitos `yuv444p16le` (`_FMT_MEIO`), só a saída em 8 bits com pontilhado; hwdownload pede o formato EXATO |
+| Brilho somando luz | claros estourados (3,9% dos pixels) | mistura Tela (`glow_passadas`); "Somar luz" = antigo |
+| fundo preto de reserva a 30 qps | "sem áudio" saía 30 qps numa timeline de 59,94 | `_base_preta(w, h, fps)` com `opcoes.fps` = `VE.fps` |
 
 ## 5. Resultados (timeline "Depoimentos V2" do Carlinhos, 98,8 s, 1080×1920)
 

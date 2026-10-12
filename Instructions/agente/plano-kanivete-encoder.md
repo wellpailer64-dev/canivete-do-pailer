@@ -220,3 +220,39 @@ Referência: 26 min 06 s (0,79×), 200 blocos de ~6 s, placa. O que se achou e o
   piscando medidas na origem (LED/fluorescente, câmera lenta).
 - Ferramentas: `D:\kanivete_testes\scripts\` comparar_export.py, zoom_todos.py, pretos.py, exp_trecho.py, bloco_var.py;
   `CANIVETE_PLACA_DEBUG=1` guarda grafo, shaders e comando de cada bloco em `<cache>\placa_dbg\`.
+
+## Rodada 6 — Brilho (glow) da camada de ajuste na placa (2026-10-12)
+Documentário do Gil com a coloração final do Pailer (camada de ajuste no vídeo todo: Luz e Cor + Aberração + **Brilho**):
+o Brilho estava no `_FX_HIBRIDO` → cada quadro dos 20 min descia para a CPU (gblur) e subia: ~1 %/min (≈ 1h40).
+- `_shader_glow` (`export_placa.py`): 4 passadas do libplacebo — limite canal a canal (+ cor × luma) salvo na textura
+  `BRILHO` (`//!SAVE`), desfoque H e V (σ = raio/2, mesmos pesos do `_shader_blur`) e soma × intensidade no MAIN.
+  Só em camada de ajuste (no clipe o Brilho é camada desenhada; a CPU também ignora). `_lc_ok` aceita `mo_glow`.
+- Medido: o mesmo render foi de ~1 %/min para ~2,7 %/min (~37 min). `teste_export --placa`: bloom 1,9; chroma2,
+  aberracao e grade OK.
+
+## Rodada 7 — qualidade: escuro em blocos e claros estourados (documentário do Gil v7_1, 2026-10-12)
+Queixa do Pailer no `Montagem Pailer v7_1.mp4` (H.264 34 Mbps): "no escuro, pixelados de bitrate baixo; nos claros,
+muito estourado". Bancada em `D:/kanivete_testes/qualidade` (`rodar.py` repete um bloco do `CANIVETE_PLACA_DEBUG` com
+outro grafo/encoder; `hp.py` gera os grafos 16 bits; `medir.py` erro por faixa de brilho; `fila_trecho.py`/`abrir_v7.py`
+em `D:/kanivete_testes/scripts` exportam um trecho pela API da fila no app de teste).
+- **Claros: era o Brilho (glow)**, não o export. Ele SOMAVA a luz (limite 21% = quase tudo acima dos médios brilha):
+  entrevista do José Antônio, 0,01% de pixels estourados sem o Brilho → 3,9% com ele. Agora a mistura padrão é **Tela**
+  (1 − (1−x)(1−g), uma vez por passada como a prévia: `vc.glow_passadas`): 0,01%, o brilho quente fica e a escada/placa
+  ganham detalhe. Opção "Somar luz (estoura os claros)" (`soma`) = o modo antigo. Prévia (`editor-motion.js`, canvas
+  `screen`), CPU (`blend all_expr`) e placa (`_shader_glow`) iguais; projetos antigos passam a usar Tela.
+- **Escuro: era a cadeia em 8 bits, não o encoder.** As fontes são FX30 HEVC **10 bits**, mas cada passo do libplacebo
+  gravava `yuv420p`: o 10 bits virava 8 ANTES da LUT/contraste/claridade e o quadro arredondava 5 vezes (camada →
+  composição → LUT → Luz e Cor → Aberração → Brilho). No interior do piano do Gil o escuro virava manchas em bloco; o
+  mesmo grafo sem perdas (ffv1) já mostrava o defeito, e trocar o encoder (NVENC cq 14, aq, x264 aq-mode 3, HEVC 10)
+  quase não mudava. Agora: camada em **10 bits** (`_FMT_CAM = p010le`), composição e efeitos da camada de ajuste em
+  **16 bits 4:4:4** (`_FMT_MEIO`), e um último `libplacebo=format=yuv420p` com pontilhado blue noise antes do
+  `hwdownload`. Mesmo tamanho de arquivo; tempo igual ou menor (bloco de 30 s: 60–64 s → 55–60 s). Camadas em 16 bits
+  davam a mesma imagem que em 10 e eram mais lentas.
+- **H.265 10 bits pela placa** liberado (`motivo` aceitava só 8): a saída desce em p010 (legendas em yuv420p10le).
+- **Bug achado de carona: "Exportar sem áudio" saía em 30 qps** numa timeline de 59,94 (e qualquer export que não usa o
+  vídeo principal, ex. projeto montado só pelo painel Projeto): o fundo preto de reserva (`_base_preta`) era gerado a
+  30 e a taxa vinha dele. Agora vem na taxa da timeline (`opcoes.fps` = `VE.fps`, congelada no item da fila).
+- Testes: `teste_export.py` 27/27 na CPU e 27/27 `--placa`; blocos forçados (grade, camadas, bloom, legendas, chroma2) OK.
+- Pendências: (1) reexportar o documentário inteiro e o Pailer conferir no escuro/claro; (2) o Pailer decidir se a mistura
+  Tela fica como padrão (ou voltar Somar no projeto dele); (3) a parte da CPU ainda desce em 8 bits nos efeitos híbridos;
+  (4) o encoder NVENC usa ~40 Mbps a cq 17 onde o x264 dá o mesmo visual com ~15 — avaliar no próximo passo.
