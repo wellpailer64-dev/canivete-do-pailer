@@ -262,3 +262,23 @@ em `D:/kanivete_testes/scripts` exportam um trecho pela API da fila no app de te
 - Pendências: (1) reexportar o documentário inteiro e o Pailer conferir no escuro/claro; (2) o Pailer decidir se a mistura
   Tela fica como padrão (ou voltar Somar no projeto dele); (3) a parte da CPU ainda desce em 8 bits nos efeitos híbridos;
   (4) o encoder NVENC usa ~40 Mbps a cq 17 onde o x264 dá o mesmo visual com ~15 — avaliar no próximo passo.
+
+## Rodada 8 — ensinar à placa o que ainda cai no processador (2026-10-12)
+Levantamento (código do export + os 9 projetos do disco), pela ordem combinada com o Pailer — um por vez, cada um
+documentado, commitado e publicado antes do próximo:
+1. **Fade/opacidade em clipe de vídeo** — FEITO (abaixo).
+2. Mesclagens fora do Multiplicar (Tela, Sobrepor…): hoje UMA camada assim manda a timeline INTEIRA para a CPU
+   (`motivo`). O `blend_vulkan` do ffmpeg 8.1 só tem normal e multiply.
+3. Efeito com quadros-chave em clipe de vídeo (`fxk`): timeline inteira na CPU (reels da Carolini Feijão).
+4. Transições de sobreposição (`editor-ovt.js`/`transicoes.py`): render prévio quadro a quadro em numpy/OpenCV sobre um
+   intermediário ProRes; a prévia já tem o shader (WebGL) — portar para o libplacebo.
+5. Chroma Key junto com outro efeito / com opacidade: a camada desce (o key sozinho já é shader).
+- Sem solução na placa: XAVC 4:2:2 (câmera do Edgar) e ProRes — o decodificador Vulkan não lê.
+
+### 8.1 Fade de clipe na placa
+Antes: clipe de vídeo com opacidade (fixa ou quadros-chave) descia a cada quadro (`hwdownload` → RGBA →
+`colorchannelmixer` + `sendcmd` → `hwupload`). Agora `_shader_alfa` (`export_placa.py`): o alfa num shader do libplacebo,
+saída `rgba64le` (`_FMT_ALFA`). Os valores são os da CPU (`_valor_kf` no tempo do clipe, `pula` no bloco) guardados em
+TRECHOS RETOS (faixa de inclinações, uma passada): um clipe de 10 min com fade = 18 trechos (uma tabela por quadro passaria
+do limite do shader); mais de 256 trechos → fica no caminho antigo. Medido (C5797 4K, 20 s, fade): 23,2 s → 14,5 s (−37%).
+Caso novo `fadevideo` no `teste_export` (placa 5,2 / CPU 5,4); `--placa` 27/27 + fadevideo OK.

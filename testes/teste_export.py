@@ -413,6 +413,15 @@ CASOS = {
             fx: [{ id: id(), t: 'ca', on: true, v: { r: 5, g: 0, b: -5, raio: 0 } }] });
         return [clip(0, 0, 0, 4, 'b.mp4'), pip, a1, a2];
     """, ""),
+    # fade em CLIPE DE VÍDEO (com --placa: o alfa num shader da placa, _shader_alfa; antes descia para a CPU): entrada e
+    # saída com quadros-chave, opacidade fixa de 50% e um fade com curva suave
+    "fadevideo": (1080, 1920, """
+        const { clip } = __te;
+        const a = clip(1, 0.3, 0, 3, 'c.mp4', { p: { sc: 50, x: 540, y: 600, rot: 0, op: 100 } });
+        a.k = { op: [{ t: 0, v: 0, i: 'lin' }, { t: 0.8, v: 100, i: 'lin' }, { t: 2.2, v: 100, i: 'ease' }, { t: 3, v: 0, i: 'lin' }] };
+        const b = clip(2, 1, 0, 2.5, 'b.mp4', { p: { sc: 45, x: 540, y: 1350, rot: 0, op: 50 } });
+        return [clip(0, 0, 0, 4, 'principal'), a, b];
+    """, ""),
     # sobreposições: zoom para dentro, giro, lente e flare
     "sobreposicao": (1080, 1920, """
         const { clip } = __te;

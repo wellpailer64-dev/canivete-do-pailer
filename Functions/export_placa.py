@@ -72,6 +72,7 @@ def _fmt_decodificado(info):
 # 10 bits, a composição e os efeitos em 16 bits 4:4:4, e só a saída volta a 8 bits com pontilhado (blue noise).
 _FMT_CAM = "p010le"
 _FMT_MEIO = "yuv444p16le"
+_FMT_ALFA = "rgba64le"   # camada com transparência feita na placa (fade de clipe)
 
 
 def disponivel():
@@ -460,6 +461,47 @@ def _shader_opacidade(c, ini, fim, fps, desde=None):
             f"    vec4 c = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n    c.a = OP[clamp(frame - 1, 0, {n - 1})];\n    return c;\n}}\n")
 
 
+def _shader_alfa(c, fps, pula=0.0, max_trechos=256):
+    """Opacidade de um CLIPE de vídeo na placa (fade, opacidade fixa ou com quadros-chave), no lugar de descer o quadro
+    para a CPU (colorchannelmixer + sendcmd). O valor de cada quadro é o mesmo da CPU (_valor_kf no tempo do clipe), mas
+    guardado em TRECHOS RETOS (um fade = 1 trecho; constante = 1): uma tabela por quadro de um clipe de 10 min passaria do
+    limite do shader. O contador `frame` começa em 1 no 1º quadro da camada (tempo do clipe = pula). None se precisar de
+    mais de max_trechos trechos (curva muito picada: fica na CPU)."""
+    n = max(1, int(math.ceil((c["dur"] - pula) * fps)) + 2)
+    if "op" in c["kf"]:
+        vals = [max(0.0, min(1.0, vc._valor_kf(c["kf"]["op"], pula + i / fps))) for i in range(n)]
+    else:
+        vals = [max(0.0, min(1.0, c["op"]))] * n
+    tol = 0.25 / 255
+    trechos, a = [], 0   # (início, fim, valor no início, valor no fim), em quadros
+    while a < n:
+        # estende enquanto a reta de a até b passa a ±tol de todos os pontos do meio: a faixa de inclinações que serve
+        # a todos eles (lo..hi) encolhe a cada ponto — uma passada só (clipe de 10 min = 36 mil quadros)
+        b, lo, hi = a, -1e9, 1e9
+        while b + 1 < n:
+            d = b + 1 - a
+            s = (vals[b + 1] - vals[a]) / d
+            if not lo - 1e-12 <= s <= hi + 1e-12:
+                break
+            lo, hi = max(lo, (vals[b + 1] - tol - vals[a]) / d), min(hi, (vals[b + 1] + tol - vals[a]) / d)
+            b += 1
+        trechos.append((a, b, vals[a], vals[b]))
+        a = b + 1
+        if len(trechos) > max_trechos:
+            return None
+    lst = lambda xs: ", ".join(xs)
+    m = len(trechos)
+    return (f"//!HOOK MAIN\n//!BIND HOOKED\n//!DESC opacidade do clipe\n"
+            f"const int T0[{m}] = int[]({lst(str(t[0]) for t in trechos)});\n"
+            f"const int T1[{m}] = int[]({lst(str(t[1]) for t in trechos)});\n"
+            f"const float V0[{m}] = float[]({lst(f'{t[2]:.5f}' for t in trechos)});\n"
+            f"const float V1[{m}] = float[]({lst(f'{t[3]:.5f}' for t in trechos)});\n"
+            f"vec4 hook() {{\n    vec4 c = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n    int f = frame - 1;\n"
+            f"    float a = V1[{m - 1}];\n    for (int k = 0; k < {m}; k++) {{\n"
+            f"        if (f <= T1[k]) {{ a = T1[k] > T0[k] ? mix(V0[k], V1[k], float(max(f - T0[k], 0)) / float(T1[k] - T0[k])) : V0[k]; break; }}\n"
+            f"    }}\n    c.a = a;\n    return c;\n}}\n")
+
+
 def _shader_ca(v, W, H):
     """Aberração cromática (editor-fx.js "ca") como o exportador de CPU: cada canal ampliado a partir do centro (escalas
     normalizadas pela menor) e, com Raio, misturado ao original por uma queda radial (cheio até meio raio, nada no raio).
@@ -607,6 +649,12 @@ def _entrada_video(g, c, info, pasta, n_cam):
                 c["_giro_tam"] = (RW, RH)
         opac = (f"hwdownload,format={baixo},scale=in_color_matrix={_mtx(info)},format=rgba,"
                 + (f"{fx_cpu}," if fx_cpu else "") + f"{gir}{a.lstrip(',') + ',' if a else ''}format=rgba,hwupload,")
+    elif not _opaca(c) and (sh_alfa := _shader_alfa(c, g.fps, pula)):
+        # fade de um clipe na placa (antes descia para a CPU a cada quadro): o alfa num shader, saída RGBA de 16 bits
+        arq = os.path.join(pasta, f"alfa_v{n_cam}.glsl")
+        with open(arq, "w", encoding="utf-8") as fh:
+            fh.write(sh_alfa)
+        opac = f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={_FMT_ALFA}:disable_linear=1,"
     elif not _opaca(c):
         # fade de um clipe: só ele desce para receber a transparência (sendcmd no tempo da timeline) e sobe de volta
         a = (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@vop{n_cam}", c["st"])
