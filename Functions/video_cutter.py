@@ -376,14 +376,21 @@ def converter_previas(itens, emit):
             for mid, path, work in fila:
                 if _CONV["parar"]:
                     break
-                emit("veOnConversor", {"feitos": feitos, "total": len(fila), "nome": os.path.basename(path)})
+                base = {"feitos": feitos, "total": len(fila), "nome": os.path.basename(path), "id": mid, "liberado": liberado}
+                emit("veOnConversor", {**base, "pct": 0})
+                ultimo = [0]
+
+                def pct(p, base=base):   # a % do vídeo atual (bolinha de atividade do editor); no máximo a cada 2%
+                    if p >= ultimo[0] + 2 or p >= 100:
+                        ultimo[0] = p
+                        emit("veOnConversor", {**base, "pct": int(p)})
                 try:
                     info = probe(path)
                     final = os.path.join(work, f"proxy_v3_{lado}.mp4")
                     tmp = os.path.join(work, f"proxy_v3_{lado}.mp4.{os.getpid()}.tmp.mp4")
                     with _trava_proxy(final):
                         with _VAGAS_PROXY.vaga(os.path.abspath(path) + "|conv", 2):
-                            ok, err, _ = gerar_proxy(path, info, tmp, lambda p: None, None, lado=lado)
+                            ok, err, _ = gerar_proxy(path, info, tmp, pct, None, lado=lado)
                         if not ok:
                             _apagar_item(tmp)
                             continue

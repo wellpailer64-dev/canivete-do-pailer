@@ -33,6 +33,25 @@ function veAtvEvento(ev) {
 }
 window.veAtvEvento = veAtvEvento;
 
+// Conversor de prévias antigas (Sequência › Converter prévias antigas): bloco próprio no topo da lista
+function veAtvConversor(ev) {
+    VEATV.conv = ev.fim ? { ...ev, t: Date.now() } : ev;
+    veAtvAgendar();
+}
+window.veAtvConversor = veAtvConversor;
+function veAtvConvHtml() {
+    const c = VEATV.conv;
+    if (!c || (c.fim && Date.now() - c.t > 5 * 60000)) return '';
+    const bytes = b => typeof veCacheBytesTxt === 'function' ? veCacheBytesTxt(b) : `${(b / 1e9).toFixed(1)} GB`;
+    const lib = c.liberado ? ` · ${bytes(c.liberado)} ${veT('liberados')}` : '';
+    if (c.fim) return `<div class="ve-atv-conv fim"><b>${veT('Prévias convertidas para leves')}: ${c.feitos} ${veT('de')} ${c.total}</b><small>${lib.slice(3)}</small></div>`;
+    const pct = Math.max(0, Math.min(100, c.pct || 0)), geral = (c.feitos + pct / 100) / Math.max(1, c.total) * 100;
+    const esc = s => String(s).replace(/[&<>"]/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[x]));
+    return `<div class="ve-atv-conv"><b><i class="ve-atv-gira"></i> ${veT('Convertendo prévias para leves')}: ${c.feitos + 1} ${veT('de')} ${c.total}${lib}</b>
+        <span class="ve-atv-barra"><span style="width:${geral.toFixed(1)}%"></span></span>
+        <small>${esc(c.nome)} · ${pct}%</small><span class="ve-atv-barra fina"><span style="width:${pct}%"></span></span></div>`;
+}
+
 const VEATV_TXT = {
     fila: 'Na fila', lendo: 'Lendo o arquivo', espera: 'Esperando vaga para a prévia', previa: 'Gerando prévia leve',
     parcial: 'Prévia dos trechos da timeline', completa: 'Trechos prontos · prévia completa no fundo',
@@ -55,7 +74,8 @@ function veAtvLista() {
     return out;
 }
 function veAtvContagem(lista) {
-    return { ativos: lista.filter(x => VEATV_ATIVO.has(x.etapa)).length, erros: lista.filter(x => x.etapa === 'erro').length };
+    const conv = VEATV.conv && !VEATV.conv.fim ? 1 : 0;   // a conversão em andamento conta como uma atividade
+    return { ativos: lista.filter(x => VEATV_ATIVO.has(x.etapa)).length + conv, erros: lista.filter(x => x.etapa === 'erro').length };
 }
 
 function veAtvAgendar() {
@@ -68,7 +88,7 @@ function veAtvRender() {
     const lista = veAtvLista(), n = veAtvContagem(lista);
     b.classList.toggle('girando', n.ativos > 0);
     b.classList.toggle('erro', !n.ativos && n.erros > 0);
-    b.hidden = !n.ativos && !n.erros && !lista.length;
+    b.hidden = !n.ativos && !n.erros && !lista.length && !veAtvConvHtml();
     b.title = n.ativos ? `Carregando ${n.ativos} mídia(s) — clique para ver` : 'Atividade em segundo plano';
     b.querySelector('.ve-atv-n').textContent = n.ativos ? String(n.ativos) : '';
     if (VEATV.aberto) veAtvPopRender(lista, n);
@@ -87,8 +107,11 @@ function veAtvPopRender(lista, n) {
             <span class="ve-atv-txt"><b>${esc(veAtvNome(it.id))}</b><small>${esc(txt)}${extra}</small>
             ${pct != null ? `<span class="ve-atv-barra"><span style="width:${pct}%"></span></span>` : ''}</span></div>`;
     }).join('');
-    pop.innerHTML = `<div class="ve-atv-cab"><b>${n.ativos ? `Carregando ${n.ativos} mídia(s)` : 'Nada carregando agora'}</b>
+    const midias = n.ativos - (VEATV.conv && !VEATV.conv.fim ? 1 : 0);
+    const cab = midias ? `Carregando ${midias} mídia(s)` : n.ativos ? 'Trabalhando no fundo' : 'Nada carregando agora';
+    pop.innerHTML = `<div class="ve-atv-cab"><b>${cab}</b>
         ${lista.some(x => x.etapa === 'pronto' || x.etapa === 'painel' || x.etapa === 'erro') ? '<button class="ve-btn ve-btn-ghost" id="ve-atv-limpar">Limpar concluídos</button>' : ''}</div>
+        ${veAtvConvHtml()}
         <div class="ve-atv-lista">${linhas || '<div class="ve-atv-vazio">Todas as mídias do projeto estão prontas.</div>'}</div>`;
     const lp = document.getElementById('ve-atv-limpar');
     if (lp) lp.onclick = e => {

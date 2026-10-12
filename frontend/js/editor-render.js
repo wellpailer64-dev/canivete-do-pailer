@@ -643,8 +643,9 @@ function veConverterPrevias() {
     });
 }
 window.veOnConversor = ev => {
+    if (typeof veAtvConversor === 'function') veAtvConversor(ev);   // bolinha de atividade: andamento ao vivo
     if (ev.fim) { veToast(`${veT('Prévias convertidas')}: ${ev.feitos}/${ev.total}` + (ev.liberado ? ` · ${veCacheBytesTxt(ev.liberado)} ${veT('liberados')}` : '')); return; }
-    if (ev.feitos % 5 === 0) veToast(`${veT('Convertendo prévias')} ${ev.feitos + 1}/${ev.total} · ${ev.nome}`);
+    if (ev.pct === 0 && ev.feitos % 5 === 0) veToast(`${veT('Convertendo prévias')} ${ev.feitos + 1}/${ev.total} · ${ev.nome}`);
 };
 
 function vePrefsCacheLimpar(tudo) {
