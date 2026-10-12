@@ -2446,3 +2446,5 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-atv-conv small { color: var(--ve-dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ve-atv-conv.fim b { color: #4caf50; }
 .ve-atv-barra.fina { height: 2px; opacity: .7; }
+/* o display: flex dos menus anulava o atributo hidden: fechavam no código e continuavam na tela */
+.ve-proxy-pop[hidden], .ve-atv-pop[hidden] { display: none; }
