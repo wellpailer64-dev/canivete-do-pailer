@@ -61,7 +61,8 @@ async function veFilaAdicionarAgora(nome, cfg) {
     if (typeof veMidiasTamanhoGarantir === 'function') await veMidiasTamanhoGarantir();   // 4K ainda sem tamanho: saía ampliado
     if (typeof veCompProntas === 'function') await veCompProntas(msg);
     if (typeof ve3dProntas === 'function') await ve3dProntas(msg);
-    if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg);
+    // placa ligada: só o plano das transições de sobreposição (a placa faz no shader); desligada: renderiza antes
+    if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg, !!(cfg ? cfg.gpu : veFilaCfgLer().gpu));
     if (VE.clips.some(veTxPrecisa)) await veTxPngs();
     const plano = veExportPlan(true), master = veMasterLim(), mix = master ? [...plano.mix, { master }] : plano.mix;
     const c = cfg ? JSON.parse(JSON.stringify(cfg)) : veFilaCfgLer();

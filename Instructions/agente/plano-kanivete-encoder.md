@@ -270,7 +270,7 @@ documentado, commitado e publicado antes do próximo:
 2. **Mesclagens fora do Multiplicar** — FEITO (8.2). Antes UMA camada assim mandava a timeline INTEIRA para a CPU
    (`motivo`). O `blend_vulkan` do ffmpeg 8.1 só tem normal e multiply.
 3. **Desfoque com quadros-chave em clipe de vídeo** — FEITO (8.3). (Na Carolini o que aparecia era o Pincel Roto, que já vira vídeo com alfa antes de exportar: vai pela placa.)
-4. Transições de sobreposição (`editor-ovt.js`/`transicoes.py`): render prévio quadro a quadro em numpy/OpenCV sobre um
+4. **Transições de sobreposição** — FEITO (8.4). Antes: render prévio quadro a quadro em numpy/OpenCV sobre um
    intermediário ProRes; a prévia já tem o shader (WebGL) — portar para o libplacebo.
 5. Chroma Key junto com outro efeito / com opacidade: a camada desce (o key sozinho já é shader).
 - Sem solução na placa: XAVC 4:2:2 (câmera do Edgar) e ProRes — o decodificador Vulkan não lê.
@@ -304,3 +304,23 @@ amostras por lado). Fica na CPU só com Chroma Key, efeito híbrido ou giro no m
   arquivo a curva corria em dobro (desfoque voltando 0,9 s antes). Shader que lê `frame` = UMA passada por arquivo.
 - Caso novo `desfoquevideo` (fundo parado: o vídeo de base andando fazia o navegador entregar o quadro vizinho): placa
   1,7, CPU 4,3.
+
+### 8.4 Transições de sobreposição na placa (zoom, giro, pan, esticar, lente, glitch, flash, flare, vazamento de luz…)
+Antes: com a exportação pedida, `veOvtProntas` renderizava CADA transição: o trecho de baixo num ProRes (pela CPU),
+cada quadro por numpy/OpenCV (~130 ms/quadro) e um H.264 CRF 10 que entrava no lugar da camada. AutoFrame do Carlinhos:
+5 transições (3 s) = 17,3 s de preparo antes de a exportação começar.
+Agora, com a placa ligada (`veOvtProntas(faixa, msg, soPlano=true)` na fila e no export): só o PLANO de cada uma
+(`VEOVT.jobs`: {job, h, base}) vai na camada (`o.ovt`, `veOvtNoPlano`) — 0,09 s. Na placa, `_shader_ovt`: o shader da
+prévia (`VE_OVT_FS`) portado para o libplacebo, com os parâmetros de cada quadro (`transicoes.parametros`, a mesma conta)
+em tabelas pelo `frame` (uma passada por arquivo); entra antes dos outros efeitos da camada de ajuste. ~1 ms/quadro
+(1080×1920, zoom com 12 amostras). Os 14 tipos conferidos contra `transicoes.aplicar`: ±1 nível (p99).
+- Reserva: se a exportação cair no processador, `video_cutter._ovt_na_cpu` renderiza com o mesmo plano (mesmo cache,
+  `transicoes.render`) e troca a camada pelo vídeo pronto, como `veOvtNoPlano` (conferido com `CANIVETE_PLACA=0`).
+- As transições vêm do plano (`ovt.job.fx`): o `veFxExport` tira as transições da lista de efeitos da camada.
+- Prévia renderizada que já preparou o arquivo: a exportação reaproveita (`VEOVT.arq` tem prioridade).
+- `teste_export`: o caso `sobreposicao` com `--placa` limpa `VEOVT.arq` para exercitar o shader: placa 4,9, CPU 6,0.
+- Armadilha medida: as tabelas por quadro como `const` no código do shader davam arquivos de até 490 KB e a placa caía
+  (`VK_ERROR_DEVICE_LOST`, caso `autoframe` ia para a CPU). Agora vão numa TEXTURA embutida (`//!TEXTURE TAB`, rgba32f,
+  uma linha por quadro, `texelFetch`); 3 s a 60 qps em 1080×1920 = 2 s de placa. `autoframe` na placa: pior 2,2.
+- O progresso da reserva ("Transição de sobreposição n (no processador)") não começa com "Processador ·", para não
+  esconder o motivo de a placa não ter montado.

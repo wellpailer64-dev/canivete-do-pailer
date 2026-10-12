@@ -206,7 +206,7 @@ void main() {
     gl_FragColor = vec4(c, 1.0);
 }`;
 
-const VEOVT = { cv: null, gl: null, u: null, falhou: false, arq: new Map() };
+const VEOVT = { cv: null, gl: null, u: null, falhou: false, arq: new Map(), jobs: new Map() };
 function veOvtGl() {
     if (VEOVT.gl || VEOVT.falhou) return VEOVT.gl;
     const cv = document.createElement('canvas'), gl = cv.getContext('webgl', { premultipliedAlpha: false, alpha: false, preserveDrawingBuffer: true });
@@ -379,19 +379,23 @@ function veOvtSigs() {
     return new Map(VE.clips.filter(c => veIsAdj(c) && veOvtFx(c).length).map(c => [c, veOvtSig(c)]));
 }
 
-// Renderiza (ou reaproveita) as camadas de sobreposição no trecho `faixa` ({a, b}; null = tudo). msg(texto) = progresso
-async function veOvtProntas(faixa, msg) {
+// Renderiza (ou reaproveita) as camadas de sobreposição no trecho `faixa` ({a, b}; null = tudo). msg(texto) = progresso.
+// soPlano (exportação com a placa ligada): NÃO renderiza — guarda o plano de cada uma (VEOVT.jobs); a placa faz a
+// transição num shader (export_placa._shader_ovt) e, se a exportação cair no processador, o Python renderiza com ele
+// (video_cutter._ovt_na_cpu). 5 transições (3 s) levavam 17 s de preparo antes de a exportação começar.
+async function veOvtProntas(faixa, msg, soPlano = false) {
     const api = window.pywebview && window.pywebview.api;
     const lista = VE.clips.filter(c => veIsAdj(c) && !veOculto(c) && veOvtFx(c).length && (!faixa || (c.st < faixa.b && veEnd(c) > faixa.a)))
         .sort((x, y) => x.tr - y.tr || x.st - y.st);   // de baixo para cima: a de cima usa as de baixo já prontas
     if (!lista.length || !api || !api.ve_ovt_render) return;
     for (let i = 0; i < lista.length; i++) {
         const c = lista[i], sig = veOvtSig(c);
-        if (VEOVT.arq.has(sig)) continue;
-        if (msg) msg(`${veT('Transições de sobreposição')} ${i + 1}/${lista.length}...`);
+        if (VEOVT.arq.has(sig) || (soPlano && VEOVT.jobs.has(sig))) continue;
+        if (msg && !soPlano) msg(`${veT('Transições de sobreposição')} ${i + 1}/${lista.length}...`);
         try {
-            const job = await veOvtJob(c);
-            const r = await api.ve_ovt_render(vePrPrefs().dir, 'ovt.' + vePrHash(JSON.stringify([4, job])), job);
+            const job = await veOvtJob(c), h = 'ovt.' + vePrHash(JSON.stringify([4, job]));
+            if (soPlano) { VEOVT.jobs.set(sig, { job, h, base: vePrPrefs().dir }); continue; }
+            const r = await api.ve_ovt_render(vePrPrefs().dir, h, job);
             if (r && r.success) VEOVT.arq.set(sig, r.path);
             else if (!(r && r.cancelled)) veToast(`${veT('Falha na transição')} ${veOvtNome(c)}: ${(r && r.error) || ''}`);
         } catch (e) {
@@ -403,8 +407,12 @@ async function veOvtProntas(faixa, msg) {
 // Plano de exportação (veExportPlanClips): a camada vira o vídeo pronto do trecho (com os outros efeitos dela)
 function veOvtNoPlano(c, o) {
     const sig = VEOVT.sigs && VEOVT.sigs.get(c._o || c), arq = sig && veIsAdj(c) && veOvtFx(c).length && VEOVT.arq.get(sig);
-    if (!arq) return o;
     const off = Math.max(0, (c.s || 0) - ((c._o || c).s || 0));
+    if (!arq) {   // sem render: o plano vai junto (placa: shader; processador: renderiza no Python)
+        const jb = sig && veIsAdj(c) && veOvtFx(c).length && VEOVT.jobs.get(sig);
+        if (jb) o.ovt = Object.assign({ off }, jb);
+        return o;
+    }
     return Object.assign(o, { tipo: 'video', path: arq, s: off, e: off + veLen(c), sc: 100, x: VE.seqW / 2, y: VE.seqH / 2, rot: 0,
                               mw: VE.seqW, mh: VE.seqH, v: 1, ox: 0, oy: 0, kf: o.kf && o.kf.op ? { op: o.kf.op } : {} });
 }

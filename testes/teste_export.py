@@ -206,7 +206,9 @@ JS_AJUDA = r"""
         window.__teHook = true;
       }
       if (typeof veCompProntas === 'function') await veCompProntas(() => {});
-      if (typeof veOvtProntas === 'function') await veOvtProntas(null);
+      // placa: sem os arquivos que a prévia renderizada já preparou, para a exportação passar pelo shader (export_placa._shader_ovt)
+      if (window.__tePlaca && typeof VEOVT !== 'undefined') VEOVT.arq.clear();
+      if (typeof veOvtProntas === 'function') await veOvtProntas(null, null, !!window.__tePlaca);   // placa: só o plano (shader), como o export de verdade
       if (typeof ve3dProntas === 'function') await ve3dProntas(() => {});
       VE._txPng = null;
       if (VE.clips.some(veTxPrecisa)) await veTxPngs();   // textos/gráficos em PNG; camadas do motion desenhadas

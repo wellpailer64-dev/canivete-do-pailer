@@ -283,10 +283,15 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
                      or (c["tipo"] == "video" and (_key_so(c["fx"]) or vc._clipe_tem_alfa(c["path"])))):
             return "rotação"
         if c["tipo"] == "ajuste":
-            if not _lc_ok(c["fx"]) and not _fx_hibrido(c["fx"]):
+            # transições de sobreposição: shader na placa (_shader_ovt); precisam do ponto do corte (c["ovt"]["job"])
+            ovt = _ovt_fx(c)
+            resto = [f for f in c["fx"] if f not in ovt]
+            if ovt and _fx_hibrido(resto):
+                return "transição de sobreposição sem o plano da placa"
+            if not _lc_ok(resto) and not _fx_hibrido(resto):
                 return "camada de ajuste com efeito fora do Luz e Cor"
-            if (not _opaca(c) and _fx_hibrido(c["fx"])
-                    and any(e.startswith(vc._NIT_NO_YUV) for e in vc._filtros_fx(c["fx"], 64, 64, "m"))):
+            if (not _opaca(c) and _fx_hibrido(resto)
+                    and any(e.startswith(vc._NIT_NO_YUV) for e in vc._filtros_fx(resto, 64, 64, "m"))):
                 return "camada de ajuste com Nitidez e opacidade"
         elif c["tipo"] == "video":
             if vc._clipe_tem_alfa(c["path"]):
@@ -538,6 +543,89 @@ def _shader_blur_anim(fxk, W, H, dur, fps, pula=0.0):
                           f"        tot += 2.0 * w;\n    }}\n    return soma / tot;\n}}\n")
         return partes
     return None
+
+
+def _ovt_fx(c):
+    """Transições de sobreposição (editor-ovt.js / transicoes.py) da camada de ajuste, na ordem: as do plano
+    (c["ovt"]["job"]["fx"], valores completos — o veFxExport tira as transições da lista de efeitos da camada)."""
+    from Functions import transicoes as trs
+    job = (c.get("ovt") or {}).get("job") or {}
+    return [f for f in job.get("fx") or [] if isinstance(f, dict) and f.get("t") in trs.TIPOS]
+
+
+def _shader_ovt(t, v, uc, dur, fps, W, H, local0, n):
+    """Uma transição de sobreposição na placa: o núcleo do shader da prévia (editor-ovt.js VE_OVT_FS) num hook do
+    libplacebo, com os parâmetros de CADA quadro (transicoes.parametros, a mesma conta da prévia e do render da CPU)
+    numa TEXTURA embutida (//!TEXTURE rgba32f: uma linha por quadro — matrizes M, deslocamentos W, globais, faixas do
+    glitch), lida pelo contador `frame` (uma passada por arquivo: o contador anda a cada passada). Tabelas `const` no
+    código davam shaders de 490 KB e derrubavam a placa (VK_ERROR_DEVICE_LOST, caso autoframe). Quadro i do ramo =
+    tempo local0 + i/fps da camada. Antes: o trecho de baixo ia para um ProRes, cada quadro passava por numpy/OpenCV
+    (~130 ms/quadro) e virava um H.264 — 5 transições (3 s) levavam 17 s só de preparo."""
+    import struct
+    from Functions import transicoes as trs
+    ps = [trs.parametros(t, v, (local0 + i / fps) / max(dur, 1e-3), uc, dur, fps, W, H) for i in range(n)]
+    K = max(1, min(trs.K_MAX, max(int(p["K"]) for p in ps)))
+    glitch = any(p["gl"] for p in ps)
+    larg = 2 * K + 5 + (6 if glitch else 0)   # colunas: M[K], W[K], G1, G2, FL, LK1, (lk4, lk5, gl, K), GB[24]/4
+    dados = bytearray()
+    for p in ps:
+        k = max(1, min(K, int(p["K"])))
+        linha = [p["M"][j] if j < k else [1, 0, 0, 1] for j in range(K)] + [p["W"][j] if j < k else [0, 0, 0, 0] for j in range(K)]
+        linha += [p["g1"], p["g2"], p["fl"], p["lk"][0:4], [p["lk"][4], p["lk"][5], float(p["gl"]), float(k)]]
+        if glitch:
+            linha += [p["gb"][j:j + 4] for j in range(0, 24, 4)]
+        for q in linha:
+            dados += struct.pack("<4f", *[float(x) for x in q])
+    c0 = ps[0]
+    f3 = lambda q: "vec3(" + ", ".join(f"{float(x):.6f}" for x in q) + ")"
+    T = "texelFetch(TAB, ivec2({}, f), 0)"
+    return (f"//!TEXTURE TAB\n//!SIZE {larg} {n}\n//!FORMAT rgba32f\n//!FILTER NEAREST\n{dados.hex()}\n\n"
+            "//!HOOK MAIN\n//!BIND HOOKED\n//!BIND TAB\n//!DESC transicao de sobreposicao\n"
+            f"const int NQ = {n};\nconst int KK = {K};\n"
+            f"const vec3 FLASHC = {f3(c0['flashC'])};\nconst vec3 FLC = {f3(c0['flC'])};\n"
+            f"const vec3 LKC1 = {f3(c0['lkC1'])};\nconst vec3 LKC2 = {f3(c0['lkC2'])};\n"
+            "vec2 mir(vec2 p, vec2 R) { vec2 t = mod(p, 2.0 * R); return min(t, 2.0 * R - t); }\n"
+            "float disco(vec2 n, vec2 c, float r) { return 1.0 - smoothstep(r * 0.7, r, length(n - c)); }\n"
+            "vec4 hook() {\n"
+            "    int f = clamp(frame - 1, 0, NQ - 1);\n"
+            "    vec2 R = HOOKED_size, p = HOOKED_pos * R;\n"
+            "    float S = 0.5 * length(R);\n"
+            f"    vec4 G1 = {T.format('2 * KK')}, G2 = {T.format('2 * KK + 1')}, FL = {T.format('2 * KK + 2')}, "
+            f"LK1 = {T.format('2 * KK + 3')}, X = {T.format('2 * KK + 4')};\n"
+            "    vec2 LK2 = X.xy;\n    int k0 = max(1, int(X.w + 0.5));\n"
+            "    vec2 n0 = (p - 0.5 * R) / S, q = p;\n"
+            "    if (G1.w > 0.0) { float B = G1.w * S; q = (floor(q / B) + 0.5) * B; }\n"
+            "    vec2 n = (q - 0.5 * R) / S;\n"
+            + ("    if (X.z > 0.5) { int fb = int(clamp(floor(q.y / R.y * 24.0), 0.0, 23.0)); "
+               f"vec4 gb = {T.format('2 * KK + 5 + fb / 4')}; n.x += gb[fb % 4]; }}\n" if glitch else "") +
+            "    vec3 acc = vec3(0.0);\n"
+            "    for (int k = 0; k < KK; k++) {\n"
+            "        if (k >= k0) break;\n"
+            f"        vec4 m = {T.format('k')}, w = {T.format('KK + k')};\n"
+            "        vec2 P = vec2(m.x * n.x + m.y * n.y + w.x, m.z * n.x + m.w * n.y + w.y);\n"
+            "        if (w.w != 0.0) P *= 1.0 + w.w * dot(P, P);\n"
+            "        if (w.z != 0.0) { float r = clamp(1.0 - length(P), 0.0, 1.0), ph = w.z * r * r, c = cos(ph), s = sin(ph); "
+            "P = vec2(P.x * c - P.y * s, P.x * s + P.y * c); }\n"
+            "        if (G1.x != 0.0) { float r = length(P); P += P * (G1.x * sin(6.283185307 * (r * G1.y - G1.z)) / max(r, 1e-6)); }\n"
+            "        if (G2.x > 0.0) acc += vec3(clamp(HOOKED_tex(mir(0.5 * R + P * (1.0 + G2.x) * S, R) / R), 0.0, 1.0).r, "
+            "clamp(HOOKED_tex(mir(0.5 * R + P * S, R) / R), 0.0, 1.0).g, "
+            "clamp(HOOKED_tex(mir(0.5 * R + P * (1.0 - G2.x) * S, R) / R), 0.0, 1.0).b);\n"
+            "        else acc += clamp(HOOKED_tex(mir(0.5 * R + P * S, R) / R), 0.0, 1.0).rgb;\n"
+            "    }\n"
+            "    vec3 c = acc / float(k0);\n"
+            "    if (G2.y > 0.0) c = 1.0 - (1.0 - c) * (1.0 - G2.y * FLASHC);\n"
+            "    if (G2.z > 0.0 || FL.z > 0.0) {\n"
+            "        vec2 L = FL.xy, d = n0 - L; float d2 = dot(d, d), qq = (sqrt(d2) - 0.3) / 0.02;\n"
+            "        float br = exp(-d2 / 0.004) + exp(-d2 / 0.06) * 0.45 + exp(-d2 / 0.5) * 0.15 + exp(-qq * qq) * 0.12;\n"
+            "        float rs = exp(-(d.y * d.y) / 0.00012) * exp(-abs(d.x) / 0.7) * 0.7;\n"
+            "        float fa = disco(n0, L * -0.35, 0.05) * 0.22 + disco(n0, L * -0.7, 0.1) * 0.14 + disco(n0, L * 0.45, 0.035) * 0.25 + disco(n0, L * -1.15, 0.16) * 0.10;\n"
+            "        vec3 fl = FLC * br * G2.z + vec3(0.7, 0.82, 1.0) * rs * G2.z + vec3(0.55, 0.85, 1.0) * fa * G2.z + FLC * FL.z;\n"
+            "        c = 1.0 - (1.0 - c) * (1.0 - clamp(fl, 0.0, 1.0));\n    }\n"
+            "    if (G2.w > 0.0 || LK2.y > 0.0) {\n"
+            "        vec2 a = n0 - LK1.xy, b = n0 - LK1.zw, e = n0 - vec2(0.15, LK2.x);\n"
+            "        vec3 lk = (LKC1 * exp(-dot(a, a) / 0.36) + LKC2 * exp(-dot(b, b) / 0.25) + (LKC1 + LKC2) * 0.5 * exp(-dot(e, e) / 0.2025)) * G2.w + LKC2 * LK2.y;\n"
+            "        c = 1.0 - (1.0 - c) * (1.0 - clamp(lk, 0.0, 1.0));\n    }\n"
+            "    return vec4(c, 1.0);\n}\n")
 
 
 def _shader_alfa(c, fps, pula=0.0, max_trechos=256):
@@ -1041,8 +1129,10 @@ def _ajuste(g, entrada, c, pasta, mtx="bt709"):
     opaco = _opaca(c)
     if not opaco and c["op"] <= 0.001 and "op" not in c["kf"]:
         return entrada
-    if _fx_hibrido(c["fx"]):
-        efs = vc._filtros_fx(c["fx"], g.W, g.H, f"a{g.rot}")
+    ovt = _ovt_fx(c)   # transições de sobreposição: shaders próprios, ANTES dos outros efeitos (como o render da CPU)
+    resto = [f for f in c["fx"] if f not in ovt]
+    if _fx_hibrido(resto):
+        efs = vc._filtros_fx(resto, g.W, g.H, f"a{g.rot}")
         nit = ",".join(e[len(vc._NIT_NO_YUV):] for e in efs if e.startswith(vc._NIT_NO_YUV))
         efs = [e for e in efs if not e.startswith(vc._NIT_NO_YUV)]
         # o que chega pode ser a base (_FMT_CAM), a composição (_FMT_MEIO) ou outro ajuste que subiu da CPU: um passo
@@ -1059,17 +1149,32 @@ def _ajuste(g, entrada, c, pasta, mtx="bt709"):
                  if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
             passos = [desce + "," + ",".join(efs + [a]) + ",format=rgba,hwupload"]
     else:
-        passos = _passos_lc(g, c["fx"], g.W, g.H, pasta, f"a{g.rot}")
-    if not passos:
-        return entrada
+        passos = _passos_lc(g, resto, g.W, g.H, pasta, f"a{g.rot}")
     ini, fim = max(0.0, c["st"]), min(g.total, c["st"] + c["dur"])
     if fim - ini < g.fd / 2:   # nenhum quadro da saída: um ramo vazio travava filtros que esperam quadro (blend da vinheta)
         return entrada
     # Trecho que começa tarde no bloco: com trim=start o composto não anda até chegar o 1º quadro do trecho, e o outro
     # ramo do split guarda TODOS os quadros até lá na placa (Gil, ajuste aos 9,6 s de um bloco: ~570 quadros; em 16 bits,
     # 6,8 GB → memória esgotada, 2026-10-12). Então o ramo anda desde o início do bloco, com alfa 0 antes do trecho.
-    hib = _fx_hibrido(c["fx"])
+    hib = _fx_hibrido(resto)
     tarde = ini > 0.5 and (opaco or not hib)   # híbrido com opacidade já leva o alfa pela CPU (sendcmd): fica como era
+    if ovt:
+        # 1º quadro do ramo: o do início do bloco (tarde ou a camada cobrindo tudo) ou o 1º que o trim deixa passar
+        cobre = opaco and ini <= g.fd / 2 and fim >= g.total - g.fd / 2
+        t0 = 0.0 if (tarde or cobre) else (math.ceil(ini * g.fps + 0.25) - 1) / g.fps
+        n_q = max(1, int(math.ceil((fim - t0) * g.fps)) + 2)
+        job = (c.get("ovt") or {}).get("job") or {}
+        uc = float(job.get("uc", 0.5))
+        fx_job = job.get("fx") or [{"t": f["t"], "v": f.get("v") or {}} for f in ovt]
+        sh_ovt = []
+        for j, f in enumerate(fx_job):
+            arq = os.path.join(pasta, f"ovt_a{g.rot}_{j}.glsl")
+            with open(arq, "w", encoding="utf-8") as fh:
+                fh.write(_shader_ovt(f["t"], f.get("v") or {}, uc, c["dur"], g.fps, g.W, g.H, t0 - c["st"], n_q))
+            sh_ovt.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={_FMT_MEIO}:disable_linear=1")
+        passos = sh_ovt + passos
+    if not passos:
+        return entrada
     if (not opaco and not hib) or tarde:
         # opacidade na placa: o alfa de cada quadro num shader e o trecho composto por cima do original
         arq = os.path.join(pasta, f"op_a{g.rot}.glsl")

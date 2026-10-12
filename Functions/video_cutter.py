@@ -1824,6 +1824,44 @@ def motivo_sem_gpu():
     return _hw_motivo
 
 
+def _ovt_na_cpu(camadas, prog=None, stop_event=None):
+    """Exportação pela CPU com transições de sobreposição que vieram SEM render (placa ligada: editor-ovt.js manda só o
+    plano, {job, h, base, off}, e a placa faz no shader): renderiza agora como a prévia renderizava antes de exportar
+    (transicoes.render, o mesmo cache) e troca a camada pelo vídeo pronto, como veOvtNoPlano. Falhou: a camada fica
+    (sem a transição) e o erro vai para o progresso."""
+    if not any(isinstance(c, dict) and isinstance(c.get("ovt"), dict) for c in camadas or []):
+        return camadas
+    from Functions import transicoes
+    out, n = [], 0
+    for c in camadas:
+        o = c.get("ovt") if isinstance(c, dict) else None
+        if not (isinstance(o, dict) and o.get("job") and o.get("h")):
+            out.append(c)
+            continue
+        if stop_event is not None and stop_event.is_set():
+            return camadas
+        n += 1
+        if prog:
+            prog(0, f"Transição de sobreposição {n} (no processador)...")   # sem "Processador ·": não esconde o motivo
+        try:
+            r = transicoes.render(o.get("base") or "", o["h"], o["job"])
+        except Exception as e:
+            r = {"success": False, "error": str(e)}
+        if not r.get("success"):
+            if prog:
+                prog(0, f"Falha na transição: {r.get('error') or ''}")
+            out.append(c)
+            continue
+        W, H = (o["job"].get("quadro") or [1920, 1080])[:2]
+        off = float(o.get("off") or 0)
+        novo = {k: v for k, v in c.items() if k != "ovt"}
+        novo.update(tipo="video", path=r["path"], s=off, e=off + float(c.get("e", 0)) - float(c.get("s", 0)), sc=100,
+                    x=W / 2, y=H / 2, rot=0, mw=W, mh=H, v=1, ox=0, oy=0,
+                    kf={"op": c["kf"]["op"]} if isinstance(c.get("kf"), dict) and c["kf"].get("op") else {})
+        out.append(novo)
+    return out
+
+
 def glow_passadas(inten):
     """Opacidade de cada passada do Brilho (editor-motion.js "mo_glow" desenha o brilho k vezes: 1, 1, ..., resto)."""
     out, k = [], float(inten)
@@ -3338,6 +3376,9 @@ def _normalizar_camadas(camadas, path_video):
                 "seq": c.get("seq") if tipo == "imagem" and c.get("seq") and os.path.isfile(str(c.get("seq"))) else None,
                 "bm": c.get("bm") if c.get("bm") in _BLEND_FF and tipo != "ajuste" else None,
                 "ca": [f for f in (c.get("ca") or []) if isinstance(f, dict) and tipo != "ajuste"],
+                # transição de sobreposição ainda não renderizada (editor-ovt.js veOvtNoPlano): {job, h, base, off} —
+                # a placa faz no shader (export_placa._shader_ovt); a CPU renderiza antes (_ovt_na_cpu)
+                "ovt": c.get("ovt") if isinstance(c.get("ovt"), dict) and tipo == "ajuste" else None,
             }
         except Exception:
             continue
@@ -3533,6 +3574,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
           and not FORMATOS_SAIDA.get(str(formato_saida).lower(), {}).get("audio_only")):
         prog(0, "Processador · " + ("exportação por blocos ligada" if isinstance(opcoes, dict) and opcoes.get("blocos")
                                     else "placa de vídeo desligada na exportação"))
+    camadas = _ovt_na_cpu(camadas, prog, stop_event)
     # por blocos só com a base de fundo (sequência noutro tamanho: tudo vira camada). Base com trechos do vídeo
     # principal: cada trecho é arredondado em quadros desde o zero e um bloco no meio dela saía um quadro deslocado
     if (janela is None and isinstance(opcoes, dict) and opcoes.get("blocos") and camadas and not saida and not previa_h
