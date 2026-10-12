@@ -141,9 +141,10 @@ function veAtvAlternar(e) {
     exp.parentNode.insertBefore(caixa, document.getElementById('ve-fila-btn') || exp);
     document.getElementById('ve-atv-btn').onclick = veAtvAlternar;
     document.getElementById('ve-atv-pop').onclick = e => e.stopPropagation();
-    document.addEventListener('mousedown', e => {
-        if (VEATV.aberto && !caixa.contains(e.target)) { VEATV.aberto = false; document.getElementById('ve-atv-pop').hidden = true; }
-    });
+    // fecha ao clicar fora (pointerdown na CAPTURA: o editor cancela o mousedown em vários painéis) e com Esc
+    const fechar = () => { VEATV.aberto = false; document.getElementById('ve-atv-pop').hidden = true; };
+    document.addEventListener('pointerdown', e => { if (VEATV.aberto && !caixa.contains(e.target)) fechar(); }, true);
+    document.addEventListener('keydown', e => { if (VEATV.aberto && e.key === 'Escape') fechar(); }, true);
     setInterval(() => { if (typeof VEPJF !== 'undefined' && (VEPJF.fila.length || VEPJF.ativos.size || VEATV.aberto)) veAtvRender(); }, 1000);
 })();
 window.VEATV_API = { lista: () => veAtvLista().map(x => ({ ...x, nome: veAtvNome(x.id) })), abrir: () => { if (!VEATV.aberto) veAtvAlternar(); } };

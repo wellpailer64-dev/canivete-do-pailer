@@ -41,12 +41,17 @@ function veProxyPedir(chave, path, t) {
             if (!r || !r.success) return;
             const img = new Image();
             img.crossOrigin = 'anonymous';   // o WebGL dos efeitos (Luz e Cor) recusa imagem "contaminada"
-            img.onload = () => { if (!veProxyLigado() && !VE.playing) veDraw(); };
+            img.onload = () => { if (!veProxyLigado() && !VE.playing) veProxyRedesenhar(); };
             img.src = r.url;
             VEPROXY.quadros.set(chave, img);
             if (VEPROXY.quadros.size > 40) VEPROXY.quadros.delete(VEPROXY.quadros.keys().next().value);
         });
     }, 120);
+}
+
+// redesenha o MONITOR (o veDraw só redesenha a timeline: a imagem trocava só quando outra coisa pedia o monitor)
+function veProxyRedesenhar() {
+    if (typeof veDrawMonitorSoon === 'function') veDrawMonitorSoon(); else if (typeof veDrawMonitor === 'function') veDrawMonitor();
 }
 
 function veProxyAlternar() {
@@ -55,7 +60,7 @@ function veProxyAlternar() {
     veProxyUi();
     veToast(on ? veT('Proxy ligado: o monitor usa as prévias leves')
         : veT('Proxy desligado: parado, o monitor mostra o arquivo original em qualidade cheia'));
-    if (VE.ready) veDraw();
+    if (VE.ready) veProxyRedesenhar();
 }
 
 function veProxyUi() {
@@ -129,7 +134,9 @@ function veProxyFechar() { VEPROXY.aberto = false; const pop = document.getEleme
     document.getElementById('ve-proxy-btn').onclick = veProxyAlternar;
     document.getElementById('ve-proxy-mais').onclick = veProxyAbrir;
     document.getElementById('ve-proxy-pop').onclick = e => e.stopPropagation();
-    document.addEventListener('mousedown', e => { if (VEPROXY.aberto && !g.contains(e.target)) veProxyFechar(); });
+    // fecha ao clicar fora (pointerdown na CAPTURA: o editor cancela o mousedown em vários painéis) e com Esc
+    document.addEventListener('pointerdown', e => { if (VEPROXY.aberto && !g.contains(e.target)) veProxyFechar(); }, true);
+    document.addEventListener('keydown', e => { if (VEPROXY.aberto && e.key === 'Escape') veProxyFechar(); }, true);
     window.addEventListener('prefs-carregadas', veProxyUi);
     veProxyUi();
 })();
