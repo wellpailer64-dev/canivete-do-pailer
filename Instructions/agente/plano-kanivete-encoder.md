@@ -253,6 +253,12 @@ em `D:/kanivete_testes/scripts` exportam um trecho pela API da fila no app de te
   vídeo principal, ex. projeto montado só pelo painel Projeto): o fundo preto de reserva (`_base_preta`) era gerado a
   30 e a taxa vinha dele. Agora vem na taxa da timeline (`opcoes.fps` = `VE.fps`, congelada no item da fila).
 - Testes: `teste_export.py` 27/27 na CPU e 27/27 `--placa`; blocos forçados (grade, camadas, bloom, legendas, chroma2) OK.
+- **Memória esgotada depois da publicação (0721bbe), achada pelo Pailer:** camada de ajuste que começa TARDE no bloco
+  (créditos do Gil: desfoque aos 9,6 s de um bloco de 11,6 s). O ramo dela era `trim=start`, o composto não andava até
+  o 1º quadro do trecho, e o outro ramo do `split` guardava ~570 quadros na placa — em 8 bits 1,7 GB (cabia), em 16 bits
+  6,8 GB (VK_ERROR_OUT_OF_DEVICE_MEMORY, caía na CPU). Agora (`_ajuste`, `tarde` = começa depois de 0,5 s) o ramo anda
+  desde o início do bloco, com alfa 0 antes do trecho (`_shader_opacidade(..., desde=0)`). Trecho 1196,8–1249: pela placa,
+  pico 5,6 GB com o app aberto. Regra: NUNCA `trim=start` tardio num ramo de `split` (os quadros do outro ramo ficam presos).
 - Pendências: (1) reexportar o documentário inteiro e o Pailer conferir no escuro/claro; (2) o Pailer decidir se a mistura
   Tela fica como padrão (ou voltar Somar no projeto dele); (3) a parte da CPU ainda desce em 8 bits nos efeitos híbridos;
   (4) o encoder NVENC usa ~40 Mbps a cq 17 onde o x264 dá o mesmo visual com ~15 — avaliar no próximo passo.

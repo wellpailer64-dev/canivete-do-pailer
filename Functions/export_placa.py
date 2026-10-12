@@ -442,15 +442,19 @@ def _shader_glow(v):
     return "\n".join(partes)
 
 
-def _shader_opacidade(c, ini, fim, fps):
+def _shader_opacidade(c, ini, fim, fps, desde=None):
     """Alfa da camada de ajuste por quadro do trecho [ini, fim) (o contador `frame` do shader começa em 1 no primeiro
     quadro que o libplacebo recebe): tabela com a opacidade de cada quadro (quadros-chave como _valor_kf) — a saída
-    RGBA é composta por cima do original, como o overlay da CPU."""
-    n = max(1, int(round((fim - ini) * fps)) + 2)
+    RGBA é composta por cima do original, como o overlay da CPU. desde: o ramo começa antes (no início do bloco) e os
+    quadros antes de ini ficam com alfa 0 (ver _ajuste: o trim tardio prendia quadros na placa)."""
+    desde = ini if desde is None else desde
+    n = max(1, int(round((fim - desde) * fps)) + 2)
     if "op" in c["kf"]:
-        vals = [max(0.0, min(1.0, vc._valor_kf(c["kf"]["op"], ini - c["st"] + i / fps))) for i in range(n)]
+        vals = [max(0.0, min(1.0, vc._valor_kf(c["kf"]["op"], desde - c["st"] + i / fps))) for i in range(n)]
     else:
         vals = [max(0.0, min(1.0, c["op"]))] * n
+    if desde < ini:
+        vals = [0.0 if desde + i / fps < ini - 0.25 / fps else v for i, v in enumerate(vals)]
     tab = ",".join(f"{v:.4f}" for v in vals)
     return (f"//!HOOK MAIN\n//!BIND HOOKED\n//!DESC opacidade\nconst float OP[{n}] = float[]({tab});\nvec4 hook() {{\n"
             f"    vec4 c = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n    c.a = OP[clamp(frame - 1, 0, {n - 1})];\n    return c;\n}}\n")
@@ -884,11 +888,16 @@ def _ajuste(g, entrada, c, pasta, mtx="bt709"):
     ini, fim = max(0.0, c["st"]), min(g.total, c["st"] + c["dur"])
     if fim - ini < g.fd / 2:   # nenhum quadro da saída: um ramo vazio travava filtros que esperam quadro (blend da vinheta)
         return entrada
-    if not opaco and not _fx_hibrido(c["fx"]):
+    # Trecho que começa tarde no bloco: com trim=start o composto não anda até chegar o 1º quadro do trecho, e o outro
+    # ramo do split guarda TODOS os quadros até lá na placa (Gil, ajuste aos 9,6 s de um bloco: ~570 quadros; em 16 bits,
+    # 6,8 GB → memória esgotada, 2026-10-12). Então o ramo anda desde o início do bloco, com alfa 0 antes do trecho.
+    hib = _fx_hibrido(c["fx"])
+    tarde = ini > 0.5 and (opaco or not hib)   # híbrido com opacidade já leva o alfa pela CPU (sendcmd): fica como era
+    if (not opaco and not hib) or tarde:
         # opacidade na placa: o alfa de cada quadro num shader e o trecho composto por cima do original
         arq = os.path.join(pasta, f"op_a{g.rot}.glsl")
         with open(arq, "w", encoding="utf-8") as fh:
-            fh.write(_shader_opacidade(c, ini, fim, g.fps))
+            fh.write(_shader_opacidade(c, ini, fim, g.fps, 0.0 if tarde else None))
         passos = passos + [f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format=rgba:disable_linear=1"]
     if opaco and ini <= g.fd / 2 and fim >= g.total - g.fd / 2:
         r = g.rotulo("a")
@@ -898,7 +907,8 @@ def _ajuste(g, entrada, c, pasta, mtx="bt709"):
     g.filtros.append(f"{entrada}split[{a}][{b}x]")
     # o trim decide pelo FIM de cada quadro (fica se termina depois do start e até o end): ±¼ de quadro pega do quadro que
     # começa em ini ao que termina em fim. Com ini − ½ quadro a camada entrava e saía um quadro antes (medido 2026-10-10)
-    g.filtros.append(f"[{b}x]trim=start={ini + g.fd / 4:.6f}:end={fim + g.fd / 4:.6f},{','.join(passos)}[{b}]")
+    corte = f"trim=end={fim + g.fd / 4:.6f}" if tarde else f"trim=start={ini + g.fd / 4:.6f}:end={fim + g.fd / 4:.6f}"
+    g.filtros.append(f"[{b}x]{corte},{','.join(passos)}[{b}]")
     return _compor(g, f"[{a}]", [(f"[{b}]", ("0", "0", "ow", "oh"))])
 
 
