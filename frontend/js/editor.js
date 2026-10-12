@@ -3448,6 +3448,7 @@ function veDesenharItens(ctx, cv, itens, pv, t, semFoscos) {
             const p = veCaAplicar(c, veProps(c), t), sz = veMediaSize(c);   // + Rotação/Tremer/Pulsar em loop
             // texto animado vem com margem em volta (letras que saem da caixa): desenha maior, mesmo centro
             const pd = src && src._pad || 0, szd = pd ? { w: sz.w + 2 * pd, h: sz.h + 2 * pd } : sz;
+            if (src !== 'offline' && typeof veProxyQuadro === 'function') src = veProxyQuadro(c, src, t);   // PROXY desligado: o original
             if (src !== 'offline') src = veFxRender(c, src, szd, pv * p.sc / 100, t);   // efeitos rodam antes do movimento (como no Premiere)
             ctx.save();
             ctx.globalAlpha = Math.max(0, Math.min(1, p.op / 100));
@@ -3497,7 +3498,9 @@ function veDrawMonitor() {
     // parado: o quadro guardado basta. Tocando, os players das camadas e das transições continuam
     // acompanhando a agulha (abaixo) — senão, no fim do trecho guardado, todos teriam de buscar de uma vez
     // e a imagem travava.
-    if (cachedSrc && !VE.playing) { usarCache(); return; }
+    // PROXY desligado (editor-proxy.js): parado, monta com o quadro do original e não guarda no cache das prévias
+    const semProxy = typeof veProxyLigado === 'function' && !veProxyLigado() && !VE.playing;
+    if (cachedSrc && !VE.playing && !semProxy) { usarCache(); return; }
     const t = VE.playhead, v = veVideo();
     // transição na agulha (editor-trans.js): os clipes envolvidos vêm estendidos e animados;
     // o que entra fica por cima do que sai (mesma trilha: ordem de início)
@@ -3512,7 +3515,7 @@ function veDrawMonitor() {
     const cobre = vis.map(({ c }) => !veIsImage(c) && veIsPlain(c) && !c._tr && !veTemAlfa(c)).lastIndexOf(true);
     if (cobre > 0) vis = vis.slice(cobre);
     // parcial: alguma camada sem o quadro certo ainda (carregando/buscando) — desenha, mas não guarda no cache
-    let falta = false, parcial = false;
+    let falta = false, parcial = semProxy;
     veCamPreparar(t, vis.map(({ c }) => c), virt);
     const itens = vis.map(({ c, i }) => {
         let src = null;

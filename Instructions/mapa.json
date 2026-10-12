@@ -36,6 +36,7 @@
     "editor-ovt.js",
     "editor-projeto.js",
     "editor-props.js",
+    "editor-proxy.js",
     "editor-psd.js",
     "editor-remix.js",
     "editor-render.js",
@@ -127,6 +128,8 @@
     "ve_render_limpar",
     "ve_render_manutencao",
     "ve_render_info",
+    "ve_tamanhos_midia",
+    "ve_quadro_original",
     "ve_win_rect",
     "ve_win_hit",
     "ve_win_alpha",
@@ -1687,6 +1690,14 @@
   },
   "ve_render_info": {
    "args": "base, chave=None",
+   "modulos": []
+  },
+  "ve_tamanhos_midia": {
+   "args": "paths",
+   "modulos": []
+  },
+  "ve_quadro_original": {
+   "args": "path, t, largura=2560",
    "modulos": []
   },
   "video_cutter_cancel_export": {

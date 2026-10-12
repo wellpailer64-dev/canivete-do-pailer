@@ -794,9 +794,28 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-transport-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .ve-ruler-btn { min-width: 28px; height: 28px; }
 .ve-ruler-btn.active { color: var(--ve-accent); background: rgba(212, 129, 74, .12); }
-.ve-proxy-btn { height: 28px; padding: 0 7px; font-size: 10px; font-weight: 600; letter-spacing: .06em; }
 .ve-fhd-btn { width: auto; padding: 0 6px; font-size: 10px; font-weight: 700; letter-spacing: .04em; }
+/* Botão PROXY + setinha de opções (editor-proxy.js) */
+.ve-proxy-grupo { position: relative; display: inline-flex; align-items: center; }
+.ve-proxy-btn { height: 28px; padding: 0 7px; font-size: 10px; font-weight: 600; letter-spacing: .06em; border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .ve-proxy-btn.active { color: var(--ve-accent); background: rgba(212, 129, 74, .12); }
+.ve-proxy-mais { height: 28px; width: 18px; min-width: 18px; padding: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.ve-proxy-pop { position: absolute; bottom: 34px; left: 0; z-index: 3000; width: 248px; padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 6px;
+    background: var(--ve-panel); border: 1px solid var(--ve-line-2); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); font: 12px var(--ve-ui); color: var(--ve-text); }
+.ve-proxy-topo { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; }
+.ve-proxy-chave { width: 30px; height: 17px; border-radius: 9px; border: 0; padding: 0; background: var(--ve-line-2); position: relative; cursor: pointer; transition: background .15s; }
+.ve-proxy-chave i { position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: left .15s; }
+.ve-proxy-chave.on { background: var(--ve-accent); }
+.ve-proxy-chave.on i { left: 15px; }
+.ve-proxy-dica { color: var(--ve-dim); font-size: 11px; margin-bottom: 2px; }
+.ve-proxy-rot { color: var(--ve-dim); font-size: 10.5px; margin-top: 4px; }
+.ve-proxy-seg { display: flex; background: var(--ve-bg); border: 1px solid var(--ve-line); border-radius: 6px; padding: 2px; gap: 2px; }
+.ve-proxy-seg button { flex: 1; border: 0; background: transparent; color: var(--ve-dim); font: 500 11.5px var(--ve-ui); padding: 5px 4px; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+.ve-proxy-seg button:hover { color: var(--ve-text); }
+.ve-proxy-seg button.on { background: var(--ve-panel-2); color: var(--ve-text); }
+.ve-proxy-acoes { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--ve-line); }
+.ve-proxy-acoes button { border: 0; background: transparent; color: var(--ve-dim); font: 11.5px var(--ve-ui); cursor: pointer; padding: 2px 0; }
+.ve-proxy-acoes button:hover { color: var(--ve-accent); }
 .ve-res-sel {
     height: 24px;
     padding: 0 4px;

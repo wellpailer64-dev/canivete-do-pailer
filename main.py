@@ -727,6 +727,37 @@ def ve_render_manutencao(base, max_gb=20, dias=30):
         return {"success": False, "error": str(e)}
 
 
+def ve_quadro_original(path, t, largura=2560):
+    """Botão PROXY desligado (imagem cheia): o quadro do ARQUIVO ORIGINAL no instante t (s da fonte), em JPEG de alta
+    qualidade, para o monitor desenhar no lugar do quadro da prévia leve quando parado — vale para todo formato,
+    inclusive os que o editor não toca (MXF, 10 bits, 4:2:2). Guardado no cache (cada quadro sai uma vez)."""
+    import hashlib
+    import subprocess
+    from Functions import media_server, video_cutter
+    try:
+        if not path or not os.path.isfile(path):
+            return {"success": False, "error": "arquivo não encontrado"}
+        t = max(0.0, float(t))
+        largura = max(320, min(3840, int(largura or 2560)))
+        st = os.stat(path)
+        chave = hashlib.md5(f"{os.path.basename(path).lower()}|{st.st_size}|{st.st_mtime}|{t:.4f}|{largura}".encode()).hexdigest()[:16]
+        pasta = os.path.join(video_cutter._midia_dir(), "quadros_originais")
+        os.makedirs(pasta, exist_ok=True)
+        arq = os.path.join(pasta, f"q_{chave}.jpg")
+        if not os.path.isfile(arq):
+            tmp = arq + ".tmp.jpg"
+            r = subprocess.run([video_cutter.ffmpeg_path(), "-v", "error", "-y", "-ss", f"{t:.4f}", "-i", path, "-frames:v", "1",
+                                "-vf", f"scale='min({largura},iw)':-2:flags=lanczos", "-q:v", "2", tmp],
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
+                               creationflags=video_cutter._creationflags())
+            if r.returncode != 0 or not os.path.isfile(tmp):
+                return {"success": False, "error": (r.stderr or "").strip()[-200:] or "o ffmpeg não tirou o quadro"}
+            os.replace(tmp, arq)
+        return {"success": True, "url": media_server.register(arq)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def ve_tamanhos_midia(paths):
     """{caminho: {width, height}} dos vídeos (ffprobe, já girado como a prévia). O Editor chama antes de exportar: vídeo
     que ainda estava na fila de preparação não tinha o tamanho e o 'caber no quadro' saía 100% (4K ampliado 2× no
@@ -4002,6 +4033,9 @@ class ApiBridge:
 
     def ve_tamanhos_midia(self, paths):
         return ve_tamanhos_midia(paths)
+
+    def ve_quadro_original(self, path, t, largura=2560):
+        return ve_quadro_original(path, t, largura)
 
     def video_cutter_cancel_export(self):
         return video_cutter_cancel_export()

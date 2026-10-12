@@ -511,24 +511,10 @@ function vePrefsCacheSalvar(patch) {
     PREFS.cache = { ...vePrPrefs(), ...patch };
     prefsSave();
     vePrAplicarRam();
-    veProxyBtnUi();
 }
-
-// Proxy junto aos vídeos (desligado por padrão: a pasta do cliente pode estar na nuvem e subiria GBs de prévias).
-// Vale para as próximas prévias; as já feitas no cache continuam valendo (não converte de novo).
-function veProxyJuntoToggle() {
-    const on = !vePrPrefs().proxyJunto;
-    vePrefsCacheSalvar({ proxyJunto: on });
-    const el = document.getElementById('pref-proxy-junto');
-    if (el) el.value = on ? '1' : '0';
-    veToast(on ? 'Proxy ligado: as próximas prévias leves vão para a pasta Proxy ao lado dos vídeos'
-        : 'Proxy desligado: as próximas prévias leves vão para o cache');
-}
-
-function veProxyBtnUi() {
-    const b = document.getElementById('ve-proxy-btn');
-    if (b) b.classList.toggle('active', !!vePrPrefs().proxyJunto);
-}
+// Proxy junto aos vídeos (pasta Proxy ao lado deles, p/ levar o projeto a outro PC): só em Preferências › Onde guardar
+// as prévias leves. O botão PROXY do monitor saiu (2026-10-11): repetia essa opção e lembrava o do Premiere, que faz outra
+// coisa (alternar original × proxy) — aqui a prévia leve entra sozinha quando o formato não toca direto.
 
 function vePrAplicarRam() {
     if (typeof veCache !== 'function') return;
@@ -662,7 +648,7 @@ function vePrefsCacheLimpar(tudo) {
     });
 }
 
-window.addEventListener('prefs-carregadas', () => { vePrAplicarRam(); vePrManutencao(); veHevcTestar(); veProxyBtnUi(); });
+window.addEventListener('prefs-carregadas', () => { vePrAplicarRam(); vePrManutencao(); veHevcTestar(); });
 
 // H.265 toca direto neste PC? (precisa da extensão HEVC do Windows e de decodificador): toca uma amostra pequena,
 // busca um quadro e confere a imagem. O resultado vai para as preferências (hevcDireto), que o Python lê ao preparar
