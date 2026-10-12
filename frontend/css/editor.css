@@ -802,7 +802,11 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-proxy-mais { height: 28px; width: 18px; min-width: 18px; padding: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .ve-proxy-pop { position: absolute; bottom: 34px; left: 0; z-index: 3000; width: 248px; padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 6px;
     background: var(--ve-panel); border: 1px solid var(--ve-line-2); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); font: 12px var(--ve-ui); color: var(--ve-text); }
-.ve-proxy-topo { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 13px; }
+.ve-proxy-topo { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; }
+.ve-proxy-topo span { flex: 1; }
+.ve-pop-x { width: 22px; height: 22px; border: 0; border-radius: 5px; background: transparent; color: var(--ve-dim); font: 400 17px/1 var(--ve-ui); cursor: pointer; display: grid; place-items: center; padding: 0; }
+.ve-pop-x:hover { background: var(--ve-panel-2); color: var(--ve-text); }
+.ve-atv-cab-acoes { display: flex; align-items: center; gap: 6px; }
 .ve-proxy-chave { width: 30px; height: 17px; border-radius: 9px; border: 0; padding: 0; background: var(--ve-line-2); position: relative; cursor: pointer; transition: background .15s; }
 .ve-proxy-chave i { position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: left .15s; }
 .ve-proxy-chave.on { background: var(--ve-accent); }

@@ -82,7 +82,8 @@ function veProxyPopRender() {
         `<button data-v="${v}" class="${String(v) === String(atual) ? 'on' : ''}" title="${veT(d || n)}">${veT(n)}</button>`).join('') + '</div>';
     const on = veProxyLigado();
     pop.innerHTML = `<div class="ve-proxy-topo"><span>${veT('Prévias leves')}</span>
-            <button class="ve-proxy-chave${on ? ' on' : ''}" id="ve-proxy-chk" title="${veT('Ligado: o monitor usa as prévias leves. Desligado: parado, mostra o arquivo original')}"><i></i></button></div>
+            <button class="ve-proxy-chave${on ? ' on' : ''}" id="ve-proxy-chk" title="${veT('Ligado: o monitor usa as prévias leves. Desligado: parado, mostra o arquivo original')}"><i></i></button>
+            <button class="ve-pop-x" id="ve-proxy-x" title="${veT('Fechar')} (Esc)">×</button></div>
         <div class="ve-proxy-dica">${on ? veT('O monitor usa as cópias leves.') : veT('Parado, o monitor mostra o original.')}</div>
         <div class="ve-proxy-rot">${veT('Qualidade')}</div>
         ${seg('alt', [[540, '540p', '540p (a mais leve)'], [720, '720p', '720p (mais leve, padrão)'], [1080, '1080p', '1080p (máxima)']], p.altura || 720)}
@@ -95,6 +96,7 @@ function veProxyPopRender() {
             <button id="ve-proxy-prefs">${veT('Mais opções')}</button>
         </div>`;
     pop.querySelector('#ve-proxy-chk').onclick = () => veProxyAlternar();
+    pop.querySelector('#ve-proxy-x').onclick = () => veProxyFechar();
     const campo = { alt: 'altura', hevc: 'hevc', onde: 'proxyJunto' };
     pop.querySelectorAll('.ve-proxy-seg').forEach(g => g.querySelectorAll('button').forEach(bt => bt.onclick = () => {
         vePrefsCacheCampo(campo[g.dataset.seg], bt.dataset.v);
@@ -137,6 +139,8 @@ function veProxyFechar() { VEPROXY.aberto = false; const pop = document.getEleme
     // fecha ao clicar fora (pointerdown na CAPTURA: o editor cancela o mousedown em vários painéis) e com Esc
     document.addEventListener('pointerdown', e => { if (VEPROXY.aberto && !g.contains(e.target)) veProxyFechar(); }, true);
     document.addEventListener('keydown', e => { if (VEPROXY.aberto && e.key === 'Escape') veProxyFechar(); }, true);
+    // clique numa janela solta (timeline, painéis) não chega a este documento: a janela perde o foco — fecha também
+    window.addEventListener('blur', () => { if (VEPROXY.aberto) veProxyFechar(); });
     window.addEventListener('prefs-carregadas', veProxyUi);
     veProxyUi();
 })();

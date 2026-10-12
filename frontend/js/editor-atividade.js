@@ -110,9 +110,11 @@ function veAtvPopRender(lista, n) {
     const midias = n.ativos - (VEATV.conv && !VEATV.conv.fim ? 1 : 0);
     const cab = midias ? `Carregando ${midias} mídia(s)` : n.ativos ? 'Trabalhando no fundo' : 'Nada carregando agora';
     pop.innerHTML = `<div class="ve-atv-cab"><b>${cab}</b>
-        ${lista.some(x => x.etapa === 'pronto' || x.etapa === 'painel' || x.etapa === 'erro') ? '<button class="ve-btn ve-btn-ghost" id="ve-atv-limpar">Limpar concluídos</button>' : ''}</div>
+        <span class="ve-atv-cab-acoes">${lista.some(x => x.etapa === 'pronto' || x.etapa === 'painel' || x.etapa === 'erro') ? '<button class="ve-btn ve-btn-ghost" id="ve-atv-limpar">Limpar concluídos</button>' : ''}
+        <button class="ve-pop-x" id="ve-atv-x" title="Fechar (Esc)">×</button></span></div>
         ${veAtvConvHtml()}
         <div class="ve-atv-lista">${linhas || '<div class="ve-atv-vazio">Todas as mídias do projeto estão prontas.</div>'}</div>`;
+    document.getElementById('ve-atv-x').onclick = e => { e.stopPropagation(); VEATV.aberto = false; pop.hidden = true; };
     const lp = document.getElementById('ve-atv-limpar');
     if (lp) lp.onclick = e => {
         e.stopPropagation();
@@ -145,6 +147,8 @@ function veAtvAlternar(e) {
     const fechar = () => { VEATV.aberto = false; document.getElementById('ve-atv-pop').hidden = true; };
     document.addEventListener('pointerdown', e => { if (VEATV.aberto && !caixa.contains(e.target)) fechar(); }, true);
     document.addEventListener('keydown', e => { if (VEATV.aberto && e.key === 'Escape') fechar(); }, true);
+    // clique numa janela solta (timeline, painéis) não chega a este documento: a janela perde o foco — fecha também
+    window.addEventListener('blur', () => { if (VEATV.aberto) fechar(); });
     setInterval(() => { if (typeof VEPJF !== 'undefined' && (VEPJF.fila.length || VEPJF.ativos.size || VEATV.aberto)) veAtvRender(); }, 1000);
 })();
 window.VEATV_API = { lista: () => veAtvLista().map(x => ({ ...x, nome: veAtvNome(x.id) })), abrir: () => { if (!VEATV.aberto) veAtvAlternar(); } };
