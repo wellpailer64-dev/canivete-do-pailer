@@ -338,3 +338,7 @@ Cor trabalha em luma/croma, não no RGB com transparência. Caso novo `chroma3`:
   prévia (caso `chroma2`: 10,5 contra 7,7 pela CPU). Não era faixa de TV, nem pré-multiplicação na volta a RGBA, nem
   `disable_linear` na LUT. Próximo palpite: como a LUT do libplacebo trata a entrada RGBA (comparar a LUT sobre a saída do
   key com o lut3d da CPU num quadro só). Por ora esse clipe continua híbrido (desce só ele).
+- **Memória da placa ocupada ao começar (2026-10-12, Pailer: 6,6 de 8 GB, caiu no processador):** antes de desistir,
+  `liberar_placa` cancela o render da prévia (o ffmpeg dele leva segundos para sair), descarrega a voz/motor da Kani, o
+  Pincel Roto e o gerador de efeitos, e espera até 15 s conferindo `cabe_na_placa` de novo. Pendente: o que o próprio
+  WebView do editor ocupa (vídeos da prévia decodificados na placa) não dá para soltar pelo Python.

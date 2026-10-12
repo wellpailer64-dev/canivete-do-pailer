@@ -129,6 +129,29 @@ def memoria_em_uso():
         return 0
 
 
+def liberar_placa(cabe, prog=None, espera=15.0):
+    """Antes de desistir da placa por memória: tira dela o que o próprio app deixou ocupando — render da prévia em
+    andamento (o automático para com a exportação, mas o ffmpeg dele leva segundos para sair), a voz da Kani mantida
+    carregada, o motor de chat da Kani (llama.cpp), o Pincel Roto e o gerador de efeitos sonoros — e espera a memória
+    baixar (até `espera` s), conferindo `cabe()` de novo. Pailer: 6,6 de 8 GB ocupados ao começar o render, e caía no
+    processador (2026-10-12). True se passou a caber."""
+    import time
+    if prog:
+        prog(0, "Liberando a memória da placa de vídeo...")
+    for mod, fn in (("render_cache", "cancelar"), ("omnivoice_tool", "descarregar"), ("kani", "parar"),
+                    ("pincel_roto", "liberar"), ("gerador_sfx", "liberar")):
+        try:
+            getattr(__import__(f"Functions.{mod}", fromlist=[fn]), fn)()
+        except Exception:
+            pass
+    fim = time.time() + espera
+    while time.time() < fim:
+        time.sleep(1.0)
+        if cabe():
+            return True
+    return cabe()
+
+
 def cabe_na_placa(segmentos, lay, path):
     """A exportação cabe na memória livre? Estimativa × 2,6 (medido 2026-10-08: 2,0 → 3,8 GB e, com as cópias Full HD
     automáticas, 2,3 → 5,6 GB além do que já estava ocupado — a fila adiantada de quadros cresce durante o export) + o
@@ -1381,6 +1404,9 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
         m = "placa sem Vulkan/libplacebo"
     # CANIVETE_PLACA_BLOCOS=1: em blocos mesmo cabendo (teste_export --placa-blocos confere as emendas)
     grande = m is None and (os.environ.get("CANIVETE_PLACA_BLOCOS") == "1" or not cabe_na_placa(args["segmentos"], lay, args["path"]))
+    if grande and os.environ.get("CANIVETE_PLACA_BLOCOS") != "1":
+        # não cabe com o que está ocupado agora: libera o que o app deixou na placa e confere de novo
+        grande = not liberar_placa(lambda: cabe_na_placa(args["segmentos"], lay, args["path"]), prog)
     if grande and not all(isinstance(s, dict) and s.get("gap") is not None for s in args["segmentos"] or []):
         m = "memória livre da placa insuficiente (4K bruto: Forçar Full HD resolve; ou feche o que usa a placa)"
     if m:
