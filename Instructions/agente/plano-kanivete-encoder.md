@@ -333,3 +333,8 @@ da lista como a CPU. Opacidade fixa ou com quadros-chave: `_shader_alfa(..., mul
 opacidade do quadro). Saída do key em `rgba64le` (`_FMT_ALFA`). Respeite o seu voto: os 8 clipes "Luz e Cor → Chroma
 Key" passam a ir inteiros pela placa. Continua híbrido: Key ANTES do Luz e Cor (1 clipe no Respeite) — o shader do Luz e
 Cor trabalha em luma/croma, não no RGB com transparência. Caso novo `chroma3`: placa 8,2 / CPU 7,7.
+- Tentado e desfeito (2026-10-12): Key ANTES do Luz e Cor na placa. Recorte em `yuva444p16le` (o Luz e Cor mexe em
+  luma/croma, alfa intacto) ou em `rgba64le` com só a LUT: tudo na placa, mas o recorte saía ~9% mais escuro que a
+  prévia (caso `chroma2`: 10,5 contra 7,7 pela CPU). Não era faixa de TV, nem pré-multiplicação na volta a RGBA, nem
+  `disable_linear` na LUT. Próximo palpite: como a LUT do libplacebo trata a entrada RGBA (comparar a LUT sobre a saída do
+  key com o lut3d da CPU num quadro só). Por ora esse clipe continua híbrido (desce só ele).
