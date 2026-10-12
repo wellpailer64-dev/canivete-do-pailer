@@ -272,7 +272,7 @@ documentado, commitado e publicado antes do próximo:
 3. **Desfoque com quadros-chave em clipe de vídeo** — FEITO (8.3). (Na Carolini o que aparecia era o Pincel Roto, que já vira vídeo com alfa antes de exportar: vai pela placa.)
 4. **Transições de sobreposição** — FEITO (8.4). Antes: render prévio quadro a quadro em numpy/OpenCV sobre um
    intermediário ProRes; a prévia já tem o shader (WebGL) — portar para o libplacebo.
-5. Chroma Key junto com outro efeito / com opacidade: a camada desce (o key sozinho já é shader).
+5. **Chroma Key com outros efeitos e com opacidade** — FEITO (8.5); fica híbrido só Key antes do Luz e Cor.
 - Sem solução na placa: XAVC 4:2:2 (câmera do Edgar) e ProRes — o decodificador Vulkan não lê.
 
 ### 8.1 Fade de clipe na placa
@@ -324,3 +324,12 @@ em tabelas pelo `frame` (uma passada por arquivo); entra antes dos outros efeito
   uma linha por quadro, `texelFetch`); 3 s a 60 qps em 1080×1920 = 2 s de placa. `autoframe` na placa: pior 2,2.
 - O progresso da reserva ("Transição de sobreposição n (no processador)") não começa com "Processador ·", para não
   esconder o motivo de a placa não ter montado.
+
+### 8.5 Chroma Key com outros efeitos e com opacidade na placa
+Antes: Chroma Key junto com qualquer outro efeito, ou com opacidade/fade, fazia a camada descer para a CPU a cada
+quadro. Agora (`_key_so`): o key roda na placa quando é o ÚLTIMO efeito e antes dele só há efeitos que a placa faz
+(Luz e Cor, Aberração, Desfoque) — eles passam no vídeo (`_passos_lc`) e o shader do key recorta o resultado, na ordem
+da lista como a CPU. Opacidade fixa ou com quadros-chave: `_shader_alfa(..., multiplica=True)` (alfa do recorte × a
+opacidade do quadro). Saída do key em `rgba64le` (`_FMT_ALFA`). Respeite o seu voto: os 8 clipes "Luz e Cor → Chroma
+Key" passam a ir inteiros pela placa. Continua híbrido: Key ANTES do Luz e Cor (1 clipe no Respeite) — o shader do Luz e
+Cor trabalha em luma/croma, não no RGB com transparência. Caso novo `chroma3`: placa 8,2 / CPU 7,7.

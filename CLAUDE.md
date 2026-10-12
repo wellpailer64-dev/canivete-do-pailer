@@ -78,6 +78,8 @@ Respeite o seu voto: 892 s → 205 s. Blocos no teste: `CANIVETE_PLACA_BLOCOS=1 
 **Taxa da timeline CRAVADA** (`video_cutter.taxa_timeline`, `probe()["fps_timeline"]`): nunca a média de vídeo de celular.
 Rodada 7 (qualidade, 2026-10-12, plano "Rodada 7"): placa em 10/16 bits por dentro (escuro sem blocos), Brilho em Tela
 (claros sem estourar), H.265 10 bits pela placa, "sem áudio" na taxa da timeline. Bancada: `D:/kanivete_testes/qualidade`.
+Rodada 8 (plano §8.1–8.5): fade de clipe, os 12 modos de mesclagem, desfoque animado, transições de sobreposição e
+Chroma Key com Luz e Cor/opacidade agora na placa (shaders do libplacebo; parâmetros por quadro em trechos retos ou textura).
 
 Mixer de trilhas de áudio (Audio Track Mixer do Premiere): `frontend/js/editor-mixer.js` (aba junto dos Controles de
 efeito): pan, M/S (S também no cabeçalho da trilha), fader −∞..+15 dB na escala do Premiere, medidor L/R por trilha e o Mix.

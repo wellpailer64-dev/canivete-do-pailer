@@ -189,9 +189,13 @@ def _fx_hibrido(fx):
 
 
 def _key_so(fx):
-    """Só um Chroma Key ativo no clipe: o recorte roda inteiro num shader da placa (_shader_key)."""
+    """Chroma Key que roda inteiro na placa (_shader_key): o ÚLTIMO efeito ativo do clipe, com antes dele só efeitos que
+    a placa já faz (_lc_ok: Luz e Cor, Aberração, Desfoque) — eles passam no vídeo e o key recorta o resultado, na
+    ordem da lista como a CPU. (Respeite o seu voto: 8 clipes "Luz e Cor → Chroma Key" desciam para a CPU.) Key antes do
+    Luz e Cor continua híbrido: o shader do Luz e Cor trabalha em luma/croma, não no RGB com transparência."""
     ativos = [f for f in fx or [] if f.get("on") is not False]
-    return len(ativos) == 1 and ativos[0].get("t") == "key"
+    return (bool(ativos) and ativos[-1].get("t") == "key" and not any(f.get("t") == "key" for f in ativos[:-1])
+            and _lc_ok(ativos[:-1]))
 
 
 def _shader_key(v):
@@ -628,7 +632,7 @@ def _shader_ovt(t, v, uc, dur, fps, W, H, local0, n):
             "    return vec4(c, 1.0);\n}\n")
 
 
-def _shader_alfa(c, fps, pula=0.0, max_trechos=256):
+def _shader_alfa(c, fps, pula=0.0, max_trechos=256, multiplica=False):
     """Opacidade de um CLIPE de vídeo na placa (fade, opacidade fixa ou com quadros-chave), no lugar de descer o quadro
     para a CPU (colorchannelmixer + sendcmd). O valor de cada quadro é o mesmo da CPU (_valor_kf no tempo do clipe), mas
     guardado em TRECHOS RETOS (um fade = 1 trecho; constante = 1): uma tabela por quadro de um clipe de 10 min passaria do
@@ -643,7 +647,8 @@ def _shader_alfa(c, fps, pula=0.0, max_trechos=256):
     if trechos is None:
         return None
     return (f"//!HOOK MAIN\n//!BIND HOOKED\n//!DESC opacidade do clipe\n{_glsl_trechos('ALFA', trechos)}"
-            f"vec4 hook() {{\n    vec4 c = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n    c.a = ALFA(frame - 1);\n    return c;\n}}\n")
+            f"vec4 hook() {{\n    vec4 c = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n"
+            f"    c.a {'*' if multiplica else ''}= ALFA(frame - 1);\n    return c;\n}}\n")
 
 
 def _shader_ca(v, W, H):
@@ -764,16 +769,25 @@ def _entrada_video(g, c, info, pasta, n_cam):
         efeito += f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={_FMT_CAM}:disable_linear=1,"
     opac = ""
     if key_gpu:
-        # recorte inteiro na placa (shader); a saída já é RGBA. Opacidade: só esta camada desce para recebê-la
+        # recorte inteiro na placa (shader); a saída já é RGBA. Antes dele, os efeitos da lista que vêm antes (Luz e Cor…)
+        ativos = [f for f in c["fx"] if f.get("on") is not False]
+        efeito = "".join(p + "," for p in _passos_lc(g, ativos[:-1], rw, rh, pasta, f"k{n_cam}", _FMT_CAM))
         arq = os.path.join(pasta, f"key_v{n_cam}.glsl")
         with open(arq, "w", encoding="utf-8") as fh:
-            fh.write(_shader_key(next(f for f in c["fx"] if f.get("on") is not False).get("v") or {}))
+            fh.write(_shader_key(ativos[-1].get("v") or {}))
         # upscaler=nearest: a cor (4:2:0) ampliada como o swscale do exportador de CPU (pico de diferença 53 → 28 na borda)
-        efeito = f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format=rgba:disable_linear=1:upscaler=nearest,"
-        if not _opaca(c):
+        efeito += f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={_FMT_ALFA}:disable_linear=1:upscaler=nearest,"
+        # opacidade (fade) na placa: o alfa do recorte × a opacidade de cada quadro (antes a camada descia para a CPU)
+        sh_op = None if _opaca(c) else _shader_alfa(c, g.fps, pula, multiplica=True)
+        if sh_op:
+            arq = os.path.join(pasta, f"kalfa_v{n_cam}.glsl")
+            with open(arq, "w", encoding="utf-8") as fh:
+                fh.write(sh_op)
+            efeito += f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={_FMT_ALFA}:disable_linear=1,"
+        elif not _opaca(c):
             a = (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@vop{n_cam}", c["st"])
                  if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
-            opac = f"hwdownload,format=rgba,{a},hwupload,"
+            opac = f"hwdownload,format={_FMT_ALFA},{a},hwupload,"
     elif hib:
         # desce, os mesmos filtros do exportador de CPU no tamanho da mídia (com a opacidade, se houver) e sobe com o alfa
         a = ""
