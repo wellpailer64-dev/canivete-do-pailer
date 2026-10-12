@@ -269,7 +269,7 @@ documentado, commitado e publicado antes do próximo:
 1. **Fade/opacidade em clipe de vídeo** — FEITO (abaixo).
 2. **Mesclagens fora do Multiplicar** — FEITO (8.2). Antes UMA camada assim mandava a timeline INTEIRA para a CPU
    (`motivo`). O `blend_vulkan` do ffmpeg 8.1 só tem normal e multiply.
-3. Efeito com quadros-chave em clipe de vídeo (`fxk`): timeline inteira na CPU (reels da Carolini Feijão).
+3. **Desfoque com quadros-chave em clipe de vídeo** — FEITO (8.3). (Na Carolini o que aparecia era o Pincel Roto, que já vira vídeo com alfa antes de exportar: vai pela placa.)
 4. Transições de sobreposição (`editor-ovt.js`/`transicoes.py`): render prévio quadro a quadro em numpy/OpenCV sobre um
    intermediário ProRes; a prévia já tem o shader (WebGL) — portar para o libplacebo.
 5. Chroma Key junto com outro efeito / com opacidade: a camada desce (o key sozinho já é shader).
@@ -281,7 +281,7 @@ Antes: clipe de vídeo com opacidade (fixa ou quadros-chave) descia a cada quadr
 saída `rgba64le` (`_FMT_ALFA`). Os valores são os da CPU (`_valor_kf` no tempo do clipe, `pula` no bloco) guardados em
 TRECHOS RETOS (faixa de inclinações, uma passada): um clipe de 10 min com fade = 18 trechos (uma tabela por quadro passaria
 do limite do shader); mais de 256 trechos → fica no caminho antigo. Medido (C5797 4K, 20 s, fade): 23,2 s → 14,5 s (−37%).
-Caso novo `fadevideo` no `teste_export` (placa 5,2 / CPU 5,4); `--placa` 27/27 + fadevideo OK.
+Caso novo `fadevideo` no `teste_export` (placa 5,2 / CPU 5,4); `--placa` 27/27 + fadevideo OK. `_trechos`/`_glsl_trechos` servem também ao desfoque animado (8.3).
 
 ### 8.2 Mesclagens na placa (todos os 12 modos)
 Antes: qualquer camada em Tela, Sobrepor, Luz suave… (fora o Multiplicar) mandava a timeline INTEIRA para a CPU.
@@ -294,3 +294,13 @@ lê os dois pontos e devolve `a·(1−α) + modo(a,b)·α`; depois recorta a met
   `b = rgb/α²`. Conferido em número (Tela/Sobrepor/Adicionar a 50%: ±1 nível da fórmula).
 Caso `mesclagem` (12 modos, fotos a 70%): CPU 57 s → placa 6 s, pior 5,5; caso novo `mesclagemvideo` (vídeo em Tela com
 fade + Sobrepor): placa 5,0 = CPU 5,0. `--placa` 29/29. Fica na CPU: mesclagem + Sombra projetada na mesma camada.
+
+### 8.3 Desfoque com quadros-chave em clipe de vídeo na placa
+O exportador de CPU só anima o Desfoque (`vc._fx_animados`); no modo placa um clipe de VÍDEO com ele (`fxk`) mandava a
+timeline INTEIRA para a CPU. Agora `_shader_blur_anim`: o sigma de cada quadro (mesma conta, no quadro já reduzido) em
+trechos retos (`_trechos`/`_glsl_trechos`, os mesmos do fade) e os pesos do gaussiano calculados no shader (até 64
+amostras por lado). Fica na CPU só com Chroma Key, efeito híbrido ou giro no mesmo clipe.
+- Armadilha medida: o contador `frame` do libplacebo avança A CADA PASSADA do arquivo de shader — com H e V no mesmo
+  arquivo a curva corria em dobro (desfoque voltando 0,9 s antes). Shader que lê `frame` = UMA passada por arquivo.
+- Caso novo `desfoquevideo` (fundo parado: o vídeo de base andando fazia o navegador entregar o quadro vizinho): placa
+  1,7, CPU 4,3.

@@ -291,7 +291,10 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
         elif c["tipo"] == "video":
             if vc._clipe_tem_alfa(c["path"]):
                 continue   # vídeo com transparência (camada desenhada, Comp): lido e tratado na CPU, sobe em RGBA
-            if c.get("fxk"):
+            # efeito com quadros-chave: o exportador de CPU só anima o Desfoque (vc._fx_animados), e ele vai num shader
+            # (_shader_blur_anim); com Chroma Key/híbrido/giro o clipe ainda vai pela CPU
+            if c.get("fxk") and any((f.get("p") or {}) for f in c["fxk"]) and (
+                    _key_so(c["fx"]) or _fx_hibrido(c["fx"]) or c["rot"] % 360 or "rot" in c["kf"]):
                 return "vídeo com efeito animado"
             if not _lc_ok(c["fx"]) and not _fx_hibrido(c["fx"]):
                 return "vídeo com efeito fora do Luz e Cor"
@@ -462,22 +465,11 @@ def _shader_opacidade(c, ini, fim, fps, desde=None):
             f"    vec4 c = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n    c.a = OP[clamp(frame - 1, 0, {n - 1})];\n    return c;\n}}\n")
 
 
-def _shader_alfa(c, fps, pula=0.0, max_trechos=256):
-    """Opacidade de um CLIPE de vídeo na placa (fade, opacidade fixa ou com quadros-chave), no lugar de descer o quadro
-    para a CPU (colorchannelmixer + sendcmd). O valor de cada quadro é o mesmo da CPU (_valor_kf no tempo do clipe), mas
-    guardado em TRECHOS RETOS (um fade = 1 trecho; constante = 1): uma tabela por quadro de um clipe de 10 min passaria do
-    limite do shader. O contador `frame` começa em 1 no 1º quadro da camada (tempo do clipe = pula). None se precisar de
-    mais de max_trechos trechos (curva muito picada: fica na CPU)."""
-    n = max(1, int(math.ceil((c["dur"] - pula) * fps)) + 2)
-    if "op" in c["kf"]:
-        vals = [max(0.0, min(1.0, vc._valor_kf(c["kf"]["op"], pula + i / fps))) for i in range(n)]
-    else:
-        vals = [max(0.0, min(1.0, c["op"]))] * n
-    tol = 0.25 / 255
-    trechos, a = [], 0   # (início, fim, valor no início, valor no fim), em quadros
+def _trechos(vals, tol, max_trechos=256):
+    """Valores por quadro → trechos retos [(início, fim, valor no início, valor no fim)] (a reta de cada trecho passa a
+    ±tol de todos os pontos do meio; uma passada só, pela faixa de inclinações). None se passar de max_trechos."""
+    n, trechos, a = len(vals), [], 0
     while a < n:
-        # estende enquanto a reta de a até b passa a ±tol de todos os pontos do meio: a faixa de inclinações que serve
-        # a todos eles (lo..hi) encolhe a cada ponto — uma passada só (clipe de 10 min = 36 mil quadros)
         b, lo, hi = a, -1e9, 1e9
         while b + 1 < n:
             d = b + 1 - a
@@ -490,17 +482,80 @@ def _shader_alfa(c, fps, pula=0.0, max_trechos=256):
         a = b + 1
         if len(trechos) > max_trechos:
             return None
-    lst = lambda xs: ", ".join(xs)
+    return trechos
+
+
+def _glsl_trechos(nome, trechos):
+    """Tabelas de trechos e a função float {nome}(int f) que devolve o valor do quadro f (0 = 1º quadro da camada)."""
     m = len(trechos)
-    return (f"//!HOOK MAIN\n//!BIND HOOKED\n//!DESC opacidade do clipe\n"
-            f"const int T0[{m}] = int[]({lst(str(t[0]) for t in trechos)});\n"
-            f"const int T1[{m}] = int[]({lst(str(t[1]) for t in trechos)});\n"
-            f"const float V0[{m}] = float[]({lst(f'{t[2]:.5f}' for t in trechos)});\n"
-            f"const float V1[{m}] = float[]({lst(f'{t[3]:.5f}' for t in trechos)});\n"
-            f"vec4 hook() {{\n    vec4 c = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n    int f = frame - 1;\n"
-            f"    float a = V1[{m - 1}];\n    for (int k = 0; k < {m}; k++) {{\n"
-            f"        if (f <= T1[k]) {{ a = T1[k] > T0[k] ? mix(V0[k], V1[k], float(max(f - T0[k], 0)) / float(T1[k] - T0[k])) : V0[k]; break; }}\n"
-            f"    }}\n    c.a = a;\n    return c;\n}}\n")
+    lst = lambda xs: ", ".join(xs)
+    return (f"const int {nome}_T0[{m}] = int[]({lst(str(t[0]) for t in trechos)});\n"
+            f"const int {nome}_T1[{m}] = int[]({lst(str(t[1]) for t in trechos)});\n"
+            f"const float {nome}_V0[{m}] = float[]({lst(f'{t[2]:.5f}' for t in trechos)});\n"
+            f"const float {nome}_V1[{m}] = float[]({lst(f'{t[3]:.5f}' for t in trechos)});\n"
+            f"float {nome}(int f) {{\n    for (int k = 0; k < {m}; k++)\n"
+            f"        if (f <= {nome}_T1[k]) return {nome}_T1[k] > {nome}_T0[k] ? mix({nome}_V0[k], {nome}_V1[k], "
+            f"float(max(f - {nome}_T0[k], 0)) / float({nome}_T1[k] - {nome}_T0[k])) : {nome}_V0[k];\n"
+            f"    return {nome}_V1[{m - 1}];\n}}\n")
+
+
+def _shader_blur_anim(fxk, W, H, dur, fps, pula=0.0):
+    """Desfoque com quadros-chave (editor-fx.js "blur", fxk) num CLIPE de vídeo, na placa: o sigma de cada quadro
+    (a conta de vc._fx_animados: 100% = 5% do lado menor, aqui do quadro já reduzido W×H) em trechos retos, e os pesos do
+    gaussiano calculados no shader (até 64 amostras por lado, de k em k acima disso). Devolve [shader H, shader V] — UM
+    arquivo por passada: o contador `frame` do libplacebo avança a cada passada (medido: com as duas no mesmo arquivo a
+    curva corria em dobro). Antes um clipe assim mandava a timeline inteira para a CPU. None se não há desfoque animado
+    ou a curva é picada demais."""
+    for f in fxk or []:
+        if f.get("t") != "blur" or not (f.get("p") or {}).get("amt"):
+            continue
+        pts = []
+        for q in f["p"]["amt"]:
+            try:
+                pts.append((float(q[0]), float(q[1]), str(q[2]) if len(q) > 2 else "lin", vc._curva_kf(q) if len(q) > 3 else None))
+            except Exception:
+                continue
+        if not pts:
+            continue
+        pts.sort(key=lambda p: p[0])
+        base = max(2, min(W, H)) / 2000.0
+        n = max(1, int(math.ceil((dur - pula) * fps)) + 2)
+        sig = [min(1000.0, max(0.0, vc._valor_kf(pts, pula + i / fps)) * base) for i in range(n)]
+        tr = _trechos(sig, 0.02)
+        if tr is None:
+            return None
+        partes = []
+        for dx, dy, nome in ((1, 0, "horizontal"), (0, 1, "vertical")):
+            partes.append(f"//!HOOK MAIN\n//!BIND HOOKED\n//!DESC desfoque animado {nome}\n{_glsl_trechos('SIG', tr)}"
+                          f"vec4 hook() {{\n    float s = SIG(frame - 1);\n"
+                          f"    vec4 c0 = clamp(HOOKED_texOff(vec2(0.0)), 0.0, 1.0);\n    if (s < 0.05) return c0;\n"
+                          f"    float r = ceil(3.0 * s), passo = max(1.0, ceil(r / 64.0));\n"
+                          f"    vec4 soma = c0; float tot = 1.0;\n"
+                          f"    for (float i = passo; i <= r; i += passo) {{\n"
+                          f"        float w = exp(-(i * i) / (2.0 * s * s));\n"
+                          f"        soma += w * (clamp(HOOKED_texOff(vec2({dx}.0 * i, {dy}.0 * i)), 0.0, 1.0) + "
+                          f"clamp(HOOKED_texOff(vec2({-dx}.0 * i, {-dy}.0 * i)), 0.0, 1.0));\n"
+                          f"        tot += 2.0 * w;\n    }}\n    return soma / tot;\n}}\n")
+        return partes
+    return None
+
+
+def _shader_alfa(c, fps, pula=0.0, max_trechos=256):
+    """Opacidade de um CLIPE de vídeo na placa (fade, opacidade fixa ou com quadros-chave), no lugar de descer o quadro
+    para a CPU (colorchannelmixer + sendcmd). O valor de cada quadro é o mesmo da CPU (_valor_kf no tempo do clipe), mas
+    guardado em TRECHOS RETOS (um fade = 1 trecho; constante = 1): uma tabela por quadro de um clipe de 10 min passaria do
+    limite do shader. O contador `frame` começa em 1 no 1º quadro da camada (tempo do clipe = pula). None se precisar de
+    mais de max_trechos trechos (curva muito picada: fica na CPU)."""
+    n = max(1, int(math.ceil((c["dur"] - pula) * fps)) + 2)
+    if "op" in c["kf"]:
+        vals = [max(0.0, min(1.0, vc._valor_kf(c["kf"]["op"], pula + i / fps))) for i in range(n)]
+    else:
+        vals = [max(0.0, min(1.0, c["op"]))] * n
+    trechos = _trechos(vals, 0.25 / 255, max_trechos)   # um fade = 1 trecho; clipe de 10 min com fades = 18
+    if trechos is None:
+        return None
+    return (f"//!HOOK MAIN\n//!BIND HOOKED\n//!DESC opacidade do clipe\n{_glsl_trechos('ALFA', trechos)}"
+            f"vec4 hook() {{\n    vec4 c = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n    c.a = ALFA(frame - 1);\n    return c;\n}}\n")
 
 
 def _shader_ca(v, W, H):
@@ -609,7 +664,16 @@ def _entrada_video(g, c, info, pasta, n_cam):
                 + (f"w={rw}:h={rh}:" if red < 1 else "") + f"format={_FMT_CAM}:disable_linear=1,")
     sobe = ("" if vk else (f"scale={rw}:{rh}:flags=bicubic," if red < 1 else "") + "format=yuv420p,hwupload,")
     # os efeitos medem em % da mídia: no quadro reduzido, as medidas do quadro reduzido
-    efeito = "" if hib or key_gpu else "".join(p + "," for p in _passos_lc(g, c["fx"], rw, rh, pasta, f"v{n_cam}", _FMT_CAM))
+    # desfoque animado (fxk): sai da lista fixa e vai num shader com o sigma de cada quadro (_shader_blur_anim)
+    ids_anim = {f.get("id") for f in c.get("fxk") or [] if f.get("id") and (f.get("p") or {})}
+    fx_fixos = [f for f in c["fx"] if f.get("id") not in ids_anim]
+    efeito = "" if hib or key_gpu else "".join(p + "," for p in _passos_lc(g, fx_fixos, rw, rh, pasta, f"v{n_cam}", _FMT_CAM))
+    sh_bl = None if hib or key_gpu else _shader_blur_anim(c.get("fxk"), rw, rh, c["dur"], g.fps, pula)
+    for j, sh in enumerate(sh_bl or []):
+        arq = os.path.join(pasta, f"blanim_v{n_cam}_{j}.glsl")
+        with open(arq, "w", encoding="utf-8") as fh:
+            fh.write(sh)
+        efeito += f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={_FMT_CAM}:disable_linear=1,"
     opac = ""
     if key_gpu:
         # recorte inteiro na placa (shader); a saída já é RGBA. Opacidade: só esta camada desce para recebê-la

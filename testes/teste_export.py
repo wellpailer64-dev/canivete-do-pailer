@@ -413,6 +413,13 @@ CASOS = {
             fx: [{ id: id(), t: 'ca', on: true, v: { r: 5, g: 0, b: -5, raio: 0 } }] });
         return [clip(0, 0, 0, 4, 'b.mp4'), pip, a1, a2];
     """, ""),
+    # desfoque com quadros-chave num CLIPE DE VÍDEO (com --placa: _shader_blur_anim; antes a timeline inteira ia pela CPU)
+    "desfoquevideo": (1080, 1920, """
+        const { clip } = __te, a = veFxNewId();
+        const v = clip(1, 0.2, 0, 3, 'c.mp4', { p: { sc: 70, x: 540, y: 900, rot: 0, op: 100 }, fx: [{ id: a, t: 'blur', on: true, v: { amt: 0 } }] });
+        v.k = { ['fx.' + a + '.amt']: [{ t: 0, v: 70, i: 'out' }, { t: 0.6, v: 0, i: 'lin' }, { t: 2.2, v: 0, i: 'in' }, { t: 3, v: 90, i: 'lin' }] };
+        return [clip(0, 0, 0, 4, 'foto2.jpg', { p: { sc: 160, x: 540, y: 960, rot: 0, op: 100 } }), v];   // fundo parado: só o desfoque mexe
+    """, ""),
     # mesclagem com VÍDEO (com --placa: fundo e camada lado a lado num shader, _mesclar): Tela com fade e Sobrepor
     "mesclagemvideo": (1080, 1920, """
         const { clip } = __te;
@@ -711,7 +718,7 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
         if k < len(todos):
             pega(k)
             difs.append((float(np.abs(previa[k].astype(np.int16) - ex[k].astype(np.int16)).mean()), k))
-    if nome in ("motion", "curvas", "fxmotion", "bloom", "invfill", "desfoqueanim", "girar"):
+    if nome in ("motion", "curvas", "fxmotion", "bloom", "invfill", "desfoqueanim", "girar", "desfoquevideo"):
         # motion: detalhes finos (anel, borda de máscara) quase não mexem na média: confere a pior região 30×30.
         # Contra o quadro exato do ffmpeg (o navegador, buscando no meio do quadro, às vezes entrega o vizinho: um
         # objeto rápido anda 30 px por quadro)
