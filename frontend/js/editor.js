@@ -5218,7 +5218,7 @@ function veRender() {
     }
     ctx.font = '10.5px Cascadia Mono, Consolas, monospace';
     // com marcadores, a faixa de cima é deles (editor-marcadores.js): os números descem para a metade de baixo
-    const comMk = (VE.markers || []).length > 0, topoMk = comMk ? (window.VE_MK_H ?? 10) + 2 : 6;
+    const comMk = (VE.markers || []).length > 0, topoMk = comMk ? (window.VE_MK_H ?? 10) + (window.VE_MK_Y ?? 0) + 2 : 6;
     for (let t = Math.floor(t0 / major) * major; t <= t1; t += major) {
         const x = Math.round(X(t)) + 0.5;
         ctx.fillStyle = '#555';

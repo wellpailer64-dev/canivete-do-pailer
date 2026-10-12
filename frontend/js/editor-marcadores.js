@@ -8,6 +8,9 @@
 
 const VEMK = { drag: null, cursor: false, sel: null };   // sel = o marcador selecionado (objeto): mostra as alças
 var VE_MK_H = 10;   // altura da faixa dos marcadores no topo da régua (os números da régua descem quando há marcador)
+// a faixa dos marcadores começa LOGO ABAIXO das barras da prévia renderizada (0–4 px, vermelha/verde) e do cache RAM
+// (4–6 px, azul): antes os marcadores tampavam as barras
+var VE_MK_Y = 7;
 
 // ── chip do In/Out (barra da timeline): só aparece com entrada ou saída marcada ──
 function veIoChip() {
@@ -25,6 +28,7 @@ function veIoChip() {
 // ── marcador na régua sob o ponto: {i (índice em VE.markers), modo: 'fim' | 'mover'} ──
 function veMkAt(x, y) {
     if (!VE.ready || y > VE_RULER || !(VE.markers || []).length) return null;
+    y -= VE_MK_Y;
     const X = t => (t - VE.view) * VE.pps;
     let achou = null;
     VE.markers.forEach((m, i) => {
@@ -53,7 +57,8 @@ function veMkTxtCor(cor) {
 function veMkDesenhar(ctx, X, W, H) {
     const lista = VE.markers || [];
     ctx.save();
-    ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+    ctx.beginPath(); ctx.rect(0, VE_MK_Y, W, H); ctx.clip();
+    ctx.translate(0, VE_MK_Y);   // tudo da faixa desce para baixo das barras de render
     lista.forEach((m, i) => {
         const t = +m.t || 0, d = +m.d || 0;
         const x = Math.round(X(t)) + 0.5, x2 = Math.round(X(t + d)) + 0.5;
@@ -74,7 +79,7 @@ function veMkDesenhar(ctx, X, W, H) {
             ctx.fillRect(x2 - 3, 0, 3, VE_MK_H);   // ponta que arrasta
             if (sel) {   // só o selecionado tinge as trilhas (os atos cobrem a timeline toda: tingir todos pesava)
                 ctx.fillStyle = veRgba(cor, 0.06);
-                ctx.fillRect(x, VE_RULER, x2 - x, H - VE_RULER);
+                ctx.fillRect(x, VE_RULER - VE_MK_Y, x2 - x, H - VE_RULER);
             }
         }
         ctx.fillStyle = cor;
