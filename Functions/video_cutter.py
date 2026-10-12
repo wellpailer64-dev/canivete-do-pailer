@@ -64,7 +64,9 @@ FORMATOS_SAIDA = {
 
 # crf x264 | cq GPU | crf vp9 | bitrate áudio | preset x264
 _QUALIDADE = {
-    "high":   {"crf": 18, "cq": 20, "vp9": 24, "ab": "256k", "preset": "medium"},
+    # "Máxima" (high): master de entrega. cq 20 dava ~25 Mbps num 1080p59,94 e blocos nas sombras (documentário do
+    # Gil, 2026-10-11); cq 17 / crf 16 ≈ 35–40 Mbps nesse material
+    "high":   {"crf": 16, "cq": 17, "vp9": 22, "ab": "320k", "preset": "medium"},
     "medium": {"crf": 21, "cq": 23, "vp9": 30, "ab": "192k", "preset": "fast"},
     "fast":   {"crf": 24, "cq": 26, "vp9": 34, "ab": "160k", "preset": "veryfast"},
     "low":    {"crf": 28, "cq": 30, "vp9": 40, "ab": "128k", "preset": "veryfast"},

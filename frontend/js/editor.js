@@ -2649,6 +2649,16 @@ function veMediaSize(c) {
     return { w: VE.seqW, h: VE.seqH };
 }
 
+// Antes de exportar: todo vídeo do projeto com o tamanho de verdade. O que ainda estava na fila de preparação caía no
+// tamanho da sequência e o "caber no quadro" virava 100% — 4K saía ampliado 2× (documentário do Gil, 2026-10-11).
+async function veMidiasTamanhoGarantir() {
+    const falta = (VE.media || []).filter(m => m && m.kind === 'video' && m.id && !m.removido && m.path
+        && !(m.info && m.info.width) && !(m.w && m.h));
+    if (!falta.length || !window.pywebview || !window.pywebview.api.ve_tamanhos_midia) return;
+    const r = await window.pywebview.api.ve_tamanhos_midia([...new Set(falta.map(m => m.path))]) || {};
+    for (const m of falta) { const t = r[m.path]; if (t && t.width) { m.w = t.width; m.h = t.height; } }
+}
+
 // ── adicionar imagem ──
 function vePickImage() {
     if (!VE.ready && typeof veCriarProjetoVazio === 'function') veCriarProjetoVazio({ quieto: true });
@@ -6094,6 +6104,7 @@ async function veStartExport() {
     // vence, vazio = preto) + áudio + camadas por cima
     VE._txPng = null;
     try {
+        await veMidiasTamanhoGarantir();   // vídeo ainda na fila de preparação: sem isto o 4K saía ampliado
         // Comps que mudaram renderizam antes (editor-comp.js): na exportação elas entram pelo arquivo delas
         if (typeof veCompProntas === 'function') await veCompProntas(msg => { $ve('ve-exp-msg').textContent = msg; });
         if (typeof ve3dProntas === 'function') await ve3dProntas(msg => { $ve('ve-exp-msg').textContent = msg; });

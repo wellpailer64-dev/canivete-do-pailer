@@ -200,3 +200,23 @@ Modo placa: **205 s (1,27×)**, CPU ~10%; diferença média para a exportação 
 - Testes novos em `teste_export.py`: `chroma2` (key só, key + Luz e Cor, ajuste com Aberração + Desfoque e opacidade
   animada) e `aberracao`. Bancada: `D:/kanivete_testes/keyplaca` (`bloco.py N` monta um bloco do Respeite por script).
 - Pendências: abrir o 1º bloco ainda leva ~10 s; Brilho/Contraste e efeitos de clipe combinados com o key ainda descem.
+
+## Rodada 5 — documentário do Gil (20 min, 50 arquivos, 2026-10-11)
+Referência: 26 min 06 s (0,79×), 200 blocos de ~6 s, placa. O que se achou e o que mudou:
+- **Piscada preta no 1º quadro de cada bloco** que começa no meio de um plano longo (20 piscadas a cada 5,96 s): a
+  camada que vinha tocando entrava em −¼ de quadro (tempo negativo) e o libplacebo não a mostrava. `_entra()`: o −¼ só
+  para camada que começa DENTRO do bloco. Reproduzido e conferido (blocos 6 s × sem blocos: diferença 0,02).
+- **4K ampliado 2×** (drone, show, coro, final do Gil): vídeo ainda na fila de preparação não tinha `m.info` e o
+  `veMediaSize` caía no tamanho da sequência. `veMidiasTamanhoGarantir()` + API `ve_tamanhos_midia` antes de exportar.
+- **Blocos**: um trecho que não cabia encolhia os blocos da timeline inteira (12 → 6 s); agora `_blocos` divide só o
+  bloco que não cabe. **2 blocos ao mesmo tempo** quando cabem (`_blocos_juntos`, `CANIVETE_PLACA_PAR`).
+- **Leitura 3 s antes** de cada camada → 1 s (`_PREROLL`, `CANIVETE_PLACA_PREROLL`): um bloco de 5 s caiu de 5,6 para 4,4 s.
+- XAVC (H.264 4:2:2 10 bits, câmera do Edgar) a placa não decodifica: CPU com 2 threads, ~100 qps por leitura.
+- **Etiqueta de cor**: o .mp4 dos blocos saía sem BT.709 (some no concat) → `h264_metadata`/`hevc_metadata` na junção.
+- **Máxima** = cq 17 / crf 16 (era cq 20 / crf 18 ≈ 25 Mbps num 1080p59,94).
+- Selo "Montado na placa" do último render dizia "Processador" (a mensagem final é "Concluído!"): `it.foiPlaca`.
+- Origem, não export: entrevista do André era a cópia `C5774_OTMZD.mp4` (4K a 2,9 Mbps, mosaico no fundo); o original
+  `C5774.MP4` (45 Mbps) foi copiado para 03 ENTREVISTAS (`D:\kanivete_testes\tuhu_org\trocar_andre.py`). Luzes
+  piscando medidas na origem (LED/fluorescente, câmera lenta).
+- Ferramentas: `D:\kanivete_testes\scripts\` comparar_export.py, zoom_todos.py, pretos.py, exp_trecho.py, bloco_var.py;
+  `CANIVETE_PLACA_DEBUG=1` guarda grafo, shaders e comando de cada bloco em `<cache>\placa_dbg\`.

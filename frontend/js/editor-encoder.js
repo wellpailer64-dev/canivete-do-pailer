@@ -174,7 +174,7 @@ function veKeAgora() {
     $ve('ke-agora-tempo').textContent = tempo;
     $ve('ke-agora-vel').textContent = vel;
     const m = String((ult && ult.msg) || ''), modo = $ve('ke-modo'), motivo = ult && ult.motivoCpu;
-    const placa = !motivo && /placa/i.test(m), turbo = !motivo && /turbo/i.test(m);
+    const placa = !motivo && (/placa/i.test(m) || !!(ult && ult.foiPlaca)), turbo = !motivo && !placa && (/turbo/i.test(m) || !!(ult && ult.foiTurbo));
     modo.hidden = !m && !motivo;
     modo.textContent = placa ? veT('Montado na placa') : turbo ? 'Turbo' : veT('Processador') + (motivo ? ` · ${motivo}` : '');
     modo.title = motivo ? `${veT('Montado no processador porque')}: ${motivo}` : '';
@@ -219,7 +219,11 @@ function veKeMonitorLigar() {
         const it = VEFILA.atual;
         if (it && !e.done && e.message) {
             if (/^Processador · /.test(e.message)) it.motivoCpu = e.message.slice(14);   // por que não foi na placa
-            else it.msg = e.message;
+            else {
+                it.msg = e.message;
+                // lembra o modo: no fim a mensagem vira "Concluído!" e o selo do último render dizia "Processador"
+                if (/placa/i.test(e.message)) it.foiPlaca = true; else if (/turbo/i.test(e.message)) it.foiTurbo = true;
+            }
         }
         if (it && e.done) { VEKE_MON.ultimo = it; if (e.success && typeof playConcluido === 'function') playConcluido(); }
         const r = ev(e);

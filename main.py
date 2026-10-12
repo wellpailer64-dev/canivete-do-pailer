@@ -727,6 +727,23 @@ def ve_render_manutencao(base, max_gb=20, dias=30):
         return {"success": False, "error": str(e)}
 
 
+def ve_tamanhos_midia(paths):
+    """{caminho: {width, height}} dos vídeos (ffprobe, já girado como a prévia). O Editor chama antes de exportar: vídeo
+    que ainda estava na fila de preparação não tinha o tamanho e o 'caber no quadro' saía 100% (4K ampliado 2× no
+    export do documentário do Gil, 2026-10-11)."""
+    from concurrent.futures import ThreadPoolExecutor
+    from Functions import video_cutter
+
+    def um(p):
+        try:
+            i = video_cutter.probe(p)
+            return p, {"width": i.get("width"), "height": i.get("height")}
+        except Exception:
+            return p, None
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        return {p: r for p, r in ex.map(um, [p for p in paths or [] if p and os.path.isfile(p)]) if r and r.get("width")}
+
+
 def ve_render_info(base, chave=None):
     from Functions import render_cache
     try:
@@ -3982,6 +3999,9 @@ class ApiBridge:
 
     def ve_render_info(self, base, chave=None):
         return ve_render_info(base, chave)
+
+    def ve_tamanhos_midia(self, paths):
+        return ve_tamanhos_midia(paths)
 
     def video_cutter_cancel_export(self):
         return video_cutter_cancel_export()

@@ -57,6 +57,7 @@ async function veFilaAdicionarAgora(nome, cfg) {
     { const off = veOfflineNaTimeline(); if (off.length) { veAvisoOffline(off); return null; } }
     const msg = m => { const el = $ve('ve-fila-msg'); if (el) el.textContent = m || ''; };
     msg('Preparando ' + veFilaNomeTimeline() + '… (o render começa sozinho)');
+    if (typeof veMidiasTamanhoGarantir === 'function') await veMidiasTamanhoGarantir();   // 4K ainda sem tamanho: saía ampliado
     if (typeof veCompProntas === 'function') await veCompProntas(msg);
     if (typeof ve3dProntas === 'function') await ve3dProntas(msg);
     if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg);

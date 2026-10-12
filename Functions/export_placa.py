@@ -16,6 +16,7 @@ principal, 10 bits, ProRes, saída reduzida) devolve motivo() ≠ None e a expor
 placa também cai na CPU (video_cutter.exportar_video). Medições e pendências: Instructions/agente/plano-kanivete-encoder.md §7–8.
 """
 import copy
+import json
 import math
 import os
 import shutil
@@ -447,6 +448,20 @@ def _tam(c, bw, bh, kx, tl):
 # Cada camada entra 1/4 de quadro antes do seu início: com o tempo do 1º quadro IGUAL ao do quadro da saída, o
 # libplacebo às vezes ainda não a mostrava (arredondamento da base de tempo) — quadro preto no corte (teste_export
 # grade/velocidade). Um quarto de quadro não muda a escolha de quadro nem o fim (trim em fim − ½ quadro).
+# Leitura começa este tanto antes do trecho (-ss antes do -i) e o corte exato fica no trim. Era 3 s (como no exportador
+# de CPU), mas em blocos de 5–12 s isso era decodificar até 60% a mais: um bloco do documentário do Gil (XAVC 4:2:2
+# 10 bits, que a placa não lê) caiu de 5,6 s para 4,4 s sem a sobra. O -ss do ffmpeg já decodifica desde o quadro-chave
+# anterior e descarta até o ponto; 1 s cobre o arredondamento de tempo dos arquivos (teste_export --placa).
+_PREROLL = float(os.environ.get("CANIVETE_PLACA_PREROLL") or 1.0)
+
+
+def _entra(t0, fd):
+    """Tempo do 1º quadro da camada. Começando DENTRO do bloco/timeline: ¼ de quadro antes (ver acima). Já tocando no
+    início do bloco (t0 ≤ 0, blocos de plano longo): exato, na grade — com −¼ o quadro do zero ficava em tempo negativo,
+    o libplacebo não o mostrava e cada bloco começava com 1 quadro PRETO (documentário do Gil: 20 piscadas a cada 5,96 s)."""
+    return t0 if t0 <= 1e-9 else t0 - fd / 4
+
+
 def _entrada_video(g, c, info, pasta, n_cam):
     """Clipe lido na placa (ou na CPU e enviado uma vez); tempos idênticos aos do exportador de CPU."""
     vk = _ler_na_placa(info)
@@ -454,7 +469,7 @@ def _entrada_video(g, c, info, pasta, n_cam):
     # da timeline); o tempo interno dela (quadros-chave, opacidade) continua contando do início verdadeiro (st < 0)
     pula = c.get("pula", 0.0)
     s0 = c["s"] + pula * c["v"]
-    ss = max(0.0, s0 - 3.0)
+    ss = max(0.0, s0 - _PREROLL)
     fq = vc._fps_fonte(c["path"])
     if fq and ss > 0 and not c.get("base"):
         ss = math.floor(ss * fq + 1e-6) / fq
@@ -535,7 +550,7 @@ def _entrada_video(g, c, info, pasta, n_cam):
                      f"end={vc._tempo_ffmpeg(c['s'] - ss + c['fonte'])},"
                      + ("setpts=PTS-STARTPTS," if c.get("base") else f"setpts=(PTS-{s0 - ss:.6f}/TB)/{c['v']:.6f},")
                      + f"fps=fps={g.fps:.3f}:start_time=0,tpad=stop_mode=clone:stop_duration={vc._tempo_ffmpeg(g.fd)},"
-                     f"settb=AVTB,setpts=PTS-STARTPTS+round({c['st'] + pula - g.fd / 4:.9f}/TB),"
+                     f"settb=AVTB,setpts=PTS-STARTPTS+round({_entra(c['st'] + pula, g.fd):.9f}/TB),"
                      f"trim=end={min(g.total, c['st'] + c['dur']) - g.fd / 2:.6f},{sobe}{giro}{efeito}{opac}null[{r}]")
     tl = f"(ot-{c['st']:.6f})"   # ot = tempo do quadro de SAÍDA (o t do libplacebo é o da entrada)
     kx = _escala(c, tl)
@@ -553,7 +568,7 @@ def _entrada_video_alfa(g, c, n_cam):
     CPU ("vídeo com transparência"): a propaganda KANIVETE tinha 24."""
     pula = c.get("pula", 0.0)
     s0 = c["s"] + pula * c["v"]
-    ss = max(0.0, s0 - 3.0)
+    ss = max(0.0, s0 - _PREROLL)
     leitura = c["s"] - ss + c["fonte"] + 1.0
     k = g.entrada(["-threads", "2"] + (["-ss", vc._tempo_ffmpeg(ss)] if ss > 0 else []) + ["-t", vc._tempo_ffmpeg(leitura), "-i", c["path"]])
     ids_anim = {f.get("id") for f in c.get("fxk") or [] if f.get("id")}
@@ -569,7 +584,7 @@ def _entrada_video_alfa(g, c, n_cam):
                      f"setpts=(PTS-{s0 - ss:.6f}/TB)/{c['v']:.6f},"
                      f"fps=fps={g.fps:.3f}:start_time=0,tpad=stop_mode=clone:stop_duration={vc._tempo_ffmpeg(g.fd)},"
                      + ",".join(passos)
-                     + f",settb=AVTB,setpts=PTS-STARTPTS+round({c['st'] + pula - g.fd / 4:.9f}/TB),"
+                     + f",settb=AVTB,setpts=PTS-STARTPTS+round({_entra(c['st'] + pula, g.fd):.9f}/TB),"
                      f"trim=end={min(g.total, c['st'] + c['dur']) - g.fd / 2:.6f}{opac},format=rgba,hwupload[{r}]")
     tl = f"(ot-{c['st']:.6f})"
     kx = _escala(c, tl)
@@ -638,7 +653,7 @@ def _entrada_imagem(g, c, n_cam):
         cadeia += "," + (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@pop{n_cam}")
                          if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
     # base de tempo em µs: a do PNG (1/25 s) arredondava o início para múltiplos de 0,04 s e o 1º quadro sumia (preto)
-    cadeia += f",format=rgba,settb=AVTB,setpts=PTS-STARTPTS+round({c['st'] - g.fd / 4:.9f}/TB),trim=end={fim - g.fd / 2:.6f}"
+    cadeia += f",format=rgba,settb=AVTB,setpts=PTS-STARTPTS+round({_entra(c['st'], g.fd):.9f}/TB),trim=end={fim - g.fd / 2:.6f}"
     tl = f"(ot-{c['st']:.6f})"   # ot = tempo do quadro de SAÍDA (o t do libplacebo é o da entrada)
     kx = _escala(c, tl)
     if ang is not None:   # textura girada: o tamanho na tela é o dela (em px da mídia = textura ÷ redução) × escala
@@ -843,7 +858,7 @@ def _base(g, segmentos, path, info):
             g.filtros.append(f"color=c=black:s={g.W}x{g.H}:r={g.fps:.3f}:d={vc._tempo_ffmpeg(p[1])},format=yuv420p,"
                              f"hwupload,setsar=1[{r}]")
         else:
-            ss = max(0.0, p[0] - 3.0)
+            ss = max(0.0, p[0] - _PREROLL)
             pre = (["-hwaccel", "vulkan", "-hwaccel_output_format", "vulkan"] if vk else []) + ["-threads", "2"]
             if rot and vk:
                 pre += ["-display_rotation:v:0", "0"]
@@ -912,30 +927,59 @@ def _no_bloco(c, a):
 
 def _blocos(lay, total, fps, path):
     """[(início, fim, quadros, camadas do bloco)] ou None se algum bloco ainda não couber na memória da placa.
-    Blocos adaptativos: se algum não cabe no tamanho padrão, tenta blocos menores (metade, até ~1,5 s) — a propaganda
-    KANIVETE tinha 70 camadas (21 vídeos transparentes) nos primeiros 12 s e caía inteira na CPU (2026-10-11)."""
+    Blocos adaptativos: o bloco que não cabe no tamanho padrão é dividido (metade, até ~1,5 s) — SÓ ele: antes um trecho
+    pesado encolhia os blocos da timeline inteira (documentário do Gil, 20 min: tudo em blocos de ~5 s, cada um abrindo
+    ffmpeg, placa e encoder de novo). A propaganda KANIVETE tinha 70 camadas nos primeiros 12 s (2026-10-11)."""
     n_q = int(round(total * fps))
     spans = [(c["st"], c["st"] + c["dur"], c["tipo"] == "video") for c in lay]
-    alvo = _BLOCO_PLACA_S
-    while True:
-        cortes = vc._cortes_blocos(spans, n_q, fps, alvo)
-        out = []
-        for k0, k1 in zip(cortes, cortes[1:]):
-            a, b = k0 / fps, k1 / fps
-            # só o que cobre ao menos meio quadro do bloco: camadas fora da grade da saída (30 qps numa saída de 29,97)
-            # tocavam a borda por uma fração de quadro e entravam sem nenhum quadro — a vinheta da camada de ajuste
-            # (movie em loop + blend) ficava esperando para sempre (Respeite, bloco 1: travado em 3%, 2026-10-10)
-            meio = 0.5 / fps
-            sub = [_no_bloco(c, a) for c in lay if c["st"] < b - meio and c["st"] + c["dur"] > a + meio]
-            if not cabe_na_placa(None, sub, path):
-                out = None
-                break
-            out.append((a, b, k1 - k0, sub))
-        if out is not None:
-            return out
-        if alvo <= 1.5:
+    # só o que cobre ao menos meio quadro do bloco: camadas fora da grade da saída (30 qps numa saída de 29,97)
+    # tocavam a borda por uma fração de quadro e entravam sem nenhum quadro — a vinheta da camada de ajuste
+    # (movie em loop + blend) ficava esperando para sempre (Respeite, bloco 1: travado em 3%, 2026-10-10)
+    meio = 0.5 / fps
+
+    def dividir(k0, k1, alvo):
+        a, b = k0 / fps, k1 / fps
+        sub = [_no_bloco(c, a) for c in lay if c["st"] < b - meio and c["st"] + c["dur"] > a + meio]
+        if cabe_na_placa(None, sub, path):
+            return [(a, b, k1 - k0, sub)]
+        if alvo <= 1.5 or k1 - k0 < 4:
             return None
         alvo = max(1.5, alvo / 2)
+        sp = [(x - a, y - a, v) for x, y, v in spans if y > a and x < b]
+        cortes = vc._cortes_blocos(sp, k1 - k0, fps, alvo)
+        if len(cortes) <= 2:   # curto demais para o corte "bom": ao meio
+            cortes = [0, (k1 - k0) // 2, k1 - k0]
+        out = []
+        for c0, c1 in zip(cortes, cortes[1:]):
+            r = dividir(k0 + c0, k0 + c1, alvo)
+            if r is None:
+                return None
+            out += r
+        return out
+
+    cortes = vc._cortes_blocos(spans, n_q, fps, _BLOCO_PLACA_S)
+    out = []
+    for k0, k1 in zip(cortes, cortes[1:]):
+        r = dividir(k0, k1, _BLOCO_PLACA_S)
+        if r is None:
+            return None
+        out += r
+    return out
+
+
+def _blocos_juntos(blocos, path):
+    """Quantos blocos rodam ao mesmo tempo na placa: 2 se os dois maiores cabem juntos na memória livre (a placa e o
+    encoder ficavam pela metade — Gil: CPU 19%, placa 57% — com um bloco por vez). CANIVETE_PLACA_PAR força."""
+    try:
+        n = int(os.environ.get("CANIVETE_PLACA_PAR") or 0)
+    except ValueError:
+        n = 0
+    if n > 0:
+        return n
+    if len(blocos) < 2:
+        return 1
+    maiores = sorted((memoria_estimada(None, sub, path) for _, _, _, sub in blocos), reverse=True)[:2]
+    return 2 if sum(maiores) * 2.6 + memoria_em_uso() <= 0.92 * memoria_placa() else 1
 
 def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
     """Exporta a timeline na placa. None = não é para a placa (motivo em args['_motivo']); senão o resultado de
@@ -1012,9 +1056,12 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
     leg = args.get("legendas")
     ass = vc._gerar_ass(leg["itens"], leg.get("estilo") or {}, W, H) if leg and leg.get("itens") else None
 
-    def _render(lay_r, total_r, segs_r, arq, feitos):
-        """Monta e codifica [0, total_r] (a timeline inteira ou um bloco) em arq. None = deu certo; senão o erro."""
-        g, final = montar(lay_r, W, H, fps, total_r, pasta, segs_r, args["path"], info)
+    def _render(lay_r, total_r, segs_r, arq, feitos, pasta_r=None, on_p=None):
+        """Monta e codifica [0, total_r] (a timeline inteira ou um bloco) em arq. None = deu certo; senão o erro.
+        pasta_r: a do bloco (blocos ao mesmo tempo não dividem o grafo nem os shaders)."""
+        pasta_r = pasta_r or pasta
+        os.makedirs(pasta_r, exist_ok=True)
+        g, final = montar(lay_r, W, H, fps, total_r, pasta_r, segs_r, args["path"], info)
         sub = ""
         if ass:   # num bloco o relógio começa em `feitos`: as legendas usam o tempo da timeline
             sub = (f",setpts=PTS+{feitos:.6f}/TB,subtitles=filename={vc._caminho_filtro(ass)},setpts=PTS-{feitos:.6f}/TB"
@@ -1023,15 +1070,20 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
         fm, rot_v, args_min = vc.saida_miniatura("[vbaixo]")   # a miniatura do quadro em render (janela do Encoder)
         g.filtros += fm
         g.filtros.append(f"{rot_v}null[vout]")
-        grafo = os.path.join(pasta, "grafo.txt")
+        grafo = os.path.join(pasta_r, "grafo.txt")
         with open(grafo, "w", encoding="utf-8") as f:
             f.write(";\n".join(g.filtros))
         if os.environ.get("CANIVETE_PLACA_DEBUG") == "1":   # guarda o grafo e o comando para depurar
             shutil.copy(grafo, os.path.join(vc._midia_dir(), f"placa_grafo_{uuid.uuid4().hex[:6]}.txt"))
         cmd = g.cmd + ["-/filter_complex", grafo, "-map", "[vout]", "-t", vc._tempo_ffmpeg(total_r), *enc, *cor,
                        "-an", arq] + args_min
-        rc, err = vc._run_progress(cmd, total_r, lambda p: (video_pct.__setitem__(0, (feitos + p / 100 * total_r) / total * 100),
-                                                           _progresso()), stop_event, _holder)
+        if os.environ.get("CANIVETE_PLACA_DEBUG") == "1":   # o bloco inteiro (grafo, shaders, comando), para repetir à mão
+            dbg = os.path.join(vc._midia_dir(), "placa_dbg", os.path.basename(pasta) + "_" + os.path.basename(pasta_r))
+            shutil.copytree(pasta_r, dbg, dirs_exist_ok=True, ignore=shutil.ignore_patterns("*.ts", "*.wav", "*.mp4", "b0*"))
+            with open(os.path.join(dbg, "cmd.json"), "w", encoding="utf-8") as f:
+                json.dump(cmd, f, ensure_ascii=False)
+        on_p = on_p or (lambda p: (video_pct.__setitem__(0, (feitos + p / 100 * total_r) / total * 100), _progresso()))
+        rc, err = vc._run_progress(cmd, total_r, on_p, stop_event, _holder)
         if stop_event is not None and stop_event.is_set():
             return {"success": False, "cancelled": True, "error": "Exportação cancelada."}
         if rc != 0 or not os.path.isfile(arq):
@@ -1054,15 +1106,44 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
                 return r
         else:
             ext_b = ".ts" if vcodec in ("h264", "hevc") else ".mkv"
-            partes = []
-            for i, (a, b, n_b, sub) in enumerate(blocos):
-                parte = os.path.join(pasta, f"b{i:03d}{ext_b}")
-                r = _render(sub, n_b / fps, [{"gap": n_b / fps}], parte, a)
+            partes = [(os.path.join(pasta, f"b{i:03d}{ext_b}"), n_b) for i, (a, b, n_b, sub) in enumerate(blocos)]
+            feito = [0.0] * len(blocos)   # fração pronta de cada bloco (vários ao mesmo tempo)
+            trava = threading.Lock()
+            erro = []
+
+            def _um(i):
+                if erro or (stop_event is not None and stop_event.is_set()):
+                    return
+                a, b, n_b, sub = blocos[i]
+
+                def on_p(p, i=i):
+                    with trava:
+                        feito[i] = p / 100
+                        video_pct[0] = sum(f * n for f, (_, _, n, _) in zip(feito, blocos)) / max(1, n_total) * 100
+                    _progresso()
+                r = _render(sub, n_b / fps, [{"gap": n_b / fps}], partes[i][0], a, os.path.join(pasta, f"b{i:03d}"), on_p)
                 if r:
                     if not r.get("cancelled"):
                         r["error"] = f"bloco {i + 1}/{len(blocos)} ({a:.1f}–{b:.1f} s) " + r["error"]
-                    return r
-                partes.append((parte, n_b))
+                    erro.append(r)
+                else:
+                    on_p(100)
+                    shutil.rmtree(os.path.join(pasta, f"b{i:03d}"), ignore_errors=True)
+
+            n_total = sum(n for _, _, n, _ in blocos)
+            juntos = _blocos_juntos(blocos, args["path"])
+            prog(0, f"Exportando na placa de vídeo ({len(blocos)} blocos" + (f", {juntos} ao mesmo tempo" if juntos > 1 else "") + ")...")
+            if juntos > 1:
+                from concurrent.futures import ThreadPoolExecutor
+                with ThreadPoolExecutor(max_workers=juntos) as ex:
+                    list(ex.map(_um, range(len(blocos))))
+            else:
+                for i in range(len(blocos)):
+                    _um(i)
+                    if erro:
+                        break
+            if erro:
+                return erro[0]
             lista = os.path.join(pasta, "lista.txt")
             with open(lista, "w", encoding="utf-8") as f:   # duração exata de cada pedaço (quadros / fps)
                 f.writelines(f"file '{p.replace(chr(92), '/')}'\nduration {n / fps:.6f}\n" for p, n in partes)
@@ -1085,8 +1166,12 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
                 cmd += ["-b:a", q["ab"]]
         else:
             cmd += ["-map", "0:v:0"]
+        # a etiqueta de cor BT.709 some ao emendar os blocos (o arquivo saía "sem cor definida" e alguns players mostram
+        # outro contraste): regravada no próprio fluxo, sem recodificar
+        etiqueta = {"h264": "h264_metadata", "hevc": "hevc_metadata"}.get(vcodec)
         cmd += ["-c:v", "copy"] + (["-tag:v", "hvc1"] if vcodec == "hevc" and cfg["ext"] in (".mp4", ".mov") else []) \
-            + cfg["extra"] + [temp]
+            + (["-bsf:v", f"{etiqueta}=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1:video_full_range_flag=0"]
+               if etiqueta else []) + cfg["extra"] + [temp]
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",
                            creationflags=vc._creationflags())
         if r.returncode != 0 or not os.path.isfile(temp):
