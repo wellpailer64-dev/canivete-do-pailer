@@ -76,6 +76,7 @@ arquivo .part → renomeado no fim · miniatura ke_quadro.jpg 1×/s (saida_minia
 | app aberto usando a placa | export pela placa estoura a memória | margem de 30% na estimativa; medir sempre com o PC livre |
 | cadeia em 8 bits (rodada 7) | escuro em manchas/blocos; o 10 bits da FX30 virava 8 antes da cor | camada `p010le` (`_FMT_CAM`), composição e efeitos `yuv444p16le` (`_FMT_MEIO`), só a saída em 8 bits com pontilhado; hwdownload pede o formato EXATO |
 | Brilho somando luz | claros estourados (3,9% dos pixels) | mistura Tela (`glow_passadas`); "Somar luz" = antigo |
+| `color=black@0` do ffmpeg | sai preto OPACO (ignora o alfa) | fundo transparente = `fillcolor` do libplacebo |
 | `trim=start` tardio num ramo de `split` | o outro ramo guarda todos os quadros até lá: memória esgotada (16 bits: 6,8 GB) | ramo desde o início do bloco, alfa 0 antes (`_ajuste` `tarde`) |
 | fundo preto de reserva a 30 qps | "sem áudio" saía 30 qps numa timeline de 59,94 | `_base_preta(w, h, fps)` com `opcoes.fps` = `VE.fps` |
 

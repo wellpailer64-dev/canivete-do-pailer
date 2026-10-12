@@ -267,7 +267,7 @@ em `D:/kanivete_testes/scripts` exportam um trecho pela API da fila no app de te
 Levantamento (código do export + os 9 projetos do disco), pela ordem combinada com o Pailer — um por vez, cada um
 documentado, commitado e publicado antes do próximo:
 1. **Fade/opacidade em clipe de vídeo** — FEITO (abaixo).
-2. Mesclagens fora do Multiplicar (Tela, Sobrepor…): hoje UMA camada assim manda a timeline INTEIRA para a CPU
+2. **Mesclagens fora do Multiplicar** — FEITO (8.2). Antes UMA camada assim mandava a timeline INTEIRA para a CPU
    (`motivo`). O `blend_vulkan` do ffmpeg 8.1 só tem normal e multiply.
 3. Efeito com quadros-chave em clipe de vídeo (`fxk`): timeline inteira na CPU (reels da Carolini Feijão).
 4. Transições de sobreposição (`editor-ovt.js`/`transicoes.py`): render prévio quadro a quadro em numpy/OpenCV sobre um
@@ -282,3 +282,15 @@ saída `rgba64le` (`_FMT_ALFA`). Os valores são os da CPU (`_valor_kf` no tempo
 TRECHOS RETOS (faixa de inclinações, uma passada): um clipe de 10 min com fade = 18 trechos (uma tabela por quadro passaria
 do limite do shader); mais de 256 trechos → fica no caminho antigo. Medido (C5797 4K, 20 s, fade): 23,2 s → 14,5 s (−37%).
 Caso novo `fadevideo` no `teste_export` (placa 5,2 / CPU 5,4); `--placa` 27/27 + fadevideo OK.
+
+### 8.2 Mesclagens na placa (todos os 12 modos)
+Antes: qualquer camada em Tela, Sobrepor, Luz suave… (fora o Multiplicar) mandava a timeline INTEIRA para a CPU.
+O `blend_vulkan` só tem normal/multiply, então `_mesclar` põe o fundo e a camada LADO A LADO numa textura 2W×H (fundo à
+esquerda, camada à direita) e um shader (`_shader_mesclar`, fórmulas W3C do canvas em `_BM_GLSL`; Adicionar = lighter)
+lê os dois pontos e devolve `a·(1−α) + modo(a,b)·α`; depois recorta a metade esquerda (`crop_w`). Armadilhas medidas:
+- a fonte `color=black@0` do ffmpeg IGNORA o alfa (sai preto opaco: Tela parecia certa, Sobrepor escurecia tudo) — a
+  metade vazia usa o fundo do próprio libplacebo (`fillcolor`, transparente por padrão);
+- a cor da camada chega multiplicada por α DUAS vezes no shader (0x33 a 50% lido como 12,3; `alpha_mode` não muda):
+  `b = rgb/α²`. Conferido em número (Tela/Sobrepor/Adicionar a 50%: ±1 nível da fórmula).
+Caso `mesclagem` (12 modos, fotos a 70%): CPU 57 s → placa 6 s, pior 5,5; caso novo `mesclagemvideo` (vídeo em Tela com
+fade + Sobrepor): placa 5,0 = CPU 5,0. `--placa` 29/29. Fica na CPU: mesclagem + Sombra projetada na mesma camada.

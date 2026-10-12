@@ -413,6 +413,14 @@ CASOS = {
             fx: [{ id: id(), t: 'ca', on: true, v: { r: 5, g: 0, b: -5, raio: 0 } }] });
         return [clip(0, 0, 0, 4, 'b.mp4'), pip, a1, a2];
     """, ""),
+    # mesclagem com VÍDEO (com --placa: fundo e camada lado a lado num shader, _mesclar): Tela com fade e Sobrepor
+    "mesclagemvideo": (1080, 1920, """
+        const { clip } = __te;
+        const a = clip(1, 0.2, 0, 3, 'c.mp4', { bm: 'screen', p: { sc: 60, x: 540, y: 650, rot: 0, op: 100 } });
+        a.k = { op: [{ t: 0, v: 0, i: 'lin' }, { t: 1, v: 100, i: 'lin' }] };
+        const b = clip(2, 0.8, 0, 2.5, 'b.mp4', { bm: 'overlay', p: { sc: 50, x: 540, y: 1300, rot: 0, op: 100 } });
+        return [clip(0, 0, 0, 4, 'principal'), a, b];
+    """, ""),
     # fade em CLIPE DE VÍDEO (com --placa: o alfa num shader da placa, _shader_alfa; antes descia para a CPU): entrada e
     # saída com quadros-chave, opacidade fixa de 50% e um fade com curva suave
     "fadevideo": (1080, 1920, """

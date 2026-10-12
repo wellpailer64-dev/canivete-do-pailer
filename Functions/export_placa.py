@@ -274,8 +274,9 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
     if not lay:
         return "sem camadas"
     for c in lay:
-        if c.get("bm") and (c["bm"] != "multiply" or vc._sombra_camada(c)):
-            return "modo de mesclagem (fora o Multiplicar)"
+        if c.get("bm") and ((c["bm"] != "multiply" and c["bm"] != "add" and c["bm"] not in _BM_GLSL)
+                            or vc._sombra_camada(c)):
+            return "modo de mesclagem com sombra projetada"
         # girado: imagem/texto gira na CPU antes de subir (_entrada_imagem); vídeo desce, gira na CPU e sobe (híbrido)
         gira = c["rot"] or "rot" in c["kf"] or any(f.get("t") == "ca_rot" for f in c.get("ca") or [])
         if gira and (c["tipo"] == "ajuste" or c.get("bm") or "sx" in c["kf"] or "sy" in c["kf"]
@@ -842,6 +843,70 @@ def _multiplicar(g, atual, c, n, info, pasta):
     return f"[{b}]"
 
 
+# Modos de mesclagem na placa (rodada 8.2), com as fórmulas do canvas da prévia (W3C Compositing: a = o que está
+# embaixo, b = a camada). O blend_vulkan do ffmpeg só tem normal e multiply; aqui o fundo e a camada ficam LADO A LADO
+# numa textura de largura 2W (fundo à esquerda, camada à direita sobre transparente) e um shader lê os dois pontos.
+_BM_GLSL = {
+    "darken": "min(a, b)",
+    "colorburn": "vec3(a.r >= 1.0 ? 1.0 : b.r <= 0.0 ? 0.0 : 1.0 - min(1.0, (1.0 - a.r) / b.r), "
+                 "a.g >= 1.0 ? 1.0 : b.g <= 0.0 ? 0.0 : 1.0 - min(1.0, (1.0 - a.g) / b.g), "
+                 "a.b >= 1.0 ? 1.0 : b.b <= 0.0 ? 0.0 : 1.0 - min(1.0, (1.0 - a.b) / b.b))",
+    "lighten": "max(a, b)",
+    "screen": "a + b - a * b",
+    "colordodge": "vec3(a.r <= 0.0 ? 0.0 : b.r >= 1.0 ? 1.0 : min(1.0, a.r / (1.0 - b.r)), "
+                  "a.g <= 0.0 ? 0.0 : b.g >= 1.0 ? 1.0 : min(1.0, a.g / (1.0 - b.g)), "
+                  "a.b <= 0.0 ? 0.0 : b.b >= 1.0 ? 1.0 : min(1.0, a.b / (1.0 - b.b)))",
+    "overlay": "mix(2.0 * a * b, 1.0 - 2.0 * (1.0 - a) * (1.0 - b), step(0.5, a))",
+    "hardlight": "mix(2.0 * a * b, 1.0 - 2.0 * (1.0 - a) * (1.0 - b), step(0.5, b))",
+    "softlight": "mix(a - (1.0 - 2.0 * b) * a * (1.0 - a), "
+                 "a + (2.0 * b - 1.0) * (mix(((16.0 * a - 12.0) * a + 4.0) * a, sqrt(a), step(0.25, a)) - a), "
+                 "step(0.5, b))",
+    "difference": "abs(a - b)",
+    "exclusion": "a + b - 2.0 * a * b",
+}
+
+
+def _shader_mesclar(bm):
+    """Shader da textura lado a lado (largura 2W): à esquerda, o fundo misturado com a camada pelo modo `bm`, com a
+    transparência da camada (resultado = a·(1−α) + modo(a, b)·α). A cor da camada chega multiplicada por α DUAS vezes
+    (medido: 0x33 a 50% lido como 12,3 — a composição grava pré-multiplicado e o libplacebo multiplica de novo ao ler;
+    alpha_mode não muda): b = rgb/α². "add" é o lighter do canvas: a + b·α."""
+    if bm == "add":
+        conta = "    o = min(vec3(1.0), a + b * al);\n"
+    else:
+        conta = f"    o = mix(a, clamp({_BM_GLSL[bm]}, 0.0, 1.0), al);\n"
+    return ("//!HOOK MAIN\n//!BIND HOOKED\n//!DESC mesclagem\nvec4 hook() {\n"
+            "    vec2 p = HOOKED_pos;\n    if (p.x >= 0.5) return vec4(0.0, 0.0, 0.0, 1.0);\n"
+            "    vec3 a = clamp(HOOKED_tex(p).rgb, 0.0, 1.0);\n"
+            "    vec4 q = clamp(HOOKED_tex(vec2(p.x + 0.5, p.y)), 0.0, 1.0);\n"
+            "    float al = q.a;\n    vec3 b = al > 1e-3 ? clamp(q.rgb / (al * al), 0.0, 1.0) : vec3(0.0);\n    vec3 o;\n"
+            f"{conta}    return vec4(o, 1.0);\n}}\n")
+
+
+def _mesclar(g, atual, c, n, info, pasta):
+    """Camada com modo de mesclagem (fora o Multiplicar) toda na placa: fundo e camada lado a lado (_shader_mesclar) e
+    a metade da esquerda recortada. A camada cobre a timeline toda como as outras entradas do libplacebo (aparece só
+    enquanto tem quadros; fora dela a metade direita é transparente e o fundo passa igual)."""
+    # o fundo do libplacebo (fillcolor) já é transparente: a metade direita fica (0,0,0,0) onde não há camada. (Uma
+    # entrada color=black@0 NÃO serve: a fonte de cor do ffmpeg ignora o alfa e saía preto opaco — Sobrepor escurecia tudo)
+    itens = _entrada_video(g, c, info, pasta, n) if c["tipo"] == "video" else _entrada_imagem(g, c, n)
+    r = g.rotulo("m")
+    px, py, pw, ph = {0: "0"}, {0: "0"}, {0: str(g.W)}, {0: "oh"}
+    for i, (_, (x, y, w, h)) in enumerate(itens, 1):
+        px[i], py[i], pw[i], ph[i] = f"({x})+{g.W}", y, w, h
+    arq = os.path.join(pasta, f"bm_{n}.glsl")
+    with open(arq, "w", encoding="utf-8") as fh:
+        fh.write(_shader_mesclar(c["bm"]))
+    g.filtros.append(f"{atual}{''.join(rot for rot, _ in itens)}libplacebo=inputs={len(itens) + 1}:w={2 * g.W}:h={g.H}:"
+                     f"fps={g.fps:.3f}:format={_FMT_ALFA}:disable_linear=1:"
+                     f"pos_x='{_arvore(px, '0')}':pos_y='{_arvore(py, '0')}':"
+                     f"pos_w='{_arvore(pw, 'ow')}':pos_h='{_arvore(ph, 'oh')}',"
+                     f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={_FMT_ALFA}:disable_linear=1,"
+                     f"libplacebo=w={g.W}:h={g.H}:crop_x=0:crop_y=0:crop_w={g.W}:crop_h={g.H}:"
+                     f"format={_FMT_MEIO}:disable_linear=1[{r}]")
+    return f"[{r}]"
+
+
 def _shader_lc(sig, k, nit, vig, W, H):
     """Clareza (gaussiano σ na luma + Y += k·(Y−borrado)·4Y(1−Y), faixa cheia), Vinheta (cos⁴ do ângulo, como o
     vignette do ffmpeg, multiplicando o RGB = Y e o afastamento do cinza de U/V) e Nitidez (unsharp 5×5 binomial,
@@ -1015,10 +1080,10 @@ def montar(lay, W, H, fps, total, pasta, segmentos=None, path=None, info=None):
             continue
         if c["tipo"] == "video" and c["path"] not in infos:
             infos[c["path"]] = vc.probe(c["path"])
-        if c.get("bm"):   # Multiplicar: o que está embaixo é composto antes, e a camada multiplica o resultado
+        if c.get("bm"):   # mesclagem: o que está embaixo é composto antes, e a camada se mistura ao resultado
             atual = _compor(g, atual, pendentes)
             pendentes = []
-            atual = _multiplicar(g, atual, c, n, infos.get(c["path"]), pasta)
+            atual = (_multiplicar if c["bm"] == "multiply" else _mesclar)(g, atual, c, n, infos.get(c["path"]), pasta)
             continue
         if c["tipo"] == "video" and vc._clipe_tem_alfa(c["path"]):
             pendentes += _entrada_video_alfa(g, c, n)
