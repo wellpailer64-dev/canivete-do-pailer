@@ -16,7 +16,9 @@ from tkinter import ttk
 if getattr(sys, 'frozen', False):
     BASE_DIR = os.path.dirname(sys.executable)
 else:
-    BASE_DIR = os.getcwd()
+    # pasta do código, não a pasta de onde foi chamado: rodando `python main.py` de outra pasta, procurava os modelos
+    # ali, não achava e baixava tudo de novo (~3,6 GB) nessa pasta (2026-10-13)
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 INSTALLED_MARKER = os.path.join(BASE_DIR, "models", ".installed")
 MARKER_VERSION = "v4-ffmpeg-n8.1"
@@ -372,7 +374,7 @@ def _run_item(item: dict, on_progress=None, on_label=None,
         if hasattr(sys, "_MEIPASS"):
             bundle_path = os.path.join(sys._MEIPASS, source)
         else:
-            bundle_path = os.path.join(os.getcwd(), source)
+            bundle_path = os.path.join(BASE_DIR, source)
             
         try:
             if os.path.exists(bundle_path):
