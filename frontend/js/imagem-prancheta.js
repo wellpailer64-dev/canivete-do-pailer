@@ -422,3 +422,155 @@ function ieMenuContextoItens(ev, itens) {
         }));
     };
 })();
+
+// ─────────────────────────── pranchetas como no Photoshop: criar, mover pelo nome, Alt+arrastar, duplicar ───────────
+// Prancheta é sempre do nível de cima (nunca dentro de outra). Cópia (Alt+arrastar o nome, Ctrl+J, Ctrl+C/Ctrl+V) entra
+// à direita das outras; a área do documento cresce para caber (a área de montagem do Photoshop é infinita) sem a vista
+// pular. O que passa da prancheta continua na camada, só não aparece (composição recortada, acima).
+const IE_PR_ESPACO = 100;   // px entre pranchetas
+
+function ieMoverPrancheta(L, dx, dy) {
+    if (!dx && !dy) return;
+    iePercorrer([L], Y => { ieMoverCamada(Y, dx, dy); Y.movido = true; ieInvalidar(Y); });
+}
+
+// a área do documento cresce (ou anda para a esquerda/cima) até caber todas as pranchetas; a vista fica onde estava
+function ieDocCaberPranchetas(doc) {
+    const pr = iePranchetas(doc);
+    if (!pr.length) return;
+    let x0 = 0, y0 = 0, x1 = doc.w, y1 = doc.h;
+    pr.forEach(L => { const P = L.prancheta; x0 = Math.min(x0, P.x); y0 = Math.min(y0, P.y); x1 = Math.max(x1, P.x + P.w); y1 = Math.max(y1, P.y + P.h); });
+    if (x0 === 0 && y0 === 0 && x1 === doc.w && y1 === doc.h) return;
+    const z = doc.zoom, px = doc.px, py = doc.py;
+    ieRedimTela(doc, x0, y0, x1 - x0, y1 - y0, false);
+    doc.zoom = z; doc.px = px + x0 * z; doc.py = py + y0 * z;
+    (doc.guias || []).forEach(g => { g.p -= g.o === 'v' ? x0 : y0; });
+    ieDesenharVista(); ieDesenharSobre();
+}
+
+// lugar livre à direita de todas as pranchetas (na altura de `ref`, se der)
+function iePranchetaLugar(doc, ref) {
+    const pr = iePranchetas(doc);
+    if (!pr.length) return { x: 0, y: 0 };
+    return { x: Math.max(...pr.map(L => L.prancheta.x + L.prancheta.w)) + IE_PR_ESPACO, y: ref ? ref.y : Math.min(...pr.map(L => L.prancheta.y)) };
+}
+
+function iePranchetaNomeCopia(doc, nome) {
+    return ieNomeLivre(doc, String(nome).replace(/ cópia( \d+)?$/, '') + ' ' + ieT('cópia'));
+}
+
+// cópia de uma prancheta (com tudo dentro) no nível de cima, logo acima da original; dx/dy = deslocamento da cópia
+function ieDuplicarPrancheta(doc, L, dx, dy) {
+    const N = ieDuplicarCamada(doc, L, true);
+    N.nome = iePranchetaNomeCopia(doc, L.nome);
+    N.pranchetaMudou = true;
+    ieMoverPrancheta(N, dx, dy);
+    const i = doc.camadas.indexOf(L);
+    doc.camadas.splice(i < 0 ? doc.camadas.length : i + 1, 0, N);
+    iePercorrer([N], Y => ieInvalidar(Y));
+    return N;
+}
+
+// prancheta nova: vazia (tamanho da última ou do documento) ou com as camadas dadas dentro
+function ieNovaPrancheta(doc, opc = {}) {
+    const ultima = iePranchetas(doc).slice(-1)[0];
+    const w = Math.round(opc.w || (ultima ? ultima.prancheta.w : doc.w)), h = Math.round(opc.h || (ultima ? ultima.prancheta.h : doc.h));
+    const lugar = opc.x != null ? { x: opc.x, y: opc.y || 0 } : iePranchetaLugar(doc);
+    const G = ieNovaCamada(doc, { tipo: 'grupo', nome: opc.nome || ieNomeLivre(doc, ieT('Prancheta')), filhos: [], aberto: true });
+    G.prancheta = { x: Math.round(lugar.x), y: Math.round(lugar.y), w, h, fundo: opc.fundo === undefined ? '#ffffff' : opc.fundo };
+    G.pranchetaMudou = true;
+    const dentro = (opc.camadas || []).filter(L => !L.prancheta);
+    for (const L of dentro) { const a = ieAchar(doc, L.id); if (a) a.lista.splice(a.i, 1); }
+    G.filhos.push(...dentro);
+    doc.camadas.push(G);
+    doc.ativa = G.id; doc.selIds = [G.id];
+    ieDocCaberPranchetas(doc);
+    ieTudo(doc);
+    return G;
+}
+
+Object.assign(IE_CMDS, {
+    novaPrancheta: async doc => {
+        if (!doc) return;
+        const ultima = iePranchetas(doc).slice(-1)[0];
+        const v = await ieDialogo({ titulo: 'Nova prancheta', campos: [
+            { id: 'w', rotulo: 'Largura (px)', tipo: 'numero', min: 1, max: 30000, valor: ultima ? ultima.prancheta.w : doc.w },
+            { id: 'h', rotulo: 'Altura (px)', tipo: 'numero', min: 1, max: 30000, valor: ultima ? ultima.prancheta.h : doc.h }] });
+        if (!v) return;
+        ieNovaPrancheta(doc, { w: v.w, h: v.h });
+        ieHist(ieT('Nova prancheta'));
+    },
+    // camadas selecionadas viram uma prancheta do tamanho delas; sem pranchetas e sem seleção: a tela inteira vira uma
+    pranchetaDasCamadas: doc => {
+        if (!doc) return;
+        let sel = ieListaComum(doc, ieSelecionadas(doc)).filter(L => !L.prancheta);
+        const tela = !ieTemPranchetas(doc) && (!sel.length || sel.length === doc.camadas.length);
+        if (tela) sel = doc.camadas.slice();
+        if (!sel.length) return;
+        const R = tela ? ieRDoc(doc) : sel.reduce((R, L) => ieRUniao(R, ieRCamada(L)), null) || ieRDoc(doc);
+        ieNovaPrancheta(doc, { camadas: sel, x: R.x, y: R.y, w: R.w, h: R.h, fundo: null });
+        ieHist(ieT('Prancheta a partir das camadas'));
+    },
+});
+
+// Ctrl+J numa prancheta: a cópia vai para o lado, não por cima. Ctrl+V de pranchetas copiadas: nível de cima, à
+// direita das outras (nunca dentro da prancheta ativa)
+(function () {
+    const dup = IE_CMDS.duplicar;
+    IE_CMDS.duplicar = async doc => {
+        const sel = doc ? ieListaComum(doc, ieSelecionadas(doc)) : [];
+        if (!doc || doc.sel || !sel.length || !sel.every(L => L.prancheta)) return dup(doc);
+        const novas = [];
+        for (const L of sel) { const lugar = iePranchetaLugar(doc, L.prancheta); novas.push(ieDuplicarPrancheta(doc, L, lugar.x - L.prancheta.x, lugar.y - L.prancheta.y)); }
+        doc.selIds = novas.map(N => N.id); doc.ativa = novas[novas.length - 1].id;
+        ieDocCaberPranchetas(doc); ieTudo(doc); ieHist(ieT('Duplicar prancheta'));
+    };
+    const colar = ieColarCamadas;
+    ieColarCamadas = function (doc, a, dx, dy) {
+        if (!a.camadas || !a.camadas.length || !a.camadas.every(S => S.prancheta)) return colar.apply(this, arguments);
+        const ref = a.camadas[0].prancheta, minX = Math.min(...a.camadas.map(S => S.prancheta.x)), lugar = iePranchetaLugar(doc, ref);
+        const novas = a.camadas.map(S => {
+            const N = ieDuplicarCamada(doc, S, true);
+            N.nome = iePranchetaNomeCopia(doc, S.nome);
+            N.pranchetaMudou = true;
+            ieMoverPrancheta(N, lugar.x - minX, lugar.y - ref.y);
+            doc.camadas.push(N);
+            iePercorrer([N], Y => ieInvalidar(Y));
+            return N;
+        });
+        doc.selIds = novas.map(N => N.id); doc.ativa = novas[novas.length - 1].id;
+        ieDocCaberPranchetas(doc); ieTudo(doc); ieHist(ieT('Colar prancheta'));
+    };
+})();
+
+// nome da prancheta: clicar seleciona (acima); arrastar move a prancheta inteira; Alt+arrastar arrasta uma CÓPIA
+document.addEventListener('pointerdown', ev => {
+    const doc = IE.doc, sobre = ieEl('ie-sobre');
+    if (!doc || ev.target !== sobre || ev.button !== 0 || IE.semExtras) return;
+    const r = sobre.getBoundingClientRect(), sx = ev.clientX - r.left, sy = ev.clientY - r.top;
+    const rot = iePranchetaRotulos(doc).find(q => sx >= q.x && sx <= q.x + q.w && sy >= q.y && sy <= q.y + q.h);
+    if (!rot) return;
+    const x0 = ev.clientX, y0 = ev.clientY, alt = ev.altKey;
+    let L = rot.L, feito = { x: 0, y: 0 }, ativo = false;
+    const mover = e => {
+        if (!ativo) {
+            if (Math.hypot(e.clientX - x0, e.clientY - y0) < 4) return;
+            ativo = true;
+            if (alt) { L = ieDuplicarPrancheta(doc, L, 0, 0); doc.ativa = L.id; doc.selIds = [L.id]; ieUiCamadas(); }
+        }
+        const dx = Math.round((e.clientX - x0) / doc.zoom), dy = Math.round((e.clientY - y0) / doc.zoom);
+        ieMoverPrancheta(L, dx - feito.x, dy - feito.y);
+        feito = { x: dx, y: dy };
+        ieDesenharVista(); ieDesenharSobre();
+    };
+    const soltar = () => {
+        window.removeEventListener('pointermove', mover, true);
+        window.removeEventListener('pointerup', soltar, true);
+        if (!ativo) return;
+        ieDocCaberPranchetas(doc);
+        ieTudo(doc);
+        ieHist(ieT(alt ? 'Duplicar prancheta' : 'Mover prancheta'));
+    };
+    window.addEventListener('pointermove', mover, true);
+    window.addEventListener('pointerup', soltar, true);
+}, true);

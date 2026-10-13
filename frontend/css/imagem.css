@@ -243,6 +243,9 @@
 .ie-cam-seta .ie-i { width: 12px; height: 12px; transition: transform .12s; }
 .ie-cam-seta.aberta .ie-i { transform: rotate(90deg); }
 .ie-cam-pasta { color: var(--text-2); width: 20px; height: 20px; }
+/* prancheta no painel Camadas: ícone próprio e nome em destaque (como no Photoshop) */
+.ie-cam-prancheta .ie-cam-pasta { color: var(--text-1, #e8e8e8); }
+.ie-cam-prancheta .ie-cam-nome { font-weight: 700; }
 .ie-cam-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ie-cam-t { font: 700 12px var(--font-ui); color: var(--text-2); width: 16px; text-align: center; }
 .ie-cam-tipo, .ie-cam-cad { width: 14px; height: 14px; color: var(--text-3); }

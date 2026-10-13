@@ -585,6 +585,16 @@ async function ieCenaVisitar(el, ctx, h) {
     }
     const op = parseFloat(cs.opacity), bmCss = cs.mixBlendMode;
     const bm = bmCss && bmCss !== 'normal' ? (IE_BM.find(b => b && b[2] === bmCss && !b[3]) || [])[0] : null;
+    // data-prancheta="Feed": o bloco vira uma PRANCHETA (formatos diferentes da mesma peça no mesmo arquivo, como no
+    // Photoshop — regra do Pailer, 2026-10-13); data-fundo="#fff" = fundo dela (sem = transparente)
+    if (el.dataset.prancheta != null && itens.length) {
+        const r = ieCenaRet(el, ctx);
+        const G = ieNovaCamada(ctx.doc, { tipo: 'grupo', nome: el.dataset.prancheta || nome || ieT('Prancheta'), filhos: itens, aberto: true });
+        G.prancheta = { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h), fundo: el.dataset.fundo || null };
+        G.pranchetaMudou = true;
+        G.cena = { k: ieCenaChave(ctx, me.chave + '|p') };
+        return [G];
+    }
     if (nome && itens.length > 1) {
         const G = ieNovaCamada(ctx.doc, { tipo: 'grupo', nome, filhos: itens, op: op < 1 ? op : 1, bm: bm || 'PASS_THROUGH', aberto: false });
         G.cena = { k: ieCenaChave(ctx, me.chave + '|g') };

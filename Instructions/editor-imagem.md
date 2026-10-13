@@ -291,7 +291,12 @@ nome/slide de um .iknv antigo, inclusive com escala, e põe o texto editável po
   no git: cada usuário tem as suas.
 - Pranchetas do PSD (artb): grupo com `L.prancheta = {x, y, w, h, fundo}`, composto isolado com fundo e recorte;
   fora delas é área de montagem; nome em cima (clique seleciona); Propriedades edita L/A/X/Y/fundo (grava no artb);
-  Arquivo > Pranchetas para arquivos. Ainda não há ferramenta Prancheta (criar prancheta nova).
+  Arquivo > Pranchetas para arquivos. Criar: Camada > Nova prancheta... / Prancheta a partir das camadas (sem pranchetas e
+  sem seleção, a tela inteira vira uma). Arrastar o NOME move a prancheta com tudo dentro; Alt+arrastar o nome = cópia;
+  Ctrl+J e Ctrl+C/Ctrl+V numa prancheta = cópia à direita das outras (sempre no nível de cima, nunca dentro de outra);
+  a área do documento cresce sozinha (ieDocCaberPranchetas) sem a vista pular. Camadas: ícone de prancheta + nome em
+  negrito. Peça em vários formatos = UMA PRANCHETA POR FORMATO (regra do Pailer, 2026-10-13); no KNV.cena:
+  `<div data-prancheta="Feed 1080x1440" data-fundo="#0f2e55">`.
 - Réguas (Ctrl+R, unidade no canto), guias (arrastar da régua; Mover arrasta; de volta à régua apaga; Ctrl+;,
   Alt+Ctrl+; trava, Nova guia, Novo layout de guias), lidas e gravadas no PSD (recurso 1032).
 - Caractere/Parágrafo completos (escala H/V, deslocamento, kerning, versalete, sobrescrito/subscrito, sublinhado,

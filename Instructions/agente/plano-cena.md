@@ -115,6 +115,11 @@ como mexida: a camada refeita pelo HTML leva os filtros da antiga (`ieCenaLevarF
   o runner não recarrega funções embrulhadas por outro módulo (ex.: `ieDesenharSobre`; recarregar a original fazia
   guias, fatias e réguas sumirem do app de teste).
 
+## Vários formatos da mesma peça (feed + story...) = pranchetas
+`<div data-prancheta="Feed 1080x1440" data-fundo="#cor" style="position:absolute;left:0;top:0;width:1080px;height:1440px">`
+e outro ao lado (100 px de folga): cada bloco vira uma prancheta (recorta o que passa, nome em cima, exporta uma por
+prancheta). Documento = `--formato` com a soma das larguras. Sem fundo no `body` (fora das pranchetas é área de montagem).
+
 ## Carrossel de cliente com rascunho + vídeos (2026-10-13, artigo Magnet US: ~240k → meta < 120k)
 O caro foi LER (páginas do rascunho, quadros de vídeo, prévias), não montar (11 slides em ~1 s por rodada). Agora:
 - `py -3.13 tools/briefing.py "<pasta do cliente>"` (segundo plano) → `briefing.md`: texto de cada página do PDF,

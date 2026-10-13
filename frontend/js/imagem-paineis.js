@@ -31,6 +31,7 @@ const IE_ICONES = {
     zoom: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.8-4.8M10.5 7.5v6M7.5 10.5h6"/>',
     eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
     folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    prancheta: '<rect x="7" y="7" width="10" height="10"/><path d="M7 2v3M17 2v3M7 19v3M17 19v3M2 7h3M19 7h3M2 17h3M19 17h3"/>',
     plus: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 8v8M8 12h8"/>',
     trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
     mask: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="12" cy="12" r="4.5"/>',
@@ -368,11 +369,11 @@ function ieUiCamadas() {
         const tipoIco = X.tipo === 'texto' ? '<b class="ie-cam-t">T</b>' : X.tipo === 'inteligente' ? '' :
             X.tipo === 'ajuste' ? ieIco('adj', 'ie-cam-tipo') : X.tipo === 'forma' || X.tipo === 'preenchimento' ? ieIco('shape', 'ie-cam-tipo') : '';
         const miniatura = X.tipo === 'grupo'
-            ? `<button class="ie-cam-seta ${X.aberto ? 'aberta' : ''}" data-abrir="${X.id}">${ieIco('chev')}</button>${ieIco('folder', 'ie-cam-pasta')}`
+            ? `<button class="ie-cam-seta ${X.aberto ? 'aberta' : ''}" data-abrir="${X.id}">${ieIco('chev')}</button>${ieIco(X.prancheta ? 'prancheta' : 'folder', 'ie-cam-pasta')}`
             : X.tipo === 'ajuste' ? `<span class="ie-cam-mini ie-cam-mini-aj ${doc.mascaraAlvo && X.id === doc.ativa ? '' : 'alvo'}" data-alvo="px">${ieIco('adj')}</span>`
             : `<span class="ie-cam-mini-box"><canvas class="ie-cam-mini ${!(doc.mascaraAlvo && X.id === doc.ativa) ? 'alvo' : ''}" data-alvo="px" data-mini="${X.id}" width="40" height="40"></canvas>${X.tipo === 'inteligente' ? `<i class="ie-cam-selo" title="${ieT('Objeto inteligente')}">${ieIco('smart')}</i>` : ''}</span>`;
         const masc = X.m ? `<button class="ie-cam-elo ${X.m.solta ? 'off' : ''}" data-elo="${X.id}" title="${ieT(X.m.solta ? 'Máscara solta: move separado da imagem (clique: prender)' : 'Máscara presa à camada: movem juntas (clique: soltar)')}">${ieIco('elo')}</button><canvas class="ie-cam-mini ie-cam-masc ${X.m.desativada ? 'off' : ''} ${doc.mascaraAlvo && X.id === doc.ativa ? 'alvo' : ''}" data-alvo="m" data-mmini="${X.id}" width="40" height="40" title="${ieT('Máscara (Shift+clique: desativar)')}"></canvas>` : '';
-        return `<div class="ie-cam ${sel.has(X.id) ? 'sel' : ''} ${X.id === doc.ativa ? 'ativa' : ''} ${X.visivel ? '' : 'oculta'} ${X.clip ? 'clip' : ''}" data-id="${X.id}" draggable="true" style="--nivel:${nivel}">
+        return `<div class="ie-cam ${X.prancheta ? 'ie-cam-prancheta' : ''} ${sel.has(X.id) ? 'sel' : ''} ${X.id === doc.ativa ? 'ativa' : ''} ${X.visivel ? '' : 'oculta'} ${X.clip ? 'clip' : ''}" data-id="${X.id}" draggable="true" style="--nivel:${nivel}">
             <button class="ie-cam-olho ${X.visivel ? 'on' : ''}" data-olho="${X.id}" title="${ieT('Mostrar/ocultar (Alt+clique: só esta)')}">${X.visivel ? ieIco('eye') : ''}</button>
             <span class="ie-cam-recuo"></span>${X.clip ? `<span class="ie-cam-clip">${ieIco('clip')}</span>` : ''}
             ${miniatura}${masc}
@@ -1317,7 +1318,7 @@ const IE_MENUS = [
         ['Tamanho da imagem...', 'tamImagem', 'Alt+Ctrl+I'], ['Tamanho da tela...', 'tamTela', 'Alt+Ctrl+C'],
         ['Rotação da imagem', [['180°', 'img:g180'], ['90° horário', 'img:g90h'], ['90° anti-horário', 'img:g90a'], '-', ['Inverter tela na horizontal', 'img:fh'], ['Inverter tela na vertical', 'img:fv']]], '-',
         ['Cortar na seleção', 'cortarSel'], ['Aparar transparência', 'aparar']]],
-    ['Camada', [['Nova camada', 'novaCamada', 'Shift+Ctrl+N'], ['Nova camada de preenchimento', [['Cor sólida...', 'preenchimentoCor'], ['Degradê...', 'preenchimentoDeg']]], ['Duplicar camada', 'duplicar', 'Ctrl+J'], ['Camada via recorte', 'viaRecorte', 'Shift+Ctrl+J'], ['Excluir camada', 'excluirCamada'], '-',
+    ['Camada', [['Nova camada', 'novaCamada', 'Shift+Ctrl+N'], ['Nova camada de preenchimento', [['Cor sólida...', 'preenchimentoCor'], ['Degradê...', 'preenchimentoDeg']]], ['Duplicar camada', 'duplicar', 'Ctrl+J'], ['Nova prancheta...', 'novaPrancheta'], ['Prancheta a partir das camadas', 'pranchetaDasCamadas'], ['Camada via recorte', 'viaRecorte', 'Shift+Ctrl+J'], ['Excluir camada', 'excluirCamada'], '-',
         ['Máscara de camada', [['Revelar tudo', 'mascara'], ['Ocultar tudo', 'mascaraOcultar'], ['Revelar seleção', 'mascaraSel'], ['Ocultar seleção', 'mascaraSelOcultar'], '-',
             ['Inverter máscara', 'mascaraInverter'], ['Desativar/ativar', 'mascaraDesativar'], ['Aplicar', 'mascaraAplicar'], ['Excluir', 'mascaraExcluir']]],
         ['Objetos inteligentes', [['Converter em objeto inteligente', 'objetoInteligente'], ['Editar conteúdo no Vetor', 'editarNoVetor'], ['Rasterizar', 'rasterizar'], '-',

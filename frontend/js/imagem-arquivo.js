@@ -723,8 +723,9 @@ async function ieCopiar(mesclado, recortar) {
     if (!mesclado && !recortar && typeof ieFiltroFocoCopiar === 'function' && ieFiltroFocoCopiar()) { IE._filtroFoco = null; ieUiCamadas(); return; }   // filtro inteligente em foco
     IE.filtroCopiado = null;   // copiou pixels: o Ctrl+V volta a colar imagem
     const doc = IE.doc, L = ieAtiva(doc);
-    // duas ou mais camadas selecionadas, sem seleção de pixels: copia as CAMADAS (o Ctrl+V cola todas, como no Photoshop)
-    if (!mesclado && doc && !doc.sel && ieSelecionadas(doc).length > 1) return ieCopiarCamadas(doc, recortar);
+    // duas ou mais camadas, ou um grupo/prancheta, sem seleção de pixels: copia as CAMADAS (o Ctrl+V cola, como no
+    // Photoshop; prancheta colada entra ao lado das outras — imagem-prancheta.js)
+    if (!mesclado && doc && !doc.sel && (ieSelecionadas(doc).length > 1 || (L && L.tipo === 'grupo'))) return ieCopiarCamadas(doc, recortar);
     let c, x, y;
     const R = doc.sel ? doc.sel.bbox : ieRDoc(doc);
     if (mesclado) {
