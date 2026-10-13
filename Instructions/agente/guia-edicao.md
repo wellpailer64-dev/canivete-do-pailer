@@ -125,7 +125,9 @@ Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lu
   esfumaçado embaixo (PNG gerado em PIL com alfa suave + ruído; pincel com desfoque ficou faixa dura) só onde há
   legenda sem cartela; erros de gravação com cara de câmera velha (Luz e Cor sat 38/desbotado/vinheta, Aberração,
   Granulação, PNG de linhas de TV 45%, ● REC piscando por k.op). Script: D:/kanivete_testes/quiz_instrutor/
-  (montar.py gera o .vknv direto; ajustes.js/degrade.js no app). Armadilha: veGrMidia devolve o OBJETO da mídia — usar .id.
+  (montar.py gera o .vknv direto; ajustes.js/degrade.js no app). Armadilhas: veGrMidia devolve o OBJETO da mídia — usar .id;
+  trecho de fonte SEMPRE dentro da duração (e ≤ dur − 0,05: passou do fim = tela preta na prévia e no export); arredondar
+  st/e de clipes vizinhos pelo MESMO valor (sobra de milésimos fazia o aparar engolir o vizinho).
 - 2026-10-10 MOTION / PROPAGANDA (ref. Pinterest → propaganda KANIVETE, "FICOU PERFEITO"): receita inteira em
   Instructions/agente/plano-motion.md § "Receita validada". Notas do Pailer: OmniVoice lê palavra com cara de inglês
   em inglês ("finalize" → "finalaize": usar palavra 100% PT, ex. "finaliza"); faltou trilha energética (ele manda a

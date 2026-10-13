@@ -73,12 +73,29 @@ function veAgAviso(texto, erro) {
     setTimeout(() => el.remove(), 5000);
 }
 
+// A ação do agente vira um passo do Ctrl+Z e avisa a prévia: antes, mudar um clipe sem mexer no tamanho dele (ex.: o
+// trecho da fonte) deixava o monitor tocando o trecho renderizado ANTIGO (quiz Carlinhos: preto que já tinha sido
+// corrigido, 2026-10-13). Se a própria ação já gravou o passo (veRippleRemove etc.), não grava de novo.
 window.veAgente = async function (acao, fn) {
     veAgLog('claude', acao);
     veAgAviso(acao);
     if (typeof fn !== 'function') return undefined;
+    const editor = typeof VE === 'object' && VE.ready && typeof veSnapshot === 'function';
+    const antes = editor ? veSnapshot() : null;
     try {
-        return await fn();
+        const r = await fn();
+        if (antes != null && VE.ready && veSnapshot() !== antes) {
+            if (VE.history[VE.history.length - 1] !== antes) {
+                VE.history.push(antes);
+                if (VE.history.length > 200) VE.history.shift();
+                VE.future = [];
+                if (typeof veUpdateUndo === 'function') veUpdateUndo();
+            }
+            if (!VE.dirty) { VE.dirty = true; if (typeof veUpdateTitle === 'function') veUpdateTitle(); }
+            if (typeof veCacheInvalidate === 'function') veCacheInvalidate();
+            if (typeof vePrInvalidar === 'function') vePrInvalidar();
+        }
+        return r;
     } catch (e) {
         veAgLog('erro', `Claude: ${acao} — ${(e && e.message) || e}`);
         veAgAviso(`${acao} (falhou)`, true);
