@@ -643,6 +643,12 @@ const IE_MOVER = {
             if (!(ev.shiftKey && Math.abs(dx) <= Math.abs(dy))) dx += Math.round(a.dx);
             if (!(ev.shiftKey && Math.abs(dx) > Math.abs(dy))) dy += Math.round(a.dy);
         }
+        if (m.B && typeof ieGICalc === 'function') {   // guias inteligentes: alinhamento e vão igual
+            const ids = []; for (const X of m.alvos) iePercorrer([X], Y => { ids.push(Y.id); });
+            const tinha = IE._gi;
+            IE._gi = ieGICalc(doc, { x: m.B.x + dx, y: m.B.y + dy, w: m.B.w, h: m.B.h }, ids);
+            if (tinha || IE._gi) ieDesenharSobre();
+        }
         const ddx = dx - m.dx, ddy = dy - m.dy;
         if (!ddx && !ddy) return;
         m.dx = dx; m.dy = dy;
@@ -661,13 +667,16 @@ const IE_MOVER = {
         }
         for (const L of m.alvos) ieMoverPeloElo(doc, L, ddx, ddy);
         const R = m.alvos.reduce((R, X) => ieRUniao(R, ieRCamada(X)), null);
-        ieAgendar(ieRUniao(ieRUniao(m.R, R), m.Rult), doc);
+        // só onde a camada estava no quadro anterior + onde está agora (antes entrava também o lugar do começo do
+        // arraste: a região crescia com a distância e cada quadro ficava mais lento)
+        ieAgendar(ieRUniao(R, m.Rult || m.R), doc);
         m.Rult = R;
         ieUiPropsPos?.();
     },
     up(p, ev, doc) {
         const m = IE.mov;
-        IE.mov = null;
+        IE.mov = null; IE._cong = null;   // solta o que o arraste rápido guardou
+        if (IE._gi) { IE._gi = null; ieDesenharSobre(); }
         if (!m) return;
         if (m.caixa) { ieSelecionarPorCaixa(doc, m.caixa, m.somar, m.alvoClique); ieDesenharSobre(); return; }
         if (m.alternar != null && !m.dx && !m.dy) {   // Shift+clique sem arrastar num já selecionado: sai da seleção
@@ -693,6 +702,12 @@ const IE_MOVER = {
             ieHist(ieT(m.dup ? 'Duplicar e mover' : 'Mover'));
             ieUiCamadas?.();
         }
+    },
+    // Ctrl parado sobre outro objeto: distâncias até ele (guias inteligentes do Photoshop)
+    hover(p, ev, doc) {
+        const antes = IE._giHover;
+        IE._giHover = (ev.ctrlKey || ev.metaKey) && !IE.mov && typeof ieGIMedirAte === 'function' && ieGuiasIntLigadas() ? ieGIMedirAte(doc, p) : null;
+        if (antes || IE._giHover) ieDesenharSobre();
     },
     dbl(p, ev, doc) {
         const L = (typeof ieTextoNoPonto === 'function' && ieTextoNoPonto(doc, p)) || ieCamadaNoPonto(doc, p.x, p.y);
@@ -1467,10 +1482,14 @@ function ieMatInv(m) {
 }
 const ieMatPt = (m, x, y) => ({ x: m[0] * x + m[2] * y + m[4], y: m[1] * x + m[3] * y + m[5] });
 const IE_ID = [1, 0, 0, 1, 0, 0];
+// tira o resíduo de seno/cosseno (girar 180°/90°, inverter): 0,9999999999 vira 1 e o espelho fica pixel a pixel
+// (antes cada inversão crescia 1 px e reamostrava a imagem, deixando-a levemente borrada)
+const ieMatLimpa = m => m.map(v => (Math.abs(v - Math.round(v)) < 1e-6 ? Math.round(v) : v));
 
 // plano transformado por M (px do documento): {c, x, y}
 function ieTransformarPlano(o, M, fundo = 0) {
     if (!o || !o.c) return null;
+    M = ieMatLimpa(M);
     const w = o.c.width, h = o.c.height;
     const cs = [ieMatPt(M, o.x, o.y), ieMatPt(M, o.x + w, o.y), ieMatPt(M, o.x, o.y + h), ieMatPt(M, o.x + w, o.y + h)];
     const x1 = Math.floor(Math.min(...cs.map(p => p.x))), y1 = Math.floor(Math.min(...cs.map(p => p.y)));
@@ -1560,7 +1579,7 @@ function ieTransfMat(t) {
     const cos = Math.cos(t.rot), sin = Math.sin(t.rot);
     // T(c) * R * S * T(-c0)
     const a = cos * t.sx, b = sin * t.sx, c = -sin * t.sy, d = cos * t.sy;
-    return [a, b, c, d, t.cx - (a * cx0 + c * cy0), t.cy - (b * cx0 + d * cy0)];
+    return ieMatLimpa([a, b, c, d, t.cx - (a * cx0 + c * cy0), t.cy - (b * cx0 + d * cy0)]);
 }
 
 async function ieTransfIniciar(M0) {
@@ -1617,7 +1636,7 @@ function ieTransfPrevia() {
     let R = null;
     for (const o of t.orig) {
         const L = o.L;
-        R = ieRUniao(R, o.Rantes);
+        if (!t.Rult) R = ieRUniao(R, o.Rantes);   // o lugar original só no primeiro quadro (depois basta o quadro anterior)
         const txt = L.tipo === 'texto' && (L.txt || L._txtVetor);
         if (t.quad && !Mq) L._tfPrev = ieTransformarPlanoQuad({ c: o.c, x: o.x, y: o.y }, t);
         else if (txt) {   // texto: redesenhado com a fonte na escala nova (nítido), não esticado
@@ -1643,7 +1662,7 @@ function ieTransfPrevia() {
 function ieTransfAplicar() {
     const t = IE.transf, doc = IE.doc;
     if (!t) return;
-    IE.transf = null;
+    IE.transf = null; IE._cong = null;
     doc._esconderSel = false;
     const Mq = ieQuadAfim(t), M = Mq || ieTransfMat(t);
     const ident = !t.quad && Math.abs(M[0] - 1) < 1e-9 && Math.abs(M[3] - 1) < 1e-9 && !M[1] && !M[2] && !M[4] && !M[5];
@@ -1687,10 +1706,10 @@ function ieTransfAplicar() {
 function ieTransfCancelar() {
     const t = IE.transf, doc = IE.doc;
     if (!t) return;
-    IE.transf = null;
+    IE.transf = null; IE._cong = null;
     doc._esconderSel = false;
     for (const o of t.orig) { o.L._tfPrev = null; o.L._mPrev = null; ieInvalidar(o.L); }
-    ieAgendar(t.Rult, doc);
+    ieAgendar(t.orig.reduce((R, o) => ieRUniao(R, o.Rantes), t.Rult), doc);   // volta para o lugar de antes
     ieOpcoesRender?.();
     ieDesenharSobre();
 }
@@ -1812,8 +1831,20 @@ const IE_TRANSF = {
         if (!a) return;
         const s = a.s;
         if (a.h === 'dentro') {
-            if (t.quad) { t.quad = Object.fromEntries(Object.entries(s.quad).map(([k, v]) => [k, { x: v.x + p.x - a.p0.x, y: v.y + p.y - a.p0.y }])); }
-            t.cx = s.cx + p.x - a.p0.x; t.cy = s.cy + p.y - a.p0.y;
+            let dx = p.x - a.p0.x, dy = p.y - a.p0.y;
+            if (ev.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }   // Shift: só na horizontal ou na vertical
+            // caixa de agora (sem o arraste) para o encaixe e as guias inteligentes
+            const k = ieTransfCantos({ ...t, cx: s.cx, cy: s.cy, quad: s.quad }), xs = [k.tl.x, k.tr.x, k.br.x, k.bl.x], ys = [k.tl.y, k.tr.y, k.br.y, k.bl.y];
+            const B = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+            const ids = t.alvos.map(L => L.id);
+            if (typeof ieAjustarDelta === 'function' && !ev.ctrlKey) {   // Exibir > Ajustar (Ctrl segura o encaixe)
+                const aj = ieAjustarDelta({ ...B, x: B.x + dx, y: B.y + dy }, { camadas: ids }, doc);
+                if (!(ev.shiftKey && !dx)) dx += aj.dx;
+                if (!(ev.shiftKey && !dy)) dy += aj.dy;
+            }
+            if (s.quad) { t.quad = Object.fromEntries(Object.entries(s.quad).map(([k, v]) => [k, { x: v.x + dx, y: v.y + dy }])); }
+            t.cx = s.cx + dx; t.cy = s.cy + dy;
+            IE._gi = typeof ieGICalc === 'function' ? ieGICalc(doc, { ...B, x: B.x + dx, y: B.y + dy }, ids) : null;
         }
         else if (a.h === 'girar') {
             const a0 = Math.atan2(a.p0.y - s.cy, a.p0.x - s.cx), a1 = Math.atan2(p.y - s.cy, p.x - s.cx);
@@ -1865,8 +1896,9 @@ const IE_TRANSF = {
         }
         ieTransfPrevia();
         ieOpcoesRender?.(true);
+        ieDesenharSobre();
     },
-    up() { if (IE.transf) IE.transf.arr = null; },
+    up() { if (IE.transf) IE.transf.arr = null; if (IE._gi) { IE._gi = null; ieDesenharSobre(); } },
     dbl() { ieTransfAplicar(); },
     cursor(ev) {
         const t = IE.transf, doc = IE.doc;

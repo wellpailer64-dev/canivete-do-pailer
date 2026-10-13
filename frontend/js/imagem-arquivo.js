@@ -327,6 +327,24 @@ async function ieSalvar(comoNovo = false, destinoForcado = null, refeito = false
         const ida = !!(ini && ini.ida_e_volta && doc.pyId);
         const envios = [];
         let n = 0;
+        // texto que não vai reaproveitar a camada de texto intacta do arquivo: vai montado dos dados do editor (texto_ps).
+        // Texto que veio do PSD sem dados do editor é convertido; se não der (fonte ausente, estilos misturados), PERGUNTA
+        // antes — antes ele virava pixels sem aviso ("nenhuma camada se perde" ao regravar o arquivo inteiro).
+        const regrava = L => !ida || L.ref == null || L.sujoPx || L.movido;
+        const textoPsd = new Map(), perde = [];
+        for (const L of ieTodas(doc)) {
+            if (L.tipo !== 'texto' || L.rasterizar || L.txt || !regrava(L)) continue;
+            const t = L.texto ? await ieTextoDoPsd(L, true).catch(() => null) : null;
+            if (t && !t.semFonte && !t.misto) textoPsd.set(L, t); else perde.push(L.nome);
+        }
+        if (perde.length) {
+            ieCarregando(false);
+            const ok = await appConfirm({ titulo: ieT('Textos vão virar pixels'),
+                texto: `${perde.length} ${ieT('texto(s) não podem ir editáveis para o PSD (fonte não instalada ou estilos misturados)')}: ${perde.slice(0, 8).join(', ')}${perde.length > 8 ? '…' : ''}. ${ieT('No .iknv eles continuam como estão.')}`,
+                botoes: [{ rotulo: ieT('Cancelar'), valor: null }, { rotulo: ieT('Salvar assim mesmo'), valor: 1, tipo: 'primario' }] });
+            if (!ok) return false;
+            ieCarregando(`${ieT('Salvando')} ${ieNomeArq(destino)}...`, 5);
+        }
         const no = L => {
             const s = { uid: L.uid, ref: ida ? L.ref : null, ref_nome: ida && L.ref != null ? (L.refNome ?? null) : null, tipo: L.tipo, nome: L.nome, visivel: L.visivel, op: L.op, fill: L.fill, bm: L.bm, clip: !!L.clip, aberto: L.aberto !== false };
             if (L.tipo === 'grupo') { s.filhos = L.filhos.map(no); if (L.prancheta && L.pranchetaMudou) s.prancheta = L.prancheta; }
@@ -345,9 +363,11 @@ async function ieSalvar(comoNovo = false, destinoForcado = null, refeito = false
                     if (!ieMatEhId(rel)) s.tf = rel;
                 }
                 if (ida && L.ref != null && L.textoNovo != null) { s.texto_novo = L.textoNovo; s.texto_estilo = L.textoEstilo || null; }
-                // texto criado no editor: o Python monta uma camada de texto do Photoshop (continua editável lá)
-                if (L.tipo === 'texto' && L.txt && (!ida || L.ref == null) && !L.rasterizar) {
-                    const t = L.txt;
+                // texto com dados do editor (criado aqui ou convertido do PSD): o Python monta uma camada de texto do
+                // Photoshop (continua editável lá) sempre que não reaproveita a do arquivo intacta
+                const tTx = L.tipo === 'texto' && !L.rasterizar && regrava(L) ? (L.txt || textoPsd.get(L)) : null;
+                if (tTx) {
+                    const t = tTx;
                     s.texto_ps = { s: t.s, m: t.m || IE_ID, caixa: t.caixa || null, ps: t.ps || '',
                         trechos: (t.trechos || []).map(r => ({ a: r.a, b: r.b, ps: r.ps, cor: r.cor, negFalso: r.negFalso, itaFalso: r.itaFalso, sublinhado: r.sublinhado, tachado: r.tachado })),
                         ...Object.fromEntries(IE_TX_CHAVES.filter(k => t[k] !== undefined).map(k => [k, t[k]])) };
@@ -396,8 +416,9 @@ async function ieSalvar(comoNovo = false, destinoForcado = null, refeito = false
             fatias: ieFatiasSpec(doc), fatias_mudou: JSON.stringify(ieFatiasSpec(doc)) !== doc.fatiasOrig, luz: doc.luzGlobal || null,
             guias: doc.guias || [], guias_mudou: JSON.stringify(doc.guias || []) !== (doc.guiasOrig || '[]') };
         const r = await api.ie_salvar(spec);
-        if (r && r.refaz && !refeito) {   // referências do arquivo desencontradas: esquece todas e grava tudo de novo
-            iePercorrer(doc.camadas, L => { L.ref = null; L.refNome = null; });
+        if (r && r.refaz && !refeito) {   // referências desencontradas: esquece as ruins (ou todas) e grava de novo
+            const ruins = r.ruins_uid && r.ruins_uid.length ? new Set(r.ruins_uid) : null;
+            iePercorrer(doc.camadas, L => { if (!ruins || ruins.has(L.uid)) { L.ref = null; L.refNome = null; } });
             ieToast(ieT('Camadas do PSD desencontradas: gravando o arquivo inteiro de novo (nenhuma camada se perde)'));
             ieCarregando(false);
             return ieSalvar(false, destino, true);
@@ -702,6 +723,8 @@ async function ieCopiar(mesclado, recortar) {
     if (!mesclado && !recortar && typeof ieFiltroFocoCopiar === 'function' && ieFiltroFocoCopiar()) { IE._filtroFoco = null; ieUiCamadas(); return; }   // filtro inteligente em foco
     IE.filtroCopiado = null;   // copiou pixels: o Ctrl+V volta a colar imagem
     const doc = IE.doc, L = ieAtiva(doc);
+    // duas ou mais camadas selecionadas, sem seleção de pixels: copia as CAMADAS (o Ctrl+V cola todas, como no Photoshop)
+    if (!mesclado && doc && !doc.sel && ieSelecionadas(doc).length > 1) return ieCopiarCamadas(doc, recortar);
     let c, x, y;
     const R = doc.sel ? doc.sel.bbox : ieRDoc(doc);
     if (mesclado) {
@@ -720,8 +743,44 @@ async function ieCopiar(mesclado, recortar) {
         const b = await ieCanvasBlob(c);
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]);
     } catch (e) { /* sem acesso à área do Windows: fica só a interna */ }
-    try { IE.areaSeq = (await ieApi()?.ve_area_seq())?.seq; } catch (e) { IE.areaSeq = null; }
+    await ieAreaSeqGuardar();
     if (recortar) await ieLimpar();
+}
+// número da área do Windows depois da nossa cópia: o Windows ainda o sobe algumas vezes logo depois (o navegador grava
+// os formatos aos poucos); sem reler, o Ctrl+V achava que veio outra coisa de fora e colava a imagem do Windows
+async function ieAreaSeqGuardar() {
+    const area = IE.area, ler = async () => { try { const s = (await ieApi()?.ve_area_seq())?.seq; if (IE.area === area) IE.areaSeq = s; } catch (e) { if (IE.area === area) IE.areaSeq = null; } };
+    await ler();
+    for (const ms of [150, 500, 1200]) setTimeout(ler, ms);
+}
+// Ctrl+C com várias camadas: guarda cópias delas (com grupos, efeitos, máscaras e texto) e, para colar fora do app,
+// a imagem das camadas juntas na área do Windows
+async function ieCopiarCamadas(doc, recortar) {
+    const ids = new Set(ieSelecionadas(doc).map(L => L.id));
+    // camada dentro de um grupo também selecionado já vai junto com o grupo
+    const dentroDeSel = L => { let a = ieAchar(doc, L.id); while (a && a.pai) { if (ids.has(a.pai.id)) return true; a = ieAchar(doc, a.pai.id); } return false; };
+    const sel = ieListaComum(doc, ieSelecionadas(doc)).filter(L => !dentroDeSel(L));
+    if (!sel.length) return;
+    const R = sel.reduce((R, L) => ieRUniao(R, ieRCamada(L)), null) || ieRDoc(doc);
+    const c = ieCanvas(Math.max(1, R.w), Math.max(1, R.h)), k = ieCtx(c);
+    for (const L of sel) iePercorrer([L], Y => { if (Y.tipo !== 'grupo' && ieVisivelDeFato(doc, Y)) { const r = ieRaster(Y); if (r && r.c) k.drawImage(r.c, r.x - R.x, r.y - R.y); } });
+    IE.area = { c, x: R.x, y: R.y, camadas: sel.map(L => ieDuplicarCamada(doc, L, true)) };
+    try { const b = await ieCanvasBlob(c); await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]); } catch (e) { /* só a interna */ }
+    await ieAreaSeqGuardar();
+    ieToast(ieT('Camadas copiadas') + `: ${sel.length}`);
+    if (recortar) IE_CMDS.excluirCamada(doc);
+}
+// Ctrl+V das camadas copiadas: entram acima da camada ativa, na mesma ordem e com as mesmas posições entre si
+function ieColarCamadas(doc, a, dx, dy) {
+    const A = ieAtiva(doc), pos = A && ieAchar(doc, A.id);
+    const novas = a.camadas.map(S => ieDuplicarCamada(doc, S, true));
+    for (const N of novas) {
+        if (dx || dy) iePercorrer([N], Y => ieMoverCamada(Y, dx, dy));
+        iePercorrer([N], Y => ieInvalidar(Y));
+    }
+    if (pos) pos.lista.splice(pos.i + 1, 0, ...novas); else doc.camadas.push(...novas);
+    doc.selIds = novas.map(N => N.id); doc.ativa = novas[novas.length - 1].id;
+    ieTudo(doc); ieHist(ieT('Colar'));
 }
 // colar com o mouse sobre a tela: o centro do que entra vai para onde está o mouse
 function ieColarNoMouse(doc, w, h, noLugar) {
@@ -741,6 +800,7 @@ async function ieColar(noLugar) {
         const visivel = ieRInter({ x: a.x, y: a.y, w: a.c.width, h: a.c.height }, ieRDoc(doc));
         const pm = ieColarNoMouse(doc, a.c.width, a.c.height, noLugar);
         const x = pm ? pm.x : noLugar || visivel ? a.x : Math.round((doc.w - a.c.width) / 2), y = pm ? pm.y : noLugar || visivel ? a.y : Math.round((doc.h - a.c.height) / 2);
+        if (a.camadas) { ieColarCamadas(doc, a, x - a.x, y - a.y); return; }
         ieColocarCanvas(ieClonar(a.c), ieNomeLivre(doc, ieT('Camada')), x, y);
         return;
     }

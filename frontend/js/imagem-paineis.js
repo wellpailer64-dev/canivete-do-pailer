@@ -1363,7 +1363,8 @@ function ieMenusRender() {
     }, true);
     ieEl('ie-pop').addEventListener('click', ev => {
         const it = ev.target.closest('[data-cmd]');
-        if (!it || it.classList.contains('off')) return;
+        if (!it || it.classList.contains('off') || ev._ieCmdFeito) return;
+        ev._ieCmdFeito = true;   // o menu de contexto (ieMenuContextoItens) escuta o mesmo #ie-pop: um comando só por clique
         ieEl('ie-pop').hidden = true;
         fechar();
         ieCmd(it.dataset.cmd);

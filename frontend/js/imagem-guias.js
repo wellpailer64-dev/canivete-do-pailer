@@ -325,7 +325,160 @@ function ieAjustarDelta(R, excluir, doc = IE.doc) {
         for (const v of vals) { const a = ieAjustarValor(v, linhas, lim); if (a != null && (d == null || Math.abs(a - v) < Math.abs(d))) d = a - v; }
         return d || 0;
     };
-    return { dx: melhor([R.x, R.x + R.w / 2, R.x + R.w], L.xs), dy: melhor([R.y, R.y + R.h / 2, R.y + R.h], L.ys) };
+    let dx = melhor([R.x, R.x + R.w / 2, R.x + R.w], L.xs), dy = melhor([R.y, R.y + R.h / 2, R.y + R.h], L.ys);
+    // guias inteligentes: também encaixa no espaçamento igual (o mesmo vão de outros objetos ou o meio entre dois)
+    if (ieGuiasIntLigadas() && ieAjustarA().camadas) {
+        const e = ieGIAlvosEspaco(doc, R, excluir && excluir.camadas);
+        const perto = (alvos, v, d0) => { let d = d0; for (const a of alvos) if (Math.abs(a - v) < lim && (!d || Math.abs(a - v) < Math.abs(d))) d = a - v; return d; };
+        dx = perto(e.xs, R.x, dx); dy = perto(e.ys, R.y, dy);
+    }
+    return { dx, dy };
+}
+
+// ─────────────────────────── guias inteligentes (como no Photoshop) ───────────────────────────
+// Ao arrastar (Mover ou Ctrl+T): linhas magenta quando uma borda/centro bate com a de outro objeto ou do documento, e a
+// medida do vão quando ele fica igual ao de outros objetos. Ctrl parado sobre um objeto: distâncias até ele.
+const IE_GI_COR = '#ff2bd6';
+function ieGuiasIntLigadas() { return iePref('guiasInt', true) !== false; }
+// caixas dos outros objetos + vãos entre vizinhos (guardados enquanto o documento não muda)
+function ieGIObjetos(doc, excluir = []) {
+    const chave = doc.hist.i + '|' + excluir.join(',');
+    if (IE._giCache && IE._giCache.doc === doc && IE._giCache.chave === chave) return IE._giCache;
+    const fora = new Set(excluir), objs = [];
+    iePercorrer(doc.camadas, L => {
+        if (fora.has(L.id) || !L.visivel || L.tipo === 'grupo' || L.tipo === 'ajuste') return;
+        const R = ieCaixaCamada(L);
+        if (R && R.w > 0 && R.h > 0 && !(R.w >= doc.w && R.h >= doc.h)) objs.push(R);
+    });
+    // vão de cada objeto até o vizinho mais perto à direita / abaixo (que se sobrepõe no outro eixo)
+    const vaos = { h: [], v: [] };
+    for (const A of objs) {
+        let bh = null, bv = null;
+        for (const B of objs) {
+            if (A === B) continue;
+            const gh = B.x - (A.x + A.w), gv = B.y - (A.y + A.h);
+            if (gh > 0.5 && B.y < A.y + A.h && B.y + B.h > A.y && (!bh || gh < bh.g)) bh = { g: gh, A, B };
+            if (gv > 0.5 && B.x < A.x + A.w && B.x + B.w > A.x && (!bv || gv < bv.g)) bv = { g: gv, A, B };
+        }
+        if (bh) vaos.h.push(bh);
+        if (bv) vaos.v.push(bv);
+    }
+    return (IE._giCache = { doc, chave, objs, vaos });
+}
+// vizinhos mais perto de R nos quatro lados
+function ieGIVizinhos(objs, R) {
+    const v = {};
+    for (const O of objs) {
+        const sobV = O.y < R.y + R.h && O.y + O.h > R.y, sobH = O.x < R.x + R.w && O.x + O.w > R.x;
+        if (sobV && O.x + O.w <= R.x + 0.5 && (!v.e || O.x + O.w > v.e.x + v.e.w)) v.e = O;
+        if (sobV && O.x >= R.x + R.w - 0.5 && (!v.d || O.x < v.d.x)) v.d = O;
+        if (sobH && O.y + O.h <= R.y + 0.5 && (!v.c || O.y + O.h > v.c.y + v.c.h)) v.c = O;
+        if (sobH && O.y >= R.y + R.h - 0.5 && (!v.b || O.y < v.b.y)) v.b = O;
+    }
+    return v;
+}
+// posições de R.x / R.y que deixam o vão igual a um que já existe (ou R no meio de dois vizinhos)
+function ieGIAlvosEspaco(doc, R, excluir) {
+    const { objs, vaos } = ieGIObjetos(doc, excluir), v = ieGIVizinhos(objs, R), xs = [], ys = [];
+    const gh = [...new Set(vaos.h.map(a => Math.round(a.g)))], gv = [...new Set(vaos.v.map(a => Math.round(a.g)))];
+    if (v.e) gh.forEach(g => xs.push(v.e.x + v.e.w + g));
+    if (v.d) gh.forEach(g => xs.push(v.d.x - g - R.w));
+    if (v.e && v.d) xs.push(Math.round((v.e.x + v.e.w + v.d.x - R.w) / 2));
+    if (v.c) gv.forEach(g => ys.push(v.c.y + v.c.h + g));
+    if (v.b) gv.forEach(g => ys.push(v.b.y - g - R.h));
+    if (v.c && v.b) ys.push(Math.round((v.c.y + v.c.h + v.b.y - R.h) / 2));
+    return { xs, ys };
+}
+// o que desenhar para R (caixa do que se move): {linhas: [{o, p, a, b}], medidas: [{o, a, b, p}]}
+function ieGICalc(doc, R, excluir) {
+    if (!doc || !R || !ieGuiasIntLigadas()) return null;
+    const { objs, vaos } = ieGIObjetos(doc, excluir), tol = 0.6, linhas = [], medidas = [];
+    const alinha = (o, p, a, b) => {
+        const l = linhas.find(l => l.o === o && Math.abs(l.p - p) < tol);
+        if (l) { l.a = Math.min(l.a, a); l.b = Math.max(l.b, b); } else linhas.push({ o, p, a, b });
+    };
+    const D = { x: 0, y: 0, w: doc.w, h: doc.h };
+    for (const O of [D, ...objs]) {
+        for (const ov of [O.x, O.x + O.w / 2, O.x + O.w]) for (const rv of [R.x, R.x + R.w / 2, R.x + R.w])
+            if (Math.abs(ov - rv) < tol) alinha('v', ov, Math.min(O.y, R.y), Math.max(O.y + O.h, R.y + R.h));
+        for (const ov of [O.y, O.y + O.h / 2, O.y + O.h]) for (const rv of [R.y, R.y + R.h / 2, R.y + R.h])
+            if (Math.abs(ov - rv) < tol) alinha('h', ov, Math.min(O.x, R.x), Math.max(O.x + O.w, R.x + R.w));
+    }
+    // vão igual: R até o vizinho e o mesmo vão em outro par (mostra os dois, como no Photoshop)
+    const v = ieGIVizinhos(objs, R);
+    const meioV = (A, B) => (Math.max(A.y, B.y) + Math.min(A.y + A.h, B.y + B.h)) / 2;
+    const meioH = (A, B) => (Math.max(A.x, B.x) + Math.min(A.x + A.w, B.x + B.w)) / 2;
+    const iguais = (g, lista, eixo) => {
+        const par = lista.find(q => Math.abs(q.g - g) < tol && q.A !== R && q.B !== R);
+        if (!par) return false;
+        medidas.push(eixo === 'h' ? { o: 'h', a: par.A.x + par.A.w, b: par.B.x, p: meioV(par.A, par.B) } : { o: 'v', a: par.A.y + par.A.h, b: par.B.y, p: meioH(par.A, par.B) });
+        return true;
+    };
+    const ge = v.e && R.x - (v.e.x + v.e.w), gd = v.d && v.d.x - (R.x + R.w);
+    const gc = v.c && R.y - (v.c.y + v.c.h), gb = v.b && v.b.y - (R.y + R.h);
+    const mostraH = (g, a, b, O) => medidas.push({ o: 'h', a, b, p: meioV(O, R) });
+    const mostraV = (g, a, b, O) => medidas.push({ o: 'v', a, b, p: meioH(O, R) });
+    if (ge > 0.5 && gd > 0.5 && Math.abs(ge - gd) < tol) { mostraH(ge, v.e.x + v.e.w, R.x, v.e); mostraH(gd, R.x + R.w, v.d.x, v.d); }
+    else {
+        if (ge > 0.5 && iguais(ge, vaos.h, 'h')) mostraH(ge, v.e.x + v.e.w, R.x, v.e);
+        if (gd > 0.5 && iguais(gd, vaos.h, 'h')) mostraH(gd, R.x + R.w, v.d.x, v.d);
+    }
+    if (gc > 0.5 && gb > 0.5 && Math.abs(gc - gb) < tol) { mostraV(gc, v.c.y + v.c.h, R.y, v.c); mostraV(gb, R.y + R.h, v.b.y, v.b); }
+    else {
+        if (gc > 0.5 && iguais(gc, vaos.v, 'v')) mostraV(gc, v.c.y + v.c.h, R.y, v.c);
+        if (gb > 0.5 && iguais(gb, vaos.v, 'v')) mostraV(gb, R.y + R.h, v.b.y, v.b);
+    }
+    return linhas.length || medidas.length ? { linhas, medidas } : null;
+}
+// Ctrl parado com o Mover: distâncias da seleção até o objeto sob o mouse (ou até as bordas do documento)
+function ieGIMedirAte(doc, p) {
+    const S = ieCaixaAlvos(doc);
+    if (!S || !p) return null;
+    const L = ieAlvoNoPonto(doc, p);
+    let sel = false;
+    if (L) iePercorrer(ieSelecionadas(doc), Y => { if (Y === L) sel = true; });
+    const H = (!L || sel) ? { x: 0, y: 0, w: doc.w, h: doc.h } : ieCaixaCamada(L);
+    if (!H) return null;
+    const medidas = [], cy = S.y + S.h / 2, cx = S.x + S.w / 2;
+    const yH = Math.max(S.y, H.y) < Math.min(S.y + S.h, H.y + H.h) ? (Math.max(S.y, H.y) + Math.min(S.y + S.h, H.y + H.h)) / 2 : cy;
+    const xV = Math.max(S.x, H.x) < Math.min(S.x + S.w, H.x + H.w) ? (Math.max(S.x, H.x) + Math.min(S.x + S.w, H.x + H.w)) / 2 : cx;
+    const add = (o, a, b, p) => { if (Math.abs(b - a) >= 0.5) medidas.push({ o, a: Math.min(a, b), b: Math.max(a, b), p }); };
+    if (H.x >= S.x + S.w) add('h', S.x + S.w, H.x, yH);
+    else if (H.x + H.w <= S.x) add('h', H.x + H.w, S.x, yH);
+    else { add('h', H.x, S.x, cy); add('h', S.x + S.w, H.x + H.w, cy); }
+    if (H.y >= S.y + S.h) add('v', S.y + S.h, H.y, xV);
+    else if (H.y + H.h <= S.y) add('v', H.y + H.h, S.y, xV);
+    else { add('v', H.y, S.y, cx); add('v', S.y + S.h, H.y + H.h, cx); }
+    return { linhas: [], medidas, caixa: H };
+}
+function ieGISobre(ctx, doc) {
+    const g = IE._gi || (!IE.mov && !IE.transf && IE._giHover);
+    if (!g || !ieGuiasIntLigadas()) return;
+    const T = (x, y) => ieDocTela(x, y, doc), r = v => Math.round(v) + 0.5;
+    ctx.save();
+    ctx.strokeStyle = IE_GI_COR; ctx.fillStyle = IE_GI_COR; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const l of g.linhas) {
+        if (l.o === 'v') { const a = T(l.p, l.a), b = T(l.p, l.b); ctx.moveTo(r(a.x), a.y - 6); ctx.lineTo(r(a.x), b.y + 6); }
+        else { const a = T(l.a, l.p), b = T(l.b, l.p); ctx.moveTo(a.x - 6, r(a.y)); ctx.lineTo(b.x + 6, r(a.y)); }
+    }
+    ctx.stroke();
+    if (g.caixa) { const a = T(g.caixa.x, g.caixa.y); ctx.strokeRect(r(a.x), r(a.y), Math.round(g.caixa.w * doc.zoom), Math.round(g.caixa.h * doc.zoom)); }
+    ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const m of g.medidas) {
+        const h = m.o === 'h', a = h ? T(m.a, m.p) : T(m.p, m.a), b = h ? T(m.b, m.p) : T(m.p, m.b);
+        ctx.beginPath();
+        if (h) { ctx.moveTo(a.x, r(a.y)); ctx.lineTo(b.x, r(a.y)); ctx.moveTo(r(a.x), a.y - 4); ctx.lineTo(r(a.x), a.y + 4); ctx.moveTo(r(b.x), b.y - 4); ctx.lineTo(r(b.x), b.y + 4); }
+        else { ctx.moveTo(r(a.x), a.y); ctx.lineTo(r(a.x), b.y); ctx.moveTo(a.x - 4, r(a.y)); ctx.lineTo(a.x + 4, r(a.y)); ctx.moveTo(b.x - 4, r(b.y)); ctx.lineTo(b.x + 4, r(b.y)); }
+        ctx.stroke();
+        const txt = Math.round(m.b - m.a) + ' px', w = ctx.measureText(txt).width + 10, mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        const lx = h ? mx : mx + w / 2 + 4, ly = h ? my + 12 : my;
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(lx - w / 2, ly - 8, w, 16, 3); else ctx.rect(lx - w / 2, ly - 8, w, 16);
+        ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.fillText(txt, lx, ly + 0.5); ctx.fillStyle = IE_GI_COR;
+    }
+    ctx.restore();
 }
 
 // ─────────────────────────── menus, atalhos, comandos ───────────────────────────
@@ -338,6 +491,7 @@ Object.assign(IE_CMDS, {
     limparGuiasTela: doc => ieGuiasLimpar(doc, 'tela'),
     fatiasGuias: doc => ieFatiasDasGuias(doc),
     ajustar: () => { iePrefGravar('ajustar', !ieAjustarLigado()); },
+    guiasInt: () => { iePrefGravar('guiasInt', !ieGuiasIntLigadas()); IE._gi = IE._giHover = null; ieDesenharSobre(); },
 });
 for (const k of ['guias', 'grade', 'camadas', 'fatias', 'limites']) IE_CMDS['ajustarA:' + k] = () => { const a = ieAjustarA(); a[k] = !a[k]; iePrefGravar('ajustarA', a); };
 IE_CMDS['ajustarA:tudo'] = () => iePrefGravar('ajustarA', { guias: true, grade: true, camadas: true, fatias: true, limites: true });
@@ -350,12 +504,13 @@ Object.assign(IE_ATALHOS, { 'Shift+Ctrl+;': 'ajustar' });
         ['Limpar guias', 'limparGuias'], ['Limpar guias da prancheta selecionada', 'limparGuiasPrancheta'], ['Limpar guias da tela de pintura', 'limparGuiasTela'], '-',
         ['Nova guia...', 'novaGuia'], ['Novo layout de guias...', 'layoutGuias'], ['Novas guias da forma', 'guiasDaForma']];
     const aj = [['Ajustar', 'ajustar', 'Shift+Ctrl+;'], ['Ajustar a', [['Guias', 'ajustarA:guias'], ['Grade', 'ajustarA:grade'], ['Camadas', 'ajustarA:camadas'],
-        ['Fatias', 'ajustarA:fatias'], ['Limites do documento', 'ajustarA:limites'], '-', ['Tudo', 'ajustarA:tudo'], ['Nenhum', 'ajustarA:nada']]]];
+        ['Fatias', 'ajustarA:fatias'], ['Limites do documento', 'ajustarA:limites'], '-', ['Tudo', 'ajustarA:tudo'], ['Nenhum', 'ajustarA:nada']]],
+        ['Guias inteligentes', 'guiasInt']];
     if (i >= 0) ex.splice(i, 1, ['Guias', sub], ...aj);
     else ex.push('-', ['Guias', sub], ...aj);
     const pode = ieCmdPode;
     ieCmdPode = function (c) {
-        if (c === 'ajustar' || String(c).startsWith('ajustarA:') || c === 'layoutGuias' || c === 'novaGuia') return !!IE.doc;
+        if (c === 'ajustar' || c === 'guiasInt' || String(c).startsWith('ajustarA:') || c === 'layoutGuias' || c === 'novaGuia') return !!IE.doc;
         if (c === 'limparGuiasPrancheta' || c === 'limparGuiasTela') return ieTemPranchetas(IE.doc) && !!(IE.doc.guias || []).length;
         if (c === 'guiasDaForma') return !!IE.doc && ieSelecionadas(IE.doc).length > 0;
         if (c === 'fatiasGuias') return !!IE.doc && (IE.doc.guias || []).length > 0;
@@ -375,6 +530,7 @@ document.addEventListener('dblclick', ev => {
 // ✓ dos itens de menu que ligam/desligam (ieMenuHtml consulta)
 function ieCmdMarcado(c) {
     if (c === 'ajustar') return ieAjustarLigado();
+    if (c === 'guiasInt') return ieGuiasIntLigadas();
     if (String(c).startsWith('ajustarA:')) { const k = c.slice(9), a = ieAjustarA(); return k in a ? ieAjustarLigado() && a[k] : false; }
     if (c === 'guias') return !!IE.verGuias;
     if (c === 'travarGuias') return !!(IE.doc && IE.doc.guiasTravadas);
@@ -383,3 +539,11 @@ function ieCmdMarcado(c) {
     if (c === 'verFatias') return !!(IE.doc && IE.doc.verFatias);
     return false;
 }
+// Ctrl apertado/solto com o Mover parado: liga/desliga as distâncias na hora (sem esperar o mouse andar)
+document.addEventListener('keydown', ev => {
+    if (ev.key !== 'Control' || ev.repeat || !IE.doc || IE.mov || IE.transf || !ieAtivoVisivel() || !ieGuiasIntLigadas()) return;
+    if ((IE.ferrTemp || IE.ferr) !== 'mover' || !IE.mouse) return;
+    IE._giHover = ieGIMedirAte(IE.doc, IE.mouse); ieDesenharSobre();
+});
+document.addEventListener('keyup', ev => { if (ev.key === 'Control' && IE._giHover) { IE._giHover = null; ieDesenharSobre(); } });
+window.addEventListener('blur', () => { if (IE._giHover) { IE._giHover = null; ieDesenharSobre(); } });

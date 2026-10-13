@@ -23,6 +23,9 @@ function ieFonteCss(t, tam = t.tam) {
 IE.fontesOk = new Set();
 IE.fontesCarregando = new Map();
 async function ieGarantirFonte(t) {
+    // a lista de estilos do Windows só carregava ao usar a ferramenta Texto: antes disso o estilo não era achado, o
+    // css ficava vazio e o texto redesenhado (Ctrl+T, editar) saía no peso normal — Jost Black virava Jost fino
+    if (!IE.estilos) await ieCarregarFontes();
     const e = ieEstiloDe(t.fam, t.estilo);
     if (!e) { t.css = null; return false; }
     t.varPeso = e.var ? e.peso : 0;

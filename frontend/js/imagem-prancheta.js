@@ -332,7 +332,9 @@ function ieMenuContextoItens(ev, itens) {
     pop.style.left = ev.clientX - rb.left + 'px'; pop.style.top = ev.clientY - rb.top + 'px';
     const fechar = e => { if (e && pop.contains(e.target) && !e.target.closest('[data-cmd]')) return; pop.hidden = true; document.removeEventListener('pointerdown', fora, true); };
     const fora = e => { if (!pop.contains(e.target)) fechar(); };
-    pop.onclick = e => { const b = e.target.closest('[data-cmd]'); if (b) { fechar(); ieCmd(b.dataset.cmd); } };
+    // o clique também chega ao ouvinte geral do #ie-pop (imagem-paineis.js): quem vier primeiro executa, o outro só fecha
+    // (antes o comando rodava duas vezes: Inverter horizontal virava e desvirava, Girar 90° dava 180°)
+    pop.onclick = e => { const b = e.target.closest('[data-cmd]'); if (b) { fechar(); if (!e._ieCmdFeito) { e._ieCmdFeito = true; ieCmd(b.dataset.cmd); } } };
     setTimeout(() => document.addEventListener('pointerdown', fora, true), 0);
 }
 

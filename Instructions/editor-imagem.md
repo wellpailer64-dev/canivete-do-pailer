@@ -41,7 +41,11 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   largura vazia = automática e medianiz, margem nos 4 lados, centralizar, limpar, visualizar; Novas guias da forma;
   limpar), duplo clique na guia com o Mover = editar; arrastar da régua: Alt troca a orientação, Shift encaixa nas marcas;
   guias no histórico (Ctrl+Z). Exibir > Ajustar (Shift+Ctrl+;) e Ajustar a (guias, grade, camadas, fatias, limites):
-  Letreiro, Fatia, Corte, Forma, Mover e a própria guia encaixam (Ctrl segura). Ferramenta Fatia > **Fatias das guias**.
+  Letreiro, Fatia, Corte, Forma, Mover, arraste do Ctrl+T e a própria guia encaixam (Ctrl segura). Ferramenta Fatia > **Fatias das guias**.
+  **Guias inteligentes** (Exibir > Guias inteligentes, `ieGICalc`/`ieGISobre`): ao arrastar no Mover ou no Ctrl+T, linhas
+  magenta quando borda/centro bate com outro objeto ou o documento; vão igual a outro par (ou meio entre dois vizinhos)
+  mostra "N px" e encaixa; Ctrl parado com o Mover = distâncias até o objeto sob o mouse. Shift no arraste do Ctrl+T trava o eixo.
+  Teste avulso: `D:\kanivete_testes\scripts\teste_guias_int.py` (porta 9333).
   Carrossel à mão (o método do Photoshop): Arquivo > Novo > "Carrossel 1080 × 1440" + Páginas (largura = 1080 × páginas,
   já com as guias e uma fatia por página) → montar → Arquivo > Exportar fatias (`nome_01`, `_02`...).
   Teste com mouse de verdade: `D:\kanivete_testes\scripts	este_guias.py` (app em --agente=9333).
@@ -161,6 +165,15 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   salvos, padrões dos efeitos, painéis, fontes e arquivos recentes) em %APPDATA%/CaniveteDoPailer/editor_imagem.json.
 
 ## Abrir e salvar
+**Textos no PSD (2026-10-13, 71 textos do "Dia do instrutor v2" viraram pixels):** texto que não reaproveita a camada de
+texto intacta do arquivo (novo, sem referência, mexido/movido, ou regravando tudo) vai como TEXTO montado dos dados do
+editor (`texto_ps`; o Python cria a camada nova mesmo havendo a original). Texto do PSD sem dados do editor é convertido
+(`ieTextoDoPsd`); se não der (fonte ausente/estilos misturados) o salvar PERGUNTA antes. "Referências desencontradas"
+esquece só as camadas ruins (`ruins_uid`). `ieGarantirFonte` carrega a lista de estilos antes (sem ela o texto redesenhado
+saía no peso normal). Teste: `D:\kanivete_testes\scripts\teste_textos_psd.py` (iknv → psd, mover, sem referências, reabrir).
+Recuperação feita: `D:\kanivete_testes\scripts\recuperar_textos.py` (compara cada camada de pixels com o texto de mesmo
+nome/slide de um .iknv antigo, inclusive com escala, e põe o texto editável por cima da imagem atual).
+
 - As camadas vêm do Python como PNG **servido da memória** (nada em disco); a página libera com `ie_liberar`.
 - Salvar é de ida e volta: o Python relê o PSD de origem e troca só o que mudou. Camada não pintada fica como estava
   (texto, objeto inteligente, forma, efeitos e ajustes continuam editáveis no Photoshop). Mover/transformar texto,
@@ -285,6 +298,25 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   tachado, 7 alinhamentos, recuos, espaço antes/depois, hifenizar só grava no PSD), gravados no EngineData do texto
   do PSD; texto novo vai como texto editável (ver Salvar).
 - Camadas: filtro por tipo e por nome. Propriedades sem camada = Documento (tela, réguas e grades, guias, ações rápidas).
+
+## Desempenho com canvas grandes (2026-10-13)
+Medido no "Dia do instrutor v2" (6480 × 1440, 198 camadas) e num teste de 79 fotos com mesclagens e recortes
+(`D:\kanivete_testes\scripts\teste_arraste_rapido.py`, porta 9333; confere pixel a pixel contra `ieAchatar`):
+- **Canvas sempre na memória comum** (`ieCanvas` com `willReadFrequently`): misturar canvas da placa com canvas da memória
+  fazia o navegador esperar a placa a cada desenho (mesclagem 23 → 2 ms; ir para a tela 18 → 3 ms). Não voltar à placa.
+- **Folha de rascunho recortada** (`ieTemp`): a folha cresce até o maior pedido e `destination-in` percorria a folha
+  INTEIRA a cada recorte. Agora cada uso tem `clip` no pedaço pedido.
+- **Composição em blocos de 2048 px** (`ieCompor` → `ieComporPedaco`, `ieAchatar`): as folhas de rascunho não passam de 2048 px
+  (antes, 4 folhas do tamanho do documento ficavam guardadas para sempre).
+- **Pula o que não toca a região** (`ieComporLista`): camada folha e seu recorte fora da região não são desenhados.
+- **Arraste rápido** (`ieCongAtual`/`ieComporCong`): no Mover e no Ctrl+T guarda em blocos de 256 px o que está embaixo
+  (e o de cima, se todo Normal/isolado — `ieListaIndep`) só por onde a camada passa; abre grupos "Passagem" no caminho.
+  `IE.congDesligado = true` desliga (para comparar). Região do arraste = quadro anterior + atual (antes incluía o começo).
+- **Histórico com limite para TODOS os documentos juntos** (`IE_HIST_BYTES` 2,5 GB, `ieHistBytes`/`ieHistPodar`; conta originais de
+  objeto inteligente e máscaras): poda primeiro os documentos parados; avisa uma vez.
+Resultado no teste: quadro de arraste 268 → 3,5 ms (13 ms sem o arraste rápido).
+Pendências: prévia no tamanho da tela durante zoom/arraste (canvas enormes); `doc.achatadoC` (cópia achatada do PSD) carregar só
+quando usada; desfazer recompõe o documento inteiro (só o que mudou); histórico antigo no disco (rascunho em D:).
 
 ## Tela
 - Zoom em pixels da tela (100% = 1 pixel da imagem por pixel da tela, como no Photoshop, mesmo com a escala do

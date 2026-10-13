@@ -60,6 +60,9 @@ function ieCanvas(w, h) {
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.ceil(w));
     c.height = Math.max(1, Math.ceil(h));
+    // todos na memória comum (o editor lê pixels o tempo todo): misturar canvas da placa com canvas da memória obrigava
+    // o navegador a esperar a placa a cada desenho — grupo com recorte 73 ms → 23 ms, mesclagem 23 → 2 ms (2026-10-13)
+    c.getContext('2d', { willReadFrequently: true });
     return c;
 }
 function ieCtx(c) { return c.getContext('2d'); }
@@ -196,6 +199,7 @@ function ieGravavel(L, alvo = 'c') {
 }
 function ieInvalidar(L) {
     if (!L) return;
+    if (IE._cong && !IE._cong.ids.has(L.id)) IE._cong = null;   // mudou algo parado: o arraste rápido refaz o que guardou
     L._raster = null;
     L._v = (L._v || 0) + 1;
     L._thumbV = -1;
@@ -257,7 +261,9 @@ function ieAparar(o) {   // corta a borda transparente do plano (economiza memó
 }
 
 // ─────────────────────────── histórico ───────────────────────────
-const IE_HIST_MAX = 60, IE_HIST_BYTES = 1.6e9;
+// IE_HIST_BYTES vale para TODOS os documentos abertos juntos (antes era 1,6 GB por documento: 4 arquivos grandes abertos
+// passavam de 6 GB e o editor caía) e conta também os originais dos objetos inteligentes e as máscaras
+const IE_HIST_MAX = 60, IE_HIST_BYTES = 2.5e9;
 function ieCongelar(c) { if (c) c._congelado = true; return c; }
 
 // cópia de dados simples; canvases vão por referência (congelados)
@@ -314,18 +320,36 @@ function ieHist(nome, doc = IE.doc) {
     h.i = h.itens.length - 1;
     // limite de estados e de memória (canvases contados uma vez)
     while (h.itens.length > IE_HIST_MAX) { h.itens.splice(1, 1); h.i--; }
-    let bytes = 0;
-    const vistos = new Set();
-    const conta = lista => lista.forEach(s => {
-        for (const c of [s.c, s.m && s.m.c]) if (c && !vistos.has(c)) { vistos.add(c); bytes += c.width * c.height * 4; }
-        if (s.filhos) conta(s.filhos);
-    });
-    for (let i = h.itens.length - 1; i >= 0; i--) {
-        conta(h.itens[i].foto.camadas);
-        if (bytes > IE_HIST_BYTES && i > 0 && i < h.i) { h.itens.splice(1, i); h.i -= i; break; }
-    }
+    ieHistPodar(doc);
     if (nome !== 'Abrir' && nome !== 'Novo') ieMudouDoc(doc);
     ieHistRender?.();
+}
+
+// memória de todos os históricos abertos (cada canvas contado uma vez: o que não mudou é compartilhado entre estados)
+function ieHistBytes() {
+    const vistos = new Set();
+    let bytes = 0;
+    const conta = lista => lista.forEach(s => {
+        for (const c of [s.c, s.m && s.m.c, s.c0 && s.c0.c]) if (c && c.width && !vistos.has(c)) { vistos.add(c); bytes += c.width * c.height * 4; }
+        if (s.filhos) conta(s.filhos);
+    });
+    for (const d of IE.docs || []) for (const it of d.hist.itens) conta(it.foto.camadas);
+    return bytes;
+}
+// passou do limite: tira os estados mais antigos, primeiro dos documentos que não estão em uso; no atual sempre ficam
+// o estado de abertura e os 2 últimos (como o Photoshop encurta o histórico em vez de cair)
+function ieHistPodar(atual) {
+    let podou = 0;
+    for (let n = 0; n < 500 && ieHistBytes() > IE_HIST_BYTES; n++) {
+        const outro = (IE.docs || []).find(d => d !== atual && d.hist.itens.length > 1 && (d.hist.i > 1 || d.hist.itens.length > d.hist.i + 1));
+        const d = outro || (atual.hist.i > 2 ? atual : null);
+        if (!d) break;
+        const h = d.hist;
+        if (h.i > 1) { h.itens.splice(1, 1); h.i--; } else h.itens.splice(h.i + 1, 1);   // sem antigos: o refazer mais distante
+        podou++;
+    }
+    if (podou && !IE._avisoHist) { IE._avisoHist = true; ieToast?.(ieT('Memória alta: o histórico mais antigo foi descartado para o editor não travar')); }
+    if (podou) ieHistRender?.();
 }
 
 function ieIrHist(i, doc = IE.doc) {
@@ -360,11 +384,16 @@ function ieTemp(k, w, h) {
         IE.temps[k] = c;
     }
     const x = ieCtx(c);
+    if (c._recorte) x.restore();
     x.setTransform(1, 0, 0, 1, 0, 0);
     x.globalAlpha = 1;
     x.globalCompositeOperation = 'source-over';
     x.filter = 'none';
     x.clearRect(0, 0, w, h);
+    // só o pedaço pedido: a folha guardada cresce até o maior pedido (o documento inteiro) e as operações que apagam
+    // fora da forma (destination-in, source-in) percorriam a folha INTEIRA a cada recorte (~20 ms cada, mesmo longe)
+    x.save(); x.beginPath(); x.rect(0, 0, w, h); x.clip();
+    c._recorte = true;
     return c;
 }
 
@@ -505,6 +534,12 @@ function ieComporLista(ctx, lista, R, o, prof) {
         if (IE._pararEm === L) { IE._parou = true; return; }   // ieAchatarAbaixo: só o que está embaixo de L
         let j = i + 1;
         if (!L.clip) while (j < lista.length && lista[j].clip) j++;
+        // camada (e o recorte preso nela) que não toca a região: nada a desenhar. Antes cada recorte longe dali ainda
+        // custava ~2 ms por quadro. Grupos não entram (os efeitos do grupo passam da caixa dos filhos).
+        if (L.visivel && L.tipo !== 'grupo' && L.tipo !== 'ajuste' && !(L.vazamento && L.vazamento !== 'nenhum')) {
+            const Rl = ieRCamada(L);
+            if (!Rl || !ieRInter(Rl, R)) { i = j - 1; continue; }
+        }
         if (L.visivel) {
             const clipados = lista.slice(i + 1, j).filter(c => c.visivel);
             if (clipados.length && L.tipo !== 'ajuste') ieComporCorte(ctx, L, clipados, R, o, prof);
@@ -724,10 +759,19 @@ function ieComporAjuste(ctx, L, R, o, prof) {
     ctx.restore();
 }
 
+// composição em blocos de no máximo 2048 px: as folhas de rascunho (ieTemp) crescem até o maior pedaço pedido e ficam
+// guardadas; compor o documento inteiro de uma vez as deixava do tamanho dele (4 folhas de 400 MB num canvas 10k × 10k)
+const IE_COMP_BLOCO = 2048;
 function ieCompor(doc, R) {
     R = ieRInter(ieRInt(R || ieRDoc(doc)), ieRDoc(doc));
     if (!R) return;
     if (doc.comp.width !== doc.w || doc.comp.height !== doc.h) doc.comp = ieCanvas(doc.w, doc.h);
+    const B = IE_COMP_BLOCO;
+    if (R.w <= B && R.h <= B) return ieComporPedaco(doc, R);
+    for (let y = R.y; y < R.y + R.h; y += B) for (let x = R.x; x < R.x + R.w; x += B)
+        ieComporPedaco(doc, { x, y, w: Math.min(B, R.x + R.w - x), h: Math.min(B, R.y + R.h - y) });
+}
+function ieComporPedaco(doc, R) {
     const ctx = ieCtx(doc.comp);
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -748,15 +792,118 @@ function ieCompor(doc, R) {
     ctx.beginPath();
     ctx.rect(R.x, R.y, R.w, R.h);
     ctx.clip();
-    ieComporLista(ctx, doc.camadas, R, { x: 0, y: 0, base: IE._fundoComp }, 0);
+    const cg = ieCongAtual(doc);
+    if (cg) ieComporCong(ctx, doc, R, cg);
+    else ieComporLista(ctx, doc.camadas, R, { x: 0, y: 0, base: IE._fundoComp }, 0);
     ctx.restore();
+}
+
+// ─────────────────────────── arraste rápido ───────────────────────────
+// Arrastando no Mover ou no Ctrl+T, só as camadas que se movem mudam: o que está embaixo delas e (quando não depende do
+// que está embaixo) o que está por cima ficam guardados prontos e cada quadro desenha 3 coisas em vez da pilha toda.
+// Guardado em blocos de 256 px só por onde a camada passa (não o documento inteiro), então começar a arrastar não
+// trava e a memória acompanha o caminho do arraste. Mesmo resultado da composição normal: "sobre" é associativo, e o
+// de cima só é guardado se for todo Normal/isolado.
+const IE_CONG_BLOCO = 256;
+function ieCongAlvos() {
+    if (IE.transf) return IE.transf.alvos;
+    const m = IE.mov;
+    return m && m.alvos && !m.flut && !m.caixa && !m.transf ? m.alvos : null;
+}
+function ieGrupoPlano(L) {   // grupo que se desenha como se os filhos estivessem soltos na lista de cima
+    return L.tipo === 'grupo' && L.visivel && L.bm === 'PASS_THROUGH' && L.op >= 1 && !(L.m && !L.m.desativada) && !(!L.fxOculto && ieTemFx(L.fx));
+}
+// a lista não depende do que está embaixo dela (pode ser composta à parte e posta por cima)
+function ieListaIndep(lista) {
+    let base = null;
+    for (const L of lista) {
+        if (!L.clip) base = L;
+        if (!L.visivel) continue;
+        if (L.clip && base && !(base.misturaCorte === false && base.tipo !== 'grupo')) continue;   // mistura dentro do recorte
+        if (L.tipo === 'ajuste' || (L.vazamento && L.vazamento !== 'nenhum') || !ieMescSeNeutro(L.mescSe) || !ieCanaisTodos(L.canais)) return false;
+        if (ieGrupoPlano(L)) { if (!ieListaIndep(L.filhos)) return false; continue; }
+        if (L.bm && L.bm !== 'NORMAL' && L.bm !== 'PASS_THROUGH') return false;
+    }
+    return true;
+}
+function ieCongAtual(doc) {
+    const alvos = ieCongAlvos();
+    if (!alvos || !alvos.length || IE._fundoComp || IE.congDesligado) { IE._cong = null; return null; }
+    const ids = new Set();
+    for (const X of alvos) iePercorrer([X], Y => { ids.add(Y.id); });
+    const chave = doc.id + '|' + doc.hist.i + '|' + [...ids].sort((a, b) => a - b).join(',');
+    if (IE._cong && IE._cong.doc === doc && IE._cong.chave === chave) return IE._cong.ok ? IE._cong : null;
+    IE._cong = { doc, chave, ids, ok: false };
+    if (typeof ieCrMargemDoc === 'function' && ieCrMargemDoc(doc)) return null;
+    if (ieTodas(doc).some(L => L.visivel && L.vazamento && L.vazamento !== 'nenhum')) return null;
+    const contem = L => ids.has(L.id) || (L.tipo === 'grupo' && L.filhos.some(contem));
+    let falhou = false;
+    const abrir = lista => {
+        const out = [];
+        for (let i = 0; i < lista.length; i++) {
+            const L = lista[i];
+            if (!ids.has(L.id) && ieGrupoPlano(L) && contem(L)) {
+                // recorte que começa no grupo ou logo depois dele mudaria de base se os filhos fossem soltos
+                if ((L.filhos[0] && L.filhos[0].clip) || (lista[i + 1] && lista[i + 1].clip)) { falhou = true; return out; }
+                out.push(...abrir(L.filhos));
+            } else out.push(L);
+        }
+        return out;
+    };
+    const plano = abrir(doc.camadas);
+    if (falhou) return null;
+    let lo = -1, hi = -1;
+    plano.forEach((L, i) => { if (contem(L)) { if (lo < 0) lo = i; hi = i; } });
+    if (lo < 0) return null;
+    while (lo > 0 && plano[lo].clip) lo--;
+    while (hi + 1 < plano.length && plano[hi + 1].clip) hi++;
+    const acimaOk = ieListaIndep(plano.slice(hi + 1));
+    Object.assign(IE._cong, { ok: true, plano, lo, hi, acimaOk, blocos: new Map() });
+    return IE._cong;
+}
+function ieComporCong(ctx, doc, R, cg) {
+    const B = IE_CONG_BLOCO, o = { x: 0, y: 0 }, lista = [];
+    // blocos da região que ainda não foram guardados: compõe uma vez o retângulo que os cobre e recorta em blocos
+    let U = null;
+    for (let by = Math.floor(R.y / B); by * B < R.y + R.h; by++) for (let bx = Math.floor(R.x / B); bx * B < R.x + R.w; bx++) {
+        const k = bx + ',' + by;
+        if (!cg.blocos.has(k)) { cg.blocos.set(k, null); U = ieRUniao(U, { x: bx * B, y: by * B, w: B, h: B }); }
+        lista.push(k);
+    }
+    if (U && (U = ieRInter(U, ieRDoc(doc)))) {
+        const partes = [[cg.plano.slice(0, cg.lo), 'ab']];
+        if (cg.acimaOk) partes.push([cg.plano.slice(cg.hi + 1), 'ac']);
+        for (const [camadas, lado] of partes) {
+            const t = ieCanvas(U.w, U.h), tx = ieCtx(t);
+            tx.setTransform(1, 0, 0, 1, -U.x, -U.y);
+            ieComporLista(tx, camadas, U, { x: U.x, y: U.y }, 0);
+            for (const [k, b] of cg.blocos) {
+                if (b && b[lado]) continue;
+                const [bx, by] = k.split(',').map(Number), X = bx * B, Y = by * B;
+                if (X < U.x || Y < U.y || X >= U.x + U.w || Y >= U.y + U.h) continue;
+                const c = ieCanvas(B, B);
+                ieCtx(c).drawImage(t, X - U.x, Y - U.y, B, B, 0, 0, B, B);
+                const blk = cg.blocos.get(k) || {}; blk[lado] = c; cg.blocos.set(k, blk);
+            }
+        }
+    }
+    const pinta = lado => { for (const k of lista) { const b = cg.blocos.get(k); if (b && b[lado]) { const [bx, by] = k.split(',').map(Number); ctx.drawImage(b[lado], bx * B, by * B); } } };
+    pinta('ab');   // ctx já está recortado na região R
+    ieComporLista(ctx, cg.plano.slice(cg.lo, cg.hi + 1), R, o, 0);
+    if (cg.acimaOk) pinta('ac');
+    else ieComporLista(ctx, cg.plano.slice(cg.hi + 1), R, o, 0);
 }
 
 // imagem achatada de uma lista de camadas num canvas novo do tamanho do documento
 function ieAchatar(doc, lista = doc.camadas, R = ieRDoc(doc)) {
-    const c = ieCanvas(R.w, R.h), ctx = ieCtx(c);
+    const c = ieCanvas(R.w, R.h), ctx = ieCtx(c), B = IE_COMP_BLOCO;
     ctx.setTransform(1, 0, 0, 1, -R.x, -R.y);
-    ieComporLista(ctx, lista, R, { x: R.x, y: R.y }, 10);
+    for (let y = R.y; y < R.y + R.h; y += B) for (let x = R.x; x < R.x + R.w; x += B) {   // em blocos (ver ieCompor)
+        const Rb = { x, y, w: Math.min(B, R.x + R.w - x), h: Math.min(B, R.y + R.h - y) };
+        ctx.save(); ctx.beginPath(); ctx.rect(Rb.x, Rb.y, Rb.w, Rb.h); ctx.clip();
+        ieComporLista(ctx, lista, Rb, { x: R.x, y: R.y }, 10);
+        ctx.restore();
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     return c;
 }
@@ -1033,6 +1180,7 @@ function ieDesenharSobre() {
     const f = IE.transf ? null : IE_FERR?.[IE.ferrTemp || IE.ferr];
     try { f?.sobre?.(ctx, doc); } catch (e) { console.error(e); }
     IE.transf && ieTransfSobre?.(ctx, doc);
+    if (typeof ieGISobre === 'function') ieGISobre(ctx, doc);   // guias inteligentes (imagem-guias.js)
 }
 setInterval(() => {
     const d = IE.doc;

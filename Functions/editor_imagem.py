@@ -1731,7 +1731,7 @@ def salvar(spec):
         # referências conferidas ANTES de gravar (2026-10-06: referência desencontrada gravou os pixels de uma camada
         # na outra — "cena5" com o texto de outro slide): a camada reaproveitada do arquivo tem que ser a MESMA do
         # último salvamento (mesmo nome, posição existente, sem duas camadas no mesmo ref). Senão o editor grava tudo.
-        usadas, ruins = set(), []
+        usadas, ruins, ruins_uid = set(), [], []
 
         def conferir(nos):
             for no in nos:
@@ -1741,11 +1741,12 @@ def salvar(spec):
                     esperado = no.get("ref_nome") or no.get("nome")
                     if o is None or r in usadas or (esperado and o.name != esperado):
                         ruins.append(no.get("nome"))
+                        ruins_uid.append(no.get("uid"))
                     usadas.add(r)
                 conferir(no.get("filhos") or [])
         conferir(spec.get("camadas") or [])
         if ruins:
-            return {"success": False, "refaz": True,
+            return {"success": False, "refaz": True, "ruins_uid": ruins_uid,
                     "error": f"referências desencontradas em {len(ruins)} camada(s) (ex.: {', '.join(map(str, ruins[:3]))}); gravando tudo de novo"}
         hdr = psd._record.header
         W0, H0 = hdr.width, hdr.height
@@ -1793,7 +1794,9 @@ def salvar(spec):
                 im = _img(arquivos, no.get("chave"))
                 vivo = orig is not None and orig.kind in ("type", "smartobject", "shape", "solidcolorfill",
                                                           "gradientfill", "patternfill")
-                if orig is not None and not no.get("rasterizar"):
+                # texto com os dados do editor (texto_ps): vai como camada de texto NOVA montada desses dados — reaproveitar a
+                # do arquivo com pixels novos por cima deixava de ser texto (2026-10-13: 71 textos viraram pixels)
+                if orig is not None and not no.get("rasterizar") and not no.get("texto_ps"):
                     ob = orig
                     if vivo and no.get("tf"):
                         if not _transformar_vivo(orig, no["tf"], W, H, W0, H0):
@@ -1825,7 +1828,7 @@ def salvar(spec):
                     if im is None:
                         im = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
                     ob = _nova_pixel(pai, im, no.get("nome") or "Camada", no.get("x", 0), no.get("y", 0))
-                    if orig is None and no.get("texto_ps"):   # texto criado no editor: vai como texto editável
+                    if no.get("texto_ps"):   # texto com os dados do editor: vai como texto editável
                         try:
                             _texto_novo(ob, no["texto_ps"])
                         except Exception as e:
