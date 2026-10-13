@@ -101,5 +101,5 @@ function veFaixaSelecionar(e, t, row) {
 // Legendas que andam com o grupo da ferramenta A: dt = deslocamento no tempo (0 volta ao lugar de antes)
 function veFaixaLegsMover(legs, dt) {
     if (!legs || !VE.legendas) return;
-    legs.forEach(({ k, c0 }) => { if (VE.legendas[k]) VE.legendas[k] = veLegMover(c0, dt); });
+    legs.forEach(({ k, c0 }) => { if (VE.legendas[k]) VE.legendas[k] = dt ? veLegMover(c0, dt) : veLegClone(c0); });
 }
