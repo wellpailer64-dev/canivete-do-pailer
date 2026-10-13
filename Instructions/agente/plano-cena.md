@@ -115,6 +115,18 @@ como mexida: a camada refeita pelo HTML leva os filtros da antiga (`ieCenaLevarF
   o runner não recarrega funções embrulhadas por outro módulo (ex.: `ieDesenharSobre`; recarregar a original fazia
   guias, fatias e réguas sumirem do app de teste).
 
+## Carrossel de cliente com rascunho + vídeos (2026-10-13, artigo Magnet US: ~240k → meta < 120k)
+O caro foi LER (páginas do rascunho, quadros de vídeo, prévias), não montar (11 slides em ~1 s por rodada). Agora:
+- `py -3.13 tools/briefing.py "<pasta do cliente>"` (segundo plano) → `briefing.md`: texto de cada página do PDF,
+  imagens embutidas extraídas e listadas (tamanho, posição, "pequena: ampliar"), falas transcritas com tempo (cache) e
+  `quadros_<video>.jpg` = quadro no momento em que o cliente APONTA ("aqui", "tira", "coloca") com a fala embaixo.
+- `py -3.13 tools/imgprep.py arq [--corte] [--ampliar 4 --tipo arte|foto] [--recortar] [--tapar 2000] [--branco]`
+  e `--folha a.png b.png` (conferir recortes numa imagem só).
+- `knv.py --usuario` (app aberto do Pailer: sem recarregar código, sem fechar documentos; `--nome` ativa o documento
+  da peça antes de atualizar), `--formato 1080x1400`, `--psd arq.psd`, `--exportar pasta --base NOME`; avisos repetidos
+  viram uma linha (`--avisos todos` para a lista); prévia de carrossel em GRADE (`--colunas`).
+- Modelos de cliente prontos para partir: `D:\kanivete_biblioteca\modelos\magnetus_artigo\LEIA-ME.md`.
+
 ## Fluxo barato (2026-10-03, depois do carrossel 3D)
 Biblioteca local `D:\kanivete_biblioteca` (ou `--biblioteca` / `%KANIVETE_BIBLIOTECA%`): `recursos/` (objetos já
 recortados + .json com prompt/semente), `modelos/` (peças aprovadas, para ESTUDO — as peças nascem do zero),

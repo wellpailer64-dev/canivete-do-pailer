@@ -20,6 +20,12 @@ uso: py -3.13 tools/knv.py peca.html [--formato feed] [--salvar peca.iknv] [--pr
               recursos/nome.png; <img data-guardar="nome"> grava lá o recurso recortado (+ nome.json com prompt/semente)
   --guardar-modelo nome [--nota "..."]  copia html, .iknv, receitas, exportados e prévia para modelos/nome (estudo)
   --listar    recursos e modelos da biblioteca
+  --formato 1080x1400   tamanho livre (L x A) além dos nomes (feed, retrato, story...)
+  --usuario   no app ABERTO do usuário (porta 9222 se não der --porta): não recarrega o código, não fecha documentos
+              (--de abre sem fechar os outros); rodar de novo com --nome ativa esse documento antes de atualizar
+  --psd arq.psd  salva também em PSD (textos editáveis, objetos inteligentes); --base NOME = nome dos PNGs do --exportar
+  --avisos todos   lista cada aviso (padrão: os repetidos — letra pequena, quase alinhados — viram 1 linha com a contagem)
+  Prévia de carrossel sai em GRADE (--colunas 6), não numa tira comprida: dá para olhar inteira numa imagem só.
 Recarrega frontend/js/imagem-*.js do disco (mudou o código do editor → não precisa reiniciar o app).
 Guia: Instructions/agente/plano-cena.md"""
 import argparse, base64, io, json, os, re, sys, time
@@ -41,7 +47,15 @@ ap.add_argument("--amostras"); ap.add_argument("--fontes"); ap.add_argument("--e
 ap.add_argument("--biblioteca", default=os.environ.get("KANIVETE_BIBLIOTECA", r"D:\kanivete_biblioteca"))
 ap.add_argument("--revisar", action="store_true", help="revisor (tools/revisor.py): corte, contraste, sombra dura, avatar");
 ap.add_argument("--guardar-modelo"); ap.add_argument("--nota", default=""); ap.add_argument("--listar", action="store_true")
+ap.add_argument("--usuario", action="store_true"); ap.add_argument("--psd"); ap.add_argument("--base")
+ap.add_argument("--avisos", default="resumo"); ap.add_argument("--colunas", type=int, default=6)
+porta_dada = any(x == "--porta" or x.startswith("--porta=") for x in sys.argv)
 a = ap.parse_args()
+if a.usuario:
+    a.sem_recarga = True
+    if not porta_dada: a.porta = 9222
+tam = re.fullmatch(r"(\d+)\s*[x×]\s*(\d+)", a.formato or "")
+if tam: a.w_h = (int(tam.group(1)), int(tam.group(2))); a.formato = None; a.novo = a.novo or (not a.de and a.html != "-")
 if a.formato and not a.de and a.html != "-": a.novo = True   # sem --de, montar com formato é peça nova (não remonta a cena aberta)
 BIB = os.path.abspath(a.biblioteca)
 ESTILOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fontes_estilos.json")
@@ -137,6 +151,7 @@ if html and "gerar:" in html:   # o FLUX precisa da placa: tira os modelos do Ol
     except Exception: pass
 opc = {"base": barra(os.path.dirname(os.path.abspath(a.html))) if html else None, "biblioteca": barra(BIB)}
 if getattr(a, "w_gerar", None): opc["w"], opc["h"] = a.w_gerar
+if getattr(a, "w_h", None): opc["w"], opc["h"] = a.w_h
 for k in ("formato", "nome", "margem"):
     if getattr(a, k) is not None: opc[k] = getattr(a, k)
 if a.novo: opc["novo"] = True
@@ -174,9 +189,13 @@ with sync_playwright() as p:
             except Exception as e: print("!! fonte", n, str(e).splitlines()[0][:100])
     t = time.time()
     try:
-        r = pg.evaluate("""async ({html, opc, de, depois, salvar, exportar, fmt, referencia, variacoes, comparar, ver}) => {
+        r = pg.evaluate("""async ({html, opc, de, depois, salvar, exportar, fmt, referencia, variacoes, comparar, ver, usuario, psd, base}) => {
             const KNV = window.KNV; const out = {};
-            if (de) { await KNV.fecharTudo(); await KNV.abrir(de); if (!IE.doc || !IE.doc.path) throw new Error('não abriu ' + de); if (IE.doc.cena) IE.doc.cena.biblioteca = opc.biblioteca; }
+            if (de) { if (!usuario) await KNV.fecharTudo(); await KNV.abrir(de); if (!IE.doc || !IE.doc.path) throw new Error('não abriu ' + de); if (IE.doc.cena) IE.doc.cena.biblioteca = opc.biblioteca; }
+            else if (html != null && !opc.novo && opc.nome) {   // rodar de novo: o documento da peça, não o que estiver na frente
+                KNV.doc(opc.nome);
+                if (!IE.doc || IE.doc.nome !== opc.nome) throw new Error('documento "' + opc.nome + '" não está aberto (aberto: ' + (IE.doc && IE.doc.nome) + ')');
+            } else if (html != null && !opc.novo && usuario && !(IE.doc && IE.doc.cena)) throw new Error('o documento da frente não é de cena: use --nome ou --novo');
             if (html != null) out.cena = await KNV.cena(html, opc);
             if (referencia) out.referencia = await KNV.referencia(referencia);
             if (depois) { const f = new Function('KNV', 'return (async () => {' + depois + '\\n})()'); out.depois = await f(KNV); }
@@ -185,9 +204,11 @@ with sync_playwright() as p:
             if (ver) out.ver = KNV.ver(ver);
             out.recursos = KNV.recursosNovos();
             if (salvar) out.salvo = await KNV.salvar(salvar);
-            if (exportar) out.exportados = await KNV.exportar(exportar, {fmt});
+            if (psd) { const nome = IE.doc.nome; out.psd = await ieSalvar(true, psd) ? psd : null; }
+            if (exportar) out.exportados = await KNV.exportar(exportar, base ? {fmt, base} : {fmt});
             return out; }""", {"html": html, "opc": opc, "de": barra(a.de), "depois": depois, "salvar": barra(a.salvar), "exportar": os.path.abspath(a.exportar) if a.exportar else None, "fmt": a.fmt,
-                              "referencia": barra(a.referencia), "variacoes": variacoes, "comparar": a.comparar, "ver": ver})
+                              "referencia": barra(a.referencia), "variacoes": variacoes, "comparar": a.comparar, "ver": ver,
+                              "usuario": a.usuario, "psd": barra(a.psd), "base": a.base})
     except Exception as e:
         print("!! erro:", str(e).splitlines()[0][:600]); r = None
     finally:
@@ -195,7 +216,16 @@ with sync_playwright() as p:
     if r:
         c = r.get("cena") or {}
         if c: print(f"cena {c['w']}x{c['h']}" + (f" ({c['slides']} slides)" if c.get("slides") else "") + f": {c['camadas']} camadas em {c['ms']} ms" + (f"; mantidas (mexidas): {', '.join(c['mantidas'])}" if c.get("mantidas") else ""))
-        for av in c.get("avisos", []): print("  aviso:", av)
+        avisos = c.get("avisos", [])
+        if a.avisos != "todos":   # os repetidos viram uma linha (a lista inteira custava milhares de tokens por rodada)
+            grupos = {"pequeno para ler": [], "quase alinhados": []}
+            resto = []
+            for av in avisos:
+                k = next((g for g in grupos if g in av), None)
+                (grupos[k] if k else resto).append(av)
+            avisos = resto + [f"{len(v)}× {k} (ex.: {v[0][:70]}) — --avisos todos para a lista" for k, v in grupos.items() if v]
+        for av in avisos: print("  aviso:", av)
+        if r.get("psd"): print("psd:", r["psd"])
         for f in r.get("exportados") or []: print("exportado:", f)
         if r.get("depois") is not None: print("depois:", json.dumps(r["depois"], ensure_ascii=False)[:800])
         for rc in r.get("recursos") or []:   # data-guardar → biblioteca/recursos
@@ -216,12 +246,20 @@ with sync_playwright() as p:
         for it in rv["itens"]: print("  ", it)
     if a.mapa: print(pg.evaluate("window.KNV.mapa()"))
     png = None if a.sem_previa else base64.b64decode(pg.evaluate("e => window.KNV.png(e)", a.escala))
+    slide_w = pg.evaluate("() => (IE.doc && IE.doc.cena && IE.doc.cena.slide && IE.doc.cena.slide.w) || 0")
 
 previa = None if a.sem_previa else (a.previa or (os.path.splitext(a.html)[0] + ".jpg" if html else None))
 if previa and png:
     from PIL import Image
-    Image.open(io.BytesIO(png)).convert("RGB").save(previa, quality=85)
-    print("prévia:", previa)
+    im = Image.open(io.BytesIO(png)).convert("RGB")
+    sw = round(slide_w * a.escala) if slide_w else 0
+    if sw and im.width > sw * 1.5:   # carrossel: grade de slides (uma imagem só, sem tira comprida)
+        n = round(im.width / sw); cols = min(a.colunas, n); lin = -(-n // cols)
+        grade = Image.new("RGB", (cols * sw + (cols - 1) * 6, lin * im.height + (lin - 1) * 6), (128, 128, 128))
+        for i in range(n): grade.paste(im.crop((i * sw, 0, (i + 1) * sw, im.height)), ((i % cols) * (sw + 6), (i // cols) * (im.height + 6)))
+        im = grade
+    im.save(previa, quality=85)
+    print("prévia:", previa, f"{im.width}x{im.height}")
 
 if a.guardar_modelo:   # banco de estudo: o que funcionou, para consultar (não é fôrma: as peças nascem do zero)
     import shutil, glob

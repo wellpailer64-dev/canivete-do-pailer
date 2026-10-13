@@ -19,6 +19,9 @@ criar ferramenta, comando ou teste: `py -3.13 tools/mapa_geral.py` (regenera os 
 - Editar código: `py -3.13 tools/patch.py mudancas.patch` (blocos `@@ arquivo` / `<<<` velho `===` novo `>>>`; confere âncora
   única, tudo ou nada, checa sintaxe e desfaz se quebrar). Nada de heredoc com Python inline para editar.
 - Achar onde mexer: `py -3.13 tools/mapa_codigo.py vetor|imagem|editor --busca termo` (comandos/funções:linha) antes de grep/ler arquivo.
+- Pasta de cliente (rascunho PDF, áudios, vídeos de tela): `py -3.13 tools/briefing.py "<pasta>"` → briefing.md + folhas
+  (fala junto do quadro onde ele aponta); imagens: `tools/imgprep.py` (ampliar/recortar/tapar/folha). Carrossel no app
+  aberto do Pailer: `tools/knv.py peca.html --usuario --nome X` (não fecha nada). Guia: plano-cena.md › "Carrossel de cliente".
 - Aplicar mudança no app aberto, SEM recarregar (projeto, janelas soltas e Ctrl+Z ficam): `py -3.13 tools/aplicar.py
   frontend/js/x.js [y.css] [--py] [--porta 9222]` — rodar depois de CADA mudança no app do usuário. Troca só as funções
   que MUDARAM; constante que já existe e função envolvida por outro arquivo (`nome = function` num bloco de outro .js, ex.
