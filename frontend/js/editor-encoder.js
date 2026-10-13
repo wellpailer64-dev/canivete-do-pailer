@@ -195,9 +195,17 @@ async function veKeMonitorTick() {
     veKeMed('enc', r.enc, r.enc == null ? '' : `${Math.round(r.enc)}%`);
     const mon = $ve('ke-monitor');
     if (mon) mon.title = r.placa || veT('Sem placa NVIDIA: só CPU e RAM');
-    const q = r.quadro, img = $ve('ke-thumb-img');
+    const q = r.quadro, img = $ve('ke-thumb-img'), at = VEFILA.atual;
+    // render novo: limpa a miniatura (antes ficava a do render anterior durante toda a preparação) e só aceita
+    // quadro gravado depois que ele começou
+    if (at && VEKE_MON.item !== at.id) {
+        VEKE_MON.item = at.id; VEKE_MON.quadroT = 0;
+        if (img) img.removeAttribute('src');
+        $ve('ke-thumb')?.classList.remove('com');
+    }
+    const novo = q && (!at || !at.t0 || q.t * 1000 >= at.t0 - 1000);
     // o quadro do render atual (ou o último, se terminou rápido — render curto acabava antes da 1ª leitura)
-    if (q && img && (VEFILA.atual || VEKE_MON.ultimo) && q.t !== VEKE_MON.quadroT) {
+    if (novo && img && (at || VEKE_MON.ultimo) && q.t !== VEKE_MON.quadroT) {
         VEKE_MON.quadroT = q.t;
         img.onload = () => $ve('ke-thumb').classList.add('com');
         img.src = `${q.url}?t=${q.t}`;

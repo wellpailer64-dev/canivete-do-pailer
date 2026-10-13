@@ -1337,6 +1337,29 @@ def _no_bloco(c, a):
     return c
 
 
+def _base_em_camadas(segmentos, camadas, path, W, H, info):
+    """Trilha base (trechos do vídeo principal, um atrás do outro) → camadas de vídeo por baixo de todas, ajustadas ao
+    quadro como a base (cabe inteiro, centrado). Devolve (segmentos só com vazios, camadas) ou (None, None)."""
+    mw, mh = int(info.get("width") or W), int(info.get("height") or H)
+    if mw <= 0 or mh <= 0:
+        return None, None
+    sc = min(W / mw, H / mh) * 100.0
+    t, segs, base = 0.0, [], []
+    for s in segmentos or []:
+        if not isinstance(s, dict):
+            return None, None
+        if s.get("gap") is not None:
+            d = float(s["gap"])
+        else:
+            a, b = float(s.get("start", 0)), float(s.get("end", 0))
+            d = b - a
+            base.append({"tipo": "video", "path": path, "seq": None, "st": t, "s": a, "e": b, "sc": sc, "x": W / 2, "y": H / 2,
+                         "rot": 0, "op": 100, "kf": {}, "fx": [], "ca": [], "mw": mw, "mh": mh, "v": 1, "bm": None, "ox": 0, "oy": 0})
+        segs.append({"gap": d})
+        t += d
+    return (segs, base + list(camadas or [])) if base else (None, None)
+
+
 def _blocos(lay, total, fps, path):
     """[(início, fim, quadros, camadas do bloco)] ou None se algum bloco ainda não couber na memória da placa.
     Blocos adaptativos: o bloco que não cabe no tamanho padrão é dividido (metade, até ~1,5 s) — SÓ ele: antes um trecho
@@ -1424,6 +1447,14 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
     if grande and os.environ.get("CANIVETE_PLACA_BLOCOS") != "1" and not args.get("_blocos"):
         # não cabe com o que está ocupado agora: libera o que o app deixou na placa e confere de novo
         grande = not liberar_placa(lambda: cabe_na_placa(args["segmentos"], lay, args["path"]), prog)
+    if grande and not all(isinstance(s, dict) and s.get("gap") is not None for s in args["segmentos"] or []):
+        # os blocos só dividem camadas: os trechos "lisos" do vídeo principal (trilha base) viram camadas de vídeo no
+        # mesmo lugar e a base fica vazia — antes isso caía inteiro no processador (quiz Carlinhos, 37 cortes, 2026-10-13)
+        segs, cams = _base_em_camadas(args["segmentos"], args["camadas"], args["path"], W, H, info)
+        if segs is not None:
+            args["segmentos"], args["camadas"] = segs, cams   # no lugar: o _motivo e a volta pela CPU usam o mesmo
+            lay = vc._normalizar_camadas(args["camadas"], args["path"])
+            vc._camadas_na_grade(lay, info["fps"])
     if grande and not all(isinstance(s, dict) and s.get("gap") is not None for s in args["segmentos"] or []):
         m = "memória livre da placa insuficiente (4K bruto: Forçar Full HD resolve; ou feche o que usa a placa)"
     if m:
