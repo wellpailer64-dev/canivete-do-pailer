@@ -30,7 +30,11 @@ FERRAMENTAS = {
     "conversa": ("Grava uma conversa entre um homem e uma mulher. args: {falas: [{papel: H|M, texto}]}", False),
     "buscar_musica": ("Escolhe uma música de fundo da biblioteca. args: {clima: calma|alegre|animada|intensa|melancolica, segundos_min}", False),
     "montar_vinheta": ("Mixa uma voz gravada (A?) com música de fundo (A? de buscar_musica, opcional) e impacto. args: {voz: 'A1', musica: 'A2'}", False),
-    "entregar": ("Termina e entrega ao usuário. args: {arquivos: ['A1', ...], mensagem (curta, em português)}", False),
+    "pesquisar_web": ("Pesquisa na internet, lê as melhores páginas e devolve um resumo estruturado com as fontes (vira um texto A?). args: {pergunta}", False),
+    "ler_documento": ("Lê o texto de um PDF, Word ou TXT anexado (vira um texto A?). args: {arquivo: 'A1'}", False),
+    "salvar_documento": ("Salva um texto em arquivo bonito. args: {formato: pdf|docx|txt|md, titulo, conteudo (texto em markdown OU o nome de um texto, ex.: 'A2')}", False),
+    "remover_fundo": ("Tira o fundo de uma imagem (anexada ou gerada) e devolve PNG transparente. args: {imagem: 'A1'}", True),
+    "entregar": ("Termina e entrega. args: {arquivos: ['A1', ...] (só arquivos), resposta (opcional: texto em markdown para mostrar no chat, ou o nome de um texto 'A3'), mensagem (1 ou 2 frases)}", False),
 }
 
 _SISTEMA = """Você é a Kani, assistente do app KANIVETE, trabalhando EM ETAPAS com FERRAMENTAS REAIS que rodam no computador
@@ -52,6 +56,10 @@ REGRAS:
 - Vinheta: a música fica por baixo da voz, ~10 dB mais baixa (o montar_vinheta já faz isso); buscar_musica sempre acha uma
   (baixa da internet se a biblioteca não tiver).
 - Na mensagem de entrega não cite A1/A2: diga o que foi feito em uma ou duas frases.
+- Pesquisa: pesquisar_web e entregue com resposta = o texto da pesquisa (ex.: 'A1'); só salve em PDF/DOC/TXT se pedirem.
+- Documento: escreva o conteúdo (escrever, em markdown com ## seções e listas) ou use um texto pronto (pesquisa, leitura)
+  e chame salvar_documento com conteudo = o nome do texto (ex.: 'A2'). Título curto e claro.
+- Imagem anexada: use o nome dela (A1...) nas ferramentas (ex.: remover_fundo). Nunca invente arquivo que não existe.
 - Termine SEMPRE com "entregar", listando os arquivos que respondem ao pedido (não liste intermediários como a voz crua
   usada numa vinheta, a não ser que peçam). No máximo {max} ações."""
 
@@ -63,13 +71,21 @@ _SCHEMA = {"type": "object", "properties": {
     "required": ["pensamento", "acao", "args"]}
 
 _COMPLEXO = re.compile(r"(roteiro|campanha|\bkit\b|pacote|s[eé]rie|v[aá]ri[ao]s|e depois|tamb[eé]m|junto com|al[eé]m d|"
+                       r"\bpdf\b|\bdocx?\b|\bword\b|\btxt\b|documento|arquivo de texto|apostila|relat[oó]rio|"
+                       r"pesquis|procur[ae] na (?:internet|web)|busca na (?:internet|web)|na internet|not[ií]cias|"
+                       r"(?:tir[ae]|remov[ae]|apag[ae]|recort[ae]).{0,25}fundo|sem fundo|"
+                       r"resum[aeo].{0,20}(?:pdf|documento|arquivo|anexo|texto)|"
                        r"\b(?:\d+|duas|dois|tr[eê]s|quatro)\s+(?:imagens|fotos|vinhetas|narra|efeitos|vers)|"
                        r"(?:imagem|foto).{0,60}(?:narra|vinhet|som|efeito|m[uú]sica)|(?:narra|vinhet|som|efeito).{0,60}(?:imagem|foto))", re.I)
 
 
 def precisa(texto):
-    """Pedido composto (mais de uma coisa, roteiro, campanha, "também"...): vai para o agente, não para a criação direta."""
-    return bool(_COMPLEXO.search(texto or ""))
+    """Pedido composto (mais de uma coisa, roteiro, campanha, "também"...) ou que usa uma habilidade (PDF/doc/txt, pesquisa
+    na web, tirar fundo, resumir documento): vai para o agente, não para a criação direta."""
+    t = texto or ""
+    if re.match(r"^\s*(como|onde|qual|o que [eé]|por ?que)\b.{0,60}\b(app|kanivete|ferramenta|bot[aã]o|menu)\b", t, re.I):
+        return False   # dúvida de como usar o app: conversa normal
+    return bool(_COMPLEXO.search(t))
 
 
 def _chamar(msgs, max_tokens=700, primeiro=False):
@@ -92,7 +108,25 @@ def _chamar(msgs, max_tokens=700, primeiro=False):
                                      data=json.dumps(corpo).encode("utf-8"), headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=300) as r:
             out = json.loads(r.read().decode("utf-8"))["choices"][0]["message"]["content"]
-    return json.loads(out)
+    try:
+        return json.loads(out)
+    except ValueError:   # cortou no limite de tokens: o objeto até onde veio fechado
+        m = re.search(r"\{.*\}", out or "", re.S)
+        if m:
+            return json.loads(m.group(0))
+        raise
+
+
+def _chamar_seguro(msgs, primeiro=False):
+    """Anti-erro: JSON quebrado ou motor engasgado → tenta de novo uma vez com mais espaço (e o motor reiniciado)."""
+    try:
+        return _chamar(msgs, 700, primeiro)
+    except Exception:
+        try:
+            kani.parar()
+        except Exception:
+            pass
+        return _chamar(msgs + [{"role": "user", "content": "Responda de novo, só o JSON, curto."}], 1100, primeiro)
 
 
 class _Estado:
@@ -104,6 +138,19 @@ class _Estado:
         k = f"A{self.n}"
         self.arq[k] = {"tipo": tipo, "path": path, "nome": os.path.basename(path) if path else "", "texto": texto, **(extra or {})}
         return k
+
+    def texto(self, v):
+        """Um texto: o nome de um texto já feito ('A3') vira o conteúdo dele; senão o próprio valor."""
+        v = str(v or "").strip()
+        a = self.arq.get(v)
+        return (a.get("conteudo") or a.get("texto") or "") if a else v
+
+    def arquivo(self, v, tipos):
+        a = self.arq.get(str(v or "").strip())
+        if not a or not a.get("path") or a["tipo"] not in tipos:
+            disp = ", ".join(f"{k} ({x['tipo']})" for k, x in self.arq.items() if x["tipo"] in tipos) or "nenhum"
+            raise ValueError(f"precisa de um {'/'.join(tipos)} — disponíveis: {disp}")
+        return a
 
     def pct(self, p, msg):
         self.on({"job": self.job, "progresso": {"pct": int(p), "msg": msg}})
@@ -117,10 +164,39 @@ def _executar(est, acao, a):
         instr = str(a.get("instrucao") or "").strip()
         if not instr:
             raise ValueError("falta 'instrucao'")
-        t = kani_criar._llm("Escreva em português do Brasil exatamente o que for pedido, pronto para usar, sem comentários.", instr, 500, 0.7)
+        t = kani_criar._llm("Escreva em português do Brasil exatamente o que for pedido, pronto para usar, sem comentários. "
+                            "Use markdown (## títulos, listas) quando for um documento.", instr, 900, 0.7)
         if not t:
             raise RuntimeError("não consegui escrever")
-        return f"Texto escrito:\n{t[:1200]}"
+        k = est.novo("texto", None, t[:300], {"conteudo": t})
+        return f"Texto escrito ({k}):\n{t[:1200]}"
+    if acao == "pesquisar_web":
+        from Functions import kani_skills
+        perg = str(a.get("pergunta") or "").strip()
+        if not perg:
+            raise ValueError("falta 'pergunta'")
+        resumo, fontes = kani_skills.pesquisar(perg, on)
+        k = est.novo("texto", None, resumo[:300], {"conteudo": resumo})
+        return f"Pesquisa pronta ({k}, {len(fontes)} fontes). Início do resumo:\n{resumo[:1500]}"
+    if acao == "ler_documento":
+        from Functions import kani_skills
+        doc = est.arquivo(a.get("arquivo"), ("anexo_doc",))
+        t = kani_skills.ler(doc["path"])
+        k = est.novo("texto", None, t[:300], {"conteudo": t})
+        return f"Documento lido ({k}, {len(t)} caracteres). Começo:\n{t[:1500]}"
+    if acao == "salvar_documento":
+        from Functions import kani_skills
+        conteudo = est.texto(a.get("conteudo"))
+        titulo = str(a.get("titulo") or "Documento").strip()[:80]
+        path = kani_skills.documento(str(a.get("formato") or "pdf"), titulo, conteudo)
+        return f"Documento salvo: {est.novo('documento', path, titulo)} ({os.path.splitext(path)[1][1:].upper()})."
+    if acao == "remover_fundo":
+        from Functions import kani_skills
+        img = est.arquivo(a.get("imagem"), ("imagem", "anexo_imagem"))
+        kani_criar._liberar_placa()
+        on(20, "Recortando (pessoa: cabelo fio a fio; objeto: borda limpa)...")
+        path = kani_skills.remover_fundo(img["path"])
+        return f"Fundo removido: {est.novo('imagem', path, 'sem fundo')} (PNG transparente)."
     if acao == "gerar_imagem":
         from Functions import gerador_imagem
         desc = str(a.get("descricao") or "").strip()
@@ -206,7 +282,7 @@ def _executar(est, acao, a):
     raise ValueError(f"ferramenta desconhecida: {acao}")
 
 
-def rodar(job, pedido, on_evento, historico=None):
+def rodar(job, pedido, on_evento, historico=None, anexos=None):
     """Em thread. historico: últimas mensagens da conversa (contexto curto)."""
     if not _ocupado.acquire(blocking=False):
         return {"success": False, "error": "A Kani já está trabalhando em outro pedido."}
@@ -223,7 +299,14 @@ def rodar(job, pedido, on_evento, historico=None):
             for m in (historico or [])[-4:]:
                 if m.get("role") in ("user", "assistant") and m.get("content"):
                     msgs.append({"role": m["role"], "content": str(m["content"])[:600]})
-            msgs.append({"role": "user", "content": f"Pedido: {pedido}"})
+            ids_anexo = []
+            for p in anexos or []:
+                if p and os.path.isfile(p):
+                    ext = os.path.splitext(p)[1].lower()
+                    tipo = "anexo_imagem" if ext in (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".heic") else \
+                        "anexo_doc" if ext in (".pdf", ".docx", ".txt", ".md", ".csv", ".srt", ".json") else "anexo"
+                    ids_anexo.append(f"{est.novo(tipo, p)} = {os.path.basename(p)} ({tipo.replace('anexo_', '') if '_' in tipo else 'arquivo'})")
+            msgs.append({"role": "user", "content": f"Pedido: {pedido}" + (f"\nArquivos anexados: {'; '.join(ids_anexo)}" if ids_anexo else "")})
             refeitos = {}
             for n in range(1, MAX_PASSOS + 1):
                 if job in _cancelar:
@@ -231,7 +314,7 @@ def rodar(job, pedido, on_evento, historico=None):
                 if n == MAX_PASSOS - 1:   # freio: entrega com o que tem
                     msgs.append({"role": "user", "content": "Limite de etapas chegando: a próxima ação TEM que ser entregar, com os melhores arquivos que você já tem."})
                 on_evento({"job": job, "passo": {"n": n, "estado": "pensando"}})
-                r = _chamar(msgs, primeiro=(n == 1))
+                r = _chamar_seguro(msgs, primeiro=(n == 1))
                 if n == 1 and r.get("plano"):
                     on_evento({"job": job, "plano": [str(x)[:120] for x in r["plano"]][:8]})
                 acao, args = r.get("acao"), r.get("args") or {}
@@ -240,16 +323,21 @@ def rodar(job, pedido, on_evento, historico=None):
                 _traj[job]["passos"].append({"acao": acao, "args": {k: (v if not isinstance(v, (list, dict)) else json.dumps(v, ensure_ascii=False)[:200])
                                                                    for k, v in args.items()}})
                 if acao == "entregar":
-                    ids = [str(x) for x in (args.get("arquivos") or []) if str(x) in est.arq]
+                    ids = [str(x) for x in (args.get("arquivos") or []) if str(x) in est.arq and est.arq[str(x)].get("path")
+                           and not est.arq[str(x)]["tipo"].startswith("anexo")]
                     if not ids:   # o modelo esqueceu de listar: entrega os finais
-                        ids = [k for k, v in est.arq.items() if v["tipo"] in ("imagem", "vinheta", "efeito")] or list(est.arq)
+                        ids = [k for k, v in est.arq.items() if v["tipo"] in ("imagem", "vinheta", "efeito", "documento") and v.get("path")]
+                    resp = est.texto(args.get("resposta")) if args.get("resposta") else ""
+                    if not resp and not ids:   # pesquisa sem arquivo: o último texto feito é a resposta
+                        tx = [v for v in est.arq.values() if v["tipo"] == "texto"]
+                        resp = tx[-1]["conteudo"] if tx else ""
                     from Functions import media_server
                     arqs = [{**{k: v for k, v in est.arq[i].items() if k in ("tipo", "path", "nome", "texto", "musica")},
                              "url": media_server.register(est.arq[i]["path"])} for i in ids if est.arq[i]["tipo"] != "musica"]
                     on_evento({"job": job, "passo": {"n": n, "pensamento": pens, "acao": acao, "estado": "ok", "resumo": "Entregue"}})
                     msg = re.sub(r"\b(?:o |a |os |as )?(?:arquivo |vinheta |imagem |narra[cç][aã]o )?A\d+\b", lambda m: m.group(0).rsplit(" ", 1)[0] if " " in m.group(0) else "o arquivo",
                                  str(args.get("mensagem") or "Pronto!"))
-                    on_evento({"job": job, "fim": True, "mensagem": re.sub(r"\s{2,}", " ", msg)[:600], "arquivos": arqs})
+                    on_evento({"job": job, "fim": True, "mensagem": re.sub(r"\s{2,}", " ", msg)[:600], "arquivos": arqs, "resposta": resp[:8000]})
                     return
                 # freio de revisão: cada ferramenta de criação pode ser refeita uma vez; depois disso o app segue
                 refeitos[acao] = refeitos.get(acao, 0) + 1
@@ -271,9 +359,9 @@ def rodar(job, pedido, on_evento, historico=None):
             # passou do limite sem entregar: o app entrega o melhor que tem (a última peça final de cada tipo)
             finais = {}
             for k, v in est.arq.items():
-                if v["tipo"] in ("vinheta", "imagem", "efeito", "narracao"):
+                if v["tipo"] in ("vinheta", "imagem", "efeito", "narracao", "documento") and v.get("path"):
                     finais[v["tipo"]] = k
-            ids = [finais[t] for t in ("vinheta", "imagem", "efeito") if t in finais] or ([finais["narracao"]] if "narracao" in finais else [])
+            ids = [finais[t] for t in ("vinheta", "imagem", "efeito", "documento") if t in finais] or ([finais["narracao"]] if "narracao" in finais else [])
             if not ids:
                 raise RuntimeError("passou do limite de etapas sem entregar")
             from Functions import media_server

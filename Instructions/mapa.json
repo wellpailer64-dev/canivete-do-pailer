@@ -769,6 +769,11 @@
   "musicas_url",
   "kani_agente_precisa",
   "kani_agente",
+  "kani_ditado_iniciar",
+  "kani_ditado_nivel",
+  "kani_ditado_parar",
+  "kani_abrir_link",
+  "kani_anexar",
   "kani_agente_avaliar",
   "kani_memoria_comando",
   "kani_agente_parar",
@@ -1296,10 +1301,36 @@
    ]
   },
   "kani_agente": {
-   "args": "job, pedido, historico=None",
+   "args": "job, pedido, historico=None, anexos=None",
    "modulos": [
     "kani_agente"
    ]
+  },
+  "kani_ditado_iniciar": {
+   "args": "",
+   "modulos": [
+    "kani_ditado"
+   ]
+  },
+  "kani_ditado_nivel": {
+   "args": "",
+   "modulos": [
+    "kani_ditado"
+   ]
+  },
+  "kani_ditado_parar": {
+   "args": "transcrever=True",
+   "modulos": [
+    "kani_ditado"
+   ]
+  },
+  "kani_abrir_link": {
+   "args": "url",
+   "modulos": []
+  },
+  "kani_anexar": {
+   "args": "",
+   "modulos": []
   },
   "kani_agente_avaliar": {
    "args": "job, nota",
@@ -2592,7 +2623,9 @@
   "Functions/kani.py": "Kani — assistente de conversa do KANIVETE (tipo ChatGPT, local e offline), para tarefas do dia a dia e,",
   "Functions/kani_agente.py": "kani_agente.py — a Kani trabalhando EM ETAPAS (agente): planeja, usa ferramentas uma de cada vez, olha o resultado,",
   "Functions/kani_criar.py": "kani_criar.py — a Kani CRIA coisas no chat: imagem (Z-Image, gerador_imagem), efeito sonoro (EzAudio, gerador_sfx),",
+  "Functions/kani_ditado.py": "kani_ditado.py — 🎤 no chat da Kani: clica, fala, clica de novo e o texto aparece no campo (para revisar e enviar)",
   "Functions/kani_memoria.py": "kani_memoria.py — o que a Kani aprende com a pessoa, sem retreinar o modelo (como as memórias e receitas do Claude):",
+  "Functions/kani_skills.py": "kani_skills.py — habilidades do dia a dia da Kani (ferramentas do modo em etapas, kani_agente.py):",
   "Functions/legendas.py": "legendas.py — transcrição da timeline do Pocket Editor (painel Texto: Transcrever / Criar legendas)",
   "Functions/legendas_formatos.py": "SRT e VTT: blocos separados por linha em branco, com uma linha \"início --> fim\"",
   "Functions/media_server.py": "media_server.py — Servidor HTTP local (127.0.0.1) para a interface reproduzir mídia",

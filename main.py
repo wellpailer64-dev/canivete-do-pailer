@@ -3577,9 +3577,40 @@ class ApiBridge:
         from Functions import kani_agente
         return kani_agente.precisa(texto)
 
-    def kani_agente(self, job, pedido, historico=None):
+    def kani_agente(self, job, pedido, historico=None, anexos=None):
         from Functions import kani_agente
-        return kani_agente.rodar(job, pedido, lambda d: _js("kaniAgente", d), historico)
+        return kani_agente.rodar(job, pedido, lambda d: _js("kaniAgente", d), historico, anexos)
+
+    # 🎤 ditado no chat da Kani (Functions/kani_ditado.py)
+    def kani_ditado_iniciar(self):
+        from Functions import kani_ditado
+        return kani_ditado.iniciar()
+
+    def kani_ditado_nivel(self):
+        from Functions import kani_ditado
+        return kani_ditado.nivel()
+
+    def kani_ditado_parar(self, transcrever=True):
+        from Functions import kani_ditado
+        return kani_ditado.parar(transcrever)
+
+    def kani_abrir_link(self, url):
+        """Link de fonte no chat da Kani: abre no navegador padrão (só http/https)."""
+        import re
+        import webbrowser
+        if not re.match(r"^https?://", str(url or "")):
+            return {"success": False}
+        webbrowser.open(url)
+        return {"success": True}
+
+    def kani_anexar(self):
+        """📎 do chat da Kani: escolher fotos/documentos para ela usar (tirar fundo, resumir, ler...)."""
+        if not _window:
+            return {"success": False}
+        r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), allow_multiple=True, file_types=(
+            "Imagens e documentos (*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.heic;*.pdf;*.docx;*.txt;*.md;*.csv;*.srt)", "Todos os arquivos (*.*)"))
+        paths = list(r or [])
+        return {"success": bool(paths), "paths": paths}
 
     def kani_agente_avaliar(self, job, nota):
         """👍/👎 num trabalho em etapas: o 👍 vira exemplo para pedidos parecidos (Functions/kani_memoria.py)."""

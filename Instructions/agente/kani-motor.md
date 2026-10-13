@@ -174,3 +174,15 @@ Antes de trocar: corrigir a caixinha no prompt/gaveta e medir no llama.cpp (o mo
 - Vinheta: voz −16 LUFS e música −26 (~10 dB abaixo, abaixa mais na fala), final −14; voz + 2,3 s. Sem música que sirva
   na biblioteca (climas vizinhos valem), `musicas.garantir` baixa uma nova do Openverse (pula as que já tem).
 - Medido: "roteiro e vinheta de 10 s para Receitas da Vó, música alegre" → 5 passos, 78 s, música baixada sozinha.
+
+## Habilidades do dia a dia, ditado e visual (2026-10-13)
+- `Functions/kani_skills.py` (ferramentas do agente): `documento` (TXT/MD/DOCX e PDF caprichado pelo PyMuPDF Story: faixa
+  laranja no título, seções, listas, tabelas, rodapé com página), `ler` (PDF/DOCX/TXT anexado), `remover_fundo`
+  (recorte_pro: pessoa → matting, objeto → BEN2, apara o vazio), `pesquisar` (DuckDuckGo HTML sem chave → lê 4 páginas →
+  resumo de cada uma em chamada curta → resumo final estruturado; as fontes de verdade com link no fim).
+- Textos longos (pesquisa, leitura, escrita) viram itens A? — `salvar_documento(conteudo='A2')` sem copiar o texto.
+- 📎 anexos no chat (sempre vão para o modo em etapas); 🎤 ditado (`kani_ditado.py`: sk_gravar + reconhecimento das
+  legendas, ~6 s); links das fontes abrem no navegador (`kani_abrir_link`). Anti-erro: JSON quebrado → tenta de novo
+  (`_chamar_seguro`). Conversa: tom e o que ela sabe fazer no prompt de `_sistema`.
+- Visual: gaveta 680 px, botão Ampliar (até 1100 px, lembrado), coluna central, campo em cartão com 📎 🧠 🎤 dentro.
+- Medido: pesquisa (4 fontes) ~1,5 min; PDF de checklist 53 s; tirar fundo de foto anexada 50 s.

@@ -130,3 +130,65 @@ body.kani-aberta .update-banner { right: calc(min(560px, 100vw) + 16px) !importa
 .kani-ag-aval small { opacity: .7; font-size: 11.5px; }
 .kani-ag-aval button { width: 32px; height: 28px; border-radius: 8px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.04); cursor: pointer; font-size: 14px; }
 .kani-ag-aval button:hover { border-color: #ff8c42; }
+.kani-anexos { position: absolute; left: 14px; right: 14px; bottom: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0; }
+.kani-anexos[hidden] { display: none; }
+.kani-anexo { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 4px 0 10px; border-radius: 999px; background: rgba(255,140,66,.14);
+    border: 1px solid rgba(255,140,66,.4); font-size: 11.5px; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kani-anexo button { width: 20px; height: 20px; border: 0; border-radius: 50%; background: rgba(0,0,0,.25); color: inherit; cursor: pointer; }
+.kani-pe { position: relative; }
+.kani-ag-resp { font-size: 13px; line-height: 1.55; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.04); }
+.kani-ag-resp h4 { margin: 10px 0 4px; color: #ff8c42; }
+.kani-cria-img.xadrez { background: repeating-conic-gradient(#3a3a3a 0 25%, #2a2a2a 0 50%) 50% / 18px 18px; }
+.kani-link { color: #ff8c42; text-decoration: underline dotted; cursor: pointer; }
+.kani-mic { flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: transparent; color: inherit;
+    font: 600 11px var(--font-ui); cursor: pointer; display: grid; place-items: center; }
+.kani-mic:hover { border-color: #ff8c42; }
+.kani-mic.gravando { border-color: #ef4444; color: #fff; background: rgba(239,68,68,calc(.25 + var(--nv, 0) * .55));
+    box-shadow: 0 0 0 calc(var(--nv, 0) * 6px) rgba(239,68,68,.25); transition: box-shadow .2s, background .2s; }
+.kani-mic.transcrevendo { border-color: #ff8c42; }
+
+/* =========================================================
+   Visual 2026-10-13: gaveta maior (modo largo), coluna central, campo em cartão com as ferramentas dentro
+   ========================================================= */
+.kani { width: min(680px, 100vw); background: radial-gradient(120% 60% at 100% 0%, rgba(255,140,66,.07), transparent 55%), #121010;
+    transition: width .25s cubic-bezier(.2,.8,.2,1); }
+.kani.largo { width: min(1100px, 94vw); }
+body.kani-aberta .update-banner { right: calc(min(680px, 100vw) + 16px) !important; }
+.kani-cab { padding: 14px 16px; background: rgba(26, 21, 18, .75); backdrop-filter: blur(10px); }
+.kani-cab .kani-av { width: 38px; height: 38px; border-radius: 11px; box-shadow: 0 0 0 2px rgba(255,140,66,.45), 0 6px 18px rgba(255,140,66,.18); }
+.kani-tit b { font-size: 16px; letter-spacing: -.01em; }
+.kani-tit small { display: flex; align-items: center; gap: 6px; }
+.kani-on { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 3px rgba(74,222,128,.15); }
+.kani-bt { width: 34px; height: 34px; border-radius: 9px; }
+.kani.largo #kani-largo { color: #ff8c42; }
+/* conversa numa coluna confortável */
+.kani-corpo { padding: 22px 20px 12px; gap: 16px; }
+.kani-corpo > * { width: 100%; max-width: 780px; margin-left: auto; margin-right: auto; }
+.kani-msg { font-size: 14px; line-height: 1.65; }
+.kani-msg.eu { max-width: 80%; margin-right: 0; width: auto; background: linear-gradient(135deg, #3a2618, #2a1d14); border: 1px solid #4a3020;
+    padding: 10px 14px; border-radius: 18px 18px 6px 18px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.kani-msg.ela { max-width: 100%; }
+.kani-boas h3 { font-size: 22px; letter-spacing: -.01em; }
+.kani-boas .kani-av-g { width: 84px; height: 84px; border-radius: 22px; box-shadow: 0 0 0 3px rgba(255,140,66,.35), 0 18px 40px rgba(255,140,66,.18); }
+.kani-sug { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-top: 16px; max-width: 640px; }
+.kani-sug button { padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,.03); border-color: #2c2420; line-height: 1.4; transition: transform .12s, border-color .12s; }
+.kani-sug button:hover { transform: translateY(-1px); }
+/* campo em cartão */
+.kani-pe { display: block; padding: 10px 16px 16px; background: transparent; border-top: 0; }
+.kani-comp { position: relative; max-width: 780px; margin: 0 auto; border: 1px solid #3a2f28; border-radius: 18px; background: #1a1513;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35); transition: border-color .15s, box-shadow .15s; }
+.kani-comp:focus-within { border-color: #ff8c42; box-shadow: 0 10px 30px rgba(0,0,0,.35), 0 0 0 3px rgba(255,140,66,.12); }
+.kani-pe textarea { width: 100%; display: block; min-height: 52px; max-height: 220px; padding: 14px 16px 6px; border: 0; border-radius: 18px 18px 0 0;
+    background: transparent; font-size: 14px; }
+.kani-pe textarea:focus { border: 0; }
+.kani-comp-bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px 8px 10px; }
+.kani-comp-bar .kani-etapas, .kani-comp-bar .kani-mic { width: 34px; height: 34px; border-radius: 10px; border-color: transparent; background: rgba(255,255,255,.04); }
+.kani-comp-bar .kani-etapas:hover, .kani-comp-bar .kani-mic:hover { border-color: #3a2f28; }
+.kani-dica { flex: 1; text-align: right; padding-right: 6px; font-size: 10.5px; color: var(--text-3); opacity: .7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kani-enviar { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg, #ff9a52, #d4814a); box-shadow: 0 4px 14px rgba(255,140,66,.3); }
+.kani-anexos { position: static; padding: 10px 12px 0; }
+/* cartões das criações e do modo em etapas com mais ar */
+.kani-cria, .kani-ag { padding: 14px; border-radius: 14px; border: 1px solid #2a221d; background: rgba(255,255,255,.025); }
+.kani-cria-img { border-radius: 12px; }
+@media (max-width: 720px) { .kani-dica { display: none; } }
+body.kani-aberta:has(.kani.largo) .update-banner { right: calc(min(1100px, 94vw) + 16px) !important; }

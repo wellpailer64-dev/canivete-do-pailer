@@ -43,7 +43,8 @@ function kaniMd(txt) {
     const abrir = [];
     // o Qwen3.5 às vezes esquece o "abrir:" e escreve [[remover-fundo]]: vale também, se for uma ferramenta do app
     txt = String(txt || '').replace(/\[\[(abrir:)?([a-z0-9-]+)\]\]/gi, (m, a, id) => { if (!kaniNomeFerramenta(id)) return a ? '' : m; if (!abrir.includes(id)) abrir.push(id); return ''; });
-    const inl = s => kaniEsc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>');
+    const inl = s => kaniEsc(s).replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a class="kani-link" data-link="$2" title="$2">$1</a>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>');
     const blocos = [];
     txt = txt.replace(/```([a-zA-Z0-9_+-]*)[ \t]*\n?([\s\S]*?)(```|$)/g, (_, ling, corpo) => {   // aberto ainda (gerando) também vira caixa
         const lg = (ling || '').toLowerCase();
@@ -116,18 +117,30 @@ function kaniMontar() {
     const g = document.createElement('aside');
     g.className = 'kani notranslate'; g.id = 'kani'; g.setAttribute('translate', 'no'); g.hidden = true;
     g.innerHTML = `
-        <header class="kani-cab"><span class="kani-av">K</span><div class="kani-tit"><b>Kani</b><small>assistente do KANIVETE · roda no seu computador</small></div>
+        <header class="kani-cab"><span class="kani-av">K</span><div class="kani-tit"><b>Kani</b><small><i class="kani-on"></i>assistente do KANIVETE · roda no seu computador</small></div>
+            <button class="kani-bt" id="kani-largo" title="Ampliar / reduzir a janela"><svg class="i"><use href="#i-fit"/></svg></button>
             <button class="kani-bt" id="kani-hist-bt" title="Conversas"><svg class="i"><use href="#i-table"/></svg></button>
             <button class="kani-bt" title="Nova conversa" onclick="kaniNova()"><svg class="i"><use href="#i-file"/></svg></button>
             <button class="kani-bt" title="Fechar (Esc)" onclick="kaniFechar()"><svg class="i"><use href="#i-x"/></svg></button></header>
         <div class="kani-hist" id="kani-hist" hidden></div>
         <div class="kani-corpo" id="kani-corpo"></div>
-        <footer class="kani-pe" id="kani-pe">
-            <button class="kani-etapas" id="kani-etapas" title="Pensar em etapas: a Kani planeja e usa as ferramentas uma de cada vez (pedidos compostos já vão assim)">🧠</button>
-            <textarea id="kani-txt" rows="1" placeholder="Pergunte à Kani… (Enter envia, Shift+Enter quebra linha)"></textarea>
-            <button class="kani-enviar" id="kani-enviar" title="Enviar"><svg class="i"><use href="#i-arrow-up"/></svg></button>
+        <footer class="kani-pe" id="kani-pe"><div class="kani-comp">
+            <div class="kani-anexos" id="kani-anexos" hidden></div>
+            <textarea id="kani-txt" rows="1" placeholder="Pergunte ou peça algo à Kani…"></textarea>
+            <div class="kani-comp-bar">
+                <button class="kani-etapas" id="kani-anexar" title="Anexar foto ou documento (para tirar o fundo, resumir, ler...)">📎</button>
+                <button class="kani-etapas" id="kani-etapas" title="Pensar em etapas: a Kani planeja e usa as ferramentas uma de cada vez (pedidos compostos já vão assim)">🧠</button>
+                <button class="kani-mic" id="kani-mic" title="Falar em vez de escrever (clique, fale, clique de novo)">🎤</button>
+                <small class="kani-dica">Enter envia · Shift+Enter quebra linha</small>
+                <button class="kani-enviar" id="kani-enviar" title="Enviar"><svg class="i"><use href="#i-arrow-up"/></svg></button>
+            </div></div>
         </footer>`;
     document.body.appendChild(g);
+    try { if (localStorage.getItem('kani-largo') === '1') g.classList.add('largo'); } catch (e) { /* sem storage */ }
+    g.querySelector('#kani-largo').onclick = () => {
+        g.classList.toggle('largo');
+        try { localStorage.setItem('kani-largo', g.classList.contains('largo') ? '1' : '0'); } catch (e) { /* sem storage */ }
+    };
     const txt = g.querySelector('#kani-txt');
     txt.addEventListener('input', () => { txt.style.height = 'auto'; txt.style.height = Math.min(160, txt.scrollHeight) + 'px'; });
     txt.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); kaniEnviar(); } });
@@ -148,6 +161,10 @@ function kaniMontar() {
             return;
         }
         if (e.target.closest('[data-ag-parar]')) { if (KANI.agenteJob) kaniApi().kani_agente_parar(KANI.agenteJob); return; }
+        const lk = e.target.closest('[data-link]');
+        if (lk) { e.preventDefault(); kaniApi().kani_abrir_link(lk.dataset.link); return; }
+        const cpr = e.target.closest('[data-copiar-resp]');
+        if (cpr) { const m = KANI.conversa.msgs.find(x => x.agente && x.agente.job === cpr.dataset.copiarResp); if (m) kaniCopiar(m.agente.resposta.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '$1 ($2)'), cpr); return; }
         const av = e.target.closest('[data-ag-aval]');
         if (av) {
             const m = KANI.conversa.msgs.find(x => x.agente && x.agente.job === av.dataset.job); if (!m) return;
@@ -158,6 +175,13 @@ function kaniMontar() {
             return;
         }
         if (e.target.closest('#kani-etapas')) { KANI.etapas = !KANI.etapas; const b = document.getElementById('kani-etapas'); b.classList.toggle('on', KANI.etapas); return; }
+        if (e.target.closest('#kani-mic')) { kaniDitado(); return; }
+        if (e.target.closest('#kani-anexar')) {
+            kaniApi().kani_anexar().then(r => { if (r && r.success) { KANI.anexos = [...new Set([...(KANI.anexos || []), ...r.paths])]; kaniAnexosRender(); document.getElementById('kani-txt').focus(); } });
+            return;
+        }
+        const ax = e.target.closest('[data-tira-anexo]');
+        if (ax) { KANI.anexos.splice(+ax.dataset.tiraAnexo, 1); kaniAnexosRender(); return; }
         const cr = e.target.closest('[data-cria-baixar],[data-cria-abrir],[data-cria-pasta]');
         if (cr) {
             const k = KANI.conversa.msgs[+(cr.dataset.criaBaixar ?? cr.dataset.criaAbrir ?? cr.dataset.criaPasta)].criacao, api = kaniApi();
@@ -233,6 +257,7 @@ async function kaniAbrir() {
 }
 function kaniFechar() {
     if (KANI.aberto) kaniApi()?.kani_voz?.(false);
+    if (KANI.ditado === 'gravando') { clearInterval(KANI.ditadoT); KANI.ditado = null; kaniApi()?.kani_ditado_parar?.(false); }
     if (KANI.audio) KANI.audio.pause();
     KANI.voz = null;
     KANI.aberto = false; const g = document.getElementById('kani'); if (g) g.hidden = true; document.body.classList.remove('kani-aberta');
@@ -259,6 +284,8 @@ async function kaniEnviar(texto) {
     const t = document.getElementById('kani-txt');
     texto = (texto ?? t.value).trim();
     if (!texto || KANI.gerando) return null;
+    // com anexo: sempre em etapas (é ela que decide o que fazer com o arquivo)
+    if (KANI.anexos && KANI.anexos.length) { kaniAgenteIniciar(texto); return null; }
     // memória: "lembra que...", "esquece...", "o que você sabe sobre mim?" (kani_memoria.py) — resposta na hora, sem IA
     const memo = await kaniApi().kani_memoria_comando?.(texto).catch(() => null);
     if (memo) {
@@ -299,7 +326,7 @@ function kaniParar() { if (KANI.gerando) kaniApi().kani_parar(KANI.gerando.id); 
 
 // ── criações (Functions/kani_criar.py): imagem, efeito sonoro, narração, vinheta — progresso e entrega no chat ──
 const KANI_CRIA_NOME = { imagem: 'a imagem', efeito: 'o efeito sonoro', narracao: 'a narração', vinheta: 'a vinheta' };
-const KANI_CRIA_ICO = { imagem: 'image', efeito: 'volume', narracao: 'volume', vinheta: 'music' };
+const KANI_CRIA_ICO = { imagem: 'image', efeito: 'volume', narracao: 'volume', vinheta: 'music', documento: 'file' };
 async function kaniCriar(texto, tipo, pedido) {
     const c = KANI.conversa, job = 'c' + Date.now().toString(36);
     pedido = pedido || texto;
@@ -331,28 +358,62 @@ function kaniCriaHtml(m, i) {
 }
 // ── Kani em etapas (agente): plano, cada etapa com estado e pensamento, progresso e a entrega com os arquivos ──
 const KANI_ACOES = { escrever: 'Escrever o texto', gerar_imagem: 'Gerar imagem', gerar_efeito: 'Gerar efeito sonoro', narrar: 'Gravar a narração',
-    conversa: 'Gravar a conversa', buscar_musica: 'Escolher a música', montar_vinheta: 'Montar a vinheta', entregar: 'Entregar' };
+    conversa: 'Gravar a conversa', buscar_musica: 'Escolher a música', montar_vinheta: 'Montar a vinheta', entregar: 'Entregar',
+    pesquisar_web: 'Pesquisar na internet', ler_documento: 'Ler o documento', salvar_documento: 'Salvar o documento', remover_fundo: 'Tirar o fundo' };
 async function kaniAgenteIniciar(texto) {
     const c = KANI.conversa, job = 'g' + Date.now().toString(36);
     if (!c.titulo) c.titulo = texto.slice(0, 60);
     const hist = c.msgs.filter(m => !m.criacao && !m.agente && m.content).slice(-4).map(m => ({ role: m.role, content: m.content }));
-    c.msgs.push({ role: 'user', content: texto });
+    const anexos = KANI.anexos || [];
+    KANI.anexos = []; kaniAnexosRender();
+    c.msgs.push({ role: 'user', content: texto + (anexos.length ? `\n📎 ${anexos.map(p => p.split(/[\\/]/).pop()).join(', ')}` : '') });
     c.msgs.push({ role: 'assistant', content: '', agente: { job, estado: 'trabalhando', plano: [], passos: [], arquivos: [] } });
     const t = document.getElementById('kani-txt'); t.value = ''; t.style.height = 'auto';
     KANI.agenteJob = job;
     kaniRender();
-    const r = await kaniApi().kani_agente(job, texto, hist).catch(e => ({ success: false, error: e.message }));
+    const r = await kaniApi().kani_agente(job, texto, hist, anexos).catch(e => ({ success: false, error: e.message }));
     if (!r || !r.success) window.kaniAgente({ job, erro: (r && r.error) || 'falhou' });
 }
-// prévia de um arquivo entregue (imagem ou som) com Baixar / Abrir / Pasta; o caminho vai no próprio botão
+// ── 🎤 ditado: clica, fala, clica de novo → o texto entra no campo (reconhecimento local) ──
+async function kaniDitado() {
+    const b = document.getElementById('kani-mic'), api = kaniApi(), txt = document.getElementById('kani-txt');
+    if (KANI.ditado === 'transcrevendo') return;
+    if (KANI.ditado === 'gravando') {
+        KANI.ditado = 'transcrevendo'; clearInterval(KANI.ditadoT);
+        b.className = 'kani-mic transcrevendo'; b.innerHTML = '<span class="kani-gira"></span>'; b.title = 'Transcrevendo...';
+        const r = await api.kani_ditado_parar(true).catch(e => ({ success: false, error: e.message }));
+        KANI.ditado = null; b.className = 'kani-mic'; b.textContent = '🎤'; b.title = 'Falar em vez de escrever (clique, fale, clique de novo)';
+        if (r && r.success && r.texto) {
+            txt.value = (txt.value.trim() ? txt.value.trim() + ' ' : '') + r.texto;
+            txt.dispatchEvent(new Event('input')); txt.focus(); txt.setSelectionRange(txt.value.length, txt.value.length);
+        } else if (typeof toast === 'function') toast((r && r.error) || 'Não entendi');
+        return;
+    }
+    const r = await api.kani_ditado_iniciar().catch(e => ({ success: false, error: e.message }));
+    if (!r || !r.success) { if (typeof toast === 'function') toast((r && r.error) || 'Microfone indisponível'); return; }
+    KANI.ditado = 'gravando';
+    b.className = 'kani-mic gravando'; b.title = 'Gravando — clique para parar';
+    KANI.ditadoT = setInterval(async () => {
+        const n = await api.kani_ditado_nivel().catch(() => null); if (!n || KANI.ditado !== 'gravando') return;
+        b.style.setProperty('--nv', Math.max(0, Math.min(1, (n.pico + 50) / 50)).toFixed(2));
+        b.textContent = `${Math.floor(n.seg)}s`;
+    }, 250);
+}
+function kaniAnexosRender() {
+    const el = document.getElementById('kani-anexos'); if (!el) return;
+    const l = KANI.anexos || [];
+    el.hidden = !l.length;
+    el.innerHTML = l.map((p, i) => `<span class="kani-anexo">📎 ${kaniEsc(p.split(/[\\/]/).pop())}<button data-tira-anexo="${i}" title="Tirar">×</button></span>`).join('');
+}
+// prévia de um arquivo entregue (imagem, som ou documento) com Baixar / Abrir / Pasta; o caminho vai no próprio botão
 function kaniArqHtml(a) {
     if (a.path && !a._url) { a._url = 'pendente'; kaniApi().kani_criar_url(a.path).then(r => { a._url = (r && r.url) || 'sumiu'; kaniRender(); }); }
     const url = a._url && !['pendente', 'sumiu'].includes(a._url) ? a._url : a.url;
     const p = kaniEsc(encodeURIComponent(a.path || ''));
     if (a._url === 'sumiu') return `<div class="kani-erro">${kaniEsc(a.nome || '')}: apagado ao fechar o app.</div>`;
     return `<div class="kani-cria pronta"><div class="kani-cria-cab"><svg class="i"><use href="#i-${KANI_CRIA_ICO[a.tipo] || 'file'}"/></svg> ${kaniEsc(a.nome || '')}</div>
-        ${!url ? '' : a.tipo === 'imagem' ? `<img class="kani-cria-img" src="${kaniEsc(url)}" alt="" data-arq-abrir="${p}">` : `<audio class="kani-cria-som" controls src="${kaniEsc(url)}"></audio>`}
-        ${a.texto && a.tipo !== 'imagem' ? `<details class="kani-cria-txt"><summary>Texto</summary>${kaniEsc(a.texto)}</details>` : ''}
+        ${!url || a.tipo === 'documento' ? '' : a.tipo === 'imagem' ? `<img class="kani-cria-img${/sem_fundo/.test(a.nome || '') ? ' xadrez' : ''}" src="${kaniEsc(url)}" alt="" data-arq-abrir="${p}">` : `<audio class="kani-cria-som" controls src="${kaniEsc(url)}"></audio>`}
+        ${a.texto && !['imagem', 'documento'].includes(a.tipo) ? `<details class="kani-cria-txt"><summary>Texto</summary>${kaniEsc(a.texto)}</details>` : ''}
         ${a.musica && a.musica.titulo ? `<details class="kani-cria-txt"><summary>Música: ${kaniEsc(a.musica.titulo)}</summary>${kaniEsc(a.musica.credito || '')}</details>` : ''}
         <div class="kani-cria-bts"><button data-arq-baixar="${p}"><svg class="i"><use href="#i-download"/></svg> Baixar</button>
             <button data-arq-abrir="${p}"><svg class="i"><use href="#i-play"/></svg> Abrir</button>
@@ -373,6 +434,7 @@ function kaniAgenteHtml(m) {
             ${p.estado === 'executando' && g.progresso ? `<div class="kani-prog"><i style="width:${Math.max(3, g.progresso.pct || 0)}%"></i></div><small class="kani-cria-msg">${kaniEsc(g.progresso.msg || '')}</small>` : ''}
             </div></div>`).join('')}</div>
         ${g.mensagem ? `<p class="kani-ag-msg">${kaniEsc(g.mensagem)}</p>` : ''}
+        ${g.resposta ? `<div class="kani-ag-resp">${kaniMd(g.resposta)}</div><div class="kani-acoes"><button data-copiar-resp="${g.job}" title="Copiar"><svg class="i"><use href="#i-copy"/></svg></button></div>` : ''}
         ${(g.arquivos || []).map(kaniArqHtml).join('')}
         ${g.estado === 'ok' ? `<div class="kani-ag-aval">${g.avaliado ? `<small>${g.avaliado > 0 ? 'Obrigada! Vou usar esse jeito como exemplo nos próximos pedidos parecidos.'
             : 'Anotado. Diga "lembra que..." com o que mudar e eu guardo.'}</small>`
@@ -397,6 +459,7 @@ window.kaniAgente = function (d) {
     }
     if (d.fim || d.erro) {
         g.estado = d.erro ? 'erro' : 'ok'; g.mensagem = d.erro ? 'Não consegui terminar: ' + d.erro : d.mensagem; g.arquivos = d.arquivos || [];
+        g.resposta = d.resposta || '';
         m.content = d.erro ? 'Não consegui terminar o pedido.' : (d.mensagem || 'Pronto.');
         KANI.agenteJob = null;
         const at = KANI.conversa; KANI.conversa = conv; kaniGuardar(); KANI.conversa = at;
