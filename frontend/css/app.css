@@ -1687,3 +1687,50 @@ html.barra-propria .app-container { height: calc(100vh - 26px); }
 .hd-txt b { font-size: 14px; font-weight: 650; }
 .hd-txt small { font-size: 11.5px; color: rgba(255,255,255,.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 900px) { .home-destaque { grid-template-columns: 1fr; } }
+
+/* =========================================================
+   Início — layout 2026-10-12 (o vídeo de fundo fica como está)
+   Coluna mais larga, sem repetir na grade os 4 apps do topo, cards compactos com o nome sobre a foto, área de soltar
+   numa linha e a faixa "Peça à Kani" (injetada pelo kani.js).
+   ========================================================= */
+#page-home.tool-page, #page-home.active { width: min(100%, 1240px); max-width: 1240px; }
+.home-grid .home-card[onclick*="'video-cutter'"], .home-grid .home-card[onclick*="'editor-imagem'"],
+.home-grid .home-card[onclick*="'vetor-kanivete'"], .home-grid .home-card[onclick*="'sound-kanivete'"] { display: none; }
+.home-cat:not(:has(.home-card:not([onclick*="'video-cutter'"]):not([onclick*="'editor-imagem'"]):not([onclick*="'vetor-kanivete'"]):not([onclick*="'sound-kanivete'"]))) { display: none; }
+.home-tools { gap: 20px; }
+.home-grid { grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); gap: 14px; }
+/* card: foto, véu e texto empilhados na mesma célula */
+.home-card { display: grid; grid-template: 1fr / 1fr; border-radius: 10px; }
+.home-card > * { grid-area: 1 / 1; }
+.home-card .hc-media { aspect-ratio: 16 / 10; margin: 0; border-radius: 10px; }
+.home-card .hc-media::after { background: linear-gradient(180deg, rgba(0, 0, 0, .05) 25%, rgba(0, 0, 0, .86)); }
+.home-card .hc-media > .hc-ico { left: auto; right: 10px; top: 10px; bottom: auto; width: 26px; height: 26px; }
+.home-card b, .home-card small { position: relative; z-index: 2; align-self: end; padding: 0 12px; pointer-events: none; text-shadow: 0 1px 8px rgba(0, 0, 0, .6); }
+.home-card b { margin-bottom: 29px; font-size: 13.5px; color: #fff; }
+.home-card small { margin: 0 0 11px; font-size: 11.5px; color: rgba(255, 255, 255, .72); -webkit-line-clamp: 1; }
+.home-card:hover .hc-media { transform: translateY(-2px); }
+/* área de soltar numa linha (ícone · texto · botões); sugestões embaixo, na largura toda */
+.dropzone.home-drop { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 2px 16px; padding: 16px 20px; text-align: left; }
+.home-drop .dz-icon { grid-row: 1 / span 2; margin: 0; }
+.home-drop .dz-title { grid-column: 2; margin: 0; }
+.home-drop .dz-sub { grid-column: 2; margin: 0; }
+.home-drop .dz-actions { grid-column: 3; grid-row: 1 / span 2; margin: 0; }
+.home-drop .home-suggest { grid-column: 1 / -1; }
+@media (max-width: 760px) { .dropzone.home-drop { grid-template-columns: auto 1fr; } .home-drop .dz-actions { grid-column: 1 / -1; grid-row: auto; } }
+/* faixa "Peça à Kani" */
+.home-kani { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: var(--r-lg); border: 1px solid rgba(255, 140, 66, .28);
+    background: radial-gradient(90% 140% at 0% 0%, rgba(255, 140, 66, .12), transparent 60%), var(--bg-2); }
+.home-kani-lin { display: flex; align-items: center; gap: 12px; }
+.home-kani-av { width: 38px; height: 38px; flex-shrink: 0; border-radius: 10px; background: url(../identidade/kani.webp) center / cover, #2a1d14; }
+.home-kani-txt { flex-shrink: 0; display: flex; flex-direction: column; }
+.home-kani-txt b { font-size: 13.5px; } .home-kani-txt small { font-size: 11.5px; color: var(--text-3); }
+.home-kani input { flex: 1; min-width: 0; height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--bg-1); color: var(--text); font: 13px var(--font-ui); }
+.home-kani input:focus { outline: none; border-color: var(--primary); }
+.home-kani-chips { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 50px; }
+.home-kani-chips button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-2);
+    background: var(--bg-3); color: var(--text-2); font: 600 12px var(--font-ui); cursor: pointer; }
+.home-kani-chips button:hover { border-color: var(--primary); color: var(--text); }
+.home-kani-chips .i { color: var(--primary); }
+@media (max-width: 760px) { .home-kani-txt { display: none; } .home-kani-chips { padding-left: 0; } }
+/* a bolinha da Kani sobe quando o aviso de versão nova está na tela */
+body:has(.update-banner:not([hidden])) .kani-bolinha { bottom: 86px; }

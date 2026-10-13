@@ -191,6 +191,10 @@ Chat local tipo ChatGPT (Qwen3.5 4B Q5_K_M; bancada de modelos e escolha em `Ins
 `kani.NOME`. Avatar `frontend/identidade/kani.webp` (original `D:/kanivete_biblioteca/marcas/kani/kani_oficial.png`, inteira com cantos arredondados como o logo). Ouvir: voz Fran
 (OmniVoice 12 passos + `kani.PRONUNCIA` para nomes do app e siglas) mantida carregada enquanto o chat está aberto (`omnivoice_tool.manter_carregado`/`descarregar`,
 runner `serve`), ~3 s por leitura. Teste: `py -3.13 testes/teste_kani.py` (porta 9334).
+**Kani cria no chat** (2026-10-12): imagem (Z-Image), efeito sonoro (EzAudio), narração (Fran) e vinheta (narração + jingle
+do Soundboard + impacto, mixada no ffmpeg) — `Functions/kani_criar.py` (detectar por verbo + tipo; a Kani escreve o
+prompt/texto e sai da placa), cartão com progresso, prévia, Baixar/Abrir/Mostrar na pasta (`kaniCriacao` em kani.js);
+arquivos em `modelos_ia/kani/criacoes`. Faixa "Peça à Kani" na Home (`kaniHome`).
 
 ## Remover fundo (recorte)
 GPU automática (onnxruntime-directml), pessoa → BiRefNet matting / objeto → BEN2 (YuNet decide), uma sessão por vez na

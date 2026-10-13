@@ -3542,6 +3542,36 @@ class ApiBridge:
         from Functions import kani
         return kani.voz_ligar(bool(ligar))
 
+    def kani_criar_tipo(self, texto):
+        """Pedido de criar algo (imagem, efeito sonoro, narração, vinheta)? O tipo, ou None para a conversa normal."""
+        from Functions import kani_criar
+        return kani_criar.detectar(texto)
+
+    def kani_criar(self, job, tipo, pedido):
+        """A Kani cria e entrega no chat (Functions/kani_criar.py): progresso e fim em kaniCriacao(...)."""
+        from Functions import kani_criar
+        return kani_criar.criar(job, tipo, pedido, lambda d: _js("kaniCriacao", d))
+
+    def kani_criar_url(self, path):
+        from Functions import kani_criar
+        return kani_criar.url(path)
+
+    def kani_salvar_como(self, path):
+        """Baixar a criação: "Salvar como" e copia o arquivo para onde a pessoa escolher."""
+        import shutil
+        if not (_window and path and os.path.isfile(path)):
+            return {"success": False}
+        ext = os.path.splitext(path)[1]
+        r = _window.create_file_dialog(_file_dialog_kind("SAVE", webview.SAVE_DIALOG), save_filename=os.path.basename(path),
+                                       file_types=(f"Arquivo (*{ext})",))
+        if not r:
+            return {"success": False, "cancelled": True}
+        dest = r[0] if isinstance(r, (list, tuple)) else r
+        if not dest.lower().endswith(ext.lower()):
+            dest += ext
+        shutil.copy(path, dest)
+        return {"success": True, "path": dest}
+
     def kani_falar(self, texto, chave=""):
         """Lê a resposta com a voz da Kani (Fran, OmniVoice 12 passos); o áudio volta em kaniVoz({chave, url})."""
         from Functions import kani

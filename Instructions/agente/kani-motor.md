@@ -141,3 +141,13 @@ Antes de trocar: corrigir a caixinha no prompt/gaveta e medir no llama.cpp (o mo
 - Bancada: efeito sonoro 12/12 e JSON 5/6. Mas inventou recurso: música pela Geração de Voz e envio direto para o TikTok.
   Também falou de "HTML/CSS/JS" e só pôs o `[[abrir]]` em 8 de 15.
 - Ficou o 4B em todo PC. No leve, o ganho veio de aquecer o motor e do lote 128: `Instructions/agente/nucleo-hardware.md`, Fase 3.
+
+## Criações no chat (2026-10-12)
+- `Functions/kani_criar.py`: `detectar(texto)` (verbo de criar + tipo; pergunta "como…" vai para a conversa), `criar(job,
+  tipo, pedido, on_evento)` em thread, um por vez (os motores dividem a placa). Imagem: a Kani escreve o prompt em inglês
+  (`_llm`, keep_alive 0 / llama.cpp parado) → `gerador_imagem.gerar` (proporção pelo pedido: story/vertical, horizontal,
+  feed). Efeito: `gerador_sfx.gerar_arquivo` (segundos do pedido). Narração: texto entre aspas ou depois de ":" (senão a
+  Kani escreve) → OmniVoice Fran 32 passos. Vinheta: texto curto (sem IA: "Bem-vindos ao canal X!") + jingle do
+  Soundboard (sidechain) + riser hit, −14 LUFS, voz + 3,3 s.
+- Testado 2026-10-12: narração 49 s, imagem 768×1344 50 s, vinheta 20 s (6,5 s de áudio). Nesta pasta de dev faltam o
+  modelo da Kani (gguf) e o `t5.pesos` do EzAudio — no app instalado estão; o erro chega no chat certinho.

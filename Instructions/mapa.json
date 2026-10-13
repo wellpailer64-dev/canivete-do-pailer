@@ -149,6 +149,11 @@
     "af_recomendar",
     "af_planejar",
     "af_escolher",
+    "afm_config",
+    "afm_config_salvar",
+    "afm_pasta_saida",
+    "af_drive",
+    "af_drive_cancelar",
     "afm_listar",
     "afm_salvar",
     "afm_apagar",
@@ -756,6 +761,10 @@
   "kani_enviar",
   "kani_parar",
   "kani_voz",
+  "kani_criar_tipo",
+  "kani_criar",
+  "kani_criar_url",
+  "kani_salvar_como",
   "kani_falar",
   "reveal_file",
   "open_file",
@@ -1232,6 +1241,28 @@
    "modulos": [
     "kani"
    ]
+  },
+  "kani_criar_tipo": {
+   "args": "texto",
+   "modulos": [
+    "kani_criar"
+   ]
+  },
+  "kani_criar": {
+   "args": "job, tipo, pedido",
+   "modulos": [
+    "kani_criar"
+   ]
+  },
+  "kani_criar_url": {
+   "args": "path",
+   "modulos": [
+    "kani_criar"
+   ]
+  },
+  "kani_salvar_como": {
+   "args": "path",
+   "modulos": []
   },
   "kani_falar": {
    "args": "texto, chave=\"\"",
@@ -1831,6 +1862,32 @@
    "args": "tipo",
    "modulos": []
   },
+  "afm_config": {
+   "args": "",
+   "modulos": [
+    "autoframe_modelos"
+   ]
+  },
+  "afm_config_salvar": {
+   "args": "cfg",
+   "modulos": [
+    "autoframe_modelos"
+   ]
+  },
+  "afm_pasta_saida": {
+   "args": "base, cliente=None",
+   "modulos": [
+    "autoframe_modelos"
+   ]
+  },
+  "af_drive": {
+   "args": "url",
+   "modulos": []
+  },
+  "af_drive_cancelar": {
+   "args": "",
+   "modulos": []
+  },
   "afm_listar": {
    "args": "",
    "modulos": [
@@ -1858,6 +1915,7 @@
   "afm_escolher": {
    "args": "tipo",
    "modulos": [
+    "autoframe_modelos",
     "media_server"
    ]
   },
@@ -2455,6 +2513,7 @@
   "Functions/hardware.py": "Núcleo de hardware do KANIVETE: identifica o PC uma vez e diz a cada parte do app quanto ela pode usar",
   "Functions/instancia_unica.py": "instancia_unica.py — Uma cópia só do app aberta",
   "Functions/kani.py": "Kani — assistente de conversa do KANIVETE (tipo ChatGPT, local e offline), para tarefas do dia a dia e,",
+  "Functions/kani_criar.py": "kani_criar.py — a Kani CRIA coisas no chat: imagem (Z-Image, gerador_imagem), efeito sonoro (EzAudio, gerador_sfx),",
   "Functions/legendas.py": "legendas.py — transcrição da timeline do Pocket Editor (painel Texto: Transcrever / Criar legendas)",
   "Functions/legendas_formatos.py": "SRT e VTT: blocos separados por linha em branco, com uma linha \"início --> fim\"",
   "Functions/media_server.py": "media_server.py — Servidor HTTP local (127.0.0.1) para a interface reproduzir mídia",

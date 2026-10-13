@@ -6,8 +6,9 @@
 // API: window.KANI (abrir, perguntar, estado).
 // =========================================================
 const KANI = { aberto: false, conversa: null, gerando: null, estado: null, baixando: false };
-const KANI_SUGESTOES = ['Como corto um vídeo e exporto para reels (9:16)?', 'Como tiro o fundo de uma foto?', 'Como limpo o ruído de uma gravação?',
-    'Como coloco legenda automática no vídeo?', 'Me ajuda a escrever a legenda de um post'];
+const KANI_SUGESTOES = ['Como corto um vídeo e exporto para reels (9:16)?', 'Como tiro o fundo de uma foto?',
+    'Gera uma imagem de um café da manhã aconchegante, luz da janela', 'Cria um efeito sonoro de porta rangendo',
+    'Faz uma vinheta animada para o meu canal de receitas', 'Me ajuda a escrever a legenda de um post'];
 const kaniEsc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const kaniApi = () => window.pywebview && window.pywebview.api;
 
@@ -138,6 +139,15 @@ function kaniMontar() {
         if (e.target.closest('#kani-baixar')) kaniBaixar();
         const cm = e.target.closest('[data-copiar-msg]'); if (cm) { kaniCopiar(kaniLimpo(KANI.conversa.msgs[+cm.dataset.copiarMsg].content), cm); return; }
         const om = e.target.closest('[data-ouvir-msg]'); if (om) { kaniOuvir(+om.dataset.ouvirMsg); return; }
+        const cr = e.target.closest('[data-cria-baixar],[data-cria-abrir],[data-cria-pasta]');
+        if (cr) {
+            const k = KANI.conversa.msgs[+(cr.dataset.criaBaixar ?? cr.dataset.criaAbrir ?? cr.dataset.criaPasta)].criacao, api = kaniApi();
+            if (!k || !k.path) return;
+            if (cr.dataset.criaBaixar !== undefined) api.kani_salvar_como(k.path).then(r => { if (r && r.success && typeof toast === 'function') toast('Salvo em ' + r.path); });
+            else if (cr.dataset.criaAbrir !== undefined) api.open_file(k.path);
+            else api.reveal_file(k.path);
+            return;
+        }
         const cb = e.target.closest('[data-copiar-bloco]');
         if (cb) { const i = +cb.closest('.kani-msg').dataset.i, k = +cb.dataset.copiarBloco; kaniCopiar(kaniBlocosDe(KANI.conversa.msgs[i].content)[k] || '', cb); return; }
     });
@@ -167,6 +177,7 @@ function kaniRender() {
         return;
     }
     corpo.innerHTML = c.msgs.map((m, i) => m.role === 'user' ? `<div class="kani-msg eu">${kaniEsc(m.content)}</div>`
+        : m.criacao ? `<div class="kani-msg ela" data-i="${i}">${kaniCriaHtml(m, i)}${m.erro ? `<div class="kani-erro">${kaniEsc(m.erro)}</div>` : ''}</div>`
         : `<div class="kani-msg ela" data-i="${i}">${m.content ? kaniMd(m.content) : '<span class="kani-pensando"><i></i><i></i><i></i></span>'}${m.erro ? `<div class="kani-erro">${kaniEsc(m.erro)}</div>` : ''}${kaniAcoes(m, i)}</div>`).join('');
     corpo.scrollTop = corpo.scrollHeight;
     const env = document.getElementById('kani-enviar');
@@ -228,6 +239,9 @@ async function kaniEnviar(texto) {
     const t = document.getElementById('kani-txt');
     texto = (texto ?? t.value).trim();
     if (!texto || KANI.gerando) return null;
+    // pedido de criar (imagem, efeito sonoro, narração, vinheta): vai para o motor certo, não para a conversa
+    const tipo = await kaniApi().kani_criar_tipo?.(texto).catch(() => null);
+    if (tipo) { kaniCriar(texto, tipo); return null; }
     const c = KANI.conversa;
     if (!c.titulo) c.titulo = texto.slice(0, 60);
     c.msgs.push({ role: 'user', content: texto });
@@ -242,6 +256,60 @@ async function kaniEnviar(texto) {
     return id;
 }
 function kaniParar() { if (KANI.gerando) kaniApi().kani_parar(KANI.gerando.id); }
+
+// ── criações (Functions/kani_criar.py): imagem, efeito sonoro, narração, vinheta — progresso e entrega no chat ──
+const KANI_CRIA_NOME = { imagem: 'a imagem', efeito: 'o efeito sonoro', narracao: 'a narração', vinheta: 'a vinheta' };
+const KANI_CRIA_ICO = { imagem: 'image', efeito: 'volume', narracao: 'volume', vinheta: 'music' };
+async function kaniCriar(texto, tipo) {
+    const c = KANI.conversa, job = 'c' + Date.now().toString(36);
+    if (!c.titulo) c.titulo = texto.slice(0, 60);
+    c.msgs.push({ role: 'user', content: texto });
+    c.msgs.push({ role: 'assistant', content: '', criacao: { job, tipo, estado: 'gerando', pct: 0, msg: 'Começando...' } });
+    const t = document.getElementById('kani-txt'); t.value = ''; t.style.height = 'auto';
+    kaniRender();
+    const r = await kaniApi().kani_criar(job, tipo, texto).catch(e => ({ success: false, error: e.message }));
+    if (!r || !r.success) window.kaniCriacao({ job, erro: (r && r.error) || 'falhou' });
+}
+function kaniCriaHtml(m, i) {
+    const k = m.criacao, nome = KANI_CRIA_NOME[k.tipo] || 'isso';
+    if (k.estado === 'gerando') return `<div class="kani-cria"><div class="kani-cria-cab"><span class="kani-gira"></span> Criando ${nome}…</div>
+        <div class="kani-prog"><i style="width:${Math.max(3, k.pct || 0)}%"></i></div><small class="kani-cria-msg">${kaniEsc(k.msg || '')}</small></div>`;
+    if (k.estado !== 'pronto') return '';
+    if (k.path && !k._url) { k._url = 'pendente'; kaniApi().kani_criar_url(k.path).then(r => { k._url = (r && r.url) || 'sumiu'; kaniRender(); }); }
+    const url = k._url && !['pendente', 'sumiu'].includes(k._url) ? k._url : null;
+    const prev = k._url === 'sumiu' ? '<div class="kani-erro">O arquivo não está mais na pasta.</div>'
+        : !url ? '<span class="kani-pensando"><i></i><i></i><i></i></span>'
+        : k.tipo === 'imagem' ? `<img class="kani-cria-img" src="${kaniEsc(url)}" alt="" data-cria-abrir="${i}" title="Abrir a imagem">`
+        : `<audio class="kani-cria-som" controls src="${kaniEsc(url)}"></audio>`;
+    return `<div class="kani-cria pronta"><div class="kani-cria-cab"><svg class="i"><use href="#i-${KANI_CRIA_ICO[k.tipo] || 'file'}"/></svg> ${kaniEsc(k.nome || '')}</div>${prev}
+        ${k.texto ? `<details class="kani-cria-txt"><summary>${k.tipo === 'imagem' || k.tipo === 'efeito' ? 'Pedido usado' : 'Texto narrado'}</summary>${kaniEsc(k.texto)}</details>` : ''}
+        <div class="kani-cria-bts"><button data-cria-baixar="${i}"><svg class="i"><use href="#i-download"/></svg> Baixar</button>
+            <button data-cria-abrir="${i}"><svg class="i"><use href="#i-play"/></svg> Abrir</button>
+            <button data-cria-pasta="${i}"><svg class="i"><use href="#i-folder"/></svg> Mostrar na pasta</button></div></div>`;
+}
+window.kaniCriacao = function (d) {
+    let conv = null, i = -1;
+    for (const c of [KANI.conversa, ...kaniConversas()]) {
+        i = c ? c.msgs.findIndex(m => m.criacao && m.criacao.job === d.job) : -1;
+        if (i >= 0) { conv = c; break; }
+    }
+    if (!conv) return;
+    const m = conv.msgs[i], k = m.criacao;
+    if (d.erro) { k.estado = 'erro'; m.erro = 'Não consegui criar: ' + d.erro; m.content = 'Não consegui criar ' + (KANI_CRIA_NOME[k.tipo] || '') + '.'; }
+    else if (d.fim) {
+        Object.assign(k, { estado: 'pronto', path: d.path, _url: d.url, nome: d.nome, texto: d.texto });
+        m.content = `Pronto! Criei ${KANI_CRIA_NOME[k.tipo] || 'o arquivo'} (${d.nome}).`;
+    } else {
+        Object.assign(k, { pct: d.pct, msg: d.msg });
+        const el = KANI.conversa === conv && document.querySelector(`#kani-corpo .kani-msg[data-i="${i}"]`);
+        if (el) { el.innerHTML = kaniCriaHtml(m, i); return; }
+    }
+    if (d.erro || d.fim) {
+        const at = KANI.conversa; KANI.conversa = conv; kaniGuardar(); KANI.conversa = at;
+        if (d.fim && !KANI.aberto && typeof toast === 'function') toast(`Kani: ${KANI_CRIA_NOME[k.tipo] || 'a criação'} ficou pronta`);
+    }
+    if (KANI.conversa === conv) kaniRender();
+};
 window.kaniEvento = function (d) {
     const g = KANI.gerando; if (!g || g.id !== d.id) return;
     const m = g.conv.msgs[g.i];
@@ -267,5 +335,28 @@ function kaniBolinha() {
 }
 document.addEventListener('DOMContentLoaded', kaniBolinha);
 if (document.readyState !== 'loading') kaniBolinha();
+
+// ── faixa "Peça à Kani" na Home (logo abaixo da área de soltar): pergunta ou pedido de criação, com atalhos ──
+const KANI_HOME_CHIPS = [['image', 'Imagem', 'Gera uma imagem de '], ['volume', 'Efeito sonoro', 'Cria um efeito sonoro de '],
+    ['volume', 'Narração', 'Narre: "'], ['music', 'Vinheta', 'Faz uma vinheta para ']];
+function kaniHome() {
+    const drop = document.querySelector('#page-home .home-drop');
+    if (!drop || document.getElementById('home-kani')) return;
+    const s = document.createElement('section');
+    s.className = 'home-kani'; s.id = 'home-kani';
+    s.innerHTML = `<div class="home-kani-lin"><span class="home-kani-av"></span>
+        <span class="home-kani-txt"><b>Peça à Kani</b><small>pergunte ou peça para criar</small></span>
+        <input type="text" id="home-kani-txt" placeholder="Ex.: gera uma imagem de um café da manhã aconchegante, luz da janela">
+        <button class="btn-primary" id="home-kani-ir">Enviar</button></div>
+        <div class="home-kani-chips">${KANI_HOME_CHIPS.map(([i, n, t]) => `<button data-kh="${kaniEsc(t)}"><svg class="i"><use href="#i-${i}"/></svg>${n}</button>`).join('')}</div>`;
+    drop.after(s);
+    const inp = s.querySelector('#home-kani-txt');
+    const ir = () => { const t = inp.value.trim(); if (!t) { inp.focus(); return; } inp.value = ''; KANI_API.perguntar(t); };
+    s.querySelector('#home-kani-ir').onclick = ir;
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ir(); } });
+    s.querySelectorAll('[data-kh]').forEach(b => b.onclick = () => { inp.value = b.dataset.kh; inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); });
+}
+document.addEventListener('DOMContentLoaded', kaniHome);
+if (document.readyState !== 'loading') kaniHome();
 window.KANI_API = { abrir: kaniAbrir, fechar: kaniFechar, perguntar: async t => { await kaniAbrir(); return kaniEnviar(t); },
     estado: () => KANI.estado, conversa: () => KANI.conversa, gerando: () => !!KANI.gerando };
