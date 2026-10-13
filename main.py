@@ -3542,10 +3542,11 @@ class ApiBridge:
         from Functions import kani
         return kani.voz_ligar(bool(ligar))
 
-    def kani_criar_tipo(self, texto):
-        """Pedido de criar algo (imagem, efeito sonoro, narração, vinheta)? O tipo, ou None para a conversa normal."""
+    def kani_criar_tipo(self, texto, anterior=None):
+        """Pedido de criar algo (imagem, efeito sonoro, narração, vinheta)? {tipo, continua} ou None (conversa normal).
+        anterior = tipo da última criação da conversa ("e se fosse..." refaz a mesma, com a mudança)."""
         from Functions import kani_criar
-        return kani_criar.detectar(texto)
+        return kani_criar.detectar(texto, anterior)
 
     def kani_criar(self, job, tipo, pedido):
         """A Kani cria e entrega no chat (Functions/kani_criar.py): progresso e fim em kaniCriacao(...)."""

@@ -239,9 +239,16 @@ async function kaniEnviar(texto) {
     const t = document.getElementById('kani-txt');
     texto = (texto ?? t.value).trim();
     if (!texto || KANI.gerando) return null;
-    // pedido de criar (imagem, efeito sonoro, narração, vinheta): vai para o motor certo, não para a conversa
-    const tipo = await kaniApi().kani_criar_tipo?.(texto).catch(() => null);
-    if (tipo) { kaniCriar(texto, tipo); return null; }
+    // pedido de criar (imagem, efeito sonoro, narração, vinheta): vai para o motor certo, não para a conversa.
+    // Logo depois de uma criação, "e se fosse...", "agora com..." refaz a mesma com a mudança (pedido original + mudança)
+    const c0 = KANI.conversa, ult = c0.msgs.length ? c0.msgs[c0.msgs.length - 1] : null;
+    const ant = ult && ult.criacao ? ult.criacao : null;
+    const det = await kaniApi().kani_criar_tipo?.(texto, ant ? ant.tipo : null).catch(() => null);
+    const tipo = det && (typeof det === "string" ? det : det.tipo);
+    if (tipo) {
+        const pedido = det.continua && ant && ant.pedido ? `${ant.pedido}. Mudança pedida: ${texto}` : texto;
+        kaniCriar(texto, tipo, pedido); return null;
+    }
     const c = KANI.conversa;
     if (!c.titulo) c.titulo = texto.slice(0, 60);
     c.msgs.push({ role: 'user', content: texto });
@@ -250,7 +257,9 @@ async function kaniEnviar(texto) {
     const id = 'r' + Date.now().toString(36);
     KANI.gerando = { id, conv: c, i: c.msgs.length - 1 };
     kaniRender();
-    const hist = c.msgs.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
+    // criações ficam fora do histórico da conversa: com "Pronto! Criei a vinheta (...)" nele, a IA imitava e dizia que
+    // tinha criado um arquivo que não existia
+    const hist = c.msgs.slice(0, -1).filter((m, i, l) => !m.criacao && !(l[i + 1] && l[i + 1].criacao)).map(m => ({ role: m.role, content: m.content }));
     const r = await kaniApi().kani_enviar(id, hist, kaniFerramentaAtual()).catch(e => ({ success: false, error: e.message }));
     if (!r || !r.success) window.kaniEvento({ id, erro: (r && r.error) || 'falhou' });
     return id;
@@ -260,14 +269,15 @@ function kaniParar() { if (KANI.gerando) kaniApi().kani_parar(KANI.gerando.id); 
 // ── criações (Functions/kani_criar.py): imagem, efeito sonoro, narração, vinheta — progresso e entrega no chat ──
 const KANI_CRIA_NOME = { imagem: 'a imagem', efeito: 'o efeito sonoro', narracao: 'a narração', vinheta: 'a vinheta' };
 const KANI_CRIA_ICO = { imagem: 'image', efeito: 'volume', narracao: 'volume', vinheta: 'music' };
-async function kaniCriar(texto, tipo) {
+async function kaniCriar(texto, tipo, pedido) {
     const c = KANI.conversa, job = 'c' + Date.now().toString(36);
+    pedido = pedido || texto;
     if (!c.titulo) c.titulo = texto.slice(0, 60);
     c.msgs.push({ role: 'user', content: texto });
-    c.msgs.push({ role: 'assistant', content: '', criacao: { job, tipo, estado: 'gerando', pct: 0, msg: 'Começando...' } });
+    c.msgs.push({ role: 'assistant', content: '', criacao: { job, tipo, pedido, estado: 'gerando', pct: 0, msg: 'Começando...' } });
     const t = document.getElementById('kani-txt'); t.value = ''; t.style.height = 'auto';
     kaniRender();
-    const r = await kaniApi().kani_criar(job, tipo, texto).catch(e => ({ success: false, error: e.message }));
+    const r = await kaniApi().kani_criar(job, tipo, pedido).catch(e => ({ success: false, error: e.message }));
     if (!r || !r.success) window.kaniCriacao({ job, erro: (r && r.error) || 'falhou' });
 }
 function kaniCriaHtml(m, i) {

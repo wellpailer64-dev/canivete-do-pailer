@@ -49,18 +49,26 @@ def limpar():
     return n
 
 
-def detectar(texto):
-    """'imagem' | 'efeito' | 'narracao' | 'vinheta' | None. Só pedido de CRIAR (verbo + tipo): "como gero uma imagem
-    no app?" é pergunta (vai para a conversa normal)."""
+_CONTINUA = re.compile(r"^\s*(e se|e com|agora|refa[zçc]|de novo|outra|outro|mais |menos |s[oó] que|com |sem |muda|mude|troca|troque|"
+                       r"mas |deixa|deixe|coloca|coloque|p[oõ]e|ponha|tira|tire|em vez|ao inv[eé]s|igual|parecid|vers[aã]o)", re.I)
+
+
+def detectar(texto, anterior=None):
+    """{tipo, continua} ou None. Pedido de CRIAR (verbo + tipo): "como gero uma imagem no app?" é pergunta (vai para a
+    conversa normal). anterior = tipo da última criação da conversa: "e se fosse uma conversa entre um homem e uma
+    mulher?" logo depois de uma vinheta é a mesma criação de novo, com a mudança (continua=True) — antes ia para a
+    conversa e a Kani dizia que tinha criado um arquivo que não existia (2026-10-12)."""
     t = (texto or "").strip()
-    if not t or re.match(r"^\s*(como|onde|qual|quais|por ?que|o que|d[aá] pra|tem como|consigo)\b", t, re.I):
+    if not t:
+        return None
+    tipo = next((tp for tp, rx in _TIPOS if rx.search(t)), None)
+    if anterior and _CONTINUA.match(t) and not re.match(r"^\s*(como|onde|qual|quais|por ?que|o que)\b", t, re.I):
+        return {"tipo": tipo or anterior, "continua": True}
+    if re.match(r"^\s*(como|onde|qual|quais|por ?que|o que|d[aá] pra|tem como|consigo)\b", t, re.I):
         return None
     if not re.search(_VERBO, t, re.I) and not re.match(r"^\s*(uma?|um)\s", t, re.I):
         return None
-    for tipo, rx in _TIPOS:
-        if rx.search(t):
-            return tipo
-    return None
+    return {"tipo": tipo, "continua": False} if tipo else None
 
 
 def _llm(sistema, pedido, max_tokens=220, temperatura=0.4):
@@ -99,6 +107,49 @@ Describe subject, setting, lighting, style and composition in 20 to 60 words. Ke
 visual details that help. No text, letters, logos or watermarks unless the user asked for text. Answer with the prompt only."""
 _SIS_NARRACAO = """Você escreve textos para narração em português do Brasil. A partir do pedido, escreva SÓ o texto que será
 falado: frases curtas, naturais, sem emojis, sem hashtags, sem títulos, sem aspas, sem marcações. Até {n} palavras."""
+
+
+_SIS_DIALOGO = """Você escreve diálogos curtos para áudio em português do Brasil, entre um homem (H) e uma mulher (M).
+A partir do pedido, escreva de {a} a {b} falas alternadas, cada uma numa linha começando com "H:" ou "M:". Frases curtas e
+naturais, sem emojis, sem hashtags, sem aspas, sem narrador, sem rubricas. Responda só com as falas."""
+_DIALOGO = re.compile(r"(conversa|di[aá]logo|bate.?papo|entre (?:um )?homem e (?:uma )?mulher|entre (?:uma )?mulher e (?:um )?homem|duas vozes|dois locutores)", re.I)
+# o banco de vozes não guarda gênero: o par Fran/Nico foi gravado como diálogo; os outros pelo nome
+_VOZES_M = ("nico", "marcos", "rafael")
+_VOZES_F = ("fran", "helo ribeiro", "yolanda")
+
+
+def _falas(texto):
+    """[(papel 'H'|'M', fala)] das linhas "H: ..."/"M: ..." (ou Homem:/Mulher:)."""
+    out = []
+    for l in (texto or "").splitlines():
+        m = re.match(r"^\s*(H|M|Homem|Mulher|Ele|Ela)\s*[:\-–]\s*(.+)$", l.strip(), re.I)
+        if m and m.group(2).strip():
+            out.append(("M" if m.group(1).lower() in ("m", "mulher", "ela") else "H", re.sub(r"[#*_`\[\]\"“”]", "", m.group(2)).strip()))
+    return out
+
+
+def _dialogo(falas, saida, on):
+    """Cada fala com a voz do papel, juntas com 0,25 s de respiro (ffmpeg concat)."""
+    from Functions.omnivoice_tool import list_voices, synthesize
+    vozes = list_voices()
+    por = lambda nomes: next((v for n in nomes for v in vozes if (v.get("name") or "").strip().lower() == n), None)
+    vh, vm = por(_VOZES_M), por(_VOZES_F)
+    if not (vh and vm):
+        raise RuntimeError("para conversa preciso de uma voz de homem e uma de mulher salvas (Geração de Voz)")
+    partes = []
+    for i, (papel, fala) in enumerate(falas):
+        on(15 + 60 * i / max(1, len(falas)), f"Gravando a fala {i + 1} de {len(falas)} ({vh['name'] if papel == 'H' else vm['name']})...")
+        r = synthesize((vh if papel == "H" else vm)["id"], kani.para_voz(fala),
+                       {"num_step": 32, "language": "pt", "speed": 1.0, "normalize_text": True, "respiro": True})
+        partes.append(r["output_path"])
+    ent = sum((["-i", p] for p in partes), [])
+    g = "".join(f"[{i}:a]aresample=48000,aformat=channel_layouts=mono,apad=pad_dur=0.25[p{i}];" for i in range(len(partes)))
+    g += "".join(f"[p{i}]" for i in range(len(partes))) + f"concat=n={len(partes)}:v=0:a=1[o]"
+    rr = subprocess.run([_ffmpeg(), "-y", "-v", "error", *ent, "-filter_complex", g, "-map", "[o]", saida], capture_output=True, text=True,
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if rr.returncode != 0:
+        raise RuntimeError("não consegui juntar as falas: " + (rr.stderr or "")[-200:])
+    return saida
 
 
 def _citado(texto):
@@ -219,6 +270,18 @@ def criar(job, tipo, pedido, on_evento):
                 path = os.path.join(pasta(), f"efeito_{nome}.wav")
                 shutil.copy(res["path"], path)
                 texto = res.get("texto_en") or pedido
+            elif tipo in ("narracao", "vinheta") and _DIALOGO.search(pedido):
+                # conversa entre um homem e uma mulher: a Kani escreve as falas (ou vêm no pedido como "H: ..."/"M: ...")
+                falas = _falas(pedido)
+                if not falas:
+                    on(5, "Escrevendo a conversa...")
+                    a, b = (2, 4) if tipo == "vinheta" else (4, 8)
+                    falas = _falas(_llm(_SIS_DIALOGO.replace("{a}", str(a)).replace("{b}", str(b)), pedido, 420, 0.7) or "")
+                if len(falas) < 2:
+                    raise RuntimeError('não consegui escrever a conversa (mande as falas assim: "H: ..." e "M: ...", uma por linha)')
+                voz = _dialogo(falas, os.path.join(pasta(), f"_voz_{nome}.wav"), on)
+                texto = "\n".join(f"{'Homem' if p == 'H' else 'Mulher'}: {f}" for p, f in falas)
+                path = _finalizar(tipo, voz, nome, on)
             elif tipo in ("narracao", "vinheta"):
                 n = 22 if tipo == "vinheta" else 90
                 texto = _citado(pedido)
@@ -235,35 +298,7 @@ def criar(job, tipo, pedido, on_evento):
                     raise RuntimeError("não consegui escrever o texto (mande o texto entre aspas)")
                 texto = re.sub(r"[#*_`\[\]]", "", texto).strip()
                 voz = _falar(texto, os.path.join(pasta(), f"_voz_{nome}.wav"), on)
-                if tipo == "narracao":
-                    path = os.path.join(pasta(), f"narracao_{nome}.wav")
-                    os.replace(voz, path)
-                else:
-                    on(80, "Mixando com a música e o impacto...")
-                    jingle, imp = _jingle()
-                    if not jingle:
-                        raise RuntimeError("baixe o pack no painel Soundboard (a vinheta usa os jingles dele)")
-                    path = os.path.join(pasta(), f"vinheta_{nome}.mp3")
-                    # jingle abre, a voz entra aos 0,9 s com a música abaixando por baixo (sidechain), o impacto fecha
-                    ent = ["-i", jingle, "-i", voz] + (["-i", imp] if imp else [])
-                    g = ("[0:a]aresample=48000,apad=pad_dur=30,volume=0.9[m];[1:a]aresample=48000,adelay=900|900,apad=pad_dur=30,asplit[v][sc];"
-                         "[m][sc]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=350[md];"
-                         + ("[2:a]aresample=48000,volume=0.7[i];[md][v][i]amix=inputs=3:duration=longest:normalize=0" if imp
-                            else "[md][v]amix=inputs=2:duration=longest:normalize=0")
-                         + ",loudnorm=I=-14:TP=-1.5,afade=t=out:st=0:d=0.01[o]")
-                    # duração: atraso + voz + 2,4 s (a música respira no fim); tudo com apad e cortado no atrim
-                    from Functions import video_cutter
-                    dur = float(video_cutter.probe(voz).get("duration") or 4) + 0.9 + 2.4   # atraso da voz + respiro
-                    g = g.replace("afade=t=out:st=0:d=0.01", f"atrim=0:{dur:.2f},afade=t=out:st={max(0, dur - 1.2):.2f}:d=1.2")
-                    rr = subprocess.run([_ffmpeg(), "-y", "-v", "error", *ent, "-filter_complex", g, "-map", "[o]", "-c:a", "libmp3lame",
-                                         "-b:a", "192k", path], capture_output=True, text=True,
-                                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-                    if rr.returncode != 0 or not os.path.isfile(path):
-                        raise RuntimeError("a mixagem falhou: " + (rr.stderr or "")[-200:])
-                    try:
-                        os.remove(voz)
-                    except OSError:
-                        pass
+                path = _finalizar(tipo, voz, nome, on)
             else:
                 raise RuntimeError("não sei criar isso ainda")
             from Functions import media_server
@@ -276,6 +311,40 @@ def criar(job, tipo, pedido, on_evento):
 
     threading.Thread(target=run, daemon=True).start()
     return {"success": True}
+
+
+def _finalizar(tipo, voz, nome, on):
+    """Narração: a voz como está. Vinheta: jingle abre, a voz por cima (sidechain), impacto fecha, −14 LUFS."""
+    if tipo == "narracao":
+        path = os.path.join(pasta(), f"narracao_{nome}.wav")
+        os.replace(voz, path)
+        return path
+    on(80, "Mixando com a música e o impacto...")
+    jingle, imp = _jingle()
+    if not jingle:
+        raise RuntimeError("baixe o pack no painel Soundboard (a vinheta usa os jingles dele)")
+    path = os.path.join(pasta(), f"vinheta_{nome}.mp3")
+    # jingle abre, a voz entra aos 0,9 s com a música abaixando por baixo (sidechain), o impacto fecha
+    ent = ["-i", jingle, "-i", voz] + (["-i", imp] if imp else [])
+    g = ("[0:a]aresample=48000,apad=pad_dur=30,volume=0.9[m];[1:a]aresample=48000,adelay=900|900,apad=pad_dur=30,asplit[v][sc];"
+         "[m][sc]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=350[md];"
+         + ("[2:a]aresample=48000,volume=0.7[i];[md][v][i]amix=inputs=3:duration=longest:normalize=0" if imp
+            else "[md][v]amix=inputs=2:duration=longest:normalize=0")
+         + ",loudnorm=I=-14:TP=-1.5,afade=t=out:st=0:d=0.01[o]")
+    # duração: atraso + voz + 2,4 s (a música respira no fim); tudo com apad e cortado no atrim
+    from Functions import video_cutter
+    dur = float(video_cutter.probe(voz).get("duration") or 4) + 0.9 + 2.4   # atraso da voz + respiro
+    g = g.replace("afade=t=out:st=0:d=0.01", f"atrim=0:{dur:.2f},afade=t=out:st={max(0, dur - 1.2):.2f}:d=1.2")
+    rr = subprocess.run([_ffmpeg(), "-y", "-v", "error", *ent, "-filter_complex", g, "-map", "[o]", "-c:a", "libmp3lame",
+                         "-b:a", "192k", path], capture_output=True, text=True,
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if rr.returncode != 0 or not os.path.isfile(path):
+        raise RuntimeError("a mixagem falhou: " + (rr.stderr or "")[-200:])
+    try:
+        os.remove(voz)
+    except OSError:
+        pass
+    return path
 
 
 def url(path):
