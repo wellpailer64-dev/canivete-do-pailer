@@ -18,7 +18,8 @@ const VE_AFC_ESTILOS = { auto: 'Automático', dinamico: 'Dinâmico', batida: 'Ba
 const VE_AFC_LOOKS = { estilo: 'Do estilo', vivo: 'Vivo', suave: 'Tons suaves', quente: 'Quente', filme: 'Filme', nenhum: 'Natural' };
 const VE_AFC_TRANS = ['dissolve', 'crossfade', 'fadeblack', 'push', 'slide', 'pull', 'pop', 'chicote', 'fold', 'splith', 'splitv',
     // sobreposições (editor-ovt.js): camada por cima do corte
-    'ovt:zoomin', 'ovt:zoomout', 'ovt:panblur', 'ovt:spin', 'ovt:stretch', 'ovt:lens', 'ovt:glitch', 'ovt:flash', 'ovt:flare', 'ovt:leak'];
+    'split4', 'ovt:zoomin', 'ovt:zoomout', 'ovt:panblur', 'ovt:spin', 'ovt:stretch', 'ovt:blurx', 'ovt:twirl', 'ovt:lens', 'ovt:ripple',
+    'ovt:shake', 'ovt:glitch', 'ovt:pixel', 'ovt:flash', 'ovt:flare', 'ovt:leak'];
 const veAfcTrNome = t => t.startsWith('ovt:') ? (typeof VE_OVT === 'object' && VE_OVT[t.slice(4)] ? '✦ ' + veT(VE_OVT[t.slice(4)].nome) : t) : veT(VE_TR[t] ? VE_TR[t].nome : t);
 const VE_AFC_FREQ = { base: 'Onde o estilo pede', tres: '1 a cada 3 cortes', todos: 'Todo corte' };
 const VE_AFC_CANTOS = { nao: 'Não', se: '↖', sd: '↗', ie: '↙', id: '↘' };
@@ -27,10 +28,10 @@ function veAfcNovo() {
     return {
         nome: '', cor: '#F97316', logo: null,
         paleta: { primaria: '#111111', secundaria: '#F97316', texto: '#ffffff' }, fonte: 'Arial',
-        intro: { tipo: 'animada', seg: 3, anim: 'pop', texto: '', video: null, transparente: false },
+        intro: { tipo: 'animada', seg: 3, anim: 'pop', texto: '', video: null, transparente: false, segV: 0, som: true },
         marca: { pos: 'sd', tam: 16, op: 90 },
         fim: { tipo: 'animada', compassos: 'auto', texto: '', video: null },
-        estilo: 'dinamico', look: 'estilo', trans: [], transFreq: 'base', flashMarca: false, todas: true, sfx: true,
+        estilo: 'dinamico', look: 'estilo', trans: [], transFreq: 'base', flashMarca: false, todas: true, sfx: true, apres: 'misto',
         dur: 0, telas: 'sim', inicioModo: 'agitada', musicas: [], musicaProx: 0,
     };
 }
@@ -52,6 +53,20 @@ function veAfcPath(m, campo) {
     if (v && typeof v === 'object') return v.src;
     return m._arq && m._arq[campo] ? m._arq[campo].path : null;
 }
+// {dur, som} do vídeo de intro/encerramento (escolhido agora ou salvo no modelo: autoframe_modelos.duracao)
+function veAfcArqInfo(m, campo) {
+    const v = campo.split('.').reduce((o, k) => o && o[k], m);
+    return (v && typeof v === 'object' ? v : m._arq && m._arq[campo]) || {};
+}
+// Segundos usados do vídeo de intro/encerramento: o arquivo inteiro ou os escolhidos (segV, 0 = inteiro)
+function veAfcVideoSeg(m, lado) {
+    const dur = +veAfcArqInfo(m, lado + '.video').dur || 0, s = +(m[lado] && m[lado].segV) || 0;
+    return s > 0 && dur ? Math.min(s, dur) : dur;
+}
+// intro/encerramento de vídeo que ocupa a tela (o plano reserva o tempo dele, como o das intros do sistema)
+const veAfcVideoCobre = (m, lado) => m[lado].tipo === 'video' && !(lado === 'intro' && m.intro.transparente) && veAfcVideoSeg(m, lado) > 0;
+// a intro de vídeo estica/encolhe até 10% para fechar no corte da música (sem cortar o fim dela)
+const VE_AFC_VEL = 0.1;
 
 // ── trocar de aba: o Quick guarda o que estava montado ──
 const VE_AF_ESTADO = ['itens', 'midias', 'fora', 'musica', 'musicaPath', 'modelos', 'modelo', 'dur', 'ordem', 'titulo', 'inicioModo', 'manual', 'inicioT', 'telas'];
@@ -88,6 +103,7 @@ function veAfcComecar(m) {
     VEAF.dur = m.dur || 0;
     VEAF.telas = m.telas || 'sim';
     VEAF.inicioModo = m.inicioModo || 'agitada';
+    VEAF.apres = m.apres || 'misto';
     VEAF.titulo = (m.intro && m.intro.texto) || '';
     veAfRender();
     veAfAnalisar();
@@ -104,123 +120,180 @@ function veAfcTrocarMusica(i) {
 }
 
 // ── tela da aba Customizado: cards ou o formulário ──
+const VE_AFC_ICO_INTRO = { animada: 'sparkles', logo_cor: 'swatch', logo_cena: 'layers', video: 'film', comp: 'layers', nenhuma: 'x', nenhum: 'x' };
+const veAfcIco = (n, cls = '') => `<svg class="i${cls ? ' ' + cls : ''}"><use href="#i-${n}"/></svg>`;
+// "há 3 dias" a partir de um carimbo em segundos (modelo.json: usado/atualizado)
+function veAfcQuando(t) {
+    if (!t) return '';
+    const d = (Date.now() / 1000 - t) / 86400;
+    if (d < 1) return veT('usado hoje');
+    if (d < 2) return veT('usado ontem');
+    if (d < 30) return `${veT('usado há')} ${Math.floor(d)} ${veT('dias')}`;
+    return `${veT('usado há')} ${Math.floor(d / 30)} ${veT(Math.floor(d / 30) === 1 ? 'mês' : 'meses')}`;
+}
+const veAfcIniciais = m => veEsc((m.nome || '?').trim().split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase());
+
 function veAfcTela() {
     if (VEAFC.ed) return veAfcForm();
     if (!VEAFC.lista) return `<div class="ve-af-vazio">${veT('Carregando...')}</div>`;
     const card = m => {
-        const logo = veAfcUrl(m, 'logo'), n = (m.musicas || []).length;
-        return `<div class="ve-afc-card" style="--cc:${veEsc(m.cor || '#F97316')}">
-            <div class="ve-afc-capa">${logo ? `<img src="${veEsc(logo)}" alt="">` : `<b>${veEsc((m.nome || '?').slice(0, 2).toUpperCase())}</b>`}</div>
-            <div class="ve-afc-txt"><b>${veEsc(m.nome || veT('Sem nome'))}</b>
-                <small>${veT(VE_AFC_ESTILOS[m.estilo] || 'Automático')} · ${n} ${veT(n === 1 ? 'música' : 'músicas')}</small></div>
-            <div class="ve-afc-acoes">
-                <button class="ve-btn ve-btn-primary ve-btn-sm" data-afc="comecar" data-id="${m.id}">${veT('Começar')}</button>
-                <button class="ve-btn ve-btn-sm ve-btn-ghost" data-afc="editar" data-id="${m.id}" title="${veT('Editar modelo')}"><svg class="i"><use href="#i-gear"/></svg></button>
+        const logo = veAfcUrl(m, 'logo'), n = (m.musicas || []).filter(x => x.arq || x.src).length, p = m.paleta || {};
+        const fim = VE_AFC_FIM[m.fim && m.fim.tipo] || '';
+        return `<article class="ve-afc-card" style="--cc:${veEsc(m.cor || '#F97316')};--p:${veEsc(p.primaria || '#111')};--s:${veEsc(p.secundaria || '#F97316')}">
+            <div class="ve-afc-poster">
+                <span class="ve-afc-estilo">${veT(VE_AFC_ESTILOS[m.estilo] || 'Automático')}</span>
+                ${logo ? `<img src="${veEsc(logo)}" alt="">` : `<b>${veAfcIniciais(m)}</b>`}
+                <span class="ve-afc-paleta">${[p.primaria, p.secundaria, p.texto].filter(Boolean).map(c => `<i style="background:${veEsc(c)}"></i>`).join('')}</span>
             </div>
-        </div>`;
+            <div class="ve-afc-info">
+                <b title="${veEsc(m.nome || '')}">${veEsc(m.nome || veT('Sem nome'))}</b>
+                <ul>
+                    <li>${veAfcIco(VE_AFC_ICO_INTRO[m.intro && m.intro.tipo] || 'play')} ${veT('Intro')}: ${veT(VE_AFC_INTRO[m.intro && m.intro.tipo] || '—')}</li>
+                    <li>${veAfcIco('film')} ${veT('Final')}: ${veT(fim || '—')}</li>
+                    <li>${veAfcIco('music')} ${n} ${veT(n === 1 ? 'música' : 'músicas')}${n > 1 ? ` · ${veT('alternando')}` : ''}</li>
+                </ul>
+                ${m.usado ? `<small>${veAfcQuando(m.usado)}</small>` : ''}
+            </div>
+            <div class="ve-afc-acoes">
+                <button class="ve-btn ve-btn-primary" data-afc="comecar" data-id="${m.id}">${veAfcIco('sparkles')} ${veT('Começar')}</button>
+                <button class="ve-btn ve-btn-ghost ve-afc-engr" data-afc="editar" data-id="${m.id}" title="${veT('Editar modelo')}">${veAfcIco('gear')}</button>
+            </div>
+        </article>`;
     };
-    return `<div class="ve-af-sec">
-        <div class="ve-af-h">${veT('Modelos de cliente')}</div>
+    return `<div class="ve-afc-lista">
         <p class="ve-af-dica">${veT('Cada modelo guarda a intro, o logo, as cores, as transições e as músicas de um cliente. Clique em Começar e mande o material.')}</p>
         <div class="ve-afc-cards">${VEAFC.lista.map(card).join('')}
-            <button class="ve-afc-novo" data-afc="novo"><span>+</span>${veT('Novo modelo')}</button>
+            <button class="ve-afc-novo" data-afc="novo"><span>+</span><b>${veT('Novo modelo')}</b><small>${veT('identidade de um cliente')}</small></button>
         </div>
     </div>`;
 }
 
+// Celular de prévia do modelo (formulário): fundo na cor principal, logo (ou o vídeo da intro), texto no selo e o
+// logo do canto na posição/tamanho/opacidade escolhidos. Só ilustra; a edição de verdade sai no AutoFrame.
+function veAfcPrevia(m) {
+    const logo = veAfcUrl(m, 'logo'), p = m.paleta, tipo = m.intro.tipo;
+    const vid = tipo === 'video' ? veAfcUrl(m, 'intro.video') : null;
+    const sl = veAfcSelo(p, p.primaria), txt = (m.intro.texto || '').trim();
+    const pos = m.marca.pos, canto = logo && pos !== 'nao'
+        ? `<img class="ve-afc-cel-canto" src="${veEsc(logo)}" alt="" style="width:${m.marca.tam}%;opacity:${(m.marca.op ?? 90) / 100};${pos.startsWith('s') ? 'top:7%' : 'bottom:20%'};${pos.endsWith('d') ? 'right:6%' : 'left:6%'}">` : '';
+    let tela;
+    if (vid) tela = `<video src="${veEsc(vid)}" muted loop autoplay playsinline></video>`;
+    else if (tipo === 'nenhuma' || veAfcPronto(tipo)) tela = `<div class="ve-afc-cel-cena"></div>${canto}`;
+    else tela = `<div class="ve-afc-cel-luz"></div>
+        ${logo ? `<img class="ve-afc-cel-logo" src="${veEsc(logo)}" alt="">` : `<b class="ve-afc-cel-ini">${veAfcIniciais(m)}</b>`}
+        ${txt ? `<span class="ve-afc-cel-selo" style="background:${veEsc(sl.fundo)};color:${veEsc(sl.cor)};font-family:'${veEsc(m.fonte || 'Arial')}'">${veEsc(txt)}</span>` : ''}
+        ${tipo === 'logo_cena' ? canto : ''}`;
+    return `<div class="ve-afc-cel" style="--p:${veEsc(p.primaria)};--s:${veEsc(p.secundaria)}">
+        <div class="ve-afc-cel-tela">${tela}</div>
+        <span class="ve-afc-cel-tag">${veT('Intro')} · ${veT(VE_AFC_INTRO[tipo] || '')}</span>
+    </div>`;
+}
+
 function veAfcForm() {
-    const m = VEAFC.ed, pill = (campo, v, txt) => {
-        const atual = campo.split('.').reduce((o, k) => o && o[k], m);
-        return `<button class="ve-af-pill${String(atual) === String(v) ? ' on' : ''}" data-afc-set="${campo}" data-v="${v}">${veT(txt)}</button>`;
+    const m = VEAFC.ed, val = campo => campo.split('.').reduce((o, k) => o && o[k], m);
+    const pill = (campo, v, txt) => `<button class="ve-af-pill${String(val(campo)) === String(v) ? ' on' : ''}" data-afc-set="${campo}" data-v="${v}">${veT(txt)}</button>`;
+    const pills = (campo, obj) => `<div class="ve-af-pills">${Object.entries(obj).map(([v, t]) => pill(campo, v, t)).join('')}</div>`;
+    // escolha com ícone (tipo de intro/encerramento)
+    const tiles = (campo, obj) => `<div class="ve-afc-tiles">${Object.entries(obj).map(([v, t]) => `
+        <button class="ve-afc-tile${String(val(campo)) === v ? ' on' : ''}" data-afc-set="${campo}" data-v="${v}">${veAfcIco(VE_AFC_ICO_INTRO[v] || 'play')}<span>${veT(t)}</span></button>`).join('')}</div>`;
+    const cor = (campo, rot) => `<label class="ve-afc-cor"><input type="color" data-afc-in="${campo}" value="${veEsc(val(campo))}"><span>${veT(rot)}</span></label>`;
+    const txt = (campo, ph) => `<input type="text" class="ve-afc-in" data-afc-in="${campo}" value="${veEsc(val(campo) || '')}" placeholder="${veT(ph)}">`;
+    const arq = (campo, tipo, rot, ico = 'upload') => {
+        const p = veAfcPath(m, campo), d = +veAfcArqInfo(m, campo).dur || 0;
+        return `<div class="ve-afc-arq${p ? ' tem' : ''}">${veAfcIco(p ? 'check' : ico)}
+            <span>${p ? `<b>${veEsc(veAfNome(p))}</b>${d ? ` <em>${d.toFixed(1).replace('.', ',')} s</em>` : ''}` : veT('nenhum arquivo')}</span>
+            <button class="ve-btn ve-btn-sm" data-afc="arq" data-campo="${campo}" data-tipo="${tipo}">${veT(p ? 'Trocar' : rot)}</button>
+            ${p ? `<button class="ve-afc-x" data-afc="tirar" data-campo="${campo}" title="${veT('Tirar')}">×</button>` : ''}</div>`;
     };
-    const pills = (campo, obj) => Object.entries(obj).map(([v, t]) => pill(campo, v, t)).join('');
-    const cor = (campo, rot) => `<label class="ve-afc-cor"><input type="color" data-afc-in="${campo}" value="${veEsc(campo.split('.').reduce((o, k) => o && o[k], m))}"><span>${veT(rot)}</span></label>`;
-    const txt = (campo, ph) => `<input type="text" class="ve-afc-in" data-afc-in="${campo}" value="${veEsc(campo.split('.').reduce((o, k) => o && o[k], m) || '')}" placeholder="${veT(ph)}">`;
-    const arq = (campo, tipo, rot) => {
-        const p = veAfcPath(m, campo);
-        return `<div class="ve-afc-arq"><button class="ve-btn ve-btn-sm" data-afc="arq" data-campo="${campo}" data-tipo="${tipo}">${veT(rot)}</button>
-            <span>${p ? veEsc(veAfNome(p)) : veT('nenhum arquivo')}</span>${p ? `<button class="ve-afc-x" data-afc="tirar" data-campo="${campo}" title="${veT('Tirar')}">×</button>` : ''}</div>`;
+    const linha = (rot, html, dica) => `<div class="ve-afc-campo"><label>${veT(rot)}</label><div class="ve-afc-ctl">${html}${dica ? `<small class="ve-af-info">${veT(dica)}</small>` : ''}</div></div>`;
+    const chk = (campo, rot, def = false) => `<label class="ve-afc-chk"><input type="checkbox" data-afc-chk="${campo}"${(val(campo) ?? def) ? ' checked' : ''}><i></i><span>${veT(rot)}</span></label>`;
+    const bloco = (ico, titulo, sub, corpo) => `<section class="ve-afc-bloco"><header><span class="ve-afc-ico">${veAfcIco(ico)}</span><div><b>${veT(titulo)}</b><small>${veT(sub)}</small></div></header><div class="ve-afc-campos">${corpo}</div></section>`;
+    const fontes = (typeof VEPP !== 'undefined' && VEPP.fontes) || [];
+    // intro de vídeo: quantos segundos usar e o som dela
+    const videoOpcoes = () => {
+        const d = +veAfcArqInfo(m, 'intro.video').dur || 0;
+        if (!d) return '';
+        const inteiro = !(+m.intro.segV > 0 && +m.intro.segV < d);
+        return linha('Duração', `<div class="ve-af-pills"><button class="ve-af-pill${inteiro ? ' on' : ''}" data-afc-set="intro.segV" data-v="0">${veT('Arquivo inteiro')} · ${d.toFixed(1).replace('.', ',')} s</button>
+                <span class="ve-afc-ou">${veT('ou só os primeiros')}</span><input type="number" class="ve-afc-in ve-afc-seg" min="1" max="${d.toFixed(1)}" step="0.5" data-afc-num="intro.segV" value="${inteiro ? '' : +m.intro.segV}" placeholder="—"><span class="ve-afc-un">s</span></div>`,
+                'A primeira cena entra na batida mais perto do fim da intro: ela estica ou encolhe até 10% para fechar certinho, sem perder o final.') +
+            (veAfcArqInfo(m, 'intro.video').som ? linha('Som', chk('intro.som', 'Usar o som da intro (toca junto com a música)', true)) : '');
     };
-    const logo = veAfcUrl(m, 'logo'), fontes = (typeof VEPP !== 'undefined' && VEPP.fontes) || [];
-    const linha = (rot, html) => `<div class="ve-af-op"><span>${veT(rot)}</span>${html}</div>`;
+    const intro = m.intro, fim = m.fim;
+    const corpoIntro = linha('Tipo', tiles('intro.tipo', VE_AFC_INTRO)) +
+        (intro.tipo === 'video' ? linha('Arquivo', arq('intro.video', 'video', 'Escolher vídeo', 'film'), 'MP4 ou MOV. MOV com transparência pode ficar por cima das cenas.') + (intro.transparente ? '' : videoOpcoes()) : '') +
+        (intro.tipo === 'comp' ? linha('Comp', veAfcCompCampo(m, 'intro')) : '') +
+        (veAfcPronto(intro.tipo) ? linha('', chk('intro.transparente', 'Tem fundo transparente (fica por cima das cenas)')) : '') +
+        (intro.tipo === 'animada' ? `<p class="ve-afc-nota">${veT('Formas na cor de destaque, as melhores fotos entrando na batida, o logo batendo no compasso e o texto em selo. Com efeitos sonoros do Soundboard.')}</p>` : '') +
+        (['animada', 'logo_cor', 'logo_cena'].includes(intro.tipo)
+            ? linha('Duração', `<div class="ve-af-pills"><input type="number" class="ve-afc-in ve-afc-seg" min="1" max="15" step="0.5" data-afc-num="intro.seg" value="${veAfcIntroSeg(m)}"><span class="ve-afc-un">${veT('segundos')}</span></div>`, 'Fecha no corte da música mais perto.') +
+              (intro.tipo !== 'animada' ? linha('Animação do logo', pills('intro.anim', VE_AFC_ANIM)) : '') + linha('Texto', txt('intro.texto', 'opcional: slogan ou título padrão'))
+            : '');
+    const cantos = `<div class="ve-afc-cantos">${['se', 'sd', 'ie', 'id'].map(k => `<button class="${m.marca.pos === k ? 'on' : ''}" data-afc-set="marca.pos" data-v="${k}" title="${veT(VE_AFC_CANTOS[k])}"></button>`).join('')}</div>
+        <button class="ve-af-pill${m.marca.pos === 'nao' ? ' on' : ''}" data-afc-set="marca.pos" data-v="nao">${veT('Sem logo no canto')}</button>`;
+    const faixa = (campo, min, max) => `<div class="ve-afc-faixa"><input type="range" min="${min}" max="${max}" data-afc-num="${campo}" value="${val(campo)}"><small>${val(campo)}%</small></div>`;
     return `<div class="ve-afc-form">
-        <div class="ve-af-h">${m.id ? veT('Editar modelo') : veT('Novo modelo')}</div>
-        <div class="ve-af-sec">
-            ${linha('Cliente', txt('nome', 'nome do cliente'))}
-            ${linha('Cor do card', cor('cor', ''))}
-            <div class="ve-afc-logo">
-                <div class="ve-afc-logo-prev" style="--bg:${veEsc(m.paleta.primaria)}">${logo ? `<img src="${veEsc(logo)}" alt="">` : `<small>${veT('sem logo')}</small>`}</div>
-                ${arq('logo', 'logo', 'Escolher logo')}
+        <div class="ve-afc-barra">
+            <button class="ve-btn ve-btn-ghost ve-btn-sm" data-afc="cancelar" title="${veT('Voltar aos modelos sem salvar')}">‹ ${veT('Modelos')}</button>
+            <b>${veT(m.id ? 'Editar modelo' : 'Novo modelo')}</b>
+            <span class="ve-top-spacer"></span>
+            <button class="ve-btn ve-btn-sm" data-afc="cancelar">${veT('Cancelar')}</button>
+            <button class="ve-btn ve-btn-primary ve-btn-sm" data-afc="salvar">${veAfcIco('save')} ${veT('Salvar modelo')}</button>
+        </div>
+        <div class="ve-afc-grade">
+            <aside class="ve-afc-lado">${veAfcPrevia(m)}<small class="ve-af-info">${veT('Prévia da identidade (cor, logo, texto e logo no canto)')}</small></aside>
+            <div class="ve-afc-blocos">
+                ${bloco('swatch', 'Identidade', 'Nome, logo, cores e fonte do cliente',
+                    linha('Cliente', txt('nome', 'nome do cliente')) +
+                    linha('Logo', arq('logo', 'logo', 'Escolher logo', 'image'), 'PNG com fundo transparente fica melhor.') +
+                    linha('Cores', `<div class="ve-afc-cores">${cor('paleta.primaria', 'Principal')}${cor('paleta.secundaria', 'Destaque')}${cor('paleta.texto', 'Texto')}${cor('cor', 'Card')}</div>`) +
+                    linha('Fonte', `<input type="text" class="ve-afc-in" list="ve-afc-fontes" data-afc-in="fonte" value="${veEsc(m.fonte || '')}"><datalist id="ve-afc-fontes">${fontes.map(f => `<option value="${veEsc(f)}">`).join('')}</datalist>`))}
+                ${bloco('play', 'Intro', 'Como o vídeo abre', corpoIntro)}
+                ${bloco('image', 'Logo no canto', 'Assinatura durante as cenas',
+                    linha('Posição', `<div class="ve-af-pills">${cantos}</div>`) +
+                    (m.marca.pos !== 'nao' ? linha('Tamanho', faixa('marca.tam', 6, 40)) + linha('Opacidade', faixa('marca.op', 20, 100)) : ''))}
+                ${bloco('film', 'Encerramento', 'Como o vídeo fecha',
+                    linha('Tipo', tiles('fim.tipo', VE_AFC_FIM)) +
+                    (fim.tipo === 'video' ? linha('Arquivo', arq('fim.video', 'video', 'Escolher vídeo', 'film')) : '') +
+                    (fim.tipo === 'comp' ? linha('Comp', veAfcCompCampo(m, 'fim')) : '') +
+                    (fim.tipo === 'logo_cor' || fim.tipo === 'animada' ? linha('Duração', `<div class="ve-af-pills">${pill('fim.compassos', 'auto', 'Automática (~4 s)')}${pill('fim.compassos', 1, '1 compasso')}${pill('fim.compassos', 2, '2 compassos')}${pill('fim.compassos', 4, '4 compassos')}</div>`) +
+                        linha('Texto', txt('fim.texto', 'opcional: @perfil · telefone · site')) : ''))}
+                ${bloco('wand', 'Edição', 'Ritmo, cor e transições',
+                    linha('Estilo', pills('estilo', VE_AFC_ESTILOS)) +
+                    linha('Cor', pills('look', VE_AFC_LOOKS)) +
+                    linha('Transições', `<div class="ve-af-pills">${VE_AFC_TRANS.map(t => `<button class="ve-af-pill${m.trans.includes(t) ? ' on' : ''}" data-afc-tr="${t}">${veAfcTrNome(t)}</button>`).join('')}</div>`,
+                        m.trans.length ? 'Alterna entre as marcadas.' : 'Nenhuma marcada: usa as do estilo.') +
+                    (m.trans.length ? linha('Frequência', pills('transFreq', VE_AFC_FREQ)) : '') +
+                    linha('Fotos', pills('apres', VE_AF_APRES), 'Cartão e Moldura mostram a foto inteira (nunca cortam ninguém); o Misto alterna com a tela cheia nas cenas calmas.') +
+                    linha('Telas divididas', `<div class="ve-af-pills">${pill('telas', 'sim', 'Sim')}${pill('telas', 'nao', 'Não')}</div>`) +
+                    linha('Começar em', `<div class="ve-af-pills">${pill('inicioModo', 'inicio', 'Início')}${pill('inicioModo', 'refrao', 'Refrão')}${pill('inicioModo', 'agitada', 'Mais agitada')}</div>`) +
+                    linha('', chk('todas', 'Usar todas as fotos e vídeos (a duração se ajusta)', true)) +
+                    (m.todas === false ? linha('Duração', `<div class="ve-af-pills">${pill('dur', 0, 'Música toda')}${pill('dur', 15, '15 s')}${pill('dur', 30, '30 s')}${pill('dur', 60, '60 s')}</div>`) : '') +
+                    linha('', chk('flashMarca', 'Flash de impacto na cor de destaque (em vez de branco)')) +
+                    linha('', chk('sfx', 'Efeitos sonoros do Soundboard (whoosh, impacto no logo...)', true)))}
+                ${bloco('music', 'Músicas', 'Alternam a cada vídeo, nesta ordem',
+                    `<div class="ve-afc-musicas">${(m.musicas || []).map((x, i) => `<div class="ve-afc-mus"><span class="ve-afc-mus-n">${i + 1}</span><span>${veEsc(x.nome || veAfNome(x.src || x.arq))}</span>
+                        <button class="ve-afc-x" data-afc="tirar-musica" data-i="${i}" title="${veT('Tirar')}">×</button></div>`).join('') || `<p class="ve-afc-nota">${veT('Nenhuma música ainda: o modelo precisa de pelo menos uma.')}</p>`}</div>
+                    <button class="ve-btn ve-btn-sm" data-afc="arq" data-campo="musicas" data-tipo="musicas">${veAfcIco('music')} ${veT('Adicionar músicas')}</button>`)}
+                ${m.id ? `<div class="ve-afc-perigo"><button class="ve-btn ve-btn-ghost ve-btn-sm ve-afc-apagar" data-afc="apagar">${veAfcIco('trash')} ${veT(VEAFC.apagar ? 'Apagar mesmo? Clique de novo' : 'Apagar modelo')}</button></div>` : ''}
             </div>
-            ${linha('Paleta', cor('paleta.primaria', 'Principal') + cor('paleta.secundaria', 'Destaque') + cor('paleta.texto', 'Texto'))}
-            ${linha('Fonte', `<input type="text" class="ve-afc-in" list="ve-afc-fontes" data-afc-in="fonte" value="${veEsc(m.fonte || '')}"><datalist id="ve-afc-fontes">${fontes.map(f => `<option value="${veEsc(f)}">`).join('')}</datalist>`)}
-        </div>
-        <div class="ve-af-sec">
-            <div class="ve-af-h">${veT('Intro')}</div>
-            ${linha('Tipo', pills('intro.tipo', VE_AFC_INTRO))}
-            ${m.intro.tipo === 'video' ? arq('intro.video', 'video', 'Escolher o arquivo da intro') +
-                `<small class="ve-af-info">${veT('MP4 ou MOV. MOV com transparência pode ficar por cima das cenas.')}</small>` +
-                `<label class="ve-afc-chk"><input type="checkbox" data-afc-chk="intro.transparente"${m.intro.transparente ? ' checked' : ''}> ${veT('Tem fundo transparente (fica por cima das cenas)')}</label>` : ''}
-            ${m.intro.tipo === 'comp' ? veAfcCompCampo(m, 'intro') +
-                `<label class="ve-afc-chk"><input type="checkbox" data-afc-chk="intro.transparente"${m.intro.transparente ? ' checked' : ''}> ${veT('Tem fundo transparente (fica por cima das cenas)')}</label>` : ''}
-            ${m.intro.tipo === 'animada' ? `<small class="ve-af-info">${veT('Formas na cor de destaque, as melhores fotos entrando na batida, o logo batendo no compasso e o texto em selo. Com efeitos sonoros do Soundboard.')}</small>` : ''}
-            ${['animada', 'logo_cor', 'logo_cena'].includes(m.intro.tipo) ? linha('Duração', `<input type="number" class="ve-afc-in ve-afc-seg" min="1" max="15" step="0.5" data-afc-num="intro.seg" value="${veAfcIntroSeg(m)}" title="${veT('Fecha no corte da música mais perto')}"><span class="ve-afc-un">${veT('segundos')}</span>`) +
-                (m.intro.tipo !== 'animada' ? linha('Animação do logo', pills('intro.anim', VE_AFC_ANIM)) : '') + linha('Texto', txt('intro.texto', 'opcional: slogan ou título padrão')) : ''}
-        </div>
-        <div class="ve-af-sec">
-            <div class="ve-af-h">${veT('Logo no canto')}</div>
-            ${linha('Posição', pills('marca.pos', VE_AFC_CANTOS))}
-            ${m.marca.pos !== 'nao' ? linha('Tamanho', `<input type="range" min="6" max="40" data-afc-num="marca.tam" value="${m.marca.tam}"><small>${m.marca.tam}%</small>`) +
-                linha('Opacidade', `<input type="range" min="20" max="100" data-afc-num="marca.op" value="${m.marca.op}"><small>${m.marca.op}%</small>`) : ''}
-        </div>
-        <div class="ve-af-sec">
-            <div class="ve-af-h">${veT('Encerramento')}</div>
-            ${linha('Tipo', pills('fim.tipo', VE_AFC_FIM))}
-            ${m.fim.tipo === 'video' ? arq('fim.video', 'video', 'Escolher o arquivo do encerramento') : ''}
-            ${m.fim.tipo === 'comp' ? veAfcCompCampo(m, 'fim') : ''}
-            ${m.fim.tipo === 'logo_cor' || m.fim.tipo === 'animada' ? linha('Duração', pill('fim.compassos', 'auto', 'Automática (~4 s)') + pill('fim.compassos', 1, '1 compasso') + pill('fim.compassos', 2, '2 compassos') + pill('fim.compassos', 4, '4 compassos')) +
-                linha('Texto', txt('fim.texto', 'opcional: @perfil · telefone · site')) : ''}
-        </div>
-        <div class="ve-af-sec">
-            <div class="ve-af-h">${veT('Edição')}</div>
-            ${linha('Estilo', pills('estilo', VE_AFC_ESTILOS))}
-            ${linha('Cor', pills('look', VE_AFC_LOOKS))}
-            ${linha('Transições', VE_AFC_TRANS.map(t => `<button class="ve-af-pill${m.trans.includes(t) ? ' on' : ''}" data-afc-tr="${t}">${veAfcTrNome(t)}</button>`).join(''))}
-            <small class="ve-af-info">${veT(m.trans.length ? 'Alterna entre as marcadas.' : 'Nenhuma marcada: usa as do estilo.')}</small>
-            ${m.trans.length ? linha('Frequência', pills('transFreq', VE_AFC_FREQ)) : ''}
-            <label class="ve-afc-chk"><input type="checkbox" data-afc-chk="flashMarca"${m.flashMarca ? ' checked' : ''}> ${veT('Flash de impacto na cor de destaque (em vez de branco)')}</label>
-            <label class="ve-afc-chk"><input type="checkbox" data-afc-chk="todas"${m.todas !== false ? ' checked' : ''}> ${veT('Usar todas as fotos e vídeos (a duração se ajusta)')}</label>
-            ${m.todas === false ? linha('Duração', pill('dur', 0, 'Música toda') + pill('dur', 15, '15 s') + pill('dur', 30, '30 s') + pill('dur', 60, '60 s')) : ''}
-            <label class="ve-afc-chk"><input type="checkbox" data-afc-chk="sfx"${m.sfx !== false ? ' checked' : ''}> ${veT('Efeitos sonoros (whoosh nas transições, impacto no logo...) do Soundboard')}</label>
-            ${linha('Telas divididas', pill('telas', 'sim', 'Sim') + pill('telas', 'nao', 'Não'))}
-            ${linha('Começar em', pill('inicioModo', 'inicio', 'Início') + pill('inicioModo', 'refrao', 'Refrão') + pill('inicioModo', 'agitada', 'Mais agitada'))}
-        </div>
-        <div class="ve-af-sec">
-            <div class="ve-af-h">${veT('Músicas')} <small class="ve-af-info">${veT('alternam a cada vídeo, nesta ordem')}</small></div>
-            ${(m.musicas || []).map((x, i) => `<div class="ve-afc-arq"><svg class="i"><use href="#i-music"/></svg><span>${veEsc(x.nome || veAfNome(x.src || x.arq))}</span>
-                <button class="ve-afc-x" data-afc="tirar-musica" data-i="${i}" title="${veT('Tirar')}">×</button></div>`).join('')}
-            <div class="ve-af-botoes"><button class="ve-btn ve-btn-sm" data-afc="arq" data-campo="musicas" data-tipo="musicas"><svg class="i"><use href="#i-music"/></svg> ${veT('Adicionar músicas')}</button></div>
-        </div>
-        <div class="ve-af-gerar">
-            <button class="ve-btn ve-btn-primary" data-afc="salvar">${veT('Salvar modelo')}</button>
-            <button class="ve-btn" data-afc="cancelar">${veT('Cancelar')}</button>
-            ${m.id ? `<span class="ve-top-spacer"></span><button class="ve-btn ve-btn-ghost ve-afc-apagar" data-afc="apagar">${veT(VEAFC.apagar ? 'Apagar mesmo?' : 'Apagar modelo')}</button>` : ''}
         </div>
     </div>`;
 }
 
 // Cabeçalho do fluxo "Começar" (no lugar do topo do Quick) e a escolha de música do modelo
 function veAfcCabecalho() {
-    const m = VEAF.cli, logo = veAfcUrl(m, 'logo');
-    return `<div class="ve-afc-topo" style="--cc:${veEsc(m.cor || '#F97316')}">
+    const m = VEAF.cli, logo = veAfcUrl(m, 'logo'), p = m.paleta || {};
+    return `<div class="ve-afc-topo" style="--cc:${veEsc(m.cor || '#F97316')};--p:${veEsc(p.primaria || '#111')};--s:${veEsc(p.secundaria || '#F97316')}">
         <button class="ve-btn ve-btn-sm ve-btn-ghost" data-afc="voltar" title="${veT('Voltar aos modelos')}">‹</button>
-        <div class="ve-afc-capa">${logo ? `<img src="${veEsc(logo)}" alt="">` : `<b>${veEsc((m.nome || '?').slice(0, 2).toUpperCase())}</b>`}</div>
-        <div class="ve-afc-txt"><b>${veEsc(m.nome)}</b><small>${veT(VE_AFC_ESTILOS[m.estilo] || 'Automático')} · ${veT(VE_AFC_INTRO[m.intro.tipo])}</small></div>
+        <div class="ve-afc-capa">${logo ? `<img src="${veEsc(logo)}" alt="">` : `<b>${veAfcIniciais(m)}</b>`}</div>
+        <div class="ve-afc-txt"><b>${veEsc(m.nome)}</b>
+            <small>${veT(VE_AFC_ESTILOS[m.estilo] || 'Automático')} · ${veT('Intro')}: ${veT(VE_AFC_INTRO[m.intro.tipo])} · ${veT('Final')}: ${veT(VE_AFC_FIM[m.fim.tipo] || '')}</small></div>
     </div>`;
 }
 function veAfcMusicas() {
     const mus = VEAF.cli.musicas.filter(x => x.path);
-    return `<div class="ve-af-op">${mus.map((x, i) => `<button class="ve-af-pill${i === VEAF.cliMus ? ' on' : ''}" data-afc="musica" data-i="${i}" title="${veEsc(x.nome)}">${veEsc(x.nome.replace(/\.[^.]+$/, '').slice(0, 28))}</button>`).join('')}</div>`;
+    return `<div class="ve-af-pills">${mus.map((x, i) => `<button class="ve-af-pill${i === VEAF.cliMus ? ' on' : ''}" data-afc="musica" data-i="${i}" title="${veEsc(x.nome)}">${veAfcIco('music')} ${veEsc(x.nome.replace(/\.[^.]+$/, '').slice(0, 28))}</button>`).join('')}</div>`;
 }
 
 // ── eventos ──
@@ -269,7 +342,8 @@ function veAfcClick(e) {
             if (b.dataset.campo === 'musicas') r.itens.forEach(x => VEAFC.ed.musicas.push({ src: x.path, nome: veAfNome(x.path) }));
             else {
                 const ch = b.dataset.campo.split('.'), alvo = ch.slice(0, -1).reduce((o, k) => o[k], VEAFC.ed);
-                alvo[ch[ch.length - 1]] = { src: r.itens[0].path, url: r.itens[0].url };
+                alvo[ch[ch.length - 1]] = { src: r.itens[0].path, url: r.itens[0].url, dur: r.itens[0].dur, som: r.itens[0].som };
+                if (b.dataset.campo === 'intro.video') VEAFC.ed.intro.segV = 0;   // arquivo novo: começa inteiro
             }
             veAfRender();
         });
@@ -301,8 +375,10 @@ function veAfcInput(e) {
     const ch = campo.split('.'), alvo = ch.slice(0, -1).reduce((o, k) => o[k], m), k = ch[ch.length - 1];
     alvo[k] = t.dataset.afcChk ? t.checked : t.dataset.afcNum ? +t.value : t.value;
     if (t.dataset.afcNum && t.type === 'range' && t.nextElementSibling) t.nextElementSibling.textContent = t.value + '%';
-    // a cor principal muda o fundo da prévia do logo; o resto não precisa redesenhar (o campo perderia o foco)
-    if (campo === 'paleta.primaria') { const p = t.ownerDocument.querySelector('.ve-afc-logo-prev'); if (p) p.style.setProperty('--bg', t.value); }
+    // só o celular de prévia é redesenhado (o formulário inteiro tiraria o foco do campo); com o vídeo da intro
+    // tocando, só o que aparece nele (cores e logo do canto) redesenha
+    const pv = t.ownerDocument.querySelector('.ve-afc-cel');
+    if (pv && !(pv.querySelector('video') && !/^(paleta|marca)\./.test(campo))) pv.outerHTML = veAfcPrevia(m);
     if (t.dataset.afcChk) veAfRender();
     return true;
 }
@@ -323,8 +399,8 @@ const veAfcIntroSeg = m => Math.max(1, Math.min(15, +(m.intro && m.intro.seg) ||
 // Segundos de intro + encerramento (para "usar todas as fotos" calcular a duração do vídeo)
 function veAfcExtraSeg(m, bpm) {
     const bar = 4 * 60 / (bpm || 120);
-    return (veAfcCobre(m.intro.tipo) ? veAfcIntroSeg(m) : 0) +
-        (veAfcCobre(m.fim.tipo) ? veAfcCompassos(m.fim.compassos, bpm) * bar : 0);
+    return (veAfcCobre(m.intro.tipo) ? veAfcIntroSeg(m) : veAfcVideoCobre(m, 'intro') ? veAfcVideoSeg(m, 'intro') : 0) +
+        (veAfcCobre(m.fim.tipo) ? veAfcCompassos(m.fim.compassos, bpm) * bar : veAfcVideoCobre(m, 'fim') ? veAfcVideoSeg(m, 'fim') : 0);
 }
 
 // Segundos reservados no começo/fim (intro e encerramento que cobrem a tela): o plano não põe cena ali
@@ -332,8 +408,10 @@ function veAfcReserva(m, bpm) {
     const bar = 4 * 60 / (bpm || 120);
     // intro: meia batida a menos, para o plano poder cortar na batida mais perto dos segundos pedidos (com a reserva
     // cheia, 3 s viravam 3,6 s a 83 BPM)
-    return [veAfcCobre(m.intro.tipo) ? Math.max(1, veAfcIntroSeg(m) - 30 / (bpm || 120)) : 0,
-            veAfcCobre(m.fim.tipo) ? veAfcCompassos(m.fim.compassos, bpm) * bar : 0];
+    // intro de vídeo: também reservada (antes as cenas dos primeiros segundos eram jogadas fora — "usar todas" falhava)
+    const intro = veAfcCobre(m.intro.tipo) ? veAfcIntroSeg(m) : veAfcVideoCobre(m, 'intro') ? veAfcVideoSeg(m, 'intro') : 0;
+    return [intro ? Math.max(1, intro - 30 / (bpm || 120)) : 0,
+            veAfcCobre(m.fim.tipo) ? veAfcCompassos(m.fim.compassos, bpm) * bar : veAfcVideoCobre(m, 'fim') ? veAfcVideoSeg(m, 'fim') : 0];
 }
 
 // Som do Soundboard escolhido sempre igual para o mesmo cliente (identidade sonora): categoria + nome
@@ -382,19 +460,23 @@ async function veAfcPreparar(plano, bin) {
     // intro que cobre a tela: as cenas começam no primeiro corte depois dela
     let di = 0;
     if (veAfcCobre(m.intro.tipo)) di = veAfcIntroSeg(m);
-    else if (veAfcPronto(m.intro.tipo) && x.introV && !m.intro.transparente) di = x.introV.info.duration;
+    else if (veAfcPronto(m.intro.tipo) && x.introV && !m.intro.transparente)
+        di = (m.intro.tipo === 'video' && veAfcVideoSeg(m, 'intro')) || x.introV.info.duration;
     if (di > 0) {
         // feita pelo sistema: o corte da música mais perto dos segundos escolhidos (fica na batida)
         const perto = bordas.filter(t => t - t0 >= 1).sort((a, b) => Math.abs(a - t0 - di) - Math.abs(b - t0 - di))[0];
+        // vídeo: a cena mais perto do fim dela dentro de ±10% (a intro estica/encolhe até lá); senão a última antes
+        const naVel = m.intro.tipo === 'video'
+            ? inicios.filter(t => t > t0 && Math.abs((t - t0) / di - 1) <= VE_AFC_VEL).sort((a, b) => Math.abs(a - t0 - di) - Math.abs(b - t0 - di))[0] : null;
         const corte = veAfcPronto(m.intro.tipo)
-            ? inicios.filter(t => t - t0 <= di + 0.05 && t > t0).pop() ?? inicios.find(t => t > t0)
+            ? naVel ?? inicios.filter(t => t - t0 <= di + 0.05 && t > t0).pop() ?? inicios.find(t => t > t0)
             : perto;
-        if (corte != null) { x.introFim = corte - t0; plano.slots = plano.slots.filter(s => (s.cel ? s.grupo_a : s.a) >= corte - 1e-3); }
+        if (corte != null) { x.introFim = corte - t0; x.introSeg = di; plano.slots = plano.slots.filter(s => (s.cel ? s.grupo_a : s.a) >= corte - 1e-3); }
     }
     // encerramento: as cenas acabam no último corte antes dele
     let df = 0;
     if (veAfcCobre(m.fim.tipo)) df = veAfcCompassos(m.fim.compassos, plano.bpm) * compasso;
-    else if (veAfcPronto(m.fim.tipo) && x.fimV) df = x.fimV.info.duration;
+    else if (veAfcPronto(m.fim.tipo) && x.fimV) df = (m.fim.tipo === 'video' && veAfcVideoSeg(m, 'fim')) || x.fimV.info.duration;
     if (df > 0) {
         const corte = bordas.filter(t => plano.fim - t >= df - 0.05 && t > t0 + (x.introFim || 0) + 0.5).pop();
         if (corte != null) { x.fimIni = corte - t0; plano.slots = plano.slots.filter(s => (s.cel ? s.grupo_a : s.a) < corte - 1e-3); }
@@ -434,6 +516,7 @@ async function veAfcPreparar(plano, bin) {
                 whoosh: veAfcSom(m, 'whoosh', /^Whoosh|^Swoosh|^Transição/, 0, Math.max(0.8, b * 3)),
                 whoosh2: veAfcSom(m, 'whoosh', /^Whoosh|^Swoosh|^Transição/, 1, Math.max(0.8, b * 3)),
                 fim: veAfcSom(m, 'notificacao', /^Sucesso|^Sino|^Ding/, 0, 2.5),
+                glitch: veAfcSom(m, 'glitch', /^Glitch/i, 0, 1.2),
             };
             for (const k of Object.keys(x.sfx)) x.sfx[k] = x.sfx[k] && { ...x.sfx[k], md: await x.som(x.sfx[k]) };
         } else x.semPack = true;
@@ -538,11 +621,16 @@ function veAfcExtras(out, plano, x) {
     const nova = () => topo++;
     // cor (Luz e Cor) só nas cenas: a cor da marca fica exata. Cobre a transição de entrada/saída inteira
     // (começar no meio de uma transição deixa um trecho preto no quadro)
-    const aIni = iniCenas ? Math.max(0, iniCenas - 0.3) : 0, aFim = x.fimIni != null ? Math.min(x.total, fimCenas + 0.3) : fimCenas;
+    // intro pronta (vídeo/Comp) entra em corte seco e já vem acabada: nada de cor/efeito da edição em cima dela
+    const prontaI = veAfcPronto(m.intro.tipo) && !m.intro.transparente && iniCenas > 0;
+    const aIni = prontaI ? iniCenas : iniCenas ? Math.max(0, iniCenas - 0.3) : 0, aFim = x.fimIni != null ? Math.min(x.total, fimCenas + 0.3) : fimCenas;
     // só o look (a camada longa); os efeitos curtos (clarão, P&B, pulso) ficam onde estão
-    out.filter(c => c.fx && c.fx.some(f => f.t === 'lc') && VE.media[c.m] && VE.media[c.m].kind === 'ajuste' && c.e - c.s > 1 && !(c.k && c.k.op)).forEach(c => {
-        c.st = +aIni.toFixed(4); c.e = +(aFim - aIni).toFixed(4);
-    });
+    const look = c => c.fx && c.fx.some(f => f.t === 'lc') && VE.media[c.m] && VE.media[c.m].kind === 'ajuste' && c.e - c.s > 1 && !(c.k && c.k.op);
+    out.filter(look).forEach(c => { c.st = +aIni.toFixed(4); c.e = +(aFim - aIni).toFixed(4); });
+    if (prontaI) for (let i = out.length - 1; i >= 0; i--) {
+        const c = out[i];
+        if (!look(c) && VE.media[c.m] && VE.media[c.m].kind === 'ajuste' && c.st < iniCenas - 0.01) out.splice(i, 1);
+    }
     // a cena antes do encerramento não escurece (o encerramento entra no lugar)
     if (x.fimIni != null) out.forEach(c => { if (c.tout && c.tout.t === 'fadeblack' && Math.abs(c.st + c.e - c.s - x.fimIni) < 0.05) delete c.tout; });
     const tAuto = m.trans.find(t => VE_TR[t]) || 'pull';   // a do encerramento é de camada (as sobreposições não entram aqui)
@@ -553,13 +641,14 @@ function veAfcExtras(out, plano, x) {
         if (!s || !s.md) return;
         let ini = 0;
         if (st < 0) { ini = -st; st = 0; }
-        const dur = Math.min(s.dur - ini, x.total - st);
+        const v = (extra && extra.v) || 1;   // som com velocidade (intro de vídeo esticada): dur = na timeline
+        const dur = Math.min((s.dur - ini) / v, x.total - st);
         if (dur <= 0.05) return;
         let k = fimA.findIndex(f => f <= st + 1e-3);
         if (k < 0) { fimA.push(0); k = fimA.length - 1; }
         fimA[k] = st + dur;
         // +3 dB sobre o ganho de cada som (o cliente pediu os efeitos um pouco mais altos, 2026-10-01)
-        out.push({ tr: k + 1, st: +st.toFixed(4), s: +ini.toFixed(4), e: +(ini + dur).toFixed(4), m: s.md.id, g: g + 3, ...(extra || {}) });
+        out.push({ tr: k + 1, st: +st.toFixed(4), s: +ini.toFixed(4), e: +(ini + dur * v).toFixed(4), m: s.md.id, g: g + 3, ...(extra || {}) });
     };
     const sx = x.sfx || {};
     const logoSc = larg => x.logo ? W * larg / x.logo.w * 100 : 100;
@@ -716,22 +805,30 @@ function veAfcExtras(out, plano, x) {
         som(sx.boom, 0, -4);
         x.introFim = di;
     } else if (veAfcPronto(m.intro.tipo) && x.introV) {
-        const dur = m.intro.transparente ? x.introV.info.duration : (x.introFim || x.introV.info.duration);
-        out.push({ tr: m.intro.transparente ? nova() : SC, st: 0, s: 0, e: +Math.min(dur, x.introV.info.duration).toFixed(4), m: x.introV.id, x: 'v' });
-        // Comp com som: o som dela numa trilha de áudio livre (a imagem fica no lugar da intro)
-        if (x.introV.comp && x.introV.info.has_audio) som({ md: x.introV, dur: Math.min(dur, x.introV.info.duration) }, 0, 0, { x: 'a' });
+        const total = x.introV.info.duration, usa = Math.min(total, x.introSeg || total);
+        const dur = m.intro.transparente ? total : (x.introFim || usa);
+        // vídeo: estica/encolhe (até 10%) para o fim dele cair no corte da música; fora disso corta o que passar
+        const v = m.intro.tipo === 'video' && !m.intro.transparente && x.introFim ? Math.max(1 - VE_AFC_VEL, Math.min(1 + VE_AFC_VEL, usa / x.introFim)) : 1;
+        const e = +Math.min(total, dur * v).toFixed(4), vel = Math.abs(v - 1) > 0.002 ? { v: +v.toFixed(5) } : {};
+        out.push({ tr: m.intro.transparente ? nova() : SC, st: 0, s: 0, e, m: x.introV.id, x: 'v', ...vel });
+        // som da intro (Comp ou vídeo com som, se o modelo quiser): numa trilha de áudio livre, junto da música
+        const comSom = x.introV.comp ? x.introV.info.has_audio : (x.introV.info.has_audio && m.intro.som !== false);
+        if (comSom) som({ md: x.introV, dur: e }, 0, -3, { x: 'a', ...vel });
         if (m.intro.transparente) x.introFim = 0;
-        texto(b, Math.max(1, dur - b), VEAF.titulo, H * 0.62, nova());
+        // intro pronta já traz o título dela: o texto do modelo só entra sobre intro transparente
+        if (m.intro.transparente) texto(b, Math.max(1, dur - b), VEAF.titulo, H * 0.62, nova());
     } else texto(0, Math.min(x.total, Math.max(2.5, b * 8)), VEAF.titulo, H * 0.42, nova());
     // corpo: whoosh em cada transição (no máximo um a cada ~1,5 s), impacto nos flashes
     let ult = -9, alt = 0;
     // cortes com transição: de camada (tin) ou de sobreposição (camada de ajuste centrada no corte)
-    const cortes = out.filter(c => c.tin && c.tr === SC).map(c => c.st)
-        .concat(out.filter(c => typeof veOvtFx === 'function' && VE.media[c.m] && VE.media[c.m].kind === 'ajuste' && veOvtFx(c).length).map(c => c.st + (c.e - c.s) / 2));
-    cortes.filter(t => t > iniCenas + 0.1 && t < fimCenas - 0.1).sort((a, b2) => a - b2).forEach(t => {
+    // transição glitch/pixel ganha o som de glitch do Soundboard (o resto, whoosh)
+    const cortes = out.filter(c => c.tin && c.tr === SC).map(c => ({ t: c.st }))
+        .concat(out.filter(c => typeof veOvtFx === 'function' && VE.media[c.m] && VE.media[c.m].kind === 'ajuste' && veOvtFx(c).length)
+            .map(c => ({ t: c.st + (c.e - c.s) / 2, glitch: veOvtFx(c).some(f => f.t === 'glitch' || f.t === 'pixel') })));
+    cortes.filter(o => o.t > iniCenas + 0.1 && o.t < fimCenas - 0.1).sort((a, b2) => a.t - b2.t).forEach(({ t, glitch }) => {
         if (t - ult < 1.5) return;
-        const s = alt++ % 2 ? sx.whoosh2 : sx.whoosh;
-        if (s) { som(s, t - s.dur * 0.45, -9); ult = t; }
+        const s = glitch && sx.glitch ? sx.glitch : alt++ % 2 ? sx.whoosh2 : sx.whoosh;
+        if (s) { som(s, t - (s === sx.glitch ? 0.05 : s.dur * 0.45), -9); ult = t; }
     });
     out.filter(c => VE.media[c.m] && VE.media[c.m]._afBranco && c.st > iniCenas + 0.1 && c.st < fimCenas).forEach(c => som(sx.boom, c.st + 0.02, -8));
     // encerramento

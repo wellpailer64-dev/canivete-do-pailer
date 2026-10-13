@@ -3024,7 +3024,66 @@ def _key_params(v):
     return {"ar": ar, "ag": ag, "ab": ab, "dk": _num(v.get("dk"), 0.05, 1, 0.5), "ganho": _num(v.get("ganho"), 0, 2, 1),
             "cb": cb, "cw": max(cw, cb + 0.01), "eq": _num(v.get("eq"), 0, 1, 0.5), "spill": _num(v.get("spill"), 0, 1, 1),
             "azul": bool(v.get("azul")), "choke": int(round(_num(v.get("choke"), -10, 10))),
-            "suave": _num(v.get("suave"), 0, 20)}
+            "suave": _num(v.get("suave"), 0, 20), "max": bool(v.get("max")), "desc": _num(v.get("desc"), 0, 1),
+            "tela": [_num(x, 0, 1) for x in (list(v.get("tela") or [])[:3] + [0, 0.69, 0.25])[:3]]}
+
+
+def _key_alfa_cor(kp, R, G, B):
+    """As contas do veKeyDraw (editor-fx.js) em numpy (0..255): alfa da chave (0..1, em 8 bits como a LUT da prévia) e
+    a cor descontaminada e sem reflexo."""
+    import numpy as np
+    eq, az, mx = kp["eq"], kp["azul"], kp["max"]
+
+    def outros(r, g, b):
+        if az:
+            return np.maximum(r, g) if mx else r * eq + g * (1 - eq)
+        return np.maximum(r, b) if mx else r * eq + b * (1 - eq)
+
+    S = B if az else G
+    bruto = np.clip(np.floor(0.5 * outros(R, G, B) - 0.5 * S + 128), 0, 255)
+    ak = np.clip(((1 - kp["ganho"] * (1 - 2 * bruto / 255) / kp["dk"]) - kp["cb"]) / (kp["cw"] - kp["cb"]), 0, 1)
+    ak = np.floor(ak * 255 + 0.5) / 255
+    c = [R, G, B]
+    if kp["desc"] > 0.001:
+        aa = np.maximum(ak, 0.08)
+        f = np.where(ak < 1, kp["desc"] * (1 - aa) / aa, 0)
+        c = [np.clip(x + f * (x - t * 255), 0, 255) for x, t in zip(c, kp["tela"])]
+    if kp["spill"] > 0.001:
+        i = 2 if az else 1
+        c[i] = c[i] - kp["spill"] * np.maximum(c[i] - outros(*c), 0)
+    return ak, c
+
+
+def _key_geq(kp):
+    """Chroma Key com "Preservar amarelos" (outros = máx. de R e B) ou "Descontaminar bordas" — o despill do ffmpeg só
+    mistura R e B pelo Equilíbrio. A cor final só depende do RGB de entrada: vai numa LUT 3D (65³, tetraédrica; um geq
+    com tudo fazia 0,5 quadro/s em 1080×1920). A transparência vai num geq curto (~10 q/s). O modo placa faz no shader."""
+    import numpy as np
+    eq, az = kp["eq"], kp["azul"]
+    chave = json.dumps({k: kp[k] for k in ("eq", "azul", "max", "desc", "spill", "ganho", "dk", "cb", "cw", "tela")}, sort_keys=True)
+    nome = os.path.join(_work_dir(), f"key_{hashlib.md5(chave.encode()).hexdigest()[:16]}.cube")
+    if not os.path.isfile(nome):
+        n = 65
+        v = np.arange(n) * 255.0 / (n - 1)
+        B, G, R = np.meshgrid(v, v, v, indexing="ij")   # .cube: r mais rápido
+        _, c = _key_alfa_cor(kp, R.ravel(), G.ravel(), B.ravel())
+        tab = np.clip(np.stack(c, axis=1) / 255.0, 0, 1)
+        with open(nome + ".part", "w", encoding="ascii") as f:
+            f.write(f"LUT_3D_SIZE {n}\n")
+            np.savetxt(f, tab, fmt="%.6f")
+        os.replace(nome + ".part", nome)
+    if kp["max"]:
+        o = "max(r(X,Y),g(X,Y))" if az else "max(r(X,Y),b(X,Y))"
+    else:
+        o = f"(r(X,Y)*{eq:.5f}+g(X,Y)*{1 - eq:.5f})" if az else f"(r(X,Y)*{eq:.5f}+b(X,Y)*{1 - eq:.5f})"
+    S = "b(X,Y)" if az else "g(X,Y)"
+    # alfa = rampa linear do bruto (0,5·outros − 0,5·tela + 127,5): a·bruto + c, já em 0..255 (menos contas por pixel)
+    g_, dk, cb, cw = kp["ganho"], kp["dk"], kp["cb"], kp["cw"]
+    ka = 2 * g_ / (255 * dk) / (cw - cb) * 255
+    kc = ((1 - g_ / dk) - cb) / (cw - cb) * 255
+    a = f"clip({ka:.6f}*(0.5*{o}-0.5*{S}+127.5)+{kc:.5f},0,255)*alpha(X,Y)/255"
+    return (f"format=gbrap,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='{a}',"
+            f"lut3d=file={_caminho_filtro(nome)}:interp=tetrahedral")
 
 
 def _filtros_fx(fx, mw, mh, tag="x"):
@@ -3091,7 +3150,9 @@ def _filtros_fx(fx, mw, mh, tag="x"):
             cadeia = [f"colorchannelmixer=ar={ar:.5f}:ag={ag:.5f}:ab={ab:.5f}:aa=0.5",
                       # o alfa bruto sai do vídeo opaco; a imagem com transparência própria multiplica depois
                       f"lutrgb=a='{a}'"]
-            if spill > 0.001:
+            if kp["max"] or kp["desc"] > 0.001:
+                cadeia = [_key_geq(kp)]   # alfa, descontaminação e reflexo juntos (despill do ffmpeg não sabe o máx.)
+            elif spill > 0.001:
                 azul = 1 if kp["azul"] else 0
                 cadeia.append(f"despill=type={azul}:mix={eq:.5f}:expand=0:red=0:green={-spill if not azul else 0:.4f}"
                               f":blue={-spill if azul else 0:.4f}:brightness=0:alpha=0")
@@ -3559,6 +3620,14 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             r = export_placa.exportar(args_placa, aberto, pasta_saida, prog, stop_event, proc_holder)
         except Exception as e:
             r = {"success": False, "error": f"placa: {e}"}
+        if (r is not None and not r.get("success") and not r.get("cancelled")
+                and any(k in (r.get("error") or "") for k in ("MEMORY", "allocate"))):
+            # memória da placa: tenta de novo na placa, em blocos, antes de cair no processador
+            prog(0, "Placa sem memória para tudo de uma vez: exportando em blocos...")
+            try:
+                r = export_placa.exportar(dict(args_placa, _blocos=True), aberto, pasta_saida, prog, stop_event, proc_holder)
+            except Exception as e:
+                r = {"success": False, "error": f"placa (blocos): {e}"}
         if r is not None and (r.get("success") or r.get("cancelled")):
             return r
         # "Processador · motivo": o Encoder mostra por que a montagem não foi na placa (antes era preciso investigar)
@@ -4168,8 +4237,15 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 filtros[i_cadeia] = filtros[i_cadeia][:-len(f"[l{n}]")] + f"[l{n}r]"
                 r, (R, G, B, op, dx, dy, sig) = f"sh{n}", sombra
                 m = int(math.ceil(3 * sig)) + 2
+                # Moldura de TAMANHO FIXO (o maior que a camada chega, girada e com pulso): com a escala animada a camada
+                # muda de tamanho a cada quadro, e pad iw+m → lutrgb/gblur com quadros de tamanho variável derrubava o
+                # ffmpeg (0xC0000005 / corrupção de memória — AutoFrame com cartões e as setas da intro Carlinhos,
+                # 2026-10-12). eval=frame recentra cada quadro na moldura fixa (o centro continua o mesmo).
+                maior = max([c["sc"]] + [p[1] for p in c["kf"].get("sc", [])]) * 1.2
+                lado = int(math.ceil(math.hypot(c["mw"], c["mh"]) * maior)) + 2 * m + 4
+                lado += lado % 2
                 filtros.append(f"[l{n}r]split[l{n}][{r}a]")
-                filtros.append(f"[{r}a]format=rgba,pad=iw+{2 * m}:ih+{2 * m}:{m}:{m}:color=black@0,"
+                filtros.append(f"[{r}a]format=rgba,pad={lado}:{lado}:(ow-iw)/2:(oh-ih)/2:color=black@0:eval=frame,"
                                f"lutrgb=r={R}:g={G}:b={B}:a='val*{op:.4f}'"
                                + (f",format=gbrap,gblur=sigma={sig:.3f}:planes=8,format=rgba" if sig >= 0.3 else "") + f"[{r}b]")
                 filtros.append(f"{vf}[{r}b]overlay=x='({px})+{dx:.3f}-w/2':y='({py})+{dy:.3f}-h/2'"

@@ -1380,6 +1380,82 @@ def af_escolher(tipo):
     return {"success": True, "paths": list(r) if isinstance(r, (list, tuple)) else [r]}
 
 
+# AutoFrame: "Importar do Drive" — baixa a pasta (só fotos e vídeos) com o rclone do gdrive dumper e manda o caminho de
+# volta para o painel analisar (repetidas e ruins saem como sempre). Pasta = <Vídeos>/Kanivete AutoFrame/<nome>_<id>:
+# o mesmo link de novo só baixa o que falta.
+_AF_DRIVE_EXT = ["jpg", "jpeg", "png", "webp", "heic", "heif", "bmp", "tif", "tiff",
+                 "mp4", "mov", "m4v", "mkv", "avi", "webm", "mts", "m2ts", "3gp"]
+_af_drive_stop = None
+
+
+def _af_drive_base():
+    base = os.path.join(os.path.expanduser("~"), "Videos")
+    return os.path.join(base if os.path.isdir(base) else os.path.expanduser("~"), "Kanivete AutoFrame")
+
+
+def af_drive(url):
+    from Functions import gdrive_dumper as gd
+    import re
+    import threading
+    global _af_drive_stop
+    if _af_drive_stop is not None and not _af_drive_stop.is_set():
+        return {"success": False, "error": "Já existe um download do Drive em andamento."}
+    tipo, item_id = gd.parse_link(url)
+    if not item_id:
+        return {"success": False, "error": "Link do Drive inválido: cole o link da pasta (ou do arquivo)."}
+    _af_drive_stop = stop = threading.Event()
+
+    def send(**d):
+        if _window:
+            try:
+                _window.evaluate_js(f"veOnAfDrive({json.dumps(d)})")
+            except Exception:
+                pass
+
+    def run():
+        try:
+            send(etapa="conectando", msg="Conectando ao Google Drive...")
+            ok, erro = gd.garantir_conexao(callback_log=lambda m: send(etapa="conectando", msg=str(m)))
+            if not ok:
+                send(etapa="erro", msg=erro or "Não consegui conectar ao Google Drive.")
+                return
+            nome = gd.get_folder_name(item_id, tipo=tipo) or item_id
+            limpo = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(nome)).strip(" .")[:60] or "Drive"
+            destino = os.path.join(_af_drive_base(), f"{limpo}_{item_id[:6]}")
+            send(etapa="baixando", msg=f"Baixando “{nome}”...", pct=0, pasta=destino)
+            remote = [item_id] if tipo == "file" else ["--drive-root-folder-id", item_id, "gdrive:"]
+            ok = gd.dump_pasta(remote, destino, perfil="rapida", tipo=tipo, incluir=_AF_DRIVE_EXT, stop_event=stop,
+                               callback_progresso=lambda p, s: send(etapa="baixando", pct=p, msg=(
+                                   f"{s.get('files_done', 0)}/{s.get('files_total', '?')} arquivos · {s.get('speed', '')}"
+                                   if isinstance(s, dict) and s.get("files_total", -1) not in (-1, None) else
+                                   f"Baixando... {s.get('done', '') if isinstance(s, dict) else ''}")))
+            if stop.is_set():
+                send(etapa="erro", msg="Download cancelado.")
+            elif ok:
+                send(etapa="pronto", msg="Download concluído", pasta=destino, nome=nome)
+            else:
+                send(etapa="erro", msg="O download falhou (link sem acesso? confira se a pasta está compartilhada).")
+        except Exception as e:
+            send(etapa="erro", msg=f"Erro: {e}")
+        finally:
+            stop.set()
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
+def af_drive_cancelar():
+    if _af_drive_stop is not None:
+        _af_drive_stop.set()
+        try:
+            from Functions import gdrive_dumper as gd
+            if gd._current_proc is not None:
+                gd._current_proc.kill()
+        except Exception:
+            pass
+    return {"success": True}
+
+
 def _capa_do_projeto(dados):
     """(arquivo, segundo) da capa: o primeiro quadro da timeline ativa — a camada de base no começo (trilha mais baixa
     com imagem/vídeo; vídeo com transparência e imagens por cima só se não houver outra). Sem clipes: o vídeo principal."""
@@ -4138,6 +4214,12 @@ class ApiBridge:
     def af_escolher(self, tipo):
         return af_escolher(tipo)
 
+    def af_drive(self, url):
+        return af_drive(url)
+
+    def af_drive_cancelar(self):
+        return af_drive_cancelar()
+
     # AutoFrame Customizado: modelos de cliente (Functions/autoframe_modelos.py)
     def afm_listar(self):
         from Functions import autoframe_modelos
@@ -4167,9 +4249,10 @@ class ApiBridge:
         else:
             r = _window.create_file_dialog(abrir, allow_multiple=True, file_types=(
                 "Música (*.mp3;*.wav;*.m4a;*.aac;*.flac;*.ogg;*.opus)", "Todos os arquivos (*.*)"))
-        from Functions import media_server
+        from Functions import media_server, autoframe_modelos
         paths = list(r or [])
-        return {"success": bool(paths), "itens": [{"path": p, "url": media_server.register(p)} for p in paths]}
+        return {"success": bool(paths), "itens": [{"path": p, "url": media_server.register(p),
+                                                    **(autoframe_modelos.duracao(p) if tipo == "video" else {})} for p in paths]}
 
     def ve_autosave(self, chave, nome, dados):
         return ve_autosave(chave, nome, dados)

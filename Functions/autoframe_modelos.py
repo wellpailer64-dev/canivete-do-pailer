@@ -78,7 +78,7 @@ def _com_urls(m):
         nome = _get(m, chaves)
         p = os.path.join(pasta, nome) if nome else None
         if p and os.path.isfile(p):
-            out["_arq"][".".join(chaves)] = {"path": p, "url": media_server.register(p)}
+            out["_arq"][".".join(chaves)] = {"path": p, "url": media_server.register(p), **(duracao(p) if chaves[-1] == "video" else {})}
     for d in _comp_midias(out):
         if d.get("arq"):
             p = os.path.join(pasta, d["arq"])
@@ -88,6 +88,16 @@ def _com_urls(m):
         mu["path"] = p if os.path.isfile(p) else None
         mu["url"] = media_server.register(p) if mu["path"] else None
     return out
+
+
+def duracao(p):
+    """Duração e som de um vídeo de intro/encerramento (o plano reserva esse tempo antes de importar a mídia)."""
+    try:
+        from Functions import video_cutter
+        r = video_cutter.probe(p)
+        return {"dur": float(r.get("duration") or 0), "som": bool(r.get("has_audio"))}
+    except Exception:
+        return {"dur": 0, "som": False}
 
 
 def listar():

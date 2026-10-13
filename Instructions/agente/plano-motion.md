@@ -83,6 +83,11 @@ Gramática de motion que o Pailer aprovou:
   (`vePrSegEm = () => null`) para ver a prévia ao vivo.
 
 ## Pendências
+- (Resolvido 2026-10-12) Prévia renderizada e exportação desenhando a mesma camada juntas apagavam a pasta uma da outra
+  (`FileNotFoundError q00000.png`): `cena3d.inicio` agora usa pasta por sessão. Em aberto: 1× o ffmpeg caiu
+  (3221225477) numa exportação da intro; o log se perdeu — se repetir, guardar o `export_fail_*.log`.
+- (Resolvido 2026-10-12) Chroma Key: "Preservar amarelos", "Descontaminar bordas" e "Mostrar status" (prévia WebGL/CPU,
+  exportação CPU = geq curto do alfa + LUT 3D 65³ da cor, placa = shader). Teste: `teste_export.py --casos chroma4`.
 - Vídeo com máscara/mãe na exportação é lido pelo navegador (H.264/VP9 ok; HEVC/ProRes não abrem: cai na cópia de edição).
 - Transição do editor numa camada desenhada não entra no desenho (a camada desenhada sai do clipe original).
 - Repetidor de formas, caminho de movimento curvo (posição com alças espaciais), auto-orientar, expressões livres.

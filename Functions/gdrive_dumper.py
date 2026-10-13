@@ -411,7 +411,7 @@ def _stats_to_ui(st):
     }
 
 
-def _montar_cmd(tipo, remote_args, destino, perfil, use_shared):
+def _montar_cmd(tipo, remote_args, destino, perfil, use_shared, incluir=None):
     cfg = PERFIS.get(perfil, PERFIS["normal"])
     sparse = _suporta_sparse(destino)
     comum = [
@@ -440,6 +440,9 @@ def _montar_cmd(tipo, remote_args, destino, perfil, use_shared):
         comum.append("--local-no-sparse")
     if use_shared:
         comum.append("--drive-shared-with-me")
+    if incluir and tipo != "file":
+        # só esses arquivos (ex.: fotos e vídeos para o AutoFrame), sem ligar para maiúsculas
+        comum += ["--ignore-case", "--include", "*.{" + ",".join(incluir) + "}"]
     if tipo == "file":
         # remote_args = [file_id]
         return [_rclone_exe(), "backend", "copyid", "gdrive:", remote_args[0], destino.rstrip("\\/") + os.sep] + comum
@@ -449,7 +452,7 @@ def _montar_cmd(tipo, remote_args, destino, perfil, use_shared):
 def dump_pasta(remote_args, destino, perfil="rapida",
                callback_log=None, callback_progresso=None,
                callback_arquivo=None,
-               stop_event=None, pause_event=None, tipo="folder"):
+               stop_event=None, pause_event=None, tipo="folder", incluir=None):
     """
     Executa o download via rclone.
 
@@ -504,7 +507,7 @@ def dump_pasta(remote_args, destino, perfil="rapida",
         tentativa += 1
         log("Iniciando download..." if tentativa == 1 else f"Tentativa {tentativa}/{MAX_TENTATIVAS} — retomando...")
 
-        cmd = _montar_cmd(tipo, remote_args, destino, perfil, use_shared)
+        cmd = _montar_cmd(tipo, remote_args, destino, perfil, use_shared, incluir)
         pausado = travou = False
         erros_linhas = []
 

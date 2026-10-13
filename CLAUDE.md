@@ -131,7 +131,8 @@ textos): plano em `Instructions/agente/ajuste-premiere.md`.
 Máscaras (ferramentas Máscara/Caneta), fosco de trilha, camada mãe + Nulo, desfoque de movimento, cronômetro em qualquer
 parâmetro de efeito/máscara/forma, aparar caminho/tracejado/estrela, curvas Passar e voltar/Elástico/Quicar, efeitos Brilho,
 Granulação, Rampa, Preenchimento, Contorno, Desfoque direcional/radial, Eco. Exporta como "camada desenhada" (ProRes 4444
-pelo desenhista da prévia). Guia, API `VEMO_API`, armadilhas e pendências: `Instructions/agente/plano-motion.md`.
+pelo desenhista da prévia). **Antes de qualquer motion: `Instructions/agente/mapa-habilidades-motion.md`** (técnicas destravadas
+peça a peça — confete, letra por letra, chevrons, recorte que preserva amarelo; anotar as novas ao terminar). Guia, API `VEMO_API`, armadilhas e pendências: `Instructions/agente/plano-motion.md`.
 Testes: `py -3.13 testes/teste_motion.py` e `py -3.13 testes/teste_export.py --casos motion,fxmotion,curvas --folha`.
 
 ## Pincel Roto (Roto Brush do After Effects)

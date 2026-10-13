@@ -21,9 +21,11 @@ def inicio(base, h):
     final = os.path.join(_pasta(base), h + ".mov")
     if os.path.isfile(final):
         return {"success": True, "pronto": True, "path": final, "url": media_server.register(final)}
-    tmp = os.path.join(_pasta(base), h + ".quadros")
-    shutil.rmtree(tmp, ignore_errors=True); os.makedirs(tmp, exist_ok=True)
+    # pasta POR SESSÃO: a prévia renderizada e a exportação podiam desenhar a mesma camada juntas e a segunda apagava
+    # a pasta da primeira no meio (FileNotFoundError q00000.png no lote — intro Carlinhos, 2026-10-12)
     sessao, url = media_server.abrir_envio()
+    tmp = os.path.join(_pasta(base), f"{h}.{sessao}.quadros")
+    shutil.rmtree(tmp, ignore_errors=True); os.makedirs(tmp, exist_ok=True)
     return {"success": True, "pronto": False, "sessao": sessao, "url": url, "pasta": tmp}
 
 
@@ -46,7 +48,7 @@ def fim(base, h, sessao, pasta, fps, n, on_progress=lambda p: None):
     faltam = [i for i in range(int(n)) if not os.path.isfile(os.path.join(pasta, f"q{i:05d}.png"))]
     if faltam:
         return {"success": False, "error": f"faltaram {len(faltam)} quadro(s) (ex.: {faltam[:3]})"}
-    final = os.path.join(_pasta(base), h + ".mov"); parte = os.path.join(_pasta(base), h + ".part.mov")
+    final = os.path.join(_pasta(base), h + ".mov"); parte = os.path.join(_pasta(base), f"{h}.{sessao}.part.mov")
     args = ["-framerate", str(fps), "-i", os.path.join(pasta, "q%05d.png"),
             "-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le", "-vendor", "apl0", parte]
     ok, erros = rodar_ffmpeg(args, duracao=int(n) / float(fps), on_progress=on_progress)

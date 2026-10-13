@@ -221,3 +221,24 @@ zeely.ai/blog/master-instagram-safe-zones (2026; adotada a margem mais conservad
 - Título: 2 linhas, última palavra em destaque (cor de destaque, maior), fonte no peso mais grosso, mais baixo.
 - Encerramento: só o logo centralizado e animado, sem frase, e fade para preto no fim.
 - Corpo (Fase 1: curvas, clarão, P&B nos acentos, pulso): aprovado ("ficou top").
+
+## AutoFrame Customizado: intro "Meu arquivo de vídeo" (2026-10-12)
+- O tempo da intro de vídeo é RESERVADO no plano (como o das intros do sistema): com "usar todas", nenhuma foto some.
+- Duração: arquivo inteiro ou os primeiros N s (`intro.segV`). A 1ª cena entra na batida mais perto do fim; a intro
+  estica/encolhe até 10% (`VE_AFC_VEL`, velocidade do clipe) para fechar ali sem perder o final; fora disso, corta.
+- Som da intro (`intro.som`, padrão ligado) numa trilha de áudio, na mesma velocidade, junto da música.
+- Nada da edição (look de cor, pulsos, sobreposições) cai em cima da intro pronta; o texto do modelo só entra em
+  intro transparente. Duração e som do arquivo: `autoframe_modelos.duracao` (listar e escolher).
+- Layout do painel (2026-10-12): `frontend/css/autoframe.css` — etapas com trilho, cards-pôster, formulário em 2
+  colunas com celular de prévia ao vivo (`veAfcPrevia`).
+- Apresentação das fotos (`VEAF.apres` / `m.apres`, padrão Misto): `veAfCartao` — Cartão (foto inteira, cantos 5%,
+  sombra macia, entra de baixo girando e assenta torta 1,5°) e Moldura (forma branca por trás, cai com mola, 3°), sobre a
+  mesma foto desfocada; saem ~0,3 s antes do corte (a transição seguinte começa antes dele). Misto: cena sem acento com
+  1 batida ou mais, uma a cada 3; foto que não cabe em 9:16 sem cortar alguém sempre vira cartão. Só quadros-chave de
+  posição/escala/giro + rounded/sombra/forma: nada de camada desenhada (exportação rápida).
+- Importar do Drive (`af_drive` em main.py): rclone do gdrive dumper só com fotos/vídeos (`incluir`), pasta
+  `~/Videos/Kanivete AutoFrame/<nome>_<id>` (o mesmo link de novo só baixa o que falta) e entra na análise normal.
+- Som: transição glitch/pixel usa a categoria glitch do Soundboard. Transições novas no modelo: split4, twirl, blurx,
+  ripple, shake, pixel; o rodízio do Dinâmico ganhou blurx.
+- Exportação (2026-10-12): sombra projetada com escala animada derrubava o ffmpeg na CPU (quadros de tamanho variável
+  em pad/lutrgb/gblur) → moldura de tamanho fixo; placa sem memória (muitas imagens) → tenta em blocos antes da CPU.

@@ -136,7 +136,14 @@ const VE_FX = {
             { k: 'encolher', nome: 'Encolher / expandir', min: -10, max: 10, step: 1, def: 0, un: 'px' },
             { k: 'suave', nome: 'Suavizar borda', min: 0, max: 20, step: 0.5, def: 0, un: 'px' },
             { k: 'spill', nome: 'Remover reflexo', min: 0, max: 100, step: 1, def: 100, un: '%' },
+            // Preservar amarelos: a transparência e o reflexo medem o verde contra o MAIOR entre vermelho e azul
+            // (amarelo, laranja e pele têm vermelho ≥ verde: ficam inteiros). Sem ele, o Equilíbrio mistura R e B e
+            // um amarelo esverdeado da tela fica meio transparente (a placa "Passei de primeira" ia a marrom).
+            { k: 'max', nome: 'Preservar amarelos (máx. de R e B)', tipo: 'bool', def: 0 },
+            // Descontaminar: na borda semitransparente (cabelo, desfoque) tira a parte da tela da cor: F = (C − (1−a)·tela)/a
+            { k: 'desc', nome: 'Descontaminar bordas', min: 0, max: 100, step: 1, def: 0, un: '%' },
             { k: 'matte', nome: 'Mostrar matte (só na prévia)', tipo: 'bool', def: 0 },
+            { k: 'status', nome: 'Mostrar status: cinza = semitransparente (só na prévia)', tipo: 'bool', def: 0 },
         ],
         neutro: () => false,
         draw: (a, v, env) => veKeyDrawGL(a, v, env) || veKeyDraw(a, v, env),
@@ -145,7 +152,7 @@ const VE_FX = {
             // coeficientes do colorchannelmixer para o alfa (aa = 0,5 com o alfa de entrada 255 = constante)
             const mix = k.azul ? { ar: 0.5 * e, ag: 0.5 * c, ab: -0.5 } : { ar: 0.5 * e, ag: -0.5, ab: 0.5 * c };
             return { azul: k.azul ? 1 : 0, ...mix, dk: k.dk, ganho: k.ganho, cb: k.cb, cw: k.cw, eq: e,
-                     spill: k.spill, choke: k.choke, suave: k.suave };
+                     spill: k.spill, choke: k.choke, suave: k.suave, max: k.max ? 1 : 0, desc: k.desc, tela: k.tela };
         },
     },
     crop: {
@@ -445,9 +452,10 @@ function veB3dDraw(a, v, env) {
 function veKeyCalc(v) {
     const hx = /^#[0-9a-f]{6}$/i.test(v.cor) ? v.cor : VE_KEY_PADRAO;
     const kr = parseInt(hx.slice(1, 3), 16) / 255, kg = parseInt(hx.slice(3, 5), 16) / 255, kb = parseInt(hx.slice(5, 7), 16) / 255;
-    const azul = kb > kg, eq = v.bal / 100;
-    // canal da tela S e os outros dois (o1 pesa eq, o2 pesa 1−eq)
-    const dk = Math.max(0.05, azul ? kb - (eq * kr + (1 - eq) * kg) : kg - (eq * kr + (1 - eq) * kb));
+    const azul = kb > kg, eq = v.bal / 100, max = !!v.max;
+    // canal da tela S e os outros dois (o1 pesa eq, o2 pesa 1−eq; com "Preservar amarelos", o maior dos dois)
+    const outros = azul ? (max ? Math.max(kr, kg) : eq * kr + (1 - eq) * kg) : (max ? Math.max(kr, kb) : eq * kr + (1 - eq) * kb);
+    const dk = Math.max(0.05, (azul ? kb : kg) - outros);
     const cb = Math.min(v.preto, v.branco - 1) / 100, cw = Math.max(v.branco, v.preto + 1) / 100;
     const ganho = v.ganho / 100;
     const lut = new Uint8ClampedArray(256);
@@ -455,7 +463,8 @@ function veKeyCalc(v) {
         const a = 1 - ganho * (1 - 2 * i / 255) / dk;
         lut[i] = Math.round(Math.min(1, Math.max(0, (a - cb) / (cw - cb))) * 255);
     }
-    return { azul, eq, dk, cb, cw, ganho, lut, spill: v.spill / 100, choke: Math.round(v.encolher), suave: v.suave };
+    return { azul, eq, dk, cb, cw, ganho, lut, spill: v.spill / 100, choke: Math.round(v.encolher), suave: v.suave,
+             max, desc: Math.max(0, Math.min(100, +v.desc || 0)) / 100, tela: [kr, kg, kb] };
 }
 const VEKEY = { a: null, b: null, m: null, m2: null };
 function veKeyCv(k, w, h) {
@@ -484,15 +493,24 @@ function veKeyDraw(a, v, env) {
     A.ctx.clearRect(0, 0, w, h);
     A.ctx.drawImage(a.cv, 0, 0);
     const img = A.ctx.getImageData(0, 0, w, h), d = img.data, n = w * h, al = new Uint8ClampedArray(n);
-    const eq = k.eq, ceq = 1 - eq, amt = k.spill, lut = k.lut;
+    const eq = k.eq, ceq = 1 - eq, amt = k.spill, lut = k.lut, mx = k.max, desc = k.desc;
+    const T = k.tela.map(x => x * 255);
+    // os "outros" canais (contra o da tela): média pelo Equilíbrio ou o maior (Preservar amarelos)
+    const outros = (r, g, b) => k.azul ? (mx ? Math.max(r, g) : r * eq + g * ceq) : (mx ? Math.max(r, b) : r * eq + b * ceq);
     for (let i = 0, j = 0; i < n; i++, j += 4) {
-        const r = d[j], g = d[j + 1], b = d[j + 2];
-        const bruto = k.azul ? 0.5 * eq * r + 0.5 * ceq * g - 0.5 * b + 127.5 : 0.5 * eq * r - 0.5 * g + 0.5 * ceq * b + 127.5;
+        let r = d[j], g = d[j + 1], b = d[j + 2];
+        const bruto = 0.5 * outros(r, g, b) - 0.5 * (k.azul ? b : g) + 127.5;
         const src = d[j + 3];
-        al[i] = src === 0 ? 0 : Math.round(lut[Math.max(0, Math.min(255, Math.round(bruto)))] * src / 255);
+        const ak = lut[Math.max(0, Math.min(255, Math.round(bruto)))];
+        al[i] = src === 0 ? 0 : Math.round(ak * src / 255);
+        if (desc > 0 && ak < 255) {
+            const a = Math.max(ak / 255, 0.08), f = desc * (1 - a) / a;   // C + desc·(F − C), F = (C − (1−a)·T)/a
+            r = Math.max(0, Math.min(255, r + f * (r - T[0]))); g = Math.max(0, Math.min(255, g + f * (g - T[1]))); b = Math.max(0, Math.min(255, b + f * (b - T[2])));
+            d[j] = r; d[j + 1] = g; d[j + 2] = b;
+        }
         if (amt > 0) {
-            if (k.azul) { const s = b - (r * eq + g * ceq); if (s > 0) d[j + 2] = b - amt * s; }
-            else { const s = g - (r * eq + b * ceq); if (s > 0) d[j + 1] = g - amt * s; }
+            const s = (k.azul ? b : g) - outros(r, g, b);
+            if (s > 0) d[j + (k.azul ? 2 : 1)] = (k.azul ? b : g) - amt * s;
         }
         d[j + 3] = 255;
     }
@@ -503,7 +521,11 @@ function veKeyDraw(a, v, env) {
     for (let i = 0, j = 0; i < n; i++, j += 4) { md[j] = md[j + 1] = md[j + 2] = 255; md[j + 3] = al[i]; }
     M.ctx.putImageData(mi, 0, 0);
     let mask = M.cv;
-    const sp = k.suave * env.q;
+    if (v.status) {   // status: preto = some, branco = fica, cinza = semitransparente (onde o recorte precisa de ajuste)
+        for (let i = 0, j = 0; i < n; i++, j += 4) { md[j + 3] = al[i] < 5 ? 0 : al[i] > 250 ? 255 : 128; }
+        M.ctx.putImageData(mi, 0, 0);
+    }
+    const sp = v.status ? 0 : k.suave * env.q;
     if (sp >= 0.05) {
         const M2 = veKeyCv('m2', w, h);
         M2.ctx.clearRect(0, 0, w, h);
@@ -514,7 +536,7 @@ function veKeyDraw(a, v, env) {
     }
     const out = veFxOther(a, w, h);
     out.ctx.globalCompositeOperation = 'source-over';
-    if (v.matte) {
+    if (v.matte || v.status) {
         out.ctx.fillStyle = '#000';
         out.ctx.fillRect(0, 0, w, h);
         out.ctx.drawImage(mask, 0, 0);
@@ -538,18 +560,25 @@ const VE_KEY_VS = `#version 300 es
 in vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }`;
 const VE_KEY_FS_MATTE = `#version 300 es
 precision highp float;
-uniform sampler2D src; uniform sampler2D lut; uniform bool azul; uniform float eq, amt;
+uniform sampler2D src; uniform sampler2D lut; uniform bool azul, mx; uniform float eq, amt, desc; uniform vec3 tela;
 out vec4 o;
+float outros(vec3 c) {
+    float ceq = 1.0 - eq;
+    return azul ? (mx ? max(c.r, c.g) : c.r * eq + c.g * ceq) : (mx ? max(c.r, c.b) : c.r * eq + c.b * ceq);
+}
 void main() {
     vec4 c = texelFetch(src, ivec2(gl_FragCoord.xy), 0) * 255.0;
-    float ceq = 1.0 - eq;
-    float bruto = azul ? 0.5 * eq * c.r + 0.5 * ceq * c.g - 0.5 * c.b + 127.5 : 0.5 * eq * c.r - 0.5 * c.g + 0.5 * ceq * c.b + 127.5;
+    float bruto = 0.5 * outros(c.rgb) - 0.5 * (azul ? c.b : c.g) + 127.5;
     float l = texelFetch(lut, ivec2(int(clamp(floor(bruto + 0.5), 0.0, 255.0)), 0), 0).r * 255.0;
     float al = c.a == 0.0 ? 0.0 : floor(l * c.a / 255.0 + 0.5);
     vec3 rgb = c.rgb;
+    if (desc > 0.0 && l < 255.0) {
+        float a = max(l / 255.0, 0.08);
+        rgb = clamp(rgb + desc * (1.0 - a) / a * (rgb - tela * 255.0), 0.0, 255.0);
+    }
     if (amt > 0.0) {
-        if (azul) { float s = c.b - (c.r * eq + c.g * ceq); if (s > 0.0) rgb.b = c.b - amt * s; }
-        else { float s = c.g - (c.r * eq + c.b * ceq); if (s > 0.0) rgb.g = c.g - amt * s; }
+        float s = (azul ? rgb.b : rgb.g) - outros(rgb);
+        if (s > 0.0) { if (azul) rgb.b -= amt * s; else rgb.g -= amt * s; }
     }
     o = vec4(rgb, al) / 255.0;
 }`;
@@ -582,12 +611,13 @@ void main() {
 // saída no canvas (desvira: linha 0 da textura = topo da imagem); matte = branco no preto
 const VE_KEY_FS_OUT = `#version 300 es
 precision highp float;
-uniform sampler2D src; uniform bool matte; uniform ivec2 tam;
+uniform sampler2D src; uniform bool matte, status; uniform ivec2 tam;
 out vec4 o;
 void main() {
     ivec2 q = ivec2(gl_FragCoord.xy); q.y = tam.y - 1 - q.y;
     vec4 c = texelFetch(src, q, 0);
-    o = matte ? vec4(vec3(c.a), 1.0) : c;
+    float s = c.a < 0.02 ? 0.0 : c.a > 0.98 ? 1.0 : 0.5;
+    o = status ? vec4(vec3(s), 1.0) : matte ? vec4(vec3(c.a), 1.0) : c;
 }`;
 const VEKEYGL = { gl: null, falhou: false };
 function veKeyGl() {
@@ -616,8 +646,8 @@ function veKeyGl() {
         gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
         Object.assign(VEKEYGL, {
             cv, gl, w: 0, h: 0, lutKey: '',
-            P: { matte: prog(VE_KEY_FS_MATTE, ['src', 'lut', 'azul', 'eq', 'amt']), morf: prog(VE_KEY_FS_MORF, ['src', 'dir', 'minimo', 'tam']),
-                 blur: prog(VE_KEY_FS_BLUR, ['src', 'dir', 'sig', 'R', 'tam']), out: prog(VE_KEY_FS_OUT, ['src', 'matte', 'tam']) },
+            P: { matte: prog(VE_KEY_FS_MATTE, ['src', 'lut', 'azul', 'mx', 'eq', 'amt', 'desc', 'tela']), morf: prog(VE_KEY_FS_MORF, ['src', 'dir', 'minimo', 'tam']),
+                 blur: prog(VE_KEY_FS_BLUR, ['src', 'dir', 'sig', 'R', 'tam']), out: prog(VE_KEY_FS_OUT, ['src', 'matte', 'status', 'tam']) },
             src: tex(), lut: tex(), T: [tex(), tex()], F: [gl.createFramebuffer(), gl.createFramebuffer()],
         });
         return gl;
@@ -670,7 +700,8 @@ function veKeyDrawGL(a, v, env) {
             return feito;
         };
         // 1) matte + reflexo
-        let t = passo(G.P.matte, G.src, u => { gl.uniform1i(u.lut, 1); gl.uniform1i(u.azul, k.azul ? 1 : 0); gl.uniform1f(u.eq, k.eq); gl.uniform1f(u.amt, k.spill); });
+        let t = passo(G.P.matte, G.src, u => { gl.uniform1i(u.lut, 1); gl.uniform1i(u.azul, k.azul ? 1 : 0); gl.uniform1f(u.eq, k.eq); gl.uniform1f(u.amt, k.spill);
+            gl.uniform1i(u.mx, k.max ? 1 : 0); gl.uniform1f(u.desc, k.desc); gl.uniform3f(u.tela, ...k.tela); });
         // 2) encolher / expandir: n vezes, horizontal e vertical
         const ch = Math.round(k.choke * env.q);
         for (let i = 0; i < Math.abs(ch); i++) {
@@ -679,7 +710,7 @@ function veKeyDrawGL(a, v, env) {
             }
         }
         // 3) suavizar a borda
-        const sp = k.suave * env.q;
+        const sp = v.status ? 0 : k.suave * env.q;
         if (sp >= 0.05) {
             const R = Math.min(64, Math.ceil(sp * 3));
             for (const dir of [[1, 0], [0, 1]]) {
@@ -693,6 +724,7 @@ function veKeyDrawGL(a, v, env) {
         gl.bindTexture(gl.TEXTURE_2D, t);
         gl.uniform1i(G.P.out.u.src, 0);
         gl.uniform1i(G.P.out.u.matte, v.matte ? 1 : 0);
+        gl.uniform1i(G.P.out.u.status, v.status ? 1 : 0);
         gl.uniform2i(G.P.out.u.tam, w, h);
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);

@@ -229,9 +229,14 @@ def _shader_key(v):
     No MAIN a cor vem em ponto flutuante SEM trava: o verde da tela tem vermelho −0,06 (BT.709) e o alfa caía de 42 para
     28 — travada em 0..1 como a conversão da CPU/prévia (medido 2026-10-10)."""
     p = vc._key_params(v)
+    # "Preservar amarelos": outros = o maior dos dois canais (não a mistura do Equilíbrio) — vc._key_geq
+    if p["max"]:
+        bruto = ("0.5 * max(c.r, c.g) - 0.5 * c.b + 0.5" if p["azul"] else "0.5 * max(c.r, c.b) - 0.5 * c.g + 0.5")
+    else:
+        bruto = f"{p['ar']:.5f} * c.r + {p['ag']:.5f} * c.g + {p['ab']:.5f} * c.b + 0.5"
     partes = [f"//!HOOK MAIN\n//!BIND HOOKED\n//!SAVE K0\n//!COMPONENTS 1\n//!DESC chroma alfa\nvec4 hook() {{\n"
               f"    vec3 c = clamp(HOOKED_tex(HOOKED_pos).rgb, 0.0, 1.0);\n"
-              f"    float v = clamp({p['ar']:.5f} * c.r + {p['ag']:.5f} * c.g + {p['ab']:.5f} * c.b + 0.5, 0.0, 1.0);\n"
+              f"    float v = clamp({bruto}, 0.0, 1.0);\n"
               f"    v = floor(v * 255.0 + 0.5) / 255.0;\n"
               f"    float a = clamp(((1.0 - {p['ganho']:.5f} * (1.0 - 2.0 * v) / {p['dk']:.5f}) - {p['cb']:.5f}) / "
               f"{p['cw'] - p['cb']:.5f}, 0.0, 1.0);\n"
@@ -258,16 +263,25 @@ def _shader_key(v):
                           f"    return vec4(a, 0.0, 0.0, 0.0);\n}}\n")
             n += 1
     desp = ""
+    if p["desc"] > 0.001:
+        # descontaminar com o alfa da chave antes de encolher/suavizar (K0): C + desc·(C − tela)·(1−a)/a
+        t = p["tela"]
+        desp += (f"    float ak = K0_tex(HOOKED_pos).x;\n"
+                 f"    if (ak < 1.0) {{ float aa = max(ak, 0.08);\n"
+                 f"        c.rgb = clamp(c.rgb + {p['desc']:.5f} * (1.0 - aa) / aa * (c.rgb - vec3({t[0]:.5f}, {t[1]:.5f}, {t[2]:.5f})), 0.0, 1.0); }}\n")
     if p["spill"] > 0.001:
-        # despill do ffmpeg (type, mix = Equilíbrio, expand 0, escala −spill no canal da tela)
+        # despill do ffmpeg (type, mix = Equilíbrio, expand 0, escala −spill no canal da tela); "Preservar amarelos": o máx.
         m = p["eq"]
         if p["azul"]:
-            desp = (f"    float sm = max(c.b - (c.r * {m:.5f} + c.g * {1 - m:.5f}), 0.0);\n"
-                    f"    c.b = max(c.b - {p['spill']:.5f} * sm, 0.0);\n")
+            o = "max(c.r, c.g)" if p["max"] else f"(c.r * {m:.5f} + c.g * {1 - m:.5f})"
+            desp += (f"    float sm = max(c.b - {o}, 0.0);\n"
+                     f"    c.b = max(c.b - {p['spill']:.5f} * sm, 0.0);\n")
         else:
-            desp = (f"    float sm = max(c.g - (c.r * {m:.5f} + c.b * {1 - m:.5f}), 0.0);\n"
-                    f"    c.g = max(c.g - {p['spill']:.5f} * sm, 0.0);\n")
-    partes.append(f"//!HOOK MAIN\n//!BIND HOOKED\n//!BIND K{n}\n//!DESC chroma saida\nvec4 hook() {{\n"
+            o = "max(c.r, c.b)" if p["max"] else f"(c.r * {m:.5f} + c.b * {1 - m:.5f})"
+            desp += (f"    float sm = max(c.g - {o}, 0.0);\n"
+                     f"    c.g = max(c.g - {p['spill']:.5f} * sm, 0.0);\n")
+    k0 = "//!BIND K0\n" if p["desc"] > 0.001 and n > 0 else ""
+    partes.append(f"//!HOOK MAIN\n//!BIND HOOKED\n//!BIND K{n}\n{k0}//!DESC chroma saida\nvec4 hook() {{\n"
                   f"    vec4 c = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n{desp}    c.a = K{n}_tex(HOOKED_pos).x;\n    return c;\n}}\n")
     return "\n".join(partes)
 
@@ -1403,8 +1417,11 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
     if m is None and not disponivel():
         m = "placa sem Vulkan/libplacebo"
     # CANIVETE_PLACA_BLOCOS=1: em blocos mesmo cabendo (teste_export --placa-blocos confere as emendas)
-    grande = m is None and (os.environ.get("CANIVETE_PLACA_BLOCOS") == "1" or not cabe_na_placa(args["segmentos"], lay, args["path"]))
-    if grande and os.environ.get("CANIVETE_PLACA_BLOCOS") != "1":
+    # _blocos: a montagem inteira já estourou a memória da placa (muitas imagens: cada uma reserva quadros próprios —
+    # AutoFrame com cartões, 72 imagens, 2026-10-12): de novo, em blocos, cada um só com as camadas do trecho
+    grande = m is None and (os.environ.get("CANIVETE_PLACA_BLOCOS") == "1" or args.get("_blocos")
+                            or not cabe_na_placa(args["segmentos"], lay, args["path"]))
+    if grande and os.environ.get("CANIVETE_PLACA_BLOCOS") != "1" and not args.get("_blocos"):
         # não cabe com o que está ocupado agora: libera o que o app deixou na placa e confere de novo
         grande = not liberar_placa(lambda: cabe_na_placa(args["segmentos"], lay, args["path"]), prog)
     if grande and not all(isinstance(s, dict) and s.get("gap") is not None for s in args["segmentos"] or []):

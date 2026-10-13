@@ -460,6 +460,9 @@
     "ie_dialogo_abrir",
     "ie_dialogo_salvar",
     "ie_colar_windows",
+    "ie_miniaturas",
+    "ie_miniatura_gravar",
+    "ie_baixar_imagem",
     "ie_soltar_memoria",
     "ie_existe",
     "ie_prefs",
@@ -1140,6 +1143,24 @@
   },
   "ie_colar_windows": {
    "args": "",
+   "modulos": [
+    "editor_imagem"
+   ]
+  },
+  "ie_miniaturas": {
+   "args": "paths",
+   "modulos": [
+    "editor_imagem"
+   ]
+  },
+  "ie_miniatura_gravar": {
+   "args": "path, data_url",
+   "modulos": [
+    "editor_imagem"
+   ]
+  },
+  "ie_baixar_imagem": {
+   "args": "url",
    "modulos": [
     "editor_imagem"
    ]
@@ -2369,6 +2390,7 @@
   "Instructions/agente/guia-edicao.md": "GUIA-EDICAO :: Pocket Editor (Canivete do Pailer) — para agentes de IA",
   "Instructions/agente/kani-motor.md": "Motor da Kani: bancada de modelos e escolha (2026-10-10)",
   "Instructions/agente/mapa-editor.md": "Mapa do código — editor (gerado por tools/mapa_codigo.py; nome:linha)",
+  "Instructions/agente/mapa-habilidades-motion.md": "Mapa de habilidades de motion (árvore de técnicas desbloqueadas)",
   "Instructions/agente/mapa-imagem.md": "Mapa do código — imagem (gerado por tools/mapa_codigo.py; nome:linha)",
   "Instructions/agente/mapa-kanivete-encoder.md": "Mapa do Kanivete Encoder (Ke)",
   "Instructions/agente/mapa-vetor.md": "Mapa do código — vetor (gerado por tools/mapa_codigo.py; nome:linha)",

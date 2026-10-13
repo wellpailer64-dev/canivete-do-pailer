@@ -411,6 +411,16 @@ CASOS = {
         const k2 = clip(2, 1.5, 0, 2.5, 'verde.mp4', { fx: [key()], p: { sc: 60, x: 540, y: 1300, rot: 0, op: 60 } });
         return [clip(0, 0, 0, 4, 'b.mp4'), k1, k2];
     """, ""),
+    # Chroma Key com "Preservar amarelos" (máx. de R e B) e "Descontaminar bordas" (geq na CPU, shader na placa):
+    # um com os dois e encolher/suavizar, outro só descontaminando (Equilíbrio normal), sobre fundo colorido
+    "chroma4": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const key = (mx, desc, en, su) => ({ id: id(), t: 'key', on: true,
+            v: { cor: '#00b140', ganho: 100, bal: 50, preto: 0, branco: 100, encolher: en, suave: su, spill: 100, matte: 0, max: mx, desc } });
+        const k1 = clip(1, 0, 0, 2, 'verde.mp4', { fx: [key(1, 60, 1, 2)] });
+        const k2 = clip(1, 2, 0, 2, 'verde.mp4', { fx: [key(0, 80, 0, 0)] });
+        return [clip(0, 0, 0, 4, 'b.mp4'), k1, k2];
+    """, ""),
     # aberração cromática (shader na placa: export_placa._shader_ca): camada de ajuste com Aberração + Luz e Cor na
     # timeline toda e outra com Raio (queda radial) num trecho; e num clipe de vídeo
     "aberracao": (1080, 1920, """
