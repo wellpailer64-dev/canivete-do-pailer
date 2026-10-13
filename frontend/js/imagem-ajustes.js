@@ -435,6 +435,9 @@ async function ieIntFiltro(L, def, cmd, idx = -1) {
     ieIntAtualizar(L, Rantes);
     ieHist(ieT(def.titulo));
     ieUiCamadas?.();
+    // Filtro › Último filtro (Ctrl+F) também depois de um filtro INTELIGENTE (antes só o destrutivo guardava: Camera Raw
+    // num objeto inteligente e Ctrl+F na outra foto não fazia nada — 2026-10-13)
+    IE.ultimoFiltro = { titulo: def.titulo, ajuste: def.ajuste, proc: def.proc, margem: def.margem, vals, cmd };
 }
 
 // aplica um processamento destrutivo na camada ativa, com diálogo e prévia (objeto inteligente: filtro inteligente)

@@ -699,6 +699,8 @@ function ieDropNavegador(ev) {
 
 // ─────────────────────────── área de transferência ───────────────────────────
 async function ieCopiar(mesclado, recortar) {
+    if (!mesclado && !recortar && typeof ieFiltroFocoCopiar === 'function' && ieFiltroFocoCopiar()) { IE._filtroFoco = null; ieUiCamadas(); return; }   // filtro inteligente em foco
+    IE.filtroCopiado = null;   // copiou pixels: o Ctrl+V volta a colar imagem
     const doc = IE.doc, L = ieAtiva(doc);
     let c, x, y;
     const R = doc.sel ? doc.sel.bbox : ieRDoc(doc);
@@ -728,6 +730,8 @@ function ieColarNoMouse(doc, w, h, noLugar) {
     return { x: Math.round(m.x - w / 2), y: Math.round(m.y - h / 2) };
 }
 async function ieColar(noLugar) {
+    // filtro inteligente copiado (Ctrl+C num filtro do painel): cola nas camadas selecionadas
+    if (!noLugar && IE.filtroCopiado && typeof ieFiltroColar === 'function' && ieFiltroColar()) return;
     const doc = IE.doc, api = ieApi();
     let seq = null;
     try { seq = (await api?.ve_area_seq())?.seq; } catch (e) { /* sem API */ }
@@ -1044,6 +1048,7 @@ const IE_CMDS = {
         ieTudo(doc); ieHist(ieT(ligar ? 'Criar máscara de corte' : 'Soltar máscara de corte'));
     },
     frente: doc => ieOrdem(doc, 'frente'), avancar: doc => ieOrdem(doc, 'avancar'), recuar: doc => ieOrdem(doc, 'recuar'), tras: doc => ieOrdem(doc, 'tras'),
+    topoDoc: doc => ieOrdemAbsoluta(doc, 'topo'), fundoDoc: doc => ieOrdemAbsoluta(doc, 'fundo'),
     camAcima: doc => { const t = ieTodas(doc), i = t.findIndex(L => L.id === doc.ativa); if (t[i + 1]) ieAtivar(t[i + 1].id, doc); },
     camAbaixo: doc => { const t = ieTodas(doc), i = t.findIndex(L => L.id === doc.ativa); if (i > 0) ieAtivar(t[i - 1].id, doc); },
     rasterizar: doc => { ieSelecionadas(doc).forEach(L => ieRasterizar(L)); ieTudo(doc); ieHist(ieT('Rasterizar camada')); },
@@ -1197,6 +1202,18 @@ function ieOrdem(doc, modo) {
     else if (modo === 'recuar') { const min = Math.min(...idx); if (min <= 0) return; const viz = lista[min - 1]; tira(); lista.splice(lista.indexOf(viz), 0, ...sel); }
     ieTudo(doc); ieHist(ieT('Organizar'));
 }
+// Ctrl+Alt+↑/↓: topo/fundo do DOCUMENTO inteiro (sai de qualquer grupo/slide), na ordem em que estavam na pilha.
+// A máscara de corte (clip) não vale fora do lugar original: sai desligada.
+function ieOrdemAbsoluta(doc, modo) {
+    const ordem = ieTodas(doc), sel = ieSelecionadas(doc).filter(L => ieAchar(doc, L.id))
+        .filter(L => !ieSelecionadas(doc).some(P => P !== L && P.filhos && iePercorrerTem(P, L)))   // filho de grupo também selecionado vai com o grupo
+        .sort((p, q) => ordem.indexOf(p) - ordem.indexOf(q));
+    if (!sel.length) return;
+    for (const L of sel) { const a = ieAchar(doc, L.id); a.lista.splice(a.i, 1); L.clip = false; }
+    if (modo === 'topo') doc.camadas.push(...sel); else doc.camadas.unshift(...sel);
+    ieTudo(doc); ieHist(ieT('Organizar'));
+}
+function iePercorrerTem(G, L) { return (G.filhos || []).some(X => X === L || iePercorrerTem(X, L)); }
 
 // ── Remover plano de fundo / Selecionar assunto (como no Photoshop): a IA de recorte do Kanivete (BiRefNet,
 // Functions/removerfundo.py) acha o assunto da camada e devolve a máscara; o editor usa como máscara da camada

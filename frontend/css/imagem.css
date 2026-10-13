@@ -386,6 +386,8 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 .ie-cam-fxl { border-bottom: 1px solid var(--ie-linha); }
 .ie-cam-fxi { display: flex; align-items: center; gap: 6px; height: 22px; font-size: 11.5px; color: var(--text-2); padding-left: calc(var(--nivel) * 14px + 52px); cursor: default; }
 .ie-cam-fxi .ie-cam-olho { width: 22px; height: 22px; border-right: 0; }
+.ie-cam-fxi.foco { background: var(--ie-hover); box-shadow: inset 2px 0 0 var(--ie-acento); color: var(--text-1); }
+.ie-cam-fxi[draggable=true] { cursor: grab; }
 .ie-cam-fxi .ie-cam-olho .ie-i { width: 13px; height: 13px; }
 .ie-cam-fxi:hover { background: rgba(255, 255, 255, .03); }
 /* janela Estilo de camada */

@@ -382,8 +382,8 @@ function ieUiCamadas() {
             <div class="ie-cam-fxi" data-fxi="todos"><button class="ie-cam-olho ${X.fxOculto ? '' : 'on'}" data-fxolho="todos">${X.fxOculto ? '' : ieIco('eye')}</button><span>${ieLsT('Efeitos')}</span></div>
             ${ieFxLista(X.fx).map(({ tipo, i, e }) => `<div class="ie-cam-fxi" data-fxi="${tipo}:${i}"><button class="ie-cam-olho ${e.on ? 'on' : ''}" data-fxolho="${tipo}:${i}">${e.on ? ieIco('eye') : ''}</button><span>${ieLsT(IE_FX_NOME[tipo])}</span></div>`).join('')}
         </div>` : '') + (X.tipo === 'inteligente' && X.filtrosAberto && (X.filtrosInt || []).length ? `<div class="ie-cam-fxl ie-cam-fil" style="--nivel:${nivel}" data-id="${X.id}">
-            <div class="ie-cam-fxi" data-fii="todos"><button class="ie-cam-olho ${X.filtrosOff ? '' : 'on'}" data-fiolho="todos">${X.filtrosOff ? '' : ieIco('eye')}</button><span>${ieT('Filtros inteligentes')}</span></div>
-            ${X.filtrosInt.map((f, i) => `<div class="ie-cam-fxi" data-fii="${i}" title="${ieT('Duplo clique: editar')}"><button class="ie-cam-olho ${f.on ? 'on' : ''}" data-fiolho="${i}">${f.on ? ieIco('eye') : ''}</button><span>${ieEsc(ieT(f.titulo || f.cmd))}</span><button class="ie-cam-fidel" data-fidel="${i}" title="${ieT('Excluir filtro inteligente')}">×</button></div>`).join('')}
+            <div class="ie-cam-fxi ${ieFiltroFocoEm(X.id, 'todos') ? 'foco' : ''}" data-fii="todos" draggable="true" title="${ieT('Arrastar para outra camada: move · Alt+arrastar: copia · Ctrl+C/Ctrl+V')}"><button class="ie-cam-olho ${X.filtrosOff ? '' : 'on'}" data-fiolho="todos">${X.filtrosOff ? '' : ieIco('eye')}</button><span>${ieT('Filtros inteligentes')}</span></div>
+            ${X.filtrosInt.map((f, i) => `<div class="ie-cam-fxi ${ieFiltroFocoEm(X.id, i) ? 'foco' : ''}" data-fii="${i}" draggable="true" title="${ieT('Duplo clique: editar · arrastar para outra camada: move · Alt+arrastar: copia · Ctrl+C/Ctrl+V')}"><button class="ie-cam-olho ${f.on ? 'on' : ''}" data-fiolho="${i}">${f.on ? ieIco('eye') : ''}</button><span>${ieEsc(ieT(f.titulo || f.cmd))}</span><button class="ie-cam-fidel" data-fidel="${i}" title="${ieT('Excluir filtro inteligente')}">×</button></div>`).join('')}
         </div>` : '');
     }).join('') || `<div class="ie-vazio">${ieT('Sem camadas')}</div>`;
     if (minisVelhas.size) lista.querySelectorAll('canvas[data-mini], canvas[data-mmini]').forEach(c => {
@@ -596,6 +596,17 @@ function ieCamadasInstalar() {
         if (!linha) return;
         const id = +linha.dataset.id;
         const L = ieAchar(doc, id)?.L;
+        // 2 cliques no nome = renomear. O dblclick do navegador não chega: o 1º clique redesenha a lista e o 2º cai
+        // num elemento novo — então o duplo clique é contado aqui (mesma camada, < 450 ms)
+        if (ev.target.closest('[data-nome]') && !ev.ctrlKey && !ev.shiftKey && !ev.altKey) {
+            const u = IE._cliqueNome, agora = Date.now();
+            IE._cliqueNome = { id, t: agora };
+            if (u && u.id === id && agora - u.t < 450) {
+                IE._cliqueNome = null;
+                const el = lista.querySelector(`[data-nome="${id}"]`);
+                if (el) { ieRenomear(id, el); return; }
+            }
+        }
         const alvo = ev.target.closest('[data-alvo]');
         if (alvo && ev.ctrlKey && L) { ieSelDaCamada(L, alvo.dataset.alvo === 'm'); return; }
         if (alvo && alvo.dataset.alvo === 'm' && ev.shiftKey && L && L.m) {
@@ -677,6 +688,7 @@ function ieCamadasInstalar() {
         arrast = null;
     });
     lista.addEventListener('dragend', () => { arrast = null; });
+    ieFiltrosArrasteInstalar(lista);
 
     topo.addEventListener('change', ev => {
         const doc = IE.doc, sel = ieSelecionadas(doc);
@@ -708,6 +720,92 @@ function ieAncestral(doc, g, L) {   // g é grupo acima de L?
     let achou = false;
     iePercorrer(g.filhos, X => { if (X === L) { achou = true; return false; } });
     return achou;
+}
+
+// ─────────── filtros inteligentes entre camadas (como no Photoshop) ───────────
+// arrastar o filtro (ou o cabeçalho "Filtros inteligentes" = todos) para outra camada move; Alt+arrastar copia.
+// Clicar no filtro deixa ele "em foco": Ctrl+C copia o(s) filtro(s) e Ctrl+V cola nas camadas selecionadas.
+// Camada de destino que não é objeto inteligente vira um antes (o Photoshop faz igual).
+function ieFiltroFocoEm(id, idx) { const f = IE._filtroFoco; return !!(f && f.id === id && String(f.idx) === String(idx)); }
+function ieFiltrosDe(L, idx) { return !L || !L.filtrosInt ? [] : idx === 'todos' ? L.filtrosInt : L.filtrosInt.filter((f, i) => i === +idx); }
+function ieFiltrosNaCamada(doc, para, fs) {
+    if (!para || !fs.length) return null;
+    if (para.tipo === 'grupo' || para.tipo === 'ajuste') { ieToast(ieT('Filtro inteligente vai numa camada de imagem ou objeto inteligente')); return null; }
+    if (para.tipo !== 'inteligente' || !para.c0) {
+        doc.selIds = [para.id]; doc.ativa = para.id;
+        IE_CMDS.objetoInteligente(doc);
+        para = ieAtiva(doc);
+        if (!para || para.tipo !== 'inteligente') return null;
+    }
+    const R = ieRCamada(para);
+    para.filtrosInt = [...(para.filtrosInt || []), ...ieClone(fs)];
+    para.filtrosAberto = true;
+    ieIntAtualizar(para, R);
+    return para;
+}
+function ieFiltrosParaCamada(doc, deId, idx, paraId, copiar) {
+    const de = ieAchar(doc, deId)?.L, para = ieAchar(doc, paraId)?.L;
+    if (!de || !para || de === para) return;
+    const fs = ieFiltrosDe(de, idx);
+    if (!ieFiltrosNaCamada(doc, para, fs)) return;
+    if (!copiar) {
+        const R = ieRCamada(de);
+        de.filtrosInt = idx === 'todos' ? [] : de.filtrosInt.filter((f, i) => i !== +idx);
+        ieIntAtualizar(de, R);
+    }
+    ieHist(ieT(copiar ? 'Copiar filtro inteligente' : 'Mover filtro inteligente'));
+    ieUiCamadas();
+}
+function ieFiltroFocoCopiar() {
+    const f = IE._filtroFoco, doc = IE.doc, L = f && doc && ieAchar(doc, f.id)?.L;
+    const fs = ieFiltrosDe(L, f && f.idx);
+    if (!fs.length) return false;
+    IE.filtroCopiado = ieClone(fs);
+    ieToast(ieT(fs.length > 1 ? 'Filtros inteligentes copiados: selecione outra camada e Ctrl+V' : 'Filtro inteligente copiado: selecione outra camada e Ctrl+V'));
+    return true;
+}
+function ieFiltroColar() {
+    const doc = IE.doc;
+    if (!doc || !IE.filtroCopiado || !IE.filtroCopiado.length) return false;
+    const alvos = ieSelecionadas(doc).map(L => L.id);
+    if (!alvos.length) return false;
+    for (const id of alvos) ieFiltrosNaCamada(doc, ieAchar(doc, id)?.L, IE.filtroCopiado);
+    ieHist(ieT('Colar filtro inteligente'));
+    ieUiCamadas();
+    return true;
+}
+function ieFiltrosArrasteInstalar(lista) {
+    let fa = null;
+    lista.addEventListener('click', ev => {   // foco do filtro (para o Ctrl+C); clicar numa camada tira o foco
+        const fii = ev.target.closest('[data-fii]');
+        if (fii && !ev.target.closest('button')) { IE._filtroFoco = { id: +fii.closest('.ie-cam-fil').dataset.id, idx: fii.dataset.fii === 'todos' ? 'todos' : +fii.dataset.fii }; setTimeout(() => ieUiCamadas(), 0); }
+        else if (ev.target.closest('.ie-cam')) IE._filtroFoco = null;
+    }, true);
+    lista.addEventListener('dragstart', ev => {
+        const fii = ev.target.closest('[data-fii]');
+        if (!fii) return;
+        ev.stopPropagation();
+        fa = { id: +fii.closest('.ie-cam-fil').dataset.id, idx: fii.dataset.fii === 'todos' ? 'todos' : +fii.dataset.fii, copiar: ev.altKey };
+        ev.dataTransfer.effectAllowed = 'copyMove';
+        ev.dataTransfer.setData('text/x-ie-filtro', '1');
+    }, true);
+    lista.addEventListener('dragover', ev => {
+        if (!fa) return;
+        ev.preventDefault(); ev.stopPropagation();
+        fa.copiar = fa.copiar || ev.altKey;
+        ev.dataTransfer.dropEffect = fa.copiar ? 'copy' : 'move';
+        lista.querySelectorAll('.ie-cam').forEach(l => l.classList.remove('drop-dentro'));
+        const linha = ev.target.closest('.ie-cam');
+        if (linha && +linha.dataset.id !== fa.id) linha.classList.add('drop-dentro');
+    }, true);
+    lista.addEventListener('drop', ev => {
+        if (!fa) return;
+        ev.preventDefault(); ev.stopPropagation();
+        lista.querySelectorAll('.ie-cam').forEach(l => l.classList.remove('drop-dentro'));
+        const linha = ev.target.closest('.ie-cam'), f = fa; fa = null;
+        if (linha) ieFiltrosParaCamada(IE.doc, f.id, f.idx, +linha.dataset.id, f.copiar || ev.altKey);
+    }, true);
+    lista.addEventListener('dragend', () => { fa = null; lista.querySelectorAll('.ie-cam').forEach(l => l.classList.remove('drop-dentro')); }, true);
 }
 
 function ieRenomear(id, el) {
@@ -1316,6 +1414,9 @@ const IE_ATALHOS = {
     // máscara na camada: com seleção, revela a seleção (Shift: oculta); sem seleção, máscara branca/preta inteira
     'Alt+M': 'mascara', 'Alt+Shift+M': 'mascaraOcultar',
     'Shift+D': 'excluirAlvo',   // D sozinho continua sendo as cores padrão (preto/branco), como no Photoshop
+    // Alt+↑ / Alt+↓: camada ou grupo para o topo / o fundo DENTRO do grupo em que está (slide do carrossel continua inteiro)
+    'Alt+ArrowUp': 'frente', 'Alt+ArrowDown': 'tras',
+    'Alt+Ctrl+ArrowUp': 'topoDoc', 'Alt+Ctrl+ArrowDown': 'fundoDoc',   // + Ctrl: topo/fundo do documento inteiro
 };
 
 function ieTeclaNome(ev) {

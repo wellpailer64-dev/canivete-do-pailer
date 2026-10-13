@@ -107,6 +107,15 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   Borracha temporária); **Alt+M** máscara (com seleção revela a seleção, sem seleção branca), **Alt+Shift+M** máscara
   que oculta; **Shift+D** exclui o alvo (`excluirAlvo`: a máscara se a miniatura da máscara é o alvo, senão as camadas
   selecionadas — D sozinho continua cores padrão). Delete/Backspace sem seleção com a máscara como alvo exclui só a máscara.
+  **Alt+↑/↓** topo/fundo dentro do grupo (`frente`/`tras`); **Ctrl+Alt+↑/↓** topo/fundo do documento inteiro
+  (`ieOrdemAbsoluta`, sai do grupo/slide, clip desligado). Duplo clique no nome da camada renomeia (contado no clique:
+  o 1º clique redesenha a lista e o dblclick do navegador se perdia).
+- Cópia (Ctrl+J, Alt+arrastar) de objeto inteligente vindo do PSD continua objeto inteligente com o mesmo `c0`
+  (`ieDuplicarCamada`); no PSD vai como objeto inteligente incorporado novo (`_so_novo`).
+- Filtros inteligentes: Ctrl+F repete também o último filtro INTELIGENTE (`ieIntFiltro` grava `IE.ultimoFiltro`);
+  arrastar um filtro (ou o cabeçalho = todos) para outra camada move, Alt+arrastar copia; clique no filtro (foco) +
+  Ctrl+C / Ctrl+V cola nas camadas selecionadas (`ieFiltrosArrasteInstalar`, `ieFiltrosParaCamada`, `ieFiltroColar`);
+  destino de pixels vira objeto inteligente antes (como no Photoshop).
 - Clique da seleção automática em texto (`ieTextoNoPonto`): só as linhas, na altura real das letras
   (`ieTextoCaixaLocal(t, linhas, true)`) — o topo declarado da fonte (Jost 1,07 em) e a caixa de parágrafo cobriam o texto
   de cima. Janelas de diálogo (Estilo de camada, filtros, ajustes) arrastam pelo cabeçalho (`ieDlgArrastavel`, posição

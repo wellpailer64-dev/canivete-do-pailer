@@ -509,11 +509,13 @@ function ieDuplicarCamada(doc, L, manterNome = false) {
         X.uid = 'u' + doc.id + '_' + X.id + '_' + Math.random().toString(36).slice(2, 7);
         X.ref = null; X.sujoPx = true; X.sujoM = !!X.m;
         if (X.tipo !== 'pixel' && X.tipo !== 'grupo' && X.tipo !== 'ajuste') {
-            // cópia de texto/objeto inteligente do PSD: vira pixels (o original continua vivo). Objeto inteligente
-            // criado no editor continua objeto inteligente, com o MESMO original (como as instâncias do Photoshop)
+            // Objeto inteligente (do editor OU do PSD) continua objeto inteligente na cópia, com o MESMO original em c0
+            // (como as instâncias do Photoshop); ao salvar no PSD a cópia vai como objeto inteligente incorporado novo
+            // com esse original (_so_novo). Antes a cópia do que veio do PSD virava pixels (Alt+arrastar e Ctrl+J,
+            // 2026-10-13). Texto/forma do PSD sem dados editáveis no editor ainda viram pixels.
             const textoEditor = !doPsd && X.tipo === 'texto' && (X.txt || X.texto);
             const formaEditor = !doPsd && X.tipo === 'forma' && (X.vet || X.kind === 'shape');
-            if (!textoEditor && !formaEditor && !X.txt && !(X.tipo === 'inteligente' && X.c0 && !doPsd)) { X.tipo = 'pixel'; delete X.c0; delete X.tf; delete X.texto; }
+            if (!textoEditor && !formaEditor && !X.txt && !(X.tipo === 'inteligente' && X.c0)) { X.tipo = 'pixel'; delete X.c0; delete X.tf; delete X.texto; }
         }
         if (X.filhos) X.filhos.forEach(renova);
     };
