@@ -379,11 +379,17 @@ def _run_item(item: dict, on_progress=None, on_label=None,
         try:
             if os.path.exists(bundle_path):
                 os.makedirs(os.path.dirname(dest) or BASE_DIR, exist_ok=True)
+                # destino pode ser um modelo LIGADO de outra instalação (Functions/modelos_compartilhados.py): tira só o
+                # link (junção/link físico) — escrever por cima mudaria o arquivo da outra instalação também
+                if os.path.lexists(dest) and (os.path.islink(dest) or os.path.isjunction(dest)):
+                    os.rmdir(dest) if os.path.isdir(dest) else os.remove(dest)
                 if os.path.isdir(bundle_path):
                     if os.path.exists(dest):
                         shutil.rmtree(dest)
                     shutil.copytree(bundle_path, dest)
                 else:
+                    if os.path.isfile(dest):
+                        os.remove(dest)
                     shutil.copy2(bundle_path, dest)
             else:
                 raise FileNotFoundError(f"Arquivo {source} não encontrado no bundle.")

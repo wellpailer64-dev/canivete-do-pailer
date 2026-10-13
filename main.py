@@ -4943,6 +4943,13 @@ def main():
         )
         return
 
+    # Modelos que outra instalação desta máquina já tem (o .exe e o app pelo código) são ligados em vez de baixados
+    try:
+        from Functions import modelos_compartilhados
+        modelos_compartilhados.sincronizar(modelos_compartilhados.app_dir())
+    except Exception as e:
+        print("[modelos] não deu para ligar os de outra instalação:", e)
+
     # Primeiro uso: verifica e instala dependências se necessário
     from first_run import precisa_instalar, executar_instalacao
     if precisa_instalar():
