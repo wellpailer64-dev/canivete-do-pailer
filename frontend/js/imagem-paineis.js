@@ -1060,6 +1060,38 @@ function ieSeletorCor(ancora, inicial, aoMudar) {
 
 // ─────────────────────────── diálogos ───────────────────────────
 // campos: [{id, rotulo, tipo: 'faixa'(padrão)|'numero'|'check'|'select'|'cor'|'texto'|'area'|'nota'|'curva', min, max, passo, valor, opcoes}]
+// Janela de diálogo arrastável pelo cabeçalho (como no Photoshop: tirar de cima do que está sendo ajustado).
+// A posição fica guardada por janela durante a sessão (IE._dlgPos[chave]) e volta ao reabrir.
+function ieDlgArrastavel(dlg, alca, chave) {
+    if (!dlg || !alca) return;
+    const pos = (IE._dlgPos ||= {});
+    const aplicar = (x, y) => { dlg.style.translate = `${x}px ${y}px`; };
+    if (chave && pos[chave]) aplicar(pos[chave].x, pos[chave].y);
+    alca.classList.add('ie-dlg-alca');
+    alca.addEventListener('pointerdown', ev => {
+        if (ev.button !== 0 || ev.target.closest('input, select, button, textarea, label')) return;
+        ev.preventDefault();
+        const ini = pos[chave] || { x: 0, y: 0 }, x0 = ev.clientX, y0 = ev.clientY, area = dlg.parentElement.getBoundingClientRect();
+        const r0 = dlg.getBoundingClientRect();
+        alca.setPointerCapture(ev.pointerId);
+        const mover = e => {
+            // não deixa o cabeçalho sair da área do editor (sempre dá para pegar de volta)
+            const dx = Math.min(Math.max(e.clientX - x0, area.left - r0.left - r0.width + 80), area.right - r0.left - 80);
+            const dy = Math.min(Math.max(e.clientY - y0, area.top - r0.top), area.bottom - r0.top - 40);
+            const p = { x: ini.x + dx, y: ini.y + dy };
+            if (chave) pos[chave] = p;
+            aplicar(p.x, p.y);
+        };
+        const soltar = () => { alca.removeEventListener('pointermove', mover); alca.removeEventListener('pointerup', soltar); alca.removeEventListener('pointercancel', soltar); };
+        alca.addEventListener('pointermove', mover); alca.addEventListener('pointerup', soltar); alca.addEventListener('pointercancel', soltar);
+    });
+    alca.addEventListener('dblclick', ev => {   // duplo clique no cabeçalho: volta para o centro
+        if (ev.target.closest('input, select, button, textarea, label')) return;
+        if (chave) delete pos[chave];
+        dlg.style.translate = '';
+    });
+}
+
 function ieDialogo({ titulo, campos, previa, ok = 'OK', largura, lado }) {
     return new Promise(resolve => {
         const box = ieEl('ie-modal');
@@ -1085,6 +1117,7 @@ function ieDialogo({ titulo, campos, previa, ok = 'OK', largura, lado }) {
             <div class="ie-dlg-rod">${previa ? `<label class="ie-dlg-chk"><input type="checkbox" class="ie-dlg-previa" checked> ${ieT('Visualizar')}</label>` : ''}<div class="ie-op-esp"></div>
             <button class="ie-btn" data-r="0">${ieT('Cancelar')}</button><button class="ie-btn ie-btn-primario" data-r="1">${ieT(ok)}</button></div></div>`;
         box.hidden = false;
+        if (!lado) ieDlgArrastavel(box.querySelector('.ie-dlg'), box.querySelector('.ie-dlg > h3'), 'dlg:' + titulo);
         let tm = 0;
         const atualizar = () => {
             if (!previa || tm === -1) return;   // fechado: prévia atrasada não desfaz o OK
@@ -1280,6 +1313,9 @@ const IE_ATALHOS = {
     'Ctrl+A': 'selTudo', 'Ctrl+D': 'selNada', 'Shift+Ctrl+I': 'selInverter', 'Shift+F6': 'selSuavizar',
     'Ctrl+=': 'zoomMais', 'Ctrl++': 'zoomMais', 'Ctrl+-': 'zoomMenos', 'Ctrl+0': 'zoomAjustar', 'Ctrl+1': 'zoom100', 'Alt+Ctrl+0': 'zoom100',
     'Shift+Ctrl+A': 'f:cameraRaw', 'Alt+[': 'camAbaixo', 'Alt+]': 'camAcima',
+    // máscara na camada: com seleção, revela a seleção (Shift: oculta); sem seleção, máscara branca/preta inteira
+    'Alt+M': 'mascara', 'Alt+Shift+M': 'mascaraOcultar',
+    'Shift+D': 'excluirAlvo',   // D sozinho continua sendo as cores padrão (preto/branco), como no Photoshop
 };
 
 function ieTeclaNome(ev) {

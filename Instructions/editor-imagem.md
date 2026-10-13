@@ -102,6 +102,16 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   (PDFs "Keyboard shortcuts | Photoshop" e "Photoshop CC Windows Keyboard Shortcuts Reference"); Ajuda > Atalhos do
   teclado (Alt+Shift+Ctrl+K) lista todos, marcando os que o editor ainda não tem (Q, J, O, P, R, réguas/guias...).
   Modos de mesclagem por Shift+Alt+letra valem para a camada (o editor não tem modo no pincel).
+- Atalhos do Kanivete além do Photoshop (2026-10-13, pedidos do Pailer): **'** alterna "Selecionar: Camada | Grupo" do
+  Mover e mostra o nome ao lado do ponteiro por 1 s (`ieTeclaAlvoMover`/`ieAvisoPonteiro`; com o Pincel a tecla é a
+  Borracha temporária); **Alt+M** máscara (com seleção revela a seleção, sem seleção branca), **Alt+Shift+M** máscara
+  que oculta; **Shift+D** exclui o alvo (`excluirAlvo`: a máscara se a miniatura da máscara é o alvo, senão as camadas
+  selecionadas — D sozinho continua cores padrão). Delete/Backspace sem seleção com a máscara como alvo exclui só a máscara.
+- Clique da seleção automática em texto (`ieTextoNoPonto`): só as linhas, na altura real das letras
+  (`ieTextoCaixaLocal(t, linhas, true)`) — o topo declarado da fonte (Jost 1,07 em) e a caixa de parágrafo cobriam o texto
+  de cima. Janelas de diálogo (Estilo de camada, filtros, ajustes) arrastam pelo cabeçalho (`ieDlgArrastavel`, posição
+  por janela na sessão, duplo clique centraliza); o Estilo de camada não escurece o documento. Selecionar assunto e
+  Remover fundo mostram `ieCarregando(txt, 'indet')` (barra correndo) e não aceitam 2º clique enquanto rodam.
 
 ## Reaproveitado do editor de vídeo
 - Filtro > **Filtro Camera Raw** (Shift+Ctrl+A), `frontend/js/imagem-cameraraw.js`: janela própria como o ACR — foto à
@@ -132,6 +142,9 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 - Ordem de desenho como no Photoshop (de baixo para cima): sombra, brilho externo, conteúdo (com o Preenchimento),
   padrão, degradê, cor, acetinado, brilho interno, sombra interna, traçado, chanfro. Sombra e brilho externo saem como
   `ext` e misturam com o que está embaixo no modo deles; a parte de fora do chanfro externo/entalhe sai como `acima`.
+- **Efeitos no GRUPO** (sombra no selo...): `ieRasterGrupoFx` compõe os filhos na caixa do grupo e passa pelo mesmo
+  `ieFxRender` (cache pela assinatura dos filhos, `ieGrupoAssin`); PSD lê e grava o lfx2 do grupo (no registro de
+  abertura da pasta). Antes eram ignorados no desenho e descartados ao salvar (2026-10-13).
 - Canais, Misturar se e Vazamento são aplicados em `ieComporCamada` (imagem-nucleo.js); a máscara de corte usa só a
   forma da base (`raster.forma`), sem a sombra dela. Luz global do documento (`doc.luzGlobal`, recursos 1037/1049 do PSD).
 - PSD: `_ler_fx`/`_gravar_efeitos` (lfx2, chaves únicas e *Multi) e `_ler_mescla`/`_gravar_mescla` (knko, infx, clbl,

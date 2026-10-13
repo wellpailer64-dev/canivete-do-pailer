@@ -12,10 +12,12 @@ const ieNomeArq = p => String(p || '').split(/[\\/]/).pop();
 function ieCarregando(txt, pct) {
     const box = ieEl('ie-carregando');
     if (!box) return;
-    if (txt === false) { box.hidden = true; return; }
+    if (txt === false) { box.hidden = true; box.classList.remove('indet'); return; }
     box.hidden = false;
     if (txt) ieEl('ie-carregando-txt').textContent = txt;
-    ieEl('ie-carregando-barra').style.width = (pct == null ? 0 : pct) + '%';
+    // pct = 'indet': tempo desconhecido (IA rodando) → barra correndo, para não parecer travado
+    box.classList.toggle('indet', pct === 'indet');
+    ieEl('ie-carregando-barra').style.width = (pct === 'indet' ? 35 : pct == null ? 0 : pct) + '%';
 }
 function ieProgresso(d) { if (d && IE.abrindo) ieCarregando(`${ieT('Lendo')} ${IE.abrindo}: ${d.nome || ''}`, d.p); }
 window.ieProgresso = ieProgresso;
@@ -328,8 +330,8 @@ async function ieSalvar(comoNovo = false, destinoForcado = null, refeito = false
         const no = L => {
             const s = { uid: L.uid, ref: ida ? L.ref : null, ref_nome: ida && L.ref != null ? (L.refNome ?? null) : null, tipo: L.tipo, nome: L.nome, visivel: L.visivel, op: L.op, fill: L.fill, bm: L.bm, clip: !!L.clip, aberto: L.aberto !== false };
             if (L.tipo === 'grupo') { s.filhos = L.filhos.map(no); if (L.prancheta && L.pranchetaMudou) s.prancheta = L.prancheta; }
-            // efeitos: só vão quando mudaram no editor (ou camada nova); o Python troca só os 4 que o editor conhece
-            else if (L.fxMudou || ((!ida || L.ref == null) && L.fx && ieTemFx(L.fx))) { s.fx = ieFxNorm(L.fx) || {}; s.fx_oculto = !!L.fxOculto; }
+            // efeitos (camada ou grupo): só vão quando mudaram no editor (ou camada nova); o Python troca só os que conhece
+            if (L.fxMudou || ((!ida || L.ref == null) && L.fx && ieTemFx(L.fx))) { s.fx = ieFxNorm(L.fx) || {}; s.fx_oculto = !!L.fxOculto; }
             if (L.mesclaMudou || !ida || L.ref == null) s.mescla = Object.fromEntries(IE_MESCLA_CHAVES.filter(k => L[k] !== undefined).map(k => [k, L[k]]));
             if (ieRaster0(L)) {
                 const novo = !ida || L.ref == null || L.sujoPx || L.rasterizar;
@@ -753,7 +755,8 @@ async function ieColar(noLugar) {
 async function ieLimpar() {
     const doc = IE.doc, L = ieAtiva(doc);
     if (!L) return;
-    if (!doc.sel) {   // sem seleção: Delete exclui a camada (como no Photoshop)
+    if (!doc.sel) {   // sem seleção: Delete exclui a camada (como no Photoshop)...
+        if (doc.mascaraAlvo && L.m) return IE_CMDS.mascaraExcluir(doc);   // ...ou só a máscara, se o alvo é a máscara
         return IE_CMDS.excluirCamada(doc);
     }
     if (doc.mascaraAlvo && L.m) {
@@ -1089,6 +1092,8 @@ const IE_CMDS = {
     },
     mascara: doc => ieMascaraNova(doc, true),
     mascaraOcultar: doc => ieMascaraNova(doc, false),
+    // Shift+D: exclui o que está como alvo — a máscara (miniatura da máscara clicada) ou a(s) camada(s)
+    excluirAlvo: doc => { const L = ieAtiva(doc); return doc.mascaraAlvo && L && L.m ? IE_CMDS.mascaraExcluir(doc) : IE_CMDS.excluirCamada(doc); },
     mascaraSel: doc => ieMascaraNova(doc, true, true),
     mascaraSelOcultar: doc => ieMascaraNova(doc, false, true),
     mascaraInverter: doc => { doc.mascaraAlvo = true; IE_AJUSTES.inverter(); },
@@ -1205,9 +1210,17 @@ async function ieMascaraAssunto(L) {
     const api = window.pywebview && window.pywebview.api;
     if (!api || !api.ie_mascara_assunto) { ieToast(ieT('Recurso indisponível nesta versão')); return null; }
     if (!L || !L.c) { ieToast(ieT('Selecione uma camada com pixels')); return null; }
-    const baixado = await ieRecorteBaixado(['birefnet-lite']);
-    ieToast(ieT(baixado ? 'Procurando o assunto da camada...' : 'Procurando o assunto da camada... (a primeira vez baixa o modelo de IA)'));
-    const r = await api.ie_mascara_assunto(L.c.toDataURL('image/png'));
+    // a IA leva alguns segundos (mais na 1ª vez): indicador na tela até terminar e um clique só de cada vez —
+    // antes era só um aviso rápido e parecia que o 1º clique não tinha funcionado (2026-10-13)
+    if (IE._assuntoRodando) { ieToast(ieT('Ainda procurando o assunto...')); return null; }
+    IE._assuntoRodando = true;
+    let r;
+    try {
+        ieCarregando(ieT('Procurando o assunto da camada...'), 'indet');
+        const baixado = await ieRecorteBaixado(['birefnet-lite']);
+        if (!baixado) ieCarregando(ieT('Procurando o assunto da camada... (a primeira vez baixa o modelo de IA)'), 'indet');
+        r = await api.ie_mascara_assunto(L.c.toDataURL('image/png'));
+    } finally { IE._assuntoRodando = false; ieCarregando(false); }
     if (!r || !r.success) { ieToast((r && r.error) || ieT('Não foi possível achar o assunto')); return null; }
     const img = new Image();
     img.src = 'data:image/png;base64,' + r.png;
@@ -1237,7 +1250,7 @@ async function ieRemoverFundo(doc, { rapido = false } = {}) {
     if (!L.c) { ieToast(ieT('Selecione uma camada com pixels')); return; }
     if (!(await iePodePintar(L, 'remover o plano de fundo'))) return;
     const baixado = await ieRecorteBaixado();
-    ieCarregando(ieT(baixado ? 'Recortando com precisão (borda, cabelo, cor)...' : 'Recortando com precisão (borda, cabelo, cor)... a primeira vez baixa o modelo (~930 MB)'), 50);
+    ieCarregando(ieT(baixado ? 'Recortando com precisão (borda, cabelo, cor)...' : 'Recortando com precisão (borda, cabelo, cor)... a primeira vez baixa o modelo (~930 MB)'), 'indet');
     let r;
     try { r = await api.ie_recorte_pro(L.c.toDataURL('image/png')); } finally { ieCarregando(false); }
     if (!r || !r.success) { ieToast((r && r.error) || ieT('Não foi possível recortar')); return; }

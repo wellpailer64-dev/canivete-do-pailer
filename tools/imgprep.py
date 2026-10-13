@@ -4,7 +4,7 @@ uso: py -3.13 tools/imgprep.py ENTRADA [ENTRADA...] [--corte x,y,w,h] [--ampliar
      py -3.13 tools/imgprep.py --folha a.png b.png ... [--fundo "#3580DC"] [-o folha.jpg]
   --corte     recorta um pedaço antes (px da imagem de entrada)
   --ampliar   2, 3 ou 4 (Real-ESRGAN Vulkan; --tipo arte p/ ilustração/ícone, foto p/ foto e exame)
-  --recortar  tira o fundo (BEN2 na placa) e corta nas bordas do objeto
+  --recortar [pessoa]  tira o fundo e corta nas bordas (objeto = BEN2; pessoa = BiRefNet matting, cabelo fino)
   --limpar F  apaga ilhas soltas menores que F × a maior (sobras de texto/painel vizinho no recorte); 0 = não limpa
   --tapar N   buracos fechados maiores que N px viram opacos (placa "HELP" vazada, miolo de balão) — 0 = não tapa
   --branco    fundo branco liso vira transparente sem IA (ícone chapado sobre branco), com a cor despremultiplicada
@@ -65,7 +65,7 @@ def preparar(ent, o):
     if o.branco: im = tirar_branco(im)
     if o.recortar:
         from Functions import recorte_pro
-        cores, alfa = recorte_pro.recortar(np.array(im.convert("RGB")), "objeto")
+        cores, alfa = recorte_pro.recortar(np.array(im.convert("RGB")), o.recortar)
         im = Image.fromarray(np.dstack([cores, alfa]))
     if o.tapar: im = tapar(im, o.tapar)   # antes de limpar: letras soltas dentro da placa grudam nela e não somem
     if (o.recortar or o.branco) and o.limpar: im = limpar(im, o.limpar)
@@ -87,7 +87,7 @@ def conferir(arqs, fundo, dest):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("entradas", nargs="+")
     ap.add_argument("--corte"); ap.add_argument("--ampliar", type=int); ap.add_argument("--tipo", default="arte")
-    ap.add_argument("--recortar", action="store_true"); ap.add_argument("--limpar", type=float, default=0.02)
+    ap.add_argument("--recortar", nargs="?", const="objeto", choices=["objeto", "pessoa"]); ap.add_argument("--limpar", type=float, default=0.02)
     ap.add_argument("--tapar", type=int, default=0); ap.add_argument("--branco", action="store_true")
     ap.add_argument("--saida"); ap.add_argument("--sufixo", default="_ok")
     ap.add_argument("--folha", action="store_true"); ap.add_argument("--fundo", default="#3580DC"); ap.add_argument("-o")

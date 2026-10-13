@@ -589,9 +589,46 @@ function ieVazar(ctx, L, r, o) {
     ctx.restore();
 }
 
+// assinatura do conteúdo de um grupo (versões, posições, visibilidade, opacidade e efeitos dos filhos), para o cache
+// dos efeitos do grupo saber quando refazer
+function ieGrupoAssin(L) {
+    return L.filhos.map(X => [X.id, X._v || 0, X.x, X.y, X.visivel ? 1 : 0, X.op, X.bm, X.fill, X.clip ? 1 : 0,
+        X.fxOculto ? 0 : JSON.stringify(X.fx || null), X.m ? (X.m._v || 0) + ':' + (X.m.desativada ? 1 : 0) : '',
+        X.tipo === 'grupo' ? ieGrupoAssin(X) : ''].join(',')).join('|');
+}
+
+// Grupo com efeitos de camada (sombra, traçado, brilho... no próprio grupo, como no Photoshop): os filhos são compostos
+// à parte na caixa inteira do grupo e esse resultado passa pelo mesmo ieFxRender das camadas. Antes os efeitos do grupo
+// eram ignorados: a sombra não aparecia nem na prévia da janela de estilo (2026-10-13, selo do carrossel Carlinhos).
+function ieRasterGrupoFx(L, mask, prof) {
+    const C = ieCaixaCamada(L);
+    if (!C || C.w < 1 || C.h < 1) return null;
+    const assin = [ieGrupoAssin(L), C.x, C.y, C.w, C.h, JSON.stringify(L.fx), L.fill, mask ? (mask._v || 0) : ''].join('#');
+    if (L._grupoFx && L._grupoFx.assin === assin) return L._grupoFx.r;
+    const G = ieCanvas(C.w, C.h), gc = ieCtx(G);
+    gc.setTransform(1, 0, 0, 1, -C.x, -C.y);
+    ieComporLista(gc, L.filhos, C, { x: C.x, y: C.y }, prof + 4);
+    gc.setTransform(1, 0, 0, 1, 0, 0);
+    if (mask) { gc.globalCompositeOperation = 'destination-in'; gc.drawImage(ieMascaraRegiao(mask, C), 0, 0); gc.globalCompositeOperation = 'source-over'; }
+    const f = ieFxRender(G, L.fx, { fill: L.fill ?? 1, interiorComFill: !!L.misturaInterior, doc: IE.doc, org: { x: C.x, y: C.y } });
+    const r = { c: f.c, x: C.x - f.mg, y: C.y - f.mg, ext: f.ext, acima: f.acima };
+    L._grupoFx = { assin, r };
+    return r;
+}
+
 function ieComporCamada(ctx, L, R, o, prof, forcarNormal, semExt) {
     if (L.tipo === 'grupo') {
         const mask = L.m && !L.m.desativada ? L.m : null;
+        if (!L.fxOculto && ieTemFx(L.fx)) {
+            const r = ieRasterGrupoFx(L, mask, prof);
+            if (!r) return;
+            const op = forcarNormal ? 1 : L.op, gco = forcarNormal ? 'source-over' : ieGco(L.bm === 'PASS_THROUGH' ? 'NORMAL' : L.bm);
+            const extra = lista => { for (const e of lista || []) { ctx.save(); ctx.globalAlpha = e.op * op; ctx.globalCompositeOperation = ieGco(e.bm); ctx.drawImage(e.c, r.x, r.y); ctx.restore(); } };
+            if (!semExt) extra(r.ext);
+            ctx.save(); ctx.globalAlpha = op; ctx.globalCompositeOperation = gco; ctx.drawImage(r.c, r.x, r.y); ctx.restore();
+            extra(r.acima);
+            return;
+        }
         if (L.bm === 'PASS_THROUGH' && L.op >= 1 && !mask && !forcarNormal) return ieComporLista(ctx, L.filhos, R, o, prof);
         const t = ieTemp(prof + 1, R.w, R.h), tc = ieCtx(t);
         tc.setTransform(1, 0, 0, 1, -R.x, -R.y);

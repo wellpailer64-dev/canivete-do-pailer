@@ -466,6 +466,13 @@ def _abrir_psd(path, doc, on_progress):
                     no["prancheta"] = _ler_prancheta(layer)
                 no["filhos"] = nivel(layer, raiz, indice_local, interno)
                 mascara(layer, no)
+                try:   # efeitos no próprio grupo (sombra no selo...): o editor desenha desde 2026-10-13
+                    fx, fx_ligado = _ler_fx(layer, luz)
+                    if fx and len(fx) > 1:
+                        no["fx"] = fx
+                        no["fx_oculto"] = not fx_ligado
+                except Exception:
+                    logging.debug("efeitos do grupo não lidos", exc_info=True)
                 out.append(no)
                 continue
             brit = _brilho_antigo(layer) if k == "pixel" else None
@@ -1869,7 +1876,7 @@ def salvar(spec):
                                     ob._record.mask_data.background_color = orig._record.mask_data.background_color
                             except Exception as e:
                                 logging.debug("máscara da rasterizada: %s", e)
-            if "fx" in no and no["tipo"] != "grupo":
+            if "fx" in no:   # grupo também: o efeito fica no registro de abertura da pasta (Group._record)
                 try:
                     _gravar_efeitos(ob, no["fx"], no.get("fx_oculto"), avisos)
                 except Exception as e:

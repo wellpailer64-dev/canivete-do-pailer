@@ -119,7 +119,7 @@ function ieLsFechar(ok) {
     const st = IE_LS.st;
     if (!st) return;
     const box = ieEl('ie-modal');
-    box.hidden = true; box.innerHTML = ''; box.classList.remove('lado');
+    box.hidden = true; box.innerHTML = ''; box.classList.remove('lado', 'ls');
     document.removeEventListener('keydown', ieLsTecla, true);
     clearTimeout(ieLsTimer);
     IE_LS.st = null;
@@ -169,6 +169,8 @@ function ieLsMontar() {
             </div>
         </div></div>`;
     box.hidden = false;
+    box.classList.add('ls');   // sem escurecer o documento: dá para ver o efeito enquanto ajusta
+    ieDlgArrastavel(box.querySelector('.ie-ls'), box.querySelector('.ie-ls-cab'), 'estilo');
     document.addEventListener('keydown', ieLsTecla, true);
     box.querySelector('[data-ls-nome]').addEventListener('input', ev => { st.mescla.nome = ev.target.value; });
     box.querySelector('.ie-ls').addEventListener('click', ieLsClique);

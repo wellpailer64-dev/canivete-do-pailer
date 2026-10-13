@@ -236,6 +236,31 @@ function ieTeclaNumero(ev) {
 // Ctrl segurado = ferramenta Mover temporária (exceto Mão, Zoom, Forma, Texto); ` segurado com o pincel = borracha
 const IE_SEM_CTRL_MOVER = ['mover', 'mao', 'zoom', 'forma', 'texto'];
 
+// ' (apóstrofo; no ABNT é a tecla ao lado do 1) alterna o "Selecionar: Camada | Grupo" do Mover e mostra o nome
+// pequeno ao lado do ponteiro por 1 s. Com o Pincel a mesma tecla segura a Borracha, então lá não alterna.
+function ieTeclaAlvoMover(ev) {
+    if (ev.key !== "'" || ev.ctrlKey || ev.altKey || ev.metaKey || ev.repeat || IE.ferr === 'pincel' || !IE.doc) return false;
+    const op = IE.op.mover;
+    op.alvo = (op.alvo || 'camada') === 'grupo' ? 'camada' : 'grupo';
+    if (IE.ferr === 'mover') ieOpcoesRender();   // o botão Camada/Grupo da barra acompanha
+    ieAvisoPonteiro(ieT(op.alvo === 'grupo' ? 'Grupo' : 'Camada'));
+    return true;
+}
+function ieAvisoPonteiro(txt) {
+    const vista = ieEl('ie-vista');
+    if (!vista) return;
+    let el = vista.querySelector('.ie-aviso-ponteiro');
+    if (!el) { el = document.createElement('div'); el.className = 'ie-aviso-ponteiro'; vista.appendChild(el); }
+    const m = IE.mouse, r = vista.getBoundingClientRect();
+    const x = m ? m.sx : r.width / 2, y = m ? m.sy : r.height / 2;
+    el.textContent = txt;
+    el.style.left = Math.min(x + 16, r.width - 90) + 'px';
+    el.style.top = Math.max(y - 26, 4) + 'px';
+    el.classList.remove('some'); void el.offsetWidth; el.classList.add('mostra');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.classList.remove('mostra'); el.classList.add('some'); }, 1000);
+}
+
 (function () {
     const orig = ieTecla;
     ieTecla = function (ev) {
@@ -249,6 +274,7 @@ const IE_SEM_CTRL_MOVER = ['mover', 'mao', 'zoom', 'forma', 'texto'];
             if (IE.ferrTemp !== 'borracha') { IE.ferrTemp = 'borracha'; ieCursor(ev); }
             return;
         }
+        if (ieTeclaAlvoMover(ev)) { ev.preventDefault(); return; }
         // formatação de texto com a ferramenta Texto e uma camada de texto selecionada
         if (IE.ferr === 'texto' && doc && ieTextoAtalho(ev)) { ev.preventDefault(); ev.stopPropagation(); return; }
         // números (opacidade/fluxo; dois dígitos rápidos)

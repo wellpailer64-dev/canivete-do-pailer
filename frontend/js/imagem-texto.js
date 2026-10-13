@@ -187,7 +187,7 @@ function ieTextoLayout(t) {
     return out;
 }
 
-function ieTextoCaixaLocal(t, linhas = ieTextoLayout(t)) {
+function ieTextoCaixaLocal(t, linhas = ieTextoLayout(t), soLinhas = false) {
     const x = ieMedir(t), sh = (t.escH || 100) / 100, sv = (t.escV || 100) / 100, sobe = ieTxSobe(t), tam = ieTxTam(t);
     const m0 = x.measureText('Hg');
     const asc = Math.max(m0.fontBoundingBoxAscent || 0, m0.actualBoundingBoxAscent || 0, tam * 0.8) * sv;
@@ -196,9 +196,13 @@ function ieTextoCaixaLocal(t, linhas = ieTextoLayout(t)) {
     for (const l of linhas) {
         const mt = x.measureText(l.s || ' ');
         const esq = Math.min(0, -(mt.actualBoundingBoxLeft || 0) * sh), dir = Math.max(l.wl, (mt.actualBoundingBoxRight || 0) * sh);
-        R = ieRUniao(R, { x: l.x + esq - t.tam * 0.1, y: l.y - sobe - asc, w: dir - esq + t.tam * 0.25, h: asc + desc });
+        // soLinhas (clique): altura das letras de verdade da linha — o topo declarado da fonte (Jost: 1,07 em) deixa
+        // uma faixa invisível acima das letras que cobria o texto de cima; mínimo p/ ainda pegar clicando entre letras
+        const a = soLinhas ? Math.max(mt.actualBoundingBoxAscent || 0, tam * 0.55) * sv : asc;
+        const d = soLinhas ? Math.max(mt.actualBoundingBoxDescent || 0, tam * 0.12) * sv : desc;
+        R = ieRUniao(R, { x: l.x + esq - t.tam * 0.1, y: l.y - sobe - a, w: dir - esq + t.tam * 0.25, h: a + d });
     }
-    if (t.caixa) R = ieRUniao(R, { x: t.caixa[0], y: t.caixa[1], w: t.caixa[2] - t.caixa[0], h: 1 });
+    if (t.caixa && !soLinhas) R = ieRUniao(R, { x: t.caixa[0], y: t.caixa[1], w: t.caixa[2] - t.caixa[0], h: 1 });
     return R || { x: 0, y: -asc, w: 1, h: asc + desc };
 }
 
@@ -344,7 +348,9 @@ function ieTextoNoPonto(doc, p) {
     visitar(doc.camadas, true);
     for (let i = ordem.length - 1; i >= 0; i--) {
         const L = ordem[i], t = L.txt, q = ieMatPt(ieMatInv(t.m || IE_ID), p.x, p.y);
-        const B = ieTextoCaixaLocal(t);
+        // só as linhas escritas: a caixa de parágrafo (moldura de edição) pode ser bem maior que o texto e passava por
+        // cima de outras camadas — clicar no "TIME DA CARLINHOS" pegava o "Paulinho" de baixo (2026-10-13)
+        const B = ieTextoCaixaLocal(t, ieTextoLayout(t), true);
         const tol = Math.max(2, t.tam * 0.08);
         if (q.x >= B.x - tol && q.y >= B.y - tol && q.x <= B.x + B.w + tol && q.y <= B.y + B.h + tol) return L;
     }
