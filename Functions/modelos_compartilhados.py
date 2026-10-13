@@ -128,3 +128,54 @@ def app_dir():
     if getattr(sys, "frozen", False):
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _hash(p, bloco=8 * 2**20):
+    import hashlib
+    h = hashlib.sha1()
+    with open(p, "rb") as f:
+        while True:
+            b = f.read(bloco)
+            if not b:
+                return h.hexdigest()
+            h.update(b)
+
+
+def deduplicar(principal, copia, log=print):
+    """Cópias IDÊNTICAS (conteúdo inteiro) em `copia` viram links físicos para o arquivo de `principal` — libera o disco
+    sem mudar nada para o app (os dois nomes são o mesmo arquivo; apagar um não apaga o outro). Troca atômica (link com
+    nome provisório + os.replace); arquivo em uso (app aberto) fica como está. Devolve {trocados, bytes, em_uso, diferentes}."""
+    r = {"trocados": 0, "bytes": 0, "em_uso": [], "diferentes": 0}
+    for sub in PASTAS:
+        a_base, b_base = os.path.join(principal, sub), os.path.join(copia, sub)
+        if not (os.path.isdir(a_base) and os.path.isdir(b_base)):
+            continue
+        for raiz, dirs, arqs in os.walk(b_base):
+            dirs[:] = [d for d in dirs if not _eh_link(os.path.join(raiz, d))]   # não entra em pasta já ligada
+            for nome in arqs:
+                b = os.path.join(raiz, nome)
+                a = os.path.join(a_base, os.path.relpath(b, b_base))
+                try:
+                    if (not os.path.isfile(a) or os.path.islink(b) or os.path.samefile(a, b)
+                            or os.path.getsize(a) != os.path.getsize(b) or not _mesmo_disco(a, b)):
+                        continue
+                    if _hash(a) != _hash(b):
+                        r["diferentes"] += 1
+                        continue
+                    tam, tmp = os.path.getsize(b), b + ".kanivete_link"
+                    if os.path.lexists(tmp):
+                        os.remove(tmp)
+                    os.link(a, tmp)
+                    try:
+                        os.replace(tmp, b)
+                    except OSError:
+                        os.remove(tmp)
+                        r["em_uso"].append(os.path.relpath(b, copia))
+                        continue
+                    r["trocados"] += 1
+                    r["bytes"] += tam
+                except OSError as e:
+                    r["em_uso"].append(f"{os.path.relpath(b, copia)} ({e.__class__.__name__})")
+    log(f"[modelos] {r['trocados']} cópia(s) idêntica(s) viraram link: {r['bytes'] / 2**30:.2f} GB liberados"
+        + (f"; {len(r['em_uso'])} em uso ficaram" if r["em_uso"] else ""))
+    return r
