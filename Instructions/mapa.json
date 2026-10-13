@@ -769,6 +769,7 @@
   "musicas_url",
   "kani_agente_precisa",
   "kani_agente",
+  "kani_maos_resposta",
   "kani_ditado_iniciar",
   "kani_ditado_nivel",
   "kani_ditado_parar",
@@ -1301,9 +1302,16 @@
    ]
   },
   "kani_agente": {
-   "args": "job, pedido, historico=None, anexos=None",
+   "args": "job, pedido, historico=None, anexos=None, recentes=None",
    "modulos": [
-    "kani_agente"
+    "kani_agente",
+    "kani_maos"
+   ]
+  },
+  "kani_maos_resposta": {
+   "args": "i, res",
+   "modulos": [
+    "kani_maos"
    ]
   },
   "kani_ditado_iniciar": {
@@ -2554,6 +2562,7 @@
   "Instructions/agente/direcao-de-arte.md": "Direção de arte e motion para o AutoFrame e as edições do Pocket Editor",
   "Instructions/agente/diretor-de-arte.md": "Diretor de arte de carrossel (padrão de resposta + o que o Jr executa por comando)",
   "Instructions/agente/guia-edicao.md": "GUIA-EDICAO :: Pocket Editor (Canivete do Pailer) — para agentes de IA",
+  "Instructions/agente/kani-maos.md": "Mãos da Kani — a Kani operando os apps ao vivo",
   "Instructions/agente/kani-motor.md": "Motor da Kani: bancada de modelos e escolha (2026-10-10)",
   "Instructions/agente/mapa-editor.md": "Mapa do código — editor (gerado por tools/mapa_codigo.py; nome:linha)",
   "Instructions/agente/mapa-habilidades-motion.md": "Mapa de habilidades de motion (árvore de técnicas desbloqueadas)",
@@ -2624,6 +2633,7 @@
   "Functions/kani_agente.py": "kani_agente.py — a Kani trabalhando EM ETAPAS (agente): planeja, usa ferramentas uma de cada vez, olha o resultado,",
   "Functions/kani_criar.py": "kani_criar.py — a Kani CRIA coisas no chat: imagem (Z-Image, gerador_imagem), efeito sonoro (EzAudio, gerador_sfx),",
   "Functions/kani_ditado.py": "kani_ditado.py — 🎤 no chat da Kani: clica, fala, clica de novo e o texto aparece no campo (para revisar e enviar)",
+  "Functions/kani_maos.py": "kani_maos.py — as \"mãos\" da Kani nos apps: ela preenche uma FICHA curta e o código monta a peça AO VIVO na tela",
   "Functions/kani_memoria.py": "kani_memoria.py — o que a Kani aprende com a pessoa, sem retreinar o modelo (como as memórias e receitas do Claude):",
   "Functions/kani_skills.py": "kani_skills.py — habilidades do dia a dia da Kani (ferramentas do modo em etapas, kani_agente.py):",
   "Functions/legendas.py": "legendas.py — transcrição da timeline do Pocket Editor (painel Texto: Transcrever / Criar legendas)",
@@ -2700,6 +2710,7 @@
   "teste_illustrator": "Compatibilidade Vetor Kanivete ↔ Adobe Illustrator (Functions/ponte_illustrator.py) — app em --agente=9333 e o",
   "teste_imagem": "Teste do Editor de Imagem (frontend/js/imagem-*.js + Functions/editor_imagem.py) no app de verdade",
   "teste_kani": "Kani (assistente) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila) e confere: bolinha na Home,",
+  "teste_kani_maos": "Teste das mãos da Kani: abre o app de teste (porta 9338, dados em D:/kanivete_testes), pede um flyer ao agente da",
   "teste_laco": "Laço: Shift soma, Alt subtrai, Shift+Alt cruza; o mesmo no magnético; Ctrl+clique na miniatura seleciona a camada",
   "teste_mixer": "Mixer de trilhas de áudio (editor-mixer.js): Premiere → Kanivete → XML do Premiere e a conta do som na exportação",
   "teste_motion": "Motion do Editor Kanivete (editor-motion.js) com mouse de verdade: ferramenta Máscara (arrastar no monitor), Caneta",

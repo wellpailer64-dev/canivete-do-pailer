@@ -59,6 +59,18 @@ function ieHsv(hex) {
 }
 function ieDeHsv(h, s, v) { s /= 100; v /= 100; const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); }; return ieRgbHex(f(5) * 255, f(3) * 255, f(1) * 255); }
 function ieDefinirCor(c, alvo = IE.corAlvo) { IE.cor[alvo] = c; ieUiCores(); }
+// clique numa amostra com camada de Cor sólida ou de forma selecionada: a cor vai também para ela (como no Photoshop)
+function ieAmostraNasCamadas(c) {
+    const doc = IE.doc;
+    if (!doc) return;
+    const alvos = ieSelecionadas(doc).filter(L => (L.tipo === 'preenchimento' && L.pre && L.pre.tipo === 'cor') || (L.tipo === 'forma' && L.vet));
+    let mudou = false;
+    for (const L of alvos) {
+        if (L.tipo === 'forma') { if (L.vet.cor !== c) { L.vet.cor = c; ieFormaRender(L, doc); mudou = true; } }
+        else if (L.pre.cor !== c) { L.pre.cor = c; iePreRender(L, doc); mudou = true; }
+    }
+    if (mudou) { ieHist(ieT(alvos.length > 1 || alvos[0].tipo === 'forma' ? 'Cor da forma' : 'Cor do preenchimento')); ieUiCamadas?.(); ieUiProps?.(); }
+}
 // modos: 'cubo' (quadrado de saturação/brilho + faixa de matiz, o padrão do Photoshop), 'rgb', 'hsb'
 IE.corMatiz = 0;
 ieJanRegistrar('cor', 'Cor', ['cor'], corpo => {
@@ -202,9 +214,15 @@ ieJanRegistrar('amostras', 'Amostras', ['cor'], corpo => {
     const busca = corpo.querySelector('[data-busca]');
     busca.addEventListener('input', () => { corpo._busca = busca.value; ieJanAtualizar('cor'); setTimeout(() => { const b = corpo.querySelector('[data-busca]'); b.focus(); b.setSelectionRange(b.value.length, b.value.length); }, 70); });
     busca.addEventListener('keydown', e => e.stopPropagation());
-    corpo.querySelectorAll('[data-rec]').forEach(b => b.onclick = e => ieDefinirCor(b.dataset.rec, e.ctrlKey || e.altKey ? 1 : 0));
+    corpo.querySelectorAll('[data-rec]').forEach(b => b.onclick = e => { const f = e.ctrlKey || e.altKey ? 1 : 0; ieDefinirCor(b.dataset.rec, f); if (!f) ieAmostraNasCamadas(b.dataset.rec); });
     corpo.querySelectorAll('.ie-am[data-gi]').forEach(b => {
-        b.onclick = e => { IE.amSel = { gi: +b.dataset.gi, ci: b.dataset.ci !== undefined ? +b.dataset.ci : undefined }; ieDefinirCor(item(b).c, e.ctrlKey || e.altKey ? 1 : 0); ieJanAtualizar('cor'); };
+        b.onclick = e => {
+            IE.amSel = { gi: +b.dataset.gi, ci: b.dataset.ci !== undefined ? +b.dataset.ci : undefined };
+            const f = e.ctrlKey || e.altKey ? 1 : 0;
+            ieDefinirCor(item(b).c, f);
+            if (!f) ieAmostraNasCamadas(item(b).c);
+            ieJanAtualizar('cor');
+        };
         b.ondblclick = async () => {
             const x = item(b);
             const v = await ieDialogo({ titulo: 'Nome da amostra', campos: [{ id: 'n', rotulo: 'Nome', tipo: 'texto', valor: x.n || '' }] });
@@ -1029,7 +1047,7 @@ function ieBarraCtxAtualizar() {
     let R, itens;
     if (doc.sel) {
         R = doc.sel.bbox;
-        itens = [['selInverter', 'Inverter seleção'], ['selSuavizar', 'Suavizar...'], ['selExpandir', 'Expandir...'], ['mascaraSel', 'Criar máscara'], ['preencher', 'Preencher...'], ['viaRecorte', 'Nova camada'], ['selAssunto', 'Selecionar assunto'], ['selNada', 'Desmarcar']];
+        itens = [['removerSel', 'Remover'], ['selInverter', 'Inverter seleção'], ['selSuavizar', 'Suavizar...'], ['selExpandir', 'Expandir...'], ['mascaraSel', 'Criar máscara'], ['preencher', 'Preencher...'], ['viaRecorte', 'Nova camada'], ['selAssunto', 'Selecionar assunto'], ['selNada', 'Desmarcar']];
     } else {
         const L = ieAtiva(doc);
         R = L && ieCaixaCamada(L);
@@ -1039,7 +1057,12 @@ function ieBarraCtxAtualizar() {
         if (['pixel', 'ajuste', 'grupo'].includes(L.tipo)) itens = itens.filter(i => i[0] !== 'rasterizar');
     }
     const chave = itens.map(i => i[0]).join('|');
-    if (b._chave !== chave) { b._chave = chave; b.querySelector('.ie-ctb-btns').innerHTML = itens.map(([c, r]) => `<button data-cmd="${c}">${ieJanH(r)}</button>`).join(''); }
+    if (b._chave !== chave) {
+        b._chave = chave; b.querySelector('.ie-ctb-btns').innerHTML = itens.map(([c, r]) => `<button data-cmd="${c}">${ieJanH(r)}</button>`).join('');
+        // com seleção, a caixa vira Preenchimento generativo (como no Photoshop): o texto preenche a seleção; vazio remove
+        b.querySelector('.ie-ctb-prompt').placeholder = ieT(doc.sel ? 'O que gerar na seleção (vazio = remover)...' : 'Gerar com IA: descreva ou cole um prompt...');
+        b.querySelector('.ie-ctb-modo').hidden = !!doc.sel;
+    }
     const v = ieVistaTam(), s = ieDocTela(R.x + R.w / 2, R.y + R.h, doc);
     b.hidden = false;
     const w = b.offsetWidth || 300, fixa = iePref('barraCtxPos', null);
@@ -1059,8 +1082,18 @@ function ieBarraCtxAtualizar() {
 // pode continuar trabalhando: a camada entra acima da ativa quando terminar
 async function ieBarraCtxGerar() {
     const b = ieBarraCtx(), inp = b.querySelector('.ie-ctb-prompt'), bt = b.querySelector('.ie-ctb-gerar');
-    const prompt = inp.value.trim(), doc = IE.doc;
-    if (!prompt || !doc || IE._ctbGerando) return;
+    let prompt = inp.value.trim();
+    const doc = IE.doc;
+    if (!doc || IE._ctbGerando) return;
+    if (doc.sel) {   // seleção: preenche a seleção; "remover", "apagar", "tirar" (ou vazio) tiram o que está lá
+        if (/^(remover|remova|remove|apagar|apague|tirar|tire|retirar|excluir|limpar|delete|erase|clean)\b[^,;]{0,30}$/i.test(prompt)) prompt = '';
+        IE._ctbGerando = true; bt.disabled = true; bt.textContent = ieT(prompt ? 'Gerando...' : 'Removendo...');
+        try { await iePreenchimentoGenerativo(doc, prompt); }
+        catch (e) { console.error('[preencher pela barra]', e); }
+        finally { IE._ctbGerando = false; bt.disabled = false; bt.textContent = '✦ ' + ieT('Gerar'); }
+        return;
+    }
+    if (!prompt) return;
     const objeto = b.querySelector('.ie-ctb-modo').value === 'objeto';
     const k = 1024 / Math.max(doc.w, doc.h);
     const [w, h] = objeto ? [1024, 1024] : [Math.round(doc.w * k / 16) * 16, Math.round(doc.h * k / 16) * 16];
@@ -1073,6 +1106,7 @@ async function ieBarraCtxGerar() {
     finally { IE._ctbGerando = false; bt.disabled = false; bt.textContent = '✦ ' + ieT('Gerar'); }
 }
 IE_CMDS['ajuste:matiz'] = () => ieAjNova('matiz');
+IE_CMDS.removerSel = doc => iePreencherConteudo(doc, { amostra: 'todas', saida: 'nova' });   // Remover (barra): o que está em volta preenche a seleção
 IE_CMDS.barraCtxDesligar = () => { IE._ctbOculta = true; ieBarraCtxAtualizar(); };   // só até o próximo clique numa camada
 
 // ─────────────────────────── menu Janela ───────────────────────────

@@ -1637,11 +1637,12 @@ function veColar() {
     }
     if (cb.cs) { veColarVarios(cb.cs); return; }
     if (cb.c.m && !VE.media[cb.c.m]) { veToast('A mídia desse clipe não está mais no projeto'); return; }
-    const tr = veColarTrilha(cb.c);
+    const st = veSnapFrame(VE.playhead), tr0 = veColarTrilha(cb.c);
+    const tr = tr0 + veColarDesce([{ ...cb.c, tr: tr0, st }]);
     veEnsureTrackIndex(tr);
     if (veTrkLocked(tr)) { veAvisoBloqueio(); return; }
     vePushHistory();
-    const novo = { ...veCopiaClipe(cb.c), tr, st: veSnapFrame(VE.playhead) };
+    const novo = { ...veCopiaClipe(cb.c), tr, st };
     vePlaceClip(novo);
     veAfterEdit(veEnd(novo));
     veToast(`Colado em ${veIsAudio(novo) ? 'A' : 'V'}${novo.tr + 1}`);
@@ -1654,6 +1655,15 @@ function veColarTrilha(c) {
     const kind = veIsAudio(c) ? 'a' : 'v', n = Math.max(veTrackCount(), c.tr + 1);
     for (let k = 0; k < n; k++) if (veTrkAlvo(kind, k)) return k;
     return c.tr;
+}
+
+// Colar sem apagar nada: fica na trilha de origem (ou na alvo) se ela estiver livre no trecho; senão desce para a
+// próxima trilha livre (A1 → A2 → A3…; vídeo V1 → V2…). cs = clipes já com trilha e tempo de destino; devolve quantas
+// trilhas descer (o grupo desce junto, mantendo a distância entre as trilhas).
+function veColarDesce(cs) {
+    const cabe = d => cs.every(c => !veTrkLocked(c.tr + d) && veTrackFree(c.tr + d, c.st, c.st + (c.e - c.s) / veVel(c), c));
+    for (let d = 0; d < 64; d++) if (cabe(d)) return d;
+    return 0;
 }
 
 // Vários clipes copiados: o primeiro cai na agulha e os outros mantêm a distância e a trilha de cada um; os vínculos
@@ -1669,11 +1679,19 @@ function veColarVarios(cs) {
         });
         cs = cs.map(c => ({ ...c, tr: c.tr + (desl[veIsAudio(c) ? 'a' : 'v'] || 0) }));
     }
+    // sem apagar o que já está na timeline: cada tipo (vídeo / áudio) desce junto até caber
+    const t = veSnapFrame(VE.playhead);
+    ['v', 'a'].forEach(kind => {
+        const do_ = cs.filter(c => (veIsAudio(c) ? 'a' : 'v') === kind);
+        if (!do_.length) return;
+        const d = veColarDesce(do_.map(c => ({ ...c, st: t + c.st })));
+        if (d) cs = cs.map(c => (veIsAudio(c) ? 'a' : 'v') === kind ? { ...c, tr: c.tr + d } : c);
+    });
     const trs = [...new Set(cs.map(c => c.tr))];
     trs.forEach(tr => veEnsureTrackIndex(tr));
     if (trs.some(veTrkLocked)) { veAvisoBloqueio(); return; }
     vePushHistory();
-    const t = veSnapFrame(VE.playhead), lk = veLkMapa(), novos = [];
+    const lk = veLkMapa(), novos = [];
     cs.forEach(c => {
         const n = lk({ ...JSON.parse(JSON.stringify(c)), st: t + c.st });
         vePlaceClip(n);

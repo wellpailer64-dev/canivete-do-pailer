@@ -939,8 +939,28 @@ function i18nT(s) {
             if (re.test(lim)) { en = lim.replace(re, rep); break; }
         }
     }
+    if (en == null) en = i18nPartes(lim);
     if (en == null) return s;
     return s === lim ? en : s.replace(lim, en);
+}
+// sem a frase inteira no dicionário: traduz o miolo e devolve o final como estava — "Abrir...", "Mover (V)",
+// "Luz linear ≈", "Opacidade:", "Suavizar: 2 px"
+// Tenta cada forma de dividir e fica com a primeira que traduz todas as partes (senão, a que traduziu alguma).
+function i18nPartes(s) {
+    const neutro = x => !/[A-Za-zÀ-ú]{2}/.test(x) || /^(Ctrl|Alt|Shift|Enter|Esc)[\w+/]*$/.test(x);
+    const junta = (partes, fmt) => {
+        const tr = partes.map(x => i18nT(x));
+        const algum = tr.some((x, i) => x !== partes[i]);
+        return algum ? { txt: fmt(tr), ok: tr.every((x, i) => x !== partes[i] || neutro(x)) } : null;
+    };
+    const c = [];
+    let r;
+    if ((r = s.match(/^(.+?)(\.\.\.|…|:|\s≈)$/))) c.push(junta([r[1]], t => t[0] + r[2]));
+    if ((r = s.match(/^(.+?)\s\(([^()]{1,60})\)$/))) c.push(junta([r[1], r[2]], t => `${t[0]} (${t[1]})`));
+    if (s.includes(' · ')) { const ps = s.split(' · '); c.push(junta(ps, t => t.join(' · '))); }
+    if ((r = s.match(/^([^:·()]{1,60}):\s+(.+)$/))) c.push(junta([r[1], r[2]], t => `${t[0]}: ${t[1]}`));
+    const v = c.filter(Boolean);
+    return (v.find(x => x.ok) || v[0])?.txt ?? null;
 }
 
 // o que é do usuário não se traduz: "Fundo"/"Texto" como nome de camada viravam "Background"/"Text"

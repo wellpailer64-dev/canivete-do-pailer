@@ -2036,6 +2036,115 @@ def _gravar_imagem(im, destino, q, dpi):
     return None
 
 
+# ── tela inicial: miniaturas dos Recentes e imagem arrastada do navegador ──
+_MINI_LADO = 320
+
+
+def _arq_miniatura(path):
+    import hashlib
+    pasta = os.path.join(os.environ.get("APPDATA") or os.path.expanduser("~"), "CaniveteDoPailer", "ie_miniaturas")
+    os.makedirs(pasta, exist_ok=True)
+    h = hashlib.sha1(os.path.normcase(os.path.abspath(path)).encode("utf-8")).hexdigest()[:20]
+    return os.path.join(pasta, h + ".jpg")
+
+
+def _miniatura_psd(path):
+    """A miniatura JPEG que o Photoshop grava nos recursos do PSD/PSB (id 1036): lê só o começo do arquivo."""
+    import struct
+    with open(path, "rb") as f:
+        if f.read(26)[:4] != b"8BPS":
+            return None
+        (n,) = struct.unpack(">I", f.read(4))
+        f.seek(n, 1)
+        (tam,) = struct.unpack(">I", f.read(4))
+        fim = f.tell() + tam
+        while f.tell() + 12 <= fim:
+            if f.read(4) != b"8BIM":
+                return None
+            (rid,) = struct.unpack(">H", f.read(2))
+            (ln,) = struct.unpack(">B", f.read(1))
+            f.seek(ln + (ln + 1) % 2, 1)
+            (dl,) = struct.unpack(">I", f.read(4))
+            if rid == 1036:
+                return Image.open(io.BytesIO(f.read(dl)[28:]))
+            f.seek(dl + dl % 2, 1)
+    return None
+
+
+def _gerar_miniatura(path):
+    ext = os.path.splitext(path)[1].lower()
+    if ext in (".psd", ".psb"):
+        return _miniatura_psd(path)
+    if ext == ".iknv":
+        import zipfile
+        with zipfile.ZipFile(path) as z:
+            return Image.open(io.BytesIO(z.read("previa.png"))) if "previa.png" in z.namelist() else None
+    im = Image.open(path)
+    im.draft("RGB", (_MINI_LADO * 2, _MINI_LADO * 2))
+    return im
+
+
+def miniaturas(paths):
+    """{caminho: data URL} das miniaturas dos Recentes. Guardadas em %APPDATA%/CaniveteDoPailer/ie_miniaturas; a que
+    falta (ou é mais velha que o arquivo) sai da miniatura do PSD, da previa.png do .iknv ou da própria imagem."""
+    import base64
+    out = {}
+    for p in paths or []:
+        try:
+            if not os.path.isfile(p):
+                continue
+            arq = _arq_miniatura(p)
+            if not (os.path.isfile(arq) and os.path.getmtime(arq) >= os.path.getmtime(p)):
+                try:
+                    im = _gerar_miniatura(p)
+                except Exception:
+                    im = None
+                if im is not None:
+                    im = im.convert("RGBA")
+                    im.thumbnail((_MINI_LADO, _MINI_LADO))
+                    fundo = Image.new("RGB", im.size, (40, 40, 40))
+                    fundo.paste(im, mask=im.split()[3])
+                    fundo.save(arq, "JPEG", quality=82)
+            if os.path.isfile(arq):
+                with open(arq, "rb") as f:
+                    out[p] = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode()
+        except Exception as e:
+            logging.getLogger(__name__).debug("miniatura %s: %s", p, e)
+    return out
+
+
+def gravar_miniatura(path, data_url):
+    """Miniatura feita pelo editor ao abrir/salvar (o composto de verdade, inclusive de PSD sem miniatura)."""
+    import base64
+    try:
+        with open(_arq_miniatura(path), "wb") as f:
+            f.write(base64.b64decode(data_url.split(",", 1)[1]))
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def baixar_imagem(url):
+    """Imagem arrastada de um site (ChatGPT, Pinterest...): baixa pelo Python (sem CORS) e serve como PNG."""
+    import urllib.parse
+    import urllib.request
+    if not (url or "").lower().startswith(("http://", "https://")):
+        return {"success": False, "error": "endereço inválido"}
+    try:
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36",
+            "Accept": "image/avif,image/webp,image/png,image/*,*/*;q=0.8"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            dados = r.read(300 * 1024 * 1024)
+        im = Image.open(io.BytesIO(dados))
+        im.load()
+        nome = os.path.splitext(os.path.basename(urllib.parse.urlparse(url).path))[0] or "Imagem"
+        tok, u = media_server.register_bytes(_png(im.convert("RGBA")), "baixada.png", "image/png")
+        return {"success": True, "url": u, "token": tok, "nome": nome[:60]}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def colar_windows():
     """Ctrl+V no editor: imagem copiada no Windows (servida da memória) ou arquivos copiados no Explorer."""
     try:

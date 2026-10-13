@@ -626,13 +626,73 @@ function ieRecentesAdd(p) {
     const l = ieRecentes().filter(x => x.toLowerCase() !== p.toLowerCase());
     l.unshift(p);
     iePrefGravar('recentes', l.slice(0, 12));
+    const doc = IE.docs.find(d => d.path && d.path.toLowerCase() === p.toLowerCase()) || IE.doc;
+    if (doc) ieMiniaturaGravar(p, doc);
+}
+// miniatura do composto (a dos Recentes), um instante depois de abrir/salvar
+function ieMiniaturaGravar(p, doc) {
+    setTimeout(() => {
+        try {
+            let src = doc.achatado && doc.achatadoC;
+            if (!src) { ieCompor(doc, ieRDoc(doc)); src = doc.comp; }
+            if (!src || !src.width) return;
+            const k = Math.min(1, 320 / Math.max(src.width, src.height));
+            const c = ieCanvas(Math.max(1, Math.round(src.width * k)), Math.max(1, Math.round(src.height * k))), x = ieCtx(c);
+            x.fillStyle = '#282828'; x.fillRect(0, 0, c.width, c.height);
+            x.imageSmoothingQuality = 'high';
+            x.drawImage(src, 0, 0, c.width, c.height);
+            ieApi()?.ie_miniatura_gravar(p, c.toDataURL('image/jpeg', 0.82));
+        } catch (e) { /* sem miniatura */ }
+    }, 800);
 }
 function ieRecentesRender() {
     const box = ieEl('ie-recentes');
     if (!box) return;
     const l = ieRecentes();
-    box.innerHTML = l.length ? `<div class="ie-recentes-tit">${ieT('Recentes')}</div>` + l.map(p => `<button class="ie-recente" data-p="${ieEsc(p)}" title="${ieEsc(p)}">${ieIco(/\.ps[db]$/i.test(p) ? 'folder' : 'type').replace('type', 'type')}<span>${ieEsc(ieNomeArq(p))}</span></button>`).join('') : '';
+    box.innerHTML = l.length ? `<div class="ie-recentes-tit">${ieT('Recentes')}</div><div class="ie-recentes-grade">` + l.map(p => `<button class="ie-recente" data-p="${ieEsc(p)}" title="${ieEsc(p)}"><span class="ie-recente-mini">${ieIco(/\.ps[db]$/i.test(p) ? 'folder' : 'type')}</span><span class="ie-recente-nome">${ieEsc(ieNomeArq(p))}</span></button>`).join('') + '</div>' : '';
     if (!box._ok) { box._ok = true; box.addEventListener('click', ev => { const b = ev.target.closest('[data-p]'); if (b) ieAbrirArquivo(b.dataset.p); }); }
+    if (l.length && ieApi()?.ie_miniaturas) ieApi().ie_miniaturas(l).then(m => {
+        box.querySelectorAll('[data-p]').forEach(b => { const u = m && m[b.dataset.p]; if (u) b.querySelector('.ie-recente-mini').innerHTML = `<img src="${u}" alt="">`; });
+    }).catch(() => {});
+}
+
+// imagem arrastada de um site (ChatGPT, Pinterest, outro navegador): o arquivo virtual que o Chrome manda ou, sem ele,
+// o endereço da imagem baixado pelo Python. Arquivo do disco continua chegando pelo Python (onArquivosSoltos).
+function ieDropNavegador(ev) {
+    const dt = ev.dataTransfer;
+    if (!dt) return;
+    const arqs = Array.from(dt.files || []).filter(f => /^image\//.test(f.type) || IE_EXT.test(f.name || ''));
+    if (arqs.some(f => f.pywebviewFullPath)) return;
+    const html = dt.getData('text/html') || '';
+    const uri = (dt.getData('text/uri-list') || '').split(/\r?\n/).find(s => s && !s.startsWith('#')) || '';
+    const src = ((html.match(/<img[^>]+src=["']([^"']+)/i) || [])[1] || '').replace(/&amp;/g, '&');
+    if (!arqs.length && !src && !uri) return;
+    const t0 = Date.now();
+    setTimeout(async () => {
+        if (IE.entregouArquivo && IE.entregouArquivo >= t0 - 50) return;   // era arquivo do disco: o Python já abriu
+        let c = null, nome = ieT('Imagem'), erro = '';
+        ieCarregando(`${ieT('Trazendo a imagem')}...`, 30);
+        try {
+            if (arqs[0]) {
+                try {
+                    const bmp = await createImageBitmap(arqs[0], { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+                    c = ieCanvas(bmp.width, bmp.height); ieCtx(c).drawImage(bmp, 0, 0); bmp.close?.();
+                    nome = (arqs[0].name || '').replace(/\.[^.]+$/, '') || nome;
+                } catch (e) { erro = e.message || String(e); }
+            }
+            const url = !c && [src, uri].find(u => /^(https?:|data:image\/)/i.test(u));
+            if (url && url.startsWith('data:')) c = await ieImagemDeUrl(url);
+            else if (url) {
+                const r = await ieApi()?.ie_baixar_imagem(url);
+                if (r && r.success) { c = await ieImagemDeUrl(r.url); ieApi().ie_soltar_memoria([r.token]); nome = r.nome || nome; }
+                else erro = (r && r.error) || erro;
+            }
+        } catch (e) { erro = e.message || String(e); }
+        finally { ieCarregando(false); }
+        if (!c) { ieToast(`${ieT('Não trouxe a imagem')}${erro ? ': ' + erro : ''}`); return; }
+        if (!IE.doc) { ieNovoDoc2(nome, c.width, c.height, 72, 'transp'); ieColocarCanvas(c, nome, 0, 0); }
+        else ieColocarCanvas(c, ieNomeLivre(IE.doc, nome), undefined, undefined, true);
+    }, 600);
 }
 
 // ─────────────────────────── área de transferência ───────────────────────────
@@ -1136,11 +1196,17 @@ function ieOrdem(doc, modo) {
 // ── Remover plano de fundo / Selecionar assunto (como no Photoshop): a IA de recorte do Kanivete (BiRefNet,
 // Functions/removerfundo.py) acha o assunto da camada e devolve a máscara; o editor usa como máscara da camada
 // (os pixels continuam, dá para retocar a máscara com o pincel) ou como seleção ──
+// o aviso de download só enquanto o modelo ainda não está no disco
+async function ieRecorteBaixado(modelos) {
+    try { const api = ieApi(); return !!(api && api.ie_recorte_baixado && (await (modelos ? api.ie_recorte_baixado(modelos) : api.ie_recorte_baixado())).baixado); }
+    catch (e) { return false; }
+}
 async function ieMascaraAssunto(L) {
     const api = window.pywebview && window.pywebview.api;
     if (!api || !api.ie_mascara_assunto) { ieToast(ieT('Recurso indisponível nesta versão')); return null; }
     if (!L || !L.c) { ieToast(ieT('Selecione uma camada com pixels')); return null; }
-    ieToast(ieT('Procurando o assunto da camada... (a primeira vez baixa o modelo de IA)'));
+    const baixado = await ieRecorteBaixado(['birefnet-lite']);
+    ieToast(ieT(baixado ? 'Procurando o assunto da camada...' : 'Procurando o assunto da camada... (a primeira vez baixa o modelo de IA)'));
     const r = await api.ie_mascara_assunto(L.c.toDataURL('image/png'));
     if (!r || !r.success) { ieToast((r && r.error) || ieT('Não foi possível achar o assunto')); return null; }
     const img = new Image();
@@ -1170,7 +1236,8 @@ async function ieRemoverFundo(doc, { rapido = false } = {}) {
     }
     if (!L.c) { ieToast(ieT('Selecione uma camada com pixels')); return; }
     if (!(await iePodePintar(L, 'remover o plano de fundo'))) return;
-    ieCarregando(ieT('Recortando com precisão (borda, cabelo, cor)... a primeira vez baixa o modelo (~930 MB)'), 50);
+    const baixado = await ieRecorteBaixado();
+    ieCarregando(ieT(baixado ? 'Recortando com precisão (borda, cabelo, cor)...' : 'Recortando com precisão (borda, cabelo, cor)... a primeira vez baixa o modelo (~930 MB)'), 50);
     let r;
     try { r = await api.ie_recorte_pro(L.c.toDataURL('image/png')); } finally { ieCarregando(false); }
     if (!r || !r.success) { ieToast((r && r.error) || ieT('Não foi possível recortar')); return; }
@@ -1258,9 +1325,12 @@ function ieIniciar() {
     });
     // soltar arquivo direto na vista (o Python entrega o caminho real em onArquivosSoltos)
     const vista = ieEl('ie-vista');
-    vista.addEventListener('dragover', ev => { if (ev.dataTransfer?.types?.includes('Files')) { ev.preventDefault(); vista.classList.add('soltar'); } });
+    vista.addEventListener('dragover', ev => {
+        const t = ev.dataTransfer?.types || [];
+        if (t.includes('Files') || t.includes('text/uri-list') || t.includes('text/html')) { ev.preventDefault(); ev.dataTransfer.dropEffect = 'copy'; vista.classList.add('soltar'); }
+    });
     vista.addEventListener('dragleave', () => vista.classList.remove('soltar'));
-    vista.addEventListener('drop', () => { vista.classList.remove('soltar'); IE.soltouNaVista = Date.now(); });
+    vista.addEventListener('drop', ev => { vista.classList.remove('soltar'); IE.soltouNaVista = Date.now(); ieDropNavegador(ev); });
 }
 
 // troca de ferramenta do app: modo foco (sem o banner) e desenho na hora certa
@@ -1284,7 +1354,7 @@ function ieIniciar() {
     const orig = window._entregarItens;
     if (typeof orig !== 'function') return;
     window._entregarItens = function (tool, itens) {
-        if (tool === 'editor-imagem') { ieIniciar(); const naVista = IE.soltouNaVista && Date.now() - IE.soltouNaVista < 1500; return ieReceberArquivos(itens, naVista); }
+        if (tool === 'editor-imagem') { IE.entregouArquivo = Date.now(); ieIniciar(); const naVista = IE.soltouNaVista && Date.now() - IE.soltouNaVista < 1500; return ieReceberArquivos(itens, naVista); }
         return orig(tool, itens);
     };
     _entregarItens = window._entregarItens;

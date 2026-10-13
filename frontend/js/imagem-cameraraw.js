@@ -536,7 +536,8 @@ document.addEventListener('click', ev => {
     if (!b || !IE.doc) return;
     ev.stopPropagation();
     const pop = ieEl('ie-pop'), rb = ieEl('ie').getBoundingClientRect(), r = b.getBoundingClientRect();
-    pop.innerHTML = ieMenuHtml([['Camera Raw (luz, cor, claridade, textura...)', 'ajuste:cameraRaw'], '-',
+    pop.innerHTML = ieMenuHtml([['Cor sólida...', 'preenchimentoCor'], ['Degradê...', 'preenchimentoDeg'], '-',
+        ['Camera Raw (luz, cor, claridade, textura...)', 'ajuste:cameraRaw'], '-',
         ...Object.entries(IE_AJ_CAMADAS).filter(([k]) => k !== 'cameraRaw').map(([k, d]) => [d.nome + '...', 'ajuste:' + k])]);
     pop.hidden = false;
     pop.style.left = Math.min(rb.width - 280, r.left - rb.left) + 'px';

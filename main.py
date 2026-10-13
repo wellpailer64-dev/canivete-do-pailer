@@ -3333,6 +3333,16 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def ie_recorte_baixado(self, modelos=("birefnet-matting", "ben2", "yunet")):
+        """Os modelos do recorte já estão no disco? (o aviso "a primeira vez baixa o modelo" só aparece se faltar)"""
+        from Functions.removerfundo import _modelo_path_cfg
+        from Functions.midia import modelo_path
+        for m in modelos:
+            p = modelo_path("u2net", "yunet-2023mar.onnx") if m == "yunet" else _modelo_path_cfg(m)[0]
+            if not os.path.isfile(p):
+                return {"baixado": False}
+        return {"baixado": True}
+
     def ie_recorte_pro(self, png_b64):
         """Photo Kanivete: recorte profissional (Functions/recorte_pro.py) — cores sem o fundo misturado + máscara."""
         import hashlib
@@ -3452,6 +3462,18 @@ class ApiBridge:
     def ie_colar_windows(self):
         from Functions import editor_imagem
         return editor_imagem.colar_windows()
+
+    def ie_miniaturas(self, paths):
+        from Functions import editor_imagem
+        return editor_imagem.miniaturas(paths)
+
+    def ie_miniatura_gravar(self, path, data_url):
+        from Functions import editor_imagem
+        return editor_imagem.gravar_miniatura(path, data_url)
+
+    def ie_baixar_imagem(self, url):
+        from Functions import editor_imagem
+        return editor_imagem.baixar_imagem(url)
 
     def ie_soltar_memoria(self, tokens):
         from Functions import media_server
@@ -3577,9 +3599,15 @@ class ApiBridge:
         from Functions import kani_agente
         return kani_agente.precisa(texto)
 
-    def kani_agente(self, job, pedido, historico=None, anexos=None):
+    def kani_agente(self, job, pedido, historico=None, anexos=None, recentes=None):
         from Functions import kani_agente
-        return kani_agente.rodar(job, pedido, lambda d: _js("kaniAgente", d), historico, anexos)
+        from Functions import kani_maos
+        kani_maos.enviar = lambda d: _js("kaniMaos", d)   # as mãos da Kani na tela (frontend/js/kani-maos.js)
+        return kani_agente.rodar(job, pedido, lambda d: _js("kaniAgente", d), historico, anexos, recentes)
+
+    def kani_maos_resposta(self, i, res):
+        from Functions import kani_maos
+        return kani_maos.responder(i, res)
 
     # 🎤 ditado no chat da Kani (Functions/kani_ditado.py)
     def kani_ditado_iniciar(self):

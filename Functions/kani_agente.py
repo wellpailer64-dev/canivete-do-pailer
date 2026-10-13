@@ -34,6 +34,8 @@ FERRAMENTAS = {
     "ler_documento": ("Lê o texto de um PDF, Word ou TXT anexado (vira um texto A?). args: {arquivo: 'A1'}", False),
     "salvar_documento": ("Salva um texto em arquivo bonito. args: {formato: pdf|docx|txt|md, titulo, conteudo (texto em markdown OU o nome de um texto, ex.: 'A2')}", False),
     "remover_fundo": ("Tira o fundo de uma imagem (anexada ou gerada) e devolve PNG transparente. args: {imagem: 'A1'}", True),
+    "montar_flyer": ("Monta um FLYER/cartaz/post de divulgação no Photo Kanivete, ao vivo na tela (layout, foto, textos) e salva o projeto editável. "
+                     "args: {pedido: o pedido com TODAS as informações (nome, data, hora, local, preço, contato), foto (opcional): 'A1' imagem anexada/criada}", True),
     "entregar": ("Termina e entrega. args: {arquivos: ['A1', ...] (só arquivos), resposta (opcional: texto em markdown para mostrar no chat, ou o nome de um texto 'A3'), mensagem (1 ou 2 frases)}", False),
 }
 
@@ -59,7 +61,10 @@ REGRAS:
 - Pesquisa: pesquisar_web e entregue com resposta = o texto da pesquisa (ex.: 'A1'); só salve em PDF/DOC/TXT se pedirem.
 - Documento: escreva o conteúdo (escrever, em markdown com ## seções e listas) ou use um texto pronto (pesquisa, leitura)
   e chame salvar_documento com conteudo = o nome do texto (ex.: 'A2'). Título curto e claro.
-- Imagem anexada: use o nome dela (A1...) nas ferramentas (ex.: remover_fundo). Nunca invente arquivo que não existe.
+- Flyer, cartaz, panfleto ou post de divulgação = montar_flyer como PRIMEIRA ação (ele mesmo escreve os textos e gera a
+  foto: não use escrever nem gerar_imagem antes; passe foto só se a pessoa anexou ou já criou uma) e depois entregar.
+- Imagem anexada ou já criada nesta conversa: use o nome dela (A1...) nas ferramentas (ex.: remover_fundo) — NÃO gere
+  outra. Nunca invente arquivo que não existe.
 - Termine SEMPRE com "entregar", listando os arquivos que respondem ao pedido (não liste intermediários como a voz crua
   usada numa vinheta, a não ser que peçam). No máximo {max} ações."""
 
@@ -74,9 +79,13 @@ _COMPLEXO = re.compile(r"(roteiro|campanha|\bkit\b|pacote|s[eé]rie|v[aá]ri[ao]
                        r"\bpdf\b|\bdocx?\b|\bword\b|\btxt\b|documento|arquivo de texto|apostila|relat[oó]rio|"
                        r"pesquis|procur[ae] na (?:internet|web)|busca na (?:internet|web)|na internet|not[ií]cias|"
                        r"(?:tir[ae]|remov[ae]|apag[ae]|recort[ae]).{0,25}fundo|sem fundo|"
+                       r"\bfl[ae]?y[ae]rs?\b|cartaz|panfleto|post de divulga|arte (?:de|para) divulga|"
                        r"resum[aeo].{0,20}(?:pdf|documento|arquivo|anexo|texto)|"
                        r"\b(?:\d+|duas|dois|tr[eê]s|quatro)\s+(?:imagens|fotos|vinhetas|narra|efeitos|vers)|"
                        r"(?:imagem|foto).{0,60}(?:narra|vinhet|som|efeito|m[uú]sica)|(?:narra|vinhet|som|efeito).{0,60}(?:imagem|foto))", re.I)
+
+
+_FLYER = re.compile(r"\bfl[ae]?y[ae]rs?\b|cartaz|panfleto|post de divulga|arte (?:de|para) divulga", re.I)
 
 
 def precisa(texto):
@@ -197,6 +206,18 @@ def _executar(est, acao, a):
         on(20, "Recortando (pessoa: cabelo fio a fio; objeto: borda limpa)...")
         path = kani_skills.remover_fundo(img["path"])
         return f"Fundo removido: {est.novo('imagem', path, 'sem fundo')} (PNG transparente)."
+    if acao == "montar_flyer":
+        from Functions import kani_maos
+        ped = str(a.get("pedido") or "").strip()
+        if not ped:
+            raise ValueError("falta 'pedido'")
+        foto = est.arquivo(a.get("foto"), ("imagem", "anexo_imagem"))["path"] if a.get("foto") else None
+        r = kani_maos.montar_flyer(ped, kani_criar.pasta(), foto, on)
+        f = r["ficha"]
+        k = est.novo("imagem", r["previa"], f["titulo"], {"flyer": True}) if r["previa"] else None
+        kp = est.novo("documento", r["iknv"], "projeto editável do Photo (.iknv)", {"flyer": True})
+        return (f"Flyer montado no Photo ({f['esqueleto']}, estilo {f['estilo']}, título \"{f['titulo']}\"): "
+                f"prévia {k or '(sem prévia)'}, projeto editável {kp}." + (f" Avisos: {'; '.join(r['avisos'][:3])}" if r["avisos"] else ""))
     if acao == "gerar_imagem":
         from Functions import gerador_imagem
         desc = str(a.get("descricao") or "").strip()
@@ -282,7 +303,9 @@ def _executar(est, acao, a):
     raise ValueError(f"ferramenta desconhecida: {acao}")
 
 
-def rodar(job, pedido, on_evento, historico=None, anexos=None):
+def rodar(job, pedido, on_evento, historico=None, anexos=None, recentes=None):
+    """recentes: arquivos já criados NESTA conversa ([{path, tipo, nome}], o mais recente primeiro) — "remove o fundo
+    dessa foto" logo depois de gerar a imagem usa ela (antes o agente não a via e gerava outra, 2026-10-13)."""
     """Em thread. historico: últimas mensagens da conversa (contexto curto)."""
     if not _ocupado.acquire(blocking=False):
         return {"success": False, "error": "A Kani já está trabalhando em outro pedido."}
@@ -306,7 +329,20 @@ def rodar(job, pedido, on_evento, historico=None, anexos=None):
                     tipo = "anexo_imagem" if ext in (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".heic") else \
                         "anexo_doc" if ext in (".pdf", ".docx", ".txt", ".md", ".csv", ".srt", ".json") else "anexo"
                     ids_anexo.append(f"{est.novo(tipo, p)} = {os.path.basename(p)} ({tipo.replace('anexo_', '') if '_' in tipo else 'arquivo'})")
-            msgs.append({"role": "user", "content": f"Pedido: {pedido}" + (f"\nArquivos anexados: {'; '.join(ids_anexo)}" if ids_anexo else "")})
+            ids_rec = []
+            for r in (recentes or [])[:4]:
+                p = r.get("path") if isinstance(r, dict) else None
+                if p and os.path.isfile(p) and p not in (anexos or []):
+                    tipo = {"imagem": "imagem", "vinheta": "vinheta", "efeito": "efeito", "narracao": "narracao", "documento": "documento"}.get(r.get("tipo"), "anexo")
+                    k = est.novo(tipo, p, r.get("texto") or "")
+                    ids_rec.append(f"{k} = {os.path.basename(p)} ({tipo}{', o MAIS RECENTE' if not ids_rec else ''})")
+            contexto = ""
+            if ids_rec:
+                contexto += ("\nArquivos já criados nesta conversa (quando a pessoa diz \"essa foto\", \"essa imagem\", \"esse áudio\", "
+                             "é o mais recente do tipo): " + "; ".join(ids_rec))
+            if ids_anexo:
+                contexto += f"\nArquivos anexados agora: {'; '.join(ids_anexo)}"
+            msgs.append({"role": "user", "content": f"Pedido: {pedido}{contexto}"})
             refeitos = {}
             for n in range(1, MAX_PASSOS + 1):
                 if job in _cancelar:
@@ -318,6 +354,12 @@ def rodar(job, pedido, on_evento, historico=None, anexos=None):
                 if n == 1 and r.get("plano"):
                     on_evento({"job": job, "plano": [str(x)[:120] for x in r["plano"]][:8]})
                 acao, args = r.get("acao"), r.get("args") or {}
+                if _FLYER.search(pedido) and acao in ("escrever", "gerar_imagem") and not any(v.get("flyer") for v in est.arq.values()):
+                    # flyer: a montagem já escreve e gera a foto (recortada); o 4B insistia em escrever/gerar antes (2026-10-13)
+                    foto = next((k for k, v in est.arq.items() if v["tipo"] == "anexo_imagem"), None)
+                    acao, args = "montar_flyer", {"pedido": pedido, **({"foto": foto} if foto else {})}
+                elif acao == "montar_flyer" and any(v.get("flyer") for v in est.arq.values()):
+                    acao, args = "entregar", {"mensagem": "Flyer montado no Photo Kanivete, com o projeto editável salvo."}   # não remonta
                 pens = str(r.get("pensamento") or "")[:300]
                 msgs.append({"role": "assistant", "content": json.dumps({"pensamento": pens, "acao": acao, "args": args}, ensure_ascii=False)})
                 _traj[job]["passos"].append({"acao": acao, "args": {k: (v if not isinstance(v, (list, dict)) else json.dumps(v, ensure_ascii=False)[:200])
@@ -325,6 +367,7 @@ def rodar(job, pedido, on_evento, historico=None, anexos=None):
                 if acao == "entregar":
                     ids = [str(x) for x in (args.get("arquivos") or []) if str(x) in est.arq and est.arq[str(x)].get("path")
                            and not est.arq[str(x)]["tipo"].startswith("anexo")]
+                    ids += [k for k, v in est.arq.items() if v.get("flyer") and k not in ids]   # prévia + .iknv sempre
                     if not ids:   # o modelo esqueceu de listar: entrega os finais
                         ids = [k for k, v in est.arq.items() if v["tipo"] in ("imagem", "vinheta", "efeito", "documento") and v.get("path")]
                     resp = est.texto(args.get("resposta")) if args.get("resposta") else ""

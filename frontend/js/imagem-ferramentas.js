@@ -1626,6 +1626,11 @@ function ieTransfPrevia() {
             const tf = ieMatMul(M, o.tf || IE_ID);
             L._tfPrev = (L.filtrosInt || []).length ? ieIntPlano(L, tf) : ieTransformarPlano({ c: L.c0.c, x: L.c0.x, y: L.c0.y }, tf);
         } else L._tfPrev = ieTransformarPlano({ c: o.c, x: o.x, y: o.y }, M);
+        // a máscara ligada acompanha na prévia também (antes ficava parada até confirmar)
+        if (L.m && L.m.c && !L.m.solta) {
+            const n = t.quad && !Mq ? ieTransformarPlanoQuad(L.m, t, L.m.fundo || 0) : ieTransformarPlano(L.m, M, L.m.fundo || 0);
+            L._mPrev = n ? { ...L.m, ...n } : null;
+        } else if (L.m && !L.m.solta) { const q = t.quad && !Mq ? ieQuadMap(t.R0, t.quad, L.m.x, L.m.y) : ieMatPt(M, L.m.x, L.m.y); L._mPrev = { ...L.m, x: Math.round(q.x), y: Math.round(q.y) }; }
         L._raster = null;
         if (L._tfPrev) R = ieRUniao(R, ieRCamada(L));
     }
@@ -1644,7 +1649,7 @@ function ieTransfAplicar() {
     for (const o of t.orig) {
         const L = o.L;
         const prev = L._tfPrev;
-        L._tfPrev = null;
+        L._tfPrev = null; L._mPrev = null;
         if (ident) continue;
         if (t.quad && !Mq) {
             if (L.tipo !== 'pixel') L.rasterizar = true;
@@ -1660,7 +1665,8 @@ function ieTransfAplicar() {
             for (const s of L.vet.subs) for (const q of s.pts) { [q.x, q.y] = T(q.x, q.y); if (q.i) q.i = T(...q.i); if (q.o) q.o = T(...q.o); }
             ieFormaRender(L, doc);
         }
-        if (L.m && L.m.c) {
+        if (L.m && L.m.solta) { /* corrente desligada: só a imagem (como no Photoshop) */ }
+        else if (L.m && L.m.c) {
             const n = t.quad && !Mq ? ieTransformarPlanoQuad(L.m, t, L.m.fundo || 0) : ieTransformarPlano(L.m, M, L.m.fundo || 0);
             if (n) { L.m = { ...L.m, ...n }; L.sujoM = true; }
         } else if (L.m) { const p = t.quad && !Mq ? ieQuadMap(t.R0, t.quad, L.m.x, L.m.y) : ieMatPt(M, L.m.x, L.m.y); L.m = { ...L.m, x: Math.round(p.x), y: Math.round(p.y) }; }
@@ -1681,7 +1687,7 @@ function ieTransfCancelar() {
     if (!t) return;
     IE.transf = null;
     doc._esconderSel = false;
-    for (const o of t.orig) { o.L._tfPrev = null; ieInvalidar(o.L); }
+    for (const o of t.orig) { o.L._tfPrev = null; o.L._mPrev = null; ieInvalidar(o.L); }
     ieAgendar(t.Rult, doc);
     ieOpcoesRender?.();
     ieDesenharSobre();

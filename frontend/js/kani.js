@@ -371,7 +371,14 @@ async function kaniAgenteIniciar(texto) {
     const t = document.getElementById('kani-txt'); t.value = ''; t.style.height = 'auto';
     KANI.agenteJob = job;
     kaniRender();
-    const r = await kaniApi().kani_agente(job, texto, hist, anexos).catch(e => ({ success: false, error: e.message }));
+    // arquivos já criados nesta conversa, o mais recente primeiro ("remove o fundo dessa foto" = a última imagem)
+    const recentes = [];
+    for (const m of c.msgs.slice().reverse()) {
+        const l = m.criacao && m.criacao.estado === 'pronto' ? [m.criacao] : m.agente ? (m.agente.arquivos || []).slice().reverse() : [];
+        for (const a of l) if (a.path && a._url !== 'sumiu' && !recentes.some(x => x.path === a.path)) recentes.push({ path: a.path, tipo: a.tipo, nome: a.nome, texto: (a.texto || '').slice(0, 200) });
+        if (recentes.length >= 4) break;
+    }
+    const r = await kaniApi().kani_agente(job, texto, hist, anexos, recentes).catch(e => ({ success: false, error: e.message }));
     if (!r || !r.success) window.kaniAgente({ job, erro: (r && r.error) || 'falhou' });
 }
 // ── 🎤 ditado: clica, fala, clica de novo → o texto entra no campo (reconhecimento local) ──

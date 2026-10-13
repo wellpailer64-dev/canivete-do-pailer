@@ -172,7 +172,8 @@ function veSbTrilhaLivre(st, dur, novo, reservados = []) {
 }
 
 async function veSbAplicarNasBordas(k) {
-    const alvos = (typeof veSelLista === 'function' ? veSelLista() : []).filter(c => VE.clips.includes(c));
+    const soSom = c => c.x === 'a' || (veMediaOf(c) || {}).kind === 'audio';
+    const alvos = (typeof veSelLista === 'function' ? veSelLista() : []).filter(c => VE.clips.includes(c) && !soSom(c));
     if (!alvos.length) return false;
     const m = await veSbMidia(k);
     if (!m) { veToast('Não foi possível abrir esse som'); return true; }
@@ -202,7 +203,8 @@ async function veSbAplicarNasBordas(k) {
     return true;
 }
 
-// Shift+1: com clipes selecionados, põe o som no início e no fim deles; sem seleção, põe na agulha.
+// Shift+1: com clipes de IMAGEM selecionados, põe o som no início e no fim deles; senão, põe na agulha. Clipe só de som
+// selecionado não conta: o som recém-posto fica selecionado e o Shift+1 seguinte ia para as bordas dele, longe da agulha.
 function veSbAplicarSelecionado() {
     const k = veSbKeySelecionada();
     if (!k) { veToast('Selecione um som no Soundboard (um clique) para aplicar com Shift+1'); return; }

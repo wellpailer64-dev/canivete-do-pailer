@@ -129,6 +129,13 @@
 .ie-recente { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 0; border-radius: 5px; background: none; color: var(--text-2); font: inherit; cursor: pointer; text-align: left; }
 .ie-recente:hover { background: var(--ie-hover); color: var(--text); }
 .ie-recente span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ie-inicio-box:has(.ie-recentes-grade) { width: min(780px, 100%); }
+.ie-recentes-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+.ie-recentes-grade .ie-recente { flex-direction: column; align-items: stretch; gap: 6px; padding: 6px; min-width: 0; }
+.ie-recente-mini { aspect-ratio: 4 / 3; display: grid; place-items: center; border-radius: 4px; background: rgba(255, 255, 255, .04); color: var(--text-3); }
+.ie-recente-mini img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.ie-recente-mini .i { width: 26px; height: 26px; }
+.ie-recente-nome { font-size: 12px; text-align: center; }
 
 .ie-carregando { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: rgba(0, 0, 0, .45); }
 .ie-carregando[hidden] { display: none; }

@@ -161,8 +161,8 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - **API** (`pywebview.api.*`, 9): `web_scraper_analyze(url)`, `web_scraper_download(url, mode, destino)`, `web_scraper(url, tipo, destino)`, `web_scraper_csv(url)`, `cerebro_load()`, `cerebro_save(content)`, `cerebro_exists()`, `cerebro_remove()`, `cerebro_select_file()`
 - **Guias**: `Instructions/webscraper.md`, `Instructions/cerebro.md`
 
-### API geral (app, janela, preferências, arquivos) — 46 métodos
-`select_folder(tool)`, `select_file(tool)`, `select_image(tool)`, `open_folder(path)`, `hardware_estado()`, `hardware_definir_modo(modo)`, `kani_estado()`, `kani_baixar()`, `kani_enviar(cid, mensagens, ferramenta="")`, `kani_parar(cid)`, `kani_voz(ligar=True)`, `musicas_listar(filtros=None)`, `musicas_analisar()`, `musicas_trocar_pasta()`, `musicas_openverse(texto="", genero="", duracao="", pagina=1)`, `musicas_openverse_baixar(item)`, `musicas_url(path)`, `kani_agente_precisa(texto)`, `kani_agente(job, pedido, historico=None, anexos=None)`, `kani_ditado_iniciar()`, `kani_ditado_nivel()`, `kani_ditado_parar(transcrever=True)`, `kani_abrir_link(url)`, `kani_anexar()`, `kani_agente_avaliar(job, nota)`, `kani_memoria_comando(texto)`, `kani_agente_parar(job)`, `kani_criar_tipo(texto, anterior=None)`, `kani_criar(job, tipo, pedido)`, `kani_criar_url(path)`, `kani_salvar_como(path)`, `kani_falar(texto, chave="")`, `reveal_file(path)`, `open_file(path)`, `select_video_file(tool)`, `prefs_load()`, `prefs_save(dados)`, `check_update()`, `apply_update()`, `sair_app()`, `toggle_fullscreen()`, `janela_cmd(acao)`, `janela_propria()`, `janela_ativar()`, `on_webview_ready(sender, args)`, `on_new_window_request(sender, args)`
+### API geral (app, janela, preferências, arquivos) — 47 métodos
+`select_folder(tool)`, `select_file(tool)`, `select_image(tool)`, `open_folder(path)`, `hardware_estado()`, `hardware_definir_modo(modo)`, `kani_estado()`, `kani_baixar()`, `kani_enviar(cid, mensagens, ferramenta="")`, `kani_parar(cid)`, `kani_voz(ligar=True)`, `musicas_listar(filtros=None)`, `musicas_analisar()`, `musicas_trocar_pasta()`, `musicas_openverse(texto="", genero="", duracao="", pagina=1)`, `musicas_openverse_baixar(item)`, `musicas_url(path)`, `kani_agente_precisa(texto)`, `kani_agente(job, pedido, historico=None, anexos=None, recentes=None)`, `kani_maos_resposta(i, res)`, `kani_ditado_iniciar()`, `kani_ditado_nivel()`, `kani_ditado_parar(transcrever=True)`, `kani_abrir_link(url)`, `kani_anexar()`, `kani_agente_avaliar(job, nota)`, `kani_memoria_comando(texto)`, `kani_agente_parar(job)`, `kani_criar_tipo(texto, anterior=None)`, `kani_criar(job, tipo, pedido)`, `kani_criar_url(path)`, `kani_salvar_como(path)`, `kani_falar(texto, chave="")`, `reveal_file(path)`, `open_file(path)`, `select_video_file(tool)`, `prefs_load()`, `prefs_save(dados)`, `check_update()`, `apply_update()`, `sair_app()`, `toggle_fullscreen()`, `janela_cmd(acao)`, `janela_propria()`, `janela_ativar()`, `on_webview_ready(sender, args)`, `on_new_window_request(sender, args)`
 
 ## 6. Vetor Kanivete — comandos `VKN.cmd(nome, args)` (154; a interface, o Claude e o Jr usam os mesmos)
 - `vetor-3d.js`: `girar_3d` (3D girar), `extrudar_3d` (3D extrudar), `editar_3d` (editar 3D), `mapear_arte` (mapear arte no 3D), `limpar_mapas` (tirar artes mapeadas), `expandir_3d` (expandir 3D)
@@ -240,6 +240,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/direcao-de-arte.md` — Direção de arte e motion para o AutoFrame e as edições do Pocket Editor
 - `Instructions/agente/diretor-de-arte.md` — Diretor de arte de carrossel (padrão de resposta + o que o Jr executa por comando)
 - `Instructions/agente/guia-edicao.md` — GUIA-EDICAO :: Pocket Editor (Canivete do Pailer) — para agentes de IA
+- `Instructions/agente/kani-maos.md` — Mãos da Kani — a Kani operando os apps ao vivo
 - `Instructions/agente/kani-motor.md` — Motor da Kani: bancada de modelos e escolha (2026-10-10)
 - `Instructions/agente/mapa-editor.md` — Mapa do código — editor (gerado por tools/mapa_codigo.py; nome:linha)
 - `Instructions/agente/mapa-habilidades-motion.md` — Mapa de habilidades de motion (árvore de técnicas desbloqueadas)
@@ -310,6 +311,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/kani_agente.py` — kani_agente.py — a Kani trabalhando EM ETAPAS (agente): planeja, usa ferramentas uma de cada vez, olha o resultado,
 - `Functions/kani_criar.py` — kani_criar.py — a Kani CRIA coisas no chat: imagem (Z-Image, gerador_imagem), efeito sonoro (EzAudio, gerador_sfx),
 - `Functions/kani_ditado.py` — kani_ditado.py — 🎤 no chat da Kani: clica, fala, clica de novo e o texto aparece no campo (para revisar e enviar)
+- `Functions/kani_maos.py` — kani_maos.py — as "mãos" da Kani nos apps: ela preenche uma FICHA curta e o código monta a peça AO VIVO na tela
 - `Functions/kani_memoria.py` — kani_memoria.py — o que a Kani aprende com a pessoa, sem retreinar o modelo (como as memórias e receitas do Claude):
 - `Functions/kani_skills.py` — kani_skills.py — habilidades do dia a dia da Kani (ferramentas do modo em etapas, kani_agente.py):
 - `Functions/legendas.py` — legendas.py — transcrição da timeline do Pocket Editor (painel Texto: Transcrever / Criar legendas)
@@ -386,6 +388,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_illustrator.py` — Compatibilidade Vetor Kanivete ↔ Adobe Illustrator (Functions/ponte_illustrator.py) — app em --agente=9333 e o
 - `testes/teste_imagem.py` — Teste do Editor de Imagem (frontend/js/imagem-*.js + Functions/editor_imagem.py) no app de verdade
 - `testes/teste_kani.py` — Kani (assistente) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila) e confere: bolinha na Home,
+- `testes/teste_kani_maos.py` — Teste das mãos da Kani: abre o app de teste (porta 9338, dados em D:/kanivete_testes), pede um flyer ao agente da
 - `testes/teste_laco.py` — Laço: Shift soma, Alt subtrai, Shift+Alt cruza; o mesmo no magnético; Ctrl+clique na miniatura seleciona a camada
 - `testes/teste_mixer.py` — Mixer de trilhas de áudio (editor-mixer.js): Premiere → Kanivete → XML do Premiere e a conta do som na exportação
 - `testes/teste_motion.py` — Motion do Editor Kanivete (editor-motion.js) com mouse de verdade: ferramenta Máscara (arrastar no monitor), Caneta

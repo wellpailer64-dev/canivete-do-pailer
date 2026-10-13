@@ -407,7 +407,7 @@ function ieRaster(L) {
     const src = L._tfPrev || (L.c ? { c: L.c, x: L.x, y: L.y } : null);
     if (!src || !src.c) return null;
     if (L._raster && L._raster.src === src.c) return L._raster;
-    const mask = L.m && !L.m.desativada ? L.m : null;
+    const mask = L.m && !L.m.desativada ? (L._tfPrev && L._mPrev) || L.m : null;
     const fx = L.fxOculto ? null : (ieTemFx(L.fx) ? L.fx : null);
     if (!mask && !fx && L.fill >= 1) return src;
     const w = src.c.width, h = src.c.height;
