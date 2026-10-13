@@ -1389,8 +1389,8 @@ _af_drive_stop = None
 
 
 def _af_drive_base():
-    base = os.path.join(os.path.expanduser("~"), "Videos")
-    return os.path.join(base if os.path.isdir(base) else os.path.expanduser("~"), "Kanivete AutoFrame")
+    from Functions.midia import raiz_dados
+    return os.path.join(raiz_dados(), "AutoFrame Drive")   # no disco do app (nunca na pasta do usuário do C)
 
 
 def af_drive(url):
@@ -3580,6 +3580,16 @@ class ApiBridge:
     def kani_agente(self, job, pedido, historico=None):
         from Functions import kani_agente
         return kani_agente.rodar(job, pedido, lambda d: _js("kaniAgente", d), historico)
+
+    def kani_agente_avaliar(self, job, nota):
+        """👍/👎 num trabalho em etapas: o 👍 vira exemplo para pedidos parecidos (Functions/kani_memoria.py)."""
+        from Functions import kani_agente
+        return kani_agente.avaliar(job, nota)
+
+    def kani_memoria_comando(self, texto):
+        """"lembra que...", "esquece...", "o que você sabe sobre mim?": a resposta pronta, ou None (conversa normal)."""
+        from Functions import kani_memoria
+        return kani_memoria.comando(texto)
 
     def kani_agente_parar(self, job):
         from Functions import kani_agente

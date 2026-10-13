@@ -24,10 +24,8 @@ _UA = "KANIVETE/1.0 (app de edicao local)"
 
 
 def _cfg_path():
-    base = os.environ.get("APPDATA") or os.path.expanduser("~")
-    p = os.path.join(base, "CaniveteDoPailer")
-    os.makedirs(p, exist_ok=True)
-    return os.path.join(p, "musicas.json")
+    from Functions.midia import raiz_dados
+    return os.path.join(raiz_dados(), "musicas.json")
 
 
 def pasta():
@@ -38,7 +36,8 @@ def pasta():
             return p
     except (OSError, ValueError):
         pass
-    p = os.path.join(os.path.expanduser("~"), "Music", "Kanivete Músicas")
+    from Functions.midia import raiz_dados
+    p = os.path.join(raiz_dados(), "Músicas")   # no disco do app (nunca na pasta do usuário do C)
     os.makedirs(p, exist_ok=True)
     return p
 
@@ -116,6 +115,72 @@ def _clima(path, a):
     return c, round(en, 3), round(brilho, 3), maior
 
 
+def _item(p, antigo=None):
+    """Entrada do índice de uma música: análise (BPM, energia, refrão, drop) + clima + etiquetas do arquivo."""
+    from Functions import autoframe
+    a = autoframe.analisar_musica(p)
+    clima, en, brilho, maior = _clima(p, a)
+    item = dict(antigo or {})
+    item.update({"dur": round(float(a.get("dur") or 0), 1), "bpm": round(float(a.get("bpm") or 0)), "energia": en,
+                 "brilho": brilho, "maior": maior, "clima": clima, "mtime": int(os.path.getmtime(p)),
+                 "refrao": (a.get("refrao") or {}).get("t"), "drop": a.get("drop")})
+    for k, v in _tags(p).items():
+        item.setdefault(k, v)
+    item.setdefault("titulo", os.path.splitext(os.path.basename(p))[0])
+    return item
+
+
+# clima → busca em inglês no Openverse (o acervo é quase todo em inglês)
+_BUSCA_CLIMA = {"calma": "calm acoustic", "alegre": "happy upbeat", "animada": "energetic upbeat pop",
+                "intensa": "epic cinematic", "melancolica": "sad piano"}
+
+
+def garantir(clima=None, dur_min=10, on=lambda pct, msg: None):
+    """Uma música para o clima: da biblioteca; sem nenhuma que sirva, busca no Openverse (CC0/CC BY primeiro), baixa,
+    analisa e devolve — a vinheta nunca fica sem fundo (com a biblioteca vazia ela caía no jingle de 3 s, 2026-10-13).
+    None só sem internet e com a biblioteca vazia."""
+    # climas vizinhos valem (o classificador é aproximado: uma música "alegre" às vezes sai "animada")
+    viz = {"alegre": ("alegre", "animada"), "animada": ("animada", "alegre", "intensa"), "calma": ("calma", "melancolica", "alegre"),
+           "intensa": ("intensa", "animada"), "melancolica": ("melancolica", "calma")}.get(clima or "", ())
+    import random
+    ok = [x for x in listar()["musicas"] if (x.get("dur") or 0) >= dur_min and (not viz or x.get("clima") in viz)]
+    if ok:
+        return random.choice(ok)
+    m = escolher(clima, dur_min)
+    tem = {(x.get("titulo") or "").lower() for x in _ler().values()}
+    q = _BUSCA_CLIMA.get(clima or "", "happy upbeat")
+    on(82, f"Buscando uma música ({q}) no Openverse...")
+    for lic in ("cc0,pdm,by", "cc0,pdm,by,by-sa"):
+        try:
+            import urllib.parse
+            params = {"q": q, "category": "music", "license": lic, "page_size": 12, "length": "medium"}
+            req = urllib.request.Request("https://api.openverse.org/v1/audio/?" + urllib.parse.urlencode(params), headers={"User-Agent": _UA})
+            with urllib.request.urlopen(req, timeout=25) as r:
+                res = json.loads(r.read().decode("utf-8")).get("results") or []
+        except Exception:
+            break
+        for x in res:
+            if not x.get("url") or (x.get("duration") or 0) / 1000 < dur_min or (x.get("title") or "").lower() in tem:
+                continue   # já está na biblioteca (e não serviu): outra
+            item = {"titulo": x.get("title") or "Sem título", "artista": x.get("creator") or "", "genero": ", ".join(x.get("genres") or []),
+                    "licenca": x.get("license"), "licenca_nome": _LIC.get(x.get("license"), x.get("license")), "fonte": x.get("source"),
+                    "url": x["url"], "pagina": x.get("foreign_landing_url") or "", "atribuicao": x.get("attribution") or ""}
+            on(85, f"Baixando \"{item['titulo']}\"...")
+            b = openverse_baixar(item)
+            if not b.get("success"):
+                continue
+            try:
+                rel = os.path.relpath(b["path"], pasta())
+                with _lock:
+                    ind = _ler()
+                    ind[rel] = _item(b["path"], ind.get(rel, {}))
+                    _gravar(ind)
+                return {"path": b["path"], **ind[rel]}
+            except Exception:
+                continue
+    return m
+
+
 def analisar(on_progress=lambda d: None):
     """Analisa as músicas novas da pasta (em thread). on_progress({pct, msg}) / {fim, n}."""
     if not _analisando.acquire(blocking=False):
@@ -134,16 +199,7 @@ def analisar(on_progress=lambda d: None):
                 rel = os.path.relpath(p, base)
                 on_progress({"pct": int(100 * i / max(1, len(novos))), "msg": f"Analisando {i + 1}/{len(novos)}: {os.path.basename(p)}"})
                 try:
-                    a = autoframe.analisar_musica(p)
-                    clima, en, brilho, maior = _clima(p, a)
-                    item = dict(ind.get(rel, {}))
-                    item.update({"dur": round(float(a.get("dur") or 0), 1), "bpm": round(float(a.get("bpm") or 0)), "energia": en,
-                                 "brilho": brilho, "maior": maior, "clima": clima, "mtime": int(os.path.getmtime(p)),
-                                 "refrao": (a.get("refrao") or {}).get("t"), "drop": a.get("drop")})
-                    for k, v in _tags(p).items():
-                        item.setdefault(k, v)
-                    item.setdefault("titulo", os.path.splitext(os.path.basename(p))[0])
-                    ind[rel] = item
+                    ind[rel] = _item(p, ind.get(rel, {}))
                 except Exception as e:
                     ind[rel] = {"erro": str(e)[:120], "mtime": int(os.path.getmtime(p)), "titulo": os.path.basename(p)}
                 with _lock:

@@ -34,6 +34,21 @@ def pasta_cache(nome):
     return d
 
 
+def raiz_dados():
+    """Raiz das pastas de trabalho que o app cria sozinho (músicas, downloads do Drive...): no MESMO disco do app, nunca
+    na pasta do usuário do C (o C enche e deixa o sistema lento — regra do Pailer: "tudo no disco D, sempre").
+    <disco do app>/Kanivete; se a raiz do disco não deixar criar, a pasta do próprio app."""
+    disco = os.path.splitdrive(os.path.abspath(app_dir()))[0]
+    p = os.path.join(disco + os.sep, "Kanivete") if disco else os.path.join(app_dir(), "dados")
+    try:
+        os.makedirs(p, exist_ok=True)
+        return p
+    except OSError:
+        p = os.path.join(app_dir(), "dados")
+        os.makedirs(p, exist_ok=True)
+        return p
+
+
 def app_dir():
     """Pasta do app: ao lado do .exe (PyInstaller) ou raiz do projeto."""
     if getattr(sys, "frozen", False):

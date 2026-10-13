@@ -327,8 +327,8 @@ def _finalizar(tipo, voz, nome, on, pedido="", musica=None):
     jingle, imp = _jingle()
     mus = musica   # o agente já escolheu (kani_agente: buscar_musica)
     if mus is None:
-        try:
-            mus = musicas.escolher(musicas.clima_do_pedido(pedido), dvoz + 4)
+        try:   # da biblioteca; sem nenhuma que sirva, baixa uma do Openverse
+            mus = musicas.garantir(musicas.clima_do_pedido(pedido), dvoz + 4, on)
         except Exception:
             pass
     if not (mus or jingle):
@@ -337,15 +337,16 @@ def _finalizar(tipo, voz, nome, on, pedido="", musica=None):
     # música (do refrão, entrando suave) ou jingle; a voz entra aos 0,9 s com a música abaixando por baixo
     ini = max(0.0, float((mus or {}).get("refrao") or 0) - 0.5) if mus else 0.0
     ent = (["-ss", f"{ini:.2f}", "-i", mus["path"]] if mus else ["-i", jingle]) + ["-i", voz] + (["-i", imp] if imp else [])
-    g = (f"[0:a]aresample=48000,apad=pad_dur=30,volume={0.55 if mus else 0.9},afade=t=in:d={0.6 if mus else 0}[m];"
-         "[1:a]aresample=48000,adelay=900|900,apad=pad_dur=30,asplit[v][sc];"
-         "[m][sc]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=350[md];"
+    # níveis em números: voz em −16 LUFS e a música ~10 dB abaixo (−26), que ainda abaixa ~4 dB quando a voz fala
+    g = (f"[0:a]aresample=48000,{'loudnorm=I=-26:TP=-6:LRA=11,' if mus else 'volume=0.9,'}apad=pad_dur=30,afade=t=in:d={0.6 if mus else 0}[m];"
+         "[1:a]aresample=48000,loudnorm=I=-16:TP=-2:LRA=7,adelay=900|900,apad=pad_dur=30,asplit[v][sc];"
+         "[m][sc]sidechaincompress=threshold=0.05:ratio=3:attack=30:release=400[md];"
          + ("[2:a]aresample=48000,volume=0.7[i];[md][v][i]amix=inputs=3:duration=longest:normalize=0" if imp
             else "[md][v]amix=inputs=2:duration=longest:normalize=0")
          + ",loudnorm=I=-14:TP=-1.5,afade=t=out:st=0:d=0.01[o]")
     # duração: atraso + voz + 2,4 s (a música respira no fim); tudo com apad e cortado no atrim
-    dur = dvoz + 0.9 + 2.4   # atraso da voz + respiro
-    g = g.replace("afade=t=out:st=0:d=0.01", f"atrim=0:{dur:.2f},afade=t=out:st={max(0, dur - 1.2):.2f}:d=1.2")
+    dur = dvoz + 0.9 + 1.4   # abertura + voz + um respiro curto no fim (com fade)
+    g = g.replace("afade=t=out:st=0:d=0.01", f"atrim=0:{dur:.2f},afade=t=out:st={max(0, dur - 1.0):.2f}:d=1.0")
     rr = subprocess.run([_ffmpeg(), "-y", "-v", "error", *ent, "-filter_complex", g, "-map", "[o]", "-c:a", "libmp3lame",
                          "-b:a", "192k", path], capture_output=True, text=True,
                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))

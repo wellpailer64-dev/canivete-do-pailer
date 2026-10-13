@@ -163,3 +163,14 @@ Antes de trocar: corrigir a caixinha no prompt/gaveta e medir no llama.cpp (o mo
   entrega (kaniAgente / kaniArqHtml em kani.js).
 - Medido 2026-10-13: "roteiro e narração de um anúncio de 15 s para uma padaria" → 10 passos, ~4 min: 22 s → reescreveu
   → 10,7 s → reescreveu → 13,6 s → vinheta 16,9 s. Imagem dentro do agente ainda não testada com o app do usuário fechado.
+
+## Memória e exemplos — o "treino" da Kani sem retreinar (2026-10-13)
+- `Functions/kani_memoria.py`: "lembra que…", "daqui pra frente…", "prefiro…" → nota permanente (entra no prompt da conversa
+  e do agente); "o que você sabe sobre mim?" lista; "esquece …" apaga. 👍 no cartão do agente guarda o pedido + a
+  sequência de ações; os 2 👍 mais parecidos entram como exemplo no próximo pedido. Arquivos em `D:\Kanivete\Kani`
+  (`raiz_dados()`: tudo no disco do app). Os 👍 acumulados são a base para um LoRA no futuro.
+- Freios do agente: cada ferramenta de criação pode ser refeita 1 vez; no penúltimo passo a entrega é obrigatória; se
+  estourar, o app entrega a melhor versão. Revisão flexível (75–125% da duração pedida, com texto bom, segue).
+- Vinheta: voz −16 LUFS e música −26 (~10 dB abaixo, abaixa mais na fala), final −14; voz + 2,3 s. Sem música que sirva
+  na biblioteca (climas vizinhos valem), `musicas.garantir` baixa uma nova do Openverse (pula as que já tem).
+- Medido: "roteiro e vinheta de 10 s para Receitas da Vó, música alegre" → 5 passos, 78 s, música baixada sozinha.

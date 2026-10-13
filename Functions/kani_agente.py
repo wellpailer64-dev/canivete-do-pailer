@@ -46,8 +46,11 @@ REGRAS:
 - Faça só o que foi pedido, bem feito. Textos em português do Brasil, naturais, sem emojis nem hashtags quando forem falados.
 - Vinheta = voz (narrar ou conversa) + buscar_musica + montar_vinheta. Narração simples = narrar.
 - Se uma ferramenta der erro, tente corrigir os argumentos uma vez; se não der, siga sem ela e explique na entrega.
-- REVISE antes de seguir: se o pedido tem duração (ex.: 15 segundos), compare com a duração que a ferramenta devolveu; se
-  passou mais de 20%, use escrever de novo pedindo um texto mais curto (~2,3 palavras por segundo) e grave de novo.
+- REVISE antes de seguir, sem ser rígida: se o pedido tem duração (ex.: 15 segundos), compare com a duração que voltou.
+  Entre 75% e 125% do pedido (ex.: 11 a 19 s para 15 s) e com o texto bom, SIGA com ele. Só fora disso reescreva
+  (~2,3 palavras por segundo) e grave de novo — no máximo uma vez.
+- Vinheta: a música fica por baixo da voz, ~10 dB mais baixa (o montar_vinheta já faz isso); buscar_musica sempre acha uma
+  (baixa da internet se a biblioteca não tiver).
 - Na mensagem de entrega não cite A1/A2: diga o que foi feito em uma ou duas frases.
 - Termine SEMPRE com "entregar", listando os arquivos que respondem ao pedido (não liste intermediários como a voz crua
   usada numa vinheta, a não ser que peçam). No máximo {max} ações."""
@@ -182,9 +185,9 @@ def _executar(est, acao, a):
         return f"Conversa gravada: {est.novo('narracao', path, chr(10).join(f'{p}: {t}' for p, t in falas))} ({d:.1f} s)."
     if acao == "buscar_musica":
         from Functions import musicas
-        m = musicas.escolher(str(a.get("clima") or "") or None, float(a.get("segundos_min") or 10))
+        m = musicas.garantir(str(a.get("clima") or "") or None, float(a.get("segundos_min") or 10), est.pct)
         if not m:
-            return "A biblioteca de músicas está vazia: a vinheta vai usar o jingle do app."
+            return "Sem música (biblioteca vazia e sem internet): a vinheta vai usar o jingle do app."
         k = est.novo("musica", m["path"], m.get("credito") or "", {"musica": {x: m.get(x) for x in ("titulo", "artista", "credito", "licenca")}, "refrao": m.get("refrao")})
         return f"Música escolhida: {k} = \"{m.get('titulo')}\" ({m.get('clima')}, {m.get('bpm')} BPM, {m.get('dur')} s)."
     if acao == "montar_vinheta":
@@ -197,7 +200,9 @@ def _executar(est, acao, a):
         path = kani_criar._finalizar("vinheta", tmp, nome, on, "", musica=({"path": mus["path"], "refrao": mus.get("refrao"), **mus.get("musica", {})} if mus else None))
         from Functions import video_cutter
         d = float(video_cutter.probe(path).get("duration") or 0)
-        return f"Vinheta montada: {est.novo('vinheta', path, voz['texto'], {'musica': (mus or {}).get('musica')})} ({d:.1f} s)."
+        k = est.novo('vinheta', path, voz['texto'], {'musica': (mus or {}).get('musica')})
+        return (f"Vinheta montada: {k} ({d:.1f} s no total = abertura + a voz + um respiro no fim; a duração pedida vale para a "
+                f"FALA, que já foi conferida). Próxima ação: entregar.")
     raise ValueError(f"ferramenta desconhecida: {acao}")
 
 
@@ -210,14 +215,21 @@ def rodar(job, pedido, on_evento, historico=None):
         est = _Estado(job, on_evento)
         try:
             ferr = "\n".join(f"- {k}: {d}" for k, (d, _) in FERRAMENTAS.items())
-            msgs = [{"role": "system", "content": _SISTEMA.replace("{ferramentas}", ferr).replace("{max}", str(MAX_PASSOS))}]
+            from Functions import kani_memoria
+            extra = "\n\n".join(x for x in (kani_memoria.bloco_prompt(), kani_memoria.exemplos_para(pedido)) if x)
+            msgs = [{"role": "system", "content": _SISTEMA.replace("{ferramentas}", ferr).replace("{max}", str(MAX_PASSOS))
+                     + ("\n\n" + extra if extra else "")}]
+            _traj[job] = {"pedido": pedido, "passos": []}
             for m in (historico or [])[-4:]:
                 if m.get("role") in ("user", "assistant") and m.get("content"):
                     msgs.append({"role": m["role"], "content": str(m["content"])[:600]})
             msgs.append({"role": "user", "content": f"Pedido: {pedido}"})
+            refeitos = {}
             for n in range(1, MAX_PASSOS + 1):
                 if job in _cancelar:
                     raise RuntimeError("parado")
+                if n == MAX_PASSOS - 1:   # freio: entrega com o que tem
+                    msgs.append({"role": "user", "content": "Limite de etapas chegando: a próxima ação TEM que ser entregar, com os melhores arquivos que você já tem."})
                 on_evento({"job": job, "passo": {"n": n, "estado": "pensando"}})
                 r = _chamar(msgs, primeiro=(n == 1))
                 if n == 1 and r.get("plano"):
@@ -225,6 +237,8 @@ def rodar(job, pedido, on_evento, historico=None):
                 acao, args = r.get("acao"), r.get("args") or {}
                 pens = str(r.get("pensamento") or "")[:300]
                 msgs.append({"role": "assistant", "content": json.dumps({"pensamento": pens, "acao": acao, "args": args}, ensure_ascii=False)})
+                _traj[job]["passos"].append({"acao": acao, "args": {k: (v if not isinstance(v, (list, dict)) else json.dumps(v, ensure_ascii=False)[:200])
+                                                                   for k, v in args.items()}})
                 if acao == "entregar":
                     ids = [str(x) for x in (args.get("arquivos") or []) if str(x) in est.arq]
                     if not ids:   # o modelo esqueceu de listar: entrega os finais
@@ -237,6 +251,12 @@ def rodar(job, pedido, on_evento, historico=None):
                                  str(args.get("mensagem") or "Pronto!"))
                     on_evento({"job": job, "fim": True, "mensagem": re.sub(r"\s{2,}", " ", msg)[:600], "arquivos": arqs})
                     return
+                # freio de revisão: cada ferramenta de criação pode ser refeita uma vez; depois disso o app segue
+                refeitos[acao] = refeitos.get(acao, 0) + 1
+                if acao in ("narrar", "conversa", "montar_vinheta", "buscar_musica", "gerar_imagem", "gerar_efeito") and refeitos[acao] > 2:
+                    msgs.append({"role": "user", "content": f"Você já usou {acao} {refeitos[acao] - 1} vezes: não repita. Use o que já tem e siga para a próxima etapa ou entregue."})
+                    on_evento({"job": job, "passo": {"n": n, "pensamento": pens, "acao": acao, "estado": "ok", "resumo": "Já feito: seguindo com o que tem"}})
+                    continue
                 on_evento({"job": job, "passo": {"n": n, "pensamento": pens, "acao": acao, "estado": "executando"}})
                 try:
                     if FERRAMENTAS.get(acao, ("", False))[1]:
@@ -248,7 +268,19 @@ def rodar(job, pedido, on_evento, historico=None):
                 on_evento({"job": job, "passo": {"n": n, "pensamento": pens, "acao": acao, "estado": estado, "resumo": resumo[:240]}})
                 msgs.append({"role": "user", "content": f"Resultado da ação {n} ({acao}): {resumo}\nArquivos até agora: "
                              + (", ".join(f"{k}={v['tipo']}" for k, v in est.arq.items()) or "nenhum") + ". Qual a próxima ação?"})
-            raise RuntimeError("passou do limite de etapas sem entregar")
+            # passou do limite sem entregar: o app entrega o melhor que tem (a última peça final de cada tipo)
+            finais = {}
+            for k, v in est.arq.items():
+                if v["tipo"] in ("vinheta", "imagem", "efeito", "narracao"):
+                    finais[v["tipo"]] = k
+            ids = [finais[t] for t in ("vinheta", "imagem", "efeito") if t in finais] or ([finais["narracao"]] if "narracao" in finais else [])
+            if not ids:
+                raise RuntimeError("passou do limite de etapas sem entregar")
+            from Functions import media_server
+            on_evento({"job": job, "fim": True, "mensagem": "Pronto! (Parei de ajustar no limite de etapas e entreguei a melhor versão.)",
+                       "arquivos": [{**{k: v for k, v in est.arq[i].items() if k in ("tipo", "path", "nome", "texto", "musica")},
+                                     "url": media_server.register(est.arq[i]["path"])} for i in ids]})
+            return
         except Exception as e:
             from Functions import media_server
             on_evento({"job": job, "erro": str(e), "arquivos": [{**{k: v for k, v in a.items() if k in ("tipo", "path", "nome", "texto")},
@@ -262,6 +294,18 @@ def rodar(job, pedido, on_evento, historico=None):
                 pass
 
     threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
+_traj = {}   # job → {pedido, passos} (o 👍 do chat vira exemplo em kani_memoria)
+
+
+def avaliar(job, nota):
+    t = _traj.get(job)
+    if not t:
+        return {"success": False, "error": "esse trabalho não está mais na memória (o app foi reaberto)"}
+    from Functions import kani_memoria
+    kani_memoria.guardar_exemplo(t["pedido"], t["passos"], 1 if nota > 0 else -1)
     return {"success": True}
 
 

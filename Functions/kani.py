@@ -282,6 +282,14 @@ def buscar(pergunta, n=4):
     return [kb["chunks"][i] for _, i in notas[:n]]
 
 
+def _preferencias():
+    try:
+        from Functions import kani_memoria
+        return kani_memoria.bloco_prompt()
+    except Exception:
+        return ""
+
+
 def _sistema(pergunta, ferramenta):
     kb = _carregar_kb()
     trechos = buscar(pergunta + " " + (ferramenta or ""))
@@ -322,6 +330,7 @@ Regras:
   nesse formato, com "abrir:"), usando o ID desta lista: {ids}. Ex.: "...e clique em Salvar. [[abrir:remover-fundo]]".
   Em conversa geral (quem criou, ideias, textos) não ponha.
 A pessoa está agora em: {ferramenta or 'tela inicial'}.
+{_preferencias()}
 
 AJUDA DO KANIVETE (trechos dos guias):
 {doc}"""

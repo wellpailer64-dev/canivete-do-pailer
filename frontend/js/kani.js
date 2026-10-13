@@ -148,6 +148,15 @@ function kaniMontar() {
             return;
         }
         if (e.target.closest('[data-ag-parar]')) { if (KANI.agenteJob) kaniApi().kani_agente_parar(KANI.agenteJob); return; }
+        const av = e.target.closest('[data-ag-aval]');
+        if (av) {
+            const m = KANI.conversa.msgs.find(x => x.agente && x.agente.job === av.dataset.job); if (!m) return;
+            kaniApi().kani_agente_avaliar(av.dataset.job, +av.dataset.agAval).then(r => {
+                if (r && !r.success && typeof toast === 'function') toast(r.error);
+                m.agente.avaliado = +av.dataset.agAval; kaniGuardar(); kaniRender();
+            });
+            return;
+        }
         if (e.target.closest('#kani-etapas')) { KANI.etapas = !KANI.etapas; const b = document.getElementById('kani-etapas'); b.classList.toggle('on', KANI.etapas); return; }
         const cr = e.target.closest('[data-cria-baixar],[data-cria-abrir],[data-cria-pasta]');
         if (cr) {
@@ -250,6 +259,15 @@ async function kaniEnviar(texto) {
     const t = document.getElementById('kani-txt');
     texto = (texto ?? t.value).trim();
     if (!texto || KANI.gerando) return null;
+    // memória: "lembra que...", "esquece...", "o que você sabe sobre mim?" (kani_memoria.py) — resposta na hora, sem IA
+    const memo = await kaniApi().kani_memoria_comando?.(texto).catch(() => null);
+    if (memo) {
+        const cm = KANI.conversa;
+        if (!cm.titulo) cm.titulo = texto.slice(0, 60);
+        cm.msgs.push({ role: 'user', content: texto }, { role: 'assistant', content: memo, memoria: true });
+        const tx = document.getElementById('kani-txt'); tx.value = ''; tx.style.height = 'auto';
+        kaniGuardar(); kaniRender(); return null;
+    }
     // pedido composto (ou "Pensar em etapas" ligado): a Kani trabalha em etapas (kani_agente.py)
     if (KANI.etapas || await kaniApi().kani_agente_precisa?.(texto).catch(() => false)) { kaniAgenteIniciar(texto); return null; }
     // pedido de criar (imagem, efeito sonoro, narração, vinheta): vai para o motor certo, não para a conversa.
@@ -356,6 +374,9 @@ function kaniAgenteHtml(m) {
             </div></div>`).join('')}</div>
         ${g.mensagem ? `<p class="kani-ag-msg">${kaniEsc(g.mensagem)}</p>` : ''}
         ${(g.arquivos || []).map(kaniArqHtml).join('')}
+        ${g.estado === 'ok' ? `<div class="kani-ag-aval">${g.avaliado ? `<small>${g.avaliado > 0 ? 'Obrigada! Vou usar esse jeito como exemplo nos próximos pedidos parecidos.'
+            : 'Anotado. Diga "lembra que..." com o que mudar e eu guardo.'}</small>`
+            : `<small>Ficou bom?</small><button data-ag-aval="1" data-job="${g.job}" title="Sim: vira exemplo para os próximos">👍</button><button data-ag-aval="-1" data-job="${g.job}" title="Não">👎</button>`}</div>` : ''}
     </div>`;
 }
 window.kaniAgente = function (d) {
