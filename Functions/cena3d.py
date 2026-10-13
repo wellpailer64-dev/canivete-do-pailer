@@ -32,6 +32,7 @@ def inicio(base, h):
 def lote(sessao, pasta):
     """Grava no disco os quadros que chegaram e deixa a caixa aberta para o próximo lote."""
     arquivos = media_server.fechar_envio(sessao)
+    os.makedirs(pasta, exist_ok=True)   # se alguém apagou a pasta (vazia) no meio, ela volta
     for nome, dados in arquivos.items():
         if not nome.endswith(".png") or "/" in nome or "\\" in nome:
             continue

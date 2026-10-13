@@ -263,18 +263,36 @@ def cancelar():
     return {"success": True}
 
 
+def _em_uso(r):
+    """Pasta de quadros de uma camada sendo desenhada agora (cena3d.inicio: <hash>.<sessão>.quadros): a limpeza não
+    entra. Ela nasce vazia e só recebe o 1º lote depois de 24 quadros — a manutenção que roda depois de cada lote da
+    prévia apagava a pasta vazia e a exportação caía com FileNotFoundError q00000.png (quiz Carlinhos, 2026-10-13)."""
+    partes = r.replace("\\", "/").split("/")
+    for i, p in enumerate(partes):
+        if p.endswith(".quadros"):
+            try:   # sobra de app fechado no meio (mais de 6 h parada) pode ir embora
+                return time.time() - os.path.getmtime("/".join(partes[:i + 1])) < 6 * 3600
+            except OSError:
+                return False
+    return False
+
+
 def limpar(base, chave=None):
     """chave = só o projeto; sem chave = todo o cache em disco. Não apaga o que está renderizando agora."""
     alvo = pasta_projeto(base, chave, criar=False) if chave else _raiz(base)
     antes = _tamanho_pasta(alvo) if os.path.isdir(alvo) else 0
     if os.path.isdir(alvo):
         for r, _, fs in os.walk(alvo):
+            if _em_uso(r):
+                continue
             for f in fs:
                 if f.endswith(".part" + _EXT) and _stop is not None:
                     continue
                 _apagar(os.path.join(r, f))
         for r, ds, _ in os.walk(alvo, topdown=False):
             for d in ds:
+                if _em_uso(os.path.join(r, d)):
+                    continue
                 try:
                     os.rmdir(os.path.join(r, d))
                 except OSError:
@@ -289,6 +307,8 @@ def manutencao(base, max_gb=20, dias=30):
         return {"success": True, "total": 0, "apagados": 0}
     arquivos = []
     for r, _, fs in os.walk(raiz):
+        if _em_uso(r):
+            continue
         for f in fs:
             p = os.path.join(r, f)
             try:
@@ -319,6 +339,8 @@ def manutencao(base, max_gb=20, dias=30):
         apagados += 1
     for r, ds, _ in os.walk(raiz, topdown=False):
         for d in ds:
+            if _em_uso(os.path.join(r, d)):
+                continue
             try:
                 os.rmdir(os.path.join(r, d))   # só as vazias
             except OSError:
