@@ -77,3 +77,8 @@ python -m Functions.agente_midia batidas "<música>"                 # bpm, bati
 - **transcrever**: o mesmo modelo do painel Texto; ~5x mais rápido que o tempo real.
 - **batidas**: andamento por autocorrelação (prefere 80–160 BPM; `bpm_alternativo` = dobro/metade), batidas
   ajustadas ao ataque (±10 ms nos testes de clique a 96 e 125 BPM).
+
+## Borda laranja (aviso visual)
+Enquanto um agente está conectado na porta, todas as janelas (inclusive os painéis soltos) ganham uma borda laranja
+fina e esfumaçada; apaga ~6 s depois da última conexão. `Functions/agente_borda.py` (psutil confere a porta a cada
+0,7 s) → `agenteBorda(on)` em `frontend/js/app.js` (anota as janelas de `window.open`).

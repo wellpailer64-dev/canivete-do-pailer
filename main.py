@@ -5034,6 +5034,15 @@ def main():
 
     window.events.loaded += _bind_drop
 
+    # Modo agente: borda laranja nas janelas enquanto um agente está conectado na porta (Functions/agente_borda.py)
+    # (a porta é definida mais abaixo, em _PORTA_AGENTE; aqui só se lê quando a janela termina de carregar)
+    _borda = []
+    def _ligar_borda():
+        if _PORTA_AGENTE and not _borda:
+            from Functions import agente_borda
+            _borda.append(agente_borda.iniciar(_PORTA_AGENTE, lambda on: _js("agenteBorda", on)))
+    window.events.loaded += _ligar_borda
+
     # Projeto aberto por duplo clique: .vknv/.vcnvt vai para o editor de vídeo, .iknv para o de imagem
     from Functions import projeto as _projeto
     _projeto.registrar_associacao()

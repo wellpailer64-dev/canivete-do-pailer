@@ -830,6 +830,7 @@ function veSeqAplicar(seq, opts = {}) {
     veCacheInvalidate();
     if (seq.w > 0 && seq.h > 0) veSeqQuadro(seq.w, seq.h);
     VE.clips = vePlain(seq.clips, []);
+    veSanearSobrepostas();
     VE_TRK = veSeqTracks(seq.trilhas, VE.clips);
     veEnsureTracks(veTrackCount());
     veBuildHeads();
@@ -4116,18 +4117,43 @@ function veTrimTo(d, t, semSnap) {
     const vizinhos = VE.clips.filter((o, j) => j !== d.i && o.tr === c0.tr && veConflita(o, c0));
     const img = veIsImage(c), limite = veDurMidia(c);
     t = semSnap ? Math.max(0, t) : veMoveSnap(t, d.i);
+    // vizinho = qualquer camada da mesma linha que começa antes (ou termina depois): se ela já invade esta por
+    // milésimos (arredondamento), a borda trava no começo desta — antes, a que invadia não contava e a borda passava
+    // por cima dela inteira (um clipe "engolia" o outro, os dois na mesma trilha)
     if (d.side === 'l') {
-        const prevEnd = Math.max(0, ...vizinhos.filter(o => veEnd(o) <= c0.st + VE_EPS).map(veEnd));
+        const prevEnd = Math.max(0, ...vizinhos.filter(o => o.st < c0.st - VE_EPS).map(o => Math.min(veEnd(o), c0.st)));
         const minSt = img ? prevEnd : Math.max(prevEnd, c0.st - c0.s / v);
         const st = Math.min(Math.max(t, minSt), en0 - veFrame());
         c.st = st;
         c.s = c0.s + (st - c0.st) * v;
     } else {
-        const nextSt = Math.min(Infinity, ...vizinhos.filter(o => o.st >= en0 - VE_EPS).map(o => o.st));
+        const nextSt = Math.min(Infinity, ...vizinhos.filter(o => veEnd(o) > en0 + VE_EPS).map(o => Math.max(o.st, en0)));
         const maxEn = img ? nextSt : Math.min(nextSt, c0.st + (limite - c0.s) / v);
         const en = Math.max(Math.min(t, maxEn), c0.st + veFrame());
         c.e = c0.s + (en - c0.st) * v;
     }
+}
+
+// Física da trilha (como no Premiere): duas camadas não dividem a mesma linha (V ou A) da mesma trilha. Sobreposição
+// de menos de 1 quadro (arredondamento de projeto gerado por script) é aparada no fim da de antes; as maiores ficam
+// (nada some sozinho) e voltam na lista para avisar. Devolve [{a, b, seg}] das que sobraram.
+function veSanearSobrepostas() {
+    const q = veFrame(), resto = [];
+    const linhas = new Map();
+    VE.clips.forEach(c => ['v', 'a'].forEach(l => {
+        if (l === 'v' ? !veOcupaV(c) : !veOcupaA(c)) return;
+        const k = c.tr + l; if (!linhas.has(k)) linhas.set(k, []); linhas.get(k).push(c);
+    }));
+    linhas.forEach(lista => {
+        lista.sort((a, b) => a.st - b.st);
+        for (let i = 1; i < lista.length; i++) {
+            const a = lista[i - 1], b = lista[i], sobra = veEnd(a) - b.st;
+            if (sobra <= VE_EPS) continue;
+            if (sobra < q && veEnd(a) <= veEnd(b)) a.e = veSrcAt(a, b.st);
+            else resto.push({ a, b, seg: +sobra.toFixed(3) });
+        }
+    });
+    return resto;
 }
 
 function veMoveSnap(t, excluir) {

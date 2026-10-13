@@ -2,6 +2,43 @@
 // App JavaScript - Canivete do Pailer
 // =========================
 
+// ── Modo agente: borda laranja enquanto o Claude/um script está conectado (main.py → Functions/agente_borda.py) ──
+// Fina e esfumaçada, das bordas para dentro, em todas as janelas (as soltas também: window.open é anotado aqui).
+// Não pega clique (pointer-events: none). Enquanto acesa, confere a cada 2 s se surgiu janela nova.
+const _janelasSoltas = new Set();
+(() => {
+    const abrir = window.open;
+    window.open = function (...a) {
+        const w = abrir.apply(window, a);
+        if (w) _janelasSoltas.add(w);
+        return w;
+    };
+})();
+let _agenteBordaOn = false, _agenteBordaTimer = null;
+function _agenteBordaAplicar() {
+    const docs = [document];
+    _janelasSoltas.forEach(w => { if (w.closed) { _janelasSoltas.delete(w); return; } try { if (w.document) docs.push(w.document); } catch (e) { } });
+    docs.forEach(d => {
+        let el = d.getElementById('agente-borda');
+        if (!el) {
+            if (!_agenteBordaOn || !(d.body || d.documentElement)) return;
+            el = d.createElement('div');
+            el.id = 'agente-borda';
+            el.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647;opacity:0;transition:opacity .5s;'
+                + 'box-shadow:inset 0 0 18px 2px rgba(251,138,60,.5),inset 0 0 0 1px rgba(251,138,60,.45)';
+            (d.body || d.documentElement).appendChild(el);
+            el.getBoundingClientRect();   // entra com a transição
+        }
+        el.style.opacity = _agenteBordaOn ? '1' : '0';
+    });
+}
+function agenteBorda(on) {
+    _agenteBordaOn = !!on;
+    _agenteBordaAplicar();
+    clearInterval(_agenteBordaTimer);
+    _agenteBordaTimer = _agenteBordaOn ? setInterval(_agenteBordaAplicar, 2000) : null;
+}
+
 // ── Estado global ──────────────────────────────────────────────────────────
 const selectedPaths = {};   // caminho selecionado por ferramenta
 const selectedTypes = {};   // 'file' ou 'folder' por ferramenta
