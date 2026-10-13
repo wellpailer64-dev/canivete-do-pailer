@@ -239,6 +239,23 @@ function veAfMidiaDe(path) {
     return (VE.media || []).find(m => !m.removido && m.path && n(m.path) === n(path) && m.kind === tipo);
 }
 
+// Onde o projeto (e por ele a exportação) fica. Projeto já salvo: ele manda (nada é perguntado nem movido).
+// Customizado: <pasta dos vídeos>/Autoframe - <cliente>/Autoframe - dd.mm.aa/; Quick: pergunta a pasta.
+// null = deixar como está (cancelou: a exportação usa a pasta das mídias, como antes)
+async function veAfDestino(cli) {
+    if (VE.ready && VE.projectPath) return null;
+    const api = veAfApi();
+    if (!api || !api.afm_pasta_saida) return null;
+    let base = cli ? VEAFC.cfg && VEAFC.cfg.pasta : null;
+    if (!base) {
+        veToast(veT(cli ? 'Escolha a pasta dos vídeos do AutoFrame (fica lembrada)' : 'Escolha a pasta onde salvar o projeto e o vídeo'));
+        base = cli ? await veAfcEscolherPasta() : ((await api.select_folder('autoframe')) || {}).path;
+        if (!base) return null;
+    }
+    const r = await api.afm_pasta_saida(base, cli ? cli.nome : null);
+    return r && r.success ? r : null;
+}
+
 async function veAfGerar(outra) {
     const api = veAfApi();
     if (!api || !VEAF.musica || !VEAF.modelo || VEAF.gerando) return;
@@ -246,6 +263,7 @@ async function veAfGerar(outra) {
     VEAF.gerando = true;
     veAfRender();
     try {
+        const destino = await veAfDestino(VEAF.cli);
         // modelo de cliente com "usar todas": a duração é a que faz todas as mídias entrarem (+ intro e encerramento)
         const cobrir = VEAF.cli && VEAF.cli.todas !== false ? veAfcExtraSeg(VEAF.cli, VEAF.musica.bpm) : null;
         const reserva = VEAF.cli ? veAfcReserva(VEAF.cli, VEAF.musica.bpm) : null;   // intro/encerramento sem cena embaixo
@@ -297,6 +315,11 @@ async function veAfGerar(outra) {
         veSeqSalvarAtiva();
         if (extra) veAfComps(cli, bin && bin.id);   // intro e encerramento como Comps (editor-autoframe-cliente.js)
         vePjRender();
+        // projeto salvo na pasta do dia: a exportação vai para a mesma pasta (veOpenExport usa a do projeto)
+        if (destino && !VE.projectPath) {
+            VE.projectPath = destino.projeto;
+            if (!await veSaveProject(false)) VE.projectPath = null;
+        }
         const uso = plano.uso ? ` · ${plano.uso.usadas}/${plano.uso.total} ${veT('mídias usadas')}${plano.uso.telas ? ` · ${plano.uso.telas} ${veT('telas divididas')}` : ''}` : '';
         if (cli && !outra) veAfApi().afm_usou(cli.id, VEAF.cliMus).then(r => { if (r && r.success) cli.musicaProx = r.musicaProx; });
         veToast(`AutoFrame: ${plano.slots.length} ${veT('cenas no ritmo')} (${Math.round(plano.bpm)} BPM)${uso} · ${veT('tudo editável na timeline')}`);

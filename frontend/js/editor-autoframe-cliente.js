@@ -39,7 +39,17 @@ function veAfcNovo() {
 function veAfcCarregar() {
     const api = veAfApi();
     if (!api || !api.afm_listar) return;
+    if (api.afm_config) api.afm_config().then(r => { VEAFC.cfg = (r && r.config) || {}; veAfRender(); });
     api.afm_listar().then(r => { VEAFC.lista = (r && r.success && r.modelos) || []; veAfRender(); });
+}
+// Pasta dos vídeos do Customizado (lembrada): cada cliente ganha "Autoframe - <nome>" e cada dia "Autoframe - dd.mm.aa"
+async function veAfcEscolherPasta() {
+    const api = veAfApi(), r = api && await api.select_folder('autoframe');
+    if (!r || !r.success) return null;
+    const s = await api.afm_config_salvar({ pasta: r.path });
+    VEAFC.cfg = (s && s.config) || { pasta: r.path };
+    veAfRender();
+    return r.path;
 }
 
 // URL de um arquivo do modelo (salvo: _arq; escolhido agora: {src, url})
@@ -160,7 +170,15 @@ function veAfcTela() {
             </div>
         </article>`;
     };
+    const pasta = VEAFC.cfg && VEAFC.cfg.pasta;
     return `<div class="ve-afc-lista">
+        <div class="ve-afc-pasta${pasta ? '' : ' vazia'}">
+            <span class="ve-afc-ico">${veAfcIco('folder')}</span>
+            <div><b>${veT('Pasta dos vídeos')}</b>
+                <small>${pasta ? veEsc(pasta) : veT('ainda não escolhida: o app pergunta no primeiro Gerar')}</small>
+                <small class="ve-af-info">${veT('Cada cliente ganha uma pasta "Autoframe - nome" e cada dia uma "Autoframe - 12.10.26", com o projeto e o vídeo exportado.')}</small></div>
+            <button class="ve-btn ve-btn-sm" data-afc="pasta">${veT(pasta ? 'Trocar' : 'Escolher pasta')}</button>
+        </div>
         <p class="ve-af-dica">${veT('Cada modelo guarda a intro, o logo, as cores, as transições e as músicas de um cliente. Clique em Começar e mande o material.')}</p>
         <div class="ve-afc-cards">${VEAFC.lista.map(card).join('')}
             <button class="ve-afc-novo" data-afc="novo"><span>+</span><b>${veT('Novo modelo')}</b><small>${veT('identidade de um cliente')}</small></button>
@@ -321,6 +339,7 @@ function veAfcClick(e) {
     else if (acao === 'editar') { VEAFC.ed = Object.assign(veAfcNovo(), JSON.parse(JSON.stringify(achar()))); VEAFC.apagar = false; }
     else if (acao === 'cancelar') VEAFC.ed = null;
     else if (acao === 'comecar') { veAfcComecar(achar()); return true; }
+    else if (acao === 'pasta') { veAfcEscolherPasta(); return true; }
     else if (acao === 'voltar') { VEAF.cli = null; veAfcLimparFluxo(); veAfcCarregar(); }
     else if (acao === 'musica') { veAfcTrocarMusica(+b.dataset.i); return true; }
     else if (acao === 'tirar-musica') VEAFC.ed.musicas.splice(+b.dataset.i, 1);

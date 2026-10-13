@@ -256,3 +256,12 @@
     background: var(--ve-bg); color: var(--ve-text); font: 12px var(--ve-ui); }
 .ve-af-drive input:focus { outline: none; border-color: var(--ve-accent); }
 .ve-af-drive .ve-af-prog { margin: 0; }
+
+/* ── pasta dos vídeos (Customizado) ── */
+.ve-afc-pasta { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--ve-line);
+    background: color-mix(in srgb, var(--ve-panel-2) 55%, transparent); }
+.ve-afc-pasta.vazia { border-style: dashed; border-color: color-mix(in srgb, var(--ve-accent) 45%, var(--ve-line-2)); }
+.ve-afc-pasta > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ve-afc-pasta b { font: 700 12.5px var(--ve-ui); color: var(--ve-text); }
+.ve-afc-pasta small { font: 11px var(--ve-mono); color: var(--ve-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ve-afc-pasta small.ve-af-info { font-family: var(--ve-ui); white-space: normal; color: var(--ve-faint); }

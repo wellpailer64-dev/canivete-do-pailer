@@ -100,6 +100,58 @@ def duracao(p):
         return {"dur": 0, "som": False}
 
 
+# Pasta dos vídeos do AutoFrame Customizado: <pasta>/Autoframe - <cliente>/Autoframe - dd.mm.aa/ (projeto + exportação)
+def _cfg_path():
+    return os.path.join(_base(), "_config.json")
+
+
+def config():
+    try:
+        with open(_cfg_path(), encoding="utf-8") as f:
+            return {"success": True, "config": json.load(f)}
+    except (OSError, ValueError):
+        return {"success": True, "config": {}}
+
+
+def config_salvar(cfg):
+    try:
+        atual = config()["config"]
+        atual.update({k: v for k, v in (cfg or {}).items() if k in ("pasta",)})
+        with open(_cfg_path() + ".tmp", "w", encoding="utf-8") as f:
+            json.dump(atual, f, ensure_ascii=False, indent=1)
+        os.replace(_cfg_path() + ".tmp", _cfg_path())
+        return {"success": True, "config": atual}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def _limpo(nome):
+    return re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(nome or "")).strip(" .")[:80]
+
+
+def pasta_saida(base, cliente=None):
+    """Cria e devolve a pasta do dia e um nome livre para o projeto. Com cliente: <base>/Autoframe - <cliente>/
+    Autoframe - dd.mm.aa/Autoframe - <cliente> - dd.mm.aa.vknv; sem (Quick): <base>/AutoFrame - dd.mm.aa.vknv.
+    Gerar de novo no mesmo dia: o projeto ganha (2), (3)..."""
+    try:
+        if not base or not os.path.isdir(base):
+            return {"success": False, "error": "pasta não encontrada"}
+        dia = time.strftime("%d.%m.%y")
+        if cliente:
+            pasta = os.path.join(base, f"Autoframe - {_limpo(cliente)}", f"Autoframe - {dia}")
+            nome = f"Autoframe - {_limpo(cliente)} - {dia}"
+        else:
+            pasta, nome = base, f"AutoFrame - {dia}"
+        os.makedirs(pasta, exist_ok=True)
+        proj, n = os.path.join(pasta, nome + ".vknv"), 2
+        while os.path.exists(proj):
+            proj = os.path.join(pasta, f"{nome} ({n}).vknv")
+            n += 1
+        return {"success": True, "pasta": pasta, "projeto": proj}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def listar():
     out = []
     for mid in sorted(os.listdir(_base())):

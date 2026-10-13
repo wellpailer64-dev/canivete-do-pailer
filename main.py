@@ -4214,6 +4214,18 @@ class ApiBridge:
     def af_escolher(self, tipo):
         return af_escolher(tipo)
 
+    def afm_config(self):
+        from Functions import autoframe_modelos
+        return autoframe_modelos.config()
+
+    def afm_config_salvar(self, cfg):
+        from Functions import autoframe_modelos
+        return autoframe_modelos.config_salvar(cfg)
+
+    def afm_pasta_saida(self, base, cliente=None):
+        from Functions import autoframe_modelos
+        return autoframe_modelos.pasta_saida(base, cliente)
+
     def af_drive(self, url):
         return af_drive(url)
 
