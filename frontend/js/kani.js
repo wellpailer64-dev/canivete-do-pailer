@@ -123,6 +123,7 @@ function kaniMontar() {
         <div class="kani-hist" id="kani-hist" hidden></div>
         <div class="kani-corpo" id="kani-corpo"></div>
         <footer class="kani-pe" id="kani-pe">
+            <button class="kani-etapas" id="kani-etapas" title="Pensar em etapas: a Kani planeja e usa as ferramentas uma de cada vez (pedidos compostos já vão assim)">🧠</button>
             <textarea id="kani-txt" rows="1" placeholder="Pergunte à Kani… (Enter envia, Shift+Enter quebra linha)"></textarea>
             <button class="kani-enviar" id="kani-enviar" title="Enviar"><svg class="i"><use href="#i-arrow-up"/></svg></button>
         </footer>`;
@@ -139,6 +140,15 @@ function kaniMontar() {
         if (e.target.closest('#kani-baixar')) kaniBaixar();
         const cm = e.target.closest('[data-copiar-msg]'); if (cm) { kaniCopiar(kaniLimpo(KANI.conversa.msgs[+cm.dataset.copiarMsg].content), cm); return; }
         const om = e.target.closest('[data-ouvir-msg]'); if (om) { kaniOuvir(+om.dataset.ouvirMsg); return; }
+        const ar = e.target.closest('[data-arq-baixar],[data-arq-abrir],[data-arq-pasta]');
+        if (ar) {
+            const api = kaniApi(), p = decodeURIComponent(ar.dataset.arqBaixar ?? ar.dataset.arqAbrir ?? ar.dataset.arqPasta);
+            if (ar.dataset.arqBaixar !== undefined) api.kani_salvar_como(p).then(r => { if (r && r.success && typeof toast === 'function') toast('Salvo em ' + r.path); });
+            else if (ar.dataset.arqAbrir !== undefined) api.open_file(p); else api.reveal_file(p);
+            return;
+        }
+        if (e.target.closest('[data-ag-parar]')) { if (KANI.agenteJob) kaniApi().kani_agente_parar(KANI.agenteJob); return; }
+        if (e.target.closest('#kani-etapas')) { KANI.etapas = !KANI.etapas; const b = document.getElementById('kani-etapas'); b.classList.toggle('on', KANI.etapas); return; }
         const cr = e.target.closest('[data-cria-baixar],[data-cria-abrir],[data-cria-pasta]');
         if (cr) {
             const k = KANI.conversa.msgs[+(cr.dataset.criaBaixar ?? cr.dataset.criaAbrir ?? cr.dataset.criaPasta)].criacao, api = kaniApi();
@@ -177,6 +187,7 @@ function kaniRender() {
         return;
     }
     corpo.innerHTML = c.msgs.map((m, i) => m.role === 'user' ? `<div class="kani-msg eu">${kaniEsc(m.content)}</div>`
+        : m.agente ? `<div class="kani-msg ela" data-i="${i}">${kaniAgenteHtml(m)}</div>`
         : m.criacao ? `<div class="kani-msg ela" data-i="${i}">${kaniCriaHtml(m, i)}${m.erro ? `<div class="kani-erro">${kaniEsc(m.erro)}</div>` : ''}</div>`
         : `<div class="kani-msg ela" data-i="${i}">${m.content ? kaniMd(m.content) : '<span class="kani-pensando"><i></i><i></i><i></i></span>'}${m.erro ? `<div class="kani-erro">${kaniEsc(m.erro)}</div>` : ''}${kaniAcoes(m, i)}</div>`).join('');
     corpo.scrollTop = corpo.scrollHeight;
@@ -239,6 +250,8 @@ async function kaniEnviar(texto) {
     const t = document.getElementById('kani-txt');
     texto = (texto ?? t.value).trim();
     if (!texto || KANI.gerando) return null;
+    // pedido composto (ou "Pensar em etapas" ligado): a Kani trabalha em etapas (kani_agente.py)
+    if (KANI.etapas || await kaniApi().kani_agente_precisa?.(texto).catch(() => false)) { kaniAgenteIniciar(texto); return null; }
     // pedido de criar (imagem, efeito sonoro, narração, vinheta): vai para o motor certo, não para a conversa.
     // Logo depois de uma criação, "e se fosse...", "agora com..." refaz a mesma com a mudança (pedido original + mudança)
     const c0 = KANI.conversa, ult = c0.msgs.length ? c0.msgs[c0.msgs.length - 1] : null;
@@ -259,7 +272,7 @@ async function kaniEnviar(texto) {
     kaniRender();
     // criações ficam fora do histórico da conversa: com "Pronto! Criei a vinheta (...)" nele, a IA imitava e dizia que
     // tinha criado um arquivo que não existia
-    const hist = c.msgs.slice(0, -1).filter((m, i, l) => !m.criacao && !(l[i + 1] && l[i + 1].criacao)).map(m => ({ role: m.role, content: m.content }));
+    const hist = c.msgs.slice(0, -1).filter((m, i, l) => !m.criacao && !m.agente && !(l[i + 1] && (l[i + 1].criacao || l[i + 1].agente))).map(m => ({ role: m.role, content: m.content }));
     const r = await kaniApi().kani_enviar(id, hist, kaniFerramentaAtual()).catch(e => ({ success: false, error: e.message }));
     if (!r || !r.success) window.kaniEvento({ id, erro: (r && r.error) || 'falhou' });
     return id;
@@ -298,6 +311,79 @@ function kaniCriaHtml(m, i) {
             <button data-cria-abrir="${i}"><svg class="i"><use href="#i-play"/></svg> Abrir</button>
             <button data-cria-pasta="${i}"><svg class="i"><use href="#i-folder"/></svg> Mostrar na pasta</button></div>`}</div>`;
 }
+// ── Kani em etapas (agente): plano, cada etapa com estado e pensamento, progresso e a entrega com os arquivos ──
+const KANI_ACOES = { escrever: 'Escrever o texto', gerar_imagem: 'Gerar imagem', gerar_efeito: 'Gerar efeito sonoro', narrar: 'Gravar a narração',
+    conversa: 'Gravar a conversa', buscar_musica: 'Escolher a música', montar_vinheta: 'Montar a vinheta', entregar: 'Entregar' };
+async function kaniAgenteIniciar(texto) {
+    const c = KANI.conversa, job = 'g' + Date.now().toString(36);
+    if (!c.titulo) c.titulo = texto.slice(0, 60);
+    const hist = c.msgs.filter(m => !m.criacao && !m.agente && m.content).slice(-4).map(m => ({ role: m.role, content: m.content }));
+    c.msgs.push({ role: 'user', content: texto });
+    c.msgs.push({ role: 'assistant', content: '', agente: { job, estado: 'trabalhando', plano: [], passos: [], arquivos: [] } });
+    const t = document.getElementById('kani-txt'); t.value = ''; t.style.height = 'auto';
+    KANI.agenteJob = job;
+    kaniRender();
+    const r = await kaniApi().kani_agente(job, texto, hist).catch(e => ({ success: false, error: e.message }));
+    if (!r || !r.success) window.kaniAgente({ job, erro: (r && r.error) || 'falhou' });
+}
+// prévia de um arquivo entregue (imagem ou som) com Baixar / Abrir / Pasta; o caminho vai no próprio botão
+function kaniArqHtml(a) {
+    if (a.path && !a._url) { a._url = 'pendente'; kaniApi().kani_criar_url(a.path).then(r => { a._url = (r && r.url) || 'sumiu'; kaniRender(); }); }
+    const url = a._url && !['pendente', 'sumiu'].includes(a._url) ? a._url : a.url;
+    const p = kaniEsc(encodeURIComponent(a.path || ''));
+    if (a._url === 'sumiu') return `<div class="kani-erro">${kaniEsc(a.nome || '')}: apagado ao fechar o app.</div>`;
+    return `<div class="kani-cria pronta"><div class="kani-cria-cab"><svg class="i"><use href="#i-${KANI_CRIA_ICO[a.tipo] || 'file'}"/></svg> ${kaniEsc(a.nome || '')}</div>
+        ${!url ? '' : a.tipo === 'imagem' ? `<img class="kani-cria-img" src="${kaniEsc(url)}" alt="" data-arq-abrir="${p}">` : `<audio class="kani-cria-som" controls src="${kaniEsc(url)}"></audio>`}
+        ${a.texto && a.tipo !== 'imagem' ? `<details class="kani-cria-txt"><summary>Texto</summary>${kaniEsc(a.texto)}</details>` : ''}
+        ${a.musica && a.musica.titulo ? `<details class="kani-cria-txt"><summary>Música: ${kaniEsc(a.musica.titulo)}</summary>${kaniEsc(a.musica.credito || '')}</details>` : ''}
+        <div class="kani-cria-bts"><button data-arq-baixar="${p}"><svg class="i"><use href="#i-download"/></svg> Baixar</button>
+            <button data-arq-abrir="${p}"><svg class="i"><use href="#i-play"/></svg> Abrir</button>
+            <button data-arq-pasta="${p}"><svg class="i"><use href="#i-folder"/></svg> Mostrar na pasta</button></div></div>`;
+}
+function kaniAgenteHtml(m) {
+    const g = m.agente, vivo = g.estado === 'trabalhando';
+    const ic = e => e === 'ok' ? '<b class="kani-ag-ok">✓</b>' : e === 'erro' ? '<b class="kani-ag-erro">✕</b>' : '<span class="kani-gira"></span>';
+    return `<div class="kani-ag">
+        <div class="kani-ag-cab">${vivo ? '<span class="kani-gira"></span> Trabalhando em etapas…' : g.estado === 'erro' ? 'Parei no meio' : '✓ Pronto'}
+            ${vivo ? '<button class="kani-ag-parar" data-ag-parar="1">Parar</button>' : ''}</div>
+        ${g.plano.length ? `<div class="kani-ag-plano"><small>Plano</small><ol>${g.plano.map(x => `<li>${kaniEsc(String(x).replace(/^\s*\d+[.)-]\s*/, ''))}</li>`).join('')}</ol></div>` : ''}
+        <div class="kani-ag-passos">${g.passos.filter(p => p.acao || p.estado === 'pensando').map(p => `<div class="kani-ag-passo">
+            ${ic(p.estado === 'pensando' || p.estado === 'executando' ? '' : p.estado)}
+            <div><b>${p.acao ? kaniEsc(KANI_ACOES[p.acao] || p.acao) : 'Pensando no próximo passo…'}</b>
+            ${p.pensamento ? `<small class="kani-ag-pens" title="${kaniEsc(p.pensamento)}">${kaniEsc(p.pensamento)}</small>` : ''}
+            ${p.resumo && p.estado !== 'ok' ? `<small class="kani-ag-res">${kaniEsc(p.resumo)}</small>` : p.resumo && p.acao !== 'entregar' ? `<small class="kani-ag-res">${kaniEsc(p.acao === 'escrever' ? '“' + p.resumo.split('\n').slice(1).join(' ').trim().slice(0, 220) + '”' : p.resumo.split('\n')[0])}</small>` : ''}
+            ${p.estado === 'executando' && g.progresso ? `<div class="kani-prog"><i style="width:${Math.max(3, g.progresso.pct || 0)}%"></i></div><small class="kani-cria-msg">${kaniEsc(g.progresso.msg || '')}</small>` : ''}
+            </div></div>`).join('')}</div>
+        ${g.mensagem ? `<p class="kani-ag-msg">${kaniEsc(g.mensagem)}</p>` : ''}
+        ${(g.arquivos || []).map(kaniArqHtml).join('')}
+    </div>`;
+}
+window.kaniAgente = function (d) {
+    let conv = null, i = -1;
+    for (const c of [KANI.conversa, ...kaniConversas()]) { i = c ? c.msgs.findIndex(m => m.agente && m.agente.job === d.job) : -1; if (i >= 0) { conv = c; break; } }
+    if (!conv) return;
+    const m = conv.msgs[i], g = m.agente;
+    if (d.plano) g.plano = d.plano;
+    if (d.passo) {
+        const k = g.passos.findIndex(p => p.n === d.passo.n);
+        if (k >= 0) g.passos[k] = { ...g.passos[k], ...d.passo }; else g.passos.push({ ...d.passo });
+        if (d.passo.estado !== 'executando') g.progresso = null;
+    }
+    if (d.progresso) {
+        g.progresso = d.progresso;
+        const el = KANI.conversa === conv && document.querySelector(`#kani-corpo .kani-msg[data-i="${i}"] .kani-prog i`);
+        if (el) { el.style.width = Math.max(3, d.progresso.pct || 0) + '%'; const s = el.parentElement.nextElementSibling; if (s) s.textContent = d.progresso.msg || ''; return; }
+    }
+    if (d.fim || d.erro) {
+        g.estado = d.erro ? 'erro' : 'ok'; g.mensagem = d.erro ? 'Não consegui terminar: ' + d.erro : d.mensagem; g.arquivos = d.arquivos || [];
+        m.content = d.erro ? 'Não consegui terminar o pedido.' : (d.mensagem || 'Pronto.');
+        KANI.agenteJob = null;
+        const at = KANI.conversa; KANI.conversa = conv; kaniGuardar(); KANI.conversa = at;
+        if (KANI.aberto) kaniApi()?.kani_voz?.(true);
+    }
+    if (KANI.conversa === conv) kaniRender();
+};
+
 window.kaniCriacao = function (d) {
     let conv = null, i = -1;
     for (const c of [KANI.conversa, ...kaniConversas()]) {

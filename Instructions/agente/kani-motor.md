@@ -151,3 +151,15 @@ Antes de trocar: corrigir a caixinha no prompt/gaveta e medir no llama.cpp (o mo
   Soundboard (sidechain) + riser hit, −14 LUFS, voz + 3,3 s.
 - Testado 2026-10-12: narração 49 s, imagem 768×1344 50 s, vinheta 20 s (6,5 s de áudio). Nesta pasta de dev faltam o
   modelo da Kani (gguf) e o `t5.pesos` do EzAudio — no app instalado estão; o erro chega no chat certinho.
+
+## Kani em etapas (agente, 2026-10-13)
+- `Functions/kani_agente.py`: ciclo planejar → ação (uma ferramenta) → resultado → próxima ação → entregar, até 10 passos.
+  Cada passo é uma chamada curta com a resposta TRAVADA em JSON (`response_format` com schema no llama.cpp; `format` no
+  Ollama); no 1º passo o plano é obrigatório. O app guarda a memória (arquivos viram A1, A2...; o modelo nunca vê caminho).
+- Ferramentas: escrever, gerar_imagem, gerar_efeito, narrar (mulher/homem), conversa (H/M), buscar_musica, montar_vinheta,
+  entregar. Imagem/efeito: a Kani sai da placa antes. Regra de REVISÃO no prompt (duração pedida ±20%: reescreve e regrava).
+- Rota: pedido composto (`precisa`: mais de uma coisa, roteiro, campanha, kit, "também"...) ou botão 🧠 "Pensar em etapas"
+  no chat; pedido simples continua direto (kani_criar). Chat: cartão com plano, etapas (estado + pensamento), progresso e
+  entrega (kaniAgente / kaniArqHtml em kani.js).
+- Medido 2026-10-13: "roteiro e narração de um anúncio de 15 s para uma padaria" → 10 passos, ~4 min: 22 s → reescreveu
+  → 10,7 s → reescreveu → 13,6 s → vinheta 16,9 s. Imagem dentro do agente ainda não testada com o app do usuário fechado.

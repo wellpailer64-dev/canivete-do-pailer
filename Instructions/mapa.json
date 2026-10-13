@@ -761,6 +761,15 @@
   "kani_enviar",
   "kani_parar",
   "kani_voz",
+  "musicas_listar",
+  "musicas_analisar",
+  "musicas_trocar_pasta",
+  "musicas_openverse",
+  "musicas_openverse_baixar",
+  "musicas_url",
+  "kani_agente_precisa",
+  "kani_agente",
+  "kani_agente_parar",
   "kani_criar_tipo",
   "kani_criar",
   "kani_criar_url",
@@ -1242,8 +1251,62 @@
     "kani"
    ]
   },
-  "kani_criar_tipo": {
+  "musicas_listar": {
+   "args": "filtros=None",
+   "modulos": [
+    "musicas"
+   ]
+  },
+  "musicas_analisar": {
+   "args": "",
+   "modulos": [
+    "musicas"
+   ]
+  },
+  "musicas_trocar_pasta": {
+   "args": "",
+   "modulos": [
+    "musicas"
+   ]
+  },
+  "musicas_openverse": {
+   "args": "texto=\"\", genero=\"\", duracao=\"\", pagina=1",
+   "modulos": [
+    "musicas"
+   ]
+  },
+  "musicas_openverse_baixar": {
+   "args": "item",
+   "modulos": [
+    "musicas"
+   ]
+  },
+  "musicas_url": {
+   "args": "path",
+   "modulos": [
+    "media_server"
+   ]
+  },
+  "kani_agente_precisa": {
    "args": "texto",
+   "modulos": [
+    "kani_agente"
+   ]
+  },
+  "kani_agente": {
+   "args": "job, pedido, historico=None",
+   "modulos": [
+    "kani_agente"
+   ]
+  },
+  "kani_agente_parar": {
+   "args": "job",
+   "modulos": [
+    "kani_agente"
+   ]
+  },
+  "kani_criar_tipo": {
+   "args": "texto, anterior=None",
    "modulos": [
     "kani_criar"
    ]
@@ -2513,6 +2576,7 @@
   "Functions/hardware.py": "Núcleo de hardware do KANIVETE: identifica o PC uma vez e diz a cada parte do app quanto ela pode usar",
   "Functions/instancia_unica.py": "instancia_unica.py — Uma cópia só do app aberta",
   "Functions/kani.py": "Kani — assistente de conversa do KANIVETE (tipo ChatGPT, local e offline), para tarefas do dia a dia e,",
+  "Functions/kani_agente.py": "kani_agente.py — a Kani trabalhando EM ETAPAS (agente): planeja, usa ferramentas uma de cada vez, olha o resultado,",
   "Functions/kani_criar.py": "kani_criar.py — a Kani CRIA coisas no chat: imagem (Z-Image, gerador_imagem), efeito sonoro (EzAudio, gerador_sfx),",
   "Functions/legendas.py": "legendas.py — transcrição da timeline do Pocket Editor (painel Texto: Transcrever / Criar legendas)",
   "Functions/legendas_formatos.py": "SRT e VTT: blocos separados por linha em branco, com uma linha \"início --> fim\"",
@@ -2521,6 +2585,7 @@
   "Functions/melhorar_audio_runner.py": "Melhorar áudio (estilo Adobe Podcast) — o trabalho pesado, em duas etapas:",
   "Functions/memoria.py": "Modelos de IA carregados sob demanda saem da memória quando ficam parados",
   "Functions/midia.py": "midia.py — utilidades compartilhadas de mídia (caminhos do app, ffmpeg/ffprobe, progresso)",
+  "Functions/musicas.py": "musicas.py — Biblioteca de músicas do KANIVETE (fundo de vinhetas, AutoFrame, edição)",
   "Functions/omnivoice_runner.py": "Runner isolado para operacoes pesadas do OmniVoice",
   "Functions/omnivoice_tool.py": "Ferramenta OmniVoice: geração e sintese de voz sob demanda",
   "Functions/organizador_de_imagens.py": "limparduplicadas.py",

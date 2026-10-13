@@ -3572,6 +3572,19 @@ class ApiBridge:
         from Functions import media_server
         return {"url": media_server.register(path) if path and os.path.isfile(path) else None}
 
+    # Kani em etapas (agente: Functions/kani_agente.py) — eventos em kaniAgente(...)
+    def kani_agente_precisa(self, texto):
+        from Functions import kani_agente
+        return kani_agente.precisa(texto)
+
+    def kani_agente(self, job, pedido, historico=None):
+        from Functions import kani_agente
+        return kani_agente.rodar(job, pedido, lambda d: _js("kaniAgente", d), historico)
+
+    def kani_agente_parar(self, job):
+        from Functions import kani_agente
+        return kani_agente.parar(job)
+
     def kani_criar_tipo(self, texto, anterior=None):
         """Pedido de criar algo (imagem, efeito sonoro, narração, vinheta)? {tipo, continua} ou None (conversa normal).
         anterior = tipo da última criação da conversa ("e se fosse..." refaz a mesma, com a mudança)."""

@@ -195,6 +195,9 @@ runner `serve`), ~3 s por leitura. Teste: `py -3.13 testes/teste_kani.py` (porta
 do Soundboard + impacto, mixada no ffmpeg) — `Functions/kani_criar.py` (detectar por verbo + tipo; a Kani escreve o
 prompt/texto e sai da placa), cartão com progresso, prévia, Baixar/Abrir/Mostrar na pasta (`kaniCriacao` em kani.js);
 arquivos em `modelos_ia/kani/criacoes`. Faixa "Peça à Kani" na Home (`kaniHome`).
+**Kani em etapas (agente)**: `Functions/kani_agente.py` — planeja, usa uma ferramenta por passo (JSON travado), revisa e
+entrega; pedidos compostos ou botão 🧠. Biblioteca de músicas (pasta local analisada + Openverse): `Functions/musicas.py`,
+`frontend/js/musicas.js` (barra lateral › Músicas); a vinheta usa música da biblioteca pelo clima. Guia: `kani-motor.md`.
 
 ## Remover fundo (recorte)
 GPU automática (onnxruntime-directml), pessoa → BiRefNet matting / objeto → BEN2 (YuNet decide), uma sessão por vez na

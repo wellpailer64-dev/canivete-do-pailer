@@ -314,7 +314,7 @@ def criar(job, tipo, pedido, on_evento):
     return {"success": True}
 
 
-def _finalizar(tipo, voz, nome, on, pedido=""):
+def _finalizar(tipo, voz, nome, on, pedido="", musica=None):
     """Narração: a voz como está. Vinheta: MÚSICA DE FUNDO da biblioteca (clima do pedido; começa no refrão) por baixo da
     voz (sidechain) e o impacto na abertura, −14 LUFS. Biblioteca vazia: o jingle do Soundboard faz a vez da música."""
     if tipo == "narracao":
@@ -325,11 +325,12 @@ def _finalizar(tipo, voz, nome, on, pedido=""):
     from Functions import video_cutter, musicas
     dvoz = float(video_cutter.probe(voz).get("duration") or 4)
     jingle, imp = _jingle()
-    mus = None
-    try:
-        mus = musicas.escolher(musicas.clima_do_pedido(pedido), dvoz + 4)
-    except Exception:
-        pass
+    mus = musica   # o agente já escolheu (kani_agente: buscar_musica)
+    if mus is None:
+        try:
+            mus = musicas.escolher(musicas.clima_do_pedido(pedido), dvoz + 4)
+        except Exception:
+            pass
     if not (mus or jingle):
         raise RuntimeError("a vinheta precisa de música: ponha músicas na Biblioteca de músicas (ou baixe o pack do Soundboard)")
     path = os.path.join(pasta(), f"vinheta_{nome}.mp3")

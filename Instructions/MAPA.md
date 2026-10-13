@@ -161,8 +161,8 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - **API** (`pywebview.api.*`, 9): `web_scraper_analyze(url)`, `web_scraper_download(url, mode, destino)`, `web_scraper(url, tipo, destino)`, `web_scraper_csv(url)`, `cerebro_load()`, `cerebro_save(content)`, `cerebro_exists()`, `cerebro_remove()`, `cerebro_select_file()`
 - **Guias**: `Instructions/webscraper.md`, `Instructions/cerebro.md`
 
-### API geral (app, janela, preferências, arquivos) — 30 métodos
-`select_folder(tool)`, `select_file(tool)`, `select_image(tool)`, `open_folder(path)`, `hardware_estado()`, `hardware_definir_modo(modo)`, `kani_estado()`, `kani_baixar()`, `kani_enviar(cid, mensagens, ferramenta="")`, `kani_parar(cid)`, `kani_voz(ligar=True)`, `kani_criar_tipo(texto)`, `kani_criar(job, tipo, pedido)`, `kani_criar_url(path)`, `kani_salvar_como(path)`, `kani_falar(texto, chave="")`, `reveal_file(path)`, `open_file(path)`, `select_video_file(tool)`, `prefs_load()`, `prefs_save(dados)`, `check_update()`, `apply_update()`, `sair_app()`, `toggle_fullscreen()`, `janela_cmd(acao)`, `janela_propria()`, `janela_ativar()`, `on_webview_ready(sender, args)`, `on_new_window_request(sender, args)`
+### API geral (app, janela, preferências, arquivos) — 39 métodos
+`select_folder(tool)`, `select_file(tool)`, `select_image(tool)`, `open_folder(path)`, `hardware_estado()`, `hardware_definir_modo(modo)`, `kani_estado()`, `kani_baixar()`, `kani_enviar(cid, mensagens, ferramenta="")`, `kani_parar(cid)`, `kani_voz(ligar=True)`, `musicas_listar(filtros=None)`, `musicas_analisar()`, `musicas_trocar_pasta()`, `musicas_openverse(texto="", genero="", duracao="", pagina=1)`, `musicas_openverse_baixar(item)`, `musicas_url(path)`, `kani_agente_precisa(texto)`, `kani_agente(job, pedido, historico=None)`, `kani_agente_parar(job)`, `kani_criar_tipo(texto, anterior=None)`, `kani_criar(job, tipo, pedido)`, `kani_criar_url(path)`, `kani_salvar_como(path)`, `kani_falar(texto, chave="")`, `reveal_file(path)`, `open_file(path)`, `select_video_file(tool)`, `prefs_load()`, `prefs_save(dados)`, `check_update()`, `apply_update()`, `sair_app()`, `toggle_fullscreen()`, `janela_cmd(acao)`, `janela_propria()`, `janela_ativar()`, `on_webview_ready(sender, args)`, `on_new_window_request(sender, args)`
 
 ## 6. Vetor Kanivete — comandos `VKN.cmd(nome, args)` (154; a interface, o Claude e o Jr usam os mesmos)
 - `vetor-3d.js`: `girar_3d` (3D girar), `extrudar_3d` (3D extrudar), `editar_3d` (editar 3D), `mapear_arte` (mapear arte no 3D), `limpar_mapas` (tirar artes mapeadas), `expandir_3d` (expandir 3D)
@@ -307,6 +307,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/hardware.py` — Núcleo de hardware do KANIVETE: identifica o PC uma vez e diz a cada parte do app quanto ela pode usar
 - `Functions/instancia_unica.py` — instancia_unica.py — Uma cópia só do app aberta
 - `Functions/kani.py` — Kani — assistente de conversa do KANIVETE (tipo ChatGPT, local e offline), para tarefas do dia a dia e,
+- `Functions/kani_agente.py` — kani_agente.py — a Kani trabalhando EM ETAPAS (agente): planeja, usa ferramentas uma de cada vez, olha o resultado,
 - `Functions/kani_criar.py` — kani_criar.py — a Kani CRIA coisas no chat: imagem (Z-Image, gerador_imagem), efeito sonoro (EzAudio, gerador_sfx),
 - `Functions/legendas.py` — legendas.py — transcrição da timeline do Pocket Editor (painel Texto: Transcrever / Criar legendas)
 - `Functions/legendas_formatos.py` — SRT e VTT: blocos separados por linha em branco, com uma linha "início --> fim"
@@ -315,6 +316,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/melhorar_audio_runner.py` — Melhorar áudio (estilo Adobe Podcast) — o trabalho pesado, em duas etapas:
 - `Functions/memoria.py` — Modelos de IA carregados sob demanda saem da memória quando ficam parados
 - `Functions/midia.py` — midia.py — utilidades compartilhadas de mídia (caminhos do app, ffmpeg/ffprobe, progresso)
+- `Functions/musicas.py` — musicas.py — Biblioteca de músicas do KANIVETE (fundo de vinhetas, AutoFrame, edição)
 - `Functions/omnivoice_runner.py` — Runner isolado para operacoes pesadas do OmniVoice
 - `Functions/omnivoice_tool.py` — Ferramenta OmniVoice: geração e sintese de voz sob demanda
 - `Functions/organizador_de_imagens.py` — limparduplicadas.py
