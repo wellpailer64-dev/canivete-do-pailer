@@ -54,6 +54,24 @@
 
 /* barra de opções */
 .ie-opcoes { display: flex; align-items: center; gap: 10px; padding: 0 10px; border-bottom: 1px solid var(--ie-linha); background: var(--ie-painel); overflow-x: auto; overflow-y: hidden; white-space: nowrap; scrollbar-width: none; }
+/* casinha (Início) à esquerda da barra de opções, como no Photoshop */
+.ie-opcoes-linha { display: flex; align-items: stretch; min-width: 0; }
+.ie-opcoes-linha > .ie-opcoes { flex: 1; min-width: 0; }
+.ie-home { flex: none; width: 40px; display: grid; place-items: center; background: var(--ie-painel); border: 0; border-right: 1px solid var(--ie-linha); border-bottom: 1px solid var(--ie-linha); color: var(--text-2); cursor: pointer; }
+.ie-home:hover { color: var(--text-1, #fff); background: var(--ie-hover, rgba(255,255,255,.06)); }
+.ie-home.on { color: var(--ie-acento, #fb8a3c); }
+.ie-home .i { width: 18px; height: 18px; }
+.ie-inicio-abertos { width: 100%; }
+.ie-inicio-abertos-lista { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 6px; }
+/* prova de cores na barra de status e CMYK no seletor de cores */
+.ie-st-prova { color: var(--ie-acento, #fb8a3c); font-weight: 600; }
+.ie-st-prova[hidden] { display: none; }
+.ie-cp-cmyk { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; margin: 4px 0; }
+.ie-cp-cmyk label { display: flex; align-items: center; gap: 4px; font-size: 11px; }
+.ie-cp-cmyk input { width: 42px; }
+.ie-cp-cmyk i { font-style: normal; color: var(--text-2); }
+.ie-cp-gama { grid-column: 1 / -1; color: #f5b041; font-size: 11px; }
+.ie-cp-gama[hidden] { display: none; }
 .ie-op-ico { color: var(--ie-acento); display: grid; place-items: center; padding-right: 6px; border-right: 1px solid var(--ie-linha); height: 22px; }
 .ie-op-tit { font-weight: 600; }
 .ie-op-sep { width: 1px; height: 20px; background: var(--ie-linha-2); }
@@ -362,6 +380,7 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 .ie.ie-tela-2 .ie-top, .ie.ie-tela-2 .ie-opcoes, .ie.ie-tela-2 .ie-ferr, .ie.ie-tela-2 .ie-paineis, .ie.ie-tela-2 .ie-abas,
 .ie.ie-tela-2 .ie-status { display: none !important; }
 .ie.ie-tela-2 .ie-corpo { grid-template-columns: 0 0 minmax(0, 1fr) 0 !important; }
+.ie.ie-tela-2 .ie-opcoes-linha { overflow: hidden; visibility: hidden; }
 .ie.ie-tela-2 .ie-centro { grid-template-rows: 0 minmax(0, 1fr) 0; }
 .ie.ie-tela-2 .ie-vista { background: #000; }
 .ie.ie-sem-paineis { grid-template-rows: 40px 0 minmax(0, 1fr); }

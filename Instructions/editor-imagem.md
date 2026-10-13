@@ -435,3 +435,15 @@ Próximas fases (combinadas): 2) atualização ao vivo Photo → Editor; 3) volt
 opacidade, visibilidade); 4) "Levar e animar" (entradas por camada, estilos suave/enérgico, 6 s por slide).
 Atalhos: Ctrl+Shift+, exporta a(s) camada(s) selecionada(s) em PNG; Ctrl+Shift+. exporta tudo (fatias/pranchetas/tela);
 sem janela: `KNV.exportarRapido(tudo, pasta)`.
+
+## Cor para gráfica (CMYK) e Início (imagem-cor.js, Functions/cor_icc.py) — 2026-10-13
+- O app trabalha em sRGB. Abrir: JPG/PNG/TIFF com perfil (Adobe RGB, P3, CMYK) e PSD RGB com perfil não-sRGB entram
+  convertidos pelo perfil (CMYK sem perfil = FOGRA39); PSD Adobe RGB passa a sair como PSD novo em sRGB. Antes as cores
+  ficavam lavadas (conversão "na mão").
+- Exibir > Prova de cores (Ctrl+Y; refazer continua em Shift+Ctrl+Z), Alerta de gama (Shift+Ctrl+Y, ΔE > 6 = cinza),
+  Configurar prova (FOGRA39/FOGRA29/GRACoL/SWOP, perfis do Vetor). Tabela 64³ calculada no Python (0,3 s) e aplicada só
+  na vista (os pixels não mudam). Status mostra "Prova: CMYK <perfil>".
+- Exportar como: Cor = RGB ou CMYK <perfil> → JPG/TIFF/PDF/PSD achatado com o perfil embutido (PSD CMYK escrito direto
+  no formato, invertido como o Photoshop guarda). Seletor de cores: C/M/Y/K + aviso de fora da gama.
+- Casinha à esquerda da barra de opções: tela inicial (Recentes + "Continuar" de cada aberto) sem fechar nada; Esc,
+  aba ou Continuar voltam.

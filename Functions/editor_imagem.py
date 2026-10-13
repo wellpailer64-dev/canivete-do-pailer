@@ -279,7 +279,13 @@ def _abrir_imagem(path, doc):
         dpi = round(float((im.info.get("dpi") or (72, 72))[0]), 2)
     except Exception:
         pass
-    rgba = im.convert("RGBA")
+    # perfil de cor embutido (Adobe RGB, Display P3, CMYK...): converte para sRGB, que é como o app trabalha
+    from Functions import cor_icc
+    icc = im.info.get("icc_profile")
+    avisos = []
+    if im.mode == "CMYK" or (icc and not cor_icc._eh_srgb(icc)):
+        avisos.append(f"Cores convertidas de {cor_icc.descricao(icc) or im.mode} para sRGB")
+    rgba = cor_icc.para_srgb(im)
     url = _servir(doc, _png(rgba), "fundo.png")
     w, h = rgba.size
     opaco = rgba.getextrema()[3][0] == 255
@@ -288,7 +294,7 @@ def _abrir_imagem(path, doc):
             "camadas": [{"tipo": "pixel", "nome": "Fundo" if opaco else "Camada 0", "visivel": True, "op": 1, "fill": 1,
                          "bm": "NORMAL", "clip": False, "x": 0, "y": 0, "w": w, "h": h, "url": url,
                          "fundo": opaco}],
-            "avisos": []}
+            "avisos": avisos}
 
 
 def _abrir_psd(path, doc, on_progress):
@@ -301,6 +307,14 @@ def _abrir_psd(path, doc, on_progress):
     avisos = []
     if not doc["rgb"]:
         avisos.append(f"Documento em {modo}: o editor trabalha em RGB e salva um PSD novo em RGB")
+    # RGB com perfil que não é sRGB (Adobe RGB, P3): as camadas entram convertidas e o PSD sai novo em sRGB (senão as
+    # camadas mexidas iam em sRGB para dentro de um PSD Adobe RGB e mudavam de cor)
+    from Functions import cor_icc
+    _icc = psd.image_resources.get_data(1039) if doc["rgb"] else None
+    _icc = _icc if _icc and not cor_icc._eh_srgb(_icc) else None
+    if _icc:
+        doc["rgb"] = False
+        avisos.append(f"Cores convertidas de {cor_icc.descricao(_icc) or 'outro perfil'} para sRGB; o PSD sai novo em sRGB")
     try:
         angulo = float(psd.image_resources.get_data(1037) or 120)
     except Exception:
@@ -392,7 +406,7 @@ def _abrir_psd(path, doc, on_progress):
         except Exception:
             im = None
         if im is not None and im.size[0] and im.size[1]:
-            return im.convert("RGBA"), layer.left, layer.top
+            return (cor_icc.para_srgb(im, _icc) if _icc else im.convert("RGBA")), layer.left, layer.top
         if layer.kind == "solidcolorfill":
             rgb = _cor_soco(layer)
             if rgb:
@@ -540,7 +554,7 @@ def _abrir_psd(path, doc, on_progress):
     try:
         im = psd.topil()
         if im is not None:
-            achatado = _servir(doc, _png(im.convert("RGBA")), "achatado.png")
+            achatado = _servir(doc, _png(cor_icc.para_srgb(im, _icc) if _icc else im.convert("RGBA")), "achatado.png")
     except Exception:
         pass
     return {"success": True, "nome": os.path.splitext(os.path.basename(path))[0], "w": int(psd.width),
@@ -2013,7 +2027,11 @@ def exportar(spec):
     im = _img(arquivos, spec.get("composto"))
     if im is None:
         return {"success": False, "error": "composição não chegou"}
-    erro = _gravar_imagem(im, spec["destino"], int(spec.get("qualidade", 92)), float(spec.get("dpi") or 72))
+    if spec.get("cmyk"):   # para gráfica: CMYK pelo perfil escolhido (Functions/cor_icc.py), com o perfil embutido
+        from Functions import cor_icc
+        erro = cor_icc.salvar_cmyk(im, spec["destino"], spec["cmyk"], int(spec.get("qualidade", 95)), float(spec.get("dpi") or 300))
+    else:
+        erro = _gravar_imagem(im, spec["destino"], int(spec.get("qualidade", 92)), float(spec.get("dpi") or 72))
     if erro:
         return {"success": False, "error": erro}
     return {"success": True, "path": spec["destino"]}

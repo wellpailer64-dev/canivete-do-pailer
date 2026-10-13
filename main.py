@@ -3421,6 +3421,19 @@ class ApiBridge:
         from Functions import editor_imagem
         return editor_imagem.exportar(spec)
 
+    # gestão de cor do Photo (Functions/cor_icc.py): prova de cores, alerta de gama e cores CMYK do seletor
+    def ie_cor_lut(self, perfil="FOGRA39"):
+        from Functions import cor_icc
+        return cor_icc.lut_prova(perfil)
+
+    def ie_cor_converter(self, lista, sentido="rgb_cmyk", perfil="FOGRA39"):
+        from Functions import cor_icc
+        return {"success": True, "cores": cor_icc.cores(lista, sentido, perfil)}
+
+    def ie_cor_perfis(self):
+        from Functions import vetor_kanivete as vk
+        return {"success": True, "perfis": vk.perfis_disponiveis()}
+
     def ie_exportar_fatias(self, spec):
         from Functions import editor_imagem
         return editor_imagem.exportar_fatias(spec)

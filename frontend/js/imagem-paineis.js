@@ -1334,6 +1334,7 @@ const IE_MENUS = [
     ['Filtro', [['Filtro Camera Raw...', 'f:cameraRaw', 'Shift+Ctrl+A'], '-', ['Desfoque gaussiano...', 'f:gaussiano'], ['Desfoque de movimento...', 'f:movimento'], ['Máscara de nitidez...', 'f:nitidez'], ['Adicionar ruído...', 'f:ruido'], ['Mosaico...', 'f:mosaico'], '-',
         ['Distorcer', [['Ondulação...', 'f:ondulacao'], ['Respingos...', 'f:respingos'], ['Torcer...', 'f:torcer']]]]],
     ['Exibir', [['Aproximar', 'zoomMais', 'Ctrl++'], ['Afastar', 'zoomMenos', 'Ctrl+-'], ['Ajustar à tela', 'zoomAjustar', 'Ctrl+0'], ['100%', 'zoom100', 'Ctrl+1'], '-',
+        ['Prova de cores (CMYK)', 'prova', 'Ctrl+Y'], ['Alerta de gama', 'alertaGama', 'Shift+Ctrl+Y'], ['Configurar prova...', 'configurarProva'], '-',
         ['Fatias', 'verFatias'], ['Comparar com a imagem salva no PSD', 'verAchatado'], ['Avisos da abertura', 'avisos']]],
 ];
 
