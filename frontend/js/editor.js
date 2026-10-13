@@ -1439,13 +1439,16 @@ function veGrupoDtr(lista, dtr) {
 }
 
 // Solta os selecionados deslocados de dt segundos e dtr trilhas (alt = cópias). Sobrescreve o que estiver embaixo.
-function veMoverGrupo(lista, dt, dtr, alt) {
+// legs = legendas que vão junto (ferramenta A): a prévia já as moveu; voltam ao lugar antes do histórico
+function veMoverGrupo(lista, dt, dtr, alt, legs) {
+    if (legs && typeof veFaixaLegsMover === 'function') veFaixaLegsMover(legs, 0);
     lista = lista.filter(c => !veLocked(c));
     if (!lista.length) { veAvisoBloqueio(); veDraw(); return; }
     dt = Math.max(dt, -Math.min(...lista.map(c => c.st)));
     dtr = veGrupoDtr(lista, dtr);
     if (Math.abs(dt) < veFrame() / 2 && !dtr) { veDraw(); return; }
     vePushHistory();
+    if (legs && !alt) veFaixaLegsMover(legs, veSnapFrame(lista[0].st + dt) - lista[0].st);
     const prim = VE.clips[VE.sel], lk = veLkMapa(), tiny = veFrame() * 0.5;
     const novos = lista.map(c => {
         const n = alt ? lk(JSON.parse(JSON.stringify(c))) : { ...c };
@@ -6458,7 +6461,9 @@ function veInitEvents() {
             // Selecionar faixa para a frente/trás (editor-lacunas.js): pega o grupo e já pode arrastar
             const c = veFaixaSelecionar(e, t, row), lista = veSelLista();
             if (c) VE.drag = { mode: 'move', i: VE.clips.indexOf(c), x0: e.clientX, y0: e.clientY, grab: t - c.st, active: false,
-                               st: c.st, tr: c.tr, kind: row.kind, grupo: lista.length > 1 ? lista : null };
+                               st: c.st, tr: c.tr, kind: row.kind, grupo: lista.length > 1 || VE.faixaLegs ? lista : null,
+                               legs: VE.faixaLegs, st0: c.st };
+            VE.faixaLegs = null;
             veRenderClips(); veRenderProps(); veDrawMonitor(); veDraw();
             return;
         }
@@ -6600,6 +6605,8 @@ function veInitEvents() {
             const p = veTimeFromEvent(e);
             d.st = veMoveTarget(d.i, p.t - d.grab);
             d.alt = e.altKey;   // Alt (antes ou durante o arraste): solta uma cópia e o original fica
+            // ferramenta A: as legendas do grupo acompanham ao vivo (cópia com Alt não leva legenda)
+            if (d.legs) { veFaixaLegsMover(d.legs, d.alt ? 0 : Math.max(d.st - d.st0, -Math.min(...d.grupo.map(c => c.st)))); veDrawMonitorSoon(); }
             // trilha sob o mouse (arrastando pelo vídeo ou pelo áudio, o par vinculado vai junto)
             const r = veRowAt(p.y);
             if (r && r.kind !== 'l') d.tr = veTrackIndex(r);
@@ -6659,7 +6666,7 @@ function veInitEvents() {
             return;
         }
         if (d && d.mode === 'move' && d.active) {
-            if (d.grupo) veMoverGrupo(d.grupo, d.st - VE.clips[d.i].st, d.tr - VE.clips[d.i].tr, d.alt);
+            if (d.grupo) veMoverGrupo(d.grupo, d.st - VE.clips[d.i].st, d.tr - VE.clips[d.i].tr, d.alt, d.legs);
             else if (d.alt) veDuplicarEm(d.i, d.tr, d.st); else veMoveClip(d.i, d.tr, d.st);
         } else veDraw();
         // trilha criada no arraste e que ficou vazia (soltou em outra): sai

@@ -119,6 +119,13 @@ cobertura, texto, ajuste, som) e a fala transcrita embaixo. 1ª vez ~4 min (extr
 Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lugar de prints do monitor).
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-10-13 QUIZ CARLINHOS (Dia do Instrutor, "mandou muito bem"): formato = erros de gravação na abertura → cartela
+  título → por pergunta: cartela (pincel azul + texto, "Pergunta N", whoosh + leak) sobre quem pergunta, respostas dos
+  3 em sequência → música emotiva na última pergunta. Notas: legenda sobre imagem clara precisa de APOIO = degradê azul
+  esfumaçado embaixo (PNG gerado em PIL com alfa suave + ruído; pincel com desfoque ficou faixa dura) só onde há
+  legenda sem cartela; erros de gravação com cara de câmera velha (Luz e Cor sat 38/desbotado/vinheta, Aberração,
+  Granulação, PNG de linhas de TV 45%, ● REC piscando por k.op). Script: D:/kanivete_testes/quiz_instrutor/
+  (montar.py gera o .vknv direto; ajustes.js/degrade.js no app). Armadilha: veGrMidia devolve o OBJETO da mídia — usar .id.
 - 2026-10-10 MOTION / PROPAGANDA (ref. Pinterest → propaganda KANIVETE, "FICOU PERFEITO"): receita inteira em
   Instructions/agente/plano-motion.md § "Receita validada". Notas do Pailer: OmniVoice lê palavra com cara de inglês
   em inglês ("finalize" → "finalaize": usar palavra 100% PT, ex. "finaliza"); faltou trilha energética (ele manda a

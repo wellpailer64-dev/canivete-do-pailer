@@ -5,7 +5,8 @@
 // não se desfaz). Com clipe de outra trilha dentro do espaço, não fecha (igual ao Premiere com Sync Lock);
 // trilha travada (cadeado) fica parada.
 // Ferramenta Selecionar faixa para a frente (A) / para trás (Shift+A): clicar pega todos os clipes dali em diante
-// (ou para trás) em todas as trilhas; com Shift, só a trilha clicada. Arrastar move o grupo inteiro.
+// (ou para trás) em todas as trilhas; com Shift, só a trilha clicada. Arrastar move o grupo inteiro — e, sem Shift,
+// as legendas dali em diante (ou para trás) andam junto, para não perder a sincronia (VE.faixaLegs → drag.legs).
 // =========================================================
 
 VE.gapSel = null;
@@ -83,10 +84,22 @@ function veFaixaSelecionar(e, t, row) {
         && (!e.shiftKey || c.tr === tr));
     if (e.shiftKey) lista = [...new Set(lista.flatMap(c => veVinculados(c)))].filter(c => !veLocked(c));
     if (clicado && !veLocked(clicado) && !lista.includes(clicado)) lista.push(clicado);
+    // legendas do mesmo lado do ponto (só sem Shift: com Shift é uma trilha só)
+    VE.faixaLegs = e.shiftKey ? null : (VE.legendas || []).map((l, k) => ({ k, c0: veLegClone(l) }))
+        .filter(({ c0 }) => (para > 0 ? c0.st >= T - VE_EPS : c0.en <= T + VE_EPS));
+    if (VE.faixaLegs && !VE.faixaLegs.length) VE.faixaLegs = null;
     if (!lista.length) { veSelDefinir([], null); return null; }
     const prim = clicado && lista.includes(clicado) ? clicado
         : lista.reduce((m, c) => (para > 0 ? c.st < m.st : veEnd(c) > veEnd(m)) ? c : m);
     veSelDefinir(lista, prim);
-    veToast(`${lista.length} ${veT(lista.length > 1 ? 'clipes selecionados' : 'clipe selecionado')}`);
+    const nl = VE.faixaLegs ? VE.faixaLegs.length : 0;
+    veToast(`${lista.length} ${veT(lista.length > 1 ? 'clipes selecionados' : 'clipe selecionado')}`
+        + (nl ? ` + ${nl} ${veT(nl > 1 ? 'legendas' : 'legenda')}` : ''));
     return prim;
+}
+
+// Legendas que andam com o grupo da ferramenta A: dt = deslocamento no tempo (0 volta ao lugar de antes)
+function veFaixaLegsMover(legs, dt) {
+    if (!legs || !VE.legendas) return;
+    legs.forEach(({ k, c0 }) => { if (VE.legendas[k]) VE.legendas[k] = veLegMover(c0, dt); });
 }
