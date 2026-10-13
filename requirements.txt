@@ -52,3 +52,4 @@ pyphen==0.18.1
 zstandard==0.25.0
 lxml==6.0.3
 pyinstaller==6.19.0
+mutagen>=1.47

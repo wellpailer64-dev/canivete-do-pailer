@@ -1734,3 +1734,54 @@ html.barra-propria .app-container { height: calc(100vh - 26px); }
 @media (max-width: 760px) { .home-kani-txt { display: none; } .home-kani-chips { padding-left: 0; } }
 /* a bolinha da Kani sobe quando o aviso de versão nova está na tela */
 body:has(.update-banner:not([hidden])) .kani-bolinha { bottom: 86px; }
+
+/* =========================================================
+   Biblioteca de músicas (frontend/js/musicas.js)
+   ========================================================= */
+.mus-fundo { position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; background: rgba(0, 0, 0, .55); backdrop-filter: blur(3px); }
+.mus-fundo[hidden] { display: none; }
+.mus-jan { width: min(920px, calc(100vw - 40px)); height: min(720px, calc(100vh - 60px)); display: flex; flex-direction: column; gap: 12px; padding: 16px 18px;
+    border-radius: 14px; border: 1px solid var(--line-2); background: var(--bg-1); box-shadow: 0 30px 80px rgba(0, 0, 0, .6); }
+.mus-cab { display: flex; align-items: center; gap: 10px; }
+.mus-ico { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: rgba(47, 168, 119, .16); color: #2fa877; }
+.mus-cab b { display: block; font-size: 14.5px; }
+.mus-cab small { font-size: 11px; color: var(--text-3); }
+.mus-cab small a { color: var(--text-2); cursor: pointer; text-decoration: underline dotted; }
+.mus-esp { flex: 1; }
+.mus-bt { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--bg-3); color: var(--text); font: 600 12px var(--font-ui); cursor: pointer; }
+.mus-bt:hover { border-color: var(--primary); }
+.mus-x { width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: var(--text-3); font-size: 20px; cursor: pointer; }
+.mus-x:hover { color: var(--text); background: var(--bg-3); }
+.mus-abas { display: flex; gap: 6px; }
+.mus-filtros { display: flex; flex-direction: column; gap: 8px; }
+.mus-filtros input { height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); font: 13px var(--font-ui); }
+.mus-filtros input:focus { outline: none; border-color: var(--primary); }
+.mus-busca-ov { display: flex; gap: 8px; } .mus-busca-ov input { flex: 1; }
+.mus-linha { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.mus-linha > span { width: 64px; font: 600 10.5px var(--font-ui); color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
+.mus-chip { height: 26px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text-2); font: 600 11.5px var(--font-ui); cursor: pointer; }
+.mus-chip:hover { color: var(--text); border-color: var(--text-3); }
+.mus-chip.on { color: var(--primary); border-color: var(--primary); background: var(--primary-soft); }
+.mus-nota { font-size: 11px; color: var(--text-3); line-height: 1.45; }
+.mus-prog { position: relative; height: 24px; border-radius: 7px; background: var(--bg-3); overflow: hidden; }
+.mus-prog i { position: absolute; inset: 0 auto 0 0; background: rgba(47, 168, 119, .35); transition: width .3s; }
+.mus-prog span { position: relative; display: block; padding: 0 10px; line-height: 24px; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mus-lista { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding-right: 4px; }
+.mus-vazio { padding: 30px; text-align: center; color: var(--text-3); font-size: 12.5px; line-height: 1.5; }
+.mus-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; background: var(--bg-2); }
+.mus-item:hover { background: var(--bg-3); }
+.mus-play { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 50%; border: 1px solid var(--line-2); background: var(--bg-1); color: var(--text); cursor: pointer; font-size: 11px; }
+.mus-play.on, .mus-play:hover { border-color: #2fa877; color: #2fa877; }
+.mus-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mus-info b { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mus-info small { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mus-info em { font-style: normal; color: var(--text-2); }
+.mus-tag { padding: 2px 9px; border-radius: 999px; font: 700 10.5px var(--font-ui); background: var(--bg-3); color: var(--text-2); }
+.mus-tag.c-calma { color: #7dd3fc; background: rgba(125, 211, 252, .12); } .mus-tag.c-alegre { color: #fde047; background: rgba(253, 224, 71, .12); }
+.mus-tag.c-animada { color: #fb923c; background: rgba(251, 146, 60, .12); } .mus-tag.c-intensa { color: #f87171; background: rgba(248, 113, 113, .12); }
+.mus-tag.c-melancolica { color: #c4b5fd; background: rgba(196, 181, 253, .12); }
+.mus-num { width: 60px; text-align: right; font: 11px var(--mono); color: var(--text-3); }
+.mus-usar { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--primary); background: var(--primary-soft); color: var(--primary); font: 700 12px var(--font-ui); cursor: pointer; flex-shrink: 0; }
+.mus-usar:hover { background: var(--primary); color: #1a0d02; }
+.mus-usar:disabled { opacity: .6; cursor: default; } .mus-usar.ok { border-color: #2fa877; color: #2fa877; background: rgba(47, 168, 119, .1); opacity: 1; }
+.mus-mais { align-self: center; margin: 8px; height: 30px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); cursor: pointer; }

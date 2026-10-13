@@ -281,7 +281,7 @@ def criar(job, tipo, pedido, on_evento):
                     raise RuntimeError('não consegui escrever a conversa (mande as falas assim: "H: ..." e "M: ...", uma por linha)')
                 voz = _dialogo(falas, os.path.join(pasta(), f"_voz_{nome}.wav"), on)
                 texto = "\n".join(f"{'Homem' if p == 'H' else 'Mulher'}: {f}" for p, f in falas)
-                path = _finalizar(tipo, voz, nome, on)
+                path = _finalizar(tipo, voz, nome, on, pedido)
             elif tipo in ("narracao", "vinheta"):
                 n = 22 if tipo == "vinheta" else 90
                 texto = _citado(pedido)
@@ -298,12 +298,13 @@ def criar(job, tipo, pedido, on_evento):
                     raise RuntimeError("não consegui escrever o texto (mande o texto entre aspas)")
                 texto = re.sub(r"[#*_`\[\]]", "", texto).strip()
                 voz = _falar(texto, os.path.join(pasta(), f"_voz_{nome}.wav"), on)
-                path = _finalizar(tipo, voz, nome, on)
+                path = _finalizar(tipo, voz, nome, on, pedido)
             else:
                 raise RuntimeError("não sei criar isso ainda")
             from Functions import media_server
             on_evento({"job": job, "fim": True, "tipo": tipo, "path": path, "url": media_server.register(path),
-                       "nome": os.path.basename(path), "texto": texto})
+                       "nome": os.path.basename(path), "texto": texto,
+                       "musica": {k: _ultima_musica.get(k) for k in ("titulo", "artista", "credito", "licenca")} if tipo == "vinheta" and _ultima_musica else None})
         except Exception as e:
             on_evento({"job": job, "erro": str(e)})
         finally:
@@ -313,27 +314,36 @@ def criar(job, tipo, pedido, on_evento):
     return {"success": True}
 
 
-def _finalizar(tipo, voz, nome, on):
-    """Narração: a voz como está. Vinheta: jingle abre, a voz por cima (sidechain), impacto fecha, −14 LUFS."""
+def _finalizar(tipo, voz, nome, on, pedido=""):
+    """Narração: a voz como está. Vinheta: MÚSICA DE FUNDO da biblioteca (clima do pedido; começa no refrão) por baixo da
+    voz (sidechain) e o impacto na abertura, −14 LUFS. Biblioteca vazia: o jingle do Soundboard faz a vez da música."""
     if tipo == "narracao":
         path = os.path.join(pasta(), f"narracao_{nome}.wav")
         os.replace(voz, path)
         return path
-    on(80, "Mixando com a música e o impacto...")
+    on(80, "Escolhendo a música e mixando...")
+    from Functions import video_cutter, musicas
+    dvoz = float(video_cutter.probe(voz).get("duration") or 4)
     jingle, imp = _jingle()
-    if not jingle:
-        raise RuntimeError("baixe o pack no painel Soundboard (a vinheta usa os jingles dele)")
+    mus = None
+    try:
+        mus = musicas.escolher(musicas.clima_do_pedido(pedido), dvoz + 4)
+    except Exception:
+        pass
+    if not (mus or jingle):
+        raise RuntimeError("a vinheta precisa de música: ponha músicas na Biblioteca de músicas (ou baixe o pack do Soundboard)")
     path = os.path.join(pasta(), f"vinheta_{nome}.mp3")
-    # jingle abre, a voz entra aos 0,9 s com a música abaixando por baixo (sidechain), o impacto fecha
-    ent = ["-i", jingle, "-i", voz] + (["-i", imp] if imp else [])
-    g = ("[0:a]aresample=48000,apad=pad_dur=30,volume=0.9[m];[1:a]aresample=48000,adelay=900|900,apad=pad_dur=30,asplit[v][sc];"
+    # música (do refrão, entrando suave) ou jingle; a voz entra aos 0,9 s com a música abaixando por baixo
+    ini = max(0.0, float((mus or {}).get("refrao") or 0) - 0.5) if mus else 0.0
+    ent = (["-ss", f"{ini:.2f}", "-i", mus["path"]] if mus else ["-i", jingle]) + ["-i", voz] + (["-i", imp] if imp else [])
+    g = (f"[0:a]aresample=48000,apad=pad_dur=30,volume={0.55 if mus else 0.9},afade=t=in:d={0.6 if mus else 0}[m];"
+         "[1:a]aresample=48000,adelay=900|900,apad=pad_dur=30,asplit[v][sc];"
          "[m][sc]sidechaincompress=threshold=0.03:ratio=8:attack=20:release=350[md];"
          + ("[2:a]aresample=48000,volume=0.7[i];[md][v][i]amix=inputs=3:duration=longest:normalize=0" if imp
             else "[md][v]amix=inputs=2:duration=longest:normalize=0")
          + ",loudnorm=I=-14:TP=-1.5,afade=t=out:st=0:d=0.01[o]")
     # duração: atraso + voz + 2,4 s (a música respira no fim); tudo com apad e cortado no atrim
-    from Functions import video_cutter
-    dur = float(video_cutter.probe(voz).get("duration") or 4) + 0.9 + 2.4   # atraso da voz + respiro
+    dur = dvoz + 0.9 + 2.4   # atraso da voz + respiro
     g = g.replace("afade=t=out:st=0:d=0.01", f"atrim=0:{dur:.2f},afade=t=out:st={max(0, dur - 1.2):.2f}:d=1.2")
     rr = subprocess.run([_ffmpeg(), "-y", "-v", "error", *ent, "-filter_complex", g, "-map", "[o]", "-c:a", "libmp3lame",
                          "-b:a", "192k", path], capture_output=True, text=True,
@@ -344,7 +354,12 @@ def _finalizar(tipo, voz, nome, on):
         os.remove(voz)
     except OSError:
         pass
+    _ultima_musica.clear()
+    _ultima_musica.update(mus or {})
     return path
+
+
+_ultima_musica = {}   # a música usada na última vinheta (o chat mostra título e crédito)
 
 
 def url(path):

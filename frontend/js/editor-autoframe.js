@@ -652,6 +652,7 @@ function veAfRender() {
     const p2 = (cli ? veAfcMusicas() : `<div class="ve-af-musica">
                 <span class="ve-af-mus-ico">${ico('music')}</span>
                 <span class="ve-af-mus-txt">${VEAF.musicaPath ? `<b>${veEsc(veAfNome(VEAF.musicaPath))}</b>` : `<b>${veT('Nenhuma música')}</b><small>${veT('MP3, WAV, M4A... (arrastar também funciona)')}</small>`}</span>
+                <button class="ve-btn ve-btn-sm ve-btn-ghost" data-af="musica-bib" title="${veT('Biblioteca de músicas (sua pasta e Openverse)')}">${ico('music')} ${veT('Da biblioteca')}</button>
                 <button class="ve-btn ve-btn-sm" data-af="musica">${veT(VEAF.musicaPath ? 'Trocar' : 'Escolher música')}</button>
             </div>`) +
         (mus ? `<div class="ve-af-onda-box">
@@ -744,6 +745,7 @@ function veAfInit() {
                 if (inp) inp.focus();
             }
             else if (k === 'drive-baixar') veAfDriveBaixar();
+            else if (k === 'musica-bib' && window.MUSICAS) MUSICAS.abrir({ escolher: p => { VEAF.musicaPath = p; VEAF.musica = null; veAfAnalisar(); } });
             else if (k === 'drive-cancelar') { const api = veAfApi(); if (api && api.af_drive_cancelar) api.af_drive_cancelar(); }
             else if (k === 'gerar') veAfGerar(false);
             else if (k === 'outra') veAfGerar(true);

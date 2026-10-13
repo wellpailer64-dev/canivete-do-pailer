@@ -293,6 +293,7 @@ function kaniCriaHtml(m, i) {
         : `<audio class="kani-cria-som" controls src="${kaniEsc(url)}"></audio>`;
     return `<div class="kani-cria pronta"><div class="kani-cria-cab"><svg class="i"><use href="#i-${KANI_CRIA_ICO[k.tipo] || 'file'}"/></svg> ${kaniEsc(k.nome || '')}</div>${prev}
         ${k.texto ? `<details class="kani-cria-txt"><summary>${k.tipo === 'imagem' || k.tipo === 'efeito' ? 'Pedido usado' : 'Texto narrado'}</summary>${kaniEsc(k.texto)}</details>` : ''}
+        ${k.musica && k.musica.titulo ? `<details class="kani-cria-txt"><summary>Música: ${kaniEsc(k.musica.titulo)}${k.musica.artista ? ' · ' + kaniEsc(k.musica.artista) : ''}</summary>${kaniEsc(k.musica.credito || k.musica.licenca || 'Da sua biblioteca de músicas.')}</details>` : ''}
         ${k._url === 'sumiu' ? '' : `<div class="kani-cria-bts"><button data-cria-baixar="${i}" title="Guardar uma cópia (a criação some quando o app fecha)"><svg class="i"><use href="#i-download"/></svg> Baixar</button>
             <button data-cria-abrir="${i}"><svg class="i"><use href="#i-play"/></svg> Abrir</button>
             <button data-cria-pasta="${i}"><svg class="i"><use href="#i-folder"/></svg> Mostrar na pasta</button></div>`}</div>`;
@@ -307,7 +308,7 @@ window.kaniCriacao = function (d) {
     const m = conv.msgs[i], k = m.criacao;
     if (d.erro) { k.estado = 'erro'; m.erro = 'Não consegui criar: ' + d.erro; m.content = 'Não consegui criar ' + (KANI_CRIA_NOME[k.tipo] || '') + '.'; }
     else if (d.fim) {
-        Object.assign(k, { estado: 'pronto', path: d.path, _url: d.url, nome: d.nome, texto: d.texto });
+        Object.assign(k, { estado: 'pronto', path: d.path, _url: d.url, nome: d.nome, texto: d.texto, musica: d.musica || null });
         m.content = `Pronto! Criei ${KANI_CRIA_NOME[k.tipo] || 'o arquivo'} (${d.nome}).`;
     } else {
         Object.assign(k, { pct: d.pct, msg: d.msg });

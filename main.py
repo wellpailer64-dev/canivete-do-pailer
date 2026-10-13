@@ -3542,6 +3542,36 @@ class ApiBridge:
         from Functions import kani
         return kani.voz_ligar(bool(ligar))
 
+    # Biblioteca de músicas (Functions/musicas.py): pasta local analisada + busca no Openverse
+    def musicas_listar(self, filtros=None):
+        from Functions import musicas
+        return musicas.listar(filtros)
+
+    def musicas_analisar(self):
+        from Functions import musicas
+        return musicas.analisar(lambda d: _js("musicasProgresso", d))
+
+    def musicas_trocar_pasta(self):
+        from Functions import musicas
+        if not _window:
+            return {"success": False}
+        r = _window.create_file_dialog(_file_dialog_kind("FOLDER", webview.FOLDER_DIALOG), directory=musicas.pasta())
+        if not r:
+            return {"success": False, "cancelled": True}
+        return musicas.definir_pasta(r[0] if isinstance(r, (list, tuple)) else r)
+
+    def musicas_openverse(self, texto="", genero="", duracao="", pagina=1):
+        from Functions import musicas
+        return musicas.openverse_buscar(texto, genero, duracao, pagina)
+
+    def musicas_openverse_baixar(self, item):
+        from Functions import musicas
+        return musicas.openverse_baixar(item)
+
+    def musicas_url(self, path):
+        from Functions import media_server
+        return {"url": media_server.register(path) if path and os.path.isfile(path) else None}
+
     def kani_criar_tipo(self, texto, anterior=None):
         """Pedido de criar algo (imagem, efeito sonoro, narração, vinheta)? {tipo, continua} ou None (conversa normal).
         anterior = tipo da última criação da conversa ("e se fosse..." refaz a mesma, com a mudança)."""
