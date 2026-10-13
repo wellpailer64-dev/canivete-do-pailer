@@ -309,9 +309,14 @@ function veAfcCabecalho() {
             <small>${veT(VE_AFC_ESTILOS[m.estilo] || 'Automático')} · ${veT('Intro')}: ${veT(VE_AFC_INTRO[m.intro.tipo])} · ${veT('Final')}: ${veT(VE_AFC_FIM[m.fim.tipo] || '')}</small></div>
     </div>`;
 }
+// as músicas do modelo (alternam a cada vídeo) + outra só para este vídeo (arquivo ou biblioteca; o modelo não muda)
 function veAfcMusicas() {
-    const mus = VEAF.cli.musicas.filter(x => x.path);
-    return `<div class="ve-af-pills">${mus.map((x, i) => `<button class="ve-af-pill${i === VEAF.cliMus ? ' on' : ''}" data-afc="musica" data-i="${i}" title="${veEsc(x.nome)}">${veAfcIco('music')} ${veEsc(x.nome.replace(/\.[^.]+$/, '').slice(0, 28))}</button>`).join('')}</div>`;
+    const mus = VEAF.cli.musicas.filter(x => x.path), nome = p => veEsc(veAfNome(p).replace(/\.[^.]+$/, '').slice(0, 28));
+    const avulsa = VEAF.cliMus < 0 && VEAF.musicaPath
+        ? `<button class="ve-af-pill on" title="${veEsc(veAfNome(VEAF.musicaPath))} · ${veT('só neste vídeo')}">${veAfcIco('music')} ${nome(VEAF.musicaPath)}</button>` : '';
+    return `<div class="ve-af-pills">${mus.map((x, i) => `<button class="ve-af-pill${i === VEAF.cliMus ? ' on' : ''}" data-afc="musica" data-i="${i}" title="${veEsc(x.nome)}">${veAfcIco('music')} ${veEsc(x.nome.replace(/\.[^.]+$/, '').slice(0, 28))}</button>`).join('')}${avulsa}
+            <button class="ve-btn ve-btn-sm ve-btn-ghost" data-af="musica-bib" title="${veT('Biblioteca de músicas (sua pasta e Openverse)')}">${ico('music')} ${veT('Da biblioteca')}</button>
+            <button class="ve-btn ve-btn-sm" data-af="musica" title="${veT('Outra música só neste vídeo (o modelo continua igual)')}">${veT('Outra música')}</button></div>`;
 }
 
 // ── eventos ──

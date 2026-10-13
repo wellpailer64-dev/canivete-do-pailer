@@ -72,7 +72,8 @@ function veAfEscolher(tipo) {
     if (!api) return;
     api.af_escolher(tipo).then(r => {
         if (!r || !r.success) return;
-        if (tipo === 'musica') { VEAF.musicaPath = r.paths[0]; VEAF.musica = null; veAfAnalisar(); return; }
+        // no modelo de cliente: música avulsa, só neste vídeo (cliMus -1: o rodízio das músicas do modelo não anda)
+        if (tipo === 'musica') { if (VEAF.cli) { VEAF.cliMus = -1; VEAF.manual = null; } VEAF.musicaPath = r.paths[0]; VEAF.musica = null; veAfAnalisar(); return; }
         veAfAdicionar(r.paths.map(p => ({ path: p, pasta: tipo === 'pasta' })));
     });
 }
@@ -88,8 +89,9 @@ function veAfSoltouAqui(drop) {
 
 function veAfAdicionar(itens) {
     if (VEAF.aba === 'custom' && !VEAF.cli) { veToast(veT('Clique em Começar num modelo antes de mandar o material')); return; }
-    const musica = VEAF.cli ? null : itens.find(i => !i.pasta && EXT_AUDIO.test(i.path) && !EXT_VIDEO.test(i.path));
-    if (musica) { VEAF.musicaPath = musica.path; VEAF.musica = null; }
+    // música arrastada: no modelo de cliente vale só para este vídeo (o rodízio das músicas do modelo não anda)
+    const musica = itens.find(i => !i.pasta && EXT_AUDIO.test(i.path) && !EXT_VIDEO.test(i.path));
+    if (musica) { if (VEAF.cli) { VEAF.cliMus = -1; VEAF.manual = null; } VEAF.musicaPath = musica.path; VEAF.musica = null; }
     const novos = itens.filter(i => i !== musica && !VEAF.itens.some(x => x.path === i.path));
     VEAF.itens.push(...novos);
     veAfAnalisar();
@@ -321,7 +323,7 @@ async function veAfGerar(outra) {
             if (!await veSaveProject(false)) VE.projectPath = null;
         }
         const uso = plano.uso ? ` · ${plano.uso.usadas}/${plano.uso.total} ${veT('mídias usadas')}${plano.uso.telas ? ` · ${plano.uso.telas} ${veT('telas divididas')}` : ''}` : '';
-        if (cli && !outra) veAfApi().afm_usou(cli.id, VEAF.cliMus).then(r => { if (r && r.success) cli.musicaProx = r.musicaProx; });
+        if (cli && !outra && VEAF.cliMus >= 0) veAfApi().afm_usou(cli.id, VEAF.cliMus).then(r => { if (r && r.success) cli.musicaProx = r.musicaProx; });
         veToast(`AutoFrame: ${plano.slots.length} ${veT('cenas no ritmo')} (${Math.round(plano.bpm)} BPM)${uso} · ${veT('tudo editável na timeline')}`);
     } catch (e) {
         veToast(veT('AutoFrame não conseguiu gerar: ') + (e.message || e));
@@ -745,7 +747,7 @@ function veAfInit() {
                 if (inp) inp.focus();
             }
             else if (k === 'drive-baixar') veAfDriveBaixar();
-            else if (k === 'musica-bib' && window.MUSICAS) MUSICAS.abrir({ escolher: p => { VEAF.musicaPath = p; VEAF.musica = null; veAfAnalisar(); } });
+            else if (k === 'musica-bib' && window.MUSICAS) MUSICAS.abrir({ escolher: p => { if (VEAF.cli) { VEAF.cliMus = -1; VEAF.manual = null; } VEAF.musicaPath = p; VEAF.musica = null; veAfAnalisar(); } });
             else if (k === 'drive-cancelar') { const api = veAfApi(); if (api && api.af_drive_cancelar) api.af_drive_cancelar(); }
             else if (k === 'gerar') veAfGerar(false);
             else if (k === 'outra') veAfGerar(true);
