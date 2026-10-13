@@ -277,15 +277,15 @@ function kaniCriaHtml(m, i) {
     if (k.estado !== 'pronto') return '';
     if (k.path && !k._url) { k._url = 'pendente'; kaniApi().kani_criar_url(k.path).then(r => { k._url = (r && r.url) || 'sumiu'; kaniRender(); }); }
     const url = k._url && !['pendente', 'sumiu'].includes(k._url) ? k._url : null;
-    const prev = k._url === 'sumiu' ? '<div class="kani-erro">O arquivo não está mais na pasta.</div>'
+    const prev = k._url === 'sumiu' ? '<div class="kani-erro">Apagado ao fechar o app (as criações ficam só enquanto ele está aberto: use Baixar para guardar).</div>'
         : !url ? '<span class="kani-pensando"><i></i><i></i><i></i></span>'
         : k.tipo === 'imagem' ? `<img class="kani-cria-img" src="${kaniEsc(url)}" alt="" data-cria-abrir="${i}" title="Abrir a imagem">`
         : `<audio class="kani-cria-som" controls src="${kaniEsc(url)}"></audio>`;
     return `<div class="kani-cria pronta"><div class="kani-cria-cab"><svg class="i"><use href="#i-${KANI_CRIA_ICO[k.tipo] || 'file'}"/></svg> ${kaniEsc(k.nome || '')}</div>${prev}
         ${k.texto ? `<details class="kani-cria-txt"><summary>${k.tipo === 'imagem' || k.tipo === 'efeito' ? 'Pedido usado' : 'Texto narrado'}</summary>${kaniEsc(k.texto)}</details>` : ''}
-        <div class="kani-cria-bts"><button data-cria-baixar="${i}"><svg class="i"><use href="#i-download"/></svg> Baixar</button>
+        ${k._url === 'sumiu' ? '' : `<div class="kani-cria-bts"><button data-cria-baixar="${i}" title="Guardar uma cópia (a criação some quando o app fecha)"><svg class="i"><use href="#i-download"/></svg> Baixar</button>
             <button data-cria-abrir="${i}"><svg class="i"><use href="#i-play"/></svg> Abrir</button>
-            <button data-cria-pasta="${i}"><svg class="i"><use href="#i-folder"/></svg> Mostrar na pasta</button></div></div>`;
+            <button data-cria-pasta="${i}"><svg class="i"><use href="#i-folder"/></svg> Mostrar na pasta</button></div>`}</div>`;
 }
 window.kaniCriacao = function (d) {
     let conv = null, i = -1;
@@ -306,6 +306,7 @@ window.kaniCriacao = function (d) {
     }
     if (d.erro || d.fim) {
         const at = KANI.conversa; KANI.conversa = conv; kaniGuardar(); KANI.conversa = at;
+        if (KANI.aberto && (k.tipo === 'imagem' || k.tipo === 'efeito')) kaniApi()?.kani_voz?.(true);   // a criação soltou a voz da placa
         if (d.fim && !KANI.aberto && typeof toast === 'function') toast(`Kani: ${KANI_CRIA_NOME[k.tipo] || 'a criação'} ficou pronta`);
     }
     if (KANI.conversa === conv) kaniRender();

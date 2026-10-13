@@ -4938,6 +4938,11 @@ def main():
         instancia_unica.escutar(_receber_de_outra_copia)
 
     def _splash_sound():
+        try:   # criações do chat da Kani da sessão anterior (Functions/kani_criar.py): não acumulam
+            from Functions import kani_criar
+            threading.Thread(target=kani_criar.limpar, daemon=True).start()
+        except Exception:
+            pass
         try:
             import winsound
             sound_path = os.path.join(base_dir, "identidade", "sound", "splash.wav")

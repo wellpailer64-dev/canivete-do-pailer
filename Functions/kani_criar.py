@@ -33,6 +33,22 @@ def pasta():
     return p
 
 
+def limpar():
+    """Ao abrir o app: as criações da sessão anterior saem (ficam só enquanto o app está aberto — o Baixar copia para
+    onde a pessoa quiser). Pedido do Pailer: não acumular arquivo à toa."""
+    p = os.path.join(kani.pasta(), "criacoes")
+    if not os.path.isdir(p):
+        return 0
+    n = 0
+    for f in os.listdir(p):
+        try:
+            os.remove(os.path.join(p, f))
+            n += 1
+        except OSError:
+            pass
+    return n
+
+
 def detectar(texto):
     """'imagem' | 'efeito' | 'narracao' | 'vinheta' | None. Só pedido de CRIAR (verbo + tipo): "como gero uma imagem
     no app?" é pergunta (vai para a conversa normal)."""
@@ -135,6 +151,21 @@ def _jingle():
             imp if os.path.isfile(imp) else None)
 
 
+def _liberar_placa():
+    """Imagem e efeito precisam da placa quase inteira: com o chat aberto a voz da Kani fica carregada (OmniVoice, para
+    o Ouvir sair rápido) e o gerador de imagem falhava com "generate_image returned no results" (2026-10-12).
+    Solta a voz e o motor de conversa; o chat recarrega a voz quando a criação termina (kaniCriacao → kani_voz)."""
+    try:
+        from Functions import omnivoice_tool
+        omnivoice_tool.descarregar()
+    except Exception:
+        pass
+    try:
+        kani.parar()
+    except Exception:
+        pass
+
+
 def criar(job, tipo, pedido, on_evento):
     """Em thread. Um pedido por vez (os motores dividem a placa)."""
     if not _ocupado.acquire(blocking=False):
@@ -153,10 +184,15 @@ def criar(job, tipo, pedido, on_evento):
                 on(3, "Escrevendo o pedido para o gerador...")
                 prompt = _llm(_SIS_IMAGEM, pedido, 160) or pedido
                 w, h = _proporcao(pedido)
+                _liberar_placa()
                 on(10, "Gerando a imagem (cerca de 40 s)...")
                 r = gerador_imagem.gerar({"prompt": prompt, "largura": w, "altura": h, "semente": -1},
                                          lambda d: on(10 + 88 * float(d.get("pct", 0)) / 100 if isinstance(d, dict) and d.get("pct") is not None else 50,
                                                       (d.get("msg") if isinstance(d, dict) else None) or "Gerando a imagem..."))
+                try:
+                    gerador_imagem.parar()   # solta a placa para a voz e a conversa voltarem
+                except Exception:
+                    pass
                 if not r.get("success"):
                     raise RuntimeError(r.get("error") or "o gerador não devolveu a imagem")
                 path = os.path.join(pasta(), f"imagem_{nome}.png")
@@ -173,6 +209,7 @@ def criar(job, tipo, pedido, on_evento):
                         pronto.set()
                     else:
                         on(d.get("pct", 0), d.get("msg") or "Gerando o efeito...")
+                _liberar_placa()
                 r = gerador_sfx.gerar_arquivo(pedido, _segundos(pedido), ev)
                 if not r.get("success"):
                     raise RuntimeError(r.get("error"))
