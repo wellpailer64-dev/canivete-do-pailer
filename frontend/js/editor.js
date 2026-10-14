@@ -4437,6 +4437,8 @@ function veProjectData() {
             }),
         // painel Projeto: pastas e a organização do vídeo principal
         bins: VE.bins || [],
+        // painel Pessoas (editor-pessoas.js): nome dado a cada rosto + o centro do rosto (128 números) para reconhecer
+        pessoas: VE.pessoas || [],
         m0: VE.media[0] ? { pasta: VE.media[0].pasta || null, cor: VE.media[0].cor, nome: VE.media[0].nome,
                             ...(VE.media[0].mel ? { mel: VE.media[0].mel, melOff: !!VE.media[0].melOff } : {}) } : null,
         // Comp apagada do Projeto não vai junto (a timeline dela ficava só para o desfazer)
@@ -4756,6 +4758,8 @@ function veApplyProject() {
         })
         .filter(c => c.e - c.s > 1e-3);
     VE.bins = Array.isArray(d.bins) ? d.bins : [];
+    VE.pessoas = Array.isArray(d.pessoas) ? d.pessoas : [];
+    if (typeof vePsProjetoAberto === 'function') vePsProjetoAberto();
     if (d.m0 && VE.media[0]) Object.assign(VE.media[0], d.m0);
     VE.media.forEach(nm => { if (nm && nm.mel && !veMediaOffline(nm)) veMelCarregar(nm); });
     const savedSeqs = Array.isArray(d.sequences) && d.sequences.length ? d.sequences : null;

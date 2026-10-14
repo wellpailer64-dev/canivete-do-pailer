@@ -2169,6 +2169,44 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-fila-tags i { font-style: normal; font-size: 10.5px; padding: 1px 6px; border-radius: 3px; background: var(--ve-panel-2); color: var(--ve-dim); border: 1px solid var(--ve-line); }
 .ve-fila-barra { height: 4px; border-radius: 2px; background: var(--ve-line); overflow: hidden; }
 .ve-fila-barra i { display: block; height: 100%; background: var(--ve-accent); transition: width .3s; }
+/* painel Pessoas (editor-pessoas.js) */
+.ve-ps { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+.ve-ps-topo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px; border-bottom: 1px solid var(--ve-line); }
+.ve-ps-est { flex: 1 1 160px; min-width: 0; display: flex; align-items: center; gap: 7px; color: var(--ve-dim); font-size: 11px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-ps-acoes { display: flex; flex-wrap: wrap; gap: 5px; }
+.ve-ps-roda { width: 9px; height: 9px; flex: none; border-radius: 50%; border: 2px solid var(--ve-accent); border-right-color: transparent; animation: ve-ps-gira 1s linear infinite; }
+.ve-ps-roda.pausa { animation: none; border-color: var(--ve-dim); }
+@keyframes ve-ps-gira { to { transform: rotate(360deg); } }
+.ve-ps-vazio { padding: 18px 14px; color: var(--ve-dim); font-size: 12px; line-height: 1.5; }
+.ve-ps-grade { flex: 1; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 12px 8px; padding: 12px 10px; align-content: start; }
+.ve-ps-card { display: grid; justify-items: center; gap: 4px; min-width: 0; }
+.ve-ps-foto { width: 72px; height: 72px; border-radius: 50%; border: 2px solid var(--ve-line-2); background: #0b0c0d center / cover no-repeat; cursor: pointer; padding: 0; }
+.ve-ps-foto:hover { border-color: var(--ve-accent); }
+.ve-ps-foto.grande { width: 56px; height: 56px; cursor: default; flex: none; }
+.ve-ps-nome { width: 100%; min-width: 0; padding: 3px 4px; border: 1px solid transparent; border-radius: 4px; outline: 0; background: transparent;
+    color: var(--ve-text); font: 600 12px var(--ve-ui); text-align: center; }
+.ve-ps-nome:hover { border-color: var(--ve-line-2); }
+.ve-ps-nome:focus { border-color: var(--ve-accent); background: var(--ve-bg); }
+.ve-ps-nome::placeholder { color: var(--ve-dim); font-weight: 400; font-style: italic; }
+.ve-ps-card small { color: var(--ve-dim); font-size: 10.5px; text-align: center; }
+.ve-ps-cab { display: flex; align-items: center; gap: 10px; padding: 10px; border-bottom: 1px solid var(--ve-line); }
+.ve-ps-cab > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.ve-ps-cab .ve-ps-nome { text-align: left; font-size: 14px; }
+.ve-ps-cab b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-ps-cab small { color: var(--ve-dim); font-size: 11px; padding-left: 4px; }
+.ve-ps-cenas { flex: 1; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); grid-auto-rows: max-content;
+    gap: 8px; padding: 10px; align-content: start; }
+.ve-ps-grade { grid-auto-rows: max-content; }
+.ve-ps-cena { display: grid; grid-template-rows: auto auto auto; align-content: start; height: auto; min-height: 0; gap: 2px; padding: 0 0 5px;
+    border: 1px solid var(--ve-line-2); border-radius: 5px; background: var(--ve-bg);
+    color: var(--ve-text); text-align: left; cursor: pointer; overflow: hidden; }
+.ve-ps-cena:hover { border-color: var(--ve-accent); }
+.ve-ps-cena.talvez { opacity: .7; border-style: dashed; }
+.ve-ps-mini { display: block; aspect-ratio: 16 / 10; background: #0b0c0d center / contain no-repeat; }
+.ve-ps-cena b, .ve-ps-cena small { padding: 0 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-ps-cena b { font-size: 11.5px; }
+.ve-ps-cena small { font-size: 10.5px; color: var(--ve-dim); }
 /* legenda da cor por tipo de camada (Configurações da timeline) */
 .ve-tl-legenda { display: grid; gap: 3px; padding: 4px 12px 8px; font-size: 11px; color: var(--ve-dim); }
 .ve-tl-legenda span { display: flex; align-items: center; gap: 7px; }

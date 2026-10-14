@@ -3304,6 +3304,60 @@ class ApiBridge:
     def ve_comp_pausar(self, pausar=True):
         return ve_comp_pausar(pausar)
 
+    # Painel Pessoas: rostos do projeto agrupados por pessoa + busca por foto (Functions/busca_rosto.py; editor-pessoas.js)
+    def _rosto_cache(self, base):
+        from Functions import render_cache
+        return os.path.join(base or os.path.expanduser("~"), render_cache.PASTA_RAIZ)
+
+    def ve_ps_analisar(self, midias, base=None, nomes=None):
+        from Functions import busca_rosto
+        return busca_rosto.analisar(midias, self._rosto_cache(base), nomes)
+
+    def ve_ps_agrupar(self, midias, base=None, nomes=None):
+        """Só o que já está no índice (rápido): reagrupa depois de dar nome, sem analisar nada."""
+        from Functions import busca_rosto
+        try:
+            return {"success": True, "pessoas": busca_rosto.agrupar(midias, self._rosto_cache(base), nomes)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_ps_buscar(self, ref, midias, base=None, ref_t=None, rosto=0):
+        from Functions import busca_rosto
+        return busca_rosto.buscar(ref, midias, self._rosto_cache(base), ref_t, int(rosto or 0))
+
+    def ve_ps_estado(self, jid):
+        from Functions import busca_rosto
+        return busca_rosto.estado(jid)
+
+    def ve_ps_cancelar(self, jid):
+        from Functions import busca_rosto
+        return busca_rosto.cancelar(jid)
+
+    def ve_ps_pausar(self, sim=True):
+        from Functions import busca_rosto
+        return busca_rosto.pausar(bool(sim))
+
+    def ve_ps_referencia(self, caminho, t=None):
+        from Functions import busca_rosto
+        r = busca_rosto.referencia(caminho, t)
+        r.pop("_vetores", None)
+        return r
+
+    def ve_ps_quem(self, caminho, pessoas, t=None):
+        from Functions import busca_rosto
+        try:
+            return busca_rosto.quem_e(caminho, pessoas, t)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_ps_mini(self, caminho, t, base=None, caixa=None, lado=360):
+        from Functions import busca_rosto, media_server
+        try:
+            p = busca_rosto.miniatura(caminho, float(t or 0), self._rosto_cache(base), caixa, int(lado or 360))
+            return {"success": bool(p), "url": media_server.register(p) if p else None}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def ve_medir_volume(self, caminho):
         """Render pronto: volume integrado (LUFS) e pico do som, para avisar som baixo/alto demais (GaIA render 1 saiu
         em -33 LUFS sem ninguém notar). ~2 s para 9 min de áudio."""

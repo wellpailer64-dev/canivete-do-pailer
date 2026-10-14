@@ -682,6 +682,7 @@
                                         <button class="ve-icon-btn ve-fhd-btn" onclick="vePjForcarFullHD()" title="Forçar Full HD: converte os vídeos selecionados maiores que Full HD (2K, 4K, 8K, em pé ou deitados) para 1080 no lado menor, sem perda visível, na pasta &quot;Otimizados FullHD&quot; ao lado do original. Deixa a edição bem mais leve; no fim pergunta se troca no projeto e na timeline.">FHD</button>
                                         <button class="ve-icon-btn" onclick="vePjNovoAjuste()" title="Nova camada de ajuste"><svg class="i"><use href="#i-sliders"/></svg></button>
                                         <button class="ve-icon-btn" onclick="vePjNovaCor()" title="Nova cor sólida (camada de cor do tamanho do quadro)"><svg class="i"><use href="#i-swatch"/></svg></button>
+                                        <button class="ve-icon-btn" onclick="vePsAbrir()" title="Pessoas: os rostos do projeto agrupados por pessoa, com todas as cenas de cada uma (e busca por foto)"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 19.5c.8-3.4 3.4-5.3 6.5-5.3 1.4 0 2.6.3 3.6 1"/><circle cx="17" cy="16" r="2.8"/><path d="m19.1 18.1 2.2 2.2"/></svg></button>
                                         <span class="ve-pj-sep"></span>
                                         <button class="ve-icon-btn ve-pj-modo" data-pj-modo="lista" title="Visualização em lista"><svg class="i"><use href="#i-table"/></svg></button>
                                         <button class="ve-icon-btn ve-pj-modo" data-pj-modo="grade" title="Visualização em grade (cards com prévia)"><svg class="i"><use href="#i-grid"/></svg></button>
@@ -910,6 +911,7 @@
                         <div class="ve-panel ve-med" data-panel="medidores" data-title="Medidores de áudio"><canvas class="ve-med-cv" id="ve-med-cv" title="Clique para zerar as luzes de pico"></canvas><button class="ve-med-master" id="ve-med-master">LIM</button></div>
                         <div class="ve-panel ve-desemp-p" data-panel="desempenho" data-title="Desempenho"><div class="ve-desemp" id="ve-desemp"></div></div>
                         <div class="ve-panel ve-mixer-p" data-panel="mixer" data-title="Mixer de trilhas de áudio"><div class="ve-mixer" id="ve-mixer"></div></div>
+                        <div class="ve-panel ve-pessoas-p" data-panel="pessoas" data-title="Pessoas"><div class="ve-ps" id="ve-ps"></div></div>
                         <section class="ve-panel ve-timeline" data-panel="timeline" data-title="Timeline">
                             <div class="ve-tl-toolbar">
                                 <div class="ve-seq-tabs" id="ve-seq-tabs"></div>
@@ -2122,6 +2124,7 @@
     <script src="js/editor-dock.js"></script>
     <script src="js/editor-comandos.js"></script>
     <script src="js/editor-fila.js"></script>
+    <script src="js/editor-pessoas.js"></script>
     <script src="js/editor-atividade.js"></script>
     <script src="js/editor-proxy.js"></script>
     <script src="js/editor-atributos.js"></script>

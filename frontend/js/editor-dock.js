@@ -33,7 +33,7 @@ function vedDefault() {
             { t: 's', d: 'row', z: [0.77, 0.23], c: [
                 { t: 'g', p: ['monitor'], a: 'monitor' },
                 { t: 's', d: 'col', z: [0.6, 0.4], c: [
-                    { t: 'g', p: ['pp', 'props', 'lc', 'texto', 'projeto', 'mixer'], a: 'pp' },
+                    { t: 'g', p: ['pp', 'props', 'lc', 'texto', 'projeto', 'pessoas', 'mixer'], a: 'pp' },
                     { t: 'g', p: ['fx', 'trans', 'sb', 'keys'], a: 'fx' },
                 ] },
             ] },
@@ -249,6 +249,12 @@ function vedApply(d) {
         const gs = [st.root, ...st.floats.map(f => f.root)].flatMap(r => vedGroups(r));
         const g = gs.find(g => g.p.includes('pp')) || gs.find(g => g.p.includes('fx'));
         if (g) { g.p.push('mixer'); st.novos = st.novos.filter(id => id !== 'mixer'); }
+    }
+    // Pessoas (rostos do projeto, editor-pessoas.js): aba logo depois do Projeto, sem roubar a ativa
+    if (st.novos.includes('pessoas')) {
+        const gs = [st.root, ...st.floats.map(f => f.root)].flatMap(r => vedGroups(r));
+        const g = gs.find(g => g.p.includes('projeto')) || gs.find(g => g.p.includes('pp'));
+        if (g) { const i = g.p.indexOf('projeto'); g.p.splice(i >= 0 ? i + 1 : g.p.length, 0, 'pessoas'); st.novos = st.novos.filter(id => id !== 'pessoas'); }
     }
     st.novos.forEach(id => vedAddTab(id, true));
     vedRender();
