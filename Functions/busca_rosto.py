@@ -507,3 +507,44 @@ def miniatura(caminho, t, cache, caixa=None, lado=360):
     img = cv2.resize(img, (max(1, int(W * s)), max(1, int(H * s))), interpolation=cv2.INTER_AREA if s < 1 else cv2.INTER_CUBIC)
     cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 84])[1].tofile(arq)
     return arq
+
+
+# ─────────────────────────── revisor: GC sobre a pessoa certa? ───────────────────────────
+def revisar_gc(itens, cache, nomes):
+    """itens: [{gc, path, kind, t0, t1}] (o nome do GC e a cena embaixo dele, em tempo da fonte).
+    nomes: [{nome, c}] do projeto. Para cada GC: quem aparece na cena (entre as pessoas com nome) e se bate com o GC.
+    Só olha o que já está no índice (não analisa nada aqui). estado: 'ok' | 'outra' | 'ninguem' | 'sem_indice'."""
+    salvos = [(n.get("nome") or "", np.array(n["c"], np.float32)) for n in (nomes or []) if n.get("nome") and n.get("c") and len(n["c"]) == 128]
+    out = []
+    for it in itens or []:
+        r = {"gc": it.get("gc"), "estado": "sem_indice", "vista": None, "nota": 0.0}
+        try:
+            ind = _indice(it["path"], it.get("kind"), cache, so_cache=True) if it.get("path") and os.path.exists(it["path"]) else None
+        except Exception:
+            ind = None
+        if ind is not None:
+            t, _b, e, _q = ind
+            if it.get("kind") == "image":
+                sel = np.ones(len(t), bool)
+            else:
+                vao = _vao(t) / 1.6
+                sel = (t >= float(it["t0"]) - vao) & (t <= float(it["t1"]) + 0.5)
+            r["estado"] = "ninguem"
+            if sel.any() and salvos:
+                notas = [(float(np.max(e[sel] @ v)), nome) for nome, v in salvos]
+                dele = [x for x in notas if _mesmo_nome(it.get("gc"), x[1])]
+                outra = max((x for x in notas if not _mesmo_nome(it.get("gc"), x[1])), default=(0.0, None))
+                if dele and max(dele)[0] >= LIMIAR:            # a pessoa do GC está na cena: confirma com o limiar normal
+                    r["estado"], r["nota"], r["vista"] = "ok", round(max(dele)[0], 3), max(dele)[1]
+                elif outra[0] >= FORTE:                         # outra pessoa com nome, e com certeza: avisa
+                    r["estado"], r["nota"], r["vista"] = "outra", round(outra[0], 3), outra[1]
+        out.append(r)
+    return out
+
+
+def _mesmo_nome(a, b):
+    import unicodedata
+    def toks(s):
+        s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
+        return {w for w in re.split(r"[^a-z]+", s) if len(w) >= 4 and w not in ("prof", "dona", "senhor", "senhora")}
+    return bool(toks(a) & toks(b))

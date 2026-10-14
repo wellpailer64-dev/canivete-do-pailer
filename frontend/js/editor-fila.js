@@ -104,21 +104,83 @@ async function veFilaConferirArquivos() {
     ms.filter(m => falta.has(m.path)).forEach(m => { m.offline = true; m._quando = usadas.get(m.id); });
     if (falta.size && typeof vePjRender === 'function') vePjRender();
 }
+// ── Revisor antes do render (não trava nada: os avisos vão no item e num aviso na tela) ──
+// GC × rosto (painel Pessoas: a cena embaixo do GC mostra outra pessoa com nome?), camada que passa do fim da cena dela
+// (a "faixa escura" do GaIA: textura da tomada vertical sobrando 68 s) e tomada que pisca (< 0,7 s na trilha de base).
+async function veFilaRevisar() {
+    const av = [], nm = c => c.nome || (VE.media[c.m] || {}).name || '';
+    // camadas que acompanham uma tomada (textura/fundo) e passaram do fim dela
+    for (const c of VE.clips) {
+        const n = nm(c), m = n.match(/^Textura · (.+)$/) || n.match(/^(.+) · fundo$/);
+        if (!m) continue;
+        const base = VE.clips.find(x => x !== c && nm(x) === m[1] && Math.abs(x.st - c.st) < 1);
+        if (base && veEnd(c) > veEnd(base) + 0.5) av.push({ t: veEnd(base), texto: `"${n}" passa ${veHuman(veEnd(c) - veEnd(base))} do fim da cena "${m[1]}"` });
+    }
+    // tomada que pisca na trilha de base (V1)
+    for (const c of VE.clips) {
+        if (c.tr !== 0 || veIsAudio(c) || veOculto(c)) continue;
+        const m = VE.media[c.m]; if (!m || !(m.kind === 'video' || m.kind === 'image')) continue;
+        if (veLen(c) < 0.7 && c.st > 0.1) av.push({ t: c.st, texto: `tomada de ${veLen(c).toFixed(1)} s ("${nm(c)}") pisca na tela` });
+    }
+    // GC sobre a pessoa certa (só com nomes dados no painel Pessoas e o material já analisado)
+    const api = window.pywebview && window.pywebview.api;
+    if (api && api.ve_ps_revisar_gc && (VE.pessoas || []).some(p => p.nome)) {
+        const itens = [], gcs = [];
+        for (const g of VE.clips) {
+            const mg = VE.media[g.m], n = nm(g), k = n.match(/^GC · (.+)$/);
+            if (!mg || !mg.comp || !k) continue;
+            const a = g.st, b = veEnd(g);
+            const sob = VE.clips.filter(c => c !== g && !veIsAudio(c) && !veOculto(c) && c.tr < g.tr && c.st < b && veEnd(c) > a && !/^Textura · /.test(nm(c)))
+                .map(c => ({ c, m: VE.media[c.m] })).filter(o => o.m && o.m.path && (o.m.kind === 'video' || o.m.kind === 'image'))
+                .sort((x, y) => y.c.tr - x.c.tr)[0];
+            if (!sob) continue;
+            const i0 = Math.max(a, sob.c.st), i1 = Math.min(b, veEnd(sob.c));
+            itens.push({ gc: k[1], path: sob.m.path, kind: sob.m.kind, t0: veSrcAt(sob.c, i0), t1: veSrcAt(sob.c, i1) });
+            gcs.push({ t: a, nome: k[1] });
+        }
+        if (itens.length) {
+            const r = await api.ve_ps_revisar_gc(itens, vePrPrefs().dir, VE.pessoas).catch(() => null);
+            (r && r.success ? r.itens : []).forEach((x, i) => {
+                if (x.estado === 'outra') av.push({ t: gcs[i].t, texto: `GC "${gcs[i].nome}" está sobre ${x.vista} (rosto ${x.nota.toFixed(2)})` });
+            });
+        }
+    }
+    return av.sort((x, y) => x.t - y.t);
+}
+// Preparo visível: o item aparece na fila na hora, com o que está sendo preparado (Comps, 3D, transições, motion) —
+// antes a fila ficava vazia por até 1 h no GaIA e parecia que nada estava acontecendo.
+function veFilaPrepMsg(m) {
+    const p = VEFILA.prepAtual; if (!p || !m) return;
+    p.msg = m;
+    const el = document.querySelector(`#ve-fila-lista [data-prep="${p.id}"] small`);
+    if (el) el.textContent = m + ' · ' + veHuman((Date.now() - p.t0) / 1000); else veFilaRender();
+}
 async function veFilaAdicionarAgora(nome, cfg) {
+    const prep = { id: 'p' + Date.now(), nome: nome || (cfg && cfg.nome) || veFilaNomeTimeline(), msg: 'Conferindo os arquivos…', t0: Date.now() };
+    VEFILA.preps = VEFILA.preps || [];
+    VEFILA.preps.push(prep); VEFILA.prepAtual = prep; veFilaRender();
+    try { return await veFilaAdicionarPreparando(nome, cfg); }
+    finally { VEFILA.preps = VEFILA.preps.filter(p => p !== prep); if (VEFILA.prepAtual === prep) VEFILA.prepAtual = null; veFilaRender(); }
+}
+async function veFilaAdicionarPreparando(nome, cfg) {
     await veFilaConferirArquivos();
     { const off = veOfflineNaTimeline(); if (off.length) { veAvisoOffline(off); return null; } }
-    const msg = m => { const el = $ve('ve-fila-msg'); if (el) el.textContent = m || ''; };
+    const msg = m => { const el = $ve('ve-fila-msg'); if (el) el.textContent = m || ''; veFilaPrepMsg(m); };
     msg('Preparando ' + veFilaNomeTimeline() + '… (o render começa sozinho)');
     if (typeof veMidiasTamanhoGarantir === 'function') await veMidiasTamanhoGarantir();   // 4K ainda sem tamanho: saía ampliado
     if (typeof veCompProntas === 'function') await veCompProntas(msg);
     if (typeof ve3dProntas === 'function') await ve3dProntas(msg);
     // placa ligada: só o plano das transições de sobreposição (a placa faz no shader); desligada: renderiza antes
     if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg, !!(cfg ? cfg.gpu : veFilaCfgLer().gpu));
-    if (VE.clips.some(veTxPrecisa)) await veTxPngs();
+    if (VE.clips.some(veTxPrecisa)) { msg('Preparando textos, formas e camadas de motion…'); await veTxPngs(); }
+    msg('Revisando a timeline…');
+    const avisos = await veFilaRevisar().catch(() => []);
+    if (avisos.length) veToast(`Revisor: ${avisos.length} aviso(s) — ${avisos.slice(0, 2).map(a => veHuman(a.t) + ' ' + a.texto).join(' · ')}${avisos.length > 2 ? ' …' : ''}`);
+    msg('Montando o plano do render…');
     const plano = veExportPlan(true), master = veMasterLim(), mix = master ? [...plano.mix, { master }] : plano.mix;
     const c = cfg ? JSON.parse(JSON.stringify(cfg)) : veFilaCfgLer();
     c.nome = nome || c.nome || veFilaNomeTimeline();
-    const it = { id: ++VEFILA.seq, timeline: veFilaNomeTimeline(), dur: plano.dur, estado: 'espera', pct: 0, cfg: c,
+    const it = { id: ++VEFILA.seq, timeline: veFilaNomeTimeline(), dur: plano.dur, estado: 'espera', pct: 0, cfg: c, avisos, faixa: veExportFaixa(),
         plano: { fonteCom: veFonteParaPlano({ ...plano, mix }, true), fonteSem: veFonteParaPlano({ ...plano, mix }, false), base: plano.base,
                  camadas: plano.camadas, audio: plano.audio, dur: plano.dur, mix, leg: veTxExport(plano.faixa), quadro: [VE.seqW, VE.seqH], projeto: VE.projectPath || '', fps: VE.fps || 30 } };
     VEFILA.itens.push(it);
@@ -176,6 +238,7 @@ function veFilaEvento(ev) {
     it.estado = ev.success ? 'pronto' : ev.cancelled ? 'cancelado' : 'erro';
     it.saida = ev.output_path; it.erro = ev.error; it.pct = ev.success ? 100 : it.pct; it.tempo = (Date.now() - it.t0) / 1000;
     VEFILA.atual = null; VE.exportRunning = false;
+    if (it.estado === 'pronto' && it.emenda && it.saida) { veFilaEmendar(it); veFilaRender(); veFilaProximo(); return; }
     if (it.estado === 'pronto' && it.saida && !it.cfg.noAudio) veFilaMedirVolume(it);
     if (it.estado === 'pronto' && it.cfg.drive && it.saida) veFilaDriveEnviar(it);
     if (it.estado === 'cancelado') { VEFILA.rodando = false; document.querySelector('.menu-item[data-tool="video-cutter"]')?.classList.remove('rodando'); veFilaRender(); return; }
@@ -198,6 +261,44 @@ function veFilaSelecionar(id) {   // carrega as configurações do item no formu
     if (VEFILA.sel == null) VEFILA._cfgLivre = veFilaCfgLer();   // o que estava no formulário volta ao desmarcar
     VEFILA.sel = id;
     veFilaCfgAplicar(it.cfg);
+    veFilaRender();
+}
+// ── Corrigir trecho de um render pronto (Functions/emenda.py): marque In/Out na timeline em volta do que está errado,
+// clique em "Corrigir trecho" no item pronto. Só o pedaço entre dois quadros-chave do vídeo pronto é exportado de novo
+// (mesmas configurações, sem áudio) e trocado; o resto e o som ficam como estavam. Sai "<nome> (corrigido)" ao lado.
+async function veFilaCorrigir(id) {
+    const it = VEFILA.itens.find(x => x.id === id), api = window.pywebview && window.pywebview.api;
+    if (!it || !it.saida || !api || !api.ve_emenda_pontos) return;
+    if (it.faixa) { veToast('Esse render foi só de um trecho (In→Out): corrigir funciona em render da timeline inteira'); return; }
+    if (it.timeline !== veFilaNomeTimeline()) { veToast(`Abra a timeline "${it.timeline}" para corrigir esse render`); return; }
+    if (VE.inPt == null || VE.outPt == null || VE.outPt - VE.inPt < veFrame()) {
+        veToast('Marque o trecho errado na timeline com I (entrada) e O (saída) e clique de novo em "Corrigir trecho"'); return;
+    }
+    const p = await api.ve_emenda_pontos(it.saida, VE.inPt, VE.outPt);
+    if (!p || !p.success) { veToast('Corrigir trecho: ' + ((p && p.error) || 'falhou')); return; }
+    const ant = [VE.inPt, VE.outPt];
+    VE.inPt = p.k1; VE.outPt = Math.min(p.k2, VE.dur);
+    const cfg = JSON.parse(JSON.stringify(it.cfg));
+    cfg.nome = it.cfg.nome + ' (trecho ' + veHuman(p.k1).replace(/[:\s]/g, '') + ')'; cfg.noAudio = true; cfg.drive = '';
+    let novo = null;
+    try { novo = await veFilaAdicionarAtual(cfg.nome, cfg); }
+    finally { VE.inPt = ant[0]; VE.outPt = ant[1]; veRefresh(); }
+    const ni = VEFILA.itens.find(x => x.id === novo); if (!ni) return;
+    ni.emenda = { original: it.saida, k1: p.k1, k2: p.k2, de: it.id, drive: it.cfg.drive || '' };
+    veToast(`Corrigindo ${veHuman(p.k1)}–${veHuman(p.k2)} (${(p.k2 - p.k1).toFixed(1)} s) de "${it.cfg.nome}"`);
+    veFilaRender();
+    veFilaIniciar().catch(e => veToast(e.message));
+}
+async function veFilaEmendar(it) {
+    const e = it.emenda, api = window.pywebview.api;
+    it.emendaMsg = 'emendando no vídeo pronto…'; veFilaRender();
+    const r = await api.ve_emendar(e.original, it.saida, e.k1, e.k2).catch(err => ({ success: false, error: String(err) }));
+    if (r && r.success) {
+        it.trecho = it.saida; it.saida = r.path; it.emendaMsg = 'corrigido: ' + r.path.split(/[\\/]/).pop();
+        veToast(`Trecho corrigido sem exportar tudo: ${r.path.split(/[\\/]/).pop()}`);
+        if (typeof playConcluido === 'function') playConcluido();
+        if (e.drive) { it.cfg.drive = e.drive; veFilaDriveEnviar(it); }
+    } else { it.emendaMsg = 'a emenda falhou: ' + ((r && r.error) || '?'); veToast('Corrigir trecho: ' + it.emendaMsg); }
     veFilaRender();
 }
 // Volume do render pronto (LUFS integrado): etiqueta no item; fora de -20..-11 avisa (YouTube/Instagram ≈ -14..-16)
@@ -291,15 +392,21 @@ function veFilaRender() {
     const L = $ve('ve-fila-lista'); if (!L) return;
     L.innerHTML = VEFILA.itens.length ? VEFILA.itens.map((it, i) => `<div class="ve-fila-item ${it.estado}${VEFILA.sel === it.id ? ' sel' : ''}" data-fila="${it.id}" title="${it.estado === 'espera' ? 'Clique para ver e mudar as configurações deste item' : ''}">
         <span class="ve-fila-n">${i + 1}</span>
-        <span class="ve-fila-info"><b>${veEsc(it.cfg.nome)}</b><small>${veEsc(it.timeline)}${it.tempo ? ' · feito em ' + veHuman(it.tempo) : ''}${it.erro ? ' · ' + veEsc(String(it.erro).slice(0, 120)) : ''}</small>
-            <span class="ve-fila-tags">${veFilaEtiquetas(it.cfg, it.dur).map(t => `<i>${veEsc(t)}</i>`).join('')}${it.volume ? `<i class="ve-fila-vol${it.volume.lufs < -20 || it.volume.lufs > -11 ? ' ruim' : ''}" title="Volume integrado do som exportado${it.volume.pico != null ? ' · pico ' + it.volume.pico.toFixed(1) + ' dB' : ''}">${it.volume.lufs.toFixed(1)} LUFS</i>` : ''}</span>
+        <span class="ve-fila-info"><b>${veEsc(it.cfg.nome)}</b><small>${veEsc(it.timeline)}${it.tempo ? ' · feito em ' + veHuman(it.tempo) : ''}${it.erro ? ' · ' + veEsc(String(it.erro).slice(0, 120)) : ''}${it.emendaMsg ? ' · ' + veEsc(it.emendaMsg) : ''}</small>
+            <span class="ve-fila-tags">${(it.avisos || []).length ? `<i class="ve-fila-aviso" title="${veEsc(it.avisos.map(a => veHuman(a.t) + ' — ' + a.texto).join('\n'))}">⚠ ${it.avisos.length} aviso(s)</i>` : ''}${veFilaEtiquetas(it.cfg, it.dur).map(t => `<i>${veEsc(t)}</i>`).join('')}${it.volume ? `<i class="ve-fila-vol${it.volume.lufs < -20 || it.volume.lufs > -11 ? ' ruim' : ''}" title="Volume integrado do som exportado${it.volume.pico != null ? ' · pico ' + it.volume.pico.toFixed(1) + ' dB' : ''}">${it.volume.lufs.toFixed(1)} LUFS</i>` : ''}</span>
             <span class="ve-fila-barra"><i style="width:${it.pct}%"></i></span>${veFilaDriveHtml(it)}</span>
         <span class="ve-fila-est">${VE_FILA_ESTADO[it.estado] || it.estado}${it.estado === 'rodando' ? ` ${Math.round(it.pct)}%` : ''}</span>
-        <span class="ve-fila-acoes">${it.estado === 'pronto' ? `<button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.open_file(${veEsc(JSON.stringify(it.saida))})" title="Assistir"><svg class="i"><use href="#i-play"/></svg></button><button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.reveal_file(${veEsc(JSON.stringify(it.saida))})" title="Mostrar na pasta"><svg class="i"><use href="#i-folder"/></svg></button>` : ''}
+        <span class="ve-fila-acoes">${it.estado === 'pronto' && !it.emenda && !it.faixa && /\.(mp4|mov|mkv)$/i.test(it.saida || '') ? `<button class="ve-btn ve-btn-sm" onclick="event.stopPropagation(); veFilaCorrigir(${it.id})" title="Corrigir trecho: marque com I e O o que está errado na timeline e clique aqui — refaz só esse pedaço e emenda no vídeo pronto (o resto e o som ficam iguais)">Corrigir trecho</button>` : ''}${it.estado === 'pronto' ? `<button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.open_file(${veEsc(JSON.stringify(it.saida))})" title="Assistir"><svg class="i"><use href="#i-play"/></svg></button><button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.reveal_file(${veEsc(JSON.stringify(it.saida))})" title="Mostrar na pasta"><svg class="i"><use href="#i-folder"/></svg></button>` : ''}
             ${it.estado === 'erro' || it.estado === 'cancelado' ? `<button class="ve-btn ve-btn-sm" onclick="veFilaRefazer(${it.id})">De novo</button>` : ''}
             ${it.estado === 'espera' ? `<button class="ve-btn ve-btn-sm" onclick="veFilaMover(${it.id}, -1)" title="Subir">↑</button><button class="ve-btn ve-btn-sm" onclick="veFilaMover(${it.id}, 1)" title="Descer">↓</button>` : ''}
             ${it.estado !== 'rodando' ? `<button class="ve-btn ve-btn-sm" onclick="veFilaRemover(${it.id})" title="Tirar da fila"><svg class="i"><use href="#i-x"/></svg></button>` : ''}</span></div>`).join('')
         : '<div class="ve-fila-vazia">Fila vazia. Escolha as configurações ao lado e use "Adicionar à fila" (ou ▶ para renderizar só a timeline aberta).</div>';
+    const preps = (VEFILA.preps || []).map(p => `<div class="ve-fila-item preparando" data-prep="${p.id}">
+        <span class="ve-fila-n">…</span>
+        <span class="ve-fila-info"><b>${veEsc(p.nome)}</b><small>${veEsc(p.msg)} · ${veHuman((Date.now() - p.t0) / 1000)}</small>
+            <span class="ve-fila-barra ve-fila-indet"><i></i></span></span>
+        <span class="ve-fila-est">Preparando</span><span class="ve-fila-acoes"></span></div>`).join('');
+    if (preps) L.innerHTML = preps + (VEFILA.itens.length ? L.innerHTML : '');
     const sel = VEFILA.itens.find(x => x.id === VEFILA.sel);
     $ve('ve-fila-dica').textContent = sel ? `Editando as configurações de "${sel.cfg.nome}". Clique de novo nele para voltar ao formulário livre.` :
         'Cada item guarda a timeline como estava ao entrar na fila. Clique num item para ver e mudar as configurações dele.';
@@ -318,7 +425,7 @@ function veFilaRodape() {
 }
 function veFilaBadge() {
     const b = $ve('ve-fila-btn'); if (!b) return;
-    const n = VEFILA.itens.filter(x => x.estado === 'espera' || x.estado === 'rodando').length;
+    const n = VEFILA.itens.filter(x => x.estado === 'espera' || x.estado === 'rodando').length + (VEFILA.preps || []).length;
     b.querySelector('.ve-fila-cont').textContent = n ? String(n) : '';
     b.classList.toggle('rodando', VEFILA.rodando);
 }
@@ -359,6 +466,6 @@ function veFilaAbrir() { if (!VE.ready) return; if (!$ve('ve-export').hidden) re
     }
 })();
 window.VEFILA_API = {
-    adicionar: (nome, cfg) => veFilaAdicionarAtual(nome, cfg), todas: () => veFilaAdicionarTodas(), iniciar: () => veFilaIniciar(),
+    adicionar: (nome, cfg) => veFilaAdicionarAtual(nome, cfg), revisar: () => veFilaRevisar(), corrigir: id => veFilaCorrigir(id), todas: () => veFilaAdicionarTodas(), iniciar: () => veFilaIniciar(),
     parar: () => veFilaParar(), selecionar: id => veFilaSelecionar(id), itens: () => VEFILA.itens.map(({ plano, ...r }) => r),
 };

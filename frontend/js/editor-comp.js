@@ -506,7 +506,7 @@ async function veCompProntasLaco(aviso) {
             const falha = pend.map(e => VECOMP.falhas.get(e.sig)).find(Boolean);
             throw new Error(`${veT('a Comp não renderizou')}${falha ? ': ' + falha : ''}`);
         }
-        if (aviso) aviso(`${veT('Renderizando a Comp')} "${a.nome}"... ${a.pct || 0}%`);
+        if (aviso) { const falta = veCompPendentes().length; aviso(`${veT('Renderizando a Comp')} "${a.nome}"... ${a.pct || 0}%${falta > 1 ? ` · ${veT('faltam')} ${falta}` : ''}`); }
         await new Promise(r => VECOMP.espera.push(r));
     }
 }

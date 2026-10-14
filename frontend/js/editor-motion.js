@@ -677,7 +677,8 @@ async function veMoAssar(mapa, filtro, clips = VE.clips) {
             const r = await veMoAssarUm(c, clips, como, pct => {
                 const msg = `${veT('Desenhando camadas de motion')} ${j + 1}/${lista.length}: ${pct}%`;
                 const el = typeof $ve === 'function' && $ve('ve-exp-msg');
-                if (el) el.textContent = msg; else if (pct === 0) veToast(msg);
+                if (typeof veFilaPrepMsg === 'function' && VEFILA.prepAtual) veFilaPrepMsg(msg);   // item em preparo na fila
+                else if (el) el.textContent = msg; else if (pct === 0) veToast(msg);
             });
             if (r) mapa.set(c, r);
         } catch (e) {

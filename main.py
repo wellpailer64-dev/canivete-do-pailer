@@ -3350,6 +3350,13 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def ve_ps_revisar_gc(self, itens, base=None, nomes=None):
+        from Functions import busca_rosto
+        try:
+            return {"success": True, "itens": busca_rosto.revisar_gc(itens, self._rosto_cache(base), nomes)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def ve_ps_mini(self, caminho, t, base=None, caixa=None, lado=360):
         from Functions import busca_rosto, media_server
         try:
@@ -3375,6 +3382,21 @@ class ApiBridge:
                 return {"success": False, "error": "sem som"}
             val = lambda m: None if not m or "inf" in m.group(1) else float(m.group(1))
             return {"success": True, "lufs": val(i), "pico": val(pk)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    # Corrigir trecho de um vídeo já exportado (Functions/emenda.py; botão no item pronto da fila)
+    def ve_emenda_pontos(self, arquivo, a, b):
+        from Functions import emenda
+        try:
+            return emenda.pontos(arquivo, a, b)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_emendar(self, original, trecho, k1, k2):
+        from Functions import emenda
+        try:
+            return emenda.emendar(original, trecho, k1, k2)
         except Exception as e:
             return {"success": False, "error": str(e)}
 

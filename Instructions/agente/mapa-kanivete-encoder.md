@@ -136,14 +136,19 @@ Corte também a base (só os segmentos até T).
 - **Volume do render pronto** (`ve_medir_volume`, ebur128): etiqueta "−15,7 LUFS" no item; fora de −20..−11 avisa.
 - **Motion travava a preparação** (`veMoVideo`): com 10 vídeos abertos o 11º nunca carregava; agora fica com 3 e tem
   prazo de 30 s.
-- Trecho errado num export pronto: exportar só [K1,K2) entre quadros-chave e emendar (receita na memória
-  feedback-emenda-export; ferramenta "corrigir trecho" ainda não existe — pendência).
+- **Corrigir trecho** (botão no item pronto; `Functions/emenda.py`, `veFilaCorrigir`): marcar I/O na timeline em volta do
+  erro → exporta só [k1,k2) entre quadros-chave do vídeo pronto (mesmas configurações, sem áudio) e emenda: parte A com
+  `-frames:v`, trecho remuxado com `-video_track_timescale` do original, C com `-ss k2` cópia, áudio original; confere
+  contagem de quadros e decodifica a região. Teste: `D:/kanivete_testes/scripts/teste_corrigir.py` (600/600 quadros,
+  fora do trecho idêntico).
+- **Preparo visível na fila**: o item aparece na hora ("Preparando · Renderizando a Comp X 30% · faltam 12 · 4 min").
+- **Revisor antes do render** (`veFilaRevisar`, não trava): GC × rosto (painel Pessoas: avisa GC sobre OUTRA pessoa com nome,
+  ≥0,45; confirma a própria com ≥0,36), camada "Textura ·/· fundo" passando do fim da cena, tomada < 0,7 s na V1. Avisos no
+  item (⚠ N avisos, lista no title) e num aviso na tela. `VEFILA_API.revisar()`.
 
 ## 7. Pendências (por ordem)
-00. (2026-10-14) Preparo visível na fila (item "Preparando: Comps 12/33, motion 3/19" antes de entrar); Comps 2–3 ao
-    mesmo tempo quando a placa sobra; camada de motion num formato que a placa decodifica (hoje ProRes 4444 = CPU);
-    ferramenta "corrigir trecho de um export" (emenda automática); revisor antes do export (texto sobre rosto, camada
-    sobrando além da cena, cena descartada por tempo negativo).
+00. (2026-10-14) Comps 2–3 ao mesmo tempo quando a placa sobra; camada de motion num formato que a placa decodifica
+    (hoje ProRes 4444 = CPU); revisor: texto sobre rosto.
 0. **PRÓXIMO (combinado 2026-10-08): frear a fila adiantada de quadros.** Com as cópias Full HD a memória da placa
    cresce de 4,8 → 7,0 GB ao longo do export (`D:/kanivete_testes/encoder/medir_pico_fhd.py`: export 5,6 GB +
    app 1,4 = 6,9 de 8); no app do usuário estourou em 21% e a conferência (×2,6 agora) manda para a CPU quando o app
