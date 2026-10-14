@@ -2,6 +2,8 @@
 // Visor com a câmera da cena (arrastar = orbitar e GRAVA na câmera; rodinha = distância; botão do meio ou Shift =
 // deslocar) ou vista livre (C: só olha, não grava). Clique num objeto = seleciona com setas (W mover, E girar, R escala).
 // Lista de objetos, propriedades do selecionado (ve3dPainelHtml) e régua de tempo com os ◆ dele.
+// Edição: Delete tira, Ctrl+D duplica, H esconde/mostra, F enquadra o selecionado (vista livre), Q eixo local/mundo,
+// Ctrl segurado ao arrastar as setas = ímã (0,1 / 15° / 0,1), duplo clique no nome renomeia, arquivo 3D solto entra na cena.
 // Mesmo runtime da prévia (ve3dAplicar) com câmera própria; desenha só quando algo muda e em resolução menor mexendo.
 const VE3T = { el: null, mid: -1, so: 'camera', livre: false, vista: null, cam: null, hs: null, tc: null, rt: null, chave: '', dados: '', raf: 0, play: null, arr: null, mexendo: false, saida: {} };
 
@@ -14,9 +16,10 @@ function ve3dTelaMontar() {
     el.innerHTML = `<div class="ve3t-topo"><b data-3t="titulo"></b>
         <div class="ve3t-grupo"><button class="ve-btn ve-btn-sm" data-3tvista="cena" title="${veT('Arrastar grava na câmera da cena')}">${veT('Câmera da cena')}</button><button class="ve-btn ve-btn-sm" data-3tvista="livre" title="${veT('Só olhar, não grava (C)')}">${veT('Vista livre')}</button></div>
         <div class="ve3t-grupo"><button class="ve-btn ve-btn-sm" data-3tmodo="translate" title="W">${veT('Mover')}</button><button class="ve-btn ve-btn-sm" data-3tmodo="rotate" title="E">${veT('Girar')}</button><button class="ve-btn ve-btn-sm" data-3tmodo="scale" title="R">${veT('Escala')}</button></div>
+        <div class="ve3t-grupo"><button class="ve-btn ve-btn-sm" data-3tespaco title="${veT('Setas no eixo do objeto ou do mundo (Q)')}">${veT('Eixo: mundo')}</button><button class="ve-btn ve-btn-sm" data-3tima title="${veT('Ímã: passos de 0,1 / 15° (ou segure Ctrl)')}">${veT('Ímã')}</button></div>
         <button class="ve-btn ve-btn-sm" data-3tfechar title="Esc">${veT('Voltar à timeline')}</button></div>
         <div class="ve3t-lista" data-3t="lista"></div>
-        <div class="ve3t-visor" data-3t="visor"><canvas></canvas><div class="ve3t-dica">${veT('Arrastar: orbitar · Rodinha: distância · Shift/meio: deslocar · Clique: selecionar · W/E/R: mover/girar/escala')}</div></div>
+        <div class="ve3t-visor" data-3t="visor"><canvas></canvas><div class="ve3t-dica">${veT('Arrastar: orbitar · Rodinha: distância · Shift/meio: deslocar · Clique: selecionar · W/E/R: mover/girar/escala · Delete · Ctrl+D duplicar · H esconder · F enquadrar · solte .glb/.obj/.fbx aqui')}</div></div>
         <div class="ve3t-lado" data-3t="lado"></div>
         <div class="ve3t-tempo"><div class="ve3t-ctl"><button class="ve-btn ve-btn-sm" data-3tplay title="${veT('Espaço')}">▶</button><span class="ve3t-hora" data-3t="hora"></span></div>
             <div class="ve3t-regua"><input type="range" data-3t="regua" min="0" max="1" step="0.001"></div>
@@ -25,13 +28,16 @@ function ve3dTelaMontar() {
     const q = k => el.querySelector(`[data-3t="${k}"]`);
     Object.assign(VE3T, { el, lista: q('lista'), visor: q('visor'), lado: q('lado'), hora: q('hora'), regua: q('regua'), faixas: q('faixas'), titulo: q('titulo'), cv: el.querySelector('.ve3t-visor canvas') });
     el.addEventListener('click', e => {
-        const b = e.target.closest('[data-3tsel],[data-3tadd],[data-3tvista],[data-3tmodo],[data-3tfechar],[data-3tplay],[data-3tkf]'); if (!b) return;
+        const b = e.target.closest('[data-3tolho],[data-3tsel],[data-3tadd],[data-3tvista],[data-3tmodo],[data-3tespaco],[data-3tima],[data-3tfechar],[data-3tplay],[data-3tkf]'); if (!b) return;
         const d = b.dataset;
-        if (d['3tsel'] != null) ve3dTelaSelecionar(d['3tsel']);
+        if (d['3tolho'] != null) ve3dTelaEsconder(d['3tolho']);
+        else if (d['3tsel'] != null) ve3dTelaSelecionar(d['3tsel']);
         else if (d['3tadd'] != null) {
             const m = ve3dTelaMidia(); if (d['3tadd'] === 'arquivo') { ve3dImportarUi(); return; }
-            VE3DAPI.modelo({ forma: d['3tadd'], cena: m.id, cor: { esfera: '#ec6e48', cubo: '#0e3b4a', cilindro: '#ebd5a8', toro: '#ec6e48', cone: '#48281a' }[d['3tadd']] }).then(r => ve3dTelaSelecionar(r.id));
+            VE3DAPI.modelo({ forma: d['3tadd'], cena: m.id, cor: VE3D_CORES[d['3tadd']] }).then(r => ve3dTelaSelecionar(r.id));
         }
+        else if (d['3tespaco'] != null) ve3dTelaEspaco();
+        else if (d['3tima'] != null) ve3dTelaIma(!VE3T.ima);
         else if (d['3tvista'] != null) ve3dTelaLivre(d['3tvista'] === 'livre');
         else if (d['3tmodo'] != null) ve3dTelaModo(d['3tmodo']);
         else if (d['3tfechar'] != null) ve3dTelaFechar();
@@ -40,8 +46,9 @@ function ve3dTelaMontar() {
     });
     // propriedades: os mesmos eventos do painel Propriedades (ve3dEvento usa o clipe selecionado)
     const sel = () => { const c = ve3dTelaClipe(); if (c) VE.sel = VE.clips.indexOf(c); return !!c; };
-    VE3T.lado.addEventListener('input', e => { const p = e.target.closest('[data-p3d],[data-p3dcena]'); if (p && sel()) ve3dEvento(p, 'input'); });
-    VE3T.lado.addEventListener('change', e => { const p = e.target.closest('[data-p3d],[data-p3dcena]'); if (p && sel()) ve3dEvento(p, 'fim'); });
+    VE3T.lado.addEventListener('input', e => { const p = e.target.closest('[data-p3d],[data-p3dcena],[data-p3dfonte]'); if (p && sel()) ve3dEvento(p, 'input'); });
+    VE3T.lado.addEventListener('change', e => { const p = e.target.closest('[data-p3d],[data-p3dcena],[data-p3dfonte],[data-p3dparte]'); if (p && sel()) ve3dEvento(p, 'fim'); });
+    VE3T.lista.addEventListener('dblclick', e => { const b = e.target.closest('[data-3tsel]'); if (b && !['camera', 'luz', 'cenario'].includes(b.dataset['3tsel'])) ve3dTelaRenomear(b); });
     VE3T.lado.addEventListener('click', e => { const p = e.target.closest('[data-p3dkf],[data-p3dacao]'); if (p && sel()) ve3dEvento(p, 'clique'); });
     VE3T.regua.addEventListener('input', () => { ve3dTelaParar(); veSeek(+VE3T.regua.value); });
     VE3T.faixas.addEventListener('pointerdown', ve3dTelaKfArrastar);
@@ -50,6 +57,49 @@ function ve3dTelaMontar() {
     cv.addEventListener('wheel', ve3dTelaRodinha, { passive: false });
     cv.addEventListener('contextmenu', e => e.preventDefault());
     window.addEventListener('keydown', ve3dTelaTecla, true);
+    window.addEventListener('keyup', e => { if (e.key === 'Control' && VE3T.el && !VE3T.el.hidden) ve3dTelaIma(VE3T.ima, false); }, true);
+}
+// ── edição ──
+function ve3dTelaIma(sim, ctrl = false) {   // ímã ligado (botão) ou Ctrl segurado: passos fixos nas setas
+    VE3T.ima = sim; const tc = VE3T.tc, on = sim || ctrl;
+    if (tc) { tc.setTranslationSnap(on ? 0.1 : null); tc.setRotationSnap(on ? Math.PI / 12 : null); tc.setScaleSnap(on ? 0.1 : null); }
+    const b = VE3T.el && VE3T.el.querySelector('[data-3tima]'); if (b) b.classList.toggle('on', !!sim);
+}
+function ve3dTelaEspaco() {
+    const tc = VE3T.tc; if (!tc) return;
+    tc.setSpace(tc.space === 'local' ? 'world' : 'local');
+    const b = VE3T.el.querySelector('[data-3tespaco]'); if (b) b.textContent = tc.space === 'local' ? veT('Eixo: objeto') : veT('Eixo: mundo');
+    VE3T.chave = '';
+}
+const ve3dTelaModeloSel = () => { const m = ve3dTelaMidia(); return ve3dEh(m) && m.c3d.modelos.find(x => x.id === VE3T.so) || null; };
+function ve3dTelaEsconder(id) {
+    const m = ve3dTelaMidia(), md = ve3dEh(m) && m.c3d.modelos.find(x => x.id === id); if (!md) return;
+    vePushHistory(); delete md.kf.visivel; md.p.visivel = md.p.visivel === 0 ? 1 : 0; ve3dMudou(m); ve3dTelaLado();
+}
+function ve3dTelaApagar() {
+    const md = ve3dTelaModeloSel(); if (!md) return;
+    VE3DAPI.remover(md.id, VE3T.mid); VE3T.so = 'camera'; ve3dTelaGizmo(); ve3dTelaLado();
+}
+function ve3dTelaDuplicar() {
+    const md = ve3dTelaModeloSel(); if (!md) return;
+    const r = VE3DAPI.duplicar(md.id, VE3T.mid); ve3dTelaSelecionar(r.id);
+}
+function ve3dTelaRenomear(b) {
+    const m = ve3dTelaMidia(), id = b.dataset['3tsel'], md = m.c3d.modelos.find(x => x.id === id); if (!md) return;
+    const inp = document.createElement('input'); inp.className = 've3t-nome'; inp.value = md.nome || '';
+    b.replaceWith(inp); inp.focus(); inp.select();
+    let feito = false;
+    const fim = ok => { if (feito) return; feito = true; if (ok) VE3DAPI.renomear(id, inp.value, VE3T.mid); ve3dTelaLado(); };
+    inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') fim(true); if (e.key === 'Escape') fim(false); });
+    inp.addEventListener('blur', () => fim(true));
+}
+function ve3dTelaEnquadrar() {   // F: vista livre olhando para o selecionado (ou a cena toda), sem mexer na câmera da cena
+    const rt = VE3T.rt, T = VE3T.T; if (!rt) return;
+    const o = rt.objs.find(x => x.md.id === VE3T.so), alvos = o ? [o] : rt.objs.filter(x => x.raiz.visible); if (!alvos.length) return;
+    const b = new T.Box3(); alvos.forEach(x => b.expandByObject(x.raiz));
+    const c = b.getCenter(new T.Vector3()), r = Math.max(0.2, b.getSize(new T.Vector3()).length() / 2);
+    ve3dTelaLivre(true);
+    VE3T.vista.alvo = c; VE3T.vista.d = Math.min(60, r / Math.sin((VE3T.cam.fov || 32) * Math.PI / 360) * 1.15); VE3T.chave = '';
 }
 
 async function ve3dTelaAbrir(c) {
@@ -97,10 +147,11 @@ function ve3dTelaVista(cam) {
 function ve3dTelaLista() {
     const m = ve3dTelaMidia(); if (!ve3dEh(m)) return;
     const it = (id, nome) => `<button class="ve3t-it${VE3T.so === id ? ' on' : ''}" data-3tsel="${veEsc(id)}">${veEsc(nome)}</button>`;
+    const mod = md => `<div class="ve3t-linha${md.p.visivel === 0 ? ' oculto' : ''}">${it(md.id, md.nome || md.id)}<span class="ve3t-olho" data-3tolho="${veEsc(md.id)}" title="${veT('Esconder/mostrar (H)')}">${md.p.visivel === 0 ? '◌' : '●'}</span></div>`;
     VE3T.lista.innerHTML = it('camera', veT('Câmera')) + it('luz', veT('Luz')) + it('cenario', veT('Cenário')) + '<hr>' +
-        m.c3d.modelos.map(md => it(md.id, md.nome || md.id)).join('') +
-        `<div class="ve3t-add">${['esfera', 'cubo', 'cilindro', 'toro', 'cone'].map(f => `<button class="ve-btn ve-btn-sm ve-btn-ghost" data-3tadd="${f}">+ ${veT(f)}</button>`).join('')}
-        <button class="ve-btn ve-btn-sm ve-btn-ghost" data-3tadd="arquivo">${veT('Importar .glb / .obj…')}</button></div>`;
+        m.c3d.modelos.map(mod).join('') +
+        `<div class="ve3t-add">${VE3D_FORMAS.map(f => `<button class="ve-btn ve-btn-sm ve-btn-ghost" data-3tadd="${f}">+ ${veT(f)}</button>`).join('')}
+        <button class="ve-btn ve-btn-sm ve-btn-ghost" data-3tadd="arquivo" title=".glb .gltf .obj .fbx .blend .dae .stl .ply .3mf">${veT('Importar modelo 3D…')}</button></div>`;
 }
 function ve3dTelaLado() {
     if (!VE3T.el || VE3T.el.hidden) return;
@@ -116,7 +167,7 @@ function ve3dTelaLaco() {
     const m = ve3dTelaMidia(), c = ve3dTelaClipe(); if (!ve3dEh(m) || !c) { ve3dTelaFechar(); return; }
     if (VE3T.play) { let T = VE3T.play.p0 + (performance.now() - VE3T.play.t0) / 1000; if (T >= veEnd(c)) { VE3T.play = { t0: performance.now(), p0: c.st }; T = c.st; } VE.playhead = T; }
     const rt = ve3dRuntime(m); if (!rt) return;
-    if (rt !== VE3T.rt) { VE3T.rt = rt; VE3T.chave = ''; ve3dTelaGizmo(); }
+    if (rt !== VE3T.rt) { VE3T.rt = rt; VE3T.chave = ''; ve3dTelaGizmo(); if (!VE3T.lado.contains(document.activeElement)) ve3dTelaLado(); }   // partes do modelo novo na Aparência
     const dados = JSON.stringify(m.c3d);
     if (dados !== VE3T.dados && !VE3T.mexendo && !VE3T.arr && !VE3T.lado.contains(document.activeElement)) ve3dTelaLado();   // desfazer, API
     const bx = VE3T.visor.getBoundingClientRect(), leve = VE3T.mexendo || VE3T.arr || VE3T.play ? 0.6 : 1, tc = VE3T.tc;
@@ -194,7 +245,7 @@ async function ve3dTelaGizmo() {
         tc.addEventListener('mouseDown', () => { vePushHistory(); VE3T.mexendo = true; });
         tc.addEventListener('mouseUp', () => { VE3T.mexendo = false; const mm = ve3dTelaMidia(); if (ve3dEh(mm)) ve3dMudou(mm); ve3dTelaLado(); });
         tc.addEventListener('objectChange', ve3dTelaDoGizmo);
-        VE3T.hs.add(tc.getHelper()); VE3T.tc = tc;
+        VE3T.hs.add(tc.getHelper()); VE3T.tc = tc; ve3dTelaIma(!!VE3T.ima);
     }
     const o = rt.objs.find(x => x.md.id === VE3T.so);
     if (o) VE3T.tc.attach(o.raiz); else VE3T.tc.detach();
@@ -267,11 +318,17 @@ function ve3dTelaTecla(e) {
     if (!VE3T.el || VE3T.el.hidden) return;
     const tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select') { if (e.key === 'Escape') e.target.blur(); return; }
-    if (e.ctrlKey || e.metaKey) return;   // desfazer, salvar: o editor cuida
     const k = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && k === 'd') { ve3dTelaDuplicar(); e.preventDefault(); e.stopPropagation(); return; }
+    if (e.key === 'Control') { ve3dTelaIma(VE3T.ima, true); return; }
+    if (e.ctrlKey || e.metaKey) return;   // desfazer, salvar: o editor cuida
     if (k === 'escape') ve3dTelaFechar();
     else if (k === ' ') ve3dTelaPlay();
     else if (k === 'w' || k === 'e' || k === 'r') ve3dTelaModo({ w: 'translate', e: 'rotate', r: 'scale' }[k]);
     else if (k === 'c') ve3dTelaLivre(!VE3T.livre);
+    else if (k === 'delete' || k === 'backspace') ve3dTelaApagar();
+    else if (k === 'h') { const md = ve3dTelaModeloSel(); if (md) ve3dTelaEsconder(md.id); }
+    else if (k === 'f') ve3dTelaEnquadrar();
+    else if (k === 'q') ve3dTelaEspaco();
     e.preventDefault(); e.stopPropagation();   // nenhuma outra tecla vai para a timeline (Delete apagaria a faixa)
 }

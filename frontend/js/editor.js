@@ -2708,6 +2708,13 @@ function veDropFiles(itens) {
         itens = itens.filter(i => !psds.includes(i));
         if (!itens.length) return;
     }
+    // modelos 3D (.glb, .obj, .fbx...): entram na cena 3D aberta/selecionada ou numa cena nova (editor-3d.js)
+    const m3d = itens.filter(i => !i.pasta && typeof VE3D_EXT !== 'undefined' && VE3D_EXT.test(i.path));
+    if (m3d.length) {
+        ve3dSoltar(m3d.map(i => i.path));
+        itens = itens.filter(i => !m3d.includes(i));
+        if (!itens.length) return;
+    }
     const drop = veDropAtual();
     // no painel AutoFrame: pastas/fotos/vídeos/música vão para ele (editor-autoframe.js)
     if (typeof veAfSoltouAqui === 'function' && veAfSoltouAqui(drop)) { veAfAdicionar(itens); return; }

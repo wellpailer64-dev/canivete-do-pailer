@@ -9,17 +9,24 @@
 // =========================================================
 const VE3D = { lib: null, rt: new Map(), telas: new WeakMap(), atual: null, falhas: new Map(), espera: [], timer: 0 };
 const VE3D_COR = 'roxo';
+const VE3D_CORES = { esfera: '#ec6e48', cubo: '#0e3b4a', cilindro: '#ebd5a8', toro: '#ec6e48', cone: '#48281a', plano: '#d9d4cc' };   // cor de cada primitiva nova
+const VE3D_FORMAS = ['esfera', 'cubo', 'cilindro', 'toro', 'cone', 'plano'];
 const VE3D_MATERIAIS = {   // os mesmos presets do render no Blender (Functions/blender_cena.py)
     papel: { roughness: 0.6, sheen: 0.35, sheenRoughness: 0.6, clearcoat: 0.12, clearcoatRoughness: 0.45 }, /* papel de copo: acetinado */ fosco: { roughness: 0.65 }, plastico: { roughness: 0.32 }, ceramica: { roughness: 0.12, clearcoat: 0.7, clearcoatRoughness: 0.04 },
     metal: { roughness: 0.22, metalness: 0.35, clearcoat: 1 }, vidro: { roughness: 0.02, transmission: 1, ior: 1.45, thickness: 0.2 },
 };
 const ve3dEh = m => !!(m && m.c3d);
+const VE3D_EXT = /\.(glb|gltf|obj|fbx|blend|dae|stl|ply|3mf)$/i;          // o que entra numa cena 3D (soltar, importar)
+const VE3D_EXT_BLENDER = /\.(fbx|blend|dae|stl|ply|3mf)$/i;                // esses passam pelo Blender (→ .glb)
 function ve3dLib() {
     if (!VE3D.lib) VE3D.lib = (async () => {
         const T = await import('three');
-        const [{ GLTFLoader }, { OBJLoader }, { RoomEnvironment }, { toCreasedNormals }] = await Promise.all([import('three/addons/loaders/GLTFLoader.js'),
-            import('three/addons/loaders/OBJLoader.js'), import('three/addons/environments/RoomEnvironment.js'), import('three/addons/utils/BufferGeometryUtils.js')]);
-        return { T, GLTFLoader, OBJLoader, RoomEnvironment, toCreasedNormals };
+        const [{ GLTFLoader }, { OBJLoader }, { RoomEnvironment }, { toCreasedNormals }, { MTLLoader }, { DRACOLoader }, { MeshoptDecoder }] = await Promise.all([import('three/addons/loaders/GLTFLoader.js'),
+            import('three/addons/loaders/OBJLoader.js'), import('three/addons/environments/RoomEnvironment.js'), import('three/addons/utils/BufferGeometryUtils.js'),
+            import('three/addons/loaders/MTLLoader.js'), import('three/addons/loaders/DRACOLoader.js'), import('three/addons/libs/meshopt_decoder.module.js')]);
+        // .glb comprimido (Draco/meshopt), comum em bancos de modelos: decodificador local, sem internet
+        const draco = new DRACOLoader().setDecoderPath(new URL('vendor/three/addons/libs/draco/', document.baseURI).href);
+        return { T, GLTFLoader, OBJLoader, RoomEnvironment, toCreasedNormals, MTLLoader, draco, MeshoptDecoder };
     })();
     return VE3D.lib;
 }
@@ -62,16 +69,27 @@ async function ve3dCarregarModelo(md, L) {
         obj = await ve3dDoVetor(f.desc, T);
         obj.updateMatrixWorld(true);
     } else {
-        const r = await window.pywebview.api.ve_3d_url(f.path || '');
-        if (!r || !r.success) throw new Error(`modelo 3D não encontrado: ${f.path}`);
-        if (/\.obj$/i.test(f.path)) {
-            obj = await new OBJLoader().loadAsync(r.url);
-            obj.traverse(o => { if (o.isMesh && (!o.material || o.material.type === 'MeshPhongMaterial')) o.material = new T.MeshPhysicalMaterial({ color: new T.Color(f.cor || '#d9d4cc'), ...(VE3D_MATERIAIS[f.material] || VE3D_MATERIAIS.plastico) }); });
+        const r = await window.pywebview.api.ve_3d_preparar(f.path || '', typeof vePrPrefs === 'function' ? vePrPrefs().dir : null);
+        if (!r || !r.success) throw new Error(r && r.precisa_blender ? veT('para abrir esse formato é preciso baixar o Blender (importe o modelo de novo)') : `${veT('modelo 3D')}: ${(r && r.error) || f.path}`);
+        // texturas/.bin/.mtl pedidos por caminho relativo, absoluto do PC do autor ou com outra caixa: troca pelo
+        // arquivo de mesmo nome achado ao lado do modelo (cena3d._anexos)
+        const ger = new T.LoadingManager(), anexos = r.anexos || {};
+        ger.setURLModifier(u => { if (/^(data|blob):/.test(u)) return u; const n = decodeURIComponent(u.split(/[?#]/)[0]).split(/[\\/]/).pop().toLowerCase(); return anexos[n] || u; });
+        if (r.tipo === 'obj') {
+            const ld = new OBJLoader(ger);
+            if (r.mtl && r.mtl.length) { const mats = await new L.MTLLoader(ger).loadAsync(r.mtl[0]); mats.preload(); ld.setMaterials(mats); }
+            obj = await ld.loadAsync(r.url);
+            const semMtl = !(r.mtl && r.mtl.length);
+            obj.traverse(o => { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(x => ve3dFisico(T, x, semMtl)) : ve3dFisico(T, o.material, semMtl); });
         } else {
-            const g = await new GLTFLoader().loadAsync(r.url); obj = g.scene;
+            const ld = new GLTFLoader(ger).setDRACOLoader(L.draco).setMeshoptDecoder(L.MeshoptDecoder);
+            const g = await ld.loadAsync(r.url); obj = g.scene;
             if (g.animations && g.animations.length) { mixer = new T.AnimationMixer(obj); g.animations.forEach(a => mixer.clipAction(a).play()); }
         }
     }
+    // partes = nomes dos materiais (corpo, tampa, rótulo...): a aparência pode ir só numa delas
+    const partes = new Set(); obj.traverse(o => { if (o.isMesh) [].concat(o.material || []).forEach(x => { if (x && x.name) partes.add(x.name); }); });
+    await ve3dAparencia(obj, f, T);
     obj.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     norm.add(obj);
     const b = new T.Box3().setFromObject(obj), tam = b.getSize(new T.Vector3()), c = b.getCenter(new T.Vector3());
@@ -79,7 +97,66 @@ async function ve3dCarregarModelo(md, L) {
     norm.scale.setScalar(s); norm.position.set(-c.x * s, -b.min.y * s, -c.z * s);
     // sombra de contato (foto de produto): mancha macia no chão sob o modelo; cresce e esmaece quando ele sobe
     const pe = Math.max(tam.x, tam.z) * s / 2;
-    return { raiz, mixer, pe };
+    return { raiz, mixer, pe, partes: [...partes] };
+}
+// material do .obj/.mtl (Phong) → físico, MANTENDO as texturas (cor, relevo, normal, transparência); sem .mtl, cinza claro
+function ve3dFisico(T, m, semMtl) {
+    if (m && (m.isMeshPhysicalMaterial || m.isMeshStandardMaterial)) return m;
+    if (!m || semMtl) return new T.MeshPhysicalMaterial({ name: (m && m.name) || '', color: new T.Color('#d9d4cc'), ...VE3D_MATERIAIS.plastico });   // o nome (usemtl) vira a "parte"
+    const brilho = m.shininess ?? 30;
+    const n = new T.MeshPhysicalMaterial({ name: m.name, color: m.color ? m.color.clone() : new T.Color(1, 1, 1), map: m.map || null, normalMap: m.normalMap || null,
+        bumpMap: m.bumpMap || null, bumpScale: m.bumpScale ?? 1, alphaMap: m.alphaMap || null, emissive: m.emissive ? m.emissive.clone() : new T.Color(0, 0, 0),
+        emissiveMap: m.emissiveMap || null, transparent: !!m.transparent || (m.opacity ?? 1) < 1, opacity: m.opacity ?? 1, side: m.side,
+        roughness: Math.min(0.95, Math.max(0.08, 1 - Math.sqrt(brilho / 1000))), metalness: 0 });
+    if (n.map) n.map.colorSpace = T.SRGBColorSpace;
+    if (n.emissiveMap) n.emissiveMap.colorSpace = T.SRGBColorSpace;
+    return n;
+}
+// sem coordenadas de textura (STL, muitos .obj): projeção de caixa — cada face pega a imagem pelo lado que encara
+function ve3dUvCaixa(geo, T) {
+    if (geo.attributes.uv) return;
+    if (!geo.attributes.normal) geo.computeVertexNormals();
+    geo.computeBoundingBox();
+    const b = geo.boundingBox, t = b.getSize(new T.Vector3()), p = geo.attributes.position, n = geo.attributes.normal, uv = new Float32Array(p.count * 2);
+    const ul = (v, k) => (v - b.min[k]) / (t[k] || 1);
+    for (let i = 0; i < p.count; i++) {
+        const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i)), x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+        const [u, v] = ax >= ay && ax >= az ? [ul(z, 'z'), ul(y, 'y')] : ay >= az ? [ul(x, 'x'), ul(z, 'z')] : [ul(x, 'x'), ul(y, 'y')];
+        uv[i * 2] = u; uv[i * 2 + 1] = v;
+    }
+    geo.setAttribute('uv', new T.BufferAttribute(uv, 2));
+}
+// aparência escolhida pela pessoa (vale para modelo de arquivo e primitiva): cor = cor única (tira a textura do
+// arquivo), material = acabamento (papel, fosco, plástico, cerâmica, metal, vidro), textura = imagem (rótulo, estampa,
+// madeira...), texRep = repetições. No modelo inteiro (f.cor, f.material...) ou numa parte (f.partes[nome do material],
+// que vale por cima). Sem nada disso, fica o material do arquivo.
+async function ve3dAparencia(obj, f, T) {
+    if (f.tipo === 'vetor') return;
+    const arq = f.tipo === 'arquivo', limpa = a => Object.fromEntries(Object.entries(a || {}).filter(([, v]) => v != null && v !== ''));
+    const todo = limpa({ cor: arq ? f.cor : null, material: arq ? f.material : null, textura: f.textura, texRep: f.textura ? f.texRep : null });
+    const partes = Object.fromEntries(Object.entries(f.partes || {}).map(([k, v]) => [k, limpa(v)]).filter(([, v]) => Object.keys(v).length));
+    if (!Object.keys(todo).length && !Object.keys(partes).length) return;
+    const texs = new Map();   // caminho|repetição → textura (carregada uma vez)
+    for (const a of [todo, ...Object.values(partes)]) {
+        const ch = a.textura && `${a.textura}|${+a.texRep || 1}`; if (!ch || texs.has(ch)) continue;
+        const r = await window.pywebview.api.ve_3d_url(a.textura);
+        if (!r || !r.success) { texs.set(ch, null); continue; }
+        const tex = await new T.TextureLoader().loadAsync(r.url); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 8;
+        tex.wrapS = tex.wrapT = T.RepeatWrapping; const k = Math.max(0.05, +a.texRep || 1); tex.repeat.set(k, k); texs.set(ch, tex);
+    }
+    obj.traverse(o => {
+        if (!o.isMesh) return;
+        const troca = m => {
+            const a = { ...todo, ...(partes[(m && m.name) || ''] || {}) }; if (!Object.keys(a).length) return m;
+            const n = m && (m.isMeshPhysicalMaterial || m.isMeshStandardMaterial) ? m.clone() : new T.MeshPhysicalMaterial({ name: (m && m.name) || '', map: m && m.map || null });
+            const pre = VE3D_MATERIAIS[a.material], tex = a.textura ? texs.get(`${a.textura}|${+a.texRep || 1}`) : null;
+            if (pre) Object.assign(n, { roughness: 0.5, metalness: 0, transmission: 0, clearcoat: 0, sheen: 0, ...pre });
+            if (a.cor && (arq || partes[(m && m.name) || ''])) { n.color = new T.Color(a.cor); n.map = null; }
+            if (tex) { ve3dUvCaixa(o.geometry, T); n.map = tex; n.color = new T.Color(1, 1, 1); }
+            n.needsUpdate = true; return n;
+        };
+        o.material = Array.isArray(o.material) ? o.material.map(troca) : troca(o.material);
+    });
 }
 // objeto 3D do Vetor (enviar_editor_3d): a mesma descrição do render no Blender (vbCena) — girar = torno com o rótulo em
 // UV (u = ângulo, v = altura), extrudar = forma com chanfro para dentro e as artes coladas nas faces. Espaço do Vetor
@@ -371,15 +448,52 @@ function ve3dAlvo(ref) {   // mídia da cena: id da mídia, nome, ou o clipe sel
 function ve3dObj(m, quem) { const C = m.c3d; if (quem === 'camera') return C.camera; if (quem === 'luz') return C.luz; if (quem === 'cenario') return ve3dCenario(C); const md = C.modelos.find(x => x.id === quem || x.nome === quem); if (!md) throw new Error(`modelo "${quem}" não existe na cena`); return md; }
 window.VE3DAPI = {
     nova: (op = {}) => ve3dNova(op),
-    // modelo: caminho (.glb/.gltf/.obj) ou primitiva (esfera|cubo|cilindro|toro|cone|plano) com cor/material
+    // modelo: caminho (.glb/.gltf/.obj/.fbx/.blend/.dae/.stl/.ply/.3mf) ou primitiva (esfera|cubo|cilindro|toro|cone|plano)
+    // com cor/material/textura (imagem)/texRep. FBX e cia. são convertidos no Blender antes de entrar (o 1º uso baixa o Blender).
     async modelo(op = {}) {
-        const m = ve3dAlvo(op.cena); vePushHistory();
+        const m = ve3dAlvo(op.cena);
+        if (op.arquivo) await ve3dPrepararArquivo(op.arquivo);   // falha (sem Blender, arquivo ruim) antes de mexer na cena
+        vePushHistory();
         const id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-        const fonte = op.vetor ? { tipo: 'vetor', desc: op.vetor } : op.arquivo ? { tipo: 'arquivo', path: op.arquivo, ...(op.cor ? { cor: op.cor } : {}), ...(op.material ? { material: op.material } : {}) }
-            : { tipo: 'primitiva', forma: op.forma || 'esfera', cor: op.cor || '#ec6e48', material: op.material || 'plastico' };
+        const extra = { ...(op.cor ? { cor: op.cor } : {}), ...(op.material ? { material: op.material } : {}), ...(op.textura ? { textura: op.textura, texRep: op.texRep || 1 } : {}) };
+        const fonte = op.vetor ? { tipo: 'vetor', desc: op.vetor } : op.arquivo ? { tipo: 'arquivo', path: op.arquivo, ...extra }
+            : { tipo: 'primitiva', forma: op.forma || 'esfera', cor: op.cor || '#ec6e48', material: op.material || 'plastico', ...extra };
         m.c3d.modelos.push({ id, nome: op.nome || (op.arquivo ? op.arquivo.split(/[\\/]/).pop() : op.forma || 'esfera'), fonte,
             p: { x: op.x || 0, y: op.y || 0, z: op.z || 0, rx: op.rx || 0, ry: op.ry || 0, rz: op.rz || 0, esc: op.esc ?? 1, velocidade: op.velocidade ?? 1 }, kf: {} });
-        ve3dMudou(m); await ve3dGarantir(m); return { id, modelos: m.c3d.modelos.length };
+        ve3dMudou(m);
+        try { await ve3dGarantir(m); }
+        catch (e) { m.c3d.modelos = m.c3d.modelos.filter(x => x.id !== id); ve3dMudou(m); throw e; }   // não deixa um modelo quebrado na cena
+        return { id, modelos: m.c3d.modelos.length };
+    },
+    // aparência: {cor (null = a do arquivo), material (null = o do arquivo), textura (caminho de imagem | null), texRep,
+    // parte (nome do material: só nela; ver partes())}
+    async aparencia(quem, op = {}, cena) {
+        const m = ve3dAlvo(cena), md = ve3dObj(m, quem); if (!md.fonte || md.fonte.tipo === 'vetor') throw new Error('objeto do Vetor: troque a arte no Vetor');
+        vePushHistory(); const f = md.fonte = JSON.parse(JSON.stringify(md.fonte));
+        const alvo = op.parte ? ((f.partes = f.partes || {})[op.parte] = f.partes[op.parte] || {}) : f;
+        for (const k of ['cor', 'material', 'textura', 'texRep']) if (k in op) { if (op[k] == null || op[k] === '') delete alvo[k]; else alvo[k] = op[k]; }
+        if (op.parte && !Object.keys(alvo).length) delete f.partes[op.parte];
+        if (f.partes && !Object.keys(f.partes).length) delete f.partes;
+        if (f.tipo === 'primitiva') { f.cor = f.cor || '#ec6e48'; f.material = f.material || 'plastico'; }
+        ve3dMudou(m); await ve3dGarantir(m); return f;
+    },
+    // partes do modelo (nomes dos materiais do arquivo: corpo, tampa, rótulo...) — para aparencia({parte})
+    async partes(quem, cena) { const m = ve3dAlvo(cena), md = ve3dObj(m, quem), rt = await ve3dGarantir(m); const o = rt.objs.find(x => x.md.id === md.id); return o ? o.partes : []; },
+    // duplicar: cópia com as mesmas propriedades e quadros-chave, um pouco ao lado
+    duplicar(quem, cena) {
+        const m = ve3dAlvo(cena), md = ve3dObj(m, quem); vePushHistory();
+        const n = JSON.parse(JSON.stringify(md)); n.id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+        n.nome = `${md.nome} ${veT('cópia')}`; n.p.x = Math.round(((n.p.x || 0) + 0.4 * (n.p.esc ?? 1)) * 1000) / 1000;
+        if (n.kf && n.kf.x) n.kf.x = n.kf.x.map(([t, v, s]) => [t, typeof v === 'number' ? v + 0.4 * (n.p.esc ?? 1) : v, s]);
+        m.c3d.modelos.splice(m.c3d.modelos.indexOf(md) + 1, 0, n); ve3dMudou(m); return { id: n.id };
+    },
+    renomear(quem, nome, cena) { const m = ve3dAlvo(cena), md = ve3dObj(m, quem); if (!String(nome || '').trim()) return md.nome; vePushHistory(); md.nome = String(nome).trim(); ve3dMudou(m); return md.nome; },
+    // zerar: volta posição/giro/escala ao padrão (no chão, no centro); chao: só apoia no chão (y = 0)
+    zerar(quem, op = {}, cena) {
+        const m = ve3dAlvo(cena), md = ve3dObj(m, quem); vePushHistory();
+        const ks = op.chao ? ['y'] : ['x', 'y', 'z', 'rx', 'ry', 'rz', 'esc', 'sx', 'sy', 'sz'];
+        for (const k of ks) { delete md.kf[k]; if (k === 'esc') md.p.esc = 1; else if (/^s[xyz]$/.test(k)) delete md.p[k]; else md.p[k] = 0; }
+        ve3dMudou(m); return md.p;
     },
     // definir: valor fixo (sem quadro-chave) de camera|luz|<modelo>.prop
     definir(quem, valores, cena) { const m = ve3dAlvo(cena), o = ve3dObj(m, quem); vePushHistory(); Object.assign(o.p, valores); ve3dMudou(m); return o.p; },
@@ -406,7 +520,12 @@ window.VE3DAPI = {
     remover(quem, cena) { const m = ve3dAlvo(cena); vePushHistory(); m.c3d.modelos = m.c3d.modelos.filter(x => x.id !== quem && x.nome !== quem); ve3dMudou(m); return m.c3d.modelos.length; },
     info(cena) { const m = ve3dAlvo(cena); return { midia: m.id, nome: m.name, dur: m.dur, renderizada: m.c3dSig === ve3dSig(m) && !!m.path, path: m.path, modelos: m.c3d.modelos.map(x => ({ id: x.id, nome: x.nome, fonte: x.fonte, p: x.p, kf: Object.keys(x.kf) })),
         camera: m.c3d.camera, luz: m.c3d.luz }; },
-    renderizar: async cena => { const m = ve3dAlvo(cena); await ve3dRenderizar(m); return { path: m.path, ok: m.c3dSig === ve3dSig(m) }; },
+    renderizar: async cena => {   // espera a que estiver no meio (o fundo renderiza sozinho) em vez de rodar duas juntas
+        const m = ve3dAlvo(cena);
+        while (VE3D.atual) await new Promise(r => { VE3D.espera.push(r); setTimeout(r, 500); });
+        if (m.c3dSig !== ve3dSig(m) || !m.path) await ve3dRenderizar(m);
+        return { path: m.path, ok: m.c3dSig === ve3dSig(m), erro: VE3D.falhas.get(ve3dSig(m)) };
+    },
     quadro(t, cena, w = 640) { const m = ve3dAlvo(cena), rt = ve3dRuntime(m); if (!rt) return null; ve3dAplicar(rt, m, t, w, w * VE.seqH / VE.seqW); return rt.cv.toDataURL('image/png'); },
 };
 // a verificação das Comps (troca de timeline, abrir projeto) também confere as cenas 3D
@@ -421,10 +540,47 @@ function ve3dNovaUi() {
 }
 async function ve3dImportarUi() {
     const api = window.pywebview && window.pywebview.api; if (!api) return;
-    const p = await api.vk_dialogo('abrir', ['Modelos 3D (*.glb;*.gltf;*.obj)']); if (!p) return;
-    try { let m; try { m = ve3dAlvo(); } catch (e) { ve3dNova({ nome: p.split(/[\\/]/).pop().replace(/\.\w+$/, '') }); }
-        veToast(veT('Carregando o modelo 3D...')); await VE3DAPI.modelo({ arquivo: p }); ve3dPainel(); }
-    catch (e) { veToast(e.message || String(e)); }
+    const p = await api.vk_dialogo('abrir', ['Modelos 3D (*.glb;*.gltf;*.obj;*.fbx;*.blend;*.dae;*.stl;*.ply;*.3mf)']); if (!p) return;
+    await ve3dSoltar([p]);
+}
+// FBX e cia.: confere/converte ANTES de pôr na cena; sem o Blender, pergunta se pode baixar (uma vez, ~400 MB)
+async function ve3dPrepararArquivo(p) {
+    const api = window.pywebview.api, base = typeof vePrPrefs === 'function' ? vePrPrefs().dir : null;
+    if (VE3D_EXT_BLENDER.test(p)) veToast(veT('Convertendo o modelo no Blender...'));
+    let r = await api.ve_3d_preparar(p, base);
+    if (r && r.precisa_blender) {
+        const ok = typeof appConfirm === 'function' && await appConfirm({ titulo: veT('Abrir modelo 3D'),
+            texto: `${veT('Para abrir')} ${p.split('.').pop().toUpperCase()} ${veT('o app converte o modelo no Blender (gratuito), que ainda não foi baixado')} (${r.tamanho_mb} MB, ${veT('uma vez só')}).`,
+            botoes: [{ rotulo: veT('Cancelar'), valor: false, tipo: 'secundario' }, { rotulo: veT('Baixar o Blender'), valor: true, tipo: 'primario' }] });
+        if (!ok) throw new Error(veT('modelo não importado (sem o Blender)'));
+        veToast(veT('Baixando o Blender...'));
+        const b = await api.ve_3d_blender_instalar();
+        if (!b || !b.success) throw new Error(`${veT('não foi possível baixar o Blender')}: ${(b && b.error) || ''}`);
+        veToast(veT('Convertendo o modelo no Blender...'));
+        r = await api.ve_3d_preparar(p, base);
+    }
+    if (!r || !r.success) throw new Error((r && r.error) || veT('não foi possível abrir o modelo'));
+    if (r.faltando && r.faltando.length) veToast(`${veT('Texturas que não vieram com o modelo')}: ${r.faltando.map(x => x.split(/[\\/]/).pop()).join(', ')}`);
+    return r;
+}
+// arquivos 3D soltos (timeline, monitor, tela 3D) ou importados: vão para a cena aberta na tela 3D, senão para a cena
+// selecionada, senão para uma cena nova na agulha
+async function ve3dSoltar(caminhos) {
+    let m = null;
+    if (typeof VE3T === 'object' && VE3T.el && !VE3T.el.hidden) m = ve3dTelaMidia();
+    if (!ve3dEh(m)) { const c = (typeof veSelLista === 'function' ? veSelLista() : []).find(c => ve3dEh(veMediaOf(c))); m = c && veMediaOf(c); }
+    let nova = false;
+    try {
+        if (!ve3dEh(m)) { const r = ve3dNova({ nome: caminhos[0].split(/[\\/]/).pop().replace(/\.\w+$/, '') }); m = VE.media[r.midia]; nova = true; }
+        let ult = null;
+        for (const p of caminhos) { veToast(`${veT('Carregando o modelo 3D...')} ${p.split(/[\\/]/).pop()}`); ult = await VE3DAPI.modelo({ arquivo: p, cena: m.id }); }
+        ve3dPainel();
+        if (ult && typeof VE3T === 'object' && VE3T.el && !VE3T.el.hidden) ve3dTelaSelecionar(ult.id);
+        veToast(veT('Modelo 3D na cena'));
+    } catch (e) {
+        if (nova && !m.c3d.modelos.length && typeof veUndo === 'function') veUndo();   // cena nova que ficou vazia: desfaz
+        veToast(e.message || String(e));
+    }
 }
 function ve3dPainelHtml(c, so) {   // so (tela 3D): só a parte do objeto selecionado — camera, luz, cenario ou id do modelo
     const m = veMediaOf(c), C = m.c3d, t = Math.max(0, veSrcAt(c, VE.playhead));
@@ -438,7 +594,7 @@ function ve3dPainelHtml(c, so) {   // so (tela 3D): só a parte do objeto seleci
     const cam = C.camera, luz = C.luz;
     const um = md => `${lin(md.id, md, 'x', 'X', -4, 4, 0.01)}${lin(md.id, md, 'y', 'Y', -2, 4, 0.01)}${lin(md.id, md, 'z', 'Z', -4, 4, 0.01)}
         ${lin(md.id, md, 'ry', 'Girar', -360, 360, 1, '°')}${lin(md.id, md, 'rx', 'Inclinar', -180, 180, 1, '°')}${lin(md.id, md, 'esc', 'Escala', 0.05, 4, 0.01, '×')}`;
-    const modelos = C.modelos.map(md => `<div class="ve-p3d-mod"><div class="ve-pp-l"><b>${veEsc(md.nome)}</b><span></span><button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="rem:${md.id}" title="${veT('Tirar da cena')}">✕</button></div>
+    const modelos = C.modelos.map(md => `<div class="ve-p3d-mod"><div class="ve-pp-l"><b>${veEsc(md.nome)}</b><span></span><button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="editar:${md.id}" title="${veT('Aparência (cor, acabamento, imagem) e edição na tela 3D')}">✎</button><button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="rem:${md.id}" title="${veT('Tirar da cena')}">✕</button></div>
         ${um(md)}</div>`).join('');
     const S = {};
     S.camera = vePpSec(veT('Câmera'), lin('camera', cam, 'azimute', 'Órbita', -180, 180, 1, '°') + lin('camera', cam, 'elevacao', 'Altura', -10, 85, 1, '°') +
@@ -451,8 +607,8 @@ function ve3dPainelHtml(c, so) {   // so (tela 3D): só a parte do objeto seleci
             lin('luz', luz, 'contra', 'Contraluz', 0, 8, 0.05) + lin('luz', luz, 'contato', 'Sombra de contato', 0, 1, 0.01) +
             `<div class="ve-pp-l"><label>${veT('Cor da luz')}</label><input type="color" data-p3d="luz|cor" value="${veEsc(luz.p.cor || '#ffffff')}"></div>`);
     S.modelos = vePpSec(veT('Modelos'), (modelos || `<small class="ve-pp-dica">${veT('Nenhum modelo ainda.')}</small>`) +
-            `<div class="ve-pp-botoes"><button class="ve-btn ve-btn-sm" data-p3dacao="arquivo">${veT('Importar .glb / .obj…')}</button></div>
-            <div class="ve-pp-botoes">${['esfera', 'cubo', 'cilindro', 'toro', 'cone'].map(f => `<button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="${f}">+ ${veT(f)}</button>`).join('')}</div>`);
+            `<div class="ve-pp-botoes"><button class="ve-btn ve-btn-sm" data-p3dacao="arquivo" title=".glb .gltf .obj .fbx .blend .dae .stl .ply .3mf">${veT('Importar modelo 3D…')}</button></div>
+            <div class="ve-pp-botoes">${VE3D_FORMAS.map(f => `<button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="${f}">+ ${veT(f)}</button>`).join('')}</div>`);
     S.cenario = vePpSec(veT('Cenário'), (() => { const cn = ve3dCenario(C); return `<div class="ve-pp-l"><label>${veT('Estúdio infinito')}</label><input type="checkbox" data-p3dcena="estudio" ${cn.p.estudio ? 'checked' : ''}>
             <input type="color" data-p3dcena="estudioCor" value="${veEsc(cn.p.estudioCor || '#e9e4dc')}"></div>` +
             lin('cenario', cn, 'neblina', 'Neblina', 0, 1, 0.01) +
@@ -466,9 +622,33 @@ function ve3dPainelHtml(c, so) {   // so (tela 3D): só a parte do objeto seleci
     if (so === 'camera' || so === 'luz') return S[so];
     if (so === 'cenario') return S.cenario + S.cena;
     const md = C.modelos.find(x => x.id === so); if (!md) return S.modelos;
+    Object.defineProperty(md, '_mid', { value: m.id, configurable: true, enumerable: false });   // a Aparência acha as partes no runtime da cena
     return vePpSec(veEsc(md.nome), um(md) + lin(md.id, md, 'rz', 'Rolar', -180, 180, 1, '°') + lin(md.id, md, 'sx', 'Largura', 0.05, 4, 0.01, '×') +
         lin(md.id, md, 'sy', 'Altura', 0.05, 4, 0.01, '×') + lin(md.id, md, 'sz', 'Profundidade', 0.05, 4, 0.01, '×') + lin(md.id, md, 'contato', 'Sombra de contato', 0, 1, 0.01) +
-        `<div class="ve-pp-botoes"><button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="rem:${md.id}">${veT('Tirar da cena')}</button></div>`);
+        `<div class="ve-pp-botoes"><button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="dup:${md.id}" title="Ctrl+D">${veT('Duplicar')}</button>
+        <button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="chao:${md.id}">${veT('Apoiar no chão')}</button>
+        <button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="zerar:${md.id}">${veT('Zerar posição')}</button>
+        <button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="rem:${md.id}" title="Delete">${veT('Tirar da cena')}</button></div>`) +
+        ve3dAparenciaHtml(md);
+}
+// Aparência do modelo selecionado: cor, acabamento e imagem (textura/rótulo) — muda a fonte (a cena remonta o modelo)
+function ve3dAparenciaHtml(md) {
+    const f0 = md.fonte || {}; if (f0.tipo === 'vetor') return vePpSec(veT('Aparência'), `<small class="ve-pp-dica">${veT('Objeto do Vetor: troque cor e arte no Vetor e envie de novo.')}</small>`);
+    // partes (materiais do arquivo): a escolhida fica só na interface (VE3D.parteSel); os campos mostram a dela
+    const e = VE3D.rt.get(md._mid), o = e && e.rt && e.rt.objs.find(x => x.md.id === md.id), partes = (o && o.partes) || [];
+    const parte = partes.includes((VE3D.parteSel || {})[md.id]) ? VE3D.parteSel[md.id] : '';
+    const f = parte ? ((f0.partes || {})[parte] || {}) : f0, livre = f0.tipo === 'arquivo' || !!parte;   // livre: dá para voltar ao original
+    const nomes = { papel: 'Papel', fosco: 'Fosco', plastico: 'Plástico', ceramica: 'Cerâmica', metal: 'Metal', vidro: 'Vidro' };
+    const opc = (livre ? `<option value="">${veT(parte ? 'Como no modelo' : 'Do arquivo')}</option>` : '') + Object.entries(nomes).map(([k, n]) => `<option value="${k}"${f.material === k ? ' selected' : ''}>${veT(n)}</option>`).join('');
+    const sel = partes.length > 1 ? `<div class="ve-pp-l"><label>${veT('Aplicar em')}</label><select data-p3dparte="${md.id}"><option value="">${veT('Modelo inteiro')}</option>${partes.map(p => `<option value="${veEsc(p)}"${p === parte ? ' selected' : ''}>${veEsc(p)}${(f0.partes || {})[p] ? ' •' : ''}</option>`).join('')}</select></div>` : '';
+    return vePpSec(veT('Aparência'), sel +
+        `<div class="ve-pp-l"><label>${veT('Cor')}</label>${livre ? `<input type="checkbox" data-p3dfonte="${md.id}|corOriginal" ${f.cor ? '' : 'checked'}> ${veT('original')}` : ''}
+            <input type="color" data-p3dfonte="${md.id}|cor" value="${veEsc(f.cor || '#d9d4cc')}" ${livre && !f.cor ? 'disabled' : ''}></div>
+        <div class="ve-pp-l"><label>${veT('Acabamento')}</label><select data-p3dfonte="${md.id}|material">${opc}</select></div>
+        <div class="ve-pp-l"><label>${veT('Imagem')}</label><span class="ve-p3d-tex" title="${veEsc(f.textura || '')}">${f.textura ? veEsc(f.textura.split(/[\\/]/).pop()) : veT('nenhuma')}</span>
+            <button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="tex:${md.id}">${veT('Escolher…')}</button>${f.textura ? `<button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="semtex:${md.id}" title="${veT('Tirar a imagem')}">✕</button>` : ''}</div>
+        ${f.textura ? `<div class="ve-pp-l"><label>${veT('Repetir')}</label><input type="number" data-p3dfonte="${md.id}|texRep" min="0.05" max="50" step="0.5" value="${+f.texRep || 1}"><i>×</i></div>` : ''}
+        <small class="ve-pp-dica">${veT(partes.length > 1 ? 'Imagem = rótulo, estampa ou textura. Escolha a parte (ex.: corpo da lata) para aplicar só nela.' : 'Imagem = rótulo, estampa ou textura no modelo inteiro (modelo sem mapa de textura recebe a imagem por lado).')}</small>`);
 }
 function ve3dEvento(el, tipo) {
     const c = VE.clips[VE.sel], m = c && veMediaOf(c); if (!ve3dEh(m)) return;
@@ -483,12 +663,34 @@ function ve3dEvento(el, tipo) {
         if (k === 'estudioCor' || k === 'neblinaCor') ve3dCenario(m.c3d).p[k] = el.value;
         ve3dMudou(m); ve3dPainel(); return;
     }
+    if (el.dataset.p3dparte) { (VE3D.parteSel = VE3D.parteSel || {})[el.dataset.p3dparte] = el.value; ve3dPainel(); return; }
+    if (el.dataset.p3dfonte) {   // aparência: só no fim (change), remonta o modelo
+        if (tipo === 'input') return;
+        const [quem, k] = el.dataset.p3dfonte.split('|'), parte = (VE3D.parteSel || {})[quem] || '', op = parte ? { parte } : {};
+        const atual = parte ? ((ve3dObj(m, quem).fonte.partes || {})[parte] || {}) : ve3dObj(m, quem).fonte;
+        if (k === 'corOriginal') op.cor = el.checked ? null : (atual.cor || '#d9d4cc');
+        else if (k === 'texRep') op.texRep = Math.max(0.05, parseFloat(String(el.value).replace(',', '.')) || 1);
+        else op[k] = el.value || null;
+        VE3DAPI.aparencia(quem, op, m.id).then(ve3dPainel).catch(e => veToast(e.message || String(e)));
+        return;
+    }
     if (el.dataset.p3dacao) {
-        const a = el.dataset.p3dacao;
+        const a = el.dataset.p3dacao, alvoId = a.slice(a.indexOf(':') + 1);
         if (a === 'tela') return ve3dTelaAbrir(c);
         if (a === 'arquivo') return ve3dImportarUi();
         if (a.startsWith('rem:')) { VE3DAPI.remover(a.slice(4), m.id); ve3dPainel(); return; }
-        VE3DAPI.modelo({ forma: a, cena: m.id, cor: { esfera: '#ec6e48', cubo: '#0e3b4a', cilindro: '#ebd5a8', toro: '#ec6e48', cone: '#48281a' }[a] }).then(() => ve3dPainel());
+        if (a.startsWith('editar:')) { ve3dTelaAbrir(c).then(() => ve3dTelaSelecionar(alvoId)); return; }
+        if (a.startsWith('dup:')) { const r = VE3DAPI.duplicar(alvoId, m.id); if (typeof ve3dTelaSelecionar === 'function' && VE3T.el && !VE3T.el.hidden) ve3dTelaSelecionar(r.id); ve3dPainel(); return; }
+        if (a.startsWith('chao:')) { VE3DAPI.zerar(alvoId, { chao: true }, m.id); ve3dPainel(); return; }
+        if (a.startsWith('zerar:')) { VE3DAPI.zerar(alvoId, {}, m.id); ve3dPainel(); return; }
+        const parte = (VE3D.parteSel || {})[alvoId] || '', pp = parte ? { parte } : {};
+        if (a.startsWith('semtex:')) { VE3DAPI.aparencia(alvoId, { textura: null, ...pp }, m.id).then(ve3dPainel); return; }
+        if (a.startsWith('tex:')) {
+            (async () => { const p = await window.pywebview.api.vk_dialogo('abrir', ['Imagens (*.png;*.jpg;*.jpeg;*.webp;*.bmp)']); if (!p) return;
+                try { await VE3DAPI.aparencia(alvoId, { textura: p, ...pp }, m.id); ve3dPainel(); } catch (e) { veToast(e.message || String(e)); } })();
+            return;
+        }
+        VE3DAPI.modelo({ forma: a, cena: m.id, cor: VE3D_CORES[a] }).then(() => ve3dPainel());
         return;
     }
     if (el.dataset.p3dkf) {

@@ -123,6 +123,8 @@
     "ve_roto_cancelar",
     "ve_roto_video",
     "ve_3d_url",
+    "ve_3d_preparar",
+    "ve_3d_blender_instalar",
     "ve_render_tocar",
     "ve_render_mover",
     "ve_render_limpar",
@@ -1667,6 +1669,18 @@
     "cena3d"
    ]
   },
+  "ve_3d_preparar": {
+   "args": "caminho, base=None",
+   "modulos": [
+    "cena3d"
+   ]
+  },
+  "ve_3d_blender_instalar": {
+   "args": "",
+   "modulos": [
+    "blender_render"
+   ]
+  },
   "vk_blender_estado": {
    "args": "",
    "modulos": [
@@ -2531,6 +2545,11 @@
  "ve3d": [
   "nova",
   "modelo",
+  "aparencia",
+  "partes",
+  "duplicar",
+  "renomear",
+  "zerar",
   "definir",
   "kf",
   "doVetor",
@@ -2635,6 +2654,7 @@
   "Functions/autoframe.py": "AutoFrame — vídeos no ritmo da música a partir de uma pasta de fotos e vídeos (no espírito dos modelos do CapCut)",
   "Functions/autoframe_modelos.py": "autoframe_modelos.py — modelos de cliente do AutoFrame (aba \"AutoFrame Customizado\")",
   "Functions/blender_cena.py": "Roda DENTRO do Blender (blender -b -P blender_cena.py -- cena.json): monta a cena dos objetos 3D do Vetor Kanivete e",
+  "Functions/blender_converter.py": "blender_converter.py — roda DENTRO do Python do Blender (Functions/cena3d.py: converter):",
   "Functions/blender_render.py": "blender_render.py — render fotorrealista dos objetos 3D do Vetor Kanivete (girar_3d / extrudar_3d) no Blender (Cycles)",
   "Functions/cena3d.py": "cena3d.py — Cena 3D do Editor Kanivete (frontend/js/editor-3d.js): a página renderiza cada quadro com three.js (o MESMO",
   "Functions/cerebro_local.py": "Retorna o caminho do cérebro ativo salvo",
@@ -2715,6 +2735,7 @@
   "Functions/webscraper.py": ""
  },
  "testes": {
+  "teste_3d_modelos": "Teste dos modelos 3D baixados de banco na Cena 3D do Editor (app em --agente=9333):",
   "teste_atributos": "Remover atributos e ajuste em grupo (editor-atributos.js) — abre um app próprio (porta 9334, dados em",
   "teste_barra": "Barra de tarefas contextual: alça move e lembra, Selecionar assunto / Remover fundo, × esconde só até o próximo clique",
   "teste_blender": "Teste do render fotorrealista (Vetor 3D → Blender), app em --agente=9333. Rápido (400 px, 24 amostras): copo (girar) com",

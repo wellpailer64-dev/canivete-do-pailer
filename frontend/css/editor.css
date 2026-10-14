@@ -2119,6 +2119,13 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve3t-it.on { color: var(--ve-accent, #ff8a3d); }
 .ve3t-lista hr { border: 0; border-top: 1px solid var(--ve-line); margin: 6px 0; width: 100%; }
 .ve3t-add { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.ve3t-linha { display: flex; align-items: center; gap: 2px; }
+.ve3t-linha .ve3t-it { flex: 1; min-width: 0; }
+.ve3t-linha.oculto .ve3t-it { opacity: .45; }
+.ve3t-olho { cursor: pointer; font-size: 10px; padding: 2px 6px; opacity: .55; user-select: none; }
+.ve3t-olho:hover { opacity: 1; }
+.ve3t-nome { font: inherit; font-size: 12px; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--ve-accent, #ff8a3d); background: var(--ve-panel-2); color: inherit; outline: none; }
+.ve-p3d-tex { flex: 1; min-width: 0; font-size: 11px; opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ve3t-visor { position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #141414; }
 .ve3t-visor canvas { background: repeating-conic-gradient(#2a2a2a 0 25%, #222 0 50%) 0 0 / 16px 16px; touch-action: none; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
 .ve3t-dica { position: absolute; left: 10px; bottom: 8px; font-size: 11px; opacity: .6; pointer-events: none; }

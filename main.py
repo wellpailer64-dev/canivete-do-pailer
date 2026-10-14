@@ -4068,6 +4068,17 @@ class ApiBridge:
         from Functions import cena3d
         return cena3d.url(caminho)
 
+    def ve_3d_preparar(self, caminho, base=None):
+        from Functions import cena3d
+        try:
+            return cena3d.preparar(caminho, base)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_3d_blender_instalar(self):
+        from Functions import blender_render
+        return blender_render.instalar(lambda d: _ve_emit("ve3dBlenderProgresso", d), esperar=True)
+
     def vk_blender_estado(self):
         from Functions import blender_render
         e = blender_render.estado()

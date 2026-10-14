@@ -4,7 +4,7 @@ motor da prévia) e manda os PNGs em lotes pela caixa de envio do media_server; 
 o ffmpeg monta um .mov ProRes 4444 com alfa em <cache de render>/Cenas3D/<hash>.mov (hash do conteúdo da cena: serve a
 qualquer projeto e desfazer reaproveita, como as Comps). Lote em disco: 300 quadros 1080p não ficam na memória.
 """
-import os, shutil, time
+import hashlib, os, re, shutil, subprocess, time
 
 from Functions import media_server, render_cache
 from Functions.midia import rodar_ffmpeg
@@ -80,3 +80,90 @@ def url(caminho):
     if not caminho or not os.path.isfile(caminho):
         return {"success": False, "error": "arquivo não encontrado"}
     return {"success": True, "url": media_server.register(caminho), "nome": os.path.basename(caminho)}
+
+
+# ── modelos baixados de bancos (Sketchfab, Poly Pizza, CGTrader, TurboSquid...) ──
+DIRETOS = (".glb", ".gltf", ".obj")                                # o three.js lê
+PELO_BLENDER = (".fbx", ".blend", ".dae", ".stl", ".ply", ".3mf")   # convertidos para .glb no Blender
+_EXT_ANEXO = re.compile(r"\.(png|jpe?g|webp|bmp|tga|tiff?|gif|ktx2|dds|bin|mtl)$", re.I)
+
+
+def _anexos(pasta):
+    """Arquivos ao lado do modelo (texturas, .bin, .mtl) em até 3 níveis de subpasta → {nome em minúsculas: URL}.
+    O carregador troca qualquer caminho pedido (relativo, absoluto do PC do autor, com caixa errada) pelo nome."""
+    achados, n = {}, 0
+    base = pasta.count(os.sep)
+    for raiz, pastas, nomes in os.walk(pasta):
+        if raiz.count(os.sep) - base >= 3:
+            pastas[:] = []
+        for nome in nomes:
+            if _EXT_ANEXO.search(nome) and nome.lower() not in achados:
+                achados[nome.lower()] = media_server.register(os.path.join(raiz, nome))
+                n += 1
+                if n >= 3000:
+                    return achados
+    return achados
+
+
+def _mtllibs(caminho):
+    """Bibliotecas de material citadas no .obj ("mtllib x.mtl"); sem nenhuma citada, um .mtl de mesmo nome ao lado."""
+    libs = []
+    with open(caminho, encoding="utf-8", errors="replace") as f:
+        for linha in f:
+            if linha.startswith("mtllib "):
+                libs += [x for x in linha[7:].strip().replace("\\", "/").split("/")[-1:] if x]
+    if not libs:
+        irmao = os.path.splitext(caminho)[0] + ".mtl"
+        if os.path.isfile(irmao):
+            libs = [os.path.basename(irmao)]
+    return libs
+
+
+def converter(caminho, base, on_progress=lambda d: None):
+    """.fbx/.blend/.dae/.stl/.ply/.3mf → .glb pelo Blender (cache por arquivo + data + tamanho)."""
+    from Functions import blender_render
+    from Functions.midia import NO_WINDOW
+    b = blender_render.exe()
+    if not b:
+        return {"success": False, "precisa_blender": True, "tamanho_mb": round(blender_render.TAMANHO / 1e6),
+                "error": "para abrir esse formato o app usa o Blender, que ainda não foi baixado"}
+    st = os.stat(caminho)
+    h = hashlib.sha1(f"{os.path.abspath(caminho)}|{st.st_mtime_ns}|{st.st_size}|1".encode()).hexdigest()[:20]
+    pasta = os.path.join(_pasta(base), "convertidos"); os.makedirs(pasta, exist_ok=True)
+    saida = os.path.join(pasta, h + ".glb")
+    if os.path.isfile(saida):
+        return {"success": True, "path": saida}
+    parte = os.path.join(pasta, h + ".part.glb")
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "blender_converter.py")
+    on_progress({"msg": "Convertendo o modelo no Blender..."})
+    p = subprocess.run([b, "-b", "--factory-startup", "-noaudio", "-P", script, "--", caminho, parte], capture_output=True,
+                       text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL, creationflags=NO_WINDOW, timeout=900)
+    log = (p.stdout or "").splitlines() + (p.stderr or "").splitlines()
+    if p.returncode != 0 or not os.path.isfile(parte) or os.path.getsize(parte) == 0:
+        erro = [l for l in log if "Error" in l or "KANIVETE" in l or "Traceback" in l][-4:] or log[-4:]
+        return {"success": False, "error": "o Blender não conseguiu converter o modelo: " + " | ".join(erro)}
+    os.replace(parte, saida)
+    return {"success": True, "path": saida, "faltando": [l.split("faltando", 1)[1].strip() for l in log if "KANIVETE: textura faltando" in l]}
+
+
+def preparar(caminho, base=None):
+    """Modelo do disco → o que o three.js precisa: URL do arquivo, tipo (glb/gltf/obj), os anexos por nome e os .mtl.
+    Formatos que o three.js não lê passam pelo Blender (→ .glb)."""
+    if not caminho or not os.path.isfile(caminho):
+        return {"success": False, "error": "arquivo não encontrado"}
+    ext = os.path.splitext(caminho)[1].lower()
+    faltando = []
+    if ext in PELO_BLENDER:
+        r = converter(caminho, base)
+        if not r.get("success"):
+            return r
+        faltando = r.get("faltando") or []
+        return {"success": True, "tipo": "glb", "url": media_server.register(r["path"]), "anexos": {}, "mtl": [],
+                "convertido": r["path"], "faltando": faltando}
+    if ext not in DIRETOS:
+        return {"success": False, "error": f"formato {ext} não é modelo 3D"}
+    anexos = _anexos(os.path.dirname(os.path.abspath(caminho))) if ext != ".glb" else {}
+    libs = _mtllibs(caminho) if ext == ".obj" else []
+    mtl = [anexos[n.lower()] for n in libs if n.lower() in anexos]
+    faltando = [n for n in libs if n.lower() not in anexos]   # .obj copiado sem o .mtl: fica sem cor/textura do autor
+    return {"success": True, "tipo": ext[1:], "url": media_server.register(caminho), "anexos": anexos, "mtl": mtl, "faltando": faltando}

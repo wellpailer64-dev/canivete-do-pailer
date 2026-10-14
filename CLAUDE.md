@@ -162,8 +162,10 @@ Tela própria (duplo clique na faixa, como a Comp): `frontend/js/editor-3d-tela.
 Modelos .glb/.obj e primitivas com câmera, luz, sombra e quadros-chave (◆), prévia ao vivo em three.js e ProRes 4444
 para a exportação: `frontend/js/editor-3d.js` + `Functions/cena3d.py`; API `VE3DAPI`. Guia e pendências:
 `Instructions/agente/cena-3d-editor.md`. Foco (desfoque por profundidade), estúdio infinito, neblina e objetos 3D do
-Vetor (Objeto › "3D: Animar no Editor", `enviar_editor_3d`). Testes: `python testes/teste_export.py --casos 3d,3dfoco`
-e `python testes/teste_vetor_editor3d.py`.
+Vetor (Objeto › "3D: Animar no Editor", `enviar_editor_3d`). Modelos de banco: .glb/.gltf/.obj(+.mtl e texturas ao lado)
+direto; .fbx/.blend/.dae/.stl/.ply/.3mf convertidos no Blender; soltar no editor; aparência por parte (cor, acabamento,
+imagem/rótulo); edição na tela 3D (Delete, Ctrl+D, H, F, Q, ímã, renomear). Testes: `python testes/teste_export.py --casos 3d,3dfoco`,
+`python testes/teste_vetor_editor3d.py` e `py -3.13 testes/teste_3d_modelos.py`.
 
 ## Editor de Imagem (estilo Photoshop)
 Guia, arquivos e limitações em `Instructions/editor-imagem.md`; código em `frontend/js/imagem-*.js` e

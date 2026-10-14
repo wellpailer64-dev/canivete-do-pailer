@@ -775,7 +775,7 @@ function vePpInit() {
     const valor = el => el.type === 'checkbox' ? el.checked
         : (el.type === 'number' || el.type === 'range') ? parseFloat(String(el.value).replace(',', '.')) : el.value;
     box.addEventListener('input', e => {
-        const p3d = e.target.closest('[data-p3d],[data-p3dcena]');   // Cena 3D (editor-3d.js)
+        const p3d = e.target.closest('[data-p3d],[data-p3dcena],[data-p3dfonte]');   // Cena 3D (editor-3d.js)
         if (p3d && VE.ready) { ve3dEvento(p3d, 'input'); return; }
         const pce = e.target.closest('[data-pce]');   // Propriedades essenciais da Comp (editor-comp.js)
         if (pce && VE.ready) { veCompEssEvento(pce, 'input'); return; }
@@ -786,7 +786,7 @@ function vePpInit() {
         vePpDepois(o, false);
     });
     box.addEventListener('change', e => {
-        const p3d = e.target.closest('[data-p3d],[data-p3dcena]');
+        const p3d = e.target.closest('[data-p3d],[data-p3dcena],[data-p3dfonte],[data-p3dparte]');
         if (p3d && VE.ready) { ve3dEvento(p3d, 'fim'); return; }
         const pce = e.target.closest('[data-pce]');
         if (pce && VE.ready) { veCompEssEvento(pce, 'fim'); return; }
