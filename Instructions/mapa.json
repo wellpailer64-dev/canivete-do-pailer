@@ -407,6 +407,7 @@
     "imagem-cameraraw.js",
     "imagem-caneta.js",
     "imagem-cena.js",
+    "imagem-cor.js",
     "imagem-dissolver.js",
     "imagem-dock.js",
     "imagem-estilo.js",
@@ -461,6 +462,9 @@
     "ie_salvar",
     "ie_salvar_iknv",
     "ie_exportar",
+    "ie_cor_lut",
+    "ie_cor_converter",
+    "ie_cor_perfis",
     "ie_exportar_fatias",
     "ie_dialogo_abrir",
     "ie_dialogo_salvar",
@@ -1151,6 +1155,24 @@
    "args": "spec",
    "modulos": [
     "editor_imagem"
+   ]
+  },
+  "ie_cor_lut": {
+   "args": "perfil=\"FOGRA39\"",
+   "modulos": [
+    "cor_icc"
+   ]
+  },
+  "ie_cor_converter": {
+   "args": "lista, sentido=\"rgb_cmyk\", perfil=\"FOGRA39\"",
+   "modulos": [
+    "cor_icc"
+   ]
+  },
+  "ie_cor_perfis": {
+   "args": "",
+   "modulos": [
+    "vetor_kanivete as vk"
    ]
   },
   "ie_exportar_fatias": {
@@ -2603,6 +2625,7 @@
   "Instructions/webscraper.md": "Web Scraper"
  },
  "modulos": {
+  "Functions/agente_borda.py": "Modo agente: borda laranja nas janelas enquanto um agente (Claude, scripts de teste) está conectado na porta de",
   "Functions/agente_midia.py": "agente_midia.py — ferramentas para um agente (Claude) entender as mídias de um projeto sem assistir/ouvir tudo",
   "Functions/amostras.py": "Amostras de cor (painel Amostras do Editor de Imagem): lê as do Photoshop instalado (Swatches.psp, com os grupos)",
   "Functions/ampliar_imagem.py": "Ampliar foto por IA (super-resolução): Real-ESRGAN ncnn Vulkan (BSD-3, xinntao/Real-ESRGAN), GPU via Vulkan",
@@ -2620,6 +2643,7 @@
   "Functions/compressor_video.py": "compressor_video.py — Compressor de Vídeo para o Canivete do Pailer",
   "Functions/converterimagem.py": "converterimagem.py",
   "Functions/convertermp3.py": "Conversor de áudio (e extração de áudio de vídeos) via ffmpeg",
+  "Functions/cor_icc.py": "Gestão de cor do Photo Kanivete: o app trabalha em sRGB; aqui entram e saem os outros espaços pelo perfil ICC",
   "Functions/editor_imagem.py": "Editor de Imagem (frontend/js/imagem-*.js): abrir e salvar PSD/PSB e imagens comuns",
   "Functions/efeitos_pr.py": "Efeitos de áudio do Premiere no Kanivete (frontend/dados/premiere_audio.json, gerado por tools/premiere_audio_dados.py)",
   "Functions/encoder_monitor.py": "Monitor do Kanivete Encoder: CPU, RAM e placa de vídeo (NVIDIA: uso, encoder, decoder, memória) em tempo real e o",
@@ -2629,6 +2653,7 @@
   "Functions/gdrive_dumper.py": "gdrive_dumper.py — Módulo do GDRIVE DUMPER para o Canivete do Pailer",
   "Functions/gerador_imagem.py": "gerador_imagem.py — Gerar imagem com IA no Photo Kanivete (texto → imagem e edição com imagens de referência)",
   "Functions/gerador_sfx.py": "Gerar efeitos sonoros por texto (EzAudio XL, licença MIT; OpenSound/EzAudio) — local, sem torch, sem login",
+  "Functions/google_fotos.py": "google_fotos.py — álbum compartilhado do Google Fotos no GDRIVE DUMPER (photos.app.goo.gl / photos.google.com/share)",
   "Functions/hardware.py": "Núcleo de hardware do KANIVETE: identifica o PC uma vez e diz a cada parte do app quanto ela pode usar",
   "Functions/instancia_unica.py": "instancia_unica.py — Uma cópia só do app aberta",
   "Functions/kani.py": "Kani — assistente de conversa do KANIVETE (tipo ChatGPT, local e offline), para tarefas do dia a dia e,",
@@ -2645,6 +2670,7 @@
   "Functions/melhorar_audio_runner.py": "Melhorar áudio (estilo Adobe Podcast) — o trabalho pesado, em duas etapas:",
   "Functions/memoria.py": "Modelos de IA carregados sob demanda saem da memória quando ficam parados",
   "Functions/midia.py": "midia.py — utilidades compartilhadas de mídia (caminhos do app, ffmpeg/ffprobe, progresso)",
+  "Functions/modelos_compartilhados.py": "Modelos compartilhados entre as instalações do app na mesma máquina (o .exe em dist/ e o app rodado pelo código)",
   "Functions/musicas.py": "musicas.py — Biblioteca de músicas do KANIVETE (fundo de vinhetas, AutoFrame, edição)",
   "Functions/omnivoice_runner.py": "Runner isolado para operacoes pesadas do OmniVoice",
   "Functions/omnivoice_tool.py": "Ferramenta OmniVoice: geração e sintese de voz sob demanda",

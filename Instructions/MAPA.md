@@ -113,10 +113,10 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 
 ### Imagem
 #### Photo Kanivete — `switchTool('editor-imagem')`
-- **Interface**: `imagem-ajustes.js`, `imagem-api.js`, `imagem-arquivo.js`, `imagem-atalhos.js`, `imagem-cameraraw.js`, `imagem-caneta.js`, `imagem-cena.js`, `imagem-dissolver.js`, `imagem-dock.js`, `imagem-estilo.js`, `imagem-fatias.js`, `imagem-ferramentas.js`, `imagem-filtros.js`, `imagem-fx.js`, `imagem-galeria.js`, `imagem-gerador.js`, `imagem-guias.js`, `imagem-janela.js`, `imagem-nucleo.js`, `imagem-paineis.js`, `imagem-prancheta.js`, `imagem-recuperar.js`, `imagem-texto.js`, `ponte-kanivete.js`, `imagem.css`
+- **Interface**: `imagem-ajustes.js`, `imagem-api.js`, `imagem-arquivo.js`, `imagem-atalhos.js`, `imagem-cameraraw.js`, `imagem-caneta.js`, `imagem-cena.js`, `imagem-cor.js`, `imagem-dissolver.js`, `imagem-dock.js`, `imagem-estilo.js`, `imagem-fatias.js`, `imagem-ferramentas.js`, `imagem-filtros.js`, `imagem-fx.js`, `imagem-galeria.js`, `imagem-gerador.js`, `imagem-guias.js`, `imagem-janela.js`, `imagem-nucleo.js`, `imagem-paineis.js`, `imagem-prancheta.js`, `imagem-recuperar.js`, `imagem-texto.js`, `ponte-kanivete.js`, `imagem.css`
 - **Python**: `Functions/editor_imagem.py`, `Functions/gerador_imagem.py`, `Functions/preencher_conteudo.py`, `Functions/ceu.py`, `Functions/recorte_pro.py`, `Functions/ampliar_imagem.py`, `Functions/fontes.py`, `Functions/psd_texto_modelo.py`, `Functions/psd_so_modelo.py`, `Functions/amostras.py`, `Functions/recuperar.py`
 - **Automação (agente/Jr)**: window.KNV (imagem-api.js); diagramar: KNV.cena / tools/knv.py; Worker: executor.js
-- **API** (`pywebview.api.*`, 33): `ie_curar(regiao, mascara, dx, dy, difusao=0)`, `ie_preencher_ia(regiao, mascara, expandir=None)`, `ie_ceu_mascara(foto, deslocar=0, esmaecer=0)`, `ie_ceu_cor(ceu_png)`, `ie_preencher_conteudo(regiao, mascara, raio=6)`, `ie_instalar_fonte(familia)`, `ie_abrir(path)`, `ie_liberar(doc)`, `ie_mascara_assunto(png_b64, modelo="birefnet-lite")`, `ie_recorte_pro(png_b64)`, `ie_gerador_estado(modelo=None)`, `ie_gerador_baixar(modelo=None)`, `ie_gerar(spec)`, `ie_gerador_cancelar(job)`, `ie_gerador_parar()`, `ie_gerador_remover()`, `ie_fechar(doc)`, `ie_salvar_inicio(doc)`, `ie_salvar(spec)`, `ie_salvar_iknv(spec)`, `ie_exportar(spec)`, `ie_exportar_fatias(spec)`, `ie_dialogo_abrir(multiplos=True)`, `ie_dialogo_salvar(nome, ext="psd", pasta="")`, `ie_colar_windows()`, `ie_miniaturas(paths)`, `ie_miniatura_gravar(path, data_url)`, `ie_baixar_imagem(url)`, `ie_soltar_memoria(tokens)`, `ie_existe(path)`, `ie_prefs(dados=None)`, `ie_amostras(origem="photoshop")`, `ie_fonte_url(arquivo)`
+- **API** (`pywebview.api.*`, 36): `ie_curar(regiao, mascara, dx, dy, difusao=0)`, `ie_preencher_ia(regiao, mascara, expandir=None)`, `ie_ceu_mascara(foto, deslocar=0, esmaecer=0)`, `ie_ceu_cor(ceu_png)`, `ie_preencher_conteudo(regiao, mascara, raio=6)`, `ie_instalar_fonte(familia)`, `ie_abrir(path)`, `ie_liberar(doc)`, `ie_mascara_assunto(png_b64, modelo="birefnet-lite")`, `ie_recorte_pro(png_b64)`, `ie_gerador_estado(modelo=None)`, `ie_gerador_baixar(modelo=None)`, `ie_gerar(spec)`, `ie_gerador_cancelar(job)`, `ie_gerador_parar()`, `ie_gerador_remover()`, `ie_fechar(doc)`, `ie_salvar_inicio(doc)`, `ie_salvar(spec)`, `ie_salvar_iknv(spec)`, `ie_exportar(spec)`, `ie_cor_lut(perfil="FOGRA39")`, `ie_cor_converter(lista, sentido="rgb_cmyk", perfil="FOGRA39")`, `ie_cor_perfis()`, `ie_exportar_fatias(spec)`, `ie_dialogo_abrir(multiplos=True)`, `ie_dialogo_salvar(nome, ext="psd", pasta="")`, `ie_colar_windows()`, `ie_miniaturas(paths)`, `ie_miniatura_gravar(path, data_url)`, `ie_baixar_imagem(url)`, `ie_soltar_memoria(tokens)`, `ie_existe(path)`, `ie_prefs(dados=None)`, `ie_amostras(origem="photoshop")`, `ie_fonte_url(arquivo)`
 - **Testes**: `testes/teste_barra.py`, `testes/teste_cameraraw.py`, `testes/teste_caneta.py`, `testes/teste_ceu.py`, `testes/teste_conteudo.py`, `testes/teste_corte_alt.py`, `testes/teste_dissolver.py`, `testes/teste_editar.py`, `testes/teste_filtros.py`, `testes/teste_galeria.py`, `testes/teste_generativo.py`, `testes/teste_guias.py`, `testes/teste_imagem.py`, `testes/teste_laco.py`, `testes/teste_pincel.py`, `testes/teste_psd_deg_app.py`, `testes/teste_psd_forma.py`, `testes/teste_psd_pre.py`, `testes/teste_psd_refs.py`, `testes/teste_psd_so.py`, `testes/teste_psd_texto.py`
 - **Guias**: `Instructions/editor-imagem.md`, `Instructions/agente/design-photo-kanivete.md`, `Instructions/agente/plano-cena.md`, `Instructions/agente/direcao-carrossel.md`, `Instructions/agente/diretor-de-arte.md`, `Instructions/agente/mapa-imagem.md`
 
@@ -281,6 +281,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/webscraper.md` — Web Scraper
 
 ## 10. Módulos Python (`Functions/`)
+- `Functions/agente_borda.py` — Modo agente: borda laranja nas janelas enquanto um agente (Claude, scripts de teste) está conectado na porta de
 - `Functions/agente_midia.py` — agente_midia.py — ferramentas para um agente (Claude) entender as mídias de um projeto sem assistir/ouvir tudo
 - `Functions/amostras.py` — Amostras de cor (painel Amostras do Editor de Imagem): lê as do Photoshop instalado (Swatches.psp, com os grupos)
 - `Functions/ampliar_imagem.py` — Ampliar foto por IA (super-resolução): Real-ESRGAN ncnn Vulkan (BSD-3, xinntao/Real-ESRGAN), GPU via Vulkan
@@ -298,6 +299,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/compressor_video.py` — compressor_video.py — Compressor de Vídeo para o Canivete do Pailer
 - `Functions/converterimagem.py` — converterimagem.py
 - `Functions/convertermp3.py` — Conversor de áudio (e extração de áudio de vídeos) via ffmpeg
+- `Functions/cor_icc.py` — Gestão de cor do Photo Kanivete: o app trabalha em sRGB; aqui entram e saem os outros espaços pelo perfil ICC
 - `Functions/editor_imagem.py` — Editor de Imagem (frontend/js/imagem-*.js): abrir e salvar PSD/PSB e imagens comuns
 - `Functions/efeitos_pr.py` — Efeitos de áudio do Premiere no Kanivete (frontend/dados/premiere_audio.json, gerado por tools/premiere_audio_dados.py)
 - `Functions/encoder_monitor.py` — Monitor do Kanivete Encoder: CPU, RAM e placa de vídeo (NVIDIA: uso, encoder, decoder, memória) em tempo real e o
@@ -307,6 +309,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/gdrive_dumper.py` — gdrive_dumper.py — Módulo do GDRIVE DUMPER para o Canivete do Pailer
 - `Functions/gerador_imagem.py` — gerador_imagem.py — Gerar imagem com IA no Photo Kanivete (texto → imagem e edição com imagens de referência)
 - `Functions/gerador_sfx.py` — Gerar efeitos sonoros por texto (EzAudio XL, licença MIT; OpenSound/EzAudio) — local, sem torch, sem login
+- `Functions/google_fotos.py` — google_fotos.py — álbum compartilhado do Google Fotos no GDRIVE DUMPER (photos.app.goo.gl / photos.google.com/share)
 - `Functions/hardware.py` — Núcleo de hardware do KANIVETE: identifica o PC uma vez e diz a cada parte do app quanto ela pode usar
 - `Functions/instancia_unica.py` — instancia_unica.py — Uma cópia só do app aberta
 - `Functions/kani.py` — Kani — assistente de conversa do KANIVETE (tipo ChatGPT, local e offline), para tarefas do dia a dia e,
@@ -323,6 +326,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/melhorar_audio_runner.py` — Melhorar áudio (estilo Adobe Podcast) — o trabalho pesado, em duas etapas:
 - `Functions/memoria.py` — Modelos de IA carregados sob demanda saem da memória quando ficam parados
 - `Functions/midia.py` — midia.py — utilidades compartilhadas de mídia (caminhos do app, ffmpeg/ffprobe, progresso)
+- `Functions/modelos_compartilhados.py` — Modelos compartilhados entre as instalações do app na mesma máquina (o .exe em dist/ e o app rodado pelo código)
 - `Functions/musicas.py` — musicas.py — Biblioteca de músicas do KANIVETE (fundo de vinhetas, AutoFrame, edição)
 - `Functions/omnivoice_runner.py` — Runner isolado para operacoes pesadas do OmniVoice
 - `Functions/omnivoice_tool.py` — Ferramenta OmniVoice: geração e sintese de voz sob demanda

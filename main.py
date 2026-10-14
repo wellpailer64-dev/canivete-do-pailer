@@ -2524,6 +2524,14 @@ def gdrive_analyze(url):
             send(log=str(msg))
 
         try:
+            from Functions import google_fotos
+            if google_fotos.e_link(url):
+                # álbum compartilhado do Google Fotos: sem rclone e sem login
+                log("Lendo o álbum do Google Fotos...")
+                a = google_fotos.analisar(url, callback_log=log)
+                send(complete=True, totalSize="—", totalFiles=f"{a['total']} ({a['fotos']} fotos, {a['videos']} vídeos)",
+                     folderName=f"📷 {a['titulo']}")
+                return
             tipo, item_id = parse_link(url)
             if not item_id:
                 send(error="URL inválida! Não encontrei o ID da pasta/arquivo.")
@@ -2600,25 +2608,23 @@ def gdrive_dump(url, destino, perfil="rapida"):
                 pass
 
         try:
-            tipo, item_id = parse_link(url)
+            from Functions import google_fotos
+            fotos = google_fotos.e_link(url)
+            tipo, item_id = parse_link(url) if not fotos else ("album", url)
             if not item_id:
                 emit(log_msg="❌ URL inválida!", complete=True, success=False)
                 return
 
-            remote_args = [item_id] if tipo == "file" else ["--drive-root-folder-id", item_id, "gdrive:"]
             emit(log_msg="Iniciando download...", percent=0)
-
-            success = dump_pasta(
-                remote_args,
-                destino,
-                perfil=perfil,
-                tipo=tipo,
-                callback_log=lambda m: emit(log_msg=m),
-                callback_progresso=lambda p, s: emit(percent=p, stats=s),
-                callback_arquivo=lambda n, p: emit(currentFile=n),
-                stop_event=stop_ev,
-                pause_event=pause_ev,
-            )
+            callbacks = dict(callback_log=lambda m: emit(log_msg=m),
+                             callback_progresso=lambda p, s: emit(percent=p, stats=s),
+                             callback_arquivo=lambda n, p: emit(currentFile=n),
+                             stop_event=stop_ev, pause_event=pause_ev)
+            if fotos:
+                success = google_fotos.baixar(url, destino, perfil=perfil, **callbacks)
+            else:
+                remote_args = [item_id] if tipo == "file" else ["--drive-root-folder-id", item_id, "gdrive:"]
+                success = dump_pasta(remote_args, destino, perfil=perfil, tipo=tipo, **callbacks)
 
             if success:
                 emit(log_msg="✅ Download concluído!", percent=100, complete=True, success=True)

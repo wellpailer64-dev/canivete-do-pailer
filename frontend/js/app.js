@@ -3112,7 +3112,7 @@ function _escHtml(t) {
 function analyzeGdrive() {
     const url = document.getElementById('gdrive-url').value.trim();
     if (!url) {
-        _gdriveStatus('<span class="txt-err">Cole o link do Google Drive primeiro.</span>');
+        _gdriveStatus('<span class="txt-err">Cole o link do Google Drive ou do Google Fotos primeiro.</span>');
         return;
     }
 
@@ -3156,7 +3156,7 @@ function runGdriveDump() {
     const destino = document.getElementById('gdrive-destino').value;
 
     if (!url) {
-        document.getElementById('gdrive-msg').textContent = 'Cole o link do Google Drive primeiro.';
+        document.getElementById('gdrive-msg').textContent = 'Cole o link do Google Drive ou do Google Fotos primeiro.';
         document.getElementById('progress-gdrive').style.display = 'block';
         return;
     }
