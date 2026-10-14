@@ -53,7 +53,7 @@ function ve3dVal(o, k, t) {   // valor da propriedade no tempo t (quadros-chave 
     return kf.at(-1)[1];
 }
 const ve3dChave = m => JSON.stringify([m.c3d.modelos.map(md => [md.id, md.fonte]), m.c3d.chao !== false]);   // o que exige remontar a cena
-const VE3D_VERSAO = 5;   // subir quando o desenho mudar (foco, neblina, materiais): os .mov do cache ficam velhos
+const VE3D_VERSAO = 6;   // subir quando o desenho mudar (foco, neblina, materiais): os .mov do cache ficam velhos
 const ve3dSig = m => 'c3d.' + vePrHash(JSON.stringify([VE3D_VERSAO, m.c3d, VE.seqW, VE.seqH, VE.fps, +m.dur || 0]));
 
 async function ve3dCarregarModelo(md, L) {
@@ -75,12 +75,26 @@ async function ve3dCarregarModelo(md, L) {
         // arquivo de mesmo nome achado ao lado do modelo (cena3d._anexos)
         const ger = new T.LoadingManager(), anexos = r.anexos || {};
         ger.setURLModifier(u => { if (/^(data|blob):/.test(u)) return u; const n = decodeURIComponent(u.split(/[?#]/)[0]).split(/[\\/]/).pop().toLowerCase(); return anexos[n] || u; });
+        // texturas do .mtl carregam DEPOIS do modelo (4K demoram): espera todas antes de desenhar, senão sai branco
+        const fila = { ocioso: true, fim: null };
+        const ini = ger.itemStart.bind(ger); ger.itemStart = u => { fila.ocioso = false; ini(u); };
+        ger.onLoad = () => { fila.ocioso = true; if (fila.fim) fila.fim(); };
         if (r.tipo === 'obj') {
-            const ld = new OBJLoader(ger);
-            if (r.mtl && r.mtl.length) { const mats = await new L.MTLLoader(ger).loadAsync(r.mtl[0]); mats.preload(); ld.setMaterials(mats); }
-            obj = await ld.loadAsync(r.url);
-            const semMtl = !(r.mtl && r.mtl.length);
-            obj.traverse(o => { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(x => ve3dFisico(T, x, semMtl)) : ve3dFisico(T, o.material, semMtl); });
+            const ld = new OBJLoader(ger); let extras = {};
+            if (r.mtl && r.mtl.length) {
+                const mats = await new L.MTLLoader(ger).loadAsync(r.mtl[0]);
+                extras = ve3dMtlPbr(mats.materialsInfo); mats.preload(); ld.setMaterials(mats);
+            }
+            // arestas/pontos soltos ("l"/"p") no mesmo objeto das faces: o OBJLoader passa o objeto INTEIRO para fios
+            // (tênis vira aramado branco, sem textura). O Blender não desenha essas arestas: saem antes de ler.
+            const resp = await fetch(r.url); if (!resp.ok) throw new Error(`${veT('modelo 3D')}: HTTP ${resp.status}`);
+            obj = ld.parse((await resp.text()).replace(/^[lp][ \t][^\n]*\n?/gm, ''));
+            const semMtl = !(r.mtl && r.mtl.length), texL = new T.TextureLoader(ger);
+            const carrega = u => { const t = texL.load(u); t.colorSpace = T.NoColorSpace; t.wrapS = t.wrapT = T.RepeatWrapping; return t; };
+            obj.traverse(o => { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(x => ve3dFisico(T, x, semMtl, extras, carrega)) : ve3dFisico(T, o.material, semMtl, extras, carrega); });
+            const linhas = []; obj.traverse(o => { if (o.isLine || o.isPoints) linhas.push(o); });   // arestas soltas do .obj ("l"): viram fios brancos
+            linhas.forEach(o => o.parent && o.parent.remove(o));
+            if (!fila.ocioso) await new Promise(res => { fila.fim = res; setTimeout(res, 120000); });
         } else {
             const ld = new GLTFLoader(ger).setDRACOLoader(L.draco).setMeshoptDecoder(L.MeshoptDecoder);
             const g = await ld.loadAsync(r.url); obj = g.scene;
@@ -99,17 +113,35 @@ async function ve3dCarregarModelo(md, L) {
     const pe = Math.max(tam.x, tam.z) * s / 2;
     return { raiz, mixer, pe, partes: [...partes] };
 }
-// material do .obj/.mtl (Phong) → físico, MANTENDO as texturas (cor, relevo, normal, transparência); sem .mtl, cinza claro
-function ve3dFisico(T, m, semMtl) {
+// .mtl de exportadores PBR (Substance, Blender): "map_Bump x_Normal.png" é mapa NORMAL (lido como relevo vira um aramado),
+// rugosidade em map_Pr / map_Ns "...Roughness", metal em map_Pm / refl "...Metallic". Corrige o materialsInfo antes do
+// MTLLoader criar os materiais e devolve os mapas PBR que ele não conhece: {material: {rugosidade, metal}}.
+function ve3dMtlPbr(info) {
+    const extras = {}, url = v => String(v || '').split(/\s+/).filter((x, i, a) => !(x.startsWith('-') || (i > 0 && a[i - 1].startsWith('-')))).join(' ').trim();
+    for (const [nome, i] of Object.entries(info || {})) {
+        for (const k of ['map_bump', 'bump']) if (i[k] && !i.norm && /normal|_nrm|_nor[._]|_n\.(png|jpe?g|tga)$/i.test(i[k])) { i.norm = url(i[k]); delete i[k]; }
+        const rug = i.map_pr || (i.map_ns && /rough/i.test(i.map_ns) ? i.map_ns : null), met = i.map_pm || (i.refl && /metal/i.test(i.refl) ? i.refl : null);
+        if (rug && /rough/i.test(i.map_ns || '')) delete i.map_ns;
+        if (rug || met) extras[nome] = { rugosidade: rug ? url(rug) : null, metal: met ? url(met) : null };
+    }
+    return extras;
+}
+// material do .obj/.mtl (Phong) → físico, MANTENDO as texturas (cor, relevo, normal, transparência); sem .mtl, cinza claro.
+// extras (ve3dMtlPbr): rugosidade/metal em textura, carregados por carrega(url) (mesmo gerenciador: troca de caminho e espera)
+function ve3dFisico(T, m, semMtl, extras = {}, carrega = null) {
     if (m && (m.isMeshPhysicalMaterial || m.isMeshStandardMaterial)) return m;
     if (!m || semMtl) return new T.MeshPhysicalMaterial({ name: (m && m.name) || '', color: new T.Color('#d9d4cc'), ...VE3D_MATERIAIS.plastico });   // o nome (usemtl) vira a "parte"
-    const brilho = m.shininess ?? 30;
-    const n = new T.MeshPhysicalMaterial({ name: m.name, color: m.color ? m.color.clone() : new T.Color(1, 1, 1), map: m.map || null, normalMap: m.normalMap || null,
+    const brilho = m.shininess ?? 30, x = extras[m.name] || {};
+    // com textura de cor, o Kd (0,8 padrão do Blender) só escureceria a imagem: no Blender ele nem é usado quando há textura
+    const n = new T.MeshPhysicalMaterial({ name: m.name, color: m.map ? new T.Color(1, 1, 1) : m.color ? m.color.clone() : new T.Color(1, 1, 1), map: m.map || null, normalMap: m.normalMap || null,
         bumpMap: m.bumpMap || null, bumpScale: m.bumpScale ?? 1, alphaMap: m.alphaMap || null, emissive: m.emissive ? m.emissive.clone() : new T.Color(0, 0, 0),
         emissiveMap: m.emissiveMap || null, transparent: !!m.transparent || (m.opacity ?? 1) < 1, opacity: m.opacity ?? 1, side: m.side,
         roughness: Math.min(0.95, Math.max(0.08, 1 - Math.sqrt(brilho / 1000))), metalness: 0 });
     if (n.map) n.map.colorSpace = T.SRGBColorSpace;
     if (n.emissiveMap) n.emissiveMap.colorSpace = T.SRGBColorSpace;
+    if (n.normalMap) n.normalMap.colorSpace = T.NoColorSpace;
+    if (carrega && x.rugosidade) { n.roughnessMap = carrega(x.rugosidade); n.roughness = 1; }
+    if (carrega && x.metal) { n.metalnessMap = carrega(x.metal); n.metalness = 1; }
     return n;
 }
 // sem coordenadas de textura (STL, muitos .obj): projeção de caixa — cada face pega a imagem pelo lado que encara

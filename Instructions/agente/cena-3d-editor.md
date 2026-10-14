@@ -19,6 +19,10 @@ Código: `frontend/js/editor-3d.js` (three.js r170 local em `frontend/vendor/thr
   (decodificador local em `vendor/three/addons/libs`). **.fbx/.blend/.dae/.stl/.ply/.3mf** → .glb no Blender
   (`cena3d.converter` + `Functions/blender_converter.py`: acha texturas perdidas pelo nome, tira câmeras/luzes; cache em
   `<cache>/Cenas3D/convertidos/<hash>.glb`); sem Blender, pergunta e baixa (`ve_3d_blender_instalar`, ~400 MB).
+- .obj real (tênis Air Jordan, 2026-10-14): arestas soltas `l`/`p` no mesmo objeto das faces faziam o OBJLoader virar o
+  objeto INTEIRO em fios (aramado branco) — saem do texto antes do parse. Texturas do .mtl esperadas (LoadingManager)
+  antes de desenhar. `ve3dMtlPbr`: "map_Bump *_Normal" → normal, `map_Ns *Roughness`/`map_Pr` → rugosidade,
+  `refl *Metallic`/`map_Pm` → metal; com textura de cor o Kd 0,8 do Blender é ignorado (cor branca).
 - Aparência (`fonte.cor/material/textura/texRep`, `fonte.partes[nome do material]` por cima): `ve3dAparencia`. Cor
   única tira a textura do arquivo; imagem em modelo sem UV = projeção de caixa (`ve3dUvCaixa`). Partes = nomes dos
   materiais (usemtl/glTF) — rótulo só no corpo da lata. Mudar a fonte remonta o modelo.

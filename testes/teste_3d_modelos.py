@@ -42,6 +42,24 @@ with sync_playwright() as p:
         ok("erro" not in r, f"{nome}: entrou na cena ({r})")
         c = cores(pg, nome)
         ok(c["vermelho"] > 200 and c["verde"] > 200, f"{nome}: textura xadrez aparece ({c})")
+    # 1b) .obj como o do tênis Air Jordan (Blender/Substance): arestas soltas "l" no mesmo objeto das faces (o OBJLoader
+    # virava tudo em fios), nome com espaço e mapa NORMAL em map_Bump, rugosidade em map_Ns e metal em refl
+    import shutil
+    dl = f"{M}/linhas"; os.makedirs(dl, exist_ok=True)
+    src = open(f"{M}/obj/cubo.obj", encoding="utf-8").read().replace("mtllib cubo.mtl", "mtllib cubo com espaco.mtl")
+    open(f"{dl}/cubo com espaco.obj", "w", encoding="utf-8").write(src + "l 1 2\nl 2 3\n")
+    for k in ("BaseColor", "Normal", "Roughness", "Metallic"): shutil.copy(f"{M}/obj/textures/xadrez.png", f"{dl}/cubo com espaco_{k}.png")
+    open(f"{dl}/cubo com espaco.mtl", "w", encoding="utf-8").write("newmtl xadrez\nNs 250\nKd 0.8 0.8 0.8\nmap_Bump cubo com espaco_Normal.png\n"
+        "map_Kd cubo com espaco_BaseColor.png\nmap_Ns cubo com espaco_Roughness.png\nrefl cubo com espaco_Metallic.png\n")
+    pg.evaluate("VE3DAPI.nova({ dur: 1, nome: 'linhas' })")
+    r = pg.evaluate("a => VE3DAPI.modelo({ arquivo: a, ry: 30, rx: 20 }).then(r => r, e => ({ erro: e.message }))", f"{dl}/cubo com espaco.obj")
+    mats = pg.evaluate("""() => { const o = VE3D.rt.get(ve3dAlvo().id).rt.objs[0], ms = []; let fios = 0;
+        o.raiz.traverse(x => { if (x.isLine) fios++; if (x.isMesh) [].concat(x.material).forEach(m => ms.push({ map: !!(m.map && m.map.image), normal: !!m.normalMap, bump: !!m.bumpMap,
+            rug: !!m.roughnessMap, metal: !!m.metalnessMap, cor: m.color.getHexString() })); }); return { ms, fios }; }""")
+    ok(len(mats["ms"]) == 1 and mats["fios"] == 0, f"arestas soltas não viram fios: superfície inteira ({mats})")
+    m0 = (mats["ms"] or [{}])[0]
+    ok(m0.get("map") and m0.get("normal") and not m0.get("bump") and m0.get("rug") and m0.get("metal") and m0.get("cor") == "ffffff",
+       f"textura carregada antes de desenhar; Normal em map_Bump vira normal; rugosidade e metal ({m0})")
     # 2) STL (sem textura) + aparência: imagem com projeção de caixa; depois cor única no .obj
     pg.evaluate("VE3DAPI.nova({ dur: 1, nome: 'stl' })")
     r = pg.evaluate("a => VE3DAPI.modelo({ arquivo: a, ry: 30, rx: 20 }).then(r => r, e => ({ erro: e.message }))", f"{M}/stl/cubo.stl")
