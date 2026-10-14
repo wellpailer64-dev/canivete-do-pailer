@@ -546,9 +546,8 @@ const I18N_EN = {
     'Selecione um clipe na timeline (ou arraste a animação até ele)': 'Select a clip on the timeline (or drag the animation onto it)',
     'Passe o mouse para ver o exemplo. Transição: arraste até o corte entre dois clipes (a borda do bloco muda a duração). Constante: arraste até o clipe ou dê duplo clique com ele selecionado; os ajustes ficam no Controles de efeito.':
         'Hover to preview. Transition: drag onto the cut between two clips (the block edge changes the duration). Constant: drag onto the clip or double-click with it selected; settings are in Effect Controls.',
-    'Modo desenvolvedor': 'Developer mode', 'Faltam': '', 'cliques para o modo desenvolvedor': 'more clicks to developer mode',
-    'clique para o modo desenvolvedor': 'more click to developer mode', 'Modo desenvolvedor ativado': 'Developer mode enabled',
-    'Permitir que o Claude controle a janela (modo agente)': 'Allow Claude to control the window (agent mode)',
+    'Modo desenvolvedor': 'Developer mode', 'Modo desenvolvedor ativado': 'Developer mode enabled',
+    'Permitir controle externo da janela (modo agente)': 'Allow external control of the window (agent mode)',
     'Abre a porta de controle do painel só neste computador (127.0.0.1). Enquanto estiver ligada, qualquer programa do PC pode usar o app. Vale a partir da próxima vez que o app abrir.':
         'Opens the panel control port on this computer only (127.0.0.1). While on, any program on this PC can use the app. Takes effect the next time the app opens.',
     'Agora: ligado em': 'Now: on at', 'Agora: desligado': 'Now: off', 'reabra o app para aplicar': 'reopen the app to apply',
@@ -1065,7 +1064,8 @@ function prefsSetLang(lang) {
     prefsSave();
 }
 
-// ── Modo desenvolvedor (Preferências → Geral): 5 cliques seguidos no botão liberam o modo agente ──
+// ── Modo desenvolvedor (Preferências → Geral): 10 cliques seguidos no botão quase invisível liberam o modo agente,
+// sem contagem na tela ──
 let prefsDevN = 0, prefsDevT = 0;
 function prefsDevClique() {
     if (PREFS.dev) { prefsDevRender(); return; }
@@ -1073,11 +1073,7 @@ function prefsDevClique() {
     if (agora - prefsDevT > 2000) prefsDevN = 0;   // cliques seguidos (até 2 s entre um e outro)
     prefsDevT = agora;
     prefsDevN++;
-    const falta = 5 - prefsDevN;
-    if (falta > 0) {
-        if (prefsDevN >= 2 && typeof toast === 'function') toast(`${i18nT('Faltam')} ${falta} ${i18nT(falta > 1 ? 'cliques para o modo desenvolvedor' : 'clique para o modo desenvolvedor')}`, 'info', 1500);
-        return;
-    }
+    if (prefsDevN < 10) return;
     PREFS.dev = true;
     prefsSave();
     prefsDevRender();

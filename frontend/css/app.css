@@ -1407,10 +1407,10 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .pref-cache-grid .modal-input { padding: 7px 10px; }
 .pref-cache-uso { font: 12px var(--mono); color: var(--text-2); }
 .pref-lang { display: flex; gap: 8px; }
-/* Modo desenvolvedor: botão discreto no fim da aba Geral (5 cliques liberam o modo agente) */
-.pref-dev { margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--border, #2a2a2a); }
-.pref-dev-btn { background: none; border: 0; padding: 2px 0; color: var(--text-3, #666); font-size: 11px; cursor: default; user-select: none; }
-.pref-dev-btn.ativo { color: var(--primary); }
+/* Modo desenvolvedor: quase invisível no canto da aba Geral (10 cliques liberam o modo agente) */
+.pref-dev { margin-top: 18px; }
+.pref-dev-btn { align-self: flex-end; background: none; border: 0; padding: 2px 0; color: var(--text-3, #666); font-size: 8px; opacity: .12; cursor: default; user-select: none; outline: none; }
+.pref-dev-btn.ativo { color: var(--primary); opacity: .6; }
 .pref-dev-corpo { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .pref-dev-corpo[hidden] { display: none; }
 .pref-dev-chk { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
