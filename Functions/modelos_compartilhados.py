@@ -72,12 +72,53 @@ def _tirar_quebrado(p):
             pass
 
 
+def _vizinhas(app):
+    """Instalações irmãs que existem mesmo sem registro: o .exe em <código>/dist/CaniveteDoPailer e a pasta do código."""
+    out = []
+    pai2 = os.path.dirname(os.path.dirname(app))
+    if os.path.basename(os.path.dirname(app)).lower() == "dist" and os.path.isfile(os.path.join(pai2, "main.py")):
+        out.append(pai2)
+    exe = os.path.join(app, "dist", "CaniveteDoPailer")
+    if os.path.isdir(os.path.join(exe, "_internal")):
+        out.append(exe)
+    return out
+
+
+def _mesclar(src, dst, rel, ligados, pulados, prof=0):
+    """Pasta que existe dos dois lados (ex.: um download começou nesta instalação): liga, dentro dela, só o que falta
+    (arquivo pronto da outra no lugar do .part que ainda está baixando). Até 4 níveis."""
+    if prof > 4:
+        return
+    for nome in os.listdir(src):
+        if nome.endswith(_IGNORAR):
+            continue
+        s, d = os.path.join(src, nome), os.path.join(dst, nome)
+        _tirar_quebrado(d)
+        if os.path.isdir(s) and os.path.isdir(d) and not _eh_link(d) and not _eh_link(s):
+            _mesclar(s, d, rel + "/" + nome, ligados, pulados, prof + 1)
+            continue
+        if os.path.lexists(d) or not os.path.exists(s):
+            continue
+        real = os.path.realpath(s)
+        if not _mesmo_disco(real, d):
+            pulados.append(f"{rel}/{nome} (outro disco)")
+            continue
+        try:
+            ok = _juncao(d, real) if os.path.isdir(real) else (os.link(real, d) or True)
+        except OSError as e:
+            ok = False
+            pulados.append(f"{rel}/{nome} ({e})")
+        if ok:
+            ligados.append(f"{rel}/{nome}")
+
+
 def sincronizar(app, log=print):
     """Anota esta instalação e liga os modelos que as outras já têm. Devolve {ligados: [...], pulados: [...]}."""
     app = os.path.abspath(app)
     apps = [p for p in _ler() if os.path.isdir(p)]
-    if _norm(app) not in [_norm(p) for p in apps]:
-        apps.append(app)
+    for p in [app] + _vizinhas(app):
+        if _norm(p) not in [_norm(q) for q in apps]:
+            apps.append(p)
     _gravar(apps)
     ligados, pulados = [], []
     if os.name != "nt":
@@ -96,28 +137,7 @@ def sincronizar(app, log=print):
             if not os.path.isdir(src_base):
                 continue
             os.makedirs(dst_base, exist_ok=True)
-            for nome in os.listdir(src_base):
-                if nome.endswith(_IGNORAR):
-                    continue
-                s, d = os.path.join(src_base, nome), os.path.join(dst_base, nome)
-                _tirar_quebrado(d)
-                if os.path.lexists(d) or not os.path.exists(s):
-                    continue
-                real = os.path.realpath(s)   # liga direto no arquivo de verdade (nunca link de link)
-                if not _mesmo_disco(real, d):
-                    pulados.append(f"{sub}/{nome} (outro disco)")
-                    continue
-                try:
-                    if os.path.isdir(real):
-                        ok = _juncao(d, real)
-                    else:
-                        os.link(real, d)
-                        ok = True
-                except OSError as e:
-                    ok = False
-                    pulados.append(f"{sub}/{nome} ({e})")
-                if ok:
-                    ligados.append(f"{sub}/{nome}")
+            _mesclar(src_base, dst_base, sub, ligados, pulados)
     if ligados:
         log(f"[modelos] {len(ligados)} modelo(s) de outra instalação ligados sem baixar: {', '.join(ligados[:8])}"
             + (" ..." if len(ligados) > 8 else ""))
