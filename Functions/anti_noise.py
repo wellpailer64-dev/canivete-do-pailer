@@ -35,6 +35,9 @@ def executavel():
         if os.path.isfile(p):
             return p
         os.makedirs(os.path.dirname(p), exist_ok=True)
+        from Functions import modelos_compartilhados   # outra instalação (exe/código) já tem: liga em vez de baixar
+        if modelos_compartilhados.pegar_de_outra(p):
+            return p
         tmp = p + ".part"
         req = urllib.request.Request(URL, headers={"User-Agent": "Kanivete"})
         with urllib.request.urlopen(req, timeout=60) as r, open(tmp, "wb") as f:

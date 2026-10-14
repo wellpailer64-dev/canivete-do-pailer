@@ -237,6 +237,11 @@ def baixar(on_progress):
                 if os.path.exists(alvo) and os.path.getsize(alvo) == info["tamanho"] and _sha(alvo) == info["sha256"]:
                     feito += info["tamanho"]
                     continue
+                from Functions import modelos_compartilhados   # outra instalação já tem e confere: liga em vez de baixar
+                if (modelos_compartilhados.pegar_de_outra(alvo) and os.path.getsize(alvo) == info["tamanho"]
+                        and _sha(alvo) == info["sha256"]):
+                    feito += info["tamanho"]
+                    continue
                 parcial = alvo + ".download"
                 ja = os.path.getsize(parcial) if os.path.exists(parcial) else 0
                 req = _ua(URL_BASE + nome)

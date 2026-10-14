@@ -76,6 +76,9 @@ def garantir_modelo(progresso=lambda p, m: None):
         if os.path.isfile(dest) and os.path.getsize(dest) == tam:
             continue
         os.makedirs(os.path.dirname(dest), exist_ok=True)
+        from Functions import modelos_compartilhados   # outra instalação (exe/código) já tem: liga em vez de baixar
+        if modelos_compartilhados.pegar_de_outra(dest) and os.path.getsize(dest) == tam:
+            continue
         tmp = dest + ".download"
         with urllib.request.urlopen(URL + k, timeout=60) as r, open(tmp, "wb") as out:
             while True:

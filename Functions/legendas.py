@@ -68,7 +68,8 @@ def _baixar(repo, arquivo, destino, on_bytes, stop):
     """Baixa um arquivo do Hugging Face com progresso (bytes) e retomada simples (.parte)."""
     import requests
     from huggingface_hub import hf_hub_url
-    if os.path.isfile(destino):
+    from Functions import modelos_compartilhados   # outra instalação (exe/código) já tem: liga em vez de baixar
+    if os.path.isfile(destino) or modelos_compartilhados.pegar_de_outra(destino):
         on_bytes(os.path.getsize(destino))
         return
     parte = destino + ".parte"

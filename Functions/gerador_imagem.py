@@ -103,7 +103,11 @@ def estado(modelo=None):
 # ───────────────────────── instalação (download com retomada) ─────────────────────────
 
 def _baixar_arquivo(url, destino, on_bytes):
-    """Baixa para destino.part (retoma de onde parou) e renomeia no fim."""
+    """Baixa para destino.part (retoma de onde parou) e renomeia no fim. Outra instalação (exe/código) já tem: liga."""
+    from Functions import modelos_compartilhados
+    if modelos_compartilhados.pegar_de_outra(destino):
+        tam = os.path.getsize(destino); on_bytes(tam, tam)
+        return
     parte = destino + ".part"
     feito = os.path.getsize(parte) if os.path.exists(parte) else 0
     req = urllib.request.Request(url, headers={"User-Agent": "CaniveteDoPailer", **({"Range": f"bytes={feito}-"} if feito else {})})

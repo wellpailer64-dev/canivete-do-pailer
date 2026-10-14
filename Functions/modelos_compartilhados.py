@@ -199,3 +199,32 @@ def deduplicar(principal, copia, log=print):
     log(f"[modelos] {r['trocados']} cópia(s) idêntica(s) viraram link: {r['bytes'] / 2**30:.2f} GB liberados"
         + (f"; {len(r['em_uso'])} em uso ficaram" if r["em_uso"] else ""))
     return r
+
+
+def pegar_de_outra(destino, app=None):
+    """Antes de baixar um arquivo de modelo: se outra instalação já tem o MESMO arquivo (mesmo caminho dentro da pasta do
+    app), liga (link físico) e devolve True — o download nem começa. Serve com o app aberto (a sincronização da abertura
+    não pega o que só é pedido no meio do uso). Fora da pasta do app ou em outro disco: False (baixa normal)."""
+    try:
+        app = os.path.abspath(app or app_dir())
+        destino = os.path.abspath(destino)
+        rel = os.path.relpath(destino, app)
+    except ValueError:
+        return False
+    if rel.startswith(".."):
+        return False
+    if os.path.isfile(destino):
+        return True
+    for outro in _ler() + _vizinhas(app):
+        if _norm(outro) == _norm(app):
+            continue
+        s = os.path.join(outro, rel)
+        if os.path.isfile(s) and os.path.getsize(s) > 0 and _mesmo_disco(s, destino):
+            try:
+                os.makedirs(os.path.dirname(destino), exist_ok=True)
+                os.link(os.path.realpath(s), destino)
+                print(f"[modelos] {rel} ligado de {outro} (sem baixar)")
+                return True
+            except OSError:
+                continue
+    return False
