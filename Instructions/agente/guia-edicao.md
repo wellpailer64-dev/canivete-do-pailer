@@ -119,6 +119,19 @@ cobertura, texto, ajuste, som) e a fala transcrita embaixo. 1ª vez ~4 min (extr
 Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lugar de prints do monitor).
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-10-14 GaIA V2 (Finep, 8:49, "estamos ficando muito PRO"): MOTIONS perfeitos (ajudam a narrativa) — manter.
+  CORRIGIR: (1) CORTE com padrão profissional: cortar no fim de frase / fim de movimento / no contexto do que é dito;
+  nunca voltar para uma tomada curta (<~1,5 s) entre o fim de um motion e a próxima cena — o motion termina junto com a
+  cena ou a cena seguinte começa com ele; sem "pisca" de plano. (2) Mudança brusca de ambiente/bloco → flare/leak ou fade
+  to black (curto) emendando, não corte seco. (3) SFX: menos e no lugar — só quando casa com o que se vê (whoosh só em
+  movimento real na tela, digitais só em UI/dado); nada de SFX em toda entrada de texto; revisar exagero antes de
+  entregar. (4) FOTOS: precisam de critério estético (ver direcao-de-arte: retrato emoldurado sobre fundo desfocado da
+  própria foto, rosto nunca sob o GC, nada de foto pequena perdida, Ken Burns leve, resolução mínima ~700 px no lado
+  exibido). (5) Tomada boa e curta: esticar com velocidade só até ~75% (perde fluidez abaixo disso); antes usar mais do
+  arquivo. (6) Timeline organizada: cor por tipo de camada (GC, motion explicativo, ajuste, apoio, vídeo base, áudio).
+  (7) Pessoas: GC sempre sobre a pessoa CERTA — confirmar quem é quem com o usuário/fotos antes (errei Diogo, Jhordano,
+  Fabrício, Denise, Vitor); conferir que uma frase do plano não casou com outra ocorrência (em("especialistas e") pegou
+  "especialistas em").
 - 2026-10-13 QUIZ CARLINHOS (Dia do Instrutor, "mandou muito bem"): formato = erros de gravação na abertura → cartela
   título → por pergunta: cartela (pincel azul + texto, "Pergunta N", whoosh + leak) sobre quem pergunta, respostas dos
   3 em sequência → música emotiva na última pergunta. Notas: legenda sobre imagem clara precisa de APOIO = degradê azul

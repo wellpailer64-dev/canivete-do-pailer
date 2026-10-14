@@ -92,8 +92,9 @@ function veMixUi() {
     el.classList.toggle('rack', veMixRackAberto());
     el.querySelectorAll('.ve-mix-slot').forEach(b => {
         const f = ((VE_TRK.a[+b.dataset.mk] || {}).fx || [])[+b.dataset.slot], d = f && VE_AFX[f.t];
-        b.textContent = d ? d.nome : '';
-        b.title = d ? `${d.nome}${f.on === false ? ' · ' + veT('desligado') : ''} · ${veT('clique para ajustar')}` : veT('Escolher efeito');
+        const ss = !!d && !!d.pr && !d.som;   // efeito do Premiere sem processamento no Kanivete: não muda o som aqui
+        b.textContent = d ? (ss ? `${d.nome} · ${veT('só Premiere')}` : d.nome) : '';
+        b.title = d ? `${d.nome}${f.on === false ? ' · ' + veT('desligado') : ''}${ss ? ' · ' + veT('não muda o som no Kanivete (vai e volta intacto para o Premiere)') : ''} · ${veT('clique para ajustar')}` : veT('Escolher efeito');
         b.classList.toggle('cheio', !!d);
         b.classList.toggle('off', !!d && f.on === false);
         b.classList.toggle('semsom', !!d && !!d.pr && !d.som);
@@ -286,7 +287,7 @@ function veMixSlot(sl, k, i) {
     const cats = VE_MIX_CATS.map(() => []);
     Object.entries(VE_AFX).forEach(([t, d]) => { if (t !== 'antinoise' && t !== 'trk') cats[veMixCatDe(d)].push([t, d]); });
     cats.forEach(l => l.sort((a, b) => a[1].nome.localeCompare(b[1].nome)));
-    const ef = ([t, d]) => `<div class="ve-mix-ef${d.pr && !d.som ? ' semsom' : ''}" data-t="${t}" title="${d.pr && !d.som ? veT('Sem prévia no Kanivete: vai e volta intacto para o Premiere') : d.tag || ''}">${d.nome}</div>`;
+    const ef = ([t, d]) => `<div class="ve-mix-ef${d.pr && !d.som ? ' semsom' : ''}" data-t="${t}" title="${d.pr && !d.som ? veT('Não muda o som no Kanivete: vai e volta intacto para o Premiere') : d.tag || ''}">${d.nome}${d.pr && !d.som ? `<small class="ve-mix-tag">${veT('só Premiere')}</small>` : ''}</div>`;
     const html = `<input class="ve-mix-busca" placeholder="${veT('Buscar efeito')}">`
         + `<div class="ve-mix-menu"><div class="ve-mix-nenhum" data-nenhum="1">${veT('Nenhum')}</div><hr>`
         + VE_MIX_CATS.map(([, nome], j) => cats[j].length ? `<div class="ve-mix-catit" data-c="${j}">${veT(nome)}<i>›</i></div>` : '').join('')

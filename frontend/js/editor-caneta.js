@@ -181,7 +181,9 @@ function veTlConfigMenu(btn) {
     const it = (id, nome, on) => `<button class="ve-ctx-item" data-cfg="${id}">${on ? '✓' : '<span style="display:inline-block;width:.8em"></span>'} ${veT(nome)}</button>`;
     m.innerHTML = it('linhas', 'Mostrar linhas de volume e opacidade', veCnMostrar())
         + it('snap', 'Ímã (encaixar)', VE.snap) + it('vinculo', 'Seleção vinculada', VE.vinculo)
-        + '<hr>' + it('alvo-todas', 'Todas as trilhas como alvo', false);
+        + '<hr>' + it('alvo-todas', 'Todas as trilhas como alvo', false)
+        + '<hr>' + it('cor-tipo', 'Cor por tipo de camada', veCorTipoLigada())
+        + (veCorTipoLigada() ? `<div class="ve-tl-legenda">${VE_COR_TIPO.map(([, nome, cor]) => `<span><i style="background:${(VE_CORES.find(x => x[0] === cor) || [])[2]}"></i>${veT(nome)}</span>`).join('')}</div>` : '');
     doc.body.appendChild(m);
     const r = btn.getBoundingClientRect();
     m.style.left = r.left + 'px'; m.style.top = (r.bottom + 4) + 'px';
@@ -193,6 +195,7 @@ function veTlConfigMenu(btn) {
         if (id === 'linhas') { veCnMostrar(!veCnMostrar()); veDraw(); }
         else if (id === 'snap') veToggleSnap();
         else if (id === 'vinculo') veToggleVinculo();
+        else if (id === 'cor-tipo') { try { localStorage.setItem('ve_cor_tipo', veCorTipoLigada() ? '0' : '1'); } catch (e) { /* sem armazenamento */ } veDraw(); }
         else if (id === 'alvo-todas') { [...VE_TRK.v, ...VE_TRK.a].forEach(t => { if (t) delete t.semAlvo; }); veBuildHeads(); veToast(veT('Todas as trilhas como alvo')); }
         m.remove();
     });

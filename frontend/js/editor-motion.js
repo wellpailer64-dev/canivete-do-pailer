@@ -552,7 +552,13 @@ function veMoAssinatura(c, lista) {
 // Vídeo para desenhar a camada fora da prévia: o arquivo original (ou a cópia de edição), quadro exato
 async function veMoVideo(m) {
     VEMO.videos = VEMO.videos || new Map();
-    if (VEMO.videos.has(m.id)) return VEMO.videos.get(m.id);
+    if (VEMO.videos.has(m.id)) { const v = VEMO.videos.get(m.id); VEMO.videos.delete(m.id); VEMO.videos.set(m.id, v); return v; }
+    // o WebView só abre uns poucos vídeos ao mesmo tempo: com 10 guardados o 11º nunca carregava e a exportação parava
+    // ali para sempre (GaIA V2). Ficam só os 3 usados por último; o resto fecha.
+    for (const [id, velho] of [...VEMO.videos].slice(0, Math.max(0, VEMO.videos.size - 2))) {
+        VEMO.videos.delete(id);
+        try { velho.removeAttribute('src'); velho.load(); } catch (e) { /* já fechado */ }
+    }
     const v = document.createElement('video');
     v.muted = true; v.preload = 'auto'; v.crossOrigin = 'anonymous';
     let url = null;
@@ -560,7 +566,8 @@ async function veMoVideo(m) {
     const tentar = u => new Promise(res => {
         if (!u) { res(false); return; }
         const ok = () => { limpar(); res(true); }, erro = () => { limpar(); res(false); };
-        const limpar = () => { v.removeEventListener('loadeddata', ok); v.removeEventListener('error', erro); };
+        const to = setTimeout(erro, 30000);   // sem resposta: tenta a outra cópia e, se nada, erro em vez de travar
+        const limpar = () => { clearTimeout(to); v.removeEventListener('loadeddata', ok); v.removeEventListener('error', erro); };
         v.addEventListener('loadeddata', ok); v.addEventListener('error', erro);
         v.src = u; v.load();
     });

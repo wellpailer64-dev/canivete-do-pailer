@@ -105,3 +105,20 @@ escala com curva), `kf()` (quadro-chave), `fx()` (efeito), `texto()/img()/forma(
   livres (wiggle, loop) — pendências em `plano-motion.md`.
 - Texto em caminho / máscara de texto revelando vídeo; luz varrendo o título (fosco alfa de um brilho inclinado).
 - Câmera 3D com profundidade nas camadas 2D (paralaxe) — a Cena 3D existe, falta o "3D de camada" do AE.
+
+## Peça: V1 GaIA (Smart Tree/Finep, 8 min, 2026-10-14) — `D:/kanivete_testes/smarttree/v1/` (base.py + montar_v1.py + montador.js)
+- 🔓 **Documentário inteiro por plano em código**: cobertura e motion presos às PALAVRAS da narração (`em("frase", apos)`
+  sobre o palavras.json do Whisper); respiros = trechos da narração com folga (`RESPIROS`). Narração nova = transcrever e
+  remontar (o ritmo acompanha). `sequencia([...])` = cada tomada vai até a próxima.
+- 🔓 **Comps automáticas**: `with comp("Motion · X"):` — cada camada sobe uma trilha; o montador chama `veCompDeClipes`
+  e a timeline principal fica com 6 trilhas nomeadas (base, textura, vertical, motion, GC, acabamento). Remontar apaga as
+  Comps velhas da pasta.
+- 🔓 **Vertical no 16:9 (pedido do Pailer)**: recorte 1080×1600 por máscara (9:16 corta em cima/baixo, 3:4 nas laterais)
+  na altura toda + o mesmo vídeo ampliado com desfoque 55 e brilho −45 no fundo + textura (grão + sombra macia) entre eles.
+- 🔓 **Raízes-circuito** (linguagem do logo Smart Trees): `linha()` (forma 'lin' + aparar caminho 0→100, rot = atan2) +
+  `no()` (ponto que pula com halo PNG) — redes, diagramas de camadas, linha do tempo, degraus, TRL, anel de progresso
+  (elipse só contorno com apFim).
+- 🔓 **Efeitos sonoros ligados ao motion**: cada nó/etiqueta/GC/lettering registra um evento; o som entra com o PICO no
+  quadro (medido: `sfx_medidas.json`), volume normalizado por tipo, intervalo mínimo por tipo (whoosh 2,6 s, tick 0,42 s).
+- Armadilha: fonte instalada só para o usuário (Fraunces) NÃO aparece no editor (cai no Arial). Conferir medindo a
+  largura no canvas (`measureText` igual ao Arial = falta); `document.fonts.check` sempre diz sim.

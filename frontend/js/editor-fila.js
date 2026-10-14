@@ -12,14 +12,42 @@ const VE_FILA_PILLS = ['format', 'quality', 'codec', 'bits', 'taxa', 'blocos'];
 // ── configurações (formulário ↔ item) ──
 function veFilaCfgLer() {
     const pills = Object.fromEntries(VE_FILA_PILLS.map(k => [k, vePill(k)]));
+    veFilaDriveCampo();
     return { pills, res: $ve('ve-res').value, gpu: $ve('ve-gpu').checked, noAudio: $ve('ve-noaudio').checked, mbps: $ve('ve-exp-mbps').value,
-             nome: $ve('ve-exp-nome').value.trim(), dest: VE.dest || null, destLabel: $ve('ve-dest-label').textContent };
+             nome: $ve('ve-exp-nome').value.trim(), dest: VE.dest || null, destLabel: $ve('ve-dest-label').textContent,
+             drive: ($ve('ve-drive-link').value || '').trim() };
+}
+// Campo "Enviar ao Drive" (opcional) logo abaixo de "Salvar em": colou o link de uma pasta, o render pronto sobe sozinho
+// para ela (Functions/drive_envio.py), com barra de progresso no item da fila. O último link fica lembrado.
+function veFilaDriveCampo() {
+    if ($ve('ve-drive-link')) return;
+    const dest = $ve('ve-dest-label'); const campo = dest && dest.closest('.ve-field'); if (!campo) return;
+    const div = document.createElement('div');
+    div.className = 've-field ve-drive-campo';
+    div.innerHTML = `<label>Enviar ao Google Drive <small>(opcional)</small></label>
+        <div class="ve-dest"><input type="text" id="ve-drive-link" class="ve-input" spellcheck="false"
+            placeholder="Cole o link de uma pasta do Drive: sobe sozinho quando o render terminar">
+        <button class="ve-btn ve-btn-sm" title="Não enviar" onclick="$ve('ve-drive-link').value=''; veFilaDriveLembrar()"><svg class="i"><use href="#i-x"/></svg></button></div>
+        <small class="ve-drive-aviso" id="ve-drive-aviso"></small>`;
+    campo.after(div);
+    let salvo = ''; try { salvo = localStorage.getItem('ve_drive_link') || ''; } catch (e) { /* sem armazenamento */ }
+    const inp = $ve('ve-drive-link'); inp.value = salvo;
+    inp.addEventListener('input', () => veFilaDriveLembrar());   // o 'input' do formulário leva o link ao item escolhido
+    veFilaDriveConferir();
+}
+function veFilaDriveLembrar() { try { localStorage.setItem('ve_drive_link', $ve('ve-drive-link').value.trim()); } catch (e) { /* sem armazenamento */ } veFilaDriveConferir(); }
+function veFilaDriveConferir() {
+    const v = ($ve('ve-drive-link') || {}).value || '', av = $ve('ve-drive-aviso'); if (!av) return;
+    const ok = !v.trim() || /\/folders\/[\w-]+|[?&]id=[\w-]+|^[\w-]{25,}$/.test(v.trim());
+    av.textContent = !v.trim() ? '' : ok ? 'O render pronto sobe para essa pasta (a conta precisa poder editar nela).' : 'Esse link não é de uma pasta do Drive.';
+    av.classList.toggle('erro', !ok);
 }
 function veFilaCfgAplicar(c) {
     for (const k of VE_FILA_PILLS) if (c.pills[k]) veExpPill(k, c.pills[k]);
     if ([...$ve('ve-res').options].some(o => o.value === c.res)) $ve('ve-res').value = c.res;
     $ve('ve-gpu').checked = c.gpu; $ve('ve-noaudio').checked = c.noAudio; $ve('ve-exp-mbps').value = c.mbps;
     $ve('ve-exp-nome').value = c.nome; VE.dest = c.dest; $ve('ve-dest-label').textContent = c.destLabel;
+    veFilaDriveCampo(); if ($ve('ve-drive-link')) { $ve('ve-drive-link').value = c.drive || ''; veFilaDriveConferir(); }
     veUpdateExportSummary();
 }
 function veFilaEtiquetas(c, dur) {
@@ -27,7 +55,8 @@ function veFilaEtiquetas(c, dur) {
     const q = { high: 'Máxima', medium: 'Alta', fast: 'Boa', low: 'Leve' }[c.pills.quality] || '';   // os nomes dos botões de Qualidade
     const res = c.res === 'original' ? 'Original' : c.res + 'p';
     const ext = !audio && c.pills.codec === 'prores' && ['mp4', 'mov', 'mkv'].includes(f) ? 'mov' : f;
-    return [ext.toUpperCase(), ...(audio ? [] : [cod + (c.pills.bits === '10' ? ' 10 bits' : ''), res, c.pills.taxa === 'mbps' ? c.mbps + ' Mbps' : q]), veHuman(dur)].filter(Boolean);
+    return [ext.toUpperCase(), ...(audio ? [] : [cod + (c.pills.bits === '10' ? ' 10 bits' : ''), res, c.pills.taxa === 'mbps' ? c.mbps + ' Mbps' : q]), veHuman(dur),
+            c.drive ? '→ Drive' : ''].filter(Boolean);
 }
 function veFilaArgs(it) {   // monta os argumentos do video_cutter_export com o plano congelado + as configurações do item
     const c = it.cfg, P = it.plano, fmt = c.pills.format || 'mp4';
@@ -54,7 +83,29 @@ async function veFilaAdicionarAtual(nome = null, cfg = null) {
         if (!VEFILA.preparando && VEFILA.iniciarDepois) { VEFILA.iniciarDepois = false; veFilaIniciar().catch(e => veToast(e.message)); }
     }
 }
+// Antes de congelar: confere no DISCO se cada arquivo que a timeline usa (direto ou dentro de Comp) ainda existe. A
+// marca de offline só vinha da abertura do projeto: um arquivo movido depois saía PRETO no export, sem aviso (GaIA,
+// foto do Jhordano, 2026-10-14). O que sumiu vira offline e o aviso diz onde está na timeline.
+async function veFilaConferirArquivos() {
+    const api = window.pywebview && window.pywebview.api; if (!api || !api.ve_arquivos_faltando) return;
+    const usadas = new Map(), vistas = new Set();
+    const varrer = (clips, base) => (clips || []).forEach(c => {
+        const m = VE.media[c.m || 0]; if (!m) return;
+        if (m.path && !usadas.has(m.id)) usadas.set(m.id, base != null ? base : c.st);
+        if (m.comp && m.sequenceId && !vistas.has(m.sequenceId)) {
+            vistas.add(m.sequenceId);
+            const s = (VE.sequences || []).find(x => x.id === m.sequenceId);
+            if (s && s.id !== VE.activeSequence) varrer(s.clips, base != null ? base : c.st);
+        }
+    });
+    varrer(VE.clips, null);
+    const ms = [...usadas.keys()].map(id => VE.media[id]).filter(m => m && !veMediaOffline(m));
+    const falta = new Set(await api.ve_arquivos_faltando(ms.map(m => m.path)).catch(() => []));
+    ms.filter(m => falta.has(m.path)).forEach(m => { m.offline = true; m._quando = usadas.get(m.id); });
+    if (falta.size && typeof vePjRender === 'function') vePjRender();
+}
 async function veFilaAdicionarAgora(nome, cfg) {
+    await veFilaConferirArquivos();
     { const off = veOfflineNaTimeline(); if (off.length) { veAvisoOffline(off); return null; } }
     const msg = m => { const el = $ve('ve-fila-msg'); if (el) el.textContent = m || ''; };
     msg('Preparando ' + veFilaNomeTimeline() + '… (o render começa sozinho)');
@@ -125,6 +176,8 @@ function veFilaEvento(ev) {
     it.estado = ev.success ? 'pronto' : ev.cancelled ? 'cancelado' : 'erro';
     it.saida = ev.output_path; it.erro = ev.error; it.pct = ev.success ? 100 : it.pct; it.tempo = (Date.now() - it.t0) / 1000;
     VEFILA.atual = null; VE.exportRunning = false;
+    if (it.estado === 'pronto' && it.saida && !it.cfg.noAudio) veFilaMedirVolume(it);
+    if (it.estado === 'pronto' && it.cfg.drive && it.saida) veFilaDriveEnviar(it);
     if (it.estado === 'cancelado') { VEFILA.rodando = false; document.querySelector('.menu-item[data-tool="video-cutter"]')?.classList.remove('rodando'); veFilaRender(); return; }
     veFilaRender();
     veFilaProximo();
@@ -147,6 +200,53 @@ function veFilaSelecionar(id) {   // carrega as configurações do item no formu
     veFilaCfgAplicar(it.cfg);
     veFilaRender();
 }
+// Volume do render pronto (LUFS integrado): etiqueta no item; fora de -20..-11 avisa (YouTube/Instagram ≈ -14..-16)
+async function veFilaMedirVolume(it) {
+    const api = window.pywebview && window.pywebview.api; if (!api || !api.ve_medir_volume) return;
+    const r = await api.ve_medir_volume(it.saida).catch(() => null);
+    if (!r || !r.success || r.lufs == null) return;
+    it.volume = r;
+    const baixo = r.lufs < -20, alto = r.lufs > -11;
+    if (baixo || alto) veToast(`Som de "${it.cfg.nome}" ${baixo ? 'BAIXO' : 'ALTO'} demais: ${r.lufs.toFixed(1)} LUFS (o ideal fica entre -16 e -14). Confira o Mix no Mixer.`);
+    veFilaRender();
+}
+// Envio ao Drive do item pronto: o Python sobe (rclone) e aqui só acompanha, 1×/s, na barra do item
+async function veFilaDriveEnviar(it) {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.ve_drive_enviar) { it.drive = { fase: 'erro', erro: 'esta versão do app ainda não envia ao Drive (atualize)' }; veFilaRender(); return; }
+    it.drive = { fase: 'conferindo', pct: 0 };
+    veFilaRender();
+    const r = await api.ve_drive_enviar(it.saida, it.cfg.drive);
+    if (!r || !r.success) { it.drive = { fase: 'erro', erro: (r && r.error) || 'falhou' }; veFilaRender(); veToast('Drive: ' + it.drive.erro); return; }
+    it.drive.id = r.id;
+    const passo = async () => {
+        const e = await api.ve_drive_estado(r.id).catch(() => null);
+        if (e && e.success) it.drive = { ...e, id: r.id };
+        veFilaRenderItem(it);
+        if (!e || !['pronto', 'erro', 'cancelado'].includes(e.fase)) { setTimeout(passo, 1000); return; }
+        veFilaRender();
+        if (e.fase === 'pronto') { veToast(`"${it.cfg.nome}" está no Drive`); if (typeof playConcluido === 'function') playConcluido(); }
+        else if (e.fase === 'erro') veToast('Drive: ' + e.erro);
+    };
+    passo();
+}
+function veFilaDriveTexto(d) {
+    if (!d) return '';
+    const mb = b => (b / 1048576).toFixed(0) + ' MB';
+    if (d.fase === 'conferindo') return 'Drive: conferindo a pasta…';
+    if (d.fase === 'enviando') return `Drive: enviando ${Math.round(d.pct || 0)}% · ${mb(d.enviado || 0)} de ${mb(d.total || 0)}` +
+        (d.vel ? ` · ${(d.vel / 1048576).toFixed(1)} MB/s` : '') + (d.eta != null ? ` · falta ~${veHuman(d.eta)}` : '');
+    if (d.fase === 'pronto') return 'Drive: enviado';
+    if (d.fase === 'cancelado') return 'Drive: envio cancelado';
+    return 'Drive: ' + (d.erro || 'falhou');
+}
+function veFilaDriveHtml(it) {
+    const d = it.drive; if (!d) return '';
+    return `<span class="ve-fila-drive ${d.fase}"><span class="ve-fila-barra"><i style="width:${d.pct || 0}%"></i></span><small>${veEsc(veFilaDriveTexto(d))}</small>
+        ${d.fase === 'pronto' && d.link ? `<button class="ve-btn ve-btn-sm" onclick="event.stopPropagation(); window.pywebview.api.kani_abrir_link(${veEsc(JSON.stringify(d.link))})">Abrir no Drive</button>` : ''}
+        ${['conferindo', 'enviando'].includes(d.fase) && d.id ? `<button class="ve-btn ve-btn-sm" onclick="event.stopPropagation(); window.pywebview.api.ve_drive_cancelar(${d.id})">Cancelar envio</button>` : ''}
+        ${['erro', 'cancelado'].includes(d.fase) ? `<button class="ve-btn ve-btn-sm" onclick="event.stopPropagation(); veFilaDriveEnviar(VEFILA.itens.find(x => x.id === ${it.id}))">Enviar de novo</button>` : ''}</span>`;
+}
 function veFilaFormMudou() {   // formulário mexido com um item escolhido: vale para ele
     const it = VEFILA.itens.find(x => x.id === VEFILA.sel);
     if (it && it.estado !== 'rodando') { it.cfg = veFilaCfgLer(); veFilaRender(); }
@@ -155,6 +255,7 @@ function veFilaFormMudou() {   // formulário mexido com um item escolhido: vale
 // ── interface (dentro da janela Exportar) ──
 const VE_FILA_ESTADO = { espera: 'Na fila', rodando: 'Renderizando', pronto: 'Pronto', erro: 'Erro', cancelado: 'Cancelado' };
 function veFilaMontar() {
+    veFilaDriveCampo();
     if ($ve('ve-fila-col')) return;
     const box = $ve('ve-export').querySelector('.ve-modal-box'), form = $ve('ve-export-form');
     box.classList.add('ve-exp-com-fila');
@@ -180,6 +281,9 @@ function veFilaRenderItem(it) {
     el.querySelector('.ve-fila-barra i').style.width = it.pct + '%';
     const eta = it.estado === 'rodando' && it.pct > 3 ? ' · falta ~' + veHuman((Date.now() - it.t0) / 1000 / it.pct * (100 - it.pct)) : '';
     el.querySelector('.ve-fila-est').textContent = (VE_FILA_ESTADO[it.estado] || it.estado) + (it.estado === 'rodando' ? ` ${Math.round(it.pct)}%${eta}` : '');
+    const dv = el.querySelector('.ve-fila-drive');
+    if (it.drive && dv && dv.classList.contains(it.drive.fase)) { dv.querySelector('i').style.width = (it.drive.pct || 0) + '%'; dv.querySelector('small').textContent = veFilaDriveTexto(it.drive); }
+    else if (it.drive) return veFilaRender();
     veFilaBadge();
 }
 function veFilaRender() {
@@ -188,8 +292,8 @@ function veFilaRender() {
     L.innerHTML = VEFILA.itens.length ? VEFILA.itens.map((it, i) => `<div class="ve-fila-item ${it.estado}${VEFILA.sel === it.id ? ' sel' : ''}" data-fila="${it.id}" title="${it.estado === 'espera' ? 'Clique para ver e mudar as configurações deste item' : ''}">
         <span class="ve-fila-n">${i + 1}</span>
         <span class="ve-fila-info"><b>${veEsc(it.cfg.nome)}</b><small>${veEsc(it.timeline)}${it.tempo ? ' · feito em ' + veHuman(it.tempo) : ''}${it.erro ? ' · ' + veEsc(String(it.erro).slice(0, 120)) : ''}</small>
-            <span class="ve-fila-tags">${veFilaEtiquetas(it.cfg, it.dur).map(t => `<i>${veEsc(t)}</i>`).join('')}</span>
-            <span class="ve-fila-barra"><i style="width:${it.pct}%"></i></span></span>
+            <span class="ve-fila-tags">${veFilaEtiquetas(it.cfg, it.dur).map(t => `<i>${veEsc(t)}</i>`).join('')}${it.volume ? `<i class="ve-fila-vol${it.volume.lufs < -20 || it.volume.lufs > -11 ? ' ruim' : ''}" title="Volume integrado do som exportado${it.volume.pico != null ? ' · pico ' + it.volume.pico.toFixed(1) + ' dB' : ''}">${it.volume.lufs.toFixed(1)} LUFS</i>` : ''}</span>
+            <span class="ve-fila-barra"><i style="width:${it.pct}%"></i></span>${veFilaDriveHtml(it)}</span>
         <span class="ve-fila-est">${VE_FILA_ESTADO[it.estado] || it.estado}${it.estado === 'rodando' ? ` ${Math.round(it.pct)}%` : ''}</span>
         <span class="ve-fila-acoes">${it.estado === 'pronto' ? `<button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.open_file(${veEsc(JSON.stringify(it.saida))})" title="Assistir"><svg class="i"><use href="#i-play"/></svg></button><button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.reveal_file(${veEsc(JSON.stringify(it.saida))})" title="Mostrar na pasta"><svg class="i"><use href="#i-folder"/></svg></button>` : ''}
             ${it.estado === 'erro' || it.estado === 'cancelado' ? `<button class="ve-btn ve-btn-sm" onclick="veFilaRefazer(${it.id})">De novo</button>` : ''}

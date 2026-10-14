@@ -1584,6 +1584,10 @@ def preparar_midia(path, emit, stop_event=None, prioridade=1, leve=False, trecho
     except Exception as e:
         emit({"stage": "error", "error": f"Não foi possível analisar o vídeo: {e}"})
         return
+    if info["duration"] > 0 and not info["has_video"] and info.get("has_audio"):
+        # .mp4/.mov só com som (narração gravada no celular, áudio exportado em MP4): a página troca a mídia para áudio
+        emit({"stage": "so_audio", "duration": info["duration"]})
+        return
     if info["duration"] <= 0 or not info["has_video"]:
         emit({"stage": "error", "error": "Arquivo sem vídeo ou com duração inválida."})
         return

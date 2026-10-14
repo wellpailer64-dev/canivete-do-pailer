@@ -108,6 +108,13 @@
     "ve_render_trecho",
     "ve_render_cancelar",
     "ve_comp_render",
+    "ve_comp_pausar",
+    "ve_medir_volume",
+    "ve_arquivos_faltando",
+    "ve_drive_enviar",
+    "ve_drive_estado",
+    "ve_drive_cancelar",
+    "ve_drive_link_ok",
     "ve_comp_cancelar",
     "ve_ovt_render",
     "ve_psd_importar",
@@ -796,6 +803,7 @@
   "prefs_save",
   "check_update",
   "apply_update",
+  "fechar_visto",
   "sair_app",
   "toggle_fullscreen",
   "janela_cmd",
@@ -1054,6 +1062,44 @@
   "ve_comp_render": {
    "args": "base, h, job",
    "modulos": []
+  },
+  "ve_comp_pausar": {
+   "args": "pausar=True",
+   "modulos": []
+  },
+  "ve_medir_volume": {
+   "args": "caminho",
+   "modulos": [
+    "audio_cutter"
+   ]
+  },
+  "ve_arquivos_faltando": {
+   "args": "caminhos",
+   "modulos": []
+  },
+  "ve_drive_enviar": {
+   "args": "arquivo, link",
+   "modulos": [
+    "drive_envio"
+   ]
+  },
+  "ve_drive_estado": {
+   "args": "eid",
+   "modulos": [
+    "drive_envio"
+   ]
+  },
+  "ve_drive_cancelar": {
+   "args": "eid",
+   "modulos": [
+    "drive_envio"
+   ]
+  },
+  "ve_drive_link_ok": {
+   "args": "link",
+   "modulos": [
+    "drive_envio"
+   ]
   },
   "ve_comp_cancelar": {
    "args": "",
@@ -2275,6 +2321,10 @@
    "args": "",
    "modulos": []
   },
+  "fechar_visto": {
+   "args": "",
+   "modulos": []
+  },
   "sair_app": {
    "args": "",
    "modulos": []
@@ -2664,6 +2714,7 @@
   "Functions/converterimagem.py": "converterimagem.py",
   "Functions/convertermp3.py": "Conversor de áudio (e extração de áudio de vídeos) via ffmpeg",
   "Functions/cor_icc.py": "Gestão de cor do Photo Kanivete: o app trabalha em sRGB; aqui entram e saem os outros espaços pelo perfil ICC",
+  "Functions/drive_envio.py": "Envio automático de um arquivo pronto (render da fila) para uma pasta do Google Drive, com progresso",
   "Functions/editor_imagem.py": "Editor de Imagem (frontend/js/imagem-*.js): abrir e salvar PSD/PSB e imagens comuns",
   "Functions/efeitos_pr.py": "Efeitos de áudio do Premiere no Kanivete (frontend/dados/premiere_audio.json, gerado por tools/premiere_audio_dados.py)",
   "Functions/encoder_monitor.py": "Monitor do Kanivete Encoder: CPU, RAM e placa de vídeo (NVIDIA: uso, encoder, decoder, memória) em tempo real e o",

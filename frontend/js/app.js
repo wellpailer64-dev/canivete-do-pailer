@@ -510,8 +510,13 @@ async function appSair() {
     _saindo = true;
     try {
         if (typeof VE !== 'undefined' && VE.ready) {
-            if (VE.exportRunning) {
-                const r = await appConfirm({ titulo: 'Exportação em andamento', texto: 'Sair agora interrompe a exportação.',
+            const fila = typeof VEFILA !== 'undefined' ? VEFILA : null;
+            const preparando = fila && fila.preparando, naFila = fila && fila.itens.some(x => x.estado === 'espera');
+            const enviando = fila && fila.itens.some(x => x.drive && ['conferindo', 'enviando'].includes(x.drive.fase));
+            if (VE.exportRunning || preparando || (fila && fila.rodando) || enviando) {
+                const r = await appConfirm({ titulo: enviando && !VE.exportRunning && !preparando ? 'Envio ao Drive em andamento' : 'Render em andamento',
+                    texto: enviando && !VE.exportRunning && !preparando ? 'Sair agora interrompe o envio para o Google Drive.'
+                        : `Sair agora interrompe ${preparando ? 'a preparação do render (Comps e camadas de motion)' : 'a exportação'}${naFila ? ' e a fila de render' : ''}. O render roda dentro do Kanivete: minimize em vez de fechar.`,
                     botoes: [{ rotulo: 'Cancelar', valor: null }, { rotulo: 'Sair mesmo assim', valor: 1, tipo: 'perigo' }] });
                 if (!r) return;
             }

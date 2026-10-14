@@ -6,6 +6,7 @@ import os
 import json
 import sys
 import threading
+import time
 import atexit
 import shutil
 import tempfile
@@ -692,6 +693,11 @@ def ve_comp_render(base, h, job):
 def ve_comp_cancelar():
     from Functions import render_cache
     return render_cache.cancelar_comp()
+
+
+def ve_comp_pausar(pausar=True):
+    from Functions import render_cache
+    return render_cache.pausar_comp(bool(pausar))
 
 
 def ve_render_tocar(base, chave, hashes):
@@ -3295,6 +3301,50 @@ class ApiBridge:
     def ve_comp_render(self, base, h, job):
         return ve_comp_render(base, h, job)
 
+    def ve_comp_pausar(self, pausar=True):
+        return ve_comp_pausar(pausar)
+
+    def ve_medir_volume(self, caminho):
+        """Render pronto: volume integrado (LUFS) e pico do som, para avisar som baixo/alto demais (GaIA render 1 saiu
+        em -33 LUFS sem ninguém notar). ~2 s para 9 min de áudio."""
+        import re
+        import subprocess
+        from Functions.audio_cutter import ffmpeg_path, _creationflags
+        try:
+            r = subprocess.run([ffmpeg_path(), "-hide_banner", "-nostats", "-i", caminho, "-vn", "-af", "ebur128=peak=true",
+                                "-f", "null", "-"], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                               timeout=600, creationflags=_creationflags())
+            fim = r.stderr[r.stderr.rfind("Summary:"):]
+            i = re.search(r"I:\s+(-?[\d.]+|-inf) LUFS", fim)
+            pk = re.search(r"Peak:\s+(-?[\d.]+|-inf) dBFS", fim)
+            if not i:
+                return {"success": False, "error": "sem som"}
+            val = lambda m: None if not m or "inf" in m.group(1) else float(m.group(1))
+            return {"success": True, "lufs": val(i), "pico": val(pk)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_arquivos_faltando(self, caminhos):
+        """Exportar: quais destes arquivos sumiram do disco (movidos/apagados depois de abrir o projeto)."""
+        return [p for p in (caminhos or []) if p and not os.path.exists(p)]
+
+    # Envio automático ao Google Drive depois do render (fila de render: Functions/drive_envio.py)
+    def ve_drive_enviar(self, arquivo, link):
+        from Functions import drive_envio
+        return drive_envio.iniciar(arquivo, link)
+
+    def ve_drive_estado(self, eid):
+        from Functions import drive_envio
+        return drive_envio.estado(eid)
+
+    def ve_drive_cancelar(self, eid):
+        from Functions import drive_envio
+        return drive_envio.cancelar(eid)
+
+    def ve_drive_link_ok(self, link):
+        from Functions import drive_envio
+        return drive_envio.validar_link(link)
+
     def ve_comp_cancelar(self):
         return ve_comp_cancelar()
 
@@ -4599,8 +4649,14 @@ class ApiBridge:
     def gdrive_cancel(self):
         return gdrive_cancel()
 
+    def fechar_visto(self):
+        """A página recebeu o X e está perguntando (appSair): o 2º X não força o fechamento."""
+        _FECHAR["visto"] = time.time()
+        return True
+
     def sair_app(self):
         """Ctrl+Q: fecha o app (a página já perguntou sobre o projeto não salvo)."""
+        _FECHAR["ok"] = True
         if _window:
             # fora da thread da chamada: destroy espera a interface, que está respondendo a esta chamada
             threading.Thread(target=_window.destroy, daemon=True).start()
@@ -4845,6 +4901,7 @@ def _porta_agente():
 
 
 _PORTA_AGENTE = None   # porta do modo agente desta abertura (None = desligado)
+_FECHAR = {"ok": False, "pedido": 0.0, "visto": 0.0}   # X da janela: a página confirma antes (_ao_fechar)
 
 
 def _agente_nas_preferencias():
@@ -5070,6 +5127,25 @@ def main():
             print("[drop] indisponível:", e)
 
     window.events.loaded += _bind_drop
+
+    # X da janela (e o "fechar" da barra própria, WM_CLOSE): antes fechava direto, sem aviso — matava o render no meio
+    # (GaIA 2026-10-14). Agora pergunta à página (appSair: render/preparo em andamento, projeto não salvo) e só fecha
+    # quando ela chamar sair_app. Página travada (não respondeu ao 1º X): o 2º X em até 8 s fecha mesmo assim.
+    def _ao_fechar():
+        if _FECHAR["ok"]:
+            return True
+        agora = time.time()
+        if agora - _FECHAR["pedido"] < 8 and _FECHAR["visto"] < _FECHAR["pedido"]:
+            return True
+        _FECHAR["pedido"] = agora
+        def _perguntar():
+            try:
+                window.evaluate_js("window.appSair ? (window.pywebview.api.fechar_visto(), appSair()) : window.pywebview.api.sair_app()")
+            except Exception:
+                pass
+        threading.Thread(target=_perguntar, daemon=True).start()
+        return False
+    window.events.closing += _ao_fechar
 
     # Modo agente: borda laranja nas janelas enquanto um agente está conectado na porta (Functions/agente_borda.py)
     # (a porta é definida mais abaixo, em _PORTA_AGENTE; aqui só se lê quando a janela termina de carregar)

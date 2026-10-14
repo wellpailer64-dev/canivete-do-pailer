@@ -645,6 +645,13 @@ function veCompUrlPronta(m) {
 function veCompTick() {
     if (!VE.ready) return;
     const api = window.pywebview && window.pywebview.api;
+    // com ve_comp_pausar: o render congela no play e continua de onde parou ao parar (não perde o que já fez)
+    if (api && api.ve_comp_pausar && VECOMP.atual && !VECOMP.exportando && !VECOMP.atual.cancelando) {
+        const a = VECOMP.atual;
+        if (VE.playing && !a.suspensa) { a.suspensa = true; api.ve_comp_pausar(true).then(r => { if (!r || !r.success) a.suspensa = false; }); }
+        else if (!VE.playing && a.suspensa) { a.suspensa = false; api.ve_comp_pausar(false); }
+        return;
+    }
     if (VE.playing && VECOMP.atual && !VECOMP.exportando && !VECOMP.atual.cancelando && api && api.ve_comp_cancelar) {
         VECOMP.atual.cancelando = true;
         api.ve_comp_cancelar();

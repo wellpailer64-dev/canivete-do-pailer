@@ -218,7 +218,28 @@ def renderizar_comp(base, h, job, on_progress):
     return {"success": True, "path": final, "url": media_server.register(final), "size": os.path.getsize(final)}
 
 
+def pausar_comp(pausar=True):
+    """Play começou/parou: congela (ou solta) o ffmpeg do render da Comp em vez de matar — o render continua de onde
+    parou. Antes, cada play cancelava e a Comp longa recomeçava do zero (nunca terminava se se tocava sempre)."""
+    with _comp_lock:
+        p = _comp_proc
+    if p is None:
+        return {"success": False, "error": "sem render"}
+    try:
+        import psutil
+        pr = psutil.Process(p.pid)
+        for q in [pr] + pr.children(recursive=True):
+            try:
+                q.suspend() if pausar else q.resume()
+            except psutil.Error:
+                pass
+        return {"success": True, "pausado": bool(pausar)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def cancelar_comp():
+    pausar_comp(False)          # processo congelado não morre direito no Windows: solta antes
     with _comp_lock:
         if _comp_stop is not None:
             _comp_stop.set()

@@ -1366,6 +1366,25 @@ function veMidiaPriorizar(m) {
     if (i < 0 && m.path && api && api.ve_priorizar_midia) api.ve_priorizar_midia(m.path);
 }
 
+// .mp4/.mov sem imagem (só som): a mídia vira áudio no mesmo lugar (mesmo id: os clipes ficam onde estão e passam a
+// tocar como áudio na trilha A deles)
+async function veMidiaParaAudio(m) {
+    const api = window.pywebview && window.pywebview.api;
+    if (!m || !api || !api.video_cutter_add_audio || m._paraAudio) return false;
+    m._paraAudio = true;
+    try {
+        const r = await api.video_cutter_add_audio(m.path);
+        if (!r || !r.success) { m.erro = (r && r.error) || veT('Não foi possível ler o áudio'); return false; }
+        Object.assign(m, { kind: 'audio', dur: r.dur, peaks: r.peaks || [], url: r.url, quadros: r.quadros });
+        delete m.erro; delete m.info; delete m.thumbs; delete m.proxy; delete m.pct;
+        veAudioRegistrar(m.id, r.url, r.quadros);
+        VE.clips.forEach(c => { if (veMid(c) === m.id && c.x === 'v') delete c.x; });
+        veCacheInvalidate(); veRelayout(); veApplyAudioGain(); veRefresh();
+        if (typeof vePjRender === 'function') vePjRender();
+        return true;
+    } finally { delete m._paraAudio; }
+}
+
 // Eventos da preparação de um vídeo do projeto (Functions/video_cutter.py: preparar_midia)
 function veOnMidia(ev) {
     const m = VE.media[ev.id];
@@ -1424,6 +1443,8 @@ function veOnMidia(ev) {
             return { t: tb.t, url: tb.url, img };
         });
         if (m.id === 0) VE.thumbs = m.thumbs;
+    } else if (ev.stage === 'so_audio') {
+        veMidiaParaAudio(m);
     } else if (ev.stage === 'error') {
         // falha passageira (disco ocupado, pasta de cache recriada, ffmpeg interrompido): tenta de novo sozinho, até 2
         // vezes, antes de mostrar o erro. Arquivo que não existe / sem vídeo não adianta repetir.

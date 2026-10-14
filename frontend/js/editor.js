@@ -180,7 +180,41 @@ const VE_CORES = [
     ['magenta', 'Magenta', '#c877d4'], ['lavanda', 'Lavanda', '#bbafea'], ['bege', 'Bege', '#cab59c'],
     ['marrom', 'Marrom', '#bf8635'],
 ];
-const veCor = c => { const k = c && c.cor && VE_CORES.find(x => x[0] === c.cor); return k ? k[2] : null; };
+const veCor = c => { const id = c && (veCorManual(c) || veCorTipo(c)); const k = id && VE_CORES.find(x => x[0] === id); return k ? k[2] : null; };
+// a Comp nasce com a cor laranja (VE_COMP_COR, editor-comp.js): com a cor por tipo ligada, essa automática dá lugar ao tipo
+function veCorManual(c) {
+    if (!c.cor) return null;
+    const m = VE.media && VE.media[c.m || 0];
+    return m && m.comp && typeof VE_COMP_COR !== 'undefined' && c.cor === VE_COMP_COR && veCorTipoLigada() ? null : c.cor;
+}
+// Cor automática por TIPO de camada (pedido do Pailer, GaIA 2026-10-14: achar-se na timeline): vale só para o clipe sem
+// cor escolhida à mão (botão direito › cor). Desliga em Configurações da timeline (chave inglesa).
+const VE_COR_TIPO = [
+    ['gc', 'GC (nomes)', 'amarelo'], ['motion', 'Motion, lettering e cartelas (Comps)', 'violeta'], ['ajuste', 'Camada de ajuste', 'magenta'],
+    ['grafico', 'Texto e formas', 'rosa'], ['foto', 'Fotos e imagens de apoio', 'verde'], ['c3d', 'Cena 3D', 'ceruleo'],
+    ['musica', 'Música', 'azul'], ['sfx', 'Efeitos sonoros', 'caribe'],
+];
+function veCorTipoLigada() { try { return localStorage.getItem('ve_cor_tipo') !== '0'; } catch (e) { return true; } }
+function veCorTipoQual(c) {
+    const m = VE.media && VE.media[c.m || 0]; if (!m) return null;
+    const nome = String(c.nome || m.nome || m.name || '');
+    if (m.comp) return /^GC\b/i.test(nome) ? 'gc' : 'motion';
+    if (m.kind === 'ajuste') return 'ajuste';
+    if (m.c3d) return 'c3d';
+    if (m.kind === 'texto' || m.kind === 'forma' || m.kind === 'grafico' || m.kind === 'cor') return 'grafico';
+    if (m.kind === 'image') return 'foto';
+    if (m.kind === 'audio' || (c.tr != null && veIsAudio(c) && m.kind !== 'video')) {
+        const trilha = String(((VE_TRK.a || [])[c.tr] || {}).nome || '');
+        if (/sfx|efeito|whoosh|impacto|soundboard/i.test(nome + ' ' + trilha + ' ' + (m.path || ''))) return 'sfx';
+        if (/m[uú]sica|trilha|music|song/i.test(nome + ' ' + trilha) || (m.dur || 0) > 45 && !/narra|voz|locu/i.test(nome + ' ' + trilha)) return 'musica';
+    }
+    return null;
+}
+function veCorTipo(c) {
+    if (!c || !veCorTipoLigada()) return null;
+    const t = veCorTipoQual(c), k = t && VE_COR_TIPO.find(x => x[0] === t);
+    return k ? k[2] : null;
+}
 function veRgba(hex, a) {
     const n = parseInt(hex.slice(1), 16);
     return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
@@ -2354,7 +2388,7 @@ function veOfflineNaTimeline() {
     return veOfflineMedias().filter(m => usadas.has(m.id));
 }
 function veAvisoOffline(lista) {
-    const nomes = lista.slice(0, 3).map(m => m.name || m.nome || '?').join(', ') + (lista.length > 3 ? ` +${lista.length - 3}` : '');
+    const nomes = lista.slice(0, 3).map(m => (m.name || m.nome || '?') + (m._quando != null ? ` ${veT('em')} ${veHuman(m._quando)}` : '')).join(', ') + (lista.length > 3 ? ` +${lista.length - 3}` : '');
     veToast(`${veT('Mídia offline na timeline')} (${nomes}): ${veT('relinque ou tire da timeline antes de exportar')}`);
 }
 function veProjetoSeqs(d) {
@@ -4912,12 +4946,30 @@ function veBuildHeads() {
             : 'Trilha-alvo: Ctrl+K, ↑/↓, Q/W e colar agem nela · clique para tirar · Shift+clique: todas as ' + (tr.kind === 'v' ? 'de vídeo' : 'de áudio')}">${tr.id}</button>`;
         return `
         <div class="ve-head ve-head-${tr.kind}${tr.main ? ' main' : ''}${st.lock ? ' locked' : ''}${off ? ' off' : ''}" data-tr="${i}" style="height:${tr.h}px">
-            <div class="ve-head-row">${lock}${alvo}${extra}</div>
+            <div class="ve-head-row">${lock}${alvo}<span class="ve-head-nome" data-hnome="${k}" data-hkind="${tr.kind}" title="${veEsc(st.nome || '')}${st.nome ? ' · ' : ''}${veT('Alt+duplo clique: dar nome à trilha')}">${veEsc(st.nome || '')}</span>${extra}</div>
             ${tr.main && tr.h >= 40 ? `<span>${tr.kind === 'v' ? 'Vídeo' : 'Áudio'}</span>` : ''}
             <i class="ve-head-grip" data-grip="${i}" title="Arraste para aumentar ou diminuir a trilha"></i>
         </div>` + (typeof veKlHeadsHtml === 'function' ? veKlHeadsHtml(tr) : '');
     }).join('');
     if (typeof veMixUi === 'function') veMixUi();   // o Mixer de trilhas acompanha as trilhas e os M/S
+}
+
+// Nome da trilha no cabeçalho (VE_TRK.v[k].nome / .a[k].nome; vai junto com a timeline no projeto)
+function veTrackRenomear(span) {
+    const kind = span.dataset.hkind, k = +span.dataset.hnome, st = veTrackState(kind, k);
+    const inp = document.createElement('input');
+    inp.className = 've-head-nome-inp'; inp.value = st.nome || ''; inp.maxLength = 40;
+    span.replaceWith(inp); inp.focus(); inp.select();
+    let feito = false;
+    const fim = ok => {
+        if (feito) return; feito = true;
+        const v = inp.value.trim();
+        if (ok && v !== (st.nome || '')) { vePushHistory(); if (v) st.nome = v; else delete st.nome; if (typeof veSeqSalvarAtiva === 'function') veSeqSalvarAtiva(); }
+        veBuildHeads();
+    };
+    inp.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') fim(true); else if (ev.key === 'Escape') fim(false); });
+    inp.addEventListener('blur', () => fim(true));
+    inp.addEventListener('pointerdown', ev => ev.stopPropagation());
 }
 
 // Ativar/desativar os clipes selecionados (Ctrl+Shift+E). Algum ativo na seleção: desativa todos; senão, ativa
@@ -5355,7 +5407,9 @@ function veRender() {
         if (cw > 50 && vh >= 12) {
             ctx.fillStyle = '#eef0ff';
             ctx.font = '600 10.5px Segoe UI';
-            const nome = adj ? ((typeof veOvtNome === 'function' && veOvtNome(c) && '✦ ' + veOvtNome(c)) || veT('Camada de ajuste')) : txt ? 'T  ' + veNomeTexto(c) : img ? (med.nome || med.name || veT('Imagem'))
+            // c.nome: nome dado ao clipe (contexto da cena); senão o de sempre (mídia, texto, ajuste)
+            const nome = c.nome ? (txt ? 'T  ' : '') + c.nome
+                : adj ? ((typeof veOvtNome === 'function' && veOvtNome(c) && '✦ ' + veOvtNome(c)) || veT('Camada de ajuste')) : txt ? 'T  ' + veNomeTexto(c) : img ? (med.nome || med.name || veT('Imagem'))
                 : veMid(c) ? (med.nome || med.name) : veT(`Clipe ${i + 1}`);
             ctx.fillText(nome + velTxt + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, vy + 10.5);
         }
@@ -5443,7 +5497,7 @@ function veRender() {
             ctx.fillRect(cx, ay, cw, Math.min(13, ah));
             ctx.fillStyle = '#04150d';
             ctx.font = '600 10px Segoe UI';
-            ctx.fillText((med.nome || med.name || veT('Áudio')) + velTxt + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, ay + 10);
+            ctx.fillText((c.nome || med.nome || med.name || veT('Áudio')) + velTxt + (cw > 150 ? '  ·  ' + veShort(len) : ''), cx + 6, ay + 10);
         }
         const enh = (typeof veMaEstado === 'function' ? veMaEstado(c.m || 0) : null) || (typeof veAnEstado === 'function' ? veAnEstado(c) : null);
         if (enh && !ghost) veMaDesenhar(ctx, cx, ay, cw, ah, enh);
@@ -5753,7 +5807,7 @@ function veRenderClips() {
         <div class="ve-clip${i === VE.sel ? ' sel' : ''}" data-i="${i}">
             <div class="ve-clip-bar"${veCor(c) ? ` style="background:${veCor(c)}"` : ''}></div>
             <div>
-                <div class="ve-clip-name">${veNomeClipe(c)} ${i + 1} <span class="ve-clip-tr">V${c.tr + 1}</span>${c.g ? ` <span class="ve-clip-db">${veFmtDb(c.g)}</span>` : ''}${vfxBadge}${afxBadge}</div>
+                <div class="ve-clip-name">${c.nome ? veEsc(c.nome) : veNomeClipe(c) + ' ' + (i + 1)} <span class="ve-clip-tr">V${c.tr + 1}</span>${c.g ? ` <span class="ve-clip-db">${veFmtDb(c.g)}</span>` : ''}${vfxBadge}${afxBadge}</div>
                 <div class="ve-clip-time">${veShort(c.st)} → ${veShort(veEnd(c))} · ${veShort(veLen(c))}</div>
             </div>
             <button class="ve-clip-act" data-act="${i}" title="Apagar clipe (D)"><svg class="i"><use href="#i-trash"/></svg></button>
@@ -6414,6 +6468,9 @@ function veInitResizers() {
     // Duplo clique no cabeçalho: alterna trilha compacta / expandida
     $ve('ve-heads-rows').addEventListener('dblclick', e => {
         if (e.target.closest('[data-hact]')) return;
+        // Alt+duplo clique (ou duplo clique no nome): dar nome à trilha (ex.: "Drone", "Cartelas")
+        const nm = e.target.closest('[data-hnome]') || (e.altKey && e.target.closest('[data-tr]') && e.target.closest('[data-tr]').querySelector('[data-hnome]'));
+        if (nm && (e.altKey || nm.textContent.trim())) { veTrackRenomear(nm); return; }
         const row = e.target.closest('[data-tr]');
         if (!row) return;
         const tr = VE_TRACKS[+row.dataset.tr];

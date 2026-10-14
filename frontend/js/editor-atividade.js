@@ -73,9 +73,25 @@ function veAtvLista() {
     out.sort((a, b) => peso(a.etapa) - peso(b.etapa) || (a.ordem ?? 0) - (b.ordem ?? 0) || (b.fim || 0) - (a.fim || 0));
     return out;
 }
-function veAtvContagem(lista) {
+// Comps da timeline aberta que ainda não têm o render em dia (o monitor as desenha ao vivo ou mostra "Preparando
+// prévia…"): a que está renderizando agora (VECOMP.atual, com %) e as que esperam a vez, na ordem da timeline
+function veAtvComps() {
+    if (typeof VECOMP === 'undefined' || !VE.media || !VE.clips) return [];
+    const vistos = new Set(), out = [];
+    const at = VECOMP.atual;
+    [...VE.clips].sort((a, b) => a.st - b.st).forEach(c => {
+        const m = VE.media[c.m || 0];
+        if (!m || m.removido || !m.comp || vistos.has(m.id)) return;
+        vistos.add(m.id);
+        const agora = at && at.mid === m.id;
+        if (!agora && m.url && !m._aoVivo) return;
+        out.push({ id: m.id, comp: true, etapa: agora ? 'renderizando' : VECOMP.pausado ? 'pausada' : 'nafila', pct: agora ? at.pct : null, st: c.st });
+    });
+    return out;
+}
+function veAtvContagem(lista, comps = veAtvComps()) {
     const conv = VEATV.conv && !VEATV.conv.fim ? 1 : 0;   // a conversão em andamento conta como uma atividade
-    return { ativos: lista.filter(x => VEATV_ATIVO.has(x.etapa)).length + conv, erros: lista.filter(x => x.etapa === 'erro').length };
+    return { ativos: lista.filter(x => VEATV_ATIVO.has(x.etapa)).length + conv + comps.length, erros: lista.filter(x => x.etapa === 'erro').length };
 }
 
 function veAtvAgendar() {
@@ -85,35 +101,54 @@ function veAtvAgendar() {
 function veAtvRender() {
     const b = document.getElementById('ve-atv-btn');
     if (!b) return;
-    const lista = veAtvLista(), n = veAtvContagem(lista);
+    const lista = veAtvLista(), comps = veAtvComps(), n = veAtvContagem(lista, comps);
     b.classList.toggle('girando', n.ativos > 0);
     b.classList.toggle('erro', !n.ativos && n.erros > 0);
     b.hidden = !n.ativos && !n.erros && !lista.length && !veAtvConvHtml();
-    b.title = n.ativos ? `Carregando ${n.ativos} mídia(s) — clique para ver` : 'Atividade em segundo plano';
+    b.title = n.ativos ? `Preparando ${n.ativos} item(ns) — clique para ver` : 'Atividade em segundo plano';
     b.querySelector('.ve-atv-n').textContent = n.ativos ? String(n.ativos) : '';
-    if (VEATV.aberto) veAtvPopRender(lista, n);
+    if (VEATV.aberto) veAtvPopRender(lista, n, comps);
 }
-function veAtvPopRender(lista, n) {
+const VEATV_PREP = new Set(['fila', 'lendo', 'espera', 'previa', 'parcial', 'completa', 'miniaturas']);
+function veAtvPopRender(lista, n, comps = veAtvComps()) {
     const pop = document.getElementById('ve-atv-pop');
     if (!pop) return;
     const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-    const linhas = lista.slice(0, 200).map(it => {
+    const linha = it => {
+        if (it.comp) {
+            const pct = it.pct != null ? Math.max(0, Math.min(100, Math.round(it.pct))) : null;
+            const txt = it.etapa === 'renderizando' ? `Renderizando a Comp${pct != null ? ` ${pct}%` : ''}`
+                : it.etapa === 'pausada' ? 'Comp na fila · o render espera o play parar' : 'Comp na fila de render';
+            return `<div class="ve-atv-item ${it.etapa === 'renderizando' ? 'previa' : 'fila'}" data-id="${it.id}" title="Clique: mostrar no painel Projeto">
+            <span class="ve-atv-marca">${it.etapa === 'renderizando' ? '<i class="ve-atv-gira"></i>' : '·'}</span>
+            <span class="ve-atv-txt"><b>${esc(veAtvNome(it.id))}</b><small>${esc(txt)}</small>
+            ${it.etapa === 'renderizando' ? `<span class="ve-atv-barra"><span style="width:${pct || 0}%"></span></span>` : ''}</span></div>`;
+        }
         const pct = it.etapa === 'previa' || it.etapa === 'parcial' ? Math.max(0, Math.min(100, Math.round(it.pct || 0))) : null;
-        const txt = VEATV_TXT[it.etapa] || it.etapa;
+        const txt = VEATV_TXT[it.etapa] || (/^done$/i.test(it.etapa || '') ? 'Pronto' : it.etapa);
         const extra = it.etapa === 'erro' ? `: ${esc(it.erro || '')}` : pct != null ? ` ${pct}%` : it.tentativa ? ` (tentativa ${it.tentativa})` : '';
-        const marca = it.etapa === 'pronto' || it.etapa === 'painel' ? '✓' : it.etapa === 'erro' ? '!' : VEATV_ATIVO.has(it.etapa) && it.etapa !== 'fila' ? '<i class="ve-atv-gira"></i>' : '·';
+        const marca = it.etapa === 'pronto' || it.etapa === 'painel' || /^done$/i.test(it.etapa || '') ? '✓' : it.etapa === 'erro' ? '!' : VEATV_ATIVO.has(it.etapa) && it.etapa !== 'fila' ? '<i class="ve-atv-gira"></i>' : '·';
         return `<div class="ve-atv-item ${it.etapa}" data-id="${it.id}" title="Clique: mostrar no painel Projeto">
             <span class="ve-atv-marca">${marca}</span>
             <span class="ve-atv-txt"><b>${esc(veAtvNome(it.id))}</b><small>${esc(txt)}${extra}</small>
             ${pct != null ? `<span class="ve-atv-barra"><span style="width:${pct}%"></span></span>` : ''}</span></div>`;
-    }).join('');
-    const midias = n.ativos - (VEATV.conv && !VEATV.conv.fim ? 1 : 0);
-    const cab = midias ? `Carregando ${midias} mídia(s)` : n.ativos ? 'Trabalhando no fundo' : 'Nada carregando agora';
+    };
+    // duas colunas: o que já foi carregado (e erros) · o que está sendo preparado (versões leves e Comps)
+    const prep = [...lista.filter(x => VEATV_PREP.has(x.etapa)), ...comps];
+    const feitos = lista.filter(x => !VEATV_PREP.has(x.etapa));
+    const linhas = feitos.slice(0, 200).map(linha).join('');
+    const linhasP = prep.slice(0, 200).map(linha).join('');
+    const cab = n.ativos ? `Preparando ${n.ativos} item(ns)` : 'Nada sendo preparado agora';
     pop.innerHTML = `<div class="ve-atv-cab"><b>${cab}</b>
         <span class="ve-atv-cab-acoes">${lista.some(x => x.etapa === 'pronto' || x.etapa === 'painel' || x.etapa === 'erro') ? '<button class="ve-btn ve-btn-ghost" id="ve-atv-limpar">Limpar concluídos</button>' : ''}
         <button class="ve-pop-x" id="ve-atv-x" title="Fechar (Esc)">×</button></span></div>
         ${veAtvConvHtml()}
-        <div class="ve-atv-lista">${linhas || '<div class="ve-atv-vazio">Todas as mídias do projeto estão prontas.</div>'}</div>`;
+        <div class="ve-atv-cols">
+            <div class="ve-atv-col"><div class="ve-atv-coltit">Carregados</div>
+                <div class="ve-atv-lista">${linhas || '<div class="ve-atv-vazio">Nenhum arquivo carregado ainda.</div>'}</div></div>
+            <div class="ve-atv-col"><div class="ve-atv-coltit">Preparando versões leves e prévias${prep.length ? ` · ${prep.length}` : ''}</div>
+                <div class="ve-atv-lista">${linhasP || '<div class="ve-atv-vazio">Tudo pronto: versões leves e Comps em dia.</div>'}</div></div>
+        </div>`;
     document.getElementById('ve-atv-x').onclick = e => { e.stopPropagation(); VEATV.aberto = false; pop.hidden = true; };
     const lp = document.getElementById('ve-atv-limpar');
     if (lp) lp.onclick = e => {
@@ -149,6 +184,6 @@ function veAtvAlternar(e) {
     document.addEventListener('keydown', e => { if (VEATV.aberto && e.key === 'Escape') fechar(); }, true);
     // clique numa janela solta (timeline, painéis) não chega a este documento: a janela perde o foco — fecha também
     window.addEventListener('blur', () => { if (VEATV.aberto) fechar(); });
-    setInterval(() => { if (typeof VEPJF !== 'undefined' && (VEPJF.fila.length || VEPJF.ativos.size || VEATV.aberto)) veAtvRender(); }, 1000);
+    setInterval(() => { if (typeof VEPJF !== 'undefined' && (VEPJF.fila.length || VEPJF.ativos.size || VEATV.aberto || (typeof VECOMP !== 'undefined' && VECOMP.atual))) veAtvRender(); }, 1000);
 })();
 window.VEATV_API = { lista: () => veAtvLista().map(x => ({ ...x, nome: veAtvNome(x.id) })), abrir: () => { if (!VEATV.aberto) veAtvAlternar(); } };

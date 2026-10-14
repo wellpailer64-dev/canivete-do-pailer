@@ -1269,6 +1269,8 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-head { padding: 0 6px; }
 .ve-head-row { display: flex; align-items: center; gap: 4px; }
 .ve-head-row b { flex: 1; text-align: center; }
+.ve-head-row .ve-head-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 10.5px var(--ve-font, 'Segoe UI'); color: var(--ve-text, #dfe3ff); opacity: .85; padding-left: 2px; }
+.ve-head-nome-inp { flex: 1; min-width: 0; height: 18px; font: 600 10.5px 'Segoe UI'; background: #0d0f18; color: #fff; border: 1px solid var(--ve-accent, #5b6ee1); border-radius: 3px; padding: 0 4px; }
 .ve-hb {
     display: grid; place-items: center; width: 20px; height: 18px; padding: 0; flex-shrink: 0;
     border: 1px solid transparent; border-radius: 3px; background: transparent; color: var(--ve-faint);
@@ -2167,6 +2169,27 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-fila-tags i { font-style: normal; font-size: 10.5px; padding: 1px 6px; border-radius: 3px; background: var(--ve-panel-2); color: var(--ve-dim); border: 1px solid var(--ve-line); }
 .ve-fila-barra { height: 4px; border-radius: 2px; background: var(--ve-line); overflow: hidden; }
 .ve-fila-barra i { display: block; height: 100%; background: var(--ve-accent); transition: width .3s; }
+/* legenda da cor por tipo de camada (Configurações da timeline) */
+.ve-tl-legenda { display: grid; gap: 3px; padding: 4px 12px 8px; font-size: 11px; color: var(--ve-dim); }
+.ve-tl-legenda span { display: flex; align-items: center; gap: 7px; }
+.ve-tl-legenda i { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+/* volume medido do render pronto e envio ao Drive depois do render (editor-fila.js) */
+.ve-fila-tags i.ve-fila-vol { color: #3fb67a; }
+.ve-fila-tags i.ve-fila-vol.ruim { color: #e5735a; font-weight: 600; }
+.ve-drive-campo .ve-input { flex: 1; min-width: 0; height: 32px; padding: 0 10px; border: 1px solid var(--ve-line-2); border-radius: 4px;
+    outline: 0; background: var(--ve-bg); color: var(--ve-text); font: 13px var(--ve-ui); }
+.ve-drive-campo .ve-input:focus { border-color: var(--ve-accent); }
+#ve-export.ve-ke .ve-drive-campo .ve-input { height: 34px; border-radius: 6px; border-color: #2c2f33; background: #0f1011; }
+.ve-drive-aviso { display: block; margin-top: 4px; color: var(--ve-dim); font-size: 11px; }
+.ve-drive-aviso.erro { color: #e5735a; }
+.ve-fila-drive { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 6px; }
+.ve-fila-drive .ve-fila-barra { flex: 1 1 100%; }
+.ve-fila-drive .ve-fila-barra i, #ve-export.ve-ke .ve-fila-drive .ve-fila-barra i { background: #4a90e2; }
+.ve-fila-drive.pronto .ve-fila-barra i, #ve-export.ve-ke .ve-fila-drive.pronto .ve-fila-barra i { background: #3fb67a; }
+.ve-fila-drive.erro .ve-fila-barra i, .ve-fila-drive.cancelado .ve-fila-barra i,
+#ve-export.ve-ke .ve-fila-drive.erro .ve-fila-barra i, #ve-export.ve-ke .ve-fila-drive.cancelado .ve-fila-barra i { background: #e5735a; }
+.ve-fila-drive small { flex: 1; color: var(--ve-dim); font-size: 11px; }
+.ve-fila-drive.erro small { color: #e5735a; }
 .ve-fila-est { font-size: 11.5px; color: var(--ve-dim); white-space: nowrap; }
 .ve-fila-acoes { display: flex; gap: 4px; }
 .ve-fila-vazia, .ve-fila-dica { color: var(--ve-faint); font-size: 12px; line-height: 1.5; }
@@ -2376,6 +2399,8 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-mix-ef { padding: 3px 10px; border-radius: 3px; cursor: pointer; }
 .ve-mix-ef:hover { background: #e2e2e6; }
 .ve-mix-ef.semsom { color: #6b6b72; font-style: italic; }
+.ve-mix-ef .ve-mix-tag { float: right; margin-left: 10px; padding: 0 5px; border-radius: 3px; font: 600 9px 'Segoe UI'; font-style: normal; color: #a1a1aa; background: rgba(255, 255, 255, .06); line-height: 15px; }
+.ve-mix-slot.semsom { color: #8b8b93; }
 .ve-mix-ed-topo { display: flex; align-items: center; gap: 6px; padding-bottom: 6px; border-bottom: 1px solid #d4d4d8; margin-bottom: 6px; }
 .ve-mix-ed-topo b { flex: 1; }
 .ve-mix-ed-topo button { border: 0; background: #e2e2e6; border-radius: 3px; padding: 1px 6px; cursor: pointer; }
@@ -2436,6 +2461,12 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-atv-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--ve-line); font: 12px var(--ve-ui); color: var(--ve-text); }
 .ve-atv-cab .ve-btn { padding: 2px 8px; font-size: 11px; }
 .ve-atv-lista { overflow: auto; padding: 4px 0; }
+.ve-atv-pop { width: 720px; max-width: calc(100vw - 24px); }
+.ve-atv-cols { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; flex: 1; overflow: hidden; }
+.ve-atv-col { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.ve-atv-col + .ve-atv-col { border-left: 1px solid var(--ve-line); }
+.ve-atv-coltit { padding: 7px 12px 4px; font: 600 10.5px var(--ve-ui); letter-spacing: .04em; text-transform: uppercase; color: var(--ve-dim); }
+.ve-atv-col .ve-atv-lista { flex: 1; max-height: calc(60vh - 80px); }
 .ve-atv-item { display: flex; gap: 8px; padding: 6px 12px; cursor: pointer; font: 12px var(--ve-ui); color: var(--ve-text); }
 .ve-atv-item:hover { background: var(--ve-panel-2); }
 .ve-atv-marca { width: 14px; flex: none; display: grid; place-items: center; color: var(--ve-dim); }

@@ -122,7 +122,28 @@ Corte também a base (só os segmentos até T).
   `placa_falhou_*.txt` na pasta de mídia.
 - Medir em trechos curtos e com o PC livre: o export do usuário ou o app aberto distorcem tudo.
 
+## 6b. Feito em 2026-10-14 (GaIA V2, Finep — o que deu errado no render real)
+- **Envio ao Drive**: campo "Enviar ao Google Drive (opcional)" no formulário (link de pasta, lembrado); o item pronto
+  sobe sozinho (`Functions/drive_envio.py`: confere permissão com arquivo-teste ANTES — a pasta só-leitura dava 403 no
+  fim de 4 GB —, rclone com `--use-json-log --stats 1s`, link do arquivo no fim) com barra/MB/s/falta e "Abrir no Drive",
+  "Cancelar envio", "Enviar de novo". API `ve_drive_enviar/estado/cancelar`. Teste: `D:/kanivete_testes/scripts/teste_drive_fila.py`
+  (app 9333 + `RCLONE_CONFIG` do usuário; pasta de teste do Pailer 1Xn3AR4NS9eIwdL6Gjddw_Tv0AVC-xbwB).
+- **Arquivo movido = offline**: `veFilaConferirArquivos` confere no disco (`ve_arquivos_faltando`) tudo que a timeline usa
+  (também dentro de Comp) antes de congelar; antes um PNG movido saía PRETO sem aviso. Aviso diz o tempo (`m._quando`).
+- **X da janela pergunta** (`_ao_fechar` em main.py → `appSair`): render/preparo/fila/envio em andamento ou projeto não
+  salvo; antes o X fechava direto e matou o render na preparação. Página travada: 2º X em 8 s fecha. Teste:
+  `D:/kanivete_testes/scripts/teste_fechar.py`.
+- **Volume do render pronto** (`ve_medir_volume`, ebur128): etiqueta "−15,7 LUFS" no item; fora de −20..−11 avisa.
+- **Motion travava a preparação** (`veMoVideo`): com 10 vídeos abertos o 11º nunca carregava; agora fica com 3 e tem
+  prazo de 30 s.
+- Trecho errado num export pronto: exportar só [K1,K2) entre quadros-chave e emendar (receita na memória
+  feedback-emenda-export; ferramenta "corrigir trecho" ainda não existe — pendência).
+
 ## 7. Pendências (por ordem)
+00. (2026-10-14) Preparo visível na fila (item "Preparando: Comps 12/33, motion 3/19" antes de entrar); Comps 2–3 ao
+    mesmo tempo quando a placa sobra; camada de motion num formato que a placa decodifica (hoje ProRes 4444 = CPU);
+    ferramenta "corrigir trecho de um export" (emenda automática); revisor antes do export (texto sobre rosto, camada
+    sobrando além da cena, cena descartada por tempo negativo).
 0. **PRÓXIMO (combinado 2026-10-08): frear a fila adiantada de quadros.** Com as cópias Full HD a memória da placa
    cresce de 4,8 → 7,0 GB ao longo do export (`D:/kanivete_testes/encoder/medir_pico_fhd.py`: export 5,6 GB +
    app 1,4 = 6,9 de 8); no app do usuário estourou em 21% e a conferência (×2,6 agora) manda para a CPU quando o app
