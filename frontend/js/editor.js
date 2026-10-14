@@ -4009,8 +4009,11 @@ function veExportPlanClips() {
             // camada desenhada pelo motion (máscara, fosco, camada mãe, efeito animado...): vídeo do quadro inteiro, pronto
             if (pk && pk.mov) {
                 const o = c._o || c, s = Math.max(0, (c.s - o.s) / veVel(c));
-                return { _c: c, tipo: 'video', path: pk.mov, seq: null, st: c.st, s, e: s + veLen(c), sc: 100, x: VE.seqW / 2, y: VE.seqH / 2,
-                         rot: 0, op: 100, kf: {}, fx: [], ca: [], mw: VE.seqW, mh: VE.seqH, v: 1, bm: veBmAtivo(c) ? c.bm : null, ox: 0, oy: 0 };
+                // recortado ao desenho (cena3d.fim recortar): só o retângulo, no lugar dele
+                const bx = pk.box && pk.box.W ? pk.box : null, kx = bx ? VE.seqW / bx.W : 1, ky = bx ? VE.seqH / bx.H : 1;
+                return { _c: c, tipo: 'video', path: pk.mov, seq: null, st: c.st, s, e: s + veLen(c), sc: 100,
+                         x: bx ? (bx.x + bx.w / 2) * kx : VE.seqW / 2, y: bx ? (bx.y + bx.h / 2) * ky : VE.seqH / 2,
+                         rot: 0, op: 100, kf: {}, fx: [], ca: [], mw: bx ? bx.w * kx : VE.seqW, mh: bx ? bx.h * ky : VE.seqH, v: 1, bm: veBmAtivo(c) ? c.bm : null, ox: 0, oy: 0 };
             }
             // texto: PNG desenhado f vezes maior (nítido na maior escala dele); a escala desconta isso
             const png = veIsTexto(c) || veEhGrafico(c) ? pk : null, f = png ? png.f : 1;

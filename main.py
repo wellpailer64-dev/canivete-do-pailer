@@ -4134,10 +4134,10 @@ class ApiBridge:
         from Functions import cena3d
         return cena3d.lote(sessao, pasta)
 
-    def ve_c3d_fim(self, base, h, sessao, pasta, fps, n):
+    def ve_c3d_fim(self, base, h, sessao, pasta, fps, n, recortar=False):
         from Functions import cena3d
         try:
-            return cena3d.fim(base, h, sessao, pasta, fps, n)
+            return cena3d.fim(base, h, sessao, pasta, fps, n, recortar=bool(recortar))
         except Exception as e:
             return {"success": False, "error": str(e)}
 

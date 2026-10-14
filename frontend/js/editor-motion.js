@@ -628,7 +628,7 @@ async function veMoAssarSig(c, lista, como, aviso, sig, W, H, fps) {
     const api = window.pywebview.api, n = Math.max(1, Math.round(veLen(c) * fps));
     const ini = await api.ve_c3d_inicio(vePrPrefs().dir, sig);
     if (!ini || !ini.success) throw new Error((ini && ini.error) || 'não abriu o render');
-    if (ini.pronto) return { mov: ini.path };
+    if (ini.pronto) return { mov: ini.path, box: ini.box || null };
     const cv = document.createElement('canvas');
     cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d');
@@ -661,9 +661,9 @@ async function veMoAssarSig(c, lista, como, aviso, sig, W, H, fps) {
             if (aviso && i % 6 === 0) aviso(Math.round(i * 100 / n));
         }
     } finally { VEMO.assando--; }
-    const r = await api.ve_c3d_fim(vePrPrefs().dir, sig, ini.sessao, ini.pasta, fps, n);
+    const r = await api.ve_c3d_fim(vePrPrefs().dir, sig, ini.sessao, ini.pasta, fps, n, true);   // recorta ao desenho
     if (!r || !r.success) throw new Error((r && r.error) || 'não montou o vídeo da camada');
-    return { mov: r.path };
+    return { mov: r.path, box: r.box || null };
 }
 
 // Chamado pela preparação da exportação (veTxPngs): cada camada do motion vira o vídeo desenhado

@@ -4377,7 +4377,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             # 10 s: buscar decodifica do começo, e RLE decodifica rápido
             video_args = ["-c:v", "qtrle", "-g", "300", "-pix_fmt", "argb"] + prep["args_cor"]
         elif alfa:
-            video_args = ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le"] + prep["args_cor"]
+            # Comp: "prores" (codificador simples do ffmpeg) ~3× mais rápido que o prores_ks no 4444 com alfa (26 s de
+            # Comp: 18 s → 5 s só de codificação), mesma imagem
+            video_args = ["-c:v", "prores", "-profile:v", "4", "-pix_fmt", "yuva444p10le", "-vendor", "apl0"] + prep["args_cor"]
         else:
             video_args = ["-vn"] if audio_only else _args_video(cfg, q, gpu, bits, mbps) + prep["args_cor"]
             if prep["turbo"] and "-pix_fmt" in video_args:

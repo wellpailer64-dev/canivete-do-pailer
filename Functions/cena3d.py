@@ -4,7 +4,7 @@ motor da prévia) e manda os PNGs em lotes pela caixa de envio do media_server; 
 o ffmpeg monta um .mov ProRes 4444 com alfa em <cache de render>/Cenas3D/<hash>.mov (hash do conteúdo da cena: serve a
 qualquer projeto e desfazer reaproveita, como as Comps). Lote em disco: 300 quadros 1080p não ficam na memória.
 """
-import hashlib, os, re, shutil, subprocess, time
+import hashlib, json, os, re, shutil, subprocess, time
 
 from Functions import media_server, render_cache
 from Functions.midia import rodar_ffmpeg
@@ -20,7 +20,7 @@ def inicio(base, h):
         return {"success": False, "error": "hash inválido"}
     final = os.path.join(_pasta(base), h + ".mov")
     if os.path.isfile(final):
-        return {"success": True, "pronto": True, "path": final, "url": media_server.register(final)}
+        return {"success": True, "pronto": True, "path": final, "url": media_server.register(final), "box": _caixa_lida(final)}
     # pasta POR SESSÃO: a prévia renderizada e a exportação podiam desenhar a mesma camada juntas e a segunda apagava
     # a pasta da primeira no meio (FileNotFoundError q00000.png no lote — intro Carlinhos, 2026-10-12)
     sessao, url = media_server.abrir_envio()
@@ -43,15 +43,61 @@ def lote(sessao, pasta):
     return {"success": True, "gravados": len(arquivos)}
 
 
-def fim(base, h, sessao, pasta, fps, n, on_progress=lambda p: None):
-    """Quadros q00000.png... → ProRes 4444 com alfa (yuva444p10le). Apaga a pasta dos quadros."""
+def _caixa_lida(final):
+    """Retângulo guardado ao lado do .mov recortado (fim(recortar=True)); None = vídeo do quadro inteiro."""
+    try:
+        with open(final + ".caixa.json", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def _caixa_quadros(pasta, n):
+    """União de onde há desenho (alfa > 2) em TODOS os quadros: x, y, w, h pares + o tamanho do quadro."""
+    import cv2
+    import numpy as np
+    x0 = y0 = None; x1 = y1 = -1; W = H = 0
+    for i in range(int(n)):
+        im = cv2.imread(os.path.join(pasta, f"q{i:05d}.png"), cv2.IMREAD_UNCHANGED)
+        if im is None or im.ndim < 3 or im.shape[2] < 4:
+            return None
+        H, W = im.shape[:2]
+        a = im[:, :, 3] > 2
+        ys = np.flatnonzero(a.any(axis=1))
+        if not len(ys):
+            continue
+        xs = np.flatnonzero(a.any(axis=0))
+        x0 = xs[0] if x0 is None else min(x0, xs[0]); x1 = max(x1, xs[-1])
+        y0 = ys[0] if y0 is None else min(y0, ys[0]); y1 = max(y1, ys[-1])
+    if x0 is None:   # nada desenhado: um pedacinho só
+        return {"x": 0, "y": 0, "w": 2, "h": 2, "W": W, "H": H}
+    x0 = max(0, int(x0) - 2) // 2 * 2; y0 = max(0, int(y0) - 2) // 2 * 2
+    w = min(W - x0, (int(x1) + 3 - x0 + 1) // 2 * 2); h = min(H - y0, (int(y1) + 3 - y0 + 1) // 2 * 2)
+    return {"x": x0, "y": y0, "w": w, "h": h, "W": W, "H": H}
+
+
+def fim(base, h, sessao, pasta, fps, n, on_progress=lambda p: None, recortar=False):
+    """Quadros q00000.png... → ProRes 4444 com alfa (yuva444p10le). Apaga a pasta dos quadros.
+    recortar=True (camadas do motion): grava SÓ o retângulo onde há desenho em algum quadro e guarda a caixa em
+    <final>.caixa.json — uma linha que se desenha ocupava 1920×1080 e a Comp do GaIA com 16 delas levava 196 s para
+    renderizar; recortadas (0,6% do quadro em média) foram 68 s, imagem igual."""
     lote(sessao, pasta); media_server.fechar_envio(sessao)
     faltam = [i for i in range(int(n)) if not os.path.isfile(os.path.join(pasta, f"q{i:05d}.png"))]
     if faltam:
         return {"success": False, "error": f"faltaram {len(faltam)} quadro(s) (ex.: {faltam[:3]})"}
     final = os.path.join(_pasta(base), h + ".mov"); parte = os.path.join(_pasta(base), f"{h}.{sessao}.part.mov")
-    args = ["-framerate", str(fps), "-i", os.path.join(pasta, "q%05d.png"),
-            "-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le", "-vendor", "apl0", parte]
+    caixa = None
+    if recortar:
+        try:
+            c = _caixa_quadros(pasta, n)
+            if c and c["w"] * c["h"] < 0.7 * c["W"] * c["H"]:
+                caixa = c
+        except Exception:
+            caixa = None
+    filtro = ["-vf", f"crop={caixa['w']}:{caixa['h']}:{caixa['x']}:{caixa['y']}"] if caixa else []
+    # "prores" (o codificador simples do ffmpeg): ProRes 4444 com alfa ~3× mais rápido que o prores_ks, mesma imagem
+    args = ["-framerate", str(fps), "-i", os.path.join(pasta, "q%05d.png"), *filtro,
+            "-c:v", "prores", "-profile:v", "4", "-pix_fmt", "yuva444p10le", "-vendor", "apl0", parte]
     ok, erros = rodar_ffmpeg(args, duracao=int(n) / float(fps), on_progress=on_progress)
     ok = ok and os.path.isfile(parte) and os.path.getsize(parte) > 0
     shutil.rmtree(pasta, ignore_errors=True)
@@ -66,7 +112,15 @@ def fim(base, h, sessao, pasta, fps, n, on_progress=lambda p: None):
             if n == 29:
                 raise
             time.sleep(0.25)
-    return {"success": True, "path": final, "url": media_server.register(final)}
+    try:
+        if caixa:
+            with open(final + ".caixa.json", "w", encoding="utf-8") as f:
+                json.dump(caixa, f)
+        elif os.path.exists(final + ".caixa.json"):
+            os.remove(final + ".caixa.json")
+    except OSError:
+        pass
+    return {"success": True, "path": final, "url": media_server.register(final), "box": caixa}
 
 
 def pasta_vetor(base):

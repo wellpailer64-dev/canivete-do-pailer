@@ -133,6 +133,10 @@ Corte também a base (só os segmentos até T).
 - **X da janela pergunta** (`_ao_fechar` em main.py → `appSair`): render/preparo/fila/envio em andamento ou projeto não
   salvo; antes o X fechava direto e matou o render na preparação. Página travada: 2º X em 8 s fecha. Teste:
   `D:/kanivete_testes/scripts/teste_fechar.py`.
+- **Camada de motion recortada ao desenho** (`cena3d.fim(recortar=True)`, caixa em `<mov>.caixa.json`, plano em
+  `veExportPlanClips` com `pk.box`): Comp do GaIA com 16 linhas animadas 196 s → 68 s, imagem igual (máx 5/255). Comp e
+  motion em ProRes 4444 pelo codificador `prores` (`-profile:v 4`, não "4444"): ~3× mais rápido que o `prores_ks`.
+  Cache antigo (tela cheia) continua valendo; só as camadas novas saem recortadas (VE_MO_VERSAO não subiu de propósito).
 - **Volume do render pronto** (`ve_medir_volume`, ebur128): etiqueta "−15,7 LUFS" no item; fora de −20..−11 avisa.
 - **Motion travava a preparação** (`veMoVideo`): com 10 vídeos abertos o 11º nunca carregava; agora fica com 3 e tem
   prazo de 30 s.
@@ -147,8 +151,9 @@ Corte também a base (só os segmentos até T).
   item (⚠ N avisos, lista no title) e num aviso na tela. `VEFILA_API.revisar()`.
 
 ## 7. Pendências (por ordem)
-00. (2026-10-14) Comps 2–3 ao mesmo tempo quando a placa sobra; camada de motion num formato que a placa decodifica
-    (hoje ProRes 4444 = CPU); revisor: texto sobre rosto.
+00. (2026-10-14) Comp no modo placa (hoje "fundo transparente" cai na CPU: o resto da Comp — PNGs, fundo — ainda ~50 s
+    por 26 s); revisor: texto sobre rosto. (Comps em paralelo: medido — 1 Comp já usa ~50% de 16 núcleos; 2 juntas
+    ganhariam pouco e pesariam na edição: NÃO fazer.)
 0. **PRÓXIMO (combinado 2026-10-08): frear a fila adiantada de quadros.** Com as cópias Full HD a memória da placa
    cresce de 4,8 → 7,0 GB ao longo do export (`D:/kanivete_testes/encoder/medir_pico_fhd.py`: export 5,6 GB +
    app 1,4 = 6,9 de 8); no app do usuário estourou em 21% e a conferência (×2,6 agora) manda para a CPU quando o app
