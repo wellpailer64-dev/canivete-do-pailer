@@ -60,12 +60,11 @@ def estado():
 
 
 def baixar(prog=lambda *a: None):
-    from Functions.gerador_imagem import _baixar_arquivo
+    from Functions.gerador_imagem import _baixar_arquivo, extrair_zip
     os.makedirs(pasta(), exist_ok=True)
     z = os.path.join(pasta(), f"vozes-v{VERSAO}.zip")
     _baixar_arquivo(URL, z, lambda f, t: prog(5 + 90 * f / max(1, t), "Baixando o banco de vozes"))
-    with zipfile.ZipFile(z) as zz:
-        zz.extractall(pasta())
+    extrair_zip(z, pasta())
     os.remove(z)
     return estado()
 

@@ -119,8 +119,8 @@ def baixar(on_progress):
                         on_progress({"pct": min(99, int((antes + feito) * 100 / total)), "msg": f"Baixando {nome}: {feito / 1e9:.2f} / {max(tot, feito) / 1e9:.2f} GB"})
                     _baixar_arquivo(url, destino, prog)
                 if destino.endswith(".zip") and os.path.isfile(destino):
-                    with zipfile.ZipFile(destino) as zf:
-                        zf.extractall(os.path.join(pasta(), "bin"))
+                    from Functions.gerador_imagem import extrair_zip
+                    extrair_zip(destino, os.path.join(pasta(), "bin"))
                     os.remove(destino)
                 antes += tam
             if not (os.path.isfile(_exe()) and os.path.isfile(_gguf_novo())):

@@ -126,6 +126,24 @@ def _baixar_arquivo(url, destino, on_bytes):
     os.replace(parte, destino)
 
 
+def extrair_zip(zp, destino):
+    """Extrai numa pasta ao lado e só então move para o destino (os .exe por último): se a extração parar no meio, o
+    destino não fica com o .exe sem as DLLs — que o instalado() tomaria por pronto."""
+    import shutil
+    tmp = destino.rstrip("\\/") + ".extraindo"
+    shutil.rmtree(tmp, ignore_errors=True)
+    with zipfile.ZipFile(zp) as z:
+        z.extractall(tmp)
+    arqs = []
+    for raiz, _, nomes in os.walk(tmp):
+        arqs += [os.path.join(raiz, n) for n in nomes]
+    for a in sorted(arqs, key=lambda a: a.lower().endswith((".exe", "banco.json"))):
+        alvo = os.path.join(destino, os.path.relpath(a, tmp))
+        os.makedirs(os.path.dirname(alvo), exist_ok=True)
+        os.replace(a, alvo)
+    shutil.rmtree(tmp, ignore_errors=True)
+
+
 def baixar(on_progress, modelo=None):
     """Baixa motor + arquivos do modelo (padrão Z-Image) em segundo plano. on_progress({pct, msg}) / {fim: True} / {erro}."""
     m = _qual(modelo)
@@ -150,8 +168,7 @@ def baixar(on_progress, modelo=None):
                         on_progress(dict(_estado_dl))
                     _baixar_arquivo(url, destino, prog)
                 if destino.endswith(".zip") and os.path.isfile(destino):
-                    with zipfile.ZipFile(destino) as zf:
-                        zf.extractall(os.path.join(pasta(), "bin", _motor()))
+                    extrair_zip(destino, os.path.join(pasta(), "bin", _motor()))
                     os.remove(destino)
                 antes += tam
             if not instalado(m):

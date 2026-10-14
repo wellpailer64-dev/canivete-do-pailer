@@ -62,7 +62,8 @@ def instalar(on_progress=lambda d: None, esperar=False):
                         on_progress(dict(_estado))
             os.replace(parte, zp)
             _estado.update(pct=96, msg="Extraindo o Blender..."); on_progress(dict(_estado))
-            with zipfile.ZipFile(zp) as z: z.extractall(pasta())
+            from Functions.gerador_imagem import extrair_zip
+            extrair_zip(zp, pasta())
             os.remove(zp)
             if not instalado(): raise RuntimeError("blender.exe não apareceu depois de extrair")
             _estado.update(pct=100, msg="Pronto"); on_progress({"fim": True}); fim["ok"] = True

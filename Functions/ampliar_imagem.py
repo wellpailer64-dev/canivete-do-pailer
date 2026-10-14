@@ -34,12 +34,11 @@ def instalar(on_progress=lambda d: None):
     """Baixa e descompacta o Real-ESRGAN (uma vez)."""
     if instalado():
         return {"success": True, "ja": True}
-    from Functions.gerador_imagem import _baixar_arquivo
+    from Functions.gerador_imagem import _baixar_arquivo, extrair_zip
     os.makedirs(pasta(), exist_ok=True)
     zipf = os.path.join(pasta(), "realesrgan.zip")
     _baixar_arquivo(URL, zipf, lambda f, t: on_progress({"feito": f, "total": t}))
-    with zipfile.ZipFile(zipf) as z:
-        z.extractall(pasta())
+    extrair_zip(zipf, pasta())
     os.remove(zipf)
     return {"success": instalado()}
 
