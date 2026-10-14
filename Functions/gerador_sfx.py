@@ -30,9 +30,74 @@ def pasta_modelo():
     return os.environ.get("CANIVETE_SFX_MODELO") or os.path.join(base, "modelos_ia", "sfx_ezaudio")
 
 
+ESSENCIAIS = ("t5.onnx", "t5.pesos", "dit.onnx", "dit.pesos", "vae_dec.onnx", "vae_dec.pesos", "tokenizer.json")
+
+
+def _pedacos(p, nome):
+    """X.pesos.p01, p02... de um download que não chegou a ser montado (ordem pelo número)."""
+    try:
+        return sorted(f for f in os.listdir(p) if re.fullmatch(re.escape(nome) + r"\.p\d+", f))
+    except OSError:
+        return []
+
+
+def _manifesto_local(p):
+    try:
+        with open(os.path.join(p, "manifesto.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
 def instalado(pasta=None):
+    """Tudo no lugar — ou TODOS os pedaços de um .pesos que ficou sem montar (gerar() monta antes de usar). Sem o
+    manifesto guardado não dá para saber se os pedaços estão completos: conta como não baixado (o download retoma)."""
     p = pasta or pasta_modelo()
-    return all(os.path.exists(os.path.join(p, f)) for f in ("t5.onnx", "dit.onnx", "vae_dec.onnx", "tokenizer.json"))
+    juntar = _manifesto_local(p).get("juntar") or {}
+
+    def ok(f):
+        if os.path.exists(os.path.join(p, f)):
+            return True
+        partes = juntar.get(f)
+        return bool(partes) and all(os.path.exists(os.path.join(p, x)) for x in partes)
+    return all(ok(f) for f in ESSENCIAIS)
+
+
+def _montar_pedacos(p, progresso=None):
+    """Junta os .pesos que ficaram em pedaços (o download parou na montagem). Confere pelo manifesto guardado na pasta
+    (ou o do release, se houver internet); sem nenhum dos dois, confere a soma dos tamanhos dos pedaços."""
+    faltam = [f for f in ESSENCIAIS if f.endswith(".pesos") and not os.path.exists(os.path.join(p, f)) and _pedacos(p, f)]
+    if not faltam:
+        return
+    man = _manifesto_local(p)
+    if not man:
+        try:
+            with urllib.request.urlopen(_ua(URL_BASE + "manifesto.json"), timeout=15) as r:
+                man = json.loads(r.read().decode("utf-8"))
+        except Exception:
+            pass
+    for nome in faltam:
+        if progresso:
+            progresso(0, "Montando o modelo (só desta vez)...")
+        partes = (man.get("juntar") or {}).get(nome) or _pedacos(p, nome)
+        if not all(os.path.exists(os.path.join(p, x)) for x in partes):
+            raise RuntimeError("o download do gerador de efeitos ficou pela metade; baixe de novo no Soundboard (continua de onde parou)")
+        alvo = os.path.join(p, nome)
+        with open(alvo + ".tmp", "wb") as g:
+            for parte in partes:
+                with open(os.path.join(p, parte), "rb") as f:
+                    for b in iter(lambda: f.read(1 << 24), b""):
+                        g.write(b)
+        sha = (man.get("sha_juntos") or {}).get(nome)
+        if sha and _sha(alvo + ".tmp") != sha:
+            os.remove(alvo + ".tmp")
+            raise RuntimeError(f"o modelo está incompleto ({nome}); baixe o gerador de efeitos de novo no Soundboard")
+        os.replace(alvo + ".tmp", alvo)
+        for parte in partes:
+            try:
+                os.remove(os.path.join(p, parte))
+            except OSError:
+                pass
 
 
 # ── agendador DDIM (diffusers.DDIMScheduler com a config do EzAudio XL) ──
@@ -134,6 +199,7 @@ def gerar(texto, segundos=10.0, passos=50, guia=5.0, reescala=0.75, semente=None
     if not instalado(pasta):
         raise RuntimeError("modelo de efeitos sonoros não instalado")
     prog = progresso or (lambda f, r: None)
+    _montar_pedacos(pasta, prog)
     medidas = {}
     t0 = time.time()
     # 1) leitor de texto: a frase e a frase vazia (o "sem texto" do guidance); depois sai da placa
@@ -229,11 +295,21 @@ def baixar(on_progress):
             os.makedirs(destino, exist_ok=True)
             with urllib.request.urlopen(_ua(URL_BASE + "manifesto.json"), timeout=60) as r:
                 man = json.loads(r.read().decode("utf-8"))
+            with open(os.path.join(destino, "manifesto.json"), "w", encoding="utf-8") as f:
+                json.dump(man, f)   # guardado: a montagem dos pedaços confere por ele se o download parar no fim
             arqs = man["arquivos"]
             total = sum(a["tamanho"] for a in arqs.values())
             feito = 0
+            montados = set()   # pedaços de um .pesos que já está montado e confere: não baixa de novo
+            for junto, partes in (man.get("juntar") or {}).items():
+                alvo = os.path.join(destino, junto)
+                if os.path.exists(alvo) and _sha(alvo) == man["sha_juntos"][junto]:
+                    montados.update(partes)
             for nome, info in arqs.items():
                 alvo = os.path.join(destino, nome)
+                if nome in montados:
+                    feito += info["tamanho"]
+                    continue
                 if os.path.exists(alvo) and os.path.getsize(alvo) == info["tamanho"] and _sha(alvo) == info["sha256"]:
                     feito += info["tamanho"]
                     continue
