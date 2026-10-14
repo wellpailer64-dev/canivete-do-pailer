@@ -120,7 +120,7 @@ async function veFilaRevisar() {
     for (const c of VE.clips) {
         if (c.tr !== 0 || veIsAudio(c) || veOculto(c)) continue;
         const m = VE.media[c.m]; if (!m || !(m.kind === 'video' || m.kind === 'image')) continue;
-        if (veLen(c) < 0.7 && c.st > 0.1) av.push({ t: c.st, texto: `tomada de ${veLen(c).toFixed(1)} s ("${nm(c)}") pisca na tela` });
+        if (veLen(c) < 0.7 && c.st > 0.1) av.push({ t: c.st, texto: `tomada de ${veLen(c).toFixed(1)} s ("${nm(c).replace(/ · fundo$/, '')}") pisca na tela` });
     }
     // GC sobre a pessoa certa (só com nomes dados no painel Pessoas e o material já analisado)
     const api = window.pywebview && window.pywebview.api;
@@ -145,7 +145,59 @@ async function veFilaRevisar() {
             });
         }
     }
+    // texto/GC em cima de um rosto (rostos do painel Pessoas; só o material já analisado)
+    if (api && api.ve_ps_rostos) for (const a of await veFilaTextoSobreRosto(api).catch(() => [])) av.push(a);
     return av.sort((x, y) => x.t - y.t);
+}
+// Caixa (na tela) dos textos de um clipe de texto ou de uma Comp de GC/lettering; aproximada pelo tamanho da letra
+function veFilaCaixasTexto(c) {
+    const m = VE.media[c.m];
+    const caixa = t => {
+        const tx = t.tx || {}, p = t.p || {}, tam = +tx.tam || 40, linhas = String(tx.t || '').split('\n');
+        const w = Math.min(+tx.caixa || 1e9, Math.max(...linhas.map(l => l.length)) * tam * 0.52) * ((+p.sc || 100) / 100);
+        const h = linhas.length * tam * 1.2 * ((+p.sc || 100) / 100);
+        const x0 = tx.alin === 'left' && tx.caixa ? (+p.x || 0) - tx.caixa / 2 : (+p.x || 0) - w / 2;
+        return [x0, (+p.y || 0) - h / 2, w, h];
+    };
+    if (m && m.comp) {
+        const s = (VE.sequences || []).find(q => q.id === m.sequenceId);
+        return s ? (s.clips || []).filter(veIsTexto).map(caixa) : [];
+    }
+    return veIsTexto(c) ? [caixa(c)] : [];
+}
+async function veFilaTextoSobreRosto(api) {
+    const nm = c => c.nome || (VE.media[c.m] || {}).name || '';
+    const textos = VE.clips.filter(c => !veOculto(c) && (veIsTexto(c) || (VE.media[c.m] && VE.media[c.m].comp && /^(GC|Lettering|Título|Cartela) · /.test(nm(c)))));
+    const pares = [];
+    for (const g of textos) {
+        const caixas = veFilaCaixasTexto(g); if (!caixas.length) continue;
+        const a = g.st, b = veEnd(g);
+        const sob = VE.clips.filter(c => c !== g && !veIsAudio(c) && !veOculto(c) && c.tr < g.tr && c.st < b && veEnd(c) > a && !/^Textura · |· fundo$/.test(nm(c)))
+            .map(c => ({ c, m: VE.media[c.m] })).filter(o => o.m && o.m.path && (o.m.kind === 'video' || o.m.kind === 'image'))
+            .sort((x, y) => y.c.tr - x.c.tr)[0];
+        if (!sob) continue;
+        const i0 = Math.max(a, sob.c.st), i1 = Math.min(b, veEnd(sob.c));
+        pares.push({ g, sob, caixas, item: { path: sob.m.path, kind: sob.m.kind, t0: veSrcAt(sob.c, i0), t1: veSrcAt(sob.c, i1) } });
+    }
+    if (!pares.length) return [];
+    const r = await api.ve_ps_rostos(pares.map(p => p.item), vePrPrefs().dir);
+    if (!r || !r.success) return [];
+    const av = [];
+    pares.forEach((par, i) => {
+        const { c } = par.sob, sz = veMediaSize(c), p = veStaticProps(c), s = (+p.sc || 100) / 100;
+        const mk = c.mk && c.mk[0] && c.mk[0].pts;   // recorte da tomada vertical: rosto fora dele não aparece
+        const cobre = (r.itens[i] || []).some(([fx, fy, fw, fh]) => {
+            const mx = (fx + fw / 2) * sz.w, my = (fy + fh / 2) * sz.h;
+            if (mk && mk.length >= 19 && (mx < mk[0] || mx > mk[6] || my < mk[1] || my > mk[13])) return false;
+            const X = p.x + ((fx * sz.w) - sz.w / 2) * s, Y = p.y + ((fy * sz.h) - sz.h / 2) * s, W = fw * sz.w * s, H = fh * sz.h * s;
+            return par.caixas.some(([x, y, w, h]) => {
+                const iw = Math.min(X + W, x + w) - Math.max(X, x), ih = Math.min(Y + H, y + h) - Math.max(Y, y);
+                return iw > 0 && ih > 0 && iw * ih > 0.2 * W * H;
+            });
+        });
+        if (cobre) av.push({ t: par.g.st, texto: `"${nm(par.g)}" fica em cima de um rosto na cena "${nm(par.sob.c)}"` });
+    });
+    return av;
 }
 // Preparo visível: o item aparece na fila na hora, com o que está sendo preparado (Comps, 3D, transições, motion) —
 // antes a fila ficava vazia por até 1 h no GaIA e parecia que nada estava acontecendo.

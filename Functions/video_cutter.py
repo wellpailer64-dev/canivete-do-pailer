@@ -3612,6 +3612,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
         path = _base_imagem(path)   # timeline que começou por uma imagem: fundo preto no tamanho dela
     # Modo placa (Functions/export_placa.py): a timeline inteira montada na placa de vídeo (Vulkan + libplacebo), como
     # o Premiere. O que ele ainda não sabe fazer (motivo) ou uma falha na placa seguem pela CPU, abaixo
+    # (Comp pela placa com fundo transparente: medido 2026-10-14 — 60 s × 48 s na CPU e o alfa saía errado; fica na CPU)
     if (janela is None and camadas and not saida and not previa_h and not alfa and usar_gpu
             and not (isinstance(opcoes, dict) and opcoes.get("blocos"))
             and not FORMATOS_SAIDA.get(str(formato_saida).lower(), {}).get("audio_only")):

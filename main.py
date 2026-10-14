@@ -3350,6 +3350,13 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def ve_ps_rostos(self, itens, base=None):
+        from Functions import busca_rosto
+        try:
+            return {"success": True, "itens": busca_rosto.rostos_no_trecho(itens, self._rosto_cache(base))}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def ve_ps_revisar_gc(self, itens, base=None, nomes=None):
         from Functions import busca_rosto
         try:

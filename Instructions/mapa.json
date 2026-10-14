@@ -118,6 +118,7 @@
     "ve_ps_pausar",
     "ve_ps_referencia",
     "ve_ps_quem",
+    "ve_ps_rostos",
     "ve_ps_revisar_gc",
     "ve_ps_mini",
     "ve_medir_volume",
@@ -1128,6 +1129,12 @@
     "busca_rosto"
    ]
   },
+  "ve_ps_rostos": {
+   "args": "itens, base=None",
+   "modulos": [
+    "busca_rosto"
+   ]
+  },
   "ve_ps_revisar_gc": {
    "args": "itens, base=None, nomes=None",
    "modulos": [
@@ -1742,7 +1749,7 @@
    ]
   },
   "ve_c3d_fim": {
-   "args": "base, h, sessao, pasta, fps, n",
+   "args": "base, h, sessao, pasta, fps, n, recortar=False",
    "modulos": [
     "cena3d"
    ]

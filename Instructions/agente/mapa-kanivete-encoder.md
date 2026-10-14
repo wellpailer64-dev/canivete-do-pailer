@@ -147,13 +147,17 @@ Corte também a base (só os segmentos até T).
   fora do trecho idêntico).
 - **Preparo visível na fila**: o item aparece na hora ("Preparando · Renderizando a Comp X 30% · faltam 12 · 4 min").
 - **Revisor antes do render** (`veFilaRevisar`, não trava): GC × rosto (painel Pessoas: avisa GC sobre OUTRA pessoa com nome,
-  ≥0,45; confirma a própria com ≥0,36), camada "Textura ·/· fundo" passando do fim da cena, tomada < 0,7 s na V1. Avisos no
+  ≥0,45; confirma a própria com ≥0,36), camada "Textura ·/· fundo" passando do fim da cena, tomada < 0,7 s na V1, texto/GC/cartela em cima de um rosto
+  (`veFilaTextoSobreRosto`: rostos do índice do painel Pessoas projetados na tela pela posição/escala da cena, fora do
+  recorte da tomada vertical não conta; sobreposição > 20% do rosto). Avisos no
   item (⚠ N avisos, lista no title) e num aviso na tela. `VEFILA_API.revisar()`.
 
 ## 7. Pendências (por ordem)
-00. (2026-10-14) Comp no modo placa (hoje "fundo transparente" cai na CPU: o resto da Comp — PNGs, fundo — ainda ~50 s
-    por 26 s); revisor: texto sobre rosto. (Comps em paralelo: medido — 1 Comp já usa ~50% de 16 núcleos; 2 juntas
-    ganhariam pouco e pesariam na edição: NÃO fazer.)
+00. (2026-10-14) Medido e DESCARTADO: Comp no modo placa com alfa (60 s × 48 s na CPU e o alfa saía errado — o
+    libplacebo entrega cor pré-multiplicada; foi desfeito) e Comps em paralelo (1 Comp já usa ~50% de 16 núcleos).
+    Números da Comp do GaIA (26 s, 43 camadas): 188 s tela cheia → 48 s com motion recortado (PSNR 82,9 dB = igual).
+    Armadilha de teste: os PNGs de texto do trabalho da Comp moram no TEMP do app — fechar o app apaga e o render sai
+    sem textos (parecia defeito do codificador).
 0. **PRÓXIMO (combinado 2026-10-08): frear a fila adiantada de quadros.** Com as cópias Full HD a memória da placa
    cresce de 4,8 → 7,0 GB ao longo do export (`D:/kanivete_testes/encoder/medir_pico_fhd.py`: export 5,6 GB +
    app 1,4 = 6,9 de 8); no app do usuário estourou em 21% e a conferência (×2,6 agora) manda para a CPU quando o app

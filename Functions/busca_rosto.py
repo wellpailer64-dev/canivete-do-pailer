@@ -248,8 +248,15 @@ def _indice(caminho, tipo, cache, job=None, so_cache=False):
 
 
 # ─────────────────────────── referência e busca por foto ───────────────────────────
-def _img_ref(caminho, t=None):
+def _img_ref(caminho, t=None, chave=False):
+    """Imagem da foto, ou o quadro t do vídeo. chave=True: o QUADRO-CHAVE em t, lido do mesmo jeito que a análise —
+    a busca exata por tempo devolvia outro quadro em vídeo de iPhone (o homem já tinha andado) e a foto do perfil e as
+    miniaturas recortavam o lugar errado (uma ferramenta em vez do rosto)."""
     if t is not None and os.path.splitext(caminho)[1].lower() not in _EXTS_IMG:
+        if chave:
+            for tt, im in _quadros_video(caminho, t0=max(0.0, float(t) - 0.05), dur=3.0):
+                if tt >= float(t) - 0.1:
+                    return im
         return next((im for _t, im in _quadros_video(caminho, t0=max(0.0, float(t)), dur=0.9, todos=True)), None)
     return _ler_imagem(caminho)
 
@@ -403,7 +410,7 @@ def agrupar(midias, cache, nomes=None, minimo=3):
     Cada rosto entra na pessoa de centro mais parecido (≥ GRUPO), do mais nítido para o menos; centros parecidos
     (≥ JUNTAR) viram uma pessoa só. Fica quem aparece em ≥ 'minimo' quadros. O nome vem do projeto (centro ≥ 0,5)."""
     ms = _midias_ok(midias)
-    E, Q, ORIG, VAO = [], [], [], {}
+    E, Q, ORIG, VAO, BOA = [], [], [], {}, []
     for k, m in enumerate(ms):
         ind = _indice(m["path"], m.get("kind"), cache, so_cache=True)
         if ind is None or not len(ind[0]):
@@ -414,6 +421,7 @@ def agrupar(midias, cache, nomes=None, minimo=3):
         VAO[k] = _vao(t)
         for i in np.nonzero(bons)[0]:
             E.append(e[i]); Q.append(nota[i]); ORIG.append((k, float(t[i]), [float(x) for x in b[i]]))
+            BOA.append(bool(q[i, 1] >= 60 and q[i, 2] >= 0.55 and q[i, 0] >= 0.88))   # bom para foto de perfil
     if not E:
         return []
     E = np.array(E, np.float32); Q = np.array(Q, np.float32)
@@ -442,7 +450,9 @@ def agrupar(midias, cache, nomes=None, minimo=3):
         if len(mem) < minimo:
             continue
         c = soma / np.linalg.norm(soma)
-        melhor = max(mem, key=lambda i: Q[i])
+        # foto do perfil: o rosto grande, nítido e bem de frente (se houver), senão o de melhor nota
+        boas = [i for i in mem if BOA[i]]
+        melhor = max(boas or mem, key=lambda i: Q[i])
         k, tb, cx = ORIG[melhor]
         por_arq = {}
         for i in mem:
@@ -461,8 +471,8 @@ def agrupar(midias, cache, nomes=None, minimo=3):
             sv = float(v @ c)
             if sv >= 0.5 and sv > ns:
                 nome, ns = n, sv
-        if not nome and sum(len(o["trechos"]) for o in ocorr) < 2:
-            continue   # aparece numa cena só: ruído (rosto de passagem); a busca por foto ainda acha
+        if not nome and sum(len(o["trechos"]) for o in ocorr) < 3:
+            continue   # aparece em 1–2 cenas: ruído (rosto de passagem, objeto confundido com rosto); a busca ainda acha
         pessoas.append({"chave": hashlib.sha1(np.round(c, 2).tobytes()).hexdigest()[:10], "nome": nome, "n": len(mem),
                         "arquivos": len(ocorr), "cenas": sum(len(o["trechos"]) for o in ocorr),
                         "foto": {"path": ms[k]["path"], "t": tb, "caixa": cx}, "c": [round(float(x), 4) for x in c],
@@ -486,12 +496,12 @@ def miniatura(caminho, t, cache, caixa=None, lado=360):
     """JPEG pequeno do quadro t; com 'caixa' recorta o ROSTO (quadrado com folga) para a foto do perfil."""
     pasta = os.path.join(cache, "rostos", "mini")
     os.makedirs(pasta, exist_ok=True)
-    h = hashlib.sha1(f"{caminho}|{t:.2f}|{caixa}|{lado}".encode("utf-8")).hexdigest()[:16]
+    h = hashlib.sha1(f"2|{caminho}|{t:.2f}|{caixa}|{lado}".encode("utf-8")).hexdigest()[:16]   # 2: lida no quadro-chave
     arq = os.path.join(pasta, h + ".jpg")
     if os.path.exists(arq):
         return arq
     import cv2
-    img = _img_ref(caminho, t)
+    img = _img_ref(caminho, t, chave=True)   # o tempo veio da análise (quadro-chave)
     if img is None:
         return None
     H, W = img.shape[:2]
@@ -548,3 +558,22 @@ def _mesmo_nome(a, b):
         s = unicodedata.normalize("NFKD", str(s or "")).encode("ascii", "ignore").decode().lower()
         return {w for w in re.split(r"[^a-z]+", s) if len(w) >= 4 and w not in ("prof", "dona", "senhor", "senhora")}
     return bool(toks(a) & toks(b))
+
+
+def rostos_no_trecho(itens, cache):
+    """itens: [{path, kind, t0, t1}] → para cada um, as caixas [x, y, w, h] (fração da mídia) dos rostos nítidos no
+    trecho (só o que já está no índice). Para o revisor: texto ou GC em cima de um rosto."""
+    out = []
+    for it in itens or []:
+        caixas = []
+        try:
+            ind = _indice(it["path"], it.get("kind"), cache, so_cache=True) if os.path.exists(it.get("path") or "") else None
+        except Exception:
+            ind = None
+        if ind is not None and len(ind[0]):
+            t, b, _e, q = ind
+            sel = np.ones(len(t), bool) if it.get("kind") == "image" else (t >= float(it["t0"]) - 0.5) & (t <= float(it["t1"]) + 0.5)
+            sel &= (q[:, 0] >= 0.8) & (q[:, 1] >= 34)
+            caixas = [[round(float(x), 4) for x in b[i]] for i in np.nonzero(sel)[0]]
+        out.append(caixas)
+    return out
