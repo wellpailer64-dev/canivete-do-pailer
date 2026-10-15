@@ -72,6 +72,12 @@
         const op = { padrao, perfil: a.perfil || VK.doc.perfil, marcas: a.marcas ?? (padrao !== 'rgb'), sangria: a.sangria != null ? vkPT(+a.sangria) : (padrao === 'rgb' ? 0 : VK.doc.sangria),
             pranchetas: a.pranchetas ? [].concat(a.pranchetas).map(n => (VK.doc.pranchetas.find(p => p.id === n || p.nome === n) || {}).id).filter(Boolean) : [],
             spotsParaProcesso: !!a.spotsParaProcesso, titulo: VK.doc.nome, textoEditavel: !!a.texto_editavel };   // texto_editavel: fonte embutida, texto copiável (PDF digital)
+        // marcas como o guia de impressão pede (mm; espessura em pt); sem = as do documento (doc.marcas) ou o padrão
+        const mc = { ...(VK.doc.marcas || {}) };
+        for (const [k, c] of [['marcas_dist', 'dist'], ['marcas_comp', 'comp'], ['marcas_esp', 'esp']]) if (a[k] != null) mc[c] = +a[k];
+        if (mc.dist != null) op.marcas_dist = vkPT(mc.dist);
+        if (mc.comp) op.marcas_comp = vkPT(mc.comp);
+        if (mc.esp) op.marcas_esp = +mc.esp;
         vkCarregando(true, 'Gerando PDF para gráfica...');
         let r;
         try { r = await api().vk_exportar_pdf(await vkDocPy(), caminho, op); } finally { vkCarregando(false); }
@@ -292,6 +298,7 @@ function vkFechamento(op = {}) {
         if (o.tipo === 'texto') {
             const g = vkGeo(o), tam = o.tam * vkEsc(o.m);
             if (g && !g.achou) add('erro', 'fonte', `Fonte não instalada: ${(g.faltam && g.faltam.join(', ')) || o.fam} (sai em Arial)`, [o.id]);
+            if (g && g.sem_glifo && g.sem_glifo.length) add('erro', 'sem_glifo', `A fonte ${o.fam} não tem: ${g.sem_glifo.join(' ')} (sairia caixinha vazia) — instale a fonte completa`, [o.id]);
             else if (g && g.achou === 'embutida') add('aviso', 'fonte_embutida', `Fonte embutida do arquivo original (só as letras que já existiam): ${o.fam} — instale para editar à vontade`, [o.id]);
             if (vkPretoRico(o.preench) && tam < 14) add('aviso', 'preto_rico', 'Texto pequeno em preto de 4 cores (fica borrado se o registro variar): use 100K', [o.id], 'preto_texto');
             if (tam < 6) add('aviso', 'texto_pequeno', 'Texto menor que 6 pt (pode não sair legível)', [o.id]);
@@ -327,6 +334,9 @@ function vkFechamento(op = {}) {
         }
     }
     if (impressao && b <= 0) add('aviso', 'sem_sangria', 'Documento sem sangria (o padrão de gráfica é 3 mm)', []);
+    // página de PDF tem no máximo 200 pol (5080 mm) por lado, contando sangria e marcas: painel maior = escala 1:10 (como no Illustrator)
+    const grandes = d.pranchetas.filter(p => Math.max(p.w, p.h) + 2 * (b + vkPT(10)) > 14400);
+    if (impressao && grandes.length) add('erro', 'grande_demais', `Prancheta maior que 5,08 m com sangria e marcas (limite do PDF): ${grandes.map(p => p.nome).join(', ')} — monte em escala 1:10 e avise a gráfica`, []);
     if (impressao && d.modoCor === 'rgb') add('aviso', 'modo_rgb', 'Documento em modo RGB', [], 'converter_cmyk');
     const erros = itens.filter(x => x.nivel === 'erro'), avisos = itens.filter(x => x.nivel === 'aviso');
     return { ok: !erros.length, padrao, perfil: d.perfil, tac_max: tacMax, erros, avisos, info: { spots: [...spots], pranchetas: d.pranchetas.length, sangria_mm: vkR(vkMM(b), 2) } };

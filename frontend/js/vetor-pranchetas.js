@@ -205,3 +205,113 @@ async function vkPrUp(A) {
         ctx.restore();
     };
 })();
+
+// ── Série numerada (sinalização em série: armários 001…200, salas, andares) ──
+// A prancheta modelo (com o número, ex. "001" ou "SALA 01") vira N pranchetas idênticas no MESMO arquivo, cada uma com o
+// número seguinte (zeros à esquerda como no modelo). Antes de criar, confere se a fonte tem todos os caracteres: fonte
+// embutida de .ai/PDF só traz as letras que o arquivo usava (o "001" não traz o 2…9) e sairia caixinha vazia.
+// serie_pranchetas {prancheta, texto (id/nome; sem = o único texto da prancheta com número), de, ate | quantidade,
+//   passo, digitos, lista (["Diretoria", "RH"...] em vez de números: troca o texto inteiro), nome (molde "Armário {n}"),
+//   colunas, espaco (mm)}
+function vkSerieAchados(ids, todos) {   // textos dentro da arte (inclusive em grupos); sem `todos`, só os com número
+    const out = [];
+    const anda = o => { if (o.tipo === 'texto' && (todos || /\d/.test(o.conteudo || ''))) out.push(o); (o.itens || []).forEach(anda); };
+    ids.forEach(id => { const o = vkObj(id); if (o) anda(o); });
+    return out;
+}
+function vkSerieTrocar(o, ini, fim, novo) {   // troca o trecho [ini, fim) do texto e acerta os trechos de estilo
+    const d = novo.length - (fim - ini);
+    o.conteudo = o.conteudo.slice(0, ini) + novo + o.conteudo.slice(fim);
+    if (d && o.trechos) o.trechos = o.trechos.map(t => ({ ...t, ini: t.ini >= fim ? t.ini + d : t.ini, fim: t.fim >= fim ? t.fim + d : t.fim }));
+}
+(function () {
+    vkRegistrar('serie_pranchetas', 'série numerada', async a => {
+        await vkGeosProntas();   // caixa dos textos pronta: a arte de cada prancheta é medida pelo centro
+        const ps = VK.doc.pranchetas, p = vkPrAchar(a.prancheta);
+        const arte = new Map(ps.map(q => [q.id, vkPrArte(q)])), ids = arte.get(p.id);
+        const lista = Array.isArray(a.lista) ? a.lista.map(String) : null;
+        let alvo;
+        if (a.texto != null) {
+            alvo = vkSerieAchados(ids, true).find(o => o.id === a.texto || o.nome === a.texto);
+            if (!alvo) throw new Error(`texto "${a.texto}" não achado na prancheta ${p.nome}`);
+        } else {
+            const ach = vkSerieAchados(ids, !!lista && !vkSerieAchados(ids).length);
+            if (!ach.length) throw new Error('a prancheta modelo não tem texto com número: passe texto (id ou nome)');
+            if (ach.length > 1) throw new Error(`a prancheta tem ${ach.length} textos possíveis (${ach.map(o => `"${o.conteudo}"`).join(', ')}): passe texto (id ou nome)`);
+            alvo = ach[0];
+        }
+        const txt = alvo.conteudo || '', runs = [...txt.matchAll(/\d+/g)], run = lista ? null : runs[runs.length - 1];
+        if (!lista && !run) throw new Error(`o texto "${txt}" não tem número: use lista para nomes`);
+        const ini = run ? run.index : 0, fim = run ? run.index + run[0].length : txt.length;
+        const digitos = +a.digitos || (run ? run[0].length : 1), passo = +a.passo || 1;
+        let valores;
+        if (lista) valores = lista;
+        else {
+            const de = a.de != null ? +a.de : +run[0] + passo;
+            const ate = a.ate != null ? +a.ate : a.quantidade != null ? de + (a.quantidade - 1) * passo : null;
+            if (ate == null) throw new Error('passe ate (último número) ou quantidade');
+            valores = [];
+            for (let n = de; passo > 0 ? n <= ate : n >= ate; n += passo) valores.push(String(n).padStart(digitos, '0'));
+        }
+        if (!valores.length) throw new Error('nada a criar (confira de/ate)');
+        if (valores.length > 2000) throw new Error('mais de 2000 pranchetas numa série: divida em arquivos');
+        // fonte: todos os caracteres novos existem? (com trechos, vale a fonte do texto)
+        const chars = [...new Set(valores.join(''))].filter(c => c.trim()).join('');
+        const g = await vkGeoPronta({ ...vkClone(alvo), id: vkId(), conteudo: chars, trechos: [], caixa: null, caixa_alt: null, anterior: null, seguinte: null });
+        if (g && g.sem_glifo && g.sem_glifo.length) throw new Error(`a fonte ${alvo.fam} ${alvo.estilo || ''} não tem: ${g.sem_glifo.join(' ')} — instale a fonte da marca (a embutida no arquivo só traz as letras que ele usava)`);
+        if (g && g.achou === false) throw new Error(`fonte não instalada: ${(g.faltam || []).join(', ') || alvo.fam} — instale a fonte da marca antes da série`);
+        // cópias: arte inteira (com a sangria); o texto-alvo é achado andando junto pela árvore
+        const molde = String(a.nome || '');
+        // nome: molde, ou o do modelo com o número trocado ("Armário 001" → "Armário 002"), ou o texto da placa ("SALA 02")
+        const nomeDe = (v, tx) => molde ? molde.replace(/\{n\}/g, v) : run && String(p.nome).includes(run[0]) ? String(p.nome).replace(run[0], v) : tx || v;
+        const novas = [];
+        for (const v of valores) {
+            let copia = null;
+            const reid = (o, orig) => { if (orig === alvo) copia = o; o.id = vkId(); if (o.itens) o.itens.forEach((x, i) => reid(x, orig.itens[i])); return o; };
+            const nids = [];
+            for (const id of ids) {
+                const o = vkObj(id), l = vkListaDe(id); if (!o || !l) continue;
+                const c = reid(vkClone(o), o); l.push(c); nids.push(c.id);
+            }
+            if (copia) vkSerieTrocar(copia, ini, fim, v);
+            const q = { ...vkClone(p), id: vkId('p'), nome: nomeDe(v, copia && copia.conteudo.replace(/\s+/g, ' ').trim()) };
+            novas.push(q); arte.set(q.id, nids);
+        }
+        ps.splice(ps.indexOf(p) + 1, 0, ...novas);
+        const L = vkLayoutPr(), cv = v => (a.un === 'pt' ? +v : vkPT(+v));
+        if (a.colunas || a.espaco != null || L.modo === 'livre') {
+            // grade só da série, embaixo de tudo (o resto do documento fica onde está)
+            const e = a.espaco != null ? cv(a.espaco) : (L.espaco ?? 36), col = Math.max(1, +a.colunas || (L.modo === 'livre' ? 10 : L.colunas || 4));
+            const y0 = Math.max(...ps.filter(q => !novas.includes(q)).map(q => q.y + q.h)) + e;
+            vkPrAplicar(novas, novas.map((q, i) => [p.x + (i % col) * (p.w + e), y0 + Math.floor(i / col) * (p.h + e)]), arte);
+        } else vkPrReorganizar(true, arte);
+        VK.ativa = p.id;
+        return { pranchetas: novas.length, de: valores[0], ate: valores[valores.length - 1], nomes: novas.length <= 6 ? novas.map(q => q.nome) : [novas[0].nome, '…', novas[novas.length - 1].nome] };
+    });
+    const m = VK_MENUS.find(x => x[0] === 'Objeto');
+    if (m) m[1].push(['Pranchetas: Série numerada…', '', () => vkSerieDialogo()]);
+})();
+function vkSerieDialogo() {
+    let ach = [];
+    try { ach = vkSerieAchados(vkPrArte(vkPrAchar())); } catch (e) { /* sem documento */ }
+    const t = ach[0], run = t && [...t.conteudo.matchAll(/\d+/g)].pop();
+    const ini = run ? +run[0] : 1, dig = run ? run[0].length : 3;
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+    vkModal(`<div class="ie-dlg-tit">Série numerada</div><div class="ie-dlg-corpo">
+        <div class="vk-nota">A prancheta ativa é o modelo${t ? ` (texto “${esc(t.conteudo)}”)` : ''}. Cada prancheta nova recebe o número seguinte, no mesmo arquivo.</div>
+        ${ach.length > 1 ? `<div class="vk-linha"><span>Texto</span><select id="se-tx">${ach.map(o => `<option value="${o.id}">${esc(o.conteudo)}</option>`).join('')}</select></div>` : ''}
+        <div class="vk-grade">${vkNum('De', ini + 1, 'id="se-de"', '', 1)}${vkNum('Até', Math.max(ini + 1, 200), 'id="se-ate"', '', 1)}${vkNum('Passo', 1, 'id="se-passo" min="1"', '', 1)}${vkNum('Dígitos', dig, 'id="se-dig" min="1" max="8"', '', 1)}</div>
+        <div class="vk-linha"><span>Ou nomes, um por linha (troca o texto inteiro)</span></div>
+        <textarea id="se-lista" rows="4" style="width:100%;box-sizing:border-box;background:var(--ie-painel-2);border:1px solid var(--ie-linha-2);color:var(--text);border-radius:4px;padding:4px 6px;font:inherit" placeholder="Diretoria&#10;RH&#10;Financeiro"></textarea>
+        <div class="vk-linha"><span>Nome das pranchetas</span><input id="se-nome" placeholder="ex.: Armário {n}"></div>
+        </div><div class="ie-dlg-rod"><button class="ie-btn" data-x>Cancelar</button><button class="ie-btn ie-btn-primario" id="se-ok">Criar</button></div>`, (m, fechar) => {
+        m.querySelector('#se-ok').onclick = () => {
+            const g = id => m.querySelector(id), lista = g('#se-lista').value.split('\n').map(s => s.trim()).filter(Boolean);
+            const args = lista.length ? { lista } : { de: +g('#se-de').value, ate: +g('#se-ate').value, passo: +g('#se-passo').value, digitos: +g('#se-dig').value };
+            if (g('#se-tx')) args.texto = g('#se-tx').value;
+            if (g('#se-nome').value.trim()) args.nome = g('#se-nome').value.trim();
+            fechar();
+            vkCmdUi('serie_pranchetas', args).then(r => { if (r) { vkToast(`${r.pranchetas} pranchetas criadas (${r.de} … ${r.ate})`); vkEnquadrar(vkBoxUniao(VK.doc.pranchetas.map(p => ({ tipo: 'caminho', subs: vkRetSubs(p.x, p.y, p.w, p.h) })))); } });
+        };
+    });
+}

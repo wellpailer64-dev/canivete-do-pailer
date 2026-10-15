@@ -2221,7 +2221,7 @@
    ]
   },
   "ve_autosave": {
-   "args": "chave, nome, dados",
+   "args": "chave, nome, dados, rapido=False",
    "modulos": []
   },
   "ve_autosave_lista": {
@@ -2571,6 +2571,7 @@
   "duplicar_prancheta": "duplicar prancheta",
   "ordem_prancheta": "ordem da prancheta",
   "prancheta_caixa": "tamanho da prancheta",
+  "serie_pranchetas": "série numerada",
   "faca_caixa": "faca de caixa",
   "pintura_dinamica": "pintura dinâmica",
   "recuperacao": "recuperação",

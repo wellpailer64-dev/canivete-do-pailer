@@ -237,6 +237,8 @@ Estudo de caso, modelo, API, fechamento e pendências: `Instructions/vetor-kaniv
 marcas, verificação relendo o PDF). **API primeiro**: tudo é `vkCmd`/`window.VKN.cmd` (interface, Claude e Worker iguais);
 ler o documento com `VKN.mapa()`, conferir com `VKN.fechamento()`. Worker: `"app": "vetor"`. Teste: `python testes/teste_vetor.py`
 (rodar antes de release quando mexer no Vetor).
+Sinalização em série (placas 001…200 no mesmo arquivo): `serie_pranchetas` (Objeto › Pranchetas: Série numerada…), marcas
+de corte do guia do cliente (`marcas_dist/comp/esp`) e erro `sem_glifo` (fonte embutida sem os algarismos): §14 e §4 do guia.
 Pranchetas (ordem 4 por linha/vertical, duplicar, Alt+arrastar, alças), Novo documento com modelos e Criar fonte (.otf de
 glifos em pranchetas): §14 do guia; `testes/teste_pranchetas.py`, `testes/teste_fonte.py`.
 Illustrator ida e volta (.ai NATIVO montado no Illustrator instalado; volta com pranchetas/camadas/texto de área): §15,

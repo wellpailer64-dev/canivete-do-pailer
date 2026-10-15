@@ -592,11 +592,18 @@ def _bbox_obj(o):
     return (min(c[0] for c in cantos), min(c[1] for c in cantos), max(c[0] for c in cantos), max(c[1] for c in cantos))
 
 
-def _marcas(W, b, m, larg, alt):
+def _marcas_cfg(op, b):
+    """(distância do corte, comprimento, espessura) em pt — padrão: fora da sangria (mín. 6 pt), 15 pt, 0,25 pt;
+    o guia de impressão do cliente pode pedir outros (marcas_dist / marcas_comp / marcas_esp)."""
+    dist = op.get("marcas_dist")
+    return (float(dist) if dist is not None else max(b, 6.0), float(op.get("marcas_comp") or 15.0), float(op.get("marcas_esp") or 0.25))
+
+
+def _marcas(W, b, m, larg, alt, cfg=None):
     """Marcas de corte nos 4 cantos (coordenadas da página, origem embaixo à esquerda), cor de registro."""
-    ofs = max(b, 6.0); comp = 15.0
+    ofs, comp, esp = cfg or (max(b, 6.0), 15.0, 0.25)
     x0, y0, x1, y1 = m, m, m + larg, m + alt
-    out = ["q", "0.25 w", "0 J", f"/{W._sep('All', [100, 100, 100, 100])} CS 1 SCN"]
+    out = ["q", f"{_f(esp)} w", "0 J", f"/{W._sep('All', [100, 100, 100, 100])} CS 1 SCN"]
     for x, y, sx, sy in ((x0, y0, -1, -1), (x1, y0, 1, -1), (x0, y1, -1, 1), (x1, y1, 1, 1)):
         out.append(f"{_f(x + sx * ofs)} {_f(y)} m {_f(x + sx * (ofs + comp))} {_f(y)} l S")
         out.append(f"{_f(x)} {_f(y + sy * ofs)} m {_f(x)} {_f(y + sy * (ofs + comp))} l S")
@@ -623,8 +630,8 @@ def exportar_pdf(doc, caminho, op=None):
     abs_ = [a for a in doc.get("pranchetas", []) if not alvo or a["id"] in alvo]
     if not abs_:
         return {"success": False, "error": "nenhuma prancheta para exportar"}
-    m = b + (6 + 15 + 3 if marcas else 0) if padrao != "rgb" or marcas else b
-    if marcas: m = max(b, 6.0) + 15 + 3
+    mcfg = _marcas_cfg(op, b)
+    m = max(b, mcfg[0] + mcfg[1] + 3) if marcas else b
     for ab in abs_:
         PW, PH = ab["w"] + 2 * m, ab["h"] + 2 * m
         D = [1, 0, 0, -1, m - ab["x"], PH - m + ab["y"]]
@@ -641,7 +648,7 @@ def exportar_pdf(doc, caminho, op=None):
                 if bb and (bb[2] < x0 or bb[0] > x1 or bb[3] < y0 or bb[1] > y1): continue
                 corpo += W.objeto(o)
         corpo.append("Q")
-        if marcas: corpo += _marcas(W, b, m, ab["w"], ab["h"])
+        if marcas: corpo += _marcas(W, b, m, ab["w"], ab["h"], mcfg)
         res = pikepdf.Dictionary()
         for k, v in W.res.items():
             if v: res["/" + k] = pikepdf.Dictionary({"/" + n: x for n, x in v.items()})

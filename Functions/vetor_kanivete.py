@@ -362,6 +362,8 @@ def _glifos(texto, ini, fim, p, falta):
         for nome, cl, av, ox, oy in _moldar(F, s_, float(p.get("track") or 0), f_):
             ci = pos + cl
             ch = texto[ci] if ci < len(texto) else ""
+            if nome == F["ordem"][0] and ch.strip():   # glifo 0 = .notdef
+                falta.add("!" + ch)   # a fonte não tem o caractere (sai caixinha vazia): fechamento acusa
             out.append({"nome": nome, "ci": ci, "adv": av * sc * eh, "xo": ox * sc * eh, "yo": oy * sc * ev, "F": F, "sx": sc * eh, "sy": sc * ev,
                         "desl": desl, "tam": float(p["tam"]), "asc": F["asc"] * sc * ev, "desc": -F["desc"] * sc * ev,
                         "esp": ch in (" ", "\u00a0") or (nome in _ESPACOS and ch != "\t"), "tab": ch == "\t", "hif": ch in ("-", "‐", "–", "/"),
@@ -701,8 +703,9 @@ def texto_geometria(spec):
             alt_tot = asc0 + desc0
     lista = list(partes.values())
     r = {"subs": [s for _c, ss in lista for s in ss], "linhas": info, "larg": larg_tot, "alt": alt_tot, "asc": asc0, "desc": desc0,
-         "achou": False if any(not f.startswith("~") for f in falta) else ("embutida" if falta else True),
-         "faltam": sorted(f for f in falta if not f.startswith("~")), "fonte": os.path.basename(arq0),
+         "achou": False if any(not f.startswith(("~", "!")) for f in falta) else ("embutida" if "~embutida" in falta else True),
+         "faltam": sorted(f for f in falta if not f.startswith(("~", "!"))), "fonte": os.path.basename(arq0),
+         "sem_glifo": sorted(f[1:] for f in falta if f.startswith("!")),
          "corte": corte, "transborda": corte is not None, **({"glifos": coleta} if coleta is not None else {})}
     if len(lista) > 1 or (lista and (lista[0][0][0] is not None or lista[0][0][1] is not None)):
         r["partes"] = [{"subs": ss, **({"preench": c[0]} if c[0] is not None else {}), **({"traco": c[1]} if c[1] is not None else {})} for c, ss in lista]

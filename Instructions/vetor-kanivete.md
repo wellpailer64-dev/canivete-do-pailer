@@ -146,7 +146,12 @@ perfil, PDF/X recusa (X exige o perfil embutido); PDF CMYK sai com conversão si
 | margem | aviso | texto a menos de 3 mm do corte |
 | pontos_soltos | aviso | caminhos de 1 ponto → `limpar` |
 | sem_sangria | aviso | documento sem sangria |
+| sem_glifo | erro | a fonte não tem algum caractere do texto (sairia caixinha vazia; típico de fonte EMBUTIDA de .ai/PDF, que só traz as letras usadas) |
+| grande_demais | erro | prancheta + sangria + marcas passa de 5080 mm (200 pol, limite da página de PDF): montar em escala 1:10 e avisar a gráfica |
 Exportar com erro pede confirmação (agente: `forcar: true`).
+**Marcas de corte do guia do cliente** (2026-10-15): `exportar_pdf` aceita `marcas_dist` (mm do corte; padrão = fora da
+sangria, mín. 6 pt), `marcas_comp` (mm; padrão 15 pt) e `marcas_esp` (pt; padrão 0,25); no diálogo Exportar, gravados em
+`doc.marcas` (vão no .aknv). A página cresce para caber (`_marcas_cfg` em vetor_exportar.py).
 
 ## 5. Abrir arquivos de fora (`vetor_importar.py`)
 - **PDF/AI**: interpretador do content stream (pikepdf): caminhos, `re`, cores exatas (g/rg/k, cs/scn com ICCBased,
@@ -323,6 +328,16 @@ duplicar, Ctrl+D como no Illustrator, tela de início com modelos.
   orientação, pranchetas + ordem, sangria, CMYK/RGB + perfil; volta o último ajuste. Tela inicial com "Começar rápido".
 - Layout: o Vetor não ocupava a área toda (o Photo e o Editor ligam `body.ve-focus`); agora
   `.content-area:has(#page-vetor-kanivete.active)` em vetor.css.
+- **Série numerada** (sinalização em série, 2026-10-15; Objeto › Pranchetas: Série numerada…): `serie_pranchetas`
+  {prancheta (modelo; sem = ativa), texto (id/nome; sem = o único texto com número), de, ate | quantidade, passo, digitos
+  (padrão = os do modelo, "001" → 3), lista (nomes em vez de números: troca o texto inteiro), nome (molde "Armário {n}";
+  sem = o nome do modelo com o número trocado, ou o texto da placa), colunas, espaco (mm)}. Copia a arte inteira da
+  prancheta (com sangria; texto dentro de grupo também), troca só o ÚLTIMO número do texto (trechos de estilo acertados),
+  entra na ordem do documento (layout livre: grade de 10 embaixo de tudo); um Ctrl+Z desfaz a série. ANTES de criar,
+  confere se a fonte tem todos os caracteres (`sem_glifo` do `texto_geometria`, glifo 0) e recusa. Medido: 200 placas em
+  30 ms; PDF/X-4 de 200 páginas verificado; .ai nativo de 200 pranchetas em 4–7 s (Illustrator 30 reabre com 200
+  pranchetas, números únicos, 100 × 40 mm exatos, CMYK igual). Testes `D:/kanivete_testes/scripts/teste_serie_vetor.py`
+  e `teste_serie_ai.py` (Illustrator aberto). Ao trabalhar com arquivo de cliente: instalar a fonte da marca antes.
 - Teste `testes/teste_pranchetas.py [--debug]` (comandos + mouse de verdade; app em --agente=9333). A 1ª rodada logo
   depois de recarregar a página pode perder o mouse; rode de novo.
 - **Criar fonte própria** (`vetor-fonte.js` + `Functions/vetor_fonte.py`, estilo Fontself): Texto › Criar fonte: modelo de
