@@ -66,7 +66,9 @@ const VE_TR = {
         nome: 'Puxar (zoom)', tag: 'Pull', pausa: 0.3,
         fn: u => ({ a: { s: 1 + 0.35 * veEaseIO(u) }, b: { s: 1 + 1.4 * (1 - veEaseOut(u)), op: Math.min(1, u * 2.5) } }),
     },
-    pop: { nome: 'Pop', tag: 'Pop', pausa: 0.3, fn: u => ({ a: {}, b: { s: 0.15 + 0.85 * veEaseBack(u), op: Math.min(1, u * 4) } }) },
+    // ancora: a escala cresce a partir do ponto de âncora da PRÓPRIA camada (logo no canto pula no lugar dele); as de
+    // câmera (Puxar, Chicote) seguem no centro do quadro
+    pop: { nome: 'Pop', tag: 'Pop', pausa: 0.3, ancora: true, fn: u => ({ a: {}, b: { s: 0.15 + 0.85 * veEaseBack(u), op: Math.min(1, u * 4) } }) },
     // Chicote (whip pan): os dois quadros correm juntos, quase parados nas pontas e muito rápidos no meio (o meio
     // cai na batida); a imagem estica na direção do movimento na proporção da velocidade, como o borrão de câmera
     chicote: {
@@ -301,8 +303,12 @@ function veTransVirtuaisCalc() {
                 const f = veTransFx(j, papel, T, parte), s = f.s == null ? 1 : f.s, fx = f.sx == null ? 1 : f.sx, fy = f.sy == null ? 1 : f.sy;
                 if (f.sx != null) usaSx = true;
                 if (f.sy != null) usaSy = true;
-                x = W / 2 + (f.dx || 0) * W + s * fx * (x - W / 2);
-                y = H / 2 + (f.dy || 0) * H + s * fy * (y - H / 2);
+                if (VE_TR[j.t] && VE_TR[j.t].ancora) {   // a Posição já é o ponto de âncora: só a escala muda
+                    x += (f.dx || 0) * W; y += (f.dy || 0) * H;
+                } else {
+                    x = W / 2 + (f.dx || 0) * W + s * fx * (x - W / 2);
+                    y = H / 2 + (f.dy || 0) * H + s * fy * (y - H / 2);
+                }
                 sc *= s;
                 sx *= fx;
                 sy *= fy;

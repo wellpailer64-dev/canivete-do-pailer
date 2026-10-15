@@ -94,3 +94,17 @@ Gramática de motion que o Pailer aprovou:
 - Organização: rótulos/nomes de camada na timeline e indicador de máscara/mãe/fosco no clipe.
 - Fluxo de produção: montar as telas no Photo Kanivete (`KNV.cena`, uma prancheta por cena, camadas nomeadas) e mandar
   para o Editor (ponte Photo→Editor "Animar") — o ponto de partida do Pailer no PSD → AE.
+
+
+## 2026-10-14 — pedidos do Pailer (estudando as Comps do GaIA para animar à mão)
+- Pincel: **Shift = linha reta** do começo do traço até o cursor, travada de 45° em 45° (pontos a cada 6 px, para o
+  Aparar percorrer); tamanho do pincel passou para **Alt+arrastar**. Forma Linha: Shift trava o ângulo em 45°.
+- Pincel com **Aparar caminho** (início/fim/deslocamento, animáveis): seção "Pincel" nos Controles de efeito; os traços
+  contam como um caminho só, na ordem em que foram pintados (`veGrTracosAparados`, editor-grafico.js). Valores em
+  `c.fm.ap*` / `c.k['fm.ap*']`, os mesmos da forma.
+- **Pop** (transição de entrada) cresce a partir do ponto de âncora da PRÓPRIA camada (`ancora: true` em VE_TR); antes
+  escalava a partir do centro do quadro e o logo do canto "viajava" até o lugar. Puxar/Chicote seguem no centro.
+- Caneta (P) e Máscara na barra de ferramentas (grupo). PENDENTE (pedido): Caneta que cria CAMINHO como forma (não
+  máscara), com cor/espessura/preenchimento e Aparar — forma 'cam' com os pontos Bézier da caneta.
+- Pendência antiga achada no teste: caso `transicoes` do teste_export reprova no meio do Chicote (q85, 92,8) com ou sem
+  a mudança do Pop — prévia e export um quadro defasados na troca do chicote.

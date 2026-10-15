@@ -732,7 +732,14 @@ function veMoPainelHtml(c) {
                 ${veMoLinhaNum(`mk.${m.id}.exp`, 'Expansão', VE_MO_MK.exp)}
             </div>
         </div>`).join('');
-    const forma = c.fm ? `
+    const kind = (veMediaOf(c) || {}).kind;
+    // Pincel: Aparar caminho nos traços pintados (na ordem em que foram pintados), animável como nas formas
+    const pincel = kind === 'pincel' ? `
+        <div class="ve-fxc-title">${veT('Pincel')}</div>
+        <div class="ve-fxe ve-mo-forma"><div class="ve-fxe-body">
+            ${['apIni', 'apFim', 'apDesl'].map(k => veMoLinhaNum('fm.' + k, VE_MO_FM[k].nome, VE_MO_FM[k])).join('')}
+        </div></div>` : '';
+    const forma = c.fm && kind !== 'pincel' ? `
         <div class="ve-fxc-title">${veT('Forma')}</div>
         <div class="ve-fxe ve-mo-forma"><div class="ve-fxe-body">
             <div class="ve-mo-linha"><label>${veT('Tipo')}</label><select data-mofm="t">${Object.entries(VE_FORMAS).map(([k, n]) => `<option value="${k}"${c.fm.t === k ? ' selected' : ''}>${veT(n)}</option>`).join('')}</select>
@@ -742,7 +749,7 @@ function veMoPainelHtml(c) {
             ${['w', 'h', 'raio', 'cLarg'].concat(c.fm.t === 'est' || c.fm.t === 'pol' ? ['pontas'] : []).concat(c.fm.t === 'est' ? ['raioInt'] : [])
                 .concat(['apIni', 'apFim', 'apDesl', 'tLen', 'tVao', 'tDesl']).map(k => veMoLinhaNum('fm.' + k, VE_MO_FM[k].nome, VE_MO_FM[k])).join('')}
         </div></div>` : '';
-    return `<div class="ve-mo">
+    return pincel + `<div class="ve-mo">
         <div class="ve-fxc-title">${veT('Camada (motion)')}</div>
         <div class="ve-mo-linha"><label>${veT('Camada mãe')}</label><select data-mo="pai"><option value="">${veT('Nenhuma')}</option>${opc(o.pai)}</select></div>
         <div class="ve-mo-linha"><label>${veT('Fosco de trilha')}</label>

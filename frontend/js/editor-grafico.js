@@ -186,6 +186,25 @@ function veGrTraco(x, t) {
     x.restore();
 }
 
+// Traços do pincel aparados: [a, b] em frações do comprimento de TODOS os traços somados (um caminho só)
+function veGrTracosAparados(x, T, a, b) {
+    const lens = T.map(t => { const p = t.pts || []; let L = 0; for (let k = 2; k < p.length; k += 2) L += Math.hypot(p[k] - p[k - 2], p[k + 1] - p[k - 1]); return L; });
+    const tot = lens.reduce((s, l) => s + l, 0);
+    if (tot <= 0) { T.forEach(t => veGrTraco(x, t)); return; }
+    const s0 = Math.max(0, Math.min(1, a)) * tot, s1 = Math.max(0, Math.min(1, b)) * tot;
+    let ini = 0;
+    T.forEach((t, i) => {
+        const L = lens[i], fim = ini + L;
+        if (L > 0 && fim > s0 && ini < s1) {
+            const p = t.pts, pts = [];
+            for (let k = 0; k < p.length; k += 2) pts.push([p[k], p[k + 1]]);
+            const pedaco = veGrTrecho(pts, false, Math.max(0, (s0 - ini) / L), Math.min(1, (s1 - ini) / L));
+            if (pedaco.length >= 2) veGrTraco(x, { ...t, pts: pedaco.flat() });
+        } else if (L === 0 && ini >= s0 && ini <= s1) veGrTraco(x, t);   // ponto solto (um clique)
+        ini = fim;
+    });
+}
+
 function veGrafDesenho(c) {
     const o = c._o || c, m = veMediaOf(c), sz = veGrafTamanho(c);
     if (m.kind === 'cor') {
@@ -213,8 +232,23 @@ function veGrafDesenho(c) {
         }
         return g.cv;
     }
-    // pincel: os traços prontos ficam guardados; o que está sendo pintado agora é desenhado por cima
+    // pincel com Aparar caminho (início/fim/deslocamento, animáveis — 'fm.ap*', editor-motion.js): os traços contam
+    // como um caminho só, na ordem em que foram pintados; desenha só o trecho [a, b] do comprimento total
     const T = (c.br && c.br.tracos) || [], n = T.length;
+    const fmA = (c.fm || (c.k && Object.keys(c.k).some(k => k.startsWith('fm.ap')))) && typeof veMoFormaEm === 'function'
+        ? veMoFormaEm({ ...c, fm: c.fm || {} }) : c.fm;
+    const ap = fmA ? veGrAparar(fmA) : null;
+    if (ap) {
+        const kAp = sz.w + 'x' + sz.h + '|' + T.reduce((a, t) => a + t.pts.length, 0) + '|' + ap.a.toFixed(4) + '|' + ap.b.toFixed(4);
+        let g = VEGR.cache.get(o);
+        if (!g || g.kAp !== kAp) {
+            const cv = veGrCanvas(sz.w, sz.h);
+            if (!ap.vazio) veGrTracosAparados(cv.getContext('2d'), T, ap.a, ap.b);
+            g = { kAp, cv };
+            VEGR.cache.set(o, g);
+        }
+        return g.cv;
+    }
     const kBase = sz.w + 'x' + sz.h + '|' + (n - 1) + '|' + T.slice(0, -1).reduce((a, t) => a + t.pts.length, 0);
     let g = VEGR.cache.get(o);
     if (!g || g.kBase !== kBase) {
@@ -394,8 +428,9 @@ function veGrPointer(e) {
     VEM.panned = true;
     if (VE.playing) veStop();
     const scr = $ve('ve-screen'), doc = scr.ownerDocument, win = doc.defaultView, pt0 = veTxPontoQuadro(e);
-    if (VE.tool === 'pincel' && e.shiftKey) {
-        // Shift+arrastar: muda o tamanho do pincel (direita aumenta, esquerda diminui), sem pintar
+    if (VE.tool === 'pincel' && e.altKey) {
+        // Alt+arrastar: muda o tamanho do pincel (direita aumenta, esquerda diminui), sem pintar (o Shift agora é a
+        // linha reta, como no Photoshop/Illustrator)
         const q = veTxQuadroTela(), x0 = e.clientX, y0 = e.clientY, tam0 = VEGR.pincel.tam;
         const move = ev => {
             VEGR.pincel.tam = Math.round(Math.max(1, Math.min(1200, tam0 + (ev.clientX - x0) / q.s)));
@@ -436,7 +471,9 @@ function veGrPointer(e) {
         if (VE.tool === 'forma') {
             let dx = pt.x - pt0.x, dy = pt.y - pt0.y;
             if (c.fm.t === 'lin') {
-                // linha: comprimento = distância, espessura = contorno; gira na direção do arraste
+                // linha: comprimento = distância, espessura = contorno; gira na direção do arraste.
+                // Shift: ângulo travado de 45° em 45° (reta horizontal, vertical ou diagonal certinha)
+                if (ev.shiftKey) { const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4), l = Math.hypot(dx, dy); dx = Math.cos(a) * l; dy = Math.sin(a) * l; }
                 const len = Math.max(2, Math.hypot(dx, dy)), esp = Math.max(2, +VEGR.forma.cLarg || 8);
                 c.fm = { ...c.fm, w: Math.round(len), h: Math.round(esp) };
                 c.p = { ...c.p, x: (pt0.x + pt.x) / 2, y: (pt0.y + pt.y) / 2, rot: +(Math.atan2(dy, dx) * 180 / Math.PI).toFixed(2) };
@@ -447,8 +484,18 @@ function veGrPointer(e) {
             }
         } else {
             const q = veGrLocal(c, pt), T = c.br.tracos, t = T[T.length - 1], p = t.pts;
-            if (Math.hypot(q.x - p[p.length - 2], q.y - p[p.length - 1]) < 1.5) return;
-            p.push(+q.x.toFixed(1), +q.y.toFixed(1));
+            if (ev.shiftKey) {
+                // Shift: linha RETA do começo do traço até o cursor, travada de 45° em 45° (apoio para não sair torto)
+                let dx = q.x - p[0], dy = q.y - p[1];
+                const a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4), l = Math.hypot(dx, dy);
+                dx = Math.cos(a) * l; dy = Math.sin(a) * l;
+                const n = Math.max(1, Math.ceil(l / 6));   // pontos ao longo da reta (o Aparar caminho percorre o traço)
+                t.pts = [p[0], p[1]];
+                for (let k = 1; k <= n; k++) t.pts.push(+(p[0] + dx * k / n).toFixed(1), +(p[1] + dy * k / n).toFixed(1));
+            } else {
+                if (Math.hypot(q.x - p[p.length - 2], q.y - p[p.length - 1]) < 1.5) return;
+                p.push(+q.x.toFixed(1), +q.y.toFixed(1));
+            }
         }
         veDrawMonitor();
     };
@@ -510,7 +557,7 @@ function veGrOpcoesRender(box) {
         ${faixa('p.tam', 'Tamanho', 1, 1200, P.tam, 'px')}
         ${faixa('p.dur', 'Dureza', 0, 100, P.dur, '%')}
         ${faixa('p.op', 'Opacidade', 1, 100, P.op, '%')}
-        <small>${veT('Shift+arrastar: tamanho')}</small>
+        <small>${veT('Shift: linha reta · Alt+arrastar: tamanho')}</small>
         <button class="ve-btn ve-btn-sm ve-btn-ghost" data-gracao="nova" title="${veT('O próximo traço começa uma camada de desenho nova')}">${veT('Nova camada')}</button>` : `
         <span class="ve-gr-tit">${veT('Forma')}</span>
         <span class="ve-gr-tipos">${Object.entries(VE_FORMAS).map(([t, n]) => `<button class="${F.t === t ? 'on' : ''}" data-grt="${t}" title="${veT(n)}">${VE_FORMAS_ICO[t]}</button>`).join('')}</span>
