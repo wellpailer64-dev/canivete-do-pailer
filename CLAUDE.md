@@ -113,6 +113,9 @@ monitor. Índice por arquivo em `<cache>/Canivete Render Cache/rostos/`. API `VE
 Bancada: `D:/kanivete_testes/rosto` (mesma pessoa 0,43–0,89; outras ≤ 0,30); testes `D:/kanivete_testes/scripts/teste_pessoas*.py`.
 Usar SEMPRE antes de pôr GC: confirmar que o rosto da cena é da pessoa do nome.
 
+**PENDENTE — Estabilizador melhor que o Warp Stabilizer** (e a lista de prioridades para ficar profissional: bateria de
+projetos reais, tracker, MOGRT, rampas de velocidade, multicâmera): `Instructions/agente/plano-estabilizador.md`.
+
 Atributos de vários clipes (como no Premiere): `frontend/js/editor-atributos.js` — botão direito → "Remover atributos…"
 (efeitos de vídeo/áudio, movimento, opacidade, mesclagem, volume, transições, com caixinhas; vale para a seleção) e ajuste
 em grupo (mexer num efeito com vários selecionados leva o valor ao mesmo efeito de todos). Teste: `testes/teste_atributos.py`.
