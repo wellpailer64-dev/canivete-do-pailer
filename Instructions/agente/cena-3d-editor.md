@@ -47,6 +47,35 @@ Código: `frontend/js/editor-3d.js` (three.js r170 local em `frontend/vendor/thr
   Propriedades do modelo: Duplicar, Apoiar no chão, Zerar posição, Aparência (Aplicar em: modelo inteiro ou parte).
   No painel Propriedades, ✎ ao lado do modelo abre a tela com ele selecionado.
 - ◆ = cronômetro do After Effects: ligado, mexer no valor grava quadro-chave na agulha; clicar de novo desliga a animação.
+- **Quadros-chave nas faixas da tela 3D (2026-10-15, como no editor)**: clique seleciona o ◆ (Shift/Ctrl soma), retângulo
+  no vazio seleciona vários, arrastar move (Alt duplica), **Delete apaga só os ◆** (sem ◆ selecionado, tira o objeto;
+  o último ◆ de uma propriedade deixa o valor fixo), Ctrl+C / Ctrl+V cola na agulha (copiado de UM objeto + outro
+  selecionado = cola no selecionado), botão direito = Easy Ease/interpolações (Linear, Suave, Acelerar, Frear, Parar,
+  Passar e voltar, Elástico, Quicar), F9 / Shift+F9 / Ctrl+Shift+F9, Esc tira a seleção (sem seleção fecha a tela),
+  ‹◆ ◆› = ◆ anterior/próximo do selecionado. Um ◆ da faixa = o objeto inteiro naquele tempo. A curva fica no ◆ que
+  CHEGA (`kf[p][i][2]`, vale para o trecho antes dele); interpolar um ◆ muda o trecho que SAI dele (como no editor);
+  `ve3dEase` usa `veKfEase` do editor para as curvas novas (a exportação é o mesmo runtime).
+- **Tremido** (stop motion) nas Propriedades do modelo: `p.tremido` (graus, ± no Rolar) e `p.tremidoRitmo` (trocas/s,
+  padrão 4), sem quadros-chave (`ve3dTremido`; cada objeto num passo seu pelo id). Pravda Noir: 33 ◆ × 3 → 2 valores.
+- Ouvintes da tela chamam a global (`e => f(e)`): `tools/aplicar.py` troca sem remontar. Funções envolvidas por
+  `editor-3d-mexer.js`/`placas.js` (Montar, Tempo, Tecla, Apertar, Rodinha, PainelHtml, Aplicar) só reabrindo o app,
+  ou com `D:/kanivete_testes/scripts/reenvolver3d.py` (recarrega a original e refaz o envoltório).
+  Teste com mouse real: `D:/kanivete_testes/scripts/teste_kf3d.py` (app 9333 com a cena do `jornal/montar.py`).
+- **Propriedades por faixa (2026-10-15)**: ▸ no nome (ou U com o objeto selecionado) abre uma faixa por propriedade
+  animada; ◆ de propriedade = seleção `{q, t, p}` (sem `p` = o objeto inteiro); mover/apagar/copiar/interpolar respeitam
+  `p` (`ve3dKfListas`). Clicar num ◆ seleciona o objeto dono no painel.
+- **Curva do quadro-chave**: com ◆ selecionado, o painel mostra o gráfico do trecho que sai dele (o mesmo desenhista do
+  editor, `veKgDesenhar` em editor.js); arrastar alça grava `[t, v, 'bez', [x1, y1, x2, y2]]` no ◆ seguinte (vale para
+  todos os selecionados); duplo clique = linear. `ve3dVal` lê as alças (`ve3dEase(n, u, b)`); mover/copiar levam a curva.
+- **Ordem das placas (corrigido 2026-10-15)**: placa transparente sem depthWrite; o three ordenava por renderOrder (o
+  do Group vira groupOrder) ANTES da distância, então a camada criada depois ficava sempre por cima, mesmo atrás.
+  Agora `setTransparentSort` só na cena de placas (editor-3d-placas.js): distância à câmera primeiro, camada desempata.
+  Bancada: `D:/kanivete_testes/placas_ordem/` (3 placas de cor; conta.js conta os pixels com e sem a correção).
+- **Divisa** visor × faixas (`.ve3t-divisa`): arrastar muda a altura das faixas (guardada em localStorage
+  `ve3t-tempo-h`, só conveniência), duplo clique volta ao automático; play e régua ficam presos no topo ao rolar.
+  Teste: `D:/kanivete_testes/scripts/teste_kf3d2.py` (U/▸, apagar só uma propriedade, alça da curva, divisa).
+- Tela 3D: toda ferramenta com dica + atalho no título; dica do visor só com o mouse em cima; textos em inglês no
+  bloco "Cena 3D" do fim de `i18n.js` (nomes dos objetos com `translate="no"`).
 
 ## Camadas em profundidade (o "3D das camadas" do After) — 2026-10-14
 `frontend/js/editor-3d-placas.js`. Botão direito nas camadas → **"Camadas → Cena 3D (profundidade)"** (paleta:
@@ -102,3 +131,55 @@ Placas, tela com mouse e leveza: `py -3.13 testes/teste_3d_placas.py` (app em `-
   (mapa de profundidade leve, conferir licença), luz e sombra nas placas.
 - Blender para render pesado da cena do Editor; texto 3D; placa de fundo com imagem/vídeo; quadros-chave da cena 3D
   na timeline (hoje só no painel); vínculo vivo Vetor → Editor (hoje é cópia: reenviar após editar).
+
+## Embalagens e Render fotorrealista (2026-10-15)
+- **Embalagem** (`editor-3d-embalagem.js`): "+ Pote" / "+ Bastão" na tela 3D; `fonte = {tipo: 'embalagem', produto, material
+  softtouch|brilho|gel, cores {corpo, tampa, base, gel}, rotulo}`; painel "Embalagem" no lugar da Aparência. Perfil único em
+  `frontend/embalagens.json` (lido também pelo Blender). Prévia leve (96 divisões, sem bolhas/ranhuras); tamanho real entre
+  as embalagens (`userData.escala = 1/2,94`: o bastão tem 1 de altura). API: `VE3DAPI.modelo({embalagem, material, cores,
+  rotulo})`, `VE3DAPI.embalagem(id, {...})`.
+- **📷 Render fotorrealista** (topo da tela 3D; `VE3DAPI.estudio({qualidade: rapida|estudio|4k})`): a cena na agulha →
+  `ve_3d_estudio` → `blender_render.estudio` → `Functions/blender_estudio.py` (objetos com a matriz do three convertida:
+  Y↑ → Z↑, ×2,94; câmera com posição/direção/fov; estúdio da cena = ciclorama na cor; sem estúdio = fundo transparente com
+  sombra; abertura → fstop). Cache pelo hash do spec (a mesma cena não renderiza de novo); vai para o painel Projeto e abre.
+  Rápido 96 amostras ~23 s (RTX 3050). Só embalagens entram (o resto é avisado em "ficaram de fora").
+  Teste: `D:/kanivete_testes/estudio/teste_emb.py` + `render_cena.js` (app 9333). Ponte nova = reabrir o app.
+- **Luzes como no Blender** (`editor-3d-luzes.js`, 2026-10-15): Softbox (área), Spot, Ponto e Sol são objetos da cena
+  (`fonte {tipo: 'luz', luz}`; lista, gizmo, ◆, H desliga, Ctrl+D); propriedades em md.p: potencia (W; Sol = força),
+  largura/altura (softbox), angulo (spot), kelvin + cor (filtro), giro (no eixo), mx/my/mz (mira: sempre apontam para
+  ela, como o Track To). Prévia: RectAreaLight/SpotLight/PointLight/DirectionalLight; o desenho da luz só na tela 3D
+  (`op.cam`). Com luz na cena, a luz automática antiga apaga (ambiente ×0,25) e as luzes não entram no enquadramento.
+  "Estúdio 3 pontos" (`VE3DAPI.estudio3pontos`): chave 265 W em faixa, recorte 330 W, preenchimento 35 W, teto 85 W em
+  volta do lado da câmera. Render: `spec.luzes` → as mesmas luzes no Blender (W × 2,94²; HDRI ×0,3). API `VE3DAPI.luz`.
+  Teste: `D:/kanivete_testes/estudio/teste_luzes.py`.
+- **Material estilo Blender** (2026-10-15): biblioteca única `frontend/materiais.json` (Soft-touch, Plástico brilhante, Gel,
+  Gel fosco, Vidro, Metal escovado/polido, Dourado, Papel, Veludo, Cerâmica, Borracha) com os campos do Principled em
+  português (cor, metalico, rugosidade, especular, transmissao, ior, absorcao, verniz, verniz_rug, sheen, emissao,
+  emissao_forca, bolhas, relevo nenhum|ranhuras|imagem, relevo_forca, relevo_img, textura, textura_escala). Por parte da
+  embalagem em `fonte.materiais[parte]`; sem isso vale o acabamento antigo (`ve3dEmbParams` no JS = `params` no Blender).
+  Painel: pílulas das partes, grade de amostras, grupos Superfície/Transmissão/Verniz e tecido/Emissão/Textura e relevo;
+  arrastar = só a prévia (`ve3dMatAplicar`), soltar = grava (remonta a peça). API `VE3DAPI.embalagem(id, {parte, preset})`
+  ou `{parte, campos: {...}}`. Render leva `materiais` no spec. Teste: `D:/kanivete_testes/estudio/teste_mat.py`.
+  Pendências: abas Objeto/Embalagem/Material (painel comprido), ranhuras da prévia também no topo da tampa.
+- **Vídeo fotorrealista** (2026-10-15): menu 📷 › Vídeo rápido (EEVEE) / máximo (Cycles); `ve3dEstudioVideo` calcula a
+  cena quadro a quadro (◆ de objetos/câmera/luzes) → `spec.quadros` → Blender monta uma vez e renderiza todos →
+  ffmpeg: MP4 H.264 (com fundo) ou MOV ProRes 4444 com alfa (sem fundo) → painel Projeto. Progresso no botão
+  (`ve_3d_estudio_progresso`). EEVEE: gel em modo pontilhado + refração por raytracing, sem volume (névoa); sem bolhas.
+  Medido: 120 quadros Full HD em 499 s (~4 s/quadro, RTX 3050). Ciclorama 600 de largura (câmera girando não vê a
+  ponta). API `VE3DAPI.estudioVideo({motor})`. Teste: `D:/kanivete_testes/estudio/teste_video.py`.
+- **Layout profissional da Lux** (2026-10-15, `lux-ui.js` + estrutura em `editor-3d-tela.js`): topo com marca + menus
+  (Arquivo, Editar, Adicionar, Objeto, Render, Janela, Ajuda) + Render; barra de ferramentas vertical (mover/girar/escala,
+  enquadrar, +); viewport com cabeçalho flutuante (Câmera da cena|Vista livre, Sólido|Material, eixo, ímã); à direita a
+  Cena (outliner com ícone por tipo e olho) e as Propriedades em abas de ícone (Render, Mundo, Câmera, Objeto, Embalagem,
+  Material, Luz — conforme a seleção, como o Blender: `luxAbas`). Sólido = argila só nos objetos. Shift+A = Adicionar,
+  F2 renomear. Softbox desenhada como no Blender (contorno + véu + seta).
+- **Projeto .lknv** (`Functions/lux_projeto.py`, pontes `lux_salvar`/`lux_abrir`): zip com cena.json + recursos/ (rótulos,
+  texturas, modelos COPIADOS para dentro) + previa.png; abre extraindo em `<raiz de dados>/Lux/<hash>`. Na Lux aberta pela
+  barra lateral: Ctrl+S/Ctrl+Shift+S/Ctrl+O/Ctrl+N; recentes no menu Arquivo (localStorage). Duplo clique no Windows
+  (`projeto._TIPOS`) → `abrirProjetoExterno` → `luxAbrirArquivo`. Cena aberta pelo Editor continua embutida no .vknv
+  (Ctrl+S salva o projeto do Editor); "Salvar como .lknv" exporta. A cena aberta de um .lknv mora no projeto do Editor
+  por trás (`m.lux.arquivo` = onde Ctrl+S grava). Teste: `D:/kanivete_testes/estudio/teste_layout.py`.
+- **Render de vídeo otimizado** (bancada `D:/kanivete_testes/bench_cycles`): o que pesa é amostras (64→32 = −46%; 16 =
+  −70%), com a limpeza OptiX ficam iguais a olho (PSNR ~39 dB); 8 pulos de transmissão = idêntico (57 dB) e −5%; bolhas e
+  limiar não pesam. Vídeo prévia = Cycles 16 (~3 s/quadro), final = Cycles 32 (~5,6 s); EEVEE ficou como opção (sem bolhas,
+  ~4 s). Fotos com 8 pulos.

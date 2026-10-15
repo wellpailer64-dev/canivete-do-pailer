@@ -4213,6 +4213,41 @@ class ApiBridge:
         from Functions import cena3d
         return cena3d.url(caminho)
 
+    def ve_3d_estudio(self, spec):
+        """foto fotorrealista da Cena 3D (embalagens) no Blender — Functions/blender_render.estudio"""
+        from Functions import blender_render
+        try:
+            return blender_render.estudio(json.loads(spec) if isinstance(spec, str) else spec)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def lux_salvar(self, caminho, dados, previa=None):
+        """projeto da Lux Kanivete (.lknv): cena + recursos copiados para dentro — Functions/lux_projeto.py"""
+        from Functions import lux_projeto
+        try:
+            return lux_projeto.salvar(caminho, json.loads(dados) if isinstance(dados, str) else dados, previa)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def lux_abrir(self, caminho):
+        from Functions import lux_projeto
+        try:
+            return lux_projeto.abrir(caminho)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_3d_estudio_video(self, spec):
+        """vídeo fotorrealista da Cena 3D (quadro a quadro no Blender) — Functions/blender_render.estudio_video"""
+        from Functions import blender_render
+        try:
+            return blender_render.estudio_video(json.loads(spec) if isinstance(spec, str) else spec)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_3d_estudio_progresso(self):
+        from Functions import blender_render
+        return dict(blender_render.PROGRESSO)
+
     def ve_3d_preparar(self, caminho, base=None):
         from Functions import cena3d
         try:

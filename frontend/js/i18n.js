@@ -1146,3 +1146,50 @@ window.i18nWatch = i18nWatch;
 window.prefsOpen = prefsOpen;
 window.prefsClose = prefsClose;
 window.prefsSetLang = prefsSetLang;
+
+// Cena 3D (editor-3d*.js): tela 3D, Propriedades da cena, quadros-chave e tremido
+Object.assign(I18N_EN, {
+    "Cena 3D": "3D Scene", "Câmera": "Camera", "Câmera da cena": "Scene camera", "Vista livre": "Free view", "Eixo: mundo": "Axis: world", "Eixo: objeto": "Axis: object",
+    "Ímã": "Snap", "Enquadrar": "Frame", "Voltar à timeline": "Back to timeline", "Girar": "Rotate", "Escala": "Scale",
+    "Câmera da cena: arrastar no visor grava na câmera (C alterna)": "Scene camera: dragging in the viewer records on the camera (C toggles)",
+    "Vista livre: só olha, não grava na câmera (C alterna)": "Free view: just looks, doesn't record on the camera (C toggles)",
+    "Setas no eixo do objeto ou do mundo": "Gizmo on the object or world axis", "Ímã: passos de 0,1 / 15° (ou segure Ctrl)": "Snap: steps of 0.1 / 15° (or hold Ctrl)",
+    "Enquadrar o selecionado na vista livre": "Frame the selection in free view", "Play/pausa": "Play/pause", "Espaço": "Space",
+    "Quadro-chave anterior do objeto selecionado": "Previous keyframe of the selected object", "Próximo quadro-chave do objeto selecionado": "Next keyframe of the selected object",
+    "Arraste para mudar o tempo": "Drag to change the time",
+    "◆: clique seleciona (Shift soma) · arrastar move (Alt duplica) · retângulo no vazio seleciona vários · Delete apaga · Ctrl+C / Ctrl+V · botão direito: interpolação · F9 Easy Ease":
+        "◆: click selects (Shift adds) · drag moves (Alt duplicates) · marquee in empty space selects several · Delete removes · Ctrl+C / Ctrl+V · right-click: interpolation · F9 Easy Ease",
+    "Arrastar objeto: mover · Arrastar no vazio: orbitar · Rodinha: distância · Alt+rodinha ou [ ]: profundidade · Shift ou botão do meio: deslocar":
+        "Drag object: move · Drag empty space: orbit · Wheel: distance · Alt+wheel or [ ]: depth · Shift or middle button: pan",
+    "Arrastar: orbitar · Rodinha: distância · Shift ou botão do meio: deslocar · Clique: selecionar · solte .glb/.obj/.fbx aqui":
+        "Drag: orbit · Wheel: distance · Shift or middle button: pan · Click: select · drop .glb/.obj/.fbx here",
+    "Câmera: órbita, distância, lente e foco": "Camera: orbit, distance, lens and focus", "Luz: direção, intensidade e sombra": "Light: direction, intensity and shadow",
+    "Cenário: estúdio infinito, neblina e fundo": "Set: infinite studio, fog and background", "Cenário": "Set",
+    "Clique: selecionar · duplo clique: renomear · H: esconder · Ctrl+D: duplicar · Delete: tirar da cena": "Click: select · double-click: rename · H: hide · Ctrl+D: duplicate · Delete: remove from scene",
+    "Esconder/mostrar (H)": "Hide/show (H)", "Adicionar à cena": "Add to scene", "esfera": "sphere", "cubo": "cube", "cilindro": "cylinder", "toro": "torus", "cone": "cone", "plano": "plane",
+    "Importar modelo 3D…": "Import 3D model…", "Órbita": "Orbit", "Lente (fov)": "Lens (fov)", "Olhar na altura": "Look-at height",
+    "Distância vazia = enquadra sozinho. ◆ anima a propriedade.": "Empty distance = frames by itself. ◆ animates the property.", "Foco": "Focus", "Distância do foco": "Focus distance",
+    "Desfoque 0 = tudo nítido. Foco vazio = no ponto que a câmera olha. Anime o foco para trocar de objeto.": "Blur 0 = all sharp. Empty focus = at the point the camera looks at. Animate the focus to switch objects.",
+    "Animado: mexer grava quadro-chave aqui. Clique para tirar a animação": "Animated: changing it records a keyframe here. Click to remove the animation", "Animar com quadros-chave": "Animate with keyframes",
+    "Profundidade (vista de cima): clique seleciona; arraste para cima/baixo para levar ao fundo ou trazer para a frente sem mudar o tamanho na tela":
+        "Depth (top view): click selects; drag up/down to push back or bring forward without changing the on-screen size",
+    "Ambiente": "Ambient", "Contraluz": "Rim light", "Sombra de contato": "Contact shadow", "Estúdio infinito": "Infinite studio", "Neblina": "Fog", "Cor da neblina": "Fog color",
+    "Cena": "Scene", "Sombra no chão": "Floor shadow", "transparente": "transparent", "Arquivo da exportação em dia.": "Export file up to date.",
+    "O arquivo da exportação é refeito sozinho quando você para de mexer.": "The export file is rebuilt by itself when you stop editing.", "Abrir a tela 3D": "Open the 3D screen",
+    "Inclinar": "Tilt", "Rolar": "Roll", "Largura": "Width", "Profundidade": "Depth", "Tremido": "Jitter", "Ritmo do tremido": "Jitter rate",
+    "Stop motion: a peça balança no Rolar, sem quadros-chave (0 = parada)": "Stop motion: the piece wobbles on Roll, without keyframes (0 = still)",
+    "Quantas vezes por segundo a peça troca de lado": "How many times per second the piece switches sides",
+    "Zerar posição": "Reset position", "Tirar da cena": "Remove from scene", "Apoiar no chão": "Rest on floor", "Para o fundo": "Push back", "Para a frente": "Bring forward",
+    "Muda a profundidade sem mudar o tamanho na tela (parallax quando a câmera anda). Atalhos: [ e ], Alt + rodinha, ou arraste a linha no mapa do canto.":
+        "Changes depth without changing the on-screen size (parallax when the camera moves). Shortcuts: [ and ], Alt + wheel, or drag the line in the corner map.",
+    "Aparência (cor, acabamento, imagem) e edição na tela 3D": "Appearance (color, finish, image) and editing on the 3D screen", "Nenhum modelo ainda.": "No models yet.", "Modelos": "Models",
+    "quadro-chave": "keyframe", "quadros-chave": "keyframes", "Interpolação": "Interpolation", "Acelerar": "Ease in", "Frear": "Ease out", "Passar e voltar (overshoot)": "Overshoot",
+    "Quicar": "Bounce", "Selecione quadros-chave nas faixas": "Select keyframes in the tracks", "Não há quadro-chave depois": "No keyframe after", "Não há quadro-chave antes": "No keyframe before",
+    "Mostrar/esconder as propriedades animadas": "Show/hide animated properties", "Curva do quadro-chave": "Keyframe curve", "Valor": "Value", "Velocidade": "Speed",
+    "Este ◆ é o último: a curva vale para o trecho que sai dele.": "This ◆ is the last one: the curve applies to the segment leaving it.",
+    "Arraste as alças para mudar a curva (duplo clique volta ao linear)": "Drag the handles to change the curve (double-click resets to linear)",
+    "Arraste para dar mais espaço ao visor ou às faixas (duplo clique volta ao automático)": "Drag to give more room to the viewer or the tracks (double-click resets to automatic)",
+    "Visível": "Visible", "Olhar: X": "Look-at: X", "Olhar: Z": "Look-at: Z", "Direção": "Direction", "Distância": "Distance", "Intensidade": "Intensity", "Sombra": "Shadow", "Desfoque": "Blur",
+    "◆: clique seleciona (Shift soma) · arrastar move (Alt duplica) · retângulo no vazio seleciona vários · Delete apaga · Ctrl+C / Ctrl+V · botão direito: interpolação · F9 Easy Ease · ▸ ou U: propriedades":
+        "◆: click selects (Shift adds) · drag moves (Alt duplicates) · marquee in empty space selects several · Delete removes · Ctrl+C / Ctrl+V · right-click: interpolation · F9 Easy Ease · ▸ or U: properties",
+});

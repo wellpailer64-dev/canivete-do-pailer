@@ -185,6 +185,11 @@
                     <span class="icon"><svg class="i"><use href="#i-globe"/></svg></span><span class="label">Gerar Favicon</span>
                 </button>
 
+                <div class="menu-group">3D</div>
+                <button class="menu-item" data-tool="lux-kanivete" onclick="luxAbrir()" title="Lux Kanivete — produto em 3D: embalagens, luzes, materiais e render fotorrealista">
+                    <span class="icon"><span class="app-logo al-lk">Lk</span></span><span class="label">Lux Kanivete</span>
+                </button>
+
                 <div class="menu-group">Web</div>
                 <button class="menu-item" data-tool="gdrive-dumper" onclick="switchTool('gdrive-dumper')">
                     <span class="icon"><svg class="i"><use href="#i-cloud"/></svg></span><span class="label">GDrive Dumper</span>
@@ -329,6 +334,15 @@
                                 <button class="home-card" onclick="switchTool('omnivoice')">
                                     <span class="hc-media"><img src="img/tools/geracao-voz.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-sparkles"/></svg></span></span>
                                     <b>Geração de Voz</b><small>Salve vozes por referência curta e sintetize textos com OmniVoice</small>
+                                </button>
+                            </div>
+                        </section>
+                        <section class="home-cat">
+                            <h4>3D</h4>
+                            <div class="home-grid">
+                                <button class="home-card" onclick="luxAbrir()">
+                                    <span class="hc-media"><img src="img/tools/lux-kanivete.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico hc-app"><span class="app-logo al-lk">Lk</span></span></span>
+                                    <b>Lux Kanivete</b><small>Produto em 3D: embalagens, luzes de estúdio, materiais e foto fotorrealista</small>
                                 </button>
                             </div>
                         </section>
@@ -2119,6 +2133,10 @@
     <script src="js/editor-3d.js"></script>
     <script src="js/editor-3d-tela.js"></script>
     <script src="js/editor-3d-placas.js"></script>
+    <script src="js/editor-3d-embalagem.js"></script>
+    <script src="js/editor-3d-luzes.js"></script>
+    <script src="js/lux.js"></script>
+    <script src="js/lux-ui.js"></script>
     <script src="js/editor-3d-mexer.js"></script>
     <script src="js/editor-roto.js"></script>
     <script src="js/editor-caneta.js"></script>

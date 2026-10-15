@@ -3820,7 +3820,10 @@ function veKfGraphDraw(q) {
     const cv = $ve('ve-kf-graph');
     if (!cv) return;
     if (q) VE_KG.q = q;
-    q = VE_KG.q;
+    veKgDesenhar(cv, VE_KG.q, VE_KG.drag);
+}
+// desenha a curva de q num canvas qualquer (o do painel Propriedades e o da tela 3D); drag = alça em destaque
+function veKgDesenhar(cv, q, drag) {
     const dpr = window.devicePixelRatio || 1;
     const W = cv.clientWidth, H = cv.clientHeight;
     if (!W || !H) return;
@@ -3878,8 +3881,8 @@ function veKfGraphDraw(q) {
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(m.X(hx), m.Y(hy), VE_KG.drag === n ? 5.5 : 4.5, 0, Math.PI * 2);
-        ctx.fillStyle = VE_KG.drag === n ? '#fbbf24' : '#fff';
+        ctx.arc(m.X(hx), m.Y(hy), drag === n ? 5.5 : 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = drag === n ? '#fbbf24' : '#fff';
         ctx.fill();
     });
     [[0, 0], [1, 1]].forEach(([x, y]) => { ctx.fillStyle = '#D4814A'; ctx.fillRect(m.X(x) - 3, m.Y(y) - 3, 6, 6); });

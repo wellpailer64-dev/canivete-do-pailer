@@ -86,7 +86,8 @@ Rodada 7 (qualidade, 2026-10-12, plano "Rodada 7"): placa em 10/16 bits por dent
 Rodada 8 (plano §8.1–8.5): fade de clipe, os 12 modos de mesclagem, desfoque animado, transições de sobreposição e
 Chroma Key com Luz e Cor/opacidade agora na placa (shaders do libplacebo; parâmetros por quadro em trechos retos ou textura).
 Ondulação na placa (2026-10-15, plano §8.6): shader por onda com margem transparente (`_onda_passos`) em vídeo, imagem/texto
-(e a sombra) e camada de ajuste; teste `teste_export.py --casos onda,ondavideo,ondatexto,ondavideo2 --placa`.
+(e a sombra) e camada de ajuste; giro de vídeo e de imagem com onda também na placa (`_giro_passos`); teste
+`teste_export.py --casos onda,ondavideo,ondatexto,ondavideo2,ondagiro --placa`.
 
 Mixer de trilhas de áudio (Audio Track Mixer do Premiere): `frontend/js/editor-mixer.js` (aba junto dos Controles de
 efeito): pan, M/S (S também no cabeçalho da trilha), fader −∞..+15 dB na escala do Premiere, medidor L/R por trilha e o Mix.
@@ -126,6 +127,18 @@ em grupo (mexer num efeito com vários selecionados leva o valor ao mesmo efeito
 
 Teste de 4K (estresse: material pesado, camadas, 10-bit, export, memória): plano e resultados em
 `Instructions/agente/teste-4k.md` — rodada 1 feita (2026-10-01), pendências no fim do arquivo.
+
+## Lux Kanivete (Lk, amarelo) — produto em 3D
+Ferramenta própria (barra lateral › 3D e Home; do Editor, duplo clique na cena 3D abre a mesma): embalagens (pote/bastão,
+perfil em `frontend/embalagens.json`), luzes como no Blender (softbox/spot/ponto/sol, Estúdio 3 pontos), materiais do
+Principled (`frontend/materiais.json`), 📷 Render fotorrealista no Blender (`Functions/blender_estudio.py`: foto
+Rápido/Full HD/2K/4K e vídeo prévia/final em Cycles, cache por hash) e projeto **.lknv** (`Functions/lux_projeto.py`: zip
+com a cena e os recursos copiados para dentro). Layout no padrão do Blender (`frontend/js/lux-ui.js`: menus, ferramentas,
+Cena, Propriedades em abas; Shift+A adiciona); entrada `frontend/js/lux.js`; o motor é a Cena 3D do Editor
+(`editor-3d*.js`; a cena mora no projeto do Editor por trás). Guia e pendências: `Instructions/agente/cena-3d-editor.md`
+(fim) e `Instructions/agente/mockup-profissional.md` §5 (mockup profissional e passes). APIs: `VE3DAPI.modelo({embalagem})`,
+`.embalagem`, `.luz`, `.estudio3pontos`, `.estudio({qualidade})`, `.estudioVideo({qualidade: previa|final})`, `LUX_API`.
+Render na RTX 3050: foto Full HD ~45 s; vídeo prévia ~3 s/quadro, final ~5,6 s/quadro.
 
 ## Editar vídeo pelo app (agente)
 Guia interno para IAs (acesso, leitura de mídia, receita, estilo do cliente, calibração): `Instructions/agente/guia-edicao.md`.

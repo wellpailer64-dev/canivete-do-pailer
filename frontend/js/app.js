@@ -644,6 +644,10 @@ function onArquivosSoltos(itens) {
 // Projeto aberto por fora (duplo clique no Explorer ou outra cópia do app): cada extensão no seu editor
 // .vknv (e o antigo .vcnvt) = editor de vídeo; .iknv = editor de imagem; .aknv = Vetor Kanivete
 function abrirProjetoExterno(path) {
+    if (/\.lknv$/i.test(path || '')) {   // Lux Kanivete (lux.js)
+        setTimeout(() => luxAbrirArquivo(path).catch(e => toast(e.message, 'erro')), 60);
+        return;
+    }
     if (/\.sknv$/i.test(path || '')) {
         switchTool('sound-kanivete');
         setTimeout(() => skAbrir(path).catch(e => toast(e.message, 'erro')), 80);

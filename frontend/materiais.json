@@ -1,0 +1,17 @@
+{
+ "_leia": "Biblioteca de materiais (os mesmos campos do Principled BSDF do Blender, em português). Lida pela Cena 3D (editor-3d-embalagem.js, prévia em three.js) e pelo Blender (Functions/blender_estudio.py): o mesmo número vale nos dois. Aplicar um material mantém a cor da peça, a não ser que ele traga 'cor' (vidro, metais). Campos: cor, metalico 0-1, rugosidade 0-1, especular 0-1, transmissao 0-1, ior, absorcao (densidade da cor dentro do translúcido), verniz 0-1, verniz_rug, sheen 0-1 (brilho de tecido), emissao_forca, bolhas (só translúcido), relevo: nenhum|ranhuras|imagem.",
+ "_campos": {"cor": "#d9d4cc", "metalico": 0, "rugosidade": 0.5, "especular": 0.5, "transmissao": 0, "ior": 1.45, "absorcao": 0, "verniz": 0, "verniz_rug": 0.1,
+             "sheen": 0, "emissao": "#ffffff", "emissao_forca": 0, "bolhas": false, "relevo": "nenhum", "relevo_forca": 0.25, "relevo_img": null, "textura": null, "textura_escala": 1},
+ "softtouch":      {"nome": "Soft-touch",       "rugosidade": 0.52, "especular": 0.35, "verniz": 0.15, "verniz_rug": 0.35},
+ "brilhante":      {"nome": "Plástico brilhante","rugosidade": 0.15, "especular": 0.5, "verniz": 0.6, "verniz_rug": 0.05},
+ "gel":            {"nome": "Gel translúcido",  "transmissao": 1, "rugosidade": 0.05, "ior": 1.42, "absorcao": 1.0, "verniz": 0.3, "verniz_rug": 0.05, "bolhas": true},
+ "gel_fosco":      {"nome": "Gel fosco",        "transmissao": 1, "rugosidade": 0.28, "ior": 1.42, "absorcao": 0.6},
+ "vidro":          {"nome": "Vidro",            "cor": "#ffffff", "transmissao": 1, "rugosidade": 0.0, "ior": 1.5, "absorcao": 0.05},
+ "metal_escovado": {"nome": "Metal escovado",   "cor": "#c9c9c9", "metalico": 1, "rugosidade": 0.35},
+ "metal_polido":   {"nome": "Metal polido",     "cor": "#dcdcdc", "metalico": 1, "rugosidade": 0.08},
+ "ouro":           {"nome": "Dourado",          "cor": "#e3b25c", "metalico": 1, "rugosidade": 0.18},
+ "papel":          {"nome": "Papel",            "rugosidade": 0.85, "especular": 0.2},
+ "veludo":         {"nome": "Veludo",           "rugosidade": 1.0, "especular": 0.1, "sheen": 1.0},
+ "ceramica":       {"nome": "Cerâmica",         "rugosidade": 0.2, "verniz": 1.0, "verniz_rug": 0.02},
+ "borracha":       {"nome": "Borracha",         "rugosidade": 0.75, "especular": 0.3}
+}

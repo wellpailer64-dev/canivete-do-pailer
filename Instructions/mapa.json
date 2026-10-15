@@ -5,6 +5,8 @@
    "nome": "Editor Kanivete",
    "grupo": "Vídeo",
    "front": [
+    "editor-3d-embalagem.js",
+    "editor-3d-luzes.js",
     "editor-3d-mexer.js",
     "editor-3d-placas.js",
     "editor-3d-tela.js",
@@ -149,6 +151,9 @@
     "ve_roto_cancelar",
     "ve_roto_video",
     "ve_3d_url",
+    "ve_3d_estudio",
+    "ve_3d_estudio_video",
+    "ve_3d_estudio_progresso",
     "ve_3d_preparar",
     "ve_3d_blender_instalar",
     "ve_render_tocar",
@@ -734,6 +739,17 @@
    "automacao": ""
   },
   {
+   "id": "lux-kanivete",
+   "nome": "Lux Kanivete",
+   "grupo": "3D",
+   "front": [],
+   "back": [],
+   "api": [],
+   "testes": [],
+   "guias": [],
+   "automacao": ""
+  },
+  {
    "id": "gdrive-dumper",
    "nome": "GDrive Dumper",
    "grupo": "Web",
@@ -817,6 +833,8 @@
   "kani_criar_url",
   "kani_salvar_como",
   "kani_falar",
+  "lux_salvar",
+  "lux_abrir",
   "reveal_file",
   "open_file",
   "select_video_file",
@@ -1827,6 +1845,36 @@
     "cena3d"
    ]
   },
+  "ve_3d_estudio": {
+   "args": "spec",
+   "modulos": [
+    "blender_render"
+   ]
+  },
+  "lux_salvar": {
+   "args": "caminho, dados, previa=None",
+   "modulos": [
+    "lux_projeto"
+   ]
+  },
+  "lux_abrir": {
+   "args": "caminho",
+   "modulos": [
+    "lux_projeto"
+   ]
+  },
+  "ve_3d_estudio_video": {
+   "args": "spec",
+   "modulos": [
+    "blender_render"
+   ]
+  },
+  "ve_3d_estudio_progresso": {
+   "args": "",
+   "modulos": [
+    "blender_render"
+   ]
+  },
   "ve_3d_preparar": {
    "args": "caminho, base=None",
    "modulos": [
@@ -2742,6 +2790,7 @@
   "tools/mapa_codigo.py": "Mapa do código (para o agente achar onde mexer sem abrir arquivo grande): comandos registrados, funções de topo e",
   "tools/mapa_geral.py": "Mapa geral do KANIVETE — gera Instructions/MAPA.md (pessoas, Claude) e Instructions/mapa.json (Jr / Worker local)",
   "tools/medir_ref.py": "Medidor de referência: lê uma imagem de referência (print de carrossel/flyer) SEM o Claude olhar e devolve as medidas",
+  "tools/mockup3d.py": "Mockup profissional a partir de um produto 3D (pilha dos estúdios, Instructions/agente/mockup-profissional.md)",
   "tools/montar_banco_vozes.py": "Monta o pacote do banco de vozes (Functions/sk_banco_vozes.py) — não roda no app; só para gerar o zip do release",
   "tools/montar_soundboard.py": "Monta o pack \"vanilla\" do Soundboard do Pocket Editor (não roda no app; só para gerar o zip do release)",
   "tools/olho.py": "Olho local: um modelo de visão no Ollama (gemma4:e4b) olha as imagens no lugar do Claude e devolve TEXTO curto",
@@ -2776,6 +2825,7 @@
   "Instructions/agente/mapa-imagem.md": "Mapa do código — imagem (gerado por tools/mapa_codigo.py; nome:linha)",
   "Instructions/agente/mapa-kanivete-encoder.md": "Mapa do Kanivete Encoder (Ke)",
   "Instructions/agente/mapa-vetor.md": "Mapa do código — vetor (gerado por tools/mapa_codigo.py; nome:linha)",
+  "Instructions/agente/mockup-profissional.md": "Mockup profissional — o que os PSDs dos estúdios fazem (estudo 2026-10-15)",
   "Instructions/agente/nucleo-hardware.md": "Núcleo de hardware: o app se ajustar a cada PC (2026-10-10)",
   "Instructions/agente/pincel-roto.md": "Pincel Roto e Refinar borda (Roto Brush do After Effects no Editor Kanivete)",
   "Instructions/agente/plano-cena.md": "Plano CENA — diagramar no Photo Kanivete escrevendo HTML/CSS (para IAs)",
@@ -2820,6 +2870,8 @@
   "Functions/autoframe_modelos.py": "autoframe_modelos.py — modelos de cliente do AutoFrame (aba \"AutoFrame Customizado\")",
   "Functions/blender_cena.py": "Roda DENTRO do Blender (blender -b -P blender_cena.py -- cena.json): monta a cena dos objetos 3D do Vetor Kanivete e",
   "Functions/blender_converter.py": "blender_converter.py — roda DENTRO do Python do Blender (Functions/cena3d.py: converter):",
+  "Functions/blender_estudio.py": "perfil (r, z) com cada quina interna trocada por um arco (chanfro de verdade, como produto injetado)",
+  "Functions/blender_mockup.py": "malha de revolução com UV: u = volta (0,5 = frente, virada para −Y), v = z / altura do produto",
   "Functions/blender_render.py": "blender_render.py — render fotorrealista dos objetos 3D do Vetor Kanivete (girar_3d / extrudar_3d) no Blender (Cycles)",
   "Functions/busca_rosto.py": "Pessoas do projeto por rosto (pedido do Pailer, GaIA 2026-10-14: GCs sobre a pessoa errada)",
   "Functions/cena3d.py": "cena3d.py — Cena 3D do Editor Kanivete (frontend/js/editor-3d.js): a página renderiza cada quadro com three.js (o MESMO",
@@ -2853,6 +2905,7 @@
   "Functions/kani_skills.py": "kani_skills.py — habilidades do dia a dia da Kani (ferramentas do modo em etapas, kani_agente.py):",
   "Functions/legendas.py": "legendas.py — transcrição da timeline do Pocket Editor (painel Texto: Transcrever / Criar legendas)",
   "Functions/legendas_formatos.py": "SRT e VTT: blocos separados por linha em branco, com uma linha \"início --> fim\"",
+  "Functions/lux_projeto.py": "lux_projeto.py — projeto da Lux Kanivete (.lknv)",
   "Functions/media_server.py": "media_server.py — Servidor HTTP local (127.0.0.1) para a interface reproduzir mídia",
   "Functions/melhorar_audio.py": "Ferramenta Melhorar Áudio (como o Adobe Podcast Enhance): aceita áudio ou vídeo, um arquivo ou uma pasta",
   "Functions/melhorar_audio_runner.py": "Melhorar áudio (estilo Adobe Podcast) — o trabalho pesado, em duas etapas:",

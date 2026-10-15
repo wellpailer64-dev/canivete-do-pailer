@@ -1,0 +1,20 @@
+{
+ "_leia": "Perfis das embalagens (r, z) de baixo para cima, revolvidos em volta do eixo; sx/sy achatam (bastão oval); raio = chanfro das quinas; rótulo = faixa de z e de u (0,5 = frente). Lido pela Cena 3D (editor-3d-embalagem.js) e pelo Blender (Functions/blender_estudio.py): os dois desenham a MESMA peça.",
+ "pote": {
+  "nome": "Pote", "sx": 1.0, "sy": 1.0,
+  "partes": [
+   ["corpo", [[0.001, 0], [0.95, 0], [1.0, 0.06], [1.0, 0.98], [0.96, 0.98], [0.001, 0.98]], 0.035],
+   ["tampa", [[0.001, 0.97], [1.03, 0.97], [1.03, 1.39], [0.001, 1.39]], 0.06]
+  ],
+  "rotulo": {"z": [0.13, 0.88], "u": [0.16, 0.84]}
+ },
+ "bastao": {
+  "nome": "Bastão", "sx": 0.62, "sy": 0.36,
+  "partes": [
+   ["base", [[0.001, 0], [0.97, 0], [0.97, 0.16], [0.001, 0.16]], 0.03],
+   ["corpo", [[0.001, 0.15], [1.0, 0.15], [1.0, 2.0], [0.001, 2.0]], 0.05],
+   ["tampa", [[0.001, 1.99], [1.025, 1.99], [1.025, 2.62], [0.93, 2.86], [0.6, 2.93], [0.001, 2.94]], 0.08]
+  ],
+  "rotulo": {"z": [0.3, 1.86], "u": [0.29, 0.71]}
+ }
+}

@@ -5,7 +5,10 @@
 // A mídia é um VÍDEO COM ALFA, como a Comp: { kind:'video', c3d: cena, c3dSig, path }. O monitor desenha AO VIVO
 // (ve3dQuadro); para exportar, o MESMO código renderiza quadro a quadro → .mov ProRes 4444 (Functions/cena3d.py).
 // Unidades: o modelo é medido, apoiado no chão (y = 0) e escalado para 1 de altura (p.esc multiplica). Tempo = segundos
-// dentro do clipe (veSrcAt). Quadros-chave: kf[prop] = [[t, valor, 'suave'|'linear'], ...] (números).
+// dentro do clipe (veSrcAt). Quadros-chave: kf[prop] = [[t, valor, curva], ...] (números); a curva fica no ◆ que CHEGA
+// e vale para o trecho antes dele: 'suave' | 'linear' | as do editor ('in', 'out', 'hold', 'back', 'elas', 'quica') |
+// 'bez' com as alças no 4º item ([t, v, 'bez', [x1, y1, x2, y2]], gráfico da tela 3D).
+// Tremido de stop motion (p.tremido em graus, p.tremidoRitmo vezes/s): a placa balança no Rolar sem quadros-chave.
 // =========================================================
 const VE3D = { lib: null, rt: new Map(), telas: new WeakMap(), atual: null, falhas: new Map(), espera: [], timer: 0 };
 const VE3D_COR = 'roxo';
@@ -47,10 +50,17 @@ function ve3dVal(o, k, t) {   // valor da propriedade no tempo t (quadros-chave 
     for (let i = 1; i < kf.length; i++) if (t <= kf[i][0]) {
         const [t0, v0] = kf[i - 1], [t1, v1] = kf[i];
         if (typeof v0 !== 'number' || typeof v1 !== 'number') return v0;
-        const u = (t - t0) / ((t1 - t0) || 1e-9), s = kf[i][2] === 'linear' ? u : u * u * (3 - 2 * u);
-        return v0 + (v1 - v0) * s;
+        const u = (t - t0) / ((t1 - t0) || 1e-9);
+        return v0 + (v1 - v0) * ve3dEase(kf[i][2], u, kf[i][3]);
     }
     return kf.at(-1)[1];
+}
+const ve3dEase = (n, u, b) => n === 'linear' ? u : !n || n === 'suave' ? u * u * (3 - 2 * u) : typeof veKfEase === 'function' ? veKfEase({ i: n, b }, u) : u;
+// tremido de stop motion: ±tremido graus no Rolar, trocando de lado tremidoRitmo vezes por segundo (cada objeto num passo seu)
+function ve3dTremido(md, t) {
+    const a = ve3dVal(md, 'tremido', t) || 0; if (!a) return 0;
+    const r = Math.max(0.5, ve3dVal(md, 'tremidoRitmo', t) || 4), sem = [...String(md.id)].reduce((s, ch) => s + ch.charCodeAt(0), 0);
+    return (Math.floor(t * r + 1e-6) + sem) % 2 ? a : -a;
 }
 const ve3dChave = m => JSON.stringify([m.c3d.modelos.map(md => [md.id, md.fonte]), m.c3d.chao !== false]);   // o que exige remontar a cena
 const VE3D_VERSAO = 6;   // subir quando o desenho mudar (foco, neblina, materiais): os .mov do cache ficam velhos
@@ -68,6 +78,10 @@ async function ve3dCarregarModelo(md, L) {
     } else if (f.tipo === 'vetor') {
         obj = await ve3dDoVetor(f.desc, T);
         obj.updateMatrixWorld(true);
+    } else if (f.tipo === 'embalagem') {   // pote/bastão com rótulo (editor-3d-embalagem.js; o mesmo perfil do render no Blender)
+        obj = await ve3dEmbalagem(f, T);
+    } else if (f.tipo === 'luz') {         // softbox/spot/ponto/sol (editor-3d-luzes.js): objeto da cena, mira num ponto
+        obj = await ve3dLuzObjeto(f, T);
     } else {
         const r = await window.pywebview.api.ve_3d_preparar(f.path || '', typeof vePrPrefs === 'function' ? vePrPrefs().dir : null);
         if (!r || !r.success) throw new Error(r && r.precisa_blender ? veT('para abrir esse formato é preciso baixar o Blender (importe o modelo de novo)') : `${veT('modelo 3D')}: ${(r && r.error) || f.path}`);
@@ -104,14 +118,15 @@ async function ve3dCarregarModelo(md, L) {
     // partes = nomes dos materiais (corpo, tampa, rótulo...): a aparência pode ir só numa delas
     const partes = new Set(); obj.traverse(o => { if (o.isMesh) [].concat(o.material || []).forEach(x => { if (x && x.name) partes.add(x.name); }); });
     await ve3dAparencia(obj, f, T);
-    obj.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    if (!obj.userData.semNormalizar) obj.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     norm.add(obj);
     const b = new T.Box3().setFromObject(obj), tam = b.getSize(new T.Vector3()), c = b.getCenter(new T.Vector3());
-    const s = 1 / Math.max(1e-6, tam.y > 1e-3 ? tam.y : Math.max(tam.x, tam.z));   // 1 de altura (plano: 1 de lado)
-    norm.scale.setScalar(s); norm.position.set(-c.x * s, -b.min.y * s, -c.z * s);
+    const s = obj.userData.escala || 1 / Math.max(1e-6, tam.y > 1e-3 ? tam.y : Math.max(tam.x, tam.z));   // 1 de altura (plano: 1 de lado); embalagem: tamanho real entre elas
+    if (obj.userData.semNormalizar) { norm.scale.setScalar(1); norm.position.set(0, 0, 0); }   // luz: no lugar exato
+    else { norm.scale.setScalar(s); norm.position.set(-c.x * s, -b.min.y * s, -c.z * s); }
     // sombra de contato (foto de produto): mancha macia no chão sob o modelo; cresce e esmaece quando ele sobe
     const pe = Math.max(tam.x, tam.z) * s / 2;
-    return { raiz, mixer, pe, partes: [...partes] };
+    return { raiz, mixer, pe: obj.userData.semNormalizar ? 0 : pe, partes: [...partes], atualizar: obj.userData.atualizar || null };
 }
 // .mtl de exportadores PBR (Substance, Blender): "map_Bump x_Normal.png" é mapa NORMAL (lido como relevo vira um aramado),
 // rugosidade em map_Pr / map_Ns "...Roughness", metal em map_Pm / refl "...Metallic". Corrige o materialsInfo antes do
@@ -374,7 +389,8 @@ function ve3dAplicar(rt, m, t, W, H, op = {}) {   // tudo o que anima, no tempo 
     // distância automática: cabe o conjunto na posição de repouso (p, sem quadros-chave: não fica "respirando" com a
     // animação) — no mínimo ~2,4 de largura e ~1,6 de altura (quadro em pé ou deitado)
     let lx = 1.2, ly = 0.8;
-    for (const o of rt.objs) { const p = o.md.p || {}, e = p.esc ?? 1; lx = Math.max(lx, (Math.abs(p.x || 0) + 0.65 * e) * 1.08, Math.abs(p.z || 0) * 0.5 + 0.65 * e); ly = Math.max(ly, ((p.y || 0) + e) * 0.62); }
+    for (const o of rt.objs) { if (o.atualizar) continue;   // luz não entra no enquadramento
+        const p = o.md.p || {}, e = p.esc ?? 1; lx = Math.max(lx, (Math.abs(p.x || 0) + 0.65 * e) * 1.08, Math.abs(p.z || 0) * 0.5 + 0.65 * e); ly = Math.max(ly, ((p.y || 0) + e) * 0.62); }
     const fov = cp('fov'), hfov = 2 * Math.atan(Math.tan(fov * rad / 2) * W / H), dAuto = Math.max(lx / Math.tan(hfov / 2), ly / Math.tan(fov * rad / 2));
     const alvo = new T.Vector3(cp('ax'), cp('ay'), cp('az')), az = cp('azimute') * rad, el = cp('elevacao') * rad, d = cp('dist') ?? dAuto;
     cam.position.set(alvo.x + d * Math.cos(el) * Math.sin(az), alvo.y + d * Math.sin(el), alvo.z + d * Math.cos(el) * Math.cos(az));
@@ -385,6 +401,7 @@ function ve3dAplicar(rt, m, t, W, H, op = {}) {   // tudo o que anima, no tempo 
     key.position.set(alvo.x + 8 * Math.cos(le) * Math.sin(la), alvo.y + 8 * Math.sin(le), alvo.z + 8 * Math.cos(le) * Math.cos(la)); key.target.position.copy(alvo);
     key.intensity = lp('intensidade'); key.color.set(lp('cor') || '#ffffff'); amb.intensity = lp('ambiente');
     const ci = lp('contra') || 0; rt.contra.intensity = ci;
+    if (rt.objs.some(o => o.atualizar && ve3dVal(o.md, 'visivel', t) !== 0)) { key.intensity = 0; rt.contra.intensity = 0; amb.intensity *= 0.25; }   // luzes da cena mandam
     if (ci > 0) { rt.contra.position.set(alvo.x - 8 * Math.cos(0.5) * Math.sin(az + 0.5), alvo.y + 8 * Math.sin(0.5), alvo.z - 8 * Math.cos(0.5) * Math.cos(az + 0.5)); rt.contra.target.position.copy(alvo); }
     const cn = ve3dCenario(C), np = k => ve3dVal(cn, k, t), est = (np('estudio') || 0) > 0.5;
     // sombra só onde aparece (chão ou estúdio): sem ela a placa de vídeo não desenha a cena duas vezes por quadro
@@ -396,7 +413,7 @@ function ve3dAplicar(rt, m, t, W, H, op = {}) {   // tudo o que anima, no tempo 
     else rt.sc.fog = null;
     for (const o of rt.objs) {
         const v = k => ve3dVal(o.md, k, t);
-        o.raiz.position.set(v('x') || 0, v('y') || 0, v('z') || 0); o.raiz.rotation.set((v('rx') || 0) * rad, (v('ry') || 0) * rad, (v('rz') || 0) * rad);
+        o.raiz.position.set(v('x') || 0, v('y') || 0, v('z') || 0); o.raiz.rotation.set((v('rx') || 0) * rad, (v('ry') || 0) * rad, ((v('rz') || 0) + ve3dTremido(o.md, t)) * rad);
         const es = v('esc') ?? 1; o.raiz.scale.set(es * (v('sx') ?? 1), es * (v('sy') ?? 1), es * (v('sz') ?? 1));   // sx/sy/sz: achatar (pedestal = cilindro baixo)
         o.raiz.visible = v('visivel') !== 0;
         const ctt = v('contato') ?? lp('contato') ?? 0.55, alt = Math.max(0, v('y') || 0), raio = (o.pe || 0.5) * es * Math.max(v('sx') ?? 1, v('sz') ?? 1);
@@ -404,6 +421,7 @@ function ve3dAplicar(rt, m, t, W, H, op = {}) {   // tudo o que anima, no tempo 
         o.contato.position.set(v('x') || 0, 0.004, v('z') || 0); o.contato.scale.setScalar(raio * 3.3 * (1 + alt * 1.6));
         o.contato.material.opacity = ctt / (1 + alt * 3.5) ** 2;
         if (o.mixer) o.mixer.setTime(Math.max(0, t * (o.md.p.velocidade ?? 1)));
+        if (o.atualizar) o.atualizar(o, v, op);   // luz: mira, potência, tamanho, cor (editor-3d-luzes.js)
     }
     if (C.fundo) r.setClearColor(new T.Color(C.fundo), 1); else r.setClearColor(0x000000, 0);
     const Wi = Math.max(2, Math.round(W)), Hi = Math.max(2, Math.round(H));
@@ -540,7 +558,8 @@ function ve3dAlvo(ref) {   // mídia da cena: id da mídia, nome, ou o clipe sel
 function ve3dObj(m, quem) { const C = m.c3d; if (quem === 'camera') return C.camera; if (quem === 'luz') return C.luz; if (quem === 'cenario') return ve3dCenario(C); const md = C.modelos.find(x => x.id === quem || x.nome === quem); if (!md) throw new Error(`modelo "${quem}" não existe na cena`); return md; }
 window.VE3DAPI = {
     nova: (op = {}) => ve3dNova(op),
-    // modelo: caminho (.glb/.gltf/.obj/.fbx/.blend/.dae/.stl/.ply/.3mf) ou primitiva (esfera|cubo|cilindro|toro|cone|plano)
+    // modelo: caminho (.glb/.gltf/.obj/.fbx/.blend/.dae/.stl/.ply/.3mf), primitiva (esfera|cubo|cilindro|toro|cone|plano) ou
+    // embalagem ('pote'|'bastao', com material softtouch|gel|brilho, cores {corpo, tampa, base, gel} e rotulo = arte)
     // com cor/material/textura (imagem)/texRep. FBX e cia. são convertidos no Blender antes de entrar (o 1º uso baixa o Blender).
     async modelo(op = {}) {
         const m = ve3dAlvo(op.cena);
@@ -548,9 +567,10 @@ window.VE3DAPI = {
         vePushHistory();
         const id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
         const extra = { ...(op.cor ? { cor: op.cor } : {}), ...(op.material ? { material: op.material } : {}), ...(op.textura ? { textura: op.textura, texRep: op.texRep || 1 } : {}) };
-        const fonte = op.vetor ? { tipo: 'vetor', desc: op.vetor } : op.arquivo ? { tipo: 'arquivo', path: op.arquivo, ...extra }
+        const fonte = op.embalagem ? { tipo: 'embalagem', produto: op.embalagem, material: op.material || 'softtouch', cores: op.cores || {}, ...(op.rotulo ? { rotulo: op.rotulo } : {}) }
+            : op.vetor ? { tipo: 'vetor', desc: op.vetor } : op.arquivo ? { tipo: 'arquivo', path: op.arquivo, ...extra }
             : { tipo: 'primitiva', forma: op.forma || 'esfera', cor: op.cor || '#ec6e48', material: op.material || 'plastico', ...extra };
-        m.c3d.modelos.push({ id, nome: op.nome || (op.arquivo ? op.arquivo.split(/[\\/]/).pop() : op.forma || 'esfera'), fonte,
+        m.c3d.modelos.push({ id, nome: op.nome || (op.embalagem ? (op.embalagem === 'bastao' ? 'bastão' : op.embalagem) : op.arquivo ? op.arquivo.split(/[\\/]/).pop() : op.forma || 'esfera'), fonte,
             p: { x: op.x || 0, y: op.y || 0, z: op.z || 0, rx: op.rx || 0, ry: op.ry || 0, rz: op.rz || 0, esc: op.esc ?? 1, velocidade: op.velocidade ?? 1 }, kf: {} });
         ve3dMudou(m);
         try { await ve3dGarantir(m); }
@@ -676,10 +696,10 @@ async function ve3dSoltar(caminhos) {
 }
 function ve3dPainelHtml(c, so) {   // so (tela 3D): só a parte do objeto selecionado — camera, luz, cenario ou id do modelo
     const m = veMediaOf(c), C = m.c3d, t = Math.max(0, veSrcAt(c, VE.playhead));
-    const lin = (quem, o, k, rot, min, max, passo, un = '') => {
-        const v = ve3dVal(o, k, t), kf = (o.kf && o.kf[k]) || [], anim = kf.length > 0, aqui = kf.some(x => Math.abs(x[0] - t) < 0.5 / (VE.fps || 30));
+    const lin = (quem, o, k, rot, min, max, passo, un = '', pad, dica) => {
+        const v = ve3dVal(o, k, t) ?? pad, kf = (o.kf && o.kf[k]) || [], anim = kf.length > 0, aqui = kf.some(x => Math.abs(x[0] - t) < 0.5 / (VE.fps || 30));
         const vt = v == null ? '' : Math.round(v * 1000) / 1000;
-        return `<div class="ve-pp-l ve-p3d"><label>${veT(rot)}</label><input type="range" data-p3d="${quem}|${k}" min="${min}" max="${max}" step="${passo}" value="${v ?? (min + max) / 2}">
+        return `<div class="ve-pp-l ve-p3d"><label${dica ? ` title="${veT(dica)}"` : ''}>${veT(rot)}</label><input type="range" data-p3d="${quem}|${k}" min="${min}" max="${max}" step="${passo}" value="${v ?? (min + max) / 2}">
             <span class="ve-prop-num"><input type="number" data-p3d="${quem}|${k}" step="${passo}" value="${vt}" placeholder="auto"><i>${un}</i></span>
             <button class="ve-p3d-kf${anim ? ' on' : ''}${aqui ? ' aqui' : ''}" data-p3dkf="${quem}|${k}" title="${veT(anim ? 'Animado: mexer grava quadro-chave aqui. Clique para tirar a animação' : 'Animar com quadros-chave')}">◆</button></div>`;
     };
@@ -717,6 +737,8 @@ function ve3dPainelHtml(c, so) {   // so (tela 3D): só a parte do objeto seleci
     Object.defineProperty(md, '_mid', { value: m.id, configurable: true, enumerable: false });   // a Aparência acha as partes no runtime da cena
     return vePpSec(veEsc(md.nome), um(md) + lin(md.id, md, 'rz', 'Rolar', -180, 180, 1, '°') + lin(md.id, md, 'sx', 'Largura', 0.05, 4, 0.01, '×') +
         lin(md.id, md, 'sy', 'Altura', 0.05, 4, 0.01, '×') + lin(md.id, md, 'sz', 'Profundidade', 0.05, 4, 0.01, '×') + lin(md.id, md, 'contato', 'Sombra de contato', 0, 1, 0.01) +
+        lin(md.id, md, 'tremido', 'Tremido', 0, 5, 0.1, '°', 0, 'Stop motion: a peça balança no Rolar, sem quadros-chave (0 = parada)') +
+        lin(md.id, md, 'tremidoRitmo', 'Ritmo do tremido', 0.5, 12, 0.5, '/s', 4, 'Quantas vezes por segundo a peça troca de lado') +
         `<div class="ve-pp-botoes"><button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="dup:${md.id}" title="Ctrl+D">${veT('Duplicar')}</button>
         <button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="chao:${md.id}">${veT('Apoiar no chão')}</button>
         <button class="ve-btn ve-btn-sm ve-btn-ghost" data-p3dacao="zerar:${md.id}">${veT('Zerar posição')}</button>

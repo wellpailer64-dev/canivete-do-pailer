@@ -29,9 +29,15 @@
     };
     // cena de placas: sem o tom final (passo "cru" do motor, editor-3d.js) e sem sombra — a cor da foto/texto não muda
     const aplicar = ve3dAplicar;
+    // a ordem de empilhar segue a distância à câmera (a mais perto por cima) e, no mesmo Z, a ordem das camadas.
+    // O three ordena os transparentes por renderOrder ANTES da distância (e o de um Group vira groupOrder, que manda em
+    // tudo): com renderOrder = camada, a placa criada depois ficava sempre por cima, mesmo atrás. Aqui a distância vem
+    // primeiro (z do item = profundidade na tela, b.z − a.z = de trás para a frente) e a camada só desempata.
+    const ordem = (a, b) => Math.abs(a.z - b.z) > 1e-7 ? b.z - a.z : (a.groupOrder - b.groupOrder) || (a.renderOrder - b.renderOrder) || (a.id - b.id);
     ve3dAplicar = function (rt, m, t, W, H, op = {}) {
-        // a ordem de empilhar segue o Z (a mais perto da câmera por cima), e no mesmo Z a ordem das camadas
-        if (m && m.c3d && m.c3d.placas) rt.objs.forEach((o, i) => { o.raiz.renderOrder = i; });
+        const placas = !!(m && m.c3d && m.c3d.placas), r = VE3D.motor && VE3D.motor.r;
+        if (placas) rt.objs.forEach((o, i) => { o.raiz.renderOrder = i; });
+        if (r) r.setTransparentSort(placas ? ordem : null);   // o motor é de todas as cenas: as outras ficam no padrão
         return aplicar(rt, m, t, W, H, op);
     };
     // aparência (cor/material) não vale para placa

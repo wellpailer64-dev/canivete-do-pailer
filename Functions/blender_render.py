@@ -140,3 +140,89 @@ def cancelar():
 
 def remover():
     cancelar(); shutil.rmtree(pasta(), ignore_errors=True); return {"success": True}
+
+
+# ── foto de estúdio (Functions/blender_estudio.py): embalagens com material de verdade, cenário, softboxes ──
+HDRI_PADRAO = "D:/kanivete_biblioteca/hdri/studio_small_09_2k.hdr"
+
+
+PROGRESSO = {"feito": 0, "total": 0}
+
+
+def estudio_video(spec):
+    """vídeo da cena (spec com 'quadros': matrizes por quadro) → {success, path, segundos, cache}. Blender renderiza os
+    quadros (EEVEE por padrão, ~1–2 s cada; Cycles se spec['motor'] == 'cycles'); o ffmpeg junta: MP4 H.264 com fundo,
+    MOV ProRes 4444 com alfa quando o fundo é transparente. Progresso em PROGRESSO (ve_3d_estudio_progresso)."""
+    import glob, hashlib, shutil
+    b = exe()
+    if not b:
+        return {"success": False, "error": "Blender não instalado", "precisa_blender": True}
+    saida = spec.get("saida") or os.path.join(pasta(), "..", "estudio")
+    os.makedirs(saida, exist_ok=True)
+    if not spec.get("hdri") and os.path.exists(HDRI_PADRAO):
+        spec["hdri"] = HDRI_PADRAO
+    spec.setdefault("motor", "eevee")
+    chave = hashlib.sha1(json.dumps({k: v for k, v in spec.items() if k not in ("saida", "nome")}, sort_keys=True).encode()).hexdigest()[:12]
+    nome = f"{spec.get('nome') or 'video'}_{chave}"
+    alfa = not spec.get("cenario", True)
+    destino = os.path.join(saida, nome + (".mov" if alfa else ".mp4"))
+    if os.path.exists(destino):
+        return {"success": True, "path": destino, "segundos": 0, "cache": True}
+    spec = {**spec, "saida": saida.replace("\\", "/"), "nome": nome}
+    jp = os.path.join(saida, nome + ".json")
+    with open(jp, "w", encoding="utf-8") as f:
+        json.dump(spec, f, ensure_ascii=False)
+    _liberar_gpu()
+    t = time.time(); PROGRESSO.update(feito=0, total=len(spec["quadros"]))
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "blender_estudio.py")
+    p = subprocess.Popen([b, "-b", "--factory-startup", "-noaudio", "-P", script, "--", jp], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         stdin=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
+    log = []
+    for linha in p.stdout:
+        log.append(linha); log[:] = log[-60:]
+        m = re.match(r"KANIVETE: quadro (\d+)/(\d+)", linha)
+        if m: PROGRESSO.update(feito=int(m.group(1)), total=int(m.group(2)))
+    p.wait()
+    pasta_q = os.path.join(saida, nome + "_quadros")
+    if not glob.glob(os.path.join(pasta_q, "q_*.png")):
+        return {"success": False, "error": "o Blender não renderizou os quadros", "log": "".join(log)[-1500:]}
+    from Functions.convertermp3 import ffmpeg_path
+    fps = float(spec.get("fps") or 30)
+    cmd = [ffmpeg_path(), "-y", "-framerate", f"{fps:g}", "-i", os.path.join(pasta_q, "q_%05d.png")]
+    cmd += (["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le"] if alfa else ["-c:v", "libx264", "-crf", "15", "-preset", "slow", "-pix_fmt", "yuv420p", "-movflags", "+faststart"])
+    r = subprocess.run(cmd + [destino], capture_output=True, text=True, encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
+    if r.returncode != 0 or not os.path.exists(destino):
+        return {"success": False, "error": "o ffmpeg não juntou os quadros", "log": (r.stderr or "")[-1500:]}
+    if not spec.get("manter_quadros"):
+        shutil.rmtree(pasta_q, ignore_errors=True)
+    return {"success": True, "path": destino, "segundos": round(time.time() - t, 1), "cache": False, "quadros": PROGRESSO["total"]}
+
+
+def estudio(spec):
+    """spec (montado pela Cena 3D ou pelo agente) → {success, path, segundos, cache}. A mesma cena não renderiza duas
+    vezes: o nome do arquivo é o hash do spec (sem a pasta)."""
+    import hashlib
+    b = exe()
+    if not b:
+        return {"success": False, "error": "Blender não instalado", "precisa_blender": True}
+    saida = spec.get("saida") or os.path.join(pasta(), "..", "estudio")
+    os.makedirs(saida, exist_ok=True)
+    if not spec.get("hdri") and os.path.exists(HDRI_PADRAO):
+        spec["hdri"] = HDRI_PADRAO
+    chave = hashlib.sha1(json.dumps({k: v for k, v in spec.items() if k not in ("saida", "nome")}, sort_keys=True).encode()).hexdigest()[:12]
+    nome = f"{spec.get('nome') or 'estudio'}_{chave}"
+    destino = os.path.join(saida, nome + ".png")
+    if os.path.exists(destino):
+        return {"success": True, "path": destino, "segundos": 0, "cache": True}
+    spec = {**spec, "saida": saida.replace("\\", "/"), "nome": nome}
+    jp = os.path.join(saida, nome + ".json")
+    with open(jp, "w", encoding="utf-8") as f:
+        json.dump(spec, f, ensure_ascii=False)
+    _liberar_gpu()
+    t = time.time()
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "blender_estudio.py")
+    r = subprocess.run([b, "-b", "--factory-startup", "-noaudio", "-P", script, "--", jp], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
+    if "KANIVETE: estudio pronto" not in (r.stdout or "") or not os.path.exists(destino):
+        return {"success": False, "error": "o Blender não terminou a foto", "log": ((r.stdout or "") + (r.stderr or ""))[-1500:]}
+    return {"success": True, "path": destino, "segundos": round(time.time() - t, 1), "cache": False}

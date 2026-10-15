@@ -99,7 +99,7 @@ function ve3dTelaAcertar(e) {
         // botões de profundidade do painel da placa
         VE3T.lado.addEventListener('click', e => { const b = e.target.closest('[data-3tz]'); if (b) ve3dEmpurrarPasso(+b.dataset['3tz']); });
         const dica = VE3T.visor.querySelector('.ve3t-dica');
-        if (dica) dica.textContent = veT('Arrastar objeto: mover · Arrastar no vazio: orbitar · Rodinha: distância · Alt+rodinha ou [ ]: profundidade sem mudar o tamanho · Shift/meio: deslocar · W/E/R · Delete · Ctrl+D · H · F');
+        if (dica) dica.textContent = veT('Arrastar objeto: mover · Arrastar no vazio: orbitar · Rodinha: distância · Alt+rodinha ou [ ]: profundidade · Shift ou botão do meio: deslocar');
     };
     const tempo = ve3dTelaTempo;
     ve3dTelaTempo = function (c) { tempo(c); ve3dMapaDesenhar(); };
