@@ -245,6 +245,21 @@ function veKlApagar() {
     veToast(n === 1 ? 'Quadro-chave apagado' : `${n} quadros-chave apagados`);
 }
 
+// Estica/encolhe os ◆ selecionados em volta de 'pivo' (tempo da timeline): cada um vai para pivo + (t − pivo) × fator
+function veKlEscalar(c, pivo, fator) {
+    const tol = veFrame() * 0.5, k2 = { ...(c.k || {}) }, porKey = new Map();
+    const novoT = ts => { const tl = veTlAt(c, ts); return Math.round(veSrcAt(c, pivo + (tl - pivo) * fator) * 1e4) / 1e4; };
+    VEKL.sel.forEach(s => veKlGrupo(s.g).keys.forEach(k => { if (!porKey.has(k)) porKey.set(k, []); porKey.get(k).push(s.t); }));
+    porKey.forEach((ts, k) => {
+        const ks = k2[k]; if (!ks) return;
+        const mov = ks.filter(q => ts.some(t => Math.abs(q.t - t) < tol)).map(q => ({ ...q, t: novoT(q.t) }));
+        const resto = ks.filter(q => !ts.some(t => Math.abs(q.t - t) < tol) && !mov.some(m => Math.abs(m.t - q.t) < tol)).map(q => ({ ...q }));
+        k2[k] = [...resto, ...mov].sort((a, b) => a.t - b.t);
+    });
+    c.k = k2;
+    VEKL.sel = VEKL.sel.map(s => ({ g: s.g, t: novoT(s.t) }));
+}
+
 // Move (ou duplica) os ◆ selecionados dt segundos da timeline
 function veKlMover(c, dt, duplicar) {
     const ds = dt * veVel(c), tol = veFrame() * 0.5;
@@ -389,7 +404,7 @@ function veKlDesenhar(ctx, rows, X, W) {
         tempos.forEach(({ t, q, ant, ult }) => {
             const sel = veKlSelTem(r.g, t);
             let x = X(veTlAt(c, t));
-            if (d && d.ativo && sel) x += d.dt * VE.pps;
+            if (d && d.ativo && sel) x = d.escala && d.fator != null ? X(d.escala.pivo + (veTlAt(c, t) - d.escala.pivo) * d.fator) : x + d.dt * VE.pps;
             if (x < -8 || x > W + 8) return;
             const lados = veKlLados(q, ant, ult);
             if (d && d.ativo && sel && d.dup) veKlForma(ctx, X(veTlAt(c, t)), y, lados, false, true);
@@ -472,7 +487,15 @@ function veKlIniciar() {
             const kft = e.button === 0 && row && row.kind === 'v' ? veKfMarkAt(x, y, row) : null;
             const c = veKlDono();
             if (kft != null && c) { VEKL.sel = veKlSelNoTempo(c, Math.round(veSrcAt(c, kft) * 1e4) / 1e4); VEKL.selClip = c; }
-            else if (e.button === 0 && VEKL.sel.length) VEKL.sel = [];
+            else {
+                if (e.button === 0 && VEKL.sel.length) VEKL.sel = [];
+                // clipe ainda não selecionado: o 1º clique seleciona o clipe (logo depois, no editor.js); se foi em cima
+                // de um ◆ dele, o ◆ também fica selecionado — antes o Delete em seguida apagava o clipe inteiro
+                if (e.button === 0 && row && row.kind === 'v') setTimeout(() => {
+                    const k2 = veKfMarkAt(x, y, row), dono = veKlDono();
+                    if (k2 != null && dono && !VEKL.sel.length) { VEKL.sel = veKlSelNoTempo(dono, Math.round(veSrcAt(dono, k2) * 1e4) / 1e4); VEKL.selClip = dono; veDraw(); }
+                }, 0);
+            }
             return;
         }
         e.stopImmediatePropagation();
@@ -490,6 +513,15 @@ function veKlIniciar() {
                 VEKL.sel = tem ? VEKL.sel.filter(s => !(s.g === hit.g && Math.abs(s.t - hit.t) < veFrame() * 0.5)) : VEKL.sel.concat(hit);
             } else if (!tem) VEKL.sel = [hit];
             VEKL.drag = { modo: 'mover', x0: e.clientX, tl0: veTlAt(c, hit.t), dt: 0, dup: e.altKey, ativo: false, hit, toggle: e.shiftKey || e.ctrlKey };
+            // Alt no 1º ou no último de 3+ selecionados: estica/encolhe todos na proporção (como o Alt do After Effects);
+            // o ◆ da outra ponta fica parado. Alt em outro ◆ continua duplicando.
+            if (e.altKey && !e.shiftKey && !e.ctrlKey && VEKL.sel.length >= 3) {
+                const tls = VEKL.sel.map(s => veTlAt(c, s.t)), lo = Math.min(...tls), hi = Math.max(...tls), tl0 = veTlAt(c, hit.t);
+                if (hi - lo > veFrame() && (Math.abs(tl0 - lo) < 1e-4 || Math.abs(tl0 - hi) < 1e-4)) {
+                    VEKL.drag.escala = { pivo: Math.abs(tl0 - lo) < 1e-4 ? hi : lo };
+                    VEKL.drag.dup = false;
+                }
+            }
         } else {
             VEKL.drag = { modo: 'marq', ta: t, tb: t, ya: y, yb: y, base: e.shiftKey || e.ctrlKey ? VEKL.sel.slice() : [], ativo: false, x0: e.clientX, y0: e.clientY };
             if (!e.shiftKey && !e.ctrlKey) VEKL.sel = [];
@@ -519,6 +551,17 @@ function veKlIniciar() {
             // o ◆ pego encaixa nos quadros e na agulha; todos andam juntos, sem sair do clipe
             let alvo = veSnapFrame(d.tl0 + (e.clientX - d.x0) / VE.pps);
             if (Math.abs((alvo - VE.playhead) * VE.pps) < 6) alvo = VE.playhead;
+            if (d.escala) {
+                // fator = nova distância do ◆ pego até a ponta parada ÷ a de antes; não cruza a ponta nem sai do clipe
+                const p = d.escala.pivo, base = d.tl0 - p;
+                let f = (alvo - p) / base;
+                f = Math.max(f, (veFrame() * 2) / Math.abs(base));
+                const tls = VEKL.sel.map(s => veTlAt(c, s.t));
+                tls.forEach(tl => { const nt = p + (tl - p) * f; if (nt < c.st) f = Math.min(f, (c.st - p) / (tl - p)); if (nt > veEnd(c)) f = Math.min(f, (veEnd(c) - p) / (tl - p)); });
+                d.fator = f; d.dt = p + base * f - d.tl0;
+                veDraw();
+                return;
+            }
             let dt = alvo - d.tl0;
             const tls = VEKL.sel.map(s => veTlAt(c, s.t));
             dt = Math.max(dt, c.st - Math.min(...tls));
@@ -557,7 +600,15 @@ function veKlIniciar() {
         e.stopImmediatePropagation();
         const c = veKlClip();
         if (d.modo === 'mover' && c) {
-            if (d.ativo && Math.abs(d.dt) > 1e-6) {
+            if (d.ativo && d.escala && d.fator != null && Math.abs(d.fator - 1) > 1e-4) {
+                if (!veKlPodeEditar(c)) { veDraw(); return; }
+                vePushHistory();
+                veKlEscalar(c, d.escala.pivo, d.fator);
+                veKlDepois();
+                veToast(`${VEKL.sel.length} quadros-chave ${d.fator > 1 ? 'esticados' : 'encolhidos'} (${Math.round(d.fator * 100)}%)`);
+                return;
+            }
+            if (d.ativo && !d.escala && Math.abs(d.dt) > 1e-6) {
                 if (!veKlPodeEditar(c)) { veDraw(); return; }
                 vePushHistory();
                 veKlMover(c, d.dt, d.dup);

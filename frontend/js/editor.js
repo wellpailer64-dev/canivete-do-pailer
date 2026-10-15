@@ -5873,11 +5873,18 @@ function veSnapTime(t, forRazor) {
     t = veClamp(t);
     if (VE.snap) {
         const cands = veImaPontos(new Set(), !!forRazor);   // a agulha não gruda nela mesma
-        let best = null, bd = VE_IMA_PX / VE.pps;
+        let best = null, bd = VE_IMA_PX / VE.pps, noKf = false;
         for (const c of cands) { const d = Math.abs(c - t); if (d < bd) { bd = d; best = c; } }
+        // ◆ do clipe selecionado (e do aberto nas faixas de propriedade): ímã leve (alcance menor) e com o tic seco,
+        // como duas camadas encostando — a agulha cai em cima do quadro-chave para editar o valor dele
+        if (VE.drag && VE.drag.mode === 'scrub') {
+            const donos = new Set([VE.clips[VE.sel], typeof veKlDono === 'function' ? veKlDono() : null].filter(Boolean));
+            const leve = VE_IMA_PX * 0.6 / VE.pps;
+            donos.forEach(c => veKfSeqTimes(c).forEach(k => { const d = Math.abs(k - t); if (d < leve && d < bd) { bd = d; best = k; noKf = true; } }));
+        }
         // só arrastando a agulha mexe no estado do ímã (o desenho da linha de hover também passa por aqui e,
         // no meio de um arraste de camada, zerava o "encostou" e o tic tocava de novo a cada movimento)
-        if (VE.drag && VE.drag.mode === 'scrub') veImaMarcar(best, false);   // agulha: gruda, sem o tic
+        if (VE.drag && VE.drag.mode === 'scrub') veImaMarcar(best, noKf);   // agulha: gruda; no ◆, com o tic
         if (best != null) return best;
     }
     return veSnapFrame(t);
