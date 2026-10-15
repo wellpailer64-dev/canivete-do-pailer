@@ -192,8 +192,8 @@ def memoria_estimada(segmentos, lay, path):
 
 def _lc_ok(fx):
     """Todos os efeitos ativos rodam em shader na placa (_passos_lc): Luz e Cor, Aberração cromática, Desfoque e o
-    Brilho da camada de ajuste."""
-    return all(f.get("t") in ("lc", "ca", "blur", "mo_glow") or f.get("on") is False for f in fx or [])
+    Brilho da camada de ajuste — e a Ondulação (_onda_passos, depois deles)."""
+    return all(f.get("t") in ("lc", "ca", "blur", "mo_glow", "onda") or f.get("on") is False for f in fx or [])
 
 
 # Efeitos que a placa ainda não faz em shader mas o exportador de CPU faz com filtros do ffmpeg: no modo placa o quadro
@@ -202,7 +202,9 @@ def _lc_ok(fx):
 # ajustes com Desfoque e Aberração): ia inteiro pela CPU, 6× a duração (2026-10-10).
 # Motion (editor-motion.js): Preenchimento, Inverter e o Brilho da camada de ajuste também têm filtro do ffmpeg
 # Cortar, Luma Key, Cantos arredondados e Básico 3D (transições Dividir/Chicote viram esses efeitos) também
-_FX_HIBRIDO = ("key", "lc", "blur", "bc", "ca", "mo_fill", "mo_inv", "mo_glow", "crop", "luma", "rounded", "b3d")
+# Ondulação (Wave Warp): sozinha ou com Luz e Cor/Aberração/Desfoque vai em shader (_onda_passos); junto de um efeito
+# que desce, desce com ele (geq a cada quadro, vc._filtro_onda) e sobe na caixa com a margem
+_FX_HIBRIDO = ("key", "lc", "blur", "bc", "ca", "mo_fill", "mo_inv", "mo_glow", "crop", "luma", "rounded", "b3d", "onda")
 
 
 def _fx_hibrido(fx):
@@ -217,7 +219,7 @@ def _key_so(fx):
     ordem da lista como a CPU. (Respeite o seu voto: 8 clipes "Luz e Cor → Chroma Key" desciam para a CPU.) Key antes do
     Luz e Cor continua híbrido: o shader do Luz e Cor trabalha em luma/croma, não no RGB com transparência."""
     ativos = [f for f in fx or [] if f.get("on") is not False]
-    return (bool(ativos) and ativos[-1].get("t") == "key" and not any(f.get("t") == "key" for f in ativos[:-1])
+    return (bool(ativos) and ativos[-1].get("t") == "key" and not any(f.get("t") in ("key", "onda") for f in ativos[:-1])
             and _lc_ok(ativos[:-1]))
 
 
@@ -314,6 +316,10 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
     # legendas: a placa monta e o libass desenha no quadro que desce para o codificador (_render, 2026-10-11)
     if not lay:
         return "sem camadas"
+    for c in lay:   # Ondulação: shader na placa (_onda_passos); imagem/texto girado ainda gira antes de subir (CPU)
+        if vc._onda_ativa(c.get("fx")) and c["tipo"] == "imagem" and (
+                c["rot"] % 360 or "rot" in c["kf"] or vc._ca_exprs(c.get("ca"), "t")["rot"]):
+            return "Ondulação em imagem girada"
     for c in lay:
         if c.get("bm") and ((c["bm"] != "multiply" and c["bm"] != "add" and c["bm"] not in _BM_GLSL)
                             or vc._sombra_camada(c)):
@@ -688,6 +694,55 @@ def _shader_alfa(c, fps, pula=0.0, max_trechos=256, multiplica=False):
             f"    c.a {'*' if multiplica else ''}= ALFA(frame - 1);\n    return c;\n}}\n")
 
 
+def _shader_onda(v, mw, mh, s, fps, t_ini, margem):
+    """Ondulação (Wave Warp; editor-onda.js e vc._filtro_onda fazem a MESMA conta) numa passada do libplacebo. A textura
+    está em s px por px da mídia (mw×mh, a camada sem a margem) e já com a margem em volta; a conta é em px da mídia a
+    partir do centro (como o X − W/2 do geq). Tempo = t_ini + (frame − 1)/fps, contado do início da camada (o contador
+    `frame` começa em 1 no 1º quadro que a passada recebe). Fora da textura: transparente (margem) ou a borda (camada de
+    ajuste, sem margem — o geq prende na borda)."""
+    alt = vc._num(v.get("alt"), 0, 4000)
+    qtd = max(0.05, vc._num(v.get("qtd"), 0.05, 200))
+    vel = vc._num(v.get("vel"), -50, 50)
+    a = math.radians(vc._num(v.get("dir"), -360, 360))
+    ca, sa = math.cos(a), math.sin(a)
+    ca, sa = (0.0 if abs(ca) < 1e-9 else ca), (0.0 if abs(sa) < 1e-9 else sa)
+    L = max(1.0, abs(mw * ca) + abs(mh * sa))
+    k = 0.01 + vc._num(v.get("forma"), 0, 100) / 100 * 6
+    fase = math.radians(vc._num(v.get("fase"), -3600, 3600))
+    env = f"clamp(s0 / {L:.4f}, 0.0, 1.0)" if v.get("prender") else "1.0"
+    fora = ("    if (p.x < 0.0 || p.y < 0.0 || p.x > 1.0 || p.y > 1.0) return vec4(0.0);\n" if margem
+            else "    p = clamp(p, 0.5 / HOOKED_size, 1.0 - 0.5 / HOOKED_size);\n")
+    return (f"//!HOOK MAIN\n//!BIND HOOKED\n//!DESC ondulacao\nvec4 hook() {{\n"
+            f"    float t = {t_ini:.6f} + float(frame - 1) / {fps:.6f};\n"
+            f"    vec2 meio = HOOKED_size / {s:.6f} * 0.5;\n"
+            f"    vec2 q = HOOKED_pos * HOOKED_size / {s:.6f} - 0.5 - meio;\n"
+            f"    float s0 = q.x * {ca:.6f} + q.y * {sa:.6f} + {L / 2:.4f};\n"
+            f"    float ph = 6.28318531 * (s0 / {L / qtd:.5f} - {vel:.5f} * t) + {fase:.6f};\n"
+            f"    float d = {alt:.4f} * {env} * tanh({k:.5f} * sin(ph)) / {math.tanh(k):.7f};\n"
+            f"    vec2 p = (q + vec2(d * {sa:.6f}, -d * {ca:.6f}) + meio + 0.5) * {s:.6f} / HOOKED_size;\n"
+            f"{fora}    return clamp(HOOKED_tex(p), 0.0, 1.0);\n}}\n")
+
+
+def _onda_passos(fx, mw, mh, s, fps, t_ini, pasta, tag, margem=True, fmt=_FMT_ALFA):
+    """Passadas da Ondulação (uma por onda, cada uma no seu arquivo: o `frame` avança a cada passada) e, com margem, a
+    textura antes aumentada com borda transparente do tanto que a onda empurra para fora (vc._onda_margem, em px da
+    mídia × s). Devolve (passos, margem em px da textura, margem em px da mídia) — a caixa na tela cresce junto."""
+    ondas = vc._onda_ativa(fx)
+    if not ondas:
+        return [], 0, 0.0
+    passos, M = [], 0
+    if margem:
+        M = int(math.ceil(vc._onda_margem(fx) * s))
+        passos.append(f"libplacebo=w=iw+{2 * M}:h=ih+{2 * M}:pos_x={M}:pos_y={M}:pos_w=iw:pos_h=ih:fillcolor=black@0:"
+                      f"format={fmt}:disable_linear=1")
+    for j, f in enumerate(ondas):
+        arq = os.path.join(pasta, f"onda_{tag}_{j}.glsl")
+        with open(arq, "w", encoding="utf-8") as fh:
+            fh.write(_shader_onda(f.get("v") or {}, mw, mh, s, fps, t_ini, margem))
+        passos.append(f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={fmt}:disable_linear=1")
+    return passos, M, M / s
+
+
 def _shader_ca(v, W, H):
     """Aberração cromática (editor-fx.js "ca") como o exportador de CPU: cada canal ampliado a partir do centro (escalas
     normalizadas pela menor) e, com Raio, misturado ao original por uma queda radial (cheio até meio raio, nada no raio).
@@ -804,6 +859,11 @@ def _entrada_video(g, c, info, pasta, n_cam):
         with open(arq, "w", encoding="utf-8") as fh:
             fh.write(sh)
         efeito += f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={_FMT_CAM}:disable_linear=1,"
+    # Ondulação na placa, depois dos outros efeitos: a textura ganha a margem transparente e sai em RGBA (antes o
+    # clipe descia para a CPU a cada quadro); tempo do clipe = pula no 1º quadro
+    po, _, onda_mm = ([], 0, 0.0) if hib or key_gpu else _onda_passos(c["fx"], c["mw"], c["mh"], rw / c["mw"], g.fps, pula,
+                                                                       pasta, f"v{n_cam}")
+    efeito += "".join(p + "," for p in po)
     opac = ""
     if key_gpu:
         # recorte inteiro na placa (shader); a saída já é RGBA. Antes dele, os efeitos da lista que vêm antes (Luz e Cor…)
@@ -833,6 +893,13 @@ def _entrada_video(g, c, info, pasta, n_cam):
                        if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
         baixo = _FMT_CAM if giro else "yuv420p" if not vk else _fmt_decodificado(info)
         fx_cpu = ",".join(vc._filtros_fx(c["fx"], c["mw"], c["mh"], f"h{n_cam}"))
+        onda = vc._filtro_onda(c["fx"], c["mw"], c["mh"], c["st"])   # tempo aqui = o da timeline
+        bw0, bh0 = c["mw"], c["mh"]   # o quadro que chega ao giro (com a margem da onda, se houver)
+        if onda:
+            fx_cpu = f"{fx_cpu},{onda}" if fx_cpu else onda
+            m = vc._onda_margem(c["fx"])
+            bw0, bh0 = int(c["mw"]) + 2 * m, int(c["mh"]) + 2 * m
+            c["_giro_tam"] = (bw0, bh0)   # a caixa que sobe, com a margem da onda
         gir = ""
         if gira_v:
             # tempo aqui = o da timeline (setpts com o início da camada; num bloco, st < 0 e o tempo começa no bloco):
@@ -840,20 +907,20 @@ def _entrada_video(g, c, info, pasta, n_cam):
             tv = f"(t-{c['st']:.6f})"
             if "rot" in c["kf"] or car:
                 e = vc._expr_kf(c["kf"]["rot"], tv) if "rot" in c["kf"] else f"{c['rot']:.5f}"
-                D = int(math.ceil(math.hypot(c["mw"], c["mh"]))) + 2
+                D = int(math.ceil(math.hypot(bw0, bh0))) + 2
                 D += D % 2
                 gir = f"rotate=a='(({e}){'+' + car if car else ''})*PI/180':c=black@0:ow={D}:oh={D},"
                 c["_giro_tam"] = (D, D)
             else:
                 rad = math.radians(c["rot"])
-                RW = int(math.ceil(c["mw"] * abs(math.cos(rad)) + c["mh"] * abs(math.sin(rad)))) + 2
-                RH = int(math.ceil(c["mw"] * abs(math.sin(rad)) + c["mh"] * abs(math.cos(rad)))) + 2
+                RW = int(math.ceil(bw0 * abs(math.cos(rad)) + bh0 * abs(math.sin(rad)))) + 2
+                RH = int(math.ceil(bw0 * abs(math.sin(rad)) + bh0 * abs(math.cos(rad)))) + 2
                 RW, RH = RW + RW % 2, RH + RH % 2
                 gir = f"rotate={rad:.6f}:c=black@0:ow={RW}:oh={RH},"
                 c["_giro_tam"] = (RW, RH)
         opac = (f"hwdownload,format={baixo},scale=in_color_matrix={_mtx(info)},format=rgba,"
                 + (f"{fx_cpu}," if fx_cpu else "") + f"{gir}{a.lstrip(',') + ',' if a else ''}format=rgba,hwupload,")
-    elif not _opaca(c) and (sh_alfa := _shader_alfa(c, g.fps, pula)):
+    elif not _opaca(c) and (sh_alfa := _shader_alfa(c, g.fps, pula, multiplica=bool(po))):   # com onda: alfa × opacidade
         # fade de um clipe na placa (antes descia para a CPU a cada quadro): o alfa num shader, saída RGBA de 16 bits
         arq = os.path.join(pasta, f"alfa_v{n_cam}.glsl")
         with open(arq, "w", encoding="utf-8") as fh:
@@ -865,7 +932,7 @@ def _entrada_video(g, c, info, pasta, n_cam):
              if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
         # formato EXATO na placa: o que passou pelo libplacebo (giro/redução/Luz e Cor) é _FMT_CAM, o que subiu da CPU é
         # yuv420p; direto do decodificador é nv12/p010 (com "nv12|yuv420p" o ffmpeg escolhia errado e a exportação falhava)
-        baixo = _FMT_CAM if (giro or efeito) else "yuv420p" if not vk else _fmt_decodificado(info)
+        baixo = _FMT_ALFA if po else _FMT_CAM if (giro or efeito) else "yuv420p" if not vk else _fmt_decodificado(info)
         opac = f"hwdownload,format={baixo},scale=in_color_matrix=bt709,format=rgba,{a},hwupload,"
     r = g.rotulo("v")
     g.filtros.append(f"[{k}:v:0]{_marca_cor(c['path'], info)}trim=start={vc._tempo_ffmpeg(s0 - ss)}:"
@@ -880,7 +947,7 @@ def _entrada_video(g, c, info, pasta, n_cam):
         RW, RH = c["_giro_tam"]
         ang = f"({_expr(c, 'rot', c['rot'], tl)})" + (f"+{vc._ca_exprs(c.get('ca'), tl)['rot']}" if car else "")
         return [(f"[{r}]", _posicao(c, kx, f"({RW}*({kx}))", f"({RH}*({kx}))", tl, ang=ang))]
-    return [(f"[{r}]", _posicao(c, kx, *_tam(c, c["mw"], c["mh"], kx, tl), tl))]
+    return [(f"[{r}]", _posicao(c, kx, *_tam(c, c["mw"] + 2 * onda_mm, c["mh"] + 2 * onda_mm, kx, tl), tl))]
 
 
 def _entrada_video_alfa(g, c, n_cam):
@@ -897,6 +964,11 @@ def _entrada_video_alfa(g, c, n_cam):
     fx_anim = vc._fx_animados(c.get("fxk"), c["mw"], c["mh"], c["dur"], g.fps, f"tbl{n_cam}")
     fx_cpu = vc._filtros_fx([f for f in c["fx"] if not (fx_anim and f.get("id") in ids_anim)], c["mw"], c["mh"], f"t{n_cam}")
     passos = ["format=rgba"] + [e[len(vc._NIT_NO_YUV):] if e.startswith(vc._NIT_NO_YUV) else e for e in fx_cpu] + ([fx_anim] if fx_anim else [])
+    # Ondulação: já está na CPU, vai junto (geq com a margem); o tempo aqui começa em 0 no 1º quadro (= pula no clipe)
+    onda = vc._filtro_onda(c["fx"], c["mw"], c["mh"], -pula)
+    mo = vc._onda_margem(c["fx"]) if onda else 0
+    if onda:
+        passos.append(onda)
     opac = ""
     if not _opaca(c):
         opac = "," + (vc._opacidade_animada(c["kf"]["op"], c["dur"], g.fps, f"colorchannelmixer@top{n_cam}", c["st"])
@@ -910,7 +982,7 @@ def _entrada_video_alfa(g, c, n_cam):
                      f"trim=end={min(g.total, c['st'] + c['dur']) - g.fd / 2:.6f}{opac},format=rgba,hwupload[{r}]")
     tl = f"(ot-{c['st']:.6f})"
     kx = _escala(c, tl)
-    return [(f"[{r}]", _posicao(c, kx, *_tam(c, c["mw"], c["mh"], kx, tl), tl))]
+    return [(f"[{r}]", _posicao(c, kx, *_tam(c, c["mw"] + 2 * mo, c["mh"] + 2 * mo, kx, tl), tl))]
 
 
 def _entrada_imagem(g, c, n_cam):
@@ -924,7 +996,8 @@ def _entrada_imagem(g, c, n_cam):
                if not e.startswith(vc._NIT_NO_YUV)]
     bw, bh = c["mw"], c["mh"]
     recorte = []
-    if not seq and not tem_anim and not any(f.get("t") in ("blur", "b3d") and f.get("on") is not False for f in c["fx"]):
+    # (Ondulação: sem recorte — a onda mede a partir do centro da imagem inteira, como na CPU)
+    if not seq and not tem_anim and not any(f.get("t") in ("blur", "b3d", "onda") and f.get("on") is not False for f in c["fx"]):
         bb = vc._bbox_alfa(c["path"])
         if bb and abs(bb[4] - c["mw"]) <= 1 and abs(bb[5] - c["mh"]) <= 1:
             x0, y0, bw, bh, Wi, Hi = bb
@@ -978,14 +1051,18 @@ def _entrada_imagem(g, c, n_cam):
     cadeia += f",format=rgba,settb=AVTB,setpts=PTS-STARTPTS+round({_entra(c['st'], g.fd):.9f}/TB),trim=end={fim - g.fd / 2:.6f}"
     tl = f"(ot-{c['st']:.6f})"   # ot = tempo do quadro de SAÍDA (o t do libplacebo é o da entrada)
     kx = _escala(c, tl)
+    # Ondulação na placa depois de subir (a cada quadro, na textura reduzida; imagem girada não chega aqui: motivo())
+    s_tex = tw / bw
+    po, _, onda_mm = _onda_passos(c["fx"], c["mw"], c["mh"], s_tex, g.fps, 0.0, g.pasta, f"i{n_cam}")
+    onda = "".join("," + p for p in po)
     if ang is not None:   # textura girada: o tamanho na tela é o dela (em px da mídia = textura ÷ redução) × escala
         wv, hv = f"({RW / red:.5f}*({kx}))", f"({RH / red:.5f}*({kx}))"
     else:
-        wv, hv = _tam(c, bw, bh, kx, tl)
+        wv, hv = _tam(c, bw + 2 * onda_mm, bh + 2 * onda_mm, kx, tl)
     sombra = vc._sombra_camada(c)
     r = g.rotulo("i")
     if not sombra:
-        g.filtros.append(f"{cadeia},hwupload[{r}]")
+        g.filtros.append(f"{cadeia},hwupload{onda}[{r}]")
         return [(f"[{r}]", _posicao(c, kx, wv, hv, tl, ang=ang))]
     # sombra: a transparência da imagem na cor da sombra, desfocada (em px da textura: desvio × redução) e posta por
     # baixo, deslocada — como _sombra_camada no exportador
@@ -994,12 +1071,14 @@ def _entrada_imagem(g, c, n_cam):
     m = int(math.ceil(3 * sig_t)) + 2
     rs = g.rotulo("s")
     g.filtros.append(f"{cadeia},split[{r}a][{rs}a]")
-    g.filtros.append(f"[{r}a]hwupload[{r}]")
+    g.filtros.append(f"[{r}a]hwupload{onda}[{r}]")
+    # a sombra ondula junto (mesma onda, a partir do mesmo centro; a margem dela soma à do desfoque)
+    po_s, M_s, _ = _onda_passos(c["fx"], c["mw"], c["mh"], s_tex, g.fps, 0.0, g.pasta, f"s{n_cam}")
     g.filtros.append(f"[{rs}a]pad=iw+{2 * m}:ih+{2 * m}:{m}:{m}:color=black@0,lutrgb=r={R}:g={G}:b={B}:a='val*{op:.4f}'"
                      + (f",format=gbrap,gblur=sigma={sig_t:.3f}:planes=8,format=rgba" if sig_t >= 0.3 else "")
-                     + f",hwupload[{rs}]")
+                     + f",hwupload{''.join(',' + p for p in po_s)}[{rs}]")
     esc = f"(({kx})/{red:.6f})"
-    wsv, hsv = f"(({RW}+{2 * m})*{esc})", f"(({RH}+{2 * m})*{esc})"
+    wsv, hsv = f"(({RW}+{2 * (m + M_s)})*{esc})", f"(({RH}+{2 * (m + M_s)})*{esc})"
     return [(f"[{rs}]", _posicao(c, kx, wsv, hsv, tl, dx, dy, ang=ang)), (f"[{r}]", _posicao(c, kx, wv, hv, tl, ang=ang))]
 
 
@@ -1186,6 +1265,9 @@ def _ajuste(g, entrada, c, pasta, mtx="bt709"):
         efs = vc._filtros_fx(resto, g.W, g.H, f"a{g.rot}")
         nit = ",".join(e[len(vc._NIT_NO_YUV):] for e in efs if e.startswith(vc._NIT_NO_YUV))
         efs = [e for e in efs if not e.startswith(vc._NIT_NO_YUV)]
+        onda = vc._filtro_onda(resto, g.W, g.H, c["st"], margem=False)   # desce junto; o trim não zera o tempo
+        if onda:
+            efs.append(onda)
         # o que chega pode ser a base (_FMT_CAM), a composição (_FMT_MEIO) ou outro ajuste que subiu da CPU: um passo
         # do libplacebo deixa o formato exato para o hwdownload
         desce = (f"libplacebo=format={_FMT_MEIO}:disable_linear=1,hwdownload,format={_FMT_MEIO},"
@@ -1209,6 +1291,13 @@ def _ajuste(g, entrada, c, pasta, mtx="bt709"):
     # 6,8 GB → memória esgotada, 2026-10-12). Então o ramo anda desde o início do bloco, com alfa 0 antes do trecho.
     hib = _fx_hibrido(resto)
     tarde = ini > 0.5 and (opaco or not hib)   # híbrido com opacidade já leva o alfa pela CPU (sendcmd): fica como era
+    if not hib and vc._onda_ativa(resto):
+        # Ondulação na placa, depois dos outros efeitos, sem margem (o quadro inteiro; fora dele, a borda). Tempo da
+        # camada no 1º quadro do ramo (a mesma conta das transições abaixo)
+        cobre = opaco and ini <= g.fd / 2 and fim >= g.total - g.fd / 2
+        t_ramo = 0.0 if (tarde or cobre) else (math.ceil(ini * g.fps + 0.25) - 1) / g.fps
+        passos = passos + _onda_passos(resto, g.W, g.H, 1.0, g.fps, t_ramo - c["st"], pasta, f"a{g.rot}",
+                                       margem=False, fmt=_FMT_MEIO)[0]
     if ovt:
         # 1º quadro do ramo: o do início do bloco (tarde ou a camada cobrindo tudo) ou o 1º que o trim deixa passar
         cobre = opaco and ini <= g.fd / 2 and fim >= g.total - g.fd / 2
@@ -1290,6 +1379,7 @@ def _base(g, segmentos, path, info):
 def montar(lay, W, H, fps, total, pasta, segmentos=None, path=None, info=None):
     """Grafo da timeline (trilha base + camadas de baixo para cima) → (_Grafo, rótulo final na placa)."""
     g = _Grafo(W, H, fps, total)
+    g.pasta = pasta   # shaders das imagens (Ondulação) também vão para a pasta do render
     atual, pendentes = _base(g, segmentos, path, info), []
     infos = {}
     for n, c in enumerate(lay):

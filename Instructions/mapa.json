@@ -36,6 +36,7 @@
     "editor-medidor.js",
     "editor-mixer.js",
     "editor-motion.js",
+    "editor-onda.js",
     "editor-ovt.js",
     "editor-pessoas.js",
     "editor-projeto.js",

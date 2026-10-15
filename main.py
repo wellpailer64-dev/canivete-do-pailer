@@ -4482,8 +4482,11 @@ class ApiBridge:
 
     def ve_agente_porta(self):
         """Porta do modo agente desta abertura (Preferências → Modo desenvolvedor). teste = app das baterias de teste
-        (APPDATA em kanivete_testes ou CANIVETE_TESTE=1): o Ke só dá um sinal curto no fim, sem a voz da Fran."""
-        teste = os.environ.get("CANIVETE_TESTE") == "1" or "kanivete_testes" in (os.environ.get("APPDATA") or "").lower()
+        (modo agente numa porta que não é a 9222 do app do Pailer — 9333/9334/9337…; ou APPDATA/TEMP em kanivete_testes;
+        ou CANIVETE_TESTE=1): no fim de um render só um toque curto, sem a voz da Fran nem o som de concluído."""
+        pastas = " ".join(os.environ.get(k) or "" for k in ("APPDATA", "TEMP", "LOCALAPPDATA")).lower()
+        teste = (os.environ.get("CANIVETE_TESTE") == "1" or "kanivete_testes" in pastas
+                 or (_PORTA_AGENTE is not None and int(_PORTA_AGENTE) != 9222))
         return {"porta": _PORTA_AGENTE, "teste": teste}
 
     def prefs_load(self):

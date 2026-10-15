@@ -18,6 +18,7 @@ animar ("trabalhando é que se percebe o que falta").
 | Formas | + Estrela, Polígono; preenchimento liga/desliga; Aparar caminho (início/fim/deslocamento); Tracejado; ponta redonda; largura/altura/raio animáveis | `c.fm`, `c.k['fm.<p>']`, `veGrForma` |
 | Interpolações | + Passar e voltar (overshoot, Bézier), Elástico, Quicar (botão direito no ◆) | `VE_KF_BEZ.back`, `VE_KF_ESPECIAL`, `_ease_especial` (py) |
 | Efeitos novos | Preenchimento, Rampa de gradiente, Brilho (glow), Granulação, Desfoque direcional, Desfoque radial, Contorno, Eco (rastro) | `VE_FX.mo_*` (margem: o efeito vaza da camada) |
+| Ondulação (Wave Warp, 2026-10-15) | Painel Animação e Efeitos › Distorcer: altura, quantidade de ondas, velocidade (ondas/s, negativo inverte), direção, formato (seno → quadrada), fase, prender o começo (bandeira). NÃO vira camada desenhada: prévia por faixas (~9 ms/quadro 1080×1920 no monitor), exportação `vc._filtro_onda` (geq, roda por último e a camada cresce a altura de cada lado; imagem parada: depois do loop), placa: vídeo pelo híbrido (`_giro_tam` com a margem) | `frontend/js/editor-onda.js`; teste_export `onda`, `ondavideo` (CPU e --placa) |
 
 ## Exportação: camada desenhada
 Camada com máscara, fosco, mãe, desfoque de movimento, parâmetro do motion animado ou efeito `soDesenho` (os `mo_*`) é
@@ -83,6 +84,8 @@ Gramática de motion que o Pailer aprovou:
   (`vePrSegEm = () => null`) para ver a prévia ao vivo.
 
 ## Pendências
+- (Feito 2026-10-15) **Ondulação na placa em shader** — ver plano-kanivete-encoder.md › 8.6. Só imagem/texto GIRADO
+  com onda ainda manda a exportação inteira para a CPU ("Ondulação em imagem girada").
 - (Resolvido 2026-10-12) Prévia renderizada e exportação desenhando a mesma camada juntas apagavam a pasta uma da outra
   (`FileNotFoundError q00000.png`): `cena3d.inicio` agora usa pasta por sessão. Em aberto: 1× o ffmpeg caiu
   (3221225477) numa exportação da intro; o log se perdeu — se repetir, guardar o `export_fail_*.log`.

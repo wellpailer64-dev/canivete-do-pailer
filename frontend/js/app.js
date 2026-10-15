@@ -859,7 +859,21 @@ function navSom(tipo, vol = 1) {
     } catch (e) { /* sem áudio: segue em silêncio */ }
 }
 
-function playConcluido() {
+// App das baterias de teste (APPDATA em kanivete_testes ou CANIVETE_TESTE=1, ve_agente_porta().teste): no lugar do
+// som de concluído, só o toque curto do Ke — uma bateria com dezenas de exportações virava uma falação
+let _appTeste = null;
+async function _ehAppTeste() {
+    if (_appTeste === null) {
+        try {
+            const api = window.pywebview && window.pywebview.api;
+            _appTeste = !!(api && api.ve_agente_porta && ((await api.ve_agente_porta()) || {}).teste);
+        } catch (e) { _appTeste = false; }
+    }
+    return _appTeste;
+}
+
+async function playConcluido() {
+    if (await _ehAppTeste()) { if (typeof veKeSom === 'function') veKeSom('ok'); return; }
     const audio = document.getElementById('audio-concluido');
     if (audio) { audio.currentTime = 0; audio.play().catch(e => console.log("Audio play blocked", e)); }
 }

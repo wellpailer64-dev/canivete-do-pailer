@@ -566,6 +566,49 @@ CASOS = {
         h.k = { x: [{ t: 0, v: 100, i: 'lin' }, { t: 3, v: 980, i: 'lin' }], rot: [{ t: 0, v: 0, i: 'lin' }, { t: 3, v: 360, i: 'lin' }] };
         return [fundo, a, b, c, d, e, f, g, h];
     """, ""),
+    # Ondulação (Wave Warp, editor-onda.js × video_cutter._filtro_onda): foto de fundo ondulando (no vídeo de teste a linha
+    # rápida pega o quadro vizinho no navegador e reprova a região sem ser a onda — o vídeo fica no "ondavideo"), logo "bandeira" preso
+    # no começo (a onda sai da camada: margem) e logo na diagonal com formato quase quadrado
+    "onda": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const fundo = clip(0, 0, 0, 2.5, 'foto2.jpg', { p: { sc: 160, x: 540, y: 960, rot: 0, op: 100 }, fx: [{ id: id(), t: 'onda', on: true, v: { alt: 30, qtd: 3, vel: 1, dir: 0, forma: 0, fase: 0, prender: 0 } }] });
+        const a = clip(1, 0, 0, 2.5, 'logo.png', { p: { sc: 60, x: 540, y: 500, rot: 0, op: 100 }, fx: [{ id: id(), t: 'onda', on: true, v: { alt: 40, qtd: 2, vel: 1.5, dir: 0, forma: 0, fase: 0, prender: 1 } }] });
+        const b = clip(2, 0, 0, 2.5, 'logo.png', { p: { sc: 50, x: 540, y: 1300, rot: 0, op: 100 }, fx: [{ id: id(), t: 'onda', on: true, v: { alt: 25, qtd: 4, vel: -0.8, dir: 45, forma: 70, fase: 90, prender: 0 } }] });
+        return [fundo, a, b];
+    """, ""),
+    # Ondulação só em vídeo: no modo placa vai pelo caminho híbrido (desce, geq, sobe na caixa com a margem)
+    "ondavideo": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const fundo = clip(0, 0, 0, 2.5, 'principal', { p: { sc: 70, x: 540, y: 960, rot: 0, op: 100 }, fx: [{ id: id(), t: 'onda', on: true, v: { alt: 35, qtd: 2.5, vel: 1, dir: 90, forma: 30, fase: 0, prender: 0 } }] });
+        return [fundo];
+    """, ""),
+    # Ondulação em shader na placa (export_placa._onda_passos): texto com sombra e fade, camada de ajuste que começa no
+    # meio (tempo do ramo) e só na metade de cima… (a onda vale no quadro inteiro do trecho)
+    "ondatexto": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const fundo = clip(0, 0, 0, 2.5, 'foto3.jpg', { p: { sc: 160, x: 540, y: 960, rot: 0, op: 100 } });
+        const tm = veTxMidia();
+        const tx = { tr: 1, st: 0, s: 0, e: 2.5, m: tm.id, tx: { ...VE_TX_PADRAO, t: 'Ondulando', tam: 150, sOn: true, sCor: '#102030', sOp: 100, sDist: 12, sBlur: 6, sAng: 90 },
+            fx: [{ id: id(), t: 'onda', on: true, v: { alt: 18, qtd: 2, vel: 1.2, dir: 0, forma: 20, fase: 0, prender: 0 } }] };
+        tx.p = Object.assign(veDefProps(tx), { sc: 100, x: 540, y: 700 });
+        tx.k = { op: [{ t: 0, v: 0, i: 'lin' }, { t: 0.6, v: 100, i: 'lin' }] };
+        let aj = VE.media.find(x => x.kind === 'ajuste');
+        if (!aj) { aj = { id: VE.media.length, kind: 'ajuste', name: 'Camada de ajuste' }; VE.media.push(aj); }
+        const adj = { tr: 2, st: 0.8, s: 0, e: 1.7, m: aj.id, fx: [{ id: id(), t: 'onda', on: true, v: { alt: 14, qtd: 3, vel: -1, dir: 90, forma: 0, fase: 45, prender: 0 } }] };
+        adj.p = veDefProps(adj);
+        return [fundo, tx, adj];
+    """, ""),
+    # Ondulação em vídeo: com Luz e Cor e fade (shader, alfa × opacidade) e girado (desce com o giro: caixa com a margem)
+    "ondavideo2": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const a = clip(0, 0, 0, 2.5, 'principal', { p: { sc: 45, x: 540, y: 520, rot: 0, op: 100 }, fx: [
+            { id: id(), t: 'lc', on: true, v: Object.assign(veLcDefaults(), { sat: 140 }) },
+            { id: id(), t: 'onda', on: true, v: { alt: 30, qtd: 2, vel: 1, dir: 0, forma: 50, fase: 0, prender: 1 } }] });
+        a.k = { op: [{ t: 0, v: 100, i: 'lin' }, { t: 2.5, v: 30, i: 'lin' }] };
+        const b = clip(1, 0, 0, 2.5, 'principal', { p: { sc: 35, x: 540, y: 1400, rot: 12, op: 100 }, fx: [
+            { id: id(), t: 'onda', on: true, v: { alt: 25, qtd: 3, vel: 0.7, dir: 30, forma: 0, fase: 0, prender: 0 } }] });
+        return [a, b];
+    """, ""),
     # acabamento global: camada de ajuste com Brilho (mo_glow pelo ffmpeg, colorido e com intensidade > 100%) e
     # aberração cromática leve no quadro inteiro, sobre foto + logo
     "bloom": (1080, 1920, """
@@ -769,7 +812,7 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
         if k < len(todos):
             pega(k)
             difs.append((float(np.abs(previa[k].astype(np.int16) - ex[k].astype(np.int16)).mean()), k))
-    if nome in ("motion", "curvas", "fxmotion", "bloom", "invfill", "desfoqueanim", "girar", "desfoquevideo"):
+    if nome in ("motion", "curvas", "fxmotion", "bloom", "invfill", "desfoqueanim", "girar", "desfoquevideo", "onda", "ondavideo", "ondatexto", "ondavideo2"):
         # motion: detalhes finos (anel, borda de máscara) quase não mexem na média: confere a pior região 30×30.
         # Contra o quadro exato do ffmpeg (o navegador, buscando no meio do quadro, às vezes entrega o vizinho: um
         # objeto rápido anda 30 px por quadro)

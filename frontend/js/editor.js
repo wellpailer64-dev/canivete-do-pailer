@@ -6311,6 +6311,7 @@ function veOnExport(ev) {
         box.className = 've-exp-result err';
         box.textContent = ev.cancelled ? 'Exportação cancelada.' : (ev.error || 'Erro ao exportar.');
         $ve('ve-exp-msg').textContent = ev.cancelled ? 'Cancelado' : 'Falhou';
+        if (!ev.cancelled && typeof veKeVoz === 'function') veKeVoz('falhou');   // Fran (no app de teste, o toque curto)
     }
     veExportFoot('done');
 }

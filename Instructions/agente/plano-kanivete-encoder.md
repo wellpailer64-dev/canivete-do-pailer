@@ -273,6 +273,7 @@ documentado, commitado e publicado antes do próximo:
 4. **Transições de sobreposição** — FEITO (8.4). Antes: render prévio quadro a quadro em numpy/OpenCV sobre um
    intermediário ProRes; a prévia já tem o shader (WebGL) — portar para o libplacebo.
 5. **Chroma Key com outros efeitos e com opacidade** — FEITO (8.5); fica híbrido só Key antes do Luz e Cor.
+6. **Ondulação (Wave Warp)** — FEITO (8.6, 2026-10-15); só imagem/texto girado com onda ainda vai pela CPU.
 - Sem solução na placa: XAVC 4:2:2 (câmera do Edgar) e ProRes — o decodificador Vulkan não lê.
 
 ### 8.1 Fade de clipe na placa
@@ -342,3 +343,21 @@ Cor trabalha em luma/croma, não no RGB com transparência. Caso novo `chroma3`:
   `liberar_placa` cancela o render da prévia (o ffmpeg dele leva segundos para sair), descarrega a voz/motor da Kani, o
   Pincel Roto e o gerador de efeitos, e espera até 15 s conferindo `cabe_na_placa` de novo. Pendente: o que o próprio
   WebView do editor ocupa (vídeos da prévia decodificados na placa) não dá para soltar pelo Python.
+
+### 8.6 Ondulação (Wave Warp) na placa (2026-10-15)
+Antes: onda em imagem, texto, camada de ajuste ou vídeo com transparência/girado mandava a exportação INTEIRA para a
+CPU; vídeo comum descia a cada quadro (geq). Agora `_shader_onda` / `_onda_passos` (export_placa.py): a MESMA conta de
+`vc._filtro_onda` e da prévia (editor-onda.js) num shader por onda (o `frame` avança por passada: 1 arquivo cada), em px
+da mídia a partir do centro (textura em s px por px da mídia), tempo = t_ini + (frame − 1)/fps. Margem: uma passada
+`libplacebo=w=iw+2M:h=ih+2M:pos_x=M:pos_y=M:pos_w=iw:pos_h=ih:fillcolor=black@0` (rgba64le, borda transparente) e a
+caixa na tela cresce M/s de cada lado.
+- Vídeo: depois do Luz e Cor/Desfoque, t_ini = pula; com fade, `_shader_alfa(multiplica=True)` (alfa da onda × opacidade).
+- Vídeo girado ou com efeito que desce (híbrido): a onda desce junto (geq) e o giro usa o quadro COM a margem.
+- Vídeo com transparência (ProRes 4444): já é preparado na CPU, a onda vai junto (geq, t0 = −pula).
+- Imagem/texto: depois de subir a textura reduzida (s = tw/mw), t_ini = 0; sem o recorte da parte visível; a sombra
+  projetada ondula junto (mesma onda, margem somada à do desfoque). Girada: ainda vai pela CPU (motivo).
+- Camada de ajuste: sem margem (fora do quadro = a borda, como o geq), tempo do 1º quadro do ramo − st (a conta das
+  transições); com efeito que desce, a onda desce junto.
+- Teste: `teste_export.py --casos onda,ondavideo,ondatexto,ondavideo2 --placa` — os 4 "montado na placa", pior diferença
+  2,3 (texto com sombra e fade + ajuste começando no meio). O vídeo girado (ondavideo2) é o mais lento (41 s para 2,5 s:
+  geq no quadro inteiro na CPU) — se aparecer em projeto real, levar o giro de vídeo para a placa.

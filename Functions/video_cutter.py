@@ -3330,6 +3330,49 @@ _BLEND_FF = {
 }
 
 
+def _onda_ativa(fx):
+    return [f for f in fx or [] if f.get("t") == "onda" and f.get("on") is not False
+            and _num((f.get("v") or {}).get("alt"), 0, 4000) > 0]
+
+
+def _onda_margem(fx):
+    """Px de cada lado que a Ondulação empurra para fora da camada (a soma das alturas)."""
+    m = sum(_num((f.get("v") or {}).get("alt"), 0, 4000) for f in _onda_ativa(fx))
+    return int(math.ceil(m)) + 2 if m > 0 else 0
+
+
+def _filtro_onda(fx, mw, mh, t0=0.0, margem=True):
+    """Ondulação (Wave Warp do After / Mister Horse; editor-onda.js faz a MESMA conta na prévia). Roda depois dos outros
+    efeitos da camada, em px da mídia: o quadro cresce `_onda_margem` de cada lado (a onda sai da camada, como na prévia)
+    e cada pixel lê a fonte deslocada d = altura × formato(fase) na direção perpendicular à que a onda corre.
+    Tempo: T − t0 (t0 = início da camada quando o tempo da cadeia é o da timeline). Sem margem: camada de ajuste."""
+    ondas = _onda_ativa(fx)
+    if not ondas:
+        return None
+    m = _onda_margem(fx) if margem else 0
+    partes = ["format=rgba"] + ([f"pad=w=iw+{2 * m}:h=ih+{2 * m}:x={m}:y={m}:color=black@0"] if m else [])
+    for f in ondas:
+        v = f.get("v") or {}
+        alt = _num(v.get("alt"), 0, 4000)
+        qtd = max(0.05, _num(v.get("qtd"), 0.05, 200))
+        vel = _num(v.get("vel"), -50, 50)
+        a = math.radians(_num(v.get("dir"), -360, 360))
+        ca, sa = math.cos(a), math.sin(a)
+        ca, sa = (0.0 if abs(ca) < 1e-9 else ca), (0.0 if abs(sa) < 1e-9 else sa)
+        L = max(1.0, abs(mw * ca) + abs(mh * sa))
+        k = 0.01 + _num(v.get("forma"), 0, 100) / 100 * 6
+        fase = math.radians(_num(v.get("fase"), -3600, 3600))
+        s0 = f"((X-W/2)*{ca:.6f}+(Y-H/2)*{sa:.6f}+{L / 2:.3f})"
+        ph = f"(2*PI*({s0}/{L / qtd:.4f}-{vel:.5f}*(T-{t0:.6f}))+{fase:.5f})"
+        env = f"*clip({s0}/{L:.3f}\\,0\\,1)" if v.get("prender") else ""
+        D = f"({alt:.3f}{env}*tanh({k:.4f}*sin({ph}))/{math.tanh(k):.6f})"
+        sx = f"X+{D}*{sa:.6f}" if sa else "X"
+        sy = f"Y-{D}*{ca:.6f}" if ca else "Y"
+        p = f"({sx}\\,{sy})"
+        partes.append(f"geq=r='r{p}':g='g{p}':b='b{p}':a='alpha{p}'")
+    return ",".join(partes)
+
+
 def _ca_exprs(ca, tv):
     """Animações constantes do clipe (painel Animação → Constante; veCaAplicar em editor-fx.js faz a mesma conta),
     no tempo `tv` (segundos desde o início do clipe): multiplica a escala, soma à rotação (graus) e à posição (px)."""
@@ -3951,6 +3994,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 # Camada de ajuste: os efeitos valem para o que já foi composto (as trilhas de baixo) no trecho dela.
                 # Um ramo do vídeo composto passa pelos efeitos (só no trecho) e volta por cima com a opacidade da camada.
                 efeitos = _filtros_fx(c["fx"], W, H, f"a{n}")
+                onda = _filtro_onda(c["fx"], W, H, c["st"], margem=False)   # tempo da timeline no trecho
+                if onda:
+                    efeitos.append(onda)
                 # nitidez do Luz e Cor marcada para depois da volta a YUV (_NIT_NO_YUV); na Comp (alfa) fica no RGBA
                 nit_yuv = ",".join(e[len(_NIT_NO_YUV):] for e in efeitos if e.startswith(_NIT_NO_YUV))
                 efeitos = [e for e in efeitos if not e.startswith(_NIT_NO_YUV)]
@@ -4054,7 +4100,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             # vídeo (mais que os 13 cortes juntos; projeto Depoimentos do Carlinhos, 2026-10-08)
             pulso = _ca_pulso_max(c.get("ca"))
             if (c["tipo"] == "video" and not c["fx"] or img_fixa) and ("sc" in kf or pulso > 1) and not sx and not sy \
-                    and (not ca["sc"] or pulso > 1):
+                    and (not ca["sc"] or pulso > 1) and not _onda_ativa(c["fx"]):   # a onda mede em px da mídia
                 maior = (max(p[1] for p in kf["sc"]) if "sc" in kf else c["sc"]) * pulso
                 if maior < 0.95:
                     pre_red = max(0.01, maior)
@@ -4106,6 +4152,10 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             fx_anim = _fx_animados(fxk, c["mw"], c["mh"], c["dur"], fps, f"bl{n}")
             if fx_anim:
                 ordem.insert(0, fx_anim)
+            # Ondulação: depois dos outros efeitos e a cada quadro (numa imagem parada, depois de repetir o quadro)
+            fx_onda = _filtro_onda(c["fx"], c["mw"], c["mh"])
+            if fx_onda:
+                ordem.insert(1 if fx_anim else 0, fx_onda)
             efeitos = _filtros_fx([f for f in c["fx"] if not (fx_anim and f.get("id") in ids_anim)], c["mw"], c["mh"], f"l{n}")
             # imagem parada com muito transparente em volta (texto, logo): recortada à parte visível depois dos efeitos
             # (que rodam no tamanho da mídia) e antes do resto; o centro da camada anda junto pela âncora (ox/oy:
@@ -4113,7 +4163,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
             # do recorte: com eles, não recorta
             recorte = []
             if c["tipo"] == "imagem" and not c.get("seq") and not fx_anim and not any(
-                    f.get("t") in ("blur", "b3d") and f.get("on") is not False for f in c["fx"]):
+                    f.get("t") in ("blur", "b3d", "onda") and f.get("on") is not False for f in c["fx"]):
                 bb = _bbox_alfa(c["path"])
                 if bb and abs(bb[4] - c["mw"]) <= 1 and abs(bb[5] - c["mh"]) <= 1:
                     x0, y0, w0, h0, Wi, Hi = bb
@@ -4156,7 +4206,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 # imagem parada: efeitos, escala, giro e opacidade fixos são aplicados uma vez no único quadro
                 # (ex.: LUT num PNG grande antes de reduzir); só o que anima com o tempo roda a cada quadro
                 animados = [f for f, anima in ((escala, escala_animada), (giro, "rot" in kf or ca["rot"]),
-                                                (opac, "op" in kf), (fx_anim, True)) if f and anima]
+                                                (opac, "op" in kf), (fx_anim, True), (fx_onda, True)) if f and anima]
                 k = 0
                 while k < len(filtros_clip) and filtros_clip[k] not in animados:
                     k += 1
@@ -4176,7 +4226,7 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 filtros_clip.append(f"tpad=stop_mode=clone:stop_duration={_tempo_ffmpeg(frame_dur)}")
             if c["tipo"] == "imagem" and not c.get("seq") and fixa:
                 cadeia = f"{src}fps=fps={fps}:start_time=0"
-            elif c["tipo"] == "video" and not efeitos and not giro and not opac and not bm \
+            elif c["tipo"] == "video" and not efeitos and not fx_onda and not giro and not opac and not bm \
                     and pixfmt in ("yuv420p", "yuv444p") and not _clipe_tem_alfa(c["path"] or path):
                 # clipe opaco só cortado/redimensionado/posicionado: fica em YUV do começo ao fim. A ida e volta para
                 # RGBA (quadro inteiro, 2 conversões por quadro) não muda nada na imagem e era o mais caro do grafo.

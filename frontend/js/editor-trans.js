@@ -775,12 +775,13 @@ function veRenderTrList() {
 
 // ── aba Constante: cartões de Rotação / Tremer / Pulsar (efeitos com `constante` em editor-fx.js) ──
 const VECA = { anim: new Map() };
-const veCaTipos = () => Object.keys(VE_FX).filter(t => VE_FX[t].constante);
+const veCaTipos = () => Object.keys(VE_FX).filter(t => VE_FX[t].constante || VE_FX[t].anima);   // anima: Ondulação (editor-onda.js)
 const veCaNorm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 function veCaDesenhar(cv, t, u) {
     const x = cv.getContext('2d'), W = cv.width, H = cv.height;
     x.fillStyle = '#0b0b0b'; x.fillRect(0, 0, W, H);
     if (!VETRV.B || VETRV.B === 'carregando') return;
+    if (t === 'onda' && typeof veOndaCartao === 'function') { x.drawImage(veOndaCartao(VETRV.B, W, H, u), 0, 0); return; }
     const v = {};
     VE_FX[t].params.forEach(p => { v[p.k] = p.def; });
     const p = veCaAplicar({ st: 0, fx: [{ t, on: true, v }] }, { x: 0, y: 0, sc: 100, rot: 0 }, u), k = W / 540;

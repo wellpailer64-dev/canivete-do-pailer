@@ -85,6 +85,8 @@ Rodada 7 (qualidade, 2026-10-12, plano "Rodada 7"): placa em 10/16 bits por dent
 (claros sem estourar), H.265 10 bits pela placa, "sem áudio" na taxa da timeline. Bancada: `D:/kanivete_testes/qualidade`.
 Rodada 8 (plano §8.1–8.5): fade de clipe, os 12 modos de mesclagem, desfoque animado, transições de sobreposição e
 Chroma Key com Luz e Cor/opacidade agora na placa (shaders do libplacebo; parâmetros por quadro em trechos retos ou textura).
+Ondulação na placa (2026-10-15, plano §8.6): shader por onda com margem transparente (`_onda_passos`) em vídeo, imagem/texto
+(e a sombra) e camada de ajuste; teste `teste_export.py --casos onda,ondavideo,ondatexto,ondavideo2 --placa`.
 
 Mixer de trilhas de áudio (Audio Track Mixer do Premiere): `frontend/js/editor-mixer.js` (aba junto dos Controles de
 efeito): pan, M/S (S também no cabeçalho da trilha), fader −∞..+15 dB na escala do Premiere, medidor L/R por trilha e o Mix.
@@ -146,7 +148,7 @@ textos): plano em `Instructions/agente/ajuste-premiere.md`.
 ## Motion (recursos do After Effects no Editor)
 Máscaras (ferramentas Máscara/Caneta), fosco de trilha, camada mãe + Nulo, desfoque de movimento, cronômetro em qualquer
 parâmetro de efeito/máscara/forma, aparar caminho/tracejado/estrela, curvas Passar e voltar/Elástico/Quicar, efeitos Brilho,
-Granulação, Rampa, Preenchimento, Contorno, Desfoque direcional/radial, Eco. Exporta como "camada desenhada" (ProRes 4444
+Granulação, Rampa, Preenchimento, Contorno, Desfoque direcional/radial, Eco, Ondulação (Wave Warp, `editor-onda.js`: sem camada desenhada). Exporta como "camada desenhada" (ProRes 4444
 pelo desenhista da prévia). **Antes de qualquer motion: `Instructions/agente/mapa-habilidades-motion.md`** (técnicas destravadas
 peça a peça — confete, letra por letra, chevrons, recorte que preserva amarelo; anotar as novas ao terminar). Guia, API `VEMO_API`, armadilhas e pendências: `Instructions/agente/plano-motion.md`.
 Testes: `py -3.13 testes/teste_motion.py` e `py -3.13 testes/teste_export.py --casos motion,fxmotion,curvas --folha`.

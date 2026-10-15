@@ -825,6 +825,7 @@ function veTemAlfa(c) { const m = veMediaOf(c); return !!(m && m.info && m.info.
 function veFxRender(c, src, sz, alvo, T) {
     const fx = veFxActive(c, T).filter(f => !VE_FX[f.t].constante && !VE_FX[f.t].ovt && !VE_FX[f.t].aoDesenhar);
     if (!fx.length) return src;
+    fx.sort((x, y) => (x.t === 'onda') - (y.t === 'onda'));   // Ondulação por último, como na exportação (_filtro_onda)
     let q = Math.min(1, 1920 / Math.max(sz.w, sz.h));
     if (alvo > 0) q = Math.min(q, Math.max(0.125, Math.ceil(alvo * 8) / 8));
     const w = Math.max(1, Math.round(sz.w * q)), h = Math.max(1, Math.round(sz.h * q));
