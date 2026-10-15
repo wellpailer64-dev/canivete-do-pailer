@@ -320,21 +320,144 @@ function ieHist(nome, doc = IE.doc) {
     h.i = h.itens.length - 1;
     // limite de estados e de memória (canvases contados uma vez)
     while (h.itens.length > IE_HIST_MAX) { h.itens.splice(1, 1); h.i--; }
+    ieHistCompactarLogo(doc);
     ieHistPodar(doc);
     if (nome !== 'Abrir' && nome !== 'Novo') ieMudouDoc(doc);
     ieHistRender?.();
 }
 
-// memória de todos os históricos abertos (cada canvas contado uma vez: o que não mudou é compartilhado entre estados)
+// memória de todos os históricos abertos (cada canvas contado uma vez: o que não mudou é compartilhado entre estados;
+// um retalho conta o pedaço dele e segue para a base)
 function ieHistBytes() {
     const vistos = new Set();
     let bytes = 0;
+    const soma = c => {
+        while (c && !vistos.has(c)) {
+            vistos.add(c);
+            if (c.retalho) { if (c.px) bytes += c.px.width * c.px.height * 4; c = c.base; }
+            else { if (c.width) bytes += c.width * c.height * 4; return; }
+        }
+    };
     const conta = lista => lista.forEach(s => {
-        for (const c of [s.c, s.m && s.m.c, s.c0 && s.c0.c]) if (c && c.width && !vistos.has(c)) { vistos.add(c); bytes += c.width * c.height * 4; }
+        for (const c of [s.c, s.m && s.m.c, s.c0 && s.c0.c]) soma(c);
         if (s.filhos) conta(s.filhos);
     });
     for (const d of IE.docs || []) for (const it of d.hist.itens) conta(it.foto.camadas);
     return bytes;
+}
+
+// ── histórico em retalhos (ideia dos ladrilhos do PhotoCraft) ──
+// Cada passo guardava a camada INTEIRA: numa foto de 6000×4000, 96 MB por pincelada, ~26 passos no limite. Agora, com o
+// editor parado, o estado anterior troca a camada inteira por um retalho: só o retângulo que mudou, em cima da camada
+// do estado seguinte ({retalho, base, x, y, w, h, px}). Desfazer remonta com uma cópia só (ieHistMontar).
+const IE_RETALHO_MIN = 1e6;   // camadas menores que 1 Mpx ficam inteiras (não compensa)
+function ieHistSlots(doc, fn) {   // fn(objeto, chave) para cada canvas guardado no histórico (camada e máscara)
+    const anda = lista => lista.forEach(s => {
+        if (s.c) fn(s, 'c');
+        if (s.m && s.m.c) fn(s.m, 'c');
+        if (s.filhos) anda(s.filhos);
+    });
+    for (const it of doc.hist.itens) anda(it.foto.camadas);
+}
+// troca `velho` por `novo` em todo o histórico (estados que compartilham a camada e retalhos que se apoiam nela)
+function ieHistTrocar(velho, novo) {
+    const retalhos = new Set();
+    for (const d of IE.docs || []) ieHistSlots(d, (o, k) => {
+        if (o[k] === velho) o[k] = novo;
+        for (let c = o[k]; c && c.retalho && !retalhos.has(c); c = c.base) retalhos.add(c);
+    });
+    retalhos.forEach(r => { if (r.base === velho && r !== novo) r.base = novo; });
+}
+function ieHistMontar(v) {   // retalho → canvas (uma cópia da camada inteira mais próxima e os pedaços por cima)
+    if (!v || !v.retalho) return v;
+    const cadeia = [];
+    for (let c = v; c.retalho; c = c.base) cadeia.push(c);
+    if (cadeia.every(r => !r.w)) return cadeia[cadeia.length - 1].base;   // nada mudou: a própria camada (congelada)
+    const n = ieClonar(cadeia[cadeia.length - 1].base), x = ieCtx(n);
+    for (let i = cadeia.length - 1; i >= 0; i--) {
+        const r = cadeia[i];
+        if (!r.w) continue;
+        x.clearRect(r.x, r.y, r.w, r.h);
+        x.drawImage(r.px, r.x, r.y);
+    }
+    return ieCongelar(n);
+}
+// antes de voltar a um estado: os retalhos dele viram canvas de novo (e quem se apoiava neles passa a usar o canvas)
+function ieHistMontarEstado(foto) {
+    const anda = lista => lista.forEach(s => {
+        if (s.c && s.c.retalho) ieHistTrocar(s.c, ieHistMontar(s.c));
+        if (s.m && s.m.c && s.m.c.retalho) ieHistTrocar(s.m.c, ieHistMontar(s.m.c));
+        if (s.filhos) anda(s.filhos);
+    });
+    anda(foto.camadas);
+}
+function ieHistCompactarLogo(doc) {
+    clearTimeout(doc._compT);
+    doc._compT = setTimeout(() => ieHistCompactar(doc), 600);
+}
+// pares (anterior, atual) da mesma camada que mudaram; o diff anda em faixas com pausa, para não travar o pincel
+async function ieHistCompactar(doc) {
+    const h = doc.hist, n = h.itens.length;
+    if (n < 2 || h.i !== n - 1 || doc._compactando) return;
+    doc._compactando = true;
+    try {
+        const vivos = new Set();
+        for (const d of IE.docs || []) iePercorrer(d.camadas, L => { if (L.c) vivos.add(L.c); if (L.m && L.m.c) vivos.add(L.m.c); });
+        const pares = [];
+        const junta = (a, b) => {
+            const ids = new Map(b.map(s => [s.id, s]));
+            a.forEach(s => {
+                const t = ids.get(s.id);
+                if (!t) return;
+                if (s.c && t.c && s.c !== t.c && s.x === t.x && s.y === t.y) pares.push([s.c, t.c]);
+                if (s.m && t.m && s.m.c && t.m.c && s.m.c !== t.m.c && s.m.x === t.m.x && s.m.y === t.m.y) pares.push([s.m.c, t.m.c]);
+                if (s.filhos && t.filhos) junta(s.filhos, t.filhos);
+            });
+        };
+        // do mais antigo para o mais novo: o retalho de j se apoia no canvas de j+1, que vira retalho em seguida (ieHistTrocar
+        // passa a base adiante)
+        const itens = [...h.itens];
+        for (let j = 0; j < n - 1; j++) junta(itens[j].foto.camadas, itens[j + 1].foto.camadas);
+        const mexeu = () => h.itens.length !== n || itens.some((it, j) => h.itens[j] !== it);
+        for (const [A, B] of pares) {
+            if (A.retalho || B.retalho || vivos.has(A) || A.width !== B.width || A.height !== B.height || A.width * A.height < IE_RETALHO_MIN) continue;
+            const R = await ieHistDiff(A, B);
+            if (R === false || mexeu()) return;   // mexeram no histórico: o próximo passo compacta de novo
+            if (R && R.w * R.h > A.width * A.height * 0.6) continue;   // mudou quase tudo: inteira mesmo
+            const r = { retalho: true, base: B, x: 0, y: 0, w: 0, h: 0, px: null };
+            if (R) {
+                r.x = R.x; r.y = R.y; r.w = R.w; r.h = R.h;
+                r.px = ieCanvas(R.w, R.h);
+                ieCtx(r.px).drawImage(A, -R.x, -R.y);
+            }
+            ieHistTrocar(A, r);
+        }
+    } finally { doc._compactando = false; }
+}
+// retângulo onde A e B diferem (null = iguais; false = desistiu)
+async function ieHistDiff(A, B) {
+    const w = A.width, H = A.height, xa = ieCtx(A), xb = ieCtx(B), FAIXA = 256;
+    let x0 = w, x1 = -1, y0 = H, y1 = -1;
+    for (let y = 0; y < H; y += FAIXA) {
+        const fh = Math.min(FAIXA, H - y);
+        let a, b;
+        try { a = new Uint32Array(xa.getImageData(0, y, w, fh).data.buffer); b = new Uint32Array(xb.getImageData(0, y, w, fh).data.buffer); }
+        catch (e) { return false; }
+        for (let j = 0; j < fh; j++) {
+            const L = j * w;
+            let i = 0;
+            while (i < w && a[L + i] === b[L + i]) i++;
+            if (i === w) continue;
+            let k = w - 1;
+            while (a[L + k] === b[L + k]) k--;
+            if (i < x0) x0 = i;
+            if (k > x1) x1 = k;
+            if (y + j < y0) y0 = y + j;
+            y1 = y + j;
+        }
+        await new Promise(r => setTimeout(r, 0));
+    }
+    return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 // passou do limite: tira os estados mais antigos, primeiro dos documentos que não estão em uso; no atual sempre ficam
 // o estado de abertura e os 2 últimos (como o Photoshop encurta o histórico em vez de cair)
@@ -359,6 +482,7 @@ function ieIrHist(i, doc = IE.doc) {
     ieTextoEncerrar?.(true);
     ieFerrCancelar?.();
     const f = h.itens[i].foto;
+    ieHistMontarEstado(f);
     h.i = i;
     const mudouTam = f.w !== doc.w || f.h !== doc.h;
     doc.w = f.w; doc.h = f.h;

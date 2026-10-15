@@ -743,6 +743,7 @@ function veSnapshot() {
 function vePushHistory() {
     if (!VE.dirty) { VE.dirty = true; veUpdateTitle(); }
     veCacheInvalidate();
+    veAutosaveLogo();
     VE.history.push(veSnapshot());
     if (VE.history.length > 200) VE.history.shift();
     VE.future = [];
@@ -4342,19 +4343,30 @@ function veFmtRecente(ts) {
 }
 // ── salvamento automático (a cada 3 min com mudanças; cópias em %APPDATA%/CaniveteDoPailer/autosave) ──
 const VE_AUTOSAVE_MS = 3 * 60 * 1000;
-function veAutosave(forcar) {
+// Cópia de segurança logo depois de cada edição (antes só a cada 3 min: o app caindo perdia até 3 min de trabalho).
+// Espera a edição assentar; tocando, exportando ou arrastando, adia (gravar custa ~20 ms num projeto de 275 clipes).
+// Vai para um arquivo "última" por projeto (sobrescrito); as 5 cópias com hora continuam de 3 em 3 min
+function veAutosaveLogo() {
+    clearTimeout(VE._autoLogoT);
+    VE._autoLogoT = setTimeout(function tenta() {
+        if (VE.playing || VE.exportRunning || veCacheEditando()) { VE._autoLogoT = setTimeout(tenta, 2000); return; }
+        veAutosave(true, true);
+    }, 4000);
+}
+
+function veAutosave(forcar, rapido) {
     const api = window.pywebview && window.pywebview.api;
     if (!api || !api.ve_autosave || !VE.ready || !VE.dirty || VE.exportRunning || VE._pendingProject) return;
     if (!forcar && Date.now() - (VE._autoT || 0) < VE_AUTOSAVE_MS) return;
     let dados;
     try { dados = veProjectData(); } catch (e) { return; }
     const snap = JSON.stringify(dados.sequences || []) + JSON.stringify(dados.clips || []);
-    VE._autoT = Date.now();
-    if (snap === VE._autoSnap) return;   // nada mudou desde a última cópia
-    VE._autoSnap = snap;
+    if (!rapido) VE._autoT = Date.now();
+    if (snap === (rapido ? VE._autoSnapR : VE._autoSnap)) return;   // nada mudou desde a última cópia
+    if (rapido) VE._autoSnapR = snap; else VE._autoSnap = snap;
     dados._autosave = { origem: VE.projectPath || null, quando: new Date().toISOString() };
     const nome = (VE.projectPath || VE.path || 'projeto').split(/[\\/]/).pop().replace(/\.[^.]+$/, '');
-    api.ve_autosave(VE.projectPath || VE.path || '', nome, JSON.stringify(dados)).catch(() => {});
+    api.ve_autosave(VE.projectPath || VE.path || '', nome, JSON.stringify(dados), !!rapido).catch(() => {});
 }
 setInterval(() => veAutosave(false), 30 * 1000);
 

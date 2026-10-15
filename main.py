@@ -1221,9 +1221,10 @@ def _autosave_dir():
     return pasta
 
 
-def ve_autosave(chave, nome, dados):
+def ve_autosave(chave, nome, dados, rapido=False):
     """Cópia de segurança do projeto aberto (nunca sobrescreve o .vknv do usuário).
-    Guarda as 5 últimas de cada projeto e no máximo 40 no total."""
+    Guarda as 5 últimas de cada projeto e no máximo 40 no total; rapido = a de logo depois de cada edição, num
+    arquivo "-ultima-0" por projeto, sobrescrito (não gira as 5 com hora)."""
     from Functions import projeto
     import re
     import time as _t
@@ -1231,8 +1232,11 @@ def ve_autosave(chave, nome, dados):
         h = hashlib.sha1(str(chave or nome or "sem-projeto").encode("utf-8", "replace")).hexdigest()[:8]
         base = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(nome or "projeto")).strip(" .")[:40] or "projeto"
         pasta = _autosave_dir()
+        if rapido:
+            return {"success": True, "path": projeto.salvar(os.path.join(pasta, f"{base}-{h}-ultima-0.vknv"), dados)}
         final = projeto.salvar(os.path.join(pasta, f"{base}-{h}-{_t.strftime('%Y%m%d-%H%M%S')}.vknv"), dados)
-        todos = sorted((os.path.join(pasta, f) for f in os.listdir(pasta) if f.endswith((".vknv", ".vcnvt"))),
+        todos = sorted((os.path.join(pasta, f) for f in os.listdir(pasta)
+                        if f.endswith((".vknv", ".vcnvt")) and "-ultima-0." not in f),
                        key=os.path.getmtime, reverse=True)
         deste = [f for f in todos if f"-{h}-" in os.path.basename(f)]
         for f in deste[5:] + [f for f in todos if f not in deste[:5]][40:]:
@@ -4576,8 +4580,8 @@ class ApiBridge:
         return {"success": bool(paths), "itens": [{"path": p, "url": media_server.register(p),
                                                     **(autoframe_modelos.duracao(p) if tipo == "video" else {})} for p in paths]}
 
-    def ve_autosave(self, chave, nome, dados):
-        return ve_autosave(chave, nome, dados)
+    def ve_autosave(self, chave, nome, dados, rapido=False):
+        return ve_autosave(chave, nome, dados, rapido)
 
     def ve_autosave_lista(self):
         return ve_autosave_lista()

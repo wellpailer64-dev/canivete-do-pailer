@@ -3,7 +3,10 @@
 Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (PNG, JPG, WebP, TIFF...) ou documento novo.
 
 ## Arquivos
-- `frontend/js/imagem-nucleo.js` — modelo (documento, camadas, máscaras), histórico (copy-on-write), composição
+- `frontend/js/imagem-nucleo.js` — modelo (documento, camadas, máscaras), histórico (copy-on-write + retalhos: com o
+  editor parado, cada estado antigo troca a camada inteira só pelo retângulo que mudou, apoiado no estado seguinte —
+  `ieHistCompactar`/`ieHistMontar`; 8 pinceladas em 6000×4000: 768 MB → 8 MB, mesmo Ctrl+Z; teste
+  `D:/kanivete_testes/scripts/teste_hist_retalho.py`, app em 9333), composição
   (modos de mesclagem do Photoshop, grupos com passagem, máscara de corte (Alt+Ctrl+G, botão do painel ou **Alt+clique na divisa entre duas camadas**: cursor de corte, prende a de cima na de baixo; de novo solta — `testes/teste_corte_alt.py`), máscaras, efeitos, camadas de ajuste), vista.
 - `frontend/js/imagem-ajustes.js` — matemática dos ajustes (camadas de ajuste do PSD e menu Imagem > Ajustes) e filtros.
 - `frontend/js/imagem-ferramentas.js` — ferramentas (Mover, Letreiro, Laço, Varinha, Corte, Conta-gotas, Carimbo,
