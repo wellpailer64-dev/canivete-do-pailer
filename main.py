@@ -4481,8 +4481,10 @@ class ApiBridge:
             return {"success": False, "error": str(e)}
 
     def ve_agente_porta(self):
-        """Porta do modo agente desta abertura (Preferências → Modo desenvolvedor)."""
-        return {"porta": _PORTA_AGENTE}
+        """Porta do modo agente desta abertura (Preferências → Modo desenvolvedor). teste = app das baterias de teste
+        (APPDATA em kanivete_testes ou CANIVETE_TESTE=1): o Ke só dá um sinal curto no fim, sem a voz da Fran."""
+        teste = os.environ.get("CANIVETE_TESTE") == "1" or "kanivete_testes" in (os.environ.get("APPDATA") or "").lower()
+        return {"porta": _PORTA_AGENTE, "teste": teste}
 
     def prefs_load(self):
         return prefs_load()

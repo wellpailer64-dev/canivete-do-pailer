@@ -84,7 +84,8 @@ function veKeMini() {   // barrinha: aparece minimizada; com a fila rodando most
     window.addEventListener('resize', () => { if (veKeEl() && !veKeEl().hidden && veKeEl().dataset.ke) veKePosicionar(); });
 })();
 // ── Atalhos: Ctrl+M põe a timeline aberta na fila E abre a janela; Ctrl+Shift+M põe na fila sem abrir (aviso + som e a
-// barrinha minimizada mostra o andamento). Os dois já começam a renderizar se a fila estava parada. ──
+// barrinha minimizada mostra o andamento). Nenhum dos dois começa a renderizar: o início é sempre o ▶ Renderizar
+// (pedido do usuário, 2026-10-15). Com a fila já rodando, o item novo entra na vez dele. ──
 async function veKeFilaAtalho(abrir) {
     if (!VE.ready) return null;
     if (VE.exportRunning && !VEFILA.rodando) { veToast('Espere a exportação atual terminar'); return null; }
@@ -98,8 +99,8 @@ async function veKeFilaAtalho(abrir) {
     if (!id) return null;
     veKeSom('fila');
     const it = VEFILA.itens.find(x => x.id === id), esp = VEFILA.itens.filter(x => x.estado === 'espera').length;
-    veToast(`${veT('Na fila do Kanivete Encoder')}: ${it ? it.cfg.nome : ''}` + (VEFILA.rodando ? ` · ${esp} ${veT('esperando')}` : ''));
-    if (!VEFILA.rodando) { if (VEFILA.preparando) VEFILA.iniciarDepois = true; else veFilaIniciar().catch(e => veToast(e.message)); }
+    veToast(`${veT('Na fila do Kanivete Encoder')}: ${it ? it.cfg.nome : ''} · ${esp} ${veT('esperando')}` +
+        (VEFILA.rodando ? '' : ` · ${veT('▶ Renderizar para começar')}`));
     if (!abrir && veKeEl().hidden) { VEKE.min = true; veKeMini(); }
     return id;
 }
@@ -111,17 +112,40 @@ function veKeSom(tipo) {
         const ctx = veKeAudio || (veKeAudio = new (window.AudioContext || window.webkitAudioContext)());
         if (ctx.state === 'suspended') ctx.resume();
         const t0 = ctx.currentTime + 0.01;
-        const notas = tipo === 'fila' ? [[987.8, 0], [1318.5, 0.075]] : [[659.3, 0], [880, 0.09], [1318.5, 0.18]];
+        // ok / erro = sinal curto e leve do app de teste (no lugar da voz): dois toques subindo / descendo
+        const notas = tipo === 'fila' ? [[987.8, 0], [1318.5, 0.075]] : tipo === 'ok' ? [[880, 0], [1174.7, 0.08]]
+            : tipo === 'erro' ? [[440, 0], [349.2, 0.1]] : [[659.3, 0], [880, 0.09], [1318.5, 0.18]];
+        const vol = tipo === 'ok' || tipo === 'erro' ? 0.07 : 0.14;
         for (const [f, d] of notas) {
             const o = ctx.createOscillator(), g = ctx.createGain();
             o.type = 'sine'; o.frequency.value = f;
             g.gain.setValueAtTime(0.0001, t0 + d);
-            g.gain.exponentialRampToValueAtTime(0.14, t0 + d + 0.012);
+            g.gain.exponentialRampToValueAtTime(vol, t0 + d + 0.012);
             g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.22);
             o.connect(g).connect(ctx.destination);
             o.start(t0 + d); o.stop(t0 + d + 0.25);
         }
     } catch (e) { /* sem áudio: fica só o aviso */ }
+}
+
+// ── Voz da Fran no fim (frontend/audio/ke/*.mp3: fala + cama sonora suave, -16 LUFS; geradas em D:/kanivete_testes/ke_voz):
+// pronto = render pronto sem Drive; drive = render pronto E enviado ao Drive; falhou = render com erro (cancelar não fala);
+// drivefalhou = o envio ao Drive deu erro. Variações sorteadas sem repetir a última. Sem arquivo/áudio: o som antigo.
+// App das baterias de teste (ve_agente_porta().teste): só o sinal curto ok/erro, sem falação. ──
+const VEKE_VOZ = { pronto: 3, drive: 2, falhou: 2, drivefalhou: 1 }, veKeVozUlt = {};
+let veKeTeste = null;
+async function veKeVoz(tipo) {
+    const n = VEKE_VOZ[tipo]; if (!n) return;
+    if (veKeTeste === null) {
+        const api = window.pywebview && window.pywebview.api;
+        veKeTeste = !!(api && api.ve_agente_porta && ((await api.ve_agente_porta().catch(() => null)) || {}).teste);
+    }
+    if (veKeTeste) { veKeSom(/falhou/.test(tipo) ? 'erro' : 'ok'); return; }
+    let k = 1 + Math.floor(Math.random() * n);
+    if (n > 1 && k === veKeVozUlt[tipo]) k = k % n + 1;
+    veKeVozUlt[tipo] = k;
+    const a = new Audio(`audio/ke/${tipo}_${k}.mp3`);
+    a.play().catch(() => { if (/^(pronto|drive)$/.test(tipo) && typeof playConcluido === 'function') playConcluido(); });
 }
 
 // ── "Renderizando agora" (miniatura do quadro, barra, tempo, velocidade, placa/CPU) e o monitor ao vivo ──
@@ -233,7 +257,12 @@ function veKeMonitorLigar() {
                 if (/placa/i.test(e.message)) it.foiPlaca = true; else if (/turbo/i.test(e.message)) it.foiTurbo = true;
             }
         }
-        if (it && e.done) { VEKE_MON.ultimo = it; if (e.success && typeof playConcluido === 'function') playConcluido(); }
+        if (it && e.done) {
+            VEKE_MON.ultimo = it;
+            // com Drive fica em silêncio: a Fran fala uma vez só, quando o envio terminar; trecho de emenda fala depois de emendar
+            if (e.success && !it.emenda) { if (!(it.cfg && it.cfg.drive)) veKeVoz('pronto'); }
+            else if (!e.success && !e.cancelled) veKeVoz('falhou');
+        }
         const r = ev(e);
         veKeAgora();
         return r;

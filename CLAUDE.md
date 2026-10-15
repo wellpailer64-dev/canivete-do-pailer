@@ -67,8 +67,10 @@ se edita. Botão Fila no cabeçalho abre o mesmo painel. API `VEFILA_API`. Teste
 
 **Kanivete Encoder (Ke) — comece pelo mapa `Instructions/agente/mapa-kanivete-encoder.md`** (caminho do export,
 arquivos, armadilhas medidas, resultados, testes, pendências). Janela própria do export feita (`editor-encoder.js`: logo Ke, solta, minimiza, lembra posição).
-Atalhos: Ctrl+M = pôr na fila + abrir; Ctrl+Shift+M = pôr na fila sem abrir (aviso, som, barrinha; a fila começa
-sozinha); marcador anterior = Alt+Shift+M. Janela: "Renderizando agora" com miniatura do quadro (o ffmpeg grava
+Atalhos: Ctrl+M = pôr na fila + abrir; Ctrl+Shift+M = pôr na fila sem abrir (aviso, som, barrinha); NENHUM começa a
+renderizar: o início é sempre o ▶ Renderizar (pedido do Pailer); marcador anterior = Alt+Shift+M. Voz da Fran no fim
+(`veKeVoz`: pronto / drive / falhou / drivefalhou, `frontend/audio/ke/*.mp3`, fontes em `D:/kanivete_testes/ke_voz`); com
+Drive ela fala só no fim do envio. App de teste (APPDATA em kanivete_testes ou CANIVETE_TESTE=1): só sinal curto ok/erro. Janela: "Renderizando agora" com miniatura do quadro (o ffmpeg grava
 `ke_quadro.jpg` 1×/s: `video_cutter.saida_miniatura`), velocidade, selo placa/CPU e monitor ao vivo de CPU/RAM/placa
 (`Functions/encoder_monitor.py`, API `ve_encoder_estado`). Painel Desempenho no editor (o mesmo monitor, encaixável): `frontend/js/editor-desempenho.js`.
 Export otimizado (rodada 1, 2026-10-08: reels reais de 3,6× → 1,26× a duração; bancada em `D:/kanivete_testes/encoder`); medições e pendências em `Instructions/agente/plano-kanivete-encoder.md`.

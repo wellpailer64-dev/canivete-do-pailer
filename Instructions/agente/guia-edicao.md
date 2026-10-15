@@ -119,6 +119,13 @@ cobertura, texto, ajuste, som) e a fala transcrita embaixo. 1ª vez ~4 min (extr
 Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lugar de prints do monitor).
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-10-15 QUIZ CARLINHOS v2 ("perfeito, to exportando"): erros de gravação foram para o FIM (gancho = fala final
+  "E é isso" → whoosh + leak → REC → cartela final); piada esticada até o fim das risadas; cartela só com o texto da
+  pergunta (sem "Pergunta N"); LEGENDA NUNCA ATRAVESSA CORTE DE CÂMERA (separar pelas palavras no corte = cada pessoa
+  na sua); REC menos escuro (vig 25, exp +0,25); fundo das cartelas = Comp 2×2 com todos sorrindo (sc 50; vídeo de
+  resolução menor: sc = 50·1920/altura). Música curta de gravação de tela em loop ficou "evidente" mesmo com emendas
+  nos whooshes → pedir a música inteira. Armadilhas: `veLegMover` DEVOLVE cópia (usar map); importar áudio da Área de
+  Trabalho falhou (copiar para ASSETS); regex com `\\` em heredoc do Git Bash perde a barra (usar String.fromCharCode(92)).
 - 2026-10-14 GaIA V2 (Finep, 8:49, "estamos ficando muito PRO"): MOTIONS perfeitos (ajudam a narrativa) — manter.
   CORRIGIR: (1) CORTE com padrão profissional: cortar no fim de frase / fim de movimento / no contexto do que é dito;
   nunca voltar para uma tomada curta (<~1,5 s) entre o fim de um motion e a próxima cena — o motion termina junto com a

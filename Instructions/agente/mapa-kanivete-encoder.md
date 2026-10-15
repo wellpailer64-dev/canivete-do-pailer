@@ -8,6 +8,10 @@ Ponto de entrada para mexer no export do Editor Kanivete. O histórico completo 
 ```
 Atalho / botão                          frontend/js/editor-comandos.js, editor-encoder.js, editor-fila.js
   Ctrl+M = fila + abre a janela  ·  Ctrl+Shift+M = fila sem abrir  ·  Ctrl+E = só abre  ·  ▶ Renderizar
+  (os atalhos NÃO começam o render: só o ▶; no fim a Fran fala — veKeVoz em editor-encoder.js, audio/ke/*.mp3:
+   pronto | drive (só no fim do ENVIO; o fim do render com Drive fica mudo) | falhou | drivefalhou; app de teste =
+   sinal curto ok/erro, ve_agente_porta().teste. Link do Drive colado com nenhum item escolhido vale também para os
+   itens em espera (veFilaDriveLembrar). Item enviado: botões "Abrir pasta do Drive" e "Abrir vídeo no Drive".)
         │
         ▼
 veFilaAdicionarAtual (editor-fila.js) ── "congela" a timeline:

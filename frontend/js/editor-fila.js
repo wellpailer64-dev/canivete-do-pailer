@@ -35,7 +35,18 @@ function veFilaDriveCampo() {
     inp.addEventListener('input', () => veFilaDriveLembrar());   // o 'input' do formulário leva o link ao item escolhido
     veFilaDriveConferir();
 }
-function veFilaDriveLembrar() { try { localStorage.setItem('ve_drive_link', $ve('ve-drive-link').value.trim()); } catch (e) { /* sem armazenamento */ } veFilaDriveConferir(); }
+// Sem item escolhido, o link vale também para os que ESPERAM na fila com o link antigo do formulário: o render só começa
+// no ▶ e o link colado depois do Ctrl+M ficava fora do item (2026-10-15). Item com link próprio fica com o dele.
+function veFilaDriveLembrar() {
+    const novo = $ve('ve-drive-link').value.trim();
+    let ant = ''; try { ant = localStorage.getItem('ve_drive_link') || ''; localStorage.setItem('ve_drive_link', novo); } catch (e) { /* sem armazenamento */ }
+    if (VEFILA.sel == null && novo !== ant) {
+        const esp = VEFILA.itens.filter(x => x.estado === 'espera' && (x.cfg.drive || '') === ant);
+        esp.forEach(x => x.cfg.drive = novo);
+        if (esp.length) veFilaRender();
+    }
+    veFilaDriveConferir();
+}
 function veFilaDriveConferir() {
     const v = ($ve('ve-drive-link') || {}).value || '', av = $ve('ve-drive-aviso'); if (!av) return;
     const ok = !v.trim() || /\/folders\/[\w-]+|[?&]id=[\w-]+|^[\w-]{25,}$/.test(v.trim());
@@ -218,7 +229,7 @@ async function veFilaAdicionarPreparando(nome, cfg) {
     await veFilaConferirArquivos();
     { const off = veOfflineNaTimeline(); if (off.length) { veAvisoOffline(off); return null; } }
     const msg = m => { const el = $ve('ve-fila-msg'); if (el) el.textContent = m || ''; veFilaPrepMsg(m); };
-    msg('Preparando ' + veFilaNomeTimeline() + '… (o render começa sozinho)');
+    msg('Preparando ' + veFilaNomeTimeline() + '…');
     if (typeof veMidiasTamanhoGarantir === 'function') await veMidiasTamanhoGarantir();   // 4K ainda sem tamanho: saía ampliado
     if (typeof veCompProntas === 'function') await veCompProntas(msg);
     if (typeof ve3dProntas === 'function') await ve3dProntas(msg);
@@ -348,9 +359,9 @@ async function veFilaEmendar(it) {
     if (r && r.success) {
         it.trecho = it.saida; it.saida = r.path; it.emendaMsg = 'corrigido: ' + r.path.split(/[\\/]/).pop();
         veToast(`Trecho corrigido sem exportar tudo: ${r.path.split(/[\\/]/).pop()}`);
-        if (typeof playConcluido === 'function') playConcluido();
-        if (e.drive) { it.cfg.drive = e.drive; veFilaDriveEnviar(it); }
-    } else { it.emendaMsg = 'a emenda falhou: ' + ((r && r.error) || '?'); veToast('Corrigir trecho: ' + it.emendaMsg); }
+        if (e.drive) { it.cfg.drive = e.drive; veFilaDriveEnviar(it); }   // a Fran fala no fim do envio
+        else if (typeof veKeVoz === 'function') veKeVoz('pronto');
+    } else { it.emendaMsg = 'a emenda falhou: ' + ((r && r.error) || '?'); veToast('Corrigir trecho: ' + it.emendaMsg); if (typeof veKeVoz === 'function') veKeVoz('falhou'); }
     veFilaRender();
 }
 // Volume do render pronto (LUFS integrado): etiqueta no item; fora de -20..-11 avisa (YouTube/Instagram ≈ -14..-16)
@@ -370,7 +381,7 @@ async function veFilaDriveEnviar(it) {
     it.drive = { fase: 'conferindo', pct: 0 };
     veFilaRender();
     const r = await api.ve_drive_enviar(it.saida, it.cfg.drive);
-    if (!r || !r.success) { it.drive = { fase: 'erro', erro: (r && r.error) || 'falhou' }; veFilaRender(); veToast('Drive: ' + it.drive.erro); return; }
+    if (!r || !r.success) { it.drive = { fase: 'erro', erro: (r && r.error) || 'falhou' }; veFilaRender(); veToast('Drive: ' + it.drive.erro); if (typeof veKeVoz === 'function') veKeVoz('drivefalhou'); return; }
     it.drive.id = r.id;
     const passo = async () => {
         const e = await api.ve_drive_estado(r.id).catch(() => null);
@@ -378,8 +389,8 @@ async function veFilaDriveEnviar(it) {
         veFilaRenderItem(it);
         if (!e || !['pronto', 'erro', 'cancelado'].includes(e.fase)) { setTimeout(passo, 1000); return; }
         veFilaRender();
-        if (e.fase === 'pronto') { veToast(`"${it.cfg.nome}" está no Drive`); if (typeof playConcluido === 'function') playConcluido(); }
-        else if (e.fase === 'erro') veToast('Drive: ' + e.erro);
+        if (e.fase === 'pronto') { veToast(`"${it.cfg.nome}" está no Drive`); if (typeof veKeVoz === 'function') veKeVoz('drive'); else if (typeof playConcluido === 'function') playConcluido(); }
+        else if (e.fase === 'erro') { veToast('Drive: ' + e.erro); if (typeof veKeVoz === 'function') veKeVoz('drivefalhou'); }
     };
     passo();
 }
@@ -395,8 +406,12 @@ function veFilaDriveTexto(d) {
 }
 function veFilaDriveHtml(it) {
     const d = it.drive; if (!d) return '';
+    // pronto: dois botões — a pasta (o link colado) e o vídeo (link do arquivo; sem ele, drive_envio devolve a pasta)
+    const abrir = (url, txt) => `<button class="ve-btn ve-btn-sm" onclick="event.stopPropagation(); window.pywebview.api.kani_abrir_link(${veEsc(JSON.stringify(url))})">${txt}</button>`;
+    const pasta = d.fase === 'pronto' ? (it.cfg.drive || (d.link && !/\/file\//.test(d.link) ? d.link : '')) : '';
+    const video = d.fase === 'pronto' && d.link && /\/file\//.test(d.link) ? d.link : '';
     return `<span class="ve-fila-drive ${d.fase}"><span class="ve-fila-barra"><i style="width:${d.pct || 0}%"></i></span><small>${veEsc(veFilaDriveTexto(d))}</small>
-        ${d.fase === 'pronto' && d.link ? `<button class="ve-btn ve-btn-sm" onclick="event.stopPropagation(); window.pywebview.api.kani_abrir_link(${veEsc(JSON.stringify(d.link))})">Abrir no Drive</button>` : ''}
+        ${pasta ? abrir(pasta, 'Abrir pasta do Drive') : ''}${video ? abrir(video, 'Abrir vídeo no Drive') : ''}
         ${['conferindo', 'enviando'].includes(d.fase) && d.id ? `<button class="ve-btn ve-btn-sm" onclick="event.stopPropagation(); window.pywebview.api.ve_drive_cancelar(${d.id})">Cancelar envio</button>` : ''}
         ${['erro', 'cancelado'].includes(d.fase) ? `<button class="ve-btn ve-btn-sm" onclick="event.stopPropagation(); veFilaDriveEnviar(VEFILA.itens.find(x => x.id === ${it.id}))">Enviar de novo</button>` : ''}</span>`;
 }
