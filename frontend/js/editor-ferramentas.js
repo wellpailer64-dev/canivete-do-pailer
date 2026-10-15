@@ -15,7 +15,8 @@ const VE_FERR = [
     [{ id: 'forma', ic: 'i-shape', nome: 'Forma (retângulo, elipse, triângulo, linha)', tecla: 'Y' }],
     [{ id: 'pincel', ic: 'i-brush', nome: 'Pincel (Shift: linha reta)', tecla: 'B' }],
     // Caneta e Máscara (editor-motion.js) existiam só pelo atalho/menu: agora na barra, num grupo
-    [{ id: 'caneta', ic: 'i-pen', nome: 'Caneta (máscara no monitor; pontos nas linhas de volume e opacidade)', tecla: 'P' },
+    [{ id: 'caminho', ic: 'i-pen', nome: 'Caneta de caminho (linhas e curvas com cor, espessura e Aparar caminho)', tecla: 'Shift+G' },
+     { id: 'caneta', ic: 'i-pen', nome: 'Caneta de máscara (máscara no monitor; pontos nas linhas de volume e opacidade)', tecla: 'P' },
      { id: 'mascara', ic: 'i-mask', nome: 'Máscara (retângulo ou elipse no monitor)', tecla: '' }],
     [{ id: 'fwd', ic: 'i-fwd', nome: 'Selecionar faixa para a frente', tecla: 'A' },
      { id: 'bwd', ic: 'i-bwd', nome: 'Selecionar faixa para trás', tecla: 'Shift+A' }],

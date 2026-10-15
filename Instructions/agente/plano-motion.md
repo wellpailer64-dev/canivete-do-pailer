@@ -104,7 +104,16 @@ Gramática de motion que o Pailer aprovou:
   `c.fm.ap*` / `c.k['fm.ap*']`, os mesmos da forma.
 - **Pop** (transição de entrada) cresce a partir do ponto de âncora da PRÓPRIA camada (`ancora: true` em VE_TR); antes
   escalava a partir do centro do quadro e o logo do canto "viajava" até o lugar. Puxar/Chicote seguem no centro.
-- Caneta (P) e Máscara na barra de ferramentas (grupo). PENDENTE (pedido): Caneta que cria CAMINHO como forma (não
-  máscara), com cor/espessura/preenchimento e Aparar — forma 'cam' com os pontos Bézier da caneta.
+- Caneta (P) e Máscara na barra de ferramentas (grupo). **Caneta de caminho (Shift+G)** — `frontend/js/editor-caminho.js`:
+  forma `t: 'cam'` (pontos Bézier como a máscara, `c.fm.pts` em px da forma, `fech`), clique = ponto, arrastar = curva,
+  Shift = 45°, clique no 1º ponto fecha, Enter/Esc/duplo clique termina; traço/espessura/preenchimento/ponta redonda na
+  caixinha do monitor; Aparar caminho e tracejado como nas formas (`veCamPolilinha` achata a curva). Estado `VECAMI`
+  (`VECAM` já existia no editor.js — o nome repetido derrubava o arquivo inteiro). Ainda não: editar pontos depois.
+- **Pontas do pincel** (`t.ponta`): Redonda, Marcador (chapado), Giz (grão fixo, igual na prévia e no export),
+  Caligrafia (ponta chata a 45°). Caso `caminho` do teste_export confere caminho + pontas + Aparar.
+- ARMADILHA: camada de motion gravada com o código quebrado fica no cache (mesma assinatura) e sai VAZIA nas próximas
+  exportações — ao consertar um desenho, apagar `Cenas3D/mo.*` do teste (ou subir VE_MO_VERSAO se já foi para usuário).
 - Pendência antiga achada no teste: caso `transicoes` do teste_export reprova no meio do Chicote (q85, 92,8) com ou sem
-  a mudança do Pop — prévia e export um quadro defasados na troca do chicote.
+  a mudança do Pop. Descartado (2026-10-14): amostrar os quadros-chave na grade (continua 89,2) e alinhar a janela ao
+  quadro (só "mudou" o quadro ruim e quebrou o Dividir — desfeito). Próximo a olhar: o esticão sx do chicote no export
+  (escala de largura e posição do overlay) × a prévia.

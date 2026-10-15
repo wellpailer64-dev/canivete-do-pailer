@@ -478,6 +478,20 @@ CASOS = {
     # motion (editor-motion.js): nulo girando com uma filha em órbita e desfoque de movimento, foto com máscara elíptica
     # animada (abre) e desfoque animado, texto recortado por uma faixa que passa (fosco alfa; a faixa não aparece),
     # anel com aparar caminho animado e tracejado — tudo vira camada desenhada na exportação
+    # Caneta de caminho (forma 'cam', curvas Bézier) com Aparar caminho animado e as pontas do pincel (marcador, giz,
+    # caligrafia) com Aparar: a prévia e a exportação têm de desenhar o mesmo trecho em cada quadro (2026-10-14)
+    "caminho": (1080, 1920, """
+        const { clip } = __te, fm = veGrMidia('forma', 'Forma'), pm = veGrMidia('pincel', 'Desenho');
+        const pts = [40, 300, 0, 0, 160, -260,  520, 300, -160, 260, 160, -260,  1000, 300, -160, 260, 0, 0];
+        const cam = { tr: 1, st: 0, s: 0, e: 3, m: fm.id, fm: { t: 'cam', pts, fech: false, w: 1040, h: 600, cOn: true, cCor: '#4fc3ff', cLarg: 14, pOn: false, cor: '#F97316', pontaR: true },
+            p: { sc: 100, x: 540, y: 600, rot: 0, op: 100 } };
+        cam.k = { 'fm.apFim': [{ t: 0, v: 0, i: 'lin' }, { t: 2, v: 100, i: 'ease' }] };
+        const linha = (y, ponta, cor) => { const p = []; for (let x = 100; x <= 980; x += 8) p.push(x, y + 60 * Math.sin(x / 90)); return { cor, tam: 40, dur: 100, op: 100, ponta, pts: p }; };
+        const br = { tr: 2, st: 0, s: 0, e: 3, m: pm.id, br: { w: 1080, h: 1920, tracos: [linha(1100, 'marcador', '#ffd400'), linha(1350, 'giz', '#ffffff'), linha(1600, 'caligrafia', '#ff5fd2')] },
+            p: { sc: 100, x: 540, y: 960, rot: 0, op: 100 }, fm: { apFim: 100 } };
+        br.k = { 'fm.apFim': [{ t: 0.2, v: 0, i: 'lin' }, { t: 2.6, v: 100, i: 'lin' }] };
+        return [clip(0, 0, 0, 3, 'b.mp4'), cam, br];
+    """, ""),
     "motion": (1080, 1920, """
         const { clip } = __te, W = 1080, H = 1920, fid = veFxNewId(), fm = veGrMidia('forma', 'Forma');
         let mn = VE.media.find(x => x && x.kind === 'nulo');

@@ -13,6 +13,7 @@
     "editor-audio.js",
     "editor-autoframe-cliente.js",
     "editor-autoframe.js",
+    "editor-caminho.js",
     "editor-caneta.js",
     "editor-colar-externo.js",
     "editor-comandos.js",

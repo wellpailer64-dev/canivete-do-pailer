@@ -5855,7 +5855,7 @@ function veSetTool(tool) {
     wrap.classList.toggle('tool-bwd', tool === 'bwd');
     $ve('ve-screen').classList.toggle('tool-pincel', tool === 'pincel');
     $ve('ve-screen').classList.toggle('tool-forma', tool === 'forma');
-    $ve('ve-screen').classList.toggle('tool-mascara', tool === 'mascara' || tool === 'caneta');
+    $ve('ve-screen').classList.toggle('tool-mascara', tool === 'mascara' || tool === 'caneta' || tool === 'caminho');
     if (typeof veGrOpcoes === 'function') veGrOpcoes();   // opções do Pincel / Forma no monitor
     if (typeof veMoOpcoes === 'function') veMoOpcoes();   // opções da Máscara / Caneta (editor-motion.js)
     $ve('ve-screen').classList.toggle('tool-texto', tool === 'texto');

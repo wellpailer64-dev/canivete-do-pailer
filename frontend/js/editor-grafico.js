@@ -12,8 +12,8 @@
 
 const VE_GRAF = new Set(['cor', 'forma', 'pincel']);
 const veEhGrafico = c => { const m = c && veMediaOf(c); return !!m && VE_GRAF.has(m.kind); };
-const VE_FORMAS = { ret: 'Retângulo', eli: 'Elipse', tri: 'Triângulo', lin: 'Linha', est: 'Estrela', pol: 'Polígono' };
-const VE_FORMAS_ICO = { ret: '▭', eli: '◯', tri: '△', lin: '╱', est: '☆', pol: '⬠' };
+const VE_FORMAS = { ret: 'Retângulo', eli: 'Elipse', tri: 'Triângulo', lin: 'Linha', est: 'Estrela', pol: 'Polígono', cam: 'Caminho (Caneta)' };
+const VE_FORMAS_ICO = { ret: '▭', eli: '◯', tri: '△', lin: '╱', est: '☆', pol: '⬠', cam: '✎' };
 const VEGR = {
     cache: new WeakMap(),
     pincel: { cor: '#ffffff', tam: 24, dur: 80, op: 100 },
@@ -49,6 +49,7 @@ function veGrCanvas(w, h) {
 // Contorno da forma como polilinha fechada (px da forma), começando em cima e no sentido horário (como no AE):
 // é o que o Aparar caminho e o tracejado percorrem
 function veGrPontos(fm, w, h, i) {
+    if (fm.t === 'cam') return typeof veCamPolilinha === 'function' ? veCamPolilinha(fm.pts, fm.fech) : [];   // Caneta de caminho
     const out = [], n = Math.max(3, Math.round(+fm.pontas || 5)), rx = Math.max(0.5, w / 2 - i), ry = Math.max(0.5, h / 2 - i), cx = w / 2, cy = h / 2;
     if (fm.t === 'eli') {
         for (let k = 0; k < 160; k++) { const a = -Math.PI / 2 + k * 2 * Math.PI / 160; out.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]); }
@@ -118,7 +119,7 @@ function veGrPoli(x, pts, fech) {
 function veGrForma(x, fm) {
     const { w, h } = fm, b = fm.cOn ? Math.max(0, +fm.cLarg || 0) : 0, i = b / 2;
     const ap = veGrAparar(fm), tr = (+fm.tLen || 0) > 0, pOn = fm.pOn !== false;
-    if (ap || tr || fm.t === 'est' || fm.t === 'pol') {
+    if (ap || tr || fm.t === 'est' || fm.t === 'pol' || fm.t === 'cam') {
         // Aparar caminho, tracejado, estrela e polígono: o contorno percorrido como polilinha
         if (ap && ap.vazio) return;
         const tracejar = () => { if (tr) { x.setLineDash([Math.max(0.1, +fm.tLen), Math.max(0, +fm.tVao || 0)]); x.lineDashOffset = -(+fm.tDesl || 0); } };
@@ -137,14 +138,16 @@ function veGrForma(x, fm) {
             x.restore();
             return;
         }
-        const P = veGrPontos(fm, w, h, i), T = ap ? veGrTrecho(P, true, ap.a, ap.b) : P;
-        if (pOn) { x.beginPath(); veGrPoli(x, T, true); x.fillStyle = fm.cor; x.fill(); }
+        // caminho da Caneta: aberto ou fechado (fm.fech); as outras formas são sempre fechadas
+        const fech = fm.t === 'cam' ? !!fm.fech : true;
+        const P = veGrPontos(fm, w, h, i), T = ap ? veGrTrecho(P, fech, ap.a, ap.b) : P;
+        if (pOn && fech) { x.beginPath(); veGrPoli(x, T, true); x.fillStyle = fm.cor; x.fill(); }
         if (b > 0) {
             x.lineWidth = b;
             x.strokeStyle = fm.cCor;
             tracejar();
             x.beginPath();
-            veGrPoli(x, T, !ap);
+            veGrPoli(x, T, fech && !ap);
             x.stroke();
         }
         x.restore();
@@ -165,8 +168,24 @@ function veGrForma(x, fm) {
     }
 }
 
+// Pontas do pincel (t.ponta; padrão redonda). Poucas e diferentes de verdade, para letreiro e rabisco à mão.
+const VE_PONTAS = { redonda: 'Redonda', marcador: 'Marcador', giz: 'Giz', caligrafia: 'Caligrafia' };
+const VE_PONTAS_ICO = { redonda: '●', marcador: '■', giz: '░', caligrafia: '✒' };
+let VE_GR_GRAO = null;   // textura do giz (ruído), feita uma vez
+function veGrGrao() {
+    if (VE_GR_GRAO) return VE_GR_GRAO;
+    const cv = veGrCanvas(160, 160), x = cv.getContext('2d'), im = x.createImageData(160, 160);
+    let s = 12345;   // aleatório fixo: o mesmo traço sai igual na prévia e na exportação
+    const r = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    for (let i = 0; i < im.data.length; i += 4) { const v = r(); im.data[i + 3] = v < 0.42 ? 255 : v < 0.6 ? 120 : 0; }
+    x.putImageData(im, 0, 0);
+    return (VE_GR_GRAO = cv);
+}
+
 // Traço do pincel: dureza 100 = borda dura; menor = mais esfumado (desfoque proporcional ao tamanho)
 function veGrTraco(x, t) {
+    const ponta = t.ponta || 'redonda';
+    if (ponta !== 'redonda' && (t.pts || []).length >= 4) return veGrTracoPonta(x, t, ponta);
     const macio = Math.max(0, Math.min(1, (100 - (+t.dur || 0)) / 100));
     const larg = Math.max(0.5, t.tam * (1 - macio * 0.45)), desf = t.tam * macio * 0.35, p = t.pts || [];
     if (p.length < 2) return;
@@ -203,6 +222,53 @@ function veGrTracosAparados(x, T, a, b) {
         } else if (L === 0 && ini >= s0 && ini <= s1) veGrTraco(x, t);   // ponto solto (um clique)
         ini = fim;
     });
+}
+
+function veGrTracoPonta(x, t, ponta) {
+    const p = t.pts, larg = Math.max(0.5, +t.tam || 1);
+    x.save();
+    x.globalAlpha = Math.max(0, Math.min(1, (t.op == null ? 100 : t.op) / 100));
+    x.strokeStyle = x.fillStyle = t.cor;
+    if (ponta === 'caligrafia') {
+        // ponta chata a 45°: a largura muda com a direção do traço (fino num sentido, grosso no outro)
+        const nx = Math.cos(-Math.PI / 4) * larg / 2, ny = Math.sin(-Math.PI / 4) * larg / 2;
+        x.beginPath();
+        for (let k = 2; k < p.length; k += 2) {
+            const ax = p[k - 2], ay = p[k - 1], bx = p[k], by = p[k + 1];
+            x.moveTo(ax - nx, ay - ny); x.lineTo(ax + nx, ay + ny); x.lineTo(bx + nx, by + ny); x.lineTo(bx - nx, by - ny); x.closePath();
+        }
+        x.fill();
+        x.restore();
+        return;
+    }
+    const caminho = ctx => {
+        ctx.beginPath(); ctx.moveTo(p[0], p[1]);
+        for (let k = 2; k < p.length - 2; k += 2) ctx.quadraticCurveTo(p[k], p[k + 1], (p[k] + p[k + 2]) / 2, (p[k + 1] + p[k + 3]) / 2);
+        ctx.lineTo(p[p.length - 2], p[p.length - 1]);
+    };
+    if (ponta === 'marcador') {
+        // marcador: borda dura, ponta chapada, cor por igual (sem esfumar)
+        x.lineWidth = larg; x.lineCap = 'square'; x.lineJoin = 'miter'; x.miterLimit = 2;
+        caminho(x); x.stroke();
+        x.restore();
+        return;
+    }
+    // giz: o traço desenhado num rascunho do tamanho dele e "comido" pela textura de grão
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let k = 0; k < p.length; k += 2) { x0 = Math.min(x0, p[k]); x1 = Math.max(x1, p[k]); y0 = Math.min(y0, p[k + 1]); y1 = Math.max(y1, p[k + 1]); }
+    const m = larg, W = Math.ceil(x1 - x0 + 2 * m), H = Math.ceil(y1 - y0 + 2 * m);
+    if (W < 1 || H < 1 || W * H > 9e6) { x.lineWidth = larg; x.lineCap = x.lineJoin = 'round'; caminho(x); x.stroke(); x.restore(); return; }
+    const cv = veGrCanvas(W, H), r = cv.getContext('2d');
+    r.translate(m - x0, m - y0);
+    r.strokeStyle = t.cor; r.lineWidth = larg; r.lineCap = r.lineJoin = 'round';
+    caminho(r); r.stroke();
+    r.setTransform(1, 0, 0, 1, 0, 0);
+    r.globalCompositeOperation = 'destination-out';
+    r.fillStyle = r.createPattern(veGrGrao(), 'repeat');
+    r.translate(-(x0 % 160), -(y0 % 160));   // a textura presa ao quadro (traços vizinhos combinam)
+    r.fillRect(x0 % 160, y0 % 160, W, H);
+    x.drawImage(cv, x0 - m, y0 - m);
+    x.restore();
 }
 
 function veGrafDesenho(c) {
@@ -462,7 +528,7 @@ function veGrPointer(e) {
             VE.clips.push(c);
         }
         const q = veGrLocal(c, pt0), P = VEGR.pincel;
-        c.br = { ...c.br, tracos: [...c.br.tracos, { cor: P.cor, tam: P.tam, dur: P.dur, op: P.op, pts: [+q.x.toFixed(1), +q.y.toFixed(1)] }] };
+        c.br = { ...c.br, tracos: [...c.br.tracos, { cor: P.cor, tam: P.tam, dur: P.dur, op: P.op, ponta: P.ponta || 'redonda', pts: [+q.x.toFixed(1), +q.y.toFixed(1)] }] };
     }
     VE.sel = VE.clips.indexOf(c);
     veRelayout();
@@ -542,6 +608,8 @@ function veGrOpcoes() {
         box.addEventListener('click', e => {
             const b = e.target.closest('[data-grt]');
             if (b) { VEGR.forma.t = b.dataset.grt; veGrSalvarOpcoes(); veGrOpcoesRender(box); }
+            const bp = e.target.closest('[data-grp]');
+            if (bp) { VEGR.pincel.ponta = bp.dataset.grp; veGrSalvarOpcoes(); veGrOpcoesRender(box); }
             if (e.target.closest('[data-gracao="nova"]')) { VE.sel = -1; veRefresh(); veToast(veT('Pinte no monitor: o próximo traço vira uma camada nova')); }
         });
     }
@@ -553,6 +621,7 @@ function veGrOpcoesRender(box) {
         `<label>${veT(rot)}<input type="range" data-gr="${k}" min="${min}" max="${max}" value="${v}"><b data-grv="${k}">${v}</b>${un}</label>`;
     box.innerHTML = VE.tool === 'pincel' ? `
         <span class="ve-gr-tit">${veT('Pincel')}</span>
+        <span class="ve-gr-tipos">${Object.entries(VE_PONTAS).map(([t, n]) => `<button class="${(P.ponta || 'redonda') === t ? 'on' : ''}" data-grp="${t}" title="${veT(n)}">${VE_PONTAS_ICO[t]}</button>`).join('')}</span>
         <label>${veT('Cor')}<input type="color" data-gr="p.cor" value="${P.cor}"></label>
         ${faixa('p.tam', 'Tamanho', 1, 1200, P.tam, 'px')}
         ${faixa('p.dur', 'Dureza', 0, 100, P.dur, '%')}
@@ -560,7 +629,7 @@ function veGrOpcoesRender(box) {
         <small>${veT('Shift: linha reta · Alt+arrastar: tamanho')}</small>
         <button class="ve-btn ve-btn-sm ve-btn-ghost" data-gracao="nova" title="${veT('O próximo traço começa uma camada de desenho nova')}">${veT('Nova camada')}</button>` : `
         <span class="ve-gr-tit">${veT('Forma')}</span>
-        <span class="ve-gr-tipos">${Object.entries(VE_FORMAS).map(([t, n]) => `<button class="${F.t === t ? 'on' : ''}" data-grt="${t}" title="${veT(n)}">${VE_FORMAS_ICO[t]}</button>`).join('')}</span>
+        <span class="ve-gr-tipos">${Object.entries(VE_FORMAS).filter(([t]) => t !== 'cam').map(([t, n]) => `<button class="${F.t === t ? 'on' : ''}" data-grt="${t}" title="${veT(n)}">${VE_FORMAS_ICO[t]}</button>`).join('')}</span>
         <label>${veT('Preenchimento')}<input type="color" data-gr="f.cor" value="${F.cor}"></label>
         <label><input type="checkbox" data-gr="f.cOn"${F.cOn ? ' checked' : ''}>${veT('Contorno')}<input type="color" data-gr="f.cCor" value="${F.cCor}"></label>
         ${faixa('f.cLarg', 'Espessura', 1, 80, F.cLarg, 'px')}

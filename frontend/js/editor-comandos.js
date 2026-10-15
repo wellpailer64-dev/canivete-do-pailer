@@ -139,6 +139,7 @@ const VE_CMDS = [
     { id: 'ferr-lamina', grupo: 'ferramentas', nome: 'Ferramenta Lâmina', teclas: ['C'], fn: () => veSetTool('razor') },
     { id: 'ferr-remix', grupo: 'ferramentas', nome: 'Ferramenta Remix', teclas: ['Shift+R'], fn: () => { veSetTool('remix'); veToast(veT('Remix: arraste a ponta direita de uma música para esticar ou encurtar (o começo e o final ficam)')); } },
     { id: 'remix-original', grupo: 'clipe', nome: 'Remix: voltar à música original', teclas: [], fn: () => veRmxOriginal(), pode: () => !!VE.clips[VE.sel] && veRmxEh(VE.clips[VE.sel]) },
+    { id: 'ferr-caminho', grupo: 'ferramentas', nome: 'Caneta de caminho', teclas: ['Shift+G'], fn: () => { veSetTool('caminho'); veToast(veT('Caneta de caminho: clique para pontos, arraste para curvas, clique no 1º ponto para fechar, Enter para terminar')); } },
     { id: 'ferr-caneta', grupo: 'ferramentas', nome: 'Ferramenta Caneta', teclas: ['P'], fn: () => { veSetTool('caneta'); veToast(veT('Caneta (P): clique na linha amarela do clipe para criar um ponto · Alt+clique apaga · no monitor, desenha máscara')); } },
     { id: 'ferr-mao', grupo: 'ferramentas', nome: 'Ferramenta Mão', teclas: ['H'], fn: () => veSetTool('hand') },
     { id: 'ferr-zoom', grupo: 'ferramentas', nome: 'Ferramenta Zoom', teclas: ['Z'], fn: () => veSetTool('zoom') },

@@ -186,6 +186,7 @@ function veTfCursor(alvo, c) {
 function veTfDesenhar(ctx, cv, pv) {
     if (typeof veScCaptura === 'function') veScCaptura(cv);   // escopos: o quadro antes das alças
     if (typeof veMoOverlay === 'function') veMoOverlay(ctx, pv);   // máscaras e caneta (editor-motion.js)
+    if (typeof veCamOverlay === 'function') veCamOverlay(ctx, pv);   // Caneta de caminho em edição (editor-caminho.js)
     const c = VE.clips[VE.sel];
     if (!veTfVisivel(c) || (VEPP.edit && VEPP.edit.c === c)) return;
     const p = veProps(c), sz = veMediaSize(c);
