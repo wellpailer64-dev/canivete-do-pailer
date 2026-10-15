@@ -237,6 +237,8 @@ Estudo de caso, modelo, API, fechamento e pendências: `Instructions/vetor-kaniv
 marcas, verificação relendo o PDF). **API primeiro**: tudo é `vkCmd`/`window.VKN.cmd` (interface, Claude e Worker iguais);
 ler o documento com `VKN.mapa()`, conferir com `VKN.fechamento()`. Worker: `"app": "vetor"`. Teste: `python testes/teste_vetor.py`
 (rodar antes de release quando mexer no Vetor).
+Traçado de imagem v2 (Image Trace: VTracer + limpeza por IA + fundo + cores da marca, já solto em curvas): `Functions/vetor_tracar.py`,
+`frontend/js/vetor-tracar.js`, tabela §1 do guia.
 Sinalização em série (placas 001…200 no mesmo arquivo): `serie_pranchetas` (Objeto › Pranchetas: Série numerada…), marcas
 de corte do guia do cliente (`marcas_dist/comp/esp`) e erro `sem_glifo` (fonte embutida sem os algarismos): §14 e §4 do guia.
 Pranchetas (ordem 4 por linha/vertical, duplicar, Alt+arrastar, alças), Novo documento com modelos e Criar fonte (.otf de

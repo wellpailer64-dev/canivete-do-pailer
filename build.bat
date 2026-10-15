@@ -73,6 +73,9 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --collect-all "librosa" ^
  --hidden-import "Functions.remix" ^
  --hidden-import "Functions.pincel_roto" ^
+ --hidden-import "Functions.vetor_tracar" ^
+ --hidden-import "Functions.ampliar_imagem" ^
+ --collect-all "vtracer" ^
  --collect-all "yt_dlp_ejs" ^
  --collect-all "pyphen" ^
  --collect-all "webview" ^

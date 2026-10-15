@@ -572,6 +572,7 @@
     "vetor-separacoes.js",
     "vetor-simbolos.js",
     "vetor-texto.js",
+    "vetor-tracar.js",
     "vetor-transformar.js",
     "vetor-vinculos.js",
     "vetor.css"
@@ -597,6 +598,7 @@
     "vk_salvar",
     "vk_texto_geometria",
     "vk_icone",
+    "vk_tracar",
     "vk_vetorizar",
     "vk_blender_estado",
     "vk_blender_instalar",
@@ -1734,6 +1736,12 @@
     "vetor_kanivete"
    ]
   },
+  "vk_tracar": {
+   "args": "arquivo, op=None",
+   "modulos": [
+    "vetor_tracar"
+   ]
+  },
   "vk_vetorizar": {
    "args": "arquivo, cores=6, area_min=12, ignorar_fundo=True",
    "modulos": [
@@ -2605,6 +2613,7 @@
   "desvio_texto": "contorno de texto",
   "colunas": "colunas de texto",
   "fonte_eixos": "eixos da fonte",
+  "selecionar_mesma_cor": "selecionar mesma cor",
   "repetir": "repetir transformação",
   "transformar_cada": "transformar cada",
   "distribuir_espaco": "distribuir espaçamento",
@@ -2887,6 +2896,7 @@
   "Functions/vetor_importar.py": "Vetor Kanivete: abrir PDF, AI, SVG e PowerPoint como documento vetorial editável (modelo em Instructions/vetor-kanivete.md)",
   "Functions/vetor_kanivete.py": "Vetor Kanivete (estilo Illustrator): o lado Python do editor vetorial (frontend/js/vetor-*.js)",
   "Functions/vetor_saida.py": "Vetor Kanivete — saídas para o mercado",
+  "Functions/vetor_tracar.py": "Traçado de imagem do Vetor Kanivete (Image Trace do Illustrator, melhorado)",
   "Functions/video_cutter.py": "video_cutter.py — Motor do Pocket Editor (editor de vídeo do Canivete do Pailer)",
   "Functions/videoconverter.py": "videoconverter.py — converte vídeos entre formatos, vídeo→GIF/MP3 e GIF→vídeo",
   "Functions/videodownloader.py": "Traduz os erros mais comuns do yt-dlp para o usuário",
