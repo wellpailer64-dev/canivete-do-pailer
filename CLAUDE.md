@@ -175,7 +175,11 @@ para a exportação: `frontend/js/editor-3d.js` + `Functions/cena3d.py`; API `VE
 `Instructions/agente/cena-3d-editor.md`. Foco (desfoque por profundidade), estúdio infinito, neblina e objetos 3D do
 Vetor (Objeto › "3D: Animar no Editor", `enviar_editor_3d`). Modelos de banco: .glb/.gltf/.obj(+.mtl e texturas ao lado)
 direto; .fbx/.blend/.dae/.stl/.ply/.3mf convertidos no Blender; soltar no editor; aparência por parte (cor, acabamento,
-imagem/rótulo); edição na tela 3D (Delete, Ctrl+D, H, F, Q, ímã, renomear). Testes: `python testes/teste_export.py --casos 3d,3dfoco`,
+imagem/rótulo); edição na tela 3D (Delete, Ctrl+D, H, F, Q, ímã, renomear). **Camadas em profundidade** (2026-10-14):
+botão direito → "Camadas → Cena 3D" vira placas (`editor-3d-placas.js`); arrastar objeto, Alt+rodinha/[ ] e mapa de
+profundidade sem mudar o tamanho na tela (`editor-3d-mexer.js`); para o agente `VE3DAPI.naTela/colocar/folha`. Leve: um
+motor WebGL só, ≤ 4 cenas montadas, objetos reaproveitados, arquivo da exportação só com o app parado (guia § Leveza;
+receita de colagem no mapa de motion §4). Testes: `py -3.13 testes/teste_3d_placas.py`, `python testes/teste_export.py --casos 3d,3dfoco,placas`,
 `python testes/teste_vetor_editor3d.py` e `py -3.13 testes/teste_3d_modelos.py`.
 
 ## Editor de Imagem (estilo Photoshop)

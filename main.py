@@ -4141,6 +4141,10 @@ class ApiBridge:
         from Functions import cena3d
         return cena3d.lote(sessao, pasta)
 
+    def ve_c3d_cancelar(self, sessao, pasta):
+        from Functions import cena3d
+        return cena3d.cancelar(sessao, pasta)
+
     def ve_c3d_fim(self, base, h, sessao, pasta, fps, n, recortar=False):
         from Functions import cena3d
         try:

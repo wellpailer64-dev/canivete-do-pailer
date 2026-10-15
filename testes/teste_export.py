@@ -480,6 +480,20 @@ CASOS = {
     # anel com aparar caminho animado e tracejado — tudo vira camada desenhada na exportação
     # Caneta de caminho (forma 'cam', curvas Bézier) com Aparar caminho animado e as pontas do pincel (marcador, giz,
     # caligrafia) com Aparar: a prévia e a exportação têm de desenhar o mesmo trecho em cada quadro (2026-10-14)
+    # camadas → Cena 3D (editor-3d-placas.js): forma e texto viram placas sobre o vídeo; a de baixo vai para trás e a
+    # câmera aproxima (parallax): a prévia (three.js) tem que bater com o arquivo
+    "placas": (1080, 1920, """
+        const { clip } = __te, fm = veGrMidia('forma', 'Forma'), tm = veTxMidia();
+        return [clip(0, 0, 0, 3, 'b.mp4'),
+            { tr: 1, st: 0, s: 0, e: 3, m: fm.id, nome: 'Caixa', fm: { t: 'ret', w: 700, h: 320, cor: '#0E2621', cOn: true, cCor: '#F1E4B2', cLarg: 6, raio: 16 }, p: { sc: 100, x: 540, y: 1100, rot: -4, op: 92 } },
+            { tr: 2, st: 0.5, s: 0, e: 2.5, m: tm.id, nome: 'Título', tx: { ...VE_TX_PADRAO, t: 'Profundidade', tam: 110, cor: '#ffd400' }, p: { sc: 100, x: 540, y: 1100, rot: -4, op: 100 } }];
+    """, """
+        return (async () => {
+            const r = await ve3dDeCamadas(VE.clips.filter(c => c.tr >= 1)), m = VE.media[r.midia], d = m.c3d.camera.p.dist;
+            const f = m.c3d.modelos[0]; f.p.z = -0.8; f.p.esc = 1 + 0.8 / d;
+            m.c3d.camera.kf.dist = [[0, d, 'suave'], [3, d * 0.7, 'suave']]; ve3dMudou(m);
+        })();
+    """),
     "caminho": (1080, 1920, """
         const { clip } = __te, fm = veGrMidia('forma', 'Forma'), pm = veGrMidia('pincel', 'Desenho');
         const pts = [40, 300, 0, 0, 160, -260,  520, 300, -160, 260, 160, -260,  1000, 300, -160, 260, 0, 0];

@@ -68,6 +68,22 @@ escala com curva), `kf()` (quadro-chave), `fx()` (efeito), `texto()/img()/forma(
 - 🔓 **Textura de papel gerada** (numpy): base clara + ruído grosso borrado + grão fino + 260 pintinhas escuras +
   vinheta leve; versão escura na cor da marca para a abertura. Sem baixar nada.
 - 🔓 **Grade tracejada sutil**, objeto recortado com sombra, mini-objeto no canto, cursor clicando.
+- 🔓 **Colagem em profundidade na Cena 3D** (teste "Pravda Noir", soviético + noir, 2026-10-14, o Pailer: "tá perfeito")
+  — pasta `D:/kanivete_testes/jornal/` (gerar.py → recorte.py → montar.py). Como fazer:
+  1. **Assets**: Z-Image (`gerador_imagem.gerar`) com prompts de foto P&B de jornal (fundo de página, fábrica, pessoa,
+     silhueta, foguete) + formas em numpy/PIL (sol, estrela, faixa diagonal, manchetes em Impact/Times).
+  2. **Textura de recorte** (`recorte.py`): duotom tinta `#141210` × papel `#ECE2C9` + grão; **retícula** de jornal a 45°
+     (pontos 5–7 px); recorte da pessoa pelo BEN2 + **borda de papel branca de tesoura** (máscara dilatada 22 px com
+     contorno rasgado: ruído grosso + fibra fina) + sombra projetada embutida; foto de cena com **borda rasgada**
+     e sem moldura (cortar 5% da geração). Vermelho `#C41E1C` só em sol, estrela e manchete.
+  3. **Profundidade**: posições PENSADAS NA TELA e convertidas para a cena (`VE3DAPI.colocar` ou `fz = (D0 - z)/D0`):
+     fundo z −1, sol −0,75, foto −0,5, faixa −0,3, pessoa −0,1, objetos 0 a 0,15, silhueta 0,3, manchetes 0,4–0,5.
+  4. **Câmera**: aproximar só 10% e órbita de ±3° em 8 s (mais que isso joga quem está na frente para fora do
+     quadro); manchetes entram (x/y com ◆), estrela gira, foguete atravessa, "tremido" de stop motion (rz ±0,6° a
+     cada 0,25 s linear) em 3 recortes. Neblina 0,06 escura; **sem desfoque de foco** (o Pailer viu "tudo com blur").
+  5. **Conferir sem abrir imagem**: `VE3DAPI.naTela(cena, t)` em 0, meio e fim — `fora` > 3% em quem não está entrando
+     = ajustar; depois UMA `VE3DAPI.folha(cena, [6 tempos])` e a folha do mp4.
+  Armadilha: fundo gerado (1344 px) não pode ficar ampliado > ~1,3× na tela (borra) — trazer para mais perto (z −1).
 
 ## 5. Recorte e chave
 - ⭐🔓 **Recorte de fundo verde que preserva amarelo** (intro) — o problema: Chroma Key comum mede "verde − média de
@@ -104,7 +120,7 @@ escala com curva), `kf()` (quadro-chave), `fx()` (efeito), `texto()/img()/forma(
 - Caminho de movimento curvo (alças espaciais), auto-orientar ao longo do caminho, repetidor de formas, expressões
   livres (wiggle, loop) — pendências em `plano-motion.md`.
 - Texto em caminho / máscara de texto revelando vídeo; luz varrendo o título (fosco alfa de um brilho inclinado).
-- Câmera 3D com profundidade nas camadas 2D (paralaxe) — a Cena 3D existe, falta o "3D de camada" do AE.
+- Parallax automático de UMA foto (mapa de profundidade) e vídeo como placa na Cena 3D.
 
 ## Peça: V1 GaIA (Smart Tree/Finep, 8 min, 2026-10-14) — `D:/kanivete_testes/smarttree/v1/` (base.py + montar_v1.py + montador.js)
 - 🔓 **Documentário inteiro por plano em código**: cobertura e motion presos às PALAVRAS da narração (`em("frase", apos)`

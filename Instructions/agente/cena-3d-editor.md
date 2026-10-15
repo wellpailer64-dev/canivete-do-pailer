@@ -48,6 +48,38 @@ Código: `frontend/js/editor-3d.js` (three.js r170 local em `frontend/vendor/thr
   No painel Propriedades, ✎ ao lado do modelo abre a tela com ele selecionado.
 - ◆ = cronômetro do After Effects: ligado, mexer no valor grava quadro-chave na agulha; clicar de novo desliga a animação.
 
+## Camadas em profundidade (o "3D das camadas" do After) — 2026-10-14
+`frontend/js/editor-3d-placas.js`. Botão direito nas camadas → **"Camadas → Cena 3D (profundidade)"** (paleta:
+`cena3d-camadas`; API `VE3DAPI.deCamadas(clips)`): cada foto/texto/forma/Comp parada é desenhada como o monitor desenha
+(efeitos, máscara, rotação), recortada ao que tem desenho e vira uma **placa** (`fonte: {tipo:'placa', path, w, h}`,
+plano sem luz). Câmera fov 40 com o quadro inteiro de altura 1 no Z = 0: o 1º quadro sai igual ao 2D (diferença média
+0,14). Cena `c3d.placas = true`: sem tom final e sem sombra. Camada mais curta = `visivel` com ◆. Um Ctrl+Z desfaz a
+conversão. Vídeo ainda não vira placa (fica de fora, com aviso).
+
+**Mexer na tela 3D** (`frontend/js/editor-3d-mexer.js`, vale para qualquer objeto):
+- arrastar o objeto direto = move no plano da tela (arrastar no vazio continua orbitando a câmera);
+- **Alt + rodinha** ou **[ / ]** (Shift = fino) ou botões "Para o fundo / Para a frente" no painel da placa: empurra ao
+  longo do raio da câmera com a escala compensada — na tela fica IGUAL, só muda a profundidade (parallax);
+- **mapa de profundidade** (canto direito, vista de cima): câmera, campo de visão e cada camada; clique seleciona,
+  arrastar para cima/baixo = para o fundo/frente.
+
+**Olhos e mãos do agente** (sem abrir imagem nem adivinhar unidades): `VE3DAPI.naTela(cena, t)` → por objeto
+`{nome, caixa:[x0,y0,x1,y1] em % do quadro, fora:% fora do quadro, z, dist}`; `VE3DAPI.colocar(cena, nome, {x, y, h|w, z, rz}, t)`
+→ posiciona PELA TELA (x/y em %, h = % da altura) em qualquer z; `VE3DAPI.folha(cena, [t...], largura)` → UMA imagem
+JPEG com os quadros lado a lado. Receita de colagem em `mapa-habilidades-motion.md` §4.
+
+## Leveza (2026-10-14)
+- **Um motor só** (um contexto WebGL, `ve3dMotor`) para todas as cenas: cada cena abria o seu e nunca devolvia; com
+  várias timelines de cenas a página caía. No máximo **4 cenas montadas** (`ve3dPodar`; as fora da timeline aberta saem
+  primeiro, `ve3dLiberar` devolve geometria/material/textura).
+- **Mexer não remonta tudo**: objeto com a mesma fonte é reaproveitado (assinatura `o.ch` de quando carregou — a
+  Aparência troca `md.fonte` no mesmo objeto). Acrescentar uma placa: ~17 ms (antes relia todas do disco).
+- **Arquivo da exportação só com o app parado** (12 s sem mexer, fora do play e da tela 3D); mexeu no meio, o render
+  para e apaga os quadros (`ve_c3d_cancelar`). Antes ele desenhava todos os quadros em tamanho cheio 2,5 s depois de
+  CADA mudança e travava a interface ~15 s. Exportar continua esperando o arquivo (`ve3dProntas`).
+- Sombra só com chão/estúdio; alvo de desenho guardado por tamanho (até 3: monitor, tela, render).
+- Armadilha: depois do Ctrl+Z os modelos são cópias — `ve3dAplicar` religa `o.md` pelos ids (`rt.mods`).
+
 ## API (agente/Worker): `VE3DAPI`
 `nova({dur, st, nome})`, `modelo({arquivo | forma, cor, material, textura, texRep, x..esc, cena})`, `definir(quem, {...})`,
 `aparencia(quem, {cor, material, textura, texRep, parte})`, `partes(quem)`, `duplicar(quem)`, `renomear(quem, nome)`,
@@ -61,8 +93,12 @@ Código: `frontend/js/editor-3d.js` (three.js r170 local em `frontend/vendor/thr
 e `gerar_lata3d.py` no Blender): .obj+.mtl em subpasta, .gltf separado, .glb Draco, .fbx com textura de outro PC, .stl,
 lata com 2 partes sem .mtl; aparência, partes, ferramentas da tela, soltar e o arquivo da exportação.
 `python testes/teste_export.py --casos 3d,3dfoco` (3d: esfera quicando, cubo girando, câmera orbitando sobre vídeo;
-3dfoco: estúdio, neblina, foco animado). Ponte: `python testes/teste_vetor_editor3d.py` (app em `--agente=9333`).
+3dfoco: estúdio, neblina, foco animado; placas: forma + texto em profundidade com a câmera aproximando).
+Ponte: `python testes/teste_vetor_editor3d.py` (app em `--agente=9333`).
+Placas, tela com mouse e leveza: `py -3.13 testes/teste_3d_placas.py` (app em `--agente=9333`).
 
 ## Pendências
+- Placas: vídeo como placa (textura de vídeo por quadro), opacidade/mesclagem por placa, parallax automático de UMA foto
+  (mapa de profundidade leve, conferir licença), luz e sombra nas placas.
 - Blender para render pesado da cena do Editor; texto 3D; placa de fundo com imagem/vídeo; quadros-chave da cena 3D
   na timeline (hoje só no painel); vínculo vivo Vetor → Editor (hoje é cópia: reenviar após editar).

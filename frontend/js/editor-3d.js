@@ -241,11 +241,38 @@ async function ve3dDoVetor(d, T) {
     }
     return g;
 }
-async function ve3dMontar(m) {
-    const L = await ve3dLib(), { T, RoomEnvironment } = L, cv = document.createElement('canvas');
+// UM renderizador (contexto WebGL) para todas as cenas: cada cena abria o seu e nunca devolvia — o navegador aguenta
+// ~16 e, com várias timelines de cenas 3D abertas, derrubava a página (2026-10-14). Quem desenha copia o quadro na hora
+// (monitor, tela 3D, render do arquivo: tudo síncrono depois do ve3dAplicar), então dividir o mesmo é seguro.
+function ve3dMotor(L) {
+    if (VE3D.motor) return VE3D.motor;
+    const { T, RoomEnvironment } = L, cv = document.createElement('canvas');
     const r = new T.WebGLRenderer({ canvas: cv, alpha: true, antialias: true, preserveDrawingBuffer: true });
     r.outputColorSpace = T.SRGBColorSpace; r.toneMapping = T.NeutralToneMapping; r.shadowMap.enabled = true; r.shadowMap.type = T.PCFSoftShadowMap;
-    const sc = new T.Scene(), pm = new T.PMREMGenerator(r); sc.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+    const pm = new T.PMREMGenerator(r), env = pm.fromScene(new RoomEnvironment(), 0.04).texture; pm.dispose();
+    // passo final com e sem o tom (cena de placas: a cor da foto/texto não muda), o mesmo alvo para os dois
+    const cru = ve3dFocoPasso(T); cru.mat.toneMapped = false;
+    return (VE3D.motor = { r, cv, env, foco: ve3dFocoPasso(T), cru, alvo: null, mancha: ve3dMancha(T) });
+}
+// devolve à placa de vídeo o que só esta cena usava (geometria, material, textura); motor, ambiente e mancha são de todas
+function ve3dLiberar(rt) {
+    if (!rt || !rt.sc || rt.livre) return; rt.livre = true;
+    const mo = VE3D.motor, fica = new Set([mo && mo.env, mo && mo.mancha]);
+    rt.sc.traverse(x => {
+        if (x.geometry) x.geometry.dispose();
+        for (const mt of [].concat(x.material || [])) { for (const v of Object.values(mt)) if (v && v.isTexture && !fica.has(v)) v.dispose(); mt.dispose(); }
+    });
+}
+// no máximo 4 cenas montadas na memória; as que não estão na timeline aberta saem primeiro (voltam montando se precisar)
+function ve3dPodar(manter) {
+    if (VE3D.rt.size <= 4) return;
+    const usadas = new Set(VE.clips.map(c => c.m || 0));
+    const fora = [...VE3D.rt.entries()].filter(([id]) => id !== manter && !usadas.has(id)).sort((a, b) => (a[1].uso || 0) - (b[1].uso || 0));
+    for (const [id, e] of fora) { if (VE3D.rt.size <= 4) break; if (e.prom && !e.rt) continue; ve3dLiberar(e.rt); VE3D.rt.delete(id); }
+}
+async function ve3dMontar(m, ant) {
+    const L = await ve3dLib(), { T } = L, mo = ve3dMotor(L), r = mo.r, cv = mo.cv;
+    const sc = new T.Scene(); sc.environment = mo.env;
     const cam = new T.PerspectiveCamera(32, 16 / 9, 0.05, 200);
     const key = new T.DirectionalLight(0xffffff, 2.6); key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.radius = 5; key.shadow.bias = -0.0004;
     Object.assign(key.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4, near: 0.1, far: 40 }); sc.add(key, key.target);
@@ -259,18 +286,23 @@ async function ve3dMontar(m) {
     for (let j = 0; j < perfil.length; j++) for (let i = 0; i < 2; i++) pos.setXYZ(j * 2 + i, i ? 40 : -40, perfil[j][1], perfil[j][0]);
     gEst.computeVertexNormals();
     const estudio = new T.Mesh(gEst, new T.MeshStandardMaterial({ color: 0xe9e4dc, roughness: 0.92, side: T.DoubleSide })); estudio.receiveShadow = true; sc.add(estudio);
-    // foco (profundidade de campo): a cena vai para um alvo com profundidade e um passo de desfoque por distância
-    const foco = ve3dFocoPasso(T);
-    const objs = [], mancha = ve3dMancha(T);
+    // foco (profundidade de campo): a cena vai para um alvo com profundidade e um passo de desfoque por distância (do motor)
+    const objs = [], mancha = mo.mancha;
+    // objeto que já estava na cena anterior com a mesma fonte é REAPROVEITADO (antes: mexer na lista relia todas as
+    // imagens/modelos do disco a cada mudança)
+    // a assinatura é a de QUANDO o objeto foi carregado (o.ch): a Aparência troca md.fonte no mesmo objeto
+    const chaveObj = md => md.id + '|' + JSON.stringify(md.fonte), velhos = new Map(((ant && !ant.livre && ant.objs) || []).map(o => [o.ch, o]));
     for (const md of m.c3d.modelos) {
+        const v = velhos.get(chaveObj(md));
+        if (v) { velhos.delete(chaveObj(md)); sc.add(v.raiz, v.contato); objs.push({ ...v, md }); continue; }
         const o = await ve3dCarregarModelo(md, L); sc.add(o.raiz);
         const ct = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshBasicMaterial({ map: mancha, color: 0x000000, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
         ct.rotation.x = -Math.PI / 2; ct.renderOrder = 1; sc.add(ct);
-        objs.push({ md, ...o, contato: ct });
+        objs.push({ md, ...o, contato: ct, ch: chaveObj(md) });
     }
     // contraluz: recorte nas bordas (atrás do objeto, oposta à câmera), sem sombra
     const contra = new T.DirectionalLight(0xffffff, 0); sc.add(contra, contra.target);
-    return { r, cv, sc, cam, key, amb, chao, estudio, foco, objs, contra, T, chave: ve3dChave(m) };
+    return { r, cv, sc, cam, key, amb, chao, estudio, objs, contra, T, chave: ve3dChave(m) };
 }
 function ve3dMancha(T) {   // degradê radial (preto → transparente) da sombra de contato
     const cv = document.createElement('canvas'); cv.width = cv.height = 256; const x = cv.getContext('2d'), g = x.createRadialGradient(128, 128, 0, 128, 128, 128);
@@ -316,12 +348,19 @@ function ve3dFocoPasso(T) {
 // cena pronta para desenhar já (null = montando; quando ficar pronta, o monitor redesenha)
 function ve3dRuntime(m) {
     const e = VE3D.rt.get(m.id), chave = ve3dChave(m);
+    if (e) e.uso = performance.now();
     if (e && e.rt && e.rt.chave === chave) return e.rt;
     if (!e || e.chave !== chave) {
-        const novo = { chave, rt: e && e.rt, prom: null };
-        novo.prom = ve3dMontar(m).then(rt => { if (novo.rt && novo.rt !== rt) { try { novo.rt.r.dispose(); } catch (x) { /* contexto */ } } novo.rt = rt; veCacheInvalidate(); if (VE.ready) veDrawMonitorSoon(); return rt; })
-            .catch(err => { novo.erro = err.message || String(err); veToast(`${veT('Cena 3D')}: ${novo.erro}`); });
+        // uma montagem por vez por cena: a próxima parte da anterior (que ela reaproveita), senão as duas disputavam os objetos
+        const antes = e && e.prom ? e.prom.catch(() => null) : Promise.resolve(null), velho = e && e.rt;
+        const novo = { chave, rt: velho, prom: null, uso: performance.now() };
+        novo.prom = antes.then(async feito => {
+            const ant = feito || velho, rt = await ve3dMontar(m, ant);
+            if (ant && ant !== rt) ve3dLiberar(ant);
+            novo.rt = rt; veCacheInvalidate(); if (VE.ready) veDrawMonitorSoon(); return rt;
+        }).catch(err => { novo.erro = err.message || String(err); veToast(`${veT('Cena 3D')}: ${novo.erro}`); });
         VE3D.rt.set(m.id, novo);
+        ve3dPodar(m.id);
     }
     return null;
 }
@@ -330,6 +369,8 @@ async function ve3dGarantir(m) { const rt = ve3dRuntime(m); if (rt) return rt; c
 // câmera da cena, sobre = cena desenhada por cima sem foco (setas do objeto selecionado)
 function ve3dAplicar(rt, m, t, W, H, op = {}) {   // tudo o que anima, no tempo t (s, dentro do clipe), e desenha W×H
     const { T, key, amb, chao, r } = rt, cam = op.cam || rt.cam, C = m.c3d, cp = k => ve3dVal(C.camera, k, t), lp = k => ve3dVal(C.luz, k, t), rad = Math.PI / 180;
+    // Ctrl+Z troca os objetos da cena por cópias (mesma chave, sem remontar): o runtime passa a ler as novas
+    if (rt.mods !== C.modelos) { const por = new Map(C.modelos.map(md => [md.id, md])); for (const o of rt.objs) { const n = por.get(o.md.id); if (n) o.md = n; } rt.mods = C.modelos; }
     // distância automática: cabe o conjunto na posição de repouso (p, sem quadros-chave: não fica "respirando" com a
     // animação) — no mínimo ~2,4 de largura e ~1,6 de altura (quadro em pé ou deitado)
     let lx = 1.2, ly = 0.8;
@@ -346,6 +387,8 @@ function ve3dAplicar(rt, m, t, W, H, op = {}) {   // tudo o que anima, no tempo 
     const ci = lp('contra') || 0; rt.contra.intensity = ci;
     if (ci > 0) { rt.contra.position.set(alvo.x - 8 * Math.cos(0.5) * Math.sin(az + 0.5), alvo.y + 8 * Math.sin(0.5), alvo.z - 8 * Math.cos(0.5) * Math.cos(az + 0.5)); rt.contra.target.position.copy(alvo); }
     const cn = ve3dCenario(C), np = k => ve3dVal(cn, k, t), est = (np('estudio') || 0) > 0.5;
+    // sombra só onde aparece (chão ou estúdio): sem ela a placa de vídeo não desenha a cena duas vezes por quadro
+    const somb = !C.placas && (C.chao !== false || est); if (key.castShadow !== somb) key.castShadow = somb;
     chao.visible = C.chao !== false && !est; chao.material.opacity = lp('sombra');
     rt.estudio.visible = est; rt.estudio.material.color.set(np('estudioCor') || '#e9e4dc'); rt.estudio.rotation.y = az; rt.estudio.position.set(alvo.x, 0, alvo.z);
     const neb = np('neblina') || 0;
@@ -369,14 +412,18 @@ function ve3dAplicar(rt, m, t, W, H, op = {}) {   // tudo o que anima, no tempo 
     // sempre pelo alvo + passo final (tom e cor no fim): a neblina do three entra depois da conversão de cor no
     // desenho direto e mudaria de cor ao ligar o foco. Foco: raio máximo proporcional à altura (igual em qualquer resolução)
     {
-        const f = rt.foco;
-        if (!f.alvo || f.alvo.width !== Wi || f.alvo.height !== Hi) {
-            if (f.alvo) f.alvo.dispose();
-            f.alvo = new T.WebGLRenderTarget(Wi, Hi, { type: T.HalfFloatType, samples: 4, depthTexture: new T.DepthTexture(Wi, Hi) });
+        // alvos por tamanho (monitor, tela 3D e render desenham em tamanhos diferentes: recriar a cada troca pesava)
+        const mo = VE3D.motor, f = C.placas ? mo.cru : mo.foco, ka = Wi + 'x' + Hi, alvos = mo.alvos || (mo.alvos = new Map());
+        let alvo = alvos.get(ka);
+        if (alvo) alvos.delete(ka);
+        else {
+            alvo = new T.WebGLRenderTarget(Wi, Hi, { type: T.HalfFloatType, samples: 4, depthTexture: new T.DepthTexture(Wi, Hi) });
+            while (alvos.size >= 3) { const [k0, a0] = alvos.entries().next().value; a0.depthTexture.dispose(); a0.dispose(); alvos.delete(k0); }
         }
-        r.setRenderTarget(f.alvo); r.clear(); r.render(rt.sc, cam); r.setRenderTarget(null);
+        alvos.set(ka, alvo);   // o último usado fica no fim
+        r.setRenderTarget(alvo); r.clear(); r.render(rt.sc, cam); r.setRenderTarget(null);
         const u = f.mat.uniforms;
-        u.tCor.value = f.alvo.texture; u.tProf.value = f.alvo.depthTexture; u.res.value.set(Wi, Hi); u.raio.value = op.vista ? 0 : ab * Hi * 0.04;
+        u.tCor.value = alvo.texture; u.tProf.value = alvo.depthTexture; u.res.value.set(Wi, Hi); u.raio.value = op.vista ? 0 : ab * Hi * 0.04;
         u.foco.value = Math.max(0.05, cp('foco') ?? d); u.perto.value = cam.near; u.longe.value = cam.far;
         r.setClearColor(0x000000, 0); r.clear(); r.render(f.sc, f.cam);
     }
@@ -414,13 +461,18 @@ function ve3dNova(op = {}) {
     ve3dMudou(m);
     return { midia: m.id, clipe: VE.clips.indexOf(novo) };
 }
-function ve3dMudou(m) {   // a cena mudou: o monitor desenha ao vivo e o arquivo é refeito em segundo plano
+// o arquivo da cena (para tocar liso e exportar) só é refeito com o app PARADO: ele desenha todos os quadros em tamanho
+// cheio e travava a interface por ~15 s depois de CADA mexida (2026-10-14). Mexeu de novo no meio: o render para.
+const VE3D_OCIOSO = 12000;
+const ve3dOcupado = () => VE.playing || !!(typeof VE3T !== 'undefined' && VE3T.el && VE3T.raf && VE3T.el.isConnected && !VE3T.el.hidden);
+function ve3dMudou(m) {   // a cena mudou: o monitor desenha ao vivo e o arquivo é refeito quando o app ficar parado
     m._aoVivo = true; VE.dirty = true; veCacheInvalidate(); if (VE.ready) veDrawMonitorSoon();
-    clearTimeout(VE3D.timer); VE3D.timer = setTimeout(ve3dVerificar, 2500);
+    VE3D.mexeu = performance.now();
+    clearTimeout(VE3D.timer); VE3D.timer = setTimeout(ve3dVerificar, VE3D_OCIOSO);
 }
 function ve3dVerificar() {
     if (!VE.ready || VE3D.atual) return;
-    if (VE.playing && !VE3D.exportando) { clearTimeout(VE3D.timer); VE3D.timer = setTimeout(ve3dVerificar, 2500); return; }
+    if (!VE3D.exportando && (ve3dOcupado() || performance.now() - (VE3D.mexeu || 0) < VE3D_OCIOSO - 50)) { clearTimeout(VE3D.timer); VE3D.timer = setTimeout(ve3dVerificar, 3000); return; }
     const pend = ve3dMidias().find(m => (m.c3dSig !== ve3dSig(m) || !m.path) && !VE3D.falhas.has(ve3dSig(m)));
     if (pend) ve3dRenderizar(pend);
 }
@@ -433,8 +485,13 @@ async function ve3dRenderizar(m) {
         if (!ini || !ini.success) throw new Error((ini && ini.error) || 'não abriu o render');
         let path = ini.path;
         if (!ini.pronto) {
+            VE3D.sessao = ini;
             const rt = await ve3dGarantir(m), W = VE.seqW, H = VE.seqH, fps = VE.fps || 30, n = Math.max(1, Math.round((+m.dur || 1) * fps));
             for (let i = 0; i < n; i++) {
+                if (!VE3D.exportando) {   // em segundo plano: mexeu na cena → para (o arquivo já ficou velho); tocando ou na tela 3D → espera
+                    if (ve3dSig(m) !== sig || ve3dRuntime(m) !== rt) throw Object.assign(new Error('a cena mudou'), { mudou: true });
+                    while (ve3dOcupado() && !VE3D.exportando) await new Promise(r => setTimeout(r, 500));
+                }
                 ve3dAplicar(rt, m, i / fps, W, H);
                 const b = veCanvasPng(rt.cv);   // síncrono: o toBlob era adiado ~1 s por quadro fora de primeiro plano
                 const rr = await fetch(ini.url + `q${String(i).padStart(5, '0')}.png`, { method: 'POST', body: b, headers: { 'Content-Type': 'image/png' } });
@@ -448,11 +505,14 @@ async function ve3dRenderizar(m) {
         }
         if (ve3dSig(m) === sig) { m.path = path; m.c3dSig = sig; delete m.erro; veMidiaPreparar(m, true); VE.dirty = true; veCacheInvalidate(); }
     } catch (e) {
-        VE3D.falhas.set(sig, (e && e.message) || String(e));
-        veToast(`${veT('Falha ao renderizar a cena 3D')} ${m.name}: ${(e && e.message) || e}`);
+        if (e && e.mudou) { if (VE3D.sessao && api.ve_c3d_cancelar) api.ve_c3d_cancelar(VE3D.sessao.sessao, VE3D.sessao.pasta); }
+        else {
+            VE3D.falhas.set(sig, (e && e.message) || String(e));
+            veToast(`${veT('Falha ao renderizar a cena 3D')} ${m.name}: ${(e && e.message) || e}`);
+        }
     } finally {
-        VE3D.atual = null; VE3D.espera.splice(0).forEach(r => r());
-        setTimeout(ve3dVerificar, 300);
+        VE3D.atual = null; VE3D.sessao = null; VE3D.espera.splice(0).forEach(r => r());
+        clearTimeout(VE3D.timer); VE3D.timer = setTimeout(ve3dVerificar, VE3D.exportando ? 300 : VE3D_OCIOSO);
     }
 }
 // exportação: espera as cenas 3D usadas estarem renderizadas (como veCompProntas)

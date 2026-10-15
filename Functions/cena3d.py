@@ -43,6 +43,17 @@ def lote(sessao, pasta):
     return {"success": True, "gravados": len(arquivos)}
 
 
+def cancelar(sessao, pasta):
+    """Render de fundo interrompido (a cena mudou): fecha a caixa de envio e apaga os quadros já gravados."""
+    try:
+        media_server.fechar_envio(sessao)
+    except Exception:
+        pass
+    if pasta and str(pasta).endswith(".quadros") and os.path.basename(os.path.dirname(os.path.abspath(pasta))) == "Cenas3D":
+        shutil.rmtree(pasta, ignore_errors=True)
+    return {"success": True}
+
+
 def _caixa_lida(final):
     """Retângulo guardado ao lado do .mov recortado (fim(recortar=True)); None = vídeo do quadro inteiro."""
     try:

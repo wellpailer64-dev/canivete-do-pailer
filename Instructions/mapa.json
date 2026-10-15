@@ -5,6 +5,8 @@
    "nome": "Editor Kanivete",
    "grupo": "Vídeo",
    "front": [
+    "editor-3d-mexer.js",
+    "editor-3d-placas.js",
     "editor-3d-tela.js",
     "editor-3d.js",
     "editor-afx-pr.js",
@@ -135,6 +137,7 @@
     "ve_psd_importar",
     "ve_c3d_inicio",
     "ve_c3d_lote",
+    "ve_c3d_cancelar",
     "ve_c3d_fim",
     "ve_c3d_pasta",
     "ve_remix",
@@ -1749,6 +1752,12 @@
     "cena3d"
    ]
   },
+  "ve_c3d_cancelar": {
+   "args": "sessao, pasta",
+   "modulos": [
+    "cena3d"
+   ]
+  },
   "ve_c3d_fim": {
    "args": "base, h, sessao, pasta, fps, n, recortar=False",
    "modulos": [
@@ -2884,6 +2893,7 @@
  },
  "testes": {
   "teste_3d_modelos": "Teste dos modelos 3D baixados de banco na Cena 3D do Editor (app em --agente=9333):",
+  "teste_3d_placas": "Camadas em profundidade na Cena 3D (editor-3d-placas.js + editor-3d-mexer.js), app em --agente=9333:",
   "teste_atributos": "Remover atributos e ajuste em grupo (editor-atributos.js) — abre um app próprio (porta 9334, dados em",
   "teste_barra": "Barra de tarefas contextual: alça move e lembra, Selecionar assunto / Remover fundo, × esconde só até o próximo clique",
   "teste_blender": "Teste do render fotorrealista (Vetor 3D → Blender), app em --agente=9333. Rápido (400 px, 24 amostras): copo (girar) com",
