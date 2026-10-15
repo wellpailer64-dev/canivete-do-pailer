@@ -273,7 +273,7 @@ documentado, commitado e publicado antes do próximo:
 4. **Transições de sobreposição** — FEITO (8.4). Antes: render prévio quadro a quadro em numpy/OpenCV sobre um
    intermediário ProRes; a prévia já tem o shader (WebGL) — portar para o libplacebo.
 5. **Chroma Key com outros efeitos e com opacidade** — FEITO (8.5); fica híbrido só Key antes do Luz e Cor.
-6. **Ondulação (Wave Warp)** — FEITO (8.6, 2026-10-15); só imagem/texto girado com onda ainda vai pela CPU.
+6. **Ondulação (Wave Warp)** — FEITO (8.6, 2026-10-15), com o giro na placa (vídeo girado não desce mais).
 - Sem solução na placa: XAVC 4:2:2 (câmera do Edgar) e ProRes — o decodificador Vulkan não lê.
 
 ### 8.1 Fade de clipe na placa
@@ -361,3 +361,8 @@ caixa na tela cresce M/s de cada lado.
 - Teste: `teste_export.py --casos onda,ondavideo,ondatexto,ondavideo2 --placa` — os 4 "montado na placa", pior diferença
   2,3 (texto com sombra e fade + ajuste começando no meio). O vídeo girado (ondavideo2) é o mais lento (41 s para 2,5 s:
   geq no quadro inteiro na CPU) — se aparecer em projeto real, levar o giro de vídeo para a placa.
+- (Mesmo dia) **Giro na placa** (`_giro_passos`): textura aumentada para a caixa do giro (RW×RH fixo, D×D com
+  quadros-chave) e um shader que gira (conta inversa do rotate da CPU: horário na tela; ângulo por quadro em trechos
+  retos). Vídeo girado sem efeito que desce não desce mais (ondavideo2: 41 s → 3 s); imagem/texto girado COM onda: onda
+  e depois giro na placa (caso `ondagiro`). Ainda na CPU: giro constante (ca_rot), imagem girada com onda E sombra, e
+  imagem girada sem onda (gira uma vez antes de subir — barato, fica como está).

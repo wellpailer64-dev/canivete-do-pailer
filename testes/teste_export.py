@@ -598,6 +598,18 @@ CASOS = {
         adj.p = veDefProps(adj);
         return [fundo, tx, adj];
     """, ""),
+    # Ondulação + giro na placa (_giro_passos depois da onda): texto girado fixo e logo com giro animado
+    "ondagiro": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const fundo = clip(0, 0, 0, 2.5, 'foto3.jpg', { p: { sc: 160, x: 540, y: 960, rot: 0, op: 100 } });
+        const tm = veTxMidia();
+        const tx = { tr: 1, st: 0, s: 0, e: 2.5, m: tm.id, tx: { ...VE_TX_PADRAO, t: 'Girando', tam: 140 },
+            fx: [{ id: id(), t: 'onda', on: true, v: { alt: 16, qtd: 2, vel: 1, dir: 0, forma: 0, fase: 0, prender: 0 } }] };
+        tx.p = Object.assign(veDefProps(tx), { sc: 100, x: 540, y: 600, rot: -10 });
+        const logo = clip(2, 0, 0, 2.5, 'logo.png', { p: { sc: 50, x: 540, y: 1300, rot: 0, op: 100 }, fx: [{ id: id(), t: 'onda', on: true, v: { alt: 22, qtd: 3, vel: -1, dir: 90, forma: 40, fase: 0, prender: 0 } }] });
+        logo.k = { rot: [{ t: 0, v: 0, i: 'lin' }, { t: 2.5, v: 90, i: 'lin' }] };
+        return [fundo, tx, logo];
+    """, ""),
     # Ondulação em vídeo: com Luz e Cor e fade (shader, alfa × opacidade) e girado (desce com o giro: caixa com a margem)
     "ondavideo2": (1080, 1920, """
         const { clip } = __te, id = () => veFxNewId();
@@ -812,7 +824,7 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
         if k < len(todos):
             pega(k)
             difs.append((float(np.abs(previa[k].astype(np.int16) - ex[k].astype(np.int16)).mean()), k))
-    if nome in ("motion", "curvas", "fxmotion", "bloom", "invfill", "desfoqueanim", "girar", "desfoquevideo", "onda", "ondavideo", "ondatexto", "ondavideo2"):
+    if nome in ("motion", "curvas", "fxmotion", "bloom", "invfill", "desfoqueanim", "girar", "desfoquevideo", "onda", "ondavideo", "ondatexto", "ondavideo2", "ondagiro"):
         # motion: detalhes finos (anel, borda de máscara) quase não mexem na média: confere a pior região 30×30.
         # Contra o quadro exato do ffmpeg (o navegador, buscando no meio do quadro, às vezes entrega o vizinho: um
         # objeto rápido anda 30 px por quadro)

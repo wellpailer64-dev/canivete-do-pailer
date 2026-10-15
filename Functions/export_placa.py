@@ -316,10 +316,13 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
     # legendas: a placa monta e o libass desenha no quadro que desce para o codificador (_render, 2026-10-11)
     if not lay:
         return "sem camadas"
-    for c in lay:   # Ondulação: shader na placa (_onda_passos); imagem/texto girado ainda gira antes de subir (CPU)
-        if vc._onda_ativa(c.get("fx")) and c["tipo"] == "imagem" and (
-                c["rot"] % 360 or "rot" in c["kf"] or vc._ca_exprs(c.get("ca"), "t")["rot"]):
-            return "Ondulação em imagem girada"
+    for c in lay:   # Ondulação: shader na placa (_onda_passos); imagem girada com onda gira na placa (_giro_passos),
+        # menos com giro constante (ca_rot) ou sombra projetada (a sombra ainda gira na CPU)
+        if vc._onda_ativa(c.get("fx")) and c["tipo"] == "imagem" and (c["rot"] % 360 or "rot" in c["kf"]) and (
+                vc._ca_exprs(c.get("ca"), "t")["rot"] or vc._sombra_camada(c)):
+            return "Ondulação em imagem girada com sombra ou giro constante"
+        if vc._onda_ativa(c.get("fx")) and c["tipo"] == "imagem" and vc._ca_exprs(c.get("ca"), "t")["rot"]:
+            return "Ondulação em imagem com giro constante"
     for c in lay:
         if c.get("bm") and ((c["bm"] != "multiply" and c["bm"] != "add" and c["bm"] not in _BM_GLSL)
                             or vc._sombra_camada(c)):
@@ -743,6 +746,40 @@ def _onda_passos(fx, mw, mh, s, fps, t_ini, pasta, tag, margem=True, fmt=_FMT_AL
     return passos, M, M / s
 
 
+def _giro_passos(c, fps, pula, bw, bh, pasta, tag, fmt=_FMT_ALFA):
+    """Rotação da camada na placa (no lugar do rotate da CPU, mesma conta: horário na tela, interpolação linear, fora =
+    transparente). bw×bh = a textura que chega (px da textura, já com a margem da onda). Fixa: caixa RW×RH do giro;
+    com quadros-chave: caixa D×D da diagonal e o ângulo de cada quadro em trechos retos (tempo do clipe = pula no 1º
+    quadro). Animação constante de giro (ca_rot) não entra: fica na CPU. Devolve (passos, RW, RH) ou None se a curva é
+    picada demais."""
+    n = max(1, int(math.ceil((c["dur"] - pula) * fps)) + 2)
+    if "rot" in c["kf"]:
+        D = int(math.ceil(math.hypot(bw, bh))) + 2
+        RW = RH = D + D % 2
+        vals = [vc._valor_kf(c["kf"]["rot"], pula + i / fps) for i in range(n)]
+    else:
+        rad = math.radians(c["rot"])
+        RW = int(math.ceil(bw * abs(math.cos(rad)) + bh * abs(math.sin(rad)))) + 2
+        RH = int(math.ceil(bw * abs(math.sin(rad)) + bh * abs(math.cos(rad)))) + 2
+        RW, RH = RW + RW % 2, RH + RH % 2
+        vals = [c["rot"]] * n
+    tr = _trechos([math.radians(v) for v in vals], 0.0005)
+    if tr is None:
+        return None
+    arq = os.path.join(pasta, f"giro_{tag}.glsl")
+    with open(arq, "w", encoding="utf-8") as fh:
+        fh.write(f"//!HOOK MAIN\n//!BIND HOOKED\n//!DESC giro\n{_glsl_trechos('ANG', tr)}vec4 hook() {{\n"
+                 f"    float a = ANG(frame - 1), cs = cos(a), sn = sin(a);\n"
+                 f"    vec2 q = HOOKED_pos * HOOKED_size - HOOKED_size * 0.5;\n"
+                 f"    vec2 p = (vec2(q.x * cs + q.y * sn, -q.x * sn + q.y * cs) + HOOKED_size * 0.5) / HOOKED_size;\n"
+                 f"    if (p.x < 0.0 || p.y < 0.0 || p.x > 1.0 || p.y > 1.0) return vec4(0.0);\n"
+                 f"    return clamp(HOOKED_tex(p), 0.0, 1.0);\n}}\n")
+    # a textura cresce para a caixa do giro (centrada, borda transparente) e o shader gira dentro dela
+    return ([f"libplacebo=w={RW}:h={RH}:pos_x={(RW - bw) / 2:.3f}:pos_y={(RH - bh) / 2:.3f}:pos_w=iw:pos_h=ih:"
+             f"fillcolor=black@0:format={fmt}:disable_linear=1",
+             f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={fmt}:disable_linear=1"], RW, RH)
+
+
 def _shader_ca(v, W, H):
     """Aberração cromática (editor-fx.js "ca") como o exportador de CPU: cada canal ampliado a partir do centro (escalas
     normalizadas pela menor) e, com Raio, misturado ao original por uma queda radial (cheio até meio raio, nada no raio).
@@ -839,7 +876,10 @@ def _entrada_video(g, c, info, pasta, n_cam):
     # vídeo girado: o quadro desce e gira na CPU (como no exportador: quadro do tamanho da diagonal quando o giro anima)
     car = vc._ca_exprs(c.get("ca"), f"(t-{c['st']:.6f})")["rot"]
     gira_v = bool(c["rot"] % 360) or "rot" in c["kf"] or bool(car)
-    hib = (_fx_hibrido(c["fx"]) or gira_v) and not key_gpu
+    # giro na placa (_giro_passos) quando nada mais faz o clipe descer: antes todo vídeo girado descia a cada quadro.
+    # Com giro constante (ca_rot) ou efeito que desce, continua girando na CPU junto com eles
+    gira_gpu = gira_v and not car and not _fx_hibrido(c["fx"]) and not key_gpu
+    hib = (_fx_hibrido(c["fx"]) or (gira_v and not gira_gpu)) and not key_gpu
     # efeitos que descem para a CPU medem em px da mídia (encolher/suavizar do Chroma Key): sem reduzir antes deles
     red = min(1.0, k_max * 1.02) if k_max < 0.9 and not hib and not key_gpu else 1.0
     rw, rh = max(2, int(round(c["mw"] * red / 2)) * 2), max(2, int(round(c["mh"] * red / 2)) * 2)
@@ -864,6 +904,13 @@ def _entrada_video(g, c, info, pasta, n_cam):
     po, _, onda_mm = ([], 0, 0.0) if hib or key_gpu else _onda_passos(c["fx"], c["mw"], c["mh"], rw / c["mw"], g.fps, pula,
                                                                        pasta, f"v{n_cam}")
     efeito += "".join(p + "," for p in po)
+    if gira_gpu:   # depois dos efeitos e da onda, na caixa com a margem dela (px da textura)
+        M = (rw / c["mw"]) * onda_mm
+        gp = _giro_passos(c, g.fps, pula, rw + 2 * M, rh + 2 * M, pasta, f"v{n_cam}")
+        if gp is None:
+            raise RuntimeError("giro com quadros-chave picados demais para a placa")
+        efeito += "".join(p + "," for p in gp[0])
+        c["_giro_tam"] = (gp[1] * c["mw"] / rw, gp[2] * c["mw"] / rw)   # caixa girada em px da mídia
     opac = ""
     if key_gpu:
         # recorte inteiro na placa (shader); a saída já é RGBA. Antes dele, os efeitos da lista que vêm antes (Luz e Cor…)
@@ -920,7 +967,7 @@ def _entrada_video(g, c, info, pasta, n_cam):
                 c["_giro_tam"] = (RW, RH)
         opac = (f"hwdownload,format={baixo},scale=in_color_matrix={_mtx(info)},format=rgba,"
                 + (f"{fx_cpu}," if fx_cpu else "") + f"{gir}{a.lstrip(',') + ',' if a else ''}format=rgba,hwupload,")
-    elif not _opaca(c) and (sh_alfa := _shader_alfa(c, g.fps, pula, multiplica=bool(po))):   # com onda: alfa × opacidade
+    elif not _opaca(c) and (sh_alfa := _shader_alfa(c, g.fps, pula, multiplica=bool(po) or gira_gpu)):   # onda/giro: alfa × opacidade
         # fade de um clipe na placa (antes descia para a CPU a cada quadro): o alfa num shader, saída RGBA de 16 bits
         arq = os.path.join(pasta, f"alfa_v{n_cam}.glsl")
         with open(arq, "w", encoding="utf-8") as fh:
@@ -932,7 +979,7 @@ def _entrada_video(g, c, info, pasta, n_cam):
              if "op" in c["kf"] else f"colorchannelmixer=aa={c['op']:.4f}")
         # formato EXATO na placa: o que passou pelo libplacebo (giro/redução/Luz e Cor) é _FMT_CAM, o que subiu da CPU é
         # yuv420p; direto do decodificador é nv12/p010 (com "nv12|yuv420p" o ffmpeg escolhia errado e a exportação falhava)
-        baixo = _FMT_ALFA if po else _FMT_CAM if (giro or efeito) else "yuv420p" if not vk else _fmt_decodificado(info)
+        baixo = _FMT_ALFA if po or gira_gpu else _FMT_CAM if (giro or efeito) else "yuv420p" if not vk else _fmt_decodificado(info)
         opac = f"hwdownload,format={baixo},scale=in_color_matrix=bt709,format=rgba,{a},hwupload,"
     r = g.rotulo("v")
     g.filtros.append(f"[{k}:v:0]{_marca_cor(c['path'], info)}trim=start={vc._tempo_ffmpeg(s0 - ss)}:"
@@ -1030,6 +1077,10 @@ def _entrada_imagem(g, c, n_cam):
         RW, RH = RW + RW % 2, RH + RH % 2
         giro_fixo = f"rotate={rad:.6f}:c=black@0:ow={RW}:oh={RH}"
         ang = f"{c['rot']:.6f}"
+    # com Ondulação o giro vem DEPOIS da onda: os dois na placa, depois de subir (sem giro constante: motivo())
+    giro_placa = bool(vc._onda_ativa(c["fx"])) and ang is not None
+    if giro_placa:
+        giro_fixo = giro_anim = None
     depois = ([fx_anim] if fx_anim else []) + ([giro_anim] if giro_anim else [])
     if seq:
         k = g.entrada(["-f", "concat", "-safe", "0", "-i", seq])
@@ -1055,6 +1106,13 @@ def _entrada_imagem(g, c, n_cam):
     s_tex = tw / bw
     po, _, onda_mm = _onda_passos(c["fx"], c["mw"], c["mh"], s_tex, g.fps, 0.0, g.pasta, f"i{n_cam}")
     onda = "".join("," + p for p in po)
+    if giro_placa:
+        M = onda_mm * s_tex
+        gp = _giro_passos(c, g.fps, 0.0, tw + 2 * M, th + 2 * M, g.pasta, f"i{n_cam}")
+        if gp is None:
+            raise RuntimeError("giro com quadros-chave picados demais para a placa")
+        onda += "".join("," + p for p in gp[0])
+        RW, RH = gp[1], gp[2]
     if ang is not None:   # textura girada: o tamanho na tela é o dela (em px da mídia = textura ÷ redução) × escala
         wv, hv = f"({RW / red:.5f}*({kx}))", f"({RH / red:.5f}*({kx}))"
     else:

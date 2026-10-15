@@ -84,8 +84,8 @@ Gramática de motion que o Pailer aprovou:
   (`vePrSegEm = () => null`) para ver a prévia ao vivo.
 
 ## Pendências
-- (Feito 2026-10-15) **Ondulação na placa em shader** — ver plano-kanivete-encoder.md › 8.6. Só imagem/texto GIRADO
-  com onda ainda manda a exportação inteira para a CPU ("Ondulação em imagem girada").
+- (Feito 2026-10-15) **Ondulação na placa em shader** — ver plano-kanivete-encoder.md › 8.6 (com giro na placa). Ainda
+  manda tudo para a CPU: imagem com onda + giro constante (ca_rot), ou girada com onda E sombra projetada.
 - (Resolvido 2026-10-12) Prévia renderizada e exportação desenhando a mesma camada juntas apagavam a pasta uma da outra
   (`FileNotFoundError q00000.png`): `cena3d.inicio` agora usa pasta por sessão. Em aberto: 1× o ffmpeg caiu
   (3221225477) numa exportação da intro; o log se perdeu — se repetir, guardar o `export_fail_*.log`.
