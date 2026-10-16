@@ -163,8 +163,20 @@ Teste de 4K (estresse: material pesado, camadas, 10-bit, export, memória): plan
 PowerPoint moderno para as palestras do cliente: `Instructions/slider-kanivete.md` (modelo, API, exportar, armadilhas,
 pendências). `frontend/js/slider.js` (núcleo + comandos `SDK.cmd`), `slider-ui.js` (interface), `slider-show.js`
 (apresentação), `css/slider.css`, `Functions/slider_kanivete.py` (.dknv, PDF/PNG/MP4/PPTX editável, importar PPTX).
-Agente: `SDK.cmd('modelo', {tema})`, `SDK.cena(html, {novo: true})` por slide, `SDK.foto(n)` para conferir, `SDK.mapa()`.
-Teste: `py -3.13 testes/teste_slider.py` (porta 9333).
+Agente: `SDK.cmd('modelo', {tema})`, `SDK.cena(html, {novo: true})` por slide; ler BARATO com `SDK.texto()` → `SDK.revisar()` →
+`SDK.folha({caminho})` (ou `py -3.13 tools/sd.py texto|revisar|folha|cmd|lote|cena|js`, no app aberto, não fecha nada);
+`SDK.lote([...])` = um Ctrl+Z. Gráficos (`slider-grafico.js`, 14 modelos, CSV, PPTX nativo), paletas de cliente iguais às do
+Photo/Photoshop (`slider-cores.js`, .ase), animações/transições com prévia na mesa. Janela sem margem (padding 10 px como o Photo).
+PowerPoint com animações/transições/vídeo automático (`Functions/slider_pptx.py`, ida e volta), PDF pesquisável/leve, importar
+PDF em camadas, MP4 com animação e vídeo dentro, Kani criando a palestra (`slider_kani.py`, `slider-kani.js`).
+Testes: `py -3.13 testes/teste_slider.py`, `teste_slider_extra.py` (atalhos com teclado de verdade) e `teste_slider_arquivos.py
+[--kani]` (arquivos abertos no LibreOffice de `D:/kanivete_testes/libreoffice`) — porta 9333.
+
+## Tela da 1ª instalação
+`first_run.py` abre `frontend/instalar.html` (+ `js/instalar.js`) numa janela do pywebview: o carrossel da Home
+(`home-banners.js`), barra na identidade do KANIVETE e música opcional (`frontend/audio/instalador/musica.ogg`; sem o arquivo,
+o botão some). `DOWNLOADS` em ordem de tamanho (`mb`): leves primeiro, Whisper Medium por último; CLIP/Flan sem os formatos
+que o app não usa (`ignore`). Sem pywebview, cai na janela antiga em Tk. Prévia sem baixar: `py -3.13 first_run.py --demo [--cdp 9340]`.
 
 ## Lux Kanivete (Lk, magenta) — produto em 3D
 Ferramenta própria, independente do Editor (aba e página próprias como o Photo; barra lateral › 3D e Home; do Editor,

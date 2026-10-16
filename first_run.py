@@ -30,33 +30,41 @@ DOWNLOADS = [
         "type": "pip",
         "module": "pillow_heif",
         "package": "pillow-heif",
+        "mb": 4,
     },
     {
         "label": "Baixando modelo de transcrição (Whisper Small)",
         "type": "whisper",
         "model": "small",
+        "mb": 461,
     },
     {
         "label": "Baixando modelo de transcrição (Whisper Medium)",
         "type": "whisper",
         "model": "medium",
+        "mb": 1420,
     },
     {
         "label": "Baixando modelo de imagem (CLIP)",
         "type": "huggingface",
         "repo": "openai/clip-vit-base-patch32",
         "dest": "modelos_ia/clip",
+        "mb": 610,
+        # o repositório traz o MESMO modelo em PyTorch, TensorFlow e Flax: o app só usa o PyTorch (-1,2 GB)
+        "ignore": ["*.h5", "*.msgpack", "*.ot", "onnx/*", "*.onnx"],
     },
     {
         "label": "Baixando modelo de remoção de fundo (U2Net)",
         "type": "url",
         "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx",
+        "mb": 176,
         "dest": "modelos_ia/u2net/u2net.onnx",
     },
     {
         "label": "Baixando modelo de recorte preciso (ISNet)",
         "type": "url",
         "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx",
+        "mb": 179,
         "dest": "modelos_ia/u2net/isnet-general-use.onnx",
     },
     {
@@ -64,6 +72,7 @@ DOWNLOADS = [
         "type": "url",
         "github_latest": "https://api.github.com/repos/denoland/deno/releases/latest",
         "asset_pattern": "deno-x86_64-pc-windows-msvc.zip",
+        "mb": 45,
         "dest": "modelos_ia/deno.zip",
         "extract": "modelos_ia/deno.exe",
     },
@@ -72,6 +81,9 @@ DOWNLOADS = [
         "type": "huggingface",
         "repo": "google/flan-t5-base",
         "dest": "modelos_ia/cerebro/flan_t5_base",
+        "mb": 1000,
+        # 4 cópias do mesmo modelo no repositório; o transformers carrega o model.safetensors (-3,1 GB)
+        "ignore": ["*.h5", "*.msgpack", "*.ot", "pytorch_model.bin", "onnx/*", "*.onnx"],
     },
     {
         # Série estável 8.1 (só recebe correções), não a compilação diária ("master"): a diária de 2026-09 passou a
@@ -81,6 +93,7 @@ DOWNLOADS = [
         "type": "url",
         "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-gpl-8.1.zip",
         "versao": "n8.1",
+        "mb": 150,
         "dest": "modelos_ia/ffmpeg.zip",
         "extract": ["modelos_ia/ffmpeg.exe", "modelos_ia/ffprobe.exe"],
     },
@@ -88,10 +101,14 @@ DOWNLOADS = [
         "label": "Baixando Rclone",
         "type": "url",
         "url": "https://downloads.rclone.org/rclone-current-windows-amd64.zip",
+        "mb": 22,
         "dest": "modelos_ia/rclone.zip",
         "extract": "modelos_ia/rclone.exe",
     },
 ]
+
+# os leves e rápidos primeiro, os modelos grandes por último (a pessoa vê o app andando e o que demora fica no fim)
+DOWNLOADS.sort(key=lambda it: it.get("mb", 0))
 
 
 # ── Helpers de caminho ──────────────────────────────────────────────────────
@@ -316,6 +333,7 @@ def _run_item(item: dict, on_progress=None, on_label=None,
             repo_id=item["repo"],
             local_dir=_abs(item["dest"]),
             local_dir_use_symlinks=False,
+            ignore_patterns=item.get("ignore"),
         )
 
     elif tipo == "url":
@@ -424,8 +442,8 @@ def _configurar_rclone(on_label=None, on_progress=None):
 
 # ── Interface Tkinter ───────────────────────────────────────────────────────
 
-def executar_instalacao():
-    """Abre janela de instalação Tkinter e bloqueia até concluir."""
+def _instalacao_tk():
+    """Janela antiga (Tkinter): reserva quando a tela nova (pywebview) não abre."""
     root = tk.Tk()
     root.title("KANIVETE — Instalação")
     root.configure(bg="#0D0D0D")
@@ -553,3 +571,134 @@ def executar_instalacao():
 
     threading.Thread(target=instalar, daemon=True).start()
     root.mainloop()
+
+
+# ── Tela nova (pywebview): banners das ferramentas, barra na identidade do KANIVETE e música opcional ──────────────
+def _pagina_instalador():
+    """frontend/instalar.html: ao lado do .exe (build) ou no pacote (_MEIPASS), como o main.py acha o index.html"""
+    bases = [BASE_DIR, getattr(sys, "_MEIPASS", BASE_DIR), os.path.dirname(os.path.abspath(__file__))]
+    for b in bases:
+        p = os.path.join(b, "frontend", "instalar.html")
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+def _instalar_itens(estado, demo=False):
+    """roda a lista (do menor para o maior) atualizando `estado` para a página: label, pct do item, geral (por MB)"""
+    total_mb = sum(it.get("mb", 50) for it in DOWNLOADS) or 1
+    estado.update(total=len(DOWNLOADS), total_mb=total_mb)
+    feito = 0.0
+    falhas = []
+    for i, item in enumerate(DOWNLOADS):
+        mb = item.get("mb", 50)
+        estado.update(i=i, pct=0, girando=False)
+
+        def prog(p, _mb=mb, _f=feito):
+            estado["pct"] = p
+            estado["feito_mb"] = _f + _mb * p / 100
+            estado["geral"] = 100 * estado["feito_mb"] / total_mb
+
+        def rotulo(t):
+            estado["label"] = t
+
+        def gira():
+            estado["girando"] = True
+
+        def para():
+            estado["girando"] = False
+            prog(100)
+        prog(0)
+        if demo:
+            rotulo(item["label"])
+            import time
+            for p in range(0, 101, 4):
+                prog(p)
+                time.sleep(0.05 + mb / 40000)
+        elif _item_existe(item):
+            rotulo("✓ Já instalado: " + item["label"].replace("Baixando ", ""))
+        else:
+            try:
+                _run_item(item, on_progress=prog, on_label=rotulo, on_spinner_start=gira, on_spinner_stop=para)
+            except Exception as e:
+                falhas.append(item["label"])
+                rotulo(f"⚠ Falhou: {item['label']} ({e})")
+        feito += mb
+        prog(100) if not falhas or falhas[-1] != item["label"] else None
+        estado["feito_mb"] = feito
+        estado["geral"] = 100 * feito / total_mb
+    if not demo:
+        try:
+            _configurar_rclone(on_label=lambda t: estado.update(label=t), on_progress=lambda p: None)
+        except Exception as e:
+            print("[instalação] rclone:", e)
+    return falhas
+
+
+def executar_instalacao(demo=False):
+    """Tela da 1ª instalação. Bloqueia até concluir. Sem pywebview (ou sem a página), cai na janela antiga em Tk."""
+    pagina = _pagina_instalador()
+    try:
+        import webview
+    except Exception:
+        webview = None
+    if not webview or not pagina:
+        return _instalacao_tk()
+
+    estado = {"label": "Preparando…", "pct": 0, "geral": 0, "i": 0, "total": len(DOWNLOADS), "feito_mb": 0, "total_mb": 0,
+              "girando": False, "fim": False, "falhas": []}
+
+    class _Api:
+        def estado(self):
+            return estado
+
+    janela = webview.create_window("KANIVETE — Instalação", url=pagina, js_api=_Api(), width=1180, height=760,
+                                   min_size=(900, 600), background_color="#0B0A0C")
+    pode_fechar = {"ok": False}
+    try:
+        janela.events.closing += lambda: pode_fechar["ok"]   # não fecha no meio (como a antiga)
+    except Exception:
+        pass
+
+    def trabalhar():
+        import time
+        try:
+            falhas = _instalar_itens(estado, demo)
+            estado["falhas"] = falhas
+            if not falhas and not demo:
+                _marcar_instalado()
+        except Exception as e:
+            estado["label"] = f"❌ Erro durante a instalação: {e}"
+        finally:
+            estado["fim"] = True
+            estado["geral"] = 100
+            time.sleep(3.2 if not demo else 6)
+            pode_fechar["ok"] = True
+            try:
+                janela.destroy()
+            except Exception:
+                pass
+
+    # música de fundo sem precisar de clique (o WebView2 bloqueia som automático por padrão)
+    var = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"
+    antes = os.environ.get(var)
+    os.environ[var] = ((antes or "") + " --autoplay-policy=no-user-gesture-required").strip()
+    try:
+        webview.start(trabalhar)
+    except Exception as e:
+        print("[instalação] tela nova falhou, usando a antiga:", e)
+        if not estado["fim"]:
+            return _instalacao_tk()
+    finally:
+        if antes is None:
+            os.environ.pop(var, None)
+        else:
+            os.environ[var] = antes
+
+
+if __name__ == "__main__":
+    # prévia da tela sem baixar nada: py -3.13 first_run.py --demo [--cdp 9340]
+    if "--demo" in sys.argv:
+        if "--cdp" in sys.argv:
+            os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"--remote-debugging-port={sys.argv[sys.argv.index('--cdp') + 1]}"
+        executar_instalacao(demo=True)

@@ -7,8 +7,9 @@ const SDU = { z: 1, ajustar: true, vivo: false, mapa: new Map(), clip: null, men
 const sdEl = id => document.getElementById(id);
 const SD_FORMAS = [['ret', 'Retângulo'], ['elipse', 'Elipse'], ['tri', 'Triângulo'], ['losango', 'Losango'], ['estrela', 'Estrela'], ['hexagono', 'Hexágono'],
     ['seta', 'Seta'], ['linha', 'Linha'], ['coracao', 'Coração'], ['balao', 'Balão de fala']];
-const SD_ANIMS = [['nenhuma', 'Nenhuma'], ['esmaecer', 'Esmaecer'], ['subir', 'Subir'], ['descer', 'Descer'], ['esquerda', 'Da esquerda'], ['direita', 'Da direita'], ['zoom', 'Zoom'], ['girar', 'Girar']];
-const SD_TRANS = [['nenhuma', 'Nenhuma'], ['esmaecer', 'Esmaecer'], ['deslizar', 'Deslizar'], ['empurrar', 'Empurrar'], ['zoom', 'Zoom'], ['cobrir', 'Cobrir']];
+const SD_ANIMS = [['nenhuma', 'Nenhuma'], ['esmaecer', 'Esmaecer'], ['subir', 'Subir'], ['descer', 'Descer'], ['esquerda', 'Da esquerda'], ['direita', 'Da direita'], ['zoom', 'Zoom'], ['pular', 'Pular (elástico)'],
+    ['girar', 'Girar'], ['crescer', 'Crescer de baixo (gráficos)'], ['revelar', 'Revelar da esquerda']];
+const SD_TRANS = [['nenhuma', 'Nenhuma'], ['esmaecer', 'Esmaecer'], ['deslizar', 'Deslizar'], ['empurrar', 'Empurrar'], ['subir', 'Subir'], ['zoom', 'Zoom'], ['cobrir', 'Cobrir'], ['revelar', 'Revelar (círculo)'], ['preto', 'Passar pelo preto']];
 const SD_MESCLAS = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'soft-light', 'hard-light', 'difference', 'luminosity'];
 const SD_EXT_IMG = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i, SD_EXT_VID = /\.(mp4|mov|webm|m4v|mkv)$/i;
 
@@ -42,6 +43,11 @@ function sdMontarUI() {
         <button class="sd-fe" data-menu="formas" title="Formas"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="10" height="10" rx="2"/><circle cx="16" cy="16" r="5"/></svg><span>Forma</span></button>
         <button class="sd-fe" data-a="imagem" title="Imagem ou GIF"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/></svg><span>Imagem</span></button>
         <button class="sd-fe" data-a="video" title="Vídeo"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="M17 10l4-2v8l-4-2z"/></svg><span>Vídeo</span></button>
+        <button class="sd-fe" data-a="grafico" title="Gráfico (barras, linha, pizza, rosca, metas…)"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg><span>Gráfico</span></button>
+        <button class="sd-fe sd-fe-kani" data-a="kani" title="Kani: criar a palestra a partir de um tema ou texto, reescrever o texto selecionado, escrever as notas"><img src="identidade/kani.webp" alt=""><span>Kani</span></button>
+        <i class="sd-sep"></i>
+        <button class="sd-fe" data-menu="animar" title="Animação de entrada do objeto selecionado"><svg viewBox="0 0 24 24"><path d="M5 19l5-14 3 8 2-4 4 10"/><circle cx="19" cy="5" r="1.5"/></svg><span>Animar</span></button>
+        <button class="sd-fe" data-menu="transicao" title="Transição para este slide"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="9" height="12" rx="1.5"/><path d="M15 9l3 3-3 3M12 12h6"/></svg><span>Transição</span></button>
         <i class="sd-sep"></i>
         <button class="sd-ic" data-a="desfazer" title="Desfazer (Ctrl+Z)">↶</button><button class="sd-ic" data-a="refazer" title="Refazer (Ctrl+Shift+Z)">↷</button>
         <i class="sd-sep"></i>
@@ -56,8 +62,8 @@ function sdMontarUI() {
         <aside class="sd-lista" id="sd-lista"></aside>
         <main class="sd-mesa" id="sd-mesa"><div class="sd-papel" id="sd-papel"><div class="sd-palco" id="sd-palco"></div><div class="sd-sobre" id="sd-sobre"></div></div></main>
         <aside class="sd-lado">
-          <div class="sd-abas"><button data-aba="design" class="on">Design</button><button data-aba="camadas">Camadas</button></div>
-          <div class="sd-painel" id="sd-props"></div><div class="sd-painel" id="sd-camadas" hidden></div>
+          <div class="sd-abas"><button data-aba="design" class="on">Design</button><button data-aba="cores">Cores</button><button data-aba="camadas">Camadas</button></div>
+          <div class="sd-painel" id="sd-props"></div><div class="sd-painel" id="sd-cores" hidden></div><div class="sd-painel" id="sd-camadas" hidden></div>
         </aside>
       </div>
       <footer class="sd-rodape"><textarea id="sd-notas" placeholder="Notas do apresentador (aparecem na visão do apresentador e vão para o PPTX)…"></textarea><div class="sd-status" id="sd-status"></div></footer>
@@ -69,7 +75,8 @@ function sdMontarUI() {
     raiz.addEventListener('click', sdClique);
     sdEl('sd-notas').addEventListener('input', e => { const s = sdSlide(); if (s) { s.notas = e.target.value; SD.sujo = true; clearTimeout(SD.tg); SD.tg = setTimeout(sdGuardarRascunho, 1200); } });
     sdEl('sd-notas').addEventListener('change', () => sdTitulo());
-    sdMontarMesa(); sdMontarLista(); sdMontarPaineis();
+    sdMontarMesa(); sdMontarLista(); sdMontarPaineis(); if (typeof sdcMontar === 'function') sdcMontar();
+    raiz.addEventListener('mousedown', e => { SDU.foco = e.target.closest('#sd-lista') ? 'lista' : e.target.closest('#sd-mesa') ? 'mesa' : SDU.foco; }, true);
     SD.ouvintes.push(sdAoMudar);
     new ResizeObserver(() => { if (SDU.ajustar) sdAjustarZoom(); }).observe(sdEl('sd-mesa'));
     sdApi() && sdApi().ve_fontes().then(r => { SDU.fontes = (r && r.fontes) || []; sdEl('sd-fontes').innerHTML = SDU.fontes.map(f => `<option value="${sdEsc(f)}">`).join(''); }).catch(() => {});
@@ -84,7 +91,8 @@ function sdAoMudar(q) {
     if (q === 'camadas' || q === 'slide') { sdRenderMesa(); sdRenderPaineis(); sdBarraFmt(); sdMiniAgendar(sdSlide()); sdTitulo(); return; }
     sdRenderTudo();
 }
-function sdRenderTudo() { sdRenderMesa(true); sdRenderLista(); sdRenderPaineis(); sdRenderNotas(); sdTitulo(); sdBarraFmt(); }
+// mesa incremental também no "tudo" (só a camada que mudou é recriada; vídeo não recarrega a cada comando)
+function sdRenderTudo() { sdRenderMesa(false); sdRenderLista(); sdRenderPaineis(); sdRenderNotas(); sdTitulo(); sdBarraFmt(); }
 function sdTitulo() {
     const t = sdEl('sd-titulo'); if (!t || !SD.doc) return;
     t.innerHTML = `${sdEsc(SD.arquivo ? sdNomeArq(SD.arquivo) : SD.doc.nome)}<small>${SD.arquivo ? '.dknv' : ''}${SD.sujo ? ' •' : ''}</small>`;
@@ -107,7 +115,7 @@ function sdLobby() {
           <p>Slides 16:9 com camadas, vídeo e GIF, temas prontos e modo apresentação. Abra um PowerPoint, comece de um modelo ou do zero, e exporte em PDF, PPTX, PNG ou vídeo.</p></div>
         <div class="kl-acoes"><button class="ie-btn ie-btn-primario kl-novo" data-sdl="nova"><svg class="i"><use href="#i-file"/></svg> Nova apresentação</button>
           <div class="kl-mais"><button class="ie-btn" data-sdl="abrir"><svg class="i"><use href="#i-folder"/></svg> Abrir…</button>
-          <button class="ie-btn" data-sdl="pptx">Importar PowerPoint…</button></div></div></div>
+          <button class="ie-btn" data-sdl="pptx">Importar PowerPoint ou PDF…</button><button class="ie-btn" data-sdl="kani" title="A Kani escreve o roteiro e o Slider monta no tema">✨ Criar com a Kani…</button></div></div></div>
       <div class="sd-modelos"><div class="ie-recentes-tit">Modelos</div><div class="sd-modelos-lista">${Object.entries(SD_TEMAS).map(([k, t]) => `
         <button class="sd-modelo" data-sdl="tema:${k}" style="--f:${t.cores.fundo};--t:${t.cores.tinta};--d:${t.cores.destaque}">
           <span class="sd-modelo-arte"><i style="font-family:'${t.titulo}'">Aa</i><em></em></span><b>${t.nome}</b><small>${t.titulo} · ${t.texto}</small></button>`).join('')}</div></div>
@@ -122,7 +130,8 @@ function sdLobby() {
             const b = e.target.closest('[data-sdl]'); if (!b) return;
             const a = b.dataset.sdl;
             if (a === 'nova') { if (await sdPodeDescartar()) { await sdUi('novo', {}); sdMostrarEditor(); } }
-            else if (a === 'abrir' || a === 'pptx') { const r2 = await sdUi('abrir', a === 'pptx' ? { caminho: await sdApi().vk_dialogo('abrir', ['PowerPoint (*.pptx)']) || '' } : {}); if (r2 && !r2.cancelado) { sdRelatorio(r2); sdMostrarEditor(); } }
+            else if (a === 'abrir' || a === 'pptx') { const r2 = await sdUi('abrir', a === 'pptx' ? { caminho: await sdApi().vk_dialogo('abrir', ['PowerPoint ou PDF (*.pptx;*.pdf)', 'PowerPoint (*.pptx)', 'PDF (*.pdf)']) || '' } : {}); if (r2 && !r2.cancelado) { sdRelatorio(r2); sdMostrarEditor(); } }
+            else if (a === 'kani') { sdKaniAbrir(b); }
             else if (a === 'continuar') { if (!SD.doc) { const r3 = sdRascunho(); await sdPrepararUrls(r3.doc); sdCarregar(r3.doc, r3.arquivo); SD.sujo = !!r3.sujo; } sdMostrarEditor(); }
             else if (a.startsWith('tema:')) { if (await sdPodeDescartar()) { await sdUi('modelo', { tema: a.slice(5) }); sdMostrarEditor(); } }
             else if (a.startsWith('arq:')) { const r4 = await sdUi('abrir', { caminho: a.slice(4) }); if (r4 && !r4.cancelado) sdMostrarEditor(); }
@@ -154,12 +163,43 @@ async function sdClique(e) {
     if (b.dataset.menu) { sdAbrirMenu(b.dataset.menu, b); return; }
     if (b.dataset.alinhar) { await sdUi('alinhar', { como: b.dataset.alinhar }); return; }
     if (b.dataset.distribuir) { await sdUi('distribuir', { eixo: b.dataset.distribuir }); return; }
-    if (b.dataset.aba) { SDU.aba = b.dataset.aba; document.querySelectorAll('.sd-abas button').forEach(x => x.classList.toggle('on', x === b)); sdEl('sd-props').hidden = SDU.aba !== 'design'; sdEl('sd-camadas').hidden = SDU.aba !== 'camadas'; sdRenderPaineis(); return; }
+    if (b.dataset.aba) { sdAba(b.dataset.aba); return; }
     if (b.dataset.fmt) { sdFmt(b.dataset.fmt, b); return; }
     sdAcao(b.dataset.a);
 }
+function sdAba(aba) {
+    SDU.aba = aba; document.querySelectorAll('.sd-abas button').forEach(x => x.classList.toggle('on', x.dataset.aba === aba));
+    sdEl('sd-props').hidden = aba !== 'design'; sdEl('sd-cores').hidden = aba !== 'cores'; sdEl('sd-camadas').hidden = aba !== 'camadas'; sdRenderPaineis();
+}
+// prévia na mesa (como o PowerPoint toca o efeito ao escolher): animações de entrada do slide (ou só das ids) e a transição
+function sdPreverAnim(ids) {
+    const s = sdSlide(); if (!s || typeof sdAnimQuadros !== 'function') return 0;
+    const cs = (ids && ids.length ? ids : s.camadas.map(c => c.id)).map(i => sdCamada(i, s)).filter(c => c && !c.oculto && sdTemAnim(c));
+    let t = 0;
+    for (const c of cs) {
+        const m = SDU.mapa.get(c.id); if (!m) continue;
+        const d = (c.anim.dur || 0.6) * 1000, atraso = (c.anim.atraso || 0) * 1000 + (c.anim.clique ? t : 0);
+        m.el.animate(sdAnimQuadros(c, m.el.style.transform || ''), { duration: d, delay: atraso, easing: SD_ANIM_CURVA[c.anim.tipo] || 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+        if (c.anim.clique) t = atraso + d + 300;
+    }
+    return cs.length;
+}
+function sdPreverTransicao() {
+    const s = sdSlide(), tr = s && s.transicao, raiz = sdEl('sd-palco') && sdEl('sd-palco').firstElementChild;
+    if (!raiz || !tr || !tr.tipo || tr.tipo === 'nenhuma') return false;
+    const q = sdTransQuadros(tr.tipo, 1, 1); if (!q) return false;
+    sdEl('sd-papel').style.overflow = 'hidden';
+    raiz.animate(q[0], { duration: (+tr.dur || 0.5) * 1000, easing: 'cubic-bezier(.4,0,.2,1)' }).finished.then(() => { sdEl('sd-papel').style.overflow = ''; }, () => {});
+    return true;
+}
+function sdAlternarClique() {
+    const cs = sdAlvos({}).filter(c => c.anim); if (!cs.length) return;
+    sdHist(); const v = !cs.every(c => c.anim.clique); cs.forEach(c => { c.anim.clique = v; }); sdMudou('camadas');
+}
 async function sdAcao(a) {
     if (a === 'apresentar') return sdApresentar(0);
+    if (a === 'grafico') return sdGrafGaleria(document.querySelector('#sd-barra [data-a="grafico"]'));
+    if (a === 'kani') return sdKaniAbrir(document.querySelector('#sd-barra [data-a="kani"]'));
     if (a === 'apresentar-aqui') return sdApresentar(SD.atual);
     if (a === 'texto') return sdUi('texto', { html: 'Clique duas vezes para editar' });
     if (a === 'titulo') return sdUi('texto', { html: 'Título', tam: 96, peso: 600, fonte: SD.doc.tema.titulo, w: 1400, h: 140 });
@@ -178,11 +218,12 @@ async function sdAcao(a) {
 // ───────────── menus ─────────────
 function sdItensMenu(m) {
     const temSel = SD.sel.length > 0, s = sdSlide(), rec = sdRecentes();
-    const exp = [['PDF', '', () => sdUi('exportar', { formato: 'pdf' })], ['PowerPoint editável (.pptx)', '', () => sdExportarPptx()], ['PowerPoint em imagens (.pptx)', '', () => sdUi('exportar', { formato: 'pptx_imagens' })],
-        ['Imagens PNG (um por slide)', '', () => sdUi('exportar', { formato: 'png' })], ['Vídeo MP4 (com transições)', '', () => sdUi('exportar', { formato: 'mp4' })], ['Slide atual em PNG', '', () => sdUi('exportar', { formato: 'png', slides: 'atual' })]];
+    const exp = [['PDF (alta qualidade, texto pesquisável)', '', () => sdExportarUi('pdf')], ['PDF leve (e-mail, WhatsApp)', '', () => sdExportarUi('pdf', { qualidade: 'leve' })],
+        ['PowerPoint editável (.pptx)', '', () => sdExportarPptx()], ['PowerPoint em imagens (.pptx)', '', () => sdExportarUi('pptx_imagens')],
+        ['Imagens PNG (um por slide)', '', () => sdExportarUi('png')], ['Vídeo MP4 (animações, transições e vídeos)', '', () => sdExportarUi('mp4')], ['Slide atual em PNG', '', () => sdExportarUi('png', { slides: 'atual' })]];
     const L = {
         arquivo: [['Nova apresentação', 'Ctrl+N', async () => { if (await sdPodeDescartar()) sdUi('novo', {}); }], ['Abrir…', 'Ctrl+O', async () => { const r = await sdUi('abrir', {}); sdRelatorio(r); }],
-            ['Importar PowerPoint…', '', async () => { const p = await sdApi().vk_dialogo('abrir', ['PowerPoint (*.pptx)']); if (p) sdRelatorio(await sdUi('abrir', { caminho: p })); }],
+            ['Importar PowerPoint ou PDF…', '', async () => { const p = await sdApi().vk_dialogo('abrir', ['PowerPoint ou PDF (*.pptx;*.pdf)', 'PowerPoint (*.pptx)', 'PDF (*.pdf)']); if (p && await sdPodeDescartar()) sdRelatorio(await sdUi('abrir', { caminho: p })); }],
             ...(rec.length ? [['—Recentes'], ...rec.slice(0, 6).map(p => [sdNomeArq(p), '', () => sdUi('abrir', { caminho: p })])] : []),
             ['-'], ['Salvar', 'Ctrl+S', () => sdSalvarUi()], ['Salvar como…', 'Ctrl+Shift+S', () => sdSalvarUi(true)], ['-'], ['—Exportar'], ...exp, ['-'], ['Fechar (voltar ao início)', '', sdFechar]],
         exportar: exp,
@@ -190,11 +231,18 @@ function sdItensMenu(m) {
             ['Copiar', 'Ctrl+C', sdCopiar, !temSel], ['Colar', 'Ctrl+V', sdColar, !SDU.clip], ['Duplicar', 'Ctrl+D', () => sdUi('duplicar', {}), !temSel], ['Apagar', 'Del', () => sdUi('apagar', {}), !temSel],
             ['-'], ['Selecionar tudo', 'Ctrl+A', () => sdUi('selecionar', { ids: s.camadas.filter(c => !c.trava).map(c => c.id) })]],
         inserir: [['Texto', 'T', () => sdAcao('texto')], ['Título', '', () => sdAcao('titulo')], ['Imagem ou GIF…', '', () => sdAcao('imagem')], ['Vídeo…', '', () => sdAcao('video')],
+            ['—Gráfico'], ...SD_GRAF_MODELOS.map(m => [m.nome, '', () => sdUi('grafico', { modelo: m.id })]),
             ['—Tabela'], ...[[2, 2], [3, 3], [4, 3], [5, 4]].map(([l, k]) => [`Tabela ${l} × ${k}`, '', () => sdUi('tabela', { linhas: l, colunas: k })]), ['-'], ['—Formas'],
             ...SD_FORMAS.map(([k, n]) => [n, '', () => sdUi('forma', { forma: k })])],
         formas: SD_FORMAS.map(([k, n]) => [n, '', () => sdUi('forma', { forma: k })]),
+        animar: [['—Entrada do objeto selecionado'], ...SD_ANIMS.map(([k, n]) => [(sdAlvos({})[0]?.anim?.tipo || 'nenhuma') === k ? '✓ ' + n : n, '', async () => { await sdUi('animacao', { tipo: k, clique: !!sdAlvos({})[0]?.anim?.clique }); sdPreverAnim(SD.sel); }, !temSel]),
+            ['-'], [(sdAlvos({}).length && sdAlvos({}).every(c => c.anim && c.anim.clique) ? '✓ ' : '') + 'Esperar o clique (passo)', '', sdAlternarClique, !sdAlvos({}).some(c => c.anim)],
+            ['▶ Prever as animações deste slide', '', () => { if (!sdPreverAnim()) sdToast('Este slide não tem animações', 'aviso'); }], ['▶ Ver em tela cheia', '', () => sdApresentar(SD.atual, { soEste: true })]],
+        transicao: [['—Ao entrar neste slide'], ...SD_TRANS.map(([k, n]) => [((s && s.transicao && s.transicao.tipo) || 'nenhuma') === k ? '✓ ' + n : n, '', async () => { await sdUi('slide_transicao', { tipo: k, dur: (s.transicao && s.transicao.dur) || 0.5 }); sdPreverTransicao(); }]),
+            ['-'], ['Esta transição em todos os slides', '', () => sdUi('slide_transicao', { ...(s.transicao || {}), todos: true })], ['▶ Prever', '', () => sdPreverTransicao()]],
         slide: [['—Novo slide'], ...Object.entries(SD_LAYOUTS).map(([k, n]) => [n, k === 'titulo_texto' ? 'Ctrl+M' : '', () => sdUi('slide_novo', { layout: k })]), ['-'],
-            ['Duplicar slide', '', () => sdUi('slide_duplicar', {})], [s && s.oculto ? 'Mostrar slide' : 'Ocultar slide', '', () => sdUi('slide_props', { oculto: !(s && s.oculto) })],
+            ['—Trocar o layout deste slide (mantém os textos)'], ...Object.entries(SD_LAYOUTS).map(([k, n]) => [n, '', () => sdUi('slide_layout', { layout: k })]), ['-'],
+            ['Duplicar slide', 'Ctrl+Shift+D', () => sdUi('slide_duplicar', {})], [s && s.oculto ? 'Mostrar slide' : 'Ocultar slide', '', () => sdUi('slide_props', { oculto: !(s && s.oculto) })],
             ['Apagar slide', '', () => sdUi('slide_apagar', {}), SD.doc.slides.length < 2], ['-'], ['Este fundo em todos os slides', '', () => sdUi('slide_fundo', { ...s.fundo, todos: true })],
             ['Esta transição em todos os slides', '', () => sdUi('slide_transicao', { ...(s.transicao || {}), todos: true })]],
         organizar: [['Trazer para a frente', 'Ctrl+]', () => sdUi('ordem', { para: 'frente' }), !temSel], ['Enviar para trás', 'Ctrl+[', () => sdUi('ordem', { para: 'tras' }), !temSel],
@@ -204,7 +252,7 @@ function sdItensMenu(m) {
             ['Distribuir na horizontal', '', () => sdUi('distribuir', { eixo: 'h' }), SD.sel.length < 3], ['Distribuir na vertical', '', () => sdUi('distribuir', { eixo: 'v' }), SD.sel.length < 3], ['-'],
             ['Agrupar', 'Ctrl+G', () => sdUi('agrupar', {}), SD.sel.length < 2], ['Desagrupar', 'Ctrl+Shift+G', () => sdUi('desagrupar', {}), !sdAlvos({}).some(c => c.grupo)], ['-'],
             ['Travar / destravar', 'Ctrl+L', () => sdAlternar('trava'), !temSel], ['Ocultar / mostrar', 'Ctrl+H', () => sdAlternar('oculto'), !temSel]],
-        exibir: [['Apresentar do início', 'F5', () => sdApresentar(0)], ['Apresentar deste slide', 'Shift+F5', () => sdApresentar(SD.atual)], ['-'],
+        exibir: [['Apresentar do início', 'F5', () => sdApresentar(0)], ['Apresentar deste slide', 'Shift+F5', () => sdApresentar(SD.atual)], ['Prever animações deste slide', '', () => { if (!sdPreverAnim()) sdToast('Este slide não tem animações', 'aviso'); }], ['-'],
             ['Ajustar à tela', 'Ctrl+0', () => sdAcao('ajustar')], ['Tamanho real (100%)', 'Ctrl+1', () => sdAcao('z100')], ['Ampliar', 'Ctrl+=', () => sdAcao('zoom+')], ['Reduzir', 'Ctrl+−', () => sdAcao('zoom-')], ['-'],
             [(SDU.guias ? '✓ ' : '') + 'Guias inteligentes', '', () => { SDU.guias = !SDU.guias; }], [(sdEl('sd').classList.contains('sem-notas') ? '' : '✓ ') + 'Notas do apresentador', '', () => sdEl('sd').classList.toggle('sem-notas')]],
     };
@@ -230,6 +278,10 @@ function sdAbrirMenu(m, ancora, xy) {
 function sdFecharMenuFora(e) { if (SDU.menu && !SDU.menu.contains(e.target)) sdFecharMenu(); }
 function sdFecharMenu() { if (SDU.menu) SDU.menu.remove(); SDU.menu = null; document.removeEventListener('mousedown', sdFecharMenuFora, true); }
 async function sdSalvarUi(como = false) { const r = await sdUi('salvar', { como }); if (r && r.caminho) sdToast('Salvo: ' + sdNomeArq(r.caminho) + '.dknv'); }
+async function sdExportarUi(formato, op = {}) {
+    const r = await sdUi('exportar', { formato, ...op });
+    if (r && r.caminho) sdToast(`Exportado: ${String(r.caminho).split(/[\\/]/).pop()}${r.tamanho ? ' · ' + r.tamanho : ''}`);
+}
 async function sdExportarPptx() { const r = await sdUi('exportar', { formato: 'pptx' }); if (r && r.caminho) sdToast('PowerPoint salvo' + (r.avisos && r.avisos.length ? ` (${r.avisos.length} aviso(s): ${r.avisos[0]})` : '')); }
 function sdAlternar(k) { const cs = sdAlvos({}); const v = !cs.every(c => c[k]); return sdUi('editar', { [k]: v || null }); }
 
@@ -248,12 +300,13 @@ function sdAplicarZoom() {
 }
 
 // ───────────── mesa: desenho incremental (vídeo não recarrega quando só a posição muda) ─────────────
+const sdJsCamada = c => JSON.stringify(c) + (c.tipo === 'grafico' ? JSON.stringify(SD.doc.tema) : '');   // gráfico usa as cores do tema
 function sdRenderMesa(tudo = false) {
     const palco = sdEl('sd-palco'), s = sdSlide(); if (!palco || !s) return;
     if (tudo || palco.dataset.slide !== s.id || !palco.firstElementChild) {
         palco.innerHTML = ''; SDU.mapa.clear(); palco.dataset.slide = s.id;
         const el = sdMontarSlide(s, 'edit'); palco.appendChild(el);
-        for (const c of s.camadas) SDU.mapa.set(c.id, { el: el.querySelector(`[data-id="${c.id}"]`), js: JSON.stringify(c) });
+        for (const c of s.camadas) SDU.mapa.set(c.id, { el: el.querySelector(`[data-id="${c.id}"]`), js: sdJsCamada(c) });
         sdAplicarZoom();
         return;
     }
@@ -263,7 +316,7 @@ function sdRenderMesa(tudo = false) {
     let ant = raiz.querySelector('.sd-fundo');
     for (const c of s.camadas) {
         vivos.add(c.id);
-        const js = JSON.stringify(c), m = SDU.mapa.get(c.id);
+        const js = sdJsCamada(c), m = SDU.mapa.get(c.id);
         let el = m && m.el;
         if (!m || m.js !== js) {
             const novo = sdCamadaEl(c, 'edit');
@@ -352,10 +405,18 @@ function sdMontarMesa() {
         let k = 0;
         for (const f of fs) {
             let p = (f.pywebviewFullPath || f.path || '').replace(/\\/g, '/');
-            if (/\.(pptx|dknv)$/i.test(p)) { if (await sdPodeDescartar()) sdRelatorio(await sdUi('abrir', { caminho: p })); return; }
+            if (/\.(pptx|dknv|pdf)$/i.test(p)) { if (await sdPodeDescartar()) sdRelatorio(await sdUi('abrir', { caminho: p })); return; }
             if (!p && /^image\//.test(f.type)) { const d = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); }); const r = await sdApi().sd_gravar_midia(d, f.name || 'imagem'); p = r && r.path; }
             if (!p) continue;
             const tipo = SD_EXT_VID.test(p) ? 'video' : SD_EXT_IMG.test(p) ? 'imagem' : null; if (!tipo) continue;
+            // solto em cima de um "Espaço da imagem" (forma do layout) ou de outra imagem: entra no lugar dela, do mesmo tamanho
+            const s = sdSlide(), vaga = !k && [...s.camadas].reverse().find(c => !c.oculto && !c.trava && sdDentro(c, mx, my) && ((c.tipo === 'forma' && /espa[cç]o|foto|imagem/i.test(c.nome || '')) || c.tipo === 'imagem'));
+            if (vaga) {
+                await sdUrl(p);
+                const r = await sdUi(tipo, { src: p, x: vaga.x, y: vaga.y, w: vaga.w, h: vaga.h, rot: vaga.rot || 0, raio: vaga.raio || 0, ajuste: 'cobrir', posicao: s.camadas.indexOf(vaga) });
+                if (r) { await sdUi('apagar', { ids: [vaga.id] }); SD.sel = [r.id]; sdAvisar('sel'); sdToast('Imagem colocada no espaço do layout'); }
+                k++; continue;
+            }
             const r = await sdUi(tipo, { src: p });
             if (r) { const c = sdCamada(r.id, sdSlide()); c.x = Math.round(mx - c.w / 2 + k * 30); c.y = Math.round(my - c.h / 2 + k * 30); k++; sdMudou('camadas'); }
         }
@@ -559,14 +620,24 @@ function sdRenderLista() {
     const L = sdEl('sd-lista'); if (!L || !SD.doc) return;
     const k = 176 / SD.doc.largura;
     L.innerHTML = SD.doc.slides.map((s, i) => `<div class="sd-it${i === SD.atual ? ' on' : ''}${s.oculto ? ' oculto' : ''}" data-si="${i}" draggable="true">
-        <span class="sd-n">${i + 1}</span><div class="sd-mini" style="width:${SD.doc.largura * k}px;height:${SD.doc.altura * k}px"><div class="sd-mini-in" data-mini="${s.id}" style="transform:scale(${k})"></div></div></div>`).join('') +
+        <span class="sd-n">${i + 1}</span><div class="sd-mini" style="width:${SD.doc.largura * k}px;height:${SD.doc.altura * k}px"><div class="sd-mini-in" data-mini="${s.id}" style="transform:scale(${k})"></div><span class="sd-it-fx" hidden></span></div></div>`).join('') +
         '<button class="sd-novo" data-novo="1">+ Novo slide</button>';
-    SD.doc.slides.forEach(s => sdMini(s));
+    SD.doc.slides.forEach(s => sdMini(s, true));
     sdMarcarLista();
 }
-function sdMini(s) {
+// miniatura: só redesenha o slide que mudou (cache pelo JSON do slide; a lista inteira é refeita a cada comando)
+SDU.minis = new Map();
+function sdMini(s, reaproveitar = false) {
     const box = document.querySelector(`[data-mini="${s.id}"]`); if (!box) return;
-    box.innerHTML = ''; box.appendChild(sdMontarSlide(s, 'mini'));
+    const js = JSON.stringify(s) + JSON.stringify(SD.doc.tema) + Object.keys(SD.posters).length + Object.keys(SD.fontesArq).length, m = SDU.minis.get(s.id);
+    let el;
+    if (reaproveitar && m && m.js === js) el = m.el;
+    else { el = sdMontarSlide(s, 'mini'); SDU.minis.set(s.id, { js, el }); }
+    box.innerHTML = ''; box.appendChild(el);
+    if (SDU.minis.size > SD.doc.slides.length + 20) { const vivos = new Set(SD.doc.slides.map(x => x.id)); for (const k of SDU.minis.keys()) if (!vivos.has(k)) SDU.minis.delete(k); }
+    const fx = box.parentElement.querySelector('.sd-it-fx');   // selos: ⇢ transição · ★ animação
+    if (fx) { const tr = s.transicao && s.transicao.tipo && s.transicao.tipo !== 'nenhuma', an = s.camadas.some(c => c.anim && c.anim.tipo && c.anim.tipo !== 'nenhuma');
+        fx.textContent = (tr ? '⇢' : '') + (an ? '★' : ''); fx.title = [tr ? 'transição: ' + s.transicao.tipo : '', an ? 'tem animações' : ''].filter(Boolean).join(' · '); fx.hidden = !tr && !an; }
 }
 function sdMiniAgendar(s) { if (!s) return; clearTimeout(SDU.tm); SDU.tm = setTimeout(() => sdMini(s), 250); }
 function sdMarcarLista() {
@@ -603,7 +674,11 @@ function sdMontarPaineis() {
         else if (a === 'sombra') { const cs = sdAlvos({}); sdUi('editar', { sombra: cs.every(c => c.sombra) ? null : { x: 0, y: 12, desf: 36, cor: 'rgba(0,0,0,.35)' } }); }
         else if (a === 'trocar') { const c = sdAlvos({})[0]; if (c) sdTrocarMidia(c); }
         else if (a === 'anim-ver') { sdApresentar(SD.atual, { soEste: true }); }
+        else if (a === 'anim-prever') { sdPreverAnim(SD.sel); }
+        else if (a === 'trans-prever') { sdPreverTransicao(); }
     });
+    // escolheu o efeito: toca na mesa
+    P.addEventListener('change', e => { const p = e.target.dataset && e.target.dataset.p; if (p && p.startsWith('anim.')) setTimeout(() => sdPreverAnim(SD.sel), 30); else if (p && p.startsWith('transicao.')) setTimeout(sdPreverTransicao, 30); });
     P.addEventListener('focusin', e => { if (e.target.closest('[data-alvo="tema"]') && !SDU.temaAntes) SDU.temaAntes = sdClone(SD.doc.tema); });
     const C = sdEl('sd-camadas');
     C.addEventListener('click', e => {
@@ -631,12 +706,13 @@ function sdRenderPaineis() {
     if (!SD.doc) return;
     const P = sdEl('sd-props'), C = sdEl('sd-camadas'); if (!P) return;
     if (SDU.aba === 'camadas') sdRenderCamadas(C);
+    if (SDU.aba === 'cores' && typeof sdcRender === 'function') { const f = document.activeElement; if (!(f && f.closest && f.closest('#sd-cores input'))) sdcRender(); }
     if (P.contains(document.activeElement) && document.activeElement.matches('input[type=text],input[type=number],textarea')) return;
     const cs = sdAlvos({});
     P.innerHTML = cs.length ? sdPainelCamada(cs) : sdPainelSlide();
 }
 function sdRenderCamadas(C) {
-    const s = sdSlide(), ic = { texto: 'T', forma: '◆', imagem: '▣', video: '▶' };
+    const s = sdSlide(), ic = { texto: 'T', forma: '◆', imagem: '▣', video: '▶', grafico: '▥' };
     C.innerHTML = s.camadas.length ? [...s.camadas].reverse().map(c => `<div class="sd-cam${SD.sel.includes(c.id) ? ' on' : ''}${c.oculto ? ' oculta' : ''}" data-ci="${c.id}" draggable="true">
         <span class="sd-cam-ic">${ic[c.tipo] || '•'}</span>${c.grupo ? '<span class="sd-cam-g" title="Em grupo">⧉</span>' : ''}<span class="sd-cam-n">${sdEsc(c.nome || (c.tipo === 'texto' ? sdTextoPuro(c).slice(0, 30) : c.tipo))}</span>
         <button class="sd-cam-b${c.oculto ? ' off' : ''}" data-cv="oculto" data-id="${c.id}" title="Ocultar / mostrar">${c.oculto ? '◌' : '●'}</button>
@@ -653,7 +729,7 @@ const sdT = (p, rot, v, o = {}) => `<label class="sd-row"><span>${rot}</span><in
 const sdSec = (t, h) => `<section class="sd-sec"><h5>${t}</h5>${h}</section>`;
 function sdPainelCamada(cs) {
     const c = cs[0], tipos = new Set(cs.map(x => x.tipo)), um = tipos.size === 1 ? c.tipo : null;
-    let h = sdSec(cs.length > 1 ? `${cs.length} objetos` : ({ texto: 'Texto', forma: 'Forma', imagem: c.src && /\.gif$/i.test(c.src) ? 'GIF' : 'Imagem', video: 'Vídeo' }[c.tipo]),
+    let h = sdSec(cs.length > 1 ? `${cs.length} objetos` : ({ texto: 'Texto', forma: 'Forma', imagem: c.src && /\.gif$/i.test(c.src) ? 'GIF' : 'Imagem', video: 'Vídeo', grafico: 'Gráfico' }[c.tipo]),
         `<div class="sd-grade2">${sdN('x', 'X', Math.round(c.x))}${sdN('y', 'Y', Math.round(c.y))}${sdN('w', 'Larg.', Math.round(c.w), { min: 1 })}${sdN('h', 'Alt.', Math.round(c.h), { min: 1 })}${sdN('rot', 'Giro °', c.rot || 0, { step: 1 })}</div>
         ${sdR('opac', 'Opacidade', Math.round((c.opac ?? 1) * 100), 0, 100, 1, { k: 0.01, mostra: Math.round((c.opac ?? 1) * 100) + '%' })}`);
     if (um === 'texto') h += sdSec('Tipografia', `${sdT('fonte', 'Fonte', c.fonte, { list: 'sd-fontes' })}<div class="sd-grade2">${sdN('tam', 'Tamanho', c.tam, { min: 4 })}${sdS('peso', 'Peso', c.peso || 400, [[100, 'Fino'], [200, 'Extraleve'], [300, 'Leve'], [400, 'Normal'], [500, 'Médio'], [600, 'Seminegrito'], [700, 'Negrito'], [800, 'Extranegrito'], [900, 'Preto']])}</div>
@@ -664,6 +740,7 @@ function sdPainelCamada(cs) {
     if (um === 'forma') h += sdSec('Forma', `${sdS('forma', 'Tipo', c.forma, SD_FORMAS)}${sdCor('preench', 'Preenchimento', c.preench)}${sdCor('preench2', 'Degradê até', c.preench2)}${c.preench2 ? sdR('angulo', 'Ângulo', c.angulo ?? 90, 0, 360) : ''}
         ${sdCor('traco', 'Contorno', c.traco)}<div class="sd-grade2">${sdN('espessura', 'Espessura', c.espessura || 0, { min: 0 })}${c.forma === 'ret' || c.forma === 'balao' ? sdN('raio', 'Cantos', c.raio || 0, { min: 0 }) : ''}</div>
         ${c.forma === 'linha' ? sdS('ponta', 'Ponta', c.ponta || '', [['', 'Nenhuma'], ['seta', 'Seta']]) : ''}${sdC('tracejado', 'Tracejado', c.tracejado)}`);
+    if (um === 'grafico' && cs.length === 1 && typeof sdPainelGrafico === 'function') h += sdPainelGrafico(c);
     if (um === 'imagem' || um === 'video') h += sdSec(um === 'video' ? 'Vídeo' : 'Imagem', `<button class="sd-btn sd-larga" data-pa="trocar">Trocar arquivo…</button>
         ${sdS('ajuste', 'Ajuste', c.ajuste || 'cobrir', [['cobrir', 'Preencher (cortar)'], ['conter', 'Caber inteira'], ['esticar', 'Esticar']])}${sdN('raio', 'Cantos', c.raio || 0, { min: 0 })}
         ${(c.ajuste || 'cobrir') === 'cobrir' ? sdR('focoX', 'Foco ↔', c.focoX ?? 50, 0, 100) + sdR('focoY', 'Foco ↕', c.focoY ?? 50, 0, 100) : ''}
@@ -673,7 +750,7 @@ function sdPainelCamada(cs) {
     h += sdSec('Efeitos', `<button class="sd-btn sd-larga${cs.every(x => x.sombra) ? ' on' : ''}" data-pa="sombra">${cs.every(x => x.sombra) ? '✓ ' : ''}Sombra</button>
         ${c.sombra ? `<div class="sd-grade2">${sdN('sombra.x', 'Sombra X', c.sombra.x || 0)}${sdN('sombra.y', 'Sombra Y', c.sombra.y ?? 12)}${sdN('sombra.desf', 'Desfoque', c.sombra.desf ?? 36, { min: 0 })}</div>${sdCor('sombra.cor', 'Cor da sombra', c.sombra.cor || 'rgba(0,0,0,.35)')}` : ''}
         ${sdN('desfoque', 'Desfocar', c.desfoque || 0, { min: 0 })}${sdS('mescla', 'Mesclagem', c.mescla || 'normal', SD_MESCLAS.map(m => [m, { normal: 'Normal', multiply: 'Multiplicar', screen: 'Tela', overlay: 'Sobrepor', darken: 'Escurecer', lighten: 'Clarear', 'color-dodge': 'Subexposição', 'color-burn': 'Superexposição', 'soft-light': 'Luz suave', 'hard-light': 'Luz forte', difference: 'Diferença', luminosity: 'Luminosidade' }[m]]))}`);
-    h += sdSec('Animação de entrada', `${sdS('anim.tipo', 'Efeito', c.anim?.tipo || 'nenhuma', SD_ANIMS)}${c.anim && c.anim.tipo !== 'nenhuma' ? `<div class="sd-grade2">${sdN('anim.dur', 'Duração (s)', c.anim.dur ?? 0.6, { step: 0.1, min: 0.1 })}${sdN('anim.atraso', 'Atraso (s)', c.anim.atraso || 0, { step: 0.1, min: 0 })}</div>${sdC('anim.clique', 'Esperar o clique (passo da apresentação)', c.anim.clique)}<button class="sd-btn sd-larga" data-pa="anim-ver">▶ Ver no slide</button>` : ''}`);
+    h += sdSec('Animação de entrada', `${sdS('anim.tipo', 'Efeito', c.anim?.tipo || 'nenhuma', SD_ANIMS)}${c.anim && c.anim.tipo !== 'nenhuma' ? `<div class="sd-grade2">${sdN('anim.dur', 'Duração (s)', c.anim.dur ?? 0.6, { step: 0.1, min: 0.1 })}${sdN('anim.atraso', 'Atraso (s)', c.anim.atraso || 0, { step: 0.1, min: 0 })}</div>${sdC('anim.clique', 'Esperar o clique (passo da apresentação)', c.anim.clique)}<div class="sd-grade2"><button class="sd-btn sd-larga" data-pa="anim-prever">▶ Prever aqui</button><button class="sd-btn sd-larga" data-pa="anim-ver">Tela cheia</button></div>` : ''}`);
     h += sdSec('Camada', `${sdC('trava', 'Travada (não seleciona na mesa)', c.trava)}${sdC('oculto', 'Oculta', c.oculto)}`);
     return h;
 }
@@ -685,7 +762,7 @@ function sdPainelSlide() {
         ${f.tipo === 'imagem' ? `<button class="sd-btn sd-larga" data-pa="fundo-img">${f.img ? 'Trocar imagem…' : 'Escolher imagem…'}</button>${sdS('fundo.ajuste', 'Ajuste', f.ajuste || 'cobrir', [['cobrir', 'Preencher'], ['conter', 'Caber']], { alvo: 'slide' })}${sdR('fundo.escurecer', 'Escurecer', f.escurecer || 0, 0, 0.9, 0.05, { alvo: 'slide' })}` : ''}
         <button class="sd-btn sd-larga" data-pa="fundo-todos">Usar este fundo em todos</button>`) +
         sdSec('Transição', `${sdS('transicao.tipo', 'Efeito', tr.tipo || 'nenhuma', SD_TRANS, { alvo: 'slide' })}${sdN('transicao.dur', 'Duração (s)', tr.dur ?? 0.5, { step: 0.1, min: 0.1, alvo: 'slide' })}
-        <button class="sd-btn sd-larga" data-pa="trans-todos">Usar em todos os slides</button>${sdN('dur', 'Tempo no vídeo (s)', s.dur || 5, { step: 0.5, min: 0.5, alvo: 'slide' })}${sdC('oculto', 'Ocultar na apresentação', s.oculto, { alvo: 'slide' })}`) +
+        <div class="sd-grade2"><button class="sd-btn sd-larga" data-pa="trans-prever">▶ Prever</button><button class="sd-btn sd-larga" data-pa="trans-todos">Em todos</button></div>${sdN('dur', 'Tempo no vídeo (s)', s.dur || 5, { step: 0.5, min: 0.5, alvo: 'slide' })}${sdC('oculto', 'Ocultar na apresentação', s.oculto, { alvo: 'slide' })}`) +
         sdSec('Tema da apresentação', `<div class="sd-temas">${Object.entries(SD_TEMAS).map(([k, t]) => `<button class="sd-tema" data-pa="tema:${k}" title="Aplicar o tema ${t.nome} em todos os slides" style="--f:${t.cores.fundo};--t:${t.cores.tinta};--d:${t.cores.destaque}"><i style="font-family:'${t.titulo}'">Aa</i><small>${t.nome}</small></button>`).join('')}</div>
         ${sdT('tema.titulo', 'Fonte dos títulos', T.titulo, { list: 'sd-fontes', alvo: 'tema' })}${sdT('tema.texto', 'Fonte do texto', T.texto, { list: 'sd-fontes', alvo: 'tema' })}
         ${['fundo', 'tinta', 'destaque', 'suave', 'apoio'].map(k => sdCor('tema.cores.' + k, { fundo: 'Fundo', tinta: 'Texto', destaque: 'Destaque', suave: 'Suave', apoio: 'Apoio' }[k], T.cores[k], { alvo: 'tema' })).join('')}
@@ -703,7 +780,7 @@ async function sdColar() {
     if (!SDU.clip) return;
     sdHist();
     const s = sdSlide(), novos = [];
-    for (const c of sdClone(SDU.clip)) {
+    for (const c of sdNovosGrupos(sdClone(SDU.clip))) {
         c.id = sdId(); if (s.camadas.some(x => x.x === c.x && x.y === c.y)) { c.x += 30; c.y += 30; }
         if (c.src) await sdUrl(c.src);
         s.camadas.push(c); novos.push(c.id);
@@ -726,6 +803,9 @@ document.addEventListener('keydown', e => {
     if (ctrl && k === 'y') { feito(); sdDesfazer(true); return; }
     if (ctrl && k === 'n') { feito(); sdPodeDescartar().then(ok => ok && sdUi('novo', {})); return; }
     if (ctrl && k === 'm') { feito(); sdUi('slide_novo', {}); return; }
+    if (ctrl && e.shiftKey && k === 'd') { feito(); sdUi('slide_duplicar', {}); return; }
+    if (ctrl && e.shiftKey && k === 'c') { feito(); if (SD.sel.length) { sdUi('estilo_copiar', {}); sdToast('Estilo copiado (Ctrl+Shift+V cola)'); } return; }
+    if (ctrl && e.shiftKey && k === 'v') { feito(); if (SD.sel.length) sdUi('estilo_colar', {}); return; }
     if (ctrl && k === 'c') { feito(); sdCopiar(); return; }
     if (ctrl && k === 'x') { feito(); sdCopiar(); sdUi('apagar', {}); return; }
     if (ctrl && k === 'v') { if (SDU.clip || localStorage.getItem('sd-clip')) { feito(); sdColar(); } return; }
@@ -740,13 +820,22 @@ document.addEventListener('keydown', e => {
     if (ctrl && k === '0') { feito(); sdAcao('ajustar'); return; }
     if (ctrl && k === '1') { feito(); sdAcao('z100'); return; }
     if (ctrl && (k === 'b' || k === 'i' || k === 'u') && SD.sel.length) { feito(); sdFmt({ b: 'bold', i: 'italic', u: 'underline' }[k]); return; }
-    if ((k === 'delete' || k === 'backspace')) { feito(); if (SD.sel.length) sdUi('apagar', {}); else if (document.activeElement && document.activeElement.closest('#sd-lista')) sdUi('slide_apagar', {}); return; }
+    // Delete: apaga a seleção; sem seleção e com a lista de slides em foco (último clique nela), apaga o slide
+    if ((k === 'delete' || k === 'backspace')) { feito(); if (SD.sel.length) sdUi('apagar', {}); else if (SDU.foco === 'lista' && SD.doc.slides.length > 1) sdUi('slide_apagar', {}); return; }
+    if (k === 'pageup' || k === 'pagedown' || ((k === 'home' || k === 'end') && !ctrl)) {
+        feito(); const n = k === 'home' ? 0 : k === 'end' ? SD.doc.slides.length - 1 : SD.atual + (k === 'pagedown' ? 1 : -1);
+        if (n >= 0 && n < SD.doc.slides.length && n !== SD.atual) { SD.atual = n; SD.sel = []; sdAvisar('atual'); } return;
+    }
     if (k === 'escape') { if (SD.sel.length) { feito(); SD.sel = []; sdAvisar('sel'); } return; }
     if (k === 't' && !ctrl) { feito(); sdAcao('texto'); return; }
     if (k === 'enter' && SD.sel.length === 1) { const c = sdCamada(SD.sel[0], sdSlide()); if (c && c.tipo === 'texto') { feito(); sdEditarTexto(c); } return; }
     if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown'].includes(k)) {
         feito();
-        if (!SD.sel.length) { const n = SD.atual + (k === 'arrowdown' || k === 'arrowright' ? 1 : -1); if (n >= 0 && n < SD.doc.slides.length) { SD.atual = n; sdAvisar('atual'); } return; }
+        if (!SD.sel.length) {
+            const n = SD.atual + (k === 'arrowdown' || k === 'arrowright' ? 1 : -1); if (n < 0 || n >= SD.doc.slides.length) return;
+            if (ctrl && SDU.foco === 'lista') { sdUi('slide_mover', { para: n + 1 }); return; }   // Ctrl+setas na lista: muda o slide de lugar
+            SD.atual = n; sdAvisar('atual'); return;
+        }
         const p = e.shiftKey ? 10 : 1;
         if (!SDU.setaHist) { sdHist(); SDU.setaHist = true; }
         sdAlvos({}).forEach(c => { if (k === 'arrowleft') c.x -= p; if (k === 'arrowright') c.x += p; if (k === 'arrowup') c.y -= p; if (k === 'arrowdown') c.y += p; });

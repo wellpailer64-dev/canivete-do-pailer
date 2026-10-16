@@ -3707,6 +3707,8 @@ class ApiBridge:
                 if lista is None:
                     return {"success": False, "error": "Photoshop não encontrado neste computador"}
                 return {"success": True, "lista": lista, "origem": versao}
+            if origem not in ("arquivo", None, "") and os.path.isfile(origem):   # caminho direto (agente)
+                return {"success": True, "lista": amostras.ler_arquivo(origem), "origem": os.path.splitext(os.path.basename(origem))[0]}
             if not _window:
                 return {"success": False}
             r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), allow_multiple=False, file_types=(
@@ -3715,6 +3717,16 @@ class ApiBridge:
                 return {"success": False, "cancelled": True}
             path = r[0]
             return {"success": True, "lista": amostras.ler_arquivo(path), "origem": os.path.splitext(os.path.basename(path))[0]}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ie_amostras_gravar(self, caminho, lista):
+        """Paletas → .ase (Adobe Swatch Exchange, com os grupos): Slider › Cores › Exportar."""
+        try:
+            from Functions import amostras
+            if not caminho.lower().endswith(".ase"):
+                caminho += ".ase"
+            return {"success": True, "path": amostras.escrever_ase(lista, caminho)}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -4310,6 +4322,13 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def sd_gravar_imagem(self, caminho, data_url):
+        from Functions import slider_kanivete
+        try:
+            return slider_kanivete.gravar_imagem(caminho, data_url)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def sd_gravar_midia(self, data_url, nome="colado"):
         from Functions import slider_kanivete
         try:
@@ -4323,6 +4342,19 @@ class ApiBridge:
             return slider_kanivete.importar_pptx(caminho)
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    def sd_importar_pdf(self, caminho):
+        """PDF → slides em camadas (fundo, fotos, textos editáveis), uma página por slide"""
+        from Functions import slider_kanivete
+        try:
+            return slider_kanivete.importar_pdf(caminho)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def sd_kani(self, acao, dados=None):
+        """Kani no Slider: roteiro de palestra, notas do apresentador, reescrever texto (Functions/slider_kani.py)"""
+        from Functions import slider_kani
+        return slider_kani.pedir(acao, dados)
 
     def ve_3d_estudio_video(self, spec):
         """vídeo fotorrealista da Cena 3D (quadro a quadro no Blender) — Functions/blender_render.estudio_video"""

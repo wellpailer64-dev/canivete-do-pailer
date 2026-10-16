@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KANIVETE — Instalação</title>
+<!-- Tela da 1ª instalação (first_run.py abre numa janela do pywebview). Banners = o mesmo carrossel da Home (home-banners.js). -->
+<link rel="stylesheet" href="css/app.css">
+<style>
+  html, body { height: 100%; }
+  body.instalador { margin: 0; overflow: hidden; background: #0b0a0c; color: #f2efe9; font-family: var(--font-ui, "Segoe UI", sans-serif);
+      display: grid; grid-template-rows: auto 1fr auto; user-select: none; }
+  .in-video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .2; filter: saturate(.4); z-index: -2; pointer-events: none; }
+  .in-luz { position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background: radial-gradient(60% 55% at 85% 115%, rgba(212,129,74,.28), transparent 70%), radial-gradient(45% 50% at 0% -10%, rgba(212,129,74,.16), transparent 70%),
+                  linear-gradient(180deg, rgba(11,10,12,.2), rgba(11,10,12,.85)); }
+  .in-topo { display: flex; align-items: center; gap: 14px; padding: 26px clamp(20px, 4vw, 56px) 0; }
+  .in-topo img { width: 46px; height: 46px; border-radius: 10px; box-shadow: 0 0 0 1px rgba(255,255,255,.12), 0 8px 24px rgba(0,0,0,.45); }
+  .in-topo .wordmark { height: 22px; color: #f2efe9; }
+  .in-topo small { display: block; margin-top: 6px; color: rgba(242,239,233,.55); font-size: 12.5px; letter-spacing: .02em; }
+  .in-meio { display: flex; flex-direction: column; justify-content: center; padding: 18px clamp(20px, 4vw, 56px); min-height: 0; }
+  .in-meio .home-banners { width: min(100%, 1240px); margin: 0 auto; }
+  .in-meio .hb-cta { display: none !important; }
+  .in-meio .hb-slide, .in-meio .hb-chip { cursor: default; }
+  .in-rodape { padding: 0 clamp(20px, 4vw, 56px) 26px; }
+  .in-caixa { width: min(100%, 1240px); margin: 0 auto; padding: 18px 22px 16px; border-radius: 16px; background: rgba(20,18,21,.82);
+      box-shadow: 0 0 0 1px rgba(255,255,255,.07), 0 18px 50px rgba(0,0,0,.5); }
+  .in-linha { display: flex; align-items: baseline; gap: 16px; }
+  .in-pct { font: 800 34px/1 var(--font-ui, "Segoe UI"); color: var(--primary, #D4814A); font-variant-numeric: tabular-nums; min-width: 92px; }
+  .in-txt { flex: 1; min-width: 0; }
+  .in-item { color: #f2efe9; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .in-conta { margin-top: 3px; color: rgba(242,239,233,.5); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .in-trilho { position: relative; height: 12px; margin-top: 14px; border-radius: 99px; background: rgba(255,255,255,.07); overflow: hidden; }
+  .in-barra { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 99px; transition: width .45s cubic-bezier(.2,.8,.2,1);
+      background: linear-gradient(90deg, #a85a2c, #D4814A 55%, #ffb27a); box-shadow: 0 0 18px rgba(212,129,74,.55); }
+  .in-barra::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+      background-size: 40% 100%; background-repeat: no-repeat; animation: in-brilho 1.8s linear infinite; }
+  @keyframes in-brilho { from { background-position: -40% 0; } to { background-position: 140% 0; } }
+  .in-sub { height: 3px; margin-top: 6px; border-radius: 99px; background: rgba(255,255,255,.05); overflow: hidden; }
+  .in-sub i { display: block; height: 100%; width: 0; background: rgba(212,129,74,.55); transition: width .3s; }
+  body.girando .in-sub i { width: 30% !important; animation: in-vai 1.2s ease-in-out infinite alternate; }
+  @keyframes in-vai { from { transform: translateX(-10%); } to { transform: translateX(240%); } }
+  .in-baixo { display: flex; align-items: center; gap: 12px; margin-top: 12px; color: rgba(242,239,233,.45); font-size: 12px; }
+  .in-baixo p { flex: 1; margin: 0; }
+  .in-som { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px 0 10px; border: 1px solid rgba(255,255,255,.12); border-radius: 99px;
+      background: rgba(255,255,255,.04); color: #f2efe9; font: 600 12px var(--font-ui, "Segoe UI"); cursor: pointer; }
+  .in-som:hover { border-color: var(--primary, #D4814A); }
+  .in-som svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .in-som .onda { transition: opacity .2s; } .in-som.off .onda { opacity: 0; } .in-som .x { opacity: 0; } .in-som.off .x { opacity: 1; }
+  .in-som:not(.off) .onda { animation: in-pulsa 1.4s ease-in-out infinite; }
+  @keyframes in-pulsa { 50% { opacity: .35; } }
+  .in-som[hidden], .in-credito[hidden] { display: none; }
+  .in-credito { color: rgba(242,239,233,.35); font-size: 11px; }
+  body.fim .in-barra { background: linear-gradient(90deg, #D4814A, #ffb27a); }
+  body.fim .in-pct { color: #ffb27a; }
+  @media (max-height: 700px) { .in-meio .hb-trilho { display: none; } }
+</style>
+</head>
+<body class="instalador">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-kanivete" viewBox="0 -30 5270 1060"><path class="wm-a" stroke="none" d="M0 1000Q40 952 40 840V525H382L524 840L582 968Q605 986 636 1000H374Q341 952 341 840L235 604V840Q235 952 275 1000ZM1075 640 1048 525H1249L1322 840L1346 946Q1365 979 1398 1000H1118Q1121 952 1121 840L1089 702H895L865 840Q865 952 869 1000H707Q741 979 759 944L852 525H934L909 640ZM0 0H275Q235 48 235 160V420L465 0H555L319 430L341 475H40V160Q40 48 0 0ZM1494 0H1723L1913 475H1718L1616 220V475H1534V160Q1534 48 1494 0ZM1738 525H1933L2035 780V525H2117V985L2123 1000H1928ZM928 0H1128L1238 475H1037L990 273L946 475H864L949 92ZM2307 0H2582Q2542 48 2542 160V475H2347V160Q2347 48 2307 0ZM2307 1000Q2347 952 2347 840V525H2542V840Q2542 952 2582 1000ZM2157 0Q2117 48 2117 160V475H2035V160Q2035 48 1995 0ZM1494 1000Q1534 952 1534 840V525H1616V840Q1616 952 1656 1000Z"/><path class="wm-b" stroke="none" d="M4120 0H4644V250L4594 86H4480V475H4284V86H4170L4120 250ZM3494 0H3932V250L3888 82H3735Q3729 116 3729 160V392H3834V330L3866 392V470H3729V475H3534V160Q3534 48 3494 0ZM4802 0H5240V250L5196 82H5043Q5037 116 5037 160V392H5142V330L5174 392V470H5037V475H4842V160Q4842 48 4802 0ZM2928 1000 2840 525H3041L3068 673L3095 525H3177L3110 898L3128 1000ZM3494 1000Q3534 952 3534 840V525H3729V840Q3729 883 3735 916H3902L3940 790V1000ZM4802 1000Q4842 952 4842 840V525H5037V840Q5037 883 5043 916H5210L5248 790V1000ZM2704 0H2984Q2974 48 2974 160L3032 475H2831L2755 63Q2738 24 2704 0ZM4244 1000Q4284 952 4284 840V525H4480V840Q4480 952 4520 1000ZM3313 0Q3279 24 3261 63L3244 160L3187 475H3105L3162 160Q3162 48 3151 0Z"/></symbol></svg>
+  <video class="in-video" src="video/home-bg.webm?v=4" autoplay muted loop playsinline aria-hidden="true"></video>
+  <div class="in-luz"></div>
+  <header class="in-topo">
+    <img src="identidade/splash.png" alt="">
+    <div><svg class="wordmark wordmark-duo" viewBox="0 -30 5270 1060" aria-label="KANIVETE"><use href="#i-kanivete"/></svg>
+      <small>Preparando o seu canivete: as ferramentas de IA rodam no seu computador, então elas vêm agora, uma vez só.</small></div>
+  </header>
+  <main class="in-meio"><section class="home-banners" id="home-banners" aria-label="Ferramentas do KANIVETE"></section></main>
+  <footer class="in-rodape"><div class="in-caixa">
+    <div class="in-linha"><div class="in-pct" id="in-pct">0%</div>
+      <div class="in-txt"><div class="in-item" id="in-item">Preparando…</div><div class="in-conta" id="in-conta"></div></div></div>
+    <div class="in-trilho"><div class="in-barra" id="in-barra"></div></div>
+    <div class="in-sub"><i id="in-item-barra"></i></div>
+    <div class="in-baixo"><p>Os menores vêm primeiro; os modelos grandes de IA ficam por último. Pode usar o computador normalmente enquanto isso.</p>
+      <span class="in-credito" id="in-credito">♪ música de fundo</span>
+      <button class="in-som" id="in-som" title="Desligar a música"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="onda" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="x" d="M17 9l5 6M22 9l-5 6"/></svg><span>Música</span></button></div>
+  </div></footer>
+  <audio id="in-musica" src="audio/instalador/musica.ogg" loop preload="auto"></audio>
+  <script src="js/home-banners.js"></script>
+  <script src="js/instalar.js"></script>
+</body>
+</html>

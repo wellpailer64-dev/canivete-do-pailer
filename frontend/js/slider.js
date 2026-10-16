@@ -10,7 +10,7 @@ const SD = {
     urls: {}, posters: {}, dados: {},      // caminho → URL do servidor local · capa do vídeo · data URL (exportar)
     curto: false, ouvintes: [],
 };
-const SD_RASCUNHO = 'sd-rascunho', SD_RECENTES = 'sd-recentes';
+const SD_RASCUNHO = 'sd-rascunho', SD_RECENTES = 'sd-recentes';   // (as paletas ficam em IE.prefs, ver slider-cores.js)
 const sdApi = () => window.pywebview && window.pywebview.api;
 const sdEsc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const sdId = () => Math.random().toString(36).slice(2, 10);
@@ -46,21 +46,33 @@ function sdTxt(o, tema) {
 }
 // luminância relativa (0 = preto, 1 = branco): os layouts escolhem o par escuro/claro do tema por ela
 function sdLum(h) { const m = String(h || '').match(/^#?([0-9a-f]{6})/i); if (!m) return 1; const v = [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16) / 255).map(c => c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4); return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]; }
+// contraste (WCAG) e cor legível: escurece/clareia a cor até chegar no mínimo contra o fundo (o destaque de um tema
+// claro, ex. verde-água no branco, fica 2,5:1 — no número grande/subtítulo ele vira um tom mais fechado da MESMA cor)
+const sdContrasteCor = (a, b) => { const la = sdLum(a), lb = sdLum(b); return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); };
+function sdLegivel(cor, fundo, min = 3) {
+    if (!/^#[0-9a-f]{6}/i.test(cor || '') || !/^#[0-9a-f]{6}/i.test(fundo || '') || sdContrasteCor(cor, fundo) >= min) return cor;
+    const alvo = sdLum(fundo) > 0.4 ? '#000000' : '#ffffff', p = [0, 2, 4].map(i => parseInt(cor.slice(1 + i, 3 + i), 16)), q = [0, 2, 4].map(i => parseInt(alvo.slice(1 + i, 3 + i), 16));
+    for (let t = 0.05; t <= 1; t += 0.05) {
+        const c = '#' + p.map((v, i) => Math.round(v + (q[i] - v) * t).toString(16).padStart(2, '0')).join('');
+        if (sdContrasteCor(c, fundo) >= min) return c;
+    }
+    return alvo;
+}
 function sdNovoSlide(layout = 'titulo_texto', ref = null, tema = null) {
     const T = tema || (SD.doc && SD.doc.tema) || SD_TEMA, C0 = T.cores, tit = o => sdTxt({ fonte: T.titulo, peso: 600, entrelinha: 1.05, ...o }, T);
     const esc = sdLum(C0.fundo) < sdLum(C0.tinta) ? C0.fundo : C0.tinta, clr = esc === C0.fundo ? C0.tinta : C0.fundo;
     const sobreDest = sdLum(C0.destaque) > 0.35 ? esc : clr;   // texto em cima do destaque
-    const C = { ...C0, escuro: esc, claro: clr, sobreDest };
+    const C = { ...C0, escuro: esc, claro: clr, sobreDest, destEsc: sdLegivel(C0.destaque, esc), destFundo: sdLegivel(C0.destaque, C0.fundo), apoioFundo: sdLegivel(C0.apoio, C0.fundo, 4.5) };
     const s = { id: sdId(), fundo: { tipo: 'cor', cor: C.fundo }, transicao: { tipo: 'esmaecer', dur: 0.5 }, dur: 5, notas: '', camadas: [] };
     const L = s.camadas;
     if (layout === 'titulo') {
         s.fundo = { tipo: 'cor', cor: C.escuro };
         L.push({ id: sdId(), tipo: 'forma', nome: 'Faixa', forma: 'ret', x: 140, y: 300, w: 120, h: 12, rot: 0, opac: 1, preench: C.destaque, raio: 6 });
         L.push(tit({ nome: 'Título', html: 'Título da apresentação', x: 140, y: 350, w: 1500, h: 260, tam: 112, cor: C.claro }));
-        L.push(sdTxt({ nome: 'Subtítulo', html: 'Palestrante · data', x: 144, y: 640, w: 1200, h: 60, tam: 40, cor: C.destaque }, T));
+        L.push(sdTxt({ nome: 'Subtítulo', html: 'Palestrante · data', x: 144, y: 640, w: 1200, h: 60, tam: 40, cor: C.destEsc }, T));
     } else if (layout === 'titulo_texto') {
         L.push(tit({ nome: 'Título', html: 'Título do slide', y: 110, h: 120, tam: 76 }));
-        L.push(sdTxt({ nome: 'Texto', html: 'Escreva aqui o conteúdo do slide. Clique duas vezes para editar.', y: 290, h: 600, tam: 44, cor: C.apoio }, T));
+        L.push(sdTxt({ nome: 'Texto', html: 'Escreva aqui o conteúdo do slide. Clique duas vezes para editar.', y: 290, h: 600, tam: 44, cor: C.apoioFundo }, T));
     } else if (layout === 'duas_colunas') {
         L.push(tit({ nome: 'Título', html: 'Comparação', y: 110, h: 120, tam: 76 }));
         L.push(sdTxt({ nome: 'Coluna 1', html: '<b>Antes</b><br>Ponto um<br>Ponto dois', x: 140, y: 300, w: 780, h: 560, tam: 40 }, T));
@@ -68,19 +80,19 @@ function sdNovoSlide(layout = 'titulo_texto', ref = null, tema = null) {
     } else if (layout === 'imagem_lateral') {
         L.push({ id: sdId(), tipo: 'forma', nome: 'Espaço da imagem', forma: 'ret', x: 960, y: 0, w: 960, h: 1080, rot: 0, opac: 1, preench: C.suave, raio: 0 });
         L.push(tit({ nome: 'Título', html: 'Título', x: 140, y: 320, w: 700, h: 140, tam: 80 }));
-        L.push(sdTxt({ nome: 'Texto', html: 'Texto curto que acompanha a imagem.', x: 140, y: 500, w: 700, h: 300, tam: 40, cor: C.apoio }, T));
+        L.push(sdTxt({ nome: 'Texto', html: 'Texto curto que acompanha a imagem.', x: 140, y: 500, w: 700, h: 300, tam: 40, cor: C.apoioFundo }, T));
     } else if (layout === 'secao') {
         s.fundo = { tipo: 'cor', cor: C.destaque };
-        L.push(tit({ nome: 'Número', html: '01', x: 140, y: 250, w: 600, h: 220, tam: 200, peso: 300, cor: C.sobreDest }));
+        L.push(tit({ nome: 'Número', html: '01', x: 140, y: 230, w: 600, h: 260, tam: 200, peso: 300, cor: C.sobreDest }));
         L.push(tit({ nome: 'Título', html: 'Nome da seção', x: 140, y: 520, w: 1640, h: 160, tam: 110, cor: C.sobreDest }));
     } else if (layout === 'citacao') {
         s.fundo = { tipo: 'cor', cor: C.suave };
-        L.push(tit({ nome: 'Aspas', html: '“', x: 140, y: 120, w: 300, h: 300, tam: 360, cor: C.destaque, peso: 500 }));
+        L.push(tit({ nome: 'Aspas', html: '“', x: 140, y: 120, w: 300, h: 300, tam: 360, cor: C.destaque, peso: 500, entrelinha: 0.7 }));
         L.push(tit({ nome: 'Citação', html: 'Uma frase forte que resume a ideia do slide.', x: 260, y: 380, w: 1400, h: 300, tam: 80, peso: 500 }));
-        L.push(sdTxt({ nome: 'Autor', html: '— Nome do autor', x: 264, y: 720, w: 1000, h: 60, tam: 36, cor: C.apoio }, T));
+        L.push(sdTxt({ nome: 'Autor', html: '— Nome do autor', x: 264, y: 720, w: 1000, h: 60, tam: 36, cor: sdLegivel(C.apoio, C.suave, 4.5) }, T));
     } else if (layout === 'numero') {
-        L.push(tit({ nome: 'Número', html: '87%', x: 140, y: 220, w: 1640, h: 400, tam: 340, cor: C.destaque, alin: 'centro' }));
-        L.push(sdTxt({ nome: 'Legenda', html: 'o que esse número significa', x: 360, y: 680, w: 1200, h: 80, tam: 48, alin: 'centro', cor: C.apoio }, T));
+        L.push(tit({ nome: 'Número', html: '87%', x: 140, y: 200, w: 1640, h: 440, tam: 340, cor: C.destFundo, alin: 'centro' }));
+        L.push(sdTxt({ nome: 'Legenda', html: 'o que esse número significa', x: 360, y: 680, w: 1200, h: 80, tam: 48, alin: 'centro', cor: C.apoioFundo }, T));
     } else if (layout === 'lista') {
         L.push(tit({ nome: 'Título', html: 'Tópicos', y: 110, h: 120, tam: 76 }));
         [0, 1, 2].forEach(k => {
@@ -90,7 +102,7 @@ function sdNovoSlide(layout = 'titulo_texto', ref = null, tema = null) {
     } else if (layout === 'encerramento') {
         s.fundo = { tipo: 'cor', cor: C.escuro };
         L.push(tit({ nome: 'Título', html: 'Obrigado!', x: 140, y: 380, w: 1640, h: 200, tam: 150, cor: C.claro, alin: 'centro' }));
-        L.push(sdTxt({ nome: 'Contato', html: '@perfil · email@exemplo.com', x: 140, y: 620, w: 1640, h: 70, tam: 40, cor: C.destaque, alin: 'centro' }, T));
+        L.push(sdTxt({ nome: 'Contato', html: '@perfil · email@exemplo.com', x: 140, y: 620, w: 1640, h: 70, tam: 40, cor: C.destEsc, alin: 'centro' }, T));
     }
     L.forEach(c => { c.nome = c.nome || c.tipo; });
     return s;
@@ -197,6 +209,8 @@ function sdCamadaEl(c, modo = 'edit') {
         el.appendChild(t);
     } else if (c.tipo === 'forma') {
         el.innerHTML = sdFormaSvg(c);
+    } else if (c.tipo === 'grafico') {
+        el.innerHTML = typeof sdGraficoSvg === 'function' ? sdGraficoSvg(c) : '';
     } else if (c.tipo === 'imagem' || (c.tipo === 'video' && modo === 'foto')) {
         const im = document.createElement('img');
         im.src = modo === 'foto' ? (SD.dados[c.src + (c.tipo === 'video' ? '#q' : '')] || '') : sdSrc(c.src);
@@ -404,7 +418,7 @@ sdRegistrar('slide_fundo', 'fundo {slide, tipo: cor|degrade|imagem, cor, cor2, a
     if (a.img) await sdUrl(a.img);
     return { slides: alvo.length };
 });
-sdRegistrar('slide_transicao', 'transição {slide, tipo: nenhuma|esmaecer|deslizar|empurrar|zoom|cobrir, dur, todos}', a => {
+sdRegistrar('slide_transicao', 'transição {slide, tipo: nenhuma|esmaecer|deslizar|empurrar|subir|zoom|cobrir|revelar|preto, dur, todos}', a => {
     const alvo = a.todos ? SD.doc.slides : [sdSlide(a.slide)];
     alvo.forEach(s => { s.transicao = { tipo: a.tipo || 'esmaecer', dur: +a.dur || 0.5 }; });
     return { slides: alvo.length };
@@ -460,10 +474,13 @@ sdRegistrar('apagar', 'apaga camadas {ids}', a => {
     s.camadas = s.camadas.filter(c => !ids.has(c.id)); SD.sel = SD.sel.filter(i => !ids.has(i));
     return { ids: [...ids] };
 });
+// cópia de um grupo vira um grupo NOVO (com o mesmo id, clicar na cópia selecionava a original junto)
+function sdNovosGrupos(cs) { const m = {}; cs.forEach(c => { if (c.grupo) c.grupo = m[c.grupo] = m[c.grupo] || sdId(); }); return cs; }
 sdRegistrar('duplicar', 'duplica camadas {ids, dx, dy}', a => {
-    const s = sdSlide(a.slide), novos = [];
+    const s = sdSlide(a.slide), novos = [], gs = {};
     for (const c of sdAlvos(a, s)) {
         const n = sdClone(c); n.id = sdId(); n.x += sdNum(a.dx, 30); n.y += sdNum(a.dy, 30);
+        if (n.grupo) n.grupo = gs[n.grupo] = gs[n.grupo] || sdId();
         s.camadas.splice(s.camadas.indexOf(c) + 1 + novos.length, 0, n); novos.push(n.id);
     }
     SD.sel = novos; return { ids: novos };
@@ -497,7 +514,7 @@ sdRegistrar('distribuir', 'distribui com o mesmo espaço {ids, eixo: h|v}', a =>
     return { ids: cs.map(c => c.id) };
 }, { qual: 'camadas' });
 sdRegistrar('selecionar', 'seleciona {ids} (vazio = nada)', a => { SD.sel = (a.ids || (a.id ? [a.id] : [])).filter(i => sdCamada(i, sdSlide())); return { ids: SD.sel }; }, { leitura: true, semMudanca: true, qual: 'sel' });
-sdRegistrar('animacao', 'animação de entrada {ids, tipo: nenhuma|esmaecer|subir|descer|esquerda|direita|zoom|girar, dur, atraso, clique}', a => {
+sdRegistrar('animacao', 'animação de entrada {ids, tipo: nenhuma|esmaecer|subir|descer|esquerda|direita|zoom|girar|pular|crescer|revelar, dur, atraso, clique}', a => {
     const cs = sdAlvos(a); cs.forEach(c => { if (!a.tipo || a.tipo === 'nenhuma') delete c.anim; else c.anim = { tipo: a.tipo, dur: +a.dur || 0.6, atraso: +a.atraso || 0, clique: !!a.clique }; });
     return { ids: cs.map(c => c.id) };
 }, { qual: 'camadas' });
@@ -553,7 +570,8 @@ async function sdCena(html, op = {}) {
     box.innerHTML = html; document.body.appendChild(box);
     await document.fonts.ready;
     const R = box.getBoundingClientRect(), novos = [];
-    const raiz = box.firstElementChild && box.children.length === 1 ? box.firstElementChild : box;
+    const filhos = [...box.children].filter(e => !/^(STYLE|LINK|SCRIPT)$/.test(e.tagName));
+    const raiz = filhos.length === 1 ? filhos[0] : box;
     const csR = getComputedStyle(raiz);
     if (csR.backgroundColor && csR.backgroundColor !== 'rgba(0, 0, 0, 0)') s.fundo = { tipo: 'cor', cor: sdCorHex(csR.backgroundColor) };
     if (/gradient/.test(csR.backgroundImage)) { const cs = csR.backgroundImage.match(/rgba?\([^)]+\)|#[0-9a-f]{3,8}/gi) || []; const ang = (csR.backgroundImage.match(/(\d+)deg/) || [])[1]; if (cs.length >= 2) s.fundo = { tipo: 'degrade', cor: sdCorHex(cs[0]), cor2: sdCorHex(cs.at(-1)), angulo: +ang || 135 }; }
@@ -643,9 +661,16 @@ async function sdPrepararFoto(s) {
     }
     await Promise.all(ps);
 }
-async function sdFotoSlide(s, largura = 1920, mime = 'image/png', q = 0.92) {
+// quadro(el): ajusta o slide montado (já no documento, fora da tela) antes da foto — o MP4 usa para congelar as animações num instante
+async function sdFotoSlide(s, largura = 1920, mime = 'image/png', q = 0.92, quadro = null) {
     await sdGarantirFontes(); await sdPrepararFoto(s); await document.fonts.ready;
     const W = SD.doc.largura, H = SD.doc.altura, k = largura / W, el = sdMontarSlide(s, 'foto');
+    if (quadro) {
+        const box = document.createElement('div');
+        Object.assign(box.style, { position: 'fixed', left: '-30000px', top: '0', width: W + 'px', height: H + 'px', overflow: 'hidden' });
+        box.appendChild(el); document.body.appendChild(box);
+        try { quadro(el); } finally { box.remove(); }
+    }
     const css = await sdCssFontes(s);
     if (css) { const st = document.createElement('style'); st.textContent = css; el.prepend(st); }
     const xml = new XMLSerializer().serializeToString(el);
@@ -669,18 +694,37 @@ sdRegistrar('salvar', 'salva o .dknv {caminho}', async a => {
     SD.arquivo = r.path; SD.sujo = false; sdRecenteAdd(r.path); sdGuardarRascunho(); sdAvisar('arquivo');
     return { caminho: r.path };
 }, { leitura: true, qual: 'arquivo' });
-sdRegistrar('abrir', 'abre um .dknv ou importa um .pptx {caminho}', async a => {
+sdRegistrar('abrir', 'abre um .dknv ou importa um .pptx / .pdf (uma página por slide, em camadas) {caminho}', async a => {
     let p = a.caminho;
-    if (!p) { p = await sdApi().vk_dialogo('abrir', ['Apresentações (*.dknv;*.pptx)', 'Slider Kanivete (*.dknv)', 'PowerPoint (*.pptx)']); if (!p) return { cancelado: true }; }
-    const ppt = /\.pptx$/i.test(p);
-    const r = ppt ? await sdApi().sd_importar_pptx(p) : await sdApi().sd_abrir(p);
+    if (!p) { p = await sdApi().vk_dialogo('abrir', ['Apresentações (*.dknv;*.pptx;*.pdf)', 'Slider Kanivete (*.dknv)', 'PowerPoint (*.pptx)', 'PDF (*.pdf)']); if (!p) return { cancelado: true }; }
+    const ppt = /\.(pptx|pdf)$/i.test(p);
+    const r = /\.pdf$/i.test(p) ? await sdApi().sd_importar_pdf(p) : ppt ? await sdApi().sd_importar_pptx(p) : await sdApi().sd_abrir(p);
     if (!r || !r.success) throw new Error('não abriu: ' + ((r && r.error) || p));
     await sdPrepararUrls(r.doc);
     sdCarregar(r.doc, ppt ? null : r.path);
     if (!ppt) sdRecenteAdd(r.path);
     return { slides: r.doc.slides.length, caminho: r.path || p, relatorio: r.relatorio };
 }, { leitura: true, semDoc: true });
-sdRegistrar('exportar', 'exporta {formato: pdf|png|mp4|pptx|pptx_imagens, caminho, largura (px), slides: todos|atual}', async a => {
+// MP4: a linha do tempo das animações de um slide (as de clique entram em sequência, sem esperar clique)
+function sdPlanoAnim(s, inicio = 0) {
+    const vis = s.camadas.filter(c => !c.oculto && c.anim && c.anim.tipo && c.anim.tipo !== 'nenhuma');
+    const plano = []; let fimAuto = inicio;
+    for (const c of vis.filter(c => !c.anim.clique)) { const t0 = inicio + (+c.anim.atraso || 0), d = +c.anim.dur || 0.6; plano.push({ c, t0, d }); fimAuto = Math.max(fimAuto, t0 + d); }
+    let t = fimAuto + (vis.some(c => !c.anim.clique) ? 0.4 : 0);
+    for (const c of vis.filter(c => c.anim.clique)) { const t0 = t + (+c.anim.atraso || 0), d = +c.anim.dur || 0.6; plano.push({ c, t0, d }); t = t0 + d + 0.5; }
+    return { plano, fim: plano.length ? Math.max(...plano.map(p => p.t0 + p.d)) : 0 };
+}
+function sdCongelarAnim(el, plano, t) {   // estado de cada camada animada no instante t (as animações de verdade, paradas)
+    for (const { c, t0, d } of plano) {
+        const e = el.querySelector(`[data-id="${c.id}"]`); if (!e) continue;
+        const a = e.animate(sdAnimQuadros(c, e.style.transform || ''), { duration: d * 1000, easing: SD_ANIM_CURVA[c.anim.tipo] || 'cubic-bezier(.2,.8,.2,1)', fill: 'both' });
+        a.pause(); a.currentTime = Math.max(0, Math.min(d, t - t0)) * 1000;
+        const cs = getComputedStyle(e), op = cs.opacity, tr = cs.transform, cp = cs.clipPath;
+        a.cancel();
+        e.style.opacity = op; e.style.transform = tr === 'none' ? '' : tr; e.style.clipPath = cp === 'none' ? '' : cp;
+    }
+}
+sdRegistrar('exportar', 'exporta {formato: pdf|png|mp4|pptx|pptx_imagens, caminho, largura (px), qualidade: alta|leve, slides: todos|atual}', async a => {
     const fmt = a.formato || 'pdf';
     const ext = { pdf: 'pdf', mp4: 'mp4', pptx: 'pptx', pptx_imagens: 'pptx', png: '' }[fmt];
     let p = a.caminho;
@@ -690,21 +734,43 @@ sdRegistrar('exportar', 'exporta {formato: pdf|png|mp4|pptx|pptx_imagens, caminh
     }
     if (ext && !new RegExp(`\\.${ext}$`, 'i').test(p)) p += '.' + ext;
     if (fmt === 'pptx') {
-        const r = await sdApi().sd_exportar('nativo', 'pptx_nativo', p, JSON.stringify(SD.doc), {});
+        // gráficos: cores e texto resolvidos pelo tema (o Python não conhece o tema)
+        const doc = sdClone(SD.doc);
+        doc.slides.forEach(s => s.camadas.forEach(c => { if (c.tipo === 'grafico') { c.cores = sdGrafCores(c); c.fonte = c.fonte || doc.tema.texto; c.tamTexto = c.tamTexto || Math.max(14, Math.min(40, Math.min(c.w, c.h) * 0.05)); } }));
+        const r = await sdApi().sd_exportar('nativo', 'pptx_nativo', p, JSON.stringify(doc), {});
         if (!r || !r.success) throw new Error((r && r.error) || 'falhou');
         return { caminho: r.path, avisos: r.avisos };
     }
-    const job = 'sd' + Date.now(), larg = +a.largura || (fmt === 'mp4' ? 1920 : 2560);
+    const leve = a.qualidade === 'leve';
+    const job = 'sd' + Date.now(), larg = +a.largura || (fmt === 'mp4' ? 1920 : leve ? 1600 : 2560), qj = leve ? 0.8 : 0.92;
     const lista = a.slides === 'atual' ? [sdSlide()] : SD.doc.slides.filter(s => !s.oculto);
     const mime = fmt === 'png' ? 'image/png' : 'image/jpeg';
+    const FPS = 30, docMp4 = { ...SD.doc, slides: [] };
     for (let i = 0; i < lista.length; i++) {
         sdAvisar({ progresso: (i + 1) / lista.length, texto: `Slide ${i + 1} de ${lista.length}` });
-        const d = await sdFotoSlide(lista[i], larg, mime, 0.93);
+        const s = lista[i];
+        if (fmt === 'mp4') {   // animações viram quadros (começam depois da transição de entrada)
+            const tr = i > 0 && s.transicao && s.transicao.tipo !== 'nenhuma' ? (+s.transicao.dur || 0.5) : 0;
+            const { plano, fim } = sdPlanoAnim(s, tr);
+            const sd = sdClone(s); sd.animQuadros = 0;
+            if (plano.length) {
+                const n = Math.ceil(fim * FPS) + 1;
+                for (let j = 0; j < n; j++) {
+                    if (j % 6 === 0) sdAvisar({ progresso: (i + j / n) / lista.length, texto: `Slide ${i + 1} de ${lista.length} · animação ${Math.round(j / n * 100)}%` });
+                    const d = await sdFotoSlide(s, larg, mime, 0.9, el => sdCongelarAnim(el, plano, j / FPS));
+                    const r = await sdApi().sd_quadro(job, `${String(i).padStart(3, '0')}_a${String(j).padStart(4, '0')}`, d);
+                    if (!r || !r.success) throw new Error((r && r.error) || 'quadro');
+                }
+                sd.animQuadros = n; sd.dur = Math.max(+s.dur || 5, fim + 1.5);
+            }
+            docMp4.slides.push(sd);
+        }
+        const d = await sdFotoSlide(s, larg, mime, fmt === 'mp4' ? 0.93 : qj);
         const r = await sdApi().sd_quadro(job, i, d);
         if (!r || !r.success) throw new Error((r && r.error) || 'quadro');
     }
     sdAvisar({ progresso: 1, texto: fmt === 'mp4' ? 'Montando o vídeo…' : 'Juntando…' });
-    const doc = { ...SD.doc, slides: lista };
+    const doc = fmt === 'mp4' ? docMp4 : { ...SD.doc, slides: lista };
     const r = await sdApi().sd_exportar(job, fmt === 'pptx_imagens' ? 'pptx' : fmt, p, JSON.stringify(doc), { base: sdNomeArq(SD.arquivo) || SD.doc.nome || 'slide' });
     sdAvisar({ progresso: null });
     if (!r || !r.success) throw new Error((r && r.error) || 'falhou');

@@ -6,7 +6,27 @@
 // =========================================================
 const SDS = { on: false, lista: [], i: 0, passo: 0, passos: [], el: null, ini: 0, num: '', soEste: false };
 const SD_ANIM_DE = { esmaecer: 'opacity:0', subir: 'opacity:0;transform:translateY(80px)', descer: 'opacity:0;transform:translateY(-80px)',
-    esquerda: 'opacity:0;transform:translateX(-160px)', direita: 'opacity:0;transform:translateX(160px)', zoom: 'opacity:0;transform:scale(.6)', girar: 'opacity:0;transform:rotate(-25deg) scale(.7)' };
+    esquerda: 'opacity:0;transform:translateX(-160px)', direita: 'opacity:0;transform:translateX(160px)', zoom: 'opacity:0;transform:scale(.6)', girar: 'opacity:0;transform:rotate(-25deg) scale(.7)',
+    pular: 'opacity:0;transform:scale(.3)', crescer: 'clip-path:inset(100% 0 0 0)', revelar: 'clip-path:inset(0 100% 0 0)' };
+const SD_ANIM_CURVA = { pular: 'cubic-bezier(.34,1.7,.5,1)', crescer: 'cubic-bezier(.25,.8,.25,1)', revelar: 'cubic-bezier(.45,0,.2,1)' };
+// quadros-chave de uma animação de entrada (apresentação e prévia na mesa usam os mesmos)
+function sdAnimQuadros(c, base = '') {
+    // recorte (clip-path) só nas animações de recorte: no resto cortaria a sombra do objeto
+    const de = { opacity: c.opac != null && c.opac < 1 ? c.opac : 1, transform: base || 'none' }, para = { ...de };
+    for (const d of (SD_ANIM_DE[c.anim.tipo] || 'opacity:0').split(';')) { const [k, v] = d.split(':'); if (k === 'transform') de.transform = (base + ' ' + v).trim(); else if (k === 'clip-path') { de.clipPath = v; para.clipPath = 'inset(0 0 0 0)'; } else de[k] = +v; }
+    return [de, para];
+}
+// transição de slide: [quadros do novo, quadros do velho] (k = escala do palco)
+function sdTransQuadros(tipo, sinal = 1, k = 1) {
+    const S = `scale(${k})`;
+    return { esmaecer: [[{ opacity: 0 }, { opacity: 1 }]], deslizar: [[{ transform: `translateX(${sinal * 100}%) ${S}` }, { transform: `translateX(0) ${S}` }]],
+        empurrar: [[{ transform: `translateX(${sinal * 100}%) ${S}` }, { transform: `translateX(0) ${S}` }], [{ transform: `translateX(0) ${S}` }, { transform: `translateX(${-sinal * 100}%) ${S}` }]],
+        subir: [[{ transform: `translateY(${sinal * 100}%) ${S}` }, { transform: `translateY(0) ${S}` }]],
+        zoom: [[{ opacity: 0, transform: `scale(${k * 1.12})` }, { opacity: 1, transform: S }]],
+        cobrir: [[{ clipPath: sinal > 0 ? 'inset(0 0 0 100%)' : 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }]],
+        revelar: [[{ clipPath: 'circle(0% at 50% 50%)' }, { clipPath: 'circle(75% at 50% 50%)' }]],
+        preto: [[{ opacity: 0, offset: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1, offset: 1 }], [{ opacity: 1 }, { opacity: 0, offset: 0.5 }, { opacity: 0 }]] }[tipo];
+}
 
 async function sdApresentar(de = 0, op = {}) {
     if (!SD.doc) return;
@@ -62,15 +82,12 @@ function sdShowIr(i, direcao = 1, passo = 0) {
     pal.appendChild(novo); sdShowEscala();
     const tr = direcao === null ? null : (direcao > 0 ? s.transicao : (SDS.lista[i + 1] || {}).transicao);
     const tipo = tr && tr.tipo && tr.tipo !== 'nenhuma' ? tr.tipo : null, dur = (tr && +tr.dur) || 0.5;
-    if (velho && tipo) {
-        const k = +pal.style.getPropertyValue('--k') || 1, sinal = direcao > 0 ? 1 : -1;
-        const ani = { esmaecer: [[{ opacity: 0 }, { opacity: 1 }]], deslizar: [[{ transform: `translateX(${sinal * 100}%) scale(${k})` }, { transform: `translateX(0) scale(${k})` }]],
-            empurrar: [[{ transform: `translateX(${sinal * 100}%) scale(${k})` }, { transform: `translateX(0) scale(${k})` }], [{ transform: `translateX(0) scale(${k})` }, { transform: `translateX(${-sinal * 100}%) scale(${k})` }]],
-            zoom: [[{ opacity: 0, transform: `scale(${k * 1.12})` }, { opacity: 1, transform: `scale(${k})` }]],
-            cobrir: [[{ clipPath: sinal > 0 ? 'inset(0 0 0 100%)' : 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }]] }[tipo];
+    const ani = velho && tipo && sdTransQuadros(tipo, direcao > 0 ? 1 : -1, +pal.style.getPropertyValue('--k') || 1);
+    if (ani) {
+        if (tipo === 'preto') pal.style.background = '#000';
         novo.animate(ani[0], { duration: dur * 1000, easing: 'cubic-bezier(.4,0,.2,1)' });
         if (ani[1]) velho.animate(ani[1], { duration: dur * 1000, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' });
-        setTimeout(() => { pal.querySelectorAll('.sd-slide').forEach(x => { if (x !== novo) sdShowLimpar(x); }); }, dur * 1000 + 30);
+        setTimeout(() => { pal.querySelectorAll('.sd-slide').forEach(x => { if (x !== novo) sdShowLimpar(x); }); pal.style.background = ''; }, dur * 1000 + 30);
     } else pal.querySelectorAll('.sd-slide').forEach(x => { if (x !== novo) sdShowLimpar(x); });
     // vídeos: os de "tocar sozinho" começam; os outros ficam no 1º quadro com controles
     novo.querySelectorAll('video').forEach(v => {
@@ -85,13 +102,17 @@ function sdShowIr(i, direcao = 1, passo = 0) {
 function sdShowLimpar(x) { x.querySelectorAll('video').forEach(v => { v.pause(); v.removeAttribute('src'); v.load(); }); x.remove(); }
 function sdShowEsconder(e, c) {
     e.style.transition = 'none';
-    const de = SD_ANIM_DE[c.anim.tipo] || 'opacity:0';
-    for (const d of de.split(';')) { const [k, v] = d.split(':'); if (k === 'transform') e.style.transform = (e.dataset.base + ' ' + v).trim(); else e.style[k] = v; }
+    const [de] = sdAnimQuadros(c, e.dataset.base);
+    e.style.opacity = de.opacity; e.style.transform = de.transform === 'none' ? '' : de.transform; e.style.clipPath = de.clipPath || '';
 }
 function sdShowRevelar(e, c, ja = false) {
     void e.offsetWidth;
-    e.style.transition = ja ? 'none' : `opacity ${c.anim.dur || 0.6}s ease, transform ${c.anim.dur || 0.6}s cubic-bezier(.2,.8,.2,1)`;
+    const d = c.anim.dur || 0.6, curva = SD_ANIM_CURVA[c.anim.tipo] || 'cubic-bezier(.2,.8,.2,1)';
+    e.style.transition = ja ? 'none' : `opacity ${d}s ease, transform ${d}s ${curva}, clip-path ${d}s ${curva}`;
     e.style.opacity = c.opac != null && c.opac < 1 ? c.opac : '1'; e.style.transform = e.dataset.base || '';
+    if (e.style.clipPath) {   // recorte: anima até inset(0) (de/para "none" não interpola) e depois solta
+        e.style.clipPath = 'inset(0 0 0 0)'; clearTimeout(e._tc); e._tc = setTimeout(() => { e.style.clipPath = ''; }, ja ? 0 : d * 1000 + 60);
+    }
     const v = e.querySelector('video'); if (v && c.auto) v.play().catch(() => {});
 }
 function sdShowPasso(ja = false) {

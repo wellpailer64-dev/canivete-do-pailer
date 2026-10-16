@@ -137,3 +137,29 @@ def do_photoshop():
         return None, None
     arq = max(set(achados), key=os.path.getmtime)
     return ler_arquivo(arq), os.path.basename(os.path.dirname(os.path.dirname(arq)))
+
+
+def escrever_ase(lista, caminho):
+    """Grava um .ase (Adobe Swatch Exchange) com os grupos — o Photoshop e o Illustrator importam (Amostras › Importar)."""
+    def nome_b(n):
+        t = (str(n or "") + "\x00").encode("utf-16-be")
+        return struct.pack(">H", len(t) // 2) + t
+
+    def cor_b(c):
+        h = str(c.get("c", "#000000")).lstrip("#")[:6].ljust(6, "0")
+        r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+        corpo = nome_b(c.get("n") or "#" + h) + b"RGB " + struct.pack(">3fH", r, g, b, 2)
+        return struct.pack(">HI", 0x0001, len(corpo)) + corpo
+
+    blocos = []
+    for x in lista or []:
+        if isinstance(x, dict) and x.get("cores") is not None:
+            corpo = nome_b(x.get("g", "Grupo"))
+            blocos.append(struct.pack(">HI", 0xC001, len(corpo)) + corpo)
+            blocos += [cor_b(c) for c in x["cores"]]
+            blocos.append(struct.pack(">HI", 0xC002, 0))
+        elif isinstance(x, dict) and x.get("c"):
+            blocos.append(cor_b(x))
+    with open(caminho, "wb") as f:
+        f.write(b"ASEF" + struct.pack(">HHI", 1, 0, len(blocos)) + b"".join(blocos))
+    return caminho
