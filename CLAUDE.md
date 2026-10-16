@@ -83,8 +83,13 @@ se edita. Botão Fila no cabeçalho abre o mesmo painel. API `VEFILA_API`. Teste
 arquivos, armadilhas medidas, resultados, testes, pendências). Janela própria do export feita (`editor-encoder.js`: logo Ke, solta, minimiza, lembra posição).
 **Aba própria** (barra lateral › Kanivete Encoder, `keAoTrocar`): a mesma janela encaixa em `#ke-casa` sem abrir o Vídeo;
 sem projeto mostra fila/andamento/monitor; sair da aba devolve a janela ao Vídeo (fechada; barrinha se rodando). Pôr na
-fila continua no Vídeo (Ctrl+M). Teste: `py -3.13 testes/teste_ke_aba.py` (porta 9333). Próximo passo combinado: Ke como
-Media Encoder (arquivos soltos do disco, renders da Lux e do Sound).
+fila continua no Vídeo (Ctrl+M). Teste: `py -3.13 testes/teste_ke_aba.py` (porta 9333).
+**Media Encoder** (2026-10-16, `frontend/js/ke-arquivos.js` + `Functions/ke_arquivos.py`): a fila aceita itens `tipo`
+"arquivo" (arrastar na aba do Ke ou "+ Arquivos"; predefinição por item: MP4 H.264 máx/1080p/720p, H.265, ProRes, MP3,
+WAV; NVENC quando houver) e "lux" (Render › "→ fila do Ke": `ve3dEstudioVideoSpec` congela todos os quadros; o Blender
+roda na vez do item). Mesmo canal `veOnExport`/`_ve_export_stop`: andamento, Parar, Drive e Fran iguais. API `KE_API`.
+Teste: `py -3.13 testes/teste_ke_media.py [--sem-lux]`. Falta: export do Sound Kanivete entrar na fila; Parar não
+interrompe o Blender (o item da Lux termina).
 Atalhos: Ctrl+M = pôr na fila + abrir; Ctrl+Shift+M = pôr na fila sem abrir (aviso, som, barrinha); NENHUM começa a
 renderizar: o início é sempre o ▶ Renderizar (pedido do Pailer); marcador anterior = Alt+Shift+M. Voz da Fran no fim
 (`veKeVoz`: pronto / drive / falhou / drivefalhou, `frontend/audio/ke/*.mp3`, fontes em `D:/kanivete_testes/ke_voz`); com

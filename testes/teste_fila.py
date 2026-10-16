@@ -75,7 +75,7 @@ def main():
             pg.evaluate("s => { veOpenExport(); VE.dest = s; $ve('ve-dest-label').textContent = s; }", SAIDA)
             ok(pg.evaluate("!!$ve('ve-fila-col') && !$ve('ve-export').hidden"), "Exportar e fila no mesmo painel")
             ok("Adicionar à fila" in pg.inner_text("#ve-export-foot") and "Renderizar" in pg.inner_text("#ve-export-foot"), "rodapé com Adicionar à fila e ▶ Renderizar")
-            pg.click("#ve-fila-col .ve-fila-cab button")   # Todas as timelines
+            pg.click("#ve-fila-col .ve-fila-cab > button")   # Todas as timelines (o "+ Arquivos" do Ke fica dentro de .ke-arq-cab)
             pg.wait_for_function("VEFILA_API.itens().length === 2", timeout=60000)
             itens = pg.evaluate("VEFILA_API.itens()")
             ok([i["cfg"]["nome"] for i in itens] == ["Timeline 1", "Fila B"], "todas as timelines entram com o nome de cada uma", str([i["cfg"]["nome"] for i in itens]))

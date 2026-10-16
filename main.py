@@ -789,6 +789,47 @@ def ve_render_info(base, chave=None):
         return {"success": False, "error": str(e)}
 
 
+# ── Kanivete Encoder como Media Encoder: arquivos do disco por predefinição (Functions/ke_arquivos.py). O andamento vai
+# pelo mesmo veOnExport do export e o Parar usa o mesmo _ve_export_stop: a fila trata os dois tipos de item igual. ──
+def ke_presets():
+    from Functions import ke_arquivos
+    return {"success": True, "presets": ke_arquivos.presets()}
+
+
+def ke_arquivo_info(path):
+    from Functions import ke_arquivos
+    return ke_arquivos.info(path)
+
+
+def ke_escolher_arquivos():
+    if not _window:
+        return {"success": False}
+    tipos = ("Vídeo e áudio (*.mp4;*.mov;*.mkv;*.avi;*.webm;*.m4v;*.mxf;*.ts;*.mts;*.m2ts;*.mpg;*.mpeg;*.wmv;*.flv;*.gif;"
+             "*.mp3;*.wav;*.flac;*.m4a;*.aac;*.ogg;*.opus;*.wma)", "Todos os arquivos (*.*)")
+    r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), allow_multiple=True, file_types=tipos)
+    if not r:
+        return {"success": False, "cancelled": True}
+    return {"success": True, "paths": list(r) if isinstance(r, (list, tuple)) else [r]}
+
+
+def ke_arquivo_converter(entrada, preset, pasta_saida=None, usar_gpu=True):
+    from Functions import ke_arquivos
+    global _ve_export_stop
+    stop = threading.Event()
+    _ve_export_stop = stop
+
+    def run():
+        try:
+            r = ke_arquivos.converter(entrada, preset, pasta_saida or None, bool(usar_gpu),
+                                      on_progress=lambda p, m: _ve_emit("veOnExport", {"pct": p, "message": m}), stop_event=stop)
+            _ve_emit("veOnExport", {"done": True, **r})
+        except Exception as e:
+            _ve_emit("veOnExport", {"done": True, "success": False, "error": str(e)})
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
 def video_cutter_cancel_export():
     from Functions.video_cutter import cancelar_exportacao
     from Functions import transicoes
@@ -4468,6 +4509,18 @@ class ApiBridge:
 
     def video_cutter_cancel_export(self):
         return video_cutter_cancel_export()
+
+    def ke_presets(self):
+        return ke_presets()
+
+    def ke_arquivo_info(self, path):
+        return ke_arquivo_info(path)
+
+    def ke_escolher_arquivos(self):
+        return ke_escolher_arquivos()
+
+    def ke_arquivo_converter(self, entrada, preset, pasta_saida=None, usar_gpu=True):
+        return ke_arquivo_converter(entrada, preset, pasta_saida, usar_gpu)
 
     def reveal_file(self, path):
         return reveal_file(path)

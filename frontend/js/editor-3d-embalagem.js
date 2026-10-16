@@ -292,9 +292,9 @@ async function ve3dEstudio(c, op = {}) {
 // qualidade: 'previa' (Cycles 16 amostras, ~3 s/quadro na RTX 3050) | 'final' (Cycles 32, ~5,6 s) | 'eevee' (motor rápido, sem bolhas)
 // — bancada 2026-10-15: amostras é o que pesa; 8 pulos no gel = idêntico; com a limpeza OptiX 16–32 amostras ficam iguais a olho a 64
 const VE3D_VIDEO_Q = { previa: { motor: 'cycles', amostras: 16 }, final: { motor: 'cycles', amostras: 32 }, eevee: { motor: 'eevee' } };
-async function ve3dEstudioVideo(c, { qualidade = 'previa', motor, aoProgresso, segundos, amostras } = {}) {
+// a receita do vídeo (todos os quadros calculados aqui; o Blender só desenha): serve ao render direto e à fila do Ke
+async function ve3dEstudioVideoSpec(c, { qualidade = 'previa', motor, segundos, amostras } = {}) {
     const VQ = VE3D_VIDEO_Q[qualidade] || VE3D_VIDEO_Q.previa; motor = motor || VQ.motor; amostras = amostras || VQ.amostras;
-    if (VE3D.estudioRodando) throw new Error(veT('Já tem um render rodando'));
     const vel = typeof veVel === 'function' ? veVel(c) : 1, fps = V3.fps || 30, n = Math.max(1, Math.round(Math.min(veEnd(c) - c.st, segundos || 1e9) * fps));
     const { spec, fora } = await ve3dEstudioSpec(c, { qualidade: 'estudio', t: c.s });
     if (!spec.objetos.length) throw new Error(veT('Nenhuma embalagem na cena: o render fotorrealista é para Pote e Bastão'));
@@ -307,6 +307,11 @@ async function ve3dEstudioVideo(c, { qualidade = 'previa', motor, aoProgresso, s
     if (typeof VE3T === 'object') VE3T.chave = '';
     Object.assign(spec, { quadros, fps, motor, amostras: amostras || (motor === 'cycles' ? 32 : spec.amostras), pulos_transmissao: 8, amostras_eevee: 64, nome: spec.nome + '_video' });
     const dir = typeof vePrPrefs === 'function' && vePrPrefs().dir; if (dir) spec.saida = dir.replace(/[\\/]+$/, '') + '/Estudio';
+    return { spec, fora, n, fps };
+}
+async function ve3dEstudioVideo(c, { qualidade = 'previa', motor, aoProgresso, segundos, amostras } = {}) {
+    if (VE3D.estudioRodando) throw new Error(veT('Já tem um render rodando'));
+    const { spec, fora } = await ve3dEstudioVideoSpec(c, { qualidade, motor, segundos, amostras });
     VE3D.estudioRodando = true;
     const tm = setInterval(async () => { try { const p = await window.pywebview.api.ve_3d_estudio_progresso(); if (aoProgresso) aoProgresso(p); } catch (e) { /* segue */ } }, 1000);
     try {

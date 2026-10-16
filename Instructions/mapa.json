@@ -846,6 +846,10 @@
   "kani_falar",
   "lux_salvar",
   "lux_abrir",
+  "ke_presets",
+  "ke_arquivo_info",
+  "ke_escolher_arquivos",
+  "ke_arquivo_converter",
   "reveal_file",
   "open_file",
   "select_video_file",
@@ -2125,6 +2129,22 @@
    "args": "",
    "modulos": []
   },
+  "ke_presets": {
+   "args": "",
+   "modulos": []
+  },
+  "ke_arquivo_info": {
+   "args": "path",
+   "modulos": []
+  },
+  "ke_escolher_arquivos": {
+   "args": "",
+   "modulos": []
+  },
+  "ke_arquivo_converter": {
+   "args": "entrada, preset, pasta_saida=None, usar_gpu=True",
+   "modulos": []
+  },
   "reveal_file": {
    "args": "path",
    "modulos": []
@@ -2916,6 +2936,7 @@
   "Functions/kani_maos.py": "kani_maos.py — as \"mãos\" da Kani nos apps: ela preenche uma FICHA curta e o código monta a peça AO VIVO na tela",
   "Functions/kani_memoria.py": "kani_memoria.py — o que a Kani aprende com a pessoa, sem retreinar o modelo (como as memórias e receitas do Claude):",
   "Functions/kani_skills.py": "kani_skills.py — habilidades do dia a dia da Kani (ferramentas do modo em etapas, kani_agente.py):",
+  "Functions/ke_arquivos.py": "ke_arquivos.py — Kanivete Encoder como Media Encoder: arquivos soltos do disco (e renders de outras ferramentas)",
   "Functions/legendas.py": "legendas.py — transcrição da timeline do Pocket Editor (painel Texto: Transcrever / Criar legendas)",
   "Functions/legendas_formatos.py": "SRT e VTT: blocos separados por linha em branco, com uma linha \"início --> fim\"",
   "Functions/lux_projeto.py": "lux_projeto.py — projeto da Lux Kanivete (.lknv)",
@@ -2997,6 +3018,7 @@
   "teste_kani": "Kani (assistente) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila) e confere: bolinha na Home,",
   "teste_kani_maos": "Teste das mãos da Kani: abre o app de teste (porta 9338, dados em D:/kanivete_testes), pede um flyer ao agente da",
   "teste_ke_aba": "Kanivete Encoder na aba própria (editor-encoder.js keAoTrocar) — app em --agente=9333:",
+  "teste_ke_media": "Kanivete Encoder como Media Encoder (ke-arquivos.js + Functions/ke_arquivos.py) — app em --agente=9333:",
   "teste_laco": "Laço: Shift soma, Alt subtrai, Shift+Alt cruza; o mesmo no magnético; Ctrl+clique na miniatura seleciona a camada",
   "teste_lux_casa": "Lux com casa própria: abre sem o Editor, desfaz sozinha, envia cópia para a timeline (app em --agente=9333)",
   "teste_mixer": "Mixer de trilhas de áudio (editor-mixer.js): Premiere → Kanivete → XML do Premiere e a conta do som na exportação",

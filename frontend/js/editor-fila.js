@@ -307,7 +307,10 @@ async function veFilaProximo() {
     if (typeof vePrAutoParar === 'function' && typeof VEPR !== 'undefined' && (VEPR.atual || VEPR.fila.length)) vePrAutoParar();
     document.querySelector('.menu-item[data-tool="video-cutter"]')?.classList.add('rodando');
     veFilaRender();
-    try { await window.pywebview.api.video_cutter_export(...veFilaArgs(it)); }
+    try {   // arquivos do disco e renders da Lux: ke-arquivos.js (mesmo andamento e mesmo fim)
+        if (it.tipo && typeof keRodarItem === 'function') await keRodarItem(it);
+        else await window.pywebview.api.video_cutter_export(...veFilaArgs(it));
+    }
     catch (e) { veFilaEvento({ done: true, success: false, error: (e && (e.message || e)) || 'falhou' }); }
 }
 function veFilaEvento(ev) {
@@ -335,6 +338,7 @@ function veFilaLimparProntos() { VEFILA.itens = VEFILA.itens.filter(x => x.estad
 function veFilaRefazer(id) { const it = VEFILA.itens.find(x => x.id === id); if (it && it.estado !== 'rodando') { it.estado = 'espera'; it.pct = 0; it.erro = null; veFilaRender(); } }
 function veFilaSelecionar(id) {   // carrega as configurações do item no formulário (e o formulário passa a editar ele)
     const it = VEFILA.itens.find(x => x.id === id);
+    if (it && it.tipo) return;   // arquivo/Lux: a predefinição fica no próprio item (o formulário é das timelines)
     if (!it || it.estado === 'rodando') { if (VEFILA.sel != null && VEFILA._cfgLivre) veFilaCfgAplicar(VEFILA._cfgLivre); VEFILA.sel = null; veFilaRender(); return; }
     if (VEFILA.sel == null) VEFILA._cfgLivre = veFilaCfgLer();   // o que estava no formulário volta ao desmarcar
     VEFILA.sel = id;
@@ -475,10 +479,10 @@ function veFilaRender() {
     L.innerHTML = VEFILA.itens.length ? VEFILA.itens.map((it, i) => `<div class="ve-fila-item ${it.estado}${VEFILA.sel === it.id ? ' sel' : ''}" data-fila="${it.id}" title="${it.estado === 'espera' ? 'Clique para ver e mudar as configurações deste item' : ''}">
         <span class="ve-fila-n">${i + 1}</span>
         <span class="ve-fila-info"><b>${veEsc(it.cfg.nome)}</b><small>${veEsc(it.timeline)}${it.tempo ? ' · feito em ' + veHuman(it.tempo) : ''}${it.erro ? ' · ' + veEsc(String(it.erro).slice(0, 120)) : ''}${it.emendaMsg ? ' · ' + veEsc(it.emendaMsg) : ''}</small>
-            <span class="ve-fila-tags">${(it.avisos || []).length ? `<i class="ve-fila-aviso" onclick="event.stopPropagation(); veFilaIrAviso(${it.id})" title="${veEsc(it.avisos.map(a => veHuman(a.t) + ' — ' + a.texto).join('\n') + '\n\n' + veT('Clique: leva a agulha ao ponto (de novo: próximo aviso)'))}">⚠ ${it.avisos.length} aviso(s)</i>` : ''}${veFilaEtiquetas(it.cfg, it.dur).map(t => `<i>${veEsc(t)}</i>`).join('')}${it.volume ? `<i class="ve-fila-vol${it.volume.lufs < -20 || it.volume.lufs > -11 ? ' ruim' : ''}" title="Volume integrado do som exportado${it.volume.pico != null ? ' · pico ' + it.volume.pico.toFixed(1) + ' dB' : ''}">${it.volume.lufs.toFixed(1)} LUFS</i>` : ''}</span>
+            <span class="ve-fila-tags">${(it.avisos || []).length ? `<i class="ve-fila-aviso" onclick="event.stopPropagation(); veFilaIrAviso(${it.id})" title="${veEsc(it.avisos.map(a => veHuman(a.t) + ' — ' + a.texto).join('\n') + '\n\n' + veT('Clique: leva a agulha ao ponto (de novo: próximo aviso)'))}">⚠ ${it.avisos.length} aviso(s)</i>` : ''}${it.tipo && typeof keEtiquetasHtml === 'function' ? keEtiquetasHtml(it) : veFilaEtiquetas(it.cfg, it.dur).map(t => `<i>${veEsc(t)}</i>`).join('')}${it.volume ? `<i class="ve-fila-vol${it.volume.lufs < -20 || it.volume.lufs > -11 ? ' ruim' : ''}" title="Volume integrado do som exportado${it.volume.pico != null ? ' · pico ' + it.volume.pico.toFixed(1) + ' dB' : ''}">${it.volume.lufs.toFixed(1)} LUFS</i>` : ''}</span>
             <span class="ve-fila-barra"><i style="width:${it.pct}%"></i></span>${veFilaDriveHtml(it)}</span>
         <span class="ve-fila-est">${VE_FILA_ESTADO[it.estado] || it.estado}${it.estado === 'rodando' ? ` ${Math.round(it.pct)}%` : ''}</span>
-        <span class="ve-fila-acoes">${it.estado === 'pronto' && !it.emenda && !it.faixa && /\.(mp4|mov|mkv)$/i.test(it.saida || '') ? `<button class="ve-btn ve-btn-sm" onclick="event.stopPropagation(); veFilaCorrigir(${it.id})" title="Corrigir trecho: marque com I e O o que está errado na timeline e clique aqui — refaz só esse pedaço e emenda no vídeo pronto (o resto e o som ficam iguais)">Corrigir trecho</button>` : ''}${it.estado === 'pronto' ? `<button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.open_file(${veEsc(JSON.stringify(it.saida))})" title="Assistir"><svg class="i"><use href="#i-play"/></svg></button><button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.reveal_file(${veEsc(JSON.stringify(it.saida))})" title="Mostrar na pasta"><svg class="i"><use href="#i-folder"/></svg></button>` : ''}
+        <span class="ve-fila-acoes">${it.estado === 'pronto' && !it.tipo && !it.emenda && !it.faixa && /\.(mp4|mov|mkv)$/i.test(it.saida || '') ? `<button class="ve-btn ve-btn-sm" onclick="event.stopPropagation(); veFilaCorrigir(${it.id})" title="Corrigir trecho: marque com I e O o que está errado na timeline e clique aqui — refaz só esse pedaço e emenda no vídeo pronto (o resto e o som ficam iguais)">Corrigir trecho</button>` : ''}${it.estado === 'pronto' ? `<button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.open_file(${veEsc(JSON.stringify(it.saida))})" title="Assistir"><svg class="i"><use href="#i-play"/></svg></button><button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.reveal_file(${veEsc(JSON.stringify(it.saida))})" title="Mostrar na pasta"><svg class="i"><use href="#i-folder"/></svg></button>` : ''}
             ${it.estado === 'erro' || it.estado === 'cancelado' ? `<button class="ve-btn ve-btn-sm" onclick="veFilaRefazer(${it.id})">De novo</button>` : ''}
             ${it.estado === 'espera' ? `<button class="ve-btn ve-btn-sm" onclick="veFilaMover(${it.id}, -1)" title="Subir">↑</button><button class="ve-btn ve-btn-sm" onclick="veFilaMover(${it.id}, 1)" title="Descer">↓</button>` : ''}
             ${it.estado !== 'rodando' ? `<button class="ve-btn ve-btn-sm" onclick="veFilaRemover(${it.id})" title="Tirar da fila"><svg class="i"><use href="#i-x"/></svg></button>` : ''}</span></div>`).join('')

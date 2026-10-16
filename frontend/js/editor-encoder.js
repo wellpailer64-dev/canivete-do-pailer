@@ -287,7 +287,8 @@ function keAoTrocar(id) {
             veFilaMontar();
             if (!$ve('ke-sem-projeto')) {
                 const d = document.createElement('div'); d.className = 'ke-sem-projeto'; d.id = 'ke-sem-projeto';
-                d.innerHTML = `<b>${veT('Nenhuma timeline aberta')}</b><span>${veT('Para pôr um vídeo na fila, abra o projeto no Vídeo Kanivete e use Ctrl+M (põe na fila e abre o Ke) ou Ctrl+Shift+M (põe na fila sem abrir).')}</span>
+                d.innerHTML = `<b>${veT('Converta arquivos ou renderize timelines')}</b><span>${veT('Arraste vídeos e áudios para cá (ou use "+ Arquivos" na fila) e escolha a predefinição: MP4, H.265, ProRes, MP3, WAV. Renders de vídeo da Lux também entram aqui (Render › "→ fila do Ke").')}</span>
+                    <b>${veT('Nenhuma timeline aberta')}</b><span>${veT('Para pôr um vídeo na fila, abra o projeto no Vídeo Kanivete e use Ctrl+M (põe na fila e abre o Ke) ou Ctrl+Shift+M (põe na fila sem abrir).')}</span>
                     <span>${veT('A fila, o andamento e o monitor da máquina ficam aqui; o render continua mesmo trocando de aba.')}</span>`;
                 $ve('ve-export-form').parentNode.insertBefore(d, $ve('ve-export-form'));
             }

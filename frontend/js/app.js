@@ -638,6 +638,7 @@ function onArquivosSoltos(itens) {
     const projVet = itens.find(i => !i.pasta && /\.aknv$/i.test(i.path));
     if (projVet && tool !== 'vetor-kanivete') { abrirProjetoExterno(projVet.path); return; }
     if (tool === 'home') return homeSugerir(itens);
+    if (tool === 'kanivete-encoder' && typeof keSoltar === 'function') return keSoltar(itens);   // Ke: arquivos entram na fila
     _entregarItens(tool, itens);
 }
 

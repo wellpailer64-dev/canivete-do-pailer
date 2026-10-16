@@ -151,6 +151,8 @@ function luxAbaRender(c) {
             <small class="ve-pp-dica">${veT('A cena como está na agulha, no motor Cycles (luz de verdade). Mesma cena = não renderiza de novo.')}</small>`) +
         vePpSec(veT('Vídeo'), `<div class="lux-render-lista"><button class="lux-render-op" data-luxrender="video:previa"><b>${veT('Prévia')}</b><small>~3 s ${veT('por quadro')} · 16 ${veT('amostras')}</small></button>
             <button class="lux-render-op" data-luxrender="video:final"><b>${veT('Final')}</b><small>~6 s ${veT('por quadro')} · 32 ${veT('amostras')}</small></button></div>
+            <div class="ve-pp-botoes"><button class="ve-btn ve-btn-sm" data-luxke="previa" title="${veT('Congela a cena agora e renderiza na fila do Kanivete Encoder (dá para continuar mexendo)')}">${veT('Prévia')} → ${veT('fila do Ke')}</button>
+                <button class="ve-btn ve-btn-sm" data-luxke="final" title="${veT('Congela a cena agora e renderiza na fila do Kanivete Encoder (dá para continuar mexendo)')}">${veT('Final')} → ${veT('fila do Ke')}</button></div>
             <small class="ve-pp-dica">${veT('A animação inteira (◆ de objetos, câmera e luzes). Sai em MP4; sem fundo, MOV com transparência.')}</small>`) +
         vePpSec(veT('Saída'), `<div class="ve-pp-l"><label>${veT('Fundo')}</label><span>${cn.p.estudio ? veT('estúdio infinito') + ` <i class="lux-amostra" style="background:${veEsc(cn.p.estudioCor || '#e9e4dc')}"></i>` : veT('transparente (PNG/MOV com alfa)')}</span></div>
             <div class="ve-pp-botoes"><button class="ve-btn ve-btn-sm ve-btn-ghost" data-luxpasta>${veT('Abrir a pasta dos renders')}</button></div>`);
@@ -164,6 +166,7 @@ document.addEventListener('click', e => {
     else if (ab) { VE3T.aba = ab.dataset.luxaba; ve3dTelaLado(); }
     else if (so) luxSombreado(so.dataset['3tsomb']);
     else if (rd) ve3dEstudioExecutar(ve3dTelaClipe(), rd.dataset.luxrender, rd);
+    else if (e.target.closest('[data-luxke]')) keLuxEnviar(ve3dTelaClipe(), e.target.closest('[data-luxke]').dataset.luxke).catch(er => veToast(er.message || String(er)));
     else if (pa) luxPastaRenders();
 });
 window.addEventListener('keydown', e => {   // registrado antes da tela: Ctrl+S/O/N da Lux não vão para o Editor
