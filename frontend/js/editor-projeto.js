@@ -679,13 +679,13 @@ function veMaDesenhar(ctx, x, y, w, h, e) {
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.fillRect(x, y, w, h);
     const d = (performance.now() / 45) % 16;
-    ctx.strokeStyle = e.fila ? 'rgba(255,255,255,0.07)' : 'rgba(212,129,74,0.22)';
+    ctx.strokeStyle = e.fila ? 'rgba(255,255,255,0.07)' : veAcc(0.22);
     ctx.lineWidth = 5;
     ctx.beginPath();
     for (let k = x - h - 16 + d; k < x + w + 16; k += 16) { ctx.moveTo(k, y + h); ctx.lineTo(k + h, y); }
     ctx.stroke();
     if (!e.fila && e.pct >= 0) {
-        ctx.fillStyle = '#D4814A';
+        ctx.fillStyle = veAcc();
         ctx.fillRect(x, y + h - 3, w * Math.min(1, e.pct / 100), 3);
     }
     if (w > 46 && h >= 12) {
@@ -1801,14 +1801,14 @@ function veTimelineDropGhost(ctx, rows, X, W) {
         ctx.save();
         ctx.globalAlpha = .74;
         veRoundRect(ctx, x, y, w, h, 4);
-        ctx.fillStyle = audio ? 'rgba(67,197,143,.28)' : 'rgba(212,129,74,.28)';
+        ctx.fillStyle = audio ? 'rgba(67,197,143,.28)' : veAcc(.28);
         ctx.fill();
-        ctx.strokeStyle = cor || (audio ? '#43c58f' : '#D4814A');
+        ctx.strokeStyle = cor || (audio ? '#43c58f' : veAcc());
         ctx.lineWidth = 2;
         ctx.setLineDash([6, 4]);
         veRoundRect(ctx, x, y, w, h, 4); ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = cor || (audio ? '#43c58f' : '#D4814A');
+        ctx.fillStyle = cor || (audio ? '#43c58f' : veAcc());
         ctx.fillRect(x, y, w, Math.min(12, h));
         if (w > 42 && h > 18) {
             ctx.fillStyle = audio ? '#d8ffe9' : '#fff0df';

@@ -66,9 +66,9 @@ function veGapDesenhar(ctx, rowOf, X) {
     if (!r) return;
     const x1 = X(g.a), x2 = X(g.b);
     ctx.save();
-    ctx.fillStyle = 'rgba(212,129,74,0.22)';
+    ctx.fillStyle = veAcc(0.22);
     ctx.fillRect(x1, r.y + 3, x2 - x1, r.h - 6);
-    ctx.strokeStyle = '#D4814A';
+    ctx.strokeStyle = veAcc();
     ctx.lineWidth = 2;
     ctx.strokeRect(x1 + 1, r.y + 4, Math.max(0, x2 - x1 - 2), r.h - 8);
     ctx.restore();

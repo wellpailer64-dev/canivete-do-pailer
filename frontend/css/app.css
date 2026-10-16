@@ -9,8 +9,8 @@
     /* Laranja — só ação principal e estado ativo */
     --primary: #D4814A;
     --primary-hover: #DC9566;
-    --primary-soft: rgba(212, 129, 74, .10);
-    --primary-line: rgba(212, 129, 74, .45);
+    --primary-soft: color-mix(in srgb, var(--primary) 10%, transparent);
+    --primary-line: color-mix(in srgb, var(--primary) 45%, transparent);
 
     /* Pretos neutros (sem tom azulado) */
     --bg-0: #080808;   /* fundo do app */
@@ -257,7 +257,7 @@ button { cursor: pointer; }
 .sidebar-foot.clicavel:hover { background: var(--bg-3); color: var(--text); }
 .sidebar-foot.clicavel:hover #app-version::after { content: " · verificar"; color: var(--primary); }
 .sidebar-foot.verificando .dot { background: var(--primary); animation: sb-pisca .8s ease-in-out infinite alternate; }
-.sidebar-foot.nova .dot { background: var(--primary); box-shadow: 0 0 0 3px rgba(212,129,74,.25); }
+.sidebar-foot.nova .dot { background: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
 .sidebar-foot.falhou .dot { background: #e0a040; }
 @keyframes sb-pisca { to { opacity: .25; } }
 
@@ -642,7 +642,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
     letter-spacing: .01em;
     color: #120800;
     background: var(--primary);
-    box-shadow: 0 10px 30px -14px rgba(212, 129, 74, .9);
+    box-shadow: 0 10px 30px -14px color-mix(in srgb, var(--primary) 90%, transparent);
 }
 .btn-run:hover:not(:disabled) { background: var(--primary-hover); }
 .btn-run > * { position: relative; }
@@ -1684,6 +1684,23 @@ html.barra-propria .app-container { height: calc(100vh - 26px); }
 .al-vk { --al: #ff8c42; --al-fundo: #2b1408; }   /* Vetor Kanivete: laranja */
 .al-ke { --al: #9b4dff; --al-fundo: #1a0833; }   /* Kanivete Encoder: roxo forte */
 .al-lk { --al: #ff4fc8; --al-fundo: #2b0a22; }   /* Lux Kanivete: magenta */
+
+/* Cor de destaque = a do logo da ferramenta aberta (como a Lux): switchTool grava html[data-ferramenta]; as janelas
+   soltas copiam o atributo. Fora destas (Home e ferramentas sem marca) fica o laranja padrão. Mudou a cor da marca
+   (.al-*): mudar aqui também. Desenho em canvas usa veAcc() (app.js), que lê esta cor. */
+:root[data-ferramenta="video-cutter"] { --primary: #c9a8ff; }
+:root[data-ferramenta="editor-imagem"] { --primary: #4c9bff; }
+:root[data-ferramenta="vetor-kanivete"] { --primary: #ff8c42; }
+:root[data-ferramenta="sound-kanivete"] { --primary: #7fd6ff; }
+:root[data-ferramenta="lux-kanivete"] { --primary: #ff4fc8; }
+:root[data-ferramenta="slider-kanivete"] { --primary: #2ee6c8; }
+:root[data-ferramenta="kanivete-encoder"], .ve-ke { --primary: #9b4dff; }   /* a janela do Encoder é roxa até no Vídeo */
+:root[data-ferramenta], .ve-ke {
+    --primary-hover: color-mix(in srgb, var(--primary) 78%, #fff);
+    --primary-soft: color-mix(in srgb, var(--primary) 10%, transparent);
+    --primary-line: color-mix(in srgb, var(--primary) 45%, transparent);
+}
+.ve-ke { --ve-accent: var(--primary); --ve-accent-2: var(--primary-hover); --ie-acento: var(--primary); }
 .app-logo-marca { width: 22px; height: 22px; font-size: 11px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px var(--al); }
 .app-logo-grande { width: 56px; height: 56px; font-size: 26px; border-radius: 12px; box-shadow: inset 0 0 0 2.5px var(--al); margin: 0 auto 14px; }
 .tab .tab-ico .app-logo { width: 16px; height: 16px; font-size: 8px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--al); }

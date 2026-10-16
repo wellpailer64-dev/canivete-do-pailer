@@ -912,8 +912,22 @@ window.addEventListener('pywebviewready', () => {
     window.pywebview.api.janela_propria().then(ok => document.documentElement.classList.toggle('barra-propria', !!ok)).catch(() => {});
 });
 
+// Cor de destaque da ferramenta aberta (a do logo; html[data-ferramenta] no app.css) para desenhos em canvas:
+// veAcc() = '#rrggbb', veAcc(.3) = rgba com essa opacidade. Lida uma vez por troca de ferramenta.
+let _veAcc = null;
+function veAcc(a) {
+    if (!_veAcc) {
+        const v = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
+        const m = /^#([0-9a-f]{6})$/i.exec(v), n = m ? parseInt(m[1], 16) : 0xD4814A;
+        _veAcc = { hex: '#' + n.toString(16).padStart(6, '0'), rgb: `${n >> 16 & 255},${n >> 8 & 255},${n & 255}` };
+    }
+    return a == null ? _veAcc.hex : `rgba(${_veAcc.rgb},${a})`;
+}
+
 function switchTool(toolId) {
     console.log("Switching to:", toolId);
+    document.documentElement.dataset.ferramenta = toolId;
+    _veAcc = null;
     const ativaAntes = document.querySelector('.menu-item.active')?.dataset.tool;
     if (toolId !== 'home' && toolId !== ativaAntes) playEtereo();
     

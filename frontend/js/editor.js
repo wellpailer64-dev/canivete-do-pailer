@@ -3867,7 +3867,7 @@ function veKgDesenhar(cv, q, drag) {
     ctx.beginPath();
     if (hold) { ctx.moveTo(m.X(0), m.Y(0)); ctx.lineTo(m.X(1), m.Y(0)); ctx.lineTo(m.X(1), m.Y(1)); }
     else ys.forEach((y, n) => ctx[n ? 'lineTo' : 'moveTo'](m.X(n / N), m.Y(y)));
-    ctx.strokeStyle = '#D4814A';
+    ctx.strokeStyle = veAcc();
     ctx.lineWidth = 2;
     ctx.stroke();
     if (hold) return;
@@ -3885,7 +3885,7 @@ function veKgDesenhar(cv, q, drag) {
         ctx.fillStyle = drag === n ? '#fbbf24' : '#fff';
         ctx.fill();
     });
-    [[0, 0], [1, 1]].forEach(([x, y]) => { ctx.fillStyle = '#D4814A'; ctx.fillRect(m.X(x) - 3, m.Y(y) - 3, 6, 6); });
+    [[0, 0], [1, 1]].forEach(([x, y]) => { ctx.fillStyle = veAcc(); ctx.fillRect(m.X(x) - 3, m.Y(y) - 3, 6, 6); });
 }
 
 function veKfGraphInit(cv) {
@@ -5441,7 +5441,7 @@ function veRender() {
         }
         if (veHasFx(c) && cw > 34 && vh >= 12) {
             // selo fx (como no Premiere): laranja = efeitos ligados; cinza = todos desligados/neutros
-            ctx.fillStyle = veFxActive(c).length ? '#D4814A' : '#666';
+            ctx.fillStyle = veFxActive(c).length ? veAcc() : '#666';
             ctx.fillRect(cx + cw - 20, vy + 2, 17, 10);
             ctx.fillStyle = '#1a0d02';
             ctx.font = '700 8.5px Cascadia Mono, Consolas, monospace';
@@ -5451,9 +5451,9 @@ function veRender() {
         if (!ghost && i === VE.fxHover) {
             ctx.save();
             ctx.globalAlpha = 1;
-            ctx.fillStyle = 'rgba(212,129,74,0.18)';
+            ctx.fillStyle = veAcc(0.18);
             ctx.fillRect(cx, vy, cw, vh);
-            ctx.strokeStyle = '#D4814A';
+            ctx.strokeStyle = veAcc();
             ctx.lineWidth = 2;
             ctx.setLineDash([4, 3]);
             veRoundRect(ctx, cx, vy, cw, vh, 2); ctx.stroke();
@@ -5464,7 +5464,7 @@ function veRender() {
         if (img || c.x === 'v' || !veOcupaA(c)) {   // imagem, vídeo com o som separado ou sem som: sem linha de áudio
             ctx.globalAlpha = 1;
             if ((selSet.has(c) && !dim) || ghost) {
-                ctx.strokeStyle = '#D4814A';
+                ctx.strokeStyle = veAcc();
                 ctx.lineWidth = 2;
                 if (ghost) ctx.setLineDash([5, 3]);
                 veRoundRect(ctx, cx, vy, cw, vh, 2); ctx.stroke();
@@ -5534,7 +5534,7 @@ function veRender() {
 
         // seleção (o fantasma do arraste ganha contorno tracejado)
         if ((selSet.has(c) && !dim) || ghost) {
-            ctx.strokeStyle = '#D4814A';
+            ctx.strokeStyle = veAcc();
             ctx.lineWidth = 2;
             if (ghost) ctx.setLineDash([5, 3]);
             if (!aud) { veRoundRect(ctx, cx, vy, cw, vh, 2); ctx.stroke(); }
@@ -5546,7 +5546,7 @@ function veRender() {
             const txt = `${mv && mv.alt ? '+ ' : ''}${aud ? 'A' : 'V'}${tr + 1} · ${veShort(st)}`, ty = aud ? ay : vy;
             ctx.fillStyle = 'rgba(0,0,0,0.75)';
             ctx.fillRect(Math.max(2, x1), ty - 17, ctx.measureText(txt).width + 10, 15);
-            ctx.fillStyle = '#D4814A';
+            ctx.fillStyle = veAcc();
             ctx.fillText(txt, Math.max(2, x1) + 5, ty - 6);
         }
     });
@@ -5579,10 +5579,10 @@ function veRender() {
                 ctx.restore();
             }
             if (legSel.has(i)) {
-                ctx.strokeStyle = '#D4814A';
+                ctx.strokeStyle = veAcc();
                 ctx.lineWidth = 2;
                 ctx.strokeRect(x1 + 1, y + 1, w - 2, h - 2);
-                ctx.fillStyle = '#D4814A';
+                ctx.fillStyle = veAcc();
                 ctx.fillRect(x1 + 1, y + 2, Math.min(4, w / 2), h - 4);
                 ctx.fillRect(x1 + w - Math.min(5, w / 2), y + 2, Math.min(4, w / 2), h - 4);
             }
@@ -5595,9 +5595,9 @@ function veRender() {
     // retângulo de seleção
     if (VE.drag && VE.drag.mode === 'marq') {
         const d = VE.drag, xa = X(d.ta), xb = X(d.tb);
-        ctx.fillStyle = 'rgba(212,129,74,0.10)';
+        ctx.fillStyle = veAcc(0.10);
         ctx.fillRect(Math.min(xa, xb), Math.min(d.ya, d.yb), Math.abs(xb - xa), Math.abs(d.yb - d.ya));
-        ctx.strokeStyle = 'rgba(212,129,74,0.85)';
+        ctx.strokeStyle = veAcc(0.85);
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 3]);
         ctx.strokeRect(Math.min(xa, xb) + 0.5, Math.min(d.ya, d.yb) + 0.5, Math.abs(xb - xa), Math.abs(d.yb - d.ya));
@@ -5674,7 +5674,7 @@ function veDrawKfMarks(ctx, c, i, st, y) {
         // ◆ selecionado (editor-keyframes.js: Delete apaga só ele): contorno branco
         const kSel = sel && typeof veKlTemSel === 'function' && veKlTemSel() &&
             VEKL.sel.some(s => Math.abs(veTlAt(c, s.t) - t) < veFrame() / 2);
-        ctx.fillStyle = naAgulha ? '#fbbf24' : sel ? '#D4814A' : 'rgba(255,255,255,0.7)';
+        ctx.fillStyle = naAgulha ? '#fbbf24' : sel ? veAcc() : 'rgba(255,255,255,0.7)';
         ctx.strokeStyle = kSel ? '#fff' : 'rgba(0,0,0,0.7)';
         ctx.lineWidth = kSel ? 2 : 1;
         ctx.beginPath();

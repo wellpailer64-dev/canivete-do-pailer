@@ -1292,7 +1292,7 @@ function ieCurvaEditor(cv, pts, aoMudar) {
         x.strokeStyle = '#eee'; x.beginPath();
         for (let i = 0; i < 256; i++) (i ? x.lineTo(i, 255 - lut[i]) : x.moveTo(i, 255 - lut[i]));
         x.stroke();
-        x.fillStyle = '#D4814A';
+        x.fillStyle = veAcc();
         pts.forEach(([a, b]) => { x.fillRect(a - 3, 255 - b - 3, 6, 6); });
     };
     let ativo = -1;

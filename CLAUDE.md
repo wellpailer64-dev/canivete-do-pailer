@@ -6,7 +6,9 @@
   amigos procura esses nomes; trocar exige uma migração planejada.
 - Nomes visíveis: **Vídeo Kanivete** (Vd, lilás; antes "Editor Kanivete"), **Photo Kanivete** (Pk, azul), **Vetor
   Kanivete** (Vk, laranja), **Sound Kanivete** (Sk, azul clarinho), **Lux Kanivete** (Lk, magenta), **Kanivete Encoder**
-  (Ke, roxo forte), **Slider Kanivete** (Sd, verde-água; `.dknv`). Cores em `.al-*` (`frontend/css/app.css`, `som.css`). No código continuam editor de vídeo (`editor*.js`,
+  (Ke, roxo forte), **Slider Kanivete** (Sd, verde-água; `.dknv`). Cores em `.al-*` (`frontend/css/app.css`, `som.css`). A cor de
+  destaque do app (`--primary`) vira a da marca na aba aberta (`html[data-ferramenta]`, app.css; canvas: `veAcc()` em app.js);
+  laranja só na Home e nas ferramentas sem marca. Nada de `#D4814A` fixo: use `var(--primary)`/`veAcc()`. No código continuam editor de vídeo (`editor*.js`,
   `video-cutter`, "Pocket Editor" nos comentários) e editor de imagem (`imagem-*.js`).
 - Home (2026-10-16): banners deslizantes no topo, um por ferramenta, troca a cada 4 s (`frontend/js/home-banners.js`,
   `HB_ITENS` com título/subtítulo/corpo; artes `frontend/img/home/banner-<id>.webp` geradas no Z-Image local por

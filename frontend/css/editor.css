@@ -11,7 +11,7 @@
     --ve-text: var(--text);
     --ve-dim: var(--text-2);
     --ve-faint: var(--text-3);
-    --ve-accent: #D4814A;
+    --ve-accent: var(--primary);
     --ve-accent-2: var(--primary-hover);
     --ve-video: #5b6ee1;
     --ve-audio: #2fa877;
@@ -192,8 +192,8 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
     left: 10px;
     padding: 3px 8px;
     border-radius: 3px;
-    background: rgba(212, 129, 74, .16);
-    border: 1px solid rgba(212, 129, 74, .45);
+    background: color-mix(in srgb, var(--primary) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 45%, transparent);
     color: var(--ve-accent-2);
     font: 700 10px var(--ve-ui);
     letter-spacing: .08em;
@@ -325,7 +325,7 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
     border: 1px solid transparent;
 }
 .ve-clip:hover { background: var(--ve-panel-2); }
-.ve-clip.sel { border-color: var(--ve-accent); background: rgba(212, 129, 74, .07); }
+.ve-clip.sel { border-color: var(--ve-accent); background: color-mix(in srgb, var(--primary) 7%, transparent); }
 .ve-clip-bar { height: 100%; min-height: 28px; border-radius: 0 2px 2px 0; background: var(--ve-video); }
 .ve-clip.off .ve-clip-bar { background: repeating-linear-gradient(45deg, #5a2323 0 3px, #2a1515 3px 6px); }
 .ve-clip-name { font-weight: 600; font-size: 12px; }
@@ -378,7 +378,7 @@ body.ve-focus .content-area { padding: 10px; overflow: hidden; }
     background: var(--ve-bg); color: var(--ve-dim); font: 600 11.5px var(--ve-ui); cursor: pointer;
 }
 .ve-seq-tab:hover { color: var(--ve-text); border-color: var(--ve-line-2); }
-.ve-seq-tab.active { color: var(--ve-text); border-color: var(--ve-accent); background: #D4814A12; }
+.ve-seq-tab.active { color: var(--ve-text); border-color: var(--ve-accent); background: color-mix(in srgb, var(--primary) 7%, transparent); }
 .ve-seq-tab span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ve-seq-tab button {
     display: grid; place-items: center; flex: none; width: 15px; height: 15px; padding: 0; border: 0;
@@ -441,7 +441,7 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-vbar[hidden] { display: none; }
 .ve-vbar:hover, .ve-vbar.ativa { opacity: 1; background: rgba(255, 255, 255, .05); }
 .ve-vbar i { display: block; width: 5px; margin-left: 2px; border-radius: 3px; background: rgba(255, 255, 255, .32); transition: width .15s, margin .15s, background .15s; }
-.ve-vbar:hover i, .ve-vbar.ativa i { width: 7px; margin-left: 1px; background: rgba(212, 129, 74, .85); }
+.ve-vbar:hover i, .ve-vbar.ativa i { width: 7px; margin-left: 1px; background: color-mix(in srgb, var(--primary) 85%, transparent); }
 .ve-tl-wrap.tool-razor { cursor: crosshair; }
 .ve-tl-wrap.tool-fwd { cursor: e-resize; }
 /* Pincel e Forma (editor-grafico.js): cursor no monitor e a caixa de opções no canto dele */
@@ -464,7 +464,7 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-gr-tipos button.on { border-color: var(--ve-accent); color: var(--ve-accent); }
 .ve-pj-swatch { width: 100%; height: 100%; border-radius: 3px; }
 /* Mostrar no projeto: o item pisca para achar com o olho */
-@keyframes vePjPiscar { 0%, 100% { box-shadow: none; } 20%, 60% { box-shadow: 0 0 0 2px var(--ve-accent), 0 0 14px rgba(212, 129, 74,.55); } 40%, 80% { box-shadow: none; } }
+@keyframes vePjPiscar { 0%, 100% { box-shadow: none; } 20%, 60% { box-shadow: 0 0 0 2px var(--ve-accent), 0 0 14px color-mix(in srgb, var(--primary) 55%, transparent); } 40%, 80% { box-shadow: none; } }
 .pj-piscar { animation: vePjPiscar 1.6s ease-in-out; border-radius: 4px; }
 .ve-screen.tool-pincel, .ve-screen.tool-pincel canvas { cursor: none; }   /* a silhueta do pincel faz de cursor */
 .ve-gr-cursor { position: absolute; z-index: 5; pointer-events: none; border-radius: 50%; border: 1.5px solid #fff;
@@ -598,7 +598,7 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
     cursor: pointer;
 }
 .ve-pill:hover { color: var(--ve-text); }
-.ve-pill.active { border-color: var(--ve-accent); color: var(--ve-accent); background: rgba(212, 129, 74, .08); }
+.ve-pill.active { border-color: var(--ve-accent); color: var(--ve-accent); background: color-mix(in srgb, var(--primary) 8%, transparent); }
 .ve-select {
     width: 100%;
     height: 32px;
@@ -725,7 +725,7 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
     background: #1a1a1d; color: var(--ve-faint); font: 700 10px var(--ve-mono); letter-spacing: .08em; cursor: pointer;
 }
 .ve-med-master:hover { color: var(--ve-text); border-color: rgba(255, 255, 255, .25); }
-.ve-med-master.on { background: rgba(212, 129, 74, .16); border-color: #D4814A; color: #e3a77c; }
+.ve-med-master.on { background: color-mix(in srgb, var(--primary) 16%, transparent); border-color: var(--primary); color: var(--primary-hover); }
 .ve-lim-master { margin-top: 0; padding-top: 0; border-top: 0; }
 
 /* ---------- Ganho (G) e lista de clipes ---------- */
@@ -793,12 +793,12 @@ body.ve-resizing-y, body.ve-resizing-y * { cursor: ns-resize !important; user-se
 .ve-ruler-hit-v { top: 12px; left: 0; bottom: 0; width: 16px; cursor: col-resize; }
 .ve-transport-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .ve-ruler-btn { min-width: 28px; height: 28px; }
-.ve-ruler-btn.active { color: var(--ve-accent); background: rgba(212, 129, 74, .12); }
+.ve-ruler-btn.active { color: var(--ve-accent); background: color-mix(in srgb, var(--primary) 12%, transparent); }
 .ve-fhd-btn { width: auto; padding: 0 6px; font-size: 10px; font-weight: 700; letter-spacing: .04em; }
 /* Botão PROXY + setinha de opções (editor-proxy.js) */
 .ve-proxy-grupo { position: relative; display: inline-flex; align-items: center; }
 .ve-proxy-btn { height: 28px; padding: 0 7px; font-size: 10px; font-weight: 600; letter-spacing: .06em; border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.ve-proxy-btn.active { color: var(--ve-accent); background: rgba(212, 129, 74, .12); }
+.ve-proxy-btn.active { color: var(--ve-accent); background: color-mix(in srgb, var(--primary) 12%, transparent); }
 .ve-proxy-mais { height: 28px; width: 18px; min-width: 18px; padding: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .ve-proxy-pop { position: absolute; bottom: 34px; left: 0; z-index: 3000; width: 248px; padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 6px;
     background: var(--ve-panel); border: 1px solid var(--ve-line-2); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); font: 12px var(--ve-ui); color: var(--ve-text); }
@@ -976,7 +976,7 @@ body.ve-docking, body.ve-docking * { cursor: grabbing !important; user-select: n
 }
 .ve-ddrop {
     position: fixed; z-index: 999; pointer-events: none; border-radius: 4px;
-    background: rgba(212, 129, 74, .2); border: 2px solid var(--ve-accent);
+    background: color-mix(in srgb, var(--primary) 20%, transparent); border: 2px solid var(--ve-accent);
     transition: left .08s, top .08s, width .08s, height .08s;
 }
 .ve-ddrop[hidden], .ve-dzones[hidden] { display: none; }
@@ -1030,7 +1030,7 @@ body.ve-docking, body.ve-docking * { cursor: grabbing !important; user-select: n
 .ve-at-grupo { position: sticky; top: 0; z-index: 1; padding: 12px 0 5px; background: var(--ve-panel); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ve-faint); }
 .ve-at-row { display: flex; align-items: center; gap: 12px; min-height: 32px; padding: 2px 6px; border-radius: 4px; }
 .ve-at-row:hover { background: var(--ve-panel-2); }
-.ve-at-row.gravando { background: rgba(212, 129, 74,.14); box-shadow: inset 0 0 0 1px rgba(212, 129, 74,.5); }
+.ve-at-row.gravando { background: color-mix(in srgb, var(--primary) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 50%, transparent); }
 .ve-at-nome { flex: 1; min-width: 0; font-size: 12.5px; color: var(--ve-text); }
 .ve-at-teclas { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 5px; }
 .ve-at-kbd {
@@ -1070,8 +1070,8 @@ body.ve-docking, body.ve-docking * { cursor: grabbing !important; user-select: n
 .ve-tr-card canvas { width: 100%; aspect-ratio: 16 / 9; border-radius: 3px; background: #0b0b0b; border: 1px solid #8b5cf655; }
 .ve-tr-card:hover canvas { border-color: #8b5cf6; }
 /* a transição do Ctrl+D (clique no cartão) */
-.ve-tr-card.escolhida { border-color: var(--ve-accent, #D4814A); box-shadow: 0 0 0 1px var(--ve-accent, #D4814A), 0 0 10px #D4814A55; }
-.ve-tr-card.escolhida canvas { border-color: var(--ve-accent, #D4814A); }
+.ve-tr-card.escolhida { border-color: var(--ve-accent, var(--primary)); box-shadow: 0 0 0 1px var(--ve-accent, var(--primary)), 0 0 10px color-mix(in srgb, var(--primary) 33%, transparent); }
+.ve-tr-card.escolhida canvas { border-color: var(--ve-accent, var(--primary)); }
 .ve-tr-card span { font-size: 11.5px; color: var(--ve-text, #ddd); }
 .ve-tr-card small { font-size: 10px; color: var(--ve-faint); margin-top: -3px; }
 .ve-tr-controls {
@@ -1092,7 +1092,7 @@ body.ve-docking, body.ve-docking * { cursor: grabbing !important; user-select: n
 }
 .ve-tr-dir-buttons button { width: 24px; padding: 0; font-size: 13px; font-family: "Segoe UI Symbol", var(--ve-ui); }
 .ve-tr-control-row button:hover { color: var(--ve-text); border-color: var(--ve-faint); background: var(--ve-panel-2); }
-.ve-tr-control-row button.active { color: var(--ve-accent); border-color: var(--ve-accent); background: #D4814A14; }
+.ve-tr-control-row button.active { color: var(--ve-accent); border-color: var(--ve-accent); background: color-mix(in srgb, var(--primary) 8%, transparent); }
 /* Chroma Key: cor da tela + conta-gotas, e opção liga/desliga */
 .ve-prop-cor { display: flex; align-items: center; gap: 8px; }
 .ve-prop-cor label { flex: 1; }
@@ -1174,7 +1174,7 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-menu, .ve-mbar-menu, .ve-ctx, .ve-dghost, .ve-ddrop, .ve-dzones, .ve-cp-fundo {
     --ve-bg: var(--bg-0); --ve-panel: var(--bg-1); --ve-panel-2: var(--bg-3);
     --ve-line: var(--line); --ve-line-2: var(--line-2); --ve-text: var(--text); --ve-dim: var(--text-2);
-    --ve-faint: var(--text-3); --ve-accent: #D4814A; --ve-accent-2: var(--primary-hover);
+    --ve-faint: var(--text-3); --ve-accent: var(--primary); --ve-accent-2: var(--primary-hover);
     --ve-danger: #ef4444; --ve-ui: var(--font-ui); --ve-mono: var(--mono);
 }
 
@@ -1183,11 +1183,11 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-dcompass[hidden] { display: none; }
 .ve-dcompass i {
     position: absolute; display: grid; place-items: center; border-radius: 4px; font: 700 13px/1 Segoe UI, sans-serif;
-    font-style: normal; color: #D4814A; background: rgba(18, 18, 18, .94); border: 1px solid rgba(212, 129, 74, .75);
+    font-style: normal; color: var(--primary); background: rgba(18, 18, 18, .94); border: 1px solid color-mix(in srgb, var(--primary) 75%, transparent);
     box-shadow: 0 6px 18px rgba(0, 0, 0, .55);
 }
 .ve-dcompass i.root { border-style: dashed; }
-.ve-dcompass i.on { background: #D4814A; color: #111; }
+.ve-dcompass i.on { background: var(--primary); color: #111; }
 .ve-float-bar .ve-btn { flex-shrink: 0; }
 
 /* ---------- Luz e Cor (editor-lc.js) ---------- */
@@ -1443,7 +1443,7 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-seqcfg-tam .ve-icon-btn { margin-bottom: 4px; }
 .ve-seqcfg-nome small { color: var(--ve-faint); font-size: 11.5px; }
 .ve-seqcfg-prev { display: flex; align-items: center; gap: 12px; margin-top: 10px; min-height: 66px; }
-.ve-seqcfg-prev > div { flex: none; border: 1px solid var(--ve-accent); background: rgba(212, 129, 74,.12); border-radius: 2px; transition: width .15s, height .15s; }
+.ve-seqcfg-prev > div { flex: none; border: 1px solid var(--ve-accent); background: color-mix(in srgb, var(--primary) 12%, transparent); border-radius: 2px; transition: width .15s, height .15s; }
 .ve-seqcfg-prev span { font-size: 11.5px; color: var(--ve-dim); }
 .ve-seqcfg-dica { font-size: 11px; line-height: 1.5; color: var(--ve-faint); }
 .ve-tx-nota { margin: 0; font-size: 11px; color: var(--ve-dim); line-height: 1.5; }
@@ -1451,13 +1451,13 @@ html.ve-float-html body { background: var(--bg-0); }
 /* ferramenta Texto: caixa transparente sobre o texto do monitor (o desenho de verdade fica por baixo) */
 .ve-screen.tool-texto, .ve-screen.tool-texto canvas { cursor: text; }
 .ve-tx-edit {
-    position: absolute; z-index: 6; margin: 0; border: 1px dashed rgba(212, 129, 74,.9); border-radius: 2px;
-    background: transparent; color: transparent; caret-color: #D4814A; resize: none; overflow: hidden;
+    position: absolute; z-index: 6; margin: 0; border: 1px dashed color-mix(in srgb, var(--primary) 90%, transparent); border-radius: 2px;
+    background: transparent; color: transparent; caret-color: var(--primary); resize: none; overflow: hidden;
     white-space: pre; outline: none; box-sizing: border-box; padding-bottom: 0; transform-origin: 50% 50%;
 }
-.ve-tx-edit::selection { background: rgba(212, 129, 74,.35); color: transparent; }
+.ve-tx-edit::selection { background: color-mix(in srgb, var(--primary) 35%, transparent); color: transparent; }
 /* ferramenta Texto: a caixa sendo desenhada (clicar e arrastar no monitor) */
-.ve-tx-caixa-nova { position: absolute; z-index: 6; border: 1px dashed #D4814A; background: rgba(212, 129, 74, 0.08); pointer-events: none; }
+.ve-tx-caixa-nova { position: absolute; z-index: 6; border: 1px dashed var(--primary); background: color-mix(in srgb, var(--primary) 8%, transparent); pointer-events: none; }
 
 /* ferramenta Velocidade (R) */
 .ve-tl-wrap.tool-rate { cursor: default; }
@@ -1492,10 +1492,10 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-pj-lista.alvo { box-shadow: inset 0 0 0 2px var(--ve-accent); }
 .ve-pj-row { height: 26px; font-size: 12px; color: var(--ve-text); cursor: default; border-radius: 3px; margin: 0 4px; padding-left: 6px; }
 .ve-pj-row:hover { background: var(--ve-panel-2); }
-.ve-pj-row.sel { background: rgba(212, 129, 74,.18); box-shadow: inset 0 0 0 1px rgba(212, 129, 74,.45); }
+.ve-pj-row.sel { background: color-mix(in srgb, var(--primary) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 45%, transparent); }
 .ve-pj-row.atual { box-shadow: inset 3px 0 0 var(--ve-accent); }
 .ve-pj-row.atual .ve-pj-nome { color: var(--ve-text); font-weight: 650; }
-.ve-pj-row.alvo { background: rgba(212, 129, 74,.3); box-shadow: inset 0 0 0 2px var(--ve-accent); }
+.ve-pj-row.alvo { background: color-mix(in srgb, var(--primary) 30%, transparent); box-shadow: inset 0 0 0 2px var(--ve-accent); }
 .ve-pj-row.fraco > *:not(.ve-pj-cor) { opacity: .6; }
 .ve-pj-row.lost {
     color: #fecaca;
@@ -1518,7 +1518,7 @@ html.ve-float-html body { background: var(--bg-0); }
     white-space: nowrap; user-select: none;
 }
 .ve-pj-enh {
-    color: #fff; background: repeating-linear-gradient(135deg, rgba(212, 129, 74,.95) 0 6px, rgba(234,88,12,.75) 6px 12px);
+    color: #fff; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--primary) 95%, transparent) 0 6px, rgba(234,88,12,.75) 6px 12px);
     background-size: 17px 17px; animation: ve-pj-enh 0.8s linear infinite;
 }
 .ve-pj-enh.fila { color: var(--ve-dim); background: var(--ve-panel-2); animation: none; }
@@ -1579,8 +1579,8 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-pj-grade > .ve-clips-empty { grid-column: 1 / -1; }
 .ve-pj-card { min-width: 0; padding: 5px; border-radius: 4px; cursor: default; position: relative; }
 .ve-pj-card:hover { background: var(--ve-panel-2); }
-.ve-pj-card.sel { background: rgba(212, 129, 74,.18); box-shadow: inset 0 0 0 1px rgba(212, 129, 74,.55); }
-.ve-pj-card.alvo { background: rgba(212, 129, 74,.3); box-shadow: inset 0 0 0 2px var(--ve-accent); }
+.ve-pj-card.sel { background: color-mix(in srgb, var(--primary) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 55%, transparent); }
+.ve-pj-card.alvo { background: color-mix(in srgb, var(--primary) 30%, transparent); box-shadow: inset 0 0 0 2px var(--ve-accent); }
 .ve-pj-card.fraco .ve-pj-capa { opacity: .6; }
 .ve-pj-card.lost .ve-pj-capa {
     opacity: 1;
@@ -1846,7 +1846,7 @@ body.ve-kl-scrub, body.ve-kl-scrub * { cursor: ew-resize !important; }
 .ve-af-mid em { position: absolute; right: 3px; bottom: 3px; padding: 0 4px; border-radius: 2px; background: rgba(0,0,0,.7); font: 600 9.5px var(--ve-mono); font-style: normal; color: #fff; }
 .ve-af-onda { width: 100%; height: 46px; border-radius: 4px; background: #0b0c10; }
 .ve-af-prog { position: relative; height: 22px; border-radius: 4px; background: var(--ve-panel-2); overflow: hidden; }
-.ve-af-prog div { position: absolute; inset: 0 auto 0 0; background: rgba(212, 129, 74, .35); transition: width .2s; }
+.ve-af-prog div { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--primary) 35%, transparent); transition: width .2s; }
 .ve-af-prog span { position: relative; display: block; padding: 0 8px; line-height: 22px; font: 11px var(--ve-ui); color: var(--ve-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ve-af-modelos { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
 .ve-af-mod { display: flex; flex-direction: column; gap: 4px; padding: 10px; text-align: left; border: 1px solid var(--ve-line-2); border-radius: 5px; background: var(--ve-panel-2); color: var(--ve-text); cursor: pointer; }
@@ -2001,7 +2001,7 @@ body.ve-kl-scrub, body.ve-kl-scrub * { cursor: ew-resize !important; }
 .ve-tx-abas button.on { border-bottom-color: #c3c6ce; }
 .ve-pj-row.sel { background: rgba(255, 255, 255, .07); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16); }
 /* menus: hover num tom pastel suave, texto claro (antes: laranja cheio) */
-.ve-mbar-menu button:hover:not(:disabled) { background: rgba(212, 129, 74, .16); color: var(--ve-text); }
+.ve-mbar-menu button:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--ve-text); }
 .ve-mbar-menu button:hover:not(:disabled) kbd { color: var(--ve-dim); }
 .ve-menu button b, .ve-mbar-menu button b { color: #d6b394; }
 
@@ -2468,7 +2468,7 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-mixer { position: relative; }
 .ve-mix-rackbt { position: absolute; left: 2px; top: 2px; z-index: 2; height: 16px; padding: 0 5px; font: 600 9px/14px inherit;
     color: #8a8a92; background: #232327; border: 1px solid #3a3a40; border-radius: 3px; cursor: pointer; }
-.ve-mixer.rack .ve-mix-rackbt { color: #e3a77c; border-color: #D4814A; }
+.ve-mixer.rack .ve-mix-rackbt { color: var(--primary-hover); border-color: var(--primary); }
 .ve-mix-rack { display: none; flex-direction: column; gap: 1px; margin: 12px 0 6px; padding: 3px; background: #a9a9ad; border-radius: 4px; flex: 0 0 auto; }
 .ve-mixer.rack .ve-mix-rack { display: flex; }
 .ve-mix-col.mestre .ve-mix-rack { background: none; padding: 0; }
@@ -2507,7 +2507,7 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-mix-ed-bool { display: block; margin-bottom: 4px; }
 /* Gerar efeito sonoro por texto (editor-sfx-gerar.js) */
 .ve-sfx { padding: 6px 8px 0; }
-.ve-sfx-caixa { border: 1px solid var(--ve-line); border-radius: 6px; background: rgba(212, 129, 74, .06); }
+.ve-sfx-caixa { border: 1px solid var(--ve-line); border-radius: 6px; background: color-mix(in srgb, var(--primary) 6%, transparent); }
 .ve-sfx-caixa > summary { cursor: pointer; padding: 6px 8px; font-size: 12px; font-weight: 600; color: var(--ve-text); }
 .ve-sfx-corpo { display: flex; flex-direction: column; gap: 6px; padding: 0 8px 8px; }
 .ve-sfx-corpo small { color: var(--ve-dim); font-size: 11px; }
@@ -2517,11 +2517,11 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-sfx-linha select { flex: 0 0 auto; background: var(--ve-panel-2); color: var(--ve-text); border: 1px solid var(--ve-line-2); border-radius: 4px; padding: 3px; }
 .ve-sfx-linha button { flex: 1; }
 .ve-sfx-barra { height: 4px; border-radius: 2px; background: var(--ve-panel-2); overflow: hidden; }
-.ve-sfx-barra i { display: block; height: 100%; background: #D4814A; transition: width .2s; }
+.ve-sfx-barra i { display: block; height: 100%; background: var(--primary); transition: width .2s; }
 .ve-sfx-msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ve-sfx-ex { display: flex; flex-wrap: wrap; gap: 4px; }
 .ve-sfx-ex button { border: 1px solid var(--ve-line-2); background: none; color: var(--ve-dim); border-radius: 10px; padding: 1px 8px; font-size: 10px; cursor: pointer; }
-.ve-sfx-ex button:hover { color: var(--ve-text); border-color: #D4814A; }
+.ve-sfx-ex button:hover { color: var(--ve-text); border-color: var(--primary); }
 
 /* Pincel Roto (editor-roto.js): tela própria como a da Cena 3D */
 .vero { position: fixed; inset: 0; z-index: 900; border: 0; border-radius: 0; height: auto; display: grid; grid-template-rows: 40px minmax(0, 1fr) auto; background: var(--ve-bg); color: var(--ve-text); }

@@ -202,7 +202,7 @@
 .sk-sbtn .i { width: 15px; height: 15px; }
 .sk-start-mais .sk-sbtn { height: 28px; padding: 0 10px; font-size: 12px; background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.1); backdrop-filter: blur(6px); }
 .sk-start-mais .sk-sbtn:hover { background: rgba(255,255,255,.1); }
-.sk-sbtn-pri { background: #D4814A; border-color: #D4814A; color: #1a0d02; }
+.sk-sbtn-pri { background: var(--primary); border-color: var(--primary); color: #1a0d02; }
 .sk-sbtn-pri:hover { background: #e08f58; border-color: #e08f58; }
 .sk-sbtn-lg { height: 40px; padding: 0 22px; font-size: 14px; }
 .sk-sbtn-sm { height: 26px; padding: 0 10px; font-size: 11.5px; } .sk-sbtn-ghost { background: transparent; }

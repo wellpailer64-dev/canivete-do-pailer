@@ -11,7 +11,7 @@
     --ie-linha: var(--line);
     --ie-linha-2: var(--line-2);
     --ie-acento: var(--primary);
-    --ie-sel: rgba(212, 129, 74, .18);
+    --ie-sel: color-mix(in srgb, var(--primary) 18%, transparent);
     --ie-vista: #1c1c1c;
     display: grid;
     grid-template-rows: 40px 38px minmax(0, 1fr);

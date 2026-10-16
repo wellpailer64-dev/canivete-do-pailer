@@ -141,7 +141,7 @@ function veMedVertical(x, w, h, fundo) {
         // Hard Limiter no Master: barra laranja de cima para baixo = quanto ele está abaixando agora
         if (veMasterLim() && VEMED.reducao > 0.05) {
             const xg = xs[1] + largura + 3, lg = Math.max(3, Math.min(6, largura / 2));
-            x.fillStyle = '#D4814A';
+            x.fillStyle = veAcc();
             x.fillRect(xg, topo, lg, Math.min(hb, hb * VEMED.reducao / -VE_MED_MIN));
         }
         return;

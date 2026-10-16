@@ -500,7 +500,7 @@ function veBordaDesenhar(ctx, rows) {
     if (veOcupaV(c)) ids.push('V' + (c.tr + 1));
     if (veOcupaA(c)) ids.push('A' + (c.tr + 1));
     ctx.save();
-    ctx.strokeStyle = '#D4814A';
+    ctx.strokeStyle = veAcc();
     ctx.lineWidth = 3;
     ids.forEach(id => {
         const r = rows.find(r => r.id === id);
@@ -544,7 +544,7 @@ function veTransDesenhar(ctx, rows) {
         else if (!j.B) { ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + b.w, b.y + b.h); }
         else { ctx.moveTo(b.x, b.y + b.h); ctx.lineTo(b.x + b.w, b.y); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x + b.w, b.y + b.h); }
         ctx.stroke();
-        ctx.strokeStyle = on ? '#D4814A' : j._prev ? '#c4b5fd' : cor[2];
+        ctx.strokeStyle = on ? veAcc() : j._prev ? '#c4b5fd' : cor[2];
         ctx.lineWidth = on ? 2 : 1;
         if (j._prev) ctx.setLineDash([4, 3]);
         veRoundRect(ctx, b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1, 2); ctx.stroke();
