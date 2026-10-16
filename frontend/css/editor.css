@@ -2240,7 +2240,8 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-tl-legenda { display: grid; gap: 3px; padding: 4px 12px 8px; font-size: 11px; color: var(--ve-dim); }
 .ve-tl-legenda span { display: flex; align-items: center; gap: 7px; }
 .ve-tl-legenda i { width: 10px; height: 10px; border-radius: 2px; flex: none; }
-.ve-fila-tags i.ve-fila-aviso { color: #e5b13a; font-weight: 600; cursor: help; }
+.ve-fila-tags i.ve-fila-aviso { color: #e5b13a; font-weight: 600; cursor: pointer; }
+.ve-fila-tags i.ve-fila-aviso:hover { text-decoration: underline; }
 /* item em preparo na fila (Comps, motion…): barra andando sem porcentagem */
 .ve-fila-item.preparando { opacity: .9; }
 .ve-fila-indet i { width: 35% !important; animation: ve-fila-indet 1.4s ease-in-out infinite; }

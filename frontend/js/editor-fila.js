@@ -131,7 +131,7 @@ async function veFilaRevisar() {
     for (const c of VE.clips) {
         if (c.tr !== 0 || veIsAudio(c) || veOculto(c)) continue;
         const m = VE.media[c.m]; if (!m || !(m.kind === 'video' || m.kind === 'image')) continue;
-        if (veLen(c) < 0.7 && c.st > 0.1) av.push({ t: c.st, texto: `tomada de ${veLen(c).toFixed(1)} s ("${nm(c).replace(/ · fundo$/, '')}") pisca na tela` });
+        if (veLen(c) < 0.7 && c.st > 0.1) av.push({ t: c.st, tr: c.tr, texto: `tomada de ${veLen(c).toFixed(1)} s ("${nm(c).replace(/ · fundo$/, '')}") pisca na tela` });
     }
     // GC sobre a pessoa certa (só com nomes dados no painel Pessoas e o material já analisado)
     const api = window.pywebview && window.pywebview.api;
@@ -159,6 +159,21 @@ async function veFilaRevisar() {
     // texto/GC em cima de um rosto (rostos do painel Pessoas; só o material já analisado)
     if (api && api.ve_ps_rostos) for (const a of await veFilaTextoSobreRosto(api).catch(() => [])) av.push(a);
     return av.sort((x, y) => x.t - y.t);
+}
+// Clique no "⚠ N aviso(s)" do item: a agulha vai ao ponto do aviso (abre a timeline do item se for outra) e seleciona
+// o clipe que começa ali; cliques seguidos passam pelos avisos em ordem
+function veFilaIrAviso(id) {
+    const it = VEFILA.itens.find(x => x.id === id), n = it ? (it.avisos || []).length : 0;
+    if (!n || !VE.ready) return;
+    it._av = ((it._av ?? -1) + 1) % n;
+    const a = it.avisos[it._av];
+    if (it.seq && it.seq !== VE.activeSequence && (VE.sequences || []).some(s => s.id === it.seq)) veOpenTimeline(it.seq);
+    if (VE.playing) veStop();
+    const i = VE.clips.findIndex(c => (a.tr == null || c.tr === a.tr) && !veIsAudio(c) && Math.abs(c.st - a.t) < 0.02);
+    if (i >= 0) { VE.sel = i; VE.selx = null; }
+    veSeek(a.t);
+    veRefresh();
+    veToast(`${veT('Aviso')} ${it._av + 1}/${n} · ${veHuman(a.t)} — ${a.texto}`);
 }
 // Caixa (na tela) dos textos de um clipe de texto ou de uma Comp de GC/lettering; aproximada pelo tamanho da letra
 function veFilaCaixasTexto(c) {
@@ -243,7 +258,7 @@ async function veFilaAdicionarPreparando(nome, cfg) {
     const plano = veExportPlan(true), master = veMasterLim(), mix = master ? [...plano.mix, { master }] : plano.mix;
     const c = cfg ? JSON.parse(JSON.stringify(cfg)) : veFilaCfgLer();
     c.nome = nome || c.nome || veFilaNomeTimeline();
-    const it = { id: ++VEFILA.seq, timeline: veFilaNomeTimeline(), dur: plano.dur, estado: 'espera', pct: 0, cfg: c, avisos, faixa: veExportFaixa(),
+    const it = { id: ++VEFILA.seq, timeline: veFilaNomeTimeline(), seq: VE.activeSequence, dur: plano.dur, estado: 'espera', pct: 0, cfg: c, avisos, faixa: veExportFaixa(),
         plano: { fonteCom: veFonteParaPlano({ ...plano, mix }, true), fonteSem: veFonteParaPlano({ ...plano, mix }, false), base: plano.base,
                  camadas: plano.camadas, audio: plano.audio, dur: plano.dur, mix, leg: veTxExport(plano.faixa), quadro: [VE.seqW, VE.seqH], projeto: VE.projectPath || '', fps: VE.fps || 30 } };
     VEFILA.itens.push(it);
@@ -460,7 +475,7 @@ function veFilaRender() {
     L.innerHTML = VEFILA.itens.length ? VEFILA.itens.map((it, i) => `<div class="ve-fila-item ${it.estado}${VEFILA.sel === it.id ? ' sel' : ''}" data-fila="${it.id}" title="${it.estado === 'espera' ? 'Clique para ver e mudar as configurações deste item' : ''}">
         <span class="ve-fila-n">${i + 1}</span>
         <span class="ve-fila-info"><b>${veEsc(it.cfg.nome)}</b><small>${veEsc(it.timeline)}${it.tempo ? ' · feito em ' + veHuman(it.tempo) : ''}${it.erro ? ' · ' + veEsc(String(it.erro).slice(0, 120)) : ''}${it.emendaMsg ? ' · ' + veEsc(it.emendaMsg) : ''}</small>
-            <span class="ve-fila-tags">${(it.avisos || []).length ? `<i class="ve-fila-aviso" title="${veEsc(it.avisos.map(a => veHuman(a.t) + ' — ' + a.texto).join('\n'))}">⚠ ${it.avisos.length} aviso(s)</i>` : ''}${veFilaEtiquetas(it.cfg, it.dur).map(t => `<i>${veEsc(t)}</i>`).join('')}${it.volume ? `<i class="ve-fila-vol${it.volume.lufs < -20 || it.volume.lufs > -11 ? ' ruim' : ''}" title="Volume integrado do som exportado${it.volume.pico != null ? ' · pico ' + it.volume.pico.toFixed(1) + ' dB' : ''}">${it.volume.lufs.toFixed(1)} LUFS</i>` : ''}</span>
+            <span class="ve-fila-tags">${(it.avisos || []).length ? `<i class="ve-fila-aviso" onclick="event.stopPropagation(); veFilaIrAviso(${it.id})" title="${veEsc(it.avisos.map(a => veHuman(a.t) + ' — ' + a.texto).join('\n') + '\n\n' + veT('Clique: leva a agulha ao ponto (de novo: próximo aviso)'))}">⚠ ${it.avisos.length} aviso(s)</i>` : ''}${veFilaEtiquetas(it.cfg, it.dur).map(t => `<i>${veEsc(t)}</i>`).join('')}${it.volume ? `<i class="ve-fila-vol${it.volume.lufs < -20 || it.volume.lufs > -11 ? ' ruim' : ''}" title="Volume integrado do som exportado${it.volume.pico != null ? ' · pico ' + it.volume.pico.toFixed(1) + ' dB' : ''}">${it.volume.lufs.toFixed(1)} LUFS</i>` : ''}</span>
             <span class="ve-fila-barra"><i style="width:${it.pct}%"></i></span>${veFilaDriveHtml(it)}</span>
         <span class="ve-fila-est">${VE_FILA_ESTADO[it.estado] || it.estado}${it.estado === 'rodando' ? ` ${Math.round(it.pct)}%` : ''}</span>
         <span class="ve-fila-acoes">${it.estado === 'pronto' && !it.emenda && !it.faixa && /\.(mp4|mov|mkv)$/i.test(it.saida || '') ? `<button class="ve-btn ve-btn-sm" onclick="event.stopPropagation(); veFilaCorrigir(${it.id})" title="Corrigir trecho: marque com I e O o que está errado na timeline e clique aqui — refaz só esse pedaço e emenda no vídeo pronto (o resto e o som ficam iguais)">Corrigir trecho</button>` : ''}${it.estado === 'pronto' ? `<button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.open_file(${veEsc(JSON.stringify(it.saida))})" title="Assistir"><svg class="i"><use href="#i-play"/></svg></button><button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.reveal_file(${veEsc(JSON.stringify(it.saida))})" title="Mostrar na pasta"><svg class="i"><use href="#i-folder"/></svg></button>` : ''}
