@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="css/vetor.css">
     <link rel="stylesheet" href="css/som.css">
     <link rel="stylesheet" href="css/kani.css">
+    <link rel="stylesheet" href="css/slider.css">
     <link rel="icon" href="identidade/icone.ico">
 </head>
 <body>
@@ -188,6 +189,11 @@
                     <span class="icon"><svg class="i"><use href="#i-globe"/></svg></span><span class="label">Gerar Favicon</span>
                 </button>
 
+                <div class="menu-group">Apresentação</div>
+                <button class="menu-item" data-tool="slider-kanivete" onclick="switchTool('slider-kanivete')" title="Slider Kanivete — apresentações 16:9 com camadas, vídeo, GIF e modo apresentação">
+                    <span class="icon"><span class="app-logo al-sd">Sd</span></span><span class="label">Slider Kanivete</span>
+                </button>
+
                 <div class="menu-group">3D</div>
                 <button class="menu-item" data-tool="lux-kanivete" onclick="luxAbrir()" title="Lux Kanivete — produto em 3D: embalagens, luzes, materiais e render fotorrealista">
                     <span class="icon"><span class="app-logo al-lk">Lk</span></span><span class="label">Lux Kanivete</span>
@@ -303,6 +309,15 @@
                                 <button class="home-card" onclick="switchTool('omnivoice')">
                                     <span class="hc-media"><img src="img/tools/geracao-voz.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-sparkles"/></svg></span></span>
                                     <b>Geração de Voz</b><small>Salve vozes por referência curta e sintetize textos com OmniVoice</small>
+                                </button>
+                            </div>
+                        </section>
+                        <section class="home-cat">
+                            <h4>Apresentação</h4>
+                            <div class="home-grid">
+                                <button class="home-card" onclick="switchTool('slider-kanivete')">
+                                    <span class="hc-media"><img src="img/tools/slider-kanivete.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico hc-app"><span class="app-logo al-sd">Sd</span></span></span>
+                                    <b>Slider Kanivete</b><small>Slides 16:9 com camadas, vídeo, GIF, temas e modo apresentação</small>
                                 </button>
                             </div>
                         </section>
@@ -537,6 +552,7 @@
 
                 <!-- Editor de vídeo -->
                 <div class="tool-page ve-page" id="page-lux-kanivete"></div>
+                <div class="tool-page ve-page" id="page-slider-kanivete"></div>
                 <div class="tool-page ve-page" id="page-kanivete-encoder"><div class="ve ke-casa" id="ke-casa"></div></div>
                 <div class="tool-page ve-page" id="page-video-cutter">
                     <div class="ve" id="ve">
@@ -2110,6 +2126,9 @@
     <script src="js/editor-3d-luzes.js"></script>
     <script src="js/lux.js"></script>
     <script src="js/lux-ui.js"></script>
+    <script src="js/slider.js"></script>
+    <script src="js/slider-ui.js"></script>
+    <script src="js/slider-show.js"></script>
     <script src="js/editor-3d-mexer.js"></script>
     <script src="js/editor-roto.js"></script>
     <script src="js/editor-caneta.js"></script>

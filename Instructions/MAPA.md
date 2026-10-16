@@ -152,6 +152,9 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - **API** (`pywebview.api.*`, 1): `favicon_generator(image_path, site_name, theme_color)`
 - **Guias**: `Instructions/favicon-generator.md`
 
+### Apresentação
+#### Slider Kanivete — `switchTool('slider-kanivete')`
+
 ### 3D
 #### Lux Kanivete — `switchTool('lux-kanivete')`
 
@@ -166,8 +169,8 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - **API** (`pywebview.api.*`, 9): `web_scraper_analyze(url)`, `web_scraper_download(url, mode, destino)`, `web_scraper(url, tipo, destino)`, `web_scraper_csv(url)`, `cerebro_load()`, `cerebro_save(content)`, `cerebro_exists()`, `cerebro_remove()`, `cerebro_select_file()`
 - **Guias**: `Instructions/webscraper.md`, `Instructions/cerebro.md`
 
-### API geral (app, janela, preferências, arquivos) — 54 métodos
-`select_folder(tool)`, `select_file(tool)`, `select_image(tool)`, `open_folder(path)`, `hardware_estado()`, `hardware_definir_modo(modo)`, `kani_estado()`, `kani_baixar()`, `kani_enviar(cid, mensagens, ferramenta="")`, `kani_parar(cid)`, `kani_voz(ligar=True)`, `musicas_listar(filtros=None)`, `musicas_analisar()`, `musicas_trocar_pasta()`, `musicas_openverse(texto="", genero="", duracao="", pagina=1)`, `musicas_openverse_baixar(item)`, `musicas_url(path)`, `kani_agente_precisa(texto)`, `kani_agente(job, pedido, historico=None, anexos=None, recentes=None)`, `kani_maos_resposta(i, res)`, `kani_ditado_iniciar()`, `kani_ditado_nivel()`, `kani_ditado_parar(transcrever=True)`, `kani_abrir_link(url)`, `kani_anexar()`, `kani_agente_avaliar(job, nota)`, `kani_memoria_comando(texto)`, `kani_agente_parar(job)`, `kani_criar_tipo(texto, anterior=None)`, `kani_criar(job, tipo, pedido)`, `kani_criar_url(path)`, `kani_salvar_como(path)`, `kani_falar(texto, chave="")`, `lux_salvar(caminho, dados, previa=None)`, `lux_abrir(caminho)`, `ke_presets()`, `ke_arquivo_info(path)`, `ke_escolher_arquivos()`, `ke_arquivo_converter(entrada, preset, pasta_saida=None, usar_gpu=True)`, `reveal_file(path)`, `open_file(path)`, `select_video_file(tool)`, `prefs_load()`, `prefs_save(dados)`, `check_update()`, `apply_update()`, `fechar_visto()`, `sair_app()`, `toggle_fullscreen()`, `janela_cmd(acao)`, `janela_propria()`, `janela_ativar()`, `on_webview_ready(sender, args)`, `on_new_window_request(sender, args)`
+### API geral (app, janela, preferências, arquivos) — 61 métodos
+`select_folder(tool)`, `select_file(tool)`, `select_image(tool)`, `open_folder(path)`, `hardware_estado()`, `hardware_definir_modo(modo)`, `kani_estado()`, `kani_baixar()`, `kani_enviar(cid, mensagens, ferramenta="")`, `kani_parar(cid)`, `kani_voz(ligar=True)`, `musicas_listar(filtros=None)`, `musicas_analisar()`, `musicas_trocar_pasta()`, `musicas_openverse(texto="", genero="", duracao="", pagina=1)`, `musicas_openverse_baixar(item)`, `musicas_url(path)`, `kani_agente_precisa(texto)`, `kani_agente(job, pedido, historico=None, anexos=None, recentes=None)`, `kani_maos_resposta(i, res)`, `kani_ditado_iniciar()`, `kani_ditado_nivel()`, `kani_ditado_parar(transcrever=True)`, `kani_abrir_link(url)`, `kani_anexar()`, `kani_agente_avaliar(job, nota)`, `kani_memoria_comando(texto)`, `kani_agente_parar(job)`, `kani_criar_tipo(texto, anterior=None)`, `kani_criar(job, tipo, pedido)`, `kani_criar_url(path)`, `kani_salvar_como(path)`, `kani_falar(texto, chave="")`, `lux_salvar(caminho, dados, previa=None)`, `lux_abrir(caminho)`, `sd_salvar(caminho, doc, previa=None)`, `sd_abrir(caminho)`, `sd_url(caminho)`, `sd_quadro(job, i, data_url)`, `sd_exportar(job, formato, caminho, doc=None, opcoes=None)`, `sd_gravar_midia(data_url, nome="colado")`, `sd_importar_pptx(caminho)`, `ke_presets()`, `ke_arquivo_info(path)`, `ke_escolher_arquivos()`, `ke_arquivo_converter(entrada, preset, pasta_saida=None, usar_gpu=True)`, `reveal_file(path)`, `open_file(path)`, `select_video_file(tool)`, `prefs_load()`, `prefs_save(dados)`, `check_update()`, `apply_update()`, `fechar_visto()`, `sair_app()`, `toggle_fullscreen()`, `janela_cmd(acao)`, `janela_propria()`, `janela_ativar()`, `on_webview_ready(sender, args)`, `on_new_window_request(sender, args)`
 
 ## 6. Vetor Kanivete — comandos `VKN.cmd(nome, args)` (157; a interface, o Claude e o Jr usam os mesmos)
 - `vetor-3d.js`: `girar_3d` (3D girar), `extrudar_3d` (3D extrudar), `editar_3d` (editar 3D), `mapear_arte` (mapear arte no 3D), `limpar_mapas` (tirar artes mapeadas), `expandir_3d` (expandir 3D)
@@ -270,6 +273,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/plano-identidade-pocket.md` — Plano — Identidade visual "pocket" (teste da missão, iniciado 2026-10-15)
 - `Instructions/agente/plano-kanivete-encoder.md` — Kanivete Encoder (Ke) — plano (rodada 1 de otimização FEITA em 2026-10-08; pendências no fim)
 - `Instructions/agente/plano-motion.md` — Motion no Editor Kanivete (recursos do After Effects)
+- `Instructions/agente/plano-slider-kanivete.md` — Plano — Slider Kanivete (Sd, verde-água) — pedido do Pailer em 2026-10-16 (missão da madrugada) — FEITO (v1)
 - `Instructions/agente/ponte-premiere.md` — Ponte Kanivete ↔ Premiere Pro (plugin UXP "Kanivete Ponte")
 - `Instructions/agente/remover-fundo.md` — Remover fundo (recorte) — velocidade × qualidade (2026-10-06)
 - `Instructions/agente/teste-4k.md` — Teste de 4K (estresse do Editor de Vídeo)
@@ -287,6 +291,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/modo-agente.md` — Modo agente (depuração remota)
 - `Instructions/organizador-imagens.md` — Organizador de Imagens
 - `Instructions/remover-fundo.md` — Remover Fundo
+- `Instructions/slider-kanivete.md` — Slider Kanivete (Sd, verde-água) — apresentações 16:9
 - `Instructions/sound-kanivete.md` — Sound Kanivete (Sk) — editor de áudio multipista
 - `Instructions/transcrever-audio.md` — Transcrever Áudio
 - `Instructions/vetor-kanivete.md` — Vetor Kanivete (estilo Illustrator) — estudo de caso, modelo, API e fechamento
@@ -375,6 +380,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/sk_banco_vozes.py` — Banco de vozes do Texto para Voz (Sound Kanivete)
 - `Functions/sk_espectro.py` — Sound Kanivete — espectrograma, reparo espectral e separação voz/instrumental
 - `Functions/sk_gravar.py` — Sound Kanivete — gravar do microfone (ou interface de áudio) direto num WAV 24 bits
+- `Functions/slider_kanivete.py` — slider_kanivete.py — Slider Kanivete (Sd, verde-água): apresentações 16:9 (PowerPoint/Canva/Figma no Kanivete)
 - `Functions/snapshot_logger.py` — snapshot_logger.py — Backup/restauração para o Organizador de Vídeos
 - `Functions/sound_kanivete.py` — Sound Kanivete (Sk) — editor de áudio multipista do KANIVETE (frontend/js/som-*.js)
 - `Functions/soundboard.py` — soundboard.py — pack de efeitos sonoros do painel Soundboard do Pocket Editor
@@ -443,6 +449,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_remix.py` — Remix de música na timeline (editor-remix.js + Functions/remix.py), com mouse de verdade: põe uma música de 3:46
 - `testes/teste_roto.py` — Pincel Roto (editor-roto.js + Functions/pincel_roto.py) no app de verdade: vídeo de entrevista na V1, texto animado
 - `testes/teste_sfx.py` — Gerador de efeitos sonoros (Functions/gerador_sfx.py): agendador DDIM igual ao do diffusers e uma geração curta
+- `testes/teste_slider.py` — Slider Kanivete (Sd): comandos, desfazer, HTML → slide, mídias (imagem, GIF, vídeo), salvar/abrir .dknv, exportar
 - `testes/teste_som.py` — Sound Kanivete (som.js + Functions/sound_kanivete.py) — app em --agente=9333, mouse de verdade
 - `testes/teste_timeline_pr.py` — Timeline como a do Premiere (2026-10-11): ferramentas no topo da coluna das trilhas, alvo de trilha (Track Targeting),
 - `testes/teste_vetor.py` — Teste do Vetor Kanivete pela API real (app em --agente=9333): monta um cartão de visita pelos comandos (window.VKN),

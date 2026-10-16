@@ -4277,6 +4277,53 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    # Slider Kanivete (apresentações): Functions/slider_kanivete.py, frontend/js/slider*.js
+    def sd_salvar(self, caminho, doc, previa=None):
+        from Functions import slider_kanivete
+        try:
+            return slider_kanivete.salvar(caminho, json.loads(doc) if isinstance(doc, str) else doc, previa)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def sd_abrir(self, caminho):
+        from Functions import slider_kanivete
+        try:
+            return slider_kanivete.abrir(caminho)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def sd_url(self, caminho):
+        from Functions import media_server
+        return {"url": media_server.register(caminho) if caminho and os.path.isfile(caminho) else None}
+
+    def sd_quadro(self, job, i, data_url):
+        from Functions import slider_kanivete
+        try:
+            return slider_kanivete.quadro(job, i, data_url)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def sd_exportar(self, job, formato, caminho, doc=None, opcoes=None):
+        from Functions import slider_kanivete
+        try:
+            return slider_kanivete.exportar(job, formato, caminho, json.loads(doc) if isinstance(doc, str) else doc, opcoes)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def sd_gravar_midia(self, data_url, nome="colado"):
+        from Functions import slider_kanivete
+        try:
+            return slider_kanivete.gravar_midia(data_url, nome)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def sd_importar_pptx(self, caminho):
+        from Functions import slider_kanivete
+        try:
+            return slider_kanivete.importar_pptx(caminho)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def ve_3d_estudio_video(self, spec):
         """vídeo fotorrealista da Cena 3D (quadro a quadro no Blender) — Functions/blender_render.estudio_video"""
         from Functions import blender_render

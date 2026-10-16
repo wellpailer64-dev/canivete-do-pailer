@@ -1780,7 +1780,7 @@ body:not(:has(#page-home.active)):has(.update-banner:not([hidden])) .kani-bolinh
 .hb-vd { --al: #c9a8ff; } .hb-ke { --al: #9b4dff; } .hb-pk { --al: #4c9bff; } .hb-vk { --al: #ff8c42; } .hb-sk { --al: #7fd6ff; } .hb-lk { --al: #ff4fc8; }
 .hb-kani-logo { background: url(../identidade/kani.webp) center / cover !important; box-shadow: none !important; }
 /* trilho: ícone, nome e info de cada ferramenta; o ativo mostra a barrinha dos 5 s */
-.hb-trilho { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.hb-trilho { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; }   /* uma coluna por item de HB_ITENS */
 .hb-chip { position: relative; display: flex; align-items: center; gap: 9px; min-width: 0; height: 52px; padding: 0 12px; border-radius: 12px; overflow: hidden;
     border: 1px solid rgba(255, 255, 255, .07); background: rgba(16, 14, 15, .72); color: var(--text); text-align: left; cursor: pointer;
     backdrop-filter: blur(8px); transition: border-color .2s, background .2s, transform .2s; }
@@ -1799,8 +1799,8 @@ body:not(:has(#page-home.active)):has(.update-banner:not([hidden])) .kani-bolinh
 @media (max-width: 700px) { .hb-trilho { grid-template-columns: repeat(2, minmax(0, 1fr)); } .hb-corpo { display: none; } }
 @media (prefers-reduced-motion: reduce) { .hb-slide.on .hb-arte, .hb-slide.on .hb-txt > * { animation: none; opacity: 1; transform: none; } }
 /* a grade embaixo não repete as ferramentas dos banners */
-.home-grid .home-card[onclick*="luxAbrir"] { display: none; }
-.home-cat:not(:has(.home-card:not([onclick*="'video-cutter'"]):not([onclick*="'editor-imagem'"]):not([onclick*="'vetor-kanivete'"]):not([onclick*="'sound-kanivete'"]):not([onclick*="luxAbrir"]))) { display: none; }
+.home-grid .home-card[onclick*="luxAbrir"], .home-grid .home-card[onclick*="'slider-kanivete'"] { display: none; }
+.home-cat:not(:has(.home-card:not([onclick*="'video-cutter'"]):not([onclick*="'editor-imagem'"]):not([onclick*="'vetor-kanivete'"]):not([onclick*="'sound-kanivete'"]):not([onclick*="luxAbrir"]):not([onclick*="'slider-kanivete'"]))) { display: none; }
 /* "Peça à Kani": vidro fixo embaixo, no centro da coluna da Home */
 #page-home > .home-kani { position: sticky; bottom: 16px; z-index: 20; align-self: center; width: min(820px, 100%); margin-top: 18px; padding: 10px 12px;
     border-radius: 18px; border-color: rgba(255, 140, 66, .32); background: rgba(18, 14, 12, .82); backdrop-filter: blur(16px) saturate(1.2);

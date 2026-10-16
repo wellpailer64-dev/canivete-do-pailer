@@ -14,6 +14,7 @@ LOGOS = {
     "vk": ("Vk", "#ff8c42", "#2b1408"),   # Vetor Kanivete (.aknv)
     "sk": ("Sk", "#7fd6ff", "#0a2230"),   # Sound Kanivete (.sknv)
     "lk": ("Lk", "#ff4fc8", "#2b0a22"),   # Lux Kanivete (.lknv)
+    "sd": ("Sd", "#2ee6c8", "#062a26"),   # Slider Kanivete (.dknv)
 }
 TAMANHOS = (16, 24, 32, 48, 64, 128, 256)
 FONTE = r"C:\Windows\Fonts\segoeuib.ttf"

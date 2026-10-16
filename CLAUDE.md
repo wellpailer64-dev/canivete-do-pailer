@@ -6,7 +6,7 @@
   amigos procura esses nomes; trocar exige uma migração planejada.
 - Nomes visíveis: **Vídeo Kanivete** (Vd, lilás; antes "Editor Kanivete"), **Photo Kanivete** (Pk, azul), **Vetor
   Kanivete** (Vk, laranja), **Sound Kanivete** (Sk, azul clarinho), **Lux Kanivete** (Lk, magenta), **Kanivete Encoder**
-  (Ke, roxo forte). Cores em `.al-*` (`frontend/css/app.css`, `som.css`). No código continuam editor de vídeo (`editor*.js`,
+  (Ke, roxo forte), **Slider Kanivete** (Sd, verde-água; `.dknv`). Cores em `.al-*` (`frontend/css/app.css`, `som.css`). No código continuam editor de vídeo (`editor*.js`,
   `video-cutter`, "Pocket Editor" nos comentários) e editor de imagem (`imagem-*.js`).
 - Home (2026-10-16): banners deslizantes no topo, um por ferramenta, troca a cada 4 s (`frontend/js/home-banners.js`,
   `HB_ITENS` com título/subtítulo/corpo; artes `frontend/img/home/banner-<id>.webp` geradas no Z-Image local por
@@ -158,6 +158,13 @@ em grupo (mexer num efeito com vários selecionados leva o valor ao mesmo efeito
 
 Teste de 4K (estresse: material pesado, camadas, 10-bit, export, memória): plano e resultados em
 `Instructions/agente/teste-4k.md` — rodada 1 feita (2026-10-01), pendências no fim do arquivo.
+
+## Slider Kanivete (Sd, verde-água) — apresentações 16:9
+PowerPoint moderno para as palestras do cliente: `Instructions/slider-kanivete.md` (modelo, API, exportar, armadilhas,
+pendências). `frontend/js/slider.js` (núcleo + comandos `SDK.cmd`), `slider-ui.js` (interface), `slider-show.js`
+(apresentação), `css/slider.css`, `Functions/slider_kanivete.py` (.dknv, PDF/PNG/MP4/PPTX editável, importar PPTX).
+Agente: `SDK.cmd('modelo', {tema})`, `SDK.cena(html, {novo: true})` por slide, `SDK.foto(n)` para conferir, `SDK.mapa()`.
+Teste: `py -3.13 testes/teste_slider.py` (porta 9333).
 
 ## Lux Kanivete (Lk, magenta) — produto em 3D
 Ferramenta própria, independente do Editor (aba e página próprias como o Photo; barra lateral › 3D e Home; do Editor,

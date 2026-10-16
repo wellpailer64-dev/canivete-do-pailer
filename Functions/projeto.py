@@ -15,6 +15,7 @@ EXTENSAO_IMAGEM = ".iknv"               # projeto do editor de imagem (Functions
 EXTENSAO_VETOR = ".aknv"                # documento do Vetor Kanivete (Functions/vetor_kanivete.py)
 EXTENSAO_SOM = ".sknv"                  # projeto do Sound Kanivete (Functions/sound_kanivete.py)
 EXTENSAO_LUX = ".lknv"                  # projeto da Lux Kanivete (Functions/lux_projeto.py)
+EXTENSAO_SLIDER = ".dknv"               # apresentação do Slider Kanivete (Functions/slider_kanivete.py)
 FORMATO = "vknv"
 FORMATOS_ACEITOS = ("vknv", "vcnvt")
 VERSAO = 1
@@ -25,7 +26,8 @@ _TIPOS = {".vknv": ("CaniveteDoPailer.vknv", "Projeto do Vídeo Kanivete", "vd")
           ".iknv": ("CaniveteDoPailer.iknv", "Projeto do Photo Kanivete", "pk"),
           ".aknv": ("CaniveteDoPailer.aknv", "Documento do Vetor Kanivete", "vk"),
           ".sknv": ("CaniveteDoPailer.sknv", "Projeto do Sound Kanivete", "sk"),
-          ".lknv": ("CaniveteDoPailer.lknv", "Projeto da Lux Kanivete", "lk")}
+          ".lknv": ("CaniveteDoPailer.lknv", "Projeto da Lux Kanivete", "lk"),
+          ".dknv": ("CaniveteDoPailer.dknv", "Apresentação do Slider Kanivete", "sd")}
 
 
 def com_extensao(path):
@@ -125,6 +127,6 @@ def _tem_valor(chave):
 def projeto_na_linha_de_comando(argv=None):
     """Caminho do projeto (.vknv, .vcnvt, .iknv ou .aknv) recebido ao abrir o app por duplo clique (ou None)."""
     for a in (argv if argv is not None else sys.argv[1:]):
-        if a.lower().endswith(EXTENSOES_VIDEO + (EXTENSAO_IMAGEM, EXTENSAO_VETOR, EXTENSAO_SOM, EXTENSAO_LUX)) and os.path.isfile(a):
+        if a.lower().endswith(EXTENSOES_VIDEO + (EXTENSAO_IMAGEM, EXTENSAO_VETOR, EXTENSAO_SOM, EXTENSAO_LUX, EXTENSAO_SLIDER)) and os.path.isfile(a):
             return os.path.abspath(a)
     return None

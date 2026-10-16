@@ -645,6 +645,11 @@ function onArquivosSoltos(itens) {
 // Projeto aberto por fora (duplo clique no Explorer ou outra cópia do app): cada extensão no seu editor
 // .vknv (e o antigo .vcnvt) = editor de vídeo; .iknv = editor de imagem; .aknv = Vetor Kanivete
 function abrirProjetoExterno(path) {
+    if (/\.dknv$/i.test(path || '')) {   // Slider Kanivete (slider.js)
+        switchTool('slider-kanivete');
+        setTimeout(() => sdCmd('abrir', { caminho: path }).then(() => SDK_UI.editor()).catch(e => toast(e.message, 'erro')), 80);
+        return;
+    }
     if (/\.lknv$/i.test(path || '')) {   // Lux Kanivete (lux.js)
         setTimeout(() => luxAbrirArquivo(path).catch(e => toast(e.message, 'erro')), 60);
         return;
@@ -946,6 +951,7 @@ function switchTool(toolId) {
     _abrirAba(toolId);
     if (typeof luxAoTrocar === 'function') luxAoTrocar(toolId);   // Lux: pausa ao sair da aba, volta ao entrar
     if (typeof keAoTrocar === 'function') keAoTrocar(toolId);     // Ke: a janela da fila mora na aba dele
+    if (typeof sdAoTrocar === 'function') sdAoTrocar(toolId);     // Slider: lobby/editor ao entrar, pausa os vídeos ao sair
     if (typeof klAplicar === 'function') { setTimeout(klAplicar, 0); setTimeout(klAplicar, 400); }   // lobbys padronizados (lobby.js)
     navAutoAgendar();
     homeBgSync();
