@@ -12,6 +12,10 @@
   `HB_ITENS` com título/subtítulo/corpo; artes `frontend/img/home/banner-<id>.webp` geradas no Z-Image local por
   `D:/kanivete_testes/scripts/gerar_banners.py`); trilho embaixo com ícone, nome e info; "Peça à Kani" fixa embaixo no
   centro; aviso de versão nova em cima do "Pergunte à Kani". Ferramenta nova com marca = item novo em `HB_ITENS` + arte.
+- Lobbys padronizados (2026-10-16, `frontend/js/lobby.js`): toda ferramenta com projeto abre num lobby no padrão do Vídeo
+  (cartão com arte + logo + Novo/Abrir, seções de modelos/abertos/recentes, Recuperar) sobre o vídeo do Início sem cor
+  tingido na cor dela (`KL_LOBBYS`). Photo/Vetor reaproveitam `#ie-inicio`/`#vk-inicio` (mesmos ids); Lux monta `#lux-inicio`
+  em lux.js (fechar a cena volta ao lobby, "Continuar" reabre). `video/home-bg.webm` já é sem cor (trocou o vídeo: subir o `?v=`).
 - Ícone de cada arquivo de projeto = o logo da ferramenta (`identidade/arquivos/<sigla>.ico`, gerado por
   `py -3.13 tools/icones_arquivos.py`; registro por extensão em `Functions/projeto.py` `_TIPOS`). Mudou cor/sigla: rodar de novo.
 - Ferramenta separada = aba e página próprias (`#page-<id>` com `ve-page`), sem abrir outra por trás; o `switchTool` chama

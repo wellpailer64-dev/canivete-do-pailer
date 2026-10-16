@@ -545,7 +545,8 @@ function kaniHome() {
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ir(); } });
     s.querySelectorAll('[data-kh]').forEach(b => b.onclick = () => { inp.value = b.dataset.kh; inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); });
 }
-document.addEventListener('DOMContentLoaded', kaniHome);
-if (document.readyState !== 'loading') kaniHome();
+// (2026-10-16) a faixa "Peça à Kani" saiu da Home a pedido do Pailer: fica só o botão "Pergunte à Kani" à direita
+// document.addEventListener('DOMContentLoaded', kaniHome);
+// if (document.readyState !== 'loading') kaniHome();
 window.KANI_API = { abrir: kaniAbrir, fechar: kaniFechar, perguntar: async t => { await kaniAbrir(); return kaniEnviar(t); },
     estado: () => KANI.estado, conversa: () => KANI.conversa, gerando: () => !!KANI.gerando };

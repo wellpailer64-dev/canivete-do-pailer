@@ -292,11 +292,11 @@ body.nav-oculto .tabbar { padding-left: 74px; transition: padding-left .3s var(-
 .main-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-0); position: relative; }
 /* Fundo animado (frontend/video/home-bg.webm). O desfoque já está gravado no vídeo: um blur()
    em CSS custaria à placa de vídeo desfocar a tela inteira a cada quadro. */
-.home-bg {
+.home-bg {   /* o arquivo já vem sem cor e um pouco mais escuro (2026-10-16): os lobbys tingem por cima */
     position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
     opacity: 0; pointer-events: none; transition: opacity .8s var(--ease);
 }
-.main-content:has(#page-home.active) .home-bg.pronto { opacity: .35; }
+.main-content:has(#page-home.active) .home-bg.pronto { opacity: .24; }   /* mais escuro (2026-10-16) */
 .main-content:has(.tool-page.active:not(#page-home):not(.ve-page)) .home-bg.pronto { opacity: .18; }
 .main-content:has(#page-video-cutter.active #ve-start:not([hidden])) .home-bg.pronto { opacity: .18; }   /* lobby do editor */
 .main-content::before {
@@ -1779,7 +1779,7 @@ body:not(:has(#page-home.active)):has(.update-banner:not([hidden])) .kani-bolinh
 .hb-lk .hb-arte { object-position: 100% 60%; }   /* arte alargada à esquerda: o pote cabe inteiro */ .hb-vk .hb-arte { object-position: 70% 40%; }
 .hb-vd { --al: #c9a8ff; } .hb-ke { --al: #9b4dff; } .hb-pk { --al: #4c9bff; } .hb-vk { --al: #ff8c42; } .hb-sk { --al: #7fd6ff; } .hb-lk { --al: #ff4fc8; }
 .hb-kani-logo { background: url(../identidade/kani.webp) center / cover !important; box-shadow: none !important; }
-/* trilho: ícone, nome e info de cada ferramenta; o ativo mostra a barrinha dos 4 s */
+/* trilho: ícone, nome e info de cada ferramenta; o ativo mostra a barrinha dos 5 s */
 .hb-trilho { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
 .hb-chip { position: relative; display: flex; align-items: center; gap: 9px; min-width: 0; height: 52px; padding: 0 12px; border-radius: 12px; overflow: hidden;
     border: 1px solid rgba(255, 255, 255, .07); background: rgba(16, 14, 15, .72); color: var(--text); text-align: left; cursor: pointer;
@@ -1792,7 +1792,7 @@ body:not(:has(#page-home.active)):has(.update-banner:not([hidden])) .kani-bolinh
 .hb-chip-txt small { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hb-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; }
 .hb-prog i { display: block; height: 100%; width: 0; background: var(--al); }
-.hb-chip.on .hb-prog i { animation: hb-prog 4s linear forwards; }
+.hb-chip.on .hb-prog i { animation: hb-prog 5s linear forwards; }
 .home-banners:hover .hb-chip.on .hb-prog i { animation-play-state: paused; }   /* mouse em cima pausa a troca */
 @keyframes hb-prog { from { width: 0; } to { width: 100%; } }
 @media (max-width: 1100px) { .hb-trilho { grid-template-columns: repeat(4, minmax(0, 1fr)); } .hb-txt { width: 58%; } }
@@ -1864,3 +1864,46 @@ body:has(#page-home.active) .update-banner .btn-primary { height: 32px; padding:
 .mus-usar:hover { background: var(--primary); color: #1a0d02; }
 .mus-usar:disabled { opacity: .6; cursor: default; } .mus-usar.ok { border-color: #2fa877; color: #2fa877; background: rgba(47, 168, 119, .1); opacity: 1; }
 .mus-mais { align-self: center; margin: 8px; height: 30px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--text); cursor: pointer; }
+
+/* =========================================================
+   Lobbys padronizados (lobby.js, 2026-10-16): fundo = vídeo do Início sem cor tingido na cor da ferramenta (--kl-cor);
+   Photo/Vetor/Lux com o cartão e as seções no padrão do Vídeo Kanivete.
+   ========================================================= */
+.kl-com-fundo { isolation: isolate; transform: translateZ(0); background: #0b0a0c !important; }   /* o fundo fixo fica preso ao lobby */
+.kl-fundo { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: #0b0a0c; }
+.kl-fundo video { width: 100%; height: 100%; object-fit: cover; opacity: .6; }   /* home-bg.webm já sem cor */
+.kl-tinta { position: absolute; inset: 0; background: var(--kl-cor); mix-blend-mode: color; opacity: .85; }
+.kl-veu { position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% 0%, transparent 30%, rgba(8, 7, 9, .7) 100%), rgba(8, 7, 9, .35); }
+.kl.kl { --ie-linha-2: var(--line-2); --ie-painel-2: var(--bg-2); --ie-hover: var(--bg-3); --ie-acento: var(--primary);
+    position: absolute; inset: var(--kl-top, 40px) 0 0 0; z-index: 30; display: grid !important; place-items: start center; padding: 6vh 28px 28px; overflow: auto; }
+.kl.kl[hidden] { display: none !important; }   /* .kl.kl: vence o .ie-inicio antigo (imagem.css vem depois) */
+.kl .kl-inner { width: min(980px, 100%); display: flex; flex-direction: column; align-items: stretch; gap: 22px; text-align: left; }
+.kl-hero { position: relative; overflow: hidden; isolation: isolate; display: flex; align-items: flex-end; gap: 28px; min-height: 300px; padding: 24px 28px;
+    border: 1px solid rgba(255, 255, 255, .08); border-radius: 6px; background: #0b0b0c; }
+.kl-hero-bg { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: cover; object-position: 70% 40%; opacity: 0; transition: opacity 1s ease; }
+.kl-hero-bg.pronto { opacity: .6; }
+.kl-hero::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background: linear-gradient(0deg, rgba(11,11,12,.94) 0%, rgba(11,11,12,.55) 45%, rgba(11,11,12,.15) 100%); }
+.kl-hero-txt { flex: 1; min-width: 0; }
+.kl-hero-txt .app-logo-grande { margin: 0 0 12px; }
+.kl-hero h2 { margin: 0 0 6px; font: 650 24px var(--font-ui); color: var(--text); }
+.kl-hero p { margin: 0; max-width: 440px; font-size: 12.5px; line-height: 1.55; color: rgba(235, 235, 235, .62); }
+.kl-acoes { display: flex; flex-direction: column; align-items: stretch; gap: 8px; flex: 0 0 auto; }
+.kl-novo { justify-content: center; height: 38px !important; padding: 0 22px !important; font-size: 13px; }
+.kl-mais { display: flex; gap: 6px; }
+.kl-mais .ie-btn { flex: 1; justify-content: center; height: 28px; font-size: 12px; background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.1); backdrop-filter: blur(6px); }
+/* seções (modelos rápidos, abertos, recentes) no formato das do Vídeo */
+.kl .ie-recentes, .kl .vk-rapido, .kl .ie-inicio-abertos:not(:empty) { width: auto; margin: 0; padding: 0 12px 12px; border: 1px solid rgba(255, 255, 255, .08); border-radius: 5px;
+    background: rgba(14, 14, 14, .82); backdrop-filter: blur(8px); }
+.kl .ie-recentes:empty, .kl #vk-recentes:empty, .kl .kl-lista:empty { display: none !important; }
+.kl .ie-recentes-tit { margin: 0 -12px 12px; padding: 12px 14px; border-bottom: 1px solid rgba(255, 255, 255, .08); color: var(--text); font-size: 13px; font-weight: 600;
+    text-transform: none; letter-spacing: 0; }
+.kl .vk-rapido-lista { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); }
+.kl #vk-recentes, .kl .kl-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.kl #vk-recentes .ie-recentes-tit, .kl .kl-lista .ie-recentes-tit { grid-column: 1 / -1; margin-bottom: 4px; }
+.kl #vk-recentes .ie-recente, .kl .kl-lista .ie-recente { height: 40px; padding: 0 12px; border: 1px solid var(--line-2); border-radius: 5px; background: var(--bg-0);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.kl .ie-recente:hover { border-color: var(--kl-cor); }
+.kl .ie-inicio-abertos-lista { justify-content: flex-start; }
+/* Vídeo e Sound: o fundo tingido aparece atrás das seções (já tinham o lobby) */
+.ve-start.kl-com-fundo, .sk-start.kl-com-fundo { background: #0b0a0c !important; }

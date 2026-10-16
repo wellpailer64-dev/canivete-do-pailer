@@ -31,7 +31,7 @@ async function luxAbrirArquivo(p) {
     if (!p) return;
     // já aberto nesta sessão: só mostra
     const a = LUXC.m && LUXC.m.lux && LUXC.m.lux.arquivo;
-    if (a && a.toLowerCase() === p.toLowerCase()) { await luxAbrir(); return; }
+    if (a && a.toLowerCase() === p.toLowerCase()) { await luxAbrir({ continuar: true }); return; }
     const r = await window.pywebview.api.lux_abrir(p);
     if (!r || !r.success) throw new Error(veT('Não abriu o projeto') + ': ' + ((r && r.error) || p));
     await luxAbrir({ dados: r.dados, arquivo: r.path });

@@ -945,6 +945,7 @@ function switchTool(toolId) {
     _abrirAba(toolId);
     if (typeof luxAoTrocar === 'function') luxAoTrocar(toolId);   // Lux: pausa ao sair da aba, volta ao entrar
     if (typeof keAoTrocar === 'function') keAoTrocar(toolId);     // Ke: a janela da fila mora na aba dele
+    if (typeof klAplicar === 'function') { setTimeout(klAplicar, 0); setTimeout(klAplicar, 400); }   // lobbys padronizados (lobby.js)
     navAutoAgendar();
     homeBgSync();
     if (toolId === 'home') renderRecentes();
