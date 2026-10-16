@@ -1115,6 +1115,17 @@ function prefsOpen() {
     m.style.display = 'flex';
 }
 
+function doeOpen() {
+    const m = document.getElementById('modal-doe');
+    if (m) m.style.display = 'flex';
+}
+
+function doeClose(e) {
+    const m = document.getElementById('modal-doe');
+    if (!m || (e && e.target !== m)) return;
+    m.style.display = 'none';
+}
+
 function prefsClose(e) {
     const m = document.getElementById('modal-prefs');
     if (e && e.target !== m) return;

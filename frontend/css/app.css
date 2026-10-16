@@ -1435,6 +1435,16 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .pref-lang button:hover { color: var(--text); border-color: var(--text-3); }
 .pref-lang button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .menu-prefs { margin: 0 12px 6px; width: calc(100% - 24px); }
+.menu-doe .icon { color: #ff5c7a; }
+.doe-box { position: relative; width: min(460px, 92vw); text-align: center; align-items: center; gap: 12px; }
+.doe-box h3 { justify-content: center; font-size: 18px; }
+.doe-box p { text-align: left; }
+.doe-coracao { font-size: 34px; line-height: 1; color: #ff5c7a; }
+.doe-qr { width: 200px; height: 200px; background: #fff; padding: 10px; border-radius: 14px; image-rendering: pixelated; margin-top: 4px; }
+.doe-legenda { font-size: 12px; color: var(--text-2); }
+.doe-assina { font-size: 13px; font-style: italic; color: var(--text-2); }
+.doe-x { position: absolute; top: 10px; right: 14px; background: none; border: 0; color: var(--text-2); font-size: 22px; cursor: pointer; }
+.doe-x:hover { color: var(--text); }
 .modal-box h3 { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; }
 .modal-box h3 .i { color: var(--primary); }
 .modal-box p { font-size: 13px; color: var(--text-2); line-height: 1.5; }

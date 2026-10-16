@@ -123,6 +123,9 @@
 .ie-vista { position: relative; overflow: hidden; background: var(--ie-vista); min-height: 0; }
 .ie-vista.soltar { box-shadow: inset 0 0 0 2px var(--ie-acento); }
 #ie-canvas, .ie-sobre { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* fundo do documento/pranchetas (ieVistaFundo): branco + xadrez 8 px e a sombra, por baixo do canvas */
+.ie-fundo { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.ie-fundo > i { position: absolute; display: block; background: repeating-conic-gradient(#fff 0 25%, #ccc 0 50%) 0 0 / 16px 16px; box-shadow: 0 0 18px rgba(0, 0, 0, .6); }
 .ie-sobre { touch-action: none; }
 .ie-texto-edit {
     position: absolute; z-index: 5; transform-origin: 0 0; background: transparent; border: 0; outline: 1px dashed rgba(74, 163, 255, .9);
@@ -311,6 +314,11 @@
 .ie-cp { display: flex; gap: 8px; padding: 10px; background: var(--ie-painel-2); border: 1px solid var(--ie-linha-2); border-radius: 8px; box-shadow: var(--shadow-pop); }
 .ie-cp canvas { border-radius: 3px; cursor: crosshair; }
 .ie-cp-lado { display: flex; flex-direction: column; gap: 6px; width: 92px; }
+.ie-cp-acoes { display: flex; gap: 4px; }
+.ie-cp-acoes .ie-cp-ok { flex: 1; }
+.ie-cp-gotas { width: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.ie-cp-gotas .ie-i { width: 15px; height: 15px; }
+.ie-cp-gotas.on { background: var(--accent, #d4824e); color: #fff; }
 .ie-cp-lado label { display: flex; align-items: center; gap: 4px; color: var(--text-2); }
 .ie-cp-lado input { width: 100%; min-width: 0; height: 22px; background: var(--bg-input); color: var(--text); border: 1px solid var(--ie-linha-2); border-radius: 3px; padding: 0 4px; font: 12px var(--mono); }
 .ie-cp-amostras { display: flex; height: 30px; border: 1px solid var(--ie-linha-2); border-radius: 3px; overflow: hidden; }

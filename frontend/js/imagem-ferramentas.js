@@ -386,11 +386,11 @@ function iePintarCobertura(doc, L, cob, R, nome, { cor, opac = 1, borracha = fal
 // camada sob o clique (Seleção automática): o pixel VISÍVEL da própria camada — alfa × opacidade × preenchimento ×
 // máscara, e dentro da base quando presa por máscara de corte. Sombra/brilho (efeitos) não contam (antes a sombra do
 // Daniel, brilhos e a palavra-eco a 7% roubavam o clique de quem estava embaixo)
-function ieAlfaEm(L, x, y) {
+function ieAlfaEm(L, x, y, semOpacidade = false) {
     const c = L.c;
     if (!c || x < L.x || y < L.y || x >= L.x + c.width || y >= L.y + c.height) return 0;
     let a = ieCtx(c).getImageData(Math.floor(x - L.x), Math.floor(y - L.y), 1, 1).data[3] / 255;
-    a *= (L.op ?? 1) * (L.fill ?? 1);
+    if (!semOpacidade) a *= (L.op ?? 1) * (L.fill ?? 1);
     const m = L.m;
     if (a > 0 && m && !m.desativada) {
         const dentro = m.c && x >= m.x && y >= m.y && x < m.x + m.c.width && y < m.y + m.c.height;
@@ -410,13 +410,19 @@ function ieCamadaNoPonto(doc, x, y) {
         }
     };
     visitar(doc.camadas, true);
+    // camada clarinha (marca d'água, palavra-eco: pixel cheio, mas opacidade baixa): perde para o conteúdo de verdade
+    // embaixo dela, mas ganha do FUNDO do slide (antes a engrenagem a 6% sobre o fundo nunca era selecionada)
+    let fraca = null;
     for (let i = ordem.length - 1; i >= 0; i--) {
         const { L, base } = ordem[i];
-        if (ieAlfaEm(L, x, y) <= 0.08) continue;
         if (base && base !== L && base.c && ieAlfaEm(base, x, y) <= 0.08) continue;   // fora da base do corte: não aparece
-        return L;
+        if (ieAlfaEm(L, x, y) <= 0.08) {
+            if (!fraca && ieAlfaEm(L, x, y, true) > 0.08) fraca = L;
+            continue;
+        }
+        return fraca && ieEhFundo(doc, L) ? fraca : L;
     }
-    return null;
+    return fraca;
 }
 
 // alvo do clique: o pixel visível OU a caixa das linhas de um texto (clicar entre as letras também pega o texto) —

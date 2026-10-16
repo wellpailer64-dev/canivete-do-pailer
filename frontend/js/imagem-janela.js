@@ -59,10 +59,18 @@ function ieHsv(hex) {
 }
 function ieDeHsv(h, s, v) { s /= 100; v /= 100; const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); }; return ieRgbHex(f(5) * 255, f(3) * 255, f(1) * 255); }
 function ieDefinirCor(c, alvo = IE.corAlvo) { IE.cor[alvo] = c; ieUiCores(); }
-// clique numa amostra com camada de Cor sólida ou de forma selecionada: a cor vai também para ela (como no Photoshop)
+// clique numa amostra com camada de Cor sólida, de forma ou de TEXTO selecionada: a cor vai também para ela (como no
+// Photoshop). Texto em edição com trecho selecionado: só o trecho (o mesmo caminho do painel Caractere)
 function ieAmostraNasCamadas(c) {
     const doc = IE.doc;
     if (!doc) return;
+    const ed = IE.edTexto;
+    if ((ed || ieSelecionadas(doc).some(L => L.txt || L.texto)) && typeof ieTextoEstilo === 'function') {
+        const ta = ieEl('ie-texto-edit');
+        ieTextoEstilo({ cor: c });
+        if (ed && ta) setTimeout(() => ta.focus(), 0);   // a amostra é um botão: devolve o cursor ao texto em edição
+        ieUiProps?.(); ieOpcoesRender?.();
+    }
     const alvos = ieSelecionadas(doc).filter(L => (L.tipo === 'preenchimento' && L.pre && L.pre.tipo === 'cor') || (L.tipo === 'forma' && L.vet));
     let mudou = false;
     for (const L of alvos) {

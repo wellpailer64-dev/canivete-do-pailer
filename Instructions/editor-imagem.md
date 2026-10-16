@@ -123,6 +123,9 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   arrastar um filtro (ou o cabeçalho = todos) para outra camada move, Alt+arrastar copia; clique no filtro (foco) +
   Ctrl+C / Ctrl+V cola nas camadas selecionadas (`ieFiltrosArrasteInstalar`, `ieFiltrosParaCamada`, `ieFiltroColar`);
   destino de pixels vira objeto inteligente antes (como no Photoshop).
+- Seleção automática (`ieCamadaNoPonto`): pixel visível > 8% (alfa × opacidade × preenchimento × máscara). Camada
+  clarinha (marca d'água/palavra-eco: pixel cheio, opacidade baixa) perde para conteúdo embaixo, mas ganha do FUNDO do
+  slide (`ieEhFundo`) — 2026-10-16, engrenagem a 6% que nunca era selecionada.
 - Clique da seleção automática em texto (`ieTextoNoPonto`): só as linhas, na altura real das letras
   (`ieTextoCaixaLocal(t, linhas, true)`) — o topo declarado da fonte (Jost 1,07 em) e a caixa de parágrafo cobriam o texto
   de cima. Janelas de diálogo (Estilo de camada, filtros, ajustes) arrastam pelo cabeçalho (`ieDlgArrastavel`, posição
@@ -224,6 +227,10 @@ nome/slide de um .iknv antigo, inclusive com escala, e põe o texto editável po
   (`ResourceDict` e `DocumentResources` → FontSet, o índice vale para as duas) e o `Txt ` termina em nulo.
 - Caixa de parágrafo: a 1ª linha de base fica em topo + sTypoAscender (OS/2, `asc` em Functions/fontes.py) × tamanho,
   como no Photoshop (o ascendente do navegador descia ~10 px a 48 px).
+- Editando texto de parágrafo (2026-10-16): só o contorno da caixa (a área de digitação não tem contorno próprio — antes
+  apareciam dois retângulos) com 8 alças; arrastar muda `t.caixa` no espaço do texto e reflui ao vivo
+  (`ieTextoAlca`, `ieTextoCaixaArrastar` em imagem-texto.js). Ouvinte da área de digitação nasce no `ieTextoInstalar`:
+  o `aplicar.py` não o reinstala (no app aberto só vale reabrindo).
 - A composição feita pela página vira a imagem achatada do arquivo.
 - Efeitos editados no editor (`L.fxMudou`) ou de camada nova: o Python reescreve só Sombra projetada, Brilho externo,
   Traçado e Sobreposição de cor no `lfx2` (os outros efeitos ficam; efeito tirado fica desligado; `lrFX` sai).
@@ -323,6 +330,22 @@ Medido no "Dia do instrutor v2" (6480 × 1440, 198 camadas) e num teste de 79 fo
 - **Histórico com limite para TODOS os documentos juntos** (`IE_HIST_BYTES` 2,5 GB, `ieHistBytes`/`ieHistPodar`; conta originais de
   objeto inteligente e máscaras): poda primeiro os documentos parados; avisa uma vez.
 Resultado no teste: quadro de arraste 268 → 3,5 ms (13 ms sem o arraste rápido).
+**Rodada 2 (2026-10-16, PSDs/PSB de pranchetas da Magnetus, pacote 8; scripts `D:\kanivete_testes\scripts\bench_psd_pranchetas.py`,
+`trace_zoom.py`, `abre_fecha.py`, `canvas_vivos.py`, cópias em `D:\kanivete_testes\magnetus_psd`):**
+- **Xadrez e sombra das pranchetas em CSS** (`ieVistaFundo` → `.ie-fundo > i` por baixo do `#ie-canvas`): pintado no canvas, o
+  xadrez custava 10–30 ms por quadro só na rasterização (trace: "Paint" do canvas). Zoom no PSB 2262×3449 com 4 pranchetas:
+  4,5 s de travadas → 0. Copiar a composição para um canvas da placa PIOROU (o navegador espera a placa): não tentar de novo.
+- **Vista parcial também com pranchetas** (`ieVistaParcialOk`): antes, com prancheta, cada quadro de arraste redesenhava a tela
+  inteira e refazia as reduções (~60 ms); travadas no arraste 8,7 s → 0,9 s. Não vale com máscara/canal na tela.
+- **Fechar documento solta os caches de `IE` que apontam para ele** (`ieFecharDoc`): `IE._giCache` (guias inteligentes) segurava
+  o documento fechado inteiro (~800 MB por PSB). Abrir/fechar agora volta sempre ao mesmo patamar.
+- **Miniaturas do painel Camadas em fatias de ~12 ms, as visíveis primeiro** (`ieMiniaturas`): abrir congelava 1,9 s no fim.
+- **Abrir PSD em paralelo** (`_abrir_psd`: pixels, máscara e objeto inteligente de cada camada folha num pool de threads,
+  resultado idêntico): PSB de 113 MB 15,2 → 10,6 s; carrossel de 160 MB 6,3 → 3,6 s. O resto é o psd_tools em Python puro
+  (GIL); o mesmo trabalho em .iknv abre em ~3,5 s.
+- **Desfazer/refazer por diferença** (`ieHistDiferenca`): camada igual herda os caches e só o que mudou é recomposto
+  (345 → 103 ms; recompor 231 → 4 ms). Conferido pixel a pixel contra `ieAchatar` (`scripts/conferir_desfazer.py`).
+- `ieMudouDoc` só redesenha as abas quando o documento passa a "não salvo" (olho de camada ~70 ms).
 Pendências: prévia no tamanho da tela durante zoom/arraste (canvas enormes); `doc.achatadoC` (cópia achatada do PSD) carregar só
 quando usada; desfazer recompõe o documento inteiro (só o que mudou); histórico antigo no disco (rascunho em D:).
 

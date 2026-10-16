@@ -267,6 +267,9 @@ async function ieFecharDoc(doc, semPerguntar) {
     const i = IE.docs.indexOf(doc);
     if (i >= 0) IE.docs.splice(i, 1);
     if (doc.pyId) ieApi()?.ie_fechar(doc.pyId);
+    // caches de IE que guardam o documento (guias inteligentes, arraste rápido...): sem soltar, o documento fechado
+    // inteiro (camadas, composição, histórico) ficava na memória — ~800 MB no PSB de pranchetas da Magnetus
+    for (const k of Object.keys(IE)) { const v = IE[k]; if (v && typeof v === 'object' && !Array.isArray(v) && v.doc === doc) IE[k] = null; }
     if (IE.doc === doc) ieMostrarDoc(IE.docs[Math.min(i, IE.docs.length - 1)] || null);
     else ieAbasRender();
     return true;

@@ -484,14 +484,22 @@ function ieMiniaturas(ja) {
         // durante a pincelada a miniatura espera (como o Photoshop): ela lê os pixels da camada inteira (ieLimites) e,
         // num documento grande, isso travava o pincel a cada atualização (2026-10-07); ieTracoFim pede de novo
         if (typeof IE_TRACO !== 'undefined' && IE_TRACO) { ieMiniTimer = setTimeout(fazer, 250); return; }
-        document.querySelectorAll('#ie-cam-lista canvas[data-mini]').forEach(cv => {
-            const L = ieAchar(doc, +cv.dataset.mini)?.L;
-            if (L && (cv._v !== L._v || cv._c !== L.c)) { cv._v = L._v; cv._c = L.c; ieMiniatura(cv, L, false); }
+        // em fatias de ~12 ms, as que aparecem na lista primeiro: abrir o PSB de pranchetas da Magnetus (60 camadas)
+        // fazia todas de uma vez e congelava a tela 1,8 s no fim da abertura
+        const lista = ieEl('ie-cam-lista'), vis = lista && lista.getBoundingClientRect(), pend = [];
+        lista?.querySelectorAll('canvas[data-mini], canvas[data-mmini]').forEach(cv => {
+            const masc = cv.dataset.mmini != null, L = ieAchar(doc, +(masc ? cv.dataset.mmini : cv.dataset.mini))?.L;
+            const fonte = L && (masc ? L.m && L.m.c : L.c);
+            if (!L || (masc && !L.m) || (cv._v === L._v && cv._c === fonte)) return;
+            const r = cv.getBoundingClientRect();
+            pend.push({ cv, L, masc, fonte, fora: !vis || r.bottom < vis.top || r.top > vis.bottom });
         });
-        document.querySelectorAll('#ie-cam-lista canvas[data-mmini]').forEach(cv => {
-            const L = ieAchar(doc, +cv.dataset.mmini)?.L;
-            if (L && L.m && (cv._v !== L._v || cv._c !== L.m.c)) { cv._v = L._v; cv._c = L.m.c; ieMiniatura(cv, L, true); }
-        });
+        pend.sort((a, b) => a.fora - b.fora);
+        const t0 = performance.now();
+        for (const p of pend) {
+            if (performance.now() - t0 > 12) { ieMiniTimer = setTimeout(fazer, 0); return; }
+            p.cv._v = p.L._v; p.cv._c = p.fonte; ieMiniatura(p.cv, p.L, p.masc);
+        }
     };
     if (ja) fazer(); else ieMiniTimer = setTimeout(fazer, 250);
 }
@@ -1104,7 +1112,8 @@ function ieSeletorCor(ancora, inicial, aoMudar) {
             <label>R <input type="number" class="ie-cp-c" data-c="0" min="0" max="255"></label>
             <label>G <input type="number" class="ie-cp-c" data-c="1" min="0" max="255"></label>
             <label>B <input type="number" class="ie-cp-c" data-c="2" min="0" max="255"></label>
-            <button class="ie-btn ie-btn-mini ie-btn-primario ie-cp-ok">OK</button></div></div>`;
+            <div class="ie-cp-acoes"><button class="ie-btn ie-btn-mini ie-cp-gotas" title="${ieT('Conta-gotas: pegar uma cor da tela')}">${ieIco('dropper')}</button>
+            <button class="ie-btn ie-btn-mini ie-btn-primario ie-cp-ok">OK</button></div></div></div>`;
     const sv = pop.querySelector('.ie-cp-sv'), hc = pop.querySelector('.ie-cp-h');
     const hsvRgb = (h, s, v) => { const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); }; return [f(5) * 255, f(3) * 255, f(1) * 255]; };
     const desenhar = () => {
@@ -1147,8 +1156,29 @@ function ieSeletorCor(ancora, inicial, aoMudar) {
     pop.querySelectorAll('.ie-cp-c').forEach(i => i.addEventListener('input', () => { const c = [r, g, b]; c[+i.dataset.c] = ieClamp(+i.value || 0, 0, 255); deRgb(...c); }));
     pop.querySelectorAll('input').forEach(i => i.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Enter') fechar(); }));
     const fechar = () => { pop.hidden = true; document.removeEventListener('pointerdown', fora, true); };
-    const fora = ev => { if (!pop.contains(ev.target) && ev.target !== ancora) fechar(); };
+    const fora = ev => { if (!pop.contains(ev.target) && ev.target !== ancora && !pop.querySelector('.ie-cp-gotas.on')) fechar(); };
     pop.querySelector('.ie-cp-ok').onclick = fechar;
+    // conta-gotas (como no Photoshop com o Seletor de cores aberto): EyeDropper do navegador pega qualquer pixel da tela
+    // (documento, painéis, outro monitor) com lupa; sem ele, o próximo clique no documento amostra a imagem composta
+    const gotas = pop.querySelector('.ie-cp-gotas');
+    gotas.onclick = async ev => {
+        ev.stopPropagation();
+        if (window.EyeDropper) {
+            try { const r = await new EyeDropper().open(); if (r && r.sRGBHex) deRgb(...ieHexRgb(r.sRGBHex)); } catch (e) { /* Esc */ }
+            return;
+        }
+        gotas.classList.add('on');
+        const pegar = e => {
+            document.removeEventListener('pointerdown', pegar, true);
+            gotas.classList.remove('on');
+            const doc = IE.doc;
+            if (!doc || e.target !== ieEl('ie-sobre')) return;
+            e.stopPropagation(); e.preventDefault();
+            const c = ieAmostrarCor(doc, ieTelaDoc(e, doc), true);
+            if (c) deRgb(...ieHexRgb(c));
+        };
+        setTimeout(() => document.addEventListener('pointerdown', pegar, true), 0);
+    };
     pop.hidden = false;
     const ra = ancora.getBoundingClientRect(), rb = ieEl('ie').getBoundingClientRect();
     pop.style.left = Math.min(rb.width - 340, ra.right - rb.left + 6) + 'px';

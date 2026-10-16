@@ -329,6 +329,11 @@ def _abrir_psd(path, doc, on_progress):
     total = max(1, len(todas))
     feitos = [0]
     links_cache = {}
+    # pixels, máscara e objeto inteligente de cada camada folha em paralelo (decodificar canais, compor camadas sem pixels
+    # prontos e gerar o PNG): o PSB de pranchetas da Magnetus (113 MB) levava ~15 s numa linha só
+    from concurrent.futures import ThreadPoolExecutor
+    pool = ThreadPoolExecutor(max_workers=max(1, min(6, (os.cpu_count() or 2) - 1)))
+    pend = []   # (no, futuro que devolve o que entra no nó)
 
     def links_do(p):
         k = id(p)
@@ -461,7 +466,7 @@ def _abrir_psd(path, doc, on_progress):
             if not interno:
                 feitos[0] += 1
             if on_progress and not interno:
-                on_progress(min(99, int(feitos[0] * 100 / total)), layer.name)
+                on_progress(min(20, int(feitos[0] * 20 / total)), layer.name)   # percorrer é rápido; o resto vem do pool
             k = layer.kind
             no = {"ref": None if interno else indice_local.get(id(layer)), "nome": layer.name, "visivel": bool(layer.visible),
                   "op": round(layer.opacity / 255, 4), "fill": round(layer.fill_opacity / 255, 4),
@@ -511,21 +516,31 @@ def _abrir_psd(path, doc, on_progress):
                 pre = _grad_pre(layer)
                 if pre:
                     no["pre"] = pre
-            im, x0, y0 = pixels(layer, raiz)
-            if im is not None:
-                no.update({"x": int(x0), "y": int(y0), "w": im.size[0], "h": im.size[1],
-                           "url": _servir(doc, _png(im), "camada.png")})
-            else:
-                no.update({"x": 0, "y": 0, "w": 0, "h": 0})
-            if k == "smartobject":
+            def trab_pixels(layer=layer, raiz=raiz):
+                im, x0, y0 = pixels(layer, raiz)
+                if im is None:
+                    return {"x": 0, "y": 0, "w": 0, "h": 0}
+                return {"x": int(x0), "y": int(y0), "w": im.size[0], "h": im.size[1], "url": _servir(doc, _png(im), "camada.png")}
+
+            def trab_so(layer=layer, raiz=raiz):
                 so = smart_conteudo(layer, raiz)
                 if so and so.get("camadas"):
-                    no["so"] = {kk: vv for kk, vv in so.items() if kk != "aviso"}
-                elif so and so.get("aviso") == "grande":
+                    return {"so": {kk: vv for kk, vv in so.items() if kk != "aviso"}}
+                if so and so.get("aviso") == "grande":
                     avisos.append(f"{layer.name}: objeto inteligente interno grande ({so['bytes'] // (1024 * 1024)} MB); abre como prévia")
                 elif so and so.get("aviso"):
                     avisos.append(f"{layer.name}: conteúdo do objeto inteligente não lido ({so['aviso']})")
-            mascara(layer, no)
+                return {}
+
+            def trab_mascara(layer=layer, no=no):
+                mascara(layer, no)
+                return {}
+
+            no.update({"x": 0, "y": 0, "w": 0, "h": 0})
+            pend.append((no, pool.submit(trab_pixels)))
+            if k == "smartobject":
+                pend.append((no, pool.submit(trab_so)))
+            pend.append((no, pool.submit(trab_mascara)))
             try:
                 if layer.has_vector_mask() and k not in ("shape", "solidcolorfill", "gradientfill", "patternfill"):
                     avisos.append(f"{layer.name}: máscara vetorial não aparece no editor (fica no arquivo)")
@@ -549,7 +564,17 @@ def _abrir_psd(path, doc, on_progress):
             out.append(no)
         return out
 
-    camadas = nivel(psd)
+    try:
+        camadas = nivel(psd)
+        i = 0
+        while i < len(pend):   # cresce enquanto os objetos inteligentes abrem as camadas de dentro
+            no, fut = pend[i]
+            no.update(fut.result())
+            i += 1
+            if on_progress:
+                on_progress(min(99, 20 + int(i * 79 / max(1, len(pend)))), no.get("nome", ""))
+    finally:
+        pool.shutdown(wait=True, cancel_futures=True)
     achatado = None
     try:
         im = psd.topil()

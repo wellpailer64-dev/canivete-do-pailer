@@ -402,10 +402,13 @@ function ieTextoPosicionar() {
     const x0 = t.caixa ? t.caixa[0] : (t.alin === 'center' ? -larg / 2 : t.alin === 'right' ? -larg : 0);
     const y0 = (t.caixa ? t.caixa[1] : -asc) - (adv - t.tam * 1.0) / 2;
     const m = ieMatMul([doc.zoom, 0, 0, doc.zoom, doc.px, doc.py], t.m || IE_ID);
+    // texto de parágrafo: a área de digitação ocupa a caixa inteira e não tem contorno próprio (o contorno e as alças
+    // da caixa são desenhados no canvas) — antes apareciam dois retângulos, o da caixa e o das linhas escritas
+    const altLinhas = Math.max(adv, linhas.length * adv) + adv * 0.4;
     Object.assign(ta.style, {
         font: ieFonteCss(t), letterSpacing: (t.esp || 0) / 1000 * t.tam + 'px', lineHeight: adv + 'px', color: t.cor,
-        textAlign: t.alin, left: '0px', top: '0px', width: larg + 'px',
-        height: Math.max(adv, linhas.length * adv) + adv * 0.4 + 'px',
+        textAlign: t.alin, left: '0px', top: '0px', width: larg + 'px', outline: t.caixa ? 'none' : '',
+        height: (t.caixa ? Math.max(altLinhas, t.caixa[3] - t.caixa[1] + (adv - t.tam) / 2) : altLinhas) + 'px',
         transform: `matrix(${m.join(',')}) translate(${x0}px, ${y0}px)`, textTransform: t.caixaAlta ? 'uppercase' : 'none',
     });
     void B;
@@ -465,7 +468,65 @@ function ieTextoInstalar() {
         if (typeof ieTextoAtalho === 'function' && ieTextoAtalho(ev)) { ev.preventDefault(); return; }
         if (ev.key === 'Escape' || (ev.key === 'Enter' && (ev.ctrlKey || ev.location === 3))) { ev.preventDefault(); ieTextoEncerrar(true); }
     });
-    ta.addEventListener('pointerdown', ev => ev.stopPropagation());
+    ta.addEventListener('pointerdown', ev => {
+        ev.stopPropagation();
+        const doc = IE.doc, h = doc && ieTextoAlca(ieTelaDoc(ev, doc), doc);
+        if (h) { ev.preventDefault(); ieTextoCaixaArrastar(h, ev); }
+    });
+    ta.addEventListener('pointermove', ev => {
+        const doc = IE.doc, h = doc && !IE._txCaixaArr && ieTextoAlca(ieTelaDoc(ev, doc), doc);
+        ta.style.cursor = h ? IE_TX_CURSOR[h] : '';
+    });
+}
+
+// ───────── alças da caixa de parágrafo (como no Photoshop: arrastar muda o tamanho da caixa e o texto reflui) ─────────
+const IE_TX_CURSOR = { tl: 'nwse-resize', br: 'nwse-resize', tr: 'nesw-resize', bl: 'nesw-resize', t: 'ns-resize', b: 'ns-resize', l: 'ew-resize', r: 'ew-resize' };
+
+// alça da caixa do texto em edição sob o ponto p (coordenadas do documento), ou null
+function ieTextoAlca(p, doc = IE.doc) {
+    const ed = IE.edTexto;
+    if (!ed || !ed.L.txt.caixa || !doc) return null;
+    const t = ed.L.txt, c = t.caixa, q = ieMatPt(ieMatInv(t.m || IE_ID), p.x, p.y);
+    const esc = ieTextoEscala(t);
+    const h = ieAlcaRet({ x: c[0], y: c[1], w: c[2] - c[0], h: c[3] - c[1] }, q, { zoom: doc.zoom * esc });
+    return h && h !== 'dentro' ? h : null;
+}
+
+function ieTextoCaixaPontos(t, doc) {
+    const c = t.caixa, mx = (c[0] + c[2]) / 2, my = (c[1] + c[3]) / 2;
+    return [[c[0], c[1]], [mx, c[1]], [c[2], c[1]], [c[2], my], [c[2], c[3]], [mx, c[3]], [c[0], c[3]], [c[0], my]]
+        .map(([x, y]) => { const q = ieMatPt(t.m || IE_ID, x, y); const s = ieDocTela(q.x, q.y, doc); return [s.x, s.y]; });
+}
+
+// arrasta a alça h: muda a caixa no espaço do texto (girado/escalado junto), mínimo de 1 letra
+function ieTextoCaixaArrastar(h, ev0) {
+    const ed = IE.edTexto, doc = IE.doc;
+    if (!ed || !doc) return;
+    const t = ed.L.txt, inv = ieMatInv(t.m || IE_ID), min = Math.max(4, t.tam * 0.6);
+    IE._txCaixaArr = true;
+    const ta = ieEl('ie-texto-edit');
+    const mover = ev => {
+        const p = ieTelaDoc(ev, doc), q = ieMatPt(inv, p.x, p.y), c = t.caixa;
+        if (h.includes('l')) c[0] = Math.min(q.x, c[2] - min);
+        if (h.includes('r')) c[2] = Math.max(q.x, c[0] + min);
+        if (h.includes('t')) c[1] = Math.min(q.y, c[3] - min);
+        if (h.includes('b')) c[3] = Math.max(q.y, c[1] + min);
+        ieTextoPosicionar(); ieTextoAoVivo(ed.L); ieDesenharSobre();
+    };
+    const soltar = () => {
+        window.removeEventListener('pointermove', mover); window.removeEventListener('pointerup', soltar);
+        IE._txCaixaArr = false;
+        t.caixa = t.caixa.map(v => Math.round(v * 100) / 100);
+        // texto todo selecionado (ao entrar na edição): o cursor vai para o fim, para digitar não apagar tudo
+        setTimeout(() => {
+            if (!ta) return;
+            ta.focus();
+            const n = ta.value.length;
+            if (n && ta.selectionStart === 0 && ta.selectionEnd === n) ta.setSelectionRange(n, n);
+        }, 0);
+    };
+    window.addEventListener('pointermove', mover); window.addEventListener('pointerup', soltar);
+    void ev0;
 }
 
 // mudou estilo pela barra de opções: vale para o texto em edição ou para as camadas de texto selecionadas
@@ -536,9 +597,12 @@ function ieTextoEstilo(mud) {
 
 // ─────────────────────────── ferramenta ───────────────────────────
 const IE_TEXTO = {
-    nome: 'Texto', tecla: 'T', icone: 'type', cursor: 'text',
+    nome: 'Texto', tecla: 'T', icone: 'type',
+    cursor(ev) { const doc = IE.doc, h = ev && doc && ieTextoAlca(ieTelaDoc(ev, doc), doc); return h ? IE_TX_CURSOR[h] : 'text'; },
     down(p, ev, doc) {
         if (IE.edTexto) {
+            const h = ieTextoAlca(p, doc);
+            if (h) { ieTextoCaixaArrastar(h, ev); return; }
             // clique fora do texto em edição confirma
             const L = IE.edTexto.L, r = ieRaster(L) || L._rasterAntes;
             ieTextoEncerrar(true);
@@ -583,6 +647,7 @@ const IE_TEXTO = {
             const pts = [[c[0], c[1]], [c[2], c[1]], [c[2], c[3]], [c[0], c[3]]].map(([x, y]) => { const q = ieMatPt(m, x, y); return ieDocTela(q.x, q.y, doc); });
             ctx.save(); ctx.strokeStyle = '#4aa3ff'; ctx.setLineDash([3, 3]); ctx.beginPath();
             pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.closePath(); ctx.stroke(); ctx.restore();
+            ieAlcasDesenhar(ctx, ieTextoCaixaPontos(t, doc));
         }
     },
 };

@@ -833,6 +833,7 @@
   "kani_estado",
   "kani_baixar",
   "kani_enviar",
+  "kani_tela_ok",
   "kani_parar",
   "kani_voz",
   "musicas_listar",
@@ -853,6 +854,7 @@
   "kani_memoria_comando",
   "kani_agente_parar",
   "kani_criar_tipo",
+  "kani_baixar_modelo",
   "kani_criar",
   "kani_criar_url",
   "kani_salvar_como",
@@ -1474,10 +1476,14 @@
    ]
   },
   "kani_enviar": {
-   "args": "cid, mensagens, ferramenta=\"\"",
+   "args": "cid, mensagens, ferramenta=\"\", tela=\"\"",
    "modulos": [
     "kani"
    ]
+  },
+  "kani_tela_ok": {
+   "args": "",
+   "modulos": []
   },
   "kani_parar": {
    "args": "cid",
@@ -1594,6 +1600,13 @@
    "args": "texto, anterior=None",
    "modulos": [
     "kani_criar"
+   ]
+  },
+  "kani_baixar_modelo": {
+   "args": "tipo",
+   "modulos": [
+    "gerador_imagem as g",
+    "gerador_sfx as g"
    ]
   },
   "kani_criar": {
@@ -3018,6 +3031,7 @@
   "Functions/convertermp3.py": "Conversor de áudio (e extração de áudio de vídeos) via ffmpeg",
   "Functions/cor_icc.py": "Gestão de cor do Photo Kanivete: o app trabalha em sRGB; aqui entram e saem os outros espaços pelo perfil ICC",
   "Functions/drive_envio.py": "Envio automático de um arquivo pronto (render da fila) para uma pasta do Google Drive, com progresso",
+  "Functions/drive_publico.py": "drive_publico.py — GDRIVE DUMPER sem login: pasta/arquivo do Google Drive compartilhado como \"qualquer pessoa com o link\"",
   "Functions/editor_imagem.py": "Editor de Imagem (frontend/js/imagem-*.js): abrir e salvar PSD/PSB e imagens comuns",
   "Functions/efeitos_pr.py": "Efeitos de áudio do Premiere no Kanivete (frontend/dados/premiere_audio.json, gerado por tools/premiere_audio_dados.py)",
   "Functions/emenda.py": "Corrigir um trecho de um vídeo já exportado sem exportar tudo de novo (GaIA 2026-10-14: foto do Jhordano preta em 6 s",

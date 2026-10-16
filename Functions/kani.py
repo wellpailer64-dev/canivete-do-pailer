@@ -290,7 +290,7 @@ def _preferencias():
         return ""
 
 
-def _sistema(pergunta, ferramenta):
+def _sistema(pergunta, ferramenta, tela=""):
     kb = _carregar_kb()
     trechos = buscar(pergunta + " " + (ferramenta or ""))
     doc = "\n\n".join(f"### {t['titulo']}\n{t['texto']}" for t in trechos) or "(nada encontrado)"
@@ -339,16 +339,23 @@ A pessoa está agora em: {ferramenta or 'tela inicial'}.
 {_preferencias()}
 
 AJUDA DO KANIVETE (trechos dos guias):
-{doc}"""
+{doc}""" + (f"""
+
+O QUE ESTÁ NA TELA DA PESSOA AGORA (o app te mostra isto: você ESTÁ vendo a tela por este resumo):
+{tela}
+Quando a pergunta falar do trabalho aberto ("esse título", "essa camada", "o documento", "o clipe", "este slide"),
+responda DIRETO com estes dados (o texto, os nomes, o tamanho, a quantidade). Nunca diga que não vê a tela e nunca peça
+para colar, copiar ou anexar o que já está aqui. Não repita a lista inteira sem necessidade.""" if tela else "")
 
 
 # ─────────────────────────── conversa ───────────────────────────
-def conversar(cid, mensagens, ferramenta, on_evento):
-    """Roda em thread: on_evento({id, delta}) a cada pedaço, {id, fim: True} ou {id, erro}."""
+def conversar(cid, mensagens, ferramenta, on_evento, tela=""):
+    """Roda em thread: on_evento({id, delta}) a cada pedaço, {id, fim: True} ou {id, erro}. tela = resumo do que está
+    aberto (kani-tela.js), no FIM do prompt de sistema: a parte fixa continua no cache do llama.cpp."""
     def run():
         try:
             ult = next((m["content"] for m in reversed(mensagens) if m.get("role") == "user"), "")
-            msgs = [{"role": "system", "content": _sistema(ult, ferramenta)}] + [m for m in mensagens[-12:] if m.get("role") in ("user", "assistant")]
+            msgs = [{"role": "system", "content": _sistema(ult, ferramenta, (tela or "")[:1600])}] + [m for m in mensagens[-12:] if m.get("role") in ("user", "assistant")]
             if _ollama_tem():
                 corpo = {"model": OLLAMA_MODELO, "messages": msgs, "stream": True, "think": False, "keep_alive": "5m",
                          "options": {"num_ctx": CTX, "temperature": 0.6}}

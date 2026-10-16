@@ -287,6 +287,11 @@ runner `serve`), ~3 s por leitura. Teste: `py -3.13 testes/teste_kani.py` (porta
 do Soundboard + impacto, mixada no ffmpeg) — `Functions/kani_criar.py` (detectar por verbo + tipo; a Kani escreve o
 prompt/texto e sai da placa), cartão com progresso, prévia, Baixar/Abrir/Mostrar na pasta (`kaniCriacao` em kani.js);
 arquivos em `modelos_ia/kani/criacoes`. Faixa "Peça à Kani" na Home (`kaniHome`).
+**Kani fora da Home + contexto da tela** (2026-10-16, `frontend/js/kani-tela.js`): bolinha flutuante arrastável (posição
+em localStorage `kani-flutua-pos`; clique abre a gaveta). A cada mensagem vai um RESUMO EM TEXTO do que está aberto
+(`KANI_TELA['<página>']`: Photo, Vídeo, Vetor, Sound, Slider; genérico nas outras), lido só ao enviar, no fim do prompt
+(`kani._sistema(…, tela)`; cache intacto): 1ª palavra 2,8 s com × 2,5 s sem. Pergunta sobre o que está aberto não vai
+para o modo em etapas. Chip "👁 Vendo…" no pé da gaveta liga/desliga (`kani-ver-tela`). Ferramenta nova: um leitor em `KANI_TELA`.
 Gerador que falta (imagem/efeito): `kani_criar.FaltaModelo` → o cartão mostra "Baixar o gerador (X GB)" (`kani_baixar_modelo`,
 `kaniModeloProgresso`) e refaz o pedido sozinho ao terminar; no modo em etapas, botão "Refazer o pedido".
 **Mãos da Kani** (2026-10-13): flyer montado AO VIVO no Photo a partir de uma ficha da Kani (trilho paralelo, não mexe

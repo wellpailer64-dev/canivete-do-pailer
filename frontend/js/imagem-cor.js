@@ -151,7 +151,7 @@ ieExportarDialogo = async function () {
         box.className = 'ie-cp-cmyk';
         box.innerHTML = ['C', 'M', 'Y', 'K'].map((n, i) => `<label>${n} <input type="number" class="ie-cp-k" data-k="${i}" min="0" max="100" step="1"><i>%</i></label>`).join('')
             + `<small class="ie-cp-gama" hidden title="${ieT('A impressão não alcança esta cor: ela sai mais apagada')}">⚠ ${ieT('fora da gama CMYK')}</small>`;
-        lado.insertBefore(box, lado.querySelector('.ie-cp-ok'));
+        lado.insertBefore(box, lado.querySelector('.ie-cp-acoes') || lado.querySelector('.ie-cp-ok'));
         const api = ieApi();
         let t = null;
         atualizar = hex => {

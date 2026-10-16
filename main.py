@@ -3783,9 +3783,13 @@ class ApiBridge:
         from Functions import kani
         return kani.baixar(lambda d: _js("kaniProgresso", d))
 
-    def kani_enviar(self, cid, mensagens, ferramenta=""):
+    def kani_enviar(self, cid, mensagens, ferramenta="", tela=""):
         from Functions import kani
-        return kani.conversar(cid, mensagens, ferramenta, lambda d: _js("kaniEvento", d))
+        return kani.conversar(cid, mensagens, ferramenta, lambda d: _js("kaniEvento", d), tela)
+
+    def kani_tela_ok(self):
+        """O front pergunta se este back aceita o contexto da tela em separado (senão manda junto do nome da ferramenta)."""
+        return True
 
     def kani_parar(self, cid):
         from Functions import kani

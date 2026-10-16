@@ -206,6 +206,7 @@ function ieInvalidar(L) {
 }
 function ieMudouDoc(doc = IE.doc) {
     if (!doc) return;
+    if (doc.sujo) return;   // a aba já mostra "não salvo": redesenhar as abas a cada clique custava 12–30 ms
     doc.sujo = true;
     ieAbasRender?.();
 }
@@ -484,7 +485,7 @@ function ieIrHist(i, doc = IE.doc) {
     const f = h.itens[i].foto;
     ieHistMontarEstado(f);
     h.i = i;
-    const mudouTam = f.w !== doc.w || f.h !== doc.h;
+    const mudouTam = f.w !== doc.w || f.h !== doc.h, antes = doc.camadas;
     doc.w = f.w; doc.h = f.h;
     doc.camadas = ieRestaurarCamadas(f.camadas);
     doc.ativa = f.ativa; doc.selIds = [...f.selIds]; doc.mascaraAlvo = !!f.mascaraAlvo;
@@ -495,7 +496,41 @@ function ieIrHist(i, doc = IE.doc) {
     if (doc.sel) ieSelContorno(doc);
     if (mudouTam) { doc.comp = ieCanvas(doc.w, doc.h); ieAjustarVista(doc); }
     ieMudouDoc(doc);
-    ieTudo(doc);
+    IE._cong = null;
+    const R = mudouTam ? undefined : ieHistDiferenca(antes, doc.camadas);
+    if (R === undefined) return ieTudo(doc);   // a pilha mudou (camada nova, apagada, reordenada): compõe tudo
+    if (R) ieAgendar(ieRInter(ieRInt(R), ieRDoc(doc)) || ieRDoc(doc), doc); else ieQuadroPedir();
+    ieUiTudo?.();
+}
+// desfazer/refazer: camada restaurada igual à atual (mesmos dados e os mesmos canvas) herda os caches dela (efeitos,
+// texto rasterizado, miniatura) e só o que mudou é recomposto — antes recompunha o documento inteiro (~230 ms no PSB de
+// pranchetas da Magnetus). Devolve a região a recompor, null (nada mudou na imagem) ou undefined (a pilha mudou)
+function ieHistDiferenca(antes, depois) {
+    const igual = (a, b) => {
+        if (a === b) return true;
+        if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || a instanceof HTMLCanvasElement || b instanceof HTMLCanvasElement) return false;
+        if (Array.isArray(a) !== Array.isArray(b)) return false;
+        const ka = Object.keys(a).filter(k => k[0] !== '_' && k !== 'filhos'), kb = Object.keys(b).filter(k => k[0] !== '_' && k !== 'filhos');
+        return ka.length === kb.length && ka.every(k => igual(a[k], b[k]));
+    };
+    let R = null;
+    const anda = (la, lb) => {   // true = algo mudou dentro; null = pilha diferente
+        if (la.length !== lb.length) return null;
+        let mudou = false;
+        for (let i = 0; i < la.length; i++) {
+            const a = la[i], b = lb[i];
+            if (a.id !== b.id || !!a.filhos !== !!b.filhos) return null;
+            const dentro = a.filhos ? anda(a.filhos, b.filhos) : false;
+            if (dentro === null) return null;
+            const eq = igual(a, b);
+            if (eq && !dentro) { for (const k in a) if (k[0] === '_') b[k] = a[k]; continue; }
+            mudou = true;
+            if (!eq) { const r1 = ieRCamada(a), r2 = ieRCamada(b); R = ieRUniao(ieRUniao(R, r1), r2); if (!r1 || !r2) R = ieRUniao(R, { x: -1e7, y: -1e7, w: 2e7, h: 2e7 }); }
+        }
+        return mudou;
+    };
+    const m = anda(antes, depois);
+    return m === null ? undefined : m ? R : null;
 }
 function ieDesfazer() { const d = IE.doc; if (d) ieIrHist(d.hist.i - 1, d); }
 function ieRefazer() { const d = IE.doc; if (d) ieIrHist(d.hist.i + 1, d); }
@@ -1064,8 +1099,24 @@ function ieVistaEstado(doc) {
     const c = ieEl('ie-canvas');
     return c && doc ? `${doc.id}|${doc.zoom}|${doc.px}|${doc.py}|${c.width}x${c.height}|${doc._verAchatado ? 1 : 0}` : '';
 }
-function ieVistaParcialOk(doc, R) {
-    return IE._vistaEst && IE._vistaEst === ieVistaEstado(doc) && R.w * R.h < doc.w * doc.h * 0.4 && !doc.camadas.some(L => L.prancheta);
+function ieVistaParcialOk(doc, R) {   // máscara/canal na tela: os envoltórios de ieDesenharVista desenham por cima
+    return IE._vistaEst && IE._vistaEst === ieVistaEstado(doc) && R.w * R.h < doc.w * doc.h * 0.4 && !doc.verMascara && !doc.verCanal;
+}
+// fundo da vista (branco + xadrez e a sombra): em CSS por baixo do canvas, um quadro por prancheta (com pranchetas, fora
+// delas é a área de montagem, sem xadrez). Pintado no canvas, o xadrez custava 10–30 ms por quadro de zoom/rolagem/arraste
+// (PSB 2262×3449 com 4 pranchetas) e obrigava a vista inteira a cada quadro; em CSS o compositor desenha à parte.
+function ieVistaFundo(doc) {
+    const v = ieEl('ie-vista');
+    if (!v) return;
+    let f = v.querySelector(':scope > .ie-fundo');
+    if (!f) { f = document.createElement('div'); f.className = 'ie-fundo'; v.insertBefore(f, v.firstChild); }
+    const areas = !doc ? [] : doc.camadas.some(L => L.prancheta) ? doc.camadas.filter(L => L.prancheta && L.visivel).map(L => L.prancheta) : [{ x: 0, y: 0, w: doc.w, h: doc.h }];
+    while (f.children.length > areas.length) f.lastChild.remove();
+    while (f.children.length < areas.length) f.appendChild(document.createElement('i'));
+    areas.forEach((P, i) => {
+        const st = f.children[i].style, css = `left:${doc.px + P.x * doc.zoom}px;top:${doc.py + P.y * doc.zoom}px;width:${P.w * doc.zoom}px;height:${P.h * doc.zoom}px`;
+        if (st.cssText !== css) st.cssText = css;
+    });
 }
 function ieDesenharVistaParcial(doc, R) {
     const c = ieEl('ie-canvas'), ctx = ieCtx(c), dpr = window.devicePixelRatio || 1, s = doc.zoom * dpr;
@@ -1076,11 +1127,7 @@ function ieDesenharVistaParcial(doc, R) {
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
-    ctx.clearRect(x0, y0, x1 - x0, y1 - y0);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);   // fundo branco + xadrez (origem no canto do documento, como a vista inteira)
-    ctx.fillStyle = '#fff'; ctx.fillRect(x0 / dpr, y0 / dpr, (x1 - x0) / dpr, (y1 - y0) / dpr);
-    ctx.translate(doc.px, doc.py); ctx.fillStyle = ieXadrezPadrao(ctx); ctx.fillRect(x0 / dpr - doc.px, y0 / dpr - doc.py, (x1 - x0) / dpr, (y1 - y0) / dpr);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(x0, y0, x1 - x0, y1 - y0);   // o xadrez fica por baixo, em CSS (ieVistaFundo)
     const fonte = doc._verAchatado && doc.achatadoC ? doc.achatadoC : doc.comp;
     ctx.imageSmoothingEnabled = !(Math.abs(s - 1) < 1e-3 || s >= 3 || (s > 1 && Math.abs(s - Math.round(s)) < 1e-3));
     ctx.imageSmoothingQuality = 'high';
@@ -1208,24 +1255,9 @@ function ieDesenharVista() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, c.width, c.height);
     const doc = IE.doc;
+    ieVistaFundo(doc);
     if (!doc) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // com pranchetas, fora delas é a área de montagem (sem xadrez): sombra e xadrez só em cada prancheta
-    const areas = doc.camadas.some(L => L.prancheta) ? doc.camadas.filter(L => L.prancheta && L.visivel).map(L => L.prancheta) : [{ x: 0, y: 0, w: doc.w, h: doc.h }];
-    for (const P of areas) {
-        const x = doc.px + P.x * doc.zoom, y = doc.py + P.y * doc.zoom, w = P.w * doc.zoom, h = P.h * doc.zoom;
-        ctx.save();
-        ctx.shadowColor = 'rgba(0,0,0,.6)';
-        ctx.shadowBlur = 18;
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(x, y, w, h);
-        ctx.restore();
-        ctx.fillStyle = ieXadrezPadrao(ctx);
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.fillRect(0, 0, w, h);
-        ctx.restore();
-    }
     const fonte = doc._verAchatado && doc.achatadoC ? doc.achatadoC : doc.comp;
     ieDesenharNitido(ctx, fonte, doc, dpr);
     IE._vistaEst = ieVistaEstado(doc);

@@ -299,8 +299,11 @@ async function kaniEnviar(texto) {
         const tx = document.getElementById('kani-txt'); tx.value = ''; tx.style.height = 'auto';
         kaniGuardar(); kaniRender(); return null;
     }
-    // pedido composto (ou "Pensar em etapas" ligado): a Kani trabalha em etapas (kani_agente.py)
-    if (KANI.etapas || await kaniApi().kani_agente_precisa?.(texto).catch(() => false)) { kaniAgenteIniciar(texto); return null; }
+    // pedido composto (ou "Pensar em etapas" ligado): a Kani trabalha em etapas (kani_agente.py). Pergunta sobre o que
+    // está aberto ("esse título", "quantas camadas tem esse documento") fica na conversa, que recebe o resumo da tela
+    const sobreTela = typeof kaniContextoTela === 'function' && kaniContextoTela()
+        && /\b(ess[ea]s?|dess[ea]s?|nest[ea]s?|nesse|nessa|est[ea]s?|dest[ea]s?|selecionad\w*|na tela|aberto|documento|camadas?|clipes?|timeline|slides?|projeto)\b/i.test(texto);
+    if (KANI.etapas || (!sobreTela && await kaniApi().kani_agente_precisa?.(texto).catch(() => false))) { kaniAgenteIniciar(texto); return null; }
     // pedido de criar (imagem, efeito sonoro, narração, vinheta): vai para o motor certo, não para a conversa.
     // Logo depois de uma criação, "e se fosse...", "agora com..." refaz a mesma com a mudança (pedido original + mudança)
     const c0 = KANI.conversa, ult = c0.msgs.length ? c0.msgs[c0.msgs.length - 1] : null;
@@ -322,7 +325,12 @@ async function kaniEnviar(texto) {
     // criações ficam fora do histórico da conversa: com "Pronto! Criei a vinheta (...)" nele, a IA imitava e dizia que
     // tinha criado um arquivo que não existia
     const hist = c.msgs.slice(0, -1).filter((m, i, l) => !m.criacao && !m.agente && !(l[i + 1] && (l[i + 1].criacao || l[i + 1].agente))).map(m => ({ role: m.role, content: m.content }));
-    const r = await kaniApi().kani_enviar(id, hist, kaniFerramentaAtual()).catch(e => ({ success: false, error: e.message }));
+    // contexto da tela (kani-tela.js): lido só agora, na hora de enviar. Back antigo (sem kani_tela_ok): vai junto do
+    // nome da ferramenta, que o prompt já mostra
+    const tela = typeof kaniContextoTela === 'function' ? kaniContextoTela() : '', api = kaniApi();
+    const r = await (api.kani_tela_ok ? api.kani_enviar(id, hist, kaniFerramentaAtual(), tela)
+        : api.kani_enviar(id, hist, tela ? `${kaniFerramentaAtual()}\nO que está na tela agora:\n${tela}` : kaniFerramentaAtual()))
+        .catch(e => ({ success: false, error: e.message }));
     if (!r || !r.success) window.kaniEvento({ id, erro: (r && r.error) || 'falhou' });
     return id;
 }
