@@ -1,5 +1,5 @@
 // =========================================================
-// Editor Kanivete — CENA 3D (camadas 3D como no After Effects 2024+): modelos .glb/.gltf/.obj (com a animação que vier
+// Vídeo Kanivete — CENA 3D (camadas 3D como no After Effects 2024+): modelos .glb/.gltf/.obj (com a animação que vier
 // neles) e primitivas, câmera em órbita, luz principal com sombra, ambiente de estúdio (reflexos PBR), chão que só
 // recebe sombra, fundo transparente — tudo com quadros-chave. three.js r170 local (frontend/vendor/three, MIT).
 // A mídia é um VÍDEO COM ALFA, como a Comp: { kind:'video', c3d: cena, c3dSig, path }. O monitor desenha AO VIVO
@@ -64,6 +64,21 @@ function ve3dTremido(md, t) {
 }
 const ve3dChave = m => JSON.stringify([m.c3d.modelos.map(md => [md.id, md.fonte]), m.c3d.chao !== false]);   // o que exige remontar a cena
 const VE3D_VERSAO = 6;   // subir quando o desenho mudar (foco, neblina, materiais): os .mov do cache ficam velhos
+// Contexto da cena: a timeline do Editor ou a casa própria da Lux (lux.js põe V3.casa = LUXC: { m, c, t, w, h, fps,
+// hist }). A tela 3D, os painéis e a API leem tempo, tamanho, seleção e histórico daqui, nunca direto do VE: assim a
+// Lux abre sem o Editor. Prévia do monitor, cache e exportação do Editor continuam no VE.
+const V3 = {
+    casa: null,
+    get lux() { return !!this.casa; },
+    get t() { return this.casa ? this.casa.t : VE.playhead; },
+    set t(v) { if (this.casa) this.casa.t = v; else VE.playhead = v; },
+    get w() { return this.casa ? this.casa.w : VE.seqW; },
+    get h() { return this.casa ? this.casa.h : VE.seqH; },
+    get fps() { return this.casa ? this.casa.fps : VE.fps; },
+    hist() { if (this.casa) this.casa.hist(); else vePushHistory(); },
+    ir(t) { if (!this.casa) return veSeek(t); const c = this.casa.c; this.casa.t = Math.max(c.st, Math.min(veEnd(c) - 1e-4, +t || 0)); },
+    clipe() { return this.casa ? this.casa.c : VE.clips[VE.sel]; },
+};
 const ve3dSig = m => 'c3d.' + vePrHash(JSON.stringify([VE3D_VERSAO, m.c3d, VE.seqW, VE.seqH, VE.fps, +m.dur || 0]));
 
 async function ve3dCarregarModelo(md, L) {
@@ -281,7 +296,7 @@ function ve3dLiberar(rt) {
 // no máximo 4 cenas montadas na memória; as que não estão na timeline aberta saem primeiro (voltam montando se precisar)
 function ve3dPodar(manter) {
     if (VE3D.rt.size <= 4) return;
-    const usadas = new Set(VE.clips.map(c => c.m || 0));
+    const usadas = new Set(VE.clips.map(c => c.m || 0)); if (V3.casa && V3.casa.m) usadas.add(V3.casa.m.id);
     const fora = [...VE3D.rt.entries()].filter(([id]) => id !== manter && !usadas.has(id)).sort((a, b) => (a[1].uso || 0) - (b[1].uso || 0));
     for (const [id, e] of fora) { if (VE3D.rt.size <= 4) break; if (e.prom && !e.rt) continue; ve3dLiberar(e.rt); VE3D.rt.delete(id); }
 }
@@ -484,6 +499,7 @@ function ve3dNova(op = {}) {
 const VE3D_OCIOSO = 12000;
 const ve3dOcupado = () => VE.playing || !!(typeof VE3T !== 'undefined' && VE3T.el && VE3T.raf && VE3T.el.isConnected && !VE3T.el.hidden);
 function ve3dMudou(m) {   // a cena mudou: o monitor desenha ao vivo e o arquivo é refeito quando o app ficar parado
+    if (m._lux) { if (V3.casa) V3.casa.sujo = true; return; }   // cena da Lux: não mexe no projeto do Editor
     m._aoVivo = true; VE.dirty = true; veCacheInvalidate(); if (VE.ready) veDrawMonitorSoon();
     VE3D.mexeu = performance.now();
     clearTimeout(VE3D.timer); VE3D.timer = setTimeout(ve3dVerificar, VE3D_OCIOSO);
@@ -551,8 +567,9 @@ async function ve3dProntas(aviso) {
 
 // ── API (agente, Worker e a interface usam a mesma) ──
 function ve3dAlvo(ref) {   // mídia da cena: id da mídia, nome, ou o clipe selecionado
+    if (V3.casa && V3.casa.m && (ref == null || ref === V3.casa.m.id)) return V3.casa.m;   // Lux aberta: a cena dela
     if (ref != null) { const m = typeof ref === 'number' ? VE.media[ref] : VE.media.find(x => x && ve3dEh(x) && x.name === ref); if (ve3dEh(m)) return m; }
-    const c = (typeof veSelLista === 'function' ? veSelLista() : []).find(c => ve3dEh(veMediaOf(c))) || VE.clips.find(c => ve3dEh(veMediaOf(c)) && VE.playhead >= c.st && VE.playhead < veEnd(c));
+    const c = (typeof veSelLista === 'function' ? veSelLista() : []).find(c => ve3dEh(veMediaOf(c))) || VE.clips.find(c => ve3dEh(veMediaOf(c)) && V3.t >= c.st && V3.t < veEnd(c));
     const m = c && veMediaOf(c); if (!ve3dEh(m)) throw new Error('nenhuma cena 3D selecionada'); return m;
 }
 function ve3dObj(m, quem) { const C = m.c3d; if (quem === 'camera') return C.camera; if (quem === 'luz') return C.luz; if (quem === 'cenario') return ve3dCenario(C); const md = C.modelos.find(x => x.id === quem || x.nome === quem); if (!md) throw new Error(`modelo "${quem}" não existe na cena`); return md; }
@@ -564,7 +581,7 @@ window.VE3DAPI = {
     async modelo(op = {}) {
         const m = ve3dAlvo(op.cena);
         if (op.arquivo) await ve3dPrepararArquivo(op.arquivo);   // falha (sem Blender, arquivo ruim) antes de mexer na cena
-        vePushHistory();
+        V3.hist();
         const id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
         const extra = { ...(op.cor ? { cor: op.cor } : {}), ...(op.material ? { material: op.material } : {}), ...(op.textura ? { textura: op.textura, texRep: op.texRep || 1 } : {}) };
         const fonte = op.embalagem ? { tipo: 'embalagem', produto: op.embalagem, material: op.material || 'softtouch', cores: op.cores || {}, ...(op.rotulo ? { rotulo: op.rotulo } : {}) }
@@ -581,7 +598,7 @@ window.VE3DAPI = {
     // parte (nome do material: só nela; ver partes())}
     async aparencia(quem, op = {}, cena) {
         const m = ve3dAlvo(cena), md = ve3dObj(m, quem); if (!md.fonte || md.fonte.tipo === 'vetor') throw new Error('objeto do Vetor: troque a arte no Vetor');
-        vePushHistory(); const f = md.fonte = JSON.parse(JSON.stringify(md.fonte));
+        V3.hist(); const f = md.fonte = JSON.parse(JSON.stringify(md.fonte));
         const alvo = op.parte ? ((f.partes = f.partes || {})[op.parte] = f.partes[op.parte] || {}) : f;
         for (const k of ['cor', 'material', 'textura', 'texRep']) if (k in op) { if (op[k] == null || op[k] === '') delete alvo[k]; else alvo[k] = op[k]; }
         if (op.parte && !Object.keys(alvo).length) delete f.partes[op.parte];
@@ -593,25 +610,25 @@ window.VE3DAPI = {
     async partes(quem, cena) { const m = ve3dAlvo(cena), md = ve3dObj(m, quem), rt = await ve3dGarantir(m); const o = rt.objs.find(x => x.md.id === md.id); return o ? o.partes : []; },
     // duplicar: cópia com as mesmas propriedades e quadros-chave, um pouco ao lado
     duplicar(quem, cena) {
-        const m = ve3dAlvo(cena), md = ve3dObj(m, quem); vePushHistory();
+        const m = ve3dAlvo(cena), md = ve3dObj(m, quem); V3.hist();
         const n = JSON.parse(JSON.stringify(md)); n.id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
         n.nome = `${md.nome} ${veT('cópia')}`; n.p.x = Math.round(((n.p.x || 0) + 0.4 * (n.p.esc ?? 1)) * 1000) / 1000;
         if (n.kf && n.kf.x) n.kf.x = n.kf.x.map(([t, v, s]) => [t, typeof v === 'number' ? v + 0.4 * (n.p.esc ?? 1) : v, s]);
         m.c3d.modelos.splice(m.c3d.modelos.indexOf(md) + 1, 0, n); ve3dMudou(m); return { id: n.id };
     },
-    renomear(quem, nome, cena) { const m = ve3dAlvo(cena), md = ve3dObj(m, quem); if (!String(nome || '').trim()) return md.nome; vePushHistory(); md.nome = String(nome).trim(); ve3dMudou(m); return md.nome; },
+    renomear(quem, nome, cena) { const m = ve3dAlvo(cena), md = ve3dObj(m, quem); if (!String(nome || '').trim()) return md.nome; V3.hist(); md.nome = String(nome).trim(); ve3dMudou(m); return md.nome; },
     // zerar: volta posição/giro/escala ao padrão (no chão, no centro); chao: só apoia no chão (y = 0)
     zerar(quem, op = {}, cena) {
-        const m = ve3dAlvo(cena), md = ve3dObj(m, quem); vePushHistory();
+        const m = ve3dAlvo(cena), md = ve3dObj(m, quem); V3.hist();
         const ks = op.chao ? ['y'] : ['x', 'y', 'z', 'rx', 'ry', 'rz', 'esc', 'sx', 'sy', 'sz'];
         for (const k of ks) { delete md.kf[k]; if (k === 'esc') md.p.esc = 1; else if (/^s[xyz]$/.test(k)) delete md.p[k]; else md.p[k] = 0; }
         ve3dMudou(m); return md.p;
     },
     // definir: valor fixo (sem quadro-chave) de camera|luz|<modelo>.prop
-    definir(quem, valores, cena) { const m = ve3dAlvo(cena), o = ve3dObj(m, quem); vePushHistory(); Object.assign(o.p, valores); ve3dMudou(m); return o.p; },
+    definir(quem, valores, cena) { const m = ve3dAlvo(cena), o = ve3dObj(m, quem); V3.hist(); Object.assign(o.p, valores); ve3dMudou(m); return o.p; },
     // kf: quadro-chave em t (s dentro do clipe) — valores {prop: número}; suave (padrão) ou linear
     kf(quem, t, valores, op = {}) {
-        const m = ve3dAlvo(op.cena), o = ve3dObj(m, quem); vePushHistory();
+        const m = ve3dAlvo(op.cena), o = ve3dObj(m, quem); V3.hist();
         for (const [k, v] of Object.entries(valores)) {
             const l = (o.kf[k] = o.kf[k] || []).filter(x => Math.abs(x[0] - t) > 1e-6); l.push([+t, v, op.linear ? 'linear' : 'suave']); l.sort((a, b) => a[0] - b[0]); o.kf[k] = l;
         }
@@ -627,9 +644,9 @@ window.VE3DAPI = {
         const e = new T.Euler().setFromRotationMatrix(Rt, 'XYZ');
         return VE3DAPI.modelo({ cena: m.id, nome: op.nome || 'Vetor 3D', vetor: op.desc, rx: e.x / rad, ry: e.y / rad, rz: e.z / rad, esc: op.esc ?? 1, x: op.x || 0 });
     },
-    limparKf(quem, prop, cena) { const m = ve3dAlvo(cena), o = ve3dObj(m, quem); vePushHistory(); if (prop) delete o.kf[prop]; else o.kf = {}; ve3dMudou(m); return true; },
-    cena(op = {}) { const m = ve3dAlvo(op.cena); vePushHistory(); if ('fundo' in op) m.c3d.fundo = op.fundo || null; if ('chao' in op) m.c3d.chao = !!op.chao; if (op.dur) { m.dur = +op.dur; m.info.duration = m.dur; } ve3dMudou(m); return m.c3d; },
-    remover(quem, cena) { const m = ve3dAlvo(cena); vePushHistory(); m.c3d.modelos = m.c3d.modelos.filter(x => x.id !== quem && x.nome !== quem); ve3dMudou(m); return m.c3d.modelos.length; },
+    limparKf(quem, prop, cena) { const m = ve3dAlvo(cena), o = ve3dObj(m, quem); V3.hist(); if (prop) delete o.kf[prop]; else o.kf = {}; ve3dMudou(m); return true; },
+    cena(op = {}) { const m = ve3dAlvo(op.cena); V3.hist(); if ('fundo' in op) m.c3d.fundo = op.fundo || null; if ('chao' in op) m.c3d.chao = !!op.chao; if (op.dur) { m.dur = +op.dur; m.info.duration = m.dur; } ve3dMudou(m); return m.c3d; },
+    remover(quem, cena) { const m = ve3dAlvo(cena); V3.hist(); m.c3d.modelos = m.c3d.modelos.filter(x => x.id !== quem && x.nome !== quem); ve3dMudou(m); return m.c3d.modelos.length; },
     info(cena) { const m = ve3dAlvo(cena); return { midia: m.id, nome: m.name, dur: m.dur, renderizada: m.c3dSig === ve3dSig(m) && !!m.path, path: m.path, modelos: m.c3d.modelos.map(x => ({ id: x.id, nome: x.nome, fonte: x.fonte, p: x.p, kf: Object.keys(x.kf) })),
         camera: m.c3d.camera, luz: m.c3d.luz }; },
     renderizar: async cena => {   // espera a que estiver no meio (o fundo renderiza sozinho) em vez de rodar duas juntas
@@ -638,7 +655,7 @@ window.VE3DAPI = {
         if (m.c3dSig !== ve3dSig(m) || !m.path) await ve3dRenderizar(m);
         return { path: m.path, ok: m.c3dSig === ve3dSig(m), erro: VE3D.falhas.get(ve3dSig(m)) };
     },
-    quadro(t, cena, w = 640) { const m = ve3dAlvo(cena), rt = ve3dRuntime(m); if (!rt) return null; ve3dAplicar(rt, m, t, w, w * VE.seqH / VE.seqW); return rt.cv.toDataURL('image/png'); },
+    quadro(t, cena, w = 640) { const m = ve3dAlvo(cena), rt = ve3dRuntime(m); if (!rt) return null; ve3dAplicar(rt, m, t, w, w * V3.h / V3.w); return rt.cv.toDataURL('image/png'); },
 };
 // a verificação das Comps (troca de timeline, abrir projeto) também confere as cenas 3D
 if (typeof veCompVerificar === 'function') { const _v = veCompVerificar; veCompVerificar = function () { const r = _v.apply(this, arguments); clearTimeout(VE3D.timer); VE3D.timer = setTimeout(ve3dVerificar, 1500); return r; }; }
@@ -695,9 +712,9 @@ async function ve3dSoltar(caminhos) {
     }
 }
 function ve3dPainelHtml(c, so) {   // so (tela 3D): só a parte do objeto selecionado — camera, luz, cenario ou id do modelo
-    const m = veMediaOf(c), C = m.c3d, t = Math.max(0, veSrcAt(c, VE.playhead));
+    const m = veMediaOf(c), C = m.c3d, t = Math.max(0, veSrcAt(c, V3.t));
     const lin = (quem, o, k, rot, min, max, passo, un = '', pad, dica) => {
-        const v = ve3dVal(o, k, t) ?? pad, kf = (o.kf && o.kf[k]) || [], anim = kf.length > 0, aqui = kf.some(x => Math.abs(x[0] - t) < 0.5 / (VE.fps || 30));
+        const v = ve3dVal(o, k, t) ?? pad, kf = (o.kf && o.kf[k]) || [], anim = kf.length > 0, aqui = kf.some(x => Math.abs(x[0] - t) < 0.5 / (V3.fps || 30));
         const vt = v == null ? '' : Math.round(v * 1000) / 1000;
         return `<div class="ve-pp-l ve-p3d"><label${dica ? ` title="${veT(dica)}"` : ''}>${veT(rot)}</label><input type="range" data-p3d="${quem}|${k}" min="${min}" max="${max}" step="${passo}" value="${v ?? (min + max) / 2}">
             <span class="ve-prop-num"><input type="number" data-p3d="${quem}|${k}" step="${passo}" value="${vt}" placeholder="auto"><i>${un}</i></span>
@@ -765,11 +782,11 @@ function ve3dAparenciaHtml(md) {
         <small class="ve-pp-dica">${veT(partes.length > 1 ? 'Imagem = rótulo, estampa ou textura. Escolha a parte (ex.: corpo da lata) para aplicar só nela.' : 'Imagem = rótulo, estampa ou textura no modelo inteiro (modelo sem mapa de textura recebe a imagem por lado).')}</small>`);
 }
 function ve3dEvento(el, tipo) {
-    const c = VE.clips[VE.sel], m = c && veMediaOf(c); if (!ve3dEh(m)) return;
-    const t = Math.max(0, veSrcAt(c, VE.playhead));
+    const c = V3.clipe(), m = c && veMediaOf(c); if (!ve3dEh(m)) return;
+    const t = Math.max(0, veSrcAt(c, V3.t));
     if (el.dataset.p3dcena) {
         if (tipo === 'input' && el.type === 'checkbox') return;
-        vePushHistory(); const k = el.dataset.p3dcena;
+        V3.hist(); const k = el.dataset.p3dcena;
         if (k === 'chao') m.c3d.chao = el.checked;
         if (k === 'transparente') m.c3d.fundo = el.checked ? null : (m.c3d.fundo || '#202020');
         if (k === 'fundo' && !el.disabled) m.c3d.fundo = el.value;
@@ -808,7 +825,7 @@ function ve3dEvento(el, tipo) {
         return;
     }
     if (el.dataset.p3dkf) {
-        const [quem, k] = el.dataset.p3dkf.split('|'), o = ve3dObj(m, quem); vePushHistory();
+        const [quem, k] = el.dataset.p3dkf.split('|'), o = ve3dObj(m, quem); V3.hist();
         if (o.kf[k] && o.kf[k].length) { o.p[k] = ve3dVal(o, k, t); delete o.kf[k]; }
         else { const v = ve3dVal(o, k, t) ?? (k === 'dist' ? 3.2 : 0); o.kf[k] = [[+t.toFixed(4), v, 'suave']]; }
         ve3dMudou(m); ve3dPainel(); return;
@@ -816,10 +833,10 @@ function ve3dEvento(el, tipo) {
     const [quem, k] = el.dataset.p3d.split('|'), o = ve3dObj(m, quem);
     let v = el.type === 'color' ? el.value : el.value === '' ? null : parseFloat(String(el.value).replace(',', '.'));
     if (typeof v === 'number' && !isFinite(v)) return;
-    if (tipo === 'input' && !VE._p3dEdit) { vePushHistory(); VE._p3dEdit = true; }
+    if (tipo === 'input' && !VE._p3dEdit) { V3.hist(); VE._p3dEdit = true; }
     if (tipo !== 'input') VE._p3dEdit = false;
     if (o.kf[k] && o.kf[k].length && typeof v === 'number') {   // animado: grava (ou troca) o quadro-chave neste tempo
-        const l = o.kf[k].filter(x => Math.abs(x[0] - t) > 0.5 / (VE.fps || 30)); l.push([+t.toFixed(4), v, 'suave']); l.sort((a, b) => a[0] - b[0]); o.kf[k] = l;
+        const l = o.kf[k].filter(x => Math.abs(x[0] - t) > 0.5 / (V3.fps || 30)); l.push([+t.toFixed(4), v, 'suave']); l.sort((a, b) => a[0] - b[0]); o.kf[k] = l;
     } else o.p[k] = v;
     const linha = el.closest('.ve-p3d'); if (linha) linha.querySelectorAll('[data-p3d]').forEach(x => { if (x !== el && v != null) x.value = x.type === 'number' ? Math.round(v * 1000) / 1000 : v; });
     ve3dMudou(m);

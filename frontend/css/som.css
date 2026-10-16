@@ -38,7 +38,7 @@
 .sk-exp { display: flex; flex-direction: column; gap: 10px; min-width: 340px; }
 .sk-exp label { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 8px; }
 .sk .ie-inicio { position: absolute; inset: 0; }
-.al-sk { --al: #ffd166; --al-fundo: #2a2008; }   /* Sound Kanivete: dourado */
+.al-sk { --al: #7fd6ff; --al-fundo: #0a2230; }   /* Sound Kanivete: azul clarinho */
 .hd-sk { --al: #ffd166; }
 
 .sk-texto { line-height: 1.7; color: var(--text); font-size: 13px; max-height: 60vh; overflow-y: auto; padding: 6px; background: #120f0d; border-radius: 6px; }
@@ -182,7 +182,7 @@
 .sk-pnl .sk-exp label { grid-template-columns: 110px minmax(0, 1fr); }
 .sk-pnl .sk-exp label.sk-chk { display: flex; }
 
-/* tela inicial no padrão do Editor Kanivete (cartão com imagem, Novo projeto, modelos, recentes, recuperar) */
+/* tela inicial no padrão do Vídeo Kanivete (cartão com imagem, Novo projeto, modelos, recentes, recuperar) */
 .sk-start { position: absolute; inset: var(--sk-top, 46px) 0 0 0; z-index: 8; display: grid; place-items: start center; padding: 6vh 28px 28px; overflow: auto; background: var(--bg-0, #121212); }
 .sk-start[hidden] { display: none; }
 .sk-start-inner { width: min(980px, 100%); display: flex; flex-direction: column; gap: 22px; }

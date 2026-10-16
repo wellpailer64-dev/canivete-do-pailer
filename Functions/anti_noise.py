@@ -1,5 +1,5 @@
 """
-Anti Noise (efeito de áudio do Editor Kanivete): tira o ruído de fundo com o DeepFilterNet3 (rede neural).
+Anti Noise (efeito de áudio do Vídeo Kanivete): tira o ruído de fundo com o DeepFilterNet3 (rede neural).
 
 Usa o executável oficial do DeepFilterNet (Rust, modelo embutido, só processador: ~8x mais rápido que o tempo
 real), baixado na primeira vez para modelos_ia/deepfilter/. Cada arquivo é limpo UMA vez: o .wav limpo fica no

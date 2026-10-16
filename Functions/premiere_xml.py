@@ -1,4 +1,4 @@
-"""Exportar o projeto do Editor Kanivete (.vknv) como XML do Final Cut Pro 7 (xmeml v4), que o Premiere Pro abre
+"""Exportar o projeto do Vídeo Kanivete (.vknv) como XML do Final Cut Pro 7 (xmeml v4), que o Premiere Pro abre
 em Arquivo › Importar. É a volta do Functions/premiere.py (que lê o .prproj): Kanivete → XML → Premiere.
 
 Vão: todas as timelines (sequências aninhadas viram clipes de sequência), cortes, trilhas (oculta/muda/travada),

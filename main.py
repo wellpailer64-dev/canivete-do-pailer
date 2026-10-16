@@ -4954,7 +4954,7 @@ def _janela_solta_propria(chrome, sender, args):
 
     adiado = args.GetDeferral()
     form = WinForms.Form()
-    form.Text = "Editor Kanivete"
+    form.Text = "Vídeo Kanivete"
     form.BackColor = Color.FromArgb(255, 8, 8, 8)
     try:
         form.Icon = chrome.form.Icon

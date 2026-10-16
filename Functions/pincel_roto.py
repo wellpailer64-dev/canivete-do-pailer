@@ -1,5 +1,5 @@
 """
-pincel_roto.py — Pincel Roto do Editor Kanivete (o Roto Brush do After Effects): recorta uma pessoa/objeto do vídeo a
+pincel_roto.py — Pincel Roto do Vídeo Kanivete (o Roto Brush do After Effects): recorta uma pessoa/objeto do vídeo a
 partir de traços num quadro-base e segue sozinho pelos outros quadros.
 
 Motor: SAM 2.1 Hiera-Tiny de vídeo em ONNX (square-zero-labs/sam2.1-tiny-video-onnx, Apache-2.0, 182 MB, baixado no

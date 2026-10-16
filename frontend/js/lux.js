@@ -1,51 +1,96 @@
 // =========================================================
-// Lux Kanivete (Lk, amarelo) — a Cena 3D como ferramenta própria: embalagens, luzes (softbox, spot, ponto, sol),
-// materiais do Blender e render fotorrealista. Entra pela barra lateral (categoria 3D) e pela Home sem passar pelo
-// Editor; do Editor, duplo clique numa cena 3D abre a mesma ferramenta. O motor é o mesmo da Cena 3D
-// (editor-3d*.js: a cena mora no projeto do Editor — histórico, Ctrl+S, timeline); aqui só a porta de entrada, a marca
-// e a volta. Abrir: a cena selecionada, a última cena 3D da timeline ou uma nova (5 s, fundo transparente e Estúdio 3 pontos).
+// Lux Kanivete (Lk, magenta) — a Cena 3D como ferramenta própria: embalagens, luzes (softbox, spot, ponto, sol),
+// materiais do Blender e render fotorrealista. Entra pela barra lateral (categoria 3D) e pela Home SEM o Editor: a cena
+// mora numa casa própria (LUXC: cena, tempo, tamanho, desfazer), fora do projeto do Editor. O motor é o mesmo da Cena 3D
+// (editor-3d*.js), que lê tudo pela tomada V3 (editor-3d.js). Do Editor, duplo clique numa cena 3D da timeline abre a
+// mesma tela com a cena da timeline; "Enviar ao Editor" copia a cena da Lux para a timeline.
 // =========================================================
 
 const LUX = { de: 'home', nome: 'Lux Kanivete', sigla: 'Lk' };
+const LUX_RASCUNHO = 'lux-rascunho';   // a cena aberta volta depois de fechar o app (até salvar um .lknv)
+const LUXC = {
+    m: null, c: null, t: 0, w: 1920, h: 1080, fps: 30, sujo: false, desfazer: [], refazer: [],
+    hist() { this.desfazer.push(luxFoto()); if (this.desfazer.length > 100) this.desfazer.shift(); this.refazer = []; this.sujo = true; luxGuardarLogo(); },
+};
+const luxFoto = () => JSON.stringify({ c3d: LUXC.m.c3d, dur: LUXC.m.dur });
+
+// monta a casa com uma cena (dados de um .lknv, do rascunho ou nova)
+function luxCasa(dados = {}, arquivo = null) {
+    LUXC.w = +dados.largura || 1920; LUXC.h = +dados.altura || 1080; LUXC.fps = +dados.fps || 30;
+    const dur = +dados.duracao || 5;
+    const m = { id: 'lux', kind: 'video', c3d: dados.c3d || ve3dPadrao(), name: dados.nome || (arquivo ? luxNomeArq(arquivo) : veT('Cena') + ' 1'),
+        cor: VE3D_COR, path: null, dur, _lux: true, info: { duration: dur, width: LUXC.w, height: LUXC.h, fps: LUXC.fps, has_audio: false, alfa: true } };
+    if (arquivo) m.lux = { arquivo };
+    LUXC.m = m; LUXC.c = { tr: 0, st: 0, s: 0, get e() { return +m.dur || 5; }, m: m.id, _m: m };
+    LUXC.t = 0; LUXC.desfazer = []; LUXC.refazer = []; LUXC.sujo = false;
+}
+function luxGuardar() {
+    if (!LUXC.m) return;
+    const m = LUXC.m, d = { nome: m.name, c3d: m.c3d, largura: LUXC.w, altura: LUXC.h, fps: LUXC.fps, duracao: m.dur };
+    try { localStorage.setItem(LUX_RASCUNHO, JSON.stringify({ dados: d, arquivo: m.lux && m.lux.arquivo, sujo: LUXC.sujo })); } catch (e) { /* só nesta sessão */ }
+}
+function luxGuardarLogo() { clearTimeout(LUXC.tg); LUXC.tg = setTimeout(luxGuardar, 1500); }
+function luxRascunho() { try { return JSON.parse(localStorage.getItem(LUX_RASCUNHO) || 'null'); } catch (e) { return null; } }
 
 async function luxAbrir(op = {}) {
     const antes = document.querySelector('.menu-item.active')?.dataset.tool;
     if (antes && antes !== 'lux-kanivete') LUX.de = antes;
-    switchTool('video-cutter');   // o motor da cena mora no Editor (fica atrás da janela da Lux)
-    document.querySelectorAll('.menu-item').forEach(i => i.classList.toggle('active', i.dataset.tool === 'lux-kanivete'));
-    const tt = document.getElementById('tool-title'); if (tt) tt.textContent = LUX.nome;
-    await new Promise(r => setTimeout(r, 30));
+    if (op.nova && LUXC.m && LUXC.sujo && !confirm(veT('A cena atual tem mudanças não salvas. Começar outra mesmo assim?'))) return;
+    if (VE.playing) veStop();
+    LUX.abrindo = true; try { switchTool('lux-kanivete'); } finally { LUX.abrindo = false; }
+    V3.casa = LUXC; VE3T.lux = true;
     try {
-        const nova = op.nova || op.dados;
-        let c = nova ? null : VE.clips[VE.sel];
-        if (!(c && ve3dEh(veMediaOf(c)))) c = nova ? null : [...VE.clips].reverse().find(x => ve3dEh(veMediaOf(x)));
-        if (!c) c = op.dados ? luxCenaDe(op.dados, op.arquivo) : await luxNovaCena();
-        VE3T.lux = true;
-        await ve3dTelaAbrir(c);
-    } catch (e) { VE3T.lux = false; veToast(e.message || String(e)); }
+        if (op.dados) luxCasa(op.dados, op.arquivo);
+        else if (op.nova || !LUXC.m) {
+            const r = !op.nova && luxRascunho();
+            if (r && r.dados) { luxCasa(r.dados, r.arquivo); LUXC.sujo = !!r.sujo; }
+            else await luxNovaCena();
+        }
+        await ve3dTelaAbrir(LUXC.c);
+    } catch (e) { VE3T.lux = false; V3.casa = null; veToast(e.message || String(e)); }
 }
 // cena nova pronta para produto: um pote no centro, fundo transparente e as quatro softboxes do estúdio de agência
 async function luxNovaCena() {
-    const n = VE.media.filter(m => m && !m.removido && ve3dEh(m)).length;
-    const r = ve3dNova({ dur: 5, st: 0, nome: `${veT('Cena')} ${n + 1}` }), m = VE.media[r.midia];
+    luxCasa({ nome: `${veT('Cena')} 1` });
     // fundo transparente (padrão do Kanivete: PNG com sombra, pronto para compor); estúdio infinito é opção no Cenário
-    await VE3DAPI.modelo({ embalagem: 'pote', cena: m.id });   // começa com um produto no centro (troca no painel)
-    await VE3DAPI.estudio3pontos({ cena: m.id });
-    return VE.clips[r.clipe];
+    await VE3DAPI.modelo({ embalagem: 'pote', cena: LUXC.m.id });   // começa com um produto no centro (troca no painel)
+    await VE3DAPI.estudio3pontos({ cena: LUXC.m.id });
+    LUXC.desfazer = []; LUXC.sujo = false;
 }
-// cena vinda de um .lknv (lux-ui.js luxAbrirArquivo): entra na timeline e lembra o arquivo (Ctrl+S grava nele)
-function luxCenaDe(dados, arquivo) {
-    const r = ve3dNova({ dur: +dados.duracao || 5, st: 0, nome: dados.nome || luxNomeArq(arquivo), cena: dados.c3d }), m = VE.media[r.midia];
-    m.lux = { arquivo };
-    return VE.clips[r.clipe];
+// Ctrl+Z / Ctrl+Shift+Z da Lux: fotos da cena (c3d + duração), separadas do histórico do Editor
+function luxDesfazer(volta = false) {
+    const de = volta ? LUXC.refazer : LUXC.desfazer, para = volta ? LUXC.desfazer : LUXC.refazer;
+    if (!LUXC.m || !de.length) return;
+    para.push(luxFoto());
+    const f = JSON.parse(de.pop()), m = LUXC.m;
+    m.c3d = f.c3d; m.dur = f.dur; m.info.duration = f.dur; LUXC.sujo = true; luxGuardarLogo();
+    const so = VE3T.so, existe = ['camera', 'luz', 'cenario'].includes(so) || m.c3d.modelos.some(x => x.id === so);
+    VE3T.chave = ''; ve3dTelaSelecionar(existe ? so : 'camera');
 }
-// a janela da Lux fechou (Fechar / Esc): volta para onde estava (ou a Home)
+// troca de aba (switchTool): entrar na aba da Lux abre a cena; sair dela pausa a tela (a cena fica na casa)
+function luxAoTrocar(id) {
+    if (LUX.abrindo) return;
+    if (id === 'lux-kanivete') { if (!V3.casa) luxAbrir(); return; }
+    if (!V3.casa) return;
+    luxGuardar(); ve3dTelaParar(); cancelAnimationFrame(VE3T.raf);
+    if (VE3T.tc) VE3T.tc.detach();
+    VE3T.el.hidden = true; VE3T.lux = false; V3.casa = null;
+}
+// a janela da Lux fechou (Fechar / Esc): guarda o rascunho e volta para onde estava (ou a Home)
 function luxSaiu() {
-    const para = LUX.de && LUX.de !== 'video-cutter' && LUX.de !== 'lux-kanivete' ? LUX.de : 'home';
+    luxGuardar(); V3.casa = null;
+    const para = LUX.de && LUX.de !== 'lux-kanivete' ? LUX.de : 'home';
     switchTool(para);
 }
-// da Lux para o Editor: a cena continua na timeline
+// da Lux para o Editor: uma CÓPIA da cena entra na timeline, na agulha (a Lux continua com a dela)
 function luxParaEditor() {
-    VE3T.lux = false; ve3dTelaFechar(); switchTool('video-cutter');
+    const m = LUXC.m; if (!m) return;
+    const cena = JSON.parse(JSON.stringify(m.c3d)), dur = +m.dur || 5, nome = m.name;
+    VE3T.lux = false; ve3dTelaFechar(); luxGuardar(); V3.casa = null;
+    switchTool('video-cutter');
+    setTimeout(() => {
+        try { ve3dNova({ cena, dur, nome }); ve3dPainel(); veToast(veT('Cena da Lux na timeline')); }
+        catch (e) { veToast(e.message || String(e)); }
+    }, 60);
 }
-window.LUX_API = { abrir: luxAbrir, nova: () => luxAbrir({ nova: true }) };
+window.LUX_API = { abrir: luxAbrir, nova: () => luxAbrir({ nova: true }), casa: () => LUXC };

@@ -8,12 +8,13 @@ const VEKE = { min: false };
 const veKeEl = () => $ve('ve-export');
 const veKeBox = () => veKeEl() && veKeEl().querySelector('.ve-modal-box');
 function veKeLer() { try { return JSON.parse(veLsGet('ve-ke-janela') || 'null'); } catch (e) { return null; } }
+const veKePagina = () => !!(veKeEl() && veKeEl().classList.contains('ke-pagina'));   // na aba própria do Ke
 function veKeGravar() {
-    const b = veKeBox(); if (!b || veKeEl().hidden) return;
+    const b = veKeBox(); if (!b || veKeEl().hidden || veKePagina()) return;
     try { veLsSet('ve-ke-janela', JSON.stringify({ x: b.offsetLeft, y: b.offsetTop, w: b.offsetWidth, h: b.offsetHeight })); } catch (e) { /* sem storage */ }
 }
 function veKePosicionar() {
-    const el = veKeEl(), b = veKeBox(); if (!el || !b) return;
+    const el = veKeEl(), b = veKeBox(); if (!el || !b || veKePagina()) return;
     const W = el.clientWidth, H = el.clientHeight, j = veKeLer();
     if (j && j.w) { b.style.width = Math.min(j.w, W - 16) + 'px'; b.style.height = Math.min(j.h, H - 16) + 'px'; }
     const w = b.offsetWidth, h = b.offsetHeight;
@@ -76,7 +77,7 @@ function veKeMini() {   // barrinha: aparece minimizada; com a fila rodando most
         veKePosicionar();
     };
     const fechar = veCloseExport;
-    veCloseExport = function () { veKeGravar(); VEKE.min = false; const m = $ve('ve-ke-mini'); if (m) m.hidden = true; return fechar(); };
+    veCloseExport = function () { if (veKePagina()) return; veKeGravar(); VEKE.min = false; const m = $ve('ve-ke-mini'); if (m) m.hidden = true; return fechar(); };
     // a barrinha acompanha a fila
     const r = veFilaRender, ri = veFilaRenderItem;
     veFilaRender = function () { r(); veKeMini(); };
@@ -269,5 +270,35 @@ function veKeMonitorLigar() {
     };
 })();
 
+// ── Aba própria (barra lateral › Kanivete Encoder): a janela da fila sai do Vídeo Kanivete e encaixa na página do Ke,
+// sem abrir o Vídeo Kanivete. Sem projeto aberto mostra a fila, o andamento e o monitor (pôr na fila é no Vídeo, Ctrl+M).
+// Ao sair da aba ela volta para o Vídeo fechada; com a fila rodando, a barrinha minimizada mostra o andamento lá. ──
+function keAoTrocar(id) {
+    const el = veKeEl(); if (!el) return;
+    const casa = document.getElementById('ke-casa');
+    if (id === 'kanivete-encoder') {
+        if (!VEKE.casaOrig) VEKE.casaOrig = el.parentNode;
+        if (el.parentNode !== casa) casa.appendChild(el);
+        el.classList.add('ke-pagina');
+        veKeMontar(); VEKE.min = false; $ve('ve-ke-mini').hidden = true;
+        el.classList.toggle('ke-vazio', !VE.ready);
+        if (VE.ready) { if (el.hidden) veOpenExport(); }
+        else {
+            veFilaMontar();
+            if (!$ve('ke-sem-projeto')) {
+                const d = document.createElement('div'); d.className = 'ke-sem-projeto'; d.id = 'ke-sem-projeto';
+                d.innerHTML = `<b>${veT('Nenhuma timeline aberta')}</b><span>${veT('Para pôr um vídeo na fila, abra o projeto no Vídeo Kanivete e use Ctrl+M (põe na fila e abre o Ke) ou Ctrl+Shift+M (põe na fila sem abrir).')}</span>
+                    <span>${veT('A fila, o andamento e o monitor da máquina ficam aqui; o render continua mesmo trocando de aba.')}</span>`;
+                $ve('ve-export-form').parentNode.insertBefore(d, $ve('ve-export-form'));
+            }
+            el.hidden = false; veFilaRender(); veKeMonitorLigar();
+        }
+        return;
+    }
+    if (el.parentNode !== casa) return;
+    el.hidden = true; el.classList.remove('ke-pagina', 'ke-vazio');
+    (VEKE.casaOrig || $ve('ve')).appendChild(el);
+    if (VEFILA.rodando || VEFILA.atual) { VEKE.min = true; veKeMini(); }   // no Vídeo, a barrinha segue o render
+}
 window.VEKE_API = { minimizar: () => veKeMinimizar(), restaurar: () => veKeRestaurar(), estado: () => ({ aberto: !veKeEl().hidden, min: VEKE.min, janela: veKeLer() }),
     filaAtalho: abrir => veKeFilaAtalho(abrir) };

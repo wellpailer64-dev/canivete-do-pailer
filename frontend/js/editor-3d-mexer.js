@@ -27,7 +27,7 @@ const ve3dEmpurrarBase = md => {
 // um passo de empurrar (rodinha, teclas): junta os passos seguidos num só Ctrl+Z
 function ve3dEmpurrarPasso(s) {
     const md = ve3dTelaModeloSel(); if (!md) { veToast(veT('Selecione um objeto para mudar a profundidade')); return; }
-    clearTimeout(VE3T.empFim); if (!VE3T.empurrando) { vePushHistory(); VE3T.empurrando = true; }
+    clearTimeout(VE3T.empFim); if (!VE3T.empurrando) { V3.hist(); VE3T.empurrando = true; }
     ve3dEmpurrar(md, s);
     VE3T.empFim = setTimeout(() => { VE3T.empurrando = false; const m = ve3dTelaMidia(); if (ve3dEh(m)) ve3dMudou(m); ve3dTelaLado(); }, 400);
 }
@@ -61,7 +61,7 @@ function ve3dTelaAcertar(e) {
         const x0 = e.clientX, y0 = e.clientY; let hist = false;
         const mover = ev => {
             const dx = ev.clientX - x0, dy = ev.clientY - y0; if (!hist && Math.hypot(dx, dy) < 4) return;
-            if (!hist) { vePushHistory(); hist = true; VE3T.mexendo = true; }
+            if (!hist) { V3.hist(); hist = true; VE3T.mexendo = true; }
             const r3 = v => Math.round(v * 10000) / 10000;
             for (const k of ['x', 'y', 'z']) ve3dTelaGrava(md, k, r3(p0[k] + (dirx[k] * dx - diry[k] * dy) * porPx), t);
             VE3T.chave = '';
@@ -116,7 +116,7 @@ function ve3dMapaGeo() {
     const T = VE3T.T, t = ve3dTelaT(c), C = m.c3d.camera, rad = Math.PI / 180, s = VE3T.saida || {};
     const alvo = s.alvo || new T.Vector3(), d = s.d || 4, az = (ve3dVal(C, 'azimute', t) || 0) * rad, el = (ve3dVal(C, 'elevacao', t) || 0) * rad;
     const cam = { x: alvo.x + d * Math.cos(el) * Math.sin(az), z: alvo.z + d * Math.cos(el) * Math.cos(az) };
-    const hf = Math.atan(Math.tan((ve3dVal(C, 'fov', t) || 32) * rad / 2) * VE.seqW / VE.seqH), cx = new T.Box3();
+    const hf = Math.atan(Math.tan((ve3dVal(C, 'fov', t) || 32) * rad / 2) * V3.w / V3.h), cx = new T.Box3();
     const cams = { ...cam, ang: Math.atan2(alvo.x - cam.x, alvo.z - cam.z), hf };
     const camadas = rt.objs.filter(o => o.raiz.visible).map(o => { cx.setFromObject(o.raiz); return { id: o.md.id, x0: cx.min.x, x1: cx.max.x, z: o.raiz.position.z }; });
     let xs = [cam.x, ...camadas.flatMap(l => [l.x0, l.x1])], zs = [cam.z, ...camadas.map(l => l.z)];
@@ -127,7 +127,7 @@ function ve3dMapaGeo() {
 }
 function ve3dMapaDesenhar(forcar) {
     const cv = VE3T.mapa; if (!cv || !VE3T.rt) return;
-    const m = ve3dTelaMidia(), chave = [ve3dEh(m) && JSON.stringify(m.c3d), VE.playhead, VE3T.so, VE3T.saida && VE3T.saida.d].join('|');
+    const m = ve3dTelaMidia(), chave = [ve3dEh(m) && JSON.stringify(m.c3d), V3.t, VE3T.so, VE3T.saida && VE3T.saida.d].join('|');
     if (!forcar && chave === VE3T.mapaChave) return; VE3T.mapaChave = chave;
     const g = ve3dMapaGeo(), x = cv.getContext('2d'); x.clearRect(0, 0, cv.width, cv.height); if (!g) return;
     VE3T.mapaGeo = g;
@@ -163,7 +163,7 @@ function ve3dMapaApertar(e) {
     let hist = false;
     const mover = ev => {
         const dy = ev.clientY - y0; if (!hist && Math.abs(dy) < 3) return;
-        if (!hist) { vePushHistory(); hist = true; VE3T.mexendo = true; VE3T.mapaArr = true; }
+        if (!hist) { V3.hist(); hist = true; VE3T.mexendo = true; VE3T.mapaArr = true; }
         // para cima = mais longe: a distância até a câmera cresce o que o mouse subiu no mapa
         ve3dEmpurrar(md, Math.max(0.05, (base.prof - dy * porPx) / base.prof), base);
     };

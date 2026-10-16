@@ -1,4 +1,4 @@
-"""Importar projeto do Premiere Pro (.prproj) no Editor Kanivete. Só LEITURA: o .prproj nunca é alterado.
+"""Importar projeto do Premiere Pro (.prproj) no Vídeo Kanivete. Só LEITURA: o .prproj nunca é alterado.
 
 O .prproj é um XML compactado (gzip) com um grafo plano de objetos que se referenciam por ObjectID/ObjectUID:
 Sequence → TrackGroups (vídeo/áudio) → Track → TrackItem (Start/End na sequência) → SubClip → Clip

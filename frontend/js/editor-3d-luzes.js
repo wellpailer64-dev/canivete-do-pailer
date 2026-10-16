@@ -71,14 +71,14 @@ async function ve3dLuzObjeto(f, T) {
 
 // ── painel da luz (no lugar das propriedades de modelo) ──
 function ve3dLuzLin(md, k, rot, min, max, passo, un, pad, t) {
-    const v = ve3dVal(md, k, t) ?? pad, kf = (md.kf && md.kf[k]) || [], anim = kf.length > 0, aqui = kf.some(x => Math.abs(x[0] - t) < 0.5 / (VE.fps || 30));
+    const v = ve3dVal(md, k, t) ?? pad, kf = (md.kf && md.kf[k]) || [], anim = kf.length > 0, aqui = kf.some(x => Math.abs(x[0] - t) < 0.5 / (V3.fps || 30));
     const vt = v == null ? '' : Math.round(v * 1000) / 1000, q = veEsc(md.id);
     return `<div class="ve-pp-l ve-p3d"><label>${veT(rot)}</label><input type="range" data-p3d="${q}|${k}" min="${min}" max="${max}" step="${passo}" value="${v ?? (min + max) / 2}">
         <span class="ve-prop-num"><input type="number" data-p3d="${q}|${k}" step="${passo}" value="${vt}"><i>${un || ''}</i></span>
         <button class="ve-p3d-kf${anim ? ' on' : ''}${aqui ? ' aqui' : ''}" data-p3dkf="${q}|${k}" title="${veT(anim ? 'Animado: mexer grava quadro-chave aqui. Clique para tirar a animação' : 'Animar com quadros-chave')}">◆</button></div>`;
 }
 function ve3dLuzPainel(c, md) {
-    const t = Math.max(0, veSrcAt(c, VE.playhead)), tipo = md.fonte.luz || 'softbox', P = VE3D_LUZ_PADRAO[tipo] || {}, q = veEsc(md.id);
+    const t = Math.max(0, veSrcAt(c, V3.t)), tipo = md.fonte.luz || 'softbox', P = VE3D_LUZ_PADRAO[tipo] || {}, q = veEsc(md.id);
     const L = (k, r, a, b, p, u, d) => ve3dLuzLin(md, k, r, a, b, p, u, d, t);
     const cor = veEsc(md.p.cor || '#ffffff');
     return vePpSec(`${veT(VE3D_LUZ_TIPOS[tipo])} · ${veEsc(md.nome)}`,
@@ -108,7 +108,7 @@ function ve3dLuzPainel(c, md) {
 // VE3DAPI.luz({tipo: softbox|spot|ponto|sol, x, y, z, mira: [x, y, z], potencia, largura, altura, angulo, kelvin, cor, giro, nome})
 VE3DAPI.luz = async function (op = {}) {
     const m = ve3dAlvo(op.cena), tipo = VE3D_LUZ_TIPOS[op.tipo] ? op.tipo : 'softbox', P = VE3D_LUZ_PADRAO[tipo];
-    vePushHistory();
+    V3.hist();
     const id = 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), mi = op.mira || [0, 0.4, 0];
     const n = m.c3d.modelos.filter(x => (x.fonte || {}).tipo === 'luz' && x.fonte.luz === tipo).length;
     m.c3d.modelos.push({ id, nome: op.nome || `${veT(VE3D_LUZ_TIPOS[tipo]).toLowerCase()}${n ? ' ' + (n + 1) : ''}`, fonte: { tipo: 'luz', luz: tipo },

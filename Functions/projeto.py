@@ -18,13 +18,14 @@ EXTENSAO_LUX = ".lknv"                  # projeto da Lux Kanivete (Functions/lux
 FORMATO = "vknv"
 FORMATOS_ACEITOS = ("vknv", "vcnvt")
 VERSAO = 1
-# tipo do arquivo no Windows (o ProgId antigo do .vcnvt continua valendo para os arquivos velhos)
-_TIPOS = {".vknv": ("CaniveteDoPailer.vknv", "Projeto de vídeo do KANIVETE"),
-          ".vcnvt": ("CaniveteDoPailer.vcnvt", "Projeto de vídeo do KANIVETE (antigo)"),
-          ".iknv": ("CaniveteDoPailer.iknv", "Projeto de imagem do KANIVETE"),
-          ".aknv": ("CaniveteDoPailer.aknv", "Documento vetorial do KANIVETE"),
-          ".sknv": ("CaniveteDoPailer.sknv", "Projeto de áudio do KANIVETE"),
-          ".lknv": ("CaniveteDoPailer.lknv", "Projeto 3D da Lux Kanivete")}
+# tipo do arquivo no Windows (o ProgId antigo do .vcnvt continua valendo para os arquivos velhos) e o ícone de cada um:
+# o logo da ferramenta (identidade/arquivos/<logo>.ico, gerado por tools/icones_arquivos.py)
+_TIPOS = {".vknv": ("CaniveteDoPailer.vknv", "Projeto do Vídeo Kanivete", "vd"),
+          ".vcnvt": ("CaniveteDoPailer.vcnvt", "Projeto do Vídeo Kanivete (antigo)", "vd"),
+          ".iknv": ("CaniveteDoPailer.iknv", "Projeto do Photo Kanivete", "pk"),
+          ".aknv": ("CaniveteDoPailer.aknv", "Documento do Vetor Kanivete", "vk"),
+          ".sknv": ("CaniveteDoPailer.sknv", "Projeto do Sound Kanivete", "sk"),
+          ".lknv": ("CaniveteDoPailer.lknv", "Projeto da Lux Kanivete", "lk")}
 
 
 def com_extensao(path):
@@ -77,13 +78,17 @@ def registrar_associacao():
     try:
         import winreg
         exe = sys.executable
-        icone = os.path.join(os.path.dirname(exe), "_internal", "identidade", "icone.ico")
-        if not os.path.isfile(icone):
-            icone = exe
+        ident = os.path.join(os.path.dirname(exe), "_internal", "identidade")
+        geral = os.path.join(ident, "icone.ico")
+        if not os.path.isfile(geral):
+            geral = exe
         comando = f'"{exe}" "%1"'
         base = r"Software\Classes"
         mudou = False
-        for ext, (progid, descricao) in _TIPOS.items():
+        for ext, (progid, descricao, logo) in _TIPOS.items():
+            icone = os.path.join(ident, "arquivos", logo + ".ico")
+            if not os.path.isfile(icone):
+                icone = geral
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\{ext}") as k:
                 atual = winreg.QueryValue(k, None) if _tem_valor(k) else ""
                 if atual != progid:
@@ -92,7 +97,9 @@ def registrar_associacao():
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\{progid}") as k:
                 winreg.SetValue(k, "", winreg.REG_SZ, descricao)
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\{progid}\DefaultIcon") as k:
-                winreg.SetValue(k, "", winreg.REG_SZ, icone)
+                if (winreg.QueryValue(k, None) if _tem_valor(k) else "") != icone:
+                    winreg.SetValue(k, "", winreg.REG_SZ, icone)
+                    mudou = True   # ícone novo: o Explorer precisa redesenhar
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\{progid}\shell\open\command") as k:
                 antigo = winreg.QueryValue(k, None) if _tem_valor(k) else ""
                 if antigo != comando:

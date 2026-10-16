@@ -116,11 +116,11 @@ async function vbRenderizar(a = {}) {
 }
 window.vkBlenderProgresso = d => { if (d && d.msg) vkCarregando(true, d.msg); };
 // Vetor → Editor (Cena 3D): a mesma descrição do Blender (perfil/forma, chanfro, material, rótulo e artes em PNG) vira um
-// modelo three.js animável numa cena 3D do Editor Kanivete (editor-3d.js, VE3DAPI.doVetor). Sem cena aberta, cria uma.
+// modelo three.js animável numa cena 3D do Vídeo Kanivete (editor-3d.js, VE3DAPI.doVetor). Sem cena aberta, cria uma.
 async function vbEnviarEditor(a = {}) {
     const alvos = (a.ids ? a.ids.map(vkObj) : vkTxAlvos(a)).filter(o => o && o.tres_d); if (!alvos.length) throw new Error('enviar_editor_3d: escolha objetos 3D (girar_3d/extrudar_3d)');
-    if (typeof VE3DAPI !== 'object' || typeof VE === 'undefined') throw new Error('enviar_editor_3d: Editor Kanivete indisponível');
-    if (!VE.ready) throw new Error('enviar_editor_3d: abra um vídeo ou crie uma timeline no Editor Kanivete antes');
+    if (typeof VE3DAPI !== 'object' || typeof VE === 'undefined') throw new Error('enviar_editor_3d: Vídeo Kanivete indisponível');
+    if (!VE.ready) throw new Error('enviar_editor_3d: abra um vídeo ou crie uma timeline no Vídeo Kanivete antes');
     const api = vkApi(), pr = await api.ve_c3d_pasta(typeof vePrPrefs === 'function' ? vePrPrefs().dir : ''), out = [];
     if (a.juntar && alvos.length > 1) {   // um modelo só (copo + tampa): as peças mantêm a posição relativa do documento
         const partes = [];

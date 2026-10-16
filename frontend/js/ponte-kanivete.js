@@ -1,5 +1,5 @@
 // =========================================================
-// Ponte Photo Kanivete → Editor Kanivete (Fase 1: levar). Os dois editores rodam na mesma página: o documento aberto
+// Ponte Photo Kanivete → Vídeo Kanivete (Fase 1: levar). Os dois editores rodam na mesma página: o documento aberto
 // no Photo Kanivete vira Comps no editor de vídeo, uma faixa por camada, como o importar PSD (editor-psd.js), que é
 // reaproveitado: aqui se monta a mesma árvore de "nós" que o Functions/psd_import.py entrega.
 //   pixel/objeto inteligente/forma → PNG com efeitos, máscara e filtros já aplicados (posição, opacidade, mesclagem)
@@ -129,12 +129,12 @@ function ponteNos(doc, lista, R, ctx) {
     return nos;
 }
 
-// Photo Kanivete: botão "Levar para o Editor Kanivete". modo: 'slides' (uma Comp por fatia; padrão com fatias) | 'inteiro'
+// Photo Kanivete: botão "Levar para o Vídeo Kanivete". modo: 'slides' (uma Comp por fatia; padrão com fatias) | 'inteiro'
 async function ponteLevar({ modo } = {}) {
     const doc = IE.doc, api = ieApi();
     if (!doc || !api) return;
     if (!doc.path || !/\.iknv$/i.test(doc.path)) {
-        ieToast(ieT('Salve o documento como projeto (.iknv) antes de levar para o Editor Kanivete'));
+        ieToast(ieT('Salve o documento como projeto (.iknv) antes de levar para o Vídeo Kanivete'));
         await ieCmd('salvar');
         if (!doc.path || !/\.iknv$/i.test(doc.path)) return;
     }
@@ -143,7 +143,7 @@ async function ponteLevar({ modo } = {}) {
     modo = modo || (fatias.length > 1 ? 'slides' : 'inteiro');
     const partes = modo === 'slides' && fatias.length ? fatias.map((f, i) => ({ x: f.x, y: f.y, w: f.w, h: f.h, nome: `${nome} · ${f.nome || String(i + 1).padStart(2, '0')}` }))
         : [{ x: 0, y: 0, w: doc.w, h: doc.h, nome }];
-    ieToast(ieT('Preparando as camadas para o Editor Kanivete...'));
+    ieToast(ieT('Preparando as camadas para o Vídeo Kanivete...'));
     ieCompor(doc, ieRDoc(doc));
     const ctx = { pasta, png: new Map(), avisos: [] }, spec = { doc: doc.path, nome, partes: [] };
     for (const [i, P] of partes.entries()) {
@@ -169,7 +169,7 @@ async function veKnvAbrir(spec) {
     let novo = false;
     if (!VE.ready) {
         veOpenPath(spec.partes[0].achatado);
-        if (!await vePsdEsperar(() => VE.ready && VE.clips.length, 30000)) { veToast(veT('Não consegui abrir no Editor Kanivete')); return null; }
+        if (!await vePsdEsperar(() => VE.ready && VE.clips.length, 30000)) { veToast(veT('Não consegui abrir no Vídeo Kanivete')); return null; }
         VE.clips = [];
         novo = true;
     }

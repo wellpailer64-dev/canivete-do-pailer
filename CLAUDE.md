@@ -4,8 +4,14 @@
 - Nome visível: **KANIVETE** (janela, splash, marca, textos, release). Identificadores internos continuam
   `CaniveteDoPailer` (exe, zip do release, `%APPDATA%\CaniveteDoPailer`, mutex, `CANIVETE_*`): o updater instalado nos
   amigos procura esses nomes; trocar exige uma migração planejada.
-- Nomes visíveis dos editores: **Editor Kanivete** (vídeo) e **Photo Kanivete** (imagem); no código continuam
-  editor de vídeo (`editor*.js`, "Pocket Editor" nos comentários) e editor de imagem (`imagem-*.js`).
+- Nomes visíveis: **Vídeo Kanivete** (Vd, lilás; antes "Editor Kanivete"), **Photo Kanivete** (Pk, azul), **Vetor
+  Kanivete** (Vk, laranja), **Sound Kanivete** (Sk, azul clarinho), **Lux Kanivete** (Lk, magenta), **Kanivete Encoder**
+  (Ke, coral). Cores em `.al-*` (`frontend/css/app.css`, `som.css`). No código continuam editor de vídeo (`editor*.js`,
+  `video-cutter`, "Pocket Editor" nos comentários) e editor de imagem (`imagem-*.js`).
+- Ícone de cada arquivo de projeto = o logo da ferramenta (`identidade/arquivos/<sigla>.ico`, gerado por
+  `py -3.13 tools/icones_arquivos.py`; registro por extensão em `Functions/projeto.py` `_TIPOS`). Mudou cor/sigla: rodar de novo.
+- Ferramenta separada = aba e página próprias (`#page-<id>` com `ve-page`), sem abrir outra por trás; o `switchTool` chama
+  `luxAoTrocar`/`keAoTrocar` para pausar/devolver ao sair da aba. Receita: Lux (tomada `V3`) e Ke (abaixo).
 - Projetos: `.vknv` = editor de vídeo (os `.vcnvt` antigos abrem; Ctrl+S grava um `.vknv` ao lado),
   `.iknv` = editor de imagem (zip com documento.json + PNGs; `Functions/editor_imagem.py`). Associação no Windows
   (HKCU) em `Functions/projeto.py`; duplo clique roteado por `abrirProjetoExterno` (frontend/js/app.js).
@@ -67,6 +73,10 @@ se edita. Botão Fila no cabeçalho abre o mesmo painel. API `VEFILA_API`. Teste
 
 **Kanivete Encoder (Ke) — comece pelo mapa `Instructions/agente/mapa-kanivete-encoder.md`** (caminho do export,
 arquivos, armadilhas medidas, resultados, testes, pendências). Janela própria do export feita (`editor-encoder.js`: logo Ke, solta, minimiza, lembra posição).
+**Aba própria** (barra lateral › Kanivete Encoder, `keAoTrocar`): a mesma janela encaixa em `#ke-casa` sem abrir o Vídeo;
+sem projeto mostra fila/andamento/monitor; sair da aba devolve a janela ao Vídeo (fechada; barrinha se rodando). Pôr na
+fila continua no Vídeo (Ctrl+M). Teste: `py -3.13 testes/teste_ke_aba.py` (porta 9333). Próximo passo combinado: Ke como
+Media Encoder (arquivos soltos do disco, renders da Lux e do Sound).
 Atalhos: Ctrl+M = pôr na fila + abrir; Ctrl+Shift+M = pôr na fila sem abrir (aviso, som, barrinha); NENHUM começa a
 renderizar: o início é sempre o ▶ Renderizar (pedido do Pailer); marcador anterior = Alt+Shift+M. Voz da Fran no fim
 (`veKeVoz`: pronto / drive / falhou / drivefalhou, `frontend/audio/ke/*.mp3`, fontes em `D:/kanivete_testes/ke_voz`); com
@@ -128,17 +138,22 @@ em grupo (mexer num efeito com vários selecionados leva o valor ao mesmo efeito
 Teste de 4K (estresse: material pesado, camadas, 10-bit, export, memória): plano e resultados em
 `Instructions/agente/teste-4k.md` — rodada 1 feita (2026-10-01), pendências no fim do arquivo.
 
-## Lux Kanivete (Lk, amarelo) — produto em 3D
-Ferramenta própria (barra lateral › 3D e Home; do Editor, duplo clique na cena 3D abre a mesma): embalagens (pote/bastão,
+## Lux Kanivete (Lk, magenta) — produto em 3D
+Ferramenta própria, independente do Editor (aba e página próprias como o Photo; barra lateral › 3D e Home; do Editor,
+duplo clique numa cena 3D da timeline abre a mesma tela por cima, com a cena da timeline): embalagens (pote/bastão,
 perfil em `frontend/embalagens.json`), luzes como no Blender (softbox/spot/ponto/sol, Estúdio 3 pontos), materiais do
 Principled (`frontend/materiais.json`), 📷 Render fotorrealista no Blender (`Functions/blender_estudio.py`: foto
 Rápido/Full HD/2K/4K e vídeo prévia/final em Cycles, cache por hash) e projeto **.lknv** (`Functions/lux_projeto.py`: zip
 com a cena e os recursos copiados para dentro). Layout no padrão do Blender (`frontend/js/lux-ui.js`: menus, ferramentas,
 Cena, Propriedades em abas; Shift+A adiciona); entrada `frontend/js/lux.js`; o motor é a Cena 3D do Editor
-(`editor-3d*.js`; a cena mora no projeto do Editor por trás). Guia e pendências: `Instructions/agente/cena-3d-editor.md`
+(`editor-3d*.js`), mas a cena da Lux mora numa **casa própria** (`LUXC` em lux.js: cena, agulha, tamanho, Ctrl+Z e
+rascunho em localStorage) e o motor lê tudo pela tomada **`V3`** (editor-3d.js: `V3.t/w/h/fps/hist()/ir()/clipe()`,
+`V3.casa` = LUXC ou null = timeline). Nunca `VE.playhead`/`vePushHistory` direto na tela/painéis 3D. "Enviar ao Editor"
+copia a cena para a timeline. Teste: `py -3.13 testes/teste_lux_casa.py` (porta 9333). Guia e pendências: `Instructions/agente/cena-3d-editor.md`
 (fim) e `Instructions/agente/mockup-profissional.md` §5 (mockup profissional e passes). APIs: `VE3DAPI.modelo({embalagem})`,
 `.embalagem`, `.luz`, `.estudio3pontos`, `.estudio({qualidade})`, `.estudioVideo({qualidade: previa|final})`, `LUX_API`.
 Render na RTX 3050: foto Full HD ~45 s; vídeo prévia ~3 s/quadro, final ~5,6 s/quadro.
+Missão em andamento que usa a Lux: identidade visual pocket — plano e etapas em `Instructions/agente/plano-identidade-pocket.md`.
 
 ## Editar vídeo pelo app (agente)
 Guia interno para IAs (acesso, leitura de mídia, receita, estilo do cliente, calibração): `Instructions/agente/guia-edicao.md`.

@@ -1,5 +1,5 @@
 """
-cena3d.py — Cena 3D do Editor Kanivete (frontend/js/editor-3d.js): a página renderiza cada quadro com three.js (o MESMO
+cena3d.py — Cena 3D do Vídeo Kanivete (frontend/js/editor-3d.js): a página renderiza cada quadro com three.js (o MESMO
 motor da prévia) e manda os PNGs em lotes pela caixa de envio do media_server; aqui os lotes vão para o disco e, no fim,
 o ffmpeg monta um .mov ProRes 4444 com alfa em <cache de render>/Cenas3D/<hash>.mov (hash do conteúdo da cena: serve a
 qualquer projeto e desfazer reaproveita, como as Comps). Lote em disco: 300 quadros 1080p não ficam na memória.

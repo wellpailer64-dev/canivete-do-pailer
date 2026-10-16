@@ -18,20 +18,20 @@ async function luxSalvar(como = false) {
     if (!/\.lknv$/i.test(p)) p += '.lknv';
     let previa = null;
     try {   // miniatura do quadro na agulha
-        const q = ve3dQuadro(c, Math.max(0, veSrcAt(c, VE.playhead)), 1), k = 480 / Math.max(q.width, q.height), cv = document.createElement('canvas');
+        const q = ve3dQuadro(c, Math.max(0, veSrcAt(c, V3.t)), 1), k = 480 / Math.max(q.width, q.height), cv = document.createElement('canvas');
         cv.width = Math.round(q.width * k); cv.height = Math.round(q.height * k); cv.getContext('2d').drawImage(q, 0, 0, cv.width, cv.height); previa = cv.toDataURL('image/png');
     } catch (e) { /* sem miniatura */ }
-    const dados = { nome: luxNomeArq(p), c3d: m.c3d, largura: VE.seqW, altura: VE.seqH, fps: VE.fps || 30, duracao: +m.dur || (veEnd(c) - c.st) };
+    const dados = { nome: luxNomeArq(p), c3d: m.c3d, largura: V3.w, altura: V3.h, fps: V3.fps || 30, duracao: +m.dur || (veEnd(c) - c.st) };
     const r = await window.pywebview.api.lux_salvar(p, JSON.stringify(dados), previa);
     if (!r || !r.success) { veToast(veT('Não foi possível salvar') + ': ' + ((r && r.error) || '')); return; }
-    m.lux = { arquivo: r.path }; m.name = luxNomeArq(r.path); luxRecenteAdd(r.path); VE3T.lux_sujo = false;
+    m.lux = { arquivo: r.path }; m.name = luxNomeArq(r.path); luxRecenteAdd(r.path); VE3T.lux_sujo = false; if (m._lux) { LUXC.sujo = false; luxGuardar(); }
     ve3dTelaTitulo(); veToast(`${veT('Projeto salvo')}: ${luxNomeArq(r.path)}.lknv` + (r.recursos ? ` · ${r.recursos} ${veT('arquivo(s) copiados para dentro')}` : ''));
 }
 async function luxAbrirArquivo(p) {
     if (!p) return;
     // já aberto nesta sessão: só mostra
-    const ja = VE.media.find(x => x && !x.removido && x.lux && x.lux.arquivo && x.lux.arquivo.toLowerCase() === p.toLowerCase());
-    if (ja) { const c = VE.clips.find(x => veMediaOf(x) === ja); if (c) { VE.sel = VE.clips.indexOf(c); await luxAbrir(); return; } }
+    const a = LUXC.m && LUXC.m.lux && LUXC.m.lux.arquivo;
+    if (a && a.toLowerCase() === p.toLowerCase()) { await luxAbrir(); return; }
     const r = await window.pywebview.api.lux_abrir(p);
     if (!r || !r.success) throw new Error(veT('Não abriu o projeto') + ': ' + ((r && r.error) || p));
     await luxAbrir({ dados: r.dados, arquivo: r.path });
@@ -58,7 +58,7 @@ function luxItensMenu(nome) {
             ['Salvar como .lknv…', 'Ctrl+Shift+S', () => luxSalvar(true)],
             ['-'], ['Importar modelo 3D…', '', add('arquivo')], ['Exportar foto (Full HD)', '', est('estudio')], ['Exportar vídeo (prévia)', '', est('video:previa')],
             ['-'], [VE3T.lux ? 'Fechar a Lux' : 'Voltar à timeline', 'Esc', ve3dTelaFechar]],
-        editar: [['Desfazer', 'Ctrl+Z', () => typeof veUndo === 'function' && veUndo()], ['Refazer', 'Ctrl+Shift+Z', () => typeof veRedo === 'function' && veRedo()],
+        editar: [['Desfazer', 'Ctrl+Z', () => V3.casa ? luxDesfazer() : typeof veUndo === 'function' && veUndo()], ['Refazer', 'Ctrl+Shift+Z', () => V3.casa ? luxDesfazer(true) : typeof veRedo === 'function' && veRedo()],
             ['-'], ['Duplicar', 'Ctrl+D', ve3dTelaDuplicar, !md], ['Apagar', 'Del', () => VE3T.kfSel.length ? ve3dKfApagar() : ve3dTelaApagar(), !md && !VE3T.kfSel.length],
             ['Esconder / mostrar', 'H', () => md && ve3dTelaEsconder(md.id), !md], ['Renomear', 'F2', () => luxRenomear(), !md]],
         adicionar: [t('Embalagem'), ['Pote', '', add('emb:pote')], ['Bastão', '', add('emb:bastao')],
@@ -145,7 +145,7 @@ function luxAbaHtml(c, aba, md) {
     return '';
 }
 function luxAbaRender(c) {
-    const W = VE.seqW || 1920, H = VE.seqH || 1080, cn = ve3dCenario(veMediaOf(c).c3d), Q = VE3D_ESTUDIO_Q;
+    const W = V3.w || 1920, H = V3.h || 1080, cn = ve3dCenario(veMediaOf(c).c3d), Q = VE3D_ESTUDIO_Q;
     const tam = q => { if (!q.lado) return `${W}×${H}`; const k = q.lado / Math.max(W, H); return `${Math.round(W * k)}×${Math.round(H * k)}`; };
     return vePpSec(veT('Foto'), `<div class="lux-render-lista">${Object.entries(Q).map(([k, q]) => `<button class="lux-render-op" data-luxrender="${k}"><b>${veT(q.nome.split(' (')[0])}</b><small>${tam(q)} · ${q.amostras} ${veT('amostras')}</small></button>`).join('')}</div>
             <small class="ve-pp-dica">${veT('A cena como está na agulha, no motor Cycles (luz de verdade). Mesma cena = não renderiza de novo.')}</small>`) +
@@ -173,6 +173,7 @@ window.addEventListener('keydown', e => {   // registrado antes da tela: Ctrl+S/
     if (e.shiftKey && !ctrl && k === 'a') { luxMenu('adicionar', null, [VE3T.mouse ? VE3T.mouse[0] : innerWidth / 2, VE3T.mouse ? VE3T.mouse[1] : innerHeight / 2]); feito(); return; }
     if (!ctrl && !e.shiftKey && k === 'f2') { luxRenomear(); feito(); return; }
     if (!ctrl) return;
+    if (V3.casa && (k === 'z' || k === 'y')) { luxDesfazer(k === 'y' || e.shiftKey); feito(); return; }   // desfazer da Lux (o do Editor não vê a cena)
     const projetoLux = VE3T.lux || (m && m.lux);
     if (k === 's' && (projetoLux || e.shiftKey)) { luxSalvar(e.shiftKey); feito(); }
     else if (k === 'o' && VE3T.lux) { luxAbrirDialogo(); feito(); }

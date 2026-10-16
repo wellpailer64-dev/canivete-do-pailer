@@ -2111,13 +2111,16 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 /* Tela da Cena 3D (editor-3d-tela.js): duplo clique na faixa da cena */
 .ve3t { position: fixed; inset: 0; z-index: 900; border: 0; border-radius: 0; height: auto; display: grid; grid-template-columns: 190px minmax(0, 1fr) 300px; grid-template-rows: 40px minmax(0, 1fr) auto; background: var(--ve-bg); color: var(--ve-text); }
 .ve3t[hidden] { display: none; }
+#page-lux-kanivete.active { position: relative; }
+.content-area:has(#page-lux-kanivete.active) { padding: 10px; overflow: hidden; }   /* área toda, como o Photo e o Vetor */
+#page-lux-kanivete > .ve3t { position: absolute; z-index: 1; border: 1px solid var(--ve-line); border-radius: 8px; overflow: hidden; }   /* Lux: dentro da janela do Kanivete (abas e marca em cima) */
 .ve3t-topo { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-bottom: 1px solid var(--ve-line); background: var(--ve-panel); }
 .ve3t-topo b { margin-right: auto; font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 8px; }
 .ve3t-topo b .app-logo { width: 22px; height: 22px; font-size: 10.5px; border-radius: 5px; box-shadow: inset 0 0 0 1.4px var(--al); }
 .ve3t-topo b small { font-weight: 400; opacity: .6; }
-.ve3t { --ve-accent: #ffd23f; }   /* Lux Kanivete: o amarelo da marca nos destaques */
-.ve3t .ve-btn.on, .ve3t-grupo .on { color: #1d1803; }
-.ve3t-trilha.on { background: rgba(255,210,63,.08) !important; }
+.ve3t { --ve-accent: #ff4fc8; }   /* Lux Kanivete: o magenta da marca nos destaques */
+.ve3t .ve-btn.on, .ve3t-grupo .on { color: #2a0322; }
+.ve3t-trilha.on { background: rgba(255,79,200,.08) !important; }
 .ve3t-grupo { display: flex; gap: 2px; }
 .ve3t-grupo .on { background: var(--ve-accent, #ff8a3d); color: #111; }
 .ve3t-lista { overflow: auto; padding: 8px; border-right: 1px solid var(--ve-line); background: var(--ve-panel); display: flex; flex-direction: column; gap: 2px; }
@@ -2149,8 +2152,8 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve3t-trilha.on { background: rgba(255,138,61,.08); }
 .ve3t-kf { position: absolute; top: 2px; transform: translateX(-50%); font-size: 12px; color: rgba(255,138,61,.55); cursor: ew-resize; touch-action: none; }
 .ve3t-kf:hover { color: var(--ve-accent, #ff8a3d); }
-.ve3t-kf.sel { color: #ffd23f; text-shadow: 0 0 4px rgba(255,210,63,.7); }
-.ve3t-laco { position: absolute; border: 1px dashed #ffd23f; background: rgba(255,210,63,.08); pointer-events: none; z-index: 2; }
+.ve3t-kf.sel { color: #ff4fc8; text-shadow: 0 0 4px rgba(255,79,200,.7); }
+.ve3t-laco { position: absolute; border: 1px dashed #ff4fc8; background: rgba(255,79,200,.08); pointer-events: none; z-index: 2; }
 .ve3t { grid-template-rows: 40px minmax(0, 1fr) 5px auto; }
 .ve3t-divisa { grid-column: 1 / -1; cursor: ns-resize; background: var(--ve-line); touch-action: none; }
 .ve3t-divisa:hover, .ve3t-divisa.on { background: var(--ve-accent, #ff8a3d); }
@@ -2282,6 +2285,19 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 /* Kanivete Encoder (editor-encoder.js): janela solta, sem escurecer o editor; minimizar vira barrinha */
 #ve-export.ve-ke { background: transparent; backdrop-filter: none; pointer-events: none; display: block; padding: 0; }
 #ve-export.ve-ke[hidden] { display: none; }
+/* Ke na aba própria (keAoTrocar): a mesma janela encaixada na página, sem arrastar/minimizar */
+.content-area:has(#page-kanivete-encoder.active) { padding: 10px; overflow: hidden; }
+#page-kanivete-encoder.active { position: relative; }
+.ke-casa { position: absolute; inset: 0; }
+#ve-export.ve-ke.ke-pagina { position: absolute; inset: 0; z-index: 1; }
+#ve-export.ke-pagina .ve-modal-box { left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important; max-width: none; max-height: none;
+    resize: none; border: 1px solid var(--ve-line); border-radius: 8px; box-shadow: none; }
+#ve-export.ke-pagina .ve-modal-head { cursor: default; }
+#ve-export.ke-pagina .ve-ke-bts, #ve-export.ke-pagina [onclick="veCloseExport()"], #ve-export.ke-vazio .ve-fila-cab button { display: none; }
+.ke-sem-projeto { display: none; }
+#ve-export.ke-pagina.ke-vazio .ke-sem-projeto { display: flex; flex-direction: column; gap: 8px; padding: 24px; color: var(--ve-muted); font: 13px/1.5 var(--ve-ui); }
+#ve-export.ke-pagina.ke-vazio .ke-sem-projeto b { color: var(--ve-text); font-size: 14px; }
+#ve-export.ke-pagina.ke-vazio #ve-export-form, #ve-export.ke-pagina.ke-vazio .ve-modal-foot [data-so-projeto] { display: none; }
 #ve-export.ve-ke .ve-modal-box { pointer-events: auto; position: absolute; display: flex; flex-direction: column; resize: both; overflow: hidden;
     min-width: 520px; min-height: 360px; max-width: calc(100% - 8px); max-height: calc(100% - 8px); box-shadow: 0 18px 60px rgba(0,0,0,.65), 0 0 0 1px rgba(255,112,86,.18); }
 #ve-export.ve-ke .ve-modal-head { cursor: grab; user-select: none; gap: 10px; }
@@ -2592,7 +2608,7 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve3t-direita .ve3t-lista { display: block; flex: 0 0 auto; max-height: 34%; overflow: auto; padding: 0 6px 8px; border: 0; border-bottom: 1px solid var(--lux-l); background: transparent; }
 .ve3t-direita .ve3t-linha { display: flex; align-items: center; border-radius: 6px; margin: 1px 0; }
 .ve3t-direita .ve3t-linha:hover { background: var(--lux-p2); }
-.ve3t-direita .ve3t-linha.on { background: rgba(255,210,63,.14); }
+.ve3t-direita .ve3t-linha.on { background: rgba(255,79,200,.14); }
 .ve3t-direita .ve3t-it { all: unset; flex: 1; min-width: 0; cursor: pointer; display: flex; align-items: center; gap: 9px; padding: 5px 8px; font-size: 12px; color: var(--lux-t); white-space: nowrap; }
 .ve3t-direita .ve3t-it span { overflow: hidden; text-overflow: ellipsis; }
 .ve3t-direita .ve3t-linha.on .ve3t-it { color: #fff; }
@@ -2626,5 +2642,5 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .lux-atalhos > div { min-width: 380px; padding: 18px 20px; border-radius: 12px; background: #1c1c1f; border: 1px solid #2d2d32; box-shadow: 0 20px 60px rgba(0,0,0,.6); color: #dcdce1; }
 .lux-atalhos b { display: block; margin-bottom: 10px; font-size: 14px; }
 .lux-atalhos p { display: flex; gap: 12px; margin: 5px 0; font-size: 12px; }
-.lux-atalhos kbd { min-width: 70px; color: #ffd23f; font-family: inherit; }
+.lux-atalhos kbd { min-width: 70px; color: #ff4fc8; font-family: inherit; }
 .lux-atalhos small { display: block; margin-top: 12px; opacity: .5; }

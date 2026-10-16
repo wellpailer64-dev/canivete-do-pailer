@@ -91,7 +91,7 @@ Object.assign(I18N_EN, {
     "Aniagem": "Burlap",
     "Animar": "Animate",
     "Animar a tira inteira (carrossel)": "Animate the whole strip (carousel)",
-    "Animar no Editor Kanivete": "Animate in Editor Kanivete",
+    "Animar no Vídeo Kanivete": "Animate in Video Kanivete",
     "Anterior": "Previous",
     "Antes": "Before",
     "Antes / depois": "Before / after",

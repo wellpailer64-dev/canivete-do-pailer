@@ -1,5 +1,5 @@
 // =========================================================
-// Editor Kanivete — Motion (recursos do After Effects que o motion profissional usa)
+// Vídeo Kanivete — Motion (recursos do After Effects que o motion profissional usa)
 //   Máscaras na camada (retângulo, elipse, caneta; modo, inverter, pena, opacidade, expansão; caminho animável)
 //   Fosco de trilha (alfa / luma, normal ou invertido) apontando para qualquer camada; a camada-fosco some da tela
 //   Camada mãe (parentesco) e Nulo (camada de controle que não aparece)

@@ -1,5 +1,5 @@
 /* =========================================================
-   AutoFrame (painel do Editor Kanivete) — layout 2026-10-12
+   AutoFrame (painel do Vídeo Kanivete) — layout 2026-10-12
    Topo com a marca e abas compactas; fluxo em etapas numeradas ligadas por um trilho; rodapé fixo com o Gerar;
    modelos de cliente em cards-pôster na cor do cliente; formulário em duas colunas com o celular de prévia.
    Sobrepõe as regras antigas de .ve-af* (editor.css). Larguras pelo próprio painel (container queries).

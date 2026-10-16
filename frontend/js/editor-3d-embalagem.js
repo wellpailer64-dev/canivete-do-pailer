@@ -166,7 +166,7 @@ function ve3dEmbPainel(md, so) {   // so: 'emb' (aba Embalagem) | 'mat' (aba Mat
     const aparencia = ve3dAparenciaHtml;
     ve3dAparenciaHtml = function (md) { return (md.fonte || {}).tipo === 'embalagem' ? ve3dEmbPainel(md) : aparencia(md); };
     ve3dEmbDefs().catch(() => {}); ve3dMatDefs().catch(() => {});
-    const cena = () => { const c = VE.clips[VE.sel], m = c && veMediaOf(c); return ve3dEh(m) ? m : null; };
+    const cena = () => { const c = V3.clipe(), m = c && veMediaOf(c); return ve3dEh(m) ? m : null; };
     const embalagem = (quem, op) => { const m = cena(); if (m) VE3DAPI.embalagem(quem, op, m.id).then(() => ve3dPainel()).catch(e => veToast(e.message || String(e))); };
     const parteDe = quem => (VE3D.embParte || {})[quem] || 'corpo';
     const valor = el => el.type === 'checkbox' ? el.checked : el.type === 'color' || el.tagName === 'SELECT' ? el.value : parseFloat(String(el.value).replace(',', '.'));
@@ -211,7 +211,7 @@ VE3DAPI.embalagem = async function (quem, op = {}, cena) {
     const m = ve3dAlvo(cena), md = ve3dObj(m, quem), f = md.fonte;
     if (!f || f.tipo !== 'embalagem') throw new Error(`"${quem}" não é uma embalagem`);
     await ve3dMatDefs();
-    vePushHistory();
+    V3.hist();
     for (const k of ['produto', 'material']) if (op[k]) f[k] = op[k];
     if (op.cores) f.cores = { ...(f.cores || {}), ...op.cores };
     if ('rotulo' in op) { if (op.rotulo) f.rotulo = op.rotulo; else delete f.rotulo; }
@@ -241,9 +241,9 @@ const VE3D_ESTUDIO_Q = { rapida: { amostras: 96, nome: 'Rápido (prévia, ~20 s)
     '2k': { amostras: 320, nome: 'Estúdio 2K / QHD 2560 (~2 min)', lado: 2560 }, '4k': { amostras: 320, nome: 'Estúdio 4K / UHD 3840 (~3 min)', lado: 3840 } };
 async function ve3dEstudioSpec(c, { qualidade = 'estudio', t: tFonte } = {}) {
     const m = veMediaOf(c), rt = await ve3dGarantir(m), T = rt.T, Q = VE3D_ESTUDIO_Q[qualidade] || VE3D_ESTUDIO_Q.estudio;
-    let W = VE.seqW || 1920, H = VE.seqH || 1080;
+    let W = V3.w || 1920, H = V3.h || 1080;
     if (Q.lado) { const k = Q.lado / Math.max(W, H); W = Math.round(W * k); H = Math.round(H * k); }
-    const t = tFonte ?? Math.max(0, veSrcAt(c, VE.playhead));
+    const t = tFonte ?? Math.max(0, veSrcAt(c, V3.t));
     ve3dAplicar(rt, m, t, Math.max(64, Math.round(W / 6)), Math.max(64, Math.round(H / 6)));   // posições e câmera no tempo da agulha
     const K = 2.94, Cm = new T.Matrix4().set(1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1), Ci = Cm.clone().invert(), S = new T.Matrix4().makeScale(K, K, K);
     const linhas = M => M.clone().transpose().elements.map(v => +v.toFixed(6));
@@ -295,7 +295,7 @@ const VE3D_VIDEO_Q = { previa: { motor: 'cycles', amostras: 16 }, final: { motor
 async function ve3dEstudioVideo(c, { qualidade = 'previa', motor, aoProgresso, segundos, amostras } = {}) {
     const VQ = VE3D_VIDEO_Q[qualidade] || VE3D_VIDEO_Q.previa; motor = motor || VQ.motor; amostras = amostras || VQ.amostras;
     if (VE3D.estudioRodando) throw new Error(veT('Já tem um render rodando'));
-    const vel = typeof veVel === 'function' ? veVel(c) : 1, fps = VE.fps || 30, n = Math.max(1, Math.round(Math.min(veEnd(c) - c.st, segundos || 1e9) * fps));
+    const vel = typeof veVel === 'function' ? veVel(c) : 1, fps = V3.fps || 30, n = Math.max(1, Math.round(Math.min(veEnd(c) - c.st, segundos || 1e9) * fps));
     const { spec, fora } = await ve3dEstudioSpec(c, { qualidade: 'estudio', t: c.s });
     if (!spec.objetos.length) throw new Error(veT('Nenhuma embalagem na cena: o render fotorrealista é para Pote e Bastão'));
     const quadros = [];
@@ -323,8 +323,9 @@ async function ve3dEstudioExecutar(c, est, btn) {
         const video = est.startsWith('video:');
         const r = video ? await ve3dEstudioVideo(c, { qualidade: est.slice(6), aoProgresso: p => { if (btn && p && p.total) btn.textContent = `⏳ ${p.feito}/${p.total}`; } })
             : await ve3dEstudio(c, { qualidade: est });
-        if (typeof vePjImportarArquivo === 'function') await vePjImportarArquivo(r.path);
-        veToast(`${veT(video ? 'Vídeo pronto' : 'Foto pronta')}${r.cache ? ` (${veT('já estava feita')})` : ` · ${r.segundos} s`} — ${veT('no painel Projeto')}` + (r.fora && r.fora.length ? ` · ${veT('ficaram de fora')}: ${r.fora.join(', ')}` : ''));
+        const noEditor = !V3.casa && typeof vePjImportarArquivo === 'function';   // na Lux o render não entra no projeto do Editor
+        if (noEditor) await vePjImportarArquivo(r.path);
+        veToast(`${veT(video ? 'Vídeo pronto' : 'Foto pronta')}${r.cache ? ` (${veT('já estava feita')})` : ` · ${r.segundos} s`}${noEditor ? ' — ' + veT('no painel Projeto') : ''}` + (r.fora && r.fora.length ? ` · ${veT('ficaram de fora')}: ${r.fora.join(', ')}` : ''));
         window.pywebview.api.open_file(r.path);
         return r;
     } catch (er) { veToast(er.message || String(er)); }
@@ -351,5 +352,5 @@ function ve3dEstudioMenu(btn) {
 }
 // API (agente): VE3DAPI.estudio({qualidade: rapida|estudio|4k}) → {path, segundos, cache, fora}; usa a cena selecionada
 // VE3DAPI.estudioVideo({motor: eevee|cycles}) → {path, segundos, quadros, cache}
-VE3DAPI.estudioVideo = async function (op = {}) { const c = ve3dTelaClipe && ve3dTelaClipe() || VE.clips[VE.sel]; if (!c) throw new Error('selecione a cena 3D'); return ve3dEstudioVideo(c, op); };
-VE3DAPI.estudio = async function (op = {}) { const c = ve3dTelaClipe && ve3dTelaClipe() || VE.clips[VE.sel]; if (!c) throw new Error('selecione a cena 3D'); return ve3dEstudio(c, op); };
+VE3DAPI.estudioVideo = async function (op = {}) { const c = ve3dTelaClipe && ve3dTelaClipe() || V3.clipe(); if (!c) throw new Error('selecione a cena 3D'); return ve3dEstudioVideo(c, op); };
+VE3DAPI.estudio = async function (op = {}) { const c = ve3dTelaClipe && ve3dTelaClipe() || V3.clipe(); if (!c) throw new Error('selecione a cena 3D'); return ve3dEstudio(c, op); };

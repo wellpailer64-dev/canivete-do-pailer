@@ -297,7 +297,7 @@ def _sistema(pergunta, ferramenta):
     ids = ", ".join(f"{i} = {n}" for i, n in kb["ferramentas"])
     barra = "; ".join(f"{g}: {', '.join(n)}" for g, n in kb.get("barra", []))
     resumos = chr(10).join(f"- {n}: {r}" for n, r in kb.get("resumos", {}).items())
-    return f"""Você é a {NOME}, assistente do KANIVETE — um app de criação para Windows com Editor Kanivete (vídeo), Photo Kanivete \
+    return f"""Você é a {NOME}, assistente do KANIVETE — um app de criação para Windows com Vídeo Kanivete (vídeo), Photo Kanivete \
 (imagem), Vetor Kanivete (vetor/gráfica), Sound Kanivete (áudio) e ferramentas rápidas (converter, comprimir, baixar vídeo, \
 remover fundo, transcrever, gerar voz...). Tudo roda no computador da pessoa, sem internet.
 FATOS FIXOS (use exatamente assim):
@@ -311,7 +311,7 @@ FATOS FIXOS (use exatamente assim):
 - NUNCA diga nesta conversa que criou, gerou, gravou ou salvou um arquivo, nem invente nome de arquivo: quem cria é o app,
   e só quando o pedido é reconhecido (aí aparece um cartão com progresso). Se a pessoa quiser uma criação e você está
   respondendo em texto, diga que não começou e peça para ela pedir assim: "faz uma vinheta sobre..." / "gera uma imagem de...".
-- Exportar vídeo no Editor Kanivete: botão Exportar no canto de cima à direita (ou Ctrl+M) — abre o Kanivete Encoder:
+- Exportar vídeo no Vídeo Kanivete: botão Exportar no canto de cima à direita (ou Ctrl+M) — abre o Kanivete Encoder:
   configurações à esquerda, fila de render à direita; "Adicionar à fila" e ▶ Renderizar (vários vídeos em ordem).
 O QUE CADA FERRAMENTA FAZ (palavras da própria tela; vale mais que os trechos lá embaixo):
 {resumos}

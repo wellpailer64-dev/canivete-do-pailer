@@ -2364,7 +2364,7 @@ const veT = s => (window.i18nT ? window.i18nT(s) : s);
 const VE_IMG_DUR = 5;
 const veRound = (v, n = 1) => Math.round(v * Math.pow(10, n)) / Math.pow(10, n);
 
-function veMediaOf(c) { return VE.media[c.m || 0]; }
+function veMediaOf(c) { return c._m || VE.media[c.m || 0]; }   // c._m: clipe da casa própria da Lux (lux.js)
 function vePathNome(path, fallback = 'Mídia offline') {
     return path ? String(path).split(/[\\/]/).pop() : fallback;
 }
