@@ -2147,7 +2147,7 @@
    "modulos": []
   },
   "ke_parar": {
-   "args": "",
+   "args": "tipo=None",
    "modulos": [
     "blender_render",
     "sound_kanivete"
@@ -2827,6 +2827,7 @@
   "tools/imgprep.py": "Prepara imagens para a peça numa linha: cortar, ampliar por IA, recortar o fundo, limpar sobras e tapar buracos",
   "tools/kani_kb.py": "Base de ajuda da Kani (assistente do KANIVETE): junta os guias das ferramentas (Instructions/*.md) e o mapa geral",
   "tools/knv.py": "Monta uma peça do Photo Kanivete a partir de HTML/CSS (KNV.cena) no app aberto em modo agente e confere",
+  "tools/logotipo.py": "Logotipo a partir de uma fonte livre (OFL) com letras redesenhadas: técnica de agência \"fonte de base + ajustes\"",
   "tools/mapa_codigo.py": "Mapa do código (para o agente achar onde mexer sem abrir arquivo grande): comandos registrados, funções de topo e",
   "tools/mapa_geral.py": "Mapa geral do KANIVETE — gera Instructions/MAPA.md (pessoas, Claude) e Instructions/mapa.json (Jr / Worker local)",
   "tools/medir_ref.py": "Medidor de referência: lê uma imagem de referência (print de carrossel/flyer) SEM o Claude olhar e devolve as medidas",
@@ -3029,6 +3030,7 @@
   "teste_ke_media": "Kanivete Encoder como Media Encoder (ke-arquivos.js + Functions/ke_arquivos.py) — app em --agente=9333:",
   "teste_ke_parar": "Parar da fila do Ke interrompe o Blender (item da Lux): app em --agente=9333",
   "teste_laco": "Laço: Shift soma, Alt subtrai, Shift+Alt cruza; o mesmo no magnético; Ctrl+clique na miniatura seleciona a camada",
+  "teste_lobby_camadas": "Lobby do Photo/Vetor não cobre a janela Novo documento nem os menus (app 9333)",
   "teste_lux_casa": "Lux com casa própria: abre sem o Editor, desfaz sozinha, envia cópia para a timeline (app em --agente=9333)",
   "teste_mixer": "Mixer de trilhas de áudio (editor-mixer.js): Premiere → Kanivete → XML do Premiere e a conta do som na exportação",
   "teste_motion": "Motion do Editor Kanivete (editor-motion.js) com mouse de verdade: ferramenta Máscara (arrastar no monitor), Caneta",

@@ -268,6 +268,9 @@ Ainda não: oclusão própria no girar 3D (perfil que se esconde atrás de si), 
   editável na mesma linha de base (várias linhas = texto de área; `<span>/<b>/<em>` = trechos), `<img data-arquivo>` com
   object-fit, `data-icone`, `data-qr`, `data-simbolo="Nome"` (símbolo do documento encaixado na caixa), `data-grupo`,
   `data-nome`. Reset de CSS com `:where()` (não vence as classes da página). Rodar de novo troca só o que a cena criou.
+- Trechos (`<span>`) contam a posição como o innerText (sem espaço no começo da linha/antes do `<br>`; antes a cor
+  começava 1 letra depois quando o HTML tinha quebra de linha). `white-space:nowrap` = folga de 2 em na caixa (a medida do
+  Vetor é um pouco mais larga e quebrava a linha de novo). Logo a partir de fonte: `tools/logotipo.py` (marca sereno).
 - Fonte variável sem arquivo por peso (Inter): o motor converte o estilo (SemiBold, Light...) no eixo `wght` sozinho.
 - `tools/vk_cena.py` + `marca.json` (cores hex+cmyk viram `var(--nome)` e a paleta; fontes `var(--titulo)`/`var(--texto)`).
   Kit da marca = documento com os símbolos (assinaturas, logotipo, símbolo, versões negativas): `D:/kanivete_biblioteca/marcas/<marca>/`.

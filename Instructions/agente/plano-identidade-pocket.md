@@ -23,15 +23,15 @@ Cuidado: cor de tela muito saturada (verde-limão) sai apagada em CMYK — escol
 | 1 | Escola de mockup (5 PSDs dissecados camada a camada) | **Feita** | `Instructions/agente/mockup-profissional.md` §1–4; `D:/kanivete_biblioteca/mockups/estudo/` |
 | 2 | Produto 3D com rótulo e foto de estúdio | **Feita** (virou a **Lux Kanivete**) | `CLAUDE.md` › Lux; `cena-3d-editor.md` (fim); `mockup-profissional.md` §5 |
 | 2b | Vídeo 3D (render quadro a quadro) | **Feita** (Cycles prévia ~3 s/quadro, final ~5,6 s) | idem |
-| 2c | Presets de cena (flutuando, fileira "um diferente no meio de iguais", macro da tampa, herói inclinado) | **Próxima** | — |
-| 3 | A marca: nome, palavra-sistema, slogan, frases | A fazer | — |
-| 4 | Logotipo no Vetor com construção profissional (grade, ajuste óptico, versões, área de proteção) | A fazer | Vetor Kanivete |
-| 5 | Paleta (pensada para CMYK) e tipografia | A fazer | — |
+| 2c | Presets de cena (flutuando, fileira "um diferente no meio de iguais", macro da tampa, herói inclinado) | Adiada (fazer junto da etapa 7) | — |
+| 3 | A marca: nome, palavra-sistema, slogan, frases | **Feita**: **sereno** (orvalho + calma), "Pode suar. Fica sereno.", "[momento] sereno" | `D:/kanivete_biblioteca/marcas/sereno/marca.md` |
+| 4 | Logotipo no Vetor com construção profissional (grade, ajuste óptico, versões, área de proteção) | **Feita**: Fraunces macia + "o" em gota; kit com 4 símbolos | `tools/logotipo.py`; `marcas/sereno/logo/`, `kit.aknv` |
+| 5 | Paleta (pensada para CMYK) e tipografia | **Feita**: noite/manhã/orvalho/sálvia/lavanda/pêssego + terracota (texto de destaque); Fraunces + Jost | `marcas/sereno/marca.json` |
 | 6 | Rótulos (pote e bastão) com a marca | A fazer | Vetor/Photo → PNG para a Lux |
 | 7 | Fotos de produto na Lux (herói, flutuando, fileira, macro) + mockups no Photo (cartão, sacola…) | A fazer | Lux + Photo |
 | 8 | Cenas de campanha com frases (sensação da marca) | A fazer | Photo (KNV.cena) |
 | 9 | Vídeo 3D de 5 s da marca | A fazer | Lux › Render › Vídeo final |
-| 10 | Montagem final no Vetor (pranchetas uma abaixo da outra) | A fazer | Vetor Kanivete |
+| 10 | Montagem final no Vetor (pranchetas uma abaixo da outra) | **Começada**: manual de 8 páginas (capa, conceito, palavra-sistema, logotipo, versões, cores, tipografia, voz); acrescentar as próximas etapas nele | `marcas/sereno/kit.aknv`, `sereno_manual.pdf`; montagem: `D:/kanivete_testes/sereno/manual.py` (páginas em `paginas.html`) |
 
 ## Ferramentas que já existem para isso
 - **Lux Kanivete**: embalagens pote/bastão (`frontend/embalagens.json`), materiais do Principled (`frontend/materiais.json`),
@@ -47,4 +47,12 @@ Cuidado: cor de tela muito saturada (verde-limão) sai apagada em CMYK — escol
 - Gel no EEVEE sem bolhas (ficou como opção; o vídeo usa Cycles).
 
 ## Próximo passo ao voltar
-Etapa **2c** (presets de cena na Lux) e, em seguida, **3** (a marca). Atualizar a tabela acima a cada etapa fechada.
+Etapa **6** (rótulos do pote e do bastão com a marca sereno, 3 aromas) → **7** (fotos na Lux, com os presets da 2c) → 8 → 9;
+cada etapa vira páginas novas no manual (`paginas.html` + `manual.py`). Atualizar a tabela acima a cada etapa fechada.
+
+## Técnicas aprendidas na marca (2026-10-15)
+- Logo = fonte livre de base + letra redesenhada em código (`tools/logotipo.py`: instancia a variável, troca a letra com
+  skia-pathops, gera SVG + folha de construção). Barato: uma rodada = ~1 s e uma folha reduzida para olhar.
+- Kit = SVG por cor importado no Vetor → `criar_simbolo`; páginas do manual em HTML com `data-simbolo` (VKN.cena).
+- Pêssego/laranja claro não passa no contraste como texto sobre creme: criar um tom de texto (terracota) na paleta.
+- Revisor: fundo de cartão em grade às vezes não é visto (contraste falso); conferir na folha de contato.

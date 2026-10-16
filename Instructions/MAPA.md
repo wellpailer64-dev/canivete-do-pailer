@@ -91,7 +91,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - **Interface**: `som-dock.js`, `som-espectro.js`, `som-gravar.js`, `som-motor.js`, `som-paineis.js`, `som-texto.js`, `som-tts.js`, `som.js`, `som.css`
 - **Python**: `Functions/sound_kanivete.py`, `Functions/sk_gravar.py`, `Functions/sk_espectro.py`, `Functions/sk_banco_vozes.py`
 - **Automação (agente/Jr)**: window.SKN (som.js): novo, importar, cortar, alterarClipe, exportar, estado...
-- **API** (`pywebview.api.*`, 23): `sk_info(path)`, `sk_trecho(arq, k, sr=48000)`, `sk_auto(acao, proj=None, caminho=None, pid=None)`, `sk_gravar(acao, dispositivo=None, caminho=None, sr=48000, canais=1)`, `sk_ir(tamanho=1.2)`, `sk_espectro(arq, t0, t1, cols=1200, rows=256)`, `sk_salvar(proj, caminho)`, `sk_abrir(caminho)`, `sk_exportar(proj, caminho, op=None)`, `sk_medir(proj, op=None)`, `sk_processar(arq, efeito, op=None)`, `sk_transcrever(proj, idioma="pt", faixas=None)`, `sk_lufs(arq, de=0, dur=None)`, `sk_silencios(arq, de=0, dur=None, limiar=-40, minimo=0.6)`, `sk_pasta_padrao()`, `sk_vozes()`, `sk_voz_criar(nome, arq, op=None)`, `sk_banco(acao="estado", vid=None)`, `sk_voz_desenhar(instruct, seed=0, texto=None)`, `sk_voz_apagar(voz_id)`, `sk_voz(voz_id, texto, op=None)`, `sk_dialogo(modo, tipos=None, nome="")`, `ke_parar()`
+- **API** (`pywebview.api.*`, 23): `sk_info(path)`, `sk_trecho(arq, k, sr=48000)`, `sk_auto(acao, proj=None, caminho=None, pid=None)`, `sk_gravar(acao, dispositivo=None, caminho=None, sr=48000, canais=1)`, `sk_ir(tamanho=1.2)`, `sk_espectro(arq, t0, t1, cols=1200, rows=256)`, `sk_salvar(proj, caminho)`, `sk_abrir(caminho)`, `sk_exportar(proj, caminho, op=None)`, `sk_medir(proj, op=None)`, `sk_processar(arq, efeito, op=None)`, `sk_transcrever(proj, idioma="pt", faixas=None)`, `sk_lufs(arq, de=0, dur=None)`, `sk_silencios(arq, de=0, dur=None, limiar=-40, minimo=0.6)`, `sk_pasta_padrao()`, `sk_vozes()`, `sk_voz_criar(nome, arq, op=None)`, `sk_banco(acao="estado", vid=None)`, `sk_voz_desenhar(instruct, seed=0, texto=None)`, `sk_voz_apagar(voz_id)`, `sk_voz(voz_id, texto, op=None)`, `sk_dialogo(modo, tipos=None, nome="")`, `ke_parar(tipo=None)`
 - **Testes**: `testes/teste_som.py`
 - **Guias**: `Instructions/sound-kanivete.md`
 
@@ -219,6 +219,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/imgprep.py` — Prepara imagens para a peça numa linha: cortar, ampliar por IA, recortar o fundo, limpar sobras e tapar buracos
 - `tools/kani_kb.py` — Base de ajuda da Kani (assistente do KANIVETE): junta os guias das ferramentas (Instructions/*.md) e o mapa geral
 - `tools/knv.py` — Monta uma peça do Photo Kanivete a partir de HTML/CSS (KNV.cena) no app aberto em modo agente e confere
+- `tools/logotipo.py` — Logotipo a partir de uma fonte livre (OFL) com letras redesenhadas: técnica de agência "fonte de base + ajustes"
 - `tools/mapa_codigo.py` — Mapa do código (para o agente achar onde mexer sem abrir arquivo grande): comandos registrados, funções de topo e
 - `tools/mapa_geral.py` — Mapa geral do KANIVETE — gera Instructions/MAPA.md (pessoas, Claude) e Instructions/mapa.json (Jr / Worker local)
 - `tools/medir_ref.py` — Medidor de referência: lê uma imagem de referência (print de carrossel/flyer) SEM o Claude olhar e devolve as medidas
@@ -421,6 +422,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_ke_media.py` — Kanivete Encoder como Media Encoder (ke-arquivos.js + Functions/ke_arquivos.py) — app em --agente=9333:
 - `testes/teste_ke_parar.py` — Parar da fila do Ke interrompe o Blender (item da Lux): app em --agente=9333
 - `testes/teste_laco.py` — Laço: Shift soma, Alt subtrai, Shift+Alt cruza; o mesmo no magnético; Ctrl+clique na miniatura seleciona a camada
+- `testes/teste_lobby_camadas.py` — Lobby do Photo/Vetor não cobre a janela Novo documento nem os menus (app 9333)
 - `testes/teste_lux_casa.py` — Lux com casa própria: abre sem o Editor, desfaz sozinha, envia cópia para a timeline (app em --agente=9333)
 - `testes/teste_mixer.py` — Mixer de trilhas de áudio (editor-mixer.js): Premiere → Kanivete → XML do Premiere e a conta do som na exportação
 - `testes/teste_motion.py` — Motion do Editor Kanivete (editor-motion.js) com mouse de verdade: ferramenta Máscara (arrastar no monitor), Caneta

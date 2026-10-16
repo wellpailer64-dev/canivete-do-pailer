@@ -117,7 +117,10 @@ async function vkCenaTexto(el, cs, r, rr, p, pal, cmd, cv, nome) {
     const area = linhas.length > 1 || el.dataset.caixa != null;
     let res;
     if (area) {
-        const cx = r.left - rr.left + pl, cw = r.width - pl - pr + 1.5;
+        // linhas só por <br> (nowrap/pre): a medida do Vetor sai um pouco mais larga que a do navegador; folga de 2 em
+        // para não quebrar de novo, mantendo o alinhamento (centro/direita deslocam a caixa)
+        const folga = /nowrap|pre/.test(cs.whiteSpace) ? tam * 2 : 0;
+        const cx = r.left - rr.left + pl - (alin === 'centro' ? folga / 2 : alin === 'dir' ? folga : 0), cw = r.width - pl - pr + 1.5 + folga;
         res = await cmd('texto', { ...comum, x: p.x + cx, y: p.y + r.top - rr.top + pt, caixa: vkMM(cw), caixa_alt: vkMM(r.height - pt - (parseFloat(cs.paddingBottom) || 0) + lh), un: undefined, prancheta: p.id,
             ...{ x: vkMM(cx), y: vkMM(r.top - rr.top + pt) } }, nome);
         if (res) { const o = vkObj(res.id), g = await vkGeoPronta(o); if (g && g.linhas && g.linhas[0]) o.m[5] += p.y + base0 - (o.m[5] + g.linhas[0].base * (vkEsc(o.m) || 1)); }
@@ -127,11 +130,17 @@ async function vkCenaTexto(el, cs, r, rr, p, pal, cmd, cv, nome) {
     }
     if (!res) return;
     // trechos: <span>/<b>/<em> com cor ou peso diferente do bloco
-    const o = vkObj(res.id); let pos = 0;
+    // posição igual à do innerText: espaços colapsados, sem espaço no começo da linha nem antes do <br>
+    const o = vkObj(res.id); let pos = 0, ult = '\n';
     const walk = async (n, herd) => {
-        if (n.nodeType === 3) { pos += n.textContent.replace(/\s+/g, ' ').length; return; }
+        if (n.nodeType === 3) {
+            let t = n.textContent.replace(/\s+/g, ' ');
+            if (ult === '\n' || ult === ' ') t = t.replace(/^ /, '');
+            if (t) { pos += t.length; ult = t.at(-1); }
+            return;
+        }
         if (n.nodeType !== 1) return;
-        if (n.tagName === 'BR') { pos += 1; return; }
+        if (n.tagName === 'BR') { if (ult === ' ') pos -= 1; pos += 1; ult = '\n'; return; }
         const c2 = getComputedStyle(n), ini = pos;
         for (const f of n.childNodes) await walk(f, herd);
         if (n === el) return;
