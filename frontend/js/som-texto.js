@@ -68,7 +68,7 @@ function skUiExportar(el) {
         <label>Volume final ${sel('ske-l', [['', 'Como está'], ['-14', '-14 LUFS (redes, streaming)'], ['-16', '-16 LUFS (podcast)'], ['-23', '-23 LUFS (TV)']], op.l)}</label>
         <label>Faixas ${sel('ske-fx', [['', 'Mixagem de todas'], ...SK.proj.faixas.map(f => [f.id, `Só "${skEsc(f.nome)}"`])], op.fx)}</label>
         <label class="sk-chk"><input type="checkbox" id="ske-stems" ${op.stems ? 'checked' : ''}> Stems: um arquivo por faixa (mesmo tamanho, alinhados)</label></div>
-        <div class="sk-p-acoes"><button class="ie-btn ie-btn-primario" id="ske-ok">Exportar…</button><button class="ie-btn ie-btn-mini" onclick="skEnviarEditor().catch(e => skToast(e.message))">→ Editor de vídeo</button></div>
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-primario" id="ske-ok">Exportar…</button><button class="ie-btn ie-btn-mini" id="ske-ke" title="Congela o projeto agora e exporta na fila do Kanivete Encoder (dá para continuar mexendo)">→ fila do Ke</button><button class="ie-btn ie-btn-mini" onclick="skEnviarEditor().catch(e => skToast(e.message))">→ Vídeo Kanivete</button></div>
         <div class="sk-grupo sk-exp"><div class="sk-p-tit">Informações (ID3) e capítulos</div>
         ${campo('titulo', 'Título')}${campo('artista', 'Artista')}${campo('album', 'Álbum / programa')}${campo('ano', 'Ano')}${campo('genero', 'Gênero')}${campo('comentario', 'Comentário')}
         <label class="sk-chk"><input type="checkbox" id="ske-caps" ${op.caps ? 'checked' : ''} ${nm ? '' : 'disabled'}> Marcadores viram capítulos (${nm})</label>
@@ -85,10 +85,11 @@ function skUiExportar(el) {
     };
     el.onclick = async e => {
         if (e.target.id === 'ske-modelo-ok') { const n = skSalvarModelo(el.querySelector('#ske-modelo').value); skToast(`Modelo salvo: ${n}`); return; }
-        if (e.target.id !== 'ske-ok') return;
+        if (e.target.id !== 'ske-ok' && e.target.id !== 'ske-ke') return;
         const o = SK.expOp;
         const c = await skApi().sk_dialogo('salvar', [`Áudio (*.${o.f})`], `${SK.proj.nome || 'audio'}.${o.f}`);
         if (!c) return;
+        if (e.target.id === 'ske-ke') { skParaKe(c, o); return; }
         const r = await skExportarTudo(c, o).catch(er => ({ success: false, error: er.message }));
         skToast(r.success ? (r.arquivos ? `${r.arquivos.length} stems exportados` : `Exportado: ${r.caminho.split(/[\\/]/).pop()}`) : r.error);
     };
@@ -104,6 +105,22 @@ async function skExportarTudo(caminho, o) {
         try { return await SKN.exportar(caminho, { ...base, lufs: o.l === '' ? null : +o.l, faixas: o.fx ? [o.fx] : null }); } finally { skEl('sk-status-info').textContent = ''; }
     }
     return skExportarStems(caminho, base);
+}
+// Fila do Kanivete Encoder (ke-arquivos.js, item tipo "som"): o projeto e as opções congelam agora (cópia), as chamadas
+// do sk_exportar ficam prontas (uma; ou uma por faixa nos stems) e rodam na vez do item — dá para seguir editando.
+function skParaKe(caminho, o) {
+    if (typeof keSomEnviar !== 'function') { skToast('Esta versão ainda não tem a fila do Ke'); return null; }
+    const proj = JSON.parse(JSON.stringify(SK.proj)), base = skOpExport(o), chamadas = [];
+    if (!o.stems) chamadas.push({ caminho, op: { ...base, lufs: o.l === '' ? null : +o.l, faixas: o.fx ? [o.fx] : null } });
+    else {
+        const raiz = caminho.replace(/\.[^.\\/]+$/, ''), ext = base.formato || 'wav', fim = skFim(), solo = proj.faixas.some(f => f.solo);
+        proj.faixas.filter(f => f.clipes.length && !f.mudo && (!solo || f.solo)).forEach(f =>
+            chamadas.push({ caminho: `${raiz} - ${f.nome.replace(/[\\/:*?"<>|]/g, '_')}.${ext}`, op: { ...base, faixas: [f.id], ini: 0, fim, capitulos: null } }));
+    }
+    if (!chamadas.length) { skToast('Nada para exportar'); return null; }
+    const id = keSomEnviar({ nome: caminho.split(/[\\/]/).pop().replace(/\.[^.]+$/, ''), proj, chamadas, dur: skFim(), formato: base.formato, stems: !!o.stems });
+    skToast(`Na fila do Kanivete Encoder${o.stems ? ` (${chamadas.length} stems)` : ''} · ▶ Renderizar no Ke para começar`);
+    return id;
 }
 async function skExportarStems(caminho, op = {}) {   // um arquivo por faixa com som, do 0 ao fim do projeto (alinham no DAW)
     const raiz = caminho.replace(/\.[^.\\/]+$/, ''), ext = (op.formato || 'wav'), fim = skFim(), arquivos = [];

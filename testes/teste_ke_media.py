@@ -1,9 +1,10 @@
 """Kanivete Encoder como Media Encoder (ke-arquivos.js + Functions/ke_arquivos.py) — app em --agente=9333:
 arquivos do disco na fila da aba do Ke (sem projeto), cada um com a sua predefinição, renderizados em ordem; e um render
-curto da Lux mandado para a fila. Uso: py -3.13 testes/teste_ke_media.py [video.mp4] [--sem-lux]"""
+curto da Lux mandado para a fila. Uso: py -3.13 testes/teste_ke_media.py [video.mp4] [--sem-lux] [--sem-som]"""
 import os, sys, time
 from playwright.sync_api import sync_playwright
 
+AUDIO = r"D:\kanivete_testes\ke_media\quick_misto.mp3"
 VIDEO = next((a for a in sys.argv[1:] if not a.startswith('--')), r"D:\kanivete_testes\autoframe\quick_misto.mp4")
 falhas = []
 def ok(c, m):
@@ -47,5 +48,25 @@ with sync_playwright() as p:
         r = J("(({estado, saida, erro}) => ({estado, saida, erro}))(VEFILA.itens.filter(x => x.tipo === 'lux').slice(-1)[0])")
         print(r)
         ok(r['estado'] == 'pronto' and r['saida'] and os.path.isfile(r['saida']), f'Lux renderizou pela fila do Ke em {round(time.time() - t0)} s')
+    if '--sem-som' not in sys.argv:
+        J("switchTool('sound-kanivete')"); time.sleep(2)
+        J("skNovo('vazio', 'Teste Ke')"); time.sleep(1)
+        J(f"skImportar([{AUDIO!r}])"); time.sleep(4)
+        saida = os.path.join(os.path.dirname(AUDIO), 'teste_ke_som.mp3')
+        a = J(f"skParaKe({saida!r}, {{f: 'mp3', k: '192', l: '-14', fx: '', stems: false, caps: false}})")
+        b = J(f"skParaKe({saida.replace('.mp3', '_st.wav')!r}, {{f: 'wav', k: '192', l: '', fx: '', stems: true, caps: false}})")
+        ok(bool(a and b), 'Sound pôs mixagem e stems na fila do Ke')
+        J("switchTool('kanivete-encoder')"); time.sleep(1)
+        J("veFilaIniciar()")
+        t0 = time.time()
+        while time.time() - t0 < 180 and J("VEFILA.itens.some(x => x.tipo === 'som' && (x.estado === 'espera' || x.estado === 'rodando'))"):
+            time.sleep(1)
+        res = J("VEFILA.itens.filter(x => x.tipo === 'som').slice(-2).map(x => ({e: x.estado, s: x.saida, erro: x.erro, vol: x.volume && x.volume.lufs}))")
+        print(res)
+        ok(all(r['e'] == 'pronto' and r['s'] and os.path.isfile(r['s']) for r in res), 'Sound exportou pela fila (mixagem e stems)')
+        ok(res[0]['vol'] is not None and abs(res[0]['vol'] + 14) < 1.5, f"mixagem no volume pedido (-14 LUFS: {res[0]['vol']})")
+        for r in res:
+            try: os.remove(r['s'])
+            except OSError: pass
     J("VEFILA.itens = VEFILA.itens.filter(x => !x.tipo); veFilaRender()")
 print('FALHAS:', len(falhas)); sys.exit(1 if falhas else 0)

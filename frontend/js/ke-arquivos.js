@@ -62,10 +62,34 @@ async function keLuxEnviar(c, qualidade = 'previa', op = {}) {   // op.segundos:
     return it.id;
 }
 
+// Sound Kanivete: projeto e opções congelados por som-texto.js (skParaKe); cada chamada é um sk_exportar
+function keSomEnviar({ nome, proj, chamadas, dur, formato, stems }) {
+    const it = { id: ++VEFILA.seq, tipo: 'som', proj, chamadas, timeline: `Sound · ${proj.nome || nome}`, dur: +dur || 0, formato, stems, estado: 'espera', pct: 0,
+        cfg: { nome, drive: (($ve('ve-drive-link') || {}).value || '').trim(), noAudio: false } };
+    VEFILA.itens.push(it); veFilaRender();
+    if (typeof veKeSom === 'function') veKeSom('fila');
+    return it.id;
+}
+
 // ── execução (chamada por veFilaProximo para os tipos novos) ──
 async function keRodarItem(it) {
     const api = window.pywebview.api;
     if (it.tipo === 'arquivo') { await api.ke_arquivo_converter(it.entrada, it.cfg.preset, it.cfg.dest || null, it.cfg.gpu !== false); return; }
+    if (it.tipo === 'som') {   // sk_exportar não dá andamento: a barra anda por chamada (stems = uma por faixa)
+        const n = it.chamadas.length;
+        try {
+            let primeiro = null;
+            for (const [i, ch] of it.chamadas.entries()) {
+                if (VEFILA.pausar && i) throw new Error(veT('parado'));
+                veFilaEvento({ pct: i / n * 100 + 2, message: n > 1 ? `${veT('Mixando o stem')} ${i + 1} ${veT('de')} ${n}` : veT('Mixando o áudio') });
+                const r = await api.sk_exportar(it.proj, ch.caminho, ch.op);
+                if (!r || !r.success) throw new Error((r && r.error) || veT('não exportou'));
+                primeiro = primeiro || r.caminho || ch.caminho;
+            }
+            veFilaEvento({ done: true, success: true, output_path: primeiro });
+        } catch (e) { veFilaEvento({ done: true, success: false, error: e.message || String(e) }); }
+        return;
+    }
     if (it.tipo === 'lux') {
         // o andamento do Blender vem por consulta (1×/s); o fim chega como o evento do export
         veFilaEvento({ pct: 0, message: veT('Renderizando no Blender, na placa') });   // Cycles + OptiX: o selo do Ke mostra placa
@@ -95,7 +119,7 @@ function keMontarCab(refazer) {
 }
 // etiquetas do item (no lugar das do formulário) e a predefinição editável enquanto espera
 function keEtiquetasHtml(it) {
-    const tags = it.tipo === 'lux' ? [it.qualidade === 'final' ? 'Cycles · final' : 'Cycles · prévia', `${it.quadros} ${veT('quadros')}`, veHuman(it.dur)]
+    const tags = it.tipo === 'som' ? [String(it.formato || '').toUpperCase(), it.stems ? `${it.chamadas.length} stems` : 'mixagem', veHuman(it.dur)] : it.tipo === 'lux' ? [it.qualidade === 'final' ? 'Cycles · final' : 'Cycles · prévia', `${it.quadros} ${veT('quadros')}`, veHuman(it.dur)]
         : [it.estado === 'espera' ? '' : kePresetNome(it.cfg.preset), veHuman(it.dur)].filter(Boolean);
     const sel = it.tipo === 'arquivo' && it.estado === 'espera'
         ? `<select class="ke-item-preset" onclick="event.stopPropagation()" onchange="keItemPreset(${it.id}, this.value)">${kePresets().filter(([id]) => it.temVideo || /^(mp3|wav)$/.test(id))
@@ -108,5 +132,5 @@ function keItemPreset(id, preset) { const it = VEFILA.itens.find(x => x.id === i
     const r = veFilaRender;
     veFilaRender = function () { r(); keMontarCab(); };
 })();
-window.KE_API = { adicionar: (caminhos, preset) => keArquivosAdicionar(caminhos, preset), lux: (q, op) => keLuxEnviar(typeof ve3dTelaClipe === 'function' ? ve3dTelaClipe() : null, q, op),
+window.KE_API = { som: d => keSomEnviar(d), adicionar: (caminhos, preset) => keArquivosAdicionar(caminhos, preset), lux: (q, op) => keLuxEnviar(typeof ve3dTelaClipe === 'function' ? ve3dTelaClipe() : null, q, op),
     presets: () => kePresets().map(p => p[0]) };
