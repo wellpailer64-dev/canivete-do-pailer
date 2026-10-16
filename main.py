@@ -1465,21 +1465,29 @@ def af_drive(url):
 
     def run():
         try:
-            send(etapa="conectando", msg="Conectando ao Google Drive...")
-            ok, erro = gd.garantir_conexao(callback_log=lambda m: send(etapa="conectando", msg=str(m)))
-            if not ok:
-                send(etapa="erro", msg=erro or "Não consegui conectar ao Google Drive.")
-                return
-            nome = gd.get_folder_name(item_id, tipo=tipo) or item_id
+            from Functions import drive_publico
+            send(etapa="conectando", msg="Abrindo o link do Google Drive...")
+            publico = drive_publico.acessivel(item_id, url)   # link público: sem login (sem a tela "app não verificado")
+            if not publico:
+                ok, erro = gd.garantir_conexao(callback_log=lambda m: send(etapa="conectando", msg=str(m)))
+                if not ok:
+                    send(etapa="erro", msg=erro or "Não consegui conectar ao Google Drive.")
+                    return
+            nome = (publico or {}).get("name") or gd.get_folder_name(item_id, tipo=tipo) or item_id
             limpo = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", str(nome)).strip(" .")[:60] or "Drive"
             destino = os.path.join(_af_drive_base(), f"{limpo}_{item_id[:6]}")
             send(etapa="baixando", msg=f"Baixando “{nome}”...", pct=0, pasta=destino)
             remote = [item_id] if tipo == "file" else ["--drive-root-folder-id", item_id, "gdrive:"]
-            ok = gd.dump_pasta(remote, destino, perfil="rapida", tipo=tipo, incluir=_AF_DRIVE_EXT, stop_event=stop,
-                               callback_progresso=lambda p, s: send(etapa="baixando", pct=p, msg=(
-                                   f"{s.get('files_done', 0)}/{s.get('files_total', '?')} arquivos · {s.get('speed', '')}"
-                                   if isinstance(s, dict) and s.get("files_total", -1) not in (-1, None) else
-                                   f"Baixando... {s.get('done', '') if isinstance(s, dict) else ''}")))
+            prog = lambda p, s: send(etapa="baixando", pct=p, msg=(
+                f"{s.get('files_done', 0)}/{s.get('files_total', '?')} arquivos · {s.get('speed', '')}"
+                if isinstance(s, dict) and s.get("files_total", -1) not in (-1, None) else
+                f"Baixando... {s.get('done', '') if isinstance(s, dict) else ''}"))
+            if publico:
+                ok = drive_publico.baixar(item_id, destino, url=url, perfil="rapida", incluir=_AF_DRIVE_EXT, stop_event=stop,
+                                          callback_progresso=prog, callback_log=lambda m: send(etapa="baixando", msg=str(m)))
+            else:
+                ok = gd.dump_pasta(remote, destino, perfil="rapida", tipo=tipo, incluir=_AF_DRIVE_EXT, stop_event=stop,
+                                   callback_progresso=prog)
             if stop.is_set():
                 send(etapa="erro", msg="Download cancelado.")
             elif ok:
@@ -2587,6 +2595,18 @@ def gdrive_analyze(url):
             if not item_id:
                 send(error="URL inválida! Não encontrei o ID da pasta/arquivo.")
                 return
+            from Functions import drive_publico
+            publico = drive_publico.acessivel(item_id, url)
+            if publico:   # link público: sem login (sem a tela "O Google não verificou este app")
+                log("🔓 Link público: não precisa entrar com a conta Google.")
+                try:
+                    nome, tb, tf = drive_publico.analisar(item_id, url, callback_log=log)
+                    icone = "📁 " if publico.get("mimeType") == drive_publico.PASTA else "📄 "
+                    send(complete=True, totalSize=_format_size(tb), totalFiles=tf, folderName=icone + nome)
+                except Exception as e:
+                    send(error=str(e), allowDownload=True)
+                return
+            log("🔒 Link privado (compartilhado só com algumas contas): precisa entrar com a conta Google que tem acesso.")
             ok, erro = garantir_conexao(callback_log=log)
             if not ok:
                 send(error=erro)
@@ -2671,8 +2691,11 @@ def gdrive_dump(url, destino, perfil="rapida"):
                              callback_progresso=lambda p, s: emit(percent=p, stats=s),
                              callback_arquivo=lambda n, p: emit(currentFile=n),
                              stop_event=stop_ev, pause_event=pause_ev)
+            from Functions import drive_publico
             if fotos:
                 success = google_fotos.baixar(url, destino, perfil=perfil, **callbacks)
+            elif drive_publico.acessivel(item_id, url):   # link público: sem login
+                success = drive_publico.baixar(item_id, destino, url=url, perfil=perfil, **callbacks)
             else:
                 remote_args = [item_id] if tipo == "file" else ["--drive-root-folder-id", item_id, "gdrive:"]
                 success = dump_pasta(remote_args, destino, perfil=perfil, tipo=tipo, **callbacks)

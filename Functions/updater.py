@@ -16,6 +16,7 @@ import tempfile
 import zipfile
 import subprocess
 import time
+import urllib.error
 import urllib.request
 
 GITHUB_REPO = "wellpailer64-dev/canivete-do-pailer"
@@ -59,26 +60,78 @@ def _vtuple(v):
     return tuple(partes[:3])
 
 
-def _get_json(url, timeout=10):
+def _ssl():
+    """certificados do certifi (vai no build junto com o requests): Windows sem o certificado raiz atualizado davam
+    CERTIFICATE_VERIFY_FAILED e a busca de atualização falhava calada"""
+    import ssl
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return ssl.create_default_context()
+
+
+def _abrir(req, timeout):
+    try:
+        return urllib.request.urlopen(req, timeout=timeout, context=_ssl())
+    except urllib.error.URLError as e:
+        if "CERTIFICATE" in str(e).upper():   # antivírus que inspeciona HTTPS: usa os certificados do Windows
+            return urllib.request.urlopen(req, timeout=timeout)
+        raise
+
+
+def _get_json(url, timeout=15):
     req = urllib.request.Request(url, headers={
         "User-Agent": "CaniveteDoPailer-Updater",
         "Accept": "application/vnd.github+json",
     })
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with _abrir(req, timeout) as r:
         return json.loads(r.read().decode("utf-8"))
 
 
-def check_update():
-    """Retorna dict: {available, current, latest, notes, url, size}"""
-    atual = versao_local()
+def _ultima_pelo_site(timeout=15):
+    """plano B sem a API (que limita 60 consultas/hora por IP e às vezes é bloqueada): o endereço
+    github.com/<repo>/releases/latest redireciona para .../tag/vX.Y.Z — a versão vem do endereço final"""
+    req = urllib.request.Request(f"https://github.com/{GITHUB_REPO}/releases/latest", headers={"User-Agent": "CaniveteDoPailer-Updater"})
+    with _abrir(req, timeout) as r:
+        final = r.geturl()
+    tag = final.rstrip("/").rsplit("/", 1)[-1]
+    if not tag.lower().startswith("v"):
+        raise RuntimeError("não achei a versão no site do GitHub")
+    return {"tag_name": tag, "body": "", "assets": [{"name": ASSET_NAME, "size": 0,
+            "browser_download_url": f"https://github.com/{GITHUB_REPO}/releases/download/{tag}/{ASSET_NAME}"}]}
+
+
+def _registrar(msg):
     try:
-        rel = _get_json(API_LATEST)
-    except Exception as e:
-        return {"available": False, "current": atual, "error": str(e)}
+        from Functions.midia import logs_dir
+        with open(os.path.join(logs_dir(), "atualizacao.log"), "a", encoding="utf-8") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S ") + msg + "\n")
+    except Exception:
+        pass
+
+
+def check_update():
+    """Retorna dict: {available, current, latest, notes, url, size, error}. Tenta a API do GitHub e, se falhar, o site."""
+    atual = versao_local()
+    erros = []
+    rel = None
+    for fonte in (lambda: _get_json(API_LATEST), _ultima_pelo_site):
+        try:
+            rel = fonte()
+            break
+        except Exception as e:
+            erros.append(str(e)[:160])
+    if rel is None:
+        _registrar(f"busca falhou (v{atual}): {' | '.join(erros)}")
+        return {"available": False, "current": atual, "error": erros[-1] if erros else "sem resposta",
+                "frozen": bool(getattr(sys, "frozen", False))}
 
     latest = rel.get("tag_name", "").lstrip("vV")
     asset = next((a for a in rel.get("assets", []) if a.get("name") == ASSET_NAME), None)
     disponivel = bool(asset) and _vtuple(latest) > _vtuple(atual)
+    if erros:
+        _registrar(f"API falhou ({erros[0]}); site respondeu v{latest}")
     return {
         "available": disponivel,
         "current": atual,
@@ -92,7 +145,7 @@ def check_update():
 
 def _baixar(url, destino, total, callback_progresso=None):
     req = urllib.request.Request(url, headers={"User-Agent": "CaniveteDoPailer-Updater"})
-    with urllib.request.urlopen(req, timeout=60) as r, open(destino, "wb") as f:
+    with _abrir(req, 60) as r, open(destino, "wb") as f:
         total = int(r.headers.get("Content-Length") or total or 0)
         baixado = 0
         ultimo = -1

@@ -54,9 +54,11 @@ jobs:
         shell: pwsh
         env:
           GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          GDRIVE_API_KEY: ${{ secrets.GDRIVE_API_KEY }}
         run: |
           if (-not $env:GDRIVE_CLIENT_SECRET) { Write-Error "Configure o secret GDRIVE_CLIENT_SECRET no repositório."; exit 1 }
-          Set-Content -Path Functions/_credenciais.py -Value "CLIENT_SECRET = `"$($env:GDRIVE_CLIENT_SECRET.Trim())`"" -Encoding utf8
+          if (-not $env:GDRIVE_API_KEY) { Write-Error "Configure o secret GDRIVE_API_KEY (chave de API do Drive: link público sem login)."; exit 1 }
+          Set-Content -Path Functions/_credenciais.py -Value "CLIENT_SECRET = `"$($env:GDRIVE_CLIENT_SECRET.Trim())`"`nAPI_KEY = `"$($env:GDRIVE_API_KEY.Trim())`"" -Encoding utf8
 
       - name: Build (PyInstaller)
         shell: cmd

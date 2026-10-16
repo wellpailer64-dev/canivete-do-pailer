@@ -352,6 +352,10 @@ sempre saindo da placa antes da geração. Conversão: `D:\kanivete_testes\sfx\e
 ## Segredos
 - `Functions/_credenciais.py` (client secret do Google Drive) fica fora do git; no CI vem do secret
   `GDRIVE_CLIENT_SECRET`. Nunca exibir nem commitar o valor.
+- Chave de API do Drive (`API_KEY` no mesmo `_credenciais.py`; secret `GDRIVE_API_KEY`; projeto canivete-do-pailer, restrita à
+  Google Drive API): link PÚBLICO baixa sem login (`Functions/drive_publico.py`, sem a tela "O Google não verificou este app");
+  link privado continua no login (rclone, escopo drive). Atualizador: tenta de novo se falhar, plano B pelo site do GitHub,
+  log em `logs/atualizacao.log`; clicar na versão = verificar agora.
 
 ## ffmpeg
 - O ffmpeg baixado é recente (7+): `-filter_complex_script` não existe mais; use `-/filter_complex`

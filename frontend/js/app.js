@@ -3433,13 +3433,35 @@ function updateAppUpdateProgress(data) {
 }
 window.updateAppUpdateProgress = updateAppUpdateProgress;
 
+// Busca de atualização: 4 s depois de abrir; se falhar (internet ainda subindo, antivírus, limite do GitHub) tenta de
+// novo em 1, 5 e 20 min; com o app aberto confere a cada 3 h. Clique no número da versão = verificar agora.
+// Antes era uma tentativa só, com o erro engolido: quem deixava o app aberto ou abria sem rede nunca via a versão nova.
+const _UPD = { tentativa: 0, achou: false, t: null };
+function _buscarAtualizacao(manual = false) {
+    clearTimeout(_UPD.t);
+    const v = _el('app-version');
+    if (manual && v) v.textContent = 'Verificando atualizações…';
+    return window.pywebview.api.check_update().then(info => {
+        if (!info) throw new Error('sem resposta');
+        if (v && info.current) {
+            v.textContent = 'v' + info.current + (info.error ? ' · não consegui verificar atualizações' : info.available ? ' · versão nova: v' + info.latest : ' · local e offline');
+            v.title = info.error ? 'Clique para tentar de novo. Motivo: ' + info.error : 'Clique para verificar se há versão nova';
+        }
+        if (info.error) throw new Error(info.error);
+        _UPD.tentativa = 0;
+        if (info.available) { _UPD.achou = true; _showUpdateBanner(info); }
+        else if (manual && typeof toast === 'function') toast('Você já está na versão mais nova (v' + info.current + ').');
+        _UPD.t = setTimeout(() => _buscarAtualizacao(), 3 * 3600e3);
+    }).catch(() => {
+        const esperas = [60e3, 5 * 60e3, 20 * 60e3, 60 * 60e3];
+        _UPD.t = setTimeout(() => _buscarAtualizacao(), esperas[Math.min(_UPD.tentativa++, esperas.length - 1)]);
+        if (manual && typeof toast === 'function') toast('Não consegui verificar atualizações agora. Tento de novo sozinho em instantes.', 'aviso');
+    });
+}
 window.addEventListener('pywebviewready', () => {
-    setTimeout(() => {
-        window.pywebview.api.check_update().then(info => {
-            if (info && info.current && _el('app-version')) _el('app-version').textContent = 'v' + info.current + ' · local e offline';
-            if (info && info.available) _showUpdateBanner(info);
-        }).catch(() => {});
-    }, 4000);
+    setTimeout(() => _buscarAtualizacao(), 4000);
+    const v = _el('app-version');
+    if (v) { v.style.cursor = 'pointer'; v.addEventListener('click', () => _buscarAtualizacao(true)); }
 });
 
 window.onArquivosSoltos = onArquivosSoltos;
