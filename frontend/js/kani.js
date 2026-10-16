@@ -529,8 +529,8 @@ if (document.readyState !== 'loading') kaniBolinha();
 const KANI_HOME_CHIPS = [['image', 'Imagem', 'Gera uma imagem de '], ['volume', 'Efeito sonoro', 'Cria um efeito sonoro de '],
     ['volume', 'Narração', 'Narre: "'], ['music', 'Vinheta', 'Faz uma vinheta para ']];
 function kaniHome() {
-    const drop = document.querySelector('#page-home .home-drop');
-    if (!drop || document.getElementById('home-kani')) return;
+    const home = document.getElementById('page-home');   // barra fixa embaixo, no centro da Home (CSS: sticky)
+    if (!home || document.getElementById('home-kani')) return;
     const s = document.createElement('section');
     s.className = 'home-kani'; s.id = 'home-kani';
     s.innerHTML = `<div class="home-kani-lin"><span class="home-kani-av"></span>
@@ -538,7 +538,7 @@ function kaniHome() {
         <input type="text" id="home-kani-txt" placeholder="Ex.: gera uma imagem de um café da manhã aconchegante, luz da janela">
         <button class="btn-primary" id="home-kani-ir">Enviar</button></div>
         <div class="home-kani-chips">${KANI_HOME_CHIPS.map(([i, n, t]) => `<button data-kh="${kaniEsc(t)}"><svg class="i"><use href="#i-${i}"/></svg>${n}</button>`).join('')}</div>`;
-    drop.after(s);
+    home.appendChild(s);
     const inp = s.querySelector('#home-kani-txt');
     const ir = () => { const t = inp.value.trim(); if (!t) { inp.focus(); return; } inp.value = ''; KANI_API.perguntar(t); };
     s.querySelector('#home-kani-ir').onclick = ir;

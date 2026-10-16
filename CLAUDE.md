@@ -6,8 +6,12 @@
   amigos procura esses nomes; trocar exige uma migração planejada.
 - Nomes visíveis: **Vídeo Kanivete** (Vd, lilás; antes "Editor Kanivete"), **Photo Kanivete** (Pk, azul), **Vetor
   Kanivete** (Vk, laranja), **Sound Kanivete** (Sk, azul clarinho), **Lux Kanivete** (Lk, magenta), **Kanivete Encoder**
-  (Ke, coral). Cores em `.al-*` (`frontend/css/app.css`, `som.css`). No código continuam editor de vídeo (`editor*.js`,
+  (Ke, roxo forte). Cores em `.al-*` (`frontend/css/app.css`, `som.css`). No código continuam editor de vídeo (`editor*.js`,
   `video-cutter`, "Pocket Editor" nos comentários) e editor de imagem (`imagem-*.js`).
+- Home (2026-10-16): banners deslizantes no topo, um por ferramenta, troca a cada 4 s (`frontend/js/home-banners.js`,
+  `HB_ITENS` com título/subtítulo/corpo; artes `frontend/img/home/banner-<id>.webp` geradas no Z-Image local por
+  `D:/kanivete_testes/scripts/gerar_banners.py`); trilho embaixo com ícone, nome e info; "Peça à Kani" fixa embaixo no
+  centro; aviso de versão nova em cima do "Pergunte à Kani". Ferramenta nova com marca = item novo em `HB_ITENS` + arte.
 - Ícone de cada arquivo de projeto = o logo da ferramenta (`identidade/arquivos/<sigla>.ico`, gerado por
   `py -3.13 tools/icones_arquivos.py`; registro por extensão em `Functions/projeto.py` `_TIPOS`). Mudou cor/sigla: rodar de novo.
 - Ferramenta separada = aba e página próprias (`#page-<id>` com `ve-page`), sem abrir outra por trás; o `switchTool` chama

@@ -9,7 +9,7 @@ RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SAIDA = os.path.join(RAIZ, "identidade", "arquivos")
 # nome do .ico: (sigla, cor, fundo) — as mesmas de .al-* no app.css / som.css
 LOGOS = {
-    "vd": ("Vd", "#b48cff", "#1c1230"),   # Vídeo Kanivete (.vknv)
+    "vd": ("Vd", "#c9a8ff", "#1e1530"),   # Vídeo Kanivete (.vknv)
     "pk": ("Pk", "#4c9bff", "#0a1a2e"),   # Photo Kanivete (.iknv)
     "vk": ("Vk", "#ff8c42", "#2b1408"),   # Vetor Kanivete (.aknv)
     "sk": ("Sk", "#7fd6ff", "#0a2230"),   # Sound Kanivete (.sknv)

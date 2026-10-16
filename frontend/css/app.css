@@ -1659,10 +1659,10 @@ html.barra-propria .app-container { height: calc(100vh - 26px); }
 .app-logo { --al: #ff8c42; --al-fundo: #2b1408; display: inline-grid; place-items: center; flex: none; box-sizing: border-box;
     width: 19px; height: 19px; border-radius: 22%; background: var(--al-fundo); box-shadow: inset 0 0 0 1.2px var(--al);
     color: var(--al); font: 700 9.5px/1 var(--font-ui); letter-spacing: -.02em; }
-.al-vd { --al: #b48cff; --al-fundo: #1c1230; }   /* Vídeo Kanivete: lilás */
+.al-vd { --al: #c9a8ff; --al-fundo: #1e1530; }   /* Vídeo Kanivete: lilás (mais claro que o roxo do Ke) */
 .al-pk { --al: #4c9bff; --al-fundo: #0a1a2e; }   /* Photo Kanivete: azul */
 .al-vk { --al: #ff8c42; --al-fundo: #2b1408; }   /* Vetor Kanivete: laranja */
-.al-ke { --al: #ff7056; --al-fundo: #2b100b; }   /* Kanivete Encoder: coral */
+.al-ke { --al: #9b4dff; --al-fundo: #1a0833; }   /* Kanivete Encoder: roxo forte */
 .al-lk { --al: #ff4fc8; --al-fundo: #2b0a22; }   /* Lux Kanivete: magenta */
 .app-logo-marca { width: 22px; height: 22px; font-size: 11px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px var(--al); }
 .app-logo-grande { width: 56px; height: 56px; font-size: 26px; border-radius: 12px; box-shadow: inset 0 0 0 2.5px var(--al); margin: 0 auto 14px; }
@@ -1733,8 +1733,86 @@ html.barra-propria .app-container { height: calc(100vh - 26px); }
 .home-kani-chips button:hover { border-color: var(--primary); color: var(--text); }
 .home-kani-chips .i { color: var(--primary); }
 @media (max-width: 760px) { .home-kani-txt { display: none; } .home-kani-chips { padding-left: 0; } }
-/* a bolinha da Kani sobe quando o aviso de versão nova está na tela */
-body:has(.update-banner:not([hidden])) .kani-bolinha { bottom: 86px; }
+/* a bolinha da Kani sobe quando o aviso de versão nova está na tela (fora da Home; na Home o aviso fica em cima dela) */
+body:not(:has(#page-home.active)):has(.update-banner:not([hidden])) .kani-bolinha { bottom: 86px; }
+
+/* =========================================================
+   Início — banners (2026-10-16): carrossel no topo (home-banners.js), trilho com as ferramentas, "Peça à Kani" fixa
+   embaixo no centro e o aviso de versão nova em cima do botão "Pergunte à Kani", no mesmo tamanho.
+   ========================================================= */
+.home-banners { display: flex; flex-direction: column; gap: 10px; margin: 6px 0 8px; }
+.hb-palco { position: relative; aspect-ratio: 1240 / 330; min-height: 260px; border-radius: 18px; overflow: hidden; background: #0b0a0c;
+    border: 1px solid rgba(255, 255, 255, .07); box-shadow: 0 24px 60px -30px rgba(0, 0, 0, .9); }
+.hb-slide { position: absolute; inset: 0; display: block; padding: 0; border: 0; background: none; color: #fff; text-align: left; cursor: pointer;
+    opacity: 0; visibility: hidden; transition: opacity .7s var(--ease, ease), visibility 0s .7s; isolation: isolate; }
+.hb-slide.on { opacity: 1; visibility: visible; transition: opacity .7s var(--ease, ease), visibility 0s; z-index: 1; }
+.hb-arte { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 70% 50%; z-index: -2; transform: scale(1.07); }
+.hb-slide.on .hb-arte { animation: hb-zoom 6s var(--ease, ease) forwards; }
+@keyframes hb-zoom { from { transform: scale(1.07); } to { transform: scale(1); } }
+.hb-veu { position: absolute; inset: 0; z-index: -1;
+    background: radial-gradient(60% 120% at 0% 100%, color-mix(in srgb, var(--al) 22%, transparent), transparent 70%),
+                linear-gradient(90deg, rgba(8, 7, 9, .97) 0%, rgba(8, 7, 9, .9) 30%, rgba(8, 7, 9, .45) 52%, rgba(8, 7, 9, 0) 72%),
+                linear-gradient(0deg, rgba(8, 7, 9, .55), transparent 40%); }
+.hb-txt { position: absolute; left: clamp(26px, 4vw, 52px); top: 50%; transform: translateY(-50%); width: min(520px, 46%); display: flex; flex-direction: column; gap: 12px; }
+.hb-txt > * { opacity: 0; transform: translateY(10px); }
+.hb-slide.on .hb-txt > * { animation: hb-sobe .6s var(--ease, ease) forwards; }
+.hb-slide.on .hb-txt > :nth-child(2) { animation-delay: .08s; } .hb-slide.on .hb-txt > :nth-child(3) { animation-delay: .16s; } .hb-slide.on .hb-txt > :nth-child(4) { animation-delay: .24s; }
+@keyframes hb-sobe { to { opacity: 1; transform: none; } }
+.hb-marca { display: flex; align-items: center; gap: 8px; font-size: 12.5px; letter-spacing: .01em; }
+.hb-marca .app-logo { width: 26px; height: 26px; font-size: 11.5px; border-radius: 7px; box-shadow: inset 0 0 0 1.5px var(--al); }
+.hb-marca b { font-weight: 650; color: #fff; }
+.hb-marca i { font-style: normal; color: rgba(255, 255, 255, .35); }
+.hb-marca em { font-style: normal; color: var(--al); font-weight: 600; }
+.hb-head { font: 700 clamp(24px, 2.6vw, 38px)/1.08 var(--font-ui); letter-spacing: -.025em; color: #fff; text-wrap: balance; }
+.hb-corpo { font-size: 13.5px; line-height: 1.55; color: rgba(255, 255, 255, .7); max-width: 460px; }
+.hb-cta { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px 0 16px; margin-top: 4px; border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--al) 55%, transparent); background: color-mix(in srgb, var(--al) 14%, rgba(0, 0, 0, .3));
+    color: #fff; font: 600 12.5px var(--font-ui); backdrop-filter: blur(6px); transition: background .2s, gap .2s; }
+.hb-seta { width: 15px; height: 15px; color: var(--al); }
+.hb-slide:hover .hb-cta { background: color-mix(in srgb, var(--al) 30%, rgba(0, 0, 0, .3)); gap: 12px; }
+/* Kani: o avatar oficial num halo laranja, no lugar da foto */
+.hb-arte-kani { display: block; background: radial-gradient(40% 70% at 74% 50%, rgba(255, 140, 66, .35), transparent 70%),
+    radial-gradient(70% 120% at 100% 0%, rgba(255, 90, 40, .18), transparent 60%), #0d0907; }
+.hb-arte-kani i { position: absolute; right: 16%; top: 50%; width: min(36%, 300px); aspect-ratio: 1; transform: translateY(-50%) rotate(-4deg); border-radius: 22%;
+    background: url(../identidade/kani.webp) center / cover; box-shadow: 0 30px 80px -20px rgba(255, 120, 50, .55), 0 0 0 1px rgba(255, 160, 100, .25); }
+.hb-kani, .hb-chip.hb-kani { --al: #ff8c42; }
+.hb-lk .hb-arte { object-position: 100% 60%; }   /* arte alargada à esquerda: o pote cabe inteiro */ .hb-vk .hb-arte { object-position: 70% 40%; }
+.hb-vd { --al: #c9a8ff; } .hb-ke { --al: #9b4dff; } .hb-pk { --al: #4c9bff; } .hb-vk { --al: #ff8c42; } .hb-sk { --al: #7fd6ff; } .hb-lk { --al: #ff4fc8; }
+.hb-kani-logo { background: url(../identidade/kani.webp) center / cover !important; box-shadow: none !important; }
+/* trilho: ícone, nome e info de cada ferramenta; o ativo mostra a barrinha dos 4 s */
+.hb-trilho { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.hb-chip { position: relative; display: flex; align-items: center; gap: 9px; min-width: 0; height: 52px; padding: 0 12px; border-radius: 12px; overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, .07); background: rgba(16, 14, 15, .72); color: var(--text); text-align: left; cursor: pointer;
+    backdrop-filter: blur(8px); transition: border-color .2s, background .2s, transform .2s; }
+.hb-chip:hover { transform: translateY(-1px); }
+.hb-chip.on { border-color: color-mix(in srgb, var(--al) 55%, transparent); background: color-mix(in srgb, var(--al) 9%, rgba(16, 14, 15, .85)); }
+.hb-chip .app-logo { width: 26px; height: 26px; font-size: 11px; border-radius: 7px; box-shadow: inset 0 0 0 1.5px var(--al); }
+.hb-chip-txt { display: flex; flex-direction: column; min-width: 0; }
+.hb-chip-txt b { font-size: 12.5px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hb-chip-txt small { font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hb-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; }
+.hb-prog i { display: block; height: 100%; width: 0; background: var(--al); }
+.hb-chip.on .hb-prog i { animation: hb-prog 4s linear forwards; }
+.home-banners:hover .hb-chip.on .hb-prog i { animation-play-state: paused; }   /* mouse em cima pausa a troca */
+@keyframes hb-prog { from { width: 0; } to { width: 100%; } }
+@media (max-width: 1100px) { .hb-trilho { grid-template-columns: repeat(4, minmax(0, 1fr)); } .hb-txt { width: 58%; } }
+@media (max-width: 700px) { .hb-trilho { grid-template-columns: repeat(2, minmax(0, 1fr)); } .hb-corpo { display: none; } }
+@media (prefers-reduced-motion: reduce) { .hb-slide.on .hb-arte, .hb-slide.on .hb-txt > * { animation: none; opacity: 1; transform: none; } }
+/* a grade embaixo não repete as ferramentas dos banners */
+.home-grid .home-card[onclick*="luxAbrir"] { display: none; }
+.home-cat:not(:has(.home-card:not([onclick*="'video-cutter'"]):not([onclick*="'editor-imagem'"]):not([onclick*="'vetor-kanivete'"]):not([onclick*="'sound-kanivete'"]):not([onclick*="luxAbrir"]))) { display: none; }
+/* "Peça à Kani": vidro fixo embaixo, no centro da coluna da Home */
+#page-home > .home-kani { position: sticky; bottom: 16px; z-index: 20; align-self: center; width: min(820px, 100%); margin-top: 18px; padding: 10px 12px;
+    border-radius: 18px; border-color: rgba(255, 140, 66, .32); background: rgba(18, 14, 12, .82); backdrop-filter: blur(16px) saturate(1.2);
+    box-shadow: 0 18px 50px -12px rgba(0, 0, 0, .8), 0 0 0 1px rgba(255, 255, 255, .03); gap: 8px; }
+#page-home > .home-kani .home-kani-chips button { height: 24px; font-size: 11.5px; }
+/* aviso de versão nova: na Home fica em cima do "Pergunte à Kani", com a mesma largura, altura e cantos */
+body:has(#page-home.active) .kani-bolinha { width: 296px; }
+body:has(#page-home.active) .update-banner { right: 26px; bottom: 92px; width: 296px; height: 56px; padding: 0 8px 0 16px; gap: 10px; border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, .1); background: rgba(20, 16, 14, .92); backdrop-filter: blur(8px); box-shadow: 0 12px 34px rgba(0, 0, 0, .5); font-size: 13px; }
+body:has(#page-home.active) .update-banner > span:first-of-type { flex: 1; min-width: 0; white-space: nowrap; }
+body:has(#page-home.active) .update-banner .ub-status:empty { display: none; }
+body:has(#page-home.active) .update-banner .btn-primary { height: 32px; padding: 0 12px; border-radius: 9px; }
 
 /* =========================================================
    Biblioteca de músicas (frontend/js/musicas.js)

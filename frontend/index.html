@@ -224,43 +224,9 @@
 
                 <!-- Início -->
                 <div class="tool-page active" id="page-home" data-drop="home">
-                    <header class="home-top">
-                        <div>
-                            <h1 class="home-title">O que vamos fazer <em>hoje?</em></h1>
-                            <p class="home-sub">Vídeo, áudio e imagem direto no seu PC. Solte um arquivo abaixo e o Kanivete sugere a ferramenta certa.</p>
-                        </div>
-                        <span class="home-badge"><svg class="i"><use href="#i-shield"/></svg>Nada vai para a nuvem</span>
-                    </header>
-                    <!-- as 3 ferramentas principais, fixas no topo (imagens: img/home, geradas pelo Z-Image-Turbo local) -->
-                    <div class="home-destaque">
-                        <button class="hd-card hd-ek" onclick="switchTool('video-cutter')">
-                            <img src="img/home/editor.webp" alt="" decoding="async">
-                            <span class="hd-rodape"><span class="app-logo al-vd">Vd</span><span class="hd-txt"><b>Vídeo Kanivete</b><small>Vídeo, áudio, camadas, Comp e 3D</small></span></span>
-                        </button>
-                        <button class="hd-card hd-pk" onclick="switchTool('editor-imagem')">
-                            <img src="img/home/photo.webp" alt="" decoding="async">
-                            <span class="hd-rodape"><span class="app-logo al-pk">Pk</span><span class="hd-txt"><b>Photo Kanivete</b><small>Fotos, PSD, retoque e IA local</small></span></span>
-                        </button>
-                        <button class="hd-card hd-vk" onclick="switchTool('vetor-kanivete')">
-                            <img src="img/home/vetor.webp" alt="" decoding="async">
-                            <span class="hd-rodape"><span class="app-logo al-vk">Vk</span><span class="hd-txt"><b>Vetor Kanivete</b><small>Identidade visual e arte para gráfica</small></span></span>
-                        </button>
-                        <button class="hd-card hd-sk" onclick="switchTool('sound-kanivete')">
-                            <img src="img/home/som.webp" alt="" decoding="async">
-                            <span class="hd-rodape"><span class="app-logo al-sk">Sk</span><span class="hd-txt"><b>Sound Kanivete</b><small>Áudio em faixas, limpeza, voz e volume certo</small></span></span>
-                        </button>
-                    </div>
-
-                    <div class="dropzone home-drop" data-tool="home">
-                        <div class="dz-icon"><svg class="i"><use href="#i-drop"/></svg></div>
-                        <div class="dz-title">Solte qualquer arquivo ou pasta</div>
-                        <div class="dz-sub">Vídeo, áudio, imagem, PDF ou uma pasta inteira</div>
-                        <div class="dz-actions">
-                            <button class="btn-secondary" onclick="homeEscolher('file')"><svg class="i"><use href="#i-file"/></svg>Escolher arquivo</button>
-                            <button class="btn-secondary" onclick="homeEscolher('folder')"><svg class="i"><use href="#i-folder"/></svg>Escolher pasta</button>
-                        </div>
-                        <div class="home-suggest" id="home-suggest" hidden></div>
-                    </div>
+                    <!-- banners deslizantes: um por ferramenta (home-banners.js; artes em img/home/banner-*.webp, Z-Image local) -->
+                    <section class="home-banners" id="home-banners" aria-label="Ferramentas do KANIVETE"></section>
+                    <div class="home-suggest" id="home-suggest" hidden></div>
 
                     <section id="home-recent-wrap" hidden>
                         <h3 class="home-group">Recentes</h3>
@@ -2105,6 +2071,7 @@
     <script src="js/i18n-photo.js"></script>
     <script src="js/app.js"></script>
     <script src="js/kani.js"></script>
+    <script src="js/home-banners.js"></script>
     <script src="js/musicas.js"></script>
     <script src="js/editor.js"></script>
     <script src="js/editor-fx.js"></script>
