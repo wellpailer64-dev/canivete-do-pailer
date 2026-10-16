@@ -279,6 +279,12 @@ entrega; pedidos compostos ou botão 🧠. Biblioteca de músicas (pasta local a
 GPU automática (onnxruntime-directml), pessoa → BiRefNet matting / objeto → BEN2 (YuNet decide), uma sessão por vez na
 placa; medições, qualidade e pendências (cena em duas passadas ainda não publicada) em `Instructions/agente/remover-fundo.md`.
 
+## Logotipo (marca)
+**Antes de desenhar logo: `Instructions/agente/direcao-logotipo.md`** (princípios Haviv/Rand, construção de desenhista de
+letra: extremos, sem joelho, G2, miolo por deslocamento). `tools/logotipo.py` (fonte livre + peça em Bézier; `gota_bez`,
+`deslocar`) e `tools/contorno.py` (pente de curvatura: joelho/salto/extremo) antes de qualquer olhada. Prancha de
+direções em P&B + reduções + ícone para o Pailer escolher.
+
 ## Carrossel com direção de arte
 Roteiro JSON → `tools/esqueleto.py --montar` (10 layouts, 6 estilos, arte-final, auto-ajuste, revisor de direção);
 Jr: `tools/roteiro_local.py --etapas [--hibrido]`; mapa: `tools/direcao_mapa.py`. Guia e pendências:

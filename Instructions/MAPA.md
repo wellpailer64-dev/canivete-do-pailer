@@ -211,6 +211,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/worker/worker.py` — Canivete Worker: executa um contrato de tarefa (Task Contract) no Photo Kanivete com um modelo local (Ollama),
 - `tools/aplicar.py` — Aplica mudanças no app ABERTO sem recarregar a página (o projeto, as janelas soltas e o Ctrl+Z continuam)
 - `tools/briefing.py` — Briefing barato de uma pasta do cliente: lê PDF/imagens/áudios/vídeos e devolve UM resumo em texto + poucas folhas
+- `tools/contorno.py` — Qualidade do contorno de um logo (o "pente de curvatura" do RoboFont/Glyphs, para conferir sem olhar a olho)
 - `tools/direcao_mapa.py` — Mapa de direção de arte (para o Claude, o Worker e o roteiro_local): layouts, estilos e técnicas em linhas curtas —
 - `tools/esqueleto.py` — Roteiro (JSON curto) → carrossel diagramado (HTML do KNV.cena) pelos ESQUELETOS aprovados. O agente só escreve o
 - `tools/gerar_marca.py` — Gera a marca KANIVETE: letras próprias desenhadas aqui (geometria nossa, sem ler fonte nenhuma), no espírito
@@ -249,6 +250,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/design-photo-kanivete.md` — Fazer arte no Photo Kanivete pela API (guia para IAs)
 - `Instructions/agente/direcao-carrossel.md` — Direção de arte de carrossel (para IAs) — o que separa peça boa de "landing page genérica"
 - `Instructions/agente/direcao-de-arte.md` — Direção de arte e motion para o AutoFrame e as edições do Pocket Editor
+- `Instructions/agente/direcao-logotipo.md` — Direção de logotipo — como os grandes fazem (estudo de 2026-10-16)
 - `Instructions/agente/diretor-de-arte.md` — Diretor de arte de carrossel (padrão de resposta + o que o Jr executa por comando)
 - `Instructions/agente/guia-edicao.md` — GUIA-EDICAO :: Pocket Editor (Canivete do Pailer) — para agentes de IA
 - `Instructions/agente/kani-maos.md` — Mãos da Kani — a Kani operando os apps ao vivo

@@ -31,37 +31,120 @@ def _bbox(p):
 
 
 # ---------- trocas de letra ----------
-def gota(p, inclina=30, ponta=1.78, raio_ponta=0.06, concavo=0.05):
-    """'o' vira gota de orvalho: a casca externa ganha uma ponta (inclinada para a direita) tangente à elipse;
-    o miolo continua o da fonte (contraste de peso fica na ponta, como gota cheia)."""
-    x0, y0, x1, y1 = _bbox(p)
-    cx, cy, rx, ry = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2, (y1 - y0) / 2
-    a = math.radians(inclina)
-    # ponta no espaço do círculo unitário (elipse → círculo: dividir por rx, ry)
-    ux, uy = math.sin(a) * ponta, math.cos(a) * ponta
-    d = math.hypot(ux, uy)
-    base = math.atan2(uy, ux)
-    abre = math.acos(1 / d)
-    tang = [(math.cos(base + s * abre), math.sin(base + s * abre)) for s in (1, -1)]
-    E = lambda u, v: (cx + u * rx, cy + v * ry)
-    ap = E(ux, uy)
-    t1, t2 = E(*tang[0]), E(*tang[1])
-    # ponta levemente arredondada: corta a quina com uma curva
-    r = raio_ponta
-    q1 = (ap[0] + (t1[0] - ap[0]) * r, ap[1] + (t1[1] - ap[1]) * r)
-    q2 = (ap[0] + (t2[0] - ap[0]) * r, ap[1] + (t2[1] - ap[1]) * r)
-    tri = pathops.Path()
-    tri.moveTo(*E(0, 0)); tri.lineTo(*t1); tri.lineTo(*q1); tri.quadTo(*ap, *q2); tri.lineTo(*t2); tri.close()
-    # tira o miolo da fonte de dentro da ponta
-    miolo = pathops.Path()
+K = 0.5522847498   # alça do quarto de círculo em cúbica
+
+
+def gota_bez(rx, ry, altura, meio=28, inclina=0.0, cx=0.0, cy=0.0, folga=0.45):
+    """Gota em Bézier, construída como desenhista de letra: a base é meia elipse (2 quartos, pontos nos extremos, alças
+    horizontais/verticais) e cada lado sobe até a ponta numa cúbica com curvatura IGUAL à da elipse na emenda (G2: sem
+    joelho) e tangente na ponta inclinada `meio` graus do eixo. `altura` = do centro até a ponta. Desenhada reta e
+    girada inteira (inclina, graus, sentido horário). Devolve pathops.Path."""
+    ph = math.radians(meio)
+    c = folga * altura
+    p2x = c * math.sin(ph)
+    a = math.sqrt(max(1e-9, (2 / 3) * (rx - p2x) * ry * ry / rx))     # κ(0) = rx/ry² (curvatura da elipse no lado)
+    pts = {"dir": (rx, 0), "base": (0, -ry), "esq": (-rx, 0), "ponta": (0, altura)}
+    t = math.radians(-inclina)
+    R = lambda x, y: (cx + x * math.cos(t) - y * math.sin(t), cy + x * math.sin(t) + y * math.cos(t))
+    g = pathops.Path()
+    g.moveTo(*R(0, altura))
+    g.cubicTo(*R(-p2x, altura - c * math.cos(ph)), *R(-rx, a), *R(-rx, 0))            # lado esquerdo desce
+    g.cubicTo(*R(-rx, -K * ry), *R(-K * rx, -ry), *R(0, -ry))                         # quarto inferior esquerdo
+    g.cubicTo(*R(K * rx, -ry), *R(rx, -K * ry), *R(rx, 0))                            # quarto inferior direito
+    g.cubicTo(*R(rx, a), *R(p2x, altura - c * math.cos(ph)), *R(0, altura))           # lado direito sobe
+    g.close()
+    return g
+
+
+def gota(p, inclina=12, ponta=1.62, meio=28):
+    """'o' vira gota de orvalho: casca e miolo construídos com gota_bez a partir das medidas da letra da fonte (traço
+    vertical e horizontal medidos — horizontais mais finas, como na fonte), miolo com a ponta recuada pela espessura /
+    seno do meio-ângulo (lados paralelos = traço uniforme)."""
     contornos = list(p.contours)
-    externo = max(contornos, key=lambda c: (_bbox(c)[2] - _bbox(c)[0]))
-    for c in contornos:
-        if c is not externo:
-            miolo = pathops.op(miolo, c, pathops.PathOp.UNION)
-    casca = pathops.op(externo, tri, pathops.PathOp.UNION)
-    casca = pathops.simplify(casca, fix_winding=True)
+    ext = max(contornos, key=lambda c: (_bbox(c)[2] - _bbox(c)[0]))
+    bx = _bbox(ext)
+    rx, ry = (bx[2] - bx[0]) / 2, (bx[3] - bx[1]) / 2
+    cx, cy = bx[0] + rx, bx[1] + ry
+    internos = [c for c in contornos if c is not ext]
+    casca = gota_bez(rx, ry, ponta * ry, meio, inclina, cx, cy)
+    if not internos:
+        return casca
+    bi = _bbox(internos[0])
+    tv, th = rx - (bi[2] - bi[0]) / 2, ry - (bi[3] - bi[1]) / 2
+    miolo = deslocar(casca, -tv)                                        # traço uniforme = casca deslocada para dentro
+    mb = _bbox(miolo); my = (mb[1] + mb[3]) / 2
+    k = (ry - th) / max(1e-6, ry - tv)                                  # horizontais um pouco mais finas (como a fonte)
+    from fontTools.pens.transformPen import TransformPen
+    m2 = pathops.Path(); miolo.draw(TransformPen(m2.getPen(), (1, 0, 0, k, 0, cy - cy * k)))
+    miolo = m2
     return pathops.op(casca, miolo, pathops.PathOp.DIFFERENCE)
+
+
+def deslocar(p, d):
+    """Deslocamento do contorno (offset do Illustrator) por d unidades; d < 0 = para dentro. Feito com o traçador do
+    skia (contorno do traço de largura 2|d|, quinas em ponta) e operação booleana."""
+    import skia
+    sp = skia.Path()
+    from fontTools.pens.basePen import BasePen
+
+    class _P(BasePen):
+        def _moveTo(self, a): sp.moveTo(*a)
+        def _lineTo(self, a): sp.lineTo(*a)
+        def _qCurveToOne(self, a, b): sp.quadTo(*a, *b)
+        def _curveToOne(self, a, b, c): sp.cubicTo(*a, *b, *c)
+        def _closePath(self): sp.close()
+    p.draw(_P(None))
+    pinta = skia.Paint(Style=skia.Paint.kStroke_Style, StrokeWidth=2 * abs(d), StrokeJoin=skia.Paint.kMiter_Join, StrokeMiter=20)
+    faixa = skia.Path(); pinta.getFillPath(sp, faixa)
+    r = skia.Op(sp, faixa, skia.PathOp.kDifference_PathOp if d < 0 else skia.PathOp.kUnion_PathOp)
+    out = pathops.Path(); pen = out.getPen()
+    for verbo, pts in r:
+        if verbo == skia.Path.kMove_Verb: pen.moveTo(tuple(pts[0]))
+        elif verbo == skia.Path.kLine_Verb: pen.lineTo(tuple(pts[1]))
+        elif verbo == skia.Path.kQuad_Verb: pen.qCurveTo(tuple(pts[1]), tuple(pts[2]))
+        elif verbo == skia.Path.kConic_Verb: pen.qCurveTo(tuple(pts[1]), tuple(pts[2]))
+        elif verbo == skia.Path.kCubic_Verb: pen.curveTo(tuple(pts[1]), tuple(pts[2]), tuple(pts[3]))
+        elif verbo == skia.Path.kClose_Verb: pen.closePath()
+    return pathops.simplify(out, fix_winding=True)
+
+
+def nos_extremos(p):
+    """Acrescenta âncoras nos extremos horizontais/verticais de cada cúbica (divide no t do extremo, de Casteljau),
+    como 'Adicionar âncoras' do Illustrator: regra de desenhista de letra mesmo depois de girar a peça."""
+    from fontTools.pens.recordingPen import RecordingPen
+    from fontTools.misc.bezierTools import splitCubicAtT
+    rec = RecordingPen(); p.draw(rec)
+    out = pathops.Path(); pen = out.getPen(); cur = None
+    for op, pts in rec.value:
+        if op == "curveTo" and len(pts) == 3:
+            a, b, c, d = cur, *pts
+            ts = []
+            for i in (0, 1):   # raízes de B'(t) = 0 em x e em y
+                A = -a[i] + 3 * b[i] - 3 * c[i] + d[i]; B = 2 * (a[i] - 2 * b[i] + c[i]); C = b[i] - a[i]
+                if abs(A) < 1e-12:
+                    rs = [-C / B] if abs(B) > 1e-12 else []
+                else:
+                    D = B * B - 4 * A * C
+                    rs = [] if D < 0 else [(-B + s_ * D ** 0.5) / (2 * A) for s_ in (1, -1)]
+                ts += [t for t in rs if 0.02 < t < 0.98]
+            ts = sorted(set(round(t, 6) for t in ts))
+            for seg in (splitCubicAtT(a, b, c, d, *ts) if ts else [(a, b, c, d)]):
+                pen.curveTo(*seg[1:])
+            cur = d
+        elif op == "qCurveTo" and pts[-1] is not None:   # quadráticas (miolo do deslocamento): extremo em t = −B/2A
+            from fontTools.pens.basePen import decomposeQuadraticSegment
+            from fontTools.misc.bezierTools import splitQuadraticAtT
+            for b, c in decomposeQuadraticSegment(pts):
+                a = cur
+                ts = sorted(t for t in ((a[i] - b[i]) / (a[i] - 2 * b[i] + c[i]) for i in (0, 1)
+                                        if abs(a[i] - 2 * b[i] + c[i]) > 1e-12) if 0.02 < t < 0.98)
+                for seg in (splitQuadraticAtT(a, b, c, *ts) if ts else [(a, b, c)]):
+                    pen.qCurveTo(*seg[1:])
+                cur = c
+        else:
+            getattr(pen, op)(*pts)
+            cur = pts[-1] if pts else cur
+    return out
 
 
 TROCAS = {"gota": gota}
@@ -192,6 +275,7 @@ def main():
         cores = [v["hex"] for v in cs.values()]
     else:
         cores = a.cores.split(",")
+    logo, simb = nos_extremos(logo), nos_extremos(simb)
     (out / "logotipo.svg").write_text(svg_de(logo), encoding="utf-8")
     (out / "simbolo.svg").write_text(svg_de(simb), encoding="utf-8")
     folha(logo, simb, met, cores, out / "folha.png")
