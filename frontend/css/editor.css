@@ -2385,7 +2385,7 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ke-med-n { font: 650 9.5px var(--ve-ui); letter-spacing: .08em; text-transform: uppercase; color: #6f747b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ke-med-v { font: 600 12px var(--ve-mono); color: #e3e5e8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ke-med-b { height: 3px; border-radius: 2px; background: #24272a; overflow: hidden; }
-.ke-med-b i { display: block; height: 100%; width: 0; background: #6aa9ff; transition: width .6s; }
+.ke-med-b i { display: block; height: 100%; width: 0; background: #6aa9ff; }   /* sem transição: 1×/s, animar a largura refazia o layout a cada quadro (2026-10-16) */
 .ke-med[data-k="gpu"] .ke-med-b i, .ke-med[data-k="vram"] .ke-med-b i, .ke-med[data-k="enc"] .ke-med-b i { background: #76b900; }
 .ke-med.alto .ke-med-b i { background: #ff6b6b; }
 .ke-med.sem { opacity: .45; }
@@ -2404,7 +2404,7 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-des-v { font: 600 13px var(--ve-mono); color: #e6e8eb; white-space: nowrap; }
 .ve-des-s { font: 10.5px var(--ve-mono); color: #6f747b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; align-self: end; padding-bottom: 1px; }
 .ve-des-b { grid-column: 1 / 3; height: 3px; margin-top: 5px; border-radius: 2px; background: #24272a; overflow: hidden; align-self: start; }
-.ve-des-b i { display: block; height: 100%; width: 0; background: #6aa9ff; transition: width .6s; }
+.ve-des-b i { display: block; height: 100%; width: 0; background: #6aa9ff; }   /* sem transição (ver .ke-med-b i) */
 .ve-des-m[data-k="gpu"] .ve-des-b i, .ve-des-m[data-k="vram"] .ve-des-b i, .ve-des-m[data-k="enc"] .ve-des-b i { background: #76b900; }
 .ve-des-m.alto .ve-des-b i { background: #ff6b6b; }
 .ve-des-m.alto .ve-des-v { color: #ff8f8f; }

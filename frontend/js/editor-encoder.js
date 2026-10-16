@@ -207,6 +207,7 @@ function veKeAgora() {
 }
 async function veKeMonitorTick() {
     if (veKeEl().hidden) { clearInterval(VEKE_MON.timer); VEKE_MON.timer = null; return; }
+    if (document.hidden) return;   // app minimizado: não lê a máquina à toa
     veKeAgora();
     const api = window.pywebview && window.pywebview.api;
     if (!api || !api.ve_encoder_estado) return;

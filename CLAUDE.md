@@ -16,6 +16,12 @@
   (cartão com arte + logo + Novo/Abrir, seções de modelos/abertos/recentes, Recuperar) sobre o vídeo do Início sem cor
   tingido na cor dela (`KL_LOBBYS`). Photo/Vetor reaproveitam `#ie-inicio`/`#vk-inicio` (mesmos ids); Lux monta `#lux-inicio`
   em lux.js (fechar a cena volta ao lobby, "Continuar" reabre). `video/home-bg.webm` já é sem cor (trocou o vídeo: subir o `?v=`).
+  Fundo de cada lobby = `video/lobby-<id>.webm`, o mesmo vídeo já tingido (ffmpeg `format=gbrp,colorchannelmixer=` cinza × cor
+  da ferramenta, 12 qps; nada de mix-blend-mode por quadro). Camada do lobby 21: abaixo dos modais (.ie-modal 25) e menus
+  (.ie-pop 30) — `testes/teste_lobby_camadas.py`.
+- Leveza com o app parado (2026-10-16, `D:/kanivete_testes/scripts/varredura.py` e `exp_cpu.py` medem por ferramenta):
+  nada de `backdrop-filter` por cima de vídeo, nem animar `width`/`box-shadow` em loop (use transform/opacity); vídeos de
+  fundo a 12 qps e pausados quando cobertos ou com o app minimizado; medidores 1×/s sem transição. Home 25% → ~6% de um núcleo.
 - Ícone de cada arquivo de projeto = o logo da ferramenta (`identidade/arquivos/<sigla>.ico`, gerado por
   `py -3.13 tools/icones_arquivos.py`; registro por extensão em `Functions/projeto.py` `_TIPOS`). Mudou cor/sigla: rodar de novo.
 - Ferramenta separada = aba e página próprias (`#page-<id>` com `ve-page`), sem abrir outra por trás; o `switchTool` chama

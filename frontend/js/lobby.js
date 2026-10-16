@@ -7,26 +7,28 @@
 // Lux (#lux-inicio) monta o dela em lux.js com as mesmas classes. Aplicado a cada troca de ferramenta (switchTool).
 // =========================================================
 const KL_LOBBYS = [
-    { sel: '#ve-start', cor: '#c9a8ff' },
-    { sel: '#sk-inicio', cor: '#7fd6ff' },
-    { sel: '#lux-inicio', cor: '#ff4fc8' },
-    { sel: '#ie-inicio', cor: '#4c9bff', sig: 'Pk', al: 'al-pk', titulo: 'Comece sua arte', img: 'img/home/banner-pk.webp',
+    { sel: '#ve-start', cor: '#c9a8ff', vid: 'vd' },
+    { sel: '#sk-inicio', cor: '#7fd6ff', vid: 'sk' },
+    { sel: '#lux-inicio', cor: '#ff4fc8', vid: 'lk' },
+    { sel: '#ie-inicio', cor: '#4c9bff', vid: 'pk', sig: 'Pk', al: 'al-pk', titulo: 'Comece sua arte', img: 'img/home/banner-pk.webp',
       texto: 'Abra um PSD com as camadas, uma foto ou comece do zero. Retoque, recorte, gere imagens com IA e monte carrosséis e flyers.',
       novo: () => ieNovoDialogo(), abrir: () => ieAbrirDialogo() },
-    { sel: '#vk-inicio', cor: '#ff8c42', sig: 'Vk', al: 'al-vk', titulo: 'Comece seu vetor', img: 'img/home/banner-vk.webp',
+    { sel: '#vk-inicio', cor: '#ff8c42', vid: 'vk', sig: 'Vk', al: 'al-vk', titulo: 'Comece seu vetor', img: 'img/home/banner-vk.webp',
       texto: 'Abra PDF, AI, SVG ou PowerPoint, ou comece de um modelo. Desenhe com curvas e feche o arquivo em PDF/X para a gráfica.',
       novo: () => vkNovoDialogo(), abrir: () => vkCmdUi('abrir', {}) },
 ];
-const KL_VIDEO = 'video/home-bg.webm?v=3';   // ?v=2: o arquivo virou sem cor (2026-10-16); muda o número se trocar o vídeo
+// o vídeo do Início já gravado na cor de cada ferramenta (video/lobby-<id>.webm, ~60 KB): tingir com mix-blend-mode a
+// cada quadro custava ~5–7% de um núcleo com o app parado (medido 2026-10-16). Trocou o vídeo/cor: gerar de novo (ffmpeg
+// colorchannelmixer = cinza × cor, ver CLAUDE.md) e subir o ?v=.
+const KL_VIDEO = id => `video/lobby-${id}.webm?v=2`;
 let klVisto = null;
 
-// fundo: o vídeo do Início sem cor + uma camada da cor da ferramenta (mistura "cor": o vídeo dá a luz, a ferramenta a cor)
-function klFundo(el, cor) {
+function klFundo(el, cor, vid) {
     if (el.querySelector(':scope > .kl-fundo')) return;
     el.classList.add('kl-com-fundo');
     el.style.setProperty('--kl-cor', cor);
     const f = document.createElement('div'); f.className = 'kl-fundo'; f.setAttribute('aria-hidden', 'true');
-    f.innerHTML = `<video src="${KL_VIDEO}" muted loop playsinline preload="auto" tabindex="-1"></video><i class="kl-tinta"></i><i class="kl-veu"></i>`;
+    f.innerHTML = `<video src="${KL_VIDEO(vid)}" muted loop playsinline preload="auto" tabindex="-1"></video><i class="kl-veu"></i>`;
     el.prepend(f);
     const v = f.querySelector('video');
     // só toca com o lobby na tela (lobby escondido ou outra ferramenta: pausa)
@@ -59,8 +61,12 @@ function klAplicar() {
     for (const o of KL_LOBBYS) {
         const el = document.querySelector(o.sel); if (!el) continue;
         if (o.sig) klPadrao(el, o);
-        klFundo(el, o.cor);
+        klFundo(el, o.cor, o.vid);
     }
 }
+// app minimizado ou em segundo plano: os vídeos dos lobbys param (o IntersectionObserver não vê a janela sumir)
+document.addEventListener('visibilitychange', () => document.querySelectorAll('.kl-fundo video').forEach(v => {
+    if (document.hidden) v.pause(); else if (v.offsetParent) v.play().catch(() => {});
+}));
 document.addEventListener('DOMContentLoaded', () => { klAplicar(); setTimeout(klAplicar, 800); });
 window.KL_API = { aplicar: klAplicar };

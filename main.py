@@ -4522,11 +4522,14 @@ class ApiBridge:
     def ke_arquivo_converter(self, entrada, preset, pasta_saida=None, usar_gpu=True):
         return ke_arquivo_converter(entrada, preset, pasta_saida, usar_gpu)
 
-    def ke_parar(self):
-        """Parar da fila do Ke nos itens da Lux (Blender) e do Sound (ffmpeg da mixagem)."""
+    def ke_parar(self, tipo=None):
+        """Parar da fila do Ke: só o tipo do item em andamento ("lux" = Blender, "som" = mixagem do Sound) — parar um não
+        derruba um render feito direto na outra ferramenta ao mesmo tempo."""
         from Functions import blender_render, sound_kanivete
-        blender_render.cancelar_video()
-        sound_kanivete.cancelar_export()
+        if tipo in (None, "lux"):
+            blender_render.cancelar_video()
+        if tipo in (None, "som"):
+            sound_kanivete.cancelar_export()
         return {"success": True}
 
     def reveal_file(self, path):

@@ -158,7 +158,8 @@ function musMenu() {
     const ref = document.querySelector('.menu-item[data-tool="converter-audio"]');
     if (!ref) return;
     const b = ref.cloneNode(true);
-    b.id = 'mus-menu'; b.removeAttribute('data-tool'); b.classList.remove('active');
+    b.id = 'mus-menu'; b.removeAttribute('data-tool'); b.removeAttribute('onclick'); b.classList.remove('active');
+    b.title = 'Músicas — biblioteca local analisada (clima, BPM) e busca grátis no Openverse';   // a cópia vinha com a dica do Converter Áudio
     b.querySelector('.label') && (b.querySelector('.label').textContent = 'Músicas');
     const u = b.querySelector('use'); if (u) u.setAttribute('href', '#i-music');
     b.onclick = e => { e.preventDefault(); e.stopPropagation(); musAbrir(); };

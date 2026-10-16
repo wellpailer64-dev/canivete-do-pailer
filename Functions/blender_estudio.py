@@ -162,8 +162,7 @@ def construir(fo):
   """uma embalagem (fo: produto, material, cores, rotulo, bolhas) na origem; devolve os objetos criados"""
   global P, ALT
   P = PROD[fo.get("produto", "pote")]; ALT = max(z for _, perf, _ in P["partes"] for _, z in perf)
-  cores = {"corpo": "#1d4a2a", "tampa": "#1d4a2a", "base": "#2f9a78", "gel": "#8fdcc4", **(fo.get("cores") or {})}
-  mat = fo.get("material", "softtouch"); antes = set(sc.objects)
+  antes = set(sc.objects)   # cores e material de cada parte: params(fo, parte)
   for nome, perfil, raio in P["partes"]:
     ob = revolver(nome, arredondar(perfil, raio))
     m = material_de(nome, params(fo, nome), perfil)

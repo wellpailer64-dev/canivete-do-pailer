@@ -43,7 +43,8 @@ function veDesMed(k, pct, valor, sub, dica) {
 
 async function veDesTick() {
     const el = VEDES.el;
-    if (!el || VEDES.ocupado || !el.isConnected || !el.offsetWidth || !el.offsetHeight) return;   // fechado, aba de trás ou outra ferramenta
+    if (!el || VEDES.ocupado || !el.isConnected || !el.offsetWidth || !el.offsetHeight || document.hidden) return;   // fechado, aba de trás ou outra ferramenta
+    const lobby = document.getElementById('ve-start'); if (lobby && !lobby.hidden) return;   // lobby por cima: ninguém vê o painel
     const api = window.pywebview && window.pywebview.api;
     if (!api || !api.ve_encoder_estado) return;
     VEDES.ocupado = true;

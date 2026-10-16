@@ -1871,11 +1871,11 @@ body:has(#page-home.active) .update-banner .btn-primary { height: 32px; padding:
    ========================================================= */
 .kl-com-fundo { isolation: isolate; transform: translateZ(0); background: #0b0a0c !important; }   /* o fundo fixo fica preso ao lobby */
 .kl-fundo { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; background: #0b0a0c; }
-.kl-fundo video { width: 100%; height: 100%; object-fit: cover; opacity: .6; }   /* home-bg.webm já sem cor */
-.kl-tinta { position: absolute; inset: 0; background: var(--kl-cor); mix-blend-mode: color; opacity: .85; }
+.kl-fundo video { width: 100%; height: 100%; object-fit: cover; opacity: .75; }   /* video/lobby-<id>.webm: já na cor da ferramenta */
+
 .kl-veu { position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% 0%, transparent 30%, rgba(8, 7, 9, .7) 100%), rgba(8, 7, 9, .35); }
 .kl.kl { --ie-linha-2: var(--line-2); --ie-painel-2: var(--bg-2); --ie-hover: var(--bg-3); --ie-acento: var(--primary);
-    position: absolute; inset: var(--kl-top, 40px) 0 0 0; z-index: 30; display: grid !important; place-items: start center; padding: 6vh 28px 28px; overflow: auto; }
+    position: absolute; inset: var(--kl-top, 40px) 0 0 0; z-index: 21;   /* abaixo dos modais (.ie-modal 25) e menus (.ie-pop 30) */ display: grid !important; place-items: start center; padding: 6vh 28px 28px; overflow: auto; }
 .kl.kl[hidden] { display: none !important; }   /* .kl.kl: vence o .ie-inicio antigo (imagem.css vem depois) */
 .kl .kl-inner { width: min(980px, 100%); display: flex; flex-direction: column; align-items: stretch; gap: 22px; text-align: left; }
 .kl-hero { position: relative; overflow: hidden; isolation: isolate; display: flex; align-items: flex-end; gap: 28px; min-height: 300px; padding: 24px 28px;
@@ -1907,3 +1907,29 @@ body:has(#page-home.active) .update-banner .btn-primary { height: 32px; padding:
 .kl .ie-inicio-abertos-lista { justify-content: flex-start; }
 /* Vídeo e Sound: o fundo tingido aparece atrás das seções (já tinham o lobby) */
 .ve-start.kl-com-fundo, .sk-start.kl-com-fundo { background: #0b0a0c !important; }
+
+/* =========================================================
+   Leveza (2026-10-16, medido com o app parado): desfoque de vidro (backdrop-filter) por cima de vídeo que se mexe é
+   refeito a cada quadro — Home 25% → ~2% de um núcleo sem eles e sem animar largura/sombra. Aqui o vidro vira fundo
+   sólido quase igual; barrinha dos banners anima transform (não largura); o pulso da Kani anima opacidade (não sombra).
+   ========================================================= */
+.hc-media > .hc-ico { backdrop-filter: none; background: rgba(12, 12, 14, .74); }
+.hb-cta { backdrop-filter: none; background: color-mix(in srgb, var(--al) 16%, rgba(10, 9, 11, .78)); }
+.hb-chip { backdrop-filter: none; background: rgba(18, 16, 17, .9); }
+.hb-chip.on { background: color-mix(in srgb, var(--al) 10%, rgba(18, 16, 17, .94)); }
+.hb-prog i { width: 100% !important; transform: scaleX(0); transform-origin: 0 50%; will-change: transform; }
+.hb-chip.on .hb-prog i { animation: hb-prog-x 5s linear forwards; }
+@keyframes hb-prog-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+body .kani-bolinha { backdrop-filter: none; background: rgba(20, 16, 14, .97); animation: none; }
+body .kani-bolinha::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; box-shadow: 0 0 0 8px rgba(255, 140, 66, .28);
+    opacity: 0; animation: kani-pulso-leve 2.8s ease-in-out infinite; }
+@keyframes kani-pulso-leve { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+body:has(#page-home.active) .update-banner { backdrop-filter: none; background: rgba(20, 16, 14, .97); }
+.kl .ie-recentes, .kl .vk-rapido, .kl .ie-inicio-abertos:not(:empty), .kl-mais .ie-btn { backdrop-filter: none; }
+.kl .ie-recentes, .kl .vk-rapido, .kl .ie-inicio-abertos:not(:empty) { background: rgba(14, 14, 14, .9); }
+.kl-mais .ie-btn { background: rgba(30, 30, 32, .9); }
+.ve-start-section, .ve-start-mais .ve-btn, .sk-start-section, .sk-start-mais .sk-sbtn { backdrop-filter: none !important; }
+.ve-start-section, .sk-start-section { background: rgba(14, 14, 14, .9) !important; }
+.ve-start-mais .ve-btn, .sk-start-mais .sk-sbtn { background: rgba(30, 30, 32, .9) !important; }
+/* sugestão ao soltar um arquivo na Home: a área "Solte qualquer arquivo" saiu; vira cartão logo abaixo dos banners */
+#page-home > .home-suggest { margin: 0; padding: 14px 16px; border: 1px solid rgba(255, 255, 255, .08); border-radius: 12px; background: rgba(18, 16, 17, .92); }

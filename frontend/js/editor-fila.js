@@ -329,7 +329,7 @@ function veFilaEvento(ev) {
 function veFilaParar() {
     VEFILA.pausar = true;
     const at = VEFILA.atual, api = window.pywebview.api;
-    if (at && (at.tipo === 'lux' || at.tipo === 'som') && api.ke_parar) api.ke_parar();   // Blender / mixagem do Sound
+    if (at && (at.tipo === 'lux' || at.tipo === 'som') && api.ke_parar) api.ke_parar(at.tipo);   // Blender / mixagem do Sound
     else if (at) api.video_cutter_cancel_export();
     veFilaRender();
 }

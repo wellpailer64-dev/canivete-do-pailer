@@ -343,7 +343,7 @@ function homeBgSync() {
     if (!v) return;
     const ativa = document.querySelector('.tool-page.active');
     const lobby = _el('ve-start'), naLobby = !!lobby && !lobby.hidden && ativa?.id === 'page-video-cutter';   // lobby do editor usa o mesmo fundo
-    const usarFundo = ativa && (!ativa.classList.contains('ve-page') || naLobby);
+    const usarFundo = ativa && !ativa.classList.contains('ve-page');   // os lobbys têm o fundo deles (lobby.js): este não toca por baixo
     const tocar = usarFundo && !document.hidden
         && !matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (tocar) v.play().catch(() => {}); else v.pause();

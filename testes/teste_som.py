@@ -120,7 +120,7 @@ with sync_playwright() as p:
         som = next(s for c in sb["categorias"] for s in c["sons"])
         ids = pg.evaluate("async (p) => await SKN.importar(p, {ini: 0.5})", som["path"])
         ok(len(ids) == 1, "som do soundboard entra na timeline", som.get("nome") or som["arq"])
-    ok(pg.evaluate("document.querySelectorAll('.sk-atalho').length") == 4 and pg.evaluate("document.querySelectorAll('.menu-item.menu-sub').length") == 4,
+    ok(pg.evaluate("document.querySelectorAll('.sk-atalho').length") == 4 and pg.evaluate("document.querySelectorAll('.menu-item.menu-sub[data-tool]').length") == 4,   # Músicas (musicas.js) também é .menu-sub, sem data-tool
        "as 4 ferramentas de áudio viraram atalhos agrupados sob o Sk")
     # fase 4: igualar volume, cortar silêncios, EQ/compressor da faixa, ponte com o Editor
     subprocess.run([FF, "-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=330:duration=4,volume=0.12", D + "baixo.wav"], check=True)
