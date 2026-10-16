@@ -347,7 +347,8 @@
     "sk_voz_desenhar",
     "sk_voz_apagar",
     "sk_voz",
-    "sk_dialogo"
+    "sk_dialogo",
+    "ke_parar"
    ],
    "testes": [
     "teste_som"
@@ -2145,6 +2146,13 @@
    "args": "entrada, preset, pasta_saida=None, usar_gpu=True",
    "modulos": []
   },
+  "ke_parar": {
+   "args": "",
+   "modulos": [
+    "blender_render",
+    "sound_kanivete"
+   ]
+  },
   "reveal_file": {
    "args": "path",
    "modulos": []
@@ -3019,6 +3027,7 @@
   "teste_kani_maos": "Teste das mãos da Kani: abre o app de teste (porta 9338, dados em D:/kanivete_testes), pede um flyer ao agente da",
   "teste_ke_aba": "Kanivete Encoder na aba própria (editor-encoder.js keAoTrocar) — app em --agente=9333:",
   "teste_ke_media": "Kanivete Encoder como Media Encoder (ke-arquivos.js + Functions/ke_arquivos.py) — app em --agente=9333:",
+  "teste_ke_parar": "Parar da fila do Ke interrompe o Blender (item da Lux): app em --agente=9333",
   "teste_laco": "Laço: Shift soma, Alt subtrai, Shift+Alt cruza; o mesmo no magnético; Ctrl+clique na miniatura seleciona a camada",
   "teste_lux_casa": "Lux com casa própria: abre sem o Editor, desfaz sozinha, envia cópia para a timeline (app em --agente=9333)",
   "teste_mixer": "Mixer de trilhas de áudio (editor-mixer.js): Premiere → Kanivete → XML do Premiere e a conta do som na exportação",

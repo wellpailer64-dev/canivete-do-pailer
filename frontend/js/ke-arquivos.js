@@ -80,9 +80,10 @@ async function keRodarItem(it) {
         try {
             let primeiro = null;
             for (const [i, ch] of it.chamadas.entries()) {
-                if (VEFILA.pausar && i) throw new Error(veT('parado'));
+                if (VEFILA.pausar && i) { veFilaEvento({ done: true, success: false, cancelled: true }); return; }   // Parar entre stems
                 veFilaEvento({ pct: i / n * 100 + 2, message: n > 1 ? `${veT('Mixando o stem')} ${i + 1} ${veT('de')} ${n}` : veT('Mixando o áudio') });
                 const r = await api.sk_exportar(it.proj, ch.caminho, ch.op);
+                if (r && r.cancelled) { veFilaEvento({ done: true, success: false, cancelled: true }); return; }
                 if (!r || !r.success) throw new Error((r && r.error) || veT('não exportou'));
                 primeiro = primeiro || r.caminho || ch.caminho;
             }
@@ -100,7 +101,8 @@ async function keRodarItem(it) {
         if (typeof VE3D === 'object') VE3D.estudioRodando = true;
         try {
             const r = await api.ve_3d_estudio_video(it.spec);
-            veFilaEvento(r && r.success ? { done: true, success: true, output_path: r.path } : { done: true, success: false, error: (r && r.error) || veT('o vídeo falhou') });
+            veFilaEvento(r && r.success ? { done: true, success: true, output_path: r.path }
+                : { done: true, success: false, cancelled: !!(r && r.cancelled), error: (r && r.error) || veT('o vídeo falhou') });
         } catch (e) { veFilaEvento({ done: true, success: false, error: e.message || String(e) }); }
         finally { clearInterval(tm); if (typeof VE3D === 'object') VE3D.estudioRodando = false; }
     }

@@ -314,10 +314,35 @@ def _montar(proj, sr=48000, faixas_ids=None):
     return entradas, ";".join(filtros), "[mix]", fim
 
 
+_EXP = {"p": None, "parar": False}   # ffmpeg do export em andamento: o Parar da fila do Ke encerra (cancelar_export)
+
+
+def _rodar(cmd, timeout):
+    """subprocess.run que o Parar da fila do Kanivete Encoder consegue interromper."""
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=NO_WINDOW)
+    _EXP["p"] = p
+    try:
+        out, err = p.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        out, err = p.communicate()
+    finally:
+        _EXP["p"] = None
+    return subprocess.CompletedProcess(cmd, p.returncode, out, err)
+
+
+def cancelar_export():
+    _EXP["parar"] = True
+    p = _EXP["p"]
+    if p is not None and p.poll() is None:
+        p.kill()
+    return {"success": True}
+
+
 def _loudnorm_medir(entradas, fc, rot, alvo, tp, timeout=3600):
     cmd = [ffmpeg(), "-hide_banner", "-nostdin", *entradas, "-filter_complex", f"{fc};{rot}loudnorm=I={alvo}:TP={tp}:LRA=11:print_format=json[o]",
            "-map", "[o]", "-f", "null", "-"]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, creationflags=NO_WINDOW)
+    r = _rodar(cmd, timeout)
     txt = r.stderr or ""
     i = txt.rfind("{")
     return json.loads(txt[i:txt.rfind("}") + 1]) if i >= 0 else None
@@ -328,6 +353,7 @@ def exportar(proj, caminho, op=None):
     ini/fim (s: só um trecho), meta {titulo, artista, album, ano, genero, comentario} (ID3/tags), capitulos [{t, nome}]
     (marcadores viram capítulos no mp3/m4a/ogg/flac/opus)}."""
     op = op or {}
+    _EXP["parar"] = False
     fmt = (op.get("formato") or os.path.splitext(caminho)[1].lstrip(".") or "mp3").lower()
     if fmt not in FORMATOS:
         return {"success": False, "error": f"formato {fmt}: use {', '.join(FORMATOS)}"}
@@ -342,6 +368,8 @@ def exportar(proj, caminho, op=None):
     if op.get("lufs") not in (None, "", False):
         alvo, tp = float(op["lufs"]), float(op.get("tp", -1))
         med = _loudnorm_medir(entradas, fc, rot, alvo, tp)
+        if _EXP["parar"]:
+            return {"success": False, "cancelled": True, "error": "parado"}
         if med:
             fc += (f";{rot}loudnorm=I={alvo}:TP={tp}:LRA=11:measured_I={med['input_i']}:measured_TP={med['input_tp']}:measured_LRA={med['input_lra']}"
                    f":measured_thresh={med['input_thresh']}:offset={med['target_offset']}:linear=true,aresample={sr}[ln]")
@@ -373,7 +401,13 @@ def exportar(proj, caminho, op=None):
         meta += ["-map_chapters", str(n)]
     cmd = [ffmpeg(), "-y", "-hide_banner", "-nostdin", *entradas, *extra, "-/filter_complex", script, "-map", rot, "-ar", str(sr), *canais, *codec,
            *meta, *(["-id3v2_version", "3"] if fmt == "mp3" else []), caminho]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=7200, creationflags=NO_WINDOW)
+    r = _rodar(cmd, 7200)
+    if _EXP["parar"]:   # parado pela fila: o arquivo pela metade sai
+        try:
+            os.remove(caminho)
+        except OSError:
+            pass
+        return {"success": False, "cancelled": True, "error": "parado"}
     if r.returncode != 0 or not os.path.isfile(caminho):
         return {"success": False, "error": (r.stderr or "")[-600:]}
     return {"success": True, "caminho": caminho, "dur": round(b - a, 3)}

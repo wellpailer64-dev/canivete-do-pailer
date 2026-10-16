@@ -326,7 +326,13 @@ function veFilaEvento(ev) {
     veFilaRender();
     veFilaProximo();
 }
-function veFilaParar() { VEFILA.pausar = true; if (VEFILA.atual) window.pywebview.api.video_cutter_cancel_export(); veFilaRender(); }
+function veFilaParar() {
+    VEFILA.pausar = true;
+    const at = VEFILA.atual, api = window.pywebview.api;
+    if (at && (at.tipo === 'lux' || at.tipo === 'som') && api.ke_parar) api.ke_parar();   // Blender / mixagem do Sound
+    else if (at) api.video_cutter_cancel_export();
+    veFilaRender();
+}
 function veFilaPausar() { VEFILA.pausar = !VEFILA.pausar; veFilaRender(); }
 function veFilaRemover(id) { const i = VEFILA.itens.findIndex(x => x.id === id); if (i >= 0 && VEFILA.itens[i].estado !== 'rodando') { VEFILA.itens.splice(i, 1); if (VEFILA.sel === id) veFilaSelecionar(null); } veFilaRender(); }
 function veFilaMover(id, d) {

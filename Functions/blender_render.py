@@ -147,6 +147,16 @@ HDRI_PADRAO = "D:/kanivete_biblioteca/hdri/studio_small_09_2k.hdr"
 
 
 PROGRESSO = {"feito": 0, "total": 0}
+_VIDEO = {"p": None, "parar": False}   # render de vídeo em andamento: o Parar da fila do Ke encerra (cancelar_video)
+
+
+def cancelar_video():
+    """Parar da fila do Kanivete Encoder: encerra o Blender do vídeo; estudio_video apaga os quadros e volta cancelado."""
+    _VIDEO["parar"] = True
+    p = _VIDEO["p"]
+    if p is not None and p.poll() is None:
+        p.kill()
+    return {"success": True}
 
 
 def estudio_video(spec):
@@ -175,15 +185,27 @@ def estudio_video(spec):
     _liberar_gpu()
     t = time.time(); PROGRESSO.update(feito=0, total=len(spec["quadros"]))
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "blender_estudio.py")
+    _VIDEO["parar"] = False
     p = subprocess.Popen([b, "-b", "--factory-startup", "-noaudio", "-P", script, "--", jp], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                          stdin=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
+    _VIDEO["p"] = p
     log = []
-    for linha in p.stdout:
-        log.append(linha); log[:] = log[-60:]
-        m = re.match(r"KANIVETE: quadro (\d+)/(\d+)", linha)
-        if m: PROGRESSO.update(feito=int(m.group(1)), total=int(m.group(2)))
-    p.wait()
+    try:
+        for linha in p.stdout:
+            log.append(linha); log[:] = log[-60:]
+            m = re.match(r"KANIVETE: quadro (\d+)/(\d+)", linha)
+            if m: PROGRESSO.update(feito=int(m.group(1)), total=int(m.group(2)))
+        p.wait()
+    finally:
+        _VIDEO["p"] = None
     pasta_q = os.path.join(saida, nome + "_quadros")
+    if _VIDEO["parar"]:   # parado pela fila: nada pela metade fica na pasta
+        shutil.rmtree(pasta_q, ignore_errors=True)
+        try:
+            os.remove(jp)
+        except OSError:
+            pass
+        return {"success": False, "cancelled": True, "error": "parado"}
     if not glob.glob(os.path.join(pasta_q, "q_*.png")):
         return {"success": False, "error": "o Blender não renderizou os quadros", "log": "".join(log)[-1500:]}
     from Functions.convertermp3 import ffmpeg_path

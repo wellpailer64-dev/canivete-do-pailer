@@ -91,7 +91,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - **Interface**: `som-dock.js`, `som-espectro.js`, `som-gravar.js`, `som-motor.js`, `som-paineis.js`, `som-texto.js`, `som-tts.js`, `som.js`, `som.css`
 - **Python**: `Functions/sound_kanivete.py`, `Functions/sk_gravar.py`, `Functions/sk_espectro.py`, `Functions/sk_banco_vozes.py`
 - **Automação (agente/Jr)**: window.SKN (som.js): novo, importar, cortar, alterarClipe, exportar, estado...
-- **API** (`pywebview.api.*`, 22): `sk_info(path)`, `sk_trecho(arq, k, sr=48000)`, `sk_auto(acao, proj=None, caminho=None, pid=None)`, `sk_gravar(acao, dispositivo=None, caminho=None, sr=48000, canais=1)`, `sk_ir(tamanho=1.2)`, `sk_espectro(arq, t0, t1, cols=1200, rows=256)`, `sk_salvar(proj, caminho)`, `sk_abrir(caminho)`, `sk_exportar(proj, caminho, op=None)`, `sk_medir(proj, op=None)`, `sk_processar(arq, efeito, op=None)`, `sk_transcrever(proj, idioma="pt", faixas=None)`, `sk_lufs(arq, de=0, dur=None)`, `sk_silencios(arq, de=0, dur=None, limiar=-40, minimo=0.6)`, `sk_pasta_padrao()`, `sk_vozes()`, `sk_voz_criar(nome, arq, op=None)`, `sk_banco(acao="estado", vid=None)`, `sk_voz_desenhar(instruct, seed=0, texto=None)`, `sk_voz_apagar(voz_id)`, `sk_voz(voz_id, texto, op=None)`, `sk_dialogo(modo, tipos=None, nome="")`
+- **API** (`pywebview.api.*`, 23): `sk_info(path)`, `sk_trecho(arq, k, sr=48000)`, `sk_auto(acao, proj=None, caminho=None, pid=None)`, `sk_gravar(acao, dispositivo=None, caminho=None, sr=48000, canais=1)`, `sk_ir(tamanho=1.2)`, `sk_espectro(arq, t0, t1, cols=1200, rows=256)`, `sk_salvar(proj, caminho)`, `sk_abrir(caminho)`, `sk_exportar(proj, caminho, op=None)`, `sk_medir(proj, op=None)`, `sk_processar(arq, efeito, op=None)`, `sk_transcrever(proj, idioma="pt", faixas=None)`, `sk_lufs(arq, de=0, dur=None)`, `sk_silencios(arq, de=0, dur=None, limiar=-40, minimo=0.6)`, `sk_pasta_padrao()`, `sk_vozes()`, `sk_voz_criar(nome, arq, op=None)`, `sk_banco(acao="estado", vid=None)`, `sk_voz_desenhar(instruct, seed=0, texto=None)`, `sk_voz_apagar(voz_id)`, `sk_voz(voz_id, texto, op=None)`, `sk_dialogo(modo, tipos=None, nome="")`, `ke_parar()`
 - **Testes**: `testes/teste_som.py`
 - **Guias**: `Instructions/sound-kanivete.md`
 
@@ -419,6 +419,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_kani_maos.py` — Teste das mãos da Kani: abre o app de teste (porta 9338, dados em D:/kanivete_testes), pede um flyer ao agente da
 - `testes/teste_ke_aba.py` — Kanivete Encoder na aba própria (editor-encoder.js keAoTrocar) — app em --agente=9333:
 - `testes/teste_ke_media.py` — Kanivete Encoder como Media Encoder (ke-arquivos.js + Functions/ke_arquivos.py) — app em --agente=9333:
+- `testes/teste_ke_parar.py` — Parar da fila do Ke interrompe o Blender (item da Lux): app em --agente=9333
 - `testes/teste_laco.py` — Laço: Shift soma, Alt subtrai, Shift+Alt cruza; o mesmo no magnético; Ctrl+clique na miniatura seleciona a camada
 - `testes/teste_lux_casa.py` — Lux com casa própria: abre sem o Editor, desfaz sozinha, envia cópia para a timeline (app em --agente=9333)
 - `testes/teste_mixer.py` — Mixer de trilhas de áudio (editor-mixer.js): Premiere → Kanivete → XML do Premiere e a conta do som na exportação
