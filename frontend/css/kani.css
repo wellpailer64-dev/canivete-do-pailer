@@ -55,6 +55,9 @@ body.kani-aberta .kani-bolinha { display: none !important; }
 .kani-abrir button { border: 1px solid #ff8c4277; background: #2b1408; color: #ffb45c; border-radius: 6px; padding: 5px 10px; font: 600 12px var(--font-ui); cursor: pointer; }
 .kani-abrir button:hover { background: #3a1c0c; }
 .kani-erro { margin-top: 6px; color: #ff8a80; font-size: 12px; }
+.kani-cria.falta p.kani-cria-msg { margin: 6px 0 8px; }
+.kani-cria.falta small.kani-cria-msg { display: block; margin-top: 6px; }
+.kani-baixar-gerador { background: var(--primary, #D4814A) !important; border-color: var(--primary, #D4814A) !important; color: #1a0f08 !important; font-weight: 650; }
 .kani-pensando { display: inline-flex; gap: 4px; padding: 6px 0; }
 .kani-pensando i { width: 6px; height: 6px; border-radius: 50%; background: #ff8c42; animation: kani-ponto 1.2s infinite ease-in-out; }
 .kani-pensando i:nth-child(2) { animation-delay: .15s; } .kani-pensando i:nth-child(3) { animation-delay: .3s; }

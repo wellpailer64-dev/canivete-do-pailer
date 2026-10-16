@@ -252,6 +252,14 @@ button { cursor: pointer; }
     gap: 8px;
 }
 .sidebar-foot .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); flex-shrink: 0; }
+/* clicar na versão = procurar atualização agora (app.js › _buscarAtualizacao) */
+.sidebar-foot.clicavel { cursor: pointer; border-radius: 6px; transition: background .15s, color .15s; }
+.sidebar-foot.clicavel:hover { background: var(--bg-3); color: var(--text); }
+.sidebar-foot.clicavel:hover #app-version::after { content: " · verificar"; color: var(--primary); }
+.sidebar-foot.verificando .dot { background: var(--primary); animation: sb-pisca .8s ease-in-out infinite alternate; }
+.sidebar-foot.nova .dot { background: var(--primary); box-shadow: 0 0 0 3px rgba(212,129,74,.25); }
+.sidebar-foot.falhou .dot { background: #e0a040; }
+@keyframes sb-pisca { to { opacity: .25; } }
 
 /* Sidebar compacta (só ícones): fixa pelo botão (nav-mini) ou automática numa ferramenta (nav-auto) */
 body.nav-mini .sidebar, body.nav-auto:not(.nav-peek) .sidebar { width: 64px; }

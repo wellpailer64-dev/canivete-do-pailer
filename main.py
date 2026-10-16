@@ -3892,6 +3892,17 @@ class ApiBridge:
         from Functions import kani_criar
         return kani_criar.detectar(texto, anterior)
 
+    def kani_baixar_modelo(self, tipo):
+        """O gerador que faltou numa criação da Kani (botão no cartão): imagem (Z-Image) ou efeito (EzAudio).
+        Andamento em kaniModeloProgresso({tipo, pct, msg} / {tipo, fim} / {tipo, erro})."""
+        if tipo == "imagem":
+            from Functions import gerador_imagem as g
+            return g.baixar(lambda d: _js("kaniModeloProgresso", {"tipo": tipo, **d}))
+        if tipo == "efeito":
+            from Functions import gerador_sfx as g
+            return g.baixar(lambda d: _js("kaniModeloProgresso", {"tipo": tipo, **d}))
+        return {"success": False, "error": f"não sei baixar: {tipo}"}
+
     def kani_criar(self, job, tipo, pedido):
         """A Kani cria e entrega no chat (Functions/kani_criar.py): progresso e fim em kaniCriacao(...)."""
         from Functions import kani_criar

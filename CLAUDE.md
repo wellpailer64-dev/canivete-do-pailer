@@ -287,6 +287,8 @@ runner `serve`), ~3 s por leitura. Teste: `py -3.13 testes/teste_kani.py` (porta
 do Soundboard + impacto, mixada no ffmpeg) — `Functions/kani_criar.py` (detectar por verbo + tipo; a Kani escreve o
 prompt/texto e sai da placa), cartão com progresso, prévia, Baixar/Abrir/Mostrar na pasta (`kaniCriacao` em kani.js);
 arquivos em `modelos_ia/kani/criacoes`. Faixa "Peça à Kani" na Home (`kaniHome`).
+Gerador que falta (imagem/efeito): `kani_criar.FaltaModelo` → o cartão mostra "Baixar o gerador (X GB)" (`kani_baixar_modelo`,
+`kaniModeloProgresso`) e refaz o pedido sozinho ao terminar; no modo em etapas, botão "Refazer o pedido".
 **Mãos da Kani** (2026-10-13): flyer montado AO VIVO no Photo a partir de uma ficha da Kani (trilho paralelo, não mexe
 nas ferramentas do Claude) — `Functions/kani_maos.py`, `frontend/js/kani-maos.js`; guia `Instructions/agente/kani-maos.md`;
 teste `py -3.13 testes/teste_kani_maos.py`.

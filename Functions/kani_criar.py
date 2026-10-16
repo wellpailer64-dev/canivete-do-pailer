@@ -217,6 +217,13 @@ def _liberar_placa():
         pass
 
 
+class FaltaModelo(RuntimeError):
+    """o gerador ainda não foi baixado: o cartão da Kani mostra o botão "Baixar" (kani_baixar_modelo) e refaz o pedido"""
+    def __init__(self, tipo, gb, msg):
+        super().__init__(msg)
+        self.tipo, self.gb = tipo, gb
+
+
 def criar(job, tipo, pedido, on_evento):
     """Em thread. Um pedido por vez (os motores dividem a placa)."""
     if not _ocupado.acquire(blocking=False):
@@ -231,7 +238,7 @@ def criar(job, tipo, pedido, on_evento):
             if tipo == "imagem":
                 from Functions import gerador_imagem
                 if not gerador_imagem.instalado():
-                    raise RuntimeError("o gerador de imagem ainda não foi baixado (Photo Kanivete › Gerar imagem)")
+                    raise FaltaModelo("imagem", gerador_imagem.estado().get("tamanho_gb"), "o gerador de imagem ainda não foi baixado")
                 on(3, "Escrevendo o pedido para o gerador...")
                 prompt = _llm(_SIS_IMAGEM, pedido, 160) or pedido
                 w, h = _proporcao(pedido)
@@ -251,6 +258,8 @@ def criar(job, tipo, pedido, on_evento):
                 texto = prompt
             elif tipo == "efeito":
                 from Functions import gerador_sfx
+                if not gerador_sfx.instalado():
+                    raise FaltaModelo("efeito", gerador_sfx.estado().get("tamanho_gb"), "o gerador de efeitos sonoros ainda não foi baixado")
                 pronto = threading.Event()
                 res = {}
 
@@ -305,6 +314,8 @@ def criar(job, tipo, pedido, on_evento):
             on_evento({"job": job, "fim": True, "tipo": tipo, "path": path, "url": media_server.register(path),
                        "nome": os.path.basename(path), "texto": texto,
                        "musica": {k: _ultima_musica.get(k) for k in ("titulo", "artista", "credito", "licenca")} if tipo == "vinheta" and _ultima_musica else None})
+        except FaltaModelo as e:
+            on_evento({"job": job, "erro": str(e), "falta": e.tipo, "gb": e.gb})
         except Exception as e:
             on_evento({"job": job, "erro": str(e)})
         finally:

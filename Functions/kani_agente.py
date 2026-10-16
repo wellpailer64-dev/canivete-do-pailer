@@ -220,6 +220,8 @@ def _executar(est, acao, a):
                 f"prévia {k or '(sem prévia)'}, projeto editável {kp}." + (f" Avisos: {'; '.join(r['avisos'][:3])}" if r["avisos"] else ""))
     if acao == "gerar_imagem":
         from Functions import gerador_imagem
+        if not gerador_imagem.instalado():
+            raise kani_criar.FaltaModelo("imagem", gerador_imagem.estado().get("tamanho_gb"), "o gerador de imagem ainda não foi baixado")
         desc = str(a.get("descricao") or "").strip()
         if not desc:
             raise ValueError("falta 'descricao'")
@@ -241,6 +243,8 @@ def _executar(est, acao, a):
         return f"Imagem criada: {est.novo('imagem', path, prompt)} ({w}x{h})."
     if acao == "gerar_efeito":
         from Functions import gerador_sfx
+        if not gerador_sfx.instalado():
+            raise kani_criar.FaltaModelo("efeito", gerador_sfx.estado().get("tamanho_gb"), "o gerador de efeitos sonoros ainda não foi baixado")
         desc = str(a.get("descricao") or "").strip()
         if not desc:
             raise ValueError("falta 'descricao'")
@@ -394,6 +398,8 @@ def rodar(job, pedido, on_evento, historico=None, anexos=None, recentes=None):
                         kani.parar()   # imagem/efeito: a placa para o motor da criação
                     resumo = _executar(est, acao, args)
                     estado = "ok"
+                except kani_criar.FaltaModelo:
+                    raise   # não adianta tentar outro caminho: o cartão oferece baixar o gerador
                 except Exception as e:
                     resumo, estado = f"ERRO: {e}", "erro"
                 on_evento({"job": job, "passo": {"n": n, "pensamento": pens, "acao": acao, "estado": estado, "resumo": resumo[:240]}})
@@ -414,7 +420,8 @@ def rodar(job, pedido, on_evento, historico=None, anexos=None, recentes=None):
             return
         except Exception as e:
             from Functions import media_server
-            on_evento({"job": job, "erro": str(e), "arquivos": [{**{k: v for k, v in a.items() if k in ("tipo", "path", "nome", "texto")},
+            on_evento({"job": job, "erro": str(e), **({"falta": e.tipo, "gb": e.gb} if isinstance(e, kani_criar.FaltaModelo) else {}),
+                       "arquivos": [{**{k: v for k, v in a.items() if k in ("tipo", "path", "nome", "texto")},
                                                                     "url": media_server.register(a["path"])} for a in est.arq.values() if a["tipo"] != "musica"]})
         finally:
             _cancelar.discard(job)

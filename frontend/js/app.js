@@ -3439,13 +3439,16 @@ window.updateAppUpdateProgress = updateAppUpdateProgress;
 const _UPD = { tentativa: 0, achou: false, t: null };
 function _buscarAtualizacao(manual = false) {
     clearTimeout(_UPD.t);
-    const v = _el('app-version');
+    const v = _el('app-version'), pe = v && v.closest('.sidebar-foot');
     if (manual && v) v.textContent = 'Verificando atualizações…';
+    if (pe) { pe.classList.add('verificando'); pe.classList.remove('falhou'); }
     return window.pywebview.api.check_update().then(info => {
         if (!info) throw new Error('sem resposta');
+        if (pe) { pe.classList.remove('verificando'); pe.classList.toggle('falhou', !!info.error); pe.classList.toggle('nova', !!info.available); }
         if (v && info.current) {
-            v.textContent = 'v' + info.current + (info.error ? ' · não consegui verificar atualizações' : info.available ? ' · versão nova: v' + info.latest : ' · local e offline');
-            v.title = info.error ? 'Clique para tentar de novo. Motivo: ' + info.error : 'Clique para verificar se há versão nova';
+            v.textContent = 'v' + info.current + (info.error ? ' · não consegui verificar' : info.available ? ' · nova: v' + info.latest : ' · local e offline');
+            if (pe) pe.title = info.error ? 'Não consegui procurar atualização (' + info.error + '). Clique para tentar de novo.'
+                : info.available ? 'Versão nova v' + info.latest + ' disponível: clique para ver e atualizar' : 'Clique para procurar uma versão nova agora';
         }
         if (info.error) throw new Error(info.error);
         _UPD.tentativa = 0;
@@ -3453,6 +3456,7 @@ function _buscarAtualizacao(manual = false) {
         else if (manual && typeof toast === 'function') toast('Você já está na versão mais nova (v' + info.current + ').');
         _UPD.t = setTimeout(() => _buscarAtualizacao(), 3 * 3600e3);
     }).catch(() => {
+        if (pe) { pe.classList.remove('verificando'); pe.classList.add('falhou'); }
         const esperas = [60e3, 5 * 60e3, 20 * 60e3, 60 * 60e3];
         _UPD.t = setTimeout(() => _buscarAtualizacao(), esperas[Math.min(_UPD.tentativa++, esperas.length - 1)]);
         if (manual && typeof toast === 'function') toast('Não consegui verificar atualizações agora. Tento de novo sozinho em instantes.', 'aviso');
@@ -3460,8 +3464,8 @@ function _buscarAtualizacao(manual = false) {
 }
 window.addEventListener('pywebviewready', () => {
     setTimeout(() => _buscarAtualizacao(), 4000);
-    const v = _el('app-version');
-    if (v) { v.style.cursor = 'pointer'; v.addEventListener('click', () => _buscarAtualizacao(true)); }
+    const pe = _el('app-version') && _el('app-version').closest('.sidebar-foot');
+    if (pe) { pe.classList.add('clicavel'); pe.title = 'Clique para procurar uma versão nova agora'; pe.addEventListener('click', () => _buscarAtualizacao(true)); }
 });
 
 window.onArquivosSoltos = onArquivosSoltos;

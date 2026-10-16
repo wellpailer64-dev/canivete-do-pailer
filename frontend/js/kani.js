@@ -182,6 +182,10 @@ function kaniMontar() {
         }
         const ax = e.target.closest('[data-tira-anexo]');
         if (ax) { KANI.anexos.splice(+ax.dataset.tiraAnexo, 1); kaniAnexosRender(); return; }
+        const bg = e.target.closest('[data-baixar-gerador]');
+        if (bg) { if (!(KANI.modelos[bg.dataset.baixarGerador] || {}).baixando) kaniBaixarModelo(bg.dataset.baixarGerador); return; }
+        const rf = e.target.closest('[data-ag-refazer]');
+        if (rf) { const g = KANI.conversa.msgs.map(m => m.agente).find(a => a && a.job === rf.dataset.agRefazer); if (g && g.pedido) { delete g.falta; kaniAgenteIniciar(g.pedido.replace(/\n📎.*$/s, '')); } return; }
         const cr = e.target.closest('[data-cria-baixar],[data-cria-abrir],[data-cria-pasta]');
         if (cr) {
             const k = KANI.conversa.msgs[+(cr.dataset.criaBaixar ?? cr.dataset.criaAbrir ?? cr.dataset.criaPasta)].criacao, api = kaniApi();
@@ -338,8 +342,48 @@ async function kaniCriar(texto, tipo, pedido) {
     const r = await kaniApi().kani_criar(job, tipo, pedido).catch(e => ({ success: false, error: e.message }));
     if (!r || !r.success) window.kaniCriacao({ job, erro: (r && r.error) || 'falhou' });
 }
+// botão "Baixar o gerador" do cartão: um download por vez; ao terminar, refaz os pedidos que esperavam por ele
+const KANI_GERADOR = { imagem: 'o gerador de imagens', efeito: 'o gerador de efeitos sonoros' };
+KANI.modelos = KANI.modelos || {};
+function kaniBaixarModelo(tipo) {
+    const st = KANI.modelos[tipo] = { pct: 0, msg: 'Começando o download…', baixando: true };
+    kaniRender();
+    kaniApi().kani_baixar_modelo(tipo).then(r => {
+        if (!r || !r.success) window.kaniModeloProgresso({ tipo, erro: (r && r.error) || 'não consegui começar o download' });
+    });
+    return st;
+}
+window.kaniModeloProgresso = function (d) {
+    const st = KANI.modelos[d.tipo] = { ...(KANI.modelos[d.tipo] || {}), ...d };
+    if (d.erro) { st.baixando = false; st.msg = d.erro; }
+    else if (d.fim) {
+        st.baixando = false; st.pronto = true;
+        if (typeof toast === 'function') toast(`Kani: ${KANI_GERADOR[d.tipo] || 'o gerador'} foi baixado. Criando o que você pediu…`);
+        for (const c of [KANI.conversa, ...kaniConversas()]) for (const m of (c ? c.msgs : [])) {   // refaz o que esperava
+            const k = m.criacao;
+            if (k && k.estado === 'falta' && k.falta === d.tipo) {
+                Object.assign(k, { estado: 'gerando', pct: 0, msg: 'Começando...', job: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5) });
+                delete k.falta; m.content = '';
+                kaniApi().kani_criar(k.job, k.tipo, k.pedido).then(r => { if (!r || !r.success) window.kaniCriacao({ job: k.job, erro: (r && r.error) || 'falhou' }); });
+            }
+        }
+        kaniGuardar();
+    }
+    const el = document.querySelectorAll(`[data-modelo-prog="${d.tipo}"]`);
+    if (el.length && !d.fim && !d.erro) el.forEach(x => { x.querySelector('i').style.width = Math.max(3, st.pct || 0) + '%'; x.nextElementSibling.textContent = st.msg || ''; });
+    else kaniRender();
+};
 function kaniCriaHtml(m, i) {
     const k = m.criacao, nome = KANI_CRIA_NOME[k.tipo] || 'isso';
+    if (k.estado === 'falta') {
+        const st = KANI.modelos[k.falta] || {}, gb = k.gb ? ` (${String(k.gb).replace('.', ',')} GB, uma vez só)` : '';
+        return `<div class="kani-cria falta"><div class="kani-cria-cab"><svg class="i"><use href="#i-download"/></svg> Falta baixar ${KANI_GERADOR[k.falta] || 'o gerador'}</div>
+            ${m.content ? `<p class="kani-cria-msg">${kaniEsc(m.content)}</p>` : ''}
+            ${st.baixando ? `<div class="kani-prog" data-modelo-prog="${k.falta}"><i style="width:${Math.max(3, st.pct || 0)}%"></i></div><small class="kani-cria-msg">${kaniEsc(st.msg || '')}</small>`
+                : `<div class="kani-cria-bts"><button class="kani-baixar-gerador" data-baixar-gerador="${k.falta}"><svg class="i"><use href="#i-download"/></svg> Baixar ${KANI_GERADOR[k.falta] || 'o gerador'}${gb}</button></div>
+                   ${st.msg && !st.pronto ? `<small class="kani-cria-msg">${kaniEsc(st.msg)}</small>` : ''}
+                   <small class="kani-cria-msg">Roda tudo no seu computador, sem internet depois. Quando terminar, eu crio ${nome} sozinha.</small>`}</div>`;
+    }
     if (k.estado === 'gerando') return `<div class="kani-cria"><div class="kani-cria-cab"><span class="kani-gira"></span> Criando ${nome}…</div>
         <div class="kani-prog"><i style="width:${Math.max(3, k.pct || 0)}%"></i></div><small class="kani-cria-msg">${kaniEsc(k.msg || '')}</small></div>`;
     if (k.estado !== 'pronto') return '';
@@ -441,6 +485,10 @@ function kaniAgenteHtml(m) {
             ${p.estado === 'executando' && g.progresso ? `<div class="kani-prog"><i style="width:${Math.max(3, g.progresso.pct || 0)}%"></i></div><small class="kani-cria-msg">${kaniEsc(g.progresso.msg || '')}</small>` : ''}
             </div></div>`).join('')}</div>
         ${g.mensagem ? `<p class="kani-ag-msg">${kaniEsc(g.mensagem)}</p>` : ''}
+        ${g.falta ? (() => { const st = KANI.modelos[g.falta] || {}; return st.pronto
+            ? `<div class="kani-cria-bts"><button class="kani-baixar-gerador" data-ag-refazer="${g.job}">Pronto! Refazer o pedido</button></div>`
+            : st.baixando ? `<div class="kani-prog" data-modelo-prog="${g.falta}"><i style="width:${Math.max(3, st.pct || 0)}%"></i></div><small class="kani-cria-msg">${kaniEsc(st.msg || '')}</small>`
+            : `<div class="kani-cria-bts"><button class="kani-baixar-gerador" data-baixar-gerador="${g.falta}"><svg class="i"><use href="#i-download"/></svg> Baixar ${KANI_GERADOR[g.falta] || 'o gerador'}${g.gb ? ` (${String(g.gb).replace('.', ',')} GB, uma vez só)` : ''}</button></div>${st.msg ? `<small class="kani-cria-msg">${kaniEsc(st.msg)}</small>` : ''}`; })() : ''}
         ${g.resposta ? `<div class="kani-ag-resp">${kaniMd(g.resposta)}</div><div class="kani-acoes"><button data-copiar-resp="${g.job}" title="Copiar"><svg class="i"><use href="#i-copy"/></svg></button></div>` : ''}
         ${(g.arquivos || []).map(kaniArqHtml).join('')}
         ${g.estado === 'ok' ? `<div class="kani-ag-aval">${g.avaliado ? `<small>${g.avaliado > 0 ? 'Obrigada! Vou usar esse jeito como exemplo nos próximos pedidos parecidos.'
@@ -464,6 +512,10 @@ window.kaniAgente = function (d) {
         const el = KANI.conversa === conv && document.querySelector(`#kani-corpo .kani-msg[data-i="${i}"] .kani-prog i`);
         if (el) { el.style.width = Math.max(3, d.progresso.pct || 0) + '%'; const s = el.parentElement.nextElementSibling; if (s) s.textContent = d.progresso.msg || ''; return; }
     }
+    if (d.erro && d.falta) {   // gerador não baixado: botão para baixar e "refazer o pedido" quando terminar
+        g.falta = d.falta; g.gb = d.gb; g.pedido = g.pedido || (conv.msgs[i - 1] && conv.msgs[i - 1].content) || '';
+        d.erro = `para isso eu preciso de ${KANI_GERADOR[d.falta] || 'um gerador'}, que ainda não foi baixado`;
+    }
     if (d.fim || d.erro) {
         g.estado = d.erro ? 'erro' : 'ok'; g.mensagem = d.erro ? 'Não consegui terminar: ' + d.erro : d.mensagem; g.arquivos = d.arquivos || [];
         g.resposta = d.resposta || '';
@@ -483,7 +535,12 @@ window.kaniCriacao = function (d) {
     }
     if (!conv) return;
     const m = conv.msgs[i], k = m.criacao;
-    if (d.erro) { k.estado = 'erro'; m.erro = 'Não consegui criar: ' + d.erro; m.content = 'Não consegui criar ' + (KANI_CRIA_NOME[k.tipo] || '') + '.'; }
+    if (d.erro && d.falta) {   // gerador ainda não baixado: o cartão oferece baixar e refaz o pedido sozinho
+        k.estado = 'falta'; k.falta = d.falta; k.gb = d.gb;
+        m.content = `Para criar ${KANI_CRIA_NOME[k.tipo] || 'isso'} eu preciso de um gerador que roda no seu computador e ainda não foi baixado.`;
+        delete m.erro;
+    }
+    else if (d.erro) { k.estado = 'erro'; m.erro = 'Não consegui criar: ' + d.erro; m.content = 'Não consegui criar ' + (KANI_CRIA_NOME[k.tipo] || '') + '.'; }
     else if (d.fim) {
         Object.assign(k, { estado: 'pronto', path: d.path, _url: d.url, nome: d.nome, texto: d.texto, musica: d.musica || null });
         m.content = `Pronto! Criei ${KANI_CRIA_NOME[k.tipo] || 'o arquivo'} (${d.nome}).`;
