@@ -927,6 +927,7 @@ def prefs_save(dados):
         with open(tmp, "w", encoding="utf-8") as f:
             f.write(dados)
         os.replace(tmp, final)
+        _agente_estado_prefs()   # agente.json: "pendente_reinicio" ao ligar com o app aberto
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4969,6 +4970,11 @@ class ApiBridge:
         _FECHAR["visto"] = time.time()
         return True
 
+    def reiniciar_marcar(self):
+        """Preferências › "Reiniciar agora": a saída a seguir (appSair, que pergunta do projeto) reabre o app."""
+        _REINICIAR[0] = time.time()
+        return True
+
     def sair_app(self):
         """Ctrl+Q: fecha o app (a página já perguntou sobre o projeto não salvo)."""
         _FECHAR["ok"] = True
@@ -5261,28 +5267,124 @@ def _pid_vivo(pid):
         return False
 
 
-def _agente_registrar(porta, sair=False):
-    """Anota (ou tira, ao fechar) esta cópia em agente.json: o agente acha a porta sem varrer 9222–9231.
+_trava_agente_json = threading.Lock()
+
+
+def _agente_registrar(sair=False, **campos):
+    """Anota (ou tira, ao fechar) esta cópia em agente.json — TODA abertura, com o modo ligado ou não: o agente lê o
+    arquivo em vez de varrer portas (relato do notebook, 2026-10-16: 3 portas do app sem explicação, a de controle no
+    msedgewebview2.exe). campos: estado (ligado/desligado/pendente_reinicio), porta, porta_interface, porta_instancia.
     Entradas de cópias que já fecharam saem na hora."""
-    import time
     arq = _agente_arquivo()
+    with _trava_agente_json:
+        try:
+            with open(arq, "r", encoding="utf-8") as f:
+                lista = (json.load(f) or {}).get("instancias") or []
+        except Exception:
+            lista = []
+        minha = next((x for x in lista if isinstance(x, dict) and x.get("pid") == os.getpid()), None)
+        lista = [x for x in lista if isinstance(x, dict) and x.get("pid") != os.getpid() and _pid_vivo(x.get("pid", 0))]
+        if not sair:
+            if minha is None:
+                from Functions import updater
+                minha = {"pid": os.getpid(), "versao": updater.versao_local(), "inicio": time.strftime("%Y-%m-%d %H:%M:%S"),
+                         "codigo": not getattr(sys, "frozen", False), "processo_da_porta": "msedgewebview2.exe",
+                         "protocolo": "CDP (depuração remota do WebView2)"}
+            minha.update(campos)
+            p = minha.get("porta")
+            minha["url"] = f"http://127.0.0.1:{p}/json/list" if p else None
+            if minha.get("porta_interface"):
+                minha["docs"] = f"http://127.0.0.1:{minha['porta_interface']}/agente.md"
+            lista.append(minha)
+        try:
+            os.makedirs(os.path.dirname(arq), exist_ok=True)
+            tmp = arq + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({"leia": "estado 'ligado' = conecte em url (CDP). porta_interface e porta_instancia NÃO aceitam "
+                                   "comandos. Instruções: docs (agente.md).", "instancias": lista},
+                          f, ensure_ascii=False, indent=1)
+            os.replace(tmp, arq)
+        except Exception:
+            pass
+
+
+def _agente_estado_prefs():
+    """Depois de mudar as Preferências: ligado agora, desligado ou pendente_reinicio (ligado nas Preferências com o
+    app aberto sem a porta — só vale ao reabrir)."""
     try:
-        with open(arq, "r", encoding="utf-8") as f:
-            lista = (json.load(f) or {}).get("instancias") or []
+        with open(_prefs_path(), "r", encoding="utf-8") as f:
+            d = json.load(f) or {}
     except Exception:
-        lista = []
-    lista = [x for x in lista if isinstance(x, dict) and x.get("pid") != os.getpid() and _pid_vivo(x.get("pid", 0))]
-    if not sair:
-        lista.append({"porta": porta, "pid": os.getpid(), "inicio": time.strftime("%Y-%m-%d %H:%M:%S"),
-                      "codigo": not getattr(sys, "frozen", False)})
+        d = {}
+    quer = bool(d.get("dev") and d.get("agente"))
+    if _PORTA_AGENTE:
+        _agente_registrar(estado="ligado", ao_reabrir="ligado" if quer or _porta_agente() else "desligado")
+    else:
+        _agente_registrar(estado="pendente_reinicio" if quer else "desligado")
+
+
+_REINICIAR = [0.0]   # pedido de "Reiniciar agora" (Preferências): vale por 2 min, se a pessoa cancelar a saída
+
+
+def _relancar_se_pedido():
+    """Ao fechar com "Reiniciar agora" pedido: abre uma cópia nova ~2 s depois (esta já saiu e soltou a instância única)."""
+    if not _REINICIAR[0] or time.time() - _REINICIAR[0] > 120:
+        return
+    import subprocess
+    if getattr(sys, "frozen", False):
+        cmd = [sys.executable] + sys.argv[1:]
+    else:
+        cmd = [sys.executable, os.path.abspath(sys.argv[0])] + sys.argv[1:]
+    linha = subprocess.list2cmdline(cmd)
     try:
-        os.makedirs(os.path.dirname(arq), exist_ok=True)
-        tmp = arq + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump({"instancias": lista}, f, ensure_ascii=False, indent=1)
-        os.replace(tmp, arq)
+        subprocess.Popen(f'cmd /c ping -n 3 127.0.0.1 >nul & start "" {linha}', cwd=os.getcwd(),
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except Exception as e:
+        print("[reiniciar] não relançou:", e)
+
+
+def _servidor_com_ajuda():
+    """Servidor da interface (pywebview/bottle): "/" dava erro 500 (a rota "/" do pywebview chama asset() sem o
+    arquivo) — agora leva a /agente.md; 404 diz onde estão as instruções; .md sai como texto."""
+    import mimetypes
+    mimetypes.add_type("text/plain", ".md")
+    try:
+        import webview.http as wh
     except Exception:
-        pass
+        return
+    orig = wh.bottle.run
+    if getattr(orig, "_kanivete", False):
+        return
+
+    def meio(app):
+        def wsgi(environ, start_response):
+            if environ.get("PATH_INFO") in ("", "/"):
+                start_response("302 Found", [("Location", "/agente.md"), ("Content-Length", "0")])
+                return [b""]
+            achou = []
+
+            def sr(status, headers, exc_info=None):
+                if status.startswith("404"):
+                    achou.append(status)
+                    return lambda _b: None
+                return start_response(status, headers, exc_info) if exc_info else start_response(status, headers)
+            corpo = app(environ, sr)
+            if not achou:
+                return corpo
+            if hasattr(corpo, "close"):
+                corpo.close()
+            txt = ("404 — servidor da INTERFACE do KANIVETE (só arquivos da tela; não aceita comandos).\n"
+                   "Instruções para agentes: /agente.md\n").encode("utf-8")
+            start_response("404 Not Found", [("Content-Type", "text/plain; charset=utf-8"), ("Content-Length", str(len(txt)))])
+            return [txt]
+        return wsgi
+
+    def run(*a, **kw):
+        if "app" in kw:
+            kw["app"] = meio(kw["app"])
+        return orig(*a, **kw)
+    run._kanivete = True
+    wh.bottle.run = run
 
 
 def _abrir_em_outra_copia():
@@ -5485,7 +5587,9 @@ def main():
     atexit.register(gdrive_cancel)
     if primeira_copia is None:
         from Functions import instancia_unica
-        instancia_unica.escutar(_receber_de_outra_copia)
+        _porta_inst = instancia_unica.escutar(_receber_de_outra_copia)
+        if _porta_inst:
+            _agente_registrar(porta_instancia=_porta_inst)
 
     def _splash_sound():
         try:   # criações do chat da Kani da sessão anterior (Functions/kani_criar.py): não acumulam
@@ -5511,8 +5615,21 @@ def main():
     if porta_agente:
         webview.settings["REMOTE_DEBUGGING_PORT"] = porta_agente
         print(f"[agente] depuração remota em http://127.0.0.1:{porta_agente}")
-        _agente_registrar(porta_agente)   # agente.json: o agente acha esta cópia direto
-        atexit.register(lambda: _agente_registrar(porta_agente, sair=True))
+    # agente.json em TODA abertura (ligado ou não): o agente acha esta cópia, a porta e o estado sem varrer portas
+    _agente_registrar(estado="ligado" if porta_agente else "desligado", porta=porta_agente)
+    _agente_estado_prefs()
+    atexit.register(lambda: _agente_registrar(sair=True))
+
+    def _anotar_interface():
+        try:
+            from urllib.parse import urlparse
+            p = urlparse(window.get_current_url() or "").port
+            if p:
+                _agente_registrar(porta_interface=p)
+        except Exception:
+            pass
+    window.events.loaded += lambda: threading.Thread(target=_anotar_interface, daemon=True).start()
+    _servidor_com_ajuda()
 
     # O servidor local do pywebview aceita só 5 conexões na fila (padrão do Python): ao abrir, a página
     # pede ~15 arquivos de uma vez e o Windows recusa o resto — um script do editor ficava sem carregar
@@ -5524,6 +5641,8 @@ def main():
     
     # Ao fechar
     _cleanup_temp_thumbs()
+    _agente_registrar(sair=True)
+    _relancar_se_pedido()
     return
 
 

@@ -83,10 +83,20 @@ def escutar(ao_receber):
                         if not parte:
                             break
                         dados += parte
-                    p = json.loads(dados.decode("utf-8"))
-                    if p.get("token") == token:
+                    try:
+                        p = json.loads(dados.decode("utf-8"))
+                    except ValueError:
+                        p = None
+                    if isinstance(p, dict) and p.get("token") == token:
                         c.sendall(b"ok")
                         pedido = p
+                    else:   # não é a outra cópia do app (um agente procurando a porta de controle): diz o que é
+                        msg = ("ERRO: porta de instancia unica do KANIVETE (so recebe o pedido de outra copia do app). "
+                               "Controle do agente: %APPDATA%\\CaniveteDoPailer\\agente.json\n").encode("utf-8")
+                        if dados[:4] in (b"GET ", b"POST", b"HEAD"):
+                            msg = (b"HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=utf-8\r\n"
+                                   b"Content-Length: " + str(len(msg)).encode() + b"\r\nConnection: close\r\n\r\n" + msg)
+                        c.sendall(msg)
             except Exception:
                 continue
             if pedido:
@@ -96,3 +106,4 @@ def escutar(ao_receber):
                     print("[instância] pedido falhou:", e)
 
     threading.Thread(target=_loop, daemon=True).start()
+    return srv.getsockname()[1]

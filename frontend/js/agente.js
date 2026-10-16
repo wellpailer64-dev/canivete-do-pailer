@@ -49,8 +49,15 @@ function veAgEmbrulhar() {
     envolve('veToast', 'aviso', m => (typeof m === 'string' ? m : m && m.msg));
     envolve('veOnExport', 'export', ev => {
         if (typeof ev === 'string') { try { ev = JSON.parse(ev); } catch (e) { return null; } }
-        if (!ev || !ev.done) return null;
-        return ev.success ? `concluída: ${ev.output_path} (${ev.duration ? ev.duration.toFixed(1) + ' s' : '?'})` : `FALHOU: ${ev.error || '?'}`;
+        if (!ev) return null;
+        if (!ev.done) { if (!veAgEmbrulhar.t0) veAgEmbrulhar.t0 = Date.now(); return null; }
+        // "(60.0 s)" parecia o tempo de exportação: era a duração do vídeo (relato 2026-10-16) — agora os dois, rotulados
+        const levou = veAgEmbrulhar.t0 ? ((Date.now() - veAgEmbrulhar.t0) / 1000).toFixed(1) + ' s' : '?';
+        veAgEmbrulhar.t0 = 0;
+        if (!ev.success) return `FALHOU (após ${levou}): ${ev.error || '?'}`;
+        const mb = ev.size ? ` · ${(ev.size / 1048576).toFixed(1)} MB` : '';
+        return `concluída: ${ev.output_path} (duração do vídeo ${ev.duration ? ev.duration.toFixed(1) + ' s' : '?'} · exportou em ${levou}`
+            + ` · ${ev.placa || ev.turbo ? 'na placa' : 'no processador'}${mb})`;
     });
 }
 document.addEventListener('DOMContentLoaded', () => setTimeout(veAgEmbrulhar, 0));

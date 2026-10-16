@@ -97,6 +97,15 @@ def estado():
         except Exception:
             pass
     g = _placa() or {}
+    # 1ª leitura: CPU (janela de 1 s) e nvidia-smi ainda sem amostra — espera um pouco em vez de devolver null (um agente
+    # concluía "placa não detectada"; relato do notebook, 2026-10-16); o que não chegar sai com aquecendo = True
+    fim = time.time() + 1.5
+    while time.time() < fim and ((psutil is not None and _cpu["v"] is None)
+                                 or (not g and _gpu["proc"] is not None and not _gpu["sem_nvidia"])):
+        time.sleep(0.1)
+        r["cpu"] = _cpu["v"]
+        g = _gpu["dados"] or {}
+    r["aquecendo"] = (psutil is not None and r["cpu"] is None) or (not g and _gpu["proc"] is not None)
     r.update(gpu=g.get("gpu"), enc=g.get("enc"), dec=g.get("dec"), vram=g.get("vram"), vram_total=g.get("vram_total"),
              placa=g.get("nome"))
     try:

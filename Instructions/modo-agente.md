@@ -15,14 +15,19 @@ Ou defina a variável de ambiente `CANIVETE_AGENTE_PORTA=9222` antes de abrir o 
 Sem isso o modo fica **desligado** (padrão).
 
 ### Ligado sempre (Preferências, escondido)
-Preferências → Geral → clique **5 vezes** em "Modo desenvolvedor" → marque **"Permitir que o Claude controle a janela"**.
+Preferências → Geral → clique **10 vezes** em "Modo desenvolvedor" → marque **"Permitir controle externo da janela"**
+(com o app aberto, aparece **"Reiniciar agora"**: a saída normal, que pergunta do projeto, e o app reabre sozinho).
 A partir da próxima abertura (exe, atalho ou `python main.py`), o app liga a porta sozinho, na primeira livre de
 **9222 a 9231** (uma segunda cópia pega a seguinte). O estado aparece ali mesmo ("Agora: ligado em ...").
 Fica gravado em `%APPDATA%/CaniveteDoPailer/preferencias.json` (`dev` e `agente`).
 
 ### Achar a cópia aberta
-Cada cópia com o modo agente ligado se anota em `%APPDATA%/CaniveteDoPailer/agente.json`
-(`{"instancias": [{"porta", "pid", "inicio", "codigo"}]}`) e se tira ao fechar. Confira se o `pid` ainda existe
+TODA cópia aberta (modo ligado ou não) se anota em `%APPDATA%/CaniveteDoPailer/agente.json` e se tira ao fechar:
+`{"instancias": [{pid, versao, estado: ligado|desligado|pendente_reinicio, porta, url, ao_reabrir, porta_interface,
+docs, porta_instancia, processo_da_porta: "msedgewebview2.exe"}]}` (main.py `_agente_registrar`). A porta de controle é do
+`msedgewebview2.exe` (procurar pelo nome do app não acha). Na porta da interface, `/` leva a `/agente.md`
+(`frontend/agente.md`, o guia que vai na instalação) e os 404 apontam para ele; a porta de instância única responde
+"ERRO: ..." a quem não é outra cópia do app. Relato que motivou: notebook i5 + Iris Xe/GTX 1650, 2026-10-16. Confira se o `pid` ainda existe
 (fechada à força, a entrada fica até a próxima abertura limpar).
 
 ### Registro e ações do agente (frontend/js/agente.js)

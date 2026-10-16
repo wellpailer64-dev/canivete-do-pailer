@@ -1993,6 +1993,7 @@
                         <label class="pref-dev-chk"><input type="checkbox" id="pref-agente" onchange="prefsSetAgente(this.checked)"> Permitir controle externo da janela (modo agente)</label>
                         <p>Abre a porta de controle do painel só neste computador (127.0.0.1). Enquanto estiver ligada, qualquer programa do PC pode usar o app. Vale a partir da próxima vez que o app abrir.</p>
                         <p class="pref-dev-estado" id="pref-agente-estado"></p>
+                        <button type="button" class="btn-primary" id="pref-agente-reiniciar" onclick="prefsReiniciar()" hidden>Reiniciar agora</button>
                         <button type="button" class="btn-secondary" onclick="prefsDevDesligar()">Desativar o modo desenvolvedor</button>
                     </div>
                 </div>

@@ -24,3 +24,9 @@ No primeiro uso dessa ferramenta, o aplicativo pode abrir uma janela do Chrome p
 Depois dessa autorizacao inicial, o GDrive Dumper fica configurado para baixar arquivos em massa do Google Drive sem precisar gerar zip manualmente.
 
 Se aparecerem esses avisos no primeiro uso, pode seguir normalmente.
+
+PARA O CLAUDE / MODO AGENTE (controle do app por uma IA neste PC)
+
+1. Leia %APPDATA%\CaniveteDoPailer\agente.json (porta, estado e o link das instrucoes).
+2. Se o estado nao for "ligado": Preferencias > Geral > clique 10 vezes em "Modo desenvolvedor", marque "Permitir controle externo da janela" e clique em "Reiniciar agora".
+3. Conecte em http://127.0.0.1:<porta>/json/list (Chrome DevTools Protocol). Instrucoes completas em http://127.0.0.1:<porta_interface>/agente.md.

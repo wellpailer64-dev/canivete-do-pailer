@@ -551,7 +551,7 @@ const I18N_EN = {
     'Abre a porta de controle do painel só neste computador (127.0.0.1). Enquanto estiver ligada, qualquer programa do PC pode usar o app. Vale a partir da próxima vez que o app abrir.':
         'Opens the panel control port on this computer only (127.0.0.1). While on, any program on this PC can use the app. Takes effect the next time the app opens.',
     'Agora: ligado em': 'Now: on at', 'Agora: desligado': 'Now: off', 'reabra o app para aplicar': 'reopen the app to apply',
-    'Desativar o modo desenvolvedor': 'Turn off developer mode',
+    'Desativar o modo desenvolvedor': 'Turn off developer mode', 'Projeto aberto': 'Project opened', 'mídia(s) offline na timeline': 'offline media in the timeline', 'só no painel Projeto': 'only in the Project panel', 'mídia(s) offline só no painel Projeto (fora da timeline)': 'offline media only in the Project panel (not in the timeline)', 'Reiniciar agora': 'Restart now',
     'Melhorar áudio': 'Enhance audio', 'Melhorando o áudio no fundo — dá para continuar editando': 'Enhancing audio in the background — you can keep editing',
     'Voz com som de estúdio (Sidon + OmniVoice). Gera o _melhorado.wav ao lado do original e troca só o som: a imagem e os cortes ficam iguais': 'Studio-quality voice (Sidon + OmniVoice). Creates a _melhorado.wav next to the original and swaps only the sound: the picture and the cuts stay the same',
     'Melhorando': 'Enhancing', 'na fila': 'queued', 'Melhorado': 'Enhanced', 'Original': 'Original', 'Áudio melhorado': 'Enhanced audio',
@@ -1090,8 +1090,18 @@ function prefsDevRender() {
     api.ve_agente_porta().then(r => {
         const porta = r && r.porta;
         estado.textContent = porta ? `${i18nT('Agora: ligado em')} http://127.0.0.1:${porta}` : i18nT('Agora: desligado');
-        if (!!porta !== !!PREFS.agente) estado.textContent += ' · ' + i18nT('reabra o app para aplicar');
+        const pendente = !!porta !== !!PREFS.agente;
+        if (pendente) estado.textContent += ' · ' + i18nT('reabra o app para aplicar');
+        const bt = document.getElementById('pref-agente-reiniciar');
+        if (bt) bt.hidden = !pendente || !api.reiniciar_marcar;
     }).catch(() => {});
+}
+// "Reiniciar agora": a saída de sempre (pergunta do projeto não salvo e do render) e o app reabre sozinho
+async function prefsReiniciar() {
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.reiniciar_marcar) return;
+    await api.reiniciar_marcar();
+    if (typeof appSair === 'function') appSair(); else api.sair_app();
 }
 function prefsSetAgente(v) {
     PREFS.agente = !!v;

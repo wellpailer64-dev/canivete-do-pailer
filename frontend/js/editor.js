@@ -4834,8 +4834,12 @@ function veApplyProject() {
     // arquivo de Comp que sumiu do cache não é mídia offline: ela renderiza de novo
     const compArq = new Set((d.media || []).filter(m => m.comp && m.path).map(m => m.path));
     const faltam = (missing || []).filter(p => !compArq.has(p)).length;
-    veToast(faltam ? `Projeto aberto — ${faltam} mídia(s) offline`
-                   : 'Projeto aberto: ' + name.replace(/\.(vknv|vcnvt|prproj)$/i, ''));
+    // offline só no painel Projeto (sem uso na timeline) não atrapalha: o aviso diz onde está (relato 2026-10-16: "1 mídia
+    // offline" com a timeline inteira presente parecia erro)
+    const naTl = faltam ? veOfflineNaTimeline().length : 0;
+    veToast(!faltam ? 'Projeto aberto: ' + name.replace(/\.(vknv|vcnvt|prproj)$/i, '')
+        : naTl ? `${veT('Projeto aberto')} — ${naTl} ${veT('mídia(s) offline na timeline')}${faltam > naTl ? ` (+${faltam - naTl} ${veT('só no painel Projeto')})` : ''}`
+        : `${veT('Projeto aberto')} — ${faltam} ${veT('mídia(s) offline só no painel Projeto (fora da timeline)')}`);
     // importado do Premiere: ainda não é um projeto nosso (Ctrl+S grava um .vknv) e mostra o que não veio
     if (premiere) setTimeout(() => { VE.dirty = true; veUpdateTitle(); vePremiereRelatorio(name, premiere); }, 400);
 }

@@ -22,12 +22,15 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import threading
 import uuid
 
 from Functions import video_cutter as vc
 
 _vk = None
+_vk_le = None    # o decodificador Vulkan devolve a imagem certa? (Iris Xe de notebook: quadro todo verde)
+_vk_idx = None   # índice Vulkan da placa usada
 _trava_vk = threading.Lock()
 PARA_RGB_IMG = "scale=in_color_matrix=bt601,format=rgba"   # foto/PNG: o mesmo do exportador (BT.601)
 # rotação do celular (probe: rotation % 360) → rotate do libplacebo (medido contra o autorotate da CPU: 45,8 dB). O
@@ -38,6 +41,8 @@ _CODECS_VK = ("h264", "hevc", "av1")
 
 def _ler_na_placa(info):
     """Decodificar na placa: o que ela lê (H.264/HEVC/AV1 em 4:2:0); o resto é lido na CPU e sobe."""
+    if not _vk_le:
+        return False
     if info.get("vcodec") not in _CODECS_VK:
         return False
     if info.get("pix_fmt", "") not in ("yuv420p", "yuvj420p", "nv12", "yuv420p10le", "p010le"):
@@ -75,21 +80,90 @@ _FMT_MEIO = "yuv444p16le"
 _FMT_ALFA = "rgba64le"   # camada com transparência feita na placa (fade de clipe)
 
 
+def _vk_dev():
+    """Índice Vulkan da placa: a dedicada (discrete), não a 0. Em notebook híbrido a 0 costuma ser a integrada (Iris Xe),
+    e o export "na placa" saía todo verde nela com a GTX parada (relato do notebook i5-11300H + GTX 1650, 2026-10-16)."""
+    global _vk_idx
+    if _vk_idx is None:
+        _vk_idx = 0
+        try:
+            r = subprocess.run([vc.ffmpeg_path(), "-v", "verbose", "-init_hw_device", "vulkan=vk:99", "-f", "lavfi",
+                                "-i", "nullsrc", "-frames:v", "1", "-f", "null", "-"],
+                               capture_output=True, text=True, timeout=30, creationflags=vc._creationflags())
+            gpus = re.findall(r"^\[Vulkan[^\]]*\]\s+(\d+): (.+?) \((\w+)\)", r.stderr or "", re.M)
+            dedicadas = [int(i) for i, _n, t in gpus if t == "discrete"]
+            if dedicadas:
+                _vk_idx = dedicadas[0]
+        except Exception:
+            pass
+    return _vk_idx
+
+
+def _vk_arg():
+    return f"vulkan=vk:{_vk_dev()}"
+
+
+def _cor_ok(cmd):
+    """Roda o ffmpeg e confere que o quadro de saída (1×1 rgb24) é o vermelho de entrada (200, 40, 30), não verde/preto."""
+    r = subprocess.run(cmd, capture_output=True, timeout=60, creationflags=vc._creationflags())
+    px = r.stdout[:3]
+    return r.returncode == 0 and len(px) == 3 and abs(px[0] - 200) < 30 and abs(px[1] - 40) < 30 and abs(px[2] - 30) < 30
+
+
+def _quadros_zerados(video, total):
+    """O vídeo saiu com quadros YUV zerados (tela verde)? Lê 3 quadros pequenos: com U e V quase todos abaixo de 16 (fora
+    da faixa de vídeo; nenhuma imagem de verdade fica assim) em 2 deles, a placa devolveu quadros vazios. Visto num
+    notebook com Iris Xe: 140 kb/s, tudo verde e o log dizendo "concluída" (relato 2026-10-16)."""
+    ruins = 0
+    for f in (0.1, 0.5, 0.9):
+        try:
+            r = subprocess.run([vc.ffmpeg_path(), "-v", "error", "-ss", f"{max(0.0, total * f):.3f}", "-i", video,
+                                "-frames:v", "1", "-vf", "scale=32:18,format=yuv420p", "-f", "rawvideo", "-"],
+                               capture_output=True, timeout=30, creationflags=vc._creationflags())
+        except Exception:
+            continue
+        d = r.stdout
+        if r.returncode != 0 or len(d) < 864:
+            continue
+        uv = d[576:864]
+        if sum(1 for i in range(144) if uv[i] < 16 and uv[144 + i] < 16) > 0.8 * 144:
+            ruins += 1
+    return ruins >= 2
+
+
 def disponivel():
-    """A placa faz Vulkan + libplacebo com este ffmpeg? (testado uma vez por sessão)."""
-    global _vk
+    """A placa faz Vulkan + libplacebo com este ffmpeg? (testado uma vez por sessão). Confere a COR que volta (o teste
+    antigo usava preto e passava com a placa devolvendo quadro zerado) e, à parte, a leitura de H.264 pelo Vulkan:
+    se só ela falha, os vídeos são lidos na CPU e sobem (_ler_na_placa)."""
+    global _vk, _vk_le
     with _trava_vk:
         if _vk is None:
+            ff, dev = vc.ffmpeg_path(), ["-init_hw_device", _vk_arg(), "-filter_hw_device", "vk"]
+            sai = ["-frames:v", "1", "-f", "rawvideo", "-"]
             try:
-                r = subprocess.run(
-                    [vc.ffmpeg_path(), "-v", "error", "-init_hw_device", "vulkan=vk:0", "-filter_hw_device", "vk",
-                     "-f", "lavfi", "-i", "color=black:s=64x64:d=0.1",
-                     "-vf", "format=yuv420p,hwupload,libplacebo=format=yuv420p,hwdownload,format=yuv420p",
-                     "-f", "null", "-"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60, creationflags=vc._creationflags())
-                _vk = r.returncode == 0
+                _vk = _cor_ok([ff, "-v", "error"] + dev + [
+                    "-f", "lavfi", "-i", "color=0xC8281E:s=64x64:d=0.1",
+                    "-vf", "format=yuv420p,hwupload,libplacebo=format=yuv420p,hwdownload,format=yuv420p,"
+                           "scale=1:1,format=rgb24"] + sai)
             except Exception:
                 _vk = False
+            _vk_le = False
+            if _vk:
+                amostra = os.path.join(tempfile.gettempdir(), f"kn_vk_{uuid.uuid4().hex[:8]}.mp4")
+                try:
+                    subprocess.run([ff, "-y", "-v", "error", "-f", "lavfi", "-i", "color=0xC8281E:s=256x256:d=0.2:r=30",
+                                    "-c:v", "libx264", "-pix_fmt", "yuv420p", amostra],
+                                   capture_output=True, timeout=60, creationflags=vc._creationflags())
+                    _vk_le = _cor_ok([ff, "-v", "error"] + dev + [
+                        "-hwaccel", "vulkan", "-hwaccel_output_format", "vulkan", "-i", amostra,
+                        "-vf", "libplacebo=format=yuv420p,hwdownload,format=yuv420p,scale=1:1,format=rgb24"] + sai)
+                except Exception:
+                    _vk_le = False
+                finally:
+                    try:
+                        os.remove(amostra)
+                    except OSError:
+                        pass
         return _vk
 
 
@@ -365,7 +439,7 @@ class _Grafo:
         self.W, self.H, self.fps, self.total = W, H, fps, total
         self.fd = 1.0 / fps
         self.cmd = [vc.ffmpeg_path(), "-y", "-v", "error", "-nostats", "-progress", "pipe:1",
-                    "-init_hw_device", "vulkan=vk:0", "-filter_hw_device", "vk"]
+                    "-init_hw_device", _vk_arg(), "-filter_hw_device", "vk"]
         self.filtros = []
         self.n = 0
         self.rot = 0
@@ -1567,6 +1641,7 @@ def _blocos_juntos(blocos, path):
 def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
     """Exporta a timeline na placa. None = não é para a placa (motivo em args['_motivo']); senão o resultado de
     exportar_video ({success, ...}). Falha com success False → quem chamou refaz pela CPU."""
+    global _vk
     op = dict(args.get("opcoes") or {})
     fmt = str(args["formato_saida"]).lower()
     cfg = vc.FORMATOS_SAIDA.get(fmt, vc.FORMATOS_SAIDA["mp4"])
@@ -1752,6 +1827,9 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
                                creationflags=vc._creationflags())
             if r.returncode != 0 or not os.path.isfile(video):
                 return {"success": False, "error": "placa (juntar blocos): " + "\n".join(vc._linhas_ffmpeg(r.stderr) or [str(r.returncode)])}
+        if _quadros_zerados(video, total):   # a placa "exportou" sem erro, mas a imagem saiu vazia (verde)
+            _vk = False   # o resto da sessão exporta pela CPU
+            return {"success": False, "error": "placa: imagem saiu verde (quadros zerados na placa de vídeo)"}
         if t_som:
             t_som.join()
             r = res_som.get("r") or {}
