@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="css/som.css">
     <link rel="stylesheet" href="css/kani.css">
     <link rel="stylesheet" href="css/slider.css">
+    <link rel="stylesheet" href="css/ata.css">
     <link rel="icon" href="identidade/icone.ico">
 </head>
 <body>
@@ -187,6 +188,11 @@
                 </button>
                 <button class="menu-item" data-tool="favicon" onclick="switchTool('favicon')">
                     <span class="icon"><svg class="i"><use href="#i-globe"/></svg></span><span class="label">Gerar Favicon</span>
+                </button>
+
+                <div class="menu-group">Reuniões</div>
+                <button class="menu-item" data-tool="ata-kanivete" onclick="switchTool('ata-kanivete')" title="Ata Kanivete (Beta) — grava a reunião do Google Meet e a Kani escreve a ATA">
+                    <span class="icon"><span class="app-logo al-at">At</span></span><span class="label">Ata Kanivete</span><span class="menu-beta">Beta</span>
                 </button>
 
                 <div class="menu-group">Apresentação</div>
@@ -556,6 +562,7 @@
                 <!-- Editor de vídeo -->
                 <div class="tool-page ve-page" id="page-lux-kanivete"></div>
                 <div class="tool-page ve-page" id="page-slider-kanivete"></div>
+                <div class="tool-page ve-page" id="page-ata-kanivete"></div>
                 <div class="tool-page ve-page" id="page-kanivete-encoder"><div class="ve ke-casa" id="ke-casa"></div></div>
                 <div class="tool-page ve-page" id="page-video-cutter">
                     <div class="ve" id="ve">
@@ -2157,6 +2164,7 @@
     <script src="js/slider-cores.js"></script>
     <script src="js/slider-agente.js"></script>
     <script src="js/slider-kani.js"></script>
+    <script src="js/ata.js"></script>
     <script src="js/editor-3d-mexer.js"></script>
     <script src="js/editor-roto.js"></script>
     <script src="js/editor-caneta.js"></script>

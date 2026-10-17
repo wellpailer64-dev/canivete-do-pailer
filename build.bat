@@ -121,6 +121,7 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "fontTools" ^
  --hidden-import "lxml" ^
  --collect-all "pptx" ^
+ --collect-all "sherpa_onnx" --hidden-import "Functions.ata_kanivete" --hidden-import "websockets.sync.client" ^
  --collect-data "cv2" ^
  --copy-metadata "pywebview" ^
  --copy-metadata "pythonnet" ^

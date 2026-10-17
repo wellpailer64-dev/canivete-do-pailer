@@ -752,6 +752,17 @@
    "automacao": ""
   },
   {
+   "id": "ata-kanivete",
+   "nome": "Ata Kanivete",
+   "grupo": "Reuniões",
+   "front": [],
+   "back": [],
+   "api": [],
+   "testes": [],
+   "guias": [],
+   "automacao": ""
+  },
+  {
    "id": "slider-kanivete",
    "nome": "Slider Kanivete",
    "grupo": "Apresentação",
@@ -871,6 +882,18 @@
   "sd_importar_pptx",
   "sd_importar_pdf",
   "sd_kani",
+  "ata_listar",
+  "ata_abrir",
+  "ata_salvar",
+  "ata_apagar",
+  "ata_importar",
+  "ata_meet_abrir",
+  "ata_meet_cmd",
+  "ata_meet_estado",
+  "ata_processar",
+  "ata_reescrever",
+  "ata_pdf",
+  "ata_audio",
   "ke_presets",
   "ke_arquivo_info",
   "ke_escolher_arquivos",
@@ -883,6 +906,7 @@
   "check_update",
   "apply_update",
   "fechar_visto",
+  "reiniciar_marcar",
   "sair_app",
   "toggle_fullscreen",
   "janela_cmd",
@@ -1980,6 +2004,79 @@
     "slider_kani"
    ]
   },
+  "ata_listar": {
+   "args": "",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
+  "ata_abrir": {
+   "args": "sid",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
+  "ata_salvar": {
+   "args": "sid, doc",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
+  "ata_apagar": {
+   "args": "sid",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
+  "ata_importar": {
+   "args": "",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
+  "ata_meet_abrir": {
+   "args": "link=\"\"",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
+  "ata_meet_cmd": {
+   "args": "acao",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
+  "ata_meet_estado": {
+   "args": "",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
+  "ata_processar": {
+   "args": "sid",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
+  "ata_reescrever": {
+   "args": "sid",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
+  "ata_pdf": {
+   "args": "sid",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
+  "ata_audio": {
+   "args": "sid, faixa",
+   "modulos": [
+    "ata_kanivete",
+    "media_server"
+   ]
+  },
   "ve_3d_estudio_video": {
    "args": "spec",
    "modulos": [
@@ -2625,6 +2722,10 @@
    "args": "",
    "modulos": []
   },
+  "reiniciar_marcar": {
+   "args": "",
+   "modulos": []
+  },
   "sair_app": {
    "args": "",
    "modulos": []
@@ -2956,6 +3057,7 @@
  "guias": {
   "Instructions/agente/ajuste-premiere.md": "AJUSTE PREMIERE: plano para a próxima sessão",
   "Instructions/agente/arquiteto-local.md": "Arquiteto Local B",
+  "Instructions/agente/ata-kanivete.md": "Ata Kanivete (At, verde #1FA971) — Beta",
   "Instructions/agente/cena-3d-editor.md": "Cena 3D no Editor Kanivete (estilo After Effects)",
   "Instructions/agente/design-photo-kanivete.md": "Fazer arte no Photo Kanivete pela API (guia para IAs)",
   "Instructions/agente/direcao-carrossel.md": "Direção de arte de carrossel (para IAs) — o que separa peça boa de \"landing page genérica\"",
@@ -3013,6 +3115,7 @@
   "Functions/ampliar_imagem.py": "Ampliar foto por IA (super-resolução): Real-ESRGAN ncnn Vulkan (BSD-3, xinntao/Real-ESRGAN), GPU via Vulkan",
   "Functions/anti_noise.py": "Anti Noise (efeito de áudio do Vídeo Kanivete): tira o ruído de fundo com o DeepFilterNet3 (rede neural)",
   "Functions/area_transferencia.py": "area_transferencia.py — o que foi copiado no Windows, para o Ctrl+V da timeline do Pocket Editor",
+  "Functions/ata_kanivete.py": "ata_kanivete.py — Ata Kanivete (At, verde; Beta): grava reunião do Google Meet e escreve a ATA",
   "Functions/audio_cutter.py": "Editor simples de audio com cortes multiponto via ffmpeg",
   "Functions/autoframe.py": "AutoFrame — vídeos no ritmo da música a partir de uma pasta de fotos e vídeos (no espírito dos modelos do CapCut)",
   "Functions/autoframe_modelos.py": "autoframe_modelos.py — modelos de cliente do AutoFrame (aba \"AutoFrame Customizado\")",

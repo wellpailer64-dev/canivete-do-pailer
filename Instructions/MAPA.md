@@ -152,6 +152,9 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - **API** (`pywebview.api.*`, 1): `favicon_generator(image_path, site_name, theme_color)`
 - **Guias**: `Instructions/favicon-generator.md`
 
+### Reuniões
+#### Ata Kanivete — `switchTool('ata-kanivete')`
+
 ### Apresentação
 #### Slider Kanivete — `switchTool('slider-kanivete')`
 
@@ -169,8 +172,8 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - **API** (`pywebview.api.*`, 9): `web_scraper_analyze(url)`, `web_scraper_download(url, mode, destino)`, `web_scraper(url, tipo, destino)`, `web_scraper_csv(url)`, `cerebro_load()`, `cerebro_save(content)`, `cerebro_exists()`, `cerebro_remove()`, `cerebro_select_file()`
 - **Guias**: `Instructions/webscraper.md`, `Instructions/cerebro.md`
 
-### API geral (app, janela, preferências, arquivos) — 66 métodos
-`select_folder(tool)`, `select_file(tool)`, `select_image(tool)`, `open_folder(path)`, `hardware_estado()`, `hardware_definir_modo(modo)`, `kani_estado()`, `kani_baixar()`, `kani_enviar(cid, mensagens, ferramenta="", tela="")`, `kani_tela_ok()`, `kani_parar(cid)`, `kani_voz(ligar=True)`, `musicas_listar(filtros=None)`, `musicas_analisar()`, `musicas_trocar_pasta()`, `musicas_openverse(texto="", genero="", duracao="", pagina=1)`, `musicas_openverse_baixar(item)`, `musicas_url(path)`, `kani_agente_precisa(texto)`, `kani_agente(job, pedido, historico=None, anexos=None, recentes=None)`, `kani_maos_resposta(i, res)`, `kani_ditado_iniciar()`, `kani_ditado_nivel()`, `kani_ditado_parar(transcrever=True)`, `kani_abrir_link(url)`, `kani_anexar()`, `kani_agente_avaliar(job, nota)`, `kani_memoria_comando(texto)`, `kani_agente_parar(job)`, `kani_criar_tipo(texto, anterior=None)`, `kani_baixar_modelo(tipo)`, `kani_criar(job, tipo, pedido)`, `kani_criar_url(path)`, `kani_salvar_como(path)`, `kani_falar(texto, chave="")`, `lux_salvar(caminho, dados, previa=None)`, `lux_abrir(caminho)`, `sd_salvar(caminho, doc, previa=None)`, `sd_abrir(caminho)`, `sd_url(caminho)`, `sd_quadro(job, i, data_url)`, `sd_exportar(job, formato, caminho, doc=None, opcoes=None)`, `sd_gravar_imagem(caminho, data_url)`, `sd_gravar_midia(data_url, nome="colado")`, `sd_importar_pptx(caminho)`, `sd_importar_pdf(caminho)`, `sd_kani(acao, dados=None)`, `ke_presets()`, `ke_arquivo_info(path)`, `ke_escolher_arquivos()`, `ke_arquivo_converter(entrada, preset, pasta_saida=None, usar_gpu=True)`, `reveal_file(path)`, `open_file(path)`, `select_video_file(tool)`, `prefs_load()`, `prefs_save(dados)`, `check_update()`, `apply_update()`, `fechar_visto()`, `sair_app()`, `toggle_fullscreen()`, `janela_cmd(acao)`, `janela_propria()`, `janela_ativar()`, `on_webview_ready(sender, args)`, `on_new_window_request(sender, args)`
+### API geral (app, janela, preferências, arquivos) — 79 métodos
+`select_folder(tool)`, `select_file(tool)`, `select_image(tool)`, `open_folder(path)`, `hardware_estado()`, `hardware_definir_modo(modo)`, `kani_estado()`, `kani_baixar()`, `kani_enviar(cid, mensagens, ferramenta="", tela="")`, `kani_tela_ok()`, `kani_parar(cid)`, `kani_voz(ligar=True)`, `musicas_listar(filtros=None)`, `musicas_analisar()`, `musicas_trocar_pasta()`, `musicas_openverse(texto="", genero="", duracao="", pagina=1)`, `musicas_openverse_baixar(item)`, `musicas_url(path)`, `kani_agente_precisa(texto)`, `kani_agente(job, pedido, historico=None, anexos=None, recentes=None)`, `kani_maos_resposta(i, res)`, `kani_ditado_iniciar()`, `kani_ditado_nivel()`, `kani_ditado_parar(transcrever=True)`, `kani_abrir_link(url)`, `kani_anexar()`, `kani_agente_avaliar(job, nota)`, `kani_memoria_comando(texto)`, `kani_agente_parar(job)`, `kani_criar_tipo(texto, anterior=None)`, `kani_baixar_modelo(tipo)`, `kani_criar(job, tipo, pedido)`, `kani_criar_url(path)`, `kani_salvar_como(path)`, `kani_falar(texto, chave="")`, `lux_salvar(caminho, dados, previa=None)`, `lux_abrir(caminho)`, `sd_salvar(caminho, doc, previa=None)`, `sd_abrir(caminho)`, `sd_url(caminho)`, `sd_quadro(job, i, data_url)`, `sd_exportar(job, formato, caminho, doc=None, opcoes=None)`, `sd_gravar_imagem(caminho, data_url)`, `sd_gravar_midia(data_url, nome="colado")`, `sd_importar_pptx(caminho)`, `sd_importar_pdf(caminho)`, `sd_kani(acao, dados=None)`, `ata_listar()`, `ata_abrir(sid)`, `ata_salvar(sid, doc)`, `ata_apagar(sid)`, `ata_importar()`, `ata_meet_abrir(link="")`, `ata_meet_cmd(acao)`, `ata_meet_estado()`, `ata_processar(sid)`, `ata_reescrever(sid)`, `ata_pdf(sid)`, `ata_audio(sid, faixa)`, `ke_presets()`, `ke_arquivo_info(path)`, `ke_escolher_arquivos()`, `ke_arquivo_converter(entrada, preset, pasta_saida=None, usar_gpu=True)`, `reveal_file(path)`, `open_file(path)`, `select_video_file(tool)`, `prefs_load()`, `prefs_save(dados)`, `check_update()`, `apply_update()`, `fechar_visto()`, `reiniciar_marcar()`, `sair_app()`, `toggle_fullscreen()`, `janela_cmd(acao)`, `janela_propria()`, `janela_ativar()`, `on_webview_ready(sender, args)`, `on_new_window_request(sender, args)`
 
 ## 6. Vetor Kanivete — comandos `VKN.cmd(nome, args)` (157; a interface, o Claude e o Jr usam os mesmos)
 - `vetor-3d.js`: `girar_3d` (3D girar), `extrudar_3d` (3D extrudar), `editar_3d` (editar 3D), `mapear_arte` (mapear arte no 3D), `limpar_mapas` (tirar artes mapeadas), `expandir_3d` (expandir 3D)
@@ -250,6 +253,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 ## 9. Guias (`Instructions/`)
 - `Instructions/agente/ajuste-premiere.md` — AJUSTE PREMIERE: plano para a próxima sessão
 - `Instructions/agente/arquiteto-local.md` — Arquiteto Local B
+- `Instructions/agente/ata-kanivete.md` — Ata Kanivete (At, verde #1FA971) — Beta
 - `Instructions/agente/cena-3d-editor.md` — Cena 3D no Editor Kanivete (estilo After Effects)
 - `Instructions/agente/design-photo-kanivete.md` — Fazer arte no Photo Kanivete pela API (guia para IAs)
 - `Instructions/agente/direcao-carrossel.md` — Direção de arte de carrossel (para IAs) — o que separa peça boa de "landing page genérica"
@@ -307,6 +311,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Functions/ampliar_imagem.py` — Ampliar foto por IA (super-resolução): Real-ESRGAN ncnn Vulkan (BSD-3, xinntao/Real-ESRGAN), GPU via Vulkan
 - `Functions/anti_noise.py` — Anti Noise (efeito de áudio do Vídeo Kanivete): tira o ruído de fundo com o DeepFilterNet3 (rede neural)
 - `Functions/area_transferencia.py` — area_transferencia.py — o que foi copiado no Windows, para o Ctrl+V da timeline do Pocket Editor
+- `Functions/ata_kanivete.py` — ata_kanivete.py — Ata Kanivete (At, verde; Beta): grava reunião do Google Meet e escreve a ATA
 - `Functions/audio_cutter.py` — Editor simples de audio com cortes multiponto via ffmpeg
 - `Functions/autoframe.py` — AutoFrame — vídeos no ritmo da música a partir de uma pasta de fotos e vídeos (no espírito dos modelos do CapCut)
 - `Functions/autoframe_modelos.py` — autoframe_modelos.py — modelos de cliente do AutoFrame (aba "AutoFrame Customizado")

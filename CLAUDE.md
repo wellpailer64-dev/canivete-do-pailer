@@ -6,7 +6,7 @@
   amigos procura esses nomes; trocar exige uma migração planejada.
 - Nomes visíveis: **Vídeo Kanivete** (Vd, lilás; antes "Editor Kanivete"), **Photo Kanivete** (Pk, azul), **Vetor
   Kanivete** (Vk, laranja), **Sound Kanivete** (Sk, azul clarinho), **Lux Kanivete** (Lk, magenta), **Kanivete Encoder**
-  (Ke, roxo forte), **Slider Kanivete** (Sd, verde-água; `.dknv`). Cores em `.al-*` (`frontend/css/app.css`, `som.css`). A cor de
+  (Ke, roxo forte), **Slider Kanivete** (Sd, verde-água; `.dknv`), **Ata Kanivete** (At, verde #1FA971; Beta). Cores em `.al-*` (`frontend/css/app.css`, `som.css`). A cor de
   destaque do app (`--primary`) vira a da marca na aba aberta (`html[data-ferramenta]`, app.css; canvas: `veAcc()` em app.js);
   laranja só na Home e nas ferramentas sem marca. Nada de `#D4814A` fixo: use `var(--primary)`/`veAcc()`. No código continuam editor de vídeo (`editor*.js`,
   `video-cutter`, "Pocket Editor" nos comentários) e editor de imagem (`imagem-*.js`).
@@ -173,6 +173,13 @@ PowerPoint com animações/transições/vídeo automático (`Functions/slider_pp
 PDF em camadas, MP4 com animação e vídeo dentro, Kani criando a palestra (`slider_kani.py`, `slider-kani.js`).
 Testes: `py -3.13 testes/teste_slider.py`, `teste_slider_extra.py` (atalhos com teclado de verdade) e `teste_slider_arquivos.py
 [--kani]` (arquivos abertos no LibreOffice de `D:/kanivete_testes/libreoffice`) — porta 9333.
+
+## Ata Kanivete (At, verde; Beta) — reunião do Google Meet vira ATA
+Chrome à parte (perfil próprio, login uma vez) com a captura injetada por CDP (`frontend/ata/captura.js`: microfone e
+áudios recebidos em Opus, ~10 MB/h; legendas e participantes) → Parakeet (VAD de reunião, trechos ≤ 12 s) → vozes
+separadas no sherpa-onnx (limiar 0,5; renomear = juntar) → Kani escreve a ATA (em blocos se for longa) → PDF (PyMuPDF
+Story). `Functions/ata_kanivete.py`, `frontend/js/ata.js`, `css/ata.css`, API `ATA_API`. O Meet NÃO manda áudio por pessoa.
+Guia, medições, armadilhas e pendências (falta teste em call real com várias pessoas): `Instructions/agente/ata-kanivete.md`.
 
 ## Tela da 1ª instalação
 `first_run.py` abre `frontend/instalar.html` (+ `js/instalar.js`) numa janela do pywebview: o carrossel da Home

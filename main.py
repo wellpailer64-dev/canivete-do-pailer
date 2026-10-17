@@ -4395,6 +4395,116 @@ class ApiBridge:
         from Functions import slider_kani
         return slider_kani.pedir(acao, dados)
 
+    # Ata Kanivete (Beta): reunião do Meet → transcrição → ATA da Kani → PDF (Functions/ata_kanivete.py, frontend/js/ata.js)
+    _ata_lock = threading.Lock()
+
+    def ata_listar(self):
+        from Functions import ata_kanivete
+        return ata_kanivete.listar()
+
+    def ata_abrir(self, sid):
+        from Functions import ata_kanivete
+        try:
+            return {"success": True, "doc": ata_kanivete.abrir(sid)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ata_salvar(self, sid, doc):
+        from Functions import ata_kanivete
+        return ata_kanivete.salvar(sid, json.loads(doc) if isinstance(doc, str) else doc)
+
+    def ata_apagar(self, sid):
+        from Functions import ata_kanivete
+        return ata_kanivete.apagar(sid)
+
+    def ata_importar(self):
+        from Functions import ata_kanivete
+        r = self.sk_dialogo("abrir", ("Áudio e vídeo (*.mp3;*.wav;*.m4a;*.ogg;*.opus;*.webm;*.mp4;*.mov;*.mkv;*.aac;*.flac)",
+                                      "Todos (*.*)"))
+        if not r:
+            return {"cancelado": True}
+        return ata_kanivete.importar_audio(r)
+
+    def ata_meet_abrir(self, link=""):
+        from Functions import ata_kanivete
+        try:
+            return ata_kanivete.meet_abrir(link, lambda o: _js("ataEvento", o))
+        except Exception as e:
+            _registrar_erro("ata_meet_abrir", e)
+            return {"success": False, "error": str(e)}
+
+    def ata_meet_cmd(self, acao):
+        from Functions import ata_kanivete
+        try:
+            return ata_kanivete.meet_cmd(acao)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ata_meet_estado(self):
+        from Functions import ata_kanivete
+        return ata_kanivete.meet_estado()
+
+    def _ata_rodar(self, sid, fn):
+        """Uma reunião processando por vez (transcrição e Kani disputam a mesma memória)."""
+        def tarefa():
+            from Functions import ata_kanivete
+            with ApiBridge._ata_lock:
+                try:
+                    r = fn(lambda p, m: _js("ataEvento", {"tipo": "progresso", "id": sid, "p": p, "msg": m}))
+                    if r.get("cancelled"):
+                        _js("ataEvento", {"tipo": "cancelado", "id": sid})
+                    elif r.get("success"):
+                        _js("ataEvento", {"tipo": "pronta", "id": sid})
+                    else:
+                        _js("ataEvento", {"tipo": "erro", "id": sid, "msg": r.get("error")})
+                except Exception as e:
+                    _registrar_erro("ata", e)
+                    _js("ataEvento", {"tipo": "erro", "id": sid, "msg": str(e)})
+                finally:
+                    ata_kanivete.liberar()
+        threading.Thread(target=tarefa, daemon=True).start()
+        return {"success": True}
+
+    def ata_processar(self, sid):
+        from Functions import ata_kanivete
+        return self._ata_rodar(sid, lambda prog: ata_kanivete.processar(sid, prog))
+
+    def ata_reescrever(self, sid):
+        from Functions import ata_kanivete
+
+        def fn(prog):
+            doc = ata_kanivete.abrir(sid)
+            doc["ata"] = ata_kanivete.escrever_ata(doc, prog)
+            if doc["ata"].get("titulo"):
+                doc["titulo"] = doc["ata"]["titulo"]
+            doc["estado"] = "pronta"
+            ata_kanivete.salvar(sid, doc)
+            return {"success": True}
+        return self._ata_rodar(sid, fn)
+
+    def ata_pdf(self, sid):
+        import re
+        from Functions import ata_kanivete
+        doc = ata_kanivete.abrir(sid)
+        nome = re.sub(r'[\\/:*?"<>|]+', " ", (doc.get("ata") or {}).get("titulo") or doc.get("titulo") or "ATA").strip()[:80]
+        caminho = self.sk_dialogo("salvar", ("PDF (*.pdf)",), nome + ".pdf")
+        if not caminho:
+            return {"cancelado": True}
+        if not caminho.lower().endswith(".pdf"):
+            caminho += ".pdf"
+        try:
+            r = ata_kanivete.exportar_pdf(sid, caminho, doc)
+            os.startfile(caminho)
+            return r
+        except Exception as e:
+            _registrar_erro("ata_pdf", e)
+            return {"success": False, "error": str(e)}
+
+    def ata_audio(self, sid, faixa):
+        from Functions import ata_kanivete, media_server
+        p = os.path.join(ata_kanivete.pasta(), sid, faixa + ".webm")
+        return {"url": media_server.register(p) if os.path.isfile(p) else None}
+
     def ve_3d_estudio_video(self, spec):
         """vídeo fotorrealista da Cena 3D (quadro a quadro no Blender) — Functions/blender_render.estudio_video"""
         from Functions import blender_render

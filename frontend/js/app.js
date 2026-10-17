@@ -966,6 +966,7 @@ function switchTool(toolId) {
     if (typeof luxAoTrocar === 'function') luxAoTrocar(toolId);   // Lux: pausa ao sair da aba, volta ao entrar
     if (typeof keAoTrocar === 'function') keAoTrocar(toolId);     // Ke: a janela da fila mora na aba dele
     if (typeof sdAoTrocar === 'function') sdAoTrocar(toolId);     // Slider: lobby/editor ao entrar, pausa os vídeos ao sair
+    if (typeof ataAoTrocar === 'function') ataAoTrocar(toolId);   // Ata: lista e estado do Meet só com a aba aberta
     if (typeof klAplicar === 'function') { setTimeout(klAplicar, 0); setTimeout(klAplicar, 400); }   // lobbys padronizados (lobby.js)
     navAutoAgendar();
     homeBgSync();
