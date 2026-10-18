@@ -122,6 +122,23 @@ def main():
             time.sleep(0.5)
             vis = pg.evaluate("(() => { const s = document.getElementById('ve-az-sec'), r = s && s.getBoundingClientRect(); return !!r && r.height > 40 && !!s.querySelector('[data-az-acao=gerar]'); })()")
             ok(vis, "seção Autozoom no painel Animação")
+            # cliques de verdade (mouse) nos controles: as opções mudam e o desenho acompanha
+            pg.evaluate("document.getElementById('ve-az-sec').open = true")
+
+            def clicar(sel):
+                el = pg.locator(sel).first
+                el.scroll_into_view_if_needed()
+                bx = el.bounding_box()
+                pg.mouse.click(bx["x"] + bx["width"] / 2, bx["y"] + bx["height"] / 2)
+                time.sleep(0.3)
+            antes = pg.evaluate("({ ...veAzOpc() })")
+            for s in ("[data-az=qtd][data-v=muito]", "[data-az=estilo][data-v=seco]", "[data-az=forca][data-v=forte]", ".ve-az-chave"):
+                clicar("#ve-az-corpo " + s)
+            o = pg.evaluate("veAzOpc()")
+            on = pg.evaluate("[...document.querySelectorAll('#ve-az-corpo .on')].map(b => b.dataset.v).sort().join(',')")
+            ok(o["qtd"] == "muito" and o["estilo"] == "seco" and o["forca"] == "forte" and o["mb"] != antes["mb"] and on == "forte,muito,seco",
+               "cliques com o mouse na seção Autozoom", f"{o} · marcados {on}")
+            pg.evaluate("a => { localStorage.setItem('ve-autozoom', JSON.stringify(a)); VEAZ.opc = null; veAzRender(); }", antes)
             # 1) Médio + Smart (transcreve sozinho se faltar)
             t0 = time.time()
             n = pg.evaluate("VEAZ_API.gerar({ qtd: 'medio', estilo: 'smart', forca: 'media' }).then(l => (l || []).length)")

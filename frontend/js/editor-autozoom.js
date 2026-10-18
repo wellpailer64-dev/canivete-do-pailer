@@ -222,23 +222,40 @@ function veAzRemover() {
 }
 
 // ── painel Animação › Autozoom ──
+// desenho da curva de cada estilo (o zoom no tempo: entra, segura, sai)
+const VE_AZ_CURVAS = {
+    seco: 'M3 30 H26 V8 H74 V30 H97',
+    suave: 'M3 30 C17 30 21 8 38 8 C50 8 60 6 68 6 C80 6 83 30 97 30',
+    smart: 'M3 30 H14 V9 H32 V30 H44 C54 30 56 7 70 7 C80 7 84 30 97 30',
+};
 function veAzRender() {
-    const box = document.getElementById('ve-az-corpo'); if (!box) return;
+    const box = $ve('ve-az-corpo'); if (!box) return;   // $ve: o painel pode estar numa janela solta
     const o = veAzOpc(), n = VE.ready ? veAzCamadas().length : 0;
-    const grupo = (k, itens) => itens.map(([v, nome, dica]) => `<button type="button" data-az="${k}" data-v="${v}" class="${o[k] === v ? 'active' : ''}" title="${veT(dica)}">${veT(nome)}</button>`).join('');
+    const seg = (k, itens) => `<div class="ve-az-seg">${itens.map(([v, nome, sub, dica]) => `<button type="button" data-az="${k}" data-v="${v}" class="${o[k] === v ? 'on' : ''}" title="${veT(dica)}"><b>${veT(nome)}</b>${sub ? `<small>${sub}</small>` : ''}</button>`).join('')}</div>`;
+    const pontos = n => `<i class="ve-az-pts">${'<span></span>'.repeat(n)}</i>`;
+    const estilos = [['seco', 'Seco', 'Punch no corte', 'Punch-in: entra e sai no corte, junto com a palavra'],
+                     ['suave', 'Suave', 'Entra e respira', 'Chega com curva, respira devagar e sai em S'],
+                     ['smart', 'Smart', 'Decide sozinho', 'Decide por momento: frase curta e forte = seco; frase longa = empurrão lento; o resto suave']];
     box.innerHTML = `
-        <div class="ve-tr-control-row"><span>${veT('Quantidade')}</span><div class="ve-tr-speed-buttons">${grupo('qtd', [['pouco', 'Pouco', 'Um a cada ~12 s'], ['medio', 'Médio', 'Um a cada ~7 s'], ['muito', 'Muito', 'Um a cada ~4 s'], ['auto', 'Automático', 'Só onde a fala pede (nota alta), no máximo um a cada 3,5 s']])}</div></div>
-        <div class="ve-tr-control-row"><span>${veT('Estilo')}</span><div class="ve-tr-speed-buttons">${grupo('estilo', [['seco', 'Seco', 'Punch-in: entra e sai no corte, junto com a palavra'], ['suave', 'Suave', 'Chega com curva, respira devagar e sai em S'], ['smart', 'Smart', 'Decide por momento: frase curta e forte = seco; frase longa = empurrão lento; o resto suave']])}</div></div>
-        <div class="ve-tr-control-row"><span>${veT('Força')}</span><div class="ve-tr-speed-buttons">${grupo('forca', [['leve', 'Leve', '108–112%'], ['media', 'Média', '111–116%'], ['forte', 'Forte', '115–122%']])}</div></div>
-        <div class="ve-tr-control-row"><span>${veT('Desfoque')}</span><div class="ve-tr-speed-buttons">${grupo('mb', [['sim', 'Ligado', 'Desfoque de movimento nos zooms rápidos (só borra enquanto o zoom anda)'], ['nao', 'Desligado', 'Zoom sem desfoque de movimento']])}</div></div>
-        <div class="ve-az-acoes">
-            <button type="button" class="ve-btn ve-btn-sm ve-az-gerar" data-az-acao="gerar"${VEAZ.rodando ? ' disabled' : ''}>${VEAZ.rodando ? '⏳ ' + veT('Analisando a fala…') : '🔍 ' + veT('Gerar autozoom')}</button>
-            <button type="button" class="ve-btn ve-btn-sm" data-az-acao="remover"${n ? '' : ' disabled'}>${veT('Remover')}${n ? ` (${n})` : ''}</button>
-        </div>
-        <div class="ve-az-dica">${veT('Lê a transcrição e a ênfase da voz, escolhe os momentos fortes e cria camadas de ajuste cor-de-rosa com zoom no rosto. Cada uma pode ser ajustada nos Controles de efeito (zoom, curva, centro).')}</div>`;
+        <div class="ve-az-estilos">${estilos.map(([v, nome, sub, dica]) => `
+            <button type="button" class="ve-az-estilo${o.estilo === v ? ' on' : ''}" data-az="estilo" data-v="${v}" title="${veT(dica)}">
+                <svg viewBox="0 0 100 36" preserveAspectRatio="none"><path class="ve-az-grade" d="M3 30 H97"/><path class="ve-az-curva" d="${VE_AZ_CURVAS[v]}"/></svg>
+                <b>${veT(nome)}${v === 'smart' ? ' <em>✦</em>' : ''}</b><small>${veT(sub)}</small></button>`).join('')}</div>
+        <div class="ve-az-linha"><span class="ve-az-rot">${veT('Quantidade')}</span>${seg('qtd', [
+            ['pouco', 'Pouco', pontos(1), 'Um a cada ~12 s'], ['medio', 'Médio', pontos(2), 'Um a cada ~7 s'],
+            ['muito', 'Muito', pontos(3), 'Um a cada ~4 s'], ['auto', 'Auto', '<i class="ve-az-pts">✦</i>', 'Só onde a fala pede (nota alta), no máximo um a cada 3,5 s']])}</div>
+        <div class="ve-az-linha"><span class="ve-az-rot">${veT('Força')}</span>${seg('forca', [
+            ['leve', 'Leve', '110%', '108–112%'], ['media', 'Média', '115%', '111–116%'], ['forte', 'Forte', '120%', '115–122%']])}</div>
+        <label class="ve-az-chave" title="${veT('Desfoque de movimento nos zooms rápidos (só borra enquanto o zoom anda)')}">
+            <input type="checkbox" data-az-mb${o.mb !== 'nao' ? ' checked' : ''}><span class="ve-az-trilho"><span></span></span>
+            <span>${veT('Desfoque de movimento')}<small>${veT('só nos zooms rápidos')}</small></span></label>
+        <button type="button" class="ve-az-gerar" data-az-acao="gerar"${VEAZ.rodando ? ' disabled' : ''}>
+            ${VEAZ.rodando ? `<span class="ve-az-gira"></span>${veT('Analisando a fala…')}` : `<svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21M8 10.5h5M10.5 8v5"/></svg>${veT('Gerar autozoom')}`}</button>
+        ${n ? `<div class="ve-az-pe"><span>${n} ${veT(n === 1 ? 'zoom na timeline' : 'zooms na timeline')}</span>
+            <button type="button" data-az-acao="remover">${veT('Remover')}</button></div>` : ''}`;
 }
 function veAzInit() {
-    const sec = document.getElementById('ve-az-sec'); if (!sec || sec._ok) return;
+    const sec = $ve('ve-az-sec'); if (!sec || sec._ok) return;
     sec._ok = true;
     sec.addEventListener('click', e => {
         const b = e.target.closest('[data-az],[data-az-acao]'); if (!b) return;
@@ -246,8 +263,34 @@ function veAzInit() {
         if (b.dataset.azAcao === 'gerar') veAzGerar();
         else if (b.dataset.azAcao === 'remover') veAzRemover();
     });
+    sec.addEventListener('change', e => { if (e.target.matches('[data-az-mb]')) veAzSetOpc('mb', e.target.checked ? 'sim' : 'nao'); });
     veAzRender();
 }
+// textos do painel em inglês (i18n.js: sem tradução, aparece em português)
+if (typeof I18N_EN === 'object') Object.entries({   // só o que o dicionário ainda não tem (não troca a tradução de outros painéis)
+    'Autozoom': 'Autozoom', 'zooms de ênfase pela fala, em camadas de ajuste': 'emphasis zooms driven by speech, on adjustment layers',
+    'Seco': 'Punch', 'Suave': 'Ease', 'Smart': 'Smart', 'Punch no corte': 'Cuts in sharp', 'Entra e respira': 'Glides and breathes', 'Decide sozinho': 'Picks per moment',
+    'Punch-in: entra e sai no corte, junto com a palavra': 'Punch-in: cuts in and out with the word',
+    'Chega com curva, respira devagar e sai em S': 'Eases in, breathes slowly and eases out',
+    'Decide por momento: frase curta e forte = seco; frase longa = empurrão lento; o resto suave': 'Decides per moment: short strong line = punch; long line = slow push; the rest eased',
+    'Quantidade': 'Amount', 'Pouco': 'Few', 'Médio': 'Some', 'Muito': 'Many', 'Auto': 'Auto', 'Força': 'Strength', 'Leve': 'Light', 'Média': 'Medium', 'Forte': 'Strong',
+    'Um a cada ~12 s': 'One every ~12 s', 'Um a cada ~7 s': 'One every ~7 s', 'Um a cada ~4 s': 'One every ~4 s',
+    'Só onde a fala pede (nota alta), no máximo um a cada 3,5 s': 'Only where the speech calls for it, at most one every 3.5 s',
+    'Desfoque de movimento': 'Motion blur', 'só nos zooms rápidos': 'only on fast zooms',
+    'Desfoque de movimento nos zooms rápidos (só borra enquanto o zoom anda)': 'Motion blur on fast zooms (blurs only while the zoom moves)',
+    'Gerar autozoom': 'Generate autozoom', 'Analisando a fala…': 'Reading the speech…', 'Remover': 'Remove',
+    'zoom na timeline': 'zoom on the timeline', 'zooms na timeline': 'zooms on the timeline',
+    'Lê a fala e dá zoom no rosto nos momentos fortes': 'Reads the speech and zooms into the face at the strong moments',
+    'Zoom (Autozoom)': 'Zoom (Autozoom)', 'Entrada': 'In', 'Saída': 'Out', 'Suavidade da curva': 'Curve smoothness', 'Mola (passa do alvo e volta)': 'Spring (overshoots and settles)',
+    'Deriva (respira no meio)': 'Drift (breathes in the middle)', 'Obturador': 'Shutter',
+    'Autozoom: transcrevendo a fala primeiro…': 'Autozoom: transcribing the speech first…', 'Autozoom: esperando a transcrição terminar…': 'Autozoom: waiting for the transcript…',
+    'Autozoom: sem fala transcrita na timeline': 'Autozoom: no transcribed speech on the timeline', 'Autozoom: nenhum momento de ênfase encontrado': 'Autozoom: no emphasis moment found',
+    'Nenhum autozoom na timeline': 'No autozoom on the timeline',
+}).forEach(([k, v]) => { if (!(k in I18N_EN)) I18N_EN[k] = v; });
+if (typeof I18N_RE === 'object') I18N_RE.push(
+    [/^Autozoom: (\d+) zooms? \((.+)\)$/, (m, n, r) => `Autozoom: ${n} zoom${n === '1' ? '' : 's'} (${r.replace(/secos?/g, 'punch').replace(/suaves?/g, 'eased').replace(/empurr(ão|ões)/g, 'slow push')})`],
+    [/^(\d+) autozooms? removidos?$/, (m, n) => `${n} autozoom${n === '1' ? '' : 's'} removed`],
+);
 document.addEventListener('DOMContentLoaded', veAzInit);
 if (document.readyState !== 'loading') setTimeout(veAzInit, 0);
 
