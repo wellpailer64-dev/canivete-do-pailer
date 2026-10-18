@@ -33,6 +33,24 @@ Pedido do Pailer em 2026-10-17. Publicada como **Beta** (selo na barra lateral e
    Contexto da Kani 8 k: acima de `BLOCO_PALAVRAS` (2200) vai em partes e depois junta. ~20–30 s numa reunião curta.
 7. **PDF**: PyMuPDF `Story` (HTML → PDF) com Segoe UI do Windows, faixa verde no topo, rodapé "Ata Kanivete · página".
 
+## Rodada 2 (2026-10-17)
+- **Para sozinho ao sair da chamada** (captura.js `vigiar`: botão "Sair da chamada"/"Leave call" some por 3 s depois de
+  visto durante a gravação). Opção **"Gravar sozinho ao entrar"** (localStorage `ata-auto` → `meet_abrir(auto)` injeta
+  `window.__ataAuto`; troca ao vivo por `meet_cmd('auto1'|'auto0')`); parou na mão ainda na chamada = não religa.
+  Se o Meet mudar o rótulo do botão, nada é automático (o manual continua).
+- **Recuperação**: `listar()` (com cache por data do ata.json) vira "gravado" a sessão presa em "gravando" (app/PC caiu;
+  duração = último evento; aviso `interrompida` na tela) e destrava "processando" que não está em `_em_processo`.
+- **Cancelar** o processamento (`ata_cancelar` → `stop`; transcrição salva antes da Kani, então cancelar não a perde).
+- **Busca** em todas as reuniões (`buscar`: título, falas, ATA, sem acento) → abre a transcrição na fala achada.
+- **Player** da transcrição: `mix.webm` (eu + outros, ffmpeg amix, com índice: o .webm do MediaRecorder não pula no
+  tempo), feito no processar ou no 1º play (`audio_mix`); fala acesa durante o play, velocidade, espaço = play/pausa.
+- **Tarefas** com ✓ (`feito`), contador na lista e "Tarefas em aberto" de todas as reuniões na tela inicial
+  (`tarefas_abertas`, `marcar_tarefa`). PDF/Word marcam "(concluída)".
+- **Estilos de ATA** (`ESTILOS`: formal, resumida, detalhada, cliente, equipe, aula) + **pedido livre à Kani** (`doc.pedido`),
+  na aba "Falantes e ajustes".
+- **Copiar** em texto (formato WhatsApp) e **Word** (`exportar_docx`, python-docx). **Kani** lê a ATA aberta (`KANI_TELA`).
+- Teste avulso: `D:/kanivete_testes/scripts/teste_ata_r2.py` (app em 9333; só lê, não grava nas reuniões).
+
 ## Medições (2026-10-17, RTX 3050)
 Reunião falsa de 2min17s: importar + transcrever + separar + ATA = 90 s. Transcrição 10× o tempo real; separação ~6×.
 Gravação real do Pailer (72 s, só ele) transcreveu bem; errou só nomes próprios (glossário resolve).

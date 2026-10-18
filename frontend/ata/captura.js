@@ -3,7 +3,7 @@
 // Eventos: legendas (texto com o nome de quem fala), participantes, nível de cada áudio recebido e fontes (CSRC) do Meet.
 (() => {
   if (window.__ata) return;
-  const A = window.__ata = { remotos: [], mics: [], pcs: [], on: false, t0: 0, ctx: null };
+  const A = window.__ata = { remotos: [], mics: [], pcs: [], on: false, t0: 0, ctx: null, auto: !!window.__ataAuto };
   const enviar = (o) => { try { window.ataEnviar(JSON.stringify(o)); } catch (e) {} };
   const t = () => +((performance.now() - A.t0) / 1000).toFixed(2);
 
@@ -86,7 +86,7 @@
     A.dOut = A.ctx.createMediaStreamDestination();
     A.dMic = A.ctx.createMediaStreamDestination();
     A.anMic = A.ctx.createAnalyser(); A.anMic.fftSize = 512;
-    A.t0 = performance.now(); A.on = true;
+    A.t0 = performance.now(); A.on = true; A.viu = false;
     A.remotos.forEach(ligarRemoto);
     A.mics.forEach(s => { const n = ligar(s, A.dMic); if (n) n.connect(A.anMic); });
     A.rec = [gravador(A.dOut, 'outros'), gravador(A.dMic, 'eu')];
@@ -101,6 +101,20 @@
     A.rec.forEach(m => m.stop()); A.timers.forEach(clearInterval);
     setTimeout(() => { A.on = false; A.parando = false; enviar({ ev: 'fim', t: t() }); A.ctx.close(); }, 1500);
   };
+
+  // dentro da chamada = o botão de sair existe. Ao sair (ou a reunião acabar), para sozinho; com "gravar ao entrar"
+  // (A.auto), começa sozinho. Se o Meet mudar o rótulo do botão, nada acontece sozinho (o botão manual continua).
+  const naChamada = () => !!document.querySelector('button[aria-label*="air da chamada" i], button[aria-label*="eave call" i]');
+  let dentro = 0, fora = 0;
+  function vigiar() {
+    if (!A.botao) return;
+    const ok = naChamada();
+    dentro = ok ? dentro + 1 : 0; fora = ok ? 0 : fora + 1;
+    if (ok && A.on) A.viu = true;
+    if (!ok && fora >= 3) A.parouManual = false;
+    if (A.auto && ok && dentro >= 2 && !A.on && !A.parando && !A.parouManual) A.botao(true);
+    if (A.on && A.viu && fora >= 3) A.botao(false);
+  }
 
   // botão por cima do Meet (sem innerHTML: o Meet usa Trusted Types)
   function painel() {
@@ -123,6 +137,7 @@
         A.iniciar(); bt.textContent = '■ Parar'; bt.style.background = '#D93025'; dot.style.background = '#D93025';
         rel = setInterval(() => { const s = Math.floor(t()); tempo.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }, 500);
       } else {
+        A.parouManual = naChamada();   // parou ainda na chamada: o "gravar ao entrar" não religa
         A.parar(); clearInterval(rel); bt.textContent = '● Gravar ATA'; bt.style.background = '#1FA971';
         dot.style.background = '#1FA971';
       }
@@ -130,5 +145,5 @@
     box.append(dot, nome, tempo, bt);
     document.body.appendChild(box);
   }
-  setInterval(painel, 1000);
+  setInterval(() => { painel(); vigiar(); }, 1000);
 })();

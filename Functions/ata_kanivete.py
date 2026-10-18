@@ -187,14 +187,16 @@ def _ler_cdp(ws):
     _avisar({"tipo": "fechado"})
 
 
-def meet_abrir(link="", on_evento=None):
-    """Abre (ou traz) o Chrome do Meet com a captura. link vazio = página inicial do Meet."""
+def meet_abrir(link="", on_evento=None, auto=False):
+    """Abre (ou traz) o Chrome do Meet com a captura. link vazio = página inicial do Meet.
+    auto = começa a gravar sozinho ao entrar na chamada (para sozinho ao sair, sempre)."""
     from websockets.sync.client import connect
     _meet["on_evento"] = on_evento or _meet["on_evento"]
     url = link.strip() or "https://meet.google.com/"
     if not re.match(r"^https://meet\.google\.com/", url):
         return {"success": False, "error": "cole um link do Google Meet (https://meet.google.com/...)"}
     if _meet["ws"] and _meet["proc"] and _meet["proc"].poll() is None:
+        meet_cmd("auto1" if auto else "auto0")
         _cdp("Page.navigate", {"url": url})
         return {"success": True, "ja_aberto": True}
     exe = navegador()
@@ -223,7 +225,7 @@ def meet_abrir(link="", on_evento=None):
     _cdp("Runtime.enable")
     _cdp("Page.enable")
     _cdp("Runtime.addBinding", {"name": "ataEnviar"})
-    _cdp("Page.addScriptToEvaluateOnNewDocument", {"source": _captura_js()})
+    _cdp("Page.addScriptToEvaluateOnNewDocument", {"source": f"window.__ataAuto = {json.dumps(bool(auto))};\n" + _captura_js()})
     _cdp("Page.navigate", {"url": url})
     return {"success": True}
 
@@ -236,11 +238,12 @@ def _captura_js():
 
 
 def meet_cmd(acao):
-    """gravar | parar | frente — o mesmo que o botão por cima do Meet."""
+    """gravar | parar | frente | auto1 | auto0 — o mesmo que o botão por cima do Meet; auto = gravar ao entrar na chamada."""
     if not _meet["ws"]:
         return {"success": False, "error": "o Meet não está aberto"}
     expr = {"gravar": "window.__ata && window.__ata.botao(true)", "parar": "window.__ata && window.__ata.botao(false)",
-            "frente": "window.focus()"}[acao]
+            "frente": "window.focus()", "auto1": "window.__ataAuto = true; window.__ata && (window.__ata.auto = true)",
+            "auto0": "window.__ataAuto = false; window.__ata && (window.__ata.auto = false)"}[acao]
     _cdp("Runtime.evaluate", {"expression": expr, "userGesture": True})
     if acao == "frente":
         _cdp("Page.bringToFront")
@@ -323,15 +326,131 @@ def salvar(sid, doc):
     return {"success": True}
 
 
+_lista_cache = {}        # sid → (data do ata.json, resumo): a lista não relê transcrições longas a cada volta à aba
+_em_processo = set()     # sessões sendo processadas agora (o resto marcado "processando" ficou de um app que caiu)
+
+
+def _resumo(doc):
+    tar = (doc.get("ata") or {}).get("tarefas") or []
+    r = {k: doc.get(k) for k in ("id", "titulo", "quando", "duracao", "estado", "participantes")}
+    r["abertas"] = sum(1 for t in tar if not t.get("feito"))
+    return r
+
+
+def _recuperar(sid, d, doc):
+    """Gravação ou processamento que não terminou (o app, o navegador ou o PC caiu no meio): volta a "gravado" com o que
+    chegou ao disco, para gerar a ATA. True = mudou."""
+    atual = _meet["sessao"] and os.path.basename(_meet["sessao"]) == sid
+    if doc.get("estado") == "gravando" and not atual:
+        ts = [o.get("t") or 0 for o in _eventos(d)]
+        doc.update(estado="gravado", duracao=round(max(ts or [0]), 1) or _duracao(os.path.join(d, "outros.webm")),
+                   participantes=_nomes_meet(d), interrompida=True)
+    elif doc.get("estado") == "processando" and sid not in _em_processo:
+        doc["estado"] = "pronta" if doc.get("ata") else "gravado"
+    else:
+        return False
+    _salvar_doc(d, doc)
+    return True
+
+
 def listar():
     out = []
     for sid in sorted(os.listdir(pasta()), reverse=True):
+        d = os.path.join(pasta(), sid)
+        p = os.path.join(d, "ata.json")
         try:
-            doc = abrir(sid)
+            mt = os.path.getmtime(p)
+            c = _lista_cache.get(sid)
+            if not c or c[0] != mt:
+                doc = abrir(sid)
+                if _recuperar(sid, d, doc):
+                    mt = os.path.getmtime(p)
+                c = _lista_cache[sid] = (mt, _resumo(doc))
         except Exception:
             continue
-        out.append({k: doc.get(k) for k in ("id", "titulo", "quando", "duracao", "estado", "participantes")})
+        out.append(c[1])
     return out
+
+
+def _sem_acento(s):
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", str(s or "").lower()) if unicodedata.category(c) != "Mn")
+
+
+def buscar(termo):
+    """Reuniões com o termo no título, na ATA ou na transcrição (sem diferença de acento/maiúscula):
+    [resumo + trecho (a frase onde aparece) + t (segundo da fala, se veio da transcrição)]."""
+    q = _sem_acento(termo).strip()
+    if len(q) < 2:
+        return []
+    out = []
+    for r in listar():
+        try:
+            doc = abrir(r["id"])
+        except Exception:
+            continue
+        achou, trecho, t = q in _sem_acento(doc.get("titulo")), "", None
+        for tu in doc.get("turnos") or []:
+            tx = _sem_acento(tu.get("texto"))
+            i = tx.find(q)
+            if i >= 0:
+                orig = tu["texto"]
+                a = max(0, i - 40)
+                trecho = ("…" if a else "") + orig[a:i + len(q) + 60].strip() + ("…" if i + len(q) + 60 < len(orig) else "")
+                t, achou = tu.get("ini"), True
+                break
+        if not achou and q in _sem_acento(json.dumps(doc.get("ata") or {}, ensure_ascii=False)):
+            achou, trecho = True, "na ATA"
+        if achou:
+            out.append(dict(r, trecho=trecho, t=t))
+    return out
+
+
+def tarefas_abertas():
+    """Tarefas ainda não feitas de todas as reuniões (mais recentes primeiro)."""
+    out = []
+    for r in listar():
+        if not r.get("abertas"):
+            continue
+        try:
+            doc = abrir(r["id"])
+        except Exception:
+            continue
+        for i, t in enumerate((doc.get("ata") or {}).get("tarefas") or []):
+            if not t.get("feito"):
+                out.append(dict(t, id=r["id"], i=i, reuniao=doc.get("titulo"), quando=doc.get("quando")))
+    return out
+
+
+def marcar_tarefa(sid, i, feito=True):
+    doc = abrir(sid)
+    tar = (doc.get("ata") or {}).get("tarefas") or []
+    if not 0 <= int(i) < len(tar):
+        return {"success": False, "error": "tarefa não encontrada"}
+    tar[int(i)]["feito"] = bool(feito)
+    return salvar(sid, doc)
+
+
+def audio_mix(sid):
+    """Uma faixa só (a sua voz + os outros) com índice para pular no tempo: o .webm do MediaRecorder não tem índice e o
+    player não vai direto a um ponto de uma reunião longa. Refeita só se uma faixa mudar."""
+    d = os.path.join(pasta(), sid)
+    dst = os.path.join(d, "mix.webm")
+    fx = [os.path.join(d, f) for f in ("eu.webm", "outros.webm") if os.path.isfile(os.path.join(d, f))]
+    if not fx:
+        return None
+    if os.path.isfile(dst) and os.path.getmtime(dst) >= max(map(os.path.getmtime, fx)):
+        return dst
+    cmd = [_ffmpeg(), "-y", "-v", "error"]
+    for f in fx:
+        cmd += ["-i", f]
+    if len(fx) > 1:
+        cmd += ["-filter_complex", "amix=inputs=2:duration=longest:normalize=0"]
+    tmp = os.path.join(d, "_mix.webm")
+    cmd += ["-ac", "1", "-c:a", "libopus", "-b:a", "32k", "-application", "voip", tmp]
+    subprocess.run(cmd, check=True, capture_output=True, creationflags=NO_WINDOW)
+    os.replace(tmp, dst)
+    return dst
 
 
 def apagar(sid):
@@ -470,6 +589,8 @@ def processar(sid, prog=lambda p, m: None, stop=None):
     d = os.path.join(pasta(), sid)
     doc = abrir(sid)
     doc["estado"] = "processando"
+    doc.pop("erro", None)
+    _em_processo.add(sid)
     _salvar_doc(d, doc)
     try:
         palavras = []           # [ini, fim, texto, spk]
@@ -529,8 +650,14 @@ def processar(sid, prog=lambda p, m: None, stop=None):
             doc["estado"] = "gravado"
             _salvar_doc(d, doc)
             return {"success": False, "error": "não encontrei fala na gravação"}
+        _salvar_doc(d, doc)      # transcrição guardada antes da Kani: cancelar ou falhar daqui em diante não a perde
+        try:
+            prog(66, "Preparando o áudio para ouvir...")
+            audio_mix(sid)
+        except Exception:
+            pass
         prog(70, "A Kani está escrevendo a ATA...")
-        doc["ata"] = escrever_ata(doc, prog)
+        doc["ata"] = escrever_ata(doc, prog, stop)
         if doc["ata"].get("titulo"):
             doc["titulo"] = doc["ata"]["titulo"]
         doc["estado"] = "pronta"
@@ -538,14 +665,16 @@ def processar(sid, prog=lambda p, m: None, stop=None):
         prog(100, "ATA pronta")
         return {"success": True, "doc": doc}
     except InterruptedError:
-        doc["estado"] = "gravado"
+        doc["estado"] = "pronta" if doc.get("ata") else "gravado"
         _salvar_doc(d, doc)
         return {"success": False, "cancelled": True}
     except Exception as e:
-        doc["estado"] = "gravado"
+        doc["estado"] = "pronta" if doc.get("ata") else "gravado"
         doc["erro"] = str(e)
         _salvar_doc(d, doc)
         raise
+    finally:
+        _em_processo.discard(sid)
 
 
 # ───────────────────────── ATA pela Kani ─────────────────────────
@@ -554,6 +683,19 @@ SISTEMA = ("Você é secretária de reuniões. Escreva a ATA da reunião a parti
            "Tarefa = alguém ficou de fazer algo (responsável, o quê, prazo como foi dito; sem prazo: \"a definir\"). "
            "Pendência = ficou em aberto ou depende de algo. Corrija erros óbvios da transcrição pelo contexto, mas nunca "
            "troque um termo do glossário por outro nome.")
+# estilo escolhido na tela (doc["estilo"]) + pedido livre do usuário (doc["pedido"]) vão no fim das instruções
+ESTILOS = {
+    "formal": ("Formal", ""),
+    "resumida": ("Resumida", " Seja breve: resumo em até 3 frases, no máximo 4 temas na discussão, itens curtos."),
+    "detalhada": ("Detalhada", " Seja detalhada: registre cada argumento importante, números citados e quem defendeu cada "
+                               "posição na discussão."),
+    "cliente": ("Reunião com cliente", " É uma reunião com cliente: na discussão destaque as necessidades do cliente, a "
+                                       "proposta, valores e objeções; nas tarefas, os próximos passos de cada lado."),
+    "equipe": ("Alinhamento de equipe", " É um alinhamento de equipe: na discussão, o andamento de cada frente e os "
+                                        "bloqueios; nas tarefas, quem destrava o quê."),
+    "aula": ("Aula ou treinamento", " É uma aula ou treinamento: a discussão vira os tópicos ensinados com os pontos-chave "
+                                    "de cada um; decisões = combinados; tarefas = exercícios ou entregas pedidas."),
+}
 SCHEMA = {"type": "object", "required": ["titulo", "pauta", "resumo", "discussao", "decisoes", "tarefas", "pendencias", "proxima"],
           "properties": {
               "titulo": {"type": "string"},
@@ -583,11 +725,18 @@ def transcricao_texto(doc):
     return "\n".join(f"[{int(i // 60):02d}:{int(i % 60):02d}] {n}: {tx}" for i, n, _, tx in linhas)
 
 
-def escrever_ata(doc, prog=lambda p, m: None):
+def escrever_ata(doc, prog=lambda p, m: None, stop=None):
     from Functions import kani
     from Functions.kani_maos import _llm_json
     if not kani.estado().get("pronto"):
         raise RuntimeError("a Kani ainda não está instalada: abra a Kani (barra lateral › IA › Kani) uma vez para baixar o modelo")
+
+    def parou():
+        if stop is not None and stop.is_set():
+            raise InterruptedError
+    sistema = SISTEMA + ESTILOS.get(doc.get("estilo") or "formal", ESTILOS["formal"])[1]
+    if (doc.get("pedido") or "").strip():
+        sistema += " Pedido do usuário para esta ATA (siga, sem inventar fatos): " + doc["pedido"].strip()
     fal = doc.get("falantes") or {}
     cab = f"Participantes: {', '.join(dict.fromkeys(fal.values()))}\n"
     if doc.get("glossario"):
@@ -603,14 +752,16 @@ def escrever_ata(doc, prog=lambda p, m: None):
     if atual:
         blocos.append(atual)
     if len(blocos) == 1:
-        return _llm_json(SISTEMA, cab + "\nTranscrição:\n" + "\n".join(blocos[0]), SCHEMA, 2000)
+        return _llm_json(sistema, cab + "\nTranscrição:\n" + "\n".join(blocos[0]), SCHEMA, 2000)
     # reunião longa: uma ATA parcial por bloco, depois a Kani junta as parciais numa só
     parciais = []
     for i, b in enumerate(blocos):
+        parou()
         prog(70 + 20 * i / len(blocos), f"A Kani está lendo a parte {i + 1} de {len(blocos)}...")
-        parciais.append(_llm_json(SISTEMA, cab + f"\nTranscrição (parte {i + 1} de {len(blocos)}):\n" + "\n".join(b), SCHEMA, 1500))
+        parciais.append(_llm_json(sistema, cab + f"\nTranscrição (parte {i + 1} de {len(blocos)}):\n" + "\n".join(b), SCHEMA, 1500))
+    parou()
     prog(92, "Juntando as partes da ATA...")
-    return _llm_json(SISTEMA + " Agora você recebe ATAs parciais de partes seguidas da MESMA reunião: junte numa ATA só, "
+    return _llm_json(sistema + " Agora você recebe ATAs parciais de partes seguidas da MESMA reunião: junte numa ATA só, "
                      "sem repetir itens.", cab + "\nATAs parciais:\n" + json.dumps(parciais, ensure_ascii=False), SCHEMA, 2000)
 
 
@@ -656,8 +807,8 @@ def html_ata(doc):
         h.append("<h2>DECISÕES</h2>" + lista(a["decisoes"]))
     if a.get("tarefas"):
         h.append('<h2>TAREFAS</h2><table class="tar"><tr><th>RESPONSÁVEL</th><th>TAREFA</th><th>PRAZO</th></tr>' +
-                 "".join(f"<tr><td>{_esc(t.get('responsavel'))}</td><td>{_esc(t.get('tarefa'))}</td><td>{_esc(t.get('prazo'))}</td></tr>"
-                         for t in a["tarefas"]) + "</table>")
+                 "".join(f"<tr><td>{_esc(t.get('responsavel'))}</td><td>{_esc(t.get('tarefa'))}</td><td>{_esc(t.get('prazo'))}"
+                         f"{' (concluída)' if t.get('feito') else ''}</td></tr>" for t in a["tarefas"]) + "</table>")
     if a.get("pendencias"):
         h.append("<h2>PENDÊNCIAS</h2>" + lista(a["pendencias"]))
     if a.get("proxima"):
@@ -714,4 +865,77 @@ def exportar_pdf(sid, caminho, doc=None):
     pdf.set_metadata({"title": (doc.get("ata") or {}).get("titulo") or doc.get("titulo") or "ATA", "author": NOME})
     pdf.save(caminho)
     pdf.close()
+    return {"success": True, "caminho": caminho}
+
+
+# ───────────────────────── Word (.docx) no mesmo modelo ─────────────────────────
+def exportar_docx(sid, caminho, doc=None):
+    """A ATA em Word editável, com as mesmas seções e o verde do PDF (python-docx)."""
+    from docx import Document
+    from docx.enum.table import WD_TABLE_ALIGNMENT
+    from docx.shared import Pt, RGBColor
+    doc = doc or abrir(sid)
+    a = doc.get("ata") or {}
+    verde = RGBColor.from_string(COR[1:])
+    cinza = RGBColor(0x6B, 0x72, 0x80)
+    w = Document()
+    st = w.styles["Normal"]
+    st.font.name, st.font.size = "Segoe UI", Pt(10)
+
+    def par(txt, tam=10, cor=None, negrito=False, antes=0, depois=4):
+        p = w.add_paragraph()
+        p.paragraph_format.space_before, p.paragraph_format.space_after = Pt(antes), Pt(depois)
+        r = p.add_run(str(txt or ""))
+        r.font.size, r.bold = Pt(tam), negrito
+        if cor:
+            r.font.color.rgb = cor
+        return p
+
+    def secao(nome):
+        par(nome, 8.5, verde, True, 14, 4)
+
+    def lista(xs):
+        for x in xs:
+            if str(x).strip():
+                w.add_paragraph(str(x), style="List Bullet")
+
+    part = list(dict.fromkeys((doc.get("falantes") or {}).values())) or doc.get("participantes") or []
+    par("ATA DE REUNIÃO", 7.5, verde, True, 0, 2)
+    par(a.get("titulo") or doc.get("titulo"), 19, None, True, 0, 8)
+    par(f"{_data_br(doc.get('quando'))} · {_hora(doc.get('quando'))} · {_dur(doc.get('duracao'))}"
+        + (f" · Participantes: {', '.join(part)}" if part else ""), 9, cinza, False, 0, 6)
+    if a.get("pauta"):
+        secao("PAUTA")
+        lista(a["pauta"])
+    if a.get("resumo"):
+        secao("RESUMO")
+        par(a["resumo"])
+    if a.get("discussao"):
+        secao("DISCUSSÃO")
+        for x in a["discussao"]:
+            par(x.get("tema"), 10, None, True, 6, 1)
+            par(x.get("texto"))
+    if a.get("decisoes"):
+        secao("DECISÕES")
+        lista(a["decisoes"])
+    if a.get("tarefas"):
+        secao("TAREFAS")
+        tb = w.add_table(rows=1, cols=3)
+        tb.alignment = WD_TABLE_ALIGNMENT.LEFT
+        tb.style = "Light List Accent 6" if "Light List Accent 6" in [s.name for s in w.styles] else tb.style
+        for c, nome in zip(tb.rows[0].cells, ("RESPONSÁVEL", "TAREFA", "PRAZO")):
+            c.text = nome
+        for t in a["tarefas"]:
+            cs = tb.add_row().cells
+            cs[0].text, cs[1].text = t.get("responsavel") or "", t.get("tarefa") or ""
+            cs[2].text = (t.get("prazo") or "") + (" (concluída)" if t.get("feito") else "")
+    if a.get("pendencias"):
+        secao("PENDÊNCIAS")
+        lista(a["pendencias"])
+    if a.get("proxima"):
+        secao("PRÓXIMA REUNIÃO")
+        par(a["proxima"])
+    w.core_properties.title = a.get("titulo") or doc.get("titulo") or "ATA"
+    w.core_properties.author = NOME
+    w.save(caminho)
     return {"success": True, "caminho": caminho}

@@ -4425,10 +4425,29 @@ class ApiBridge:
             return {"cancelado": True}
         return ata_kanivete.importar_audio(r)
 
-    def ata_meet_abrir(self, link=""):
+    def ata_buscar(self, termo):
+        from Functions import ata_kanivete
+        return ata_kanivete.buscar(termo)
+
+    def ata_tarefas(self):
+        from Functions import ata_kanivete
+        return ata_kanivete.tarefas_abertas()
+
+    def ata_marcar_tarefa(self, sid, i, feito=True):
         from Functions import ata_kanivete
         try:
-            return ata_kanivete.meet_abrir(link, lambda o: _js("ataEvento", o))
+            return ata_kanivete.marcar_tarefa(sid, i, feito)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ata_estilos(self):
+        from Functions import ata_kanivete
+        return [[k, v[0]] for k, v in ata_kanivete.ESTILOS.items()]
+
+    def ata_meet_abrir(self, link="", auto=False):
+        from Functions import ata_kanivete
+        try:
+            return ata_kanivete.meet_abrir(link, lambda o: _js("ataEvento", o), bool(auto))
         except Exception as e:
             _registrar_erro("ata_meet_abrir", e)
             return {"success": False, "error": str(e)}
@@ -4444,37 +4463,54 @@ class ApiBridge:
         from Functions import ata_kanivete
         return ata_kanivete.meet_estado()
 
+    _ata_stop = {}
+
+    def ata_cancelar(self, sid):
+        ev = ApiBridge._ata_stop.get(sid)
+        if ev:
+            ev.set()
+        return {"success": bool(ev)}
+
     def _ata_rodar(self, sid, fn):
-        """Uma reunião processando por vez (transcrição e Kani disputam a mesma memória)."""
+        """Uma reunião processando por vez (transcrição e Kani disputam a mesma memória). fn(prog, stop)."""
+        stop = ApiBridge._ata_stop[sid] = threading.Event()
+
         def tarefa():
             from Functions import ata_kanivete
             with ApiBridge._ata_lock:
                 try:
-                    r = fn(lambda p, m: _js("ataEvento", {"tipo": "progresso", "id": sid, "p": p, "msg": m}))
+                    if stop.is_set():       # cancelada enquanto esperava a vez
+                        raise InterruptedError
+                    r = fn(lambda p, m: _js("ataEvento", {"tipo": "progresso", "id": sid, "p": p, "msg": m}), stop)
                     if r.get("cancelled"):
                         _js("ataEvento", {"tipo": "cancelado", "id": sid})
                     elif r.get("success"):
                         _js("ataEvento", {"tipo": "pronta", "id": sid})
                     else:
                         _js("ataEvento", {"tipo": "erro", "id": sid, "msg": r.get("error")})
+                except InterruptedError:
+                    _js("ataEvento", {"tipo": "cancelado", "id": sid})
                 except Exception as e:
                     _registrar_erro("ata", e)
                     _js("ataEvento", {"tipo": "erro", "id": sid, "msg": str(e)})
                 finally:
                     ata_kanivete.liberar()
+                    if ApiBridge._ata_stop.get(sid) is stop:
+                        ApiBridge._ata_stop.pop(sid, None)
         threading.Thread(target=tarefa, daemon=True).start()
         return {"success": True}
 
     def ata_processar(self, sid):
         from Functions import ata_kanivete
-        return self._ata_rodar(sid, lambda prog: ata_kanivete.processar(sid, prog))
+        return self._ata_rodar(sid, lambda prog, stop: ata_kanivete.processar(sid, prog, stop))
 
     def ata_reescrever(self, sid):
         from Functions import ata_kanivete
 
-        def fn(prog):
+        def fn(prog, stop):
             doc = ata_kanivete.abrir(sid)
-            doc["ata"] = ata_kanivete.escrever_ata(doc, prog)
+            doc["ata"] = ata_kanivete.escrever_ata(doc, prog, stop)
+            doc.pop("erro", None)
             if doc["ata"].get("titulo"):
                 doc["titulo"] = doc["ata"]["titulo"]
             doc["estado"] = "pronta"
@@ -4500,9 +4536,37 @@ class ApiBridge:
             _registrar_erro("ata_pdf", e)
             return {"success": False, "error": str(e)}
 
-    def ata_audio(self, sid, faixa):
+    def ata_docx(self, sid):
+        import re
+        from Functions import ata_kanivete
+        doc = ata_kanivete.abrir(sid)
+        nome = re.sub(r'[\\/:*?"<>|]+', " ", (doc.get("ata") or {}).get("titulo") or doc.get("titulo") or "ATA").strip()[:80]
+        caminho = self.sk_dialogo("salvar", ("Documento do Word (*.docx)",), nome + ".docx")
+        if not caminho:
+            return {"cancelado": True}
+        if not caminho.lower().endswith(".docx"):
+            caminho += ".docx"
+        try:
+            r = ata_kanivete.exportar_docx(sid, caminho, doc)
+            os.startfile(caminho)
+            return r
+        except Exception as e:
+            _registrar_erro("ata_docx", e)
+            return {"success": False, "error": str(e)}
+
+    def ata_audio(self, sid, faixa="mix"):
+        """mix = as duas faixas juntas e com índice (pular no tempo); cai na faixa crua se o ffmpeg falhar."""
         from Functions import ata_kanivete, media_server
-        p = os.path.join(ata_kanivete.pasta(), sid, faixa + ".webm")
+        p = None
+        if faixa == "mix":
+            try:
+                p = ata_kanivete.audio_mix(sid)
+            except Exception as e:
+                _registrar_erro("ata_audio", e)
+            faixa = "outros"
+        p = p or os.path.join(ata_kanivete.pasta(), sid, faixa + ".webm")
+        if not os.path.isfile(p):
+            p = os.path.join(ata_kanivete.pasta(), sid, "eu.webm")
         return {"url": media_server.register(p) if os.path.isfile(p) else None}
 
     def ve_3d_estudio_video(self, spec):

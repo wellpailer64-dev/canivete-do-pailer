@@ -73,6 +73,12 @@ function sdMontarUI() {
     </div>`;
     const raiz = sdEl('sd');
     raiz.addEventListener('click', sdClique);
+    // barra que não coube (janela estreita): a rodinha rola para o lado
+    sdEl('sd-barra').addEventListener('wheel', e => {
+        const b = e.currentTarget;
+        if (b.scrollWidth <= b.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+        b.scrollLeft += e.deltaY; e.preventDefault();
+    }, { passive: false });
     sdEl('sd-notas').addEventListener('input', e => { const s = sdSlide(); if (s) { s.notas = e.target.value; SD.sujo = true; clearTimeout(SD.tg); SD.tg = setTimeout(sdGuardarRascunho, 1200); } });
     sdEl('sd-notas').addEventListener('change', () => sdTitulo());
     sdMontarMesa(); sdMontarLista(); sdMontarPaineis(); if (typeof sdcMontar === 'function') sdcMontar();
@@ -720,7 +726,7 @@ function sdRenderCamadas(C) {
         : '<p class="sd-vazio">Slide sem camadas. Use a barra acima para inserir texto, formas, imagens e vídeos.</p>';
 }
 // linhas de propriedades
-const sdN = (p, rot, v, o = {}) => `<label class="sd-row"><span>${rot}</span><input type="number" data-p="${p}" value="${v ?? ''}" step="${o.step || 1}"${o.min != null ? ` min="${o.min}"` : ''}${o.max != null ? ` max="${o.max}"` : ''}${o.alvo ? ` data-alvo="${o.alvo}"` : ''}></label>`;
+const sdN = (p, rot, v, o = {}) => `<label class="sd-row"><span title="${rot}">${rot}</span><input type="number" data-p="${p}" value="${v ?? ''}" step="${o.step || 1}"${o.min != null ? ` min="${o.min}"` : ''}${o.max != null ? ` max="${o.max}"` : ''}${o.alvo ? ` data-alvo="${o.alvo}"` : ''}></label>`;
 const sdR = (p, rot, v, min, max, step = 1, o = {}) => `<label class="sd-row"><span>${rot}</span><input type="range" data-p="${p}" min="${min}" max="${max}" step="${step}" value="${v ?? min}"${o.k ? ` data-k_="${o.k}"` : ''}${o.alvo ? ` data-alvo="${o.alvo}"` : ''}><output>${o.mostra != null ? o.mostra : v ?? ''}</output></label>`;
 const sdCor = (p, rot, v, o = {}) => `<label class="sd-row"><span>${rot}</span><span class="sd-corin"><input type="color" data-p="${p}" value="${sdHex6(v)}"${o.alvo ? ` data-alvo="${o.alvo}"` : ''}><input type="text" data-p="${p}" value="${sdEsc(v || '')}"${o.alvo ? ` data-alvo="${o.alvo}"` : ''} placeholder="nenhuma"></span></label>`;
 const sdS = (p, rot, v, ops, o = {}) => `<label class="sd-row"><span>${rot}</span><select data-p="${p}"${o.alvo ? ` data-alvo="${o.alvo}"` : ''}>${ops.map(([k, n]) => `<option value="${k}"${String(k) === String(v ?? '') ? ' selected' : ''}>${n}</option>`).join('')}</select></label>`;
@@ -762,11 +768,11 @@ function sdPainelSlide() {
         ${f.tipo === 'imagem' ? `<button class="sd-btn sd-larga" data-pa="fundo-img">${f.img ? 'Trocar imagem…' : 'Escolher imagem…'}</button>${sdS('fundo.ajuste', 'Ajuste', f.ajuste || 'cobrir', [['cobrir', 'Preencher'], ['conter', 'Caber']], { alvo: 'slide' })}${sdR('fundo.escurecer', 'Escurecer', f.escurecer || 0, 0, 0.9, 0.05, { alvo: 'slide' })}` : ''}
         <button class="sd-btn sd-larga" data-pa="fundo-todos">Usar este fundo em todos</button>`) +
         sdSec('Transição', `${sdS('transicao.tipo', 'Efeito', tr.tipo || 'nenhuma', SD_TRANS, { alvo: 'slide' })}${sdN('transicao.dur', 'Duração (s)', tr.dur ?? 0.5, { step: 0.1, min: 0.1, alvo: 'slide' })}
-        <div class="sd-grade2"><button class="sd-btn sd-larga" data-pa="trans-prever">▶ Prever</button><button class="sd-btn sd-larga" data-pa="trans-todos">Em todos</button></div>${sdN('dur', 'Tempo no vídeo (s)', s.dur || 5, { step: 0.5, min: 0.5, alvo: 'slide' })}${sdC('oculto', 'Ocultar na apresentação', s.oculto, { alvo: 'slide' })}`) +
+        <div class="sd-grade2"><button class="sd-btn sd-larga" data-pa="trans-prever">▶ Prever</button><button class="sd-btn sd-larga" data-pa="trans-todos">Em todos</button></div>${sdN('dur', 'No MP4 (s)', s.dur || 5, { step: 0.5, min: 0.5, alvo: 'slide' })}${sdC('oculto', 'Ocultar na apresentação', s.oculto, { alvo: 'slide' })}`) +
         sdSec('Tema da apresentação', `<div class="sd-temas">${Object.entries(SD_TEMAS).map(([k, t]) => `<button class="sd-tema" data-pa="tema:${k}" title="Aplicar o tema ${t.nome} em todos os slides" style="--f:${t.cores.fundo};--t:${t.cores.tinta};--d:${t.cores.destaque}"><i style="font-family:'${t.titulo}'">Aa</i><small>${t.nome}</small></button>`).join('')}</div>
-        ${sdT('tema.titulo', 'Fonte dos títulos', T.titulo, { list: 'sd-fontes', alvo: 'tema' })}${sdT('tema.texto', 'Fonte do texto', T.texto, { list: 'sd-fontes', alvo: 'tema' })}
+        ${sdT('tema.titulo', 'Fonte título', T.titulo, { list: 'sd-fontes', alvo: 'tema' })}${sdT('tema.texto', 'Fonte do texto', T.texto, { list: 'sd-fontes', alvo: 'tema' })}
         ${['fundo', 'tinta', 'destaque', 'suave', 'apoio'].map(k => sdCor('tema.cores.' + k, { fundo: 'Fundo', tinta: 'Texto', destaque: 'Destaque', suave: 'Suave', apoio: 'Apoio' }[k], T.cores[k], { alvo: 'tema' })).join('')}
-        <button class="sd-btn sd-larga" data-pa="tema-aplicar">Aplicar as mudanças do tema em todos os slides</button>`);
+        <button class="sd-btn sd-larga" data-pa="tema-aplicar" title="Leva as fontes e cores acima para todos os slides">Aplicar o tema em todos os slides</button>`);
 }
 
 // ───────────── área de transferência ─────────────
