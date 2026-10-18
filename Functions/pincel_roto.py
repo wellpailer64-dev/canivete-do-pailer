@@ -57,7 +57,9 @@ MODELOS = {   # qualidade → repositório, revisão, pasta em modelos_ia e arqu
 }
 MAX_PONTOS = 12          # por quadro-base
 ASSUNTO = 2              # rótulo do ponto "Selecionar assunto"
-PADRAO = {"refinar": 1, "suave": 20, "deslocar": 0, "contraste": 0, "pena": 0, "tremido": 30}
+PADRAO = {"refinar": 1, "suave": 20, "deslocar": 0, "contraste": 0, "pena": 0, "tremido": 30, "descont": 100,
+          "nitidez": 50, "rosto": 1}
+SUBS = ("quadros", "m", "base", "a", "p", "c")
 
 
 # ───────────────────────── modelo ─────────────────────────
@@ -246,6 +248,19 @@ _trava = threading.Lock()
 _trava_info = threading.Lock()
 _evento = threading.Event()
 _operario = {"t": None}
+_pausa = threading.Event()   # play no editor: o Roto espera (seguir, borda e montar o vídeo disputavam a máquina)
+
+
+def pausar(sim=True):
+    (_pausa.set if sim else _pausa.clear)()
+    return {"success": True, "pausado": _pausa.is_set()}
+
+
+def _vez(j=None):
+    """Ponto de espera dos laços pesados enquanto o editor toca (a exportação não pausa: ela não toca)."""
+    t0 = time.time()
+    while _pausa.is_set() and not (j and j.cancelar) and time.time() - t0 < 600:
+        time.sleep(0.1)
 
 
 def _pasta_raiz(base):
@@ -280,11 +295,11 @@ def _probe(video):
 class Trabalho:
     def __init__(self, base, rid, video, a, b, qual=None):
         self.rid, self.dir = rid, os.path.join(_pasta_raiz(base), rid)
-        for sub in ("quadros", "m", "base", "a", "p"):
+        for sub in SUBS:
             os.makedirs(os.path.join(self.dir, sub), exist_ok=True)
         info = self._ler()
         if not info or info.get("video") != video or abs(info.get("a", -1) - a) > 1e-3 or abs(info.get("b", -1) - b) > 1e-3:
-            for sub in ("quadros", "m", "base", "a", "p"):
+            for sub in SUBS:
                 shutil.rmtree(os.path.join(self.dir, sub), ignore_errors=True)
                 os.makedirs(os.path.join(self.dir, sub), exist_ok=True)
             w, h, fps = _probe(video)
@@ -300,6 +315,8 @@ class Trabalho:
         self.info = info
         self.estado = {"fase": "", "feito": 0, "total": 0, "msg": "", "erro": "", "t0": 0, "rodando": False}
         self.cancelar = False
+        self.video_erro = ""
+        self.rosto_ult = None
         self.trava_ver = threading.Lock()
         self._salvar()
 
@@ -375,7 +392,8 @@ def abrir(base, rid, video, a, b, qual=None):
             "h": j.info["h"], "bases": j.info["bases"], "params": j.info["params"], "qual": j.info["qual"],
             "pend": j.info["pend"], "modelo": modelo_ok(j.info["qual"]), "placa": _usar_placa(),
             "url_p": media_server.register_pasta(os.path.join(j.dir, "p")),
-            "url_q": media_server.register_pasta(os.path.join(j.dir, "quadros"))}
+            "url_q": media_server.register_pasta(os.path.join(j.dir, "quadros")),
+            "url_c": media_server.register_pasta(os.path.join(j.dir, "c"))}
 
 
 def estado(rid):
@@ -465,10 +483,12 @@ def refinar(rid, params):
         p.update({k: float(v) for k, v in (params or {}).items() if k in PADRAO})
         if p == j.info["params"]:
             return {"success": True, "igual": True}
+        # só a descontaminação mudou: o alfa fica, refaz só as cores da prévia
+        so_cor = all(p[k] == j.info["params"].get(k) for k in p if k != "descont")
         j.info["params"] = p
         j._salvar()
-        _fila[:] = [x for x in _fila if not (x[0] == rid and x[1] == "refinar")]
-    _enfileirar(rid, "refinar")
+        _fila[:] = [x for x in _fila if not (x[0] == rid and x[1] in ("refinar", "cores"))]
+    _enfileirar(rid, "cores" if so_cor else "refinar")
     return {"success": True}
 
 
@@ -515,7 +535,8 @@ def _laco():
             continue
         rid, tarefa, args = item
         try:
-            {"extrair": _extrair, "base": _tarefa_base, "congelar": _congelar, "refinar": _refinar_tudo}[tarefa](j, *args)
+            {"extrair": _extrair, "base": _tarefa_base, "congelar": _congelar, "refinar": _refinar_tudo,
+             "cores": _cores_tudo, "video": _tarefa_video}[tarefa](j, *args)
             j.estado["msg"] = "" if not j.cancelar else "cancelado"
         except Exception as e:
             import traceback
@@ -755,6 +776,7 @@ class _Refinador:
             if item is None:
                 return
             i, ant = item
+            _vez(self.j)
             try:
                 a = _refinar_um(self.j, i, P, self.ult[1] if ant is not None and self.ult[0] == ant else None)
                 self.ult = (i, a)
@@ -815,6 +837,7 @@ def _congelar(j):
             recentes = []   # o quadro-base já está nos conds
             ant = q0
             for i in range(ini, fim + d, d):
+                _vez(j)
                 if j.cancelar:
                     return
                 e = M.codificar(j.quadro(i))
@@ -847,8 +870,94 @@ def _guiado(I, p, r, eps):
     return m(a) * I + m(mp - a * mI)
 
 
-def refinar_quadro(bgr, prob, P, anterior=None):
-    """prob: probabilidade do modelo (uint8, qualquer tamanho) → alfa float 0..1 no tamanho do quadro."""
+_det_rosto = threading.local()   # um YuNet por linha (o OpenCV não divide o detector entre threads)
+
+
+def _rostos_quadro(bgr):
+    """Rostos: [x, y, w, h, 5 pontos (olho, olho, nariz, boca, boca) em pares x, y...] em pixels do quadro — YuNet do
+    Remover fundo, em até 640 px."""
+    try:
+        d = getattr(_det_rosto, "d", None)
+        if d is None:
+            from Functions.recorte_pro import _yunet
+            from Functions.midia import modelo_path
+            _yunet()   # baixa se faltar
+            d = _det_rosto.d = cv2.FaceDetectorYN.create(modelo_path("u2net", "yunet-2023mar.onnx"), "", (320, 320), 0.6, 0.3, 50)
+        H, W = bgr.shape[:2]
+        s = min(1.0, 640 / max(H, W))
+        im = cv2.resize(bgr, (int(W * s), int(H * s)), interpolation=cv2.INTER_AREA) if s < 1 else bgr
+        d.setInputSize((im.shape[1], im.shape[0]))
+        _, f = d.detect(im)
+        return [[float(v) / s for v in r[:14]] for r in (f if f is not None else []) if min(r[2], r[3]) * 1 / s >= 24]
+    except Exception as e:
+        print(f"[pincel roto] rosto: {e}")
+        return []
+
+
+def _fechar_rostos(dura, rostos, k):
+    """Rosto sem buraco: dentro de uma elipse em volta de cada rosto (testa e cabelo inclusos), fecha falhas — lente de
+    óculos que o modelo deixou vazada (mesmo encostando no fundo pela lateral), bochecha comida. Só soma pixels dentro
+    da elipse e só onde o rosto já é do recorte (o fundo ao lado da cabeça fica)."""
+    H, W = dura.shape
+    for r in rostos:
+        x, y, w, h = r[:4]
+        pts = np.array(r[4:14], np.float32).reshape(5, 2) if len(r) >= 14 else None
+        # de frente = nariz no meio dos olhos; de perfil a caixa passa do rosto e pegaria o fundo na frente da testa
+        frente = 0.0
+        if pts is not None:
+            olhos = abs(pts[1, 0] - pts[0, 0])
+            frente = max(0.0, 1 - abs(pts[2, 0] - (pts[0, 0] + pts[1, 0]) / 2) / max(1.0, olhos * 0.5)) if olhos > 1 else 0.0
+        cx, cy, ax, ay = x + w / 2, y + h * 0.42, w * 0.78, h * 0.95
+        x0, x1 = int(max(0, cx - ax)), int(min(W, cx + ax + 1))
+        y0, y1 = int(max(0, cy - ay)), int(min(H, cy + ay + 1))
+        if x1 - x0 < 8 or y1 - y0 < 8:
+            continue
+        reg = dura[y0:y1, x0:x1]
+        if reg.mean() < 0.25:   # o rosto não está no recorte (outra pessoa, objeto recortado): não mexe
+            continue
+        el = np.zeros_like(reg)
+        if frente >= 0.4:   # fechamento de lente/bochecha só de frente (de perfil o vão na frente da testa é fundo)
+            cv2.ellipse(el, (int(cx - x0), int(cy - y0)), (int(ax), int(ay)), 0, 0, 360, 1, -1)
+        t = max(3, int(w * 0.16)) | 1
+        fech = cv2.morphologyEx(reg, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (t, t)))
+        # buraco que sobrou dentro da elipse (sem encostar na borda dela) também fecha
+        fundo = ((1 - fech) & el).astype(np.uint8)
+        nl, lab, st, _ = cv2.connectedComponentsWithStats(fundo, 4)
+        if nl > 1:
+            borda_el = el - cv2.erode(el, np.ones((3, 3), np.uint8))
+            toca = set(np.unique(lab[(borda_el > 0) | (el == 0)]).tolist())
+            for c in range(1, nl):
+                if c not in toca:
+                    fech[lab == c] = 1
+        # miolo do rosto (a caixa do detector, da testa ao queixo): o que está ali é rosto ou algo NA FRENTE dele (mão,
+        # microfone) — nunca o fundo; fica sempre no recorte
+        miolo = np.zeros_like(reg)
+        if pts is not None:
+            # forma do rosto pelos pontos: olhos, nariz, boca + queixo e testa no eixo olhos→boca (sempre dentro do rosto,
+            # mesmo de perfil); de frente, um pouco mais larga. Mão na frente do queixo não abre buraco no rosto
+            olho, boca = pts[:2].mean(0), pts[3:].mean(0)
+            eixo = boca - olho
+            # laterais: rosto virado (3/4) — o lado oposto ao nariz vai até a beira da caixa (bochecha, orelha); o lado do
+            # nariz para no nariz (depois dele é fundo)
+            s = float(np.sign(pts[2, 0] - olho[0])) if frente < 0.85 else 0.0
+            longe_e = x + w * (0.12 if s >= 0 else 0.3 + 0.45 * frente)
+            longe_d = x + w * (0.88 if s <= 0 else 0.7 - 0.45 * frente)
+            if s > 0:
+                longe_d = max(longe_d, pts[2, 0])
+            elif s < 0:
+                longe_e = min(longe_e, pts[2, 0])
+            extra = np.array([boca + eixo * 0.95, olho - eixo * 0.55, pts[3] + eixo * 0.6, pts[4] + eixo * 0.6,
+                              [longe_e, olho[1]], [longe_e, boca[1]], [longe_d, olho[1]], [longe_d, boca[1]]])
+            todos = np.vstack([pts, extra])
+            cas = (todos - [x0, y0]).astype(np.int32)
+            cv2.fillConvexPoly(miolo, cv2.convexHull(cas), 1)
+        dura[y0:y1, x0:x1] = np.maximum(np.maximum(reg, fech & el), miolo)
+    return dura
+
+
+def refinar_quadro(bgr, prob, P, anterior=None, rostos=None):
+    """prob: probabilidade do modelo (uint8, qualquer tamanho) → alfa float 0..1 no tamanho do quadro.
+    rostos: caixas dos rostos (_rostos_quadro) — o recorte não fura dentro deles."""
     H, W = bgr.shape[:2]
     k = max(1, round(max(W, H) / 1920))          # 4K: mesmos números em pixels de 1080p
     pr = cv2.resize(prob, (W, H), interpolation=cv2.INTER_LINEAR)
@@ -872,18 +981,22 @@ def refinar_quadro(bgr, prob, P, anterior=None):
             tapa[c] = c not in borda and st[c, cv2.CC_STAT_AREA] < 0.006 * W * H
         if tapa.any():
             dura = np.maximum(dura, tapa[lab].astype(np.uint8))
+    if rostos and P.get("rosto", 1):
+        dura = _fechar_rostos(dura, rostos, k)
     d = int(round(P.get("deslocar", 0) * k))
     if d:
         el = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * abs(d) + 1, 2 * abs(d) + 1))
         dura = cv2.dilate(dura, el) if d > 0 else cv2.erode(dura, el)
     a = dura.astype(np.float32)
+    nit = min(1.0, max(0.0, P.get("nitidez", 0) / 100))   # Nitidez: borda seca (faixa macia mais estreita e mais dura)
     if P.get("refinar", 1):
         # filtro guiado em meia resolução, só na faixa de ±10 px do contorno: a borda segue a foto (cabelo, dedos)
         g = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255
         w2, h2 = max(2, W // 2), max(2, H // 2)
         ref = cv2.resize(_guiado(cv2.resize(g, (w2, h2), interpolation=cv2.INTER_AREA),
-                                 cv2.resize(a, (w2, h2), interpolation=cv2.INTER_AREA), 6 * k, 1e-3), (W, H), interpolation=cv2.INTER_LINEAR)
-        r = 10 * k
+                                 cv2.resize(a, (w2, h2), interpolation=cv2.INTER_AREA), max(1, round(6 * k * (1 - 0.75 * nit))), 1e-3),
+                         (W, H), interpolation=cv2.INTER_LINEAR)
+        r = max(2, round(10 * k * (1 - 0.7 * nit)))
         el = np.ones((2 * r + 1, 2 * r + 1), np.uint8)
         faixa = (cv2.dilate(dura, el) - cv2.erode(dura, el)) > 0
         a = np.where(faixa, np.clip(ref, 0, 1), a)
@@ -891,6 +1004,8 @@ def refinar_quadro(bgr, prob, P, anterior=None):
     c = P.get("contraste", 0)
     if c > 0:
         a = np.clip((a - 0.5) * (1 + c / 25) + 0.5, 0, 1)
+    if nit > 0:   # 100%: transição de ~1–2 px (só o antisserrilhado), sem o degradê largo
+        a = np.clip((a - 0.5) * (1 + nit * 7) + 0.5, 0, 1)
     pe = P.get("pena", 0)
     if pe > 0:
         a = cv2.GaussianBlur(a, (0, 0), pe / 2 * k)
@@ -901,18 +1016,111 @@ def refinar_quadro(bgr, prob, P, anterior=None):
     return a
 
 
+def _medias(F, B, a, r):
+    """Médias locais da pessoa (F) e do fundo (B), ponderadas pelo alfa."""
+    a3 = a[..., None]
+    ma = cv2.blur(a, (r, r))[..., None]
+    return cv2.blur(F * a3, (r, r)) / (ma + 1e-5), cv2.blur(B * (1 - a3), (r, r)) / (1 - ma + 1e-5)
+
+
+def _fusao(I, F, B, a, r):
+    """Uma passada do Blur-Fusion (Forte & Pitié 2021): o resto da equação de composição (I = αF + (1−α)B) devolvido
+    à média local da pessoa."""
+    mF, mB = _medias(F, B, a, r)
+    a3 = a[..., None]
+    return np.clip(mF + a3 * (I - a3 * mF - (1 - a3) * mB), 0, 1), mB
+
+
+def descontaminar(bgr, a, forca=1.0):
+    """Descontaminar cores da borda: a cor de cada pixel meio transparente vira a da pessoa, sem a do fundo antigo
+    (a franja escura/colorida em volta do cabelo some sobre outro fundo). Só na faixa da borda (+ margem das médias);
+    o miolo e o alfa não mudam. bgr uint8, a float 0..1 → bgr uint8."""
+    if forca <= 0:
+        return bgr
+    borda = ((a > 0.004) & (a < 0.996)).view(np.uint8)
+    bx, by, bw, bh = cv2.boundingRect(borda)
+    if not bw:
+        return bgr
+    H, W = a.shape
+    k = max(1, round(max(W, H) / 1920))
+    r1, r2 = 90 * k, 6 * k
+    y0, y1 = max(0, by - r1), min(H, by + bh + r1)
+    x0, x1 = max(0, bx - r1), min(W, bx + bw + r1)
+    I8 = bgr[y0:y1, x0:x1]
+    al = a[y0:y1, x0:x1].astype(np.float32)
+    # as médias são suaves: em meia resolução (4× menos conta); a fórmula final, em resolução cheia, guarda os fios
+    h2, w2 = max(2, (y1 - y0) // 2), max(2, (x1 - x0) // 2)
+    Ih = cv2.resize(I8, (w2, h2), interpolation=cv2.INTER_AREA).astype(np.float32) / 255
+    ah = cv2.resize(al, (w2, h2), interpolation=cv2.INTER_AREA)
+    Fh, Bh = _fusao(Ih, Ih, Ih, ah, max(3, r1 // 2))
+    mF, mB = _medias(Fh, Bh, ah, max(3, r2 // 2))
+    mF = cv2.resize(mF, (x1 - x0, y1 - y0), interpolation=cv2.INTER_LINEAR)
+    mB = cv2.resize(mB, (x1 - x0, y1 - y0), interpolation=cv2.INTER_LINEAR)
+    # a fórmula final só nos pixels da borda (a faixa é uma fração pequena do quadro)
+    idx = np.nonzero(borda[y0:y1, x0:x1])
+    Ip, mFp, mBp, ap = I8[idx].astype(np.float32) / 255, mF[idx], mB[idx], al[idx][:, None]
+    F = np.clip(mFp + ap * (Ip - ap * mFp - (1 - ap) * mBp), 0, 1)
+    out = bgr.copy()
+    sub = out[y0:y1, x0:x1]
+    sub[idx] = np.clip((Ip + (F - Ip) * min(1.0, forca)) * 255 + 0.5, 0, 255).astype(np.uint8)
+    return out
+
+
 def _refinar_um(j, i, P, anterior=None):
     prob = cv2.imread(j.arq("m", i), cv2.IMREAD_GRAYSCALE)
     bgr = j.quadro(i)
     if prob is None or bgr is None:
         return None
     w, h = j.info["w"], j.info["h"]
-    a = refinar_quadro(bgr, prob, P, anterior)
+    rostos = _rostos_quadro(bgr) if P.get("rosto", 1) else []
+    if rostos:
+        j.rosto_ult = (i, rostos)
+    elif P.get("rosto", 1) and j.rosto_ult and abs(j.rosto_ult[0] - i) <= 8:   # perfil/borrão: vale o rosto vizinho
+        rostos = j.rosto_ult[1]
+    a = refinar_quadro(bgr, prob, P, anterior, rostos)
     a8 = (a * 255 + 0.5).astype(np.uint8)
     cv2.imwrite(j.arq("a", i), a8)
-    _png_previa(j.arq("p", i), cv2.resize(a8, (max(2, w // 2), max(2, h // 2)), interpolation=cv2.INTER_AREA))
+    pa = cv2.resize(a8, (max(2, w // 2), max(2, h // 2)), interpolation=cv2.INTER_AREA)
+    _png_previa(j.arq("p", i), pa)
+    _cores_previa(j, i, P, bgr, pa)
     j.nova_versao(i)
     return a
+
+
+def _cores_previa(j, i, P, bgr=None, pa=None):
+    """Cores descontaminadas da borda para a prévia (meia resolução): PNG com a cor nova só na faixa da borda (o resto
+    transparente), desenhado por cima do quadro já recortado (source-atop) — a prévia fica igual à exportação."""
+    arq = j.arq("c", i)
+    if P.get("descont", 0) <= 0:
+        if os.path.isfile(arq):
+            os.remove(arq)
+        return
+    if pa is None:
+        a8 = cv2.imread(j.arq("a", i), cv2.IMREAD_GRAYSCALE)
+        if a8 is None:
+            return
+        pa = cv2.resize(a8, (max(2, j.info["w"] // 2), max(2, j.info["h"] // 2)), interpolation=cv2.INTER_AREA)
+    bgr = j.quadro(i) if bgr is None else bgr
+    if bgr is None:
+        return
+    pb = cv2.resize(bgr, (pa.shape[1], pa.shape[0]), interpolation=cv2.INTER_AREA)
+    af = pa.astype(np.float32) / 255
+    cor = descontaminar(pb, af, P["descont"] / 100)
+    zona = ((af > 0.004) & (af < 0.996)).astype(np.uint8) * 255
+    cv2.imwrite(arq, np.dstack([cor, zona]))
+
+
+def _cores_tudo(j):
+    P = j.info["params"]
+    feitos = [i for i in range(j.info["n"]) if os.path.isfile(j.arq("a", i))]
+    j.estado.update(msg="Descontaminando as cores…", fase="refinar", total=len(feitos), feito=0, t0=time.time())
+    for i in feitos:
+        _vez(j)
+        if j.cancelar:
+            return
+        _cores_previa(j, i, P)
+        j.nova_versao(i)
+        j.estado["feito"] += 1
 
 
 def _refinar(j, quadros, msg="Refinando a borda…"):
@@ -921,6 +1129,7 @@ def _refinar(j, quadros, msg="Refinando a borda…"):
         j.estado.update(msg=msg, fase="refinar", total=len(quadros), feito=0, t0=time.time())
     ant, ult = None, None
     for i in quadros:
+        _vez(j)
         if j.cancelar:
             return
         if ult is not None and i != ult + 1:
@@ -958,10 +1167,45 @@ def video_alfa(rid, on_progress=lambda p: None):
     if j.info["pend"] and j.info["bases"]:   # Freeze ainda não pedido: a exportação segue o que falta
         congelar(rid)
     esperar(rid)
+    return _montar_video(j, on_progress)
+
+
+def video_pedir(rid):
+    """Para a tela (chamada longa do pywebview cai): devolve o vídeo pronto ou {pendente} e monta em segundo plano
+    (tarefa "video" na fila, depois do seguimento que faltar); o JS consulta o estado e pede de novo."""
+    j = _job(rid)
+    if j.info["pend"] and j.info["bases"]:
+        congelar(rid)
+    with _trava:
+        ocupado = j.estado["rodando"] or any(x[0] == rid for x in _fila)
+        if not ocupado:
+            final = _nome_video(j)
+            if os.path.isfile(final):
+                return {"success": True, "path": final, "a": j.info["a"]}
+            if j.video_erro:
+                e, j.video_erro = j.video_erro, ""
+                return {"success": False, "error": e}
+        if not any(x[0] == rid and x[1] == "video" for x in _fila):
+            _fila.append((rid, "video", ()))
+    _garantir_operario()
+    return {"success": True, "pendente": True}
+
+
+def _tarefa_video(j):
+    j.estado.update(msg="Montando o vídeo recortado…", total=100, feito=0)
+    r = _montar_video(j, lambda p: j.estado.update(feito=int(p)))
+    j.video_erro = "" if r.get("success") else r.get("error", "?")
+
+
+def _nome_video(j):
+    assin = hashlib.sha1(json.dumps([j.info["ver"], j.info["params"]]).encode()).hexdigest()[:12]
+    return os.path.join(j.dir, f"recorte_{assin}.mov")
+
+
+def _montar_video(j, on_progress):
     info = j.info
     n = info["n"]
-    assin = hashlib.sha1(json.dumps([info["ver"], info["params"]]).encode()).hexdigest()[:12]
-    final = os.path.join(j.dir, f"recorte_{assin}.mov")
+    final = _nome_video(j)
     if os.path.isfile(final):
         return {"success": True, "path": final, "a": info["a"]}
     for f in os.listdir(j.dir):
@@ -976,8 +1220,14 @@ def video_alfa(rid, on_progress=lambda p: None):
             if branco is None:
                 branco = np.full((info["h"], info["w"]), 255, np.uint8)
             cv2.imwrite(j.arq("a", i), branco)
-    from Functions.midia import rodar_ffmpeg
     parte = final + ".part.mov"
+    if info["params"].get("descont", 0) > 0:
+        ok, erro = _video_descontaminado(j, parte, on_progress)
+        if not ok:
+            return {"success": False, "error": "o recorte não foi montado: " + erro[-300:]}
+        os.replace(parte, final)
+        return {"success": True, "path": final, "a": info["a"]}
+    from Functions.midia import rodar_ffmpeg
     args = ["-ss", f"{info['a']:.6f}", "-i", info["video"], "-framerate", f"{info['fps']:.6f}", "-start_number", "0",
             "-i", os.path.join(j.dir, "a", "a_%05d.png"), "-filter_complex",
             f"[0:v]fps={info['fps']:.6f},format=rgba[v];[1:v]format=gray[m];[v][m]alphamerge[s]", "-map", "[s]",
@@ -988,3 +1238,57 @@ def video_alfa(rid, on_progress=lambda p: None):
         return {"success": False, "error": "o ffmpeg não montou o recorte: " + str(erros or "")[-300:]}
     os.replace(parte, final)
     return {"success": True, "path": final, "a": info["a"]}
+
+
+def _video_descontaminado(j, parte, on_progress):
+    """Quadro ORIGINAL (do vídeo, não o JPEG do cache) + alfa refinado, com as cores da borda descontaminadas, em
+    ProRes 4444. Lê e grava por tubos do ffmpeg; as contas rodam em 4 linhas (o OpenCV solta o GIL)."""
+    from concurrent.futures import ThreadPoolExecutor
+    from Functions.midia import ffmpeg, NO_WINDOW
+    info = j.info
+    n, w, h, fps, forca = info["n"], info["w"], info["h"], info["fps"], info["params"]["descont"] / 100
+    dec = subprocess.Popen([ffmpeg(), "-v", "error", "-nostdin", "-ss", f"{info['a']:.6f}", "-i", info["video"],
+                            "-vf", f"fps={fps:.6f},scale={w}:{h}", "-frames:v", str(n), "-f", "rawvideo", "-pix_fmt", "bgr24", "-"],
+                           stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)
+    enc = subprocess.Popen([ffmpeg(), "-v", "error", "-nostdin", "-y", "-f", "rawvideo", "-pix_fmt", "bgra", "-s", f"{w}x{h}",
+                            "-framerate", f"{fps:.6f}", "-i", "-", "-c:v", "prores_ks", "-profile:v", "4444",
+                            "-pix_fmt", "yuva444p10le", "-vendor", "apl0", parte],
+                           stdin=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=NO_WINDOW)
+
+    def um(i, bgr):
+        a8 = cv2.imread(j.arq("a", i), cv2.IMREAD_GRAYSCALE)
+        if a8 is None or a8.shape != (h, w):
+            a8 = np.full((h, w), 255, np.uint8)
+        cor = descontaminar(bgr, a8.astype(np.float32) / 255, forca)
+        return np.dstack([cor, a8]).tobytes()
+
+    tam = w * h * 3
+    feitos = 0
+    try:
+        with ThreadPoolExecutor(4) as ex:
+            fila = []
+            for i in range(n + 1):
+                _vez()
+                buf = dec.stdout.read(tam) if i < n else b""
+                if len(buf) == tam:
+                    fila.append(ex.submit(um, i, np.frombuffer(buf, np.uint8).reshape(h, w, 3)))
+                while fila and (len(fila) >= 6 or len(buf) < tam):
+                    enc.stdin.write(fila.pop(0).result())
+                    feitos += 1
+                    on_progress(feitos / n * 100)
+                if len(buf) < tam:
+                    break
+        enc.stdin.close()
+        erro = enc.stderr.read().decode("utf-8", "replace")
+        enc.wait()
+        dec.wait()
+    except Exception as e:
+        for p in (dec, enc):
+            try:
+                p.kill()
+            except Exception:
+                pass
+        return False, f"{type(e).__name__}: {e}"
+    if enc.returncode != 0 or not os.path.isfile(parte) or not feitos:
+        return False, erro or "ffmpeg"
+    return True, ""

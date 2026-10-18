@@ -24,6 +24,12 @@ VE_FX.roto = {
         { k: 'contraste', nome: 'Contraste', min: 0, max: 100, step: 1, def: 0, un: '%' },
         { k: 'deslocar', nome: 'Deslocar borda', min: -30, max: 30, step: 1, def: 0, un: 'px' },
         { k: 'tremido', nome: 'Reduzir tremido', min: 0, max: 100, step: 1, def: 30, un: '%' },
+        // tira a cor do fundo antigo dos pixels da borda (a auréola escura/colorida em volta do cabelo sobre outro fundo)
+        { k: 'descont', nome: 'Descontaminar cores', min: 0, max: 100, step: 1, def: 100, un: '%' },
+        // borda seca: estreita a faixa macia (0 = macia como antes; 100 = só o antisserrilhado)
+        { k: 'nitidez', nome: 'Nitidez da borda', min: 0, max: 100, step: 1, def: 50, un: '%' },
+        // o recorte não fura dentro do rosto (lente dos óculos, mão na frente do queixo) — detector de rosto
+        { k: 'rosto', nome: 'Proteger rosto', tipo: 'bool', def: 1 },
     ],
     neutro: v => !(v.rd && v.rd.rid),
     draw(a, v, env) {
@@ -39,13 +45,19 @@ VE_FX.roto = {
             if (!img) return a;
         }
         const x = a.ctx;
-        x.save(); x.globalCompositeOperation = 'destination-in'; x.drawImage(img, 0, 0, env.w, env.h); x.restore();
+        x.save(); x.globalCompositeOperation = 'destination-in'; x.drawImage(img, 0, 0, env.w, env.h);
+        // cores descontaminadas da borda (Python: c_NNNNN.png, só a faixa da borda)
+        const desc = veRotoParamsDe(v).descont > 0, cor = desc && veRotoImg(st, i, true, 'c');
+        if (cor) { x.globalCompositeOperation = 'source-atop'; x.drawImage(cor, 0, 0, env.w, env.h); }
+        else if (desc) veRotoImg(st, i, false, 'c');
+        x.restore();
         return a;
     },
 };
 
 const veRotoFx = c => ((c && c.fx) || []).find(f => f.t === 'roto' && f.on !== false) || null;
-const veRotoParamsDe = v => Object.fromEntries(VE_FX.roto.params.map(p => [p.k, +v[p.k] || 0]));
+// parâmetro que o projeto não tem (efeito criado numa versão antiga) vale o padrão
+const veRotoParamsDe = v => Object.fromEntries(VE_FX.roto.params.map(p => [p.k, v[p.k] == null ? p.def : +v[p.k] || 0]));
 
 // quadro do trecho do recorte no instante T da timeline
 function veRotoQuadro(st, c, T) {
@@ -110,16 +122,17 @@ function veRotoParams(st, v) {
     st.tParams = setTimeout(() => { window.pywebview.api.ve_roto_refinar(st.rid, p).then(() => veRotoVigiar()); }, 450);
 }
 
-// máscara da prévia do quadro i (Image já carregada ou null; carrega em segundo plano)
-function veRotoImg(st, i, soPronta) {
-    if (i < 0 || i >= st.n || !st.ver[i]) return null;
-    const chave = `${st.rid}|${i}|${st.ver[i]}`;
+// máscara da prévia do quadro i (Image já carregada ou null; carrega em segundo plano); tipo 'c' = cores da borda
+function veRotoImg(st, i, soPronta, tipo = 'p') {
+    if (i < 0 || i >= st.n || !st.ver[i] || (tipo === 'c' && !st.url_c)) return null;
+    const chave = `${st.rid}|${tipo}${i}|${st.ver[i]}`;
     let e = VERO.img.get(chave);
     if (!e) {
         if (soPronta) return null;
         const im = new Image(); im.crossOrigin = 'anonymous'; e = { im, ok: false };
         im.onload = () => { e.ok = true; if (!VE.playing) veRotoRedesenhar(); };
-        im.src = `${st.url_p}p_${String(i).padStart(5, '0')}.png?v=${st.ver[i]}`;
+        im.onerror = () => { e.falhou = true; };   // sem cores (descontaminar desligado ou ainda refinando)
+        im.src = `${tipo === 'c' ? st.url_c : st.url_p}${tipo}_${String(i).padStart(5, '0')}.png?v=${st.ver[i]}`;
         VERO.img.set(chave, e);
         if (VERO.img.size > 240) VERO.img.delete(VERO.img.keys().next().value);
     }
@@ -142,6 +155,9 @@ function veRotoVigiar() {
     VERO.timer = setInterval(async () => {
         const api = window.pywebview && window.pywebview.api; if (!api) return;
         let algum = false;
+        // tocando: o trabalho do Roto espera (seguir/borda/montar o vídeo no Python disputavam a máquina com o play)
+        const tocando = !!VE.playing && !VE.exportRunning;
+        if (tocando !== !!VERO.pausado) { VERO.pausado = tocando; api.ve_roto_pausar?.(tocando); }
         for (const st of Object.values(VERO.st)) {
             if (!st.vigiar && !(VERO.tela && !VERO.tela.el.hidden && VERO.tela.rid === st.rid)) continue;
             const r = await api.ve_roto_estado(st.rid); if (!r || !r.success) continue;
@@ -153,7 +169,10 @@ function veRotoVigiar() {
             algum = algum || st.vigiar;
             if (VERO.tela && VERO.tela.rid === st.rid) veRotoTelaStatus();
         }
-        if (!algum && !(VERO.tela && !VERO.tela.el.hidden)) { clearInterval(VERO.timer); VERO.timer = 0; }
+        if (!algum && !(VERO.tela && !VERO.tela.el.hidden)) {
+            clearInterval(VERO.timer); VERO.timer = 0;
+            if (VERO.pausado) { VERO.pausado = false; api.ve_roto_pausar?.(false); }
+        }
     }, 400);
     Object.values(VERO.st).forEach(st => { st.vigiar = true; });
 }
@@ -166,8 +185,9 @@ async function veRotoPreparar(mapa, filtro, clips = VE.clips) {
         if (!VERO.st[rd.rid]) await veRotoAbrirJob(rd, c);
         const st = VERO.st[rd.rid]; if (!st) continue;
         await window.pywebview.api.ve_roto_refinar(rd.rid, veRotoParamsDe(veFxValues(f)));
-        await veRotoEsperar(rd.rid);   // propagação/refinamento em andamento: espera aqui (chamada longa no Python cai)
-        const r = await api.ve_roto_video(rd.rid);
+        // o vídeo recortado é montado em segundo plano (chamada longa no Python cai): pede, espera a fila, pede de novo
+        let r = await api.ve_roto_video(rd.rid);
+        for (let k = 0; r && r.success && r.pendente && k < 20; k++) { await veRotoEsperar(rd.rid); r = await api.ve_roto_video(rd.rid); }
         if (r && r.success) mapa.set(c, Object.assign(mapa.get(c) || {}, { roto: { path: r.path, a: r.a } }));
         else veToast(veT('Pincel Roto') + ': ' + ((r && r.error) || '?'));
     }
@@ -207,6 +227,11 @@ function veRotoTelaMontar() {
         <button class="ve-btn ve-btn-sm vero-ico" data-roacao="max" title="${veT('Tela cheia')}">⤢</button>
         <button class="ve-btn ve-btn-sm" data-roacao="fechar" title="Esc">${veT('Voltar à timeline')}</button></div>
         <div class="vero-visor" data-ro="visor"><canvas></canvas><div class="vero-dica">${veT('Pinte o que fica · Alt: tirar · Ctrl+arrastar: tamanho do pincel · ←/→: quadro · Espaço: tocar · F: Freeze · Delete: apaga o quadro-base')}</div></div>
+        <div class="vero-borda"><b>${veT('Borda')}</b>
+            <label title="${veT('Borda seca: menos degradê no contorno (0 = macia, 100 = só o antisserrilhado)')}">${veT('Nitidez')} <input type="range" min="0" max="100" step="1" data-roparam="nitidez"><span data-roval="nitidez"></span></label>
+            <label title="${veT('Tira a cor do fundo antigo da borda (sem auréola escura ou colorida em volta do cabelo)')}"><input type="checkbox" data-roparam="descont"> ${veT('Descontaminar cores')}</label>
+            <label title="${veT('O recorte não fura dentro do rosto (lente dos óculos, mão na frente do queixo)')}"><input type="checkbox" data-roparam="rosto"> ${veT('Proteger rosto')}</label>
+            <span class="vero-borda-dica">${veT('Mais ajustes em Controles de efeito › Refinar borda')}</span></div>
         <div class="vero-tempo"><button class="ve-btn ve-btn-sm" data-roacao="play" title="${veT('Espaço')}">▶</button><span class="vero-hora" data-ro="hora"></span>
             <canvas class="vero-regua" data-ro="regua"></canvas>
             <button class="ve-btn ve-btn-sm" data-roacao="apagar" title="Delete">${veT('Apagar quadro-base')}</button>
@@ -226,6 +251,14 @@ function veRotoTelaMontar() {
         if (T.seguir.checked) veRotoFreeze();
     });
     T.qual.addEventListener('change', () => veRotoQualidade(T.qual.value));
+    // Borda (os mesmos parâmetros do efeito nos Controles de efeito): mudar refaz o alfa/as cores em segundo plano
+    el.querySelectorAll('[data-roparam]').forEach(inp => inp.addEventListener(inp.type === 'range' ? 'input' : 'change', () => {
+        const f = veRotoFx(veRotoTelaClipe()), st = VERO.st[T.rid]; if (!f) return;
+        const k = inp.dataset.roparam, val = inp.type === 'checkbox' ? (inp.checked ? (k === 'descont' ? 100 : 1) : 0) : +inp.value;
+        veFxEdit(f.id, x => { x.v = { ...x.v, [k]: val }; return x; });
+        veRotoTelaBorda();
+        if (st) { veRotoParams(st, veRotoFx(veRotoTelaClipe()).v); st.vigiar = true; veRotoVigiar(); }
+    }));
     el.addEventListener('pointerdown', e => { if (e.target === el) veRotoTelaFechar(); });   // clique no fundo desfocado volta
     el.addEventListener('click', e => {
         const b = e.target.closest('[data-romodo],[data-rovista],[data-roacao]'); if (!b) return;
@@ -276,6 +309,7 @@ async function veRotoTelaAbrir(c) {
     veRotoTelaBotoes();
     const st = VERO.st[T.rid] || await veRotoAbrirJob(f.v.rd, c);
     if (st) { st.vigiar = true; veRotoVigiar(); T.qual.value = st.qual || 'alta'; }
+    veRotoTelaBorda();
     cancelAnimationFrame(T.raf); T.raf = requestAnimationFrame(veRotoTelaLaco);
     veRotoTelaDesenhar();
     return true;
@@ -302,6 +336,16 @@ function veRotoTelaStatus() {
     T.status.textContent = s;
     T.el.querySelector('[data-roacao="cancelar"]').hidden = !(st.rodando || st.fila);
     T.freeze.classList.toggle('vero-pend', (st.pend || []).length > 0 && Object.keys(st.bases || {}).length > 0);
+}
+// controles de Borda da tela ← valores do efeito
+function veRotoTelaBorda() {
+    const T = VERO.tela, f = veRotoFx(veRotoTelaClipe()); if (!T || !f) return;
+    const p = veRotoParamsDe(f.v);
+    T.el.querySelectorAll('[data-roparam]').forEach(inp => {
+        const k = inp.dataset.roparam;
+        if (inp.type === 'checkbox') inp.checked = p[k] > 0; else inp.value = p[k];
+    });
+    const n = T.el.querySelector('[data-roval="nitidez"]'); if (n) n.textContent = `${p.nitidez}%`;
 }
 // ❄ Freeze: segue o recorte a partir dos quadros-base (o que estiver pendente)
 function veRotoFreeze() {
@@ -380,7 +424,12 @@ function veRotoTelaDesenhar() {
     const tmp = veFxCanvas(4, w, h), t = tmp.ctx;
     if (T.vista === 'xadrez' && mk) {
         const n = 12; for (let yy = 0; yy < h; yy += n) for (let xx = 0; xx < w; xx += n) { x.fillStyle = ((xx + yy) / n) % 2 ? '#bbb' : '#eee'; x.fillRect(xx, yy, n, n); }
-        if (q) { t.clearRect(0, 0, w, h); t.drawImage(q, 0, 0, w, h); t.globalCompositeOperation = 'destination-in'; t.drawImage(mk, 0, 0, w, h); t.globalCompositeOperation = 'source-over'; x.drawImage(tmp.cv, 0, 0); }
+        if (q) {
+            t.clearRect(0, 0, w, h); t.drawImage(q, 0, 0, w, h); t.globalCompositeOperation = 'destination-in'; t.drawImage(mk, 0, 0, w, h);
+            const cor = veRotoImg(st, i, false, 'c');   // como vai sair na exportação: borda descontaminada
+            if (cor && veRotoParamsDe((veRotoFx(c) || {}).v || {}).descont > 0) { t.globalCompositeOperation = 'source-atop'; t.drawImage(cor, 0, 0, w, h); }
+            t.globalCompositeOperation = 'source-over'; x.drawImage(tmp.cv, 0, 0);
+        }
     } else if (T.vista === 'alfa' && mk) {
         x.fillStyle = '#000'; x.fillRect(0, 0, w, h); x.drawImage(mk, 0, 0, w, h);
     } else {

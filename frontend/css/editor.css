@@ -2530,7 +2530,12 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 /* janela por cima do editor; o editor fica atrás desfocado (a tela para o play: nada animando atrás do desfoque) */
 .vero { position: fixed; inset: 0; z-index: 900; border: 0; border-radius: 0; height: auto; display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); place-items: center; background: rgba(0, 0, 0, .38); backdrop-filter: blur(6px); color: var(--ve-text); }
 .vero[hidden] { display: none; }
-.vero-jan { width: min(1480px, 90vw); height: 88vh; display: grid; grid-template-rows: 40px minmax(0, 1fr) auto; background: var(--ve-bg); border: 1px solid var(--ve-line-2); border-radius: 10px; overflow: hidden; box-shadow: 0 18px 60px rgba(0, 0, 0, .55); }
+.vero-borda { display: flex; align-items: center; gap: 16px; padding: 6px 12px; border-top: 1px solid var(--ve-line); background: var(--ve-panel); font-size: 12px; min-width: 0; overflow: hidden; }
+.vero-borda label { display: flex; align-items: center; gap: 6px; white-space: nowrap; cursor: pointer; }
+.vero-borda input[type=range] { width: 110px; }
+.vero-borda [data-roval] { min-width: 34px; font-variant-numeric: tabular-nums; opacity: .8; }
+.vero-borda-dica { margin-left: auto; opacity: .5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vero-jan { width: min(1480px, 90vw); height: 88vh; display: grid; grid-template-rows: 40px minmax(0, 1fr) auto auto; background: var(--ve-bg); border: 1px solid var(--ve-line-2); border-radius: 10px; overflow: hidden; box-shadow: 0 18px 60px rgba(0, 0, 0, .55); }
 .vero.vero-max .vero-jan { width: 100vw; height: 100vh; border-radius: 0; border: 0; }
 .vero-topo { display: flex; align-items: center; gap: 10px; padding: 0 10px; border-bottom: 1px solid var(--ve-line); background: var(--ve-panel); min-width: 0; overflow: hidden; }
 .vero-topo b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 60px; }

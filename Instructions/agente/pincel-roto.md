@@ -35,6 +35,29 @@ Uso típico: texto atrás da pessoa (V1 vídeo, V2 texto, V3 o mesmo vídeo com 
   para ao abrir: nada anima atrás). Armadilha: `.ve` define `grid-template-rows: 46px …` — sem redefinir as linhas no
   `.vero`, a janela caía na faixa de 46 px do topo.
 
+## Rodada 3 — borda profissional (2026-10-18)
+- **Descontaminar cores** (`descontaminar`, padrão 100%): Blur-Fusion em 2 passadas (Forte & Pitié 2021; médias da
+  pessoa e do fundo ponderadas pelo alfa, raios 90 e 6 px em 1080p), médias em meia resolução e a fórmula final só nos
+  pixels da faixa da borda: 0,15 s/quadro. Some a auréola escura em volta do cabelo/rosto sobre fundo claro
+  (`D:/kanivete_testes/roto/descont.py`, `exp_lado.jpg`). Exportação: `_video_descontaminado` lê o vídeo ORIGINAL por
+  tubo do ffmpeg, 4 linhas de conta, grava ProRes 4444 por tubo (15 s: 12,6 → 38,5 s). Prévia igual: `c/c_N.png` (cor
+  nova só na faixa, meia resolução) desenhada com `source-atop` depois do `destination-in`; mudar só a descontaminação =
+  tarefa "cores" (não refaz o alfa).
+- **Nitidez da borda** (padrão 50): estreita a faixa do filtro guiado e endurece o alfa (100 = só o antisserrilhado). Com
+  0 a faixa macia larga deixa sombra mesmo descontaminada (`nitidez.jpg`).
+- **Proteger rosto** (padrão ligado): YuNet (13 ms/quadro, um detector por linha) → a forma do rosto pelos 5 pontos
+  (olhos, nariz, boca + queixo/testa no eixo olhos→boca; o lado oposto ao nariz até a bochecha, o lado do nariz para no
+  nariz) fica sempre no recorte (mão na frente do queixo não fura o rosto); de frente (nariz no meio dos olhos ≥ 0,4)
+  também fecha lente de óculos/bochecha numa elipse em volta. De perfil a caixa do detector passa do rosto e puxava o
+  fundo na frente da testa: por isso os pontos, não a caixa. Rosto não achado (borrão) usa o do quadro vizinho (≤ 8).
+- Na tela: faixa **Borda** (Nitidez, Descontaminar, Proteger rosto) acima da régua — os mesmos parâmetros do efeito.
+- Montar o vídeo recortado ficou longo: `video_pedir` (tarefa "video" na fila; o JS pede, espera e pede de novo) —
+  chamada longa do pywebview cai. `video_alfa` (bloqueante) fica para os testes.
+- Mão que ENTRA na frente do rosto continua cortada fora da forma do rosto: correção com traço verde.
+- **Play leve**: medido 30 quadros/s no monitor com o Roto (igual a sem efeito; máscara certa em todos). O que travava
+  era o trabalho do Roto junto com o play (seguimento disparado pelo render automático; montar o vídeo). Agora tocar
+  pausa o Roto (`ve_roto_pausar` pelo vigia, `_vez()` nos laços); a exportação não pausa. `scripts/roto_play.py`.
+
 ## Motor (Functions/pincel_roto.py)
 - **SAM 2.1 Hiera-Tiny de vídeo em ONNX** — `square-zero-labs/sam2.1-tiny-video-onnx` (Apache-2.0, revisão fixa
   `3b2984dd…`, 182 MB, MD5 conferido), baixado no 1º uso em `modelos_ia/sam2_tiny_video`. 5 grafos: vision_encoder,
@@ -93,7 +116,7 @@ Uso típico: texto atrás da pessoa (V1 vídeo, V2 texto, V3 o mesmo vídeo com 
 ## Pendências
 - Lente de óculos cujo furo encosta no fundo (aro na lateral do rosto) deixa o texto aparecer: hoje só pintando a lente
   com o verde; pensar num fechamento morfológico só em furos estreitos.
-- Descontaminar cores da borda (o "Decontaminate" do After): hoje a cor da borda é a do quadro original.
+
 - Desfoque de movimento na borda (Motion blur do Refine Edge).
 - Acelerar mais: processar só a área da pessoa; IOBinding (feats na placa entre codificador e decodificador).
 - Objeto que ENTRA no quadro depois do quadro-base (mão esquerda no trecho de teste) não é pego: precisa de quadro-base.

@@ -4319,6 +4319,10 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def ve_roto_pausar(self, sim=True):
+        from Functions import pincel_roto
+        return pincel_roto.pausar(bool(sim))
+
     def ve_roto_congelar(self, rid):
         from Functions import pincel_roto
         try:
@@ -4347,7 +4351,7 @@ class ApiBridge:
     def ve_roto_video(self, rid):
         from Functions import pincel_roto
         try:
-            return pincel_roto.video_alfa(rid)
+            return pincel_roto.video_pedir(rid)
         except Exception as e:
             return {"success": False, "error": str(e)}
 

@@ -244,7 +244,8 @@ Recorte de pessoa/objeto no vídeo pintando num quadro-base (verde soma, Alt tir
 = novo quadro-base; Refinar borda nos Controles de efeito. SAM 2.1 de vídeo em ONNX fp16 (2026-10-18: Small 1024 "alta"
 0,28 s/quadro, Tiny 512 "rápida" 0,07; Apache-2.0, 1º uso), DirectML. Tela em janela por cima do editor desfocado;
 **Freeze** (pintar só faz o quadro-base; ❄/F segue; "Seguir sozinho" opcional; o render automático NÃO dispara o Freeze:
-`veRotoOcupado`), ✨ Selecionar assunto (BEN2 do Remover fundo como partida). `frontend/js/editor-roto.js` + `Functions/pincel_roto.py`; exporta como ProRes 4444 com alfa.
+`veRotoOcupado`), ✨ Selecionar assunto (BEN2 do Remover fundo como partida). Borda: Descontaminar (Blur-Fusion; prévia
+`c_` com source-atop), Nitidez, Proteger rosto (YuNet + 5 pontos). `frontend/js/editor-roto.js` + `Functions/pincel_roto.py`; exporta como ProRes 4444 com alfa.
 Guia, medições e pendências: `Instructions/agente/pincel-roto.md`. Teste: `py -3.13 testes/teste_roto.py [--dur 15]`.
 
 ## Comp (estilo After Effects)

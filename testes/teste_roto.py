@@ -188,6 +188,17 @@ def main():
             time.sleep(1)
             pg.evaluate("VEROTO_API.esperar()")
             time.sleep(1)
+            # Borda na própria tela: Nitidez (arrastar o controle), Descontaminar e Proteger rosto ligados por padrão
+            bd = pg.evaluate("""(() => { const q = s => VERO.tela.el.querySelector(s), r = q('.vero-borda').getBoundingClientRect();
+                return [r.height > 10, +q('[data-roparam=nitidez]').value, q('[data-roparam=descont]').checked, q('[data-roparam=rosto]').checked]; })()""")
+            ok(bd == [True, 50, True, True], "controles de Borda na tela do Roto (nitidez 50, descontaminar, rosto)", str(bd))
+            pg.evaluate("(() => { const i = VERO.tela.el.querySelector('[data-roparam=nitidez]'); i.value = 70; i.dispatchEvent(new Event('input')); })()")
+            time.sleep(1.5)
+            pg.evaluate("VEROTO_API.esperar()")
+            time.sleep(1)
+            nv = pg.evaluate("(() => { const f = veRotoFx(VE.clips[VE.sel]); return [f.v.nitidez, VERO.st[f.v.rd.rid].params && VERO.st[f.v.rd.rid].params.nitidez]; })()")
+            pyp = pg.evaluate("r => window.pywebview.api.ve_roto_estado(r).then(e => e.params.nitidez)", pg.evaluate("Object.keys(VERO.st)[0]"))
+            ok(nv[0] == 70 and pyp == 70, "Nitidez da tela chega ao efeito e ao Python", f"{nv} {pyp}")
             # 3) print da tela no quadro 180 (ou no meio) e volta para a timeline
             pg.screenshot(path=saida + "tela_roto.png")
             ok(os.path.getsize(saida + "tela_roto.png") > 10000, "print da tela do Pincel Roto", saida + "tela_roto.png")
