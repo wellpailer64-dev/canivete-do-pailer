@@ -24,7 +24,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 
-VERSAO = 3   # este script montou o pack v1 (Kenney/Freesound); do v2 em diante: tools/pack_sfx.py --zip N
+VERSAO = 4   # este script montou o pack v1 (Kenney/Freesound); do v2 em diante: tools/pack_sfx.py --zip N
 UA = {"User-Agent": "Mozilla/5.0 (CaniveteDoPailer soundboard builder)"}
 
 KENNEY = ["interface-sounds", "ui-audio", "impact-sounds", "digital-audio", "casino-audio", "rpg-audio",

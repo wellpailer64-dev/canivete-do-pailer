@@ -14,8 +14,8 @@ import zipfile
 
 from Functions.midia import app_dir
 
-VERSAO = 3   # v2 (2026-10-18): pack novo cortado de vídeos sem copyright (tools/fatiar_sfx.py + tools/pack_sfx.py --zip N);
-             # v3: + 22 whooshes suaves curtos (os da Legenda Premium)
+VERSAO = 4   # v2 (2026-10-18): pack novo cortado de vídeos sem copyright (tools/fatiar_sfx.py + tools/pack_sfx.py --zip N);
+             # v3: + 22 whooshes suaves curtos (os da Legenda Premium); v4: + 8 sub drops sintetizados no KANIVETE
 URL_PACK = (f"https://github.com/wellpailer64-dev/canivete-do-pailer/releases/download/"
             f"soundboard-v{VERSAO}/soundboard-v{VERSAO}.zip")
 

@@ -92,7 +92,7 @@ def montar_zip(base, versao):
         dst = os.path.join(saida, *rel.split("/"))
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy2(os.path.join(base, o["ogg"]), dst)
-        s = {"arq": rel, "nome": o["nome"], "dur": o["dur"], "fonte": o.get("fonte", ""), "licenca": "sem copyright (segundo o canal)"}
+        s = {"arq": rel, "nome": o["nome"], "dur": o["dur"], "fonte": o.get("fonte", ""), "licenca": "próprio (sintetizado no KANIVETE)" if o.get("fonte") == "sintetizado no KANIVETE" else "sem copyright (segundo o canal)"}
         if o.get("estilo"):
             s["estilo"] = o["estilo"]
         # instante do "golpe" do som (s): a Legenda Premium põe esse ponto na chegada da palavra (sem esperar as formas
