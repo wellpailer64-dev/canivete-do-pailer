@@ -2777,7 +2777,7 @@ def _gerar_ass(itens, estilo, W, H):
         cache[chave] = info
         return info
 
-    n = 0
+    n, premium = 0, False
     for it in itens:
         if not isinstance(it, dict):
             continue
@@ -2787,6 +2787,13 @@ def _gerar_ass(itens, estilo, W, H):
             continue
         txt = str(it.get("texto", "")).strip()
         if en - st < 0.02 or not txt:
+            continue
+        if isinstance(it.get("prm"), dict):   # Legenda Premium: peças já medidas pela prévia (editor-legenda-premium.js)
+            if not premium:
+                estilos.append("Style: LegP,Arial,40,&H00FFFFFF,&H00FFFFFF,&H00000000,&HFF000000,0,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1")
+                premium = True
+            eventos.extend(_ass_premium(it["prm"], st, en))
+            n += 1
             continue
         info = info_estilo(it)
         if info["maiusc"]:
@@ -2827,6 +2834,165 @@ def _gerar_ass(itens, estilo, W, H):
     with open(arq, "w", encoding="utf-8") as f:
         f.write("\n".join(linhas) + "\n")
     return arq
+
+
+# ── Legenda Premium (editor-legenda-premium.js: veLpDesenhar / veLpExport) ──
+# Cada palavra vira 3 camadas: sombra de leitura (1), brilho (2) e o texto (3), com a mesma entrada da prévia
+# (desfoque e brilho / acender / subir / pop) e a saída do bloco. Fontes "KPR Fxx" de frontend/fonts/premium,
+# entregues ao libass pelo fontsdir (_filtro_sub). Medidas em px do quadro; cx/cy = centro da linha da palavra.
+_PASTA_FONTES_PREMIUM = os.path.join(getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                     "frontend", "fonts", "premium")
+
+
+def _filtro_sub(ass):
+    """Filtro subtitles do .ass das legendas (com as fontes da Legenda Premium)."""
+    f = f"subtitles=filename={_caminho_filtro(ass)}"
+    if os.path.isdir(_PASTA_FONTES_PREMIUM):
+        f += f":fontsdir={_caminho_filtro(_PASTA_FONTES_PREMIUM)}"
+    return f
+
+
+_MET_PREMIUM = None
+
+
+def _met_premium(nome):
+    """Ascendente e descendente "do Windows" (OS/2 usWinAscent/usWinDescent ÷ unitsPerEm) da fonte KPR: o libass
+    usa ESTES para o Fontsize (= altura da linha) e para a linha de base; o navegador mede pelo hhea (Poppins: 1,76 ×
+    1,40 em — a exportação saía 26% menor). None se não for uma fonte da pasta."""
+    global _MET_PREMIUM
+    if _MET_PREMIUM is None:
+        import struct
+        from Functions import fontes
+        _MET_PREMIUM = {}
+        try:
+            for arq in os.listdir(_PASTA_FONTES_PREMIUM):
+                if not arq.lower().endswith((".ttf", ".otf")):
+                    continue
+                p = os.path.join(_PASTA_FONTES_PREMIUM, arq)
+                with open(p, "rb") as f:
+                    dados = f.read()
+                ntab = struct.unpack_from(">H", dados, 4)[0]
+                tabs = {}
+                for k in range(ntab):
+                    tag, _, pos, _ = struct.unpack_from(">4sIII", dados, 12 + k * 16)
+                    tabs[tag] = pos
+                upm = struct.unpack_from(">H", dados, tabs[b"head"] + 18)[0] or 1000
+                wa, wd = struct.unpack_from(">HH", dados, tabs[b"OS/2"] + 74)
+                for fo in fontes._ler(p):
+                    _MET_PREMIUM[fo["gdi"]] = (wa / upm, wd / upm)
+        except Exception:
+            pass
+    return _MET_PREMIUM.get(nome)
+
+
+def _ass_alfa(v):
+    return f"&H{max(0, min(255, int(round(v)))):02X}&"
+
+
+def _ass_mistura(hexcor, k):
+    """Cor escurecida como veLpMistura (k = 0 escura … 1 a cor) → BBGGRR."""
+    try:
+        hx = str(hexcor).lstrip("#")
+        rr, gg, bb = int(hx[0:2], 16), int(hx[2:4], 16), int(hx[4:6], 16)
+    except Exception:
+        rr = gg = bb = 255
+    f = 0.38 + 0.62 * k
+    return f"{round(bb * f):02X}{round(gg * f):02X}{round(rr * f):02X}"
+
+
+def _ass_premium(prm, st, en):
+    anim = str(prm.get("anim") or "desfoque")
+    d = max(40, int(round(_num(prm.get("dur"), 0.05, 1, 0.22) * 1000)))
+    sai = int(round(_num(prm.get("sai"), 0, 1, 0.14) * 1000))
+    brilho = _num(prm.get("brilho"), 0, 100, 0) / 100
+    sombra = _num(prm.get("sombra"), 0, 1, 0.6)
+    track = _num(prm.get("track"), -0.3, 0.3, 0)
+    ev = []
+    for r in prm.get("runs") or []:
+        try:
+            a = max(st, float(r["a"]))
+            cx, cy, fs, em = (float(r[k]) for k in ("cx", "cy", "fs", "em"))
+        except Exception:
+            continue
+        if a >= en - 0.03 or em <= 0:
+            continue
+        L = int(round((en - a) * 1000))
+        s0 = max(0, L - sai)
+        fonte = "".join(ch for ch in str(r.get("f") or "Arial") if ch not in ",{}\\\n\r").strip() or "Arial"
+        met = _met_premium(fonte)
+        if met and r.get("b") is not None:   # altura da linha e centro pelas medidas que o libass usa
+            fs = em * (met[0] + met[1])
+            cy = float(r["b"]) - met[0] * em + fs / 2
+        txt = _ass_escapar(str(r.get("t", "")))
+        cor_hex = str(r.get("cor") or "#FFFFFF")
+        cor = _ass_cor(cor_hex)[4:]
+        enf = bool(r.get("e"))
+        branco = cor_hex.upper() == "#FFFFFF"
+        fixo = f"\\fn{fonte}\\fs{fs:.1f}\\b0\\i0\\bord0\\shad0\\fsp{track * em:.2f}\\q2"
+
+        def camada(nivel, ox, oy, alvo, c1, blur_fixo, pulso=None):
+            """alvo = transparência final (0 opaco … 255); blur_fixo = desfoque da camada parada (px)."""
+            x, y = cx + ox, cy + oy
+            t = ["\\an5", fixo, f"\\1c&H{c1}&"]
+            sai_tags = "\\alpha&HFF&"
+            if anim == "desfoque":
+                b0 = max(blur_fixo, 0.16 * em)
+                if enf:
+                    t.append(f"\\move({x + 0.14 * em:.1f},{y:.1f},{x:.1f},{y:.1f},0,{d})")
+                else:
+                    t.append(f"\\pos({x:.1f},{y:.1f})")
+                t.append(f"\\blur{b0:.1f}\\t(0,{d},0.45,\\blur{blur_fixo:.1f})\\fscx106\\fscy106\\t(0,{d},0.45,\\fscx100\\fscy100)")
+                if pulso is not None:   # brilho que passa do ponto na chegada e assenta
+                    t.append(f"\\alpha&HFF&\\t(0,{int(d * 0.45)},\\alpha{_ass_alfa(pulso)})\\t({int(d * 0.45)},{d},\\alpha{_ass_alfa(alvo)})")
+                else:
+                    t.append(f"\\alpha&HFF&\\t(0,{int(d * 0.55)},\\alpha{_ass_alfa(alvo)})")
+                sai_tags += f"\\blur{blur_fixo + 0.1 * em:.1f}"
+            elif anim == "acender":
+                t.append(f"\\pos({x:.1f},{y:.1f})\\blur{blur_fixo:.1f}")
+                if c1 == cor:
+                    t.append(f"\\1c&H{_ass_mistura(cor_hex, 0)}&\\t(0,{d},0.45,\\1c&H{c1}&)")
+                t.append(f"\\alpha{_ass_alfa(255 - (255 - alvo) * 0.35)}\\t(0,{d},0.45,\\alpha{_ass_alfa(alvo)})")
+            elif anim == "subir":
+                t.append(f"\\move({x:.1f},{y + 0.28 * em:.1f},{x:.1f},{y:.1f},0,{d})")
+                t.append(f"\\blur{blur_fixo + 0.04 * em:.1f}\\t(0,{d},0.45,\\blur{blur_fixo:.1f})")
+                t.append(f"\\alpha&HFF&\\t(0,{int(d * 0.62)},\\alpha{_ass_alfa(alvo)})")
+            else:   # pop
+                t.append(f"\\pos({x:.1f},{y:.1f})\\blur{blur_fixo:.1f}")
+                t.append(f"\\fscx60\\fscy60\\t(0,{int(d * 0.6)},\\fscx108\\fscy108)\\t({int(d * 0.6)},{d},\\fscx100\\fscy100)")
+                t.append(f"\\alpha&HFF&\\t(0,{int(d * 0.4)},\\alpha{_ass_alfa(alvo)})")
+            if s0 < L:
+                t.append(f"\\t({s0},{L},{sai_tags})")
+            ev.append(f"Dialogue: {nivel},{_ass_tempo(a)},{_ass_tempo(en)},LegP,,0,0,0,,{{{''.join(t)}}}{txt}")
+
+        if sombra > 0:
+            camada(1, 0, 0.035 * em, 255 * (1 - 0.55 * sombra), "000000", 0.07 * em)
+        if brilho > 0.01:
+            forca = 0.55 if branco else 0.7
+            c_gl = "E6F4FF" if branco else cor
+            pulso = 255 * (1 - min(1, forca * brilho * 2.3)) if anim == "desfoque" else None
+            camada(2, 0, 0, 255 * (1 - min(1, forca * brilho)), c_gl, em * (0.09 + 0.11 * brilho), pulso)
+        camada(3, 0, 0, 0, cor, 0)
+    s = prm.get("sub")
+    if isinstance(s, dict):
+        try:
+            a = max(st, float(s["a"]))
+            x, y, w, h = (float(s[k]) for k in ("x", "y", "w", "h"))
+        except Exception:
+            a, w, h = en, 0, 0
+        if a < en - 0.03 and w > 0 and h > 0:
+            L = int(round((en - a) * 1000))
+            s0 = max(0, L - sai)
+            cor = _ass_cor(s.get("cor") or "#FF9A2E")[4:]
+            forma = _ass_retangulo(w, h, h / 2)
+            ab = f"\\clip({x - h:.1f},{y - h * 6:.1f},{x + 0.5:.1f},{y + h * 7:.1f})"
+            corre = f"\\t(0,320,0.45,\\clip({x - h:.1f},{y - h * 6:.1f},{x + w + h:.1f},{y + h * 7:.1f}))"
+            fim = f"\\t({s0},{L},\\alpha&HFF&)" if s0 < L else ""
+            if brilho > 0.01:
+                ev.append(f"Dialogue: 2,{_ass_tempo(a)},{_ass_tempo(en)},LegP,,0,0,0,,{{\\an7\\pos({x:.1f},{y:.1f})\\bord0\\shad0"
+                          f"\\1c&H{cor}&\\alpha{_ass_alfa(255 * (1 - min(1, 0.4 + 0.5 * brilho)))}\\blur{h * (1.2 + 2 * brilho):.1f}{ab}{corre}{fim}\\p1}}{forma}")
+            ev.append(f"Dialogue: 3,{_ass_tempo(a)},{_ass_tempo(en)},LegP,,0,0,0,,{{\\an7\\pos({x:.1f},{y:.1f})\\bord0\\shad0"
+                      f"\\1c&H{cor}&\\alpha&H00&{ab}{corre}{fim}\\p1}}{forma}")
+    return ev
 
 
 def _ass_escapar(txt):
@@ -4361,10 +4527,10 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 # bloco: as legendas são as da timeline inteira, no relógio dela (a que já vinha na tela continua no
                 # meio da animação; com o tempo do bloco ela recomeçava a entrada a cada emenda)
                 t0 = janela["t0"]
-                filtros.append(f"{vf}setpts=PTS+{t0:.6f}/TB,subtitles=filename={_caminho_filtro(ass)},"
+                filtros.append(f"{vf}setpts=PTS+{t0:.6f}/TB,{_filtro_sub(ass)},"
                                f"setpts=PTS-{t0:.6f}/TB[vsub]")
             elif ass:
-                filtros.append(f"{vf}subtitles=filename={_caminho_filtro(ass)}[vsub]")
+                filtros.append(f"{vf}{_filtro_sub(ass)}[vsub]")
             if ass:
                 vf = "[vsub]"
 

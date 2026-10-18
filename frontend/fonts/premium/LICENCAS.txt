@@ -1,0 +1,6 @@
+Fontes da Legenda Premium (Vídeo Kanivete)
+
+Todas são do Google Fonts, sob a SIL Open Font License 1.1 (texto em OFL.txt): Anton, Bricolage Grotesque,
+Cormorant Garamond, DM Serif Display, Fraunces, Instrument Serif, Inter, Manrope, Montserrat, Playfair Display e Poppins.
+Cada arquivo é uma instância estática (um peso/estilo) com o nome interno trocado para "KPR Fxx" (a OFL pede que versões
+modificadas não usem o nome reservado original); a lista arquivo → nome está em fontes.json.

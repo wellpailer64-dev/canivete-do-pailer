@@ -3329,7 +3329,7 @@ function veRulersDraw() {
     const w = stage.clientWidth || 0, h = stage.clientHeight || 0;
     const dpr = scr.ownerDocument.defaultView.devicePixelRatio || 1;
     const g = typeof veGuiasGeo === 'function' ? veGuiasGeo() : null;
-    const temGuias = typeof VEG !== 'undefined' && (VEG.drag || VEG.snapLinhas || (VEG.show && veGuias().length));
+    const temGuias = typeof VEG !== 'undefined' && (VEG.drag || VEG.snapLinhas || (VEG.show && veGuias().length) || VEG.seg);
     const chave = [w, h, dpr, VEM.rulers, g && [g.k, g.x0, g.y0, g.sr.w, g.sr.h].join(), typeof VEG !== 'undefined' ? VEG._rev : 0, temGuias].join('|');
     if (chave === ov._chave) return;
     ov._chave = chave;
@@ -4951,11 +4951,14 @@ function veBuildHeads() {
     if (!box) return;
     veEnsureTracks(veTrackCount());
     box.innerHTML = VE_TRACKS.map((tr, i) => {
-        if (tr.kind === 'l') return `
-        <div class="ve-head ve-head-l" data-tr="${i}" style="height:${tr.h}px" title="Legendas (painel Texto)">
-            <div class="ve-head-row"><b>LEG</b></div>
+        if (tr.kind === 'l') {
+            const oc = typeof veTxOcultas === 'function' && veTxOcultas();
+            return `
+        <div class="ve-head ve-head-l${oc ? ' off' : ''}" data-tr="${i}" style="height:${tr.h}px" title="${veT('Legendas (painel Texto) · botão direito: opções')}">
+            <div class="ve-head-row"><b>${veT('Legendas')}</b><button class="ve-hb${oc ? ' on' : ''}" data-legolho title="${oc ? veT('Mostrar as legendas') : veT('Ocultar as legendas (não aparecem na prévia nem na exportação)')}"><svg class="i"><use href="#i-${oc ? 'eye-off' : 'eye'}"/></svg></button></div>
             <i class="ve-head-grip" data-grip="${i}" title="Arraste para aumentar ou diminuir a trilha"></i>
         </div><div class="ve-head-folga" id="ve-head-folga" style="height:${veFolgaTopo()}px"></div>`;
+        }
         const k = veTrackIndex(tr), st = veTrackState(tr.kind, k);
         const bt = (act, on, titulo, conteudo) =>
             `<button class="ve-hb${on ? ' on' : ''}" data-hact="${act}" data-hk="${k}" data-hkind="${tr.kind}" title="${titulo}">${conteudo}</button>`;
@@ -6452,6 +6455,7 @@ function veInitMonitorZoom() {
     scr.addEventListener('pointercancel', end);
     new ResizeObserver(() => veApplyMonitor()).observe(scr);
     veToggleRulers(VEM.rulers);
+    if (typeof veSegToggle === 'function') veSegToggle(VEG.seg);   // margens de segurança (editor-guias.js)
     veSetPreviewRes(VEM.res);
     veVideo().addEventListener('loadedmetadata', veMonitorFit);
     veDrawMonitor();
@@ -6496,8 +6500,15 @@ function veInitResizers() {
         win.addEventListener('pointerup', up);
     });
     $ve('ve-heads-rows').addEventListener('click', e => {
+        if (e.target.closest('[data-legolho]')) { veTxOcultar(); return; }
         const b = e.target.closest('[data-hact]');
         if (b) veTrackToggle(b.dataset.hkind, +b.dataset.hk, b.dataset.hact, e.shiftKey);
+    });
+    // botão direito no cabeçalho das legendas: o mesmo menu da faixa (editor-texto.js)
+    $ve('ve-heads-rows').addEventListener('contextmenu', e => {
+        if (!e.target.closest('.ve-head-l')) return;
+        e.preventDefault();
+        veLegMenu(-1, e.clientX, e.clientY, e.target.ownerDocument);
     });
     // Duplo clique no cabeçalho: alterna trilha compacta / expandida
     $ve('ve-heads-rows').addEventListener('dblclick', e => {
@@ -6809,6 +6820,7 @@ function veInitEvents() {
         if (!VE.ready) return;
         const { t, y } = veTimeFromEvent(e);
         const row = veRowAt(y);
+        if (row && row.kind === 'l') { veLegMenu(veTxLegendaEm(t), e.clientX, e.clientY, wrap.ownerDocument); return; }
         const i = row ? veClipAtTrack(t, veTrackIndex(row), row.kind) : -1;
         if (i < 0) return;
         if (veLocked(VE.clips[i])) { veAvisoBloqueio(); return; }

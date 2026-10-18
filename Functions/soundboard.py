@@ -14,7 +14,7 @@ import zipfile
 
 from Functions.midia import app_dir
 
-VERSAO = 1
+VERSAO = 2   # v2 (2026-10-18): pack novo cortado de vídeos sem copyright (tools/fatiar_sfx.py + tools/pack_sfx.py --zip 2)
 URL_PACK = (f"https://github.com/wellpailer64-dev/canivete-do-pailer/releases/download/"
             f"soundboard-v{VERSAO}/soundboard-v{VERSAO}.zip")
 

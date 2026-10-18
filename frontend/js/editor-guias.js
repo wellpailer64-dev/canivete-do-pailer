@@ -13,7 +13,18 @@ const VEG = {
     drag: null,         // {o: 'h'|'v', i: índice (-1 = nova), p}
     mouse: null,        // ponteiro sobre o palco (px do palco), para a marca nas réguas
     snapLinhas: null,   // [{o, p}] linhas em que a camada encaixou (desenhadas enquanto arrasta)
+    seg: veLsGet('ve.seg') === '1',   // margens de segurança (botão na barra do Programa)
 };
+// Margens de segurança (Safe Margins do Premiere): área de ação (90% do quadro) e de títulos (80%), em % do quadro —
+// valem para vertical e horizontal; só no monitor, nunca na exportação. A Legenda Premium fica dentro da de títulos.
+const VE_SEG_ACAO = 0.9, VE_SEG_TITULO = 0.8;
+function veSegToggle(on) {
+    VEG.seg = typeof on === 'boolean' ? on : !VEG.seg;
+    veLsSet('ve.seg', VEG.seg ? '1' : '0');
+    const b = $ve('ve-seg-btn');
+    if (b) b.classList.toggle('active', VEG.seg);
+    veGuiasRedesenhar();
+}
 const VE_GUIA_TOL = 5;      // px de tela para pegar uma guia
 const VE_GUIA_ENCAIXE = 7;  // px de tela para encaixar
 
@@ -94,6 +105,14 @@ function veGuiasDesenhar(ctx, g, w, h) {
     ctx.rect(sr.x, sr.y, sr.w, sr.h);
     ctx.clip();
     ctx.lineWidth = 1;
+    if (VEG.seg && VE.seqW && VE.seqH) {
+        [[VE_SEG_ACAO, 'rgba(255,255,255,0.22)'], [VE_SEG_TITULO, 'rgba(255,255,255,0.38)']].forEach(([f, cor]) => {
+            const w = VE.seqW * f * g.k, h = VE.seqH * f * g.k;
+            const x = Math.round(g.x0 + VE.seqW * (1 - f) / 2 * g.k) + 0.5, y = Math.round(g.y0 + VE.seqH * (1 - f) / 2 * g.k) + 0.5;
+            ctx.strokeStyle = cor;
+            ctx.strokeRect(x, y, Math.round(w), Math.round(h));
+        });
+    }
     lista.forEach((gd, i) => { if (!drag || drag.i !== i) linha(gd.o, gd.p, 'rgba(0,229,255,0.85)'); });
     if (drag && drag.p != null) linha(drag.o, drag.p, drag.apagar ? 'rgba(248,113,113,0.9)' : 'rgba(0,229,255,1)', drag.apagar);
     (VEG.snapLinhas || []).forEach(s => linha(s.o, s.p, 'rgba(255,64,200,0.95)'));

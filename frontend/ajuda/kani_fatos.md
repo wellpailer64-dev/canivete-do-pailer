@@ -30,6 +30,18 @@ No fim, avisa com som; pode enviar ao Google Drive.
 ## Legendas automáticas
 No Vídeo Kanivete as legendas saem da fala do próprio vídeo. Para só tirar o texto de um áudio ou vídeo (ou baixar o .srt),
 use a ferramenta Transcrever, na seção Áudio da barra lateral.
+São três modos, escolhidos no painel Texto › Legendas: Clássica (a frase inteira, estilo TV), Dinâmica (a frase com a
+palavra falada destacada) e Premium (blocos curtos montados como título, com duas fontes que combinam: palavras pequenas
+de ligação, a palavra principal e uma palavra de destaque em itálico colorido, entrando uma a uma no tempo da fala, com
+desfoque e brilho, acender, subir ou pop). Na Premium escolhe-se a dupla de fontes (Brilho quente, Editorial, Impacto,
+Suave, Elegante, Moderno), a cor do destaque, quantos títulos (poucos, médio, muitos), a posição, o brilho, o tamanho e o
+traço sob o destaque; "Refinar com a Kani" deixa a Kani escolher os títulos e as palavras de destaque lendo o texto.
+A caixinha "Efeitos sonoros nas legendas" põe sons do Soundboard no tempo das palavras, combinando com a animação
+(whoosh na entrada dos títulos, pop, clique) e com o assunto (moedas quando fala de dinheiro, confirmação quando algo deu
+certo, câmera, pergunta), em Sutil, Médio ou Forte, com volume, numa trilha de áudio própria.
+Clicando numa legenda dá para trocar título ↔ simples e o papel de cada palavra. A exportação grava igual à prévia.
+No monitor Programa, o botão ao lado das réguas liga as margens de segurança: dois retângulos finos (área de ação 90% e
+de títulos 80%) que mostram onde textos e informações ficam seguros, no vídeo vertical ou horizontal; não saem na exportação.
 
 ## Photo Kanivete (editor de imagem, estilo Photoshop)
 Camadas, máscaras, texto, formas, filtros, ajustes, objeto inteligente, Camera Raw, Liquify, laço, caneta. Abre e salva PSD

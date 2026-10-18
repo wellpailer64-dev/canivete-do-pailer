@@ -274,6 +274,21 @@ CASOS = {
         VE.legendas = [{ st: 0.2, en: 1.4, texto: 'Olá, meu nome é Caroline' }, { st: 1.4, en: 2.9, texto: 'sou médica veterinária' }];
         VE.legGravar = true; veRefresh();
     """),
+    # Legenda Premium (editor-legenda-premium.js → _ass_premium): duas fontes próprias (fontsdir), entrada palavra a
+    # palavra com desfoque e brilho, títulos colados/sobrepostos e o traço sob o destaque
+    "premium": (1080, 1920, """
+        const { clip } = __te;
+        VELP_DUPLAS.forEach(d => [d.base, d.enf, d.lig, d.pe, d.simp].forEach(f => document.fonts.load('40px "' + f + '"')));
+        return [clip(0, 0, 0, 4, 'principal')];
+    """, """
+        VETX.palavras = [[0.10, 0.45, 'Ninguém'], [0.45, 0.75, 'odeia'], [0.75, 1.15, 'editar,'], [1.3, 1.45, 'na'], [1.45, 1.9, 'verdade'],
+            [1.95, 2.05, 'o'], [2.05, 2.2, 'que'], [2.2, 2.4, 'você'], [2.4, 2.75, 'odeia'], [2.85, 2.95, 'é'], [2.95, 3.05, 'o'],
+            [3.05, 3.4, 'tempo'], [3.4, 3.55, 'que'], [3.55, 3.9, 'leva.']];
+        VE.legEstilo = { ...veTxEstilo(), modo: 'premium', pr: { ...VELP_PADRAO } };
+        veLpCriar(true);
+        VE.legendas = VE.legendas.map((l, i) => ({ ...l, pr: { t: i % 2 === 0 ? 1 : 0, r: veLpPapeisAuto(veTxTokens(l.texto), i % 2 === 0) } }));
+        VE.legGravar = true; veRefresh();
+    """),
     # camadas: PiP com escala/posição animadas e giro, logo com transparência e opacidade animada, texto
     "camadas": (1080, 1920, """
         const { clip } = __te, W = 1080, H = 1920;

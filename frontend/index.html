@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/editor.css">
     <link rel="stylesheet" href="css/editor-motion.css">
+    <link rel="stylesheet" href="css/editor-legenda-premium.css">
     <link rel="stylesheet" href="css/autoframe.css">
     <link rel="stylesheet" href="css/imagem.css">
     <link rel="stylesheet" href="css/vetor.css">
@@ -86,6 +87,7 @@
         <symbol id="i-pointer" viewBox="0 0 24 24"><path d="m4 4 7 17 2.5-7.5L21 11z"/></symbol>
         <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 5v14M20 5v14M8 12h8M11 9l-3 3 3 3M13 9l3 3-3 3"/></symbol>
         <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M3 3h18v5H8v13H3z"/><path d="M7 3v2.5M11 3v2.5M15 3v2.5M19 3v2.5M3 12h2.5M3 16h2.5"/></symbol>
+        <symbol id="i-seguranca" viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="19" height="15" rx="1.5"/><rect x="6.5" y="8" width="11" height="8" rx=".5" stroke-dasharray="2 1.6"/></symbol>
     </svg>
 
     <!-- Splash -->
@@ -645,6 +647,7 @@
                                         <div class="ve-tc" id="ve-tc" ondblclick="veTcEditar()" title="Posição atual · duplo clique para digitar onde ir (ex.: 1:05:12, 130, +2s)">00:00:00:00</div>
                                         <button class="ve-tc-copiar" id="ve-tc-copiar" onclick="veTcCopiar()" title="Copiar o timecode"><svg class="i"><use href="#i-copy"/></svg></button>
                                         <button class="ve-tbtn ve-ruler-btn" id="ve-ruler-btn" onclick="veToggleRulers()" title="Réguas (Ctrl+R)"><svg class="i"><use href="#i-ruler"/></svg></button>
+                                        <button class="ve-tbtn ve-ruler-btn" id="ve-seg-btn" onclick="veSegToggle()" title="Margens de segurança: área de ação (90%) e de títulos (80%) — textos e informações de leitura dentro da linha de dentro"><svg class="i"><use href="#i-seguranca"/></svg></button>
 
                                         <select class="ve-res-sel" id="ve-res-sel" onchange="veSetPreviewRes(this.value)" title="Resolução da reprodução: Half alivia o processamento na prévia (a exportação sai sempre em qualidade máxima)">
                                             <option value="1">Full</option>
@@ -2135,6 +2138,7 @@
     <script src="js/editor-lc.js"></script>
     <script src="js/editor-audio.js"></script>
     <script src="js/editor-texto.js"></script>
+    <script src="js/editor-legenda-premium.js"></script>
     <script src="js/editor-props.js"></script>
     <script src="js/editor-transform.js"></script>
     <script src="js/editor-guias.js"></script>

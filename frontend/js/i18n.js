@@ -715,6 +715,10 @@ const I18N_EN = {
     'Preparando o áudio da timeline...': 'Preparing the timeline audio...', 'Carregando o modelo...': 'Loading the model...', 'Transcrevendo...': 'Transcribing...',
     'Otimizando o modelo (uma vez só)...': 'Optimizing the model (only once)...', 'Modelo pronto': 'Model ready',
     'Legendas (painel Texto)': 'Captions (Text panel)',
+    'Legendas (painel Texto) · botão direito: opções': 'Captions (Text panel) · right-click: options', 'Mostrar as legendas': 'Show captions',
+    'Ocultar as legendas': 'Hide captions', 'Ocultar as legendas (não aparecem na prévia nem na exportação)': 'Hide captions (not in the preview or the export)',
+    'Painel Texto › Legendas': 'Text panel › Captions', 'Apagar esta legenda': 'Delete this caption', 'Apagar todas as legendas': 'Delete all captions',
+    'A transcrição continua no painel Texto: dá para montar de novo': 'The transcript stays in the Text panel: you can build them again',
     // Áudio solto na timeline
     'Preparando o áudio...': 'Preparing audio...', 'Não foi possível abrir o áudio': 'Could not open the audio',
     'Não há trilha de áudio livre a partir da agulha': 'No free audio track from the playhead',

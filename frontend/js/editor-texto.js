@@ -211,6 +211,7 @@ function veTxMontarLegendas(o) {
 }
 
 function veTxCriarLegendas() {
+    if (typeof veLpAtivo === 'function' && veLpAtivo()) { veLpCriar(); return; }   // Premium: blocos curtos (editor-legenda-premium.js)
     if (!VETX.palavras.length) { veToast('Transcreva a sequência primeiro'); return; }
     const juntas = veTxJuntarHifen(VETX.palavras);
     if (juntas.length !== VETX.palavras.length) { VETX.palavras = juntas; VETX.construidoTexto = false; }
@@ -385,10 +386,64 @@ function veTxPalavrasCaixas(L, e) {
 }
 const veTxRaioDestaque = (b, e) => Math.min(b.w, b.h) / 2 * Math.max(0, Math.min(100, +e.dRaio || 0)) / 100;
 
+// ── faixa de legendas na timeline: olhinho (ocultar) e menu do botão direito ──
+// Ocultas = nem no monitor nem na exportação, como o olhinho das trilhas de vídeo (VE.legEstilo.oculta: vai junto com
+// a timeline e entra no desfazer)
+const veTxOcultas = () => !!(VE.legEstilo && VE.legEstilo.oculta);
+function veTxOcultar(v) {
+    vePushHistory();
+    VE.legEstilo = { ...veTxEstilo(), oculta: typeof v === 'boolean' ? v : !veTxOcultas() };
+    veMarcarAlterado();
+    veBuildHeads();
+    veRefresh();
+}
+// Apaga legendas (i = uma; -1 = todas). A transcrição fica: dá para montar de novo em outro modo
+function veTxApagarLegendas(i) {
+    if (!(VE.legendas || []).length) return;
+    vePushHistory();
+    VE.legendas = i >= 0 ? VE.legendas.filter((_, k) => k !== i) : [];
+    VETX.legSel = -1;
+    veMarcarAlterado();
+    veRefresh();
+    if (typeof veLpSfxAtualizar === 'function') veLpSfxAtualizar();   // os efeitos sonoros da Premium saem junto
+    veToast(i >= 0 ? 'Legenda apagada' : 'Legendas apagadas (a transcrição continua no painel Texto)');
+}
+function veLegMenu(i, x, y, doc) {
+    veClipMenuFechar();
+    const n = (VE.legendas || []).length, oc = veTxOcultas();
+    const m = doc.createElement('div');
+    m.className = 've-ctx';
+    m.innerHTML = `
+        <div class="ve-ctx-title">${veT('Legendas')}${n ? ` · ${n}` : ''}</div>
+        <button class="ve-ctx-item" data-lm="olho">${oc ? veT('Mostrar as legendas') : veT('Ocultar as legendas')}</button>
+        <button class="ve-ctx-item" data-lm="texto">${veT('Painel Texto › Legendas')}</button>
+        ${n ? '<div class="ve-ctx-sep"></div>' : ''}
+        ${i >= 0 ? `<button class="ve-ctx-item perigo" data-lm="uma">${veT('Apagar esta legenda')}</button>` : ''}
+        ${n ? `<button class="ve-ctx-item perigo" data-lm="todas" title="${veT('A transcrição continua no painel Texto: dá para montar de novo')}">${veT('Apagar todas as legendas')}</button>` : ''}`;
+    doc.body.appendChild(m);
+    veCtxPosicionar(m, x, y, doc);
+    m.addEventListener('click', e => {
+        const it = e.target.closest('[data-lm]');
+        if (!it) return;
+        veClipMenuFechar();
+        const a = it.dataset.lm;
+        if (a === 'olho') veTxOcultar();
+        else if (a === 'uma') veTxApagarLegendas(i);
+        else if (a === 'todas') veTxApagarLegendas(-1);
+        else { vedShow('texto'); VETX.aba = 'leg'; veTxRender(); }
+    });
+    const fora = e => { if (!m.contains(e.target)) veClipMenuFechar(); };
+    const tecla = e => { if (e.key === 'Escape') veClipMenuFechar(); };
+    setTimeout(() => { doc.addEventListener('pointerdown', fora, true); doc.addEventListener('keydown', tecla, true); }, 0);
+    VE._ctx = { m, fechar: () => { doc.removeEventListener('pointerdown', fora, true); doc.removeEventListener('keydown', tecla, true); m.remove(); } };
+}
+
 // Desenha a legenda da agulha no monitor (coordenadas do quadro; mesma conta do .ass da exportação)
 function veTxDesenhar(ctx) {
+    if (veTxOcultas()) return;
     const i = veTxLegendaEm(VE.playhead);
     if (i < 0) return;
+    if (veLpAtivo()) { veLpDesenhar(ctx, i, VE.playhead); return; }   // Legenda Premium (editor-legenda-premium.js)
     const e = veTxEstiloLegenda(i), L = veTxLegLayout(VE.legendas[i].texto, e);
     if (!L.linhas.length) return;
     const { cx, em, alt, linhas, topo } = L;
@@ -448,6 +503,7 @@ function veTxDesenhar(ctx) {
 function veTxLegendaNoPonto(pt) {
     const i = veTxLegendaEm(VE.playhead);
     if (i < 0) return -1;
+    if (veLpAtivo()) { const c = veLpCaixa(i); return pt.x >= c.x && pt.x <= c.x + c.w && pt.y >= c.y && pt.y <= c.y + c.h ? i : -1; }
     const L = veTxLegLayout(VE.legendas[i].texto, veTxEstiloLegenda(i)), f = L.folga * 2;
     const dentro = pt.x >= L.cx - L.wMax / 2 - f && pt.x <= L.cx + L.wMax / 2 + f && pt.y >= L.topo - f && pt.y <= L.topo + L.bloco + f;
     return dentro ? i : -1;
@@ -457,6 +513,11 @@ function veTxLegendaNoPonto(pt) {
 function veTxLegEditar(i) {
     veTxLegEditarFim();
     if (VE.playing) veStop();
+    if (veLpAtivo()) {   // Premium: o texto se edita nas Propriedades (a composição muda a cada letra)
+        VETX.legSel = i; VE.sel = -1; vedShow('pp'); veRefresh();
+        setTimeout(() => { const t = $ve('ve-pp') && $ve('ve-pp').querySelector('[data-pp="leg.texto"]'); if (t) { t.focus(); t.select(); } });
+        return;
+    }
     const scr = $ve('ve-screen'), ta = scr.ownerDocument.createElement('textarea');
     ta.className = 've-tx-edit ve-leg-edit';
     ta.spellcheck = false;
@@ -544,13 +605,15 @@ function veTxExportar(origem) {
 // Para a exportação: legendas gravadas no vídeo (se ligado)
 // faixa {a, b}: exportando só o trecho In→Out, as legendas vão recortadas e trazidas para o zero
 function veTxExport(faixa) {
-    if (VE.legGravar === false || !(VE.legendas || []).length) return null;
+    if (VE.legGravar === false || veTxOcultas() || !(VE.legendas || []).length) return null;
     const base = veTxEstilo();
     let itens = !faixa ? VE.legendas.map((l, i) => ({ l, i })) : VE.legendas
         .map((l, i) => ({ l, i }))
         .filter(x => x.l.st < faixa.b && x.l.en > faixa.a)
         .map(x => ({ ...x, l: { ...x.l, st: Math.max(x.l.st, faixa.a) - faixa.a, en: Math.min(x.l.en, faixa.b) - faixa.a } }));
     itens = itens.map(({ l, i }) => {
+        // Premium: as peças já medidas pela prévia (_ass_premium em video_cutter.py)
+        if (veLpAtivo()) { const item = { ...l, prm: veLpExport(i, faixa ? faixa.a : 0) }; delete item.pt; delete item.pr; return item; }
         const e = veTxEstiloLegenda(i);
         const item = { ...l, estilo: { ...e, razao: veTxMetricas(e).razao } };
         const fator = veTxLegLayout(l.texto, e).fator;
@@ -606,7 +669,12 @@ function veTxConstruir() {
             </div>
         </div>
         <div class="ve-tx-corpo" data-txc="leg" hidden>
-            <div class="ve-tx-sec">
+            <div class="ve-tx-sec velp-sec">
+                <b>Modo das legendas</b>
+                ${veLpModosHtml()}
+                <div class="velp-painel" id="velp-painel" hidden>${veLpPainelHtml()}</div>
+            </div>
+            <div class="ve-tx-sec" data-lp-so-classica>
                 <b>Criar legendas</b>
                 <div class="ve-tx-grade">
                     <label>Máx. caracteres por linha<input type="number" id="ve-leg-max" min="7" max="72" step="1"></label>
@@ -616,7 +684,7 @@ function veTxConstruir() {
                 </div>
                 <button class="ve-btn ve-btn-primary" data-txacao="criar">Criar legendas a partir da transcrição</button>
             </div>
-            <div class="ve-tx-sec">
+            <div class="ve-tx-sec" data-lp-so-classica>
                 <b>Estilo</b>
                 <p class="ve-tx-nota">Fonte, tamanho, cor, fundo e posição das legendas ficam no painel Propriedades (selecione uma legenda).</p>
                 <button class="ve-btn ve-btn-sm" data-txacao="estilo">Editar estilo em Propriedades</button>
@@ -670,6 +738,7 @@ function veTxRenderLeg() {
         if (el.type === 'checkbox') el.checked = !!e[k]; else if (el.ownerDocument.activeElement !== el) el.value = e[k];
     });
     $ve('ve-leg-gravar').checked = VE.legGravar !== false;
+    veLpRenderPainel();
     const L = VE.legendas || [], lista = $ve('ve-leg-lista');
     const chave = JSON.stringify(L) + VETX.legSel;
     if (lista._chave === chave) return;

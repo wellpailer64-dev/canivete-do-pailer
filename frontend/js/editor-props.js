@@ -476,6 +476,7 @@ function vePpHtml(a) {
         return cab(nSel > 1 ? `${nSel} ${veT('legendas selecionadas')}` : 'Legenda',
                    nSel > 1 ? veT('o estilo muda em todas elas') : `${VETX.legSel + 1} de ${VE.legendas.length} · trilha LEG`) +
             vePpSec('Texto da legenda', `<textarea class="ve-pp-texto" data-pp="leg.texto" rows="3"></textarea>`) +
+            (veLpAtivo() ? veLpPropsHtml() + vePpSec('Exportação', `${vePpChk('legGravar', 'Gravar as legendas no vídeo ao exportar')}`) + links([['texto', 'Painel Texto']]) :
             vePpSec('Estilo desta legenda', `
                 ${veCpLegHtml()}
                 <div class="ve-pp-l"><label>Fonte</label>${vePpFontes('le.fam')}</div>
@@ -508,7 +509,7 @@ function vePpHtml(a) {
                 </div>
                 <small class="ve-pp-dica">Um retângulo acompanha palavra por palavra, no tempo da fala. Vale para todas as legendas.</small>`) +
             vePpSec('Exportação', `${vePpChk('legGravar', 'Gravar as legendas no vídeo ao exportar')}`) +
-            links([['texto', 'Painel Texto']]);
+            links([['texto', 'Painel Texto']]));
     }
     const nome = `${veNomeClipe(c)} ${VE.sel + 1}`;
     if (a.tipo === 'texto') {
@@ -710,7 +711,8 @@ function vePpRender() {
     const box = $ve('ve-pp');
     if (!box) return;
     const a = vePpAlvo();
-    const chave = [a.tipo, VE.sel, VETX.legSel, a.c ? a.c.tr : '', VE.seqW, VE.seqH, !!VEPP.fontes, VE.info && VE.info.has_audio, !!VECP.leg, typeof veLegSelIdx === 'function' ? veLegSelIdx().length : 0].join('|');
+    const chave = [a.tipo, VE.sel, VETX.legSel, a.c ? a.c.tr : '', VE.seqW, VE.seqH, !!VEPP.fontes, VE.info && VE.info.has_audio, !!VECP.leg, typeof veLegSelIdx === 'function' ? veLegSelIdx().length : 0,
+                   a.tipo === 'legenda' && typeof veLpChavePP === 'function' ? veLpChavePP() : ''].join('|');
     if (chave !== VEPP.chave) {
         const abertas = [...box.querySelectorAll('details.ve-pp-sec')].map(d => d.open);
         const tipo0 = VEPP.chave.split('|')[0];

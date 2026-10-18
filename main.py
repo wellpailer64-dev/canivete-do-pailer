@@ -339,6 +339,15 @@ def ve_texto_modelos():
     return legendas.modelos_estado()
 
 
+def ve_leg_premium_kani(blocos, titulos=None):
+    """Legenda Premium: a Kani escolhe a palavra de destaque de cada título (Functions/legenda_premium.py)."""
+    from Functions import legenda_premium
+    try:
+        return legenda_premium.refinar(blocos, titulos)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def ve_transcrever(clipes, total, idioma="pt"):
     """Transcreve a timeline em background; eventos em veOnTexto({stage, pct, msg} | {stage:'pronto', ...})."""
     from Functions import legendas
@@ -3182,6 +3191,9 @@ class ApiBridge:
 
     def ve_texto_modelos(self):
         return ve_texto_modelos()
+
+    def ve_leg_premium_kani(self, blocos, titulos=None):
+        return ve_leg_premium_kani(blocos, titulos)
 
     def ve_transcrever(self, clipes, total, idioma="pt"):
         return ve_transcrever(clipes, total, idioma)

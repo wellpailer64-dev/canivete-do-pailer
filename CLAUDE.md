@@ -122,6 +122,13 @@ Ondulação na placa (2026-10-15, plano §8.6): shader por onda com margem trans
 (e a sombra) e camada de ajuste; giro de vídeo e de imagem com onda também na placa (`_giro_passos`); teste
 `teste_export.py --casos onda,ondavideo,ondatexto,ondavideo2,ondagiro --placa`.
 
+**Legendas em 3 modos** (2026-10-18, painel Texto › Legendas): Clássica, Dinâmica (destaque da palavra falada) e
+**Premium** — blocos curtos montados como título com duas fontes (dupla), papéis por palavra (ligação/base/destaque),
+entrada palavra a palavra, Kani refina o destaque, efeitos sonoros do Soundboard pelo movimento/assunto (`lpSfx`);
+margens de segurança no Programa (`veSegToggle`). `frontend/js/editor-legenda-premium.js` (`veLp*`), fontes OFL
+em `frontend/fonts/premium` ("KPR Fxx", fontsdir do libass), `_ass_premium` em video_cutter.py. Guia, armadilha das
+métricas (win × hhea) e pendências: `Instructions/agente/legenda-criativa.md`. Teste: `teste_export.py --casos premium`.
+
 Mixer de trilhas de áudio (Audio Track Mixer do Premiere): `frontend/js/editor-mixer.js` (aba junto dos Controles de
 efeito): pan, M/S (S também no cabeçalho da trilha), fader −∞..+15 dB na escala do Premiere, medidor L/R por trilha e o Mix.
 Estado em `VE_TRK.a[k]` {vol, pan, mute, solo} e `VE.master.vol`; som pelo efeito interno `trk` (editor.js `veTrkAfx`,
@@ -369,8 +376,12 @@ sempre saindo da placa antes da geração. Conversão: `D:\kanivete_testes\sfx\e
 ## Soundboard (pack de sons do editor)
 - Não vai no build: o painel baixa `soundboard-vN.zip` do release `soundboard-vN` (pré-release, para não virar
   o "latest" do updater) e instala em `<app>/soundboard/`. Só sons CC0 (Kenney, Freesound filtrado por CC0).
-- Gerar: `python tools/montar_soundboard.py <pasta>`; para pack novo, suba `VERSAO` nos dois arquivos
-  (`tools/montar_soundboard.py` e `Functions/soundboard.py`) e publique o zip num release novo.
+- **Pack v2** (2026-10-18, 232 sons/14 categorias, 9 MB): cortado pelo Pailer de vídeos "sem copyright" do YouTube —
+  `tools/fatiar_sfx.py` (corta no mínimo de silêncio, nomeia, anota a origem no manifesto) e `tools/pack_sfx.py`
+  (Opus 128k/96k mono, volume nivelado; `--zip N` monta o release). Mestres WAV e manifesto em `D:/kanivete_testes/sfx_pack`
+  (sons de marca/jogo/filme/biblioteca paga ficam marcados "licenca" e fora do pack). Pack novo: suba `VERSAO` em
+  `Functions/soundboard.py`, publique `soundboard-vN.zip` no release `soundboard-vN` (pré-release); o app oferece "Atualizar".
+  O v1 (Kenney/Freesound) era montado por `tools/montar_soundboard.py`.
 
 ## Segredos
 - `Functions/_credenciais.py` (client secret do Google Drive) fica fora do git; no CI vem do secret

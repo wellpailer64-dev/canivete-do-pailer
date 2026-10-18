@@ -1736,8 +1736,8 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
         g, final = montar(lay_r, W, H, fps, total_r, pasta_r, segs_r, args["path"], info)
         sub = ""
         if ass:   # num bloco o relógio começa em `feitos`: as legendas usam o tempo da timeline
-            sub = (f",setpts=PTS+{feitos:.6f}/TB,subtitles=filename={vc._caminho_filtro(ass)},setpts=PTS-{feitos:.6f}/TB"
-                   if feitos > 1e-6 else f",subtitles=filename={vc._caminho_filtro(ass)}")
+            sub = (f",setpts=PTS+{feitos:.6f}/TB,{vc._filtro_sub(ass)},setpts=PTS-{feitos:.6f}/TB"
+                   if feitos > 1e-6 else f",{vc._filtro_sub(ass)}")
         # a saída volta a 8 bits (ou 10, no H.265 10 bits) num passo só, com pontilhado (o último filtro pode deixar
         # 16 bits, RGBA ou yuv420p); o libass desenha as legendas em yuv420p10le, não em p010
         fim = ("p010le", ",format=yuv420p10le") if bits == 10 else ("yuv420p", "")
