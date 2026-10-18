@@ -151,6 +151,8 @@
     "ve_roto_abrir",
     "ve_roto_estado",
     "ve_roto_base",
+    "ve_roto_congelar",
+    "ve_roto_qualidade",
     "ve_roto_refinar",
     "ve_roto_cancelar",
     "ve_roto_video",
@@ -1908,7 +1910,7 @@
    ]
   },
   "ve_roto_abrir": {
-   "args": "base, rid, video, a, b",
+   "args": "base, rid, video, a, b, qual=None",
    "modulos": [
     "pincel_roto"
    ]
@@ -1920,7 +1922,19 @@
    ]
   },
   "ve_roto_base": {
-   "args": "rid, quadro, pontos",
+   "args": "rid, quadro, pontos, seguir=True",
+   "modulos": [
+    "pincel_roto"
+   ]
+  },
+  "ve_roto_congelar": {
+   "args": "rid",
+   "modulos": [
+    "pincel_roto"
+   ]
+  },
+  "ve_roto_qualidade": {
+   "args": "rid, qual, seguir=True",
    "modulos": [
     "pincel_roto"
    ]

@@ -4301,10 +4301,10 @@ class ApiBridge:
             return {"success": False, "error": str(e)}
 
     # Pincel Roto do Editor (frontend/js/editor-roto.js + Functions/pincel_roto.py): SAM 2.1 de vídeo, em segundo plano
-    def ve_roto_abrir(self, base, rid, video, a, b):
+    def ve_roto_abrir(self, base, rid, video, a, b, qual=None):
         from Functions import pincel_roto
         try:
-            return pincel_roto.abrir(base, rid, video, float(a), float(b))
+            return pincel_roto.abrir(base, rid, video, float(a), float(b), qual)
         except Exception as e:
             return {"success": False, "error": str(e)}
 
@@ -4312,10 +4312,24 @@ class ApiBridge:
         from Functions import pincel_roto
         return pincel_roto.estado(rid)
 
-    def ve_roto_base(self, rid, quadro, pontos):
+    def ve_roto_base(self, rid, quadro, pontos, seguir=True):
         from Functions import pincel_roto
         try:
-            return pincel_roto.definir_base(rid, quadro, pontos)
+            return pincel_roto.definir_base(rid, quadro, pontos, bool(seguir))
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_roto_congelar(self, rid):
+        from Functions import pincel_roto
+        try:
+            return pincel_roto.congelar(rid)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_roto_qualidade(self, rid, qual, seguir=True):
+        from Functions import pincel_roto
+        try:
+            return pincel_roto.qualidade(rid, qual, bool(seguir))
         except Exception as e:
             return {"success": False, "error": str(e)}
 

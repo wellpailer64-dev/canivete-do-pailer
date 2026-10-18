@@ -15,6 +15,26 @@ Uso típico: texto atrás da pessoa (V1 vídeo, V2 texto, V3 o mesmo vídeo com 
   Reduzir tremido (mistura com o quadro anterior só na faixa da borda). Mudar refaz o alfa (~0,1 s/quadro) em segundo plano.
 - Quadro fora do trecho recortado (antes de pintar, ou clipe esticado além do trecho de quando o efeito nasceu) = opaco.
 
+## Rodada 2 (2026-10-18)
+- **Modelo**: SAM 2.1 de vídeo fp16 da diffusionstudio (Apache-2.0, revisões fixas, MD5): "alta" = Hiera-Small 1024
+  (`modelos_ia/sam2_small_video_fp16`, 112 MB) e "rapido" = Hiera-Tiny 512 (`sam2_tiny_video_fp16`, 83 MB). Bancada
+  `D:/kanivete_testes/roto/bancada.py` (RTX 3050, 1080p): Tiny fp32 antigo 0,50 s/quadro; **Small fp16 0,28** (e segue a
+  mão que o Tiny perdia, microfone sai limpo — `folha_mao.jpg`, `folha_bancada.jpg`); Tiny 512 fp16 0,07 (borda grossa).
+  Na CPU o Small fp16 é lento (codificador 3,6 s) → sem placa o padrão é "rapido". Qualidade fica no projeto (`rd.q`);
+  trocar refaz as memórias dos quadros-base (`info.qual`; npz de outro modelo é apagado ao abrir).
+- **Freeze**: `definir_base(..., seguir)` só calcula o quadro-base (~2 s, codificação do quadro guardada para vários
+  traços) e anota `info.pend`; `congelar` segue os trechos ao redor dos pendentes. Trecho entre dois quadros-base é seguido
+  pela METADE (1ª metade do da esquerda, 2ª do da direita). Pintar com o seguimento rodando interrompe e o recoloca na fila.
+  A exportação congela o que faltar; o **render automático em segundo plano** (`vePrAutoTick`) pula trechos com Roto
+  pendente/rodando (`veRotoOcupado`) — antes ele chamava o `video_alfa` e disparava o seguimento sozinho.
+- **Selecionar assunto**: ponto com rótulo 2 (`[0,0,2]`, traço `{auto:1}` no projeto); máscara do BEN2 (`base/s_N.png`,
+  sai o SAM da placa, entra o BEN2, volta o SAM: ~9 s) vira o recorte de partida e os traços somam/tiram por cima.
+- **Memória só com objeto achado** (nota > 0 e iou > 0,3): quadro em que ele some não entra no banco.
+- **Borda em paralelo**: `_Refinador` (linha própria na CPU) refina enquanto a placa segue. 450 quadros: 300 s → 145 s.
+- **Tela**: janela (`.vero-jan`, 90vw × 88vh, ⤢ tela cheia) sobre o editor com `backdrop-filter: blur(6px)` (o play
+  para ao abrir: nada anima atrás). Armadilha: `.ve` define `grid-template-rows: 46px …` — sem redefinir as linhas no
+  `.vero`, a janela caía na faixa de 46 px do topo.
+
 ## Motor (Functions/pincel_roto.py)
 - **SAM 2.1 Hiera-Tiny de vídeo em ONNX** — `square-zero-labs/sam2.1-tiny-video-onnx` (Apache-2.0, revisão fixa
   `3b2984dd…`, 182 MB, MD5 conferido), baixado no 1º uso em `modelos_ia/sam2_tiny_video`. 5 grafos: vision_encoder,
@@ -75,6 +95,7 @@ Uso típico: texto atrás da pessoa (V1 vídeo, V2 texto, V3 o mesmo vídeo com 
   com o verde; pensar num fechamento morfológico só em furos estreitos.
 - Descontaminar cores da borda (o "Decontaminate" do After): hoje a cor da borda é a do quadro original.
 - Desfoque de movimento na borda (Motion blur do Refine Edge).
-- Acelerar: fp16, memory_attention (metade do tempo), processar só a área da pessoa.
+- Acelerar mais: processar só a área da pessoa; IOBinding (feats na placa entre codificador e decodificador).
+- Objeto que ENTRA no quadro depois do quadro-base (mão esquerda no trecho de teste) não é pego: precisa de quadro-base.
 - Clipe com máscara/motion (camada desenhada) + Pincel Roto: a camada desenhada usa o alfa da prévia (meia resolução).
 - Vários objetos separados no mesmo clipe (hoje um objeto por efeito; dá para pôr o clipe duas vezes).

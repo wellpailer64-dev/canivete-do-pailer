@@ -356,7 +356,9 @@ function vePrAutoTick() {
     // vídeo da timeline ainda sem prévia de edição: espera (o render sairia com ele faltando)
     if (VE.clips.some(c => { const m = VE.media[veMid(c)]; return m && m.id && m.kind === 'video' && (!m.url || m._aoVivo) && !m.offline && !m.erro; })) return;
     const ph = VE.playhead, dist = s => ph < s.a ? s.a - ph : ph > s.b ? (ph - s.b) * 1.5 : 0;   // à frente primeiro
-    const add = vePrSegmentos().filter(s => s.pesado && !VEPR.files.has(s.sig) && !VEPRA.falhas.has(s.sig))
+    // Pincel Roto esperando o Freeze (ou seguindo): o render automático não dispara o seguimento sozinho
+    const rotoOcupado = s => typeof veRotoOcupado === 'function' && veRotoOcupado(s.a, s.b);
+    const add = vePrSegmentos().filter(s => s.pesado && !VEPR.files.has(s.sig) && !VEPRA.falhas.has(s.sig) && !rotoOcupado(s))
         .sort((x, y) => dist(x) - dist(y)).map(s => ({ a: s.a, b: s.b, sig: s.sig }));
     if (!add.length) return;
     VEPRA.ativo = true;

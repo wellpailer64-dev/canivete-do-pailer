@@ -20,6 +20,10 @@ Timeline com trilhas de vídeo e áudio, cortes (Ctrl+K), transições, efeitos,
 Effects, Pincel Roto (recortar pessoa no vídeo), Cena 3D, mixer de áudio e remix de música. Projetos .vknv. Abre projetos
 do Premiere (.prproj) e devolve para o Premiere em XML. Exportar: botão Exportar no canto de cima à direita ou Ctrl+M (põe
 na fila e abre o Kanivete Encoder); Ctrl+Shift+M põe na fila sem abrir. Painel Pessoas agrupa os rostos do projeto.
+Pincel Roto (Efeitos › Chaveamento, ou duplo clique no clipe com o efeito): abre numa janela por cima do editor. Pinte o
+que fica (Alt tira) ou clique em "✨ Selecionar assunto" para o app achar a pessoa sozinho; o quadro pintado vira
+quadro-base. O recorte dos outros quadros só é montado quando você clica em "❄ Freeze" (ou tecla F); marque "Seguir
+sozinho" para montar logo depois de cada traço. Qualidade alta (borda mais fiel) ou Rápida (uns 3× mais rápida).
 
 ## Kanivete Encoder (fila de exportação, estilo Media Encoder)
 Configurações à esquerda e fila à direita. Cada item da fila tem as suas próprias configurações (formato, resolução,

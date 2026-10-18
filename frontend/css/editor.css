@@ -22,6 +22,7 @@
 
     display: grid;
     grid-template-rows: 46px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);   /* sem ela a coluna cresce até o conteúdo mínimo dos painéis (estreitar a janela cortava/deixava vazio) */
     height: 100%;
     background: var(--ve-bg);
     color: var(--ve-text);
@@ -1137,7 +1138,7 @@ body.ve-fx-dragging, body.ve-fx-dragging * { cursor: grabbing !important; user-s
 
 /* ---------- Janela solta (painel numa janela própria do Windows) ---------- */
 html.ve-float-html body { background: var(--bg-0); }
-.ve.ve-float { height: 100vh; border: 0; border-radius: 0; grid-template-rows: 30px minmax(0, 1fr); }
+.ve.ve-float { height: 100vh; border: 0; border-radius: 0; grid-template-rows: 30px minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }   /* sem a coluna, a grade crescia até o conteúdo mínimo do painel: estreitar a janela deixava vazio ou corte */
 .ve-float-bar {
     display: flex; align-items: center; gap: 8px; padding: 0 4px 0 12px; background: var(--ve-bg);
     border-bottom: 1px solid var(--ve-line); font: 600 11.5px var(--ve-ui); color: var(--ve-text);
@@ -2526,9 +2527,17 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-sfx-ex button:hover { color: var(--ve-text); border-color: var(--primary); }
 
 /* Pincel Roto (editor-roto.js): tela própria como a da Cena 3D */
-.vero { position: fixed; inset: 0; z-index: 900; border: 0; border-radius: 0; height: auto; display: grid; grid-template-rows: 40px minmax(0, 1fr) auto; background: var(--ve-bg); color: var(--ve-text); }
+/* janela por cima do editor; o editor fica atrás desfocado (a tela para o play: nada animando atrás do desfoque) */
+.vero { position: fixed; inset: 0; z-index: 900; border: 0; border-radius: 0; height: auto; display: grid; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); place-items: center; background: rgba(0, 0, 0, .38); backdrop-filter: blur(6px); color: var(--ve-text); }
 .vero[hidden] { display: none; }
-.vero-topo { display: flex; align-items: center; gap: 10px; padding: 0 10px; border-bottom: 1px solid var(--ve-line); background: var(--ve-panel); }
+.vero-jan { width: min(1480px, 90vw); height: 88vh; display: grid; grid-template-rows: 40px minmax(0, 1fr) auto; background: var(--ve-bg); border: 1px solid var(--ve-line-2); border-radius: 10px; overflow: hidden; box-shadow: 0 18px 60px rgba(0, 0, 0, .55); }
+.vero.vero-max .vero-jan { width: 100vw; height: 100vh; border-radius: 0; border: 0; }
+.vero-topo { display: flex; align-items: center; gap: 10px; padding: 0 10px; border-bottom: 1px solid var(--ve-line); background: var(--ve-panel); min-width: 0; overflow: hidden; }
+.vero-topo b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 60px; }
+.vero-status { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.vero-ico { padding: 2px 8px; }
+.vero-seguir { display: flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; cursor: pointer; }
+.vero-freeze.vero-pend { background: var(--primary); color: #fff; border-color: var(--primary); }
 .vero-topo b { font-weight: 600; font-size: 13px; }
 .vero-grupo { display: flex; gap: 2px; }
 .vero-grupo .on { background: var(--ve-accent, #ff8a3d); color: #111; }
@@ -2538,7 +2547,7 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .vero-visor { position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #141414; }
 .vero-visor canvas { touch-action: none; cursor: none; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
 .vero-dica { position: absolute; left: 10px; bottom: 8px; font-size: 11px; opacity: .6; pointer-events: none; }
-.vero-tempo { display: grid; grid-template-columns: auto 110px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--ve-line); background: var(--ve-panel); }
+.vero-tempo { display: grid; grid-template-columns: auto 110px minmax(0, 1fr) auto auto auto auto; gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--ve-line); background: var(--ve-panel); }
 .vero-hora { font-variant-numeric: tabular-nums; font-size: 12px; }
 .vero-regua { width: 100%; height: 26px; cursor: pointer; touch-action: none; }
 

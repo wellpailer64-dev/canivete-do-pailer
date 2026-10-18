@@ -126,12 +126,25 @@ def main():
             # 1) abre a tela (cria o efeito) e pinta o quadro-base 0 pela API
             pg.evaluate("i => VEROTO_API.abrir(VE.clips[i])", ci)
             pg.wait_for_function("(() => { const s = VEROTO_API.estado(); return s && !s.rodando && s.n > 0; })()", timeout=600000)
+            jan = pg.evaluate("(() => { const r = document.querySelector('.vero-jan').getBoundingClientRect(); return [r.width / innerWidth, r.height / innerHeight, getComputedStyle(VERO.tela.el).backdropFilter]; })()")
+            ok(jan[0] < 0.95 and jan[1] < 0.95 and "blur" in jan[2], "tela do Roto em janela por cima do editor desfocado", str(jan))
+            pg.evaluate("VEROTO_API.seguir(false)")   # Freeze: pintar só faz o quadro-base
             t0 = time.time()
             pg.evaluate("""() => {
                 const c = VE.clips[VE.sel];
                 VEROTO_API.tracar(c, 0, [[0.4375, 0.2], [0.4375, 0.5], [0.4375, 0.85]], true);
                 VEROTO_API.tracar(c, 0, [[0.64, 0.83]], false);
             }""")
+            time.sleep(1)
+            pg.evaluate("VEROTO_API.esperar()")
+            time.sleep(1)
+            e = pg.evaluate("VEROTO_API.estado()")
+            ok(e["prontos"] <= 2 and 0 in e["pend"], "sem Freeze: só o quadro-base", f"{e['prontos']} prontos, pendentes {e['pend']}, {time.time() - t0:.1f} s")
+            fz = pg.evaluate("(() => { const r = VERO.tela.freeze.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2, VERO.tela.freeze.classList.contains('vero-pend')]; })()")
+            ok(fz[2], "botão Freeze aceso com quadro-base pendente")
+            t0 = time.time()
+            pg.mouse.click(fz[0], fz[1])
+            time.sleep(1.5)
             pg.wait_for_function("(() => { const s = VEROTO_API.estado(); return s && (!!s.erro || (!s.rodando && s.prontos === s.n)); })()", timeout=3600000, polling=1000)
             e = pg.evaluate("VEROTO_API.estado()")
             seg = time.time() - t0
@@ -153,7 +166,28 @@ def main():
                 bases = pg.evaluate("VEROTO_API.estado().bases")
                 ok(180 in bases, "traço com o mouse virou quadro-base", str(bases))
                 time.sleep(1)
+                pg.keyboard.press("f")   # F = Freeze
+                time.sleep(1)
                 pg.evaluate("VEROTO_API.esperar()")   # consulta o Python direto (o vigia da tela pode estar 1 passo atrás)
+                time.sleep(1)
+                e = pg.evaluate("VEROTO_API.estado()")
+                ok(not e["pend"] and e["prontos"] == e["n"], "F seguiu a correção", f"pendentes {e['pend']}")
+            # ✨ Selecionar assunto num quadro do meio
+            meio = pg.evaluate("VEROTO_API.estado().n") // 2
+            pg.evaluate("""m => { const c = VE.clips[VE.sel], st = Object.values(VERO.st)[0];
+                veSeek(c.st + (st.a + (m + 0.5) / st.fps - c.s)); }""", meio)
+            time.sleep(1)
+            t0 = time.time()
+            pg.evaluate("VEROTO_API.assunto()")
+            time.sleep(1)
+            pg.evaluate("VEROTO_API.esperar()")
+            time.sleep(1)
+            e = pg.evaluate("VEROTO_API.estado()")
+            ok(meio in e["bases"] and not e["erro"], "Selecionar assunto virou quadro-base", f"{time.time() - t0:.1f} s {e['erro']}")
+            pg.evaluate("VEROTO_API.freeze()")
+            time.sleep(1)
+            pg.evaluate("VEROTO_API.esperar()")
+            time.sleep(1)
             # 3) print da tela no quadro 180 (ou no meio) e volta para a timeline
             pg.screenshot(path=saida + "tela_roto.png")
             ok(os.path.getsize(saida + "tela_roto.png") > 10000, "print da tela do Pincel Roto", saida + "tela_roto.png")

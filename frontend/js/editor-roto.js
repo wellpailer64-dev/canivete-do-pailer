@@ -9,6 +9,8 @@
 // (pincel_roto.video_alfa) que entra no lugar da mídia (veRotoPreparar → plano de exportação). Quadro sem recorte = opaco.
 
 const VERO = { st: {}, img: new Map(), abrindo: {}, timer: 0, tela: null };
+// Freeze: pintar só calcula o quadro-base; o seguimento roda no botão ❄ Freeze (ou sozinho, com "Seguir sozinho")
+const veRotoSeguir = () => { try { return localStorage.getItem('ve-roto-seguir') === '1'; } catch (e) { return false; } };
 
 VE_FX.roto = {
     nome: 'Pincel Roto e Refinar borda', cat: 'Chaveamento', tag: 'Roto Brush',
@@ -65,7 +67,7 @@ async function veRotoAbrirJob(rd, c) {
     if (!api || !api.ve_roto_abrir || !m || !m.path) return null;
     VERO.abrindo[rd.rid] = true;
     try {
-        const r = await api.ve_roto_abrir(vePrPrefs().dir, rd.rid, m.path, rd.a, rd.b);
+        const r = await api.ve_roto_abrir(vePrPrefs().dir, rd.rid, m.path, rd.a, rd.b, rd.q || null);
         if (!r || !r.success) { veToast(veT('Pincel Roto') + ': ' + ((r && r.error) || '?')); return null; }
         const st = VERO.st[rd.rid] = Object.assign(VERO.st[rd.rid] || {}, r, { ver: new Array(r.n).fill(0), pend: {} });
         await veRotoSincronizar(rd, st);
@@ -80,21 +82,22 @@ async function veRotoSincronizar(rd, st) {
     Object.entries(rd.tr || {}).forEach(([q, ts]) => { if (ts && ts.length) nos[q] = veRotoPontos(ts); });
     const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     const mudou = Object.keys(nos).filter(q => !igual(nos[q], py[q])), sobrou = Object.keys(py).filter(q => !nos[q]);
-    for (const q of [...sobrou, ...mudou]) await api.ve_roto_base(rd.rid, +q, nos[q] || []);
+    for (const q of [...sobrou, ...mudou]) await api.ve_roto_base(rd.rid, +q, nos[q] || [], veRotoSeguir());
     st.bases = nos;
 }
 
-// traços → pontos do modelo: 1 no meio do traço curto; 3 (15%, 50%, 85% do caminho) no comprido
+// traços → pontos do modelo: 1 no meio do traço curto; 3 (15%, 50%, 85% do caminho) no comprido; "Selecionar assunto"
+// = [0, 0, 2] (o Python parte da máscara do assunto e os traços somam/tiram por cima)
 function veRotoPontos(tracos) {
-    const out = [];
+    const out = [], auto = tracos.some(t => t.auto);
     tracos.forEach(t => {
-        const p = t.p || []; if (!p.length) return;
+        const p = t.p || []; if (t.auto || !p.length) return;
         const seg = [0]; for (let k = 1; k < p.length; k++) seg.push(seg[k - 1] + Math.hypot((p[k][0] - p[k - 1][0]) * VE.seqW / VE.seqH, p[k][1] - p[k - 1][1]));
         const L = seg[seg.length - 1];
         const em = u => { const d = u * L; let k = 1; while (k < seg.length - 1 && seg[k] < d) k++; const s0 = seg[k - 1], s1 = seg[k] || s0, f = s1 > s0 ? (d - s0) / (s1 - s0) : 0, A = p[k - 1], B = p[Math.min(k, p.length - 1)]; return [A[0] + (B[0] - A[0]) * f, A[1] + (B[1] - A[1]) * f]; };
         (L < 0.06 ? [0.5] : [0.15, 0.5, 0.85]).forEach(u => { const [x, y] = em(u); out.push([+x.toFixed(4), +y.toFixed(4), t.l ? 1 : 0]); });
     });
-    return out.slice(-12);
+    return auto ? [[0, 0, 2], ...out.slice(-12)] : out.slice(-12);
 }
 
 // Refinar borda mudou nos Controles de efeito: o Python refaz o alfa (espera parar de mexer)
@@ -143,7 +146,7 @@ function veRotoVigiar() {
             if (!st.vigiar && !(VERO.tela && !VERO.tela.el.hidden && VERO.tela.rid === st.rid)) continue;
             const r = await api.ve_roto_estado(st.rid); if (!r || !r.success) continue;
             const mud = r.ver.some((v, i) => v !== st.ver[i]);
-            Object.assign(st, { ver: r.ver, rodando: r.rodando, fila: r.fila, fase: r.fase, feito: r.feito, total: r.total, msg: r.msg, erro: r.erro, s_quadro: r.s_quadro, extraido: r.extraido });
+            Object.assign(st, { ver: r.ver, rodando: r.rodando, fila: r.fila, fase: r.fase, feito: r.feito, total: r.total, msg: r.msg, erro: r.erro, s_quadro: r.s_quadro, extraido: r.extraido, pend: r.pend, qual: r.qual });
             st.vigiar = r.rodando || r.fila > 0;
             if (r.erro && r.erro !== st.erroVisto) { st.erroVisto = r.erro; veToast(veT('Pincel Roto') + ': ' + r.erro); }
             if (mud) veRotoRedesenhar();
@@ -170,6 +173,15 @@ async function veRotoPreparar(mapa, filtro, clips = VE.clips) {
     }
 }
 
+// algum clipe com Pincel Roto no trecho a..b da timeline ainda sem Freeze, seguindo ou não aberto (render automático espera)
+function veRotoOcupado(a, b) {
+    return VE.clips.some(c => {
+        const f = veRotoFx(c); if (!f || !f.v.rd || c.st >= b || veEnd(c) <= a) return false;
+        const st = VERO.st[f.v.rd.rid];
+        return !st || st.rodando || st.fila || ((st.pend || []).length && Object.keys(st.bases || {}).length);
+    });
+}
+
 // espera o trabalho do Python esvaziar a fila (consulta a cada 0,5 s; aviso se demorar)
 async function veRotoEsperar(rid) {
     const api = window.pywebview.api;
@@ -183,30 +195,47 @@ async function veRotoEsperar(rid) {
 
 // ───────────────────────── tela do Pincel Roto ─────────────────────────
 function veRotoTelaMontar() {
+    // janela por cima do editor (que fica atrás, desfocado); ⤢ ocupa a tela toda
     const el = document.createElement('div'); el.className = 've vero'; el.hidden = true;
-    el.innerHTML = `<div class="vero-topo"><b data-ro="titulo"></b>
+    el.innerHTML = `<div class="vero-jan"><div class="vero-topo"><b data-ro="titulo"></b>
         <div class="vero-grupo"><button class="ve-btn ve-btn-sm" data-romodo="1" title="${veT('Pintar o que fica (verde)')}">✚ ${veT('Somar')}</button><button class="ve-btn ve-btn-sm" data-romodo="0" title="${veT('Segure Alt para tirar (vermelho)')}">▬ ${veT('Tirar')}</button></div>
         <label class="vero-tam">${veT('Pincel')} <input type="range" min="0.005" max="0.15" step="0.001" data-ro="tam"></label>
+        <button class="ve-btn ve-btn-sm" data-roacao="assunto" title="${veT('Acha a pessoa/objeto principal deste quadro sozinho (depois dá para somar/tirar com o pincel)')}">✨ ${veT('Selecionar assunto')}</button>
         <div class="vero-grupo"><button class="ve-btn ve-btn-sm" data-rovista="contorno">${veT('Contorno')}</button><button class="ve-btn ve-btn-sm" data-rovista="alfa">${veT('Alfa')}</button><button class="ve-btn ve-btn-sm" data-rovista="xadrez">${veT('Transparente')}</button></div>
         <span class="vero-status" data-ro="status"></span>
         <button class="ve-btn ve-btn-sm" data-roacao="cancelar" hidden>${veT('Parar')}</button>
+        <button class="ve-btn ve-btn-sm vero-ico" data-roacao="max" title="${veT('Tela cheia')}">⤢</button>
         <button class="ve-btn ve-btn-sm" data-roacao="fechar" title="Esc">${veT('Voltar à timeline')}</button></div>
-        <div class="vero-visor" data-ro="visor"><canvas></canvas><div class="vero-dica">${veT('Pinte o que fica · Alt: tirar · Ctrl+arrastar: tamanho do pincel · ←/→: quadro · Espaço: tocar · Delete: apaga o quadro-base')}</div></div>
+        <div class="vero-visor" data-ro="visor"><canvas></canvas><div class="vero-dica">${veT('Pinte o que fica · Alt: tirar · Ctrl+arrastar: tamanho do pincel · ←/→: quadro · Espaço: tocar · F: Freeze · Delete: apaga o quadro-base')}</div></div>
         <div class="vero-tempo"><button class="ve-btn ve-btn-sm" data-roacao="play" title="${veT('Espaço')}">▶</button><span class="vero-hora" data-ro="hora"></span>
             <canvas class="vero-regua" data-ro="regua"></canvas>
-            <button class="ve-btn ve-btn-sm" data-roacao="apagar" title="Delete">${veT('Apagar quadro-base')}</button></div>`;
+            <button class="ve-btn ve-btn-sm" data-roacao="apagar" title="Delete">${veT('Apagar quadro-base')}</button>
+            <select class="ve-btn ve-btn-sm" data-ro="qual" title="${veT('Alta: borda mais fiel (SAM 2.1 Small) · Rápida: uns 3× mais rápida, borda mais grossa')}"><option value="alta">${veT('Qualidade alta')}</option><option value="rapido">${veT('Rápida')}</option></select>
+            <label class="vero-seguir" title="${veT('Desligado: pintar só mostra o quadro-base; o recorte dos outros quadros espera o Freeze')}"><input type="checkbox" data-ro="seguir"> ${veT('Seguir sozinho')}</label>
+            <button class="ve-btn ve-btn-sm vero-freeze" data-roacao="freeze" title="${veT('Monta o recorte dos outros quadros a partir dos quadros-base (F)')}">❄ Freeze</button></div></div>`;
     document.body.appendChild(el);
     const q = k => el.querySelector(`[data-ro="${k}"]`);
     const T = VERO.tela = { el, visor: q('visor'), cv: el.querySelector('.vero-visor canvas'), regua: q('regua'), hora: q('hora'), status: q('status'), titulo: q('titulo'), tam: q('tam'),
+        qual: q('qual'), seguir: q('seguir'), freeze: el.querySelector('[data-roacao="freeze"]'),
         modo: 1, vista: 'contorno', raio: 0.035, traco: null, play: null, raf: 0, img: null, imgI: -1, cursor: null };
     T.tam.value = T.raio;
     T.tam.addEventListener('input', () => { T.raio = +T.tam.value; veRotoTelaDesenhar(); });
+    T.seguir.checked = veRotoSeguir();
+    T.seguir.addEventListener('change', () => {
+        try { localStorage.setItem('ve-roto-seguir', T.seguir.checked ? '1' : '0'); } catch (e) { /* sem armazenamento */ }
+        if (T.seguir.checked) veRotoFreeze();
+    });
+    T.qual.addEventListener('change', () => veRotoQualidade(T.qual.value));
+    el.addEventListener('pointerdown', e => { if (e.target === el) veRotoTelaFechar(); });   // clique no fundo desfocado volta
     el.addEventListener('click', e => {
         const b = e.target.closest('[data-romodo],[data-rovista],[data-roacao]'); if (!b) return;
         const d = b.dataset;
         if (d.romodo != null) T.modo = +d.romodo;
         else if (d.rovista) T.vista = d.rovista;
         else if (d.roacao === 'fechar') return veRotoTelaFechar();
+        else if (d.roacao === 'freeze') return veRotoFreeze();
+        else if (d.roacao === 'assunto') return veRotoAssunto();
+        else if (d.roacao === 'max') { el.classList.toggle('vero-max'); return veRotoTelaDesenhar(); }
         else if (d.roacao === 'play') return veRotoTelaPlay();
         else if (d.roacao === 'apagar') return veRotoApagarBase();
         else if (d.roacao === 'cancelar') { window.pywebview.api.ve_roto_cancelar(T.rid); return; }
@@ -246,7 +275,7 @@ async function veRotoTelaAbrir(c) {
     T.el.hidden = false; T.titulo.textContent = `${veT('Pincel Roto')} · ${m.name || ''}`;
     veRotoTelaBotoes();
     const st = VERO.st[T.rid] || await veRotoAbrirJob(f.v.rd, c);
-    if (st) { st.vigiar = true; veRotoVigiar(); }
+    if (st) { st.vigiar = true; veRotoVigiar(); T.qual.value = st.qual || 'alta'; }
     cancelAnimationFrame(T.raf); T.raf = requestAnimationFrame(veRotoTelaLaco);
     veRotoTelaDesenhar();
     return true;
@@ -267,10 +296,31 @@ function veRotoTelaStatus() {
     if (st.rodando || st.fila) {
         const pct = st.total ? Math.round(st.feito / st.total * 100) : 0;
         s = `${veT(st.msg || 'Trabalhando…')} ${pct}%` + (st.s_quadro && st.fase === 'propagar' ? ` · ${String(st.s_quadro).replace('.', ',')} s/${veT('quadro')}` : '');
-    } else if (!Object.keys(st.bases || {}).length) s = veT('Pinte a pessoa ou o objeto num quadro');
+    } else if (!Object.keys(st.bases || {}).length) s = veT('Pinte a pessoa ou o objeto num quadro (ou ✨ Selecionar assunto)');
+    else if ((st.pend || []).length) s = veT('Quadro-base pronto · ❄ Freeze monta o recorte dos outros quadros');
     else s = `${st.ver.filter(Boolean).length}/${st.n} ${veT('quadros recortados')}`;
     T.status.textContent = s;
     T.el.querySelector('[data-roacao="cancelar"]').hidden = !(st.rodando || st.fila);
+    T.freeze.classList.toggle('vero-pend', (st.pend || []).length > 0 && Object.keys(st.bases || {}).length > 0);
+}
+// ❄ Freeze: segue o recorte a partir dos quadros-base (o que estiver pendente)
+function veRotoFreeze() {
+    const T = VERO.tela, st = T && VERO.st[T.rid]; if (!st) return;
+    if (!Object.keys(st.bases || {}).length) { veToast(veT('Pinte um quadro-base antes (ou ✨ Selecionar assunto)')); return; }
+    window.pywebview.api.ve_roto_congelar(st.rid).then(() => { st.vigiar = true; veRotoVigiar(); });
+}
+// ✨ Selecionar assunto: o quadro atual vira quadro-base com a máscara do Remover fundo (os traços somam/tiram por cima)
+function veRotoAssunto() {
+    const T = VERO.tela, c = veRotoTelaClipe(), st = T && VERO.st[T.rid]; if (!c || !st) return;
+    if (!st.extraido) { veToast(veT('Espere ler os quadros do vídeo')); return; }
+    const i = veRotoQuadro(st, c); if (i < 0) return;
+    veRotoMudarTracos(c, i, l => [{ l: 1, auto: 1, r: 0, p: [] }, ...l.filter(t => !t.auto)]);
+}
+// qualidade do modelo (fica no projeto: rd.q)
+function veRotoQualidade(q) {
+    const T = VERO.tela, f = veRotoFx(veRotoTelaClipe()), st = T && VERO.st[T.rid]; if (!f || !st) return;
+    veFxEdit(f.id, x => { x.v.rd = { ...x.v.rd, q }; return x; });
+    window.pywebview.api.ve_roto_qualidade(st.rid, q, veRotoSeguir()).then(() => { st.qual = q; st.vigiar = true; veRotoVigiar(); });
 }
 
 // ── laço: tocar e redesenhar a régua ──
@@ -351,7 +401,7 @@ function veRotoTelaDesenhar() {
     }
     // traços do quadro-base atual (e o que está sendo pintado)
     const f = veRotoFx(c), tr = ((f && f.v.rd && f.v.rd.tr) || {})[i] || [];
-    [...tr, ...(T.traco ? [T.traco] : [])].forEach(s => {
+    [...tr, ...(T.traco ? [T.traco] : [])].filter(s => s.p && s.p.length).forEach(s => {
         x.save(); x.lineCap = x.lineJoin = 'round'; x.lineWidth = Math.max(2, s.r * h * 2);
         x.strokeStyle = s.l ? 'rgba(40,220,90,0.55)' : 'rgba(240,60,60,0.55)';
         x.beginPath(); s.p.forEach(([px, py], k) => k ? x.lineTo(px * w, py * h) : x.moveTo(px * w, py * h));
@@ -432,7 +482,7 @@ function veRotoMudarTracos(c, i, fn) {
     if (st) {
         st.bases = { ...(st.bases || {}) };
         if (lista.length) st.bases[i] = veRotoPontos(lista); else delete st.bases[i];
-        window.pywebview.api.ve_roto_base(rd.rid, i, lista.length ? st.bases[i] : []).then(() => { st.vigiar = true; veRotoVigiar(); });
+        window.pywebview.api.ve_roto_base(rd.rid, i, lista.length ? st.bases[i] : [], veRotoSeguir()).then(() => { st.vigiar = true; veRotoVigiar(); });
     }
     veRotoTelaDesenhar();
 }
@@ -458,6 +508,7 @@ function veRotoTelaTecla(e) {
         return;
     }
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); veRotoApagarBase(); return; }
+    if (!e.ctrlKey && !e.altKey && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); e.stopPropagation(); veRotoFreeze(); return; }
     // Ctrl+Z / Ctrl+Shift+Z ficam com o editor (os traços estão no efeito); depois, ressincroniza com o Python
     if (e.ctrlKey && /^[zy]$/i.test(e.key)) setTimeout(() => { const f = veRotoFx(c); if (f && st) veRotoSincronizar(f.v.rd, st).then(() => { st.vigiar = true; veRotoVigiar(); veRotoTelaDesenhar(); }); }, 50);
     if (!e.ctrlKey && !e.metaKey) e.stopPropagation();   // as letras não viram atalho da timeline atrás da tela
@@ -467,9 +518,12 @@ window.addEventListener('keyup', e => { if (VERO.tela) VERO.tela.alt = e.altKey;
 // API para testes e para a Kani: VEROTO_API.abrir(c), .tracar(c, quadro, [[x, y]...], soma), .estado(c)
 const VEROTO_API = {
     abrir: c => veRotoTelaAbrir(c || VE.clips[VE.sel]),
+    freeze: () => veRotoFreeze(),
+    assunto: () => veRotoAssunto(),
+    seguir(v) { try { localStorage.setItem('ve-roto-seguir', v ? '1' : '0'); } catch (e) { /* sem armazenamento */ } if (VERO.tela) VERO.tela.seguir.checked = !!v; },
     tracar(c, i, pts, soma = true, raio = 0.03) { c = c || VE.clips[VE.sel]; veRotoAddTraco(c, i, { l: soma ? 1 : 0, r: raio, p: pts }); },
     esperar(c) { c = c || VE.clips[VE.sel]; const f = veRotoFx(c); return f && f.v.rd ? veRotoEsperar(f.v.rd.rid) : null; },
-    estado(c) { c = c || VE.clips[VE.sel]; const f = veRotoFx(c), st = f && f.v.rd && VERO.st[f.v.rd.rid]; return st ? { n: st.n, prontos: st.ver.filter(Boolean).length, rodando: !!(st.rodando || st.fila), erro: st.erro || '', bases: Object.keys(st.bases || {}).map(Number), msg: st.msg || '' } : null; },
+    estado(c) { c = c || VE.clips[VE.sel]; const f = veRotoFx(c), st = f && f.v.rd && VERO.st[f.v.rd.rid]; return st ? { n: st.n, prontos: st.ver.filter(Boolean).length, rodando: !!(st.rodando || st.fila), erro: st.erro || '', bases: Object.keys(st.bases || {}).map(Number), pend: st.pend || [], qual: st.qual || '', msg: st.msg || '' } : null; },
     quadro: (c, T) => { c = c || VE.clips[VE.sel]; const f = veRotoFx(c), st = f && VERO.st[f.v.rd.rid]; return st ? veRotoQuadro(st, c, T) : -1; },
 };
 window.VEROTO_API = VEROTO_API;
