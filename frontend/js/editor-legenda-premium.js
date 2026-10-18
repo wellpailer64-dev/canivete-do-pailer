@@ -682,21 +682,15 @@ document.addEventListener('click', ev => {
 // ── efeitos sonoros: sons do Soundboard no tempo das palavras, escolhidos pelo movimento e pelo assunto ──
 // Cada pedido = [categoria do pack, nome, duração mín, máx] (sons curtos: o pico do som cai na chegada da palavra).
 // entra = entrada do título (1ª palavra); acento = palavra de destaque; simples = toque leve nas legendas simples.
-// Os nomes valem para o pack 2 (2026-10-18: "Whoosh rápido 01", "Clique 01", "Correto"...) e o antigo (v1).
+// Pedidos em ordem de preferência: vale o primeiro que achar som no pack instalado (os seguintes = pack antigo).
+// Em todas as animações, whoosh SUAVE (pack 3, 2026-10-18: versões curtas com entrada/saída em curva, feitas para as
+// legendas): o clique de mouse/pop repetido a cada legenda ficou estranho no teste do Pailer.
+const VELP_SFX_WHOOSH = [['whoosh', /^whoosh suave \d/i, 0, 0.8], ['whoosh', /^(swish|swoosh|whoosh)( (rápido|curto))? \d/i, 0.25, 1.2]];
+const VELP_SFX_MINI = [['whoosh', /^whoosh suave mini \d/i, 0, 0.5], ['whoosh', /^whoosh suave \d/i, 0, 0.8], ['whoosh', /^(swish|swoosh) \d/i, 0, 0.5]];
 const VELP_SFX_PAL = {
-    entra: {
-        desfoque: [['whoosh', /^(swish|swoosh|whoosh)( (rápido|médio|curto))? \d/i, 0.25, 1.4]],
-        subir: [['whoosh', /^(swoosh|swish|whoosh rápido) \d/i, 0.2, 1.2]],
-        pop: [['pop', /^(pop|bolha|pop de boca) \d/i, 0, 0.45]],
-        acender: [['pop', /^(clique|clique suave|pluck|seleção) \d/i, 0, 0.3]],
-    },
-    acento: {
-        desfoque: [['whoosh', /^(swish|swoosh|whoosh rápido) \d/i, 0, 0.5]],
-        subir: [['pop', /^(rollover|clique suave|clique) \d/i, 0, 0.3]],
-        pop: [['pop', /^(pop|bolha) \d/i, 0, 0.35]],
-        acender: [['pop', /^(pluck|toque|clique) \d/i, 0, 0.25]],
-    },
-    simples: [['pop', /^(clique suave|toque|clique) \d/i, 0, 0.25]],
+    entra: { desfoque: VELP_SFX_WHOOSH, subir: VELP_SFX_WHOOSH, pop: VELP_SFX_WHOOSH, acender: VELP_SFX_WHOOSH },
+    acento: { desfoque: VELP_SFX_MINI, subir: VELP_SFX_MINI, pop: VELP_SFX_MINI, acender: VELP_SFX_MINI },
+    simples: VELP_SFX_MINI,
 };
 // assunto da palavra → som que combina (vale a primeira que bater no título)
 const VELP_SFX_ASSUNTO = [
@@ -710,25 +704,25 @@ const VELP_SFX_ASSUNTO = [
      [['objetos', /^digitando \d/i, 0, 1.7], ['trabalho', /^digitando (curto|médio)$/i, 0, 2.6]]],
 ];
 const VELP_SFX_PERGUNTA = [['notificacao', /^pergunta \d/i, 0, 0.5], ['memes', /^ahn\?/i, 0, 1.2]];
-const VELP_SFX_GANHO = { entra: -12, acento: -14, assunto: -10, simples: -19 };   // dB no clipe, antes do Volume do painel
+const VELP_SFX_GANHO = { entra: -13, acento: -17, assunto: -10, simples: -21 };   // dB no clipe, antes do Volume do painel
 const VELP_SFX_DICA = {
-    sutil: 'Um som na entrada de cada título, no ritmo da animação, e um som do assunto quando a frase pede (moedas, câmera, confirmação…).',
-    medio: 'Sutil + um toque na palavra de destaque de cada título.',
-    forte: 'Médio + um clique leve no começo de cada legenda simples.',
+    sutil: 'Um whoosh suave na entrada de cada título e um som do assunto quando a frase pede (moedas, câmera, confirmação…).',
+    medio: 'Sutil + um whoosh bem curto na palavra de destaque de cada título.',
+    forte: 'Médio + um whoosh bem leve no começo de cada legenda simples.',
 };
 
 // Sons que atendem a um pedido, com o instante do pico (o "golpe" do som) — pk = forma de onda do pack (48 picos)
 function veLpSfxSons(dados, pedidos) {
-    const out = [];
-    (pedidos || []).forEach(([cat, rx, dmin, dmax]) => {
-        const c = (dados.categorias || []).find(x => x.id === cat);
+    for (const [cat, rx, dmin, dmax] of pedidos || []) {
+        const c = (dados.categorias || []).find(x => x.id === cat), out = [];
         (c ? c.sons : []).forEach(s => {
             if (!rx.test(s.nome) || s.dur < dmin || s.dur > dmax) return;
             const pk = Array.isArray(s.pk) && s.pk.length ? s.pk : null;
-            out.push({ ...s, pico: pk ? pk.indexOf(Math.max(...pk)) / pk.length * s.dur : 0 });
+            out.push({ ...s, pico: typeof s.pico === 'number' ? s.pico : pk ? pk.indexOf(Math.max(...pk)) / pk.length * s.dur : 0 });   // pico: do catálogo (pack 3)
         });
-    });
-    return out;
+        if (out.length) return out;   // o primeiro pedido que tem som no pack instalado
+    }
+    return [];
 }
 
 // Plano: [{st, s (som), g (dB), tipo}] — no máximo um som a cada 0,22 s (fica o de maior prioridade)
@@ -824,10 +818,11 @@ async function veLpSfxAtualizar(aviso) {
         plano.forEach(p => {
             const m = midias.get(p.s.path);
             if (!m) return;
-            const dur = m.dur || p.s.dur, st = veSnapFrame(Math.max(0, p.st));
-            const tr = veSbTrilhaLivre(st, dur, { m: m.id }, novos);
+            // som que começaria antes do zero (1ª palavra logo no início): corta o começo dele, o golpe fica no lugar
+            const dur = m.dur || p.s.dur, ini = Math.min(dur * 0.8, Math.max(0, -p.st)), st = veSnapFrame(Math.max(0, p.st));
+            const tr = veSbTrilhaLivre(st, dur - ini, { m: m.id }, novos);
             if (tr < 0) return;
-            novos.push({ tr, st, s: 0, e: dur, m: m.id, g: p.g + vol, lpSfx: 1, lpG: p.g, ...(m.cor ? { cor: m.cor } : {}) });
+            novos.push({ tr, st, s: +ini.toFixed(3), e: dur, m: m.id, g: p.g + vol, lpSfx: 1, lpG: p.g, ...(m.cor ? { cor: m.cor } : {}) });
         });
         VE.clips.push(...novos);
         veRelayout();

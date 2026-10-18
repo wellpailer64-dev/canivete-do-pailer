@@ -84,8 +84,9 @@ Referências (folhas e tiras ampliadas em `D:/kanivete_testes/legenda_ref`, `v2/
   **Margens de segurança** no Programa (botão ao lado das réguas, `veSegToggle` em editor-guias.js): retângulos de ação
   (90%) e de títulos (80%), só no monitor, valem para vertical e horizontal.
 - **Efeitos sonoros** (caixinha no painel, `pr.sfx`; Sutil/Médio/Forte + Volume): sons do pack do Soundboard escolhidos
-  pelo movimento (`VELP_SFX_PAL`: entrada do título = whoosh/swish curto no Desfoque e Subir, pop no Pop, clique no
-  Acender; acento na palavra de destaque) e pelo assunto (`VELP_SFX_ASSUNTO`: dinheiro → moedas/caixa, deu certo →
+  pelo movimento (`VELP_SFX_PAL`: só whoosh SUAVE em todas as animações — entrada do título = "Whoosh suave", destaque e
+  legendas simples = "Whoosh suave mini"; o clique de mouse repetido ficou estranho no teste do Pailer; o pico vem do
+  catálogo, campo `pico`) e pelo assunto (`VELP_SFX_ASSUNTO`: dinheiro → moedas/caixa, deu certo →
   confirmação, foto → câmera, erro → erro, pergunta → pergunta). O PICO do som (forma de onda `pk` do pack) cai na
   chegada da palavra; no máximo um som a cada 0,22 s; ganho −10 a −19 dB (SFX contido). Clipes marcados `lpSfx` numa
   trilha de áudio própria, refeitos ao montar/trocar dupla, animação, títulos ou papéis (os movidos à mão também).

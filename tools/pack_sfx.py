@@ -95,6 +95,13 @@ def montar_zip(base, versao):
         s = {"arq": rel, "nome": o["nome"], "dur": o["dur"], "fonte": o.get("fonte", ""), "licenca": "sem copyright (segundo o canal)"}
         if o.get("estilo"):
             s["estilo"] = o["estilo"]
+        # instante do "golpe" do som (s): a Legenda Premium põe esse ponto na chegada da palavra (sem esperar as formas
+        # de onda que o app calcula na 1ª abertura do painel)
+        x = f.ler(dst)
+        j = int(SR * 0.01)
+        e = (x ** 2).mean(1)
+        e = np.convolve(e[:len(e) // j * j].reshape(-1, j).mean(1), np.ones(5) / 5, "same")
+        s["pico"] = round(int(np.argmax(e)) * 0.01, 3)
         cats.setdefault(o["cat"], []).append(s)
     nomes = m.get("categorias", {})
     ordem = [c for c in ORDEM if c in cats] + sorted(c for c in cats if c not in ORDEM)
