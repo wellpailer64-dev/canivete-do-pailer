@@ -44,13 +44,18 @@ const VELP_DUPLAS = [
       anim: 'desfoque', brilho: 35, sombra: 0.65, ex: ['muito', 'mais'] },
 ];
 const VELP_CORES = ['#FF9A2E', '#F5C518', '#C8F560', '#5CC8FF', '#FF7A6B', '#E9C27D', '#B892FF', '#FFFFFF'];
-const VELP_ANIMS = [['auto', '✦ Automática'], ['desfoque', 'Desfoque e brilho'], ['acender', 'Acender'], ['subir', 'Subir'], ['pop', 'Pop']];
-const VELP_DUR = { desfoque: 0.24, acender: 0.18, subir: 0.22, pop: 0.22 };   // entrada de cada palavra (s)
-const VELP_SAI = 0.14;                                                         // saída do bloco (s)
+const VELP_ANIMS = [['auto', '✦ Automática'], ['desfoque', 'Desfoque e brilho'], ['acender', 'Acender'], ['subir', 'Subir'], ['pop', 'Pop'],
+                    ['revelar', 'Revelar'], ['zoom', 'Zoom'], ['cair', 'Cair'], ['deslizar', 'Deslizar']];
+// entrada de cada palavra (s)
+const VELP_DUR = { desfoque: 0.24, acender: 0.18, subir: 0.22, pop: 0.22, revelar: 0.26, zoom: 0.24, cair: 0.24, deslizar: 0.24 };
+const VELP_SAIDAS = [['auto', '✦ Automática'], ['esmaecer', 'Esmaecer'], ['desfocar', 'Desfocar'], ['encolher', 'Encolher'], ['varrer', 'Varrer']];
+const VELP_SAI_DUR = { esmaecer: 0.14, desfocar: 0.16, encolher: 0.16, varrer: 0.22 };   // saída do bloco (s)
+const VELP_SAI = 0.14;
+const VELP_MARCAS = [['traco', 'Traço'], ['caixa', 'Marca-texto'], ['nenhum', 'Nenhum']];
 const VELP_TITULOS = { poucos: 8, equilibrado: 4.5, muitos: 2.5 };             // um título a cada N segundos
 const VELP_POS = { cima: 0.24, peito: 0.6, baixo: 0.8 };                       // centro do bloco (× altura)
 const VELP_SEGURA = 0.8;   // área segura de títulos: 80% do quadro (10% de margem em cada lado, como no Premiere)
-const VELP_PADRAO = { dupla: 'brilho', cor: '', anim: 'auto', brilho: null, tam: 100, pos: 'peito', titulos: 'equilibrado', sub: true,
+const VELP_PADRAO = { dupla: 'brilho', cor: '', anim: 'auto', saida: 'auto', marca: '', brilho: null, tam: 100, pos: 'peito', titulos: 'equilibrado', sub: true,
                       sfx: false, sfxNivel: 'medio', sfxVol: 0 };
 // palavras de ligação (ficam pequenas, coladas na palavra seguinte)
 const VELP_LIG = new Set(('a o as os e é de do da dos das no na nos nas num numa em um uma uns umas pra pro pras pros ' +
@@ -70,7 +75,9 @@ const veLpAtivo = (e = veTxEstilo()) => e.modo === 'premium';
 // configuração efetiva (o que ficou vazio vem da dupla)
 function veLpCfg(e = veTxEstilo()) {
     const p = { ...VELP_PADRAO, ...(e.pr || {}) }, D = veLpDupla(p.dupla);
-    return { ...p, D, cor: p.cor || D.cor, anim: p.anim || D.anim, brilho: p.brilho == null ? D.brilho : +p.brilho };
+    // marca do destaque: traço (padrão), marca-texto ou nenhuma; projetos antigos guardavam só sub: true/false
+    return { ...p, D, cor: p.cor || D.cor, anim: p.anim || D.anim, saida: p.saida || 'auto', marca: p.marca || (p.sub === false ? 'nenhum' : 'traco'),
+             brilho: p.brilho == null ? D.brilho : +p.brilho };
 }
 function veLpSetCfg(patch) {
     VE.legEstilo = { ...veTxEstilo(), pr: { ...VELP_PADRAO, ...(veTxEstilo().pr || {}), ...patch } };
@@ -155,9 +162,14 @@ function veLpBlocos(W) {
         const b = blocos[i], p = blocos[i + 1];
         if (b.every(w => veLpEhLig(w[2])) && p[0][0] - b[b.length - 1][1] < 0.6 && b.length + p.length <= 6) blocos.splice(i, 2, [...b, ...p]);
     }
+    // cortes do vídeo principal: o bloco que terminaria logo depois de um corte termina no corte (não atravessa a troca
+    // de cena só com a cauda, depois que a fala acabou)
+    const cortes = (VE.clips || []).filter(c => c.tr === 0 && !veIsAudio(c)).flatMap(c => [c.st, veEnd(c)]);
     return blocos.map((b, i) => {
         const prox = blocos[i + 1], fim = b[b.length - 1][1];
-        const en = prox && prox[0][0] - fim < 0.7 ? prox[0][0] : fim + 0.35;
+        let en = prox && prox[0][0] - fim < 0.7 ? prox[0][0] : fim + 0.35;
+        const corte = cortes.filter(c => c > fim + 0.06 && c < en - 0.02).sort((x, y) => x - y)[0];
+        if (corte != null) en = corte;
         return { st: +b[0][0].toFixed(3), en: +Math.max(b[0][0] + 0.4, en).toFixed(3), texto: b.map(w => w[2]).join(' '),
                  pt: b.map(w => [+w[0].toFixed(3), +w[1].toFixed(3)]) };
     });
@@ -341,14 +353,24 @@ function veLpLayout(i) {
                         cor, papel: it.papel, a: P[it.k] ? Math.max(l.st, P[it.k][0]) : l.st, pe: !!l2.pe });
         });
     });
-    // traço sob o destaque (só no título, quando o destaque não está no pé): entra um pouco antes da palavra
+    // marca do destaque (só no título, quando o destaque não está no pé), entrando um pouco antes da palavra:
+    // traço embaixo, ou marca-texto (caixa na cor de destaque atrás da palavra, que passa a ter a cor que contrasta)
     let sub = null;
     const re = runs.find(x => x.papel === 'e' && !x.pe);
-    if (titulo && cfg.sub && re) {
+    if (titulo && re && cfg.marca === 'traco') {
         const T = 0.1 * U * fit;
-        sub = { x: re.x, y: re.base + Math.max(veLpMet(re.f).desc * re.em * 0.55, T * 0.12), w: re.w, h: Math.max(2, T * 0.055), a: Math.max(l.st, re.a - 0.18), cor: cfg.cor };
+        sub = { tipo: 'traco', x: re.x, y: re.base + Math.max(veLpMet(re.f).desc * re.em * 0.55, T * 0.12), w: re.w, h: Math.max(2, T * 0.055),
+                a: Math.max(l.st, re.a - 0.18), cor: cfg.cor };
+        sub.r = sub.h / 2;
+    } else if (titulo && re && cfg.marca === 'caixa') {
+        const met = veLpMet(re.f), px = re.em * 0.14, top = re.base - met.asc * re.em * 0.8, bot = re.base + met.desc * re.em * 0.5;
+        sub = { tipo: 'caixa', x: re.x - px, y: top, w: re.w + px * 2, h: bot - top, a: Math.max(l.st, re.a - 0.12), cor: cfg.cor };
+        sub.r = sub.h * 0.2;
+        re.cor = veLpContraste(cfg.cor);
+        re.sg = re.ss = true;   // sem brilho nem sombra: a caixa já separa a palavra do fundo
     }
-    const L = { runs, sub, caixa: { x: x0, y: y0, w: Wb, h: Hb }, cfg, titulo, track: D.track, anim: veLpAnimDe(i, cfg) };
+    const anim = veLpAnimDe(i, cfg);
+    const L = { runs, sub, caixa: { x: x0, y: y0, w: Wb, h: Hb }, cfg, titulo, track: D.track, anim, saida: veLpSaidaDe(i, cfg, anim) };
     VELP.cache.set(i, { chave, L });
     return L;
 }
@@ -362,22 +384,35 @@ function veLpAnimDe(i, cfg) {
     const L = VE.legendas || [], l = L[i];
     if (!l) return cfg.D.anim;
     const tk = veTxTokens(l.texto), fim = tk[tk.length - 1] || '', base = cfg.D.anim;
-    const outra = base === 'desfoque' ? 'subir' : 'desfoque';
+    const outra = base === 'desfoque' ? 'deslizar' : 'desfoque';
     if (!(l.pr && l.pr.t)) return base === 'desfoque' || base === 'pop' ? 'subir' : 'acender';
     const antes = L.slice(0, i).filter(x => x.pr && x.pr.t).length;
-    if (antes === 0) return 'desfoque';                                     // o gancho
-    if (/!["')\]]?$/.test(fim) || tk.some(w => /\d/.test(w))) return 'pop';
+    if (antes === 0) return base === 'acender' ? 'revelar' : base === 'pop' ? 'zoom' : 'desfoque';   // o gancho
+    if (/!["')\]]?$/.test(fim) || tk.some(w => /\d/.test(w))) return antes % 2 ? 'pop' : 'zoom';      // número / exclamação: impacto
     if (/\?["')\]]?$/.test(fim)) return 'subir';
-    return antes % 2 ? base : outra;
+    return [base, outra, 'revelar'][antes % 3];                             // os outros: variam sem repetir
+}
+// Saída "Automática": combina com a entrada (revelar ↔ varrer, impacto ↔ encolher, desfoque ↔ desfocar); simples esmaecem
+function veLpSaidaDe(i, cfg, anim) {
+    if (cfg.saida !== 'auto') return cfg.saida;
+    const l = (VE.legendas || [])[i];
+    if (!l || !(l.pr && l.pr.t)) return 'esmaecer';
+    return anim === 'revelar' || anim === 'deslizar' ? 'varrer' : anim === 'pop' || anim === 'zoom' ? 'encolher' : anim === 'desfoque' ? 'desfocar' : 'esmaecer';
+}
+// texto sobre o marca-texto: escuro em cor clara, branco em cor escura
+function veLpContraste(hex) {
+    const n = parseInt(String(hex).slice(1), 16) || 0, lum = (0.299 * (n >> 16 & 255) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255;
+    return lum > 0.58 ? '#141414' : '#FFFFFF';
 }
 const veLpEase = p => 1 - Math.pow(1 - p, 3);
 // estado de uma peça no instante t: alpha, desfoque (em), escala, deslocamento (em), mistura de cor (0 = escura) e brilho extra
-function veLpEstado(anim, t, a, fim, enf) {
-    const dur = VELP_DUR[anim] || 0.2;
+// rev = fração visível a partir da esquerda (revelar); corte = fração escondida a partir da esquerda (varrer)
+function veLpEstado(anim, t, a, fim, enf, saida = 'esmaecer') {
+    const dur = VELP_DUR[anim] || 0.2, sd = VELP_SAI_DUR[saida] || VELP_SAI;
     if (t < a) return null;
     const p = Math.min(1, (t - a) / dur), s = veLpEase(p);
-    const q = Math.max(0, Math.min(1, (t - (fim - VELP_SAI)) / VELP_SAI));
-    const o = { al: 1, bl: 0, sc: 1, dx: 0, dy: 0, mix: 1, boost: 0 };
+    const q = Math.max(0, Math.min(1, (t - (fim - sd)) / sd));
+    const o = { al: 1, bl: 0, sc: 1, dx: 0, dy: 0, mix: 1, boost: 0, rev: 1, corte: 0 };
     if (anim === 'desfoque') {
         o.al = Math.min(1, p * 1.8); o.bl = (1 - s) * 0.16; o.sc = 1.06 - 0.06 * s; o.dx = enf ? (1 - s) * 0.14 : 0;
         o.boost = p < 1 ? Math.sin(Math.PI * Math.min(1, p / 0.9)) : 0;
@@ -387,9 +422,25 @@ function veLpEstado(anim, t, a, fim, enf) {
         o.al = Math.min(1, p * 1.6); o.dy = (1 - s) * 0.28; o.bl = (1 - s) * 0.04;
     } else if (anim === 'pop') {
         o.al = Math.min(1, p * 2.5); o.sc = p < 0.6 ? 0.6 + 0.48 * (p / 0.6) : 1.08 - 0.08 * ((p - 0.6) / 0.4);
+    } else if (anim === 'revelar') {
+        o.rev = s; o.al = Math.min(1, p * 4);
+    } else if (anim === 'zoom') {
+        o.sc = 1.35 - 0.35 * s; o.bl = (1 - s) * 0.12; o.al = Math.min(1, p * 2);
+    } else if (anim === 'cair') {
+        o.dy = -(1 - s) * 0.6; o.al = Math.min(1, p * 2);
+    } else if (anim === 'deslizar') {
+        o.dx = -(1 - s) * 0.6; o.bl = (1 - s) * 0.03; o.al = Math.min(1, p * 2);
     }
-    if (q > 0) { o.al *= 1 - q; if (anim === 'desfoque') o.bl += q * 0.1; }
-    return o.al > 0.003 ? o : null;
+    if (q > 0) {
+        const e = veLpEase(q);
+        if (saida === 'varrer') o.corte = e;
+        else {
+            o.al *= 1 - q;
+            if (saida === 'desfocar') o.bl += q * 0.1;
+            else if (saida === 'encolher') o.sc *= 1 - 0.25 * e;
+        }
+    }
+    return o.al > 0.003 && o.corte < 0.999 && o.rev > 0.001 ? o : null;
 }
 function veLpMistura(hex, k) {   // cor → escura (k = 0) … cor (k = 1)
     const n = parseInt(String(hex).slice(1), 16) || 0, f = 0.38 + 0.62 * k;
@@ -404,21 +455,28 @@ function veLpDesenhar(ctx, i, t) {
     ctx.textBaseline = 'alphabetic';
     ctx.textAlign = 'left';
     if (L.sub) {
-        const o = veLpEstado('subir', t, L.sub.a, l.en, false);
+        const o = veLpEstado('subir', t, L.sub.a, l.en, false, L.saida);
         if (o) {
-            const p = Math.min(1, (t - L.sub.a) / 0.32), w = L.sub.w * veLpEase(p), s = L.sub;
+            const s = L.sub, p = Math.min(1, (t - s.a) / (s.tipo === 'caixa' ? 0.28 : 0.32)), w = s.w * veLpEase(p);
             ctx.save();
             ctx.globalAlpha = o.al;
             ctx.fillStyle = s.cor;
-            ctx.shadowColor = s.cor; ctx.shadowBlur = (6 + 14 * brilho) * esc * (s.h / 6);
-            ctx.beginPath(); ctx.roundRect(s.x, s.y, Math.max(0.1, w), s.h, s.h / 2); ctx.fill();
+            if (s.tipo !== 'caixa') { ctx.shadowColor = s.cor; ctx.shadowBlur = (6 + 14 * brilho) * esc * (s.h / 6); }
+            const x0 = s.x + s.w * o.corte;
+            ctx.beginPath(); ctx.roundRect(x0, s.y, Math.max(0.1, s.x + w - x0), s.h, Math.min(s.r, Math.max(0.1, w) / 2)); ctx.fill();
             ctx.restore();
         }
     }
     for (const r of L.runs) {
-        const o = veLpEstado(L.anim, t, r.a, l.en, r.papel === 'e');
+        const o = veLpEstado(L.anim, t, r.a, l.en, r.papel === 'e', L.saida);
         if (!o) continue;
         ctx.save();
+        if (o.rev < 1 || o.corte > 0) {   // revelar / varrer: a palavra aparece/some da esquerda para a direita
+            const m = r.em * 0.5;
+            ctx.beginPath();
+            ctx.rect(r.x - m + (r.w + 2 * m) * o.corte, r.base - r.em * 2, (r.w + 2 * m) * (o.rev - o.corte), r.em * 3);
+            ctx.clip();
+        }
         ctx.font = `${r.em}px "${r.f}"`;
         ctx.letterSpacing = `${L.track * r.em}px`;
         const cx = r.x + r.w / 2, cy = r.base - r.em * 0.35;
@@ -430,12 +488,12 @@ function veLpDesenhar(ctx, i, t) {
         const cor = o.mix < 1 ? veLpMistura(r.cor, o.mix) : r.cor;
         ctx.fillStyle = cor;
         // sombra de leitura (curta, escura) e, por cima, o brilho na cor da palavra
-        if (sombra > 0) {
+        if (sombra > 0 && !r.ss) {
             ctx.shadowColor = `rgba(0,0,0,${(0.55 * sombra).toFixed(3)})`;
             ctx.shadowBlur = r.em * 0.14 * esc; ctx.shadowOffsetY = r.em * 0.035 * esc;
             ctx.fillText(r.txt, r.x, r.base);
         }
-        const gl = brilho * (1 + 1.3 * o.boost);
+        const gl = r.sg ? 0 : brilho * (1 + 1.3 * o.boost);
         if (gl > 0.01) {
             ctx.shadowColor = r.cor === '#FFFFFF' ? `rgba(255,244,230,${Math.min(1, 0.55 * gl).toFixed(3)})` : veTxRgba(r.cor, Math.min(100, 70 * gl));
             ctx.shadowBlur = r.em * (0.18 + 0.22 * gl) * esc; ctx.shadowOffsetY = 0;
@@ -455,14 +513,16 @@ function veLpCaixa(i) { const c = veLpLayout(i).caixa, f = VE.seqH * 0.01; retur
 function veLpExport(i, desloc) {
     const L = veLpLayout(i), cfg = L.cfg, D = cfg.D, r1 = v => Math.round(v * 10) / 10;
     return {
-        anim: L.anim, dur: VELP_DUR[L.anim] || 0.2, sai: VELP_SAI, brilho: cfg.brilho, sombra: D.sombra, track: D.track,
+        anim: L.anim, dur: VELP_DUR[L.anim] || 0.2, saida: L.saida, sai: VELP_SAI_DUR[L.saida] || VELP_SAI,
+        brilho: cfg.brilho, sombra: D.sombra, track: D.track,
         runs: L.runs.map(r => {
             const met = veLpMet(r.f), fs = r.em * met.razao;
             // b = linha de base: o _ass_premium refaz fs/cy com as medidas que o libass usa (OS/2 win, não hhea)
             return { t: r.txt, f: r.f, fs: r1(fs), em: r1(r.em), cx: r1(r.x + r.w / 2), cy: r1(r.base - met.asc * r.em + fs / 2), b: r1(r.base),
-                     cor: r.cor, e: r.papel === 'e' ? 1 : 0, a: +Math.max(0, r.a - desloc).toFixed(3) };
+                     w: r1(r.w), cor: r.cor, e: r.papel === 'e' ? 1 : 0, sg: r.sg ? 1 : 0, ss: r.ss ? 1 : 0, a: +Math.max(0, r.a - desloc).toFixed(3) };
         }),
-        sub: L.sub ? { x: r1(L.sub.x), y: r1(L.sub.y), w: r1(L.sub.w), h: r1(L.sub.h), a: +Math.max(0, L.sub.a - desloc).toFixed(3), cor: L.sub.cor } : null,
+        sub: L.sub ? { tipo: L.sub.tipo, x: r1(L.sub.x), y: r1(L.sub.y), w: r1(L.sub.w), h: r1(L.sub.h), r: r1(L.sub.r),
+                       a: +Math.max(0, L.sub.a - desloc).toFixed(3), cor: L.sub.cor } : null,
     };
 }
 
@@ -536,11 +596,19 @@ function veLpPainelHtml() {
             <div class="velp-rot">Entrada das palavras</div>
             <div class="velp-seg velp-seg-4" data-lpseg="anim">${VELP_ANIMS.map(([v, n]) => `<button data-v="${v}">${n}</button>`).join('')}</div>
         </div>
+        <div class="velp-bloco">
+            <div class="velp-rot">Saída do bloco</div>
+            <div class="velp-seg velp-seg-4" data-lpseg="saida">${VELP_SAIDAS.map(([v, n]) => `<button data-v="${v}">${n}</button>`).join('')}</div>
+        </div>
+        <div class="velp-bloco">
+            <div class="velp-rot">Destaque dos títulos</div>
+            <div class="velp-seg" data-lpseg="marca">${VELP_MARCAS.map(([v, n]) => `<button data-v="${v}">${n}</button>`).join('')}</div>
+        </div>
         <div class="velp-bloco velp-2col">
             <label class="velp-faixa"><span class="velp-rot">Brilho <output data-lpout="brilho"></output></span><input type="range" min="0" max="100" step="1" data-lpfaixa="brilho"></label>
             <label class="velp-faixa"><span class="velp-rot">Tamanho <output data-lpout="tam"></output></span><input type="range" min="50" max="180" step="1" data-lpfaixa="tam"></label>
         </div>
-        <label class="velp-chave"><input type="checkbox" data-lpsub><span></span>Traço sob o destaque dos títulos</label>
+
         <div class="velp-sfx">
             <label class="velp-chave"><input type="checkbox" data-lpsfx><span></span>Efeitos sonoros nas legendas</label>
             <div class="velp-sfx-op" data-lpsfxop>
@@ -584,7 +652,7 @@ function veLpRenderPainel() {
         inp.style.setProperty('--p', ((cfg[k] - inp.min) / (inp.max - inp.min) * 100).toFixed(1) + '%');
         pn.querySelector(`[data-lpout="${k}"]`).textContent = k === 'tam' ? `${Math.round(cfg[k])}%` : k === 'sfxVol' ? `${cfg[k] > 0 ? '+' : ''}${Math.round(cfg[k])} dB` : Math.round(cfg[k]);
     });
-    pn.querySelector('[data-lpsub]').checked = !!cfg.sub;
+
     pn.querySelector('[data-lpsfx]').checked = !!cfg.sfx;
     pn.querySelector('[data-lpsfxop]').hidden = !cfg.sfx;
     pn.querySelector('[data-lpsfxdica]').textContent = VELP_SFX_DICA[cfg.sfxNivel] || '';
@@ -648,7 +716,7 @@ function veLpInit() {
             if (ev.target.dataset.lpfaixa === 'sfxVol') veLpSfxVolume();
             veRefresh();
         }
-        if (ev.target.matches('[data-lpsub]')) { vePushHistory(); veLpSetCfg({ sub: ev.target.checked }); veRefresh(); }
+
         if (ev.target.matches('[data-lpsfx]')) { vePushHistory(); veLpSetCfg({ sfx: ev.target.checked }); veRefresh(); veLpSfxAtualizar(true); }
     });
 }

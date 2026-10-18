@@ -2902,12 +2902,25 @@ def _ass_mistura(hexcor, k):
 
 def _ass_premium(prm, st, en):
     anim = str(prm.get("anim") or "desfoque")
+    saida = str(prm.get("saida") or "esmaecer")
     d = max(40, int(round(_num(prm.get("dur"), 0.05, 1, 0.22) * 1000)))
     sai = int(round(_num(prm.get("sai"), 0, 1, 0.14) * 1000))
     brilho = _num(prm.get("brilho"), 0, 100, 0) / 100
     sombra = _num(prm.get("sombra"), 0, 1, 0.6)
     track = _num(prm.get("track"), -0.3, 0.3, 0)
     ev = []
+
+    def recorte(xl, xr, y0, y1, L, s0, entra):
+        """\\clip animado: revelar (abre da esquerda para a direita na entrada) e varrer (fecha da esquerda na saída)."""
+        if not entra and saida != "varrer":
+            return ""
+        t = [f"\\clip({xl:.1f},{y0:.1f},{xl if entra else xr:.1f},{y1:.1f})" if entra else f"\\clip({xl:.1f},{y0:.1f},{xr:.1f},{y1:.1f})"]
+        if entra:
+            t.append(f"\\t(0,{d},0.45,\\clip({xl:.1f},{y0:.1f},{xr:.1f},{y1:.1f}))")
+        if saida == "varrer" and s0 < L:
+            t.append(f"\\t({s0},{L},1.6,\\clip({xr:.1f},{y0:.1f},{xr:.1f},{y1:.1f}))")
+        return "".join(t)
+
     for r in prm.get("runs") or []:
         try:
             a = max(st, float(r["a"]))
@@ -2928,6 +2941,7 @@ def _ass_premium(prm, st, en):
         cor = _ass_cor(cor_hex)[4:]
         enf = bool(r.get("e"))
         branco = cor_hex.upper() == "#FFFFFF"
+        larg = _num(r.get("w"), 0, 100000, em * max(1, len(str(r.get("t", "")))) * 0.55)
         fixo = f"\\fn{fonte}\\fs{fs:.1f}\\b0\\i0\\bord0\\shad0\\fsp{track * em:.2f}\\q2"
 
         def camada(nivel, ox, oy, alvo, c1, blur_fixo, pulso=None):
@@ -2935,6 +2949,7 @@ def _ass_premium(prm, st, en):
             x, y = cx + ox, cy + oy
             t = ["\\an5", fixo, f"\\1c&H{c1}&"]
             sai_tags = "\\alpha&HFF&"
+            entra_alfa = f"\\alpha&HFF&\\t(0,{int(d * 0.5)},\\alpha{_ass_alfa(alvo)})"
             if anim == "desfoque":
                 b0 = max(blur_fixo, 0.16 * em)
                 if enf:
@@ -2946,7 +2961,6 @@ def _ass_premium(prm, st, en):
                     t.append(f"\\alpha&HFF&\\t(0,{int(d * 0.45)},\\alpha{_ass_alfa(pulso)})\\t({int(d * 0.45)},{d},\\alpha{_ass_alfa(alvo)})")
                 else:
                     t.append(f"\\alpha&HFF&\\t(0,{int(d * 0.55)},\\alpha{_ass_alfa(alvo)})")
-                sai_tags += f"\\blur{blur_fixo + 0.1 * em:.1f}"
             elif anim == "acender":
                 t.append(f"\\pos({x:.1f},{y:.1f})\\blur{blur_fixo:.1f}")
                 if c1 == cor:
@@ -2956,22 +2970,39 @@ def _ass_premium(prm, st, en):
                 t.append(f"\\move({x:.1f},{y + 0.28 * em:.1f},{x:.1f},{y:.1f},0,{d})")
                 t.append(f"\\blur{blur_fixo + 0.04 * em:.1f}\\t(0,{d},0.45,\\blur{blur_fixo:.1f})")
                 t.append(f"\\alpha&HFF&\\t(0,{int(d * 0.62)},\\alpha{_ass_alfa(alvo)})")
+            elif anim == "zoom":
+                t.append(f"\\pos({x:.1f},{y:.1f})\\blur{max(blur_fixo, 0.12 * em):.1f}\\t(0,{d},0.45,\\blur{blur_fixo:.1f})")
+                t.append(f"\\fscx135\\fscy135\\t(0,{d},0.45,\\fscx100\\fscy100)" + entra_alfa)
+            elif anim == "cair":
+                t.append(f"\\move({x:.1f},{y - 0.6 * em:.1f},{x:.1f},{y:.1f},0,{d})\\blur{blur_fixo:.1f}" + entra_alfa)
+            elif anim == "deslizar":
+                t.append(f"\\move({x - 0.6 * em:.1f},{y:.1f},{x:.1f},{y:.1f},0,{d})")
+                t.append(f"\\blur{blur_fixo + 0.03 * em:.1f}\\t(0,{d},0.45,\\blur{blur_fixo:.1f})" + entra_alfa)
+            elif anim == "revelar":
+                t.append(f"\\pos({x:.1f},{y:.1f})\\blur{blur_fixo:.1f}\\alpha&HFF&\\t(0,{int(d * 0.25)},\\alpha{_ass_alfa(alvo)})")
             else:   # pop
                 t.append(f"\\pos({x:.1f},{y:.1f})\\blur{blur_fixo:.1f}")
                 t.append(f"\\fscx60\\fscy60\\t(0,{int(d * 0.6)},\\fscx108\\fscy108)\\t({int(d * 0.6)},{d},\\fscx100\\fscy100)")
                 t.append(f"\\alpha&HFF&\\t(0,{int(d * 0.4)},\\alpha{_ass_alfa(alvo)})")
-            if s0 < L:
+            m = em * 0.5
+            t.append(recorte(cx - larg / 2 - m, cx + larg / 2 + m, y - em * 2, y + em * 2, L, s0, anim == "revelar"))
+            if s0 < L and saida != "varrer":
+                if saida == "desfocar":
+                    sai_tags += f"\\blur{blur_fixo + 0.1 * em:.1f}"
+                elif saida == "encolher":
+                    sai_tags += "\\fscx75\\fscy75"
                 t.append(f"\\t({s0},{L},{sai_tags})")
             ev.append(f"Dialogue: {nivel},{_ass_tempo(a)},{_ass_tempo(en)},LegP,,0,0,0,,{{{''.join(t)}}}{txt}")
 
-        if sombra > 0:
+        if sombra > 0 and not r.get("ss"):
             camada(1, 0, 0.035 * em, 255 * (1 - 0.55 * sombra), "000000", 0.07 * em)
-        if brilho > 0.01:
+        if brilho > 0.01 and not r.get("sg"):
             forca = 0.55 if branco else 0.7
             c_gl = "E6F4FF" if branco else cor
             pulso = 255 * (1 - min(1, forca * brilho * 2.3)) if anim == "desfoque" else None
             camada(2, 0, 0, 255 * (1 - min(1, forca * brilho)), c_gl, em * (0.09 + 0.11 * brilho), pulso)
         camada(3, 0, 0, 0, cor, 0)
+    # marca do destaque: traço embaixo (com brilho) ou marca-texto (caixa atrás da palavra, camada 0), abrindo da esquerda
     s = prm.get("sub")
     if isinstance(s, dict):
         try:
@@ -2980,17 +3011,22 @@ def _ass_premium(prm, st, en):
         except Exception:
             a, w, h = en, 0, 0
         if a < en - 0.03 and w > 0 and h > 0:
+            caixa = s.get("tipo") == "caixa"
             L = int(round((en - a) * 1000))
             s0 = max(0, L - sai)
             cor = _ass_cor(s.get("cor") or "#FF9A2E")[4:]
-            forma = _ass_retangulo(w, h, h / 2)
-            ab = f"\\clip({x - h:.1f},{y - h * 6:.1f},{x + 0.5:.1f},{y + h * 7:.1f})"
-            corre = f"\\t(0,320,0.45,\\clip({x - h:.1f},{y - h * 6:.1f},{x + w + h:.1f},{y + h * 7:.1f}))"
-            fim = f"\\t({s0},{L},\\alpha&HFF&)" if s0 < L else ""
-            if brilho > 0.01:
+            forma = _ass_retangulo(w, h, _num(s.get("r"), 0, h, h / 2))
+            y0, y1 = y - h * 6, y + h * 7
+            ab = f"\\clip({x - h:.1f},{y0:.1f},{x + 0.5:.1f},{y1:.1f})"
+            corre = f"\\t(0,{280 if caixa else 320},0.45,\\clip({x - h:.1f},{y0:.1f},{x + w + h:.1f},{y1:.1f}))"
+            if s0 < L and saida == "varrer":
+                fim = f"\\t({s0},{L},1.6,\\clip({x + w + h:.1f},{y0:.1f},{x + w + h:.1f},{y1:.1f}))"
+            else:
+                fim = f"\\t({s0},{L},\\alpha&HFF&)" if s0 < L else ""
+            if brilho > 0.01 and not caixa:
                 ev.append(f"Dialogue: 2,{_ass_tempo(a)},{_ass_tempo(en)},LegP,,0,0,0,,{{\\an7\\pos({x:.1f},{y:.1f})\\bord0\\shad0"
                           f"\\1c&H{cor}&\\alpha{_ass_alfa(255 * (1 - min(1, 0.4 + 0.5 * brilho)))}\\blur{h * (1.2 + 2 * brilho):.1f}{ab}{corre}{fim}\\p1}}{forma}")
-            ev.append(f"Dialogue: 3,{_ass_tempo(a)},{_ass_tempo(en)},LegP,,0,0,0,,{{\\an7\\pos({x:.1f},{y:.1f})\\bord0\\shad0"
+            ev.append(f"Dialogue: {0 if caixa else 3},{_ass_tempo(a)},{_ass_tempo(en)},LegP,,0,0,0,,{{\\an7\\pos({x:.1f},{y:.1f})\\bord0\\shad0"
                       f"\\1c&H{cor}&\\alpha&H00&{ab}{corre}{fim}\\p1}}{forma}")
     return ev
 

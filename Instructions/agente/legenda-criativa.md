@@ -97,11 +97,18 @@ Referências (folhas e tiras ampliadas em `D:/kanivete_testes/legenda_ref`, `v2/
 - **Entrada Automática** (padrão, `pr.anim = 'auto'`, `veLpAnimDe`): por legenda — o gancho (1º título) com desfoque e
   brilho, título com número ou "!" com pop, com "?" subindo, os outros alternando a da dupla com uma segunda; legendas
   simples discretas (subir/acender). A exportação recebe a entrada de cada legenda (`item.prm.anim`).
-- **Teste**: `py -3.13 testes/teste_export.py --casos premium --folha` (prévia × exportação); prints do painel:
+- **Rodada 3 (2026-10-18)**: entradas novas Revelar (clip abre da esquerda), Zoom (135%→100% com desfoque), Cair e
+  Deslizar; **saídas** (`pr.saida`: Automática, Esmaecer, Desfocar, Encolher, Varrer — a automática combina com a
+  entrada, `veLpSaidaDe`); **destaque** dos títulos (`pr.marca`: Traço, Marca-texto = caixa na cor de destaque atrás da
+  palavra com texto em contraste e sem brilho/sombra, Nenhum; `pr.sub` antigo vira traço/nenhum); bloco que terminaria
+  logo depois de um corte do vídeo principal (V1) termina no corte (`veLpBlocos`). Na exportação: `\clip` animado
+  (revelar/varrer), `\move` (cair/deslizar), escala (zoom/encolher); caixa na camada 0.
+- **Teste**: `py -3.13 testes/teste_export.py --casos premium,premium2,premium3,premium4,premium5 --folha` (prévia × exportação); prints do painel:
   `D:/kanivete_testes/scripts/lp_ui.py`.
 
 ## Pendências
 - Desviar do rosto sozinho (YuNet do Painel Pessoas) — hoje a posição é Cima/Meio/Baixo + arrastar no monitor.
 - Clarão de luz entre blocos-título e ícone/logo junto do título (vídeo A).
+- Cair/Deslizar/Subir: a prévia usa curva suave e o libass move em linha reta (\move não tem curva) — diferença pequena.
 - Legenda Premium no Sound Kanivete/Ke de arquivos: não se aplica (só timeline do Vídeo).
 - Testar num vídeo real de fala com várias densidades e ajustar `veLpBlocos`/`veLpNotaTitulo` com o Pailer.

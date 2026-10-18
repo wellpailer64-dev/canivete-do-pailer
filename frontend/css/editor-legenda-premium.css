@@ -95,7 +95,7 @@
 .velp-seg button:hover { color: var(--ve-text); }
 .velp-seg button.on { background: color-mix(in srgb, var(--velp-acc) 18%, var(--ve-panel-2)); color: var(--ve-text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--velp-acc) 45%, transparent); }
 .velp-seg-4 { flex-wrap: wrap; }
-.velp-seg-4 button { flex: 1 1 45%; }
+.velp-seg-4 button { flex: 1 1 22%; }
 .velp-seg-4 button[data-v="auto"] { flex-basis: 100%; }   /* Automática na linha de cima, as 4 embaixo */
 .velp-pos button { display: flex; justify-content: center; padding: 4px; }
 .velp-cel { position: relative; display: block; width: 11px; height: 18px; border: 1.5px solid currentColor; border-radius: 3px; opacity: .8; }
