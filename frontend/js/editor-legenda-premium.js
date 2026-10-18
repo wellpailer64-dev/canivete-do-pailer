@@ -813,6 +813,8 @@ async function veLpSfxAtualizar(aviso) {
         const plano = veLpSfxPlano(dados, cfg);
         const midias = new Map();
         for (const p of plano) if (!midias.has(p.s.path)) midias.set(p.s.path, await veLpSfxMidia(p.s));
+        // amarelo por padrão (a trilha de legendas também é amarela); se a pessoa trocou a cor, os refeitos mantêm a dela
+        const cor = (VE.clips.find(c => c.lpSfx && c.cor) || {}).cor || 'amarelo';
         tirar();
         const novos = [], vol = +cfg.sfxVol || 0;
         plano.forEach(p => {
@@ -822,7 +824,7 @@ async function veLpSfxAtualizar(aviso) {
             const dur = m.dur || p.s.dur, ini = Math.min(dur * 0.8, Math.max(0, -p.st)), st = veSnapFrame(Math.max(0, p.st));
             const tr = veSbTrilhaLivre(st, dur - ini, { m: m.id }, novos);
             if (tr < 0) return;
-            novos.push({ tr, st, s: +ini.toFixed(3), e: dur, m: m.id, g: p.g + vol, lpSfx: 1, lpG: p.g, ...(m.cor ? { cor: m.cor } : {}) });
+            novos.push({ tr, st, s: +ini.toFixed(3), e: dur, m: m.id, g: p.g + vol, lpSfx: 1, lpG: p.g, cor });
         });
         VE.clips.push(...novos);
         veRelayout();
