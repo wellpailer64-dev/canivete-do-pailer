@@ -68,6 +68,27 @@ com `xfade` pela transição de cada slide, `dur` por slide), PPTX em imagens (p
 (`pptx_nativo`: texto com trechos, formas, imagens com recorte do "cobrir", vídeo como vídeo, fundo, notas; sombra/
 mesclagem não vão — avisa).
 
+## Apresentação para qualquer aparelho (.html) — 2026-10-17
+Exportar › "Apresentação para qualquer aparelho (.html)" (`SDK.cmd('exportar', {formato: 'html', caminho})`): UM arquivo
+que abre com dois cliques no PC, Mac, celular, tablet ou navegador da TV, sem instalar nada (o `.dknv` continua sendo o
+projeto editável). Pedido do Pailer: formato de apresentar separado do projeto; decidido só HTML (extensão própria/exe
+não abre em celular).
+- `frontend/js/slider-html.js` (`sdExportarHtml`): monta cada slide como na apresentação (`sdMontarSlide(s, 'show')`),
+  troca as mídias por `data-m` (id da mídia), capa do vídeo em `data-p`, miniatura de cada slide (grade/notas), animações,
+  transição, notas, ocultos, fontes e pesos usados, todo o texto (subconjunto das fontes).
+- `Functions/slider_html.py`: mídias em base64 dentro do arquivo (fotos a 2× o tamanho em que aparecem `_img_otim`, GIF
+  como está, vídeo em MP4 H.264 `_video_pptx` — o que toca em todo celular), fontes em WOFF2 só com as letras usadas
+  (fontTools: Inter 800 KB → 62 KB, Poppins ~5 KB por peso), tudo no reprodutor.
+- Reprodutor `frontend/slider-player/player.html`: tela inicial (1º slide de verdade, Apresentar / Ver slides), barra que
+  some sozinha (anterior, n/total, próximo, grade, notas, tela preta, tela cheia), PageUp/PageDown/setas/Espaço (passador),
+  número+Enter, B/W, F, G, N; celular: deslizar ou tocar à direita/esquerda, trava a tela acesa (Wake Lock), deita na tela
+  cheia (Android). Grade: pular para um slide e ocultar/mostrar (olho; lembrado no aparelho por `localStorage`). Mídia
+  vira Blob só quando o slide chega (e adianta o próximo). Animações e transições copiadas de `slider-show.js` (mudou lá:
+  mudar aqui). API `window.SLIDER_PLAYER` (estado, ir, avancar, voltar, comecar, grade).
+- Limites: iPhone não tem tela cheia de página (a página ocupa a tela; deitar o celular); abrir pelo WhatsApp/Arquivos no
+  iPhone mostra a prévia sem JS → "Abrir no Safari" (o `<noscript>` explica); arquivo > 150 MB avisa (vídeo pesa).
+- Teste: `py -3.13 testes/teste_slider_html.py` (app em 9333; abre o .html no Edge como PC e como iPhone deitado).
+
 ## Arquivos (conferidos em `testes/teste_slider_arquivos.py`, com o LibreOffice de `D:/kanivete_testes/libreoffice` como leitor externo)
 - **PowerPoint editável**: transição de cada slide (`<p:transition>` com `p14:dur`), animações de entrada como o PowerPoint
   grava (comportamentos set/animEffect/anim em `<p:timing>`; automáticas no grupo "ao abrir o slide", cada "esperar o

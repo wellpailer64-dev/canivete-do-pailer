@@ -171,7 +171,9 @@ Agente: `SDK.cmd('modelo', {tema})`, `SDK.cena(html, {novo: true})` por slide; l
 Photo/Photoshop (`slider-cores.js`, .ase), animações/transições com prévia na mesa. Janela sem margem (padding 10 px como o Photo).
 PowerPoint com animações/transições/vídeo automático (`Functions/slider_pptx.py`, ida e volta), PDF pesquisável/leve, importar
 PDF em camadas, MP4 com animação e vídeo dentro, Kani criando a palestra (`slider_kani.py`, `slider-kani.js`).
-Testes: `py -3.13 testes/teste_slider.py`, `teste_slider_extra.py` (atalhos com teclado de verdade) e `teste_slider_arquivos.py
+**Apresentação para qualquer aparelho** (2026-10-17): Exportar › `.html` único com o reprodutor (`frontend/slider-player/player.html`,
+`slider-html.js`, `Functions/slider_html.py`; mídias e fontes dentro, celular com toque); guia › "Apresentação para qualquer aparelho".
+Testes: `py -3.13 testes/teste_slider.py`, `teste_slider_html.py`, `teste_slider_extra.py` (atalhos com teclado de verdade) e `teste_slider_arquivos.py
 [--kani]` (arquivos abertos no LibreOffice de `D:/kanivete_testes/libreoffice`) — porta 9333.
 
 ## Ata Kanivete (At, verde; Beta) — reunião do Google Meet vira ATA

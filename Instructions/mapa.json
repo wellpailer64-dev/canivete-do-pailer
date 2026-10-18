@@ -877,6 +877,7 @@
   "sd_url",
   "sd_quadro",
   "sd_exportar",
+  "sd_exportar_html",
   "sd_gravar_imagem",
   "sd_gravar_midia",
   "sd_importar_pptx",
@@ -887,12 +888,18 @@
   "ata_salvar",
   "ata_apagar",
   "ata_importar",
+  "ata_buscar",
+  "ata_tarefas",
+  "ata_marcar_tarefa",
+  "ata_estilos",
   "ata_meet_abrir",
   "ata_meet_cmd",
   "ata_meet_estado",
+  "ata_cancelar",
   "ata_processar",
   "ata_reescrever",
   "ata_pdf",
+  "ata_docx",
   "ata_audio",
   "ke_presets",
   "ke_arquivo_info",
@@ -1974,6 +1981,12 @@
     "slider_kanivete"
    ]
   },
+  "sd_exportar_html": {
+   "args": "caminho, pacote",
+   "modulos": [
+    "slider_html"
+   ]
+  },
   "sd_gravar_imagem": {
    "args": "caminho, data_url",
    "modulos": [
@@ -2034,8 +2047,32 @@
     "ata_kanivete"
    ]
   },
+  "ata_buscar": {
+   "args": "termo",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
+  "ata_tarefas": {
+   "args": "",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
+  "ata_marcar_tarefa": {
+   "args": "sid, i, feito=True",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
+  "ata_estilos": {
+   "args": "",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
   "ata_meet_abrir": {
-   "args": "link=\"\"",
+   "args": "link=\"\", auto=False",
    "modulos": [
     "ata_kanivete"
    ]
@@ -2051,6 +2088,10 @@
    "modulos": [
     "ata_kanivete"
    ]
+  },
+  "ata_cancelar": {
+   "args": "sid",
+   "modulos": []
   },
   "ata_processar": {
    "args": "sid",
@@ -2070,8 +2111,14 @@
     "ata_kanivete"
    ]
   },
+  "ata_docx": {
+   "args": "sid",
+   "modulos": [
+    "ata_kanivete"
+   ]
+  },
   "ata_audio": {
-   "args": "sid, faixa",
+   "args": "sid, faixa=\"mix\"",
    "modulos": [
     "ata_kanivete",
     "media_server"
@@ -3191,6 +3238,7 @@
   "Functions/sk_banco_vozes.py": "Banco de vozes do Texto para Voz (Sound Kanivete)",
   "Functions/sk_espectro.py": "Sound Kanivete — espectrograma, reparo espectral e separação voz/instrumental",
   "Functions/sk_gravar.py": "Sound Kanivete — gravar do microfone (ou interface de áudio) direto num WAV 24 bits",
+  "Functions/slider_html.py": "slider_html.py — Slider Kanivete › Exportar › \"Apresentação (HTML)\": UM arquivo .html que apresenta em qualquer aparelho",
   "Functions/slider_kani.py": "slider_kani.py — a Kani (modelo local) ajudando no Slider Kanivete. Ela só escreve o CONTEÚDO numa ficha JSON travada",
   "Functions/slider_kanivete.py": "slider_kanivete.py — Slider Kanivete (Sd, verde-água): apresentações 16:9 (PowerPoint/Canva/Figma no Kanivete)",
   "Functions/slider_pptx.py": "slider_pptx.py — o que o python-pptx não faz no PowerPoint do Slider Kanivete: TRANSIÇÕES, ANIMAÇÕES de entrada e",
@@ -3265,6 +3313,7 @@
   "teste_slider": "Slider Kanivete (Sd): comandos, desfazer, HTML → slide, mídias (imagem, GIF, vídeo), salvar/abrir .dknv, exportar",
   "teste_slider_arquivos": "Slider Kanivete — 3ª bateria: os ARQUIVOS. PowerPoint exportado com animações, transições, vídeo (sozinho/repetir/mudo)",
   "teste_slider_extra": "Slider Kanivete — 2ª bateria: janela sem margem, gráficos (todos os modelos, CSV, PPTX nativo), paletas de cliente",
+  "teste_slider_html": "Slider › Exportar › Apresentação (HTML): monta uma apresentação com foto, GIF, vídeo, animações (automática e de",
   "teste_som": "Sound Kanivete (som.js + Functions/sound_kanivete.py) — app em --agente=9333, mouse de verdade",
   "teste_timeline_pr": "Timeline como a do Premiere (2026-10-11): ferramentas no topo da coluna das trilhas, alvo de trilha (Track Targeting),",
   "teste_vetor": "Teste do Vetor Kanivete pela API real (app em --agente=9333): monta um cartão de visita pelos comandos (window.VKN),",

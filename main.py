@@ -4361,6 +4361,15 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def sd_exportar_html(self, caminho, pacote):
+        """Apresentação num .html só, que abre em qualquer aparelho (Functions/slider_html.py)."""
+        from Functions import slider_html
+        try:
+            return slider_html.exportar(caminho, json.loads(pacote) if isinstance(pacote, str) else pacote)
+        except Exception as e:
+            _registrar_erro("sd_exportar_html", e)
+            return {"success": False, "error": str(e)}
+
     def sd_gravar_imagem(self, caminho, data_url):
         from Functions import slider_kanivete
         try:

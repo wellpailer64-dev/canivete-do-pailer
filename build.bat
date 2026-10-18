@@ -50,6 +50,9 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --add-data "version.txt;." ^
  --add-data "%WHISPER_ASSETS%;whisper/assets" ^
  --hidden-import "PIL" ^
+ --hidden-import "fontTools.subset" ^
+ --hidden-import "brotli" ^
+ --hidden-import "Functions.slider_html" ^
  --hidden-import "pillow_heif" ^
  --hidden-import "yt_dlp" ^
  --hidden-import "webview" ^

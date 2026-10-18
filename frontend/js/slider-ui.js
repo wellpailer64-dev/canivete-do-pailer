@@ -224,7 +224,7 @@ async function sdAcao(a) {
 // ───────────── menus ─────────────
 function sdItensMenu(m) {
     const temSel = SD.sel.length > 0, s = sdSlide(), rec = sdRecentes();
-    const exp = [['PDF (alta qualidade, texto pesquisável)', '', () => sdExportarUi('pdf')], ['PDF leve (e-mail, WhatsApp)', '', () => sdExportarUi('pdf', { qualidade: 'leve' })],
+    const exp = [['Apresentação para qualquer aparelho (.html)', '', () => sdExportarUi('html')], ['-'], ['PDF (alta qualidade, texto pesquisável)', '', () => sdExportarUi('pdf')], ['PDF leve (e-mail, WhatsApp)', '', () => sdExportarUi('pdf', { qualidade: 'leve' })],
         ['PowerPoint editável (.pptx)', '', () => sdExportarPptx()], ['PowerPoint em imagens (.pptx)', '', () => sdExportarUi('pptx_imagens')],
         ['Imagens PNG (um por slide)', '', () => sdExportarUi('png')], ['Vídeo MP4 (animações, transições e vídeos)', '', () => sdExportarUi('mp4')], ['Slide atual em PNG', '', () => sdExportarUi('png', { slides: 'atual' })]];
     const L = {
@@ -286,7 +286,9 @@ function sdFecharMenu() { if (SDU.menu) SDU.menu.remove(); SDU.menu = null; docu
 async function sdSalvarUi(como = false) { const r = await sdUi('salvar', { como }); if (r && r.caminho) sdToast('Salvo: ' + sdNomeArq(r.caminho) + '.dknv'); }
 async function sdExportarUi(formato, op = {}) {
     const r = await sdUi('exportar', { formato, ...op });
-    if (r && r.caminho) sdToast(`Exportado: ${String(r.caminho).split(/[\\/]/).pop()}${r.tamanho ? ' · ' + r.tamanho : ''}`);
+    if (r && r.caminho) sdToast(`Exportado: ${String(r.caminho).split(/[\\/]/).pop()}${r.tamanho ? ' · ' + r.tamanho : ''}${r.avisos && r.avisos.length ? ' · ' + r.avisos[0] : ''}`);
+    // a apresentação em HTML abre no navegador para conferir (é assim que ela abre em qualquer aparelho)
+    if (r && r.caminho && formato === 'html' && sdApi() && sdApi().open_file) sdApi().open_file(r.caminho);
 }
 async function sdExportarPptx() { const r = await sdUi('exportar', { formato: 'pptx' }); if (r && r.caminho) sdToast('PowerPoint salvo' + (r.avisos && r.avisos.length ? ` (${r.avisos.length} aviso(s): ${r.avisos[0]})` : '')); }
 function sdAlternar(k) { const cs = sdAlvos({}); const v = !cs.every(c => c[k]); return sdUi('editar', { [k]: v || null }); }

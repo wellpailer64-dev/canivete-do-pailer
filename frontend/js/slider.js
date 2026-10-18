@@ -724,15 +724,16 @@ function sdCongelarAnim(el, plano, t) {   // estado de cada camada animada no in
         e.style.opacity = op; e.style.transform = tr === 'none' ? '' : tr; e.style.clipPath = cp === 'none' ? '' : cp;
     }
 }
-sdRegistrar('exportar', 'exporta {formato: pdf|png|mp4|pptx|pptx_imagens, caminho, largura (px), qualidade: alta|leve, slides: todos|atual}', async a => {
+sdRegistrar('exportar', 'exporta {formato: pdf|png|mp4|pptx|pptx_imagens|html (apresentação que abre em qualquer aparelho), caminho, largura (px), qualidade: alta|leve, slides: todos|atual}', async a => {
     const fmt = a.formato || 'pdf';
-    const ext = { pdf: 'pdf', mp4: 'mp4', pptx: 'pptx', pptx_imagens: 'pptx', png: '' }[fmt];
+    const ext = { pdf: 'pdf', mp4: 'mp4', pptx: 'pptx', pptx_imagens: 'pptx', png: '', html: 'html' }[fmt];
     let p = a.caminho;
     if (!p) {
-        p = fmt === 'png' ? await sdApi().vk_dialogo('pasta') : await sdApi().vk_dialogo('salvar', [`${fmt.toUpperCase()} (*.${ext})`], (SD.doc.nome || 'Apresentação') + '.' + ext);
+        p = fmt === 'png' ? await sdApi().vk_dialogo('pasta') : await sdApi().vk_dialogo('salvar', [fmt === 'html' ? 'Apresentação para qualquer aparelho (*.html)' : `${fmt.toUpperCase()} (*.${ext})`], (SD.doc.nome || 'Apresentação') + '.' + ext);
         if (!p) return { cancelado: true };
     }
     if (ext && !new RegExp(`\\.${ext}$`, 'i').test(p)) p += '.' + ext;
+    if (fmt === 'html') return sdExportarHtml(p, a);
     if (fmt === 'pptx') {
         // gráficos: cores e texto resolvidos pelo tema (o Python não conhece o tema)
         const doc = sdClone(SD.doc);

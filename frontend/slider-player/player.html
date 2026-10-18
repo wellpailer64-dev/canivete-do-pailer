@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="generator" content="Slider Kanivete">
+<title>__TITULO__</title>
+<!-- Apresentação exportada pelo Slider Kanivete: reprodutor + slides + mídias + fontes num arquivo só (Functions/slider_html.py) -->
+<style>/*__FONTES__*/</style>
+<style>
+:root { --sd: #2ee6c8; --fundo: #000; --vidro: rgba(18, 20, 24, .78); --linha: rgba(255, 255, 255, .12); --txt: #f2f4f7; --txt2: rgba(242, 244, 247, .62); }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--fundo); color: var(--txt); overflow: hidden; overscroll-behavior: none;
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; }
+#pl { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; touch-action: none; user-select: none; -webkit-user-select: none; }
+#pl.ocioso { cursor: none; }
+#palco { position: relative; overflow: hidden; flex: none; background: #000; }
+#palco .sd-slide { position: absolute !important; left: 0; top: 0; transform-origin: 0 0; }
+/* o editor do app zera margens de tudo: o slide aqui também, para o texto cair no mesmo lugar */
+#palco .sd-slide *, .mini .sd-slide * { margin: 0; padding: 0; box-sizing: border-box; }
+#palco video[controls] { pointer-events: auto; }
+#tela { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; color: #777; font-size: 15px; }
+#tela[hidden] { display: none; }
+
+/* barra de controles (some sozinha) */
+#barra { position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 6; display: flex; align-items: center;
+    gap: 2px; padding: 5px; border-radius: 14px; background: var(--vidro); border: 1px solid var(--linha); box-shadow: 0 10px 40px rgba(0, 0, 0, .45);
+    transition: opacity .25s, transform .25s; }
+#pl.ocioso #barra, #pl.ocioso #topo { opacity: 0; pointer-events: none; }
+#pl.ocioso #barra { transform: translateX(-50%) translateY(8px); }
+.bt { display: inline-grid; place-items: center; min-width: 40px; height: 40px; padding: 0 10px; border: 0; border-radius: 10px; background: none; cursor: pointer; }
+.bt:hover { background: rgba(255, 255, 255, .09); }
+.bt.on { color: var(--sd); background: rgba(46, 230, 200, .12); }
+.bt svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sep { width: 1px; height: 22px; background: var(--linha); margin: 0 4px; }
+#cont { min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; color: var(--txt2); font-size: 13px; }
+#cont b { color: var(--txt); font-weight: 600; }
+#topo { position: absolute; left: 0; right: 0; top: 0; z-index: 5; height: 3px; background: rgba(255, 255, 255, .08); transition: opacity .25s; }
+#topo i { display: block; height: 100%; background: var(--sd); transform-origin: left; transition: transform .35s ease; }
+
+/* tela inicial */
+#inicio { position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px; overflow: auto; touch-action: auto; }
+#inicio[hidden] { display: none; }
+#inicio .fundo { position: absolute; inset: -40px; background-size: cover; background-position: center; filter: blur(30px) brightness(.35); transform: scale(1.1); }
+#inicio .cx { position: relative; width: min(760px, 100%); display: grid; gap: 22px; justify-items: center; text-align: center; }
+/* capa = o 1º slide de verdade (nítido), do tamanho que couber com título e botões na tela (celular deitado inclusive) */
+#inicio .capa { position: relative; overflow: hidden; width: min(100%, max(160px, calc((100dvh - 250px) * 16 / 9))); aspect-ratio: 16 / 9; border-radius: 14px;
+    background: #111; box-shadow: 0 30px 80px rgba(0, 0, 0, .6); border: 1px solid var(--linha); }
+#inicio .capa .sd-slide { position: absolute !important; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+#inicio .capa .sd-slide * { margin: 0; padding: 0; box-sizing: border-box; }
+@media (max-height: 480px) { #inicio .cx { gap: 12px; } #inicio .info { margin-top: -6px; } .grande { height: 42px; padding: 0 18px; font-size: 15px; } #inicio .dica { display: none; } }
+#inicio h1 { margin: 0; color: #fff; font-size: clamp(22px, 4vw, 34px); line-height: 1.15; font-weight: 700; letter-spacing: -.01em; }
+#inicio .info { color: var(--txt2); font-size: 14px; margin-top: -12px; }
+#inicio .bts { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.grande { display: inline-flex; align-items: center; gap: 9px; height: 50px; padding: 0 26px; border-radius: 12px; border: 1px solid var(--linha);
+    background: rgba(255, 255, 255, .08); font-size: 16px; font-weight: 600; cursor: pointer; }
+.grande.pri { background: var(--sd); border-color: transparent; color: #04201c; }
+.grande:hover { filter: brightness(1.08); }
+#inicio .dica { color: var(--txt2); font-size: 12.5px; }
+.marca { display: inline-flex; align-items: center; gap: 7px; color: var(--txt2); font-size: 12px; }
+.marca b { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; border: 1.5px solid var(--sd); color: var(--sd); font: 700 9.5px/1 system-ui; }
+
+/* grade de slides: pular para um e ocultar/mostrar */
+#grade { position: absolute; inset: 0; z-index: 8; display: flex; flex-direction: column; background: #08090b; touch-action: auto; }
+#grade[hidden] { display: none; }
+#grade header { display: flex; align-items: center; gap: 12px; padding: max(14px, env(safe-area-inset-top)) 18px 12px; border-bottom: 1px solid var(--linha); }
+#grade header h2 { margin: 0; font-size: 16px; font-weight: 600; flex: 1; }
+#grade header small { color: var(--txt2); font-size: 12.5px; }
+#grade .lista { flex: 1; overflow: auto; padding: 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; align-content: start;
+    -webkit-overflow-scrolling: touch; }
+.it { position: relative; display: grid; gap: 6px; cursor: pointer; }
+.it .mini { position: relative; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; background: #1a1c20 center / cover; outline: 1px solid var(--linha); }
+.it.atual .mini { outline: 2px solid var(--sd); }
+.it.oculto .mini { opacity: .28; filter: grayscale(1); }
+.it .rot { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--txt2); }
+.it .rot b { color: var(--txt); font-weight: 600; min-width: 18px; }
+.it .rot span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.it .olho { position: absolute; top: 6px; right: 6px; width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 8px;
+    background: rgba(0, 0, 0, .6); cursor: pointer; }
+.it .olho svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.it.oculto .olho { background: rgba(255, 90, 90, .85); }
+.it .tag { position: absolute; left: 8px; top: 8px; padding: 2px 7px; border-radius: 5px; background: rgba(0, 0, 0, .7); font-size: 11px; display: none; }
+.it.oculto .tag { display: block; }
+
+/* notas do apresentador */
+#notas { position: absolute; right: 12px; top: 12px; bottom: 76px; z-index: 7; width: min(380px, calc(100% - 24px)); display: flex; flex-direction: column; gap: 12px;
+    padding: 16px; border-radius: 14px; background: var(--vidro); border: 1px solid var(--linha); touch-action: auto; }
+#notas[hidden] { display: none; }
+#notas .tempo { display: flex; align-items: baseline; gap: 10px; }
+#notas .tempo b { font-size: 26px; font-variant-numeric: tabular-nums; }
+#notas .tempo span { color: var(--txt2); }
+#notas .txt { flex: 1; overflow: auto; white-space: pre-wrap; font-size: 15px; line-height: 1.55; }
+#notas .prox small { color: var(--txt2); font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; }
+#notas .prox .mini { margin-top: 6px; aspect-ratio: 16 / 9; border-radius: 6px; background: #1a1c20 center / cover; outline: 1px solid var(--linha); }
+#aviso { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); z-index: 9; padding: 8px 14px; border-radius: 10px; background: var(--vidro);
+    border: 1px solid var(--linha); font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; }
+#aviso.on { opacity: 1; }
+#som { position: absolute; right: 16px; top: 16px; z-index: 6; }
+#som[hidden] { display: none; }
+@media (max-width: 560px) { .bt { min-width: 38px; padding: 0 7px; } .sep { margin: 0 2px; } #cont { min-width: 54px; } .so-pc { display: none; } }
+</style>
+</head>
+<body>
+<noscript><div style="padding:30px;font:16px system-ui;color:#fff">Esta apresentação precisa abrir num navegador (Chrome, Safari, Edge ou Firefox).
+No celular: toque em Compartilhar › Abrir no navegador.</div></noscript>
+<div id="pl">
+  <div id="palco"></div>
+  <div id="tela" hidden></div>
+  <div id="topo"><i></i></div>
+  <div id="barra">
+    <button class="bt" id="b-ant" title="Anterior (←, PageUp)"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div id="cont"></div>
+    <button class="bt" id="b-prox" title="Próximo (→, PageDown, Espaço)"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+    <span class="sep"></span>
+    <button class="bt" id="b-grade" title="Slides: pular e ocultar (G)"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg></button>
+    <button class="bt" id="b-notas" title="Notas do apresentador (N)"><svg viewBox="0 0 24 24"><path d="M5 4h10l4 4v12H5z"/><path d="M9 11h6M9 15h6"/></svg></button>
+    <button class="bt so-pc" id="b-preto" title="Tela preta (B)"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="13" rx="2" fill="currentColor"/></svg></button>
+    <button class="bt" id="b-cheia" title="Tela cheia (F)"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  </div>
+  <button class="grande" id="som" hidden>🔈 Tocar com som</button>
+  <div id="notas" hidden><div class="tempo"><b id="n-tempo">00:00</b><span id="n-hora"></span></div><div class="txt" id="n-txt"></div>
+    <div class="prox"><small>Próximo</small><div class="mini" id="n-prox"></div></div></div>
+  <section id="grade" hidden><header><h2>Slides</h2><small>Toque no olho para ocultar ou mostrar</small>
+    <button class="bt" id="g-fechar" title="Fechar (Esc)"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header><div class="lista" id="g-lista"></div></section>
+  <section id="inicio"><div class="fundo" id="i-fundo"></div><div class="cx">
+    <div class="capa" id="i-capa"></div>
+    <h1 id="i-titulo"></h1><div class="info" id="i-info"></div>
+    <div class="bts"><button class="grande pri" id="i-ir"><svg width="18" height="18" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></svg>Apresentar</button>
+      <button class="grande" id="i-grade">Ver slides</button></div>
+    <div class="dica" id="i-dica">← → ou PageUp/PageDown para passar · F tela cheia · G slides · N notas</div>
+    <div class="marca"><b>Sd</b>Feito no Slider Kanivete</div></div></section>
+  <div id="aviso"></div>
+</div>
+<script id="dados" type="application/json">__DADOS__</script>
+<!--__MIDIAS__-->
+<script>
+'use strict';
+const D = JSON.parse(document.getElementById('dados').textContent);
+const W = D.largura || 1920, H = D.altura || 1080;
+const $ = id => document.getElementById(id);
+const P = { lista: [], i: 0, passo: 0, passos: [], ini: 0, num: '', oc: new Set(), fim: false, ocupado: false, wake: null };
+const toque = matchMedia('(pointer: coarse)').matches;
+
+// ── mídias: base64 dentro do arquivo → Blob na hora de usar (vídeo toca de blob em todo navegador, inclusive iPhone) ──
+const URLS = {};
+// decodifica em pedaços (sem a cópia inteira de um vídeo grande) e solta o texto depois: no celular a mídia fica uma vez só
+// na memória. Cada mídia vira Blob uma vez e fica (voltar slides não decodifica de novo).
+async function midia(id) {
+    if (URLS[id]) return URLS[id];
+    const el = document.getElementById(id); if (!el) return '';
+    return (URLS[id] = new Promise(res => setTimeout(() => {
+        const tipo = el.dataset.tipo, b64 = el.textContent, partes = [], N = 4 * 1024 * 1024;   // múltiplo de 4
+        for (let k = 0; k < b64.length; k += N) {
+            const s = atob(b64.slice(k, k + N)), u = new Uint8Array(s.length);
+            for (let j = 0; j < s.length; j++) u[j] = s.charCodeAt(j);
+            partes.push(u);
+        }
+        el.textContent = '';
+        res(URL.createObjectURL(new Blob(partes, { type: tipo })));
+    }, 0)));
+}
+async function prepararMidias(raiz) {
+    const ps = [];
+    raiz.querySelectorAll('[data-m]').forEach(el => ps.push(midia(el.dataset.m).then(u => {
+        if (el.tagName === 'VIDEO') { el.src = u; el.preload = 'auto'; } else el.src = u;
+    })));
+    await Promise.race([Promise.all(ps), new Promise(r => setTimeout(r, 4000))]);
+    await Promise.all([...raiz.querySelectorAll('img')].map(im => im.decode ? im.decode().catch(() => {}) : null));
+}
+// adianta as mídias do próximo slide
+// (com o navegador folgado: decodificar um vídeo grande no meio de uma transição engasgaria)
+function adiantar(i) { const s = P.lista[i]; if (!s) return; (window.requestIdleCallback || (f => setTimeout(f, 700)))(() => (s.m || []).forEach(id => midia(id)), { timeout: 2500 }); }
+
+// ── ocultos: começa como no editor; o que mudar aqui fica guardado neste aparelho ──
+const CH = 'sdk-ocultos:' + D.chave;
+function lerOcultos() {
+    let salvo = null; try { salvo = JSON.parse(localStorage.getItem(CH) || 'null'); } catch (e) { /* sem armazenamento */ }
+    P.oc = new Set(salvo || D.slides.filter(s => s.oculto).map(s => s.id));
+}
+function gravarOcultos() { try { localStorage.setItem(CH, JSON.stringify([...P.oc])); } catch (e) { /* sem armazenamento */ } }
+function refazerLista() {
+    const atual = P.lista[P.i];
+    P.lista = D.slides.filter(s => !P.oc.has(s.id));
+    const k = atual ? P.lista.indexOf(atual) : -1;
+    if (k >= 0) P.i = k; else P.i = Math.min(P.i, Math.max(0, P.lista.length - 1));
+}
+
+// ── desenho e escala ──
+function escala() {
+    const k = Math.min(innerWidth / W, innerHeight / H), pal = $('palco');
+    pal.style.width = W * k + 'px'; pal.style.height = H * k + 'px'; pal.dataset.k = k;
+    pal.querySelectorAll('.sd-slide').forEach(s => { s.style.transform = `scale(${k})`; });
+}
+function montar(s) {
+    const box = document.createElement('div'); box.innerHTML = s.html;
+    const el = box.firstElementChild;
+    el.querySelectorAll('video').forEach(v => {
+        const c = (s.videos || {})[v.closest('[data-id]').dataset.id] || {};
+        v.playsInline = true; v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', '');
+        v.loop = !!c.loop; v.muted = !!c.mudo; v.preload = 'auto';
+        if (v.dataset.p) v.poster = v.dataset.p;
+        if (!c.auto) v.controls = true;
+    });
+    return el;
+}
+
+// ── animações e transições (as mesmas da apresentação do editor: slider-show.js) ──
+const ANIM_DE = { esmaecer: 'opacity:0', subir: 'opacity:0;transform:translateY(80px)', descer: 'opacity:0;transform:translateY(-80px)',
+    esquerda: 'opacity:0;transform:translateX(-160px)', direita: 'opacity:0;transform:translateX(160px)', zoom: 'opacity:0;transform:scale(.6)', girar: 'opacity:0;transform:rotate(-25deg) scale(.7)',
+    pular: 'opacity:0;transform:scale(.3)', crescer: 'clip-path:inset(100% 0 0 0)', revelar: 'clip-path:inset(0 100% 0 0)' };
+const ANIM_CURVA = { pular: 'cubic-bezier(.34,1.7,.5,1)', crescer: 'cubic-bezier(.25,.8,.25,1)', revelar: 'cubic-bezier(.45,0,.2,1)' };
+function animDe(a, base) {
+    const de = { opacity: a.opac != null && a.opac < 1 ? a.opac : 1, transform: base || 'none' };
+    for (const d of (ANIM_DE[a.tipo] || 'opacity:0').split(';')) { const [k, v] = d.split(':'); if (k === 'transform') de.transform = (base + ' ' + v).trim(); else if (k === 'clip-path') de.clipPath = v; else de[k] = +v; }
+    return de;
+}
+function transQuadros(tipo, sinal, k) {
+    const S = `scale(${k})`;
+    return { esmaecer: [[{ opacity: 0 }, { opacity: 1 }]], deslizar: [[{ transform: `translateX(${sinal * 100}%) ${S}` }, { transform: `translateX(0) ${S}` }]],
+        empurrar: [[{ transform: `translateX(${sinal * 100}%) ${S}` }, { transform: `translateX(0) ${S}` }], [{ transform: `translateX(0) ${S}` }, { transform: `translateX(${-sinal * 100}%) ${S}` }]],
+        subir: [[{ transform: `translateY(${sinal * 100}%) ${S}` }, { transform: `translateY(0) ${S}` }]],
+        zoom: [[{ opacity: 0, transform: `scale(${k * 1.12})` }, { opacity: 1, transform: S }]],
+        cobrir: [[{ clipPath: sinal > 0 ? 'inset(0 0 0 100%)' : 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }]],
+        revelar: [[{ clipPath: 'circle(0% at 50% 50%)' }, { clipPath: 'circle(75% at 50% 50%)' }]],
+        preto: [[{ opacity: 0, offset: 0 }, { opacity: 0, offset: 0.5 }, { opacity: 1, offset: 1 }], [{ opacity: 1 }, { opacity: 0, offset: 0.5 }, { opacity: 0 }]] }[tipo];
+}
+function esconder(e, a) {
+    e.style.transition = 'none';
+    const de = animDe(a, e.dataset.base);
+    e.style.opacity = de.opacity; e.style.transform = de.transform === 'none' ? '' : de.transform; e.style.clipPath = de.clipPath || '';
+}
+function revelar(e, a, ja) {
+    void e.offsetWidth;
+    const d = a.dur || 0.6, curva = ANIM_CURVA[a.tipo] || 'cubic-bezier(.2,.8,.2,1)';
+    e.style.transition = ja ? 'none' : `opacity ${d}s ease, transform ${d}s ${curva}, clip-path ${d}s ${curva}`;
+    e.style.opacity = a.opac != null && a.opac < 1 ? a.opac : '1'; e.style.transform = e.dataset.base || '';
+    if (e.style.clipPath) { e.style.clipPath = 'inset(0 0 0 0)'; clearTimeout(e._tc); e._tc = setTimeout(() => { e.style.clipPath = ''; }, ja ? 0 : d * 1000 + 60); }
+    const v = e.querySelector('video'); if (v && !v.controls) tocar(v);
+}
+function tocar(v) {
+    const p = v.play(); if (!p) return;
+    p.catch(() => { if (!v.muted) { v.muted = true; v.play().catch(() => {}); $('som').hidden = false; } });
+}
+function limpar(x) { x.querySelectorAll('video').forEach(v => { v.pause(); v.removeAttribute('src'); v.load(); }); x.remove(); }
+
+async function ir(i, direcao = 1, passo = 0) {
+    const s = P.lista[i]; if (!s || P.ocupado) return;
+    P.ocupado = true;
+    try {
+        const pal = $('palco'), velho = pal.querySelector('.sd-slide:last-child');
+        const novo = montar(s);
+        await prepararMidias(novo);
+        P.i = i; P.passo = 0; P.fim = false; $('tela').hidden = true;
+        P.passos = (s.anim || []).filter(a => a.clique);
+        for (const a of s.anim || []) {
+            const e = novo.querySelector(`[data-id="${a.id}"]`); if (!e) continue;
+            e.dataset.base = e.style.transform || '';
+            esconder(e, a);
+            if (!a.clique) setTimeout(() => revelar(e, a), 60 + (+a.atraso || 0) * 1000);
+        }
+        pal.appendChild(novo); escala();
+        const tr = direcao === null ? null : (direcao > 0 ? s.transicao : (P.lista[i + 1] || {}).transicao);
+        const tipo = tr && tr.tipo && tr.tipo !== 'nenhuma' ? tr.tipo : null, dur = (tr && +tr.dur) || 0.5;
+        const ani = velho && tipo && transQuadros(tipo, direcao > 0 ? 1 : -1, +pal.dataset.k || 1);
+        if (ani) {
+            if (tipo === 'preto') pal.style.background = '#000';
+            novo.animate(ani[0], { duration: dur * 1000, easing: 'cubic-bezier(.4,0,.2,1)' });
+            if (ani[1]) velho.animate(ani[1], { duration: dur * 1000, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' });
+            setTimeout(() => { pal.querySelectorAll('.sd-slide').forEach(x => { if (x !== novo) limpar(x); }); }, dur * 1000 + 30);
+        } else pal.querySelectorAll('.sd-slide').forEach(x => { if (x !== novo) limpar(x); });
+        novo.querySelectorAll('video').forEach(v => {
+            const c = (s.videos || {})[v.closest('[data-id]').dataset.id] || {};
+            try { v.currentTime = +c.ini || 0; } catch (e) { /* ainda sem dados */ }
+            if (c.auto && parseFloat(v.closest('[data-id]').style.opacity || '1') > 0) tocar(v);   // com animação, toca ao aparecer
+        });
+        if (passo === 'fim') while (P.passo < P.passos.length) passoSeguinte(true);
+        adiantar(i + 1);
+        atualizar();
+    } finally { P.ocupado = false; }
+}
+function passoSeguinte(ja = false) {
+    const a = P.passos[P.passo]; if (!a) return false;
+    const e = $('palco').querySelector(`.sd-slide:last-child [data-id="${a.id}"]`);
+    if (e) revelar(e, a, ja);
+    P.passo++; atualizar(); return true;
+}
+function avancar() {
+    if (!$('tela').hidden && !P.fim) { $('tela').hidden = true; return; }
+    if (P.passo < P.passos.length) { passoSeguinte(); return; }
+    if (P.i + 1 < P.lista.length) ir(P.i + 1, 1);
+    else if (!P.fim) { P.fim = true; tela('#000', 'Fim da apresentação'); }
+}
+function voltar() {
+    if (!$('tela').hidden) { $('tela').hidden = true; P.fim = false; return; }
+    if (P.i > 0) ir(P.i - 1, -1, 'fim');
+}
+function tela(cor, msg = '') {
+    const t = $('tela');
+    if (!cor) { t.hidden = true; return; }
+    t.hidden = false; t.style.background = cor; t.textContent = msg; t.style.color = cor === '#fff' ? '#000' : '#777';
+}
+
+// ── interface ──
+function atualizar() {
+    const n = P.lista.length;
+    $('cont').innerHTML = `<b>${n ? P.i + 1 : 0}</b> / ${n}`;
+    $('topo').firstElementChild.style.transform = `scaleX(${n ? (P.i + 1) / n : 0})`;
+    $('b-ant').disabled = P.i === 0 && P.passo === 0;
+    notas();
+}
+function notas() {
+    const box = $('notas'); if (box.hidden) return;
+    const s = P.lista[P.i], prox = P.lista[P.i + 1];
+    $('n-txt').textContent = (s && s.notas) || '(sem notas neste slide)';
+    $('n-prox').style.backgroundImage = prox ? `url(${prox.mini})` : 'none';
+    $('n-prox').textContent = prox ? '' : '';
+    relogio();
+}
+function relogio() {
+    if (!P.ini) return;
+    const t = Math.floor((Date.now() - P.ini) / 1000);
+    $('n-tempo').textContent = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+    $('n-hora').textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+setInterval(() => { if (!$('notas').hidden) relogio(); }, 1000);
+
+function aviso(t) { const a = $('aviso'); a.textContent = t; a.classList.add('on'); clearTimeout(a._t); a._t = setTimeout(() => a.classList.remove('on'), 1600); }
+
+function grade(abrir = $('grade').hidden) {
+    $('grade').hidden = !abrir;
+    $('b-grade').classList.toggle('on', abrir);
+    if (!abrir) return;
+    const atual = P.lista[P.i];
+    $('g-lista').innerHTML = D.slides.map((s, k) => `<div class="it${P.oc.has(s.id) ? ' oculto' : ''}${s === atual ? ' atual' : ''}" data-k="${k}">
+        <div class="mini" style="background-image:url(${s.mini})"><span class="tag">Oculto</span>
+          <button class="olho" data-olho="${k}" title="${P.oc.has(s.id) ? 'Mostrar' : 'Ocultar'} este slide">${P.oc.has(s.id) ? ICONE_OCULTO : ICONE_OLHO}</button></div>
+        <div class="rot"><b>${k + 1}</b><span>${esc(s.titulo || '')}</span></div></div>`).join('');
+    const el = $('g-lista').querySelector('.atual'); if (el) el.scrollIntoView({ block: 'center' });
+}
+const ICONE_OLHO = '<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const ICONE_OCULTO = '<svg viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4M6.2 6.2C3.6 8 2 12 2 12s3.5 7 10 7c1.7 0 3.2-.4 4.5-1.1"/></svg>';
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+$('g-lista').addEventListener('click', e => {
+    const o = e.target.closest('[data-olho]');
+    if (o) {
+        e.stopPropagation();
+        const s = D.slides[+o.dataset.olho];
+        if (P.oc.has(s.id)) P.oc.delete(s.id);
+        else { if (D.slides.filter(x => !P.oc.has(x.id)).length <= 1) return aviso('Pelo menos um slide precisa ficar visível'); P.oc.add(s.id); }
+        gravarOcultos();
+        const eraAtual = P.lista[P.i] === s;
+        refazerLista(); grade(true); atualizar(); info();
+        if (eraAtual && P.oc.has(s.id) && $('inicio').hidden) ir(P.i, null);   // apresentando: o slide atual sumiu, mostra o seguinte
+        return;
+    }
+    const it = e.target.closest('.it'); if (!it) return;
+    const s = D.slides[+it.dataset.k];
+    if (P.oc.has(s.id)) { P.oc.delete(s.id); gravarOcultos(); refazerLista(); }
+    grade(false);
+    comecar(P.lista.indexOf(s));
+});
+
+async function cheia() {
+    const d = document, el = d.documentElement;
+    try {
+        if (d.fullscreenElement || d.webkitFullscreenElement) { (d.exitFullscreen || d.webkitExitFullscreen).call(d); return; }
+        await (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+        if (screen.orientation && screen.orientation.lock && toque) screen.orientation.lock('landscape').catch(() => {});
+    } catch (e) { /* aparelho sem tela cheia (iPhone): a página já ocupa a tela */ }
+}
+const temCheia = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+if (!temCheia) $('b-cheia').style.display = 'none';
+document.addEventListener('fullscreenchange', () => $('b-cheia').classList.toggle('on', !!document.fullscreenElement));
+
+async function manterTela() { try { if ('wakeLock' in navigator) P.wake = await navigator.wakeLock.request('screen'); } catch (e) { /* sem trava de tela */ } }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && P.ini) manterTela(); });
+
+function comecar(i = 0) {
+    $('inicio').hidden = true;
+    if (!P.ini) { P.ini = Date.now(); manterTela(); }
+    ir(Math.max(0, i), null);
+    acordar();
+}
+
+// controles somem parados; voltam ao mexer o mouse ou tocar
+function acordar() { const pl = $('pl'); pl.classList.remove('ocioso'); clearTimeout(P.to); P.to = setTimeout(() => { if ($('grade').hidden && $('inicio').hidden) pl.classList.add('ocioso'); }, toque ? 3200 : 2200); }
+addEventListener('mousemove', acordar);
+
+// ── teclado (inclusive o passador de slides: PageDown/PageUp, "." tela preta) ──
+addEventListener('keydown', e => {
+    const k = e.key;
+    if (!$('inicio').hidden) { if ([' ', 'Enter', 'ArrowRight', 'PageDown'].includes(k)) { e.preventDefault(); comecar(0); } return; }
+    if (!$('grade').hidden) { if (k === 'Escape' || k === 'g' || k === 'G') { e.preventDefault(); grade(false); } return; }
+    const feito = () => e.preventDefault();
+    if (/^[0-9]$/.test(k)) { feito(); P.num += k; aviso('Ir ao slide ' + P.num); return; }
+    if (k === 'Enter' && P.num) { feito(); const n = Math.max(1, Math.min(P.lista.length, +P.num)) - 1; P.num = ''; ir(n, n > P.i ? 1 : -1); return; }
+    if (['ArrowRight', 'ArrowDown', ' ', 'PageDown', 'Enter'].includes(k)) { feito(); avancar(); return; }
+    if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(k)) { feito(); voltar(); return; }
+    if (k === 'Home') { feito(); ir(0, -1); return; }
+    if (k === 'End') { feito(); ir(P.lista.length - 1, 1, 'fim'); return; }
+    if (k === 'b' || k === 'B' || k === '.') { feito(); tela($('tela').hidden ? '#000' : null); return; }
+    if (k === 'w' || k === 'W' || k === ',') { feito(); tela($('tela').hidden ? '#fff' : null); return; }
+    if (k === 'f' || k === 'F') { feito(); cheia(); return; }
+    if (k === 'g' || k === 'G') { feito(); grade(); return; }
+    if (k === 'n' || k === 'N') { feito(); alternarNotas(); return; }
+    if (k === 'Escape') { if (!$('notas').hidden) { feito(); alternarNotas(); } }
+});
+function alternarNotas() { const n = $('notas'); n.hidden = !n.hidden; $('b-notas').classList.toggle('on', !n.hidden); notas(); }
+
+// ── toque e clique: deslizar troca de slide; toque à direita avança, à esquerda volta ──
+let t0 = null;
+$('palco').parentElement.addEventListener('pointerdown', e => {
+    if (e.target.closest('#barra,#grade,#notas,#inicio,#som,video[controls]')) return;
+    t0 = { x: e.clientX, y: e.clientY, t: Date.now() };
+});
+addEventListener('pointerup', e => {
+    if (!t0) return;
+    const dx = e.clientX - t0.x, dy = e.clientY - t0.y, rap = Date.now() - t0.t < 600; t0 = null;
+    acordar();
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) && rap) { if (dx < 0) avancar(); else voltar(); return; }
+    if (Math.abs(dx) < 12 && Math.abs(dy) < 12) { if (e.clientX < innerWidth * 0.33) voltar(); else avancar(); }
+});
+addEventListener('contextmenu', e => { if (!e.target.closest('video')) { e.preventDefault(); voltar(); } });
+addEventListener('resize', escala);
+addEventListener('orientationchange', () => setTimeout(escala, 200));
+
+$('b-ant').onclick = e => { e.stopPropagation(); voltar(); acordar(); };
+$('b-prox').onclick = e => { e.stopPropagation(); avancar(); acordar(); };
+$('b-grade').onclick = e => { e.stopPropagation(); grade(); };
+$('g-fechar').onclick = () => grade(false);
+$('b-notas').onclick = e => { e.stopPropagation(); alternarNotas(); };
+$('b-preto').onclick = e => { e.stopPropagation(); tela($('tela').hidden ? '#000' : null); };
+$('b-cheia').onclick = e => { e.stopPropagation(); cheia(); };
+$('som').onclick = e => { e.stopPropagation(); $('palco').querySelectorAll('video').forEach(v => { v.muted = false; v.play().catch(() => {}); }); $('som').hidden = true; };
+$('i-ir').onclick = () => { cheia(); comecar(0); };
+$('i-grade').onclick = () => { grade(true); };
+
+// ── abertura ──
+lerOcultos(); refazerLista();
+document.title = D.nome || document.title;
+$('i-titulo').textContent = D.nome || 'Apresentação';
+function info() {
+    const n = P.lista.length, oc = D.slides.length - n;
+    $('i-info').textContent = `${n} slide${n === 1 ? '' : 's'}${oc ? ` · ${oc} oculto${oc === 1 ? '' : 's'}` : ''}`;
+}
+info();
+$('i-fundo').style.backgroundImage = `url(${(P.lista[0] || D.slides[0]).mini})`;
+// capa viva: o 1º slide montado de verdade (o vídeo fica na capa dele, parado)
+async function capa() {
+    const box = $('i-capa'), s = P.lista[0] || D.slides[0];
+    box.style.backgroundImage = `url(${s.mini})`; box.style.backgroundSize = 'cover';
+    const el = montar(s);
+    el.querySelectorAll('video').forEach(v => { const im = document.createElement('img'); im.src = v.dataset.p || ''; im.style.cssText = v.style.cssText; v.replaceWith(im); });
+    await prepararMidias(el);
+    box.innerHTML = ''; box.appendChild(el);
+    const ajustar = () => { el.style.transform = `scale(${box.clientWidth / W})`; };
+    ajustar(); addEventListener('resize', ajustar);
+}
+capa();
+if (toque) $('i-dica').textContent = 'Deslize ou toque nas laterais para passar os slides';
+escala(); atualizar(); adiantar(0);
+window.SLIDER_PLAYER = { estado: () => ({ i: P.i, passo: P.passo, total: P.lista.length, ocultos: [...P.oc], inicio: !$('inicio').hidden }), ir, avancar, voltar, comecar, grade };
+</script>
+</body>
+</html>
