@@ -44,13 +44,13 @@ const VELP_DUPLAS = [
       anim: 'desfoque', brilho: 35, sombra: 0.65, ex: ['muito', 'mais'] },
 ];
 const VELP_CORES = ['#FF9A2E', '#F5C518', '#C8F560', '#5CC8FF', '#FF7A6B', '#E9C27D', '#B892FF', '#FFFFFF'];
-const VELP_ANIMS = [['desfoque', 'Desfoque e brilho'], ['acender', 'Acender'], ['subir', 'Subir'], ['pop', 'Pop']];
+const VELP_ANIMS = [['auto', '✦ Automática'], ['desfoque', 'Desfoque e brilho'], ['acender', 'Acender'], ['subir', 'Subir'], ['pop', 'Pop']];
 const VELP_DUR = { desfoque: 0.24, acender: 0.18, subir: 0.22, pop: 0.22 };   // entrada de cada palavra (s)
 const VELP_SAI = 0.14;                                                         // saída do bloco (s)
 const VELP_TITULOS = { poucos: 8, equilibrado: 4.5, muitos: 2.5 };             // um título a cada N segundos
 const VELP_POS = { cima: 0.24, peito: 0.6, baixo: 0.8 };                       // centro do bloco (× altura)
 const VELP_SEGURA = 0.8;   // área segura de títulos: 80% do quadro (10% de margem em cada lado, como no Premiere)
-const VELP_PADRAO = { dupla: 'brilho', cor: '', anim: '', brilho: null, tam: 100, pos: 'peito', titulos: 'equilibrado', sub: true,
+const VELP_PADRAO = { dupla: 'brilho', cor: '', anim: 'auto', brilho: null, tam: 100, pos: 'peito', titulos: 'equilibrado', sub: true,
                       sfx: false, sfxNivel: 'medio', sfxVol: 0 };
 // palavras de ligação (ficam pequenas, coladas na palavra seguinte)
 const VELP_LIG = new Set(('a o as os e é de do da dos das no na nos nas num numa em um uma uns umas pra pro pras pros ' +
@@ -240,7 +240,8 @@ function veLpModo(modo) {
 function veLpLayout(i) {
     const l = VE.legendas[i], e = veTxEstiloLegenda(i), cfg = veLpCfg(e), D = cfg.D;
     const W = VE.seqW, H = VE.seqH;
-    const chave = JSON.stringify([l.texto, l.pr, l.pt, l.st, l.en, e.pr, e.px, e.py, W, H, VELP.met.size]);
+    const chave = JSON.stringify([l.texto, l.pr, l.pt, l.st, l.en, e.pr, e.px, e.py, W, H, VELP.met.size,
+        (VE.legendas || []).slice(0, i).filter(x => x.pr && x.pr.t).length]);   // a entrada Automática depende dos títulos antes
     const c = VELP.cache.get(i);
     if (c && c.chave === chave) return c.L;
     VELP.fontes = veLpCarregarFontes(D);
@@ -347,12 +348,28 @@ function veLpLayout(i) {
         const T = 0.1 * U * fit;
         sub = { x: re.x, y: re.base + Math.max(veLpMet(re.f).desc * re.em * 0.55, T * 0.12), w: re.w, h: Math.max(2, T * 0.055), a: Math.max(l.st, re.a - 0.18), cor: cfg.cor };
     }
-    const L = { runs, sub, caixa: { x: x0, y: y0, w: Wb, h: Hb }, cfg, titulo, track: D.track };
+    const L = { runs, sub, caixa: { x: x0, y: y0, w: Wb, h: Hb }, cfg, titulo, track: D.track, anim: veLpAnimDe(i, cfg) };
     VELP.cache.set(i, { chave, L });
     return L;
 }
 
 // ── animação ──
+// Entrada "Automática": escolhe por legenda, pelo papel e pelo tom da frase. Títulos chamam atenção (o gancho com
+// desfoque e brilho, número ou exclamação com pop, pergunta subindo, os outros alternando a da dupla com uma segunda
+// para não repetir); legendas simples entram discretas, para os títulos se destacarem.
+function veLpAnimDe(i, cfg) {
+    if (cfg.anim !== 'auto') return cfg.anim;
+    const L = VE.legendas || [], l = L[i];
+    if (!l) return cfg.D.anim;
+    const tk = veTxTokens(l.texto), fim = tk[tk.length - 1] || '', base = cfg.D.anim;
+    const outra = base === 'desfoque' ? 'subir' : 'desfoque';
+    if (!(l.pr && l.pr.t)) return base === 'desfoque' || base === 'pop' ? 'subir' : 'acender';
+    const antes = L.slice(0, i).filter(x => x.pr && x.pr.t).length;
+    if (antes === 0) return 'desfoque';                                     // o gancho
+    if (/!["')\]]?$/.test(fim) || tk.some(w => /\d/.test(w))) return 'pop';
+    if (/\?["')\]]?$/.test(fim)) return 'subir';
+    return antes % 2 ? base : outra;
+}
 const veLpEase = p => 1 - Math.pow(1 - p, 3);
 // estado de uma peça no instante t: alpha, desfoque (em), escala, deslocamento (em), mistura de cor (0 = escura) e brilho extra
 function veLpEstado(anim, t, a, fim, enf) {
@@ -399,7 +416,7 @@ function veLpDesenhar(ctx, i, t) {
         }
     }
     for (const r of L.runs) {
-        const o = veLpEstado(cfg.anim, t, r.a, l.en, r.papel === 'e');
+        const o = veLpEstado(L.anim, t, r.a, l.en, r.papel === 'e');
         if (!o) continue;
         ctx.save();
         ctx.font = `${r.em}px "${r.f}"`;
@@ -438,7 +455,7 @@ function veLpCaixa(i) { const c = veLpLayout(i).caixa, f = VE.seqH * 0.01; retur
 function veLpExport(i, desloc) {
     const L = veLpLayout(i), cfg = L.cfg, D = cfg.D, r1 = v => Math.round(v * 10) / 10;
     return {
-        anim: cfg.anim, dur: VELP_DUR[cfg.anim] || 0.2, sai: VELP_SAI, brilho: cfg.brilho, sombra: D.sombra, track: D.track,
+        anim: L.anim, dur: VELP_DUR[L.anim] || 0.2, sai: VELP_SAI, brilho: cfg.brilho, sombra: D.sombra, track: D.track,
         runs: L.runs.map(r => {
             const met = veLpMet(r.f), fs = r.em * met.razao;
             // b = linha de base: o _ass_premium refaz fs/cy com as medidas que o libass usa (OS/2 win, não hhea)
@@ -585,7 +602,11 @@ function veLpInit() {
         const md = ev.target.closest('[data-lpmodo]');
         if (md) { if (md.dataset.lpmodo !== veLpModoAtual()) veLpModo(md.dataset.lpmodo); return; }
         const d = ev.target.closest('[data-lpdupla]');
-        if (d) { vePushHistory(); veLpSetCfg({ dupla: d.dataset.lpdupla, cor: '', anim: '', brilho: null }); veRefresh(); veLpSfxAtualizar(); return; }
+        if (d) {   // a entrada Automática continua automática ao trocar de dupla; uma escolhida à mão volta para a da dupla
+            vePushHistory();
+            veLpSetCfg({ dupla: d.dataset.lpdupla, cor: '', anim: veLpCfg().anim === 'auto' ? 'auto' : '', brilho: null });
+            veRefresh(); veLpSfxAtualizar(); return;
+        }
         const c = ev.target.closest('[data-lpcor]');
         if (c) { vePushHistory(); veLpSetCfg({ cor: c.dataset.lpcor }); veRefresh(); return; }
         const sb = ev.target.closest('[data-lpseg] button');

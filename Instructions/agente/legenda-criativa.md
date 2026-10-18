@@ -94,6 +94,9 @@ Referências (folhas e tiras ampliadas em `D:/kanivete_testes/legenda_ref`, `v2/
 - **Faixa de legendas** (vale para os 3 modos): cabeçalho "Legendas"/"Captions" (i18n), olhinho = `VE.legEstilo.oculta`
   (sem monitor nem exportação, entra no desfazer), botão direito na faixa ou no cabeçalho = `veLegMenu` (ocultar, painel
   Texto, apagar esta, apagar todas — a transcrição fica; os sons lpSfx saem junto). Teste: `D:/kanivete_testes/scripts/lp_menu.py`.
+- **Entrada Automática** (padrão, `pr.anim = 'auto'`, `veLpAnimDe`): por legenda — o gancho (1º título) com desfoque e
+  brilho, título com número ou "!" com pop, com "?" subindo, os outros alternando a da dupla com uma segunda; legendas
+  simples discretas (subir/acender). A exportação recebe a entrada de cada legenda (`item.prm.anim`).
 - **Teste**: `py -3.13 testes/teste_export.py --casos premium --folha` (prévia × exportação); prints do painel:
   `D:/kanivete_testes/scripts/lp_ui.py`.
 
