@@ -103,6 +103,10 @@ Referências (folhas e tiras ampliadas em `D:/kanivete_testes/legenda_ref`, `v2/
   palavra com texto em contraste e sem brilho/sombra, Nenhum; `pr.sub` antigo vira traço/nenhum); bloco que terminaria
   logo depois de um corte do vídeo principal (V1) termina no corte (`veLpBlocos`). Na exportação: `\clip` animado
   (revelar/varrer), `\move` (cair/deslizar), escala (zoom/encolher); caixa na camada 0.
+- **Destaque (rodada 4)**: Automático (padrão; `veLpMarcaDe`: o da dupla em `VELP_MARCA_DUPLA`, número ganha caixa,
+  1 em cada 3 títulos sem marca), Traço, Marca-texto (agora rente à TINTA da palavra: `veLpTinta` mede actualBoundingBox
+  com a fonte, folga 0,08/0,06 em), **Pincel rústico** (`veLpPincel`: contorno irregular sorteado pela palavra, pontas
+  com fiapos, -1,5°; vai ao .ass como desenho com x/y no canto da caixa do próprio desenho — `veLpMarcaExport`) e Nenhum.
 - **Teste**: `py -3.13 testes/teste_export.py --casos premium,premium2,premium3,premium4,premium5 --folha` (prévia × exportação); prints do painel:
   `D:/kanivete_testes/scripts/lp_ui.py`.
 

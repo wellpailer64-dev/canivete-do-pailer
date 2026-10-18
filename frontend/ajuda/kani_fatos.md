@@ -35,7 +35,7 @@ palavra falada destacada) e Premium (blocos curtos montados como título, com du
 de ligação, a palavra principal e uma palavra de destaque em itálico colorido, entrando uma a uma no tempo da fala, com
 desfoque e brilho, acender, subir, pop, revelar, zoom, cair ou deslizar — ou Automática, que escolhe a entrada de cada
 legenda pelo tom da frase; a saída também: esmaecer, desfocar, encolher, varrer ou Automática; o destaque dos títulos pode
-ser traço, marca-texto ou nenhum). Na Premium escolhe-se a dupla de fontes (Brilho quente, Editorial, Impacto,
+ser automático, traço, marca-texto, pincel rústico ou nenhum). Na Premium escolhe-se a dupla de fontes (Brilho quente, Editorial, Impacto,
 Suave, Elegante, Moderno), a cor do destaque, quantos títulos (poucos, médio, muitos), a posição, o brilho, o tamanho e o
 traço sob o destaque; "Refinar com a Kani" deixa a Kani escolher os títulos e as palavras de destaque lendo o texto.
 A caixinha "Efeitos sonoros nas legendas" põe sons do Soundboard no tempo das palavras, combinando com a animação

@@ -3011,14 +3011,21 @@ def _ass_premium(prm, st, en):
         except Exception:
             a, w, h = en, 0, 0
         if a < en - 0.03 and w > 0 and h > 0:
-            caixa = s.get("tipo") == "caixa"
+            caixa = s.get("tipo") in ("caixa", "pincel")   # atrás da palavra (camada 0, sem brilho)
             L = int(round((en - a) * 1000))
             s0 = max(0, L - sai)
             cor = _ass_cor(s.get("cor") or "#FF9A2E")[4:]
             forma = _ass_retangulo(w, h, _num(s.get("r"), 0, h, h / 2))
+            pts = s.get("pts")
+            if isinstance(pts, list) and len(pts) >= 3:   # pincel rústico: o contorno já sorteado pela prévia
+                try:
+                    forma = "m " + " l ".join(f"{float(p[0]):.1f} {float(p[1]):.1f}" for p in pts[:1]) + " l " + \
+                            " ".join(f"{float(p[0]):.1f} {float(p[1]):.1f}" for p in pts[1:])
+                except Exception:
+                    pass
             y0, y1 = y - h * 6, y + h * 7
             ab = f"\\clip({x - h:.1f},{y0:.1f},{x + 0.5:.1f},{y1:.1f})"
-            corre = f"\\t(0,{280 if caixa else 320},0.45,\\clip({x - h:.1f},{y0:.1f},{x + w + h:.1f},{y1:.1f}))"
+            corre = f"\\t(0,{280 if caixa else 320},0.45,\\clip({x - h:.1f},{y0:.1f},{x + w + h * 2:.1f},{y1:.1f}))"
             if s0 < L and saida == "varrer":
                 fim = f"\\t({s0},{L},1.6,\\clip({x + w + h:.1f},{y0:.1f},{x + w + h:.1f},{y1:.1f}))"
             else:

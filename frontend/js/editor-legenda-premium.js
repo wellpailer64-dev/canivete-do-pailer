@@ -51,7 +51,9 @@ const VELP_DUR = { desfoque: 0.24, acender: 0.18, subir: 0.22, pop: 0.22, revela
 const VELP_SAIDAS = [['auto', '✦ Automática'], ['esmaecer', 'Esmaecer'], ['desfocar', 'Desfocar'], ['encolher', 'Encolher'], ['varrer', 'Varrer']];
 const VELP_SAI_DUR = { esmaecer: 0.14, desfocar: 0.16, encolher: 0.16, varrer: 0.22 };   // saída do bloco (s)
 const VELP_SAI = 0.14;
-const VELP_MARCAS = [['traco', 'Traço'], ['caixa', 'Marca-texto'], ['nenhum', 'Nenhum']];
+const VELP_MARCAS = [['auto', '✦ Automático'], ['traco', 'Traço'], ['caixa', 'Marca-texto'], ['pincel', 'Pincel rústico'], ['nenhum', 'Nenhum']];
+// destaque que cada dupla usa no modo Automático (o resto da escolha é por título: veLpMarcaDe)
+const VELP_MARCA_DUPLA = { brilho: 'traco', editorial: 'traco', impacto: 'caixa', suave: 'pincel', elegante: 'traco', moderno: 'caixa' };
 const VELP_TITULOS = { poucos: 8, equilibrado: 4.5, muitos: 2.5 };             // um título a cada N segundos
 const VELP_POS = { cima: 0.24, peito: 0.6, baixo: 0.8 };                       // centro do bloco (× altura)
 const VELP_SEGURA = 0.8;   // área segura de títulos: 80% do quadro (10% de margem em cada lado, como no Premiere)
@@ -76,7 +78,7 @@ const veLpAtivo = (e = veTxEstilo()) => e.modo === 'premium';
 function veLpCfg(e = veTxEstilo()) {
     const p = { ...VELP_PADRAO, ...(e.pr || {}) }, D = veLpDupla(p.dupla);
     // marca do destaque: traço (padrão), marca-texto ou nenhuma; projetos antigos guardavam só sub: true/false
-    return { ...p, D, cor: p.cor || D.cor, anim: p.anim || D.anim, saida: p.saida || 'auto', marca: p.marca || (p.sub === false ? 'nenhum' : 'traco'),
+    return { ...p, D, cor: p.cor || D.cor, anim: p.anim || D.anim, saida: p.saida || 'auto', marca: p.marca || (p.sub === false ? 'nenhum' : p.sub === true ? 'traco' : 'auto'),
              brilho: p.brilho == null ? D.brilho : +p.brilho };
 }
 function veLpSetCfg(patch) {
@@ -357,17 +359,22 @@ function veLpLayout(i) {
     // traço embaixo, ou marca-texto (caixa na cor de destaque atrás da palavra, que passa a ter a cor que contrasta)
     let sub = null;
     const re = runs.find(x => x.papel === 'e' && !x.pe);
-    if (titulo && re && cfg.marca === 'traco') {
+    const marca = titulo && re ? veLpMarcaDe(i, cfg, re) : 'nenhum';
+    if (marca === 'traco') {
         const T = 0.1 * U * fit;
         sub = { tipo: 'traco', x: re.x, y: re.base + Math.max(veLpMet(re.f).desc * re.em * 0.55, T * 0.12), w: re.w, h: Math.max(2, T * 0.055),
                 a: Math.max(l.st, re.a - 0.18), cor: cfg.cor };
         sub.r = sub.h / 2;
-    } else if (titulo && re && cfg.marca === 'caixa') {
-        const met = veLpMet(re.f), px = re.em * 0.14, top = re.base - met.asc * re.em * 0.8, bot = re.base + met.desc * re.em * 0.5;
-        sub = { tipo: 'caixa', x: re.x - px, y: top, w: re.w + px * 2, h: bot - top, a: Math.max(l.st, re.a - 0.12), cor: cfg.cor };
-        sub.r = sub.h * 0.2;
+    } else if (marca === 'caixa' || marca === 'pincel') {
+        // rente às letras de verdade (a "tinta" da palavra, com os acentos e as pernas do g/p), com uma folga pequena
+        const tinta = veLpTinta(re, D.track);
+        const px = re.em * (marca === 'pincel' ? 0.16 : 0.08), py = re.em * (marca === 'pincel' ? 0.09 : 0.06);
+        sub = { tipo: marca, x: tinta.x0 - px, y: tinta.y0 - py, w: tinta.x1 - tinta.x0 + px * 2, h: tinta.y1 - tinta.y0 + py * 2,
+                a: Math.max(l.st, re.a - 0.12), cor: cfg.cor };
+        sub.r = marca === 'caixa' ? Math.min(sub.h * 0.18, re.em * 0.1) : 0;
+        if (marca === 'pincel') sub.pts = veLpPincel(sub, re.txt);
         re.cor = veLpContraste(cfg.cor);
-        re.sg = re.ss = true;   // sem brilho nem sombra: a caixa já separa a palavra do fundo
+        re.sg = re.ss = true;   // sem brilho nem sombra: o fundo da marca já separa a palavra do vídeo
     }
     const anim = veLpAnimDe(i, cfg);
     const L = { runs, sub, caixa: { x: x0, y: y0, w: Wb, h: Hb }, cfg, titulo, track: D.track, anim, saida: veLpSaidaDe(i, cfg, anim) };
@@ -398,6 +405,38 @@ function veLpSaidaDe(i, cfg, anim) {
     const l = (VE.legendas || [])[i];
     if (!l || !(l.pr && l.pr.t)) return 'esmaecer';
     return anim === 'revelar' || anim === 'deslizar' ? 'varrer' : anim === 'pop' || anim === 'zoom' ? 'encolher' : anim === 'desfoque' ? 'desfocar' : 'esmaecer';
+}
+// Destaque "Automático": o da dupla, mas número ganha caixa (pede atenção) e, de 3 em 3 títulos, um fica sem marca
+// (a marca em todos os títulos cansa e perde a força)
+function veLpMarcaDe(i, cfg, re) {
+    if (cfg.marca !== 'auto') return cfg.marca;
+    const antes = (VE.legendas || []).slice(0, i).filter(x => x.pr && x.pr.t).length;
+    if (antes % 3 === 2) return 'nenhum';
+    if (/\d/.test(re.txt)) return cfg.D.id === 'suave' ? 'pincel' : 'caixa';
+    return VELP_MARCA_DUPLA[cfg.D.id] || 'traco';
+}
+// Caixa da tinta da palavra (o desenho das letras, não a linha inteira): medida pelo navegador com a mesma fonte
+function veLpTinta(r, track) {
+    const m = VELP.m || (VELP.m = document.createElement('canvas').getContext('2d'));
+    m.font = `${r.em}px "${r.f}"`;
+    m.letterSpacing = `${track * r.em}px`;
+    const k = m.measureText(r.txt);
+    return { x0: r.x - (k.actualBoundingBoxLeft || 0), x1: r.x + (k.actualBoundingBoxRight || r.w),
+             y0: r.base - (k.actualBoundingBoxAscent || r.em * 0.72), y1: r.base + (k.actualBoundingBoxDescent || r.em * 0.2) };
+}
+// Pincel rústico: pincelada de tinta atrás da palavra — bordas de cima e de baixo irregulares, pontas com fiapos e
+// levemente torta (-1,5°). Sorteio fixo pela palavra: a mesma palavra sai sempre igual (prévia = exportação)
+function veLpPincel(s, txt) {
+    let h = 2166136261;
+    for (const ch of String(txt)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+    const rnd = () => { h = Math.imul(h ^ (h >>> 15), 2246822519); h ^= h >>> 13; return ((h >>> 0) % 10000) / 10000; };
+    const n = Math.max(10, Math.round(s.w / (s.h * 0.35))), amp = s.h * 0.07, pts = [];
+    for (let k = 0; k <= n; k++) pts.push([s.x + s.w * k / n, s.y + (rnd() - 0.3) * amp * (k === 0 || k === n ? 2 : 1)]);
+    for (let k = 0; k < 4; k++) pts.push([s.x + s.w + s.h * (0.04 + rnd() * 0.12) * (k % 2 ? -1 : 1), s.y + s.h * (0.25 + k * 0.18)]);   // ponta direita
+    for (let k = n; k >= 0; k--) pts.push([s.x + s.w * k / n, s.y + s.h + (rnd() - 0.7) * amp * (k === 0 || k === n ? 2 : 1)]);
+    for (let k = 0; k < 4; k++) pts.push([s.x - s.h * (0.04 + rnd() * 0.12) * (k % 2 ? -1 : 1), s.y + s.h * (0.8 - k * 0.18)]);    // ponta esquerda
+    const cx = s.x + s.w / 2, cy = s.y + s.h / 2, a = -1.5 * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);
+    return pts.map(([x, y]) => [cx + (x - cx) * c - (y - cy) * sn, cy + (x - cx) * sn + (y - cy) * c]);
 }
 // texto sobre o marca-texto: escuro em cor clara, branco em cor escura
 function veLpContraste(hex) {
@@ -463,7 +502,12 @@ function veLpDesenhar(ctx, i, t) {
             ctx.fillStyle = s.cor;
             if (s.tipo !== 'caixa') { ctx.shadowColor = s.cor; ctx.shadowBlur = (6 + 14 * brilho) * esc * (s.h / 6); }
             const x0 = s.x + s.w * o.corte;
-            ctx.beginPath(); ctx.roundRect(x0, s.y, Math.max(0.1, s.x + w - x0), s.h, Math.min(s.r, Math.max(0.1, w) / 2)); ctx.fill();
+            if (s.pts) {   // pincel: a pincelada inteira, mostrada até onde a "tinta" já correu
+                ctx.beginPath(); ctx.rect(x0 - s.h, s.y - s.h, Math.max(0.1, s.x + w - x0 + s.h * (w >= s.w - 0.5 ? 2 : 0)), s.h * 3); ctx.clip();
+                ctx.beginPath(); s.pts.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fill();
+            } else {
+                ctx.beginPath(); ctx.roundRect(x0, s.y, Math.max(0.1, s.x + w - x0), s.h, Math.min(s.r, Math.max(0.1, w) / 2)); ctx.fill();
+            }
             ctx.restore();
         }
     }
@@ -521,9 +565,21 @@ function veLpExport(i, desloc) {
             return { t: r.txt, f: r.f, fs: r1(fs), em: r1(r.em), cx: r1(r.x + r.w / 2), cy: r1(r.base - met.asc * r.em + fs / 2), b: r1(r.base),
                      w: r1(r.w), cor: r.cor, e: r.papel === 'e' ? 1 : 0, sg: r.sg ? 1 : 0, ss: r.ss ? 1 : 0, a: +Math.max(0, r.a - desloc).toFixed(3) };
         }),
-        sub: L.sub ? { tipo: L.sub.tipo, x: r1(L.sub.x), y: r1(L.sub.y), w: r1(L.sub.w), h: r1(L.sub.h), r: r1(L.sub.r),
-                       a: +Math.max(0, L.sub.a - desloc).toFixed(3), cor: L.sub.cor } : null,
+        sub: L.sub ? veLpMarcaExport(L.sub, desloc) : null,
     };
+}
+
+// Marca para o .ass: o desenho do libass se alinha pela caixa do próprio desenho, então o pincel (com pontas que passam
+// da caixa da palavra e torto) vai com x/y no canto da caixa dele e os pontos a partir dali
+function veLpMarcaExport(s, desloc) {
+    const r1 = v => Math.round(v * 10) / 10, o = { tipo: s.tipo, x: r1(s.x), y: r1(s.y), w: r1(s.w), h: r1(s.h), r: r1(s.r),
+                                                   a: +Math.max(0, s.a - desloc).toFixed(3), cor: s.cor };
+    if (s.pts) {
+        const xs = s.pts.map(p => p[0]), ys = s.pts.map(p => p[1]), x0 = Math.min(...xs), y0 = Math.min(...ys);
+        Object.assign(o, { x: r1(x0), y: r1(y0), w: r1(Math.max(...xs) - x0), h: r1(Math.max(...ys) - y0),
+                           pts: s.pts.map(([x, y]) => [r1(x - x0), r1(y - y0)]) });
+    }
+    return o;
 }
 
 // ── Kani: escolhe títulos e destaques lendo o texto ──
@@ -602,7 +658,7 @@ function veLpPainelHtml() {
         </div>
         <div class="velp-bloco">
             <div class="velp-rot">Destaque dos títulos</div>
-            <div class="velp-seg" data-lpseg="marca">${VELP_MARCAS.map(([v, n]) => `<button data-v="${v}">${n}</button>`).join('')}</div>
+            <div class="velp-seg velp-seg-4" data-lpseg="marca">${VELP_MARCAS.map(([v, n]) => `<button data-v="${v}">${n}</button>`).join('')}</div>
         </div>
         <div class="velp-bloco velp-2col">
             <label class="velp-faixa"><span class="velp-rot">Brilho <output data-lpout="brilho"></output></span><input type="range" min="0" max="100" step="1" data-lpfaixa="brilho"></label>

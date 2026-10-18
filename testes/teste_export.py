@@ -324,7 +324,7 @@ CASOS = {
         VETX.palavras = [[0.10, 0.45, 'Ninguém'], [0.45, 0.75, 'odeia'], [0.75, 1.15, 'editar,'], [1.3, 1.45, 'na'], [1.45, 1.9, 'verdade'],
             [1.95, 2.05, 'o'], [2.05, 2.2, 'que'], [2.2, 2.4, 'você'], [2.4, 2.75, 'odeia'], [2.85, 2.95, 'é'], [2.95, 3.05, 'o'],
             [3.05, 3.4, 'tempo'], [3.4, 3.55, 'que'], [3.55, 3.9, 'leva.']];
-        VE.legEstilo = { ...veTxEstilo(), modo: 'premium', pr: { ...VELP_PADRAO, anim: 'cair', saida: 'desfocar', marca: 'caixa', dupla: 'editorial' } };
+        VE.legEstilo = { ...veTxEstilo(), modo: 'premium', pr: { ...VELP_PADRAO, anim: 'cair', saida: 'desfocar', marca: 'pincel', dupla: 'editorial' } };
         veLpCriar(true);
         VE.legendas = VE.legendas.map((l, i) => ({ ...l, pr: { t: i % 2 === 0 ? 1 : 0, r: veLpPapeisAuto(veTxTokens(l.texto), i % 2 === 0) } }));
         VE.legGravar = true; veRefresh();
@@ -337,7 +337,7 @@ CASOS = {
         VETX.palavras = [[0.10, 0.45, 'Ninguém'], [0.45, 0.75, 'odeia'], [0.75, 1.15, 'editar,'], [1.3, 1.45, 'na'], [1.45, 1.9, 'verdade'],
             [1.95, 2.05, 'o'], [2.05, 2.2, 'que'], [2.2, 2.4, 'você'], [2.4, 2.75, 'odeia'], [2.85, 2.95, 'é'], [2.95, 3.05, 'o'],
             [3.05, 3.4, 'tempo'], [3.4, 3.55, 'que'], [3.55, 3.9, 'leva.']];
-        VE.legEstilo = { ...veTxEstilo(), modo: 'premium', pr: { ...VELP_PADRAO, anim: 'deslizar', saida: 'esmaecer', marca: 'nenhum', dupla: 'moderno' } };
+        VE.legEstilo = { ...veTxEstilo(), modo: 'premium', pr: { ...VELP_PADRAO, anim: 'deslizar', saida: 'esmaecer', marca: 'auto', dupla: 'moderno' } };
         veLpCriar(true);
         VE.legendas = VE.legendas.map((l, i) => ({ ...l, pr: { t: i % 2 === 0 ? 1 : 0, r: veLpPapeisAuto(veTxTokens(l.texto), i % 2 === 0) } }));
         VE.legGravar = true; veRefresh();
