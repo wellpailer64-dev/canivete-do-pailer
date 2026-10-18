@@ -376,8 +376,8 @@ sempre saindo da placa antes da geração. Conversão: `D:\kanivete_testes\sfx\e
 ## Soundboard (pack de sons do editor)
 - Não vai no build: o painel baixa `soundboard-vN.zip` do release `soundboard-vN` (pré-release, para não virar
   o "latest" do updater) e instala em `<app>/soundboard/`. Só sons CC0 (Kenney, Freesound filtrado por CC0).
-- **Pack v4** (2026-10-18, 262 sons/15 categorias, 9,7 MB; v3 = + 22 whooshes suaves curtos para a Legenda Premium; v4 = + 8 sub
-  drops SINTETIZADOS por `D:/kanivete_testes/sfx_pack/sintetizar_subdrops.py`, sem licença de terceiros): cortado pelo Pailer de vídeos "sem copyright" do YouTube —
+- **Pack v5** (2026-10-18, 287 sons/16 categorias, 10 MB; v3 = + 22 whooshes suaves curtos para a Legenda Premium; v4/v5 = 17 sub
+  drops e 16 sons de UI digital SINTETIZADOS por `D:/kanivete_testes/sfx_pack/sintetizar_subdrops.py` e `sintetizar_v2.py`, sem licença de terceiros):
   `tools/fatiar_sfx.py` (corta no mínimo de silêncio, nomeia, anota a origem no manifesto) e `tools/pack_sfx.py`
   (Opus 128k/96k mono, volume nivelado; `--zip N` monta o release). Mestres WAV e manifesto em `D:/kanivete_testes/sfx_pack`
   (sons de marca/jogo/filme/biblioteca paga ficam marcados "licenca" e fora do pack). Pack novo: suba `VERSAO` em

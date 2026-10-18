@@ -74,7 +74,7 @@ def main():
 
 
 # ordem das categorias no painel (as que a Legenda Premium usa primeiro)
-ORDEM = ["whoosh", "pop", "notificacao", "dinheiro", "impacto", "explosoes", "subdrop", "digital", "tensao", "ambiencia",
+ORDEM = ["whoosh", "pop", "ui", "notificacao", "dinheiro", "impacto", "explosoes", "subdrop", "digital", "tensao", "ambiencia",
          "memes", "gritos", "sinos", "objetos", "trabalho"]
 
 
