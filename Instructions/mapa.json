@@ -86,6 +86,8 @@
     "audio_cutter_export",
     "ve_texto_modelos",
     "ve_leg_premium_kani",
+    "ve_leg_premium_enfase",
+    "ve_leg_premium_cor",
     "ve_transcrever",
     "ve_transcrever_cancelar",
     "ve_salvar_legenda",
@@ -971,6 +973,14 @@
   },
   "ve_leg_premium_kani": {
    "args": "blocos, titulos=None",
+   "modulos": []
+  },
+  "ve_leg_premium_enfase": {
+   "args": "clipes, total, palavras",
+   "modulos": []
+  },
+  "ve_leg_premium_cor": {
+   "args": "caminho, opcoes",
    "modulos": []
   },
   "ve_transcrever": {

@@ -107,7 +107,15 @@ Referências (folhas e tiras ampliadas em `D:/kanivete_testes/legenda_ref`, `v2/
   1 em cada 3 títulos sem marca), Traço, Marca-texto (agora rente à TINTA da palavra: `veLpTinta` mede actualBoundingBox
   com a fonte, folga 0,08/0,06 em), **Pincel rústico** (`veLpPincel`: contorno irregular sorteado pela palavra, pontas
   com fiapos, -1,5°; vai ao .ass como desenho com x/y no canto da caixa do próprio desenho — `veLpMarcaExport`) e Nenhum.
-- **Teste**: `py -3.13 testes/teste_export.py --casos premium,premium2,premium3,premium4,premium5 --folha` (prévia × exportação); prints do painel:
+- **Rodada 5 (2026-10-18)**: duplas Retrô (Bowlby One + Shrikhand), Rústico (Alfa Slab + Caveat Brush + Special Elite),
+  Disruptivo (Archivo Black + Unbounded + Space Mono, neon) e Zine (Rubik Dirt + Sedgwick Ave); marcadores que desenham a
+  minúscula como maiúscula (Permanent Marker, Rock Salt) foram testados e tirados (legenda nunca em CAIXA ALTA).
+  **Cor do vídeo** (✦ nas cores; `cor_do_video` em legenda_premium.py): 8 quadros, matiz dominante, escolhe a cor da
+  paleta que mais se separa dele. **Ênfase da voz** (`enfase`, opção desligada por padrão): volume contra as vizinhas +
+  alongamento em palavras de 4+ letras; no Reel de referência a medida solta escolhia errado (palavras curtas e verbos
+  fracos sobem no volume) — apertada, só muda destaque com nota >= 3 e folga 2,5, e quase não mudou nada: vale como
+  opção, não como padrão. Bug corrigido: o `sub: true` que sobrava no padrão deixava o destaque Automático sempre em traço.
+- **Teste**: `py -3.13 testes/teste_export.py --casos premium,premium2,premium3,premium4,premium5,premium6,premium7,premium8,premium9 --folha` (prévia × exportação); prints do painel:
   `D:/kanivete_testes/scripts/lp_ui.py`.
 
 ## Pendências

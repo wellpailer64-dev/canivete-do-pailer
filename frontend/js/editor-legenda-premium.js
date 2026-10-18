@@ -42,6 +42,26 @@ const VELP_DUPLAS = [
       base: 'KPR F02', enf: 'KPR F15', lig: 'KPR F10', pe: 'KPR F09', simp: 'KPR F02',
       cor: '#5CC8FF', simpCor: 'acc', ligE: 0.6, enfE: 1.12, peE: 0.4, gap: 0.06, entre: 0.86, track: -0.025,
       anim: 'desfoque', brilho: 35, sombra: 0.65, ex: ['muito', 'mais'] },
+    // oldschool, rústicas e disruptivas (2026-10-18)
+    // F20 Bowlby One · F21 Shrikhand · F22 Alfa Slab One · F23 Caveat Brush · F24 Special Elite (máquina de escrever) ·
+    // F25 Archivo Black · F26 Unbounded 900 · F27 Space Mono 700 · F28 Rubik Dirt · F29 Sedgwick Ave (grafite)
+    // (marcadores que desenham a minúscula como maiúscula — Permanent Marker, Rock Salt — ficam de fora: legenda nunca em CAIXA ALTA)
+    { id: 'retro', nome: 'Retrô', desc: 'Display gordinha anos 70 + itálica retrô',
+      base: 'KPR F20', enf: 'KPR F21', lig: 'KPR F18', pe: 'KPR F17', simp: 'KPR F18',
+      cor: '#FFB347', simpCor: 'acc', ligE: 0.62, enfE: 1.1, peE: 0.4, gap: 0.06, entre: 0.9, track: -0.01,
+      anim: 'pop', brilho: 25, sombra: 0.75, ex: ['que', 'onda'] },
+    { id: 'rustico', nome: 'Rústico', desc: 'Slab de cartaz antigo + pincel à mão + máquina de escrever',
+      base: 'KPR F22', enf: 'KPR F23', lig: 'KPR F24', pe: 'KPR F24', simp: 'KPR F24',
+      cor: '#E9B949', simpCor: 'txt', ligE: 0.55, enfE: 1.35, peE: 0.42, gap: 0.08, entre: 0.9, track: 0,
+      anim: 'revelar', brilho: 0, sombra: 0.8, ex: ['de', 'raiz'] },
+    { id: 'disruptivo', nome: 'Disruptivo', desc: 'Grotesca preta + larga geométrica + monoespaçada, neon',
+      base: 'KPR F25', enf: 'KPR F26', lig: 'KPR F27', pe: 'KPR F27', simp: 'KPR F27',
+      cor: '#D4FF3A', simpCor: 'txt', ligE: 0.5, enfE: 0.92, peE: 0.38, gap: 0.05, entre: 0.88, track: -0.02,
+      anim: 'zoom', brilho: 30, sombra: 0.8, ex: ['sem', 'filtro'] },
+    { id: 'zine', nome: 'Zine', desc: 'Grunge desgastada + grafite, de fanzine',
+      base: 'KPR F28', enf: 'KPR F29', lig: 'KPR F24', pe: 'KPR F24', simp: 'KPR F24',
+      cor: '#FF4D4D', simpCor: 'txt', ligE: 0.55, enfE: 1.2, peE: 0.4, gap: 0.07, entre: 0.95, track: 0,
+      anim: 'deslizar', brilho: 10, sombra: 0.8, ex: ['faz', 'barulho'] },
 ];
 const VELP_CORES = ['#FF9A2E', '#F5C518', '#C8F560', '#5CC8FF', '#FF7A6B', '#E9C27D', '#B892FF', '#FFFFFF'];
 const VELP_ANIMS = [['auto', '✦ Automática'], ['desfoque', 'Desfoque e brilho'], ['acender', 'Acender'], ['subir', 'Subir'], ['pop', 'Pop'],
@@ -53,11 +73,12 @@ const VELP_SAI_DUR = { esmaecer: 0.14, desfocar: 0.16, encolher: 0.16, varrer: 0
 const VELP_SAI = 0.14;
 const VELP_MARCAS = [['auto', '✦ Automático'], ['traco', 'Traço'], ['caixa', 'Marca-texto'], ['pincel', 'Pincel rústico'], ['nenhum', 'Nenhum']];
 // destaque que cada dupla usa no modo Automático (o resto da escolha é por título: veLpMarcaDe)
-const VELP_MARCA_DUPLA = { brilho: 'traco', editorial: 'traco', impacto: 'caixa', suave: 'pincel', elegante: 'traco', moderno: 'caixa' };
+const VELP_MARCA_DUPLA = { brilho: 'traco', editorial: 'traco', impacto: 'caixa', suave: 'pincel', elegante: 'traco', moderno: 'caixa',
+                           retro: 'traco', rustico: 'pincel', disruptivo: 'caixa', zine: 'pincel' };
 const VELP_TITULOS = { poucos: 8, equilibrado: 4.5, muitos: 2.5 };             // um título a cada N segundos
 const VELP_POS = { cima: 0.24, peito: 0.6, baixo: 0.8 };                       // centro do bloco (× altura)
 const VELP_SEGURA = 0.8;   // área segura de títulos: 80% do quadro (10% de margem em cada lado, como no Premiere)
-const VELP_PADRAO = { dupla: 'brilho', cor: '', anim: 'auto', saida: 'auto', marca: '', brilho: null, tam: 100, pos: 'peito', titulos: 'equilibrado', sub: true,
+const VELP_PADRAO = { dupla: 'brilho', cor: '', anim: 'auto', saida: 'auto', marca: '', voz: false, brilho: null, tam: 100, pos: 'peito', titulos: 'equilibrado',
                       sfx: false, sfxNivel: 'medio', sfxVol: 0 };
 // palavras de ligação (ficam pequenas, coladas na palavra seguinte)
 const VELP_LIG = new Set(('a o as os e é de do da dos das no na nos nas num numa em um uma uns umas pra pro pras pros ' +
@@ -66,7 +87,8 @@ const VELP_LIG = new Set(('a o as os e é de do da dos das no na nos nas num num
 
 // palavras de conteúdo fracas: ficam na base, nunca viram o destaque automático ("faturar mais dinheiro" → dinheiro)
 const VELP_FRACA = new Set(('mais menos muito muita muitos muitas bem aqui ali então agora coisa coisas vai vou vamos foi era ser ' +
-    'ter tem tenho fazer faz está estou estava deu dá pode posso quer quero sempre também ainda tudo nada gente').split(' '));
+    'ter tem tenho fazer faz está estou estava deu dá pode posso quer quero sempre também ainda tudo nada gente são quem ' +
+    'esse essa este esta isso aquilo cada outro outra vem vai').split(' '));
 
 const VELP = { met: new Map(), cache: new Map(), fontes: false, kani: false };
 
@@ -76,9 +98,9 @@ const veLpDupla = id => VELP_DUPLAS.find(d => d.id === id) || VELP_DUPLAS[0];
 const veLpAtivo = (e = veTxEstilo()) => e.modo === 'premium';
 // configuração efetiva (o que ficou vazio vem da dupla)
 function veLpCfg(e = veTxEstilo()) {
-    const p = { ...VELP_PADRAO, ...(e.pr || {}) }, D = veLpDupla(p.dupla);
+    const bruto = e.pr || {}, p = { ...VELP_PADRAO, ...bruto }, D = veLpDupla(p.dupla);
     // marca do destaque: traço (padrão), marca-texto ou nenhuma; projetos antigos guardavam só sub: true/false
-    return { ...p, D, cor: p.cor || D.cor, anim: p.anim || D.anim, saida: p.saida || 'auto', marca: p.marca || (p.sub === false ? 'nenhum' : p.sub === true ? 'traco' : 'auto'),
+    return { ...p, D, cor: p.cor || D.cor, anim: p.anim || D.anim, saida: p.saida || 'auto', marca: p.marca || (bruto.sub === false ? 'nenhum' : bruto.sub === true && !bruto.anim ? 'traco' : 'auto'),
              brilho: p.brilho == null ? D.brilho : +p.brilho };
 }
 function veLpSetCfg(patch) {
@@ -114,21 +136,63 @@ function veLpMet(fam) {
 
 // ── papéis e blocos ──
 // Papéis automáticos: ligação pequena; no título, a última palavra de conteúdo vira o destaque
-function veLpPapeisAuto(tk, titulo) {
+// pt = tempos das palavras: com a ênfase da voz analisada (veLpEnfase), a palavra que a pessoa ENFATIZOU ao falar
+// (mais alta e mais esticada que as vizinhas) vira o destaque — se ela se destacar com folga das outras do título
+function veLpPapeisAuto(tk, titulo, pt) {
     const r = tk.map(w => veLpEhLig(w) ? 'l' : 'b');
     if (!r.includes('b') && tk.length) r[tk.reduce((m, w, i) => w.length > tk[m].length ? i : m, 0)] = 'b';
     const C = r.map((x, i) => x === 'b' ? i : -1).filter(i => i >= 0);
     if (titulo && tk.length >= 2 && C.length) {
         const num = C.filter(i => /\d/.test(tk[i]));
         const longas = C.filter(i => veLpNorm(tk[i]).length >= 3 && !VELP_FRACA.has(veLpNorm(tk[i])));
-        r[num.length ? num[num.length - 1] : longas.length ? longas[longas.length - 1] : C[C.length - 1]] = 'e';
+        let k = num.length ? num[num.length - 1] : longas.length ? longas[longas.length - 1] : C[C.length - 1];
+        const fortes = longas.map(i => ({ i, s: veLpEnf(pt && pt[i]) })).filter(o => o.s != null).sort((a, b) => b.s - a.s);
+        // a voz só muda a escolha quando a palavra foi MUITO marcada e se separa com folga das outras (no teste com o Reel de
+        // referência, a medida mais solta trocava o destaque certo — "editar" — por "odeia")
+        if (!num.length && fortes.length && fortes[0].s >= 3 && (fortes.length < 2 || fortes[0].s - fortes[1].s >= 2.5)) k = fortes[0].i;
+        r[k] = 'e';
     }
     return r;
 }
 // papéis da legenda (os guardados, se ainda batem com o texto; senão automáticos)
 function veLpPapeis(l) {
     const tk = veTxTokens(l.texto), pr = l.pr || {};
-    return Array.isArray(pr.r) && pr.r.length === tk.length ? pr.r : veLpPapeisAuto(tk, !!pr.t);
+    return Array.isArray(pr.r) && pr.r.length === tk.length ? pr.r : veLpPapeisAuto(tk, !!pr.t, l.pt);
+}
+// Ênfase da voz de uma palavra (pelo tempo de início dela) — null sem análise ou com a opção desligada
+function veLpEnf(p) {
+    if (!p || !VELP.enf || VELP.enfChave !== veTxMixChave() || veLpCfg().voz === false) return null;
+    const v = VELP.enf.get((+p[0]).toFixed(2));
+    return v == null ? null : v;
+}
+// Analisa a ênfase da fala (volume e alongamento de cada palavra contra as vizinhas, Functions/legenda_premium.py) uma
+// vez por mixagem e reaplica títulos/destaques automáticos; os sons das legendas são refeitos depois
+function veLpEnfase(silencioso) {
+    if (veLpCfg().voz === false || !VETX.palavras.length || VELP.enfRodando) return;
+    const chave = veTxMixChave();
+    const aplicar = () => {
+        VE.legendas = veLpEscolherTitulos((VE.legendas || []).map(l => l.pr && l.pr.m ? l : { ...l, pr: null }), veLpCfg().titulos);
+        VELP.cache.clear();
+        veRefresh();
+        veLpSfxAtualizar();
+    };
+    if (VELP.enf && VELP.enfChave === chave) { aplicar(); return; }
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.ve_leg_premium_enfase) return;
+    const orig = VE.clips;
+    let mix;
+    try { VE.clips = orig.filter(c => !c.lpSfx); mix = veExportPlan().mix; } finally { VE.clips = orig; }   // a fala, sem os sons das legendas
+    VELP.enfRodando = true;
+    api.ve_leg_premium_enfase(mix, VE.dur, VETX.palavras.map(w => [w[0], w[1], w[2]])).then(r => {
+        VELP.enfRodando = false;
+        if (!r || !r.success) return;
+        VELP.enf = new Map(VETX.palavras.map((w, k) => [(+w[0]).toFixed(2), r.enfase[k]]));
+        VELP.enfChave = chave;
+        if (!veLpAtivo()) return;
+        aplicar();
+        const n = r.enfase.filter(s => s >= 3).length;
+        if (!silencioso) veToast(`Ênfase da voz analisada: ${n} palavra${n === 1 ? '' : 's'} bem marcada${n === 1 ? '' : 's'} na fala`);
+    }).catch(() => { VELP.enfRodando = false; });
 }
 
 // Palavras da transcrição → blocos curtos (uma ideia: pausa, fim de frase, vírgula ou até 3 palavras de conteúdo)
@@ -186,6 +250,8 @@ function veLpNotaTitulo(l, i) {
     if (C.some(w => veLpNorm(w).length >= 7)) n += 1;
     if (/[!?]["')\]]?$/.test(tk[tk.length - 1] || '')) n += 2;
     if (tk.slice(1).some(w => /^\p{Lu}/u.test(w))) n += 2;
+    // palavra de conteúdo (4+ letras, não fraca) bem enfatizada na fala; as curtas ("a", "um") sobem à toa no volume
+    if (tk.some((w, k) => veLpNorm(w).length >= 4 && !veLpEhLig(w) && !VELP_FRACA.has(veLpNorm(w)) && (veLpEnf((l.pt || [])[k]) || 0) >= 3)) n += 3;
     if (!C.length) n -= 5;
     if (i === 0) n += 5;
     return n;
@@ -205,7 +271,7 @@ function veLpEscolherTitulos(L, densidade) {
     return L.map((l, i) => {
         if (l.pr && l.pr.m) return l;
         const t = esc.has(i) ? 1 : 0;
-        return { ...l, pr: { t, r: veLpPapeisAuto(veTxTokens(l.texto), !!t) } };
+        return { ...l, pr: { t, r: veLpPapeisAuto(veTxTokens(l.texto), !!t, l.pt) } };
     });
 }
 
@@ -221,6 +287,7 @@ function veLpCriar(silencioso) {
     if (!silencioso) veToast(`${VE.legendas.length} legendas Premium · ${VE.legendas.filter(l => l.pr.t).length} títulos`);
     veRefresh();
     veLpSfxAtualizar(!silencioso);
+    veLpEnfase(silencioso);   // em segundo plano: depois refina títulos/destaques pela voz
     return true;
 }
 
@@ -242,6 +309,7 @@ function veLpModo(modo) {
         else VE.legendas = veTxMontarLegendas(VETX.opcoes);
         VETX.legSel = -1;
         veToast(modo === 'premium' ? 'Legendas remontadas em blocos Premium (Ctrl+Z desfaz)' : 'Legendas remontadas em frases (Ctrl+Z desfaz)');
+        if (modo === 'premium') veLpEnfase(true);
     }
     veMarcarAlterado();
     veRefresh();
@@ -582,6 +650,28 @@ function veLpMarcaExport(s, desloc) {
     return o;
 }
 
+// ── cor de destaque tirada do vídeo ──
+// O Python olha 8 quadros do vídeo principal e escolhe, das cores da paleta, a que mais se separa das cores das cenas
+// (matiz mais distante da dominante, com saturação) — o destaque não some no fundo
+function veLpCorVideo() {
+    const c = (VE.clips || []).filter(x => x.tr === 0 && !veIsAudio(x) && !veIsImage(x)).sort((a, b) => (b.e - b.s) - (a.e - a.s))[0];
+    const m = c ? veMediaOf(c) : null, path = (m && m.path) || VE.path;
+    if (!path) { veToast('Abra um vídeo primeiro'); return; }
+    const api = window.pywebview && window.pywebview.api;
+    if (!api || !api.ve_leg_premium_cor || VELP.corRodando) return;
+    VELP.corRodando = true;
+    veLpRenderPainel();
+    api.ve_leg_premium_cor(path, VELP_CORES.filter(x => x !== '#FFFFFF')).then(r => {
+        VELP.corRodando = false;
+        if (!r || !r.success) { veToast(r && r.error || 'Não foi possível ler as cores do vídeo'); veLpRenderPainel(); return; }
+        VELP.corVideo = r.cor;
+        vePushHistory();
+        veLpSetCfg({ cor: r.cor });
+        veRefresh();
+        veToast('Cor do destaque escolhida pelas cores do vídeo');
+    }).catch(() => { VELP.corRodando = false; veLpRenderPainel(); });
+}
+
 // ── Kani: escolhe títulos e destaques lendo o texto ──
 function veLpKani() {
     const L = VE.legendas || [];
@@ -639,7 +729,7 @@ function veLpPainelHtml() {
         </div>
         <div class="velp-bloco">
             <div class="velp-rot">Cor do destaque</div>
-            <div class="velp-cores">${VELP_CORES.map(c => `<button class="velp-cor" data-lpcor="${c}" style="--c:${c}" title="${c}"></button>`).join('')}
+            <div class="velp-cores"><button class="velp-cor velp-cor-video" data-lpcorvideo title="Cor tirada do vídeo: a que mais se destaca das cores das cenas">✦</button>${VELP_CORES.map(c => `<button class="velp-cor" data-lpcor="${c}" style="--c:${c}" title="${c}"></button>`).join('')}
                 <label class="velp-cor velp-cor-livre" title="Outra cor"><input type="color" data-lpcorlivre></label></div>
         </div>
         <div class="velp-bloco velp-2col">
@@ -665,6 +755,7 @@ function veLpPainelHtml() {
             <label class="velp-faixa"><span class="velp-rot">Tamanho <output data-lpout="tam"></output></span><input type="range" min="50" max="180" step="1" data-lpfaixa="tam"></label>
         </div>
 
+        <label class="velp-chave" title="Analisa o volume e o alongamento de cada palavra na fala: a palavra que a pessoa enfatizou vira o destaque do título"><input type="checkbox" data-lpvoz><span></span>Destaque pela ênfase da voz</label>
         <div class="velp-sfx">
             <label class="velp-chave"><input type="checkbox" data-lpsfx><span></span>Efeitos sonoros nas legendas</label>
             <div class="velp-sfx-op" data-lpsfxop>
@@ -710,6 +801,11 @@ function veLpRenderPainel() {
     });
 
     pn.querySelector('[data-lpsfx]').checked = !!cfg.sfx;
+    pn.querySelector('[data-lpvoz]').checked = cfg.voz !== false;
+    const cv = pn.querySelector('[data-lpcorvideo]');
+    cv.disabled = !!VELP.corRodando;
+    cv.classList.toggle('on', !!VELP.corVideo && VELP.corVideo.toLowerCase() === cfg.cor.toLowerCase());
+    if (VELP.corVideo) cv.style.setProperty('--c', VELP.corVideo);
     pn.querySelector('[data-lpsfxop]').hidden = !cfg.sfx;
     pn.querySelector('[data-lpsfxdica]').textContent = VELP_SFX_DICA[cfg.sfxNivel] || '';
     pn.querySelector('[data-lpacao="sbbaixar"]').hidden = !VELP.sfxFalta;
@@ -733,6 +829,7 @@ function veLpInit() {
         }
         const c = ev.target.closest('[data-lpcor]');
         if (c) { vePushHistory(); veLpSetCfg({ cor: c.dataset.lpcor }); veRefresh(); return; }
+        if (ev.target.closest('[data-lpcorvideo]')) { veLpCorVideo(); return; }
         const sb = ev.target.closest('[data-lpseg] button');
         if (sb) {
             const k = sb.closest('[data-lpseg]').dataset.lpseg;
@@ -774,6 +871,12 @@ function veLpInit() {
         }
 
         if (ev.target.matches('[data-lpsfx]')) { vePushHistory(); veLpSetCfg({ sfx: ev.target.checked }); veRefresh(); veLpSfxAtualizar(true); }
+        if (ev.target.matches('[data-lpvoz]')) {
+            vePushHistory();
+            veLpSetCfg({ voz: ev.target.checked });
+            if (ev.target.checked) veLpEnfase();
+            else { VE.legendas = veLpEscolherTitulos((VE.legendas || []).map(l => l.pr && l.pr.m ? l : { ...l, pr: null }), veLpCfg().titulos); VELP.cache.clear(); veRefresh(); veLpSfxAtualizar(); }
+        }
     });
 }
 
@@ -807,9 +910,9 @@ document.addEventListener('click', ev => {
     const tk = veTxTokens(l.texto);
     let t = !!(l.pr && l.pr.t), r = [...veLpPapeis(l)];
     if (alvo.dataset.lpauto != null) {
-        VE.legendas[i] = { ...l, pr: { t: t ? 1 : 0, r: veLpPapeisAuto(tk, t) } };
+        VE.legendas[i] = { ...l, pr: { t: t ? 1 : 0, r: veLpPapeisAuto(tk, t, l.pt) } };
     } else {
-        if (alvo.dataset.lptipo != null) { t = alvo.dataset.lptipo === '1'; r = veLpPapeisAuto(tk, t); }
+        if (alvo.dataset.lptipo != null) { t = alvo.dataset.lptipo === '1'; r = veLpPapeisAuto(tk, t, l.pt); }
         else {
             const k = +alvo.dataset.lppal, prox = { l: 'b', b: 'e', e: 'l' }[r[k]];
             if (prox === 'e') r = r.map(x => x === 'e' ? 'b' : x);   // um destaque por bloco

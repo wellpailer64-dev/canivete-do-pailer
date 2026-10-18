@@ -48,6 +48,89 @@ def _lote(blocos, idx):
     return res
 
 
+def enfase(clipes, total, palavras):
+    """Ênfase de cada palavra na fala: volume (RMS) contra a mediana das vizinhas (±3 s) + quanto ela foi esticada para o
+    tamanho dela (a palavra que a pessoa "puxa"). > ~3 = bem marcada. Mixagem = a mesma da transcrição (legendas.py)."""
+    import math
+    import os
+    import wave
+
+    import numpy as np
+
+    from Functions import legendas
+    from Functions import video_cutter as vc
+    wav = os.path.join(vc._work_dir(), "enfase_legenda.wav")
+    legendas._audio_da_timeline(clipes, float(total), wav)
+    try:
+        with wave.open(wav, "rb") as w:
+            sr = w.getframerate()
+            x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float32) / 32768.0
+    finally:
+        vc._apagar(wav)
+    P = [(float(p[0]), float(p[1]), str(p[2])) for p in palavras or []]
+    nivel, estica = [], []
+    for a, b, t in P:
+        seg = x[int(a * sr):max(int(a * sr) + 1, int(b * sr))]
+        nivel.append(20 * math.log10(float(np.sqrt((seg ** 2).mean())) + 1e-6) if len(seg) else -90.0)
+        # alongamento só vale em palavra de 4+ letras (as curtas "esticam" à toa no fim de frase e na pausa)
+        letras = sum(ch.isalnum() for ch in t) or 1
+        estica.append(math.log2(max(0.7, min(2.0, (b - a) / (0.07 * letras + 0.1)))) if letras >= 4 else 0.0)
+    out = []
+    for i, (a, b, _) in enumerate(P):
+        viz = [nivel[j] for j in range(len(P)) if j != i and abs(P[j][0] - a) <= 3.0]
+        ref = float(np.median(viz)) if viz else nivel[i]
+        out.append(round((nivel[i] - ref) + 1.5 * estica[i], 2))
+    return {"success": True, "enfase": out}
+
+
+def cor_do_video(caminho, opcoes):
+    """Das cores `opcoes` (#rrggbb), a que mais se separa das cores do vídeo: matiz longe do matiz dominante das cenas
+    (8 quadros espalhados), com saturação e brilho para aparecer."""
+    import colorsys
+    import subprocess
+
+    import numpy as np
+
+    from Functions import video_cutter as vc
+    from Functions.audio_cutter import ffmpeg_path, _creationflags
+    try:
+        dur = float(vc.probe(caminho).get("duration") or 0)
+    except Exception:
+        dur = 0
+    passo = max(0.5, dur / 8) if dur else 1.0
+    r = subprocess.run([ffmpeg_path(), "-v", "error", "-i", caminho, "-vf", f"fps=1/{passo:.3f},scale=64:64", "-frames:v", "8",
+                        "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, timeout=120, creationflags=_creationflags())
+    px = np.frombuffer(r.stdout, np.uint8).reshape(-1, 3).astype(np.float32) / 255.0
+    if not len(px):
+        return {"success": False, "error": "não consegui ler quadros do vídeo"}
+    mx, mn = px.max(1), px.min(1)
+    s = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1e-6), 0)
+    rr, gg, bb = px[:, 0], px[:, 1], px[:, 2]
+    d = np.maximum(mx - mn, 1e-6)
+    h = np.where(mx == rr, ((gg - bb) / d) % 6, np.where(mx == gg, (bb - rr) / d + 2, (rr - gg) / d + 4)) / 6.0
+    peso = s * mx * (s > 0.2) * (mx > 0.2)
+    hist = np.bincount((h * 36).astype(int) % 36, weights=peso, minlength=36) + 1e-6
+    hist = np.convolve(np.concatenate([hist[-2:], hist, hist[:2]]), np.ones(5) / 5, "valid")
+    h_dom = (int(np.argmax(hist)) + 0.5) / 36.0
+    colorido = float(peso.mean())
+    melhor, nota = None, -1e9
+    for c in opcoes or []:
+        try:
+            cr, cg, cb = (int(str(c)[k:k + 2], 16) / 255.0 for k in (1, 3, 5))
+        except Exception:
+            continue
+        ch, _, cs = colorsys.rgb_to_hls(cr, cg, cb)
+        dist = min(abs(ch - h_dom), 1 - abs(ch - h_dom))      # 0..0,5
+        # vídeo pouco colorido: qualquer cor viva serve, vale mais a saturação; colorido: vale a distância do matiz
+        n = dist * (2.0 if colorido > 0.05 else 0.6) + cs * 0.6
+        # o matiz que já domina a cena (±30°) apaga o destaque
+        hb = int(ch * 36) % 36
+        n -= 1.5 * float(hist[hb] / hist.max())
+        if n > nota:
+            melhor, nota = c, n
+    return {"success": True, "cor": melhor, "dominante": round(h_dom * 360), "colorido": round(colorido, 3)}
+
+
 def refinar(blocos, titulos=None):
     """blocos = [[palavra, ...], ...]; titulos = índices dos blocos que são título →
     {success, destaques: {índice: palavra}} (em lotes de 30 títulos)."""

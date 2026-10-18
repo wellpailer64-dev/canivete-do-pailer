@@ -21,6 +21,16 @@
 @font-face { font-family: "KPR F17"; src: url("../fonts/premium/Poppins-500.ttf"); font-display: block; }
 @font-face { font-family: "KPR F18"; src: url("../fonts/premium/Poppins-700.ttf"); font-display: block; }
 @font-face { font-family: "KPR F19"; src: url("../fonts/premium/Poppins-800.ttf"); font-display: block; }
+@font-face { font-family: "KPR F20"; src: url("../fonts/premium/BowlbyOne-400.ttf"); font-display: block; }
+@font-face { font-family: "KPR F21"; src: url("../fonts/premium/Shrikhand-400.ttf"); font-display: block; }
+@font-face { font-family: "KPR F22"; src: url("../fonts/premium/AlfaSlabOne-400.ttf"); font-display: block; }
+@font-face { font-family: "KPR F23"; src: url("../fonts/premium/CaveatBrush-400.ttf"); font-display: block; }
+@font-face { font-family: "KPR F24"; src: url("../fonts/premium/SpecialElite-400.ttf"); font-display: block; }
+@font-face { font-family: "KPR F25"; src: url("../fonts/premium/ArchivoBlack-400.ttf"); font-display: block; }
+@font-face { font-family: "KPR F26"; src: url("../fonts/premium/Unbounded-900.ttf"); font-display: block; }
+@font-face { font-family: "KPR F27"; src: url("../fonts/premium/SpaceMono-700.ttf"); font-display: block; }
+@font-face { font-family: "KPR F28"; src: url("../fonts/premium/RubikDirt-400.ttf"); font-display: block; }
+@font-face { font-family: "KPR F29"; src: url("../fonts/premium/SedgwickAve-400.ttf"); font-display: block; }
 
 .velp-sec { gap: 12px; --velp-acc: #FF9A2E; }
 [data-lp-so-classica][hidden], .velp-painel[hidden] { display: none !important; }
@@ -85,6 +95,9 @@
 .velp-cor:hover { transform: scale(1.1); }
 .velp-cor.on { box-shadow: 0 0 0 2px var(--ve-bg), 0 0 0 3.5px var(--c, var(--velp-acc)); }
 .velp-cor-livre { background: conic-gradient(#ff5f6d, #ffc371, #c8f560, #5cc8ff, #b892ff, #ff5f6d); --c: var(--velp-acc); overflow: hidden; }
+.velp-cor-video { --c: #2a2a2e; display: grid; place-items: center; color: #fff; font: 600 11px var(--ve-ui);
+                  background: radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--c) 85%, #fff), var(--c)); }
+.velp-cor-video:disabled { cursor: progress; opacity: .6; }
 .velp-cor-livre input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
 
 .velp-seg { display: flex; padding: 2px; gap: 2px; border-radius: 7px; background: var(--ve-bg); border: 1px solid var(--ve-line-2); }

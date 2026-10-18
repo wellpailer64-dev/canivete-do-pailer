@@ -339,6 +339,24 @@ def ve_texto_modelos():
     return legendas.modelos_estado()
 
 
+def ve_leg_premium_enfase(clipes, total, palavras):
+    """Legenda Premium: ênfase de cada palavra na fala (volume e alongamento contra as vizinhas)."""
+    from Functions import legenda_premium
+    try:
+        return legenda_premium.enfase(clipes, total, palavras)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def ve_leg_premium_cor(caminho, opcoes):
+    """Legenda Premium: cor de destaque que se separa das cores do vídeo."""
+    from Functions import legenda_premium
+    try:
+        return legenda_premium.cor_do_video(caminho, opcoes)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def ve_leg_premium_kani(blocos, titulos=None):
     """Legenda Premium: a Kani escolhe a palavra de destaque de cada título (Functions/legenda_premium.py)."""
     from Functions import legenda_premium
@@ -3194,6 +3212,12 @@ class ApiBridge:
 
     def ve_leg_premium_kani(self, blocos, titulos=None):
         return ve_leg_premium_kani(blocos, titulos)
+
+    def ve_leg_premium_enfase(self, clipes, total, palavras):
+        return ve_leg_premium_enfase(clipes, total, palavras)
+
+    def ve_leg_premium_cor(self, caminho, opcoes):
+        return ve_leg_premium_cor(caminho, opcoes)
 
     def ve_transcrever(self, clipes, total, idioma="pt"):
         return ve_transcrever(clipes, total, idioma)
