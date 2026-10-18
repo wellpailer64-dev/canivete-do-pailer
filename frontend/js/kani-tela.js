@@ -90,7 +90,11 @@ function kaniTelaGenerica(pg) {
 function kaniContextoTela() {
     if (localStorage.getItem('kani-ver-tela') === '0') return '';
     const pg = document.querySelector('.tool-page.active'); if (!pg) return '';
-    const id = pg.id.replace(/^page-/, ''); if (id === 'home') return '';
+    const id = pg.id.replace(/^page-/, '');
+    if (id === 'home') {   // na Home: o que tem aberto nas abas (antes ia vazio e ela dizia "não consigo ver a tela")
+        const abas = [...document.querySelectorAll('.tab[data-tab] .tab-nome')].map(e => e.firstChild ? e.firstChild.textContent.trim() : '').filter(Boolean);
+        return `Tela inicial do KANIVETE (banners e a lista das ferramentas). ${abas.length ? `Abas abertas em cima: ${abas.join(', ')}.` : 'Nenhuma outra ferramenta aberta.'}`;
+    }
     let t = '';
     try { t = KANI_TELA[id] ? KANI_TELA[id]() : kaniTelaGenerica(pg); } catch (e) { console.warn('[Kani] contexto da tela:', e); t = ''; }
     if (!t) return '';

@@ -10,18 +10,26 @@ import re
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INSTR = os.path.join(RAIZ, "Instructions")
 SAIDA = os.path.join(RAIZ, "frontend", "ajuda", "kani_kb.json")
-FORA = {"build.md", "howtoeditapp.md", "modo-agente.md", "cerebro.md"}   # internos (desenvolvimento)
+FORA = {"build.md", "howtoeditapp.md", "modo-agente.md", "cerebro.md", "MAPA.md"}   # internos (desenvolvimento)
 MAX = 1400
+FATOS = os.path.join(RAIZ, "frontend", "ajuda", "kani_fatos.md")   # escrito para quem usa: vem na frente dos guias
+# seções de guia que são para quem programa: a Kani citava caminho de arquivo e plano interno ("o estabilizador está
+# pendente", "edite slider-kani.js") — medido na bateria de 2026-10-17
+SECAO_FORA = re.compile(r"onde fica|para o agente|armadilh|pend[êe]nci|depend[êe]nci|leveza|^modelo$|padr[ãa]o de implementa|"
+                        r"estabilidade do sistema|teste|api\b|arquivos? \(|bancada|medi[çc][õo]es|plano|ponte|c[óo]digo|build", re.I)
+TECNICO = re.compile(r"`[^`]*(?:[/\\]|\.(?:js|py|json|css|html|md|bat)\b|\(|\)|_[a-z]|[a-z][A-Z]|window\.|=)[^`]*`")
 
 
 def trechos(texto, fonte):
     out, titulo, buf = [], fonte, []
 
     def fechar():
-        corpo = "\n".join(buf).strip()
+        if SECAO_FORA.search(titulo.split(" — ", 1)[-1]):
+            return
+        corpo = limpar("\n".join(buf)).strip()
         while corpo:
             parte, corpo = corpo[:MAX], corpo[MAX:]
-            if len(parte.strip()) > 60:
+            if len(parte.strip()) > 60 and not re.search(r"window\.|[a-z]{3,}[A-Z][a-z]+[A-Z]|_[a-z]+_[a-z]+", parte):
                 out.append({"titulo": titulo, "texto": parte.strip(), "fonte": fonte})
     for linha in texto.splitlines():
         m = re.match(r"^(#{1,3})\s+(.*)", linha)
@@ -32,6 +40,15 @@ def trechos(texto, fonte):
             buf.append(linha)
     fechar()
     return out
+
+
+def limpar(t):
+    """tira o que é de programador: blocos de código, `caminhos/funções`, linhas de tabela com arquivo, (arquivo.py)"""
+    t = re.sub(r"```.*?```", "", t, flags=re.S)
+    t = TECNICO.sub("", t)
+    t = re.sub(r"\((?:[^()]*?\.(?:js|py|json|css)\b[^()]*)\)", "", t)
+    t = "\n".join(l for l in t.splitlines() if not re.search(r"\.(js|py|json|css)\b|Functions/|frontend/|testes/|tools/|D:/|D:\\\\", l))
+    return re.sub(r"[ \t]{2,}", " ", re.sub(r"\n{3,}", "\n\n", t))
 
 
 def ferramentas():
@@ -89,6 +106,8 @@ def resumos():
 
 def main():
     chunks = []
+    if os.path.isfile(FATOS):
+        chunks += [dict(c, fato=True) for c in trechos(re.sub(r"<!--.*?-->", "", open(FATOS, encoding="utf-8").read(), flags=re.S), "Ajuda")]
     for n in sorted(os.listdir(INSTR)):
         if n.endswith(".md") and n not in FORA:
             fonte = "Mapa geral" if n == "MAPA.md" else n[:-3].replace("-", " ").title()

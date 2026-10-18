@@ -69,20 +69,32 @@ def _gguf():
     return novo if os.path.isfile(novo) else (_gguf_antigo() or novo)
 
 
+_ollama_visto = [0.0, False]
+
+
 def _ollama_tem():
     """True se o Ollama está rodando com um dos modelos da Kani (OLLAMA_MODELOS, nessa preferência); o escolhido fica
-    em OLLAMA_MODELO."""
+    em OLLAMA_MODELO. Resposta guardada por 20 s: sem Ollama, o Windows leva ~1,5 s para recusar a porta e isso entrava
+    em TODA mensagem (1ª palavra 3,8 s no chat com o servidor respondendo em 0,3–1,1 s; medido 2026-10-17)."""
     global OLLAMA_MODELO
+    if time.time() - _ollama_visto[0] < 20:
+        return _ollama_visto[1]
+    tem = False
     try:
+        import socket
+        with socket.create_connection(("127.0.0.1", 11434), timeout=0.25):
+            pass
         with urllib.request.urlopen(OLLAMA + "/api/tags", timeout=1.5) as r:
             nomes = [m.get("name", "") for m in json.loads(r.read()).get("models", [])]
         for alvo in OLLAMA_MODELOS:
             if any(n == alvo or n.startswith(alvo + "-") for n in nomes):
                 OLLAMA_MODELO = alvo
-                return True
-        return False
+                tem = True
+                break
     except Exception:
-        return False
+        tem = False
+    _ollama_visto[:] = [time.time(), tem]
+    return tem
 
 
 def estado():
@@ -241,7 +253,8 @@ _PARADAS = set("a o as os de da do das dos e em no na nos nas um uma uns umas pa
 
 def _tok(s):
     # radical simples: o começo da palavra (removo/remover/remoção → remov; exportar/exportação → expor)
-    return [w[:5] for w in re.findall(r"[a-z0-9]+", _norm(s)) if len(w) > 2 and w not in _PARADAS]
+    # números e "kanivete" (está em tudo) não ajudam a achar o trecho: "17% de 2.350" puxava o Compressor
+    return [w[:5] for w in re.findall(r"[a-z0-9]+", _norm(s)) if len(w) > 2 and w not in _PARADAS and not w.isdigit() and not w.startswith("kanive")]
 
 
 def _carregar_kb():
@@ -262,7 +275,10 @@ def _carregar_kb():
     return _kb
 
 
-def buscar(pergunta, n=4):
+def buscar(pergunta, n=3):
+    """BM25 nos trechos da ajuda. Só o que tem relação de verdade: nota mínima e perto da melhor (antes, "quem criou o
+    Kanivete?" levava 4 trechos aleatórios = ~1,5 mil tokens de ruído e a 1ª palavra demorava mais). Trecho da ajuda
+    escrita para o usuário (fato) pesa mais que trecho de guia."""
     kb = _carregar_kb()
     q = _tok(pergunta)
     if not q or not kb["chunks"]:
@@ -277,9 +293,76 @@ def buscar(pergunta, n=4):
                 idf = math.log(1 + (N - kb["df"][w] + 0.5) / (kb["df"][w] + 0.5))
                 s += idf * tf[w] * 2.2 / (tf[w] + 1.2 * (0.25 + 0.75 * len(d) / kb["media"]))
         if s > 0:
-            notas.append((s, i))
+            notas.append((s * (1.6 if kb["chunks"][i].get("fato") else 1.0), i))
     notas.sort(reverse=True)
-    return [kb["chunks"][i] for _, i in notas[:n]]
+    if not notas or notas[0][0] < 5.0:
+        return []
+    return [kb["chunks"][i] for s, i in notas[:n] if s >= 0.45 * notas[0][0]]
+
+
+# ── contas: o modelo pequeno erra soma ("17% de 2.350 = 419,5"); o app faz a conta e entrega o resultado pronto ──
+_NUM = r"\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?"
+
+
+def _numero(s):
+    s = s.strip()
+    if re.fullmatch(r"\d{1,3}(?:\.\d{3})+(?:,\d+)?", s):        # 2.350 / 1.234,5 (jeito brasileiro)
+        return float(s.replace(".", "").replace(",", "."))
+    return float(s.replace(",", "."))
+
+
+def _br(v):
+    v = round(v, 4)
+    inteiro = abs(v - round(v)) < 1e-9
+    txt = f"{v:,.0f}" if inteiro else f"{v:,.4f}".rstrip("0")
+    return txt.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def contas(texto):
+    """'17% de 2.350', '2350 * 1,17', '(120 + 80) / 4'... → linhas 'conta = resultado' (vazio se não houver conta)."""
+    import ast
+    import operator as op
+    out = []
+    for m in re.finditer(rf"({_NUM})\s*%\s*(?:de|do|da|sobre)\s*(?:R\$\s*)?({_NUM})", texto, re.I):
+        out.append(f"{m.group(1)}% de {m.group(2)} = {_br(_numero(m.group(1)) / 100 * _numero(m.group(2)))}")
+    ops = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul, ast.Div: op.truediv, ast.Pow: op.pow, ast.USub: op.neg}
+
+    def ev(n):
+        if isinstance(n, ast.Constant) and isinstance(n.value, (int, float)):
+            return n.value
+        if isinstance(n, ast.BinOp) and type(n.op) in ops:
+            if isinstance(n.op, ast.Pow) and abs(ev(n.right)) > 12:
+                raise ValueError
+            return ops[type(n.op)](ev(n.left), ev(n.right))
+        if isinstance(n, ast.UnaryOp) and type(n.op) in ops:
+            return ops[type(n.op)](ev(n.operand))
+        raise ValueError
+    for m in re.finditer(rf"[\(\s]*(?:{_NUM})(?:\s*[-+*/x×÷^]\s*[\(\s]*(?:{_NUM})[\)\s]*)+", texto):
+        trecho = m.group(0).strip()
+        if (not re.search(r"\d\s*[-+*/x×÷^]\s*[\(\d]", trecho) or re.fullmatch(r"\d{1,2}/\d{1,2}(/\d{2,4})?", trecho)
+                or re.fullmatch(r"\d{2,4}-\d{1,2}-\d{1,4}|\(?\d{2}\)?\s*\d{4,5}-\d{4}|\d{4,5}-\d{4}|\d{3,5}x\d{3,5}", trecho)):
+            continue    # sem operador entre números, data (7/9/2022, 2026-10-17), telefone ou resolução (1920x1080)
+        expr = re.sub(_NUM, lambda n: repr(_numero(n.group(0))), trecho)
+        expr = expr.replace("x", "*").replace("×", "*").replace("÷", "/").replace("^", "**")
+        try:
+            out.append(f"{trecho} = {_br(ev(ast.parse(expr, mode='eval').body))}")
+        except Exception:
+            pass
+    return "\n".join(dict.fromkeys(out))
+
+
+def _hoje():
+    import datetime
+    d = datetime.datetime.now()
+    dias = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
+    return f"{dias[d.weekday()]}, {d:%d/%m/%Y}"
+
+
+def _versao():
+    try:
+        return open(os.path.join(app_dir(), "version.txt"), encoding="utf-8").read().strip()
+    except Exception:
+        return ""
 
 
 def _preferencias():
@@ -292,7 +375,8 @@ def _preferencias():
 
 def _sistema(pergunta, ferramenta, tela=""):
     kb = _carregar_kb()
-    trechos = buscar(pergunta + " " + (ferramenta or ""))
+    # o nome da ferramenta aberta ajuda a busca; "tela inicial" não (casava com a "Tela inicial" de todo guia)
+    trechos = buscar(pergunta + ("" if not ferramenta or ferramenta in ("tela inicial", "home", "Início") else " " + ferramenta))
     doc = "\n\n".join(f"### {t['titulo']}\n{t['texto']}" for t in trechos) or "(nada encontrado)"
     ids = ", ".join(f"{i} = {n}" for i, n in kb["ferramentas"])
     barra = "; ".join(f"{g}: {', '.join(n)}" for g, n in kb.get("barra", []))
@@ -302,6 +386,12 @@ def _sistema(pergunta, ferramenta, tela=""):
 remover fundo, transcrever, gerar voz...). Tudo roda no computador da pessoa, sem internet.
 FATOS FIXOS (use exatamente assim):
 - O KANIVETE foi criado por Wellington Pailer. Não diga que é de uma equipe, nem que é código aberto, nem cite site.
+- É gratuito (sem assinatura); apoio pelo botão "Doe ao criador" no fim da barra lateral. Versão instalada: {_versao() or 'aparece no rodapé da barra lateral'} \
+(mostrada no rodapé da barra lateral; clicar nela procura atualização).
+- O que a AJUDA diz que o app NÃO faz, responda que não tem. Nunca diga que algo está "em desenvolvimento", "pendente" ou
+  "nos planos", nem fale de planos internos.
+- Pergunta sobre o código-fonte do app (arquivos, programação do KANIVETE): diga que você ajuda a USAR o app e não tem
+  acesso ao código dele.
 - Barra lateral à esquerda, por seção: {barra}. Preferências fica no fim da barra (engrenagem).
 - Você CRIA arquivos aqui no chat quando a pessoa pede com um verbo de criar: imagem ("gera uma imagem de..."), efeito sonoro
   ("cria um som de..."), narração ("narre: texto" ou "faz uma narração sobre...") e vinheta com narração e música ("faz uma
@@ -316,7 +406,8 @@ FATOS FIXOS (use exatamente assim):
 O QUE CADA FERRAMENTA FAZ (palavras da própria tela; vale mais que os trechos lá embaixo):
 {resumos}
 JEITO DE CONVERSAR: você é calorosa, direta e prática, como uma colega experiente. Use o que já foi dito NESTA conversa
-(não peça de novo o que a pessoa já contou). Se o pedido estiver vago a ponto de você chutar, faça UMA pergunta curta antes.
+(não peça de novo o que a pessoa já contou). O que a pessoa contou aqui (nome, negócio, cidade, gostos) você SABE: use
+sem dizer que "não tem acesso". Se o pedido estiver vago a ponto de você chutar, faça UMA pergunta curta antes.
 Responda primeiro o essencial; detalhe só se ajudar. Quando fizer sentido, termine sugerindo o próximo passo útil.
 O QUE VOCÊ FAZ AQUI NO CHAT (quando pedem com verbo de ação): gerar imagem, efeito sonoro, narração, conversa a duas vozes,
 vinheta com música; salvar textos em PDF bonito, Word (.docx), TXT; tirar o fundo de uma foto anexada (📎); resumir um PDF/Word
@@ -331,12 +422,16 @@ Regras:
   texto dentro de um bloco ```texto … ``` sem **negrito** nem markdown dentro (emojis e hashtags podem); comentários e
   explicações ficam fora do bloco. SEMPRE com o bloco, mesmo quando a resposta é só o texto — é dele que sai o botão Copiar.
   Só o formato (o assunto é outro): pedido "aviso de fila na padaria" → "Aqui vai:\n```texto\nHoje a fila anda rápido, prometo! 🥖\n```".
+  Conta, resultado, data, explicação ou passo a passo NÃO vão em bloco (o bloco é só para texto que a pessoa vai colar).
+- Não termine toda resposta oferecendo mais coisas: só sugira um próximo passo quando ele for claro e útil.
   Código vai em ```linguagem … ```.
 - Quando a resposta ensina a usar uma ferramenta do app, termine SEMPRE com o marcador [[abrir:ID]] (uma vez, exatamente
   nesse formato, com "abrir:"), usando o ID desta lista: {ids}. Ex.: "...e clique em Salvar. [[abrir:remover-fundo]]".
   Em conversa geral (quem criou, ideias, textos) não ponha.
+Hoje é {_hoje()}.
 A pessoa está agora em: {ferramenta or 'tela inicial'}.
 {_preferencias()}
+{f"CONTA FEITA PELO APP (resultado certo: use exatamente este número, não refaça a conta):{chr(10)}{contas(pergunta)}" if contas(pergunta) else ""}
 
 AJUDA DO KANIVETE (trechos dos guias):
 {doc}""" + (f"""
@@ -358,7 +453,7 @@ def conversar(cid, mensagens, ferramenta, on_evento, tela=""):
             msgs = [{"role": "system", "content": _sistema(ult, ferramenta, (tela or "")[:1600])}] + [m for m in mensagens[-12:] if m.get("role") in ("user", "assistant")]
             if _ollama_tem():
                 corpo = {"model": OLLAMA_MODELO, "messages": msgs, "stream": True, "think": False, "keep_alive": "5m",
-                         "options": {"num_ctx": CTX, "temperature": 0.6}}
+                         "options": {"num_ctx": CTX, "temperature": 0.5}}
                 req = urllib.request.Request(OLLAMA + "/api/chat", data=json.dumps(corpo).encode(), headers={"Content-Type": "application/json"})
                 with urllib.request.urlopen(req, timeout=600) as r:
                     for linha in r:
@@ -377,7 +472,8 @@ def conversar(cid, mensagens, ferramenta, on_evento, tela=""):
                 on_evento({"id": cid, "status": "Acordando a IA…"})
                 _subir()
                 _srv["ocupado"] = True
-                corpo = {"messages": msgs, "stream": True, "temperature": 0.6, "chat_template_kwargs": {"enable_thinking": False}}
+                # 0,5 (era 0,6): menos invenção (hashtag #feijoada num post de padaria, bateria de 2026-10-17)
+                corpo = {"messages": msgs, "stream": True, "temperature": 0.5, "chat_template_kwargs": {"enable_thinking": False}}
                 req = urllib.request.Request(f"http://127.0.0.1:{_srv['porta']}/v1/chat/completions", data=json.dumps(corpo).encode(),
                                              headers={"Content-Type": "application/json"})
                 with urllib.request.urlopen(req, timeout=600) as r:

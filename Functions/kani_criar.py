@@ -64,7 +64,9 @@ def detectar(texto, anterior=None):
     tipo = next((tp for tp, rx in _TIPOS if rx.search(t)), None)
     if anterior and _CONTINUA.match(t) and not re.match(r"^\s*(como|onde|qual|quais|por ?que|o que)\b", t, re.I):
         return {"tipo": tipo or anterior, "continua": True}
-    if re.match(r"^\s*(como|onde|qual|quais|por ?que|o que|d[aá] pra|tem como|consigo)\b", t, re.I):
+    # pergunta sobre a criação, não pedido: "me explica como criar uma vinheta", "você sabe fazer narração?"
+    if re.match(r"^\s*(como|onde|qual|quais|por ?que|o que|d[aá] pra|tem como|consigo|(me )?explica|(me )?ensina|"
+                r"(voc[eê]|vc) sabe|sabe (fazer|criar|gerar)|[eé] poss[ií]vel)\b", t, re.I):
         return None
     if not re.search(_VERBO, t, re.I) and not re.match(r"^\s*(uma?|um)\s", t, re.I):
         return None

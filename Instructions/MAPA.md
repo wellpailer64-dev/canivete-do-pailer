@@ -436,6 +436,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_imagem.py` — Teste do Editor de Imagem (frontend/js/imagem-*.js + Functions/editor_imagem.py) no app de verdade
 - `testes/teste_kani.py` — Kani (assistente) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila) e confere: bolinha na Home,
 - `testes/teste_kani_maos.py` — Teste das mãos da Kani: abre o app de teste (porta 9338, dados em D:/kanivete_testes), pede um flyer ao agente da
+- `testes/teste_kani_respostas.py` — Kani — bateria de respostas (alucinação, fatos do app, contas, memória da conversa, tela, rotas e tempo da 1ª palavra)
 - `testes/teste_ke_aba.py` — Kanivete Encoder na aba própria (editor-encoder.js keAoTrocar) — app em --agente=9333:
 - `testes/teste_ke_media.py` — Kanivete Encoder como Media Encoder (ke-arquivos.js + Functions/ke_arquivos.py) — app em --agente=9333:
 - `testes/teste_ke_parar.py` — Parar da fila do Ke interrompe o Blender (item da Lux): app em --agente=9333

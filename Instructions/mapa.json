@@ -3287,6 +3287,7 @@
   "teste_imagem": "Teste do Editor de Imagem (frontend/js/imagem-*.js + Functions/editor_imagem.py) no app de verdade",
   "teste_kani": "Kani (assistente) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila) e confere: bolinha na Home,",
   "teste_kani_maos": "Teste das mãos da Kani: abre o app de teste (porta 9338, dados em D:/kanivete_testes), pede um flyer ao agente da",
+  "teste_kani_respostas": "Kani — bateria de respostas (alucinação, fatos do app, contas, memória da conversa, tela, rotas e tempo da 1ª palavra)",
   "teste_ke_aba": "Kanivete Encoder na aba própria (editor-encoder.js keAoTrocar) — app em --agente=9333:",
   "teste_ke_media": "Kanivete Encoder como Media Encoder (ke-arquivos.js + Functions/ke_arquivos.py) — app em --agente=9333:",
   "teste_ke_parar": "Parar da fila do Ke interrompe o Blender (item da Lux): app em --agente=9333",
