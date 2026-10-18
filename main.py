@@ -4319,6 +4319,13 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def ve_autozoom_rostos(self, pedidos):
+        from Functions import autozoom
+        try:
+            return autozoom.rostos(pedidos)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def ve_roto_pausar(self, sim=True):
         from Functions import pincel_roto
         return pincel_roto.pausar(bool(sim))

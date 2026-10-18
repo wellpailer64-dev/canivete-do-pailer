@@ -17,6 +17,7 @@
     "editor-audio.js",
     "editor-autoframe-cliente.js",
     "editor-autoframe.js",
+    "editor-autozoom.js",
     "editor-caminho.js",
     "editor-caneta.js",
     "editor-colar-externo.js",
@@ -151,6 +152,8 @@
     "ve_roto_abrir",
     "ve_roto_estado",
     "ve_roto_base",
+    "ve_autozoom_rostos",
+    "ve_roto_pausar",
     "ve_roto_congelar",
     "ve_roto_qualidade",
     "ve_roto_refinar",
@@ -1927,6 +1930,18 @@
     "pincel_roto"
    ]
   },
+  "ve_autozoom_rostos": {
+   "args": "pedidos",
+   "modulos": [
+    "autozoom"
+   ]
+  },
+  "ve_roto_pausar": {
+   "args": "sim=True",
+   "modulos": [
+    "pincel_roto"
+   ]
+  },
   "ve_roto_congelar": {
    "args": "rid",
    "modulos": [
@@ -3137,6 +3152,7 @@
   "Instructions/agente/ajuste-premiere.md": "AJUSTE PREMIERE: plano para a próxima sessão",
   "Instructions/agente/arquiteto-local.md": "Arquiteto Local B",
   "Instructions/agente/ata-kanivete.md": "Ata Kanivete (At, verde #1FA971) — Beta",
+  "Instructions/agente/autozoom.md": "Autozoom (Vídeo Kanivete)",
   "Instructions/agente/cena-3d-editor.md": "Cena 3D no Editor Kanivete (estilo After Effects)",
   "Instructions/agente/design-photo-kanivete.md": "Fazer arte no Photo Kanivete pela API (guia para IAs)",
   "Instructions/agente/direcao-carrossel.md": "Direção de arte de carrossel (para IAs) — o que separa peça boa de \"landing page genérica\"",
@@ -3199,6 +3215,7 @@
   "Functions/audio_cutter.py": "Editor simples de audio com cortes multiponto via ffmpeg",
   "Functions/autoframe.py": "AutoFrame — vídeos no ritmo da música a partir de uma pasta de fotos e vídeos (no espírito dos modelos do CapCut)",
   "Functions/autoframe_modelos.py": "autoframe_modelos.py — modelos de cliente do AutoFrame (aba \"AutoFrame Customizado\")",
+  "Functions/autozoom.py": "autozoom.py — Autozoom do Vídeo Kanivete (frontend/js/editor-autozoom.js): zooms de ênfase em camadas de ajuste",
   "Functions/blender_cena.py": "Roda DENTRO do Blender (blender -b -P blender_cena.py -- cena.json): monta a cena dos objetos 3D do Vetor Kanivete e",
   "Functions/blender_converter.py": "blender_converter.py — roda DENTRO do Python do Blender (Functions/cena3d.py: converter):",
   "Functions/blender_estudio.py": "perfil (r, z) com cada quina interna trocada por um arco (chanfro de verdade, como produto injetado)",
@@ -3298,6 +3315,7 @@
   "teste_3d_modelos": "Teste dos modelos 3D baixados de banco na Cena 3D do Editor (app em --agente=9333):",
   "teste_3d_placas": "Camadas em profundidade na Cena 3D (editor-3d-placas.js + editor-3d-mexer.js), app em --agente=9333:",
   "teste_atributos": "Remover atributos e ajuste em grupo (editor-atributos.js) — abre um app próprio (porta 9334, dados em",
+  "teste_autozoom": "Autozoom (editor-autozoom.js + Functions/autozoom.py) no app de verdade: entrevista de 15 s, transcrição, gerar",
   "teste_barra": "Barra de tarefas contextual: alça move e lembra, Selecionar assunto / Remover fundo, × esconde só até o próximo clique",
   "teste_blender": "Teste do render fotorrealista (Vetor 3D → Blender), app em --agente=9333. Rápido (400 px, 24 amostras): copo (girar) com",
   "teste_cache_midia": "teste_cache_midia.py — A limpeza do cache de mídia (video_cutter.manutencao_midia) nunca apaga o que está em uso",

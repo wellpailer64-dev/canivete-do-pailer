@@ -20,6 +20,11 @@ Timeline com trilhas de vídeo e áudio, cortes (Ctrl+K), transições, efeitos,
 Effects, Pincel Roto (recortar pessoa no vídeo), Cena 3D, mixer de áudio e remix de música. Projetos .vknv. Abre projetos
 do Premiere (.prproj) e devolve para o Premiere em XML. Exportar: botão Exportar no canto de cima à direita ou Ctrl+M (põe
 na fila e abre o Kanivete Encoder); Ctrl+Shift+M põe na fila sem abrir. Painel Pessoas agrupa os rostos do projeto.
+Autozoom (painel Animação › Autozoom): lê a fala (transcrição e ênfase da voz), escolhe os momentos fortes e cria zooms
+em camadas de ajuste cor-de-rosa na timeline, centrados no rosto. Escolha Quantidade (Pouco, Médio, Muito ou Automático),
+Estilo (Seco = entra e sai no corte; Suave = curva macia; Smart = decide por momento) e Força. Cada zoom pode ser ajustado
+nos Controles de efeito (zoom, entrada, saída, curva, centro, desfoque de movimento); Remover tira todos. "Desfoque" liga o
+desfoque de movimento nos zooms rápidos (só borra enquanto o zoom anda).
 Pincel Roto (Efeitos › Chaveamento, ou duplo clique no clipe com o efeito): abre numa janela por cima do editor. Pinte o
 que fica (Alt tira) ou clique em "✨ Selecionar assunto" para o app achar a pessoa sozinho; o quadro pintado vira
 quadro-base. O recorte dos outros quadros só é montado quando você clica em "❄ Freeze" (ou tecla F); marque "Seguir

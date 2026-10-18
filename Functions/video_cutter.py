@@ -4206,6 +4206,11 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 onda = _filtro_onda(c["fx"], W, H, c["st"], margem=False)   # tempo da timeline no trecho
                 if onda:
                     efeitos.append(onda)
+                # Autozoom (Functions/autozoom.py): o quadro conta a partir do início do trecho (ini)
+                from Functions import autozoom
+                zoom = autozoom.filtro(c["fx"], W, H, c["st"], c["dur"], max(0.0, c["st"]), float(fps))
+                if zoom:
+                    efeitos.append(zoom)
                 # nitidez do Luz e Cor marcada para depois da volta a YUV (_NIT_NO_YUV); na Comp (alfa) fica no RGBA
                 nit_yuv = ",".join(e[len(_NIT_NO_YUV):] for e in efeitos if e.startswith(_NIT_NO_YUV))
                 efeitos = [e for e in efeitos if not e.startswith(_NIT_NO_YUV)]

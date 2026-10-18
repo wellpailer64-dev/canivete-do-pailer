@@ -178,7 +178,7 @@ const VE_CORES = [
     ['floresta', 'Floresta', '#43bb6f'], ['verde', 'Verde', '#88be3b'], ['amarelo', 'Amarelo', '#d1b251'],
     ['manga', 'Manga', '#d2a559'], ['laranja', 'Laranja', '#d58f5e'], ['rosa', 'Rosa', '#d77384'],
     ['magenta', 'Magenta', '#c877d4'], ['lavanda', 'Lavanda', '#bbafea'], ['bege', 'Bege', '#cab59c'],
-    ['marrom', 'Marrom', '#bf8635'],
+    ['marrom', 'Marrom', '#bf8635'], ['pink', 'Pink', '#ff4fa3'],
 ];
 const veCor = c => { const id = c && (veCorManual(c) || veCorTipo(c)); const k = id && VE_CORES.find(x => x[0] === id); return k ? k[2] : null; };
 // a Comp nasce com a cor laranja (VE_COMP_COR, editor-comp.js): com a cor por tipo ligada, essa automática dá lugar ao tipo

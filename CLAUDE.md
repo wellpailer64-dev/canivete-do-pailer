@@ -122,6 +122,11 @@ Ondulação na placa (2026-10-15, plano §8.6): shader por onda com margem trans
 (e a sombra) e camada de ajuste; giro de vídeo e de imagem com onda também na placa (`_giro_passos`); teste
 `teste_export.py --casos onda,ondavideo,ondatexto,ondavideo2,ondagiro --placa`.
 
+**Autozoom** (2026-10-18, painel Animação › Autozoom): zooms de ênfase pela fala (blocos/nota da Legenda Premium + ênfase
+da voz + rosto YuNet) em camadas de ajuste pink com o efeito "zoom" (curva igual na prévia e no `perspective` da
+exportação; placa = híbrido). `frontend/js/editor-autozoom.js`, `Functions/autozoom.py`; guia `Instructions/agente/autozoom.md`;
+teste `py -3.13 testes/teste_autozoom.py`.
+
 **Legendas em 3 modos** (2026-10-18, painel Texto › Legendas): Clássica, Dinâmica (destaque da palavra falada) e
 **Premium** — blocos curtos montados como título com duas fontes (dupla), papéis por palavra (ligação/base/destaque),
 entrada palavra a palavra, Kani refina o destaque, efeitos sonoros do Soundboard pelo movimento/assunto (`lpSfx`);

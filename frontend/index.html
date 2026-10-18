@@ -798,6 +798,10 @@
                                     <div class="ve-fx-search"><svg class="i"><use href="#i-search"/></svg><input type="text" id="ve-tr-q" placeholder="Buscar animação" autocomplete="off"></div>
                                     <!-- uma rolagem só; cada aba abre/fecha (editor-trans.js: veAnInit) -->
                                     <div class="ve-an-rolagem" id="ve-an-rolagem">
+                                    <details class="ve-an-sec ve-az-sec" id="ve-az-sec" data-an="autozoom" open>
+                                        <summary>Autozoom <small>zooms de ênfase pela fala, em camadas de ajuste</small></summary>
+                                        <div class="ve-tr-controls ve-az-corpo" id="ve-az-corpo"></div>
+                                    </details>
                                     <details class="ve-an-sec ve-txa-sec" id="ve-txa-sec" data-an="texto" open>
                                         <summary>Texto <small>letra a letra · palavra · linha</small></summary>
                                         <div class="ve-tr-grid ve-txa-grid" id="ve-txa-list"></div>
@@ -2139,6 +2143,7 @@
     <script src="js/editor-audio.js"></script>
     <script src="js/editor-texto.js"></script>
     <script src="js/editor-legenda-premium.js"></script>
+    <script src="js/editor-autozoom.js"></script>
     <script src="js/editor-props.js"></script>
     <script src="js/editor-transform.js"></script>
     <script src="js/editor-guias.js"></script>

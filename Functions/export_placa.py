@@ -278,7 +278,7 @@ def _lc_ok(fx):
 # Cortar, Luma Key, Cantos arredondados e Básico 3D (transições Dividir/Chicote viram esses efeitos) também
 # Ondulação (Wave Warp): sozinha ou com Luz e Cor/Aberração/Desfoque vai em shader (_onda_passos); junto de um efeito
 # que desce, desce com ele (geq a cada quadro, vc._filtro_onda) e sobe na caixa com a margem
-_FX_HIBRIDO = ("key", "lc", "blur", "bc", "ca", "mo_fill", "mo_inv", "mo_glow", "crop", "luma", "rounded", "b3d", "onda")
+_FX_HIBRIDO = ("key", "lc", "blur", "bc", "ca", "mo_fill", "mo_inv", "mo_glow", "crop", "luma", "rounded", "b3d", "onda", "zoom")
 
 
 def _fx_hibrido(fx):
@@ -1400,6 +1400,12 @@ def _ajuste(g, entrada, c, pasta, mtx="bt709"):
         onda = vc._filtro_onda(resto, g.W, g.H, c["st"], margem=False)   # desce junto; o trim não zera o tempo
         if onda:
             efs.append(onda)
+        # Autozoom: o quadro conta do 1º que desce — o do início do bloco (ramo "tarde", abaixo) ou o do início do trecho
+        from Functions import autozoom
+        ini0 = max(0.0, c["st"])
+        zoom = autozoom.filtro(resto, g.W, g.H, c["st"], c["dur"], 0.0 if (ini0 > 0.5 and opaco) else ini0, g.fps)
+        if zoom:
+            efs.append(zoom)
         # o que chega pode ser a base (_FMT_CAM), a composição (_FMT_MEIO) ou outro ajuste que subiu da CPU: um passo
         # do libplacebo deixa o formato exato para o hwdownload
         desce = (f"libplacebo=format={_FMT_MEIO}:disable_linear=1,hwdownload,format={_FMT_MEIO},"

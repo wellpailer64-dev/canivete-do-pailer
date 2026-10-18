@@ -918,11 +918,12 @@ function veFxAdd(i, t) {
     if (!c || !VE_FX[t]) return;
     if (VE.info && VE.info.audio_only) { veToast('Efeitos de vídeo precisam de um vídeo ou imagem'); return; }
     const painel = VE_FX[t].painel, lista = veFxAlvos(c);
-    const aceita = x => !veLocked(x) && !veIsAudio(x) && !(VE_FX[t].soClipe && veIsAdj(x));
+    const aceita = x => !veLocked(x) && !veIsAudio(x) && !(VE_FX[t].soClipe && veIsAdj(x)) && !(VE_FX[t].soAjuste && !veIsAdj(x));
     if (lista.length === 1) {
         if (veLocked(c)) { veAvisoBloqueio(); return; }
         if (veIsAudio(c)) { veToast('Efeitos de vídeo não se aplicam a um clipe de áudio'); return; }
         if (VE_FX[t].soClipe && veIsAdj(c)) { veToast(`${VE_FX[t].nome} não se aplica a uma camada de ajuste`); return; }
+        if (VE_FX[t].soAjuste && !veIsAdj(c)) { veToast(`${VE_FX[t].nome} vai numa camada de ajuste (dá zoom em tudo o que está embaixo)`); return; }
         if (painel && c.fx && c.fx.some(f => f.t === t)) {   // um só por clipe: abre o painel dele
             VE.sel = i;
             vedShow(painel);

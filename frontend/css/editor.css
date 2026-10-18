@@ -1701,6 +1701,13 @@ body.ve-kl-scrub, body.ve-kl-scrub * { cursor: ew-resize !important; }
 .ve-an-rolagem { flex: 1; min-height: 0; overflow: auto; }
 .ve-an-rolagem .ve-tr-grid { flex: none; overflow: visible; min-height: 0; }
 .ve-an-sec.ve-txa-sec { display: block; max-height: none; }
+/* Autozoom (editor-autozoom.js) */
+.ve-an-sec.ve-az-sec { display: block; max-height: none; }
+.ve-az-corpo { display: flex; flex-direction: column; gap: 7px; padding: 8px 10px 10px; }
+.ve-az-acoes { display: flex; gap: 6px; margin-top: 2px; }
+.ve-az-gerar { background: #ff4fa3; border-color: #ff4fa3; color: #fff; font-weight: 600; }
+.ve-az-gerar:hover:not(:disabled) { filter: brightness(1.08); }
+.ve-az-dica { font-size: 11px; color: var(--ve-faint); line-height: 1.4; }
 .ve-an-sec[hidden] { display: none; }
 .ve-an-sec > summary {
     position: sticky; top: 0; z-index: 2; display: flex; align-items: baseline; gap: 6px; cursor: pointer; list-style: none;
