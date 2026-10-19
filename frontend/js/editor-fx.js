@@ -960,7 +960,7 @@ function veAfxAdd(i, t) {
     if (!ok.length) { veToast('Efeitos de áudio precisam de um clipe com som'); return; }
     vePushHistory();
     ok.forEach(x => {
-        const v = {};
+        const v = VE_AFX[t].novo ? VE_AFX[t].novo() : {};   // efeito com valores próprios (Equalizador paramétrico)
         VE_AFX[t].params.forEach(p => { v[p.k] = p.def; });
         x.afx = [...(x.afx || []), { id: veFxNewId(), t, on: true, v }];
     });
@@ -1024,9 +1024,11 @@ function veAfxAction(id, act) {
         veRenderFxControls();
         return;
     }
+    // efeito com painel próprio (Equalizador paramétrico): abre o painel ligado a este clipe
+    if (act === 'open') { const f = c.afx[j], d = VE_AFX[f.t]; if (d.abrir) d.abrir(c, f); else if (d.painel) vedShow(d.painel); return; }
     vePushHistory();
     if (act === 'on') veAfxEdit(id, f => ({ ...f, on: f.on === false }));
-    else if (act === 'reset') veAfxEdit(id, f => { VE_AFX[f.t].params.forEach(p => { f.v[p.k] = p.def; }); return f; });
+    else if (act === 'reset') veAfxEdit(id, f => { if (VE_AFX[f.t].novo) f.v = VE_AFX[f.t].novo(); VE_AFX[f.t].params.forEach(p => { f.v[p.k] = p.def; }); return f; });
     else if (act === 'del') { c.afx = c.afx.filter(f => f.id !== id); if (!c.afx.length) delete c.afx; }
     else if (act === 'up' || act === 'down') {
         const k = act === 'up' ? j - 1 : j + 1;

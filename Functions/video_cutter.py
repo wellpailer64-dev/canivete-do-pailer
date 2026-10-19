@@ -2299,7 +2299,19 @@ def _normalizar_afx(efeitos):
         t, v = str(f.get("t") or ""), f.get("v") or {}
         if not isinstance(v, dict):
             v = {}
-        if t == "vst3":   # plugin VST3 do Rack da trilha (Functions/vst3.py; renderizado antes: _pre_vst)
+        if t == "peq":   # Equalizador paramétrico (editor-peq.js): bandas limpas como lá (vePeqLimpa)
+            bs = []
+            for b in (v.get("b") or [])[:8]:
+                if not isinstance(b, dict) or b.get("on") is False:
+                    continue
+                tipo = b.get("t") if b.get("t") in ("hp", "ls", "pk", "hs", "lp", "notch") else "pk"
+                s = int(_afx_num(b.get("s"), 12))
+                bs.append({"t": tipo, "f": _afx_lim(b.get("f"), 20.0, 20000.0, 1000.0), "g": _afx_lim(b.get("g"), -18.0, 18.0, 0.0),
+                           "q": _afx_lim(b.get("q"), 0.1, 30.0, 0.707), "s": s if s in (12, 24, 48) else 12})
+            out_db = _afx_lim(v.get("out"), -18.0, 18.0, 0.0)
+            if bs or abs(out_db) > 0.01:
+                out.append((t, {"b": bs, "out": out_db}))
+        elif t == "vst3":   # plugin VST3 do Rack da trilha (Functions/vst3.py; renderizado antes: _pre_vst)
             if v.get("caminho") and v.get("cid"):
                 out.append((t, {"caminho": str(v["caminho"]), "cid": str(v["cid"]), "nome": str(v.get("nome") or ""),
                                 "estado": str(v.get("estado") or "")}))
@@ -2374,6 +2386,33 @@ def _filtros_afx(efeitos):
             for freq, width, gain in ((120, 2.0, v["lo"]), (1000, 1.0, v["mid"]), (6500, 2.0, v["hi"])):
                 if abs(gain) > 0.01:
                     fs.append(f"equalizer=frequency={freq}:width_type=o:width={width:.3f}:gain={gain:.3f}")
+        elif t == "peq":
+            fs += _filtros_peq(v)
+    return fs
+
+
+def _secoes_peq(b):
+    """Seções biquad (b, a) de uma banda do Equalizador paramétrico — a MESMA conta da prévia (editor-peq.js
+    vePeqSecoesBanda, com o veAprCoef = efeitos_pr.coef): cortes de 24/48 dB/oitava = Butterworth em cascata."""
+    from Functions import efeitos_pr
+    t = b["t"]
+    if t == "pk":
+        return [efeitos_pr.coef("peak", b["f"], b["q"], b["g"])] if abs(b["g"]) >= 0.01 else []
+    if t in ("ls", "hs"):
+        return [efeitos_pr.coef("low" if t == "ls" else "high", b["f"], b["q"], b["g"])] if abs(b["g"]) >= 0.01 else []
+    if t == "notch":
+        return [efeitos_pr.coef("notch", b["f"], b["q"])]
+    n = b["s"] // 6
+    if n == 2:
+        return [efeitos_pr.coef(t, b["f"], b["q"])]
+    return [efeitos_pr.coef(t, b["f"], 1 / (2 * math.cos((2 * k + 1) * math.pi / (2 * n)))) for k in range(n // 2)]
+
+
+def _filtros_peq(v):
+    from Functions import efeitos_pr
+    fs = [efeitos_pr._biquad(bb, aa) for b in v.get("b") or [] for bb, aa in _secoes_peq(b)]
+    if abs(v.get("out", 0.0)) > 0.01:
+        fs.append(f"volume={v['out']:.3f}dB")
     return fs
 
 

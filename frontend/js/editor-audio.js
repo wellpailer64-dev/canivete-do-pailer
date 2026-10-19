@@ -308,6 +308,11 @@ function veAudioFxProcess(l, r, fx, tap, st) {
             if (typeof veAprProcessar === 'function') [l, r] = veAprProcessar(f, j, l, r, st);
             continue;
         }
+        // Equalizador paramétrico e o de 3 faixas: filtros biquad de verdade (editor-peq.js), os mesmos da exportação
+        if ((f.t === 'peq' || f.t === 'eq') && typeof vePeqProcessar === 'function') {
+            [l, r] = vePeqProcessar(f, j, l, r, st);
+            continue;
+        }
         if (f.t === 'denoise') {
             const amt = Math.max(0, Math.min(1, (v.amt || 0) / 100));
             const thr = veAudioFxDb(v.floor || -50);
@@ -505,7 +510,7 @@ function veBusMixar(busses, t, n, passo, L, R) {
 // Estado dos efeitos do Premiere do clipe (guardado no próprio item de VEAU.clipes, que vive até a próxima edição).
 // Continua de onde parou se o pedaço começa onde o anterior terminou; num salto (busca, outro pedaço) recomeça.
 function veAprEstado(cl, fx, t0, passo) {
-    if (!fx.some(f => f.t.startsWith('pr_'))) return null;
+    if (!fx.some(f => f.t.startsWith('pr_') || f.t === 'peq' || f.t === 'eq')) return null;
     if (!cl._pr || Math.abs(cl._pr.t - t0) > passo * 2) cl._pr = { t: t0, st: {} };
     return cl._pr.st;
 }

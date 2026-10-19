@@ -127,6 +127,9 @@ da voz + rosto YuNet) em camadas de ajuste pink com o efeito "zoom" (curva igual
 exportação; placa = híbrido). `frontend/js/editor-autozoom.js`, `Functions/autozoom.py`; guia `Instructions/agente/autozoom.md`;
 teste `py -3.13 testes/teste_autozoom.py`.
 
+**Equalizador paramétrico** (2026-10-18): efeito `peq` (clipe e Rack da trilha), painel com curva/pontos/espectro/presets,
+biquads iguais na prévia e no ffmpeg — `frontend/js/editor-peq.js`, `Instructions/agente/equalizador.md`.
+
 **Plugins** (2026-10-18): VST3 por carregador PRÓPRIO (`Functions/vst3.py`, ctypes, sem GPL), sempre em processo à parte
 (`--vst3 varrer|janela|encaixar|servir|processar`); Janela › Plugins › abre o plugin num PAINEL encaixável; Rack de efeitos da
 trilha (Mixer) › Plugins VST3: um processo por espaço, prévia por HTTP local à frente da agulha, exportação `_pre_vst`. Plano (packs Mister Horse/Motion

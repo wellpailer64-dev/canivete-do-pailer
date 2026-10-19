@@ -242,23 +242,24 @@ window.VEMIX_API = {
 
 // ── rack de efeitos da trilha ──
 const VE_MIX_SLOTS = 5;
-// espaço com plugin VST3: a janela do plugin abre num painel; aqui só ligar, mover, remover
+// espaço com plugin VST3 ou com o Equalizador paramétrico: a janela/curva abre num painel; aqui só ligar, mover, remover
 function veMixEditorPlg(sl, k, i) {
-    const st = veTrackState('a', k), f = st.fx[i];
-    vePlgSlotPainel(f.id);
-    const pop = veMixPop(sl, `<div class="ve-mix-ed-topo"><b>♪ ${veEsc(f.v.nome || 'VST3')}</b> <small>A${k + 1} · VST3</small>`
+    const st = veTrackState('a', k), f = st.fx[i], eq = f.t === 'peq';
+    const abrir = () => (eq ? vePeqAbrir({ tipo: 'trilha', k, id: f.id }) : vePlgSlotPainel(f.id));
+    abrir();
+    const pop = veMixPop(sl, `<div class="ve-mix-ed-topo"><b>${eq ? veEsc(VE_AFX.peq.nome) : '♪ ' + veEsc(f.v.nome || 'VST3')}</b> <small>A${k + 1}${eq ? '' : ' · VST3'}</small>`
         + `<label><input type="checkbox" data-on="1" ${f.on === false ? '' : 'checked'}> ${veT('ligado')}</label>`
         + `<button data-acao="esq" title="${veT('Antes')}">◀</button><button data-acao="dir" title="${veT('Depois')}">▶</button>`
         + `<button data-acao="del" title="${veT('Remover')}">✕</button></div>`
-        + `<button class="ve-mix-plg-abrir" data-acao="abrir">${veT('Abrir a janela do plugin')}</button>`);
+        + `<button class="ve-mix-plg-abrir" data-acao="abrir">${veT(eq ? 'Abrir o Equalizador' : 'Abrir a janela do plugin')}</button>`);
     pop.addEventListener('input', e => {
         if (e.target.dataset.on) { st.fx = st.fx.map((x, j) => j === i ? { ...x, on: e.target.checked } : x); veMixMudou(); }
     });
     pop.addEventListener('click', e => {
         const a = e.target.closest('[data-acao]'); if (!a) return;
-        if (a.dataset.acao === 'abrir') { vePlgSlotPainel(f.id); pop.remove(); return; }
+        if (a.dataset.acao === 'abrir') { abrir(); pop.remove(); return; }
         const fx = [...st.fx];
-        if (a.dataset.acao === 'del') { fx.splice(i, 1); vePlgSlotFechar(f.id); }
+        if (a.dataset.acao === 'del') { fx.splice(i, 1); if (!eq) vePlgSlotFechar(f.id); }
         else {
             const j = a.dataset.acao === 'esq' ? i - 1 : i + 1;
             if (j < 0 || j >= fx.length) return;
@@ -361,18 +362,19 @@ function veMixSlot(sl, k, i) {
             vePlgSlotPainel(f.id);
             return;
         }
-        const t = it.dataset.t, v = {};
+        const t = it.dataset.t, v = VE_AFX[t].novo ? VE_AFX[t].novo() : {};
         VE_AFX[t].params.forEach(p => { v[p.k] = p.def; });
-        const st = veTrackState('a', k);
-        st.fx = [...(st.fx || []), { id: veFxNewId(), t, on: true, v }].slice(0, VE_MIX_SLOTS);
+        const st = veTrackState('a', k), novo = { id: veFxNewId(), t, on: true, v };
+        st.fx = [...(st.fx || []), novo].slice(0, VE_MIX_SLOTS);
         pop.remove();
         veMixMudou();
         veToast(`${VE_AFX[t].nome} ${veT('na trilha')} A${k + 1}`);
+        if (t === 'peq') vePeqAbrir({ tipo: 'trilha', k, id: novo.id });   // a curva abre junto
     });
 }
 function veMixEditor(sl, k, i) {
     const st = veTrackState('a', k), f = st.fx[i], d = VE_AFX[f.t];
-    if (f.t === 'vst3') { veMixEditorPlg(sl, k, i); return; }
+    if (f.t === 'vst3' || f.t === 'peq') { veMixEditorPlg(sl, k, i); return; }
     const ps = d.params.filter(p => !p.oculto && p.tipo !== 'cor');
     const linha = p => p.tipo === 'bool'
         ? `<label class="ve-mix-ed-bool"><input type="checkbox" data-k="${p.k}"> ${p.nome}</label>`

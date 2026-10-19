@@ -2723,3 +2723,32 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .lux-atalhos p { display: flex; gap: 12px; margin: 5px 0; font-size: 12px; }
 .lux-atalhos kbd { min-width: 70px; color: #ff4fc8; font-family: inherit; }
 .lux-atalhos small { display: block; margin-top: 12px; opacity: .5; }
+
+/* ── Equalizador paramétrico (editor-peq.js) ── */
+.ve-peq-painel { position: relative; }
+.ve-peq { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--ve-panel); font: 12px var(--ve-ui); color: var(--ve-text); }
+.ve-peq-topo { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--ve-line); min-width: 0; flex-wrap: nowrap; overflow: hidden; }
+.ve-peq-topo b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ve-peq-topo select { height: 24px; border: 1px solid var(--ve-line-2); border-radius: 5px; background: var(--ve-bg); color: var(--ve-text); font: inherit; padding: 0 6px; max-width: 220px; }
+.ve-peq-on, .ve-peq-saida { display: flex; align-items: center; gap: 5px; white-space: nowrap; color: var(--ve-dim); }
+.ve-peq-saida input { width: 110px; }
+.ve-peq-saida i { font-style: normal; font-variant-numeric: tabular-nums; min-width: 52px; color: var(--ve-text); }
+.ve-peq-esp { flex: 1; }
+.ve-peq-area { position: relative; flex: 1; min-height: 120px; }
+.ve-peq-area canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.ve-peq-dica { position: absolute; right: 10px; top: 8px; font-size: 11px; color: var(--ve-dim); pointer-events: none; background: rgba(0, 0, 0, .45); padding: 2px 7px; border-radius: 4px; }
+.ve-peq-dica:empty { display: none; }
+.ve-peq-bandas { display: flex; gap: 6px; padding: 6px 8px; border-top: 1px solid var(--ve-line); overflow-x: auto; flex: none; }
+.ve-peq-b { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--ve-line); border-left: 3px solid var(--c); border-radius: 6px; background: var(--ve-bg); flex: none; cursor: pointer; }
+.ve-peq-b.sel { border-color: var(--c); box-shadow: 0 0 0 1px var(--c) inset; }
+.ve-peq-b.off { opacity: .5; }
+.ve-peq-b label { display: flex; align-items: center; gap: 3px; color: var(--ve-faint); font-size: 10.5px; }
+.ve-peq-b input { width: 48px; height: 22px; border: 1px solid var(--ve-line-2); border-radius: 4px; background: var(--ve-panel); color: var(--ve-text); font: 11px var(--ve-mono); padding: 0 4px; }
+.ve-peq-b input:disabled { opacity: .35; }
+.ve-peq-b select { height: 22px; border: 1px solid var(--ve-line-2); border-radius: 4px; background: var(--ve-panel); color: var(--ve-text); font-size: 11px; }
+.ve-peq-n { width: 20px; height: 20px; border-radius: 50%; border: 0; background: var(--c); color: #111; font-weight: 700; font-size: 10.5px; cursor: pointer; }
+.ve-peq-b.off .ve-peq-n { background: transparent; color: var(--c); box-shadow: 0 0 0 1.5px var(--c) inset; }
+.ve-peq-x { border: 0; background: none; color: var(--ve-faint); cursor: pointer; font-size: 12px; }
+.ve-peq-x:hover { color: var(--ve-text); }
+.ve-peq-mais { flex: none; width: 32px; border: 1px dashed var(--ve-line-2); border-radius: 6px; background: none; color: var(--ve-dim); font-size: 16px; cursor: pointer; }
+.ve-peq-mais:hover { color: var(--ve-text); border-color: var(--ve-text); }

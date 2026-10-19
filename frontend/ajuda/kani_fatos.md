@@ -25,6 +25,11 @@ em camadas de ajuste cor-de-rosa na timeline, centrados no rosto. Escolha Quanti
 Estilo (Seco = entra e sai no corte; Suave = curva macia; Smart = decide por momento) e Força. Cada zoom pode ser ajustado
 nos Controles de efeito (zoom, entrada, saída, curva, centro, desfoque de movimento); Remover tira todos. "Desfoque" liga o
 desfoque de movimento nos zooms rápidos (só borra enquanto o zoom anda).
+Equalizador paramétrico (Vídeo Kanivete): Efeitos › Filtro e EQ › Equalizador paramétrico no clipe (Controles de efeito ›
+Editar no painel) ou no Mixer de trilhas › fx (rack). Abre um painel com a curva: arraste os pontos (frequência e
+ganho), rodinha muda a largura (Q), duplo clique cria uma banda, botão direito remove. Tem presets (voz mais clara,
+tirar ronco e vento, podcast, rádio, chiado, zumbido de 60 Hz) e o espectro do som tocando. Soa igual na prévia e na
+exportação.
 Plugins VST3: menu Janela › Plugins › (no Vídeo Kanivete) lista os plugins de áudio VST3 instalados no PC e abre a
 janela de cada um num painel (encaixar, soltar, maximizar). Para o som da trilha passar por um plugin: Mixer de trilhas
 de áudio › fx (rack) › clique num espaço vazio › Plugins VST3 › escolha o plugin; clicar no espaço abre a janela dele.
