@@ -43,6 +43,7 @@
     "editor-onda.js",
     "editor-ovt.js",
     "editor-pessoas.js",
+    "editor-plugins.js",
     "editor-projeto.js",
     "editor-props.js",
     "editor-proxy.js",
@@ -152,6 +153,8 @@
     "ve_roto_abrir",
     "ve_roto_estado",
     "ve_roto_base",
+    "ve_vst3_lista",
+    "ve_vst3_abrir",
     "ve_autozoom_rostos",
     "ve_roto_pausar",
     "ve_roto_congelar",
@@ -1930,6 +1933,18 @@
     "pincel_roto"
    ]
   },
+  "ve_vst3_lista": {
+   "args": "atualizar=False",
+   "modulos": [
+    "midia"
+   ]
+  },
+  "ve_vst3_abrir": {
+   "args": "caminho, cid, nome=\"\"",
+   "modulos": [
+    "midia"
+   ]
+  },
   "ve_autozoom_rostos": {
    "args": "pedidos",
    "modulos": [
@@ -3179,6 +3194,7 @@
   "Instructions/agente/plano-kanivete-encoder.md": "Kanivete Encoder (Ke) — plano (rodada 1 de otimização FEITA em 2026-10-08; pendências no fim)",
   "Instructions/agente/plano-motion.md": "Motion no Editor Kanivete (recursos do After Effects)",
   "Instructions/agente/plano-slider-kanivete.md": "Plano — Slider Kanivete (Sd, verde-água) — pedido do Pailer em 2026-10-16 (missão da madrugada) — FEITO (v1)",
+  "Instructions/agente/plugins.md": "Plugins no KANIVETE",
   "Instructions/agente/ponte-premiere.md": "Ponte Kanivete ↔ Premiere Pro (plugin UXP \"Kanivete Ponte\")",
   "Instructions/agente/remover-fundo.md": "Remover fundo (recorte) — velocidade × qualidade (2026-10-06)",
   "Instructions/agente/teste-4k.md": "Teste de 4K (estresse do Editor de Vídeo)",
@@ -3309,6 +3325,7 @@
   "Functions/video_cutter.py": "video_cutter.py — Motor do Pocket Editor (editor de vídeo do Canivete do Pailer)",
   "Functions/videoconverter.py": "videoconverter.py — converte vídeos entre formatos, vídeo→GIF/MP3 e GIF→vídeo",
   "Functions/videodownloader.py": "Traduz os erros mais comuns do yt-dlp para o usuário",
+  "Functions/vst3.py": "vst3.py — carregador PRÓPRIO de plugins de áudio VST3 do KANIVETE (Python puro + ctypes; sem compilador e sem",
   "Functions/webscraper.py": ""
  },
  "testes": {

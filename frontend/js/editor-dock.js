@@ -735,7 +735,8 @@ function veDockMenu(e) {
                 return `<button data-m="${id}"><b>${l ? '✓' : ''}</b>${veEsc(vedTitle(id))}${solta ? ' <small>(janela solta)</small>' : ''}</button>`;
             }).join('') + '<hr>' +
             (vedFloats().length ? '<button data-m="dock-all"><b>⤓</b>Encaixar todas as janelas soltas</button>' : '') +
-            '<button data-m="reset"><b>↺</b>Restaurar layout padrão</button>';
+            '<button data-m="reset"><b>↺</b>Restaurar layout padrão</button>' +
+            (typeof vePlgMenuHtml === 'function' ? vePlgMenuHtml(lista) : '');   // Plugins VST3 (editor-plugins.js)
         posiciona();
     };
 
@@ -776,6 +777,7 @@ function veDockMenu(e) {
         if (!b) return;
         const k = b.dataset.m;
         if (k === 'ws-new') { pedirNome(); return; }
+        if (k.startsWith('plg') && typeof vePlgMenuClique === 'function') { if (vePlgMenuClique(k, lista)) fechar(); return; }
         fechar();
         if (k === 'ws-update') vedWsSave(VED.ativo);
         else if (k === 'ws-revert') vedWsApply(VED.ativo);

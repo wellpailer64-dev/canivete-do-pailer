@@ -127,6 +127,10 @@ da voz + rosto YuNet) em camadas de ajuste pink com o efeito "zoom" (curva igual
 exportação; placa = híbrido). `frontend/js/editor-autozoom.js`, `Functions/autozoom.py`; guia `Instructions/agente/autozoom.md`;
 teste `py -3.13 testes/teste_autozoom.py`.
 
+**Plugins** (2026-10-18): VST3 por carregador PRÓPRIO (`Functions/vst3.py`, ctypes, sem GPL), sempre em processo à parte
+(`--vst3 varrer|janela`); Janela › Plugins abre a janela do plugin (`editor-plugins.js`). Plano (packs Mister Horse/Motion
+Bro, formato próprio, OFX) e pendências: `Instructions/agente/plugins.md`.
+
 **Legendas em 3 modos** (2026-10-18, painel Texto › Legendas): Clássica, Dinâmica (destaque da palavra falada) e
 **Premium** — blocos curtos montados como título com duas fontes (dupla), papéis por palavra (ligação/base/destaque),
 entrada palavra a palavra, Kani refina o destaque, efeitos sonoros do Soundboard pelo movimento/assunto (`lpSfx`);

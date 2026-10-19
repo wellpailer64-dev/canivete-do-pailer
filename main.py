@@ -4319,6 +4319,48 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    # Plugins VST3 (Functions/vst3.py): sempre num processo à parte — plugin que trava não derruba o app
+    def _vst3_base(self):
+        return [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, os.path.abspath(__file__)]
+
+    def ve_vst3_lista(self, atualizar=False):
+        import json
+        import subprocess
+        from Functions.midia import NO_WINDOW
+        if not atualizar and getattr(self, "_vst3_cache", None) is not None:
+            return {"success": True, "plugins": self._vst3_cache}
+        try:
+            r = subprocess.run(self._vst3_base() + ["--vst3", "varrer"], capture_output=True, text=True, encoding="utf-8",
+                               errors="replace", timeout=120, creationflags=NO_WINDOW)
+            txt = (r.stdout or "").strip()
+            lista = json.loads(txt[txt.find("["):]) if "[" in txt else []
+            self._vst3_cache = lista
+            return {"success": True, "plugins": lista}
+        except Exception as e:
+            return {"success": False, "error": str(e), "plugins": []}
+
+    def ve_vst3_abrir(self, caminho, cid, nome=""):
+        import subprocess
+        from Functions.midia import NO_WINDOW
+        abertos = self.__dict__.setdefault("_vst3_janelas", {})
+        p = abertos.get((caminho, cid))
+        if p and p.poll() is None:   # já aberta: traz para a frente
+            try:
+                import ctypes
+                h = ctypes.windll.user32.FindWindowW(None, f"{nome} — KANIVETE")
+                if h:
+                    ctypes.windll.user32.ShowWindow(h, 9)
+                    ctypes.windll.user32.SetForegroundWindow(h)
+            except Exception:
+                pass
+            return {"success": True, "ja_aberto": True}
+        try:
+            abertos[(caminho, cid)] = subprocess.Popen(self._vst3_base() + ["--vst3", "janela", caminho, cid, f"{nome} — KANIVETE"],
+                                                       creationflags=NO_WINDOW, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def ve_autozoom_rostos(self, pedidos):
         from Functions import autozoom
         try:
@@ -5896,4 +5938,8 @@ if __name__ == "__main__":
         from Functions import agente_midia
         agente_midia.main(sys.argv[2:])
         sys.exit(0)
+    # plugins VST3 num processo à parte (Functions/vst3.py): procurar e abrir a janela do plugin
+    if len(sys.argv) > 1 and sys.argv[1] == "--vst3":
+        from Functions import vst3
+        sys.exit(vst3.main_cli(sys.argv[2:]))
     main()
