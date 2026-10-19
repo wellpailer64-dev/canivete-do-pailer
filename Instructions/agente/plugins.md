@@ -181,7 +181,17 @@ Behance, Instagram, Drive, WhatsApp, Pandalab), abas, prévia, "Pegar imagens da
 `<demanda>/02 - ASSETS/REFERENCIAS` (demandas com pasta = `pandalab/vinculos.json`), print, copiar texto. Agente:
 `py -3.13 D:\Kanivete\Plugins\kanibrowser\kb.py estado|abrir|ir|imagens|baixar --demanda ID8|texto|foto [--porta 9333]`
 — passa pelo app em modo agente (`KPLUG.chamar`); também `instagram @perfil`, `link <url> --demanda ID8` (Drive público direto, resto pelo navegador → 02 - ASSETSMATERIAL), `pesquisar "termo"` (DuckDuckGo: o Google dá captcha). Pinterest pede login. Teste:
-`D:\kanivete_testes\scripts\teste_kanibrowser.py` (porta 9333). `plugin_pessoal_recarregar` também esquece os módulos
+`D:\kanivete_testes\scripts\teste_kanibrowser.py` (porta 9333).
+**Tela dividida** (2026-10-19): à esquerda o SEU navegador (as abas da janela do Pailer, pegar imagens/print/texto), à
+direita a **Visão da Kani**: o agente trabalha numa janela só dele, fora da tela (`FORA`, nunca minimizada: minimizada
+para de desenhar e os cliques travam), mostrada ao vivo por `Page.startScreencast` (`quadro()` ~4×/s só com o painel à
+vista; o `_vigia` desliga depois de 3 s sem olhar). Sem `--aba`, tudo do agente (kb.py, `ler_pagina` da Kani, pesquisa,
+Instagram, link) roda na aba da Kani dentro de `trabalho("…")` (uma tarefa por vez; aparece como "Pesquisando…" e no
+histórico). Clicar/rolar/digitar na visão = `tocar()` na aba dela; ✋ Assumir traz a janela dela para a tela (login),
+↩ Devolver esconde. ◧ Lado a lado: Chrome do Pailer na metade esquerda do monitor, Kanivete na direita (empilha: Kani
+em cima). Aba nova do Pailer ativa uma aba dele antes (o Chrome abre na última janela ativa). Identidade: óculos da
+Kani com duas lentes (seu navegador / visão dela), âmbar `#F0A01C`; fonte em `icone.svg`. Teste:
+`D:\kanivete_testes\scripts\teste_kb_visao.py` (porta 9333). `plugin_pessoal_recarregar` também esquece os módulos
 que o plugin importou (fechar o navegador antes: o canal mora no módulo).
 
 ## Pendências
