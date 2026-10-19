@@ -266,6 +266,7 @@ function skUiFaixa(el) {
         ${sl('Limiar', 'comp.limiar', fx.comp.limiar, -50, 0, 1, ' dB')}${sl('Razão', 'comp.razao', fx.comp.razao, 1, 12, 0.5, ':1', 1)}${sl('Ganho', 'comp.ganho', fx.comp.ganho, 0, 18, 0.5, ' dB', 1)}</div>
         <div class="sk-grupo">${liga('rev', 'Reverb')}<label class="sk-p-l">Ambiente<select data-fx="rev.tamanho">${[[0.6, 'Sala pequena'], [1.2, 'Estúdio'], [2.5, 'Salão'], [4, 'Igreja']].map(([v, n]) => `<option value="${v}"${+fx.rev.tamanho === v ? ' selected' : ''}>${n}</option>`).join('')}</select><small></small></label>
         ${sl('Mistura', 'rev.mix', fx.rev.mix, 0, 0.6, 0.01, '', 2)}</div>
+        ${typeof skPlgHtml === 'function' ? skPlgHtml(f) : ''}
         <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" data-igualar-faixa="${f.id}">Igualar volume dos clipes (-16 LUFS)</button></div>
         <div class="sk-grupo"><div class="sk-p-tit">Abaixar sob a voz (ducking)</div>
         <div class="sk-p-acoes"><select id="sk-duck-db"><option value="-6">-6 dB</option><option value="-12" selected>-12 dB</option><option value="-18">-18 dB</option><option value="-24">-24 dB</option></select>
@@ -279,8 +280,8 @@ function skUiFaixa(el) {
         const s = e.target.nextElementSibling; if (s && e.target.type === 'range') s.textContent = (+v).toFixed(+e.target.dataset.casas) + e.target.dataset.uni;
         if (SK.bus[f.id]) skBus(f); SK.sujo = true;
     };
-    el.onchange = e => { if (e.target.dataset.fx) { if (e.target.tagName === 'SELECT') el.oninput(e); skAntes(); skMudou('efeito da faixa'); } };
-    el.onclick = e => { const p = e.target.dataset.preset; if (p) { skAntes(); f.fx = skFxCompleto(SK_PRESETS_FX[p]); if (SK.bus[f.id]) skBus(f); skMudou('preset'); }
+    el.onchange = e => { if (typeof skPlgEvento === 'function' && skPlgEvento(e, f)) return; if (e.target.dataset.fx) { if (e.target.tagName === 'SELECT') el.oninput(e); skAntes(); skMudou('efeito da faixa'); } };
+    el.onclick = e => { if (typeof skPlgEvento === 'function' && skPlgEvento(e, f)) return; const p = e.target.dataset.preset; if (p) { skAntes(); f.fx = skFxCompleto(SK_PRESETS_FX[p]); if (SK.bus[f.id]) skBus(f); skMudou('preset'); }
         const ig = e.target.dataset.igualarFaixa; if (ig) skIgualar(f.clipes.map(c => c.id), -16).then(n => skToast(`${n} clipe(s) igualado(s)`));
         const dk = e.target.dataset.duck;
         if (dk === '1') skDucking(f.id, { db: +el.querySelector('#sk-duck-db').value }).then(n => skToast(`${n} trecho(s) de fala: trilha abaixada`)).catch(er => skToast(er.message));

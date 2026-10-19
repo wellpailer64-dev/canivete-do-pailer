@@ -150,7 +150,13 @@ Anti Noise (efeito de áudio do clipe) + Redução de reverberação, que já v�
 em tempo real. Vocal Gate (dan-k-k, GPL, VST3) baixado em `D:/kanivete_testes/vst/novos`: o instalador Inno é mais novo que o
 innoextract 1.9 — só instalando.
 
+**Sound Kanivete** (2026-10-19): plugins VST3 na faixa, prévia por faixa congelada — `Instructions/sound-kanivete.md`
+› "Plugins VST3 na faixa". Tela dos plugins da jhudstudio quebra no carregador (os 7; Ignite, Guitar Rig, RNNoise e
+Goyo abrem).
+
 ## Pendências
+- Tela dos plugins jhudstudio: access violation (ponteiro nulo) ao abrir a janela — investigar createView/IPlugFrame/
+  IRunLoop/contexto do host no `encaixar`/`_painel`.
 - Automação de parâmetro do plugin (quadros-chave), plugin no Master e nos efeitos do CLIPE.
 - Latência da prévia ao mexer no plugin tocando: ~0,35 s + fila de 0,3 s (os DAWs ficam em ~10 ms).
 - Instrumentos/MIDI (só efeitos de áudio hoje).

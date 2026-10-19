@@ -192,6 +192,25 @@ Ctrl+I, Ctrl+0 ver tudo, Ctrl+roda zoom. Navegação: barra de rolagem embaixo d
 pula), roda do mouse sobre a régua ou a barra anda para os lados (Shift+roda também), a vista não passa do fim do
 projeto (`skLimitarX`) e o teclado traz a agulha para a vista (`skMostrarAgulha`).
 
+## Plugins VST3 na faixa (2026-10-19)
+- Painel da faixa › **Plugins VST3**: "+ Plugin VST3" lista os instalados (C:\Program Files\Common Files\VST3 e
+  `<raiz_dados>/Plugins VST3`; os arquivados no Vídeo ficam de fora), caixinha liga/desliga, Abrir, ▲▼, ✕.
+  `f.plug = [{id, caminho, cid, nome, fab, estado, on}]`, no FIM da cadeia (depois do reverb), antes do volume.
+- **Faixa congelada** (`sound_kanivete.congelar_faixa`, API `sk_congelar`): clipes + cadeia do Kanivete (`_montar` da
+  faixa sozinha, volume 1) → WAV float desde o 0 + 2 s de folga → `<app> --vst3 processar` (plugin num processo à parte)
+  → `congeladas/<hash>.wav` (+ .json com a duração: corta a folga onde o plugin já calou). A prévia
+  (`frontend/js/som-plugins.js`: `skFaixaTocar` no `skPedacosNaJanela`, `skFrzPronto` deixa a cadeia do `skBus` neutra)
+  toca esse arquivo; a exportação/LUFS usa o MESMO (`_com_plugins`). Mexeu na faixa ou no ajuste: vigia a cada 0,5 s,
+  espera 1,2 s parado (1,5 s depois do último giro na janela do plugin), refaz; enquanto isso toca sem o plugin e o painel
+  diz "⏳ preparando". RNNoise em 8 s de voz: ~1 s.
+- Janela do plugin: caixa solta dentro do app (`#sk-plg-jan`, arrasta pela barra), o processo `servir` do espaço
+  `sk-<id>` põe a janela dele na área (`ve_vst3_slot_painel`), a caixa cresce para caber; ajustes novos por
+  `ve_vst3_slot_novidades('sk-')` (o Vídeo pede sem prefixo e não vê os "sk-"). Fechar a caixa encerra o processo.
+- API `SKN_PLG.lista(atualizar)`, `.por(faixaId, nome)`, `.estado(faixaId)`. Teste:
+  `D:/kanivete_testes/scripts/teste_sk_plugins.py` (porta 9333).
+- Pendente: os 7 plugins da jhudstudio (C4-EQ10, Dual-DeSser…) quebram ao abrir a TELA no carregador (access violation
+  em createView/attached; o som funciona) — vale no Vídeo também; automação de parâmetro; plugin no Master.
+
 ## Pendências
 **REMIX DE MÚSICA (pedido do Pailer, 2026-10-09)** — esticar/encurtar uma trilha arrastando a ponta do clipe, como o
 "Remix" do Premiere (Editor e Sk). Base já provada: loop sem emenda do repique (D:\kanivete_testes\scripts\loop_ritmo.py:

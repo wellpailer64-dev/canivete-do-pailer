@@ -231,3 +231,17 @@
 .sk-start-auto-lista { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; justify-content: center; }
 .sk-start-auto-item { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border-radius: 5px; border: 1px solid var(--line-2, #333); background: var(--bg-3, #222); color: var(--text); cursor: pointer; font: 12px var(--font-ui); }
 .sk-start-auto-item:hover { border-color: #ffd166; } .sk-start-auto-item span { color: var(--text-3); font-size: 11px; } .sk-start-auto-item .i { width: 14px; height: 14px; color: #ffd166; }
+/* plugins VST3 na faixa (som-plugins.js) */
+.sk-plg { display: flex; align-items: center; gap: 4px; padding: 2px 0; }
+.sk-plg span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.sk-plg .sk-chk { margin: 0; }
+#sk-plg-add { flex: 1; min-width: 0; }
+.sk-p-tit small { font-weight: 400; opacity: .7; }
+.sk-plg-jan { position: fixed; left: 120px; top: 90px; width: 760px; height: 480px; z-index: 40; display: flex; flex-direction: column;
+    background: #141414; border: 1px solid #333; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.5); overflow: hidden; }
+.sk-plg-jan[hidden] { display: none; }
+.sk-plg-jan-cab { display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: #1d1d1d; cursor: move; user-select: none; font-size: 12px; }
+.sk-plg-jan-cab b { flex: 1; font-weight: 600; color: var(--primary); }
+.sk-plg-jan-cab button { background: none; border: 0; color: #aaa; cursor: pointer; font-size: 13px; }
+.sk-plg-jan-cab button:hover { color: #fff; }
+.sk-plg-jan-area { flex: 1; display: grid; place-items: center; color: #777; font-size: 12px; }

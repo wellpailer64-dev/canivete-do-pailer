@@ -359,6 +359,7 @@
     "sk_espectro",
     "sk_salvar",
     "sk_abrir",
+    "sk_congelar",
     "sk_exportar",
     "sk_medir",
     "sk_processar",
@@ -1744,6 +1745,12 @@
     "sound_kanivete"
    ]
   },
+  "sk_congelar": {
+   "args": "faixa, sr=48000",
+   "modulos": [
+    "sound_kanivete"
+   ]
+  },
   "sk_exportar": {
    "args": "proj, caminho, op=None",
    "modulos": [
@@ -1995,7 +2002,7 @@
    "modulos": []
   },
   "ve_vst3_slot_novidades": {
-   "args": "",
+   "args": "prefixo=\"\"",
    "modulos": []
   },
   "ve_vst3_slot_fechar": {

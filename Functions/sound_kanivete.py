@@ -358,6 +358,14 @@ def exportar(proj, caminho, op=None):
     if fmt not in FORMATOS:
         return {"success": False, "error": f"formato {fmt}: use {', '.join(FORMATOS)}"}
     sr = int(op.get("sr") or 48000)
+    try:
+        proj = _com_plugins(proj)   # faixas com plugin VST3: o arquivo congelado (o mesmo da prévia)
+    except RuntimeError as e:
+        if _EXP["parar"]:
+            return {"success": False, "cancelled": True, "error": "parado"}
+        return {"success": False, "error": str(e)}
+    if _EXP["parar"]:
+        return {"success": False, "cancelled": True, "error": "parado"}
     m = _montar(proj, sr, op.get("faixas"))
     if not m:
         return {"success": False, "error": "nada para exportar (faixas vazias, mudas ou arquivos faltando)"}
@@ -413,8 +421,102 @@ def exportar(proj, caminho, op=None):
     return {"success": True, "caminho": caminho, "dur": round(b - a, 3)}
 
 
+# ─────────────────────────── plugins VST3 na faixa ───────────────────────────
+# f.plug = [{id, caminho, cid, nome, fab, estado (base64), on}] — no FIM da cadeia da faixa (depois do reverb), antes do
+# volume. A faixa com plugin é "congelada" (como nos programas de áudio): os clipes + a cadeia do Kanivete viram um WAV
+# desde o 0 e passam pelos plugins num processo à parte (`<app> --vst3 processar`, o mesmo da exportação do Vídeo);
+# a prévia toca esse arquivo (som-plugins.js) e a exportação usa o MESMO arquivo (cache pelo conteúdo da faixa).
+CAUDA_PLUGIN = 2.0   # s de silêncio no fim para a cauda (reverb/eco do plugin)
+
+
+def _plugins_ativos(f):
+    return [p for p in (f.get("plug") or []) if p.get("on", True) and p.get("caminho") and p.get("cid")]
+
+
+def _exe_app():
+    import sys
+    if getattr(sys, "frozen", False):
+        return [sys.executable]
+    return [sys.executable, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "main.py")]
+
+
+def congelar_faixa(f, sr=48000):
+    """WAV float da faixa `f` com os plugins → {success, arq, dur}. Cache pelo conteúdo (clipes, cadeia, plugins e ajustes)."""
+    plugs = _plugins_ativos(f)
+    if not plugs:
+        return {"success": False, "error": "a faixa não tem plugin ligado"}
+    base = {k: f.get(k) for k in ("clipes", "fx")}
+    chave = hashlib.sha1(json.dumps([base, [[p["caminho"], p["cid"], p.get("estado") or ""] for p in plugs], sr],
+                                    sort_keys=True, default=str).encode()).hexdigest()[:20]
+    pasta = os.path.join(_cache_dir(), "congeladas")
+    os.makedirs(pasta, exist_ok=True)
+    saida = os.path.join(pasta, f"{chave}.wav")
+    if os.path.isfile(saida) and os.path.getsize(saida) > 44 and os.path.isfile(saida + ".json"):
+        return {"success": True, "arq": saida, "dur": json.load(open(saida + ".json"))["dur"], "cache": True}
+    so = {"faixas": [{**f, "vol": 1, "mudo": False, "solo": False, "plug": []}], "master": {}}
+    m = _montar(so, sr)
+    if not m:
+        return {"success": False, "error": "faixa vazia"}
+    entradas, fc, rot, fim = m
+    seca = os.path.join(pasta, f"{chave}_seca.wav")
+    fc += f";{rot}apad=pad_dur={CAUDA_PLUGIN}[sk]"
+    script = os.path.join(tempfile.mkdtemp(prefix="skfrz_"), "fc.txt")
+    open(script, "w", encoding="utf-8").write(fc)
+    r = _rodar([ffmpeg(), "-y", "-hide_banner", "-nostdin", *entradas, "-/filter_complex", script, "-map", "[sk]",
+                "-ar", str(sr), "-ac", "2", "-c:a", "pcm_f32le", seca], 3600)
+    if r.returncode != 0 or not os.path.isfile(seca):
+        return {"success": False, "error": (r.stderr or "")[-400:]}
+    cadeia = os.path.join(os.path.dirname(script), "cadeia.json")
+    json.dump([{"caminho": p["caminho"], "cid": p["cid"], "estado": p.get("estado") or ""} for p in plugs], open(cadeia, "w", encoding="utf-8"))
+    tmp = saida + ".tmp.wav"
+    r = _rodar([*_exe_app(), "--vst3", "processar", seca, tmp, cadeia], 3600)
+    try:
+        os.remove(seca)
+    except OSError:
+        pass
+    if r.returncode != 0 or not os.path.isfile(tmp):
+        err = ((r.stderr or "").strip().splitlines() or ["o plugin fechou"])[-1]
+        return {"success": False, "error": f"plugin: {err[-300:]}"}
+    os.replace(tmp, saida)
+    # duração = até onde o plugin ainda soa (cauda de reverb/eco), no mínimo o fim da faixa: sem rabo de silêncio
+    dur = fim
+    try:
+        from Functions.vst3 import _ler_wav_float
+        import numpy as np
+        a = np.abs(_ler_wav_float(saida)).max(axis=0)
+        vivos = np.nonzero(a[int(fim * sr):] > 1e-4)[0]   # -80 dB
+        if len(vivos):
+            dur = min(fim + CAUDA_PLUGIN, fim + (vivos[-1] + 1) / sr)
+    except Exception:
+        dur = fim + CAUDA_PLUGIN
+    dur = round(float(dur), 4)
+    json.dump({"dur": dur}, open(saida + ".json", "w"))
+    return {"success": True, "arq": saida, "dur": dur}
+
+
+def _com_plugins(proj, sr=48000):
+    """cópia do projeto em que cada faixa com plugin vira um clipe só (o arquivo congelado), sem a cadeia (já está nele)"""
+    if not any(_plugins_ativos(f) for f in proj.get("faixas", [])):
+        return proj
+    out = {**proj, "faixas": []}
+    for f in proj.get("faixas", []):
+        if not _plugins_ativos(f) or f.get("mudo"):
+            out["faixas"].append(f)
+            continue
+        r = congelar_faixa(f, sr)
+        if not r.get("success"):
+            raise RuntimeError(f"faixa {f.get('nome', '')}: {r.get('error')}")
+        out["faixas"].append({**f, "fx": {}, "plug": [], "clipes": [{"id": "frz", "arq": r["arq"], "ini": 0, "de": 0, "dur": r["dur"], "vol": 1,
+                                                                    "fade_in": 0, "fade_out": 0}]})
+    return out
+
+
 def medir_lufs(proj, op=None):
     """Loudness integrada da mixagem (LUFS) e pico verdadeiro (dBTP) — para mostrar antes de exportar."""
+    try:
+        proj = _com_plugins(proj)
+    except RuntimeError as e:
+        return {"success": False, "error": str(e)}
     m = _montar(proj, 48000, (op or {}).get("faixas"))
     if not m:
         return {"success": False, "error": "nada para medir"}

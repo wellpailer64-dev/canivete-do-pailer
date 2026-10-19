@@ -83,7 +83,8 @@ function skBus(f) {
         b.vol.connect(SK.master.ent); b.vol.connect(b.an);
         SK.bus[f.id] = b;
     }
-    const fx = f.fx || {}, eq = fx.eq || {}, c = fx.comp || {}, h = fx.hpf || {}, g = fx.gate || {}, d = fx.deess || {}, geq = fx.geq || {}, rv = fx.rev || {};
+    // faixa congelada com plugins VST3 (som-plugins.js): a cadeia já está no arquivo — aqui fica neutra
+    const fx = (typeof skFrzPronto === 'function' && skFrzPronto(f) ? {} : f.fx) || {}, eq = fx.eq || {}, c = fx.comp || {}, h = fx.hpf || {}, g = fx.gate || {}, d = fx.deess || {}, geq = fx.geq || {}, rv = fx.rev || {};
     b.hpf.frequency.value = h.ativo ? (h.freq || 80) : 1;
     if (b.dyn) { const P = b.dyn.parameters; P.get('gate').value = g.ativo ? 1 : 0; P.get('gLim').value = Math.pow(10, (g.limiar ?? -50) / 20); P.get('deess').value = d.ativo ? 1 : 0; P.get('dQ').value = d.quant ?? 0.5; }
     b.gr.gain.value = eq.grave || 0; b.me.gain.value = eq.medio || 0; b.ag.gain.value = eq.agudo || 0;
@@ -137,10 +138,11 @@ function skPedaco(arq, k) {
 // trechos de cada clipe ativo entre a agulha e agulha + janela: [{c, f, k, a, b}] (a, b em segundos do arquivo)
 function skPedacosNaJanela(ph, janela) {
     const out = [], solo = SK.proj.faixas.some(f => f.solo);
-    for (const f of SK.proj.faixas) {
-        if (f.mudo || (solo && !f.solo)) continue;
+    for (const f0 of SK.proj.faixas) {
+        if (f0.mudo || (solo && !f0.solo)) continue;
+        const f = typeof skFaixaTocar === 'function' ? skFaixaTocar(f0) : f0;   // com plugin pronto: o arquivo congelado
         for (const c of f.clipes) {
-            if (c.ini + c.dur <= ph || c.ini > ph + janela || !SK.picos[c.arq]) continue;
+            if (c.ini + c.dur <= ph || c.ini > ph + janela || (!SK.picos[c.arq] && !c.frz)) continue;
             const a0 = c.de + Math.max(0, ph - c.ini), b0 = c.de + Math.min(c.dur, ph + janela - c.ini);
             for (let k = Math.floor(a0 / SK_SEG); k * SK_SEG < b0; k++) {
                 const a = Math.max(k * SK_SEG, c.de), b = Math.min((k + 1) * SK_SEG, c.de + c.dur);

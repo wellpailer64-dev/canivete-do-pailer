@@ -4034,6 +4034,15 @@ class ApiBridge:
         from Functions import sound_kanivete
         return sound_kanivete.abrir(caminho)
 
+    def sk_congelar(self, faixa, sr=48000):
+        """Faixa com plugins VST3 → WAV congelado (Functions/sound_kanivete.congelar_faixa) + URL para a prévia."""
+        from Functions import sound_kanivete
+        try:
+            r = sound_kanivete.congelar_faixa(faixa, int(sr or 48000))
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+        return r
+
     def sk_exportar(self, proj, caminho, op=None):
         from Functions import sound_kanivete
         try:
@@ -4527,10 +4536,13 @@ class ApiBridge:
     def ve_vst3_slot_restaurar(self, sid, estado):
         return {"success": self._vst3_slot_cmd(sid, {"restaurar": estado})}
 
-    def ve_vst3_slot_novidades(self):
-        """Ajustes novos (mexeram na janela do plugin) e espaços que caíram: {sid: {estado?, caiu?}}."""
+    def ve_vst3_slot_novidades(self, prefixo=""):
+        """Ajustes novos (mexeram na janela do plugin) e espaços que caíram: {sid: {estado?, caiu?}}. Cada tela pega só os
+        seus: o Sound Kanivete pede prefixo "sk-"; sem prefixo (o Vídeo) ficam de fora os "sk-"."""
         out = {}
         for sid, e in list(self._vst3_slots().items()):
+            if (prefixo and not sid.startswith(prefixo)) or (not prefixo and sid.startswith("sk-")):
+                continue
             if e["estado"]:
                 out[sid] = {"estado": e["estado"]}
                 e["estado"] = None
