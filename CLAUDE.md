@@ -210,7 +210,7 @@ Guia, medições, armadilhas e pendências (falta teste em call real com várias
 Ferramentas só do Pailer em `D:\Kanivete\Plugins\<id>\kanivete.json`, fora do git (carregador `Functions/plugins_pessoais.py`,
 `frontend/js/plugins-pessoais.js`; guia `Instructions/agente/plugins.md` › Plugins pessoais). **Pandalab**: demandas do
 Laboratório Panda → `py -3.13 D:\Kanivete\Plugins\pandalab\panda.py demandas --status abertas` / `demanda <id8>` /
-`baixar <id8>` (pasta certa do cliente pelo `mapa_clientes.json`). Escrever no Pandalab (criar/mudar) só com o ok do Pailer.
+`baixar <id8>` (pasta certa do cliente pelo `mapa_clientes.json`); volta: `status <id> --status in_progress --sim`, `comentar <id> --descricao ".." --sim`, entrega pelo site ("Pegar os finais da pasta", `finais <id>`). Card real: confirmar com o Pailer; teste = card "[TESTE] …" cliente PandaLab.
 Segurança do sistema Pandalab (tabelas abertas sem login): `01 - PANDA LAB/00 - Sistema Pandalab/SEGURANCA-PLANO.md`.
 **KaniBrowser** (`D:\Kanivete\Plugins\kanibrowser`): Chrome do Kanivete por canal privado (pipe, sem porta), logins
 guardados; `kb.py imagens|baixar --demanda ID8|texto|foto` pelo app em modo agente. Postar/enviar/clicar em site de
