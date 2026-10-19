@@ -1315,13 +1315,15 @@ async function ieCenaExportar(pasta, { fmt = 'png', q = 92, base, escala = 1 } =
 
 // ─────────────────────────── atalhos de exportação rápida (pedido do usuário 2026-10-03) ───────────────────────────
 // Ctrl+Shift+, = cada camada selecionada em PNG (recortada no tamanho dela, com efeitos); Ctrl+Shift+. = o documento em
-// PNG: com fatias, uma por fatia; com pranchetas, uma por prancheta; senão a tela inteira. Pergunta a pasta uma vez.
+// PNG: com fatias, uma por fatia; com pranchetas, uma por prancheta; senão a tela inteira. Pergunta a pasta uma vez,
+// abrindo na pasta onde o projeto está salvo (como o Exportar normal; documento sem arquivo: a pasta que o Windows lembra).
 async function ieExportarRapido(tudo, pastaAuto) {   // pastaAuto: automação (KNV.exportarRapido), sem a janela de salvar
     const doc = IE.doc, api = ieApi();
     if (!doc || !api) return;
     let pasta = pastaAuto;
     if (!pasta) {
-        const d = await api.ie_dialogo_salvar(String(doc.nome || 'peca').replace(/\.\w+$/, ''), 'png');
+        const pastaDoc = doc.path ? doc.path.replace(/[\/][^\/]*$/, '') : '';
+        const d = await api.ie_dialogo_salvar(String(doc.nome || 'peca').replace(/\.\w+$/, ''), 'png', pastaDoc);
         if (!d || !d.success || !d.path) return;
         pasta = d.path.replace(/[\\/][^\\/]*$/, '');
     }
