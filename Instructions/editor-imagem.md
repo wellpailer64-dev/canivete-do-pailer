@@ -473,3 +473,12 @@ sem janela: `KNV.exportarRapido(tudo, pasta)`.
   no formato, invertido como o Photoshop guarda). Seletor de cores: C/M/Y/K + aviso de fora da gama.
 - Casinha à esquerda da barra de opções: tela inicial (Recentes + "Continuar" de cada aberto) sem fechar nada; Esc,
   aba ou Continuar voltam.
+
+## Desempenho: redesenho caro não trava a tela (2026-10-19)
+Carrossel 6480×1440 com camada Camera Raw por cima (arte-final) levava 2,6 s a cada redesenho inteiro; vários seguidos
+e o app parava por minutos. Agora (`imagem-nucleo.js`, `ieQuadro`): o custo é medido (`doc._msMP`, ms por megapixel) e,
+se o redesenho previsto passa de ~60 ms, a região vira blocos de 512 px (`doc._fila`) compostos ~30 ms por quadro, o
+que mudou por último primeiro; arrastando/transformando continua direto. Camera Raw: granulação e vinheta calculadas
+uma vez por documento (`ieCrPosicao`, Int8/Uint8), Claridade numa grade reduzida alinhada ao documento
+(`ieCrDesfReduzido`, sem emenda) e `ieFBox` sem min/max no laço (~2×). Carrossel: 2,6 s → 1,1 s; maior trava 2,6 s →
+0,19 s; imagem igual (diferença máx. 1 nível). Medir: `D:/kanivete_testes/pedro5/medir.py` e `perfil.py`.

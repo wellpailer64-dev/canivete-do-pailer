@@ -341,11 +341,11 @@ function ieTextoIndiceNoPonto(L, p) {
 function ieTextoNoPonto(doc, p) {
     if (!doc || !p) return null;
     const ordem = [];
-    const visitar = (lista, visivel) => {
+    const visitar = (lista, visivel, trav) => {   // texto bloqueado (nele ou no grupo) não pega o clique
         for (const L of lista) {
-            const v = visivel && L.visivel;
-            if (L.filhos) visitar(L.filhos, v);
-            else if (v && L.txt) ordem.push(L);
+            const v = visivel && L.visivel, t = trav || !!(L.travas & IE_TRAVA.tudo);
+            if (L.filhos) visitar(L.filhos, v, t);
+            else if (v && !t && L.txt) ordem.push(L);
         }
     };
     visitar(doc.camadas, true);

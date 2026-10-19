@@ -398,15 +398,18 @@ function ieAlfaEm(L, x, y, semOpacidade = false) {
     }
     return a;
 }
+// camada bloqueada ("Travar tudo" nela ou num grupo acima): o clique na tela passa por ela e pega a de baixo
+// (pedido do Pailer, 2026-10-19 — como o Photoshop com a Seleção automática)
+const ieTravadaTudo = L => !!(L && L.travas & IE_TRAVA.tudo);
 function ieCamadaNoPonto(doc, x, y) {
     const ordem = [];
-    const visitar = (lista, visivel) => {
+    const visitar = (lista, visivel, trav) => {
         let base = null;   // a camada de baixo de uma sequência presa por máscara de corte
         for (const L of lista) {
-            const v = visivel && L.visivel;
+            const v = visivel && L.visivel, t = trav || ieTravadaTudo(L);
             if (!L.clip) base = L;
-            if (L.filhos) visitar(L.filhos, v);
-            else if (v && ieRaster0(L)) ordem.push({ L, base: L.clip ? base : null });
+            if (L.filhos) visitar(L.filhos, v, t);
+            else if (v && !t && ieRaster0(L)) ordem.push({ L, base: L.clip ? base : null });
         }
     };
     visitar(doc.camadas, true);

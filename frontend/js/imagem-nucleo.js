@@ -924,6 +924,7 @@ const IE_COMP_BLOCO = 2048;
 function ieCompor(doc, R) {
     R = ieRInter(ieRInt(R || ieRDoc(doc)), ieRDoc(doc));
     if (!R) return;
+    if (doc._fila && R.w >= doc.w && R.h >= doc.h) doc._fila = null;   // composição inteira (exportar, API): a fila acabou
     if (doc.comp.width !== doc.w || doc.comp.height !== doc.h) doc.comp = ieCanvas(doc.w, doc.h);
     const B = IE_COMP_BLOCO;
     if (R.w <= B && R.h <= B) return ieComporPedaco(doc, R);
@@ -1079,6 +1080,39 @@ function ieQuadroPedir() {
     ieQuadroPedido = true;
     requestAnimationFrame(ieQuadro);
 }
+// Redesenho caro não prende a tela (2026-10-19: carrossel 6480×1440 com camada Camera Raw por cima = 2,6 s por
+// redesenho inteiro; vários seguidos e o app parava minutos): a região vira blocos de 512 px compostos aos poucos,
+// ~30 ms por quadro, o que mudou por último primeiro. O custo vem medido (ms por megapixel de cada composição).
+const IE_FILA_BLOCO = 512, IE_FILA_ORC = 30;
+function ieCompCaro(doc, R) {
+    const custo = doc._msMP != null ? doc._msMP : (typeof ieCrMargemDoc === 'function' && ieCrMargemDoc(doc) ? 250 : 0);
+    return R.w * R.h / 1e6 * custo > 60;
+}
+function ieCompMedir(doc, R, ms) {
+    const mp = R.w * R.h / 1e6;
+    if (mp < 0.25) return;   // pedaço pequeno: o tempo fixo engana
+    const v = ms / mp;
+    doc._msMP = doc._msMP == null ? v : doc._msMP * 0.6 + v * 0.4;
+}
+function ieFilaPor(doc, R) {
+    const B = IE_FILA_BLOCO, novo = new Map();
+    for (let y = Math.floor(R.y / B) * B; y < R.y + R.h; y += B)
+        for (let x = Math.floor(R.x / B) * B; x < R.x + R.w; x += B) novo.set(x + ',' + y, { x, y });
+    for (const [k, p] of doc._fila || []) if (!novo.has(k)) novo.set(k, p);
+    doc._fila = novo;
+}
+function ieFilaPasso(doc) {
+    const f = doc._fila, B = IE_FILA_BLOCO, t0 = performance.now();
+    let U = null;
+    for (const [k, p] of f) {
+        f.delete(k);
+        const R = ieRInter({ x: p.x, y: p.y, w: B, h: B }, ieRDoc(doc));
+        if (R) { const t = performance.now(); ieCompor(doc, R); ieCompMedir(doc, R, performance.now() - t); U = U ? ieRUniao(U, R) : R; }
+        if (performance.now() - t0 > IE_FILA_ORC) break;
+    }
+    if (doc._fila && !doc._fila.size) doc._fila = null;
+    return U;
+}
 function ieQuadro() {
     ieQuadroPedido = false;
     const doc = IE.doc;
@@ -1086,8 +1120,21 @@ function ieQuadro() {
     if (doc && doc._sujo) {
         R = doc._sujo;
         doc._sujo = null;
-        try { ieCompor(doc, R); } catch (e) { console.error('[editor de imagem] compor', e); }
-        ieMiniaturas?.();   // miniaturas acompanham a pintura (só as camadas que mudaram, com atraso)
+        // arrastando/transformando: direto (em pedaços a camada "rasgaria" no caminho); o resto vai para a fila
+        const arrasto = IE.transf || (IE.mov && IE.mov.alvos);
+        if (!arrasto && (doc._fila || ieCompCaro(doc, R))) { ieFilaPor(doc, R); R = null; }
+        else {
+            const t = performance.now();
+            try { ieCompor(doc, R); } catch (e) { console.error('[editor de imagem] compor', e); }
+            ieCompMedir(doc, R, performance.now() - t);
+            ieMiniaturas?.();   // miniaturas acompanham a pintura (só as camadas que mudaram, com atraso)
+        }
+    }
+    if (doc && doc._fila) {
+        let U = null;
+        try { U = ieFilaPasso(doc); } catch (e) { console.error('[editor de imagem] compor', e); doc._fila = null; }
+        if (U) R = R ? ieRUniao(R, U) : U;
+        if (doc._fila) ieQuadroPedir(); else ieMiniaturas?.();
     }
     // só um pedaço mudou e a vista é a mesma: redesenha só esse pedaço da tela (arrastar em tempo real num documento
     // grande: antes cada quadro reduzia a composição inteira — 15 MP no carrossel — e ficava em ~30 fps)

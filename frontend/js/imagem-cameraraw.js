@@ -92,6 +92,55 @@ function ieCrLut3d(d, lut, N) {
         for (let c = 0; c < 3; c++) d[i + c] = (lut[p000 + c] * w000 + lut[p100 + c] * w100 + lut[p010 + c] * w010 + lut[p110 + c] * w110 + lut[p001 + c] * w001 + lut[p101 + c] * w101 + lut[p011 + c] * w011 + lut[p111 + c] * w111) * 255 + 0.5;
     }
 }
+// Desfoque grande (Claridade) numa grade reduzida ALINHADA ao documento: dá o mesmo resultado em qualquer pedaço da
+// composição por regiões (sem emenda) e faz ~10× menos conta que o desfoque em resolução cheia (2026-10-19)
+function ieCrDesfReduzido(Y, w, h, r, ox, oy) {
+    const q = Math.min(4, Math.floor(r / 4));
+    if (q < 2) return gfDesf(Y, w, h, r);
+    const gx0 = Math.floor(ox / q), gy0 = Math.floor(oy / q);
+    const W = Math.floor((ox + w - 1) / q) - gx0 + 1, H = Math.floor((oy + h - 1) / q) - gy0 + 1;
+    const s = new Float32Array(W * H), c = new Float32Array(W * H), col = new Int32Array(w);
+    for (let x = 0; x < w; x++) col[x] = Math.floor((x + ox) / q) - gx0;
+    for (let y = 0; y < h; y++) {
+        const j = (Math.floor((y + oy) / q) - gy0) * W, L = y * w;
+        for (let x = 0; x < w; x++) { const k = j + col[x]; s[k] += Y[L + x]; c[k]++; }
+    }
+    for (let k = 0; k < s.length; k++) s[k] /= c[k] || 1;
+    // volta para a resolução cheia (bilinear), com as colunas calculadas uma vez
+    const b = gfDesf(s, W, H, r / q), o = new Float32Array(w * h), X0 = new Int32Array(w), X1 = new Int32Array(w), TX = new Float32Array(w);
+    for (let x = 0; x < w; x++) { const fx = (x + ox + 0.5) / q - 0.5 - gx0; X0[x] = Math.max(0, Math.min(W - 1, Math.floor(fx))); X1[x] = Math.min(W - 1, X0[x] + 1); TX[x] = Math.max(0, Math.min(1, fx - X0[x])); }
+    for (let y = 0; y < h; y++) {
+        const fy = (y + oy + 0.5) / q - 0.5 - gy0, y0 = Math.max(0, Math.min(H - 1, Math.floor(fy))), y1 = Math.min(H - 1, y0 + 1), ty = Math.max(0, Math.min(1, fy - y0));
+        const A = y0 * W, B2 = y1 * W, L = y * w;
+        for (let x = 0; x < w; x++) {
+            const x0 = X0[x], x1 = X1[x], tx = TX[x];
+            const a = b[A + x0] + (b[A + x1] - b[A + x0]) * tx, a2 = b[B2 + x0] + (b[B2 + x1] - b[B2 + x0]) * tx;
+            o[L + x] = a + (a2 - a) * ty;
+        }
+    }
+    return o;
+}
+// Granulação e vinheta só dependem da POSIÇÃO no documento: calculadas uma vez para o documento inteiro (Int8/Uint8,
+// ~2 B por pixel) e recortadas para cada pedaço. Antes eram refeitas a cada composição (15% do tempo) porque o cache
+// do Camera Raw se apaga quando o que está embaixo muda.
+const IE_CR_POS = new Map();
+function ieCrPosicao(nome, chave, w, h, ox, oy, tw, th, fn, inteiro) {
+    if (tw * th > 40e6) return fn({ w, h, ox, oy });
+    const k = [nome, chave, tw, th].join('|');
+    let g = IE_CR_POS.get(k);
+    if (!g) {
+        const f = fn({ w: tw, h: th, ox: 0, oy: 0 });
+        g = inteiro ? Int8Array.from(f, x => Math.round(Math.max(-1, Math.min(1, x)) * 127)) : Uint8Array.from(f, x => Math.round(Math.max(0, Math.min(1, x)) * 255));
+        IE_CR_POS.set(k, g);
+        if (IE_CR_POS.size > 6) IE_CR_POS.delete(IE_CR_POS.keys().next().value);
+    }
+    const o = new Float32Array(w * h), s = inteiro ? 1 / 127 : 1 / 255;
+    for (let y = 0; y < h; y++) {
+        const yy = Math.min(th - 1, Math.max(0, y + oy)) * tw;
+        for (let x = 0; x < w; x++) o[y * w + x] = g[yy + Math.min(tw - 1, Math.max(0, x + ox))] * s;
+    }
+    return o;
+}
 function ieCrHash(d) { const q = new Uint32Array(d.buffer, d.byteOffset, d.length >> 2); let h = 2166136261; for (let i = 0; i < q.length; i++) h = Math.imul(h ^ q[i], 16777619); return h >>> 0; }
 // processa os pixels d (RGBA, no lugar) de um recorte (na escala e) cujo canto está em (ox, oy) da imagem inteira
 // escalada (tw × th); A = cor do ar (névoa). C = cache (objeto): as partes pesadas (redução de ruído, desfoques da
@@ -114,8 +163,8 @@ function ieCrDados(d, w, h, v, e = 1, ox = 0, oy = 0, tw = w, th = h, A = null, 
     });
     const src = base || d, S = Math.min(tw, th);
     const Y0 = (v.clar || v.tex || v.nitQ > 0) ? pega('y0', kNr, () => { const Y = new Float32Array(n); for (let i = 0; i < n; i++) Y[i] = src[i * 4] * 0.299 + src[i * 4 + 1] * 0.587 + src[i * 4 + 2] * 0.114; return Y; }) : null;
-    const dClar = v.clar ? pega('clar', kNr, () => { const b = gfDesf(Y0, w, h, Math.max(1, S * 0.015)); return Y0.map((y, i) => (y - b[i]) * 4 * (y / 255) * (1 - y / 255)); }) : null;
-    const dTex = v.tex ? pega('tex', kNr, () => { const b = gfDesf(Y0, w, h, Math.max(1, S * 0.0035)); return Y0.map((y, i) => y - b[i]); }) : null;
+    const dClar = v.clar ? pega('clar', kNr, () => { const b = ieCrDesfReduzido(Y0, w, h, Math.max(1, S * 0.015), ox, oy); for (let i = 0; i < n; i++) { const y = Y0[i]; b[i] = (y - b[i]) * 4 * (y / 255) * (1 - y / 255); } return b; }) : null;
+    const dTex = v.tex ? pega('tex', kNr, () => { const b = gfDesf(Y0, w, h, Math.max(1, S * 0.0035)); for (let i = 0; i < n; i++) b[i] = Y0[i] - b[i]; return b; }) : null;
     const dNit = v.nitQ > 0 ? pega('nit', [kNr, v.nitR, v.nitD, v.nitM].join(), () => {
         const b = gfDesf(Y0, w, h, Math.max(0.5, v.nitR * e)), lim = (100 - v.nitD) * 0.06;
         let msk = null;
@@ -129,15 +178,15 @@ function ieCrDados(d, w, h, v, e = 1, ox = 0, oy = 0, tw = w, th = h, A = null, 
         const r = Math.max(1, Math.round(7 * e));
         return gfDesf(ieFMinMax(esc, w, h, r, false), w, h, r * 2).map(t => Math.max(0.15, 1 - 0.95 * t));
     }) : null;
-    const grao = v.grao > 0 ? pega('grao', [v.graoT, v.graoA].join(), () => {
-        const P = { w, h, ox, oy }, liso = gfSuave(P, Math.max(0.6, (1 + v.graoT / 100 * 3) * e), 71), fino = gfRuido(P, 72), ra = v.graoA / 100;
+    const grao = v.grao > 0 ? pega('grao', [v.graoT, v.graoA].join(), () => ieCrPosicao('grao', [v.graoT, v.graoA, e].join(), w, h, ox, oy, tw, th, P => {
+        const liso = gfSuave(P, Math.max(0.6, (1 + v.graoT / 100 * 3) * e), 71), fino = gfRuido(P, 72), ra = v.graoA / 100;
         return liso.map((l, i) => l * (1 - ra) + (fino[i] * 2 - 1) * ra);
-    }) : null;
-    const vinh = v.vig ? pega('vig', [v.vigM, v.vigR, v.vigD].join(), () => {
-        const p = 2 * Math.pow(3, -v.vigR / 100), m = 0.25 + v.vigM / 100 * 0.9, f = 0.05 + v.vigD / 100 * 0.9, o = new Float32Array(n);
-        for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const u = Math.abs(((i + ox) / tw - 0.5) * 2), q = Math.abs(((j + oy) / th - 0.5) * 2); o[j * w + i] = gfSs(m, m + f, Math.pow(Math.pow(u, p) + Math.pow(q, p), 1 / p)); }
+    }, true)) : null;
+    const vinh = v.vig ? pega('vig', [v.vigM, v.vigR, v.vigD].join(), () => ieCrPosicao('vig', [v.vigM, v.vigR, v.vigD].join(), w, h, ox, oy, tw, th, P => {
+        const p = 2 * Math.pow(3, -v.vigR / 100), m = 0.25 + v.vigM / 100 * 0.9, f = 0.05 + v.vigD / 100 * 0.9, o = new Float32Array(P.w * P.h);
+        for (let j = 0; j < P.h; j++) for (let i = 0; i < P.w; i++) { const u = Math.abs(((i + P.ox) / tw - 0.5) * 2), q = Math.abs(((j + P.oy) / th - 0.5) * 2); o[j * P.w + i] = gfSs(m, m + f, Math.pow(Math.pow(u, p) + Math.pow(q, p), 1 / p)); }
         return o;
-    }) : null;
+    }, false)) : null;
     // daqui para baixo é barato: cor, somas e misturas
     if (base) d.set(base);
     const L = ieCrLut(v);
