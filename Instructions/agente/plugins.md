@@ -160,6 +160,19 @@ janela deste processo visível FORA da tela (`casa`: WS_POPUP|WS_VISIBLE em −3
 passa para a do KANIVETE depois do attached (encaixar e servir). Medido: os 12 plugins instalados abrem pelo Vídeo e
 pelo Sound e seguem abertos; som da jhudstudio pelo congelamento ok.
 
+## Plugins pessoais (2026-10-19) — ferramenta só do usuário, fora do git
+`Functions/plugins_pessoais.py` + `frontend/js/plugins-pessoais.js`: cada pasta `<raiz_dados>/Plugins/<id>/` (D:\Kanivete\Plugins)
+com `kanivete.json` (`nome`, `sigla`, `cor`, `js`, `css`, `py`, `descricao`, `desligado`) vira item na barra lateral ›
+Pessoais (depois de Reuniões) com a página vazia `#page-plugin-<id>`. O js roda com `KPLUG` e `PLUGIN_ID`; chama o Python
+por `KPLUG.chamar(id, 'funcao', {args})` → API `plugin_pessoal` → só as funções de `API_KANIVETE` do módulo `py`
+(o resto é recusado). `plugin_pessoal_recarregar(id)` esquece o módulo depois de editar. Nada disso vai no release:
+quem não tem a pasta não vê nada.
+Primeiro plugin: **Pandalab** (`D:\Kanivete\Plugins\pandalab`): demandas do sistema Laboratório Panda (Supabase), detalhe,
+baixar o material para a pasta certa do cliente (`mapa_clientes.json` + `pastas.py`: cliente/produção/ano/mês/`nn - TIPO -
+TÍTULO`, vídeo com 01 BRUTO…04 RENDERS, BRIEFING.txt), criar demanda (com confirmação). Linha de comando para o agente:
+`py -3.13 D:\Kanivete\Plugins\pandalab\panda.py demandas|demanda|onde|baixar|pastas|criar`. Teste:
+`D:\kanivete_testes\scripts\teste_plugin_pandalab.py 9333`.
+
 ## Pendências
 
 - Automação de parâmetro do plugin (quadros-chave), plugin no Master e nos efeitos do CLIPE.

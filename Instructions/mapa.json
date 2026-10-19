@@ -909,6 +909,9 @@
   "sd_importar_pptx",
   "sd_importar_pdf",
   "sd_kani",
+  "plugins_pessoais_listar",
+  "plugin_pessoal",
+  "plugin_pessoal_recarregar",
   "ata_listar",
   "ata_abrir",
   "ata_salvar",
@@ -2149,6 +2152,24 @@
     "slider_kani"
    ]
   },
+  "plugins_pessoais_listar": {
+   "args": "",
+   "modulos": [
+    "plugins_pessoais"
+   ]
+  },
+  "plugin_pessoal": {
+   "args": "pid, funcao, args=None",
+   "modulos": [
+    "plugins_pessoais"
+   ]
+  },
+  "plugin_pessoal_recarregar": {
+   "args": "pid",
+   "modulos": [
+    "plugins_pessoais"
+   ]
+  },
   "ata_listar": {
    "args": "",
    "modulos": [
@@ -3360,6 +3381,7 @@
   "Functions/organizador_de_videos.py": "organizador_de_videos.py",
   "Functions/otimizar.py": "Forçar Full HD (painel Projeto): vídeo maior que Full HD (2K, 4K, 8K, em pé ou deitado) vira uma cópia com o lado",
   "Functions/pincel_roto.py": "pincel_roto.py — Pincel Roto do Vídeo Kanivete (o Roto Brush do After Effects): recorta uma pessoa/objeto do vídeo a",
+  "Functions/plugins_pessoais.py": "Plugins pessoais do KANIVETE: ferramentas que moram SÓ no PC de quem as fez, fora do git e do release",
   "Functions/ponte_illustrator.py": "Ponte com o Adobe Illustrator instalado (COM + ExtendScript) — .ai NATIVO, com todas as pranchetas",
   "Functions/ponte_premiere.py": "Ponte Kanivete ↔ Premiere Pro: conversa com o plugin UXP \"Kanivete Ponte\" (guia: Instructions/agente/ponte-premiere.md)",
   "Functions/preencher_conteudo.py": "Preenchimento sensível ao conteúdo (Photo Kanivete: Editar › Preenchimento sensível ao conteúdo, como o Photoshop)",

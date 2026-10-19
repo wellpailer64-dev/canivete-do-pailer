@@ -4731,6 +4731,19 @@ class ApiBridge:
         from Functions import slider_kani
         return slider_kani.pedir(acao, dados)
 
+    # Plugins pessoais: <raiz_dados>/Plugins/<id>/kanivete.json, fora do git (Functions/plugins_pessoais.py, plugins-pessoais.js)
+    def plugins_pessoais_listar(self):
+        from Functions import plugins_pessoais
+        return plugins_pessoais.listar()
+
+    def plugin_pessoal(self, pid, funcao, args=None):
+        from Functions import plugins_pessoais
+        return plugins_pessoais.chamar(pid, funcao, args)
+
+    def plugin_pessoal_recarregar(self, pid):
+        from Functions import plugins_pessoais
+        return plugins_pessoais.recarregar(pid)
+
     # Ata Kanivete (Beta): reunião do Meet → transcrição → ATA da Kani → PDF (Functions/ata_kanivete.py, frontend/js/ata.js)
     _ata_lock = threading.Lock()
 

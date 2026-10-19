@@ -206,6 +206,13 @@ separadas no sherpa-onnx (limiar 0,5; renomear = juntar) → Kani escreve a ATA 
 Story). `Functions/ata_kanivete.py`, `frontend/js/ata.js`, `css/ata.css`, API `ATA_API`. O Meet NÃO manda áudio por pessoa.
 Guia, medições, armadilhas e pendências (falta teste em call real com várias pessoas): `Instructions/agente/ata-kanivete.md`.
 
+## Plugins pessoais (Pandalab)
+Ferramentas só do Pailer em `D:\Kanivete\Plugins\<id>\kanivete.json`, fora do git (carregador `Functions/plugins_pessoais.py`,
+`frontend/js/plugins-pessoais.js`; guia `Instructions/agente/plugins.md` › Plugins pessoais). **Pandalab**: demandas do
+Laboratório Panda → `py -3.13 D:\Kanivete\Plugins\pandalab\panda.py demandas --status abertas` / `demanda <id8>` /
+`baixar <id8>` (pasta certa do cliente pelo `mapa_clientes.json`). Escrever no Pandalab (criar/mudar) só com o ok do Pailer.
+Segurança do sistema Pandalab (tabelas abertas sem login): `01 - PANDA LAB/00 - Sistema Pandalab/SEGURANCA-PLANO.md`.
+
 ## Tela da 1ª instalação
 `first_run.py` abre `frontend/instalar.html` (+ `js/instalar.js`) numa janela do pywebview: o carrossel da Home
 (`home-banners.js`), barra na identidade do KANIVETE e música opcional (`frontend/audio/instalador/musica.ogg`; sem o arquivo,
