@@ -352,6 +352,9 @@ function vedRender() {
     if (typeof veLayoutChanged === 'function') veLayoutChanged();
 }
 
+// peso das partes em milhares: os z somam ~1, e com um grupo travado no max-width (Medidores) a soma dos outros
+// ficava < 1 — o flexbox então só distribui essa fração da sobra e abria um vão vazio no fim da linha
+const vedFlex = z => `${z * 1000} 1 0px`;
 function vedBuild(n, h, doc) {
     if (n.t === 'g') {
         const g = doc.createElement('div');
@@ -382,7 +385,7 @@ function vedBuild(n, h, doc) {
             s.appendChild(sash);
         }
         const e = vedBuild(ch, h, doc);
-        e.style.flex = `${n.z[i]} 1 0px`;
+        e.style.flex = vedFlex(n.z[i]);
         s.appendChild(e);
     });
     return s;
@@ -1158,8 +1161,8 @@ function vedSashDrag(e, sash) {
         const na = Math.min(Math.max(sa + (row ? ev.clientX : ev.clientY) - p0, ma), tot - mb);
         n.z[i - 1] = ftot * na / tot;
         n.z[i] = ftot - n.z[i - 1];
-        a.style.flex = `${n.z[i - 1]} 1 0px`;
-        b.style.flex = `${n.z[i]} 1 0px`;
+        a.style.flex = vedFlex(n.z[i - 1]);
+        b.style.flex = vedFlex(n.z[i]);
     };
     const up = () => {
         sash.removeEventListener('pointermove', move);
