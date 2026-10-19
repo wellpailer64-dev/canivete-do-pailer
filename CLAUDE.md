@@ -212,6 +212,9 @@ Ferramentas só do Pailer em `D:\Kanivete\Plugins\<id>\kanivete.json`, fora do g
 Laboratório Panda → `py -3.13 D:\Kanivete\Plugins\pandalab\panda.py demandas --status abertas` / `demanda <id8>` /
 `baixar <id8>` (pasta certa do cliente pelo `mapa_clientes.json`). Escrever no Pandalab (criar/mudar) só com o ok do Pailer.
 Segurança do sistema Pandalab (tabelas abertas sem login): `01 - PANDA LAB/00 - Sistema Pandalab/SEGURANCA-PLANO.md`.
+**KaniBrowser** (`D:\Kanivete\Plugins\kanibrowser`): Chrome do Kanivete por canal privado (pipe, sem porta), logins
+guardados; `kb.py imagens|baixar --demanda ID8|texto|foto` pelo app em modo agente. Postar/enviar/clicar em site de
+terceiros só com o ok do Pailer.
 
 ## Tela da 1ª instalação
 `first_run.py` abre `frontend/instalar.html` (+ `js/instalar.js`) numa janela do pywebview: o carrossel da Home

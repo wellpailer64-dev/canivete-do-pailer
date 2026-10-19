@@ -172,6 +172,17 @@ baixar o material para a pasta certa do cliente (`mapa_clientes.json` + `pastas.
 TÍTULO`, vídeo com 01 BRUTO…04 RENDERS, BRIEFING.txt), criar demanda (com confirmação). Linha de comando para o agente:
 `py -3.13 D:\Kanivete\Plugins\pandalab\panda.py demandas|demanda|onde|baixar|pastas|criar`. Teste:
 `D:\kanivete_testes\scripts\teste_plugin_pandalab.py 9333`.
+Segundo plugin: **KaniBrowser** (`D:\Kanivete\Plugins\kanibrowser`): um Chrome do Kanivete com perfil próprio
+(`D:\Kanivete\KaniBrowser\perfil`, logins guardados) aberto por **canal privado** (`--remote-debugging-pipe` +
+`--remote-debugging-io-pipes=<h_in>,<h_out>`, pipes herdados só pelo Chrome via `STARTUPINFO.lpAttributeList`): SEM porta
+de rede, só o processo do app comanda; o navegador fecha com o app. NUNCA trocar por `--remote-debugging-port` (porta sem
+senha = qualquer programa do PC comanda o navegador logado; o Claude Code bloqueia). Painel: endereço, atalhos (Pinterest,
+Behance, Instagram, Drive, WhatsApp, Pandalab), abas, prévia, "Pegar imagens da página" → marcar → baixar em
+`<demanda>/02 - ASSETS/REFERENCIAS` (demandas com pasta = `pandalab/vinculos.json`), print, copiar texto. Agente:
+`py -3.13 D:\Kanivete\Plugins\kanibrowser\kb.py estado|abrir|ir|imagens|baixar --demanda ID8|texto|foto [--porta 9333]`
+— passa pelo app em modo agente (`KPLUG.chamar`). Pinterest pede login para buscar. Teste:
+`D:\kanivete_testes\scripts\teste_kanibrowser.py` (porta 9333). `plugin_pessoal_recarregar` também esquece os módulos
+que o plugin importou (fechar o navegador antes: o canal mora no módulo).
 
 ## Pendências
 

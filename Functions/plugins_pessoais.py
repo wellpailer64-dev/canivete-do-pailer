@@ -99,6 +99,11 @@ def chamar(pid, funcao, args=None):
 
 def recarregar(pid):
     """esquece o módulo (depois de editar o .py do plugin, sem reabrir o app)"""
+    raiz = os.path.normcase(os.path.join(pasta(), pid))
     with _trava:
         _modulos.pop(pid, None)
+        for nome, mod in list(sys.modules.items()):   # os módulos que o plugin importou (ex.: ponte → kanibrowser)
+            arq = getattr(mod, "__file__", None)
+            if arq and os.path.normcase(arq).startswith(raiz):
+                del sys.modules[nome]
     return True
