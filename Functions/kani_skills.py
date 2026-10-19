@@ -286,6 +286,23 @@ def buscar(consulta, n=6):
 
 
 def texto_da_pagina(url, max_chars=6000):
+    """Texto principal de uma página. Página que só monta o conteúdo no navegador (Instagram, sites em JS) vem vazia
+    no download simples: aí, se o plugin pessoal KaniBrowser estiver instalado, lê pelo navegador dele."""
+    try:
+        t = _texto_http(url, max_chars)
+    except Exception:
+        t = ""
+    if len(t) >= 300:
+        return t
+    from Functions import plugins_pessoais
+    if os.path.isfile(os.path.join(plugins_pessoais.pasta(), "kanibrowser", "kanivete.json")):
+        r = plugins_pessoais.chamar("kanibrowser", "ler_pagina", {"url": url, "limite": max_chars})
+        if r.get("success") and len(r["dados"] or "") > len(t):
+            return r["dados"][:max_chars]
+    return t
+
+
+def _texto_http(url, max_chars=6000):
     """Texto principal de uma página (parágrafos e títulos; sem menu, script, rodapé)."""
     from lxml import html as lh
     pagina, tipo = _baixar(url)
