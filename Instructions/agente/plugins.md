@@ -167,7 +167,7 @@ com `kanivete.json` (`nome`, `sigla`, `cor`, `js`, `css`, `py`, `descricao`, `de
 por `KPLUG.chamar(id, 'funcao', {args})` → API `plugin_pessoal` → só as funções de `API_KANIVETE` do módulo `py`
 (o resto é recusado). `plugin_pessoal_recarregar(id)` esquece o módulo depois de editar. Nada disso vai no release:
 quem não tem a pasta não vê nada.
-Primeiro plugin: **Pandalab** (`D:\Kanivete\Plugins\pandalab`): demandas do sistema Laboratório Panda (Supabase), detalhe,
+Primeiro plugin: **Pandalab** (`D:\Kanivete\Plugins\pandalab`): modo "Sistema" = o site laboratoriopanda.com num iframe (espelho, login lá dentro); modo "Pastas e material" = demandas do sistema Laboratório Panda (Supabase), detalhe,
 baixar o material para a pasta certa do cliente (`mapa_clientes.json` + `pastas.py`: cliente/produção/ano/mês/`nn - TIPO -
 TÍTULO`, vídeo com 01 BRUTO…04 RENDERS, BRIEFING.txt), criar demanda (com confirmação). Linha de comando para o agente:
 `py -3.13 D:\Kanivete\Plugins\pandalab\panda.py demandas|demanda|onde|baixar|pastas|criar`. Teste:
