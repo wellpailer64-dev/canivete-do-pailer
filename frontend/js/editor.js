@@ -753,6 +753,7 @@ function vePushHistory() {
 function veRestore(snap) {
     const d = JSON.parse(snap);
     VE.clips = d.clips; VE.inPt = d.inPt; VE.outPt = d.outPt;
+    if (typeof veOfxRegistrarClipes === 'function') veOfxRegistrarClipes(VE.clips);   // efeitos OFX do projeto (editor-ofx.js)
     VE.markers = d.markers || [];
     VE.legendas = d.legendas || [];
     // Comp criada nesta sessão: volta ou sai do Projeto junto com o clipe dela (as do arquivo aberto ficam)
@@ -865,6 +866,7 @@ function veSeqAplicar(seq, opts = {}) {
     veCacheInvalidate();
     if (seq.w > 0 && seq.h > 0) veSeqQuadro(seq.w, seq.h);
     VE.clips = vePlain(seq.clips, []);
+    if (typeof veOfxRegistrarClipes === 'function') veOfxRegistrarClipes(VE.clips);   // efeitos OFX do projeto (editor-ofx.js)
     veSanearSobrepostas();
     VE_TRK = veSeqTracks(seq.trilhas, VE.clips);
     veEnsureTracks(veTrackCount());
@@ -5845,6 +5847,7 @@ function veRenderClips() {
 }
 
 function veRefresh() {
+    if (typeof veOfxRegistrarClipes === 'function') veOfxRegistrarClipes(VE.clips);
     if (typeof veMidiaUsadasPreparar === 'function') veMidiaUsadasPreparar();
     veTxRender();
     vePjRender();

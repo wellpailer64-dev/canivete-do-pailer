@@ -3,7 +3,21 @@
 // janela do próprio plugin. A lista é procurada uma vez (abre cada DLL num processo separado) e guardada;
 // "Procurar de novo" refaz. Próxima etapa: o plugin no Rack de efeitos da trilha (som da timeline passando por ele).
 
-const VEPLG = { lista: null, procurando: false, erro: '' };
+const VEPLG = { lista: null, procurando: false, erro: '', verArq: false };
+
+// plugins arquivados (ex.: instrumentos, que não servem para vídeo): somem do menu e do Rack; "Arquivados" restaura.
+// Guardado por caminho|cid neste PC (localStorage).
+const VEPLG_ARQ_K = 've-plg-arquivados';
+const vePlgChave = p => p.caminho + '|' + (p.cid || '');
+function vePlgArqLer() { try { return new Set(JSON.parse(localStorage.getItem(VEPLG_ARQ_K) || '[]')); } catch (e) { return new Set(); } }
+function vePlgArquivado(p) { return vePlgArqLer().has(vePlgChave(p)); }
+function vePlgArquivar(p, sim) {
+    const s = vePlgArqLer();
+    if (sim) s.add(vePlgChave(p)); else s.delete(vePlgChave(p));
+    try { localStorage.setItem(VEPLG_ARQ_K, JSON.stringify([...s])); } catch (e) {}
+}
+// os que aparecem no menu e no Rack: abriram e não estão arquivados
+const vePlgAtivo = p => !p.erro && !vePlgArquivado(p);
 
 // Plugin VST3 num espaço do Rack de efeitos da trilha (editor-mixer.js). v = {caminho, cid, nome, fab, estado (base64:
 // o ajuste do plugin, vai no projeto)}; o espaço (slot) é o id do efeito. Um processo por espaço (main.py ve_vst3_slot):
@@ -36,15 +50,22 @@ function vePlgProcurar(atualizar, aoTerminar) {
 function vePlgMenuHtml(redesenhar) {
     if (VEPLG.lista == null && !VEPLG.procurando) vePlgProcurar(false, () => { redesenhar(); vePlgReabrir(); });
     const esc = s => veEsc(String(s || ''));
+    const arq = (VEPLG.lista || []).map((p, i) => [p, i]).filter(([p]) => vePlgArquivado(p));
+    const vis = (VEPLG.lista || []).map((p, i) => [p, i]).filter(([p]) => !vePlgArquivado(p));
+    const tirar = i => `<span class="ve-plg-arq" data-m="plg-arq:${i}" title="${veT('Arquivar (some do menu e do Rack)')}">⌫</span>`;
     let itens;
     if (VEPLG.lista == null) itens = '<div class="ve-menu-empty">Procurando plugins…</div>';
-    else if (!VEPLG.lista.length) itens = '<div class="ve-menu-empty">Nenhum plugin VST3 instalado</div>';
+    else if (!vis.length) itens = `<div class="ve-menu-empty">${arq.length ? 'Todos os plugins estão arquivados' : 'Nenhum plugin VST3 instalado'}</div>`;
     else {
-        itens = VEPLG.lista.map((p, i) => p.erro
-            ? `<button disabled title="${esc(p.erro)}"><b>!</b>${esc(p.nome)} <small>(não abriu)</small></button>`
-            : `<button data-m="plg:${i}" title="${esc(p.caminho)}"><b>♪</b>${esc(p.nome)} <small>${esc(p.fabricante)}</small></button>`).join('');
+        itens = vis.map(([p, i]) => p.erro
+            ? `<button class="ve-plg-erro" title="${esc(p.erro)}"><b>!</b>${esc(p.nome)} <small>(não abriu)</small>${tirar(i)}</button>`
+            : `<button data-m="plg:${i}" title="${esc(p.caminho)}"><b>♪</b>${esc(p.nome)} <small>${esc(p.fabricante)}</small>${tirar(i)}</button>`).join('');
     }
-    const n = VEPLG.lista ? VEPLG.lista.filter(p => !p.erro).length : 0;
+    if (arq.length) {
+        itens += `<hr><button data-m="plg-arq-ver"><b>${VEPLG.verArq ? '▾' : '▸'}</b>Arquivados <small>${arq.length}</small></button>`;
+        if (VEPLG.verArq) itens += arq.map(([p, i]) => `<button data-m="plg-des:${i}" class="ve-plg-arquivado" title="${veT('Clique para restaurar')}"><b>↩</b>${esc(p.nome)} <small>${esc(p.fabricante || '')}</small></button>`).join('');
+    }
+    const n = vis.filter(([p]) => !p.erro).length;
     return `<hr><div class="ve-plg-wrap" onmouseenter="vePlgFly(this, true)" onmouseleave="vePlgFly(this, false)">
         <button data-m="plg-sub" class="ve-plg-sub"><b>♪</b>Plugins${n ? ` <small>${n}</small>` : ''}<i>›</i></button>
         <div class="ve-menu ve-plg-fly" hidden><div class="ve-menu-h">VST3</div>${itens}<hr>
@@ -69,6 +90,12 @@ function vePlgReabrir() { if (VEPLG.fly) vePlgFly(document.querySelector('.ve-me
 function vePlgMenuClique(k, redesenhar) {
     if (k === 'plg-sub') { vePlgFly(document.querySelector('.ve-menu .ve-plg-wrap'), true); return false; }
     if (k === 'plg-procurar') { vePlgProcurar(true, () => { redesenhar(); vePlgReabrir(); }); redesenhar(); vePlgReabrir(); return false; }
+    if (k === 'plg-arq-ver') { VEPLG.verArq = !VEPLG.verArq; redesenhar(); vePlgReabrir(); return false; }
+    if (k.startsWith('plg-arq:') || k.startsWith('plg-des:')) {
+        const q = VEPLG.lista && VEPLG.lista[+k.split(':')[1]];
+        if (q) vePlgArquivar(q, k.startsWith('plg-arq:'));
+        redesenhar(); vePlgReabrir(); return false;
+    }
     const p = VEPLG.lista && VEPLG.lista[+k.slice(4)];
     if (!p) return true;
     vePlgPainel(p);
@@ -262,6 +289,9 @@ window.VEPLG_API = {
     painel: nome => { const p = vePlgAchar(nome); if (p) vePlgPainel(p); return p ? vePlgId(p) : null; },
     fechar: nome => { const p = vePlgAchar(nome); if (p && VEPLG_P[vePlgId(p)]) vePlgFechar(vePlgId(p)); },
     paineis: () => Object.entries(VEPLG_P).map(([id, s]) => ({ id, nome: s.p.nome, estado: s.estado, onde: s.ultimo })),
+    // arquivar(nome, true|false): tira/devolve do menu e do Rack; arquivados() = nomes
+    arquivar: (nome, sim = true) => { const p = (VEPLG.lista || []).find(x => (x.nome || '').toLowerCase().includes(String(nome).toLowerCase())); if (p) vePlgArquivar(p, sim); return !!p; },
+    arquivados: () => (VEPLG.lista || []).filter(vePlgArquivado).map(p => p.nome),
 };
 
 // ───────────────────────── som da prévia passando pelos plugins do Rack ─────────────────────────

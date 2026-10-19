@@ -456,11 +456,23 @@ def pasta_vst3():
     return os.path.join(os.environ.get("COMMONPROGRAMFILES", r"C:\Program Files\Common Files"), "VST3")
 
 
+def pastas_vst3():
+    """a pasta padrão do Windows e <raiz_dados>/Plugins VST3 (no disco do app: plugin sem instalador, sem pedir
+    administrador e sem encher o C)"""
+    out = [pasta_vst3()]
+    try:
+        from Functions.midia import raiz_dados
+        out.append(os.path.join(raiz_dados(), "Plugins VST3"))
+    except Exception:
+        pass
+    return [p for p in out if os.path.isdir(p)]
+
+
 def varrer(pastas=None):
     """Plugins de efeito de áudio instalados: [{caminho, nome, fabricante, sub, versao}]. Abre cada DLL (rápido: ~0,1 s
     a maioria); o que falhar entra com 'erro'."""
     out = []
-    for raiz in pastas or [pasta_vst3()]:
+    for raiz in pastas or pastas_vst3():
         for base, dirs, arqs in os.walk(raiz):
             achados = [d for d in dirs if d.lower().endswith(".vst3")] + [a for a in arqs if a.lower().endswith(".vst3")]
             dirs[:] = [d for d in dirs if not d.lower().endswith(".vst3")]   # não entra no pacote

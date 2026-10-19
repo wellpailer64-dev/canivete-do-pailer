@@ -316,7 +316,7 @@ function veMixSlot(sl, k, i) {
     Object.entries(VE_AFX).forEach(([t, d]) => { if (t !== 'antinoise' && t !== 'trk' && t !== 'vst3') cats[veMixCatDe(d)].push([t, d]); });
     // plugins VST3 instalados (editor-plugins.js): uma categoria a mais, no fim
     if (typeof VEPLG !== 'undefined' && VEPLG.lista == null) vePlgProcurar(false);
-    const plgs = typeof VEPLG !== 'undefined' && VEPLG.lista ? VEPLG.lista.map((p, j) => [p, j]).filter(([p]) => !p.erro) : [];
+    const plgs = typeof VEPLG !== 'undefined' && VEPLG.lista ? VEPLG.lista.map((p, j) => [p, j]).filter(([p]) => vePlgAtivo(p)) : [];
     cats.forEach(l => l.sort((a, b) => a[1].nome.localeCompare(b[1].nome)));
     const efPlg = ([p, j]) => `<div class="ve-mix-ef" data-plg="${j}" title="${veEsc(p.fabricante || '')}">♪ ${veEsc(p.nome)}<small class="ve-mix-tag">${veEsc(p.fabricante || 'VST3')}</small></div>`;
     const ef = ([t, d]) => `<div class="ve-mix-ef${d.pr && !d.som ? ' semsom' : ''}" data-t="${t}" title="${d.pr && !d.som ? veT('Não muda o som no Kanivete: vai e volta intacto para o Premiere') : d.tag || ''}">${d.nome}${d.pr && !d.som ? `<small class="ve-mix-tag">${veT('só Premiere')}</small>` : ''}</div>`;

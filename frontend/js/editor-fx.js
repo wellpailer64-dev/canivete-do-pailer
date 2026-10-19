@@ -763,7 +763,7 @@ function veFxValues(f, c, T) {
     d.params.forEach(p => {
         if (p.tipo === 'cor') v[p.k] = f.v && /^#[0-9a-f]{6}$/i.test(f.v[p.k]) ? f.v[p.k] : p.def;
         else v[p.k] = f.v && isFinite(f.v[p.k]) ? +f.v[p.k] : p.def;
-        if (c && c.k && p.tipo !== 'cor' && p.tipo !== 'bool') {
+        if (c && c.k && p.tipo !== 'cor' && p.tipo !== 'bool' && p.tipo !== 'lista') {
             const ks = c.k[`fx.${f.id}.${p.k}`];
             if (ks && ks.length) v[p.k] = veKfValue(ks, veSrcAt(c, T == null ? VE.playhead : T));
         }
@@ -940,7 +940,8 @@ function veFxAdd(i, t) {
     ok.forEach(x => {
         const v = {};
         VE_FX[t].params.forEach(p => { v[p.k] = p.def; });
-        x.fx = [...(x.fx || []), { id: veFxNewId(), t, on: true, v }];
+        // `junto`: o que mais vai no efeito (plugin OFX leva a descrição dele, para abrir o projeto em outro PC)
+        x.fx = [...(x.fx || []), { id: veFxNewId(), t, on: true, v, ...(VE_FX[t].junto ? VE_FX[t].junto() : {}) }];
     });
     if (lista.length === 1) VE.sel = i;
     vedShow(painel || 'props');
@@ -1071,16 +1072,20 @@ function veRenderFxControls() {
                     <button data-fa="reset" title="Restaurar valores">↺</button>
                     <button data-fa="del" title="Remover efeito">✕</button>
                 </div>
-                <div class="ve-fxe-body">${d.botao ? `<button class="ve-btn ve-btn-sm ve-fxe-open" data-fa="open">${veT(d.botao)}</button>` : ''}${d.painel ? `
+                <div class="ve-fxe-body">${d.nota ? `<div class="ve-fxe-nota">${veEsc(veT(d.nota))}</div>` : ''}${d.botao ? `<button class="ve-btn ve-btn-sm ve-fxe-open" data-fa="open">${veT(d.botao)}</button>` : ''}${d.painel ? `
                     <button class="ve-btn ve-btn-sm ve-fxe-open" data-fa="open">Editar no painel ${d.nome}</button>` : d.params.filter(p => !p.oculto).map(p => p.tipo === 'cor' ? `
                     <div class="ve-prop ve-prop-cor">
                         <label>${p.nome}</label>
                         <input type="color" data-fk="${p.k}">
                         ${p.gotas === false ? '' : '<button class="ve-btn ve-btn-sm" data-fa="gotas" title="Conta-gotas: clique na tela verde/azul no monitor">⌖ Conta-gotas</button>'}
                     </div>` : p.tipo === 'bool' ? `
-                    <label class="ve-prop-bool"><input type="checkbox" data-fk="${p.k}"> ${p.nome}</label>` : `
+                    <label class="ve-prop-bool"><input type="checkbox" data-fk="${p.k}"> ${p.nome}</label>` : p.tipo === 'lista' ? `
+                    <div class="ve-prop ve-prop-lista">
+                        <label title="${veEsc(p.dica || '')}">${p.nome}</label>
+                        <select data-fk="${p.k}">${p.opcoes.map((o, j) => `<option value="${j}">${veEsc(o)}</option>`).join('')}</select>
+                    </div>` : `
                     <div class="ve-prop">
-                        <label>${tipo === 'v' && typeof veMoSwHtml === 'function' ? veMoSwHtml(`fx.${f.id}.${p.k}`) : ''}${p.nome}</label>
+                        <label${p.dica ? ` title="${veEsc(p.dica)}"` : ''}>${tipo === 'v' && typeof veMoSwHtml === 'function' ? veMoSwHtml(`fx.${f.id}.${p.k}`) : ''}${p.nome}</label>
                         <input type="range" min="${p.min}" max="${p.max}" step="${p.step}" data-fk="${p.k}">
                         <span class="ve-prop-num"><input type="${p.vis ? 'text' : 'number'}" ${p.vis ? '' : `min="${p.min}" max="${p.max}" step="${p.step}"`} data-fk="${p.k}"><i>${p.un}</i></span>
                     </div>`).join('')}
@@ -1097,7 +1102,7 @@ function veRenderFxControls() {
         const v = veFxValues(f, c);
         d.params.forEach(p => el.querySelectorAll(`[data-fk="${p.k}"]`).forEach(inp => {
             if (p.tipo === 'bool') inp.checked = !!v[p.k];
-            else if (p.tipo === 'cor') { if (inp.ownerDocument.activeElement !== inp) inp.value = v[p.k]; }
+            else if (p.tipo === 'cor' || p.tipo === 'lista') { if (inp.ownerDocument.activeElement !== inp) inp.value = String(v[p.k]); }
             else if (inp.ownerDocument.activeElement !== inp) inp.value = veFxFmt(p, v[p.k]);
         }));
     });
@@ -1125,7 +1130,7 @@ function veFxSetParam(id, k, val) {
     else if (p.tipo === 'bool') val = val ? 1 : 0;
     else { if (!isFinite(val)) return; val = Math.min(Math.max(val, p.min), p.max); }
     // parâmetro animado (cronômetro ligado): vira/atualiza o quadro-chave na agulha (editor-motion.js)
-    if (p.tipo !== 'cor' && p.tipo !== 'bool' && veKfOn(c, `fx.${id}.${k}`)) veApplyProps(c, { [`fx.${id}.${k}`]: val });
+    if (p.tipo !== 'cor' && p.tipo !== 'bool' && p.tipo !== 'lista' && veKfOn(c, `fx.${id}.${k}`)) veApplyProps(c, { [`fx.${id}.${k}`]: val });
     else veFxEdit(id, x => { x.v[k] = val; return x; });
     veRenderFxControls();
     veDrawMonitorSoon();
@@ -1157,8 +1162,21 @@ function veRenderFxList() {
     Object.entries(VE_FX).forEach(([t, d]) => { if (!d.constante && !d.ovt) add(t, d, 'v'); });   // constantes e sobreposição: painel Animação
     Object.entries(VE_AFX).forEach(([t, d]) => add(t, d, 'a'));
     const html = Object.entries(cats).map(([cat, list]) => `<div class="ve-fx-cat">${cat}</div>` +
-        list.map(([t, d, tipo]) => `<div class="ve-fx-item" data-${tipo === 'a' ? 'aft' : 'fxt'}="${t}" title="Arraste até um clipe · duplo clique aplica no clipe selecionado"><i>${tipo === 'a' ? 'aud' : 'fx'}</i><span>${d.nome}</span><small>${d.tag}</small></div>`).join('')).join('');
+        list.map(([t, d, tipo]) => `<div class="ve-fx-item" data-${tipo === 'a' ? 'aft' : 'fxt'}="${t}" title="Arraste até um clipe · duplo clique aplica no clipe selecionado"><i>${tipo === 'a' ? 'aud' : 'fx'}</i><span>${d.nome}</span><small>${d.tag}</small></div>`).join('')).join('')
+        + (typeof veOfxItensHtml === 'function' ? veOfxItensHtml(q) : '');   // plugins de imagem OpenFX (editor-ofx.js)
     $ve('ve-fx-list').innerHTML = html || '<div class="ve-clips-empty">Nenhum efeito encontrado.</div>';
+}
+
+// Onde o ponteiro está, em qualquer janela do editor: {doc, x, y} (x/y em coordenadas daquela janela). Dentro da janela
+// do evento vale o próprio clientX/Y; fora dela, o ponto da tela procura a janela solta ou a principal (vedHitScreen)
+function veFxAlvoTela(ev, doc) {
+    const w = doc.defaultView;
+    if (ev.clientX >= 0 && ev.clientY >= 0 && ev.clientX <= w.innerWidth && ev.clientY <= w.innerHeight) return { doc, x: ev.clientX, y: ev.clientY };
+    if (typeof vedHitScreen !== 'function') return { doc, x: ev.clientX, y: ev.clientY };
+    const src = VED.hosts.find(h => vedHostDoc(h) === doc);
+    const r = vedHitScreen(ev.screenX, ev.screenY, src);
+    const d2 = r && vedHostDoc(r.h);
+    return d2 ? { doc: d2, x: r.x, y: r.y } : { doc, x: -1, y: -1 };
 }
 
 // Clipe da timeline sob o ponto (-1 se nenhum); doc = documento do ponto (timeline pode estar em janela solta)
@@ -1184,12 +1202,17 @@ function veFxInit() {
         if (it.dataset.aft) veAfxAdd(VE.sel, it.dataset.aft);
         else veFxAdd(VE.sel, it.dataset.fxt);
     });
-    // arrastar o efeito: solta num clipe da timeline ou no Controles de efeito (clipe selecionado)
+    // arrastar o efeito: solta num clipe da timeline ou no Controles de efeito (clipe selecionado). Painel e timeline
+    // podem estar em janelas diferentes (janela solta, 2º monitor): o ponteiro fica preso ao item (o soltar chega mesmo
+    // fora da janela) e o ponto da TELA diz em que janela e onde caiu (veFxAlvoTela). Plugin OFX (data-ofx) também.
     list.addEventListener('pointerdown', e => {
-        const it = e.target.closest('[data-fxt],[data-aft]');
-        if (!it || e.button !== 0) return;
+        const it = e.target.closest('[data-fxt],[data-aft],[data-ofx]');
+        if (!it || e.button !== 0 || e.target.closest('.ve-plg-arq')) return;
         const win = list.ownerDocument.defaultView, doc = list.ownerDocument;   // painel pode estar em janela solta
-        VEFX.drag = { t: it.dataset.aft || it.dataset.fxt, tipo: it.dataset.aft ? 'a' : 'v', x0: e.clientX, y0: e.clientY, on: false, ghost: null };
+        const ofx = it.dataset.ofx != null ? (VEOFX.lista || [])[+it.dataset.ofx] : null;
+        if (it.dataset.ofx != null && !ofx) return;
+        try { it.setPointerCapture(e.pointerId); } catch (e2) {}
+        VEFX.drag = { t: it.dataset.aft || it.dataset.fxt, tipo: ofx ? 'o' : it.dataset.aft ? 'a' : 'v', ofx, x0: e.clientX, y0: e.clientY, on: false, ghost: null };
         const move = ev => {
             const d = VEFX.drag;
             if (!d.on) {
@@ -1197,13 +1220,14 @@ function veFxInit() {
                 d.on = true;
                 d.ghost = doc.createElement('div');
                 d.ghost.className = 've-dghost';
-                d.ghost.textContent = (d.tipo === 'a' ? 'aud  ' : 'fx  ') + (d.tipo === 'a' ? VE_AFX[d.t].nome : VE_FX[d.t].nome);
+                d.ghost.textContent = d.tipo === 'o' ? 'ofx  ' + d.ofx.nome : (d.tipo === 'a' ? 'aud  ' : 'fx  ') + (d.tipo === 'a' ? VE_AFX[d.t].nome : VE_FX[d.t].nome);
                 doc.body.appendChild(d.ghost);
                 doc.body.classList.add('ve-fx-dragging');
             }
             d.ghost.style.left = ev.clientX + 12 + 'px';
             d.ghost.style.top = ev.clientY + 10 + 'px';
-            const i = veClipAtClient(ev.clientX, ev.clientY, doc);
+            const a = veFxAlvoTela(ev, doc);
+            const i = veClipAtClient(a.x, a.y, a.doc);
             $ve('ve-tl-wrap').classList.toggle('fx-drop', i >= 0);
             if (i !== VE.fxHover) { VE.fxHover = i; veDraw(); }
         };
@@ -1218,9 +1242,10 @@ function veFxInit() {
             if (!d || !d.on) return;
             d.ghost.remove();
             veDraw();
-            const i = veClipAtClient(ev.clientX, ev.clientY, doc);
-            const props = doc.elementFromPoint(ev.clientX, ev.clientY)?.closest('#ve-pane-props');
-            const aplica = idx => d.tipo === 'a' ? veAfxAdd(idx, d.t) : veFxAdd(idx, d.t);
+            const a = veFxAlvoTela(ev, doc);
+            const i = veClipAtClient(a.x, a.y, a.doc);
+            const props = a.doc.elementFromPoint(a.x, a.y)?.closest('#ve-pane-props');
+            const aplica = idx => d.tipo === 'o' ? veOfxAplicar(d.ofx, idx) : d.tipo === 'a' ? veAfxAdd(idx, d.t) : veFxAdd(idx, d.t);
             if (i >= 0) aplica(i);
             else if (props && VE.sel >= 0) aplica(VE.sel);
             else if (props) veToast('Selecione um clipe na timeline primeiro');

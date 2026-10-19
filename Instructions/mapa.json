@@ -40,6 +40,7 @@
     "editor-medidor.js",
     "editor-mixer.js",
     "editor-motion.js",
+    "editor-ofx.js",
     "editor-onda.js",
     "editor-ovt.js",
     "editor-peq.js",
@@ -155,6 +156,8 @@
     "ve_roto_estado",
     "ve_roto_base",
     "ve_vst3_lista",
+    "ve_ofx_lista",
+    "ve_ofx_params",
     "ve_vst3_abrir",
     "ve_vst3_painel",
     "ve_vst3_slot",
@@ -1949,6 +1952,18 @@
     "midia"
    ]
   },
+  "ve_ofx_lista": {
+   "args": "atualizar=False",
+   "modulos": [
+    "midia"
+   ]
+  },
+  "ve_ofx_params": {
+   "args": "caminho, pid",
+   "modulos": [
+    "midia"
+   ]
+  },
   "ve_vst3_abrir": {
    "args": "caminho, cid, nome=\"\"",
    "modulos": [
@@ -3331,6 +3346,7 @@
   "Functions/midia.py": "midia.py — utilidades compartilhadas de mídia (caminhos do app, ffmpeg/ffprobe, progresso)",
   "Functions/modelos_compartilhados.py": "Modelos compartilhados entre as instalações do app na mesma máquina (o .exe em dist/ e o app rodado pelo código)",
   "Functions/musicas.py": "musicas.py — Biblioteca de músicas do KANIVETE (fundo de vinhetas, AutoFrame, edição)",
+  "Functions/ofx.py": "import ctypes as C",
   "Functions/omnivoice_runner.py": "Runner isolado para operacoes pesadas do OmniVoice",
   "Functions/omnivoice_tool.py": "Ferramenta OmniVoice: geração e sintese de voz sob demanda",
   "Functions/organizador_de_imagens.py": "limparduplicadas.py",

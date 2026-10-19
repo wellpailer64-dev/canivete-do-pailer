@@ -133,7 +133,10 @@ biquads iguais na prévia e no ffmpeg — `frontend/js/editor-peq.js`, `Instruct
 **Plugins** (2026-10-18): VST3 por carregador PRÓPRIO (`Functions/vst3.py`, ctypes, sem GPL), sempre em processo à parte
 (`--vst3 varrer|janela|encaixar|servir|processar`); Janela › Plugins › abre o plugin num PAINEL encaixável; Rack de efeitos da
 trilha (Mixer) › Plugins VST3: um processo por espaço, prévia por HTTP local à frente da agulha, exportação `_pre_vst`. Plano (packs Mister Horse/Motion
-Bro, formato próprio, OFX) e pendências: `Instructions/agente/plugins.md`.
+Bro, formato próprio, OFX) e pendências: `Instructions/agente/plugins.md`. Arquivar plugin (⌫, some do menu/Rack).
+**Plugins de imagem OpenFX** (2026-10-19): hospedeiro próprio `Functions/ofx.py` (`--ofx varrer|descrever|render`), bloco
+"Plugins OFX" no painel Efeitos (`frontend/js/editor-ofx.js`); etapas 1–2 feitas (listar/arquivar; aplicar com os ajustes
+nos Controles de efeito, tipo `ofx:<id>`); prévia e exportação = etapas 3–4. VST3 também em `<raiz_dados>/Plugins VST3`.
 
 **Legendas em 3 modos** (2026-10-18, painel Texto › Legendas): Clássica, Dinâmica (destaque da palavra falada) e
 **Premium** — blocos curtos montados como título com duas fontes (dupla), papéis por palavra (ligação/base/destaque),

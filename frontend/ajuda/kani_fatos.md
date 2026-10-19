@@ -35,6 +35,16 @@ janela de cada um num painel (encaixar, soltar, maximizar). Para o som da trilha
 de áudio › fx (rack) › clique num espaço vazio › Plugins VST3 › escolha o plugin; clicar no espaço abre a janela dele.
 O ajuste fica salvo no projeto e vale na prévia e na exportação. Plugins só da Adobe (.aex) e painéis do Premiere não
 funcionam fora da Adobe. O Goyo (Beta) parou de funcionar em 2023 (a Supertone desligou o servidor).
+Arquivar plugin: no menu Janela › Plugins, passe o mouse no plugin e clique em ⌫ — ele some do menu e do Mixer (não é
+desinstalado); "Arquivados", no fim da lista, traz de volta.
+Plugins de imagem OpenFX (OFX, o padrão do DaVinci Resolve e do Vegas): o painel Efeitos do Vídeo Kanivete mostra, no
+fim, o bloco "Plugins OFX" com os efeitos instalados no PC (pasta C:\Program Files\Common Files\OFX\Plugins ou a pasta
+Kanivete\Plugins OFX no disco do app), em grupos; ⌫ arquiva um efeito ou o grupo todo, ↻ procura de novo. Duplo clique
+ou arrastar até um clipe aplica o plugin, com os ajustes dele nos Controles de efeito (com cronômetro nos números).
+AINDA NÃO muda a imagem: a prévia e a exportação dos plugins OFX estão em construção (próximas etapas).
+Plugins VST3 sem instalador podem ficar na pasta Kanivete\Plugins VST3 (no disco do app). Para tirar ruído de voz (no
+lugar do Goyo), use o efeito de áudio Anti Noise do próprio app: ganhou do plugin grátis RNNoise no teste.
+Plugins pagos feitos só para um editor (ex.: Neat Video "para o Resolve") não aparecem no KANIVETE.
 Pincel Roto (Efeitos › Chaveamento, ou duplo clique no clipe com o efeito): abre numa janela por cima do editor. Pinte o
 que fica (Alt tira) ou clique em "✨ Selecionar assunto" para o app achar a pessoa sozinho; o quadro pintado vira
 quadro-base. O recorte dos outros quadros só é montado quando você clica em "❄ Freeze" (ou tecla F); marque "Seguir

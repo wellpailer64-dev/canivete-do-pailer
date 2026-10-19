@@ -66,8 +66,94 @@ Limiter" do Premiere, que vira o do Kanivete) não era aplicado em lugar nenhum:
 EQ 170/221%, reverb 38/45%, limitador 47/48%, Premiere Bass 780/705, Highpass 100/100, Delay 106/106, Hard Limiter
 81/81; fader −12 dB 75/75, pan −100 50/50. Teste: `D:/kanivete_testes/scripts/mixer_rack.py '<fx json>'`, `mixer_fader.py`.
 
+## Arquivar plugin (2026-10-19)
+Menu Janela › Plugins: ⌫ no item (ao passar o mouse) arquiva — some do menu e do Rack; "Arquivados" no fim restaura.
+localStorage `ve-plg-arquivados` (caminho|cid). `VEPLG_API.arquivar(nome, sim)`, `.arquivados()`. No PC do Pailer só o
+Goyo ficou ativo (Guitar Rig, STL Ignite e os jhudstudio arquivados: instrumentos/guitarra).
+
+## PRÓXIMO: plugins de imagem — OpenFX (OFX) — plano
+**O que é**: padrão aberto (BSD, openeffects.org) que Resolve, Vegas, Nuke, Natron, Flame e HitFilm aceitam. Arquivo
+`<nome>.ofx.bundle/Contents/Win64/<nome>.ofx` (DLL) em `C:\Program Files\Common Files\OFX\Plugins`; exporta
+`OfxGetNumberOfPlugins`/`OfxGetPlugin`. API em C pura (sem COM): mais simples de carregar por ctypes que o VST3.
+O host (nós) entrega "suítes": Property, ImageEffect, Parameter, Memory, MultiThread, Message (+ Interact = desenho na
+tela, OpenGL/CUDA = opcionais). Plugins de Premiere/After (.aex/.prm) continuam fora.
+**Arquitetura (igual ao VST3)**: `Functions/ofx.py` (ctypes), sempre num processo à parte (`--ofx varrer|servir|processar`):
+plugin que trava não derruba o app.
+- Etapa 0 (teste barato, ANTES de construir): baixar plugins de teste para `D:/kanivete_testes/ofx` — exemplos do SDK
+  oficial (BSD) e openfx-misc/openfx-io do Natron (GPL: só para TESTE, não vai no app) — e medir: carregar, descrever
+  (nome, parâmetros, contextos "filter"/"general"/"transition"), renderizar 1 quadro RGBA de um numpy. Só segue se passar.
+- Etapa 1: varrer + menu (efeitos OFX numa categoria dos Efeitos de vídeo, com Arquivar como no VST3).
+- Etapa 2: parâmetros do plugin viram parâmetros do Kanivete nos Controles de efeito (double/int/bool/choice/cor/2D),
+  com cronômetro (quadros-chave) — o OFX pede o valor por tempo, então animar sai quase de graça.
+- Etapa 3: prévia — o quadro do monitor vai por memória compartilhada ao processo do plugin (RGBA float 16/32), volta
+  pronto; cache por (clipe, quadro, parâmetros) como as camadas desenhadas; renderizar à frente no play.
+- Etapa 4: exportação — o clipe com OFX vira "camada desenhada" (ProRes 4444, como Motion/Roto); placa: híbrido.
+- Etapa 5: transições OFX (contexto "transition") e geradores; ida e volta com Premiere = só o nome no relatório.
+**Riscos a medir na etapa 0**: (1) plugins pagos checam o host (kOfxPropName/versão) e a licença por família de host —
+Sapphire, BCC e Neat Video podem recusar um host desconhecido; testar com a versão demo de cada um antes de prometer;
+(2) muitos exigem OpenGL/CUDA para render rápido (CPU é obrigatório no padrão, mas lento); (3) Interact (alças na tela)
+fica para depois.
+**Etapa 0 — FEITA (2026-10-19), passou.** Hospedeiro de teste em ctypes: `D:/kanivete_testes/ofx/host_teste.py`
+(`listar <x.ofx>` / `render <x.ofx> <id> entrada.png saida.png [param=v,v]`; plugins do Natron 2.5.0 em
+`D:/kanivete_testes/ofx/dl`, DLLs do MinGW pela variável `OFX_DLLS=<Natron>/bin`). Misc.ofx (133 efeitos) e CImg.ofx
+(34) carregam, descrevem (parâmetros e padrões), criam a instância e renderizam 1280×720 RGBA float: Invert 16 ms,
+Grade 34, Blur 84, Bloom 229, GodRays 1,46 s (folha `folha.jpg`). Suítes obrigatórias: Property, ImageEffect, Parameter,
+Memory, MultiThread, Message (Interact/Progress/OpenGL e as da Nuke/Vegas são pedidas mas opcionais).
+Armadilhas medidas: (1) nem toda constante é "kOfxX" = "OfxX": kOfxImageEffectPropSupportsMultipleClipDepths =
+"OfxImageEffectPropMultipleClipDepths" e kOfxImagePreMultiplied = "OfxImageAlphaPremultiplied" (errado = render 1
+sem aviso); (2) getDimension de propriedade que não existe tem de dar 0/OK (o plugin pergunta antes de acrescentar
+contextos), senão o Describe volta 4 (falta recurso do hospedeiro); (3) "..." dos parâmetros no Windows x64 = 8 bytes
+cada, double em bits (paramSetValue lido como u64); (4) OFX conta linhas de BAIXO para cima (inverter o numpy).
+Falta medir: plugin PAGO checando o hospedeiro (demo do Neat Video/Sapphire) e contexto de transição.
+**Neat Video demo (2026-10-19)**: instalador oficial (assinado NeatLab) extraído sem instalar com innoextract em
+`D:/kanivete_testes/ofx/neatvideo/ext`. A edição "RS" (Resolve) devolve **0 efeitos** em OfxGetNumberOfPlugins, antes
+mesmo do setHost: confere o nome do PROCESSO (strings DaVinciResolve/DaVinciResolveLite/FusionStudio + GetModuleFileName).
+Edição por hospedeiro = trava de licença; NÃO fingir ser outro programa. Para plugins pagos: pedir ao fabricante uma
+edição/licença para o KANIVETE, ou só os que vendem uma edição OFX genérica. O varrer mostra "nenhum efeito: o plugin
+não aceita este programa".
+**Etapa 1 — FEITA (2026-10-19).** `Functions/ofx.py` (o hospedeiro da etapa 0, agora no app) + `main.py --ofx
+varrer|descrever|render` e API `ve_ofx_lista(atualizar)`; cada .ofx descrito num processo dele; lista guardada por arquivo
+(caminho|data|tamanho) em `pasta_cache("ofx")/lista.json`: 1ª vez 10,6 s com os 4 pacotes do Natron, depois 0,4 s.
+Pastas: Common Files\OFX\Plugins, OFX_PLUGIN_PATH e `<raiz_dados>/Plugins OFX` (no PC do Pailer:
+`D:\Kanivete\Plugins OFX\Natron (teste, GPL)` = Misc, CImg, GMIC (360 efeitos), Arena, com as DLLs do MinGW copiadas
+para dentro de cada Win64 — 532 efeitos). Tela: `frontend/js/editor-ofx.js` — bloco "Plugins OFX" recolhido no fim do
+painel Efeitos (editor-fx.js `veRenderFxList` chama `veOfxItensHtml(q)`), grupos pelo grouping, ⌫ por efeito e por
+grupo (localStorage `ve-ofx-arquivados`), "Arquivados" restaura, ↻ procura de novo; duplo clique = aviso (aplicar é a
+etapa 2). Só aparecem os de contexto filtro/geral/transição/gerador, sem os de estéreo. API `VEOFX_API.lista/arquivar/
+visiveis`. Teste: `py -3.13 D:/kanivete_testes/scripts/teste_ofx_painel.py` (app em --agente=9333, mouse de verdade).
+**Etapa 2 — FEITA (2026-10-19).** `--ofx params <x.ofx> <id>` / API `ve_ofx_params(caminho, id)` (`ofx.parametros`: rótulo,
+dica, padrão, min/max, faixa de exibição, opções, passo, tipo de double) → `veOfxDef(o)` em editor-ofx.js monta o tipo
+`VE_FX['ofx:<id>']`: Double/Integer = número com cronômetro; Boolean = caixinha; Choice = lista (tipo novo `lista` no
+editor-fx.js, sem cronômetro); 2D/3D = um controle por eixo (`o_<nome>_0/_1`); RGB(A) dentro de 0..1 = cor; fora (ganho,
+gama) = um controle para os 3 canais (`ofx.rgb`). Escondidos: maskInvert, interactive, hidpi… (VEOFX_ESCONDE). A
+descrição vai no efeito (`f.o`, via `junto` no veFxAdd) e `veOfxRegistrarClipes` remonta ao abrir/desfazer/refresh.
+Até a etapa 3–4 o tipo é `neutro: () => true` (não muda a imagem e fica fora do veFxExport) e mostra uma nota.
+Duplo clique ou ARRASTAR do bloco aplica (vale para a seleção, como os outros efeitos). Teste:
+`D:/kanivete_testes/scripts/teste_ofx_clipe.py` (porta 9333).
+**Arrastar efeito de janela solta (corrigido 2026-10-19)**: com o painel Efeitos numa janela solta (2º monitor), soltar
+num clipe da timeline principal não fazia nada (o movimento morria ao sair da janela e o ponto era lido na janela do
+painel). Agora `setPointerCapture` no item + `veFxAlvoTela` (ponto da tela → janela certa por `vedHitScreen`). Testes:
+`teste_fx_arraste.py` (mesma janela, 2 selecionados com Shift) e `teste_fx_arraste_solta.py` (reprova com o código antigo).
+Lembrete: a troca ao vivo (aplicar.py) não religa ouvintes do veFxInit — precisa reabrir o app.
+**Próximo (etapa 3, prévia)**: processo `--ofx servir` por efeito (como o VST3), quadro do monitor em RGBA 8/16 bits por
+memória compartilhada ou HTTP local, cache por (clipe, quadro, valores); `draw` devolve o quadro pronto ou o original
+enquanto calcula. XYAbsolute com padrão normalizado (OfxParamPropDefaultCoordinateSystem) × tamanho na hora do render.
+**Plugins que valem a pena para o Pailer** (para testar com demo): Neat Video (ruído), Sapphire (brilhos, flares,
+transições), BCC/Continuum, FilmConvert Nitrate (película/cor), Dehancer, Universe (Red Giant, só em alguns hosts).
+
+## Substituto do Goyo (2026-10-19)
+O Goyo (Supertone) não funciona mais (servidor desligado em 2023). Comparação em voz da Fran + ruído rosa e grave
+(`D:/kanivete_testes/vst/goyo_sub/comparar.py`, SI-SDR contra a voz limpa, maior = melhor): ruidosa 6,8 dB;
+**RNNoise** (werman, VST3 grátis, GPL) 12,4 dB; **Anti Noise do Kanivete (DeepFilterNet3)** 19,9 dB. O substituto é o
+Anti Noise (efeito de áudio do clipe) + Redução de reverberação, que já vêm no app. O RNNoise ficou em
+`D:\Kanivete\Plugins VST3` (pasta nova do varrer: `vst3.pastas_vst3()`, sem administrador, fora do C) como opção leve
+em tempo real. Vocal Gate (dan-k-k, GPL, VST3) baixado em `D:/kanivete_testes/vst/novos`: o instalador Inno é mais novo que o
+innoextract 1.9 — só instalando.
+
 ## Pendências
 - Automação de parâmetro do plugin (quadros-chave), plugin no Master e nos efeitos do CLIPE.
 - Latência da prévia ao mexer no plugin tocando: ~0,35 s + fila de 0,3 s (os DAWs ficam em ~10 ms).
 - Instrumentos/MIDI (só efeitos de áudio hoje).
-- Formato de plugin próprio; importador de packs; OFX.
+- Formato de plugin próprio; importador de packs.
+- OFX etapas 2–5 (parâmetros nos Controles de efeito, prévia, exportação, transições); teste com plugin pago de edição
+  OFX genérica (Sapphire/BCC: conferir se checam o hospedeiro pelo OfxPropName).

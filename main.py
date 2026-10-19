@@ -4339,6 +4339,45 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e), "plugins": []}
 
+    # Plugins de imagem OpenFX (Functions/ofx.py): procurar num processo à parte (cada .ofx num processo dele)
+    def ve_ofx_lista(self, atualizar=False):
+        import json
+        import subprocess
+        from Functions.midia import NO_WINDOW
+        if not atualizar and getattr(self, "_ofx_cache", None) is not None:
+            return {"success": True, "plugins": self._ofx_cache}
+        try:
+            r = subprocess.run(self._vst3_base() + ["--ofx", "varrer"] + (["--atualizar"] if atualizar else []),
+                               capture_output=True, text=True, encoding="utf-8",
+                               errors="replace", timeout=600, creationflags=NO_WINDOW)
+            txt = (r.stdout or "").strip()
+            lista = json.loads(txt[txt.find("["):]) if "[" in txt else []
+            self._ofx_cache = lista
+            return {"success": True, "plugins": lista}
+        except Exception as e:
+            return {"success": False, "error": str(e), "plugins": []}
+
+    def ve_ofx_params(self, caminho, pid):
+        """os ajustes de um efeito OFX (Functions/ofx.py parametros), num processo à parte; guardados por efeito"""
+        import json
+        import subprocess
+        from Functions.midia import NO_WINDOW
+        cache = self.__dict__.setdefault("_ofx_params", {})
+        if (caminho, pid) in cache:
+            return {"success": True, **cache[(caminho, pid)]}
+        try:
+            r = subprocess.run(self._vst3_base() + ["--ofx", "params", caminho, pid], capture_output=True, text=True,
+                               encoding="utf-8", errors="replace", timeout=90, creationflags=NO_WINDOW)
+            txt = r.stdout or ""
+            k = txt.rfind("@@OFX ")
+            d = json.loads(txt[k + 6:]) if k >= 0 else {"erro": f"o plugin fechou (código {r.returncode})"}
+            if d.get("erro"):
+                return {"success": False, "error": d["erro"]}
+            cache[(caminho, pid)] = d
+            return {"success": True, **d}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     def ve_vst3_abrir(self, caminho, cid, nome=""):
         import subprocess
         from Functions.midia import NO_WINDOW
@@ -6143,4 +6182,8 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--vst3":
         from Functions import vst3
         sys.exit(vst3.main_cli(sys.argv[2:]))
+    # plugins de imagem OpenFX num processo à parte (Functions/ofx.py)
+    if len(sys.argv) > 1 and sys.argv[1] == "--ofx":
+        from Functions import ofx
+        sys.exit(ofx.main_cli(sys.argv[2:]))
     main()

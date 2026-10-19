@@ -1168,6 +1168,26 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-plg-wrap.on > .ve-plg-sub { background: var(--ve-panel-2); }
 .ve-menu.ve-plg-fly { position: fixed; z-index: 1002; min-width: 250px; max-height: min(70vh, 520px); }
 .ve-menu.ve-plg-fly[hidden] { display: none; }
+.ve-plg-fly button { position: relative; }
+.ve-plg-arq { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); padding: 0 5px; border-radius: 3px; color: var(--ve-faint); opacity: 0; cursor: pointer; }
+.ve-plg-fly button:hover .ve-plg-arq { opacity: 1; }
+.ve-plg-arq:hover { color: var(--ve-text, #eee); background: var(--ve-panel-2); }
+.ve-plg-erro { opacity: .55; cursor: default; }
+/* plugins OFX no painel Efeitos (editor-ofx.js) */
+.ve-ofx-cab { cursor: pointer; display: flex; align-items: center; gap: 5px; user-select: none; }
+.ve-ofx-cab b, .ve-ofx-sub b { font-weight: 400; color: var(--ve-faint); }
+.ve-ofx-cab small, .ve-ofx-sub small { color: var(--ve-faint); font-weight: 400; }
+.ve-ofx-proc { margin-left: auto; color: var(--ve-faint); padding: 0 4px; border-radius: 3px; cursor: pointer; }
+.ve-ofx-proc:hover { color: var(--ve-text, #eee); background: var(--ve-panel-2); }
+.ve-ofx-sub { position: relative; padding-left: 14px; opacity: .85; }
+.ve-ofx-sub[data-ofx-verarq] { cursor: pointer; }
+.ve-ofx-item { position: relative; }
+.ve-fxe-nota { font-size: 11px; color: var(--ve-faint); line-height: 1.35; margin: 2px 0 6px; }
+.ve-prop-lista { display: flex; align-items: center; gap: 8px; }
+.ve-prop-lista select { flex: 1; min-width: 0; background: var(--ve-panel-2); color: inherit; border: 1px solid var(--ve-line-2); border-radius: 3px; padding: 2px 4px; font: inherit; font-size: 12px; }
+.ve-ofx-item i { background: #6b5bd6 !important; color: #fff !important; }
+.ve-ofx-item:hover .ve-plg-arq, .ve-ofx-sub:hover .ve-plg-arq { opacity: 1; }
+.ve-plg-arquivado { opacity: .6; }
 .ve-menu-row > button:first-child { flex: 1; min-width: 0; }
 .ve-menu .ve-menu-del { width: auto; flex: 0 0 auto; padding: 4px 8px; color: var(--ve-faint); }
 .ve-menu .ve-menu-del:hover { color: var(--ve-text); }
