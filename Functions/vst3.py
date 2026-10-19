@@ -719,7 +719,22 @@ class _WNDCLASS(Structure):
 _CLASSE = {"ok": False}
 
 
+_PAINEIS = {}   # hwnd do painel encaixado → _Painel (comandos do app chegam como WM_APP)
+_MODO = {}      # "servir": processo de um espaço do Rack (o painel pode sumir sem fechar o processo)
+
+
 def _wndproc(hwnd, msg, wp, lp):
+    if msg == 0x0002 and _MODO.get("servir"):   # WM_DESTROY servindo: só o PAINEL some (o som continua)
+        obj = _PAINEIS.pop(hwnd, None)
+        if obj is not None and getattr(obj, "dono", None):
+            obj.dono.painel_sumiu()
+        return 0
+    if msg == 0x8001 and hwnd in _PAINEIS:   # WM_APP+1: comando do app (fila do painel)
+        _PAINEIS[hwnd].comandos()
+        return 0
+    if msg == 0x0113 and hwnd in _PAINEIS and hasattr(_PAINEIS[hwnd], "relogio"):   # WM_TIMER
+        _PAINEIS[hwnd].relogio()
+        return 0
     if msg == 0x0010:   # WM_CLOSE
         _u32.DestroyWindow(hwnd)
         return 0
@@ -761,6 +776,371 @@ class _Janela:
             _u32.DispatchMessageW(byref(msg))
 
 
+class _Painel:
+    """Plugin ENCAIXADO num painel do editor: subjanela (WS_CHILD) da janela do KANIVETE — de outro processo — posta
+    sobre a área do painel (a página manda o retângulo). O plugin fica centrado num fundo escuro; se ele aceita mudar de
+    tamanho (canResize), ocupa o painel. Comandos (uma linha JSON por vez no stdin): {"r": [x, y, w, h]} (px reais no
+    cliente da janela-mãe), {"v": 0|1}, {"p": hwnd, "r": [...]} (mudou de janela: painel solto), {"q": 1}."""
+    ESTILO = 0x40000000 | 0x04000000 | 0x02000000   # WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN
+
+    @staticmethod
+    def _registrar_classe():
+        if not _CLASSE.get("painel"):
+            wc = _WNDCLASS()
+            wc.lpfnWndProc = _WNDPROC_REF
+            wc.hInstance = _k32.GetModuleHandleW(None)
+            wc.hCursor = _u32.LoadCursorW(None, 32512)
+            wc.hbrBackground = ctypes.windll.gdi32.CreateSolidBrush(0x00141414)
+            wc.lpszClassName = "KanivetePluginPainel"
+            _u32.RegisterClassW(byref(wc))
+            _CLASSE["painel"] = True
+
+    def __init__(self, pai, rect):
+        import queue as _q
+        _Painel._registrar_classe()
+        x, y, w, h = [int(v) for v in rect]
+        self.pai = pai
+        self.hwnd = _u32.CreateWindowExW(0, "KanivetePluginPainel", "KANIVETE plugin", self.ESTILO, x, y, max(1, w), max(1, h),
+                                         pai, None, _k32.GetModuleHandleW(None), None)
+        if not self.hwnd:
+            raise RuntimeError("não criou a subjanela do painel")
+        # o plugin numa subjanela própria (centrada) — o fundo do painel fica em volta
+        self.palco = _u32.CreateWindowExW(0, "KanivetePluginPainel", "", 0x40000000 | 0x10000000 | 0x02000000, 0, 0, 10, 10,
+                                          self.hwnd, None, _k32.GetModuleHandleW(None), None)
+        self.fila = _q.Queue()
+        self.view = None
+        self.vw = self.vh = 0
+        self.w, self.h = max(1, w), max(1, h)
+        _PAINEIS[self.hwnd] = self
+        self._topo()
+
+    def _topo(self):
+        # acima da página (o WebView2 também é filho da mesma janela) e sem roubar o foco
+        _u32.SetWindowPos(self.hwnd, 0, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010)
+
+    def ligar(self, view):
+        self.view = view
+        r = ViewRect()
+        _chamar(view, 9, c_int32, [POINTER(ViewRect)], byref(r))
+        self.vw, self.vh = max(1, r.right - r.left), max(1, r.bottom - r.top)
+        self.cresce = _chamar(view, 13, c_int32, []) == K_OK
+        self.arrumar()
+
+    def redimensionar(self, w, h):   # o plugin pediu (IPlugFrame)
+        self.vw, self.vh = max(1, w), max(1, h)
+        self.arrumar(do_plugin=True)
+
+    def arrumar(self, do_plugin=False):
+        if self.view and self.cresce and not do_plugin:
+            r = ViewRect(0, 0, self.w, self.h)
+            _chamar(self.view, 14, c_int32, [POINTER(ViewRect)], byref(r))   # checkSizeConstraint
+            self.vw, self.vh = r.right - r.left, r.bottom - r.top
+            _chamar(self.view, 10, c_int32, [POINTER(ViewRect)], byref(r))   # onSize
+        x, y = max(0, (self.w - self.vw) // 2), max(0, (self.h - self.vh) // 2)
+        _u32.SetWindowPos(self.palco, 0, x, y, self.vw, self.vh, 0x0004 | 0x0010)
+
+    def comandos(self):
+        while not self.fila.empty():
+            c = self.fila.get()
+            if c.get("q"):
+                _u32.DestroyWindow(self.hwnd)
+                return
+            if c.get("p"):
+                pai = int(c["p"])
+                if pai != self.pai:
+                    _u32.SetParent(self.hwnd, pai)
+                    self.pai = pai
+            if c.get("r"):
+                x, y, w, h = [int(v) for v in c["r"]]
+                self.w, self.h = max(1, w), max(1, h)
+                _u32.SetWindowPos(self.hwnd, 0, x, y, self.w, self.h, 0x0010)
+                self._topo()
+                self.arrumar()
+            if "v" in c:
+                _u32.ShowWindow(self.hwnd, 5 if c["v"] else 0)
+                if c["v"]:
+                    self._topo()
+
+
+def encaixar(caminho, cid, pai, rect):
+    """Processo do painel: carrega o plugin, põe a janela dele na subjanela e atende os comandos do stdin."""
+    import json
+    import sys
+    pl = Plugin(caminho, cid).carregar(48000, modo=K_REALTIME)
+    if not pl.ctrl:
+        raise RuntimeError("o plugin não tem janela")
+    painel = _Painel(pai, rect)
+    view = _chamar(pl.ctrl, 17, c_void_p, [c_char_p], b"editor")
+    if not view or _chamar(view, 3, c_int32, [c_char_p], b"HWND") != K_OK:
+        raise RuntimeError("o plugin não tem janela de Windows")
+    pl.janela = painel
+    pl.moldura = _Moldura(pl)
+    _chamar(view, 12, c_int32, [c_void_p], pl.moldura.ptr)
+    _chamar(view, 4, c_int32, [c_void_p, c_char_p], painel.palco, b"HWND")
+    painel.ligar(view)
+    _u32.ShowWindow(painel.hwnd, 5)
+    sys.stdout.write(json.dumps({"ok": 1, "tam": [painel.vw, painel.vh], "nome": pl.nome}) + "\n")
+    sys.stdout.flush()
+
+    def ler():   # linha de leitura: cada comando vai para a fila e acorda a janela
+        for linha in sys.stdin:
+            try:
+                painel.fila.put(json.loads(linha))
+                _u32.PostMessageW(painel.hwnd, 0x8001, 0, 0)
+            except Exception:
+                pass
+        painel.fila.put({"q": 1})   # o app fechou o tubo: fecha
+        _u32.PostMessageW(painel.hwnd, 0x8001, 0, 0)
+    threading.Thread(target=ler, daemon=True).start()
+    msg = wintypes.MSG()
+    while _u32.GetMessageW(byref(msg), None, 0, 0) > 0:
+        _u32.TranslateMessage(byref(msg))
+        _u32.DispatchMessageW(byref(msg))
+    _chamar(view, 12, c_int32, [c_void_p], None)
+    _chamar(view, 5, c_int32, [])
+    _release(view)
+    pl.fechar()
+
+
+class _Servidor:
+    """Plugin de um espaço do Rack de efeitos da trilha: UM processo por plugin (como o Bitwig): o som da prévia chega
+    por HTTP local (127.0.0.1, senha) e volta processado; a janela do plugin abre num painel do editor quando pedida;
+    mexer no plugin manda o ajuste novo ao app (vai para o projeto). Como os DAWs: processar numa linha, janela e
+    controlador na linha principal (a que carregou o plugin).
+
+    Som: POST /p?a=<quadro de saída do 1º>&reset=0|1 — corpo float32 [L…, R…] (n quadros cada). A resposta é o
+    som processado SEM compensar o atraso do plugin (é contínuo, bloco a bloco); o cabeçalho X-Inicio = a − atraso diz
+    a que quadro de saída ele corresponde. reset=1 (busca, edição): o plugin limpa a cauda (desativa/ativa).
+    stdin (JSON por linha): {"painel": {"janela": hwnd, "r": [x, y, w, h], "v": 0|1}}, {"estado": 1} (manda o ajuste),
+    {"restaurar": base64}, {"q": 1}. stdout: {"ok", "porta", "token", "atraso"} e depois {"estado": base64}."""
+
+    def __init__(self, caminho, cid, estado_b64=""):
+        import base64
+        import queue as _q
+        import secrets
+        _MODO["servir"] = True
+        self.pl = Plugin(caminho, cid).carregar(48000, modo=K_REALTIME)
+        if estado_b64:
+            self.pl.restaurar(base64.b64decode(estado_b64))
+        self.trava = threading.Lock()
+        self.token = secrets.token_hex(12)
+        self.fila = _q.Queue()
+        self.painel = self.view = None
+        # janelinha invisível que recebe os comandos e o relógio (mesma linha do plugin)
+        _Painel._registrar_classe()
+        self.hwnd = _u32.CreateWindowExW(0, "KanivetePluginPainel", "KANIVETE plugin (controle)", 0, 0, 0, 1, 1, None, None,
+                                         _k32.GetModuleHandleW(None), None)
+        _PAINEIS[self.hwnd] = self
+        _u32.SetTimer(self.hwnd, 1, 400, None)
+        self.pl.mexeu = False
+
+    # ── som (linha do servidor HTTP) ──
+    def processar(self, dados, reset):
+        n = len(dados) // 8
+        audio = np.frombuffer(dados, np.float32).reshape(2, n)
+        with self.trava:
+            if reset:
+                _chamar(self.pl.proc, 8, c_int32, [ctypes.c_ubyte], 0)
+                _chamar(self.pl.comp, 11, c_int32, [ctypes.c_ubyte], 0)
+                _chamar(self.pl.comp, 11, c_int32, [ctypes.c_ubyte], 1)
+                _chamar(self.pl.proc, 8, c_int32, [ctypes.c_ubyte], 1)
+            saida = self.pl.processar(audio, compensar=False)
+            atraso = int(_chamar(self.pl.proc, 6, c_uint32, []))
+        return np.ascontiguousarray(saida, np.float32).tobytes(), atraso
+
+    def servir_http(self):
+        import http.server
+        import urllib.parse
+        dono = self
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def _cors(self):
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Expose-Headers", "X-Inicio, X-Atraso")
+
+            def do_OPTIONS(self):
+                self.send_response(204)
+                self._cors()
+                self.send_header("Access-Control-Allow-Methods", "POST")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                self.end_headers()
+
+            def do_POST(self):
+                q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                if q.get("k", [""])[0] != dono.token:
+                    self.send_response(403)
+                    self.end_headers()
+                    return
+                corpo = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+                try:
+                    out, atraso = dono.processar(corpo, q.get("reset", ["0"])[0] == "1")
+                    a = int(q.get("a", ["0"])[0])
+                except Exception as e:
+                    self.send_response(500)
+                    self._cors()
+                    self.end_headers()
+                    self.wfile.write(str(e).encode("utf-8", "replace"))
+                    return
+                self.send_response(200)
+                self._cors()
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("X-Inicio", str(a - atraso))
+                self.send_header("X-Atraso", str(atraso))
+                self.send_header("Content-Length", str(len(out)))
+                self.end_headers()
+                self.wfile.write(out)
+
+        srv = http.server.HTTPServer(("127.0.0.1", 0), H)   # uma conexão por vez: o plugin é um só
+        self.porta = srv.server_address[1]
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+    # ── comandos e relógio (linha principal) ──
+    def _avisar(self, d):
+        import json
+        import sys
+        sys.stdout.write(json.dumps(d) + "\n")
+        sys.stdout.flush()
+
+    def _estado(self):
+        import base64
+        with self.trava:
+            return base64.b64encode(self.pl.estado()).decode("ascii")
+
+    def relogio(self):
+        if self.pl.mexeu:   # mexeram no plugin (janela): o ajuste novo vai para o projeto
+            self.pl.mexeu = False
+            self._avisar({"estado": self._estado()})
+
+    def comandos(self):
+        import base64
+        while not self.fila.empty():
+            c = self.fila.get()
+            if c.get("q"):
+                _MODO.pop("servir", None)
+                _u32.PostQuitMessage(0)
+                return
+            if c.get("fechar_painel") and self.painel:
+                h = self.painel.hwnd
+                self.painel_sumiu()
+                _u32.DestroyWindow(h)
+            if c.get("estado"):
+                self._avisar({"estado": self._estado()})
+            if c.get("restaurar"):
+                with self.trava:
+                    self.pl.restaurar(base64.b64decode(c["restaurar"]))
+            p = c.get("painel")
+            if p:
+                self._painel(p)
+
+    def _painel(self, p):
+        pai, r, vis = int(p.get("janela") or 0), p.get("r") or [0, 0, 10, 10], p.get("v", 1)
+        if self.painel is None:
+            if not vis or not pai or not self.pl.ctrl:
+                return
+            self.painel = _Painel(pai, r)
+            self.painel.dono = self
+            view = _chamar(self.pl.ctrl, 17, c_void_p, [c_char_p], b"editor")
+            if not view or _chamar(view, 3, c_int32, [c_char_p], b"HWND") != K_OK:
+                self._avisar({"erro": "o plugin não tem janela"})
+                return
+            self.view = view
+            self.pl.janela = self.painel
+            self.pl.moldura = _Moldura(self.pl)
+            _chamar(view, 12, c_int32, [c_void_p], self.pl.moldura.ptr)
+            _chamar(view, 4, c_int32, [c_void_p, c_char_p], self.painel.palco, b"HWND")
+            self.painel.ligar(view)
+            _u32.ShowWindow(self.painel.hwnd, 5)
+            self._avisar({"painel": 1, "tam": [self.painel.vw, self.painel.vh]})
+            return
+        self.painel.fila.put({"r": r, "v": vis, **({"p": pai} if pai else {})})
+        self.painel.comandos()
+
+    def painel_sumiu(self):
+        """A janela-mãe do painel fechou sem resgatar (ex.: o app fechando): solta a janela do plugin; o som continua."""
+        if self.view:
+            try:
+                _chamar(self.view, 12, c_int32, [c_void_p], None)
+                _chamar(self.view, 5, c_int32, [])
+                _release(self.view)
+            except Exception:
+                pass
+        self.view = self.painel = None
+        self.pl.janela = None
+        self._avisar({"painel": 0})
+
+    def rodar(self):
+        import json
+        import sys
+        self.servir_http()
+        self._avisar({"ok": 1, "porta": self.porta, "token": self.token, "nome": self.pl.nome,
+                      "atraso": int(_chamar(self.pl.proc, 6, c_uint32, [])), "janela": bool(self.pl.ctrl)})
+
+        def ler():
+            for linha in sys.stdin:
+                try:
+                    self.fila.put(json.loads(linha))
+                    _u32.PostMessageW(self.hwnd, 0x8001, 0, 0)
+                except Exception:
+                    pass
+            self.fila.put({"q": 1})
+            _u32.PostMessageW(self.hwnd, 0x8001, 0, 0)
+        threading.Thread(target=ler, daemon=True).start()
+        msg = wintypes.MSG()
+        while _u32.GetMessageW(byref(msg), None, 0, 0) > 0:
+            _u32.TranslateMessage(byref(msg))
+            _u32.DispatchMessageW(byref(msg))
+        if self.view:
+            _chamar(self.view, 12, c_int32, [c_void_p], None)
+            _chamar(self.view, 5, c_int32, [])
+            _release(self.view)
+        with self.trava:
+            self.pl.fechar()
+
+
+def processar_arquivo(entrada, saida, cadeia):
+    """Exportação (offline): WAV float estéreo 48 kHz → cadeia de plugins [{caminho, cid, estado}] → WAV. Atraso
+    compensado em cada plugin; a cauda (reverb) entra até o fim do arquivo (a duração é a da timeline)."""
+    import base64
+    import wave  # noqa: F401  (o WAV é float: lido e gravado à mão)
+    dados = _ler_wav_float(entrada)
+    for e in cadeia:
+        pl = Plugin(e["caminho"], e["cid"]).carregar(48000, modo=K_OFFLINE)
+        if e.get("estado"):
+            pl.restaurar(base64.b64decode(e["estado"]))
+        dados = pl.processar(dados, compensar=True)
+        pl.fechar()
+    _gravar_wav_float(saida, dados)
+
+
+def _ler_wav_float(arq):
+    with open(arq, "rb") as f:
+        b = f.read()
+    i, fmt, dados = 12, None, None
+    while i + 8 <= len(b):
+        cid, tam = b[i:i + 4], struct.unpack("<I", b[i + 4:i + 8])[0]
+        if cid == b"fmt ":
+            fmt = struct.unpack("<HHIIHH", b[i + 8:i + 24])
+        elif cid == b"data":
+            dados = b[i + 8:i + 8 + tam]
+        i += 8 + tam + (tam & 1)
+    if not fmt or dados is None or fmt[0] not in (3, 0xFFFE) or fmt[5] != 32:
+        raise RuntimeError("WAV precisa ser float 32 bits")
+    ch = fmt[1]
+    a = np.frombuffer(dados[:len(dados) // (4 * ch) * 4 * ch], np.float32).reshape(-1, ch).T
+    return np.ascontiguousarray(a if ch == 2 else np.repeat(a[:1], 2, 0), np.float32)
+
+
+def _gravar_wav_float(arq, a):
+    a = np.ascontiguousarray(a.T, np.float32)
+    corpo = a.tobytes()
+    cab = b"RIFF" + struct.pack("<I", 36 + len(corpo)) + b"WAVE" + b"fmt " + struct.pack("<IHHIIHH", 16, 3, 2, 48000, 48000 * 8, 8, 32)
+    with open(arq, "wb") as f:
+        f.write(cab + b"data" + struct.pack("<I", len(corpo)) + corpo)
+
+
 # ───────────────────────── processo à parte (o app chama assim: plugin que trava não derruba o KANIVETE) ─────────────
 def main_cli(argv):
     """`<app> --vst3 varrer` → JSON da lista no stdout; `<app> --vst3 janela <caminho> <cid hex> [título]` → abre a
@@ -773,6 +1153,24 @@ def main_cli(argv):
         out = varrer()
         sys.stdout.write(json.dumps(out, ensure_ascii=False))
         sys.stdout.flush()
+        return 0
+    if argv[0] == "servir" and len(argv) >= 3:
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)
+        except Exception:
+            pass
+        estado = sys.stdin.readline().strip() if len(argv) > 3 and argv[3] == "-" else ""   # o ajuste vem pelo stdin
+        _Servidor(argv[1], argv[2], estado).rodar()
+        return 0
+    if argv[0] == "processar" and len(argv) >= 4:
+        processar_arquivo(argv[1], argv[2], json.load(open(argv[3], encoding="utf-8")))
+        return 0
+    if argv[0] == "encaixar" and len(argv) >= 8:
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)
+        except Exception:
+            pass
+        encaixar(argv[1], argv[2], int(argv[3]), [int(float(v)) for v in argv[4:8]])
         return 0
     if argv[0] == "janela" and len(argv) >= 3:
         try:

@@ -4361,6 +4361,179 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    # Plugin ENCAIXADO num painel (editor-plugins.js): o processo do plugin põe a janela dele como subjanela da janela do
+    # KANIVETE (a principal ou a solta onde o painel está) sobre a área do painel; a página manda o retângulo quando muda
+    def ve_vst3_painel(self, pid, info, janela, rect, visivel):
+        import json
+        import subprocess
+        import threading
+        from Functions.midia import NO_WINDOW
+        paineis = self.__dict__.setdefault("_vst3_paineis", {})
+        pai = _hwnd_principal_val[0] if janela == "principal" else _janela_por_titulo(janela)
+        if not pai:
+            return {"success": False, "error": "janela não encontrada"}
+        r = [int(round(v)) for v in rect]
+        e = paineis.get(pid)
+        if e and e["p"].poll() is not None:   # o plugin caiu: o painel mostra o erro (abre de novo ao reabrir)
+            return {"success": False, "error": e.get("erro") or "o plugin fechou", "caiu": True}
+        if not e:
+            if not visivel:
+                return {"success": True}
+            p = subprocess.Popen(self._vst3_base() + ["--vst3", "encaixar", info["caminho"], info["cid"], str(pai)] + [str(v) for v in r],
+                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8",
+                                 errors="replace", creationflags=NO_WINDOW)
+            e = paineis[pid] = {"p": p, "pai": pai, "estado": "abrindo"}
+
+            def ouvir():
+                for linha in p.stdout:
+                    try:
+                        d = json.loads(linha)
+                        if d.get("ok"):
+                            e.update(estado="pronto", tam=d.get("tam"))
+                    except Exception:
+                        pass
+                err = (p.stderr.read() or "").strip().splitlines()
+                e.update(estado="caiu", erro=(err[-1] if err else "o plugin fechou")[-200:])
+            threading.Thread(target=ouvir, daemon=True).start()
+            return {"success": True, "estado": "abrindo"}
+        cmd = {"r": r, "v": 1 if visivel else 0}
+        if pai != e["pai"]:
+            cmd["p"] = pai
+            e["pai"] = pai
+        try:
+            e["p"].stdin.write(json.dumps(cmd) + "\n")
+            e["p"].stdin.flush()
+        except Exception as ex:
+            return {"success": False, "error": str(ex)}
+        return {"success": True, "estado": e["estado"]}
+
+    # ── espaço do Rack com plugin VST3 (editor-plugins.js / editor-audio.js): UM processo por espaço, que processa o
+    # som da prévia (HTTP local, a página fala direto com ele) e mostra a janela do plugin num painel quando pedido ──
+    def _vst3_slots(self):
+        return self.__dict__.setdefault("_vst3_slot", {})
+
+    def ve_vst3_slot(self, sid, info, estado=""):
+        """Garante o processo do espaço `sid` rodando; devolve {porta, token, atraso} (espera ele subir)."""
+        import json
+        import subprocess
+        import threading
+        import time as _t
+        from Functions.midia import NO_WINDOW
+        slots = self._vst3_slots()
+        e = slots.get(sid)
+        if e and e["p"].poll() is not None:
+            slots.pop(sid, None)
+            e = None
+        if not e:
+            p = subprocess.Popen(self._vst3_base() + ["--vst3", "servir", info["caminho"], info["cid"], "-"],
+                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                 encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
+            p.stdin.write((estado or "") + "\n")
+            p.stdin.flush()
+            e = slots[sid] = {"p": p, "pronto": threading.Event(), "info": None, "estado": None, "painel": None, "erro": "",
+                              "pai": None, "caminho": info["caminho"]}
+
+            def ouvir():
+                for linha in p.stdout:
+                    try:
+                        d = json.loads(linha)
+                    except Exception:
+                        continue
+                    if d.get("ok"):
+                        e["info"] = d
+                        e["pronto"].set()
+                    if "estado" in d:
+                        e["estado"] = d["estado"]          # o app busca (ve_vst3_slot_novidades) e grava no projeto
+                    if "painel" in d:
+                        e["painel"] = d
+                    if d.get("erro"):
+                        e["erro"] = d["erro"]
+                err = (p.stderr.read() or "").strip().splitlines()
+                e["erro"] = e["erro"] or (err[-1] if err else "o plugin fechou")[-200:]
+                e["pronto"].set()
+            threading.Thread(target=ouvir, daemon=True).start()
+        if not e["pronto"].wait(30) or not e["info"]:
+            return {"success": False, "error": e["erro"] or "o plugin não respondeu"}
+        i = e["info"]
+        return {"success": True, "porta": i["porta"], "token": i["token"], "atraso": i["atraso"], "janela": i.get("janela", True)}
+
+    def _vst3_slot_cmd(self, sid, cmd):
+        import json
+        e = self._vst3_slots().get(sid)
+        if not e or e["p"].poll() is not None:
+            return False
+        try:
+            e["p"].stdin.write(json.dumps(cmd) + "\n")
+            e["p"].stdin.flush()
+            return True
+        except Exception:
+            return False
+
+    def ve_vst3_slot_painel(self, sid, janela, rect, visivel):
+        """A janela do plugin do espaço num painel do editor (mesmo vigia dos painéis de plugin)."""
+        e = self._vst3_slots().get(sid)
+        if not e:
+            return {"success": False, "error": "espaço sem plugin aberto"}
+        if e["p"].poll() is not None:
+            return {"success": False, "error": e["erro"] or "o plugin fechou", "caiu": True}
+        pai = _hwnd_principal_val[0] if janela == "principal" else _janela_por_titulo(janela)
+        if not pai:
+            return {"success": False, "error": "janela não encontrada"}
+        ok = self._vst3_slot_cmd(sid, {"painel": {"janela": pai, "r": [int(round(v)) for v in rect], "v": 1 if visivel else 0}})
+        return {"success": ok, "estado": "pronto" if e["painel"] else "abrindo", "tam": (e["painel"] or {}).get("tam")}
+
+    def ve_vst3_slot_fechar_painel(self, sid):
+        return {"success": self._vst3_slot_cmd(sid, {"fechar_painel": 1})}
+
+    def ve_vst3_slot_restaurar(self, sid, estado):
+        return {"success": self._vst3_slot_cmd(sid, {"restaurar": estado})}
+
+    def ve_vst3_slot_novidades(self):
+        """Ajustes novos (mexeram na janela do plugin) e espaços que caíram: {sid: {estado?, caiu?}}."""
+        out = {}
+        for sid, e in list(self._vst3_slots().items()):
+            if e["estado"]:
+                out[sid] = {"estado": e["estado"]}
+                e["estado"] = None
+            if e["p"].poll() is not None:
+                out.setdefault(sid, {})["caiu"] = e["erro"] or "o plugin fechou"
+                self._vst3_slots().pop(sid, None)
+        return out
+
+    def ve_vst3_slot_fechar(self, sid):
+        e = self._vst3_slots().pop(sid, None)
+        if e:
+            try:
+                e["p"].stdin.write('{"q": 1}\n')
+                e["p"].stdin.flush()
+                e["p"].wait(3)
+            except Exception:
+                try:
+                    e["p"].kill()
+                except Exception:
+                    pass
+        return {"success": True}
+
+    def ve_vst3_painel_estado(self, pid):
+        e = self.__dict__.setdefault("_vst3_paineis", {}).get(pid)
+        if not e:
+            return {"success": True, "estado": "fechado"}
+        return {"success": True, "estado": e["estado"] if e["p"].poll() is None else "caiu", "tam": e.get("tam"), "erro": e.get("erro", "")}
+
+    def ve_vst3_painel_fechar(self, pid):
+        e = self.__dict__.setdefault("_vst3_paineis", {}).pop(pid, None)
+        if e:
+            try:
+                e["p"].stdin.write('{"q": 1}\n')
+                e["p"].stdin.flush()
+                e["p"].wait(3)
+            except Exception:
+                try:
+                    e["p"].kill()
+                except Exception:
+                    pass
+        return {"success": True}
+
     def ve_autozoom_rostos(self, pedidos):
         from Functions import autozoom
         try:
@@ -5488,8 +5661,36 @@ def _janela_solta_propria(chrome, sender, args):
             adiado.Complete()
 
     wv.CoreWebView2InitializationCompleted += pronto
+    # plugin VST3 encaixado num painel desta janela (subjanela de outro processo): antes de a janela sumir, ele passa
+    # para a janela principal (escondido) — senão o Windows o destruiria junto. O painel o põe no lugar novo depois
+    form.FormClosing += lambda *_: _resgatar_plugins(int(form.Handle.ToInt64()))
     form.Show()
     wv.EnsureCoreWebView2Async(sender.Environment)
+
+
+def _resgatar_plugins(hwnd_janela):
+    try:
+        import ctypes
+        from ctypes import wintypes
+        u = ctypes.windll.user32
+        principal = _hwnd_principal_val[0]
+        if not principal or not hwnd_janela:
+            return
+        achados = []
+        PROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+
+        def cada(h, _):
+            cls = ctypes.create_unicode_buffer(64)
+            u.GetClassNameW(h, cls, 64)
+            if cls.value == "KanivetePluginPainel" and u.GetParent(h) == hwnd_janela:
+                achados.append(h)
+            return True
+        u.EnumChildWindows(hwnd_janela, PROC(cada), 0)
+        for h in achados:
+            u.ShowWindow(h, 0)
+            u.SetParent(h, principal)
+    except Exception as exc:
+        print("[plugin] resgatar:", exc)
 
 
 def _porta_agente():

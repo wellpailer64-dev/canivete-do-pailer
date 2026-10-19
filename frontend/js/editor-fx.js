@@ -774,6 +774,8 @@ function veFxValues(f, c, T) {
 
 function veAfxValues(f) {
     const d = VE_AFX[f.t], v = {};
+    // plugin VST3 do Rack (editor-plugins.js): leva o plugin, o ajuste e o espaço (slot = id do efeito)
+    if (d.livre) return { ...(f.v || {}), slot: f.id };
     d.params.forEach(p => {
         if (p.tipo === 'bool') v[p.k] = f.v && f.v[p.k] ? 1 : 0;
         else v[p.k] = f.v && isFinite(f.v[p.k]) ? +f.v[p.k] : p.def;

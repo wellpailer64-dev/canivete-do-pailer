@@ -25,9 +25,11 @@ em camadas de ajuste cor-de-rosa na timeline, centrados no rosto. Escolha Quanti
 Estilo (Seco = entra e sai no corte; Suave = curva macia; Smart = decide por momento) e Força. Cada zoom pode ser ajustado
 nos Controles de efeito (zoom, entrada, saída, curva, centro, desfoque de movimento); Remover tira todos. "Desfoque" liga o
 desfoque de movimento nos zooms rápidos (só borra enquanto o zoom anda).
-Plugins VST3: menu Janela › Plugins (no Vídeo Kanivete) lista os plugins de áudio VST3 instalados no PC e abre a janela de
-cada um. Ainda não dá para o som da timeline passar por eles (vem no Rack de efeitos da trilha). Plugins só da Adobe
-(.aex) e painéis do Premiere não funcionam fora da Adobe.
+Plugins VST3: menu Janela › Plugins › (no Vídeo Kanivete) lista os plugins de áudio VST3 instalados no PC e abre a
+janela de cada um num painel (encaixar, soltar, maximizar). Para o som da trilha passar por um plugin: Mixer de trilhas
+de áudio › fx (rack) › clique num espaço vazio › Plugins VST3 › escolha o plugin; clicar no espaço abre a janela dele.
+O ajuste fica salvo no projeto e vale na prévia e na exportação. Plugins só da Adobe (.aex) e painéis do Premiere não
+funcionam fora da Adobe. O Goyo (Beta) parou de funcionar em 2023 (a Supertone desligou o servidor).
 Pincel Roto (Efeitos › Chaveamento, ou duplo clique no clipe com o efeito): abre numa janela por cima do editor. Pinte o
 que fica (Alt tira) ou clique em "✨ Selecionar assunto" para o app achar a pessoa sozinho; o quadro pintado vira
 quadro-base. O recorte dos outros quadros só é montado quando você clica em "❄ Freeze" (ou tecla F); marque "Seguir

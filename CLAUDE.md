@@ -128,7 +128,8 @@ exportação; placa = híbrido). `frontend/js/editor-autozoom.js`, `Functions/au
 teste `py -3.13 testes/teste_autozoom.py`.
 
 **Plugins** (2026-10-18): VST3 por carregador PRÓPRIO (`Functions/vst3.py`, ctypes, sem GPL), sempre em processo à parte
-(`--vst3 varrer|janela`); Janela › Plugins abre a janela do plugin (`editor-plugins.js`). Plano (packs Mister Horse/Motion
+(`--vst3 varrer|janela|encaixar|servir|processar`); Janela › Plugins › abre o plugin num PAINEL encaixável; Rack de efeitos da
+trilha (Mixer) › Plugins VST3: um processo por espaço, prévia por HTTP local à frente da agulha, exportação `_pre_vst`. Plano (packs Mister Horse/Motion
 Bro, formato próprio, OFX) e pendências: `Instructions/agente/plugins.md`.
 
 **Legendas em 3 modos** (2026-10-18, painel Texto › Legendas): Clássica, Dinâmica (destaque da palavra falada) e

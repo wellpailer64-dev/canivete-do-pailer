@@ -155,6 +155,15 @@
     "ve_roto_base",
     "ve_vst3_lista",
     "ve_vst3_abrir",
+    "ve_vst3_painel",
+    "ve_vst3_slot",
+    "ve_vst3_slot_painel",
+    "ve_vst3_slot_fechar_painel",
+    "ve_vst3_slot_restaurar",
+    "ve_vst3_slot_novidades",
+    "ve_vst3_slot_fechar",
+    "ve_vst3_painel_estado",
+    "ve_vst3_painel_fechar",
     "ve_autozoom_rostos",
     "ve_roto_pausar",
     "ve_roto_congelar",
@@ -1944,6 +1953,46 @@
    "modulos": [
     "midia"
    ]
+  },
+  "ve_vst3_painel": {
+   "args": "pid, info, janela, rect, visivel",
+   "modulos": [
+    "midia"
+   ]
+  },
+  "ve_vst3_slot": {
+   "args": "sid, info, estado=\"\"",
+   "modulos": [
+    "midia"
+   ]
+  },
+  "ve_vst3_slot_painel": {
+   "args": "sid, janela, rect, visivel",
+   "modulos": []
+  },
+  "ve_vst3_slot_fechar_painel": {
+   "args": "sid",
+   "modulos": []
+  },
+  "ve_vst3_slot_restaurar": {
+   "args": "sid, estado",
+   "modulos": []
+  },
+  "ve_vst3_slot_novidades": {
+   "args": "",
+   "modulos": []
+  },
+  "ve_vst3_slot_fechar": {
+   "args": "sid",
+   "modulos": []
+  },
+  "ve_vst3_painel_estado": {
+   "args": "pid",
+   "modulos": []
+  },
+  "ve_vst3_painel_fechar": {
+   "args": "pid",
+   "modulos": []
   },
   "ve_autozoom_rostos": {
    "args": "pedidos",

@@ -93,7 +93,7 @@ function veMixUi() {
     el.querySelectorAll('.ve-mix-slot').forEach(b => {
         const f = ((VE_TRK.a[+b.dataset.mk] || {}).fx || [])[+b.dataset.slot], d = f && VE_AFX[f.t];
         const ss = !!d && !!d.pr && !d.som;   // efeito do Premiere sem processamento no Kanivete: não muda o som aqui
-        b.textContent = d ? (ss ? `${d.nome} · ${veT('só Premiere')}` : d.nome) : '';
+        b.textContent = d ? (f.t === 'vst3' ? `♪ ${(f.v && f.v.nome) || 'VST3'}` : ss ? `${d.nome} · ${veT('só Premiere')}` : d.nome) : '';
         b.title = d ? `${d.nome}${f.on === false ? ' · ' + veT('desligado') : ''}${ss ? ' · ' + veT('não muda o som no Kanivete (vai e volta intacto para o Premiere)') : ''} · ${veT('clique para ajustar')}` : veT('Escolher efeito');
         b.classList.toggle('cheio', !!d);
         b.classList.toggle('off', !!d && f.on === false);
@@ -242,6 +242,33 @@ window.VEMIX_API = {
 
 // ── rack de efeitos da trilha ──
 const VE_MIX_SLOTS = 5;
+// espaço com plugin VST3: a janela do plugin abre num painel; aqui só ligar, mover, remover
+function veMixEditorPlg(sl, k, i) {
+    const st = veTrackState('a', k), f = st.fx[i];
+    vePlgSlotPainel(f.id);
+    const pop = veMixPop(sl, `<div class="ve-mix-ed-topo"><b>♪ ${veEsc(f.v.nome || 'VST3')}</b> <small>A${k + 1} · VST3</small>`
+        + `<label><input type="checkbox" data-on="1" ${f.on === false ? '' : 'checked'}> ${veT('ligado')}</label>`
+        + `<button data-acao="esq" title="${veT('Antes')}">◀</button><button data-acao="dir" title="${veT('Depois')}">▶</button>`
+        + `<button data-acao="del" title="${veT('Remover')}">✕</button></div>`
+        + `<button class="ve-mix-plg-abrir" data-acao="abrir">${veT('Abrir a janela do plugin')}</button>`);
+    pop.addEventListener('input', e => {
+        if (e.target.dataset.on) { st.fx = st.fx.map((x, j) => j === i ? { ...x, on: e.target.checked } : x); veMixMudou(); }
+    });
+    pop.addEventListener('click', e => {
+        const a = e.target.closest('[data-acao]'); if (!a) return;
+        if (a.dataset.acao === 'abrir') { vePlgSlotPainel(f.id); pop.remove(); return; }
+        const fx = [...st.fx];
+        if (a.dataset.acao === 'del') { fx.splice(i, 1); vePlgSlotFechar(f.id); }
+        else {
+            const j = a.dataset.acao === 'esq' ? i - 1 : i + 1;
+            if (j < 0 || j >= fx.length) return;
+            [fx[i], fx[j]] = [fx[j], fx[i]];
+        }
+        if (fx.length) st.fx = fx; else delete st.fx;
+        pop.remove();
+        veMixMudou();
+    });
+}
 function veMixRackAberto(v) {
     try {
         if (v !== undefined) localStorage.setItem('ve-mix-rack', v ? '1' : '0');
@@ -285,13 +312,18 @@ function veMixSlot(sl, k, i) {
     const fx = (VE_TRK.a[k] || {}).fx || [];
     if (fx[i]) { veMixEditor(sl, k, i); return; }
     const cats = VE_MIX_CATS.map(() => []);
-    Object.entries(VE_AFX).forEach(([t, d]) => { if (t !== 'antinoise' && t !== 'trk') cats[veMixCatDe(d)].push([t, d]); });
+    Object.entries(VE_AFX).forEach(([t, d]) => { if (t !== 'antinoise' && t !== 'trk' && t !== 'vst3') cats[veMixCatDe(d)].push([t, d]); });
+    // plugins VST3 instalados (editor-plugins.js): uma categoria a mais, no fim
+    if (typeof VEPLG !== 'undefined' && VEPLG.lista == null) vePlgProcurar(false);
+    const plgs = typeof VEPLG !== 'undefined' && VEPLG.lista ? VEPLG.lista.map((p, j) => [p, j]).filter(([p]) => !p.erro) : [];
     cats.forEach(l => l.sort((a, b) => a[1].nome.localeCompare(b[1].nome)));
+    const efPlg = ([p, j]) => `<div class="ve-mix-ef" data-plg="${j}" title="${veEsc(p.fabricante || '')}">♪ ${veEsc(p.nome)}<small class="ve-mix-tag">${veEsc(p.fabricante || 'VST3')}</small></div>`;
     const ef = ([t, d]) => `<div class="ve-mix-ef${d.pr && !d.som ? ' semsom' : ''}" data-t="${t}" title="${d.pr && !d.som ? veT('Não muda o som no Kanivete: vai e volta intacto para o Premiere') : d.tag || ''}">${d.nome}${d.pr && !d.som ? `<small class="ve-mix-tag">${veT('só Premiere')}</small>` : ''}</div>`;
     const html = `<input class="ve-mix-busca" placeholder="${veT('Buscar efeito')}">`
         + `<div class="ve-mix-menu"><div class="ve-mix-nenhum" data-nenhum="1">${veT('Nenhum')}</div><hr>`
         + VE_MIX_CATS.map(([, nome], j) => cats[j].length ? `<div class="ve-mix-catit" data-c="${j}">${veT(nome)}<i>›</i></div>` : '').join('')
-        + `</div><div class="ve-mix-lista" hidden>${cats.flat().map(ef).join('')}</div>`;
+        + (plgs.length ? `<hr><div class="ve-mix-catit" data-c="vst">♪ ${veT('Plugins VST3')}<i>›</i></div>` : '')
+        + `</div><div class="ve-mix-lista" hidden>${cats.flat().map(ef).join('')}${plgs.map(efPlg).join('')}</div>`;
     const pop = veMixPop(sl, html), busca = pop.querySelector('.ve-mix-busca'), menu = pop.querySelector('.ve-mix-menu'), lista = pop.querySelector('.ve-mix-lista');
     let sub = null;
     const abrirSub = it => {
@@ -300,7 +332,7 @@ function veMixSlot(sl, k, i) {
         menu.querySelectorAll('.ve-mix-catit').forEach(x => x.classList.toggle('on', x === it));
         sub = pop.ownerDocument.createElement('div');
         sub.className = 've-mix-pop ve-mix-sub'; sub.dataset.c = it.dataset.c;
-        sub.innerHTML = cats[+it.dataset.c].map(ef).join('');
+        sub.innerHTML = it.dataset.c === 'vst' ? plgs.map(efPlg).join('') : cats[+it.dataset.c].map(ef).join('');
         pop.appendChild(sub);   // filho do menu: clicar nele não conta como "fora"
         const r = it.getBoundingClientRect(), W = pop.ownerDocument.documentElement.clientWidth, H = pop.ownerDocument.documentElement.clientHeight;
         const esq = r.right + sub.offsetWidth + 4 > W;
@@ -319,6 +351,16 @@ function veMixSlot(sl, k, i) {
     pop.addEventListener('click', e => {
         const it = e.target.closest('.ve-mix-ef');
         if (!it) return;
+        if (it.dataset.plg != null) {   // plugin VST3: o espaço ganha o plugin e a janela dele abre num painel
+            const p = VEPLG.lista[+it.dataset.plg], st = veTrackState('a', k);
+            const f = { id: veFxNewId(), t: 'vst3', on: true, v: { caminho: p.caminho, cid: p.cid, nome: p.nome, fab: p.fabricante || '', estado: '' } };
+            st.fx = [...(st.fx || []), f].slice(0, VE_MIX_SLOTS);
+            pop.remove();
+            veMixMudou();
+            veToast(`${p.nome} ${veT('na trilha')} A${k + 1}`);
+            vePlgSlotPainel(f.id);
+            return;
+        }
         const t = it.dataset.t, v = {};
         VE_AFX[t].params.forEach(p => { v[p.k] = p.def; });
         const st = veTrackState('a', k);
@@ -330,6 +372,7 @@ function veMixSlot(sl, k, i) {
 }
 function veMixEditor(sl, k, i) {
     const st = veTrackState('a', k), f = st.fx[i], d = VE_AFX[f.t];
+    if (f.t === 'vst3') { veMixEditorPlg(sl, k, i); return; }
     const ps = d.params.filter(p => !p.oculto && p.tipo !== 'cor');
     const linha = p => p.tipo === 'bool'
         ? `<label class="ve-mix-ed-bool"><input type="checkbox" data-k="${p.k}"> ${p.nome}</label>`

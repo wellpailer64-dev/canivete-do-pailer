@@ -1157,6 +1157,17 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-menu-h { padding: 6px 10px 3px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--ve-faint); }
 .ve-menu-empty { padding: 4px 10px 6px 32px; font-size: 11.5px; color: var(--ve-faint); }
 .ve-menu-row { display: flex; align-items: center; }
+.ve-mix-plg-abrir { display: block; width: calc(100% - 16px); margin: 6px 8px 8px; padding: 6px; border: 1px solid var(--ve-line-2); border-radius: 5px; background: var(--ve-panel-2); color: var(--ve-text); cursor: pointer; }
+.ve-mix-plg-abrir:hover { border-color: var(--primary); }
+/* painel de plugin VST3: a janela do plugin (outro processo) fica por cima desta área */
+.ve-plg-painel { background: #141414; position: relative; }
+.ve-plg-area { position: absolute; inset: 0; display: grid; place-items: center; background: #141414; }
+.ve-plg-msg { font-size: 12px; color: var(--ve-faint); padding: 12px; text-align: center; }
+/* Janela › Plugins › (editor-plugins.js): a lista abre ao lado ao passar o mouse */
+.ve-plg-sub i { margin-left: auto; font-style: normal; color: var(--ve-faint); font-size: 14px; line-height: 1; }
+.ve-plg-wrap.on > .ve-plg-sub { background: var(--ve-panel-2); }
+.ve-menu.ve-plg-fly { position: fixed; z-index: 1002; min-width: 250px; max-height: min(70vh, 520px); }
+.ve-menu.ve-plg-fly[hidden] { display: none; }
 .ve-menu-row > button:first-child { flex: 1; min-width: 0; }
 .ve-menu .ve-menu-del { width: auto; flex: 0 0 auto; padding: 4px 8px; color: var(--ve-faint); }
 .ve-menu .ve-menu-del:hover { color: var(--ve-text); }

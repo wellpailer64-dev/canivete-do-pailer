@@ -397,11 +397,15 @@ function veAudioMixar(t, n) {
     return m;
 }
 
-// Mixa n quadros de saída a partir do instante t da timeline (avançando `taxa` s da timeline por s de som)
-function veAudioMixarBruto(t, n) {
+// Mixa n quadros de saída a partir do instante t da timeline (avançando `taxa` s da timeline por s de som).
+// so = trilha: só os clipes dela, e devolve a SOMA antes do Rack (a faixa dos plugins VST3: editor-plugins.js)
+function veAudioMixarBruto(t, n, so) {
     const L = new Float32Array(n), R = new Float32Array(n), passo = VEAU.taxa / VE_AU_SR, busses = {};
+    const comVst = typeof veVstTemPlugin === 'function';
     for (const cl of VEAU.clipes) {
         const [st, s0, e0, g, id, v, tom, fi, fo, fx, vk] = cl;
+        if (so != null) { const trk = fx.find(f => f.t === 'trk'); if (!trk || trk.v.tr !== so) continue; }
+        else if (comVst && veVstTemPlugin(fx)) continue;   // trilha com plugin VST3: vem pronta da faixa dela
         const F = veAudioFonteClipe(id, fx), fimC = st + (e0 - s0) / v, tFim = t + n * passo;
         if (!F || fimC <= t || st >= tFim) continue;
         // trilha com rack de efeitos (Mixer): o clipe vai para o barramento dela; efeitos, fader e pan vêm na soma
@@ -446,7 +450,9 @@ function veAudioMixarBruto(t, n) {
         }
         if (PS) cl._pr.t = t + i1 * passo;
     }
+    if (so != null) return busses[so] ? { l: busses[so].l, r: busses[so].r } : { l: L, r: R };
     veBusMixar(busses, t, n, passo, L, R);
+    if (comVst) veVstMixar(t, n, passo, L, R);
     return { l: L, r: R };
 }
 
@@ -459,6 +465,24 @@ function veBusDestino(fx, busses, n, L, R) {
     const tr = f.v.tr;
     return busses[tr] ? [busses[tr].l, busses[tr].r] : (busses[tr] = { l: new Float32Array(n), r: new Float32Array(n), v: f.v }, [busses[tr].l, busses[tr].r]);
 }
+// Memória do som da SOMA da trilha (0,5 s em anel): EQ, reverb e redução de reverberação leem o passado do som
+// (`tap`). No clipe o passado vem da fonte (veAudioFxTap); no Rack da trilha não havia de onde ler — o EQ só aplicava
+// os médios e o reverb nem rodava (a prévia do Rack não mudava o som; a exportação mudava). E = estado da trilha.
+const VE_BUS_ANEL = 24000;
+function veBusTap(E) {
+    if (!E.anel) {
+        E.anel = { l: new Float32Array(VE_BUS_ANEL), r: new Float32Array(VE_BUS_ANEL), p: 0 };
+        const A = E.anel;
+        E.tap = d => { const k = (A.p - 1 - Math.round(d * VE_AU_SR) + 2 * VE_BUS_ANEL) % VE_BUS_ANEL; return [A.l[k], A.r[k]]; };
+    }
+    return E.tap;
+}
+// uma amostra da soma pelos efeitos da trilha (o anel guarda a entrada antes de calcular, como a fonte do clipe)
+function veBusPasso(E, fx, l, r) {
+    const A = E.anel || (veBusTap(E), E.anel);
+    A.l[A.p] = l; A.r[A.p] = r; A.p = (A.p + 1) % VE_BUS_ANEL;
+    return veAudioFxProcess(l, r, fx, E.tap, E.st);
+}
 function veBusMixar(busses, t, n, passo, L, R) {
     const VEAUb = VEAU.bus || (VEAU.bus = {});
     for (const tr in busses) {
@@ -466,10 +490,10 @@ function veBusMixar(busses, t, n, passo, L, R) {
         const gl = g * (p > 0 ? 1 - p : 1), gr = g * (p < 0 ? 1 + p : 1);
         // estado dos efeitos da trilha: continua se este pedaço começa onde o anterior terminou
         let E = VEAUb[tr];
-        if (!E || E.fx !== JSON.stringify(fx) || Math.abs(E.t - t) > passo * 2) E = VEAUb[tr] = { t, st: {}, fx: JSON.stringify(fx) };
+        if (!E || E.fx !== JSON.stringify(fx) || Math.abs(E.t - t) > passo * 2) { E = VEAUb[tr] = { t, st: {}, fx: JSON.stringify(fx) }; veBusTap(E); }
         const P = VEAU.pk ? (VEAU.pk[tr] || (VEAU.pk[tr] = [0, 0])) : null;
         for (let i = 0; i < n; i++) {
-            const y = veAudioFxProcess(B.l[i], B.r[i], fx, null, E.st);
+            const y = veBusPasso(E, fx, B.l[i], B.r[i]);
             const l = y[0] * gl, r = y[1] * gr;
             L[i] += l; R[i] += r;
             if (P) { const a = Math.abs(l), b = Math.abs(r); if (a > P[0]) P[0] = a; if (b > P[1]) P[1] = b; }
@@ -620,7 +644,9 @@ function veAudioAlimentar() {
     if (!VEAU.tocando || VEAU.esperando) return;
     const alvo = VE_AU_ADIANTE * VE_AU_SR;
     let guarda = 64;
+    if (typeof veVstAdiantar === 'function') veVstAdiantar();   // plugins VST3 do Rack: a faixa vai na frente
     while (VEAU.escritos - VEAU.lidos < alvo && guarda-- > 0) {
+        if (typeof veVstPronto === 'function' && !veVstPronto(VEAU.escritos, VE_AU_CHUNK + 2048)) break;   // espera o plugin (+ folga do limitador)
         VEAU.pk = {};
         const m = veAudioMixar(VEAU.wt, VE_AU_CHUNK);
         VEAU.node.port.postMessage({ t: 'dados', l: m.l, r: m.r }, [m.l.buffer, m.r.buffer]);
@@ -652,7 +678,7 @@ async function veAudioTocar(t) {
     VEAU.tocando = true;
     VEAU.taxa = VE.rate;
     VEAU.clipes = veAudioClipes();
-    VEAU.chave = JSON.stringify([VEAU.clipes, veMasterLim()]);
+    VEAU.chave = JSON.stringify([VEAU.clipes, veMasterLim()], (k, v) => (k === 'estado' ? undefined : v));
     VEAU.lims.clear();
     VEAU.mlim = null;
     if (typeof VEMED !== 'undefined') { VEMED.fila.length = 0; VEMED.gr.length = 0; }   // medidor: fila do som anterior
@@ -664,6 +690,7 @@ async function veAudioTocar(t) {
     const esperas = veAudioPrever(t);
     if (esperas.length) await Promise.race([Promise.all(esperas), new Promise(r => setTimeout(r, 400))]);
     if (!VEAU.tocando || VEAU.base !== t) return true;
+    if (typeof veVstEsperar === 'function') { veVstReset(); await veVstEsperar(); if (!VEAU.tocando || VEAU.base !== t) return true; }
     veAudioAlimentar();
     clearInterval(VEAU.timer);
     VEAU.timer = setInterval(veAudioAlimentar, 20);
@@ -672,6 +699,7 @@ async function veAudioTocar(t) {
 
 function veAudioParar() {
     VEAU.tocando = false;
+    if (typeof veVstReset === 'function') veVstReset();
     VEAU.esperando = false;
     clearInterval(VEAU.timer);
     if (VEAU.node) VEAU.node.port.postMessage({ t: 'parar' });
@@ -680,7 +708,8 @@ function veAudioParar() {
 
 // A timeline mudou: tocando, o que ainda não tocou é mixado de novo (sem parar o som)
 function veAudioEditou() {
-    const cl = veAudioClipes(), chave = JSON.stringify([cl, veMasterLim()]);
+    // o ajuste dos plugins VST3 (estado) muda o tempo todo enquanto mexem na janela deles: não remixa por isso
+    const cl = veAudioClipes(), chave = JSON.stringify([cl, veMasterLim()], (k, v) => (k === 'estado' ? undefined : v));
     if (chave === VEAU.chave) return;
     VEAU.clipes = cl;
     VEAU.chave = chave;

@@ -2299,7 +2299,11 @@ def _normalizar_afx(efeitos):
         t, v = str(f.get("t") or ""), f.get("v") or {}
         if not isinstance(v, dict):
             v = {}
-        if t == "antinoise":   # Anti Noise (_pre_antinoise)
+        if t == "vst3":   # plugin VST3 do Rack da trilha (Functions/vst3.py; renderizado antes: _pre_vst)
+            if v.get("caminho") and v.get("cid"):
+                out.append((t, {"caminho": str(v["caminho"]), "cid": str(v["cid"]), "nome": str(v.get("nome") or ""),
+                                "estado": str(v.get("estado") or "")}))
+        elif t == "antinoise":   # Anti Noise (_pre_antinoise)
             amt = _afx_lim(v.get("amt"), 0.0, 100.0, 100.0)
             if amt > 0:
                 out.append((t, {"amt": amt}))
@@ -2485,6 +2489,84 @@ def _pre_antinoise(mix, path, tem_audio_fonte, work):
                                + (r.stderr.decode("utf-8", "replace").strip().splitlines() or ["?"])[-1])
         out.append((st, 0.0, e0 - s0, g, wav, vel, tom, fi, fo, [f for f in afx if f[0] != "antinoise"], *resto))
     return out
+
+
+def _pre_vst(mix, path, tem_audio_fonte, total, work, prog=lambda p, m: None):
+    """Trilhas com plugin VST3 no Rack (Mixer): como na prévia (editor-plugins.js), a soma dos clipes da trilha passa
+    pela cadeia do Rack na ordem — efeitos do Kanivete pelo ffmpeg, cada sequência de plugins num processo à parte
+    (`--vst3 processar`, offline, com o ajuste do projeto e o atraso compensado) — e volta como UM áudio que só leva o
+    fader e o pan da trilha. Vem antes do Hard Limiter do Master (a ordem do Premiere)."""
+    import json
+    import sys
+    import numpy as np
+    if not tem_audio_fonte:
+        mix = [c for c in mix if c[4]]
+    grupos, resto = {}, []
+    for c in mix:
+        trk = next((v for t, v in c[9] if t == "trk" and v.get("bus")), None)
+        if trk is not None and any(t in ("vst3", "limiter") for t, _ in trk["bus"]):
+            grupos.setdefault(trk["tr"], [trk, []])[1].append(c)
+        else:
+            resto.append(c)
+    if not grupos:
+        return mix
+    principal = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "main.py"))
+    base_cmd = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, principal]
+    for n_tr, (tr, (trk, cs)) in enumerate(sorted(grupos.items())):
+        prog(0, f"Passando a trilha A{tr + 1} pelos plugins...")
+        # 1) a soma dos clipes da trilha, antes do Rack (sem fader/pan: eles vêm no fim)
+        limpos = [(*c[:9], [f for f in c[9] if f[0] != "trk"], *c[10:]) for c in cs]
+        arqs = ([None] if tem_audio_fonte else []) + sorted({c[4] for c in limpos if c[4]})
+        cmd = [ffmpeg_path(), "-y", "-v", "error"]
+        entradas = {}
+        for j, arq in enumerate(arqs):
+            cmd += _entrada_audio(arq, path)
+            entradas[arq] = f"[{j}:a:0]"
+        atual = os.path.join(work, f"vst_{uuid.uuid4().hex[:10]}_0.wav")
+        grafo = ";".join(_grafo_mix(limpos, total, entradas, "s"))
+        r = subprocess.run(cmd + ["-filter_complex", grafo, "-map", "[s]", "-c:a", "pcm_f32le", "-ar", str(AUDIO_SR), atual],
+                           capture_output=True, timeout=7200, creationflags=_creationflags())
+        if r.returncode != 0 or not os.path.isfile(atual):
+            raise RuntimeError("Plugins VST3: não foi possível somar a trilha: "
+                               + (r.stderr.decode("utf-8", "replace").strip().splitlines() or ["?"])[-1])
+        # 2) a cadeia do Rack em partes: efeitos do Kanivete juntos (ffmpeg) / plugins juntos (processo à parte)
+        partes = []
+        for t, v in trk["bus"]:
+            tipo = "vst" if t == "vst3" else "lim" if t == "limiter" else "ff"
+            if partes and partes[-1][0] == tipo:
+                partes[-1][1].append((t, v))
+            else:
+                partes.append([tipo, [(t, v)]])
+        for k, (tipo, efs) in enumerate(partes, 1):
+            novo = os.path.join(work, f"vst_{uuid.uuid4().hex[:10]}_{k}.wav")
+            if tipo == "lim":   # Hard Limiter no Rack da trilha: a mesma conta do clipe e do Master (_hard_limiter)
+                from Functions import vst3 as _v3
+                x = _v3._ler_wav_float(atual).T
+                for _, v in efs:
+                    x = _hard_limiter(x, **v)
+                _v3._gravar_wav_float(novo, np.ascontiguousarray(x.T, np.float32))
+                erro = ""
+            elif tipo == "ff":
+                fs = _filtros_afx(efs)
+                if not fs:
+                    continue
+                r = subprocess.run([ffmpeg_path(), "-y", "-v", "error", "-i", atual, "-af", ",".join(fs), "-c:a", "pcm_f32le", novo],
+                                   capture_output=True, timeout=7200, creationflags=_creationflags())
+                erro = r.stderr.decode("utf-8", "replace") if r.returncode else ""
+            else:
+                cadeia = os.path.join(work, f"vst_{uuid.uuid4().hex[:10]}.json")
+                with open(cadeia, "w", encoding="utf-8") as f:
+                    json.dump([{"caminho": v["caminho"], "cid": v["cid"], "estado": v.get("estado", "")} for _, v in efs], f)
+                r = subprocess.run(base_cmd + ["--vst3", "processar", atual, novo, cadeia], capture_output=True, timeout=7200,
+                                   creationflags=_creationflags())
+                erro = (r.stderr.decode("utf-8", "replace") or r.stdout.decode("utf-8", "replace")) if r.returncode else ""
+            if erro or not os.path.isfile(novo):
+                nomes = ", ".join(v.get("nome") or t for t, v in efs)
+                raise RuntimeError(f"Plugins VST3 ({nomes}): " + ((erro or "?").strip().splitlines() or ["?"])[-1])
+            atual = novo
+        # 3) a trilha pronta volta ao mix só com o fader e o pan
+        resto.append((0.0, 0.0, total, 0.0, atual, 1.0, True, 0.0, 0.0, [("trk", {"g": trk["g"], "p": trk["p"]})]))
+    return resto
 
 
 def _entrada_audio(arq, path):
@@ -4035,6 +4117,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
     if mix and not sem_audio and any(t == "limiter" for c in mix for t, _ in c[9]):
         prog(0, "Aplicando Hard Limiter...")
         mix = _pre_limitar(mix, path, info["has_audio"], _work_dir())
+    if mix and not sem_audio and any(t == "trk" and any(tt in ("vst3", "limiter") for tt, _ in (v.get("bus") or [])) for c in mix for t, v in c[9]):
+        prog(0, "Passando as trilhas pelos plugins...")
+        mix = _pre_vst(mix, path, info["has_audio"], total, _work_dir(), prog)
     if mix and not sem_audio and master_lim:
         prog(0, "Aplicando Hard Limiter no Master...")
         mix = _limitar_master(mix, path, info["has_audio"], total, master_lim, _work_dir(), master_fim)
