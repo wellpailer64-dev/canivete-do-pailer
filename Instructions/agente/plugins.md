@@ -182,16 +182,23 @@ Behance, Instagram, Drive, WhatsApp, Pandalab), abas, prévia, "Pegar imagens da
 `py -3.13 D:\Kanivete\Plugins\kanibrowser\kb.py estado|abrir|ir|imagens|baixar --demanda ID8|texto|foto [--porta 9333]`
 — passa pelo app em modo agente (`KPLUG.chamar`); também `instagram @perfil`, `link <url> --demanda ID8` (Drive público direto, resto pelo navegador → 02 - ASSETSMATERIAL), `pesquisar "termo"` (DuckDuckGo: o Google dá captcha). Pinterest pede login. Teste:
 `D:\kanivete_testes\scripts\teste_kanibrowser.py` (porta 9333).
-**Tela dividida** (2026-10-19): à esquerda o SEU navegador (as abas da janela do Pailer, pegar imagens/print/texto), à
-direita a **Visão da Kani**: o agente trabalha numa janela só dele, fora da tela (`FORA`, nunca minimizada: minimizada
-para de desenhar e os cliques travam), mostrada ao vivo por `Page.startScreencast` (`quadro()` ~4×/s só com o painel à
-vista; o `_vigia` desliga depois de 3 s sem olhar). Sem `--aba`, tudo do agente (kb.py, `ler_pagina` da Kani, pesquisa,
-Instagram, link) roda na aba da Kani dentro de `trabalho("…")` (uma tarefa por vez; aparece como "Pesquisando…" e no
-histórico). Clicar/rolar/digitar na visão = `tocar()` na aba dela; ✋ Assumir traz a janela dela para a tela (login),
-↩ Devolver esconde. ◧ Lado a lado: Chrome do Pailer na metade esquerda do monitor, Kanivete na direita (empilha: Kani
-em cima). Aba nova do Pailer ativa uma aba dele antes (o Chrome abre na última janela ativa). Identidade: óculos da
-Kani com duas lentes (seu navegador / visão dela), âmbar `#F0A01C`; fonte em `icone.svg`. Teste:
-`D:\kanivete_testes\scripts\teste_kb_visao.py` (porta 9333). `plugin_pessoal_recarregar` também esquece os módulos
+**Tudo dentro do Kanivete** (2026-10-19, `visao.py`): nenhuma janela do Chrome aparece — todas ficam à esquerda de todos
+os monitores (`_fora`, calculado pela área virtual: o Pailer tem vários monitores), fora da barra de tarefas e do Alt+Tab
+(`_sem_barra`: WS_EX_TOOLWINDOW; a varredura em `estado` empurra para fora qualquer janelinha que caia num monitor), e o
+foco volta ao Kanivete depois de abrir. Cada aba à vista vira MJPEG (`Page.startScreencast`) num servidor 127.0.0.1 de
+porta aleatória com token, SÓ imagem; mouse/teclado voltam por `entrada()` (fila no painel, um lote por vez, movimentos
+juntados). Tamanho = `Emulation.setDeviceMetricsOverride` com o devicePixelRatio (imagem 1 para 1; a janela fica 1280×860:
+o Chrome encolhe janela maior que o monitor). Refeito no painel o que o Chrome desenha fora da página: lista de opções
+(script guarda `__kbSelPend`, lido no fim de cada `entrada`; binding exigiria Runtime.enable), avisos do site
+(`Page.javascriptDialogOpening` → caixa no painel; o clique que abre o aviso trava até responder), escolher arquivo
+(`setInterceptFileChooserDialog` → seletor do Kanivete), botão direito (menu próprio: abrir link em nova aba, salvar
+imagem na pasta da demanda...), downloads (pasta do KaniBrowser, aviso). Aba aberta pelo site entra ao lado e fica à
+vista. Esquerda = seu navegador (abas, endereço, ←→⟳, Ctrl+T/W/L, F5, Alt+←), direita = Kani (aba dela, 1280 de
+largura reduzida; divisória arrastável, ◨ esconde). Aba/janela minimizada ou de fundo não desenha e trava o clique:
+só a aba à vista recebe mouse. Transmissão só com o painel à vista. Sem `--aba`, tudo do agente roda na aba da Kani
+dentro de `trabalho("…")` (uma tarefa por vez; "Pesquisando…" e histórico). Identidade: óculos da Kani com duas lentes
+(seu navegador / visão dela), âmbar `#F0A01C`; fonte em `icone.svg`. Teste: `D:\kanivete_testes\scripts\teste_kb_dentro.py`
+(porta 9333; 17 itens: nada na tela, foco, nitidez, acento, Ctrl+A, lista, aviso, rolar, nova aba, menu, Kani, parar). `plugin_pessoal_recarregar` também esquece os módulos
 que o plugin importou (fechar o navegador antes: o canal mora no módulo).
 
 ## Pendências
