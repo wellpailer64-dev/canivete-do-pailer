@@ -180,7 +180,7 @@ senha = qualquer programa do PC comanda o navegador logado; o Claude Code bloque
 Behance, Instagram, Drive, WhatsApp, Pandalab), abas, prévia, "Pegar imagens da página" → marcar → baixar em
 `<demanda>/02 - ASSETS/REFERENCIAS` (demandas com pasta = `pandalab/vinculos.json`), print, copiar texto. Agente:
 `py -3.13 D:\Kanivete\Plugins\kanibrowser\kb.py estado|abrir|ir|imagens|baixar --demanda ID8|texto|foto [--porta 9333]`
-— passa pelo app em modo agente (`KPLUG.chamar`). Pinterest pede login para buscar. Teste:
+— passa pelo app em modo agente (`KPLUG.chamar`); também `instagram @perfil`, `link <url> --demanda ID8` (Drive público direto, resto pelo navegador → 02 - ASSETSMATERIAL), `pesquisar "termo"` (DuckDuckGo: o Google dá captcha). Pinterest pede login. Teste:
 `D:\kanivete_testes\scripts\teste_kanibrowser.py` (porta 9333). `plugin_pessoal_recarregar` também esquece os módulos
 que o plugin importou (fechar o navegador antes: o canal mora no módulo).
 
