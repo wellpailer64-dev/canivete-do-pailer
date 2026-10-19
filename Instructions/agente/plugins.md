@@ -198,7 +198,15 @@ largura reduzida; divisória arrastável, ◨ esconde). Aba/janela minimizada ou
 só a aba à vista recebe mouse. Transmissão só com o painel à vista. Sem `--aba`, tudo do agente roda na aba da Kani
 dentro de `trabalho("…")` (uma tarefa por vez; "Pesquisando…" e histórico). Identidade: óculos da Kani com duas lentes
 (seu navegador / visão dela), âmbar `#F0A01C`; fonte em `icone.svg`. Teste: `D:\kanivete_testes\scripts\teste_kb_dentro.py`
-(porta 9333; 17 itens: nada na tela, foco, nitidez, acento, Ctrl+A, lista, aviso, rolar, nova aba, menu, Kani, parar). `plugin_pessoal_recarregar` também esquece os módulos
+(porta 9333; 17 itens: nada na tela, foco, nitidez, acento, Ctrl+A, lista, aviso, rolar, nova aba, menu, Kani, parar).
+**Favoritos e logins** (2026-10-19): barra de favoritos (`favoritos.py`, `D:\Kanivete\KaniBrowser\favoritos.json`;
+iniciais ChatGPT, Gemini, Copilot, WhatsApp, Instagram, Pinterest, Behance, Pandalab): ☆/Ctrl+D no endereço, arrastar
+para reordenar, botão direito renomeia/remove, Ctrl/meio = nova aba; ícone baixado do PRÓPRIO site (nada de serviço do
+Google) em `icones/<domínio>.png`, servido pelo servidor da visão (`/<token>/i/`). Logins ficam no perfil
+(`D:\Kanivete\KaniBrowser\perfil`) e sobrevivem ao app fechado de repente (cookie de 1 dia conferido). O Chrome abre com
+`--disable-blink-features=AutomationControlled`: sem isso `navigator.webdriver` = true e o login do Google/Microsoft
+recusa "navegador pode não ser seguro". Todos os 7 sites abriram sem verificação de humano. Teste:
+`D:\kanivete_testes\scripts\teste_kb_logins.py [persistir|conferir]` (porta 9333). `plugin_pessoal_recarregar` também esquece os módulos
 que o plugin importou (fechar o navegador antes: o canal mora no módulo).
 
 ## Pendências
