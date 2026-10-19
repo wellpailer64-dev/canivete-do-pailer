@@ -151,12 +151,17 @@ em tempo real. Vocal Gate (dan-k-k, GPL, VST3) baixado em `D:/kanivete_testes/vs
 innoextract 1.9 — só instalando.
 
 **Sound Kanivete** (2026-10-19): plugins VST3 na faixa, prévia por faixa congelada — `Instructions/sound-kanivete.md`
-› "Plugins VST3 na faixa". Tela dos plugins da jhudstudio quebra no carregador (os 7; Ignite, Guitar Rig, RNNoise e
-Goyo abrem).
+› "Plugins VST3 na faixa".
+**Tela dos plugins da jhudstudio (corrigido 2026-10-19)**: os 7 (C4-EQ10, Dual-DeSser…) davam access violation
+(ponteiro nulo) no `attached` do painel encaixado. Causa medida (`D:/kanivete_testes/vst/jh_attach.py`, variações):
+no attached eles procuram a janela de CIMA **visível do próprio processo**; no painel a de cima era a do KANIVETE (outro
+processo) → nulo. Não era DPI, COM/OLE, modo tempo real nem o que o main.py carrega. Agora o `_Painel` nasce numa
+janela deste processo visível FORA da tela (`casa`: WS_POPUP|WS_VISIBLE em −32000, ferramenta, sem foco) e `levar()`
+passa para a do KANIVETE depois do attached (encaixar e servir). Medido: os 12 plugins instalados abrem pelo Vídeo e
+pelo Sound e seguem abertos; som da jhudstudio pelo congelamento ok.
 
 ## Pendências
-- Tela dos plugins jhudstudio: access violation (ponteiro nulo) ao abrir a janela — investigar createView/IPlugFrame/
-  IRunLoop/contexto do host no `encaixar`/`_painel`.
+
 - Automação de parâmetro do plugin (quadros-chave), plugin no Master e nos efeitos do CLIPE.
 - Latência da prévia ao mexer no plugin tocando: ~0,35 s + fila de 0,3 s (os DAWs ficam em ~10 ms).
 - Instrumentos/MIDI (só efeitos de áudio hoje).

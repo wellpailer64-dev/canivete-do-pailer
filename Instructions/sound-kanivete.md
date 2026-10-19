@@ -208,8 +208,8 @@ projeto (`skLimitarX`) e o teclado traz a agulha para a vista (`skMostrarAgulha`
   `ve_vst3_slot_novidades('sk-')` (o Vídeo pede sem prefixo e não vê os "sk-"). Fechar a caixa encerra o processo.
 - API `SKN_PLG.lista(atualizar)`, `.por(faixaId, nome)`, `.estado(faixaId)`. Teste:
   `D:/kanivete_testes/scripts/teste_sk_plugins.py` (porta 9333).
-- Pendente: os 7 plugins da jhudstudio (C4-EQ10, Dual-DeSser…) quebram ao abrir a TELA no carregador (access violation
-  em createView/attached; o som funciona) — vale no Vídeo também; automação de parâmetro; plugin no Master.
+- Pendente: automação de parâmetro; plugin no Master. (A tela dos plugins da jhudstudio foi corrigida no carregador:
+  `Instructions/agente/plugins.md`.)
 
 ## Pendências
 **REMIX DE MÚSICA (pedido do Pailer, 2026-10-09)** — esticar/encurtar uma trilha arrastando a ponta do clipe, como o

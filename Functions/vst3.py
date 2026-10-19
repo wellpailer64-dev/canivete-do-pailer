@@ -812,8 +812,14 @@ class _Painel:
         _Painel._registrar_classe()
         x, y, w, h = [int(v) for v in rect]
         self.pai = pai
-        self.hwnd = _u32.CreateWindowExW(0, "KanivetePluginPainel", "KANIVETE plugin", self.ESTILO, x, y, max(1, w), max(1, h),
-                                         pai, None, _k32.GetModuleHandleW(None), None)
+        self.rect0 = (x, y, max(1, w), max(1, h))
+        # nasce numa janela DESTE processo, visível mas fora da tela, e só vai para a do KANIVETE depois do attached
+        # (levar): os plugins da jhudstudio, no attached, procuram a janela de cima visível do próprio processo — sem
+        # nenhuma (a de cima era a do KANIVETE, de outro processo) davam ponteiro nulo e o processo caía
+        self.casa = _u32.CreateWindowExW(0x08000080, "KanivetePluginPainel", "KANIVETE", 0x90000000, -32000, -32000,
+                                         max(1, w), max(1, h), None, None, _k32.GetModuleHandleW(None), None)   # WS_POPUP|WS_VISIBLE, ferramenta, sem foco
+        self.hwnd = _u32.CreateWindowExW(0, "KanivetePluginPainel", "KANIVETE plugin", self.ESTILO, 0, 0, max(1, w), max(1, h),
+                                         self.casa, None, _k32.GetModuleHandleW(None), None)
         if not self.hwnd:
             raise RuntimeError("não criou a subjanela do painel")
         # o plugin numa subjanela própria (centrada) — o fundo do painel fica em volta
@@ -824,6 +830,13 @@ class _Painel:
         self.vw = self.vh = 0
         self.w, self.h = max(1, w), max(1, h)
         _PAINEIS[self.hwnd] = self
+        self._topo()
+
+    def levar(self):
+        """depois do attached: a subjanela passa para a janela do KANIVETE, no lugar do painel"""
+        _u32.SetParent(self.hwnd, self.pai)
+        x, y, w, h = self.rect0
+        _u32.SetWindowPos(self.hwnd, 0, x, y, w, h, 0x0010)
         self._topo()
 
     def _topo(self):
@@ -890,6 +903,7 @@ def encaixar(caminho, cid, pai, rect):
     _chamar(view, 12, c_int32, [c_void_p], pl.moldura.ptr)
     _chamar(view, 4, c_int32, [c_void_p, c_char_p], painel.palco, b"HWND")
     painel.ligar(view)
+    painel.levar()
     _u32.ShowWindow(painel.hwnd, 5)
     sys.stdout.write(json.dumps({"ok": 1, "tam": [painel.vw, painel.vh], "nome": pl.nome}) + "\n")
     sys.stdout.flush()
@@ -1035,9 +1049,10 @@ class _Servidor:
                 _u32.PostQuitMessage(0)
                 return
             if c.get("fechar_painel") and self.painel:
-                h = self.painel.hwnd
+                h, casa = self.painel.hwnd, self.painel.casa
                 self.painel_sumiu()
                 _u32.DestroyWindow(h)
+                _u32.DestroyWindow(casa)   # a janela escondida onde o painel nasceu
             if c.get("estado"):
                 self._avisar({"estado": self._estado()})
             if c.get("restaurar"):
@@ -1064,6 +1079,7 @@ class _Servidor:
             _chamar(view, 12, c_int32, [c_void_p], self.pl.moldura.ptr)
             _chamar(view, 4, c_int32, [c_void_p, c_char_p], self.painel.palco, b"HWND")
             self.painel.ligar(view)
+            self.painel.levar()
             _u32.ShowWindow(self.painel.hwnd, 5)
             self._avisar({"painel": 1, "tam": [self.painel.vw, self.painel.vh]})
             return

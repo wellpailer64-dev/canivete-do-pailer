@@ -46,7 +46,7 @@ Plugins VST3 sem instalador podem ficar na pasta Kanivete\Plugins VST3 (no disco
 Sound Kanivete: painel da faixa › Plugins VST3 › "+ Plugin VST3" põe um plugin de áudio instalado na faixa (depois dos
 efeitos do Kanivete); Abrir mostra a janela do plugin dentro do app. Para tocar com o plugin, o app prepara a faixa em
 segundo plano (uns segundos; o painel mostra "⏳ preparando" e enquanto isso toca sem o plugin); a exportação sai com o
-plugin. Plugins da jhudstudio ainda não abrem a janela (o som funciona). Para tirar ruído de voz (no
+plugin. Para tirar ruído de voz (no
 lugar do Goyo), use o efeito de áudio Anti Noise do próprio app: ganhou do plugin grátis RNNoise no teste.
 Plugins pagos feitos só para um editor (ex.: Neat Video "para o Resolve") não aparecem no KANIVETE.
 Pincel Roto (Efeitos › Chaveamento, ou duplo clique no clipe com o efeito): abre numa janela por cima do editor. Pinte o
