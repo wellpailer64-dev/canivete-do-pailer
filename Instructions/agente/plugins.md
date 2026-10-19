@@ -162,8 +162,8 @@ pelo Sound e seguem abertos; som da jhudstudio pelo congelamento ok.
 
 ## Plugins pessoais (2026-10-19) — ferramenta só do usuário, fora do git
 `Functions/plugins_pessoais.py` + `frontend/js/plugins-pessoais.js`: cada pasta `<raiz_dados>/Plugins/<id>/` (D:\Kanivete\Plugins)
-com `kanivete.json` (`nome`, `sigla`, `cor`, `js`, `css`, `py`, `descricao`, `desligado`) vira item na barra lateral ›
-Pessoais (depois de Reuniões) com a página vazia `#page-plugin-<id>`. O js roda com `KPLUG` e `PLUGIN_ID`; chama o Python
+com `kanivete.json` (`nome`, `sigla`, `cor`, `js`, `css`, `py`, `descricao`, `desligado`) vira item na barra lateral › Plugins
+(último grupo da lista; `icone`/`logo` = imagens do plugin) com a página vazia `#page-plugin-<id>`. O js roda com `KPLUG` e `PLUGIN_ID`; chama o Python
 por `KPLUG.chamar(id, 'funcao', {args})` → API `plugin_pessoal` → só as funções de `API_KANIVETE` do módulo `py`
 (o resto é recusado). `plugin_pessoal_recarregar(id)` esquece o módulo depois de editar. Nada disso vai no release:
 quem não tem a pasta não vê nada.

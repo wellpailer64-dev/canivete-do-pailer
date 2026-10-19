@@ -3,11 +3,11 @@
 Cada plugin é uma pasta em <raiz_dados>/Plugins/<id>/ com um kanivete.json:
   {"nome": "Pandalab", "sigla": "Pl", "cor": "#F26B3A", "js": "painel.js", "css": "painel.css",
    "py": "ponte.py", "descricao": "..."}
-O app cria a aba (barra lateral › Pessoais) com uma página vazia `#page-plugin-<id>` e roda o js dentro dela; o js
+O app cria a aba (barra lateral › Plugins, no fim da lista; `icone`/`logo` = imagens do plugin) com uma página vazia `#page-plugin-<id>` e roda o js dentro dela; o js
 chama o Python do plugin por `KPLUG.chamar('<id>', 'funcao', {args})`, que só aceita as funções listadas em
 `API_KANIVETE` no módulo `py` do plugin (nada fora dessa lista roda). Guia: Instructions/agente/plugins.md.
 """
-import importlib.util, json, os, sys, threading
+import base64, importlib.util, json, mimetypes, os, sys, threading
 
 from Functions.midia import raiz_dados
 
@@ -39,6 +39,16 @@ def _ler(pid, nome):
         return f.read()
 
 
+def _imagem(pid, nome):
+    """arquivo de imagem do plugin como data URL (a página não lê o disco direto)"""
+    p = os.path.join(pasta(), pid, nome or "")
+    if not nome or not os.path.isfile(p):
+        return ""
+    tipo = mimetypes.guess_type(p)[0] or ("image/webp" if p.endswith(".webp") else "image/png")
+    with open(p, "rb") as f:
+        return f"data:{tipo};base64," + base64.b64encode(f.read()).decode()
+
+
 def listar():
     """[{id, nome, sigla, cor, descricao, js, css}] dos plugins com kanivete.json (o texto do js/css vai junto)."""
     out = []
@@ -54,7 +64,8 @@ def listar():
             continue
         out.append({"id": pid, "nome": m.get("nome", pid), "sigla": m.get("sigla", pid[:2].title()),
                     "cor": m.get("cor", "#888"), "descricao": m.get("descricao", ""),
-                    "js": _ler(pid, m.get("js")), "css": _ler(pid, m.get("css"))})
+                    "js": _ler(pid, m.get("js")), "css": _ler(pid, m.get("css")),
+                    "icone": _imagem(pid, m.get("icone")), "logo": _imagem(pid, m.get("logo"))})
     return out
 
 

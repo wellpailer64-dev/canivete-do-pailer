@@ -1,5 +1,5 @@
 // Plugins pessoais (Functions/plugins_pessoais.py): cada pasta de <raiz_dados>/Plugins com kanivete.json vira uma aba
-// na barra lateral › Pessoais, com a página #page-plugin-<id> vazia para o js do plugin montar.
+// na barra lateral › Plugins (último grupo da lista), com a página #page-plugin-<id> vazia para o js do plugin montar.
 // O js do plugin recebe `KPLUG` e chama o Python dele por KPLUG.chamar(id, 'funcao', {args}).
 const KPLUG = {
     lista: [],
@@ -9,6 +9,7 @@ const KPLUG = {
         return r.dados;
     },
     pagina(id) { return document.getElementById('page-plugin-' + id); },
+    info(id) { return KPLUG.lista.find(p => p.id === id) || {}; },
 };
 
 async function kplugCarregar() {
@@ -16,14 +17,14 @@ async function kplugCarregar() {
     try { lista = await window.pywebview.api.plugins_pessoais_listar(); } catch (e) { return; }
     if (!lista || !lista.length) return;
     KPLUG.lista = lista;
-    const ata = document.querySelector('.menu-item[data-tool="ata-kanivete"]');
+    const menu = document.querySelector('.menu-item[data-tool="ata-kanivete"]')?.parentElement;
     const paginas = document.getElementById('page-ata-kanivete')?.parentElement;
-    if (!ata || !paginas) return;
-    let depois = document.getElementById('kplug-grupo');   // grupo "Pessoais" logo depois de Reuniões
-    if (!depois) {
-        depois = document.createElement('div');
-        depois.className = 'menu-group'; depois.id = 'kplug-grupo'; depois.textContent = 'Pessoais';
-        ata.after(depois);
+    if (!menu || !paginas) return;
+    let grupo = document.getElementById('kplug-grupo');   // grupo "Plugins" no fim da lista (depois da IA)
+    if (!grupo) {
+        grupo = document.createElement('div');
+        grupo.className = 'menu-group'; grupo.id = 'kplug-grupo'; grupo.textContent = 'Plugins';
+        menu.appendChild(grupo);
     }
     for (const p of lista) {
         if (p.erro) { console.warn('[plugin pessoal]', p.id, p.erro); continue; }
@@ -32,9 +33,11 @@ async function kplugCarregar() {
         const b = document.createElement('button');
         b.className = 'menu-item'; b.dataset.tool = tool; b.title = p.descricao || p.nome;
         b.onclick = () => switchTool(tool);
-        b.innerHTML = `<span class="icon"><span class="app-logo" style="--al:${p.cor};background:${p.cor};color:#fff">${_escHtml(p.sigla)}</span></span>` +
-            `<span class="label">${_escHtml(p.nome)}</span>`;
-        depois.after(b); depois = b;
+        const ico = p.icone
+            ? `<img class="kplug-ico" src="${p.icone}" alt="">`
+            : `<span class="app-logo" style="--al:${p.cor};background:${p.cor};color:#fff">${_escHtml(p.sigla)}</span>`;
+        b.innerHTML = `<span class="icon">${ico}</span><span class="label">${_escHtml(p.nome)}</span>`;
+        menu.appendChild(b);
         const pg = document.createElement('div');
         pg.className = 'tool-page ve-page'; pg.id = 'page-' + tool;
         paginas.appendChild(pg);
@@ -45,6 +48,12 @@ async function kplugCarregar() {
         }
     }
 }
+
+(() => {   // ícone de imagem do plugin no tamanho dos logos das ferramentas
+    const s = document.createElement('style');
+    s.textContent = '.kplug-ico{width:18px;height:18px;border-radius:5px;object-fit:cover;display:block}';
+    document.head.appendChild(s);
+})();
 
 if (window.pywebview && window.pywebview.api) kplugCarregar();
 else window.addEventListener('pywebviewready', kplugCarregar, { once: true });
