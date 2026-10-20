@@ -112,10 +112,15 @@ escala com curva), `kf()` (quadro-chave), `fx()` (efeito), `texto()/img()/forma(
   sequência, só efeitos (a trilha da sequência entra por cima).
 
 ## 9. Organização da timeline
-- 🔒 **Comps por grupo** (sugestão do Pailer, 2026-10-12): quando a timeline crescer na vertical, agrupar em Comps
-  (fundo, tipografia, partículas, transição de saída) — mais fácil de entender e mexer. Não é regra: só quando não
-  piorar o resultado. Próximo passo técnico: o `montador.js` aceitar `comp: "nome"` e montar as camadas dentro de uma
-  Comp (editor-comp.js) com a Comp na timeline principal.
+- ✅ **Uma Comp por cena — REGRA ao terminar qualquer motion** (pedido do Pailer, 2026-10-20; os reels BF tinham 46
+  faixas na principal): depois de montar, rodar `veCompAgruparCenas()` (ou botão direito num clipe › "Agrupar cenas em
+  Comps") em CADA timeline. Acha os blocos pelos cortes, põe cada cena numa Comp que **só organiza** (`m.passa`:
+  mesclagem Tela e camada de ajuste de dentro continuam pegando o que está embaixo; nada renderiza diferente) e tira as
+  faixas vazias. Reels BF: 184 → 52 clipes, 46 → 10 faixas, monitor e plano da exportação idênticos. Fundo que
+  atravessa as cenas (cor, estrada, vinheta, ajuste geral) fica na principal — de propósito. Antes de aplicar:
+  `veCompCenasPlano()` (não muda nada) mostra cenas e `conflitos` (0 = dá para agrupar sem mudar a ordem da pilha).
+  Projeto com várias timelines: o nome da Comp leva o da timeline ("Cena 3 · semaforo · Reel A").
+  Guia: `Instructions/agente/plano-comp.md` › "Comp que só organiza".
 
 ## 🔒 Próximas a destravar
 - Caminho de movimento curvo (alças espaciais), auto-orientar ao longo do caminho, repetidor de formas, expressões

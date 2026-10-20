@@ -22,6 +22,7 @@
     "editor-caneta.js",
     "editor-colar-externo.js",
     "editor-comandos.js",
+    "editor-comp-passa.js",
     "editor-comp.js",
     "editor-copiar.js",
     "editor-desempenho.js",
@@ -60,6 +61,7 @@
     "editor-texto.js",
     "editor-trans.js",
     "editor-transform.js",
+    "editor-trilhas.js",
     "editor-txanim.js",
     "editor.js",
     "editor.css"

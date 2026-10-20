@@ -250,7 +250,7 @@ async function veFilaAdicionarPreparando(nome, cfg) {
     if (typeof ve3dProntas === 'function') await ve3dProntas(msg);
     // placa ligada: só o plano das transições de sobreposição (a placa faz no shader); desligada: renderiza antes
     if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg, !!(cfg ? cfg.gpu : veFilaCfgLer().gpu));
-    if (VE.clips.some(veTxPrecisa)) { msg('Preparando textos, formas e camadas de motion…'); await veTxPngs(); }
+    if (veTxPrecisaEm(VE.clips)) { msg('Preparando textos, formas e camadas de motion…'); await veTxPngs(); }
     msg('Revisando a timeline…');
     const avisos = await veFilaRevisar().catch(() => []);
     if (avisos.length) veToast(`Revisor: ${avisos.length} aviso(s) — ${avisos.slice(0, 2).map(a => veHuman(a.t) + ' ' + a.texto).join(' · ')}${avisos.length > 2 ? ' …' : ''}`);

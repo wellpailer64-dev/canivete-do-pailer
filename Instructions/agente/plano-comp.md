@@ -118,6 +118,36 @@ duplicar a Comp no Projeto cria uma Comp independente (timeline copiada).
   é atualizada no lugar. `eid` = nome fixo da camada de dentro (fora do hash). Render/fila agora são por mídia
   (`veCompPendentes`); variação sem uso não renderiza nem é salva; ↺ volta ao valor da Comp. Textos em inglês no i18n.
 
+## Comp que só organiza + Agrupar cenas + faixas (2026-10-20)
+Pedido do Pailer: motion feito pelo agente deixou 46 faixas na principal; separar por cena SEM mudar nada.
+- **Por que não a Comp comum:** ela vira um arquivo com fundo transparente — camada em modo Tela dentro dela fica com
+  fundo opaco (ffmpeg compõe em gbrp sem alfa) e camada de ajuste de dentro deixa de pegar o que está embaixo.
+- **`m.passa`** (`frontend/js/editor-comp-passa.js`): a faixa da Comp, se neutra (`veCompPassa`: sem movimento,
+  opacidade, efeito, mesclagem, transição, velocidade, máscara, animação em loop), entra na pilha de fora com as camadas
+  de dentro, no lugar dela. Prévia: `src = 'passa'` em `veDrawMonitor` → `veCompPassaDesenhar` desenha as de dentro no
+  MESMO canvas (com as transições de dentro). Exportação: `veExportPlan` e `veTxPngs` achatam com `veCompPlana` (cópias
+  sempre os mesmos objetos: `VE._txPng` é por clipe; trilhas renumeradas na ordem da pilha; uid repetido renomeado);
+  `veMoAssar` usa a lista achatada (`VECOMP.planas`). Entradas da exportação usam `veTxPrecisaEm` (olha dentro). O arquivo
+  da Comp continua sendo renderizado (miniatura e o caso "faixa não neutra" = Comp comum). Salvo no projeto (`passa`).
+- **Criar Comp** agora leva o estado inteiro das trilhas (volume/pan/rack/nome; não cadeado/alvo/solo) e aceita
+  `opts.tr`, `opts.passa`, `opts.semHistorico`.
+- **Agrupar cenas** (`veCompCenasPlano` → `veCompAgruparCenas`): cortes = instante com 2+ camadas começando juntas
+  (±0,15 s) e no máximo 1 atravessando; camada > 40% da duração = fundo (fica fora); cada camada vai para a cena com mais
+  da duração dela. Conferência da pilha: camada de fora que aparece junto com a cena precisa ficar toda acima ou toda
+  abaixo das de dentro — senão a ponte muda de cena, sai, ou as cenas se juntam; camada de fora no meio (vinheta entre as
+  camadas e um ajuste por cima) → o lado menor sai da Comp. Lugar da Comp: faixa livre entre os limites; sem lugar, abre
+  faixa nova (`veTrkMexer`). Um Ctrl+Z desfaz tudo.
+- **Faixas** (`frontend/js/editor-trilhas.js`): botão direito no cabeçalho V/A → Adicionar faixa acima, Dar nome,
+  Excluir faixas vazias, Excluir esta faixa (com os clipes). Vídeo e áudio dividem o número da trilha (`c.tr`): mexer só
+  nas de vídeo renumera só os clipes de vídeo; clipe com som no caminho → as duas listas andam juntas (cada clipe fica com
+  o volume/pan da trilha dele). Desfazer volta as faixas: `veSnapshot` guarda `trk` e `veRestore` só repõe se
+  `VE_TRK.ver` mudou (olho/mudo continuam fora do desfazer).
+- **Como conferir (barato, sem exportar):** (1) plano da exportação antes × depois — camadas por chave numerada, zero
+  pares sobrepostos invertidos, base e mix iguais (`D:/kanivete_testes/scripts/ordem.js`); (2) monitor antes × depois por
+  `toDataURL` com **`vePrSegEm` desligado** (senão a versão original desenha o trecho pré-renderizado em disco e TUDO
+  parece diferente — custou várias rodadas) e ~3 s de espera por quadro (imagens em resolução cheia), comparando pelo
+  Ctrl+Z/Ctrl+Y na mesma sessão (`cmp2.py`, `par2.py`). Reels BF A e B: máx. 1 nível de diferença.
+
 ## Como testar (modo agente)
 - Outra instância: `python main.py --agente=9333` (não usar a do usuário, porta 9222).
 - Montar timelines por JS (ver scripts de teste do AutoFrame: criar timeline, `VE.clips = [...]`, `veRelayout()`),

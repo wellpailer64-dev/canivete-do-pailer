@@ -124,22 +124,25 @@ function veCompDeClipes(sel, nome, opts = {}) {
         n.tr = mapaTr.get(c.tr);
         return n;
     });
+    // o estado de cada trilha vai junto (olho, mudo, volume/pan/rack do Mixer, nome), menos cadeado, alvo e solo
     const trilhas = veTrkNovo(Math.max(VE_MIN_TRACKS, trs.length));
-    trs.forEach((t, k) => {
-        if (VE_TRK.v[t] && VE_TRK.v[t].hide) trilhas.v[k].hide = true;
-        if (VE_TRK.a[t] && VE_TRK.a[t].mute) trilhas.a[k].mute = true;
-    });
+    trs.forEach((t, k) => ['v', 'a'].forEach(x => {
+        const o = vePlain(VE_TRK[x][t] || {}, {});
+        delete o.lock; delete o.semAlvo; delete o.solo;
+        Object.assign(trilhas[x][k], o);
+    }));
     const seq = {
         id: veSeqId(), name: nome, comp: true, dur, clips, trilhas, texto: { palavras: [], idioma: 'pt', chave: '' },
         legendas: [], legEstilo: null, legGravar: true, inPt: null, outPt: null, markers: [], guias: [], playhead: 0,
         view: { pps: 0, x: 0 }, w: VE.seqW, h: VE.seqH, master: null,
     };
     const temSom = veCompComo(seq, () => veMixClipes().length > 0);
-    vePushHistory();   // antes da mídia nova: desfazer some com a Comp do Projeto (veRestore)
+    if (!opts.semHistorico) vePushHistory();   // antes da mídia nova: desfazer some com a Comp do Projeto (veRestore)
     VE.sequences.push(seq);
     const m = {
         id: VE.media.length, kind: 'video', comp: true, sequenceId: seq.id, name: nome, cor: VE_COMP_COR,
         pasta: opts.pasta !== undefined ? opts.pasta : typeof vePjDestino === 'function' ? vePjDestino() : null, path: null, dur, _criada: true,
+        ...(opts.passa ? { passa: true } : {}),   // só organiza (editor-comp-passa.js)
         // até o render sair: o que já se sabe (duração, quadro, se tem som) — trilha de áudio só se tiver som
         info: { duration: dur, width: VE.seqW, height: VE.seqH, fps: VE.fps || 30, has_audio: temSom, alfa: true, provisoria: true },
     };
@@ -147,7 +150,7 @@ function veCompDeClipes(sel, nome, opts = {}) {
     VE.clips = VE.clips.filter(c => !sel.includes(c));
     const novo = { tr: 0, st: st0, s: 0, e: dur, m: m.id, cor: VE_COMP_COR };
     const vs = sel.filter(veOcupaV), base = Math.min(...(vs.length ? vs : sel).map(c => c.tr));
-    let tr = base;
+    let tr = opts.tr != null ? opts.tr : base;
     while (veTrkLocked(tr) || !veTrackFree(tr, st0, fim, novo)) tr++;
     novo.tr = tr;
     veEnsureTrackIndex(tr, { refresh: true });
@@ -409,7 +412,7 @@ async function veCompJob(seq) {
     const imgs = seq.clips.map(c => VE.media[c.m || 0]).filter(m => m && m.kind === 'image' && !veMediaOffline(m));
     for (let k = 0; k < 50 && imgs.some(m => !m.w); k++) await new Promise(r => setTimeout(r, 100));
     // textos, formas e cores sólidas viram PNG (o mesmo desenho da prévia), sem mexer no VE._txPng da exportação
-    const mapa = seq.clips.some(veTxPrecisa) ? await veTxPngs(null, seq.clips, false) : new Map();
+    const mapa = veTxPrecisaEm(seq.clips) ? await veTxPngs(null, seq.clips, false, veSeqTracks(seq.trilhas, seq.clips)) : new Map();
     return veCompComo(seq, () => {
         const ant = VE._txPng;
         VE._txPng = mapa;
@@ -571,12 +574,12 @@ function veCompVideosVivos(t, lista) {
         const tc = veSrcAt(c, T);
         veCompComo(seq, () => veCompVisiveis(tc).forEach(ic => {
             const mi = veMediaOf(ic);
-            if (veCompVivo(mi)) juntar(ic, tc, d + 1);
+            if (veCompVivo(mi) || veCompPassa(ic)) juntar(ic, tc, d + 1);
             else if (!veIsImage(ic) && mi && mi.url && !veMediaOffline(mi)) out.push([veCompChave(seq.id, VE.clips.indexOf(ic)), ic]);
         }));
     };
     (lista || []).forEach(c => {
-        if (veCompVivo(veMediaOf(c)) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS) juntar(c._o || c, t, 0);
+        if ((veCompVivo(veMediaOf(c)) || veCompPassa(c)) && t >= c.st - VE_EPS && t < veEnd(c) - VE_EPS) juntar(c._o || c, t, 0);
     });
     return out;
 }
@@ -613,6 +616,7 @@ function veCompSrc(seq, ic, tc, k, fator, d) {
     const mi = veMediaOf(ic);
     if (veMediaOffline(mi)) return 'offline';
     const alvo = k * veProps(ic, tc).sc / 100;
+    if (typeof veCompPassa === 'function' && veCompPassa(ic)) return 'passa';   // desenhada na pilha de fora (editor-comp-passa.js)
     if (veCompVivo(mi)) return veCompQuadro(ic, tc, alvo, d + 1, fator) || 'comp';
     if (veIsAdj(ic)) return 'ajuste';
     if (veIsTexto(ic)) return (typeof veTxaCanvas === 'function' && veTxaCanvas(ic, alvo)) || veTxCanvas(ic, alvo).cv;

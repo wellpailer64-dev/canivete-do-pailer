@@ -178,8 +178,11 @@ function veTxTamanho(c) { const L = veTxLayout(veTxt(c)); return { w: L.w, h: L.
 
 // Exportação: cada clipe de texto vira um PNG no tamanho em que ele aparece (a maior escala dele).
 // clips = os de outra timeline (Comp, editor-comp.js); guardar = false devolve o mapa sem trocar o VE._txPng
-async function veTxPngs(filtro, clips = VE.clips, guardar = true) {
+async function veTxPngs(filtro, clips = VE.clips, guardar = true, trk = null) {
     const mapa = new Map();
+    // Comp que só organiza (editor-comp-passa.js): as camadas de dentro, como a exportação as monta (veCompPlana)
+    const pl = typeof veCompPlana === 'function' ? veCompPlana(clips, trk || veCompTrkDe(clips)) : null;
+    if (pl) clips = pl.clips;
     for (const c of clips.filter(c => veIsTexto(c) && (!filtro || filtro(c)))) {
         const p = veStaticProps(c);
         const escalas = [p.sc].concat(veKfOn(c, 'sc') ? c.k.sc.map(q => q.v) : []);

@@ -209,7 +209,7 @@ async function vePrJob(s) {
     VE._txPng = null;
     // texto vira PNG (o mesmo desenho da prévia); só os do trecho
     if (typeof veOvtProntas === 'function') await veOvtProntas(f);   // transições de sobreposição do trecho (editor-ovt.js)
-    if (VE.clips.some(c => veTxPrecisa(c) && c.st < s.b && veEnd(c) > s.a)) await veTxPngs(c => c.st < s.b && veEnd(c) > s.a);
+    if (veTxPrecisaEm(VE.clips.filter(c => c.st < s.b && veEnd(c) > s.a))) await veTxPngs(c => c.st < s.b && veEnd(c) > s.a);
     try {
         VE.legGravar = true;   // a prévia mostra as legendas mesmo que a exportação não as grave
         const plano = veExportPlan(true, f);

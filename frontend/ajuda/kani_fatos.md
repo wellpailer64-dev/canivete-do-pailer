@@ -55,6 +55,10 @@ quadro-base. O recorte dos outros quadros só é montado quando você clica em "
 sozinho" para montar logo depois de cada traço. Qualidade alta (borda mais fiel) ou Rápida (uns 3× mais rápida).
 Na faixa "Borda" da janela: Nitidez (recorte mais seco), Descontaminar cores (tira a auréola do fundo antigo em volta do
 cabelo) e Proteger rosto (o recorte não fura o rosto nem a lente dos óculos).
+Timeline cheia de faixas (motion com muitas camadas): botão direito num clipe › "Agrupar cenas em Comps". O app acha
+cada bloco de cena e põe numa Comp que só organiza: o resultado continua idêntico (modo Tela e camadas de ajuste de
+dentro continuam pegando o que está embaixo). Duplo clique na faixa da Comp abre a cena; Ctrl+Z desfaz o agrupamento.
+Botão direito no nome da faixa (V1, A1...): Adicionar faixa acima, Excluir esta faixa, Excluir faixas vazias, Dar nome.
 
 ## Kanivete Encoder (fila de exportação, estilo Media Encoder)
 Configurações à esquerda e fila à direita. Cada item da fila tem as suas próprias configurações (formato, resolução,

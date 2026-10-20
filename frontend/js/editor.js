@@ -737,7 +737,9 @@ function veSnapshot() {
     const comps = (VE.media || []).filter(m => m && m.comp && !m.removido).map(m => m.id);
     // c3d = Cenas 3D (editor-3d.js): câmera, luz, modelos e quadros-chave também se desfazem
     const c3d = {}; (VE.media || []).forEach(m => { if (m && m.c3d && !m.removido) c3d[m.id] = m.c3d; });
-    return JSON.stringify({ clips: VE.clips, inPt: VE.inPt, outPt: VE.outPt, markers: VE.markers || [], legendas: VE.legendas || [], comps, c3d });
+    // trk: faixas adicionadas/excluídas (editor-trilhas.js) voltam junto; olho/mudo/volume sozinhos não entram (ver)
+    return JSON.stringify({ clips: VE.clips, inPt: VE.inPt, outPt: VE.outPt, markers: VE.markers || [], legendas: VE.legendas || [], comps, c3d,
+                            trk: { v: VE_TRK.v, a: VE_TRK.a, ver: VE_TRK.ver || 0 } });
 }
 
 function vePushHistory() {
@@ -753,6 +755,12 @@ function vePushHistory() {
 function veRestore(snap) {
     const d = JSON.parse(snap);
     VE.clips = d.clips; VE.inPt = d.inPt; VE.outPt = d.outPt;
+    if (d.trk && (d.trk.ver || 0) !== (VE_TRK.ver || 0)) {
+        VE_TRK = veSeqTracks(d.trk, VE.clips);
+        VE_TRK.ver = d.trk.ver || 0;
+        veRebuildTracks(veTrackCount());
+        veBuildHeads();
+    }
     if (typeof veOfxRegistrarClipes === 'function') veOfxRegistrarClipes(VE.clips);   // efeitos OFX do projeto (editor-ofx.js)
     VE.markers = d.markers || [];
     VE.legendas = d.legendas || [];
@@ -3040,6 +3048,7 @@ function veClipMenu(i, x, y, doc) {
         <button class="ve-ctx-item" data-ctx="pj">Mostrar no projeto</button>
         ${typeof veEhComp === 'function' && veEhComp(veMediaOf(c)) ? '<button class="ve-ctx-item" data-ctx="abrircomp">Abrir Comp<kbd>duplo clique</kbd></button><button class="ve-ctx-item" data-ctx="descomp">Descompactar Comp</button>' : ''}
         <button class="ve-ctx-item" data-ctx="comp">Criar Comp…<kbd>Ctrl+Shift+C</kbd></button>
+        <button class="ve-ctx-item" data-ctx="cenas" title="Acha os blocos de cena e põe cada um numa Comp que só organiza (o resultado não muda)">Agrupar cenas em Comps</button>
         ${veSelLista().includes(c) && new Set(veSelLista().map(o => o.lk || o)).size > 1 ? '<button class="ve-ctx-item" data-ctx="sinc">Sincronizar clipes (pelo áudio)</button>' : ''}
         <button class="ve-ctx-item" data-ctx="off">${veClipOff(c) ? '' : '✓ '}Ativar<kbd>Ctrl+Shift+E</kbd></button>
         ${veIsImage(c) ? '' : `<button class="ve-ctx-item" data-ctx="inv">${veInvertido(c) ? '✓ ' : ''}Inverter clipe (Reverse Speed)</button>`}
@@ -3060,6 +3069,7 @@ function veClipMenu(i, x, y, doc) {
         } else if (it) {
             // Criar Comp: o clipe clicado já selecionado (com o grupo) não perde a seleção múltipla
             if (it.dataset.ctx === 'sinc') { veClipMenuFechar(); veSincronizarClipes(); return; }
+            if (it.dataset.ctx === 'cenas') { veClipMenuFechar(); veCompAgruparCenas(); return; }
             if (it.dataset.ctx === 'comp') {
                 if (!veSelLista().includes(VE.clips[i])) veSelDefinir([VE.clips[i]], VE.clips[i]);
                 veClipMenuFechar();
@@ -3178,7 +3188,8 @@ function veCamVisiveis(t, lista, cur) {
     if (cobre > 0) vis = vis.slice(cobre);
     return vis.filter(c => {
         const m = veMediaOf(c);
-        return !veIsImage(c) && !c._tr && (c._o || c) !== cur && m && m.url && !veMediaOffline(m) && !(m.comp && m._aoVivo);
+        return !veIsImage(c) && !c._tr && (c._o || c) !== cur && m && m.url && !veMediaOffline(m) && !(m.comp && m._aoVivo) &&
+            !(typeof veCompPassa === 'function' && veCompPassa(c));   // Comp que só organiza: as de dentro têm os players
     });
 }
 
@@ -3498,6 +3509,7 @@ function veDesenharItens(ctx, cv, itens, pv, t, semFoscos) {
             if (foscos && c.uid && foscos.has(c.uid)) return;   // camada usada como fosco de trilha não aparece (como no AE)
             if (src === 'ajuste') { veAdjDraw(ctx, cv, c, pv, t); return; }
             if (src === 'comp') { veCompDesenharPendente(ctx, VE.seqW, VE.seqH, veMediaOf(c)); return; }
+            if (src === 'passa') { veCompPassaDesenhar(ctx, cv, c, pv, t); return; }   // editor-comp-passa.js
             if (src === 'preparando') {
                 const p = veProps(c), sz = veMediaSize(c), [ax, ay] = veAnc(c, p, sz);
                 ctx.save();
@@ -3597,6 +3609,8 @@ function veDrawMonitor() {
             // sem a prévia ainda: a miniatura dele com "Preparando" (o player ainda tem o arquivo de OUTRO vídeo)
             src = 'preparando';
             parcial = true;
+        } else if (typeof veCompPassa === 'function' && veCompPassa(c)) {
+            src = 'passa';   // Comp que só organiza (editor-comp-passa.js): as camadas de dentro entram na pilha daqui
         } else if (med && med.comp && (med._aoVivo || !med.url)) {
             // Comp mudada e ainda sem o arquivo novo: desenhada ao vivo com as camadas de dentro (editor-comp.js)
             src = veCompQuadro(c, t, pv * veProps(c).sc / 100) || 'comp';
@@ -3653,7 +3667,9 @@ function veDrawMonitor() {
     ctx.fillRect(0, 0, cw, ch);
     ctx.setTransform(pv, 0, 0, pv, 0, 0);
     ctx.imageSmoothingQuality = 'high';
+    if (typeof VECOMP !== 'undefined') VECOMP.parcial = false;
     veDesenharItens(ctx, cv, itens, pv, t);
+    if (typeof VECOMP !== 'undefined' && VECOMP.parcial) parcial = true;   // camada de dentro de Comp ainda sem quadro
     veTxDesenhar(ctx);
     veCacheStore(cv, cw, ch, pv, itens, trans, falta || parcial);
     // caixa com alças e ponto de ancoragem do selecionado (editor-transform.js)
@@ -3985,6 +4001,9 @@ function veRecortarClips(clips, a, b) {
 // emFaixa: só o trecho In→Out (a exportação); sem isso, a timeline inteira (ex.: a transcrição).
 // faixa: outro trecho {a, b} (prévia renderizada, editor-render.js)
 function veExportPlan(emFaixa, faixa) {
+    // Comp que só organiza (editor-comp-passa.js): o plano sai das camadas de dentro, na pilha daqui
+    const pl = typeof veCompPlana === 'function' ? veCompPlana() : null;
+    if (pl) return veCompPlanaComo(pl, () => veExportPlan(emFaixa, faixa));
     // transições (editor-trans.js): o plano sai dos clipes estendidos e animados
     const orig = VE.clips, dur0 = VE.dur, f = faixa || (emFaixa ? veExportFaixa() : null);
     if (typeof veOvtSigs === 'function') VEOVT.sigs = veOvtSigs();   // sobreposições prontas (editor-ovt.js)
@@ -4447,7 +4466,7 @@ function veProjectData() {
                 if (m.kind === 'video') o.path = m.path;
                 // Comp (editor-comp.js): a timeline dela + o arquivo renderizado e o hash do conteúdo dele
                 if (m.comp) Object.assign(o, { comp: true, sequenceId: m.sequenceId, compSig: m.compSig || null, dur: m.dur,
-                                               temSom: !!(m.info && m.info.has_audio), ...(m.ov ? { ov: m.ov, ovDe: m.ovDe } : {}) });
+                                               temSom: !!(m.info && m.info.has_audio), ...(m.ov ? { ov: m.ov, ovDe: m.ovDe } : {}), ...(m.passa ? { passa: true } : {}) });
                 if (m.c3d) Object.assign(o, { c3d: m.c3d, c3dSig: m.c3dSig || null, dur: m.dur });   // Cena 3D (editor-3d.js)
                 if (m.kind === 'timeline') o.sequenceId = m.sequenceId;
                 if (m.kind === 'cor') o.fill = m.fill;   // cor sólida (m.cor é a do rótulo)
@@ -4696,7 +4715,7 @@ function veApplyProject() {
             if (m.comp) {
                 // Comp: o arquivo pode ter saído do cache (limpeza automática) — renderiza de novo (veCompVerificar)
                 const dur = m.dur || mediaDur.get(m.id) || 1;
-                Object.assign(nm, { comp: true, sequenceId: m.sequenceId, compSig: m.compSig || null, dur, ...(m.ov ? { ov: m.ov, ovDe: m.ovDe } : {}) });
+                Object.assign(nm, { comp: true, sequenceId: m.sequenceId, compSig: m.compSig || null, dur, ...(m.ov ? { ov: m.ov, ovDe: m.ovDe } : {}), ...(m.passa ? { passa: true } : {}) });
                 if (estaFaltando(m.path)) {
                     Object.assign(nm, { path: null, compSig: null,
                         info: { duration: dur, width: q.w, height: q.h, fps: VE.fps || 30, has_audio: !!m.temSom, alfa: true, provisoria: true } });
@@ -6263,7 +6282,7 @@ async function veStartExport() {
         // transições de sobreposição: o trecho de cada uma renderizado das trilhas de baixo (editor-ovt.js)
         if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg => { $ve('ve-exp-msg').textContent = msg; },
                                                                    !!($ve('ve-gpu') && $ve('ve-gpu').checked));   // placa: só o plano (shader)
-        if (VE.clips.some(veTxPrecisa)) await veTxPngs();   // textos e gráficos viram PNG; camadas do motion, vídeo
+        if (veTxPrecisaEm(VE.clips)) await veTxPngs();   // textos e gráficos viram PNG; camadas do motion, vídeo
         const plano = veExportPlan(true), master = veMasterLim();
         const mix = master ? [...plano.mix, { master }] : plano.mix;
         await window.pywebview.api.video_cutter_export(
@@ -6930,6 +6949,7 @@ function veInitEvents() {
     }).observe(wrap);
 
     veInitResizers();
+    if (typeof veTrkMenuLigar === 'function') veTrkMenuLigar();   // botão direito no cabeçalho da faixa (editor-trilhas.js)
     veInitProps();
     v.addEventListener('seeked', () => veDrawMonitor());
     v.addEventListener('loadeddata', () => veDrawMonitor());

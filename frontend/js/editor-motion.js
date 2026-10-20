@@ -669,7 +669,8 @@ async function veMoAssarSig(c, lista, como, aviso, sig, W, H, fps) {
 // Chamado pela preparação da exportação (veTxPngs): cada camada do motion vira o vídeo desenhado
 async function veMoAssar(mapa, filtro, clips = VE.clips) {
     const seq = clips === VE.clips ? null : (VE.sequences || []).find(s => s.clips === clips);
-    const como = fn => (seq && typeof veCompComo === 'function' ? veCompComo(seq, fn) : fn());
+    const pl = typeof VECOMP !== 'undefined' && VECOMP.planas && VECOMP.planas.get(clips);   // achatada (editor-comp-passa.js)
+    const como = fn => (pl ? veCompPlanaComo(pl, fn) : seq && typeof veCompComo === 'function' ? veCompComo(seq, fn) : fn());
     const lista = como(() => clips.filter(c => veMoTem(c) && !veMoFora(c) && !veOculto(c) && (!filtro || filtro(c))));
     for (let j = 0; j < lista.length; j++) {
         const c = lista[j];

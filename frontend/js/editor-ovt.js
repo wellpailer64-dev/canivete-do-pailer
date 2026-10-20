@@ -352,7 +352,7 @@ function veOvtAdd(t, corte, opts = {}) {
 async function veOvtJob(c) {
     const a = c.st, b = veEnd(c), abaixo = VE.clips.filter(o => o !== c && o.tr < c.tr);
     const noTrecho = o => o.st < b && veEnd(o) > a;
-    const mapa = abaixo.some(o => veTxPrecisa(o) && noTrecho(o)) ? await veTxPngs(noTrecho, abaixo, false) : new Map();
+    const mapa = veTxPrecisaEm(abaixo.filter(noTrecho)) ? await veTxPngs(noTrecho, abaixo, false) : new Map();
     const orig = VE.clips, ant = VE._txPng;
     VE.clips = abaixo;
     VE._txPng = mapa;
