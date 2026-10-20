@@ -280,7 +280,8 @@ Plano, modelo e limitações em `Instructions/agente/plano-comp.md`; código em 
 Plano completo (Fases 1–3 + Propriedades essenciais por faixa).
 **Comp que só organiza + Agrupar cenas** (2026-10-20, `editor-comp-passa.js`): ao terminar QUALQUER motion, rodar
 `veCompAgruparCenas()` em cada timeline (uma Comp por cena; mesclagem/ajuste de dentro continuam valendo: resultado
-idêntico). Botão direito no cabeçalho da faixa: adicionar/excluir/excluir vazias (`editor-trilhas.js`). Conferir
+idêntico). Botão direito no cabeçalho da faixa: adicionar/excluir/excluir vazias (`editor-trilhas.js`; teste
+`py -3.13 testes/teste_trilhas.py`, porta 9333). Conferir
 monitor antes×depois SEMPRE com `vePrSegEm` desligado (o trecho pré-renderizado engana). Guia: plano-comp.md;
 teste `py -3.13 testes/teste_comp_cenas.py` (porta 9333, reels BF).
 

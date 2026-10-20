@@ -431,6 +431,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_cameraraw.py` — Filtro Camera Raw em janela própria (app em --agente=9333; não mexa no mouse durante). Arrasta uma barra com o
 - `testes/teste_caneta.py` — Caneta, demarcadores, recuperação e laço magnético com mouse de verdade no app de teste (9333)
 - `testes/teste_ceu.py` — Editar › Substituição de céu do Photo Kanivete (SkySeg) — app em --agente=9333
+- `testes/teste_comp_cenas.py` — Agrupar cenas em Comps preserva exportação, monitor e desfazer (app em --agente=9333)
 - `testes/teste_conteudo.py` — Editar › Preenchimento sensível ao conteúdo do Photo Kanivete (LaMa) — app em --agente=9333
 - `testes/teste_copias_edicao.py` — Cópias de edição (Functions/otimizar.py): quadro-chave a cada ~0,25 s e refazer as antigas pelo editor
 - `testes/teste_corte_alt.py` — Máscara de corte com Alt + clique na divisa entre duas camadas (como no Photoshop), com mouse de verdade no app de
@@ -478,6 +479,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_slider_html.py` — Slider › Exportar › Apresentação (HTML): monta uma apresentação com foto, GIF, vídeo, animações (automática e de
 - `testes/teste_som.py` — Sound Kanivete (som.js + Functions/sound_kanivete.py) — app em --agente=9333, mouse de verdade
 - `testes/teste_timeline_pr.py` — Timeline como a do Premiere (2026-10-11): ferramentas no topo da coluna das trilhas, alvo de trilha (Track Targeting),
+- `testes/teste_trilhas.py` — Faixas da timeline (editor-trilhas.js): adicionar, excluir, excluir vazias e Ctrl+Z (app JÁ aberto em --agente=9333)
 - `testes/teste_vetor.py` — Teste do Vetor Kanivete pela API real (app em --agente=9333): monta um cartão de visita pelos comandos (window.VKN),
 - `testes/teste_vetor_editor3d.py` — Teste da ponte Vetor → Editor (Cena 3D), app em --agente=9333: copo (girar) com rótulo coral, caixa (extrudar com
 - `testes/teste_vetor_paineis.py` — Painéis móveis do Vetor Kanivete (vetor-dock.js, o mecanismo do Photo) — app em --agente=9333, mouse de verdade
