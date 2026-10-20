@@ -11,6 +11,7 @@ Legenda: ⭐ = o Pailer elogiou nominalmente · 🔓 = desbloqueada (usada e apr
 |---|---|---|---|
 | Propaganda KANIVETE (ref. Pinterest, 23 s) | 2026-10-10 | "ficou perfeito" | `D:/kanivete_testes/motion_kanivete/` |
 | Intro "SEQUÊNCIA DE APROVADOS" (Carlinhos, ref. Dodge, 5 s) | 2026-10-12 | "superou em TODOS os pontos", aprovado de primeira | `D:/kanivete_testes/intro_aprovados/` |
+| 2 reels Black Friday A/B + mosaico (Carlinhos, "Sinal amarelo", 24 s) | 2026-10-20 | mosaico: "melhora muito boa"; reels: "falta pouco" | `D:/kanivete_testes/bf_carlinhos/` |
 
 ## Ferramenta-base: plano em código (montar.py + montador.js)
 🔓 A timeline inteira sai de um script: cada camada é um dicionário (tipo, trilha, início, duração, propriedades,
@@ -138,3 +139,34 @@ escala com curva), `kf()` (quadro-chave), `fx()` (efeito), `texto()/img()/forma(
   quadro (medido: `sfx_medidas.json`), volume normalizado por tipo, intervalo mínimo por tipo (whoosh 2,6 s, tick 0,42 s).
 - Armadilha: fonte instalada só para o usuário (Fraunces) NÃO aparece no editor (cai no Arial). Conferir medindo a
   largura no canvas (`measureText` igual ao Arial = falta); `document.fonts.check` sempre diz sim.
+
+## Peça: Reels Black Friday A/B (Carlinhos, 2026-10-19) — `D:/kanivete_testes/bf_carlinhos/` (montar.py gera as 2 timelines)
+- 🔓 **Trilha escolhida por medida** (não dá para ouvir): prévias do Epidemic (`audiocdn.epidemicsound.com/lqmp3/...`,
+  capturadas tocando cada linha) → librosa: energia por segundo, BPM, batidas. Procurar **pausa seca + drop** (FLACO,
+  Azucares: pausa 29,5–33,0, drop 33,27). Começar o reel numa frase da música (16 tempos antes do drop): gancho 8 tempos,
+  pausa 8 tempos (tensão), drop revela a oferta. Gênero pelo público: funk carioca "Happy" > phonk (escuro/raivoso).
+- 🔓 **Teste A/B limpo**: mesma música e mesmas cenas; só o gancho (0–3,7 s) muda (`gancho_A`/`gancho_B`).
+- 🔓 **Objeto em 2 estados** (semáforo apagado / só o amarelo aceso): gerar com tudo aceso e apagar as lâmpadas no
+  numpy por DISCO em posições medidas no perfil de cor (máscara por cor pega laranja do vizinho). Acende = troca com op.
+- 🔓 **Brilho de luz = PNG radial** (`glow.png`, `glow_eli.png` para o chão) em modo Tela. Forma + desfoque saiu como
+  disco chapado na prévia (desfoque não pegou na forma com mesclagem: pendência no plano-motion).
+- 🔓 **Pessoa do ChatGPT** (luz de recorte amarela no prompt = já casa com a peça) → `recorte_pro.recortar(..., "pessoa")`
+  → posicionar pelo TOPO da cabeça (`y_topo(arq, larg, topo)`), nunca pelo centro (bate no título).
+- 🔓 Carro pequeno do cliente (645 px) → `ampliar_imagem.ampliar(..., 3, "foto")` (Real-ESRGAN; só em objeto, não rosto).
+- Exportar: `exportar.py --tl "<timeline>" --nome arq --placa`; a conexão CDP pode cair na exportação pesada (a página
+  segue): `esperar_fim.py` reconecta e espera `window.__fim`. Volume: música g −9 + limiter boost 2 → −14,4 LUFS.
+- Mosaico de feed no mesmo visual: `KNV.cena` com 3 `<section class="slide">` retrato e veículos soltos atravessando a
+  emenda; bordas da foto do meio esfumadas com `linear-gradient` (entra na cena). Logo: `LOGO 3D.png` (o "Auto escola" do
+  logo chapado some no fundo escuro).
+- Notas do Pailer (2026-10-20) que viram regra: **margem lateral 100 px** com texto que encolhe sozinho (`cabe()` no
+  montar.py); texto centrado/simétrico; **logo sem exagero** (~520 px no CTA); objeto de cena INTEIRO (semáforo com o
+  poste até fora do quadro, âncora `p.ax/ay` na BASE e balanço ±1,5° — o brilho acompanha por seno/cosseno); campanha
+  ganha **brasão oficial** (ChatGPT, 3D, fundo transparente) que aparece no drop e no CTA; **logo certo para o fundo**.
+- 🔓 **Fita de sinalização** "BLACK FRIDAY" (PNG gerado no PIL, tira 4200×120) cruzando a peça: no mosaico em X atrás
+  do herói, atravessando os 3 posts e sumindo na sombra (degradê escuro só sobre fundo+fitas, por baixo das sections);
+  nos reels cruza a tela no drop com desfoque de movimento. Referência do Pinterest via KaniBrowser (`kb.py baixar --min 150`).
+- 🔓 **Editar por cima do arquivo do Pailer**: `knv.py peca.html --de arquivo_dele.iknv` mantém as camadas que ele mexeu;
+  camada que ele apagou: tirar do HTML também; remover camadas velhas com `--depois` (ieAchar + splice).
+- Trilha pela estrutura: `musica/achar_drop.py` dá nota a "forte → pausa → drop" em qualquer pasta de prévias.
+  Kali Kush (Switch Remix, instr.): silêncio 77,55–79,2, drop 80,797; 2ª parada 92,75–95,75 com a volta em 96,0 = CTA no
+  silêncio e o botão bate na volta. **Licença**: Creator NÃO cobre cliente nem anúncio pago — não confirmar o diálogo.

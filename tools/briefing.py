@@ -96,7 +96,8 @@ def transcrever(arqs, saida, modelo):
         m = whisper.load_model(modelo, download_root=wd if os.path.isdir(wd) else None)
         for a, c in falta:
             print("transcrevendo:", os.path.basename(a), flush=True)
-            r = m.transcribe(a, language="pt", fp16=False)
+            try: r = m.transcribe(a, language="pt", fp16=False)
+            except Exception: r = {"segments": []}   # vídeo sem som (reel de referência mudo)
             segs = [{"ini": round(s["start"], 1), "fim": round(s["end"], 1), "txt": s["text"].strip()} for s in r["segments"]]
             json.dump(segs, open(c, "w", encoding="utf-8"), ensure_ascii=False); out[a] = segs
     return out
@@ -111,6 +112,14 @@ def quadros(video, segs, saida, maximo):
     if len(marcas) > maximo:   # espalha pelo vídeo inteiro em vez de pegar só o começo
         passo = len(marcas) / maximo; marcas = [marcas[int(i * passo)] for i in range(maximo)]
     if not marcas and segs: marcas = segs[:1]
+    if not segs:   # sem fala: quadros espalhados pela duração (reel de referência)
+        try:
+            p = subprocess.run([ffmpeg(), "-i", video], capture_output=True, text=True, errors="ignore",
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stderr
+            h, mi, se = re.search(r"Duration: (\d+):(\d+):([\d.]+)", p).groups(); dur = int(h) * 3600 + int(mi) * 60 + float(se)
+        except Exception: dur = 0
+        n = max(1, min(maximo, int(dur // 1.5) or 1))
+        marcas = [{"ini": dur * (i + 0.5) / n - 1.0, "fim": dur, "txt": ""} for i in range(n)]
     tmp = os.path.join(saida, "tmp_quadros"); os.makedirs(tmp, exist_ok=True)
     itens = []
     for s in marcas:
@@ -152,7 +161,7 @@ def main():
             segs = trans.get(f, [])
             md.append(f"\n### {os.path.basename(f)}")
             md.extend(f"[{int(s['ini'])//60}:{int(s['ini'])%60:02d}] {s['txt']}" for s in segs)
-            if f.lower().endswith(VID) and segs:
+            if f.lower().endswith(VID):
                 fl = quadros(f, segs, saida, a.quadros)
                 if fl: md.append(f"Quadros (onde aponta): `{os.path.basename(fl)}`")
     dest = os.path.join(saida, "briefing.md"); open(dest, "w", encoding="utf-8").write("\n".join(md) + "\n")

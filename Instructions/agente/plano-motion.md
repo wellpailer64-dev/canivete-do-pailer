@@ -84,6 +84,8 @@ Gramática de motion que o Pailer aprovou:
   (`vePrSegEm = () => null`) para ver a prévia ao vivo.
 
 ## Pendências
+- (2026-10-19) Forma (elipse) com desfoque 90–120 + mesclagem Tela apareceu como disco chapado no monitor (reels BF
+  Carlinhos); contornado com PNG radial. Conferir se o desfoque vale em forma com `bm`.
 - (Feito 2026-10-15) **Ondulação na placa em shader** — ver plano-kanivete-encoder.md › 8.6 (com giro na placa). Ainda
   manda tudo para a CPU: imagem com onda + giro constante (ca_rot), ou girada com onda E sombra projetada.
 - (Resolvido 2026-10-12) Prévia renderizada e exportação desenhando a mesma camada juntas apagavam a pasta uma da outra

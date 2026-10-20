@@ -311,7 +311,11 @@ async function kaniEnviar(texto) {
     const det = await kaniApi().kani_criar_tipo?.(texto, ant ? ant.tipo : null).catch(() => null);
     const tipo = det && (typeof det === "string" ? det : det.tipo);
     if (tipo) {
-        const pedido = det.continua && ant && ant.pedido ? `${ant.pedido}. Mudança pedida: ${texto}` : texto;
+        // "gera a imagem" sozinho: o assunto está na última mensagem da pessoa (2026-10-20: saía uma biblioteca no lugar
+        // do asfalto que ela tinha pedido antes)
+        const antUser = det.vago ? [...c0.msgs].reverse().find(m => m.role === 'user' && m.content && m.content !== texto) : null;
+        const pedido = det.continua && ant && ant.pedido ? `${ant.pedido}. Mudança pedida: ${texto}`
+            : antUser ? `${antUser.content} (${texto})` : texto;
         kaniCriar(texto, tipo, pedido); return null;
     }
     const c = KANI.conversa;

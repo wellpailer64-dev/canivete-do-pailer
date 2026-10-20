@@ -1750,7 +1750,9 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
         g.filtros.append(f"{final}libplacebo=format={fim[0]}:disable_linear=1,hwdownload,format={fim[0]}{fim[1]}{sub}[vbaixo]")
         fm, rot_v, args_min = vc.saida_miniatura("[vbaixo]")   # a miniatura do quadro em render (janela do Encoder)
         g.filtros += fm
-        g.filtros.append(f"{rot_v}null[vout]")
+        # pixel sempre quadrado: camada desenhada estreita (moeda caindo, 54×1562) passa por scale, que mexe na SAR,
+        # e o overlay herdava a do fundo — o Reel B saiu com SAR 8:1 (o player mostrava achatado)
+        g.filtros.append(f"{rot_v}setsar=1[vout]")
         grafo = os.path.join(pasta_r, "grafo.txt")
         with open(grafo, "w", encoding="utf-8") as f:
             f.write(";\n".join(g.filtros))

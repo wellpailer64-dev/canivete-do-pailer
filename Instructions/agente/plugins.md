@@ -213,6 +213,12 @@ leituras (layout de 2026-10: NÃO há mais `article`/`data-message-author-role`;
 `blob:` baixada por `fetch` dentro da página). Texto ~15 s, imagem ~50 s (1254×1254). Kani: ferramenta `perguntar_chatgpt`
 (`Functions/kani_agente.py`; "chatgpt" no pedido leva ao modo em etapas). CLI: `kb.py chatgpt "<pedido>" [--pasta P]`.
 `kani_parar` cancela a espera; `js_kani(codigo)` roda JS na aba da Kani (diagnóstico quando o site mudar o layout).
+**Agente, 2026-10-19:** `kb.py js "<código>" | js @arq.js` roda JS na aba da Kani (`js_kani`; aceita Promise). ChatGPT:
+com a imagem pronta e igual por ~8 s entrega mesmo com o turno "em andamento" (antes estourava o tempo com a imagem na
+tela). **Epidemic Sound** (conta do Pailer, Creator): busca `epidemicsound.com/music/search/?term=...`; linhas têm
+botões `Play <nome>` e `Download`; tocar dispara `audio.src = audiocdn.epidemicsound.com/lqmp3/<id>.mp3` (prévia
+inteira para medir no librosa); Download abre diálogo (Full mix/MP3) → botão "Download" → `D:\Kanivete\KaniBrowser\downloads`.
+Script de coleta: `D:/kanivete_testes/bf_carlinhos/es_coleta.js`.
 **Recarregar o plugin não fecha mais o navegador** (`_persistir`: estado em `sys`, adota a versão antiga viva): editar
 o .py e `plugin_pessoal_recarregar('kanibrowser')` vale na hora, até no app do Pailer. `plugin_pessoal_recarregar` também esquece os módulos
 que o plugin importou (fechar o navegador antes: o canal mora no módulo).

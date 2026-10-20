@@ -23,8 +23,22 @@ _TIPOS = [
     ("vinheta", re.compile(r"\bvinhet", re.I)),
     ("efeito", re.compile(r"(efeito sonoro|efeito de som|\bsfx\b|som de\b|barulho de|ru[ií]do de)", re.I)),
     ("narracao", re.compile(r"(narra[cç][aã]o|\bnarr[ae]\b|\bnarrar\b|locu[cç][aã]o|\blocut|\bleia em voz|\bfale\b.*:|grava(?:r)? (?:uma )?voz)", re.I)),
-    ("imagem", re.compile(r"(imagem|\bfoto\b|ilustra[cç][aã]o|desenho|arte\b|\blogo\b|wallpaper|papel de parede|\bpintura)", re.I)),
+    ("imagem", re.compile(r"(imagem|\bfoto\b|ilustra[cç][aã]o|desenho|arte\b|\blogo\b|wallpaper|papel de parede|\bpintura|"
+                          r"textura|\bfundo\b|background|cen[aá]rio|paisagem|\brender|mockup|[ií]cone|personagem|retrato)", re.I)),
 ]
+# "gera um asfalto de noite" não tem a palavra do tipo: verbo de imagem sem ser de som/texto = imagem (2026-10-20: ia para
+# a conversa e a Kani respondia "[Imagem gerada: ...]" sem gerar nada)
+_VERBO_IMAGEM = re.compile(r"\b(gera|gere|gerar|desenha|desenhe|renderiza|renderize)\b", re.I)
+_NAO_IMAGEM = re.compile(r"\b(texto|legenda|roteiro|post|lista|e-?mail|mensagem|resumo|t[ií]tulo|frase|c[oó]digo|planilha|"
+                         r"tabela|ideia|nome|slogan|copy|v[ií]deo|m[uú]sica)\b", re.I)
+# o que sobra do pedido sem verbo, tipo e enchimento: nada = "gera a imagem" (o assunto está na mensagem anterior)
+_ENCHIMENTO = re.compile(r"\b(gera|gere|gerar|cria|crie|criar|faz|faça|faca|fazer|desenha|desenhe|produz|produza|quero|preciso|"
+                         r"me|pra|para|mim|por|favor|a|o|as|os|uma?|essa|esse|isso|ela|ele|agora|ent[aã]o|sim|ok|pode|"
+                         r"imagem|foto|ilustra[cç][aã]o|desenho|arte|aqui|a[ií]|l[aá])\b", re.I)
+
+
+def vago(texto):
+    return len(re.sub(r"[^\w\s]", " ", _ENCHIMENTO.sub(" ", texto or "")).split()) == 0
 
 
 def pasta():
@@ -70,7 +84,9 @@ def detectar(texto, anterior=None):
         return None
     if not re.search(_VERBO, t, re.I) and not re.match(r"^\s*(uma?|um)\s", t, re.I):
         return None
-    return {"tipo": tipo, "continua": False} if tipo else None
+    if not tipo and _VERBO_IMAGEM.search(t) and not _NAO_IMAGEM.search(t):
+        tipo = "imagem"
+    return {"tipo": tipo, "continua": False, "vago": vago(t)} if tipo else None
 
 
 def _llm(sistema, pedido, max_tokens=220, temperatura=0.4):

@@ -18,6 +18,8 @@ ROTAS = {   # texto → rota esperada (criar = tipo | etapas | None = conversa)
     "gera uma imagem de um gato astronauta": "imagem", "cria um som de porta rangendo": "efeito", "faz uma vinheta sobre café": "vinheta",
     "como eu gero uma imagem no Photo?": None, "me explica como criar uma vinheta": None, "você sabe fazer narração?": None,
     "pesquisa na internet o preço do iPhone 16": "etapas",
+    "gera pra mim por favor um asfalto horizontal de noite por favor? textura realista": "imagem", "gera a imagem": "imagem",
+    "gera um texto sobre carros": None,
 }
 # (pergunta ou lista de turnos, verificação na ÚLTIMA resposta, nome)
 CASOS = [

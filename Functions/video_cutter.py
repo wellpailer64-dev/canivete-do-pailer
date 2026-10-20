@@ -4735,6 +4735,9 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
 
     def _preparar(tb):
         cmd, filtros, vf, ass, args_cor = _montar(tb)
+        if not audio_only:   # pixel sempre quadrado (um scale de camada muda a SAR e o overlay herda; ver export_placa)
+            filtros.append(f"{vf}setsar=1[vsar1]")
+            vf = "[vsar1]"
         prep_min["args"] = []
         if com_miniatura:
             fm, vf, prep_min["args"] = saida_miniatura(vf, placa=tb)
