@@ -765,7 +765,12 @@ function veKlTecla(e) {
         e.preventDefault();
         return veKlColar();
     }
-    if (!e.altKey && (e.key === 'Delete' || e.key === 'Backspace') && veKlTemSel()) {
+    // apagar = as MESMAS teclas do comando Apagar (Delete, Backspace, D ou o atalho personalizado): o D passava direto
+    // para "apagar clipe" e os quadros-chave selecionados ficavam (2026-10-20)
+    const combo = typeof veTeclaCombo === 'function' ? veTeclaCombo(e) : null;
+    const apagar = combo && typeof veMapaTeclas === 'function' ? (veMapaTeclas()[combo] || {}).id === 'apagar'
+        : !e.altKey && (e.key === 'Delete' || e.key === 'Backspace');
+    if (apagar && veKlTemSel()) {
         e.preventDefault();
         veKlApagar();
         return true;
