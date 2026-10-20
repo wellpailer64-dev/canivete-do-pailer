@@ -676,6 +676,8 @@ setInterval(veCompTick, 400);
 // A timeline da Comp com as Propriedades essenciais de uma variação aplicadas (cópia; sem ov, a própria)
 function veCompSeqEfetiva(m) {
     const seq = veCompSeqDe(m);
+    // MOGRT (editor-mogrt.js): campos do Gráficos essenciais e o plano rápido da exportação
+    if (seq && typeof veMogrtSeqEfetiva === 'function' && veCompBase(m).mgPlano) return veMogrtSeqEfetiva(m, seq);
     if (!seq || !m.ov || !Object.keys(m.ov).length) return seq;
     return { ...seq, clips: (seq.clips || []).map(c => {
         const o = c.eid && m.ov[c.eid];
@@ -723,7 +725,8 @@ function veCompVariantePara(base, ov) {
 
 // Muda uma propriedade da faixa c. digitando = a mesma edição continua (não cria uma variação por tecla)
 function veCompEssDefinir(c, eid, campo, valor, digitando) {
-    const m0 = veMediaOf(c), base = veCompBase(m0), item = veCompEssenciais(veCompSeqDe(base)).find(e => e.eid === eid);
+    const m0 = veMediaOf(c), base = veCompBase(m0);
+    const item = base.mogrt && typeof veMogrtItem === 'function' ? veMogrtItem(base, eid) : veCompEssenciais(veCompSeqDe(base)).find(e => e.eid === eid);
     if (!item || veLocked(c)) return;
     const ov = vePlain(c.ov || {}, {});
     ov[eid] = { ...(ov[eid] || {}), [campo]: valor };
@@ -753,7 +756,9 @@ function veCompEssFim() { VECOMP.ess = null; }
 
 // Seção do painel Propriedades para uma faixa de Comp
 function veCompEssHtml(c) {
-    const base = veCompBase(veMediaOf(c)), lista = veCompEssenciais(veCompSeqDe(base)), ov = c.ov || {};
+    const base = veCompBase(veMediaOf(c));
+    if (base && base.mogrt && typeof veMogrtEssHtml === 'function') return veMogrtEssHtml(c, base);   // MOGRT: campos do Gráficos essenciais
+    const lista = veCompEssenciais(veCompSeqDe(base)), ov = c.ov || {};
     const corpo = !lista.length
         ? `<small class="ve-pp-dica">${veT('Esta Comp não tem texto nem forma para mudar daqui.')}</small>`
         : lista.map(e => {

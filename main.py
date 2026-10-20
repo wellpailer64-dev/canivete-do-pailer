@@ -410,7 +410,7 @@ def ve_importar_dialogo():
         return {"success": False}
     tipos = ("Mídia (*.mp4;*.mov;*.mxf;*.mkv;*.avi;*.webm;*.flv;*.f4v;*.wmv;*.asf;*.m4v;*.ts;*.mts;*.m2ts;"
              "*.mpg;*.mpeg;*.m2v;*.r3d;*.braw;*.ari;*.arx;*.mp3;*.wav;*.flac;*.m4a;*.aac;*.ogg;"
-             "*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp;*.psd;*.psb;*.srt;*.vtt;*.ass;*.ssa;*.sbv;*.txt)",
+             "*.png;*.jpg;*.jpeg;*.webp;*.gif;*.bmp;*.psd;*.psb;*.mogrt;*.srt;*.vtt;*.ass;*.ssa;*.sbv;*.txt)",
              "Legendas (*.srt;*.vtt;*.ass;*.ssa;*.sbv;*.txt)", "Todos os arquivos (*.*)")
     r = _window.create_file_dialog(_file_dialog_kind("OPEN", webview.OPEN_DIALOG), allow_multiple=True, file_types=tipos)
     if not r:
@@ -872,6 +872,16 @@ def ve_psd_importar(path):
     from Functions import psd_import
     try:
         return psd_import.importar(path)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def ve_mogrt_importar(path):
+    """MOGRT feito no After → as Comps com as camadas e os campos do Gráficos essenciais (Functions/mogrt.py);
+    o editor monta (editor-mogrt.js)."""
+    from Functions import mogrt
+    try:
+        return mogrt.importar(path)
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -3541,6 +3551,9 @@ class ApiBridge:
 
     def ve_psd_importar(self, path):
         return ve_psd_importar(path)
+
+    def ve_mogrt_importar(self, path):
+        return ve_mogrt_importar(path)
 
     # Editor de Imagem (frontend/js/imagem-*.js, Functions/editor_imagem.py)
     def ie_abrir(self, path):

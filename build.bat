@@ -104,6 +104,7 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "Functions.anti_noise" ^
  --hidden-import "Functions.transicoes" ^
  --hidden-import "Functions.psd_import" ^
+ --hidden-import "Functions.mogrt" ^
  --hidden-import "psd_tools" ^
  --hidden-import "Functions.editor_imagem" ^
  --hidden-import "Functions.gerador_imagem" ^
@@ -124,6 +125,7 @@ python -m PyInstaller --noconfirm --onedir --windowed ^
  --hidden-import "fontTools" ^
  --hidden-import "lxml" ^
  --collect-all "pptx" ^
+ --collect-all "py_aep" ^
  --collect-all "sherpa_onnx" --hidden-import "Functions.ata_kanivete" --hidden-import "websockets.sync.client" ^
  --collect-data "cv2" ^
  --copy-metadata "pywebview" ^

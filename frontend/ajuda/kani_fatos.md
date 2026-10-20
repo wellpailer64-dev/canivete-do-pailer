@@ -59,6 +59,11 @@ Timeline cheia de faixas (motion com muitas camadas): botão direito num clipe �
 cada bloco de cena e põe numa Comp que só organiza: o resultado continua idêntico (modo Tela e camadas de ajuste de
 dentro continuam pegando o que está embaixo). Duplo clique na faixa da Comp abre a cena; Ctrl+Z desfaz o agrupamento.
 Botão direito no nome da faixa (V1, A1...): Adicionar faixa acima, Excluir esta faixa, Excluir faixas vazias, Dar nome.
+MOGRT (modelo de gráfico animado do Premiere, feito no After Effects): arraste o .mogrt para a timeline ou use Importar.
+Vira uma Comp com as camadas do After (sólidos, textos, imagens, animações, camada mãe, fosco). No painel Propriedades,
+"Gráficos essenciais" mostra os campos do modelo (nome, cargo, posição, escala...) e o valor vale só para aquela faixa,
+como no Premiere: dá para usar o mesmo GC várias vezes com nomes diferentes. Ainda não entram: efeitos do After,
+máscaras, camadas de forma, expressões e MOGRT feito no próprio Premiere (aparecem como aviso).
 
 ## Kanivete Encoder (fila de exportação, estilo Media Encoder)
 Configurações à esquerda e fila à direita. Cada item da fila tem as suas próprias configurações (formato, resolução,

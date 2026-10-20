@@ -36,6 +36,8 @@ PyMuPDF==1.27.2.2
 av==17.0.0
 # importar PSD/PSB com as camadas (editor-psd.js)
 psd-tools==1.23.0
+# Vídeo Kanivete: ler o .aep de dentro do .mogrt (Functions/mogrt.py), MIT
+py-aep==0.18.2
 # Vetor Kanivete (vetor_*.py): ler/gravar PDF, PowerPoint, texto em curvas (HarfBuzz), Pathfinder, SVG
 pikepdf==10.13.0.post1
 # ponte com o Illustrator instalado (COM): .ai nativo com todas as pranchetas (Functions/ponte_illustrator.py)

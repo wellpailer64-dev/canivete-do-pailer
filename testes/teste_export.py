@@ -614,6 +614,24 @@ CASOS = {
             m.c3d.camera.kf.dist = [[0, d, 'suave'], [3, d * 0.7, 'suave']]; ve3dMudou(m);
         })();
     """),
+    # MOGRT do After (editor-mogrt.js): barras com camada mãe, texto e logo por fosco de trilha, saída tocada ao
+    # contrário (Comp espelhada) e campos do Gráficos essenciais mudados na faixa (variação com remendos por dentro)
+    "mogrt": (1920, 1080, """
+        const { clip } = __te;
+        return [clip(0, 0, 0, 4, 'b.mp4', { p: { sc: 100, x: 960, y: 540, rot: 0, op: 100 } })];
+    """, r"""
+        return (async () => {
+            VE.playhead = 0;
+            const m = await veMogrtAbrir('D:/kanivete_testes/mogrt/lower.mogrt', { inserir: true });
+            if (!m) return;
+            const a = VE.clips.find(c => veCompBase(veMediaOf(c)) === m);
+            const ids = Object.fromEntries(m.mogrt.controles.map(c => [c.nome, c.id]));
+            veCompEssDefinir(a, ids['Texto 1'], 'v', 'MARIA DA SILVA', false); veCompEssFim();
+            veCompEssDefinir(a, ids['Escala logo'], 'v', '30', false); veCompEssFim();
+            veSelDefinir([]);   // sem as alças de seleção no monitor
+            veSeqSalvarAtiva();
+        })();
+    """),
     "caminho": (1080, 1920, """
         const { clip } = __te, fm = veGrMidia('forma', 'Forma'), pm = veGrMidia('pincel', 'Desenho');
         const pts = [40, 300, 0, 0, 160, -260,  520, 300, -160, 260, 160, -260,  1000, 300, -160, 260, 0, 0];

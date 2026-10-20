@@ -238,6 +238,7 @@ async function vePjImportarArquivo(path, pasta) {
     const api = window.pywebview.api, nome = path.split(/[\\/]/).pop();
     // PSD/PSB: Comp com as camadas, só no projeto (editor-psd.js)
     if (typeof VE_EXT_PSD !== 'undefined' && VE_EXT_PSD.test(path)) return !!(await vePsdAbrir(path, { pasta, soProjeto: true }));
+    if (typeof VE_EXT_MOGRT !== 'undefined' && VE_EXT_MOGRT.test(path)) return !!(await veMogrtAbrir(path, { pasta, soProjeto: true }));
     if (VE_EXT_IMG.test(path)) {
         const r = await api.video_cutter_add_media(path);
         if (!r || !r.success) return false;

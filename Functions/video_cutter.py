@@ -2181,10 +2181,55 @@ def _valor_kf(pts, t):
     return pts[-1][1]
 
 
+def _pts_kf(lista):
+    pts = []
+    for q in lista or []:
+        try:
+            pts.append((float(q[0]), float(q[1]), str(q[2]) if len(q) > 2 else "lin", _curva_kf(q) if len(q) > 3 else None))
+        except Exception:
+            continue
+    pts.sort(key=lambda p: p[0])
+    return pts
+
+
+def _corte_animado(f, mw, mh, dur, fps, nome):
+    """Cortar com lados animados (o fosco retangular do MOGRT vira isto, editor-mogrt.js): uma caixa transparente por
+    lado (a mesma do Cortar fixo), com a largura/altura de cada quadro por sendcmd. Preso a 0..100% DEPOIS da curva."""
+    v, p = f.get("v") or {}, f.get("p") or {}
+    curvas = {k: _pts_kf(p.get(k)) for k in ("l", "t", "r", "b")}
+    val = lambda k, t: min(100.0, max(0.0, _valor_kf(curvas[k], t) if curvas[k] else _num(v.get(k), 0, 100))) / 100.0
+    px = lambda fr, n: max(1, int(n * fr)) if fr > 0 else 0
+    fps = float(fps)
+    linhas = []
+    for i in range(int(dur * fps) + 2):
+        t, tc = i / fps, max(0.0, (i - 0.5) / fps)
+        l, r, tp, b = px(val("l", t), mw), px(val("r", t), mw), px(val("t", t), mh), px(val("b", t), mh)
+        # caixa de largura 0 desenha a imagem toda: o lado sem corte vai para fora (x = largura)
+        linhas.append(f"{tc:.5f} drawbox@{nome}l w {l or 1}, drawbox@{nome}l x {0 if l else mw}, "
+                      f"drawbox@{nome}r w {r or 1}, drawbox@{nome}r x {mw - r if r else mw}, "
+                      f"drawbox@{nome}t h {tp or 1}, drawbox@{nome}t y {0 if tp else mh}, "
+                      f"drawbox@{nome}b h {b or 1}, drawbox@{nome}b y {mh - b if b else mh};")
+    arq = os.path.join(_work_dir(), f"cr_{uuid.uuid4().hex[:8]}.txt")
+    with open(arq, "w", encoding="ascii") as fh:
+        fh.write("\n".join(linhas) + "\n")
+    caixa = "drawbox@{n}{s}=x={x}:y={y}:w={w}:h={h}:color=black@0:t=fill:replace=1"
+    return ",".join([f"format=rgba,sendcmd=f={_caminho_filtro(arq)}",
+                     caixa.format(n=nome, s="l", x=mw, y=0, w=1, h=mh), caixa.format(n=nome, s="r", x=mw, y=0, w=1, h=mh),
+                     caixa.format(n=nome, s="t", x=0, y=mh, w=mw, h=1), caixa.format(n=nome, s="b", x=0, y=mh, w=mw, h=1)])
+
+
 def _fx_animados(fxk, mw, mh, dur, fps, nome):
-    """Parâmetros de efeito animados (editor-fx.js veFxKfExport) que o ffmpeg faz sozinho: hoje o Desfoque gaussiano.
-    O gblur recebe o sigma de cada quadro por sendcmd (mesma conta da prévia: 100% = sigma de 5% do lado menor).
+    """Parâmetros de efeito animados (editor-fx.js veFxKfExport) que o ffmpeg faz sozinho: o Desfoque gaussiano e o
+    Cortar. O gblur recebe o sigma de cada quadro por sendcmd (mesma conta da prévia: 100% = sigma de 5% do lado menor).
     Devolve o filtro (ou None). O tempo conta do início da camada, como a opacidade animada."""
+    cortes = [_corte_animado(f, mw, mh, dur, fps, f"{nome}c{j}") for j, f in enumerate(fxk or [])
+              if f.get("t") == "crop" and f.get("p")]
+    desf = _desfoque_animado(fxk, mw, mh, dur, fps, nome)
+    partes = cortes + ([desf] if desf else [])
+    return ",".join(partes) if partes else None
+
+
+def _desfoque_animado(fxk, mw, mh, dur, fps, nome):
     for f in fxk or []:
         if f.get("t") != "blur" or not (f.get("p") or {}).get("amt"):
             continue

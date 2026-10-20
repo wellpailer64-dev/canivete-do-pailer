@@ -174,6 +174,12 @@ monitor. Índice por arquivo em `<cache>/Canivete Render Cache/rostos/`. API `VE
 Bancada: `D:/kanivete_testes/rosto` (mesma pessoa 0,43–0,89; outras ≤ 0,30); testes `D:/kanivete_testes/scripts/teste_pessoas*.py`.
 Usar SEMPRE antes de pôr GC: confirmar que o rosto da cena é da pessoa do nome.
 
+**MOGRT** (2026-10-20, etapas 1–2): `.mogrt` do After vira Comp editável — `Functions/mogrt.py` (lê o .aep com py-aep, MIT:
+camadas, quadros-chave com a Bézier do After, mãe, fosco, Comp ao contrário espelhada) + `frontend/js/editor-mogrt.js`
+(monta; Gráficos essenciais por faixa via variação da Comp; plano rápido: mãe parada/fosco retangular viram transformar e
+Cortar animado, `_corte_animado` no ffmpeg). Guia e pendências: `Instructions/agente/mogrt.md`. Teste:
+`teste_export.py --casos mogrt` (usa `D:/kanivete_testes/mogrt/lower.mogrt`).
+
 **PENDENTE — Estabilizador melhor que o Warp Stabilizer** (e a lista de prioridades para ficar profissional: bateria de
 projetos reais, tracker, MOGRT, rampas de velocidade, multicâmera): `Instructions/agente/plano-estabilizador.md`.
 

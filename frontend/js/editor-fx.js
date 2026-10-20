@@ -163,6 +163,7 @@ const VE_FX = {
             { k: 'r', nome: 'Direita', min: 0, max: 100, step: 0.5, def: 0, un: '%' },
             { k: 'b', nome: 'Inferior', min: 0, max: 100, step: 0.5, def: 0, un: '%' },
         ],
+        animaFF: ['l', 't', 'r', 'b'],   // animado vai pela exportação normal (drawbox + sendcmd, video_cutter._corte_animado)
         neutro: v => !v.l && !v.t && !v.r && !v.b,
         // a área cortada fica transparente: aparece o que estiver na trilha de baixo
         draw(a, v, env) {

@@ -40,6 +40,7 @@
     "editor-marcadores.js",
     "editor-medidor.js",
     "editor-mixer.js",
+    "editor-mogrt.js",
     "editor-motion.js",
     "editor-ofx.js",
     "editor-onda.js",
@@ -148,6 +149,7 @@
     "ve_comp_cancelar",
     "ve_ovt_render",
     "ve_psd_importar",
+    "ve_mogrt_importar",
     "ve_c3d_inicio",
     "ve_c3d_lote",
     "ve_c3d_cancelar",
@@ -1342,6 +1344,10 @@
    "modulos": []
   },
   "ve_psd_importar": {
+   "args": "path",
+   "modulos": []
+  },
+  "ve_mogrt_importar": {
    "args": "path",
    "modulos": []
   },
@@ -3280,6 +3286,7 @@
   "Instructions/agente/mapa-kanivete-encoder.md": "Mapa do Kanivete Encoder (Ke)",
   "Instructions/agente/mapa-vetor.md": "Mapa do código — vetor (gerado por tools/mapa_codigo.py; nome:linha)",
   "Instructions/agente/mockup-profissional.md": "Mockup profissional — o que os PSDs dos estúdios fazem (estudo 2026-10-15)",
+  "Instructions/agente/mogrt.md": "MOGRT no Vídeo Kanivete (Motion Graphics Template do Premiere)",
   "Instructions/agente/nucleo-hardware.md": "Núcleo de hardware: o app se ajustar a cada PC (2026-10-10)",
   "Instructions/agente/pincel-roto.md": "Pincel Roto e Refinar borda (Roto Brush do After Effects no Editor Kanivete)",
   "Instructions/agente/plano-cena.md": "Plano CENA — diagramar no Photo Kanivete escrevendo HTML/CSS (para IAs)",
@@ -3375,6 +3382,7 @@
   "Functions/memoria.py": "Modelos de IA carregados sob demanda saem da memória quando ficam parados",
   "Functions/midia.py": "midia.py — utilidades compartilhadas de mídia (caminhos do app, ffmpeg/ffprobe, progresso)",
   "Functions/modelos_compartilhados.py": "Modelos compartilhados entre as instalações do app na mesma máquina (o .exe em dist/ e o app rodado pelo código)",
+  "Functions/mogrt.py": "Importar MOGRT (Motion Graphics Template do Premiere) no Vídeo Kanivete como Comp editável",
   "Functions/musicas.py": "musicas.py — Biblioteca de músicas do KANIVETE (fundo de vinhetas, AutoFrame, edição)",
   "Functions/ofx.py": "import ctypes as C",
   "Functions/omnivoice_runner.py": "Runner isolado para operacoes pesadas do OmniVoice",
