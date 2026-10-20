@@ -206,7 +206,15 @@ Google) em `icones/<domínio>.png`, servido pelo servidor da visão (`/<token>/i
 (`D:\Kanivete\KaniBrowser\perfil`) e sobrevivem ao app fechado de repente (cookie de 1 dia conferido). O Chrome abre com
 `--disable-blink-features=AutomationControlled`: sem isso `navigator.webdriver` = true e o login do Google/Microsoft
 recusa "navegador pode não ser seguro". Todos os sites abriram sem verificação de humano; o Pailer entrou em todos menos o Copilot (Microsoft recusou; tirado da lista). Teste:
-`D:\kanivete_testes\scripts\teste_kb_logins.py [persistir|conferir]` (porta 9333). `plugin_pessoal_recarregar` também esquece os módulos
+`D:\kanivete_testes\scripts\teste_kb_logins.py [persistir|conferir]` (porta 9333).
+**ChatGPT pela Kani** (2026-10-19): `kb.chatgpt(pergunta, nova, pasta)` na aba da Kani (conta do Pailer): foca a caixa
+(`_CAIXA`), `Input.insertText`, clica `send-button`; espera o último bloco `data-talvt-turn-state` = "complete" e parado 2
+leituras (layout de 2026-10: NÃO há mais `article`/`data-message-author-role`; imagem em `generated-image-gallery`, URL
+`blob:` baixada por `fetch` dentro da página). Texto ~15 s, imagem ~50 s (1254×1254). Kani: ferramenta `perguntar_chatgpt`
+(`Functions/kani_agente.py`; "chatgpt" no pedido leva ao modo em etapas). CLI: `kb.py chatgpt "<pedido>" [--pasta P]`.
+`kani_parar` cancela a espera; `js_kani(codigo)` roda JS na aba da Kani (diagnóstico quando o site mudar o layout).
+**Recarregar o plugin não fecha mais o navegador** (`_persistir`: estado em `sys`, adota a versão antiga viva): editar
+o .py e `plugin_pessoal_recarregar('kanibrowser')` vale na hora, até no app do Pailer. `plugin_pessoal_recarregar` também esquece os módulos
 que o plugin importou (fechar o navegador antes: o canal mora no módulo).
 
 ## Pendências

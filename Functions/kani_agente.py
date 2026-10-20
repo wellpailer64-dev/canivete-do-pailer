@@ -31,6 +31,8 @@ FERRAMENTAS = {
     "buscar_musica": ("Escolhe uma música de fundo da biblioteca. args: {clima: calma|alegre|animada|intensa|melancolica, segundos_min}", False),
     "montar_vinheta": ("Mixa uma voz gravada (A?) com música de fundo (A? de buscar_musica, opcional) e impacto. args: {voz: 'A1', musica: 'A2'}", False),
     "pesquisar_web": ("Pesquisa na internet, lê as melhores páginas e devolve um resumo estruturado com as fontes (vira um texto A?). args: {pergunta}", False),
+    "perguntar_chatgpt": ("Manda o pedido ao ChatGPT na conta da pessoa (pelo KaniBrowser) e traz a resposta (texto A?) e as imagens que ele "
+                          "criar (imagem A?). Use SÓ quando a pessoa pedir o ChatGPT. args: {pedido: o pedido completo, em português}", False),
     "ler_documento": ("Lê o texto de um PDF, Word ou TXT anexado (vira um texto A?). args: {arquivo: 'A1'}", False),
     "salvar_documento": ("Salva um texto em arquivo bonito. args: {formato: pdf|docx|txt|md, titulo, conteudo (texto em markdown OU o nome de um texto, ex.: 'A2')}", False),
     "remover_fundo": ("Tira o fundo de uma imagem (anexada ou gerada) e devolve PNG transparente. args: {imagem: 'A1'}", True),
@@ -59,6 +61,8 @@ REGRAS:
   (baixa da internet se a biblioteca não tiver).
 - Na mensagem de entrega não cite A1/A2: diga o que foi feito em uma ou duas frases.
 - Pesquisa: pesquisar_web e entregue com resposta = o texto da pesquisa (ex.: 'A1'); só salve em PDF/DOC/TXT se pedirem.
+- ChatGPT: se a pessoa pedir para usar/perguntar ao ChatGPT (inclusive imagem), use perguntar_chatgpt com o pedido dela
+  (não use gerar_imagem nem escrever) e entregue: arquivos = as imagens que voltaram, resposta = o texto dele.
 - Documento: escreva o conteúdo (escrever, em markdown com ## seções e listas) ou use um texto pronto (pesquisa, leitura)
   e chame salvar_documento com conteudo = o nome do texto (ex.: 'A2'). Título curto e claro.
 - Flyer, cartaz, panfleto ou post de divulgação = montar_flyer como PRIMEIRA ação (ele mesmo escreve os textos e gera a
@@ -75,7 +79,7 @@ _SCHEMA = {"type": "object", "properties": {
     "args": {"type": "object"}},
     "required": ["pensamento", "acao", "args"]}
 
-_COMPLEXO = re.compile(r"(roteiro|campanha|\bkit\b|pacote|s[eé]rie|v[aá]ri[ao]s|e depois|tamb[eé]m|junto com|al[eé]m d|"
+_COMPLEXO = re.compile(r"(roteiro|campanha|\bkit\b|pacote|s[eé]rie|v[aá]ri[ao]s|e depois|tamb[eé]m|junto com|al[eé]m d|chat\s?gpt|"
                        r"\bpdf\b|\bdocx?\b|\bword\b|\btxt\b|documento|arquivo de texto|apostila|relat[oó]rio|"
                        r"pesquis|procur[ae] na (?:internet|web)|busca na (?:internet|web)|na internet|not[ií]cias|"
                        r"(?:tir[ae]|remov[ae]|apag[ae]|recort[ae]).{0,25}fundo|sem fundo|"
@@ -187,6 +191,25 @@ def _executar(est, acao, a):
         resumo, fontes = kani_skills.pesquisar(perg, on)
         k = est.novo("texto", None, resumo[:300], {"conteudo": resumo})
         return f"Pesquisa pronta ({k}, {len(fontes)} fontes). Início do resumo:\n{resumo[:1500]}"
+    if acao == "perguntar_chatgpt":
+        from Functions import plugins_pessoais
+        pedido = str(a.get("pedido") or a.get("pergunta") or "").strip()
+        if not pedido:
+            raise ValueError("falta 'pedido'")
+        if not os.path.isfile(os.path.join(plugins_pessoais.pasta(), "kanibrowser", "kanivete.json")):
+            raise RuntimeError("o ChatGPT é usado pelo KaniBrowser, que não está instalado")
+        on(20, "Perguntando ao ChatGPT (acompanhe no KaniBrowser)...")
+        r = plugins_pessoais.chamar("kanibrowser", "chatgpt", {"pergunta": pedido, "pasta": kani_criar.pasta()})
+        if not r.get("success"):
+            raise RuntimeError(r.get("error") or "o ChatGPT não respondeu")
+        d = r["dados"]
+        nomes = [est.novo("imagem", p, pedido[:200]) for p in d.get("imagens", [])]
+        out = []
+        if d.get("texto"):
+            out.append(f"Resposta do ChatGPT ({est.novo('texto', None, d['texto'][:300], {'conteudo': d['texto']})}):\n{d['texto'][:1500]}")
+        if nomes:
+            out.append(f"Imagens do ChatGPT: {', '.join(nomes)}.")
+        return "\n".join(out) or "O ChatGPT respondeu vazio."
     if acao == "ler_documento":
         from Functions import kani_skills
         doc = est.arquivo(a.get("arquivo"), ("anexo_doc",))
