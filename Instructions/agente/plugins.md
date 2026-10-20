@@ -161,7 +161,7 @@ passa para a do KANIVETE depois do attached (encaixar e servir). Medido: os 12 p
 pelo Sound e seguem abertos; som da jhudstudio pelo congelamento ok.
 
 ## Plugins pessoais (2026-10-19) — ferramenta só do usuário, fora do git
-`Functions/plugins_pessoais.py` + `frontend/js/plugins-pessoais.js`: cada pasta `<raiz_dados>/Plugins/<id>/` (D:\Kanivete\Plugins)
+`Functions/plugins_pessoais.py` + `frontend/js/plugins-pessoais.js`: cada pasta `<raiz_dados>/Plugins/<id>/` (D:\Kanivete\Plugins = junção para `DESENVOLVIMENTOS EM PYTHON\PLUGGINS KANIVETE`, repositório próprio; plugin novo vai lá)
 com `kanivete.json` (`nome`, `sigla`, `cor`, `js`, `css`, `py`, `descricao`, `desligado`) vira item na barra lateral › Plugins
 (último grupo da lista; `icone`/`logo` = imagens do plugin) com a página vazia `#page-plugin-<id>`. O js roda com `KPLUG` e `PLUGIN_ID`; chama o Python
 por `KPLUG.chamar(id, 'funcao', {args})` → API `plugin_pessoal` → só as funções de `API_KANIVETE` do módulo `py`

@@ -207,7 +207,8 @@ Story). `Functions/ata_kanivete.py`, `frontend/js/ata.js`, `css/ata.css`, API `A
 Guia, medições, armadilhas e pendências (falta teste em call real com várias pessoas): `Instructions/agente/ata-kanivete.md`.
 
 ## Plugins pessoais (Pandalab)
-Ferramentas só do Pailer em `D:\Kanivete\Plugins\<id>\kanivete.json`, fora do git (carregador `Functions/plugins_pessoais.py`,
+Ferramentas só do Pailer em `D:\Kanivete\Plugins\<id>\kanivete.json` (junção para `DESENVOLVIMENTOS EM PYTHON\PLUGGINS KANIVETE`,
+repositório próprio github.com/wellpailer64-dev/Pluggins-Kanivete; segredos no `.gitignore` de lá), fora do git do app (carregador `Functions/plugins_pessoais.py`,
 `frontend/js/plugins-pessoais.js`; guia `Instructions/agente/plugins.md` › Plugins pessoais). **Pandalab**: demandas do
 Laboratório Panda → `py -3.13 D:\Kanivete\Plugins\pandalab\panda.py demandas --status abertas` / `demanda <id8>` /
 `baixar <id8>` (pasta certa do cliente pelo `mapa_clientes.json`); volta: `status <id> --status in_progress --sim`, `comentar <id> --descricao ".." --sim`, entrega pelo site ("Pegar os finais da pasta", `finais <id>`). Card real: confirmar com o Pailer; teste = card "[TESTE] …" cliente PandaLab.
@@ -280,7 +281,8 @@ Plano completo (Fases 1–3 + Propriedades essenciais por faixa).
 **Comp que só organiza + Agrupar cenas** (2026-10-20, `editor-comp-passa.js`): ao terminar QUALQUER motion, rodar
 `veCompAgruparCenas()` em cada timeline (uma Comp por cena; mesclagem/ajuste de dentro continuam valendo: resultado
 idêntico). Botão direito no cabeçalho da faixa: adicionar/excluir/excluir vazias (`editor-trilhas.js`). Conferir
-monitor antes×depois SEMPRE com `vePrSegEm` desligado (o trecho pré-renderizado engana). Guia: plano-comp.md.
+monitor antes×depois SEMPRE com `vePrSegEm` desligado (o trecho pré-renderizado engana). Guia: plano-comp.md;
+teste `py -3.13 testes/teste_comp_cenas.py` (porta 9333, reels BF).
 
 ## Render 3D no Blender
 Objetos 3D do Vetor renderizados fotorrealistas (Cycles, GPU) com rótulo mapeado: comando `render_blender`, guia
