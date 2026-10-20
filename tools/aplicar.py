@@ -91,6 +91,8 @@ ap.add_argument("--py", action="store_true")
 ap.add_argument("--porta", type=int, default=9222)
 ap.add_argument("--so", default="", help="só estas funções/constantes (nomes separados por vírgula): não leva junto mudanças de outros no mesmo arquivo")
 a = ap.parse_args()
+# um cache por app (porta): aplicar no app de teste não pode marcar como "já aplicado" no app do usuário
+CACHE = os.path.join(CACHE, str(a.porta))
 os.makedirs(CACHE, exist_ok=True)
 with sync_playwright() as p:
     b = p.chromium.connect_over_cdp(f"http://127.0.0.1:{a.porta}")
@@ -118,7 +120,7 @@ with sync_playwright() as p:
                 print(f"{rel}: não achei {', '.join(sorted(faltam))}")
         # só as funções que mudaram; as envolvidas por outro arquivo ficam (avisa)
         env = envolvidas(caminho)
-        mudaram = [(n, x) for t, n, x in novo if t == "f" and velho.get(("f", n)) != x]
+        mudaram = [(n, x) for t, n, x in novo if t == "f" and (n in so or velho.get(("f", n)) != x)]   # --so força
         pular = [(n, env[n]) for n, _ in mudaram if n in env]
         fns = [[n, x] for n, x in mudaram if n not in env]
         r = pg.evaluate(JS, {"fns": fns, "consts": [[n, x] for t, n, x in novo if t == "c"]})
