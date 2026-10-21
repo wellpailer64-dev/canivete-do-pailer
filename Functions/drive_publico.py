@@ -52,7 +52,43 @@ def resource_key(url):
 
 
 class SemAcesso(Exception):
-    """o item não é público (ou não existe): vai pelo login"""
+    """o item não é público (ou não existe): vai pelo login. str(e) = explicação para o usuário"""
+
+
+class Bloqueado(Exception):
+    """o Google barrou os downloads ANÔNIMOS desta rede ("Sorry... automated queries"): a pasta continua pública,
+    a listagem funciona, mas o alt=media volta 403 com uma página HTML. Passa sozinho em algumas horas; pelo login
+    (rclone/OAuth) baixa na hora — quem chama cai para o login."""
+
+
+class Definitivo(RuntimeError):
+    """erro que não adianta tentar de novo agora (cota, download bloqueado pelo dono, documento grande demais)"""
+
+
+BLOQUEIO = ("O Google barrou por um tempo os downloads sem login desta rede (acha que são consultas automáticas — "
+            "costuma acontecer depois de baixar muita coisa seguida). Não é falta de permissão: a pasta está pública.")
+
+# motivo do Google (error.errors[].reason) → explicação; os do 2º grupo não adianta repetir
+_MOTIVOS = {
+    "notFound": "não encontrado — o arquivo não está público, foi apagado/movido ou o link precisa do resourcekey",
+    "insufficientFilePermissions": "esse arquivo tem compartilhamento próprio, mais fechado que o da pasta",
+    "forbidden": "o Google negou o acesso a esse arquivo (compartilhamento próprio, mais fechado que o da pasta)",
+    "appNotAuthorizedToFile": "o dono restringiu o acesso a esse arquivo",
+}
+_FINAIS = {
+    "cannotDownloadFile": "O dono desse arquivo bloqueou o download (só dá para ver no navegador). Peça para liberar o download.",
+    "downloadQuotaExceeded": "Cota de download do Google excedida para este arquivo (muita gente baixou). Tente em ~24h ou pelo login.",
+    "exportSizeLimitExceeded": "Documento do Google grande demais para exportar sem login (limite de 10 MB). Baixe pelo login.",
+    "cannotDownloadAbusiveFile": "O Google marcou esse arquivo como suspeito (vírus/abuso) e só libera para o dono.",
+}
+
+
+def _motivo(corpo):
+    try:
+        e = json.loads(corpo).get("error") or {}
+        return ((e.get("errors") or [{}])[0].get("reason") or e.get("status") or ""), e.get("message", "")
+    except Exception:
+        return "", ""
 
 
 def _pedir(url, params=None, chaves_rk=None, cabecalhos=None, timeout=60):
@@ -64,9 +100,14 @@ def _pedir(url, params=None, chaves_rk=None, cabecalhos=None, timeout=60):
         return urllib.request.urlopen(req, timeout=timeout)
     except urllib.error.HTTPError as e:
         corpo = e.read().decode("utf-8", "replace")
-        if e.code in (401, 403, 404) and not re.search(r"quota|rateLimit|keyInvalid|API key|accessNotConfigured|cannotDownloadFile", corpo, re.I):
-            raise SemAcesso(corpo[:300])
-        raise RuntimeError(_explicar(corpo) or f"Google Drive respondeu {e.code}: {corpo[:200]}")
+        if e.code in (403, 429) and re.search(r"automated queries|<title>Sorry", corpo, re.I):
+            raise Bloqueado(BLOQUEIO)
+        motivo, msg = _motivo(corpo)
+        if motivo in _FINAIS:
+            raise Definitivo(_FINAIS[motivo])
+        if e.code in (401, 403, 404) and not re.search(r"quota|rateLimit|keyInvalid|API key|accessNotConfigured", corpo, re.I):
+            raise SemAcesso(_MOTIVOS.get(motivo) or f"o Google negou ({e.code}{' ' + motivo if motivo else ''}: {msg[:120] or 'sem detalhe'})")
+        raise RuntimeError(_explicar(corpo) or f"Google Drive respondeu {e.code}: {msg or corpo[:200]}")
 
 
 def _explicar(corpo):
@@ -179,9 +220,12 @@ def _eta(s):
 
 def baixar(item_id, destino, url="", perfil="rapida", incluir=None, callback_log=None, callback_progresso=None,
            callback_arquivo=None, stop_event=None, pause_event=None):
-    """Baixa o item público para `destino` (pasta: a estrutura de subpastas vai junto). True se tudo ficou no disco."""
+    """Baixa o item público para `destino` (pasta: a estrutura de subpastas vai junto). True se tudo ficou no disco.
+    Levanta Bloqueado se o Google barrar os downloads anônimos da rede (quem chama continua pelo login)."""
     log = callback_log or (lambda m: None)
     stop = stop_event or threading.Event()
+    barrado = threading.Event()   # Bloqueado num arquivo = para todos (os outros levariam o mesmo 403)
+    falhas = {}                   # explicação → [nomes]
     log("🔓 Link público: baixando sem login (sem a tela do Google).")
     nome_raiz, itens = listar(item_id, url, incluir, log)
     if not itens:
@@ -202,7 +246,7 @@ def baixar(item_id, destino, url="", perfil="rapida", incluir=None, callback_log
         os.makedirs(os.path.dirname(final), exist_ok=True)
         part = final + ".part"
         for tent in range(5):
-            if stop.is_set():
+            if stop.is_set() or barrado.is_set():
                 return
             try:
                 ini = os.path.getsize(part) if os.path.isfile(part) and not item["exportar"] else 0
@@ -220,7 +264,7 @@ def baixar(item_id, destino, url="", perfil="rapida", incluir=None, callback_log
                     while True:
                         while pause_event is not None and pause_event.is_set() and not stop.is_set():
                             time.sleep(0.3)
-                        if stop.is_set():
+                        if stop.is_set() or barrado.is_set():
                             break
                         bloco = r.read(512 * 1024)
                         if not bloco:
@@ -229,7 +273,7 @@ def baixar(item_id, destino, url="", perfil="rapida", incluir=None, callback_log
                         with trava:
                             est["bytes"] += len(bloco)
                             est["curso"][item["id"]][1] += len(bloco)
-                if stop.is_set():
+                if stop.is_set() or barrado.is_set():
                     with trava:
                         est["curso"].pop(item["id"], None)
                     return   # o .part fica: o próximo "Baixar" continua dele
@@ -240,19 +284,27 @@ def baixar(item_id, destino, url="", perfil="rapida", incluir=None, callback_log
                     est["ok"] += 1
                     est["curso"].pop(item["id"], None)
                 return
-            except SemAcesso as e:
+            except Bloqueado:
+                with trava:
+                    est["curso"].pop(item["id"], None)
+                barrado.set()
+                return
+            except (SemAcesso, Definitivo) as e:
                 with trava:
                     est["erros"] += 1; est["curso"].pop(item["id"], None)
-                log(f"❌ Sem acesso: {item['nome']} (esse arquivo não está público)")
+                    falhas.setdefault(str(e), []).append(item["nome"])
+                log(f"❌ {item['nome']}: {e}")
                 return
             except Exception as e:
                 with trava:
                     est["curso"].pop(item["id"], None)
-                if "Cota de download" in str(e) or "bloqueou o download" in str(e) or tent == 4:
+                if tent == 4:
                     with trava:
                         est["erros"] += 1
-                    log(f"❌ Falhou: {item['nome']} ({e})")
+                        falhas.setdefault(f"falhou 5 vezes ({e})", []).append(item["nome"])
+                    log(f"❌ {item['nome']}: falhou 5 vezes ({e})")
                     return
+                log(f"↻ {os.path.basename(item['nome'])}: {e} — tentando de novo ({tent + 2}/5)")
                 time.sleep(3 * (tent + 1))
 
     def relatorio():
@@ -285,7 +337,20 @@ def baixar(item_id, destino, url="", perfil="rapida", incluir=None, callback_log
         th.join(2)
     if stop.is_set():
         return False
+    if barrado.is_set():
+        for i in faltam:   # .part pela metade atrapalharia o login (o rclone grava com o nome final)
+            p = os.path.join(destino, i["nome"]) + ".part"
+            if os.path.isfile(p):
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+        raise Bloqueado(BLOQUEIO)
     if est["erros"]:
-        log(f"⚠ {est['erros']} arquivo(s) falharam. Clique em Baixar de novo para tentar só os que faltam.")
+        log(f"⚠ {est['erros']} de {len(itens)} arquivo(s) não vieram. Resumo:")
+        for motivo, nomes in falhas.items():
+            log(f"   • {len(nomes)} — {motivo}" + (f" (ex.: {os.path.basename(nomes[0])})" if nomes else ""))
+        log("   Clique em Baixar de novo para tentar só os que faltam" +
+            (" — ou entre com a conta Google (o login baixa o que o link público não deixa)." if falhas else "."))
         return False
     return True

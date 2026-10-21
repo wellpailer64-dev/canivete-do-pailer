@@ -4042,10 +4042,12 @@ function veExportPlanClips() {
             if (pk && pk.mov) {
                 const o = c._o || c, s = Math.max(0, (c.s - o.s) / veVel(c));
                 // recortado ao desenho (cena3d.fim recortar): só o retângulo, no lugar dele
+                // desenhada menor que o quadro (exportação 1080p de um 4K, veMoNoTamanho): mw/mh = o tamanho do arquivo e
+                // a escala amplia às coordenadas do quadro (a CPU escala pelo tamanho real da entrada, não pelo mw)
                 const bx = pk.box && pk.box.W ? pk.box : null, kx = bx ? VE.seqW / bx.W : 1, ky = bx ? VE.seqH / bx.H : 1;
-                return { _c: c, tipo: 'video', path: pk.mov, seq: null, st: c.st, s, e: s + veLen(c), sc: 100,
+                return { _c: c, tipo: 'video', path: pk.mov, seq: null, st: c.st, s, e: s + veLen(c), sc: 100 * kx,
                          x: bx ? (bx.x + bx.w / 2) * kx : VE.seqW / 2, y: bx ? (bx.y + bx.h / 2) * ky : VE.seqH / 2,
-                         rot: 0, op: 100, kf: {}, fx: [], ca: [], mw: bx ? bx.w * kx : VE.seqW, mh: bx ? bx.h * ky : VE.seqH, v: 1, bm: veBmAtivo(c) ? c.bm : null, ox: 0, oy: 0 };
+                         rot: 0, op: 100, kf: {}, fx: [], ca: [], mw: bx ? bx.w : VE.seqW, mh: bx ? bx.h : VE.seqH, v: 1, bm: veBmAtivo(c) ? c.bm : null, ox: 0, oy: 0 };
             }
             // texto: PNG desenhado f vezes maior (nítido na maior escala dele); a escala desconta isso
             const png = veIsTexto(c) || veEhGrafico(c) ? pk : null, f = png ? png.f : 1;
@@ -4473,7 +4475,10 @@ function veProjectData() {
                 if (m.kind === 'video') o.path = m.path;
                 // Comp (editor-comp.js): a timeline dela + o arquivo renderizado e o hash do conteúdo dele
                 if (m.comp) Object.assign(o, { comp: true, sequenceId: m.sequenceId, compSig: m.compSig || null, dur: m.dur,
-                                               temSom: !!(m.info && m.info.has_audio), ...(m.ov ? { ov: m.ov, ovDe: m.ovDe } : {}), ...(m.passa ? { passa: true } : {}) });
+                                               temSom: !!(m.info && m.info.has_audio), ...(m.ov ? { ov: m.ov, ovDe: m.ovDe } : {}), ...(m.passa ? { passa: true } : {}),
+                                               // MOGRT (editor-mogrt.js): campos do Gráficos essenciais e o plano rápido — sem eles,
+                                               // ao reabrir os nomes de cada faixa voltavam ao do modelo (2026-10-21)
+                                               ...(m.mogrt ? { mogrt: m.mogrt } : {}), ...(m.mgPlano ? { mgPlano: true } : {}) });
                 if (m.c3d) Object.assign(o, { c3d: m.c3d, c3dSig: m.c3dSig || null, dur: m.dur });   // Cena 3D (editor-3d.js)
                 if (m.kind === 'timeline') o.sequenceId = m.sequenceId;
                 if (m.kind === 'cor') o.fill = m.fill;   // cor sólida (m.cor é a do rótulo)
@@ -4722,7 +4727,8 @@ function veApplyProject() {
             if (m.comp) {
                 // Comp: o arquivo pode ter saído do cache (limpeza automática) — renderiza de novo (veCompVerificar)
                 const dur = m.dur || mediaDur.get(m.id) || 1;
-                Object.assign(nm, { comp: true, sequenceId: m.sequenceId, compSig: m.compSig || null, dur, ...(m.ov ? { ov: m.ov, ovDe: m.ovDe } : {}), ...(m.passa ? { passa: true } : {}) });
+                Object.assign(nm, { comp: true, sequenceId: m.sequenceId, compSig: m.compSig || null, dur, ...(m.ov ? { ov: m.ov, ovDe: m.ovDe } : {}), ...(m.passa ? { passa: true } : {}),
+                                    ...(m.mogrt ? { mogrt: m.mogrt } : {}), ...(m.mgPlano ? { mgPlano: true } : {}) });
                 if (estaFaltando(m.path)) {
                     Object.assign(nm, { path: null, compSig: null,
                         info: { duration: dur, width: q.w, height: q.h, fps: VE.fps || 30, has_audio: !!m.temSom, alfa: true, provisoria: true } });
@@ -6290,7 +6296,8 @@ async function veStartExport() {
         // transições de sobreposição: o trecho de cada uma renderizado das trilhas de baixo (editor-ovt.js)
         if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg => { $ve('ve-exp-msg').textContent = msg; },
                                                                    !!($ve('ve-gpu') && $ve('ve-gpu').checked));   // placa: só o plano (shader)
-        if (veTxPrecisaEm(VE.clips)) await veTxPngs();   // textos e gráficos viram PNG; camadas do motion, vídeo
+        // camadas do motion desenhadas já no tamanho da saída (editor-motion.js veMoAssarUm)
+        if (veTxPrecisaEm(VE.clips)) await veMoNoTamanho($ve('ve-res').value, () => veTxPngs());   // textos e gráficos viram PNG; camadas do motion, vídeo
         const plano = veExportPlan(true), master = veMasterLim();
         const mix = master ? [...plano.mix, { master }] : plano.mix;
         await window.pywebview.api.video_cutter_export(

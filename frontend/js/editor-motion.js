@@ -615,16 +615,20 @@ async function veMoAssarUm(c, lista, como, aviso) {
     const api = window.pywebview && window.pywebview.api;
     if (!api || !api.ve_c3d_inicio) return null;
     const fps = VE.fps || 30;
-    const [W, H] = como(() => [VE.seqW, VE.seqH]);
+    const [W0, H0] = como(() => [VE.seqW, VE.seqH]);
+    // exportação menor que o quadro (4K → 1080p, VEMO.alvoH): desenha direto no tamanho da saída, como o monitor (pv);
+    // o box.W do arquivo menor faz o plano (veExportPlan) ampliar de volta às coordenadas do quadro
+    const k = VEMO.alvoH && Math.min(W0, H0) > VEMO.alvoH ? VEMO.alvoH / Math.min(W0, H0) : 1;
+    const W = Math.round(W0 * k / 2) * 2, H = Math.round(H0 * k / 2) * 2;
     const sig = 'mo.' + veMoHash(veMoAssinatura(c, lista) + `|${W}x${H}@${fps}|${VE_MO_VERSAO}`);
     VEMO.emCurso = VEMO.emCurso || new Map();
     if (VEMO.emCurso.has(sig)) return VEMO.emCurso.get(sig);
-    const p = veMoAssarSig(c, lista, como, aviso, sig, W, H, fps);
+    const p = veMoAssarSig(c, lista, como, aviso, sig, W, H, fps, k);
     VEMO.emCurso.set(sig, p);
     try { return await p; } finally { VEMO.emCurso.delete(sig); }
 }
 
-async function veMoAssarSig(c, lista, como, aviso, sig, W, H, fps) {
+async function veMoAssarSig(c, lista, como, aviso, sig, W, H, fps, k = 1) {
     const api = window.pywebview.api, n = Math.max(1, Math.round(veLen(c) * fps));
     const ini = await api.ve_c3d_inicio(vePrPrefs().dir, sig);
     if (!ini || !ini.success) throw new Error((ini && ini.error) || 'não abriu o render');
@@ -633,7 +637,7 @@ async function veMoAssarSig(c, lista, como, aviso, sig, W, H, fps) {
     cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d');
     const escalas = [veStaticProps(c).sc].concat(veKfOn(c, 'sc') ? c.k.sc.map(q => q.v) : []);
-    const f = Math.min(4, Math.max(1, Math.max(...escalas) / 100));
+    const f = Math.min(4, Math.max(1, Math.max(...escalas) / 100)) * k;
     const fo = c.mt && c.mt.uid ? lista.find(o => o.uid === c.mt.uid) : null;
     VEMO.assando++;
     try {
@@ -648,10 +652,11 @@ async function veMoAssarSig(c, lista, como, aviso, sig, W, H, fps) {
                 try {
                     ctx.setTransform(1, 0, 0, 1, 0, 0);
                     ctx.clearRect(0, 0, W, H);
+                    ctx.setTransform(k, 0, 0, k, 0, 0);
                     ctx.imageSmoothingQuality = 'high';
                     const itens = [{ c, src }];
                     if (srcF) itens.push({ c: fosco, src: srcF });
-                    veDesenharItens(ctx, cv, itens, 1, T);
+                    veDesenharItens(ctx, cv, itens, k, T);
                 } finally { VE.playhead = ph; }
             });
             const b = veCanvasPng(cv);
@@ -666,9 +671,19 @@ async function veMoAssarSig(c, lista, como, aviso, sig, W, H, fps) {
     return { mov: r.path, box: r.box || null };
 }
 
+// Exportação com resolução menor que o quadro ("1080" num 4K): as camadas do motion preparadas em fn() saem desenhadas
+// nesse tamanho (4× menos pixel para desenhar, comprimir em PNG e ler de volta)
+async function veMoNoTamanho(res, fn) {
+    const h = parseInt(res, 10);
+    VEMO.alvoH = h > 0 ? h : 0;
+    try { return await fn(); } finally { VEMO.alvoH = 0; }
+}
+
 // Chamado pela preparação da exportação (veTxPngs): cada camada do motion vira o vídeo desenhado
 async function veMoAssar(mapa, filtro, clips = VE.clips) {
-    const seq = clips === VE.clips ? null : (VE.sequences || []).find(s => s.clips === clips);
+    // Comp renderizada (veCompJob) passa uma CÓPIA das camadas: sem achar a Comp, veMoTem rodava na timeline de fora, a
+    // mãe não era achada e a camada saía crua (Cor sólida do quadro inteiro — o lower do MOGRT todo preto, 2026-10-21)
+    const seq = clips === VE.clips ? null : (VE.sequences || []).find(s => s.clips === clips) || (VEMO.seqDe && VEMO.seqDe.get(clips));
     const pl = typeof VECOMP !== 'undefined' && VECOMP.planas && VECOMP.planas.get(clips);   // achatada (editor-comp-passa.js)
     const como = fn => (pl ? veCompPlanaComo(pl, fn) : seq && typeof veCompComo === 'function' ? veCompComo(seq, fn) : fn());
     const lista = como(() => clips.filter(c => veMoTem(c) && !veMoFora(c) && !veOculto(c) && (!filtro || filtro(c))));

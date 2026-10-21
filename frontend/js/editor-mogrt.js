@@ -118,6 +118,34 @@ async function veMogrtMontar(r, pastaPai) {
     return { m: raiz, avisos };
 }
 
+// Projeto salvo antes de o .vknv guardar o MOGRT (2026-10-21): os campos do Gráficos essenciais sumiam ao reabrir (cada
+// faixa voltava ao nome do modelo). Relê o .mogrt e religa às Comps já montadas (mesmos nomes; uid = do After + o lote)
+async function veMogrtReligar(path) {
+    const r = await window.pywebview.api.ve_mogrt_importar(path);
+    if (!r || !r.success) throw new Error((r && r.error) || 'não leu o MOGRT');
+    const nomeDe = c => (c.id === r.raiz ? r.nome : c.nome);
+    const seqDe = {}, midias = [];
+    for (const c of r.comps) {
+        const m = VE.media.find(x => x && x.comp && !x.removido && x.ovDe == null && x.name === nomeDe(c));
+        if (!m) throw new Error(`Comp "${nomeDe(c)}" não está no projeto`);
+        seqDe[c.id] = m.sequenceId;
+        midias.push(m);
+    }
+    const u0 = (VE.sequences.find(s => s.id === seqDe[r.raiz]) || {}).clips || [];
+    const algum = VE.sequences.filter(s => Object.values(seqDe).includes(s.id)).flatMap(s => s.clips).find(c => c.uid && /_[a-z0-9]{4}$/.test(c.uid));
+    if (!algum) throw new Error('sem as camadas da importação');
+    const lote = algum.uid.split('_').pop(), uid = u => u && `${u}_${lote}`;
+    const raiz = midias[r.comps.findIndex(c => c.id === r.raiz)];
+    raiz.mogrt = {
+        controles: r.controles.map(ct => ct.alvo ? { ...ct, alvo: { ...ct.alvo, uid: uid(ct.alvo.uid), seq: seqDe[ct.alvo.comp] } } : ct),
+        espelhos: r.comps.filter(c => / \(volta\)$/.test(c.nome)).map(c => seqDe[c.id]).filter(Boolean),
+    };
+    midias.forEach(m => { m.mgPlano = true; });
+    VE_MG_PLANO.clear();
+    VE.dirty = true;
+    return { comps: midias.map(m => m.name), controles: raiz.mogrt.controles.length, lote, n: u0.length };
+}
+
 // Abre/importa um .mogrt (as mesmas opções do vePsdAbrir: pasta, inserir, soProjeto, abrir)
 async function veMogrtAbrir(path, opts = {}) {
     const api = window.pywebview && window.pywebview.api;

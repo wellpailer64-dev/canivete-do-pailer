@@ -211,9 +211,10 @@ JS_AJUDA = r"""
       if (typeof veOvtProntas === 'function') await veOvtProntas(null, null, !!window.__tePlaca);   // placa: só o plano (shader), como o export de verdade
       if (typeof ve3dProntas === 'function') await ve3dProntas(() => {});
       VE._txPng = null;
-      if (VE.clips.some(veTxPrecisa)) await veTxPngs();   // textos/gráficos em PNG; camadas do motion desenhadas
+      const res = window.__teRes || 'original';   // "1080" num quadro 4K: saída reduzida (a placa monta direto em 1080)
+      if (VE.clips.some(veTxPrecisa)) await veMoNoTamanho(res, () => veTxPngs());   // textos/gráficos em PNG; motion desenhado no tamanho da saída
       const plano = veExportPlan(true), lim = veMasterLim();
-      await window.pywebview.api.video_cutter_export(VE.path, plano.base, 'mp4', 'medium', 'original', !!window.__tePlaca, dest, false,
+      await window.pywebview.api.video_cutter_export(VE.path, plano.base, 'mp4', 'medium', res, !!window.__tePlaca, dest, false,
         plano.camadas, plano.audio, plano.dur, lim ? [...plano.mix, { master: lim }] : plano.mix, veTxExport(plano.faixa),
         [VE.seqW, VE.seqH], { nome, blocos: !!window.__teBlocos });
       return plano.dur;
@@ -823,12 +824,31 @@ CASOS = {
         v.k = { rot: [{ t: 0, v: 0, i: 'lin' }, { t: 2.5, v: 50, i: 'lin' }] };
         return [fundo, a, b, t, d, e, f, v];
     """, ""),
+    # 4K exportado em 1080 (RES_CASO): base 4K + PiP + motion (máscara animada, texto com fosco) — na placa monta direto
+    # em 1080 (export_placa: vc._reduzir_camada) e o motion é desenhado em 1080 (veMoNoTamanho); só com --4k
+    "4kmotion": (2160, 3840, """
+        const { clip } = __te, W = 2160, H = 3840, fm = veGrMidia('forma', 'Forma');
+        const foto = clip(2, 0.3, 0, 3.4, 'foto1.jpg', { uid: 'Lfoto', p: { sc: 110, x: W / 2, y: 2900, rot: 0, op: 100 },
+            mk: [{ id: 'mk1', nome: 'M1', modo: 'add', inv: false, on: true, fech: true, pts: VEMO_API.pontosEli(700, 500, 200, 200), pena: 40, op: 100, exp: 0 }] });
+        foto.k = { 'mk.mk1.cam': [{ t: 0, v: VEMO_API.pontosEli(700, 500, 200, 200), i: 'lin' }, { t: 2, v: VEMO_API.pontosEli(-200, -300, 2000, 1800), i: 'ease' }] };
+        const tm = veTxMidia();
+        const tx = { tr: 3, st: 0.5, s: 0, e: 3, m: tm.id, uid: 'Ltx', mt: { modo: 'alfa', uid: 'Lfaixa' },
+            tx: { ...VE_TX_PADRAO, t: 'KANIVETE', tam: 170, alin: 'center', cor: '#ffffff' } };
+        tx.p = Object.assign(veDefProps(tx), { sc: 100, x: W / 2, y: 1040 });
+        const faixa = { tr: 4, st: 0.5, s: 0, e: 3, m: fm.id, uid: 'Lfaixa',
+            fm: { t: 'ret', w: 640, h: 600, cor: '#ffffff', cOn: false, cCor: '#ffffff', cLarg: 8, raio: 0 }, p: { sc: 100, x: 300, y: 1040, rot: 0, op: 100 } };
+        faixa.k = { x: [{ t: 0, v: 300, i: 'lin' }, { t: 3, v: 1860, i: 'lin' }] };
+        return [clip(0, 0, 0, 3.5, 'k.mp4'), clip(1, 0.5, 0, 2.5, 'c.mp4', { x: 'v', p: { sc: 70, x: 1080, y: 1200, rot: 0 } }), foto, tx, faixa];
+    """, ""),
     # 4K: base 4K + PiP (só com --4k)
     "4k": (2160, 3840, """
         const { clip } = __te;
         return [clip(0, 0, 0, 3.5, 'k.mp4'), clip(1, 0.5, 0, 2.5, 'c.mp4', { x: 'v', p: { sc: 70, x: 1080, y: 1200, rot: 0 } })];
     """, ""),
 }
+
+
+RES_CASO = {"4kmotion": "1080"}   # casos exportados numa resolução menor que o quadro
 
 
 class _Servidor:
@@ -919,6 +939,7 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
     arq_nome = f"teste_{nome}_{int(time.time())}"
     pg.evaluate("b => { window.__teBlocos = b; }", os.environ.get("TESTE_BLOCOS") == "1")
     pg.evaluate("b => { window.__tePlaca = b; }", os.environ.get("TESTE_PLACA") == "1")
+    pg.evaluate("r => { window.__teRes = r; }", RES_CASO.get(nome) or os.environ.get("TESTE_RES") or "")
     pg.evaluate("([d, n]) => __te.exportar(d, n)", [saida, arq_nome])
     pg.wait_for_function("window.__teFim", timeout=900000)
     fim = pg.evaluate("window.__teFim")
@@ -962,7 +983,7 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
         if k < len(todos):
             pega(k)
             difs.append((float(np.abs(previa[k].astype(np.int16) - ex[k].astype(np.int16)).mean()), k))
-    if nome in ("motion", "curvas", "fxmotion", "bloom", "invfill", "desfoqueanim", "girar", "desfoquevideo", "onda", "ondavideo", "ondatexto", "ondavideo2", "ondagiro"):
+    if nome in ("motion", "4kmotion", "curvas", "fxmotion", "bloom", "invfill", "desfoqueanim", "girar", "desfoquevideo", "onda", "ondavideo", "ondatexto", "ondavideo2", "ondagiro"):
         # motion: detalhes finos (anel, borda de máscara) quase não mexem na média: confere a pior região 30×30.
         # Contra o quadro exato do ffmpeg (o navegador, buscando no meio do quadro, às vezes entrega o vizinho: um
         # objeto rápido anda 30 px por quadro)
@@ -1042,7 +1063,10 @@ def main():
     ap.add_argument("--placa", action="store_true", help="exporta com a placa de vídeo ligada (modo placa: Functions/export_placa.py)")
     ap.add_argument("--exe", default="", help="testar o exe gerado (ex.: dist/CaniveteDoPailer/CaniveteDoPailer.exe)")
     ap.add_argument("--folha", action="store_true", help="grava <caso>_folha.png com 8 quadros (prévia em cima, exportação embaixo)")
+    ap.add_argument("--res", default="", help="resolução da exportação em todos os casos (ex.: 1080; padrão: a do quadro)")
     a = ap.parse_args()
+    if a.res:
+        os.environ["TESTE_RES"] = a.res
     if a.folha:
         os.environ["TESTE_FOLHA"] = "1"
     base = os.path.join(os.environ.get("TEMP") or os.path.expanduser("~"), "canivete_teste_export")
@@ -1065,7 +1089,7 @@ def main():
     gerar_material(mat, a.k4)
     nomes = [n for n in (a.casos.split(",") if a.casos else list(CASOS) + ["autoframe"]) if n]
     if not a.k4 and not a.casos:
-        nomes = [n for n in nomes if n != "4k"]
+        nomes = [n for n in nomes if n not in ("4k", "4kmotion")]
     url = f"http://127.0.0.1:{a.porta}"
     app = None
     if not a.sem_abrir:
@@ -1107,7 +1131,7 @@ def main():
                 time.sleep(1)
                 pg.evaluate("p => veOpenPath(p)", principal)
                 pg.wait_for_function("VE.ready && VE.clips.length > 0 && $ve('ve-loading').hidden", timeout=120000)
-            faltam = [f for f in ["b.mp4", "c.mp4", "verde.mp4", "logo.png", "sinc.mp4"] + [f"foto{i + 1}.jpg" for i in range(8)] + (["k.mp4"] if "4k" in nomes else [])
+            faltam = [f for f in ["b.mp4", "c.mp4", "verde.mp4", "logo.png", "sinc.mp4"] + [f"foto{i + 1}.jpg" for i in range(8)] + (["k.mp4"] if {"4k", "4kmotion"} & set(nomes) else [])
                       if not pg.evaluate("n => VE.media.some(m => m && (m.path || '').replace(/\\\\/g, '/').endsWith('/' + n))", f)]
             if faltam:
                 pg.evaluate("async (l) => { await vePjImportar(l.map(p => ({path: p}))); }", [os.path.join(mat, f) for f in faltam])

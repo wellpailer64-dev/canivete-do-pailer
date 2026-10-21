@@ -346,7 +346,8 @@ function veCompSig(seq) {
     // 2: tamanho das imagens (render feito antes de a imagem carregar saía sem ela)
     // 3: camada de ajuste dentro da Comp deixava o fundo preto (o render corrigido precisa sair de novo)
     // 4: Luz suave e cor das camadas com mesclagem corrigidas na exportação (2026-10-02)
-    const partes = [4, seq.w, seq.h, VE.fps, VE.path || '', +seq.dur || 0, clips,
+    // 5: camada com mãe/máscara dentro da Comp saía crua (Cor sólida do quadro inteiro, preta) — veMoAssar (2026-10-21)
+    const partes = [5, seq.w, seq.h, VE.fps, VE.path || '', +seq.dur || 0, clips,
         (tr.v || []).map(t => !!(t && t.hide)), (tr.a || []).map(t => !!(t && t.mute)),
         seq.legGravar !== false && (seq.legendas || []).length ? [seq.legendas, seq.legEstilo] : null, seq.master || null];
     return 'comp.' + vePrHash(JSON.stringify(partes));
@@ -412,6 +413,8 @@ async function veCompJob(seq) {
     const imgs = seq.clips.map(c => VE.media[c.m || 0]).filter(m => m && m.kind === 'image' && !veMediaOffline(m));
     for (let k = 0; k < 50 && imgs.some(m => !m.w); k++) await new Promise(r => setTimeout(r, 100));
     // textos, formas e cores sólidas viram PNG (o mesmo desenho da prévia), sem mexer no VE._txPng da exportação
+    // a cópia da Comp não está em VE.sequences: o motion (mãe, fosco, máscara) precisa saber de qual Comp são as camadas
+    if (typeof VEMO !== 'undefined') { VEMO.seqDe = VEMO.seqDe || new WeakMap(); VEMO.seqDe.set(seq.clips, seq); }
     const mapa = veTxPrecisaEm(seq.clips) ? await veTxPngs(null, seq.clips, false, veSeqTracks(seq.trilhas, seq.clips)) : new Map();
     return veCompComo(seq, () => {
         const ant = VE._txPng;

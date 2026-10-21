@@ -250,7 +250,10 @@ async function veFilaAdicionarPreparando(nome, cfg) {
     if (typeof ve3dProntas === 'function') await ve3dProntas(msg);
     // placa ligada: só o plano das transições de sobreposição (a placa faz no shader); desligada: renderiza antes
     if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg, !!(cfg ? cfg.gpu : veFilaCfgLer().gpu));
-    if (veTxPrecisaEm(VE.clips)) { msg('Preparando textos, formas e camadas de motion…'); await veTxPngs(); }
+    if (veTxPrecisaEm(VE.clips)) {
+        msg('Preparando textos, formas e camadas de motion…');
+        await veMoNoTamanho((cfg || veFilaCfgLer()).res, () => veTxPngs());   // motion já no tamanho da saída
+    }
     msg('Revisando a timeline…');
     const avisos = await veFilaRevisar().catch(() => []);
     if (avisos.length) veToast(`Revisor: ${avisos.length} aviso(s) — ${avisos.slice(0, 2).map(a => veHuman(a.t) + ' ' + a.texto).join(' · ')}${avisos.length > 2 ? ' …' : ''}`);
@@ -259,6 +262,7 @@ async function veFilaAdicionarPreparando(nome, cfg) {
     const c = cfg ? JSON.parse(JSON.stringify(cfg)) : veFilaCfgLer();
     c.nome = nome || c.nome || veFilaNomeTimeline();
     const it = { id: ++VEFILA.seq, timeline: veFilaNomeTimeline(), seq: VE.activeSequence, dur: plano.dur, estado: 'espera', pct: 0, cfg: c, avisos, faixa: veExportFaixa(),
+        moH: parseInt(c.res, 10) || 0,   // tamanho em que as camadas do motion foram desenhadas (0 = do quadro)
         plano: { fonteCom: veFonteParaPlano({ ...plano, mix }, true), fonteSem: veFonteParaPlano({ ...plano, mix }, false), base: plano.base,
                  camadas: plano.camadas, audio: plano.audio, dur: plano.dur, mix, leg: veTxExport(plano.faixa), quadro: [VE.seqW, VE.seqH], projeto: VE.projectPath || '', fps: VE.fps || 30 } };
     VEFILA.itens.push(it);
@@ -302,6 +306,8 @@ async function veFilaProximo() {
         return;
     }
     VEFILA.atual = it; it.estado = 'rodando'; it.pct = 0; it.t0 = Date.now();
+    if (it.moH && (parseInt(it.cfg.res, 10) || 1e9) > it.moH && Math.min(VE.seqW, VE.seqH) > it.moH)
+        veToast(veT('Camadas de motion preparadas em') + ` ${it.moH}p: ` + veT('para sair nítido maior, ponha a timeline na fila de novo'));
     VE.exportRunning = true;
     // prévia renderizada (automática ou In→Out) parada: dividia a placa e a CPU com a exportação (memória estourava)
     if (typeof vePrAutoParar === 'function' && typeof VEPR !== 'undefined' && (VEPR.atual || VEPR.fila.length)) vePrAutoParar();

@@ -43,3 +43,9 @@ final leva ~5 s. A Comp guardada continua como a do After (abrir a Comp mostra m
 - Campos de caixa de seleção, lista e substituir mídia no painel.
 - Mãe ANIMADA e fosco que não é retângulo continuam pelo caminho desenhado (certo, mas lento).
 - Exportar o próprio MOGRT (modelo do Kanivete com campos).
+
+## Correções 2026-10-21 (CULTSP: lower todo preto no export)
+- Comp renderizada (`veCompJob`) passa uma CÓPIA das camadas: `veMoAssar` não achava a Comp e camada com mãe/fosco saía
+  crua (Cor sólida do quadro inteiro). Agora `VEMO.seqDe` liga a cópia à Comp; assinatura de Comp v5 (renders refeitos).
+- O .vknv não guardava `mogrt`/`mgPlano`: ao reabrir, os nomes do Gráficos essenciais voltavam ao modelo. Agora guarda;
+  projeto antigo: `veMogrtReligar('<arquivo.mogrt>')` relê e religa (uid do After + lote da importação).

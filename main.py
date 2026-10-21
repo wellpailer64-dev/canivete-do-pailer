@@ -1521,8 +1521,17 @@ def af_drive(url):
                 if isinstance(s, dict) and s.get("files_total", -1) not in (-1, None) else
                 f"Baixando... {s.get('done', '') if isinstance(s, dict) else ''}"))
             if publico:
-                ok = drive_publico.baixar(item_id, destino, url=url, perfil="rapida", incluir=_AF_DRIVE_EXT, stop_event=stop,
-                                          callback_progresso=prog, callback_log=lambda m: send(etapa="baixando", msg=str(m)))
+                try:
+                    ok = drive_publico.baixar(item_id, destino, url=url, perfil="rapida", incluir=_AF_DRIVE_EXT, stop_event=stop,
+                                              callback_progresso=prog, callback_log=lambda m: send(etapa="baixando", msg=str(m)))
+                except drive_publico.Bloqueado:
+                    send(etapa="conectando", msg="O Google barrou o download sem login desta rede; continuando pela sua conta Google...")
+                    ok, erro = gd.garantir_conexao(callback_log=lambda m: send(etapa="conectando", msg=str(m)))
+                    if not ok:
+                        send(etapa="erro", msg=(erro or "Não consegui entrar na conta Google.") + " Sem login, tente de novo em algumas horas.")
+                        return
+                    ok = gd.dump_pasta(remote, destino, perfil="rapida", tipo=tipo, incluir=_AF_DRIVE_EXT, stop_event=stop,
+                                       callback_progresso=prog)
             else:
                 ok = gd.dump_pasta(remote, destino, perfil="rapida", tipo=tipo, incluir=_AF_DRIVE_EXT, stop_event=stop,
                                    callback_progresso=prog)
@@ -2672,7 +2681,7 @@ def gdrive_analyze(url):
 
 
 def gdrive_dump(url, destino, perfil="rapida"):
-    from Functions.gdrive_dumper import parse_link, dump_pasta
+    from Functions.gdrive_dumper import parse_link, dump_pasta, garantir_conexao
     import threading
     import traceback
 
@@ -2733,7 +2742,18 @@ def gdrive_dump(url, destino, perfil="rapida"):
             if fotos:
                 success = google_fotos.baixar(url, destino, perfil=perfil, **callbacks)
             elif drive_publico.acessivel(item_id, url):   # link público: sem login
-                success = drive_publico.baixar(item_id, destino, url=url, perfil=perfil, **callbacks)
+                try:
+                    success = drive_publico.baixar(item_id, destino, url=url, perfil=perfil, **callbacks)
+                except drive_publico.Bloqueado as e:
+                    emit(log_msg=f"🚧 {e}")
+                    emit(log_msg="🔑 Continuando pela sua conta Google (o login não é barrado)...")
+                    ok, erro = garantir_conexao(callback_log=lambda m: emit(log_msg=m))
+                    if not ok:
+                        emit(log_msg=f"❌ {erro or 'Não consegui entrar na conta Google.'} Sem login, tente de novo em algumas horas.",
+                             complete=True, success=False)
+                        return
+                    remote_args = [item_id] if tipo == "file" else ["--drive-root-folder-id", item_id, "gdrive:"]
+                    success = dump_pasta(remote_args, destino, perfil=perfil, tipo=tipo, **callbacks)
             else:
                 remote_args = [item_id] if tipo == "file" else ["--drive-root-folder-id", item_id, "gdrive:"]
                 success = dump_pasta(remote_args, destino, perfil=perfil, tipo=tipo, **callbacks)

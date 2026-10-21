@@ -366,3 +366,32 @@ caixa na tela cresce M/s de cada lado.
   retos). Vídeo girado sem efeito que desce não desce mais (ondavideo2: 41 s → 3 s); imagem/texto girado COM onda: onda
   e depois giro na placa (caso `ondagiro`). Ainda na CPU: giro constante (ca_rot), imagem girada com onda E sombra, e
   imagem girada sem onda (gira uma vez antes de subir — barato, fica como está).
+
+## Rodada 9 — caso CULTSP (2026-10-20): overlay ProRes 4K derrubava o export 4K
+Projeto `CULTSP PRO/PROJETOS/CULTSPPRO_MEGA_ARTESANAL_V2.vknv` (timeline 4K 29,97, ~60 brutos A7C H.264 4K, MOGRT, Grunge
+ProRes 4K 24 qps em Luz direta, grão Kodak Tri-X ProRes 4K 4:2:2 10 bits 24 qps em 30 pedaços de 10 s, Sobrepor 10%).
+Export inteiro 4K: 815 s para 256 s (3,2×). Bancada no trecho 85–105 s (fila, modo placa, `tools/vigia_export.py --perfil`):
+| variação | tempo |
+|---|---|
+| A 4K com tudo | 906 s (!) |
+| B 1080 com tudo | 63 s |
+| C 1080 sem grão | 31 s |
+| D 1080 sem letreiros (MOGRT) | 57 s |
+| E 1080 sem grão/letreiro/Grunge | 26 s |
+| F 1080 grão LEVE | 49 s |
+| G 4K grão LEVE | 56 s |
+Grão leve = `ffmpeg -stream_loop 30 -i kodak.mov -t 300 -vf fps=30000/1001,scale=1920:1080,format=yuv420p -c:v libx264
+-preset fast -crf 31 -g 60` (373 MB/5 min; mantém 73% do desvio do grão → opacidade 10% vira 14%). 4K: 906 → 56 s (16×).
+Conclusões: (1) overlay ProRes 4K 10 bits 24 qps na timeline inteira é o vilão no 4K (provável memória da placa/conversão de
+taxa por camada); (2) mesmo leve, o grão ainda custa ~+18 s/20 s na bancada (parte é o trecho começar no meio de um clipe
+de 5 min); (3) MOGRT/Grunge ~5–6 s/20 s; (4) ~15–20 s fixos por item (preparo). Pendências: avisar no Revisor quando houver
+overlay pesado (ProRes/4K/taxa ≠ timeline) cobrindo muito tempo e oferecer "versão leve" automática; testar grão pelo
+efeito Granulação (shader) no lugar do arquivo; desfoque animado do fim (blur 0→30 em camada de ajuste) saiu fraco/ausente
+no export placa — conferir prévia × export; a mensagem "Desenhando camadas de motion" fica parada em `ve-exp-msg`
+durante o export da fila (texto velho do preparo).
+
+## Saída reduzida na placa (2026-10-21)
+4K → 1080p monta direto em 1080 na placa (`vc._reduzir_camada`, legendas medidas no quadro original) e as camadas do
+motion são desenhadas no tamanho da saída (`veMoNoTamanho`; o plano usa o tamanho real do arquivo × escala). Teste:
+`teste_export.py --4k --casos 4kmotion [--placa]`. Exportar sem ficar preso: `tools/ke_fila.py render --nome X --drive LINK`
+(espera render + Drive, acusa travada e quadro preto). Pendente: Parar durante "Liberando a memória da placa" não cancela.

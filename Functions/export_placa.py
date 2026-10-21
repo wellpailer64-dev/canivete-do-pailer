@@ -1665,7 +1665,16 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
     vc._camadas_na_grade(lay, info["fps"])
     alvo_h = vc._RESOLUCOES.get(str(args["resolucao"]), 0)
     m = None if args.get("usar_gpu") else "placa de vídeo desligada na exportação"
-    m = m or motivo(args["segmentos"], lay, args.get("legendas"), cfg, vcodec, bits, bool(alvo_h and min(W, H) > alvo_h))
+    m = m or motivo(args["segmentos"], lay, args.get("legendas"), cfg, vcodec, bits)
+    # saída menor que o quadro (4K → 1080p): monta direto no tamanho da saída, como a CPU (vc._reduzir_camada) — a base
+    # já se encaixa em g.W×g.H na leitura (libplacebo reduz ao subir), as camadas vão em px do quadro × red e os efeitos
+    # medem em % da mídia. Legendas medidas no quadro original (o libass escala o .ass). 4 vezes menos pixel por passo
+    Wq, Hq, red = W, H, 1.0
+    if alvo_h and min(W, H) > alvo_h:
+        red = alvo_h / min(W, H)
+        W, H = int(round(W * red / 2)) * 2, int(round(H * red / 2)) * 2
+        for c in lay:
+            vc._reduzir_camada(c, red)
     if m is None and not disponivel():
         m = "placa sem Vulkan/libplacebo"
     # CANIVETE_PLACA_BLOCOS=1: em blocos mesmo cabendo (teste_export --placa-blocos confere as emendas)
@@ -1679,11 +1688,13 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
     if grande and not all(isinstance(s, dict) and s.get("gap") is not None for s in args["segmentos"] or []):
         # os blocos só dividem camadas: os trechos "lisos" do vídeo principal (trilha base) viram camadas de vídeo no
         # mesmo lugar e a base fica vazia — antes isso caía inteiro no processador (quiz Carlinhos, 37 cortes, 2026-10-13)
-        segs, cams = _base_em_camadas(args["segmentos"], args["camadas"], args["path"], W, H, info)
+        segs, cams = _base_em_camadas(args["segmentos"], args["camadas"], args["path"], Wq, Hq, info)
         if segs is not None:
             args["segmentos"], args["camadas"] = segs, cams   # no lugar: o _motivo e a volta pela CPU usam o mesmo
             lay = vc._normalizar_camadas(args["camadas"], args["path"])
             vc._camadas_na_grade(lay, info["fps"])
+            for c in lay if red < 1 else []:
+                vc._reduzir_camada(c, red)
     if grande and not all(isinstance(s, dict) and s.get("gap") is not None for s in args["segmentos"] or []):
         m = "memória livre da placa insuficiente (4K bruto: Forçar Full HD resolve; ou feche o que usa a placa)"
     if m:
@@ -1732,7 +1743,7 @@ def exportar(args, aberto, pasta_saida, prog, stop_event, proc_holder=None):
     cor = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
     # legendas (o mesmo .ass da exportação pela CPU): desenhadas pelo libass no quadro já montado, ao descer da placa
     leg = args.get("legendas")
-    ass = vc._gerar_ass(leg["itens"], leg.get("estilo") or {}, W, H) if leg and leg.get("itens") else None
+    ass = vc._gerar_ass(leg["itens"], leg.get("estilo") or {}, Wq, Hq) if leg and leg.get("itens") else None
 
     def _render(lay_r, total_r, segs_r, arq, feitos, pasta_r=None, on_p=None):
         """Monta e codifica [0, total_r] (a timeline inteira ou um bloco) em arq. None = deu certo; senão o erro.
