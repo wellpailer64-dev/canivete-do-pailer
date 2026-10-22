@@ -126,6 +126,11 @@ Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lu
   de onset no som sem fala) entra como momento de som original com a trilha fora; voz da aula ruidosa: Anti Noise 30
   baixa ~4 dB → ganho por trecho (mediana dos quadros com voz) com +3,5 dB no professor. Armadilha: o lower do CULTSP não
   cresce com o texto (sem sourceRectAtTime): título até ~20 caracteres ("PRODUÇÃO MUSICAL ELETRÔNICA" invadiu o logo).
+- 2026-10-22 CULTSP PRO 03 Bananal Cultura e Gastronomia (V1 3:55, sem nota ainda; `D:/kanivete_testes/cultsp3/scripts`):
+  blocos novos no montar.py — "nat" (som direto curto da oficina, sem letreiro: "acarajé quente ou frio?", "vou
+  experimentar… eu gosto") e "montagem" (B-roll do preparo na batida com a música em cima). Trilha acústica (Gil Felix,
+  afoxê) soa ~7 dB abaixo da eletrônica nos mesmos −9/−21 dB → g +6 nos clipes de trilha; medir o render por trecho.
+  Fecho que retoma a abertura (fachada à noite) funciona como moldura.
 - 2026-10-15 QUIZ CARLINHOS v2 ("perfeito, to exportando"): erros de gravação foram para o FIM (gancho = fala final
   "E é isso" → whoosh + leak → REC → cartela final); piada esticada até o fim das risadas; cartela só com o texto da
   pergunta (sem "Pergunta N"); LEGENDA NUNCA ATRAVESSA CORTE DE CÂMERA (separar pelas palavras no corte = cada pessoa

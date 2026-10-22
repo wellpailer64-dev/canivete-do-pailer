@@ -20,7 +20,9 @@ def _pagina(porta):
     from playwright.sync_api import sync_playwright
     pw = sync_playwright().start()
     b = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{porta}", timeout=15000)
-    pg = next(x for c in b.contexts for x in c.pages if "index.html" in x.url)
+    # janelas soltas também são index.html: a certa é a que tem o editor e a fila (senão "VEFILA is not defined")
+    pg = next(x for c in b.contexts for x in c.pages
+              if "index.html" in x.url and x.evaluate("typeof VE === 'object' && typeof VEFILA === 'object'"))
     pg.set_default_timeout(600000)
     return pw, pg
 
