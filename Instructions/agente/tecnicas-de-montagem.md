@@ -85,6 +85,15 @@ Prioridade, da melhor para a pior:
 5. **Contexto**: plano geral do lugar, fachada, sala cheia.
 Evitar B-roll genérico ("papel de parede"), repetido, tremido, desfocado, escuro ou com a pessoa errada.
 
+**Plano tremido** (técnica do Pailer, 2026-10-22): o normal é **cortar a parte tremida e usar o trecho estável** do mesmo
+clipe (o `montar.py` já escolhe a janela mais estável e descarta média > 1,5 / pico > 5 px por quadro). Só quando o plano
+é **muito bom e único** (nada mais no projeto representa aquele momento) e não tem trecho firme: tentar **salvar com
+estabilização não destrutiva na própria camada**, conferir o resultado e, se deformar ou cortar demais, voltar ao original.
+Situação das ferramentas: o estabilizador próprio do Kanivete, melhor que o Warp Stabilizer, **ainda não existe** (plano
+em `plano-estabilizador.md`). Até ele existir, usar o vidstab do ffmpeg numa CÓPIA (`vidstabdetect` +
+`vidstabtransform smoothing=15, zoom 0, optzoom=1`) e trocar o arquivo só daquela mídia com `veTrocarArquivo` (o original
+fica no disco; desfaz trocando de volta). Quando o efeito "Estabilizar" do clipe existir, aplicar direto na camada.
+
 Sequência clássica de 3 planos: **geral → médio → detalhe** (ou o inverso para revelar).
 Cortar no movimento, não no meio de um movimento de câmera (pan ou zoom): pegar o trecho estável, de preferência
 começo e fim parados. Respeitar a direção do olhar (quem olha para a direita "chama" um plano do que está à direita).
