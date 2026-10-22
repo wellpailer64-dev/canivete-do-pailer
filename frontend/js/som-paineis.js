@@ -199,6 +199,40 @@ function skUiIntervalo() {
         <button class="ie-btn ie-btn-mini" onclick="skIntRecortar()" title="O projeto fica só com o intervalo">Recortar ao intervalo</button>
         <button class="ie-btn ie-btn-mini" onclick="SK.int = null; skUi(); skDesenhar()" title="Esc">Desmarcar</button></div></div>`;
 }
+function skVozPainel(c, ocup) {
+    const op = skVozEdicao(c), des = ocup ? 'disabled' : '';
+    const slider = (nome, k, min, max, passo, unidade) => `<label class="sk-p-l">${nome}<input type="range" data-voz="${k}" min="${min}" max="${max}" step="${passo}" value="${op[k]}" ${des}><small data-voz-valor="${k}">${op[k]}${unidade}</small></label>`;
+    return `<div class="sk-grupo" id="sk-voz-efeitos"><div class="sk-p-tit">Tom, velocidade e 8 bits</div>
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" id="sk-voz-bolinha" ${des}>Voz da bolinha</button><button class="ie-btn ie-btn-mini" id="sk-voz-neutro" ${des}>Neutro</button></div>
+        ${slider('Tom', 'tom', -24, 24, 0.5, ' semitons')}
+        ${slider('Velocidade', 'velocidade', 0.25, 4, 0.01, '×')}
+        <label class="sk-chk"><input type="checkbox" data-voz="preservar" ${op.preservar ? 'checked' : ''} ${des}> Preservar tom ao mudar velocidade</label>
+        <label class="sk-chk"><input type="checkbox" data-voz="bitcrusher" ${op.bitcrusher ? 'checked' : ''} ${des}> Bitcrusher (efeito digital)</label>
+        ${slider('Profundidade', 'bits', 2, 16, 1, ' bits')}
+        ${slider('Amostragem', 'amostragem', 1000, 48000, 100, ' Hz')}
+        ${slider('Intensidade', 'mistura', 0, 100, 1, '%')}
+        <div class="sk-p-info">Tom positivo deixa a voz mais aguda. 2× toca na metade do tempo. A prévia não altera o clipe; Aplicar afeta só este clipe.</div>
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" id="sk-voz-previa" ${des}>Ouvir prévia (até 6 s)</button><button class="ie-btn ie-btn-mini" id="sk-voz-parar">Parar prévia</button><button class="ie-btn ie-btn-mini" id="sk-voz-aplicar" ${des}>Aplicar</button>
+        ${c.voz_base ? `<button class="ie-btn ie-btn-mini" id="sk-voz-restaurar" ${des}>Restaurar voz</button>` : ''}</div></div>`;
+}
+function skVozPainelEventos(el, c) {
+    const painel = el.querySelector('#sk-voz-efeitos');
+    painel.oninput = e => {
+        const k = e.target.dataset.voz; if (!k) return;
+        const op = skVozEdicao(c);
+        op[k] = e.target.type === 'checkbox' ? e.target.checked : +e.target.value;
+        const valor = painel.querySelector(`[data-voz-valor="${k}"]`);
+        if (valor) valor.textContent = op[k] + ({ tom: ' semitons', velocidade: '×', bits: ' bits', amostragem: ' Hz', mistura: '%' }[k] || '');
+    };
+    const preset = ligar => { Object.assign(skVozEdicao(c), skVozPadrao(ligar)); skUiProps(); };
+    painel.querySelector('#sk-voz-bolinha').onclick = () => preset(true);
+    painel.querySelector('#sk-voz-neutro').onclick = () => preset(false);
+    painel.querySelector('#sk-voz-previa').onclick = () => skVozTransformar(c.id, null, true).catch(e => skToast(e.message));
+    painel.querySelector('#sk-voz-parar').onclick = () => skVozPararPrevia();
+    painel.querySelector('#sk-voz-aplicar').onclick = () => skVozTransformar(c.id).catch(e => skToast(e.message));
+    const restaurar = painel.querySelector('#sk-voz-restaurar');
+    if (restaurar) restaurar.onclick = () => skVozRestaurar(c.id);
+}
 function skUiClipe(el) {
     el.onclick = el.oninput = el.onchange = null;
     const [c] = SK.sel ? skClipe(SK.sel) : [null];
@@ -217,6 +251,7 @@ function skUiClipe(el) {
         <div class="sk-grupo"><div class="sk-p-tit">Volume e pausas</div><div class="sk-p-acoes">
             <select id="sk-alvo"><option value="-16">-16 LUFS (voz/podcast)</option><option value="-14">-14 LUFS (redes)</option><option value="-20">-20 LUFS (fundo)</option></select>
             <button class="ie-btn ie-btn-mini" id="sk-igualar">Igualar volume</button><button class="ie-btn ie-btn-mini" id="sk-silencio">Cortar silêncios</button></div></div>
+        ${skVozPainel(c, ocup)}
         <div class="sk-grupo"><div class="sk-p-tit">Limpeza (IA)</div>
         <label class="sk-p-l">Limpar ruído<input type="range" min="10" max="100" step="5" value="${SK.qLimpo || 80}" id="sk-q-limpo"><small id="sk-q-txt">${SK.qLimpo || 80}%</small></label>
         <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" id="sk-limpar" ${ocup ? 'disabled' : ''}>Limpar ruído</button>
@@ -229,6 +264,7 @@ function skUiClipe(el) {
         ${SK.rect && SK.rect.id === c.id ? `<div class="sk-p-info notranslate">${SK.rect.t0.toFixed(2)}–${SK.rect.t1.toFixed(2)} s · ${Math.round(SK.rect.f0)}–${Math.round(SK.rect.f1)} Hz</div>
         <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" id="sk-rep-p" ${ocup ? 'disabled' : ''}>Preencher com a vizinhança</button><button class="ie-btn ie-btn-mini" id="sk-rep-a" ${ocup ? 'disabled' : ''}>Atenuar (-30 dB)</button></div>`
         : `<div class="sk-p-info">${SK.verEsp ? 'Ctrl+arrastar no espectro do clipe marca a área (tosse, bipe, celular).' : 'Ligue a vista de espectro (▤ ou E) e marque a área com Ctrl+arrastar.'}</div>`}</div>`;
+    skVozPainelEventos(el, c);
     el.querySelector('#sk-separar').onclick = () => skSeparar(c.id).catch(e => skToast(e.message));
     const rp = el.querySelector('#sk-rep-p'); if (rp) rp.onclick = () => skReparar(c.id, { modo: 'preencher' }).catch(e => skToast(e.message));
     const ra = el.querySelector('#sk-rep-a'); if (ra) ra.onclick = () => skReparar(c.id, { modo: 'atenuar' }).catch(e => skToast(e.message));

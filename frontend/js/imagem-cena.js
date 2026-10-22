@@ -795,7 +795,8 @@ async function ieCenaGerarTodas(raiz, ctx) {
         const { s } = it;
         if (ctx.pre.has(s.chave) || (s.semente >= 0 && IE._cenaImgs.has(s.chave))) continue;
         if (!(await ieGeradorPronto())) return;
-        const r = await ieApi().ie_gerar({ prompt: s.prompt, largura: s.gw, altura: s.gh, semente: s.semente, refs: s.ref ? [s.ref] : [] });
+        // finally: sem fechar a barra, "Finalizando a imagem... (52 s)" ficava preso na tela (flyer do Big Pickle, 2026-10-22)
+        const r = await (async () => { try { return await ieApi().ie_gerar({ prompt: s.prompt, largura: s.gw, altura: s.gh, semente: s.semente, refs: s.ref ? [s.ref] : [] }); } finally { ieGerLimparBarra(); } })();
         if (!r || !r.success) continue;   // a montagem tenta de novo e avisa
         if (!r.cache) gerou = true;
         const c = await ieCenaImagem(r.path);
@@ -829,7 +830,7 @@ async function ieCenaImg(el, cs, ctx, h) {
         else if (semente >= 0 && IE._cenaImgs.has(chave)) c = IE._cenaImgs.get(chave);
         else {
             if (!(await ieGeradorPronto())) { ctx.avisos.push('gerador de imagem não instalado'); return null; }
-            const r = await ieApi().ie_gerar({ prompt, largura: gw, altura: gh, semente, refs: ref ? [ref] : [] });
+            const r = await (async () => { try { return await ieApi().ie_gerar({ prompt, largura: gw, altura: gh, semente, refs: ref ? [ref] : [] }); } finally { ieGerLimparBarra(); } })();
             if (!r || !r.success) { ctx.avisos.push(`não gerou: ${k.gerar.slice(0, 40)} (${(r && r.error) || ''})`); return null; }
             c = await ieCenaImagem(r.path);
             if (semente >= 0) IE._cenaImgs.set(chave, c);

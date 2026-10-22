@@ -485,12 +485,62 @@ function veFilaRenderItem(it) {
     else if (it.drive) return veFilaRender();
     veFilaBadge();
 }
+function veFilaRenomear(id, valor) {
+    const it = VEFILA.itens.find(x => x.id === id);
+    if (!it || it.estado !== 'espera') throw new Error('Só é possível renomear itens que estão aguardando');
+    const nome = String(valor).trim();
+    if (!nome || nome.length > 180 || /[\\/:*?"<>|\x00-\x1f]/.test(nome) || /[. ]$/.test(nome) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i.test(nome)) throw new Error('Use um nome válido, sem barras ou caracteres reservados');
+    if (nome === it.cfg.nome) return nome;
+    if (it.tipo === 'som') {
+        const antigo = it.cfg.nome;
+        const chamadas = it.chamadas.map(ch => {
+            const p = ch.caminho, inicio = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\')) + 1;
+            const arquivo = p.slice(inicio), ponto = arquivo.lastIndexOf('.');
+            const base = ponto > 0 ? arquivo.slice(0, ponto) : arquivo, ext = ponto > 0 ? arquivo.slice(ponto) : '';
+            const faixa = it.stems && base.startsWith(antigo + ' - ') ? base.slice(antigo.length) : '';
+            return { ...ch, caminho: p.slice(0, inicio) + nome + faixa + ext, op: { ...ch.op, nao_sobrescrever: true } };
+        });
+        const caminhos = new Set(chamadas.map(ch => ch.caminho.replace(/\\/g, '/').toLowerCase()));
+        if (VEFILA.itens.some(x => x !== it && ['espera', 'rodando'].includes(x.estado) && (x.chamadas || []).some(ch => caminhos.has(ch.caminho.replace(/\\/g, '/').toLowerCase())))) throw new Error('Outro item da fila já usa esse nome de saída');
+        it.chamadas = chamadas;
+    } else if (it.tipo === 'lux') {
+        const spec = JSON.parse(it.spec); spec.nome = nome; it.spec = JSON.stringify(spec);
+    } else if (it.tipo === 'arquivo') it.cfg.nomePersonalizado = true;
+    it.cfg.nome = nome;
+    if (VEFILA.sel === id && $ve('ve-exp-nome')) $ve('ve-exp-nome').value = nome;
+    return nome;
+}
+function veFilaNomeEditar(id, e) {
+    e?.stopPropagation();
+    const it = VEFILA.itens.find(x => x.id === id); if (!it || it.estado !== 'espera') return;
+    VEFILA.nomeEditando = id; VEFILA.nomeRascunho = it.cfg.nome;
+    veFilaRender();
+    const input = document.querySelector(`[data-fila-nome="${id}"]`);
+    if (input) { input.focus(); input.select(); }
+}
+function veFilaNomeFechar(id, valor, confirmar) {
+    if (VEFILA.nomeRedesenhando || VEFILA.nomeEditando !== id) return;
+    if (confirmar) {
+        try { veFilaRenomear(id, valor); }
+        catch (e) { veToast(e.message); document.querySelector(`[data-fila-nome="${id}"]`)?.focus(); return; }
+    }
+    VEFILA.nomeEditando = null; VEFILA.nomeRascunho = null; veFilaRender();
+}
+function veFilaNomeHtml(it) {
+    if (it.estado !== 'espera') return `<b>${veEsc(it.cfg.nome)}</b>`;
+    if (VEFILA.nomeEditando === it.id) return `<input class="ve-input ve-fila-nome" data-fila-nome="${it.id}" aria-label="Nome de saída" title="Nome sem extensão · Enter confirma · Esc cancela" maxlength="180" value="${veEsc(VEFILA.nomeRascunho ?? it.cfg.nome)}"
+        onclick="event.stopPropagation()" oninput="VEFILA.nomeRascunho=this.value" onblur="veFilaNomeFechar(${it.id},this.value,true)"
+        onkeydown="event.stopPropagation(); if(event.key==='Enter'||event.key==='Escape'){event.preventDefault();veFilaNomeFechar(${it.id},this.value,event.key==='Enter');}">`;
+    return `<b class="ve-fila-nome-titulo" role="button" tabindex="0" title="Clique para renomear o arquivo de saída" onclick="veFilaNomeEditar(${it.id},event)" onkeydown="if(event.key==='Enter'||event.key==='F2'){event.preventDefault();veFilaNomeEditar(${it.id},event);}">${veEsc(it.cfg.nome)}</b>`;
+}
 function veFilaRender() {
     veFilaBadge();
     const L = $ve('ve-fila-lista'); if (!L) return;
+    const input = L.querySelector('[data-fila-nome]'), foco = input && document.activeElement === input ? [input.selectionStart, input.selectionEnd] : null;
+    VEFILA.nomeRedesenhando = true;
     L.innerHTML = VEFILA.itens.length ? VEFILA.itens.map((it, i) => `<div class="ve-fila-item ${it.estado}${VEFILA.sel === it.id ? ' sel' : ''}" data-fila="${it.id}" title="${it.estado === 'espera' ? 'Clique para ver e mudar as configurações deste item' : ''}">
         <span class="ve-fila-n">${i + 1}</span>
-        <span class="ve-fila-info"><b>${veEsc(it.cfg.nome)}</b><small>${veEsc(it.timeline)}${it.tempo ? ' · feito em ' + veHuman(it.tempo) : ''}${it.erro ? ' · ' + veEsc(String(it.erro).slice(0, 120)) : ''}${it.emendaMsg ? ' · ' + veEsc(it.emendaMsg) : ''}</small>
+        <span class="ve-fila-info">${veFilaNomeHtml(it)}<small>${veEsc(it.timeline)}${it.tempo ? ' · feito em ' + veHuman(it.tempo) : ''}${it.erro ? ' · ' + veEsc(String(it.erro).slice(0, 120)) : ''}${it.emendaMsg ? ' · ' + veEsc(it.emendaMsg) : ''}</small>
             <span class="ve-fila-tags">${(it.avisos || []).length ? `<i class="ve-fila-aviso" onclick="event.stopPropagation(); veFilaIrAviso(${it.id})" title="${veEsc(it.avisos.map(a => veHuman(a.t) + ' — ' + a.texto).join('\n') + '\n\n' + veT('Clique: leva a agulha ao ponto (de novo: próximo aviso)'))}">⚠ ${it.avisos.length} aviso(s)</i>` : ''}${it.tipo && typeof keEtiquetasHtml === 'function' ? keEtiquetasHtml(it) : veFilaEtiquetas(it.cfg, it.dur).map(t => `<i>${veEsc(t)}</i>`).join('')}${it.volume ? `<i class="ve-fila-vol${it.volume.lufs < -20 || it.volume.lufs > -11 ? ' ruim' : ''}" title="Volume integrado do som exportado${it.volume.pico != null ? ' · pico ' + it.volume.pico.toFixed(1) + ' dB' : ''}">${it.volume.lufs.toFixed(1)} LUFS</i>` : ''}</span>
             <span class="ve-fila-barra"><i style="width:${it.pct}%"></i></span>${veFilaDriveHtml(it)}</span>
         <span class="ve-fila-est">${VE_FILA_ESTADO[it.estado] || it.estado}${it.estado === 'rodando' ? ` ${Math.round(it.pct)}%` : ''}</span>
@@ -505,6 +555,8 @@ function veFilaRender() {
             <span class="ve-fila-barra ve-fila-indet"><i></i></span></span>
         <span class="ve-fila-est">Preparando</span><span class="ve-fila-acoes"></span></div>`).join('');
     if (preps) L.innerHTML = preps + (VEFILA.itens.length ? L.innerHTML : '');
+    VEFILA.nomeRedesenhando = false;
+    if (foco) { const novo = L.querySelector('[data-fila-nome]'); if (novo) { novo.focus(); novo.setSelectionRange(...foco); } }
     const sel = VEFILA.itens.find(x => x.id === VEFILA.sel);
     $ve('ve-fila-dica').textContent = sel ? `Editando as configurações de "${sel.cfg.nome}". Clique de novo nele para voltar ao formulário livre.` :
         'Cada item guarda a timeline como estava ao entrar na fila. Clique num item para ver e mudar as configurações dele.';

@@ -92,7 +92,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - **Python**: `Functions/sound_kanivete.py`, `Functions/sk_gravar.py`, `Functions/sk_espectro.py`, `Functions/sk_banco_vozes.py`
 - **Automação (agente/Jr)**: window.SKN (som.js): novo, importar, cortar, alterarClipe, exportar, estado...
 - **API** (`pywebview.api.*`, 24): `sk_info(path)`, `sk_trecho(arq, k, sr=48000)`, `sk_auto(acao, proj=None, caminho=None, pid=None)`, `sk_gravar(acao, dispositivo=None, caminho=None, sr=48000, canais=1)`, `sk_ir(tamanho=1.2)`, `sk_espectro(arq, t0, t1, cols=1200, rows=256)`, `sk_salvar(proj, caminho)`, `sk_abrir(caminho)`, `sk_congelar(faixa, sr=48000)`, `sk_exportar(proj, caminho, op=None)`, `sk_medir(proj, op=None)`, `sk_processar(arq, efeito, op=None)`, `sk_transcrever(proj, idioma="pt", faixas=None)`, `sk_lufs(arq, de=0, dur=None)`, `sk_silencios(arq, de=0, dur=None, limiar=-40, minimo=0.6)`, `sk_pasta_padrao()`, `sk_vozes()`, `sk_voz_criar(nome, arq, op=None)`, `sk_banco(acao="estado", vid=None)`, `sk_voz_desenhar(instruct, seed=0, texto=None)`, `sk_voz_apagar(voz_id)`, `sk_voz(voz_id, texto, op=None)`, `sk_dialogo(modo, tipos=None, nome="")`, `ke_parar(tipo=None)`
-- **Testes**: `testes/teste_som.py`
+- **Testes**: `testes/teste_som.py`, `testes/teste_som_atalho_ke.py`, `testes/teste_som_inout.py`, `testes/teste_som_voz.py`
 - **Guias**: `Instructions/sound-kanivete.md`
 
 #### Converter Áudio — `switchTool('converter-audio')`
@@ -226,6 +226,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/icones_arquivos.py` — Gera os ícones dos arquivos de projeto (identidade/arquivos/*.ico): o logo de cada ferramenta como no app
 - `tools/imgprep.py` — Prepara imagens para a peça numa linha: cortar, ampliar por IA, recortar o fundo, limpar sobras e tapar buracos
 - `tools/kani_kb.py` — Base de ajuda da Kani (assistente do KANIVETE): junta os guias das ferramentas (Instructions/*.md) e o mapa geral
+- `tools/ke_fila.py` — Exportar pela fila do Kanivete Encoder no app aberto (modo agente), barato em tokens e sem ficar preso
 - `tools/knv.py` — Monta uma peça do Photo Kanivete a partir de HTML/CSS (KNV.cena) no app aberto em modo agente e confere
 - `tools/logotipo.py` — Logotipo a partir de uma fonte livre (OFL) com letras redesenhadas: técnica de agência "fonte de base + ajustes"
 - `tools/mapa_codigo.py` — Mapa do código (para o agente achar onde mexer sem abrir arquivo grande): comandos registrados, funções de topo e
@@ -250,6 +251,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/roteiro_local.py` — Briefing → roteiro JSON do tools/esqueleto.py pelo modelo LOCAL (Ollama; o Jr). O modelo só escreve o roteiro curto;
 - `tools/sd.py` — Slider Kanivete pela linha de comando, no app ABERTO (não fecha nem recarrega nada). Para o agente gastar pouco:
 - `tools/tripa.py` — tripa.py — a timeline inteira numa "tripa" de quadrinhos para o agente LER a montagem barato (ideia do Pailer)
+- `tools/vigia_export.py` — Vigia de exportação do Vídeo Kanivete (barato em tokens): acompanha o export/fila no app aberto em modo agente,
 - `tools/vk_cena.py` — Diagramar uma prancheta do Vetor Kanivete com HTML/CSS (VKN.cena) usando o sistema da marca
 
 ## 9. Guias (`Instructions/`)
@@ -455,6 +457,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_ke_aba.py` — Kanivete Encoder na aba própria (editor-encoder.js keAoTrocar) — app em --agente=9333:
 - `testes/teste_ke_media.py` — Kanivete Encoder como Media Encoder (ke-arquivos.js + Functions/ke_arquivos.py) — app em --agente=9333:
 - `testes/teste_ke_parar.py` — Parar da fila do Ke interrompe o Blender (item da Lux): app em --agente=9333
+- `testes/teste_ke_renomear.py` — Título editável da fila: cliques reais, cancelamento, redraw e nomes dos WAVs renderizados; só porta 9333
 - `testes/teste_laco.py` — Laço: Shift soma, Alt subtrai, Shift+Alt cruza; o mesmo no magnético; Ctrl+clique na miniatura seleciona a camada
 - `testes/teste_lobby_camadas.py` — Lobby do Photo/Vetor não cobre a janela Novo documento nem os menus (app 9333)
 - `testes/teste_lux_casa.py` — Lux com casa própria: abre sem o Editor, desfaz sozinha, envia cópia para a timeline (app em --agente=9333)
@@ -480,6 +483,9 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_slider_extra.py` — Slider Kanivete — 2ª bateria: janela sem margem, gráficos (todos os modelos, CSV, PPTX nativo), paletas de cliente
 - `testes/teste_slider_html.py` — Slider › Exportar › Apresentação (HTML): monta uma apresentação com foto, GIF, vídeo, animações (automática e de
 - `testes/teste_som.py` — Sound Kanivete (som.js + Functions/sound_kanivete.py) — app em --agente=9333, mouse de verdade
+- `testes/teste_som_atalho_ke.py` — Ctrl+Shift+M do Sound: fila real, In/Out congelado, aba em segundo plano e render de áudio; só porta 9333
+- `testes/teste_som_inout.py` — In/Out no Sound: teclas reais, WAV recortado, stems, fila, persistência e desfazer; somente porta 9333
+- `testes/teste_som_voz.py` — Tom, velocidade e bitcrusher reais; --interface inclui o app isolado na porta 9333
 - `testes/teste_timeline_pr.py` — Timeline como a do Premiere (2026-10-11): ferramentas no topo da coluna das trilhas, alvo de trilha (Track Targeting),
 - `testes/teste_trilhas.py` — Faixas da timeline (editor-trilhas.js): adicionar, excluir, excluir vazias e Ctrl+Z (app JÁ aberto em --agente=9333)
 - `testes/teste_vetor.py` — Teste do Vetor Kanivete pela API real (app em --agente=9333): monta um cartão de visita pelos comandos (window.VKN),

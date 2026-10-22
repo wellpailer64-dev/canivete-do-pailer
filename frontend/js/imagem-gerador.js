@@ -13,6 +13,7 @@ let ieGerJob = null;
 function ieGeradorProgresso(d) {
     if (!d) return;
     if (d.fim || d.erro) { ieCarregando(false); if (d.erro) ieToast(d.erro); IE._gerDl?.(d); return; }
+    if (d.job && ieGerFeitos.has(d.job)) return;   // aviso atrasado de um job que já terminou: não reabrir a barra
     if (d.job) ieGerJob = d.job;
     ieCarregando(d.msg || ieT('Gerando...'), d.pct);
     const box = document.querySelector('#ie-carregando .ie-carregando-box');
@@ -25,7 +26,8 @@ function ieGeradorProgresso(d) {
 }
 window.ieGeradorProgresso = ieGeradorProgresso;
 
-function ieGerLimparBarra() { ieGerJob = null; document.querySelectorAll('.ie-ger-cancelar').forEach(b => b.remove()); ieCarregando(false); }
+const ieGerFeitos = new Set();
+function ieGerLimparBarra() { if (ieGerJob) ieGerFeitos.add(ieGerJob); ieGerJob = null; document.querySelectorAll('.ie-ger-cancelar').forEach(b => b.remove()); ieCarregando(false); }
 
 // garante o gerador instalado (pergunta antes de baixar); modelo: 'zimage' (texto → imagem, padrão) | 'klein' (com referência)
 async function ieGeradorPronto(modelo) {

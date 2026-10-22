@@ -234,3 +234,44 @@ Rodadas seguintes do plano profissional:
 Plano profissional A–F concluído. Próximos: compensar a latência da placa ao gravar; prévia idêntica do gate/de-esser; banco v2 com mais vozes (e as CC0 Jeff/Cadu se o usuário baixar).
 Separar voz da música (precisa de um modelo de separação; o UVR/Roformer foi testado no anti-noise), curva de volume
 desenhada na timeline (o .sknv e a exportação já aceitam `curva`), Editor → Sk (editar o áudio de um vídeo aqui).
+
+## Tom, velocidade e voz em 8 bits (2026-10-21)
+- Painel **Clipe → Tom, velocidade e 8 bits**: tom de -24 a +24 semitons, velocidade de 0,25× a 4× e
+  **Preservar tom ao mudar velocidade**. Com a opção desligada, a velocidade também altera a afinação.
+- **Bitcrusher**: 2–16 bits, amostragem de 1–48 kHz e intensidade de 0–100%. **Voz da bolinha** preenche
+  +3 semitons, 1,12× com tom preservado, 8 bits, 5,5 kHz e 90% de intensidade; **Neutro** desliga os efeitos.
+- **Ouvir prévia** prepara até 6 s de saída sem alterar projeto/histórico; **Parar prévia** interrompe a audição.
+  **Aplicar** gera WAV 24 bits do trecho e troca só o clipe selecionado. A duração, fades e curva acompanham a
+  velocidade. Ctrl+Z/Y desfaz/refaz; **Restaurar voz** retorna ao áudio anterior, respeitando recortes posteriores.
+- Fonte intacta; saídas persistentes em `D:/Kanivete/Sound Kanivete/Efeitos de voz` (na unidade do código), fora
+  dos caches descartáveis. Salvar/abrir `.sknv` preserva os ajustes e a referência anterior. A exportação usa
+  o mesmo WAV da prévia da timeline. Processamento: `rubberband` e `acrusher` do FFmpeg já instalado.
+- SKN: `transformarVoz(id, {tom, velocidade, preservar, bitcrusher, bits, amostragem, mistura})`,
+  `previaVoz(id, op)`, `restaurarVoz(id)`. API: `sk_processar(arq, 'transformar_voz', {...op, de, dur, previa})`.
+- Teste: `py -3.13 testes/teste_som_voz.py --interface` com app isolado na porta 9333; sem a opção, apenas DSP.
+
+## Entrada e saída da exportação — In/Out (2026-10-21)
+- **I** marca a entrada na agulha e **O** marca a saída; **Shift+I/O** remove só aquele ponto. Atalhos não
+  atuam ao digitar em campos, e Ctrl+I continua importando áudio. Se marcar um ponto além do outro, o outro
+  ponto é removido para não criar intervalo invertido. Sem entrada/saída, usa o começo/fim do projeto.
+- Régua: intervalo azul e bandeiras I/O, independentes da seleção de edição (`SK.int`). Os pontos ficam em
+  `proj.inout = {entrada, saida, usar}`; salvar, recuperar e Ctrl+Z/Y preservam a marcação.
+- **Exportar → Área de exportação**: tempos editáveis, Marcar I/O, Limpar In/Out e escolha entre projeto inteiro
+  ou trecho. Marcar I/O ativa o trecho; exportar tudo não apaga os pontos. Intervalo vazio bloqueia a exportação.
+- Vale para WAV/MP3/etc., stems e fila do Encoder, mantendo os stems alinhados a partir da entrada. Na fila,
+  os tempos são congelados junto do projeto. `SKN.exportar` respeita a marcação; `area:'inteiro'` ou `ini/fim`
+  explícitos prevalecem. Projetos antigos sem `inout` continuam exportando inteiros.
+- API: `SKN.marcarEntrada(t)`, `marcarSaida(t)` (sem t = agulha), `limparInOut()`, `inOut()`.
+  Teste: `py -3.13 testes/teste_som_inout.py` no app isolado 9333 (backup e restauração do projeto de teste).
+
+## Atalhos para a fila do Encoder (2026-10-21)
+- **Ctrl+Shift+M** envia direto para a fila, sem diálogo de salvar e sem sair do Sound. A aba do Kanivete
+  Encoder aparece no topo em segundo plano. **Ctrl+M** envia e ativa a aba do Encoder. M sozinho continua
+  criando marcador; os atalhos da fila não atuam ao digitar em campos, nem repetem itens ao segurar a tecla.
+- Usa formato, qualidade, faixas/stems, LUFS e capítulos do painel Exportar. O In/Out ativo é congelado junto
+  com o projeto: alterar o Sound depois não muda o item que já está esperando. Abrir a aba não inicia o render;
+  o início continua no botão ▶ Renderizar (ou na vez do item, se a fila já estiver rodando).
+- Saída com nome único na pasta do `.sknv` salvo no D; sem projeto salvo nessa unidade, em
+  `D:/Kanivete/Sound Kanivete/Exportados`. A pasta é criada apenas ao renderizar.
+- Código: `skKeFilaAtalho`, `skKeTecla`, `skKeAtalhoInstalar` e `skParaKe` em `som-texto.js`;
+  `keSomEnviar` em `ke-arquivos.js`. Teste real: `py -3.13 testes/teste_som_atalho_ke.py`, porta 9333.

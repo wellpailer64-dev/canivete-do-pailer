@@ -354,6 +354,8 @@ def exportar(proj, caminho, op=None):
     (marcadores viram capítulos no mp3/m4a/ogg/flac/opus)}."""
     op = op or {}
     _EXP["parar"] = False
+    if op.get("nao_sobrescrever") and os.path.exists(caminho):
+        return {"success": False, "error": "já existe um arquivo com esse nome; escolha outro nome na fila"}
     fmt = (op.get("formato") or os.path.splitext(caminho)[1].lstrip(".") or "mp3").lower()
     if fmt not in FORMATOS:
         return {"success": False, "error": f"formato {fmt}: use {', '.join(FORMATOS)}"}
@@ -558,6 +560,68 @@ def limpar_ruido(arq, quantidade=80, log=print, prog=lambda *a: None):
     if r.returncode != 0:
         raise RuntimeError("não gravou o som limpo: " + (r.stderr or "")[-300:])
     return saida
+
+
+def transformar_voz(arq, op=None, log=print, prog=lambda *a: None):
+    """Tom, tempo e bitcrusher do trecho escolhido; saída persistente no D, sem sobrescrever a gravação."""
+    import math
+    op = op or {}
+
+    def numero(chave, padrao, minimo, maximo):
+        n = float(op.get(chave, padrao))
+        if not math.isfinite(n) or not minimo <= n <= maximo:
+            raise ValueError(f"valor inválido para {chave}: {n}")
+        return n
+
+    arq = os.path.abspath(arq)
+    if not os.path.isfile(arq):
+        raise FileNotFoundError("gravação não encontrada")
+    total = _ffprobe_dur(arq)[0]
+    de = numero("de", 0, 0, max(0, total))
+    dur = numero("dur", total - de, 0.01, max(0.01, total - de + 0.005))
+    tom = numero("tom", 0, -24, 24)
+    velocidade = numero("velocidade", 1, 0.25, 4)
+    bits = numero("bits", 8, 2, 16)
+    amostragem = numero("amostragem", 5500, 1000, 48000)
+    mistura = numero("mistura", 90, 0, 100)
+    preservar = op.get("preservar", True)
+    crusher = op.get("bitcrusher", False)
+    previa = op.get("previa", False)
+    if any(type(v) is not bool for v in (preservar, crusher, previa)):
+        raise ValueError("preservar, bitcrusher e previa precisam ser booleanos")
+    if previa:
+        dur = min(dur, 6 * velocidade)
+    opcoes = dict(de=de, dur=dur, tom=tom, velocidade=velocidade, preservar=preservar,
+                  bits=bits, amostragem=amostragem, mistura=mistura, bitcrusher=crusher, previa=previa)
+    assinatura = json.dumps([arq, os.stat(arq).st_mtime_ns, os.path.getsize(arq), opcoes], sort_keys=True)
+    nome = hashlib.sha256(assinatura.encode("utf-8")).hexdigest()[:20]
+    pasta = os.path.join(os.path.splitdrive(os.path.abspath(__file__))[0] + os.sep, "Kanivete", "Sound Kanivete", "Efeitos de voz")
+    os.makedirs(pasta, exist_ok=True)
+    saida = os.path.join(pasta, f"{'previa' if previa else 'voz'}_{nome}.wav")
+    if not os.path.isfile(saida):
+        filtros = [f"atrim=start={de:.9f}:duration={dur:.9f}", "asetpts=PTS-STARTPTS", "aresample=48000"]
+        fator = 2 ** (tom / 12) * (1 if preservar else velocidade)
+        if abs(fator - 1) > 1e-7 or abs(velocidade - 1) > 1e-7:
+            filtros.append(f"rubberband=tempo={velocidade:.9f}:pitch={fator:.9f}")
+        if crusher and mistura > 0:
+            filtros.append(f"acrusher=bits={bits:g}:samples={48000 / amostragem:.9f}:mix={mistura / 100:.6f}:mode=lin:aa=0")
+        # Proteção de pico sem normalizar para cima nem mudar o volume escolhido.
+        filtros.append("alimiter=limit=0.98:level=0:latency=1")
+        prog(15, "Preparando prévia" if previa else "Transformando a voz")
+        fd, temporario = tempfile.mkstemp(prefix="voz_", suffix=".wav", dir=pasta)
+        os.close(fd)
+        try:
+            r = subprocess.run([ffmpeg(), "-v", "error", "-y", "-i", arq, "-vn", "-af", ",".join(filtros),
+                                "-c:a", "pcm_s24le", temporario], capture_output=True, text=True,
+                               timeout=600, creationflags=NO_WINDOW)
+            if r.returncode:
+                raise RuntimeError("não foi possível transformar a voz: " + (r.stderr or "")[-500:])
+            os.replace(temporario, saida)
+        finally:
+            if os.path.isfile(temporario):
+                os.remove(temporario)
+    prog(95, "Voz pronta")
+    return {"saida": saida, "dur": _ffprobe_dur(saida)[0], "opcoes": opcoes}
 
 
 def melhorar_voz(arq, log=print, prog=lambda *a: None):

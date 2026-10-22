@@ -2772,3 +2772,7 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-peq-x:hover { color: var(--ve-text); }
 .ve-peq-mais { flex: none; width: 32px; border: 1px dashed var(--ve-line-2); border-radius: 6px; background: none; color: var(--ve-dim); font-size: 16px; cursor: pointer; }
 .ve-peq-mais:hover { color: var(--ve-text); border-color: var(--ve-text); }
+
+.ve-fila-nome-titulo { cursor: text; }
+.ve-fila-nome-titulo:hover { text-decoration: underline; text-decoration-style: dotted; }
+.ve-fila-nome { width: 100%; min-width: 0; box-sizing: border-box; font-size: 12.5px; }

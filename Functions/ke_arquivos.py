@@ -49,8 +49,13 @@ def info(path):
 
 def _saida(entrada, pasta, ext, sufixo):
     base = os.path.splitext(os.path.basename(entrada))[0]
+    personalizado = isinstance(pasta, dict)
+    if personalizado:
+        base, pasta = str(pasta.get("nome") or "").strip(), pasta.get("pasta")
+        if not base or len(base) > 180 or re.search(r'[\\/:*?"<>|\x00-\x1f]', base) or base.endswith('.') or re.match(r'^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)', base, re.I):
+            raise ValueError("nome de saída inválido")
     pasta = pasta or os.path.dirname(entrada)
-    nome = f"{base}_{sufixo}" if sufixo else base
+    nome = base if personalizado else f"{base}_{sufixo}" if sufixo else base
     p = os.path.join(pasta, f"{nome}.{ext}")
     n = 2
     while os.path.exists(p) or os.path.abspath(p) == os.path.abspath(entrada):
@@ -106,7 +111,7 @@ def _comando(entrada, saida, preset, i, usar_gpu):
 
 
 def converter(entrada, preset, pasta_saida=None, usar_gpu=True, on_progress=lambda p, m: None, stop_event=None):
-    """Converte um arquivo pela predefinição; devolve {success, output_path} como o exportar_video."""
+    """Converte pela predefinição; pasta_saida aceita diretório ou {pasta, nome} para nome personalizado na fila."""
     if preset not in PRESETS:
         return {"success": False, "error": f"predefinição desconhecida: {preset}"}
     if not os.path.isfile(entrada):

@@ -245,3 +245,6 @@
 .sk-plg-jan-cab button { background: none; border: 0; color: #aaa; cursor: pointer; font-size: 13px; }
 .sk-plg-jan-cab button:hover { color: #fff; }
 .sk-plg-jan-area { flex: 1; display: grid; place-items: center; color: #777; font-size: 12px; }
+
+#sk-inout { min-width: 0; }
+#sk-inout input { min-width: 0; }

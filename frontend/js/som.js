@@ -275,6 +275,7 @@ function skDesenhar() {
         x.fillStyle = '#ffd16655'; x.fillRect(a, 0, b - a, SK_REGUA);
         for (const px of [a, b]) { x.beginPath(); x.moveTo(Math.round(px) + 0.5, 0); x.lineTo(Math.round(px) + 0.5, H); x.stroke(); }
     }
+    skInOutDesenhar(x, X, W, H);
     // marcadores e agulha
     for (const m of SK.proj.marcadores) { const mx = Math.round(X(m.t)) + 0.5; x.strokeStyle = '#ffd166'; x.beginPath(); x.moveTo(mx, 0); x.lineTo(mx, H); x.stroke(); x.fillStyle = '#ffd166'; x.fillText(m.nome, mx + 3, SK_REGUA - 3); }
     // tudo acima fica guardado: no play só a agulha anda (skDesenharPlay cola a imagem e desenha a agulha por cima)
@@ -501,7 +502,7 @@ function skEventos() {
         if (C && k === 'i') return faz(() => skImportarDialogo());
         if (k === 's' || (C && k === 'k')) return faz(() => skCortar());
         if (k === 'delete' || k === 'backspace') return faz(() => SK.int ? skIntApagar(e.shiftKey) : skApagar());
-        if (k === 'm') return faz(() => skMarcador());
+        if (k === 'm' && !C && !e.altKey) return faz(() => skMarcador());
         if (k === 'r' && !C) return faz(() => (SK.grav ? skGravarParar() : skGravar()).catch(er => skToast(er.message)));
         if (k === 'home') return faz(() => { skIr(0); skMostrarAgulha(); skDesenhar(); });
         if (k === 'end') return faz(() => { skIr(skFim()); skMostrarAgulha(); skDesenhar(); });
@@ -510,6 +511,74 @@ function skEventos() {
         if (k === '0' && C) return faz(skEnquadrar);
     });
 }
+
+function skInOutEstado() {
+    const p = SK.proj?.inout || {}, fim = skFim();
+    const marcado = p.entrada != null || p.saida != null;
+    const a = Math.max(0, Math.min(fim, p.entrada ?? 0)), b = Math.max(0, Math.min(fim, p.saida ?? fim));
+    return { entrada: p.entrada ?? null, saida: p.saida ?? null, a, b, dur: Math.max(0, b - a),
+        marcado, usar: marcado && p.usar !== false, valido: b - a > 0.0001 };
+}
+function skInOutMarcar(lado, tempo = SK.ph, limpar = false) {
+    if (!SK.proj || !['entrada', 'saida'].includes(lado)) return;
+    tempo = Number(tempo);
+    if (!Number.isFinite(tempo)) throw new Error('tempo inválido');
+    skAntes();
+    const p = SK.proj.inout || (SK.proj.inout = { entrada: null, saida: null, usar: true });
+    p[lado] = limpar ? null : Math.max(0, Math.min(skFim(), tempo));
+    if (!limpar) {
+        const outro = lado === 'entrada' ? 'saida' : 'entrada';
+        if (p[outro] != null && (lado === 'entrada' ? p.entrada >= p.saida : p.saida <= p.entrada)) p[outro] = null;
+        p.usar = true;
+    }
+    skMudou('marcar In/Out');
+    return skInOutEstado();
+}
+function skInOutLimpar() {
+    if (!SK.proj?.inout) return;
+    skAntes(); delete SK.proj.inout; skMudou('limpar In/Out');
+}
+function skInOutUsar(usar) {
+    if (!SK.proj) return;
+    skAntes();
+    SK.proj.inout = { entrada: null, saida: null, ...(SK.proj.inout || {}), usar: !!usar };
+    skMudou('área de exportação');
+}
+function skInOutOpcoes(op = {}) {
+    if (op.area === 'inteiro' || Object.hasOwn(op, 'ini') || Object.hasOwn(op, 'fim')) return { ...op };
+    const r = skInOutEstado();
+    if (op.area !== 'marcado' && !r.usar) return { ...op };
+    if (!r.marcado || !r.valido) throw new Error('marque uma entrada e uma saída com duração maior que zero');
+    return { ...op, ini: r.a, fim: r.b };
+}
+async function skExportarArquivo(caminho, op = {}) {
+    const r = await skApi().sk_exportar(SK.proj, caminho, skInOutOpcoes(op));
+    if (!r || !r.success) throw new Error((r && r.error) || 'não exportou');
+    return r;
+}
+function skInOutTecla(e) {
+    if (!SK.proj || !skEl('page-sound-kanivete')?.classList.contains('active')) return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest('input, textarea, select, [contenteditable]')) return;
+    const k = e.key.toLowerCase(); if (k !== 'i' && k !== 'o') return;
+    e.preventDefault(); skInOutMarcar(k === 'i' ? 'entrada' : 'saida', SK.ph, e.shiftKey);
+}
+function skInOutDesenhar(x, X, W, H) {
+    const r = skInOutEstado(); if (!r.marcado) return;
+    x.save();
+    const a = Math.max(0, X(r.a)), b = Math.min(W, X(r.b));
+    x.fillStyle = r.usar ? '#72d6f044' : '#72d6f018';
+    if (b > a) x.fillRect(a, 0, b - a, SK_REGUA);
+    x.strokeStyle = '#72d6f0'; x.lineWidth = 1; x.font = 'bold 10px system-ui';
+    for (const [tempo, letra, dir] of [[r.entrada, 'I', 1], [r.saida, 'O', -1]]) {
+        if (tempo == null) continue;
+        const px = X(tempo); if (px < 0 || px > W) continue;
+        x.beginPath(); x.moveTo(px, 0); x.lineTo(px, H); x.stroke();
+        x.fillStyle = '#72d6f0'; x.fillRect(px + (dir < 0 ? -14 : 0), 0, 14, 14);
+        x.fillStyle = '#10232a'; x.fillText(letra, px + (dir < 0 ? -11 : 3), 11);
+    }
+    x.restore();
+}
+document.addEventListener('keydown', skInOutTecla);
 
 // ── automação: window.SKN (Claude, Jr, testes) ──
 window.SKN = {
@@ -526,10 +595,14 @@ window.SKN = {
     desfazer: () => skDesfazer(), refazer: () => skRefazer(),
     salvar: async caminho => { if (caminho) SK.caminho = caminho; return skSalvar(false); },
     abrir: c => skAbrir(c),
-    exportar: async (caminho, op = {}) => { const r = await skApi().sk_exportar(SK.proj, caminho, op); if (!r || !r.success) throw new Error((r && r.error) || 'não exportou'); return r; },
+    exportar: (caminho, op = {}) => skExportarArquivo(caminho, op),
+    marcarEntrada: t => skInOutMarcar('entrada', t),
+    marcarSaida: t => skInOutMarcar('saida', t),
+    limparInOut: () => skInOutLimpar(),
+    inOut: () => skInOutEstado(),
     medir: () => skApi().sk_medir(SK.proj),
     estado: () => SK.proj && ({ nome: SK.proj.nome, caminho: SK.caminho, fim: +skFim().toFixed(3), agulha: +SK.ph.toFixed(3), sel: SK.sel,
-        faixas: SK.proj.faixas.map(f => ({ id: f.id, nome: f.nome, vol: f.vol, mudo: f.mudo, solo: f.solo, clipes: f.clipes.map(c => ({ id: c.id, nome: c.nome, ini: +c.ini.toFixed(3), dur: +c.dur.toFixed(3), de: +c.de.toFixed(3), vol: c.vol, fade_in: c.fade_in, fade_out: c.fade_out, ...(c.curva ? { curva: c.curva } : {}) })) })), intervalo: SK.int }),
+        faixas: SK.proj.faixas.map(f => ({ id: f.id, nome: f.nome, vol: f.vol, mudo: f.mudo, solo: f.solo, clipes: f.clipes.map(c => ({ id: c.id, nome: c.nome, ini: +c.ini.toFixed(3), dur: +c.dur.toFixed(3), de: +c.de.toFixed(3), vol: c.vol, fade_in: c.fade_in, fade_out: c.fade_out, ...(c.curva ? { curva: c.curva } : {}) })) })), intervalo: SK.int, inout: skInOutEstado() }),
 };
 
 
@@ -560,8 +633,74 @@ async function skEfeito(id, efeito, op = {}) {
     skToast({ limpar: 'Ruído limpo', melhorar: 'Voz melhorada', reparar: 'Área reparada' }[efeito] || 'Pronto');
     return r.saida;
 }
+function skVozPadrao(preset = false) {
+    return { tom: preset ? 3 : 0, velocidade: preset ? 1.12 : 1, preservar: true,
+        bitcrusher: preset, bits: 8, amostragem: 5500, mistura: 90 };
+}
+function skVozEdicao(c) {
+    const chave = JSON.stringify([c.id, c.arq, c.de, c.dur, c.voz]);
+    if (SK.vozEdicao?.chave !== chave) SK.vozEdicao = { chave, op: { ...skVozPadrao(), ...(c.voz || {}) } };
+    return SK.vozEdicao.op;
+}
+function skVozPararPrevia() {
+    if (SK.ouvir) SK.ouvir.pause();
+}
+function skVozBase(c) {
+    const base = JSON.parse(JSON.stringify(c.voz_base || {
+        arq: c.arq, de: c.de, dur: c.dur, fade_in: c.fade_in, fade_out: c.fade_out,
+        ...(c.curva ? { curva: c.curva } : {}), ...(c.efeitos ? { efeitos: c.efeitos } : {})
+    }));
+    if (c.voz_base) {
+        const v = c.voz?.velocidade || 1;
+        base.dur = Math.min(base.dur - c.de * v, c.dur * v);
+        base.de += c.de * v;
+        base.fade_in = (c.fade_in || 0) * v; base.fade_out = (c.fade_out || 0) * v;
+        if (c.curva) base.curva = c.curva.map(([t, ganho]) => [t * v, ganho]); else delete base.curva;
+    }
+    return base;
+}
+async function skVozTransformar(id = SK.sel, op = null, previa = false) {
+    const [c] = skClipe(id); if (!c) throw new Error('escolha um clipe');
+    const projeto = SK.proj, assinatura = JSON.stringify(c);
+    const base = skVozBase(c);
+    const valores = { ...skVozPadrao(), ...(op || skVozEdicao(c)) };
+    skParar(); skVozPararPrevia();
+    const espera = skTarefa(() => skApi().sk_processar(base.arq, 'transformar_voz', { ...valores, de: base.de, dur: base.dur, previa }));
+    skUiProps();
+    let r;
+    try { r = await espera; } finally { skUiProps(); }
+    if (SK.proj !== projeto || skClipe(id)[0] !== c || JSON.stringify(c) !== assinatura) throw new Error('o clipe mudou durante o processamento; tente novamente');
+    await skCarregarPicos(r.saida);
+    if (SK.proj !== projeto || skClipe(id)[0] !== c || JSON.stringify(c) !== assinatura) throw new Error('o clipe mudou durante o processamento; tente novamente');
+    if (previa) {
+        skOuvir(SK.picos[r.saida].url);
+        return r.saida;
+    }
+    skAntes();
+    const v = r.opcoes.velocidade;
+    c.voz_base = base; c.voz = { ...valores }; c.arq = r.saida; c.de = 0; c.dur = r.dur;
+    c.fade_in = Math.min(c.dur, (base.fade_in || 0) / v);
+    c.fade_out = Math.min(c.dur, (base.fade_out || 0) / v);
+    if (base.curva) c.curva = base.curva.map(([t, ganho]) => [t / v, ganho]); else delete c.curva;
+    c.efeitos = [...(base.efeitos || []), 'Tom, velocidade e bitcrusher'];
+    SK.vozEdicao = null;
+    skMudou('transformar voz'); skToast('Efeito aplicado ao clipe; Ctrl+Z desfaz');
+    return r.saida;
+}
+function skVozRestaurar(id = SK.sel) {
+    const [c] = skClipe(id); if (!c?.voz_base) return;
+    skVozPararPrevia(); skAntes();
+    const base = skVozBase(c);
+    for (const k of ['arq', 'de', 'dur', 'fade_in', 'fade_out', 'curva', 'efeitos']) {
+        if (k in base) c[k] = JSON.parse(JSON.stringify(base[k])); else delete c[k];
+    }
+    delete c.voz; delete c.voz_base; SK.vozEdicao = null;
+    skMudou('restaurar voz');
+}
 function skOriginal(id) {
-    const [c] = skClipe(id || SK.sel); if (!c || !c.orig) return;
+    const [c] = skClipe(id || SK.sel);
+    if (c?.voz_base) { skVozRestaurar(c.id); return; }
+    if (!c || !c.orig) return;
     const atual = c.arq; skAntes();
     for (const f of SK.proj.faixas) for (const x of f.clipes) if (x.arq === atual && x.orig) { x.arq = x.orig; delete x.orig; delete x.efeitos; }
     skMudou('original');
@@ -576,6 +715,9 @@ async function skVoz(vozId, texto, { faixa = null, ini = null, op = null } = {})
 Object.assign(window.SKN, {
     limpar: (id, quantidade = 80) => skEfeito(id, 'limpar', { quantidade }),
     melhorar: id => skEfeito(id, 'melhorar'),
+    transformarVoz: (id, op) => skVozTransformar(id, op),
+    previaVoz: (id, op) => skVozTransformar(id, op, true),
+    restaurarVoz: id => skVozRestaurar(id),
     original: id => skOriginal(id),
     vozes: () => skApi().sk_vozes(),
     voz: (vozId, texto, op) => skVoz(vozId, texto, op),

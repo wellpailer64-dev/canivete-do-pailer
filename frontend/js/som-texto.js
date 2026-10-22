@@ -56,19 +56,56 @@ function skUiTexto(el) {
 }
 
 // ── Exportar: mixagem ou stems, ID3 e capítulos ──
+function skInOutPainel() {
+    const r = skInOutEstado();
+    return `<div class="sk-grupo sk-exp" id="sk-inout"><div class="sk-p-tit">Área de exportação (In/Out)</div>
+        <label>Exportar<select id="ske-area"><option value="inteiro"${!r.usar ? ' selected' : ''}>Projeto inteiro</option><option value="marcado"${r.usar ? ' selected' : ''}${!r.marcado ? ' disabled' : ''}>Trecho In/Out</option></select></label>
+        <label>Entrada (I)<input class="sk-busca" type="number" min="0" max="${skFim()}" step="0.01" data-inout="entrada" value="${r.a.toFixed(3)}"></label>
+        <label>Saída (O)<input class="sk-busca" type="number" min="0" max="${skFim()}" step="0.01" data-inout="saida" value="${r.b.toFixed(3)}"></label>
+        <div class="sk-p-info">${r.marcado ? `${skTempo(r.a)} → ${skTempo(r.b)} · ${skTempo(r.dur)}` : 'I marca a entrada; O marca a saída na agulha.'}${r.usar && !r.valido ? ' · Intervalo vazio: ajuste os pontos.' : ''}</div>
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-mini" data-io="entrada">Marcar I</button><button class="ie-btn ie-btn-mini" data-io="saida">Marcar O</button><button class="ie-btn ie-btn-mini" data-io="limpar">Limpar In/Out</button></div>
+        <div class="sk-p-info">Shift+I / Shift+O removem um ponto. Sem um dos pontos, usa o começo / fim do projeto. A seleção de edição continua independente.</div></div>`;
+}
+function skKeFilaAtalho(abrir = false) {
+    if (!SK.proj || skFim() <= 0) { skToast('Adicione áudio antes de enviar para a fila'); return null; }
+    const o = { f: 'mp3', k: '192', l: '', fx: '', stems: false, caps: true, ...(SK.expOp || {}) };
+    const pasta = /^[dD]:[\\/]/.test(SK.caminho || '') ? SK.caminho.replace(/[\\/][^\\/]*$/, '') : 'D:/Kanivete/Sound Kanivete/Exportados';
+    const nome = (SK.proj.nome || 'Audio').replace(/[\\/:*?"<>|]/g, '_');
+    const caminho = `${pasta}/${nome}_${Date.now()}_${VEFILA.seq + 1}.${o.f}`;
+    const id = skParaKe(caminho, o);
+    if (id != null && abrir) switchTool('kanivete-encoder');
+    return id;
+}
+function skKeTecla(e) {
+    if (!skEl('page-sound-kanivete')?.classList.contains('active') || !SK.proj) return;
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 'm') return;
+    if (e.target.closest('input, textarea, select, [contenteditable]')) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (e.repeat) return;
+    try { skKeFilaAtalho(!e.shiftKey); } catch (er) { skToast(er.message); }
+}
+function skKeAtalhoInstalar() {
+    if (SK.keTecla) document.removeEventListener('keydown', SK.keTecla, true);
+    SK.keTecla = skKeTecla;
+    document.addEventListener('keydown', SK.keTecla, true);
+}
+skKeAtalhoInstalar();
+
 function skUiExportar(el) {
+    skKeAtalhoInstalar();
     const op = SK.expOp || (SK.expOp = { f: 'mp3', k: '192', l: '', fx: '', stems: false, caps: true });
     const meta = SK.proj.meta || (SK.proj.meta = { titulo: SK.proj.nome || '', artista: '', album: '', ano: '', genero: '', comentario: '' });
     const sel = (id, opcoes, v) => `<select id="${id}">${opcoes.map(([a, b]) => `<option value="${a}"${String(a) === String(v) ? ' selected' : ''}>${b}</option>`).join('')}</select>`;
     const nm = SK.proj.marcadores.length, campo = (k, r) => `<label>${r}<input class="sk-busca notranslate" data-meta="${k}" value="${skEsc(meta[k] || '')}"></label>`;
     el.innerHTML = `<div class="sk-p-nome notranslate">${skEsc(SK.proj.nome)}</div><div class="sk-p-info">${SK.proj.faixas.length} faixa(s) · ${skTempo(skFim())}</div>
+        ${skInOutPainel()}
         <div class="sk-grupo sk-exp">
         <label>Formato ${sel('ske-f', ['mp3', 'wav', 'm4a', 'ogg', 'flac', 'opus'].map(f => [f, f]), op.f)}</label>
         <label>Qualidade ${sel('ske-k', [['320', '320 kbps'], ['192', '192 kbps'], ['128', '128 kbps']], op.k)}</label>
         <label>Volume final ${sel('ske-l', [['', 'Como está'], ['-14', '-14 LUFS (redes, streaming)'], ['-16', '-16 LUFS (podcast)'], ['-23', '-23 LUFS (TV)']], op.l)}</label>
         <label>Faixas ${sel('ske-fx', [['', 'Mixagem de todas'], ...SK.proj.faixas.map(f => [f.id, `Só "${skEsc(f.nome)}"`])], op.fx)}</label>
         <label class="sk-chk"><input type="checkbox" id="ske-stems" ${op.stems ? 'checked' : ''}> Stems: um arquivo por faixa (mesmo tamanho, alinhados)</label></div>
-        <div class="sk-p-acoes"><button class="ie-btn ie-btn-primario" id="ske-ok">Exportar…</button><button class="ie-btn ie-btn-mini" id="ske-ke" title="Congela o projeto agora e exporta na fila do Kanivete Encoder (dá para continuar mexendo)">→ fila do Ke</button><button class="ie-btn ie-btn-mini" onclick="skEnviarEditor().catch(e => skToast(e.message))">→ Vídeo Kanivete</button></div>
+        <div class="sk-p-acoes"><button class="ie-btn ie-btn-primario" id="ske-ok" ${skInOutEstado().usar && !skInOutEstado().valido ? 'disabled' : ''}>Exportar…</button><button class="ie-btn ie-btn-mini" id="ske-ke" ${skInOutEstado().usar && !skInOutEstado().valido ? 'disabled' : ''} title="Congela o projeto na fila do Encoder. Ctrl+Shift+M envia direto sem sair do Sound; Ctrl+M abre o Encoder.">→ fila do Ke</button><button class="ie-btn ie-btn-mini" onclick="skEnviarEditor().catch(e => skToast(e.message))">→ Vídeo Kanivete</button></div>
         <div class="sk-grupo sk-exp"><div class="sk-p-tit">Informações (ID3) e capítulos</div>
         ${campo('titulo', 'Título')}${campo('artista', 'Artista')}${campo('album', 'Álbum / programa')}${campo('ano', 'Ano')}${campo('genero', 'Gênero')}${campo('comentario', 'Comentário')}
         <label class="sk-chk"><input type="checkbox" id="ske-caps" ${op.caps ? 'checked' : ''} ${nm ? '' : 'disabled'}> Marcadores viram capítulos (${nm})</label>
@@ -79,11 +116,14 @@ function skUiExportar(el) {
         <div class="sk-p-info">Guarda as faixas, os efeitos, o master e o artista/álbum (sem os áudios). Aparece em "Começar com".</div></div>`;
     el.oninput = e => { const k = e.target.dataset.meta; if (k) { SK.proj.meta[k] = e.target.value; SK.sujo = true; } };
     el.onchange = e => {
+        if (e.target.dataset.inout) { skInOutMarcar(e.target.dataset.inout, e.target.value); return; }
+        if (e.target.id === 'ske-area') { skInOutUsar(e.target.value === 'marcado'); return; }
         if (e.target.dataset.meta) return;
         const g = s => el.querySelector(s);
         SK.expOp = { f: g('#ske-f').value, k: g('#ske-k').value, l: g('#ske-l').value, fx: g('#ske-fx').value, stems: g('#ske-stems').checked, caps: g('#ske-caps').checked };
     };
     el.onclick = async e => {
+        if (e.target.dataset.io) { e.target.dataset.io === 'limpar' ? skInOutLimpar() : skInOutMarcar(e.target.dataset.io); return; }
         if (e.target.id === 'ske-modelo-ok') { const n = skSalvarModelo(el.querySelector('#ske-modelo').value); skToast(`Modelo salvo: ${n}`); return; }
         if (e.target.id !== 'ske-ok' && e.target.id !== 'ske-ke') return;
         const o = SK.expOp;
@@ -96,7 +136,7 @@ function skUiExportar(el) {
 }
 function skOpExport(o) {
     const meta = Object.fromEntries(Object.entries(SK.proj.meta || {}).filter(([, v]) => String(v || '').trim()));
-    return { formato: o.f, kbps: +o.k, meta, capitulos: o.caps ? SK.proj.marcadores.map(m => ({ t: m.t, nome: m.nome })) : null };
+    return skInOutOpcoes({ formato: o.f, kbps: +o.k, meta, capitulos: o.caps ? SK.proj.marcadores.map(m => ({ t: m.t, nome: m.nome })) : null });
 }
 async function skExportarTudo(caminho, o) {
     const base = skOpExport(o);
@@ -115,20 +155,22 @@ function skParaKe(caminho, o) {
     else {
         const raiz = caminho.replace(/\.[^.\\/]+$/, ''), ext = base.formato || 'wav', fim = skFim(), solo = proj.faixas.some(f => f.solo);
         proj.faixas.filter(f => f.clipes.length && !f.mudo && (!solo || f.solo)).forEach(f =>
-            chamadas.push({ caminho: `${raiz} - ${f.nome.replace(/[\\/:*?"<>|]/g, '_')}.${ext}`, op: { ...base, faixas: [f.id], ini: 0, fim, capitulos: null } }));
+            chamadas.push({ caminho: `${raiz} - ${f.nome.replace(/[\\/:*?"<>|]/g, '_')}.${ext}`, op: { ...base, faixas: [f.id], ini: base.ini ?? 0, fim: base.fim ?? fim, capitulos: null } }));
     }
     if (!chamadas.length) { skToast('Nada para exportar'); return null; }
-    const id = keSomEnviar({ nome: caminho.split(/[\\/]/).pop().replace(/\.[^.]+$/, ''), proj, chamadas, dur: skFim(), formato: base.formato, stems: !!o.stems });
+    const id = keSomEnviar({ nome: caminho.split(/[\\/]/).pop().replace(/\.[^.]+$/, ''), proj, chamadas, dur: (base.fim ?? skFim()) - (base.ini ?? 0), formato: base.formato, stems: !!o.stems });
+    if (id != null && typeof _abrirAba === 'function') _abrirAba('kanivete-encoder');
     skToast(`Na fila do Kanivete Encoder${o.stems ? ` (${chamadas.length} stems)` : ''} · ▶ Renderizar no Ke para começar`);
     return id;
 }
 async function skExportarStems(caminho, op = {}) {   // um arquivo por faixa com som, do 0 ao fim do projeto (alinham no DAW)
+    op = skInOutOpcoes(op);
     const raiz = caminho.replace(/\.[^.\\/]+$/, ''), ext = (op.formato || 'wav'), fim = skFim(), arquivos = [];
     const solo = SK.proj.faixas.some(f => f.solo);
     const faixas = SK.proj.faixas.filter(f => f.clipes.length && !f.mudo && (!solo || f.solo));
     for (const [i, f] of faixas.entries()) {
         skEl('sk-status-info').textContent = `Stem ${i + 1} de ${faixas.length}: ${f.nome}…`;
-        const r = await SKN.exportar(`${raiz} - ${f.nome.replace(/[\\/:*?"<>|]/g, '_')}.${ext}`, { ...op, faixas: [f.id], ini: 0, fim, capitulos: null });
+        const r = await SKN.exportar(`${raiz} - ${f.nome.replace(/[\\/:*?"<>|]/g, '_')}.${ext}`, { ...op, faixas: [f.id], ini: op.ini ?? 0, fim: op.fim ?? fim, capitulos: null });
         arquivos.push(r.caminho);
     }
     skEl('sk-status-info').textContent = '';

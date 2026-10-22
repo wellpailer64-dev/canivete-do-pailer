@@ -4091,7 +4091,7 @@ class ApiBridge:
             return {"success": False, "error": str(e)}
 
     def sk_processar(self, arq, efeito, op=None):
-        """Efeito que gera arquivo novo (limpar | melhorar): roda em thread; progresso e fim em skProgresso(dados)."""
+        """Efeito que gera arquivo novo (limpar, melhorar, transformar_voz, reparar, separar); progresso em skProgresso."""
         from Functions import sound_kanivete
         op = op or {}
 
@@ -4100,6 +4100,8 @@ class ApiBridge:
                 saida = sound_kanivete.limpar_ruido(arq, op.get("quantidade", 80), log, progresso)
             elif efeito == "melhorar":
                 saida = sound_kanivete.melhorar_voz(arq, log, progresso)
+            elif efeito == "transformar_voz":
+                return {**sound_kanivete.transformar_voz(arq, op, log, progresso), "origem": arq, "efeito": efeito}
             elif efeito == "reparar":
                 from Functions import sk_espectro
                 saida = sk_espectro.reparar(arq, op["t0"], op["t1"], op["f0"], op["f1"], op.get("modo", "preencher"), op.get("db", -30), progresso)

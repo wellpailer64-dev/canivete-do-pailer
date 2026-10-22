@@ -74,7 +74,7 @@ function keSomEnviar({ nome, proj, chamadas, dur, formato, stems }) {
 // ── execução (chamada por veFilaProximo para os tipos novos) ──
 async function keRodarItem(it) {
     const api = window.pywebview.api;
-    if (it.tipo === 'arquivo') { await api.ke_arquivo_converter(it.entrada, it.cfg.preset, it.cfg.dest || null, it.cfg.gpu !== false); return; }
+    if (it.tipo === 'arquivo') { await api.ke_arquivo_converter(it.entrada, it.cfg.preset, it.cfg.nomePersonalizado ? { pasta: it.cfg.dest || null, nome: it.cfg.nome } : it.cfg.dest || null, it.cfg.gpu !== false); return; }
     if (it.tipo === 'som') {   // sk_exportar não dá andamento: a barra anda por chamada (stems = uma por faixa)
         const n = it.chamadas.length;
         try {
