@@ -38,7 +38,7 @@ def ler_app(nome, porta):
             if (!s) return null;
             const cl = s.id === VE.activeSequence ? VE.clips : s.clips;
             return { nome: s.name, clips: cl, markers: s.markers || [],
-                     media: Object.fromEntries(VE.media.filter(Boolean).map(m => [m.id, {kind: m.kind, path: m.path || '', nome: m.nome || m.name || ''}])) }; }""", nome)
+                     media: Object.fromEntries(VE.media.filter(Boolean).map(m => [m.id, {kind: m.kind, path: m.path || '', nome: m.nome || m.name || '', comp: !!m.comp}])) }; }""", nome)
 
 
 def fim(c): return c["st"] + (c["e"] - c["s"]) / (c.get("v") or 1)
@@ -60,7 +60,8 @@ def quadro(path, t, cache):
         if path.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
             Image.open(path).convert("RGB").resize((TW, TH)).save(arq)
         else:
-            subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{max(0, t):.2f}", "-i", limpo(path), "-frames:v", "1",
+            from Functions.audio_cutter import ffmpeg_path      # o do app: "ffmpeg" do PATH não existe em todo PC (tripa saía cinza)
+            subprocess.run([ffmpeg_path(), "-v", "error", "-ss", f"{max(0, t):.2f}", "-i", limpo(path), "-frames:v", "1",
                             "-vf", f"scale={TW}:{TH}", "-y", arq], capture_output=True, creationflags=_BAIXA)
     try: return Image.open(arq).convert("RGB")
     except Exception: return None
@@ -106,8 +107,15 @@ def main():
     from Functions import video_cutter as vc
     cache = os.path.join(vc._midia_dir(), "agente", "tripa"); os.makedirs(cache, exist_ok=True)
 
+    def tapa(c):
+        """camada que de fato cobre o quadro: grão/textura em mesclagem (Sobrepor, Luz direta...), quase transparente,
+        desligada ou letreiro (Comp/MOGRT) não contam — o grão Kodak por cima de tudo deixava a tripa inteira cinza"""
+        m = M.get(str(c.get("m") or 0), {})
+        return not (c.get("off") or (c.get("bm") or "normal") != "normal" or (c.get("p") or {}).get("op", 100) < 50
+                    or m.get("comp"))
+
     def topo(t):
-        vis = [c for c in C if c["st"] <= t < fim(c) and tipo(c, M) in ("fala", "cobertura")]
+        vis = [c for c in C if c["st"] <= t < fim(c) and tipo(c, M) in ("fala", "cobertura") and tapa(c)]
         return max(vis, key=lambda c: c["tr"]) if vis else None
     amostras = [t0 + i * a.passo for i in range(int((t1 - t0) / a.passo) + 1)]
     pedidos = {}

@@ -119,6 +119,13 @@ cobertura, texto, ajuste, som) e a fala transcrita embaixo. 1ª vez ~4 min (extr
 Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lugar de prints do monitor).
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-10-22 CULTSP PRO 02 Produção Musical Eletrônica (V1 3:51, sem nota ainda): mesmo método do Mega Artesanal V2
+  aprovado (script `D:/kanivete_testes/cultsp2/scripts/montar.py` gera o .vknv; letreiros pelo MOGRT no app). Novidades:
+  trilha eletrônica do Epidemic achada pela busca JSON (`fetch('/json/search/tracks/?term=...')` via `kb.py js`, filtro
+  hasVocals=false, BPM/gênero/mood) e baixada com o botão Download; MÚSICA TOCANDO NA AULA (detectada por periodicidade
+  de onset no som sem fala) entra como momento de som original com a trilha fora; voz da aula ruidosa: Anti Noise 30
+  baixa ~4 dB → ganho por trecho (mediana dos quadros com voz) com +3,5 dB no professor. Armadilha: o lower do CULTSP não
+  cresce com o texto (sem sourceRectAtTime): título até ~20 caracteres ("PRODUÇÃO MUSICAL ELETRÔNICA" invadiu o logo).
 - 2026-10-15 QUIZ CARLINHOS v2 ("perfeito, to exportando"): erros de gravação foram para o FIM (gancho = fala final
   "E é isso" → whoosh + leak → REC → cartela final); piada esticada até o fim das risadas; cartela só com o texto da
   pergunta (sem "Pergunta N"); LEGENDA NUNCA ATRAVESSA CORTE DE CÂMERA (separar pelas palavras no corte = cada pessoa

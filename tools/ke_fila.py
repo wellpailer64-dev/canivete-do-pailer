@@ -2,7 +2,7 @@
 
     py -3.13 tools/ke_fila.py render --nome "Mega V2 FHD" [--res 1080] [--drive LINK] [--dest PASTA] [--porta 9222]
     py -3.13 tools/ke_fila.py estado
-    py -3.13 tools/ke_fila.py drive-listar --pasta ID_OU_LINK
+    py -3.13 tools/ke_fila.py drive-listar --pasta ID_OU_LINK      (arquivos e subpastas com o ID, p/ --drive de uma subpasta)
     py -3.13 tools/ke_fila.py drive-apagar --pasta ID_OU_LINK --nome "arquivo.mp4"     (vai para a lixeira do Drive)
 
 render: põe a timeline aberta na fila com as configurações do painel (o que for passado substitui), começa o render e
@@ -108,9 +108,12 @@ def main():
         return 0
     pasta = _pasta_id(a.pasta)
     if a.acao == "drive-listar":
-        r = _rclone(["lsjson", "gdrive:", "--drive-root-folder-id", pasta, "--files-only"])
+        r = _rclone(["lsjson", "gdrive:", "--drive-root-folder-id", pasta])
         for x in json.loads(r.stdout or "[]"):
-            print(x["Name"], x["Size"], x["ModTime"][:16])
+            if x.get("IsDir"):
+                print(f"[pasta] {x['Name']}  https://drive.google.com/drive/folders/{x['ID']}")
+            else:
+                print(x["Name"], x["Size"], x["ModTime"][:16])
         return r.returncode
     r = _rclone(["deletefile", f"gdrive:{a.nome}", "--drive-root-folder-id", pasta])   # lixeira do Drive (recuperável)
     print("apagado (lixeira)" if r.returncode == 0 else "erro: " + r.stderr[-300:])
