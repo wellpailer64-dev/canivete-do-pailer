@@ -180,7 +180,8 @@ camadas, quadros-chave com a Bézier do After, mãe, fosco, Comp ao contrário e
 Cortar animado, `_corte_animado` no ffmpeg). Guia e pendências: `Instructions/agente/mogrt.md`. Teste:
 `teste_export.py --casos mogrt` (usa `D:/kanivete_testes/mogrt/lower.mogrt`).
 
-**PENDENTE — Estabilizador melhor que o Warp Stabilizer** (e a lista de prioridades para ficar profissional: bateria de
+**EM PESQUISA — Estabilizador melhor que o Warp Stabilizer** (rodada 1 em 2026-10-22: bancada `tools/estabilizador/bancada.py`,
+vidstab do ffmpeg ainda ganha; próximo: movimento só do fundo com o recorte do Pincel Roto) (e a lista de prioridades para ficar profissional: bateria de
 projetos reais, tracker, MOGRT, rampas de velocidade, multicâmera): `Instructions/agente/plano-estabilizador.md`.
 
 Atributos de vários clipes (como no Premiere): `frontend/js/editor-atributos.js` — botão direito → "Remover atributos…"

@@ -1,6 +1,7 @@
 # Estabilizador (melhor que o Warp Stabilizer) — EM PESQUISA (rodada 1 feita 2026-10-22)
 
-## Rodada 1 (2026-10-22) — bancada `D:/kanivete_testes/estab/bancada.py`
+## Rodada 1 (2026-10-22) — bancada `tools/estabilizador/bancada.py` (saídas em `D:/kanivete_testes/estab/saida`)
+Rodar: `py -3.13 tools/estabilizador/bancada.py` (ZLIM=1.10 = zoom máximo do nosso; trechos em `TRECHOS`, caminhos em `arqs.py`).
 Trechos reais de câmera na mão (CULTSP, 6 s, 1080p): 3068 (pimentas, close), 3094 (massa batida, close), 1159 (mãos
 com chaveiro), 3058 (chegada à noite, gente passando na frente). Medida: tremor residual = RMS da alta frequência do
 movimento quadro a quadro (phaseCorrelate a 480 px; menor = melhor).
