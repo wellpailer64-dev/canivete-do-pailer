@@ -118,6 +118,14 @@
 cobertura, texto, ajuste, som) e a fala transcrita embaixo. 1ª vez ~4 min (extrai os quadros); depois ~3 s (cache).
 Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lugar de prints do monitor).
 
+## REGRAS UNIVERSAIS DE MONTAGEM (Pailer, valem para TODA edição)
+- SEM PISCA DE ROSTO: B-roll que cobre o fim da fala de alguém em câmera vai ATÉ a troca de cena (ou o próximo B-roll
+  começa mais cedo); se não houver B-roll, o rosto fica um trecho longo (≥ ~1,5 s) antes de trocar. Nunca sair do B-roll
+  para milésimos/meio segundo da pessoa e já pular para outra imagem — efeito amador.
+- SEM PISCA PRETO: nenhum buraco na timeline, nem de milésimos (arredondamento de st/e entre clipes vizinhos conta).
+- Conferir antes de entregar: `py -3.13 tools/agente/polir_montagem.py <projeto.vknv>` → {"pretos": [], "piscas": []};
+  em script de montagem, `polir(clips, media, {id_midia: duração})` corrige (estica/antecipa/encolhe o B-roll vizinho).
+
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
 - 2026-10-22 NOTA DO PAILER NO CULTSP 02 V1 ("quase lá") → V2 (`cultsp2/scripts/montar_v2.py`): (1) TÍTULO DO EPISÓDIO
   no lower já no 0:00, sobre a abertura (padrão do 01); (2) GC da pessoa na 1ª fala dela, DE ROSTO (não abrir com a voz
