@@ -248,6 +248,8 @@ Missão em andamento que usa a Lux: identidade visual pocket — plano e etapas 
 
 ## Editar vídeo pelo app (agente)
 Guia interno para IAs (acesso, leitura de mídia, receita, estilo do cliente, calibração): `Instructions/agente/guia-edicao.md`.
+**Antes de montar vídeo com fala e B-roll: `Instructions/agente/tecnicas-de-montagem.md`** (J/L-cut, tipos de corte e
+transição e quando usar, storytelling, o que mostrar de B-roll, tempo de tela, checklist).
 Atualize a seção CALIBRACAO dele a cada feedback do usuário sobre uma edição.
 Composição, motion, cor e contraste (curvas, tempos, área segura do 9:16, receitas com camadas de ajuste e o plano
 de evolução do AutoFrame): `Instructions/agente/direcao-de-arte.md`.

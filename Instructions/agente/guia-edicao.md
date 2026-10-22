@@ -118,6 +118,8 @@
 cobertura, texto, ajuste, som) e a fala transcrita embaixo. 1ª vez ~4 min (extrai os quadros); depois ~3 s (cache).
 Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lugar de prints do monitor).
 
+## TÉCNICA: ler `tecnicas-de-montagem.md` (cortes, transições, storytelling, B-roll, tempo de tela) antes de montar.
+
 ## REGRAS UNIVERSAIS DE MONTAGEM (Pailer, valem para TODA edição)
 - SEM PISCA DE ROSTO: B-roll que cobre o fim da fala de alguém em câmera vai ATÉ a troca de cena (ou o próximo B-roll
   começa mais cedo); se não houver B-roll, o rosto fica um trecho longo (≥ ~1,5 s) antes de trocar. Nunca sair do B-roll
