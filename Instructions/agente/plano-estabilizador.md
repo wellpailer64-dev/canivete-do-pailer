@@ -1,4 +1,21 @@
-# Estabilizador (melhor que o Warp Stabilizer) — PENDENTE
+# Estabilizador (melhor que o Warp Stabilizer) — EM PESQUISA (rodada 1 feita 2026-10-22)
+
+## Rodada 1 (2026-10-22) — bancada `D:/kanivete_testes/estab/bancada.py`
+Trechos reais de câmera na mão (CULTSP, 6 s, 1080p): 3068 (pimentas, close), 3094 (massa batida, close), 1159 (mãos
+com chaveiro), 3058 (chegada à noite, gente passando na frente). Medida: tremor residual = RMS da alta frequência do
+movimento quadro a quadro (phaseCorrelate a 480 px; menor = melhor).
+| trecho | original | vidstab (ffmpeg, optzoom) | nosso v2 (LK + RANSAC + gaussiana, zoom 10%) |
+|---|---|---|---|
+| 3068 | 13,9 | 11,6 | 13,3 |
+| 3094 | 9,3 | 8,2 | 9,1 |
+| 1159 | 9,2 | 6,1 | 7,3 |
+| 3058 | 2,3 | 1,7 | 1,7 |
+Lições: (1) a convenção de ângulo do `estimateAffinePartial2D` é o oposto da do `getRotationMatrix2D` (o v1 girava
+para o lado errado e piorava); (2) correção sem limite pede zoom de 25% → limitar a ~10% e cortar a correção;
+(3) em close com mão/colher mexendo, tudo se move: o RANSAC pega o objeto e a medida de quadro inteiro também engana
+→ próximo passo é o item 1 do plano (movimento SÓ do fundo, tirando pessoas/mãos com o recorte do Pincel Roto) e uma
+medida só no fundo; (4) caminho por otimização com limite de corte (L1, Grundmann) em vez de gaussiana + corte bruto;
+(5) medir também o zoom real do vidstab para comparar com justiça. Hoje, para salvar um plano, o vidstab já ajuda (−12 a −33%).
 
 Pedido do Pailer (2026-10-14): estabilizar com algo aberto e leve, melhor que o Premiere. Ainda não começado.
 
