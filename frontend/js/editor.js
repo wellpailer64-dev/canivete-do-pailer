@@ -698,6 +698,10 @@ const veTlAt = (c, src) => c.st + (src - c.s) / veVel(c);   // tempo da fonte �
 // Velocidade do player para mostrar o clipe (a do L/J vezes a do clipe), no limite que o navegador aceita
 const veTaxa = c => Math.min(16, Math.max(0.0625, VE.rate * veVel(c)));
 const VE_EPS = 1e-6;
+// Sobra mínima de um clipe cortado por cima/por dentro (sobrescrever, ripple). Antes era meio quadro: a sobra menor
+// sumia e deixava um buraco do mesmo tamanho (fresta de milissegundos = quadro preto/mudo). Agora só some o que é
+// arredondamento (menos de 1 ms)
+const VE_SOBRA = 1e-3;
 
 function veRelayout() {
     veEnsureTracks(veMaxClipTrack(VE.clips));
@@ -1279,7 +1283,11 @@ function veLegSplitAt(t, selecionada, quiet) {
 function veSplitAtPlayhead(todas) {
     const t = VE.playhead;
     const sel0 = VE.sel, selx0 = VE.selx;
-    const clipOk = veSplitAt(t, true, !todas && veAlvoFiltra() ? VE.clips.filter(veClipAlvo) : null);
+    // trilhas-alvo: com a seleção vinculada ligada, o par (imagem/som) do clipe da trilha-alvo é cortado junto —
+    // senão a imagem ficava cortada e o som inteiro, e os dois pedaços do par passavam a ter tamanhos diferentes
+    let so = !todas && veAlvoFiltra() ? VE.clips.filter(veClipAlvo) : null;
+    if (so && VE.vinculo) so = [...new Set(so.flatMap(veVinculados))];
+    const clipOk = veSplitAt(t, true, so);
     const legOk = veLegSplitAt(t, false, true);
     if (clipOk && legOk) { VE.sel = sel0; VE.selx = selx0; VETX.legSel = -1; veRefresh(); }
     const ok = clipOk || legOk;
@@ -1289,11 +1297,14 @@ function veSplitAtPlayhead(todas) {
 // Remove o intervalo [a, b] de todas as trilhas e puxa o que vem depois (ripple)
 function veRippleRemove(a, b, label) {
     if (!VE.ready) return false;
-    a = veSnapFrame(veClamp(Math.min(a, b)));
-    b = veSnapFrame(veClamp(Math.max(a, b)));
+    // ponta exata de um clipe (Q/W usam os cortes) fica como está: arredondar para a grade uma ponta fora dela (fim
+    // da mídia) deixava uma fresta de milissegundos entre ela e o que veio puxado
+    const ponta = x => VE.clips.some(c => Math.abs(c.st - x) < 1e-9 || Math.abs(veEnd(c) - x) < 1e-9);
+    const encaixa = x => (ponta(x) ? veClamp(x) : veSnapFrame(veClamp(x)));
+    [a, b] = [encaixa(Math.min(a, b)), encaixa(Math.max(a, b))];
     const d = b - a;
     if (d < veFrame() * 0.5) return false;
-    const tiny = veFrame() * 0.5;
+    const tiny = VE_SOBRA;
     const out = [], lk = veLkMapa();
     VE.clips.forEach(c => {
         const en = veEnd(c);
@@ -1412,6 +1423,13 @@ function veLkMapa() {
     const m = {};
     return c => { if (c.lk) c.lk = m[c.lk] || (m[c.lk] = veNovoLk()); return c; };
 }
+// Clipe solto por cima de outro (sobrescrever): o que sobra à direita é um pedaço novo. Antes ele ficava com o mesmo
+// vínculo do pedaço da esquerda — clicar num pegava o outro junto e arrastar desalinhava as camadas. O vínculo novo
+// sai do antigo + o ponto do corte, então a imagem e o som cortados no mesmo ponto continuam um par
+function veLkSobra(c, t) {
+    if (c.lk) c.lk = String(c.lk).split('@')[0] + '@' + Math.round(t * 1000).toString(36);
+    return c;
+}
 
 // Vídeo com som → dois clipes vinculados (imagem e som). Não muda o resultado; devolve [v, a] ou null.
 function veSeparar(c) {
@@ -1475,6 +1493,26 @@ function veApagarVarios(lista, ripple) {
     veToast(`${livres.length} clipes apagados` + (livres.length < lista.length ? ' (os de trilhas bloqueadas ficaram)' : ''));
 }
 
+// Encosto: soltando clipes (já na grade), alguma ponta ficou a menos de meio quadro da ponta de uma camada parada
+// da mesma trilha? Devolve o ajuste (frações de quadro) que faz as duas se tocarem. Acontece com camadas que terminam
+// fora da grade (fim da mídia, som sincronizado): o encaixe na grade deixava uma fresta de milissegundos entre elas
+// (um quadro preto/mudo na exportação) ou uma sobreposição mínima. movidos = [{c, tr, st, en}]
+function veEncosto(movidos, parados) {
+    const meio = veFrame() * 0.5;
+    const cand = [];
+    let podeMais = true, podeMenos = true;
+    movidos.forEach(m => parados.forEach(o => {
+        if (o.tr !== m.tr || !veConflita(o, m.c)) return;
+        const dIni = veEnd(o) - m.st, dFim = o.st - m.en;
+        // já encostada certinho: andar para o lado que abriria fresta ali fica proibido (o outro lado só sobrescreve)
+        if (Math.abs(dIni) <= VE_EPS) podeMais = false;
+        if (Math.abs(dFim) <= VE_EPS) podeMenos = false;
+        [dIni, dFim].forEach(d => { if (Math.abs(d) > VE_EPS && Math.abs(d) < meio) cand.push(d); });
+    }));
+    const ok = cand.filter(d => (d > 0 ? podeMais : podeMenos)).sort((a, b) => Math.abs(a) - Math.abs(b));
+    return ok.length ? ok[0] : 0;
+}
+
 // Deslocamento de trilha que o grupo aguenta (fora da base ou em trilha bloqueada: não muda)
 function veGrupoDtr(lista, dtr) {
     if (!dtr) return 0;
@@ -1494,11 +1532,18 @@ function veMoverGrupo(lista, dt, dtr, alt, legs) {
     dtr = veGrupoDtr(lista, dtr);
     if (Math.abs(dt) < veFrame() / 2 && !dtr) { veDraw(); return; }
     vePushHistory();
-    if (legs && !alt) veFaixaLegsMover(legs, veSnapFrame(lista[0].st + dt) - lista[0].st);
-    const prim = VE.clips[VE.sel], lk = veLkMapa(), tiny = veFrame() * 0.5;
+    const prim = VE.clips[VE.sel], lk = veLkMapa(), tiny = VE_SOBRA;
+    // o grupo inteiro anda a MESMA medida: a do clipe principal encaixado na grade. Antes cada clipe era encaixado
+    // sozinho, e camadas fora da grade (fim da mídia, sincronizadas pelo som) andavam frações de quadro diferentes —
+    // abria fresta ou sobrepunha entre elas e tirava a sincronia
+    const ref = lista.includes(prim) ? prim : lista[0], minSt = Math.min(...lista.map(c => c.st));
+    let dd = Math.max(veSnapFrame(ref.st + dt) - ref.st, -minSt);
+    dd = Math.max(dd + veEncosto(lista.map(c => ({ c, tr: c.tr + dtr, st: c.st + dd, en: veEnd(c) + dd })),
+                                 alt ? VE.clips : VE.clips.filter(c => !lista.includes(c))), -minSt);
+    if (legs && !alt) veFaixaLegsMover(legs, dd);
     const novos = lista.map(c => {
         const n = alt ? lk(JSON.parse(JSON.stringify(c))) : { ...c };
-        n.st = veSnapFrame(c.st + dt); n.tr = c.tr + dtr;
+        n.st = c.st + dd; n.tr = c.tr + dtr;
         return n;
     });
     let base = alt ? VE.clips.slice() : VE.clips.filter(c => !lista.includes(c));
@@ -1508,7 +1553,7 @@ function veMoverGrupo(lista, dt, dtr, alt, legs) {
             const en = veEnd(o);
             if (o.tr !== nv.tr || en <= a + VE_EPS || o.st >= b - VE_EPS || !veConflita(o, nv)) { out.push(o); return; }
             if (o.st < a && a - o.st > tiny) out.push(veSemTout({ ...o, e: veSrcAt(o, a) }));
-            if (en > b && en - b > tiny) out.push(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }));
+            if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b));
         });
         base = out;
     });
@@ -1552,7 +1597,7 @@ async function veSincronizarClipes() {
     if (menor < -VE_EPS) { const k = Math.ceil(-menor * VE.fps - 1e-6) / VE.fps; grupos.forEach(g => dts.set(g, dts.get(g) + k)); }
     if (grupos.every(g => Math.abs(dts.get(g)) < veFrame() / 2)) { veToast('Os clipes já estão sincronizados'); return; }
     vePushHistory();
-    const prim = VE.clips[VE.sel], movidos = grupos.flat(), tiny = veFrame() * 0.5;
+    const prim = VE.clips[VE.sel], movidos = grupos.flat(), tiny = VE_SOBRA;
     const novos = movidos.map(c => ({ ...c, st: c.st + dts.get(grupos.find(g => g.includes(c))) }));
     let base = VE.clips.filter(c => !movidos.includes(c));
     novos.forEach(nv => {
@@ -1561,7 +1606,7 @@ async function veSincronizarClipes() {
             const en = veEnd(o);
             if (o.tr !== nv.tr || en <= a + VE_EPS || o.st >= b - VE_EPS || !veConflita(o, nv)) { out.push(o); return; }
             if (o.st < a && a - o.st > tiny) out.push(veSemTout({ ...o, e: veSrcAt(o, a) }));
-            if (en > b && en - b > tiny) out.push(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }));
+            if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b));
         });
         base = out;
     });
@@ -1597,13 +1642,13 @@ function veMarqueeFim(d) {
 // ── duplicar / copiar e colar / mudar de trilha ──
 // Põe `novo` na trilha dele sobrescrevendo o que estiver embaixo (como soltar um clipe); `exceto` = índice que sai
 function vePlaceClip(novo, exceto = -1) {
-    const a = novo.st, b = veEnd(novo), tiny = veFrame() * 0.5, out = [];
+    const a = novo.st, b = veEnd(novo), tiny = VE_SOBRA, out = [];
     VE.clips.forEach((o, j) => {
         if (j === exceto) return;
         const en = veEnd(o);
         if (o.tr !== novo.tr || en <= a + VE_EPS || o.st >= b - VE_EPS || !veConflita(o, novo)) { out.push(o); return; }
         if (o.st < a && a - o.st > tiny) out.push(veSemTout({ ...o, e: veSrcAt(o, a) }));
-        if (en > b && en - b > tiny) out.push(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }));
+        if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b));
     });
     out.push(novo);
     VE.clips = out;
@@ -1850,16 +1895,17 @@ function veMoveClip(i, tr, st) {
     veEnsureTrackIndex(tr);
     if (veTrkLocked(tr)) { veAvisoBloqueio(); veDraw(); return; }
     if (tr === c.tr && Math.abs(st - c.st) < veFrame() / 2) { veDraw(); return; }
+    st = Math.max(0, st + veEncosto([{ c, tr, st, en: st + veLen(c) }], VE.clips.filter((o, j) => j !== i)));
     vePushHistory();
     const moved = { ...c, tr, st };
-    const a = st, b = st + veLen(c), tiny = veFrame() * 0.5;
+    const a = st, b = st + veLen(c), tiny = VE_SOBRA;
     const out = [];
     VE.clips.forEach((o, j) => {
         if (j === i) return;
         const en = veEnd(o);
         if (o.tr !== tr || en <= a + VE_EPS || o.st >= b - VE_EPS || !veConflita(o, c)) { out.push(o); return; }
         if (o.st < a && a - o.st > tiny) out.push(veSemTout({ ...o, e: veSrcAt(o, a) }));
-        if (en > b && en - b > tiny) out.push(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }));
+        if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b));
     });
     out.push(moved);
     VE.clips = out;
@@ -2990,13 +3036,13 @@ function veAddAudio(path) {
 
 // Tira da trilha `tr` tudo que estiver entre a e b (sobrescrever), exceto o índice `exceto`
 function veCarve(clips, tr, a, b, exceto, novo) {
-    const out = [], tiny = veFrame() * 0.5;
+    const out = [], tiny = VE_SOBRA;
     clips.forEach((o, j) => {
         if (j === exceto) return;
         const en = veEnd(o);
         if (o.tr !== tr || en <= a + VE_EPS || o.st >= b - VE_EPS || (novo && !veConflita(o, novo))) { out.push(o); return; }
         if (o.st < a && a - o.st > tiny) out.push(veSemTout({ ...o, e: veSrcAt(o, a) }));
-        if (en > b && en - b > tiny) out.push(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }));
+        if (en > b && en - b > tiny) out.push(veLkSobra(veSemTin({ ...o, st: b, s: veSrcAt(o, b) }), b));
     });
     return out;
 }
@@ -4195,20 +4241,66 @@ function veTrimTo(d, t, semSnap) {
     const vizinhos = VE.clips.filter((o, j) => j !== d.i && o.tr === c0.tr && veConflita(o, c0));
     const img = veIsImage(c), limite = veDurMidia(c);
     t = semSnap ? Math.max(0, t) : veMoveSnap(t, d.i);
+    // mínimo de 1 quadro — ou o tamanho que ela já tem, se for menor (sobra no fim da mídia): antes o aparo esticava
+    // à força esse pedaço para 1 quadro e ele invadia a vizinha
+    const minLen = Math.min(veFrame(), en0 - c0.st), meio = veFrame() * 0.5;
     // vizinho = qualquer camada da mesma linha que começa antes (ou termina depois): se ela já invade esta por
     // milésimos (arredondamento), a borda trava no começo desta — antes, a que invadia não contava e a borda passava
     // por cima dela inteira (um clipe "engolia" o outro, os dois na mesma trilha)
     if (d.side === 'l') {
         const prevEnd = Math.max(0, ...vizinhos.filter(o => o.st < c0.st - VE_EPS).map(o => Math.min(veEnd(o), c0.st)));
         const minSt = img ? prevEnd : Math.max(prevEnd, c0.st - c0.s / v);
-        const st = Math.min(Math.max(t, minSt), en0 - veFrame());
+        let st = Math.min(Math.max(t, minSt), en0 - minLen);
+        // a menos de meio quadro da vizinha (que termina fora da grade): encosta nela em vez de deixar fresta
+        if (!semSnap && st - prevEnd > VE_EPS && st - prevEnd < meio && prevEnd >= minSt - VE_EPS) st = prevEnd;
         c.st = st;
         c.s = c0.s + (st - c0.st) * v;
     } else {
         const nextSt = Math.min(Infinity, ...vizinhos.filter(o => veEnd(o) > en0 + VE_EPS).map(o => Math.max(o.st, en0)));
         const maxEn = img ? nextSt : Math.min(nextSt, c0.st + (limite - c0.s) / v);
-        const en = Math.max(Math.min(t, maxEn), c0.st + veFrame());
+        let en = Math.max(Math.min(t, maxEn), c0.st + minLen);
+        if (!semSnap && nextSt - en > VE_EPS && nextSt - en < meio && nextSt <= maxEn + VE_EPS) en = nextSt;
         c.e = c0.s + (en - c0.st) * v;
+    }
+}
+
+// Aparo arrastando a borda: a clicada vai até t e as outras (par vinculado, seleção) andam a mesma medida. Se uma
+// delas bate no limite (fim da mídia, vizinho, 1 quadro), todas param ali — antes cada uma parava no seu limite e o
+// vídeo e o áudio do mesmo clipe ficavam com tamanhos diferentes
+function veAparoArrastar(d, t) {
+    const borda = (c, c0) => (d.side === 'l' ? c.st - c0.st : veEnd(c) - veEnd(c0));
+    const ponta0 = q => (d.side === 'l' ? q.c0.st : veEnd(q.c0));
+    veTrimTo(d, t);
+    if (!(d.par || []).length) return;
+    let dt = borda(VE.clips[d.i], d.c0);
+    d.par.forEach(q => {
+        veTrimTo(q, ponta0(q) + dt, true);
+        const r = borda(VE.clips[q.i], q.c0);
+        if (Math.abs(r) < Math.abs(dt)) dt = r;
+    });
+    // parou num limite fora da grade (fim da mídia): se alguma outra camada tem a ponta em outro lugar e na grade, a
+    // medida vira quadros inteiros — senão ela saía da grade e abria fresta de fração de quadro com a vizinha
+    const naGrade = x => Math.abs(x * VE.fps - Math.round(x * VE.fps)) < 1e-4;
+    if (!naGrade(dt) && d.par.some(q => naGrade(ponta0(q)) && Math.abs(ponta0(q) - ponta0(d)) > 1e-4))
+        dt = Math.sign(dt) * Math.floor(Math.abs(dt) * VE.fps + 1e-6) / VE.fps;
+    const aplicar = x => { veTrimTo(d, ponta0(d) + x, true); d.par.forEach(q => veTrimTo(q, ponta0(q) + x, true)); };
+    aplicar(dt);
+    // alguma das camadas parou a menos de meio quadro da vizinha dela (que tem a ponta fora da grade)? O grupo todo
+    // anda essa fração para ela encostar — só se nenhuma já estiver encostada e se todas conseguirem andar igual
+    const todos = [d, ...d.par], meio = veFrame() * 0.5;
+    const folga = q => {
+        const c = VE.clips[q.i], viz = VE.clips.filter((o, j) => j !== q.i && o.tr === c.tr && veConflita(o, c));
+        if (d.side === 'l') return c.st - Math.max(-Infinity, ...viz.filter(o => veEnd(o) <= c.st + VE_EPS).map(veEnd));
+        return Math.min(Infinity, ...viz.filter(o => o.st >= veEnd(c) - VE_EPS).map(o => o.st)) - veEnd(c);
+    };
+    const fs = todos.map(folga);
+    if (fs.every(f => f > VE_EPS)) {
+        const g = Math.min(...fs);
+        if (g < meio) {
+            const dt2 = dt + (d.side === 'l' ? -g : g);
+            aplicar(dt2);
+            if (todos.some(q => Math.abs(borda(VE.clips[q.i], q.c0) - dt2) > VE_EPS)) aplicar(dt);
+        }
     }
 }
 
@@ -6753,9 +6845,7 @@ function veInitEvents() {
         if (VE.drag.mode === 'trim') {
             const d = VE.drag;
             if (!d.started) { vePushHistory(); d.started = true; }
-            veTrimTo(d, t);
-            const cc = VE.clips[d.i], dt = d.side === 'l' ? cc.st - d.c0.st : veEnd(cc) - veEnd(d.c0);
-            (d.par || []).forEach(q => veTrimTo(q, (d.side === 'l' ? q.c0.st : veEnd(q.c0)) + dt, true));
+            veAparoArrastar(d, t);
             VE.dur = VE.clips.reduce((m, c) => Math.max(m, veEnd(c)), 0);
             veUpdateReadouts();
             veDrawMonitor();

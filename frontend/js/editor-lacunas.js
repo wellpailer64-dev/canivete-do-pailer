@@ -40,22 +40,30 @@ function veFecharEspaco() {
     VE.gapSel = null;
     if (!g) { veDraw(); return false; }
     if (veTrkLocked(g.tr)) { veAvisoBloqueio(); return true; }
-    const d = g.b - g.a;
+    // outras trilhas com clipe dentro do espaço: fecha o trecho que está vazio em TODAS, logo antes do que vem depois
+    // (de onde a última delas termina até onde a primeira recomeça) — antes recusava tudo, e um clipe que entrava uns
+    // quadros depois dos outros (ex.: crossfade) ou uma trilha que acabava antes das outras impedia juntar a montagem
     const bloqueia = VE.clips.filter(c => !veTrkLocked(c.tr) && c.st < g.b - VE_EPS && veEnd(c) > g.a + VE_EPS);
-    if (bloqueia.length) {
+    const depois = bloqueia.filter(c => c.st > g.a + VE_EPS);
+    const b = depois.length ? Math.min(...depois.map(c => c.st)) : g.b;
+    const a = Math.max(g.a, ...bloqueia.filter(c => veEnd(c) <= b + VE_EPS).map(veEnd));
+    const cheio = bloqueia.some(c => c.st < b - VE_EPS && veEnd(c) > a + VE_EPS);
+    if (cheio || b - a < veFrame() / 2) {
         veToast(veT('Não dá para fechar o espaço: há clipes em outras trilhas nesse trecho (trave a trilha com o cadeado para ela não se mexer)'));
         veDraw();
         return true;
     }
+    const d = b - a;
     vePushHistory();
-    VE.clips.forEach(c => { if (!veTrkLocked(c.tr) && c.st >= g.b - VE_EPS) c.st = Math.max(0, c.st - d); });
-    VE.legendas = (VE.legendas || []).map(l => (l.st >= g.b - VE_EPS ? veLegMover(l, -Math.min(d, l.st)) : l));
+    VE.clips.forEach(c => { if (!veTrkLocked(c.tr) && c.st >= b - VE_EPS) c.st = Math.max(0, c.st - d); });
+    VE.legendas = (VE.legendas || []).map(l => (l.st >= b - VE_EPS ? veLegMover(l, -Math.min(d, l.st)) : l));
+    veMkRipple(a, b);   // marcadores acompanham, como nos outros ripples
     VE.sel = -1; VE.selx = null;
     veRelayout();
     // a agulha vai para a junção (onde um clipe encostou no outro): a vista fica onde se clicou, para ver o que
     // aconteceu — antes ela voltava para a agulha, que podia estar longe, e a timeline pulava para lá
-    veAfterEdit(veSnapFrame(g.a));
-    veToast(`${veT('Espaço fechado')} (${veShort(d)})`);
+    veAfterEdit(veSnapFrame(a));
+    veToast(`${veT('Espaço fechado')} (${veShort(d)})` + (b < g.b - VE_EPS || a > g.a + VE_EPS ? ' — ' + veT('até onde as outras trilhas estão vazias') : ''));
     return true;
 }
 

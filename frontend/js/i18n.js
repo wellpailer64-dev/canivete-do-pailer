@@ -593,7 +593,7 @@ const I18N_EN = {
     'Selecionar faixa para a frente': 'Track Select Forward', 'Selecionar faixa para trás': 'Track Select Backward',
     'Faixa para a frente (A): clique para pegar tudo dali em diante · Shift: só a trilha': 'Track Select Forward (A): click to grab everything from there on · Shift: only that track',
     'Faixa para trás (Shift+A): clique para pegar tudo dali para trás · Shift: só a trilha': 'Track Select Backward (Shift+A): click to grab everything before that point · Shift: only that track',
-    'clipes selecionados': 'clips selected', 'clipe selecionado': 'clip selected', 'Espaço fechado': 'Gap closed',
+    'clipes selecionados': 'clips selected', 'clipe selecionado': 'clip selected', 'Espaço fechado': 'Gap closed', 'até onde as outras trilhas estão vazias': 'up to where the other tracks are empty',
     'Não dá para fechar o espaço: há clipes em outras trilhas nesse trecho (trave a trilha com o cadeado para ela não se mexer)':
         "Can't close the gap: other tracks have clips in it (lock a track with the padlock to keep it still)",
     'Inverter clipe (Reverse Speed)': 'Reverse Clip (Reverse Speed)', 'Clipe invertido': 'Clip reversed', 'Clipe voltou ao normal': 'Clip back to normal',
