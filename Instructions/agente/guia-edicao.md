@@ -119,6 +119,14 @@ cobertura, texto, ajuste, som) e a fala transcrita embaixo. 1ª vez ~4 min (extr
 Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lugar de prints do monitor).
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-10-22 NOTA DO PAILER NO CULTSP 02 V1 ("quase lá") → V2 (`cultsp2/scripts/montar_v2.py`): (1) TÍTULO DO EPISÓDIO
+  no lower já no 0:00, sobre a abertura (padrão do 01); (2) GC da pessoa na 1ª fala dela, DE ROSTO (não abrir com a voz
+  dela sobre B-roll); (3) letreiro do assunto da aula quando o professor começa a ensinar, sobre o ROSTO dele (plano
+  aberto com a pessoa pequena não serve); (4) MUITO MENOS B-roll sobre entrevistado e professor: rosto ≥ ~80% da fala,
+  um plano de B-roll por vez, só para esconder corte ou ilustrar; nada de B-roll sobre trecho cuja imagem já é slide/aluno;
+  (5) procurar TODAS as vozes (entrevistas, aluno perguntando em aula) e intercalar entrevista × aula; (6) B-roll só
+  estável (média ≤ 1,5 e pico ≤ 5 px/quadro) e bem composto. (7) NOME: nunca deduzir o nome de alguém pela fala de outra
+  pessoa — se a pessoa não diz o nome, letreiro pela função ("CHEF DO CURSO").
 - 2026-10-22 CULTSP PRO 02 Produção Musical Eletrônica (V1 3:51, sem nota ainda): mesmo método do Mega Artesanal V2
   aprovado (script `D:/kanivete_testes/cultsp2/scripts/montar.py` gera o .vknv; letreiros pelo MOGRT no app). Novidades:
   trilha eletrônica do Epidemic achada pela busca JSON (`fetch('/json/search/tracks/?term=...')` via `kb.py js`, filtro
