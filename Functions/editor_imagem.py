@@ -791,6 +791,8 @@ def _grad_desc(g):
 def _cor_desc(hexa):
     import psd_tools.psd.descriptor as D
     h = str(hexa or "#000000").lstrip("#")
+    if len(h) == 3:   # #abc (CSS curto)
+        h = "".join(ch * 2 for ch in h)
     r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
     c = D.Descriptor(classID=b"RGBC")
     c[b"Rd  "], c[b"Grn "], c[b"Bl  "] = D.Double(float(r)), D.Double(float(g)), D.Double(float(b))
@@ -1428,6 +1430,8 @@ def _estilo_caractere(raiz, sd, estilo):
             _ed_set(sd, "FontSize", E.Float(float(estilo["tam"])))
         if estilo.get("cor"):
             c = estilo["cor"].lstrip("#")
+            if len(c) == 3:   # #abc (CSS curto): antes o texto ia para o PSD como pixels
+                c = "".join(ch * 2 for ch in c)
             rgb = [int(c[k:k + 2], 16) / 255 for k in (0, 2, 4)]
             _ed_set(sd, "FillColor", _ed_dict([("Type", E.Integer(1)), ("Values", E.List([E.Float(1.0)] + [E.Float(v) for v in rgb]))]))
         if estilo.get("esp") is not None:

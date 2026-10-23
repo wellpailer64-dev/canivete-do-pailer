@@ -156,6 +156,12 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
 - Escalar/girar texto (Ctrl+T, alças, L/A) redesenha com a fonte na escala nova: nítido, como no Photoshop. Texto do
   PSD vira texto do editor nessa hora (só com a fonte instalada e um estilo só; senão estica os pixels). O tamanho
   mostrado é o real (tam × escala da matriz), como o painel Caractere do Photoshop.
+- **Texto em círculo** (2026-10-23, selos/carimbos; técnica do estudo Behance): Propriedades › Parágrafo › "Texto em
+  círculo" (só texto de ponto) com raio, ângulo (0 = em cima), "Por baixo" (lê por baixo, letras de pé, topo no raio)
+  e "Fechar a volta" (a frase ocupa os 360°). Modelo `t.circ = {r, ang, baixo, volta}`; a origem de `t.m` é o CENTRO;
+  desenho letra a letra em `ieTextoRenderCirc` (sem kerning entre pares); clique só no anel. Agente:
+  `KNV.texto(frase, {x, y, circulo: {raio, ang, baixo, volta}})`. No PSD vai como pixels (`rasterizar`); no .iknv volta
+  editável. Testes: `D:/kanivete_testes/scripts/teste_texto_circulo*.py` (selos, painel + iknv, PSD).
 
 ## Efeitos e opções de mesclagem na composição
 - Ordem de desenho como no Photoshop (de baixo para cima): sombra, brilho externo, conteúdo (com o Preenchimento),

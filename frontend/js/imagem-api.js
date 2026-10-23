@@ -366,14 +366,17 @@ const KNV = {
     // ── texto ──
     // texto novo: t = conteúdo ('\n' quebra linha); y = topo da 1ª linha; x = início (alin 'left'), meio ('center') ou
     // fim ('right') das linhas; caixa = [largura, altura] → texto de parágrafo com o canto de cima à esquerda em (x, y)
-    async texto(t, { x = 0, y = 0, fonte = 'Arial', estilo = 'Regular', tam = 48, cor = '#ffffff', alin = 'left', esp = 0, ent = 0, caixa, nome, acima } = {}) {
+    // circulo = {raio, ang = 0 (graus, 0 = topo), baixo = false, volta = false} → texto em volta do círculo com CENTRO
+    // em (x, y); raio = linha de base, letras para fora. Selo: frase com ' • ' no fim e volta: true (ocupa os 360°)
+    async texto(t, { x = 0, y = 0, fonte = 'Arial', estilo = 'Regular', tam = 48, cor = '#ffffff', alin = 'left', esp = 0, ent = 0, caixa, circulo, nome, acima } = {}) {
         if (acima != null) KNV.ativar(acima);
         await ieCarregarFontes();
         const doc = IE.doc;
         const tx = { s: t, tam, cor, alin, esp, ent, caixa: caixa ? [0, 0, caixa[0], caixa[1]] : null, m: [1, 0, 0, 1, x, y] };
         ieAplicarEstiloFonte(tx, fonte, ieEstiloDe(fonte, estilo));
         await ieGarantirFonte(tx);
-        if (!caixa) {   // texto de ponto: a matriz põe a LINHA DE BASE no y; desce a ascendente para o y ser o topo
+        if (circulo) { tx.caixa = null; tx.circ = { r: circulo.raio || ieTxCircRaioPadrao(tx), ang: circulo.ang || 0, baixo: !!circulo.baixo, volta: !!circulo.volta }; }
+        else if (!caixa) {   // texto de ponto: a matriz põe a LINHA DE BASE no y; desce a ascendente para o y ser o topo
             const asc = ieMedir(tx).measureText('Hg').fontBoundingBoxAscent || tam * 0.8;
             tx.m = [1, 0, 0, 1, x, y + asc];
         }

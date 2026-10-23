@@ -190,7 +190,50 @@ function ieTextoLayout(t) {
     return out;
 }
 
+// ── texto em círculo (selos e carimbos, como "Texto no demarcador" do Photoshop) ──
+// t.circ = {r (raio da linha de base), ang (graus; 0 = topo, horário), baixo (lê por baixo, letras de pé)}; a origem do
+// espaço do texto (t.m) é o CENTRO do círculo; alinhamento esquerda/centro/direita a partir do ângulo; uma linha só
+function ieTxCircExt(t) { return Math.max(1, t.circ.r) + ieTxTam(t) * 1.4 + Math.abs(ieTxSobe(t)); }
+function ieTxCircRaioPadrao(t) {   // o texto ocupa ~3/4 da volta
+    const s = String(t.s || '').split(IE_NL).join(' ');
+    return Math.max(t.tam * 1.5, Math.round(ieTxLargura(t, s, 0) / (Math.PI * 1.5)));
+}
+function ieTextoRenderCirc(L, c, x) {
+    const t = L.txt, C = t.circ, R0 = Math.max(1, C.r);
+    const s = (t.caixaAlta ? String(t.s || '').toUpperCase() : String(t.s || '')).split(IE_NL).join(' ');
+    const sh = (t.escH || 100) / 100, sv = (t.escV || 100) / 100, sobe = ieTxSobe(t);
+    const letras = [];
+    let i = 0, total = 0;
+    for (const ch of Array.from(s)) {
+        const st = ieTxTemTrechos(t) ? ieTxEstiloEm(t, i) : t;
+        const w = ieMedir(st).measureText(ch).width * sh;
+        letras.push({ ch, st, w, a: total }); total += w; i += ch.length;
+    }
+    const base = (C.ang || 0) * Math.PI / 180 + (C.baixo ? Math.PI : 0);
+    const cap = C.baixo ? (ieMedir(t).measureText('H').actualBoundingBoxAscent || ieTxTam(t) * 0.7) * sv : 0;
+    const Rb = R0 + cap;   // por baixo: o topo das letras encosta no raio (o anel fica igual ao de cima)
+    if (C.volta && letras.length) {   // fechar a volta: a frase ocupa os 360° (sobra ou falta dividida entre as letras)
+        const extra = (2 * Math.PI * Rb - total) / letras.length;
+        letras.forEach((l, k) => { l.a += extra * k; });
+        total = 2 * Math.PI * Rb - extra;   // o vão depois da última letra fecha no começo
+    }
+    const al = C.volta ? 'center' : (t.alin || 'left').replace('justify-', '').replace('justify', 'left').replace('all', 'center');
+    const ini = al === 'center' ? -total / 2 : al === 'right' ? -total : 0;
+    x.textBaseline = 'alphabetic';
+    for (const l of letras) {
+        const d = (ini + l.a + l.w / 2) / Rb, a = C.baixo ? base - d : base + d;
+        x.save();
+        x.translate(Rb * Math.sin(a), -Rb * Math.cos(a));
+        x.rotate(C.baixo ? a - Math.PI : a);
+        x.scale(sh, sv);
+        ieTxFonte(x, l.st); x.fillStyle = l.st.cor || t.cor || '#000';
+        x.fillText(l.ch, -l.w / sh / 2, -sobe);
+        x.restore();
+    }
+}
+
 function ieTextoCaixaLocal(t, linhas = ieTextoLayout(t), soLinhas = false) {
+    if (t.circ) { const E = ieTxCircExt(t); return { x: -E, y: -E, w: 2 * E, h: 2 * E }; }
     const x = ieMedir(t), sh = (t.escH || 100) / 100, sv = (t.escV || 100) / 100, sobe = ieTxSobe(t), tam = ieTxTam(t);
     const m0 = x.measureText('Hg');
     const asc = Math.max(m0.fontBoundingBoxAscent || 0, m0.actualBoundingBoxAscent || 0, tam * 0.8) * sv;
@@ -225,6 +268,7 @@ function ieTextoRender(L) {
     ieTxFonte(x, t);
     x.fillStyle = t.cor || '#000';
     x.textBaseline = 'alphabetic';
+    if (t.circ) { ieTextoRenderCirc(L, c, x); L.c = c; L.x = x1; L.y = y1; L.sujoPx = true; ieInvalidar(L); return; }
     const sh = (t.escH || 100) / 100, sv = (t.escV || 100) / 100, sobe = ieTxSobe(t), tam = ieTxTam(t);
     for (const l of linhas) {
         x.save();
@@ -315,6 +359,7 @@ IE.edTexto = null;   // {L, nova, antes}
 function ieTextoIndiceNoPonto(L, p) {
     const t = L && L.txt;
     if (!t || !p) return null;
+    if (t.circ) return String(t.s || '').length;
     const q = ieMatPt(ieMatInv(t.m || IE_ID), p.x, p.y);
     const linhas = ieTextoLayout(t);
     if (!linhas.length) return 0;
@@ -351,6 +396,11 @@ function ieTextoNoPonto(doc, p) {
     visitar(doc.camadas, true);
     for (let i = ordem.length - 1; i >= 0; i--) {
         const L = ordem[i], t = L.txt, q = ieMatPt(ieMatInv(t.m || IE_ID), p.x, p.y);
+        if (t.circ) {   // em círculo: só o anel das letras pega o clique (o miolo fica livre para o que está embaixo)
+            const d = Math.hypot(q.x, q.y);
+            if (d >= t.circ.r - t.tam * 0.4 && d <= ieTxCircExt(t)) return L;
+            continue;
+        }
         // só as linhas escritas: a caixa de parágrafo (moldura de edição) pode ser bem maior que o texto e passava por
         // cima de outras camadas — clicar no "TIME DA CARLINHOS" pegava o "Paulinho" de baixo (2026-10-13)
         const B = ieTextoCaixaLocal(t, ieTextoLayout(t), true);
@@ -576,6 +626,16 @@ function ieTextoEstilo(mud) {
                 await ieGarantirFonte(t);
             }
             for (const k of IE_TX_CHAVES) if (mud[k] !== undefined && k !== 'negFalso' && k !== 'itaFalso') t[k] = mud[k];
+            if (mud.circOn !== undefined) {   // ligar mantém o centro onde estava a linha de base (a matriz não muda)
+                if (!mud.circOn) delete t.circ;
+                else if (!t.circ) { t.circ = { r: ieTxCircRaioPadrao(t), ang: 0, baixo: false }; t.caixa = null; if (!t.alin || t.alin === 'left') t.alin = 'center'; }
+            }
+            if (t.circ) {
+                if (mud.circR !== undefined) t.circ.r = Math.max(1, +mud.circR || 1);
+                if (mud.circAng !== undefined) t.circ.ang = +mud.circAng || 0;
+                if (mud.circBaixo !== undefined) t.circ.baixo = !!mud.circBaixo;
+                if (mud.circVolta !== undefined) t.circ.volta = !!mud.circVolta;
+            }
             if (mud.caixaAlta) t.versalete = false;
             if (mud.versalete) t.caixaAlta = false;
             if (mud.tamEf !== undefined) t.tam = Math.max(0.5, mud.tamEf / ieTextoEscala(t));
@@ -733,7 +793,17 @@ function ieParagrafoHtml(t, run) {
         <div class="ie-car-l2">${n('recuo1', 'Recuo da primeira linha (px)', '→¶')}<span></span></div>
         <div class="ie-car-l2">${n('espAntes', 'Espaço antes do parágrafo (px)', '↥¶')}${n('espDepois', 'Espaço depois do parágrafo (px)', '¶↧')}</div>
         <label class="ie-ls-chk" title="${ieT('Gravado no PSD; o editor ainda não divide as palavras na tela')}"><input type="checkbox" data-tx="hifen" ${V.hifen ? 'checked' : ''}> ${ieT('Hifenizar')}</label>
+        ${t && !t.caixa || (t && t.circ) ? ieTextoCircHtml(t) : ''}
     </div>`;
+}
+// texto em círculo (selos): só texto de ponto; o ponto do texto vira o centro do círculo
+function ieTextoCircHtml(t) {
+    const C = t.circ;
+    const n = (k, tit, rot, v, extra = '') => `<label class="ie-car-c" title="${ieT(tit)}"><i class="ie-car-txt">${rot}</i><input type="number" data-tx="${k}" value="${v}" ${extra}></label>`;
+    return `<label class="ie-ls-chk" title="${ieT('Escreve o texto em volta de um círculo, como selo ou carimbo. O ponto do texto vira o centro. No PSD vai como pixels.')}"><input type="checkbox" data-tx="circOn" ${C ? 'checked' : ''}> ${ieT('Texto em círculo')}</label>
+        ${C ? `<div class="ie-car-l2">${n('circR', 'Raio do círculo (px)', '◯', Math.round(C.r), 'min="1" step="1"')}${n('circAng', 'Posição no círculo (graus; 0 = em cima)', '∠', Math.round(C.ang || 0), 'step="5"')}</div>
+        <label class="ie-ls-chk" title="${ieT('Lê por baixo do círculo, com as letras de pé')}"><input type="checkbox" data-tx="circBaixo" ${C.baixo ? 'checked' : ''}> ${ieT('Por baixo')}</label>
+        <label class="ie-ls-chk" title="${ieT('Espalha a frase pela volta inteira, sem sobrar nem sobrepor (selos: frase com • no fim)')}"><input type="checkbox" data-tx="circVolta" ${C.volta ? 'checked' : ''}> ${ieT('Fechar a volta')}</label>` : ''}`;
 }
 // Propriedades de uma camada de texto: Caractere + Parágrafo juntos (como no Photoshop)
 function ieTextoPropsHtml(t, run) {
@@ -755,7 +825,7 @@ function ieTextoPropsInstalar(box) {
             el.onclick = () => { const L = ieAtiva(); ieSeletorCor(el, (L && (L.txt || L._txtPsd || {}).cor) || IE.cor[0], c => { el.style.background = c; ieTextoEstilo({ cor: c }); }); };
             return;
         }
-        if (el.type === 'checkbox') { el.onchange = () => { ieTextoEstilo({ [k]: el.checked }); }; return; }
+        if (el.type === 'checkbox') { el.onchange = () => { ieTextoEstilo({ [k]: el.checked }); if (k === 'circOn') redesenhar(); }; return; }
         if (el.tagName === 'BUTTON') {
             el.onclick = () => {
                 const L = ieAtiva(), t = (L && (L.txt || L._txtPsd)) || IE.op.texto;

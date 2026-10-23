@@ -360,15 +360,16 @@ async function ieSalvar(comoNovo = false, destinoForcado = null, refeito = false
                     s.x = L.x; s.y = L.y;
                     if (novo) { const k = 'c' + (++n) + '.png'; s.chave = k; envios.push({ k, L, plano: 'c' }); }
                 }
-                if (L.rasterizar) s.rasterizar = true;
+                if (L.rasterizar || (L.txt && L.txt.circ)) s.rasterizar = true;
                 if (ida && L.ref != null && L.tf && !ieMatEhId(L.tf)) {
                     const rel = ieMatMul(L.tf, ieMatInv(L.tfBase || IE_ID));
                     if (!ieMatEhId(rel)) s.tf = rel;
                 }
-                if (ida && L.ref != null && L.textoNovo != null) { s.texto_novo = L.textoNovo; s.texto_estilo = L.textoEstilo || null; }
+                // texto em círculo não existe como texto do Photoshop: vai em pixels
+                if (ida && L.ref != null && L.textoNovo != null && !(L.txt && L.txt.circ)) { s.texto_novo = L.textoNovo; s.texto_estilo = L.textoEstilo || null; }
                 // texto com dados do editor (criado aqui ou convertido do PSD): o Python monta uma camada de texto do
                 // Photoshop (continua editável lá) sempre que não reaproveita a do arquivo intacta
-                const tTx = L.tipo === 'texto' && !L.rasterizar && regrava(L) ? (L.txt || textoPsd.get(L)) : null;
+                const tTx = L.tipo === 'texto' && !L.rasterizar && !(L.txt && L.txt.circ) && regrava(L) ? (L.txt || textoPsd.get(L)) : null;
                 if (tTx) {
                     const t = tTx;
                     s.texto_ps = { s: t.s, m: t.m || IE_ID, caixa: t.caixa || null, ps: t.ps || '',

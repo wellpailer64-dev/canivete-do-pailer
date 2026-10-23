@@ -93,6 +93,8 @@ de títulos 80%) que mostram onde textos e informações ficam seguros, no víde
 Camadas, máscaras, texto, formas, filtros, ajustes, objeto inteligente, Camera Raw, Liquify, laço, caneta. Abre e salva PSD
 do Photoshop com as camadas e o texto editável. Gera imagens com IA no próprio computador e monta carrosséis, feed e story.
 Projetos .iknv.
+Texto em círculo (selos e carimbos): selecione o texto e, em Propriedades › Parágrafo, marque "Texto em círculo". Dá para
+mudar o raio e a posição, ler por baixo e "Fechar a volta" (a frase ocupa o círculo inteiro). No PSD ele vai como imagem.
 
 ## Vetor Kanivete (vetor para gráfica, estilo Illustrator)
 Abre PDF, AI, SVG e PowerPoint. Pranchetas, curvas, texto, traçado de imagem (vira vetor), série numerada de placas, criar
