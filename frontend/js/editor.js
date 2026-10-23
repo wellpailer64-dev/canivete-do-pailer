@@ -5620,18 +5620,21 @@ function veRender() {
         const outra = veMid(c);
         const picos = veMelLigado(med) && med._aMel.peaks ? med._aMel.peaks : outra ? (med.peaks || []) : VE.peaks, np = picos.length, durP = outra ? veDurMidia(c) : VE.srcDur;
         if (np && veTemSom(c)) {
-            const base = ay + ah - 3, amp = Math.max(1, ah - 6), gl = veDb(c.g);
+            const base = ay + ah - 3, amp = Math.max(1, ah - 6), g0 = c.g || 0;
+            const linha = typeof veCnValor === 'function' && veKfOn(c, 'vol');   // linha de volume da caneta (dB)
             const xa = Math.max(cx, 0), xb = Math.min(cx + cw, W);
             for (let x = xa; x < xb; x += 2) {
                 const sa = srcAt(x), sb = srcAt(x + 2);
                 const ia = Math.floor(sa / durP * np), ib = Math.max(ia + 1, Math.ceil(sb / durP * np));
                 let pk = 0;
                 for (let k = Math.max(0, ia); k < Math.min(np, ib); k++) pk = Math.max(pk, picos[k]);
-                // os picos vêm em raiz (gerar_peaks: fala baixa visível): o ganho vale sobre a amplitude real
-                // (pk²), senão o vermelho acendia com o dobro dos dB (+6 dB pintava como +12) sem estourar de fato
-                const real = pk * pk * gl;
-                ctx.fillStyle = real > 1 ? '#f87171' : (cor || '#43c58f');     // vermelho = passa de 0 dBFS
-                const h = Math.max(1, Math.sqrt(Math.min(1, real)) * amp);
+                // como no Premiere: a onda segue o volume que sai (ganho + linha de volume), em escala de dB de
+                // −48 a 0 dBFS — abaixar encolhe até sumir, passar do topo = estouro (vermelho). Os picos vêm em raiz
+                // (gerar_peaks): pk² é a amplitude real.
+                const db = pk > 0 ? 40 * Math.log10(pk) + g0 + (linha ? veCnValor(c, 'a', sa) : 0) : -Infinity;
+                if (db < -48) continue;
+                ctx.fillStyle = db > 0 ? '#f87171' : (cor || '#43c58f');     // vermelho = passa de 0 dBFS
+                const h = Math.max(1, Math.min(1, (db + 48) / 48) * amp);
                 ctx.fillRect(x, base - h, 1.4, h);
             }
             if (c.g && cw > 60 && ah >= 14) {
