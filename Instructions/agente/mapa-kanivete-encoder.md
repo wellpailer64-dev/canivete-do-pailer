@@ -89,7 +89,8 @@ arquivo .part → renomeado no fim · miniatura ke_quadro.jpg 1×/s (saida_minia
 - **O próprio app ocupa a placa**: o cache de quadros do monitor (ImageBitmap) mora na memória da PLACA — 4 GB de 8 com
   o cache cheio, e a montagem recusava ("insuficiente mesmo em blocos") e caía no processador (CULTSP 04, 2026-10-23).
   `veCacheSoltarPlaca()` no início de cada item da fila e no export direto (−3,4 GB medidos); nada é guardado com
-  `VE.exportRunning`. Medir por programa: contador `GPU Process Memory(*)Dedicated Usage` (o msedgewebview2 do app).
+  `VE.exportRunning`. Medir por programa: contador `\GPU Process Memory(*)\Dedicated Usage` (o msedgewebview2 do app).
+
 ## 5. Resultados (timeline "Depoimentos V2" do Carlinhos, 98,8 s, 1080×1920)
 
 | caminho | tempo | observação |
