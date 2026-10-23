@@ -2797,4 +2797,6 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 
 .ve-fila-nome-titulo { cursor: text; }
 .ve-fila-nome-titulo:hover { text-decoration: underline; text-decoration-style: dotted; }
-.ve-fila-nome { width: 100%; min-width: 0; box-sizing: border-box; font-size: 12.5px; }
+.ve-fila-nome { width: 100%; min-width: 0; box-sizing: border-box; font-size: 12.5px; height: 26px; padding: 0 8px; border-radius: 4px;
+    background: #0f1011; color: var(--text-1, #e8e8e8); border: 1px solid var(--primary); outline: none; caret-color: var(--primary); }
+.ve-fila-nome::selection { background: var(--primary); color: #fff; }

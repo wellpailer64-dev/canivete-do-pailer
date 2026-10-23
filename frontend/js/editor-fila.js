@@ -527,6 +527,26 @@ function veFilaNomeFechar(id, valor, confirmar) {
     }
     VEFILA.nomeEditando = null; VEFILA.nomeRascunho = null; veFilaRender();
 }
+// pasta de saída por item (ícone de pasta na fila): timeline e arquivo usam cfg.dest; som troca a pasta de cada chamada
+function veFilaPastaDe(it) {
+    if (it.tipo === 'som') { const p = (it.chamadas[0] || {}).caminho || ''; return p.slice(0, Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'))) || null; }
+    return it.cfg.dest || null;
+}
+async function veFilaPasta(id) {
+    const it = VEFILA.itens.find(x => x.id === id); if (!it || it.estado !== 'espera' || it.tipo === 'lux') return;
+    const r = await window.pywebview.api.select_folder('video-cutter').catch(() => null);
+    if (!r || !r.success || !r.path) return;
+    const pasta = r.path.replace(/[\\/]+$/, '');
+    if (it.tipo === 'som') {
+        const chamadas = it.chamadas.map(ch => { const p = ch.caminho; return { ...ch, caminho: pasta + '\\' + p.slice(Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\')) + 1) }; });
+        const caminhos = new Set(chamadas.map(ch => ch.caminho.replace(/\\/g, '/').toLowerCase()));
+        if (VEFILA.itens.some(x => x !== it && ['espera', 'rodando'].includes(x.estado) && (x.chamadas || []).some(ch => caminhos.has(ch.caminho.replace(/\\/g, '/').toLowerCase())))) { veToast(veT('Outro item da fila já usa esse nome nessa pasta')); return; }
+        it.chamadas = chamadas;
+    }
+    it.cfg.dest = pasta; it.cfg.destLabel = pasta;
+    if (VEFILA.sel === id) { VE.dest = pasta; if ($ve('ve-dest-label')) $ve('ve-dest-label').textContent = pasta; }
+    veFilaRender(); veToast(`${veT('Salvar em')}: ${pasta}`);
+}
 function veFilaNomeHtml(it) {
     if (it.estado !== 'espera') return `<b>${veEsc(it.cfg.nome)}</b>`;
     if (VEFILA.nomeEditando === it.id) return `<input class="ve-input ve-fila-nome" data-fila-nome="${it.id}" aria-label="Nome de saída" title="Nome sem extensão · Enter confirma · Esc cancela" maxlength="180" value="${veEsc(VEFILA.nomeRascunho ?? it.cfg.nome)}"
@@ -547,6 +567,7 @@ function veFilaRender() {
         <span class="ve-fila-est">${VE_FILA_ESTADO[it.estado] || it.estado}${it.estado === 'rodando' ? ` ${Math.round(it.pct)}%` : ''}</span>
         <span class="ve-fila-acoes">${it.estado === 'pronto' && !it.tipo && !it.emenda && !it.faixa && /\.(mp4|mov|mkv)$/i.test(it.saida || '') ? `<button class="ve-btn ve-btn-sm" onclick="event.stopPropagation(); veFilaCorrigir(${it.id})" title="Corrigir trecho: marque com I e O o que está errado na timeline e clique aqui — refaz só esse pedaço e emenda no vídeo pronto (o resto e o som ficam iguais)">Corrigir trecho</button>` : ''}${it.estado === 'pronto' ? `<button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.open_file(${veEsc(JSON.stringify(it.saida))})" title="Assistir"><svg class="i"><use href="#i-play"/></svg></button><button class="ve-btn ve-btn-sm" onclick="window.pywebview.api.reveal_file(${veEsc(JSON.stringify(it.saida))})" title="Mostrar na pasta"><svg class="i"><use href="#i-folder"/></svg></button>` : ''}
             ${it.estado === 'erro' || it.estado === 'cancelado' ? `<button class="ve-btn ve-btn-sm" onclick="veFilaRefazer(${it.id})">De novo</button>` : ''}
+            ${it.estado === 'espera' && it.tipo !== 'lux' ? `<button class="ve-btn ve-btn-sm" onclick="event.stopPropagation(); veFilaPasta(${it.id})" title="${veEsc(veT('Escolher a pasta onde vai ser salvo') + ' · ' + (veFilaPastaDe(it) || veT('pasta padrão (a do projeto ou do vídeo original)')))}"><svg class="i"><use href="#i-folder"/></svg></button>` : ''}
             ${it.estado === 'espera' ? `<button class="ve-btn ve-btn-sm" onclick="veFilaMover(${it.id}, -1)" title="Subir">↑</button><button class="ve-btn ve-btn-sm" onclick="veFilaMover(${it.id}, 1)" title="Descer">↓</button>` : ''}
             ${it.estado !== 'rodando' ? `<button class="ve-btn ve-btn-sm" onclick="veFilaRemover(${it.id})" title="Tirar da fila"><svg class="i"><use href="#i-x"/></svg></button>` : ''}</span></div>`).join('')
         : '<div class="ve-fila-vazia">Fila vazia. Escolha as configurações ao lado e use "Adicionar à fila" (ou ▶ para renderizar só a timeline aberta).</div>';
