@@ -1,4 +1,32 @@
-# Estabilizador (melhor que o Warp Stabilizer) — EM PESQUISA (rodada 1 feita 2026-10-22)
+# Estabilizador (melhor que o Warp Stabilizer) — FEITO v1 (2026-10-23)
+
+## Como está (v1)
+- Efeito **Estabilizador** (painel Efeitos › Distorcer; `VE_FX.estab` em `frontend/js/editor-estab.js`): Resultado (Movimento
+  suave / Sem movimento), Suavidade, Método (Posição / Posição, escala e giro), Corte máximo (%). Status vivo na nota
+  do efeito (`VEST.status`, `notaDe`).
+- Motor `Functions/estabilizador.py`: `analisar` (640 px, cantos em grade 8×6, LK ida e volta < 0,7 px, trilhas longas
+  primeiro no RANSAC de semelhança, refino LMEDS) → `caminho` (L1 de Grundmann: pesos 10/1/100 × suavidade, corte
+  linearizado, janelas de 300 quadros emendadas por 3 fixos, HiGHS **ipm** = 3× o simplex; aperta e refaz se o zoom
+  exato passar) → `_zoom_preciso` (conta exata, fechada) → `renderizar` (planos YUV direto, 10 bits seguem 10, cor da
+  fonte, ler/deformar/gravar em paralelo, NVENC quando houver; ffmpeg abaixo do normal). Análise guardada em
+  `estab_<a>_<b>_<chave>.json` (mudar só os ajustes não analisa de novo); zoom ao lado da cópia (`.mp4.json`).
+- No app: um **vigia** (1×/s) compara o que cada clipe usa com o que o efeito pede e troca a mídia (cópia estabilizada
+  oculta: `m.stDe/stA/stB/stCh/stZoom`, como a do Inverter clipe); sem o efeito volta à original; desfazer/refazer só
+  mexe no efeito. Trecho = clipe ± 1 s. API `ve_estabilizar(path, a, b, cfg, job)` / `ve_estab_cancelar(job)` (main.py,
+  um de cada vez), eventos `veOnEstab`. Prévia = exportação (é a mesma mídia).
+- Teste: `py -3.13 testes/teste_estab.py [--porta 9341]` (aplica, muda corte, tira, Ctrl+Z, exporta e mede o tremor).
+- Medidas: bancada3 (tremor sintético com gabarito, `tools/estabilizador/bancada3.py`): sobra 0,8–1,7 px × vidstab
+  4,8–5,2 px, zoom 1,09 × 1,15. Reais (bancada2, medida robusta): igual ou melhor que o vidstab em 4/4. 4K 8 s:
+  análise 6,5 s + gravação 13,4 s (NVENC). Caminho de 2 min: ~5 s.
+
+## Pendências (v2)
+1. Rolling shutter (gelatina da A7c em 4K): modelo por faixas.
+2. Fundo sem pessoas (máscara do Pincel Roto/BiRefNet entra em `analisar(mascaras=...)`, já previsto).
+3. Bordas preenchidas com quadros vizinhos (em vez de zoom).
+4. Pausar no play/exportação (como o painel Pessoas); gráfico do caminho antes/depois.
+5. Comparar com o Warp Stabilizer de verdade (o Pailer exporta do Premiere).
+
+## Histórico da pesquisa
 
 ## Rodada 1 (2026-10-22) — bancada `tools/estabilizador/bancada.py` (saídas em `D:/kanivete_testes/estab/saida`)
 Rodar: `py -3.13 tools/estabilizador/bancada.py` (ZLIM=1.10 = zoom máximo do nosso; trechos em `TRECHOS`, caminhos em `arqs.py`).

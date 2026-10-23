@@ -28,6 +28,7 @@
     "editor-desempenho.js",
     "editor-dock.js",
     "editor-encoder.js",
+    "editor-estab.js",
     "editor-ferramentas.js",
     "editor-fila.js",
     "editor-fx.js",
@@ -52,6 +53,7 @@
     "editor-props.js",
     "editor-proxy.js",
     "editor-psd.js",
+    "editor-rastro.js",
     "editor-remix.js",
     "editor-render.js",
     "editor-reverse.js",
@@ -103,6 +105,10 @@
     "ve_area_transferencia",
     "ve_area_seq",
     "ve_inverter_midia",
+    "ve_estabilizar",
+    "ve_estab_cancelar",
+    "ve_rastrear",
+    "ve_rastro_parar",
     "ve_priorizar_midia",
     "ve_importar_dialogo",
     "ve_listar_pasta",
@@ -1085,6 +1091,22 @@
   },
   "ve_inverter_midia": {
    "args": "path, a, b, job",
+   "modulos": []
+  },
+  "ve_estabilizar": {
+   "args": "path, a, b, cfg, job",
+   "modulos": []
+  },
+  "ve_estab_cancelar": {
+   "args": "job",
+   "modulos": []
+  },
+  "ve_rastrear": {
+   "args": "path, t0, t1, caixa, modo, taxa, job",
+   "modulos": []
+  },
+  "ve_rastro_parar": {
+   "args": "job",
    "modulos": []
   },
   "ve_priorizar_midia": {
@@ -3297,13 +3319,14 @@
   "Instructions/agente/plano-cena.md": "Plano CENA — diagramar no Photo Kanivete escrevendo HTML/CSS (para IAs)",
   "Instructions/agente/plano-comp.md": "Plano: Comp (composição estilo After Effects) no Pocket Editor",
   "Instructions/agente/plano-economia-ponte-vetor-photo.md": "Planos (2026-10-04): economia de tokens, ponte Vetor ↔ Photo, nível \"Herbíssimo\"",
-  "Instructions/agente/plano-estabilizador.md": "Estabilizador (melhor que o Warp Stabilizer) — EM PESQUISA (rodada 1 feita 2026-10-22)",
+  "Instructions/agente/plano-estabilizador.md": "Estabilizador (melhor que o Warp Stabilizer) — FEITO v1 (2026-10-23)",
   "Instructions/agente/plano-identidade-pocket.md": "Plano — Identidade visual \"pocket\" (teste da missão, iniciado 2026-10-15)",
   "Instructions/agente/plano-kanivete-encoder.md": "Kanivete Encoder (Ke) — plano (rodada 1 de otimização FEITA em 2026-10-08; pendências no fim)",
   "Instructions/agente/plano-motion.md": "Motion no Editor Kanivete (recursos do After Effects)",
   "Instructions/agente/plano-slider-kanivete.md": "Plano — Slider Kanivete (Sd, verde-água) — pedido do Pailer em 2026-10-16 (missão da madrugada) — FEITO (v1)",
   "Instructions/agente/plugins.md": "Plugins no KANIVETE",
   "Instructions/agente/ponte-premiere.md": "Ponte Kanivete ↔ Premiere Pro (plugin UXP \"Kanivete Ponte\")",
+  "Instructions/agente/rastreador.md": "Rastreador de movimento (Tracker do After Effects) — FEITO v1 (2026-10-23)",
   "Instructions/agente/remover-fundo.md": "Remover fundo (recorte) — velocidade × qualidade (2026-10-06)",
   "Instructions/agente/tecnicas-de-montagem.md": "Técnicas de montagem: cortes, transições, storytelling e tempo de tela",
   "Instructions/agente/teste-4k.md": "Teste de 4K (estresse do Editor de Vídeo)",
@@ -3361,6 +3384,7 @@
   "Functions/efeitos_pr.py": "Efeitos de áudio do Premiere no Kanivete (frontend/dados/premiere_audio.json, gerado por tools/premiere_audio_dados.py)",
   "Functions/emenda.py": "Corrigir um trecho de um vídeo já exportado sem exportar tudo de novo (GaIA 2026-10-14: foto do Jhordano preta em 6 s",
   "Functions/encoder_monitor.py": "Monitor do Kanivete Encoder: CPU, RAM e placa de vídeo (NVIDIA: uso, encoder, decoder, memória) em tempo real e o",
+  "Functions/estabilizador.py": "estabilizador.py — Estabilizar do Vídeo Kanivete (o Warp Stabilizer do Premiere, mais leve e sem gelatina)",
   "Functions/export_placa.py": "Exportação na placa de vídeo (\"modo placa\", Kanivete Encoder rodada 3): a timeline inteira montada na GPU, como o",
   "Functions/faviconconverter.py": "faviconconverter.py",
   "Functions/fontes.py": "fontes.py — famílias de fonte instaladas no Windows e os estilos de cada uma (Light, Regular, Semibold,",
@@ -3408,6 +3432,7 @@
   "Functions/psd_import.py": "Importar PSD/PSB no editor com as camadas separadas (como o \"Composição — manter tamanhos das camadas\" do After",
   "Functions/psd_so_modelo.py": "Moldes de objeto inteligente incorporado do Photoshop (PlLd + SoLd da camada e o lnk2 global com o arquivo),",
   "Functions/psd_texto_modelo.py": "Moldes de camada de texto do Photoshop (bloco TySh), gerados pelo Photoshop 2026 (Arial 48 px de ponto e 36 px de",
+  "Functions/rastreador.py": "rastreador.py — Rastrear movimento do Vídeo Kanivete (o Tracker do After Effects)",
   "Functions/recorte_pro.py": "recorte_pro.py — Recorte profissional (Photo Kanivete: Remover plano de fundo; KNV.gerar recortar)",
   "Functions/recuperar.py": "recuperar.py — o miolo das ferramentas de recuperação do Photo Kanivete (como as do Photoshop):",
   "Functions/remix.py": "remix.py — Remix de música (o \"Remix\" do Premiere): esticar ou encurtar uma trilha para a duração pedida,",
@@ -3457,6 +3482,7 @@
   "teste_corte_alt": "Máscara de corte com Alt + clique na divisa entre duas camadas (como no Photoshop), com mouse de verdade no app de",
   "teste_dissolver": "Filtro > Dissolver (Liquify) com mouse de verdade (app em --agente=9333; não mexa no mouse durante)",
   "teste_editar": "Editar › Atenuar, Colar especial (dentro/fora) e Localizar e substituir texto do Photo Kanivete (app em --agente=9333)",
+  "teste_estab": "Estabilizador (editor-estab.js + Functions/estabilizador.py) no app de verdade: abre um trecho tremido real, aplica o",
   "teste_export": "teste_export.py — Confere a exportação do editor contra a prévia, quadro a quadro, e reprova se divergir",
   "teste_fila": "Fila de render do Editor (editor-fila.js) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila),",
   "teste_filtros": "Aplica cada filtro do menu Filtro (valores padrão) numa foto e mede; confere que mudou a imagem e não deu erro",
@@ -3492,6 +3518,7 @@
   "teste_psd_refs": "PSD salvo por cima (ida e volta) não pode trocar pixels entre camadas (2026-10-06: o carrossel do cliente voltou com",
   "teste_psd_so": "Objeto inteligente criado no Photo Kanivete → objeto inteligente INCORPORADO no PSD (Functions/editor_imagem._so_novo)",
   "teste_psd_texto": "Texto criado no Photo Kanivete → camada de texto EDITÁVEL no PSD (Functions/editor_imagem._texto_novo)",
+  "teste_rastro": "Rastreador de movimento (editor-rastro.js + Functions/rastreador.py) no app de verdade, com GABARITO: um quadro",
   "teste_remix": "Remix de música na timeline (editor-remix.js + Functions/remix.py), com mouse de verdade: põe uma música de 3:46",
   "teste_roto": "Pincel Roto (editor-roto.js + Functions/pincel_roto.py) no app de verdade: vídeo de entrevista na V1, texto animado",
   "teste_sfx": "Gerador de efeitos sonoros (Functions/gerador_sfx.py): agendador DDIM igual ao do diffusers e uma geração curta",

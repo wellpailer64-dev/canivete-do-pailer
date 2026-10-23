@@ -180,9 +180,14 @@ camadas, quadros-chave com a Bézier do After, mãe, fosco, Comp ao contrário e
 Cortar animado, `_corte_animado` no ffmpeg). Guia e pendências: `Instructions/agente/mogrt.md`. Teste:
 `teste_export.py --casos mogrt` (usa `D:/kanivete_testes/mogrt/lower.mogrt`).
 
-**EM PESQUISA — Estabilizador melhor que o Warp Stabilizer** (rodada 1 em 2026-10-22: bancada `tools/estabilizador/bancada.py`,
-vidstab do ffmpeg ainda ganha; próximo: movimento só do fundo com o recorte do Pincel Roto) (e a lista de prioridades para ficar profissional: bateria de
+**Estabilizador** (Warp Stabilizer, 2026-10-23): efeito Distorcer › Estabilizador; o vigia troca o clipe por uma cópia
+estabilizada oculta (`frontend/js/editor-estab.js` + `Functions/estabilizador.py`, L1 + zoom exato; 3–5× menos tremor que o
+vidstab com menos corte); teste `py -3.13 testes/teste_estab.py`. Guia, medidas e pendências (rolling shutter, fundo sem pessoas) (e a lista de prioridades para ficar profissional: bateria de
 projetos reais, tracker, MOGRT, rampas de velocidade, multicâmera): `Instructions/agente/plano-estabilizador.md`.
+
+**Rastreador de movimento** (Tracker do After, 2026-10-23): botão direito no clipe › Rastrear movimento…; caixa no monitor,
+◀◀/▶▶, "Aplicar a" Nulo/clipe (quadros-chave); erro < 0,5 px. `frontend/js/editor-rastro.js` + `Functions/rastreador.py`;
+guia e pendências (planar/corner pin, subpixel no export) `Instructions/agente/rastreador.md`; teste `py -3.13 testes/teste_rastro.py`.
 
 Atributos de vários clipes (como no Premiere): `frontend/js/editor-atributos.js` — botão direito → "Remover atributos…"
 (efeitos de vídeo/áudio, movimento, opacidade, mesclagem, volume, transições, com caixinhas; vale para a seleção) e ajuste

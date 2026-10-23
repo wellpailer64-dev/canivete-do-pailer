@@ -2800,3 +2800,16 @@ html.barra-propria .ve-float-bar .tb-bolas { display: flex; }
 .ve-fila-nome { width: 100%; min-width: 0; box-sizing: border-box; font-size: 12.5px; height: 26px; padding: 0 8px; border-radius: 4px;
     background: #0f1011; color: var(--text-1, #e8e8e8); border: 1px solid var(--primary); outline: none; caret-color: var(--primary); }
 .ve-fila-nome::selection { background: var(--primary); color: #fff; }
+
+/* Rastreador de movimento (editor-rastro.js): barra sobre o monitor */
+.ve-rt-barra { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 4px;
+    padding: 4px 8px; background: rgba(18, 18, 20, 0.92); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; font-size: 12px;
+    color: #ddd; white-space: nowrap; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45); }
+.ve-rt-barra[hidden] { display: none; }
+.ve-rt-barra b { color: var(--primary); font-weight: 600; margin-right: 4px; }
+.ve-rt-barra button { background: #2a2a2e; color: #eee; border: 1px solid #3a3a40; border-radius: 5px; padding: 3px 8px; cursor: pointer; font-size: 12px; }
+.ve-rt-barra button:hover { border-color: var(--primary); }
+.ve-rt-barra button.ve-rt-forte { background: var(--primary); border-color: var(--primary); color: #111; font-weight: 600; }
+.ve-rt-barra select { background: #2a2a2e; color: #eee; border: 1px solid #3a3a40; border-radius: 5px; padding: 2px 4px; font-size: 12px; max-width: 220px; }
+.ve-rt-sep { width: 1px; height: 18px; background: rgba(255, 255, 255, 0.15); margin: 0 4px; }
+.ve-rt-info { color: #999; margin-left: 4px; min-width: 70px; }

@@ -1073,7 +1073,7 @@ function veRenderFxControls() {
                     <button data-fa="reset" title="Restaurar valores">↺</button>
                     <button data-fa="del" title="Remover efeito">✕</button>
                 </div>
-                <div class="ve-fxe-body">${d.nota ? `<div class="ve-fxe-nota">${veEsc(veT(d.nota))}</div>` : ''}${d.botao ? `<button class="ve-btn ve-btn-sm ve-fxe-open" data-fa="open">${veT(d.botao)}</button>` : ''}${d.painel ? `
+                <div class="ve-fxe-body">${d.nota ? `<div class="ve-fxe-nota">${veEsc(d.notaDe ? d.notaDe(f) : veT(d.nota))}</div>` : ''}${d.botao ? `<button class="ve-btn ve-btn-sm ve-fxe-open" data-fa="open">${veT(d.botao)}</button>` : ''}${d.painel ? `
                     <button class="ve-btn ve-btn-sm ve-fxe-open" data-fa="open">Editar no painel ${d.nome}</button>` : d.params.filter(p => !p.oculto).map(p => p.tipo === 'cor' ? `
                     <div class="ve-prop ve-prop-cor">
                         <label>${p.nome}</label>

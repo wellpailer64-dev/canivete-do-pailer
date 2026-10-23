@@ -4728,6 +4728,12 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                     filtros.append(f"[{r}s{j}]trim=start={fim_bm:.4f},setpts=PTS-STARTPTS,format={pixfmt}[{r}p{j}]")
                     j += 1
                 filtros.append("".join(f"[{r}p{k}]" for k in range(nseg)) + f"concat=n={nseg}:v=1:a=0[o{n}]")
+            elif "x" in kf or "y" in kf:
+                # posição animada (rastreador, motion): com o vídeo em 4:2:0 o overlay encaixa a camada em pixel PAR
+                # (e trunca) — degraus de 2 px que tremem num rastro. Em 4:4:4 e arredondado: erro ≤ 0,5 px, como a prévia
+                fmt = "yuv444p10" if "10" in pixfmt or "422" in pixfmt else "yuv444"
+                filtros.append(f"{vf}[l{n}]overlay=x='floor(({px})-w/2+0.5)':y='floor(({py})-h/2+0.5)'"
+                               f":enable='{ena}':eof_action=pass:format={fmt}[o{n}]")
             else:
                 filtros.append(f"{vf}[l{n}]overlay=x='{px}-w/2':y='{py}-h/2'"
                                f":enable='{ena}':eof_action=pass:format=auto[o{n}]")

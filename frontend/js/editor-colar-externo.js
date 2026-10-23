@@ -68,7 +68,7 @@ async function veCeArquivos(paths, imagemColada) {
     let n = 0;
     for (const path of paths) {
         const nome = path.split(/[\\/]/).pop();
-        let m = VE.media.find(x => x && !x.removido && x.path === path && x.rvDe == null);
+        let m = VE.media.find(x => x && !x.removido && x.path === path && x.rvDe == null && x.stDe == null);
         if (!m) {
             const antes = VE.media.length;
             if (!(await vePjImportarArquivo(path, null))) { veToast(`${nome}: ${veT('formato não suportado')}`); continue; }

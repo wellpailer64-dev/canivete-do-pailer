@@ -2440,7 +2440,7 @@ function vePathNome(path, fallback = 'Mídia offline') {
     return path ? String(path).split(/[\\/]/).pop() : fallback;
 }
 function veMediaOffline(m) { return !!(m && (m.offline || m.missing || m.lost)); }
-function veOfflineMedias() { return (VE.media || []).filter(m => m && !m.removido && !m._rvGerando && veMediaOffline(m)); }
+function veOfflineMedias() { return (VE.media || []).filter(m => m && !m.removido && !m._rvGerando && m.stDe == null && veMediaOffline(m)); }
 // Offline que a timeline aberta USA (direto ou dentro de uma Comp): só essas impedem exportar. Mídia offline esquecida no
 // painel Projeto, sem uso, não trava mais o export (como no Premiere).
 function veOfflineNaTimeline() {
@@ -4592,6 +4592,7 @@ function veProjectData() {
                 if (m.kind === 'timeline') o.sequenceId = m.sequenceId;
                 if (m.kind === 'cor') o.fill = m.fill;   // cor sólida (m.cor é a do rótulo)
                 if (m.rvDe != null) Object.assign(o, { rvDe: m.rvDe, rvA: m.rvA, rvB: m.rvB });   // cópia invertida (editor-reverse.js)
+                if (m.stDe != null) Object.assign(o, { stDe: m.stDe, stA: m.stA, stB: m.stB, stCh: m.stCh, stZoom: m.stZoom });   // estabilizada (editor-estab.js)
                 if (m.mel) Object.assign(o, { mel: m.mel, melOff: !!m.melOff });   // som melhorado (editor-projeto.js)
                 return o;
             }),
@@ -4822,6 +4823,7 @@ function veApplyProject() {
         if (m.kind === 'video' || m.kind === 'video2') {
             const nm = { id: VE.media.length, kind: 'video', name: m.name, path: m.path, ...org };
             if (m.rvDe != null) Object.assign(nm, { rvDe: m.rvDe, rvA: m.rvA, rvB: m.rvB });
+            if (m.stDe != null) Object.assign(nm, { stDe: m.stDe, stA: m.stA, stB: m.stB, stCh: m.stCh, stZoom: m.stZoom });   // estabilizada
             VE.media.push(nm);
             ids[m.id] = nm.id;
             if (m.c3d) {
@@ -4911,6 +4913,13 @@ function veApplyProject() {
         nm.rvDe = ids[nm.rvDe];
         if (nm.rvDe == null) delete nm.rvDe;
         else if (nm.missing) veRvRestaurar(nm);
+    });
+    // cópias estabilizadas (editor-estab.js): idem; apagada do cache → o vigia do Estabilizador pede de novo
+    VE.media.forEach(nm => {
+        if (!nm || nm.stDe == null) return;
+        nm.stDe = ids[nm.stDe];
+        if (nm.stDe == null) delete nm.stDe;
+        else if (nm.missing || nm.offline) veStRestaurar(nm);
     });
     // músicas do Remix (editor-remix.js): idem (o remix é refeito igual a partir da original)
     VE.media.forEach(nm => {

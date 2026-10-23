@@ -311,6 +311,87 @@ def ve_preparar_midia(path, mid, urgente=False, leve=False, fundo=False, trechos
     return {"success": True}
 
 
+_ESTAB_JOBS = {}
+
+
+def ve_estabilizar(path, a, b, cfg, job):
+    """Estabilizador (Warp Stabilizer): cópia estabilizada do trecho [a, b] em segundo plano (Functions/estabilizador.py);
+    eventos em veOnEstab({job, stage: 'pct'|'done'|'error', ...}). Um de cada vez (fila): dois juntos disputam o processador."""
+    from Functions.estabilizador import estabilizar
+    stop = threading.Event()
+    _ESTAB_JOBS[job] = stop
+
+    def run():
+        with _ESTAB_TRAVA:
+            if stop.is_set():
+                _ve_emit("veOnEstab", {"job": job, "stage": "error", "error": "Cancelado."})
+                return
+            try:
+                r = estabilizar(path, a, b, cfg, lambda p: _ve_emit("veOnEstab", {"job": job, "stage": "pct", "pct": p}), stop)
+            except Exception as e:
+                r = {"success": False, "error": str(e) or "erro"}
+            finally:
+                _ESTAB_JOBS.pop(job, None)
+        if r.get("success"):
+            _ve_emit("veOnEstab", {"job": job, "stage": "done", "path": r["path"], "zoom": r.get("zoom")})
+        else:
+            _ve_emit("veOnEstab", {"job": job, "stage": "error", "error": r.get("error") or "erro"})
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
+_ESTAB_TRAVA = threading.Lock()
+_RASTRO_JOBS = {}
+
+
+def ve_rastrear(path, t0, t1, caixa, modo, taxa, job):
+    """Rastrear movimento (Tracker do After): segue a caixa de t0 até t1 (para trás se t1 < t0) em segundo plano;
+    eventos em veOnRastro({job, stage: 'q' (itens [t,x,y,escala,giro,conf] em lotes)|'done'|'error'})."""
+    from Functions.rastreador import rastrear
+    stop = threading.Event()
+    _RASTRO_JOBS[job] = stop
+    lote = []
+
+    def q(item):
+        lote.append(item)
+        if len(lote) >= 3:
+            _ve_emit("veOnRastro", {"job": job, "stage": "q", "itens": lote[:]})
+            lote.clear()
+
+    def run():
+        try:
+            rastrear(path, float(t0), float(t1), caixa, modo, taxa, q, stop)
+            if lote:
+                _ve_emit("veOnRastro", {"job": job, "stage": "q", "itens": lote[:]})
+            _ve_emit("veOnRastro", {"job": job, "stage": "done"})
+        except InterruptedError:
+            if lote:
+                _ve_emit("veOnRastro", {"job": job, "stage": "q", "itens": lote[:]})
+            _ve_emit("veOnRastro", {"job": job, "stage": "done", "parado": True})
+        except Exception as e:
+            _ve_emit("veOnRastro", {"job": job, "stage": "error", "error": str(e) or "erro"})
+        finally:
+            _RASTRO_JOBS.pop(job, None)
+
+    threading.Thread(target=run, daemon=True).start()
+    return {"success": True}
+
+
+def ve_rastro_parar(job):
+    ev = _RASTRO_JOBS.get(job)
+    if ev:
+        ev.set()
+    return {"success": True}
+
+
+def ve_estab_cancelar(job):
+    ev = _ESTAB_JOBS.get(job)
+    if ev:
+        ev.set()
+    return {"success": True}
+
+
 def ve_inverter_midia(path, a, b, job):
     """Clipe invertido (Reverse Speed): gera a cópia de trás para frente do trecho [a, b] em background;
     eventos em veOnInverter({job, stage: 'pct'|'done'|'error', ...})."""
@@ -3329,6 +3410,18 @@ class ApiBridge:
 
     def ve_inverter_midia(self, path, a, b, job):
         return ve_inverter_midia(path, a, b, job)
+
+    def ve_estabilizar(self, path, a, b, cfg, job):
+        return ve_estabilizar(path, a, b, cfg, job)
+
+    def ve_estab_cancelar(self, job):
+        return ve_estab_cancelar(job)
+
+    def ve_rastrear(self, path, t0, t1, caixa, modo, taxa, job):
+        return ve_rastrear(path, t0, t1, caixa, modo, taxa, job)
+
+    def ve_rastro_parar(self, job):
+        return ve_rastro_parar(job)
 
     def ve_priorizar_midia(self, path):
         from Functions.video_cutter import priorizar_midia

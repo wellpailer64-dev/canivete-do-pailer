@@ -23,7 +23,7 @@ const vePjTipo = m => VE_PJ_TIPOS[m.comp ? 'comp' : m.kind];
 const VE_EXT_LEG = /\.(srt|vtt|ass|ssa|sbv|txt)$/i;   // legendas (Functions/legendas_formatos.py)
 
 // (variações de Comp com Propriedades essenciais — m.ovDe — ficam escondidas: são da faixa, não do Projeto)
-const vePjMidia = () => VE.media.filter(m => m && !m.removido && !m.base && m.rvDe == null && m.rmxDe == null && m.ovDe == null && VE_PJ_TIPOS[m.kind]);
+const vePjMidia = () => VE.media.filter(m => m && !m.removido && !m.base && m.rvDe == null && m.stDe == null && m.rmxDe == null && m.ovDe == null && VE_PJ_TIPOS[m.kind]);
 const vePjNome = m => m.nome || m.name || vePjTipo(m)[1];
 const vePjBin = id => (VE.bins || []).find(b => b.id === id);
 function vePjUso(m) {
@@ -813,6 +813,7 @@ function veMelMenuItens(m, attr, soChave) {
 function veMostrarNoProjeto(c) {
     let m = c && veMediaOf(c);
     if (m && m.rvDe != null) m = VE.media[m.rvDe] || m;   // clipe invertido: a mídia original
+    if (m && m.stDe != null) m = VE.media[m.stDe] || m;   // clipe estabilizado: idem
     if (m && m.rmxDe != null) m = VE.media[m.rmxDe] || m;   // música do Remix: a original
     if (!m || !VE_PJ_TIPOS[m.kind] || m.base || m.removido) { veToast('Este clipe não tem um item no painel Projeto'); return; }
     for (let b = vePjBin(m.pasta); b; b = vePjBin(b.pai)) b.aberta = true;   // abre as pastas até ele

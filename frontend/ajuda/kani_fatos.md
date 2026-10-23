@@ -3,7 +3,7 @@
      Ferramenta nova ou mudança visível: acrescentar aqui e rodar py -3.13 tools/kani_kb.py. -->
 
 ## O que o KANIVETE ainda não faz (responda "não tem", sem prometer)
-Não tem estabilizador de vídeo (nada parecido com o Warp Stabilizer) por enquanto. Não exporta DXF para corte a laser
+Não exporta DXF para corte a laser
 (o Vetor Kanivete exporta PDF para gráfica, SVG e PNG). Não abre arquivos do Figma, do Canva, do CorelDRAW (.cdr) nem do
 After Effects (.aep). O Ata Kanivete não grava Zoom nem Microsoft Teams: só Google Meet (ou um áudio/vídeo de reunião já
 gravado, importado). A Kani não gera vídeo nem música inteira (gera imagem, efeito sonoro, narração e vinheta). Não há
@@ -64,6 +64,16 @@ Vira uma Comp com as camadas do After (sólidos, textos, imagens, animações, c
 "Gráficos essenciais" mostra os campos do modelo (nome, cargo, posição, escala...) e o valor vale só para aquela faixa,
 como no Premiere: dá para usar o mesmo GC várias vezes com nomes diferentes. Ainda não entram: efeitos do After,
 máscaras, camadas de forma, expressões e MOGRT feito no próprio Premiere (aparecem como aviso).
+Estabilizador (como o Warp Stabilizer do Premiere): no painel Efeitos › Distorcer › Estabilizador, arraste para o
+clipe tremido. Ele analisa em segundo plano (a nota do efeito mostra "analisando… %") e o clipe passa a tocar
+estabilizado; a exportação sai igual. Ajustes: Resultado (Movimento suave ou Sem movimento, como um tripé), Suavidade,
+Método (só posição ou posição, escala e giro) e Corte máximo (quanto pode ampliar para esconder as bordas). Mudar um
+ajuste refaz sozinho; tirar ou desligar o efeito volta ao original na hora.
+Rastrear movimento (como o Tracker do After Effects): botão direito no clipe de vídeo › Rastrear movimento… Aparece
+uma caixa no monitor: arraste-a até um ponto com contraste (um canto, uma letra, uma marca) e clique em ▶▶ (para frente)
+ou ◀◀ (para trás). Escolha o que seguir (posição; posição e giro; posição, giro e escala) e, em "Aplicar a", um Nulo
+novo ou um clipe (texto, imagem, outro vídeo): ele passa a acompanhar o ponto, com quadros-chave comuns. Ainda não faz
+rastreio de quatro cantos (trocar a tela de um celular).
 
 ## Kanivete Encoder (fila de exportação, estilo Media Encoder)
 Configurações à esquerda e fila à direita. Cada item da fila tem as suas próprias configurações (formato, resolução,
