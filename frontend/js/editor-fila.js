@@ -311,6 +311,7 @@ async function veFilaProximo() {
     VE.exportRunning = true;
     // prévia renderizada (automática ou In→Out) parada: dividia a placa e a CPU com a exportação (memória estourava)
     if (typeof vePrAutoParar === 'function' && typeof VEPR !== 'undefined' && (VEPR.atual || VEPR.fila.length)) vePrAutoParar();
+    if (!it.tipo && typeof veCacheSoltarPlaca === 'function') veCacheSoltarPlaca();   // quadros do monitor ocupavam a placa
     document.querySelector('.menu-item[data-tool="video-cutter"]')?.classList.add('rodando');
     veFilaRender();
     try {   // arquivos do disco e renders da Lux: ke-arquivos.js (mesmo andamento e mesmo fim)

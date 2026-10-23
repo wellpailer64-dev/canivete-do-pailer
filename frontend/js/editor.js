@@ -413,6 +413,20 @@ function veCacheRelease(item) {
     if (item.cv) { item.cv.width = 0; item.cv.height = 0; }
 }
 
+// Antes de exportar: os quadros guardados do monitor (ImageBitmap) moram na memória da PLACA — 4 GB de 8 com o cache
+// cheio, e a montagem na placa recusava ("memória livre insuficiente mesmo em blocos") e caía no processador (CULTSP 04,
+// 2026-10-23). Solta só esses quadros e os do original (proxy desligado); a prévia renderizada em disco fica.
+function veCacheSoltarPlaca() {
+    const c = veCache();
+    c.rev++;
+    c.frames.forEach(veCacheRelease);
+    c.frames.clear();
+    c.pending.clear();
+    c.bytes = 0;
+    if (typeof VEPROXY !== 'undefined') VEPROXY.quadros.clear();
+    veCacheUpdateUi();
+}
+
 function veCacheClear(silencioso) {
     const c = veCache();
     c.rev++;
@@ -554,6 +568,7 @@ function veCacheValeGuardar(itens, trans, falta) {
 function veCacheStore(cv, cw, ch, pv, itens, trans, falta) {
     const c = veCache();
     if (!c.on || !veCacheValeGuardar(itens, trans, falta) || !cw || !ch) return;
+    if (VE.exportRunning) return;   // renderizando: a placa fica para a exportação (veCacheSoltarPlaca)
     const f = veCacheFrame(), key = veCacheKey(f);
     if (c.frames.has(key) || c.pending.has(key)) return;
     const sig = veCacheSig(f);
@@ -6408,6 +6423,7 @@ async function veStartExport() {
         if (veTxPrecisaEm(VE.clips)) await veMoNoTamanho($ve('ve-res').value, () => veTxPngs());   // textos e gráficos viram PNG; camadas do motion, vídeo
         const plano = veExportPlan(true), master = veMasterLim();
         const mix = master ? [...plano.mix, { master }] : plano.mix;
+        veCacheSoltarPlaca();
         await window.pywebview.api.video_cutter_export(
             veFonteParaPlano({ ...plano, mix }, !noAudio), plano.base, vePill('format') || 'mp4', vePill('quality') || 'high',
             $ve('ve-res').value, $ve('ve-gpu').checked, VE.dest, noAudio,

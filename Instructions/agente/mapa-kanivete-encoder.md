@@ -86,6 +86,10 @@ arquivo .part → renomeado no fim · miniatura ke_quadro.jpg 1×/s (saida_minia
 | `trim=start` tardio num ramo de `split` | o outro ramo guarda todos os quadros até lá: memória esgotada (16 bits: 6,8 GB) | ramo desde o início do bloco, alfa 0 antes (`_ajuste` `tarde`) |
 | fundo preto de reserva a 30 qps | "sem áudio" saía 30 qps numa timeline de 59,94 | `_base_preta(w, h, fps)` com `opcoes.fps` = `VE.fps` |
 
+- **O próprio app ocupa a placa**: o cache de quadros do monitor (ImageBitmap) mora na memória da PLACA — 4 GB de 8 com
+  o cache cheio, e a montagem recusava ("insuficiente mesmo em blocos") e caía no processador (CULTSP 04, 2026-10-23).
+  `veCacheSoltarPlaca()` no início de cada item da fila e no export direto (−3,4 GB medidos); nada é guardado com
+  `VE.exportRunning`. Medir por programa: contador `GPU Process Memory(*)Dedicated Usage` (o msedgewebview2 do app).
 ## 5. Resultados (timeline "Depoimentos V2" do Carlinhos, 98,8 s, 1080×1920)
 
 | caminho | tempo | observação |
