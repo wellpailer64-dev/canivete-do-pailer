@@ -312,6 +312,8 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
   - prévia (`m.url`), com proxy quando o navegador não toca o formato;
   - miniaturas (`m.thumbs`);
   - áudio conformado próprio (`adicionar_audio`), registrado no mixer com o id da mídia, mais a forma de onda (`m.peaks`).
+  Os picos vêm em RAIZ da amplitude (`gerar_peaks`, fala baixa visível): na timeline o ganho do clipe vale sobre
+  `pk²` (vermelho = passa de 0 dBFS de verdade). Multiplicar a raiz direto pintava estouro com o dobro dos dB (2026-10-23).
 - Clipe de outro vídeo: `c.m = id` (`veMid(c)`).
   - Entra ajustado ao quadro ("Definir para o tamanho do quadro"): escala padrão = min(seqW/w, seqH/h).
   - Na prévia, cada player carrega o arquivo da mídia do clipe (`veDeckCarregar`, uma URL marcada por player).

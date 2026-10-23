@@ -5627,9 +5627,11 @@ function veRender() {
                 const ia = Math.floor(sa / durP * np), ib = Math.max(ia + 1, Math.ceil(sb / durP * np));
                 let pk = 0;
                 for (let k = Math.max(0, ia); k < Math.min(np, ib); k++) pk = Math.max(pk, picos[k]);
-                pk *= gl;
-                ctx.fillStyle = pk > 1 ? '#f87171' : (cor || '#43c58f');     // vermelho = estourando
-                const h = Math.max(1, Math.min(1, pk) * amp);
+                // os picos vêm em raiz (gerar_peaks: fala baixa visível): o ganho vale sobre a amplitude real
+                // (pk²), senão o vermelho acendia com o dobro dos dB (+6 dB pintava como +12) sem estourar de fato
+                const real = pk * pk * gl;
+                ctx.fillStyle = real > 1 ? '#f87171' : (cor || '#43c58f');     // vermelho = passa de 0 dBFS
+                const h = Math.max(1, Math.sqrt(Math.min(1, real)) * amp);
                 ctx.fillRect(x, base - h, 1.4, h);
             }
             if (c.g && cw > 60 && ah >= 14) {
