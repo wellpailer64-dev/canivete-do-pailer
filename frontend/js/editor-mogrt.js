@@ -189,12 +189,15 @@ function veMogrtItem(base, id) {
     const ct = base.mogrt.controles.find(x => x.id === id);
     if (!ct) return null;
     const v = ct.valor;
-    return ct.tipo === 'ponto' ? { x: v.x, y: v.y } : { v: Array.isArray(v) ? v[0] : v };
+    // texto: + tamanho da letra em % do modelo (Gráficos essenciais › Tamanho; o Premiere não tem, o título longo do
+    // CULTSP 04 "ROADIE, DIREÇÃO E PALCO" estourava o lower, que não cresce com o texto — 2026-10-23)
+    return ct.tipo === 'ponto' ? { x: v.x, y: v.y } : ct.tipo === 'texto' ? { v: Array.isArray(v) ? v[0] : v, tam: 100 }
+        : { v: Array.isArray(v) ? v[0] : v };
 }
 
 function veMogrtPatch(ct, o) {
     const p = ct.alvo.prop, it = ct.tipo === 'ponto' ? { x: ct.valor.x, y: ct.valor.y, ...o } : o;
-    if (p === 'texto') return { t: it.v };
+    if (p === 'texto') return it.tam != null && +it.tam !== 100 ? { t: it.v, tam: +it.tam } : { t: it.v };
     if (p === 'pos') return { x: +it.x, y: +it.y };
     if (p === 'esc') return { sc: +it.v };
     if (['x', 'y', 'op', 'rot'].includes(p)) return { [p]: +it.v };
@@ -203,8 +206,10 @@ function veMogrtPatch(ct, o) {
 
 function veMogrtRemendar(c, pt) {
     const n = vePlain(c, {});
-    if (pt.t != null && n.tx) {
-        n.tx.t = String(pt.t);
+    const tam = pt.tam != null && isFinite(pt.tam) && +pt.tam > 0 ? +pt.tam : null;
+    if (n.tx && (pt.t != null || tam)) {
+        if (pt.t != null) n.tx.t = String(pt.t);
+        if (tam) n.tx.tam = +(n.tx.tam * tam / 100).toFixed(2);
         if (n.mgAnc) Object.assign(n.p, veMogrtAncTexto(n.tx, n.mgAnc[0], n.mgAnc[1]));
     }
     ['x', 'y', 'sc', 'op', 'rot'].forEach(k => {
@@ -246,14 +251,22 @@ function veMogrtSeqEfetiva(m, seq) {
     return base.mgPlano ? veMogrtPlanoDe(m, s) : s;
 }
 
+// Número arrastável como no Premiere: arrastar para os lados muda (Shift ×10, Alt ×0,1), clique digita.
+// Barra junto quando o campo tem faixa (tamanho, escala, opacidade); ✥ arrasta X e Y juntos.
 function veMogrtEssHtml(c, base) {
-    const ov = c.ov || {}, num = (id, campo, v, extra = '') => `<input type="number" step="any" data-pce="${id}" data-campo="${campo}" value="${veEsc(String(+(+v).toFixed(2)))}" ${extra}>`;
+    const ov = c.ov || {}, r2 = v => +(+v).toFixed(2);
+    const num = (id, campo, v, extra = '') => `<input type="number" class="ve-mg-num" step="any" data-pce="${id}" data-campo="${campo}" value="${veEsc(String(r2(v)))}" title="${veT('Arraste para os lados (Shift = rápido, Alt = fino) ou clique para digitar')}" ${extra}>`;
+    const barra = (id, campo, v, mn, mx) => `<input type="range" class="ve-mg-barra" data-pce="${id}" data-campo="${campo}" min="${mn}" max="${mx}" step="1" value="${r2(v)}">`;
+    const faixa = ct => ct.min != null && ct.max != null ? [ct.min, ct.max]
+        : ct.alvo.prop === 'esc' ? [0, 300] : ct.alvo.prop === 'op' ? [0, 100] : ct.alvo.prop === 'rot' ? [-180, 180] : null;
     const corpo = base.mogrt.controles.filter(ct => VE_MG_TIPOS.has(ct.tipo) && ct.alvo).map(ct => {
-        const o = ov[ct.id] || {}, it = { ...veMogrtItem(base, ct.id), ...o }, mudou = Object.keys(o).length > 0;
-        const campo = ct.tipo === 'texto' ? `<textarea class="ve-pp-texto" rows="2" data-pce="${ct.id}" data-campo="v">${veEsc(String(it.v ?? ''))}</textarea>`
-            : ct.tipo === 'ponto' ? `<div class="ve-mg-xy">X ${num(ct.id, 'x', it.x)} Y ${num(ct.id, 'y', it.y)}</div>`
+        const o = ov[ct.id] || {}, it = { ...veMogrtItem(base, ct.id), ...o }, mudou = Object.keys(o).length > 0, fx = faixa(ct);
+        const campo = ct.tipo === 'texto' ? `<textarea class="ve-pp-texto" rows="2" data-pce="${ct.id}" data-campo="v">${veEsc(String(it.v ?? ''))}</textarea>
+                <div class="ve-mg-linha"><span>${veT('Tamanho')}</span>${barra(ct.id, 'tam', it.tam ?? 100, 20, 300)}${num(ct.id, 'tam', it.tam ?? 100, 'min="20" max="300"')}<i>%</i></div>`
+            : ct.tipo === 'ponto' ? `<div class="ve-mg-linha"><span class="ve-mg-pad" data-mg-pad="${ct.id}" title="${veT('Arraste para mover X e Y juntos')}">✥</span>
+                <b>X</b>${num(ct.id, 'x', it.x)}<b>Y</b>${num(ct.id, 'y', it.y)}</div>`
             : ct.tipo === 'cor' ? `<input type="color" data-pce="${ct.id}" data-campo="v" value="${veEsc(String(it.v))}">`
-            : num(ct.id, 'v', it.v, ct.min != null ? `min="${ct.min}" max="${ct.max}"` : '');
+            : `<div class="ve-mg-linha">${fx ? barra(ct.id, 'v', it.v, fx[0], fx[1]) : '<span class="ve-mg-esp"></span>'}${num(ct.id, 'v', it.v, ct.min != null ? `min="${ct.min}" max="${ct.max}"` : '')}</div>`;
         return `<div class="ve-pce${mudou ? ' mudou' : ''}">
             <div class="ve-pce-cab"><label>${veEsc(ct.nome)}</label>
                 ${mudou ? `<button class="ve-pce-volta" data-pce-volta="${ct.id}" title="${veT('Voltar ao valor do modelo')}">↺</button>` : ''}</div>
@@ -261,6 +274,55 @@ function veMogrtEssHtml(c, base) {
     }).join('') + `<small class="ve-pp-dica">${veT('Vale só para esta faixa, como no Premiere. Para mudar o modelo, abra a Comp (duplo clique).')}</small>`;
     return vePpSec(veT('Gráficos essenciais'), corpo);
 }
+
+// Arrastar os números/✥ e manter barra e número do mesmo campo juntos (o evento segue para o painel: editor-props.js)
+function veMogrtEssIniciar() {
+    if (window._veMgArrasto) return;
+    window._veMgArrasto = true;
+    const avisa = (el, tipo) => el.dispatchEvent(new Event(tipo, { bubbles: true }));
+    const par = el => el.closest('.ve-pce') && el.closest('.ve-pce').querySelectorAll(`[data-pce="${el.dataset.pce}"][data-campo="${el.dataset.campo}"]`);
+    document.addEventListener('input', e => {
+        const el = e.target;
+        if (!el.matches || !el.matches('.ve-mg-barra, .ve-mg-num')) return;
+        (par(el) || []).forEach(o => { if (o !== el) o.value = el.value; });
+    }, true);
+    document.addEventListener('pointerdown', e => {
+        if (e.button !== 0) return;
+        const pad = e.target.closest && e.target.closest('[data-mg-pad]');
+        const n = !pad && e.target.closest && e.target.closest('.ve-mg-num');
+        if (!pad && (!n || document.activeElement === n)) return;
+        e.preventDefault();
+        const linha = (pad || n).closest('.ve-mg-linha');
+        const alvos = pad ? [...linha.querySelectorAll('.ve-mg-num')] : [n];
+        const ini = alvos.map(a => parseFloat(String(a.value).replace(',', '.')) || 0);
+        const x0 = e.clientX, y0 = e.clientY;
+        let andou = false;
+        document.body.classList.add(pad ? 've-mg-movendo' : 've-kl-scrub');
+        const mover = ev => {
+            const dx = ev.clientX - x0, dy = ev.clientY - y0;
+            if (!andou && Math.abs(dx) + Math.abs(dy) < 3) return;
+            andou = true;
+            const k = ev.shiftKey ? 10 : ev.altKey ? 0.1 : 1;
+            alvos.forEach((a, i) => {
+                let v = ini[i] + (pad && i === 1 ? dy : dx) * k;
+                if (a.min !== '') v = Math.max(+a.min, v);
+                if (a.max !== '') v = Math.min(+a.max, v);
+                a.value = +v.toFixed(k < 1 ? 2 : 1);
+                avisa(a, 'input');
+            });
+        };
+        const soltar = () => {
+            document.removeEventListener('pointermove', mover);
+            document.removeEventListener('pointerup', soltar);
+            document.body.classList.remove('ve-mg-movendo', 've-kl-scrub');
+            if (andou) avisa(alvos[0], 'change');
+            else if (n) { n.focus(); n.select(); }
+        };
+        document.addEventListener('pointermove', mover);
+        document.addEventListener('pointerup', soltar);
+    }, true);
+}
+veMogrtEssIniciar();
 
 // ─────────── plano rápido (o que a exportação faz sem desenhar quadro a quadro) ───────────
 // A Comp guardada continua como a do After (mãe, fosco: editável igual); a sequência EFETIVA (prévia e exportação)

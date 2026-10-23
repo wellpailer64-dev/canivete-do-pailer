@@ -1444,6 +1444,28 @@ html.ve-float-html body { background: var(--bg-0); }
 .ve-pce-volta { border: 0; background: none; color: var(--ve-faint); font-size: 14px; cursor: pointer; padding: 0 2px; }
 .ve-pce-volta:hover { color: var(--ve-text); }
 .ve-pce .ve-pp-texto { min-height: 34px; }
+/* Gráficos essenciais do MOGRT (editor-mogrt.js): número arrastável + barra, como no Premiere */
+.ve-mg-linha { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ve-dim); }
+.ve-mg-linha > span:first-child:not(.ve-mg-pad) { min-width: 52px; }
+.ve-mg-linha > b { font-weight: 600; color: var(--ve-faint); font-size: 10.5px; }
+.ve-mg-linha > i { font-style: normal; color: var(--ve-faint); }
+.ve-mg-esp { flex: 1; }
+.ve-mg-barra { flex: 1; min-width: 40px; accent-color: var(--ve-accent); }
+.ve-mg-num {
+    width: 62px; min-width: 0; padding: 3px 5px; border-radius: 4px; border: 1px solid transparent; background: transparent;
+    color: var(--ve-accent); font: 600 12px var(--ve-mono); text-align: right; cursor: ew-resize; outline: none;
+    -moz-appearance: textfield;
+}
+.ve-mg-num::-webkit-inner-spin-button, .ve-mg-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.ve-mg-num:hover { background: var(--ve-panel-2); }
+.ve-mg-num:focus { cursor: text; background: var(--ve-bg); border-color: var(--ve-accent); color: var(--ve-text); }
+.ve-mg-linha > b + .ve-mg-num { flex: 1; text-align: left; }
+.ve-mg-pad {
+    width: 24px; height: 24px; display: grid; place-items: center; border-radius: 4px; border: 1px solid var(--ve-line-2);
+    background: var(--ve-bg); color: var(--ve-dim); font-size: 14px; cursor: move; user-select: none;
+}
+.ve-mg-pad:hover { color: var(--ve-accent); border-color: var(--ve-accent); }
+body.ve-mg-movendo, body.ve-mg-movendo * { cursor: move !important; }
 .ve-pp-botoes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .ve-pp-sep { width: 1px; height: 18px; background: var(--ve-line-2); margin: 0 4px; }
 .ve-pp-tog {
