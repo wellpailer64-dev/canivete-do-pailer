@@ -26,14 +26,19 @@ const SD_TEMAS = {
     corporativo: { nome: 'Corporativo', titulo: 'Montserrat', texto: 'Lato', cores: { fundo: '#ffffff', tinta: '#13294b', destaque: '#2f6fed', suave: '#eef2fb', apoio: '#56627a' } },
 };
 // apresentação pronta para editar: capa, seção, conteúdo, tópicos, número, citação e encerramento no tema
-function sdDocModelo(tema = 'claro', nome = 'Palestra') {
+// formatos de página: palestra 16:9 e documento (orçamento, contrato, informativo) em folha A4 — 1191 × 1684 px
+// = 595,5 × 842 pt no PDF (o _pdf crava o A4 exato); camadas em px como no 16:9
+const SD_FORMATOS = { '16:9': { nome: 'Apresentação 16:9', tam: [1920, 1080] }, a4: { nome: 'Documento A4 (em pé)', tam: [1191, 1684] }, a4_deitado: { nome: 'A4 deitado', tam: [1684, 1191] } };
+const sdTamFormato = f => (SD_FORMATOS[f] || SD_FORMATOS['16:9']).tam;
+function sdDocModelo(tema = 'claro', nome = 'Palestra', formato = '16:9') {
     const T = sdClone(SD_TEMAS[tema] || SD_TEMAS.claro); delete T.nome;
-    const d = { nome, largura: 1920, altura: 1080, tema: T, slides: [] };
-    for (const l of ['titulo', 'secao', 'titulo_texto', 'lista', 'imagem_lateral', 'numero', 'citacao', 'encerramento']) d.slides.push(sdNovoSlide(l, null, T));
+    const [W, H] = sdTamFormato(formato), d = { nome, largura: W, altura: H, tema: T, slides: [] };
+    for (const l of ['titulo', 'secao', 'titulo_texto', 'lista', 'imagem_lateral', 'numero', 'citacao', 'encerramento']) d.slides.push(sdNovoSlide(l, null, T, [W, H]));
     return d;
 }
-function sdNovoDoc(nome = 'Apresentação') {
-    return { nome, largura: 1920, altura: 1080, tema: sdClone(SD_TEMA), slides: [sdNovoSlide('titulo', null, SD_TEMA)] };
+function sdNovoDoc(nome = 'Apresentação', formato = '16:9') {
+    const [W, H] = sdTamFormato(formato);
+    return { nome, largura: W, altura: H, tema: sdClone(SD_TEMA), slides: [sdNovoSlide('titulo', null, SD_TEMA, [W, H])] };
 }
 const SD_LAYOUTS = {
     vazio: 'Em branco', titulo: 'Capa', titulo_texto: 'Título e texto', duas_colunas: 'Duas colunas', imagem_lateral: 'Imagem e texto',
@@ -58,7 +63,19 @@ function sdLegivel(cor, fundo, min = 3) {
     }
     return alvo;
 }
-function sdNovoSlide(layout = 'titulo_texto', ref = null, tema = null) {
+function sdNovoSlide(layout = 'titulo_texto', ref = null, tema = null, tam = null) {
+    const s = sdNovoSlide169(layout, ref, tema), [W, H] = tam || (SD.doc ? [SD.doc.largura, SD.doc.altura] : [1920, 1080]);
+    if (W === 1920 && H === 1080) return s;
+    // outra página (A4…): os layouts são desenhados em 1920 × 1080; tamanho pela largura, altura proporcional à página
+    const k = W / 1920, ky = H / 1080;
+    for (const c of s.camadas) {
+        const cheia = c.h >= 1080;
+        c.x = Math.round(c.x * k); c.w = Math.round(c.w * k); c.y = Math.round(cheia ? 0 : (c.y + c.h / 2) * ky - c.h * k / 2); c.h = Math.round(cheia ? H : c.h * k);
+        if (c.tam) c.tam = Math.max(8, Math.round(c.tam * k * 1.25));
+    }
+    return s;
+}
+function sdNovoSlide169(layout = 'titulo_texto', ref = null, tema = null) {
     const T = tema || (SD.doc && SD.doc.tema) || SD_TEMA, C0 = T.cores, tit = o => sdTxt({ fonte: T.titulo, peso: 600, entrelinha: 1.05, ...o }, T);
     const esc = sdLum(C0.fundo) < sdLum(C0.tinta) ? C0.fundo : C0.tinta, clr = esc === C0.fundo ? C0.tinta : C0.fundo;
     const sobreDest = sdLum(C0.destaque) > 0.35 ? esc : clr;   // texto em cima do destaque
@@ -379,9 +396,11 @@ function sdNova(tipo, a, padrao) {
     SD.sel = [c.id];
     return { id: c.id, slide: sdIdx(s) + 1 };
 }
-sdRegistrar('novo', 'documento novo {nome, layout}', a => { sdCarregar(sdNovoDoc(a.nome)); if (a.layout) SD.doc.slides[0] = sdNovoSlide(a.layout); return { slides: 1 }; }, { semDoc: true });
-sdRegistrar('modelo', 'apresentação pronta de 8 slides no tema {tema: claro|escuro|editorial|corporativo, nome}', a => {
-    sdCarregar(sdDocModelo(a.tema, a.nome)); return { slides: SD.doc.slides.length };
+sdRegistrar('novo', 'documento novo {nome, layout, formato: 16:9|a4|a4_deitado} (a4 = folha em pé de 1191×1684 px: orçamento, contrato, informativo)', a => {
+    sdCarregar(sdNovoDoc(a.nome || (a.formato === 'a4' ? 'Documento' : undefined), a.formato)); if (a.layout) SD.doc.slides[0] = sdNovoSlide(a.layout); return { slides: 1, largura: SD.doc.largura, altura: SD.doc.altura };
+}, { semDoc: true });
+sdRegistrar('modelo', 'apresentação pronta de 8 slides no tema {tema: claro|escuro|editorial|corporativo, nome, formato: 16:9|a4|a4_deitado}', a => {
+    sdCarregar(sdDocModelo(a.tema, a.nome, a.formato)); return { slides: SD.doc.slides.length };
 }, { semDoc: true, leitura: true });
 sdRegistrar('mapa', 'resumo do documento (slides e camadas)', () => sdMapa(), { leitura: true });
 sdRegistrar('slide_novo', 'slide novo {layout, depois (nº)}', a => {
@@ -556,7 +575,7 @@ sdRegistrar('tema', 'tema {titulo (fonte), texto (fonte), cores: {fundo, tinta, 
     }
     return { tema: T };
 });
-sdRegistrar('cena', 'monta o slide com HTML/CSS (1920×1080): {html, slide, novo, limpar}', a => sdCena(a.html, a));
+sdRegistrar('cena', 'monta o slide com HTML/CSS no tamanho da página (1920×1080; A4 = 1191×1684): {html, slide, novo, limpar}', a => sdCena(a.html, a));
 
 // ───────────── HTML/CSS → camadas (para o agente montar slides inteiros de uma vez) ─────────────
 async function sdCena(html, op = {}) {
@@ -581,13 +600,17 @@ async function sdCena(html, op = {}) {
     const anda = async el => {
         for (const f of el.children) {
             const cs = getComputedStyle(f); if (cs.display === 'none') continue;
-            const b = caixa(f), nome = f.dataset.nome || f.id || undefined, rot = +((cs.transform.match(/rotate\(([-\d.]+)deg/) || [])[1] || 0);
+            // giro: o estilo calculado vem como matrix(a, b, …); a caixa da camada é a do elemento SEM giro, no mesmo centro
+            const mt = cs.transform.match(/^matrix\(([-\d.e]+),\s*([-\d.e]+)/), rot = mt ? Math.round(Math.atan2(+mt[2], +mt[1]) * 180 / Math.PI) : 0;
+            let b = caixa(f);
+            if (rot) { const cx = b.x + b.w / 2, cy = b.y + b.h / 2, ow = f.offsetWidth, oh = f.offsetHeight; b = { x: Math.round(cx - ow / 2), y: Math.round(cy - oh / 2), w: ow, h: oh }; }
+            const nome = f.dataset.nome || f.id || undefined;
             const fundoOk = cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)';
             const grad = /gradient/.test(cs.backgroundImage);
             if (f.tagName === 'IMG' || f.tagName === 'VIDEO') {
                 const src = f.dataset.src || f.getAttribute('src');
                 const r = await sdMidiaCmd(f.tagName === 'IMG' ? 'imagem' : 'video', { src, ...b, slide: sdIdx(s) + 1, nome, raio: parseFloat(cs.borderTopLeftRadius) || 0,
-                    ajuste: { contain: 'conter', fill: 'esticar' }[cs.objectFit] || 'cobrir', ...(f.tagName === 'VIDEO' ? { loop: f.loop, mudo: f.muted, auto: true } : {}) });
+                    ajuste: { contain: 'conter', fill: 'esticar' }[cs.objectFit] || 'cobrir', opac: +cs.opacity, rot, ...(f.tagName === 'VIDEO' ? { loop: f.loop, mudo: f.muted, auto: true } : {}) });
                 novos.push(r.id); continue;
             }
             if (fundoOk || grad || parseFloat(cs.borderTopWidth) > 0) {

@@ -4856,12 +4856,21 @@ function veApplyProject() {
                 Object.assign(nm, { offline: true, missing: true, erro: 'Mídia offline' });
                 return;
             }
-            window.pywebview.api.video_cutter_add_audio(m.path).then(r => {
-                if (!r || !r.success) return;
+            // falhou ao abrir (a trilha nova do CULTSP 04 ficou muda, sem forma de onda, 2026-10-23): tenta de novo
+            // 2 vezes e, se não der, avisa e marca a mídia — antes desistia em silêncio
+            const carregar = tent => window.pywebview.api.video_cutter_add_audio(m.path).then(r => {
+                if (!r || !r.success) {
+                    if (tent < 2) return setTimeout(() => carregar(tent + 1), 1500 * (tent + 1));
+                    nm.erro = (r && r.error) || 'Não foi possível ler o áudio';
+                    veToast(`${nm.name}: ${veT('o áudio não carregou')} (${nm.erro})`);
+                    return;
+                }
                 Object.assign(nm, { dur: r.dur, peaks: r.peaks || [], url: r.url, quadros: r.quadros });
+                delete nm.erro;
                 veAudioRegistrar(nm.id, r.url, r.quadros);
                 veDraw();
-            });
+            }).catch(e => { if (tent < 2) setTimeout(() => carregar(tent + 1), 1500 * (tent + 1)); else nm.erro = String(e); });
+            carregar(0);
             return;
         }
         const nm = { id: VE.media.length, kind: 'image', path: m.path, name: m.name, img: new Image(), w: m.w || 0, h: m.h || 0, ...org };

@@ -282,7 +282,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/plano-cena.md` — Plano CENA — diagramar no Photo Kanivete escrevendo HTML/CSS (para IAs)
 - `Instructions/agente/plano-comp.md` — Plano: Comp (composição estilo After Effects) no Pocket Editor
 - `Instructions/agente/plano-economia-ponte-vetor-photo.md` — Planos (2026-10-04): economia de tokens, ponte Vetor ↔ Photo, nível "Herbíssimo"
-- `Instructions/agente/plano-estabilizador.md` — Estabilizador (melhor que o Warp Stabilizer) — PENDENTE
+- `Instructions/agente/plano-estabilizador.md` — Estabilizador (melhor que o Warp Stabilizer) — EM PESQUISA (rodada 1 feita 2026-10-22)
 - `Instructions/agente/plano-identidade-pocket.md` — Plano — Identidade visual "pocket" (teste da missão, iniciado 2026-10-15)
 - `Instructions/agente/plano-kanivete-encoder.md` — Kanivete Encoder (Ke) — plano (rodada 1 de otimização FEITA em 2026-10-08; pendências no fim)
 - `Instructions/agente/plano-motion.md` — Motion no Editor Kanivete (recursos do After Effects)
@@ -290,6 +290,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/plugins.md` — Plugins no KANIVETE
 - `Instructions/agente/ponte-premiere.md` — Ponte Kanivete ↔ Premiere Pro (plugin UXP "Kanivete Ponte")
 - `Instructions/agente/remover-fundo.md` — Remover fundo (recorte) — velocidade × qualidade (2026-10-06)
+- `Instructions/agente/tecnicas-de-montagem.md` — Técnicas de montagem: cortes, transições, storytelling e tempo de tela
 - `Instructions/agente/teste-4k.md` — Teste de 4K (estresse do Editor de Vídeo)
 - `Instructions/agente/worker.md` — Canivete Worker — o assistente local (para o Claude delegar operações)
 - `Instructions/build.md` — Guia de Build (Geração do Executável)
@@ -444,6 +445,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_export.py` — teste_export.py — Confere a exportação do editor contra a prévia, quadro a quadro, e reprova se divergir
 - `testes/teste_fila.py` — Fila de render do Editor (editor-fila.js) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila),
 - `testes/teste_filtros.py` — Aplica cada filtro do menu Filtro (valores padrão) numa foto e mede; confere que mudou a imagem e não deu erro
+- `testes/teste_fisica_timeline.py` — Física da timeline (2026-10-22): centenas de edições aleatórias em várias trilhas (cortes, arrastes, aparos com o
 - `testes/teste_fonte.py` — Criar fonte própria no Vetor Kanivete (Texto › Criar fonte) — app em --agente=9333
 - `testes/teste_galeria.py` — Filtro > Galeria de filtros (app em --agente=9333). Abre a janela, espera as miniaturas, troca de filtro, empilha
 - `testes/teste_generativo.py` — Preenchimento generativo e Expansão generativa do Photo Kanivete (FLUX.2 klein local) — app em --agente=9333

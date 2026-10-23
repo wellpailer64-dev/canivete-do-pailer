@@ -104,6 +104,8 @@ Timeline de áudio, fades, volume em LUFS, gravação pelo microfone, reparo e s
 salvas, conversa a duas vozes e editar o áudio pelo texto. Projetos .sknv.
 
 ## Slider Kanivete (apresentações 16:9, estilo PowerPoint)
+Também faz documentos em folha A4 em pé (orçamento, contrato, informativo): no início do Slider, "Novo documento A4"
+(ou Arquivo › Novo documento A4). O PDF sai no tamanho exato do papel, pronto para imprimir.
 Slides com camadas, temas, gráficos editáveis, vídeo e GIF, animações e transições, modo apresentação (F5) com notas do
 apresentador (N). Abre PowerPoint (.pptx) e PDF. Exportar (botão Exportar, em cima à direita): "Apresentação para
 qualquer aparelho (.html)" — um arquivo só que abre no celular, Mac, tablet ou TV pelo navegador, com controles, PageUp e

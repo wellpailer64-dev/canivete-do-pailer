@@ -149,6 +149,11 @@ Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lu
   experimentar… eu gosto") e "montagem" (B-roll do preparo na batida com a música em cima). Trilha acústica (Gil Felix,
   afoxê) soa ~7 dB abaixo da eletrônica nos mesmos −9/−21 dB → g +6 nos clipes de trilha; medir o render por trecho.
   Fecho que retoma a abertura (fachada à noite) funciona como moldura.
+- 2026-10-23 CULTSP PRO 04 Roadie/Direção de Palco (V1→V2, `D:/kanivete_testes/cultsp4/scripts`). NOTA DO PAILER: "mania de
+  pôr muito B-roll em cima da primeira apresentação; demora muito pra mostrar quem está falando". Regra: a 1ª aparição de
+  cada pessoa é ROSTO (sem ponte de B-roll, ~11 s antes do 1º plano), inclusive a fala de abertura (nada de B-roll
+  cobrindo a apresentação inteira); depois um plano de B-roll por vez entre ~6 s de rosto. Trilha CULTSP desse tema:
+  boom bap com ritmo + lofi oldschool, "descolado" (Epidemic: busca JSON + botão Download pelo `kb.py js`).
 - 2026-10-15 QUIZ CARLINHOS v2 ("perfeito, to exportando"): erros de gravação foram para o FIM (gancho = fala final
   "E é isso" → whoosh + leak → REC → cartela final); piada esticada até o fim das risadas; cartela só com o texto da
   pergunta (sem "Pergunta N"); LEGENDA NUNCA ATRAVESSA CORTE DE CÂMERA (separar pelas palavras no corte = cada pessoa

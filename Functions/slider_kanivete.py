@@ -149,6 +149,11 @@ def _pdf(qs, caminho, doc):
     import fitz
     slides = [s for s in doc.get("slides", []) if not s.get("oculto")]
     W, H = float(doc.get("largura", 1920)) * .5, float(doc.get("altura", 1080)) * .5
+    # folha A4 (documento do Slider: 1191 × 1684 px): página no tamanho exato do papel, para imprimir sem escala
+    for a, b in ((595.28, 841.89), (841.89, 595.28)):
+        if abs(W / H - a / b) < .005:
+            W, H = a, b
+    e = W / float(doc.get("largura", 1920))
     pdf, toc = fitz.open(), []
     for k, q in enumerate(qs):
         pg = pdf.new_page(width=W, height=H)
@@ -161,8 +166,8 @@ def _pdf(qs, caminho, doc):
             if not t:
                 continue
             titulo = titulo or t.split("\n")[0][:80]
-            r = fitz.Rect(float(c.get("x", 0)) * .5, float(c.get("y", 0)) * .5, (float(c.get("x", 0)) + float(c.get("w", 100))) * .5, (float(c.get("y", 0)) + float(c.get("h", 40)) + 400) * .5)
-            fz = max(4.0, float(c.get("tam", 40)) * .5)
+            r = fitz.Rect(float(c.get("x", 0)) * e, float(c.get("y", 0)) * e, (float(c.get("x", 0)) + float(c.get("w", 100))) * e, (float(c.get("y", 0)) + float(c.get("h", 40)) + 400) * e)
+            fz = max(4.0, float(c.get("tam", 40)) * e)
             for _ in range(8):   # insert_textbox não escreve nada se não couber: diminui até caber
                 if pg.insert_textbox(r, t, fontsize=fz, fontname="helv", render_mode=3, align={"centro": 1, "dir": 2, "just": 3}.get(c.get("alin"), 0)) >= 0:
                     break

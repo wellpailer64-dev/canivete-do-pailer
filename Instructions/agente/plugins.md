@@ -180,7 +180,9 @@ senha = qualquer programa do PC comanda o navegador logado; o Claude Code bloque
 Behance, Instagram, Drive, WhatsApp, Pandalab), abas, prévia, "Pegar imagens da página" → marcar → baixar em
 `<demanda>/02 - ASSETS/REFERENCIAS` (demandas com pasta = `pandalab/vinculos.json`), print, copiar texto. Agente:
 `py -3.13 D:\Kanivete\Plugins\kanibrowser\kb.py estado|abrir|ir|imagens|baixar --demanda ID8|texto|foto [--porta 9333]`
-— passa pelo app em modo agente (`KPLUG.chamar`); também `instagram @perfil`, `link <url> --demanda ID8` (Drive público direto, resto pelo navegador → 02 - ASSETSMATERIAL), `pesquisar "termo"` (DuckDuckGo: o Google dá captcha). Pinterest pede login. Teste:
+— **preferência (2026-10-23): o navegador embutido do KaniCode** (função `painel` abre o 🌐 à vista; a vista vai para a
+aba da Kani 2 s depois do último clique do Pailer; brilho verde-limão em volta da página enquanto ela trabalha, `.trab` em
+`kanicode/ui/navegador.css`); só sem o KaniCode aberto passa pelo app em modo agente (`KPLUG.chamar`); também `instagram @perfil`, `link <url> --demanda ID8` (Drive público direto, resto pelo navegador → 02 - ASSETSMATERIAL), `pesquisar "termo"` (DuckDuckGo: o Google dá captcha). Pinterest pede login. Teste:
 `D:\kanivete_testes\scripts\teste_kanibrowser.py` (porta 9333).
 **Tudo dentro do Kanivete** (2026-10-19, `visao.py`): nenhuma janela do Chrome aparece — todas ficam à esquerda de todos
 os monitores (`_fora`, calculado pela área virtual: o Pailer tem vários monitores), fora da barra de tarefas e do Alt+Tab

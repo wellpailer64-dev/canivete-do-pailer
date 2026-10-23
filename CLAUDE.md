@@ -221,7 +221,8 @@ Laboratório Panda → `py -3.13 D:\Kanivete\Plugins\pandalab\panda.py demandas 
 `baixar <id8>` (pasta certa do cliente pelo `mapa_clientes.json`); volta: `status <id> --status in_progress --sim`, `comentar <id> --descricao ".." --sim`, entrega pelo site ("Pegar os finais da pasta", `finais <id>`). Card real: confirmar com o Pailer; teste = card "[TESTE] …" cliente PandaLab.
 Segurança do sistema Pandalab (tabelas abertas sem login): `01 - PANDA LAB/00 - Sistema Pandalab/SEGURANCA-PLANO.md`.
 **KaniBrowser** (`D:\Kanivete\Plugins\kanibrowser`): Chrome do Kanivete por canal privado (pipe, sem porta), logins
-guardados; `kb.py imagens|baixar --demanda ID8|texto|foto` pelo app em modo agente. Postar/enviar/clicar em site de
+guardados; `kb.py imagens|baixar --demanda ID8|texto|foto` vai PRIMEIRO ao navegador embutido do KaniCode (painel 🌐,
+ao vivo, brilho verde-limão enquanto a Kani mexe); KANIVETE em modo agente só sem o KaniCode aberto. Postar/enviar/clicar em site de
 terceiros só com o ok do Pailer.
 
 ## Tela da 1ª instalação

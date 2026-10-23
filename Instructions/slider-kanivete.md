@@ -23,6 +23,12 @@ manual e por agente pelos MESMOS comandos, leve e fiel na exportação. Criado e
 
 ## Modelo
 `doc = {nome, largura: 1920, altura: 1080, tema: {titulo, texto, cores: {fundo, tinta, destaque, suave, apoio}}, slides: [...]}`
+**Documento A4** (2026-10-22: orçamento, contrato, informativo): `SDK.cmd('novo', {formato: 'a4'})` (ou `a4_deitado`; lobby e
+Arquivo › "Novo documento A4") = página de 1191 × 1684 px (`SD_FORMATOS`); o PDF crava o A4 exato (595 × 842 pt, texto
+pesquisável); layouts de slide são adaptados pela largura; `cena` no tamanho da página; o revisor usa mínimo de 13 px
+(papel) em vez do de telão. Modelo de orçamento Pandalab (barra preta lateral, "Orçamento" vertical laranja, tabela,
+caixas subtotal/desconto/total): `01 - PANDA LAB/00 - PANDA THINGS/MODELOS DE DOCUMENTO/Modelo_Orcamento_Pandalab_A4.dknv`;
+HTML de partida em `D:/kanivete_testes/orc_a4/modelo.html` (`sd.py cena … --substituir 1`).
 `slide = {id, fundo: {tipo: cor|degrade|imagem, cor, cor2, angulo, img, ajuste, escurecer}, transicao: {tipo, dur}, dur (s no MP4), notas, oculto, camadas}`
 `camada = {id, tipo: texto|forma|imagem|video|grafico, nome, x, y, w, h, rot, opac, mescla, sombra {x,y,desf,cor}, desfoque, oculto, trava, grupo, anim {tipo, dur, atraso, clique}}`
 - gráfico: `grafico` colunas|barras|empilhadas|linha|area|pizza|rosca|progresso|trilhas|waffle|funil, `rotulos [..]`, `series [{nome, valores, cor?}]`,

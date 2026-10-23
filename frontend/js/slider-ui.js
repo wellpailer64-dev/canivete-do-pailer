@@ -121,7 +121,7 @@ function sdLobby() {
           <p>Slides 16:9 com camadas, vídeo e GIF, temas prontos e modo apresentação. Abra um PowerPoint, comece de um modelo ou do zero, e exporte em PDF, PPTX, PNG ou vídeo.</p></div>
         <div class="kl-acoes"><button class="ie-btn ie-btn-primario kl-novo" data-sdl="nova"><svg class="i"><use href="#i-file"/></svg> Nova apresentação</button>
           <div class="kl-mais"><button class="ie-btn" data-sdl="abrir"><svg class="i"><use href="#i-folder"/></svg> Abrir…</button>
-          <button class="ie-btn" data-sdl="pptx">Importar PowerPoint ou PDF…</button><button class="ie-btn" data-sdl="kani" title="A Kani escreve o roteiro e o Slider monta no tema">✨ Criar com a Kani…</button></div></div></div>
+          <button class="ie-btn" data-sdl="a4" title="Folha A4 em pé: orçamento, contrato, informativo">Novo documento A4</button><button class="ie-btn" data-sdl="pptx">Importar PowerPoint ou PDF…</button><button class="ie-btn" data-sdl="kani" title="A Kani escreve o roteiro e o Slider monta no tema">✨ Criar com a Kani…</button></div></div></div>
       <div class="sd-modelos"><div class="ie-recentes-tit">Modelos</div><div class="sd-modelos-lista">${Object.entries(SD_TEMAS).map(([k, t]) => `
         <button class="sd-modelo" data-sdl="tema:${k}" style="--f:${t.cores.fundo};--t:${t.cores.tinta};--d:${t.cores.destaque}">
           <span class="sd-modelo-arte"><i style="font-family:'${t.titulo}'">Aa</i><em></em></span><b>${t.nome}</b><small>${t.titulo} · ${t.texto}</small></button>`).join('')}</div></div>
@@ -135,7 +135,7 @@ function sdLobby() {
         el.addEventListener('click', async e => {
             const b = e.target.closest('[data-sdl]'); if (!b) return;
             const a = b.dataset.sdl;
-            if (a === 'nova') { if (await sdPodeDescartar()) { await sdUi('novo', {}); sdMostrarEditor(); } }
+            if (a === 'nova' || a === 'a4') { if (await sdPodeDescartar()) { await sdUi('novo', a === 'a4' ? { formato: 'a4' } : {}); sdMostrarEditor(); } }
             else if (a === 'abrir' || a === 'pptx') { const r2 = await sdUi('abrir', a === 'pptx' ? { caminho: await sdApi().vk_dialogo('abrir', ['PowerPoint ou PDF (*.pptx;*.pdf)', 'PowerPoint (*.pptx)', 'PDF (*.pdf)']) || '' } : {}); if (r2 && !r2.cancelado) { sdRelatorio(r2); sdMostrarEditor(); } }
             else if (a === 'kani') { sdKaniAbrir(b); }
             else if (a === 'continuar') { if (!SD.doc) { const r3 = sdRascunho(); await sdPrepararUrls(r3.doc); sdCarregar(r3.doc, r3.arquivo); SD.sujo = !!r3.sujo; } sdMostrarEditor(); }
@@ -228,7 +228,7 @@ function sdItensMenu(m) {
         ['PowerPoint editável (.pptx)', '', () => sdExportarPptx()], ['PowerPoint em imagens (.pptx)', '', () => sdExportarUi('pptx_imagens')],
         ['Imagens PNG (um por slide)', '', () => sdExportarUi('png')], ['Vídeo MP4 (animações, transições e vídeos)', '', () => sdExportarUi('mp4')], ['Slide atual em PNG', '', () => sdExportarUi('png', { slides: 'atual' })]];
     const L = {
-        arquivo: [['Nova apresentação', 'Ctrl+N', async () => { if (await sdPodeDescartar()) sdUi('novo', {}); }], ['Abrir…', 'Ctrl+O', async () => { const r = await sdUi('abrir', {}); sdRelatorio(r); }],
+        arquivo: [['Nova apresentação', 'Ctrl+N', async () => { if (await sdPodeDescartar()) sdUi('novo', {}); }], ['Novo documento A4', '', async () => { if (await sdPodeDescartar()) sdUi('novo', { formato: 'a4' }); }],['Abrir…', 'Ctrl+O', async () => { const r = await sdUi('abrir', {}); sdRelatorio(r); }],
             ['Importar PowerPoint ou PDF…', '', async () => { const p = await sdApi().vk_dialogo('abrir', ['PowerPoint ou PDF (*.pptx;*.pdf)', 'PowerPoint (*.pptx)', 'PDF (*.pdf)']); if (p && await sdPodeDescartar()) sdRelatorio(await sdUi('abrir', { caminho: p })); }],
             ...(rec.length ? [['—Recentes'], ...rec.slice(0, 6).map(p => [sdNomeArq(p), '', () => sdUi('abrir', { caminho: p })])] : []),
             ['-'], ['Salvar', 'Ctrl+S', () => sdSalvarUi()], ['Salvar como…', 'Ctrl+Shift+S', () => sdSalvarUi(true)], ['-'], ['—Exportar'], ...exp, ['-'], ['Fechar (voltar ao início)', '', sdFechar]],

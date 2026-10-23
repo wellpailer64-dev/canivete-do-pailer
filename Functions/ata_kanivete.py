@@ -18,6 +18,7 @@ Sessão = pasta <dados>/Ata Kanivete/<AAAA-MM-DD_HHMMSS> com eu.webm, outros.web
 import base64
 import datetime
 import difflib
+import hashlib
 import json
 import os
 import re
@@ -39,7 +40,7 @@ MODELOS = {
     "voz": ("https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/"
             "wespeaker_en_voxceleb_resnet34_LM.onnx", "voz.onnx", 26),
 }
-BLOCO_PALAVRAS = 2200     # a Kani tem 8 mil tokens de contexto: reunião maior vai em blocos
+BLOCO_PALAVRAS = 900     # a Kani tem 8 mil tokens de contexto: reunião maior vai em blocos
 
 
 def pasta():
@@ -501,7 +502,7 @@ _asr = {}
 VAD_REUNIAO = {"min_silence_duration_ms": 350, "speech_pad_ms": 150, "max_speech_duration_s": 12}
 
 
-def _transcrever(wav, stop=None):
+def _transcrever(wav, stop=None, prog=lambda p, m: None):
     import gc
     from Functions import legendas
     if not legendas.modelo_pronto("pt"):
@@ -512,7 +513,11 @@ def _transcrever(wav, stop=None):
         m = onnx_asr.load_model(legendas.MODELOS["pt"]["tipo"], legendas._pasta("pt"), quantization="int8", providers=legendas.CPU)
         _asr["m"] = m.with_vad(vad, **VAD_REUNIAO).with_timestamps()
     palavras = []
-    for ini, x in legendas._pedacos(wav):
+    total = max(_duracao(wav), 1)
+    for ini, x in legendas._pedacos(wav, pedaco=30):
+        if stop is not None and stop.is_set():
+            raise InterruptedError
+        prog(min(99, int(100 * ini / total)), "Transcrevendo o áudio...")
         for seg in _asr["m"].recognize(x, sample_rate=16000):
             if stop is not None and stop.is_set():
                 raise InterruptedError
@@ -593,6 +598,14 @@ def processar(sid, prog=lambda p, m: None, stop=None):
     _em_processo.add(sid)
     _salvar_doc(d, doc)
     try:
+        if doc.get("turnos"):
+            prog(70, "Transcrição salva encontrada; retomando a escrita da ATA...")
+            doc["ata"] = escrever_ata(doc, prog, stop)
+            doc["titulo"] = doc["ata"].get("titulo") or doc.get("titulo", "")
+            doc["estado"] = "pronta"
+            _salvar_doc(d, doc)
+            prog(100, "ATA pronta")
+            return {"success": True, "doc": doc}
         palavras = []           # [ini, fim, texto, spk]
         eu_webm, out_webm = os.path.join(d, "eu.webm"), os.path.join(d, "outros.webm")
         glossario = doc.get("glossario") or []
@@ -600,14 +613,15 @@ def processar(sid, prog=lambda p, m: None, stop=None):
             prog(5, "Transcrevendo a sua voz...")
             w = os.path.join(d, "_eu16.wav")
             _wav16(eu_webm, w)
-            palavras += [p + ["eu"] for p in _transcrever(w, stop)]
+            palavras += [p + ["eu"] for p in _transcrever(
+                w, stop, lambda p, m: prog(5 + int(p * 0.19), f"Sua voz: {p}% transcrito"))]
             os.remove(w)
         falantes = {"eu": doc.get("eu") or "Eu"} if palavras else {}
         if os.path.isfile(out_webm):
             prog(25, "Transcrevendo os outros participantes...")
             w = os.path.join(d, "_outros16.wav")
             _wav16(out_webm, w)
-            ow = _transcrever(w, stop)
+            ow = _transcrever(w, stop, lambda p, m: prog(25 + int(p * 0.24), f"Outros participantes: {p}% transcrito"))
             if ow:
                 prog(50, "Separando as vozes...")
                 segs = _separar(w, prog)
@@ -629,8 +643,8 @@ def processar(sid, prog=lambda p, m: None, stop=None):
                 for p in ow:
                     m = (p[0] + p[1]) / 2
                     dentro = [s for s in segs if s["ini"] - 0.2 <= m <= s["fim"] + 0.2] or segs
-                    s = min(dentro, key=lambda s: 0 if s["ini"] <= m <= s["fim"] else min(abs(m - s["ini"]), abs(m - s["fim"])))
-                    palavras.append(p + [f"p{s['spk']}" if segs else "p0"])
+                    s = min(dentro, key=lambda s: 0 if s["ini"] <= m <= s["fim"] else min(abs(m - s["ini"]), abs(m - s["fim"]))) if dentro else None
+                    palavras.append(p + [f"p{s['spk']}" if s else "p0"])
                 if not segs:
                     falantes["p0"] = "Pessoa 1"
             os.remove(w)
@@ -725,6 +739,27 @@ def transcricao_texto(doc):
     return "\n".join(f"[{int(i // 60):02d}:{int(i % 60):02d}] {n}: {tx}" for i, n, _, tx in linhas)
 
 
+def _ata_valida(valor):
+    if not isinstance(valor, dict):
+        return False
+    for campo, regra in SCHEMA["properties"].items():
+        v = valor.get(campo)
+        if regra["type"] == "string":
+            if not isinstance(v, str):
+                return False
+        elif not isinstance(v, list):
+            return False
+        else:
+            item = regra["items"]
+            for x in v:
+                if item["type"] == "string" and not isinstance(x, str):
+                    return False
+                if item["type"] == "object" and (not isinstance(x, dict) or
+                        any(not isinstance(x.get(k), str) for k in item["required"])):
+                    return False
+    return True
+
+
 def escrever_ata(doc, prog=lambda p, m: None, stop=None):
     from Functions import kani
     from Functions.kani_maos import _llm_json
@@ -741,28 +776,81 @@ def escrever_ata(doc, prog=lambda p, m: None, stop=None):
     cab = f"Participantes: {', '.join(dict.fromkeys(fal.values()))}\n"
     if doc.get("glossario"):
         cab += f"Glossário (escreva exatamente assim): {', '.join(doc['glossario'])}\n"
-    linhas = transcricao_texto(doc).split("\n")
+    # Limites por palavras E caracteres: nomes, horários e falas longas também ocupam contexto.
     blocos, atual, n = [], [], 0
-    for l in linhas:
-        atual.append(l)
-        n += len(l.split())
-        if n >= BLOCO_PALAVRAS:
-            blocos.append(atual)
+    for palavra in transcricao_texto(doc).split():
+        if atual and (len(atual) >= BLOCO_PALAVRAS or n + len(palavra) + 1 > 6500):
+            blocos.append(" ".join(atual))
             atual, n = [], 0
+        atual.append(palavra)
+        n += len(palavra) + 1
     if atual:
-        blocos.append(atual)
-    if len(blocos) == 1:
-        return _llm_json(sistema, cab + "\nTranscrição:\n" + "\n".join(blocos[0]), SCHEMA, 2000)
-    # reunião longa: uma ATA parcial por bloco, depois a Kani junta as parciais numa só
-    parciais = []
-    for i, b in enumerate(blocos):
+        blocos.append(" ".join(atual))
+    if not blocos:
+        raise RuntimeError("Não há transcrição salva para escrever a ATA.")
+    assinatura = hashlib.sha256(json.dumps([sistema, cab, blocos, SCHEMA, 2], ensure_ascii=False).encode()).hexdigest()
+    caminho = os.path.join(pasta(), doc["id"], "ata_partes.json") if doc.get("id") else None
+    cache = {"assinatura": assinatura, "partes": {}}
+    if caminho and os.path.isfile(caminho):
+        try:
+            with open(caminho, encoding="utf-8") as f:
+                salvo = json.load(f)
+            if salvo.get("assinatura") == assinatura and isinstance(salvo.get("partes"), dict):
+                cache = salvo
+        except (OSError, ValueError):
+            pass
+
+    def gerar(chave, instrucao, entrada, p, mensagem):
         parou()
-        prog(70 + 20 * i / len(blocos), f"A Kani está lendo a parte {i + 1} de {len(blocos)}...")
-        parciais.append(_llm_json(sistema, cab + f"\nTranscrição (parte {i + 1} de {len(blocos)}):\n" + "\n".join(b), SCHEMA, 1500))
-    parou()
-    prog(92, "Juntando as partes da ATA...")
-    return _llm_json(sistema + " Agora você recebe ATAs parciais de partes seguidas da MESMA reunião: junte numa ATA só, "
-                     "sem repetir itens.", cab + "\nATAs parciais:\n" + json.dumps(parciais, ensure_ascii=False), SCHEMA, 2000)
+        salvo = cache["partes"].get(chave)
+        if _ata_valida(salvo):
+            prog(p, mensagem + " (parte salva)")
+            return salvo
+        for tentativa, limite in enumerate((2200, 3000)):
+            parou()
+            prog(p, mensagem + (" (nova tentativa: resposta incompleta)" if tentativa else ""))
+            try:
+                ocupado = kani._srv.get("ocupado", False)
+                kani._srv.update(ocupado=True, uso=time.time())
+                kani._marcar_uso()
+                try:
+                    resposta = _llm_json(instrucao + " Responda em JSON completo, com textos objetivos e sem repetir itens.",
+                                         entrada, SCHEMA, limite)
+                finally:
+                    kani._srv.update(ocupado=ocupado, uso=time.time())
+                    kani._marcar_uso()
+                if not _ata_valida(resposta):
+                    raise ValueError("estrutura incompleta")
+                parou()
+                cache["partes"][chave] = resposta
+                if caminho:
+                    with open(caminho + ".tmp", "w", encoding="utf-8") as f:
+                        json.dump(cache, f, ensure_ascii=False)
+                    os.replace(caminho + ".tmp", caminho)
+                return resposta
+            except (ValueError, TypeError) as e:
+                if tentativa:
+                    raise RuntimeError("A Kani devolveu uma ATA incompleta. As partes concluídas estão salvas; tente Reescrever para continuar.") from e
+
+    parciais = []
+    for i, bloco in enumerate(blocos):
+        parciais.append(gerar(f"parte-{i}", sistema, cab + "\nTranscrição:\n" + bloco,
+                             70 + int(20 * i / len(blocos)), f"Escrevendo parte {i + 1} de {len(blocos)}..."))
+    # Junta aos pares para não exceder o contexto ao reunir uma reunião longa.
+    nivel = 0
+    while len(parciais) > 1:
+        seguintes = []
+        for i in range(0, len(parciais), 2):
+            grupo = parciais[i:i + 2]
+            if len(grupo) == 1:
+                seguintes.append(grupo[0])
+                continue
+            seguintes.append(gerar(f"uniao-{nivel}-{i}", sistema + " Junte estas ATAs de partes seguidas da MESMA reunião, sem repetir itens.",
+                                   cab + "\nATAs parciais:\n" + json.dumps(grupo, ensure_ascii=False),
+                                   92, f"Juntando partes da ATA (etapa {nivel + 1}, grupo {i // 2 + 1})..."))
+        parciais = seguintes
+        nivel += 1
+    return parciais[0]
 
 
 # ───────────────────────── PDF no modelo padrão ─────────────────────────

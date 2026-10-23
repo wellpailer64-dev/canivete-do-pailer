@@ -68,7 +68,8 @@ async function sdRevisar(op = {}) {
             else if (!+c.rot && (c.x < -2 || c.y < -2 || c.x + c.w > W + 2 || c.y + c.h > H + 2) && c.tipo === 'texto') add(s, c, 'corte', 'texto passa da borda do slide');
             if (c.tipo === 'texto' && !sdDecorativo(c)) {
                 const m = med[c.id]; if (m && m.alt > c.h + 4) add(s, c, 'estouro', `texto pede ${Math.ceil(m.alt)} px de altura e a caixa tem ${Math.round(c.h)} (aumente h para ${Math.ceil(m.alt)} ou diminua o tam)`);
-                if ((+c.tam || 40) < 22 && sdTextoPuro(c).trim()) add(s, c, 'pequeno', `letra de ${c.tam}px fica ilegível no telão (mínimo ~24)`);
+                // página em pé (A4) é papel: 13 px ≈ 6,5 pt impresso; no 16:9 é telão
+                if (SD.doc.altura > SD.doc.largura ? (+c.tam || 40) < 13 : (+c.tam || 40) < 22 && sdTextoPuro(c).trim()) add(s, c, 'pequeno', SD.doc.altura > SD.doc.largura ? `letra de ${c.tam}px fica pequena no papel (mínimo ~13)` : `letra de ${c.tam}px fica ilegível no telão (mínimo ~24)`);
                 const atras = c.fundo || [...vis.slice(0, vis.indexOf(c))].reverse().find(o => o.tipo === 'forma' && o.preench && o.preench !== 'none' && o.x <= c.x + 2 && o.y <= c.y + 2 && o.x + o.w >= c.x + c.w - 2 && o.y + o.h >= c.y + c.h - 2)?.preench || fundo;
                 if (atras && /^#/.test(sdCorHex(atras)) && c.cor && sdContraste(sdHex6(c.cor), sdHex6(atras)) < 3) add(s, c, 'contraste', `contraste ${sdContraste(sdHex6(c.cor), sdHex6(atras)).toFixed(1)}:1 entre ${c.cor} e ${atras} (mínimo 3, ideal 4,5)`);
             }
