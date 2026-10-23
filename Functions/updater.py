@@ -213,6 +213,7 @@ def apply_update(info, callback_progresso=None):
     bat = os.path.join(tmp, "aplicar_update.bat")
     with open(bat, "w", encoding="utf-8") as f:
         f.write(f"""@echo off
+set "PATH=%SystemRoot%\\System32;%SystemRoot%;%SystemRoot%\\System32\\Wbem;%PATH%"
 chcp 65001 >nul
 title Atualizando KANIVETE...
 echo [%time%] instalador iniciado > "{log}"
@@ -253,13 +254,18 @@ start "" "{exe}"
     # O app reaberto não pode herdar as variáveis internas do PyInstaller deste processo
     env = {k: v for k, v in os.environ.items() if not k.startswith(("_PYI_", "_MEI"))}
     env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    # PATH do processo pode chegar sem o System32 (robocopy/tasklist "não reconhecido"): garante
+    sysroot = os.environ.get("SystemRoot", r"C:\Windows")
+    env["PATH"] = os.pathsep.join([os.path.join(sysroot, "System32"), sysroot, env.get("PATH", "")])
+    env.setdefault("SystemRoot", sysroot)
+    env.setdefault("ComSpec", os.path.join(sysroot, "System32", "cmd.exe"))
 
     # Console próprio: com DETACHED_PROCESS o .bat trava. A janela mostra o andamento ao usuário.
     base_flags = subprocess.CREATE_NEW_CONSOLE | subprocess.CREATE_NEW_PROCESS_GROUP
     ultimo_erro = None
     for flags in (base_flags | subprocess.CREATE_BREAKAWAY_FROM_JOB, base_flags):
         try:
-            subprocess.Popen(["cmd", "/c", bat], creationflags=flags, close_fds=True, env=env, cwd=tmp)
+            subprocess.Popen([env["ComSpec"], "/c", bat], creationflags=flags, close_fds=True, env=env, cwd=tmp)
             break
         except OSError as e:  # sair do job pode ser negado; tenta sem
             ultimo_erro = e
