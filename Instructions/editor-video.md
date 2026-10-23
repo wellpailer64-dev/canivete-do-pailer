@@ -37,6 +37,9 @@ aleatório e servido com suporte a Range (seek). Só escuta em 127.0.0.1. O Cort
   A exportação não usa players: é exata quadro a quadro (validado: 540/540 quadros corretos num 4K com 2 cortes).
 
 ### Desempenho da prévia
+- **Monitor nunca pisca preto esperando quadro**: com um player buscando (falta), `veDrawMonitor` segura o último desenho
+  até 6 s (600 ms só com erro no player). Com 600 ms fixos, 3 vídeos 4K em camadas + CPU ocupada pintavam preto ao
+  mexer em cor/efeito (medido com uma sonda no `veDrawMonitor` do app do Pailer, 2026-10-23).
 - O monitor tem a resolução em que aparece na tela (zoom × densidade da tela), até 1920 px (`veMonitorScale`,
   degraus de 1/8). Os efeitos rodam na resolução em que a mídia aparece (`veFxRender(..., alvo)`).
 - Na reprodução o monitor só redesenha quando a agulha entra em outro quadro da sequência (`veMonitorDue`):

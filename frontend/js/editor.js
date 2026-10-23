@@ -3707,11 +3707,13 @@ function veDrawMonitor() {
     // desenha em coordenadas do quadro
     const novo = cv.width !== cw || cv.height !== ch;
     // sem quadro do vídeo principal (buscando): mantém o último quadro na tela em vez de piscar preto
-    // (no máximo 600 ms, para um vídeo com erro não congelar o monitor)
+    // (como no Premiere). Busca lenta (3 vídeos 4K em camadas, CPU ocupada: > 600 ms) pintava PRETO no meio da
+    // edição — gravado no app do Pailer em 2026-10-23. Segura até 6 s; com erro no player, só 600 ms (não congela)
     if (falta && !novo) {
         const agora = performance.now();
         if (!VE._monHold) VE._monHold = agora;
-        if (agora - VE._monHold < 600) { veRulersDraw(); return; }
+        const erro = v.error || [...VECAM.slot.values()].some(k => VEX[k] && VEX[k].error);
+        if (agora - VE._monHold < (erro ? 600 : 6000)) { veRulersDraw(); return; }
     }
     VE._monHold = 0;
     if (novo) { cv.width = cw; cv.height = ch; }
