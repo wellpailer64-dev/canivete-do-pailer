@@ -56,6 +56,7 @@ Reunião falsa de 2min17s: importar + transcrever + separar + ATA = 90 s. Transc
 Gravação real do Pailer (72 s, só ele) transcreveu bem; errou só nomes próprios (glossário resolve).
 
 ## Armadilhas
+- Parakeet e Silero só no processador (`providers=legendas.CPU`): pela placa (DirectML) falhava com `UnicodeDecodeError`.
 - `sherpa_onnx/lib` traz um `onnxruntime.dll` próprio: carregar DEPOIS do onnxruntime-directml (a transcrição vem antes
   no `processar`). Ordem invertida não foi testada.
 - Convidados SEM login entrando por janela automática são barrados pelo Meet ("Não é possível participar"), mesmo com

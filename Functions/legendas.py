@@ -39,6 +39,9 @@ VAD_OPCOES = {"min_silence_duration_ms": 600, "speech_pad_ms": 150, "max_speech_
 
 _cache = {}          # modelos já carregados (carregar leva alguns segundos)
 _lock = threading.Lock()
+# Só no processador: no exe vem o onnxruntime-directml e o onnx_asr pegaria a placa sozinho,
+# onde o Parakeet quebra (erro do DirectML em português chega como UnicodeDecodeError).
+CPU = ["CPUExecutionProvider"]
 
 
 def _pasta_modelos():
@@ -129,8 +132,8 @@ def _carregar(chave):
     with _lock:
         if chave not in _cache:
             import onnx_asr
-            vad = onnx_asr.load_vad("silero", _pasta_modelos())
-            m = onnx_asr.load_model(MODELOS[chave]["tipo"], _pasta(chave), quantization="int8")
+            vad = onnx_asr.load_vad("silero", _pasta_modelos(), providers=CPU)
+            m = onnx_asr.load_model(MODELOS[chave]["tipo"], _pasta(chave), quantization="int8", providers=CPU)
             _cache[chave] = m.with_vad(vad, **VAD_OPCOES).with_timestamps()
         from Functions import memoria
         memoria.usado("legendas (ASR)", _cache.clear)

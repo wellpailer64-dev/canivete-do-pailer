@@ -174,6 +174,8 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
 - Código: `Functions/legendas.py` (motor), `frontend/js/editor-texto.js` (painel, legendas, prévia), `_gerar_ass` em `video_cutter.py` (gravação).
 - **Motor**: onnx-asr + NVIDIA Parakeet TDT 0.6B em ONNX (usa o onnxruntime que o app já tem, sem PyTorch), com Silero VAD
   (silêncio mín. 0,6 s, folga 0,15 s, trecho máx. 20 s). Medido só no processador:
+  **Sempre `providers=CPU`** (`legendas.CPU`): o exe traz o onnxruntime-directml e o onnx_asr pega a placa sozinho;
+  no DirectML o Parakeet quebra e o erro (em português) chega como `UnicodeDecodeError` (2026-10-23).
 
   | Motor | Velocidade | Erro PT | Erro EN |
   |---|---|---|---|

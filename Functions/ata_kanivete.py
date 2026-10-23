@@ -508,8 +508,8 @@ def _transcrever(wav, stop=None):
         legendas.preparar_modelo("pt", None, stop)
     if "m" not in _asr:
         import onnx_asr
-        vad = onnx_asr.load_vad("silero", legendas._pasta_modelos())
-        m = onnx_asr.load_model(legendas.MODELOS["pt"]["tipo"], legendas._pasta("pt"), quantization="int8")
+        vad = onnx_asr.load_vad("silero", legendas._pasta_modelos(), providers=legendas.CPU)
+        m = onnx_asr.load_model(legendas.MODELOS["pt"]["tipo"], legendas._pasta("pt"), quantization="int8", providers=legendas.CPU)
         _asr["m"] = m.with_vad(vad, **VAD_REUNIAO).with_timestamps()
     palavras = []
     for ini, x in legendas._pedacos(wav):
