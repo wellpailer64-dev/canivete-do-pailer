@@ -32,6 +32,10 @@ const VE_LC_SECOES = [
     { id: 'creative', nome: 'Criativo', grupos: [{ nome: null, ks: ['fade', 'sharp', 'hue'] }] },
     { id: 'curves', nome: 'Curvas', curvas: true },
     { id: 'wheels', nome: 'Rodas de cor', rodas: true },
+    { id: 'secondary', nome: 'HSL secundário', grupos: [
+        { nome: 'Selecionar faixa', ks: ['qh', 'qw', 'qf', 'qs0', 'qs1', 'ql0', 'ql1'] },
+        { nome: 'Corrigir só a faixa', ks: ['qe', 'qs', 'qr'] },
+    ] },
     { id: 'vignette', nome: 'Vinheta', grupos: [{ nome: null, ks: ['vig'] }] },
 ];
 
@@ -159,7 +163,50 @@ function veLcRodaParams(v) {
 // Conta da cor: valores → LUT 3D (Float32Array N³×3, r varia mais rápido, depois g, depois b —
 // igual ao .cube e à textura 3D). Roda a cada movimento de slider: só variáveis soltas, sem arrays por voxel.
 // Balanço de branco, exposição e contraste agem em cada canal sozinho: saem de uma tabela por canal (N valores).
+function veLcSecAtivo(v) {
+    return !!(v.qe || v.qr || (v.qs ?? 100) !== 100);
+}
+function veLcSecParams(v) {
+    if (!veLcSecAtivo(v)) return null;
+    const ordena = (a, b) => [Math.min(a, b) / 100, Math.max(a, b) / 100];
+    const ang = (v.qr || 0) * Math.PI / 180;
+    return { h: (v.qh ?? 0) % 360, w: v.qw ?? 30, f: (v.qf ?? 50) / 100,
+        s: ordena(v.qs0 ?? 10, v.qs1 ?? 100), l: ordena(v.ql0 ?? 0, v.ql1 ?? 100),
+        ex: Math.pow(2, v.qe || 0), sat: (v.qs ?? 100) / 100, cos: Math.cos(ang), sin: Math.sin(ang) };
+}
+function veLcSecPeso(r, g, b, q) {
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min, l = (max + min) / 2;
+    const s = d < 1e-8 ? 0 : d / Math.max(1e-8, 1 - Math.abs(2 * l - 1));
+    let hue = 0;
+    if (d > 1e-8) {
+        hue = 60 * (max === r ? (g - b) / d : max === g ? (b - r) / d + 2 : (r - g) / d + 4);
+        hue = (hue + 360) % 360;
+    } else if (q.w < 180) return 0;   // cinza não tem uma matiz definida
+    const dist = Math.abs((hue - q.h + 540) % 360 - 180);
+    const h = q.w >= 180 ? 1 : q.f > 0 ? 1 - veLcSmooth(q.w * (1 - q.f), q.w, dist) : +(dist <= q.w);
+    const faixa = (x, limites) => {
+        const [a, b] = limites, e = (b - a) * q.f / 2;
+        if (x < a || x > b) return 0;
+        if (e < 1e-8) return 1;
+        return (a <= 0 ? 1 : veLcSmooth(a, a + e, x)) * (b >= 1 ? 1 : 1 - veLcSmooth(b - e, b, x));
+    };
+    return h * faixa(s, q.s) * faixa(l, q.l);
+}
+function veLcSecCor(r, g, b, q) {
+    const peso = veLcSecPeso(r, g, b, q);
+    if (peso <= 0) return [r, g, b];
+    let R = r, G = g, B = b;
+    if (q.ex !== 1) {
+        R = veLcEnc(veLcDec(R) * q.ex); G = veLcEnc(veLcDec(G) * q.ex); B = veLcEnc(veLcDec(B) * q.ex);
+    }
+    const Y = veLcLuma(R, G, B), cb = (B - Y) / 1.8556, cr = (R - Y) / 1.5748;
+    const Cb = (cb * q.cos - cr * q.sin) * q.sat, Cr = (cb * q.sin + cr * q.cos) * q.sat;
+    R = Y + 1.5748 * Cr; B = Y + 1.8556 * Cb; G = (Y - 0.2126 * R - 0.0722 * B) / 0.7152;
+    const mistura = (a, z) => Math.max(0, Math.min(1, a + (z - a) * peso));
+    return [mistura(r, R), mistura(g, G), mistura(b, B)];
+}
 function veLcBuildLut(v, N) {
+    const secundaria = veLcSecParams(v);
     const kT = v.temp / 100, kG = v.tint / 100, ex = Math.pow(2, v.exp);
     const gain = [Math.pow(2, 0.35 * kT + 0.1 * kG) * ex, Math.pow(2, -0.22 * kG) * ex, Math.pow(2, -0.35 * kT + 0.1 * kG) * ex];
     const wbOn = kT || kG || v.exp;
@@ -269,6 +316,8 @@ function veLcBuildLut(v, N) {
         }
         // 8) rodas de cor (depois das curvas, como no Lumetri)
         if (rodas) { r = roda(r, 0); g = roda(g, 1); b = roda(b, 2); }
+        // 9) HSL secundário: a seleção e a correção usam a cor já ajustada acima.
+        if (secundaria) [r, g, b] = veLcSecCor(r, g, b, secundaria);
         out[o++] = r; out[o++] = g; out[o++] = b;
     }
     return out;
@@ -282,7 +331,8 @@ const VE_LC_FADE = [[0, 0.03, 0.111, 0.199, 0.287, 0.379, 0.459, 0.541, 0.635, 0
 const VE_LC_FORA_LUT = new Set(['sharp', 'vig', 'clar']);   // rodam depois da LUT, na imagem
 function veLcColorKey(v) {
     const o = {};
-    VE_FX.lc.params.forEach(p => { if (!VE_LC_FORA_LUT.has(p.k)) o[p.k] = v[p.k] ?? p.def; });
+    const secundaria = veLcSecAtivo(v);
+    VE_FX.lc.params.forEach(p => { if (!VE_LC_FORA_LUT.has(p.k) && (secundaria || !p.k.startsWith('q'))) o[p.k] = v[p.k] ?? p.def; });
     o.cv = {};
     VE_LC_CURVAS.forEach(ch => { if (!veLcCurveId(v.cv && v.cv[ch])) o.cv[ch] = v.cv[ch]; });
     o.cw = {};
@@ -292,7 +342,7 @@ function veLcColorKey(v) {
     return JSON.stringify(o);
 }
 function veLcColorNeutral(v) {
-    return VE_FX.lc.params.every(p => VE_LC_FORA_LUT.has(p.k) || (v[p.k] ?? p.def) === p.def)
+    return VE_FX.lc.params.every(p => VE_LC_FORA_LUT.has(p.k) || (!veLcSecAtivo(v) && p.k.startsWith('q')) || (v[p.k] ?? p.def) === p.def)
         && VE_LC_CURVAS.every(ch => veLcCurveId(v.cv && v.cv[ch])) && veLcRodasNeutras(v) && !veLcHcAtivo(v);
 }
 
@@ -301,7 +351,7 @@ function veLcLut(v) {
     const key = veLcColorKey(v);
     let L = VELC.luts.get(key);
     if (L) return L;
-    const n = veLcHcAtivo(v) ? VE_LC_N_HC : VE_LC_N;
+    const n = veLcHcAtivo(v) || veLcSecAtivo(v) ? VE_LC_N_HC : VE_LC_N;
     L = { key, n, f32: veLcBuildLut(v, n), b64: null };
     VELC.luts.set(key, L);
     if (VELC.luts.size > 24) VELC.luts.delete(VELC.luts.keys().next().value);
@@ -390,7 +440,12 @@ function veLcHalf(f32) {
     for (let i = 0; i < f32.length; i++) {
         fb[0] = f32[i];
         const x = ib[0], s = (x >>> 16) & 0x8000, e = ((x >>> 23) & 0xff) - 112, m = x & 0x7fffff;
-        out[i] = e <= 0 ? s : e >= 31 ? s | 0x7c00 : s | (e << 10) | ((m + 0x1000) >> 13);
+        if (e <= 0) {
+            const valor = (m | 0x800000) / Math.pow(2, 14 - e), inteiro = Math.floor(valor), resto = valor - inteiro;
+            out[i] = s | (inteiro + (resto > 0.5 || (resto === 0.5 && (inteiro & 1)) ? 1 : 0));
+        } else if (e >= 31) out[i] = s | 0x7c00 | (((x >>> 23) & 0xff) === 255 && m ? 0x200 : 0);
+        // Soma propaga o transporte da mantissa para o expoente; OR corrompia valores perto de 0,5 e 1.
+        else out[i] = s | ((e << 10) + ((m + 0xfff + ((m >>> 13) & 1)) >> 13));
     }
     return out;
 }
@@ -613,7 +668,7 @@ function veLcBuild() {
     box.innerHTML = VE_LC_SECOES.map(s => `
         <div class="ve-lc-sec${VELC.open.has(s.id) ? '' : ' collapsed'}" data-sec="${s.id}">
             <div class="ve-lc-sec-head" data-la="sec"><span class="ve-lc-caret">▾</span><b>${s.nome}</b><button data-la="resetsec" title="Restaurar esta seção">↺</button></div>
-            <div class="ve-lc-sec-body">${s.curvas ? `
+            <div class="ve-lc-sec-body">${s.id === 'secondary' ? `<div class="ve-lc-hint">Selecione a faixa, depois ajuste abaixo. Afeta todas as áreas com essas cores, sem reconhecer objetos.</div><div class="ve-lc-ctabs"><button class="ve-lc-ctab" data-la="secfaixa" data-qh="0">Vermelhos</button><button class="ve-lc-ctab" data-la="secfaixa" data-qh="120">Verdes</button><button class="ve-lc-ctab" data-la="secfaixa" data-qh="240">Azuis</button></div>` : ''}${s.curvas ? `
                 <div class="ve-lc-ctabs">
                     <button class="ve-lc-ctab" data-la="ctab" data-ct="rgb" title="Curvas RGB: luz de todas as cores ou de cada canal">RGB</button>
                     ${VE_LC_HC.map(([k, nome, , tit]) => `<button class="ve-lc-ctab" data-la="ctab" data-ct="${k}" title="${tit}">${nome}</button>`).join('')}
@@ -1044,6 +1099,12 @@ function veLcAction(el) {
     }
     if (a === 'ch') { VELC.ch = el.dataset.ch; VELC.key = ''; veLcRender(); return; }
     if (a === 'ctab') { VELC.ct = el.dataset.ct; VELC.key = ''; veLcRender(); return; }
+    if (a === 'secfaixa') {
+        if (!veLcClip()) return;
+        vePushHistory();
+        veLcChange(f => { Object.assign(f.v, { qh: Number(el.dataset.qh), qw: 40, qf: 50, qs0: 10, qs1: 100, ql0: 0, ql1: 100 }); });
+        return;
+    }
     // vale para todos os clipes selecionados que têm Luz e Cor (o principal decide liga/desliga)
     const c = veLcClip(), f = veLcFx(c);
     if (!f) return;

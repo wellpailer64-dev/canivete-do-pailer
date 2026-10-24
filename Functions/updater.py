@@ -228,7 +228,24 @@ if %tentativas% geq 60 goto instalar
 ping -n 2 127.0.0.1 >nul
 goto espera
 :instalar
-echo [%time%] app fechado (esperas: %tentativas%), copiando arquivos >> "{log}"
+echo [%time%] app fechado (esperas: %tentativas%) >> "{log}"
+rem Processos filhos (plugins VST3/OFX, servidores) seguram DLLs do _internal: espera ~10s e encerra o que sobrar
+set /a filhos=0
+:filhos
+tasklist /FI "IMAGENAME eq CaniveteDoPailer.exe" /FO CSV /NH > "{lista_pid}" 2>nul
+findstr /I /C:"CaniveteDoPailer.exe" "{lista_pid}" >nul 2>&1
+if errorlevel 1 goto copiar
+set /a filhos+=1
+if %filhos% geq 5 goto matar
+ping -n 3 127.0.0.1 >nul
+goto filhos
+:matar
+echo [%time%] encerrando processos que sobraram >> "{log}"
+taskkill /F /T /IM CaniveteDoPailer.exe >> "{log}" 2>&1
+powershell -NoProfile -Command "Get-Process | Where-Object {{ $_.Path -like '{app_dir}\\*' }} | Stop-Process -Force" >> "{log}" 2>&1
+ping -n 3 127.0.0.1 >nul
+:copiar
+echo [%time%] copiando arquivos >> "{log}"
 echo Instalando nova versao...
 rem _internal espelhado (remove bibliotecas antigas), preservando dados do usuario
 robocopy "{origem}\\_internal" "{app_dir}\\_internal" /MIR /R:10 /W:2 /NFL /NDL /NP /XD {xd_int} /XF {xf} >> "{log}"

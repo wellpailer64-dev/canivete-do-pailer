@@ -260,6 +260,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/ata-kanivete.md` — Ata Kanivete (At, verde #1FA971) — Beta
 - `Instructions/agente/autozoom.md` — Autozoom (Vídeo Kanivete)
 - `Instructions/agente/cena-3d-editor.md` — Cena 3D no Editor Kanivete (estilo After Effects)
+- `Instructions/agente/cor-cinematografica.md` — Cor cinematográfica — pesquisa e uso no Luz e Cor
 - `Instructions/agente/design-photo-kanivete.md` — Fazer arte no Photo Kanivete pela API (guia para IAs)
 - `Instructions/agente/direcao-carrossel.md` — Direção de arte de carrossel (para IAs) — o que separa peça boa de "landing page genérica"
 - `Instructions/agente/direcao-de-arte.md` — Direção de arte e motion para o AutoFrame e as edições do Pocket Editor
@@ -465,6 +466,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_ke_parar.py` — Parar da fila do Ke interrompe o Blender (item da Lux): app em --agente=9333
 - `testes/teste_ke_renomear.py` — Título editável da fila: cliques reais, cancelamento, redraw e nomes dos WAVs renderizados; só porta 9333
 - `testes/teste_laco.py` — Laço: Shift soma, Alt subtrai, Shift+Alt cruza; o mesmo no magnético; Ctrl+clique na miniatura seleciona a camada
+- `testes/teste_lc_hsl.py` — HSL secundário: seletividade, UI e prévia WebGL × render FFmpeg, sem acessar o app aberto
 - `testes/teste_lobby_camadas.py` — Lobby do Photo/Vetor não cobre a janela Novo documento nem os menus (app 9333)
 - `testes/teste_lux_casa.py` — Lux com casa própria: abre sem o Editor, desfaz sozinha, envia cópia para a timeline (app em --agente=9333)
 - `testes/teste_mixer.py` — Mixer de trilhas de áudio (editor-mixer.js): Premiere → Kanivete → XML do Premiere e a conta do som na exportação
@@ -484,6 +486,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_rastro.py` — Rastreador de movimento (editor-rastro.js + Functions/rastreador.py) no app de verdade, com GABARITO: um quadro
 - `testes/teste_remix.py` — Remix de música na timeline (editor-remix.js + Functions/remix.py), com mouse de verdade: põe uma música de 3:46
 - `testes/teste_roto.py` — Pincel Roto (editor-roto.js + Functions/pincel_roto.py) no app de verdade: vídeo de entrevista na V1, texto animado
+- `testes/teste_seq_escala.py` — Configurações da sequência › "Adaptar o conteúdo ao novo tamanho": trocar o quadro (Full HD → 4K → Full HD, e de
 - `testes/teste_sfx.py` — Gerador de efeitos sonoros (Functions/gerador_sfx.py): agendador DDIM igual ao do diffusers e uma geração curta
 - `testes/teste_slider.py` — Slider Kanivete (Sd): comandos, desfazer, HTML → slide, mídias (imagem, GIF, vídeo), salvar/abrir .dknv, exportar
 - `testes/teste_slider_arquivos.py` — Slider Kanivete — 3ª bateria: os ARQUIVOS. PowerPoint exportado com animações, transições, vídeo (sozinho/repetir/mudo)

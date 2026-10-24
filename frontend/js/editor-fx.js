@@ -115,6 +115,17 @@ const VE_FX = {
             { k: 'hue', nome: 'Rotação de matiz', min: -180, max: 180, step: 1, def: 0, un: '°' },
             // Clareza (Clarity do Camera Raw): contraste local nos meios-tons; roda depois da LUT, como a nitidez
             { k: 'clar', nome: 'Clareza', min: -100, max: 100, step: 1, def: 0, un: '' },
+            // Correção secundária por faixa HSL, depois dos ajustes globais, na mesma LUT.
+            { k: 'qh', nome: 'Cor central', min: 0, max: 360, step: 1, def: 0, un: '°' },
+            { k: 'qw', nome: 'Alcance da cor', min: 5, max: 180, step: 1, def: 30, un: '°' },
+            { k: 'qf', nome: 'Suavidade', min: 0, max: 100, step: 1, def: 50, un: '%' },
+            { k: 'qs0', nome: 'Saturação mínima', min: 0, max: 100, step: 1, def: 10, un: '%' },
+            { k: 'qs1', nome: 'Saturação máxima', min: 0, max: 100, step: 1, def: 100, un: '%' },
+            { k: 'ql0', nome: 'Luz mínima', min: 0, max: 100, step: 1, def: 0, un: '%' },
+            { k: 'ql1', nome: 'Luz máxima', min: 0, max: 100, step: 1, def: 100, un: '%' },
+            { k: 'qe', nome: 'Exposição da faixa', min: -3, max: 3, step: 0.05, def: 0, un: 'EV' },
+            { k: 'qs', nome: 'Saturação da faixa', min: 0, max: 200, step: 1, def: 100, un: '%' },
+            { k: 'qr', nome: 'Rotação da faixa', min: -180, max: 180, step: 1, def: 0, un: '°' },
         ],
         extra: ['cv', 'cw', 'hc'],
         neutro: v => veLcColorNeutral(v) && !(v.sharp > 0) && !(v.vig > 0) && !v.clar,
