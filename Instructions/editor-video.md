@@ -272,6 +272,21 @@ Criativo (filme desbotado, nitidez, vibração), Curvas (RGB/R/G/B, monótonas, 
 - O vídeo aberto tem o tamanho dele (`veMediaSize`) e entra ajustado ao quadro como os outros vídeos; clipes sem `c.p`
   se reencaixam sozinhos. A exportação recebe `quadro=[w, h]` e a resolução escolhida vale para o lado menor.
 - Monitor: fora do quadro é cinza (`.ve-screen`), o quadro é preto.
+- **Adaptar o conteúdo ao novo tamanho** (caixinha, ligada por padrão; 2026-10-24, `veSeqReescalar` em editor.js): Full HD →
+  2K/4K (ou menor) deixa tudo no mesmo lugar e do mesmo tamanho em relação ao quadro. f = menor razão (outra proporção:
+  o quadro antigo cabe inteiro, centrado; ida e volta 16:9 → 9:16 → 16:9 NÃO volta igual, encolhe de novo). Espaço da
+  camada = quadro ou mídia da mãe (`c.pai`); mídia que acompanha o quadro (ajuste, cor sólida, Comp reescalada) cresce
+  junto (escala fica; máscara e efeitos em px da camada × f: `VE_SEQ_FX_PX`); mídia fixa (vídeo, imagem, texto, forma,
+  nulo): escala × f. Sombra/Tremer em px do quadro (`VE_SEQ_FX_QUADRO`), quadros-chave, âncora, guias e legenda (outra
+  proporção) também. Comps usadas só por esta timeline crescem por dentro (`veSeqCompsSo`); Comp usada em outra timeline
+  fica e a faixa dela escala. Sem Ctrl+Z (como no Premiere): voltar = aplicar o tamanho antigo.
+  Teste: `py -3.13 testes/teste_seq_escala.py --projeto x.vknv [--comps]` (monitor antes × depois, porta 9333).
+  Efeito novo com parâmetro em px: pôr em `VE_SEQ_FX_PX` (px da camada) ou `VE_SEQ_FX_QUADRO` (px do quadro).
+- **Render maior que a timeline** (Exportar/fila: 2K/4K com timeline Full HD, "· maior que a timeline"): `veExportNoQuadro`
+  reescala a timeline de verdade só durante o PREPARO (Comps, textos, motion no tamanho da saída: nítido, não esticado),
+  cobre o editor (`.ve-exp-capa`) e devolve os campos guardados (`VE_SEQ_CAMPOS`, legenda, guias, Comps) antes do ffmpeg.
+  O item da fila guarda `plano.quadro` no tamanho maior. Trocar a resolução de um item já na fila para maior: aviso para
+  pôr de novo. Medido (Nautic, 2026-10-24): 4K pela fila = 3840×2160, igual ao Full HD reduzido (dif. 2,6), timeline volta idêntica.
 
 ## Painel Projeto (como o Project do Premiere; substitui o painel Clipes)
 - Código: `frontend/js/editor-projeto.js`. Guarda os materiais do projeto: o vídeo aberto, imagens, áudios, camadas de ajuste,

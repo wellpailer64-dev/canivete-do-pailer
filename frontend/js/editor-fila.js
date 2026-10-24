@@ -246,6 +246,10 @@ async function veFilaAdicionarPreparando(nome, cfg) {
     const msg = m => { const el = $ve('ve-fila-msg'); if (el) el.textContent = m || ''; veFilaPrepMsg(m); };
     msg('Preparando ' + veFilaNomeTimeline() + '…');
     if (typeof veMidiasTamanhoGarantir === 'function') await veMidiasTamanhoGarantir();   // 4K ainda sem tamanho: saía ampliado
+    // render maior que a timeline (Full HD → 4K): preparo com a timeline reescalada, nítido (editor.js veExportNoQuadro)
+    return veExportNoQuadro((cfg || veFilaCfgLer()).res, () => veFilaAdicionarPlano(nome, cfg, msg));
+}
+async function veFilaAdicionarPlano(nome, cfg, msg) {
     if (typeof veCompProntas === 'function') await veCompProntas(msg);
     if (typeof ve3dProntas === 'function') await ve3dProntas(msg);
     // placa ligada: só o plano das transições de sobreposição (a placa faz no shader); desligada: renderiza antes
@@ -308,6 +312,8 @@ async function veFilaProximo() {
     VEFILA.atual = it; it.estado = 'rodando'; it.pct = 0; it.t0 = Date.now();
     if (it.moH && (parseInt(it.cfg.res, 10) || 1e9) > it.moH && Math.min(VE.seqW, VE.seqH) > it.moH)
         veToast(veT('Camadas de motion preparadas em') + ` ${it.moH}p: ` + veT('para sair nítido maior, ponha a timeline na fila de novo'));
+    else if (!it.tipo && it.plano && it.plano.quadro && (parseInt(it.cfg.res, 10) || 0) > Math.min(...it.plano.quadro))
+        veToast(veT('Este item foi preparado em') + ` ${Math.min(...it.plano.quadro)}p: ` + veT('para sair em') + ` ${parseInt(it.cfg.res, 10)}p, ` + veT('ponha a timeline na fila de novo com essa resolução'));
     VE.exportRunning = true;
     // prévia renderizada (automática ou In→Out) parada: dividia a placa e a CPU com a exportação (memória estourava)
     if (typeof vePrAutoParar === 'function' && typeof VEPR !== 'undefined' && (VEPR.atual || VEPR.fila.length)) vePrAutoParar();

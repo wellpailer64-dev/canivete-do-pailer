@@ -189,6 +189,10 @@ projetos reais, tracker, MOGRT, rampas de velocidade, multicâmera): `Instructio
 ◀◀/▶▶, "Aplicar a" Nulo/clipe (quadros-chave); erro < 0,5 px. `frontend/js/editor-rastro.js` + `Functions/rastreador.py`;
 guia e pendências (planar/corner pin, subpixel no export) `Instructions/agente/rastreador.md`; teste `py -3.13 testes/teste_rastro.py`.
 
+**Trocar o quadro da timeline sem nada sair do lugar** (2026-10-24): Configurações da sequência › "Adaptar o conteúdo ao
+novo tamanho" (`veSeqReescalar`, editor.js) e render 2K/4K maior que a timeline Full HD (`veExportNoQuadro`: reescala só
+no preparo e volta). Guia `Instructions/editor-video.md` › Configurações da sequência; teste `py -3.13 testes/teste_seq_escala.py`.
+
 Atributos de vários clipes (como no Premiere): `frontend/js/editor-atributos.js` — botão direito → "Remover atributos…"
 (efeitos de vídeo/áudio, movimento, opacidade, mesclagem, volume, transições, com caixinhas; vale para a seleção) e ajuste
 em grupo (mexer num efeito com vários selecionados leva o valor ao mesmo efeito de todos). Teste: `testes/teste_atributos.py`.

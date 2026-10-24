@@ -1090,7 +1090,8 @@ function veSeqConfigAbrir() {
                     <div class="ve-seqcfg-prev"><div id="ve-sq-caixa"></div><span id="ve-sq-info"></span></div>
                 </div>
                 <div class="ve-field"><label>Taxa de quadros</label><div class="ve-seqcfg-nome" id="ve-sq-fps"></div></div>
-                <small class="ve-seqcfg-dica">Clipes sem posição/escala mexidas se encaixam sozinhos no quadro novo. A exportação sai neste tamanho.</small>
+                <label class="ve-seqcfg-adaptar"><input type="checkbox" id="ve-sq-adaptar"> ${veT('Adaptar o conteúdo ao novo tamanho')}</label>
+                <small class="ve-seqcfg-dica">${veT('Ligado: tudo fica no mesmo lugar e do mesmo tamanho em relação ao quadro (Full HD → 4K dobra posição e escala). Desligado: clipes mexidos ficam onde estão, como no Premiere. A exportação sai neste tamanho.')}</small>
             </div>
             <div class="ve-modal-foot"><button class="ve-btn ve-btn-ghost" data-sq="fechar">Cancelar</button><button class="ve-btn ve-btn-primary" data-sq="ok">Aplicar</button></div>
         </div>`;
@@ -1124,6 +1125,7 @@ function veSeqConfigAbrir() {
         VE_SEQ_PRESETS.filter(p => p[2] === g).map(([k, n]) => `<option value="${k}">${veT(n)}</option>`).join('') + '</optgroup>').join('') +
         `<optgroup label="${veT('Outros')}">` + (v ? `<option value="video">${veT('Igual ao vídeo')} (${v.replace('x', ' × ')})</option>` : '') +
         `<option value="custom">${veT('Personalizado')}</option></optgroup>`;
+    if (md.querySelector('#ve-sq-adaptar')) md.querySelector('#ve-sq-adaptar').checked = veLsGet('ve-seq-adaptar') !== '0';
     md.querySelector('#ve-sq-w').value = VE.seqW;
     md.querySelector('#ve-sq-h').value = VE.seqH;
     md.querySelector('#ve-sq-fps').innerHTML = `${String(+(VE.fps || 30).toFixed(3)).replace('.', ',')} qps <small>(${veT('padrão, pelo 1º vídeo')})</small>`;
@@ -1145,12 +1147,164 @@ function veSeqConfigPrevia() {
     md.querySelector('#ve-sq-info').textContent = w && h ? `${w} × ${h} px · ${w / g}:${h / g} · ${w > h ? 'horizontal' : w < h ? 'vertical' : 'quadrado'}` : '';
 }
 
+// ── Adaptar o conteúdo ao quadro novo (Configurações da sequência): tudo fica no mesmo lugar e do mesmo tamanho em
+// relação ao quadro (Full HD → 4K: posição ×2, escala ×2). f = a menor razão (outra proporção: o quadro antigo cabe
+// inteiro no novo, centrado). Cada camada vive num espaço: o quadro, ou o da mídia da mãe (c.pai). A mídia que acompanha
+// o quadro (ajuste, cor sólida, Comp reescalada) cresce junto: a escala dela fica e o que é medido em px dela (máscara,
+// efeitos de camada) cresce. Mídia fixa (vídeo, imagem, texto, forma, nulo): só a escala muda.
+const VE_SEQ_FX_PX = { onda: ['alt'], mo_glow: ['raio'], mo_grao: ['tam'], mo_dir: ['comp'], mo_contorno: ['larg'],
+                       keyc: ['encolher', 'suave'], roto: ['pena', 'deslocar'] };   // px da camada
+const VE_SEQ_FX_QUADRO = { sombra: ['dist', 'tam'], ca_wig: ['area'] };          // px do quadro (desenhados sobre ele)
+
+// Comps que a timeline ativa usa (direta ou indiretamente) e que nenhuma outra timeline usa: crescem junto
+function veSeqCompsSo() {
+    const comps = new Map(), fila = [VE.clips];
+    while (fila.length) {
+        for (const c of fila.pop()) {
+            const m = VE.media[c.m || 0];
+            if (!veEhCompSeq(m) || comps.has(m.sequenceId)) continue;
+            const s = (VE.sequences || []).find(q => q.id === m.sequenceId);
+            if (!s) continue;
+            comps.set(m.sequenceId, s);
+            fila.push(s.clips || []);
+        }
+    }
+    for (const s of VE.sequences || []) {   // usada fora da árvore = fica como está
+        if (s.id === VE.activeSequence || comps.has(s.id)) continue;
+        for (const c of s.clips || []) { const m = VE.media[c.m || 0]; if (veEhCompSeq(m)) comps.delete(m.sequenceId); }
+    }
+    return comps;
+}
+const veEhCompSeq = m => !!(m && m.comp && m.sequenceId != null && !m.removido);
+
+// Reescala a timeline ativa (VE.clips no VE.seqW × VE.seqH atual) para W2 × H2; comps = Comps que crescem junto
+function veSeqReescalar(W2, H2, comps = veSeqCompsSo(), feitas = new Set()) {
+    const W1 = VE.seqW, H1 = VE.seqH, f = Math.min(W2 / W1, H2 / H1), R = v => Math.round(v * 1e4) / 1e4;
+    // Comps de dentro primeiro (no tamanho delas × f): a faixa delas depois só muda de lugar
+    for (const c of VE.clips) {
+        const m = VE.media[c.m || 0];
+        if (!veEhCompSeq(m) || !comps.has(m.sequenceId) || feitas.has(m.sequenceId)) continue;
+        const s = comps.get(m.sequenceId);
+        feitas.add(s.id);
+        const w = s.w || W1, h = s.h || H1, w2 = Math.max(16, Math.round(w * f / 2) * 2), h2 = Math.max(16, Math.round(h * f / 2) * 2);
+        veCompComo(s, () => veSeqReescalar(w2, h2, comps, feitas));
+        s.w = w2; s.h = h2;
+        VE.media.forEach(x => { if (x && x.comp && x.sequenceId === s.id && x.info) { x.info.width = w2; x.info.height = h2; } });
+    }
+    const vis = VE.clips.filter(c => !veIsAudio(c));
+    vis.forEach(c => { if (c.br && !c.br.w) { c.br.w = W1; c.br.h = H1; } });   // pincel antigo: px do quadro velho
+    const antes = new Map(vis.map(c => [c, { sz: veMediaSize(c), p: veStaticProps(c) }]));
+    VE.seqW = W2; VE.seqH = H2;
+    const cresce = new Map(vis.map(c => {
+        const a = antes.get(c).sz, d = veMediaSize(c), g = Math.min(d.w / a.w, d.h / a.h);
+        return [c, { g: Math.abs(g - 1) < 1e-4 ? 1 : g, a, d }];
+    }));
+    for (const c of vis) {
+        const { g, a, d } = cresce.get(c), p0 = antes.get(c).p;
+        // espaço da camada: o quadro ou o da mídia da mãe
+        const mae = c.pai ? vis.find(o => o.uid === c.pai && o !== c) : null, cm = mae && cresce.get(mae);
+        const sp = mae ? { x1: cm.a.w / 2, y1: cm.a.h / 2, x2: cm.d.w / 2, y2: cm.d.h / 2, s: cm.g }
+                       : { x1: W1 / 2, y1: H1 / 2, x2: W2 / 2, y2: H2 / 2, s: f };
+        const mx = v => R(sp.x2 + (v - sp.x1) * sp.s), my = v => R(sp.y2 + (v - sp.y1) * sp.s), ks = sp.s / g;
+        const ax = v => R(d.w / 2 + (v - a.w / 2) * g), ay = v => R(d.h / 2 + (v - a.h / 2) * g);
+        const kf = (k, fn) => { if (c.k && Array.isArray(c.k[k])) c.k[k].forEach(q => { q.v = fn(q.v); }); };
+        if (c.p || mae || veHasKf(c)) {
+            c.p = { ...(c.p || {}), sc: R(p0.sc * ks), x: mx(p0.x), y: my(p0.y) };
+            if (p0.ax != null) c.p.ax = ax(p0.ax);
+            if (p0.ay != null) c.p.ay = ay(p0.ay);
+        } else {   // sem Movimento mexido: só grava se o encaixe automático não der o mesmo
+            const n = veDefProps(c);
+            if (Math.abs(n.sc - p0.sc * ks) > 0.01 || Math.abs(n.x - mx(p0.x)) > 0.01 || Math.abs(n.y - my(p0.y)) > 0.01)
+                c.p = { sc: R(p0.sc * ks), x: mx(p0.x), y: my(p0.y), rot: p0.rot, op: p0.op };
+        }
+        kf('x', mx); kf('y', my); kf('sc', v => R(v * ks)); kf('ax', ax); kf('ay', ay);
+        if (g !== 1) {   // mídia cresceu: máscaras em px dela
+            const pts = v => Array.isArray(v) ? v.map((n, i) => { const j = i % 6; return R(j === 0 ? ax(n) : j === 1 ? ay(n) : n * g); }) : v;
+            (c.mk || []).forEach(m => {
+                m.pts = pts(m.pts);
+                ['pena', 'exp'].forEach(k => { if (typeof m[k] === 'number') m[k] = R(m[k] * g); });
+                kf(`mk.${m.id}.cam`, pts); kf(`mk.${m.id}.pena`, v => R(v * g)); kf(`mk.${m.id}.exp`, v => R(v * g));
+            });
+        }
+        (c.fx || []).forEach(x => {
+            const lista = [[VE_SEQ_FX_PX[x.t], g], [VE_SEQ_FX_QUADRO[x.t], f]];
+            for (const [ps, k] of lista) for (const pk of ps || []) {
+                if (k === 1) continue;
+                if (x.v && typeof x.v[pk] === 'number') x.v[pk] = R(x.v[pk] * k);
+                kf(`fx.${x.id}.${pk}`, v => R(v * k));
+            }
+        });
+    }
+    // legenda: tamanho em % da altura do quadro (outra proporção: acompanha o f)
+    const kl = f * H1 / H2;
+    if (Math.abs(kl - 1) > 1e-4) {
+        if (VE.legEstilo && +VE.legEstilo.tam) VE.legEstilo.tam = R(VE.legEstilo.tam * kl);
+        (VE.legendas || []).forEach(l => { if (l.e && +l.e.tam) l.e.tam = R(l.e.tam * kl); });
+    }
+    (VE.guias || []).forEach(gd => { gd.p = Math.round(gd.o === 'h' ? H2 / 2 + (gd.p - H1 / 2) * f : W2 / 2 + (gd.p - W1 / 2) * f); });
+    return f;
+}
+
+// ── Exportar MAIOR que a timeline (projeto Full HD → render 2K/4K): durante o preparo a timeline é reescalada de verdade
+// (veSeqReescalar: textos, formas, motion e Comps desenhados no tamanho da saída, nítidos; não é esticar o vídeo
+// pronto) e volta exatamente como estava. O editor fica coberto enquanto isso (nada de editar a timeline reescalada).
+// fn devolve o que a exportação precisa (plano, args); o ffmpeg roda depois, com a timeline já de volta.
+const VE_SEQ_CAMPOS = ['p', 'k', 'mk', 'fx', 'br'];
+function veSeqEscalaGuardar() {
+    const um = clips => clips.map(c => { const o = {}; VE_SEQ_CAMPOS.forEach(k => { o[k] = c[k] === undefined ? undefined : structuredClone(c[k]); }); return o; });
+    const comps = [...veSeqCompsSo().values()];
+    return { W: VE.seqW, H: VE.seqH, clips: VE.clips, campos: um(VE.clips), legE: VE.legEstilo ? { ...VE.legEstilo } : null,
+             leg: (VE.legendas || []).map(l => (l.e ? { ...l.e } : null)), guias: structuredClone(VE.guias || []),
+             comps: comps.map(s => ({ s, w: s.w, h: s.h, campos: um(s.clips || []),
+                                      info: VE.media.filter(m => m && m.comp && m.sequenceId === s.id && m.info).map(m => [m, m.info.width, m.info.height]) })) };
+}
+function veSeqEscalaVoltar(g) {
+    const volta = (clips, campos) => clips.forEach((c, i) => VE_SEQ_CAMPOS.forEach(k => {
+        if (!campos[i]) return;
+        if (campos[i][k] === undefined) delete c[k]; else c[k] = campos[i][k];
+    }));
+    volta(g.clips, g.campos);
+    if (g.legE && VE.legEstilo) Object.assign(VE.legEstilo, g.legE);
+    (VE.legendas || []).forEach((l, i) => { if (g.leg[i] && l.e) Object.assign(l.e, g.leg[i]); });
+    VE.guias = g.guias;
+    g.comps.forEach(o => { volta(o.s.clips || [], o.campos); o.s.w = o.w; o.s.h = o.h; o.info.forEach(([m, w, h]) => { m.info.width = w; m.info.height = h; }); });
+    VE.seqW = g.W; VE.seqH = g.H;
+}
+async function veExportNoQuadro(res, fn) {
+    const alvo = parseInt(res, 10), lado = Math.min(VE.seqW, VE.seqH);
+    if (!(alvo > lado)) return fn();
+    const k = alvo / lado, W2 = Math.round(VE.seqW * k / 2) * 2, H2 = Math.round(VE.seqH * k / 2) * 2;
+    if (VE.playing) veStop();
+    const capa = document.createElement('div');
+    capa.className = 've-exp-capa';
+    capa.innerHTML = `<div>${veT('Preparando o render em')} ${W2} × ${H2}…<small>${veT('a timeline volta ao tamanho dela em seguida')}</small></div>`;
+    $ve('ve').appendChild(capa);
+    const g = veSeqEscalaGuardar(), clips0 = VE.clips, seq0 = VE.activeSequence;
+    try {
+        veSeqReescalar(W2, H2);
+        VE.seqW = W2; VE.seqH = H2;
+        veCacheInvalidate();
+        return await fn();
+    } finally {
+        if (VE.clips === clips0 && VE.activeSequence === seq0) veSeqEscalaVoltar(g);
+        else { VE.seqW = g.W; VE.seqH = g.H; }
+        capa.remove();
+        veCacheInvalidate();
+        if (typeof veApplyMonitor === 'function' && $ve('ve-canvas')) veApplyMonitor();
+        veRefresh();
+    }
+}
+
 function veSeqConfigAplicar() {
     const md = $ve('ve-seqcfg'), w = +md.querySelector('#ve-sq-w').value, h = +md.querySelector('#ve-sq-h').value;
     if (!(w >= 16 && h >= 16 && w <= 8192 && h <= 8192)) { veToast('Use de 16 a 8192 px na largura e na altura'); return; }
     md.hidden = true;
     if (Math.round(w / 2) * 2 === VE.seqW && Math.round(h / 2) * 2 === VE.seqH) return;
+    const ck = md.querySelector('#ve-sq-adaptar'), adaptar = ck ? ck.checked : veLsGet('ve-seq-adaptar') !== '0';
+    veLsSet('ve-seq-adaptar', adaptar ? '1' : '0');
+    if (adaptar) veSeqReescalar(Math.round(w / 2) * 2, Math.round(h / 2) * 2);
     veSeqQuadro(w, h);
+    if (adaptar) { veCacheInvalidate(); if (typeof veCompVerificar === 'function') veCompVerificar(); }
     veSeqSalvarAtiva();
     VE.dirty = true;
     veUpdateTitle();
@@ -6277,8 +6431,9 @@ function veOpenExport() {
     const W = VE.seqW || VE.info.width || 0, H = VE.seqH || VE.info.height || 0;
     const lado = Math.min(W, H);
     const opts = [['original', `Original (${W}×${H})`]];
-    [[2160, '4K (2160p)'], [1440, '1440p'], [1080, '1080p Full HD'], [720, '720p HD'], [480, '480p']]
-        .forEach(([r, l]) => { if (lado > r) opts.push([String(r), l]); });
+    // maiores que a timeline: renderizadas no tamanho (veExportNoQuadro), não esticadas
+    [[2160, '4K UHD (2160p)'], [1440, '2K (1440p)'], [1080, '1080p Full HD'], [720, '720p HD'], [480, '480p']]
+        .forEach(([r, l]) => { if (lado !== r) opts.push([String(r), lado < r ? `${l} · ${veT('maior que a timeline')}` : l]); });
     sel.innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
     $ve('ve-noaudio').disabled = !VE.info.has_audio;
     const soAudio = !!VE.info.audio_only;
@@ -6422,6 +6577,8 @@ async function veStartExport() {
     VE._txPng = null;
     try {
         await veMidiasTamanhoGarantir();   // vídeo ainda na fila de preparação: sem isto o 4K saía ampliado
+        // render maior que a timeline: preparo com a timeline reescalada (veExportNoQuadro); o ffmpeg roda depois
+        const args = await veExportNoQuadro($ve('ve-res').value, async () => {
         // Comps que mudaram renderizam antes (editor-comp.js): na exportação elas entram pelo arquivo delas
         if (typeof veCompProntas === 'function') await veCompProntas(msg => { $ve('ve-exp-msg').textContent = msg; });
         if (typeof ve3dProntas === 'function') await ve3dProntas(msg => { $ve('ve-exp-msg').textContent = msg; });
@@ -6432,14 +6589,14 @@ async function veStartExport() {
         if (veTxPrecisaEm(VE.clips)) await veMoNoTamanho($ve('ve-res').value, () => veTxPngs());   // textos e gráficos viram PNG; camadas do motion, vídeo
         const plano = veExportPlan(true), master = veMasterLim();
         const mix = master ? [...plano.mix, { master }] : plano.mix;
-        veCacheSoltarPlaca();
-        await window.pywebview.api.video_cutter_export(
-            veFonteParaPlano({ ...plano, mix }, !noAudio), plano.base, vePill('format') || 'mp4', vePill('quality') || 'high',
+        return [veFonteParaPlano({ ...plano, mix }, !noAudio), plano.base, vePill('format') || 'mp4', vePill('quality') || 'high',
             $ve('ve-res').value, $ve('ve-gpu').checked, VE.dest, noAudio,
             plano.camadas, plano.audio, plano.dur, mix,
             veTxExport(plano.faixa), [VE.seqW, VE.seqH],
-            veExpOpcoes()
-        );
+            veExpOpcoes()];
+        });
+        veCacheSoltarPlaca();
+        await window.pywebview.api.video_cutter_export(...args);
         VE._expNomes = VE._expNomes || {};
         const nm = $ve('ve-exp-nome').value.trim();   // nome digitado para esta timeline (o padrão acompanha o nome dela)
         if (nm && nm !== VE._expBase) VE._expNomes[VE.activeSequence] = nm; else delete VE._expNomes[VE.activeSequence];

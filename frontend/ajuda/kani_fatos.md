@@ -74,6 +74,13 @@ uma caixa no monitor: arraste-a até um ponto com contraste (um canto, uma letra
 ou ◀◀ (para trás). Escolha o que seguir (posição; posição e giro; posição, giro e escala) e, em "Aplicar a", um Nulo
 novo ou um clipe (texto, imagem, outro vídeo): ele passa a acompanhar o ponto, com quadros-chave comuns. Ainda não faz
 rastreio de quatro cantos (trocar a tela de um celular).
+Trocar o tamanho da timeline (Sequência › Configurações da sequência: Full HD, 2K, 4K, vertical...): com "Adaptar o
+conteúdo ao novo tamanho" ligado, tudo fica no mesmo lugar e do mesmo tamanho na tela (de Full HD para 4K, posição e
+escala dobram sozinhas, inclusive textos, máscaras, quadros-chave e Comps). Mudando a proporção (horizontal para vertical),
+o quadro antigo cabe inteiro no novo, centrado. Não tem Ctrl+Z: para voltar, escolha o tamanho antigo de novo.
+Exportar maior que a timeline: na Exportação/fila, a Resolução também oferece 2K e 4K UHD com a timeline em Full HD
+("maior que a timeline"). O render é montado no tamanho maior (textos e motion nítidos, não é esticar o vídeo pronto);
+enquanto prepara, o editor fica coberto por alguns instantes e a timeline volta sozinha ao tamanho dela.
 
 ## Kanivete Encoder (fila de exportação, estilo Media Encoder)
 Configurações à esquerda e fila à direita. Cada item da fila tem as suas próprias configurações (formato, resolução,
