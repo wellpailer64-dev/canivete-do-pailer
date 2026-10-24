@@ -4504,12 +4504,12 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 eh = f"({e})*({sy})" if sy else e
                 # tamanho sempre par: com metade inteira o centro não "treme" meio pixel a cada quadro do zoom
                 escala = (f"scale=w='max(2,2*trunc({base_w}*({ew})/2))':h='max(2,2*trunc({base_h}*({eh})/2))'"
-                          f":eval=frame:flags=bicubic")
+                          f":eval=frame:flags=lanczos")
             else:
                 k = c["sc"]
                 # tamanho original: sem scale (ele converte o quadro inteiro mesmo com fator 1)
                 escala = (None if abs(k - 1) < 1e-5 else
-                          f"scale='max(2,trunc(iw*{k:.5f}))':'max(2,trunc(ih*{k:.5f}))':flags=bicubic")
+                          f"scale='max(2,trunc(iw*{k:.5f}))':'max(2,trunc(ih*{k:.5f}))':flags=lanczos")
             giro = None
             if "rot" in kf or ca["rot"]:
                 # quadro fixo do tamanho da diagonal: cabe em qualquer ângulo

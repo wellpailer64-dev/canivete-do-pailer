@@ -486,6 +486,17 @@ CASOS = {
         foto.k = { op: [{ t: 0, v: 0, i: 'lin' }, { t: 0.6, v: 100, i: 'lin' }] };
         return [clip(0, 0, 0, 3, 'b.mp4'), logo, foto];
     """, ""),
+    # imagem GIRANDO com mesclagem (brilhos em Tela do clipe Brasativa): com --placa a imagem gira na CPU antes de subir
+    # e o shader de mesclagem só a posiciona — giro animado em Tela, giro fixo em Multiplicar e em Sobrepor
+    "giromescla": (1080, 1920, """
+        const { clip } = __te;
+        const logo = clip(1, 0, 0, 2.4, 'logo.png', { bm: 'screen', p: { sc: 110, x: 540, y: 600, rot: 0, op: 100 } });
+        logo.k = { rot: [{ t: 0, v: -40, i: 'lin' }, { t: 2.4, v: 50, i: 'lin' }] };
+        const f1 = clip(2, 0, 0, 2.4, 'foto5.jpg', { bm: 'multiply', p: { sc: 35, x: 360, y: 1250, rot: 14, op: 100 } });
+        const f2 = clip(3, 0.4, 0, 2.0, 'foto8.jpg', { bm: 'overlay', p: { sc: 30, x: 760, y: 1450, rot: -9, op: 80 } });
+        f2.k = { rot: [{ t: 0, v: -9, i: 'lin' }, { t: 2.0, v: 20, i: 'lin' }] };
+        return [clip(0, 0, 0, 3, 'b.mp4'), logo, f1, f2];
+    """, ""),
     # sombra projetada: efeito numa imagem girada e com escala, logo com transparência e sombra do texto em ângulo
     "sombra": (1080, 1920, """
         const { clip } = __te, W = 1080, H = 1920, id = () => veFxNewId();

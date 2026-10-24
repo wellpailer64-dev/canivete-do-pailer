@@ -129,6 +129,12 @@ Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lu
   em script de montagem, `polir(clips, media, {id_midia: duração})` corrige (estica/antecipa/encolhe o B-roll vizinho).
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-10-24 TEASER NAUTIC BAY V1 ("quase perfeito"; `D:/kanivete_testes/nautic/scripts/montar.py`): (1) DRONE: cortar a
+  correção de ângulo (o drone mexe rápido antes de estabilizar) e começar no trecho estável. Medir com `movimento.py`
+  (correlação de fase a 10 q/s → velocidade e solavanco); `estavel()` pula sozinho até o 1º trecho sem solavanco > 0,08
+  nem variação de velocidade > 0,5. (2) LETTERING: uma frase por cena (cada facilidade sobre a cena dela). (3) PELÍCULA
+  atrás do texto: faixa suave do tamanho do texto, não "bolinha" no meio. (4) Lettering fora do meio, mais baixo e
+  menor (y≈715 de 1080, acima da legenda de 2 linhas). Lançamento imobiliário: roteiro técnico do cliente manda.
 - 2026-10-22 NOTA DO PAILER NO CULTSP 02 V1 ("quase lá") → V2 (`cultsp2/scripts/montar_v2.py`): (1) TÍTULO DO EPISÓDIO
   no lower já no 0:00, sobre a abertura (padrão do 01); (2) GC da pessoa na 1ª fala dela, DE ROSTO (não abrir com a voz
   dela sobre B-roll); (3) letreiro do assunto da aula quando o professor começa a ensinar, sobre o ROSTO dele (plano

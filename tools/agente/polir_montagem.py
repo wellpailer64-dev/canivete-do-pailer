@@ -9,7 +9,7 @@ EPS = 0.0005
 
 
 def _fim(c):
-    return c["st"] + c["e"] - c["s"]
+    return c["st"] + (c["e"] - c["s"]) / (c.get("v") or 1)   # velocidade conta (veLen no app)
 
 
 def _visiveis(clips, media):

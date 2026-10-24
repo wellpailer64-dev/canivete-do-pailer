@@ -76,6 +76,10 @@ def _fmt_decodificado(info):
 # 8 bits ANTES da coloração: no escuro, degraus e manchas em bloco que o encoder ainda piorava. Agora a camada sai em
 # 10 bits, a composição e os efeitos em 16 bits 4:4:4, e só a saída volta a 8 bits com pontilhado (blue noise).
 _FMT_CAM = "p010le"
+# Redimensionar com qualidade de master (Nautic Bay, 2026-10-24): o padrão do libplacebo reduz em Mitchell (macio) e o
+# 4K do drone chegava ao 1080 com 1/3 da nitidez de um Lanczos (Laplaciano 520 × 1830; reduzir + zoom = 2 passagens
+# macias). Todo passo que muda o tamanho usa Lanczos para reduzir e EWA Lanczos para ampliar.
+_ESC = "downscaler=lanczos:upscaler=ewa_lanczos"
 _FMT_MEIO = "yuv444p16le"
 _FMT_ALFA = "rgba64le"   # camada com transparência feita na placa (fade de clipe)
 
@@ -401,9 +405,11 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
         if c.get("bm") and ((c["bm"] != "multiply" and c["bm"] != "add" and c["bm"] not in _BM_GLSL)
                             or vc._sombra_camada(c)):
             return "modo de mesclagem com sombra projetada"
-        # girado: imagem/texto gira na CPU antes de subir (_entrada_imagem); vídeo desce, gira na CPU e sobe (híbrido)
+        # girado: imagem/texto gira na CPU antes de subir (_entrada_imagem); vídeo desce, gira na CPU e sobe (híbrido).
+        # Imagem/texto girado COM mesclagem também vai: _mesclar/_multiplicar só posicionam a textura já girada
+        # (teste_export --casos giromescla --placa; brilhos em Tela do clipe Brasativa, 2026-10-24)
         gira = c["rot"] or "rot" in c["kf"] or any(f.get("t") == "ca_rot" for f in c.get("ca") or [])
-        if gira and (c["tipo"] == "ajuste" or c.get("bm") or "sx" in c["kf"] or "sy" in c["kf"]
+        if gira and (c["tipo"] == "ajuste" or (c.get("bm") and c["tipo"] == "video") or "sx" in c["kf"] or "sy" in c["kf"]
                      or (c["tipo"] == "video" and (_key_so(c["fx"]) or vc._clipe_tem_alfa(c["path"])))):
             return "rotação"
         if c["tipo"] == "ajuste":
@@ -614,14 +620,20 @@ def _trechos(vals, tol, max_trechos=256):
     return trechos
 
 
+def _glf(v):
+    """float do GLSL com 9 algarismos (a fração de pixel em fração da largura pede mais que 5 casas) e sempre com ponto."""
+    t = f"{v:.9g}"
+    return t if ("." in t or "e" in t or "n" in t) else t + ".0"
+
+
 def _glsl_trechos(nome, trechos):
     """Tabelas de trechos e a função float {nome}(int f) que devolve o valor do quadro f (0 = 1º quadro da camada)."""
     m = len(trechos)
     lst = lambda xs: ", ".join(xs)
     return (f"const int {nome}_T0[{m}] = int[]({lst(str(t[0]) for t in trechos)});\n"
             f"const int {nome}_T1[{m}] = int[]({lst(str(t[1]) for t in trechos)});\n"
-            f"const float {nome}_V0[{m}] = float[]({lst(f'{t[2]:.5f}' for t in trechos)});\n"
-            f"const float {nome}_V1[{m}] = float[]({lst(f'{t[3]:.5f}' for t in trechos)});\n"
+            f"const float {nome}_V0[{m}] = float[]({lst(_glf(t[2]) for t in trechos)});\n"
+            f"const float {nome}_V1[{m}] = float[]({lst(_glf(t[3]) for t in trechos)});\n"
             f"float {nome}(int f) {{\n    for (int k = 0; k < {m}; k++)\n"
             f"        if (f <= {nome}_T1[k]) return {nome}_T1[k] > {nome}_T0[k] ? mix({nome}_V0[k], {nome}_V1[k], "
             f"float(max(f - {nome}_T0[k], 0)) / float({nome}_T1[k] - {nome}_T0[k])) : {nome}_V0[k];\n"
@@ -811,7 +823,7 @@ def _onda_passos(fx, mw, mh, s, fps, t_ini, pasta, tag, margem=True, fmt=_FMT_AL
     if margem:
         M = int(math.ceil(vc._onda_margem(fx) * s))
         passos.append(f"libplacebo=w=iw+{2 * M}:h=ih+{2 * M}:pos_x={M}:pos_y={M}:pos_w=iw:pos_h=ih:fillcolor=black@0:"
-                      f"format={fmt}:disable_linear=1")
+                      f"format={fmt}:disable_linear=1:{_ESC}")
     for j, f in enumerate(ondas):
         arq = os.path.join(pasta, f"onda_{tag}_{j}.glsl")
         with open(arq, "w", encoding="utf-8") as fh:
@@ -850,7 +862,7 @@ def _giro_passos(c, fps, pula, bw, bh, pasta, tag, fmt=_FMT_ALFA):
                  f"    return clamp(HOOKED_tex(p), 0.0, 1.0);\n}}\n")
     # a textura cresce para a caixa do giro (centrada, borda transparente) e o shader gira dentro dela
     return ([f"libplacebo=w={RW}:h={RH}:pos_x={(RW - bw) / 2:.3f}:pos_y={(RH - bh) / 2:.3f}:pos_w=iw:pos_h=ih:"
-             f"fillcolor=black@0:format={fmt}:disable_linear=1",
+             f"fillcolor=black@0:format={fmt}:disable_linear=1:{_ESC}",
              f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={fmt}:disable_linear=1"], RW, RH)
 
 
@@ -960,8 +972,8 @@ def _entrada_video(g, c, info, pasta, n_cam):
     giro = ""
     if vk and (rot in _GIRO or red < 1):
         giro = ("libplacebo=" + (f"rotate={_GIRO[rot]}:" if rot in _GIRO else "")
-                + (f"w={rw}:h={rh}:" if red < 1 else "") + f"format={_FMT_CAM}:disable_linear=1,")
-    sobe = ("" if vk else (f"scale={rw}:{rh}:flags=bicubic," if red < 1 else "") + "format=yuv420p,hwupload,")
+                + (f"w={rw}:h={rh}:{_ESC}:" if red < 1 else "") + f"format={_FMT_CAM}:disable_linear=1,")
+    sobe = ("" if vk else (f"scale={rw}:{rh}:flags=lanczos," if red < 1 else "") + "format=yuv420p,hwupload,")
     # os efeitos medem em % da mídia: no quadro reduzido, as medidas do quadro reduzido
     # desfoque animado (fxk): sai da lista fixa e vai num shader com o sigma de cada quadro (_shader_blur_anim)
     ids_anim = {f.get("id") for f in c.get("fxk") or [] if f.get("id") and (f.get("p") or {})}
@@ -1224,10 +1236,91 @@ def _arvore(vals, padrao):
     return rec(0, max(vals) if vals else 0)
 
 
+# ─────────────── posição em fração de pixel (como After/Premiere) ───────────────
+# O libplacebo (e o overlay da CPU) arredonda pos_x/pos_y para pixel inteiro: um texto que desacelera andava 3, 3, 2, 2,
+# 1, 1, 0, 1, 0, 0... px por quadro — "tremida"/"piscada" no fim de cada movimento (Nautic Bay V3, medido no export).
+# Agora a camada que se move vai para o pixel inteiro de baixo (floor) e um shader desloca a imagem dela pela fração
+# que sobrou (amostragem bilinear), com a fração de cada quadro numa tabela no shader (o mesmo `frame` do desfoque
+# animado). Medido num quadrado a 1 px/s: 109,50 109,59 109,69 109,79... em vez de 15 quadros parados e 1 px de salto.
+_FN_EXPR = {
+    "_if": lambda c, a, b=0.0: a if c else b, "lt": lambda a, b: float(a < b), "lte": lambda a, b: float(a <= b),
+    "gt": lambda a, b: float(a > b), "gte": lambda a, b: float(a >= b), "eq": lambda a, b: float(a == b),
+    "clip": lambda x, a, b: min(max(x, a), b), "min": min, "max": max, "abs": abs, "floor": math.floor,
+    "ceil": math.ceil, "trunc": math.trunc, "sin": math.sin, "cos": math.cos, "exp": math.exp, "sqrt": math.sqrt,
+    "pow": pow, "mod": math.fmod, "PI": math.pi, "PHI": (1 + 5 ** 0.5) / 2, "E": math.e,
+}
+_SUBPX = os.environ.get("CANIVETE_SUBPIXEL", "1") != "0"
+
+
+def _avaliador(expr):
+    """Expressão do ffmpeg (as de _posicao: if/lt/clip/sin… em `ot`) → função Python de ot. None se não souber ler."""
+    try:
+        cod = compile(re.sub(r"\bif\(", "_if(", expr), "<expr>", "eval")
+        f = lambda ot: float(eval(cod, {"__builtins__": {}}, {**_FN_EXPR, "ot": ot}))
+        f(0.0)
+        return f
+    except Exception:
+        return None
+
+
+def _subpixel(g, rot, x, y, w, h):
+    """Camada que se move: devolve (rótulo, pos_x, pos_y) com o shader de fração de pixel, ou None (parada, fórmula
+    que não sabe ler ou movimento picado demais) — aí fica como antes."""
+    if not _SUBPX or ("ot" not in x and "ot" not in y):
+        return None
+    m = re.search(r"\(ot-(-?[\d.]+)\)", x + y)
+    if not m:
+        return None
+    st = float(m.group(1))
+    fx, fy = _avaliador(x), _avaliador(y)
+    fw, fh_ = _avaliador(w), _avaliador(h)
+    if not (fx and fy and fw and fh_):
+        return None
+    # o movimento termina no último quadro-chave: depois a posição fica parada (a tabela devolve o último valor)
+    fim = max([float(v) for v in re.findall(r"lt\(\(ot-[-\d.]+\),(-?[\d.]+)\)", x + y)] + [0.0]) + 0.2
+    fps = float(g.fps)
+    n = max(2, int(math.ceil(fim * fps)) + 2)
+    if n > 20000:
+        return None
+    t0 = max(st, 0.0)            # 1º quadro da camada (_entra); no bloco que já vinha tocando, o início do bloco
+    fr, fracs = [], []
+    for k in range(n):
+        ot = t0 + k / fps
+        vx, vy = fx(ot), fy(ot)
+        dx, dy = vx - math.floor(vx), vy - math.floor(vy)
+        fracs.append((dx, dy))
+        # deslocamento na textura em fração do TAMANHO NA TELA (pos_w/pos_h): independe da resolução da camada
+        fr.append((dx / max(1.0, fw(ot)), dy / max(1.0, fh_(ot))))
+    if all(abs(a) < 1e-4 and abs(b) < 1e-4 for a, b in fracs):
+        return None
+    wmin = max(1.0, min(fw(t0 + k / fps) for k in range(0, n, max(1, n // 50))))
+    hmin = max(1.0, min(fh_(t0 + k / fps) for k in range(0, n, max(1, n // 50))))
+    trx, tr_y = _trechos([a for a, _ in fr], 0.004 / wmin), _trechos([b for _, b in fr], 0.004 / hmin)
+    if trx is None or tr_y is None:
+        return None
+    arq = os.path.join(g.pasta, f"subpx_{g.rotulo('p')}.glsl")
+    with open(arq, "w", encoding="utf-8") as fh:
+        fh.write("//!HOOK MAIN\n//!BIND HOOKED\n//!DESC fração de pixel\n" + _glsl_trechos("FX", trx) + _glsl_trechos("FY", tr_y)
+                 + "vec4 hook() {\n    int f = frame - 1;\n"
+                 # dentro do passo a textura vem com o alfa MULTIPLICADO na cor (amostrar assim mistura certo na borda);
+                 # a saída volta ao alfa reto: sem dividir, o fade de entrada saía mais escuro (alfa aplicado duas
+                 # vezes; teste_export "curva", quadros 3–5 — teste mínimo: dividindo fica igual ao export sem o passo)
+                 + "    vec4 c = HOOKED_tex(HOOKED_pos - vec2(FX(f), FY(f)));\n"
+                 + "    return c.a > 1e-5 ? vec4(c.rgb / c.a, c.a) : vec4(0.0);\n}\n")
+    r = g.rotulo("u")
+    g.filtros.append(f"{rot}libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={_FMT_ALFA}:disable_linear=1[{r}]")
+    return f"[{r}]", f"floor({x})", f"floor({y})"
+
+
 def _compor(g, fundo, itens, fmt=_FMT_MEIO):
     """Um libplacebo: o fundo (entrada 0, tela inteira) + cada item no seu lugar. Devolve o rótulo da saída."""
     if not itens:
         return fundo
+    itens = list(itens)
+    for j, (rot, (x, y, w, h)) in enumerate(itens):
+        sp = _subpixel(g, rot, x, y, w, h)
+        if sp:
+            itens[j] = (sp[0], (sp[1], sp[2], w, h))
     px, py, pw, ph = {0: "0"}, {0: "0"}, {0: "ow"}, {0: "oh"}
     for i, (_, (x, y, w, h)) in enumerate(itens, 1):
         px[i], py[i], pw[i], ph[i] = x, y, w, h
@@ -1235,7 +1328,7 @@ def _compor(g, fundo, itens, fmt=_FMT_MEIO):
     # disable_linear: mistura (opacidade, bordas do texto) e redimensiona nos valores de cor como a CPU (overlay/scale).
     # Em luz linear um branco a 50% sobre preto saía Y 176 em vez de 126: fades claros demais, fim sem escurecer
     g.filtros.append(f"{fundo}{''.join(rot for rot, _ in itens)}libplacebo=inputs={len(itens) + 1}:w={g.W}:h={g.H}:"
-                     f"fps={g.fps:.3f}:format={fmt}:disable_linear=1:"
+                     f"fps={g.fps:.3f}:format={fmt}:disable_linear=1:{_ESC}:"
                      f"pos_x='{_arvore(px, '0')}':pos_y='{_arvore(py, '0')}':"
                      f"pos_w='{_arvore(pw, 'ow')}':pos_h='{_arvore(ph, 'oh')}'[{r}]")
     return f"[{r}]"
@@ -1312,7 +1405,7 @@ def _mesclar(g, atual, c, n, info, pasta):
     with open(arq, "w", encoding="utf-8") as fh:
         fh.write(_shader_mesclar(c["bm"]))
     g.filtros.append(f"{atual}{''.join(rot for rot, _ in itens)}libplacebo=inputs={len(itens) + 1}:w={2 * g.W}:h={g.H}:"
-                     f"fps={g.fps:.3f}:format={_FMT_ALFA}:disable_linear=1:"
+                     f"fps={g.fps:.3f}:format={_FMT_ALFA}:disable_linear=1:{_ESC}:"
                      f"pos_x='{_arvore(px, '0')}':pos_y='{_arvore(py, '0')}':"
                      f"pos_w='{_arvore(pw, 'ow')}':pos_h='{_arvore(ph, 'oh')}',"
                      f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={_FMT_ALFA}:disable_linear=1,"
@@ -1507,7 +1600,7 @@ def _base(g, segmentos, path, info):
             sobe = "" if vk else "format=yuv420p,hwupload,"
             g.filtros.append(f"[{k}:v:0]{_marca_cor(path, info)}trim=start={vc._tempo_ffmpeg(p[0] - ss)}:"
                              f"end={vc._tempo_ffmpeg(p[1] - ss)},setpts=PTS-STARTPTS,{sobe}"
-                             f"libplacebo={giro}w={g.W}:h={g.H}:pos_w={w}:pos_h={h}:format={_FMT_CAM}:disable_linear=1,"
+                             f"libplacebo={giro}w={g.W}:h={g.H}:pos_w={w}:pos_h={h}:format={_FMT_CAM}:disable_linear=1:{_ESC},"
                              f"setsar=1,fps=fps={g.fps:.3f}:start_time=0[{r}]")
         partes.append(f"[{r}]")
     g.filtros.append(f"{''.join(partes)}concat=n={len(partes)}:v=1:a=0[fundo]")

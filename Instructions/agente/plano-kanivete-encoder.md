@@ -395,3 +395,30 @@ durante o export da fila (texto velho do preparo).
 motion são desenhadas no tamanho da saída (`veMoNoTamanho`; o plano usa o tamanho real do arquivo × escala). Teste:
 `teste_export.py --4k --casos 4kmotion [--placa]`. Exportar sem ficar preso: `tools/ke_fila.py render --nome X --drive LINK`
 (espera render + Drive, acusa travada e quadro preto). Pendente: Parar durante "Liberando a memória da placa" não cancela.
+
+## Clipe Brasativa (2026-10-24): giro + mesclagem e muitas camadas em Tela
+- FEITO: imagem/texto GIRADO com modo de mesclagem vai pela placa (`motivo()` só recusa vídeo/ajuste girado com
+  mesclagem). Teste: `teste_export.py --casos giromescla --placa` (antes: "Processador · rotação"; depois: placa, pior 9,6).
+- PENDENTE (travamento medido): ~17 imagens em modo Tela ao mesmo tempo (estrelinhas) TRAVAM o ffmpeg da placa —
+  nenhum quadro novo, 14,8 GB de RAM; cada camada em Tela é uma passada `_mesclar` de 2W sobre o quadro inteiro.
+  Ideia: juntar camadas vizinhas com o MESMO modo (Tela é associativa) numa textura transparente e fazer UMA passada;
+  ou recusar a placa (motivo) acima de N passadas simultâneas. Reproduzir: 50–52 s da timeline "Brasativa feat. Dago · V1"
+  (projeto em COLAB/Dago miranda/KANIVETE) com as estrelas em `bm: screen`.
+- Exportar por script (CDP chamando `video_cutter_export` direto) NÃO marca `VE.exportRunning`: o Render automático de
+  prévias continua rodando junto e disputa CPU/RAM. Marcar antes (`VEPRA.pausado = true; vePrAutoParar(); VE.exportRunning = true`),
+  como em `D:/kanivete_testes/dago/app/exportar_parte.py` (com vigia: sem `ke_quadro.jpg` novo por N s = travou).
+- Exportar em partes (6 × ~33 s) + `concat -c copy` + música inteira: 206 s em 18 min pela placa (`exportar_v1.py`).
+
+## Nautic Bay (2026-10-24): fração de pixel, Lanczos e alfa no passo extra
+- FEITO: **posição em fração de pixel** na placa (`_subpixel` em `_compor`): libplacebo e overlay arredondam pos_x/pos_y,
+  e um texto que desacelera andava 3,3,2,2,1,1,0,1,0 px/quadro (tremida). Agora a camada que se move vai ao pixel de
+  baixo e um shader desloca a imagem pela fração (tabela por quadro, `frame`, como o desfoque animado); a fórmula de
+  posição é avaliada em Python (`_avaliador`). Medido no export: 5,0 → 4,3 → 3,6 … 0,3 → 0,1 → 0. Desligar:
+  `CANIVETE_SUBPIXEL=0`. Só a placa; a CPU continua em pixel inteiro (pendente).
+- ARMADILHA: no passo extra do libplacebo a textura vem com alfa MULTIPLICADO — devolver `rgb / a`. Sem isso o fade
+  de entrada saía mais escuro (teste_export "curva", quadros 3–5; teste mínimo em D:/kanivete_testes/subpixel).
+- FEITO: redimensionamento em Lanczos/EWA Lanczos (`_ESC`) e CPU `flags=lanczos` (o padrão Mitchell reduzia o 4K com
+  ~55% da nitidez). Obs.: o borrado grande do Nautic Bay era OUTRO erro — clipe de vídeo montado com escala sobre a
+  largura errada (montador usava a largura antes de o app medir o vídeo: 4K com zoom 2×).
+- teste_export --placa (14 casos): camadas, fadevideo e velocidade JÁ reprovavam antes (mesmos números); mogrt
+  instável (q0 reprova com e sem); grade no limite (9,7 sem × 10,6 com, imagem parada).
