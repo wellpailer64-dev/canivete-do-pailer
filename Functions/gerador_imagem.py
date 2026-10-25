@@ -57,6 +57,7 @@ LADO_MAX = 2048
 
 _baixando = threading.Lock()
 _srv_lock = threading.Lock()
+_gerando = threading.Lock()
 _srv = {"proc": None, "porta": 0, "uso": 0.0, "log": [], "passo": None, "motor": None, "modelo": None}
 _estado_dl = {"pct": 0, "msg": ""}
 
@@ -333,6 +334,16 @@ def _liberar_gpu_ollama():
 
 
 def gerar(spec, on_progress=lambda d: None):
+    """Uma geração por vez: a recuperação não pode interromper outro pedido que use o mesmo servidor."""
+    if not _gerando.acquire(blocking=False):
+        return {"success": False, "error": "Já existe uma geração em andamento. Aguarde ou cancele antes de gerar outra."}
+    try:
+        return _gerar(spec, on_progress)
+    finally:
+        _gerando.release()
+
+
+def _gerar(spec, on_progress=lambda d: None):
     """spec: {prompt, largura, altura, semente (-1 = aleatória), passos, refs: [caminho|b64...], motor: zimage|klein, sem_cache,
     init, mascara, forca}. Sem motor: Z-Image-Turbo; com referências: FLUX.2 klein (o Turbo não edita a partir de imagem).
     init + mascara (PNG/b64, branco = gerar) = PREENCHIMENTO GENERATIVO / EXPANSÃO (inpaint/outpaint, como o Photoshop):
@@ -369,51 +380,77 @@ def gerar(spec, on_progress=lambda d: None):
     saida = os.path.join(_cache_dir(), chave + ".png")
     if os.path.isfile(saida) and not spec.get("sem_cache"):
         return {"success": True, "path": saida, "semente": semente, "cache": True, "motor": m}
+    tentativas, falhas, inicio = 0, [], time.time()
     try:
-        _srv["ocupado"] = True
-        _subir(on_progress, m)
-        corpo = {"prompt": prompt, "negative_prompt": "", "width": w, "height": h, "seed": semente, "batch_count": 1,
-                 "ref_images": refs, "embed_image_metadata": False, "output_format": "png",
-                 "sample_params": {"sample_method": "euler", "sample_steps": passos, "guidance": {"txt_cfg": MOTORES[m]["cfg"]}}}
-        if init:
-            corpo.update(init_image=init, strength=forca)
-            if mascara:
-                corpo["mask_image"] = mascara
-        job = _http("POST", "/sdcpp/v1/img_gen", corpo)
-        jid, t0 = job["id"], time.time()
-        _srv.update(passo=None, cancelar=None)
-        while True:
-            time.sleep(0.5)
-            if _srv.get("cancelar") == jid:
-                parar()
-                raise RuntimeError("cancelada")
-            j = _http("GET", f"/sdcpp/v1/jobs/{jid}")
-            st = j.get("status")
-            if st == "completed":
-                img = j["result"]["images"][0]["b64_json"]
-                with open(saida, "wb") as f:
-                    f.write(base64.b64decode(img))
+        _srv.update(ocupado=True, cancelar=None)
+        for tentativa in range(2):
+            tentativas += 1
+            try:
+                if _srv.get("cancelar"):
+                    raise RuntimeError("cancelada")
+                _subir(on_progress, m)
+                if _srv.get("cancelar"):
+                    raise RuntimeError("cancelada")
+                corpo = {"prompt": prompt, "negative_prompt": "", "width": w, "height": h, "seed": semente, "batch_count": 1,
+                         "ref_images": refs, "embed_image_metadata": False, "output_format": "png",
+                         "sample_params": {"sample_method": "euler", "sample_steps": passos, "guidance": {"txt_cfg": MOTORES[m]["cfg"]}}}
+                if init:
+                    corpo.update(init_image=init, strength=forca)
+                    if mascara:
+                        corpo["mask_image"] = mascara
+                job = _http("POST", "/sdcpp/v1/img_gen", corpo)
+                jid, t0 = job["id"], time.time()
+                _srv.update(passo=None)
+                while True:
+                    time.sleep(0.5)
+                    if _srv.get("cancelar") == jid:
+                        parar()
+                        raise RuntimeError("cancelada")
+                    j = _http("GET", f"/sdcpp/v1/jobs/{jid}")
+                    st = j.get("status")
+                    if st == "completed":
+                        img = j["result"]["images"][0]["b64_json"]
+                        with open(saida, "wb") as f:
+                            f.write(base64.b64decode(img))
+                        break
+                    if st == "cancelled":
+                        raise RuntimeError("cancelada")
+                    if st == "failed":
+                        raise RuntimeError((j.get("error") or {}).get("message") or st)
+                    # a saída do servidor mostra os passos da amostragem (n/passos) e depois os blocos do VAE (n/blocos)
+                    ps, seg = _srv["passo"], int(time.time() - t0)
+                    if ps and ps[1] == passos:
+                        pct, msg = 5 + int(65 * ps[0] / ps[1]), f"Gerando {w}×{h}... passo {ps[0]}/{ps[1]} ({seg} s)"
+                    elif ps and ps[1]:
+                        pct, msg = 70 + int(28 * ps[0] / ps[1]), f"Finalizando a imagem... ({seg} s)"
+                    else:
+                        pct, msg = 5, f"Lendo o pedido... ({seg} s)"
+                    on_progress({"pct": pct, "msg": msg, "job": jid})
                 break
-            if st in ("failed", "cancelled"):
-                raise RuntimeError((j.get("error") or {}).get("message") or st)
-            # a saída do servidor mostra os passos da amostragem (n/passos) e depois os blocos do VAE (n/blocos)
-            ps, seg = _srv["passo"], int(time.time() - t0)
-            if ps and ps[1] == passos:
-                pct, msg = 5 + int(65 * ps[0] / ps[1]), f"Gerando {w}×{h}... passo {ps[0]}/{ps[1]} ({seg} s)"
-            elif ps and ps[1]:
-                pct, msg = 70 + int(28 * ps[0] / ps[1]), f"Finalizando a imagem... ({seg} s)"
-            else:
-                pct, msg = 5, f"Lendo o pedido... ({seg} s)"
-            on_progress({"pct": pct, "msg": msg, "job": jid})
+            except Exception as e:
+                falhas.append({"erro": str(e), "log": _srv["log"][-12:]})
+                if _srv.get("cancelar"):
+                    raise RuntimeError("cancelada") from e
+                recuperavel = re.search(r"generate_image returned (?:no|empty) results|out of (?:device |host )?memory|outofdevicememory|failed to allocate|cannot make enough memory available", str(e), re.I)
+                if tentativa or not recuperavel:
+                    raise
+                # repete uma vez com o mesmo pedido; o processo anterior sai antes de voltar a ocupar a placa
+                on_progress({"pct": 1, "msg": "O gerador falhou. Tentando novamente com o mesmo pedido..."})
+                proc = _srv["proc"]
+                parar()
+                if proc is not None:
+                    proc.wait(timeout=20)
         try:
             velhos = sorted((os.path.join(_cache_dir(), n) for n in os.listdir(_cache_dir())), key=os.path.getmtime)
             for v in velhos[:-300]:
                 os.remove(v)
         except OSError:
             pass
-        return {"success": True, "path": saida, "semente": semente, "segundos": round(time.time() - t0, 1), "motor": m}
+        return {"success": True, "path": saida, "semente": semente, "segundos": round(time.time() - inicio, 1), "motor": m,
+                "tentativas": tentativas, "largura": w, "altura": h, "falhas": falhas}
     except Exception as e:
-        return {"success": False, "error": str(e), "log": _srv["log"][-6:]}
+        return {"success": False, "error": str(e), "log": _srv["log"][-12:], "tentativas": tentativas,
+                "largura": w, "altura": h, "semente": semente, "falhas": falhas}
     finally:
         _srv["ocupado"] = False
         _srv["uso"] = time.time()

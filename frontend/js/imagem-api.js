@@ -220,7 +220,13 @@ const KNV = {
     // Imagem › Expansão generativa: formato 'story' | 'feed' | 'quadrado' | 'paisagem' | 'margem' (margem %) | 'px'
     // (largura, altura); ancora 'c' | 't' | 'b' | 'l' | 'r'; prompt opcional — a tela cresce e a IA completa o que falta
     async expansaoGenerativa(opts = {}) { const ok = await ieExpansaoGenerativa(IE.doc, opts); if (!ok) throw new Error('expansão generativa não feita'); return KNV.info(); },
-    async variacaoGenerativa() { const ok = await ieGenOutra(IE.doc, ieAtiva(IE.doc)); if (!ok) throw new Error('a camada ativa não é generativa'); return KNV.info(); },
+    async variacaoGenerativa() {
+        const L = IE.doc && ieAtiva(IE.doc);
+        if (!L || !L.generativo) throw new Error('a camada ativa não é generativa');
+        const ok = await ieGenOutra(IE.doc, L);
+        if (!ok) throw new Error('o gerador não conseguiu criar outra variação');
+        return KNV.info();
+    },
     // Editar › Substituição de céu: ceu = 'arquivo' (com caminho) ou 'azul' | 'por' | 'dramatico' | 'rosado' | 'noite' (IA);
     // a seleção ativa, se houver, é a área do céu; cria o grupo "Substituição de céu" (céu objeto inteligente + luz)
     async substituirCeu(opts = {}) { const ok = await ieSubstituirCeu(IE.doc, opts); if (!ok) throw new Error('substituição de céu não feita (sem céu?)'); return KNV.info(); },

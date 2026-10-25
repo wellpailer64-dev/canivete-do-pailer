@@ -22,7 +22,7 @@ const IE = {
         letreiro: { forma: 'ret', suav: 0 },
         laco: { modo: 'livre', suav: 0 },
         varinha: { tol: 32, contiguo: true, todas: false },
-        corte: { apagar: false },
+        corte: { apagar: false, preenchimento: 'transparente' },
         contagotas: { todas: true },
         carimbo: { tam: 60, dureza: 50, opac: 100, fluxo: 100, alinhado: true, todas: false },
         pincel: { tam: 30, dureza: 80, opac: 100, fluxo: 100, forma: 'redondo', espaco: 18, angulo: 0, redondeza: 100, varTam: 0, varAng: 0, dispersao: 0 },

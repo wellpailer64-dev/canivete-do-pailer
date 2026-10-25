@@ -35,10 +35,37 @@ Categoria Imagem → **Editor de Imagem**. Abre PSD/PSB com as camadas, fotos (P
   de padrão, Brilho externo e Sombra projetada (+); (+) = várias instâncias. `L.fx = {tipo: [instâncias]}`.
 - `frontend/js/imagem-estilo.js` — janela Estilo de camada (igual à do Photoshop): Estilos (prontos + "Novo estilo..."),
   Opções de mesclagem (modo, opacidade, preenchimento, canais R/G/B, vazamento raso/profundo, mesclar interiores e
-  cortadas como grupo, máscara oculta efeitos, Misturar se com as setas divididas por Alt), os efeitos com "+", setas,
+  cortadas como grupo, máscara oculta efeitos, Misturar se com as setas divididas por Alt e campos numéricos para os
+  quatro limites de cada faixa/canal, de 0 a 255; limites vizinhos acompanham ao cruzar), os efeitos com "+", setas,
   lixeira, menu fx, Tornar padrão / Redefinir, Visualizar e a amostra. Abre pelo botão direito na camada (primeiro item
   "Opções de mesclagem..."), duplo clique na camada, botão fx do painel, Camada > Estilo de camada. No app em inglês
   a janela usa os termos oficiais do Photoshop (IE_LS_EN). Efeitos aparecem sob a camada (fx ›) com olho por efeito.
+  Teste: `testes/teste_misturar_se.py` (fonte do app 9333 em Edge sem janela, ponte simulada; números/pixels,
+  arraste/Alt, teclado, canais, prévia, cancelar/confirmar, histórico e tradução; saída em D:/kanivete_testes/misturar_se).
+- Harmonização: Camada > Harmonizar com cenário (`imagem-harmonizar.js`). Escolha assunto e referência; luminosidade
+  e cor têm intensidades separadas, com prévia. A análise usa amostras reduzidas dos pixels visíveis, ponderadas pelo
+  alfa: exposição pela razão de luminosidade linear (limitada a ±2 EV) e equilíbrio de cores aproximado pelo croma médio.
+  É um ponto de partida, não uma reconstrução da iluminação. Nesta versão, usa camadas de imagem visíveis em Normal,
+  sem efeitos, Misturar se ou cadeia de recorte. Assunto e referência precisam ser diferentes e ter pixels visíveis.
+  Confirmar coloca o assunto num grupo isolado, na mesma posição da pilha, com Exposição e Equilíbrio de cores padrão
+  editáveis em Propriedades. Pixels e máscara originais não são alterados. Cancelar restaura a estrutura; confirmar
+  grava um passo no histórico. Intensidades ambas zero não criam grupo. Compatibilidade de PSD segue a dos ajustes existentes.
+  Automação: `KNV.cmd('harmonizar', {assunto: '2', referencia: '1', luz: 60, cor: 40})` (ids das camadas).
+  Teste: `testes/teste_harmonizar.py` (fonte do app 9333 em Edge sem janela, sem IA; cenário, alfa, pixels, prévia e histórico).
+- Refino manual de máscara: Propriedades (com a miniatura da máscara selecionada) > Refinar máscara, ou Camada >
+  Máscara de camada > Refinar máscara. Deslocar borda de −20 a +20 px (inteiros: negativo contrai, positivo expande),
+  seguido de suavidade de 0–50 px e contraste de 0–100%, com prévia que sempre parte da máscara original da janela.
+  O deslocamento usa o mínimo/máximo do alfa num disco, preservando tons intermediários e o fundo externo da máscara.
+  Fundos de inspeção: transparência, branco, preto e cor escolhida numa prévia isolada do recorte, sem efeitos.
+  Zoom da inspeção: Ajustar, 100% e 200% (pixel da imagem por pixel físico da tela); arraste para navegar ampliado.
+  A inspeção não cria camada, não muda composição/exportação nem a navegação da vista principal. Confirmar apenas
+  opções de inspeção não grava histórico; fechar a janela descarta essa visualização. Camadas sem raster podem não
+  oferecer prévia isolada. Os fundos podem ser trocados também com Visualizar desligado, examinando a máscara original.
+  Cancelar restaura; confirmar grava um passo no histórico. Não muda os pixels da imagem
+  e mantém posição, fundo e vínculo da máscara. Não faz descontaminação de cor nem reconstrói fios por IA.
+  Automação: `KNV.cmd('mascaraRefinar', {deslocar: -2, suavidade: 2, contraste: 20})`. Teste `testes/teste_refino_mascara.py`
+  (fonte do app 9333 em Edge sem janela, sem IA; disco contra referência independente, alfa, fundos, prévia, cancelar,
+  histórico e pixels preservados).
 - `frontend/js/imagem-guias.js` — guias e encaixe como no Photoshop: Exibir > Guias (Nova guia com cor, Novo layout de
   guias com predefinições 8/12/18/24 colunas + "Carrossel: N slides" + as salvas, destino, cor, colunas/linhas com
   largura vazia = automática e medianiz, margem nos 4 lados, centralizar, limpar, visualizar; Novas guias da forma;
@@ -399,7 +426,17 @@ quando usada; desfazer recompõe o documento inteiro (só o que mudou); históri
   máscara e alfa desfocados repetindo a borda (`ieGenBorrar`; o blur comum deixava fresta transparente no canto).
   Resultado numa camada nova com `L.generativo` (variações: ◀ ▶ e "Gerar outra" no painel Propriedades,
   `KNV.variacaoGenerativa()`). Sem texto o preenchimento vai pelo LaMa: o klein redesenhava o objeto que era para sair.
+  No preenchimento com texto, a suavização final fica limitada ao alfa da seleção original: não revela geração fora
+  dela nem dentro dos vãos, inclusive em novas variações. A expansão mantém seu alfa próprio para costurar a borda.
+  Se o motor devolver sem resultados ou erro de memória, libera seu processo e repete uma única vez com o mesmo
+  pedido (semente, resolução, referência, imagem e máscara). Não reduz qualidade silenciosamente nem repete
+  cancelamentos ou parâmetros inválidos. Pedidos simultâneos são recusados sem interromper a geração em andamento.
+  O retorno de geração registra `tentativas`, `largura`, `altura` e `falhas` (erro e últimas linhas do motor por tentativa);
+  `segundos` inclui a carga do modelo e a recuperação. Cache continua sem executar o motor.
+  Teste `testes/teste_gerador_recuperacao.py` (sem GPU: recuperação, limite, cancelamento, concorrência, semente e cache).
   Teste `testes/teste_generativo.py` (D:/kanivete_testes/ceu/carro.jpg; reprova faixa lisa na expansão).
+  Regressão sem carregar IA: `testes/teste_generativo_mascara.py` (app 9333, provedor sintético; retângulo, elipse,
+  vãos, seleção suave, contexto deslocado e na borda; diferença zero fora, variações, desfazer/refazer e cantos da expansão).
   Em pessoas (2026-10-07, D:/kanivete_testes/humanos): espinha/mancha de pele = SEM texto (LaMa, ~3 s, pele natural);
   com texto ("clear skin") o klein faz mancha lisa de cor diferente. Corpo cortado → expansão SEM texto continua roupa
   e corpo bem; pedir o que não cabe ("jeans e tênis" num quadro que não chega aos pés) encolhe o tronco e dá degrau.
@@ -479,6 +516,15 @@ sem janela: `KNV.exportarRapido(tudo, pasta)`.
   no formato, invertido como o Photoshop guarda). Seletor de cores: C/M/Y/K + aviso de fora da gama.
 - Casinha à esquerda da barra de opções: tela inicial (Recentes + "Continuar" de cada aberto) sem fechar nada; Esc,
   aba ou Continuar voltam.
+
+## Corte com expansão generativa (2026-10-24)
+Na ferramenta C, o seletor Preenchimento da barra superior escolhe Transparente (padrão) ou Expansão generativa.
+Arraste a caixa além da foto e confirme por Enter, duplo clique ou Cortar. Corte totalmente interno não chama IA.
+A expansão reutiliza FLUX.2 klein e cria uma camada generativa com variações; funciona também cortando um lado
+e expandindo outro. A geração usa uma cópia da composição e só aplica o tamanho após sucesso, em um passo de
+histórico. Falha, cancelamento, troca de documento ou edição durante a espera descartam o resultado sem aplicar o
+corte. Sem interseção com a foto ou acima de 8000 px por lado, a expansão é recusada.
+Teste: `py -3.13 testes/teste_corte_generativo.py` (Edge isolado, fonte do app 9333, provedor sintético).
 
 ## Desempenho: redesenho caro não trava a tela (2026-10-19)
 Carrossel 6480×1440 com camada Camera Raw por cima (arte-final) levava 2,6 s a cada redesenho inteiro; vários seguidos

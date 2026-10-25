@@ -21,6 +21,8 @@ const IE_LS_EN = {
     'Camada de forma transparente': 'Transparency Shapes Layer', 'A máscara de camada oculta os efeitos': 'Layer Mask Hides Effects',
     'A máscara vetorial oculta os efeitos': 'Vector Mask Hides Effects', 'Misturar se': 'Blend If', 'Cinza': 'Gray', 'Vermelho': 'Red', 'Verde': 'Green', 'Azul': 'Blue',
     'Esta camada': 'This Layer', 'Camada subjacente': 'Underlying Layer', 'Alt+arrastar separa a metade da seta (transição suave)': 'Alt+drag splits the slider (smooth transition)',
+    'Preto: início': 'Black: start', 'Preto: fim': 'Black: end', 'Branco: início': 'White: start', 'Branco: fim': 'White: end',
+    'Valores de 0 a 255. Ao cruzar um limite, os vizinhos acompanham.': 'Values from 0 to 255. Crossing a limit moves the neighboring limits with it.',
     'Estrutura': 'Structure', 'Qualidade': 'Quality', 'Elementos': 'Elements', 'Sombreamento': 'Shading', 'Cor': 'Color', 'Degradê': 'Gradient', 'Padrão': 'Pattern',
     'Ângulo': 'Angle', 'Usar luz global': 'Use Global Light', 'Distância': 'Distance', 'Espalhamento': 'Spread', 'Tamanho': 'Size', 'Contração': 'Choke',
     'A camada vaza a sombra projetada': 'Layer Knocks Out Drop Shadow', 'Técnica': 'Technique', 'Mais suave': 'Softer', 'Precisa': 'Precise', 'Origem': 'Source',
@@ -374,6 +376,8 @@ function ieLsMeio() {
     if (s === 'mescla') {
         obj = st.mescla;
         const ms = (obj.mescSe[st.canalMescSe] = obj.mescSe[st.canalMescSe] || { atual: [0, 0, 255, 255], baixo: [0, 0, 255, 255] });
+        const numeros = qual => `<div class="ie-ls-ms-valores">${['Preto: início', 'Preto: fim', 'Branco: início', 'Branco: fim'].map((nome, i) =>
+            `<label><span>${ieLsT(nome)}</span><input type="number" min="0" max="255" step="1" data-ms-valor="${qual}" data-ms-indice="${i}" value="${ms[qual][i]}" aria-label="${ieLsT(qual === 'atual' ? 'Esta camada' : 'Camada subjacente')}: ${ieLsT(nome)}"></label>`).join('')}</div>`;
         html = `<div class="ie-ls-tit">${ieLsT('Mesclagem geral')}</div>
             <label class="ie-ls-lin"><span>${ieLsT('Modo de mesclagem')}</span><select data-k="bm">${ieLsBmOpcoes(obj.bm, st.L.tipo === 'grupo')}</select></label>
             <label class="ie-ls-faixa"><span>${ieLsT('Opacidade')}</span><input type="range" data-k="op" data-pct min="0" max="100" value="${Math.round(obj.op * 100)}"><input type="number" data-n="op" data-pct min="0" max="100" value="${Math.round(obj.op * 100)}"><em>%</em></label>
@@ -385,9 +389,10 @@ function ieLsMeio() {
                 ['mascaraOcultaFx', 'A máscara de camada oculta os efeitos'], ['vetorOcultaFx', 'A máscara vetorial oculta os efeitos']]
                 .map(([k, r]) => `<label class="ie-ls-chk"><input type="checkbox" data-k="${k}" ${obj[k] ? 'checked' : ''}> ${ieLsT(r)}</label>`).join('')}
             <div class="ie-ls-tit">${ieLsT('Misturar se')}: <select data-mescse>${[['cinza', 'Cinza'], ['r', 'Vermelho'], ['g', 'Verde'], ['b', 'Azul']].map(([a, b]) => `<option value="${a}" ${a === st.canalMescSe ? 'selected' : ''}>${ieLsT(b)}</option>`).join('')}</select></div>
-            <div class="ie-ls-mescse"><span>${ieLsT('Esta camada')}: <b data-ms-txt="atual">${ieLsTxtFaixa(ms.atual)}</b></span><canvas data-ms="atual" width="360" height="34"></canvas>
-            <span>${ieLsT('Camada subjacente')}: <b data-ms-txt="baixo">${ieLsTxtFaixa(ms.baixo)}</b></span><canvas data-ms="baixo" width="360" height="34"></canvas>
-            <em class="ie-prop-nota">${ieLsT('Alt+arrastar separa a metade da seta (transição suave)')}</em></div>`;
+            <div class="ie-ls-mescse"><span>${ieLsT('Esta camada')}: <b data-ms-txt="atual">${ieLsTxtFaixa(ms.atual)}</b></span><canvas data-ms="atual" width="360" height="34"></canvas>${numeros('atual')}
+            <span>${ieLsT('Camada subjacente')}: <b data-ms-txt="baixo">${ieLsTxtFaixa(ms.baixo)}</b></span><canvas data-ms="baixo" width="360" height="34"></canvas>${numeros('baixo')}
+            <em class="ie-prop-nota">${ieLsT('Alt+arrastar separa a metade da seta (transição suave)')}</em>
+            <em class="ie-prop-nota">${ieLsT('Valores de 0 a 255. Ao cruzar um limite, os vizinhos acompanham.')}</em></div>`;
     } else {
         const e = ieLsGarantir(s);
         if (e.global) { e.ang = st.luz.ang; if (s.tipo === 'chanfro') e.alt = st.luz.alt; }   // "Usar luz global": mostra a luz do documento
@@ -489,6 +494,7 @@ function ieLsDialArrastar(cv, obj, k, box, mudou) {
 function ieLsMescSeWidget(cv, obj, mudou) {
     const st = IE_LS.st, qual = cv.dataset.ms, ch = st.canalMescSe;
     const faixa = () => obj.mescSe[ch][qual];
+    const numeros = [...cv.parentElement.querySelectorAll(`[data-ms-valor="${qual}"]`)];
     const W = cv.width, H = cv.height, m = 8, larg = W - 2 * m;
     const pos = v => m + v / 255 * larg;
     const desenhar = () => {
@@ -501,7 +507,25 @@ function ieLsMescSeWidget(cv, obj, mudou) {
         const sep = (a, b) => a !== b;
         if (sep(f[0], f[1])) { seta(f[0], '#222', 'e'); seta(f[1], '#222', 'd'); } else seta(f[0], '#222');
         if (sep(f[2], f[3])) { seta(f[2], '#eee', 'e'); seta(f[3], '#eee', 'd'); } else seta(f[2], '#eee');
+        numeros.forEach(el => { el.value = f[+el.dataset.msIndice]; });
     };
+    const atualizar = () => {
+        const t = cv.parentElement.querySelector(`[data-ms-txt="${qual}"]`); if (t) t.textContent = ieLsTxtFaixa(faixa());
+        desenhar(); mudou();
+    };
+    numeros.forEach(el => {
+        el.addEventListener('input', () => {
+            if (el.value === '' || !Number.isFinite(el.valueAsNumber)) return;
+            const f = faixa(), i = +el.dataset.msIndice, v = Math.round(ieClamp(el.valueAsNumber, 0, 255));
+            f[i] = v;
+            // mantém a ordem sem impedir que um limite unido se separe pela digitação
+            for (let j = 0; j < i; j++) f[j] = Math.min(f[j], v);
+            for (let j = i + 1; j < 4; j++) f[j] = Math.max(f[j], v);
+            atualizar();
+        });
+        el.addEventListener('change', desenhar);
+        el.addEventListener('blur', desenhar);
+    });
     desenhar();
     cv.addEventListener('pointerdown', ev => {
         const r = cv.getBoundingClientRect(), f = faixa();
@@ -520,8 +544,7 @@ function ieLsMescSeWidget(cv, obj, mudou) {
                 g[0] = Math.min(g[0], g[1]); g[2] = Math.min(g[2], g[3]);
                 if (g[1] > g[2]) { if (preto) g[1] = g[2]; else g[2] = g[1]; }
             }
-            const t = document.querySelector(`[data-ms-txt="${qual}"]`); if (t) t.textContent = ieLsTxtFaixa(g);
-            desenhar(); mudou();
+            atualizar();
         };
         cv.onpointerup = () => { cv.onpointermove = null; };
     });

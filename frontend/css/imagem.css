@@ -3,6 +3,9 @@
    Usa os tokens do app.css (preto, branco e laranja).
    ========================================================= */
 
+/* O Photo ocupa a área abaixo das abas, inclusive quando aberto direto pela API. */
+.content-area:has(> #page-editor-imagem.active) { padding: 0; overflow: hidden; }
+
 .ie {
     --ie-bg: var(--bg-0);
     --ie-painel: var(--bg-1);
@@ -468,6 +471,10 @@ body.nav-mini .ie-corpo, .ie-corpo { min-width: 0; }
 .ie-ls-novo input[type=text] { height: 26px; background: var(--bg-input); color: var(--text); border: 1px solid var(--ie-linha-2); border-radius: 4px; padding: 0 6px; font: inherit; }
 .ie-ls-mescse { display: flex; flex-direction: column; gap: 4px; color: var(--text-2); }
 .ie-ls-mescse canvas { width: 360px; height: 34px; cursor: pointer; }
+.ie-ls-ms-valores { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; width: 360px; max-width: 100%; margin-bottom: 8px; }
+.ie-ls-ms-valores label { display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: 10px; }
+.ie-ls-ms-valores input { width: 100%; min-width: 0; box-sizing: border-box; height: 24px; background: var(--bg-input); color: var(--text); border: 1px solid var(--ie-linha-2); border-radius: 4px; padding: 0 5px; font: inherit; }
+.ie-ls-ms-valores input:focus-visible { outline: 1px solid var(--ie-acento); outline-offset: 1px; }
 .ie-ls-estilos { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; }
 .ie-ls-estilo { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border: 1px solid var(--ie-linha-2); border-radius: 4px; background: var(--ie-painel-2); color: var(--text-2); cursor: pointer; font-size: 11px; }
 .ie-ls-estilo:hover { border-color: var(--ie-acento); color: var(--text); }

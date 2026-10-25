@@ -976,14 +976,15 @@ function ieGenCasarCor(g, orig, a) {
     ieCtx(g).putImageData(G, 0, 0);
 }
 // alfa: recorte final (canvas do documento) quando difere da máscara — a expansão usa um degradê na costura
-async function ieGerarArea(doc, R, area, prompt, semente = -1, refR = R, alfa = null, forca = 1) {
+async function ieGerarArea(doc, R, area, prompt, semente = -1, refR = R, alfa = null, forca = 1, imagem = null) {
     const api = ieApi();
     if (!(await ieGeradorPronto('klein'))) return null;
-    ieCompor(doc, ieRDoc(doc));
+    if (!imagem) ieCompor(doc, ieRDoc(doc));
+    const composicao = imagem || doc.comp;
     const [gw, gh] = ieGenTamanho(R.w, R.h);
     // contexto: a composição de R; transparente (tela nova da expansão) vira a cor média, para a referência não ter buraco
     const ctx = ieCanvas(R.w, R.h), cx = ieCtx(ctx);
-    cx.drawImage(doc.comp, -R.x, -R.y);
+    cx.drawImage(composicao, -R.x, -R.y);
     const pequeno = ieCanvas(1, 1), px = ieCtx(pequeno); px.drawImage(ctx, 0, 0, 1, 1);
     const m1 = px.getImageData(0, 0, 1, 1).data, a1 = m1[3] / 255 || 1;
     const init = ieCanvas(gw, gh), ix = ieCtx(init);
@@ -997,7 +998,7 @@ async function ieGerarArea(doc, R, area, prompt, semente = -1, refR = R, alfa = 
     const initPng = init.toDataURL('image/png');
     // referência pequena (~0,25 MP): só passa estilo/cores; do tamanho da geração ela dobrava a memória e falhava
     const kr = Math.min(1, Math.sqrt(0.25e6 / (refR.w * refR.h))), ref = ieCanvas(Math.max(64, Math.round(refR.w * kr / 16) * 16), Math.max(64, Math.round(refR.h * kr / 16) * 16));
-    ieCtx(ref).drawImage(doc.comp, refR.x, refR.y, refR.w, refR.h, 0, 0, ref.width, ref.height);
+    ieCtx(ref).drawImage(composicao, refR.x, refR.y, refR.w, refR.h, 0, 0, ref.width, ref.height);
     const r = await (async () => { try { return await api.ie_gerar({ prompt, largura: gw, altura: gh, semente, refs: [ref.toDataURL('image/png')], init: initPng, mascara: msk.toDataURL('image/png'), forca, motor: 'klein' }); } finally { ieGerLimparBarra?.(); } })();
     if (!r || !r.success) {
         if (r && /cancel/i.test(r.error || '')) ieToast(ieT('Geração cancelada'));
@@ -1009,6 +1010,11 @@ async function ieGerarArea(doc, R, area, prompt, semente = -1, refR = R, alfa = 
     const c = ieCanvas(R.w, R.h), x = ieCtx(c);
     x.imageSmoothingQuality = 'high'; x.drawImage(out, 0, 0, R.w, R.h);
     const a = alfa ? (() => { const c2 = ieCanvas(R.w, R.h); ieCtx(c2).drawImage(alfa, -R.x, -R.y); return c2; })() : ieGenBorrar(area, R, 3);
+    if (!alfa) {   // suaviza por dentro: o blur não pode revelar geração fora da seleção, nem nos vãos
+        const ax = ieCtx(a);
+        ax.filter = 'none'; ax.globalCompositeOperation = 'destination-in'; ax.drawImage(area, -R.x, -R.y);
+        ax.globalCompositeOperation = 'source-over';
+    }
     ieGenCasarCor(c, ctx, a);
     x.globalCompositeOperation = 'destination-in'; x.drawImage(a, 0, 0);
     return { c, semente: r.semente };
@@ -1038,18 +1044,24 @@ async function iePreenchimentoGenerativo(doc, prompt = '', { semente = -1 } = {}
     return true;
 }
 // formato: 'story' | 'feed' | 'quadrado' | 'paisagem' | 'margem' (margem %, em volta) | largura/altura (px)
-async function ieExpansaoGenerativa(doc, { formato = 'story', largura, altura, margem = 20, ancora = 'c', prompt = '', semente = -1 } = {}) {
+async function ieExpansaoGenerativa(doc, { formato = 'story', largura, altura, margem = 20, ancora = 'c', prompt = '', semente = -1, caixa = null, apagar = false } = {}) {
     if (!doc) return false;
     const W0 = doc.w, H0 = doc.h, prop = { story: 9 / 16, feed: 4 / 5, quadrado: 1, paisagem: 16 / 9 }[formato];
     let W = W0, H = H0;
     if (prop) { if (W0 / H0 > prop) H = Math.round(W0 / prop); else W = Math.round(H0 * prop); }
     else if (formato === 'margem') { W = Math.round(W0 * (1 + 2 * margem / 100)); H = Math.round(H0 * (1 + 2 * margem / 100)); }
     else { W = Math.max(W0, Math.round(largura || W0)); H = Math.max(H0, Math.round(altura || H0)); }
-    if (W === W0 && H === H0) { ieToast(ieT('O documento já tem esse formato: nada para expandir')); return false; }
+    if (caixa) { W = Math.round(caixa.w); H = Math.round(caixa.h); }
+    if (![W, H, caixa?.x || 0, caixa?.y || 0].every(Number.isFinite) || W < 1 || H < 1 || W > 8000 || H > 8000) { ieToast(ieT('Tamanho de expansão inválido (máximo 8000 px)')); return false; }
+    if (W === W0 && H === H0 && (!caixa || (!caixa.x && !caixa.y))) { ieToast(ieT('O documento já tem esse formato: nada para expandir')); return false; }
     if (!(await ieGeradorPronto('klein'))) return false;
     const fx = ancora.includes('l') ? 0 : ancora.includes('r') ? 1 : 0.5, fy = ancora.includes('t') ? 0 : ancora.includes('b') ? 1 : 0.5;
-    const ox = Math.round((W - W0) * fx), oy = Math.round((H - H0) * fy);
-    ieRedimTela(doc, -ox, -oy, W, H, false);
+    const ox = caixa ? -Math.round(caixa.x) : Math.round((W - W0) * fx), oy = caixa ? -Math.round(caixa.y) : Math.round((H - H0) * fy);
+    if (!ieRInter({ x: ox, y: oy, w: W0, h: H0 }, { x: 0, y: 0, w: W, h: H })) { ieToast(ieT('Mantenha parte da foto dentro do corte para expandir')); return false; }
+    // Gera sobre uma cópia da composição; falha ou cancelamento mantém a tela original.
+    ieCompor(doc, ieRDoc(doc));
+    const imagem = ieCanvas(W, H); ieCtx(imagem).drawImage(doc.comp, ox, oy);
+    const estado = doc.hist.itens[doc.hist.i];
     // área nova = fora do retângulo antigo, entrando uma faixa curta (~2% do lado menor, 16–40 px) nos lados que cresceram;
     // o recorte final passa da foto à geração num degradê nela. Faixa larga (6%) deixava manga/corpo meio transparente
     // (a IA redesenha a faixa diferente da foto e o degradê mostra as duas)
@@ -1068,9 +1080,11 @@ async function ieExpansaoGenerativa(doc, { formato = 'story', largura, altura, m
     if (bb) rampa(0, oy + H0, 0, oy + H0 - s, ox, oy + H0 - s, W0, s);
     const R = { x: 0, y: 0, w: W, h: H };
     const texto = (String(prompt || '').trim() ? String(prompt).trim() + ', ' : '') + IE_GEN_EXPANDIR + IE_GEN_COMPL;
-    const refR = { x: ox, y: oy, w: W0, h: H0 };
-    const g = await ieGerarArea(doc, R, area, texto, semente, refR, alfa);
-    if (!g) { ieHist(ieT('Tamanho da tela')); return false; }
+    const refR = ieRInter({ x: ox, y: oy, w: W0, h: H0 }, R);
+    const g = await ieGerarArea(doc, R, area, texto, semente, refR, alfa, 1, imagem);
+    if (!g) return false;
+    if (IE.doc !== doc || doc.w !== W0 || doc.h !== H0 || doc.hist.itens[doc.hist.i] !== estado) { ieToast(ieT('A foto mudou durante a geração; tente expandir novamente')); return false; }
+    ieRedimTela(doc, -ox, -oy, W, H, apagar);
     ieGenCamada(doc, g, { prompt: String(prompt || '').trim() || ieT('(expansão)'), R, area, texto, refR, alfa }, 'Expansão generativa');
     ieHist(ieT('Expansão generativa'));
     ieUiCamadas?.();

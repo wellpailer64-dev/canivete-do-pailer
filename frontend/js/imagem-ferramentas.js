@@ -1247,8 +1247,20 @@ function ieAlcaRet(r, p, doc) {
     return null;
 }
 
-function ieCorteAplicar(doc = IE.doc, r = IE.corte && IE.corte.r) {
-    if (!doc || !r || r.w < 1 || r.h < 1) return;
+async function ieCorteAplicar(doc = IE.doc, r = IE.corte && IE.corte.r) {
+    if (!doc || !r || r.w < 1 || r.h < 1 || IE._corteGerando) return false;
+    r = { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.w), h: Math.round(r.h) };
+    if (IE.op.corte.preenchimento === 'generativo' && (r.x < 0 || r.y < 0 || r.x + r.w > doc.w || r.y + r.h > doc.h)) {
+        IE._corteGerando = true;
+        try {
+            const ok = await ieExpansaoGenerativa(doc, { caixa: r, apagar: IE.op.corte.apagar });
+            if (ok && IE.doc === doc) {
+                IE.corte = IE.ferr === 'corte' ? { r: ieRDoc(doc) } : null;
+                ieOpcoesRender(); ieDesenharSobre();
+            }
+            return ok;
+        } finally { IE._corteGerando = false; }
+    }
     if (r.x === 0 && r.y === 0 && r.w === doc.w && r.h === doc.h) { ieToast(ieT('Nada para cortar')); return; }
     ieRedimTela(doc, r.x, r.y, r.w, r.h, IE.op.corte.apagar);
     IE.corte = IE.ferr === 'corte' ? { r: ieRDoc(doc) } : null;

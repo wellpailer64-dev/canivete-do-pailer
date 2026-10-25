@@ -241,6 +241,7 @@ function ieNovoDoc2(nome, w, h, dpi = 72, fundo = 'branco') {
 
 // ─────────────────────────── documentos ───────────────────────────
 function ieMostrarDoc(doc) {
+    ieIniciar();   // aberto pela API (KNV) sem passar pela aba: sem isso ficavam sem menus nem ferramentas
     ieTextoEncerrar?.(true);
     if (IE.transf) ieTransfAplicar();
     IE.doc = doc || null;
@@ -1167,6 +1168,7 @@ const IE_CMDS = {
     mascaraSel: doc => ieMascaraNova(doc, true, true),
     mascaraSelOcultar: doc => ieMascaraNova(doc, false, true),
     mascaraInverter: doc => { doc.mascaraAlvo = true; IE_AJUSTES.inverter(); },
+    mascaraRefinar: doc => ieRefinarMascara(doc),
     // Converter em objeto inteligente (como no Photoshop): os pixels de agora (com a máscara aplicada dentro) viram o
     // original; escalar/girar depois sempre parte dele (diminuir e aumentar de novo não perde nitidez) e Ctrl+J faz
     // cópias que usam o mesmo original
@@ -1346,6 +1348,137 @@ async function ieRemoverFundo(doc, { rapido = false } = {}) {
     for (let i = 0; i < p.length; i += 4) { p[i + 3] = p[i]; p[i] = p[i + 1] = p[i + 2] = 255; }
     x.putImageData(d, 0, 0);
     ieAplicarRecorte(doc, L, px, c);
+}
+// Máximo/mínimo do alfa num disco: expande/contrai sem somar transparências nem quadrar os cantos.
+function ieDeslocarMascaraPlano(m, deslocar) {
+    const d = Math.round(ieClamp(Number(deslocar) || 0, -20, 20)), r = Math.abs(d);
+    if (!r) return m;
+    const w = (m.c?.width || 1) + 2 * r, h = (m.c?.height || 1) + 2 * r;
+    const x0 = (m.x || 0) - r, y0 = (m.y || 0) - r;
+    const fonte = ieMascaraRegiao(m, { x: x0 - r, y: y0 - r, w: w + 2 * r, h: h + 2 * r });
+    const sw = fonte.width, p = ieCtx(fonte).getImageData(0, 0, sw, fonte.height).data;
+    const c = ieCanvas(w, h), x = ieCtx(c), img = x.createImageData(w, h), a = img.data;
+    const expandir = d > 0, fila = new Int32Array(sw);
+    for (let i = 0; i < a.length; i += 4) { a[i] = a[i + 1] = a[i + 2] = 255; a[i + 3] = expandir ? 0 : 255; }
+    // Cada linha do disco é uma janela horizontal; a fila mantém seu extremo em tempo linear.
+    for (let dy = -r; dy <= r; dy++) {
+        const dx = Math.floor(Math.sqrt(r * r - dy * dy));
+        for (let y = 0; y < h; y++) {
+            const base = (y + r + dy) * sw * 4;
+            let inicio = 0, fim = 0;
+            for (let i = r - dx; i < r + w + dx; i++) {
+                while (inicio < fim && fila[inicio] < i - 2 * dx) inicio++;
+                const v = p[base + i * 4 + 3];
+                while (inicio < fim && (expandir ? p[base + fila[fim - 1] * 4 + 3] <= v : p[base + fila[fim - 1] * 4 + 3] >= v)) fim--;
+                fila[fim++] = i;
+                if (i < r + dx) continue;
+                const k = (y * w + i - dx - r) * 4 + 3, extremo = p[base + fila[inicio] * 4 + 3];
+                a[k] = expandir ? Math.max(a[k], extremo) : Math.min(a[k], extremo);
+            }
+        }
+    }
+    x.putImageData(img, 0, 0);
+    return { ...m, c, x: x0, y: y0 };
+}
+// Refino manual do alfa: parte sempre da máscara original da janela, sem acumular a prévia.
+function ieRefinarMascaraPlano(m, { suavidade = 0, contraste = 0, deslocar = 0 } = {}) {
+    const s = ieClamp(Number(suavidade) || 0, 0, 50), ct = ieClamp(Number(contraste) || 0, 0, 100);
+    const base = ieDeslocarMascaraPlano(m, deslocar);
+    if (!s && !ct) return base;
+    const pad = s ? Math.ceil(s * 3) + 2 : 0;
+    const R = { x: (base.x || 0) - pad, y: (base.y || 0) - pad, w: (base.c?.width || 1) + 2 * pad, h: (base.c?.height || 1) + 2 * pad };
+    // A folga extra mantém o fundo da máscara também nas bordas do desfoque (inclusive fundo branco).
+    const fonte = ieMascaraRegiao(base, { x: R.x - pad, y: R.y - pad, w: R.w + 2 * pad, h: R.h + 2 * pad });
+    const c = ieCanvas(R.w, R.h), x = ieCtx(c);
+    if (s) x.filter = `blur(${s}px)`;
+    x.drawImage(fonte, -pad, -pad); x.filter = 'none';
+    const ajustar = a => ct === 100 ? (a >= 128 ? 255 : 0) : Math.round(ieClamp((a - 127.5) / (1 - ct / 100) + 127.5, 0, 255));
+    if (ct) {
+        const img = x.getImageData(0, 0, R.w, R.h), p = img.data;
+        for (let i = 0; i < p.length; i += 4) { p[i + 3] = ajustar(p[i + 3]); p[i] = p[i + 1] = p[i + 2] = 255; }
+        x.putImageData(img, 0, 0);
+    }
+    return { ...m, c, x: R.x, y: R.y, fundo: ct ? ajustar(m.fundo || 0) : (m.fundo || 0) };
+}
+// Prévia de inspeção separada da composição: fundo e navegação nunca entram na arte ou no histórico.
+function ieRefinoInspecao(corpo, L) {
+    const bloco = document.createElement('div'), c = document.createElement('canvas'), nota = document.createElement('div');
+    c.width = 360; c.height = 260; c.style.cssText = 'width:100%;height:260px;display:block;touch-action:none;cursor:grab;border:1px solid var(--line);border-radius:4px;';
+    c.setAttribute('aria-label', ieT('Prévia isolada do recorte')); c.dataset.refinoInspecao = '';
+    nota.className = 'ie-prop-nota'; nota.textContent = ieT('Recorte isolado, sem efeitos. Em 100%/200%, arraste para examinar a borda.');
+    bloco.append(c, nota); corpo.appendChild(bloco);
+    let valores = {}, px = 0, py = 0, zoomAnterior = 'ajustar', arraste = null;
+    const desenhar = v => {
+        valores = v || valores;
+        const dpr = window.devicePixelRatio || 1, w = Math.max(1, Math.round(c.clientWidth * dpr)), h = Math.round(260 * dpr);
+        if (c.width !== w) c.width = w; if (c.height !== h) c.height = h;
+        const x = ieCtx(c); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, w, h);
+        x.fillStyle = valores.fundoInspecao === 'branco' ? '#fff' : valores.fundoInspecao === 'preto' ? '#000' : valores.fundoInspecao === 'cor' ? (valores.corInspecao || '#808080') : ieXadrezPadrao(x);
+        x.fillRect(0, 0, w, h);
+        const raster = ieRaster(L), r = raster && (raster.forma || raster);
+        if (!r?.c) { nota.textContent = ieT('Prévia isolada indisponível para esta camada.'); return; }
+        const zoom = valores.zoomInspecao || 'ajustar';
+        if (zoom !== zoomAnterior) { px = py = 0; zoomAnterior = zoom; }
+        const k = zoom === 'ajustar' ? Math.min((w - 16 * dpr) / r.c.width, (h - 16 * dpr) / r.c.height) : Number(zoom) / 100;
+        x.imageSmoothingEnabled = zoom === 'ajustar'; x.imageSmoothingQuality = 'high';
+        x.drawImage(r.c, Math.round((w - r.c.width * k) / 2 + px), Math.round((h - r.c.height * k) / 2 + py), r.c.width * k, r.c.height * k);
+    };
+    c.addEventListener('pointerdown', e => {
+        if ((valores.zoomInspecao || 'ajustar') === 'ajustar') return;
+        arraste = { x: e.clientX, y: e.clientY, px, py }; c.setPointerCapture(e.pointerId); c.style.cursor = 'grabbing';
+    });
+    c.addEventListener('pointermove', e => {
+        if (!arraste) return;
+        const dpr = window.devicePixelRatio || 1;
+        px = arraste.px + (e.clientX - arraste.x) * dpr; py = arraste.py + (e.clientY - arraste.y) * dpr; desenhar();
+    });
+    const soltar = () => { arraste = null; c.style.cursor = 'grab'; };
+    c.addEventListener('pointerup', soltar); c.addEventListener('pointercancel', soltar);
+    return desenhar;
+}
+async function ieRefinarMascara(doc) {
+    const L = doc && ieAtiva(doc);
+    if (!L || !L.m) { ieToast(ieT('Selecione uma camada com máscara')); return false; }
+    const original = L.m, Rantes = ieRCamada(L);
+    let inspecao = null, ultima = null, chave = '', exibicao = {};
+    const mostrar = v => {
+        if (v) exibicao = v;
+        const novaChave = v ? JSON.stringify([v.deslocar, v.suavidade, v.contraste]) : '';
+        if (v && novaChave !== chave) { ultima = ieRefinarMascaraPlano(original, v); chave = novaChave; }
+        const m = v ? ultima : original;
+        if (L.m !== m) { L.m = m; ieCamadaMudou(L, Rantes, doc); }
+        if (inspecao) {
+            const box = ieEl('ie-modal');
+            for (const k of ['fundoInspecao', 'zoomInspecao']) { const el = box?.querySelector(`[data-id="${k}"]`); if (el) exibicao[k] = el.value; }
+            const cor = box?.querySelector('[data-id="corInspecao"]'); if (cor) exibicao.corInspecao = cor.style.backgroundColor;
+            inspecao(exibicao);
+        }
+    };
+    let vals;
+    try {
+        const automatico = !!IE._auto;
+        const resposta = ieDialogo({ titulo: 'Refinar máscara', lado: true,
+            campos: [{ id: 'deslocar', rotulo: 'Deslocar borda (px)', min: -20, max: 20, valor: 0 },
+                { id: 'suavidade', rotulo: 'Suavidade (px)', min: 0, max: 50, passo: 0.1, valor: 0 },
+                { id: 'contraste', rotulo: 'Contraste (%)', min: 0, max: 100, valor: 0 },
+                { id: 'fundoInspecao', rotulo: 'Fundo de inspeção', tipo: 'select', valor: 'xadrez', opcoes: [['xadrez', 'Transparência'], ['branco', 'Branco'], ['preto', 'Preto'], ['cor', 'Cor escolhida']] },
+                { id: 'corInspecao', rotulo: 'Cor de inspeção', tipo: 'cor', valor: '#808080' },
+                { id: 'zoomInspecao', rotulo: 'Zoom da inspeção', tipo: 'select', valor: 'ajustar', opcoes: [['ajustar', 'Ajustar'], ['100', '100%'], ['200', '200%']] },
+                { id: 'nota', tipo: 'nota', rotulo: 'Deslocar: negativo contrai, positivo expande. Depois, Suavidade esmaece a borda e Contraste firma os tons intermediários. Os pixels da imagem não são alterados; a máscara continua retocável.' }],
+            previa: mostrar });
+        if (!automatico) {
+            const corpo = ieEl('ie-modal')?.querySelector('.ie-dlg-corpo');
+            if (corpo) inspecao = ieRefinoInspecao(corpo, L);
+        }
+        vals = await resposta;
+    } finally { L.m = original; ieCamadaMudou(L, Rantes, doc); }
+    if (!vals) return false;
+    const refinada = ieRefinarMascaraPlano(original, vals);
+    if (refinada === original) return true;
+    L.m = refinada; L.sujoM = true; doc.mascaraAlvo = true;
+    ieCamadaMudou(L, Rantes, doc); ieHist(ieT('Refinar máscara'), doc);
+    ieUiCamadas(); ieUiProps();
+    return true;
 }
 function ieAplicarRecorte(doc, L, pixels, mascara) {
     const Rantes = ieRCamada(L);

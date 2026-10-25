@@ -115,7 +115,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 
 ### Imagem
 #### Photo Kanivete — `switchTool('editor-imagem')`
-- **Interface**: `imagem-ajustes.js`, `imagem-api.js`, `imagem-arquivo.js`, `imagem-atalhos.js`, `imagem-cameraraw.js`, `imagem-caneta.js`, `imagem-cena.js`, `imagem-cor.js`, `imagem-dissolver.js`, `imagem-dock.js`, `imagem-estilo.js`, `imagem-fatias.js`, `imagem-ferramentas.js`, `imagem-filtros.js`, `imagem-fx.js`, `imagem-galeria.js`, `imagem-gerador.js`, `imagem-guias.js`, `imagem-janela.js`, `imagem-nucleo.js`, `imagem-paineis.js`, `imagem-prancheta.js`, `imagem-recuperar.js`, `imagem-texto.js`, `ponte-kanivete.js`, `imagem.css`
+- **Interface**: `imagem-ajustes.js`, `imagem-api.js`, `imagem-arquivo.js`, `imagem-atalhos.js`, `imagem-cameraraw.js`, `imagem-caneta.js`, `imagem-cena.js`, `imagem-cor.js`, `imagem-dissolver.js`, `imagem-dock.js`, `imagem-estilo.js`, `imagem-fatias.js`, `imagem-ferramentas.js`, `imagem-filtros.js`, `imagem-fx.js`, `imagem-galeria.js`, `imagem-gerador.js`, `imagem-guias.js`, `imagem-harmonizar.js`, `imagem-janela.js`, `imagem-nucleo.js`, `imagem-paineis.js`, `imagem-prancheta.js`, `imagem-recuperar.js`, `imagem-texto.js`, `ponte-kanivete.js`, `imagem.css`
 - **Python**: `Functions/editor_imagem.py`, `Functions/gerador_imagem.py`, `Functions/preencher_conteudo.py`, `Functions/ceu.py`, `Functions/recorte_pro.py`, `Functions/ampliar_imagem.py`, `Functions/fontes.py`, `Functions/psd_texto_modelo.py`, `Functions/psd_so_modelo.py`, `Functions/amostras.py`, `Functions/recuperar.py`
 - **Automação (agente/Jr)**: window.KNV (imagem-api.js); diagramar: KNV.cena / tools/knv.py; Worker: executor.js
 - **API** (`pywebview.api.*`, 37): `ie_curar(regiao, mascara, dx, dy, difusao=0)`, `ie_preencher_ia(regiao, mascara, expandir=None)`, `ie_ceu_mascara(foto, deslocar=0, esmaecer=0)`, `ie_ceu_cor(ceu_png)`, `ie_preencher_conteudo(regiao, mascara, raio=6)`, `ie_instalar_fonte(familia)`, `ie_abrir(path)`, `ie_liberar(doc)`, `ie_mascara_assunto(png_b64, modelo="birefnet-lite")`, `ie_recorte_pro(png_b64)`, `ie_gerador_estado(modelo=None)`, `ie_gerador_baixar(modelo=None)`, `ie_gerar(spec)`, `ie_gerador_cancelar(job)`, `ie_gerador_parar()`, `ie_gerador_remover()`, `ie_fechar(doc)`, `ie_salvar_inicio(doc)`, `ie_salvar(spec)`, `ie_salvar_iknv(spec)`, `ie_exportar(spec)`, `ie_cor_lut(perfil="FOGRA39")`, `ie_cor_converter(lista, sentido="rgb_cmyk", perfil="FOGRA39")`, `ie_cor_perfis()`, `ie_exportar_fatias(spec)`, `ie_dialogo_abrir(multiplos=True)`, `ie_dialogo_salvar(nome, ext="psd", pasta="")`, `ie_colar_windows()`, `ie_miniaturas(paths)`, `ie_miniatura_gravar(path, data_url)`, `ie_baixar_imagem(url)`, `ie_soltar_memoria(tokens)`, `ie_existe(path)`, `ie_prefs(dados=None)`, `ie_amostras(origem="photoshop")`, `ie_amostras_gravar(caminho, lista)`, `ie_fonte_url(arquivo)`
@@ -444,6 +444,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_conteudo.py` — Editar › Preenchimento sensível ao conteúdo do Photo Kanivete (LaMa) — app em --agente=9333
 - `testes/teste_copias_edicao.py` — Cópias de edição (Functions/otimizar.py): quadro-chave a cada ~0,25 s e refazer as antigas pelo editor
 - `testes/teste_corte_alt.py` — Máscara de corte com Alt + clique na divisa entre duas camadas (como no Photoshop), com mouse de verdade no app de
+- `testes/teste_corte_generativo.py` — Corte C e expansão: testa em navegador isolado, com IA sintética
 - `testes/teste_dissolver.py` — Filtro > Dissolver (Liquify) com mouse de verdade (app em --agente=9333; não mexa no mouse durante)
 - `testes/teste_editar.py` — Editar › Atenuar, Colar especial (dentro/fora) e Localizar e substituir texto do Photo Kanivete (app em --agente=9333)
 - `testes/teste_estab.py` — Estabilizador (editor-estab.js + Functions/estabilizador.py) no app de verdade: abre um trecho tremido real, aplica o
@@ -454,8 +455,11 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_fonte.py` — Criar fonte própria no Vetor Kanivete (Texto › Criar fonte) — app em --agente=9333
 - `testes/teste_galeria.py` — Filtro > Galeria de filtros (app em --agente=9333). Abre a janela, espera as miniaturas, troca de filtro, empilha
 - `testes/teste_generativo.py` — Preenchimento generativo e Expansão generativa do Photo Kanivete (FLUX.2 klein local) — app em --agente=9333
+- `testes/teste_generativo_mascara.py` — Regressão da máscara generativa no app 9333; provedor sintético, sem carregar IA
+- `testes/teste_gerador_recuperacao.py` — Recuperação limitada do gerador, sem carregar modelos nem usar a GPU; saídas sempre em D
 - `testes/teste_guias.py` — Teste das guias/fatias como no Photoshop, com mouse de verdade no app de teste (9333)
 - `testes/teste_hardware.py` — Núcleo de hardware (Functions/hardware.py): o PC lido, o plano de cada nível, o modo, o balanceador de memória e,
+- `testes/teste_harmonizar.py` — Harmonização: análise, isolamento, ajustes editáveis, prévia, cancelamento e histórico; sem IA
 - `testes/teste_illustrator.py` — Compatibilidade Vetor Kanivete ↔ Adobe Illustrator (Functions/ponte_illustrator.py) — app em --agente=9333 e o
 - `testes/teste_imagem.py` — Teste do Editor de Imagem (frontend/js/imagem-*.js + Functions/editor_imagem.py) no app de verdade
 - `testes/teste_kani.py` — Kani (assistente) — abre um app próprio (porta 9334, dados em D:/kanivete_testes/fila) e confere: bolinha na Home,
@@ -469,6 +473,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_lc_hsl.py` — HSL secundário: seletividade, UI e prévia WebGL × render FFmpeg, sem acessar o app aberto
 - `testes/teste_lobby_camadas.py` — Lobby do Photo/Vetor não cobre a janela Novo documento nem os menus (app 9333)
 - `testes/teste_lux_casa.py` — Lux com casa própria: abre sem o Editor, desfaz sozinha, envia cópia para a timeline (app em --agente=9333)
+- `testes/teste_misturar_se.py` — Misturar se: campos numéricos, arraste, canais, prévia e histórico; fonte do app 9333 em Edge sem janela
 - `testes/teste_mixer.py` — Mixer de trilhas de áudio (editor-mixer.js): Premiere → Kanivete → XML do Premiere e a conta do som na exportação
 - `testes/teste_motion.py` — Motion do Editor Kanivete (editor-motion.js) com mouse de verdade: ferramenta Máscara (arrastar no monitor), Caneta
 - `testes/teste_pincel.py` — Pincel do Photo Kanivete: traço macio liso e pintura fluida em documento grande (app em --agente=9333)
@@ -484,6 +489,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_psd_so.py` — Objeto inteligente criado no Photo Kanivete → objeto inteligente INCORPORADO no PSD (Functions/editor_imagem._so_novo)
 - `testes/teste_psd_texto.py` — Texto criado no Photo Kanivete → camada de texto EDITÁVEL no PSD (Functions/editor_imagem._texto_novo)
 - `testes/teste_rastro.py` — Rastreador de movimento (editor-rastro.js + Functions/rastreador.py) no app de verdade, com GABARITO: um quadro
+- `testes/teste_refino_mascara.py` — Refino de máscara: alfa, fundo externo, prévia, cancelamento, pixels preservados e histórico; sem IA
 - `testes/teste_remix.py` — Remix de música na timeline (editor-remix.js + Functions/remix.py), com mouse de verdade: põe uma música de 3:46
 - `testes/teste_roto.py` — Pincel Roto (editor-roto.js + Functions/pincel_roto.py) no app de verdade: vídeo de entrevista na V1, texto animado
 - `testes/teste_seq_escala.py` — Configurações da sequência › "Adaptar o conteúdo ao novo tamanho": trocar o quadro (Full HD → 4K → Full HD, e de

@@ -159,7 +159,8 @@ function ieOpcoesRender(soValores) {
             break;
         case 'corte': {
             const r = IE.corte && IE.corte.r;
-            h += `<span class="ie-op-dica">${r ? `${r.w} × ${r.h} px` : ''}</span>` + ieChk('Apagar pixels cortados', 'apagar', 'corte') +
+            h += `<span class="ie-op-dica">${r ? `${r.w} × ${r.h} px` : ''}</span>` +
+                `<label>${ieT('Preenchimento')} <select data-o="corte" data-k="preenchimento"><option value="transparente" ${IE.op.corte.preenchimento !== 'generativo' ? 'selected' : ''}>${ieT('Transparente')}</option><option value="generativo" ${IE.op.corte.preenchimento === 'generativo' ? 'selected' : ''}>${ieT('Expansão generativa')}</option></select></label>` + ieChk('Apagar pixels cortados', 'apagar', 'corte') +
                 `<div class="ie-op-esp"></div><button class="ie-btn ie-btn-mini" onclick="IE_CORTE.ativar(IE.doc)">${ieIco('x')} ${ieT('Desfazer caixa')}</button>
                 <button class="ie-btn ie-btn-mini ie-btn-primario" onclick="ieCorteAplicar()">${ieIco('check')} ${ieT('Cortar')}</button>`;
             break;
@@ -898,6 +899,7 @@ function ieUiProps() {
             <button class="ie-btn ie-btn-mini" onclick="ieCmd('transformar')" title="Ctrl+T">${ieT('Transformação livre')}</button></div>`;
     if (doc.mascaraAlvo && L.m) {
         h += `<div class="ie-prop-acoes">
+            <button class="ie-btn ie-btn-mini" onclick="ieCmd('mascaraRefinar')">${ieT('Refinar máscara...')}</button>
             <button class="ie-btn ie-btn-mini" onclick="ieCmd('mascaraInverter')">${ieT('Inverter')}</button>
             <button class="ie-btn ie-btn-mini" onclick="ieCmd('mascaraDesativar')">${ieT(L.m.desativada ? 'Ativar' : 'Desativar')}</button>
             <button class="ie-btn ie-btn-mini" onclick="ieCmd('mascaraAplicar')">${ieT('Aplicar')}</button>
@@ -1350,7 +1352,7 @@ const IE_MENUS = [
         ['Cortar na seleção', 'cortarSel'], ['Aparar transparência', 'aparar']]],
     ['Camada', [['Nova camada', 'novaCamada', 'Shift+Ctrl+N'], ['Nova camada de preenchimento', [['Cor sólida...', 'preenchimentoCor'], ['Degradê...', 'preenchimentoDeg']]], ['Duplicar camada', 'duplicar', 'Ctrl+J'], ['Nova prancheta...', 'novaPrancheta'], ['Prancheta a partir das camadas', 'pranchetaDasCamadas'], ['Camada via recorte', 'viaRecorte', 'Shift+Ctrl+J'], ['Excluir camada', 'excluirCamada'], '-',
         ['Máscara de camada', [['Revelar tudo', 'mascara'], ['Ocultar tudo', 'mascaraOcultar'], ['Revelar seleção', 'mascaraSel'], ['Ocultar seleção', 'mascaraSelOcultar'], '-',
-            ['Inverter máscara', 'mascaraInverter'], ['Desativar/ativar', 'mascaraDesativar'], ['Aplicar', 'mascaraAplicar'], ['Excluir', 'mascaraExcluir']]],
+            ['Refinar máscara...', 'mascaraRefinar'], ['Inverter máscara', 'mascaraInverter'], ['Desativar/ativar', 'mascaraDesativar'], ['Aplicar', 'mascaraAplicar'], ['Excluir', 'mascaraExcluir']]],
         ['Objetos inteligentes', [['Converter em objeto inteligente', 'objetoInteligente'], ['Editar conteúdo no Vetor', 'editarNoVetor'], ['Rasterizar', 'rasterizar'], '-',
             ['Enviar documento ao Vetor (vínculo vivo)', 'enviarAoVetor']]],
         ['Remover plano de fundo', 'removerFundo'],
