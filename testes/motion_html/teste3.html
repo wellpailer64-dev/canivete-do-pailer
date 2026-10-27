@@ -1,0 +1,34 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="kv" content="w=1080;h=1080;fps=30;dur=4">
+<style>
+  html,body{margin:0;width:1080px;height:1080px;overflow:hidden;background:#0E1116;font-family:Arial, sans-serif}
+  .abs{position:absolute}
+  /* texto que sobe de trás de uma "janela" (overflow hidden) */
+  .janela{position:absolute;left:100px;width:880px;height:130px;overflow:hidden}
+  #j1{top:150px} #j2{top:280px}
+  .janela div{font-size:110px;font-weight:700;color:#fff;line-height:130px;animation:revela 0.7s cubic-bezier(0.16,1,0.3,1) both}
+  #j2 div{color:#2EC4B6;animation-delay:0.25s}
+  @keyframes revela{from{transform:translateY(130px)}to{transform:none}}
+  /* barra de progresso: largura animada */
+  #trilho{left:100px;top:520px;width:880px;height:24px;border-radius:12px;background:#222831}
+  #barra{left:100px;top:520px;width:880px;height:24px;border-radius:12px;background:#F47A1F;animation:cresce 1.6s cubic-bezier(0.65,0,0.35,1) 0.8s both}
+  @keyframes cresce{from{width:20px}to{width:880px}}
+  /* cortina por clip-path */
+  #cortina{left:100px;top:620px;width:880px;height:200px;background:#E71D36;border-radius:20px;animation:cortina 0.9s cubic-bezier(0.83,0,0.17,1) 1.6s both}
+  @keyframes cortina{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+  #rotulo{left:100px;top:670px;width:880px;text-align:center;font-size:72px;font-weight:700;color:#fff;animation:surge 0.4s ease-out 2.4s both}
+  @keyframes surge{from{opacity:0;transform:scale(0.9)}to{opacity:1;transform:none}}
+  /* cartão com sombra (vira imagem; o movimento continua nativo) */
+  #cartao{left:340px;top:880px;width:400px;height:120px;border-radius:24px;background:#fff;box-shadow:0 20px 40px rgba(0,0,0,0.5);
+    animation:surge 0.5s cubic-bezier(0.34,1.56,0.64,1) 3s both}
+</style></head>
+<body>
+  <div class="janela" id="j1"><div>Revelar texto</div></div>
+  <div class="janela" id="j2"><div>por máscara</div></div>
+  <div id="trilho" class="abs"></div>
+  <div id="barra" class="abs"></div>
+  <div id="cortina" class="abs"></div>
+  <div id="rotulo" class="abs">clip-path → máscara</div>
+  <div id="cartao" class="abs"></div>
+</body></html>

@@ -235,6 +235,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/mockup3d.py` — Mockup profissional a partir de um produto 3D (pilha dos estúdios, Instructions/agente/mockup-profissional.md)
 - `tools/montar_banco_vozes.py` — Monta o pacote do banco de vozes (Functions/sk_banco_vozes.py) — não roda no app; só para gerar o zip do release
 - `tools/montar_soundboard.py` — Monta o pack "vanilla" do Soundboard do Pocket Editor (não roda no app; só para gerar o zip do release)
+- `tools/motion_html.py` — Motion em HTML → timeline NATIVA do Vídeo Kanivete (camadas de texto, forma, cor e imagem com quadros-chave editáveis)
 - `tools/olho.py` — Olho local: um modelo de visão no Ollama (gemma4:e4b) olha as imagens no lugar do Claude e devolve TEXTO curto
 - `tools/pack_sfx.py` — pack_sfx.py — converte os mestres WAV do pack novo do Soundboard (montado com tools/fatiar_sfx.py, lista em
 - `tools/patch.py` — Aplica trocas de texto descritas num arquivo .patch simples — sem escapar aspas/barras, tudo ou nada, com conferência
@@ -278,6 +279,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/mapa-vetor.md` — Mapa do código — vetor (gerado por tools/mapa_codigo.py; nome:linha)
 - `Instructions/agente/mockup-profissional.md` — Mockup profissional — o que os PSDs dos estúdios fazem (estudo 2026-10-15)
 - `Instructions/agente/mogrt.md` — MOGRT no Vídeo Kanivete (Motion Graphics Template do Premiere)
+- `Instructions/agente/motion-html.md` — Motion em HTML → timeline nativa do Vídeo Kanivete
 - `Instructions/agente/nucleo-hardware.md` — Núcleo de hardware: o app se ajustar a cada PC (2026-10-10)
 - `Instructions/agente/pincel-roto.md` — Pincel Roto e Refinar borda (Roto Brush do After Effects no Editor Kanivete)
 - `Instructions/agente/plano-cena.md` — Plano CENA — diagramar no Photo Kanivete escrevendo HTML/CSS (para IAs)
@@ -476,6 +478,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_misturar_se.py` — Misturar se: campos numéricos, arraste, canais, prévia e histórico; fonte do app 9333 em Edge sem janela
 - `testes/teste_mixer.py` — Mixer de trilhas de áudio (editor-mixer.js): Premiere → Kanivete → XML do Premiere e a conta do som na exportação
 - `testes/teste_motion.py` — Motion do Editor Kanivete (editor-motion.js) com mouse de verdade: ferramenta Máscara (arrastar no monitor), Caneta
+- `testes/teste_motion_html.py` — Motion em HTML → timeline nativa: monta cada cena de testes/motion_html no app (--agente=9333), exporta e compara
 - `testes/teste_pincel.py` — Pincel do Photo Kanivete: traço macio liso e pintura fluida em documento grande (app em --agente=9333)
 - `testes/teste_play.py` — teste_play.py — Mede o play do Pocket Editor no app de verdade (modo agente) e reprova se engasgar
 - `testes/teste_ponte.py` — Teste da ponte Vetor <-> Photo (app em --agente=9333). Ponte Vetor ↔ Photo: objeto inteligente vetorial (ida, filtro inteligente, ampliar sem pixeliza

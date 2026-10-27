@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="kv" content="w=1080;h=1080;fps=30;dur=3">
+<style>
+  html,body{margin:0;width:1080px;height:1080px;overflow:hidden;background:#FAFAFA;font-family:Arial, sans-serif}
+  .abs{position:absolute}
+  /* carta que vira (escala só na horizontal) com texto dentro */
+  #carta{left:140px;top:140px;width:300px;height:300px;border-radius:24px;background:#0B0B0E;animation:vira .5s ease-in-out .3s both}
+  #carta div{position:absolute;left:0;top:110px;width:300px;text-align:center;font:900 80px/1 Arial;color:#FF5833}
+  @keyframes vira{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  #texto{left:560px;top:250px;font:700 70px/1 Arial;color:#0B0B0E;animation:estica .6s ease-out .5s both}
+  @keyframes estica{from{transform:scale(2,.3)}to{transform:none}}
+  /* bolinha que cresce 60× até cobrir tudo */
+  #bola{left:520px;top:800px;width:40px;height:40px;border-radius:50%;background:#FF5833;animation:engole 1s cubic-bezier(.7,0,.84,0) 1.5s both}
+  @keyframes engole{from{transform:scale(1)}to{transform:scale(60)}}
+</style></head>
+<body>
+  <div id="carta" class="abs"><div>NOVO</div></div>
+  <div id="texto" class="abs">ESTICA</div>
+  <div id="bola" class="abs"></div>
+</body></html>

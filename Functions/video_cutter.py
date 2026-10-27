@@ -3829,6 +3829,28 @@ def _clipe_tem_alfa(path):
     return _alfa_cache[chave]
 
 
+_matriz_cache = {}
+
+
+def _matriz_clipe(path, padrao):
+    """Matriz YUV→RGB de um clipe pela marca de cor DELE (ex.: camada desenhada/cena 3D gravadas em BT.709); sem
+    marca, a do vídeo base (padrao). Antes valia só a do vídeo base: camada BT.601 numa base HD mudava a cor."""
+    try:
+        chave = (path, os.path.getmtime(path))
+    except OSError:
+        return padrao
+    if chave not in _matriz_cache:
+        try:
+            cs = str(probe(path).get("color_space") or "").lower()
+        except Exception:
+            cs = ""
+        _matriz_cache[chave] = ("bt2020" if cs.startswith("bt2020") else "bt601" if cs in ("bt470bg", "smpte170m")
+                                else "bt709" if cs == "bt709"
+                                # camada desenhada/cena 3D antiga (cache sem marca): o ffmpeg gravou em BT.601
+                                else "bt601" if os.path.basename(os.path.dirname(path)) == "Cenas3D" else None)
+    return _matriz_cache[chave] or padrao
+
+
 def _normalizar_camadas(camadas, path_video):
     """Camadas por cima da base, de baixo para cima: imagens e clipes de vídeo transformados."""
     out = []
@@ -4629,8 +4651,11 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                     fim_cadeia = filtros_clip[:k] + [de_rgb] + filtros_clip[k:]
                 else:
                     fim_cadeia = filtros_clip + [de_rgb]
+                prgb = para_rgb
+                if c["tipo"] == "video" and (c["path"] or path):
+                    prgb = f"scale=in_color_matrix={_matriz_clipe(c['path'] or path, mtx)},format=rgba"
                 cadeia = f"{src}{vel}" + ",".join([f"fps=fps={fps}:start_time=0"] + ([reducao] if reducao else [])
-                                                  + [para_rgb] + fim_cadeia)
+                                                  + [prgb] + fim_cadeia)
             if c.get("pula"):
                 # quadros só a partir do bloco (sem refazer o começo); o tempo interno já é o do clipe
                 cadeia = cadeia.replace(f"fps=fps={fps}:start_time=0", f"fps=fps={fps}:start_time={c['pula']:.6f}")

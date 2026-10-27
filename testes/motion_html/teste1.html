@@ -1,0 +1,36 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta name="kv" content="w=1920;h=1080;fps=30;dur=4">
+<style>
+  html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#101820;font-family:Arial, sans-serif}
+  .abs{position:absolute}
+  #barra{left:160px;top:200px;width:600px;height:120px;background:#F47A1F;border-radius:24px;
+    animation:entra 0.8s cubic-bezier(0.16,1,0.3,1) 0.2s both}
+  @keyframes entra{from{transform:translateX(-900px)}to{transform:none}}
+  #bola{left:1300px;top:160px;width:260px;height:260px;border-radius:50%;background:#2EC4B6;
+    animation:pula 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.5s both}
+  @keyframes pula{from{transform:scale(0)}to{transform:scale(1)}}
+  #titulo{left:160px;top:420px;width:1600px;font-size:110px;font-weight:700;color:#ffffff;letter-spacing:0.02em;line-height:1.1;
+    animation:titulo 0.7s cubic-bezier(0.16,1,0.3,1) 1s both}
+  @keyframes titulo{from{opacity:0;transform:translateY(60px);filter:blur(16px)}to{opacity:1;transform:none;filter:blur(0)}}
+  #sub{left:160px;top:580px;font-size:48px;font-weight:400;color:#9FB3C8;white-space:nowrap;
+    animation:sub 0.5s ease-out 1.5s both}
+  @keyframes sub{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:none}}
+  #quadrado{left:1500px;top:640px;width:180px;height:180px;background:#E71D36;
+    animation:gira 2s linear 0.5s infinite}
+  @keyframes gira{to{transform:rotate(360deg)}}
+  #degrade{left:160px;top:760px;width:900px;height:140px;border-radius:70px;background:linear-gradient(90deg,#F47A1F,#E71D36);
+    animation:sub 0.6s ease-in-out 2.2s both}
+  #sai{left:1100px;top:780px;font-size:64px;font-weight:700;color:#FDE3CF;
+    animation:saida 0.4s ease-in 3.2s both}
+  @keyframes saida{from{opacity:1}to{opacity:0;transform:translateY(-50px) scale(0.8)}}
+</style></head>
+<body>
+  <div id="barra" class="abs"></div>
+  <div id="bola" class="abs"></div>
+  <div id="titulo" class="abs">Motion em HTML virando timeline</div>
+  <div id="sub" class="abs">camadas nativas, quadros-chave editáveis</div>
+  <div id="quadrado" class="abs"></div>
+  <div id="degrade" class="abs"></div>
+  <div id="sai" class="abs">Kanivete</div>
+</body></html>

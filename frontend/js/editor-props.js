@@ -176,6 +176,22 @@ function veTxCanvas(c, alvo) {
 
 function veTxTamanho(c) { const L = veTxLayout(veTxt(c)); return { w: L.w, h: L.h }; }
 
+// Grava o PNG de uma camada para a exportação, tentando de novo: no Windows a ponte às vezes falha por um instante
+// (ERR_NO_BUFFER_SPACE) e a camada SUMIA do vídeo sem aviso (série Pandalab, 2026-10-26: 4 de 7 sem os textos).
+// Sem conseguir, para a exportação com erro em vez de entregar o vídeo faltando camada.
+async function veSalvarPngExport(dataUrl, nome) {
+    let ultimo = null;
+    for (let k = 0; k < 5; k++) {
+        try {
+            const r = await window.pywebview.api.ve_salvar_png(dataUrl);
+            if (r && r.success) return r;
+            ultimo = r && r.error;
+        } catch (e) { ultimo = e; }
+        await new Promise(ok => setTimeout(ok, 250 * (k + 1)));
+    }
+    throw new Error(`não deu para preparar a camada "${nome || 'texto/gráfico'}" (${ultimo || 'falha ao gravar'}): exporte de novo`);
+}
+
 // Exportação: cada clipe de texto vira um PNG no tamanho em que ele aparece (a maior escala dele).
 // clips = os de outra timeline (Comp, editor-comp.js); guardar = false devolve o mapa sem trocar o VE._txPng
 async function veTxPngs(filtro, clips = VE.clips, guardar = true, trk = null) {
@@ -191,8 +207,8 @@ async function veTxPngs(filtro, clips = VE.clips, guardar = true, trk = null) {
             try { mapa.set(c, await veTxaExportar(c, Math.min(f, 2))); continue; } catch (e) { /* cai no PNG parado */ }
         }
         const d = veTxDesenho(veTxt(c), f);
-        const r = await window.pywebview.api.ve_salvar_png(d.cv.toDataURL('image/png'));
-        if (r && r.success) mapa.set(c, { path: r.path, f, w: d.cv.width, h: d.cv.height });
+        const r = await veSalvarPngExport(d.cv.toDataURL('image/png'), c.nome || veTxt(c).t);
+        mapa.set(c, { path: r.path, f, w: d.cv.width, h: d.cv.height });
     }
     await veGrafPngs(mapa, filtro, clips);   // cor sólida, formas e desenhos (editor-grafico.js)
     // Pincel Roto: o clipe recortado vira o vídeo transparente do trecho (editor-roto.js)

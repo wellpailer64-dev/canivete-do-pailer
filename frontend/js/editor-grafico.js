@@ -33,7 +33,12 @@ function veGrMidia(kind, nome) {
 
 function veGrafTamanho(c) {
     const m = veMediaOf(c);
-    if (m.kind === 'forma' && c.fm) return { w: Math.max(1, c.fm.w), h: Math.max(1, c.fm.h) };
+    if (m.kind === 'forma' && c.fm) {
+        // largura/altura animadas ('fm.w'/'fm.h', editor-motion.js): o tamanho da camada acompanha a agulha (antes o
+        // canvas ficava no tamanho parado e a forma animada era espremida dentro dele)
+        const f = c.k && (veKfOn(c, 'fm.w') || veKfOn(c, 'fm.h')) && typeof veMoFormaEm === 'function' ? veMoFormaEm(c) : c.fm;
+        return { w: Math.max(1, f.w), h: Math.max(1, f.h) };
+    }
     if (m.kind === 'pincel' && c.br) return { w: c.br.w || VE.seqW, h: c.br.h || VE.seqH };
     return { w: VE.seqW, h: VE.seqH };
 }
@@ -338,8 +343,8 @@ function veGrafDesenho(c) {
 async function veGrafPngs(mapa, filtro, clips = VE.clips) {
     for (const c of clips.filter(c => veEhGrafico(c) && (!filtro || filtro(c)))) {
         const cv = veGrafDesenho(c);
-        const r = await window.pywebview.api.ve_salvar_png(cv.toDataURL('image/png'));
-        if (r && r.success) mapa.set(c, { path: r.path, f: 1, w: cv.width, h: cv.height });
+        const r = await veSalvarPngExport(cv.toDataURL('image/png'), c.nome);
+        mapa.set(c, { path: r.path, f: 1, w: cv.width, h: cv.height });
     }
 }
 

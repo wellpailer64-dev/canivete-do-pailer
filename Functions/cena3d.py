@@ -105,10 +105,14 @@ def fim(base, h, sessao, pasta, fps, n, on_progress=lambda p: None, recortar=Fal
                 caixa = c
         except Exception:
             caixa = None
-    filtro = ["-vf", f"crop={caixa['w']}:{caixa['h']}:{caixa['x']}:{caixa['y']}"] if caixa else []
+    # RGB → YUV em BT.709 e com a marca no arquivo: sem isso o ffmpeg gravava em BT.601 sem marca e a exportação HD lia
+    # como BT.709 (vermelho (231,29,54) saía (246,48,50) nas camadas com máscara/motion)
+    cor = "scale=out_color_matrix=bt709:out_range=tv"
+    filtro = ["-vf", (f"crop={caixa['w']}:{caixa['h']}:{caixa['x']}:{caixa['y']}," if caixa else "") + cor]
     # "prores" (o codificador simples do ffmpeg): ProRes 4444 com alfa ~3× mais rápido que o prores_ks, mesma imagem
     args = ["-framerate", str(fps), "-i", os.path.join(pasta, "q%05d.png"), *filtro,
-            "-c:v", "prores", "-profile:v", "4", "-pix_fmt", "yuva444p10le", "-vendor", "apl0", parte]
+            "-c:v", "prores", "-profile:v", "4", "-pix_fmt", "yuva444p10le", "-vendor", "apl0",
+            "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv", parte]
     ok, erros = rodar_ffmpeg(args, duracao=int(n) / float(fps), on_progress=on_progress)
     ok = ok and os.path.isfile(parte) and os.path.getsize(parte) > 0
     shutil.rmtree(pasta, ignore_errors=True)

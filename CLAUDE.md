@@ -285,6 +285,12 @@ pelo desenhista da prévia). **Antes de qualquer motion: `Instructions/agente/ma
 peça a peça — confete, letra por letra, chevrons, recorte que preserva amarelo; anotar as novas ao terminar). Guia, API `VEMO_API`, armadilhas e pendências: `Instructions/agente/plano-motion.md`.
 Testes: `py -3.13 testes/teste_motion.py` e `py -3.13 testes/teste_export.py --casos motion,fxmotion,curvas --folha`.
 
+## Motion em HTML → timeline nativa (2026-10-26)
+Escrever a cena em HTML/CSS animado e o Kanivete reproduz com as ferramentas dele (texto, forma, cor, imagem, quadros-chave
+com a Bézier do CSS, máscaras de overflow/clip-path): `py -3.13 tools/motion_html.py cena.html [--comparar]` (laço de
+comparação com o HTML, piso da compressão). Guia, tabela do que vira o quê e pendências: `Instructions/agente/motion-html.md`;
+teste `py -3.13 testes/teste_motion_html.py` (porta 9333).
+
 ## Pincel Roto (Roto Brush do After Effects)
 Recorte de pessoa/objeto no vídeo pintando num quadro-base (verde soma, Alt tira) que propaga para os dois lados; correção
 = novo quadro-base; Refinar borda nos Controles de efeito. SAM 2.1 de vídeo em ONNX fp16 (2026-10-18: Small 1024 "alta"

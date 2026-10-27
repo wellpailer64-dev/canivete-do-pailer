@@ -893,12 +893,19 @@ def _posicao(c, k, wv, hv, tl, dx=0.0, dy=0.0, ang=None):
     """pos_x/pos_y/pos_w/pos_h (canto, em px do quadro) — as contas do overlay do exportador. ang = rotação da camada
     (graus, expressão em tl): o centro gira em volta do ponto de ancoragem, como no exportador de CPU."""
     px, py = _expr(c, "x", c["x"], tl), _expr(c, "y", c["y"], tl)
+    # desvio do recorte (PNG aparado pelo alfa): com escala só horizontal/vertical (sx/sy) ele estica junto — antes usava
+    # só a escala geral e o texto esticado saía alguns px fora do lugar (motion em HTML, teste4)
+    ox, oy = f"{c['ox']:.3f}", f"{c['oy']:.3f}"
+    if "sx" in c["kf"]:
+        ox = f"({ox}*({vc._expr_kf(c['kf']['sx'], tl)}))"
+    if "sy" in c["kf"]:
+        oy = f"({oy}*({vc._expr_kf(c['kf']['sy'], tl)}))"
     if (abs(c["ox"]) > 0.01 or abs(c["oy"]) > 0.01) and ang:
         a = f"(({ang})*PI/180)"
-        px = f"({px})+({k})*({c['ox']:.3f}*cos({a})-{c['oy']:.3f}*sin({a}))"
-        py = f"({py})+({k})*({c['ox']:.3f}*sin({a})+{c['oy']:.3f}*cos({a}))"
+        px = f"({px})+({k})*({ox}*cos({a})-{oy}*sin({a}))"
+        py = f"({py})+({k})*({ox}*sin({a})+{oy}*cos({a}))"
     elif abs(c["ox"]) > 0.01 or abs(c["oy"]) > 0.01:
-        px, py = f"({px})+({k})*{c['ox']:.3f}", f"({py})+({k})*{c['oy']:.3f}"
+        px, py = f"({px})+({k})*{ox}", f"({py})+({k})*{oy}"
     ca = vc._ca_exprs(c.get("ca"), tl)
     if ca["dx"]:
         px, py = f"({px})+{ca['dx']}", f"({py})+{ca['dy']}"
@@ -1149,19 +1156,22 @@ def _entrada_imagem(g, c, n_cam):
     car_t, car_tl = vc._ca_exprs(c.get("ca"), "t")["rot"], vc._ca_exprs(c.get("ca"), tl_img := f"(ot-{c['st']:.6f})")["rot"]
     giro_fixo = giro_anim = None
     RW, RH, ang = tw, th, None
+    # borda transparente de 2 px ANTES de girar: o rotate do ffmpeg não suaviza a borda externa da imagem (fica
+    # serrilhada); com a margem a borda cai dentro da área interpolada. A CPU escapava porque gira grande e reduz depois
+    PAD = "pad=iw+4:ih+4:2:2:color=black@0"
     if "rot" in c["kf"] or car_t:
         e = vc._expr_kf(c["kf"]["rot"], "t") if "rot" in c["kf"] else f"{c['rot']:.5f}"
-        D = int(math.ceil(math.hypot(tw, th))) + 2
+        D = int(math.ceil(math.hypot(tw + 4, th + 4))) + 2
         D += D % 2
-        giro_anim = f"rotate=a='(({e}){'+' + car_t if car_t else ''})*PI/180':c=black@0:ow={D}:oh={D}"
+        giro_anim = f"{PAD},rotate=a='(({e}){'+' + car_t if car_t else ''})*PI/180':c=black@0:ow={D}:oh={D}"
         RW = RH = D
         ang = f"({_expr(c, 'rot', c['rot'], tl_img)}){'+' + car_tl if car_tl else ''}"
     elif abs(c["rot"] % 360) > 1e-4:
         rad = math.radians(c["rot"])
-        RW = int(math.ceil(tw * abs(math.cos(rad)) + th * abs(math.sin(rad)))) + 2
-        RH = int(math.ceil(tw * abs(math.sin(rad)) + th * abs(math.cos(rad)))) + 2
+        RW = int(math.ceil((tw + 4) * abs(math.cos(rad)) + (th + 4) * abs(math.sin(rad)))) + 2
+        RH = int(math.ceil((tw + 4) * abs(math.sin(rad)) + (th + 4) * abs(math.cos(rad)))) + 2
         RW, RH = RW + RW % 2, RH + RH % 2
-        giro_fixo = f"rotate={rad:.6f}:c=black@0:ow={RW}:oh={RH}"
+        giro_fixo = f"{PAD},rotate={rad:.6f}:c=black@0:ow={RW}:oh={RH}"
         ang = f"{c['rot']:.6f}"
     # com Ondulação o giro vem DEPOIS da onda: os dois na placa, depois de subir (sem giro constante: motivo())
     giro_placa = bool(vc._onda_ativa(c["fx"])) and ang is not None
