@@ -223,6 +223,9 @@ Story). `Functions/ata_kanivete.py`, `frontend/js/ata.js`, `css/ata.css`, API `A
 Guia, medições, armadilhas e pendências (falta teste em call real com várias pessoas): `Instructions/agente/ata-kanivete.md`.
 
 ## Plugins pessoais (Pandalab)
+**KaniCode é software INDEPENDENTE** (2026-10-28, repo privado github.com/wellpailer64-dev/KaniCode; pasta `D:\Kanivete\Plugins\kanicode`,
+fora deste git e sem `kanivete.json`): ele comanda o KANIVETE pelo plugin `kanicode/plugins/kanivete` (`kanivete.py estado|apis|js|abrir|mapa|guia`).
+Plugins do KaniCode = `kanicode.json` (Configurações › Plugins; lobo Plugins no cérebro).
 Ferramentas só do Pailer em `D:\Kanivete\Plugins\<id>\kanivete.json` (junção para `DESENVOLVIMENTOS EM PYTHON\PLUGGINS KANIVETE`,
 repositório próprio github.com/wellpailer64-dev/Pluggins-Kanivete; segredos no `.gitignore` de lá), fora do git do app (carregador `Functions/plugins_pessoais.py`,
 `frontend/js/plugins-pessoais.js`; guia `Instructions/agente/plugins.md` › Plugins pessoais). **Pandalab**: demandas do
