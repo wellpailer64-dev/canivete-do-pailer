@@ -3829,6 +3829,9 @@ class ApiBridge:
                  "psb": "Photoshop grande (*.psb)", "pdf": "PDF (*.pdf)", "png": "PNG (*.png)",
                  "jpg": "JPEG (*.jpg)", "webp": "WebP (*.webp)", "tif": "TIFF (*.tif)"}
         ext = ext if ext in tipos else "psd"
+        # abre na pasta do projeto: aceita também o caminho do arquivo (vira a pasta dele)
+        if pasta and not os.path.isdir(pasta):
+            pasta = os.path.dirname(pasta) if os.path.isdir(os.path.dirname(pasta)) else ""
         # projeto (.iknv), PSD, PSB e PDF achatado aparecem juntos no Salvar como; vale a extensão escolhida no nome.
         salvaveis = ("iknv", "psd", "psb", "pdf")
         extras = tuple(tipos[k] for k in salvaveis if k != ext) if ext in salvaveis else ()

@@ -1323,8 +1323,8 @@ async function ieExportarRapido(tudo, pastaAuto) {   // pastaAuto: automação (
     if (!doc || !api) return;
     let pasta = pastaAuto;
     if (!pasta) {
-        const pastaDoc = doc.path ? doc.path.replace(/[\/][^\/]*$/, '') : '';
-        const d = await api.ie_dialogo_salvar(String(doc.nome || 'peca').replace(/\.\w+$/, ''), 'png', pastaDoc);
+        const pastaDoc = doc.path ? doc.path.replace(/[\\/][^\\/]*$/, '') : '';
+        const d =await api.ie_dialogo_salvar(String(doc.nome || 'peca').replace(/\.\w+$/, ''), 'png', pastaDoc);
         if (!d || !d.success || !d.path) return;
         pasta = d.path.replace(/[\\/][^\\/]*$/, '');
     }
