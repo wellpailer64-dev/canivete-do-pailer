@@ -129,6 +129,12 @@ Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lu
   em script de montagem, `polir(clips, media, {id_midia: duração})` corrige (estica/antecipa/encolhe o B-roll vizinho).
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-10-28 PAPO PRODUTIVO V2 ("de resto tá tudo perfeito"): TELA DIVIDIDA COM REFERÊNCIA = cortar o vídeo base no
+  início e no fim exatos do apoio; no trecho cortado, usar posição FIXA mais alta, centralizando quem fala na parte
+  superior; colocar a foto/referência em camada acima, ocupando a parte inferior desde o PRIMEIRO quadro desse corte.
+  Ao terminar o apoio, corte seco para o trecho com o enquadramento normal. NÃO animar a subida/descida com keyframes:
+  o deslocamento antes da entrada da foto deixava um preto rápido embaixo. Conferir os quadros das duas bordas para
+  não haver intervalo vazio. Pedido desta rodada = registrar a técnica; manter o vídeo e o restante da edição como estão.
 - 2026-10-24 TEASER NAUTIC BAY V1 ("quase perfeito"; `D:/kanivete_testes/nautic/scripts/montar.py`): (1) DRONE: cortar a
   correção de ângulo (o drone mexe rápido antes de estabilizar) e começar no trecho estável. Medir com `movimento.py`
   (correlação de fase a 10 q/s → velocidade e solavanco); `estavel()` pula sozinho até o 1º trecho sem solavanco > 0,08

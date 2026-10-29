@@ -6319,7 +6319,7 @@ def main():
     WSGIServer.request_queue_size = 128
 
     _liberar_janelas_flutuantes()
-    webview.start(_splash_sound, debug=False)
+    webview.start(_splash_sound, debug=False, icon=os.path.join(base_dir, "identidade", "icone.ico"))
     
     # Ao fechar
     _cleanup_temp_thumbs()

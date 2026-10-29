@@ -206,20 +206,26 @@ function vePrRenderizar() {
 async function vePrJob(s) {
     const f = { a: s.a, b: s.b };
     const legOrig = VE.legGravar;
-    VE._txPng = null;
-    // texto vira PNG (o mesmo desenho da prévia); só os do trecho
+    // texto vira PNG (o mesmo desenho da prévia); só os do trecho. Mapa PRÓPRIO, trocado só no instante do plano: com o
+    // VE._txPng global, a prévia rodando junto com o preparo de uma exportação trocava o mapa dela pelo do trecho e o
+    // vídeo saía sem os textos/motion (Nautic Bay 4K, 2026-10-27: 289 de 331 camadas sumiram)
     if (typeof veOvtProntas === 'function') await veOvtProntas(f);   // transições de sobreposição do trecho (editor-ovt.js)
-    if (veTxPrecisaEm(VE.clips.filter(c => c.st < s.b && veEnd(c) > s.a))) await veTxPngs(c => c.st < s.b && veEnd(c) > s.a);
+    const dentro = c => c.st < s.b && veEnd(c) > s.a;
+    const mapa = veTxPrecisaEm(VE.clips.filter(dentro)) ? await veTxPngs(dentro, VE.clips, false) : new Map();
+    const ant = VE._txPng;
     try {
         VE.legGravar = true;   // a prévia mostra as legendas mesmo que a exportação não as grave
+        VE._txPng = mapa;
         const plano = veExportPlan(true, f);
         return { path: VE.path, base: plano.base, camadas: plano.camadas, dur: plano.dur,
                  legendas: veTxExport(plano.faixa), quadro: [VE.seqW, VE.seqH], altura: vePrPrefs().altura };
-    } finally { VE.legGravar = legOrig; }
+    } finally { VE.legGravar = legOrig; VE._txPng = ant; }
 }
 
 async function vePrProximo() {
     if (VEPR.atual || !VEPR.fila.length) return;
+    // timeline reescalada para um render maior (veExportNoQuadro): a prévia espera ela voltar ao tamanho dela
+    if (VE._noQuadro) { setTimeout(vePrProximo, 2000); return; }
     const s = VEPR.fila.shift();
     // mudou desde que entrou na fila? só renderiza se o trecho ainda existir igual
     VEPR.sujo = true;

@@ -1280,12 +1280,14 @@ async function veExportNoQuadro(res, fn) {
     capa.innerHTML = `<div>${veT('Preparando o render em')} ${W2} × ${H2}…<small>${veT('a timeline volta ao tamanho dela em seguida')}</small></div>`;
     $ve('ve').appendChild(capa);
     const g = veSeqEscalaGuardar(), clips0 = VE.clips, seq0 = VE.activeSequence;
+    VE._noQuadro = true;
     try {
         veSeqReescalar(W2, H2);
         VE.seqW = W2; VE.seqH = H2;
         veCacheInvalidate();
         return await fn();
     } finally {
+        VE._noQuadro = false;
         if (VE.clips === clips0 && VE.activeSequence === seq0) veSeqEscalaVoltar(g);
         else { VE.seqW = g.W; VE.seqH = g.H; }
         capa.remove();
@@ -6586,7 +6588,9 @@ async function veStartExport() {
         if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg => { $ve('ve-exp-msg').textContent = msg; },
                                                                    !!($ve('ve-gpu') && $ve('ve-gpu').checked));   // placa: só o plano (shader)
         // camadas do motion desenhadas já no tamanho da saída (editor-motion.js veMoAssarUm)
-        if (veTxPrecisaEm(VE.clips)) await veMoNoTamanho($ve('ve-res').value, () => veTxPngs());   // textos e gráficos viram PNG; camadas do motion, vídeo
+        // mapa próprio, posto no VE._txPng só junto do plano (a prévia em segundo plano não troca no meio: editor-render.js)
+        const mapa = veTxPrecisaEm(VE.clips) ? await veMoNoTamanho($ve('ve-res').value, () => veTxPngs(null, VE.clips, false)) : new Map();   // textos e gráficos viram PNG; camadas do motion, vídeo
+        VE._txPng = mapa;
         const plano = veExportPlan(true), master = veMasterLim();
         const mix = master ? [...plano.mix, { master }] : plano.mix;
         return [veFonteParaPlano({ ...plano, mix }, !noAudio), plano.base, vePill('format') || 'mp4', vePill('quality') || 'high',

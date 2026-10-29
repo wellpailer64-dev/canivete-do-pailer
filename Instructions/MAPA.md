@@ -221,6 +221,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/direcao_mapa.py` — Mapa de direção de arte (para o Claude, o Worker e o roteiro_local): layouts, estilos e técnicas em linhas curtas —
 - `tools/esqueleto.py` — Roteiro (JSON curto) → carrossel diagramado (HTML do KNV.cena) pelos ESQUELETOS aprovados. O agente só escreve o
 - `tools/fatiar_sfx.py` — fatiar_sfx.py — corta um áudio com vários efeitos sonoros (ex.: vídeo "pacote de 5 whoosh") em um arquivo por efeito,
+- `tools/ferramenta_contexto.py` — Ferramenta de contexto — recorte retangular só do corpo da pessoa principal numa pasta de fotos, e escolha das
 - `tools/gerar_marca.py` — Gera a marca KANIVETE: letras próprias desenhadas aqui (geometria nossa, sem ler fonte nenhuma), no espírito
 - `tools/hw_simular.py` — Abre o app de teste como se fosse outro PC (núcleo de hardware: Functions/hardware.py)
 - `tools/icones_arquivos.py` — Gera os ícones dos arquivos de projeto (identidade/arquivos/*.ico): o logo de cada ferramenta como no app

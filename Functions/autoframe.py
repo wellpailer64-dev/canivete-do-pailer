@@ -45,7 +45,8 @@ def _pasta_cache():
 def _chave(path, tipo):
     try:
         st = os.stat(path)
-        k = f"{os.path.abspath(path)}|{st.st_size}|{int(st.st_mtime)}|{tipo}|v5"   # v5: caixa dos rostos e hash fino
+        # v5: caixa dos rostos e hash fino; foto v6: corpo estimado (reenquadramento) e rostos menores (pessoa longe)
+        k = f"{os.path.abspath(path)}|{st.st_size}|{int(st.st_mtime)}|{tipo}|{'v6' if tipo == 'foto' else 'v5'}"
     except OSError:
         k = f"{path}|{tipo}"
     return hashlib.sha1(k.encode("utf-8", "replace")).hexdigest()
@@ -354,6 +355,22 @@ def _rostos(gray):
     return [tuple(int(v) for v in f) for f in (r if len(r) else [])]
 
 
+_yn_trava = threading.Lock()
+
+
+def _rostos_yunet(img_bgr):
+    """Rostos (x, y, w, h) pelo YuNet do recorte (230 KB); None se o detector não estiver disponível."""
+    try:
+        from Functions.recorte_pro import _yunet
+        with _yn_trava:
+            d = _yunet()
+            d.setInputSize((img_bgr.shape[1], img_bgr.shape[0]))
+            _, r = d.detect(img_bgr)
+        return [tuple(int(v) for v in f[:4]) for f in (r if r is not None else []) if min(f[2], f[3]) >= 8]
+    except Exception:
+        return None
+
+
 def _saliencia(gray):
     """Ponto de interesse (0..1) por resíduo espectral (Hou & Zhang, 2007)."""
     import cv2
@@ -386,6 +403,20 @@ def _notas(img_bgr):
     cor = float(np.clip((math.sqrt(rg.std() ** 2 + yb.std() ** 2) + 0.3 * math.sqrt(rg.mean() ** 2 + yb.mean() ** 2)) / 100, 0, 1))
     faces = _rostos(gray)
     h, w = gray.shape[:2]
+    pessoa = None
+    if max(h, w) >= 480:   # fotos (vêm em 640 px): YuNet acha o rosto pequeno da pessoa longe, que o Haar perde
+        yn = _rostos_yunet(img_bgr)
+        if yn is not None:
+            faces = yn
+    if faces and max(h, w) >= 480:
+        # corpo estimado pelo rosto (cabeça ≈ 1/7,5 da altura): topo do cabelo, ombros/braços, joelhos e pés,
+        # de todas as pessoas; pode passar de 0..1 (corpo cortado pela própria foto)
+        pessoa = {"cab": round(min(y - fh * 0.35 for x, y, fw, fh in faces) / h, 4),
+                  "peito": round(max(y + fh * 2.2 for x, y, fw, fh in faces) / h, 4),
+                  "joelho": round(max(y + fh * 5.9 for x, y, fw, fh in faces) / h, 4),
+                  "pe": round(max(y + fh * 8.3 for x, y, fw, fh in faces) / h, 4),
+                  "x0": round(min(x - fw * 1.0 for x, y, fw, fh in faces) / w, 4),
+                  "x1": round(max(x + fw * 2.0 for x, y, fw, fh in faces) / w, 4)}
     if faces:
         x, y, fw, fh = max(faces, key=lambda f: f[2] * f[3])
         foco = ((x + fw / 2) / w, (y + fh * 0.45) / h)
@@ -411,7 +442,7 @@ def _notas(img_bgr):
     hist = hist / max(1.0, float(hist.sum()))
     return {"nit": round(nit, 3), "expo": round(expo, 3), "cor": round(cor, 3), "rostos": len(faces),
             "area_rosto": round(area_rosto, 4), "fx": round(foco[0], 3), "fy": round(foco[1], 3), "hash": str(dh),
-            "caixa": caixa, "h256": h256, "hist": [round(float(v), 4) for v in hist]}
+            "caixa": caixa, "pessoa": pessoa, "h256": h256, "hist": [round(float(v), 4) for v in hist]}
 
 
 def _ler_imagem(path, lado=640):
@@ -817,7 +848,7 @@ def _candidatos(midias, dur_slot, dur_max):
         if m["tipo"] == "foto":
             cand.append({"path": m["path"], "tipo": "foto", "nota": m["nota"], "mov": 0.0, "rostos": m["rostos"],
                          "fx": m["fx"], "fy": m["fy"], "hash": m["hash"], "w": m["w"], "h": m["h"], "data": m.get("data"),
-                         "caixa": m.get("caixa"), "posto": 0})
+                         "caixa": m.get("caixa"), "pessoa": m.get("pessoa"), "posto": 0})
             continue
         am = m["amostras"]
         if not am:
@@ -1157,7 +1188,7 @@ def planejar(musica, midias, modelo_id, dur_alvo=None, ordem="inteligente", seme
     for l, c in zip(linhas, escolha):
         s = sl[l["slot"]]
         item = {"a": l["a"], "b": l["b"], "nivel": l["nivel"], "acento": l["acento"], "path": c["path"], "tipo": c["tipo"],
-                "fx": c["fx"], "fy": c["fy"], "w": c["w"], "h": c["h"], "caixa": c.get("caixa"),
+                "fx": c["fx"], "fy": c["fy"], "w": c["w"], "h": c["h"], "caixa": c.get("caixa"), "pessoa": c.get("pessoa"),
                 "trans": "corte" if l.get("cel") else s["trans"], "flash": False if l.get("cel") else s["flash"]}
         if l.get("cel"):
             item.update(layout=s["layout"], cel=l["cel"], cel_i=l["cel_i"], grupo_a=s["a"])

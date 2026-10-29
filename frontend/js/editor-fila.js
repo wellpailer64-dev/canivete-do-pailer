@@ -87,8 +87,28 @@ function veFilaNomeTimeline(id = VE.activeSequence) {
 async function veFilaAdicionarAtual(nome = null, cfg = null) {
     if (!VE.ready) return null;
     VEFILA.preparando = (VEFILA.preparando || 0) + 1;   // transições/Comps/3D/textos viram arquivo antes de entrar
-    try { return await veFilaAdicionarAgora(nome, cfg); }
+    // Um preparo por vez: o preparo lê a timeline ABERTA (VE.clips, agulha); pôr outra na fila no meio trocava a timeline
+    // embaixo do 1º (plano com as camadas da outra) e os dois disputavam o desenhista (Reels A/B, 2026-10-28)
+    const antes = VEFILA.prepVez || Promise.resolve(), seq = VE.activeSequence;
+    let soltar; VEFILA.prepVez = new Promise(r => { soltar = r; });
+    const vez = antes.then(() => {}, () => {});
+    // nome e configurações de AGORA; o item já aparece na fila esperando a vez de preparar
+    nome = nome || (cfg && cfg.nome) || veFilaNomeTimeline();
+    cfg = cfg || veFilaCfgLer();
+    const prep = { id: 'p' + Date.now() + Math.random().toString(36).slice(2, 5), nome, msg: 'Aguardando a vez de preparar…', t0: Date.now() };
+    VEFILA.preps = VEFILA.preps || [];
+    VEFILA.preps.push(prep); veFilaRender();
+    try {
+        await vez;
+        VEFILA.prepSeq = seq;   // veFilaNaVez: cada passo do preparo volta a esta timeline
+        veFilaNaVez();
+        prep.msg = 'Conferindo os arquivos…'; prep.t0 = Date.now();
+        return await veFilaAdicionarAgora(nome, cfg, prep);
+    }
     finally {
+        VEFILA.preps = VEFILA.preps.filter(p => p !== prep); if (VEFILA.prepAtual === prep) VEFILA.prepAtual = null; veFilaRender();
+        if (VEFILA.prepSeq === seq) VEFILA.prepSeq = null;
+        soltar();
         VEFILA.preparando--;
         // Renderizar clicado durante o preparo: começa agora (antes duplicava a timeline na fila)
         if (!VEFILA.preparando && VEFILA.iniciarDepois) { VEFILA.iniciarDepois = false; veFilaIniciar().catch(e => veToast(e.message)); }
@@ -233,8 +253,9 @@ function veFilaPrepMsg(m) {
     const el = document.querySelector(`#ve-fila-lista [data-prep="${p.id}"] small`);
     if (el) el.textContent = m + ' · ' + veHuman((Date.now() - p.t0) / 1000); else veFilaRender();
 }
-async function veFilaAdicionarAgora(nome, cfg) {
-    const prep = { id: 'p' + Date.now(), nome: nome || (cfg && cfg.nome) || veFilaNomeTimeline(), msg: 'Conferindo os arquivos…', t0: Date.now() };
+async function veFilaAdicionarAgora(nome, cfg, prep = null) {
+    if (prep) { VEFILA.prepAtual = prep; return veFilaAdicionarPreparando(nome, cfg); }   // a vez chegou (veFilaAdicionarAtual)
+    prep = { id: 'p' + Date.now(), nome: nome || (cfg && cfg.nome) || veFilaNomeTimeline(), msg: 'Conferindo os arquivos…', t0: Date.now() };
     VEFILA.preps = VEFILA.preps || [];
     VEFILA.preps.push(prep); VEFILA.prepAtual = prep; veFilaRender();
     try { return await veFilaAdicionarPreparando(nome, cfg); }
@@ -249,19 +270,34 @@ async function veFilaAdicionarPreparando(nome, cfg) {
     // render maior que a timeline (Full HD → 4K): preparo com a timeline reescalada, nítido (editor.js veExportNoQuadro)
     return veExportNoQuadro((cfg || veFilaCfgLer()).res, () => veFilaAdicionarPlano(nome, cfg, msg));
 }
+// O preparo lê a timeline ABERTA: trocar de timeline no meio (ou pôr outra na fila) fazia o item sair com o conteúdo
+// da outra (Reel A com o Reel B, 2026-10-28). Antes de cada passo, volta à timeline do item em preparo.
+function veFilaNaVez() {
+    const s = VEFILA.prepSeq;
+    if (s && VE.activeSequence !== s && typeof veOpenTimeline === 'function' && (VE.sequences || []).some(x => x.id === s)) veOpenTimeline(s);
+}
 async function veFilaAdicionarPlano(nome, cfg, msg) {
+    veFilaNaVez();
     if (typeof veCompProntas === 'function') await veCompProntas(msg);
+    veFilaNaVez();
     if (typeof ve3dProntas === 'function') await ve3dProntas(msg);
+    veFilaNaVez();
     // placa ligada: só o plano das transições de sobreposição (a placa faz no shader); desligada: renderiza antes
     if (typeof veOvtProntas === 'function') await veOvtProntas(veExportFaixa(), msg, !!(cfg ? cfg.gpu : veFilaCfgLer().gpu));
+    veFilaNaVez();
+    // mapa próprio, posto no VE._txPng só junto do plano (a prévia em segundo plano não troca no meio: editor-render.js)
+    let mapa = new Map();
     if (veTxPrecisaEm(VE.clips)) {
         msg('Preparando textos, formas e camadas de motion…');
-        await veMoNoTamanho((cfg || veFilaCfgLer()).res, () => veTxPngs());   // motion já no tamanho da saída
+        mapa = await veMoNoTamanho((cfg || veFilaCfgLer()).res, () => veTxPngs(null, VE.clips, false));   // motion já no tamanho da saída
     }
+    veFilaNaVez();
     msg('Revisando a timeline…');
     const avisos = await veFilaRevisar().catch(() => []);
+    veFilaNaVez();   // daqui ao fim é sem espera: o plano sai da timeline do item
     if (avisos.length) veToast(`Revisor: ${avisos.length} aviso(s) — ${avisos.slice(0, 2).map(a => veHuman(a.t) + ' ' + a.texto).join(' · ')}${avisos.length > 2 ? ' …' : ''}`);
     msg('Montando o plano do render…');
+    VE._txPng = mapa;
     const plano = veExportPlan(true), master = veMasterLim(), mix = master ? [...plano.mix, { master }] : plano.mix;
     const c = cfg ? JSON.parse(JSON.stringify(cfg)) : veFilaCfgLer();
     c.nome = nome || c.nome || veFilaNomeTimeline();

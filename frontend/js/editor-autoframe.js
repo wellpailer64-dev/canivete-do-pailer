@@ -18,6 +18,7 @@ const VEAF = {
     dur: 0, ordem: 'inteligente', titulo: '', semente: 1, apres: 'misto',
     inicioModo: 'agitada', manual: null, inicioT: null,   // onde o vídeo começa na música
     telas: 'sim',           // telas divididas (várias cenas no mesmo quadro, entrando na batida)
+    reenq: localStorage.getItem('ve-af-reenq') || 'nao',   // reenquadrar pessoas (fica lembrado)
     analisando: false, progresso: '', pct: 0,
     aba: 'quick', cli: null, cliMus: 0,                    // aba e modelo de cliente em uso (Customizado)
 };
@@ -227,6 +228,29 @@ function veAfEnquadrarSeguro(w, h, caixa, fx, fy, folga = 1) {
     return { ...veAfEnquadrar(w, h, cx, cy, Math.min(folga, Math.max(1, zfit))), zmax: Math.max(1, zfit) };
 }
 
+// Reenquadramento inteligente (opção "Reenquadrar pessoas", só fotos): aproxima a pessoa que está longe e corrige a
+// que está alta/baixa demais. Pessoa inteira quando os pés estão na foto (a estimativa erra uns 10%); senão plano americano (até o joelho).
+// p = corpo estimado pelo rosto (autoframe.py: pessoa). Nunca corta cabeça nem lados: não cabendo de lado, null
+// (o enquadramento seguro decide, como antes)
+function veAfReenquadrar(w, h, p) {
+    if (!p || !w || !h) return null;
+    const k0 = Math.max(VE_AF_W / w, VE_AF_H / h);
+    const cab = Math.max(0, p.cab) * h, x0 = Math.max(0, p.x0) * w, x1 = Math.min(1, p.x1) * w;
+    const base = Math.min(h, (p.pe <= 1.12 ? p.pe : Math.max(p.peito, p.joelho)) * h);
+    const bh = base - cab, bw = x1 - x0;
+    if (bh <= 0 || bw <= 0) return null;
+    // a pessoa ocupa ~84% da altura (respiro em cima e embaixo) e cabe de lado com folga; zoom até 2,2×
+    const zLarg = VE_AF_W * 0.92 / (k0 * bw);
+    if (zLarg < 1) return null;
+    const z = Math.max(1, Math.min(VE_AF_H * 0.84 / (k0 * bh), zLarg, 2.2));
+    const k = k0 * z, FW = VE_AF_W / k, FH = VE_AF_H / k;
+    // quadro (px da foto): pessoa no centro, cabeça com pelo menos 6% de respiro; sem sair da foto
+    const fy0 = Math.max(0, Math.min(h - FH, Math.min((cab + base - FH) / 2, cab - FH * 0.06)));
+    const fx0 = Math.max(0, Math.min(w - FW, (x0 + x1 - FW) / 2));
+    return { sc: Math.round(k * 10000) / 100, x: Math.round((VE_AF_W / 2 + (w / 2 - fx0 - FW / 2) * k) * 10) / 10,
+        y: Math.round((VE_AF_H / 2 + (h / 2 - fy0 - FH / 2) * k) * 10) / 10, zmax: 1.04, reenq: true };
+}
+
 const veAfEsperar = (cond, ms = 60000) => new Promise(res => {
     const t0 = Date.now();
     const f = () => (cond() ? res(true) : Date.now() - t0 > ms ? res(false) : setTimeout(f, 150));
@@ -406,7 +430,7 @@ function veAfClipes(plano) {
             out.push(c);
             return;
         }
-        const q = veAfEnquadrarSeguro(s.w, s.h, s.caixa, s.fx, s.fy, folga);
+        const q = (!video && VEAF.reenq === 'sim' && veAfReenquadrar(s.w, s.h, s.pessoa)) || veAfEnquadrarSeguro(s.w, s.h, s.caixa, s.fx, s.fy, folga);
         // a animação nunca aproxima além do que deixa a caixa (cabeças) inteira no quadro
         const Z = f => Math.max(1, Math.min(f, q.zmax));
         // cartão / moldura: foto que não cabe em 9:16 sem cortar alguém sempre; no Misto, cena sem acento (1 a cada ~3)
@@ -673,6 +697,7 @@ function veAfRender() {
     const p4 = `<div class="ve-af-opcoes">
             <div class="ve-af-opc"><span>${veT('Duração')}</span><div class="ve-af-pills">${pill('dur', 0, veT('Música toda'))}${pill('dur', 15, '15 s')}${pill('dur', 30, '30 s')}${pill('dur', 60, '60 s')}</div></div>
             <div class="ve-af-opc"><span>${veT('Telas divididas')}</span><div class="ve-af-pills">${pill('telas', 'sim', veT('Sim'))}${pill('telas', 'nao', veT('Não'))}</div></div>
+            <div class="ve-af-opc"><span title="${veT('Aproxima e posiciona as pessoas das fotos: pessoa inteira ou plano americano, sem cortar cabeça nem lados')}">${veT('Reenquadrar pessoas')}</span><div class="ve-af-pills">${pill('reenq', 'sim', veT('Sim'))}${pill('reenq', 'nao', veT('Não'))}</div></div>
             <div class="ve-af-opc"><span>${veT('Apresentação das fotos')}</span><div class="ve-af-pills">${Object.entries(VE_AF_APRES).map(([v, t]) => pill('apres', v, veT(t))).join('')}</div></div>
             <div class="ve-af-opc"><span>${veT('Ordem')}</span><div class="ve-af-pills">${pill('ordem', 'inteligente', veT('Inteligente'))}${pill('ordem', 'cronologica', veT('Cronológica'))}${pill('ordem', 'aleatoria', veT('Aleatória'))}</div></div>
             ${cli && veAfcPronto(cli.intro.tipo) && !cli.intro.transparente ? '' /* intro pronta já traz o título dela */ : `<div class="ve-af-opc"><span>${veT(cli ? 'Texto da intro' : 'Título')}</span><input type="text" id="ve-af-titulo" value="${veEsc(VEAF.titulo)}" placeholder="${veT('opcional: aparece no começo')}"></div>`}
@@ -763,6 +788,7 @@ function veAfInit() {
         } else if (set) {
             const g = set.dataset.afSet;
             VEAF[g] = g === 'dur' ? +set.dataset.v : set.dataset.v;
+            if (g === 'reenq') localStorage.setItem('ve-af-reenq', VEAF.reenq);
             if (g === 'inicioModo' && VEAF.inicioModo === 'manual' && VEAF.manual == null) VEAF.manual = VEAF.inicioT || 0;
             veAfRender();
             if (g === 'dur' || g === 'inicioModo') veAfRecomendar();
