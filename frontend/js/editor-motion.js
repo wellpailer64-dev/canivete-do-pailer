@@ -427,6 +427,28 @@ function veMoAmostras(c, t, pv) {
     return Math.round(veMoClamp(d / 1.5, 3, VEMO.assando ? 48 : 16));
 }
 
+// Retângulo (pixels do canvas) que cobre a camada em todas as amostras do obturador, com folga; null = quadro inteiro
+// (sombra, eco, efeitos ou mídia sem tamanho podem desenhar fora da caixa da mídia)
+function veMoRetAmostras(c, src, base, t, ab, n, W, H) {
+    if (!src || src === 'offline' || veMoEco(c, t) || (c.fx || []).some(f => f.on !== false)) return null;
+    const sz = veMediaSize(c);
+    if (!sz || !sz.w || !sz.h) return null;
+    const m = (src._pad || 0) + (src._mais || 0);
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let j = 0; j < n; j++) {
+        const Tj = t - ab / 2 + ab * (j + 0.5) / n, M = base.multiply(veMoMundo(c, Tj));
+        [[-m, -m], [sz.w + m, -m], [sz.w + m, sz.h + m], [-m, sz.h + m]].forEach(([u, v]) => {
+            const p = M.transformPoint({ x: u, y: v });
+            x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y);
+        });
+    }
+    if (!isFinite(x0 + y0 + x1 + y1)) return null;
+    const f = 4 + 0.05 * Math.max(x1 - x0, y1 - y0);
+    x0 = Math.max(0, Math.floor(x0 - f)); y0 = Math.max(0, Math.floor(y0 - f));
+    x1 = Math.min(W, Math.ceil(x1 + f)); y1 = Math.min(H, Math.ceil(y1 + f));
+    return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : { x: 0, y: 0, w: 1, h: 1 };
+}
+
 function veMoDesenhar(ctx, cv, c, src, pv, t, itens) {
     const mt = c.mt && c.mt.uid && VE_MO_FOSCOS[c.mt.modo] ? c.mt : null;
     const n = veMoAmostras(c, t, pv), gco = src !== 'offline' && veBmGco(c), eco = src !== 'offline' && veMoEco(c, t);
@@ -456,16 +478,19 @@ function veMoDesenhar(ctx, cv, c, src, pv, t, itens) {
         // obturador de 180° centrado no quadro: média das amostras (somar com peso 1/n no alfa pré-multiplicado)
         const S = veMoTela(c, 'S', W, H), sx = S.getContext('2d'), ab = 0.5 / (VE.fps || 30);
         sx.imageSmoothingQuality = 'high';
+        // só o retângulo por onde a camada passa no obturador (uma forma pequena andando: limpar e somar o quadro
+        // inteiro a cada amostra era quase todo o tempo da camada desenhada — 48 ms → poucos ms por quadro)
+        const R = veMoRetAmostras(c, src, base, t, ab, n, W, H) || { x: 0, y: 0, w: W, h: H };
         for (let j = 0; j < n; j++) {
             const Tj = t - ab / 2 + ab * (j + 0.5) / n;
             sx.setTransform(1, 0, 0, 1, 0, 0);
-            sx.clearRect(0, 0, W, H);
+            sx.clearRect(R.x, R.y, R.w, R.h);
             sx.setTransform(base);
             comEco((T, f) => veMoUm(sx, c, src, pv, T, f), Tj - t);
             lx.setTransform(1, 0, 0, 1, 0, 0);
             lx.globalCompositeOperation = 'lighter';
             lx.globalAlpha = 1 / n;
-            lx.drawImage(S, 0, 0);
+            lx.drawImage(S, R.x, R.y, R.w, R.h, R.x, R.y, R.w, R.h);
         }
         lx.globalAlpha = 1;
         lx.globalCompositeOperation = 'source-over';
@@ -611,7 +636,7 @@ async function veMoFonte(c, T, f) {
 
 // A mesma camada pedida de novo enquanto é desenhada (a prévia renderizada e a exportação ao mesmo tempo): espera a
 // que já está rodando em vez de abrir outra na mesma pasta
-async function veMoAssarUm(c, lista, como, aviso) {
+async function veMoAssarUm(c, lista, como, aviso, aoDesenhar) {
     const api = window.pywebview && window.pywebview.api;
     if (!api || !api.ve_c3d_inicio) return null;
     const fps = VE.fps || 30;
@@ -622,24 +647,30 @@ async function veMoAssarUm(c, lista, como, aviso) {
     const W = Math.round(W0 * k / 2) * 2, H = Math.round(H0 * k / 2) * 2;
     const sig = 'mo.' + veMoHash(veMoAssinatura(c, lista) + `|${W}x${H}@${fps}|${VE_MO_VERSAO}`);
     VEMO.emCurso = VEMO.emCurso || new Map();
-    if (VEMO.emCurso.has(sig)) return VEMO.emCurso.get(sig);
-    const p = veMoAssarSig(c, lista, como, aviso, sig, W, H, fps, k);
+    if (VEMO.emCurso.has(sig)) { if (aoDesenhar) aoDesenhar(); return VEMO.emCurso.get(sig); }
+    const p = veMoAssarSig(c, lista, como, aviso, sig, W, H, fps, k, aoDesenhar);
     VEMO.emCurso.set(sig, p);
     try { return await p; } finally { VEMO.emCurso.delete(sig); }
 }
 
-async function veMoAssarSig(c, lista, como, aviso, sig, W, H, fps, k = 1) {
+async function veMoAssarSig(c, lista, como, aviso, sig, W, H, fps, k = 1, aoDesenhar = null) {
     const api = window.pywebview.api, n = Math.max(1, Math.round(veLen(c) * fps));
+    let avisou = false;
+    const solta = () => { if (!avisou && aoDesenhar) { avisou = true; aoDesenhar(); } };
+    try {
     const ini = await api.ve_c3d_inicio(vePrPrefs().dir, sig);
     if (!ini || !ini.success) throw new Error((ini && ini.error) || 'não abriu o render');
     if (ini.pronto) return { mov: ini.path, box: ini.box || null };
     const cv = document.createElement('canvas');
     cv.width = W; cv.height = H;
-    const ctx = cv.getContext('2d');
+    // canvas no processador: cada quadro é lido de volta (PNG); na placa a cópia de volta custava ~30 ms por quadro,
+    // mais que todo o desenho (Reels BF, 2026-10-28: 34 ms → 4 ms por quadro, imagem igual)
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
     const escalas = [veStaticProps(c).sc].concat(veKfOn(c, 'sc') ? c.k.sc.map(q => q.v) : []);
     const f = Math.min(4, Math.max(1, Math.max(...escalas) / 100)) * k;
     const fo = c.mt && c.mt.uid ? lista.find(o => o.uid === c.mt.uid) : null;
     VEMO.assando++;
+    const envios = [];
     try {
         for (let i = 0; i < n; i++) {
             const T = c.st + i / fps;
@@ -659,16 +690,20 @@ async function veMoAssarSig(c, lista, como, aviso, sig, W, H, fps, k = 1) {
                     veDesenharItens(ctx, cv, itens, k, T);
                 } finally { VE.playhead = ph; }
             });
+            // enviado sem esperar a resposta: o próximo quadro já desenha (toBlob demorava ~240 ms por quadro: não usar)
             const b = veCanvasPng(cv);
-            const rr = await fetch(ini.url + `q${String(i).padStart(5, '0')}.png`, { method: 'POST', body: b, headers: { 'Content-Type': 'image/png' } });
-            if (!rr.ok && rr.status !== 204) throw new Error(`envio do quadro ${i}: HTTP ${rr.status}`);
-            if (i % 24 === 23) await api.ve_c3d_lote(ini.sessao, ini.pasta);
+            envios.push(fetch(ini.url + `q${String(i).padStart(5, '0')}.png`, { method: 'POST', body: b, headers: { 'Content-Type': 'image/png' } })
+                .then(rr => { if (!rr.ok && rr.status !== 204) throw new Error(`envio do quadro ${i}: HTTP ${rr.status}`); }));
+            if (i % 24 === 23) { await Promise.all(envios.splice(0)); await api.ve_c3d_lote(ini.sessao, ini.pasta); }
             if (aviso && i % 6 === 0) aviso(Math.round(i * 100 / n));
         }
-    } finally { VEMO.assando--; }
+        await Promise.all(envios.splice(0));
+    } finally { VEMO.assando--; await Promise.allSettled(envios); }
+    solta();   // desenho pronto: a próxima camada já pode desenhar enquanto o ffmpeg monta esta
     const r = await api.ve_c3d_fim(vePrPrefs().dir, sig, ini.sessao, ini.pasta, fps, n, true);   // recorta ao desenho
     if (!r || !r.success) throw new Error((r && r.error) || 'não montou o vídeo da camada');
     return { mov: r.path, box: r.box || null };
+    } finally { solta(); }
 }
 
 // Exportação com resolução menor que o quadro ("1080" num 4K): as camadas do motion preparadas em fn() saem desenhadas
@@ -687,21 +722,28 @@ async function veMoAssar(mapa, filtro, clips = VE.clips) {
     const pl = typeof VECOMP !== 'undefined' && VECOMP.planas && VECOMP.planas.get(clips);   // achatada (editor-comp-passa.js)
     const como = fn => (pl ? veCompPlanaComo(pl, fn) : seq && typeof veCompComo === 'function' ? veCompComo(seq, fn) : fn());
     const lista = como(() => clips.filter(c => veMoTem(c) && !veMoFora(c) && !veOculto(c) && (!filtro || filtro(c))));
-    for (let j = 0; j < lista.length; j++) {
+    // Em esteira: o desenho (na página) é um por vez, mas a montagem do .mov (ffmpeg, no Python) da camada anterior roda
+    // enquanto a próxima desenha — até 3 montagens juntas (Reels BF: 124 camadas com desfoque de movimento, 2026-10-28)
+    const montando = new Set();
+    let erro = null;
+    for (let j = 0; j < lista.length && !erro; j++) {
         const c = lista[j];
-        try {
-            const r = await veMoAssarUm(c, clips, como, pct => {
-                const msg = `${veT('Desenhando camadas de motion')} ${j + 1}/${lista.length}: ${pct}%`;
-                const el = typeof $ve === 'function' && $ve('ve-exp-msg');
-                if (typeof veFilaPrepMsg === 'function' && VEFILA.prepAtual) veFilaPrepMsg(msg);   // item em preparo na fila
-                else if (el) el.textContent = msg; else if (pct === 0) veToast(msg);
-            });
-            if (r) mapa.set(c, r);
-        } catch (e) {
-            veToast(`${veT('Falha ao desenhar a camada')} ${veMoNome(c)}: ${(e && e.message) || e}`);
-            throw e;
-        }
+        let desenhou;
+        const vez = new Promise(r => { desenhou = r; });
+        const p = veMoAssarUm(c, clips, como, pct => {
+            const msg = `${veT('Desenhando camadas de motion')} ${j + 1}/${lista.length}: ${pct}%`;
+            const el = typeof $ve === 'function' && $ve('ve-exp-msg');
+            if (typeof veFilaPrepMsg === 'function' && VEFILA.prepAtual) veFilaPrepMsg(msg);   // item em preparo na fila
+            else if (el) el.textContent = msg; else if (pct === 0) veToast(msg);
+        }, desenhou).then(r => { if (r) mapa.set(c, r); }, e => {
+            if (!erro) { erro = e; veToast(`${veT('Falha ao desenhar a camada')} ${veMoNome(c)}: ${(e && e.message) || e}`); }
+        }).finally(() => { montando.delete(p); desenhou(); });
+        montando.add(p);
+        await vez;
+        while (montando.size >= 3 && !erro) await Promise.race(montando);
     }
+    await Promise.all(montando);
+    if (erro) throw erro;
 }
 
 // ─────────────────────────── painel (Controles de efeito) ───────────────────────────
