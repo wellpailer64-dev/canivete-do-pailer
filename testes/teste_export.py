@@ -504,10 +504,14 @@ CASOS = {
             fx: [{ id: id(), t: 'sombra', on: true, v: { cor: '#000000', op: 75, ang: 120, dist: 30, tam: 40 } }] });
         const logo = clip(2, 0, 0, 2, 'logo.png', { p: { sc: 90, x: 560, y: 1350, rot: 0, op: 100 },
             fx: [{ id: id(), t: 'sombra', on: true, v: { cor: '#ff2a00', op: 90, ang: 45, dist: 18, tam: 10 } }] });
+        // escala animada com sombra (de grande para pequeno): a escala travava no tamanho do 1º quadro (brasão BF, 2026-10-28)
+        const zoom = clip(4, 0, 0, 2, 'logo.png', { p: { sc: 40, x: 300, y: 1000, rot: 0, op: 100 },
+            fx: [{ id: id(), t: 'sombra', on: true, v: { cor: '#000000', op: 60, ang: 90, dist: 24, tam: 50 } }] });
+        zoom.k = { sc: [{ t: 0, v: 120, i: 'lin' }, { t: 0.3, v: 40, i: 'lin' }], rot: [{ t: 0, v: -10, i: 'lin' }, { t: 0.3, v: 0, i: 'lin' }] };
         const tm = veTxMidia();
         const tx = { tr: 3, st: 0, s: 0, e: 2, m: tm.id, tx: { ...VE_TX_PADRAO, t: 'SOMBRA', tam: 140, sOn: true, sCor: '#102030', sOp: 80, sDist: 14, sBlur: 12, sAng: 60 } };
         tx.p = Object.assign(veDefProps(tx), { sc: 100, x: W / 2, y: 300 });
-        return [clip(0, 0, 0, 2, 'b.mp4'), f, logo, tx];
+        return [clip(0, 0, 0, 2, 'b.mp4'), f, logo, zoom, tx];
     """, ""),
     # chroma key (na prévia roda na placa, WebGL2: editor-fx.js veKeyDrawGL; na exportação, ffmpeg): encolher e suavizar
     "chroma": (1080, 1920, """

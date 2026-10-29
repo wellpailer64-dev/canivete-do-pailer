@@ -4707,8 +4707,11 @@ def exportar_video(path, segmentos, formato_saida="mp4", qualidade="medium", res
                 maior = max([c["sc"]] + [p[1] for p in c["kf"].get("sc", [])]) * 1.2
                 lado = int(math.ceil(math.hypot(c["mw"], c["mh"]) * maior)) + 2 * m + 4
                 lado += lado % 2
-                filtros.append(f"[l{n}r]split[l{n}][{r}a]")
-                filtros.append(f"[{r}a]format=rgba,pad={lado}:{lado}:(ow-iw)/2:(oh-ih)/2:color=black@0:eval=frame,"
+                # a moldura fixa vem ANTES do split e vale para a camada também (centrada: o overlay põe pelo centro,
+                # nada sai do lugar). Com o pad só no ramo da sombra, a escala animada da camada ficava travada no
+                # tamanho do 1º quadro (logo do brasão a 174% nos Reels BF, 2026-10-28)
+                filtros.append(f"[l{n}r]pad={lado}:{lado}:(ow-iw)/2:(oh-ih)/2:color=black@0:eval=frame,split[l{n}][{r}a]")
+                filtros.append(f"[{r}a]format=rgba,"
                                f"lutrgb=r={R}:g={G}:b={B}:a='val*{op:.4f}'"
                                + (f",format=gbrap,gblur=sigma={sig:.3f}:planes=8,format=rgba" if sig >= 0.3 else "") + f"[{r}b]")
                 filtros.append(f"{vf}[{r}b]overlay=x='({px})+{dx:.3f}-w/2':y='({py})+{dy:.3f}-h/2'"
