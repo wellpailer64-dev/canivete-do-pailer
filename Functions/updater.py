@@ -7,7 +7,7 @@ Fluxo:
    espera o app fechar, copia os arquivos novos por cima (preservando modelos, cérebros,
    logs e configurações do usuário) e reabre o app.
 
-Só funciona no executável (PyInstaller). Rodando pelo Python, apenas informa a versão nova.
+Só consulta e instala atualizações no executável (PyInstaller). Pelo Python, informa apenas a versão local.
 """
 import os
 import sys
@@ -114,6 +114,9 @@ def _registrar(msg):
 def check_update():
     """Retorna dict: {available, current, latest, notes, url, size, error}. Tenta a API do GitHub e, se falhar, o site."""
     atual = versao_local()
+    # Pelo código-fonte, a atualização é feita na própria pasta, sem usar o instalador.
+    if not getattr(sys, "frozen", False):
+        return {"available": False, "current": atual, "frozen": False}
     erros = []
     rel = None
     for fonte in (lambda: _get_json(API_LATEST), _ultima_pelo_site):

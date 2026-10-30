@@ -1650,9 +1650,23 @@ function ieTransfDeMat(t, M) {
     Object.assign(t, { sx, sy, rot, cx: c.x, cy: c.y });
 }
 
+function ieTransfAgendar() {
+    const t = IE.transf;
+    if (!t || t._prevQuadro != null) return;
+    // Eventos do mouse podem chegar várias vezes no mesmo quadro; desenha só a posição mais recente.
+    t._prevQuadro = requestAnimationFrame(() => {
+        t._prevQuadro = null;
+        if (IE.transf !== t) return;
+        ieTransfPrevia();
+        ieOpcoesRender?.(true);
+        ieDesenharSobre();
+    });
+}
+
 function ieTransfPrevia() {
     const t = IE.transf, doc = IE.doc;
     if (!t) return;
+    if (t._prevQuadro != null) { cancelAnimationFrame(t._prevQuadro); t._prevQuadro = null; }
     const Mq = ieQuadAfim(t), M = Mq || ieTransfMat(t);
     let R = null;
     for (const o of t.orig) {
@@ -1683,6 +1697,7 @@ function ieTransfPrevia() {
 function ieTransfAplicar() {
     const t = IE.transf, doc = IE.doc;
     if (!t) return;
+    if (t._prevQuadro != null) ieTransfPrevia();
     IE.transf = null; IE._cong = null;
     doc._esconderSel = false;
     const Mq = ieQuadAfim(t), M = Mq || ieTransfMat(t);
@@ -1727,6 +1742,7 @@ function ieTransfAplicar() {
 function ieTransfCancelar() {
     const t = IE.transf, doc = IE.doc;
     if (!t) return;
+    if (t._prevQuadro != null) { cancelAnimationFrame(t._prevQuadro); t._prevQuadro = null; }
     IE.transf = null; IE._cong = null;
     doc._esconderSel = false;
     for (const o of t.orig) { o.L._tfPrev = null; o.L._mPrev = null; ieInvalidar(o.L); }
@@ -1878,8 +1894,7 @@ const IE_TRANSF = {
                 ieTransfAtivarQuad(t, ev.ctrlKey ? 'distorcer' : t.modo);
                 if (!a.s.quad) a.s.quad = Object.fromEntries(Object.entries(t.quad).map(([k, v]) => [k, { ...v }]));
                 ieTransfQuadArrastar(t, a, p);
-                ieTransfPrevia();
-                ieOpcoesRender?.(true);
+                ieTransfAgendar();
                 return;
             }
             // escala: em coordenadas locais (sem rotação), âncora no lado oposto (Alt = no centro)
@@ -1915,11 +1930,16 @@ const IE_TRANSF = {
             t.cx = s.cx + ncx * cos - ncy * sin;
             t.cy = s.cy + ncx * sin + ncy * cos;
         }
-        ieTransfPrevia();
-        ieOpcoesRender?.(true);
+        ieTransfAgendar();
+    },
+    up() {
+        if (IE.transf) {
+            if (IE.transf._prevQuadro != null) { ieTransfPrevia(); ieOpcoesRender?.(true); }
+            IE.transf.arr = null;
+        }
+        IE._gi = null;
         ieDesenharSobre();
     },
-    up() { if (IE.transf) IE.transf.arr = null; if (IE._gi) { IE._gi = null; ieDesenharSobre(); } },
     dbl() { ieTransfAplicar(); },
     cursor(ev) {
         const t = IE.transf, doc = IE.doc;

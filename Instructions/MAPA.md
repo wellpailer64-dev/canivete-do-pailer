@@ -216,6 +216,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/worker/entrevista.py` — Entrevista do assistente local (Canivete Worker): mesmos pedidos para cada modelo do Ollama, mede acerto de
 - `tools/worker/worker.py` — Canivete Worker: executa um contrato de tarefa (Task Contract) no Photo Kanivete com um modelo local (Ollama),
 - `tools/aplicar.py` — Aplica mudanças no app ABERTO sem recarregar a página (o projeto, as janelas soltas e o Ctrl+Z continuam)
+- `tools/atalho_runapp.py` — Atalho do KANIVETE pelo código (o Runapp sem console): pythonw + main.py, ícone do app e o AppUserModelID do processo
 - `tools/briefing.py` — Briefing barato de uma pasta do cliente: lê PDF/imagens/áudios/vídeos e devolve UM resumo em texto + poucas folhas
 - `tools/contorno.py` — Qualidade do contorno de um logo (o "pente de curvatura" do RoboFont/Glyphs, para conferir sem olhar a olho)
 - `tools/direcao_mapa.py` — Mapa de direção de arte (para o Claude, o Worker e o roteiro_local): layouts, estilos e técnicas em linhas curtas —
