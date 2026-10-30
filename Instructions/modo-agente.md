@@ -5,7 +5,7 @@ Permite que um agente de IA ou script de automação **veja e use o painel** do 
 
 ## Abrir o app pelo agente sem vincular à tarefa
 
-Quando o usuário autorizar abrir o Kanivete, prefira iniciar pelo Windows via `Invoke-CimMethod -ClassName Win32_Process -MethodName Create`, com executável e projeto entre aspas e `Win32_ProcessStartup.ShowWindow=0`. O processo nasce pelo serviço WMI, independente da árvore de processos da tarefa. Não use `Start-Process` para deixar o app do usuário aberto: nesta sessão (2026-10-23), ele respondeu durante a tarefa e encerrou depois de cada resposta, sem registro novo de falha. A vinculação ao processo da tarefa é uma hipótese; confirmar a permanência também na interação seguinte. Não reiniciar sem autorização nem conectar à porta 9222. Isso não altera o fluxo do app de teste na 9333.
+**O app do Pailer abre SEMPRE visível: use `py -3.13 D:/Kanivete/Plugins/kanicode/plugins/kanivete/kanivete.py abrir` e, para trazer à frente, `frente`.** Nunca `ShowWindow=0`: ele precisa ver o trabalho (2026-10-30, esta instrução escondeu o app dele). Por dentro: `Invoke-CimMethod -ClassName Win32_Process -MethodName Create`, com executável e projeto entre aspas e `Win32_ProcessStartup.ShowWindow=1`. O processo nasce pelo serviço WMI, independente da árvore de processos da tarefa. Não use `Start-Process` para deixar o app do usuário aberto: nesta sessão (2026-10-23), ele respondeu durante a tarefa e encerrou depois de cada resposta, sem registro novo de falha. A vinculação ao processo da tarefa é uma hipótese; confirmar a permanência também na interação seguinte. Não reiniciar sem autorização nem conectar à porta 9222. Isso não altera o fluxo do app de teste na 9333.
 
 ## Como ligar
 

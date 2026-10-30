@@ -67,6 +67,7 @@ async function ieAbrirArquivo(path) {
         if (r.iknv) return await ieMontarIknv(r, path);
         const doc = ieNovoDoc({ nome: r.nome, w: r.w, h: r.h, dpi: r.dpi, path, psdPath: r.psd ? path : null, pyId: r.doc, bits: r.bits, modo: r.modo, avisos: r.avisos || [] });
         doc.fatias = (r.fatias || []).map(f => ({ ...f, id: ++doc.seqFatia }));
+        doc.verFatias = doc.fatias.length > 0;   // documento com fatias abre com elas à vista (carrossel: conferir as páginas)
         doc.fatiasOrig = JSON.stringify(ieFatiasSpec(doc));
         doc.psb = !!r.psb;
         if (r.luz) doc.luzGlobal = { ang: r.luz.ang, alt: r.luz.alt };
@@ -605,6 +606,7 @@ async function ieMontarIknv(r, path) {
     doc.seq = d.seq || 0;
     iePercorrer(doc.camadas, L => { doc.seq = Math.max(doc.seq, L.id || 0); });
     doc.fatias = (d.fatias || []).map(f => ({ ...f, id: ++doc.seqFatia }));
+    doc.verFatias = doc.fatias.length > 0;   // documento com fatias abre com elas à vista (carrossel: conferir as páginas)
     doc.fatiasOrig = JSON.stringify(ieFatiasSpec(doc)); doc.guiasOrig = JSON.stringify(doc.guias || []);
     doc.ativa = d.ativa ?? null;
     doc.selIds = d.selIds || (doc.ativa != null ? [doc.ativa] : []);

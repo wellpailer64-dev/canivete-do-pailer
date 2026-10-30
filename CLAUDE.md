@@ -32,6 +32,9 @@
   `.iknv` = editor de imagem (zip com documento.json + PNGs; `Functions/editor_imagem.py`). Associação no Windows
   (HKCU) em `Functions/projeto.py`; duplo clique roteado por `abrirProjetoExterno` (frontend/js/app.js).
 
+## Peça de cliente (card do Pandalab): comece aqui
+`Instructions/agente/fluxo-peca-cliente.md` (baixar → preset → `tools/peca.py` → salvar e deixar aberto para aprovar; app sempre visível; carrossel com guias e fatias à vista). Fichas: `Instructions/agente/clientes/<cliente>.md`.
+
 ## Mapa geral (comece por aqui)
 `Instructions/MAPA.md` (ferramentas → arquivos, API, comandos VKN/KNV, testes, guias, pontes, onde ficam dados e
 caches); versão do Jr: `Instructions/mapa.json`. Achar algo: `py -3.13 tools/mapa_geral.py --busca termo`; depois de

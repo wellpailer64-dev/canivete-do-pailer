@@ -241,6 +241,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/olho.py` — Olho local: um modelo de visão no Ollama (gemma4:e4b) olha as imagens no lugar do Claude e devolve TEXTO curto
 - `tools/pack_sfx.py` — pack_sfx.py — converte os mestres WAV do pack novo do Soundboard (montado com tools/fatiar_sfx.py, lista em
 - `tools/patch.py` — Aplica trocas de texto descritas num arquivo .patch simples — sem escapar aspas/barras, tudo ou nada, com conferência
+- `tools/peca.py` — Peça de cliente no Photo Kanivete, sempre no app do Pailer, à vista. Guia: Instructions/agente/fluxo-peca-cliente.md
 - `tools/ponte_premiere.py` — Linha de comando da ponte com o Premiere (o código fica em Functions/ponte_premiere.py, que vai no executável)
 - `tools/premiere_audio_dados.py` — Gera frontend/dados/premiere_audio.json: os efeitos de áudio do Premiere (catálogo lido pelo plugin Kanivete Ponte)
 - `tools/ps_modelo_deg.py` — Gera no Photoshop camadas de preenchimento de DEGRADÊ (linear 3 cores 30°, radial com transparência): molde do GdFl
@@ -270,6 +271,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/direcao-logotipo.md` — Direção de logotipo — como os grandes fazem (estudo de 2026-10-16)
 - `Instructions/agente/diretor-de-arte.md` — Diretor de arte de carrossel (padrão de resposta + o que o Jr executa por comando)
 - `Instructions/agente/equalizador.md` — Equalizador paramétrico (Vídeo Kanivete)
+- `Instructions/agente/fluxo-peca-cliente.md` — Peça de cliente: do card à aprovação
 - `Instructions/agente/guia-edicao.md` — GUIA-EDICAO :: Pocket Editor (Canivete do Pailer) — para agentes de IA
 - `Instructions/agente/kani-maos.md` — Mãos da Kani — a Kani operando os apps ao vivo
 - `Instructions/agente/kani-motor.md` — Motor da Kani: bancada de modelos e escolha (2026-10-10)
