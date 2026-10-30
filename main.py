@@ -6342,4 +6342,18 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--ofx":
         from Functions import ofx
         sys.exit(ofx.main_cli(sys.argv[2:]))
+    # pelo código: identidade própria na barra de tarefas (senão o Windows agrupa com o python.exe; atalho em tools/atalho_runapp.py)
+    if not getattr(sys, "frozen", False) and sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Kanivete.RunApp")
+        except Exception:
+            pass
+        if sys.stdout is None:   # pythonw (atalho, sem console): o que iria para o console fica num log
+            try:
+                _pasta_log = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+                os.makedirs(_pasta_log, exist_ok=True)
+                sys.stdout = sys.stderr = open(os.path.join(_pasta_log, "runapp.log"), "w", encoding="utf-8", errors="replace", buffering=1)
+            except Exception:
+                pass
     main()
