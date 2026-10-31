@@ -78,7 +78,9 @@ const KNV = {
     // coloca uma imagem do disco como camada nova (acima da ativa ou de `acima`); x/y = canto; largura (ou altura) e ângulo
     async colocar(path, { nome, x, y, largura, altura, angulo = 0, acima } = {}) {
         if (acima != null) KNV.ativar(acima);
+        const antes = ieAtiva(IE.doc);
         await ieColocarArquivo(path);
+        if (ieAtiva(IE.doc) === antes) throw new Error(`não colocou: ${path}`);   // sem isto, renomeava e transformava a camada que já estava ativa
         if (nome) KNV.renomear(nome);
         const L = ieAtiva(IE.doc);
         const larg = largura || (altura ? L.c.width * altura / L.c.height : L.c.width);

@@ -14,7 +14,17 @@ Carrossel de Artigo tem modelo próprio: `D:/kanivete_biblioteca/modelos/magnetu
 | Enquete e Imagem em vídeo | subpastas `... EM VÍDEO` (`.psb`; Enquete também tem `.prproj`) | vídeo |
 | Monitores e logo | `00 - MODELOS DE MONITORES` | horizontal, quadrado e em pé |
 
-Em Enquete e Imagem do Dia, cada prancheta traz um monitor: `horizontal` (FEED 1, STORY 1), `Monitor quadrado` (FEED 2, STORY 2), `modelo em pé v2` (FEED 2 copy, STORY 2 copy). Escolher pela proporção do exame e manter só o que combina.
+Em Enquete e Imagem do Dia, cada prancheta traz um monitor: `horizontal` (FEED 1, STORY 1), `Monitor quadrado` (FEED 2, STORY 2), `modelo em pé v2` (FEED 2 copy, STORY 2 copy).
+
+## Exame no monitor (regra do Pailer)
+- Monitor = o de proporção mais próxima da do exame (telas: horizontal 1,71; quadrado 1,34; em pé 0,59).
+- Nunca cortar. Ampliar ao máximo que couber na tela; filete preto na borda é normal.
+- Raio-X nunca passa por upscale de IA, mesmo pequeno: só ampliação comum. A qualidade é a que o cliente enviou.
+
+## Enquete do Dia: comando único
+`py -3.13 tools/peca.py enquete --pasta "<card>" --nome "NOME" --exame IMG [--seta X,Y] [--apagar X,Y,W,H] [--refazer]`
+Escolhe o monitor, deixa só o par certo, cria as fatias, salva e devolve prévias em `D:/kanivete_testes/pecas`. `--seta` = ponto na imagem original; `--apagar` = região de letra clara a remover.
+Vídeo do cliente: `peca.py instrucao "<video>"` (fala + folha de quadros). Exportar: `peca.py entregar ... --exportar --saida "<card>/04 - RENDERS"`; entregar: `panda.py entregar <id> --pasta "<card>/04 - RENDERS" --sim`.
 
 ## Normal ou Alterado
 Capa à esquerda (animal + "arrasta"), exame à direita (moldura + "RESPONDA NOS COMENTÁRIOS").
