@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(//D:/Kanivete/Plugins/kanicode/**)",
+      "Write(//D:/Kanivete/Plugins/kanicode/**)",
+      "Bash(py -3.13 -m unittest:*)"
+    ]
+  }
+}

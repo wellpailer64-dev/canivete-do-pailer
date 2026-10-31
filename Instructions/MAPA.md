@@ -259,6 +259,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/vk_cena.py` — Diagramar uma prancheta do Vetor Kanivete com HTML/CSS (VKN.cena) usando o sistema da marca
 
 ## 9. Guias (`Instructions/`)
+- `Instructions/agente/CLAUDE-detalhes.md` — KANIVETE (antes Canivete do Pailer) — notas para o Claude
 - `Instructions/agente/ajuste-premiere.md` — AJUSTE PREMIERE: plano para a próxima sessão
 - `Instructions/agente/arquiteto-local.md` — Arquiteto Local B
 - `Instructions/agente/ata-kanivete.md` — Ata Kanivete (At, verde #1FA971) — Beta
