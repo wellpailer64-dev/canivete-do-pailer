@@ -25,8 +25,11 @@ Comece em `Instructions/agente/fluxo-peca-cliente.md`; fichas em `Instructions/a
 - Antes de release: reprodução/áudio → `testes/teste_play.py`; exportação, camadas, efeitos, cor → `testes/teste_export.py`; Photo → `teste_imagem.py`; Vetor → `teste_vetor.py`; ponte → `teste_ponte.py`.
 - Bug novo de exportação: caso novo em `CASOS` que reprova sem a correção.
 
+## Edição de vídeo: método obrigatório
+Começar por `Instructions/agente/metodo-edicao-video.md` e pelo cérebro, área `video`, títulos "Edição de Vídeo ·". Só dizer pronto com `tools/agente/conferir_edicao.py` sem REPROVADO. Um app só: nunca abrir outro KANIVETE; fechar o de teste ao terminar.
+
 ## Antes de começar, ler o guia
-Edição de vídeo `Instructions/agente/guia-edicao.md` e `tecnicas-de-montagem.md`; motion `mapa-habilidades-motion.md` (ao terminar, `veCompAgruparCenas()`); motion em HTML `motion-html.md`;
+Edição de vídeo: método acima; API e histórico em `guia-edicao.md`, teoria em `tecnicas-de-montagem.md`; motion `mapa-habilidades-motion.md` (ao terminar, `veCompAgruparCenas()`); motion em HTML `motion-html.md`;
 carrossel/flyer `direcao-carrossel.md`, `diretor-de-arte.md`, `plano-cena.md`; arte no Photo `design-photo-kanivete.md`; logo `direcao-logotipo.md`; Encoder `mapa-kanivete-encoder.md`;
 Slider `Instructions/slider-kanivete.md`; Vetor `Instructions/vetor-kanivete.md`; Photo `Instructions/editor-imagem.md`; Sound `Instructions/sound-kanivete.md`; Premiere `Instructions/importar-premiere.md` e `agente/ponte-premiere.md` (teste só em cópia); 3D `agente/cena-3d-editor.md`; Ata `agente/ata-kanivete.md`; plugins `agente/plugins.md`. Todos em `Instructions/agente/` salvo indicação.
 

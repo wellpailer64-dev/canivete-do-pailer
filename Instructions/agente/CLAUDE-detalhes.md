@@ -424,6 +424,7 @@ Illustrator ida e volta (.ai NATIVO montado no Illustrator instalado; volta com 
 Painéis móveis do Vetor (mecanismo do Photo): §16, `frontend/js/vetor-dock.js`, `testes/teste_vetor_paineis.py`.
 
 ## Reel falado e conferência (2026-11-01)
+Regras: `metodo-edicao-video.md`. Conferência geral: `tools/agente/conferir_edicao.py`.
 `tools/agente/reel_fala.py` (roteiro JSON vira projeto), `tools/agente/checar_cortes.py` (ouve os fins de corte), `tools/agente/quadros_monitor.py` (folha do monitor), `tools/agente/exportar_conferencia.py` (exporta e mede), `D:/Kanivete/Plugins/kanibrowser/epidemic.py` (trilhas). Método em `guia-edicao.md`, seção REEL FALADO. Ficha: `clientes/gordinhos.md`.
 
 ## Build local

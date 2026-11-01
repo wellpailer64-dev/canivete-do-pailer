@@ -1,4 +1,5 @@
 # GUIA-EDICAO :: Pocket Editor (Canivete do Pailer) — para agentes de IA
+# REGRAS E ORDEM DE TRABALHO: metodo-edicao-video.md (fonte única); aqui ficam API e histórico.
 # formato: denso, para máquina. calibrar a cada feedback do usuário (seção CALIBRACAO no fim). v2 2026-10-01 (+ seção 7 efeitos sonoros)
 
 ## 0 ACESSO
@@ -133,7 +134,7 @@ Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lu
 2. Ver e ouvir: transcrição + uma folha de quadros por vídeo. Só isso: nada de abrir o app ainda.
 3. Roteiro: copiar `Instructions/agente/exemplos/reel_fala_gordinhos.json` e preencher versões (trechos pela 1ª e última palavras), apoios, tarjas e finalização. Só o que é decisão editorial vai aqui.
 4. `py -3.13 tools/agente/reel_fala.py roteiro.json` (~20 s; recusa sobrescrever projeto que já existe).
-5. `py -3.13 tools/agente/checar_cortes.py projeto.vknv`: tem de dizer "0 cortes" ou trazer só borda já ouvida inteira. Palavra comida se corrige aqui, antes de mostrar.
+5. `py -3.13 tools/agente/conferir_edicao.py projeto.vknv`: sem REPROVADO; o que vier como OUVIR, ouvir. Palavra comida se corrige aqui, antes de mostrar.
 6. `reel_fala.py roteiro.json --abrir 9333` (ou 9222, sem clique) e `tools/agente/quadros_monitor.py` numa folha. Ajuste visual = mudar o roteiro antes de mostrar.
 7. Só depois: `tools/agente/exportar_conferencia.py` (taxa, LUFS, pico, pretos) em `tarefas_soltas.py`; não esperar preso.
 8. Mostrar. Depois que o Pailer mexeu e salvou, NUNCA rodar a geração de novo: mudar por cima da versão dele e guardar cópia antes.
