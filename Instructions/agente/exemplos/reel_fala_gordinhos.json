@@ -1,0 +1,29 @@
+{
+ "pasta_card": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/PAUTAS/2026/11 - NOVEMBRO/01 - REELS - UPGRADE DO TROCADOR DE CALOR - TORO, RENEGADE E ARGO",
+ "trabalho": "D:/kanivete_testes/gordinhos/reel_tool",
+ "saida": "D:/kanivete_testes/gordinhos/reel_tool/teste_ferramenta.vknv",
+ "brasao": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/01 - IDENTIDADE VISUAL/PERFIL.png",
+ "musica": "D:/01 - ALL IN CLOUD - HD PAILER/01 - PANDA LAB/01 - CLIENTES/ALESSANDRO BARBOSA/BOSCH GORDINHOS/PAUTAS/2026/11 - NOVEMBRO/01 - REELS - UPGRADE DO TROCADOR DE CALOR - TORO, RENEGADE E ARGO/02 - ASSETS/ES_Scootaloo - Jobii.mp3",
+ "cor_tarja": "#0d5c91",
+ "video_base": "m2",
+ "fontes": {"ab": "00_abertura_copia_whatsapp_0m19", "te": "20261030_120516", "in": "20261030_121010", "me": "20261030_121722", "m1": "20261030_122247", "m2": "20261030_122316"},
+ "escala_base": {"ab": 2.2588},
+ "nomes": {"jeep": "Jeep", "renegar": "Renegade", "renegate": "Renegade", "touro": "Toro", "toro": "Toro", "totaltech": "Total Tech", "parachoque": "para-choque", "capricho": "Capricho", "fiat": "Fiat", "argo": "Argo", "renato": "Renato"},
+ "versoes": [
+  {"id": "seq_a", "nome": "Reels A - com Capricho", "roteiro": [
+   ["ab", "você que tem", "no seu carro"], ["te", "nós vamos fazer também", "no fluido velho"], ["te", "sabemos que a", "praticamente excedida"],
+   ["te", "mas através de um", "consegue entender"], ["te", "qual é a qualidade", "fluido da transmissão"], ["te", "renato vai fazer", "aqui o teste"],
+   ["te", "lembrando que o fluido", "através do equipamento"], ["te", "resultado dez por", "super saturado"], ["te", "fluido já saturado", "transmissão automática"],
+   ["te", "então o cliente", "troca do fluido"], ["in", "já realizamos aqui", "máquina de diálise"], ["in", "fizemos aqui a", "alma de proteção"],
+   ["in", "já instalamos o", "o resfriador"], ["in", "como você pode", "originais de fábrica"], ["in", "aqui nós temos", "proteção náutica"],
+   ["in", "qual é a vantagem", "up grade"], ["in", "além de eliminar", "mais ideal"], ["in", "você tem melhoria", "transmissão automática"],
+   ["me", "lembrando que a", "capricho imports"], ["in", "quero fazer de", "fazer esse trabalho"], ["in", "lembrando renegate", "aqui conosco"], ["in", "espero vocês", "vocês aqui"]]}
+ ],
+ "apoios": [["te", "a troca do fluido", "m2", 0.6, 2.4], ["te", "e já realizando", "m1", 0.8, 2.6]],
+ "tarjas": [["Fiat Toro · Jeep Renegade", "ab", "um fiat", 0], ["Upgrade do trocador de calor", "ab", "passo a passo", 0], ["Teste do fluido", "te", "renato vai", 0],
+            ["Resultado: 10%", "te", "resultado dez", 0], ["Fluido saturado", "te", "fluido já saturado", 0], ["Máquina de diálise", "in", "máquina de diálise", 1],
+            ["Sem adaptação agressiva", "in", "nenhuma adaptação", 1], ["Proteção náutica", "in", "uma mangueira", 0], ["Temperatura ideal", "in", "temperatura mais", 0],
+            ["Kit Total Tech", "me", "marca totaltech", 1], ["Agende seu upgrade", "in", "clique no link", 1]],
+ "momento_chave": ["te", "resultado dez"],
+ "finalizacao": ["m2", 2.0]
+}

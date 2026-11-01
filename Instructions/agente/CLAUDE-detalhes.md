@@ -423,6 +423,9 @@ Illustrator ida e volta (.ai NATIVO montado no Illustrator instalado; volta com 
 `Functions/ponte_illustrator.py`, `testes/teste_illustrator.py`.
 Painéis móveis do Vetor (mecanismo do Photo): §16, `frontend/js/vetor-dock.js`, `testes/teste_vetor_paineis.py`.
 
+## Reel falado e conferência (2026-11-01)
+`tools/agente/reel_fala.py` (roteiro JSON vira projeto), `tools/agente/checar_cortes.py` (ouve os fins de corte), `tools/agente/quadros_monitor.py` (folha do monitor), `tools/agente/exportar_conferencia.py` (exporta e mede), `D:/Kanivete/Plugins/kanibrowser/epidemic.py` (trilhas). Método em `guia-edicao.md`, seção REEL FALADO. Ficha: `clientes/gordinhos.md`.
+
 ## Build local
 - `build.bat` apaga `dist/` inteiro, onde ficam os modelos do usuário (`modelos_ia/`, `models/`, ~8 GB).
   Gere em outra pasta (`--distpath dist_novo --workpath build_novo`) e copie só `CaniveteDoPailer.exe`,

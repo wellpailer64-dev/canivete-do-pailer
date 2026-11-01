@@ -128,7 +128,21 @@ Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lu
 - Conferir antes de entregar: `py -3.13 tools/agente/polir_montagem.py <projeto.vknv>` → {"pretos": [], "piscas": []};
   em script de montagem, `polir(clips, media, {id_midia: duração})` corrige (estica/antecipa/encolhe o B-roll vizinho).
 
+## REEL FALADO DE CLIENTE: método curto (fazer nesta ordem, sem inventar script)
+1. Material: `wa.py arquivo|midia`; card: `panda.py criar`; trilha: `kanibrowser/epidemic.py buscar|baixar`. Um olhar nos RENDERS anteriores do cliente e na ficha.
+2. Ver e ouvir: transcrição + uma folha de quadros por vídeo. Só isso: nada de abrir o app ainda.
+3. Roteiro: copiar `Instructions/agente/exemplos/reel_fala_gordinhos.json` e preencher versões (trechos pela 1ª e última palavras), apoios, tarjas e finalização. Só o que é decisão editorial vai aqui.
+4. `py -3.13 tools/agente/reel_fala.py roteiro.json` (~20 s; recusa sobrescrever projeto que já existe).
+5. `py -3.13 tools/agente/checar_cortes.py projeto.vknv`: tem de dizer "0 cortes" ou trazer só borda já ouvida inteira. Palavra comida se corrige aqui, antes de mostrar.
+6. `reel_fala.py roteiro.json --abrir 9333` (ou 9222, sem clique) e `tools/agente/quadros_monitor.py` numa folha. Ajuste visual = mudar o roteiro antes de mostrar.
+7. Só depois: `tools/agente/exportar_conferencia.py` (taxa, LUFS, pico, pretos) em `tarefas_soltas.py`; não esperar preso.
+8. Mostrar. Depois que o Pailer mexeu e salvou, NUNCA rodar a geração de novo: mudar por cima da versão dele e guardar cópia antes.
+Regras embutidas: zoom em camada de ajuste, cor em outra sem bloom (rosto ficava vermelho), voz -6 dB em gravação quente, legenda sem caixa, fim do corte no vale da voz.
+Armadilhas: taxa vem de `video_base` (usar mídia com `probe()["fps_timeline"]` 30); MOGRT só depois de testar UM renderizado; porta sem resposta não é app fechado; `kb.py js` só na aba da Kani; escrever arquivo com Write, não heredoc com barra; desfoque de movimento nos zooms multiplica o export por ~9 (padrão desligado).
+
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-11-01 REELS GORDINHOS, ajuste do Pailer: tirou o bloom e mexeu na cor (rosto muito vermelho): ct 22, hi 10, sh -4, wh 7, vib 17. NÃO COMER PALAVRA: cortei o fim de "saturado" porque limitei o corte ao início estimado da próxima palavra; o limite agora é o vale de energia e `checar_cortes.py` ouve os fins. "Sofreu para um reel simples": seguir o método curto acima.
+- 2026-11-01 REELS GORDINHOS UPGRADE: ZOOM DINÂMICO SÓ EM CAMADA DE AJUSTE, nunca escala animada no clipe (técnica do Transform em Adjustment Layer do Premiere; aqui, efeito `zoom`); cor, contraste, bloom e clareza em OUTRA camada de ajuste. Efeito `zoom` faz escala, curva, centro e desfoque; não tem posição nem rotação.
 - 2026-10-28 PAPO PRODUTIVO V2 ("de resto tá tudo perfeito"): TELA DIVIDIDA COM REFERÊNCIA = cortar o vídeo base no
   início e no fim exatos do apoio; no trecho cortado, usar posição FIXA mais alta, centralizando quem fala na parte
   superior; colocar a foto/referência em camada acima, ocupando a parte inferior desde o PRIMEIRO quadro desse corte.

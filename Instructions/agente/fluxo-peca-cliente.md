@@ -18,6 +18,9 @@ Vale para arte e vídeo de cliente do Pandalab. Siga na ordem. Cliente com ficha
 7. **Entregar para aprovação**: `py -3.13 tools/peca.py entregar --pasta "<pasta do card>" --nome "NOME"`. Só dizer "pronto" se `falhas` vier vazio. A resposta traz o caminho, o que foi feito e o que falta.
 8. **Depois do ok**: `peca.py entregar ... --exportar` gera um PNG por fatia; em seguida `panda.py entregar <id> --sim`.
 
+## Pedido que chega por WhatsApp (sem card ainda)
+Ler a conversa com `transcrever`, baixar com `wa.py arquivo|midia` para `<mês>/00 - RECEBIDO DO CLIENTE/<data> WHATSAPP`, ver e ouvir tudo, então `panda.py criar` com briefing e arquivos. Para não baixar tudo de novo do Drive: `pastas.pasta_demanda(d, criar=True)`, mover o bruto e gravar `demanda.json` e `pastas.briefing`. Antes, `panda.py pastas`: se aparecer "criar produção" em cliente que já tem outra pasta de pautas, acertar `producao` no `mapa_clientes.json`. Vídeo: `guia-edicao.md`, seção REEL FALADO.
+
 ## Se travar
 - Ferramenta sem resposta: uma tentativa com limite de tempo, depois outro caminho, e avisar.
 - Cérebro é consulta, não etapa: sem resposta, seguir por este guia.
