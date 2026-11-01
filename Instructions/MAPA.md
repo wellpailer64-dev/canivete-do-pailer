@@ -282,6 +282,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/mapa-imagem.md` — Mapa do código — imagem (gerado por tools/mapa_codigo.py; nome:linha)
 - `Instructions/agente/mapa-kanivete-encoder.md` — Mapa do Kanivete Encoder (Ke)
 - `Instructions/agente/mapa-vetor.md` — Mapa do código — vetor (gerado por tools/mapa_codigo.py; nome:linha)
+- `Instructions/agente/metodo-edicao-video.md` — Método de Edição de Vídeo do Pailer
 - `Instructions/agente/mockup-profissional.md` — Mockup profissional — o que os PSDs dos estúdios fazem (estudo 2026-10-15)
 - `Instructions/agente/mogrt.md` — MOGRT no Vídeo Kanivete (Motion Graphics Template do Premiere)
 - `Instructions/agente/motion-html.md` — Motion em HTML → timeline nativa do Vídeo Kanivete
