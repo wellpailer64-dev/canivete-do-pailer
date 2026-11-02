@@ -15,7 +15,7 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 - Ler mensagens: `WA ler --conversa X --n 20 --transcrever`. Procurar conversa: `WA conversas --busca termo`.
 - Baixar: `WA arquivo --conversa X --nome parte --pasta P`; `WA midia --conversa X --tipo video --duracao 1:10 --saida a.mp4`; `--tipo foto`.
 - Enviar só com ok do Pailer: `WA enviar --conversa X --texto "..."`.
-- Mandar vídeo, Reels, exportação ou arquivo: `WA enviar --conversa X --arquivo v.mp4 --texto legenda`. Vídeo acima de 16 MB vai como arquivo, sem compressão; `--comprimir` só se pedirem. Ver como iria sem postar: `--sim`. Nunca testar em grupo de cliente.
+- Mandar vídeo, Reels, exportação ou arquivo: `WA enviar --conversa X --arquivo v.mp4 --texto legenda`. Vídeo acima de 16 MB vai como arquivo, sem compressão; `--comprimir` só se pedirem. Ver como iria sem postar: `--sim` (só simula). PDF e documento vão sem `--documento`: essa opção é para foto e vídeo sem compressão. Nunca testar em grupo de cliente.
 - Saída do envio de arquivo: 0 enviado, 1 não enviado, 3 incerto. Com 3, olhar a conversa antes de reenviar.
 
 ## Quando algo falha
@@ -35,6 +35,11 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 
 ## Imagem e referência
 - Revisar imagem sem gastar contexto: `tools/olho.py`. Referências do Pinterest: `tools/refs.py`. Peça de cliente: `tools/peca.py`.
+
+## Currículo
+- Currículo, CV ou PDF para robô de triagem: `tools/curriculo.py`, Slider A4, ficha JSON, `.dknv` editável e PDF vetorial.
+- Ordem: `extrair arquivo.psd --pasta P` → preencher a ficha → `faltas ficha.json` → perguntar o que faltar, sem inventar → `montar ficha.json --saida BASE` → `conferir BASE.pdf --ficha ficha.json --png P` → ver as páginas → enviar com o ok do Pailer.
+- Padrão: logo ao lado do nome escrito, nível em palavra, todas as experiências com abertura e bullets de uma ideia cada. Duas colunas podem sair fora de ordem em robôs antigos: avisar.
 
 ## Demandas
 - Pandalab: `py -3.13 D:/Kanivete/Plugins/pandalab/panda.py` (mudar card real só com o Pailer).

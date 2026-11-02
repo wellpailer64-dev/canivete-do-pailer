@@ -219,6 +219,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/atalho_runapp.py` — Atalho do KANIVETE pelo código (o Runapp sem console): pythonw + main.py, ícone do app e o AppUserModelID do processo
 - `tools/briefing.py` — Briefing barato de uma pasta do cliente: lê PDF/imagens/áudios/vídeos e devolve UM resumo em texto + poucas folhas
 - `tools/contorno.py` — Qualidade do contorno de um logo (o "pente de curvatura" do RoboFont/Glyphs, para conferir sem olhar a olho)
+- `tools/curriculo.py` — curriculo.py — currículo A4 no Slider, editável (.dknv) e em PDF vetorial legível por robôs de triagem
 - `tools/direcao_mapa.py` — Mapa de direção de arte (para o Claude, o Worker e o roteiro_local): layouts, estilos e técnicas em linhas curtas —
 - `tools/esqueleto.py` — Roteiro (JSON curto) → carrossel diagramado (HTML do KNV.cena) pelos ESQUELETOS aprovados. O agente só escreve o
 - `tools/fatiar_sfx.py` — fatiar_sfx.py — corta um áudio com vários efeitos sonoros (ex.: vídeo "pacote de 5 whoosh") em um arquivo por efeito,

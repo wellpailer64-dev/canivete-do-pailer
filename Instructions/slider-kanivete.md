@@ -23,7 +23,7 @@ manual e por agente pelos MESMOS comandos, leve e fiel na exportação. Criado e
 
 ## Modelo
 `doc = {nome, largura: 1920, altura: 1080, tema: {titulo, texto, cores: {fundo, tinta, destaque, suave, apoio}}, slides: [...]}`
-**Documento A4** (2026-10-22: orçamento, contrato, informativo): `SDK.cmd('novo', {formato: 'a4'})` (ou `a4_deitado`; lobby e
+**Currículo:** `tools/curriculo.py` (guia em `agente/ferramentas-repetitivas.md`). **Documento A4** (2026-10-22: orçamento, contrato, informativo): `SDK.cmd('novo', {formato: 'a4'})` (ou `a4_deitado`; lobby e
 Arquivo › "Novo documento A4") = página de 1191 × 1684 px (`SD_FORMATOS`); o PDF crava o A4 exato (595 × 842 pt, texto
 pesquisável); layouts de slide são adaptados pela largura; `cena` no tamanho da página; o revisor usa mínimo de 13 px
 (papel) em vez do de telão. Modelo de orçamento Pandalab (barra preta lateral, "Orçamento" vertical laranja, tabela,
