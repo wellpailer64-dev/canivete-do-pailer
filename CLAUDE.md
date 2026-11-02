@@ -13,6 +13,7 @@ Ferramenta separada = aba e página próprias (`#page-<id>`), sem abrir outra po
 Comece em `Instructions/agente/fluxo-peca-cliente.md`; fichas em `Instructions/agente/clientes/<cliente>.md`.
 
 ## Trabalhar barato
+- Antes de escrever script: `Instructions/agente/ferramentas-repetitivas.md` (gatilho → comando). Assistir vídeo, ler e baixar do WhatsApp, ajustar e conferir já têm ferramenta.
 - Editar: `py -3.13 tools/patch.py mudancas.patch` (`@@ arquivo`, `<<<` velho `===` novo `>>>`; um @@ por bloco).
 - Achar: `py -3.13 tools/mapa_codigo.py vetor|imagem|editor --busca termo` antes de grep ou ler arquivo.
 - App aberto do usuário: `py -3.13 tools/aplicar.py frontend/js/x.js [--py]` depois de cada mudança, sem recarregar. `tools/recarregar.py` só no app de teste.
