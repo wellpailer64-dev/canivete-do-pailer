@@ -11,7 +11,7 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 - Ver timeline montada: `tools/tripa.py "Timeline"`; quadros do monitor: `tools/agente/quadros_monitor.py 1.5,20,45 saida.jpg --timeline "T"`.
 
 ## WhatsApp
-- Saber o que ele pediu, sem ler tudo: `WT resumo --conversa X --n 40`.
+- Primeira noção da conversa: `WT resumo --conversa X --n 40`. A Kani já errou quem falou, data e o que estava pendente (2026-11-02): é só orientação; antes de agir, conferir no texto completo, cujo caminho vem na saída.
 - Ler mensagens: `WA ler --conversa X --n 20 --transcrever`. Procurar conversa: `WA conversas --busca termo`.
 - Baixar: `WA arquivo --conversa X --nome parte --pasta P`; `WA midia --conversa X --tipo video --duracao 1:10 --saida a.mp4`; `--tipo foto`.
 - Enviar só com ok do Pailer: `WA enviar --conversa X --texto "..."`.
