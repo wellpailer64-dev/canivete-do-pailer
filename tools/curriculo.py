@@ -202,6 +202,8 @@ def faltas(f):
             r.append(f"{nome}: falta o início do período")
         if not e.get("logo"):
             r.append(f"{nome}: sem logo")
+        if re.search(r"(atuou|atua|trabalhou|trabalha|realizou|realiza|responsável por)", e.get("abertura", ""), re.I):
+            r.append(f"{nome}: abertura em terceira pessoa, escrever em primeira (Atuei, Atuo)")
         if not e.get("itens"):
             r.append(f"{nome}: sem tópicos")
         for t in e.get("itens", []):
