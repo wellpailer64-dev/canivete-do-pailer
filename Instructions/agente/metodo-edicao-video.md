@@ -14,6 +14,14 @@ Detalhes: API e histórico em `guia-edicao.md`; teoria em `tecnicas-de-montagem.
 8. **Entregar**: salvar e deixar aberto no app dele. Exportar de verdade e mudar o card só com o ok.
 9. **Aprender**: nota nova dele vira regra aqui e no cérebro no mesmo dia.
 
+## Ajuste em projeto pronto (barato, nota de 2026-11-02)
+1. `conferir_edicao.py projeto --sem-ouvir` primeiro; ela lista os problemas. Nada de despejar a timeline no chat.
+2. Mídia em outra versão: `tools/agente/trocar_midia.py projeto "nome antigo" novo.mp4 --aplicar`.
+3. Voz repetida na emenda: `tools/agente/fechar_emenda.py projeto TEMPO --aplicar`.
+4. App de teste: `tools/agente/abrir_teste.py projeto`; ao terminar, `--fechar`.
+5. Uma folha de quadros ANTES de exportar. Exportar só com a folha certa.
+Script avulso que se repete vira ferramenta. Defeito achado no olho vira regra em `conferir_edicao.py`.
+
 ## Regras
 ### Corte de fala
 - Corte no fim de frase ou de movimento, no contexto do que é dito (2026-10-14).

@@ -31,7 +31,8 @@ LEG = {"fonte": "SF Pro Display", "tam": 3.5, "cor": "#ffffff", "fundo": "sombra
        "dOp": 100, "dRaio": 30, "dPad": 12, "caixaOp": 0}
 CONEC = {"um", "uma", "a", "o", "as", "os", "de", "do", "da", "que", "e", "no", "na", "em", "com", "para", "pra", "se", "já"}
 JUNTAS = [(("um", "ponto", "três"), "1.3"), (("um", "ponto", "oito"), "1.8"), (("dez", "por", "cento"), "10%"), (("up", "grade"), "upgrade")]
-FONTE_TARJA = r"C:/Windows/Fonts/FontsFree-Net-SFProDisplay-Black.ttf"
+# a fonte instalada só para o usuário fica fora de C:/Windows/Fonts; sem achar, a largura da tarja vira chute e o brasão cobre letra
+FONTE_TARJA = next((f for f in (os.path.join(r, "FontsFree-Net-SFProDisplay-Black.ttf") for r in (r"C:/Windows/Fonts", os.path.expandvars(r"%USERPROFILE%/AppData/Local/Microsoft/Windows/Fonts"))) if os.path.exists(f)), "")
 D_TARJA, Y_TARJA, D_FIM = 2.9, 1240, 3.4
 SOM = os.path.join(CAN, "soundboard")
 
@@ -112,6 +113,8 @@ def cortes(k, ini, fim):
     for a, b, pula in ps:
         comeco = emenda if emenda is not None else max(0.0, ws[a][0] - 0.08)
         final = fim_voz(k, ws[b][1]) if pula else round((ws[b][1] + ws[b + 1][0]) / 2, 3)
+        if pula and b < i1:    # o vale pode cair na palavra seguinte e repetir voz ("moto motor", 2026-11-02)
+            final = min(final, round(ws[b + 1][0] - 0.08, 3))
         out.append((k, a, b, comeco, final))
         emenda = None if pula else final
     return out
@@ -281,7 +284,7 @@ def versao(v):
         clips.append({"tr": 6, "st": tt, "s": 0, "e": D_TARJA, "m": M_TX, "nome": txt, "tx": tx, "p": {**PADRAO, "x": 578, "y": Y_TARJA},
                       "k": {"sc": [{"t": 0, "v": 40, "i": "ease"}, {"t": 0.2, "v": 106, "i": "ease"}, {"t": 0.32, "v": 100, "i": "lin"}, {"t": D_TARJA - 0.14, "v": 100, "i": "ease"}, {"t": D_TARJA, "v": 72}],
                             "op": [{"t": 0, "v": 0, "i": "lin"}, {"t": 0.08, "v": 100, "i": "lin"}, {"t": D_TARJA - 0.12, "v": 100, "i": "lin"}, {"t": D_TARJA, "v": 0}]}})
-        clips.append({"tr": 7, "st": tt, "s": 0, "e": D_TARJA, "m": M_BR, "p": {**PADRAO, "sc": 8.6, "x": round(578 - larg / 2 - 56, 1), "y": Y_TARJA},
+        clips.append({"tr": 7, "st": tt, "s": 0, "e": D_TARJA, "m": M_BR, "p": {**PADRAO, "sc": 8.6, "x": round(578 - larg / 2 - 96, 1), "y": Y_TARJA},
                       "k": {"sc": [{"t": 0, "v": 0, "i": "ease"}, {"t": 0.22, "v": 10, "i": "ease"}, {"t": 0.36, "v": 8.6, "i": "lin"}, {"t": D_TARJA - 0.14, "v": 8.6, "i": "ease"}, {"t": D_TARJA, "v": 0}]}})
         if pop:
             clips.append({"tr": 2, "x": "a", "st": tt, "s": 0, "e": SONS["pop"][1], "m": SONS["pop"][0], "g": GANHO["pop"]})

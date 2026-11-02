@@ -482,3 +482,6 @@ Operações repetitivas no Photo Kanivete: escrever um contrato e delegar ao Qwe
 que volta numa linha JSON. Contrato, condições de sucesso e ferramentas: `Instructions/agente/worker.md`.
 Infraestrutura braçal (achar no código, troca mecânica, rodar teste, diagnosticar traceback): Code/Debug Worker
 `py -3.13 tools/worker/codigo.py contrato.json` (ferramentas fechadas); eu reviso só o diff. Mesmo guia.
+
+## Ajuste barato de vídeo (2026-11-02)
+`tools/agente/trocar_midia.py` troca mídia por outra versão, medindo o tempo pelo áudio. `tools/agente/fechar_emenda.py` tira voz repetida usando um respiro existente. `tools/agente/abrir_teste.py` sobe o app de teste e abre o projeto. `conferir_edicao.py` agora reprova voz repetida, legenda encostada na borda e brasão sobre tarja. Ordem em `metodo-edicao-video.md`.

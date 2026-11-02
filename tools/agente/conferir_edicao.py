@@ -10,6 +10,9 @@ import re
 import subprocess
 import sys
 
+import numpy as np
+from PIL import Image, ImageFont
+
 sys.stdout.reconfigure(encoding="utf-8")
 AQUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, AQUI)
@@ -30,10 +33,28 @@ if a.timeline:
 ruins = 0
 
 
-def relato(nivel, regra, texto):
+def relato(grau, regra, texto):
     global ruins
-    ruins += nivel == "REPROVADO"
-    print(f"  {nivel:10} {regra}: {texto}")
+    ruins += grau == "REPROVADO"
+    print(f"  {grau:10} {regra}: {texto}")
+
+
+SONS = {}
+
+
+def nivel(p, t0, t1):
+    if p not in SONS:
+        SONS[p] = np.frombuffer(subprocess.run(["ffmpeg", "-v", "error", "-i", p, "-ac", "1", "-ar", "16000", "-f", "f32le", "-"], capture_output=True).stdout, dtype=np.float32)
+    x = SONS[p][int(t0 * 16000):int(t1 * 16000)]
+    return float(20 * np.log10(np.sqrt((x ** 2).mean()) + 1e-9)) if len(x) else -99.0
+
+
+def largura(txt, tam, peso=700):
+    nome = f"FontsFree-Net-SFProDisplay-{'Black' if peso == 900 else 'Bold'}.ttf"
+    for r in (r"C:/Windows/Fonts", os.path.expandvars(r"%USERPROFILE%/AppData/Local/Microsoft/Windows/Fonts")):
+        if os.path.exists(os.path.join(r, nome)):
+            return ImageFont.truetype(os.path.join(r, nome), round(tam)).getlength(txt)
+    return len(txt) * tam * 0.5
 
 
 if not d.get("fps") or min(abs(float(d["fps"]) - x) for x in (24, 25, 30, 50, 60)) > 0.001:
@@ -74,6 +95,26 @@ for q in seqs:
     falta = [c for c in cs if M.get(c.get("m"), {}).get("path") and not os.path.isfile(M[c["m"]]["path"]) and not M[c["m"]].get("comp")]
     if falta:
         relato("REPROVADO", "mídia offline", M[falta[0]["m"]]["path"])
+    # emenda em que a fonte volta no tempo repete voz ("moto motor", 2026-11-02)
+    base = sorted([c for c in cs if c["tr"] == 0 and c.get("x") != "v" and kind(c) == "video"], key=lambda c: c["st"])
+    for x, y in zip(base, base[1:]):
+        vez = x["e"] - y["s"]
+        if x["m"] == y["m"] and vez > 0.01:
+            n = nivel(M[x["m"]]["path"], y["s"], x["e"])
+            if n > -20:
+                relato("REPROVADO" if vez >= 0.12 else "OUVIR", "voz repetida", f"{y['st']:.2f} s volta {vez:.2f} s com voz ({n:.0f} dB): tools/agente/fechar_emenda.py")
+    # legenda larga encosta na borda; brasão não cobre o texto da tarja
+    tam = float(e.get("tam") or 3.5) * 19.2
+    largas = [l for l in legs if largura(l["texto"], tam) > 880]
+    if largas:
+        relato("REPROVADO", "legenda encosta na borda", "; ".join(f"{l['st']:.1f} '{l['texto']}'" for l in largas[:5]))
+    for t_ in [c for c in cs if c.get("tx", {}).get("fOn")]:
+        ini = t_["p"]["x"] - largura(t_["tx"]["t"], t_["tx"]["tam"], 900) / 2
+        for b_ in [c for c in cs if kind(c) == "image" and c["tr"] != t_["tr"] and c["st"] < t_["st"] + 1 and c["st"] + c["e"] - c["s"] > t_["st"] and abs(c["p"]["y"] - t_["p"]["y"]) < 60]:
+            with Image.open(M[b_["m"]]["path"]) as im:
+                meio = im.width * b_["p"]["sc"] / 100 * 0.37
+            if b_["p"]["x"] + meio > ini:
+                relato("REPROVADO", "brasão cobre tarja", f"{t_['st']:.1f} '{t_['tx']['t']}': brasão em x {b_['p']['x']:.0f}, usar {ini - meio - 10:.0f}")
     if not a.sem_ouvir:
         o = subprocess.run([sys.executable, os.path.join(AQUI, "checar_cortes.py"), a.projeto, "--timeline", q["name"]], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
         for lin in [x for x in o.splitlines() if " voz na borda " in x and "voz na borda nan" not in x]:
