@@ -15,6 +15,12 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 - Ler mensagens: `WA ler --conversa X --n 20 --transcrever`. Procurar conversa: `WA conversas --busca termo`.
 - Baixar: `WA arquivo --conversa X --nome parte --pasta P`; `WA midia --conversa X --tipo video --duracao 1:10 --saida a.mp4`; `--tipo foto`.
 - Enviar só com ok do Pailer: `WA enviar --conversa X --texto "..."`.
+- Mandar vídeo, Reels, exportação ou arquivo: `WA enviar --conversa X --arquivo v.mp4 --texto legenda`. Vídeo acima de 16 MB vai como arquivo, sem compressão; `--comprimir` só se pedirem. Ver como iria sem postar: `--sim`. Nunca testar em grupo de cliente.
+- Saída do envio de arquivo: 0 enviado, 1 não enviado, 3 incerto. Com 3, olhar a conversa antes de reenviar.
+
+## Quando algo falha
+- Mesmo erro duas vezes: parar e ler a causa, não repetir o comando.
+- "Sem veredito" do modo automático: avisar o Pailer na primeira vez; repetir não resolve e não se contorna por outro caminho.
 
 ## Editar vídeo
 - Reel falado: roteiro JSON + `tools/agente/reel_fala.py`.
