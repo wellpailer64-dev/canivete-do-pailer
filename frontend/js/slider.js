@@ -747,9 +747,9 @@ function sdCongelarAnim(el, plano, t) {   // estado de cada camada animada no in
         e.style.opacity = op; e.style.transform = tr === 'none' ? '' : tr; e.style.clipPath = cp === 'none' ? '' : cp;
     }
 }
-sdRegistrar('exportar', 'exporta {formato: pdf|png|mp4|pptx|pptx_imagens|html (apresentação que abre em qualquer aparelho), caminho, largura (px), qualidade: alta|leve, slides: todos|atual}', async a => {
+sdRegistrar('exportar', 'exporta {formato: pdf|pdf_vetor (texto vivo e formas em vetor; autor)|png|mp4|pptx|pptx_imagens|html (apresentação que abre em qualquer aparelho), caminho, largura (px), qualidade: alta|leve, slides: todos|atual}', async a => {
     const fmt = a.formato || 'pdf';
-    const ext = { pdf: 'pdf', mp4: 'mp4', pptx: 'pptx', pptx_imagens: 'pptx', png: '', html: 'html' }[fmt];
+    const ext = { pdf: 'pdf', pdf_vetor: 'pdf', mp4: 'mp4', pptx: 'pptx', pptx_imagens: 'pptx', png: '', html: 'html' }[fmt];
     let p = a.caminho;
     if (!p) {
         p = fmt === 'png' ? await sdApi().vk_dialogo('pasta') : await sdApi().vk_dialogo('salvar', [fmt === 'html' ? 'Apresentação para qualquer aparelho (*.html)' : `${fmt.toUpperCase()} (*.${ext})`], (SD.doc.nome || 'Apresentação') + '.' + ext);
@@ -764,6 +764,14 @@ sdRegistrar('exportar', 'exporta {formato: pdf|png|mp4|pptx|pptx_imagens|html (a
         const r = await sdApi().sd_exportar('nativo', 'pptx_nativo', p, JSON.stringify(doc), {});
         if (!r || !r.success) throw new Error((r && r.error) || 'falhou');
         return { caminho: r.path, avisos: r.avisos };
+    }
+    if (fmt === 'pdf_vetor') {
+        await sdGarantirFontes(); await document.fonts.ready;
+        const lista = SD.doc.slides.filter(s => !s.oculto), paginas = []; let css = '';
+        for (const s of lista) { await sdPrepararFoto(s); css += await sdCssFontes(s); paginas.push(sdMontarSlide(s, 'foto').outerHTML); }
+        const r = await sdApi().sd_exportar_pdf_vetor(p, JSON.stringify({ paginas, css, largura: SD.doc.largura, altura: SD.doc.altura, nome: SD.doc.nome, autor: a.autor || '' }));
+        if (!r || !r.success) throw new Error((r && r.error) || 'falhou');
+        return { caminho: r.path, paginas: r.paginas, fontes: r.fontes, fontes_type3: r.fontes_type3, imagens: r.imagens };
     }
     const leve = a.qualidade === 'leve';
     const job = 'sd' + Date.now(), larg = +a.largura || (fmt === 'mp4' ? 1920 : leve ? 1600 : 2560), qj = leve ? 0.8 : 0.92;

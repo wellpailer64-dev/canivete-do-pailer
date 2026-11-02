@@ -224,7 +224,7 @@ async function sdAcao(a) {
 // ───────────── menus ─────────────
 function sdItensMenu(m) {
     const temSel = SD.sel.length > 0, s = sdSlide(), rec = sdRecentes();
-    const exp = [['Apresentação para qualquer aparelho (.html)', '', () => sdExportarUi('html')], ['-'], ['PDF (alta qualidade, texto pesquisável)', '', () => sdExportarUi('pdf')], ['PDF leve (e-mail, WhatsApp)', '', () => sdExportarUi('pdf', { qualidade: 'leve' })],
+    const exp = [['Apresentação para qualquer aparelho (.html)', '', () => sdExportarUi('html')], ['-'], ['PDF (alta qualidade, texto pesquisável)', '', () => sdExportarUi('pdf')], ['PDF leve (e-mail, WhatsApp)', '', () => sdExportarUi('pdf', { qualidade: 'leve' })], ['PDF vetorial (texto editável, currículo, gráfica)', '', () => sdExportarUi('pdf_vetor')],
         ['PowerPoint editável (.pptx)', '', () => sdExportarPptx()], ['PowerPoint em imagens (.pptx)', '', () => sdExportarUi('pptx_imagens')],
         ['Imagens PNG (um por slide)', '', () => sdExportarUi('png')], ['Vídeo MP4 (animações, transições e vídeos)', '', () => sdExportarUi('mp4')], ['Slide atual em PNG', '', () => sdExportarUi('png', { slides: 'atual' })]];
     const L = {

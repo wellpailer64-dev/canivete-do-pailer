@@ -4819,6 +4819,15 @@ class ApiBridge:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    def sd_exportar_pdf_vetor(self, caminho, pacote):
+        """PDF com texto vivo e formas em vetor (Functions/slider_kanivete.py)."""
+        from Functions import slider_kanivete
+        try:
+            return slider_kanivete.pdf_vetor(caminho, json.loads(pacote) if isinstance(pacote, str) else pacote)
+        except Exception as e:
+            _registrar_erro("sd_exportar_pdf_vetor", e)
+            return {"success": False, "error": str(e)}
+
     def sd_exportar_html(self, caminho, pacote):
         """Apresentação num .html só, que abre em qualquer aparelho (Functions/slider_html.py)."""
         from Functions import slider_html

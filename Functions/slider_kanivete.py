@@ -180,6 +180,63 @@ def _pdf(qs, caminho, doc):
     pdf.save(caminho, garbage=3, deflate=True)
 
 
+def _navegador():
+    """Edge (vem com o Windows) ou Chrome: quem imprime o PDF vetorial"""
+    for raiz in (os.environ.get("ProgramFiles(x86)"), os.environ.get("ProgramFiles"), os.environ.get("LOCALAPPDATA")):
+        for rel in (r"Microsoft\Edge\Application\msedge.exe", r"Google\Chrome\Application\chrome.exe"):
+            if raiz and os.path.isfile(os.path.join(raiz, rel)):
+                return os.path.join(raiz, rel)
+    return shutil.which("msedge") or shutil.which("chrome")
+
+
+def pdf_vetor(caminho, pacote):
+    """PDF de verdade: texto vivo com a fonte embutida, formas em vetor (só foto é imagem), na ordem das camadas (a que
+    robôs de triagem e leitores de tela leem). pacote = {paginas: [html], css, largura, altura, nome, autor}.
+    O navegador imprime o mesmo DOM da tela; o fitz só limpa páginas extras e grava metadados."""
+    import fitz
+    from pathlib import Path
+    nav = _navegador()
+    if not nav:
+        return {"success": False, "error": "Edge ou Chrome não encontrado"}
+    L, A = float(pacote["largura"]), float(pacote["altura"])
+    wpt, hpt = L * .5, A * .5
+    for a, b in ((595.28, 841.89), (841.89, 595.28)):
+        if abs(wpt / hpt - a / b) < .005:
+            wpt, hpt = a, b
+    k = wpt / .75 / L   # px do documento → px CSS da folha
+    pgs = "".join(f'<div class="pg"><div class="in">{h}</div></div>' for h in pacote["paginas"])
+    html = (f'<!doctype html><html><head><meta charset="utf-8"><title>{_html.escape(pacote.get("nome") or "")}</title><style>'
+            f'{pacote.get("css") or ""}@page{{size:{wpt}pt {hpt}pt;margin:0}}html,body{{margin:0;padding:0}}'
+            f'*{{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'
+            f'.pg{{width:{wpt}pt;height:{hpt - .1}pt;overflow:hidden;break-after:page;position:relative}}.pg:last-child{{break-after:auto}}'
+            f'.in{{width:{L}px;height:{A}px;transform:scale({k});transform-origin:0 0}}</style></head><body>{pgs}</body></html>')
+    tmp = tempfile.mkdtemp(prefix="sd_pdf_")
+    try:
+        ent, sai = os.path.join(tmp, "p.html"), os.path.join(tmp, "p.pdf")
+        with open(ent, "w", encoding="utf-8") as f:
+            f.write(html)
+        subprocess.run([nav, "--headless=new", "--disable-gpu", "--no-first-run", "--no-pdf-header-footer", "--virtual-time-budget=15000",
+                        f"--user-data-dir={os.path.join(tmp, 'perfil')}", f"--print-to-pdf={sai}", Path(ent).as_uri()],
+                       timeout=180, capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        if not os.path.isfile(sai):
+            return {"success": False, "error": "o navegador não gerou o PDF"}
+        pdf = fitz.open(sai)
+        n = len(pacote["paginas"])
+        if pdf.page_count > n:
+            pdf.delete_pages(n, pdf.page_count - 1)
+        fontes, curvas, imagens = set(), 0, 0
+        for pg in pdf:
+            imagens += len(pg.get_images())
+            for x in pg.get_fonts():
+                fontes.add(x[3].split("+")[-1])
+                curvas += x[2] == "Type3"
+        pdf.set_metadata({"title": pacote.get("nome") or "", "author": pacote.get("autor") or "", "creator": "Slider Kanivete", "producer": "KANIVETE"})
+        pdf.save(caminho, garbage=3, deflate=True)
+        return {"success": True, "path": caminho, "paginas": n, "fontes": sorted(fontes), "fontes_type3": curvas, "imagens": imagens}
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def _ffmpeg():
     from Functions.midia import ffmpeg
     return ffmpeg()

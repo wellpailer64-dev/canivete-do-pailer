@@ -104,6 +104,7 @@ não abre em celular).
 - **PDF**: uma página por slide em 960 × 540 pt (13,33 × 7,5 pol, igual ao PowerPoint), a foto do slide (2560 px) por cima e o
   texto de verdade invisível por baixo (buscar/selecionar/copiar funcionam), marcador com o título de cada slide, título nos
   metadados. "PDF leve" (1600 px, JPEG 80): ~40% do tamanho, para e-mail/WhatsApp.
+- **PDF vetorial** (`formato: 'pdf_vetor'`, opcional `autor`; `slider_kanivete.pdf_vetor`): o Edge/Chrome em segundo plano imprime o DOM dos slides: texto vivo com fonte embutida, formas em vetor, só foto em imagem, e a ordem de leitura é a ordem das camadas (de baixo para cima). Para currículo (robôs de triagem), documento e gráfica. O retorno traz `fontes` e `fontes_type3`; use fonte estática (ex.: Lato), pois variável pode virar Type3. O PDF de cima é foto + texto invisível.
 - **MP4**: animações de entrada viram quadros (`sdPlanoAnim` + `sdCongelarAnim`: as animações de verdade paradas no instante t;
   as de clique entram em sequência; começam depois da transição), vídeos das camadas tocam DENTRO do slide (ffmpeg overlay:
   cobrir/caber/esticar, "começar em", repetir; giro e cantos não) e o som deles entra se não estiverem mudos.

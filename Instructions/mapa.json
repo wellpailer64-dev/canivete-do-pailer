@@ -917,6 +917,7 @@
   "sd_url",
   "sd_quadro",
   "sd_exportar",
+  "sd_exportar_pdf_vetor",
   "sd_exportar_html",
   "sd_gravar_imagem",
   "sd_gravar_midia",
@@ -2146,6 +2147,12 @@
   },
   "sd_exportar": {
    "args": "job, formato, caminho, doc=None, opcoes=None",
+   "modulos": [
+    "slider_kanivete"
+   ]
+  },
+  "sd_exportar_pdf_vetor": {
+   "args": "caminho, pacote",
    "modulos": [
     "slider_kanivete"
    ]
