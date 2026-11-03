@@ -27,9 +27,9 @@ ap.add_argument("--sem-ouvir", action="store_true")
 a = ap.parse_args()
 d = json.load(open(a.projeto, encoding="utf-8"))
 M = {m["id"]: m for m in d["media"] if m}
-seqs = [s for s in d["sequences"] if not s["id"].startswith("seq_m") and M.get(next((m["id"] for m in d["media"] if m and m.get("sequenceId") == s["id"]), None), {}).get("kind") == "timeline"]
+seqs = [s for s in d["sequences"] if not s.get("comp") and M.get(next((m["id"] for m in d["media"] if m and m.get("sequenceId") == s["id"]), None), {}).get("kind") == "timeline"]
 if not seqs:   # timeline montada por script, sem o item de mídia dela: antes saía "sem reprovação" sem conferir nada
-    seqs = [s for s in d["sequences"] if not s["id"].startswith("seq_m")]
+    seqs = [s for s in d["sequences"] if not s.get("comp")]
 if a.timeline:
     seqs = [s for s in seqs if s["name"] == a.timeline]
 ruins = 0
