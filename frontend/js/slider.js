@@ -630,7 +630,7 @@ async function sdCena(html, op = {}) {
                 const valin = cs.display === 'flex' && cs.flexDirection !== 'column' ? ({ center: 'meio', 'flex-end': 'base', end: 'base' }[cs.alignItems] || 'topo')
                     : cs.display === 'flex' ? ({ center: 'meio', 'flex-end': 'base', end: 'base' }[cs.justifyContent] || 'topo') : 'topo';
                 const lh = cs.lineHeight === 'normal' ? 1.2 : +(parseFloat(cs.lineHeight) / parseFloat(cs.fontSize)).toFixed(3);
-                const h = f.innerHTML.replace(/\s*\n\s*/g, ' ').replace(/<(?!\/?(b|strong|i|em|u|br|span)\b)[^>]*>/gi, '').trim();
+                const h = f.innerHTML.replace(/\s*\n\s*/g, ' ').replace(/<(?!\/?(b|strong|i|em|u|br|span)\b)[^>]*>/gi, '').replace(/\s*<br\s*\/?>\s*/gi, '<br>').trim();
                 const r = sdNova('texto', { x: b.x + pl, y: b.y + pt, w: b.w - pl - pr + 2, h: b.h - pt - pb, nome: nome || f.textContent.trim().slice(0, 24), slide: sdIdx(s) + 1 }, {
                     html: h, fonte: cs.fontFamily.split(',')[0].replace(/["']/g, '').trim(), tam: parseFloat(cs.fontSize), peso: +cs.fontWeight || 400,
                     italico: cs.fontStyle === 'italic', cor: sdCorHex(cs.color), alin: al, valin, entrelinha: lh, espaco: parseFloat(cs.letterSpacing) || 0,
@@ -649,7 +649,8 @@ function sdCorHex(c) {
     const hx = [m[1], m[2], m[3]].map(v => (+v).toString(16).padStart(2, '0')).join('');
     return m[4] != null && +m[4] < 1 ? `rgba(${m[1]},${m[2]},${m[3]},${m[4]})` : '#' + hx;
 }
-function sdTextoPuro(c) { const d = document.createElement('div'); d.innerHTML = c.html || c.texto || ''; return d.textContent; }
+// <br> vira quebra: lido só pelo textContent, "Pão de Ouro:<br>a marca" parecia colado e o agente refazia o texto à toa
+function sdTextoPuro(c) { const d = document.createElement('div'); d.innerHTML = String(c.html || c.texto || '').replace(/<br\s*\/?>/gi, '\n'); return d.textContent; }
 function sdMapa() {
     if (!SD.doc) return { slides: [] };
     return { nome: SD.doc.nome, arquivo: SD.arquivo, atual: SD.atual + 1, tema: SD.doc.tema, slides: SD.doc.slides.map((s, i) => ({

@@ -28,6 +28,8 @@ a = ap.parse_args()
 d = json.load(open(a.projeto, encoding="utf-8"))
 M = {m["id"]: m for m in d["media"] if m}
 seqs = [s for s in d["sequences"] if not s["id"].startswith("seq_m") and M.get(next((m["id"] for m in d["media"] if m and m.get("sequenceId") == s["id"]), None), {}).get("kind") == "timeline"]
+if not seqs:   # timeline montada por script, sem o item de mídia dela: antes saía "sem reprovação" sem conferir nada
+    seqs = [s for s in d["sequences"] if not s["id"].startswith("seq_m")]
 if a.timeline:
     seqs = [s for s in seqs if s["name"] == a.timeline]
 ruins = 0
@@ -115,6 +117,14 @@ for q in seqs:
                 meio = im.width * b_["p"]["sc"] / 100 * 0.37
             if b_["p"]["x"] + meio > ini:
                 relato("REPROVADO", "brasão cobre tarja", f"{t_['st']:.1f} '{t_['tx']['t']}': brasão em x {b_['p']['x']:.0f}, usar {ini - meio - 10:.0f}")
+    # texto na tela (título, chamada) que passa da margem de 5% é cortado no celular, sem aviso do app
+    lado = float(q.get("w") or d.get("w") or 1080)
+    for t_ in [c for c in cs if c.get("tx", {}).get("t")]:
+        esc = float(t_.get("p", {}).get("sc", 100)) / 100
+        larg = max(largura(lin, float(t_["tx"].get("tam") or 60), 900 if t_["tx"].get("neg") else 700) for lin in t_["tx"]["t"].split("\n")) * esc
+        x = float(t_.get("p", {}).get("x", lado / 2))
+        if x - larg / 2 < lado * 0.05 or x + larg / 2 > lado * 0.95:
+            relato("REPROVADO", "texto passa da margem", f"{t_['st']:.1f} '{t_['tx']['t'][:30]}': {larg:.0f} px de {lado:.0f}; diminua ou quebre a linha")
     if not a.sem_ouvir:
         o = subprocess.run([sys.executable, os.path.join(AQUI, "checar_cortes.py"), a.projeto, "--timeline", q["name"]], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
         for lin in [x for x in o.splitlines() if " voz na borda " in x and "voz na borda nan" not in x]:
@@ -129,5 +139,7 @@ if a.render:
     if p and float(p[-1]) > -1:
         relato("REPROVADO", "pico", f"{p[-1]} dB; máximo -1")
     print(f"  {'medido':10} {i[-1] if i else '?'} LUFS, pico {p[-1] if p else '?'} dB")
+if not seqs:
+    relato("REPROVADO", "nada conferido", "nenhuma timeline achada" + (f" com o nome '{a.timeline}'" if a.timeline else ""))
 print("RESULTADO:", f"REPROVADO ({ruins})" if ruins else "sem reprovação; ouça o que veio marcado")
 sys.exit(1 if ruins else 0)

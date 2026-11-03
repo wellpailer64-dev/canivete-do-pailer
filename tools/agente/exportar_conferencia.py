@@ -4,6 +4,7 @@ Não espera presa ao comando: dispara, acompanha e, se passar de --espera, diz q
 Comando longo: usar tarefas_soltas.py. Com muitas camadas de zoom com desfoque de movimento, 2:30 levou ~18 min.
 """
 import argparse
+import os
 import re
 import subprocess
 import time
@@ -34,6 +35,7 @@ DISPARA = """async ([nomeTl, pasta, nome]) => {
     lim ? [...p.mix, { master: lim }] : p.mix, veTxExport(p.faixa), [VE.seqW, VE.seqH], { nome, blocos: false });
 }"""
 
+os.makedirs(a.pasta, exist_ok=True)   # sem a pasta o ffmpeg só diz "Error opening output", que parece codec
 with sync_playwright() as pw:
     nav = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{a.porta}")
     pg = [p for c in nav.contexts for p in c.pages if "index.html" in p.url][0]
