@@ -752,6 +752,20 @@ CASOS = {
         adj.p = veDefProps(adj);
         return [fundo, tx, adj];
     """, ""),
+    # Sete zooms com desfoque de movimento num bloco (export_placa._shader_zoom): na CPU o bloco não saía em 44 min
+    # (Gordinhos, 2026-11-02). Com --placa, tem de bater com a prévia e levar menos de 90 s.
+    "zoomsete": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        const fundo = clip(0, 0, 0, 10.5, 'foto3.jpg', { p: { sc: 160, x: 540, y: 960, rot: 0, op: 100 } });
+        let aj = VE.media.find(x => x.kind === 'ajuste');
+        if (!aj) { aj = { id: VE.media.length, kind: 'ajuste', name: 'Camada de ajuste' }; VE.media.push(aj); }
+        const zs = [0, 1, 2, 3, 4, 5, 6].map(i => {
+            const a = { tr: 1 + i, st: i * 1.5, s: 0, e: 1.4, m: aj.id, fx: [{ id: id(), t: 'zoom', on: true, v: { z: 125 + i * 5, ent: 0.3, sai: 0.3, suav: 70, mola: i % 2, der: 2, cx: 40 + i * 3, cy: 45, mb: 1, obt: 100 } }] };
+            a.p = veDefProps(a);
+            return a;
+        });
+        return [fundo, ...zs];
+    """, ""),
     # Ondulação + giro na placa (_giro_passos depois da onda): texto girado fixo e logo com giro animado
     "ondagiro": (1080, 1920, """
         const { clip } = __te, id = () => veFxNewId();
@@ -960,6 +974,9 @@ def rodar_caso(pg, nome, W, H, js_clips, js_depois, saida, srv):
     fim = pg.evaluate("window.__teFim")
     t_exp = time.time() - t0 - t_prev
     res = {"caso": nome, "ok": True, "msgs": [], "t_prev": t_prev, "t_exp": t_exp}
+    if nome == "zoomsete" and os.environ.get("TESTE_PLACA") == "1" and t_exp > 90:
+        res["ok"] = False
+        res["msgs"].append(f"zooms na placa lentos demais: exportação em {t_exp:.0f} s (máx. 90)")
     if not fim.get("success"):
         res["ok"] = False
         res["msgs"].append("exportação falhou: " + str(fim.get("error")))

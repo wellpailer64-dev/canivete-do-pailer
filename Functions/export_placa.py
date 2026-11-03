@@ -291,6 +291,14 @@ def _fx_hibrido(fx):
     return bool(ativos) and not _lc_ok(fx) and all(f.get("t") in _FX_HIBRIDO for f in ativos)
 
 
+def _zoom_na_placa(fx):
+    """(efeitos sem o zoom, zooms) quando o Autozoom pode ir em shader: todos os outros efeitos também rodam na placa.
+    Junto de um efeito que desce (Chroma Key, Cortar...), desce com ele: devolve (fx, [])."""
+    zooms = [f for f in fx or [] if f.get("t") == "zoom" and f.get("on") is not False]
+    outros = [f for f in fx or [] if f.get("t") != "zoom"]
+    return (outros, zooms) if zooms and _lc_ok(outros) else (fx, [])
+
+
 def _key_so(fx):
     """Chroma Key que roda inteiro na placa (_shader_key): o ÚLTIMO efeito ativo do clipe, com antes dele só efeitos que
     a placa já faz (_lc_ok: Luz e Cor, Aberração, Desfoque) — eles passam no vídeo e o key recorta o resultado, na
@@ -415,7 +423,7 @@ def motivo(segmentos, lay, legendas, cfg, vcodec, bits, reduz=False, alfa=False)
         if c["tipo"] == "ajuste":
             # transições de sobreposição: shader na placa (_shader_ovt); precisam do ponto do corte (c["ovt"]["job"])
             ovt = _ovt_fx(c)
-            resto = [f for f in c["fx"] if f not in ovt]
+            resto = _zoom_na_placa([f for f in c["fx"] if f not in ovt])[0]
             if ovt and _fx_hibrido(resto):
                 return "transição de sobreposição sem o plano da placa"
             if not _lc_ok(resto) and not _fx_hibrido(resto):
@@ -810,6 +818,55 @@ def _shader_onda(v, mw, mh, s, fps, t_ini, margem):
             f"    float d = {alt:.4f} * {env} * tanh({k:.5f} * sin(ph)) / {math.tanh(k):.7f};\n"
             f"    vec2 p = (q + vec2(d * {sa:.6f}, -d * {ca:.6f}) + meio + 0.5) * {s:.6f} / HOOKED_size;\n"
             f"{fora}    return clamp(HOOKED_tex(p), 0.0, 1.0);\n}}\n")
+
+
+def _shader_zoom(v, dur, fps, t_ini):
+    """Autozoom com desfoque de movimento em uma passada do libplacebo: a mesma curva de autozoom.escala, e a média de
+    MB_N instantes do obturador (autozoom.filtro faz isso na CPU com split, N perspectivas e mix). Cúbica Catmull-Rom,
+    como o perspective. Na CPU, sete zooms num bloco de 12 s somavam 35 perspectivas por quadro em 1 núcleo e o export
+    parecia travado (Gordinhos, 44 min sem nenhum quadro, 2026-11-02). Tempo = t_ini + (frame − 1)/fps, do início da camada."""
+    from Functions import autozoom
+    p = autozoom.params(v)
+    D = max(1e-3, dur)
+    z, ent, sai = p["z"], min(p["ent"], D * 0.6), min(p["sai"], D * 0.4)
+    zfim = z * (1 + p["der"])
+    meio = max(1e-6, D - ent - sai)
+    if ent <= 1e-4:
+        entrada = f"{z:.6f}"
+    elif p["mola"]:
+        entrada = (f"1.0 + {z - 1:.6f} * (1.0 + 2.70158 * pow(1.0 - x, 3.0) * -1.0 + 1.70158 * (x - 1.0) * (x - 1.0))")
+    else:
+        k = 1 + p["suav"] / 100 * 11
+        entrada = f"1.0 + {z - 1:.6f} * (1.0 - pow(2.0, -{k:.6f} * x)) / {1 - 2 ** -k:.6f}"
+    saida = f"1.0 + {zfim - 1:.6f} * y * y * (3.0 - 2.0 * y)" if sai > 1e-4 else f"{zfim:.6f}"
+    x = f"clamp(u / {max(ent, 1e-6):.6f}, 0.0, 1.0)"
+    y = f"clamp(({D:.6f} - u) / {max(sai, 1e-6):.6f}, 0.0, 1.0)"
+    n = autozoom.MB_N if p["mb"] and p["obt"] > 0 else 1
+    span = p["obt"] / fps if n > 1 else 0.0
+    return (f"//!HOOK MAIN\n//!BIND HOOKED\n//!DESC autozoom\n"
+            f"float escala(float u) {{\n    float x = {x}, y = {y};\n"
+            f"    if (u < {ent:.6f}) return {entrada};\n"
+            f"    if (u > {D - sai:.6f}) return {saida};\n"
+            f"    return {z:.6f} + {zfim - z:.6f} * clamp((u - {ent:.6f}) / {meio:.6f}, 0.0, 1.0);\n}}\n"
+            "vec4 cubica(vec2 p) {\n"
+            "    vec2 q = p * HOOKED_size - 0.5, b = floor(q), f = q - b;\n"
+            "    vec2 w0 = f * (-0.5 + f * (1.0 - 0.5 * f)), w1 = 1.0 + f * f * (-2.5 + 1.5 * f);\n"
+            "    vec2 w2 = f * (0.5 + f * (2.0 - 1.5 * f)), w3 = f * f * (-0.5 + 0.5 * f);\n"
+            "    vec4 s = vec4(0.0);\n"
+            "    float wx[4] = float[](w0.x, w1.x, w2.x, w3.x), wy[4] = float[](w0.y, w1.y, w2.y, w3.y);\n"
+            "    for (int j = 0; j < 4; j++) for (int i = 0; i < 4; i++)\n"
+            "        s += wx[i] * wy[j] * HOOKED_tex((b + vec2(float(i) - 0.5, float(j) - 0.5)) / HOOKED_size);\n"
+            "    return s;\n}\n"
+            "vec4 hook() {\n"
+            f"    const vec2 A = vec2({p['cx']:.6f}, {p['cy']:.6f});\n"
+            f"    float t = {t_ini:.6f} + float(frame - 1) / {fps:.6f}, soma = 0.0;\n"
+            "    vec4 c = vec4(0.0);\n"
+            f"    for (int j = 0; j < {n}; j++) {{\n"
+            f"        float d = {n > 1 and f'(float(j) / {n - 1}.0 - 0.5) * {span:.6f}' or '0.0'};\n"
+            f"        float s = escala(clamp(t + d, 0.0, {D:.6f}));\n"
+            "        c += cubica(clamp(A + (HOOKED_pos - A) / s, 0.0, 1.0));\n"
+            "        soma += 1.0;\n    }\n"
+            "    return clamp(c / soma, 0.0, 1.0);\n}\n")
 
 
 def _onda_passos(fx, mw, mh, s, fps, t_ini, pasta, tag, margem=True, fmt=_FMT_ALFA):
@@ -1495,7 +1552,7 @@ def _ajuste(g, entrada, c, pasta, mtx="bt709"):
     if not opaco and c["op"] <= 0.001 and "op" not in c["kf"]:
         return entrada
     ovt = _ovt_fx(c)   # transições de sobreposição: shaders próprios, ANTES dos outros efeitos (como o render da CPU)
-    resto = [f for f in c["fx"] if f not in ovt]
+    resto, zooms = _zoom_na_placa([f for f in c["fx"] if f not in ovt])
     if _fx_hibrido(resto):
         efs = vc._filtros_fx(resto, g.W, g.H, f"a{g.rot}")
         nit = ",".join(e[len(vc._NIT_NO_YUV):] for e in efs if e.startswith(vc._NIT_NO_YUV))
@@ -1539,6 +1596,15 @@ def _ajuste(g, entrada, c, pasta, mtx="bt709"):
         t_ramo = 0.0 if (tarde or cobre) else (math.ceil(ini * g.fps + 0.25) - 1) / g.fps
         passos = passos + _onda_passos(resto, g.W, g.H, 1.0, g.fps, t_ramo - c["st"], pasta, f"a{g.rot}",
                                        margem=False, fmt=_FMT_MEIO)[0]
+    if zooms:
+        # 1º quadro do ramo: o do início do bloco (tarde ou cobrindo tudo) ou o 1º que o trim deixa passar
+        cobre = opaco and ini <= g.fd / 2 and fim >= g.total - g.fd / 2
+        t_ramo = 0.0 if (tarde or cobre) else (math.ceil(ini * g.fps + 0.25) - 1) / g.fps
+        for j, f in enumerate(zooms):
+            arq = os.path.join(pasta, f"zoom_a{g.rot}_{j}.glsl")
+            with open(arq, "w", encoding="utf-8") as fh:
+                fh.write(_shader_zoom(f.get("v"), c["dur"], g.fps, t_ramo - c["st"]))
+            passos = passos + [f"libplacebo=custom_shader_path={vc._caminho_filtro(arq)}:format={_FMT_MEIO}:disable_linear=1"]
     if ovt:
         # 1º quadro do ramo: o do início do bloco (tarde ou a camada cobrindo tudo) ou o 1º que o trim deixa passar
         cobre = opaco and ini <= g.fd / 2 and fim >= g.total - g.fd / 2

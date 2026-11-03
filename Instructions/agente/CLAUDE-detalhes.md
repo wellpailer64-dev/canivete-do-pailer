@@ -127,7 +127,7 @@ Ondulação na placa (2026-10-15, plano §8.6): shader por onda com margem trans
 
 **Autozoom** (2026-10-18, painel Animação › Autozoom): zooms de ênfase pela fala (blocos/nota da Legenda Premium + ênfase
 da voz + rosto YuNet) em camadas de ajuste pink com o efeito "zoom" (curva igual na prévia e no `perspective` da
-exportação; placa = híbrido). `frontend/js/editor-autozoom.js`, `Functions/autozoom.py`; guia `Instructions/agente/autozoom.md`;
+exportação; placa = shader `export_placa._shader_zoom`, desce só junto de efeito que desce). `frontend/js/editor-autozoom.js`, `Functions/autozoom.py`; guia `Instructions/agente/autozoom.md`;
 teste `py -3.13 testes/teste_autozoom.py`.
 
 **Equalizador paramétrico** (2026-10-18): efeito `peq` (clipe e Rack da trilha), painel com curva/pontos/espectro/presets,
