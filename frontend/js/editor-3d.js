@@ -12,8 +12,9 @@
 // =========================================================
 const VE3D = { lib: null, rt: new Map(), telas: new WeakMap(), atual: null, falhas: new Map(), espera: [], timer: 0 };
 const VE3D_COR = 'roxo';
-const VE3D_CORES = { esfera: '#ec6e48', cubo: '#0e3b4a', cilindro: '#ebd5a8', toro: '#ec6e48', cone: '#48281a', plano: '#d9d4cc' };   // cor de cada primitiva nova
-const VE3D_FORMAS = ['esfera', 'cubo', 'cilindro', 'toro', 'cone', 'plano'];
+const VE3D_CORES = { esfera: '#ec6e48', cubo: '#0e3b4a', cilindro: '#ebd5a8', toro: '#ec6e48', cone: '#48281a', plano: '#d9d4cc', capsula: '#2a2a2a', celular: '#1d1d1f' };   // cor de cada primitiva nova
+const VE3D_FORMAS = ['esfera', 'cubo', 'cilindro', 'toro', 'cone', 'plano', 'capsula', 'celular'];
+const VE3D_EXT_VIDEO = /\.(mp4|mov|webm|m4v|mkv)$/i;   // textura de vídeo (tela do celular, TV, placa): anda com o tempo do clipe
 const VE3D_MATERIAIS = {   // os mesmos presets do render no Blender (Functions/blender_cena.py)
     papel: { roughness: 0.6, sheen: 0.35, sheenRoughness: 0.6, clearcoat: 0.12, clearcoatRoughness: 0.45 }, /* papel de copo: acetinado */ fosco: { roughness: 0.65 }, plastico: { roughness: 0.32 }, ceramica: { roughness: 0.12, clearcoat: 0.7, clearcoatRoughness: 0.04 },
     metal: { roughness: 0.22, metalness: 0.35, clearcoat: 1 }, vidro: { roughness: 0.02, transmission: 1, ior: 1.45, thickness: 0.2 },
@@ -63,7 +64,7 @@ function ve3dTremido(md, t) {
     return (Math.floor(t * r + 1e-6) + sem) % 2 ? a : -a;
 }
 const ve3dChave = m => JSON.stringify([m.c3d.modelos.map(md => [md.id, md.fonte]), m.c3d.chao !== false]);   // o que exige remontar a cena
-const VE3D_VERSAO = 6;   // subir quando o desenho mudar (foco, neblina, materiais): os .mov do cache ficam velhos
+const VE3D_VERSAO = 8;   // subir quando o desenho mudar (foco, neblina, materiais): os .mov do cache ficam velhos
 // Contexto da cena: a timeline do Editor ou a casa própria da Lux (lux.js põe V3.casa = LUXC: { m, c, t, w, h, fps,
 // hist }). A tela 3D, os painéis e a API leem tempo, tamanho, seleção e histórico daqui, nunca direto do VE: assim a
 // Lux abre sem o Editor. Prévia do monitor, cache e exportação do Editor continuam no VE.
@@ -85,7 +86,9 @@ async function ve3dCarregarModelo(md, L) {
     const { T, GLTFLoader, OBJLoader } = L, raiz = new T.Group(), norm = new T.Group(); raiz.add(norm);
     let obj, mixer = null;
     const f = md.fonte || {};
-    if (f.tipo === 'primitiva') {
+    if (f.tipo === 'primitiva' && (f.forma === 'capsula' || f.forma === 'celular')) {
+        obj = ve3dPrimComposta(f, T);
+    } else if (f.tipo === 'primitiva') {
         const geo = { esfera: () => new T.SphereGeometry(0.5, 96, 64), cubo: () => new T.BoxGeometry(1, 1, 1, 1, 1, 1), cilindro: () => new T.CylinderGeometry(0.4, 0.4, 1, 96),
             toro: () => new T.TorusGeometry(0.4, 0.15, 64, 160), cone: () => new T.ConeGeometry(0.45, 1, 96), plano: () => new T.PlaneGeometry(1, 1) }[f.forma || 'esfera'] || (() => new T.SphereGeometry(0.5, 96, 64));
         obj = new T.Mesh(geo(), new T.MeshPhysicalMaterial({ color: new T.Color(f.cor || '#ec6e48'), ...(VE3D_MATERIAIS[f.material] || VE3D_MATERIAIS.plastico) }));
@@ -188,6 +191,83 @@ function ve3dUvCaixa(geo, T) {
     }
     geo.setAttribute('uv', new T.BufferAttribute(uv, 2));
 }
+// Primitivas compostas (Missão Repertório ref. 01, 2026-11-04) — cada parte com nome de material, para a aparência ir
+// só nela (VE3DAPI.aparencia(quem, {parte, textura|cor})):
+//  capsula = pílula de remédio em duas metades por torno ('metade1' em cima, 'metade2' embaixo; UV u = volta, v = altura)
+//  celular = corpo arredondado com chanfro ('corpo', metal) + frente de vidro preto ('vidro') + tela ('tela', UV 0..1;
+//            imagem ou VÍDEO vira luz própria — a tela não escurece com a luz da cena) + ilha de câmera atrás ('camera')
+function ve3dPrimComposta(f, T) {
+    const g = new T.Group(), base = VE3D_MATERIAIS[f.material] || VE3D_MATERIAIS.plastico;
+    const mat = (nome, cor, extra = {}) => new T.MeshPhysicalMaterial({ name: nome, color: new T.Color(cor), ...base, ...extra });
+    if (f.forma === 'capsula') {
+        // proporção de cápsula de farmácia (comprimento ≈ 2,4× a largura); pontos com passo igual no perfil para a
+        // textura (u = volta, v = perfil) não esticar na haste
+        const r = 0.15, L = 0.42, nh = 24, passo = r * Math.PI / 2 / nh, nc = Math.max(2, Math.round(L / 2 / passo)), perfil = baixo => {
+            const p = []; for (let i = 0; i <= nh; i++) { const a = i / nh * Math.PI / 2; p.push(new T.Vector2(r * Math.sin(a), -(L / 2 + r * Math.cos(a)))); }
+            for (let j = 1; j <= nc; j++) p.push(new T.Vector2(r, -L / 2 + j * L / 2 / nc));
+            return baixo ? p : p.map(v => new T.Vector2(v.x, -v.y)).reverse();
+        };
+        g.add(new T.Mesh(new T.LatheGeometry(perfil(false), 96), mat('metade1', f.cor || '#2a2a2a')));
+        g.add(new T.Mesh(new T.LatheGeometry(perfil(true), 96), mat('metade2', f.cor2 || '#8d8d8d')));
+        return g;
+    }
+    // celular: 0,49 × 1 × 0,075 (proporção de um aparelho de 6,1 pol.), cantos de 0,075
+    const W = 0.49, H = 1, D = 0.05, bv = 0.0125, R = 0.075;
+    const ret = (w, h, r) => { const s = new T.Shape(), x = -w / 2, y = -h / 2; s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
+        s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h); s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r);
+        s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s; };
+    const corpo = new T.ExtrudeGeometry(ret(W - 2 * bv, H - 2 * bv, R), { depth: D, bevelEnabled: true, bevelThickness: bv, bevelSize: bv, bevelSegments: 6, curveSegments: 24 });
+    corpo.translate(0, 0, -D / 2);
+    g.add(new T.Mesh(corpo, mat('corpo', f.cor || '#1d1d1f', { metalness: 0.85, roughness: 0.32 })));
+    // frente inteira de vidro preto (a borda fina preta em volta da tela, como nos aparelhos atuais) + tela por cima
+    const vidro = new T.Mesh(new T.ShapeGeometry(ret(W - 0.004, H - 0.004, R - 0.002), 24), mat('vidro', '#030303', { roughness: 0.12, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.04 }));
+    vidro.position.z = D / 2 + bv + 0.0008; g.add(vidro);
+    const tw = W - 0.026, th = H - 0.026, tela = new T.ShapeGeometry(ret(tw, th, R - 0.013), 24), p = tela.attributes.position, uv = tela.attributes.uv;
+    for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) + tw / 2) / tw, (p.getY(i) + th / 2) / th);
+    const t = new T.Mesh(tela, mat('tela', '#050505', { roughness: 0.18, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05 }));
+    t.position.z = D / 2 + bv + 0.0016; g.add(t);
+    // ilha da câmera frontal (pílula preta no alto da tela)
+    const ilha = new T.Mesh(new T.ShapeGeometry(ret(0.11, 0.032, 0.016), 12), mat('ilha', '#000000', { roughness: 0.3, metalness: 0 }));
+    ilha.position.set(0, th / 2 - 0.035, D / 2 + bv + 0.0024); g.add(ilha);
+    const cam = new T.Mesh(new T.ExtrudeGeometry(ret(0.17, 0.17, 0.045), { depth: 0.008, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 3 }), mat('camera', '#2b2b2e', { metalness: 0.6, roughness: 0.25 }));
+    cam.position.set(-W / 2 + 0.13, H / 2 - 0.13, -(D / 2 + bv) - 0.012); g.add(cam);
+    return g;
+}
+// textura de vídeo: o mesmo <video> parado, levado ao instante certo do clipe (início = texIni s, texVel = velocidade; volta ao fim)
+async function ve3dTexVideo(url, T, a) {
+    const el = document.createElement('video'); el.muted = true; el.playsInline = true; el.preload = 'auto'; el.crossOrigin = 'anonymous'; el.src = url;
+    await new Promise((ok, erro) => { el.onloadeddata = ok; el.onerror = () => erro(new Error(veT('vídeo da textura não abriu'))); setTimeout(ok, 15000); });
+    // o quadro passa por um canvas 2D: o WebView2 (vídeo decodificado na placa) entrega PRETO no texImage2D direto do <video>
+    const cv = document.createElement('canvas'); cv.width = el.videoWidth || 720; cv.height = el.videoHeight || 1280;
+    const tex = new T.CanvasTexture(cv); tex.minFilter = T.LinearFilter; tex.generateMipmaps = false;
+    tex.userData.video = { el, cv, x: cv.getContext('2d'), ini: Math.max(0, +a.texIni || 0), vel: +a.texVel || 1, buscando: false };
+    ve3dVideoPinta(tex);
+    return tex;
+}
+function ve3dVideoPinta(tx) { const v = tx.userData.video; try { v.x.drawImage(v.el, 0, 0, v.cv.width, v.cv.height); } catch (e) { /* sem quadro ainda */ } tx.needsUpdate = true; }
+const ve3dVideoAlvo = (v, t) => { const d = v.el.duration || 0, s = v.ini + Math.max(0, t) * v.vel; return d > 0 ? Math.min(s % d, d - 0.001) : s; };
+function ve3dVideos(rt) {
+    if (rt._videos) return rt._videos;
+    const out = []; for (const o of rt.objs) o.raiz.traverse(x => { if (x.isMesh) [].concat(x.material || []).forEach(mt => { for (const k of ['map', 'emissiveMap']) { const tx = mt && mt[k]; if (tx && tx.userData.video && !out.includes(tx)) out.push(tx); } }); });
+    return (rt._videos = out);
+}
+// render quadro a quadro: espera cada vídeo chegar ao quadro (o monitor ao vivo pede e redesenha quando chegar)
+async function ve3dVideosEm(rt, t) {
+    for (const tx of ve3dVideos(rt)) {
+        const v = tx.userData.video, alvo = ve3dVideoAlvo(v, t);
+        if (Math.abs(v.el.currentTime - alvo) > 1e-3) await new Promise(ok => { const fim = () => { v.el.removeEventListener('seeked', fim); ok(); }; v.el.addEventListener('seeked', fim); v.el.currentTime = alvo; setTimeout(fim, 4000); });
+        ve3dVideoPinta(tx);
+    }
+}
+function ve3dVideosAoVivo(rt, t) {
+    for (const tx of ve3dVideos(rt)) {
+        const v = tx.userData.video, alvo = ve3dVideoAlvo(v, t);
+        if (v.buscando || Math.abs(v.el.currentTime - alvo) < 0.02) continue;
+        v.buscando = true;
+        v.el.addEventListener('seeked', () => { v.buscando = false; ve3dVideoPinta(tx); veCacheInvalidate(); if (VE.ready) veDrawMonitorSoon(); }, { once: true });
+        v.el.currentTime = alvo;
+    }
+}
 // aparência escolhida pela pessoa (vale para modelo de arquivo e primitiva): cor = cor única (tira a textura do
 // arquivo), material = acabamento (papel, fosco, plástico, cerâmica, metal, vidro), textura = imagem (rótulo, estampa,
 // madeira...), texRep = repetições. No modelo inteiro (f.cor, f.material...) ou numa parte (f.partes[nome do material],
@@ -195,15 +275,15 @@ function ve3dUvCaixa(geo, T) {
 async function ve3dAparencia(obj, f, T) {
     if (f.tipo === 'vetor') return;
     const arq = f.tipo === 'arquivo', limpa = a => Object.fromEntries(Object.entries(a || {}).filter(([, v]) => v != null && v !== ''));
-    const todo = limpa({ cor: arq ? f.cor : null, material: arq ? f.material : null, textura: f.textura, texRep: f.textura ? f.texRep : null });
+    const todo = limpa({ cor: arq ? f.cor : null, material: arq ? f.material : null, textura: f.textura, texRep: f.textura ? f.texRep : null, texIni: f.texIni, texVel: f.texVel });
     const partes = Object.fromEntries(Object.entries(f.partes || {}).map(([k, v]) => [k, limpa(v)]).filter(([, v]) => Object.keys(v).length));
     if (!Object.keys(todo).length && !Object.keys(partes).length) return;
     const texs = new Map();   // caminho|repetição → textura (carregada uma vez)
     for (const a of [todo, ...Object.values(partes)]) {
-        const ch = a.textura && `${a.textura}|${+a.texRep || 1}`; if (!ch || texs.has(ch)) continue;
+        const ch = a.textura && `${a.textura}|${+a.texRep || 1}|${+a.texIni || 0}|${+a.texVel || 1}`; if (!ch || texs.has(ch)) continue;
         const r = await window.pywebview.api.ve_3d_url(a.textura);
         if (!r || !r.success) { texs.set(ch, null); continue; }
-        const tex = await new T.TextureLoader().loadAsync(r.url); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 8;
+        const tex = VE3D_EXT_VIDEO.test(a.textura) ? await ve3dTexVideo(r.url, T, a) : await new T.TextureLoader().loadAsync(r.url); tex.colorSpace = T.SRGBColorSpace; tex.anisotropy = 8;
         tex.wrapS = tex.wrapT = T.RepeatWrapping; const k = Math.max(0.05, +a.texRep || 1); tex.repeat.set(k, k); texs.set(ch, tex);
     }
     obj.traverse(o => {
@@ -211,10 +291,11 @@ async function ve3dAparencia(obj, f, T) {
         const troca = m => {
             const a = { ...todo, ...(partes[(m && m.name) || ''] || {}) }; if (!Object.keys(a).length) return m;
             const n = m && (m.isMeshPhysicalMaterial || m.isMeshStandardMaterial) ? m.clone() : new T.MeshPhysicalMaterial({ name: (m && m.name) || '', map: m && m.map || null });
-            const pre = VE3D_MATERIAIS[a.material], tex = a.textura ? texs.get(`${a.textura}|${+a.texRep || 1}`) : null;
+            const pre = VE3D_MATERIAIS[a.material], tex = a.textura ? texs.get(`${a.textura}|${+a.texRep || 1}|${+a.texIni || 0}|${+a.texVel || 1}`) : null;
             if (pre) Object.assign(n, { roughness: 0.5, metalness: 0, transmission: 0, clearcoat: 0, sheen: 0, ...pre });
             if (a.cor && (arq || partes[(m && m.name) || ''])) { n.color = new T.Color(a.cor); n.map = null; }
             if (tex) { ve3dUvCaixa(o.geometry, T); n.map = tex; n.color = new T.Color(1, 1, 1); }
+            if (tex && n.name === 'tela') { n.map = null; n.color = new T.Color(0x050505); n.emissive = new T.Color(1, 1, 1); n.emissiveMap = tex; n.emissiveIntensity = 1; }   // tela acesa
             n.needsUpdate = true; return n;
         };
         o.material = Array.isArray(o.material) ? o.material.map(troca) : troca(o.material);
@@ -438,6 +519,7 @@ function ve3dAplicar(rt, m, t, W, H, op = {}) {   // tudo o que anima, no tempo 
         if (o.mixer) o.mixer.setTime(Math.max(0, t * (o.md.p.velocidade ?? 1)));
         if (o.atualizar) o.atualizar(o, v, op);   // luz: mira, potência, tamanho, cor (editor-3d-luzes.js)
     }
+    if (!op.videosProntos) ve3dVideosAoVivo(rt, t);
     if (C.fundo) r.setClearColor(new T.Color(C.fundo), 1); else r.setClearColor(0x000000, 0);
     const Wi = Math.max(2, Math.round(W)), Hi = Math.max(2, Math.round(H));
     r.setPixelRatio(1); r.setSize(Wi, Hi, false);
@@ -526,7 +608,8 @@ async function ve3dRenderizar(m) {
                     if (ve3dSig(m) !== sig || ve3dRuntime(m) !== rt) throw Object.assign(new Error('a cena mudou'), { mudou: true });
                     while (ve3dOcupado() && !VE3D.exportando) await new Promise(r => setTimeout(r, 500));
                 }
-                ve3dAplicar(rt, m, i / fps, W, H);
+                await ve3dVideosEm(rt, i / fps);
+                ve3dAplicar(rt, m, i / fps, W, H, { videosProntos: true });
                 const b = veCanvasPng(rt.cv);   // síncrono: o toBlob era adiado ~1 s por quadro fora de primeiro plano
                 const rr = await fetch(ini.url + `q${String(i).padStart(5, '0')}.png`, { method: 'POST', body: b, headers: { 'Content-Type': 'image/png' } });
                 if (!rr.ok && rr.status !== 204) throw new Error(`envio do quadro ${i}: HTTP ${rr.status}`);
@@ -583,10 +666,10 @@ window.VE3DAPI = {
         if (op.arquivo) await ve3dPrepararArquivo(op.arquivo);   // falha (sem Blender, arquivo ruim) antes de mexer na cena
         V3.hist();
         const id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-        const extra = { ...(op.cor ? { cor: op.cor } : {}), ...(op.material ? { material: op.material } : {}), ...(op.textura ? { textura: op.textura, texRep: op.texRep || 1 } : {}) };
+        const extra = { ...(op.cor ? { cor: op.cor } : {}), ...(op.material ? { material: op.material } : {}), ...(op.textura ? { textura: op.textura, texRep: op.texRep || 1 } : {}), ...(op.cor2 ? { cor2: op.cor2 } : {}) };
         const fonte = op.embalagem ? { tipo: 'embalagem', produto: op.embalagem, material: op.material || 'softtouch', cores: op.cores || {}, ...(op.rotulo ? { rotulo: op.rotulo } : {}) }
             : op.vetor ? { tipo: 'vetor', desc: op.vetor } : op.arquivo ? { tipo: 'arquivo', path: op.arquivo, ...extra }
-            : { tipo: 'primitiva', forma: op.forma || 'esfera', cor: op.cor || '#ec6e48', material: op.material || 'plastico', ...extra };
+            : { tipo: 'primitiva', forma: op.forma || 'esfera', cor: op.cor || VE3D_CORES[op.forma] || '#ec6e48', material: op.material || 'plastico', ...extra };
         m.c3d.modelos.push({ id, nome: op.nome || (op.embalagem ? (op.embalagem === 'bastao' ? 'bastão' : op.embalagem) : op.arquivo ? op.arquivo.split(/[\\/]/).pop() : op.forma || 'esfera'), fonte,
             p: { x: op.x || 0, y: op.y || 0, z: op.z || 0, rx: op.rx || 0, ry: op.ry || 0, rz: op.rz || 0, esc: op.esc ?? 1, velocidade: op.velocidade ?? 1 }, kf: {} });
         ve3dMudou(m);
@@ -600,7 +683,7 @@ window.VE3DAPI = {
         const m = ve3dAlvo(cena), md = ve3dObj(m, quem); if (!md.fonte || md.fonte.tipo === 'vetor') throw new Error('objeto do Vetor: troque a arte no Vetor');
         V3.hist(); const f = md.fonte = JSON.parse(JSON.stringify(md.fonte));
         const alvo = op.parte ? ((f.partes = f.partes || {})[op.parte] = f.partes[op.parte] || {}) : f;
-        for (const k of ['cor', 'material', 'textura', 'texRep']) if (k in op) { if (op[k] == null || op[k] === '') delete alvo[k]; else alvo[k] = op[k]; }
+        for (const k of ['cor', 'material', 'textura', 'texRep', 'texIni', 'texVel']) if (k in op) { if (op[k] == null || op[k] === '') delete alvo[k]; else alvo[k] = op[k]; }
         if (op.parte && !Object.keys(alvo).length) delete f.partes[op.parte];
         if (f.partes && !Object.keys(f.partes).length) delete f.partes;
         if (f.tipo === 'primitiva') { f.cor = f.cor || '#ec6e48'; f.material = f.material || 'plastico'; }
@@ -817,7 +900,7 @@ function ve3dEvento(el, tipo) {
         const parte = (VE3D.parteSel || {})[alvoId] || '', pp = parte ? { parte } : {};
         if (a.startsWith('semtex:')) { VE3DAPI.aparencia(alvoId, { textura: null, ...pp }, m.id).then(ve3dPainel); return; }
         if (a.startsWith('tex:')) {
-            (async () => { const p = await window.pywebview.api.vk_dialogo('abrir', ['Imagens (*.png;*.jpg;*.jpeg;*.webp;*.bmp)']); if (!p) return;
+            (async () => { const p = await window.pywebview.api.vk_dialogo('abrir', ['Imagens e vídeos (*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.mp4;*.mov;*.webm;*.m4v)']); if (!p) return;
                 try { await VE3DAPI.aparencia(alvoId, { textura: p, ...pp }, m.id); ve3dPainel(); } catch (e) { veToast(e.message || String(e)); } })();
             return;
         }

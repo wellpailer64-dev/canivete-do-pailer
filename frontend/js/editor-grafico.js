@@ -12,8 +12,8 @@
 
 const VE_GRAF = new Set(['cor', 'forma', 'pincel']);
 const veEhGrafico = c => { const m = c && veMediaOf(c); return !!m && VE_GRAF.has(m.kind); };
-const VE_FORMAS = { ret: 'Retângulo', eli: 'Elipse', tri: 'Triângulo', lin: 'Linha', est: 'Estrela', pol: 'Polígono', cam: 'Caminho (Caneta)' };
-const VE_FORMAS_ICO = { ret: '▭', eli: '◯', tri: '△', lin: '╱', est: '☆', pol: '⬠', cam: '✎' };
+const VE_FORMAS = { ret: 'Retângulo', eli: 'Elipse', tri: 'Triângulo', lin: 'Linha', est: 'Estrela', pol: 'Polígono', flo: 'Flor / Mancha', cam: 'Caminho (Caneta)' };
+const VE_FORMAS_ICO = { ret: '▭', eli: '◯', tri: '△', lin: '╱', est: '☆', pol: '⬠', flo: '✿', cam: '✎' };
 const VEGR = {
     cache: new WeakMap(),
     pincel: { cor: '#ffffff', tam: 24, dur: 80, op: 100 },
@@ -53,8 +53,41 @@ function veGrCanvas(w, h) {
 
 // Contorno da forma como polilinha fechada (px da forma), começando em cima e no sentido horário (como no AE):
 // é o que o Aparar caminho e o tracejado percorrem
+// Flor / Mancha orgânica (ref. 01 da Missão Repertório, 2026-11-04): N pétalas com a ponta em bulbo (mais larga que o
+// pescoço) e vales arredondados, como as manchas pretas de reel "papel + blob". Pétala = pescoço → arco da ponta passando
+// do meio-círculo (bulbo) → pescoço; entre pétalas, um vale no raio interno; depois 4 passadas de Chaikin arredondam tudo.
+// fm.pontas (pétalas), fm.raioInt (% do miolo), fm.bulbo (% do raio da ponta), fm.var (% de irregularidade), fm.semente.
+function veGrFlor(fm, cx, cy, rx, ry) {
+    const n = Math.max(2, Math.round(+fm.pontas || 5)), ri = Math.max(0.05, Math.min(0.9, (fm.raioInt == null ? 38 : +fm.raioInt) / 100));
+    const rb0 = Math.max(0.04, Math.min(0.6, (fm.bulbo == null ? 26 : +fm.bulbo) / 100)), vr = Math.max(0, Math.min(100, +fm.var || 0)) / 100;
+    let sem = (Math.round(+fm.semente || 1) * 9301 + 49297) % 233280;
+    const rnd = () => { sem = (sem * 9301 + 49297) % 233280; return sem / 233280 - 0.5; };
+    const P = [];
+    for (let k = 0; k < n; k++) {
+        const th = -Math.PI / 2 + k * 2 * Math.PI / n + rnd() * vr * 0.5 * Math.PI / n;
+        const rb = rb0 * (1 + rnd() * vr * 0.6), d = Math.min(1 - rb, (1 - rb) * (1 + rnd() * vr * 0.35));
+        const ux = Math.cos(th), uy = Math.sin(th), vx = -uy, vy = ux, wn = rb * 0.62, dn = ri * 0.95, be = 0.42;
+        P.push([dn * ux - wn * vx, dn * uy - wn * vy]);
+        for (let j = 0; j <= 14; j++) { const f = th - Math.PI / 2 - be + j * (Math.PI + 2 * be) / 14; P.push([d * ux + rb * Math.cos(f), d * uy + rb * Math.sin(f)]); }
+        P.push([dn * ux + wn * vx, dn * uy + wn * vy]);
+        const tv = th + Math.PI / n, rv = ri * (0.78 + rnd() * vr * 0.2);
+        P.push([rv * Math.cos(tv), rv * Math.sin(tv)]);
+    }
+    let Q = P;
+    for (let it = 0; it < 4; it++) {
+        const R = [];
+        for (let k = 0; k < Q.length; k++) { const a = Q[k], b = Q[(k + 1) % Q.length]; R.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]); }
+        Q = R;
+    }
+    // cabe na caixa: normaliza pelo maior alcance em x e y
+    let mx = 1e-6, my = 1e-6;
+    for (const [x, y] of Q) { mx = Math.max(mx, Math.abs(x)); my = Math.max(my, Math.abs(y)); }
+    return Q.map(([x, y]) => [cx + rx * x / mx, cy + ry * y / my]);
+}
+
 function veGrPontos(fm, w, h, i) {
     if (fm.t === 'cam') return typeof veCamPolilinha === 'function' ? veCamPolilinha(fm.pts, fm.fech) : [];   // Caneta de caminho
+    if (fm.t === 'flo') return veGrFlor(fm, w / 2, h / 2, Math.max(0.5, w / 2 - i), Math.max(0.5, h / 2 - i));
     const out = [], n = Math.max(3, Math.round(+fm.pontas || 5)), rx = Math.max(0.5, w / 2 - i), ry = Math.max(0.5, h / 2 - i), cx = w / 2, cy = h / 2;
     if (fm.t === 'eli') {
         for (let k = 0; k < 160; k++) { const a = -Math.PI / 2 + k * 2 * Math.PI / 160; out.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]); }
@@ -124,7 +157,7 @@ function veGrPoli(x, pts, fech) {
 function veGrForma(x, fm) {
     const { w, h } = fm, b = fm.cOn ? Math.max(0, +fm.cLarg || 0) : 0, i = b / 2;
     const ap = veGrAparar(fm), tr = (+fm.tLen || 0) > 0, pOn = fm.pOn !== false;
-    if (ap || tr || fm.t === 'est' || fm.t === 'pol' || fm.t === 'cam') {
+    if (ap || tr || fm.t === 'est' || fm.t === 'pol' || fm.t === 'flo' || fm.t === 'cam') {
         // Aparar caminho, tracejado, estrela e polígono: o contorno percorrido como polilinha
         if (ap && ap.vazio) return;
         const tracejar = () => { if (tr) { x.setLineDash([Math.max(0.1, +fm.tLen), Math.max(0, +fm.tVao || 0)]); x.lineDashOffset = -(+fm.tDesl || 0); } };

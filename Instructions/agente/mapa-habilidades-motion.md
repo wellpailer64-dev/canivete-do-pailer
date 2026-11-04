@@ -12,6 +12,7 @@ Legenda: ⭐ = o Pailer elogiou nominalmente · 🔓 = desbloqueada (usada e apr
 | Propaganda KANIVETE (ref. Pinterest, 23 s) | 2026-10-10 | "ficou perfeito" | `D:/kanivete_testes/motion_kanivete/` |
 | Intro "SEQUÊNCIA DE APROVADOS" (Carlinhos, ref. Dodge, 5 s) | 2026-10-12 | "superou em TODOS os pontos", aprovado de primeira | `D:/kanivete_testes/intro_aprovados/` |
 | 2 reels Black Friday A/B + mosaico (Carlinhos, "Sinal amarelo", 24 s) | 2026-10-20 | mosaico: "melhora muito boa"; reels: "falta pouco" | `D:/kanivete_testes/bf_carlinhos/` |
+| Ref 01 "Everyone wants shortcuts" (Missão Repertório, Pinterest, 16 s) | 2026-11-04 | (aguardando nota) | `D:/kanivete_testes/repertorio/01_shortcuts/` |
 
 ## Ferramenta-base: plano em código (montar.py + montador.js)
 🔓 A timeline inteira sai de um script: cada camada é um dicionário (tipo, trilha, início, duração, propriedades,
@@ -126,7 +127,8 @@ escala com curva), `kf()` (quadro-chave), `fx()` (efeito), `texto()/img()/forma(
 - Caminho de movimento curvo (alças espaciais), auto-orientar ao longo do caminho, repetidor de formas, expressões
   livres (wiggle, loop) — pendências em `plano-motion.md`.
 - Texto em caminho / máscara de texto revelando vídeo; luz varrendo o título (fosco alfa de um brilho inclinado).
-- Parallax automático de UMA foto (mapa de profundidade) e vídeo como placa na Cena 3D.
+- Parallax automático de UMA foto (mapa de profundidade). (Vídeo em modelo 3D: ✅ textura de vídeo, ref 01.)
+- Respiro de quadro (o quadro inteiro encolhe 97% com borda preta por 2 quadros, ref 01 em 3,35 s): precisa de Comp-pai com escala.
 
 ## Peça: V1 GaIA (Smart Tree/Finep, 8 min, 2026-10-14) — `D:/kanivete_testes/smarttree/v1/` (base.py + montar_v1.py + montador.js)
 - 🔓 **Documentário inteiro por plano em código**: cobertura e motion presos às PALAVRAS da narração (`em("frase", apos)`
@@ -175,3 +177,48 @@ escala com curva), `kf()` (quadro-chave), `fx()` (efeito), `texto()/img()/forma(
 - Trilha pela estrutura: `musica/achar_drop.py` dá nota a "forte → pausa → drop" em qualquer pasta de prévias.
   Kali Kush (Switch Remix, instr.): silêncio 77,55–79,2, drop 80,797; 2ª parada 92,75–95,75 com a volta em 96,0 = CTA no
   silêncio e o botão bate na volta. **Licença**: Creator NÃO cobre cliente nem anúncio pago — não confirmar o diálogo.
+
+## Peça: Ref 01 "Everyone wants shortcuts" (Missão Repertório, 2026-11-04) — `D:/kanivete_testes/repertorio/01_shortcuts/`
+Estética "papel + manchas": papel claro com grade fina, manchas pretas orgânicas, tipografia Montserrat preta, objetos 3D
+cinza. Decupagem em `decupagem.md`; tudo sai de `montar.py` (+ `montador.js` que já cria Cena 3D do plano e `txa`);
+comparação lado a lado com `folha.py t1 t2 …` (nossa em cima, referência embaixo, MESMOS tempos). Faixas automáticas:
+`tr` no plano é só a ordem da pilha; `faixas()` dá a faixa real (nada some por conflito).
+- 🔓 **Caixa de seleção de designer** (gatilhos: "estilo Figma", "cursor selecionando o texto", "caixa tracejada com
+  alças", "bounding box") — `selecao()`: retângulo só contorno tracejado (cLarg 2,6, tLen 11, tVao 8) cresce de 8×8 até o
+  tamanho (◆ em fm.w/fm.h + x/y com a MESMA curva [0.4,0,0.2,1], 0,4–0,5 s), canto sup. esq. fixo; 4 alças (elipse 15 px)
+  seguem os cantos; cursor (PNG) clica (escala 100→82→100) e arrasta o canto inf. dir.; o texto revela em degradê junto.
+  Duas caixas seguidas: o cursor da 1ª viaja até o canto da 2ª e some no instante em que o da 2ª aparece (`cur_vai/cur_de`).
+- 🔓 **Manchas orbitando nos cantos** (gatilhos: "blob", "mancha orgânica", "splash preto nos cantos") — forma **Flor**
+  (`t: 'flo'`, 5 pétalas, raioInt 34, bulbo 25, var 18), 740–780 px, desfoque 4 + sombra 35 %. Órbita **ELÍPTICA**
+  (`orbita()`: rx 600–700, ry 1000–1150): um nulo girando em círculo joga as manchas para fora nas laterais do quadro
+  vertical. Ângulo por trechos com curva (paradas nos cantos, troca de canto rápida na virada) + giro próprio ±60°.
+  Na transição a mancha passa grande (escala 150→110) pela lateral.
+- 🔓 **Câmera de mundo** (gatilhos: "a câmera passeia", "cena desliza para a próxima", "scroll entre cenas", "pan") — um
+  nulo (âncora no canto, x/y 0) é a câmera; cada cena mora num deslocamento (cena 2 em y+1300, cena 4 em x+560) e as
+  camadas são filhas dele. Anima só o nulo: curva [0.5,0,0.1,1] (arranca firme, assenta devagar) em 1,2–1,4 s, ou
+  [0.4,0,0.2,1] num pan curto; desfoque de movimento nas filhas. **Parallax**: o que está mais perto ganha deslocamento
+  extra (o quadro e o título saem 300–360 px a mais que o resto).
+- 🔓 **Revelação em degradê** (gatilhos: "texto aparecendo suave letra por letra", "fade da esquerda para a direita") —
+  animação de texto `fade`, letra, sobreposição 0,82, 0,4–0,55 s por linha; parágrafo 1,3 s com sobreposição 0,95. A
+  animação começa no início do clipe: para atrasar, atrase o CLIPE (`revela(t0, …)` faz isso).
+- 🔓 **Faixa curva que cresce** (gatilhos: "faixa/fita atravessando a tela", "ribbon") — Caminho (`caminho()` em
+  coordenada de tela), espessura 440, ponta redonda, Aparar fim 22→100 + opacidade 0→100 em 0,4 s. A faixa larga da
+  cena seguinte (700) começa DENTRO da primeira, com ponta redonda: a emenda some.
+- 🔓 **Anel tracejado que se desenha** em volta do objeto: Aparar fim 0→100 em 0,7 s; a rotação inicial escolhe onde
+  o traço nasce (30° = "uma hora").
+- 🔓 **Objeto 3D girando no próprio eixo** (pílula) — primitiva `capsula` (metade1 lisa, metade2 com textura de
+  covinhas por `partes`), Cena 3D só para o giro (ry 0→300 suave); posição, inclinação no plano, escala e sombra ficam
+  no CLIPE 2D (mais fácil de coreografar com a câmera de mundo).
+- 🔓 **Celular 3D com vídeo na tela** (gatilhos: "mockup de celular", "app/reel na tela do celular girando") —
+  primitiva `celular` + `aparencia(parte 'tela', textura: .mp4, texIni)`. Entra DE LADO (ry −90 → −76 → −15) enquanto
+  a câmera de mundo desliza; a tela troca de reel para app com deslize (vídeo gerado por `tela_video.py`); sai ampliando
+  para o alto (escala 207→320 %, curva in). Imagem de tela gerada por IA vem com moldura de celular: recortar a tela.
+- 🔓 **Palavras em escada viram letreiro** (gatilhos: "palavras chegando uma a uma", "letreiro deslizando") — nulo
+  "letreiro" anda em x desacelerando; cada palavra filha (larguras medidas com PIL) entra 0,13 s depois da anterior vinda
+  de +150 x / +110 y com desfoque 30, EXPO 0,42 s: chegam em escada e assentam na linha.
+- 🔓 **Palco de luz** (gatilhos: "facho de luz", "holofote", "corredor claro no escuro") — PNG gerado: laterais quase
+  pretas + faixa clara que abre em funil (y 920 até as quinas de baixo), borda com sombra macia; entra com escala 112→100.
+- 🔓 **Primeiro plano desfocado** (profundidade falsa) — cópias do objeto principal grandes nos cantos, desfoque 18–22,
+  derivando devagar (y ±35, giro ±8°).
+- 🔓 **Relógio vivo** — ponteiros do relógio gerado apagados com inpaint (cv2 Telea); ponteiros novos em PNG quadrado
+  com o PIVÔ NO CENTRO (a rotação da camada gira em volta do eixo); relógio dessaturado (cor 0,42) para o ar antigo.

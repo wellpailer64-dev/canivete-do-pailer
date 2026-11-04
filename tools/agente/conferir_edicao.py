@@ -65,7 +65,8 @@ for q in seqs:
     print("##", q["name"])
     cs = q["clips"]
     kind = lambda c: M.get(c.get("m"), {}).get("kind")
-    video = [c for c in cs if kind(c) == "video" and c.get("x") != "a" and not M.get(c.get("m"), {}).get("comp")]
+    # cena 3D (c3d) é motion desenhado: mexer Posição/Escala nela é animação, não zoom em filmagem
+    video = [c for c in cs if kind(c) == "video" and c.get("x") != "a" and not M.get(c.get("m"), {}).get("comp") and not M.get(c.get("m"), {}).get("c3d")]
     com_zoom = [c for c in video if any(p in (c.get("k") or {}) for p in ("sc", "x", "y", "sx", "sy"))]
     if com_zoom:
         relato("REPROVADO", "zoom no clipe", f"{len(com_zoom)} clipes com movimento no próprio vídeo, a começar em {com_zoom[0]['st']:.2f} s; usar camada de ajuste")
@@ -119,9 +120,12 @@ for q in seqs:
                 relato("REPROVADO", "brasão cobre tarja", f"{t_['st']:.1f} '{t_['tx']['t']}': brasão em x {b_['p']['x']:.0f}, usar {ini - meio - 10:.0f}")
     # texto na tela (título, chamada) que passa da margem de 5% é cortado no celular, sem aviso do app
     lado = float(q.get("w") or d.get("w") or 1080)
-    for t_ in [c for c in cs if c.get("tx", {}).get("t")]:
+    # com camada mãe (câmera de mundo, letreiro) a Posição é no espaço da mãe e o texto atravessa a borda de propósito
+    for t_ in [c for c in cs if c.get("tx", {}).get("t") and not c.get("pai")]:
         esc = float(t_.get("p", {}).get("sc", 100)) / 100
-        larg = max(largura(lin, float(t_["tx"].get("tam") or 60), 900 if t_["tx"].get("neg") else 700) for lin in t_["tx"]["t"].split("\n")) * esc
+        estreita = 0.72 if re.search(r"condensed|narrow|cond\b", str(t_["tx"].get("fam") or t_["tx"].get("fonte") or ""), re.I) else 1
+        peso = int(t_["tx"].get("peso") or (900 if t_["tx"].get("neg") else 700))
+        larg = max(largura(lin, float(t_["tx"].get("tam") or 60), 900 if peso >= 800 else 700) for lin in t_["tx"]["t"].split("\n")) * esc * estreita
         x = float(t_.get("p", {}).get("x", lado / 2))
         if x - larg / 2 < lado * 0.05 or x + larg / 2 > lado * 0.95:
             relato("REPROVADO", "texto passa da margem", f"{t_['st']:.1f} '{t_['tx']['t'][:30]}': {larg:.0f} px de {lado:.0f}; diminua ou quebre a linha")

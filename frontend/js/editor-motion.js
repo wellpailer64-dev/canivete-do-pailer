@@ -54,10 +54,13 @@ const VE_MO_FM = {
     tDesl: { nome: 'Tracejado: deslocamento', un: 'px', min: -100000, max: 100000, passo: 1, casas: 0, def: 0 },
     pontas: { nome: 'Pontas', un: '', min: 3, max: 64, passo: 1, casas: 0, def: 5 },
     raioInt: { nome: 'Raio interno', un: '%', min: 1, max: 100, passo: 0.5, casas: 1, def: 45 },
+    bulbo: { nome: 'Ponta (bulbo)', un: '%', min: 4, max: 60, passo: 0.5, casas: 1, def: 26 },
+    var: { nome: 'Irregularidade', un: '%', min: 0, max: 100, passo: 1, casas: 0, def: 0 },
+    semente: { nome: 'Semente', un: '', min: 1, max: 999, passo: 1, casas: 0, def: 1 },
 };
 const veMoClamp = (v, a, b) => Math.max(a, Math.min(b, v));
 // versão do desenhista: entra no hash da camada desenhada (mudou o desenho, o cache antigo não serve)
-const VE_MO_VERSAO = 'v7';
+const VE_MO_VERSAO = 'v8';
 
 // ─────────────────────────── camadas: uid, nulo, procura ───────────────────────────
 function veMoUid(c) {
@@ -804,7 +807,8 @@ function veMoPainelHtml(c) {
                 <label class="ve-mo-inv"><input type="checkbox" data-mofm="pOn"${c.fm.pOn === false ? '' : ' checked'}>${veT('Preenchimento')}</label>
                 <label class="ve-mo-inv"><input type="checkbox" data-mofm="cOn"${c.fm.cOn ? ' checked' : ''}>${veT('Contorno')}</label>
                 <label class="ve-mo-inv"><input type="checkbox" data-mofm="pontaR"${c.fm.pontaR ? ' checked' : ''}>${veT('Ponta redonda')}</label></div>
-            ${['w', 'h', 'raio', 'cLarg'].concat(c.fm.t === 'est' || c.fm.t === 'pol' ? ['pontas'] : []).concat(c.fm.t === 'est' ? ['raioInt'] : [])
+            ${['w', 'h', 'raio', 'cLarg'].concat(['est', 'pol', 'flo'].includes(c.fm.t) ? ['pontas'] : []).concat(['est', 'flo'].includes(c.fm.t) ? ['raioInt'] : [])
+                .concat(c.fm.t === 'flo' ? ['bulbo', 'var', 'semente'] : [])
                 .concat(['apIni', 'apFim', 'apDesl', 'tLen', 'tVao', 'tDesl']).map(k => veMoLinhaNum('fm.' + k, VE_MO_FM[k].nome, VE_MO_FM[k])).join('')}
         </div></div>` : '';
     return pincel + `<div class="ve-mo">

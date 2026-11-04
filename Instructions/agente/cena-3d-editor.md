@@ -126,8 +126,19 @@ lata com 2 partes sem .mtl; aparência, partes, ferramentas da tela, soltar e o 
 Ponte: `python testes/teste_vetor_editor3d.py` (app em `--agente=9333`).
 Placas, tela com mouse e leveza: `py -3.13 testes/teste_3d_placas.py` (app em `--agente=9333`).
 
+## Primitivas compostas e textura de vídeo (2026-11-04, Missão Repertório ref. 01)
+- `capsula` (pílula: partes `metade1`/`metade2`, torno com passo igual no perfil → textura não estica) e `celular`
+  (`corpo` metal, `vidro` frente preta, `tela` UV 0..1, `ilha`, `camera` atrás). `VE3DAPI.modelo({forma: 'capsula', cor,
+  cor2})`; cor padrão por forma em `VE3D_CORES`. Código: `ve3dPrimComposta` (editor-3d.js).
+- **Textura de vídeo**: `aparencia(quem, {parte, textura: 'x.mp4', texIni, texVel})` (.mp4/.mov/.webm/.m4v/.mkv; o seletor
+  "Escolher…" aceita vídeo). O quadro passa por um canvas 2D (`ve3dVideoPinta`): o WebView2 entrega PRETO no texImage2D
+  direto do `<video>`. Render quadro a quadro espera o `seeked` (`ve3dVideosEm`); o monitor pede e redesenha ao chegar
+  (`ve3dVideosAoVivo`). Volta ao começo no fim do vídeo. Parte chamada `tela` vira luz própria (emissiva).
+- Trocar o CONTEÚDO de um arquivo de textura com o mesmo caminho não refaz o .mov da cena (o hash é o da descrição):
+  use outro nome de arquivo.
+
 ## Pendências
-- Placas: vídeo como placa (textura de vídeo por quadro), opacidade/mesclagem por placa, parallax automático de UMA foto
+- Placas: vídeo como placa (a textura de vídeo já existe nos modelos, ver abaixo; falta a conversão de camada), opacidade/mesclagem por placa, parallax automático de UMA foto
   (mapa de profundidade leve, conferir licença), luz e sombra nas placas.
 - Blender para render pesado da cena do Editor; texto 3D; placa de fundo com imagem/vídeo; quadros-chave da cena 3D
   na timeline (hoje só no painel); vínculo vivo Vetor → Editor (hoje é cópia: reenviar após editar).

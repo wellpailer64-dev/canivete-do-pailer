@@ -35,6 +35,8 @@ def _segmentos(vis, fim):
 
 def conferir(clips, media, fim=None):
     vis = _visiveis(clips, media)
+    if not vis:   # timeline vazia (ex.: a "Timeline 1" que o projeto novo cria): nada a conferir
+        return {"pretos": [], "piscas": []}
     fim = fim or max(_fim(c) for c in vis)
     seg = _segmentos(vis, fim)
     pretos = [(round(a, 3), round(b - a, 3)) for a, b, c in seg if c is None]

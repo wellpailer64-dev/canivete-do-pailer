@@ -29,8 +29,8 @@ DISPARA = """async ([nomeTl, pasta, nome]) => {
     window.veOnExport = ev => { let e = ev; if (typeof e === 'string') { try { e = JSON.parse(e); } catch (x) {} } if (e && e.done) window.__ecFim = e; if (o) o(ev); }; }
   if (typeof veCompProntas === 'function') await veCompProntas(() => {});
   if (typeof veOvtProntas === 'function') await veOvtProntas(null, null, true);
-  VE._txPng = null;
-  if (VE.clips.some(veTxPrecisa)) await veMoNoTamanho('original', () => veTxPngs());
+  // igual ao export do app: texto/forma/motion/3D dentro de Comp que "só organiza" também vira PNG (veTxPrecisaEm)
+  VE._txPng = veTxPrecisaEm(VE.clips) ? await veMoNoTamanho('original', () => veTxPngs(null, VE.clips, false)) : new Map();
   const p = veExportPlan(true), lim = veMasterLim();
   window.pywebview.api.video_cutter_export(VE.path, p.base, 'mp4', 'medium', 'original', true, pasta, false, p.camadas, p.audio, p.dur,
     lim ? [...p.mix, { master: lim }] : p.mix, veTxExport(p.faixa), [VE.seqW, VE.seqH], { nome, blocos: false });
