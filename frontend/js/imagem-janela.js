@@ -43,7 +43,11 @@ function ieJanAtualizar(evento) {
     embrulhar('ieUiTudo', 'doc'); embrulhar('ieUiCamadas', 'doc'); embrulhar('ieUiCores', 'cor'); embrulhar('ieOpcoesRender', 'ferr');
     embrulhar('ieStatusMouse', 'mouse'); embrulhar('ieHistRender', 'comp');
     const q = ieQuadro;
-    ieQuadro = function () { const r = q(); if (IE.doc && IE.doc._compV !== IE._janCompV) { IE._janCompV = IE.doc._compV; ieJanAtualizar('comp'); } ieJanAtualizar('vista'); return r; };
+    // mouse apertado (caneta, pincel, forma): Navegador e Canais esperam soltar — refaziam a redução da imagem inteira a
+    // cada quadro (~70 ms num 4000×5000)
+    const comp = () => { if (IE.doc && IE.doc._compV !== IE._janCompV) { IE._janCompV = IE.doc._compV; ieJanAtualizar('comp'); } };
+    ieQuadro = function () { const r = q(); if (!IE.ponteiro) comp(); ieJanAtualizar('vista'); return r; };
+    document.addEventListener('pointerup', () => setTimeout(comp, 0), true);
 })();
 
 const ieJanH = s => ieEsc(ieT(s));
@@ -319,8 +323,16 @@ ieJanRegistrar('navegador', 'Navegador', ['comp', 'vista', 'doc'], (corpo, doc) 
     cv._geo = { k, ox, oy };
     x.fillStyle = '#2a2a2a'; x.fillRect(0, 0, W, H);
     x.fillStyle = ieXadrezPadrao(x); x.fillRect(ox, oy, doc.w * k, doc.h * k);
-    x.imageSmoothingQuality = 'high';
-    x.drawImage(ieMipmap(doc.comp, doc, k), ox, oy, doc.w * k, doc.h * k);
+    // a miniatura fica guardada; com o mouse apertado (caneta, pincel) a imagem mudada espera soltar — refazer a redução
+    // da imagem inteira a cada quadro custava ~70 ms num 4000×5000 (o retângulo vermelho continua acompanhando)
+    const chave = `${doc.id}|${doc._compV}|${W}x${H}`;
+    if (!cv._base || cv._base.chave !== chave && (!IE.ponteiro || cv._base.doc !== doc.id || cv._base.wh !== `${W}x${H}`)) {
+        const n = cv._base?.c?.width === W && cv._base.c.height === H ? cv._base.c : ieCanvas(W, H), nx = ieCtx(n);
+        nx.clearRect(0, 0, W, H); nx.imageSmoothingQuality = 'high';
+        nx.drawImage(ieMipmap(doc.comp, doc, k), ox, oy, doc.w * k, doc.h * k);
+        cv._base = { chave, c: n, doc: doc.id, wh: `${W}x${H}` };
+    }
+    x.drawImage(cv._base.c, 0, 0);
     const v = ieVistaTam();
     x.strokeStyle = '#ff3b30'; x.lineWidth = 2;
     x.strokeRect(ox + (-doc.px / doc.zoom) * k, oy + (-doc.py / doc.zoom) * k, v.w / doc.zoom * k, v.h / doc.zoom * k);

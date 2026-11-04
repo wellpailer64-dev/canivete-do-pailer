@@ -324,6 +324,12 @@ function ieOpSel(ev) {
     if (ev.altKey) return 'subtrair';
     return (IE.op.sel && IE.op.sel.modo) || 'nova';
 }
+// cursor do conta-gotas (também no Alt do pincel): a ponta é o ponto amostrado, como no Photoshop
+function ieCursorContagotas() {
+    const g = '<path d="M3 21l1.2-4.2 9-9 3 3-9 9z"/><path d="M13.2 7.8l2.3-2.3a2.2 2.2 0 013.1 3.1l-2.3 2.3"/><path d="M12 6.6l5.4 5.4"/>';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke-linecap="round" stroke-linejoin="round"><g stroke="#fff" stroke-width="3">${g}</g><g stroke="#000" stroke-width="1.2">${g}</g></svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 3 21, crosshair`;
+}
 // cursor das ferramentas de seleção com o sinal do modo no canto (+ adicionar, − subtrair, × interseção)
 function ieCursorSel(base, ev) {
     const e = ev && 'shiftKey' in ev ? ev : (IE._mods || {});
@@ -885,7 +891,7 @@ function ieAmostrarCor(doc, p, todas) {
     return ieRgbHex(d[0], d[1], d[2]);
 }
 const IE_CONTAGOTAS = {
-    nome: 'Conta-gotas', tecla: 'I', icone: 'dropper', cursor: 'crosshair',
+    nome: 'Conta-gotas', tecla: 'I', icone: 'dropper', cursor: () => ieCursorContagotas(),
     down(p, ev, doc) { this.move(p, ev, doc); },
     move(p, ev, doc) {
         if (!IE.ponteiro) return;

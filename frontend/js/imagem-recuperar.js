@@ -185,7 +185,22 @@ const IE_REMENDO = {
             await ieRecAplicar(doc, L, m, { modo: 'curar', dx: -dx, dy: -dy, difusao: o.difusao, nome: 'Remendo' });
         } else await ieRecAplicar(doc, L, doc.sel.c, { modo: 'curar', dx, dy, difusao: o.difusao, nome: 'Remendo' });
     },
-    sobre(ctx, doc) { IE_LACO.sobre(ctx, doc); },
+    // prévia ao arrastar, como no Photoshop: Origem = a área boa (sob a seleção arrastada) aparece no lugar do defeito;
+    // Destino = o conteúdo da seleção aparece onde vai cair
+    sobre(ctx, doc) {
+        const r = IE.remendo;
+        if (r && doc.sel && doc.sel.bbox && doc.comp && (Math.round(r.dx) || Math.round(r.dy))) {
+            const b = doc.sel.bbox, dx = Math.round(r.dx), dy = Math.round(r.dy), destino = IE.op.remendo.sentido === 'destino';
+            const n = ieCanvas(b.w, b.h), x = ieCtx(n);
+            x.drawImage(doc.sel.c, b.x, b.y, b.w, b.h, 0, 0, b.w, b.h);
+            x.globalCompositeOperation = 'source-in';
+            x.drawImage(doc.comp, destino ? -b.x : -(b.x + dx), destino ? -b.y : -(b.y + dy));
+            const s = ieDocTela(b.x + (destino ? dx : 0), b.y + (destino ? dy : 0), doc);
+            ctx.save(); ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(n, s.x, s.y, b.w * doc.zoom, b.h * doc.zoom); ctx.restore();
+        }
+        IE_LACO.sobre(ctx, doc);
+    },
 };
 
 // ─────────────────────────── Laço magnético ───────────────────────────

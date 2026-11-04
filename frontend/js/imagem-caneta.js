@@ -3,18 +3,23 @@
 // Caneta (P): clique = ponto de canto; clicar e arrastar = ponto suave (alças simétricas); clicar no 1º ponto fecha;
 //   Shift = 45°; Alt sobre o último ponto = quebra a alça de saída (arrastar puxa só ela); Alt sobre um ponto =
 //   Converter ponto (clique: canto; arrastar: puxa alças); Alt sobre alça = move só ela; Ctrl = Seleção direta
-//   temporária; Adicionar/excluir automaticamente (sobre um segmento adiciona, sobre um ponto exclui); Elástico;
-//   Enter/Esc termina; Backspace apaga o último ponto. Modo Demarcador ou Forma (camada de forma vetorial editável).
+//   temporária (Ctrl+clique fora termina a linha); Adicionar/excluir automaticamente (sobre um segmento adiciona, sobre
+//   um ponto exclui); Elástico; no arraste, Alt quebra a alça e Espaço reposiciona a âncora; clicar na ponta de um
+//   aberto continua ele, e na ponta de outro aberto une os dois; Ctrl+Z volta pontos e a caneta continua dali (cada
+//   passo do histórico guarda a linha em andamento); setas empurram os pontos selecionados.
+//   Enter/Esc termina; Backspace apaga o último ponto. Modo Demarcador ou Forma (camada de forma vetorial editável;
+//   Operação "Nova camada" = cada forma nova em outra camada). Forma redesenhada uma vez por quadro, só na caixa dela.
 // Caneta de forma livre (com Magnética: o traço gruda na borda mais forte), Adicionar/Excluir/Converter ponto.
 // Seleção de demarcador (A, seta preta: o subdemarcador inteiro; Alt+arrastar duplica) e Seleção direta (A, seta
-// branca: pontos e alças; arrastar no vazio seleciona pontos; Delete apaga). Painel Demarcadores: demarcador de
+// branca: pontos e alças; arrastar um segmento curvo entorta a curva; arrastar no vazio seleciona pontos; Delete apaga;
+// Ctrl troca uma seta pela outra). Painel Demarcadores: demarcador de
 // trabalho, salvar, Preencher, Traçar com o pincel, Carregar como seleção (Ctrl+Enter), Demarcador da seleção, Máscara.
 // Modelo: doc.dems = [{id, nome, trabalho, subs: [{pts: [{x, y, i: [x,y]|null, o: [x,y]|null}], fechado, op}]}],
 // doc.demAtivo = id; camada de forma: L.tipo = 'forma', L.vet = {subs, cor} (redesenhada a cada edição).
 // =========================================================
 
 Object.assign(IE.op, {
-    caneta: { modo: 'demarcador', op: 'somar', auto: true, elastico: true, cor: '#3d7bff' },
+    caneta: { modo: 'demarcador', op: 'nova', auto: true, elastico: true, cor: '#3d7bff' },   // 'nova' = Nova camada (no Demarcador vale Combinar)
     canetaLivre: { modo: 'demarcador', magnetica: false, ajuste: 2, largura: 10 },
 });
 Object.assign(IE_ICONES, {
@@ -86,23 +91,51 @@ function ieDemAlvo(doc, criar = false) {
     }
     return d;
 }
+// a camada de forma é redesenhada no máximo uma vez por quadro (o mouse manda vários movimentos por quadro; antes cada
+// um redesenhava a forma inteira: ~250 ms por movimento num documento 4000×5000); o histórico e o desfazer descarregam antes
+const IE_DEM_PEND = new Map();
+let ieDemRaf = 0;
 function ieDemMudou(doc, alvo) {
-    if (alvo && alvo.L) ieFormaRender(alvo.L);
+    if (alvo && alvo.L) IE_DEM_PEND.set(alvo.L, doc);
     doc.sujo = true;
-    ieDesenharSobre();
-    ieJanAtualizar?.('doc');
+    if (!ieDemRaf) ieDemRaf = requestAnimationFrame(ieDemDescarregar);
 }
+function ieDemDescarregar() {
+    if (ieDemRaf) cancelAnimationFrame(ieDemRaf);
+    ieDemRaf = 0;
+    const pend = [...IE_DEM_PEND]; IE_DEM_PEND.clear();
+    for (const [L, doc] of pend) if (L.vet) ieFormaRender(L, doc);
+    ieDesenharSobre();
+    // painéis (Demarcadores refaz as miniaturas no tamanho do documento) só ao soltar o mouse
+    if (IE.ponteiro) IE._demJanPend = true; else ieJanAtualizar?.('doc');
+}
+document.addEventListener('pointerup', () => setTimeout(() => { if (IE._demJanPend && !IE.ponteiro) { IE._demJanPend = false; ieJanAtualizar?.('doc'); } }, 0), true);
 
-// camada de forma vetorial: preenchimento da cor com o demarcador (regra de preenchimento por operação)
+// caixa do demarcador pelos pontos e alças (a curva nunca sai do polígono de controle)
+function ieDemCaixa(subs) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const v = (x, y) => { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; };
+    for (const s of subs) for (const q of s.pts) { v(q.x, q.y); if (q.i) v(q.i[0], q.i[1]); if (q.o) v(q.o[0], q.o[1]); }
+    return x1 < x0 ? null : ieRInt({ x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) });   // arredondar para fora já cobre a borda suavizada
+}
+const IE_DEM_OPS = { somar: 'source-over', subtrair: 'destination-out', inter: 'destination-in', excluir: 'xor' };
+// camada de forma vetorial: preenche direto só a caixa da forma (sem máscara do tamanho do documento nem varrer os pixels)
 function ieFormaRender(L, doc = IE.doc) {
     const R0 = ieRCamada(L);
-    const c = ieDemMascara(doc, L.vet.subs);
-    if (!c) { L.c = null; ieInvalidar(L); ieCamadaMudou(L, R0); return; }
-    const b = ieLimites(c);
-    const n = ieCanvas(Math.max(1, b ? b.w : 1), Math.max(1, b ? b.h : 1)), x = ieCtx(n);
-    if (b) { x.drawImage(c, -b.x, -b.y); x.globalCompositeOperation = 'source-in'; x.fillStyle = L.vet.cor || '#000'; x.fillRect(0, 0, n.width, n.height); }
-    L.c = n; L.x = b ? b.x : 0; L.y = b ? b.y : 0; L.sujoPx = true;
+    const subs = (L.vet.subs || []).filter(s => s.pts.length > 1);
+    const b = subs.length ? ieRInter(ieDemCaixa(subs), ieRDoc(doc)) : null;
+    if (!b) { L.c = null; ieInvalidar(L); ieCamadaMudou(L, R0); return; }
+    const n = ieCanvas(b.w, b.h), x = ieCtx(n);
+    x.translate(-b.x, -b.y);
+    x.fillStyle = L.vet.cor || '#000';
+    for (const s of subs) {
+        x.globalCompositeOperation = IE_DEM_OPS[s.op] || 'source-over';
+        x.beginPath(); ieDemTracar(x, { ...s, fechado: true }, (a, c) => [a, c]); x.fill();
+    }
+    L.c = n; L.x = b.x; L.y = b.y; L.sujoPx = true;
     ieInvalidar(L); ieCamadaMudou(L, R0);
+    // a caixa já é conhecida: a barra contextual não varre os pixels da forma a cada quadro (ieCaixaCamada)
+    L._caixa = { v: L._v, c: n, x: b.x, y: b.y, R: { ...b } };
 }
 // demarcador → máscara do tamanho do documento (operações dos subdemarcadores na ordem, como o Photoshop)
 function ieDemMascara(doc, subs) {
@@ -112,7 +145,7 @@ function ieDemMascara(doc, subs) {
         if (s.pts.length < 2) continue;
         const t = ieCanvas(doc.w, doc.h), tx = ieCtx(t);
         tx.fillStyle = '#fff'; tx.beginPath(); ieDemTracar(tx, { ...s, fechado: true }, (a, b) => [a, b]); tx.fill();
-        x.globalCompositeOperation = { somar: 'source-over', subtrair: 'destination-out', inter: 'destination-in', excluir: 'xor' }[s.op || 'somar'] || 'source-over';
+        x.globalCompositeOperation = IE_DEM_OPS[s.op] || 'source-over';
         x.drawImage(t, 0, 0);
     }
     return c;
@@ -153,7 +186,7 @@ function ieCanetaFixar(alvo, sub) { IE.canetaRef = sub ? { chave: ieCanetaChave(
 // cursor da caneta como no Photoshop (bico com o sinal da ação); CapsLock = cruz de precisão
 function ieCanetaCursorSvg(sinal) {
     const marca = { mais: '<path d="M17 3v6M14 6h6"/>', menos: '<path d="M14 6h6"/>', fechar: '<circle cx="17" cy="6" r="2.6"/>', novo: '<path d="M14.5 3.5l5 5M19.5 3.5l-5 5"/>',
-        converter: '<path d="M14 9l3-6 3 6"/>' }[sinal] || '';
+        converter: '<path d="M14 9l3-6 3 6"/>', retomar: '<path d="M15 9l4-6"/>', unir: '<path d="M14 6h3"/><circle cx="19" cy="6" r="1.8"/>' }[sinal] || '';
     const bico = '<path d="M3 21l2.2-7.5L13 6l5 5-7.5 7.8z"/><path d="M3 21l5.6-5.6"/><circle cx="9.6" cy="14.4" r="1.4"/>';
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke-linecap="round" stroke-linejoin="round"><g stroke="#fff" stroke-width="3.2">${bico}${marca}</g><g stroke="#000" stroke-width="1.3">${bico}${marca}</g></svg>`;
     return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 3 21, crosshair`;
@@ -164,26 +197,43 @@ function ie45(p0, p) {   // Shift: ângulo em passos de 45°
 }
 
 // ─────────────────────────── Caneta ───────────────────────────
+// ponta de um subdemarcador aberto (a caneta retoma ou une por ela, como no Photoshop)
+function iePontaAberta(h) { return h && h.tipo === 'ponto' && !h.sub.fechado && h.sub.pts.length > 0 && (h.pt === h.sub.pts[0] || h.pt === h.sub.pts[h.sub.pts.length - 1]); }
+function ieDemInverter(sub) { sub.pts.reverse(); for (const q of sub.pts) [q.i, q.o] = [q.o, q.i]; }
+function ieCanetaNovaForma(doc) {
+    const L = ieNovaCamada(doc, { tipo: 'forma', nome: ieNomeLivre(doc, ieT('Forma')), vet: { subs: [], cor: IE.op.caneta.cor }, sujoPx: true });
+    ieInserirAcima(doc, L, ieAtiva(doc)); ieAtivar(L.id, doc); IE.canetaRef = null;
+    return { subs: L.vet.subs, L };
+}
 const IE_CANETA = {
     nome: 'Caneta', tecla: 'P', icone: 'pen', cursor: () => IE._canetaCursor || 'crosshair',
     ativar() { IE.demSel = IE.demSel || { subs: new Set(), pts: new Set() }; },
     down(p, ev, doc) {
-        if (ev.ctrlKey) return IE_SEL_DIRETA.down(p, ev, doc);
-        const forma = IE.op.caneta.modo === 'forma';
+        const o = IE.op.caneta, forma = o.modo === 'forma';
         let alvo = ieDemAlvo(doc);
-        if (forma && !(alvo && alvo.L)) {   // modo Forma: a primeira âncora cria a camada de forma
-            const L = ieNovaCamada(doc, { tipo: 'forma', nome: ieNomeLivre(doc, ieT('Forma')), vet: { subs: [], cor: IE.op.caneta.cor }, sujoPx: true });
-            ieInserirAcima(doc, L, ieAtiva(doc)); ieAtivar(L.id, doc); IE.canetaRef = null;
-            alvo = { subs: L.vet.subs, L };
-        }
+        let cur = alvo && ieCanetaCur(doc, alvo);
+        let h = alvo && ieDemAcertar(doc, alvo, p, { inicio: cur && cur.pts.length > 1 ? cur.pts[0] : null });
+        // modo Forma: a primeira âncora cria a camada de forma; com "Nova camada", cada forma nova vai para outra camada
+        // (clicar no contorno da forma ativa ainda edita ela)
+        if (forma && !cur && (!(alvo && alvo.L) || (o.op === 'nova' && !h))) { alvo = ieCanetaNovaForma(doc); cur = null; h = null; }
         if (!alvo) alvo = ieDemAlvo(doc, true);
-        const cur = ieCanetaCur(doc, alvo);
-        const h = ieDemAcertar(doc, alvo, p, { inicio: cur && cur.pts.length > 1 ? cur.pts[0] : null });
         if (cur && h && h.tipo === 'ponto' && h.pt === cur.pts[0] && cur.pts.length > 1) {   // fechar
             cur.fechado = true; IE.canetaArr = { tipo: 'fechar', pt: cur.pts[0], alvo }; IE.canetaUlt = cur.pts[0]; return;
         }
         if (cur && h && h.tipo === 'ponto' && h.pt === cur.pts[cur.pts.length - 1] && ev.altKey) {   // quebrar a alça de saída
             h.pt.o = null; IE.canetaArr = { tipo: 'saida', pt: h.pt, alvo }; return;
+        }
+        if (cur && iePontaAberta(h) && h.sub !== cur && !ev.altKey) {   // unir: a linha em andamento encosta na ponta de outra aberta
+            if (h.pt !== h.sub.pts[0]) ieDemInverter(h.sub);
+            cur.pts.push(...h.sub.pts);
+            alvo.subs.splice(alvo.subs.indexOf(h.sub), 1);
+            IE.canetaRef = null; IE.canetaUlt = h.pt; IE.demSel = { subs: new Set([cur]), pts: new Set() };
+            ieDemMudou(doc, alvo); ieHist(ieT('Unir demarcadores')); return;
+        }
+        if (!cur && iePontaAberta(h) && !ev.altKey) {   // retomar um demarcador aberto pela ponta (arrastar puxa a alça de saída)
+            if (h.pt === h.sub.pts[0] && h.sub.pts.length > 1) ieDemInverter(h.sub);
+            ieCanetaFixar(alvo, h.sub); IE.canetaUlt = h.pt; IE.demSel = { subs: new Set([h.sub]), pts: new Set() };
+            IE.canetaArr = { tipo: 'retomar', pt: h.pt, alvo }; ieDesenharSobre(); return;
         }
         if (ev.altKey && h && h.tipo === 'alca') { IE.canetaArr = { tipo: 'alca', pt: h.pt, lado: h.lado, alvo }; return; }
         if (ev.altKey && h && h.tipo === 'ponto') {   // Converter ponto
@@ -199,36 +249,46 @@ const IE_CANETA = {
             ieDemMudou(doc, alvo); ieHist(ieT('Adicionar ponto de ancoragem')); return;
         }
         let sub = cur;
-        if (!sub) { sub = { pts: [], fechado: false, op: IE.op.caneta.op }; alvo.subs.push(sub); ieCanetaFixar(alvo, sub); IE.demSel = { subs: new Set([sub]), pts: new Set() }; }
+        if (!sub) { sub = { pts: [], fechado: false, op: o.op === 'nova' ? 'somar' : o.op }; alvo.subs.push(sub); ieCanetaFixar(alvo, sub); IE.demSel = { subs: new Set([sub]), pts: new Set() }; }
         const ult = sub.pts[sub.pts.length - 1];
         const q = ev.shiftKey && ult ? ie45([ult.x, ult.y], p) : p;
         const pt = { x: q.x, y: q.y, i: null, o: null };
         sub.pts.push(pt);
         IE.canetaUlt = pt;
-        IE.canetaArr = { tipo: 'novo', pt, alvo };
+        IE.canetaArr = { tipo: 'novo', pt, alvo, ult: { x: p.x, y: p.y } };
         ieDemMudou(doc, alvo);
     },
     move(p, ev, doc) {
         const a = IE.canetaArr;
-        if (!a) return IE.canetaDir ? IE_SEL_DIRETA.move(p, ev, doc) : undefined;
+        if (!a) return;
         const pt = a.pt;
+        // Espaço segurado enquanto arrasta: reposiciona a âncora (com as alças), como no Photoshop
+        if (IE.espaco && a.ult && (a.tipo === 'novo' || a.tipo === 'converter')) {
+            const dx = p.x - a.ult.x, dy = p.y - a.ult.y;
+            pt.x += dx; pt.y += dy;
+            if (pt.i) pt.i = [pt.i[0] + dx, pt.i[1] + dy];
+            if (pt.o) pt.o = [pt.o[0] + dx, pt.o[1] + dy];
+            a.ult = { x: p.x, y: p.y }; a.mudou = true; ieDemMudou(doc, a.alvo); return;
+        }
+        if (a.ult) a.ult = { x: p.x, y: p.y };
         let q = ev.shiftKey ? ie45([pt.x, pt.y], p) : p;
-        if (Math.hypot(q.x - pt.x, q.y - pt.y) * doc.zoom < 2) return;
+        if (!a.mudou && Math.hypot(q.x - pt.x, q.y - pt.y) * doc.zoom < 2) return;
         const esp = [2 * pt.x - q.x, 2 * pt.y - q.y];
-        if (a.tipo === 'novo' || a.tipo === 'converter') { pt.o = [q.x, q.y]; pt.i = esp; }
-        else if (a.tipo === 'fechar') { pt.i = esp; pt.o = [q.x, q.y]; }   // arrastar ao fechar: alças do 1º ponto
-        else if (a.tipo === 'saida') pt.o = [q.x, q.y];
+        // Alt no meio do arraste: só a alça de saída segue o mouse (a de entrada fica onde estava)
+        if (a.tipo === 'novo' || a.tipo === 'converter') { pt.o = [q.x, q.y]; if (!ev.altKey || !pt.i) pt.i = esp; }
+        else if (a.tipo === 'fechar') { if (!ev.altKey || !pt.i) pt.i = esp; pt.o = [q.x, q.y]; }   // arrastar ao fechar: alças do 1º ponto
+        else if (a.tipo === 'saida' || a.tipo === 'retomar') pt.o = [q.x, q.y];
         else if (a.tipo === 'alca') pt[a.lado] = [q.x, q.y];
         a.mudou = true;
         ieDemMudou(doc, a.alvo);
     },
     up(p, ev, doc) {
-        if (IE.canetaDir) return IE_SEL_DIRETA.up(p, ev, doc);
         const a = IE.canetaArr;
         IE.canetaArr = null;
         if (!a) return;
         if (a.tipo === 'fechar') IE.canetaRef = null;
-        ieHist(ieT({ novo: 'Ponto de ancoragem', fechar: 'Fechar demarcador', converter: 'Converter ponto', saida: 'Converter ponto', alca: 'Mover alça' }[a.tipo] || 'Caneta'));
+        if (a.tipo === 'retomar' && !a.mudou) { ieDesenharSobre(); return; }
+        ieHist(ieT({ novo: 'Ponto de ancoragem', fechar: 'Fechar demarcador', converter: 'Converter ponto', saida: 'Converter ponto', retomar: 'Converter ponto', alca: 'Mover alça' }[a.tipo] || 'Caneta'));
     },
     hover(p, ev, doc) {
         const alvo = ieDemAlvo(doc), cur = alvo && ieCanetaCur(doc, alvo);
@@ -238,12 +298,16 @@ const IE_CANETA = {
         if (ev.ctrlKey) sinal = 'seta';
         else if (IE.canetaFecha) sinal = 'fechar';   // caneta com ○: clicar fecha
         else if (ev.altKey && h) sinal = 'converter';
+        else if (iePontaAberta(h) && h.sub !== cur) sinal = cur ? 'unir' : 'retomar';   // caneta com / (retomar) ou ⊸ (unir)
         else if (IE.op.caneta.auto && h && h.tipo === 'segmento') sinal = 'mais';
         else if (IE.op.caneta.auto && !cur && h && h.tipo === 'ponto') sinal = 'menos';
         IE._canetaCursor = sinal === 'seta' ? 'default' : ev.getModifierState && ev.getModifierState('CapsLock') ? 'crosshair' : ieCanetaCursorSvg(sinal);
-        ieDesenharSobre();
+        ieDemSobrePedir();
     },
 };
+// desenho por cima no próximo quadro (o mouse parado em cima não redesenha a tela a cada evento)
+let ieDemSobreRaf = 0;
+function ieDemSobrePedir() { if (!ieDemSobreRaf) ieDemSobreRaf = requestAnimationFrame(() => { ieDemSobreRaf = 0; ieDesenharSobre(); }); }
 
 // ─────────────────────────── Caneta de forma livre (e Magnética) ───────────────────────────
 function ieDemSimplificar(pts, tol) {   // Ramer-Douglas-Peucker
@@ -311,7 +375,7 @@ const IE_CANETA_LIVRE = {
         const fechado = Math.hypot(a[0] - b[0], a[1] - b[1]) * doc.zoom < 12;
         const pts = ieDemSimplificar(fechado ? l.pts.slice(0, -1) : l.pts, Math.max(0.5, o.ajuste));
         const alvo = ieDemAlvo(doc, true);
-        alvo.subs.push({ pts: ieDemDePontos(pts, fechado), fechado, op: IE.op.caneta.op });
+        alvo.subs.push({ pts: ieDemDePontos(pts, fechado), fechado, op: IE.op.caneta.op === 'nova' ? 'somar' : IE.op.caneta.op });
         ieDemMudou(doc, alvo); ieHist(ieT('Caneta de forma livre'));
     },
     sobre(ctx, doc) {
@@ -368,9 +432,16 @@ const IE_SEL_DIRETA = {
             if (ev.shiftKey) { sel.pts.has(h.pt) ? sel.pts.delete(h.pt) : sel.pts.add(h.pt); }
             else if (!sel.pts.has(h.pt)) sel.pts = new Set([h.pt]);
             sel.subs = new Set([h.sub]);
-        } else if (h && h.tipo === 'segmento') {   // segmento: as duas pontas
-            if (!ev.shiftKey) sel.pts = new Set();
-            sel.pts.add(h.sub.pts[h.a]); sel.pts.add(h.sub.pts[h.b]); sel.subs = new Set([h.sub]);
+        } else if (h && h.tipo === 'segmento') {
+            const A = h.sub.pts[h.a], B = h.sub.pts[h.b];
+            if ((A.o || B.i) && !ev.shiftKey) {   // segmento curvo: arrastar entorta a curva (como no Photoshop)
+                sel.pts = new Set([A, B]); sel.subs = new Set([h.sub]);
+                const lisa = q => q.i && q.o && Math.abs(Math.abs(Math.atan2(q.i[1] - q.y, q.i[0] - q.x) - Math.atan2(q.o[1] - q.y, q.o[0] - q.x)) - Math.PI) < 0.05;
+                IE.demArr = { curva: { A, B, t: Math.min(0.95, Math.max(0.05, h.t)), o0: [...(A.o || [A.x, A.y])], i0: [...(B.i || [B.x, B.y])], lisaA: lisa(A), lisaB: lisa(B) }, p0: { x: p.x, y: p.y }, alvo };
+                ieDesenharSobre(); return;
+            }
+            if (!ev.shiftKey) sel.pts = new Set();   // segmento reto: as duas pontas
+            sel.pts.add(A); sel.pts.add(B); sel.subs = new Set([h.sub]);
         } else {
             if (!ev.shiftKey) sel.pts = new Set();
             IE.demArr = { caixa: { x0: p.x, y0: p.y, x1: p.x, y1: p.y }, alvo };
@@ -381,7 +452,20 @@ const IE_SEL_DIRETA = {
     },
     move(p, ev, doc) {
         const a = IE.demArr; if (!a) return;
-        if (a.caixa) { a.caixa.x1 = p.x; a.caixa.y1 = p.y; ieDesenharSobre(); return; }
+        if (a.caixa) { a.caixa.x1 = p.x; a.caixa.y1 = p.y; ieDemSobrePedir(); return; }
+        if (a.curva) {   // pesos do arraste de curva do Inkscape: o ponto agarrado acompanha o mouse
+            const { A, B, t, o0, i0 } = a.curva, d = [p.x - a.p0.x, p.y - a.p0.y];
+            const w = t <= 1 / 6 ? 0 : t <= 0.5 ? Math.pow((6 * t - 1) / 2, 3) / 2 : t <= 5 / 6 ? (1 - Math.pow((6 * (1 - t) - 1) / 2, 3)) / 2 + 0.5 : 1;
+            const k0 = (1 - w) / (3 * t * (1 - t) * (1 - t)), k1 = w / (3 * t * t * (1 - t));
+            A.o = [o0[0] + d[0] * k0, o0[1] + d[1] * k0]; B.i = [i0[0] + d[0] * k1, i0[1] + d[1] * k1];
+            const alinhar = (q, novo, outro) => {   // ponto suave continua suave: a outra alça gira junto
+                const r = Math.hypot(q[outro][0] - q.x, q[outro][1] - q.y), ang = Math.atan2(q.y - q[novo][1], q.x - q[novo][0]);
+                q[outro] = [q.x + Math.cos(ang) * r, q.y + Math.sin(ang) * r];
+            };
+            if (a.curva.lisaA) alinhar(A, 'o', 'i');
+            if (a.curva.lisaB) alinhar(B, 'i', 'o');
+            a.mudou = true; ieDemMudou(doc, a.alvo); return;
+        }
         if (a.alca) {
             const { pt, lado } = a.alca, outro = lado === 'i' ? 'o' : 'i';
             const q = ev.shiftKey ? ie45([pt.x, pt.y], p) : p;
@@ -405,7 +489,7 @@ const IE_SEL_DIRETA = {
             for (const s of (a.alvo ? a.alvo.subs : [])) for (const q of s.pts) if (q.x >= x0 && q.x <= x1 && q.y >= y0 && q.y <= y1) { IE.demSel.pts.add(q); IE.demSel.subs.add(s); }
             ieDesenharSobre(); return;
         }
-        if (a.mudou) ieHist(ieT(a.alca ? 'Mover alça' : 'Mover ponto de ancoragem'));
+        if (a.mudou) ieHist(ieT(a.alca ? 'Mover alça' : a.curva ? 'Modificar segmento' : 'Mover ponto de ancoragem'));
     },
     sobre(ctx, doc) {
         const a = IE.demArr;
@@ -468,7 +552,7 @@ function ieDemDesenhar(ctx, doc) {
                     ctx.strokeStyle = '#2f6fff'; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke();
                     ctx.fillStyle = '#2f6fff'; ctx.beginPath(); ctx.arc(b[0], b[1], 3, 0, Math.PI * 2); ctx.fill();
                 }
-                if (!ativo && ferr !== 'selDireta') continue;
+                if (!ativo && ferr !== 'selDireta' && !IE._demCtrl) continue;   // Ctrl segurado: todos os pontos, para agarrar
                 const [x, y] = T(q.x, q.y);
                 ctx.fillStyle = sel.pts.has(q) || ferr === 'selCaminho' ? '#2f6fff' : '#ffffff';
                 ctx.strokeStyle = '#2f6fff';
@@ -613,6 +697,75 @@ function ieDemFormaDeCamada(doc) {   // "Criar: Forma" — o demarcador vira cam
 }
 
 Object.assign(IE_FERR, { caneta: IE_CANETA, canetaLivre: IE_CANETA_LIVRE, pontoAdd: IE_PONTO_ADD, pontoDel: IE_PONTO_DEL, pontoConv: IE_PONTO_CONV, selCaminho: IE_SEL_CAMINHO, selDireta: IE_SEL_DIRETA });
+
+// Ctrl como no Photoshop: com a caneta e os pontos vira a Seleção direta (agarra ponto, alça ou segmento, sem largar a
+// caneta); nas setas troca uma pela outra. Antes o Ctrl caía na ferramenta Mover e arrastava a camada inteira.
+const IE_DEM_FAMILIA = ['caneta', 'canetaLivre', 'pontoAdd', 'pontoDel', 'pontoConv', 'selCaminho', 'selDireta'];
+if (typeof IE_SEM_CTRL_MOVER !== 'undefined') IE_SEM_CTRL_MOVER.push(...IE_DEM_FAMILIA);
+{
+    const orig = Object.fromEntries(IE_DEM_FAMILIA.map(n => [n, IE_FERR[n].down]));
+    for (const n of IE_DEM_FAMILIA) {
+        const F = IE_FERR[n], destino = n === 'selDireta' ? 'selCaminho' : 'selDireta';
+        F.down = function (p, ev, doc) {
+            if (!ev.ctrlKey || ev.altKey) return orig[n].call(this, p, ev, doc);
+            if (IE.ponteiro) IE.ponteiro.f = IE_FERR[destino];   // o resto do arraste vai para a seleção
+            if (n === 'caneta' || n === 'pontoAdd') {   // Ctrl+clique fora do demarcador: termina a linha aberta
+                const alvo = ieDemAlvo(doc);
+                if (!alvo || !ieDemAcertar(doc, alvo, p)) { IE.canetaRef = null; IE.canetaUlt = null; }
+            }
+            return orig[destino].call(IE_FERR[destino], p, ev, doc);
+        };
+    }
+    const ctrl = ev => {
+        const v = ev.ctrlKey && IE_DEM_FAMILIA.includes(IE.ferr) && !!document.querySelector('#page-editor-imagem.active');
+        if (v !== !!IE._demCtrl) { IE._demCtrl = v; ieDemSobrePedir(); }
+    };
+    document.addEventListener('keydown', ctrl, true);
+    document.addEventListener('keyup', ctrl, true);
+    window.addEventListener('blur', () => { IE._demCtrl = false; });
+}
+
+// Ctrl+Z / Ctrl+Shift+Z: cada passo lembra a linha que a caneta estava desenhando; voltar um ponto (ou desfazer o fechar)
+// deixa a caneta continuar dali. O histórico e o desfazer descarregam a forma pendente do quadro.
+(function () {
+    const hist0 = ieHist, ir0 = ieIrHist;
+    ieHist = function (nome, doc = IE.doc) {
+        if (IE_DEM_PEND.size) ieDemDescarregar();
+        const r = hist0(nome, doc);
+        const it = doc && doc.hist.itens[doc.hist.i];
+        if (it) it.caneta = IE.canetaRef ? { ...IE.canetaRef } : null;
+        return r;
+    };
+    ieIrHist = function (i, doc = IE.doc) {
+        IE_DEM_PEND.clear();
+        IE.canetaArr = null; IE.demArr = null;
+        const antes = doc && doc.hist.i;
+        const r = ir0(i, doc);
+        if (!doc || doc.hist.i === antes) return r;
+        const it = doc.hist.itens[doc.hist.i];
+        IE.canetaRef = it && it.caneta ? { ...it.caneta } : null;
+        IE.canetaUlt = null;
+        const alvo = ieDemAlvo(doc), cur = alvo && ieCanetaCur(doc, alvo);
+        IE.demSel = { subs: new Set(cur ? [cur] : []), pts: new Set() };
+        ieDesenharSobre();
+        return r;
+    };
+})();
+
+// setas com a Seleção direta/de demarcador (ou a caneta com pontos selecionados): empurram os pontos 1 px (Shift: 10)
+document.addEventListener('keydown', ev => {
+    const doc = IE.doc;
+    if (!doc || !ev.key.startsWith('Arrow') || ev.ctrlKey || ev.altKey || ev.metaKey || IE.transf || /INPUT|TEXTAREA|SELECT/.test(ev.target.tagName)) return;
+    if (!IE_DEM_FAMILIA.includes(IE.ferr) || !document.querySelector('#page-editor-imagem.active')) return;
+    const alvo = ieDemAlvo(doc), pts = IE.demSel?.pts;
+    if (!alvo || !pts || !pts.size) return;
+    ev.preventDefault(); ev.stopPropagation();
+    const s = ev.shiftKey ? 10 : 1, dx = ev.key === 'ArrowLeft' ? -s : ev.key === 'ArrowRight' ? s : 0, dy = ev.key === 'ArrowUp' ? -s : ev.key === 'ArrowDown' ? s : 0;
+    for (const q of pts) { q.x += dx; q.y += dy; if (q.i) q.i = [q.i[0] + dx, q.i[1] + dy]; if (q.o) q.o = [q.o[0] + dx, q.o[1] + dy]; }
+    ieDemMudou(doc, alvo);
+    clearTimeout(IE._demEmpT);
+    IE._demEmpT = setTimeout(() => ieHist(ieT('Empurrar ponto de ancoragem'), doc), 400);
+}, true);
 {
     const i = IE_FERR_ORDEM.indexOf('texto');
     IE_FERR_ORDEM.splice(i, 0, 'caneta', 'canetaLivre', 'pontoAdd', 'pontoDel', 'pontoConv');
@@ -649,9 +802,9 @@ function ieOpcoesCaneta(f) {
         if (o.modo === 'forma') h += `<label class="ie-op-campo">${ieT('Preenchimento')} <button class="ie-cor ie-op-cor" onclick="ieSeletorCor(this, IE.op.caneta.cor, c => { IE.op.caneta.cor = c; this.style.background = c; const L = ieAtiva(IE.doc); if (L && L.vet) { L.vet.cor = c; ieFormaRender(L); ieHist(ieT('Cor da forma')); } })" style="background:${o.cor}"></button></label>`;
         h += `<i class="ie-op-sep"></i><span class="ie-op-dica">${ieT('Criar:')}</span>` +
             `<button class="ie-btn ie-btn-mini" onclick="ieCmd('demSelecao')">${ieT('Seleção...')}</button><button class="ie-btn ie-btn-mini" onclick="ieCmd('demMascara')">${ieT('Máscara')}</button><button class="ie-btn ie-btn-mini" onclick="ieCmd('demForma')">${ieT('Forma')}</button>` +
-            `<i class="ie-op-sep"></i><label class="ie-op-campo">${ieT('Operação')} <select data-k="op" data-o="caneta">${[['somar', 'Combinar formas'], ['subtrair', 'Subtrair forma da frente'], ['inter', 'Interseção de áreas'], ['excluir', 'Excluir formas sobrepostas']].map(([v, r]) => `<option value="${v}" ${o.op === v ? 'selected' : ''}>${ieT(r)}</option>`).join('')}</select></label>`;
+            `<i class="ie-op-sep"></i><label class="ie-op-campo">${ieT('Operação')} <select data-k="op" data-o="caneta">${[...(o.modo === 'forma' ? [['nova', 'Nova camada']] : []), ['somar', 'Combinar formas'], ['subtrair', 'Subtrair forma da frente'], ['inter', 'Interseção de áreas'], ['excluir', 'Excluir formas sobrepostas']].map(([v, r]) => `<option value="${v}" ${o.op === v ? 'selected' : ''}>${ieT(r)}</option>`).join('')}</select></label>`;
         if (f === 'caneta') h += ieChk('Adicionar/excluir automaticamente', 'auto', 'caneta') + ieChk('Elástico', 'elastico', 'caneta') +
-            `<span class="ie-op-dica">${ieT('Clique: canto · arrastar: curva · Alt: converter · Ctrl: seleção direta · Enter/Esc termina · Ctrl+Enter: seleção')}</span>`;
+            `<span class="ie-op-dica">${ieT('Clique: canto · arrastar: curva (Alt: quebra a alça, Espaço: reposiciona) · clicar na ponta de um aberto: continua · Alt: converter · Ctrl: seleção direta (arrastar segmento entorta) · setas empurram · Enter/Esc termina · Ctrl+Enter: seleção')}</span>`;
         else h += ieChk('Magnética', 'magnetica', 'canetaLivre') + ieNum('Ajuste de curva', 'ajuste', 'canetaLivre', 0.5, 10, 0.5, ' px') + ieNum('Largura', 'largura', 'canetaLivre', 1, 64, 1, ' px');
         return h;
     }

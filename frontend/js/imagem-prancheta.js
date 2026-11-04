@@ -253,7 +253,9 @@ document.addEventListener('pointermove', ev => {
     };
     // a régua acompanha o cursor
     const st = ieStatusMouse;
-    ieStatusMouse = function (...a) { const r = st.apply(this, a); try { if (ieReguas()) ieReguasDesenhar(); } catch (e) { /* sem régua */ } return r; };
+    // uma vez por quadro: a cada movimento do mouse forçava o layout (clientWidth) e custava ~6 ms por movimento
+    const quadro = () => { IE._reguaRaf = 0; try { if (ieReguas()) ieReguasDesenhar(); } catch (e) { /* sem régua */ } };
+    ieStatusMouse = function (...a) { const r = st.apply(this, a); if (!IE._reguaRaf) IE._reguaRaf = requestAnimationFrame(quadro); return r; };
 })();
 
 // ─────────────────────────── comandos e menus ───────────────────────────

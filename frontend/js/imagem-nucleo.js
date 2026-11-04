@@ -1177,15 +1177,34 @@ function ieDesenharVistaParcial(doc, R) {
     ctx.clearRect(x0, y0, x1 - x0, y1 - y0);   // o xadrez fica por baixo, em CSS (ieVistaFundo)
     const fonte = doc._verAchatado && doc.achatadoC ? doc.achatadoC : doc.comp;
     ctx.imageSmoothingEnabled = !(Math.abs(s - 1) < 1e-3 || s >= 3 || (s > 1 && Math.abs(s - Math.round(s)) < 1e-3));
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(fonte, (x0 - dx) / kx, (y0 - dy) / ky, (x1 - x0) / kx, (y1 - y0) / ky, x0, y0, x1 - x0, y1 - y0);
+    // reduzindo com o mouse apertado: qualidade baixa (high custava ~60 ms por quadro num 4000×5000 a 22%; low ~5 ms); o
+    // ieVistaFinal redesenha tudo em alta assim que solta
+    ctx.imageSmoothingQuality = IE.ponteiro && s < 1 ? 'low' : 'high';
+    const sx = (x0 - dx) / kx, sy = (y0 - dy) / ky, sw = (x1 - x0) / kx, sh = (y1 - y0) / ky;
+    // a composição fica na CPU (willReadFrequently): desenhá-la direto na tela mandava a imagem INTEIRA para a placa a
+    // cada quadro (~75 ms num 4000×5000, mesmo mudando um pedacinho). Copia só o pedaço num retalho e manda o retalho.
+    const ix = Math.max(0, Math.floor(sx)), iy = Math.max(0, Math.floor(sy)), iw = Math.min(fonte.width, Math.ceil(sx + sw)) - ix, ih = Math.min(fonte.height, Math.ceil(sy + sh)) - iy;
+    if (iw > 0 && ih > 0 && iw * ih < fonte.width * fonte.height * 0.5) {
+        const t = ieVistaRetalho(iw, ih);
+        t.x.clearRect(0, 0, iw, ih);
+        t.x.drawImage(fonte, ix, iy, iw, ih, 0, 0, iw, ih);
+        ctx.drawImage(t.c, sx - ix, sy - iy, sw, sh, x0, y0, x1 - x0, y1 - y0);
+    } else ctx.drawImage(fonte, sx, sy, sw, sh, x0, y0, x1 - x0, y1 - y0);
     ctx.restore();
+}
+// canvas na CPU do tamanho exato do pedaço (maior mandaria sobra para a placa); na CPU, copiar da composição não sobe
+// nada e só o retalho vai para a tela
+function ieVistaRetalho(w, h, chave = '_retalho') {
+    let t = IE[chave];
+    if (!t) { t = IE[chave] = { c: document.createElement('canvas') }; t.x = t.c.getContext('2d', { willReadFrequently: true }); }
+    if (t.c.width !== w || t.c.height !== h) { t.c.width = w; t.c.height = h; }
+    return t;
 }
 // parou de mexer: redesenha a vista inteira na qualidade máxima (redução em etapas, sem emendas)
 function ieVistaFinal() {
     clearTimeout(IE._vistaT);
     IE._vistaT = setTimeout(() => {
-        if (IE.mov || IE._zAnim || performance.now() - (IE._interagindo || 0) < 140) return ieVistaFinal();
+        if (IE.mov || IE._zAnim || IE.ponteiro || performance.now() - (IE._interagindo || 0) < 140) return ieVistaFinal();   // mouse apertado: espera soltar
         IE._vistaEst = null; IE._interagindo = 0; ieDesenharVista(); ieDesenharSobre();
     }, 180);
 }
@@ -1328,10 +1347,24 @@ function ieDesenharNitido(ctx, fonte, doc, dpr) {
         return;
     }
     // zoom/rolagem em andamento: qualidade rápida (e a redução guardada mais perto); parou → ieVistaFinal refaz em alta
-    const rapido = performance.now() - (IE._interagindo || 0) < 140;
+    // mouse apertado (caneta, forma, pincel grande): a composição muda a cada quadro e refazer as reduções custava ~110 ms
+    // num 4000×5000; desenha direto em qualidade baixa e o ieVistaFinal refaz em alta ao soltar
+    const apertado = !!IE.ponteiro && fonte === doc.comp;
+    const rapido = apertado || performance.now() - (IE._interagindo || 0) < 140;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = rapido ? 'low' : 'high';
-    ctx.drawImage(rapido && s < 0.5 ? ieMipmap(fonte, doc, s * 2) : ieMipmap(fonte, doc, s), dx, dy, dw, dh);
+    if (apertado) {
+        // reduz na CPU só a parte visível, num retalho do tamanho da tela, e manda só ele (desenhar a composição direto
+        // subia os 20 MP inteiros para a placa a cada quadro: ~75 ms num 4000×5000)
+        const X0 = Math.max(dx, 0), Y0 = Math.max(dy, 0), X1 = Math.min(dx + dw, ctx.canvas.width), Y1 = Math.min(dy + dh, ctx.canvas.height);
+        if (X1 > X0 && Y1 > Y0) {
+            const kx = dw / doc.w, ky = dh / doc.h, t = ieVistaRetalho(X1 - X0, Y1 - Y0, '_retalhoVista');
+            t.x.imageSmoothingEnabled = true; t.x.imageSmoothingQuality = 'low';
+            t.x.clearRect(0, 0, X1 - X0, Y1 - Y0);
+            t.x.drawImage(fonte, (X0 - dx) / kx, (Y0 - dy) / ky, (X1 - X0) / kx, (Y1 - Y0) / ky, 0, 0, X1 - X0, Y1 - Y0);
+            ctx.drawImage(t.c, X0, Y0);
+        }
+    } else ctx.drawImage(rapido && s < 0.5 ? ieMipmap(fonte, doc, s * 2) : ieMipmap(fonte, doc, s), dx, dy, dw, dh);
     ctx.restore();
     if (rapido) ieVistaFinal();
 }

@@ -1482,7 +1482,12 @@ function ieDigitando(ev) {
 function ieTecla(ev) {
     if (!ieAtivoVisivel()) return;
     if (!ieEl('ie-modal').hidden) return;
-    if (ieDigitando(ev)) return;
+    // Alt com o mouse em cima da tela e o foco esquecido num campo numérico/lista/caixa da barra (depois de mudar o
+    // tamanho ou a opacidade): o campo solta o foco e o Alt vira conta-gotas, como no Photoshop
+    const t = ev.target, altTela = ev.key === 'Alt' && !!IE.mouse && ieDigitando(ev) && !t.isContentEditable &&
+        (t.tagName === 'SELECT' || (t.tagName === 'INPUT' && ['number', 'range', 'checkbox', 'radio', 'color', 'button'].includes(t.type)));
+    if (altTela) { t.blur(); ieEl('ie')?.focus({ preventScroll: true }); }
+    else if (ieDigitando(ev)) return;
     if (IE.edTexto) return;
     const doc = IE.doc;
     const nome = ieTeclaNome(ev);
