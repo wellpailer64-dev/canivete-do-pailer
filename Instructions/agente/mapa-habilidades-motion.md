@@ -4,6 +4,8 @@ Cada peça de motion aprovada destrava técnicas. Aqui fica O QUE funciona, COMO
 usar — para a próxima peça partir do nível em que a anterior parou. Ler antes de qualquer motion, junto da
 "Receita validada" de `plano-motion.md`. Ao terminar uma peça: anotar as habilidades novas e a nota do Pailer.
 
+Nomes de mercado de cada técnica + processo em etapas (decupar → exportar → registrar): `motion-glossario-e-processo.md`.
+
 Legenda: ⭐ = o Pailer elogiou nominalmente · 🔓 = desbloqueada (usada e aprovada) · 🔒 = próxima a destravar
 
 ## Peças que destravaram
