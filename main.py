@@ -1022,6 +1022,35 @@ def ve_layout_save(dados):
         return {"success": False, "error": str(e)}
 
 
+def _ls_path():
+    return os.path.join(os.path.dirname(_ve_layout_path()), "localstorage.json")
+
+
+def ls_load():
+    """localStorage guardado (dict chave -> texto); {} se não houver."""
+    try:
+        with open(_ls_path(), "r", encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def ls_save(dados):
+    try:
+        d = json.loads(dados)
+        if not isinstance(d, dict):
+            return {"success": False}
+        final = _ls_path()
+        tmp = final + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(dados)
+        os.replace(tmp, final)
+        return {"success": True}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def _prefs_path():
     """Preferências do app (idioma...). Mesma pasta do layout do editor (%APPDATA%/CaniveteDoPailer)."""
     return os.path.join(os.path.dirname(_ve_layout_path()), "preferencias.json")
@@ -5368,6 +5397,9 @@ class ApiBridge:
                  or (_PORTA_AGENTE is not None and int(_PORTA_AGENTE) != 9222))
         return {"porta": _PORTA_AGENTE, "teste": teste}
 
+    def ls_save(self, dados):
+        return ls_save(dados)
+
     def prefs_load(self):
         return prefs_load()
 
@@ -6052,6 +6084,13 @@ def _servidor_com_ajuda():
             if environ.get("PATH_INFO") in ("", "/"):
                 start_response("302 Found", [("Location", "/agente.md"), ("Content-Length", "0")])
                 return [b""]
+            if environ.get("PATH_INFO") == "/ls_boot.js":
+                # localStorage da última sessão, síncrono, antes dos scripts da página (frontend/js/armazenamento.js)
+                js = ("(function(d){try{for(var k in d){if(localStorage.getItem(k)===null)localStorage.setItem(k,d[k]);}}catch(e){}})(%s);"
+                      % json.dumps(ls_load()).replace("</", "<\\/")).encode("utf-8")
+                start_response("200 OK", [("Content-Type", "application/javascript; charset=utf-8"),
+                                          ("Cache-Control", "no-store"), ("Content-Length", str(len(js)))])
+                return [js]
             achou = []
 
             def sr(status, headers, exc_info=None):
@@ -6235,6 +6274,7 @@ def main():
             print("[drop] indisponível:", e)
 
     window.events.loaded += _bind_drop
+
 
     # X da janela (e o "fechar" da barra própria, WM_CLOSE): antes fechava direto, sem aviso — matava o render no meio
     # (GaIA 2026-10-14). Agora pergunta à página (appSair: render/preparo em andamento, projeto não salvo) e só fecha
