@@ -1,4 +1,5 @@
 """Agrupar cenas em Comps preserva exportação, monitor e desfazer (app em --agente=9333)."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse
 import base64
 import io
@@ -177,7 +178,7 @@ def testar_timeline(pagina, prefixo, tempos):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--porta', type=int, default=9333)
+    parser.add_argument('--porta', type=int, default=_porta_agente(9333))
     parser.add_argument('--projeto', default=r'D:\kanivete_testes\comp_cenas\reels_bf_carlinhos.vknv')
     parser.add_argument('--timelines', default='Reel A,Reel B', help='prefixos separados por vírgula')
     parser.add_argument('--tempos', default='0.5,2.6,5,7.6,12.5,17.5,21', help='segundos separados por vírgula')

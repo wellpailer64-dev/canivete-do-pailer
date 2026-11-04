@@ -28,6 +28,7 @@ uso: py -3.13 tools/knv.py peca.html [--formato feed] [--salvar peca.iknv] [--pr
   Prévia de carrossel sai em GRADE (--colunas 6), não numa tira comprida: dá para olhar inteira numa imagem só.
 Recarrega frontend/js/imagem-*.js do disco (mudou o código do editor → não precisa reiniciar o app).
 Guia: Instructions/agente/plano-cena.md"""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse, base64, io, json, os, re, sys, time
 sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
@@ -37,7 +38,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("html", nargs="?", default="-"); ap.add_argument("--formato"); ap.add_argument("--nome")
 ap.add_argument("--salvar"); ap.add_argument("--previa"); ap.add_argument("--escala", type=float, default=0.5)
 ap.add_argument("--de"); ap.add_argument("--novo", action="store_true"); ap.add_argument("--refazer", action="store_true")
-ap.add_argument("--depois"); ap.add_argument("--porta", type=int, default=9333); ap.add_argument("--margem", type=float)
+ap.add_argument("--depois"); ap.add_argument("--porta", type=int, default=_porta_agente(9333)); ap.add_argument("--margem", type=float)
 ap.add_argument("--exportar", help="pasta: um arquivo por slide (ou a peça inteira)"); ap.add_argument("--fmt", default="png")
 ap.add_argument("--mapa", action="store_true"); ap.add_argument("--sem-recarga", action="store_true")
 ap.add_argument("--sem-previa", action="store_true"); ap.add_argument("--ver"); ap.add_argument("--escala-ver", type=float, default=0.4)

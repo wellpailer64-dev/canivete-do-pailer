@@ -7,6 +7,7 @@ uso: py -3.13 tools/refs.py "flyer festa black dourado" "flyer virada de lote" -
 saída: pasta/NN.jpg, folha_N.jpg (16 por folha, numeradas), refs.json (url, busca, paleta, nota, técnicas), top.jpg
        e uma linha por referência do top no terminal. Técnica aproveitada numa peça → ficha em
        D:/kanivete_biblioteca/tecnicas (ver Instructions/agente/design-photo-kanivete.md, "Técnicas do Pinterest")."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse, base64, hashlib, io, json, os, sys, urllib.parse, urllib.request
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -96,7 +97,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("consultas", nargs="+"); ap.add_argument("--pasta", required=True); ap.add_argument("--tema", default="")
     ap.add_argument("--n", type=int, default=30); ap.add_argument("--top", type=int, default=6)
-    ap.add_argument("--sem-kani", action="store_true"); ap.add_argument("--porta", type=int, default=9333)
+    ap.add_argument("--sem-kani", action="store_true"); ap.add_argument("--porta", type=int, default=_porta_agente(9333))
     a = ap.parse_args()
     os.makedirs(a.pasta, exist_ok=True)
     itens = baixar(buscar(a.consultas, a.n), a.pasta, a.n)

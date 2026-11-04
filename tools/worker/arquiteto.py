@@ -12,6 +12,7 @@ Uso rapido:
   py -3.13 tools/worker/arquiteto.py cena "carrossel de 3 slides..." --formato retrato --slides 3 --executar
   py -3.13 tools/worker/arquiteto.py chat
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse
 import json
 import os
@@ -543,7 +544,7 @@ def main():
                     help="segundos maximos por modelo antes de tentar o proximo")
     ap.add_argument("--pensar", action="store_true",
                     help="liga o modo think dos modelos Qwen/Gemma; melhor qualidade, bem mais lento")
-    ap.add_argument("--porta", type=int, default=9333)
+    ap.add_argument("--porta", type=int, default=_porta_agente(9333))
     ap.add_argument("--saida", default=SAIDA_PADRAO)
     ap.add_argument("--documento", help=".iknv para abrir/alterar no modo contrato")
     ap.add_argument("--salvar", help="caminho .iknv de saida; no contrato, tambem liga constraints.salvar")

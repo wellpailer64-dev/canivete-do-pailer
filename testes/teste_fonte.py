@@ -8,6 +8,7 @@ largura da prancheta, caixa do I nas unidades certas, sentido dos contornos do C
 horário), sobreposição unida, traço contornado; depois usa a fonte num texto do Vetor e desenha com o PIL.
 Saída em D:/kanivete_testes/fonte. Sai com 1 se reprovar.
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import os
 import sys
 import time
@@ -32,7 +33,7 @@ with sync_playwright() as p:
     b = None
     for _ in range(120):
         try:
-            b = p.chromium.connect_over_cdp("http://127.0.0.1:9333")
+            b = p.chromium.connect_over_cdp(f"http://127.0.0.1:{_porta_agente(9333)}")
             break
         except Exception:
             time.sleep(1)

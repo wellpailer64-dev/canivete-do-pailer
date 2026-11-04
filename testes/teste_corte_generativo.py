@@ -1,4 +1,5 @@
 """Corte C e expansão: testa em navegador isolado, com IA sintética."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import ast
 import json
 import os
@@ -62,7 +63,7 @@ ENSAIO = r"""async () => {
     return 'PASSOU: seletor, expansão livre/mista, transparência, undo/redo, cancelamento, concorrência.';
 }"""
 
-with urlopen('http://127.0.0.1:9333/json/list', timeout=5) as resposta:
+with urlopen(f'http://127.0.0.1:{_porta_agente(9333)}/json/list', timeout=5) as resposta:
     url = next(item['url'] for item in json.load(resposta) if item.get('type') == 'page' and 'index.html' in item['url'])
 with sync_playwright() as p:
     navegador = p.chromium.launch(channel='msedge', headless=True)

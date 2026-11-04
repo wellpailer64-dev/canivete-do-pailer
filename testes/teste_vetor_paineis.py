@@ -7,6 +7,7 @@ do desenho solta a janela; para a borda esquerda do desenho cria coluna à esque
 fechar e reabrir pelo menu Janela; o botão Fechamento abre o painel dele; nomes de camada não são traduzidos pela
 interface; o layout volta depois de recarregar a página. No fim redefine os painéis. Sai com 1 se reprovar.
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import subprocess
 import sys
 import time
@@ -36,7 +37,7 @@ def arrastar(pg, painel, para):
 def pagina(p):
     for _ in range(90):
         try:
-            return p.chromium.connect_over_cdp("http://127.0.0.1:9333").contexts[0].pages[0]
+            return p.chromium.connect_over_cdp(f"http://127.0.0.1:{_porta_agente(9333)}").contexts[0].pages[0]
         except Exception:
             time.sleep(1)
 

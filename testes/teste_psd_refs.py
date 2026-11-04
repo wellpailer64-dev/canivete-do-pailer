@@ -4,12 +4,13 @@
 Cria 6 camadas de cores/posições diferentes, salva PSD; apaga, cria, reordena, renomeia e repinta; salva por cima
 (2×); a cada vez relê o arquivo (psd-tools) e confere cor média e caixa de cada camada. Sai com 1 se alguma trocar.
 uso: py -3.13 testes/teste_psd_refs.py [--porta 9333]   (app de teste em --agente=9333)"""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse, os, sys
 sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
 from psd_tools import PSDImage
 
-ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=9333); a = ap.parse_args()
+ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=_porta_agente(9333)); a = ap.parse_args()
 PASTA = os.path.join(os.environ.get("TEMP", "D:/kanivete_testes/tmp"), "teste_psd_refs"); os.makedirs(PASTA, exist_ok=True)
 PSD = os.path.join(PASTA, "refs.psd").replace("\\", "/")
 

@@ -1,9 +1,10 @@
 """Aplica cada filtro do menu Filtro (valores padrão) numa foto e mede; confere que mudou a imagem e não deu erro."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import sys, time, json
 sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
 with sync_playwright() as p:
-    b = p.chromium.connect_over_cdp("http://127.0.0.1:9333")
+    b = p.chromium.connect_over_cdp(f"http://127.0.0.1:{_porta_agente(9333)}")
     pg = next(x for c in b.contexts for x in c.pages if "index.html" in x.url)
     erros = []; pg.on("pageerror", lambda e: erros.append(str(e)))
     pg.wait_for_function("typeof ieFKuwahara === 'function'", timeout=60000)

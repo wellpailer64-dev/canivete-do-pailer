@@ -1,4 +1,5 @@
 """Regressão da máscara generativa no app 9333; provedor sintético, sem carregar IA."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import json
 from playwright.sync_api import sync_playwright
 
@@ -88,7 +89,7 @@ ENSAIO = r"""async () => {
 }"""
 
 with sync_playwright() as p:
-    navegador = p.chromium.connect_over_cdp('http://127.0.0.1:9333')
+    navegador = p.chromium.connect_over_cdp(f'http://127.0.0.1:{_porta_agente(9333)}')
     pagina = next(pg for c in navegador.contexts for pg in c.pages if 'index.html' in pg.url)
     pagina.set_default_timeout(90000)
     resultado = pagina.evaluate(ENSAIO)

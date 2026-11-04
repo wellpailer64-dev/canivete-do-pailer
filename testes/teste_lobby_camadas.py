@@ -1,4 +1,5 @@
 """Lobby do Photo/Vetor não cobre a janela Novo documento nem os menus (app 9333)."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import sys, time
 from playwright.sync_api import sync_playwright
 falhas = []
@@ -6,7 +7,7 @@ def ok(c, m):
     print(('OK  ' if c else 'FALHA ') + m)
     if not c: falhas.append(m)
 with sync_playwright() as p:
-    pg = next(x for c in p.chromium.connect_over_cdp("http://127.0.0.1:9333").contexts for x in c.pages if "index.html" in x.url)
+    pg = next(x for c in p.chromium.connect_over_cdp(f"http://127.0.0.1:{_porta_agente(9333)}").contexts for x in c.pages if "index.html" in x.url)
     J = pg.evaluate
     for tool, ini, modal in (('editor-imagem', 'ie-inicio', 'ie-modal'), ('vetor-kanivete', 'vk-inicio', 'vk-modal')):
         J(f"switchTool('{tool}')"); time.sleep(2)

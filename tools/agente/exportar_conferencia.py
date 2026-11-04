@@ -3,6 +3,7 @@
 Não espera presa ao comando: dispara, acompanha e, se passar de --espera, diz que continua rodando (rodar de novo com --ver).
 Comando longo: usar tarefas_soltas.py. Com muitas camadas de zoom com desfoque de movimento, 2:30 levou ~18 min.
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse
 import os
 import re
@@ -15,7 +16,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("timeline")
 ap.add_argument("pasta")
 ap.add_argument("--nome", default="conferencia")
-ap.add_argument("--porta", type=int, default=9333)
+ap.add_argument("--porta", type=int, default=_porta_agente(9333))
 ap.add_argument("--espera", type=int, default=1800)
 ap.add_argument("--ver", action="store_true", help="não exporta: só acompanha a exportação em andamento")
 a = ap.parse_args()

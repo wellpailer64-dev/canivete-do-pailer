@@ -1,6 +1,7 @@
 """Uso: py -3.13 testes/teste_psd_deg_app.py [--photoshop] (app em --agente=9333).
 Photo Kanivete (--agente=9333): um preenchimento de degradê por estilo (+ um com seleção), cada um num PSD; com
 '--photoshop' abre cada um no Photoshop, redesenha a partir do GdFl e compara com o desenho do Photo."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import base64, json, os, sys, time
 import numpy as np
 from PIL import Image
@@ -15,7 +16,7 @@ CASOS = [("linear30", dict(estilo="linear", ang=30), G3, None), ("radial", dict(
          ("diamante", dict(estilo="diamante", ang=0), G3, None), ("linear_sel", dict(estilo="linear", ang=90), G3, (300, 100, 500, 300))]
 with sync_playwright() as p:
     for _ in range(90):
-        try: b = p.chromium.connect_over_cdp("http://127.0.0.1:9333"); break
+        try: b = p.chromium.connect_over_cdp(f"http://127.0.0.1:{_porta_agente(9333)}"); break
         except Exception: time.sleep(1)
     pg = b.contexts[0].pages[0]
     pg.wait_for_function("window.pywebview && window.pywebview.api && window.KNV", timeout=90000)

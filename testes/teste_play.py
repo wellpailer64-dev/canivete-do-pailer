@@ -10,6 +10,7 @@ Abre o projeto (se ainda não estiver aberto), espera os vídeos da timeline fic
   - quadros perdidos pelo decodificador e travadas da página (quadro > 100 ms)
 Sai com código 1 se passar dos limites (bom para rodar antes de cada release).
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse
 import os
 import sys
@@ -59,7 +60,7 @@ def main():
         pass
     ap = argparse.ArgumentParser()
     ap.add_argument("projeto", nargs="?")
-    ap.add_argument("--porta", type=int, default=9333)
+    ap.add_argument("--porta", type=int, default=_porta_agente(9333))
     ap.add_argument("--segundos", type=float, default=20)
     ap.add_argument("--inicio", type=float, default=0)
     a = ap.parse_args()

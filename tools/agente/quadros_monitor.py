@@ -1,6 +1,7 @@
 """Folha com quadros do monitor do Vídeo Kanivete, sem exportar: conferir enquadramento, legenda e tarjas.
     py -3.13 tools/agente/quadros_monitor.py 1.5,20,45 saida.jpg [--porta 9333] [--timeline "Reels A"]
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse
 import io
 
@@ -10,7 +11,7 @@ from playwright.sync_api import sync_playwright
 ap = argparse.ArgumentParser()
 ap.add_argument("tempos")
 ap.add_argument("saida")
-ap.add_argument("--porta", type=int, default=9333)
+ap.add_argument("--porta", type=int, default=_porta_agente(9333))
 ap.add_argument("--timeline", default="")
 a = ap.parse_args()
 ALTURA = 430

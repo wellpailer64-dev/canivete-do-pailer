@@ -10,6 +10,7 @@ espera o fim do vídeo E do envio ao Drive, uma linha por mudança (fase/10%); n
 (tools/vigia_export.py --so-conferir: quadros pretos, silêncio, LUFS). Sai com 1 se falhar, travar (sem andar por
 --parado s) ou o arquivo tiver quadro preto. Última linha: JSON {saida, link, ok}.
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse, json, os, re, subprocess, sys, time
 
 sys.stdout.reconfigure(encoding="utf-8")
@@ -94,7 +95,7 @@ def render(a):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("acao", choices=["render", "estado", "drive-listar", "drive-apagar"])
-    ap.add_argument("--porta", type=int, default=9222)
+    ap.add_argument("--porta", type=int, default=_porta_agente(9222))
     ap.add_argument("--nome"); ap.add_argument("--res"); ap.add_argument("--drive"); ap.add_argument("--dest")
     ap.add_argument("--pasta"); ap.add_argument("--passo", type=float, default=5)
     ap.add_argument("--parado", type=float, default=600, help="segundos sem andar = travado")

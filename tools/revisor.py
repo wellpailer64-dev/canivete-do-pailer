@@ -12,6 +12,7 @@ uso: py -3.13 tools/revisor.py [peca.iknv] [--porta 9333] [--sem-corte] [--rotei
      roteiro.json = [["frases do slide 1"...], ...] ou {"slides": [{"gancho": "...", "sub": "...", "corpo": "..."}, ...]}
      (sem documento: revisa o que está aberto no app de teste)
 → {"problemas": 2, "itens": ["contraste · s1-legal: contraste 2.1 (mín. 4.5) em 11px → mancha escura ...", ...]}"""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse, base64, json, os, re, sys
 sys.stdout.reconfigure(encoding="utf-8")
 import cv2, numpy as np
@@ -67,7 +68,7 @@ def revisar(pg, corte=True, roteiro=None):
 
 if __name__ == "__main__":
     from playwright.sync_api import sync_playwright
-    ap = argparse.ArgumentParser(); ap.add_argument("doc", nargs="?"); ap.add_argument("--porta", type=int, default=9333)
+    ap = argparse.ArgumentParser(); ap.add_argument("doc", nargs="?"); ap.add_argument("--porta", type=int, default=_porta_agente(9333))
     ap.add_argument("--sem-corte", action="store_true"); ap.add_argument("--roteiro")
     a = ap.parse_args()
     with sync_playwright() as p:

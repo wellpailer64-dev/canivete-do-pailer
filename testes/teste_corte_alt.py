@@ -1,6 +1,7 @@
 """Máscara de corte com Alt + clique na divisa entre duas camadas (como no Photoshop), com mouse de verdade no app de
 teste (9333): cursor de corte, prende a de cima na de baixo, solta no segundo clique, Ctrl+Z, recorte na composição.
 --recarregar recarrega a página antes (pega JS/CSS novos sem reabrir o app)."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import sys, time
 sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
@@ -11,7 +12,7 @@ def ok(c, m):
     if not c: falhas.append(m)
 
 with sync_playwright() as p:
-    b = p.chromium.connect_over_cdp("http://127.0.0.1:9333")
+    b = p.chromium.connect_over_cdp(f"http://127.0.0.1:{_porta_agente(9333)}")
     pg = next(x for c in b.contexts for x in c.pages if "index.html" in x.url)
     if "--recarregar" in sys.argv:
         cdp = pg.context.new_cdp_session(pg); cdp.send('Network.setCacheDisabled', {'cacheDisabled': True})   # o WebView2 guarda o JS em cache

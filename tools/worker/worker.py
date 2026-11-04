@@ -7,6 +7,7 @@ O registro completo (mensagens, chamadas, erros) vai para D:/kanivete_testes/wor
 uso: py -3.13 tools/worker/worker.py contrato.json [--modelo qwen3:8b] [--reserva gemma4:e4b] [--porta 9333]
 contrato = {"task_id", "goal", "constraints": {"documento": "x.iknv", "salvar": true, "pasta_exportacao": "D:/..."},
             "assets": [], "success_conditions": ["oculta:assinatura", "texto:subtitulo=Só hoje", "exportado"]}"""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse, json, os, re, subprocess, sys, time, unicodedata, urllib.request
 sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
@@ -16,7 +17,7 @@ FINAIS = ("exportar", "levar_para_editor", "exportar_pdf")
 LOGS = r"D:\kanivete_testes\worker\logs"
 ap = argparse.ArgumentParser()
 ap.add_argument("contrato"); ap.add_argument("--modelo", default="qwen3:8b"); ap.add_argument("--reserva", default="gemma4:e4b")
-ap.add_argument("--porta", type=int, default=9333); ap.add_argument("--max-passos", type=int, default=12)
+ap.add_argument("--porta", type=int, default=_porta_agente(9333)); ap.add_argument("--max-passos", type=int, default=12)
 a = ap.parse_args()
 contrato = json.load(open(a.contrato, encoding="utf-8")) if os.path.isfile(a.contrato) else json.loads(a.contrato)
 tid = contrato.get("task_id") or time.strftime("TAREFA_%H%M%S")

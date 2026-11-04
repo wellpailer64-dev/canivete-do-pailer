@@ -4,6 +4,7 @@ desfazer. Sai com 1 se algo reprovar. Amostras em D:/kanivete_testes/vetor/amost
 
     python testes/teste_vetor.py [--porta 9333] [--print saida.png]
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse, json, os, subprocess, sys
 sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
@@ -11,7 +12,7 @@ from playwright.sync_api import sync_playwright
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AM = r"D:\kanivete_testes\vetor\amostras"
 SAI = r"D:\kanivete_testes\vetor\saida"
-ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=9333); ap.add_argument("--print", default=os.path.join(SAI, "tela.png"))
+ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=_porta_agente(9333)); ap.add_argument("--print", default=os.path.join(SAI, "tela.png"))
 a = ap.parse_args()
 os.makedirs(SAI, exist_ok=True)
 if not os.path.isfile(os.path.join(AM, "apresentacao.pptx")):

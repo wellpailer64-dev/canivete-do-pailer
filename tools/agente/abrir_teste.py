@@ -2,6 +2,7 @@
     py -3.13 tools/agente/abrir_teste.py projeto.vknv
     py -3.13 tools/agente/abrir_teste.py --fechar
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import os
 import subprocess
 import sys
@@ -10,7 +11,7 @@ import urllib.request
 
 sys.stdout.reconfigure(encoding="utf-8")
 RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-URL = "http://127.0.0.1:9333"
+URL = f"http://127.0.0.1:{_porta_agente(9333)}"
 
 
 def no_ar():

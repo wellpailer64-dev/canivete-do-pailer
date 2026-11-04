@@ -18,6 +18,7 @@ Sai com código 1 se algum caso reprovar. Os pares de quadros com problema ficam
 transições ou AutoFrame. A prévia renderizada e o cache RAM ficam desligados durante o teste (senão o monitor
 mostraria o próprio arquivo renderizado e a comparação não valeria nada).
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse
 import base64
 import json
@@ -1087,7 +1088,7 @@ def main():
     except Exception:
         pass
     ap = argparse.ArgumentParser()
-    ap.add_argument("--porta", type=int, default=9333)
+    ap.add_argument("--porta", type=int, default=_porta_agente(9333))
     ap.add_argument("--casos", default="")
     ap.add_argument("--4k", dest="k4", action="store_true")
     ap.add_argument("--blocos", action="store_true", help="exportação por blocos (abra o app com CANIVETE_BLOCO_SEG=1 para vários blocos)")

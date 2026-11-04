@@ -1,4 +1,5 @@
 """In/Out no Sound: teclas reais, WAV recortado, stems, fila, persistência e desfazer; somente porta 9333."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import json
 import os
 from pathlib import Path
@@ -23,7 +24,7 @@ class SoundInOutTest(unittest.TestCase):
         subprocess.run([ffmpeg(), '-v', 'error', '-y', '-f', 'lavfi', '-i',
                         r'aevalsrc=0.15*sin(2*PI*if(lt(t\,2)\,440\,if(lt(t\,4)\,880\,1320))*t):s=48000:d=6', fonte], check=True)
         with sync_playwright() as p:
-            b = p.chromium.connect_over_cdp('http://127.0.0.1:9333')
+            b = p.chromium.connect_over_cdp(f'http://127.0.0.1:{_porta_agente(9333)}')
             pg = next(x for x in b.contexts[0].pages if 'index.html' in x.url)
             pg.set_default_timeout(20000)
             backup = pg.evaluate('({proj:SK.proj,caminho:SK.caminho,ph:SK.ph,sel:SK.sel,sujo:SK.sujo,hist:SK.hist,futuro:SK.futuro})')

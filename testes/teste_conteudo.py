@@ -7,6 +7,7 @@ de huggingface.co/Carve/LaMa-ONNX se faltar). Seleção = a pessoa (máscara cor
 deixava um fantasma). Confere: camada nova com só a área preenchida e a pessoa sumida (perto da saída de referência do
 LaMa), saída na própria camada + Atenuar 0% volta ao original, sem seleção recusa. Sai com 1 se reprovar.
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import base64
 import io
 import sys
@@ -44,7 +45,7 @@ with sync_playwright() as p:
     b = None
     for _ in range(90):
         try:
-            b = p.chromium.connect_over_cdp("http://127.0.0.1:9333")
+            b = p.chromium.connect_over_cdp(f"http://127.0.0.1:{_porta_agente(9333)}")
             break
         except Exception:
             time.sleep(1)

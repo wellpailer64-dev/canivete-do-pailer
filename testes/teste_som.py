@@ -6,6 +6,7 @@ Gera áudios de teste (ffmpeg), monta um podcast pela SKN (importar, cortar, fad
 a reprodução (agulha anda no tempo), mover/aparar com o mouse e desfazer, salvar/abrir .sknv, exportar com duração
 exata e no volume pedido (LUFS medido de novo no arquivo). Saída em D:/kanivete_testes/sound. Sai com 1 se reprovar.
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import os
 import re
 import subprocess
@@ -44,7 +45,7 @@ with sync_playwright() as p:
     b = None
     for _ in range(120):
         try:
-            b = p.chromium.connect_over_cdp("http://127.0.0.1:9333"); break
+            b = p.chromium.connect_over_cdp(f"http://127.0.0.1:{_porta_agente(9333)}"); break
         except Exception:
             time.sleep(1)
     pg = b.contexts[0].pages[0]

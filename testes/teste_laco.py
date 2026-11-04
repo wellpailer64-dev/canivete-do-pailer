@@ -1,11 +1,12 @@
 """Laço: Shift soma, Alt subtrai, Shift+Alt cruza; o mesmo no magnético; Ctrl+clique na miniatura seleciona a camada."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import sys, time
 sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
 F = []
 def ok(c, m): print(("  ok  " if c else "  FALHOU  ") + m); F.append(m) if not c else None
 with sync_playwright() as p:
-    b = p.chromium.connect_over_cdp("http://127.0.0.1:9333"); pg = next(x for c in b.contexts for x in c.pages if "index.html" in x.url)
+    b = p.chromium.connect_over_cdp(f"http://127.0.0.1:{_porta_agente(9333)}"); pg = next(x for c in b.contexts for x in c.pages if "index.html" in x.url)
     pg.wait_for_function("typeof IE_LACO !== 'undefined'", timeout=60000); pg.evaluate("switchTool('editor-imagem')"); time.sleep(1)
     pg.evaluate("KNV.automacao(true, {padrao: 'primario'}); KNV.fecharTudo().then(() => { KNV.novo('laco', 800, 600); KNV.ajustar(false); ieAjustarVista(); ieEscolherFerr('laco'); })"); time.sleep(1)
     T = lambda x, y: pg.evaluate(f"(() => {{ const r = ieEl('ie-sobre').getBoundingClientRect(), s = ieDocTela({x}, {y}, IE.doc); return [r.left + s.x, r.top + s.y]; }})()")

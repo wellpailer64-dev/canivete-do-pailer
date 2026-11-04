@@ -16,6 +16,7 @@ O que faz (com o mouse e o teclado, como uma pessoa):
   5. reabre o PSD salvo no editor e compara de novo.
 Sai com 1 se algo falhar.
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse
 import json
 import os
@@ -81,7 +82,7 @@ def gerar_psd(path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--porta", type=int, default=9333)
+    ap.add_argument("--porta", type=int, default=_porta_agente(9333))
     ap.add_argument("--sem-abrir", action="store_true")
     ap.add_argument("--psd", default="")
     a = ap.parse_args()

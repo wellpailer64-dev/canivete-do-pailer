@@ -7,6 +7,7 @@ efeito, espera a cópia estabilizada entrar no clipe, muda o corte (cópia nova)
 Vídeo padrão: D:/kanivete_testes/estab/saida/C0715_orig.mp4 (6 s, 1080p, câmera na mão; gerado por
 D:/kanivete_testes/scripts/estab_reais.py).
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse
 import os
 import subprocess
@@ -89,7 +90,7 @@ EXPORTAR = """async ([dest, nome]) => {
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--video", default=BASE + "estab/saida/C0715_orig.mp4")
-    ap.add_argument("--porta", type=int, default=9333)
+    ap.add_argument("--porta", type=int, default=_porta_agente(9333))
     ap.add_argument("--sem-abrir", action="store_true")
     a = ap.parse_args()
     vid = a.video.replace("\\", "/")

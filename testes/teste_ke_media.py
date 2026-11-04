@@ -1,6 +1,7 @@
 """Kanivete Encoder como Media Encoder (ke-arquivos.js + Functions/ke_arquivos.py) — app em --agente=9333:
 arquivos do disco na fila da aba do Ke (sem projeto), cada um com a sua predefinição, renderizados em ordem; e um render
 curto da Lux mandado para a fila. Uso: py -3.13 testes/teste_ke_media.py [video.mp4] [--sem-lux] [--sem-som]"""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import os, sys, time
 from playwright.sync_api import sync_playwright
 
@@ -12,7 +13,7 @@ def ok(c, m):
     if not c: falhas.append(m)
 
 with sync_playwright() as p:
-    pg = next(x for c in p.chromium.connect_over_cdp("http://127.0.0.1:9333").contexts for x in c.pages if "index.html" in x.url)
+    pg = next(x for c in p.chromium.connect_over_cdp(f"http://127.0.0.1:{_porta_agente(9333)}").contexts for x in c.pages if "index.html" in x.url)
     pg.on('dialog', lambda d: d.accept())
     J = pg.evaluate
     J("switchTool('kanivete-encoder')"); time.sleep(2)

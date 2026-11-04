@@ -5,6 +5,7 @@
      o Z SEM mudar a caixa na tela; Ctrl+Z volta tudo;
   4. leveza: um motor (contexto WebGL) para todas as cenas, no máximo 4 montadas, acrescentar placa sem reler as outras.
 Uso: py -3.13 testes/teste_3d_placas.py   (sai com 1 se algo falhar)"""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import sys, time, json
 from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
@@ -13,7 +14,7 @@ def conferir(ok, msg):
     print(("OK   " if ok else "RUIM ") + msg); (None if ok else falhas.append(msg))
 
 with sync_playwright() as p:
-    pg = next(x for c in p.chromium.connect_over_cdp("http://127.0.0.1:9333").contexts for x in c.pages if "index.html" in x.url)
+    pg = next(x for c in p.chromium.connect_over_cdp(f"http://127.0.0.1:{_porta_agente(9333)}").contexts for x in c.pages if "index.html" in x.url)
     pg.set_default_timeout(120000)
     pg.wait_for_function("typeof ve3dDeCamadas === 'function' && typeof ve3dEmpurrar === 'function'")
     pg.evaluate("switchTool('video-cutter')"); time.sleep(1)

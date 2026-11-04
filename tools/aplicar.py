@@ -13,6 +13,7 @@ CSS: troca o <link> do arquivo por um com ?v=hora (só o estilo recarrega).
 --py: recarrega Functions.* pela ponte vk_recarregar (vale rodando pelo código, `python main.py`; o .exe guarda os
 módulos dentro dele e continua com os antigos até o próximo build).
 Ao contrário de tools/recarregar.py, pode rodar no app do usuário."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse, json, os, re, subprocess, sys
 from playwright.sync_api import sync_playwright
 
@@ -88,7 +89,7 @@ JS = """({fns, consts}) => {
 ap = argparse.ArgumentParser()
 ap.add_argument("arquivos", nargs="*")
 ap.add_argument("--py", action="store_true")
-ap.add_argument("--porta", type=int, default=9222)
+ap.add_argument("--porta", type=int, default=_porta_agente(9222))
 ap.add_argument("--so", default="", help="só estas funções/constantes (nomes separados por vírgula): não leva junto mudanças de outros no mesmo arquivo")
 a = ap.parse_args()
 # um cache por app (porta): aplicar no app de teste não pode marcar como "já aplicado" no app do usuário

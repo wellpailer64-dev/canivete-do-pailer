@@ -1,4 +1,5 @@
 """Faixas da timeline (editor-trilhas.js): adicionar, excluir, excluir vazias e Ctrl+Z (app JÁ aberto em --agente=9333)."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse
 import sys
 
@@ -137,7 +138,7 @@ def testar(pagina):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--porta', type=int, default=9333)
+    parser.add_argument('--porta', type=int, default=_porta_agente(9333))
     args = parser.parse_args()
     if args.porta == 9222:
         parser.error('a 9222 é o app do usuário; use o app de teste')

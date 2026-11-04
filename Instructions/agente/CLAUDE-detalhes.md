@@ -485,3 +485,6 @@ Infraestrutura braçal (achar no código, troca mecânica, rodar teste, diagnost
 
 ## Ajuste barato de vídeo (2026-11-02)
 `tools/agente/trocar_midia.py` troca mídia por outra versão, medindo o tempo pelo áudio. `tools/agente/fechar_emenda.py` tira voz repetida usando um respiro existente. `tools/agente/abrir_teste.py` sobe o app de teste e abre o projeto. `conferir_edicao.py` agora reprova voz repetida, legenda encostada na borda e brasão sobre tarja. Ordem em `metodo-edicao-video.md`.
+
+## Porta do modo agente nos scripts (2026-11-04)
+`tools/porta_agente.py`: scripts não usam mais 9222/9333 fixo; `porta(9222)` (app do Pailer) e `porta(9333)` (app de teste) leem o `agente.json` (o do APPDATA atual e o de `D:\kanivete_testesppdata`) e devolvem a porta viva. Nunca cruza os apps (faixa 9222-9231 = Pailer; fora dela = teste). `--porta` explícito continua valendo. Conferir: `py -3.13 tools/porta_agente.py 9333`. Script novo: copiar a linha de import do topo de `tools/aplicar.py` e usar `_porta_agente(9333)`.

@@ -2,10 +2,11 @@
   py -3.13 tools/recarregar.py [--porta 9333] [--py] [--ferramenta vetor-kanivete|editor-imagem|...]
 --py recarrega os módulos Functions.* (importlib.reload pela ponte vk_recarregar); depois a página recarrega sem cache e a
 ferramenta reabre. Mudança em main.py (a ponte em si) ainda exige reiniciar o app."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse, json, sys
 from playwright.sync_api import sync_playwright
 
-ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=9333); ap.add_argument("--py", action="store_true")
+ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=_porta_agente(9333)); ap.add_argument("--py", action="store_true")
 ap.add_argument("--ferramenta", default="vetor-kanivete")
 ap.add_argument("--forcar", action="store_true", help="recarrega mesmo com projeto aberto no editor de vídeo (perde o que não foi salvo)")
 a = ap.parse_args()

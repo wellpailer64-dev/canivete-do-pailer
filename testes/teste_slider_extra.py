@@ -4,12 +4,13 @@ ferramentas do agente (texto, folha, revisar, achar, lote, substituir, estilo) e
 App de teste em --agente=9333.
     py -3.13 testes/teste_slider_extra.py [--porta 9333]
 Saídas em %TEMP%/kanivete_teste_slider. Sai com 1 se algo reprovar."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse, os, sys, tempfile, time
 from playwright.sync_api import sync_playwright
 sys.stdout.reconfigure(encoding="utf-8")
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, RAIZ)
-ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=9333)
+ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=_porta_agente(9333))
 a = ap.parse_args()
 OUT = os.path.join(tempfile.gettempdir(), "kanivete_teste_slider").replace("\\", "/"); os.makedirs(OUT, exist_ok=True)
 falhas = []

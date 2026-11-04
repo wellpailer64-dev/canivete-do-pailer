@@ -1,4 +1,5 @@
 """Misturar se: campos numéricos, arraste, canais, prévia e histórico; fonte do app 9333 em Edge sem janela."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import json
 import os
 from pathlib import Path
@@ -12,7 +13,7 @@ for nome, pasta in [('TEMP', 'tmp'), ('TMP', 'tmp'), ('APPDATA', 'appdata'), ('L
     destino = Path('D:/kanivete_testes') / pasta
     destino.mkdir(parents=True, exist_ok=True)
     os.environ[nome] = str(destino)
-with urlopen('http://127.0.0.1:9333/json/list', timeout=5) as resposta:
+with urlopen(f'http://127.0.0.1:{_porta_agente(9333)}/json/list', timeout=5) as resposta:
     url = next(p['url'] for p in json.load(resposta) if p.get('type') == 'page' and 'index.html' in p.get('url', ''))
 
 with sync_playwright() as p:

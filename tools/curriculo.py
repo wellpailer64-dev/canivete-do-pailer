@@ -17,6 +17,7 @@ Tópico = uma ideia por linha. Item terminado em ":" vira subtítulo. "corte" = 
 
 Regras: nunca inventar cargo, data ou nível (use `faltas`); nada de texto dentro de imagem; só um emprego "Atual".
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse, json, html, os, re, subprocess, sys, tempfile, urllib.request
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -331,7 +332,7 @@ def main():
     s = ap.add_subparsers(dest="cmd", required=True)
     x = s.add_parser("extrair"); x.add_argument("psd"); x.add_argument("--pasta", required=True)
     x = s.add_parser("faltas"); x.add_argument("ficha")
-    x = s.add_parser("montar"); x.add_argument("ficha"); x.add_argument("--saida", required=True); x.add_argument("--porta", default=9222, type=int); x.add_argument("--sem-exportar", action="store_true"); x.add_argument("--forcar", action="store_true")
+    x = s.add_parser("montar"); x.add_argument("ficha"); x.add_argument("--saida", required=True); x.add_argument("--porta", default=_porta_agente(9222), type=int); x.add_argument("--sem-exportar", action="store_true"); x.add_argument("--forcar", action="store_true")
     x = s.add_parser("conferir"); x.add_argument("pdf"); x.add_argument("--ficha"); x.add_argument("--png")
     a = ap.parse_args()
     if a.cmd == "faltas":

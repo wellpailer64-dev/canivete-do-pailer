@@ -1,4 +1,5 @@
 """Harmonização: análise, isolamento, ajustes editáveis, prévia, cancelamento e histórico; sem IA."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import json
 import os
 from pathlib import Path
@@ -9,7 +10,7 @@ SAIDA=Path('D:/kanivete_testes/harmonizacao')
 SAIDA.mkdir(parents=True,exist_ok=True)
 for k,pasta in [('TEMP','tmp'),('TMP','tmp'),('APPDATA','appdata'),('LOCALAPPDATA','localappdata')]:
     os.environ[k]='D:/kanivete_testes/'+pasta
-with urlopen('http://127.0.0.1:9333/json/list',timeout=5) as r:
+with urlopen(f'http://127.0.0.1:{_porta_agente(9333)}/json/list',timeout=5) as r:
     url=next(x['url'] for x in json.load(r) if x.get('type')=='page' and 'index.html' in x.get('url',''))
 with sync_playwright() as p:
     b=p.chromium.launch(channel='msedge',headless=True)

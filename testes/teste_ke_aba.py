@@ -1,6 +1,7 @@
 """Kanivete Encoder na aba própria (editor-encoder.js keAoTrocar) — app em --agente=9333:
 sem projeto mostra fila/monitor sem abrir o Vídeo; com projeto mostra o formulário; põe na fila; voltar ao Vídeo devolve
 a janela (fechada) e ela abre solta de novo lá."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import sys, time
 from playwright.sync_api import sync_playwright
 
@@ -10,7 +11,7 @@ def ok(c, m):
     if not c: falhas.append(m)
 
 with sync_playwright() as p:
-    pg = next(x for c in p.chromium.connect_over_cdp("http://127.0.0.1:9333").contexts for x in c.pages if "index.html" in x.url)
+    pg = next(x for c in p.chromium.connect_over_cdp(f"http://127.0.0.1:{_porta_agente(9333)}").contexts for x in c.pages if "index.html" in x.url)
     J = pg.evaluate
     estado = """() => { const el = document.getElementById('ve-export'), r = el.getBoundingClientRect();
         return { pai: el.parentNode.id, pagina: el.classList.contains('ke-pagina'), vazio: el.classList.contains('ke-vazio'),

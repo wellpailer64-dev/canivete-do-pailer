@@ -1,4 +1,5 @@
 """Lux com casa própria: abre sem o Editor, desfaz sozinha, envia cópia para a timeline (app em --agente=9333)."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import sys, time
 from playwright.sync_api import sync_playwright
 
@@ -8,7 +9,7 @@ def ok(c, m):
     if not c: falhas.append(m)
 
 with sync_playwright() as p:
-    pg = next(x for c in p.chromium.connect_over_cdp("http://127.0.0.1:9333").contexts for x in c.pages if "index.html" in x.url)
+    pg = next(x for c in p.chromium.connect_over_cdp(f"http://127.0.0.1:{_porta_agente(9333)}").contexts for x in c.pages if "index.html" in x.url)
     pg.on('dialog', lambda d: d.accept())
     J = pg.evaluate
     J("switchTool('home')"); time.sleep(0.5)

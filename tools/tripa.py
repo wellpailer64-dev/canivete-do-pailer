@@ -12,6 +12,7 @@ Quadros: ffmpeg só do instante, minúsculo, em paralelo e com cache (D:/Canivet
 transcrições que já existem (cache do agente_midia ou --transcricoes com <nome do arquivo>.json) — nada é transcrito.
 Saída: caminhos das PNGs (≈2 mil tokens cada para ler).
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse, hashlib, json, os, re, subprocess, sys
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image, ImageDraw, ImageFont
@@ -88,7 +89,7 @@ def palavras_de(path, pasta_tr):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("nome", nargs="?", default="")
-    ap.add_argument("--json"); ap.add_argument("--porta", type=int, default=9222)
+    ap.add_argument("--json"); ap.add_argument("--porta", type=int, default=_porta_agente(9222))
     ap.add_argument("--passo", type=float, default=2.0); ap.add_argument("--linhas", type=int, default=8)
     ap.add_argument("--de", type=float, default=0); ap.add_argument("--ate", type=float, default=0)
     ap.add_argument("--transcricoes", default=r"D:\kanivete_testes\edgar\transcricoes;D:\kanivete_testes\edgar\v4",

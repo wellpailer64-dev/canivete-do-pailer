@@ -7,6 +7,7 @@ uso: py -3.13 tools/olho.py comparar --ref ref.png --peca tira.png [--foco "slid
      py -3.13 tools/olho.py revisar --peca peca.png
      py -3.13 tools/olho.py ler recorte.png
 Tira o Qwen3 do Worker e o FLUX da placa antes (não cabem juntos nos 8 GB)."""
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse, base64, io, json, sys, time, urllib.request
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -102,7 +103,7 @@ def revisar(peca):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("modo", choices=["comparar", "revisar", "ler"]); ap.add_argument("img", nargs="?")
-    ap.add_argument("--ref"); ap.add_argument("--peca"); ap.add_argument("--foco", default=""); ap.add_argument("--slides", type=int, default=0); ap.add_argument("--porta", type=int, default=9333)
+    ap.add_argument("--ref"); ap.add_argument("--peca"); ap.add_argument("--foco", default=""); ap.add_argument("--slides", type=int, default=0); ap.add_argument("--porta", type=int, default=_porta_agente(9333))
     a = ap.parse_args()
     t = time.time(); liberar_placa(a.porta)
     out = (comparar_slides(a.ref, a.peca, a.slides, a.foco) if a.slides else comparar(a.ref, a.peca, a.foco)) if a.modo == "comparar" else revisar(a.peca or a.img) if a.modo == "revisar" else ler(a.img)

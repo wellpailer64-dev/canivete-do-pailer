@@ -4,12 +4,13 @@ como PC e como celular (toque), conferindo: tela inicial, avançar por PageDown 
 ocultar/mostrar na grade, vídeo tocando, GIF carregado, fontes embutidas, notas, sem erro de JS.
     py -3.13 testes/teste_slider_html.py [--porta 9333]   (app em --agente=9333)
 """
+import sys as _sys_pa, os as _os_pa; _sys_pa.path.append(_os_pa.path.join(_os_pa.path.dirname(_os_pa.path.abspath(__file__)), '..', 'tools')); from porta_agente import porta as _porta_agente  # porta viva (agente.json)
 import argparse, os, subprocess, sys, time
 sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from playwright.sync_api import sync_playwright
 
-ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=9333); a = ap.parse_args()
+ap = argparse.ArgumentParser(); ap.add_argument("--porta", type=int, default=_porta_agente(9333)); a = ap.parse_args()
 OUT = "D:/kanivete_testes/slider_html"; os.makedirs(OUT, exist_ok=True)
 falhas = []
 def ok(cond, nome, extra=""):
