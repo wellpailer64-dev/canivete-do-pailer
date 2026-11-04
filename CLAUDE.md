@@ -31,7 +31,7 @@ Começar por `Instructions/agente/metodo-edicao-video.md` e pelo cérebro, área
 
 ## Antes de começar, ler o guia
 Edição de vídeo: método acima; API e histórico em `guia-edicao.md`, teoria em `tecnicas-de-montagem.md`; motion `mapa-habilidades-motion.md` (ao terminar, `veCompAgruparCenas()`); motion em HTML `motion-html.md`;
-carrossel/flyer `direcao-carrossel.md`, `diretor-de-arte.md`, `plano-cena.md`; arte no Photo `design-photo-kanivete.md`; logo `direcao-logotipo.md`; Encoder `mapa-kanivete-encoder.md`;
+carrossel/flyer/feed: cérebro "Design ·" + `direcao-carrossel.md`, `diretor-de-arte.md`, `repertorio-visual.md`, `plano-cena.md`; arte no Photo `design-photo-kanivete.md`; logo `direcao-logotipo.md`; Encoder `mapa-kanivete-encoder.md`;
 Slider `Instructions/slider-kanivete.md`; Vetor `Instructions/vetor-kanivete.md`; Photo `Instructions/editor-imagem.md`; Sound `Instructions/sound-kanivete.md`; Premiere `Instructions/importar-premiere.md` e `agente/ponte-premiere.md` (teste só em cópia); 3D `agente/cena-3d-editor.md`; Ata `agente/ata-kanivete.md`; plugins `agente/plugins.md`. Todos em `Instructions/agente/` salvo indicação.
 
 ## Plugins
