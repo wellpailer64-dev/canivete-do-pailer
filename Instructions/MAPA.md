@@ -244,6 +244,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `tools/patch.py` — Aplica trocas de texto descritas num arquivo .patch simples — sem escapar aspas/barras, tudo ou nada, com conferência
 - `tools/peca.py` — Peça de cliente no Photo Kanivete, sempre no app do Pailer, à vista. Guia: Instructions/agente/fluxo-peca-cliente.md
 - `tools/ponte_premiere.py` — Linha de comando da ponte com o Premiere (o código fica em Functions/ponte_premiere.py, que vai no executável)
+- `tools/porta_agente.py` — Porta CDP do KANIVETE aberto, lida do agente.json que o app grava ao abrir (main.py, _agente_registrar)
 - `tools/premiere_audio_dados.py` — Gera frontend/dados/premiere_audio.json: os efeitos de áudio do Premiere (catálogo lido pelo plugin Kanivete Ponte)
 - `tools/ps_modelo_deg.py` — Gera no Photoshop camadas de preenchimento de DEGRADÊ (linear 3 cores 30°, radial com transparência): molde do GdFl
 - `tools/ps_modelo_forma.py` — Gera no Photoshop um PSD com camadas de forma (retângulo, elipse e um demarcador com furo): molde de vmsk/SoCo
@@ -301,7 +302,9 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `Instructions/agente/plugins.md` — Plugins no KANIVETE
 - `Instructions/agente/ponte-premiere.md` — Ponte Kanivete ↔ Premiere Pro (plugin UXP "Kanivete Ponte")
 - `Instructions/agente/rastreador.md` — Rastreador de movimento (Tracker do After Effects) — FEITO v1 (2026-10-23)
+- `Instructions/agente/relatorio-aula-deepseek.md` — Relatório da aula do DeepSeek-V4.1-Flash
 - `Instructions/agente/remover-fundo.md` — Remover fundo (recorte) — velocidade × qualidade (2026-10-06)
+- `Instructions/agente/repertorio-visual.md` — Repertório visual aprovado pelo Pailer
 - `Instructions/agente/tecnicas-de-montagem.md` — Técnicas de montagem: cortes, transições, storytelling e tempo de tela
 - `Instructions/agente/teste-4k.md` — Teste de 4K (estresse do Editor de Vídeo)
 - `Instructions/agente/worker.md` — Canivete Worker — o assistente local (para o Claude delegar operações)

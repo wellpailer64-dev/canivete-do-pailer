@@ -332,11 +332,12 @@ if __name__ == "__main__":
         for k, v in ESQUELETOS.items(): print(f"{k:16} {v}")
         sys.exit(0)
     with open(a.roteiro, encoding="utf-8") as fh: r = json.load(fh)
+    H = int(r.get("altura") or H)          # altura do slide (padrão 1350); a tira fica W × n
     saida = a.saida or os.path.splitext(a.roteiro)[0] + ".html"
     with open(saida, "w", encoding="utf-8") as fh: fh.write(montar_html(r))
     print(f"html: {saida} ({len(r['slides'])} slides)")
     if a.montar:
-        cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "knv.py"), saida, "--formato", "feed", "--novo",
+        cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "knv.py"), saida, "--formato", f"{W}x{H}", "--novo",
                "--porta", str(a.porta), "--salvar", os.path.splitext(saida)[0] + ".iknv"]
         if a.exportar: cmd += ["--exportar", a.exportar]
         fin = r.get("acabamento", True)          # finalização: sombra, brilho, eco borrado, textura, Camera Raw
