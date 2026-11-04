@@ -34,6 +34,8 @@ docs, porta_instancia, processo_da_porta: "msedgewebview2.exe"}]}` (main.py `_ag
 "ERRO: ..." a quem não é outra cópia do app. Relato que motivou: notebook i5 + Iris Xe/GTX 1650, 2026-10-16. Confira se o `pid` ainda existe
 (fechada à força, a entrada fica até a próxima abertura limpar).
 
+**Scripts não leem esse arquivo na mão nem fixam porta:** `tools/porta_agente.py` → `porta(9222)` (app do Pailer, faixa 9222-9231) ou `porta(9333)` (app de teste, fora da faixa). Lê o agente.json do APPDATA atual e o de `D:\kanivete_testes\appdata`, só cópias ligadas e com pid vivo, e nunca cruza os dois apps. Conferir: `py -3.13 tools/porta_agente.py 9333`.
+
 ### Registro e ações do agente (frontend/js/agente.js)
 - `veLogTexto(40)`: os últimos avisos (toasts), erros de JavaScript, `console.error` e resultados de exportação
   que apareceram na tela (`window.__veLog`, até 300 itens).
@@ -43,9 +45,10 @@ docs, porta_instancia, processo_da_porta: "msedgewebview2.exe"}]}` (main.py `_ag
 ## Como conectar (exemplo com Playwright)
 
 ```python
+import sys; sys.path.append("tools"); from porta_agente import porta
 from playwright.sync_api import sync_playwright
 with sync_playwright() as p:
-    b = p.chromium.connect_over_cdp("http://127.0.0.1:9222")
+    b = p.chromium.connect_over_cdp(f"http://127.0.0.1:{porta(9222)}")   # 9333 = app de teste
     pg = next(pg for c in b.contexts for pg in c.pages if "index.html" in pg.url)
     pg.click('.menu-item[data-tool="compressor-video"]')
     pg.screenshot(path="tela.png")
