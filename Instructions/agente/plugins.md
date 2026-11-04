@@ -235,4 +235,4 @@ que o plugin importou (fechar o navegador antes: o canal mora no módulo).
   OFX genérica (Sapphire/BCC: conferir se checam o hospedeiro pelo OfxPropName).
 
 ## Agentes com chave pelo KaniCode
-DeepSeek e outros modelos com chave: manual em `D:/Kanivete/Plugins/kanicode/MANUAL_AGENTE.md`; treino e limites em `relatorio-aula-deepseek.md`.
+DeepSeek e outros modelos com chave: manual em `D:/Kanivete/Plugins/kanicode/docs/MANUAL_AGENTE.md`; treino e limites em `relatorio-aula-deepseek.md`.
