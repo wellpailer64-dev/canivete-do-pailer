@@ -44,7 +44,7 @@ async function ieCena(html, o = {}) {
         ctx.rr = raiz.getBoundingClientRect();
         await ieCenaGerarTodas(raiz, ctx);   // precisa do layout (ctx.rr) para o tamanho de cada geração
         IE._cenaMontando = true;
-        const itens = await ieCenaVisitar(raiz, ctx, { chave: '', caminho: '', M: null, raiz: true });
+        const itens = ieCenaPranchetasNoTopo(await ieCenaVisitar(raiz, ctx, { chave: '', caminho: '', M: null, raiz: true }));
         for (const L of ieTodasDe(itens)) { ieCenaMarcar(L); ctx.n++; }
         doc.camadas = novo ? itens : ieCenaJuntar(doc.camadas, itens, ctx);
         ieCenaChecar(raiz, ctx);
@@ -61,6 +61,12 @@ async function ieCena(html, o = {}) {
     ieUiCamadas();
     ieAgendar(ieRDoc(doc), doc);
     return { w: W, h: H, slides: nSlides || undefined, camadas: ctx.n, mantidas: ctx.mantidas, avisos, ms: Math.round(performance.now() - t0) };
+}
+// pranchetas sempre no 1º nível: só ali o Photo as trata como artboards (área de montagem, nome em cima, exportar uma
+// por uma). O div raiz com id (<div id="cena">) viraria um grupo por fora delas: o grupo se desfaz e os filhos sobem.
+function ieCenaPranchetasNoTopo(itens) {
+    const tem = L => L.tipo === 'grupo' && !L.prancheta && (L.filhos || []).some(f => f.prancheta || tem(f));
+    return itens.flatMap(L => tem(L) ? ieCenaPranchetasNoTopo(L.filhos) : [L]);
 }
 // carrossel: guias nas emendas e uma fatia por slide (Arquivo > Exportar fatias também serve), sem tocar nas do usuário
 // (as do Novo layout de guias / Fatias das guias no mesmo lugar valem: não duplica) e deixa guias e fatias à mostra
