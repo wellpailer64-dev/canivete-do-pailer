@@ -119,6 +119,7 @@ como mexida: a camada refeita pelo HTML leva os filtros da antiga (`ieCenaLevarF
 `<div data-prancheta="Feed 1080x1440" data-fundo="#cor" style="position:absolute;left:0;top:0;width:1080px;height:1440px">`
 e outro ao lado (100 px de folga): cada bloco vira uma prancheta (recorta o que passa, nome em cima, exporta uma por
 prancheta). Documento = `--formato` com a soma das larguras. Sem fundo no `body` (fora das pranchetas é área de montagem).
+Nunca fatias aqui (fatia = carrossel). `--exportar` sai uma por prancheta: `base_<nome da prancheta>.png` (2026-11-04).
 
 ## Carrossel de cliente com rascunho + vídeos (2026-10-13, artigo Magnet US: ~240k → meta < 120k)
 O caro foi LER (páginas do rascunho, quadros de vídeo, prévias), não montar (11 slides em ~1 s por rodada). Agora:

@@ -143,6 +143,12 @@ Peça: `D:\kanivete_testes\carrossel3d\` (carrossel.html + .iknv + export/). Rep
 9. **Carrossel sempre com guias e fatias à mostra** (método do Photoshop, pedido do usuário): `KNV.layoutGuias({colunas:
    {n: <páginas>, medianiz: 0}})` → `KNV.fatiasDasGuias()` → `IE.verGuias = true; doc.verFatias = true`. A cena já põe e
    mostra nas emendas (sem duplicar as do layout). Exportar pelas fatias (`--exportar`).
+9b. **Fatia é SÓ para carrossel. Feed + Story (ou qualquer formato/versão a mais) = pranchetas** (artboards), uma por
+   formato, nome "Feed 1080x1440" / "Story 1080x1920", lado a lado com 100 px de folga, sem guias nem fatias. Gatilho:
+   o pedido cita dois tamanhos (feed e story, post e capa, versão por pessoa). Na cena: um
+   `<div data-prancheta="Story 1080x1920" data-fundo="#cor">` por formato (plano-cena.md). `--exportar` e
+   `peca.py entregar --exportar` saem uma imagem por prancheta (`base_Feed 1080x1440.png`); `peca.py entregar` reprova
+   prancheta com fatia e fatias de tamanhos diferentes. Story ≠ feed esticado: recompor (área segura do story).
 10. **Textura de fundo** (tecido): camada cinza 50% acima do fundo de cada slide escuro + Galeria de filtros >
    Texturizador (tela, escala 150, relevo 32) + Adicionar ruído 14% mono, em Sobrepor 85%. Em fundo branco o Sobrepor
    não aparece (ok: slide claro fica limpo). Mais grão/textura no Camera Raw de acabamento (grao 30, graoT 30, graoA 60,

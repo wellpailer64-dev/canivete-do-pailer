@@ -2,7 +2,7 @@
 
   py -3.13 tools/peca.py preset "<preset.psd>" --pasta "<pasta do card>" --nome "NOME"   abre o preset e já grava NOME.iknv na pasta
   py -3.13 tools/peca.py abrir "<arquivo>"                                               abre um arquivo e põe o Photo na frente
-  py -3.13 tools/peca.py entregar --pasta "<pasta do card>" --nome "NOME" [--exportar] [--saida P]   guias+fatias à vista, salva, confere, deixa aberto
+  py -3.13 tools/peca.py entregar --pasta "<pasta do card>" --nome "NOME" [--exportar] [--saida P]   carrossel: guias+fatias à vista; feed+story: pranchetas; salva, confere, deixa aberto
   py -3.13 tools/peca.py enquete --pasta "<card>" --nome "NOME" --exame IMG [--monitor auto|quadrado|horizontal|empe] [--seta X,Y] [--apagar X,Y,W,H] [--refazer]
       Enquete do Dia MagnetUS inteira: escolhe o monitor pela proporção, exame inteiro no limite da tela, nunca amplia por IA, tira letra, põe seta (X,Y = ponto no exame original) e devolve prévia
   py -3.13 tools/peca.py instrucao "<video>"                                             transcreve e gera folha de quadros do vídeo do cliente
@@ -23,7 +23,8 @@ def _js(codigo, porta):
 # documento da frente com guias e fatias por página, ambas à vista; devolve o estado medido
 ESTADO = r"""
  const d=IE.doc; if(!d) throw new Error('nenhum documento aberto');
- const n=PAGINAS||(!(d.pranchetas||[]).length&&d.w>1080&&d.w%1080===0?d.w/1080:0);
+ const prs=ieTodas(d).filter(L=>L.prancheta).map(L=>[L.nome,L.prancheta.w,L.prancheta.h]);   // feed+story = pranchetas, nunca fatias
+ const n=PAGINAS||(!prs.length&&d.w>1080&&d.w%1080===0?d.w/1080:0);
  if(n>1){ const pg=d.w/n, xs=(d.guias||[]).filter(g=>g.o==='v').map(g=>Math.round(g.p));
   let ok=true; for(let i=1;i<n;i++) if(!xs.includes(Math.round(pg*i))) ok=false;
   if(!ok) ieGuiasLayoutAplicar(d,{colunas:{n,largura:'',medianiz:0}},true);
@@ -31,7 +32,7 @@ ESTADO = r"""
  if((d.fatias||[]).length){ IE.verGuias=true; d.verFatias=true; IE.semExtras=false; ieDesenharSobre(); }
  if(!document.querySelector('#page-editor-imagem.active')) switchTool('editor-imagem');
  const est={doc:d.nome,w:d.w,h:d.h,paginas:n||1,guias:(d.guias||[]).filter(g=>g.o==='v').map(g=>g.p),
-  fatias:(d.fatias||[]).map(f=>[f.x,f.w]),verGuias:!!IE.verGuias,verFatias:!!d.verFatias,
+  fatias:(d.fatias||[]).map(f=>[f.x,f.w,f.h]),pranchetas:prs,verGuias:!!IE.verGuias,verFatias:!!d.verFatias,
   photoNaFrente:!!document.querySelector('#page-editor-imagem.active')};
 """
 
@@ -43,6 +44,10 @@ def _estado(paginas):
 def _falhas(e):
     f = []
     if not e["photoNaFrente"]: f.append("o Photo não está na aba da frente")
+    if e.get("pranchetas") and e["fatias"]:
+        f.append("pranchetas com fatias: fatia é só para carrossel; tirar as fatias (cada formato já sai pela sua prancheta)")
+    if len({(w, h) for _, w, h in e["fatias"]}) > 1:
+        f.append("fatias de tamanhos diferentes: formatos diferentes (feed + story) vão em pranchetas, não em fatias")
     if e["paginas"] > 1:
         if len(e["fatias"]) != e["paginas"]: f.append(f"{len(e['fatias'])} fatias para {e['paginas']} páginas")
         if not (e["verGuias"] and e["verFatias"]): f.append("guias ou fatias escondidas")

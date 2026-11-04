@@ -1290,20 +1290,27 @@ function ieCenaChecar(raiz, ctx) {
 }
 
 // ─────────────────────────── exportar ───────────────────────────
-// cada fatia (slides do carrossel, Fatias das guias...) em arquivo: pasta/base_01.png ...; sem fatias, a peça inteira
+// Regra: fatias = carrossel (uma tira cortada em páginas). Formatos diferentes (feed + story...) = pranchetas, uma por
+// formato, exportadas uma a uma pelo nome: pasta/base_Feed 1080x1440.png. Sem fatias nem pranchetas, a peça inteira.
 async function ieCenaExportar(pasta, { fmt = 'png', q = 92, base, escala = 1 } = {}) {
     const doc = IE.doc, api = ieApi();
     if (!doc || !api) throw new Error('sem documento');
-    // as fatias do documento (carrossel da cena ou feitas à mão / Fatias das guias), na ordem; sem fatias, a peça inteira
-    const fs = doc.fatias || [];
-    const partes = fs.length ? fs.map((f, i) => ({ x: f.x, y: f.y, w: f.w, h: f.h, nome: f.nome || String(i + 1).padStart(2, '0') })) : [{ x: 0, y: 0, w: doc.w, h: doc.h, nome: '' }];
+    const fs = doc.fatias || [], prs = fs.length ? [] : ieTodas(doc).filter(L => L.prancheta && L.visivel);
+    const limpa = s => String(s).replace(/[\\/:*?"<>|]/g, '_');
+    const partes = fs.length ? fs.map((f, i) => ({ x: f.x, y: f.y, w: f.w, h: f.h, nome: f.nome || String(i + 1).padStart(2, '0') }))
+        : prs.length ? prs.map(L => ({ ...L.prancheta, nome: limpa(L.nome), L }))
+        : [{ x: 0, y: 0, w: doc.w, h: doc.h, nome: '' }];
     ieCompor(doc, ieRDoc(doc));
     const ini = await api.ie_salvar_inicio(null), itens = [];
-    const nomeBase = String(base || doc.nome || 'peca').replace(/[\\/:*?"<>|]/g, '_');
+    const nomeBase = limpa(base || doc.nome || 'peca');
     const dir = String(pasta).replace(/[\\/]+$/, '');
     for (const [i, P] of partes.entries()) {
         let c = ieCanvas(P.w, P.h);
-        ieCtx(c).drawImage(doc.comp, P.x, P.y, P.w, P.h, 0, 0, P.w, P.h);
+        if (P.L) {   // prancheta composta sozinha (outra sobreposta não entra), como em Pranchetas para arquivos
+            const x = ieCtx(c), R = { x: P.x, y: P.y, w: P.w, h: P.h };
+            x.setTransform(1, 0, 0, 1, -P.x, -P.y);
+            ieComporLista(x, [P.L], R, { x: R.x, y: R.y }, 0);
+        } else ieCtx(c).drawImage(doc.comp, P.x, P.y, P.w, P.h, 0, 0, P.w, P.h);
         if (escala !== 1) c = ieTransformarPlano({ c, x: 0, y: 0 }, [escala, 0, 0, escala, 0, 0]).c;
         const k = `slide_${i}.png`;
         await ieEnviar(ini.url, k, c);

@@ -5,7 +5,7 @@ uso: py -3.13 tools/knv.py peca.html [--formato feed] [--salvar peca.iknv] [--pr
   --de        abre esse .iknv antes (rodar de novo atualiza as camadas pela chave e não toca no que foi mexido)
   --novo      documento novo mesmo com um aberto; --refazer refaz também as camadas mexidas
   --depois    JS com chamadas KNV.* depois da cena (ajustes de foto, pincel, recorte...)
-  --exportar  pasta: carrossel = um arquivo por slide (base_01.png...), senão a peça inteira (--fmt png|jpg|webp)
+  --exportar  pasta: carrossel = um arquivo por slide (base_01.png...); pranchetas (feed+story) = um por prancheta; senão a peça inteira (--fmt png|jpg|webp)
   --previa    JPEG da composição (padrão: <peca>.jpg ao lado, escala 0.5) para julgar a estética; --sem-previa não grava
   --ver       só um pedaço, barato: "slide:2" ou "x,y,w,h" (escala --escala-ver 0.4) → <peca>_ver.jpg
   --referencia ref.png   imagem de referência como camada oculta e travada (escalada ao documento)

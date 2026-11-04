@@ -7,6 +7,7 @@ Vale para arte e vídeo de cliente do Pandalab. Siga na ordem. Cliente com ficha
 - O programa fica visível do começo ao fim. Ele precisa ver o trabalho acontecendo.
 - Fim do trabalho = salvar e deixar aberto para ele aprovar. Exportar, entregar e mudar o card só depois do ok.
 - Carrossel termina com guia na divisa e uma fatia por página, à vista.
+- Feed + Story (ou outro formato/versão a mais) = uma prancheta por formato no mesmo projeto, sem fatias. Fatia é só carrossel.
 
 ## Passos
 1. **Baixar**: `py -3.13 D:/Kanivete/Plugins/pandalab/panda.py demanda <id8>` e `baixar <id8>`. Vai para a pasta certa do cliente. Ler `BRIEFING.txt`, `demanda.json` e os `02 - ASSETS`.
