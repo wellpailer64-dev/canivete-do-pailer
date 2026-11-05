@@ -25,7 +25,11 @@ async function veRespirosPlano(opc) {
         // fonte → timeline (respeita velocidade); só o que está dentro do clipe
         (r.cortes || []).forEach(([a, b]) => {
             const ta = c.st + a / v, tb = c.st + b / v;
-            if (tb > ta) intervalos.push([Math.max(c.st, ta), Math.min(veEnd(c), tb)]);
+            if (tb <= ta) return;
+            let ia = Math.max(c.st, ta), ib = Math.min(veEnd(c), tb);
+            if (ia - c.st < 0.12) ia = c.st;               // não deixa lasca de clipe nas pontas
+            if (veEnd(c) - ib < 0.12) ib = veEnd(c);
+            intervalos.push([ia, ib]);
         });
     }
     intervalos.sort((x, y) => x[0] - y[0]);

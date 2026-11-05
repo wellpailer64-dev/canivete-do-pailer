@@ -9,7 +9,7 @@
 
 const VEAZ = { opc: null, rodando: false };
 const VE_AZ_PADRAO = { qtd: 'medio', estilo: 'smart', forca: 'media', mb: 'sim' };
-const VE_AZ_ESPACO = { pouco: 12, medio: 7, muito: 4, auto: 0 };       // segundos entre um zoom e outro (alvo)
+const VE_AZ_ESPACO = { pouco: 12, medio: 5, muito: 3.5, auto: 0 };       // segundos entre um zoom e outro (alvo)
 const VE_AZ_ZOOM = { leve: [108, 112], media: [111, 116], forte: [115, 122] };   // [suave, seco] em %
 
 // ── o efeito ──

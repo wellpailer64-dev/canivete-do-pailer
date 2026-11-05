@@ -203,6 +203,7 @@ function veLpBlocos(W) {
     const fimFrase = w => /[.!?…]["')\]]?$/.test(w);
     W.forEach((w, iw) => {
         if (cur.length && w[0] - cur[cur.length - 1][1] > 0.55) fecha();
+        else if (cur.length >= 3 && w[1] - cur[0][0] > 2.2) fecha();   // legenda não fica mais de ~2 s na tela
         cur.push(w);
         const nC = cur.filter(x => !veLpEhLig(x[2])).length, txt = cur.map(x => x[2]).join(' ');
         // a próxima palavra fecha a frase e vem colada: espera por ela ("quer faturar mais | dinheiro?" ficava sozinha)
