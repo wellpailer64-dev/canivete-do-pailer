@@ -2,7 +2,7 @@
 // Ordem da Edição completa: respiros → J-cut → transcrição da timeline já cortada → legenda Premium (com os SFX dela) →
 // autozoom. Tudo vira UM desfazer. Cada etapa pode ser desligada; as opções de cada uma vêm da sua seção.
 
-const VEKE = { rodando: false, etapa: '', ultimo: null, opc: { respiros: true, jcut: true, legenda: true, autozoom: true } };
+const VEKE = { rodando: false, cancelar: false, etapa: '', ultimo: null, opc: { respiros: true, jcut: true, legenda: true, autozoom: true } };
 try { Object.assign(VEKE.opc, JSON.parse(localStorage.getItem('ve-ke-opc') || '{}')); } catch (e) {}
 const VE_KE_ETAPAS = [
     ['respiros', 'Cortar respiros', 'pausas e respiros, com sobra natural'],
@@ -24,6 +24,7 @@ function veKeRender() {
         }).join('')}</div>
         <button type="button" class="ve-az-gerar" data-ke-acao="tudo"${VEKE.rodando ? ' disabled' : ''}>
             ${VEKE.rodando ? `<span class="ve-az-gira"></span>${veT(VEKE.etapa || 'Editando…')}` : `<svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>${veT('Editar tudo')}`}</button>
+        ${VEKE.rodando ? `<div class="ve-az-pe"><span></span><button type="button" data-ke-acao="cancelar">${veT(VEKE.cancelar ? 'Parando…' : 'Cancelar')}</button></div>` : ''}
         <div class="ve-az-pe"><span>${u ? u.resumo : veT('Um desfazer volta tudo')}</span>
             ${u && u.mudou ? `<button type="button" data-ke-acao="desfazer">${veT('Desfazer')}</button>` : ''}</div>`;
 }
@@ -40,7 +41,7 @@ async function veKeEsperarTranscricao() {
     veTxTranscrever();
     for (let k = 0; k < 1800; k++) {
         await new Promise(r => setTimeout(r, 1000));
-        if (!VETX.rodando) break;
+        if (!VETX.rodando || VEKE.cancelar) break;
     }
     return VETX.palavras.length > 0;
 }
@@ -50,8 +51,8 @@ async function veKaniEditCompleto(opc) {
     if (VEKE.rodando) return { ok: false, motivo: 'já rodando' };
     if (!VE.ready) { veToast(veT('Abra um vídeo primeiro')); return { ok: false, motivo: 'sem vídeo' }; }
     const o = { ...VEKE.opc, ...(opc || {}) }, etapas = [], n0 = VE.history.length, dur0 = veNavDur();
-    const passo = t => { VEKE.etapa = t; veKeRender(); };
-    VEKE.rodando = true; veKeRender();
+    const passo = t => { if (VEKE.cancelar) throw new Error('cancelado'); VEKE.etapa = t; veKeRender(); };
+    VEKE.rodando = true; VEKE.cancelar = false; veKeRender();
     try {
         if (o.respiros && typeof veRespirosAplicar === 'function') {
             passo('Cortando respiros…');
@@ -79,11 +80,11 @@ async function veKaniEditCompleto(opc) {
             etapas.push(`${(z && z.length) || 0} zooms`);
         }
     } catch (e) {
-        veToast('KaniEdit: ' + (e && e.message || e));
+        if (e && e.message === 'cancelado') etapas.push(veT('cancelado')); else veToast('KaniEdit: ' + (e && e.message || e));
     } finally {
         if (VE.history.length > n0 + 1) VE.history.splice(n0 + 1);   // um desfazer só para a edição inteira
         if (typeof veUpdateUndo === 'function') veUpdateUndo();
-        VEKE.rodando = false; VEKE.etapa = '';
+        VEKE.rodando = false; VEKE.cancelar = false; VEKE.etapa = '';
     }
     const mudou = VE.history.length > n0, menos = dur0 - veNavDur();
     VEKE.ultimo = { mudou, resumo: (etapas.join(' · ') + (menos > 0.05 ? ` · −${menos.toFixed(1)} s` : '')) || veT('Nada a fazer') };
@@ -103,6 +104,7 @@ function veKeInit() {
     box.addEventListener('click', e => {
         const b = e.target.closest('[data-ke-acao],[data-jc-acao]'); if (!b) return;
         if (b.dataset.keAcao === 'tudo') veKaniEditCompleto();
+        else if (b.dataset.keAcao === 'cancelar') { VEKE.cancelar = true; veKeRender(); }
         else if (b.dataset.keAcao === 'desfazer') { if (typeof veUndo === 'function') veUndo(); VEKE.ultimo = null; veKeRender(); }
         else if (b.dataset.jcAcao === 'aplicar' && veKeTemJcut()) veJcutAplicar({}).then(r => r && r.resumo && veToast(r.resumo));
     });
@@ -115,7 +117,7 @@ function veKeInit() {
 }
 if (typeof I18N_EN === 'object') Object.entries({
     'KaniEdit': 'KaniEdit', 'Edição completa': 'Full edit', 'tudo de uma vez, na ordem certa': 'everything at once, in the right order',
-    'Editar tudo': 'Edit everything', 'J-cut 0 (Ágil não deixa pausa)': 'J-cut 0 (Agile leaves no pause)', 'J-cut 0 (sem pausa sobrando)': 'J-cut 0 (no spare pause)', 'Um desfazer volta tudo': 'One undo reverts it all', 'Em construção': 'Coming soon', 'em construção': 'coming soon',
+    'Editar tudo': 'Edit everything', 'Cancelar': 'Cancel', 'Parando…': 'Stopping…', 'cancelado': 'canceled', 'J-cut 0 (Ágil não deixa pausa)': 'J-cut 0 (Agile leaves no pause)', 'J-cut 0 (sem pausa sobrando)': 'J-cut 0 (no spare pause)', 'Um desfazer volta tudo': 'One undo reverts it all', 'Em construção': 'Coming soon', 'em construção': 'coming soon',
     'pausas e respiros, com sobra natural': 'pauses and breaths, kept natural', 'J-cut': 'J-cut',
     'som da próxima frase entra antes': 'next line audio comes in early', 'Legenda Premium': 'Premium captions', 'com efeitos sonoros nas ênfases': 'with SFX on emphasis',
     'zoom no rosto nos momentos fortes': 'face zoom on strong moments', 'o som da próxima frase entra antes da imagem': 'the next line audio starts before the picture',
