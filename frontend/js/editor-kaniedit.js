@@ -61,7 +61,8 @@ async function veKaniEditCompleto(opc) {
         if (o.jcut && veKeTemJcut()) {
             passo('Aplicando J-cut…');
             const r = await veJcutAplicar({});
-            etapas.push(`J-cut ${(r && r.tratadas) || 0}`);
+            const nj = (r && r.tratadas) || 0, agil = typeof VERS === 'object' && VERS.preset === 'agressivo';
+            etapas.push(nj ? `J-cut ${nj}` : veT(agil ? 'J-cut 0 (Ágil não deixa pausa)' : 'J-cut 0 (sem pausa sobrando)'));
         }
         if (o.legenda || o.autozoom) {
             passo('Transcrevendo a fala…');
@@ -114,7 +115,7 @@ function veKeInit() {
 }
 if (typeof I18N_EN === 'object') Object.entries({
     'KaniEdit': 'KaniEdit', 'Edição completa': 'Full edit', 'tudo de uma vez, na ordem certa': 'everything at once, in the right order',
-    'Editar tudo': 'Edit everything', 'Um desfazer volta tudo': 'One undo reverts it all', 'Em construção': 'Coming soon', 'em construção': 'coming soon',
+    'Editar tudo': 'Edit everything', 'J-cut 0 (Ágil não deixa pausa)': 'J-cut 0 (Agile leaves no pause)', 'J-cut 0 (sem pausa sobrando)': 'J-cut 0 (no spare pause)', 'Um desfazer volta tudo': 'One undo reverts it all', 'Em construção': 'Coming soon', 'em construção': 'coming soon',
     'pausas e respiros, com sobra natural': 'pauses and breaths, kept natural', 'J-cut': 'J-cut',
     'som da próxima frase entra antes': 'next line audio comes in early', 'Legenda Premium': 'Premium captions', 'com efeitos sonoros nas ênfases': 'with SFX on emphasis',
     'zoom no rosto nos momentos fortes': 'face zoom on strong moments', 'o som da próxima frase entra antes da imagem': 'the next line audio starts before the picture',
