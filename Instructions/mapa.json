@@ -56,6 +56,7 @@
     "editor-rastro.js",
     "editor-remix.js",
     "editor-render.js",
+    "editor-respiros.js",
     "editor-reverse.js",
     "editor-roto.js",
     "editor-scopes.js",
@@ -121,6 +122,8 @@
     "ve_salvar_png",
     "ve_txa_lista",
     "anti_noise_preparar",
+    "ve_respiros",
+    "ve_peaks_faixa",
     "ve_sb_estado",
     "ve_sb_baixar",
     "ve_sfx_estado",
@@ -487,6 +490,7 @@
     "imagem-ajustes.js",
     "imagem-api.js",
     "imagem-arquivo.js",
+    "imagem-arrastar-valor.js",
     "imagem-atalhos.js",
     "imagem-cameraraw.js",
     "imagem-caneta.js",
@@ -952,6 +956,7 @@
   "reveal_file",
   "open_file",
   "select_video_file",
+  "ls_save",
   "prefs_load",
   "prefs_save",
   "check_update",
@@ -1186,6 +1191,18 @@
   "video_cutter_add_media": {
    "args": "path",
    "modulos": []
+  },
+  "ve_respiros": {
+   "args": "path, ini=0, dur=None, preset=\"normal\", min_pausa=None, sobra=None, sobra_longa=None",
+   "modulos": [
+    "respiros"
+   ]
+  },
+  "ve_peaks_faixa": {
+   "args": "path, ini, dur, n",
+   "modulos": [
+    "video_cutter"
+   ]
   },
   "ve_sb_estado": {
    "args": "",
@@ -2640,6 +2657,10 @@
    "args": "",
    "modulos": []
   },
+  "ls_save": {
+   "args": "dados",
+   "modulos": []
+  },
   "prefs_load": {
    "args": "",
    "modulos": []
@@ -3310,6 +3331,7 @@
   "Instructions/agente/ajuste-premiere.md": "AJUSTE PREMIERE: plano para a próxima sessão",
   "Instructions/agente/arquiteto-local.md": "Arquiteto Local B",
   "Instructions/agente/ata-kanivete.md": "Ata Kanivete (At, verde #1FA971) — Beta",
+  "Instructions/agente/auto-edicao-plano.md": "Edição automática (1 clique) — levantamento 2026-11-05",
   "Instructions/agente/autozoom.md": "Autozoom (Vídeo Kanivete)",
   "Instructions/agente/cena-3d-editor.md": "Cena 3D no Editor Kanivete (estilo After Effects)",
   "Instructions/agente/cor-cinematografica.md": "Cor cinematográfica — pesquisa e uso no Luz e Cor",
@@ -3331,8 +3353,10 @@
   "Instructions/agente/mapa-kanivete-encoder.md": "Mapa do Kanivete Encoder (Ke)",
   "Instructions/agente/mapa-vetor.md": "Mapa do código — vetor (gerado por tools/mapa_codigo.py; nome:linha)",
   "Instructions/agente/metodo-edicao-video.md": "Método de Edição de Vídeo do Pailer",
+  "Instructions/agente/missao-repertorio-motion.md": "Missão Repertório Motion (desde 2026-11-04)",
   "Instructions/agente/mockup-profissional.md": "Mockup profissional — o que os PSDs dos estúdios fazem (estudo 2026-10-15)",
   "Instructions/agente/mogrt.md": "MOGRT no Vídeo Kanivete (Motion Graphics Template do Premiere)",
+  "Instructions/agente/motion-glossario-e-processo.md": "Motion: glossário de mercado + processo em etapas",
   "Instructions/agente/motion-html.md": "Motion em HTML → timeline nativa do Vídeo Kanivete",
   "Instructions/agente/nucleo-hardware.md": "Núcleo de hardware: o app se ajustar a cada PC (2026-10-10)",
   "Instructions/agente/pincel-roto.md": "Pincel Roto e Refinar borda (Roto Brush do After Effects no Editor Kanivete)",
@@ -3460,6 +3484,7 @@
   "Functions/remix.py": "remix.py — Remix de música (o \"Remix\" do Premiere): esticar ou encurtar uma trilha para a duração pedida,",
   "Functions/removerfundo.py": "removerfundo.py",
   "Functions/render_cache.py": "Cache de render em disco do Pocket Editor (como os \"Preview Files\" do Premiere)",
+  "Functions/respiros.py": "respiros.py — acha as pausas e respiros de uma fala e devolve os trechos a cortar SEM perder a naturalidade",
   "Functions/sincronizar.py": "Sincronizar clipes pelo áudio (como o \"Sincronizar › Áudio\" do Premiere): duas câmeras gravando a mesma cena",
   "Functions/sk_banco_vozes.py": "Banco de vozes do Texto para Voz (Sound Kanivete)",
   "Functions/sk_espectro.py": "Sound Kanivete — espectrograma, reparo espectral e separação voz/instrumental",
@@ -3550,6 +3575,7 @@
   "teste_rastro": "Rastreador de movimento (editor-rastro.js + Functions/rastreador.py) no app de verdade, com GABARITO: um quadro",
   "teste_refino_mascara": "Refino de máscara: alfa, fundo externo, prévia, cancelamento, pixels preservados e histórico; sem IA",
   "teste_remix": "Remix de música na timeline (editor-remix.js + Functions/remix.py), com mouse de verdade: põe uma música de 3:46",
+  "teste_respiros": "Cortar respiros (editor-respiros.js + Functions/respiros.py) e onda em alta resolução (ve_peaks_faixa) no app de verdade",
   "teste_roto": "Pincel Roto (editor-roto.js + Functions/pincel_roto.py) no app de verdade: vídeo de entrevista na V1, texto animado",
   "teste_seq_escala": "Configurações da sequência › \"Adaptar o conteúdo ao novo tamanho\": trocar o quadro (Full HD → 4K → Full HD, e de",
   "teste_sfx": "Gerador de efeitos sonoros (Functions/gerador_sfx.py): agendador DDIM igual ao do diffusers e uma geração curta",

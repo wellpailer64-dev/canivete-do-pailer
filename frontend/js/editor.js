@@ -53,7 +53,8 @@ const VE = {
 };
 
 const VE_RULER = 40;   // régua da timeline mais alta: fácil de acertar o clique (= .ve-head-ruler no CSS)
-const VE_MAX_PPS = 3000;   // zoom máximo: ~100 px por quadro a 30 fps
+const VE_MAX_PPS = 16000;   // zoom máximo: ~530 px por quadro a 30 fps (onda em alta resolução a partir de VE_PF_MIN)
+const VE_PF_MIN = 220;      // a partir daqui a onda pede picos finos do trecho visível (ve_peaks_faixa)
 const VE_TRACK_MIN = 22, VE_TRACK_MAX = 220;
 const VE_MIN_TRACKS = 4;
 // procura na janela principal e, se o painel estiver numa janela solta (editor-dock.js), nela
@@ -5223,6 +5224,23 @@ function veClampVScroll() {
     VE.vs = Math.min(Math.max(VE.vs, 0), max);
 }
 
+// Onda de alta resolução (zoom profundo): picos finos só do trecho visível, pedidos ao Python e guardados por mídia.
+function vePicosFinos(med, path, s0, s1) {
+    if (VE.pps < VE_PF_MIN || !path || !window.pywebview?.api?.ve_peaks_faixa) return null;
+    const dens = Math.min(VE.pps * 1.2, 8000), f = med._pf;
+    if (f && f.path === path && f.ini <= s0 && f.fim >= s1 && f.dens >= dens * 0.7) return f;
+    if (!med._pfBusy) {
+        med._pfBusy = true;
+        const vis = Math.max(s1 - s0, 0.05), ini = Math.max(0, s0 - vis), dur = vis * 3;
+        const n = Math.min(24000, Math.round(dur * dens));
+        window.pywebview.api.ve_peaks_faixa(path, ini, dur, n).then(r => {
+            med._pfBusy = false;
+            if (r && r.success && r.peaks && r.peaks.length) { med._pf = { path, ini, fim: ini + dur, dens: r.peaks.length / dur, peaks: r.peaks }; veDraw(); }
+        }).catch(() => { med._pfBusy = false; });
+    }
+    return f && f.path === path && f.ini <= s0 && f.fim >= s1 ? f : null;   // enquanto chega, a onda grossa segue na tela
+}
+
 function veSetPps(pps, anchorT, anchorX) {
     VE.pps = Math.min(Math.max(pps, veMinPps()), VE_MAX_PPS);
     if (anchorT != null) VE.view = anchorT - anchorX / VE.pps;
@@ -5814,11 +5832,13 @@ function veRender() {
             const base = ay + ah - 3, amp = Math.max(1, ah - 6), g0 = c.g || 0;
             const linha = typeof veCnValor === 'function' && veKfOn(c, 'vol');   // linha de volume da caneta (dB)
             const xa = Math.max(cx, 0), xb = Math.min(cx + cw, W);
+            const fino = veMelLigado(med) ? null : vePicosFinos(outra ? med : VE, outra ? med.path : VE.path, srcAt(xa), srcAt(xb));
+            const pU = fino ? fino.peaks : picos, nU = pU.length, d0 = fino ? fino.ini : 0, dU = fino ? fino.fim - fino.ini : durP;
             for (let x = xa; x < xb; x += 2) {
                 const sa = srcAt(x), sb = srcAt(x + 2);
-                const ia = Math.floor(sa / durP * np), ib = Math.max(ia + 1, Math.ceil(sb / durP * np));
+                const ia = Math.floor((sa - d0) / dU * nU), ib = Math.max(ia + 1, Math.ceil((sb - d0) / dU * nU));
                 let pk = 0;
-                for (let k = Math.max(0, ia); k < Math.min(np, ib); k++) pk = Math.max(pk, picos[k]);
+                for (let k = Math.max(0, ia); k < Math.min(nU, ib); k++) pk = Math.max(pk, pU[k]);
                 // como no Premiere: a onda segue o volume que sai (ganho + linha de volume), em escala de dB de
                 // −48 a 0 dBFS — abaixar encolhe até sumir, passar do topo = estouro (vermelho). Os picos vêm em raiz
                 // (gerar_peaks): pk² é a amplitude real.

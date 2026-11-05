@@ -358,6 +358,22 @@ def main():
             r = J("async (a) => { const d = await ieAbrirArquivo(a); await new Promise(r => setTimeout(r, 300)); return {n: ieTodas(d).length, dif: ieDiferencaAchatado()}; }", salvo.replace("\\", "/"))
             ok(r["n"] == n_final, f"reabriu com {r['n']} camadas")
             ok(r["dif"] is not None and r["dif"]["media"] < 3, f"reaberto igual ao salvo (diferença {r['dif']})")
+            # 12. pintar, salvar, desfazer e salvar de novo: o arquivo volta junto (antes a pintura ficava no PSD)
+            r = J("""async (p) => {
+                const L = ieTodas(IE.doc).find(l => l.tipo === 'pixel' && l.c && l.ref != null && l.c.width > 20);
+                const px = () => [...ieCtx(L.c).getImageData(10, 10, 1, 1).data];
+                const antes = px();
+                ieGravavel(L); const x = ieCtx(L.c); x.fillStyle = '#ff00ff'; x.fillRect(0, 0, 20, 20);
+                L.sujoPx = true; ieInvalidar(L); ieHist('pintar'); ieTudo();
+                await ieSalvar(false, p);
+                ieDesfazer();
+                const L2 = ieTodas(IE.doc).find(l => l.uid === L.uid);
+                const ok2 = await ieSalvar(false, p);
+                return {nome: L.nome, antes, depois: [...ieCtx(L2.c).getImageData(10, 10, 1, 1).data], x: L.x + 10, y: L.y + 10, ok2};
+            }""", salvo.replace("\\", "/"))
+            l2 = next(l for l in PSDImage.open(salvo).descendants() if l.name == r["nome"])
+            arq = list(l2.topil().convert("RGBA").getpixel((r["x"] - l2.left, r["y"] - l2.top)))
+            ok(r["ok2"] and arq[:3] == r["antes"][:3], f"desfazer depois de salvar: o arquivo acompanha (tela {r['depois']}, arquivo {arq})")
             J("(() => { const api = window.pywebview.api; if (api.__orig) { api.ie_dialogo_salvar = api.__orig; delete api.__orig; } })()")
             J("(async () => { for (const d of [...IE.docs]) await ieFecharDoc(d, true); })()")
             ok(not [e for e in erros if "editor de imagem" in e or "imagem-" in e], f"sem erros de JavaScript ({erros[:3]})")

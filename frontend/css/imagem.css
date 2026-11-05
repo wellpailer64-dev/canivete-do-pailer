@@ -237,11 +237,12 @@
 .ie-trava.on { color: var(--ie-acento); border-color: var(--primary-line); }
 .ie-cam-lista { flex: 1; overflow-y: auto; min-height: 0; }
 .ie-cam {
-    display: flex; align-items: center; gap: 6px; height: 48px; padding-right: 8px; border-bottom: 1px solid var(--ie-linha); cursor: default; position: relative;
+    display: flex; align-items: center; gap: 6px; height: 72px; padding-right: 8px; border-bottom: 1px solid var(--ie-linha); cursor: default; position: relative;
 }
 .ie-cam:hover { background: rgba(255, 255, 255, .03); }
 .ie-cam.sel { background: var(--ie-sel); }
 .ie-cam.ativa { box-shadow: inset 3px 0 0 var(--ie-acento); }
+.ie-cam:focus-visible { outline: 2px solid var(--ie-acento); outline-offset: -2px; }
 .ie-cam.oculta .ie-cam-nome, .ie-cam.oculta .ie-cam-mini { opacity: .45; }
 .ie-cam.drop-acima { box-shadow: inset 0 2px 0 var(--ie-acento); }
 .ie-cam.drop-abaixo { box-shadow: inset 0 -2px 0 var(--ie-acento); }
@@ -257,7 +258,7 @@
 .ie-cam-elo .ie-i { width: 12px; height: 12px; }
 .ie-cam-elo.off { color: transparent; }
 .ie-cam-elo.off:hover { color: var(--text-3); }
-.ie-cam-mini { width: 40px; height: 40px; border: 1px solid var(--ie-linha-2); border-radius: 2px; background: #8f8f8f; flex: none; }
+.ie-cam-mini { width: 64px; height: 64px; border: 1px solid var(--ie-linha-2); border-radius: 2px; background: #8f8f8f; flex: none; }
 .ie-cam-mini.alvo { outline: 2px solid var(--text-2); outline-offset: 1px; }
 .ie-cam.sel .ie-cam-mini.alvo { outline-color: var(--ie-acento); }
 .ie-cam-mini-aj { display: grid; place-items: center; background: var(--ie-painel-2); color: var(--text-2); }

@@ -118,7 +118,7 @@ def main():
             pg.evaluate("window.vePrSegEm = () => null; window.vePrAutoTick = () => {}; window.veCacheGet = () => null;")
             pg.evaluate("""d => { veStop(); vePushHistory(); VE.clips = VE.clips.filter(c => !(c.az)); VE.clips.forEach(c => { c.e = Math.min(c.e, c.s + d); }); veRelayout(); veRefresh(); }""", a.dur)
             # painel Animação › Autozoom visível
-            pg.evaluate("vedShow && vedShow('trans')")
+            pg.evaluate("vedShow && vedShow('kaniedit')")
             time.sleep(0.5)
             vis = pg.evaluate("(() => { const s = document.getElementById('ve-az-sec'), r = s && s.getBoundingClientRect(); return !!r && r.height > 40 && !!s.querySelector('[data-az-acao=gerar]'); })()")
             ok(vis, "seção Autozoom no painel Animação")

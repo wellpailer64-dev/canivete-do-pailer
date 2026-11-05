@@ -930,6 +930,33 @@ def gerar_peaks(path, duration):
         return []
 
 
+def peaks_faixa(path, ini, dur, n):
+    """Forma de onda de ALTA resolução de só um trecho (zoom profundo da timeline, como o Premiere):
+    `n` picos de [ini, ini+dur) a 16 kHz, mesma compressão (raiz) do gerar_peaks."""
+    try:
+        import numpy as np
+    except Exception:
+        return []
+    try:
+        ini, dur, n = max(0.0, float(ini)), max(0.01, float(dur)), int(max(8, min(24000, n)))
+        r = subprocess.run(
+            [ffmpeg_path(), "-v", "error", "-ss", f"{ini:.4f}", "-t", f"{dur:.4f}", "-i", path, "-vn", "-ac", "1",
+             "-ar", "16000", "-f", "s16le", "pipe:1"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=120, creationflags=_creationflags())
+        pcm = np.frombuffer(r.stdout, dtype=np.int16)
+        if not len(pcm):
+            return []
+        total = int(round(dur * 16000))
+        if len(pcm) < total:
+            pcm = np.pad(pcm, (0, total - len(pcm)))
+        bordas = np.linspace(0, total, n + 1).astype(int)
+        a = np.abs(pcm[:total].astype(np.int32))
+        picos = np.maximum.reduceat(a, bordas[:-1]) if total >= n else a[:n]
+        return [round(float(x), 3) for x in np.sqrt(np.clip(picos / 32768.0, 0, 1))]
+    except Exception:
+        return []
+
+
 # Prévia leve: lado CURTO até `lado` px (Preferências → Qualidade das prévias: 1080/720/540; vídeo em pé
 # 2160x3840 → 1080x1920; deitado 4K → 1920x1080). Limitar a ALTURA deixava um 4K vertical borrado (405x720).
 def _proxy_escala(lado=1080):

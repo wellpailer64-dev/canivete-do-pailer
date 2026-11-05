@@ -1758,6 +1758,8 @@ body.ve-kl-scrub, body.ve-kl-scrub * { cursor: ew-resize !important; }
 .ve-an-sec.ve-txa-sec { display: block; max-height: none; }
 /* Autozoom (editor-autozoom.js) */
 .ve-an-sec.ve-az-sec { display: block; max-height: none; }
+.ve-az-corpo.ve-rs-corpo { --az: var(--primary); --az-2: var(--primary); }   /* Respiros: mesmo visual do Autozoom, na cor do tema */
+.ve-rs-corpo .ve-az-gerar { background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 70%, #000)); }
 .ve-az-corpo { --az: #ff4fa3; --az-2: #ff7ab8; display: flex; flex-direction: column; gap: 10px; padding: 10px 10px 12px; }
 .ve-az-estilos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .ve-az-estilo { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 7px 8px 8px; min-width: 0;

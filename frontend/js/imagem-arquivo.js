@@ -307,6 +307,28 @@ async function ieSalvarPdfAchatado(doc, destino) {
     } finally { ieCarregando(false); }
 }
 
+// salvou o PSD: ele vira a origem. Os estados do histórico guardavam as referências e as marcas "mudou" de antes
+// (2026-11-04: pintar, salvar, desfazer e salvar de novo deixava a pintura no arquivo — a camada voltava com
+// sujoPx=false e não era regravada). Cada estado passa a apontar para as camadas do arquivo novo e marca o que difere dele.
+function ieHistAposSalvar(doc) {
+    const vivas = new Map(ieTodas(doc).map(L => [L.uid, L]));
+    const ig = (a, b) => a === b || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+    const anda = lista => lista.forEach(s => {
+        if (s.filhos) anda(s.filhos);
+        const L = s.uid != null ? vivas.get(s.uid) : null;
+        if (!L) { s.ref = null; s.refNome = null; return; }   // camada que não existe mais no arquivo: vai inteira
+        s.ref = L.ref; s.refNome = L.refNome;
+        s.tfBase = L.tf ? [...L.tf] : undefined;
+        s.sujoPx = s.c !== L.c || !!s.c0 !== !!L.c0 || (s.c0 && s.c0.c !== L.c0.c);
+        s.movido = s.x !== L.x || s.y !== L.y;
+        s.sujoM = !!s.m !== !!L.m || !!(s.m && (s.m.c !== L.m.c || s.m.x !== L.m.x || s.m.y !== L.m.y || (s.m.fundo || 0) !== (L.m.fundo || 0) || !!s.m.desativada !== !!L.m.desativada));
+        s.fxMudou = !ig(s.fx, L.fx) || !!s.fxOculto !== !!L.fxOculto;
+        s.mesclaMudou = IE_MESCLA_CHAVES.some(k => !ig(s[k], L[k]));
+        s.pranchetaMudou = !ig(s.prancheta, L.prancheta);
+    });
+    for (const it of doc.hist.itens) anda(it.foto.camadas);
+}
+
 async function ieSalvar(comoNovo = false, destinoForcado = null, refeito = false) {
     const doc = IE.doc, api = ieApi();
     if (!doc || !api) return false;
@@ -443,6 +465,7 @@ async function ieSalvar(comoNovo = false, destinoForcado = null, refeito = false
             if (L.textoNovo != null && L.texto) { L.texto.texto = L.textoNovo; }
             L.textoNovo = null;
         });
+        ieHistAposSalvar(doc);
         doc.achatadoC = ieClonar(doc.comp); doc.achatado = true;
         doc.fatiasOrig = JSON.stringify(ieFatiasSpec(doc)); doc.guiasOrig = JSON.stringify(doc.guias || []);
         doc.sujo = false;

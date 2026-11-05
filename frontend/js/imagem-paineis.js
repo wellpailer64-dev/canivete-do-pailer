@@ -374,7 +374,7 @@ function ieUiCamadas() {
             : X.tipo === 'ajuste' ? `<span class="ie-cam-mini ie-cam-mini-aj ${doc.mascaraAlvo && X.id === doc.ativa ? '' : 'alvo'}" data-alvo="px">${ieIco('adj')}</span>`
             : `<span class="ie-cam-mini-box"><canvas class="ie-cam-mini ${!(doc.mascaraAlvo && X.id === doc.ativa) ? 'alvo' : ''}" data-alvo="px" data-mini="${X.id}" width="40" height="40"></canvas>${X.tipo === 'inteligente' ? `<i class="ie-cam-selo" title="${ieT('Objeto inteligente')}">${ieIco('smart')}</i>` : ''}</span>`;
         const masc = X.m ? `<button class="ie-cam-elo ${X.m.solta ? 'off' : ''}" data-elo="${X.id}" title="${ieT(X.m.solta ? 'Máscara solta: move separado da imagem (clique: prender)' : 'Máscara presa à camada: movem juntas (clique: soltar)')}">${ieIco('elo')}</button><canvas class="ie-cam-mini ie-cam-masc ${X.m.desativada ? 'off' : ''} ${doc.mascaraAlvo && X.id === doc.ativa ? 'alvo' : ''}" data-alvo="m" data-mmini="${X.id}" width="40" height="40" title="${ieT('Máscara (Shift+clique: desativar)')}"></canvas>` : '';
-        return `<div class="ie-cam ${X.prancheta ? 'ie-cam-prancheta' : ''} ${sel.has(X.id) ? 'sel' : ''} ${X.id === doc.ativa ? 'ativa' : ''} ${X.visivel ? '' : 'oculta'} ${X.clip ? 'clip' : ''}" data-id="${X.id}" draggable="true" style="--nivel:${nivel}">
+        return `<div class="ie-cam ${X.prancheta ? 'ie-cam-prancheta' : ''} ${sel.has(X.id) ? 'sel' : ''} ${X.id === doc.ativa ? 'ativa' : ''} ${X.visivel ? '' : 'oculta'} ${X.clip ? 'clip' : ''}" data-id="${X.id}" tabindex="0" draggable="true" style="--nivel:${nivel}">
             <button class="ie-cam-olho ${X.visivel ? 'on' : ''}" data-olho="${X.id}" title="${ieT('Mostrar/ocultar (Alt+clique: só esta)')}">${X.visivel ? ieIco('eye') : ''}</button>
             <span class="ie-cam-recuo"></span>${X.clip ? `<span class="ie-cam-clip">${ieIco('clip')}</span>` : ''}
             ${miniatura}${masc}
@@ -509,6 +509,20 @@ function ieCamadasInstalar() {
     const lista = ieEl('ie-cam-lista'), topo = ieEl('ie-cam-topo');
     if (!lista || lista._ok) return;
     lista._ok = true;
+    lista.addEventListener('keydown', ev => {
+        if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(ev.key) || ev.target.closest('input,button,select')) return;
+        const doc = IE.doc, atual = ev.target.closest('.ie-cam');
+        if (!doc || !atual) return;
+        const linhas = [...lista.querySelectorAll('.ie-cam')];
+        const indice = linhas.indexOf(atual);
+        const prox = ev.key === 'Home' ? 0 : ev.key === 'End' ? linhas.length - 1 : Math.max(0, Math.min(linhas.length - 1, indice + (ev.key === 'ArrowDown' ? 1 : -1)));
+        if (prox === indice) return;
+        ev.preventDefault();
+        ieAtivar(+linhas[prox].dataset.id, doc, { somar: ev.ctrlKey, faixa: ev.shiftKey });
+        ieUiCamadas();
+        lista.querySelector(`.ie-cam[data-id="${linhas[prox].dataset.id}"]`)?.focus({ preventScroll: true });
+        ieCamadaRolarAte(lista, linhas[prox].dataset.id);
+    });
     // Alt + divisa entre duas camadas (como no Photoshop): o cursor vira o ícone de corte e o clique prende a de cima
     // na de baixo (máscara de corte); na divisa de uma já presa, solta
     const divisa = ev => {
@@ -697,7 +711,10 @@ function ieCamadasInstalar() {
         ieReordenar(arrast, linha ? +linha.dataset.id : null, modo);
         arrast = null;
     });
-    lista.addEventListener('dragend', () => { arrast = null; });
+    lista.addEventListener('dragend', () => {
+        arrast = null;
+        lista.querySelectorAll('.ie-cam').forEach(l => l.classList.remove('drop-acima', 'drop-abaixo', 'drop-dentro'));
+    });
     ieFiltrosArrasteInstalar(lista);
 
     topo.addEventListener('change', ev => {

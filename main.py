@@ -3514,6 +3514,22 @@ class ApiBridge:
     def video_cutter_add_media(self, path):
         return video_cutter_add_media(path)
 
+    def ve_respiros(self, path, ini=0, dur=None, preset="normal", min_pausa=None, sobra=None, sobra_longa=None):
+        """Pausas/respiros a cortar de uma fala (Functions/respiros.py), em segundos da fonte relativos a ini."""
+        from Functions import respiros
+        try:
+            return respiros.detectar(path, ini, dur, preset, min_pausa, sobra, sobra_longa)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def ve_peaks_faixa(self, path, ini, dur, n):
+        """Onda em alta resolução de um trecho (zoom profundo da timeline)."""
+        from Functions import video_cutter
+        try:
+            return {"success": True, "peaks": video_cutter.peaks_faixa(path, ini, dur, n)}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     # Soundboard do editor (pack baixado no primeiro uso)
     def ve_sb_estado(self):
         from Functions import soundboard

@@ -800,10 +800,6 @@
                                     <div class="ve-fx-search"><svg class="i"><use href="#i-search"/></svg><input type="text" id="ve-tr-q" placeholder="Buscar animação" autocomplete="off"></div>
                                     <!-- uma rolagem só; cada aba abre/fecha (editor-trans.js: veAnInit) -->
                                     <div class="ve-an-rolagem" id="ve-an-rolagem">
-                                    <details class="ve-an-sec ve-az-sec" id="ve-az-sec" data-an="autozoom" open>
-                                        <summary>Autozoom <small>zooms de ênfase pela fala, em camadas de ajuste</small></summary>
-                                        <div class="ve-tr-controls ve-az-corpo" id="ve-az-corpo"></div>
-                                    </details>
                                     <details class="ve-an-sec ve-txa-sec" id="ve-txa-sec" data-an="texto" open>
                                         <summary>Texto <small>letra a letra · palavra · linha</small></summary>
                                         <div class="ve-tr-grid ve-txa-grid" id="ve-txa-list"></div>
@@ -847,6 +843,27 @@
                                     </div>
                                 </div>
                                 <!-- Soundboard: efeitos sonoros por categoria (editor-soundboard.js; pack baixado no 1º uso) -->
+                                <div class="ve-panel ve-tabpane ve-ke" id="ve-pane-kaniedit" data-panel="kaniedit" data-title="KaniEdit">
+                                    <!-- KaniEdit (editor-kaniedit.js): edição automática de 1 clique + cada etapa avulsa -->
+                                    <div class="ve-an-rolagem ve-ke-rolagem" id="ve-ke-rolagem">
+                                    <details class="ve-an-sec ve-az-sec ve-ke-sec" id="ve-ke-sec" data-ke="completa" open>
+                                        <summary>Edição completa <small>tudo de uma vez, na ordem certa</small></summary>
+                                        <div class="ve-tr-controls ve-az-corpo ve-rs-corpo ve-ke-corpo" id="ve-ke-corpo"></div>
+                                    </details>
+                                    <details class="ve-an-sec ve-az-sec ve-rs-sec" id="ve-rs-sec" data-ke="respiros" open>
+                                        <summary>Respiros <small>corta pausas e respiros sem perder a naturalidade</small></summary>
+                                        <div class="ve-tr-controls ve-az-corpo ve-rs-corpo" id="ve-rs-corpo"></div>
+                                    </details>
+                                    <details class="ve-an-sec ve-az-sec" id="ve-az-sec" data-ke="autozoom" open>
+                                        <summary>Autozoom <small>zooms de ênfase pela fala, em camadas de ajuste</small></summary>
+                                        <div class="ve-tr-controls ve-az-corpo" id="ve-az-corpo"></div>
+                                    </details>
+                                    <details class="ve-an-sec ve-az-sec ve-jc-sec" id="ve-jc-sec" data-ke="jcut" open>
+                                        <summary>J-cut <small>o som da próxima frase entra antes da imagem</small></summary>
+                                        <div class="ve-tr-controls ve-az-corpo ve-rs-corpo ve-jc-corpo" id="ve-jc-corpo"></div>
+                                    </details>
+                                    </div>
+                                </div>
                                 <div class="ve-panel ve-tabpane ve-sb" id="ve-pane-sb" data-panel="sb" data-title="Soundboard">
                                     <div class="ve-sfx" id="ve-sfx"></div>
                                     <div class="ve-sb-topo">
@@ -2148,6 +2165,9 @@
     <script src="js/editor-texto.js"></script>
     <script src="js/editor-legenda-premium.js"></script>
     <script src="js/editor-autozoom.js"></script>
+    <script src="js/editor-respiros.js"></script>
+    <script src="js/editor-jcut.js"></script>
+    <script src="js/editor-kaniedit.js"></script>
     <script src="js/editor-plugins.js"></script>
     <script src="js/editor-ofx.js"></script>
     <script src="js/editor-props.js"></script>
@@ -2213,6 +2233,7 @@
     <script src="js/imagem-paineis.js"></script>
     <script src="js/imagem-arquivo.js"></script>
     <script src="js/imagem-fatias.js"></script>
+    <script src="js/imagem-arrastar-valor.js"></script>
     <script src="js/imagem-dock.js"></script>
     <script src="js/imagem-estilo.js"></script>
     <script src="js/imagem-atalhos.js"></script>

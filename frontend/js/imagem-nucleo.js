@@ -343,7 +343,9 @@ function ieHistBytes() {
         for (const c of [s.c, s.m && s.m.c, s.c0 && s.c0.c]) soma(c);
         if (s.filhos) conta(s.filhos);
     });
-    for (const d of IE.docs || []) for (const it of d.hist.itens) conta(it.foto.camadas);
+    // a seleção é um canvas do tamanho do documento e cada passo de seleção cria outro (6000×4000 = 96 MB): ficava fora
+    // da conta e 60 passos de seleção passavam de 5 GB sem o histórico encurtar
+    for (const d of IE.docs || []) for (const it of d.hist.itens) { conta(it.foto.camadas); if (it.foto.sel) soma(it.foto.sel.c); }
     return bytes;
 }
 
@@ -1459,8 +1461,10 @@ function ieSelAplicar(doc, desenhar, op = 'nova', forma = null, suav = 0) {
 
 function ieSelDefinir(doc, c, forma = null) {
     if (!c) { doc.sel = null; ieDesenharSobre(); return; }
-    const b = ieLimites(c);
-    if (!b) { doc.sel = null; ieDesenharSobre(); return; }
+    // retângulo/elipse: a caixa sai da forma (ler o documento inteiro custava ~100 ms em 6000×4000 a cada seleção)
+    const f = forma && (forma.t === 'ret' || forma.t === 'eli') && forma.w && forma.h ? forma : null;
+    const b = f ? ieRInter(ieRInt({ x: Math.min(f.x, f.x + f.w), y: Math.min(f.y, f.y + f.h), w: Math.abs(f.w), h: Math.abs(f.h) }), ieRDoc(doc)) : ieLimites(c);
+    if (!b || !b.w || !b.h) { doc.sel = null; ieDesenharSobre(); return; }
     doc.sel = { c, bbox: b, forma };
     ieSelContorno(doc);
     ieDesenharSobre();

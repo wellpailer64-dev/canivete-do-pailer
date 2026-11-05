@@ -34,7 +34,7 @@ function vedDefault() {
                 { t: 'g', p: ['monitor'], a: 'monitor' },
                 { t: 's', d: 'col', z: [0.6, 0.4], c: [
                     { t: 'g', p: ['pp', 'props', 'lc', 'texto', 'projeto', 'pessoas', 'mixer'], a: 'pp' },
-                    { t: 'g', p: ['fx', 'trans', 'sb', 'keys'], a: 'fx' },
+                    { t: 'g', p: ['kaniedit', 'fx', 'trans', 'sb', 'keys'], a: 'kaniedit' },
                 ] },
             ] },
             { t: 's', d: 'row', z: [0.028, 0.94, 0.032], c: [
@@ -201,6 +201,15 @@ function vedApply(d) {
         if (g) {
             g.p.splice(g.p.indexOf('fx') + 1, 0, 'trans');
             st.novos = st.novos.filter(id => id !== 'trans');
+        }
+    }
+    // o KaniEdit entra como primeira aba do grupo do Efeitos (esteja ele onde estiver) e já fica aberto
+    if (st.novos.includes('kaniedit')) {
+        const g = [st.root, ...st.floats.map(f => f.root)].flatMap(r => vedGroups(r)).find(g => g.p.includes('fx'));
+        if (g) {
+            g.p.splice(g.p.indexOf('fx'), 0, 'kaniedit');
+            g.a = 'kaniedit';
+            st.novos = st.novos.filter(id => id !== 'kaniedit');
         }
     }
     // o Soundboard entra como aba logo depois do Animação (ou do Efeitos)
