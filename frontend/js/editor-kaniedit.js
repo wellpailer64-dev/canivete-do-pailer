@@ -61,7 +61,7 @@ async function veKaniEditCompleto(opc) {
         if (o.jcut && veKeTemJcut()) {
             passo('Aplicando J-cut…');
             const r = await veJcutAplicar({});
-            etapas.push(`J-cut ${(r && (r.emendas ?? r.cortes)) || 0}`);
+            etapas.push(`J-cut ${(r && r.tratadas) || 0}`);
         }
         if (o.legenda || o.autozoom) {
             passo('Transcrevendo a fala…');

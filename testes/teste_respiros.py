@@ -90,9 +90,10 @@ def main():
             # painel KaniEdit: aba própria, com as seções e o Editar tudo (só respiros aqui: sem transcrição no teste)
             ok(pg.evaluate("['ve-ke-sec','ve-rs-sec','ve-az-sec','ve-jc-sec'].every(id => document.getElementById(id)?.closest('#ve-pane-kaniedit'))"), "seções dentro do painel KaniEdit")
             pg.locator("#ve-pane-kaniedit").screenshot(path=BASE + "kaniedit.png")
-            k = pg.evaluate("veKaniEditCompleto({respiros:true, jcut:false, legenda:false, autozoom:false})")
-            ok(k["ok"] and k["mudou"] and pg.evaluate("veNavDur()") < dur0 - 1.0, "Editar tudo (só respiros) corta", str(k))
-            pg.evaluate("veTab('kaniedit'); document.getElementById('ve-ke-sec').open = true"); time.sleep(0.4)
+            pg.evaluate("VERS.preset='normal'")
+            k = pg.evaluate("veKaniEditCompleto({respiros:true, jcut:true, legenda:false, autozoom:false})")
+            ok(k["ok"] and k["mudou"] and pg.evaluate("veNavDur()") < dur0 - 1.0 and any("J-cut 2" in e for e in k["etapas"]), "Editar tudo (respiros + J-cut) corta", str(k))
+            pg.evaluate("veTab('kaniedit'); document.getElementById('ve-ke-sec').open = true; document.getElementById('ve-ke-rolagem').scrollTop = 0"); time.sleep(0.4)
             clicar("#ve-ke-corpo [data-ke-acao=desfazer]")
             ok(abs(pg.evaluate("veNavDur()") - dur0) < 0.02, "Desfazer do KaniEdit volta")
             # onda fina no zoom profundo
