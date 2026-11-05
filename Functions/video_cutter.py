@@ -3171,6 +3171,10 @@ def _ass_premium(prm, st, en):
             elif anim == "deslizar":
                 t.append(f"\\move({x - 0.6 * em:.1f},{y:.1f},{x:.1f},{y:.1f},0,{d})")
                 t.append(f"\\blur{blur_fixo + 0.03 * em:.1f}\\t(0,{d},0.45,\\blur{blur_fixo:.1f})" + entra_alfa)
+            elif anim == "surgir":   # Fala viva: aparece seco e sobe um pouco até o lugar, sem desfoque
+                t.append(f"\\move({x:.1f},{y + 0.3 * em:.1f},{x:.1f},{y:.1f},0,{int(d * 0.7)})\\blur{blur_fixo:.1f}")
+                t.append(f"\\fscx97\\fscy97\\t(0,{d},0.45,\\fscx100\\fscy100)")
+                t.append(f"\\alpha&HFF&\\t(0,{int(d * 0.25)},\\alpha{_ass_alfa(alvo)})")
             elif anim == "revelar":
                 t.append(f"\\pos({x:.1f},{y:.1f})\\blur{blur_fixo:.1f}\\alpha&HFF&\\t(0,{int(d * 0.25)},\\alpha{_ass_alfa(alvo)})")
             else:   # pop

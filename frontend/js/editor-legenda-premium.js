@@ -62,19 +62,26 @@ const VELP_DUPLAS = [
       base: 'KPR F28', enf: 'KPR F29', lig: 'KPR F24', pe: 'KPR F24', simp: 'KPR F24',
       cor: '#FF4D4D', simpCor: 'txt', ligE: 0.55, enfE: 1.2, peE: 0.4, gap: 0.07, entre: 0.95, track: 0,
       anim: 'deslizar', brilho: 10, sombra: 0.8, ex: ['faz', 'barulho'] },
+    // Fala viva (reel de entrevista, 2026-11-05): tudo branco firme, 1 a 3 palavras por vez; palavra forte entra grande
+    // e sozinha, ligação pequena; cada palavra surge seca subindo um pouco, o bloco some de corte e muda de altura.
+    // curto = blocos menores e mais títulos; fixa = a entrada Automática é sempre a da dupla; vaga = variação da altura
+    { id: 'fala', nome: 'Fala viva', desc: 'Branco firme, poucas palavras por vez, tamanho e altura mudando com a fala',
+      base: 'KPR F10', enf: 'KPR F10', lig: 'KPR F09', pe: 'KPR F09', simp: 'KPR F10',
+      cor: '#FFFFFF', simpCor: 'txt', ligE: 0.62, enfE: 1.18, peE: 0.4, gap: 0.06, entre: 0.92, track: -0.035,
+      anim: 'surgir', saida: 'seca', brilho: 0, sombra: 0.5, ex: ['de', 'verdade'], curto: true, fixa: true, vaga: 0.045 },
 ];
 const VELP_CORES = ['#FF9A2E', '#F5C518', '#C8F560', '#5CC8FF', '#FF7A6B', '#E9C27D', '#B892FF', '#FFFFFF'];
 const VELP_ANIMS = [['auto', '✦ Automática'], ['desfoque', 'Desfoque e brilho'], ['acender', 'Acender'], ['subir', 'Subir'], ['pop', 'Pop'],
-                    ['revelar', 'Revelar'], ['zoom', 'Zoom'], ['cair', 'Cair'], ['deslizar', 'Deslizar']];
+                    ['revelar', 'Revelar'], ['zoom', 'Zoom'], ['cair', 'Cair'], ['deslizar', 'Deslizar'], ['surgir', 'Surgir']];
 // entrada de cada palavra (s)
-const VELP_DUR = { desfoque: 0.24, acender: 0.18, subir: 0.22, pop: 0.22, revelar: 0.26, zoom: 0.24, cair: 0.24, deslizar: 0.24 };
-const VELP_SAIDAS = [['auto', '✦ Automática'], ['esmaecer', 'Esmaecer'], ['desfocar', 'Desfocar'], ['encolher', 'Encolher'], ['varrer', 'Varrer']];
-const VELP_SAI_DUR = { esmaecer: 0.14, desfocar: 0.16, encolher: 0.16, varrer: 0.22 };   // saída do bloco (s)
+const VELP_DUR = { desfoque: 0.24, acender: 0.18, subir: 0.22, pop: 0.22, revelar: 0.26, zoom: 0.24, cair: 0.24, deslizar: 0.24, surgir: 0.3 };
+const VELP_SAIDAS = [['auto', '✦ Automática'], ['esmaecer', 'Esmaecer'], ['desfocar', 'Desfocar'], ['encolher', 'Encolher'], ['varrer', 'Varrer'], ['seca', 'Seca']];
+const VELP_SAI_DUR = { esmaecer: 0.14, desfocar: 0.16, encolher: 0.16, varrer: 0.22, seca: 0.04 };   // saída do bloco (s)
 const VELP_SAI = 0.14;
 const VELP_MARCAS = [['auto', '✦ Automático'], ['traco', 'Traço'], ['caixa', 'Marca-texto'], ['pincel', 'Pincel rústico'], ['nenhum', 'Nenhum']];
 // destaque que cada dupla usa no modo Automático (o resto da escolha é por título: veLpMarcaDe)
 const VELP_MARCA_DUPLA = { brilho: 'traco', editorial: 'traco', impacto: 'caixa', suave: 'pincel', elegante: 'traco', moderno: 'caixa',
-                           retro: 'traco', rustico: 'pincel', disruptivo: 'caixa', zine: 'pincel' };
+                           retro: 'traco', rustico: 'pincel', disruptivo: 'caixa', zine: 'pincel', fala: 'nenhum' };
 const VELP_TITULOS = { poucos: 8, equilibrado: 4.5, muitos: 2.5 };             // um título a cada N segundos
 const VELP_POS = { cima: 0.24, peito: 0.6, baixo: 0.8 };                       // centro do bloco (× altura)
 const VELP_SEGURA = 0.8;   // área segura de títulos: 80% do quadro (10% de margem em cada lado, como no Premiere)
@@ -197,20 +204,21 @@ function veLpEnfase(silencioso) {
 
 // Palavras da transcrição → blocos curtos (uma ideia: pausa, fim de frase, vírgula ou até 3 palavras de conteúdo)
 function veLpBlocos(W) {
-    const blocos = [];
+    const blocos = [], curto = !!veLpCfg().D.curto;
+    const maxP = curto ? 3 : 5, maxC = curto ? 2 : 3, maxT = curto ? 14 : 24, maxS = curto ? 1.4 : 2.2;
     let cur = [];
     const fecha = () => { if (cur.length) blocos.push(cur); cur = []; };
     const fimFrase = w => /[.!?…]["')\]]?$/.test(w);
     W.forEach((w, iw) => {
         if (cur.length && w[0] - cur[cur.length - 1][1] > 0.55) fecha();
-        else if (cur.length >= 3 && w[1] - cur[0][0] > 2.2) fecha();   // legenda não fica mais de ~2 s na tela
+        else if (cur.length >= (curto ? 2 : 3) && w[1] - cur[0][0] > maxS) fecha();   // legenda não fica mais de ~2 s na tela
         cur.push(w);
         const nC = cur.filter(x => !veLpEhLig(x[2])).length, txt = cur.map(x => x[2]).join(' ');
         // a próxima palavra fecha a frase e vem colada: espera por ela ("quer faturar mais | dinheiro?" ficava sozinha)
-        const prox = W[iw + 1], esperar = prox && fimFrase(prox[2]) && prox[0] - w[1] < 0.3 && cur.length < 5 && txt.length + prox[2].length < 34;
+        const prox = W[iw + 1], esperar = prox && fimFrase(prox[2]) && prox[0] - w[1] < 0.3 && cur.length < maxP && txt.length + prox[2].length < maxT + 10;
         if (fimFrase(w[2])) fecha();
-        else if (/[,;:]["')\]]?$/.test(w[2]) && nC >= 1 && cur.length >= 2) fecha();
-        else if (!esperar && (nC >= 3 || txt.length >= 24 || cur.length >= 5)) {
+        else if (/[,;:]["')\]]?$/.test(w[2]) && nC >= 1 && cur.length >= (curto ? 1 : 2)) fecha();
+        else if (!esperar && (nC >= maxC || txt.length >= maxT || cur.length >= maxP)) {
             // cheio: corta antes da última frase que começou ("na verdade | o que você"), se sobrar algo dos dois lados
             let k = -1;
             for (let j = cur.length - 2; j >= 1 && k < 0; j--) if (!veLpEhLig(cur[j][2]) && veLpEhLig(cur[j + 1][2])) k = j;
@@ -227,7 +235,7 @@ function veLpBlocos(W) {
     // bloco só de ligação ("e", "pra") cola no seguinte
     for (let i = blocos.length - 2; i >= 0; i--) {
         const b = blocos[i], p = blocos[i + 1];
-        if (b.every(w => veLpEhLig(w[2])) && p[0][0] - b[b.length - 1][1] < 0.6 && b.length + p.length <= 6) blocos.splice(i, 2, [...b, ...p]);
+        if (b.every(w => veLpEhLig(w[2])) && p[0][0] - b[b.length - 1][1] < 0.6 && b.length + p.length <= maxP + (curto ? 2 : 1)) blocos.splice(i, 2, [...b, ...p]);
     }
     // cortes do vídeo principal: o bloco que terminaria logo depois de um corte termina no corte (não atravessa a troca
     // de cena só com a cauda, depois que a fala acabou)
@@ -237,7 +245,9 @@ function veLpBlocos(W) {
         let en = prox && prox[0][0] - fim < 0.7 ? prox[0][0] : fim + 0.35;
         const corte = cortes.filter(c => c > fim + 0.06 && c < en - 0.02).sort((x, y) => x - y)[0];
         if (corte != null) en = corte;
-        return { st: +b[0][0].toFixed(3), en: +Math.max(b[0][0] + 0.4, en).toFixed(3), texto: b.map(w => w[2]).join(' '),
+        en = Math.max(b[0][0] + 0.4, en);
+        if (prox) en = Math.min(en, Math.max(b[0][0] + 0.05, prox[0][0]));   // o mínimo de 0,4 s não invade o bloco seguinte
+        return { st: +b[0][0].toFixed(3), en: +en.toFixed(3), texto: b.map(w => w[2]).join(' '),
                  pt: b.map(w => [+w[0].toFixed(3), +w[1].toFixed(3)]) };
     });
 }
@@ -258,7 +268,7 @@ function veLpNotaTitulo(l, i) {
     return n;
 }
 function veLpEscolherTitulos(L, densidade) {
-    const D = VELP_TITULOS[densidade] || VELP_TITULOS.equilibrado;
+    const D = (VELP_TITULOS[densidade] || VELP_TITULOS.equilibrado) * (veLpCfg().D.curto ? 0.5 : 1);   // blocos curtos: mais palavras grandes
     const tot = L.length ? L[L.length - 1].en - L[0].st : 0, alvo = Math.max(1, Math.round(tot / D));
     const fixos = L.map((l, i) => l.pr && l.pr.m ? i : -1).filter(i => i >= 0);
     const esc = new Set(fixos.filter(i => L[i].pr.t));
@@ -409,7 +419,8 @@ function veLpLayout(i) {
     const ultima = linhas[linhas.length - 1];
     const fundo = ultima ? ultima.base + Math.max(...ultima.it.map(it => veLpMet(it.f).desc * it.em)) : 0;
     const Wb = Wb0 * fit, Hb = fundo * fit;
-    const cy = (VELP_POS[cfg.pos] || VELP_POS.peito) * H - (+e.py || 0) / 100 * H;
+    // vaga: cada bloco numa altura um pouco diferente (sorteio fixo pela posição na lista: prévia = exportação)
+    const cy = (VELP_POS[cfg.pos] || VELP_POS.peito) * H - (+e.py || 0) / 100 * H + (D.vaga ? [0, -1, 0.6, -0.4, 1][i % 5] * D.vaga * H : 0);
     let cx = W / 2 + (+e.px || 0) / 100 * W;
     // o bloco não sai da área segura nem arrastado (só encolhe se não couber)
     const mx = W * (1 - VELP_SEGURA) / 2, my = H * (1 - VELP_SEGURA) / 2;
@@ -457,6 +468,7 @@ function veLpLayout(i) {
 // para não repetir); legendas simples entram discretas, para os títulos se destacarem.
 function veLpAnimDe(i, cfg) {
     if (cfg.anim !== 'auto') return cfg.anim;
+    if (cfg.D.fixa) return cfg.D.anim;
     const L = VE.legendas || [], l = L[i];
     if (!l) return cfg.D.anim;
     const tk = veTxTokens(l.texto), fim = tk[tk.length - 1] || '', base = cfg.D.anim;
@@ -471,6 +483,7 @@ function veLpAnimDe(i, cfg) {
 // Saída "Automática": combina com a entrada (revelar ↔ varrer, impacto ↔ encolher, desfoque ↔ desfocar); simples esmaecem
 function veLpSaidaDe(i, cfg, anim) {
     if (cfg.saida !== 'auto') return cfg.saida;
+    if (cfg.D.saida) return cfg.D.saida;
     const l = (VE.legendas || [])[i];
     if (!l || !(l.pr && l.pr.t)) return 'esmaecer';
     return anim === 'revelar' || anim === 'deslizar' ? 'varrer' : anim === 'pop' || anim === 'zoom' ? 'encolher' : anim === 'desfoque' ? 'desfocar' : 'esmaecer';
@@ -538,6 +551,8 @@ function veLpEstado(anim, t, a, fim, enf, saida = 'esmaecer') {
         o.dy = -(1 - s) * 0.6; o.al = Math.min(1, p * 2);
     } else if (anim === 'deslizar') {
         o.dx = -(1 - s) * 0.6; o.bl = (1 - s) * 0.03; o.al = Math.min(1, p * 2);
+    } else if (anim === 'surgir') {   // aparece seco e sobe um pouco até o lugar (sem desfoque)
+        o.al = Math.min(1, p * 4); o.dy = (1 - s) * 0.3; o.sc = 0.97 + 0.03 * s;
     }
     if (q > 0) {
         const e = veLpEase(q);
@@ -825,7 +840,11 @@ function veLpInit() {
         const d = ev.target.closest('[data-lpdupla]');
         if (d) {   // a entrada Automática continua automática ao trocar de dupla; uma escolhida à mão volta para a da dupla
             vePushHistory();
+            const eraCurto = !!veLpCfg().D.curto;
             veLpSetCfg({ dupla: d.dataset.lpdupla, cor: '', anim: veLpCfg().anim === 'auto' ? 'auto' : '', brilho: null });
+            // dupla de blocos curtos (Fala viva) ↔ normal: remonta os blocos a partir da transcrição (no mesmo desfazer)
+            if (eraCurto !== !!veLpCfg().D.curto && VETX.palavras.length && (VE.legendas || []).length)
+                VE.legendas = veLpEscolherTitulos(veLpBlocos(veTxJuntarHifen(VETX.palavras)), veLpCfg().titulos);
             veRefresh(); veLpSfxAtualizar(); return;
         }
         const c = ev.target.closest('[data-lpcor]');
