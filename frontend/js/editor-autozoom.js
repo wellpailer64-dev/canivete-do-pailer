@@ -190,7 +190,15 @@ async function veAzGerar(opc = veAzOpc()) {
         // trilha: logo acima do vídeo/fotos; se ocupada no trecho, a de cima
         const base = Math.max(0, ...VE.clips.filter(c => !veIsAudio(c) && !veIsAdj(c) && !veIsTexto(c) && !(typeof veEhGrafico === 'function' && veEhGrafico(c))).map(c => c.tr)) + 1;
         const novos = planos.map((p, k) => {
-            const r = ros[k];
+            let r = ros[k];
+            // o rosto vem em fração da FONTE: passa para o quadro pela escala/posição do clipe naquele instante
+            // (vídeo deitado coberto e andando com o "Seguir o rosto", ou reposicionado à mão)
+            const tm = (p.st + p.en) / 2, cm = r && veAzClipeEm(tm);
+            if (cm) {
+                const pr = veProps(cm, tm), sz = veMediaSize(cm), dw = sz.w * pr.sc / 100, dh = sz.h * pr.sc / 100;
+                r = [Math.max(0, Math.min(1, (pr.x + (r[0] - 0.5) * dw) / VE.seqW)), Math.max(0, Math.min(1, (pr.y + (r[1] - 0.5) * dh) / VE.seqH)),
+                     r[2] * Math.max(dw / VE.seqW, dh / VE.seqH)];
+            }
             const v = { ...p.v, cx: 50, cy: 45, mb: opc.mb === 'nao' ? 0 : 1, obt: 100 };
             if (r) {
                 v.cx = +(r[0] * 100).toFixed(1); v.cy = +(r[1] * 100).toFixed(1);
