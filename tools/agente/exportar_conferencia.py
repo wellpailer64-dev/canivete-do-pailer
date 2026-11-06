@@ -61,3 +61,5 @@ som = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", arq, "-af", "e
 print("som:", " ".join(re.findall(r"^\s+(?:I|Peak):\s+\S+ \S+", som, re.M)[-2:]), "(alvo -14 a -16 LUFS, pico até -1)")
 pretos = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", arq, "-vf", "blackdetect=d=0.04:pix_th=0.04", "-an", "-f", "null", "-"], capture_output=True, text=True, encoding="utf-8", errors="replace").stderr
 print("quadros pretos:", pretos.count("black_start"))
+if os.name == "nt":
+    subprocess.Popen(["explorer", "/select,", os.path.normpath(arq)])   # regra do Pailer: ao fim de toda exportação, abrir a pasta no Explorer

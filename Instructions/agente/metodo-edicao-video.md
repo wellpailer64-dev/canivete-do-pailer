@@ -76,3 +76,5 @@ Script avulso que se repete vira ferramenta. Defeito achado no olho vira regra e
 - Ajuste manual é sagrado: versão nova parte da timeline dele, com cópia antes, nunca regerar (2026-10-09).
 - Projeto aberto: mudar pelo app e salvar, não só no disco (2026-10-26).
 - Um app só: nunca abrir outro KANIVETE; porta sem resposta não é app fechado. App de teste fecha ao terminar (2026-11-01).
+
+**Exportação (regra do Pailer, 2026-11-06):** todo render vai para a pasta `04 - RENDERS` do card do projeto (nunca só para a pasta de teste) e, ao terminar, abrir essa pasta no Explorer (`explorer /select,arquivo`). `exportar_conferencia.py` já abre; passe a `04 - RENDERS` como pasta de saída.
