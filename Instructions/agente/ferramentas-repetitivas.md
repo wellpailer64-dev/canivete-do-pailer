@@ -28,6 +28,7 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 ## Editar vídeo
 - Reel falado: roteiro JSON + `tools/agente/reel_fala.py`.
 - Corrigir cor de vídeo pelos escopos (branco estourado, preto esmagado, cor puxada, pele vermelha): `py -3.13 tools/agente/cor_auto.py video.mp4 --look '{...grade do cliente...}' --folha prefixo` → valores do Luz e Cor.
+- Onde a música deve começar (pula intro, acha drop e seções calmo/agitado): `py -3.13 tools/agente/musica_ponto.py musica.mp3 [--min-cena 60]`; o `reel_fala.py` já usa.
 - Conferir, sempre primeiro em projeto pronto: `tools/agente/conferir_edicao.py projeto --sem-ouvir`.
 - Palavra comida no corte: `tools/agente/checar_cortes.py projeto`.
 - Trocar arquivo por outra versão: `tools/agente/trocar_midia.py projeto "antigo" novo.mp4 --aplicar`.

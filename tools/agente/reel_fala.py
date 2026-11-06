@@ -222,6 +222,17 @@ if not os.path.isfile(f_bat):
     json.dump(json.loads(t[t.index("{"):]), open(f_bat, "w"))
 BAT = json.load(open(f_bat))
 BPM, BATIDAS = BAT["bpm"], BAT["batidas"]
+# Onde a música começa (nota do Pailer 2026-11-06): intro lenta, sem ritmo, não abre vídeo dinâmico. "musica_inicio": "auto"
+# (padrão) acha a entrada do ritmo / o drop (musica_ponto.py); número = segundo fixo; 0 = do começo.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_mi = CFG.get("musica_inicio", "auto")
+if _mi == "auto":
+    from musica_ponto import ponto as _ponto
+    _pt = _ponto(CFG["musica"], BATIDAS, BPM, 60.0)
+    MUS0 = min(BATIDAS, key=lambda b: abs(b - _pt["inicio"])) if _pt["inicio"] > 0 else 0.0
+    print(f" musica: começa em {MUS0:.2f}s ({_pt['motivo']}; ritmo entra em {_pt['entrada_ritmo']}s, drop {_pt['drop']})")
+else:
+    MUS0 = float(_mi)
 DURS = {MID[k]: _duracao(BR + v + ".mp4") for k, v in FONTES.items()}
 FT = ImageFont.truetype(FONTE_TARJA, 52) if os.path.exists(FONTE_TARJA) else None
 
@@ -294,11 +305,11 @@ def versao(v):
                         "op": [{"t": 0, "v": 0, "i": "lin"}, {"t": 0.12, "v": 100}]}})
     # trilha; se for curta, volta 8 compassos numa batida, sob a fala
     bat = lambda x: min(BATIDAS, key=lambda b: abs(b - x))
-    if fim > DUR_MUS - 1.5:
-        c1 = bat(fim_fala * 0.55); volta = bat(c1 - 8 * 4 * 60 / BPM)
-        partes = [(0.0, 0.0, c1), (c1, volta, volta + fim_fala - c1)]
+    if MUS0 + fim > DUR_MUS - 1.5:
+        c1 = bat(MUS0 + fim_fala * 0.55); volta = max(MUS0, bat(c1 - 8 * 4 * 60 / BPM))
+        partes = [(0.0, MUS0, c1), (c1 - MUS0, volta, volta + fim_fala - (c1 - MUS0))]
     else:
-        partes = [(0.0, 0.0, fim_fala)]
+        partes = [(0.0, MUS0, MUS0 + fim_fala)]
     for st_, s_, e_ in partes:
         clips.append({"tr": 1, "x": "a", "st": round(st_, 3), "s": round(s_, 3), "e": round(e_, 3), "m": M_MU, "g": GANHO["musica"]})
     clips.append({"tr": 1, "x": "a", "st": fim_fala, "s": round(partes[-1][2], 3), "e": round(partes[-1][2] + D_FIM, 3), "m": M_MU, "g": GANHO["musica_fim"], "atout": {"t": "cp", "d": 1.4}})
