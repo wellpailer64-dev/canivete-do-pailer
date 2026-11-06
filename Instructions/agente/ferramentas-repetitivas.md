@@ -11,6 +11,9 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 - Ver timeline montada: `tools/tripa.py "Timeline"`; quadros do monitor: `tools/agente/quadros_monitor.py 1.5,20,45 saida.jpg --timeline "T"`.
 
 ## WhatsApp
+- Recepção rápida: `wa_comando.py ouvir` aguarda notificação do observador DOM pela ponte, com conferência de segurança a cada 20s; confirma antes de transcrever e usa fila persistida. `wa_comando.py estado` mostra etapas/falhas. Script `whatsapp_eventos`; detalhes e limites em `kanibrowser/EXTENSAO.md`.
+- Pedidos por áudio no grupo KaniCode: `wa_comando.py ouvir` transcreve mensagens próprias novas por ID e encaminha à gerente; primeira leitura só marca histórico. Falha não vira pedido nem é repetida automaticamente; conferir log `D:/kanivete_testes/wa_comando/ouvinte.log`.
+- Contexto compacto no navegador interno: `kb.py --onde kanicode scripts rodar --nome whatsapp_contexto`. Para mensagens carregadas, dados `{"conversa":"Nome completo","n":3}`; confere conversa exata, não rola e não envia. Guia `kanibrowser/EXTENSAO.md`.
 - Primeira noção da conversa: `WT resumo --conversa X --n 40`. A Kani já errou quem falou, data e o que estava pendente (2026-11-02): é só orientação; antes de agir, conferir no texto completo, cujo caminho vem na saída.
 - Ler mensagens: `WA ler --conversa X --n 20 --transcrever`. Procurar conversa: `WA conversas --busca termo`.
 - Baixar: `WA arquivo --conversa X --nome parte --pasta P`; `WA midia --conversa X --tipo video --duracao 1:10 --saida a.mp4`; `--tipo foto`.
@@ -24,6 +27,7 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 
 ## Editar vídeo
 - Reel falado: roteiro JSON + `tools/agente/reel_fala.py`.
+- Corrigir cor de vídeo pelos escopos (branco estourado, preto esmagado, cor puxada, pele vermelha): `py -3.13 tools/agente/cor_auto.py video.mp4 --look '{...grade do cliente...}' --folha prefixo` → valores do Luz e Cor.
 - Conferir, sempre primeiro em projeto pronto: `tools/agente/conferir_edicao.py projeto --sem-ouvir`.
 - Palavra comida no corte: `tools/agente/checar_cortes.py projeto`.
 - Trocar arquivo por outra versão: `tools/agente/trocar_midia.py projeto "antigo" novo.mp4 --aplicar`.
@@ -35,6 +39,11 @@ Antes de escrever script, procurar aqui. Script avulso que se repete vira ferram
 
 ## Imagem e referência
 - Revisar imagem sem gastar contexto: `tools/olho.py`. Referências do Pinterest: `tools/refs.py`. Peça de cliente: `tools/peca.py`.
+
+## Navegador interno
+- Extensão 0.2: `extensao estado` confere prontidão/versão. Formulários: selecionar/marcar; clicar/tecla com `aguardar` confirmam condições sem repetir ação. `principal:true` lê conteúdo central; panorama limita mídias. Exemplos em `EXTENSAO.md`.
+- Visão conjunta: `kb.py --onde kanicode extensao panorama`. Mapa filtrado: `extensao mapa --dados @arquivo.json` com `tipo` (campos/botoes/links), `texto`, `seletor` e `maximo`. Panorama aceita os mesmos filtros no mapa e `limite` no texto.
+- Extensão e scripts reutilizáveis: `py -3.13 D:/Kanivete/Plugins/kanibrowser/kb.py --onde kanicode extensao estado|ler|mapa|midias|api`; biblioteca: `scripts listar` / `scripts rodar --nome extrair_links`. Guia `D:/Kanivete/Plugins/kanibrowser/EXTENSAO.md`. Downloads só concluídos com estado `complete`; ativação inicial exige reiniciar o KaniCode pelo fluxo normal.
 
 ## Currículo
 - Currículo, CV ou PDF para robô de triagem: `tools/curriculo.py`, Slider A4, ficha JSON, `.dknv` editável e PDF vetorial.

@@ -18,7 +18,7 @@ Em Enquete e Imagem do Dia, cada prancheta traz um monitor: `horizontal` (FEED 1
 
 ## Exame no monitor (regra do Pailer)
 - Monitor = o de proporção mais próxima da do exame (telas: horizontal 1,71; quadrado 1,34; em pé 0,59).
-- Nunca cortar. Ampliar ao máximo que couber na tela; filete preto na borda é normal.
+- Preservar a região clínica, sem cortar anatomia. Em Imagem do Dia em vídeo, remover os detalhes periféricos da captura do aparelho e ampliar o exame limpo até preencher toda a altura da tela do monitor; barras pretas laterais são aceitas (ajuste do Pailer em 06/11/2026).
 - Raio-X nunca passa por upscale de IA, mesmo pequeno: só ampliação comum. A qualidade é a que o cliente enviou.
 
 ## Enquete do Dia: comando único
@@ -39,3 +39,9 @@ Não mudam: títulos, logo, interrogações, "RESPONDA NOS COMENTÁRIOS", triân
 - O exame cabe na moldura do preset: enquadrar a imagem, sem alargar a moldura. Só alterar se ele pedir.
 - O ponto da seta vem do cliente. Conferir se a instrução é deste exame; sem certeza, perguntar.
 - Exemplo pronto: `03 - PAUTAS MENSAIS/2026/08 - PACOTE 8/04 - NORMAL OU ALTERADO/images`.
+
+## Ajustes aprovados pelo Pailer em 06/11/2026
+- Usar sempre o preset oficial do tipo de arte na pasta PRESSETS; preservar a identidade aprovada.
+- Título clínico laranja em caixa normal, sem texto inteiro em maiúsculas.
+- Finalizar vídeos com a assinatura animada original: `Finalização videos.mp4`, na raiz do cliente, logo sobre fundo azul, 1080×1920.
+- Prévias para aprovação no WhatsApp: grupo KaniCode, conferir o cabeçalho e que é grupo antes do envio; nunca inferir um contato pessoal como destinatário.
