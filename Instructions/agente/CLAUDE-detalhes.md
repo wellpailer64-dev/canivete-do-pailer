@@ -488,3 +488,6 @@ Infraestrutura braçal (achar no código, troca mecânica, rodar teste, diagnost
 
 ## Porta do modo agente nos scripts (2026-11-04)
 `tools/porta_agente.py`: scripts não usam mais 9222/9333 fixo; `porta(9222)` (app do Pailer) e `porta(9333)` (app de teste) leem o `agente.json` (o do APPDATA atual e o de `D:\kanivete_testesppdata`) e devolvem a porta viva. Nunca cruza os apps (faixa 9222-9231 = Pailer; fora dela = teste). `--porta` explícito continua valendo. Conferir: `py -3.13 tools/porta_agente.py 9333`. Script novo: copiar a linha de import do topo de `tools/aplicar.py` e usar `_porta_agente(9333)`.
+
+## Cor automática por escopos (2026-11-06)
+`tools/agente/cor_auto.py`: mede quadros (luma p0,5/p99,5, pixel estourado/esmagado, média Cb/Cr dos neutros, pele pelo YuNet com matiz/saturação/luz) e busca, por descida coordenada, os valores do efeito `lc` (temp, tint, exp, hi, wh, sh, bl e, se houver rosto, HSL secundário na pele: qs/qr) que põem tudo nas faixas, sem sair da grade do cliente mais que o preciso. Cada tentativa usa a mesma LUT do app: `tools/agente/lc_lut.js` roda `frontend/js/editor-lc.js` no node (processo aberto, uma linha JSON por pedido). `reel_fala.py` chama `ajustar()` por fonte (cache em `<trabalho>/cor/`) e põe uma camada de cor por trecho de fonte visível. ~20 s por fonte.

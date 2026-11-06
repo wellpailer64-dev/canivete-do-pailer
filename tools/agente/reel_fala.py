@@ -226,6 +226,28 @@ DURS = {MID[k]: _duracao(BR + v + ".mp4") for k, v in FONTES.items()}
 FT = ImageFont.truetype(FONTE_TARJA, 52) if os.path.exists(FONTE_TARJA) else None
 
 
+KEY_DE = {m: k for k, m in MID.items()}
+
+
+def cor_da_fonte(k, cache={}):
+    """Correção de cor medida da fonte k (cor_auto.ajustar), em cache na pasta de trabalho."""
+    if k not in cache:
+        import hashlib
+        from cor_auto import ajustar
+        chave = hashlib.md5(json.dumps([FONTES[k], COR], sort_keys=True).encode()).hexdigest()[:10]
+        f = f"{TRAB}/cor/{k}_{chave}.json"
+        if not os.path.isfile(f):
+            os.makedirs(TRAB + "/cor", exist_ok=True)
+            v, antes, depois = ajustar(BR + FONTES[k] + ".mp4", COR)
+            json.dump({"v": v, "antes": antes, "depois": depois}, open(f, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        d = json.load(open(f, encoding="utf-8"))
+        a, b = d["antes"], d["depois"]
+        print(f"  cor {k}: branco {a['branco']:.2f}→{b['branco']:.2f}, preto {a['preto']:.3f}→{b['preto']:.3f}, estourado {a['estourado']:.1%}→{b['estourado']:.1%}"
+              + (f", pele {a['pele_matiz']:.0f}°→{b['pele_matiz']:.0f}°" if "pele_matiz" in b else ""))
+        cache[k] = d["v"]
+    return cache[k]
+
+
 def versao(v):
     clips, legs, mapa, zooms, t, n = [], [], [], [], 0.0, 0
     for k, ini, fim_ in v["roteiro"]:
@@ -337,7 +359,28 @@ def versao(v):
         usados.append((a, b))
     for x, y in apoios:
         zoom(x, y, {"z": 108, "ent": 0, "sai": 0, "suav": 80, "mola": 0, "der": 3, "cx": 50, "cy": 50, "mb": 0, "obt": 100}, "Zoom apoio")
-    clips.append({"tr": 3, "st": 0, "s": 0, "e": fim, "m": M_AJ, "cor": "orange", "nome": "Cor", "fx": [{"id": "fxcor", "t": "lc", "on": True, "v": dict(COR)}]})
+    # Cor (pedido do Pailer 2026-11-06): cada fonte é medida (cor_auto: branco estourado, preto esmagado, cor puxada, pele
+    # vermelha) e ganha a sua correção, partindo da grade do cliente. Uma camada de ajuste por trecho em que a mesma fonte
+    # está à vista (apoio por cima da fala). "cor_auto": false no roteiro volta à grade única.
+    if CFG.get("cor_auto", True):
+        vis = [c for c in clips if c["tr"] in (0, 1) and (c["tr"] == 0 or c.get("x") == "v") and c["m"] in KEY_DE]
+        marcas = sorted({round(c["st"], 3) for c in vis} | {round(c["st"] + c["e"] - c["s"], 3) for c in vis} | {0.0, fim})
+        trechos = []
+        for x, y in zip(marcas, marcas[1:]):
+            if y - x < 1e-3:
+                continue
+            em = [c for c in vis if c["st"] - 1e-3 <= (x + y) / 2 < c["st"] + c["e"] - c["s"]]
+            top = max(em, key=lambda c: c["tr"])["m"] if em else None
+            if trechos and trechos[-1][0] == top:
+                trechos[-1][2] = y
+            else:
+                trechos.append([top, x, y])
+        for m_, x, y in trechos:
+            k_ = KEY_DE.get(m_)
+            clips.append({"tr": 3, "st": round(x, 3), "s": 0, "e": round(y - x, 3), "m": M_AJ, "cor": "orange", "nome": f"Cor {k_ or ''}".strip(),
+                          "fx": [{"id": f"fxcor{len(clips)}", "t": "lc", "on": True, "v": dict(cor_da_fonte(k_)) if k_ else dict(COR)}]})
+    else:
+        clips.append({"tr": 3, "st": 0, "s": 0, "e": fim, "m": M_AJ, "cor": "orange", "nome": "Cor", "fx": [{"id": "fxcor", "t": "lc", "on": True, "v": dict(COR)}]})
     tarjas = [(txt, quando(k, fr), bool(pop)) for txt, k, fr, pop in CFG.get("tarjas", [])]
     for txt, tt, pop in [x for x in tarjas if x[1] is not None]:
         larg = FT.getlength(txt) if FT else len(txt) * 28
