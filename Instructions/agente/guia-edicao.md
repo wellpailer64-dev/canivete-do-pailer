@@ -132,7 +132,7 @@ Usar ANTES de entregar uma versão e para entender os ajustes do usuário (no lu
 ## REEL FALADO DE CLIENTE: método curto (fazer nesta ordem, sem inventar script)
 1. Material: `wa.py arquivo|midia`; card: `panda.py criar`; trilha: `kanibrowser/epidemic.py buscar|baixar`. Um olhar nos RENDERS anteriores do cliente e na ficha.
 2. Ver e ouvir: transcrição + uma folha de quadros por vídeo. Só isso: nada de abrir o app ainda.
-3. Roteiro: copiar `Instructions/agente/exemplos/reel_fala_gordinhos.json` e preencher versões (trechos pela 1ª e última palavras), apoios, tarjas e finalização. Só o que é decisão editorial vai aqui.
+3. Roteiro: copiar `Instructions/agente/exemplos/reel_fala_gordinhos.json` e preencher versões (trechos pela 1ª e última palavras), apoios, tarjas, finalização e "zooms" ([fonte, 1ªs palavras, últimas, "suave"|"empurra", zoom %], só nos momentos fortes, ~1 a cada 6-8 s; sem "zooms" fica sem zoom). Só o que é decisão editorial vai aqui.
 4. `py -3.13 tools/agente/reel_fala.py roteiro.json` (~20 s; recusa sobrescrever projeto que já existe).
 5. `py -3.13 tools/agente/conferir_edicao.py projeto.vknv`: sem REPROVADO; o que vier como OUVIR, ouvir. Palavra comida se corrige aqui, antes de mostrar.
 6. `reel_fala.py roteiro.json --abrir 9333` (ou 9222, sem clique) e `tools/agente/quadros_monitor.py` numa folha. Ajuste visual = mudar o roteiro antes de mostrar.
@@ -142,6 +142,7 @@ Regras embutidas: zoom em camada de ajuste, cor em outra sem bloom (rosto ficava
 Armadilhas: taxa vem de `video_base` (usar mídia com `probe()["fps_timeline"]` 30); MOGRT só depois de testar UM renderizado; porta sem resposta não é app fechado; `kb.py js` só na aba da Kani; escrever arquivo com Write, não heredoc com barra; desfoque de movimento nos zooms multiplica o export por ~9 (padrão desligado).
 
 ## CALIBRACAO (feedback do usuário, mais novo em cima)
+- 2026-11-06 REELS GORDINHOS AR CONDICIONADO, nota do Pailer: (1) ESPAÇO VAZIO no fim da frase (0,74 s no seg. 8) = desconforto; cortar sempre: `reel_fala.py` agora apara as pontas pela energia da voz no nível do limite (o ruído da oficina passa de 0,6 do limite) e corta pausa interna medida na energia. (2) ZOOM "bruto e aleatório" (108→128→118 por corte, entrada 0): agora só zoom de ênfase marcado no roteiro, entrada com curva, volta suave. (3) Trilha: rock suave com guitarra. (4) Epidemic: o download passou a exigir `uiOrigin=tracklist_button` e `downloadId`; corrigido no epidemic.py, que agora devolve a aba da Kani (é a do WhatsApp da gerente) ao endereço anterior.
 - 2026-11-01 REELS GORDINHOS, ajuste do Pailer: tirou o bloom e mexeu na cor (rosto muito vermelho): ct 22, hi 10, sh -4, wh 7, vib 17. NÃO COMER PALAVRA: cortei o fim de "saturado" porque limitei o corte ao início estimado da próxima palavra; o limite agora é o vale de energia e `checar_cortes.py` ouve os fins. "Sofreu para um reel simples": seguir o método curto acima.
 - 2026-11-01 REELS GORDINHOS UPGRADE: ZOOM DINÂMICO SÓ EM CAMADA DE AJUSTE, nunca escala animada no clipe (técnica do Transform em Adjustment Layer do Premiere; aqui, efeito `zoom`); cor, contraste, bloom e clareza em OUTRA camada de ajuste. Efeito `zoom` faz escala, curva, centro e desfoque; não tem posição nem rotação.
 - 2026-10-28 PAPO PRODUTIVO V2 ("de resto tá tudo perfeito"): TELA DIVIDIDA COM REFERÊNCIA = cortar o vídeo base no

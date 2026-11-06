@@ -18,7 +18,7 @@ ALTURA = 430
 
 with sync_playwright() as pw:
     nav = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{a.porta}")
-    pg = [p for c in nav.contexts for p in c.pages if "index.html" in p.url][0]
+    pg = [p for c in nav.contexts for p in c.pages if "index.html" in p.url and p.evaluate("typeof VE") != "undefined"][0]   # duas index.html: só a do editor tem VE
     if a.timeline:
         pg.evaluate("n => { const q = VE.sequences.find(s => s.name === n); if (!q) throw new Error('timeline não achada'); if (VE.activeSequence !== q.id) veSeqAplicar(q); }", a.timeline)
     w, h = pg.evaluate("[VE.seqW, VE.seqH]")

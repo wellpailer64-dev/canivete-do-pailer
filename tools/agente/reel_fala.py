@@ -98,13 +98,35 @@ def fim_voz(k, b):
     return corte / 100 + 0.02
 
 
+def silencio(k, t0, t1):
+    """maior trecho sem voz (s) entre t0 e t1, medido na energia: a transcrição estica a palavra por cima da pausa"""
+    run = best = 0
+    for x in EN[k][max(0, int(t0 * 100)):int(t1 * 100)] > LIM[k]:
+        run = 0 if x else run + 1
+        best = max(best, run)
+    return best / 100
+
+
+def aparar(k, ini, fim, cabeca=True, cauda=True):
+    """tira o ar parado da ponta do corte pela energia (nota do Pailer 2026-11-06: 0,7 s de espera no fim da frase)"""
+    a, b = int(ini * 100), int(fim * 100)
+    v = np.nonzero(EN[k][a:b] > LIM[k])[0]    # no nível da voz: o ruído da oficina passa de 0,6 do limite e segurava a ponta
+    if not len(v):
+        return ini, fim
+    if cabeca:
+        ini = max(ini, (a + v[0]) / 100 - 0.08)
+    if cauda:
+        fim = min(fim, (a + v[-1]) / 100 + 0.18)   # folga para a consoante final não ser comida
+    return ini, fim
+
+
 def cortes(k, ini, fim):
     i0, _ = achar(k, ini)
     _, i1 = achar(k, fim, WS[k][i0][0])
     ws, ps, atual = WS[k], [], i0
     for i in range(i0 + 1, i1 + 1):
         gap, pont = ws[i][0] - ws[i - 1][1], ws[i - 1][2][-1] in ".,?!;:"
-        if gap > (0.30 if pont else 0.45):
+        if gap > (0.30 if pont else 0.45) or silencio(k, ws[i - 1][0], ws[i][1]) > (0.28 if pont else 0.38):
             ps.append((atual, i - 1, True)); atual = i
         elif ws[i - 1][1] - ws[atual][0] > (3.0 if pont else 4.6):
             ps.append((atual, i - 1, False)); atual = i    # troca de enquadramento: mesmo tempo da fonte, nada se perde
@@ -115,7 +137,9 @@ def cortes(k, ini, fim):
         final = fim_voz(k, ws[b][1]) if pula else round((ws[b][1] + ws[b + 1][0]) / 2, 3)
         if pula and b < i1:    # o vale pode cair na palavra seguinte e repetir voz ("moto motor", 2026-11-02)
             final = min(final, round(ws[b + 1][0] - 0.08, 3))
-        out.append((k, a, b, comeco, final))
+        comeco, final = aparar(k, comeco, final, cabeca=emenda is None, cauda=pula)
+        comeco = min(comeco, ws[a][1] - 0.05)
+        out.append((k, a, b, round(comeco, 3), round(final, 3)))
         emenda = None if pula else final
     return out
 
@@ -207,18 +231,15 @@ def versao(v):
     for k, ini, fim_ in v["roteiro"]:
         for kk, a, b, s0, s1 in cortes(k, ini, fim_):
             s0, s1 = round(s0, 3), round(s1, 3)
-            f = rosto(kk, (s0 + s1) / 2)
-            if f:
-                z, ent, mola, der = [(108, 0, 0, 4), (128, 0, 0, 2), (118, 0.3, 1, 2)][n % 3]
-                if f[2] > 200:
-                    z = 100 + (z - 100) * 0.4
-                cx, cy = round(f[0] / 10.8, 1), round(f[1] / 19.2, 1)
-            else:
-                z, ent, mola, der, cx, cy = (106 if n % 2 else 112), 0, 0, 3, 50, 50
-            zooms.append((round(t, 3), round(t + s1 - s0, 3), {"z": z, "ent": ent, "sai": 0, "suav": 80, "mola": mola, "der": der, "cx": cx, "cy": cy, "mb": 0, "obt": 100}))
-            sc = round(100 * CFG.get("escala_base", {}).get(kk, 1), 2)   # mídia pequena preenche o quadro; escala fixa, sem animação
+            sc =round(100 * CFG.get("escala_base", {}).get(kk, 1), 2)   # mídia pequena preenche o quadro; escala fixa, sem animação
             clips.append({"tr": 0, "st": round(t, 3), "s": s0, "e": s1, "m": MID[kk], "g": GANHO["voz"], "p": {**PADRAO, "sc": sc}})
-            legs += legendas(kk, a, b, s0 - t)
+            # a transcrição estica a palavra por cima da pausa que o corte tirou: a legenda fica dentro do clipe (não atravessa corte)
+            for l_ in legendas(kk, a, b, s0 - t):
+                fim_c = round(t + s1 - s0 - 0.02, 3)
+                l_["st"], l_["en"] = max(l_["st"], round(t, 3)), min(l_["en"], fim_c)
+                l_["pt"] = [[min(max(x, l_["st"]), l_["en"]), min(max(y, l_["st"]), l_["en"])] for x, y in l_["pt"]]
+                if l_["en"] - l_["st"] > 0.12:
+                    legs.append(l_)
             mapa.append((kk, a, b, s0, s1, t))
             t += s1 - s0; n += 1
     fim_fala = round(t, 3)
@@ -265,14 +286,55 @@ def versao(v):
     def zoom(a, b, val, nome):
         clips.append({"tr": 2, "st": round(a, 3), "s": 0, "e": round(b - a, 3), "m": M_AJ, "cor": "pink", "nome": nome, "az": {"est": "manual"},
                       "fx": [{"id": f"fxz{len(clips)}", "t": "zoom", "on": True, "v": val}]})
-    for a, b, val in zooms:
+
+    # Zoom de ênfase (nota do Pailer 2026-11-06): nada de um zoom por corte pulando de 108 para 128. Só nos momentos que o
+    # roteiro marca pelo que está sendo dito ("zooms": [fonte, 1ª palavras, últimas palavras, "suave"|"empurra", zoom %]);
+    # entra com curva, sustenta e volta suave; não atravessa apoio nem troca de fonte. Fora deles o quadro fica em 100%.
+    def tl_palavra(k, i, fim=False):
+        for kk, a, b, s0, s1, st in mapa:
+            if kk == k and a <= i <= b:
+                return st + min(max((WS[k][i][1] if fim else WS[k][i][0]), s0), s1) - s0
+        return None
+    blocos_fonte = []
+    for kk, a, b, s0, s1, st in mapa:
+        if blocos_fonte and blocos_fonte[-1][0] == kk and abs(blocos_fonte[-1][2] - st) < 0.01:
+            blocos_fonte[-1][2] = st + s1 - s0
+        else:
+            blocos_fonte.append([kk, st, st + s1 - s0])
+    usados = []
+    for k, ini_, fim__, estilo, zz in CFG.get("zooms", []):
+        i0, _ = achar(k, ini_)
+        _, i1 = achar(k, fim__, WS[k][i0][0])
+        a, b = tl_palavra(k, i0), tl_palavra(k, i1, True)
+        if a is None or b is None:
+            continue
+        a, b = a - (0.2 if estilo == "empurra" else 0.35), b + 0.4
+        bl = next((x for x in blocos_fonte if x[1] - 0.01 <= (a + b) / 2 <= x[2] + 0.01), None)
+        if bl:
+            a, b = max(a, bl[1]), min(b, bl[2])
         for x, y in apoios:
             if y > a and x < b:
-                if x - a > 0.05:
-                    zoom(a, x, val, "Zoom")
-                a = max(a, y)
-        if b - a > 0.05:
-            zoom(a, b, val, "Zoom")
+                if x - a >= b - y:
+                    b = x
+                else:
+                    a = y
+        a = max([a, 0.0] + [u[1] for u in usados if u[0] < b and u[1] > a])   # um zoom de cada vez
+        if b - a < 1.0:
+            print(f"  aviso: zoom '{ini_}' sem espaço livre, ficou de fora")
+            continue
+        D = b - a
+        mapa_m = next((m for m in mapa if m[5] <= (a + b) / 2 < m[5] + m[4] - m[3]), None)
+        f = rosto(mapa_m[0], mapa_m[3] + (a + b) / 2 - mapa_m[5]) if mapa_m else None
+        z = float(zz)
+        if f and f[2] > 200:
+            z = 100 + (z - 100) * 0.5
+        cx, cy = (round(f[0] / 10.8, 1), round(f[1] / 19.2, 1)) if f else (50, 45)
+        if estilo == "empurra":    # frase longa: empurrão lento que acompanha a fala
+            vz = {"z": z, "ent": round(min(D * 0.7, 3.5), 2), "sai": round(min(0.8, D * 0.25), 2), "suav": 25, "der": 0.5}
+        else:                      # suave: chega na palavra, respira e volta
+            vz = {"z": z, "ent": round(min(0.9, D * 0.4), 2), "sai": round(min(0.8, D * 0.35), 2), "suav": 35, "der": 1.5}
+        zoom(a, b, {**vz, "mola": 0, "cx": cx, "cy": cy, "mb": 0, "obt": 100}, "Zoom")
+        usados.append((a, b))
     for x, y in apoios:
         zoom(x, y, {"z": 108, "ent": 0, "sai": 0, "suav": 80, "mola": 0, "der": 3, "cx": 50, "cy": 50, "mb": 0, "obt": 100}, "Zoom apoio")
     clips.append({"tr": 3, "st": 0, "s": 0, "e": fim, "m": M_AJ, "cor": "orange", "nome": "Cor", "fx": [{"id": "fxcor", "t": "lc", "on": True, "v": dict(COR)}]})
@@ -311,7 +373,8 @@ def abrir(porta, plano):
     from playwright.sync_api import sync_playwright
     with sync_playwright() as pw:
         nav = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{porta}")
-        pg = [p for c in nav.contexts for p in c.pages if "index.html" in p.url][0]
+        # o app pode ter duas páginas index.html; só a do editor tem VE (2026-11-06: abriu na outra e não fez nada)
+        pg = [p for c in nav.contexts for p in c.pages if "index.html" in p.url and p.evaluate("typeof VE") != "undefined"][0]
         pg.set_default_timeout(0)
         if pg.evaluate("VE.dirty"):
             raise SystemExit("o app tem alterações sem salvar: não troquei de projeto")

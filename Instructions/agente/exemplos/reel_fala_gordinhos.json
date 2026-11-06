@@ -24,6 +24,7 @@
             ["Resultado: 10%", "te", "resultado dez", 0], ["Fluido saturado", "te", "fluido já saturado", 0], ["Máquina de diálise", "in", "máquina de diálise", 1],
             ["Sem adaptação agressiva", "in", "nenhuma adaptação", 1], ["Proteção náutica", "in", "uma mangueira", 0], ["Temperatura ideal", "in", "temperatura mais", 0],
             ["Kit Total Tech", "me", "marca totaltech", 1], ["Agende seu upgrade", "in", "clique no link", 1]],
+ "zooms": [["ab", "você que tem", "no seu carro", "suave", 118], ["te", "resultado dez por", "super saturado", "suave", 120], ["in", "qual é a vantagem", "up grade", "empurra", 116]],
  "momento_chave": ["te", "resultado dez"],
  "finalizacao": ["m2", 2.0]
 }

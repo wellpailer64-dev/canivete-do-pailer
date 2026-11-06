@@ -27,10 +27,12 @@ Script avulso que se repete vira ferramenta. Defeito achado no olho vira regra e
 - Corte no fim de frase ou de movimento, no contexto do que é dito (2026-10-14).
 - Nunca comer palavra. O fim do corte vem do vale da voz, não do tempo da transcrição (2026-11-01).
 - Tirar repetição, hesitação e "dando sequência" sem mudar o sentido.
-- Pausa: corta acima de 0,30 s depois de pontuação e 0,60 s no meio da frase.
+- Pausa: corta acima de 0,30 s depois de pontuação e 0,40 s no meio da frase, medida na energia da voz, não na transcrição.
+- Sem ar parado na ponta do corte: a frase acaba e o corte vem logo (nada de esperar ~0,7 s e pular). A transcrição estica a última palavra por cima do silêncio; a ponta vem da voz (2026-11-06).
 
 ### Zoom e camadas
 - Zoom dinâmico só em camada de ajuste, nunca escala animada no clipe (2026-11-01).
+- Zoom é de ênfase, não um por corte: escolhido pelo que está sendo dito (número, pergunta, ponto forte, chamada), entra suave, sustenta e volta suave. Nada de pular de zoom mínimo para máximo e voltar a cada corte; fora da ênfase o quadro fica parado (2026-11-06).
 - Cor em outra camada de ajuste, abaixo de logo, tarjas e legendas (2026-11-01).
 - Timeline organizada, com cor por tipo de camada (2026-10-14). Motion pronto termina em `veCompAgruparCenas()`.
 - Troca de foco entre pessoas: duas faixas iguais empilhadas, desativando a de quem não está em foco (2026-10-07).
