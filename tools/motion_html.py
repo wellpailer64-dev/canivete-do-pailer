@@ -262,6 +262,8 @@ def plano(A, nome):
                 c["tx"] = d["texto"]
             if tipo == "img":
                 arq = d.get("png") or d.get("src")
+                if d.get("video"):   # vídeo de verdade no lugar do quadro amostrado (mesmo tamanho em pixels)
+                    arq, c["tipo"], c["s"] = d["video"], "video", round(float(d.get("vs") or 0), 4)
                 c["arq"] = arq
                 c["larg"] = d["w"]
                 midias.append(arq)

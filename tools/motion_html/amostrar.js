@@ -170,7 +170,12 @@
             const mg = Math.ceil((o.texto.sOn ? o.texto.sDist + o.texto.sBlur * 1.5 : 0) + 4);
             o.cw = Math.ceil(tw + 2 * mg); o.ch = Math.ceil(th + 2 * mg);
         }
-        if (v === 'img' && el.tagName === 'IMG') o.src = decodeURIComponent(el.src.replace(/^file:\/\/\/?/, ''));
+        if (v === 'img' && el.tagName === 'IMG') {
+            o.src = decodeURIComponent(el.src.replace(/^file:\/\/\/?/, ''));
+            // <img src="quadro.jpg" data-kv-video="clipe.mp4" data-kv-s="2">: o quadro (mesmo tamanho do vídeo) só serve
+            // para amostrar o movimento; na timeline entra o vídeo, começando em data-kv-s segundos do arquivo
+            if (el.dataset.kvVideo) { o.video = decodeURIComponent(new URL(el.dataset.kvVideo, location.href).href.replace(/^file:\/\/\/?/, '')); o.vs = parseFloat(el.dataset.kvS || '0') || 0; }
+        }
         else if (v === 'img') o.raster = true;
         return o;
     };

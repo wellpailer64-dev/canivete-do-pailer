@@ -6,7 +6,7 @@ if (!VE.ready) veCriarProjetoVazio({ w: P.W, h: P.H, fps: P.fps });
 const falta = P.midias.filter(p => !VE.media.some(m => m && !m.removido && norm(m.path) === norm(p)));
 if (falta.length) await vePjImportar(falta.map(path => ({ path, pasta: false })));
 const midia = arq => VE.media.find(m => m && !m.removido && (norm(m.path) === norm(arq) || norm(m.path).endsWith('/' + norm(arq))));
-for (let k = 0; k < 100 && P.midias.some(p => { const m = midia(p.split(/[\\/]/).pop()); return !m || (m.kind === 'image' && !m.w) || (m.kind === 'audio' && !m.dur); }); k++)
+for (let k = 0; k < 100 && P.midias.some(p => { const m = midia(p.split(/[\\/]/).pop()); return !m || (m.kind === 'image' && !m.w) || ((m.kind === 'audio' || m.kind === 'video') && !m.dur); }); k++)
     await new Promise(r => setTimeout(r, 150));
 let mNulo = VE.media.find(x => x && x.kind === 'nulo' && !x.removido);
 if (!mNulo) { mNulo = { id: VE.media.length, kind: 'nulo', name: 'Nulo' }; VE.media.push(mNulo); }

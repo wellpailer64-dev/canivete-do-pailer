@@ -38,6 +38,7 @@ py -3.13 tools/motion_html.py cena.html [--saida pasta] [--nome "Timeline"] [--s
 | caixa com cor lisa, borda e arredondamento | Forma (ret/elipse); arredondamento em % (metade do lado menor, no meio do contorno) |
 | caixa com degradê, sombra de caixa, svg, texto com estilos mistos | imagem isolada (PNG da própria camada) com o MOVIMENTO nativo |
 | `<img>` | imagem do arquivo |
+| `<img src="quadro.jpg" data-kv-video="clipe.mp4" data-kv-s="0">` | clipe de vídeo com o movimento do `<img>` (o quadro tem o mesmo tamanho do vídeo; `data-kv-s` = início no arquivo). B-roll do Pexels: `kb.py` busca, `pexels.com/download/video/ID/` baixa |
 | translate/scale/rotate/transform, opacidade (inclusive dos pais) | Posição, Escala, Rotação, Opacidade com quadros-chave |
 | largura/altura animadas (barra que cresce), escala só num eixo numa forma | `fm.w`/`fm.h` animados |
 | `filter: blur()` | Desfoque gaussiano animado (100% = sigma de 5% do lado menor da mídia) |
@@ -88,4 +89,4 @@ largura/altura animadas ficava presa no tamanho parado (`veGrafTamanho` em `edit
 - Escala diferente em X e Y em texto/imagem (o editor tem uma escala só): fica a média + aviso.
 - Objeto muito rápido (~100 px/quadro) fica 2–3 px fora no meio do movimento: precisão da exportação, não do tradutor.
 - Mistura (`mix-blend-mode`) → modo de mesclagem da camada; `backdrop-filter` não tem equivalente.
-- Vídeo (`<video>`) como camada; áudio da cena.
+- `<video>` direto (hoje: `<img data-kv-video>`); áudio da cena.
