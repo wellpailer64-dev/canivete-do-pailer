@@ -97,7 +97,7 @@ def main():
             clicar("#ve-ke-corpo [data-ke-acao=desfazer]")
             ok(abs(pg.evaluate("veNavDur()") - dur0) < 0.02, "Desfazer do KaniEdit volta")
             # cancelar: respiros rodam, o J-cut é pulado, e ainda é um desfazer só
-            c = pg.evaluate("(async()=>{const p=veKaniEditCompleto({respiros:true,jcut:true,legenda:false,autozoom:false}); VEKE.cancelar=true; const r=await p; const d=veNavDur(); veUndo(); return {r, d, d2:veNavDur()}})()")
+            c = pg.evaluate("(async()=>{const p=veKaniEditCompleto({respiros:true,jcut:true,legenda:false,autozoom:false}); VEKED.cancelar=true; const r=await p; const d=veNavDur(); veUndo(); return {r, d, d2:veNavDur()}})()")
             ok("cancelado" in " ".join(c["r"]["etapas"]) and not any("J-cut" in e for e in c["r"]["etapas"]) and abs(c["d2"] - dur0) < 0.02, "Cancelar para antes do J-cut e desfaz inteiro", str(c))
             # onda fina no zoom profundo
             pg.evaluate("VE.view = 1.5; veSetPps(4000, 1.5, 0)")
