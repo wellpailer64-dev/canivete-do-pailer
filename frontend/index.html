@@ -6,7 +6,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KANIVETE</title>
-    <script src="ls_boot.js"></script>
+    <script src="ls_boot.js"></script>
+    <!-- Script da página que não carregou (erro de sintaxe, nome global repetido): aviso na tela em vez de a ferramenta
+         sumir calada (o Kanivete Encoder ficou dias sem carregar por um const repetido, 2026-11-07) -->
+    <script>(function () {
+        var falhas = window.__scriptsFalhos = [];
+        window.addEventListener('error', function (e) {
+            var f = String(e.filename || ''), m = f.match(/\/(js\/[^?#]+\.js)/);
+            if (!m || e.lineno > 1 && !(e.error instanceof SyntaxError) && !/already been declared|Unexpected/.test(e.message)) return;
+            if (document.readyState === 'complete') return;   // só a carga da página; erro em uso fica com o console
+            falhas.push(m[1] + ': ' + e.message);
+        });
+        window.addEventListener('load', function () {
+            if (!falhas.length) return;
+            console.error('[KANIVETE] scripts que não carregaram:', falhas);
+            var d = document.createElement('div');
+            d.id = 'aviso-script-falho';
+            d.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:100000;max-width:80vw;' +
+                'padding:10px 34px 10px 14px;border-radius:8px;background:#3a1414;border:1px solid #a33;color:#fdd;' +
+                'font:12px/1.45 system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.5)';
+            d.innerHTML = '<b>Parte do KANIVETE não carregou</b> (algumas ferramentas podem estar desatualizadas ou faltando):<br>' +
+                falhas.map(function (x) { return x.replace(/[<>&]/g, ''); }).join('<br>') +
+                '<button style="position:absolute;top:6px;right:8px;background:none;border:0;color:#fdd;cursor:pointer;font-size:14px" ' +
+                'onclick="this.parentNode.remove()">✕</button>';
+            document.body.appendChild(d);
+        });
+    })();</script>
     <script src="js/armazenamento.js"></script>
     <link rel="stylesheet" href="css/app.css">
     <link rel="stylesheet" href="css/editor.css">

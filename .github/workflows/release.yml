@@ -32,6 +32,9 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.txt
 
+      - name: Conferir scripts da página (nome global repetido derruba um arquivo inteiro)
+        run: python testes/teste_scripts_globais.py
+
       - name: Instalar dependências
         shell: pwsh
         run: |
