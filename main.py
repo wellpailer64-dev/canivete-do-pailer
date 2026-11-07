@@ -6157,7 +6157,10 @@ def _servidor_com_ajuda():
             if environ.get("PATH_INFO") == "/ls_boot.js":
                 # localStorage da última sessão, síncrono, antes dos scripts da página (frontend/js/armazenamento.js)
                 js = ("(function(d){try{for(var k in d){if(localStorage.getItem(k)===null)localStorage.setItem(k,d[k]);}}catch(e){}})(%s);"
-                      % json.dumps(ls_load()).replace("</", "<\\/")).encode("utf-8")
+                      % json.dumps(ls_load()).replace("</", "<\\/"))
+                if not getattr(sys, "frozen", False):   # pelo código (Runapp): selo "Runapp" na barra e no splash (app.css)
+                    js += "document.documentElement.classList.add('runapp');"
+                js = js.encode("utf-8")
                 start_response("200 OK", [("Content-Type", "application/javascript; charset=utf-8"),
                                           ("Cache-Control", "no-store"), ("Content-Length", str(len(js)))])
                 return [js]
@@ -6273,7 +6276,14 @@ def main():
     html_path = os.path.join(base_dir, "frontend", "index.html")
 
     # Carrega geometria salva da sessão anterior
-    _state_path = os.path.join(base_dir, "window_state.json")
+    # em %APPDATA% (como o resto): .exe e Runapp compartilham; migra o arquivo antigo da pasta do app
+    _state_path = os.path.join(os.path.dirname(_ve_layout_path()), "window_state.json")
+    _state_antigo = os.path.join(base_dir, "window_state.json")
+    if not os.path.exists(_state_path) and os.path.exists(_state_antigo):
+        try:
+            shutil.copy2(_state_antigo, _state_path)
+        except Exception:
+            pass
 
     def _load_window_state():
         try:
@@ -6306,7 +6316,7 @@ def main():
 
     # Criar a janela ANTES de qualquer operação que use Tcl/Tkinter residual
     _create_kwargs = dict(
-        title="KANIVETE",
+        title="KANIVETE" if getattr(sys, "frozen", False) else "KANIVETE · Runapp",
         url=html_path,
         js_api=api,
         width=_w,

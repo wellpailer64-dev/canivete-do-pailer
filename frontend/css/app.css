@@ -1649,6 +1649,9 @@ html.barra-propria .titlebar {
 }
 html.barra-propria .app-container { height: calc(100vh - 26px); }
 .titlebar-nome { flex: 1; font-size: 11px; color: rgba(255, 255, 255, .32); letter-spacing: .02em; }
+/* App aberto pelo código (Runapp.bat): selo discreto (main.py põe html.runapp no ls_boot.js) */
+html.runapp .titlebar-nome::after { content: "Runapp"; margin-left: 8px; font-size: 9px; letter-spacing: .06em; color: rgba(255, 255, 255, .22); }
+html.runapp #splash-overlay::after { content: "Runapp"; position: absolute; bottom: 18px; font-size: 10px; letter-spacing: .1em; color: rgba(255, 255, 255, .22); }
 .tb-bolas { display: flex; gap: 16px; -webkit-app-region: no-drag; app-region: no-drag; }
 .tb-bola {
     width: 9px; height: 9px; padding: 0; border: 0; border-radius: 50%; cursor: default; -webkit-app-region: no-drag; app-region: no-drag;
