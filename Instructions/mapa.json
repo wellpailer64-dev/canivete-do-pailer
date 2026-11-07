@@ -809,6 +809,17 @@
    "automacao": ""
   },
   {
+   "id": "kaniboard",
+   "nome": "KaniBoard",
+   "grupo": "Quadros",
+   "front": [],
+   "back": [],
+   "api": [],
+   "testes": [],
+   "guias": [],
+   "automacao": ""
+  },
+  {
    "id": "slider-kanivete",
    "nome": "Slider Kanivete",
    "grupo": "Apresentação",
@@ -933,6 +944,17 @@
   "plugins_pessoais_listar",
   "plugin_pessoal",
   "plugin_pessoal_recarregar",
+  "kb_listar",
+  "kb_novo",
+  "kb_abrir",
+  "kb_salvar",
+  "kb_renomear",
+  "kb_favoritar",
+  "kb_duplicar",
+  "kb_apagar",
+  "kb_midia",
+  "kb_midia_arquivo",
+  "kb_exportar_png",
   "ata_listar",
   "ata_abrir",
   "ata_salvar",
@@ -2230,6 +2252,52 @@
     "plugins_pessoais"
    ]
   },
+  "kb_listar": {
+   "args": "",
+   "modulos": [
+    "kaniboard"
+   ]
+  },
+  "kb_novo": {
+   "args": "nome=\"Sem título\", doc=None",
+   "modulos": []
+  },
+  "kb_abrir": {
+   "args": "bid",
+   "modulos": []
+  },
+  "kb_salvar": {
+   "args": "bid, doc, thumb=\"\"",
+   "modulos": []
+  },
+  "kb_renomear": {
+   "args": "bid, nome",
+   "modulos": []
+  },
+  "kb_favoritar": {
+   "args": "bid, fav=True",
+   "modulos": []
+  },
+  "kb_duplicar": {
+   "args": "bid",
+   "modulos": []
+  },
+  "kb_apagar": {
+   "args": "bid",
+   "modulos": []
+  },
+  "kb_midia": {
+   "args": "bid, data_url, nome=\"colado\"",
+   "modulos": []
+  },
+  "kb_midia_arquivo": {
+   "args": "bid, caminho=\"\"",
+   "modulos": []
+  },
+  "kb_exportar_png": {
+   "args": "data_url, nome=\"KaniBoard\"",
+   "modulos": []
+  },
   "ata_listar": {
    "args": "",
    "modulos": [
@@ -3348,6 +3416,7 @@
   "Instructions/agente/guia-edicao.md": "GUIA-EDICAO :: Pocket Editor (Canivete do Pailer) — para agentes de IA",
   "Instructions/agente/kani-maos.md": "Mãos da Kani — a Kani operando os apps ao vivo",
   "Instructions/agente/kani-motor.md": "Motor da Kani: bancada de modelos e escolha (2026-10-10)",
+  "Instructions/agente/kaniboard.md": "KaniBoard (Kb, amarelo #FFC933)",
   "Instructions/agente/legenda-criativa.md": "Legenda Criativa (estudo, 2026-10-18)",
   "Instructions/agente/mapa-editor.md": "Mapa do código — editor (gerado por tools/mapa_codigo.py; nome:linha)",
   "Instructions/agente/mapa-habilidades-motion.md": "Mapa de habilidades de motion (árvore de técnicas desbloqueadas)",
@@ -3449,6 +3518,7 @@
   "Functions/kani_maos.py": "kani_maos.py — as \"mãos\" da Kani nos apps: ela preenche uma FICHA curta e o código monta a peça AO VIVO na tela",
   "Functions/kani_memoria.py": "kani_memoria.py — o que a Kani aprende com a pessoa, sem retreinar o modelo (como as memórias e receitas do Claude):",
   "Functions/kani_skills.py": "kani_skills.py — habilidades do dia a dia da Kani (ferramentas do modo em etapas, kani_agente.py):",
+  "Functions/kaniboard.py": "kaniboard.py — KaniBoard (Kb, amarelo): quadro branco infinito (notas, formas, setas, caneta, imagens, frames)",
   "Functions/ke_arquivos.py": "ke_arquivos.py — Kanivete Encoder como Media Encoder: arquivos soltos do disco (e renders de outras ferramentas)",
   "Functions/legenda_premium.py": "legenda_premium.py — a Kani escolhe, lendo o texto, a palavra de destaque de cada título da Legenda Premium",
   "Functions/legendas.py": "legendas.py — transcrição da timeline do Pocket Editor (painel Texto: Transcrever / Criar legendas)",

@@ -6,7 +6,7 @@ e `Instructions/MAPA.md`. Achar algo: `py -3.13 tools/mapa_geral.py --busca term
 
 ## Nome
 Visível: **KANIVETE**. Internos seguem `CaniveteDoPailer` (exe, zip, `%APPDATA%`, mutex, `CANIVETE_*`): o updater dos amigos procura esses nomes.
-Ferramentas: Vídeo (Vd), Photo (Pk), Vetor (Vk), Sound (Sk), Lux (Lk), Encoder (Ke), Slider (Sd), Ata (At). Destaque por `var(--primary)`/`veAcc()`, nunca `#D4814A` fixo.
+Ferramentas: Vídeo (Vd), Photo (Pk), Vetor (Vk), Sound (Sk), Lux (Lk), Encoder (Ke), Slider (Sd), Ata (At), KaniBoard (Kb). Destaque por `var(--primary)`/`veAcc()`, nunca `#D4814A` fixo.
 Ferramenta separada = aba e página próprias (`#page-<id>`), sem abrir outra por trás.
 
 ## Peça de cliente (card do Pandalab)
@@ -32,7 +32,7 @@ Começar por `Instructions/agente/metodo-edicao-video.md` e pelo cérebro, área
 ## Antes de começar, ler o guia
 Edição de vídeo: método acima; API e histórico em `guia-edicao.md`, teoria em `tecnicas-de-montagem.md`; motion `mapa-habilidades-motion.md` (ao terminar, `veCompAgruparCenas()`); motion em HTML `motion-html.md`;
 carrossel/flyer/feed: cérebro "Design ·" + `direcao-carrossel.md`, `diretor-de-arte.md`, `repertorio-visual.md`, `plano-cena.md`; arte no Photo `design-photo-kanivete.md`; logo `direcao-logotipo.md`; Encoder `mapa-kanivete-encoder.md`;
-Slider `Instructions/slider-kanivete.md`; Vetor `Instructions/vetor-kanivete.md`; Photo `Instructions/editor-imagem.md`; Sound `Instructions/sound-kanivete.md`; Premiere `Instructions/importar-premiere.md` e `agente/ponte-premiere.md` (teste só em cópia); 3D `agente/cena-3d-editor.md`; Ata `agente/ata-kanivete.md`; plugins `agente/plugins.md`. Todos em `Instructions/agente/` salvo indicação.
+Slider `Instructions/slider-kanivete.md`; Vetor `Instructions/vetor-kanivete.md`; Photo `Instructions/editor-imagem.md`; Sound `Instructions/sound-kanivete.md`; Premiere `Instructions/importar-premiere.md` e `agente/ponte-premiere.md` (teste só em cópia); 3D `agente/cena-3d-editor.md`; Ata `agente/ata-kanivete.md`; KaniBoard `agente/kaniboard.md`; plugins `agente/plugins.md`. Todos em `Instructions/agente/` salvo indicação.
 
 ## Plugins
 KaniCode é software independente (`D:\Kanivete\Plugins\kanicode`, fora deste git). Pandalab: `py -3.13 D:\Kanivete\Plugins\pandalab\panda.py`; mudança em card real só com o Pailer, salvo entrega liberada. KaniBrowser `D:\Kanivete\Plugins\kanibrowser`: postar ou clicar em site de terceiros só com o ok dele.

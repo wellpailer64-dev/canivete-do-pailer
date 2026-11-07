@@ -11,6 +11,7 @@ const KL_LOBBYS = [
     { sel: '#sk-inicio', cor: '#7fd6ff', vid: 'sk' },
     { sel: '#lux-inicio', cor: '#ff4fc8', vid: 'lk' },
     { sel: '#sd-inicio', cor: '#2ee6c8', vid: 'sd' },
+    { sel: '#kbo-inicio', cor: '#FFC933', vid: 'kb' },
     { sel: '#ie-inicio', cor: '#4c9bff', vid: 'pk', sig: 'Pk', al: 'al-pk', titulo: 'Comece sua arte', img: 'img/home/banner-pk.webp',
       texto: 'Abra um PSD com as camadas, uma foto ou comece do zero. Retoque, recorte, gere imagens com IA e monte carrosséis e flyers.',
       novo: () => ieNovoDialogo(), abrir: () => ieAbrirDialogo() },

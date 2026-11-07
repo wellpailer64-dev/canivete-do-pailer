@@ -4929,6 +4929,55 @@ class ApiBridge:
         from Functions import plugins_pessoais
         return plugins_pessoais.recarregar(pid)
 
+    # KaniBoard (Kb, amarelo): quadro branco infinito (Functions/kaniboard.py, frontend/js/kaniboard*.js)
+    def _kb(self, fn, *a):
+        from Functions import kaniboard
+        try:
+            return getattr(kaniboard, fn)(*a)
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def kb_listar(self):
+        from Functions import kaniboard
+        return kaniboard.listar()
+
+    def kb_novo(self, nome="Sem título", doc=None):
+        return self._kb("novo", nome, json.loads(doc) if isinstance(doc, str) else doc)
+
+    def kb_abrir(self, bid):
+        return self._kb("abrir", bid)
+
+    def kb_salvar(self, bid, doc, thumb=""):
+        return self._kb("salvar", bid, doc, thumb)
+
+    def kb_renomear(self, bid, nome):
+        return self._kb("renomear", bid, nome)
+
+    def kb_favoritar(self, bid, fav=True):
+        return self._kb("favoritar", bid, fav)
+
+    def kb_duplicar(self, bid):
+        return self._kb("duplicar", bid)
+
+    def kb_apagar(self, bid):
+        return self._kb("apagar", bid)
+
+    def kb_midia(self, bid, data_url, nome="colado"):
+        return self._kb("midia_dados", bid, data_url, nome)
+
+    def kb_midia_arquivo(self, bid, caminho=""):
+        if not caminho:
+            caminho = self.vk_dialogo("abrir", ["Imagens (*.png;*.jpg;*.jpeg;*.gif;*.webp;*.bmp;*.svg;*.avif)", "Todos (*.*)"])
+            if not caminho:
+                return {"success": False, "cancelado": True}
+        return self._kb("midia_arquivo", bid, caminho)
+
+    def kb_exportar_png(self, data_url, nome="KaniBoard"):
+        caminho = self.vk_dialogo("salvar", ["Imagem PNG (*.png)"], nome + ".png")
+        if not caminho:
+            return {"success": False, "cancelado": True}
+        return self._kb("exportar_png", caminho, data_url)
+
     # Ata Kanivete (Beta): reunião do Meet → transcrição → ATA da Kani → PDF (Functions/ata_kanivete.py, frontend/js/ata.js)
     _ata_lock = threading.Lock()
 

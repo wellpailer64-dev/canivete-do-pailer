@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="css/kani.css">
     <link rel="stylesheet" href="css/slider.css">
     <link rel="stylesheet" href="css/ata.css">
+    <link rel="stylesheet" href="css/kaniboard.css">
     <link rel="icon" href="identidade/icone.ico">
 </head>
 <body>
@@ -199,6 +200,11 @@
                     <span class="icon"><span class="app-logo al-at">At</span></span><span class="label">Ata Kanivete</span><span class="menu-beta">Beta</span>
                 </button>
 
+                <div class="menu-group">Quadros</div>
+                <button class="menu-item" data-tool="kaniboard" onclick="switchTool('kaniboard')" title="KaniBoard — quadro branco infinito: notas, formas, setas, caneta, imagens e frames">
+                    <span class="icon"><span class="app-logo al-kb">Kb</span></span><span class="label">KaniBoard</span>
+                </button>
+
                 <div class="menu-group">Apresentação</div>
                 <button class="menu-item" data-tool="slider-kanivete" onclick="switchTool('slider-kanivete')" title="Slider Kanivete — apresentações 16:9 com camadas, vídeo, GIF e modo apresentação">
                     <span class="icon"><span class="app-logo al-sd">Sd</span></span><span class="label">Slider Kanivete</span>
@@ -322,6 +328,15 @@
                                 <button class="home-card" onclick="switchTool('omnivoice')">
                                     <span class="hc-media"><img src="img/tools/geracao-voz.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico"><svg class="i"><use href="#i-sparkles"/></svg></span></span>
                                     <b>Geração de Voz</b><small>Salve vozes por referência curta e sintetize textos com OmniVoice</small>
+                                </button>
+                            </div>
+                        </section>
+                        <section class="home-cat">
+                            <h4>Quadros</h4>
+                            <div class="home-grid">
+                                <button class="home-card" onclick="switchTool('kaniboard')">
+                                    <span class="hc-media"><img src="img/tools/kaniboard.webp" alt="" loading="lazy" decoding="async"><span class="hc-ico hc-app"><span class="app-logo al-kb">Kb</span></span></span>
+                                    <b>KaniBoard</b><small>Quadro infinito com notas, setas, caneta, imagens e frames</small>
                                 </button>
                             </div>
                         </section>
@@ -567,6 +582,7 @@
                 <div class="tool-page ve-page" id="page-lux-kanivete"></div>
                 <div class="tool-page ve-page" id="page-slider-kanivete"></div>
                 <div class="tool-page ve-page" id="page-ata-kanivete"></div>
+                <div class="tool-page ve-page" id="page-kaniboard"></div>
                 <div class="tool-page ve-page" id="page-kanivete-encoder"><div class="ve ke-casa" id="ke-casa"></div></div>
                 <div class="tool-page ve-page" id="page-video-cutter">
                     <div class="ve" id="ve">
@@ -2203,6 +2219,9 @@
     <script src="js/slider-agente.js"></script>
     <script src="js/slider-kani.js"></script>
     <script src="js/ata.js"></script>
+    <script src="js/kaniboard.js"></script>
+    <script src="js/kaniboard-interacao.js"></script>
+    <script src="js/kaniboard-lobby.js"></script>
     <script src="js/plugins-pessoais.js"></script>
     <script src="js/editor-3d-mexer.js"></script>
     <script src="js/editor-roto.js"></script>

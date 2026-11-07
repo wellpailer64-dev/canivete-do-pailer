@@ -6,7 +6,7 @@
   amigos procura esses nomes; trocar exige uma migração planejada.
 - Nomes visíveis: **Vídeo Kanivete** (Vd, lilás; antes "Editor Kanivete"), **Photo Kanivete** (Pk, azul), **Vetor
   Kanivete** (Vk, laranja), **Sound Kanivete** (Sk, azul clarinho), **Lux Kanivete** (Lk, magenta), **Kanivete Encoder**
-  (Ke, roxo forte), **Slider Kanivete** (Sd, verde-água; `.dknv`), **Ata Kanivete** (At, verde #1FA971; Beta). Cores em `.al-*` (`frontend/css/app.css`, `som.css`). A cor de
+  (Ke, roxo forte), **Slider Kanivete** (Sd, verde-água; `.dknv`), **Ata Kanivete** (At, verde #1FA971; Beta), **KaniBoard** (Kb, amarelo #FFC933). Cores em `.al-*` (`frontend/css/app.css`, `som.css`). A cor de
   destaque do app (`--primary`) vira a da marca na aba aberta (`html[data-ferramenta]`, app.css; canvas: `veAcc()` em app.js);
   laranja só na Home e nas ferramentas sem marca. Nada de `#D4814A` fixo: use `var(--primary)`/`veAcc()`. No código continuam editor de vídeo (`editor*.js`,
   `video-cutter`, "Pocket Editor" nos comentários) e editor de imagem (`imagem-*.js`).
@@ -485,6 +485,12 @@ Infraestrutura braçal (achar no código, troca mecânica, rodar teste, diagnost
 
 ## Ajuste barato de vídeo (2026-11-02)
 `tools/agente/trocar_midia.py` troca mídia por outra versão, medindo o tempo pelo áudio. `tools/agente/fechar_emenda.py` tira voz repetida usando um respiro existente. `tools/agente/abrir_teste.py` sobe o app de teste e abre o projeto. `conferir_edicao.py` agora reprova voz repetida, legenda encostada na borda e brasão sobre tarja. Ordem em `metodo-edicao-video.md`.
+
+## KaniBoard (Kb, amarelo) — quadro branco infinito (2026-11-07)
+Notas, formas, texto, setas que grudam, caneta/marca-texto/borracha, imagens e GIFs, frames com apresentação; lobby com
+modelos (prévia real) e grade dos quadros com prévia (`thumb.png`). `Functions/kaniboard.py` (`kb_*`), `frontend/js/kaniboard*.js`,
+`css/kaniboard.css`, API `KBO_API`. Prefixo `kbo-` porque o plugin KaniBrowser usa `.kb-*` e `window.KB_API`.
+Guia: `Instructions/agente/kaniboard.md`. Testes avulsos: `D:/kanivete_testes/scripts/kb_teste.py` e `kb_teste2.py`.
 
 ## Porta do modo agente nos scripts (2026-11-04)
 `tools/porta_agente.py`: scripts não usam mais 9222/9333 fixo; `porta(9222)` (app do Pailer) e `porta(9333)` (app de teste) leem o `agente.json` (o do APPDATA atual e o de `D:\kanivete_testesppdata`) e devolvem a porta viva. Nunca cruza os apps (faixa 9222-9231 = Pailer; fora dela = teste). `--porta` explícito continua valendo. Conferir: `py -3.13 tools/porta_agente.py 9333`. Script novo: copiar a linha de import do topo de `tools/aplicar.py` e usar `_porta_agente(9333)`.
