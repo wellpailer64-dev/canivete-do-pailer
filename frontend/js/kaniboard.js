@@ -12,7 +12,7 @@ const KB = {
     sel: new Set(), ferramenta: 'sel', forma: 'ret', corNota: '#FFF59D', caneta: { modo: 'caneta', cor: '#1a1a1a', esp: 3 },
     editando: null, hist: [], futuro: [], els: new Map(), ordemSig: '', salvarT: null, salvando: null, sujo: false,
     thumbEm: 0, camSuja: false, hover: null, mouse: { x: 0, y: 0, dentro: false }, show: null,
-    prefs: { roda: 'zoom' },
+    prefs: { roda: 'zoom' }, zoomRoda: null,
 };
 const kbApi = () => window.pywebview && window.pywebview.api;
 const kbEl = id => document.getElementById(id);
@@ -389,6 +389,22 @@ function kbZoomEm(z, sx, sy) {
     const vp = kbEl('kbo-vp'); if (sx == null) { sx = vp.clientWidth / 2; sy = vp.clientHeight / 2; }
     KB.cam.x = sx - (sx - KB.cam.x) * (z / KB.cam.z); KB.cam.y = sy - (sy - KB.cam.y) * (z / KB.cam.z); KB.cam.z = z;
     kbCamAgendar();
+}
+function kbZoomRoda(z, sx, sy, imediato = false) {
+    const atual = KB.zoomRoda || { z: KB.cam.z, sx, sy };
+    atual.z = Math.min(8, Math.max(.03, z)); atual.sx = sx; atual.sy = sy;
+    KB.zoomRoda = atual;
+    if (atual.raf) return;
+    const passo = () => {
+        const alvo = KB.zoomRoda;
+        if (!alvo) return;
+        const dz = Math.log(alvo.z / KB.cam.z), fracao = imediato ? 1 : .28;
+        const zNovo = Math.abs(dz) < .001 || imediato ? alvo.z : KB.cam.z * Math.exp(dz * fracao);
+        kbZoomEm(zNovo, alvo.sx, alvo.sy);
+        if (zNovo === alvo.z) { alvo.raf = 0; KB.zoomRoda = null; }
+        else alvo.raf = requestAnimationFrame(passo);
+    };
+    atual.raf = requestAnimationFrame(passo);
 }
 function kbCamPara(cx, margem = 80, zMax = 1.5) {
     const vp = kbEl('kbo-vp'); if (!vp || !cx) return null;

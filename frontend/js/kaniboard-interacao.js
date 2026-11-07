@@ -676,8 +676,8 @@ function kbRoda(e) {
     const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY, dx = e.deltaMode === 1 ? e.deltaX * 33 : e.deltaX;
     const touchpad = e.deltaMode === 0 && (dx !== 0 || !Number.isInteger(dy) || Math.abs(dy) < 40);
     if (e.ctrlKey || (KB.prefs.roda === 'zoom' && !touchpad && !e.shiftKey)) {
-        const k = Math.exp(-dy * (e.ctrlKey && touchpad ? .012 : .0018));
-        kbZoomEm(KB.cam.z * k, sx, sy);
+        const k = Math.exp(-dy * (e.ctrlKey && touchpad ? .004 : .0007));
+        kbZoomRoda(KB.cam.z * k, sx, sy);
     } else {
         if (e.shiftKey && !dx) { KB.cam.x -= dy; } else { KB.cam.x -= dx; KB.cam.y -= dy; }
         kbCamAgendar();
