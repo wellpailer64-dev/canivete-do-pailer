@@ -857,11 +857,27 @@ def ve_quadro_original(path, t, largura=2560):
         chave = hashlib.md5(f"{os.path.basename(path).lower()}|{st.st_size}|{st.st_mtime}|{t:.4f}|{largura}".encode()).hexdigest()[:16]
         pasta = os.path.join(video_cutter._midia_dir(), "quadros_originais")
         os.makedirs(pasta, exist_ok=True)
-        arq = os.path.join(pasta, f"q_{chave}.jpg")
+        # com transparência (GC em ProRes 4444, VP9 com alfa): PNG com alfa; em JPEG o fundo virava um retângulo PRETO
+        # no monitor parado com o proxy desligado (GC_Acores, Grafite Contra Enchente, 2026-11-07)
+        dec, alfa = [], False
+        try:
+            pr = subprocess.run([video_cutter.ffprobe_path(), "-v", "error", "-select_streams", "v:0", "-show_entries",
+                                 "stream=codec_name,pix_fmt:stream_tags", "-of", "json", path],
+                                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20,
+                                creationflags=video_cutter._creationflags())
+            v0 = (json.loads(pr.stdout or "{}").get("streams") or [{}])[0]
+            alfa = video_cutter._tem_alfa(v0.get("pix_fmt"), v0.get("tags"))
+            if alfa and v0.get("codec_name") in ("vp8", "vp9"):
+                dec = ["-c:v", "libvpx-vp9" if v0.get("codec_name") == "vp9" else "libvpx"]   # o decodificador nativo perde o alfa
+        except Exception:
+            pass
+        ext = "png" if alfa else "jpg"
+        arq = os.path.join(pasta, f"q_{chave}.{ext}")
         if not os.path.isfile(arq):
-            tmp = arq + ".tmp.jpg"
-            r = subprocess.run([video_cutter.ffmpeg_path(), "-v", "error", "-y", "-ss", f"{t:.4f}", "-i", path, "-frames:v", "1",
-                                "-vf", f"scale='min({largura},iw)':-2:flags=lanczos", "-q:v", "2", tmp],
+            tmp = arq + ".tmp." + ext
+            saida = ["-pix_fmt", "rgba"] if alfa else ["-q:v", "2"]
+            r = subprocess.run([video_cutter.ffmpeg_path(), "-v", "error", "-y", "-ss", f"{t:.4f}"] + dec + ["-i", path, "-frames:v", "1",
+                                "-vf", f"scale='min({largura},iw)':-2:flags=lanczos"] + saida + [tmp],
                                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
                                creationflags=video_cutter._creationflags())
             if r.returncode != 0 or not os.path.isfile(tmp):
