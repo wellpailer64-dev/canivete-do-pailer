@@ -586,6 +586,20 @@ CASOS = {
             fx: [{ id: id(), t: 'ca', on: true, v: { r: 5, g: 0, b: -5, raio: 0 } }] });
         return [clip(0, 0, 0, 4, 'b.mp4'), pip, a1, a2];
     """, ""),
+    # aberração só nas extremidades (Centro limpo): camada de ajuste com foco 40 e, num trecho, Raio + Centro limpo
+    # juntos; e num clipe de vídeo menor (a máscara é da camada, não do quadro)
+    "aberracaobordas": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        let aj = VE.media.find(x => x.kind === 'ajuste');
+        if (!aj) { aj = { id: VE.media.length, kind: 'ajuste', name: 'Camada de ajuste' }; VE.media.push(aj); }
+        const a1 = { tr: 2, st: 0, s: 0, e: 4, m: aj.id, fx: [{ id: id(), t: 'ca', on: true, v: { r: -10, g: 0, b: 10, raio: 0, foco: 40, suave: 40 } }] };
+        a1.p = veDefProps(a1);
+        const a2 = { tr: 3, st: 2, s: 0, e: 2, m: aj.id, fx: [{ id: id(), t: 'ca', on: true, v: { r: -6, g: 0, b: 6, raio: 150, foco: 20, suave: 80 } }] };
+        a2.p = veDefProps(a2);
+        const pip = clip(1, 0.5, 0, 3, 'c.mp4', { p: { sc: 40, x: 540, y: 600, rot: 0, op: 100 },
+            fx: [{ id: id(), t: 'ca', on: true, v: { r: 8, g: 0, b: -8, raio: 0, foco: 50, suave: 30 } }] });
+        return [clip(0, 0, 0, 4, 'b.mp4'), pip, a1, a2];
+    """, ""),
     # desfoque com quadros-chave num CLIPE DE VÍDEO (com --placa: _shader_blur_anim; antes a timeline inteira ia pela CPU)
     "desfoquevideo": (1080, 1920, """
         const { clip } = __te, a = veFxNewId();

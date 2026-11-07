@@ -937,6 +937,11 @@ def _shader_ca(v, W, H):
                         for c, s in zip("rgb", ss))
     queda = (f"    float m = clamp(2.0 - 2.0 * length((HOOKED_pos - 0.5) * vec2({W:.1f}, {H:.1f})) / {min(W, H) * raio:.3f}, 0.0, 1.0);\n"
              if raio > 0 else "    float m = 1.0;\n")
+    f0, f1 = vc._ca_foco(v)
+    if f0 > 0:   # Centro limpo: nada até f0, cheio a partir de f1 (frações da meia diagonal)
+        hd = (W * W + H * H) ** 0.5 / 2
+        queda += (f"    m *= clamp((length((HOOKED_pos - 0.5) * vec2({W:.1f}, {H:.1f})) / {hd:.3f} - {f0:.5f})"
+                  f" / {f1 - f0:.5f}, 0.0, 1.0);\n")
     return (f"//!HOOK MAIN\n//!BIND HOOKED\n//!DESC aberracao cromatica\nvec4 hook() {{\n"
             f"    vec4 o = clamp(HOOKED_tex(HOOKED_pos), 0.0, 1.0);\n    vec3 ca;\n{leitura}\n{queda}"
             f"    o.rgb = mix(o.rgb, ca, m);\n    return o;\n}}\n")

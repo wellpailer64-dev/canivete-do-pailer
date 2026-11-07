@@ -3497,6 +3497,15 @@ def _key_geq(kp):
             f"lut3d=file={_caminho_filtro(nome)}:interp=tetrahedral")
 
 
+def _ca_foco(v):
+    """Centro limpo da aberração cromática (editor-fx.js veFxCaFoco): (início, fim) da rampa em frações da meia diagonal;
+    (0, 0) = desligado."""
+    f0 = _num(v.get("foco"), 0, 95) / 100.0
+    if f0 <= 0:
+        return 0.0, 0.0
+    return f0, f0 + (1 - f0) * _num(v.get("suave"), 5, 100, 50) / 100.0
+
+
 def _filtros_fx(fx, mw, mh, tag="x"):
     """Efeitos do clipe (mesma ordem e mesmas contas da prévia do editor, em frontend/js/editor-fx.js).
     Rodam no tamanho original da mídia, antes de escala/posição/rotação/opacidade (como no Premiere).
@@ -3536,10 +3545,16 @@ def _filtros_fx(fx, mw, mh, tag="x"):
                 ca = (f"[{r}i]split=4[{r}r][{r}g][{r}b][{r}a];" + ";".join(ramos) +
                       f";[{r}a]setsar=1,extractplanes=a[{r}ap];[{r}gp][{r}bp][{r}rp][{r}ap]mergeplanes=0x00102030:gbrap")
                 raio = _num(v.get("raio"), 0, 200) / 100.0
-                if raio <= 0:   # sem queda: a camada toda
+                f0, f1 = _ca_foco(v)
+                if raio <= 0 and f0 <= 0:   # sem queda: a camada toda
                     out.append(f"scale={W}:{H},setsar=1,format=gbrap[{r}i];" + ca + ",format=rgba")
-                else:   # queda radial (bordas sem franja): cheio até meio raio, nada no raio; máscara pequena ampliada
-                    q = f"255*clip(2-2*hypot(X-W/2\\,Y-H/2)/(min(W\\,H)*{raio:.4f})\\,0\\,1)"
+                else:   # máscaras radiais (Raio: cheio até meio raio, nada no raio; Centro limpo: nada até f0, cheio
+                    # a partir de f1, frações da meia diagonal); máscara pequena ampliada
+                    q = "255"
+                    if raio > 0:
+                        q += f"*clip(2-2*hypot(X-W/2\\,Y-H/2)/(min(W\\,H)*{raio:.4f})\\,0\\,1)"
+                    if f0 > 0:
+                        q += f"*clip((2*hypot(X-W/2\\,Y-H/2)/hypot(W\\,H)-{f0:.4f})/{f1 - f0:.4f}\\,0\\,1)"
                     out.append(f"scale={W}:{H},setsar=1,format=gbrap,split=3[{r}i][{r}o][{r}k];" + ca + f"[{r}x];"
                                f"[{r}k]scale=64:{max(2, round(64 * H / W))},format=gray,geq=lum='{q}',"
                                f"scale={W}:{H}:flags=bilinear,setsar=1,format=gbrap[{r}m];[{r}o][{r}x][{r}m]maskedmerge,format=rgba")

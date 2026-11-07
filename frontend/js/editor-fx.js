@@ -45,7 +45,11 @@ const VE_FX = {
             { k: 'g', nome: 'Verde', min: -10, max: 10, step: 0.1, def: 0, un: '' },
             { k: 'b', nome: 'Azul', min: -10, max: 10, step: 0.1, def: 2, un: '' },
             { k: 'raio', nome: 'Raio', min: 0, max: 200, step: 1, def: 60, un: '%' },
+            // centro limpo: franja só nas extremidades (0 no centro até 'foco' da meia diagonal, cheia nos cantos)
+            { k: 'foco', nome: 'Centro limpo', min: 0, max: 95, step: 1, def: 0, un: '%' },
+            { k: 'suave', nome: 'Transição', min: 5, max: 100, step: 1, def: 50, un: '%' },
         ],
+        novo: { raio: 0, foco: 35 },   // efeito novo já nas bordas (os antigos sem 'foco' seguem iguais)
         neutro: v => !(v.r || v.g || v.b),
         // como o VR Chromatic Aberrations do Premiere: cada canal ampliado a partir do centro da camada (positivo
         // abre, negativo fecha; 1 = 0,45 %, medido no render). Mesma conta na exportação (_filtros_fx, "ca").
@@ -61,13 +65,22 @@ const VE_FX = {
                 x.globalCompositeOperation = 'lighter'; x.drawImage(T.cv, 0, 0);
             });
             t.globalCompositeOperation = 'source-over'; x.globalCompositeOperation = 'source-over';
-            const R = (v.raio ?? 60) / 100 * Math.min(w, h);
-            if (R > 0) {   // queda radial (bordas sem franja): cheio até meio raio, nada no raio — igual à exportação
+            const R = (v.raio ?? 60) / 100 * Math.min(w, h), [f0, f1] = veFxCaFoco(v), hd = Math.hypot(w, h) / 2;
+            if (R > 0 || f0 > 0) {   // máscaras radiais — iguais à exportação (_filtros_fx e _shader_ca)
                 t.clearRect(0, 0, w, h); t.drawImage(a.cv, 0, 0);
                 const M = veFxCanvas(4, w, h), mx = M.ctx; mx.clearRect(0, 0, w, h); mx.drawImage(b.cv, 0, 0);
-                const gr = mx.createRadialGradient(w / 2, h / 2, R / 2, w / 2, h / 2, R);
-                gr.addColorStop(0, '#000'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-                mx.globalCompositeOperation = 'destination-in'; mx.fillStyle = gr; mx.fillRect(0, 0, w, h); mx.globalCompositeOperation = 'source-over';
+                mx.globalCompositeOperation = 'destination-in';
+                if (R > 0) {   // Raio (bordas sem franja): cheio até meio raio, nada no raio
+                    const gr = mx.createRadialGradient(w / 2, h / 2, R / 2, w / 2, h / 2, R);
+                    gr.addColorStop(0, '#000'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+                    mx.fillStyle = gr; mx.fillRect(0, 0, w, h);
+                }
+                if (f0 > 0) {   // Centro limpo: nada até f0, cheio a partir de f1 (frações da meia diagonal)
+                    const gr = mx.createRadialGradient(w / 2, h / 2, f0 * hd, w / 2, h / 2, f1 * hd);
+                    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, '#000');
+                    mx.fillStyle = gr; mx.fillRect(0, 0, w, h);
+                }
+                mx.globalCompositeOperation = 'source-over';
                 x.clearRect(0, 0, w, h); x.drawImage(T.cv, 0, 0); x.drawImage(M.cv, 0, 0);
             }
             return b;
@@ -767,6 +780,12 @@ function veFxCanvas(n, w, h) {
 }
 // escalas dos canais da aberração cromática, normalizadas pela menor (nenhum canal encolhe: sem borda vazia)
 function veFxCaEscalas(v) { const s = ['r', 'g', 'b'].map(k => 1 + (+v[k] || 0) * 0.0045), mn = Math.min(...s); return s.map(x => x / mn); }
+// Centro limpo da aberração: [início, fim] da rampa em frações da meia diagonal (0,0 = desligado). Mesma conta: _ca_foco
+function veFxCaFoco(v) {
+    const f0 = Math.max(0, Math.min(95, +v.foco || 0)) / 100;
+    if (!(f0 > 0)) return [0, 0];
+    return [f0, f0 + (1 - f0) * Math.max(5, Math.min(100, v.suave ?? 50)) / 100];
+}
 function veFxOther(a, w, h) { return veFxCanvas(a === VEFX.pool[0] ? 1 : 0, w, h); }
 
 // c (opcional): os parâmetros animados do clipe (quadros-chave 'fx.<id>.<parâmetro>', editor-motion.js) no instante T
@@ -952,6 +971,7 @@ function veFxAdd(i, t) {
     ok.forEach(x => {
         const v = {};
         VE_FX[t].params.forEach(p => { v[p.k] = p.def; });
+        Object.assign(v, VE_FX[t].novo || {});
         // `junto`: o que mais vai no efeito (plugin OFX leva a descrição dele, para abrir o projeto em outro PC)
         x.fx = [...(x.fx || []), { id: veFxNewId(), t, on: true, v, ...(VE_FX[t].junto ? VE_FX[t].junto() : {}) }];
     });
