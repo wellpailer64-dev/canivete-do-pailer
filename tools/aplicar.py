@@ -97,8 +97,10 @@ CACHE = os.path.join(CACHE, str(a.porta))
 os.makedirs(CACHE, exist_ok=True)
 with sync_playwright() as p:
     b = p.chromium.connect_over_cdp(f"http://127.0.0.1:{a.porta}")
+    # a janela principal, não a de um painel solto (também é index.html, com html.ve-float-html): mudar lá não valia
     pg = next(x for c in b.contexts for x in c.pages
-              if "index.html" in x.url and x.evaluate("typeof switchTool === 'function' && !!window.pywebview"))
+              if "index.html" in x.url and x.evaluate("typeof switchTool === 'function' && !!window.pywebview"
+                                                       " && !document.documentElement.classList.contains('ve-float-html')"))
     if a.py:
         r = pg.evaluate("() => pywebview.api.vk_recarregar ? pywebview.api.vk_recarregar() : null")
         print("py:", json.dumps(r and {k: r[k] for k in ("recarregados", "erros")}, ensure_ascii=False))
