@@ -400,7 +400,7 @@ def converter_previas(itens, emit):
                             _apagar_item(tmp)
                             continue
                         os.replace(tmp, final)
-                    emit("veOnMidia", {"id": mid, "stage": "video", "url": media_server.register(final), "proxy": True})
+                    emit("veOnMidia", {"id": mid, "stage": "video", "url": media_server.register(_proxy_sem_hdr(final)), "proxy": True})
                     for f in os.listdir(work):
                         if f.startswith("proxy_v2"):
                             q = os.path.join(work, f)
@@ -799,6 +799,8 @@ def _navegador_toca(path, info):
         return False
     if info["vcodec"] == "h264" and info["pix_fmt"] not in ("yuv420p", "yuvj420p"):
         return False  # H.264 10-bit / 4:2:2 não decodifica no navegador
+    if _cor_hdr(info):
+        return False  # HLG/PQ direto: o navegador faz tone mapping e a prévia fica diferente da exportação (_proxy_sem_hdr)
     # Maior que a qualidade das prévias (4K): prévia leve. Medido (teste 4K, 2026-10-01): H.264 4K direto travou a
     # página 130–200 ms ~1 s antes de cada corte (a reserva buscando e decodificando o GOP em 4K); a prévia 1080p
     # com quadro-chave a cada 0,5 s tocou limpa com corte e dissolução a cada 2 s.
@@ -1026,6 +1028,54 @@ def _instalar_proxy(tmp, proxy, work):
 
 
 _proxy_dims = {}
+
+
+def _cor_hdr(info):
+    """Vídeo HDR de celular (HLG/PQ, BT.2020 — iPhone). O KANIVETE lê como vídeo comum: matriz BT.2020, sem tone mapping
+    (a exportação pela CPU e pela placa, o quadro original do PROXY desligado e a prévia leve fazem a mesma conta)."""
+    i = info or {}
+    return (str(i.get("color_transfer") or "") in ("arib-std-b67", "smpte2084")
+            or str(i.get("color_primaries") or "") == "bt2020")
+
+
+_sdr_feitos = {}
+
+
+def _proxy_sem_hdr(arq):
+    """Prévia leve de vídeo HDR (HLG do iPhone) com a marca de cor de vídeo comum (curva e cores BT.709; a matriz BT.2020
+    fica, é a dos números gravados). Com a marca HLG o navegador fazia o tone mapping HDR→SDR: tocando, a imagem ficava
+    mais escura e saturada (como se a camada de ajuste tivesse sido aplicada duas vezes) e, parado com o PROXY desligado,
+    voltava ao normal — o quadro original e a exportação não fazem tone mapping (Grafite Contra Enchente, 2026-11-07:
+    127/111/94 tocando × 140/131/117 parado). Só troca a marca (cópia sem recodificar, ~1 s); devolve o caminho."""
+    try:
+        if not arq or not arq.lower().endswith(".mp4"):
+            return arq
+        chave = (os.path.abspath(arq), os.path.getmtime(arq))
+        if chave in _sdr_feitos:
+            return arq
+        i = _probe_ffprobe(arq)
+        if i.get("vcodec") != "h264" or not _cor_hdr(i):
+            _sdr_feitos[chave] = True
+            return arq
+        tmp = arq + f".{os.getpid()}.sdr.mp4"
+        r = subprocess.run([ffmpeg_path(), "-v", "error", "-y", "-i", arq, "-map", "0", "-c", "copy",
+                            "-bsf:v", "h264_metadata=colour_primaries=1:transfer_characteristics=1",
+                            "-color_primaries", "bt709", "-color_trc", "bt709", "-movflags", "+faststart", tmp],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
+                           creationflags=_creationflags())
+        if r.returncode != 0 or not os.path.isfile(tmp):
+            _apagar_item(tmp)
+            print("[proxy] marca SDR falhou:", (r.stderr or "")[-200:])
+            return arq
+        try:
+            os.replace(tmp, arq)   # aberta num player: fica como estava e tenta na próxima vez
+        except OSError:
+            _apagar_item(tmp)
+            return arq
+        _sdr_feitos[(os.path.abspath(arq), os.path.getmtime(arq))] = True
+    except Exception as e:
+        print("[proxy] marca SDR:", e)
+    return arq
 
 
 def _proxy_pronto(path):
@@ -1324,7 +1374,7 @@ def preparar(path, emit, stop_event=None):
         if stop_event is not None and stop_event.is_set():
             return
         if ok:
-            emit({"stage": "video", "url": media_server.register(proxy), "proxy": True})
+            emit({"stage": "video", "url": media_server.register(_proxy_sem_hdr(proxy)), "proxy": True})
             if thumbs:
                 th = _guardar_thumbs(pasta, lado, thumbs)
             else:
@@ -1586,7 +1636,7 @@ def _completar_proxy(path, info, work, proxy, lado, chave, emit, count):
                     _apagar_item(tmp)
                     return
                 final = _instalar_proxy(tmp, proxy, work)
-            emit({"stage": "video", "url": media_server.register(final), "proxy": True})
+            emit({"stage": "video", "url": media_server.register(_proxy_sem_hdr(final)), "proxy": True})
             for n in (_nome_parcial(lado), _nome_parcial(lado) + ".json"):
                 _apagar_item(os.path.join(work, n))   # aberta no player: fica e sai na próxima limpeza
         except Exception as e:
@@ -1662,7 +1712,7 @@ def preparar_midia(path, emit, stop_event=None, prioridade=1, leve=False, trecho
         parcial = _proxy_parcial(path, info, work, lado, trechos, chave, prioridade, emit, stop_event) \
             if not os.path.isfile(proxy) else None
         if parcial and not (stop_event is not None and stop_event.is_set()):
-            emit({"stage": "video", "url": media_server.register(parcial), "proxy": True, "parcial": True})
+            emit({"stage": "video", "url": media_server.register(_proxy_sem_hdr(parcial)), "proxy": True, "parcial": True})
             th = _thumbs_guardadas(work, lado) or _thumbs_guardadas(work, "fonte")
             if th is None:
                 with _VAGAS_EXTRAS.vaga(chave + "|thumbs", prioridade):
@@ -1705,7 +1755,7 @@ def preparar_midia(path, emit, stop_event=None, prioridade=1, leve=False, trecho
         if not ok:
             emit({"stage": "error", "error": "Falha ao gerar pré-visualização: " + (err.splitlines()[-1] if err else "?")})
             return
-        emit({"stage": "video", "url": media_server.register(proxy), "proxy": True})
+        emit({"stage": "video", "url": media_server.register(_proxy_sem_hdr(proxy)), "proxy": True})
         if thumbs:
             th = _guardar_thumbs(work, lado, thumbs)
         else:
@@ -1971,9 +2021,14 @@ def _preset_cpu(preset):
 
 
 def _args_cor(info, altura):
-    """Marca de cor da saída: a da fonte (bt709, bt2020...) ou bt709 para HD sem marca (o padrão de vídeo HD)."""
+    """Marca de cor da saída: a da fonte (bt709, bt2020...) ou bt709 para HD sem marca (o padrão de vídeo HD).
+    Fonte HDR de celular (HLG/PQ): a matriz fica (BT.2020, a dos números gravados), mas curva e cores saem como vídeo
+    comum — a imagem foi montada sem tone mapping; com a marca HLG o player escurecia e saturava o vídeo pronto (e a
+    exportação pela placa, marcada BT.709, saía diferente da pela CPU)."""
     ok = lambda v: v and v not in ("unknown", "unspecified", "reserved")
     cs, cp, ct = info.get("color_space"), info.get("color_primaries"), info.get("color_transfer")
+    if _cor_hdr(info):
+        cp, ct = "bt709", "bt709"
     if ok(cs) or ok(cp) or ok(ct):
         a = []
         if ok(cs):

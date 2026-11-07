@@ -59,8 +59,7 @@ def _marca_cor(path, info):
     m = vc._marca_hd(path)
     if m:
         return m
-    if (str((info or {}).get("color_transfer") or "") in ("arib-std-b67", "smpte2084")
-            or str((info or {}).get("color_primaries") or "") == "bt2020"):
+    if vc._cor_hdr(info):
         return "sidedata=mode=delete:type=DOVI_METADATA,setparams=color_primaries=bt709:color_trc=bt709,"
     return ""
 

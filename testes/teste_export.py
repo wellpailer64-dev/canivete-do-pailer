@@ -106,6 +106,10 @@ def gerar_material(pasta, com_4k):
     if not os.path.isfile(vid("c.mp4")):   # horizontal, para o PiP
         _roda([ff, "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=s=1920x1080:r=30:d=5", "-c:v", "libx264",
                "-pix_fmt", "yuv420p", "-g", "15", vid("c.mp4")])
+    if not os.path.isfile(vid("hlg.mp4")):   # marcado como HDR de iPhone (HLG, BT.2020): caso "hlg"
+        _roda([ff, "-v", "error", "-y", "-f", "lavfi", "-i", "smptehdbars=s=1080x1920:r=30:d=4", "-vf",   # parado: a diferença é só de cor (o ffmpeg 8 grava a marca dos quadros)
+               "setparams=color_primaries=bt2020:color_trc=arib-std-b67:colorspace=bt2020nc", "-c:v", "libx264",
+               "-pix_fmt", "yuv420p", "-g", "15", vid("hlg.mp4")])
     if com_4k and not os.path.isfile(vid("k.mp4")):
         _roda([ff, "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=2160x3840:r=30:d=4", "-c:v", "libx264",
                "-pix_fmt", "yuv420p", "-preset", "veryfast", "-g", "15", vid("k.mp4")])
@@ -599,6 +603,18 @@ CASOS = {
         const pip = clip(1, 0.5, 0, 3, 'c.mp4', { p: { sc: 40, x: 540, y: 600, rot: 0, op: 100 },
             fx: [{ id: id(), t: 'ca', on: true, v: { r: 8, g: 0, b: -8, raio: 0, foco: 50, suave: 30 } }] });
         return [clip(0, 0, 0, 4, 'b.mp4'), pip, a1, a2];
+    """, ""),
+    # vídeo HDR de iPhone (HLG): o KANIVETE lê sem tone mapping (matriz BT.2020). Com a marca HLG o navegador fazia o
+    # tone mapping e, tocando, a imagem ficava escura e saturada (parecia a camada de ajuste duas vezes); a prévia leve
+    # sai marcada como vídeo comum (vc._proxy_sem_hdr). Com camada de ajuste com Luz e Cor por cima e um PiP comum
+    "hlg": (1080, 1920, """
+        const { clip } = __te, id = () => veFxNewId();
+        let aj = VE.media.find(x => x.kind === 'ajuste');
+        if (!aj) { aj = { id: VE.media.length, kind: 'ajuste', name: 'Camada de ajuste' }; VE.media.push(aj); }
+        const a1 = { tr: 2, st: 1, s: 0, e: 3, m: aj.id, fx: [{ id: id(), t: 'lc', on: true, v: Object.assign(veLcDefaults(), { ct: 20, sat: 130 }) }] };
+        a1.p = veDefProps(a1);
+        const pip = clip(1, 0.5, 0, 3, 'c.mp4', { p: { sc: 40, x: 540, y: 600, rot: 0, op: 100 } });
+        return [clip(0, 0, 0, 4, 'hlg.mp4'), pip, a1];
     """, ""),
     # desfoque com quadros-chave num CLIPE DE VÍDEO (com --placa: _shader_blur_anim; antes a timeline inteira ia pela CPU)
     "desfoquevideo": (1080, 1920, """
@@ -1191,7 +1207,7 @@ def main():
                 time.sleep(1)
                 pg.evaluate("p => veOpenPath(p)", principal)
                 pg.wait_for_function("VE.ready && VE.clips.length > 0 && $ve('ve-loading').hidden", timeout=120000)
-            faltam = [f for f in ["b.mp4", "c.mp4", "verde.mp4", "logo.png", "sinc.mp4"] + [f"foto{i + 1}.jpg" for i in range(8)] + (["k.mp4"] if {"4k", "4kmotion"} & set(nomes) else [])
+            faltam = [f for f in ["b.mp4", "c.mp4", "verde.mp4", "logo.png", "sinc.mp4", "hlg.mp4"] + [f"foto{i + 1}.jpg" for i in range(8)] + (["k.mp4"] if {"4k", "4kmotion"} & set(nomes) else [])
                       if not pg.evaluate("n => VE.media.some(m => m && (m.path || '').replace(/\\\\/g, '/').endsWith('/' + n))", f)]
             if faltam:
                 pg.evaluate("async (l) => { await vePjImportar(l.map(p => ({path: p}))); }", [os.path.join(mat, f) for f in faltam])
