@@ -501,3 +501,8 @@ Guia: `Instructions/agente/kaniboard.md`. Testes avulsos: `D:/kanivete_testes/sc
 ## Perfil comum: app de trabalho do Claude e app do Pailer (2026-11-07)
 - `tools/agente/abrir_teste.py` liga `CANIVETE_PERFIL_COMUM=1`: a cópia 9333 usa a pasta de prévias e os limites de cache das preferências REAIS do Pailer (`Functions/perfil_comum.py`, `video_cutter._cache_cfg`), e cada projeto aberto/salvo vai para `%USERPROFILE%/AppData/Roaming/CaniveteDoPailer/recentes_comuns.json`; o app do Pailer junta essa lista aos recentes em `prefs_load`. Rascunhos em `D:\kanivete_testes` não entram. Testes automáticos (sem a variável) seguem isolados.
 - Uma cópia só: `_abrir_em_outra_copia` vale também para `python main.py`; só `--agente=PORTA` abre outra.
+
+## Guardas da página e da prévia (2026-11-07)
+- `testes/teste_scripts_globais.py` (sem app, roda no release.yml antes do build): reprova `const/let/class` global repetido entre os scripts do index.html — o 2º arquivo não carrega (o Encoder sumiu assim, `VEKE`).
+- Aviso na tela "Parte do KANIVETE não carregou" (script inline no topo do index.html; lista em `window.__scriptsFalhos`).
+- `testes/teste_previa_assinaturas.py` (app de teste, porta 9341): cada controle que muda a imagem (olho da trilha, clipe desativado, opacidade, efeito, olho das legendas, tamanho) troca `vePrImpressao` (trecho renderizado) e `veCacheSig` (quadro da RAM). Controle novo que mexe na imagem → caso novo em `CONTROLES`.

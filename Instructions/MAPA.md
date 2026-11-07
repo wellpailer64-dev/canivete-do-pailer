@@ -507,6 +507,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_pranchetas.py` — Pranchetas do Vetor Kanivete como no Illustrator — app em --agente=9333
 - `testes/teste_premiere.py` — Confere a importação de um projeto do Premiere (Functions/premiere.py) contra o próprio XML do .prproj
 - `testes/teste_premiere_xml.py` — Teste da exportação para o Premiere (XML do Final Cut Pro 7): Functions/premiere_xml.py
+- `testes/teste_previa_assinaturas.py` — Prévia guardada x o que muda a imagem: cada controle que altera o quadro precisa trocar as assinaturas da prévia
 - `testes/teste_psd_deg_app.py` — Uso: py -3.13 testes/teste_psd_deg_app.py [--photoshop] (app em --agente=9333)
 - `testes/teste_psd_forma.py` — Forma criada no Photo Kanivete → camada de forma EDITÁVEL no PSD (Functions/editor_imagem._forma_nova)
 - `testes/teste_psd_pre.py` — Camada de preenchimento de cor sólida do Photo Kanivete → camada de preenchimento no PSD (editor_imagem._preenchimento)
@@ -518,6 +519,7 @@ Para se localizar: este mapa (`mapa.json` é a versão compacta) e `--busca`.
 - `testes/teste_remix.py` — Remix de música na timeline (editor-remix.js + Functions/remix.py), com mouse de verdade: põe uma música de 3:46
 - `testes/teste_respiros.py` — Cortar respiros (editor-respiros.js + Functions/respiros.py) e onda em alta resolução (ve_peaks_faixa) no app de verdade
 - `testes/teste_roto.py` — Pincel Roto (editor-roto.js + Functions/pincel_roto.py) no app de verdade: vídeo de entrevista na V1, texto animado
+- `testes/teste_scripts_globais.py` — Nomes globais repetidos entre os scripts da página (frontend/index.html)
 - `testes/teste_seq_escala.py` — Configurações da sequência › "Adaptar o conteúdo ao novo tamanho": trocar o quadro (Full HD → 4K → Full HD, e de
 - `testes/teste_sfx.py` — Gerador de efeitos sonoros (Functions/gerador_sfx.py): agendador DDIM igual ao do diffusers e uma geração curta
 - `testes/teste_slider.py` — Slider Kanivete (Sd): comandos, desfazer, HTML → slide, mídias (imagem, GIF, vídeo), salvar/abrir .dknv, exportar
