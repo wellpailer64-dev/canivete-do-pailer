@@ -497,3 +497,7 @@ Guia: `Instructions/agente/kaniboard.md`. Testes avulsos: `D:/kanivete_testes/sc
 
 ## Cor automática por escopos (2026-11-06)
 `tools/agente/cor_auto.py`: mede quadros (luma p0,5/p99,5, pixel estourado/esmagado, média Cb/Cr dos neutros, pele pelo YuNet com matiz/saturação/luz) e busca, por descida coordenada, os valores do efeito `lc` (temp, tint, exp, hi, wh, sh, bl e, se houver rosto, HSL secundário na pele: qs/qr) que põem tudo nas faixas, sem sair da grade do cliente mais que o preciso. Cada tentativa usa a mesma LUT do app: `tools/agente/lc_lut.js` roda `frontend/js/editor-lc.js` no node (processo aberto, uma linha JSON por pedido). `reel_fala.py` chama `ajustar()` por fonte (cache em `<trabalho>/cor/`) e põe uma camada de cor por trecho de fonte visível. ~20 s por fonte.
+
+## Perfil comum: app de trabalho do Claude e app do Pailer (2026-11-07)
+- `tools/agente/abrir_teste.py` liga `CANIVETE_PERFIL_COMUM=1`: a cópia 9333 usa a pasta de prévias e os limites de cache das preferências REAIS do Pailer (`Functions/perfil_comum.py`, `video_cutter._cache_cfg`), e cada projeto aberto/salvo vai para `%USERPROFILE%/AppData/Roaming/CaniveteDoPailer/recentes_comuns.json`; o app do Pailer junta essa lista aos recentes em `prefs_load`. Rascunhos em `D:\kanivete_testes` não entram. Testes automáticos (sem a variável) seguem isolados.
+- Uma cópia só: `_abrir_em_outra_copia` vale também para `python main.py`; só `--agente=PORTA` abre outra.

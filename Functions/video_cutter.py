@@ -155,7 +155,8 @@ def _prefs():
 
 
 def _cache_cfg():
-    c = _prefs().get("cache") or {}
+    from Functions import perfil_comum   # cópia de trabalho do Claude: mesma pasta de prévias do app do Pailer
+    c = (perfil_comum.cache_cfg() if perfil_comum.ligado() else _prefs().get("cache")) or {}
     try:   # padrão 720 (2026-10-11): 4x menor e ~1/3 mais rápida que a de 1080 sem diferença visível no monitor
         lado = int(c.get("altura") or 720)
     except (TypeError, ValueError):

@@ -27,7 +27,8 @@ if sys.argv[1] == "--fechar":
     print("app de teste fechado")
     sys.exit()
 if not no_ar():
-    amb = {**os.environ, "APPDATA": r"D:\kanivete_testes\appdata", "TEMP": r"D:\kanivete_testes\tmp", "TMP": r"D:\kanivete_testes\tmp", "LOCALAPPDATA": r"D:\kanivete_testes\localappdata"}
+    amb = {**os.environ, "APPDATA": r"D:\kanivete_testes\appdata", "TEMP": r"D:\kanivete_testes\tmp", "TMP": r"D:\kanivete_testes\tmp", "LOCALAPPDATA": r"D:\kanivete_testes\localappdata",
+           "CANIVETE_PERFIL_COMUM": "1"}   # mesmas prévias e recentes do app do Pailer (Functions/perfil_comum.py)
     subprocess.Popen([sys.executable, "main.py", "--agente=9333"], cwd=RAIZ, env=amb, creationflags=subprocess.CREATE_NO_WINDOW)
     for _ in range(60):
         if no_ar():

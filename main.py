@@ -1059,7 +1059,8 @@ def _prefs_path():
 def prefs_load():
     try:
         with open(_prefs_path(), "r", encoding="utf-8") as f:
-            return {"success": True, "data": json.load(f)}
+            from Functions import perfil_comum   # recentes da cópia de trabalho do Claude entram nos daqui
+            return {"success": True, "data": perfil_comum.juntar_recentes(json.load(f))}
     except FileNotFoundError:
         return {"success": True, "data": None}
     except Exception as e:
@@ -5474,6 +5475,8 @@ class ApiBridge:
     def ve_project_save(self, path, dados, salvar_como=False, formato=None):
         r = ve_project_save(path, dados, salvar_como, formato)
         if isinstance(r, dict) and r.get("success") and r.get("path") and not r.get("xml"):
+            from Functions import perfil_comum
+            perfil_comum.registrar_recente(r["path"])
             from Functions import video_cutter
             video_cutter.projeto_cache(r["path"])   # prévias novas na pasta deste projeto
         return r
@@ -5496,6 +5499,8 @@ class ApiBridge:
     def ve_project_open(self, path=None):
         r = ve_project_open(path)
         if isinstance(r, dict) and r.get("success") and r.get("path"):
+            from Functions import perfil_comum
+            perfil_comum.registrar_recente(r["path"])
             from Functions import video_cutter
             video_cutter.projeto_cache(r["path"])   # as prévias deste projeto vão para a pasta dele no cache
         return r
@@ -6184,9 +6189,10 @@ def _servidor_com_ajuda():
 
 def _abrir_em_outra_copia():
     """App (.exe) já aberto: manda o projeto do duplo clique para ele e esta cópia não abre (senão ficavam dois
-    ícones na barra e duas cópias disputando as prévias). Pelo código (python main.py) e no modo agente abre sempre.
+    ícones na barra e duas cópias disputando as prévias e as preferências). Vale também pelo código (python main.py,
+    2026-11-07); só a cópia de agente/teste (--agente=PORTA) abre sempre.
     Devolve True se entregou o pedido; None se esta é a primeira cópia (e deve escutar as próximas)."""
-    if not getattr(sys, "frozen", False) or _porta_agente():
+    if _porta_agente():
         return False
     try:
         from Functions import instancia_unica, projeto
