@@ -102,7 +102,9 @@ function vePrImpressao() {
         return m ? [id, m.path || m.url || '', veMediaOffline(m), !!(m.comp && (m._aoVivo || !m.url))] : id;
     });
     return vePrHash(JSON.stringify([VE.clips, med, VE.legendas || [], VE.legEstilo || null, VE.seqW, VE.seqH, VE.fps,
-        +VE.dur.toFixed(4), vePrPrefs().altura, VE.path || '']));
+        +VE.dur.toFixed(4), vePrPrefs().altura, VE.path || '',
+        // olho das trilhas: sem isso, ocultar a da camada de ajuste seguia tocando o trecho renderizado COM ela (2026-11-07)
+        (typeof VE_TRK !== 'undefined' && VE_TRK.v || []).map(t => !!(t && t.hide))]));
 }
 
 function vePrSegmentos() {
