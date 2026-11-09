@@ -697,7 +697,7 @@ function ieLsNovoEstilo() {
 
 // ─────────────────────────── comandos, menu de contexto e Camada > Estilo de camada ───────────────────────────
 Object.assign(IE_CMDS, {
-    copiarCR: () => ieFiltroFocoCopiar(),   // efeito Camera Raw (imagem-paineis.js)
+    copiarCR: () => ieFiltroFocoCopiar(true),   // efeito Camera Raw (imagem-paineis.js)
     colarCR: () => ieFiltroColar(),
     estiloCamada: () => ieEstiloCamada(),
     opcoesMescla: () => ieEstiloCamada(ieAtiva(), 'mescla'),

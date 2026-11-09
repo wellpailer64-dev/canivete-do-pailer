@@ -165,8 +165,8 @@ def main():
             ok(depois and antes[1] and depois["x"] - antes[1]["x"] == 40 and depois["y"] - antes[1]["y"] == 10, f"Mover: {antes[0]} andou 40,10 ({antes[1]} → {depois})")
             J("iePrefGravar('ajustar', true)")
             # 2. nova camada + pincel
-            tecla("Control+Shift+N")
-            ok(J("ieTodas(IE.doc).length") == n0 + 1, "Shift+Ctrl+N criou camada")
+            tecla("Control+N")
+            ok(J("ieTodas(IE.doc).length") == n0 + 1, "Ctrl+N criou camada")
             J("ieEscolherFerr('pincel'); IE.op.pincel.tam = 30; IE.cor[0] = '#ff0000'")
             arrastar(W * 0.2, H * 0.3, W * 0.6, H * 0.35, passos=20)
             px = J("(() => { const L = ieAtiva(); return L.c ? [L.x, L.y, L.c.width, L.c.height, ieCtx(L.c).getImageData(Math.round(" + str(W * 0.4) + ") - L.x, Math.round(" + str(H * 0.325) + ") - L.y, 1, 1).data[0]] : null; })()")
@@ -378,11 +378,21 @@ def main():
             r = J("""async () => {
                 const doc = IE.doc; await ieAjNova('cameraRaw'); const A = ieAtiva(doc); await ieAjNova('cameraRaw'); const B = ieAtiva(doc);
                 A.ajVals = {...A.ajVals, exp: 1.5}; A.ajuste = IE_AJ_CAMADAS.cameraRaw.aj(A.ajVals);
-                doc.selIds = [A.id]; doc.ativa = A.id; const c = ieFiltroFocoCopiar();
+                doc.selIds = [A.id]; doc.ativa = A.id; const c = ieFiltroFocoCopiar(true);
                 doc.selIds = [B.id]; doc.ativa = B.id; const v = ieFiltroColar();
                 return {c, v, a: A.ajVals.exp, b: B.ajVals.exp, t: B.ajuste.t};
             }""")
             ok(r["c"] and r["v"] and r["b"] == 1.5 and r["t"] == "cameraRaw", f"copiar/colar efeito Camera Raw entre camadas de ajuste ({r})")
+            # Ctrl+C / Ctrl+V na própria camada de ajuste Camera Raw: duplica a camada (acima da copiada, com os mesmos valores)
+            r = J("""async () => {
+                const doc = IE.doc, n = () => ieTodas(doc).filter(l => l.ajuste && l.ajuste.t === 'cameraRaw').length;
+                const A = ieAtiva(doc), antes = n(); IE.filtroCopiado = null; IE._filtroFoco = null;
+                doc.selIds = [A.id]; doc.ativa = A.id;
+                await ieCopiar(false, false); await new Promise(r => setTimeout(r, 1600)); await ieColar(false);
+                const N = ieAtiva(doc);
+                return {antes, depois: n(), outra: N.id !== A.id, exp: N.ajVals && N.ajVals.exp, tipo: N.ajuste && N.ajuste.t};
+            }""")
+            ok(r["depois"] == r["antes"] + 1 and r["outra"] and r["tipo"] == "cameraRaw" and r["exp"] == 1.5, f"Ctrl+C/Ctrl+V duplica a camada Camera Raw ({r})")
             J("(async () => { for (const d of [...IE.docs]) await ieFecharDoc(d, true); })()")
             ok(not [e for e in erros if "editor de imagem" in e or "imagem-" in e], f"sem erros de JavaScript ({erros[:3]})")
 

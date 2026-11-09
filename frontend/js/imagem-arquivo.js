@@ -755,7 +755,7 @@ async function ieCopiar(mesclado, recortar) {
     const doc = IE.doc, L = ieAtiva(doc);
     // duas ou mais camadas, ou um grupo/prancheta, sem seleção de pixels: copia as CAMADAS (o Ctrl+V cola, como no
     // Photoshop; prancheta colada entra ao lado das outras — imagem-prancheta.js)
-    if (!mesclado && doc && !doc.sel && (ieSelecionadas(doc).length > 1 || (L && L.tipo === 'grupo'))) return ieCopiarCamadas(doc, recortar);
+    if (!mesclado && doc && !doc.sel && (ieSelecionadas(doc).length > 1 || (L && (L.tipo === 'grupo' || L.tipo === 'ajuste')))) return ieCopiarCamadas(doc, recortar);
     let c, x, y;
     const R = doc.sel ? doc.sel.bbox : ieRDoc(doc);
     if (mesclado) {

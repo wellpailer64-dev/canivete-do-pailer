@@ -783,11 +783,11 @@ function ieFiltrosParaCamada(doc, deId, idx, paraId, copiar) {
     ieHist(ieT(copiar ? 'Copiar filtro inteligente' : 'Mover filtro inteligente'));
     ieUiCamadas();
 }
-function ieFiltroFocoCopiar() {
+function ieFiltroFocoCopiar(efeitoCR) {   // efeitoCR: só pelo menu "Copiar efeito Camera Raw"; no Ctrl+C a camada de ajuste é copiada inteira (ieCopiarCamadas)
     const f = IE._filtroFoco, doc = IE.doc, L = f && doc && ieAchar(doc, f.id)?.L;
     let fs = ieFiltrosDe(L, f && f.idx);
     if (!fs.length) {   // camada de ajuste Camera Raw ativa: copia o efeito (cola em outra camada de ajuste Camera Raw ou como filtro inteligente)
-        const A = !f && doc && ieAtiva(doc);
+        const A = efeitoCR && !f && doc && ieAtiva(doc);
         if (!(A && A.tipo === 'ajuste' && A.ajuste && A.ajuste.t === 'cameraRaw' && A.ajVals)) return false;
         fs = [{ cmd: 'f:cameraRaw', titulo: 'Filtro Camera Raw', vals: A.ajVals, on: true }];
         IE.filtroCopiado = ieClone(fs);
