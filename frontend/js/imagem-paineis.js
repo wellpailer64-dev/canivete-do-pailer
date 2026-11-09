@@ -398,7 +398,7 @@ function ieUiCamadas() {
         <button class="ie-ico-btn" data-ajmenu title="${ieT('Criar nova camada de ajuste')}">${ieIco('adj')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('corte')" title="${ieT('Criar/soltar máscara de corte (Alt+Ctrl+G)')}">${ieIco('clip')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('grupoNovo')" title="${ieT('Novo grupo')}">${ieIco('folder')}</button>
-        <button class="ie-ico-btn" onclick="ieCmd('novaCamada')" title="${ieT('Nova camada (Shift+Ctrl+N)')}">${ieIco('plus')}</button>
+        <button class="ie-ico-btn" onclick="ieCmd('novaCamada')" title="${ieT('Nova camada (Ctrl+N)')}">${ieIco('plus')}</button>
         <button class="ie-ico-btn" onclick="ieCmd('excluirCamada')" title="${ieT('Excluir camada')}">${ieIco('trash')}</button>`;
     topo.querySelector('[data-fmodo]').onchange = e => { F.modo = e.target.value; ieUiCamadas(); };
     topo.querySelectorAll('[data-ftipo]').forEach(b => b.onclick = () => { const k = b.dataset.ftipo; F.tipos = F.tipos.includes(k) ? F.tipos.filter(x => x !== k) : [...F.tipos, k]; F.on = true; ieUiCamadas(); });
@@ -1365,7 +1365,7 @@ function ieBotoesGirar(comAngulo) {
 // ─────────────────────────── menus ───────────────────────────
 // [rótulo, comando, atalho] | '-' | [rótulo, [submenu]]
 const IE_MENUS = [
-    ['Arquivo', [['Novo...', 'novo', 'Ctrl+N'], ['Abrir...', 'abrir', 'Ctrl+O'], ['Colocar imagem...', 'colocar', 'Shift+Ctrl+P'], ['Gerar imagem com IA...', 'gerarImagem', ''], '-',
+    ['Arquivo', [['Novo...', 'novo', 'Shift+Ctrl+N'], ['Abrir...', 'abrir', 'Ctrl+O'], ['Colocar imagem...', 'colocar', 'Shift+Ctrl+P'], ['Gerar imagem com IA...', 'gerarImagem', ''], '-',
         ['Salvar', 'salvar', 'Ctrl+S'], ['Salvar como...', 'salvarComo', 'Shift+Ctrl+S'], ['Exportar como...', 'exportar', 'Alt+Shift+Ctrl+W'], ['Exportar fatias...', 'exportarFatias'], '-', ['Animar no Vídeo Kanivete...', 'ponteLevar'], ['Animar a tira inteira (carrossel)...', 'ponteLevarInteiro'], '-',
         ['Fechar', 'fechar', 'Ctrl+W']]],
     ['Editar', [['Desfazer', 'desfazer', 'Ctrl+Z'], ['Refazer', 'refazer', 'Shift+Ctrl+Z'], '-',
@@ -1382,7 +1382,7 @@ const IE_MENUS = [
         ['Tamanho da imagem...', 'tamImagem', 'Alt+Ctrl+I'], ['Tamanho da tela...', 'tamTela', 'Alt+Ctrl+C'],
         ['Rotação da imagem', [['180°', 'img:g180'], ['90° horário', 'img:g90h'], ['90° anti-horário', 'img:g90a'], '-', ['Inverter tela na horizontal', 'img:fh'], ['Inverter tela na vertical', 'img:fv']]], '-',
         ['Cortar na seleção', 'cortarSel'], ['Aparar transparência', 'aparar']]],
-    ['Camada', [['Nova camada', 'novaCamada', 'Shift+Ctrl+N'], ['Nova camada de preenchimento', [['Cor sólida...', 'preenchimentoCor'], ['Degradê...', 'preenchimentoDeg']]], ['Duplicar camada', 'duplicar', 'Ctrl+J'], ['Nova prancheta...', 'novaPrancheta'], ['Prancheta a partir das camadas', 'pranchetaDasCamadas'], ['Camada via recorte', 'viaRecorte', 'Shift+Ctrl+J'], ['Excluir camada', 'excluirCamada'], '-',
+    ['Camada', [['Nova camada', 'novaCamada', 'Ctrl+N'], ['Nova camada de preenchimento', [['Cor sólida...', 'preenchimentoCor'], ['Degradê...', 'preenchimentoDeg']]], ['Duplicar camada', 'duplicar', 'Ctrl+J'], ['Nova prancheta...', 'novaPrancheta'], ['Prancheta a partir das camadas', 'pranchetaDasCamadas'], ['Camada via recorte', 'viaRecorte', 'Shift+Ctrl+J'], ['Excluir camada', 'excluirCamada'], '-',
         ['Máscara de camada', [['Revelar tudo', 'mascara'], ['Ocultar tudo', 'mascaraOcultar'], ['Revelar seleção', 'mascaraSel'], ['Ocultar seleção', 'mascaraSelOcultar'], '-',
             ['Refinar máscara...', 'mascaraRefinar'], ['Inverter máscara', 'mascaraInverter'], ['Desativar/ativar', 'mascaraDesativar'], ['Aplicar', 'mascaraAplicar'], ['Excluir', 'mascaraExcluir']]],
         ['Objetos inteligentes', [['Converter em objeto inteligente', 'objetoInteligente'], ['Editar conteúdo no Vetor', 'editarNoVetor'], ['Rasterizar', 'rasterizar'], '-',
@@ -1468,13 +1468,13 @@ function ieMenuContexto(ev, painelCamadas) {
 
 // ─────────────────────────── atalhos ───────────────────────────
 const IE_ATALHOS = {
-    'Ctrl+N': 'novo', 'Ctrl+O': 'abrir', 'Shift+Ctrl+P': 'colocar', 'Ctrl+S': 'salvar', 'Shift+Ctrl+S': 'salvarComo', 'Alt+Shift+Ctrl+W': 'exportar', 'Ctrl+W': 'fechar',
+    'Shift+Ctrl+N': 'novo', 'Ctrl+O': 'abrir', 'Shift+Ctrl+P': 'colocar', 'Ctrl+S': 'salvar', 'Shift+Ctrl+S': 'salvarComo', 'Alt+Shift+Ctrl+W': 'exportar', 'Ctrl+W': 'fechar',
     'Ctrl+Z': 'desfazer', 'Shift+Ctrl+Z': 'refazer', 'Alt+Ctrl+Z': 'desfazer', 'Ctrl+Y': 'refazer',
     'Ctrl+X': 'recortar', 'Ctrl+C': 'copiar', 'Shift+Ctrl+C': 'copiarMesclado', 'Shift+Ctrl+V': 'colarLugar',
     'Delete': 'limpar', 'Backspace': 'limpar', 'Shift+F5': 'preencher', 'Alt+Backspace': 'preencherFrente', 'Ctrl+Backspace': 'preencherFundo', 'Alt+Delete': 'preencherFrente', 'Ctrl+Delete': 'preencherFundo',
     'Ctrl+T': 'transformar', 'Ctrl+L': 'aj:niveis', 'Ctrl+M': 'aj:curvas', 'Ctrl+U': 'aj:matiz', 'Ctrl+B': 'aj:equilibrio', 'Alt+Shift+Ctrl+B': 'aj:pb',
     'Ctrl+I': 'aj:inverter', 'Shift+Ctrl+U': 'aj:dessaturar', 'Alt+Ctrl+I': 'tamImagem', 'Alt+Ctrl+C': 'tamTela',
-    'Shift+Ctrl+N': 'novaCamada', 'Ctrl+J': 'duplicar', 'Shift+Ctrl+J': 'viaRecorte', 'Alt+Ctrl+G': 'corte', 'Ctrl+G': 'agrupar', 'Shift+Ctrl+G': 'desagrupar',
+    'Ctrl+N': 'novaCamada', 'Ctrl+J': 'duplicar', 'Shift+Ctrl+J': 'viaRecorte', 'Alt+Ctrl+G': 'corte', 'Ctrl+G': 'agrupar', 'Shift+Ctrl+G': 'desagrupar',
     'Shift+Ctrl+]': 'frente', 'Ctrl+]': 'avancar', 'Ctrl+[': 'recuar', 'Shift+Ctrl+[': 'tras', 'Ctrl+E': 'mesclarBaixo', 'Shift+Ctrl+E': 'mesclarVisiveis',
     'Ctrl+A': 'selTudo', 'Ctrl+D': 'selNada', 'Shift+Ctrl+I': 'selInverter', 'Shift+F6': 'selSuavizar',
     'Ctrl+=': 'zoomMais', 'Ctrl++': 'zoomMais', 'Ctrl+-': 'zoomMenos', 'Ctrl+0': 'zoomAjustar', 'Ctrl+1': 'zoom100', 'Alt+Ctrl+0': 'zoom100',
