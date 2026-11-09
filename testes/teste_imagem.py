@@ -375,6 +375,14 @@ def main():
             arq = list(l2.topil().convert("RGBA").getpixel((r["x"] - l2.left, r["y"] - l2.top)))
             ok(r["ok2"] and arq[:3] == r["antes"][:3], f"desfazer depois de salvar: o arquivo acompanha (tela {r['depois']}, arquivo {arq})")
             J("(() => { const api = window.pywebview.api; if (api.__orig) { api.ie_dialogo_salvar = api.__orig; delete api.__orig; } })()")
+            r = J("""async () => {
+                const doc = IE.doc; await ieAjNova('cameraRaw'); const A = ieAtiva(doc); await ieAjNova('cameraRaw'); const B = ieAtiva(doc);
+                A.ajVals = {...A.ajVals, exp: 1.5}; A.ajuste = IE_AJ_CAMADAS.cameraRaw.aj(A.ajVals);
+                doc.selIds = [A.id]; doc.ativa = A.id; const c = ieFiltroFocoCopiar();
+                doc.selIds = [B.id]; doc.ativa = B.id; const v = ieFiltroColar();
+                return {c, v, a: A.ajVals.exp, b: B.ajVals.exp, t: B.ajuste.t};
+            }""")
+            ok(r["c"] and r["v"] and r["b"] == 1.5 and r["t"] == "cameraRaw", f"copiar/colar efeito Camera Raw entre camadas de ajuste ({r})")
             J("(async () => { for (const d of [...IE.docs]) await ieFecharDoc(d, true); })()")
             ok(not [e for e in erros if "editor de imagem" in e or "imagem-" in e], f"sem erros de JavaScript ({erros[:3]})")
 

@@ -785,18 +785,33 @@ function ieFiltrosParaCamada(doc, deId, idx, paraId, copiar) {
 }
 function ieFiltroFocoCopiar() {
     const f = IE._filtroFoco, doc = IE.doc, L = f && doc && ieAchar(doc, f.id)?.L;
-    const fs = ieFiltrosDe(L, f && f.idx);
-    if (!fs.length) return false;
+    let fs = ieFiltrosDe(L, f && f.idx);
+    if (!fs.length) {   // camada de ajuste Camera Raw ativa: copia o efeito (cola em outra camada de ajuste Camera Raw ou como filtro inteligente)
+        const A = !f && doc && ieAtiva(doc);
+        if (!(A && A.tipo === 'ajuste' && A.ajuste && A.ajuste.t === 'cameraRaw' && A.ajVals)) return false;
+        fs = [{ cmd: 'f:cameraRaw', titulo: 'Filtro Camera Raw', vals: A.ajVals, on: true }];
+        IE.filtroCopiado = ieClone(fs);
+        ieToast(ieT('Efeito Camera Raw copiado: selecione outra camada e Ctrl+V'));
+        return true;
+    }
     IE.filtroCopiado = ieClone(fs);
     ieToast(ieT(fs.length > 1 ? 'Filtros inteligentes copiados: selecione outra camada e Ctrl+V' : 'Filtro inteligente copiado: selecione outra camada e Ctrl+V'));
     return true;
 }
+
 function ieFiltroColar() {
     const doc = IE.doc;
     if (!doc || !IE.filtroCopiado || !IE.filtroCopiado.length) return false;
     const alvos = ieSelecionadas(doc).map(L => L.id);
     if (!alvos.length) return false;
-    for (const id of alvos) ieFiltrosNaCamada(doc, ieAchar(doc, id)?.L, IE.filtroCopiado);
+    for (const id of alvos) {
+        const T = ieAchar(doc, id)?.L, cr = IE.filtroCopiado.filter(f => f.cmd === 'f:cameraRaw').pop();
+        if (T && T.tipo === 'ajuste' && T.ajuste && T.ajuste.t === 'cameraRaw' && cr) {   // sobre outra camada Camera Raw: troca os valores
+            T.ajVals = ieClone(cr.vals); T.ajuste = IE_AJ_CAMADAS.cameraRaw.aj(T.ajVals);
+            if (typeof IE_CR_CAMADA !== 'undefined') IE_CR_CAMADA.delete(T);
+            ieInvalidar(T); ieAgendar(null, doc);
+        } else ieFiltrosNaCamada(doc, T, IE.filtroCopiado);
+    }
     ieHist(ieT('Colar filtro inteligente'));
     ieUiCamadas();
     return true;
@@ -1440,7 +1455,8 @@ function ieMenuContexto(ev, painelCamadas) {
     const itens = [...(painelCamadas ? [['Opções de mesclagem...', 'opcoesMescla'], '-'] : []),['Duplicar camada', 'duplicar'], ['Excluir camada', 'excluirCamada'], '-', ['Mesclar para baixo', 'mesclarBaixo'], ['Rasterizar camada', 'rasterizar'],
         ['Criar máscara de corte', 'corte'], ['Adicionar máscara', 'mascara'], '-', ['Selecionar pixels', 'selCamada'], ['Transformação livre', 'transformar'],
         ...(painelCamadas ? ['-', ['Converter em objeto inteligente', 'objetoInteligente'], ...(ieAtiva(doc)?.conteudo ? [['Converter em camadas', 'converterEmCamadas']] : []),
-            '-', ['Copiar estilo de camada', 'copiarEstilo'], ['Colar estilo de camada', 'colarEstilo'], ['Limpar estilo de camada', 'limparEstilo']] : [])];
+            '-', ['Copiar estilo de camada', 'copiarEstilo'], ['Colar estilo de camada', 'colarEstilo'], ['Limpar estilo de camada', 'limparEstilo'],
+            ...(ieAtiva(doc)?.ajuste?.t === 'cameraRaw' ? [['Copiar efeito Camera Raw', 'copiarCR']] : []), ...(IE.filtroCopiado?.length ? [['Colar efeito/filtro', 'colarCR']] : [])] : [])];
     if (doc.sel) itens.unshift(['Desmarcar', 'selNada'], ['Inverter seleção', 'selInverter'], ['Camada via cópia', 'duplicar'], '-');
     pop.innerHTML = ieMenuHtml(itens);
     pop.hidden = false;

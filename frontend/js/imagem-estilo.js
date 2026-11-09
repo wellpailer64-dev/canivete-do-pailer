@@ -697,6 +697,8 @@ function ieLsNovoEstilo() {
 
 // ─────────────────────────── comandos, menu de contexto e Camada > Estilo de camada ───────────────────────────
 Object.assign(IE_CMDS, {
+    copiarCR: () => ieFiltroFocoCopiar(),   // efeito Camera Raw (imagem-paineis.js)
+    colarCR: () => ieFiltroColar(),
     estiloCamada: () => ieEstiloCamada(),
     opcoesMescla: () => ieEstiloCamada(ieAtiva(), 'mescla'),
     copiarEstilo: doc => { const L = ieAtiva(doc); if (!L) return; IE.estiloCopiado = { fx: ieClone(ieFxNorm(L.fx)), mescla: Object.fromEntries(['fill', ...IE_MESCLA_CHAVES].map(k => [k, ieClone(L[k])])) }; ieToast(ieT('Estilo de camada copiado')); },
