@@ -180,11 +180,11 @@ def _tokens(pasta, textos):
 
 
 def salvar_wav(caminho, audio, sr, normalizar=True):
-    """WAV 16 bits mono (sem dependências)."""
+    """WAV 16 bits mono (sem dependências); efeitos normalizados têm pico de 0,25."""
     import wave
     a = np.asarray(audio, dtype=np.float32)
     if normalizar:
-        a = a / max(1e-6, float(np.abs(a).max())) * 0.95
+        a = a / max(1e-6, float(np.abs(a).max())) * 0.25
     with wave.open(caminho, "wb") as w:
         w.setnchannels(1)
         w.setsampwidth(2)

@@ -5257,6 +5257,16 @@ function veZoomBy(f) {
 
 function veZoomFit() { VE.view = 0; veSetPps(veFitPps()); }
 
+// Depois de aparar/esticar com a agulha fora da tela: a visão fica onde o usuário está mexendo e a agulha vem até a
+// ponta mexida (senão veAfterEdit → veSeek → veFollowPlayhead arrastava a visão para onde a agulha estava)
+function veAgulhaParaVisao(c, side) {
+    const w = veCanvasWidth(), x = (VE.playhead - VE.view) * VE.pps;
+    if (x >= 0 && x <= w) return;
+    let t = c ? (side === 'l' ? c.st : veEnd(c)) : VE.view + w / 2 / VE.pps;
+    t = Math.min(Math.max(t, VE.view), VE.view + w / VE.pps);
+    VE.playhead = veClamp(t);
+}
+
 function veFollowPlayhead(playing) {
     const w = veCanvasWidth();
     const x = (VE.playhead - VE.view) * VE.pps;
@@ -7137,8 +7147,8 @@ function veInitEvents() {
             veRefresh();
             return;
         }
-        if (d && d.mode === 'rate') { if (d.started) { veRelayout(); veAfterEdit(VE.playhead); } else veDraw(); return; }
-        if (d && d.mode === 'trim' && d.started) { veRelayout(); veAfterEdit(VE.playhead); return; }
+        if (d && d.mode === 'rate') { if (d.started) { veRelayout(); veAgulhaParaVisao(d.i != null ? VE.clips[d.i] : null, d.side); veAfterEdit(VE.playhead); } else veDraw(); return; }
+        if (d && d.mode === 'trim' && d.started) { veRelayout(); veAgulhaParaVisao(VE.clips[d.i], d.side); veAfterEdit(VE.playhead); return; }
         if (d && d.mode === 'kf') {
             const c = VE.clips[d.i];
             if (d.active && Math.abs(d.t1 - d.t0) >= veFrame() / 2) {
