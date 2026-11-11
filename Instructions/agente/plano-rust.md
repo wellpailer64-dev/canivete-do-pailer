@@ -115,3 +115,9 @@ Regra que a medição confirmou: onde havia conta repetida por pixel, consertar 
 - **Picos de áudio / forma de onda:** numpy + ffmpeg, já nativos. Procurei laços de pixel em Python (`range(h)`, `getpixel`): só `blender_render.py` (render 3D externo) e `vst3.py`.
 - **Chanfro (efeito de camada, 1,0 s em 4000x3000):** a distância 3-4 (`ieFxDistancias`) é só 0,29 s; o resto está espalhado em vários laços e desfoques. Rust ganharia pouco.
 - **Conclusão:** o que vale Rust no KANIVETE já foi feito (Máximo/Mínimo/Mediana) ou virou GPU (Camera Raw). Sobra opcional: `ieFBox` e Kuwahara (~2x). O resto era conta repetida em JS, corrigida sem trocar de linguagem.
+
+## Editor de vídeo: áudio e análises Python (2026-11-11) — nenhum candidato
+- **Mixer de áudio da prévia** (`veAudioMixarBruto`, JS na thread principal, pedaço de 1024 quadros = 21,3 ms de som; `bench/audio_mixer_medir.py`): 24 clipes sem efeito 1,7 ms; 24 com EQ 4 ms; 24 com reverb+dereverb 8,4 ms (p95 10,7). Dentro do orçamento com folga de 2x. Só passaria a valer AudioWorklet/Rust com 50+ clipes com reverb ao mesmo tempo.
+- **Estabilizador** (`Functions/estabilizador.py`, 1080p): analisar 1,1 s para 4 s de vídeo (0,27x), tudo em `cv2` (goodFeaturesToTrack 0,46 s, fluxo óptico 0,26 s). O caminho usa HiGHS (scipy); a 1ª chamada paga 2,3 s só importando scipy. Nada em Python puro.
+- **Já cobertos:** rastreador, respiros e picos usam cv2/numpy/ffmpeg; exportação de motion/zoomsete é ffmpeg.
+- **Conclusão:** o Editor não tem laço pesado em JS/Python. Rust não compensa lá.
