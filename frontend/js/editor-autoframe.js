@@ -41,7 +41,7 @@ function veAfAjuste(st, dur, lc, op) {
 
 // estilo Dinâmico: transições que se alternam na virada do compasso (nunca a mesma duas vezes seguidas).
 // 'ovt:x' = transição de sobreposição (editor-ovt.js): camada por cima do corte, não precisa de mídia sobrando
-const VE_AF_MISTO = ['ovt:zoomin', 'push', 'ovt:panblur', 'pull', 'ovt:zoomout', 'slide', 'ovt:spin', 'chicote', 'ovt:stretch', 'pop', 'ovt:lens', 'fold', 'ovt:blurx'];
+const VE_AF_MISTO = ['ovt:zoomin', 'push', 'ovt:panblur', 'pull', 'ovt:zoomout', 'slide', 'ovt:spin', 'chicote', 'ovt:stretch', 'pop', 'ovt:lens', 'fold', 'ovt:blurx', 'pushzoom', 'ovt:shake', 'quicar', 'ovt:glitch', 'atravessar', 'ovt:twirl', 'virar', 'tv', 'ovt:ripple', 'queda', 'soco', 'deslizarsuave'];
 // parâmetros de cada sobreposição no AutoFrame (mais contidos que o padrão do painel: o corte é rápido)
 const VE_AF_OVT = { zoomin: { amt: 250 }, zoomout: { amt: 250 }, spin: { ang: 180, zoom: 15 }, stretch: { amt: 300 },
                     lens: { amt: 50, ca: 25 }, leak: { amt: 80 }, flare: { amt: 90 } };
@@ -309,6 +309,7 @@ async function veAfGerar(outra) {
         const extra = cli ? await veAfcPreparar(plano, bin) : null;
         const falta = precisa.filter(p => !veAfMidiaDe(p));
         if (falta.length) throw new Error(veT('não importou: ') + falta.map(veAfNome).join(', '));
+        await veAfSujeitos(plano, bin);
         // tamanho dos vídeos desde já (a preparação de cada um ainda está na fila): cenas no lugar certo
         plano.slots.forEach(s => {
             const m = veAfMidiaDe(s.path);
@@ -357,6 +358,31 @@ async function veAfGerar(outra) {
     }
 }
 
+// Escolhe alguns cortes do estilo Dinâmico para a transição frente/fundo (sujeito antes / sujeito na frente), tira o
+// recorte (BEN2) do quadro certo e importa o PNG. Cortes sem sujeito claro (cobertura fora de 6–75%) ficam como estão.
+async function veAfSujeitos(plano, bin) {
+    const api = veAfApi();
+    if (!api || !api.af_recorte_sujeito || VEAF.sujeito === false) return;
+    const cand = plano.slots.map((s, i) => i).filter(i => i > 0 && !plano.slots[i].cel && !plano.slots[i - 1].cel && plano.slots[i].trans === 'misto');
+    const alvos = cand.filter((_, j) => j % 3 === 1).slice(0, 6);
+    let n = 0;
+    for (const i of alvos) {
+        const s = plano.slots[i], tipo = n % 2 ? 'frente' : 'antes', ref = tipo === 'antes' ? s : plano.slots[i - 1];
+        const video = ref.tipo === 'video', t = !video ? 0 : tipo === 'antes' ? ref.ini + 0.05 : Math.max(ref.ini, ref.ini + (ref.b - ref.a) - 0.08);
+        veToast(`AutoFrame: ${veT('recortando sujeito')} ${n + 1}/${alvos.length}…`);
+        try {
+            const r = await api.af_recorte_sujeito(ref.path, t, video);
+            if (!r || !r.success || r.cobertura < 0.06 || r.cobertura > 0.75) continue;
+            await vePjImportarArquivo(r.path, bin && bin.id);
+            const m = veAfMidiaDe(r.path);
+            if (!m) continue;
+            m.w = r.w; m.h = r.h; m.nome = 'Recorte do sujeito';
+            s.sj = { tipo, m, f: ref.w && r.w ? ref.w / r.w : 1 };
+            n++;
+        } catch (e) { /* sem recorte: o corte segue com a transição normal */ }
+    }
+}
+
 // Quadro 9:16 de uma cor (PNG) para o flash de impacto: branco, ou a cor de destaque do cliente; um por cor
 async function veAfBranco(pasta, cor = '#ffffff') {
     const ja = (VE.media || []).find(m => m.kind === 'image' && !m.removido && m._afBranco && (m._afCor || '#ffffff') === cor);
@@ -392,7 +418,9 @@ function veAfClipes(plano) {
     // a trilha logo acima das cenas recebe a foto inteira quando ela vai sobre fundo desfocado (enquadramento seguro)
     // TR_OV: sobreposições (acima das cenas e da foto inteira, abaixo da cor: o look vale também sobre elas)
     // TR_MD: a moldura branca (apresentação Moldura), logo abaixo da foto
-    const TR_MD = NV, TR_FR = NV + 1, TR_OV = NV + 2, TR_AJ = NV + 3, TR_FL = NV + 4, TR_FL2 = NV + 5, TR_TX = NV + 6;
+    const TR_MD = NV, TR_FR = NV + 1, TR_SJ = NV + 2, TR_OV = NV + 3, TR_AJ = NV + 4, TR_FL = NV + 5, TR_FL2 = NV + 6, TR_TX = NV + 7;
+    // TR_SJ: recorte do sujeito (transições frente/fundo), abaixo da cor e dos títulos
+    const cenas = [];   // clipe de cada cena (o recorte do sujeito copia o enquadramento dele)
     // apresentação das fotos (VE_AF_APRES): cartão/moldura mostram a foto inteira sobre o fundo desfocado dela
     const apres = VEAF.apres || 'cheia';
     let nCard = 0, desdeCard = 9;
@@ -401,6 +429,31 @@ function veAfClipes(plano) {
         const ant = plano.slots[i - 1], lenAnt = ant ? ant.b - ant.a : len;
         const d = Math.min(0.6, Math.max(0.3, batida), len * 0.9, lenAnt * 0.9);
         ovts.push({ t, corte: st, d, v: { ...(VE_AF_OVT[t] || {}), ...(extra || {}) } });
+    };
+    // transição frente/fundo: o recorte (PNG com alfa) do sujeito entra por cima da cena, em tempo diferente do fundo.
+    //  antes: o sujeito da cena nova aparece sobre a cena atual um instante antes do corte e a imagem inteira abre atrás dele
+    //  frente: o sujeito da cena que sai cresce na direção da câmera e atravessa a tela enquanto a nova já está embaixo
+    const sujeito = (i, s, st, len, cenas, batida) => {
+        const sj = s.sj, ant = plano.slots[i - 1], cn = cenas[i], ca = cenas[i - 1];
+        if (!sj || !sj.m || !cn || !ca || !ant) return false;
+        const f = sj.f || 1, kv = (c, k, fim) => { const a = c.k && c.k[k]; return a && a.length ? (fim ? a[a.length - 1].v : a[0].v) : c.p[k]; };
+        const dir = i % 2 ? 1 : -1, lenAnt = ant.b - ant.a;
+        const base = { tr: TR_SJ, s: 0, m: sj.m.id };
+        if (sj.tipo === 'antes') {
+            const pre = +Math.min(0.5, Math.max(0.3, batida * 0.8), lenAnt * 0.6).toFixed(3), seg = +Math.min(0.22, len * 0.4).toFixed(3), dur = +(pre + seg).toFixed(3);
+            const sc = kv(cn.c, 'sc', false) * f, x = kv(cn.c, 'x', false), y = kv(cn.c, 'y', false);
+            out.push({ ...base, st: +Math.max(0, st - pre).toFixed(4), e: dur, p: { sc: +sc.toFixed(2), x, y, rot: 0, op: 100 },
+                fx: [{ id: veFxNewId(), t: 'sombra', on: true, v: { cor: '#000000', op: 55, ang: 90, dist: 10, tam: 30 } }],
+                k: { sc: veAfK([[0, sc * 1.45, 'entra'], [pre, sc]]), x: veAfK([[0, x + dir * 300, 'entra'], [pre, x]]),
+                     op: veAfK([[0, 0, 'entra'], [Math.min(0.12, pre * 0.4), 100], [pre + seg * 0.3, 100], [dur, 0]]) } });
+        } else {
+            const dur = +Math.min(0.55, Math.max(0.36, batida * 0.9), len * 0.7).toFixed(3);
+            const sc = kv(ca.c, 'sc', true) * f, x = kv(ca.c, 'x', true), y = kv(ca.c, 'y', true);
+            out.push({ ...base, st: +Math.max(0, st - 0.05).toFixed(4), e: +(dur + 0.05).toFixed(3), p: { sc: +sc.toFixed(2), x, y, rot: 0, op: 100 },
+                k: { sc: veAfK([[0, sc, 'lin'], [0.05, sc, 'sai'], [dur + 0.05, sc * 3.2]]), x: veAfK([[0.05, x, 'sai'], [dur + 0.05, x - dir * 320]]),
+                     op: veAfK([[0, 100], [(dur + 0.05) * 0.55, 100], [dur + 0.05, 0]]) } });
+        }
+        return true;
     };
     const total = plano.fim - t0, bpm = plano.bpm || 120, batida = 60 / bpm;
     let nMisto = 0;
@@ -453,6 +506,7 @@ function veAfClipes(plano) {
             c.fx = [{ id: veFxNewId(), t: 'blur', on: true, v: { amt: 45 } }, { id: veFxNewId(), t: 'bc', on: true, v: { br: -35, ct: 0 } }];
             out.push(alvo);
         } else c.p = { sc: q.sc, x: q.x, y: q.y, rot: 0, op: 100 };
+        cenas[i] = { c: alvo, s0, e0 };
         // animação (quadros-chave em tempo da fonte)
         if (anim === 'kenburns') {
             const ida = i % 2 === 0, a = alvo.p.sc, b = +(alvo.p.sc * Z(1.12)).toFixed(2);
@@ -473,7 +527,8 @@ function veAfClipes(plano) {
         // transição de entrada, escolhida pelo modelo em cada corte (autoframe.py: _transicoes)
         const tr = s.trans, meio = batida / 2;
         // cortes rápidos e trocas de energia: sobreposições (zoom e pan com desfoque de movimento de verdade)
-        if (tr === 'zoom' && veAfOvtPode('zoomin')) sobrepor(i % 3 === 2 ? 'zoomout' : 'zoomin', i, st, len);
+        if (tr === 'misto' && s.sj && s.sj.m && !q.contem && sujeito(i, s, st, len, cenas, batida)) { /* recorte do sujeito */ }
+        else if (tr === 'zoom' && veAfOvtPode('zoomin')) sobrepor(i % 3 === 2 ? 'zoomout' : 'zoomin', i, st, len);
         else if (tr === 'chicote' && veAfOvtPode('panblur')) sobrepor('panblur', i, st, len, { ang: i % 4 < 2 ? 180 : 0 });
         else if (tr === 'misto' && VE_AF_MISTO[nMisto % VE_AF_MISTO.length].startsWith('ovt:') && veAfOvtPode(VE_AF_MISTO[nMisto % VE_AF_MISTO.length].slice(4))) {
             const t = VE_AF_MISTO[nMisto++ % VE_AF_MISTO.length].slice(4);

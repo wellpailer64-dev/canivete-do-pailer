@@ -30,7 +30,7 @@ LEG = {"fonte": "SF Pro Display", "tam": 3.5, "cor": "#ffffff", "fundo": "sombra
        "sCor": "#000000", "sOp": 100, "sDist": 5, "sBlur": 6, "entrada": "nenhum", "px": 0, "py": 13, "cLarg": 0, "dOn": True, "dCor": "#e0162b", "dTxt": "#ffffff",
        "dOp": 100, "dRaio": 30, "dPad": 12, "caixaOp": 0}
 CONEC = {"um", "uma", "a", "o", "as", "os", "de", "do", "da", "que", "e", "no", "na", "em", "com", "para", "pra", "se", "já"}
-JUNTAS = [(("um", "ponto", "três"), "1.3"), (("um", "ponto", "oito"), "1.8"), (("dez", "por", "cento"), "10%"), (("up", "grade"), "upgrade")]
+JUNTAS = [(("trinta", "e", "oito"), "38"), (("um", "ponto", "três"), "1.3"), (("um", "ponto", "oito"), "1.8"), (("dez", "por", "cento"), "10%"), (("up", "grade"), "upgrade")]
 # a fonte instalada só para o usuário fica fora de C:/Windows/Fonts; sem achar, a largura da tarja vira chute e o brasão cobre letra
 FONTE_TARJA = next((f for f in (os.path.join(r, "FontsFree-Net-SFProDisplay-Black.ttf") for r in (r"C:/Windows/Fonts", os.path.expandvars(r"%USERPROFILE%/AppData/Local/Microsoft/Windows/Fonts"))) if os.path.exists(f)), "")
 D_TARJA, Y_TARJA, D_FIM = 2.9, 1240, 3.4

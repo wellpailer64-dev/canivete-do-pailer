@@ -5531,6 +5531,10 @@ class ApiBridge:
                     cobrir=None, reserva=None):
         return af_planejar(musica, paths, modelo, dur_alvo, ordem, semente, inicio_modo, manual, telas, cobrir, reserva)
 
+    def af_recorte_sujeito(self, path, t=0.0, eh_video=True):
+        from Functions import autoframe as af
+        return af.recorte_sujeito(path, t, eh_video)
+
     def af_escolher(self, tipo):
         return af_escolher(tipo)
 

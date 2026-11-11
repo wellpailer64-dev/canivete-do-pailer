@@ -16,7 +16,7 @@ const veAfcPronto = t => t === 'video' || t === 'comp';
 const VE_AFC_ANIM = { pop: 'Pop', fade: 'Fade', zoom: 'Zoom lento' };
 const VE_AFC_ESTILOS = { auto: 'Automático', dinamico: 'Dinâmico', batida: 'Batida', memorias: 'Memórias', drop: 'Drop', viagem: 'Viagem', cinematico: 'Cinemático' };
 const VE_AFC_LOOKS = { estilo: 'Do estilo', vivo: 'Vivo', suave: 'Tons suaves', quente: 'Quente', filme: 'Filme', nenhum: 'Natural' };
-const VE_AFC_TRANS = ['dissolve', 'crossfade', 'fadeblack', 'push', 'slide', 'pull', 'pop', 'chicote', 'fold', 'splith', 'splitv',
+const VE_AFC_TRANS = ['dissolve', 'crossfade', 'fadeblack', 'push', 'slide', 'pull', 'pop', 'chicote', 'fold', 'pushzoom', 'quicar', 'queda', 'virar', 'tv', 'atravessar', 'soco', 'deslizarsuave', 'splith', 'splitv',
     // sobreposições (editor-ovt.js): camada por cima do corte
     'split4', 'ovt:zoomin', 'ovt:zoomout', 'ovt:panblur', 'ovt:spin', 'ovt:stretch', 'ovt:blurx', 'ovt:twirl', 'ovt:lens', 'ovt:ripple',
     'ovt:shake', 'ovt:glitch', 'ovt:pixel', 'ovt:flash', 'ovt:flare', 'ovt:leak'];

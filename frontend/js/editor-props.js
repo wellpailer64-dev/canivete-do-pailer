@@ -735,7 +735,15 @@ function vePpRender() {
     if (chave !== VEPP.chave) {
         const abertas = [...box.querySelectorAll('details.ve-pp-sec')].map(d => d.open);
         const tipo0 = VEPP.chave.split('|')[0];
+        // digitando o texto da legenda: o painel se refaz (palavras do bloco Premium), mas o foco e o cursor ficam
+        const at0 = box.ownerDocument.activeElement;
+        const digit = at0 && box.contains(at0) && at0.tagName === 'TEXTAREA' && at0.dataset.pp === 'leg.texto'
+            ? { ini: at0.selectionStart, fim: at0.selectionEnd } : null;
         box.innerHTML = vePpHtml(a);
+        if (digit) {
+            const nt = box.querySelector('textarea[data-pp="leg.texto"]');
+            if (nt) { nt.value = vePpGet('leg.texto'); nt.focus({ preventScroll: true }); nt.setSelectionRange(digit.ini, digit.fim); }
+        }
         // seções recolhidas continuam recolhidas enquanto o tipo de seleção for o mesmo
         if (tipo0 === a.tipo) box.querySelectorAll('details.ve-pp-sec').forEach((d, k) => { if (abertas[k] === false) d.open = false; });
         VEPP.chave = chave;

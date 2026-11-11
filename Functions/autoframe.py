@@ -960,8 +960,10 @@ def _layouts(M, sl, musica, cand, rng, sobra=1.0):
     # margens (em compassos) do começo e do fim sem tela dividida; com mídia sobrando, bem menores
     m_ini, m_fim = (4, 3) if sobra < 1.25 else (1, 1)
     # orientação que sobra: deitado (paisagem) ou em pé
-    deitados = sum(1 for c in cand if c["posto"] == 0 and c["w"] > c["h"] * 1.1)
-    em_pe = sum(1 for c in cand if c["posto"] == 0 and c["h"] > c["w"] * 1.1)
+    # grupo (2+ rostos) numa foto em pé tem informação na horizontal: vai para faixas deitadas (corta cima/baixo e foca
+    # nos rostos), não para colunas estreitas (pedido do Pailer, 2026-11-10)
+    deitados = sum(1 for c in cand if c["posto"] == 0 and (c["w"] > c["h"] * 1.1 or _largo(c)))
+    em_pe = sum(1 for c in cand if c["posto"] == 0 and c["h"] > c["w"] * 1.1 and not _largo(c))
     usados, ult, out, i = 0, None, [], 0
     fim = sl[-1]["b"]
     while i < len(sl):
@@ -1010,6 +1012,11 @@ def _layouts(M, sl, musica, cand, rng, sobra=1.0):
     return out
 
 
+def _largo(c):
+    """Foto com grupo de pessoas: o conteúdo é mais largo que alto mesmo com a foto em pé."""
+    return c.get("tipo") == "foto" and (c.get("rostos") or 0) >= 2
+
+
 def _encaixe_custo(c, s, M, dur, i, n):
     """Quanto a mídia c combina com o slot s (quanto maior, melhor)."""
     v = c["nota"]
@@ -1027,6 +1034,11 @@ def _encaixe_custo(c, s, M, dur, i, n):
     if s.get("cel"):
         # célula da tela dividida: orientação da mídia parecida com a da célula (menos corte)
         ar_c, ar_m = s["cel"]["w"] / s["cel"]["h"], c["w"] / max(1, c["h"])
+        if _largo(c):
+            if ar_c >= 1:
+                ar_m = ar_c            # faixa deitada: sem penalidade, o corte foca no meio
+            else:
+                v -= 0.8               # coluna estreita cortaria gente do grupo
         v -= 0.35 * abs(math.log(ar_c / max(ar_m, 1e-3)))
         # célula pede foto: vídeo num quadro pequeno (pior: um reel já editado, com a própria tela dividida dentro)
         # ficava estranho (pedido do cliente, 2026-10-01)
@@ -1210,3 +1222,46 @@ def planejar(musica, midias, modelo_id, dur_alvo=None, ordem="inteligente", seme
     return {"success": True, "modelo": {k: M[k] for k in M if k not in ("ritmo",)}, "slots": plano,
             "inicio": ini_musica, "fim": fim_musica, "bpm": musica["bpm"],
             "uso": {"usadas": len(usados), "total": len(midias), "telas": sum(1 for s in sl if s.get("layout"))}}
+
+
+# ───────── recorte do sujeito (transições frente/fundo) ─────────
+def recorte_sujeito(path, t=0.0, eh_video=True, modelo="ben2"):
+    """Quadro de `path` em `t` (ou a própria foto) com o fundo removido (BEN2) → PNG com alfa na pasta de cache.
+    Devolve {success, path, w, h, cobertura} (cobertura = fração da imagem que é sujeito; serve para descartar
+    quadros sem pessoa ou em que o recorte pegou a cena toda)."""
+    try:
+        import numpy as np
+        from PIL import Image
+        from Functions.midia import pasta_cache
+        from Functions.removerfundo import garantir_modelo, _remover_fundo_onnx
+        pasta = pasta_cache("cache_recorte_af")
+        os.makedirs(pasta, exist_ok=True)
+        try:
+            st = os.stat(path)
+            chave = f"{path}|{st.st_mtime_ns}|{st.st_size}|{round(float(t), 2)}|{modelo}"
+        except OSError:
+            chave = f"{path}|{round(float(t), 2)}|{modelo}"
+        saida = os.path.join(pasta, hashlib.sha1(chave.encode()).hexdigest() + ".png")
+        if not os.path.exists(saida):
+            if eh_video:
+                bruto = saida + ".q.png"
+                r = subprocess.run([ffmpeg_path(), "-y", "-v", "error", "-ss", f"{max(0.0, float(t)):.3f}", "-i", path, "-frames:v", "1",
+                                    "-vf", "scale='if(gt(iw,ih),min(iw,1920),-2)':'if(gt(iw,ih),-2,min(ih,1920))'", bruto],
+                                   capture_output=True, creationflags=_creationflags())
+                if r.returncode != 0 or not os.path.exists(bruto):
+                    return {"success": False, "error": "quadro não extraído"}
+                img = Image.open(bruto).convert("RGB")
+                img.load()
+                os.remove(bruto)
+            else:
+                from PIL import ImageOps
+                img = ImageOps.exif_transpose(Image.open(path)).convert("RGB")   # foto do celular vem deitada com a marca EXIF
+                img.thumbnail((1920, 1920))
+            mp, cfg = garantir_modelo(modelo)
+            rec = _remover_fundo_onnx(img, mp, cfg)
+            rec.save(saida)
+        rec = Image.open(saida)
+        alfa = np.array(rec.getchannel("A"))
+        return {"success": True, "path": saida, "w": rec.width, "h": rec.height, "cobertura": round(float((alfa > 127).mean()), 3)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}

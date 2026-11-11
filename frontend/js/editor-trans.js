@@ -111,6 +111,60 @@ Object.assign(VE_TR, {
     },
 });
 
+// Transições dinâmicas extras (estilo presets de edição de reels): só movimento, escala e opacidade, então a
+// prévia e a exportação usam o mesmo caminho das outras (quadros-chave), sem núcleo novo.
+Object.assign(VE_TR, {
+    // os dois quadros deslizam e, ao mesmo tempo, o que sai cresce e o que entra encolhe até o tamanho normal
+    pushzoom: {
+        nome: 'Empurrar com zoom', tag: 'Push Zoom', dir: true, pausa: 0.45,
+        fn: (u, tr) => { const e = veEaseIO(u), v = veTrDir(tr.dir); return { a: { dx: -v.x * e, dy: -v.y * e, s: 1 + 0.35 * e }, b: { dx: v.x * (1 - e), dy: v.y * (1 - e), s: 1 + 0.35 * (1 - e) } }; },
+    },
+    // o que entra vem de fora, passa do ponto e assenta (quicada)
+    quicar: {
+        nome: 'Quicar', tag: 'Bounce In', dir: true, pausa: 0.5,
+        fn: (u, tr) => { const e = veEaseBack(u), v = veTrDir(tr.dir); return { a: {}, b: { dx: v.x * (1 - e), dy: v.y * (1 - e), op: Math.min(1, u * 5) } }; },
+    },
+    // queda: o que entra cai de cima e esmaga um pouco ao bater, depois volta
+    queda: {
+        nome: 'Queda', tag: 'Drop', pausa: 0.6,
+        fn: u => {
+            const e = u < 0.7 ? Math.pow(u / 0.7, 2) : 1, k = u < 0.7 ? 0 : Math.sin(Math.PI * (u - 0.7) / 0.3);
+            return { a: {}, b: { dy: -(1 - e), sy: 1 - 0.07 * k, sx: 1 + 0.04 * k, op: Math.min(1, u * 6) } };
+        },
+    },
+    // virada de carta: o quadro que sai fecha no meio do eixo e o que entra abre
+    virar: {
+        nome: 'Virar', tag: 'Flip', pausa: 0.5, dir: true,
+        fn: (u, tr) => {
+            const v = veTrDir(tr.dir), horiz = Math.abs(v.x) >= Math.abs(v.y), f = sx => horiz ? { sx } : { sy: sx };
+            return u < 0.5 ? { a: { ...f(Math.max(0.001, 1 - veEaseIO(u * 2))) }, b: { op: 0 } }
+                : { a: { op: 0 }, b: { ...f(Math.max(0.001, veEaseIO((u - 0.5) * 2))) } };
+        },
+    },
+    // tela de TV: o quadro que sai achata numa linha e o que entra abre da linha
+    tv: {
+        nome: 'Linha de TV', tag: 'TV Squeeze', pausa: 0.5,
+        fn: u => u < 0.5 ? { a: { sy: Math.max(0.004, 1 - veEaseIO(u * 2)), sx: 1 + 0.04 * u }, b: { op: 0 } }
+            : { a: { op: 0 }, b: { sy: Math.max(0.004, veEaseIO((u - 0.5) * 2)) } },
+    },
+    // zoom que atravessa: o que sai estoura e some; o que entra vem de dentro, grande, e assenta
+    atravessar: {
+        nome: 'Atravessar', tag: 'Zoom Through', pausa: 0.5,
+        fn: u => ({ a: { s: 1 + 1.2 * veEaseIO(u), op: 1 - Math.min(1, u * 1.6) }, b: { s: 1 + 0.5 * (1 - veEaseOut(u)), op: Math.min(1, Math.max(0, (u - 0.25) * 2)) } }),
+    },
+    // batida: o quadro dá um soco de zoom e o seguinte entra já grande, assentando (corte no pico)
+    soco: {
+        nome: 'Soco', tag: 'Punch Cut', pausa: 0.5,
+        fn: u => u < 0.5 ? { a: { s: 1 + 0.25 * veEaseOut(u * 2) }, b: { op: 0 } }
+            : { a: { op: 0 }, b: { s: 1 + 0.25 * (1 - veEaseOut((u - 0.5) * 2)) } },
+    },
+    // deslize com dissolução: o que entra desliza curto enquanto aparece (mais suave que Empurrar)
+    deslizarsuave: {
+        nome: 'Deslize suave', tag: 'Soft Slide', dir: true, pausa: 0.5,
+        fn: (u, tr) => { const e = veEaseOut(u), v = veTrDir(tr.dir); return { a: { dx: -v.x * 0.12 * e, dy: -v.y * 0.12 * e, op: 1 - e }, b: { dx: v.x * 0.12 * (1 - e), dy: v.y * 0.12 * (1 - e), op: e } }; },
+    },
+});
+
 // Transição de áudio (a do Ctrl+Shift+D): ganho seno/cosseno — soma de potência constante no crossfade
 const VE_TR_AUD = { cp: { nome: 'Potência constante', tag: 'Constant Power' } };
 

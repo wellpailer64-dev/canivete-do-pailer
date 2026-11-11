@@ -2047,12 +2047,22 @@ function veMoveTarget(i, start) {
     let ima = null;
     if (VE.snap) {
         const grupo = VE.drag && VE.drag.grupo, fora = new Set(grupo || [c]);
-        let best = null, bd = VE_IMA_PX / VE.pps, onde = null;
-        for (const p of veImaPontos(fora)) {
-            if (Math.abs(p - start) < bd) { bd = Math.abs(p - start); best = p; onde = p; }
-            if (Math.abs(p - (start + len)) < bd) { bd = Math.abs(p - (start + len)); best = p - len; onde = p; }
+        let best = null, bd = VE_IMA_PX / VE.pps, onde = null, lado = 0;
+        const pts = veImaPontos(fora), dr = VE.drag;
+        // histerese: já grudado num ponto, só solta quando o mouse se afasta bem mais que o alcance de entrada
+        // (sem isso a camada tremia entrando e saindo do ímã na beirada do alcance)
+        if (dr && dr.imaP != null && pts.some(p => Math.abs(p - dr.imaP) < 1e-6)) {
+            const ref = dr.imaLado ? start + len : start;
+            if (Math.abs(dr.imaP - ref) < bd * 1.8) { best = dr.imaLado ? dr.imaP - len : dr.imaP; onde = dr.imaP; lado = dr.imaLado; }
         }
-        if (best != null && best >= 0) { start = best; ima = onde; }
+        if (best == null) {
+            for (const p of pts) {
+                if (Math.abs(p - start) < bd) { bd = Math.abs(p - start); best = p; onde = p; lado = 0; }
+                if (Math.abs(p - (start + len)) < bd) { bd = Math.abs(p - (start + len)); best = p - len; onde = p; lado = 1; }
+            }
+        }
+        if (best != null && best >= 0) { start = best; ima = onde; if (dr) { dr.imaP = onde; dr.imaLado = lado; } }
+        else if (dr) dr.imaP = null;
     }
     // encostou: o começo dela na ponta de uma camada da trilha de destino, ou o fim dela no começo de outra
     const tr = VE.drag && VE.drag.tr != null ? VE.drag.tr : c.tr, fora = new Set((VE.drag && VE.drag.grupo) || [c]);
@@ -7031,7 +7041,31 @@ function veInitEvents() {
     // duplo clique numa Comp abre a timeline dela (editor-comp.js)
     wrap.addEventListener('dblclick', e => { if (typeof veCompDuploClique === 'function') veCompDuploClique(e); });
 
-    wrap.addEventListener('pointermove', e => {
+    // rolagem automática nas bordas: laço próprio (tempo real, não depende do ritmo dos eventos do mouse);
+    // quanto mais perto da borda, mais rápido. Refaz o movimento com o último ponteiro a cada quadro.
+    const autoRolar = () => {
+        if (VE._arAtivo) return;
+        VE._arAtivo = true;
+        let t0 = performance.now();
+        const passo = () => {
+            const d = VE.drag, e = VE._tlEv;
+            if (!d || !e || !(d.mode === 'scrub' || d.mode === 'marq' || (d.mode === 'move' && d.active))) { VE._arAtivo = false; return; }
+            const agora = performance.now(), dt = Math.min(0.05, (agora - t0) / 1000);
+            t0 = agora;
+            const w = veCanvasWidth(), x = e.clientX - wrap.getBoundingClientRect().left, zona = 48;
+            const f = x > w - zona ? Math.min(2, (x - (w - zona)) / zona) : x < zona ? -Math.min(2, (zona - x) / zona) : 0;
+            if (f) {
+                const v0 = VE.view;
+                VE.view += f * 700 * dt / VE.pps;
+                veClampView();
+                if (VE.view !== v0) onMove(e);
+            }
+            veRaf($ve('ve-tl'), passo);
+        };
+        veRaf($ve('ve-tl'), passo);
+    };
+
+    const onMove = e => {
         const { t, x } = veTimeFromEvent(e);
         VE.hoverX = x;
         if (!VE.drag) {
@@ -7049,9 +7083,7 @@ function veInitEvents() {
         if (VE.drag.mode === 'leg') { veLegArrastar(e, t); return; }
         if (VE.drag.mode === 'trdur') { veTransArrastar(t); return; }
         if (VE.drag.mode === 'marq') {
-            const w = veCanvasWidth();
-            if (x > w - 20) { VE.view += 12 / VE.pps; veClampView(); }
-            if (x < 20) { VE.view -= 12 / VE.pps; veClampView(); }
+            autoRolar();
             VE.drag.tb = VE.view + x / VE.pps;
             VE.drag.yb = veTimeFromEvent(e).y;
             veDraw();
@@ -7093,9 +7125,7 @@ function veInitEvents() {
                 wrap.classList.add('moving');
             }
             // auto-rolagem nas bordas
-            const w = veCanvasWidth();
-            if (x > w - 24) { VE.view += 14 / VE.pps; veClampView(); }
-            if (x < 24) { VE.view -= 14 / VE.pps; veClampView(); }
+            autoRolar();
             const p = veTimeFromEvent(e);
             d.st = veMoveTarget(d.i, p.t - d.grab);
             d.alt = e.altKey;   // Alt (antes ou durante o arraste): solta uma cópia e o original fica
@@ -7124,12 +7154,11 @@ function veInitEvents() {
             veDraw();
         } else if (VE.drag.mode === 'scrub') {
             // auto-rolagem nas bordas
-            const w = veCanvasWidth();
-            if (x > w - 20) { VE.view += 12 / VE.pps; veClampView(); }
-            if (x < 20) { VE.view -= 12 / VE.pps; veClampView(); }
+            autoRolar();
             veSeek(e.shiftKey ? veSnapFrame(t) : veSnapTime(t));
         }
-    });
+    };
+    wrap.addEventListener('pointermove', e => { VE._tlEv = e; onMove(e); });
 
     const endDrag = () => {
         const d = VE.drag;
