@@ -608,12 +608,15 @@ function ieRuidoSuave(w, h, cel, semente) {
         const gw = Math.ceil(w / c) + 2, gh = Math.ceil(h / c) + 2, g = new Float32Array(gw * gh);
         for (let i = 0; i < g.length; i++) g[i] = rnd();
         const suave = t => (1 - Math.cos(t * Math.PI)) / 2;
+        // a curva suave e o índice só dependem de x (e de y): calculados uma vez por coluna/linha, não por pixel (era o gargalo)
+        const X0 = new Int32Array(w), TX = new Float64Array(w);
+        for (let x = 0; x < w; x++) { const gx = x / c, x0 = Math.floor(gx); X0[x] = x0; TX[x] = suave(gx - x0); }
         for (let y = 0; y < h; y++) {
-            const gy = y / c, y0 = Math.floor(gy), ty = suave(gy - y0);
+            const gy = y / c, y0 = Math.floor(gy), ty = suave(gy - y0), base = y0 * gw, lin = y * w;
             for (let x = 0; x < w; x++) {
-                const gx = x / c, x0 = Math.floor(gx), tx = suave(gx - x0), k = y0 * gw + x0;
-                const a = g[k] + (g[k + 1] - g[k]) * tx, b = g[k + gw] + (g[k + gw + 1] - g[k + gw]) * tx;
-                out[y * w + x] += (a + (b - a) * ty) * peso;
+                const tx = TX[x], k = base + X0[x], k2 = k + gw;
+                const a = g[k] + (g[k + 1] - g[k]) * tx, b = g[k2] + (g[k2 + 1] - g[k2]) * tx;
+                out[lin + x] += (a + (b - a) * ty) * peso;
             }
         }
     });
@@ -626,12 +629,14 @@ function ieDeslocar(c, dxy) {
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
         const [dx, dy] = dxy(x, y), sx = x + dx, sy = y + dy;
         const x0 = Math.floor(sx), y0 = Math.floor(sy), fx = sx - x0, fy = sy - y0, j = (y * w + x) * 4;
-        let r = 0, g = 0, b = 0, a = 0;
-        for (const [px, py, wt] of [[x0, y0, (1 - fx) * (1 - fy)], [x0 + 1, y0, fx * (1 - fy)], [x0, y0 + 1, (1 - fx) * fy], [x0 + 1, y0 + 1, fx * fy]]) {
-            if (px < 0 || py < 0 || px >= w || py >= h || !wt) continue;
-            const i = (py * w + px) * 4, al = src[i + 3] * wt;
-            r += src[i] * al; g += src[i + 1] * al; b += src[i + 2] * al; a += al;
-        }
+        // os 4 vizinhos escritos à mão (antes: 4 arrays novos por pixel); mesma ordem de soma, resultado idêntico
+        const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
+        const ok0 = x0 >= 0 && x0 < w, ok1 = x0 + 1 >= 0 && x0 + 1 < w, oy0 = y0 >= 0 && y0 < h, oy1 = y0 + 1 >= 0 && y0 + 1 < h;
+        let r = 0, g = 0, b = 0, a = 0, i, al;
+        if (ok0 && oy0 && w00) { i = (y0 * w + x0) * 4; al = src[i + 3] * w00; r += src[i] * al; g += src[i + 1] * al; b += src[i + 2] * al; a += al; }
+        if (ok1 && oy0 && w10) { i = (y0 * w + x0 + 1) * 4; al = src[i + 3] * w10; r += src[i] * al; g += src[i + 1] * al; b += src[i + 2] * al; a += al; }
+        if (ok0 && oy1 && w01) { i = ((y0 + 1) * w + x0) * 4; al = src[i + 3] * w01; r += src[i] * al; g += src[i + 1] * al; b += src[i + 2] * al; a += al; }
+        if (ok1 && oy1 && w11) { i = ((y0 + 1) * w + x0 + 1) * 4; al = src[i + 3] * w11; r += src[i] * al; g += src[i + 1] * al; b += src[i + 2] * al; a += al; }
         if (a > 0) { o[j] = r / a; o[j + 1] = g / a; o[j + 2] = b / a; o[j + 3] = a; }
     }
     nx.putImageData(img, 0, 0);

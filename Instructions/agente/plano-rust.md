@@ -45,7 +45,7 @@ Vetor (`vetor.json`):
 1. Antes de Rust: consertar `vkSnap` no Vetor (JS puro).
 2. Piloto Rust/WASM: **Camera Raw ao vivo** (maior ganho percebido: o slider hoje engasga), depois **Máximo/Mínimo + Galeria + Nuvens** (comparar com WebGL).
 3. Conferir saída idêntica com `testes/teste_imagem.py` / `teste_filtros.py` e comparar tempos com os mesmos `bench/*_medir.py`.
-4. Vídeo: ainda não medido (próxima rodada).
+4. Vídeo: medido (2026-11-11), ver seção "Vídeo medido" abaixo.
 
 ## Piloto feito (2026-11-11) — resultado
 **Vetor `vkSnap` (feito, em JS):** `vkSnap` era 98% do tempo ao criar formas. Agora usa `JSON.stringify` sem função de filtro (4x) e há `VKN.lote(nome, fn)`/`vkLote` (1 só ponto de desfazer, 1 cópia do documento).
@@ -89,4 +89,29 @@ Conclusão: Máximo/Mínimo vale Rust (tempo vira constante, ~45x no raio 10); M
 ## Fechamento (2026-11-11)
 - **Camera Raw na GPU** (WebGL2, queda para JS) e **Máximo/Mínimo/Mediana em Rust/WASM** (`frontend/js/imagem-wasm.js`, fonte em `rust/kanivete_wasm`, módulo embutido em base64; recompilar com `cargo build --release --target wasm32-unknown-unknown`): saída idêntica ao JS (dif 0), `teste_filtros` 63/63 e `teste_vetor` ok. Commits `c63229b` e `6f4e443`, já na main.
 - Erro `Cannot set properties of null (setting 'hidden')` resolvido: `vkUiAtualizar` rodava com `#vk` ainda vazio (comando de API antes de montar o Vetor); agora sai cedo.
-- Próximos candidatos medidos: filtros pesados em 4000x3000 (Galeria 18 s, Nuvens 10,6 s, Óleo/Ondulação/Redução de ruído ~9 s), efeitos de camada (Chanfro, Traço), importar PDF grande (9 s, Python). Vídeo ainda não medido.
+- Próximos candidatos medidos: filtros pesados em 4000x3000 (Galeria 18 s, Nuvens 10,6 s, Óleo/Ondulação/Redução de ruído ~9 s), efeitos de camada (Chanfro, Traço), importar PDF grande (9 s, Python). Vídeo medido, sem candidato urgente (seção "Vídeo medido").
+
+## Vídeo medido (2026-11-11)
+App de teste 9333, `bench/video_medir.py` → `bench/video.json` e `video_perfil_monitor.txt`. Monitor = 24 quadros por caso (JS síncrono); exportação = 1 repetição, ponta a ponta, 1080x1920.
+- **Prévia (monitor):** quase tudo <2 ms/quadro. Só estouram: `bloom` 9,5 ms, `cor` 7,5 ms (p95 ~10-12 ms). Nada passa de 16 ms em PC bom; 3D, motion, premium, chroma, sobreposição ficam abaixo de 1,5 ms.
+- **Linha do tempo:** `veRelayout` ~0 ms com 60, 300 e 1000 clipes (montar a timeline inteira 80-170 ms). Não é gargalo.
+- **Exportação (ffmpeg, nativo, não vai para Rust):** grade 1,7 s, efeitos 3,8 s, premium 2,3 s, 3d 2,2 s (todos ≤1x o tempo do vídeo); **motion 18,8 s (4,7x)** e **zoomsete 40,5 s (3,9x, 10,5 s de vídeo)** são os lentos, e o tempo está dentro do ffmpeg (a fase de preparação leva 2-10 s).
+- **Quentes no perfil do monitor:** `draw` do Brilho/Glow em `editor-motion.js:1270` (laço de pixel em JS, ~13 ms/quadro), `veLcDraw` do Luz e Cor em `editor-lc.js:534` (~20 ms/quadro) e `veScVisivel` (`editor-scopes.js:23`, força reflow a cada quadro, ~8 ms/quadro com scopes ligados).
+- **Decisão:** Vídeo não pede Rust agora. Ganho barato, sem toolchain: (1) `veScVisivel` com cache/ResizeObserver; (2) Glow e Luz e Cor em WebGL (como o Camera Raw do Photo), e só se o Pailer sentir engasgo ao ligar esses efeitos; (3) olhar os filtros do ffmpeg de motion/zoomsete (menos passadas, resolução menor nos desfoques), que é onde está o tempo real de exportação. Não medi: peaks de áudio, transições, autoframe/estabilizador/legendas (Python).
+
+## Segunda leva: JS melhorado antes de Rust (2026-11-11, ok do Pailer para as melhorias)
+Regra que a medição confirmou: onde havia conta repetida por pixel, consertar o JS rendeu mais que trocar de linguagem. Saída idêntica (checksum igual) nos três.
+- **`ieRuidoSuave`** (base de Nuvens, Ondulação, Respingos...): o cosseno e o índice eram recalculados por pixel; agora uma vez por coluna/linha. 4000x3000: 1,18 s → 0,14 s por chamada (8x). Nuvens 6,4 s → 1,2 s; Ondulação 9,2 s → 4,5 s.
+- **`ieDeslocar`** (Ondulação, Respingos, Onda, Torcer...): 4 arrays novos por pixel trocados por 4 vizinhos escritos à mão. 1,23 s → 0,55 s.
+- **Brilho (Glow)** da prévia: o laço de pixel (`getImageData` + `putImageData`) virou filtro SVG na GPU (`veMoGlowFiltro`, `editor-motion.js`); diferença máxima de 1 nível. **`veScVisivel`** (escopos): resposta guardada por 250 ms em vez de forçar o layout a cada quadro.
+- Luz e Cor (`veLcDraw`) já é WebGL2; o custo medido ali é o envio da textura, não conta em JS: nada a fazer.
+- **Sobra para Rust (medido no perfil, 4000x3000):** `ieFBox` (média em caixa, 1–2 s por filtro que usa Guiado: Faceta, Reduzir ruído, Óleo) e Kuwahara (Óleo, ~2,5 s). Ganho esperado ~2x, só vale se o Pailer sentir lentidão nesses. Mediana/Poeira já usam o Rust (1,5 s).
+
+## Fora dos filtros: levantamento (2026-11-11) — nenhum candidato novo
+- **Vetor, formas:** criar 1000 formas com degradê+traço sem lote 2,2 s, com `VKN.lote` 26 ms (5000: 0,33 s). Redesenhar a tela com tela real (canvas 2941x1804): 100 formas 0,4 ms, 1000 formas ~4 ms, 5000 formas ~21–25 ms. Fluido, JS basta. (Cuidado ao medir: no app de teste a página precisa estar ativa com `switchTool('vetor-kanivete')`; sem isso o canvas fica com largura 0 e mede 0 ms.)
+- **Importar PDF grande (10 s):** 3,7 s é codificar PNG (PIL, nativo) e 2,8 s é extração de texto do PyMuPDF (nativo). Testei `compress_level=1`: ganho ~1 s, arquivos 48→77 MB; descartado.
+- **Abrir PSD grande (6–8 s):** PNG nativo + psd-tools lendo canais; só na 1ª abertura. Sem laço de pixel em Python.
+- **Traçar imagem (7,5 s):** núcleo VTracer já nativo.
+- **Picos de áudio / forma de onda:** numpy + ffmpeg, já nativos. Procurei laços de pixel em Python (`range(h)`, `getpixel`): só `blender_render.py` (render 3D externo) e `vst3.py`.
+- **Chanfro (efeito de camada, 1,0 s em 4000x3000):** a distância 3-4 (`ieFxDistancias`) é só 0,29 s; o resto está espalhado em vários laços e desfoques. Rust ganharia pouco.
+- **Conclusão:** o que vale Rust no KANIVETE já foi feito (Máximo/Mínimo/Mediana) ou virou GPU (Camera Raw). Sobra opcional: `ieFBox` e Kuwahara (~2x). O resto era conta repetida em JS, corrigida sem trocar de linguagem.

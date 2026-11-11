@@ -16,13 +16,18 @@ function veScModo(m) {
     VESC.modo = m;
     veLsSet('ve-sc-modo', m);
     document.querySelectorAll('[data-sc-modo]').forEach(b => b.classList.toggle('active', b.dataset.scModo === m));
-    VESC.ultimo = -1;
+    VESC.ultimo = -1; VESC.vt = 0;
     veScAgendar();
 }
 
+// offsetParent/clientWidth forçam o layout; o monitor chama isto a cada quadro, então a resposta vale 250 ms
 function veScVisivel() {
+    const agora = performance.now();
+    if (VESC.vt && agora - VESC.vt < 250) return VESC.vv;
     const cv = $ve('ve-sc-cv');
-    return !!(cv && cv.offsetParent && cv.clientWidth > 20 && !cv.ownerDocument.hidden);
+    VESC.vv = !!(cv && cv.offsetParent && cv.clientWidth > 20 && !cv.ownerDocument.hidden);
+    VESC.vt = agora;
+    return VESC.vv;
 }
 
 // Laço leve: redesenha quando o monitor mudou (VE._monN) e o painel está à vista
@@ -254,7 +259,7 @@ function veScInit() {
     const m = veLsGet('ve-sc-modo');
     veScModo(['onda', 'parade', 'vetor', 'histo'].includes(m) ? m : 'onda');
     $ve('ve-sc-modos').addEventListener('click', e => { const b = e.target.closest('[data-sc-modo]'); if (b) veScModo(b.dataset.scModo); });
-    new ResizeObserver(() => { VESC.ultimo = -1; veScAgendar(); if (VE.ready) veDrawMonitorSoon(); }).observe(cv);
+    new ResizeObserver(() => { VESC.vt = 0; VESC.ultimo = -1; veScAgendar(); if (VE.ready) veDrawMonitorSoon(); }).observe(cv);
     // o painel pode aparecer depois (aba escolhida, janela solta): confere de vez em quando
     setInterval(() => {
         if (VESC.raf || !veScVisivel()) return;

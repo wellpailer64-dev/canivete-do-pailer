@@ -1270,17 +1270,9 @@ Object.assign(VE_FX, {
         draw(a, v, env) {
             const w = a.cv.width, h = a.cv.height, B = veMoFxTela(1, w, h), bx = B.ctx, lim = v.lim / 100 * 255;
             bx.setTransform(1, 0, 0, 1, 0, 0); bx.clearRect(0, 0, w, h); bx.drawImage(a.cv, 0, 0);
-            if (lim > 0 || v.usaCor) {   // só o que passa do limite brilha (canal a canal, a mesma conta da exportação)
-                try {
-                    const d = bx.getImageData(0, 0, w, h), p = d.data, k = 255 / Math.max(1, 255 - lim);
-                    const cor = v.usaCor ? [1, 3, 5].map(i => parseInt(v.cor.slice(i, i + 2), 16) / 255) : null;
-                    for (let i = 0; i < p.length; i += 4) {
-                        let r = Math.max(0, Math.min(255, (p[i] - lim) * k)), g = Math.max(0, Math.min(255, (p[i + 1] - lim) * k)), b = Math.max(0, Math.min(255, (p[i + 2] - lim) * k));
-                        if (cor) { const y = 0.2126 * r + 0.7152 * g + 0.0722 * b; r = y * cor[0]; g = y * cor[1]; b = y * cor[2]; }
-                        p[i] = r; p[i + 1] = g; p[i + 2] = b;
-                    }
-                    bx.putImageData(d, 0, 0);
-                } catch (e) { /* quadro sem CORS */ }
+            if (lim > 0 || v.usaCor) {   // só o que passa do limite brilha (canal a canal, a mesma conta da exportação); filtro SVG na GPU, sem ler pixels
+                const f = veMoGlowFiltro(lim, v.usaCor ? [1, 3, 5].map(i => parseInt(v.cor.slice(i, i + 2), 16) / 255) : null);
+                bx.globalCompositeOperation = 'copy'; bx.filter = f; bx.drawImage(a.cv, 0, 0); bx.filter = 'none'; bx.globalCompositeOperation = 'source-over';
             }
             const C = veMoFxTela(2, w, h), cx = C.ctx;
             cx.setTransform(1, 0, 0, 1, 0, 0); cx.clearRect(0, 0, w, h);
@@ -1487,3 +1479,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof veFerrRender === 'function') veFerrRender();
     }
 });
+
+
+// Glow: (canal - limite) * 255/(255-limite), cortado em 0..255, e com cor: luma × cor. Filtro SVG em sRGB (mesma conta do laço antigo em JS)
+function veMoGlowFiltro(lim, cor) {
+    let svg = document.getElementById('ve-glow-svg');
+    if (!svg) {
+        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.id = 've-glow-svg'; svg.setAttribute('width', '0'); svg.setAttribute('height', '0'); svg.style.cssText = 'position:absolute;pointer-events:none';
+        document.body.appendChild(svg);
+    }
+    const k = 255 / Math.max(1, 255 - lim), ic = -(lim / 255) * k;
+    const m = cor ? [0.2126 * cor[0], 0.7152 * cor[0], 0.0722 * cor[0], 0, 0, 0.2126 * cor[1], 0.7152 * cor[1], 0.0722 * cor[1], 0, 0,
+                     0.2126 * cor[2], 0.7152 * cor[2], 0.0722 * cor[2], 0, 0, 0, 0, 0, 1, 0] : [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
+    // um filtro novo por chamada evita o cache do Chromium quando só mudam os números (o id gira entre dois nomes)
+    VEMO_GLOWN = (VEMO_GLOWN || 0) + 1;
+    const id = 've-glow-f' + (VEMO_GLOWN & 1);
+    const fn = `<feFuncR type="linear" slope="${k}" intercept="${ic}"/><feFuncG type="linear" slope="${k}" intercept="${ic}"/><feFuncB type="linear" slope="${k}" intercept="${ic}"/>`;
+    svg.innerHTML = `<filter id="${id}" color-interpolation-filters="sRGB" x="0" y="0" width="100%" height="100%"><feComponentTransfer>${fn}</feComponentTransfer><feColorMatrix type="matrix" values="${m.join(' ')}"/></filter>`;
+    return `url(#${id})`;
+}
+var VEMO_GLOWN = 0;
